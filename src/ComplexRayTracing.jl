@@ -165,10 +165,10 @@ end
 
 An implementation of the (Möller-Trumbore algorithm)[https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/moller-trumbore-ray-triangle-intersection].
 This algorithm evaluates the possible intersection between a ray and a face that is defined by three vertices. If no intersection occurs, Inf is returned.
-kϵ is the abort threshold for backfacing and obviously nonintersecting triangles. 
+kϵ is the abort threshold for backfacing and non-intersecting triangles. 
 This algorithm is fast due to multiple breakout conditions.
 """
-function intersect3d(face::Matrix, ray::Ray; kϵ=1e-5)
+function intersect3d(face::Matrix, ray::SCDI.Ray; kϵ=1e-6)
     V1 = face[1,:]
     V2 = face[2,:]
     V3 = face[3,:]
@@ -179,23 +179,27 @@ function intersect3d(face::Matrix, ray::Ray; kϵ=1e-5)
     Det = dot(E1, Pv)
     invDet = 1/Det
     # Check if ray is backfacing or missing face
-    if (Det < kϵ) & (abs(Det) < kϵ)
+    if abs(Det) < kϵ # (Det < kϵ) && (abs(Det) < kϵ)?
         return Inf
     end
     # Compute normalized u and reject if less than 0 or greater than 1
     Tv = ray.pos-V1
-    u = dot(dot(Tv, Pv), invDet)
-    if (u < 0) | (u > 1)
+    u = dot(Tv, Pv) * invDet
+    if (u < 0) || (u > 1)
         return Inf
     end
     # Compute normalized v and reject if less than 0 or greater than 1
     Qv = cross(Tv, E1)
-    v = dot(dot(ray.dir, Qv), invDet)
-    if (v < 0) | (v > 1)
+    v = dot(ray.dir, Qv) * invDet
+    if (v < 0) || (u+v > 1)
         return Inf
     end
-    # Compute t and return positive intersection (type def. for t to avoid Any)
-    t::Float64 = dot(dot(E2, Qv), invDet)
+    # Compute t (type def. for t to avoid Any)
+    t::Float64 = dot(E2, Qv) * invDet
+    # Return intersection only if "in front of" ray origin
+    if t < kϵ
+        return inf 
+    end
     return t
 end
 
@@ -211,6 +215,7 @@ function intersect3d(object::Geometry, ray::Ray)
     for i = 1:numEl
         face = object.vertices[object.faces[i,:],:]
         t = intersect3d(face, ray)
+        # Return closest intersection
         if t < t0
             t0 = t
         end

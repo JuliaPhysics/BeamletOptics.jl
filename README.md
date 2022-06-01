@@ -6,25 +6,26 @@ This project implements a forward model to simulate different aspects of a singl
 
 - Complex ray tracing
     - Utilities
-        - [] basic translation/rotation tools
-        - [] basic STL data input
-        - [] STL vertices/face compression?
+        - [x] basic translation/rotation tools
+        - [x] basic STL data input
+        - [ ] STL vertices/face compression?
     - Rays        
-        - [] basic intersection testing
-        - [] basic optical elements (lens/mirror)
-        - [] reflection
-        - [] refraction
+        - [x] basic intersection testing
+        - [ ] basic optical elements (lens/mirror)
+        - [ ] reflection
+        - [ ] refraction
 - Optics
-    - [] phase front via Gaussian beams
-    - [] phase shift due to ref. index change
-    - [] optical intensity on detector
+    - [ ] phase front via Gaussian beams
+    - [ ] phase shift due to ref. index change
+    - [ ] optical intensity on detector
 - Mechanics
-    - [] vibration of optical elements
+    - [ ] vibration of optical elements
 - Test coverage
-    - [] translation and x,y,z-rotation tests
-    - [] Möller-Trumbore-algorithm test
-    - [] generic mesh intersection test
+    - [ ] translation and x,y,z-rotation tests
+    - [ ] Möller-Trumbore-algorithm test
+    - [ ] generic mesh intersection test
 
 ## Known bugs
 
-- [] align3d rotation incorrect if $v_{\mathrm{start}} = -v_{\mathrm{target}}$ 
+- [x] wrong intersection for some geometries/angles?
+- [ ] align3d rotation incorrect if start = -target 

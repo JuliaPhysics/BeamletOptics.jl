@@ -1,0 +1,11 @@
+# Ignore all extensions
+*
+# and the main (scripting) file
+test/main.jl
+
+# but search in all folders
+!*/ 
+
+# and include the following
+!.gitignore
+!*.jl
