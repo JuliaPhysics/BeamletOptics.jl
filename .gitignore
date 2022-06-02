@@ -1,7 +1,5 @@
 # Ignore all extensions
 *
-# and the main (scripting) file
-test/main.jl
 
 # but search in all folders
 !*/ 
@@ -9,3 +7,6 @@ test/main.jl
 # and include the following
 !.gitignore
 !*.jl
+
+# but still ignore the main (scripting) file
+main.jl

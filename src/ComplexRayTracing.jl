@@ -1,9 +1,23 @@
+"""
+    Ray
+
+An immutable struct that contains a **position vector** `pos`, a **directional vector** `dir`
+and a **length** variable `t` that are used to describe a generic ray as `pos+t*dir`.
+The directional vector is required/adjusted to have unit length, i.e. `abs(dir) == 1`.
+"""
 struct Ray
     pos::Vector
     dir::Vector
-    function Ray(pos, dir)
+    len
+    @doc """
+        Ray(pos::Vector, dir::Vector)
+
+    Ray constructor. Takes in a position vector `pos` and directional vector `dir`, which is scaled
+    to unit length. The initial ray length `t` is set to `Inf`.
+    """
+    function Ray(pos::Vector, dir::Vector)
         @assert norm(dir) != 0 "Illegal vector for direction"
-        new(pos, dir/norm(dir))
+        new(pos, dir/norm(dir), Inf)
     end
 end
 
