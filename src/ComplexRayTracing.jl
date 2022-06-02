@@ -249,7 +249,7 @@ function intersect3d(face::Matrix, ray::SCDI.Ray; kϵ=1e-6)
     t::Float64 = dot(E2, Qv) * invDet
     # Return intersection only if "in front of" ray origin
     if t < kϵ
-        return inf 
+        return Inf
     end
     return t
 end
@@ -258,7 +258,7 @@ end
     intersect3d(object::Geometry, ray::SCDI.Ray)
 
 This function is a generic implementation to check if a ray intersects the object geometry.
-If true, the distance **t** is returned, where the location of intersection is ray.pos+t*ray.dir.
+If true, the **distance** `t` is returned, where the location of intersection is `ray.pos+t*ray.dir`.
 """
 function intersect3d(object::Geometry, ray::Ray)
     numEl = size(object.faces)[1]
