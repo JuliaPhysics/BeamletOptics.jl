@@ -1,24 +1,35 @@
 """
-    Ray
+    Ray{T<:Number}
 
-An immutable struct that contains a **position vector** `pos`, a **directional vector** `dir`
+A mutable struct that contains a **position vector** `pos`, a **directional vector** `dir`
 and a **length** variable `t` that are used to describe a generic ray as `pos+t*dir`.
 The directional vector is required/adjusted to have unit length, i.e. `abs(dir) == 1`.
 """
-struct Ray
-    pos::Vector
-    dir::Vector
-    len
+mutable struct Ray{T<:Number}
+    pos::Vector{T}
+    dir::Vector{T}
+    len::T
     @doc """
-        Ray(pos::Vector, dir::Vector)
+        Ray{T}(pos::Vector{T}, dir::Vector{T}) where T
 
-    Ray constructor. Takes in a position vector `pos` and directional vector `dir`, which is scaled
+    Parametric type constructor for struct Ray. Takes in a position vector `pos` and directional vector `dir`, which is scaled
     to unit length. The initial ray length `t` is set to `Inf`.
     """
-    function Ray(pos::Vector, dir::Vector)
+    function Ray{T}(pos::Vector{T}, dir::Vector{T}) where T
         @assert norm(dir) != 0 "Illegal vector for direction"
-        new(pos, dir/norm(dir), Inf)
+        new{T}(pos, dir/norm(dir), Inf)
     end
+end
+
+"""
+    Ray(pos::Vector{T}, dir::Vector{G}) where {T<:Union{Int, Float64}, G<:Union{Int, Float64}}
+
+Concrete implementation of Ray struct for `Float64` data type. Accepts all combinations where `pos` and `dir`
+are of type `Float64` and/or the primitive `Int`. Allows seperate implementation for `Float32`, etc.
+Promotes input types to `Float64`.
+"""
+function Ray(pos::Vector{T}, dir::Vector{G}) where {T<:Union{Int, Float64}, G<:Union{Int, Float64}}
+    return Ray{Float64}(Float64.(pos), Float64.(dir))
 end
 
 struct Beamlet
@@ -39,15 +50,29 @@ struct Beamlet
     end
 end
 
-mutable struct Geometry
-    vertices::Matrix
-    faces::Matrix
-    pos::Vector
-    dir::Vector
-    function Geometry(data)
+"""
+    Geometry{T<:Number}
+
+Contains the STL mesh information for an arbitrary object, that is the `vertices` that make up the mesh and
+a matrix of `faces`, i.e. the connectivity matrix of the mesh. The data is read in using the `FileIO.jl` and 
+`MeshIO.jl` packages. Translations and rotations of the mesh are directly saved in absolute coordinates in the
+vertex matrix. For reference, a positional (`pos`) and directional (`dir`) vector are stored.  
+"""
+mutable struct Geometry{T<:Number}
+    vertices::Matrix{T}
+    faces::Matrix{Int}
+    pos::Vector{T}
+    dir::Vector{T}
+    @doc """
+        Geometry{T}(data; scale=1e-3) where T
+
+    Parametric type constructor for struct Geometry. Takes data of type `GeometryBasics.Mesh` and extracts the 
+    vertices and faces. The mesh is initialized at the global origin.
+    """
+    function Geometry{T}(data; scale=1e-3) where T
         # Read data from shitty mesh format to matrix format
         numEl = length(data)
-        vertices = Matrix{Float64}(undef, numEl*3, 3)
+        vertices = Matrix{T}(undef, numEl*3, 3)
         faces = Matrix{Int}(undef, numEl, 3)
         for i = 1:numEl
             for j = 1:3
@@ -56,8 +81,20 @@ mutable struct Geometry
             end
         end
         # Initialize geometry at origin with orientation [1,0,0] scaled to mm
-        new(vertices*1e-3, faces, [0,0,0], [1,0,0])
+        # Origin and direction are converted to type T
+        new{T}(vertices*scale, faces, T.([0,0,0]), T.([1,0,0]))
     end
+end
+
+"""
+    Geometry(data; scale=1e-3)
+
+Concrete implementation of Geometry struct. Data type of Geometry is variably selected based on
+type of vertex data (i.e `Float32`). Mesh data is scaled by factor 1e-3, assuming m scale. 
+"""
+function Geometry(data; scale=1e-3)
+    T = typeof(data[1][1][1])
+    return Geometry{T}(data; scale=scale)
 end
 
 struct Mirror
@@ -73,7 +110,7 @@ end
     orthogonal3d(target::Vector, reference::Vector)
 
 Returns a vector with unit length that is perpendicular to the target and an additional
-reference vector. Vector orientation according to right-hand rule.
+reference vector. Vector orientation is determined according to right-hand rule.
 """
 function orthogonal3d(target::Vector, reference::Vector)
     n = cross(target, reference)
