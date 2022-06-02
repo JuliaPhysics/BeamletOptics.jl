@@ -25,7 +25,7 @@ end
     Ray(pos::Vector{T}, dir::Vector{G}) where {T<:Union{Int, Float64}, G<:Union{Int, Float64}}
 
 Concrete implementation of Ray struct for `Float64` data type. Accepts all combinations where `pos` and `dir`
-are of type `Float64` and/or the primitive `Int`. Allows seperate implementation for `Float32`, etc.
+are of type `Float64` and/or the abstract `Int`. Allows seperate implementation for `Float32`, etc.
 Promotes input types to `Float64`.
 """
 function Ray(pos::Vector{T}, dir::Vector{G}) where {T<:Union{Int, Float64}, G<:Union{Int, Float64}}
@@ -51,6 +51,14 @@ struct Beamlet
 end
 
 """
+    AbstractGeometry
+
+Dispatch handle for all types that require geometry representation, i.e. translation, rotation, etc. If a subtype inherits from `AbstractGeometry`, 
+it is **required to have a composite type field** `geometry::Geometry` in order for this design scheme to work.
+"""
+abstract type AbstractGeometry end
+
+"""
     Geometry{T<:Number}
 
 Contains the STL mesh information for an arbitrary object, that is the `vertices` that make up the mesh and
@@ -64,19 +72,19 @@ mutable struct Geometry{T<:Number}
     pos::Vector{T}
     dir::Vector{T}
     @doc """
-        Geometry{T}(data; scale=1e-3) where T
+        Geometry{T}(mesh; scale=1e-3) where T
 
     Parametric type constructor for struct Geometry. Takes data of type `GeometryBasics.Mesh` and extracts the 
     vertices and faces. The mesh is initialized at the global origin.
     """
-    function Geometry{T}(data; scale=1e-3) where T
+    function Geometry{T}(mesh; scale=1e-3) where T
         # Read data from shitty mesh format to matrix format
-        numEl = length(data)
+        numEl = length(mesh)
         vertices = Matrix{T}(undef, numEl*3, 3)
         faces = Matrix{Int}(undef, numEl, 3)
         for i = 1:numEl
             for j = 1:3
-                vertices[3(i-1)+j, :] = data[i][j]
+                vertices[3(i-1)+j, :] = mesh[i][j]
                 faces[i,j] = 3(i-1)+j
             end
         end
@@ -87,23 +95,14 @@ mutable struct Geometry{T<:Number}
 end
 
 """
-    Geometry(data; scale=1e-3)
+    Geometry(mesh; scale=1e-3)
 
 Concrete implementation of Geometry struct. Data type of Geometry is variably selected based on
 type of vertex data (i.e `Float32`). Mesh data is scaled by factor 1e-3, assuming m scale. 
 """
-function Geometry(data; scale=1e-3)
-    T = typeof(data[1][1][1])
-    return Geometry{T}(data; scale=scale)
-end
-
-struct Mirror
-    pos::Vector
-    dir::Vector
-    function Mirror(pos, dir)
-        @assert norm(dir) != 0 "Illegal vector for direction"
-        new(pos, dir/norm(dir))
-    end
+function Geometry(mesh; scale=1e-3)
+    T = typeof(mesh[1][1][1])
+    return Geometry{T}(mesh; scale=scale)
 end
 
 """
@@ -272,4 +271,40 @@ function intersect3d(object::Geometry, ray::Ray)
         end
     end
     return t0
+end
+
+"""
+    translate3d!(object::T, offset::Vector) where T<:AbstractGeometry
+
+Wrapper for translate3d!(object::Geometry, offset::Vector). 
+"""
+function translate3d!(object::T, offset::Vector) where T<:AbstractGeometry
+    translate3d!(object.geometry, offset)
+end
+
+"""
+    xrotate3d!(object::T, θ) where T<:AbstractGeometry
+
+Wrapper for xrotate3d!(object::Geometry, θ).
+"""
+function xrotate3d!(object::T, θ) where T<:AbstractGeometry
+    xrotate3d!(object.geometry, θ)
+end
+
+"""
+    yrotate3d!(object::T, θ) where T<:AbstractGeometry
+    
+Wrapper for yrotate3d!(object::Geometry, θ).
+"""
+function yrotate3d!(object::T, θ) where T<:AbstractGeometry
+    yrotate3d!(object.geometry, θ)
+end
+
+"""
+    zrotate3d!(object::T, θ) where T<:AbstractGeometry
+
+Wrapper for zrotate3d!(object::Geometry, θ).
+"""
+function zrotate3d!(object::T, θ) where T<:AbstractGeometry
+    zrotate3d!(object.geometry, θ)
 end

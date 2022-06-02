@@ -21,6 +21,8 @@ This project implements a forward model to simulate different aspects of a singl
     - [ ] optical intensity distribution on detector
 - Mechanics
     - [ ] vibration of optical elements
+- Plotting
+    - [ ] automatic plot updates using Makie Observable/Buffer
 - Test coverage
     - [ ] translation and x,y,z-rotation tests
     - [ ] Möller-Trumbore-algorithm test
@@ -31,6 +33,8 @@ This project implements a forward model to simulate different aspects of a singl
 - [x] wrong intersection for some geometries/angles?
     * fixed typo in Möller-Trumbore-algorithm
 - [ ] align3d rotation incorrect if start = -target
+- [ ] red warntype for trace_system
+    * even though SCDI.intersect3d(object::Geometry, ray::Ray) is type stable?
 
 ## Comments
 
