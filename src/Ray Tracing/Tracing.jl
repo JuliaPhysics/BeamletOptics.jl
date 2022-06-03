@@ -1,12 +1,12 @@
 """
-    intersect3d(face::Matrix, ray::Ray; kϵ=1e-5)
+    moeller_trumbore_algorithm(face::Matrix, ray::Ray; kϵ=1e-5)
 
 An implementation of the (Möller-Trumbore algorithm)[https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/moller-trumbore-ray-triangle-intersection].
 This algorithm evaluates the possible intersection between a ray and a face that is defined by three vertices. If no intersection occurs, Inf is returned.
 kϵ is the abort threshold for backfacing and non-intersecting triangles. 
 This algorithm is fast due to multiple breakout conditions.
 """
-function intersect3d(face::Matrix, ray::Ray; kϵ=1e-6)
+function moeller_trumbore_algorithm(face::Matrix, ray::Ray; kϵ=1e-6)
     V1 = face[1,:]
     V2 = face[2,:]
     V3 = face[3,:]
@@ -46,17 +46,19 @@ end
 
 This function is a generic implementation to check if a ray intersects the object geometry.
 If true, the **distance** `t` is returned, where the location of intersection is `ray.pos+t*ray.dir`.
+In addition, the face index of the mesh intersection is returned.
 """
 function intersect3d(object::Geometry, ray::Ray)
     numEl = size(object.faces)[1]
     t0 = Inf
+    fID::Int = 0
     for i = 1:numEl
         face = object.vertices[object.faces[i,:],:]
-        t = intersect3d(face, ray)
+        t = moeller_trumbore_algorithm(face, ray)
         # Return closest intersection
         if t < t0
             t0 = t
         end
     end
-    return t0
+    return t0, fID
 end
