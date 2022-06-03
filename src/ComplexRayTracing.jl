@@ -218,7 +218,7 @@ This algorithm evaluates the possible intersection between a ray and a face that
 kϵ is the abort threshold for backfacing and non-intersecting triangles. 
 This algorithm is fast due to multiple breakout conditions.
 """
-function intersect3d(face::Matrix, ray::SCDI.Ray; kϵ=1e-6)
+function intersect3d(face::Matrix, ray::Ray; kϵ=1e-6)
     V1 = face[1,:]
     V2 = face[2,:]
     V3 = face[3,:]
@@ -254,7 +254,7 @@ function intersect3d(face::Matrix, ray::SCDI.Ray; kϵ=1e-6)
 end
 
 """
-    intersect3d(object::Geometry, ray::SCDI.Ray)
+    intersect3d(object::Geometry, ray::Ray)
 
 This function is a generic implementation to check if a ray intersects the object geometry.
 If true, the **distance** `t` is returned, where the location of intersection is `ray.pos+t*ray.dir`.

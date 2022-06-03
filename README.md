@@ -35,6 +35,7 @@ This project implements a forward model to simulate different aspects of a singl
 - [ ] align3d rotation incorrect if start = -target
 - [ ] red warntype for trace_system
     * even though SCDI.intersect3d(object::Geometry, ray::Ray) is type stable?
+- [ ] rename AbstractGeometry to GeometryHandle to avoid confusion
 
 ## Comments
 
