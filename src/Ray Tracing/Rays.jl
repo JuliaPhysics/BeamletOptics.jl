@@ -25,27 +25,29 @@ end
     Ray(pos::Vector{T}, dir::Vector{G}) where {T<:Union{Int, Float64}, G<:Union{Int, Float64}}
 
 Concrete implementation of Ray struct for `Float64` data type. Accepts all combinations where `pos` and `dir`
-are of type `Float64` and/or the abstract `Int`. Allows seperate implementation for `Float32`, etc.
+are of type `Float64` and/or abstract `Int`. Allows seperate implementation for `Float32`, etc.
 Promotes input types to `Float64`.
 """
 function Ray(pos::Vector{T}, dir::Vector{G}) where {T<:Union{Int, Float64}, G<:Union{Int, Float64}}
     return Ray{Float64}(Float64.(pos), Float64.(dir))
 end
 
-struct Beamlet
-    chief::Ray
-    divergence::Ray
-    waist::Ray
+mutable struct Beamlet
+    chief::Vector{Ray}
+    divergence::Vector{Ray}
+    waist::Vector{Ray}
 
     # Beamlet constructor
+    # sizehint! in constructor?
+    # append! performance (irrelevant)
     function Beamlet(chief::Ray, λ, w0)
         # All rays are initialized parallel to the x,y-plane
         # Divergence angle in rad
         θ = λ/(π*w0)
         # Divergence ray
-        divergence = Ray(chief.pos, rotate3d([0,0,1], θ)*chief.dir)
+        divergence = Ray(chief.pos, SCDI.rotate3d([0,0,1], θ)*chief.dir)
         # Waist ray
-        waist = Ray(chief.pos+orthogonal3d(chief.dir,[0,0,1])*w0, chief.dir)
-        new(chief, divergence, waist)
+        waist = Ray(chief.pos+SCDI.orthogonal3d(chief.dir,[0,0,1])*w0, chief.dir)
+        new([chief], [divergence], [waist])
     end
 end
