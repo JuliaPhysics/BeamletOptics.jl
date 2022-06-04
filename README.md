@@ -36,6 +36,7 @@ This project implements a forward model to simulate different aspects of a singl
 - [ ] red warntype for trace_system
     * even though SCDI.intersect3d(object::Geometry, ray::Ray) is type stable?
 - [ ] rename AbstractGeometry to GeometryHandle to avoid confusion
+- [ ] normal calculated from face in orthogonal3d(object::Geometry, fID::Int) points in the wrong dir?
 
 ## Comments
 

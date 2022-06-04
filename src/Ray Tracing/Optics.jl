@@ -1,9 +1,5 @@
 @Geometry struct Mirror end
 
-function intersect3d(object::Mirror, ray::Ray)
-    return intersect3d(object.geometry, ray)
-end
-
 @Geometry struct Lens
     ref_index::Float64
     function Lens(ref_index)
@@ -12,6 +8,6 @@ end
     end
 end
 
-function intersect3d(object::Lens, ray::Ray)
+function intersect3d(object::T, ray::Ray) where T<:AbstractGeometry
     return intersect3d(object.geometry, ray)
 end

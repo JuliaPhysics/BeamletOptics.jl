@@ -51,3 +51,12 @@ mutable struct Beamlet
         new([chief], [divergence], [waist])
     end
 end
+
+"""
+    Beam
+
+Temporary container struct to test ray tracing.
+"""
+mutable struct Beam 
+    rays::Vector{Ray}
+end

@@ -94,7 +94,7 @@ macro Geometry(structure)
         end
     catch
         # do nothing
-        @info "@Geometry: no internal constructor was found for " structure.args[2]
+        @debug "@Geometry: no internal constructor was found for " structure.args[2]
     end
     eval(structure)
 end

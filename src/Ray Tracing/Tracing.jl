@@ -58,6 +58,7 @@ function intersect3d(object::Geometry, ray::Ray)
         # Return closest intersection
         if t < t0
             t0 = t
+            fID = i
         end
     end
     return t0, fID

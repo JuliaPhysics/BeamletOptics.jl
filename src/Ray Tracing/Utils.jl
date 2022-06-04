@@ -11,6 +11,19 @@ function orthogonal3d(target::Vector, reference::Vector)
 end
 
 """
+    orthogonal3d(face::Matrix)
+
+Returns a vector with unit length that is perpendicular to the target face according to
+the right-hand rule. The vertices must be listed row-wise within the face matrix.
+"""
+function orthogonal3d(object::Geometry, fID::Int)
+    face = object.vertices[object.faces[fID,:],:]
+    n = cross((face[2,:]-face[1,:]), (face[3,:]-face[1,:]))
+    n /= norm(n)
+    return n
+end
+
+"""
     rotate3d(reference::Ray)
 
 Returns the rotation matrix that will rotate a vector around the reference axis at an angle
