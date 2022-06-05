@@ -11,9 +11,9 @@ This project implements a forward model to simulate different aspects of a singl
         - [ ] STL vertices/face compression?
     - Rays        
         - [x] basic intersection testing
-        - [ ] basic propagation routine over n elements
+        - [x] basic propagation routine over n elements
         - [ ] basic optical elements (lens/mirror)
-            - [ ] reflection
+            - [x] reflection
             - [ ] refraction
 - Optics
     - [ ] phase front via Gaussian beams
@@ -35,8 +35,7 @@ This project implements a forward model to simulate different aspects of a singl
 - [ ] align3d rotation incorrect if start = -target
 - [ ] red warntype for trace_system
     * even though SCDI.intersect3d(object::Geometry, ray::Ray) is type stable?
-- [ ] rename AbstractGeometry to GeometryHandle to avoid confusion
-- [ ] normal calculated from face in orthogonal3d(object::Geometry, fID::Int) points in the wrong dir?
+- [x] normal calculated from face in orthogonal3d(object::Geometry, fID::Int) points in the wrong dir?
 
 ## Comments
 
@@ -45,3 +44,6 @@ This project implements a forward model to simulate different aspects of a singl
     * ray length will be changed to `t` if an intersection occurs
     * thus requires mutable struct
     * is there a better (syntactial) way to do this, i.e. with immutable?
+* "Inheritance" is solved via composition
+    * macro injects necessary fields into struct
+    * macro ensures all wrapper functions are defined

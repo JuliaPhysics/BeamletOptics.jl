@@ -152,7 +152,7 @@ macro Geometry(type)
         tname = type.args[2]
     end
 
-    wrappers = quote
+    functions = quote
         # Euclidic manipulation operations
         translate3d!(object::eval($(tname)), offset::Vector) = translate3d!(object.geometry, offset)
         xrotate3d!(object::eval($(tname)), θ) = xrotate3d!(object.geometry, θ)
@@ -165,5 +165,5 @@ macro Geometry(type)
         orthogonal3d(object::eval($(tname)), fID::Int) = orthogonal3d(object.geometry, fID)
     end
     @debug "Generating wrapper functions for type $(tname)"
-    eval(wrappers)
+    eval(functions)
 end
