@@ -15,10 +15,12 @@ This project implements a forward model to simulate different aspects of a singl
         - [ ] basic optical elements (lens/mirror)
             - [x] reflection
             - [ ] refraction
+        - [ ] Gaussian beam struct
 - Optics
     - [ ] phase front via Gaussian beams
     - [ ] phase shift due to ref. index change
     - [ ] optical intensity distribution on detector
+    - [ ] simple astigmatism via 5, 7, 9-ray approach
 - Mechanics
     - [ ] vibration of optical elements
 - Plotting
@@ -36,6 +38,7 @@ This project implements a forward model to simulate different aspects of a singl
 - [ ] red warntype for trace_system
     * even though SCDI.intersect3d(object::Geometry, ray::Ray) is type stable?
 - [x] normal calculated from face in orthogonal3d(object::Geometry, fID::Int) points in the wrong dir?
+    * fixed typo in reflection calculation
 
 ## Comments
 
