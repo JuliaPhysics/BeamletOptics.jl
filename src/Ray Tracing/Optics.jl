@@ -7,7 +7,3 @@
         new(Float64(ref_index))
     end
 end
-
-function intersect3d(object::T, ray::Ray) where T<:AbstractGeometry
-    return intersect3d(object.geometry, ray)
-end

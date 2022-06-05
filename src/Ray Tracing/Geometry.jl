@@ -1,12 +1,4 @@
 """
-    AbstractGeometry
-
-Dispatch handle for all types that require geometry representation, i.e. translation, rotation, etc. If a subtype inherits from `AbstractGeometry`, 
-it is **required to have a composite type field** `geometry::Geometry` in order for this design scheme to work.
-"""
-abstract type AbstractGeometry end
-
-"""
     Geometry{T<:Number}
 
 Contains the STL mesh information for an arbitrary object, that is the `vertices` that make up the mesh and
@@ -56,50 +48,6 @@ function Geometry(mesh)
 end
 
 """
-    @Geometry
-
-A macro that automatically bequeaths the AbstractGeometry dispatch handle and includes the `x.geometry` field for type composition
-with the Geometry type. This is an experimental feature and might be removed in the future. 
-
-```julia
-struct MyTyp
-    x
-end
-```
-
-expands to
-
-```julia
-struct MyTyp <: AbstractGeometry
-    geometry::Geometry
-    x
-end
-```
-"""
-macro Geometry(structure)
-    # Insert inheritance from AbstractGeometry
-    structure.args[2] = Expr(:<:, structure.args[2], AbstractGeometry)
-    # Insert composite type field geometry::Geometry (requires promotion of Expr)
-    f1, f2 = promote(structure.args[3].args, [:(geometry::Geometry)])
-    structure.args[3].args = pushfirst!(f1, f2[1])
-    # Check if type has internal constructor (and modify)
-    try
-        if structure.args[3].args[end].head === :function
-            # Point to struct and constructor function call
-            fcall = structure.args[3].args[end].args[1]
-            ncall = structure.args[3].args[end].args[2].args[end]
-            # Insert mesh variable at first position in fcall and ncall
-            fcall.args = append!([fcall.args[1], :mesh], fcall.args[2:end])
-            ncall.args = append!([ncall.args[1], :(Geometry(mesh))], ncall.args[2:end])
-        end
-    catch
-        # do nothing
-        @debug "@Geometry: no internal constructor was found for " structure.args[2]
-    end
-    eval(structure)
-end
-
-"""
     translate3d!(object::Geometry, offset::Vector)
 
 Mutating function that translates the vertices of an object in relation to the offset vector.
@@ -108,15 +56,6 @@ In addition, the objection position vector is overwritten to reflect the new "ce
 function translate3d!(object::Geometry, offset::Vector)
     object.pos += offset
     object.vertices .+= offset'
-end
-
-"""
-    translate3d!(object::T, offset::Vector) where T<:AbstractGeometry
-
-Wrapper for translate3d!(object::Geometry, offset::Vector). 
-"""
-function translate3d!(object::T, offset::Vector) where T<:AbstractGeometry
-    translate3d!(object.geometry, offset)
 end
 
 """
@@ -133,15 +72,6 @@ function xrotate3d!(object::Geometry, θ)
 end
 
 """
-    xrotate3d!(object::T, θ) where T<:AbstractGeometry
-
-Wrapper for xrotate3d!(object::Geometry, θ).
-"""
-function xrotate3d!(object::T, θ) where T<:AbstractGeometry
-    xrotate3d!(object.geometry, θ)
-end
-
-"""
     yrotate3d!(object::Geometry, θ)
 
 Mutating function that rotates the object geometry around the **y-axis**. 
@@ -152,15 +82,6 @@ function yrotate3d!(object::Geometry, θ)
     R = rotate3d([0,1,0], θ)
     # Translate geometry to origin, rotate, retranslate
     object.vertices = (object.vertices .- object.pos')*R .+ object.pos'
-end
-
-"""
-    yrotate3d!(object::T, θ) where T<:AbstractGeometry
-    
-Wrapper for yrotate3d!(object::Geometry, θ).
-"""
-function yrotate3d!(object::T, θ) where T<:AbstractGeometry
-    yrotate3d!(object.geometry, θ)
 end
 
 """
@@ -177,15 +98,6 @@ function zrotate3d!(object::Geometry, θ)
 end
 
 """
-    zrotate3d!(object::T, θ) where T<:AbstractGeometry
-
-Wrapper for zrotate3d!(object::Geometry, θ).
-"""
-function zrotate3d!(object::T, θ) where T<:AbstractGeometry
-    zrotate3d!(object.geometry, θ)
-end
-
-"""
     scale3d!(object::Geometry, scale)
 
 Allows rescaling of mesh data around "center of gravity".
@@ -197,10 +109,61 @@ function scale3d!(object::Geometry, scale)
 end
 
 """
-    scale3d!(object::T, scale) where T<:AbstractGeometry
+    @Geometry
 
-Wrapper for scale3d!(object::Geometry, scale).
+A macro that automatically includes the `geometry` field for type composition with the `Geometry` type.
+Additionally, all wrapper functions required to access Geometry manipulation features are created. 
+However, these can be overwritten if another form of dispatch is necessary.
+
+```julia
+struct MyType
+    x
+end
+```
+
+expands to
+
+```julia
+struct MyType
+    geometry::Geometry
+    x
+end
+```
 """
-function scale3d!(object::T, scale) where T<:AbstractGeometry
-    scale3d!(object.geometry, scale)
+macro Geometry(type)
+    @assert type.head === :struct "@Geometry only works with structs!"
+    # Insert geometry field into struct
+    @debug "Composition of type $(type.args[2]) with field geometry::Geometry..." type.args[2]
+    pushfirst!(type.args[3].args, :(geometry::Geometry))
+    try type.args[3].args[end].head === :function
+        # Insert geometry variable into constructor
+        @debug "Modified internal constructor of type $(type.args[2])..."
+        insert!(type.args[3].args[end].args[1].args, 2, :(geometry::Geometry))
+        insert!(type.args[3].args[end].args[2].args[end].args, 2, :(geometry::Geometry))
+    catch
+        # do nothing
+    end
+    eval(type)
+
+    # Extract type name
+    if typeof(type.args[2]) == Expr
+        tname = type.args[2].args[1]
+    else
+        tname = type.args[2]
+    end
+
+    wrappers = quote
+        # Euclidic manipulation operations
+        translate3d!(object::eval($(tname)), offset::Vector) = translate3d!(object.geometry, offset)
+        xrotate3d!(object::eval($(tname)), θ) = xrotate3d!(object.geometry, θ)
+        yrotate3d!(object::eval($(tname)), θ) = yrotate3d!(object.geometry, θ)
+        zrotate3d!(object::eval($(tname)), θ) = zrotate3d!(object.geometry, θ)
+        scale3d!(object::eval($(tname)), scale) = scale3d!(object.geometry, scale)
+        # Mesh intersection
+        intersect3d(object::eval($(tname)), ray::Ray) = intersect3d(object.geometry, ray)
+        # Utils
+        orthogonal3d(object::eval($(tname)), fID::Int) = orthogonal3d(object.geometry, fID)
+    end
+    @debug "Generating wrapper functions for type $(tname)"
+    eval(wrappers)
 end
