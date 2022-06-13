@@ -11,7 +11,7 @@ function orthogonal3d(target::Vector, reference::Vector)
 end
 
 """
-    orthogonal3d(face::Matrix)
+    orthogonal3d(object::Geometry, fID::Int)
 
 Returns a vector with unit length that is perpendicular to the target face according to
 the right-hand rule. The vertices must be listed row-wise within the face matrix.
@@ -24,7 +24,7 @@ function orthogonal3d(object::Geometry, fID::Int)
 end
 
 """
-    rotate3d(reference::Ray)
+    rotate3d(reference::Vector, θ)
 
 Returns the rotation matrix that will rotate a vector around the reference axis at an angle
 θ in radians. Vector length is maintained. Rotation in clockwise direction?
