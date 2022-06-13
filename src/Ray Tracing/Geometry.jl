@@ -12,39 +12,32 @@ mutable struct Geometry{T<:Number}
     pos::Vector{T}
     dir::Vector{T}
     scale::T
-    @doc """
-        Geometry{T}(mesh) where T
-
-    Parametric type constructor for struct Geometry. Takes data of type `GeometryBasics.Mesh` and extracts the 
-    vertices and faces. The mesh is initialized at the global origin.
-    """
-    function Geometry{T}(mesh) where T
-        # Read data from shitty mesh format to matrix format
-        numEl = length(mesh)
-        vertices = Matrix{T}(undef, numEl*3, 3)
-        faces = Matrix{Int}(undef, numEl, 3)
-        for i = 1:numEl
-            for j = 1:3
-                vertices[3(i-1)+j, :] = mesh[i][j]
-                faces[i,j] = 3(i-1)+j
-            end
-        end
-        # Initialize geometry at origin with orientation [1,0,0] scaled to mm
-        # Origin and direction are converted to type T
-        scale::T = 1e-3
-        new{T}(vertices*scale, faces, T.([0,0,0]), T.([1,0,0]), scale)
-    end
 end
 
 """
     Geometry(mesh)
 
-Concrete implementation of Geometry struct. Data type of Geometry is variably selected based on
-type of vertex data (i.e `Float32`). Mesh data is scaled by factor 1e-3, assuming m scale. 
+Parametric type constructor for struct Geometry. Takes data of type `GeometryBasics.Mesh` and extracts the 
+vertices and faces. The mesh is initialized at the global origin. Data type of Geometry is variably selected based on
+type of vertex data (i.e `Float32`). Mesh data is scaled by factor 1e-3, assuming m scale.
 """
 function Geometry(mesh)
+    # Determine mesh data type (i.e. Float32)
     T = typeof(mesh[1][1][1])
-    return Geometry{T}(mesh)
+    # Read data from shitty mesh format to matrix format
+    numEl = length(mesh)
+    vertices = Matrix{T}(undef, numEl*3, 3)
+    faces = Matrix{Int}(undef, numEl, 3)
+    for i = 1:numEl
+        for j = 1:3
+            vertices[3(i-1)+j, :] = mesh[i][j]
+            faces[i,j] = 3(i-1)+j
+        end
+    end
+    # Initialize geometry at origin with orientation [1,0,0] scaled to mm
+    # Origin and direction are converted to type T
+    scale::T = 1e-3
+    return Geometry{T}(vertices*scale, faces, T.([0,0,0]), T.([1,0,0]), scale)
 end
 
 """
