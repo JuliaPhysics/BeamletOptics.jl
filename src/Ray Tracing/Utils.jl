@@ -65,3 +65,14 @@ function align3d(start::Vector, target::Vector)
     ]
     return R
 end
+
+"""
+    angle3d(target::Vector, reference::Vector)
+
+Returns the angle between the `target` and `reference` vector in **rad**. Also prints the angle to the console (in degrees).
+"""
+function angle3d(target::Vector, reference::Vector)
+    angle = acos(dot(target, reference) / (norm(target) * norm(reference)))
+    @info "Angle is $(angle*180/π)°"
+    return angle
+end
