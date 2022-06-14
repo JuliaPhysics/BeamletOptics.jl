@@ -1,5 +1,5 @@
 struct System{T}
-    objects::Vector{T} 
+    objects::Vector{T}
     function System(objects)
         # Iteratively create union of all object types
         types = :(Union{})

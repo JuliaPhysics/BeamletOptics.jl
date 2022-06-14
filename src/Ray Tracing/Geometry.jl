@@ -26,18 +26,18 @@ function Geometry(mesh)
     T = typeof(mesh[1][1][1])
     # Read data from shitty mesh format to matrix format
     numEl = length(mesh)
-    vertices = Matrix{T}(undef, numEl*3, 3)
+    vertices = Matrix{T}(undef, numEl * 3, 3)
     faces = Matrix{Int}(undef, numEl, 3)
     for i = 1:numEl
         for j = 1:3
             vertices[3(i-1)+j, :] = mesh[i][j]
-            faces[i,j] = 3(i-1)+j
+            faces[i, j] = 3(i - 1) + j
         end
     end
     # Initialize geometry at origin with orientation [1,0,0] scaled to mm
     # Origin and direction are converted to type T
     scale::T = 1e-3
-    return Geometry{T}(vertices*scale, faces, T.([0,0,0]), T.([1,0,0]), scale)
+    return Geometry{T}(vertices * scale, faces, T.([0, 0, 0]), T.([1, 0, 0]), scale)
 end
 
 """
@@ -59,9 +59,9 @@ The rotation is performed around the "center of gravtiy" axis.
 """
 function xrotate3d!(object::Geometry, θ)
     # Calculate rotation matrix
-    R = rotate3d([1,0,0], θ)
+    R = rotate3d([1, 0, 0], θ)
     # Translate geometry to origin, rotate, retranslate
-    object.vertices = (object.vertices .- object.pos')*R .+ object.pos'
+    object.vertices = (object.vertices .- object.pos') * R .+ object.pos'
 end
 
 """
@@ -72,9 +72,9 @@ The rotation is performed around the "center of gravtiy" axis.
 """
 function yrotate3d!(object::Geometry, θ)
     # Calculate rotation matrix
-    R = rotate3d([0,1,0], θ)
+    R = rotate3d([0, 1, 0], θ)
     # Translate geometry to origin, rotate, retranslate
-    object.vertices = (object.vertices .- object.pos')*R .+ object.pos'
+    object.vertices = (object.vertices .- object.pos') * R .+ object.pos'
 end
 
 """
@@ -85,9 +85,9 @@ The rotation is performed around the "center of gravtiy" axis.
 """
 function zrotate3d!(object::Geometry, θ)
     # Calculate rotation matrix
-    R = rotate3d([0,0,1], θ)
+    R = rotate3d([0, 0, 1], θ)
     # Translate geometry to origin, rotate, retranslate
-    object.vertices = (object.vertices .- object.pos')*R .+ object.pos'
+    object.vertices = (object.vertices .- object.pos') * R .+ object.pos'
 end
 
 """
@@ -128,7 +128,8 @@ macro Geometry(type)
     # Insert geometry field into struct
     @debug "Composition of type $(type.args[2]) with field geometry::Geometry..." type.args[2]
     pushfirst!(type.args[3].args, :(geometry::Geometry))
-    try type.args[3].args[end].head === :function
+    try
+        type.args[3].args[end].head === :function
         # Insert geometry variable into constructor
         @debug "Modified internal constructor of type $(type.args[2])..."
         insert!(type.args[3].args[end].args[1].args, 2, :(geometry::Geometry))

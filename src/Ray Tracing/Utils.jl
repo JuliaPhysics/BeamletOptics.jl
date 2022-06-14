@@ -17,8 +17,8 @@ Returns a vector with unit length that is perpendicular to the target face accor
 the right-hand rule. The vertices must be listed row-wise within the face matrix.
 """
 function orthogonal3d(object::Geometry, fID::Int)
-    face = object.vertices[object.faces[fID,:],:]
-    n = cross((face[2,:]-face[1,:]), (face[3,:]-face[1,:]))
+    face = object.vertices[object.faces[fID, :], :]
+    n = cross((face[2, :] - face[1, :]), (face[3, :] - face[1, :]))
     n /= norm(n)
     return n
 end
@@ -34,8 +34,8 @@ function rotate3d(reference::Vector, θ)
     sint = sin(θ)
     ux, uy, uz = reference
     R = [
-        cost+ux^2*(1-cost) ux*uy*(1-cost)-uz*sint ux*uz*(1-cost)+uy*sint;
-        uy*ux*(1-cost)+uz*sint cost+uy^2*(1-cost) uy*uz*(1-cost)-ux*sint;
+        cost+ux^2*(1-cost) ux*uy*(1-cost)-uz*sint ux*uz*(1-cost)+uy*sint
+        uy*ux*(1-cost)+uz*sint cost+uy^2*(1-cost) uy*uz*(1-cost)-ux*sint
         uz*ux*(1-cost)-uy*sint uz*uy*(1-cost)+ux*sint cost+uz^2*(1-cost)
     ]
     return R
@@ -54,13 +54,13 @@ function align3d(start::Vector, target::Vector)
     rx, ry, rz = cross(target, start)
     # if start and target are already (almost) parallel return unity
     if (abs(rx) < 1e-9) & (abs(ry) < 1e-9) & (abs(rz) < 1e-9)
-        return Matrix(1.0I,3,3)
+        return Matrix(1.0I, 3, 3)
     end
     cosA = dot(start, target)
-    k = 1/(1+cosA)
+    k = 1 / (1 + cosA)
     R = [
-        rx^2*k+cosA rx*ry*k+rz rx*rz*k-ry;
-        ry*rx*k-rz ry^2*k+cosA ry*rz*k+rx;
+        rx^2*k+cosA rx*ry*k+rz rx*rz*k-ry
+        ry*rx*k-rz ry^2*k+cosA ry*rz*k+rx
         rz*rx*k+ry rz*ry*k-rx rz^2*k+cosA
     ]
     return R
