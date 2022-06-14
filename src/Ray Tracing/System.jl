@@ -26,11 +26,12 @@ function trace_system(system::System, ray::Ray)
     return t0, oID, fID
 end
 
-function solve_system!(system::System, beam::Beam)
+function solve_system!(system::System, beam::Beam; i_max=20)
     flag = true
+    iter = 0
     # find intersect
     @debug "Ray tracing routine started."
-    while flag
+    while flag && iter <= i_max
         t0, oID, fID = trace_system(system, beam.rays[end])
         if (t0 == Inf) || (oID == 0)
             @debug "No further intersection found!"
@@ -40,6 +41,7 @@ function solve_system!(system::System, beam::Beam)
             beam.rays[end].len = t0
             flag = interact(system.objects[oID], beam, fID)
         end
+        iter += 1
     end
     @debug "Ray tracing routine ended."
 end
