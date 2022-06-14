@@ -26,7 +26,7 @@ This project implements a forward model to simulate different aspects of a singl
 - Plotting
     - [ ] automatic plot updates using Makie Observable/Buffer
 - Test coverage
-    - [ ] translation and x,y,z-rotation tests
+    - [x] translation and x,y,z-rotation tests
     - [ ] Möller-Trumbore-algorithm test
     - [ ] generic mesh intersection test
 
