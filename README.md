@@ -12,9 +12,11 @@ This project implements a forward model to simulate different aspects of a singl
     - Rays        
         - [x] basic intersection testing
         - [x] basic propagation routine over n elements
-        - [ ] basic optical elements (lens/mirror)
+        - [x] basic optical elements (lens/mirror)
             - [x] reflection
-            - [ ] refraction
+            - [x] refraction
+            - [ ] documentation
+        - [ ] wavelength field for Ray
         - [ ] Gaussian beam struct
 - Optics
     - [ ] phase front via Gaussian beams
@@ -39,6 +41,7 @@ This project implements a forward model to simulate different aspects of a singl
     * even though SCDI.intersect3d(object::Geometry, ray::Ray) is type stable?
 - [x] normal calculated from face in orthogonal3d(object::Geometry, fID::Int) points in the wrong dir?
     * fixed typo in reflection calculation
+- [ ] @code_warntype for interact(Lens, Beam)
 
 ## Comments
 
