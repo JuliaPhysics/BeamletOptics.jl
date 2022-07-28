@@ -22,13 +22,13 @@ function interact(lens::Lens, beam::Beam, fID)
     if dot(beam.rays[end].dir, normal) < 0
         @debug "Outside lens"
         n1 = 1.0
-        n2 = lens.ref_index(1.5)
+        n2 = lens.ref_index(beam.λ)
     else
         @debug "Inside lens"
-        n1 = lens.ref_index(1.5)
+        n1 = lens.ref_index(beam.λ)
         n2 = 1.0
         normal *= -1
-    end 
+    end
     # Calculate new dir. and pos.
     ndir = refraction(beam.rays[end].dir, normal, n1, n2)
     npos = beam.rays[end].pos + beam.rays[end].len * beam.rays[end].dir

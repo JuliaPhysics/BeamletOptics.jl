@@ -6,7 +6,7 @@ This algorithm evaluates the possible intersection between a ray and a face that
 kϵ is the abort threshold for backfacing and non-intersecting triangles. 
 This algorithm is fast due to multiple breakout conditions.
 """
-function moeller_trumbore_algorithm(face::Matrix, ray::Ray; kϵ=1e-6)
+function moeller_trumbore_algorithm(face::Matrix, ray::Ray; kϵ=1e-9)
     V1 = face[1, :]
     V2 = face[2, :]
     V3 = face[3, :]

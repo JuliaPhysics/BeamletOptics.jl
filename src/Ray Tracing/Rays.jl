@@ -55,8 +55,9 @@ end
 """
     Beam
 
-Temporary container struct to test ray tracing.
+Temporary container struct to test ray tracing. Wavelength `λ` in nm.
 """
 mutable struct Beam
     rays::Vector{Ray}
+    λ::Float64
 end
