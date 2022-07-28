@@ -44,4 +44,5 @@ function solve_system!(system::System, beam::Beam; i_max=20)
         iter += 1
     end
     @debug "Ray tracing routine ended."
+    return nothing
 end

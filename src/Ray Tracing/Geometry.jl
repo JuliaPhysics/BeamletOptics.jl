@@ -4,13 +4,13 @@
 Contains the STL mesh information for an arbitrary object, that is the `vertices` that make up the mesh and
 a matrix of `faces`, i.e. the connectivity matrix of the mesh. The data is read in using the `FileIO.jl` and 
 `MeshIO.jl` packages. Translations and rotations of the mesh are directly saved in absolute coordinates in the
-vertex matrix. For reference, a positional (`pos`) and directional (`dir`) vector are stored.  
+vertex matrix. For orientation and translation tracking, a positional (`pos`) and directional (`dir`) matrix are stored.  
 """
 mutable struct Geometry{T<:Number}
     vertices::Matrix{T}
     faces::Matrix{Int}
+    dir::Matrix{T}
     pos::Vector{T}
-    dir::Vector{T}
     scale::T
 end
 
@@ -37,68 +37,99 @@ function Geometry(mesh)
     # Initialize geometry at origin with orientation [1,0,0] scaled to mm
     # Origin and direction are converted to type T
     scale::T = 1e-3
-    return Geometry{T}(vertices * scale, faces, T.([0, 0, 0]), T.([1, 0, 0]), scale)
+    return Geometry{T}(vertices * scale, faces, Matrix{T}(I, 3, 3), T.([0, 0, 0]), scale)
 end
 
 """
-    translate3d!(object::Geometry, offset::Vector)
+    translate3d!(geometry::Geometry, offset::Vector)
 
-Mutating function that translates the vertices of an object in relation to the offset vector.
-In addition, the objection position vector is overwritten to reflect the new "center of gravity".
+Mutating function that translates the vertices of an geometry in relation to the offset vector.
+In addition, the geometry position vector is overwritten to reflect the new "center of gravity".
 """
-function translate3d!(object::Geometry, offset::Vector)
-    object.pos += offset
-    object.vertices .+= offset'
+function translate3d!(geometry::Geometry, offset::Vector)
+    geometry.pos += offset
+    geometry.vertices .+= offset'
+    return nothing
 end
 
 """
-    xrotate3d!(object::Geometry, θ)
+    xrotate3d!(geometry::Geometry, θ)
 
-Mutating function that rotates the object geometry around the **x-axis**. 
-The rotation is performed around the "center of gravtiy" axis.
+Mutating function that rotates the geometry geometry around the **x-axis**. 
+The rotation is performed around the "center of gravity" axis.
 """
-function xrotate3d!(object::Geometry, θ)
+function xrotate3d!(geometry::Geometry, θ)
     # Calculate rotation matrix
     R = rotate3d([1, 0, 0], θ)
     # Translate geometry to origin, rotate, retranslate
-    object.vertices = (object.vertices .- object.pos') * R .+ object.pos'
+    geometry.vertices = (geometry.vertices .- geometry.pos') * R .+ geometry.pos'
+    geometry.dir *= R
+    return nothing
 end
 
 """
-    yrotate3d!(object::Geometry, θ)
+    yrotate3d!(geometry::Geometry, θ)
 
-Mutating function that rotates the object geometry around the **y-axis**. 
-The rotation is performed around the "center of gravtiy" axis.
+Mutating function that rotates the geometry geometry around the **y-axis**. 
+The rotation is performed around the "center of gravity" axis.
 """
-function yrotate3d!(object::Geometry, θ)
+function yrotate3d!(geometry::Geometry, θ)
     # Calculate rotation matrix
     R = rotate3d([0, 1, 0], θ)
     # Translate geometry to origin, rotate, retranslate
-    object.vertices = (object.vertices .- object.pos') * R .+ object.pos'
+    geometry.vertices = (geometry.vertices .- geometry.pos') * R .+ geometry.pos'
+    geometry.dir *= R
+    return nothing
 end
 
 """
-    zrotate3d!(object::Geometry, θ)
+    zrotate3d!(geometry::Geometry, θ)
 
-Mutating function that rotates the object geometry around the **z-axis**. 
-The rotation is performed around the "center of gravtiy" axis.
+Mutating function that rotates the geometry geometry around the **z-axis**. 
+The rotation is performed around the "center of gravity" axis.
 """
-function zrotate3d!(object::Geometry, θ)
+function zrotate3d!(geometry::Geometry, θ)
     # Calculate rotation matrix
     R = rotate3d([0, 0, 1], θ)
     # Translate geometry to origin, rotate, retranslate
-    object.vertices = (object.vertices .- object.pos') * R .+ object.pos'
+    geometry.vertices = (geometry.vertices .- geometry.pos') * R .+ geometry.pos'
+    geometry.dir *= R
+    return nothing
 end
 
 """
-    scale3d!(object::Geometry, scale)
+    scale3d!(geometry::Geometry, scale)
 
 Allows rescaling of mesh data around "center of gravity".
 """
-function scale3d!(object::Geometry, scale)
+function scale3d!(geometry::Geometry, scale)
     # Translate geometry to origin, scale, return to orig. pos.
-    object.vertices = (object.vertices .- object.pos') .* scale .+ object.pos'
-    object.scale = scale
+    geometry.vertices = (geometry.vertices .- geometry.pos') .* scale .+ geometry.pos'
+    geometry.scale = scale
+    return nothing
+end
+
+"""
+    reset_translation3d!(geometry::Geometry)
+
+Resets all previous translations and returns the geometry back to the global origin.
+"""
+function reset_translation3d!(geometry::Geometry)
+    geometry.vertices .-= geometry.pos'
+    geometry.pos = zeros(eltype(geometry.pos), 3)
+    return nothing
+end
+
+"""
+    reset_rotation3d!(geometry::Geometry)
+
+Resets all previous rotations around the current offset.
+"""
+function reset_rotation3d!(geometry::Geometry)
+    R = inv(geometry.dir)
+    geometry.vertices = (geometry.vertices .- geometry.pos') * R .+ geometry.pos'
+    geometry.dir = Matrix{eltype(geometry.dir)}(I, 3, 3)
+    return nothing
 end
 
 """
@@ -157,6 +188,8 @@ macro Geometry(type)
         intersect3d(object::eval($(tname)), ray::Ray) = intersect3d(object.geometry, ray)
         # Utils
         orthogonal3d(object::eval($(tname)), fID::Int) = orthogonal3d(object.geometry, fID)
+        reset_translation3d!(object::eval($(tname))) = reset_translation3d!(object.geometry)
+        reset_rotation3d!(object::eval($(tname))) = reset_rotation3d!(object.geometry)
     end
     @debug "Generating wrapper functions for type $(tname)"
     eval(functions)

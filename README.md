@@ -9,6 +9,7 @@ This project implements a forward model to simulate different aspects of a singl
         - [x] basic translation/rotation tools
         - [x] basic STL data input
         - [ ] STL vertices/face compression?
+        - [x] reset functionaltity for rotation/translation
     - Rays        
         - [x] basic intersection testing
         - [x] basic propagation routine over n elements
@@ -42,6 +43,7 @@ This project implements a forward model to simulate different aspects of a singl
 - [x] normal calculated from face in orthogonal3d(object::Geometry, fID::Int) points in the wrong dir?
     * fixed typo in reflection calculation
 - [ ] @code_warntype for interact(Lens, Beam)
+- [ ] change names for functions that return matrices
 
 ## Comments
 
