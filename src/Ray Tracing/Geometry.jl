@@ -2,9 +2,9 @@
     Geometry{T<:Number}
 
 Contains the STL mesh information for an arbitrary object, that is the `vertices` that make up the mesh and
-a matrix of `faces`, i.e. the connectivity matrix of the mesh. The data is read in using the `FileIO.jl` and 
+a matrix of `faces`, i.e. the connectivity matrix of the mesh. The data is read in using the `FileIO.jl` and
 `MeshIO.jl` packages. Translations and rotations of the mesh are directly saved in absolute coordinates in the
-vertex matrix. For orientation and translation tracking, a positional (`pos`) and directional (`dir`) matrix are stored.  
+vertex matrix. For orientation and translation tracking, a positional (`pos`) and directional (`dir`) matrix are stored.
 """
 mutable struct Geometry{T<:Number}
     vertices::Matrix{T}
@@ -17,7 +17,7 @@ end
 """
     Geometry(mesh)
 
-Parametric type constructor for struct Geometry. Takes data of type `GeometryBasics.Mesh` and extracts the 
+Parametric type constructor for struct Geometry. Takes data of type `GeometryBasics.Mesh` and extracts the
 vertices and faces. The mesh is initialized at the global origin. Data type of Geometry is variably selected based on
 type of vertex data (i.e `Float32`). Mesh data is scaled by factor 1e-3, assuming m scale.
 """
@@ -55,7 +55,7 @@ end
 """
     xrotate3d!(geometry::Geometry, θ)
 
-Mutating function that rotates the geometry geometry around the **x-axis**. 
+Mutating function that rotates the geometry geometry around the **x-axis**.
 The rotation is performed around the "center of gravity" axis.
 """
 function xrotate3d!(geometry::Geometry, θ)
@@ -70,7 +70,7 @@ end
 """
     yrotate3d!(geometry::Geometry, θ)
 
-Mutating function that rotates the geometry geometry around the **y-axis**. 
+Mutating function that rotates the geometry geometry around the **y-axis**.
 The rotation is performed around the "center of gravity" axis.
 """
 function yrotate3d!(geometry::Geometry, θ)
@@ -85,7 +85,7 @@ end
 """
     zrotate3d!(geometry::Geometry, θ)
 
-Mutating function that rotates the geometry geometry around the **z-axis**. 
+Mutating function that rotates the geometry geometry around the **z-axis**.
 The rotation is performed around the "center of gravity" axis.
 """
 function zrotate3d!(geometry::Geometry, θ)
@@ -136,7 +136,7 @@ end
     @Geometry
 
 A macro that automatically includes the `geometry` field for type composition with the `Geometry` type.
-Additionally, all wrapper functions required to access Geometry manipulation features are created. 
+Additionally, all wrapper functions required to access Geometry manipulation features are created.
 However, these can be overwritten if another form of dispatch is necessary.
 
 ```julia
@@ -158,7 +158,7 @@ macro Geometry(type)
     @assert type.head === :struct "@Geometry only works with structs!"
     # Insert geometry field into struct
     @debug "Composition of type $(type.args[2]) with field geometry::Geometry..." type.args[2]
-    pushfirst!(type.args[3].args, :(geometry::Geometry))
+    pushfirst!(type.args[3].args, :(geometry::Geometry{Float32}))
     try
         type.args[3].args[end].head === :function
         # Insert geometry variable into constructor

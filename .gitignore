@@ -10,3 +10,25 @@
 
 # but still ignore the main (scripting) file
 main.jl
+
+# OS generated files #
+######################
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+*.jl.*.cov
+*.jl.cov
+*.jl.mem
+.vscode
+
+*.png
+snoop_compile/
+
+/Manifest.toml
+/docs/build/
+/test/test.jl

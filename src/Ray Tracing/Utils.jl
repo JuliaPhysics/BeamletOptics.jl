@@ -44,7 +44,7 @@ end
 """
     align3d(start::Vector, target::Vector)
 
-Returns the rotation matrix R that will align the start vector to be parallel to the target vector.   
+Returns the rotation matrix R that will align the start vector to be parallel to the target vector.
 Based on ['Avoiding Trigonometry'](https://gist.github.com/kevinmoran/b45980723e53edeb8a5a43c49f134724) by Íñigo Quílez. The resulting matrix
 was transposed due to column/row major issues. Vector length is maintained. This function is very fast.
 """

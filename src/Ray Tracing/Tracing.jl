@@ -11,10 +11,10 @@ end
 """
     MoellerTrumboreAlgorithm(face::Matrix, ray::Ray)
 
-A culling implementation of the **Möller-Trumbore algorithm** for ray-triangle-intersection.\\
-This algorithm evaluates the possible intersection between a `ray` and a `face` that is defined by three vertices.\\
-If no intersection occurs, `Inf` is returned. `kϵ` is the abort threshold for backfacing and non-intersecting triangles.\\
-`lϵ` is the threshold for negative values of `t`.\\
+A culling implementation of the **Möller-Trumbore algorithm** for ray-triangle-intersection.
+This algorithm evaluates the possible intersection between a `ray` and a `face` that is defined by three vertices.
+If no intersection occurs, `Inf` is returned. `kϵ` is the abort threshold for backfacing and non-intersecting triangles.
+`lϵ` is the threshold for negative values of `t`.
 This algorithm is fast due to multiple breakout conditions.
 """
 function (f::MoellerTrumboreAlgorithm)(face, ray::Ray)
@@ -51,7 +51,6 @@ function (f::MoellerTrumboreAlgorithm)(face, ray::Ray)
     end
     return t
 end
-
 
 const ray_triangle_intersection = MoellerTrumboreAlgorithm(1e-9, 1e-9)
 
