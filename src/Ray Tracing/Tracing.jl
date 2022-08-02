@@ -1,15 +1,26 @@
-"""
-    moeller_trumbore_algorithm(face::Matrix, ray::Ray; kϵ=1e-5)
+mutable struct MoellerTrumboreAlgorithm{T}
+    kϵ::T
+    lϵ::T
+end
 
-An implementation of the (Möller-Trumbore algorithm)[https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/moller-trumbore-ray-triangle-intersection].
-This algorithm evaluates the possible intersection between a ray and a face that is defined by three vertices. If no intersection occurs, Inf is returned.
-kϵ is the abort threshold for backfacing and non-intersecting triangles. 
+function MoellerTrumboreAlgorithm(kϵ, lϵ)
+    @assert kϵ >= 0 "kϵ must be ≥ 0 ..."
+    return MoellerTrumboreAlgorithm{typeof(kϵ)}(kϵ, lϵ)
+end
+
+"""
+    MoellerTrumboreAlgorithm(face::Matrix, ray::Ray)
+
+A culling implementation of the **Möller-Trumbore algorithm** for ray-triangle-intersection.\\
+This algorithm evaluates the possible intersection between a `ray` and a `face` that is defined by three vertices.\\
+If no intersection occurs, `Inf` is returned. `kϵ` is the abort threshold for backfacing and non-intersecting triangles.\\
+`lϵ` is the threshold for negative values of `t`.\\
 This algorithm is fast due to multiple breakout conditions.
 """
-function moeller_trumbore_algorithm(face::Matrix, ray::Ray; kϵ=1e-9)
-    V1 = face[1, :]
-    V2 = face[2, :]
-    V3 = face[3, :]
+function (f::MoellerTrumboreAlgorithm)(face, ray::Ray)
+    V1 = @view face[1, :]
+    V2 = @view face[2, :]
+    V3 = @view face[3, :]
 
     E1 = V2 - V1
     E2 = V3 - V1
@@ -17,7 +28,7 @@ function moeller_trumbore_algorithm(face::Matrix, ray::Ray; kϵ=1e-9)
     Det = dot(E1, Pv)
     invDet = 1 / Det
     # Check if ray is backfacing or missing face
-    if abs(Det) < kϵ # (Det < kϵ) && (abs(Det) < kϵ)?
+    if abs(Det) < f.kϵ
         return Inf
     end
     # Compute normalized u and reject if less than 0 or greater than 1
@@ -35,11 +46,14 @@ function moeller_trumbore_algorithm(face::Matrix, ray::Ray; kϵ=1e-9)
     # Compute t (type def. for t to avoid Any)
     t::Float64 = dot(E2, Qv) * invDet
     # Return intersection only if "in front of" ray origin
-    if t < kϵ
+    if t < f.lϵ
         return Inf
     end
     return t
 end
+
+
+const ray_triangle_intersection = MoellerTrumboreAlgorithm(1e-9, 1e-9)
 
 """
     intersect3d(object::Geometry, ray::Ray)
@@ -49,12 +63,12 @@ If true, the **distance** `t` is returned, where the location of intersection is
 In addition, the face index of the mesh intersection is returned.
 """
 function intersect3d(object::Geometry, ray::Ray)
-    numEl = size(object.faces)[1]
-    t0 = Inf
+    numEl = size(object.faces, 1)
+    t0::Float64 = Inf
     fID::Int = 0
     for i = 1:numEl
-        face = object.vertices[object.faces[i, :], :]
-        t = moeller_trumbore_algorithm(face, ray)
+        face = @views object.vertices[object.faces[i, :], :]
+        t = ray_triangle_intersection(face, ray)
         # Return closest intersection
         if t < t0
             t0 = t
@@ -63,3 +77,18 @@ function intersect3d(object::Geometry, ray::Ray)
     end
     return t0, fID
 end
+
+# """
+#     intersect3d(object::Geometry, ray::Ray)
+
+# **Multi-threaded test version!**
+# """
+# function intersect3d(object::Geometry, ray::Ray)
+#     numEl = size(object.faces, 1)
+#     t = Vector{Float64}(undef, numEl)
+#     Threads.@threads for i = 1:numEl
+#         face = @views object.vertices[object.faces[i, :], :]
+#         t[i] = ray_triangle_intersection(face, ray)
+#     end
+#     return findmin(t)
+# end

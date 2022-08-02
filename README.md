@@ -17,7 +17,7 @@ This project implements a forward model to simulate different aspects of a singl
             - [x] reflection
             - [x] refraction
             - [ ] documentation
-        - [ ] wavelength field for Ray
+        - [x] wavelength field for Ray
         - [ ] Gaussian beam struct
 - Optics
     - [ ] phase front via Gaussian beams
@@ -44,6 +44,7 @@ This project implements a forward model to simulate different aspects of a singl
     * fixed typo in reflection calculation
 - [ ] @code_warntype for interact(Lens, Beam)
 - [ ] change names for functions that return matrices
+- [x] functor version of Möller-Trumbore alg. is FUBAR
 
 ## Comments
 
@@ -55,3 +56,8 @@ This project implements a forward model to simulate different aspects of a singl
 * "Inheritance" is solved via composition
     * macro injects necessary fields into struct
     * macro ensures all wrapper functions are defined
+* Möller-Trumbore-algorithm
+    * det < kepsilon condition: use of abs(det) or not?
+    * original paper does not feature abs()
+    * modern implementations do use abs(det)
+    * errors during testing if used without abs()!
