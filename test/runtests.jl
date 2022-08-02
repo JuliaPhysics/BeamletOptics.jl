@@ -23,13 +23,13 @@ end
         3 4 1
     ]
     pos = [0, 0, 0]
-    dir = [0, 0, 1]
+    dir = Matrix{Int}(I, 3, 3)
     scale = 1
     plane = SCDI.Plane(SCDI.Geometry{Float64}(
         vertices,
         faces,
-        pos,
         dir,
+        pos,
         scale
     ))
 
