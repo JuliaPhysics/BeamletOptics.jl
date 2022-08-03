@@ -26,13 +26,13 @@ function (f::MoellerTrumboreAlgorithm)(face, ray::Ray)
     E2 = V3 - V1
     Pv = cross(ray.dir, E2)
     Det = dot(E1, Pv)
-    invDet = 1 / Det
     # Check if ray is backfacing or missing face
     if abs(Det) < f.kϵ
         return Inf
     end
     # Compute normalized u and reject if less than 0 or greater than 1
     Tv = ray.pos - V1
+    invDet = 1 / Det
     u = dot(Tv, Pv) * invDet
     if (u < 0) || (u > 1)
         return Inf
