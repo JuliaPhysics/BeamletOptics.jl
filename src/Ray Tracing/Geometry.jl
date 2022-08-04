@@ -1,12 +1,12 @@
 """
-    Geometry{T<:Number}
+    Mesh{T<:Number}
 
 Contains the STL mesh information for an arbitrary object, that is the `vertices` that make up the mesh and
 a matrix of `faces`, i.e. the connectivity matrix of the mesh. The data is read in using the `FileIO.jl` and
 `MeshIO.jl` packages. Translations and rotations of the mesh are directly saved in absolute coordinates in the
 vertex matrix. For orientation and translation tracking, a positional (`pos`) and directional (`dir`) matrix are stored.
 """
-mutable struct Geometry{T<:Number}
+mutable struct Mesh{T<:Number}
     vertices::Matrix{T}
     faces::Matrix{Int}
     dir::Matrix{T}
@@ -15,13 +15,13 @@ mutable struct Geometry{T<:Number}
 end
 
 """
-    Geometry(mesh)
+    Mesh(mesh)
 
-Parametric type constructor for struct Geometry. Takes data of type `GeometryBasics.Mesh` and extracts the
-vertices and faces. The mesh is initialized at the global origin. Data type of Geometry is variably selected based on
+Parametric type constructor for struct Mesh. Takes data of type `GeometryBasics.Mesh` and extracts the
+vertices and faces. The mesh is initialized at the global origin. Data type of Mesh is variably selected based on
 type of vertex data (i.e `Float32`). Mesh data is scaled by factor 1e-3, assuming m scale.
 """
-function Geometry(mesh)
+function Mesh(mesh)
     # Determine mesh data type (i.e. Float32)
     T = typeof(mesh[1][1][1])
     # Read data from shitty mesh format to matrix format
@@ -34,163 +34,130 @@ function Geometry(mesh)
             faces[i, j] = 3(i - 1) + j
         end
     end
-    # Initialize geometry at origin with orientation [1,0,0] scaled to mm
+    # Initialize mesh at origin with orientation [1,0,0] scaled to mm
     # Origin and direction are converted to type T
     scale::T = 1e-3
-    return Geometry{T}(vertices * scale, faces, Matrix{T}(I, 3, 3), T.([0, 0, 0]), scale)
+    return Mesh{T}(vertices * scale, faces, Matrix{T}(I, 3, 3), T.([0, 0, 0]), scale)
 end
 
 """
-    translate3d!(geometry::Geometry, offset::Vector)
+    orthogonal3d(object::Mesh, fID::Int)
 
-Mutating function that translates the vertices of an geometry in relation to the offset vector.
-In addition, the geometry position vector is overwritten to reflect the new "center of gravity".
+Returns a vector with unit length that is perpendicular to the target face according to
+the right-hand rule. The vertices must be listed row-wise within the face matrix.
 """
-function translate3d!(geometry::Geometry, offset::Vector)
-    geometry.pos += offset
-    geometry.vertices .+= offset'
+function orthogonal3d(object::Mesh, fID::Int)
+    face = object.vertices[object.faces[fID, :], :]
+    n = cross((face[2, :] - face[1, :]), (face[3, :] - face[1, :]))
+    n /= norm(n)
+    return n
+end
+
+"""
+    translate3d!(mesh::Mesh, offset::Vector)
+
+Mutating function that translates the vertices of an mesh in relation to the offset vector.
+In addition, the mesh position vector is overwritten to reflect the new "center of gravity".
+"""
+function translate3d!(mesh::Mesh, offset::Vector)
+    mesh.pos += offset
+    mesh.vertices .+= offset'
     return nothing
 end
 
 """
-    xrotate3d!(geometry::Geometry, θ)
+    xrotate3d!(mesh::Mesh, θ)
 
-Mutating function that rotates the geometry geometry around the **x-axis**.
+Mutating function that rotates the mesh around the **x-axis**.
 The rotation is performed around the "center of gravity" axis.
 """
-function xrotate3d!(geometry::Geometry, θ)
+function xrotate3d!(mesh::Mesh, θ)
     # Calculate rotation matrix
     R = rotate3d([1, 0, 0], θ)
-    # Translate geometry to origin, rotate, retranslate
-    geometry.vertices = (geometry.vertices .- geometry.pos') * R .+ geometry.pos'
-    geometry.dir *= R
+    # Translate mesh to origin, rotate, retranslate
+    mesh.vertices .= (mesh.vertices .- mesh.pos') * R .+ mesh.pos'
+    mesh.dir *= R
     return nothing
 end
 
 """
-    yrotate3d!(geometry::Geometry, θ)
+    yrotate3d!(mesh::Mesh, θ)
 
-Mutating function that rotates the geometry geometry around the **y-axis**.
+Mutating function that rotates the mesh around the **y-axis**.
 The rotation is performed around the "center of gravity" axis.
 """
-function yrotate3d!(geometry::Geometry, θ)
+function yrotate3d!(mesh::Mesh, θ)
     # Calculate rotation matrix
     R = rotate3d([0, 1, 0], θ)
-    # Translate geometry to origin, rotate, retranslate
-    geometry.vertices = (geometry.vertices .- geometry.pos') * R .+ geometry.pos'
-    geometry.dir *= R
+    # Translate mesh to origin, rotate, retranslate
+    mesh.vertices .= (mesh.vertices .- mesh.pos') * R .+ mesh.pos'
+    mesh.dir *= R
     return nothing
 end
 
 """
-    zrotate3d!(geometry::Geometry, θ)
+    zrotate3d!(mesh::Mesh, θ)
 
-Mutating function that rotates the geometry geometry around the **z-axis**.
+Mutating function that rotates the mesh around the **z-axis**.
 The rotation is performed around the "center of gravity" axis.
 """
-function zrotate3d!(geometry::Geometry, θ)
+function zrotate3d!(mesh::Mesh, θ)
     # Calculate rotation matrix
     R = rotate3d([0, 0, 1], θ)
-    # Translate geometry to origin, rotate, retranslate
-    geometry.vertices = (geometry.vertices .- geometry.pos') * R .+ geometry.pos'
-    geometry.dir *= R
+    # Translate mesh to origin, rotate, retranslate
+    mesh.vertices .= (mesh.vertices .- mesh.pos') * R .+ mesh.pos'
+    mesh.dir *= R
     return nothing
 end
 
 """
-    scale3d!(geometry::Geometry, scale)
+    scale3d!(mesh::Mesh, scale)
 
 Allows rescaling of mesh data around "center of gravity".
 """
-function scale3d!(geometry::Geometry, scale)
-    # Translate geometry to origin, scale, return to orig. pos.
-    geometry.vertices = (geometry.vertices .- geometry.pos') .* scale .+ geometry.pos'
-    geometry.scale = scale
+function scale3d!(mesh::Mesh, scale)
+    # Translate mesh to origin, scale, return to orig. pos.
+    mesh.vertices .= (mesh.vertices .- mesh.pos') .* scale .+ mesh.pos'
+    mesh.scale = scale
     return nothing
 end
 
 """
-    reset_translation3d!(geometry::Geometry)
+    reset_translation3d!(mesh::Mesh)
 
-Resets all previous translations and returns the geometry back to the global origin.
+Resets all previous translations and returns the mesh back to the global origin.
 """
-function reset_translation3d!(geometry::Geometry)
-    geometry.vertices .-= geometry.pos'
-    geometry.pos = zeros(eltype(geometry.pos), 3)
+function reset_translation3d!(mesh::Mesh)
+    mesh.vertices .-= mesh.pos'
+    mesh.pos = zeros(eltype(mesh.pos), 3)
     return nothing
 end
 
 """
-    reset_rotation3d!(geometry::Geometry)
+    reset_rotation3d!(mesh::Mesh)
 
 Resets all previous rotations around the current offset.
 """
-function reset_rotation3d!(geometry::Geometry)
-    R = inv(geometry.dir)
-    geometry.vertices = (geometry.vertices .- geometry.pos') * R .+ geometry.pos'
-    geometry.dir = Matrix{eltype(geometry.dir)}(I, 3, 3)
+function reset_rotation3d!(mesh::Mesh)
+    R = inv(mesh.dir)
+    mesh.vertices = (mesh.vertices .- mesh.pos') * R .+ mesh.pos'
+    mesh.dir = Matrix{eltype(mesh.dir)}(I, 3, 3)
     return nothing
 end
 
-"""
-    @Geometry
+abstract type AbstractMesh end
 
-A macro that automatically includes the `geometry` field for type composition with the `Geometry` type.
-Additionally, all wrapper functions required to access Geometry manipulation features are created.
-However, these can be overwritten if another form of dispatch is necessary.
+# Enforces that objects have to have the field mesh or implement `mesh`.
+mesh(object::AbstractMesh) = object.mesh
 
-```julia
-struct MyType
-    x
-end
-```
-
-expands to
-
-```julia
-struct MyType
-    geometry::Geometry
-    x
-end
-```
-"""
-macro Geometry(type)
-    @assert type.head === :struct "@Geometry only works with structs!"
-    # Insert geometry field into struct
-    @debug "Composition of type $(type.args[2]) with field geometry::Geometry..." type.args[2]
-    pushfirst!(type.args[3].args, :(geometry::Geometry{Float32}))
-    try
-        type.args[3].args[end].head === :function
-        # Insert geometry variable into constructor
-        @debug "Modified internal constructor of type $(type.args[2])..."
-        insert!(type.args[3].args[end].args[1].args, 2, :(geometry::Geometry))
-        insert!(type.args[3].args[end].args[2].args[end].args, 2, :(geometry::Geometry))
-    catch
-        # do nothing
-    end
-    eval(type)
-
-    # Extract type name
-    if typeof(type.args[2]) == Expr
-        tname = type.args[2].args[1]
-    else
-        tname = type.args[2]
-    end
-
-    functions = quote
-        # Euclidic manipulation operations
-        translate3d!(object::eval($(tname)), offset::Vector) = translate3d!(object.geometry, offset)
-        xrotate3d!(object::eval($(tname)), θ) = xrotate3d!(object.geometry, θ)
-        yrotate3d!(object::eval($(tname)), θ) = yrotate3d!(object.geometry, θ)
-        zrotate3d!(object::eval($(tname)), θ) = zrotate3d!(object.geometry, θ)
-        scale3d!(object::eval($(tname)), scale) = scale3d!(object.geometry, scale)
-        # Mesh intersection
-        intersect3d(object::eval($(tname)), ray::Ray) = intersect3d(object.geometry, ray)
-        # Utils
-        orthogonal3d(object::eval($(tname)), fID::Int) = orthogonal3d(object.geometry, fID)
-        reset_translation3d!(object::eval($(tname))) = reset_translation3d!(object.geometry)
-        reset_rotation3d!(object::eval($(tname))) = reset_rotation3d!(object.geometry)
-    end
-    @debug "Generating wrapper functions for type $(tname)"
-    eval(functions)
-end
+translate3d!(object::AbstractMesh, offset::Vector) = translate3d!(mesh(object), offset)
+xrotate3d!(object::AbstractMesh, θ) = xrotate3d!(mesh(object), θ)
+yrotate3d!(object::AbstractMesh, θ) = yrotate3d!(mesh(object), θ)
+zrotate3d!(object::AbstractMesh, θ) = zrotate3d!(mesh(object), θ)
+scale3d!(object::AbstractMesh, scale) = scale3d!(mesh(object), scale)
+# Mesh intersection
+intersect3d(object::AbstractMesh, ray::Ray) = intersect3d(mesh(object), ray)
+# Utils
+orthogonal3d(object::AbstractMesh, fID::Int) = orthogonal3d(mesh(object), fID)
+reset_translation3d!(object::AbstractMesh) = reset_translation3d!(mesh(object))
+reset_rotation3d!(object::AbstractMesh) = reset_rotation3d!(mesh(object))
