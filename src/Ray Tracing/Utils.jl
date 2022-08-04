@@ -11,19 +11,6 @@ function orthogonal3d(target::Vector, reference::Vector)
 end
 
 """
-    orthogonal3d(object::Geometry, fID::Int)
-
-Returns a vector with unit length that is perpendicular to the target face according to
-the right-hand rule. The vertices must be listed row-wise within the face matrix.
-"""
-function orthogonal3d(object::Geometry, fID::Int)
-    face = object.vertices[object.faces[fID, :], :]
-    n = cross((face[2, :] - face[1, :]), (face[3, :] - face[1, :]))
-    n /= norm(n)
-    return n
-end
-
-"""
     rotate3d(reference::Vector, θ)
 
 Returns the rotation matrix that will rotate a vector around the reference axis at an angle
@@ -76,3 +63,44 @@ function angle3d(target::Vector, reference::Vector)
     @debug "Angle is $(angle*180/π)°"
     return angle
 end
+
+"""
+    fast_dot3d(a, b)
+
+SIMD-accelerated version of the dot product between the vectors `a` and `b`.\\
+Assumes a vector dimension of E=3.
+"""
+function fast_dot3d(a, b)
+    c = zero(eltype(a))
+    @simd for i = 1:3
+        @inbounds c += a[i] * b[i]
+    end
+    return c
+end
+
+"""
+    fast_cross3d!(c, a, b)
+
+Specific implementation of the cross product for vector dimensions E=3.\\
+Mutates the result in `c` for the cross product of `a` with `b`.
+"""
+function fast_cross3d!(c, a, b)
+    c[1] = a[2] * b[3] - a[3] * b[2]
+    c[2] = a[3] * b[1] - a[1] * b[3]
+    c[3] = a[1] * b[2] - a[2] * b[1]
+    return nothing
+end
+
+"""
+    fast_dot3d(a, b)
+
+SIMD-accelerated version of vector subtraction `b` from `a`.\\
+Assumes a vector dimension of E=3 and mutates the data in `c`.
+"""
+function fast_sub3d!(c, a, b)
+    @simd for i = 1:3
+        @inbounds c[i] = a[i] - b[i]
+    end
+    return nothing
+end
+

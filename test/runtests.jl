@@ -9,8 +9,10 @@ using LinearAlgebra
 end
 
 @testset "Mesh/geometry backend" begin
-    SCDI.@Geometry struct Plane end
-    @test isdefined(SCDI, :Plane)
+    struct Plane{T} <: SCDI.AbstractObject
+        geometry::SCDI.Geometry{T}
+    end
+    #@test isdefined(SCDI, :Plane)
 
     vertices = [
         1 1 0
@@ -25,7 +27,7 @@ end
     pos = [0, 0, 0]
     dir = Matrix{Int}(I, 3, 3)
     scale = 1
-    plane = SCDI.Plane(SCDI.Geometry{Float64}(
+    plane = Plane{Float64}(SCDI.Geometry{Float64}(
         vertices,
         faces,
         dir,

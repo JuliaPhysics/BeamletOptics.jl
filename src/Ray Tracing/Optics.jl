@@ -1,4 +1,6 @@
-@Geometry struct Mirror end
+struct Mirror{T} <: AbstractMesh
+    mesh::Mesh{T}
+end
 
 function interact(mirror::Mirror, beam::Beam, fID)
     normal = orthogonal3d(mirror, fID)
@@ -12,7 +14,8 @@ function reflection(dir, normal)
     return dir - 2 * dot(dir, normal) * normal
 end
 
-@Geometry struct Lens
+struct Lens{T} <: AbstractMesh
+    mesh::Mesh{T}
     ref_index::Function
 end
 
