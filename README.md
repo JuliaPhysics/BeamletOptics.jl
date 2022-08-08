@@ -38,13 +38,12 @@ This project implements a forward model to simulate different aspects of a singl
 - [x] wrong intersection for some geometries/angles?
     * fixed typo in Möller-Trumbore-algorithm
 - [ ] align3d rotation incorrect if start = -target
-- [ ] red warntype for trace_system
-    * even though SCDI.intersect3d(object::Geometry, ray::Ray) is type stable?
+- [x] @code_warntype for trace_system
+    * fixed by O. Kliebisch by stabilizing intersect3d
 - [x] normal calculated from face in orthogonal3d(object::Geometry, fID::Int) points in the wrong dir?
     * fixed typo in reflection calculation
 - [ ] @code_warntype for interact(Lens, Beam)
 - [ ] change names for functions that return matrices
-- [x] functor version of Möller-Trumbore alg. is FUBAR
 
 ## Comments
 
@@ -53,11 +52,17 @@ This project implements a forward model to simulate different aspects of a singl
     * ray length will be changed to `t` if an intersection occurs
     * thus requires mutable struct
     * is there a better (syntactial) way to do this, i.e. with immutable?
-* "Inheritance" is solved via composition
-    * macro injects necessary fields into struct
-    * macro ensures all wrapper functions are defined
 * Möller-Trumbore-algorithm
     * det < kepsilon condition: use of abs(det) or not?
     * original paper does not feature abs()
     * modern implementations do use abs(det)
     * errors during testing if used without abs()!
+* type structure proposal:
+    * AbstractEntity
+        * AbstractNoMeshPlaceholder
+        * AbstractMesh
+            * AbstractBoundedMesh
+                * Prism
+                * Mirror
+* replace Matrix representation of faces and vertices by Face type?
+    * only complicates plotting etc. and not really worth it

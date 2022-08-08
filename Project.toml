@@ -6,10 +6,11 @@ version = "0.1.0"
 [deps]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
-GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+MakieCore = "20f20a25-4f0e-4fdf-b5d1-57303727442b"
 MeshIO = "7269a6da-0436-5bbc-96c2-40638cbb6118"
 Optim = "429524aa-4258-5aef-a3af-852621145aeb"
+SnoopPrecompile = "66db9d55-30c0-4569-8b51-7e840670fc0c"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

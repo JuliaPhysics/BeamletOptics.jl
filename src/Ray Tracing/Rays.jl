@@ -32,15 +32,15 @@ function Ray(pos::Vector{T}, dir::Vector{G}) where {T<:Union{Int,Float64},G<:Uni
     return Ray{Float64}(Float64.(pos), Float64.(dir))
 end
 
-mutable struct Beamlet
-    chief::Vector{Ray}
-    divergence::Vector{Ray}
-    waist::Vector{Ray}
+mutable struct Beamlet{T}
+    chief::Vector{Ray{T}}
+    divergence::Vector{Ray{T}}
+    waist::Vector{Ray{T}}
 
     # Beamlet constructor
     # sizehint! in constructor?
     # append! performance (irrelevant)
-    function Beamlet(chief::Ray, λ, w0)
+    function Beamlet(chief::Ray, λ, w0; T=Float64)
         # All rays are initialized parallel to the x,y-plane
         # Divergence angle in rad
         θ = λ / (π * w0)
@@ -48,7 +48,7 @@ mutable struct Beamlet
         divergence = Ray(chief.pos, SCDI.rotate3d([0, 0, 1], θ) * chief.dir)
         # Waist ray
         waist = Ray(chief.pos + SCDI.orthogonal3d(chief.dir, [0, 0, 1]) * w0, chief.dir)
-        new([chief], [divergence], [waist])
+        new{T}([chief], [divergence], [waist])
     end
 end
 
@@ -58,6 +58,6 @@ end
 Temporary container struct to test ray tracing. Wavelength `λ` in nm.
 """
 mutable struct Beam
-    rays::Vector{Ray}
+    rays::Vector{Ray{Float64}}
     λ::Float64
 end
