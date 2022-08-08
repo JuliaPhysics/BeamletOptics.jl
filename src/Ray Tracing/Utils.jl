@@ -92,6 +92,17 @@ function fast_cross3d!(c, a, b)
 end
 
 """
+    fast_cross3d(a, b)
+
+Non-mutating version of fast_cross3d!().
+"""
+function fast_cross3d(a, b)
+    c = zeros(eltype(a), 3)
+    fast_cross3d!(c, a, b)
+    return c
+end
+
+"""
     fast_dot3d(a, b)
 
 SIMD-accelerated version of vector subtraction `b` from `a`.\\
@@ -104,3 +115,12 @@ function fast_sub3d!(c, a, b)
     return nothing
 end
 
+"""
+    line_point_distance3d(pos, dir, point)
+
+Computes the shortes distance between a line described by `pos`+t*`dir` and a `point` in 3D.
+This function is slow and should be used only for debugging purposes.
+"""
+function line_point_distance3d(pos, dir, point)
+    return norm(SCDI.fast_cross3d(pos .- point, dir)) / norm(dir)
+end

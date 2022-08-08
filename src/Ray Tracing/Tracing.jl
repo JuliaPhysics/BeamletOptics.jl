@@ -83,3 +83,29 @@ function intersect3d(object::Mesh, ray::Ray)
     end
     return t0, fID
 end
+
+"""
+    intersect3d(sphere::AbstractSphere, ray::Ray)
+
+Intersection algorithm for `sphere`ical objects. Returns a face ID of 0 if missed and 1 if hit.\\
+This function currently only works for **intersections from outside of the sphere**, but not within the sphere!
+Based on [this example](https://gamedev.stackexchange.com/questions/96459/fast-ray-sphere-collision-code).
+"""
+function intersect3d(sphere::Sphere, ray::Ray)
+    m = ray.pos - sphere.pos
+    b = fast_dot3d(m, ray.dir)
+    c = fast_dot3d(m, m) - sphere.radius^2
+    # Exit if ray origin outside sphere (c > 0) and ray pointing away from sphere (b > 0)
+    if c > 0.0 && b > 0.0
+        return Inf, 0
+    end
+    # Exit if negative discriminant (corresponds to ray missing sphere)
+    discr = b^2 - c
+    if discr < 0.0
+        return Inf, 0
+    end
+    # Ray intersects, compute t
+    t = -b - sqrt(discr)
+    # If t < 0, ray started inside sphere
+    return t, 1
+end

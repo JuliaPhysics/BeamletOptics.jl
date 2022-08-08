@@ -1,12 +1,16 @@
+abstract type AbstractEntity end
+abstract type AbstractMesh <: AbstractEntity end
+# abstract type AbstractBoundedMesh <: AbstractMesh end
+
 """
-    Mesh{T<:Number}
+    Mesh{T}
 
 Contains the STL mesh information for an arbitrary object, that is the `vertices` that make up the mesh and
 a matrix of `faces`, i.e. the connectivity matrix of the mesh. The data is read in using the `FileIO.jl` and
 `MeshIO.jl` packages. Translations and rotations of the mesh are directly saved in absolute coordinates in the
 vertex matrix. For orientation and translation tracking, a positional (`pos`) and directional (`dir`) matrix are stored.
 """
-mutable struct Mesh{T<:Number}
+mutable struct Mesh{T} <: AbstractMesh
     vertices::Matrix{T}
     faces::Matrix{Int}
     dir::Matrix{T}
@@ -145,10 +149,31 @@ function reset_rotation3d!(mesh::Mesh)
     return nothing
 end
 
-abstract type AbstractMesh end
+"""
+    set_new_origin3d!(mesh::Mesh)
 
-# Enforces that objects have to have the field mesh or implement `mesh`.
+Resets the mesh `dir`ectional matrix and `pos`ition vector to their initial values.\\
+**Warning: this operation is non-reversible!**
+"""
+function set_new_origin3d!(mesh::Mesh)
+    mesh.dir = Matrix{eltype(mesh.dir)}(I, 3, 3)
+    mesh.pos = zeros(eltype(mesh.pos), 3)
+    return nothing
+end
+
+"""
+    mesh(object::AbstractMesh)
+
+Enforces that objects with meshes have to have the field mesh or implement `mesh`.
+"""
 mesh(object::AbstractMesh) = object.mesh
+
+# """
+#     mesh(object::AbstractBoundedMesh)
+
+# Enforces that objects with bounded meshes have to have the field bounds or implement `bounds`.
+# """
+# bounds(object::AbstractBoundedMesh) = object.bounds
 
 translate3d!(object::AbstractMesh, offset::Vector) = translate3d!(mesh(object), offset)
 xrotate3d!(object::AbstractMesh, θ) = xrotate3d!(mesh(object), θ)
@@ -161,3 +186,7 @@ intersect3d(object::AbstractMesh, ray::Ray) = intersect3d(mesh(object), ray)
 orthogonal3d(object::AbstractMesh, fID::Int) = orthogonal3d(mesh(object), fID)
 reset_translation3d!(object::AbstractMesh) = reset_translation3d!(mesh(object))
 reset_rotation3d!(object::AbstractMesh) = reset_rotation3d!(mesh(object))
+set_new_origin3d!(object::AbstractMesh) = set_new_origin3d!(mesh(object))
+# Render
+render_object!(axis, object::AbstractMesh) = render_object!(axis, mesh(object))
+render_object_normals!(axis, object::AbstractMesh) = render_object_normals!(axis, mesh(object))

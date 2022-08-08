@@ -14,21 +14,21 @@ function reflection(dir, normal)
     return dir - 2 * dot(dir, normal) * normal
 end
 
-struct Lens{T} <: AbstractMesh
+struct Prism{T} <: AbstractMesh
     mesh::Mesh{T}
     ref_index::Function
 end
 
-function interact(lens::Lens, beam::Beam, fID)
+function interact(prism::Prism, beam::Beam, fID)
     # Check dir. of ray and surface normal
-    normal = orthogonal3d(lens, fID)
+    normal = orthogonal3d(prism, fID)
     if dot(beam.rays[end].dir, normal) < 0
-        @debug "Outside lens"
+        @debug "Outside prism"
         n1 = 1.0
-        n2 = lens.ref_index(beam.λ)
+        n2 = prism.ref_index(beam.λ)
     else
-        @debug "Inside lens"
-        n1 = lens.ref_index(beam.λ)
+        @debug "Inside prism"
+        n1 = prism.ref_index(beam.λ)
         n2 = 1.0
         normal *= -1
     end
@@ -51,4 +51,34 @@ function refraction(dir, normal, n1, n2)
     end
     cosθt = sqrt(1 - sinθt²)
     return n * dir + (n * cosθi - cosθt) * normal
+end
+
+struct BallLens{T} <: AbstractSphere
+    sphere::Sphere{T}
+    ref_index::Function
+end
+
+"""
+    interact(lens::BallLens, beam::Beam, fID)
+
+Placeholder interaction scheme for a refractive sphere. `fID` has no use.
+"""
+function interact(lens::BallLens, beam::Beam, fID)
+    dir = beam.rays[end].dir
+    npos = beam.rays[end].pos + beam.rays[end].len * dir
+    normal = npos-lens.pos
+    normal /= norm(dir)
+    if dot(dir, normal) < 0
+        @debug "Outside lens"
+        n1 = 1.0
+        n2 = 1.05
+    else
+        @debug "Inside lens"
+        n1 = 1.0
+        n2 = 1.05
+        normal *= -1
+    end
+    ndir = refraction(dir, normal, n1, n2)
+    append!(beam.rays, [Ray(npos, ndir)])
+    return true
 end
