@@ -22,3 +22,23 @@ Julia 1.8:
   extends:
     - .script
     - .coverage
+pages:
+  image: julia:1.8
+  stage: deploy
+  script:
+    - |
+       D:/CI_Ressources/Julia-1.8.0-rc3/bin/julia.exe --project=docs -e '
+        using Pkg
+        Pkg.develop(PackageSpec(path=pwd()))
+        Pkg.instantiate()
+        using Documenter: doctest
+        using SCDI
+        doctest(SCDI)
+        include(\"docs/make.jl\")'
+    - mkdir -p public
+    - mv docs/build/* public/
+  artifacts:
+    paths:
+      - public
+  only:
+    - master

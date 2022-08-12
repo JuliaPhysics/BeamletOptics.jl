@@ -1,16 +1,3 @@
-# Ignore all extensions
-*
-
-# but search in all folders
-!*/ 
-
-# and include the following
-!.gitignore
-!*.jl
-
-# but still ignore the main (scripting) file
-main.jl
-
 # OS generated files #
 ######################
 .DS_Store
