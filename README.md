@@ -2,6 +2,10 @@
 
 This project implements a forward model to simulate different aspects of a single crystal dispersion interferometer (SCDI) setup.
 
+## Documentation
+
+Documentation can be found here: https://optical-air-data.pages.gitlab.dlr.de/dispersionsinterferometer/scdi-sim/
+
 ## Features 
 
 - Complex ray tracing
