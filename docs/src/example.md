@@ -9,8 +9,32 @@ WGLMakie.activate!() # hide
 
 using SCDI
 
-s1 = SCDI.BallLens{Float64}(SCDI.Sphere{Float64}([2., 0, 0], 1), x -> 1.5)
-system = SCDI.System([s1])
+struct Plane{T} <: SCDI.AbstractMesh
+    mesh::SCDI.Mesh{T}
+end
+
+vertices = [
+        1 1 0
+        1 -1 0
+        -1 -1 0
+        -1 1 0
+    ]
+    faces = [
+        1 2 3
+        3 4 1
+    ]
+    pos = [0, 0, 0]
+    dir = [1 0 0;0 1 0; 0 0 1]
+    scale = 1
+    plane = Plane{Float64}(SCDI.Mesh{Float64}(
+        vertices,
+        faces,
+        dir,
+        pos,
+        scale
+    ))
+
+system = SCDI.System([plane])
 
 f = Figure()
 ax = f[1, 1] = Axis3(f)
