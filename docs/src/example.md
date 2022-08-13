@@ -1,6 +1,9 @@
 ```@example plot
 using JSServe: Page # hide
 Page(exportable=true, offline=true) # hide
+```
+
+```@example plot
 using WGLMakie # hide
 WGLMakie.activate!() # hide
 ```
@@ -47,5 +50,4 @@ for z in collect(-0.75:0.1:0.75)
 end
 
 f
-
 ```
