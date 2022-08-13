@@ -20,6 +20,6 @@ makedocs(;
 )
 
 deploydocs(
-    repo = "https://gitlab.dlr.de/optical-air-data/dispersionsinterferometer/scdi-sim"
+    repo = "https://gitlab.dlr.de/optical-air-data/dispersionsinterferometer/scdi-sim",
     devurl = "public"
 )
