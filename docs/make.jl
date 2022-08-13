@@ -18,3 +18,5 @@ makedocs(;
         "Example" => "example.md"
     ],
 )
+
+deploydocs(repo = "https://gitlab.dlr.de/optical-air-data/dispersionsinterferometer/scdi-sim")
