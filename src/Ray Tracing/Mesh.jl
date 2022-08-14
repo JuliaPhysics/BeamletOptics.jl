@@ -189,4 +189,4 @@ reset_rotation3d!(object::AbstractMesh) = reset_rotation3d!(mesh(object))
 set_new_origin3d!(object::AbstractMesh) = set_new_origin3d!(mesh(object))
 # Render
 render_object!(axis, object::AbstractMesh) = render_object!(axis, mesh(object))
-render_object_normals!(axis, object::AbstractMesh) = render_object_normals!(axis, mesh(object))
+render_object_normals!(axis, object::AbstractMesh; l=0.01) = render_object_normals!(axis, mesh(object), l=l)
