@@ -12,8 +12,8 @@ Documentation can be found here: https://optical-air-data.pages.gitlab.dlr.de/di
     - Utilities
         - [x] basic translation/rotation tools
         - [x] basic STL data input
+        - [x] reset functionality for rotation/translation
         - [ ] STL vertices/face compression?
-        - [x] reset functionaltity for rotation/translation
     - Rays        
         - [x] basic intersection testing
         - [x] basic propagation routine over n elements
@@ -33,6 +33,7 @@ Documentation can be found here: https://optical-air-data.pages.gitlab.dlr.de/di
 - Plotting
     - [ ] automatic plot updates using Makie Observable/Buffer
 - Test coverage
+    - [x] continuous integration pipeline by O. Kliebisch
     - [x] translation and x,y,z-rotation tests
     - [ ] Möller-Trumbore-algorithm test
     - [ ] generic mesh intersection test
@@ -48,6 +49,7 @@ Documentation can be found here: https://optical-air-data.pages.gitlab.dlr.de/di
     * fixed typo in reflection calculation
 - [ ] @code_warntype for interact(Lens, Beam)
 - [ ] change names for functions that return matrices
+- [ ] weird behaviour for ray-sphere-intersection/interaction
 
 ## Comments
 
@@ -64,6 +66,7 @@ Documentation can be found here: https://optical-air-data.pages.gitlab.dlr.de/di
 * type structure proposal:
     * AbstractEntity
         * AbstractNoMeshPlaceholder
+        * AbstractSphere
         * AbstractMesh
             * AbstractBoundedMesh
                 * Prism

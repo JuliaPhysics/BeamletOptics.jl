@@ -1,11 +1,11 @@
 """
-    Ray{T<:Number}
+    Ray{T}
 
 A mutable struct that contains a **position vector** `pos`, a **directional vector** `dir`
 and a **length** variable `t` that are used to describe a generic ray as `pos+t*dir`.
 The directional vector is required/adjusted to have unit length, i.e. `abs(dir) == 1`.
 """
-mutable struct Ray{T<:Number}
+mutable struct Ray{T}
     pos::Vector{T}
     dir::Vector{T}
     len::T
