@@ -182,6 +182,8 @@ zrotate3d!(object::AbstractMesh, θ) = zrotate3d!(mesh(object), θ)
 scale3d!(object::AbstractMesh, scale) = scale3d!(mesh(object), scale)
 # Mesh intersection
 intersect3d(object::AbstractMesh, ray::Ray) = intersect3d(mesh(object), ray)
+# Mesh interaction
+interact(object::AbstractMesh, beam::Beam, ~) = false
 # Utils
 orthogonal3d(object::AbstractMesh, fID::Int) = orthogonal3d(mesh(object), fID)
 reset_translation3d!(object::AbstractMesh) = reset_translation3d!(mesh(object))

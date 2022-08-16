@@ -4,7 +4,7 @@ mutable struct MoellerTrumboreAlgorithm{T}
 end
 
 function MoellerTrumboreAlgorithm(kϵ, lϵ; T=Float64)
-    @assert kϵ >= 0 "kϵ must be ≥ 0 ..."
+    @assert kϵ >= 0 && lϵ > 0 "kϵ must be ≥ 0 and lϵ > 0..."
     return MoellerTrumboreAlgorithm{T}(kϵ, lϵ)
 end
 

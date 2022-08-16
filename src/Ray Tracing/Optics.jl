@@ -61,21 +61,22 @@ end
 """
     interact(lens::BallLens, beam::Beam, fID)
 
-Placeholder interaction scheme for a refractive sphere. `fID` has no use.
+Placeholder interaction scheme for a refractive sphere. `fID` is discarded.
 """
-function interact(lens::BallLens, beam::Beam, fID)
+function interact(blens::BallLens, beam::Beam, ~)
     dir = beam.rays[end].dir
     npos = beam.rays[end].pos + beam.rays[end].len * dir
-    normal = npos-lens.pos
+    # Normal equation for a sphere at point p: n = |p-s|
+    normal = npos-sphere(blens).pos
     normal /= norm(dir)
     if dot(dir, normal) < 0
         @debug "Outside lens"
         n1 = 1.0
-        n2 = 1.05
+        n2 = blens.ref_index(beam.λ)
     else
         @debug "Inside lens"
         n1 = 1.0
-        n2 = 1.05
+        n2 = blens.ref_index(beam.λ)
         normal *= -1
     end
     ndir = refraction(dir, normal, n1, n2)
