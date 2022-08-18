@@ -71,81 +71,141 @@ end
 
         @debug "Testing Mesh struct definition"
         @test isdefined(SCDI, :Mesh)
+        @test isdefined(SCDI, :mesh)
     end
 
+    # Generate cube since types are defined
     include("Cube.jl")
 
-    @debug "Generating stationary and moving test cubes with scale 1"
-    foo = Cube(1) # stationary
-    bar = Cube(1) # moving
+    @debug "Generating moving test cube with scale 1"
+    foo = Cube(1)
 
     @testset "Testing translate3d!" begin
-        SCDI.translate3d!(bar, -0.5 * [1, 1, 1]) # move COG to origin
-        @test minimum(bar.mesh.vertices[:, 1]) == -0.5
-        @test minimum(bar.mesh.vertices[:, 2]) == -0.5
-        @test minimum(bar.mesh.vertices[:, 3]) == -0.5
-        @test maximum(bar.mesh.vertices[:, 1]) == 0.5
-        @test maximum(bar.mesh.vertices[:, 2]) == 0.5
-        @test maximum(bar.mesh.vertices[:, 3]) == 0.5
-        @test all(bar.mesh.pos .== -0.5)
+        SCDI.translate3d!(foo, -0.5 * [1, 1, 1]) # move COG to origin
+        @test minimum(SCDI.mesh(foo).vertices[:, 1]) == -0.5
+        @test minimum(SCDI.mesh(foo).vertices[:, 2]) == -0.5
+        @test minimum(SCDI.mesh(foo).vertices[:, 3]) == -0.5
+        @test maximum(SCDI.mesh(foo).vertices[:, 1]) == 0.5
+        @test maximum(SCDI.mesh(foo).vertices[:, 2]) == 0.5
+        @test maximum(SCDI.mesh(foo).vertices[:, 3]) == 0.5
+        @test all(SCDI.mesh(foo).pos .== -0.5)
     end
 
     @testset "Testing set_new_origin3d!" begin
-        SCDI.set_new_origin3d!(bar)
-        @test all(iszero.(bar.mesh.pos))
+        SCDI.set_new_origin3d!(foo)
+        @test all(iszero.(SCDI.mesh(foo).pos))
     end
 
     @testset "Testing x/y/zrotate3d!" begin
-        @debug "Testing xrotate3d!"
-        SCDI.xrotate3d!(bar, π / 4)
-        @test isapprox(minimum(bar.mesh.vertices[:, 1]), -0.5)
-        @test isapprox(minimum(bar.mesh.vertices[:, 2]), -√2 / 2)
-        @test isapprox(minimum(bar.mesh.vertices[:, 3]), -√2 / 2)
-        @test isapprox(maximum(bar.mesh.vertices[:, 1]), 0.5)
-        @test isapprox(maximum(bar.mesh.vertices[:, 2]), √2 / 2)
-        @test isapprox(maximum(bar.mesh.vertices[:, 3]), √2 / 2)
+        @testset "Testing xrotate3d!" begin
+            SCDI.xrotate3d!(foo, π / 4)
+            @test isapprox(minimum(SCDI.mesh(foo).vertices[:, 1]), -0.5)
+            @test isapprox(minimum(SCDI.mesh(foo).vertices[:, 2]), -√2 / 2)
+            @test isapprox(minimum(SCDI.mesh(foo).vertices[:, 3]), -√2 / 2)
+            @test isapprox(maximum(SCDI.mesh(foo).vertices[:, 1]), 0.5)
+            @test isapprox(maximum(SCDI.mesh(foo).vertices[:, 2]), √2 / 2)
+            @test isapprox(maximum(SCDI.mesh(foo).vertices[:, 3]), √2 / 2)
+        end
 
-        @debug "Testing yrotate3d!"
-        SCDI.yrotate3d!(bar, π / 2)
-        @test isapprox(minimum(bar.mesh.vertices[:, 1]), -√2 / 2)
-        @test isapprox(minimum(bar.mesh.vertices[:, 2]), -√2 / 2)
-        @test isapprox(minimum(bar.mesh.vertices[:, 3]), -0.5)
-        @test isapprox(maximum(bar.mesh.vertices[:, 1]), √2 / 2)
-        @test isapprox(maximum(bar.mesh.vertices[:, 2]), √2 / 2)
-        @test isapprox(maximum(bar.mesh.vertices[:, 3]), 0.5)
+        @testset "Testing yrotate3d!" begin
+            SCDI.yrotate3d!(foo, π / 2)
+            @test isapprox(minimum(SCDI.mesh(foo).vertices[:, 1]), -√2 / 2)
+            @test isapprox(minimum(SCDI.mesh(foo).vertices[:, 2]), -√2 / 2)
+            @test isapprox(minimum(SCDI.mesh(foo).vertices[:, 3]), -0.5)
+            @test isapprox(maximum(SCDI.mesh(foo).vertices[:, 1]), √2 / 2)
+            @test isapprox(maximum(SCDI.mesh(foo).vertices[:, 2]), √2 / 2)
+            @test isapprox(maximum(SCDI.mesh(foo).vertices[:, 3]), 0.5)
+        end
 
-        @debug "Testing zrotate3d!"
-        SCDI.zrotate3d!(bar, π / 4)
-        @test isapprox(minimum(bar.mesh.vertices[:, 1]), -0.5)
-        @test isapprox(minimum(bar.mesh.vertices[:, 2]), -0.5)
-        @test isapprox(minimum(bar.mesh.vertices[:, 3]), -0.5)
-        @test isapprox(maximum(bar.mesh.vertices[:, 1]), 0.5)
-        @test isapprox(maximum(bar.mesh.vertices[:, 2]), 0.5)
-        @test isapprox(maximum(bar.mesh.vertices[:, 3]), 0.5)
+        @testset "Testing zrotate3d!" begin
+            SCDI.zrotate3d!(foo, π / 4)
+            @test isapprox(minimum(SCDI.mesh(foo).vertices[:, 1]), -0.5)
+            @test isapprox(minimum(SCDI.mesh(foo).vertices[:, 2]), -0.5)
+            @test isapprox(minimum(SCDI.mesh(foo).vertices[:, 3]), -0.5)
+            @test isapprox(maximum(SCDI.mesh(foo).vertices[:, 1]), 0.5)
+            @test isapprox(maximum(SCDI.mesh(foo).vertices[:, 2]), 0.5)
+            @test isapprox(maximum(SCDI.mesh(foo).vertices[:, 3]), 0.5)
+        end
 
         @debug "Testing orientation of dir matrix"
-        @test all(bar.mesh.dir[[2, 6, 7]] .== 1)
+        @test all(SCDI.mesh(foo).dir[[2, 6, 7]] .== 1)
     end
 
     @testset "Testing reset_rotation3d!" begin
-        SCDI.reset_rotation3d!(bar)
-        SCDI.reset_translation3d!(bar) # sneaky, useless command for that sweet code coverage
-        @test all(bar.mesh.dir .== Matrix{Float64}(I, 3, 3))
+        SCDI.reset_rotation3d!(foo)
+        SCDI.reset_translation3d!(foo) # sneaky, useless command for that sweet code coverage
+        @test all(SCDI.mesh(foo).dir .== Matrix{Float64}(I, 3, 3))
     end
 
     @testset "Testing orthogonal3d" begin
-        normal = SCDI.orthogonal3d(bar, 1)
+        normal = SCDI.orthogonal3d(foo, 1)
         @test isapprox(normal, [0, 0, -1])
     end
 
     @testset "Testing scale3d!" begin
-        SCDI.scale3d!(bar, 2)
-        @test isapprox(minimum(bar.mesh.vertices[:, 1]), -1)
-        @test isapprox(minimum(bar.mesh.vertices[:, 2]), -1)
-        @test isapprox(minimum(bar.mesh.vertices[:, 3]), -1)
-        @test isapprox(maximum(bar.mesh.vertices[:, 1]), 1)
-        @test isapprox(maximum(bar.mesh.vertices[:, 2]), 1)
-        @test isapprox(maximum(bar.mesh.vertices[:, 3]), 1)
-        @test bar.mesh.scale == 2
+        SCDI.scale3d!(foo, 2)
+        @test isapprox(minimum(SCDI.mesh(foo).vertices[:, 1]), -1)
+        @test isapprox(minimum(SCDI.mesh(foo).vertices[:, 2]), -1)
+        @test isapprox(minimum(SCDI.mesh(foo).vertices[:, 3]), -1)
+        @test isapprox(maximum(SCDI.mesh(foo).vertices[:, 1]), 1)
+        @test isapprox(maximum(SCDI.mesh(foo).vertices[:, 2]), 1)
+        @test isapprox(maximum(SCDI.mesh(foo).vertices[:, 3]), 1)
+        @test SCDI.mesh(foo).scale == 2
+    end
+end
+
+@testset "Tracing" begin
+    @testset "Testing Moeller-Trumbore algorithm" begin
+        @debug "Testing functor definition"
+        @test isdefined(SCDI, :MoellerTrumboreAlgorithm)
+        @test hasfield(SCDI.MoellerTrumboreAlgorithm, :kϵ)
+        @test hasfield(SCDI.MoellerTrumboreAlgorithm, :lϵ)
+        @test isdefined(SCDI, :ray_triangle_intersection)
+        @test isconst(SCDI, :ray_triangle_intersection)
+        @debug "Defining face in the x-y-plane with z-offset t"
+        t = 5
+        face = [
+            1 1 t
+            -1 1 t
+            0 -1 t
+        ]
+        @debug "Defining ray at origin pointing along z-axis"
+        pos = [0,0,0]
+        dir = [0,0,1]
+        ray = SCDI.Ray(pos, dir)
+        # Preallocate memory 
+        E1 = similar(ray.dir)
+        E2 = similar(ray.dir)
+        Pv = similar(ray.dir)
+        Tv = similar(ray.dir)
+        Qv = similar(ray.dir)
+        @debug "Testing intersection"
+        @test isapprox(SCDI.ray_triangle_intersection(face, ray, E1, E2, Pv, Tv, Qv), t)
+        # Check allocations (WARNING: function must have been compiled once for before this test!)
+        alloc = @allocated SCDI.ray_triangle_intersection(face, ray, E1, E2, Pv, Tv, Qv)
+        if alloc > 16
+            @warn "Allocated number of bytes for MTA larger than expected!" alloc
+        end
+    end
+
+    @testset "Testing intersect3d for meshes" begin
+        @debug "Generating test cube"
+        t = 5
+        s = 1 # scale/2
+        foo = Cube(2*s)
+        # Move cube COG to origin
+        SCDI.translate3d!(foo, -[s, s, s])
+        SCDI.set_new_origin3d!(foo)
+        # Align cube edge at t units from origin
+        SCDI.translate3d!(foo, [t+s, 0, 0])
+        @debug "Defining ray at origin with variable dir"
+        pos = [0,0,0]
+        steps = 10
+        for z in -s:(s/steps):s
+            # Ray constructed each time for unit-length dir
+            dir = [t,0,z]
+            ray = SCDI.Ray(pos, dir)
+            @test isapprox(SCDI.intersect3d(foo, ray)[1], sqrt(t^2+z^2))
+        end
     end
 end
