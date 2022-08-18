@@ -3,14 +3,14 @@
     CI: "true"
   script:
     - |
-      D:/CI_Ressources/Julia-1.8.0-rc3/bin/julia.exe --project=@. -e '
+      D:/CI_Ressources/Julia-1.8.0/bin/julia.exe --project=@. -e '
         using Pkg        
         Pkg.test(coverage=true)'
 .coverage:
   coverage: /Test coverage (\d+\.\d+%)/
   after_script:
     - |
-       D:/CI_Ressources/Julia-1.8.0-rc3/bin/julia.exe -e '
+       D:/CI_Ressources/Julia-1.8.0/bin/julia.exe -e '
         using Pkg
         Pkg.add(\"Coverage\")
         using Coverage
@@ -27,7 +27,7 @@ pages:
   stage: deploy
   script:
     - |
-       D:/CI_Ressources/Julia-1.8.0-rc3/bin/julia.exe --project=docs -e '
+       D:/CI_Ressources/Julia-1.8.0/bin/julia.exe --project=docs -e '
         using Pkg
         Pkg.develop(PackageSpec(path=pwd()))
         Pkg.instantiate()
