@@ -13,7 +13,7 @@ Documentation can be found here: https://optical-air-data.pages.gitlab.dlr.de/di
         - [x] basic translation/rotation tools
         - [x] basic STL data input
         - [x] reset functionality for rotation/translation
-        - [ ] STL vertices/face compression?
+        - [ ] STL vertices/face compression
     - Rays        
         - [x] basic intersection testing
         - [x] basic propagation routine over n elements
@@ -28,6 +28,7 @@ Documentation can be found here: https://optical-air-data.pages.gitlab.dlr.de/di
     - [ ] phase shift due to ref. index change
     - [ ] optical intensity distribution on detector
     - [ ] simple astigmatism via 5, 7, 9-ray approach
+    - [ ] Lens types using mathematical surfaces
 - Mechanics
     - [ ] vibration of optical elements
 - Plotting
@@ -35,41 +36,19 @@ Documentation can be found here: https://optical-air-data.pages.gitlab.dlr.de/di
 - Test coverage
     - [x] continuous integration pipeline by O. Kliebisch
     - [x] translation and x,y,z-rotation tests
-    - [ ] Möller-Trumbore-algorithm test
-    - [ ] generic mesh intersection test
+    - [x] Möller-Trumbore-algorithm test
+    - [x] generic mesh intersection test
+    - [ ] solve_system()/trace_system() test
+    - [ ] interact() tests 
 
 ## Known bugs
 
-- [x] wrong intersection for some geometries/angles?
-    * fixed typo in Möller-Trumbore-algorithm
 - [ ] align3d rotation incorrect if start = -target
-- [x] @code_warntype for trace_system
-    * fixed by O. Kliebisch by stabilizing intersect3d
-- [x] normal calculated from face in orthogonal3d(object::Geometry, fID::Int) points in the wrong dir?
-    * fixed typo in reflection calculation
 - [ ] @code_warntype for interact(Lens, Beam)
 - [ ] change names for functions that return matrices
-- [ ] weird behaviour for ray-sphere-intersection/interaction
+- [ ] weird results for intersect(::Sphere, ::Ray)
+- [ ] weird results for high level-of-detail meshes
 
 ## Comments
 
-* the struct that contains the ray data (pos,dir,len) is currently mutable in order to change the length
-    * ray length is initialized with `Inf`
-    * ray length will be changed to `t` if an intersection occurs
-    * thus requires mutable struct
-    * is there a better (syntactial) way to do this, i.e. with immutable?
-* Möller-Trumbore-algorithm
-    * det < kepsilon condition: use of abs(det) or not?
-    * original paper does not feature abs()
-    * modern implementations do use abs(det)
-    * errors during testing if used without abs()!
-* type structure proposal:
-    * AbstractEntity
-        * AbstractNoMeshPlaceholder
-        * AbstractSphere
-        * AbstractMesh
-            * AbstractBoundedMesh
-                * Prism
-                * Mirror
-* replace Matrix representation of faces and vertices by Face type?
-    * only complicates plotting etc. and not really worth it
+ - retrace_system() functionality to exploit information from pretraced systems?
