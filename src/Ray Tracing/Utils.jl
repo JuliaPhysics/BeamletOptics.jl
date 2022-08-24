@@ -1,4 +1,35 @@
 """
+    norm3d(v)
+
+Computes the euclidic (p=2) norm of the input `v`ector.
+"""
+function norm3d(v)
+    return sqrt(v[1]^2 + v[2]^2 + v[3]^2)
+end
+
+"""
+    norm3d(v)
+
+Mutation function that changes  the `v`ector length to be ``||v|| = 1``. See also `normalize3d`\\
+Note that there is a limit to the equality due to machine precision.
+"""
+function normalize3d!(v)
+    v ./= norm3d(v)
+    return nothing
+end
+
+"""
+    normalize3d(v)
+
+Returns a normalized version of `v`. See also `normalize3d!`.
+"""
+function normalize3d(v)
+    n = copy(v)
+    normalize3d!(n)
+    return n
+end
+
+"""
     orthogonal3d(target::Vector, reference::Vector)
 
 Returns a vector with unit length that is perpendicular to the target and an additional
@@ -6,8 +37,7 @@ reference vector. Vector orientation is determined according to right-hand rule.
 """
 function orthogonal3d(target::Vector, reference::Vector)
     n = cross(target, reference)
-    n /= norm(n)
-    return n
+    return normalize3d(n)
 end
 
 """
@@ -36,8 +66,8 @@ Based on ['Avoiding Trigonometry'](https://gist.github.com/kevinmoran/b45980723e
 was transposed due to column/row major issues. Vector length is maintained. This function is very fast.
 """
 function align3d(start::Vector, target::Vector)
-    start /= norm(start)
-    target /= norm(target)
+    normalize3d!(start)
+    normalize3d!(target)
     rx, ry, rz = cross(target, start)
     # if start and target are already (almost) parallel return unity
     if (abs(rx) < 1e-9) & (abs(ry) < 1e-9) & (abs(rz) < 1e-9)
@@ -59,7 +89,7 @@ end
 Returns the angle between the `target` and `reference` vector in **rad**. Also logs the angle in debug mode (in degrees).
 """
 function angle3d(target::Vector, reference::Vector)
-    angle = acos(dot(target, reference) / (norm(target) * norm(reference)))
+    angle = acos(dot(target, reference) / (norm3d(target) * norm3d(reference)))
     @debug "Angle is $(angle*180/π)°"
     return angle
 end
@@ -122,5 +152,37 @@ Computes the shortes distance between a line described by `pos`+t*`dir` and a `p
 This function is slow and should be used only for debugging purposes.
 """
 function line_point_distance3d(pos, dir, point)
-    return norm(SCDI.fast_cross3d(pos .- point, dir)) / norm(dir)
+    return norm3d(SCDI.fast_cross3d(pos .- point, dir)) / norm3d(dir)
+end
+
+"""
+    reflection3d(dir, normal)
+
+Calculates the reflection between an input vector `dir` and surface normal vector `normal` in 3D-space
+"""
+function reflection3d(dir, normal)
+    return dir .- 2 .* fast_dot3d(dir, normal) .* normal
+end
+
+"""
+    refraction3d(dir, normal, n1, n2)
+
+Calculates the refraction between an input vector `dir` and surface `normal` vector  in 3D-space.\\
+`n1` is the "outside" refractive index and `n2` is the "inside" refractive index.\\
+Vectors `dir` and `normal` must have **unit length**!
+"""
+function refraction3d(dir, normal, n1, n2)
+    # dir and normal must have unit length!
+    @assert isapprox(norm3d(dir), 1)
+    @assert isapprox(norm3d(normal), 1) 
+    n = n1 / n2
+    cosθi = -dot(normal, dir)
+    sinθt² = n^2 * (1 - cosθi^2)
+    # Check for total reflection
+    if sinθt² > 1.0
+        @debug "Total reflection"
+        return reflection3d(dir, normal)
+    end
+    cosθt = sqrt(1 - sinθt²)
+    return @. n * dir + (n * cosθi - cosθt) * normal
 end

@@ -17,7 +17,7 @@ If no intersection occurs, `Inf` is returned. `kϵ` is the abort threshold for b
 `lϵ` is the threshold for negative values of `t`.
 This algorithm is fast due to multiple breakout conditions.
 """
-function (f::MoellerTrumboreAlgorithm)(face, ray::Ray, E1, E2, Pv, Tv, Qv)
+function (f::MoellerTrumboreAlgorithm)(face, ray::Ray{T}, E1, E2, Pv, Tv, Qv) where T
     V1 = @view face[1, :]
     V2 = @view face[2, :]
     V3 = @view face[3, :]
@@ -28,26 +28,27 @@ function (f::MoellerTrumboreAlgorithm)(face, ray::Ray, E1, E2, Pv, Tv, Qv)
     Det = fast_dot3d(E1, Pv)
     # Check if ray is backfacing or missing face
     if abs(Det) < f.kϵ
-        return Inf
+        # Adjust type of Inf
+        return T(Inf) # typemax(T) ?
     end
     # Compute normalized u and reject if less than 0 or greater than 1
     fast_sub3d!(Tv, ray.pos, V1)
     invDet = 1 / Det
     u = fast_dot3d(Tv, Pv) * invDet
     if (u < 0) || (u > 1)
-        return Inf
+        return T(Inf)
     end
     # Compute normalized v and reject if less than 0 or greater than 1
     fast_cross3d!(Qv, Tv, E1)
     v = fast_dot3d(ray.dir, Qv) * invDet
     if (v < 0) || (u + v > 1)
-        return Inf
+        return T(Inf)
     end
     # Compute t (type def. for t to avoid Any)
-    t::Float64 = fast_dot3d(E2, Qv) * invDet
+    t::T = fast_dot3d(E2, Qv) * invDet
     # Return intersection only if "in front of" ray origin
     if t < f.lϵ
-        return Inf
+        return T(Inf)
     end
     return t
 end
@@ -61,12 +62,12 @@ This function is a generic implementation to check if a ray intersects the objec
 If true, the **distance** `t` is returned, where the location of intersection is `ray.pos+t*ray.dir`.\\
 In addition, the face index of the mesh intersection is returned.
 """
-function intersect3d(object::Mesh, ray::Ray)
+function intersect3d(object::Mesh{M}, ray::Ray{R}) where {M, R}
     numEl = size(object.faces, 1)
-    t0::Float64 = Inf
-    fID::Int = 0
     # allocate all intermediate vectors once (note that this is NOT THREAD-SAFE)
-    T = promote_type(eltype(object.faces), eltype(ray.dir))
+    T = promote_type(M, R)
+    fID::Int = 0
+    t0::T = Inf
     E1 = Vector{T}(undef, 3)
     E2 = Vector{T}(undef, 3)
     Pv = Vector{T}(undef, 3)
@@ -81,7 +82,13 @@ function intersect3d(object::Mesh, ray::Ray)
             fID = i
         end
     end
-    return t0, fID
+    if isinf(t0)
+        return NoIntersection(T)
+    else
+        face = @views object.vertices[object.faces[fID, :], :]
+        normal = orthogonal3d(object, fID) # fast_cross3d((face[2, :] - face[1, :]), (face[3, :] - face[1, :]))
+        return Intersection{T}(t0, normalize3d(T.(normal)), missing)
+    end
 end
 
 """
@@ -91,21 +98,24 @@ Intersection algorithm for `sphere`ical objects. Returns a face ID of 0 if misse
 This function currently only works for **intersections from outside of the sphere**, but not within the sphere!
 Based on [this example](https://gamedev.stackexchange.com/questions/96459/fast-ray-sphere-collision-code).
 """
-function intersect3d(sphere::Sphere, ray::Ray)
+function intersect3d(sphere::Sphere{S}, ray::Ray{R}) where {S, R}
+    T = promote_type(S, R)
     m = ray.pos - sphere.pos
     b = fast_dot3d(m, ray.dir)
     c = fast_dot3d(m, m) - sphere.radius^2
     # Exit if ray origin outside sphere (c > 0) and ray pointing away from sphere (b > 0)
     if c > 0.0 && b > 0.0
-        return Inf, 0
+        return NoIntersection(T)
     end
     # Exit if negative discriminant (corresponds to ray missing sphere)
     discr = b^2 - c
     if discr < 0.0
-        return Inf, 0
+        return NoIntersection(T)
     end
     # Ray intersects, compute t
     t = -b - sqrt(discr)
     # If t < 0, ray started inside sphere
-    return t, 1
+    dir = ray.pos .+ t .* ray.dir
+    normal = dir .- sphere.pos
+    return Intersection{T}(t, normalize3d(T.(normal)), missing)
 end

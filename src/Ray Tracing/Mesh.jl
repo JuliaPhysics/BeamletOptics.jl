@@ -52,9 +52,8 @@ the right-hand rule. The vertices must be listed row-wise within the face matrix
 """
 function orthogonal3d(object::Mesh, fID::Int)
     face = object.vertices[object.faces[fID, :], :]
-    n = cross((face[2, :] - face[1, :]), (face[3, :] - face[1, :]))
-    n /= norm(n)
-    return n
+    n = fast_cross3d((face[2, :] - face[1, :]), (face[3, :] - face[1, :]))
+    return normalize3d(n)
 end
 
 """
