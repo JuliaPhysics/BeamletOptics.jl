@@ -9,9 +9,9 @@ include("Ray Tracing/Utils.jl")
 include("Ray Tracing/Rays.jl")
 include("Ray Tracing/Mesh.jl")
 include("Ray Tracing/Sphere.jl")
-include("Ray Tracing/Tracing.jl")
+include("Ray Tracing/Intersections.jl")
 include("Ray Tracing/System.jl")
-include("Ray Tracing/Optics.jl")
+include("Ray Tracing/Interactions.jl")
 include("Ray Tracing/Render.jl")
 
 if get(ENV, "CI", "false") == "false"

@@ -1,35 +1,46 @@
+mutable struct Intersection{T}
+    const t::T
+    const n::Union{Vector{T}, Missing}
+    oID::Union{Int, Missing}
+end
+
+# Optimized for pointer look-up
+const _NoIntersectionF64 = Intersection(Inf64, missing, missing)
+const _NoIntersectionF32 = Intersection(Inf32, missing, missing)
+
+NoIntersection(::Type{Float64}) = _NoIntersectionF64
+NoIntersection(::Type{Float32}) = _NoIntersectionF32
+
 """
     Ray{T}
 
-A mutable struct that contains a **position vector** `pos`, a **directional vector** `dir`
-and a **length** variable `t` that are used to describe a generic ray as `pos+t*dir`.
-The directional vector is required/adjusted to have unit length, i.e. `abs(dir) == 1`.
+Mutable struct to store ray information. A `Ray` is described by ``\\vec{v}_{pos}+t\\cdot\\vec{v}_{dir}`` with ``t\\in[0,\\infty)``.
+
+# Fields
+- `pos`: a 3D-vector that describes the `Ray` origin
+- `dir`: a normalized 3D-vector that describes the `Ray` direction
+- `intersection`: refer to `Intersection{T}`.
 """
 mutable struct Ray{T}
     pos::Vector{T}
     dir::Vector{T}
-    len::T
-    @doc """
-        Ray{T}(pos::Vector{T}, dir::Vector{T}) where T
-
-    Parametric type constructor for struct Ray. Takes in a position vector `pos` and directional vector `dir`, which is scaled
-    to unit length. The initial ray length `t` is set to `Inf`.
-    """
-    function Ray{T}(pos::Vector{T}, dir::Vector{T}) where {T}
-        @assert norm(dir) != 0 "Illegal vector for direction"
-        new{T}(pos, dir / norm(dir), Inf)
-    end
+    intersection::Intersection{T}
 end
 
 """
-    Ray(pos::Vector{T}, dir::Vector{G}) where {T<:Union{Int, Float64}, G<:Union{Int, Float64}}
+    Ray(pos::Vector{P}, dir::Vector{D}) where {P, D}
 
-Concrete implementation of Ray struct for `Float64` data type. Accepts all combinations where `pos` and `dir`
-are of type `Float64` and/or abstract `Int`. Allows seperate implementation for `Float32`, etc.
-Promotes input types to `Float64`.
+Constructs an instance of `Ray` with common type `T`. Vector `dir` is normalized. Ray is initialized with `NoIntersection`.\\
+In general, `T<:AbstractFloat`! Inputs of type `Int` are promoted to `Float64`.
 """
-function Ray(pos::Vector{T}, dir::Vector{G}) where {T<:Union{Int,Float64},G<:Union{Int,Float64}}
-    return Ray{Float64}(Float64.(pos), Float64.(dir))
+function Ray(pos::Vector{P}, dir::Vector{D}) where {P<:Real, D<:Real}
+    @assert norm3d(dir) != 0 "Illegal vector for direction"
+    T = promote_type(P, D)
+    # Catch integer type inputs
+    if !(T<:AbstractFloat)
+        T = Float64
+    end
+    return Ray{T}(T.(pos), normalize3d(T.(dir)), NoIntersection(T))
 end
 
 mutable struct Beamlet{T}

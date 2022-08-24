@@ -5,7 +5,7 @@ mutable struct Cube{T} <: SCDI.AbstractMesh
     dimension::T
 end
 
-function Cube(scale::Real)
+function Cube(scale::Real; T=Float64)
     vertices = [
         0 0 0
         1 0 0
@@ -30,12 +30,12 @@ function Cube(scale::Real)
         1 7 8
         1 2 7
     ]
-    return Cube{Float64}(
-        SCDI.Mesh{Float64}(
+    return Cube{T}(
+        SCDI.Mesh{T}(
             vertices .* scale,
             faces,
-            Matrix{Float64}(I, 3, 3),
-            [0.0, 0.0, 0.0],
+            Matrix{T}(I, 3, 3),
+            T.([0, 0, 0]),
             scale
         ),
         scale

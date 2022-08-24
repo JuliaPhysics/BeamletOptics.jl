@@ -11,35 +11,31 @@ struct System{T}
 end
 
 function trace_system(system::System, ray::Ray)
-    t0 = Inf
-    oID::Int = 0 # object index
-    fID::Int = 0 # face index of object
-    temp::Int = 0 # buffer for face index
+    intersection::Intersection = NoIntersection(Float64)
+    temp::Intersection = NoIntersection(Float64)
     for (i, object) in enumerate(system.objects)
-        t, temp = intersect3d(object, ray)
-        if t < t0
-            t0 = t
-            oID = i
-            fID = temp
+        temp = intersect3d(object, ray)
+        if temp.t < intersection.t
+            intersection = temp
+            intersection.oID = i
         end
     end
-    return t0, oID, fID
+    return intersection
 end
 
 function solve_system!(system::System, beam::Beam; i_max=20)
     flag = true
-    iter = 0
-    # find intersect
+    iter = 1
     @debug "Ray tracing routine started."
     while flag && iter <= i_max
-        t0, oID, fID = trace_system(system, beam.rays[end])
-        if (t0 == Inf) || (oID == 0)
+        intersection = trace_system(system, beam.rays[end])
+        if isinf(intersection.t)
             @debug "No further intersection found!"
             flag = false
         else
-            @debug "Intersection found with:" oID fID
-            beam.rays[end].len = t0
-            flag = interact(system.objects[oID], beam, fID)
+            @debug "Intersection found with:" intersection.oID
+            beam.rays[end].intersection = intersection
+            flag = interact(system.objects[intersection.oID], beam)
         end
         iter += 1
     end

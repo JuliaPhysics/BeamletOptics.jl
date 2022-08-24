@@ -3,6 +3,14 @@ using Test
 using LinearAlgebra
 
 @testset "Utilites" begin
+    @testset "Testing euclidic norm utilites" begin
+        v = [1.0, 0.0, 1.0]
+        @test isapprox(SCDI.norm3d(v), sqrt(2))
+        @test isapprox(SCDI.normalize3d(v), [sqrt(2) / 2, 0, sqrt(2) / 2])
+        SCDI.normalize3d!(v)
+        @test isapprox(v, [sqrt(2) / 2, 0, sqrt(2) / 2])
+    end
+
     @debug "Testing orthogonal3d for right hand rule and unit length"
     orth = SCDI.orthogonal3d([2, 0, 0], [0, 0, 1])
     @test isapprox(orth, [0, -1, 0])
@@ -44,19 +52,60 @@ using LinearAlgebra
     point = [5, 1, 1]
     d = SCDI.line_point_distance3d(pos, dir, point)
     @test isapprox(d, √2)
+
+    @testset "Testing reflection3d" begin
+        for dx in -1:1, dy in -1:1
+            @test isapprox(SCDI.reflection3d([dx, dy, 1], [0, 0, -1]), [dx, dy, -1])
+        end
+    end
+
+    @testset "Testing refraction3d" begin
+        normal = [0, 0, 1]
+        @testset "Test from vacuum into medium" begin
+            n1 = 1.0
+            n2 = 1.5
+            for θ1 in 0:π/8:π/2
+                dir_in = [sin(θ1), 0, -cos(θ1)]
+                dir_out = SCDI.refraction3d(dir_in, normal, n1, n2)
+                θ2 = SCDI.angle3d(-normal, dir_out)
+                # 2D-equation for refraction validation
+                θ3 = asin(n1 / n2 * sin(θ1))
+                @test isapprox(θ2, θ3)
+            end
+        end
+        @testset "Test from medium into vacuum" begin
+            n1 = 1.5
+            n2 = 1.0
+            for θ1 in 0:π/8:π/2
+                dir_in = [sin(θ1), 0, -cos(θ1)]
+                dir_out = SCDI.refraction3d(dir_in, normal, n1, n2)
+                if θ1 > asin(n2 / n1)
+                    # Test for total reflection
+                    θ2 = SCDI.angle3d(dir_out, normal)
+                    @test isapprox(θ1, θ2)
+                else
+                    # Test for refraction
+                    θ2 = SCDI.angle3d(-normal, dir_out)
+                    θ3 = asin(n1 / n2 * sin(θ1))
+                    @test isapprox(θ2, θ3)
+                end
+            end
+        end
+    end
 end
 
 @testset "Rays" begin
     @debug "Testing Ray struct definition"
     @test isdefined(SCDI, :Ray)
-    pos = [0.0, 0, 0]
-    dir = [1.0, 1, 1]
-    ray = SCDI.Ray{Float64}(pos, dir)
+    pos = [0, 0, 0]
+    dir = [1, 1, 1]
+    ray = SCDI.Ray(pos, dir)
     @test ismutable(ray)
+    @test eltype(ray.pos) == Float64
 
     @debug "Testing Ray constructor (dir normalization and init. Inf length)"
-    @test norm(ray.dir) == 1
-    @test isinf(ray.len)
+    @test isapprox(SCDI.norm3d(ray.dir), 1)
+    @test isinf(ray.intersection.t)
 
     @debug "Testing Beam struct definition"
     @test isdefined(SCDI, :Beam)
@@ -154,7 +203,7 @@ end
     end
 end
 
-@testset "Tracing" begin
+@testset "Intersections" begin
     @testset "Testing Moeller-Trumbore algorithm" begin
         @debug "Testing functor definition"
         @test isdefined(SCDI, :MoellerTrumboreAlgorithm)
@@ -170,8 +219,8 @@ end
             0 -1 t
         ]
         @debug "Defining ray at origin pointing along z-axis"
-        pos = [0,0,0]
-        dir = [0,0,1]
+        pos = [0, 0, 0]
+        dir = [0, 0, 1]
         ray = SCDI.Ray(pos, dir)
         # Preallocate memory 
         E1 = similar(ray.dir)
@@ -192,20 +241,20 @@ end
         @debug "Generating test cube"
         t = 5
         s = 1 # scale/2
-        foo = Cube(2*s)
+        foo = Cube(2 * s)
         # Move cube COG to origin
         SCDI.translate3d!(foo, -[s, s, s])
         SCDI.set_new_origin3d!(foo)
         # Align cube edge at t units from origin
-        SCDI.translate3d!(foo, [t+s, 0, 0])
+        SCDI.translate3d!(foo, [t + s, 0, 0])
         @debug "Defining ray at origin with variable dir"
-        pos = [0,0,0]
+        pos = [0, 0, 0]
         steps = 10
         for z in -s:(s/steps):s
             # Ray constructed each time for unit-length dir
-            dir = [t,0,z]
+            dir = [t, 0, z]
             ray = SCDI.Ray(pos, dir)
-            @test isapprox(SCDI.intersect3d(foo, ray)[1], sqrt(t^2+z^2))
+            @test isapprox(SCDI.intersect3d(foo, ray).t, sqrt(t^2 + z^2))
         end
     end
 end
