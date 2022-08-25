@@ -29,10 +29,10 @@ Render the entire `beam` into the specified 3D-`axis`. A `color` can be specifie
 """
 function render_beam!(axis, beam::Beam; color=:blue, flen=1.0)
     for ray in beam.rays
-        if ray.len == Inf
+        if ray.intersection.t == Inf
             len = flen
         else
-            len = ray.len
+            len = ray.intersection.t
         end
         temp = ray.pos + len * ray.dir
         lines!(
