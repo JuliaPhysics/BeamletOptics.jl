@@ -94,6 +94,36 @@ using LinearAlgebra
     end
 end
 
+@testset "Types" begin
+    @debug "Testing abstract type definitions"
+    @test isdefined(SCDI, :AbstractEntity)
+    @test isdefined(SCDI, :AbstractObject)
+
+    # Generate test struct
+    mutable struct Object{T} <: SCDI.AbstractObject{T}
+        pos::Vector{T}
+    end
+
+    @testset "Testing abstract type interfaces" begin
+        object = Object([0,0,0])
+        SCDI.translate3d!(object, [1,1,1])        
+        SCDI.position!(object, [2,2,2])
+        SCDI.reset_translation3d!(object)
+        @test SCDI.position(object) == object.pos
+        @test SCDI.position(object) == zeros(3)
+        # The following test are expected to do nothing but not throw exceptions
+        SCDI.rotate3d!(object, [0,0,1], π)
+        SCDI.xrotate3d!(object, π)
+        SCDI.yrotate3d!(object, π)
+        SCDI.zrotate3d!(object, π)
+        SCDI.reset_rotation3d!(object)
+        @test_logs (:warn,) SCDI.intersect3d(object, SCDI.Ray([0,0,1],[0,0,1]))
+    end
+
+    # AbstractRay testing (WIP)
+    @test isdefined(SCDI, :AbstractRay)
+end
+
 @testset "Rays" begin
     @debug "Testing Ray struct definition"
     @test isdefined(SCDI, :Ray)
@@ -114,6 +144,7 @@ end
 end
 
 @testset "Mesh" begin
+    # NOTE: the "Mesh" testset is mutating. Errors/fails might lead to subsequent tests failing too!
     @testset "Testing type definitions" begin
         @test isdefined(SCDI, :AbstractEntity)
         @test isdefined(SCDI, :AbstractMesh)
@@ -129,61 +160,70 @@ end
     @debug "Generating moving test cube with scale 1"
     foo = Cube(1)
 
+    @testset "Testing AbstractMesh getters" begin
+        @test typeof(SCDI.meshof(foo)) == SCDI.Mesh{Float64}
+        @test SCDI.vertices(foo) == foo.mesh.vertices
+        @test SCDI.faces(foo) == foo.mesh.faces
+        @test SCDI.orientation(foo) == foo.mesh.dir
+        @test SCDI.position(foo) == foo.mesh.pos
+        @test SCDI.scale(foo) == foo.mesh.scale
+    end
+
     @testset "Testing translate3d!" begin
         SCDI.translate3d!(foo, -0.5 * [1, 1, 1]) # move COG to origin
-        @test minimum(SCDI.mesh(foo).vertices[:, 1]) == -0.5
-        @test minimum(SCDI.mesh(foo).vertices[:, 2]) == -0.5
-        @test minimum(SCDI.mesh(foo).vertices[:, 3]) == -0.5
-        @test maximum(SCDI.mesh(foo).vertices[:, 1]) == 0.5
-        @test maximum(SCDI.mesh(foo).vertices[:, 2]) == 0.5
-        @test maximum(SCDI.mesh(foo).vertices[:, 3]) == 0.5
-        @test all(SCDI.mesh(foo).pos .== -0.5)
+        @test minimum(SCDI.vertices(foo)[:, 1]) == -0.5
+        @test minimum(SCDI.vertices(foo)[:, 2]) == -0.5
+        @test minimum(SCDI.vertices(foo)[:, 3]) == -0.5
+        @test maximum(SCDI.vertices(foo)[:, 1]) == 0.5
+        @test maximum(SCDI.vertices(foo)[:, 2]) == 0.5
+        @test maximum(SCDI.vertices(foo)[:, 3]) == 0.5
+        @test all(SCDI.position(foo) .== -0.5)
     end
 
     @testset "Testing set_new_origin3d!" begin
         SCDI.set_new_origin3d!(foo)
-        @test all(iszero.(SCDI.mesh(foo).pos))
+        @test SCDI.position(foo) == zeros(3)
     end
 
     @testset "Testing x/y/zrotate3d!" begin
         @testset "Testing xrotate3d!" begin
             SCDI.xrotate3d!(foo, π / 4)
-            @test isapprox(minimum(SCDI.mesh(foo).vertices[:, 1]), -0.5)
-            @test isapprox(minimum(SCDI.mesh(foo).vertices[:, 2]), -√2 / 2)
-            @test isapprox(minimum(SCDI.mesh(foo).vertices[:, 3]), -√2 / 2)
-            @test isapprox(maximum(SCDI.mesh(foo).vertices[:, 1]), 0.5)
-            @test isapprox(maximum(SCDI.mesh(foo).vertices[:, 2]), √2 / 2)
-            @test isapprox(maximum(SCDI.mesh(foo).vertices[:, 3]), √2 / 2)
+            @test isapprox(minimum(SCDI.vertices(foo)[:, 1]), -0.5)
+            @test isapprox(minimum(SCDI.vertices(foo)[:, 2]), -√2 / 2)
+            @test isapprox(minimum(SCDI.vertices(foo)[:, 3]), -√2 / 2)
+            @test isapprox(maximum(SCDI.vertices(foo)[:, 1]), 0.5)
+            @test isapprox(maximum(SCDI.vertices(foo)[:, 2]), √2 / 2)
+            @test isapprox(maximum(SCDI.vertices(foo)[:, 3]), √2 / 2)
         end
 
         @testset "Testing yrotate3d!" begin
             SCDI.yrotate3d!(foo, π / 2)
-            @test isapprox(minimum(SCDI.mesh(foo).vertices[:, 1]), -√2 / 2)
-            @test isapprox(minimum(SCDI.mesh(foo).vertices[:, 2]), -√2 / 2)
-            @test isapprox(minimum(SCDI.mesh(foo).vertices[:, 3]), -0.5)
-            @test isapprox(maximum(SCDI.mesh(foo).vertices[:, 1]), √2 / 2)
-            @test isapprox(maximum(SCDI.mesh(foo).vertices[:, 2]), √2 / 2)
-            @test isapprox(maximum(SCDI.mesh(foo).vertices[:, 3]), 0.5)
+            @test isapprox(minimum(SCDI.vertices(foo)[:, 1]), -√2 / 2)
+            @test isapprox(minimum(SCDI.vertices(foo)[:, 2]), -√2 / 2)
+            @test isapprox(minimum(SCDI.vertices(foo)[:, 3]), -0.5)
+            @test isapprox(maximum(SCDI.vertices(foo)[:, 1]), √2 / 2)
+            @test isapprox(maximum(SCDI.vertices(foo)[:, 2]), √2 / 2)
+            @test isapprox(maximum(SCDI.vertices(foo)[:, 3]), 0.5)
         end
 
         @testset "Testing zrotate3d!" begin
             SCDI.zrotate3d!(foo, π / 4)
-            @test isapprox(minimum(SCDI.mesh(foo).vertices[:, 1]), -0.5)
-            @test isapprox(minimum(SCDI.mesh(foo).vertices[:, 2]), -0.5)
-            @test isapprox(minimum(SCDI.mesh(foo).vertices[:, 3]), -0.5)
-            @test isapprox(maximum(SCDI.mesh(foo).vertices[:, 1]), 0.5)
-            @test isapprox(maximum(SCDI.mesh(foo).vertices[:, 2]), 0.5)
-            @test isapprox(maximum(SCDI.mesh(foo).vertices[:, 3]), 0.5)
+            @test isapprox(minimum(SCDI.vertices(foo)[:, 1]), -0.5)
+            @test isapprox(minimum(SCDI.vertices(foo)[:, 2]), -0.5)
+            @test isapprox(minimum(SCDI.vertices(foo)[:, 3]), -0.5)
+            @test isapprox(maximum(SCDI.vertices(foo)[:, 1]), 0.5)
+            @test isapprox(maximum(SCDI.vertices(foo)[:, 2]), 0.5)
+            @test isapprox(maximum(SCDI.vertices(foo)[:, 3]), 0.5)
         end
 
         @debug "Testing orientation of dir matrix"
-        @test all(SCDI.mesh(foo).dir[[2, 6, 7]] .== 1)
+        @test all(SCDI.orientation(foo)[[2, 6, 7]] .== 1)
     end
 
     @testset "Testing reset_rotation3d!" begin
         SCDI.reset_rotation3d!(foo)
         SCDI.reset_translation3d!(foo) # sneaky, useless command for that sweet code coverage
-        @test all(SCDI.mesh(foo).dir .== Matrix{Float64}(I, 3, 3))
+        @test all(SCDI.orientation(foo) .== Matrix{Float64}(I, 3, 3))
     end
 
     @testset "Testing orthogonal3d" begin
@@ -193,13 +233,13 @@ end
 
     @testset "Testing scale3d!" begin
         SCDI.scale3d!(foo, 2)
-        @test isapprox(minimum(SCDI.mesh(foo).vertices[:, 1]), -1)
-        @test isapprox(minimum(SCDI.mesh(foo).vertices[:, 2]), -1)
-        @test isapprox(minimum(SCDI.mesh(foo).vertices[:, 3]), -1)
-        @test isapprox(maximum(SCDI.mesh(foo).vertices[:, 1]), 1)
-        @test isapprox(maximum(SCDI.mesh(foo).vertices[:, 2]), 1)
-        @test isapprox(maximum(SCDI.mesh(foo).vertices[:, 3]), 1)
-        @test SCDI.mesh(foo).scale == 2
+        @test isapprox(minimum(SCDI.vertices(foo)[:, 1]), -1)
+        @test isapprox(minimum(SCDI.vertices(foo)[:, 2]), -1)
+        @test isapprox(minimum(SCDI.vertices(foo)[:, 3]), -1)
+        @test isapprox(maximum(SCDI.vertices(foo)[:, 1]), 1)
+        @test isapprox(maximum(SCDI.vertices(foo)[:, 2]), 1)
+        @test isapprox(maximum(SCDI.vertices(foo)[:, 3]), 1)
+        @test SCDI.scale(foo) == 2
     end
 end
 

@@ -1,16 +1,46 @@
-abstract type AbstractEntity end
-abstract type AbstractMesh <: AbstractEntity end
-# abstract type AbstractBoundedMesh <: AbstractMesh end
+"""
+    AbstractMesh <: AbstractObject
+
+A generic type for an object whose volume can be described by a mesh. Must have a field `mesh` of type `Mesh`. See also `Mesh{T}`.
+"""
+abstract type AbstractMesh{T} <: AbstractObject{T} end
+
+# mesh! already reserved by Makie.jl
+"Enforces that `mesh`-like objects have to have the field `mesh` or implement `meshof()`."
+meshof(object::AbstractMesh) = object.mesh
+meshof!(object::AbstractMesh, mesh) = nothing
+
+vertices(object::AbstractMesh) = object.mesh.vertices
+vertices!(object::AbstractMesh, vertices) = (object.mesh.vertices .= vertices)
+
+faces(object::AbstractMesh) = object.mesh.faces
+faces!(object::AbstractMesh, faces) = nothing
+
+orientation(object::AbstractMesh) = object.mesh.dir
+orientation!(object::AbstractMesh, dir) = (object.mesh.dir .= dir)
+
+position(object::AbstractMesh) = object.mesh.pos
+position!(object::AbstractMesh, pos) = (object.mesh.pos .= pos)
+
+scale(object::AbstractMesh) = object.mesh.scale
+scale!(object::AbstractMesh, scale) = (object.mesh.scale = scale)
 
 """
-    Mesh{T}
+    Mesh{T} <: AbstractMesh{T}
 
 Contains the STL mesh information for an arbitrary object, that is the `vertices` that make up the mesh and
 a matrix of `faces`, i.e. the connectivity matrix of the mesh. The data is read in using the `FileIO.jl` and
 `MeshIO.jl` packages. Translations and rotations of the mesh are directly saved in absolute coordinates in the
-vertex matrix. For orientation and translation tracking, a positional (`pos`) and directional (`dir`) matrix are stored.
+vertex matrix. For orientation and translation tracking, a `pos`itional and `dir`ectional matrix are stored.
+
+# Fields
+- `vertices`: (m x 3)-matrix that stores the edge points of all triangles
+- `faces`: (n x 3)-matrix that stores the connectivity data for all faces
+- `dir`: (3 x 3)-matrix that represents the current orientation of the mesh
+- `pos`: 3-element vector that is used as the mesh location reference
+- `scale`: scalar value that represents the current scale of the original mesh
 """
-mutable struct Mesh{T} <: AbstractMesh
+mutable struct Mesh{T} <: AbstractMesh{T}
     vertices::Matrix{T}
     faces::Matrix{Int}
     dir::Matrix{T}
@@ -45,149 +75,117 @@ function Mesh(mesh)
 end
 
 """
-    orthogonal3d(object::Mesh, fID::Int)
-
-Returns a vector with unit length that is perpendicular to the target face according to
-the right-hand rule. The vertices must be listed row-wise within the face matrix.
-"""
-function orthogonal3d(object::Mesh, fID::Int)
-    face = object.vertices[object.faces[fID, :], :]
-    n = fast_cross3d((face[2, :] - face[1, :]), (face[3, :] - face[1, :]))
-    return normalize3d(n)
-end
-
-"""
-    translate3d!(mesh::Mesh, offset::Vector)
+    translate3d!(object::AbstractMesh, offset::Vector)
 
 Mutating function that translates the vertices of an mesh in relation to the offset vector.
 In addition, the mesh position vector is overwritten to reflect the new "center of gravity".
 """
-function translate3d!(mesh::Mesh, offset::Vector)
-    mesh.pos += offset
-    mesh.vertices .+= offset'
+function translate3d!(object::AbstractMesh, offset::Vector)
+    position!(object, position(object) .+= offset)
+    vertices!(object, vertices(object) .+= offset')
     return nothing
 end
 
 """
-    xrotate3d!(mesh::Mesh, θ)
+    xrotate3d!(object::AbstractMesh, θ)
 
 Mutating function that rotates the mesh around the **x-axis**.
 The rotation is performed around the "center of gravity" axis.
 """
-function xrotate3d!(mesh::Mesh, θ)
+function xrotate3d!(object::AbstractMesh, θ)
     # Calculate rotation matrix
     R = rotate3d([1, 0, 0], θ)
     # Translate mesh to origin, rotate, retranslate
-    mesh.vertices .= (mesh.vertices .- mesh.pos') * R .+ mesh.pos'
-    mesh.dir *= R
+    vertices!(object, (vertices(object) .- position(object)') * R .+ position(object)')
+    orientation!(object, orientation(object) * R)
     return nothing
 end
 
 """
-    yrotate3d!(mesh::Mesh, θ)
+    yrotate3d!(object::AbstractMesh, θ)
 
 Mutating function that rotates the mesh around the **y-axis**.
 The rotation is performed around the "center of gravity" axis.
 """
-function yrotate3d!(mesh::Mesh, θ)
+function yrotate3d!(object::AbstractMesh, θ)
     # Calculate rotation matrix
     R = rotate3d([0, 1, 0], θ)
     # Translate mesh to origin, rotate, retranslate
-    mesh.vertices .= (mesh.vertices .- mesh.pos') * R .+ mesh.pos'
-    mesh.dir *= R
+    vertices!(object, (vertices(object) .- position(object)') * R .+ position(object)')
+    orientation!(object, orientation(object) * R)
     return nothing
 end
 
 """
-    zrotate3d!(mesh::Mesh, θ)
+    zrotate3d!(object::AbstractMesh, θ)
 
 Mutating function that rotates the mesh around the **z-axis**.
 The rotation is performed around the "center of gravity" axis.
 """
-function zrotate3d!(mesh::Mesh, θ)
+function zrotate3d!(object::AbstractMesh, θ)
     # Calculate rotation matrix
     R = rotate3d([0, 0, 1], θ)
     # Translate mesh to origin, rotate, retranslate
-    mesh.vertices .= (mesh.vertices .- mesh.pos') * R .+ mesh.pos'
-    mesh.dir *= R
+    vertices!(object, (vertices(object) .- position(object)') * R .+ position(object)')
+    orientation!(object, orientation(object) * R)
     return nothing
 end
 
 """
-    scale3d!(mesh::Mesh, scale)
+    scale3d!(object::AbstractMesh, scale)
 
 Allows rescaling of mesh data around "center of gravity".
 """
-function scale3d!(mesh::Mesh, scale)
+function scale3d!(object::AbstractMesh, scale)
     # Translate mesh to origin, scale, return to orig. pos.
-    mesh.vertices .= (mesh.vertices .- mesh.pos') .* scale .+ mesh.pos'
-    mesh.scale = scale
+    vertices!(object, (vertices(object) .- position(object)') .* scale .+ position(object)')
+    scale!(object, scale)
     return nothing
 end
 
 """
-    reset_translation3d!(mesh::Mesh)
+    reset_translation3d!(object::AbstractMesh)
 
 Resets all previous translations and returns the mesh back to the global origin.
 """
-function reset_translation3d!(mesh::Mesh)
-    mesh.vertices .-= mesh.pos'
-    mesh.pos = zeros(eltype(mesh.pos), 3)
+function reset_translation3d!(object::AbstractMesh{T}) where T
+    vertices!(object, vertices(object) .- position(object)')
+    position!(object, zeros(T, 3))
     return nothing
 end
 
 """
-    reset_rotation3d!(mesh::Mesh)
+    reset_rotation3d!(object::AbstractMesh)
 
 Resets all previous rotations around the current offset.
 """
-function reset_rotation3d!(mesh::Mesh)
-    R = inv(mesh.dir)
-    mesh.vertices = (mesh.vertices .- mesh.pos') * R .+ mesh.pos'
-    mesh.dir = Matrix{eltype(mesh.dir)}(I, 3, 3)
+function reset_rotation3d!(object::AbstractMesh{T}) where T
+    R = inv(orientation(object))
+    vertices!(object, (vertices(object) .- position(object)') * R .+ position(object)')
+    orientation!(object, Matrix{T}(I, 3, 3))
     return nothing
 end
 
 """
-    set_new_origin3d!(mesh::Mesh)
+    set_new_origin3d!(object::AbstractMesh)
 
 Resets the mesh `dir`ectional matrix and `pos`ition vector to their initial values.\\
 **Warning: this operation is non-reversible!**
 """
-function set_new_origin3d!(mesh::Mesh)
-    mesh.dir = Matrix{eltype(mesh.dir)}(I, 3, 3)
-    mesh.pos = zeros(eltype(mesh.pos), 3)
+function set_new_origin3d!(object::AbstractMesh{T}) where T
+    orientation!(object, Matrix{T}(I, 3, 3))
+    position!(object, zeros(T, 3))
     return nothing
 end
 
 """
-    mesh(object::AbstractMesh)
+    orthogonal3d(object::AbstractMesh, fID::Int)
 
-Enforces that objects with meshes have to have the field mesh or implement `mesh`.
+Returns a vector with unit length that is perpendicular to the target `face`` according to
+the right-hand rule. The vertices must be listed row-wise within the face matrix.
 """
-mesh(object::AbstractMesh) = object.mesh
-
-# """
-#     mesh(object::AbstractBoundedMesh)
-
-# Enforces that objects with bounded meshes have to have the field bounds or implement `bounds`.
-# """
-# bounds(object::AbstractBoundedMesh) = object.bounds
-
-translate3d!(object::AbstractMesh, offset::Vector) = translate3d!(mesh(object), offset)
-xrotate3d!(object::AbstractMesh, θ) = xrotate3d!(mesh(object), θ)
-yrotate3d!(object::AbstractMesh, θ) = yrotate3d!(mesh(object), θ)
-zrotate3d!(object::AbstractMesh, θ) = zrotate3d!(mesh(object), θ)
-scale3d!(object::AbstractMesh, scale) = scale3d!(mesh(object), scale)
-# Mesh intersection
-intersect3d(object::AbstractMesh, ray::Ray) = intersect3d(mesh(object), ray)
-# Mesh interaction
-interact(object::AbstractMesh, beam::Beam, ~) = false
-# Utils
-orthogonal3d(object::AbstractMesh, fID::Int) = orthogonal3d(mesh(object), fID)
-reset_translation3d!(object::AbstractMesh) = reset_translation3d!(mesh(object))
-reset_rotation3d!(object::AbstractMesh) = reset_rotation3d!(mesh(object))
-set_new_origin3d!(object::AbstractMesh) = set_new_origin3d!(mesh(object))
-# Render
-render_object!(axis, object::AbstractMesh) = render_object!(axis, mesh(object))
-render_object_normals!(axis, object::AbstractMesh; l=0.01) = render_object_normals!(axis, mesh(object), l=l)
+function orthogonal3d(object::AbstractMesh, fID::Int)
+    face = vertices(object)[faces(object)[fID, :], :]
+    n = fast_cross3d((face[2, :] - face[1, :]), (face[3, :] - face[1, :]))
+    return normalize3d(n)
+end

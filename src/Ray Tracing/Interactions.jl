@@ -1,7 +1,4 @@
-interact(entity::AbstractEntity, beam::Beam) = false, missing, missing
-interact!(entity::AbstractEntity, beam::Beam) = false
-
-struct Mirror{T} <: AbstractMesh
+struct Mirror{T} <: AbstractMesh{T}
     mesh::Mesh{T}
 end
 
@@ -13,7 +10,7 @@ function interact(mirror::Mirror, beam::Beam)
     return true
 end
 
-struct Prism{T} <: AbstractMesh
+struct Prism{T} <: AbstractMesh{T}
     mesh::Mesh{T}
     ref_index::Function
 end
@@ -38,7 +35,7 @@ function interact(prism::Prism, beam::Beam)
     return true
 end
 
-struct BallLens{T} <: AbstractSphere
+struct BallLens{T} <: AbstractSphere{T}
     sphere::Sphere{T}
     ref_index::Function
 end
