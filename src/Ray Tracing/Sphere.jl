@@ -1,6 +1,15 @@
-abstract type AbstractSphere <: AbstractEntity end
+"""
+AbstractSphere <: AbstractObject
 
-mutable struct Sphere{T} <: AbstractSphere # is this inheritance correct? see also Mesh{T}
+A generic type for an object whose volume can be described by a sphere. Must have a field `sphere` of type `Sphere`. See also `Sphere{T}`.
+"""
+abstract type AbstractSphere{T} <: AbstractObject{T} end
+
+"Enforces that `sphere`-like objects have to have the field `sphere` or implement `sphere()`."
+sphere(object::AbstractSphere) = object.sphere
+sphere!(object::AbstractSphere, sphere) = nothing
+
+mutable struct Sphere{T} <: AbstractSphere{T}
     pos::Vector{T}
     radius::T
 end
@@ -35,12 +44,7 @@ function reset_translation3d!(sphere::Sphere)
     return nothing
 end
 
-"""
-    sphere(object::AbstractSphere)
 
-Enforces that sphere-like objects have to have the field sphere or implement `sphere`.
-"""
-sphere(object::AbstractSphere) = object.sphere
 
 translate3d!(object::AbstractSphere, offset::Vector) = translate3d!(sphere(object), offset)
 scale3d!(object::AbstractSphere, scale) = scale3d!(sphere(object), scale)

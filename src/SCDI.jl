@@ -6,6 +6,7 @@ using SnoopPrecompile
 
 # Do not change order of inclusion!
 include("Ray Tracing/Utils.jl")
+include("Ray Tracing/Types.jl")
 include("Ray Tracing/Rays.jl")
 include("Ray Tracing/Mesh.jl")
 include("Ray Tracing/Sphere.jl")
@@ -17,27 +18,27 @@ include("Ray Tracing/Render.jl")
 if get(ENV, "CI", "false") == "false"
     @precompile_setup begin
         # setup dummy workload
-        vertices = [
+        _vertices = [
             1 1 0
             1 -1 0
             -1 -1 0
             -1 1 0
         ]
-        faces = [
+        _faces = [
             1 2 3
             3 4 1
         ]
-        pos = [0, 0, 0]
-        dir = Matrix{Int}(I, 3, 3)
-        scale = 1
+        _pos = [0, 0, 0]
+        _dir = Matrix{Int}(I, 3, 3)
+        _scale = 1
         @precompile_all_calls begin
             # execute workload
             plane = Mirror{Float64}(SCDI.Mesh{Float64}(
-                vertices,
-                faces,
-                dir,
-                pos,
-                scale
+                _vertices,
+                _faces,
+                _dir,
+                _pos,
+                _scale
             ))
 
             SCDI.translate3d!(plane, [0, 0, 1])

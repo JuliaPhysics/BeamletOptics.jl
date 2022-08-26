@@ -1,6 +1,6 @@
 ### Helper functions for testing
 
-mutable struct Cube{T} <: SCDI.AbstractMesh
+mutable struct Cube{T} <: SCDI.AbstractMesh{T}
     mesh::SCDI.Mesh{T}
     dimension::T
 end

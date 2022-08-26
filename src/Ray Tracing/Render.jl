@@ -3,8 +3,8 @@
 
 Render the `mesh` of an object into the specified 3D-`axis`.
 """
-function render_object!(axis, mesh::Mesh)
-    mesh!(axis, mesh.vertices, mesh.faces, transparency=true)
+function render_object!(axis, object::AbstractMesh)
+    mesh!(axis, vertices(object), faces(object), transparency=true)
     return nothing
 end
 

@@ -21,7 +21,7 @@ Mutable struct to store ray information. A `Ray` is described by ``\\vec{v}_{pos
 - `dir`: a normalized 3D-vector that describes the `Ray` direction
 - `intersection`: refer to `Intersection{T}`.
 """
-mutable struct Ray{T}
+mutable struct Ray{T} <: AbstractRay{T}
     pos::Vector{T}
     dir::Vector{T}
     intersection::Intersection{T}

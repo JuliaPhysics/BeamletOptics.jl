@@ -62,8 +62,8 @@ This function is a generic implementation to check if a ray intersects the objec
 If true, the **distance** `t` is returned, where the location of intersection is `ray.pos+t*ray.dir`.\\
 In addition, the face index of the mesh intersection is returned.
 """
-function intersect3d(object::Mesh{M}, ray::Ray{R}) where {M, R}
-    numEl = size(object.faces, 1)
+function intersect3d(object::AbstractMesh{M}, ray::Ray{R}) where {M, R}
+    numEl = size(faces(object), 1)
     # allocate all intermediate vectors once (note that this is NOT THREAD-SAFE)
     T = promote_type(M, R)
     fID::Int = 0
@@ -74,7 +74,7 @@ function intersect3d(object::Mesh{M}, ray::Ray{R}) where {M, R}
     Tv = Vector{T}(undef, 3)
     Qv = Vector{T}(undef, 3)
     for i = 1:numEl
-        face = @views object.vertices[object.faces[i, :], :]
+        face = @views vertices(object)[faces(object)[i, :], :]
         t = ray_triangle_intersection(face, ray, E1, E2, Pv, Tv, Qv)
         # Return closest intersection
         if t < t0
@@ -85,8 +85,8 @@ function intersect3d(object::Mesh{M}, ray::Ray{R}) where {M, R}
     if isinf(t0)
         return NoIntersection(T)
     else
-        face = @views object.vertices[object.faces[fID, :], :]
-        normal = orthogonal3d(object, fID) # fast_cross3d((face[2, :] - face[1, :]), (face[3, :] - face[1, :]))
+        face = @views vertices(object)[faces(object)[fID, :], :]
+        normal = orthogonal3d(object, fID)
         return Intersection{T}(t0, normalize3d(T.(normal)), missing)
     end
 end
