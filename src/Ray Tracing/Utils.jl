@@ -88,11 +88,13 @@ end
 
 Returns the angle between the `target` and `reference` vector in **rad**. Also logs the angle in debug mode (in degrees).
 """
-function angle3d(target::Vector, reference::Vector)
-    angle = acos(dot(target, reference) / (norm3d(target) * norm3d(reference)))
+function angle3d(target::Vector{T}, reference::Vector{T}) where T    
+    arg = clamp(dot(target, reference) / (norm3d(target) * norm3d(reference)), -one(T), one(T))
+    angle = acos(arg)
     @debug "Angle is $(angle*180/π)°"
     return angle
 end
+angle3d(target::Vector{T}, reference::Vector{V}) where {T,V} = angle3d(promote(target, reference)...)
 
 """
     fast_dot3d(a, b)
