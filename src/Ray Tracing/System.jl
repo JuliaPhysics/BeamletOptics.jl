@@ -12,7 +12,6 @@ end
 
 function trace_system(system::System, ray::Ray)
     intersection::Intersection = NoIntersection(Float64)
-    temp::Intersection = NoIntersection(Float64)
     for (i, object) in enumerate(system.objects)
         temp = intersect3d(object, ray)
         if temp.t < intersection.t
