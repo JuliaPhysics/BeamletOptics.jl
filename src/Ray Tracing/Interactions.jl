@@ -45,9 +45,9 @@ end
 
 Placeholder interaction scheme for a refractive sphere.
 """
-function interact(blens::BallLens, beam::Beam)
+function interact(blens::Union{BallLens, Lens}, beam::Beam)
     dir = beam.rays[end].dir
-    npos = beam.rays[end].pos + beam.rays[end].intersection.t * dir
+    npos = @. beam.rays[end].pos + beam.rays[end].intersection.t * dir
     # Normal equation for a sphere at point p: n = |p-s|
     normal = beam.rays[end].intersection.n
     if dot(dir, normal) < 0
@@ -56,9 +56,9 @@ function interact(blens::BallLens, beam::Beam)
         n2 = blens.ref_index(beam.λ)
     else
         @debug "Inside lens"
-        n1 = 1.0
-        n2 = blens.ref_index(beam.λ)
-        normal *= -1
+        n1 = blens.ref_index(beam.λ)
+        n2 = 1.0
+        normal .*= -1
     end
     ndir = refraction3d(dir, normal, n1, n2)
     append!(beam.rays, [Ray(npos, ndir)])

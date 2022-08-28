@@ -4,7 +4,7 @@
 Computes the euclidic (p=2) norm of the input `v`ector.
 """
 function norm3d(v)
-    return sqrt(v[1]^2 + v[2]^2 + v[3]^2)
+    return @inbounds sqrt(v[1]^2 + v[2]^2 + v[3]^2)
 end
 
 """
@@ -88,7 +88,7 @@ end
 
 Returns the angle between the `target` and `reference` vector in **rad**. Also logs the angle in debug mode (in degrees).
 """
-function angle3d(target::Vector{T}, reference::Vector{T}) where T    
+function angle3d(target::Vector{T}, reference::Vector{T}) where T
     arg = clamp(dot(target, reference) / (norm3d(target) * norm3d(reference)), -one(T), one(T))
     angle = acos(arg)
     @debug "Angle is $(angle*180/π)°"
@@ -117,9 +117,9 @@ Specific implementation of the cross product for vector dimensions E=3.\\
 Mutates the result in `c` for the cross product of `a` with `b`.
 """
 function fast_cross3d!(c, a, b)
-    c[1] = a[2] * b[3] - a[3] * b[2]
-    c[2] = a[3] * b[1] - a[1] * b[3]
-    c[3] = a[1] * b[2] - a[2] * b[1]
+    @inbounds c[1] = a[2] * b[3] - a[3] * b[2]
+    @inbounds c[2] = a[3] * b[1] - a[1] * b[3]
+    @inbounds c[3] = a[1] * b[2] - a[2] * b[1]
     return nothing
 end
 
@@ -176,7 +176,7 @@ Vectors `dir` and `normal` must have **unit length**!
 function refraction3d(dir, normal, n1, n2)
     # dir and normal must have unit length!
     @assert isapprox(norm3d(dir), 1)
-    @assert isapprox(norm3d(normal), 1) 
+    @assert isapprox(norm3d(normal), 1)
     n = n1 / n2
     cosθi = -dot(normal, dir)
     sinθt² = n^2 * (1 - cosθi^2)

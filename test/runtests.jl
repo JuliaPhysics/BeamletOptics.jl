@@ -106,7 +106,7 @@ end
 
     @testset "Testing abstract type interfaces" begin
         object = Object([0,0,0])
-        SCDI.translate3d!(object, [1,1,1])        
+        SCDI.translate3d!(object, [1,1,1])
         SCDI.position!(object, [2,2,2])
         SCDI.reset_translation3d!(object)
         @test SCDI.position(object) == object.pos
@@ -243,6 +243,46 @@ end
     end
 end
 
+@testset "Lenses/Surfaces" begin
+    @testset "Testing type definitions" begin
+        @test isdefined(SCDI, :AbstractSurface)
+        @test isdefined(SCDI, :AbstractLens)
+    end
+
+    # define a test lens (thin)
+    R1 = 100e-2
+    R2 = -100e-2
+    scx_lens = SCDI.Lens(
+        SCDI.SphericSurface(R1, 0.05, 0.0),
+        SCDI.SphericSurface(-R2, 0.05, 0.0),
+        [0, 0, 1.0],
+        [0.0, 0.0, 0.0],
+        0e-3,
+        x -> 1.5
+    )
+
+    system = SCDI.System([scx_lens])
+
+    x = 1e-2
+    ray = SCDI.Ray([x, 0, -0.5], [0,0,1.0])
+    beam = SCDI.Beam([ray], 1e3)
+
+    SCDI.solve_system!(system, beam)
+
+    # get the focal length numerically
+    n = [1, 0, 0]
+    p0 = [0, 0, 0]
+    t = SCDI.fast_dot3d((p0 .- beam.rays[end].pos), n) / SCDI.fast_dot3d(beam.rays[end].dir, n)
+    pos = beam.rays[end].pos .+ t*beam.rays[end].dir
+
+    # get the focal length from lensmaker's formula. This is only an approximation valid for
+    # infinitesimal thin lenses.
+    f = (1.5 - 1.0)/1.0*(1/R1 - 1/R2)
+    @testset "Focal length" begin
+        @test isapprox(f, pos[3], atol=1e-3)
+    end
+end
+
 @testset "Intersections" begin
     @testset "Testing Moeller-Trumbore algorithm" begin
         @debug "Testing functor definition"
@@ -262,7 +302,7 @@ end
         pos = [0, 0, 0]
         dir = [0, 0, 1]
         ray = SCDI.Ray(pos, dir)
-        # Preallocate memory 
+        # Preallocate memory
         E1 = similar(ray.dir)
         E2 = similar(ray.dir)
         Pv = similar(ray.dir)
@@ -296,5 +336,43 @@ end
             ray = SCDI.Ray(pos, dir)
             @test isapprox(SCDI.intersect3d(foo, ray).t, sqrt(t^2 + z^2))
         end
+    end
+
+    @testset "Testing intersect3d for lenses" begin
+        # build test lens
+        R1 = 100e-2
+        scx_lens = SCDI.Lens(
+            SCDI.SphericSurface(R1, 0.05, 0.0),
+            SCDI.PlanarSurface(0.05),
+            [0,0,1.0],
+            [0.0, 0.0, 0.0],
+            0e-3,
+            x -> 1.5
+        )
+
+        # this ray should hit the front of the spherical surface
+        ray = SCDI.Ray([0,0,-1.0],[0,0,1.0])
+        ints = SCDI.intersect3d(scx_lens, ray)
+        intpos = ray.pos + ints.t*ray.dir
+        sagpos = -SCDI.sag(scx_lens.front, SCDI.mechanical_semi_diameter(scx_lens.front))
+
+        @test isapprox(intpos[3], sagpos)
+
+        # This ray should hit the plane surface and starts within the lens
+        ray = SCDI.Ray([0,0,intpos[3] + eps(Float64)],[0,0,1.0])
+        ints = SCDI.intersect3d(scx_lens, ray)
+        intpos = ray.pos + ints.t*ray.dir
+        @test iszero(intpos[3])
+
+        # This ray starts right behind the lens and should not intersect
+        ray = SCDI.Ray([0,0,0.1],[0,0,1.0])
+        ints = SCDI.intersect3d(scx_lens, ray)
+        @test ints === SCDI.NoIntersection(Float64)
+
+        # This ray starts right in front of the lens, will hit the sphere but miss the
+        # mechanical aperture --> no intersection
+        ray = SCDI.Ray([0,0,-1.0],[0.1,0,1.0])
+        ints = SCDI.intersect3d(scx_lens, ray)
+        @test ints === SCDI.NoIntersection(Float64)
     end
 end

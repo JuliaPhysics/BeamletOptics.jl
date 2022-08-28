@@ -32,7 +32,7 @@ Subtypes of `AbstractObject` should implement the following:
 
 ## Kinematic:
 - `translate3d!`: the object is moved by a translation vector relative to its current position
-- `rotate3d!`: the object is rotated by an angle around a reference vector 
+- `rotate3d!`: the object is rotated by an angle around a reference vector
 - `xrotate3d!`: rotation around the x-axis
 - `yrotate3d!`: rotation around the y-axis
 - `zrotate3d!`: rotation around the z-axis
@@ -78,5 +78,3 @@ end
 
 render_object!(axis, object::AbstractObject) = nothing
 render_object_normals!(axis, object::AbstractObject) = nothing
-
-
