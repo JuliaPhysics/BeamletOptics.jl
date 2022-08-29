@@ -10,44 +10,35 @@ WGLMakie.activate!() # hide
 
 ```@example plot
 
-using SCDI
+using SCDI, LinearAlgebra
 
-struct Plane{T} <: SCDI.AbstractMesh
-    mesh::SCDI.Mesh{T}
-end
+# build a plano-convex lens
+normal = [0.5, 0.0, 1.0]
+normal /= norm(normal)
+scx_lens = SCDI.Lens(
+    SCDI.SphericSurface(0.5, 0.25, 0.0),
+    SCDI.PlanarSurface(0.25),
+    normal,
+    [0.0, 0.0, 0.0],
+    5e-3,
+    x -> 1.5
+)
 
-vertices = [
-        1 1 0
-        1 -1 0
-        -1 -1 0
-        -1 1 0
-    ]
-    faces = [
-        1 2 3
-        3 4 1
-    ]
-    pos = [0, 0, 0]
-    dir = [1 0 0;0 1 0; 0 0 1]
-    scale = 1
-    plane = Plane{Float64}(SCDI.Mesh{Float64}(
-        vertices,
-        faces,
-        dir,
-        pos,
-        scale
-    ))
-
-system = SCDI.System([plane])
+system = SCDI.System([scx_lens])
 
 f = Figure()
-ax = f[1, 1] = Axis3(f)
+ax = f[1, 1] = Axis3(f, azimuth=180, elevation=0)
 SCDI.render_system!(ax, system)
-for z in collect(-0.75:0.1:0.75)
-    ray = SCDI.Ray{Float64}([0.0, 0, z], [1.0, 0, 0.0])
+for x in collect(-0.2:0.05:0.2)
+    ray = SCDI.Ray([x, 0, -0.2], [0.0, 0, 1.0])
     beam = SCDI.Beam([ray], 1e3)
     SCDI.solve_system!(system, beam)
-    SCDI.render_beam!(ax, beam, color=:blue, flen=2)
+    SCDI.render_beam!(ax, beam, color=:blue, flen=1)
 end
 
+xlims!(-.3, .3)
+ylims!(-.3, .3)
+
 f
+
 ```
