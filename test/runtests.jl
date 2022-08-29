@@ -102,10 +102,11 @@ end
     # Generate test struct
     mutable struct Object{T} <: SCDI.AbstractObject{T}
         pos::Vector{T}
+        dir::Matrix{T}
     end
 
     @testset "Testing abstract type interfaces" begin
-        object = Object([0,0,0])
+        object = Object([0,0,0], Matrix{Int}(I, 3, 3))
         SCDI.translate3d!(object, [1,1,1])
         SCDI.position!(object, [2,2,2])
         SCDI.reset_translation3d!(object)
@@ -113,10 +114,12 @@ end
         @test SCDI.position(object) == zeros(3)
         # The following test are expected to do nothing but not throw exceptions
         SCDI.rotate3d!(object, [0,0,1], π)
+        @test all(SCDI.orientation(object)[[1, 5]] .== -1) && SCDI.orientation(object)[9] == 1
         SCDI.xrotate3d!(object, π)
         SCDI.yrotate3d!(object, π)
         SCDI.zrotate3d!(object, π)
         SCDI.reset_rotation3d!(object)
+        @test SCDI.orientation(object) == Matrix{Int}(I, 3, 3)
         @test_logs (:warn,) SCDI.intersect3d(object, SCDI.Ray([0,0,1],[0,0,1]))
     end
 
