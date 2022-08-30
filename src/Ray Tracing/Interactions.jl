@@ -1,13 +1,26 @@
+struct Interaction{T}
+    pos::Union{Vector{T}, Missing}
+    dir::Union{Vector{T}, Missing}
+    information::Information{T}
+end
+
+# Optimized for pointer look-up
+const _NoInteractionF64 = Interaction{Float64}(missing, missing, NoInformation(Float64))
+const _NoInteractionF32 = Interaction{Float32}(missing, missing, NoInformation(Float32))
+
+NoInteraction(::Type{Float64}) = _NoInteractionF64
+NoInteraction(::Type{Float32}) = _NoInteractionF32
+
 struct Mirror{T} <: AbstractMesh{T}
     mesh::Mesh{T}
 end
 
-function interact(mirror::Mirror, beam::Beam)
-    normal = beam.rays[end].intersection.n
-    oray = beam.rays[end]
-    npos = oray.pos + oray.intersection.t * oray.dir
-    append!(beam.rays, [Ray(npos, Float64.(reflection3d(oray.dir, normal)))])
-    return true
+function interact3d(mirror::Mirror{M}, ray::AbstractRay{R}) where {M, R}
+    T = promote_type(M, R)
+    normal = ray.intersection.n
+    npos = position(ray) + lengthof(ray) * direction(ray)
+    ndir = reflection3d(direction(ray), normal)
+    return Interaction{T}(npos, ndir, ray.information)
 end
 
 struct Prism{T} <: AbstractMesh{T}
@@ -15,52 +28,49 @@ struct Prism{T} <: AbstractMesh{T}
     ref_index::Function
 end
 
-function interact(prism::Prism, beam::Beam)
+refractive_index(prism::Prism) = prism.ref_index
+refractive_index!(prism, ref_index) = nothing
+
+function interact3d(prism::Prism{P}, ray::Ray{R}) where {P, R}
+    T = promote_type(P, R)
     # Check dir. of ray and surface normal
-    normal = beam.rays[end].intersection.n
-    if dot(beam.rays[end].dir, normal) < 0
-        @debug "Outside prism"
+    normal = ray.intersection.n
+    λ = wavelength(ray)
+    if dot(direction(ray), normal) < 0
+        # "Outside prism"
         n1 = 1.0
-        n2 = prism.ref_index(beam.λ)
+        n2 = refractive_index(prism)(λ)
     else
-        @debug "Inside prism"
-        n1 = prism.ref_index(beam.λ)
+        # "Inside prism"
+        n1 = refractive_index(prism)(λ)
         n2 = 1.0
         normal *= -1
     end
     # Calculate new dir. and pos.
-    ndir = refraction3d(beam.rays[end].dir, normal, n1, n2)
-    npos = beam.rays[end].pos + beam.rays[end].intersection.t * beam.rays[end].dir
-    append!(beam.rays, [Ray(npos, ndir)])
-    return true
+    ndir = refraction3d(direction(ray), normal, n1, n2)
+    npos = position(ray) + lengthof(ray) * direction(ray)
+    return Interaction{T}(npos, ndir, Information(λ, n2))
 end
 
-struct BallLens{T} <: AbstractSphere{T}
-    sphere::Sphere{T}
-    ref_index::Function
-end
-
-"""
-    interact(lens::BallLens, beam::Beam, fID)
-
-Placeholder interaction scheme for a refractive sphere.
-"""
-function interact(blens::Union{BallLens, Lens}, beam::Beam)
-    dir = beam.rays[end].dir
-    npos = @. beam.rays[end].pos + beam.rays[end].intersection.t * dir
-    # Normal equation for a sphere at point p: n = |p-s|
-    normal = beam.rays[end].intersection.n
-    if dot(dir, normal) < 0
-        @debug "Outside lens"
+function interact3d(prism::Lens{G,V,W,F}, ray::Ray{R}) where {G,V,W,F,R}
+    T = promote_type(W, R)
+    # Check dir. of ray and surface normal
+    normal = ray.intersection.n
+    λ = wavelength(ray)
+    if dot(direction(ray), normal) < 0
+        # "Outside prism"
         n1 = 1.0
-        n2 = blens.ref_index(beam.λ)
+        n2 = refractive_index(prism)(λ)
     else
-        @debug "Inside lens"
-        n1 = blens.ref_index(beam.λ)
+        # "Inside prism"
+        n1 = refractive_index(prism)(λ)
         n2 = 1.0
-        normal .*= -1
+        normal *= -1
     end
-    ndir = refraction3d(dir, normal, n1, n2)
-    append!(beam.rays, [Ray(npos, ndir)])
-    return true
+    # Calculate new dir. and pos.
+    ndir = refraction3d(direction(ray), normal, n1, n2)
+    npos = position(ray) + lengthof(ray) * direction(ray)
+    return Interaction{T}(npos, ndir, Information(λ, n2))
 end
+
+refractive_index(lens::Lens) = lens.ref_index

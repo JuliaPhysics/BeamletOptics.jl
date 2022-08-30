@@ -142,7 +142,7 @@ end
 
     @debug "Testing Beam struct definition"
     @test isdefined(SCDI, :Beam)
-    beam = SCDI.Beam([ray], 1e3)
+    beam = SCDI.Beam([ray])
     @test ismutable(beam)
 end
 
@@ -246,46 +246,6 @@ end
     end
 end
 
-@testset "Lenses/Surfaces" begin
-    @testset "Testing type definitions" begin
-        @test isdefined(SCDI, :AbstractSurface)
-        @test isdefined(SCDI, :AbstractLens)
-    end
-
-    # define a test lens (thin)
-    R1 = 100e-2
-    R2 = -100e-2
-    scx_lens = SCDI.Lens(
-        SCDI.SphericSurface(R1, 0.05, 0.0),
-        SCDI.SphericSurface(-R2, 0.05, 0.0),
-        [0, 0, 1.0],
-        [0.0, 0.0, 0.0],
-        0e-3,
-        x -> 1.5
-    )
-
-    system = SCDI.System([scx_lens])
-
-    x = 1e-2
-    ray = SCDI.Ray([x, 0, -0.5], [0,0,1.0])
-    beam = SCDI.Beam([ray], 1e3)
-
-    SCDI.solve_system!(system, beam)
-
-    # get the focal length numerically
-    n = [1, 0, 0]
-    p0 = [0, 0, 0]
-    t = SCDI.fast_dot3d((p0 .- beam.rays[end].pos), n) / SCDI.fast_dot3d(beam.rays[end].dir, n)
-    pos = beam.rays[end].pos .+ t*beam.rays[end].dir
-
-    # get the focal length from lensmaker's formula. This is only an approximation valid for
-    # infinitesimal thin lenses.
-    f = (1.5 - 1.0)/1.0*(1/R1 - 1/R2)
-    @testset "Focal length" begin
-        @test isapprox(f, pos[3], atol=1e-3)
-    end
-end
-
 @testset "Intersections" begin
     @testset "Testing Moeller-Trumbore algorithm" begin
         @debug "Testing functor definition"
@@ -377,5 +337,97 @@ end
         ray = SCDI.Ray([0,0,-1.0],[0.1,0,1.0])
         ints = SCDI.intersect3d(scx_lens, ray)
         @test ints === SCDI.NoIntersection(Float64)
+    end
+end
+
+@testset "Interactions" begin
+    @test isdefined(SCDI, :Interaction)
+    @test isdefined(SCDI, :_NoInteractionF64)
+    @test isdefined(SCDI, :_NoInteractionF32)
+    @test isdefined(SCDI, :Mirror)
+    @test isdefined(SCDI, :Prism)
+end
+
+@testset "System" begin
+    # Set up system of four mirrors boxing in the origin in the x-y-plane
+    c1 = Cube(2)
+    c2 = Cube(2)
+    c3 = Cube(2)
+    c4 = Cube(2)
+    SCDI.translate3d!.([c1, c2, c3, c4], [-[1,1,1], -[1,1,1], -[1,1,1], -[1,1,1]])
+    SCDI.translate3d!.([c1, c2, c3, c4], [[2,0,0], -[2,0,0], [0,2,0], -[0,2,0]])
+    SCDI.set_new_origin3d!.([c1, c2, c3, c3])
+    m1 = SCDI.Mirror(SCDI.meshof(c1))
+    m2 = SCDI.Mirror(SCDI.meshof(c2))
+    m3 = SCDI.Mirror(SCDI.meshof(c3))
+    m4 = SCDI.Mirror(SCDI.meshof(c4))
+    system = SCDI.System([m1, m2, m3, m4])
+    # Set up ray that will be reflected at 45° angle in the middle of each mirror edge
+    ray = SCDI.Ray([0,-1,0], [1,1,0])
+    beam = SCDI.Beam([ray])
+    # Trace system
+    numEl = 8
+    alloc1 = @allocated SCDI.solve_system!(system, beam, r_max=8)
+    temp = SCDI.Beam(copy(beam.rays))
+    # Retrace system
+    alloc2 =  @allocated SCDI.solve_system!(system, beam, r_max=8)
+    @test SCDI.position.(beam.rays) == SCDI.position.(temp.rays)
+    @test length(beam.rays) == 8
+    for pos in SCDI.position.(beam.rays)
+        @test pos[3] == 0
+    end
+    if alloc2 >= alloc1
+        @warn "No retracing utilized"
+    end
+    # Remove object from beam path and retrace
+    SCDI.translate3d!(c2, [0,0,2])
+    SCDI.solve_system!(system, beam, r_max=8)
+    @test length(beam.rays) == 3
+
+    #= 
+    WIP:
+    - test for object ID correctness
+    - test for retracing correctness
+    - remove alloc warning?
+    =#
+end
+
+@testset "Lenses/Surfaces" begin
+    @testset "Testing type definitions" begin
+        @test isdefined(SCDI, :AbstractSurface)
+        @test isdefined(SCDI, :AbstractLens)
+    end
+
+    # define a test lens (thin)
+    R1 = 100e-2
+    R2 = -100e-2
+    scx_lens = SCDI.Lens(
+        SCDI.SphericSurface(R1, 0.05, 0.0),
+        SCDI.SphericSurface(-R2, 0.05, 0.0),
+        [0, 0, 1.0],
+        [0.0, 0.0, 0.0],
+        0e-3,
+        x -> 1.5
+    )
+
+    system = SCDI.System([scx_lens])
+
+    x = 1e-2
+    ray = SCDI.Ray([x, 0, -0.5], [0,0,1.0], 1000)
+    beam = SCDI.Beam([ray])
+
+    SCDI.solve_system!(system, beam)
+
+    # get the focal length numerically
+    n = [1, 0, 0]
+    p0 = [0, 0, 0]
+    t = SCDI.fast_dot3d((p0 .- beam.rays[end].pos), n) / SCDI.fast_dot3d(beam.rays[end].dir, n)
+    pos = beam.rays[end].pos .+ t*beam.rays[end].dir
+
+    # get the focal length from lensmaker's formula. This is only an approximation valid for
+    # infinitesimal thin lenses.
+    f = (1.5 - 1.0)/1.0*(1/R1 - 1/R2)
+    @testset "Focal length" begin
+        @test isapprox(f, pos[3], atol=1e-3)
     end
 end

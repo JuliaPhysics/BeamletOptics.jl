@@ -17,7 +17,7 @@ If no intersection occurs, `Inf` is returned. `kϵ` is the abort threshold for b
 `lϵ` is the threshold for negative values of `t`.
 This algorithm is fast due to multiple breakout conditions.
 """
-function (f::MoellerTrumboreAlgorithm)(face, ray::Ray{T}, E1, E2, Pv, Tv, Qv) where T
+function (f::MoellerTrumboreAlgorithm)(face, ray::AbstractRay{T}, E1, E2, Pv, Tv, Qv) where T
     V1 = @view face[1, :]
     V2 = @view face[2, :]
     V3 = @view face[3, :]
@@ -62,7 +62,7 @@ This function is a generic implementation to check if a ray intersects the objec
 If true, the **distance** `t` is returned, where the location of intersection is `ray.pos+t*ray.dir`.\\
 In addition, the face index of the mesh intersection is returned.
 """
-function intersect3d(object::AbstractMesh{M}, ray::Ray{R}) where {M, R}
+function intersect3d(object::AbstractMesh{M}, ray::AbstractRay{R}) where {M, R}
     numEl = size(faces(object), 1)
     # allocate all intermediate vectors once (note that this is NOT THREAD-SAFE)
     T = promote_type(M, R)

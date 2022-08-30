@@ -86,15 +86,15 @@ end
 """
     angle3d(target::Vector, reference::Vector)
 
-Returns the angle between the `target` and `reference` vector in **rad**. Also logs the angle in debug mode (in degrees).
+Returns the angle between the `target` and `reference` vector in **rad**.
 """
-function angle3d(target::Vector{T}, reference::Vector{T}) where T
-    arg = clamp(dot(target, reference) / (norm3d(target) * norm3d(reference)), -one(T), one(T))
+function angle3d(target::Vector{T}, reference::Vector{T}) where T    
+    arg = clamp(fast_dot3d(target, reference) / (norm3d(target) * norm3d(reference)), -one(T), one(T))
     angle = acos(arg)
-    @debug "Angle is $(angle*180/π)°"
     return angle
 end
-angle3d(target::Vector{T}, reference::Vector{V}) where {T,V} = angle3d(promote(target, reference)...)
+
+angle3d(target::Vector{T}, reference::Vector{V}) where {T, V} = angle3d(promote(target, reference)...)
 
 """
     fast_dot3d(a, b)
@@ -182,7 +182,6 @@ function refraction3d(dir, normal, n1, n2)
     sinθt² = n^2 * (1 - cosθi^2)
     # Check for total reflection
     if sinθt² > 1.0
-        @debug "Total reflection"
         return reflection3d(dir, normal)
     end
     cosθt = sqrt(1 - sinθt²)
