@@ -82,9 +82,9 @@ function rotate3d!(object::AbstractObject, axis, θ)
     return nothing 
 end
 
-xrotate3d!(object::AbstractObject, θ) = nothing
-yrotate3d!(object::AbstractObject, θ) = nothing
-zrotate3d!(object::AbstractObject, θ) = nothing
+xrotate3d!(object::AbstractObject{T}, θ) where T = rotate3d!(object, T[one(T), zero(T), zero(T)], θ)
+yrotate3d!(object::AbstractObject{T}, θ) where T = rotate3d!(object, T[zero(T), one(T), zero(T)], θ)
+zrotate3d!(object::AbstractObject{T}, θ) where T = rotate3d!(object, T[zero(T), zero(T), one(T)], θ)
 
 function reset_translation3d!(object::AbstractObject{T}) where T
     object.pos .= zeros(T, 3)
