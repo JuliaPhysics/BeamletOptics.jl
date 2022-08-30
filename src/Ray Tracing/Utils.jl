@@ -187,3 +187,11 @@ function refraction3d(dir, normal, n1, n2)
     cosθt = sqrt(1 - sinθt²)
     return @. n * dir + (n * cosθi - cosθt) * normal
 end
+
+"""
+    base_transform(base, base2=I(3))
+
+Return the base transformation matrix for transforming from vectors given
+relative to `base2` into `base`.
+"""
+base_transform(base, base2=I(3)) = base \ base2

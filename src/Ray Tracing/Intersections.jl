@@ -161,27 +161,9 @@ end
 Intersection algorithm for `lens` objects.
 """
 function intersect3d(lens::Lens, ray::Ray{T}) where T
-    # test surfaces sequentially
-    front_intersection = intersect3d(lens, lens.front, ray)
+    intersections = intersect3d(lens, lens.front, ray), intersect3d(lens, lens.back, ray)
 
-    # call sub function to handle the result (and allow for dispatch)
-    if front_intersection !== NoIntersection(T)
-        return front_intersection
-    else
-        back_intersection = intersect3d(lens, lens.back, ray)
-        return back_intersection
-    end
-end
-
-"""
-    intersect3d(lens::Lens, s::AbstractSurface, ray::Ray)
-
-General intersection for a lens intersection with generic surfaces. This falls back to
-`NoIntersection` and should be specialized for the corresponding surface type.
-"""
-function intersect3d(lens::Lens, s::AbstractSurface, ray::Ray{T}) where T
-    @warn "No intersection defined"
-    return NoIntersection(T)
+    return argmin(i -> i.t, intersections)
 end
 
 """
@@ -207,7 +189,7 @@ function intersect3d(lens::Lens, s::ConicSurface, ray::Ray{T}) where T
         # get the position of the intersections
         pos = [ray.pos .+ i.t*ray.dir for i in intersections]
         _sign = (s === lens.front ? -1 : 1)
-        n = _sign*lens.normal
+        n = _sign*normal(lens)
         bpos = lens.pos .- lens.edge_thickness/2 .* n
         distances = [norm3d(p_i - bpos) for p_i in pos]
 
@@ -235,13 +217,42 @@ function intersect3d(lens::Lens, s::ConicSurface, ray::Ray{T}) where T
 end
 
 """
-    intersect3d(lens::Lens, s::ConicSurface, ray::Ray)
+    intersect3d(lens::Lens, s::AsphericSurface, ray::Ray)
+
+Intersection implementation for a lens with an aspheric surface.
+"""
+function intersect3d(lens::Lens, s::AsphericSurface, ray::Ray{T}, iter_max=20, ϵ=1e-6) where T
+    @error "Unfinished! Do not use aspheric surfaces at the moment!"
+
+    # get the intersection against the spheric compoenent as first order approximation
+    intersection = intersect3d(lens, s.sphere, ray)
+    # any intersection at all!?
+    intersection === NoIntersection(T) && return intersection
+
+    # now we need to use an interative approach to converge onto the asphere surface.
+    # First step: Transform the intersection ray/point to the lens coordinate system
+    B_asph = base_transform(orientation(lens))
+    sphere_center = center_of_curvature(lens, s.sphere)
+    r0 = B_asph * (ray.pos .+ intersection.t * ray.dir)
+    dir_asph = B_asph * ray.dir
+    # store the z-coordinate
+    z0 = r0[3]
+    r = √(r0[1]^2 + r0[2]^2)
+    z1star = sag(s, r)
+    c1 = 1/radius_of_curvature(s)
+    l = √(1-c1*r*(1+conic_constant(s)))
+    # FIXME: Ignores odd coefficients
+    m = - r0[2]*(c1+l+map(i->s.A_even[i-1]*s.r^(2i), 2:length(s.A_even)))
+end
+
+"""
+    intersect3d(lens::Lens, s::PlanarSurface, ray::Ray)
 
 Intersection implementation for a lens with planar surfaces.
 """
 function intersect3d(lens::Lens, s::PlanarSurface, ray::Ray{T}) where T
     _sign = (s === lens.front ? -1 : 1)
-    n = _sign*lens.normal
+    n = _sign*normal(lens)
     p0 = lens.pos .+ lens.edge_thickness/2 .* n
 
     nom = fast_dot3d((p0 .- ray.pos), n)
@@ -270,4 +281,77 @@ function intersect3d(lens::Lens, s::PlanarSurface, ray::Ray{T}) where T
 
     # if this is reached, no intersection falls within the mechanical aperture
     return NoIntersection(T)
+end
+
+"""
+    intersect3d(lens::Lens, s::CylinderSurface, ray::Ray)
+
+Intersection implementation for a lens with cylinder surfaces.
+"""
+function intersect3d(lens::Lens, s::CylinderSurface, ray::Ray{T}) where T
+    _sign = (s === lens.front ? -1 : 1)
+    p = lens.pos .+ _sign*s.mechanical_semi_diameter .* s.d
+    # aliases
+    m = ray.pos - p
+    n = ray.dir
+    d = s.d
+    md = fast_dot3d(m, d)
+    nd = fast_dot3d(n, d)
+    # segment outside either end of the cylinder
+    (md < eps(T) && md + nd < eps(T)) && return NoIntersection(T)
+    (md > one(T) && md + nd > one(T)) && return NoIntersection(T)
+    mn = fast_dot3d(m, n)
+    a = one(T) - nd * nd
+    k = fast_dot3d(m,m) - s.R^2
+    c = k - md^2
+
+    if abs(a) < eps(T)
+        # ray is parallel to cylinder axis
+        c > eps(T) && return NoIntersection(T)
+        # ray intersects, find the intersection type
+        if md < eps(T)
+            # endcap 1
+            t = -mn
+        elseif md > one(T)
+            # endcap 2
+            t = nd - mn
+        else
+            # inside cylinder
+            t = zero(T)
+        end
+
+        dir = ray.pos .+ t .* ray.dir
+        normal = (dir .- sphere.pos) * sign(s.R)
+        return Intersection{T}(t, normalize3d(T.(normal)), missing)
+    end
+
+    b = mn - nd * md
+    discr = b^2 - a*c
+    if discr < eps(T)
+        return NoIntersection(T)
+    end
+
+    t = (-b - √(discr)) / a
+    if (md + t*nd < eps(T))
+        if nd < eps(T)
+            return NoIntersection(T)
+        end
+        t = -md / nd
+        if k + 2*t(mn + t) > eps(T)
+            return NoIntersection(T)
+        end
+    elseif md + t*nd > one(T)
+        if nd > eps(T)
+            return NoIntersection(T)
+        end
+
+        t = (one(T) - md) / nd
+        if k + one(T) - 2*md + t*(2*(mn-nd) + t) > eps(T)
+            return NoIntersection(T)
+        end
+    end
+
+    dir = ray.pos .+ t .* ray.dir
+    normal = (dir .- fast_dot3d(dir, d) .* d) * sign(s.R)
+    return Intersection{T}(t, normalize3d(T.(normal)), missing)
 end

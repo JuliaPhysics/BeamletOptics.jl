@@ -307,8 +307,6 @@ end
         scx_lens = SCDI.Lens(
             SCDI.SphericSurface(R1, 0.05, 0.0),
             SCDI.PlanarSurface(0.05),
-            [0,0,1.0],
-            [0.0, 0.0, 0.0],
             0e-3,
             x -> 1.5
         )
@@ -403,9 +401,7 @@ end
     R2 = -100e-2
     scx_lens = SCDI.Lens(
         SCDI.SphericSurface(R1, 0.05, 0.0),
-        SCDI.SphericSurface(-R2, 0.05, 0.0),
-        [0, 0, 1.0],
-        [0.0, 0.0, 0.0],
+        SCDI.SphericSurface(-R2, 0.05, 0.0),        
         0e-3,
         x -> 1.5
     )
@@ -413,7 +409,7 @@ end
     system = SCDI.System([scx_lens])
 
     x = 1e-2
-    ray = SCDI.Ray([x, 0, -0.5], [0,0,1.0], 1000)
+    ray = SCDI.Ray([x, 0, -0.5], [0,0,1.0], 1000.0)
     beam = SCDI.Beam([ray])
 
     SCDI.solve_system!(system, beam)
