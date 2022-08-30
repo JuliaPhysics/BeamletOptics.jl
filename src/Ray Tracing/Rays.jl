@@ -47,8 +47,8 @@ NoInformation(::Type{Float64}) = _NoInformationF64
 NoInformation(::Type{Float32}) = _NoInformationF32
 
 "Prototype constructor for `Information{T}`"
-function Information(λ, n=1, I=1, P=[0,0])
-    return Information{typeof(λ)}(λ, n, I, P)
+function Information(λ::T, n=1, I=1, P=[0,0]) where T
+    return Information{T}(λ, n, I, P)
 end
 
 """
@@ -69,8 +69,8 @@ mutable struct Ray{T} <: AbstractRay{T}
     information::Information{T}
 end
 
-lengthof(ray::Ray) = ray.intersection.t
-lengthof!(ray::Ray, len) = nothing
+Base.length(ray::Ray) = ray.intersection.t
+length!(ray::Ray, len) = nothing
 
 information(ray::Ray) = ray.information
 information!(ray::Ray, info) = (ray.information = info)

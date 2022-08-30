@@ -18,8 +18,8 @@ position!(ray::AbstractRay, pos) = (ray.pos .= pos)
 direction(ray::AbstractRay) = ray.dir
 direction!(ray::AbstractRay, dir) = (ray.dir .= dir)
 
-lengthof(ray::AbstractRay) = ray.len
-lengthof!(ray::AbstractRay, len) = (ray.len = len)
+Base.length(ray::AbstractRay) = ray.len
+length!(ray::AbstractRay, len) = (ray.len = len)
 
 "Defines the interaction between a `ray` and an `entity`."
 interact3d(entity::AbstractEntity, ray::AbstractRay{T}) where T = NoInteraction(T)

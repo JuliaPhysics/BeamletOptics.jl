@@ -4,6 +4,8 @@ using LinearAlgebra, FileIO
 using MakieCore
 using SnoopPrecompile
 
+import Base: length
+
 # Do not change order of inclusion!
 include("Ray Tracing/Utils.jl")
 include("Ray Tracing/Types.jl")
