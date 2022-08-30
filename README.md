@@ -28,7 +28,7 @@ Documentation can be found here: https://optical-air-data.pages.gitlab.dlr.de/di
     - [ ] phase shift due to ref. index change
     - [ ] optical intensity distribution on detector
     - [ ] simple astigmatism via 5, 7, 9-ray approach
-    - [ ] Lens types using mathematical surfaces
+    - [x] Lens types using mathematical surfaces
 - Mechanics
     - [ ] vibration of optical elements
 - Plotting
@@ -38,17 +38,19 @@ Documentation can be found here: https://optical-air-data.pages.gitlab.dlr.de/di
     - [x] translation and x,y,z-rotation tests
     - [x] Möller-Trumbore-algorithm test
     - [x] generic mesh intersection test
-    - [ ] solve_system()/trace_system() test
+    - [x] solve_system()/trace_system() test
     - [ ] interact() tests 
+    - [ ] more Lens/Meshlikes tests
 
 ## Known bugs
 
 - [ ] align3d rotation incorrect if start = -target
 - [ ] @code_warntype for interact(Lens, Beam)
 - [ ] change names for functions that return matrices
-- [ ] weird results for intersect(::Sphere, ::Ray)
+- [x] weird results for intersect(::Sphere, ::Ray)
+    - fixed by O.K.
 - [ ] weird results for high level-of-detail meshes
 
 ## Comments
 
- - retrace_system() functionality to exploit information from pretraced systems?
+- none
