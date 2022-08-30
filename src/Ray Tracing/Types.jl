@@ -8,7 +8,7 @@ abstract type AbstractEntity end
 """
     AbstractRay{T<:Real} <: AbstractEntity
 
-A generic type for a ray/line in 3D-space. Must have a `pos`ition a `dir`ection, defined as 3D-vectors.
+A generic type for a ray/line in 3D-space. Must have a `pos`ition, `dir`ection and `len`gth, defined as 3D-vectors and a scalar.
 """
 abstract type AbstractRay{T<:Real} <: AbstractEntity end
 
@@ -18,8 +18,11 @@ position!(ray::AbstractRay, pos) = (ray.pos .= pos)
 direction(ray::AbstractRay) = ray.dir
 direction!(ray::AbstractRay, dir) = (ray.dir .= dir)
 
+lengthof(ray::AbstractRay) = ray.len
+lengthof!(ray::AbstractRay, len) = (ray.len = len)
+
 "Defines the interaction between a `ray` and an `entity`."
-interact3d(entity::AbstractEntity, ray::AbstractRay) = false, missing, missing
+interact3d(entity::AbstractEntity, ray::AbstractRay{T}) where T = NoInteraction(T)
 
 """
     AbstractObject{T<:Real} <: AbstractEntity
@@ -45,7 +48,7 @@ Subtypes of `AbstractObject` should implement the following:
 
 ## Ray Tracing:
 - `intersect3d`: returns the intersection between an `AbstractObject` and `AbstractRay`, or lack thereof. See also `Intersection{T}`
-- `interact3d`: returns a flag of type `Bool` to continue ray tracing, and the `pos` and `dir` of a new ray.
+- `interact3d`: returns an `Interaction{T}`. See also `Interaction{T}`.
 
 ## Rendering (with GLMakie):
 - `render_object!`: plot the `object` into an `Axis3` environment
@@ -97,6 +100,12 @@ function intersect3d(object::AbstractObject{O}, ray::AbstractRay{R}) where {O, R
     @warn lazy"No intersect3d method defined for:" typeof(object)
     T = promote_type(O, R)
     return NoIntersection(T)
+end
+
+function interact3d(object::AbstractObject{O}, ray::AbstractRay{R}) where {O, R}
+    @warn lazy"No interact3d method defined for:" typeof(object)
+    T = promote_type(O, R)
+    return NoInteraction(T)
 end
 
 render_object!(axis, object::AbstractObject) = nothing
