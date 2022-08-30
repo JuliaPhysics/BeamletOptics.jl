@@ -24,11 +24,15 @@ interact3d(entity::AbstractEntity, ray::AbstractRay) = false, missing, missing
 """
     AbstractObject{T<:Real} <: AbstractEntity
 
-A generic type for something that exists in 3D-space. Must have a `pos`ition that is defined as a 3D-vector.\\
+A generic type for something that exists in 3D-space. Must have a `pos`ition and `dir`ection.\\
 Types used to describe an `object` should be subtypes of `Real`.\\
 
 # Implementation reqs.
 Subtypes of `AbstractObject` should implement the following:
+
+## Fields:
+- `pos`: a 3D-vector that stores the current `position` of the object-specific coordinate system
+- `dir`: a 3x3-matrix that represents the orthonormal basis of the object and therefore, the `orientation`
 
 ## Kinematic:
 - `translate3d!`: the object is moved by a translation vector relative to its current position
@@ -53,12 +57,31 @@ abstract type AbstractObject{T<:Real} <: AbstractEntity end
 position(object::AbstractObject) = object.pos
 position!(object::AbstractObject, pos) = (object.pos .= pos)
 
+"Enforces that `object` has to have the field `dir` or implement `orientation()`."
+orientation(object::AbstractObject) = object.dir
+orientation!(object::AbstractObject, dir) = (object.dir .= dir)
+
+"""
+    translate3d!(object::AbstractObject, offset)
+
+Translates the `pos`ition of `object` by the `offset`-vector.
+"""
 function translate3d!(object::AbstractObject, offset)
     object.pos .+= offset
     return nothing
 end
 
-rotate3d!(object::AbstractObject, axis, θ) = nothing
+"""
+    rotate3d!(object::AbstractObject, axis, θ)
+
+Rotates the `dir`-matrix of `object` around the reference-`axis` by an angle of `θ`.
+"""
+function rotate3d!(object::AbstractObject, axis, θ)
+    R = rotate3d(axis, θ)
+    orientation!(object, orientation(object) * R)
+    return nothing 
+end
+
 xrotate3d!(object::AbstractObject, θ) = nothing
 yrotate3d!(object::AbstractObject, θ) = nothing
 zrotate3d!(object::AbstractObject, θ) = nothing
@@ -68,7 +91,7 @@ function reset_translation3d!(object::AbstractObject{T}) where T
     return nothing
 end
 
-reset_rotation3d!(object::AbstractObject) = nothing
+reset_rotation3d!(object::AbstractObject{T}) where T = (object.dir = Matrix{T}(I, 3, 3))
 
 function intersect3d(object::AbstractObject{O}, ray::AbstractRay{R}) where {O, R}
     @warn lazy"No intersect3d method defined for:" typeof(object)
