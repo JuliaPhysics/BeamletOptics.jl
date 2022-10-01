@@ -52,7 +52,7 @@ function interact3d(prism::Prism{P}, ray::Ray{R}) where {P, R}
     return Interaction{T}(npos, ndir, Information(λ, n2))
 end
 
-function interact3d(lens::Lens{G,V,M,W,F}, ray::Ray{R}) where {G,V,M,W,F,R}
+function interact3d(lens::SingletLens{G,V,M,W,F}, ray::Ray{R}) where {G,V,M,W,F,R}
     T = promote_type(W, R)
     # Check dir. of ray and surface normal
     normal = ray.intersection.n
@@ -69,8 +69,8 @@ function interact3d(lens::Lens{G,V,M,W,F}, ray::Ray{R}) where {G,V,M,W,F,R}
     end
     # Calculate new dir. and pos.
     ndir = refraction3d(direction(ray), normal, n1, n2)
-    npos = position(ray) + length(ray) * direction(ray)    
+    npos = position(ray) + length(ray) * direction(ray)
     return Interaction{T}(npos, ndir, Information(λ, n2))
 end
 
-refractive_index(lens::Lens) = lens.ref_index
+refractive_index(lens::SingletLens) = lens.ref_index

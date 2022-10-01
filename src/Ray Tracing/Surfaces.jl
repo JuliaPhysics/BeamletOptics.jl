@@ -96,8 +96,8 @@ chip_zone(s::AsphericSurface) = chip_zone(s.sphere)
 
 function sag(s::AsphericSurface{T}, r::Real) where T
     return (r^2 / (radius_of_curvature(s)*(1+√(1-(1+conic_constant(s))*r^2/radius_of_curvature(s)^2)))
-            + mapreduce(i->s.A_even[i-1]*r^(2i), +, 2:length(s.A_even), init=zero(T))
-            + mapreduce(i->s.A_odd[i]*r^(2i+1), +, 1:length(s.A_odd), init=zero(T)))
+            + sum(i->s.A_even[i-1]*r^(2i), 2:(length(s.A_even)+1), init=zero(T))
+            + sum(i->s.A_odd[i]*r^(2i+1), 1:length(s.A_odd), init=zero(T)))
 end
 
 mutable struct CylinderSurface{T} <: AbstractSurface{T}

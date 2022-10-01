@@ -98,11 +98,17 @@ end
     @debug "Testing abstract type definitions"
     @test isdefined(SCDI, :AbstractEntity)
     @test isdefined(SCDI, :AbstractObject)
+    @test isdefined(SCDI, :AbstractRay)
 
-    # Generate test struct
-    mutable struct Object{T} <: SCDI.AbstractObject{T}
+    # Generate test structs
+    struct Object{T} <: SCDI.AbstractObject{T}
         pos::Vector{T}
         dir::Matrix{T}
+    end
+
+    struct Ray{T} <: SCDI.AbstractRay{T}
+        pos::Vector{T}
+        dir::Vector{T}
     end
 
     @testset "Testing abstract type interfaces" begin
@@ -123,8 +129,17 @@ end
         @test_logs (:warn,) SCDI.intersect3d(object, SCDI.Ray([0,0,1],[0,0,1]))
     end
 
-    # AbstractRay testing (WIP)
-    @test isdefined(SCDI, :AbstractRay)
+    @testset "Testing abstract ray" begin
+        object = Object([1,0,0], Matrix{Int}(I, 3, 3))
+        ray = Ray([0,0,0], [1,0,0])
+        @test SCDI.isinfrontof(object, ray) == true
+        SCDI.direction!(ray, -[1,0,0])
+        @test SCDI.isinfrontof(object, ray) == false
+        SCDI.direction!(ray, [0,1,0])
+        @test SCDI.isinfrontof(object, ray) == false
+        SCDI.direction!(ray, [1,1,0])
+        @test SCDI.isinfrontof(object, ray) == true
+    end
 end
 
 @testset "Rays" begin
@@ -304,7 +319,7 @@ end
     @testset "Testing intersect3d for lenses" begin
         # build test lens
         R1 = 100e-2
-        scx_lens = SCDI.Lens(
+        scx_lens = SCDI.SingletLens(
             SCDI.SphericSurface(R1, 0.05, 0.0),
             SCDI.PlanarSurface(0.05),
             0e-3,
@@ -382,7 +397,7 @@ end
     SCDI.solve_system!(system, beam, r_max=8)
     @test length(beam.rays) == 3
 
-    #= 
+    #=
     WIP:
     - test for object ID correctness
     - test for retracing correctness
@@ -399,9 +414,9 @@ end
     # define a test lens (thin)
     R1 = 100e-2
     R2 = -100e-2
-    scx_lens = SCDI.Lens(
+    scx_lens = SCDI.SingletLens(
         SCDI.SphericSurface(R1, 0.05, 0.0),
-        SCDI.SphericSurface(-R2, 0.05, 0.0),        
+        SCDI.SphericSurface(-R2, 0.05, 0.0),
         0e-3,
         x -> 1.5
     )
