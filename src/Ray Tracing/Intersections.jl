@@ -83,11 +83,11 @@ function intersect3d(object::AbstractMesh{M}, ray::AbstractRay{R}) where {M, R}
         end
     end
     if isinf(t0)
-        return NoIntersection(T)
+        return nothing
     else
         face = @views vertices(object)[faces(object)[fID, :], :]
         normal = orthogonal3d(object, fID)
-        return Intersection{T}(t0, normalize3d(T.(normal)), missing)
+        return Intersection{T}(t0, normalize3d(T.(normal)), nothing)
     end
 end
 
@@ -101,9 +101,9 @@ function intersect3d(sphere::Sphere{S}, ray::Ray{R}) where {S, R}
     intersections = ray_sphere_intersections(sphere, ray)
 
     # find the physically more relevant intersection (i.e. the one which is in direction of ray)
-    if all(i -> i === NoIntersection(T), intersections) || all(i -> i.t < eps(T), intersections)
+    if all(i -> i === nothing, intersections) || all(i -> i.t < eps(T), intersections)
         # No intersections or both intersections are behind the ray
-        return NoIntersection(T)
+        return nothing
     elseif intersections[1].t < eps(T)
         return intersections[2]
     elseif intersections[2].t < eps(T)
@@ -127,12 +127,12 @@ function ray_sphere_intersections(sphere::Sphere{S}, ray::Ray{R}) where {S, R}
     c = fast_dot3d(m, m) - sphere.radius^2
     # Exit if ray origin outside sphere (c > 0) and ray pointing away from sphere (b > 0)
     if c > 0.0 && b > 0.0
-        return NoIntersection(T), NoIntersection(T)
+        return nothing, nothing
     end
     # Exit if negative discriminant (corresponds to ray missing sphere)
     discr = b^2 - c
     if discr < 0.0
-        return NoIntersection(T), NoIntersection(T)
+        return nothing, nothing
     end
 
     if discr ≈ zero(T)
@@ -140,7 +140,7 @@ function ray_sphere_intersections(sphere::Sphere{S}, ray::Ray{R}) where {S, R}
         t = -b
         dir = position(ray) .+ t .* direction(ray)
         normal = (dir.- position(sphere)) * sign(sphere.radius)
-        return Intersection{T}(t, normalize3d(T.(normal)), missing), NoIntersection(T)
+        return Intersection{T}(t, normalize3d(T.(normal)), nothing), nothing
     else
         # Ray intersects twice, compute both t's
         sqrt_discr = sqrt(discr)
@@ -151,7 +151,7 @@ function ray_sphere_intersections(sphere::Sphere{S}, ray::Ray{R}) where {S, R}
 
         dir2 = position(ray) .+ t2 .* direction(ray)
         normal2 = (dir2 .- position(sphere)) * sign(sphere.radius)
-        return Intersection{T}(t1, normalize3d(T.(normal1)), missing), Intersection{T}(t2, normalize3d(T.(normal2)), missing)
+        return Intersection{T}(t1, normalize3d(T.(normal1)), nothing), Intersection{T}(t2, normalize3d(T.(normal2)), nothing)
     end
 end
 
@@ -162,8 +162,7 @@ Intersection algorithm for `lens` objects.
 """
 function intersect3d(lens::SingletLens, ray::Ray{T}) where T
     intersections = intersect3d(lens, lens.front, ray), intersect3d(lens, lens.back, ray)
-
-    return argmin(i -> i.t, intersections)
+    return argmin(i -> isnothing(i) ? typemax(T) : i.t, intersections)
 end
 
 """
@@ -179,9 +178,9 @@ function intersect3d(lens::SingletLens, s::ConicSurface, ray::Ray{T}) where T
 
     # get sphere intersections
     intersections = ray_sphere_intersections(sph, ray)
-    if all(i -> i === NoIntersection(T), intersections) || all(i -> i.t < eps(T), intersections)
+    if all(i -> i === nothing, intersections) || all(i -> !isnothing(i) && i.t < eps(T), intersections)
         # No intersections or both intersections are behind the ray
-        return NoIntersection(T)
+        return nothing
     else
         # Here the code deviates between the full sphere and a real lens. We are no longer
         # looking for the shortest interaction path but the path which hits an actual physical part of the lens
@@ -213,7 +212,7 @@ function intersect3d(lens::SingletLens, s::ConicSurface, ray::Ray{T}) where T
     end
 
     # if this is reached, no intersection falls within the mechanical aperture
-    return NoIntersection(T)
+    return nothing
 end
 
 """
@@ -227,7 +226,7 @@ function intersect3d(lens::SingletLens, s::AsphericSurface, ray::Ray{T}, iter_ma
     # test intersection with the lens plane
     intersection = intersect3d(lens, PlanarSurface(mechanical_semi_diameter(s)), ray, s === lens.front ? -1 : 1)
     # any intersection at all!?
-    intersection === NoIntersection(T) && return intersection
+    intersection === nothing && return intersection
 
     # now get the intersection with the sphere as first order approximation
     intersection = intersect3d(lens, s.sphere, ray)
@@ -271,17 +270,17 @@ function intersect3d(lens::SingletLens, s::AsphericSurface, ray::Ray{T}, iter_ma
 
     # check the intersection sign
     if sign(fast_dot3d(r_iter - position(ray), direction(ray))) == -1
-        return NoIntersection(T)
+        return nothing
     end
     # check if the ray is within the numerical error margin
     if norm3d(r_iter - B_asph*position(ray)) < ϵ
-        return NoIntersection(T)
+        return nothing
     end
     # check if the ray hits the mechanical aperture
     _sign = (s === lens.front ? -1 : 1)*sign(radius_of_curvature(s))
     edge_pos = B_asph * (position(lens) +_sign*lens.edge_thickness/2*normal(lens))
     if (norm3d(r_iter - edge_pos) > mechanical_semi_diameter(s))
-        return NoIntersection(T)
+        return nothing
     end
 
     # prepare normal vector
@@ -293,7 +292,7 @@ function intersect3d(lens::SingletLens, s::AsphericSurface, ray::Ray{T}, iter_ma
     normalize3d!(asph_normal)
     asph_normal .*= -sign(radius_of_curvature(s))
 
-    return Intersection{T}(norm3d(r_iter - position(ray)), asph_normal, missing)
+    return Intersection{T}(norm3d(r_iter - position(ray)), asph_normal, nothing)
 end
 
 function sag_coordinate(l::SingletLens, s::AsphericSurface, r::Real)
@@ -317,10 +316,10 @@ function intersect3d(lens::SingletLens, s::PlanarSurface, ray::Ray{T}, _sign=(s 
         # line and plane are parallel
         if iszero(nom) && norm3d(position(ray) - p0) < mechanical_semi_diameter(s)
             # line is contained in plane
-            return Intersection{T}(zero(T), T.(n), missing)
+            return Intersection{T}(zero(T), T.(n), nothing)
         else
             # line is not contained within plane --> no intersection
-            return NoIntersection(T)
+            return nothing
         end
     else
         # general case, single point of intersection
@@ -329,13 +328,13 @@ function intersect3d(lens::SingletLens, s::PlanarSurface, ray::Ray{T}, _sign=(s 
         if t > eps(T)
             pos = position(ray) .+ t*direction(ray)
             if norm3d(pos - p0) < mechanical_semi_diameter(s)
-                return Intersection{T}(t, T.(n), missing)
+                return Intersection{T}(t, T.(n), nothing)
             end
         end
     end
 
     # if this is reached, no intersection falls within the mechanical aperture
-    return NoIntersection(T)
+    return nothing
 end
 
 """
@@ -353,8 +352,8 @@ function intersect3d(lens::SingletLens, s::CylinderSurface, ray::Ray{T}) where T
     md = fast_dot3d(m, d)
     nd = fast_dot3d(n, d)
     # segment outside either end of the cylinder
-    (md < eps(T) && md + nd < eps(T)) && return NoIntersection(T)
-    (md > one(T) && md + nd > one(T)) && return NoIntersection(T)
+    (md < eps(T) && md + nd < eps(T)) && return nothing
+    (md > one(T) && md + nd > one(T)) && return nothing
     mn = fast_dot3d(m, n)
     a = one(T) - nd * nd
     k = fast_dot3d(m,m) - s.R^2
@@ -362,7 +361,7 @@ function intersect3d(lens::SingletLens, s::CylinderSurface, ray::Ray{T}) where T
 
     if abs(a) < eps(T)
         # ray is parallel to cylinder axis
-        c > eps(T) && return NoIntersection(T)
+        c > eps(T) && return nothing
         # ray intersects, find the intersection type
         if md < eps(T)
             # endcap 1
@@ -377,36 +376,36 @@ function intersect3d(lens::SingletLens, s::CylinderSurface, ray::Ray{T}) where T
 
         dir = position(ray) .+ t .* direction(ray)
         normal = (dir .- position(sphere)) * sign(s.R)
-        return Intersection{T}(t, normalize3d(T.(normal)), missing)
+        return Intersection{T}(t, normalize3d(T.(normal)), nothing)
     end
 
     b = mn - nd * md
     discr = b^2 - a*c
     if discr < eps(T)
-        return NoIntersection(T)
+        return nothing
     end
 
     t = (-b - √(discr)) / a
     if (md + t*nd < eps(T))
         if nd < eps(T)
-            return NoIntersection(T)
+            return nothing
         end
         t = -md / nd
         if k + 2*t(mn + t) > eps(T)
-            return NoIntersection(T)
+            return nothing
         end
     elseif md + t*nd > one(T)
         if nd > eps(T)
-            return NoIntersection(T)
+            return nothing
         end
 
         t = (one(T) - md) / nd
         if k + one(T) - 2*md + t*(2*(mn-nd) + t) > eps(T)
-            return NoIntersection(T)
+            return nothing
         end
     end
 
     dir = position(ray) .+ t .* direction(ray)
     normal = (dir .- fast_dot3d(dir, d) .* d) * sign(s.R)
-    return Intersection{T}(t, normalize3d(T.(normal)), missing)
+    return Intersection{T}(t, normalize3d(T.(normal)), nothing)
 end

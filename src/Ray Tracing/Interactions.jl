@@ -1,15 +1,8 @@
 struct Interaction{T}
-    pos::Union{Vector{T}, Missing}
-    dir::Union{Vector{T}, Missing}
-    information::Information{T}
+    pos::NullableVector{T}
+    dir::NullableVector{T}
+    information::Nullable{Information{T}}
 end
-
-# Optimized for pointer look-up
-const _NoInteractionF64 = Interaction{Float64}(missing, missing, NoInformation(Float64))
-const _NoInteractionF32 = Interaction{Float32}(missing, missing, NoInformation(Float32))
-
-NoInteraction(::Type{Float64}) = _NoInteractionF64
-NoInteraction(::Type{Float32}) = _NoInteractionF32
 
 struct Mirror{T} <: AbstractMesh{T}
     mesh::Mesh{T}

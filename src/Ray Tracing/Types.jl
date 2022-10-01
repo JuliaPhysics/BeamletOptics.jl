@@ -22,7 +22,7 @@ Base.length(ray::AbstractRay) = ray.len
 length!(ray::AbstractRay, len) = (ray.len = len)
 
 "Defines the interaction between a `ray` and an `entity`."
-interact3d(entity::AbstractEntity, ray::AbstractRay{T}) where T = NoInteraction(T)
+interact3d(::AbstractEntity, ::AbstractRay{T}) where T = nothing
 
 """
     AbstractObject{T<:Real} <: AbstractEntity
@@ -82,7 +82,7 @@ Rotates the `dir`-matrix of `object` around the reference-`axis` by an angle of 
 function rotate3d!(object::AbstractObject, axis, θ)
     R = rotate3d(axis, θ)
     orientation!(object, orientation(object) * R)
-    return nothing 
+    return nothing
 end
 
 xrotate3d!(object::AbstractObject{T}, θ) where T = rotate3d!(object, T[one(T), zero(T), zero(T)], θ)
@@ -96,27 +96,25 @@ end
 
 reset_rotation3d!(object::AbstractObject{T}) where T = (object.dir .= Matrix{T}(I, 3, 3))
 
-function intersect3d(object::AbstractObject{O}, ray::AbstractRay{R}) where {O, R}
+function intersect3d(object::AbstractObject{O}, ::AbstractRay{R}) where {O, R}
     @warn lazy"No intersect3d method defined for:" typeof(object)
-    T = promote_type(O, R)
-    return NoIntersection(T)
+    return nothing
 end
 
-function interact3d(object::AbstractObject{O}, ray::AbstractRay{R}) where {O, R}
+function interact3d(object::AbstractObject{O}, ::AbstractRay{R}) where {O, R}
     @warn lazy"No interact3d method defined for:" typeof(object)
-    T = promote_type(O, R)
-    return NoInteraction(T)
+    return nothing
 end
 
-render_object!(axis, object::AbstractObject) = nothing
-render_object_normals!(axis, object::AbstractObject) = nothing
+render_object!(::Any, ::AbstractObject) = nothing
+render_object_normals!(::Any, ::AbstractObject) = nothing
 
 """
     isinfrontof(object::AbstractObject, ray::AbstractRay)
 
 A simple test to check if an `object` lies "in front of" a `ray`.
 The forward direction is here defined as the ray `orientation`.
-Only works well if `ray` is **outside** of the volume of `object`. 
+Only works well if `ray` is **outside** of the volume of `object`.
 Can be dispatched to return more accurate results for subtypes of `AbstractObject`
 """
 function isinfrontof(object::AbstractObject, ray::AbstractRay)
