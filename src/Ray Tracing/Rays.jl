@@ -10,16 +10,9 @@ Stores some data resulting from ray tracing a `System`. This information can be 
 """
 mutable struct Intersection{T}
     const t::T
-    const n::Union{Vector{T}, Missing}
-    oID::Union{Int, Missing}
+    const n::NullableVector{T}
+    oID::Nullable{Int}
 end
-
-# Optimized for pointer look-up
-const _NoIntersectionF64 = Intersection(Inf64, missing, missing)
-const _NoIntersectionF32 = Intersection(Inf32, missing, missing)
-
-NoIntersection(::Type{Float64}) = _NoIntersectionF64
-NoIntersection(::Type{Float32}) = _NoIntersectionF32
 
 """
     Information{T}
@@ -33,18 +26,11 @@ Stores the optical parameters that are relevant for the propagation of a ray thr
 - `P`: polarization vector (either Stokes or Jones formalism, tbd.) [**currently a placeholder**]
 """
 mutable struct Information{T}
-    λ::Union{T, Missing}
-    n::Union{T, Missing}
-    I::Union{T, Missing}
-    P::Union{Vector{Complex{T}}, Missing}
+    λ::Nullable{T}
+    n::Nullable{T}
+    I::Nullable{T}
+    P::NullableVector{Complex{T}}
 end
-
-# Optimized for pointer look-up
-const _NoInformationF64 = Information{Float64}(missing, missing, missing, missing)
-const _NoInformationF32 = Information{Float32}(missing, missing, missing, missing)
-
-NoInformation(::Type{Float64}) = _NoInformationF64
-NoInformation(::Type{Float32}) = _NoInformationF32
 
 "Prototype constructor for `Information{T}`"
 function Information(λ::T, n=1, I=1, P=[0,0]) where T
@@ -65,12 +51,12 @@ Mutable struct to store ray information. A `Ray` is described by ``\\vec{v}_{pos
 mutable struct Ray{T} <: AbstractRay{T}
     pos::Vector{T}
     dir::Vector{T}
-    intersection::Intersection{T}
-    information::Information{T}
+    intersection::Nullable{Intersection{T}}
+    information::Nullable{Information{T}}
 end
 
-Base.length(ray::Ray) = ray.intersection.t
-length!(ray::Ray, len) = nothing
+Base.length(ray::Ray{T}) where T = ray.intersection.t
+length!(::Ray, len) = nothing
 
 information(ray::Ray) = ray.information
 information!(ray::Ray, info) = (ray.information = info)
@@ -82,12 +68,12 @@ refractive_index(ray::Ray) = ray.information.n
 refractive_index!(ray::Ray, n) = (ray.information.n = n)
 
 # Placeholders for the future
-polarization(ray::Ray) = nothing
-polarization!(ray::Ray, P) = nothing
+polarization(::Ray) = nothing
+polarization!(::Ray, P) = nothing
 
 # Placeholders for the future
-intensity(ray::Ray) = nothing
-intensity!(ray::Ray, I) = nothing
+intensity(::Ray) = nothing
+intensity!(::Ray, I) = nothing
 
 
 """
@@ -103,7 +89,7 @@ function Ray(pos::Vector{P}, dir::Vector{D}, λ=1064) where {P<:Real, D<:Real}
     if !(T<:AbstractFloat)
         T = Float64
     end
-    return Ray{T}(T.(pos), normalize3d(T.(dir)), NoIntersection(T), Information(T.(λ)))
+    return Ray{T}(T.(pos), normalize3d(T.(dir)), nothing, Information(T.(λ)))
 end
 
 mutable struct Beamlet{T}

@@ -13,28 +13,28 @@ end
 function trace_system!(system::System, beam::Beam{T}; r_max::Int=20) where T
     # Test until max. number of rays in beam reached
     while length(beam.rays) < r_max
-        intersection = NoIntersection(T)
+        intersection::Union{Intersection{T}, Nothing} = nothing
         ray = beam.rays[end]
         # Test against all objects in system
         for (i, object) in enumerate(system.objects)
             temp = intersect3d(object, ray)
-            if temp.t < intersection.t
+            if !isnothing(temp) && (isnothing(intersection) || temp.t < intersection.t)
                 intersection = temp
                 intersection.oID = i
             end
         end
         # Test if intersection is valid
-        if intersection === NoIntersection(T)
+        if intersection === nothing
             break
         end
         ray.intersection = intersection
         # Test if interaction is valid
         interaction = interact3d(system.objects[intersection.oID], ray)
-        if interaction === NoInteraction(T)
+        if interaction === nothing
             break
         end
         # Append ray to beam tail
-        append!(beam.rays, [Ray(interaction.pos, interaction.dir, NoIntersection(T), interaction.information)])
+        append!(beam.rays, [Ray(interaction.pos, interaction.dir, nothing, interaction.information)])
     end
     return nothing
 end
@@ -45,19 +45,19 @@ function retrace_system!(system::SCDI.System, beam::SCDI.Beam{T}) where T
     numEl = length(beam.rays)
     for ray in beam.rays
         # Test if object ID is valid
-        oID = ray.intersection.oID
-        if ismissing(oID)
+        if isnothing(ray.intersection) || isnothing(ray.intersection.oID)
             break
         end
+        oID = ray.intersection.oID
         # Test if intersection is still valid (modifys current intersection)
         ray.intersection = intersect3d(system.objects[oID], ray)
-        if ray.intersection === NoIntersection(T)
+        if ray.intersection === nothing
             break
         end
         ray.intersection.oID = oID
         # Test if interaction is still valid
-        interaction = interact3d(system.objects[oID], ray)        
-        if interaction === NoInteraction(T)
+        interaction = interact3d(system.objects[oID], ray)
+        if interaction === nothing
             break
         end
         # Modify following beam (NOT THREAD-SAFE)

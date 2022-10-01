@@ -1,4 +1,20 @@
 """
+    Nullable{T}
+
+An alias which results in `Union{T, Nothing}` to provide a shorter notation for struct
+fields which can containing nothing.
+"""
+const Nullable{T} = Union{T, Nothing} where T
+
+"""
+    NullableVector{T}
+
+An alias which results in `Union{Vector{T}, Nothing}` to provide a shorter notation for struct
+fields which can containing nothing.
+"""
+const NullableVector{T} = Union{Vector{T}, Nothing} where T
+
+"""
     norm3d(v)
 
 Computes the euclidic (p=2) norm of the input `v`ector.
@@ -88,7 +104,7 @@ end
 
 Returns the angle between the `target` and `reference` vector in **rad**.
 """
-function angle3d(target::Vector{T}, reference::Vector{T}) where T    
+function angle3d(target::Vector{T}, reference::Vector{T}) where T
     arg = clamp(fast_dot3d(target, reference) / (norm3d(target) * norm3d(reference)), -one(T), one(T))
     angle = acos(arg)
     return angle

@@ -153,7 +153,7 @@ end
 
     @debug "Testing Ray constructor (dir normalization and init. Inf length)"
     @test isapprox(SCDI.norm3d(ray.dir), 1)
-    @test isinf(ray.intersection.t)
+    @test isnothing(ray.intersection)
 
     @debug "Testing Beam struct definition"
     @test isdefined(SCDI, :Beam)
@@ -343,20 +343,18 @@ end
         # This ray starts right behind the lens and should not intersect
         ray = SCDI.Ray([0,0,0.1],[0,0,1.0])
         ints = SCDI.intersect3d(scx_lens, ray)
-        @test ints === SCDI.NoIntersection(Float64)
+        @test ints === nothing
 
         # This ray starts right in front of the lens, will hit the sphere but miss the
         # mechanical aperture --> no intersection
         ray = SCDI.Ray([0,0,-1.0],[0.1,0,1.0])
         ints = SCDI.intersect3d(scx_lens, ray)
-        @test ints === SCDI.NoIntersection(Float64)
+        @test ints === nothing
     end
 end
 
 @testset "Interactions" begin
     @test isdefined(SCDI, :Interaction)
-    @test isdefined(SCDI, :_NoInteractionF64)
-    @test isdefined(SCDI, :_NoInteractionF32)
     @test isdefined(SCDI, :Mirror)
     @test isdefined(SCDI, :Prism)
 end
