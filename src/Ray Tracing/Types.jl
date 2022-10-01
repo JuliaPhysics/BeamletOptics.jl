@@ -94,7 +94,7 @@ function reset_translation3d!(object::AbstractObject{T}) where T
     return nothing
 end
 
-reset_rotation3d!(object::AbstractObject{T}) where T = (object.dir = Matrix{T}(I, 3, 3))
+reset_rotation3d!(object::AbstractObject{T}) where T = (object.dir .= Matrix{T}(I, 3, 3))
 
 function intersect3d(object::AbstractObject{O}, ray::AbstractRay{R}) where {O, R}
     @warn lazy"No intersect3d method defined for:" typeof(object)
@@ -110,3 +110,20 @@ end
 
 render_object!(axis, object::AbstractObject) = nothing
 render_object_normals!(axis, object::AbstractObject) = nothing
+
+"""
+    isinfrontof(object::AbstractObject, ray::AbstractRay)
+
+A simple test to check if an `object` lies "in front of" a `ray`.
+The forward direction is here defined as the ray `orientation`.
+Only works well if `ray` is **outside** of the volume of `object`. 
+Can be dispatched to return more accurate results for subtypes of `AbstractObject`
+"""
+function isinfrontof(object::AbstractObject, ray::AbstractRay)
+    los = position(object) - position(ray)
+    if fast_dot3d(direction(ray), los) <= 0
+        return false
+    else
+        return true
+    end
+end

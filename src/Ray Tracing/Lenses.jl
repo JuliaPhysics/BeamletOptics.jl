@@ -25,7 +25,7 @@ The lens is characterized by its `normal` vector, its position `pos` and an `edg
 The material of this lens currently only affects the refractive index which is passed as
 function handle in `ref_index`.
 """
-mutable struct Lens{T <: AbstractSurface, V <: AbstractSurface, M<:AbstractMatrix{<:AbstractFloat}, W, F <: Function} <: AbstractLens{W}
+mutable struct SingletLens{T <: AbstractSurface, V <: AbstractSurface, M<:AbstractMatrix{<:AbstractFloat}, W, F <: Function} <: AbstractLens{W}
     front::T
     back::V
     pos::Vector{W}
@@ -34,12 +34,12 @@ mutable struct Lens{T <: AbstractSurface, V <: AbstractSurface, M<:AbstractMatri
     ref_index::F
 end
 
-function Lens(front::T, back::V, edge_thickness::W=zero(W), ref_index=x->1.5) where {T<:AbstractSurface, V<:AbstractSurface, W}
-    return Lens(
+function SingletLens(front::T, back::V, edge_thickness::W=0.0, ref_index=x->1.5) where {T<:AbstractSurface, V<:AbstractSurface, W}
+    return SingletLens(
         front,
         back,
         zeros(W, 3),
-        Matrix{W}(I, 3, 3),        
+        Matrix{W}(I, 3, 3),
         edge_thickness,
         ref_index
     )
@@ -50,7 +50,7 @@ end
 
 Returns the center thickness of the lens.
 """
-center_thickness(l::Lens) = (sag(l.front, clear_semi_diameter(l.front)) +
+center_thickness(l::SingletLens) = (sag(l.front, clear_semi_diameter(l.front)) +
                             l.edge_thickness +
                             sag(l.back, clear_semi_diameter(l.back)))
 
@@ -60,7 +60,7 @@ center_thickness(l::Lens) = (sag(l.front, clear_semi_diameter(l.front)) +
 
 Returns the center of curvature of the surface `s` of the given lens as 3D-coordinate.
 """
-function center_of_curvature(l::Lens, s::Union{CylinderSurface,ConicSurface})
+function center_of_curvature(l::SingletLens, s::Union{CylinderSurface,ConicSurface})
     # get the sign which is dependent on the surface type (front or back) and the sign
     # of the radius. Radius can be negative for concave surfaces.
     _sign = (s === l.front ? -1 : 1)*sign(radius_of_curvature(s))
@@ -74,6 +74,4 @@ end
 Returns the equivalent sphere of the conic surface `s` of the lens. This sphere is useful
 for intersection testing.
 """
-sphere(l::Lens, s::Union{CylinderSurface,ConicSurface}) = Sphere(center_of_curvature(l, s), radius_of_curvature(s))
-
-# AbstractObject Interface defintions --> TODO
+sphere(l::SingletLens, s::Union{CylinderSurface,ConicSurface}) = Sphere(center_of_curvature(l, s), radius_of_curvature(s))
