@@ -3,7 +3,7 @@ using Test
 using LinearAlgebra
 using UUIDs
 
-@testset "Utilites" begin
+@testset "Utilities" begin
     @testset "Testing euclidic norm utilites" begin
         v = [1.0, 0.0, 1.0]
         @test isapprox(SCDI.norm3d(v), sqrt(2))

@@ -135,9 +135,10 @@ For negative distances, assume first ray backwards.
 function point_on_beam(beam::Beam, t::Real)
     # Initialize counter to track cumulative length
     temp = 0
+    numEl = length(beam.rays)
     for (index, ray) in enumerate(beam.rays)
         # Catch final ray
-        if isnothing(intersection(ray))
+        if index == numEl
             break
         end
         temp += length(ray)
