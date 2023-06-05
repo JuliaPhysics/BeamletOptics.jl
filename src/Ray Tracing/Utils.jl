@@ -17,7 +17,7 @@ const NullableVector{T} = Union{Vector{T}, Nothing} where T
 """
     norm3d(v)
 
-Computes the euclidic (p=2) norm of the input `v`ector.
+Computes the euclidic (p=2) norm of the 3D input `v`ector.
 """
 function norm3d(v)
     return @inbounds sqrt(v[1]^2 + v[2]^2 + v[3]^2)
@@ -25,6 +25,15 @@ end
 
 """
     norm3d(v)
+
+Computes the euclidic (p=2) norm of the 2D input `v`ector.
+"""
+function norm2d(v)
+    return @inbounds sqrt(v[1]^2 + v[2]^2)
+end
+
+"""
+    normalize3d!(v)
 
 Mutation function that changes  the `v`ector length to be ``||v|| = 1``. See also `normalize3d`\\
 Note that there is a limit to the equality due to machine precision.
@@ -46,13 +55,13 @@ function normalize3d(v)
 end
 
 """
-    orthogonal3d(target::Vector, reference::Vector)
+    orthogonal3d(target, reference)
 
 Returns a vector with unit length that is perpendicular to the target and an additional
 reference vector. Vector orientation is determined according to right-hand rule.
 """
-function orthogonal3d(target::Vector, reference::Vector)
-    n = cross(target, reference)
+function orthogonal3d(target, reference)
+    n = fast_cross3d(target, reference)
     return normalize3d(n)
 end
 
@@ -133,6 +142,7 @@ Specific implementation of the cross product for vector dimensions E=3.\\
 Mutates the result in `c` for the cross product of `a` with `b`.
 """
 function fast_cross3d!(c, a, b)
+    # WARNING: can cause buffer overflow
     @inbounds c[1] = a[2] * b[3] - a[3] * b[2]
     @inbounds c[2] = a[3] * b[1] - a[1] * b[3]
     @inbounds c[3] = a[1] * b[2] - a[2] * b[1]
@@ -205,9 +215,56 @@ function refraction3d(dir, normal, n1, n2)
 end
 
 """
+    lensmakers_eq(R1, R2, nl, n0=1.0)
+
+Calculates the thin lens focal length based on the radius of curvature `R1`/`R2` and the lens refractive index `nl`.
+If center of sphere is on left then R < 0. If center of sphere is on right then R > 0.    
+"""
+lensmakers_eq(R1, R2, nl, n0=1.0) =  1 / ((nl-n0)/n0 * (1/R1 - 1/R2))
+
+"""
     base_transform(base, base2=I(3))
 
 Return the base transformation matrix for transforming from vectors given
 relative to `base2` into `base`.
 """
 base_transform(base, base2=I(3)) = base \ base2
+
+rayleigh_range(λ, w0, M2, n=1) = π * n * w0^2 / λ / M2
+
+beam_waist(z, w0, zr) = w0*sqrt(1+(z/zr)^2)
+
+gouy_phase(z, zr) = -atan(z/zr) # some definitions with +
+
+wavefront_curvature(z, zr) = z*(1+(zr/z)^2)
+
+divergence_angle(λ, w0, M2) = M2 * λ / (π * w0)
+
+wave_number(λ) = 2π/λ
+
+"""
+    electric_field(r, z, E0, w0, w, k, ψ, R) -> ComplexF64
+
+Computes the theoretical complex electric field distribution of an unastigmatic Gaussian laser beam.
+
+# Arguments
+- `r`: radial distance from beam origin
+- `z`: axial distance from beam origin
+- `E0`: peak electric field amplitude
+- `w0`: waist radius
+- `w`: local beam radius
+- `k`: wave number, equal to `2π/λ`
+- `ψ`: Gouy phase shift (defined as -atan(z/zr) !)
+- `R`: radius of wavefront curvature
+"""
+electric_field(r::Real, z::Real, E0, w0, w, k, ψ, R) = E0 * w0/w * exp(-r^2/w^2) * exp(im*(k*z + ψ + (k*r^2)/(2*R)))
+
+function electric_field(r::Real, z::Real, E0, w0, λ, M2=1)
+    zr = rayleigh_range(λ, w0, M2)
+    w = beam_waist(z, w0, zr)
+    k = wave_number(λ)
+    ψ = gouy_phase(z, zr)
+    R = wavefront_curvature(z, zr)
+    return electric_field(r, z, E0, w0, w, k, ψ, R)
+end
+
