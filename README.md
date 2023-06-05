@@ -13,22 +13,22 @@ Documentation can be found here: https://optical-air-data.pages.gitlab.dlr.de/di
         - [x] basic translation/rotation tools
         - [x] basic STL data input
         - [x] reset functionality for rotation/translation
-        - [ ] STL vertices/face compression
     - Rays        
         - [x] basic intersection testing
         - [x] basic propagation routine over n elements
         - [x] basic optical elements (lens/mirror)
             - [x] reflection
             - [x] refraction
-            - [ ] documentation
-        - [x] wavelength field for Ray
-        - [ ] Gaussian beam struct
+        - [x] Gaussian beam struct
+            - [ ] implement better retracing based on chief ray
+            - [ ] simple astigmatism via 5, 7, 9-ray approach
 - Optics
-    - [ ] phase front via Gaussian beams
-    - [ ] phase shift due to ref. index change
-    - [ ] optical intensity distribution on detector
-    - [ ] simple astigmatism via 5, 7, 9-ray approach
     - [x] Lens types using mathematical surfaces
+    - [ ] Photodetector
+        - [ ] optical intensity distribution on detector
+        - [ ] model interference of Gaussian beams
+        - [ ] phase front via Gaussian beams
+    - [ ] phase shift due to ref. index change
 - Mechanics
     - [ ] vibration of optical elements
 - Plotting

@@ -1,33 +1,51 @@
+"""
+    Interaction{T}
+
+Describes how a `ray` and an `object` interact with each other.
+Returns the new parameters for the construction of the next ray.
+"""
 struct Interaction{T}
-    pos::NullableVector{T}
-    dir::NullableVector{T}
-    information::Nullable{Information{T}}
+    pos::Vector{T}
+    dir::Vector{T}
+    parameters::Parameters{T}
+    hint::Nullable{UUID}
 end
 
-struct Mirror{T} <: AbstractMesh{T}
-    mesh::Mesh{T}
+position(interaction::Interaction) = interaction.pos
+
+direction(interaction::Interaction) = interaction.dir
+
+parameters(interaction::Interaction) = interaction.parameters
+
+hint(interaction::Interaction) = interaction.hint
+
+abstract type AbstractMirror <: AbstractObject end
+
+struct Mirror{S <: AbstractShape} <: AbstractMirror
+    id::UUID
+    shape::S
 end
 
-function interact3d(mirror::Mirror{M}, ray::AbstractRay{R}) where {M, R}
-    T = promote_type(M, R)
-    normal = ray.intersection.n
+function interact3d(::AbstractMirror, ray::AbstractRay{R}) where {R<:Real}
+    normal = intersection(ray).n
     npos = position(ray) + length(ray) * direction(ray)
     ndir = reflection3d(direction(ray), normal)
-    return Interaction{T}(npos, ndir, ray.information)
+    return Interaction{R}(npos, ndir, ray.parameters, nothing)
 end
 
-struct Prism{T} <: AbstractMesh{T}
-    mesh::Mesh{T}
+abstract type AbstractPrism <: AbstractObject end
+
+struct Prism{S <: AbstractShape} <: AbstractPrism
+    id::UUID
+    shape::S
     ref_index::Function
 end
 
 refractive_index(prism::Prism) = prism.ref_index
-refractive_index!(prism, ref_index) = nothing
 
-function interact3d(prism::Prism{P}, ray::Ray{R}) where {P, R}
-    T = promote_type(P, R)
+function interact3d(prism::Prism, ray::Ray{R}) where {R}
     # Check dir. of ray and surface normal
-    normal = ray.intersection.n
+    normal = intersection(ray).n
     λ = wavelength(ray)
     if dot(direction(ray), normal) < 0
         # "Outside prism"
@@ -42,28 +60,24 @@ function interact3d(prism::Prism{P}, ray::Ray{R}) where {P, R}
     # Calculate new dir. and pos.
     ndir = refraction3d(direction(ray), normal, n1, n2)
     npos = position(ray) + length(ray) * direction(ray)
-    return Interaction{T}(npos, ndir, Information(λ, n2))
+    # Hint is the current object ID
+    return Interaction{R}(npos, ndir, Parameters(λ, n2), id(prism))
 end
 
-function interact3d(lens::SingletLens{G,V,M,W,F}, ray::Ray{R}) where {G,V,M,W,F,R}
-    T = promote_type(W, R)
-    # Check dir. of ray and surface normal
-    normal = ray.intersection.n
-    λ = wavelength(ray)
-    if dot(direction(ray), normal) < 0
-        # "Outside lens"
-        n1 = refractive_index(ray)
-        n2 = refractive_index(lens)(λ)
+abstract type AbstractDetector <: AbstractObject end
+
+mutable struct Photodetector{S <: AbstractShape, T} <: AbstractDetector
+    const id::UUID
+    const shape::S
+    grid::Matrix{T}
+    beams::Nullable{Vector{UUID}}
+end
+
+function interact3d(pd::Photodetector, ray::Ray)
+    if isnothing(pd.beams)
+        pd.beams = [id(ray)]
     else
-        # "Inside lens"
-        n1 = refractive_index(lens)(λ)
-        n2 = 1.0
-        normal *= -1
+        append!(pd.beams, [id(ray)])
     end
-    # Calculate new dir. and pos.
-    ndir = refraction3d(direction(ray), normal, n1, n2)
-    npos = position(ray) + length(ray) * direction(ray)
-    return Interaction{T}(npos, ndir, Information(λ, n2))
+    return nothing
 end
-
-refractive_index(lens::SingletLens) = lens.ref_index

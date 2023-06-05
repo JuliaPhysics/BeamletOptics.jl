@@ -6,16 +6,20 @@ Stores some data resulting from ray tracing a `System`. This information can be 
 # Fields:
 - `t`: length of the ray parametrization in [m]
 - `n`: normal vector at the point of intersection
-- `oID`: index of the intersected object in the `System` object-vector
+- `id`: index of the intersected object in the `System` object-vector
 """
 mutable struct Intersection{T}
-    const t::T
-    const n::NullableVector{T}
-    oID::Nullable{Int}
+    t::T
+    n::Vector{T}
+    id::Nullable{UUID}
 end
 
+
+Base.length(intersection::Intersection) = intersection.t
+length!(::Intersection, t) = nothing
+
 """
-    Information{T}
+    Parameters{T}
 
 Stores the optical parameters that are relevant for the propagation of a ray through an optical system. See also `Ray{T}`.
 
@@ -25,16 +29,16 @@ Stores the optical parameters that are relevant for the propagation of a ray thr
 - `I`: intensity value [**currently a placeholder**]
 - `P`: polarization vector (either Stokes or Jones formalism, tbd.) [**currently a placeholder**]
 """
-mutable struct Information{T}
-    λ::Nullable{T}
-    n::Nullable{T}
-    I::Nullable{T}
-    P::NullableVector{Complex{T}}
+mutable struct Parameters{T}
+    λ::T
+    n::T
+    I::T
+    P::Vector{Complex{T}}
 end
 
-"Prototype constructor for `Information{T}`"
-function Information(λ::T, n=1, I=1, P=[0,0]) where T
-    return Information{T}(λ, n, I, P)
+"Prototype constructor for `Parameters{T}`"
+function Parameters(λ::T, n=1, I=1, P=[0, 0]) where {T}
+    return Parameters{T}(λ, n, I, P)
 end
 
 """
@@ -46,26 +50,30 @@ Mutable struct to store ray information. A `Ray` is described by ``\\vec{v}_{pos
 - `pos`: a 3D-vector that describes the `Ray` origin
 - `dir`: a normalized 3D-vector that describes the `Ray` direction
 - `intersection`: refer to `Intersection{T}`.
-- `information`: refer to `Information{T}`
+- `parameters`: refer to `Parameters{T}`
 """
 mutable struct Ray{T} <: AbstractRay{T}
+    id::UUID
     pos::Vector{T}
     dir::Vector{T}
     intersection::Nullable{Intersection{T}}
-    information::Nullable{Information{T}}
+    parameters::Nullable{Parameters{T}}
 end
 
 Base.length(ray::Ray{T}) where T = ray.intersection.t
 length!(::Ray, len) = nothing
 
-information(ray::Ray) = ray.information
-information!(ray::Ray, info) = (ray.information = info)
+intersection(ray::Ray) = ray.intersection
+intersection!(ray::Ray, intersection) = (ray.intersection = intersection)
 
-wavelength(ray::Ray) = ray.information.λ
-wavelength!(ray::Ray, λ) = (ray.information.λ = λ)
+parameters(ray::Ray) = ray.parameters
+parameters!(ray::Ray, parameters) = (ray.parameters = parameters)
 
-refractive_index(ray::Ray) = ray.information.n
-refractive_index!(ray::Ray, n) = (ray.information.n = n)
+wavelength(ray::Ray) = ray.parameters.λ
+wavelength!(ray::Ray, λ) = (ray.parameters.λ = λ)
+
+refractive_index(ray::Ray) = ray.parameters.n
+refractive_index!(ray::Ray, n) = (ray.parameters.n = n)
 
 # Placeholders for the future
 polarization(::Ray) = nothing
@@ -75,41 +83,20 @@ polarization!(::Ray, P) = nothing
 intensity(::Ray) = nothing
 intensity!(::Ray, I) = nothing
 
+function Ray(pos::Vector{T}, dir::Vector{T}, λ=1064) where {T<:AbstractFloat}
+    return Ray{T}(uuid4(), pos, normalize3d(dir), nothing, Parameters(T(λ)))
+end
 
 """
     Ray(pos::Vector{P}, dir::Vector{D}, λ=1064) where {P, D}
 
-Constructs an instance of `Ray` with common type `T`. Vector `dir` is normalized. Ray is initialized with `NoIntersection` and `λ` = 630 nm.\\
+Constructs an instance of `Ray` with common type `T`. Vector `dir` is normalized. Ray is initialized with no `intersection` and `λ` = 1064 nm.\\
 In general, `T<:AbstractFloat`! Inputs of type `Int` are promoted to `Float64`.
 """
-function Ray(pos::Vector{P}, dir::Vector{D}, λ=1064) where {P<:Real, D<:Real}
-    @assert norm3d(dir) != 0 "Illegal vector for direction"
-    T = promote_type(P, D)
-    # Catch integer type inputs
-    if !(T<:AbstractFloat)
-        T = Float64
-    end
-    return Ray{T}(T.(pos), normalize3d(T.(dir)), nothing, Information(T.(λ)))
-end
+function Ray(pos::Vector{P}, dir::Vector{D}, λ=1064) where {P<:Real,D<:Real}
+    F = float(promote_type(P, D))
 
-mutable struct Beamlet{T}
-    chief::Vector{Ray{T}}
-    divergence::Vector{Ray{T}}
-    waist::Vector{Ray{T}}
-
-    # Beamlet constructor
-    # sizehint! in constructor?
-    # append! performance (irrelevant)
-    function Beamlet(chief::Ray, λ, w0; T=Float64)
-        # All rays are initialized parallel to the x,y-plane
-        # Divergence angle in rad
-        θ = λ / (π * w0)
-        # Divergence ray
-        divergence = Ray(chief.pos, SCDI.rotate3d([0, 0, 1], θ) * chief.dir)
-        # Waist ray
-        waist = Ray(chief.pos + SCDI.orthogonal3d(chief.dir, [0, 0, 1]) * w0, chief.dir)
-        new{T}([chief], [divergence], [waist])
-    end
+    return Ray(convert(Vector{F}, pos), convert(Vector{F}, dir), λ)
 end
 
 """
@@ -120,3 +107,91 @@ Temporary container struct to test ray tracing.
 mutable struct Beam{T}
     rays::Vector{Ray{T}}
 end
+
+Beam(ray::Ray{T}) where T = Beam{T}([ray])
+
+"""
+    length(beam::Beam)
+
+Calculate the length of a beam up to the point of the last intersection.
+"""
+function Base.length(beam::Beam{T}) where T
+    l::T = 0
+    for ray in beam.rays
+        if isnothing(intersection(ray))
+            break
+        end
+        l += length(ray)
+    end
+    return l
+end
+
+"""
+    point_on_beam(beam::Beam, t::Real)
+
+Function to find a point given a specific distance `t` along the beam. Return the ray `index` aswell.
+For negative distances, assume first ray backwards.
+"""
+function point_on_beam(beam::Beam, t::Real)
+    # Initialize counter to track cumulative length
+    temp = 0
+    for (index, ray) in enumerate(beam.rays)
+        # Catch final ray
+        if isnothing(intersection(ray))
+            break
+        end
+        temp += length(ray)
+        # If the specified distance `t` is less than the cumulative length,
+        # calculate the local ray length `b` and find the point along the ray
+        if t < temp
+            b = temp - t
+            point = position(ray) + (length(ray) - b) * direction(ray)
+            return point, index
+        end
+    end
+    # If no solution at this point assume final ray with infinite length
+    ray = beam.rays[end]
+    b = t - temp
+    point = position(ray) + b * direction(ray)
+    return point, length(beam.rays)
+end
+
+function isparentbeam(beam::Beam, ray_id::UUID)
+    for ray in beam.rays
+        if id(ray) == ray_id
+            return true
+        end
+    end
+    return false
+end
+
+"""
+    isparentbeam(beam, ray)
+
+Tests if the given `beam` contains the `ray` as a part of its solution.
+"""
+isparentbeam(beam::Beam, ray::AbstractRay) = isparentbeam(beam, ray.id)
+
+function Base.show(io::IO, ::MIME"text/plain", beam::Beam)
+    for (i, ray) in enumerate(beam.rays)
+        println(io, "Ray $i:")
+        if isnothing(intersection(ray))
+            println(io, "    No intersection")
+            println(io, "    Pos.: $(position(ray))")
+            println(io, "    Dir.: $(direction(ray))")
+        else
+            println(io, "    Intersects with object #$(intersection(ray).id)")
+            println(io, "    Pos.: $(position(ray))")
+            println(io, "    Dir.: $(direction(ray))")
+            println(io, "    End.: $(position(ray) .+ length(ray) .* direction(ray))")
+        end
+    end
+    return nothing
+end
+
+"""
+    line_point_distance3d(ray, point)
+
+Returns value for the shortest distance between the `ray` (extended to ∞) and `point`.
+"""
+line_point_distance3d(ray::AbstractRay, point) = line_point_distance3d(position(ray), direction(ray), point)

@@ -1,16 +1,20 @@
 name = "SCDI"
 uuid = "c387492b-ffec-4e51-9a46-bd230226031c"
 authors = ["uitt_hu <hugo.uittenbosch@dlr.de>"]
-version = "0.2.0"
+version = "0.3.0"
 
 [deps]
-BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MakieCore = "20f20a25-4f0e-4fdf-b5d1-57303727442b"
-MeshIO = "7269a6da-0436-5bbc-96c2-40638cbb6118"
-Optim = "429524aa-4258-5aef-a3af-852621145aeb"
-SnoopPrecompile = "66db9d55-30c0-4569-8b51-7e840670fc0c"
+MarchingCubes = "299715c1-40a9-479a-aaf9-4a633d36f717"
+PrecompileTools = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
+UUIDs = "cf7118a7-6976-5b1a-9a39-7adc72f591a4"
+
+[compat]
+FileIO = "1"
+PrecompileTools = "1"
+julia = "1.7"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

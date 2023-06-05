@@ -1,29 +1,24 @@
 """
-    AbstractMesh <: AbstractObject
+    AbstractMesh <: AbstractShape
 
 A generic type for an object whose volume can be described by a mesh. Must have a field `mesh` of type `Mesh`. See also `Mesh{T}`.
 """
-abstract type AbstractMesh{T} <: AbstractObject{T} end
+abstract type AbstractMesh{T} <: AbstractShape{T} end
 
-# mesh! already reserved by Makie.jl
-"Enforces that `mesh`-like objects have to have the field `mesh` or implement `meshof()`."
-meshof(object::AbstractMesh) = object.mesh
-meshof!(object::AbstractMesh, mesh) = nothing
+vertices(mesh::AbstractMesh) = mesh.vertices
+vertices!(mesh::AbstractMesh, vertices) = (mesh.vertices .= vertices)
 
-vertices(object::AbstractMesh) = object.mesh.vertices
-vertices!(object::AbstractMesh, vertices) = (object.mesh.vertices .= vertices)
+faces(mesh::AbstractMesh) = mesh.faces
+faces!(mesh::AbstractMesh, faces) = nothing
 
-faces(object::AbstractMesh) = object.mesh.faces
-faces!(object::AbstractMesh, faces) = nothing
+orientation(mesh::AbstractMesh) = mesh.dir
+orientation!(mesh::AbstractMesh, dir) = (mesh.dir .= dir)
 
-orientation(object::AbstractMesh) = object.mesh.dir
-orientation!(object::AbstractMesh, dir) = (object.mesh.dir .= dir)
+position(mesh::AbstractMesh) = mesh.pos
+position!(mesh::AbstractMesh, pos) = (mesh.pos .= pos)
 
-position(object::AbstractMesh) = object.mesh.pos
-position!(object::AbstractMesh, pos) = (object.mesh.pos .= pos)
-
-scale(object::AbstractMesh) = object.mesh.scale
-scale!(object::AbstractMesh, scale) = (object.mesh.scale = scale)
+scale(mesh::AbstractMesh) = mesh.scale
+scale!(mesh::AbstractMesh, scale) = (mesh.scale = scale)
 
 """
     Mesh{T} <: AbstractMesh{T}
@@ -41,6 +36,7 @@ vertex matrix. For orientation and translation tracking, a `pos`itional and `dir
 - `scale`: scalar value that represents the current scale of the original mesh
 """
 mutable struct Mesh{T} <: AbstractMesh{T}
+    id::UUID
     vertices::Matrix{T}
     faces::Matrix{Int}
     dir::Matrix{T}
@@ -71,7 +67,7 @@ function Mesh(mesh)
     # Initialize mesh at origin with orientation [1,0,0] scaled to mm
     # Origin and direction are converted to type T
     scale::T = 1e-3
-    return Mesh{T}(vertices * scale, faces, Matrix{T}(I, 3, 3), T.([0, 0, 0]), scale)
+    return Mesh{T}(uuid4(), vertices * scale, faces, Matrix{T}(I, 3, 3), T.([0, 0, 0]), scale)
 end
 
 """
