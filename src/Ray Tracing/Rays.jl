@@ -8,7 +8,7 @@ Stores some data resulting from ray tracing a `System`. This information can be 
 - `n`: normal vector at the point of intersection
 - `id`: index of the intersected object in the `System` object-vector
 """
-mutable struct Intersection{T}
+mutable struct Intersection{T} <: AbstractEntity
     t::T
     n::Vector{T}
     id::Nullable{UUID}
@@ -17,6 +17,8 @@ end
 
 Base.length(intersection::Intersection) = intersection.t
 length!(::Intersection, t) = nothing
+
+normal3d(in::Intersection) = in.n
 
 """
     Parameters{T}
@@ -80,8 +82,8 @@ polarization(::Ray) = nothing
 polarization!(::Ray, P) = nothing
 
 # Placeholders for the future
-intensity(::Ray) = nothing
-intensity!(::Ray, I) = nothing
+intensity(ray::Ray) = ray.parameters.I
+intensity!(ray::Ray, I) = (ray.parameters.I = I)
 
 function Ray(pos::Vector{T}, dir::Vector{T}, λ=1064) where {T<:AbstractFloat}
     return Ray{T}(uuid4(), pos, normalize3d(dir), nothing, Parameters(T(λ)))
@@ -97,6 +99,22 @@ function Ray(pos::Vector{P}, dir::Vector{D}, λ=1064) where {P<:Real,D<:Real}
     F = float(promote_type(P, D))
 
     return Ray(convert(Vector{F}, pos), convert(Vector{F}, dir), λ)
+end
+
+"""
+    line_point_distance3d(ray, point)
+
+Returns value for the shortest distance between the `ray` (extended to ∞) and `point`.
+"""
+line_point_distance3d(ray::AbstractRay, point, buf_a=zeros(length(point)), buf_b=zeros(length(point))) = line_point_distance3d(position(ray), direction(ray), point, buf_a, buf_b)
+
+"""
+    angle3d(ray::AbstractRay, intersect::Intersection=intersection(ray))
+
+Calculates the angle between a `ray` and its or some other `intersection`.
+"""
+function angle3d(ray::AbstractRay, intersect::Intersection=intersection(ray))
+    return angle3d(direction(ray), normal3d(intersect))
 end
 
 """
@@ -116,7 +134,7 @@ Beam(ray::Ray{T}) where T = Beam{T}([ray])
 Calculate the length of a beam up to the point of the last intersection.
 """
 function Base.length(beam::Beam{T}) where T
-    l::T = 0
+    l = zero(T)
     for ray in beam.rays
         if isnothing(intersection(ray))
             break
@@ -132,9 +150,11 @@ end
 Function to find a point given a specific distance `t` along the beam. Return the ray `index` aswell.
 For negative distances, assume first ray backwards.
 """
-function point_on_beam(beam::Beam, t::Real)
+point_on_beam(beam::Beam{T}, t::Real) where T = point_on_beam!(Vector{T}(undef, 3), beam, t)
+
+function point_on_beam!(point::AbstractVector, beam::Beam, t::Real)
     # Initialize counter to track cumulative length
-    temp = 0
+    temp = zero(t)
     numEl = length(beam.rays)
     for (index, ray) in enumerate(beam.rays)
         # Catch final ray
@@ -146,15 +166,44 @@ function point_on_beam(beam::Beam, t::Real)
         # calculate the local ray length `b` and find the point along the ray
         if t < temp
             b = temp - t
-            point = position(ray) + (length(ray) - b) * direction(ray)
+            @. point = $position(ray) + ($length(ray) - b) * $direction(ray)
             return point, index
         end
     end
     # If no solution at this point assume final ray with infinite length
     ray = beam.rays[end]
     b = t - temp
-    point = position(ray) + b * direction(ray)
+    @. point .= $position(ray) + b * $direction(ray)
     return point, length(beam.rays)
+end
+
+"""
+    isparaxial(system, beam, threshold=π/4)
+
+Tests the angle between the `beam` direction and surface normal at each intersection.
+Mainly intended as a check for [`GaussianBeamlet`](@ref).
+"""
+function isparaxial(system::AbstractSystem, beam::Beam, threshold::Real=π/4)
+    # Test if refractive elements are hit with angle larger than threshold
+    for ray in beam.rays
+        if isnothing(intersection(ray))
+            break
+        end
+        target = object(system, id(intersection(ray)))
+        # Test if refractive element
+        if !isa(target, AbstractRefractiveOptic)
+            continue
+        end
+        # Test angle between ray and its intersection
+        angle = angle3d(ray)
+        if angle > π/2 # flip sector
+            angle = π - angle
+        end
+        if angle > threshold # rad
+            return false
+        end
+    end
+    return true
 end
 
 function isparentbeam(beam::Beam, ray_id::UUID)
@@ -189,10 +238,3 @@ function Base.show(io::IO, ::MIME"text/plain", beam::Beam)
     end
     return nothing
 end
-
-"""
-    line_point_distance3d(ray, point)
-
-Returns value for the shortest distance between the `ray` (extended to ∞) and `point`.
-"""
-line_point_distance3d(ray::AbstractRay, point) = line_point_distance3d(position(ray), direction(ray), point)

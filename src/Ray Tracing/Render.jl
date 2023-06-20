@@ -80,7 +80,7 @@ Helper function to visualize the `mesh` normals of an object. The normals are di
 """
 function render_object_normals!(axis, mesh::Mesh; l=0.01)
     for fID = 1:size(mesh.faces)[1]
-        nml = SCDI.orthogonal3d(mesh, fID)
+        nml = normal3d(mesh, fID)
         pos = mesh.vertices[mesh.faces[fID,1],:]
         vec = pos + l * nml
         lines!(

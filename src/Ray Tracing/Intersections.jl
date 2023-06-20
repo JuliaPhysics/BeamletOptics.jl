@@ -84,7 +84,7 @@ function intersect3d(object::AbstractMesh{M}, ray::AbstractRay{R}) where {M, R}
         return nothing
     else
         face = @views vertices(object)[faces(object)[fID, :], :]
-        normal = orthogonal3d(object, fID)
+        normal = normal3d(object, fID)
         return Intersection{T}(t0, normalize3d(T.(normal)), nothing)
     end
 end
@@ -95,10 +95,7 @@ end
 Returns the intersection between a `ray` and an infinitely large plane which is characterized by its `position` and `normal`.
 """
 function intersect3d(plane_position::AbstractArray, plane_normal::AbstractArray, ray::AbstractRay{T}) where T
-    denom = fast_dot3d(plane_normal, direction(ray))
-    if denom > 1e-6
-        t = fast_dot3d(plane_position - position(ray), plane_normal) / denom
-        return Intersection{T}(t, plane_normal, nothing)
-    end
-    return nothing
+    t = line_plane_distance3d(plane_position, plane_normal, position(ray), directon(ray))
+    isnothing(t) && return nothing
+    return Intersection{T}(t, plane_normal, nothing)
 end

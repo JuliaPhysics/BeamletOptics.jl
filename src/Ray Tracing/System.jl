@@ -1,4 +1,5 @@
-struct System
+struct System <: AbstractSystem
+    id::UUID
     object::Vector
 end
 
@@ -40,7 +41,7 @@ function trace_system!(system::System, beam::Beam{B}; r_max::Int=20) where {B}
     interaction::Nullable{Interaction{B}} = nothing
     # Test until max. number of rays in beam reached
     while length(beam.rays) < r_max
-        ray = beam.rays[end]
+        ray = last(beam.rays)
         if isnothing(interaction) || isnothing(hint(interaction))
             # Test against all objects in system
             intersection!(ray, trace_all(system, ray))
@@ -57,7 +58,7 @@ function trace_system!(system::System, beam::Beam{B}; r_max::Int=20) where {B}
             break
         end
         # Append ray to beam tail
-        append!(beam.rays, [Ray(uuid4(), interaction.pos, interaction.dir, nothing, interaction.parameters)])
+        push!(beam.rays, Ray(uuid4(), interaction.pos, interaction.dir, nothing, interaction.parameters))
     end
     return nothing
 end
@@ -71,7 +72,7 @@ function retrace_system!(system::System, beam::Beam{B}) where {B}
         if isnothing(intersection(ray))
             break
         end
-        # Recalculate current intersection)
+        # Recalculate current intersection
         intersection!(ray, intersect3d(object(system, intersection(ray).id), ray))
         # Test if intersection is valid
         if isnothing(intersection(ray))
@@ -82,7 +83,7 @@ function retrace_system!(system::System, beam::Beam{B}) where {B}
         if isnothing(interaction)
             break
         end
-        # Modify following beam (NOT THREAD-SAFE)
+        # Modify following ray (NOT THREAD-SAFE)
         if ctr < numEl
             next_ray = beam.rays[ctr+1]
             position!(next_ray, position(interaction))
@@ -116,5 +117,5 @@ function solve_system!(system::System, gauss::GaussianBeamlet; r_max=20)
     trace_system!(system, gauss.chief, r_max=r_max)
     trace_system!(system, gauss.waist, r_max=r_max)
     trace_system!(system, gauss.divergence, r_max=r_max)
-    return nothing
+    return istilted(system, gauss), isparaxial(system, gauss)
 end
