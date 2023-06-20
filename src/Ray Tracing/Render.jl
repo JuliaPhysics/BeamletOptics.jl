@@ -58,18 +58,47 @@ function render_beam!(axis, beam::Beam; color=:blue, flen=1.0)
 end
 
 """
-    render_beam!(axis, gauss::GaussianBeamlet; flen=1.0)
+    render_beam!(axis, gauss::GaussianBeamlet; color=:red, flen=0.1, show_beams=false)
 
-Render the principal rays of a `GaussianBeamlet`. The rays are color-coded as follows:
+Render the surface of a `GaussianBeamlet` as `color`. With `show_beams` the generating rays are plotted as follows:
 
 - `chief` ray: red
 - `divergence` ray: green
-- `waist` ray:    blue
+- `waist` ray: blue
 """
-function render_beam!(axis, gauss::GaussianBeamlet; flen=1.0)
-    render_beam!(axis, gauss.chief, color=:red, flen=flen)
-    render_beam!(axis, gauss.divergence, color=:green, flen=flen)
-    render_beam!(axis, gauss.waist, color=:blue, flen=flen)
+function render_beam!(axis, gauss::GaussianBeamlet{T}; color=:red, flen=0.1, show_beams=false) where T
+    # Length tracking variable
+    l::T = 0
+    for ray in gauss.chief.rays
+        # Generate local u, v coords
+        if isnothing(intersection(ray))
+            u = LinRange(0 , flen, 50)
+        else
+            u = LinRange(0, length(ray), 50)
+        end
+        v = LinRange(0, 2π, 20)
+        # Calculate beam surface at origin along y-axis
+        w = gauss_parameters(gauss, u .+ l)[1]
+        X = [w[i] * cos(v) for (i, u) in enumerate(u), v in v]  
+        Y = [u for u in u, v in v]                              
+        Z = [w[i] * sin(v) for (i, u) in enumerate(u), v in v]
+        # Transform into world coords
+        R = align3d([0,1,0], ray.dir)
+        Xt = R[1,1]*X + R[1,2]*Y + R[1,3]*Z .+ ray.pos[1]
+        Yt = R[2,1]*X + R[2,2]*Y + R[2,3]*Z .+ ray.pos[2]
+        Zt = R[3,1]*X + R[3,2]*Y + R[3,3]*Z .+ ray.pos[3]
+        surface!(axis, Xt, Yt, Zt, transparency = true, colormap = [color, color])
+        # Bump length tracker
+        if !isnothing(intersection(ray)) 
+            l += length(ray)
+        end
+    end
+    # Optionally, plot generating rays
+    if show_beams
+        render_beam!(axis, gauss.chief, flen=flen, color=:red)
+        render_beam!(axis, gauss.divergence, flen=flen, color=:green)
+        render_beam!(axis, gauss.waist, flen=flen, color=:blue)
+    end
     return nothing
 end
 
