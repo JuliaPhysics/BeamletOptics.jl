@@ -1,12 +1,14 @@
 module SCDI
 
-using LinearAlgebra, FileIO, UUIDs, MarchingCubes
+using LinearAlgebra, FileIO, UUIDs, MarchingCubes, Trapz
 using PrecompileTools
 using MakieCore
+using StaticArrays
 
 import Base: length
 
 # Do not change order of inclusion!
+include("Ray Tracing/Constants.jl")
 include("Ray Tracing/Utils.jl")
 include("Ray Tracing/Types.jl")
 include("Ray Tracing/Rays.jl")

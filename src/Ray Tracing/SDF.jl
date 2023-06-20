@@ -50,11 +50,11 @@ function render_object!(axis, s::AbstractSDF)
 end
 
 """
-    orthogonal3d(s::AbstractSDF, pos)
+    normal3d(s::AbstractSDF, pos)
 
 Computes the normal vector of `s` at `pos`.
 """
-function orthogonal3d(s::AbstractSDF, pos)
+function normal3d(s::AbstractSDF, pos)
     # approximate ∇ of s at pos
     eps = 1e-7
     norm = [
@@ -84,7 +84,7 @@ function _raymarch_outside(object::AbstractSDF{S}, pos::AbstractArray{R}, dir::A
         i += 1
         # surface has been reached if distance is less than tolerance (highly convex surfaces can require many iterations)
         if dist < eps
-            normal = orthogonal3d(object, pos)
+            normal = normal3d(object, pos)
             return Intersection{T}(t0, normal, nothing)
         end
     end
@@ -98,7 +98,7 @@ end
 Perform the ray marching algorithm if the starting pos is inside of `object`.
 """
 function _raymarch_inside(object::AbstractSDF{S}, pos::AbstractArray{R}, dir::AbstractArray{R}; num_iter=1000, dl=0.1) where {S,R}
-    # this method assumes semi-concave objects, i.e. might fail depending on the choice of dl 
+    # this method assumes semi-concave objects, i.e. might fail depending on the choice of dl
     T = promote_type(S, R)
     t0::T = 0
     i = 1
@@ -137,7 +137,7 @@ function intersect3d(object::AbstractSDF, ray::AbstractRay)
         return _raymarch_outside(object, position(ray), direction(ray), eps=eps_ray)
     end
     # Test if normal and ray dir oppose or align to determine if ray exits object
-    test = fast_dot3d(direction(ray), orthogonal3d(object, position(ray))) > 0
+    test = fast_dot3d(direction(ray), normal3d(object, position(ray))) > 0
     if test ≤ 0
         return _raymarch_inside(object, position(ray), direction(ray), dl=eps_ins)
     end
@@ -167,7 +167,7 @@ end
 """
     CylinderSDF <: AbstractSDF
 
-Implements cylinder SDF. Cylinder is initially orientated along the y-axis and symmetrical in x-z. 
+Implements cylinder SDF. Cylinder is initially orientated along the y-axis and symmetrical in x-z.
 """
 struct CylinderSDF{T} <: AbstractSDF{T}
     id::UUID

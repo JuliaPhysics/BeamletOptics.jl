@@ -13,6 +13,25 @@ abstract type AbstractEntity end
 
 id(entity::AbstractEntity) = entity.id
 
+"Defines the intersection between an `entity` and something, defaults to no intersection."
+function intersect3d(entity::AbstractEntity, ::Any)
+    @warn lazy"No intersect3d method defined for:" typeof(entity)
+    return nothing
+end
+
+"Defines the interaction between an `entity` and something, defaults to nothing which ends the ray tracer."
+function interact3d(entity::AbstractEntity, ::Any)
+    @warn lazy"No interact3d method defined for:" typeof(entity)
+    return nothing
+end
+
+"""
+    AbstractSystem <: AbstractEntity
+
+A generic type for a container type which holds objects, rays, etc. 
+"""
+abstract type AbstractSystem <: AbstractEntity end
+
 """
     AbstractRay{T<:Real} <: AbstractEntity
 
@@ -29,13 +48,10 @@ direction!(ray::AbstractRay, dir) = (ray.dir .= dir)
 Base.length(ray::AbstractRay) = ray.len
 length!(ray::AbstractRay, len) = (ray.len = len)
 
-"Defines the interaction between a `ray` and an `entity`."
-interact3d(::AbstractEntity, ::AbstractRay{T}) where T = nothing
-
 """
     AbstractObject <: AbstractEntity
 
-A generic type for 2D/3D objects. Optical elements are supposed to fall under this type. Must have a `shape` field which defines the 
+A generic type for 2D/3D objects. Optical elements are supposed to fall under this type. Must have a `shape` field which defines the
 volume or surface with which a ray can interact.
 """
 abstract type AbstractObject <: AbstractEntity end
@@ -47,18 +63,13 @@ shape(o::AbstractObject) = o.shape
 
 In general, the intersection between an `object` and a `ray` is defined as the intersection with `shape(object)`.
 """
-function intersect3d(object::AbstractObject, ray::AbstractRay) 
+function intersect3d(object::AbstractObject, ray::AbstractRay)
     intersection = intersect3d(shape(object), ray)
     # Ensure that the intersection knows about the object id
     if !isnothing(intersection)
         intersection.id = id(object)
     end
     return intersection
-end
-
-function interact3d(object::AbstractObject, ray::AbstractRay)
-    @warn lazy"No interact3d method defined for:" typeof(object)
-    return nothing
 end
 
 """
@@ -121,9 +132,9 @@ function rotate3d!(shape::AbstractShape, axis, θ)
     return nothing
 end
 
-xrotate3d!(shape::AbstractShape{T}, θ) where T = rotate3d!(shape, T[one(T), zero(T), zero(T)], θ)
-yrotate3d!(shape::AbstractShape{T}, θ) where T = rotate3d!(shape, T[zero(T), one(T), zero(T)], θ)
-zrotate3d!(shape::AbstractShape{T}, θ) where T = rotate3d!(shape, T[zero(T), zero(T), one(T)], θ)
+xrotate3d!(shape::AbstractShape{T}, θ) where T = rotate3d!(shape, @SVector(T[one(T), zero(T), zero(T)]), θ)
+yrotate3d!(shape::AbstractShape{T}, θ) where T = rotate3d!(shape, @SVector(T[zero(T), one(T), zero(T)]), θ)
+zrotate3d!(shape::AbstractShape{T}, θ) where T = rotate3d!(shape, @SVector(T[zero(T), zero(T), one(T)]), θ)
 
 function reset_translation3d!(shape::AbstractShape{T}) where T
     shape.pos .= zeros(T, 3)
@@ -131,11 +142,6 @@ function reset_translation3d!(shape::AbstractShape{T}) where T
 end
 
 reset_rotation3d!(shape::AbstractShape{T}) where T = (shape.dir .= Matrix{T}(I, 3, 3))
-
-function intersect3d(shape::AbstractShape{S}, ::AbstractRay{R}) where {S, R}
-    @warn lazy"No intersect3d method defined for:" typeof(shape)
-    return nothing
-end
 
 render_shape!(::Any, ::AbstractShape) = nothing
 render_shape_normals!(::Any, ::AbstractShape) = nothing
@@ -148,11 +154,4 @@ The forward direction is here defined as the ray `orientation`.
 Only works well if `ray` is **outside** of the volume of `shape`.
 Can be dispatched to return more accurate results for subtypes of `AbstractShape`.
 """
-function isinfrontof(shape::AbstractShape, ray::AbstractRay)
-    los = position(shape) - position(ray)
-    if fast_dot3d(direction(ray), los) <= 0
-        return false
-    else
-        return true
-    end
-end
+isinfrontof(shape::AbstractShape, ray::AbstractRay) = isinfrontof(position(shape), position(ray), direction(ray))

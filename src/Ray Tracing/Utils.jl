@@ -4,7 +4,7 @@
 An alias which results in `Union{T, Nothing}` to provide a shorter notation for struct
 fields which can containing nothing.
 """
-const Nullable{T} = Union{T, Nothing} where T
+const Nullable{T} = Union{T,Nothing} where {T}
 
 """
     NullableVector{T}
@@ -12,7 +12,7 @@ const Nullable{T} = Union{T, Nothing} where T
 An alias which results in `Union{Vector{T}, Nothing}` to provide a shorter notation for struct
 fields which can containing nothing.
 """
-const NullableVector{T} = Union{Vector{T}, Nothing} where T
+const NullableVector{T} = Union{Vector{T},Nothing} where {T}
 
 """
     norm3d(v)
@@ -55,12 +55,12 @@ function normalize3d(v)
 end
 
 """
-    orthogonal3d(target, reference)
+    normal3d(target, reference)
 
 Returns a vector with unit length that is perpendicular to the target and an additional
 reference vector. Vector orientation is determined according to right-hand rule.
 """
-function orthogonal3d(target, reference)
+function normal3d(target, reference)
     n = fast_cross3d(target, reference)
     return normalize3d(n)
 end
@@ -71,11 +71,11 @@ end
 Returns the rotation matrix that will rotate a vector around the reference axis at an angle
 θ in radians. Vector length is maintained. Rotation in clockwise direction?
 """
-function rotate3d(reference::Vector, θ)
+function rotate3d(reference::AbstractVector, θ)
     cost = cos(θ)
     sint = sin(θ)
     ux, uy, uz = reference
-    R = [
+    R = @SMatrix [
         cost+ux^2*(1-cost) ux*uy*(1-cost)-uz*sint ux*uz*(1-cost)+uy*sint
         uy*ux*(1-cost)+uz*sint cost+uy^2*(1-cost) uy*uz*(1-cost)-ux*sint
         uz*ux*(1-cost)-uy*sint uz*uy*(1-cost)+ux*sint cost+uz^2*(1-cost)
@@ -100,7 +100,7 @@ function align3d(start::Vector, target::Vector)
     end
     cosA = dot(start, target)
     k = 1 / (1 + cosA)
-    R = [
+    R = @SMatrix [
         rx^2*k+cosA rx*ry*k+rz rx*rz*k-ry
         ry*rx*k-rz ry^2*k+cosA ry*rz*k+rx
         rz*rx*k+ry rz*ry*k-rx rz^2*k+cosA
@@ -113,13 +113,13 @@ end
 
 Returns the angle between the `target` and `reference` vector in **rad**.
 """
-function angle3d(target::Vector{T}, reference::Vector{T}) where T
+function angle3d(target::Vector{T}, reference::Vector{T}) where {T}
     arg = clamp(fast_dot3d(target, reference) / (norm3d(target) * norm3d(reference)), -one(T), one(T))
     angle = acos(arg)
     return angle
 end
 
-angle3d(target::Vector{T}, reference::Vector{V}) where {T, V} = angle3d(promote(target, reference)...)
+angle3d(target::Vector{T}, reference::Vector{V}) where {T,V} = angle3d(promote(target, reference)...)
 
 """
     fast_dot3d(a, b)
@@ -179,8 +179,48 @@ end
 Computes the shortes distance between a line described by `pos`+t*`dir` and a `point` in 3D.
 This function is slow and should be used only for debugging purposes.
 """
-function line_point_distance3d(pos, dir, point)
-    return norm3d(SCDI.fast_cross3d(pos .- point, dir)) / norm3d(dir)
+function line_point_distance3d(pos, dir, point, buf_a=zeros(length(pos)), buf_b=zeros(length(pos)))
+    for i in eachindex(pos)
+        buf_a[i] = pos[i] - point[i]
+    end
+    fast_cross3d!(buf_b, buf_a, dir)
+    return norm3d(buf_b) / norm3d(dir)
+end
+
+"""
+    line_plane_distance3d(plane_position, plane_normal, line_position, line_direction)
+
+Returns the distance between a line and an infinitely large plane which are characterized by their `position` and `normal`/`direction`.
+"""
+function line_plane_distance3d(plane_position::AbstractArray, plane_normal::AbstractArray, line_position::AbstractArray, line_direction::AbstractArray)
+    denom = fast_dot3d(plane_normal, line_direction)
+    if denom > 1e-6
+        # explicit dot product for perfomance
+        c = zero(eltype(plane_position))
+        pr = line_position
+        @simd for i = 1:3
+            @inbounds c += (plane_position[i] - pr[i]) * plane_normal[i]
+        end
+        t = c / denom
+        return t
+    end
+    return nothing
+end
+
+"""
+    isinfrontof(point::AbstractVector, pos::AbstractVector, dir::AbstractVector)
+
+Tests if a `point` is in front of the plane defined by the `pos`ition and `dir`ection vectors.
+"""
+function isinfrontof(point::AbstractVector, pos::AbstractVector, dir::AbstractVector, los=similar(pos))
+    @inbounds @simd for i in eachindex(pos)
+        los[i] = point[i] - pos[i]
+    end
+    if fast_dot3d(dir, los) <= 0
+        return false
+    else
+        return true
+    end
 end
 
 """
@@ -218,9 +258,9 @@ end
     lensmakers_eq(R1, R2, nl, n0=1.0)
 
 Calculates the thin lens focal length based on the radius of curvature `R1`/`R2` and the lens refractive index `nl`.
-If center of sphere is on left then R < 0. If center of sphere is on right then R > 0.    
+If center of sphere is on left then R < 0. If center of sphere is on right then R > 0.
 """
-lensmakers_eq(R1, R2, nl, n0=1.0) =  1 / ((nl-n0)/n0 * (1/R1 - 1/R2))
+lensmakers_eq(R1, R2, nl, n0=1.0) = 1 / ((nl - n0) / n0 * (1 / R1 - 1 / R2))
 
 """
     base_transform(base, base2=I(3))
@@ -232,15 +272,15 @@ base_transform(base, base2=I(3)) = base \ base2
 
 rayleigh_range(λ, w0, M2, n=1) = π * n * w0^2 / λ / M2
 
-beam_waist(z, w0, zr) = w0*sqrt(1+(z/zr)^2)
+beam_waist(z, w0, zr) = w0 * sqrt(1 + (z / zr)^2)
 
-gouy_phase(z, zr) = -atan(z/zr) # some definitions with +
+gouy_phase(z, zr) = -atan(z / zr) # some definitions with +
 
-wavefront_curvature(z, zr) = z*(1+(zr/z)^2)
+wavefront_curvature(z, zr) = z / (z^2 + zr^2) # 1/r
 
 divergence_angle(λ, w0, M2) = M2 * λ / (π * w0)
 
-wave_number(λ) = 2π/λ
+wave_number(λ) = 2π / λ
 
 """
     electric_field(r, z, E0, w0, w, k, ψ, R) -> ComplexF64
@@ -255,9 +295,9 @@ Computes the theoretical complex electric field distribution of an unastigmatic 
 - `w`: local beam radius
 - `k`: wave number, equal to `2π/λ`
 - `ψ`: Gouy phase shift (defined as -atan(z/zr) !)
-- `R`: radius of wavefront curvature
+- `R`: wavefront curvature
 """
-electric_field(r::Real, z::Real, E0, w0, w, k, ψ, R) = E0 * w0/w * exp(-r^2/w^2) * exp(im*(k*z + ψ + (k*r^2)/(2*R)))
+electric_field(r::Real, z::Real, E0, w0, w, k, ψ, R) = E0 * w0 / w * exp(-r^2 / w^2) * exp(im * (k * z + ψ + (k * r^2 * R) / 2))
 
 function electric_field(r::Real, z::Real, E0, w0, λ, M2=1)
     zr = rayleigh_range(λ, w0, M2)
@@ -268,3 +308,12 @@ function electric_field(r::Real, z::Real, E0, w0, λ, M2=1)
     return electric_field(r, z, E0, w0, w, k, ψ, R)
 end
 
+"""
+    electric_field(I::Real, Z=Z_vacuum, ϕ=0)
+
+Calculates the E-field phasor in [V/m] for a given intensity `I` and phase ϕ. Vacuum wave impedance is assumed.
+"""
+electric_field(I::Real, Z=Z_vacuum, ϕ=0) = sqrt(2 * I * Z) * exp(im * ϕ)
+
+"Calculates the intensity in [W/m²] for a given electric field phasor `E`. Vacuum wave impedance is assumed."
+intensity(E::Complex, Z=Z_vacuum) = abs2(E) / (2 * Z)

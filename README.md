@@ -24,10 +24,10 @@ Documentation can be found here: https://optical-air-data.pages.gitlab.dlr.de/di
             - [ ] simple astigmatism via 5, 7, 9-ray approach
 - Optics
     - [x] Lens types using mathematical surfaces
-    - [ ] Photodetector
-        - [ ] optical intensity distribution on detector
-        - [ ] model interference of Gaussian beams
-        - [ ] phase front via Gaussian beams
+    - [x] Photodetector
+        - [x] optical intensity distribution on detector
+        - [x] model interference of Gaussian beams
+        - [x] phase front via Gaussian beams
     - [ ] phase shift due to ref. index change
 - Mechanics
     - [ ] vibration of optical elements
@@ -47,9 +47,10 @@ Documentation can be found here: https://optical-air-data.pages.gitlab.dlr.de/di
 - [ ] align3d rotation incorrect if start = -target
 - [ ] @code_warntype for interact(Lens, Beam)
 - [ ] change names for functions that return matrices
-- [x] weird results for intersect(::Sphere, ::Ray)
-    - fixed by O.K.
 - [ ] weird results for high level-of-detail meshes
+- [ ] SDFs and meshes rotate in opposite directions
+- [x] GaussianBeamlet efield calculation fails at beam waist
+- [ ] point_on_beam calculation can be incorrect at optical surfaces
 
 ## Comments
 

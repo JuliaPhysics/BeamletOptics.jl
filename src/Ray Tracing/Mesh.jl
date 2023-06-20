@@ -175,12 +175,12 @@ function set_new_origin3d!(object::AbstractMesh{T}) where T
 end
 
 """
-    orthogonal3d(object::AbstractMesh, fID::Int)
+    normal3d(object::AbstractMesh, fID::Int)
 
 Returns a vector with unit length that is perpendicular to the target `face`` according to
 the right-hand rule. The vertices must be listed row-wise within the face matrix.
 """
-function orthogonal3d(object::AbstractMesh, fID::Int)
+function normal3d(object::AbstractMesh, fID::Int)
     face = vertices(object)[faces(object)[fID, :], :]
     n = fast_cross3d((face[2, :] - face[1, :]), (face[3, :] - face[1, :]))
     return normalize3d(n)

@@ -35,7 +35,7 @@ function Cube(scale::Real; T=Float64)
     )
 end
 
-struct ReflectiveCube{S<:SCDI.AbstractShape} <: SCDI.AbstractMirror
+struct ReflectiveCube{S<:SCDI.AbstractShape} <: SCDI.AbstractReflectiveOptic
     id::UUID
     shape::S
 end
@@ -55,7 +55,7 @@ function RetroMesh(scale::Real; T=Float64)
     return SCDI.Mesh{T}(uuid4(), vertices .* scale, faces, Matrix{T}(I, 3, 3), T.([0, 0, 0]), scale)
 end
 
-struct RetroReflector{S<:SCDI.AbstractShape} <: SCDI.AbstractMirror
+struct RetroReflector{S<:SCDI.AbstractShape} <: SCDI.AbstractReflectiveOptic
     id::UUID
     shape::S
 end
