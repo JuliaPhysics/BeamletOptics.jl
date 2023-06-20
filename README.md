@@ -44,7 +44,7 @@ Documentation can be found here: https://optical-air-data.pages.gitlab.dlr.de/di
 
 ## Known bugs
 
-- [ ] align3d rotation incorrect if start = -target
+- [x] align3d rotation incorrect if start = -target
 - [ ] @code_warntype for interact(Lens, Beam)
 - [ ] change names for functions that return matrices
 - [ ] weird results for high level-of-detail meshes

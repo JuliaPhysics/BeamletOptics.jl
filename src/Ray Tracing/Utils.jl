@@ -90,15 +90,19 @@ Returns the rotation matrix R that will align the start vector to be parallel to
 Based on ['Avoiding Trigonometry'](https://gist.github.com/kevinmoran/b45980723e53edeb8a5a43c49f134724) by Íñigo Quílez. The resulting matrix
 was transposed due to column/row major issues. Vector length is maintained. This function is very fast.
 """
-function align3d(start::Vector, target::Vector)
+function align3d(start::Vector{A}, target::Vector{B}) where {A, B}
+    T = promote_type(A, B)
     normalize3d!(start)
     normalize3d!(target)
-    rx, ry, rz = cross(target, start)
+    rx, ry, rz = fast_cross3d(target, start)
+    cosA = fast_dot3d(start, target)
     # if start and target are already (almost) parallel return unity
-    if (abs(rx) < 1e-9) & (abs(ry) < 1e-9) & (abs(rz) < 1e-9)
-        return Matrix(1.0I, 3, 3)
+    if cosA ≈ 1
+        return Matrix{T}(I, 3, 3)
     end
-    cosA = dot(start, target)
+    if cosA ≈ -1
+        return [-one(T) zero(T) zero(T); zero(T) -one(T) zero(T); zero(T) zero(T) one(T)]
+    end
     k = 1 / (1 + cosA)
     R = @SMatrix [
         rx^2*k+cosA rx*ry*k+rz rx*rz*k-ry
