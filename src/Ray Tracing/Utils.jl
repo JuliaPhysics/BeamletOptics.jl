@@ -98,10 +98,10 @@ function align3d(start::Vector{A}, target::Vector{B}) where {A, B}
     cosA = fast_dot3d(start, target)
     # if start and target are already (almost) parallel return unity
     if cosA ≈ 1
-        return Matrix{T}(I, 3, 3)
+        return SMatrix{3,3}(one(T)I)
     end
     if cosA ≈ -1
-        return [-one(T) zero(T) zero(T); zero(T) -one(T) zero(T); zero(T) zero(T) one(T)]
+        return @SMatrix [-one(T) zero(T) zero(T); zero(T) -one(T) zero(T); zero(T) zero(T) one(T)]
     end
     k = 1 / (1 + cosA)
     R = @SMatrix [
