@@ -21,19 +21,20 @@ using UUIDs
     @test isapprox(Rot * [1, 0, 0], [0, 1, 0])
 
     @testset "Testing align3d for rotation and conservation of length" begin
+        # Start vector must have unit length!
         start = [1, 0, 0]
         # Test parallel case
         target = [1, 0, 0]
-        R = SCDI.align3d(start, target)
-        @test R * start ≈ target
+        T = SCDI.align3d(start, target)
+        @test T * start ≈ target
         # Test parallel opposite case
         target = [-1, 0, 0]
-        R = SCDI.align3d(start, target)
-        @test R * start ≈ target
-        # Test norm and 90° rotation
+        T = SCDI.align3d(start, target)
+        @test T * start ≈ target
+        # Test norm and 45° rotation
         target = [1.0, 1.0, 0.0]
-        R = SCDI.align3d(start, target)
-        @test R * start ≈ target
+        T = SCDI.align3d(start, target)
+        @test T * start ≈ target
     end
 
     @debug "Testing angle3d for resulting angle"
