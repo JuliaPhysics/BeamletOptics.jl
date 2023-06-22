@@ -20,10 +20,22 @@ using UUIDs
     Rot = SCDI.rotate3d([0, 0, 1], π / 2)
     @test isapprox(Rot * [1, 0, 0], [0, 1, 0])
 
-    @debug "Testing align3d for rotation and conservation of length"
-    target = [0, 0, 1]
-    Rot = SCDI.align3d([1, 0, 0], target)
-    @test isapprox(Rot * [1, 0, 0], target)
+    @testset "Testing align3d for rotation and conservation of length" begin
+        # Start vector must have unit length!
+        start = [1, 0, 0]
+        # Test parallel case
+        target = [1, 0, 0]
+        T = SCDI.align3d(start, target)
+        @test T * start ≈ target
+        # Test parallel opposite case
+        target = [-1, 0, 0]
+        T = SCDI.align3d(start, target)
+        @test T * start ≈ target
+        # Test norm and 45° rotation
+        target = [1.0, 1.0, 0.0]
+        T = SCDI.align3d(start, target)
+        @test T * start ≈ target
+    end
 
     @debug "Testing angle3d for resulting angle"
     a = SCDI.angle3d([1, 0, 0], [0, 0, 1])
@@ -534,7 +546,7 @@ end
         @test isapprox(ψ_numerical[i], 0, atol=1e-3)
         # Compare calculated waist after lens
         @test isapprox(w0_numerical[i], w0, atol=1e-7)
-        
+
         @testset "Testing isparaxial and istilted" begin
             # Before lens rotation
             @test SCDI.istilted(system, gauss) == false
@@ -569,7 +581,7 @@ end
     pd = SCDI.Photodetector(l, n)
     ln = SCDI.ThinLens(R1, R2, d, nl)
     SCDI.translate3d!(SCDI.shape(pd), [0, z, 0])
-    SCDI.translate3d!(SCDI.shape(ln), [0, z-f, 0])
+    SCDI.translate3d!(SCDI.shape(ln), [0, z - f, 0])
     system = SCDI.System(uuid4(), [pd])
 
     @testset "Testing fringe pattern" begin
@@ -595,8 +607,8 @@ end
         In_max, location = findmax(SCDI.intensity(pd))
         Pt = SCDI.optical_power(pd)
         Ia_max = I0 * (w0 / SCDI.beam_waist(z, w0, zR))^2
-        @test isapprox(location[1], pd.x.len/2, atol=1)
-        @test isapprox(location[2], pd.y.len/2, atol=1)
+        @test isapprox(location[1], pd.x.len / 2, atol=1)
+        @test isapprox(location[2], pd.y.len / 2, atol=1)
         @test isapprox(In_max, Ia_max, atol=0.05)
         @test isapprox(Pt, P0, atol=1e-5)
 
@@ -606,7 +618,7 @@ end
         I_numerical = SCDI.intensity.(pd.field)
         Pt = SCDI.optical_power(pd)
         @test all(isapprox.(I_analytical, I_numerical, atol=2e-1))
-        @test isapprox(Pt, 2*P0, atol=3e-5)
+        @test isapprox(Pt, 2 * P0, atol=3e-5)
     end
 
     @testset "Testing λ phase shift" begin
@@ -630,7 +642,7 @@ end
             Pt_numerical[i] = SCDI.optical_power(pd)
         end
         # Analytical solution (cosine over Δz), ref. power is 4*P0 since beam splitter is missing 
-        Pt_analytical = 4*P0*[(cos(2π * z / (maximum(Δz))) + 1) / 2 for z in Δz]
+        Pt_analytical = 4 * P0 * [(cos(2π * z / (maximum(Δz))) + 1) / 2 for z in Δz]
 
         # Compare detectors (this also tests correct behavior when focussing the beam)
         @test all(isapprox.(Pt_numerical, Pt_analytical, atol=1e-4))
