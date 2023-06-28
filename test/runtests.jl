@@ -329,6 +329,18 @@ end
             @test isapprox(SCDI.intersect3d(foo, ray).t, sqrt(t^2 + z^2))
         end
     end
+
+    @testset "Testing intersect3d for infinite planes" begin
+        t = 1.0
+        plane_origin = [0, t, 0]
+        plane_normal = SCDI.normalize3d([0, t, -t])
+        ray = SCDI.Ray([0, 0, 1], [0, 1, 0])
+        intersection = SCDI.intersect3d(plane_origin, plane_normal, ray)
+        @test isapprox(length(intersection), 2t)
+        ray = SCDI.Ray([0, 0, 1], [0, -1, 0])
+        intersection = SCDI.intersect3d(plane_origin, plane_normal, ray)
+        @test isnothing(intersection)
+    end
 end
 
 @testset "Interactions" begin
@@ -419,6 +431,73 @@ end
                 df[i] = SCDI.line_point_distance3d(beam.rays[end], [0, x, 0])
             end
             @test xs[findmin(df)[2]] ≈ f_analytical
+        end
+    end
+
+    @testset "Testing lens constructor" begin
+        # Test against Thorlab spherical lenses
+        r1 = r2 = 34.9e-3
+        l = 6.8e-3
+        LB1811 = SCDI.BiConvexLensSDF(r1, r2, l)
+        lens = SCDI.SphericalLens(r1, r2, l)
+        @test typeof(SCDI.shape(lens)) == typeof(LB1811)
+        r1 = 15.5e-3
+        r2 = Inf
+        l = 8.6e-3
+        LA1805 = SCDI.PlanoConvexLensSDF(r1, l)
+        lens = SCDI.SphericalLens(r1, r2, l)
+        @test typeof(SCDI.shape(lens)) == typeof(LA1805)
+        r1 = r2 = 52.0e-3
+        l = 3e-3
+        LD1464 = SCDI.BiConcaveLensSDF(r1, r2, l)
+        lens = SCDI.SphericalLens(-r1, -r2, l)
+        @test typeof(SCDI.shape(lens)) == typeof(LD1464)
+        r1 = 25.7e-3
+        r2 = Inf
+        l = 3.5e-3
+        LC1715 = SCDI.PlanoConcaveLensSDF(r1, l)
+        lens = SCDI.SphericalLens(-r1, r2, l)
+        @test typeof(SCDI.shape(lens)) == typeof(LC1715)
+        r1 = 32.1e-3
+        r2 = 82.2e-3
+        l = 3.6e-3
+        LE1234 = SCDI.ConvexConcaveLensSDF(r1, r2, l)
+        lens = SCDI.SphericalLens(r1, -r2, l)
+        @test typeof(SCDI.shape(lens)) == typeof(LE1234)
+    end
+
+    @testset "Testing spherical lens SDFs" begin
+        # Based on https://www.pencilofrays.com/double-gauss-sonnar-comparison/
+        l1 = SCDI.SphericalLens(48.88e-3, -182.96e-3, 8.89e-3, 52.3e-3, λ->1.62286)
+        l2 = SCDI.SphericalLens(36.92e-3, Inf, 15.11e-3, 45.11e-3, λ->1.58565)
+        l3 = SCDI.SphericalLens(-23.06e-3, Inf, 2.31e-3, 45.11e-3, λ->1.67764)
+        l4 = SCDI.SphericalLens(-23.91e-3, Inf, 1.92e-3, 40.01e-3, λ->1.57046)
+        l5 = SCDI.SphericalLens(36.92e-3, Inf, 7.77e-3, 40.01e-3, λ->1.64128)
+        l6 = SCDI.SphericalLens(48.88e-3, 1063.24e-3, 6.73e-3, 45.11e-3, λ->1.62286)
+        SCDI.zrotate3d!(SCDI.shape(l1), π)
+        SCDI.zrotate3d!(SCDI.shape(l2), π)
+        SCDI.zrotate3d!(SCDI.shape(l4), π)
+        SCDI.translate3d!(SCDI.shape(l2), [0, 11.495e-3, 0])
+        SCDI.translate3d!(SCDI.shape(l3), [0, 25.491e-3, 0])
+        SCDI.translate3d!(SCDI.shape(l4), [0, 35.568e-3, 0])
+        SCDI.translate3d!(SCDI.shape(l5), [0, 42.876e-3, 0])
+        SCDI.translate3d!(SCDI.shape(l6), [0, 50.813e-3, 0])
+        system = SCDI.System(uuid4(), [l1, l2, l3, l4, l5, l6])
+        # Test against back focal length as per source above
+        λ = 486 # nm
+        f0 = [0, 0.11602585097812582, 0] # corresponds to f=59.21 mm
+        zs = -0.02:1e-3:0.02
+        for (i, z) in enumerate(zs)
+            beam = SCDI.Beam(SCDI.Ray([0, -0.05, z], [0, 1, 0], λ))
+            SCDI.solve_system!(system, beam)
+            ray = beam.rays[end]
+            intersection = SCDI.intersect3d(f0, [0, 1, 0], ray)
+            f = SCDI.position(ray) + length(intersection) * SCDI.direction(ray)
+            dz = f0[3] - f[3]
+            # Test correct amount of beam sections
+            @test length(beam.rays) == 13
+            # Test coma
+            @test dz < 7e-5
         end
     end
 end

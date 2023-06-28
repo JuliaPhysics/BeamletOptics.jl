@@ -85,6 +85,64 @@ struct Lens{S<:AbstractShape,T<:Function} <: AbstractRefractiveOptic
     n::T
 end
 
+SphericalLens(r1, r2, l, d, n) = SphericalLens(r1, r2, l, d, λ->n)
+
+"""
+    SphericalLens(r1, r2, l=0, d=1SCDI.inch, n=λ->1.5)
+
+Creates a spherical lens based on:
+
+- `r1`: front radius
+- `r2`: back radius
+- `l`: length of cylindrical section, default is 0
+- `d`: lens diameter, default is one inch
+- `n`: refractive index as a function of λ
+
+To differentiate surface types:
+
+- `r > 0`: convex
+- `r < 0`: concave
+- `r = Inf`: planar
+"""
+function SphericalLens(r1::Real, r2::Real, l::Real=0, d::Real=1SCDI.inch, n::Function=λ->1.5)
+    if !isfinite(r1) || isnan(r1)
+        error("r1 can not be Inf")
+    end
+    # Determine lens SDF
+    shape::SCDI.Nullable{SCDI.AbstractSphericalLensSDF} = nothing
+    # Test for thin lens
+    if iszero(l)
+        shape = SCDI.ThinLensSDF(r1, r2, d)
+        # goto to avoid overwrite
+        @goto lens_creator
+    end
+    # Test for plano lens
+    if isinf(r2)
+        if r1 > 0
+            shape = SCDI.PlanoConvexLensSDF(r1, l, d)
+        elseif r1 < 0
+            shape = SCDI.PlanoConcaveLensSDF(abs(r1), l, d)
+        end
+        @goto lens_creator
+    end
+    # Test for bi-convex/concave or meniscus
+    if r1 > 0 && r2 > 0
+        shape = SCDI.BiConvexLensSDF(r1, r2, l, d)
+    end
+    if r1 < 0 && r2 < 0
+        shape = SCDI.BiConcaveLensSDF(abs(r1), abs(r2), l, d)
+    end
+    if r1 > 0 && r2 < 0
+        shape = SCDI.ConvexConcaveLensSDF(r1, abs(r2), l, d)
+    end
+    # Create lens
+    @label lens_creator
+    if isnothing(shape)
+        error("Could not find suitable lens SDF")
+    end
+    return SCDI.Lens(uuid4(), shape, n)
+end
+
 ThinLens(R1::Real, R2::Real, d::Real, n::Real) = ThinLens(R1, R2, d, x -> n)
 function ThinLens(R1::Real, R2::Real, d::Real, n::Function)
     shape = ThinLensSDF(R1, R2, d)
