@@ -1,7 +1,7 @@
 name = "SCDI"
 uuid = "c387492b-ffec-4e51-9a46-bd230226031c"
 authors = ["uitt_hu <hugo.uittenbosch@dlr.de>"]
-version = "0.3.2"
+version = "0.3.3"
 
 [deps]
 FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"

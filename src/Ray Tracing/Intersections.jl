@@ -95,7 +95,7 @@ end
 Returns the intersection between a `ray` and an infinitely large plane which is characterized by its `position` and `normal`.
 """
 function intersect3d(plane_position::AbstractArray, plane_normal::AbstractArray, ray::AbstractRay{T}) where T
-    t = line_plane_distance3d(plane_position, plane_normal, position(ray), directon(ray))
+    t = line_plane_distance3d(plane_position, plane_normal, position(ray), direction(ray))
     isnothing(t) && return nothing
     return Intersection{T}(t, plane_normal, nothing)
 end

@@ -29,9 +29,11 @@ Documentation can be found here: https://optical-air-data.pages.gitlab.dlr.de/di
         - [x] model interference of Gaussian beams
         - [x] phase front via Gaussian beams
     - [ ] phase shift due to ref. index change
+    - [ ] Multi-body container type, i.e. telescope, for easy kinematics
 - Mechanics
     - [ ] vibration of optical elements
 - Plotting
+    - [ ] render_object! dispatch for AbstractSphericalLensSDF 
     - [ ] automatic plot updates using Makie Observable/Buffer
 - Test coverage
     - [x] continuous integration pipeline by O. Kliebisch
@@ -40,10 +42,11 @@ Documentation can be found here: https://optical-air-data.pages.gitlab.dlr.de/di
     - [x] generic mesh intersection test
     - [x] solve_system()/trace_system() test
     - [ ] interact() tests 
-    - [ ] more Lens/Meshlikes tests
+    - [x] more Lens/Meshlikes tests
 
 ## Known bugs
 
+- [ ] inconsistent use of nm, m, mm (i.e. in Ray constructor, Parameters)
 - [x] align3d rotation incorrect if start = -target
 - [ ] @code_warntype for interact(Lens, Beam)
 - [ ] change names for functions that return matrices
