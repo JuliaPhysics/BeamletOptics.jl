@@ -4,24 +4,82 @@
 Ray representation of the **unastigmatic** Gaussian beam as per J. Arnaud (1985).
 The beam quality `M2` is fully considered via the divergence angle.
 """
-mutable struct GaussianBeamlet{T} <: AbstractEntity
+mutable struct GaussianBeamlet{T} <: AbstractBeam{T}
     id::UUID
     chief::Beam{T}
     waist::Beam{T}
     divergence::Beam{T}
     λ::T
     w0::T
-    M2::T
     E0::Complex{T}
+    parent::Nullable{GaussianBeamlet{T}}
+    children::Vector{GaussianBeamlet{T}}
 end
+
+function GaussianBeamlet(chief::Beam{T}, waist::Beam{T}, div::Beam{T}, λ::T, w0::T, E0::Complex{T}) where T<:Real
+    return GaussianBeamlet{T}(uuid4(), chief, waist, div, λ, w0, E0, nothing, Vector{GaussianBeamlet{T}}()) 
+end
+
+struct GaussianBeamletInteraction{R<:Real} <: AbstractInteraction
+    chief::BeamInteraction{R}
+    waist::BeamInteraction{R}
+    divergence::BeamInteraction{R}
+end
+
+hint(interaction::GaussianBeamletInteraction) = hint(interaction.chief)
 
 wavelength(beam::GaussianBeamlet) = beam.λ
 beam_waist(beam::GaussianBeamlet) = beam.w0
 beam_amplitude(beam::GaussianBeamlet) = beam.E0
-beam_quality(beam::GaussianBeamlet) = beam.M2
+
+Base.length(gauss::GaussianBeamlet) = length(gauss.chief)
 
 """
-    GaussianBeamlet(chief::Ray{T}, λ=1064, w0=1; support=[0,0,1], M2=1)
+    parent!(beam::GaussianBeamlet, parent::GaussianBeamlet)
+
+Ensures that the GaussianBeamlet knows about its parent beam. In addition, links the chief beams of child and parent
+Important for correct functioning of [`point_on_beam`](@ref) and [`length`](@ref).
+"""
+function parent!(child::GaussianBeamlet, parent::GaussianBeamlet)
+    child.parent = parent
+    child.chief.parent = parent.chief
+    return nothing
+end
+
+function interact3d(system::AbstractSystem, object::AbstractObject, gauss::GaussianBeamlet{R}, ray_id::Int) where R
+    i_c = interact3d(system, object, gauss.chief, rays(gauss.chief)[ray_id])
+    i_w = interact3d(system, object, gauss.waist, rays(gauss.waist)[ray_id])
+    i_d = interact3d(system, object, gauss.divergence, rays(gauss.divergence)[ray_id])
+    if any(isnothing, (i_c, i_w, i_d))
+        return nothing
+    end
+    return GaussianBeamletInteraction{R}(i_c, i_w, i_d)
+end
+
+function Base.push!(gauss::GaussianBeamlet{T}, interaction::GaussianBeamletInteraction{T}) where T
+    push!(gauss.chief, interaction.chief)
+    push!(gauss.waist, interaction.waist)
+    push!(gauss.divergence, interaction.divergence)
+    return nothing
+end
+
+function Base.replace!(gauss::GaussianBeamlet{T}, interaction::GaussianBeamletInteraction{T}, index::Int) where T
+    replace!(gauss.chief, interaction.chief, index)
+    replace!(gauss.waist, interaction.waist, index)
+    replace!(gauss.divergence, interaction.divergence, index)
+    return nothing
+end
+
+function _modify_beam_head!(old::GaussianBeamlet{T}, new::GaussianBeamlet{T}) where T<:Real
+    _modify_beam_head!(old.chief, new.chief)
+    _modify_beam_head!(old.waist, new.waist)
+    _modify_beam_head!(old.divergence, new.divergence)
+end
+
+_last_beam_intersection(gauss::GaussianBeamlet) = intersection(last(rays(gauss.chief)))
+
+"""
+    GaussianBeamlet(chief::Ray{T}, λ=1000e-9, w0=1e-3; M2=1, P0=1e-3, support=[0, 0, 1])
 
 Construct a Gaussian beamlet at its waist with a specified beam diameter.
 
@@ -51,7 +109,7 @@ function GaussianBeamlet(chief::Ray{T}, λ=1000e-9, w0=1e-3; M2=1, P0=1e-3, supp
     # Calculate E0 based on P0, assume zero initial phase offset
     I0 = 2*P0/(π*w0^2)
     E0 = electric_field(I0)
-    return GaussianBeamlet{T}(uuid4(), Beam(chief), Beam(ξ), Beam(η), λ, w0, M2, E0)
+    return GaussianBeamlet(Beam(chief), Beam(ξ), Beam(η), λ, w0, E0)
 end
 
 point_on_beam(gauss::GaussianBeamlet, t::Real) = point_on_beam(gauss.chief, t)
@@ -65,7 +123,7 @@ Calculate the local waist radius and Gouy phase of an unastigmatic Gaussian beam
 # Arguments
 - `gauss`: the GaussianBeamlet object for which parameters are to be calculated.
 - `z`: the position along the beam at which to calculate the parameters.
-- `hint`: an optional hint parameter for the relevant point/index of the appropriate beam segmnent. If not provided, the function will automatically select the ray.
+- `hint`: an optional hint parameter for the relevant point/index of the appropriate beam segment. If not provided, the function will automatically select the ray.
 
 # Returns
 - `w`: local radius
@@ -91,14 +149,14 @@ function gauss_parameters(gauss::GaussianBeamlet, z::Real, y0::AbstractVector{Fl
     =#
     div = gauss.divergence.rays[index]
     intersection_len = line_plane_distance3d(p0, direction(chief), position(div), direction(div))
-    @. y0 = $position(div) + intersection_len * $direction(div) - p0    
+    @. y0 = $position(div) + intersection_len * $direction(div) - p0
     y_d = norm3d(y0)
     y0 ./= y_d
     m_d = tan(π / 2 - angle3d(y0, direction(div)))
     # Waist ray height and slope
     waist = gauss.waist.rays[index]
     intersection_len = line_plane_distance3d(p0, direction(chief), position(waist), direction(waist))
-    @. y0 = $position(waist) + intersection_len * $direction(waist) - p0    
+    @. y0 = $position(waist) + intersection_len * $direction(waist) - p0
     y_w = norm3d(y0)
     y0 ./= y_w
     m_w = tan(π / 2 - angle3d(y0, direction(waist)))
@@ -144,7 +202,7 @@ end
     electric_field(gauss::GaussianBeamlet, r, z, g_b=zeros(3), p_b=zeros(3))
 
 Calculates the electric field phasor [V/m] of `gauss` at the radial and longitudinal positions `r` and `z`.
-Optionally, buffer vectors `g_b` and `p_b` can be passed.  
+Optionally, buffer vectors `g_b` and `p_b` can be passed.
 """
 function electric_field(gauss::GaussianBeamlet, r, z, g_b=zeros(3), p_b=zeros(3))
     point, index = point_on_beam!(p_b, gauss, z)
@@ -158,7 +216,7 @@ end
 """
     isparaxial(system, gb::GaussianBeamlet, threshold=π/4)
 
-Tests the angle between the waist and divergence beams and refractive surfaces. 
+Tests the angle between the waist and divergence beams and refractive surfaces.
 A target threshold of π/4 or 45° is assumed before abberations become dominant.
 """
 isparaxial(system::AbstractSystem, gb::GaussianBeamlet, threshold::Real=π/4) = isparaxial(system, gb.waist, threshold) & isparaxial(system, gb.divergence, threshold)

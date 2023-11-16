@@ -17,7 +17,7 @@ render_object!(axis, object::AbstractObject) = render_object!(axis, shape(object
 Render all objects contained in the `system`.
 """
 function render_system!(axis, system::System)
-    for object in system.object
+    for object in objects(system)
         render_object!(axis, object)
     end
     return nothing
@@ -51,8 +51,10 @@ end
 Render the entire `beam` into the specified 3D-`axis`. A `color` can be specified.
 """
 function render_beam!(axis, beam::Beam; color=:blue, flen=1.0)
-    for ray in beam.rays
-        render_ray!(axis, ray, color=color, flen=flen)
+    for child in PreOrderDFS(beam)
+        for ray in rays(child)
+            render_ray!(axis, ray, color=color, flen=flen)
+        end
     end
     return nothing
 end
@@ -67,37 +69,45 @@ Render the surface of a `GaussianBeamlet` as `color`. With `show_beams` the gene
 - `waist` ray: blue
 """
 function render_beam!(axis, gauss::GaussianBeamlet{T}; color=:red, flen=0.1, show_beams=false) where T
-    # Length tracking variable
-    l::T = 0
-    for ray in gauss.chief.rays
-        # Generate local u, v coords
-        if isnothing(intersection(ray))
-            u = LinRange(0 , flen, 50)
+    for child in PreOrderDFS(gauss)
+        # Length tracking variable
+        p = AbstractTrees.parent(child)
+        if isnothing(p)
+            l = zero(T)
         else
-            u = LinRange(0, length(ray), 50)
+            l = length(p)
         end
-        v = LinRange(0, 2π, 20)
-        # Calculate beam surface at origin along y-axis
-        w = gauss_parameters(gauss, u .+ l)[1]
-        X = [w[i] * cos(v) for (i, u) in enumerate(u), v in v]  
-        Y = [u for u in u, v in v]                              
-        Z = [w[i] * sin(v) for (i, u) in enumerate(u), v in v]
-        # Transform into world coords
-        R = align3d([0,1,0], ray.dir)
-        Xt = R[1,1]*X + R[1,2]*Y + R[1,3]*Z .+ ray.pos[1]
-        Yt = R[2,1]*X + R[2,2]*Y + R[2,3]*Z .+ ray.pos[2]
-        Zt = R[3,1]*X + R[3,2]*Y + R[3,3]*Z .+ ray.pos[3]
-        surface!(axis, Xt, Yt, Zt, transparency = true, colormap = [color, color])
-        # Bump length tracker
-        if !isnothing(intersection(ray)) 
-            l += length(ray)
+        # Render each ray segment
+        for ray in rays(child.chief)
+            # Generate local u, v coords
+            if isnothing(intersection(ray))
+                u = LinRange(0 , flen, 50)
+            else
+                u = LinRange(0, length(ray), 50)
+            end
+            v = LinRange(0, 2π, 20)
+            # Calculate beam surface at origin along y-axis
+            w = gauss_parameters(child, u .+ l)[1]
+            X = [w[i] * cos(v) for (i, u) in enumerate(u), v in v]  
+            Y = [u for u in u, v in v]                              
+            Z = [w[i] * sin(v) for (i, u) in enumerate(u), v in v]
+            # Transform into world coords
+            R = align3d([0,1,0], ray.dir)
+            Xt = R[1,1]*X + R[1,2]*Y + R[1,3]*Z .+ ray.pos[1]
+            Yt = R[2,1]*X + R[2,2]*Y + R[2,3]*Z .+ ray.pos[2]
+            Zt = R[3,1]*X + R[3,2]*Y + R[3,3]*Z .+ ray.pos[3]
+            surface!(axis, Xt, Yt, Zt, transparency = true, colormap = [color, color])
+            # Bump length tracker
+            if !isnothing(intersection(ray)) 
+                l += length(ray)
+            end
         end
-    end
-    # Optionally, plot generating rays
-    if show_beams
-        render_beam!(axis, gauss.chief, flen=flen, color=:red)
-        render_beam!(axis, gauss.divergence, flen=flen, color=:green)
-        render_beam!(axis, gauss.waist, flen=flen, color=:blue)
+        # Optionally, plot generating rays
+        if show_beams
+            render_beam!(axis, child.chief, flen=flen, color=:red)
+            render_beam!(axis, child.divergence, flen=flen, color=:green)
+            render_beam!(axis, child.waist, flen=flen, color=:blue)
+        end
     end
     return nothing
 end

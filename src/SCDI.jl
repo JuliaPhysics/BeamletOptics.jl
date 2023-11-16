@@ -4,6 +4,7 @@ using LinearAlgebra, FileIO, UUIDs, MarchingCubes, Trapz
 using PrecompileTools
 using MakieCore
 using StaticArrays
+using AbstractTrees
 
 import Base: length
 
@@ -12,12 +13,10 @@ include("Ray Tracing/Constants.jl")
 include("Ray Tracing/Utils.jl")
 include("Ray Tracing/Types.jl")
 include("Ray Tracing/Rays.jl")
-include("Ray Tracing/Gaussian.jl")
+include("Ray Tracing/Beam.jl")
 include("Ray Tracing/Mesh.jl")
 include("Ray Tracing/SDF.jl")
-include("Ray Tracing/Sphere.jl")
-include("Ray Tracing/Surfaces.jl")
-include("Ray Tracing/Intersections.jl")
+include("Ray Tracing/Gaussian.jl")
 include("Ray Tracing/System.jl")
 include("Ray Tracing/Interactions.jl")
 include("Ray Tracing/Render.jl")
@@ -50,11 +49,10 @@ if get(ENV, "CI", "false") == "false"
                     _pos,
                     _scale
             ))
-            SCDI.translate3d!(shape(plane), [0, 0, 1])
-            SCDI.xrotate3d!(shape(plane), π / 2)
-            SCDI.yrotate3d!(shape(plane), π / 4)
-            SCDI.zrotate3d!(shape(plane), π / 2)
-            SCDI.scale3d!(shape(plane), 2)
+            SCDI.translate3d!(plane, [0, 0, 1])
+            SCDI.xrotate3d!(plane, π / 2)
+            SCDI.yrotate3d!(plane, π / 4)
+            SCDI.zrotate3d!(plane, π / 2)
         end
     end
 end

@@ -11,12 +11,6 @@ vertices!(mesh::AbstractMesh, vertices) = (mesh.vertices .= vertices)
 faces(mesh::AbstractMesh) = mesh.faces
 faces!(mesh::AbstractMesh, faces) = nothing
 
-orientation(mesh::AbstractMesh) = mesh.dir
-orientation!(mesh::AbstractMesh, dir) = (mesh.dir .= dir)
-
-position(mesh::AbstractMesh) = mesh.pos
-position!(mesh::AbstractMesh, pos) = (mesh.pos .= pos)
-
 scale(mesh::AbstractMesh) = mesh.scale
 scale!(mesh::AbstractMesh, scale) = (mesh.scale = scale)
 
@@ -71,61 +65,34 @@ function Mesh(mesh)
 end
 
 """
-    translate3d!(object::AbstractMesh, offset::Vector)
+    translate3d!(object::AbstractMesh, offset)
 
 Mutating function that translates the vertices of an mesh in relation to the offset vector.
 In addition, the mesh position vector is overwritten to reflect the new "center of gravity".
 """
-function translate3d!(object::AbstractMesh, offset::Vector)
-    position!(object, position(object) .+= offset)
-    vertices!(object, vertices(object) .+= offset')
+function translate3d!(object::AbstractMesh, offset)
+    position!(object, position(object) .+ offset)
+    vertices!(object, vertices(object) .+ offset')
     return nothing
 end
 
 """
-    xrotate3d!(object::AbstractMesh, θ)
+    rotate3d!(shape::AbstractMesh, axis, θ)
 
-Mutating function that rotates the mesh around the **x-axis**.
-The rotation is performed around the "center of gravity" axis.
+Mutating function that rotates the mesh around the specified rotation `axis` by the angle `θ`.
 """
-function xrotate3d!(object::AbstractMesh, θ)
+function rotate3d!(shape::AbstractMesh, axis, θ)
     # Calculate rotation matrix
-    R = rotate3d([1, 0, 0], θ)
+    R = rotate3d(axis, θ)
     # Translate mesh to origin, rotate, retranslate
-    vertices!(object, (vertices(object) .- position(object)') * R .+ position(object)')
-    orientation!(object, orientation(object) * R)
+    vertices!(shape, (vertices(shape) .- position(shape)') * R' .+ position(shape)')
+    orientation!(shape, orientation(shape) * R)
     return nothing
 end
 
-"""
-    yrotate3d!(object::AbstractMesh, θ)
-
-Mutating function that rotates the mesh around the **y-axis**.
-The rotation is performed around the "center of gravity" axis.
-"""
-function yrotate3d!(object::AbstractMesh, θ)
-    # Calculate rotation matrix
-    R = rotate3d([0, 1, 0], θ)
-    # Translate mesh to origin, rotate, retranslate
-    vertices!(object, (vertices(object) .- position(object)') * R .+ position(object)')
-    orientation!(object, orientation(object) * R)
-    return nothing
-end
-
-"""
-    zrotate3d!(object::AbstractMesh, θ)
-
-Mutating function that rotates the mesh around the **z-axis**.
-The rotation is performed around the "center of gravity" axis.
-"""
-function zrotate3d!(object::AbstractMesh, θ)
-    # Calculate rotation matrix
-    R = rotate3d([0, 0, 1], θ)
-    # Translate mesh to origin, rotate, retranslate
-    vertices!(object, (vertices(object) .- position(object)') * R .+ position(object)')
-    orientation!(object, orientation(object) * R)
-    return nothing
-end
+xrotate3d!(shape::AbstractMesh{T}, θ) where T = rotate3d!(shape, @SVector(T[one(T), zero(T), zero(T)]), θ) 
+yrotate3d!(shape::AbstractMesh{T}, θ) where T = rotate3d!(shape, @SVector(T[zero(T), one(T), zero(T)]), θ) 
+zrotate3d!(shape::AbstractMesh{T}, θ) where T = rotate3d!(shape, @SVector(T[zero(T), zero(T), one(T)]), θ)
 
 """
     scale3d!(object::AbstractMesh, scale)
@@ -184,4 +151,83 @@ function normal3d(object::AbstractMesh, fID::Int)
     face = vertices(object)[faces(object)[fID, :], :]
     n = fast_cross3d((face[2, :] - face[1, :]), (face[3, :] - face[1, :]))
     return normalize3d(n)
+end
+
+"""
+    MoellerTrumboreAlgorithm(face::Matrix, ray::Ray)
+
+A culling implementation of the **Möller-Trumbore algorithm** for ray-triangle-intersection.
+This algorithm evaluates the possible intersection between a `ray` and a `face` that is defined by three vertices.
+If no intersection occurs, `Inf` is returned. `kϵ` is the abort threshold for backfacing and non-intersecting triangles.
+`lϵ` is the threshold for negative values of `t`.
+This algorithm is fast due to multiple breakout conditions.
+"""
+function MoellerTrumboreAlgorithm(face, ray::AbstractRay{T}, E1, E2, Pv, Tv, Qv; kϵ=1e-9, lϵ=1e-9) where T
+    V1 = @view face[1, :]
+    V2 = @view face[2, :]
+    V3 = @view face[3, :]
+
+    fast_sub3d!(E1, V2, V1)
+    fast_sub3d!(E2, V3, V1)
+    fast_cross3d!(Pv, direction(ray), E2)
+    Det = fast_dot3d(E1, Pv)
+    # Check if ray is backfacing or missing face
+    if abs(Det) < kϵ
+        # Adjust type of Inf
+        return T(Inf) # typemax(T) ?
+    end
+    # Compute normalized u and reject if less than 0 or greater than 1
+    fast_sub3d!(Tv, position(ray), V1)
+    invDet = 1 / Det
+    u = fast_dot3d(Tv, Pv) * invDet
+    if (u < 0) || (u > 1)
+        return T(Inf)
+    end
+    # Compute normalized v and reject if less than 0 or greater than 1
+    fast_cross3d!(Qv, Tv, E1)
+    v = fast_dot3d(direction(ray), Qv) * invDet
+    if (v < 0) || (u + v > 1)
+        return T(Inf)
+    end
+    # Compute t (type def. for t to avoid Any)
+    t::T = fast_dot3d(E2, Qv) * invDet
+    # Return intersection only if "in front of" ray origin
+    if t < lϵ
+        return T(Inf)
+    end
+    return t
+end
+
+"""
+    intersect3d(object::Mesh, ray::Ray)
+
+This function is a generic implementation to check if a ray intersects the object mesh.\\
+"""
+function intersect3d(object::AbstractMesh{M}, ray::AbstractRay{R}) where {M<:Real, R<:Real}
+    numEl = size(faces(object), 1)
+    # allocate all intermediate vectors once (note that this is NOT THREAD-SAFE)
+    T = promote_type(M, R)
+    fID::Int = 0
+    t0::T = Inf
+    E1 = Vector{T}(undef, 3)
+    E2 = Vector{T}(undef, 3)
+    Pv = Vector{T}(undef, 3)
+    Tv = Vector{T}(undef, 3)
+    Qv = Vector{T}(undef, 3)
+    for i = 1:numEl
+        face = @views vertices(object)[faces(object)[i, :], :]
+        t = MoellerTrumboreAlgorithm(face, ray, E1, E2, Pv, Tv, Qv)
+        # Return closest intersection
+        if t < t0
+            t0 = t
+            fID = i
+        end
+    end
+    if isinf(t0)
+        return nothing
+    else
+        face = @views vertices(object)[faces(object)[fID, :], :]
+        normal = normal3d(object, fID)
+        return Intersection{T}(t0, normalize3d(T.(normal)), nothing)
+    end
 end

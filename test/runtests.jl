@@ -2,6 +2,7 @@ using SCDI
 using Test
 using LinearAlgebra
 using UUIDs
+using AbstractTrees
 
 @testset "Utilities" begin
     @testset "Testing euclidic norm utilites" begin
@@ -109,88 +110,244 @@ using UUIDs
 end
 
 @testset "Types" begin
-    @debug "Testing abstract type definitions"
     @test isdefined(SCDI, :AbstractEntity)
-    @test isdefined(SCDI, :AbstractObject)
-    @test isdefined(SCDI, :AbstractReflectiveOptic)
-    @test isdefined(SCDI, :AbstractRefractiveOptic)
-    @test isdefined(SCDI, :AbstractShape)
-    @test isdefined(SCDI, :AbstractMesh)
+    @test isdefined(SCDI, :AbstractSystem)
     @test isdefined(SCDI, :AbstractRay)
+    @test isdefined(SCDI, :AbstractBeam)
+    @test isdefined(SCDI, :AbstractShape)
+    @test isdefined(SCDI, :AbstractObject)
+    # @test isdefined(SCDI, :AbstractObjectGroup)
+    @test isdefined(SCDI, :Intersection)
+    @test isdefined(SCDI, :Parameters)
+    @test isdefined(SCDI, :AbstractInteraction)
 
     # Generate test structs
-    struct Shapeless{T} <: SCDI.AbstractShape{T}
-        pos::Vector{T}
-        dir::Matrix{T}
+    struct TestEntity <: SCDI.AbstractEntity
+        id::UUID
     end
 
-    struct Ray{T} <: SCDI.AbstractRay{T}
+    @testset "AbstractEntity" begin
+        e = TestEntity(uuid4())
+        @test SCDI.id(e) == e.id
+        @test SCDI.id("Hello World") === nothing
+    end
+
+    struct TestSystem <: SCDI.AbstractSystem end
+
+    @testset "AbstractSystem" begin
+        # no tests
+        sys = TestSystem()
+    end
+
+    mutable struct TestRay{T} <: SCDI.AbstractRay{T}
         pos::Vector{T}
         dir::Vector{T}
     end
 
-    @testset "Testing abstract type interfaces" begin
-        object = Shapeless([0, 0, 0], Matrix{Int}(I, 3, 3))
-        SCDI.translate3d!(object, [1, 1, 1])
-        SCDI.position!(object, [2, 2, 2])
-        SCDI.reset_translation3d!(object)
-        @test SCDI.position(object) == object.pos
-        @test SCDI.position(object) == zeros(3)
-        # The following test are expected to do nothing but not throw exceptions
-        SCDI.rotate3d!(object, [0, 0, 1], π)
-        @test all(SCDI.orientation(object)[[1, 5]] .== -1) && SCDI.orientation(object)[9] == 1
-        SCDI.xrotate3d!(object, π)
-        SCDI.yrotate3d!(object, π)
-        SCDI.zrotate3d!(object, π)
-        SCDI.reset_rotation3d!(object)
-        @test SCDI.orientation(object) == Matrix{Int}(I, 3, 3)
-        @test_logs (:warn,) SCDI.intersect3d(object, SCDI.Ray([0, 0, 1], [0, 0, 1]))
+    Base.length(::TestRay) = π
+
+    @testset "AbstractRay" begin
+        r = TestRay([0.0, 0, 0], [1.0, 0, 0])
+        @test SCDI.position(r) == r.pos
+        @test SCDI.direction(r) == r.dir
+        n_pos = [1, 1, 1]
+        n_dir = [1.0, 1, 0]
+        SCDI.position!(r, n_pos)
+        SCDI.direction!(r, n_dir)
+        @test SCDI.position(r) == n_pos
+        @test SCDI.direction(r) ≈ n_dir .* (sqrt(2) / 2)
+        @test length(r) == π
+        # Test ray-plane intersection
+        plane_pos = [1, 0, -1]
+        plane_nml_1 = [-1, 0, 1]
+        plane_nml_2 = [1, 0, 0]
+        plane_nml_3 = [0, 0, 1]
+        ray = TestRay([0.0, 0, 0], [1.0, 0, 0])
+        is_1 = SCDI.intersect3d(plane_pos, plane_nml_1, ray)
+        is_2 = SCDI.intersect3d(plane_pos, plane_nml_2, ray)
+        is_3 = SCDI.intersect3d(plane_pos, plane_nml_3, ray)
+        @test length(is_1) == 2
+        @test length(is_2) == 1
+        @test isnothing(is_3)
     end
 
-    @testset "Testing abstract ray" begin
-        object = Shapeless([1, 0, 0], Matrix{Int}(I, 3, 3))
-        ray = Ray([0, 0, 0], [1, 0, 0])
-        @test SCDI.isinfrontof(object, ray) == true
-        SCDI.direction!(ray, -[1, 0, 0])
-        @test SCDI.isinfrontof(object, ray) == false
-        SCDI.direction!(ray, [0, 1, 0])
-        @test SCDI.isinfrontof(object, ray) == false
-        SCDI.direction!(ray, [1, 1, 0])
-        @test SCDI.isinfrontof(object, ray) == true
+    mutable struct TestBeam{T} <: SCDI.AbstractBeam{T}
+        id::UUID
+        parent::SCDI.Nullable{TestBeam}
+        children::Vector{TestBeam}
+    end
+
+    TestBeam() = TestBeam{Float64}(uuid4(), nothing, Vector{TestBeam{Float64}}())
+
+    @testset "AbstractBeam" begin
+        # Create beam tree
+        root = TestBeam()
+        cb1 = TestBeam()
+        cb2 = TestBeam()
+        group = [cb1, cb2]
+        cb3 = TestBeam()
+        # Add children to root, cb2
+        SCDI.children!(root, group)
+        SCDI.children!(cb2, cb3)
+        # Test tree structure
+        @test treeheight(root) == 2
+        @test treebreadth(root) == 2
+        @test SCDI.children(root) == group
+        @test first(SCDI.children(cb2)) === cb3
+        # Test parent connection
+        @test AbstractTrees.parent(root) === nothing
+        @test AbstractTrees.parent(cb1) === root
+        @test AbstractTrees.parent(cb2) === root
+        @test AbstractTrees.parent(cb3) === cb2
+        # Replace bottom child
+        cbr = TestBeam()
+        @test_throws "_modify_beam_head not implemented for $(typeof(cb2))" SCDI.children!(cb2, cbr)
+        # Test child removal
+        SCDI._drop_beams!(cb2)
+        @test isempty(SCDI.children(cb2))
+        # Stuff
+        @test_throws "_last_beam_intersection not implemented for $(typeof(cb2))" SCDI._last_beam_intersection(cb2)
+    end
+
+    mutable struct TestShapeless{T} <: SCDI.AbstractShape{T}
+        pos::Vector{T}
+        dir::Matrix{T}
+    end
+
+    SCDI.id(::TestShapeless) = nothing
+
+    TestShapeless() = TestShapeless{Float64}(zeros(3), Matrix{Float64}(I, 3, 3))
+
+    @testset "AbstractShape" begin
+        pos = zeros(3)
+        dir = Matrix{Float64}(I, 3, 3)
+        shape = TestShapeless(pos, dir)
+        # Test get/set
+        @test SCDI.position(shape) == pos
+        @test SCDI.orientation(shape) == dir
+        n_pos = [1, 1, 1]
+        n_dir = SCDI.rotate3d([0, 0, 1], π / 4)
+        SCDI.position!(shape, n_pos)
+        SCDI.orientation!(shape, n_dir)
+        @test SCDI.position(shape) == n_pos
+        @test SCDI.orientation(shape) == n_dir
+        # Test translation
+        SCDI.translate3d!(shape, n_pos)
+        @test SCDI.position(shape) == 2 * n_pos
+        SCDI.reset_translation3d!(shape)
+        @test SCDI.position(shape) == zeros(3)
+        # Test rotation
+        dir = Matrix{Float64}(I, 3, 3)
+        SCDI.orientation!(shape, dir)
+        SCDI.rotate3d!(shape, [0, 0, 1], π)
+        @test SCDI.orientation(shape)[1:4:9] == [-1, -1, 1]
+        SCDI.xrotate3d!(shape, π)
+        SCDI.yrotate3d!(shape, π)
+        SCDI.zrotate3d!(shape, π)
+        SCDI.reset_rotation3d!(shape)
+        @test SCDI.orientation(shape) == dir
+        # The following test are expected to do nothing but not throw exceptions
+        ray = TestRay([0.0, 0, 0], [1.0, 0, 0])
+        @test_logs (:warn, "No intersect3d method defined for:") SCDI.intersect3d(shape, ray)
+
+        @testset "Testing AbstractRay - AbstractShape" begin
+            shape = TestShapeless([1, 0, 0], Matrix{Int}(I, 3, 3))
+            ray = TestRay([0.0, 0, 0], [1.0, 0, 0])
+            @test SCDI.isinfrontof(shape, ray) == true
+            SCDI.direction!(ray, -[1, 0, 0])
+            @test SCDI.isinfrontof(shape, ray) == false
+            SCDI.direction!(ray, [0, 1, 0])
+            @test SCDI.isinfrontof(shape, ray) == false
+            SCDI.direction!(ray, [1.0, 1, 0])
+            @test SCDI.isinfrontof(shape, ray) == true
+            @test SCDI.norm3d(SCDI.direction(ray)) ≈ 1
+        end
+    end
+
+    struct TestObject <: SCDI.AbstractObject
+        id::UUID
+        shape::TestShapeless{<:Real}
+    end
+
+    TestObject() = TestObject(uuid4(), TestShapeless())
+
+    @testset "AbstractObject" begin
+        object = TestObject()
+        @test isa(SCDI.shape(object), TestShapeless)
+        # Test forwarding of kin. API to object shape
+        @test SCDI.position(object) == SCDI.position(SCDI.shape(object))
+        @test SCDI.position(object) == SCDI.position(SCDI.shape(object))
+        SCDI.translate3d!(object, ones(3))
+        SCDI.rotate3d!(object, [0, 0, 1], π)
+        @test SCDI.position(object) == ones(3)
+        @test SCDI.orientation(object)[1:4:9] == [-1, -1, 1]
+        SCDI.reset_translation3d!(object)
+        SCDI.reset_rotation3d!(object)
+        @test SCDI.position(object) == zeros(3)
+        @test SCDI.orientation(object)[1:4:9] == ones(3)
+        # Test translate_to3d
+        target_pos = [1,3,9]
+        SCDI.translate_to3d!(object, target_pos)
+        @test SCDI.position(object) == target_pos
+
+        @testset "Testing interact3d" begin
+            sys = TestSystem()
+            obj = TestObject()
+            ray = TestRay(zeros(3), ones(3))
+            beam = TestBeam()
+            @test_logs (:warn, "No interact3d method defined for:") SCDI.interact3d(sys, obj, beam, ray) === nothing
+        end
     end
 end
 
 @testset "Rays" begin
-    @debug "Testing Ray struct definition"
-    @test isdefined(SCDI, :Ray)
+    # Testing constructor
     pos = [0, 0, 0]
-    dir = [1, 1, 1]
+    dir = [1.0, 1, 0]
     ray = SCDI.Ray(pos, dir)
     @test ismutable(ray)
-    @test eltype(ray.pos) == Float64
-
-    @debug "Testing Ray constructor (dir normalization and init. Inf length)"
-    @test isapprox(SCDI.norm3d(ray.dir), 1)
+    @test isa(ray, SCDI.Ray{Float64})
     @test isnothing(ray.intersection)
+    @test isinf(length(ray))
+    @test isapprox(SCDI.norm3d(ray.dir), 1)
+    # Test helper functions
+    @test SCDI.line_point_distance3d(ray, [1, 1, 0]) == 0
+    @test SCDI.line_point_distance3d(ray, [-1, 1, 0]) == sqrt(2)
+end
 
-    @debug "Testing Beam struct definition"
-    @test isdefined(SCDI, :Beam)
-    beam = SCDI.Beam([ray])
-    @test ismutable(beam)
+@testset "Beams" begin
+    is = SCDI.Intersection(1.0, zeros(3), uuid4())
+    r1 = SCDI.Ray([0.0, 0, 0], [1, 0, 0])
+    r2 = SCDI.Ray([1.0, 0, 0], [0, 1, 0])
+    r3 = SCDI.Ray([1.0, 1, 0], [0, 0, 1])
+    r4 = SCDI.Ray([1.0, 1, 1], [1, 0, 0])
+    SCDI.intersection!(r1, is)
+    SCDI.intersection!(r2, is)
+    SCDI.intersection!(r3, is)
+    SCDI.intersection!(r4, nothing)
+    # Test beam
+    beam = SCDI.Beam(r1)
+    push!(beam, r2)
+    push!(beam, r3)
+    push!(beam, r4)
+    @test length(beam) == 3
+    @test SCDI.point_on_beam(beam, 0) == ([0, 0, 0], 1)
+    @test SCDI.point_on_beam(beam, 1) == ([1, 0, 0], 2)
+    @test SCDI.point_on_beam(beam, 2) == ([1, 1, 0], 3)
+    @test SCDI.point_on_beam(beam, 3) == ([1, 1, 1], 4)
+    @test SCDI.point_on_beam(beam, 10) == ([8, 1, 1], 4)
+    @test SCDI.isparentbeam(beam, r2) == true
 end
 
 @testset "Mesh" begin
     # NOTE: the "Mesh" testset is mutating. Errors/fails might lead to subsequent tests failing too!
-    @testset "Testing type definitions" begin
-        @debug "Testing Mesh struct definition"
-        @test isdefined(SCDI, :Mesh)
-    end
+    @test isdefined(SCDI, :AbstractMesh)
+    @test isdefined(SCDI, :Mesh)
 
     # Generate cube since types are defined
     include("Cube.jl")
 
-    @debug "Generating moving test cube with scale 1"
-    foo = Cube(1)
+    foo = Cube(1) # test cube
 
     @testset "Testing AbstractMesh getters" begin
         @test typeof(foo) == SCDI.Mesh{Float64}
@@ -218,6 +375,18 @@ end
     end
 
     @testset "Testing x/y/zrotate3d!" begin
+        @testset "Testing rotate3d!" begin
+            SCDI.rotate3d!(foo, [1, 0, 0], π / 4)
+            @test isapprox(minimum(SCDI.vertices(foo)[:, 1]), -0.5)
+            @test isapprox(minimum(SCDI.vertices(foo)[:, 2]), -√2 / 2)
+            @test isapprox(minimum(SCDI.vertices(foo)[:, 3]), -√2 / 2)
+            @test isapprox(maximum(SCDI.vertices(foo)[:, 1]), 0.5)
+            @test isapprox(maximum(SCDI.vertices(foo)[:, 2]), √2 / 2)
+            @test isapprox(maximum(SCDI.vertices(foo)[:, 3]), √2 / 2)
+            # Return to original rotation
+            SCDI.rotate3d!(foo, [1, 0, 0], -π / 4)
+        end
+
         @testset "Testing xrotate3d!" begin
             SCDI.xrotate3d!(foo, π / 4)
             @test isapprox(minimum(SCDI.vertices(foo)[:, 1]), -0.5)
@@ -248,7 +417,7 @@ end
             @test isapprox(maximum(SCDI.vertices(foo)[:, 3]), 0.5)
         end
 
-        @debug "Testing orientation of dir matrix"
+        # Testing orientation of dir matrix
         @test all(SCDI.orientation(foo)[[2, 6, 7]] .== 1)
     end
 
@@ -260,7 +429,7 @@ end
 
     @testset "Testing normal3d" begin
         normal = SCDI.normal3d(foo, 1)
-        @test isapprox(normal, [0, 0, -1])
+        @test isapprox(normal, [0, -1, 0])
     end
 
     @testset "Testing scale3d!" begin
@@ -273,26 +442,17 @@ end
         @test isapprox(maximum(SCDI.vertices(foo)[:, 3]), 1)
         @test SCDI.scale(foo) == 2
     end
-end
 
-@testset "Intersections" begin
     @testset "Testing Moeller-Trumbore algorithm" begin
-        @debug "Testing functor definition"
-        @test isdefined(SCDI, :MoellerTrumboreAlgorithm)
-        @test hasfield(SCDI.MoellerTrumboreAlgorithm, :kϵ)
-        @test hasfield(SCDI.MoellerTrumboreAlgorithm, :lϵ)
-        @test isdefined(SCDI, :ray_triangle_intersection)
-        @test isconst(SCDI, :ray_triangle_intersection)
-        @debug "Defining face in the x-y-plane with z-offset t"
         t = 5
         face = [
             1 1 t
             -1 1 t
             0 -1 t
         ]
-        @debug "Defining ray at origin pointing along z-axis"
-        pos = [0, 0, 0]
-        dir = [0, 0, 1]
+        # ray at origin pointing along z-axis
+        pos = [0.0, 0, 0]
+        dir = [0.0, 0, 1]
         ray = SCDI.Ray(pos, dir)
         # Preallocate memory
         E1 = similar(ray.dir)
@@ -300,102 +460,192 @@ end
         Pv = similar(ray.dir)
         Tv = similar(ray.dir)
         Qv = similar(ray.dir)
-        @debug "Testing intersection"
-        @test isapprox(SCDI.ray_triangle_intersection(face, ray, E1, E2, Pv, Tv, Qv), t)
+        @test isapprox(SCDI.MoellerTrumboreAlgorithm(face, ray, E1, E2, Pv, Tv, Qv), t)
         # Check allocations (WARNING: function must have been compiled once for before this test!)
-        alloc = @allocated SCDI.ray_triangle_intersection(face, ray, E1, E2, Pv, Tv, Qv)
+        alloc = @allocated SCDI.MoellerTrumboreAlgorithm(face, ray, E1, E2, Pv, Tv, Qv)
         if alloc > 16
             @warn "Allocated number of bytes for MTA larger than expected!" alloc
         end
     end
+    @testset "Testing intersect3d" begin
+        # Setup test cube and ray
+        cube = Cube(1)
+        SCDI.translate3d!(cube, -0.5 * [1, 1, 1])
+        SCDI.set_new_origin3d!(cube)
+        ray_pos = zeros(3)
+        ray_dir = [1.0, 0, 0]
+        ray = SCDI.Ray(ray_pos, ray_dir)
+        # Rotate cube 360°, calculate intersection distance
+        θ = 0:1:359
+        l = zeros(length(θ))
+        for (i, ~) in enumerate(θ)
+            intersection = SCDI.intersect3d(cube, ray)
+            l[i] = length(intersection)
+            SCDI.zrotate3d!(cube, deg2rad(step(θ)))
+        end
+        # Test if 0/45° distances are correct
+        @test all(l[1:90:end] .≈ SCDI.scale(cube) * 1 / 2)
+        @test all(l[1+45:90:end] .≈ SCDI.scale(cube) * sqrt(2) / 2)
+    end
 
-    @testset "Testing intersect3d for meshes" begin
-        @debug "Generating test cube"
+    @testset "Testing intersect3d - part 2" begin
         t = 5
         s = 1 # scale/2
-        foo = Cube(2 * s)
+        cube = Cube(2 * s)
         # Move cube COG to origin
-        SCDI.translate3d!(foo, -[s, s, s])
-        SCDI.set_new_origin3d!(foo)
+        SCDI.translate3d!(cube, -[s, s, s])
+        SCDI.set_new_origin3d!(cube)
         # Align cube edge at t units from origin
-        SCDI.translate3d!(foo, [t + s, 0, 0])
-        @debug "Defining ray at origin with variable dir"
+        SCDI.translate3d!(cube, [t + s, 0, 0])
         pos = [0, 0, 0]
         steps = 10
         for z in -s:(s/steps):s
             # Ray constructed each time for unit-length dir
             dir = [t, 0, z]
             ray = SCDI.Ray(pos, dir)
-            @test isapprox(SCDI.intersect3d(foo, ray).t, sqrt(t^2 + z^2))
+            @test isapprox(SCDI.intersect3d(cube, ray).t, sqrt(t^2 + z^2))
         end
     end
-
-    @testset "Testing intersect3d for infinite planes" begin
-        t = 1.0
-        plane_origin = [0, t, 0]
-        plane_normal = SCDI.normalize3d([0, t, -t])
-        ray = SCDI.Ray([0, 0, 1], [0, 1, 0])
-        intersection = SCDI.intersect3d(plane_origin, plane_normal, ray)
-        @test isapprox(length(intersection), 2t)
-        ray = SCDI.Ray([0, 0, 1], [0, -1, 0])
-        intersection = SCDI.intersect3d(plane_origin, plane_normal, ray)
-        @test isnothing(intersection)
-    end
-end
-
-@testset "Interactions" begin
-    @test isdefined(SCDI, :Interaction)
-    @test isdefined(SCDI, :Mirror)
-    @test isdefined(SCDI, :Prism)
-    @test isdefined(SCDI, :Lens)
-    @test isdefined(SCDI, :Photodetector)
-end
-
-@testset "System" begin
-    # Set up system of four mirrors boxing in the origin in the x-y-plane
-    c1 = Cube(2)
-    c2 = Cube(2)
-    c3 = Cube(2)
-    c4 = Cube(2)
-    SCDI.translate3d!.([c1, c2, c3, c4], [-[1, 1, 1], -[1, 1, 1], -[1, 1, 1], -[1, 1, 1]])
-    SCDI.translate3d!.([c1, c2, c3, c4], [[2, 0, 0], -[2, 0, 0], [0, 2, 0], -[0, 2, 0]])
-    SCDI.set_new_origin3d!.([c1, c2, c3, c3])
-    m1 = SCDI.Mirror(uuid4(), c1)
-    m2 = SCDI.Mirror(uuid4(), c2)
-    m3 = SCDI.Mirror(uuid4(), c3)
-    m4 = SCDI.Mirror(uuid4(), c4)
-    system = SCDI.System(uuid4(), [m1, m2, m3, m4])
-    # Set up ray that will be reflected at 45° angle in the middle of each mirror edge
-    ray = SCDI.Ray([0, -1, 0], [1, 1, 0])
-    beam = SCDI.Beam([ray])
-    # Trace system
-    numEl = 8
-    alloc1 = @allocated SCDI.solve_system!(system, beam, r_max=8)
-    temp = SCDI.Beam(copy(beam.rays))
-    # Retrace system
-    alloc2 = @allocated SCDI.solve_system!(system, beam, r_max=8)
-    @test SCDI.position.(beam.rays) == SCDI.position.(temp.rays)
-    @test length(beam.rays) == 8
-    for pos in SCDI.position.(beam.rays)
-        @test pos[3] == 0
-    end
-    if alloc2 >= alloc1
-        @warn "No retracing utilized"
-    end
-    # Remove object from beam path and retrace
-    SCDI.translate3d!(c2, [0, 0, 2])
-    SCDI.solve_system!(system, beam, r_max=8)
-    @test length(beam.rays) == 3
-
-    #=
-    WIP:
-    - test for object ID correctness
-    - test for retracing correctness
-    - remove alloc warning?
-    =#
 end
 
 @testset "SDFs" begin
+    @testset "Testing type definitions" begin
+        @test isdefined(SCDI, :AbstractSDF)
+        @test isdefined(SCDI, :SphereSDF)
+        @test isdefined(SCDI, :CylinderSDF)
+        @test isdefined(SCDI, :CutSphereSDF)
+        @test isdefined(SCDI, :ThinLensSDF)
+    end
+
+    # Orientation-less test point sdf
+    struct TestPointSDF{T} <: SCDI.AbstractSDF{T}
+        pos::Vector{T}
+    end
+
+    orientation(::TestPointSDF{T}) where {T} = Matrix{T}(I, 3, 3)
+    orientation!(::TestPointSDF, ::Any) = nothing
+
+    function SCDI.sdf(tp::TestPointSDF, point)
+        return SCDI.norm3d(SCDI.position(tp) - point)
+    end
+
+    @testset "Testing intersect3d" begin
+        t = 10.0
+        point = TestPointSDF(zeros(3))
+        SCDI.translate3d!(point, [t, 0, 0])
+
+        r1 = SCDI.Ray(zeros(3), [1.0, 0, 0])
+        r2 = SCDI.Ray(zeros(3), [1.0, 1, 0])
+        r3 = SCDI.Ray(zeros(3), [1.0, 0, 1])
+
+        i1 = SCDI.intersect3d(point, r1)
+        i2 = SCDI.intersect3d(point, r2)
+        i3 = SCDI.intersect3d(point, r3)
+
+        @test length(i1) == t
+        @test isnothing(i2)
+        @test isnothing(i3)
+    end
+
+    @testset "Testing normal3d" begin
+        point = TestPointSDF(zeros(3))
+        offset = [5, 0, 0]
+        SCDI.translate3d!(point, offset)
+        p1 = [1, 0, 0]
+        p2 = [0, 1, 0]
+        p3 = [0, 0, 1]
+        @test SCDI.normal3d(point, p1 + offset) == p1
+        @test SCDI.normal3d(point, p2 + offset) == p2
+        @test SCDI.normal3d(point, p3 + offset) == p3
+    end
+end
+
+@testset "System" begin
+    include("Cube.jl")
+    
+    @testset "Testing implementation" begin
+        struct SystemTestBeam{T} <: SCDI.AbstractBeam{T} end
+        struct SystemTestObject <: SCDI.AbstractObject
+            id::UUID
+        end
+        o1 = SystemTestObject(uuid4())
+        o2 = SystemTestObject(uuid4())
+        system = SCDI.System(o1)
+        beam = SystemTestBeam{Real}()
+        # Test missing implementation warnings
+        @test_logs (:warn, "Tracing for $(typeof(beam)) not implemented") SCDI.trace_system!(system, beam)
+        @test_logs (:warn, "Retracing for $(typeof(beam)) not implemented") SCDI.retrace_system!(system, beam)
+        # Test getters
+        @test SCDI.object(system, SCDI.id(o1)) == o1
+        @test_throws "Object ID not in system" SCDI.object(system, SCDI.id(o2))
+    end
+    
+    # Setup circular multipass cell with flat mirrors 
+    n_mirrors = 101
+    radius = 1
+    L = 6 * radius / n_mirrors
+    Δθ = 360 / (n_mirrors + 1)
+    mirrors = [PlanoMirror(L) for _ in 1:n_mirrors]
+    θ = 1 * Δθ
+    for m in mirrors
+        point = radius * [cos(deg2rad(θ)), sin(deg2rad(θ)), 0]
+        SCDI.zrotate3d!(m, deg2rad(θ))
+        SCDI.translate3d!(m, point)
+        θ += Δθ
+    end
+    SCDI.zrotate3d!.(mirrors, deg2rad(90))
+    
+    # Initial ray orientation and position
+    dir = [-1, 0, 0]
+    Rot = SCDI.rotate3d([0, 0, 1], deg2rad(Δθ * 1))
+    dir = Vector(Rot * dir)
+    origin = [radius, 0, 0] + -1 * dir
+    
+    @testset "Testing tracing subroutines" begin
+        system = SCDI.System(mirrors)
+        ray = SCDI.Ray(origin, dir)
+        first_id = SCDI.id(mirrors[(n_mirrors+1)÷2+2])
+        false_id = SCDI.id(mirrors[(n_mirrors+1)÷2+2+1])
+        # trace_all
+        @test SCDI.id(SCDI.trace_all(system, ray)) == first_id
+        # trace_one
+        @test SCDI.id(SCDI.trace_one(system, ray, first_id)) == first_id
+        @test SCDI.id(SCDI.trace_one(system, ray, false_id)) == first_id
+        # tracing step
+        SCDI.tracing_step!(system, ray, nothing)
+        @test SCDI.id(SCDI.intersection(ray)) == first_id
+    end
+    
+    @testset "Testing system tracing" begin
+        system = SCDI.System(mirrors)
+        first_ray = SCDI.Ray(origin, dir)
+        beam = SCDI.Beam(first_ray)
+        # Test trace_system!
+        nmax = 10
+        SCDI.trace_system!(system, beam, r_max = nmax)
+        @test length(SCDI.rays(beam)) == nmax
+        SCDI.trace_system!(system, beam, r_max = 1000000)
+        @test length(SCDI.rays(beam)) == n_mirrors + 1
+        first_ray_dir = SCDI.direction(first_ray)
+        last_ray_dir = SCDI.direction(last(SCDI.rays(beam)))
+        @test 180 - rad2deg(SCDI.angle3d(first_ray_dir, last_ray_dir)) ≈ 2 * Δθ
+        @test SCDI.id(SCDI.intersection(first_ray)) == SCDI.id(mirrors[(n_mirrors+1)÷2+2])
+    end
+    
+    @testset "Testing system retracing" begin
+        system = SCDI.System(mirrors)
+        first_ray = SCDI.Ray(origin, dir)
+        beam = SCDI.Beam(first_ray)
+        t1 = @timed SCDI.trace_system!(system, beam, r_max = 1000000)
+        t2 = @timed SCDI.retrace_system!(system, beam) # for precompilation
+        t2 = @timed SCDI.retrace_system!(system, beam)
+        if t1.time < t2.time
+            @warn "Retracing took longer than tracing, something might be bugged...\n   Tracing: $(t1.time) s\n   Retracing: $(t2.time) s"
+        end
+    end
+end
+
+@testset "Spherical Lenses" begin
     @testset "Testing type definitions" begin
         @test isdefined(SCDI, :AbstractSDF)
         @test isdefined(SCDI, :SphereSDF)
@@ -411,7 +661,7 @@ end
         nl = 1.5
         tl = SCDI.ThinLensSDF(R1, R2, 0.1)
         p = SCDI.Lens(uuid4(), tl, x -> 1.5)
-        system = SCDI.System(uuid4(), [p])
+        system = SCDI.System(p)
 
         # compare numerical and analytical focal length
         f_analytical = SCDI.lensmakers_eq(R1, -R2, nl)
@@ -468,12 +718,12 @@ end
 
     @testset "Testing spherical lens SDFs" begin
         # Based on https://www.pencilofrays.com/double-gauss-sonnar-comparison/
-        l1 = SCDI.SphericalLens(48.88e-3, -182.96e-3, 8.89e-3, 52.3e-3, λ->1.62286)
-        l2 = SCDI.SphericalLens(36.92e-3, Inf, 15.11e-3, 45.11e-3, λ->1.58565)
-        l3 = SCDI.SphericalLens(-23.06e-3, Inf, 2.31e-3, 45.11e-3, λ->1.67764)
-        l4 = SCDI.SphericalLens(-23.91e-3, Inf, 1.92e-3, 40.01e-3, λ->1.57046)
-        l5 = SCDI.SphericalLens(36.92e-3, Inf, 7.77e-3, 40.01e-3, λ->1.64128)
-        l6 = SCDI.SphericalLens(48.88e-3, 1063.24e-3, 6.73e-3, 45.11e-3, λ->1.62286)
+        l1 = SCDI.SphericalLens(48.88e-3, -182.96e-3, 8.89e-3, 52.3e-3, λ -> 1.62286)
+        l2 = SCDI.SphericalLens(36.92e-3, Inf, 15.11e-3, 45.11e-3, λ -> 1.58565)
+        l3 = SCDI.SphericalLens(-23.06e-3, Inf, 2.31e-3, 45.11e-3, λ -> 1.67764)
+        l4 = SCDI.SphericalLens(-23.91e-3, Inf, 1.92e-3, 40.01e-3, λ -> 1.57046)
+        l5 = SCDI.SphericalLens(36.92e-3, Inf, 7.77e-3, 40.01e-3, λ -> 1.64128)
+        l6 = SCDI.SphericalLens(48.88e-3, 1063.24e-3, 6.73e-3, 45.11e-3, λ -> 1.62286)
         SCDI.zrotate3d!(SCDI.shape(l1), π)
         SCDI.zrotate3d!(SCDI.shape(l2), π)
         SCDI.zrotate3d!(SCDI.shape(l4), π)
@@ -482,9 +732,9 @@ end
         SCDI.translate3d!(SCDI.shape(l4), [0, 35.568e-3, 0])
         SCDI.translate3d!(SCDI.shape(l5), [0, 42.876e-3, 0])
         SCDI.translate3d!(SCDI.shape(l6), [0, 50.813e-3, 0])
-        system = SCDI.System(uuid4(), [l1, l2, l3, l4, l5, l6])
+        system = SCDI.System([l1, l2, l3, l4, l5, l6])
         # Test against back focal length as per source above
-        λ = 486 # nm
+        λ = 486.0 # nm
         f0 = [0, 0.11602585097812582, 0] # corresponds to f=59.21 mm
         zs = -0.02:1e-3:0.02
         for (i, z) in enumerate(zs)
@@ -533,8 +783,8 @@ end
         M2_2 = 2e-3         # m
         E0_1 = SCDI.electric_field(2 * P0 / (π * w0_1^2))
         E0_2 = SCDI.electric_field(2 * P0 / (π * w0_2^2))
-        gauss_1 = SCDI.GaussianBeamlet(SCDI.Ray([0, 0, 0], [0, 1, 0]), λ_1, w0_1, M2=M2_1, P0=P0)
-        gauss_2 = SCDI.GaussianBeamlet(SCDI.Ray([0, 0, 0], [0, 1, 0]), λ_2, w0_2, M2=M2_2, P0=P0)
+        gauss_1 = SCDI.GaussianBeamlet(SCDI.Ray([0., 0, 0], [0., 1, 0]), λ_1, w0_1, M2=M2_1, P0=P0)
+        gauss_2 = SCDI.GaussianBeamlet(SCDI.Ray([0., 0, 0], [0., 1, 0]), λ_2, w0_2, M2=M2_2, P0=P0)
         # Calculate analytical values
         zr_1 = SCDI.rayleigh_range(λ_1, w0_1, M2_1)
         zr_2 = SCDI.rayleigh_range(λ_2, w0_2, M2_2)
@@ -607,10 +857,10 @@ end
         # Numerical result
         tl = SCDI.ThinLensSDF(R1, R2, 0.025)
         lens = SCDI.Lens(uuid4(), tl, x -> nl)
-        system = SCDI.System(uuid4(), [lens])
+        system = SCDI.System(lens)
         SCDI.translate3d!(SCDI.shape(lens), [0, lens_y_location, 0])
         # Create and solve beam, calculate beam parameters
-        gauss = SCDI.GaussianBeamlet(SCDI.Ray([0, 0, 0], [0, 1, 0]), λ, w0, support=[1, 0, 0], M2=1)
+        gauss = SCDI.GaussianBeamlet(SCDI.Ray([0., 0, 0], [0., 1, 0]), λ, w0, support=[1, 0, 0], M2=1)
         SCDI.solve_system!(system, gauss)
         w_numerical, R_numerical, ψ_numerical, w0_numerical = SCDI.gauss_parameters(gauss, ys)
         # Compare beam radius to within 1 μm
@@ -640,90 +890,178 @@ end
 end
 
 @testset "Interference" begin
-    # Gauss beam parameters (selected for ring fringes)
-    w0 = 0.01e-3
-    λ = 1000e-9
-    M2 = 1
-    P0 = 1e-3
-    I0 = 2 * P0 / (π * w0^2)
-    E0 = SCDI.electric_field(I0)
-    zR = SCDI.rayleigh_range(λ, w0, M2)
-    # Detector parameters
-    z = 0.1     # distance to detector
-    l = 1e-2    # detector size
-    n = 1000    # detector grid resolution
-    # Lens parameters
-    R1 = R2 = d = 0.01
-    nl = 1.5
-    f = SCDI.lensmakers_eq(R1, -R2, nl)
-    # Raytracing system (for all tests)
-    pd = SCDI.Photodetector(l, n)
-    ln = SCDI.ThinLens(R1, R2, d, nl)
-    SCDI.translate3d!(SCDI.shape(pd), [0, z, 0])
-    SCDI.translate3d!(SCDI.shape(ln), [0, z - f, 0])
-    system = SCDI.System(uuid4(), [pd])
-
-    @testset "Testing fringe pattern" begin
-        Δz = 5e-3   # arm length difference
-        # Analytic solution
-        xs = ys = LinRange(-l / 2, l / 2, n)
-        screen = zeros(ComplexF64, length(xs), length(ys))
-        for (j, y) in enumerate(ys)
-            for (i, x) in enumerate(xs)
-                r = sqrt(x^2 + y^2)
-                screen[i, j] += SCDI.electric_field(r, z, E0, w0, λ, M2)
-                screen[i, j] += SCDI.electric_field(r, z + Δz, E0, w0, λ, M2)
+    @testset "Pre-Beamsplitter tests with seperate beams" begin
+        # Gauss beam parameters (selected for ring fringes)
+        w0 = 0.01e-3
+        λ = 1000e-9
+        M2 = 1
+        P0 = 1e-3
+        I0 = 2 * P0 / (π * w0^2)
+        E0 = SCDI.electric_field(I0)
+        zR = SCDI.rayleigh_range(λ, w0, M2)
+        # Detector parameters
+        z = 0.1     # distance to detector
+        l = 1e-2    # detector size
+        n = 1000    # detector grid resolution
+        # Lens parameters
+        R1 = R2 = d = 0.01
+        nl = 1.5
+        f = SCDI.lensmakers_eq(R1, -R2, nl)
+        # Raytracing system (for all tests)
+        pd = SCDI.Photodetector(l, n)
+        ln = SCDI.ThinLens(R1, R2, d, nl)
+        SCDI.translate3d!(SCDI.shape(pd), [0, z, 0])
+        SCDI.translate3d!(SCDI.shape(ln), [0, z - f, 0])
+        system = SCDI.System(pd)
+        
+        @testset "Testing fringe pattern" begin
+            Δz = 5e-3   # arm length difference
+            # Analytic solution
+            xs = ys = LinRange(-l / 2, l / 2, n)
+            screen = zeros(ComplexF64, length(xs), length(ys))
+            for (j, y) in enumerate(ys)
+                for (i, x) in enumerate(xs)
+                    r = sqrt(x^2 + y^2)
+                    screen[i, j] += SCDI.electric_field(r, z, E0, w0, λ, M2)
+                    screen[i, j] += SCDI.electric_field(r, z + Δz, E0, w0, λ, M2)
+                end
             end
-        end
-        # Numerical solution
-        SCDI.reset_photodetector!(pd)
-        g_1 = SCDI.GaussianBeamlet(SCDI.Ray([0, 0, 0], [0, 1, 0]), λ, w0, M2=M2, P0=P0)
-        g_2 = SCDI.GaussianBeamlet(SCDI.Ray([0, -Δz, 0], [0, 1, 0]), λ, w0, M2=M2, P0=P0)
-        SCDI.solve_system!(system, g_1)
-        SCDI.solve_system!(system, g_2)
-        # Perform sanity tests before superposition - test peak position and value, test integrated power
-        SCDI.photodetection!(pd, g_1)
-        In_max, location = findmax(SCDI.intensity(pd))
-        Pt = SCDI.optical_power(pd)
-        Ia_max = I0 * (w0 / SCDI.beam_waist(z, w0, zR))^2
-        @test isapprox(location[1], pd.x.len / 2, atol=1)
-        @test isapprox(location[2], pd.y.len / 2, atol=1)
-        @test isapprox(In_max, Ia_max, atol=0.05)
-        @test isapprox(Pt, P0, atol=1e-5)
-
-        # Interfere with second beam and compare intensity distribution, integrated power
-        SCDI.photodetection!(pd, g_2)
-        I_analytical = SCDI.intensity.(screen)
-        I_numerical = SCDI.intensity.(pd.field)
-        Pt = SCDI.optical_power(pd)
-        @test all(isapprox.(I_analytical, I_numerical, atol=2e-1))
-        @test isapprox(Pt, 2 * P0, atol=3e-5)
-    end
-
-    @testset "Testing λ phase shift" begin
-        # Reset pd resolution
-        n = 100
-        P0 = 10e-3
-        SCDI.photodetector_resolution!(pd, n)
-        # Add lens to system
-        system = SCDI.System(uuid4(), [pd, ln])
-        # Numerical solution
-        Δz = LinRange(0, λ, 50)
-        Pt_numerical = zeros(length(Δz))
-        for (i, z) in enumerate(Δz)
+            # Numerical solution
             SCDI.reset_photodetector!(pd)
-            g_1 = SCDI.GaussianBeamlet(SCDI.Ray([0, 0, 0], [0, 1, 0]), λ, w0, M2=M2, P0=P0)
-            g_2 = SCDI.GaussianBeamlet(SCDI.Ray([0, z, 0], [0, 1, 0]), λ, w0, M2=M2, P0=P0)
+            g_1 = SCDI.GaussianBeamlet(SCDI.Ray([0., 0, 0], [0., 1, 0]), λ, w0, M2=M2, P0=P0)
+            g_2 = SCDI.GaussianBeamlet(SCDI.Ray([0., -Δz, 0], [0., 1, 0]), λ, w0, M2=M2, P0=P0)
             SCDI.solve_system!(system, g_1)
             SCDI.solve_system!(system, g_2)
-            SCDI.photodetection!(pd, g_1)
-            SCDI.photodetection!(pd, g_2)
-            Pt_numerical[i] = SCDI.optical_power(pd)
+            
+            # Compare solutions
+            I_analytical = SCDI.intensity.(screen)
+            I_numerical = SCDI.intensity.(pd.field)
+            Pt = SCDI.optical_power(pd)
+            @test all(isapprox.(I_analytical, I_numerical, atol=2e-1))
+            @test isapprox(Pt, 2 * P0, atol=3e-5)
         end
-        # Analytical solution (cosine over Δz), ref. power is 4*P0 since beam splitter is missing 
-        Pt_analytical = 4 * P0 * [(cos(2π * z / (maximum(Δz))) + 1) / 2 for z in Δz]
+        
+        @testset "Testing λ phase shift" begin
+            # Reset pd resolution
+            n = 100
+            P0 = 10e-3
+            SCDI.photodetector_resolution!(pd, n)
+            # Add lens to system
+            system = SCDI.System([pd, ln])
+            # Numerical solution
+            Δz = LinRange(0, λ, 50)
+            Pt_numerical = zeros(length(Δz))
+            for (i, z) in enumerate(Δz)
+                SCDI.reset_photodetector!(pd)
+                g_1 = SCDI.GaussianBeamlet(SCDI.Ray([0., 0, 0], [0., 1, 0]), λ, w0, M2=M2, P0=P0)
+                g_2 = SCDI.GaussianBeamlet(SCDI.Ray([0., z, 0], [0., 1, 0]), λ, w0, M2=M2, P0=P0)
+                SCDI.solve_system!(system, g_1)
+                SCDI.solve_system!(system, g_2)
+                Pt_numerical[i] = SCDI.optical_power(pd)
+            end
+            # Analytical solution (cosine over Δz), ref. power is 4*P0 since beam splitter is missing
+            Pt_analytical = 4 * P0 * [(cos(2π * z / (maximum(Δz))) + 1) / 2 for z in Δz]
+            
+            # Compare detectors (this also tests correct behavior when focussing the beam)
+            @test all(isapprox.(Pt_numerical, Pt_analytical, atol=1e-4))
+        end
+    end
 
-        # Compare detectors (this also tests correct behavior when focussing the beam)
-        @test all(isapprox.(Pt_numerical, Pt_analytical, atol=1e-4))
+    @testset "Michelson Interferometer" begin
+        # setup Michelson Interferometer
+        l_0 = 0.1
+        pd_size = SCDI.inch / 5
+        pd_resolution = 100
+        m1 = PlanoMirror(SCDI.inch)
+        m2 = PlanoMirror(SCDI.inch)
+        bs = SCDI.ThinBeamSplitter(SCDI.inch, 0.5)
+        pd = SCDI.Photodetector(pd_size, pd_resolution)
+        SCDI.translate3d!(m1, [l_0, 0, 0])
+        SCDI.translate3d!(m2, [0, l_0, 0])
+        SCDI.translate3d!(pd, [-l_0, 0, 0])
+        SCDI.zrotate3d!(bs, deg2rad(45))
+        SCDI.zrotate3d!(m1, deg2rad(90))
+        # SCDI.zrotate3d!(m2, deg2rad(1))
+        SCDI.zrotate3d!(pd, deg2rad(90))
+        
+        system = SCDI.System([m1, m2, bs, pd])
+        
+        # Test correct values for reflectivity/transmission
+        @test isvalid(bs)
+        
+        @testset "Equal armlength MI - integrated power" begin
+            # setup 635 nm laser with 0.1 mm waist for fast divergence
+            λ = 635e-9
+            P_0 = 5e-3
+            ray = SCDI.Ray([0, -l_0, 0], [0, 1.0, 0])
+            beam = SCDI.GaussianBeamlet(ray, λ, 1e-4, P0=P_0)
+            
+            # Shift mirror #2 by -λ to +λ
+            lambdas = LinRange(-λ, λ, 200)
+            
+            path_length_numerical = zeros(length(lambdas))
+            optical_pwr_numerical = zeros(length(lambdas))
+            
+            for (i, lambda) in enumerate(lambdas)
+                SCDI.translate_to3d!(m2, [0, l_0, 0] + [0, lambda, 0])
+                SCDI.reset_photodetector!(pd)
+                SCDI.solve_system!(system, beam)
+                
+                # Moving mirror path length
+                path_length_numerical[i] = length(beam.children[1].children[2])
+                optical_pwr_numerical[i] = SCDI.optical_power(pd)
+            end
+            
+            path_length_analytical = @. 2 * lambdas +  4l_0
+            optical_pwr_analytical = @. P_0 * (1 / 2 * cos(2π * (2lambdas / λ)) + 1/2)
+            
+            # Compare correct PD signal and λ shift in moving arm
+            @test all(isapprox.(optical_pwr_analytical, optical_pwr_numerical, atol=5e-6))
+            @test all(isapprox.(path_length_analytical, path_length_numerical))
+        end
+        
+        @testset "Unequal armlength MI - eletrical field" begin
+            λ = 635e-9
+            w0 = 1e-4
+            P0 = 1e-3
+            M2 = 1
+            I0 = 2 * P0 / (π * w0^2)
+            E0 = SCDI.electric_field(I0) * 1/sqrt(2)^2
+            zR = SCDI.rayleigh_range(λ, w0, M2)
+            
+            ray = SCDI.Ray([0, -l_0, 0], [0, 1.0, 0])
+            beam = SCDI.GaussianBeamlet(ray, λ, w0, P0=P0, M2=M2)
+            
+            # arm length diff
+            Δl = 1*l_0
+            SCDI.translate_to3d!(m2, [0, l_0 + Δl, 0])
+            
+            # numerical solution
+            SCDI.reset_photodetector!(pd)
+            SCDI.solve_system!(system, beam)
+            
+            # analytical solution
+            short_arm = 4l_0
+            long_arm = short_arm + 2Δl
+            xs = ys = LinRange(-pd_size / 2, pd_size / 2, pd_resolution)
+            screen = zeros(ComplexF64, length(xs), length(ys))
+            for (j, y) in enumerate(ys)
+                for (i, x) in enumerate(xs)
+                    r = sqrt(x^2 + y^2)
+                    screen[i, j] += SCDI.electric_field(r, short_arm, E0, w0, λ, M2)
+                    screen[i, j] += SCDI.electric_field(r, long_arm, E0, w0, λ, M2)
+                end
+            end
+            
+            Re_analytical = real.(screen)
+            Im_analytical = imag.(screen)
+            
+            Re_numerical = real(pd.field)
+            Im_numerical = imag(pd.field)
+            
+            # Compare solutions, units V/m
+            @test all(isapprox.(Re_analytical, Re_numerical, atol=5e-2))
+            @test all(isapprox.(Im_analytical, Im_numerical, atol=5e-2))
+        end    
     end
 end

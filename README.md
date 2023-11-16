@@ -31,6 +31,7 @@ Documentation can be found here: https://optical-air-data.pages.gitlab.dlr.de/di
     - [ ] phase shift due to ref. index change
     - [ ] Multi-body container type, i.e. telescope, for easy kinematics
 - Mechanics
+    - [ ] element group handling
     - [ ] vibration of optical elements
 - Plotting
     - [ ] render_object! dispatch for AbstractSphericalLensSDF 
@@ -51,9 +52,10 @@ Documentation can be found here: https://optical-air-data.pages.gitlab.dlr.de/di
 - [ ] @code_warntype for interact(Lens, Beam)
 - [ ] change names for functions that return matrices
 - [ ] weird results for high level-of-detail meshes
-- [ ] SDFs and meshes rotate in opposite directions
+- [x] SDFs and meshes rotate in opposite directions
 - [x] GaussianBeamlet efield calculation fails at beam waist
 - [ ] point_on_beam calculation can be incorrect at optical surfaces
+- [ ] intersection calculation can be incorrect if two objects "touch"
 
 ## Comments
 
