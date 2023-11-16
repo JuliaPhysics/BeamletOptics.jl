@@ -4,6 +4,7 @@ authors = ["uitt_hu <hugo.uittenbosch@dlr.de>"]
 version = "0.3.3"
 
 [deps]
+AbstractTrees = "1520ce14-60c1-5f80-bbc7-55ef81b5835c"
 FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MakieCore = "20f20a25-4f0e-4fdf-b5d1-57303727442b"
