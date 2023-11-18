@@ -9,7 +9,7 @@ vertices(mesh::AbstractMesh) = mesh.vertices
 vertices!(mesh::AbstractMesh, vertices) = (mesh.vertices .= vertices)
 
 faces(mesh::AbstractMesh) = mesh.faces
-faces!(mesh::AbstractMesh, faces) = nothing
+faces!(::AbstractMesh, ::Any) = nothing
 
 scale(mesh::AbstractMesh) = mesh.scale
 scale!(mesh::AbstractMesh, scale) = (mesh.scale = scale)
@@ -33,8 +33,8 @@ mutable struct Mesh{T} <: AbstractMesh{T}
     id::UUID
     vertices::Matrix{T}
     faces::Matrix{Int}
-    dir::Matrix{T}
-    pos::Vector{T}
+    dir::Mat{3, 3, T}
+    pos::Point3{T}
     scale::T
 end
 
@@ -52,16 +52,21 @@ function Mesh(mesh)
     numEl = length(mesh)
     vertices = Matrix{T}(undef, numEl * 3, 3)
     faces = Matrix{Int}(undef, numEl, 3)
-    for i = 1:numEl
-        for j = 1:3
-            vertices[3(i-1)+j, :] = mesh[i][j]
+    for i in 1:numEl
+        for j in 1:3
+            vertices[3(i - 1) + j, :] = mesh[i][j]
             faces[i, j] = 3(i - 1) + j
         end
     end
     # Initialize mesh at origin with orientation [1,0,0] scaled to mm
     # Origin and direction are converted to type T
     scale::T = 1e-3
-    return Mesh{T}(uuid4(), vertices * scale, faces, Matrix{T}(I, 3, 3), T.([0, 0, 0]), scale)
+    return Mesh{T}(uuid4(),
+        vertices * scale,
+        faces,
+        Matrix{T}(I, 3, 3),
+        Point3{T}(0),
+        scale)
 end
 
 """
@@ -90,9 +95,15 @@ function rotate3d!(shape::AbstractMesh, axis, θ)
     return nothing
 end
 
-xrotate3d!(shape::AbstractMesh{T}, θ) where T = rotate3d!(shape, @SVector(T[one(T), zero(T), zero(T)]), θ) 
-yrotate3d!(shape::AbstractMesh{T}, θ) where T = rotate3d!(shape, @SVector(T[zero(T), one(T), zero(T)]), θ) 
-zrotate3d!(shape::AbstractMesh{T}, θ) where T = rotate3d!(shape, @SVector(T[zero(T), zero(T), one(T)]), θ)
+function xrotate3d!(shape::AbstractMesh{T}, θ) where {T}
+    rotate3d!(shape, @SVector(T[one(T), zero(T), zero(T)]), θ)
+end
+function yrotate3d!(shape::AbstractMesh{T}, θ) where {T}
+    rotate3d!(shape, @SVector(T[zero(T), one(T), zero(T)]), θ)
+end
+function zrotate3d!(shape::AbstractMesh{T}, θ) where {T}
+    rotate3d!(shape, @SVector(T[zero(T), zero(T), one(T)]), θ)
+end
 
 """
     scale3d!(object::AbstractMesh, scale)
@@ -111,7 +122,7 @@ end
 
 Resets all previous translations and returns the mesh back to the global origin.
 """
-function reset_translation3d!(object::AbstractMesh{T}) where T
+function reset_translation3d!(object::AbstractMesh{T}) where {T}
     vertices!(object, vertices(object) .- position(object)')
     position!(object, zeros(T, 3))
     return nothing
@@ -122,7 +133,7 @@ end
 
 Resets all previous rotations around the current offset.
 """
-function reset_rotation3d!(object::AbstractMesh{T}) where T
+function reset_rotation3d!(object::AbstractMesh{T}) where {T}
     R = inv(orientation(object))
     vertices!(object, (vertices(object) .- position(object)') * R .+ position(object)')
     orientation!(object, Matrix{T}(I, 3, 3))
@@ -135,7 +146,7 @@ end
 Resets the mesh `dir`ectional matrix and `pos`ition vector to their initial values.\\
 **Warning: this operation is non-reversible!**
 """
-function set_new_origin3d!(object::AbstractMesh{T}) where T
+function set_new_origin3d!(object::AbstractMesh{T}) where {T}
     orientation!(object, Matrix{T}(I, 3, 3))
     position!(object, zeros(T, 3))
     return nothing
@@ -149,8 +160,8 @@ the right-hand rule. The vertices must be listed row-wise within the face matrix
 """
 function normal3d(object::AbstractMesh, fID::Int)
     face = vertices(object)[faces(object)[fID, :], :]
-    n = fast_cross3d((face[2, :] - face[1, :]), (face[3, :] - face[1, :]))
-    return normalize3d(n)
+    n = cross((face[2, :] - face[1, :]), (face[3, :] - face[1, :]))
+    return normalize(n)
 end
 
 """
@@ -162,35 +173,35 @@ If no intersection occurs, `Inf` is returned. `kϵ` is the abort threshold for b
 `lϵ` is the threshold for negative values of `t`.
 This algorithm is fast due to multiple breakout conditions.
 """
-function MoellerTrumboreAlgorithm(face, ray::AbstractRay{T}, E1, E2, Pv, Tv, Qv; kϵ=1e-9, lϵ=1e-9) where T
-    V1 = @view face[1, :]
-    V2 = @view face[2, :]
-    V3 = @view face[3, :]
+function MoellerTrumboreAlgorithm(face, ray::AbstractRay{T}; kϵ = 1e-9, lϵ = 1e-9) where {T}
+    V1 = Point3(face[1, 1], face[1, 2], face[1, 3])
+    V2 = Point3(face[2, 1], face[2, 2], face[2, 3])
+    V3 = Point3(face[3, 1], face[3, 2], face[3, 3])
 
-    fast_sub3d!(E1, V2, V1)
-    fast_sub3d!(E2, V3, V1)
-    fast_cross3d!(Pv, direction(ray), E2)
-    Det = fast_dot3d(E1, Pv)
+    E1 = V2 - V1
+    E2 = V3 - V1
+    Pv = cross(direction(ray), E2)
+    Det = dot(E1, Pv)
     # Check if ray is backfacing or missing face
     if abs(Det) < kϵ
         # Adjust type of Inf
         return T(Inf) # typemax(T) ?
     end
     # Compute normalized u and reject if less than 0 or greater than 1
-    fast_sub3d!(Tv, position(ray), V1)
+    Tv = position(ray) - V1
     invDet = 1 / Det
-    u = fast_dot3d(Tv, Pv) * invDet
+    u = dot(Tv, Pv) * invDet
     if (u < 0) || (u > 1)
         return T(Inf)
     end
     # Compute normalized v and reject if less than 0 or greater than 1
-    fast_cross3d!(Qv, Tv, E1)
-    v = fast_dot3d(direction(ray), Qv) * invDet
+    Qv = cross(Tv, E1)
+    v = dot(direction(ray), Qv) * invDet
     if (v < 0) || (u + v > 1)
         return T(Inf)
     end
     # Compute t (type def. for t to avoid Any)
-    t::T = fast_dot3d(E2, Qv) * invDet
+    t::T = dot(E2, Qv) * invDet
     # Return intersection only if "in front of" ray origin
     if t < lϵ
         return T(Inf)
@@ -203,20 +214,16 @@ end
 
 This function is a generic implementation to check if a ray intersects the object mesh.\\
 """
-function intersect3d(object::AbstractMesh{M}, ray::AbstractRay{R}) where {M<:Real, R<:Real}
+function intersect3d(object::AbstractMesh{M},
+        ray::AbstractRay{R}) where {M <: Real, R <: Real}
     numEl = size(faces(object), 1)
     # allocate all intermediate vectors once (note that this is NOT THREAD-SAFE)
     T = promote_type(M, R)
     fID::Int = 0
     t0::T = Inf
-    E1 = Vector{T}(undef, 3)
-    E2 = Vector{T}(undef, 3)
-    Pv = Vector{T}(undef, 3)
-    Tv = Vector{T}(undef, 3)
-    Qv = Vector{T}(undef, 3)
-    for i = 1:numEl
+    for i in 1:numEl
         face = @views vertices(object)[faces(object)[i, :], :]
-        t = MoellerTrumboreAlgorithm(face, ray, E1, E2, Pv, Tv, Qv)
+        t = MoellerTrumboreAlgorithm(face, ray)
         # Return closest intersection
         if t < t0
             t0 = t
@@ -228,6 +235,6 @@ function intersect3d(object::AbstractMesh{M}, ray::AbstractRay{R}) where {M<:Rea
     else
         face = @views vertices(object)[faces(object)[fID, :], :]
         normal = normal3d(object, fID)
-        return Intersection{T}(t0, normalize3d(T.(normal)), nothing)
+        return Intersection{T}(t0, normalize(T.(normal)), nothing)
     end
 end

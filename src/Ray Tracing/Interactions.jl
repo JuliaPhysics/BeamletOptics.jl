@@ -6,7 +6,10 @@ A generic type to represent `AbstractObject`s which reflect incoming rays. The m
 """
 abstract type AbstractReflectiveOptic <: AbstractObject end
 
-function interact3d(::AbstractSystem, ::AbstractReflectiveOptic, ::Beam{R}, ray::Ray{R}) where {R<:Real}
+function interact3d(::AbstractSystem,
+        ::AbstractReflectiveOptic,
+        ::Beam{R},
+        ray::Ray{R}) where {R <: Real}
     normal = intersection(ray).n
     npos = position(ray) + length(ray) * direction(ray)
     ndir = reflection3d(direction(ray), normal)
@@ -18,7 +21,7 @@ end
 
 Concrete implementation of a perfect mirror with arbitrary shape.
 """
-struct Mirror{S<:AbstractShape} <: AbstractReflectiveOptic
+struct Mirror{S <: AbstractShape} <: AbstractReflectiveOptic
     id::UUID
     shape::S
 end
@@ -38,7 +41,10 @@ abstract type AbstractRefractiveOptic <: AbstractObject end
 
 refractive_index(object::AbstractRefractiveOptic) = object.n
 
-function interact3d(::AbstractSystem, object::AbstractRefractiveOptic, ::Beam{R}, ray::Ray{R}) where {R}
+function interact3d(::AbstractSystem,
+        object::AbstractRefractiveOptic,
+        ::Beam{R},
+        ray::Ray{R}) where {R}
     # Check dir. of ray and surface normal
     normal = intersection(ray).n
     λ = wavelength(ray)
@@ -56,10 +62,11 @@ function interact3d(::AbstractSystem, object::AbstractRefractiveOptic, ::Beam{R}
     ndir = refraction3d(direction(ray), normal, n1, n2)
     npos = position(ray) + length(ray) * direction(ray)
     # Hint is the current object ID
-    return BeamInteraction{R}(id(object), Ray{R}(uuid4(), npos, ndir, nothing, Parameters(λ, n2)))
+    return BeamInteraction{R}(id(object),
+        Ray{R}(uuid4(), npos, ndir, nothing, Parameters(λ, n2)))
 end
 
-struct Lens{S<:AbstractShape,T<:Function} <: AbstractRefractiveOptic
+struct Lens{S <: AbstractShape, T <: Function} <: AbstractRefractiveOptic
     id::UUID
     shape::S
     n::T
@@ -88,16 +95,18 @@ Creates a spherical lens based on:
 
 If `l` is set to zero, an ideal [`ThinLens`](@ref) will be created. However, note that the acutal lens thickness will be different from zero.
 """
-function SphericalLens(r1::Real, r2::Real, l::Real, d::Real=1inch, n::Function=λ -> 1.5)
-    if !isfinite(r1) || isnan(r1)
-        error("r1 can not be Inf")
-    end
+function SphericalLens(r1::Real, r2::Real, l::Real, d::Real = 1inch, n::Function = λ -> 1.5)
     # Determine lens SDF
-    shape::Nullable{AbstractSphericalLensSDF} = nothing
+    shape::Nullable{AbstractSDF} = nothing
     # # Test for thin lens
     if iszero(l)
         shape = ThinLensSDF(r1, r2, d)
         # goto to avoid overwrite
+        @goto lens_creator
+    end
+    # Test for cylinder lens
+    if isinf(r1) && isinf(r2)
+        shape = CylinderSDF(d / 2, l / 2)
         @goto lens_creator
     end
     # Test for plano lens
@@ -133,7 +142,7 @@ function ThinLens(R1::Real, R2::Real, d::Real, n::Function)
     return Lens(uuid4(), shape, n)
 end
 
-struct Prism{S<:AbstractShape,T<:Function} <: AbstractRefractiveOptic
+struct Prism{S <: AbstractShape, T <: Function} <: AbstractRefractiveOptic
     id::UUID
     shape::S
     n::T
@@ -144,38 +153,42 @@ Implements photodetector, efield calculation during solve_system!
 =#
 abstract type AbstractDetector <: AbstractObject end
 
-mutable struct Photodetector{S<:AbstractShape,T} <: AbstractDetector
+mutable struct Photodetector{S <: AbstractShape, T} <: AbstractDetector
     const id::UUID
     const shape::S
-    x::LinRange{T,Int64}
-    y::LinRange{T,Int64}
+    x::LinRange{T, Int64}
+    y::LinRange{T, Int64}
     field::Matrix{Complex{T}}
 end
 
 function Photodetector(scale::T, n::Int) where {T}
     sz = 0.5
-    vertices = [
-        sz 0 sz
+    vertices = [sz 0 sz
         sz 0 -sz
         -sz 0 -sz
-        -sz 0 sz
-    ]
-    faces = [
-        1 2 4
-        2 3 4
-    ]
+        -sz 0 sz]
+    faces = [1 2 4
+        2 3 4]
     x = y = LinRange(-sz, sz, n) * scale
     field = zeros(Complex{T}, n, n)
-    shape = Mesh{T}(uuid4(), vertices .* scale, faces, Matrix{T}(I, 3, 3), T.([0, 0, 0]), scale)
-    return Photodetector{typeof(shape),T}(uuid4(), shape, x, y, field)
+    shape = Mesh{T}(uuid4(),
+        vertices .* scale,
+        faces,
+        Matrix{T}(I, 3, 3),
+        T.([0, 0, 0]),
+        scale)
+    return Photodetector{typeof(shape), T}(uuid4(), shape, x, y, field)
 end
 
-function interact3d(::AbstractSystem, ::Photodetector, ::B, ::Ray) where {B<:AbstractBeam}
+function interact3d(::AbstractSystem, ::Photodetector, ::B, ::Ray) where {B <: AbstractBeam}
     @warn "Photodetection for $B not implemented"
     return nothing
 end
 
-function interact3d(::AbstractSystem, pd::Photodetector, gauss::GaussianBeamlet, ray_id::Int)
+function interact3d(::AbstractSystem,
+        pd::Photodetector,
+        gauss::GaussianBeamlet,
+        ray_id::Int)
     # Add efield contribution to pd.field
     ray = gauss.chief.rays[ray_id]
     l = length(gauss)
@@ -183,29 +196,19 @@ function interact3d(::AbstractSystem, pd::Photodetector, gauss::GaussianBeamlet,
     P = ray.pos + ray.dir * ray.intersection.t
     shape_pos = position(shape(pd))
     Threads.@threads for (j, y) in collect(enumerate(pd.y))     # row column major order?
-        # thread-local storage
-        p = Vector{Float64}(undef, 3)
-        # reusable line point buffers
-        lp_a = Vector{Float64}(undef, 3)
-        lp_b = Vector{Float64}(undef, 3)
-        # reusable isinfrontof buffer
-        los = Vector{Float64}(undef, 3)
-        # reusable gauss/point buffer
-        g_b = Vector{Float64}(undef, 3)
-        p_b = Vector{Float64}(undef, 3)
         @inbounds for (i, x) in enumerate(pd.x)
             # Transform point p on PD into world coords
-            p[1] = T[1, 1] * x + T[1, 3] * y + shape_pos[1]
-            p[2] = T[2, 1] * x + T[2, 3] * y + shape_pos[2]
-            p[3] = T[3, 1] * x + T[3, 3] * y + shape_pos[3]
-            r = line_point_distance3d(ray, p, lp_a, lp_b)
+            p = Point3(T[1, 1] * x + T[1, 3] * y + shape_pos[1],
+                T[2, 1] * x + T[2, 3] * y + shape_pos[2],
+                T[3, 1] * x + T[3, 3] * y + shape_pos[3])
+            r = line_point_distance3d(ray, p)
             c = sqrt(sum(x -> (x[1] - x[2])^2, zip(P, p)))
             z = sqrt(abs(c^2 - r^2)) # abs to protect against small neg. values
             # Correct sign of z
-            if isinfrontof(p, P, ray.dir, los)
+            if isinfrontof(p, P, ray.dir)
                 z = -z
             end
-            pd.field[i, j] += electric_field(gauss, r, l + z, g_b, p_b)
+            pd.field[i, j] += electric_field(gauss, r, l + z)
         end
     end
     return nothing
@@ -220,14 +223,14 @@ Calculates the total optical power on `pd` in [W] by integration over the local 
 """
 optical_power(pd::Photodetector) = trapz((pd.x, pd.y), intensity(pd))
 
-reset_photodetector!(pd::Photodetector{S,T}) where {S,T} = (pd.field .= zero(Complex{T}))
+reset_photodetector!(pd::Photodetector{S, T}) where {S, T} = (pd.field .= zero(Complex{T}))
 
 """
     photodetector_resolution!(pd::Photodetector, n::Int)
 
 Sets the resolution of `pd` to `n` × `n`. Note that this resets the current `pd.field`.
 """
-function photodetector_resolution!(pd::Photodetector{S,T}, n::Int) where {S,T}
+function photodetector_resolution!(pd::Photodetector{S, T}, n::Int) where {S, T}
     pd.x = LinRange(pd.x.start, pd.x.stop, n)
     pd.y = LinRange(pd.y.start, pd.y.stop, n)
     pd.field = zeros(Complex{T}, n, n)
@@ -239,7 +242,7 @@ Implements thin beam splitter, beam spawning
 =#
 abstract type AbstractBeamSplitter <: AbstractObject end
 
-struct BeamSplitter{S<:AbstractShape,T<:Real} <: AbstractBeamSplitter
+struct BeamSplitter{S <: AbstractShape, T <: Real} <: AbstractBeamSplitter
     id::UUID
     shape::S
     reflectance::T
@@ -252,7 +255,7 @@ transmittance(bs::BeamSplitter) = bs.transmittance
 """
     ThinBeamSplitter(scale::T, reflectance::Real=0.5) where {T}
 
-Creates a zero-thickness, lossless, non-polarizing quadratic rectangle beam splitter where 
+Creates a zero-thickness, lossless, non-polarizing quadratic rectangle beam splitter where
 
 - `scale`: is the edge length
 - `reflectance`: determines how much light is **reflected**, i.e. 0.7 for a 70:30 splitter
@@ -264,22 +267,23 @@ The transmittance is calculated via T = √(1 - R²).
 ## Phase shift
 Note that the reflection phase shift θᵣ ∈ [0, π] is not modeled here for simplicity, since in practice it will have no effect on the interference at the detector.
 """
-function ThinBeamSplitter(scale::T, reflectance::Real=0.5) where {T}
+function ThinBeamSplitter(scale::T, reflectance::Real = 0.5) where {T}
     if reflectance ≥ 1 || isapprox(reflectance, 0)
         error("Splitting ratio ∈ (0, 1)!")
     end
     sz = 0.5
-    vertices = [
-        sz 0 sz
+    vertices = [sz 0 sz
         sz 0 -sz
         -sz 0 -sz
-        -sz 0 sz
-    ]
-    faces = [
-        1 2 4
-        2 3 4
-    ]
-    shape = Mesh{T}(uuid4(), vertices .* scale, faces, Matrix{T}(I, 3, 3), T.([0, 0, 0]), scale)
+        -sz 0 sz]
+    faces = [1 2 4
+        2 3 4]
+    shape = Mesh{T}(uuid4(),
+        vertices .* scale,
+        faces,
+        Matrix{T}(I, 3, 3),
+        T.([0, 0, 0]),
+        scale)
     Reflected = sqrt(reflectance)
     Transmitted = sqrt(1 - Reflected^2)
     return BeamSplitter(uuid4(), shape, Reflected, Transmitted)
@@ -302,7 +306,8 @@ end
 
 function interact3d(::AbstractSystem, ::BeamSplitter, beam::Beam{R}, ray::Ray{R}) where {R}
     # Push transmitted and reflected beams to system
-    children!(beam, [_beamsplitter_transmitted_beam(ray), _beamsplitter_reflected_beam(ray)])
+    children!(beam,
+        [_beamsplitter_transmitted_beam(ray), _beamsplitter_reflected_beam(ray)])
     # Stop for beam spawning
     return nothing
 end

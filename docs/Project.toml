@@ -1,5 +1,5 @@
 [deps]
-SCDI = "c387492b-ffec-4e51-9a46-bd230226031c"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
-WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 JSServe = "824d6782-a2ef-11e9-3a09-e5662e0c26f9"
+SCDI = "c387492b-ffec-4e51-9a46-bd230226031c"
+WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
