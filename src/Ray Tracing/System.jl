@@ -27,13 +27,14 @@ function object(system::System, obj_id::UUID)
     # If no match
     return error("Object ID not in system")
 end
+object(::System, ::Nothing) = error("Object ID not set. This should not happen!")
 
-function trace_system!(::System, beam::B; r_max=0) where B<:AbstractBeam
+function trace_system!(::System, beam::B; r_max = 0) where {B <: AbstractBeam}
     @warn "Tracing for $B not implemented"
     return nothing
 end
 
-function retrace_system!(::System, beam::B) where B<:AbstractBeam
+function retrace_system!(::System, beam::B) where {B <: AbstractBeam}
     @warn "Retracing for $B not implemented"
     return nothing
 end
@@ -70,7 +71,9 @@ end
     return intersection
 end
 
-@inline function tracing_step!(system::System, ray::Ray{R}, hint::Nullable{UUID}) where R<:Real
+@inline function tracing_step!(system::System,
+        ray::Ray{R},
+        hint::Nullable{UUID}) where {R <: Real}
     if isnothing(hint)
         # Test against all objects in system
         intersection!(ray, trace_all(system, ray))
@@ -80,7 +83,7 @@ end
     end
 end
 
-function trace_system!(system::System, beam::Beam{T}; r_max::Int=20) where T<:Real
+function trace_system!(system::System, beam::Beam{T}; r_max::Int = 20) where {T <: Real}
     # Test until max. number of rays in beam reached
     interaction::Nullable{BeamInteraction{T}} = nothing
     while length(rays(beam)) < r_max
@@ -100,7 +103,7 @@ function trace_system!(system::System, beam::Beam{T}; r_max::Int=20) where T<:Re
     return nothing
 end
 
-function retrace_system!(system::System, beam::Beam{T}) where T<:Real
+function retrace_system!(system::System, beam::Beam{T}) where {T <: Real}
     # Retrace existing beams (NOT THREAD-SAFE)
     cutoff::Nullable{Int} = nothing
     interaction::Nullable{BeamInteraction{T}} = nothing
@@ -125,7 +128,7 @@ function retrace_system!(system::System, beam::Beam{T}) where T<:Real
         end
         # Modify following ray (NOT THREAD-SAFE)
         if i < length(rays(beam))
-            replace!(beam, interaction, i+1)
+            replace!(beam, interaction, i + 1)
         end
     end
     # Drop no beams / branches
@@ -136,13 +139,15 @@ function retrace_system!(system::System, beam::Beam{T}) where T<:Real
     _drop_beams!(beam)
     # Drop all disconnected rays after last valid intersection, reset tail intersection to nothing
     if cutoff < length(rays(beam))
-        deleteat!(rays(beam), cutoff+1:length(rays(beam)))
+        deleteat!(rays(beam), (cutoff + 1):length(rays(beam)))
         intersection!(last(rays(beam)), nothing)
         return nothing
     end
 end
 
-function trace_system!(system::System, gauss::GaussianBeamlet{T}; r_max::Int=20) where T<:Real
+function trace_system!(system::System,
+        gauss::GaussianBeamlet{T};
+        r_max::Int = 20) where {T <: Real}
     # Test until bundle is stopped
     interaction::Nullable{GaussianBeamletInteraction{T}} = nothing
     while length(rays(gauss.chief)) < r_max
@@ -163,7 +168,10 @@ function trace_system!(system::System, gauss::GaussianBeamlet{T}; r_max::Int=20)
         if !(id_c == id_w == id_d)
             break
         end
-        interaction = interact3d(system, object(system, id_c), gauss, length(rays(gauss.chief)))
+        interaction = interact3d(system,
+            object(system, id_c),
+            gauss,
+            length(rays(gauss.chief)))
         if isnothing(interaction)
             break
         end
@@ -173,7 +181,7 @@ function trace_system!(system::System, gauss::GaussianBeamlet{T}; r_max::Int=20)
     return nothing
 end
 
-function retrace_system!(system::System, gauss::GaussianBeamlet{T}) where T<:Real
+function retrace_system!(system::System, gauss::GaussianBeamlet{T}) where {T <: Real}
     cutoff::Nullable{Int} = nothing
     interaction::Nullable{GaussianBeamletInteraction{T}} = nothing
     # Test if gauss beam is healthy
@@ -212,7 +220,7 @@ function retrace_system!(system::System, gauss::GaussianBeamlet{T}) where T<:Rea
         # Test if interaction is still valid
         interaction = interact3d(system, object(system, id(intersect_c)), gauss, i)
         if i < n_c
-            replace!(gauss, interaction, i+1) # NOT THREAD-SAFE
+            replace!(gauss, interaction, i + 1) # NOT THREAD-SAFE
         end
     end
     # Drop no beams / branches
@@ -223,9 +231,9 @@ function retrace_system!(system::System, gauss::GaussianBeamlet{T}) where T<:Rea
     _drop_beams!(gauss)
     # Drop all disconnected rays after last valid intersection, reset tail intersection to nothing
     if cutoff < n_c
-        deleteat!(rays(gauss.chief), cutoff+1:n_c)
-        deleteat!(rays(gauss.waist), cutoff+1:n_w)
-        deleteat!(rays(gauss.divergence), cutoff+1:n_d)
+        deleteat!(rays(gauss.chief), (cutoff + 1):n_c)
+        deleteat!(rays(gauss.waist), (cutoff + 1):n_w)
+        deleteat!(rays(gauss.divergence), (cutoff + 1):n_d)
         intersection!(last(rays(gauss.chief)), nothing)
         intersection!(last(rays(gauss.waist)), nothing)
         intersection!(last(rays(gauss.divergence)), nothing)
@@ -234,7 +242,7 @@ function retrace_system!(system::System, gauss::GaussianBeamlet{T}) where T<:Rea
     return nothing
 end
 
-function solve_system!(system::System, beam::AbstractBeam; r_max=20, retrace=true)
+function solve_system!(system::System, beam::AbstractBeam; r_max = 20, retrace = true)
     # Retrace system, use stateless iterator for appendability
     if retrace
         for node in StatelessBFS(beam)
@@ -245,14 +253,23 @@ function solve_system!(system::System, beam::AbstractBeam; r_max=20, retrace=tru
     for leaf in Leaves(beam)
         for beam in StatelessBFS(leaf)
             if isnothing(_last_beam_intersection(beam))
-                trace_system!(system, beam, r_max=r_max)
+                trace_system!(system, beam, r_max = r_max)
             end
         end
     end
     return nothing
 end
 
-AbstractTrees.printnode(io::IO, node::B; kw...) where B<:SCDI.AbstractObject = show(io, B)
-AbstractTrees.printnode(io::IO, node::B; kw...) where B<:SCDI.AbstractObjectGroup = show(io, B)
+function AbstractTrees.printnode(io::IO, node::B; kw...) where {B <: SCDI.AbstractObject}
+    show(io, B)
+end
+function AbstractTrees.printnode(io::IO,
+        node::B;
+        kw...) where {B <: SCDI.AbstractObjectGroup}
+    show(io, B)
+end
 
-Base.show(::IO, ::MIME"text/plain", system::System) = for obj in system.objects; print_tree(obj); end
+Base.show(::IO, ::MIME"text/plain", system::System) =
+    for obj in system.objects
+        print_tree(obj)
+    end

@@ -12,13 +12,13 @@ Mutable struct to store ray information. A `Ray` is described by ``\\vec{v}_{pos
 """
 mutable struct Ray{T} <: AbstractRay{T}
     id::UUID
-    pos::Vector{T}
-    dir::Vector{T}
+    pos::Point3{T}
+    dir::Point3{T}
     intersection::Nullable{Intersection{T}}
     parameters::Nullable{Parameters{T}}
 end
 
-function Base.length(ray::Ray{T}) where T 
+function Base.length(ray::Ray{T}) where {T}
     if isnothing(intersection(ray))
         return Inf
     end
@@ -55,9 +55,15 @@ Constructs a `Ray` where:
 
 Optionally, a wavelength `λ` can be specified.
 """
-function Ray(pos::AbstractArray{P}, dir::AbstractArray{D}, λ=1000e-9) where {P<:Real, D<:Real}
+function Ray(pos::AbstractArray{P},
+        dir::AbstractArray{D},
+        λ = 1000e-9) where {P <: Real, D <: Real}
     F = promote_type(P, D)
-    return Ray{F}(uuid4(), F.(pos), normalize3d(F.(dir)), nothing, Parameters(λ))
+    return Ray{F}(uuid4(),
+        Point3{F}(pos),
+        normalize(Point3{F}(dir)),
+        nothing,
+        Parameters(λ))
 end
 
 """
@@ -65,13 +71,15 @@ end
 
 Returns value for the shortest distance between the `ray` (extended to ∞) and `point`.
 """
-line_point_distance3d(ray::AbstractRay, point, buf_a=zeros(length(point)), buf_b=zeros(length(point))) = line_point_distance3d(position(ray), direction(ray), point, buf_a, buf_b)
+line_point_distance3d(ray::AbstractRay, point) = line_point_distance3d(position(ray),
+    direction(ray),
+    point)
 
 """
     angle3d(ray::AbstractRay, intersect::Intersection=intersection(ray))
 
 Calculates the angle between a `ray` and its or some other `intersection`.
 """
-function angle3d(ray::AbstractRay, intersect::Intersection=intersection(ray))
+function angle3d(ray::AbstractRay, intersect::Intersection = intersection(ray))
     return angle3d(direction(ray), normal3d(intersect))
 end

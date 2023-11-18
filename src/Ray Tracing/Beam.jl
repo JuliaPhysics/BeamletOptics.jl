@@ -14,22 +14,22 @@ rays(b::Beam) = b.rays
 
 Base.push!(b::Beam, ray::AbstractRay) = push!(b.rays, ray)
 
-Beam(ray::Ray{T}) where T = Beam{T}(uuid4(), [ray], nothing, Vector{Beam{T}}())
+Beam(ray::Ray{T}) where {T} = Beam{T}(uuid4(), [ray], nothing, Vector{Beam{T}}())
 
-struct BeamInteraction{R<:Real} <: AbstractInteraction
+struct BeamInteraction{R <: Real} <: AbstractInteraction
     id::Nullable{UUID}
     ray::Ray{R}
 end
 
 Base.push!(b::Beam, interaction::BeamInteraction) = push!(b, interaction.ray)
 
-function Base.replace!(beam::Beam{T}, interaction::BeamInteraction{T}, index::Int) where T
+function Base.replace!(beam::Beam{T}, interaction::BeamInteraction{T}, index::Int) where {T}
     position!(rays(beam)[index], position(interaction.ray))
     direction!(rays(beam)[index], direction(interaction.ray))
     parameters!(rays(beam)[index], parameters(interaction.ray))
 end
 
-function _modify_beam_head!(old::Beam{T}, new::Beam{T}) where T<:Real
+function _modify_beam_head!(old::Beam{T}, new::Beam{T}) where {T <: Real}
     position!(first(rays(old)), position(first(rays(new))))
     direction!(first(rays(old)), direction(first(rays(new))))
     parameters!(first(rays(old)), parameters(first(rays(new))))
@@ -43,7 +43,7 @@ _last_beam_intersection(beam::Beam) = intersection(last(rays(beam)))
 
 Calculate the length of a beam up to the point of the last intersection.
 """
-function Base.length(beam::Beam{T}) where T
+function Base.length(beam::Beam{T}) where {T}
     # Recursively get length of beam parents
     p = AbstractTrees.parent(beam)
     l0 = zero(T)
@@ -67,9 +67,7 @@ end
 Function to find a point given a specific distance `t` along the beam. Return the ray `index` aswell.
 For negative distances, assume first ray backwards.
 """
-point_on_beam(beam::Beam{T}, t::Real) where T = point_on_beam!(Vector{T}(undef, 3), beam, t)
-
-function point_on_beam!(point::AbstractVector, beam::Beam, t::Real)
+function point_on_beam(beam::Beam{T}, t::Real) where {T}
     # Initialize counter to track cumulative length
     p = AbstractTrees.parent(beam)
     if isnothing(p)
@@ -88,14 +86,14 @@ function point_on_beam!(point::AbstractVector, beam::Beam, t::Real)
         # calculate the local ray length `b` and find the point along the ray
         if t < temp
             b = temp - t
-            @. point = $position(ray) + ($length(ray) - b) * $direction(ray)
+            point = position(ray) + (length(ray) - b) * direction(ray)
             return point, index
         end
     end
     # If no solution at this point assume final ray with infinite length
     ray = last(rays(beam))
     b = t - temp
-    @. point .= $position(ray) + b * $direction(ray)
+    point = position(ray) + b * direction(ray)
     return point, numEl
 end
 
@@ -105,7 +103,7 @@ end
 Tests the angle between the `beam` direction and surface normal at each intersection.
 Mainly intended as a check for [`GaussianBeamlet`](@ref).
 """
-function isparaxial(system::AbstractSystem, beam::Beam, threshold::Real=π/4)
+function isparaxial(system::AbstractSystem, beam::Beam, threshold::Real = π / 4)
     # Test if refractive elements are hit with angle larger than threshold
     for ray in beam.rays
         if isnothing(intersection(ray))
@@ -118,7 +116,7 @@ function isparaxial(system::AbstractSystem, beam::Beam, threshold::Real=π/4)
         end
         # Test angle between ray and its intersection
         angle = angle3d(ray)
-        if angle > π/2 # flip sector
+        if angle > π / 2 # flip sector
             angle = π - angle
         end
         if angle > threshold # rad

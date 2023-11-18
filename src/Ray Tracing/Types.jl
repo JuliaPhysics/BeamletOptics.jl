@@ -70,7 +70,7 @@ id(::Any) = nothing
 """
     AbstractSystem <: AbstractEntity
 
-A generic type for a container type which holds objects, beams, etc. 
+A generic type for a container type which holds objects, beams, etc.
 """
 abstract type AbstractSystem <: AbstractEntity end
 
@@ -79,14 +79,14 @@ abstract type AbstractSystem <: AbstractEntity end
 
 A generic type for a ray/line in 3D-space. Must have a `pos`ition, `dir`ection and `len`gth, defined as 3D-vectors and a scalar.
 """
-abstract type AbstractRay{T<:Real} <: AbstractEntity end
+abstract type AbstractRay{T <: Real} <: AbstractEntity end
 
 position(ray::AbstractRay) = ray.pos
-position!(ray::AbstractRay, pos) = (ray.pos .= pos)
+position!(ray::AbstractRay, pos) = (ray.pos = pos)
 
 direction(ray::AbstractRay) = ray.dir
 function direction!(ray::AbstractRay, dir)
-    ray.dir .= normalize3d(dir)
+    ray.dir = normalize(dir)
     return nothing
 end
 
@@ -97,7 +97,9 @@ Base.length(ray::AbstractRay) = ray.len
 
 Returns the intersection between a `ray` and an infinitely large plane which is characterized by its `position` and `normal`.
 """
-function intersect3d(plane_position::AbstractArray, plane_normal::AbstractArray, ray::AbstractRay{T}) where T
+function intersect3d(plane_position::AbstractArray,
+        plane_normal::AbstractArray,
+        ray::AbstractRay{T}) where {T}
     t = line_plane_distance3d(plane_position, plane_normal, position(ray), direction(ray))
     isnothing(t) && return nothing
     return Intersection{T}(t, plane_normal, nothing)
@@ -118,17 +120,17 @@ Subtypes of `AbstractBeam` must implement the following:
 ## Functions:
 - `_modify_beam_head!`: modifies the beam path for retracing purposes
 """
-abstract type AbstractBeam{T<:Real} <: AbstractEntity end
+abstract type AbstractBeam{T <: Real} <: AbstractEntity end
 
 AbstractTrees.NodeType(::Type{<:AbstractBeam{T}}) where {T} = HasNodeType()
 AbstractTrees.nodetype(::Type{<:AbstractBeam{T}}) where {T} = AbstractBeam{T}
 
 AbstractTrees.parent(beam::AbstractBeam) = beam.parent
-parent!(beam::B, parent::B) where B<:AbstractBeam = (beam.parent = parent)
+parent!(beam::B, parent::B) where {B <: AbstractBeam} = (beam.parent = parent)
 
 AbstractTrees.children(b::AbstractBeam) = b.children
 
-AbstractTrees.printnode(io::IO, node::B; kw...) where B<: AbstractBeam = show(io, B)
+AbstractTrees.printnode(io::IO, node::B; kw...) where {B <: AbstractBeam} = show(io, B)
 
 """
     children!(beam::B, child::B) where {B<:AbstractBeam}
@@ -139,7 +141,7 @@ Handles the inclusion of adding a single `child` to an existing `beam`. The func
 2. If `beam` already has a single child, modify child beam starting ray (retracing)
 3. Else throw error
 """
-function children!(beam::B, child::B) where {B<:AbstractBeam}
+function children!(beam::B, child::B) where {B <: AbstractBeam}
     if isempty(children(beam))
         # Link parent and add child to tree
         parent!(child, beam)
@@ -153,7 +155,7 @@ function children!(beam::B, child::B) where {B<:AbstractBeam}
     return error("Adding child to beam failed")
 end
 
-function children!(beam::B, _children::AbstractVector{B}) where {B<:AbstractBeam}
+function children!(beam::B, _children::AbstractVector{B}) where {B <: AbstractBeam}
     if isempty(children(beam))
         # Link parent and add children to tree
         parent!.(_children, Ref(beam))
@@ -169,11 +171,15 @@ function children!(beam::B, _children::AbstractVector{B}) where {B<:AbstractBeam
     return error("Adding children to beam failed")
 end
 
-_drop_beams!(b::B) where {B<:AbstractBeam} = (b.children = Vector{B}())
+_drop_beams!(b::B) where {B <: AbstractBeam} = (b.children = Vector{B}())
 
-_modify_beam_head!(::B, ::B) where B<:AbstractBeam = error("_modify_beam_head not implemented for $B")
+function _modify_beam_head!(::B, ::B) where {B <: AbstractBeam}
+    error("_modify_beam_head not implemented for $B")
+end
 
-_last_beam_intersection(::B) where B<:AbstractBeam = error("_last_beam_intersection not implemented for $B")
+function _last_beam_intersection(::B) where {B <: AbstractBeam}
+    error("_last_beam_intersection not implemented for $B")
+end
 
 """
     AbstractShape{T<:Real} <: AbstractEntity
@@ -204,7 +210,7 @@ Subtypes of `AbstractShape` should implement the following:
 - `render_shape!`: plot the `shape` into an `Axis3` environment
 - `render_shape_normals!`: plot the `shape` surface normals into an `Axis3` environment (optional)
 """
-abstract type AbstractShape{T<:Real} <: AbstractEntity end
+abstract type AbstractShape{T <: Real} <: AbstractEntity end
 
 "Defines the intersection between a `shape` and a ray, defaults to no intersection."
 function intersect3d(shape::AbstractShape, ::AbstractRay)
@@ -214,11 +220,11 @@ end
 
 "Enforces that `object` has to have the field `pos` or implement `position()`."
 position(shape::AbstractShape) = shape.pos
-position!(shape::AbstractShape, pos) = (shape.pos .= pos)
+position!(shape::AbstractShape, pos) = (shape.pos = pos)
 
 "Enforces that `object` has to have the field `dir` or implement `orientation()`."
 orientation(shape::AbstractShape) = shape.dir
-orientation!(shape::AbstractShape, dir) = (shape.dir .= dir)
+orientation!(shape::AbstractShape, dir) = (shape.dir = dir)
 
 """
     translate3d!(shape::AbstractShape, offset)
@@ -226,7 +232,7 @@ orientation!(shape::AbstractShape, dir) = (shape.dir .= dir)
 Translates the `pos`ition of `shape` by the `offset`-vector.
 """
 function translate3d!(shape::AbstractShape, offset)
-    position!(shape, position(shape) .+ offset)
+    position!(shape, position(shape) + offset)
     return nothing
 end
 
@@ -241,16 +247,22 @@ function rotate3d!(shape::AbstractShape, axis, θ)
     return nothing
 end
 
-xrotate3d!(shape::AbstractShape{T}, θ) where T = rotate3d!(shape, @SVector(T[one(T), zero(T), zero(T)]), θ)
-yrotate3d!(shape::AbstractShape{T}, θ) where T = rotate3d!(shape, @SVector(T[zero(T), one(T), zero(T)]), θ)
-zrotate3d!(shape::AbstractShape{T}, θ) where T = rotate3d!(shape, @SVector(T[zero(T), zero(T), one(T)]), θ)
+function xrotate3d!(shape::AbstractShape{T}, θ) where {T}
+    rotate3d!(shape, Point3(one(T), zero(T), zero(T)), θ)
+end
+function yrotate3d!(shape::AbstractShape{T}, θ) where {T}
+    rotate3d!(shape, Point3(zero(T), one(T), zero(T)), θ)
+end
+function zrotate3d!(shape::AbstractShape{T}, θ) where {T}
+    rotate3d!(shape, Point3(zero(T), zero(T), one(T)), θ)
+end
 
-function reset_translation3d!(shape::AbstractShape{T}) where T
-    shape.pos .= zeros(T, 3)
+function reset_translation3d!(shape::AbstractShape{T}) where {T}
+    shape.pos = Point3(zero(T))
     return nothing
 end
 
-reset_rotation3d!(shape::AbstractShape{T}) where T = (shape.dir .= Matrix{T}(I, 3, 3))
+reset_rotation3d!(shape::AbstractShape{T}) where {T} = (shape.dir = Mat{3, 3, T}(I))
 
 render_shape!(::Any, ::AbstractShape) = nothing
 render_shape_normals!(::Any, ::AbstractShape) = nothing
@@ -263,13 +275,15 @@ The forward direction is here defined as the ray `orientation`.
 Only works well if `ray` is **outside** of the volume of `shape`.
 Can be dispatched to return more accurate results for subtypes of `AbstractShape`.
 """
-isinfrontof(shape::AbstractShape, ray::AbstractRay) = isinfrontof(position(shape), position(ray), direction(ray))
+isinfrontof(shape::AbstractShape, ray::AbstractRay) = isinfrontof(position(shape),
+    position(ray),
+    direction(ray))
 
 """
     AbstractObject <: AbstractEntity
 
 A generic type for 2D/3D objects. Optical elements are supposed to fall under this type.
-    
+
 # Implementation reqs.
 Subtypes of `AbstractObject` must implement the following:
 
@@ -316,14 +330,14 @@ translate3d!(object::AbstractObject, offset) = translate3d!(shape(object), offse
 
 function translate_to3d!(obj::AbstractObject, pos)
     current = position(obj)
-    translate3d!(obj, pos .- current)
+    translate3d!(obj, pos - current)
     return nothing
 end
 
 rotate3d!(object::AbstractObject, axis, θ) = rotate3d!(shape(object), axis, θ)
 
-xrotate3d!(object::AbstractObject, θ) = xrotate3d!(shape(object), θ) 
-yrotate3d!(object::AbstractObject, θ) = yrotate3d!(shape(object), θ) 
+xrotate3d!(object::AbstractObject, θ) = xrotate3d!(shape(object), θ)
+yrotate3d!(object::AbstractObject, θ) = yrotate3d!(shape(object), θ)
 zrotate3d!(object::AbstractObject, θ) = zrotate3d!(shape(object), θ)
 
 reset_translation3d!(object::AbstractObject) = reset_translation3d!(shape(object))
@@ -360,8 +374,13 @@ Stores some data resulting from ray tracing a `System`. This information can be 
 """
 mutable struct Intersection{T} <: AbstractEntity
     t::T
-    n::Vector{T}
+    n::Point3{T}
     id::Nullable{UUID}
+end
+
+function Intersection(t::T, n::AbstractVector{T}, id::Nullable{UUID}) where {T}
+    length(n) == 3 || throw(ArgumentError("`n` has to be of length 3"))
+    Intersection(t, Point3{T}(n), id)
 end
 
 Base.length(intersection::Intersection) = intersection.t
@@ -387,8 +406,11 @@ mutable struct Parameters{T}
 end
 
 "Prototype constructor for `Parameters`"
-function Parameters(λ::L=1000e-9, n::N=1, intensity::I=1, polarization::Vector{P}=[0, 0]) where {L,N,I,P}
-    T = promote_type(L,N,I,P)
+function Parameters(λ::L = 1000e-9,
+        n::N = 1,
+        intensity::I = 1,
+        polarization::Vector{P} = [0, 0]) where {L, N, I, P}
+    T = promote_type(L, N, I, P)
     return Parameters{T}(λ, n, intensity, polarization)
 end
 

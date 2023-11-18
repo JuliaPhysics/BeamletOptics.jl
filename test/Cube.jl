@@ -1,18 +1,15 @@
 ### Helper functions for testing
 
-function Cube(scale::Real; T=Float64)
-    vertices = [
-        0 0 0
+function Cube(scale::Real; T = Float64)
+    vertices = [0 0 0
         1 0 0
         1 1 0
         0 1 0
         0 1 1
         1 1 1
         1 0 1
-        0 0 1
-    ]
-    faces = [
-        1 3 2
+        0 0 1]
+    faces = [1 3 2
         1 4 3
         3 4 5
         3 5 6
@@ -23,58 +20,57 @@ function Cube(scale::Real; T=Float64)
         6 5 8
         6 8 7
         1 7 8
-        1 2 7
-    ]
-    return SCDI.Mesh{T}(
-        uuid4(),
+        1 2 7]
+    return SCDI.Mesh{T}(uuid4(),
         vertices .* scale,
         faces,
         Matrix{T}(I, 3, 3),
         T.([0, 0, 0]),
-        scale
-    )
+        scale)
 end
 
-struct ReflectiveCube{S<:SCDI.AbstractShape} <: SCDI.AbstractReflectiveOptic
+struct ReflectiveCube{S <: SCDI.AbstractShape} <: SCDI.AbstractReflectiveOptic
     id::UUID
     shape::S
 end
 
-function RetroMesh(scale::Real; T=Float64)
-    vertices = [
-        0 0 0
+function RetroMesh(scale::Real; T = Float64)
+    vertices = [0 0 0
         1 0 0
         0 1 0
-        0 0 1
-    ]
-    faces = [
-        1 3 2
+        0 0 1]
+    faces = [1 3 2
         1 4 3
-        1 2 4
-    ]
-    return SCDI.Mesh{T}(uuid4(), vertices .* scale, faces, Matrix{T}(I, 3, 3), T.([0, 0, 0]), scale)
+        1 2 4]
+    return SCDI.Mesh{T}(uuid4(),
+        vertices .* scale,
+        faces,
+        Matrix{T}(I, 3, 3),
+        T.([0, 0, 0]),
+        scale)
 end
 
-struct RetroReflector{S<:SCDI.AbstractShape} <: SCDI.AbstractReflectiveOptic
+struct RetroReflector{S <: SCDI.AbstractShape} <: SCDI.AbstractReflectiveOptic
     id::UUID
     shape::S
 end
 
 RetroReflector(scale) = RetroReflector(uuid4(), RetroMesh(scale))
 
-function PlanoMirror(scale::T) where T<:Real
+function PlanoMirror(scale::T) where {T <: Real}
     sz = 0.5
-    vertices = [
-        sz 0 sz
+    vertices = [sz 0 sz
         sz 0 -sz
         -sz 0 -sz
-        -sz 0 sz
-    ]
-    faces = [
-        1 2 4
-        2 3 4
-    ]
-    shape = SCDI.Mesh{T}(uuid4(), vertices .* scale, faces, Matrix{T}(I, 3, 3), T.([0, 0, 0]), scale)
+        -sz 0 sz]
+    faces = [1 2 4
+        2 3 4]
+    shape = SCDI.Mesh{T}(uuid4(),
+        vertices .* scale,
+        faces,
+        Matrix{T}(I, 3, 3),
+        T.([0, 0, 0]),
+        scale)
     return SCDI.Mirror(uuid4(), shape)
 end
 
@@ -92,7 +88,9 @@ SCDI.position!(group::ObjectGroup, pos) = (group.center .= pos)
 SCDI.orientation(group::ObjectGroup) = group.dir
 SCDI.orientation!(group::ObjectGroup, dir) = (group.dir .= dir)
 
-ObjectGroup(v::AbstractArray{<:SCDI.AbstractObject}, T=Float64) = ObjectGroup{T}(Matrix{T}(I, 3, 3), T.([0, 0, 0]), v)
+function ObjectGroup(v::AbstractArray{<:SCDI.AbstractObject}, T = Float64)
+    ObjectGroup{T}(Matrix{T}(I, 3, 3), T.([0, 0, 0]), v)
+end
 
 SCDI.objects(group::ObjectGroup) = group.objects
 
@@ -121,8 +119,14 @@ function SCDI.rotate3d!(group::ObjectGroup, axis, θ)
     return nothing
 end
 
-SCDI.xrotate3d!(group::ObjectGroup{T}, θ) where T = SCDI.rotate3d!(group, @SVector(T[one(T), zero(T), zero(T)]), θ)
-SCDI.yrotate3d!(group::ObjectGroup{T}, θ) where T = SCDI.rotate3d!(group, @SVector(T[zero(T), one(T), zero(T)]), θ)
-SCDI.zrotate3d!(group::ObjectGroup{T}, θ) where T = SCDI.rotate3d!(group, @SVector(T[zero(T), zero(T), one(T)]), θ)
+function SCDI.xrotate3d!(group::ObjectGroup{T}, θ) where {T}
+    SCDI.rotate3d!(group, @SVector(T[one(T), zero(T), zero(T)]), θ)
+end
+function SCDI.yrotate3d!(group::ObjectGroup{T}, θ) where {T}
+    SCDI.rotate3d!(group, @SVector(T[zero(T), one(T), zero(T)]), θ)
+end
+function SCDI.zrotate3d!(group::ObjectGroup{T}, θ) where {T}
+    SCDI.rotate3d!(group, @SVector(T[zero(T), zero(T), one(T)]), θ)
+end
 
 Base.show(::IO, ::MIME"text/plain", group::ObjectGroup) = print_tree(group)

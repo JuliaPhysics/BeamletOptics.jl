@@ -1,10 +1,17 @@
 module SCDI
 
-using LinearAlgebra, FileIO, UUIDs, MarchingCubes, Trapz
-using PrecompileTools
-using MakieCore
-using StaticArrays
-using AbstractTrees
+using LinearAlgebra: norm, normalize, normalize!, dot, cross, I
+# TODO: Where is FileIO actually used!?
+using FileIO
+using UUIDs: UUID, uuid4
+using MarchingCubes: MC, march
+using Trapz: trapz
+using PrecompileTools: @setup_workload, @compile_workload
+# TODO: Expell MakieCore here and move the rendering logic into an extension
+using MakieCore: lines!, mesh!, surface!
+using StaticArrays: @SMatrix, @SVector, SMatrix
+using GeometryBasics: Point3, Point2, Mat
+using AbstractTrees: AbstractTrees, parent, children, NodeType, nodetype, print_tree, HasNodeType, Leaves, StatelessBFS, PostOrderDFS, PreOrderDFS
 
 import Base: length
 
@@ -24,31 +31,24 @@ include("Ray Tracing/Render.jl")
 if get(ENV, "CI", "false") == "false"
     @setup_workload begin
         # setup dummy workload
-        _vertices = [
-            1 1 0
+        _vertices = [1 1 0
             1 -1 0
             -1 -1 0
-            -1 1 0
-        ]
-        _faces = [
-            1 2 3
-            3 4 1
-        ]
+            -1 1 0]
+        _faces = [1 2 3
+            3 4 1]
         _pos = [0, 0, 0]
         _dir = Matrix{Int}(I, 3, 3)
         _scale = 1
         @compile_workload begin
             # execute workload
-            plane = SCDI.Mirror(
-                uuid4(),
-                SCDI.Mesh{Float64}(
-                    uuid4(),
+            plane = SCDI.Mirror(uuid4(),
+                SCDI.Mesh{Float64}(uuid4(),
                     _vertices,
                     _faces,
                     _dir,
                     _pos,
-                    _scale
-            ))
+                    _scale))
             SCDI.translate3d!(plane, [0, 0, 1])
             SCDI.xrotate3d!(plane, π / 2)
             SCDI.yrotate3d!(plane, π / 4)
