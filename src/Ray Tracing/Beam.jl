@@ -1,7 +1,13 @@
 """
     Beam
 
-Temporary container struct to test ray tracing.
+Stores the rays that are calculated from geometric optics when propagating through an optical system.
+
+# Fields
+- `id`: beam ID (uuid4)
+- `rays`: vector of `Ray` objects, representing the rays that make up the beam
+- `parent`: reference to the parent beam, if any ([`Nullable`](@ref) to account for the root beam which has no parent)
+- `children`: vector of child beams, each child beam represents a branching or bifurcation of the original beam, i.e. beam-splitting
 """
 mutable struct Beam{T} <: AbstractBeam{T}
     id::UUID

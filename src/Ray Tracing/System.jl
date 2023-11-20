@@ -1,3 +1,12 @@
+"""
+    System <: AbstractSystem
+
+A container storing the optical elements of, i.e. a camera lens or lab setup.
+
+# Fields
+- `id::UUID`: system ID (uuid4)
+- `objects`: vector containing the different objects that are part of the system (subtypes of [`AbstractObject`](@ref))
+"""
 struct System <: AbstractSystem
     id::UUID
     objects::Vector{AbstractObject}
@@ -27,6 +36,7 @@ function object(system::System, obj_id::UUID)
     # If no match
     return error("Object ID not in system")
 end
+
 object(::System, ::Nothing) = error("Object ID not set. This should not happen!")
 
 function trace_system!(::System, beam::B; r_max = 0) where {B <: AbstractBeam}
@@ -145,6 +155,17 @@ function retrace_system!(system::System, beam::Beam{T}) where {T <: Real}
     end
 end
 
+"""
+    trace_system!(system::System, gauss::GaussianBeamlet{T}; r_max::Int = 20) where {T <: Real}
+
+Trace a `GaussianBeamlet` through an optical `system`. Tracing logic is based on iteratively tracing the `GaussianBeamlet` chief ray through the system.
+The `waist` and `divergence` ray are traced subsequently.
+
+# Arguments
+- `system::System`: The optical system through which the GaussianBeamlet is traced.
+- `gauss::GaussianBeamlet{T}`: The GaussianBeamlet object to be traced.
+- `r_max::Int=20` (optional): Maximum number of tracing iterations. Default is 20.
+"""
 function trace_system!(system::System,
         gauss::GaussianBeamlet{T};
         r_max::Int = 20) where {T <: Real}
@@ -181,6 +202,12 @@ function trace_system!(system::System,
     return nothing
 end
 
+"""
+    retrace_system!(system::System, gauss::GaussianBeamlet{T}) where {T <: Real}
+
+Retrace the beam stored in `GaussianBeamlet` through the optical `system`. Chief, waist and divergence ray intersections and interactions are recalculated.
+All rays must hit the same object, or the retracing step is aborted. If retracing is stopped before the end of the beam is reached, further rays are dropped.
+"""
 function retrace_system!(system::System, gauss::GaussianBeamlet{T}) where {T <: Real}
     cutoff::Nullable{Int} = nothing
     interaction::Nullable{GaussianBeamletInteraction{T}} = nothing
@@ -242,6 +269,18 @@ function retrace_system!(system::System, gauss::GaussianBeamlet{T}) where {T <: 
     return nothing
 end
 
+"""
+    solve_system!(system::System, beam::AbstractBeam; r_max=20, retrace=true)
+
+Manage the tracing of an `AbstractBeam` through an optical `system`. The function retraces the `beam` if possible and then proceeds to trace each leaf of the beam tree through the system.
+The condition for continued tracing is that the last `beam` intersection hits nothing. Else, the system is considered to be solved.  
+
+# Arguments
+- `system::System`: The optical system in which the beam will be traced.
+- `beam::AbstractBeam`: The beam object to be traced through the system.
+- `r_max::Int=20` (optional): Maximum number of tracing iterations for each leaf. Default is 20.
+- `retrace::Bool=true` (optional): Flag to indicate if the system should be retraced. Default is true.
+"""
 function solve_system!(system::System, beam::AbstractBeam; r_max = 20, retrace = true)
     # Retrace system, use stateless iterator for appendability
     if retrace

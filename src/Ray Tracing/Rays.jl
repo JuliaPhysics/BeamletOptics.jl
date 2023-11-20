@@ -5,8 +5,8 @@ Mutable struct to store ray information. A `Ray` is described by ``\\vec{v}_{pos
 
 # Fields
 - `id`: a UUID4 that uniquely identifies the `Ray`
-- `pos`: a 3D-vector that describes the `Ray` origin
-- `dir`: a normalized 3D-vector that describes the `Ray` direction
+- `pos`: a point in R³ that describes the `Ray` origin
+- `dir`: a normalized vector in R³ that describes the `Ray` direction
 - `intersection`: refer to [`Intersection`](@ref)
 - `parameters`: refer to [`Parameters`](@ref)
 """

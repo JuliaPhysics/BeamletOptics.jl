@@ -50,7 +50,7 @@ Base.length(gauss::GaussianBeamlet) = length(gauss.chief)
 """
     parent!(beam::GaussianBeamlet, parent::GaussianBeamlet)
 
-Ensures that the GaussianBeamlet knows about its parent beam. In addition, links the chief beams of child and parent
+Ensures that the GaussianBeamlet knows about its parent beam. In addition, links the chief beams of child and parent.
 Important for correct functioning of [`point_on_beam`](@ref) and [`length`](@ref).
 """
 function parent!(child::GaussianBeamlet, parent::GaussianBeamlet)
