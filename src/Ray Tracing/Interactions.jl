@@ -180,8 +180,10 @@ function interact3d(::AbstractSystem,
     T = transpose(orientation(shape(pd)))
     P = ray.pos + ray.dir * length(ray.intersection)
     shape_pos = position(shape(pd))
-    Threads.@threads for (j, y) in collect(enumerate(pd.y))     # row column major order?
-        @inbounds for (i, x) in enumerate(pd.x)
+    Threads.@threads for j in eachindex(pd.y)     # row column major order?
+        y = pd.y[j]
+        @inbounds for i in eachindex(pd.x)
+            x = pd.x[i]
             # Transform point p on PD into world coords
             p = Point3(T[1, 1] * x + T[1, 3] * y + shape_pos[1],
                 T[2, 1] * x + T[2, 3] * y + shape_pos[2],

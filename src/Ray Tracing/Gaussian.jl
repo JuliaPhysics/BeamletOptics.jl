@@ -156,7 +156,8 @@ Calculate the local waist radius and Gouy phase of an unastigmatic Gaussian beam
 """
 function gauss_parameters(gauss::GaussianBeamlet,
         z::Real;
-        hint::Nullable{Tuple{<:AbstractVector{<:Real}, Int}} = nothing)
+        hint = nothing)
+
     if isnothing(hint)
         p0, index = point_on_beam(gauss, z)
     else
@@ -165,6 +166,7 @@ function gauss_parameters(gauss::GaussianBeamlet,
     chief = gauss.chief.rays[index]
     n = refractive_index(chief)
     λ = wavelength(gauss)
+
     #=
     Divergence ray height and slope (same for waist ray)
     - find divergence ray "height" and "slope" at intersection point y0 with target plane at p0 of chief ray
@@ -230,7 +232,7 @@ function gauss_parameters(gauss::GaussianBeamlet{G}, zs::AbstractArray) where {G
 end
 
 """
-    electric_field(gauss::GaussianBeamlet, r, z, g_b=zeros(3), p_b=zeros(3))
+    electric_field(gauss::GaussianBeamlet, r, z)
 
 Calculates the electric field phasor [V/m] of `gauss` at the radial and longitudinal positions `r` and `z`.
 Optionally, buffer vectors `g_b` and `p_b` can be passed.

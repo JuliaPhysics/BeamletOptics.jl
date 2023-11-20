@@ -273,7 +273,7 @@ end
     solve_system!(system::System, beam::AbstractBeam; r_max=20, retrace=true)
 
 Manage the tracing of an `AbstractBeam` through an optical `system`. The function retraces the `beam` if possible and then proceeds to trace each leaf of the beam tree through the system.
-The condition for continued tracing is that the last `beam` intersection hits nothing. Else, the system is considered to be solved.  
+The condition for continued tracing is that the last `beam` intersection hits nothing. Else, the system is considered to be solved.
 
 # Arguments
 - `system::System`: The optical system in which the beam will be traced.
