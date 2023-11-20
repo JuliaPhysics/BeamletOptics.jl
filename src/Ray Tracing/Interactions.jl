@@ -93,46 +93,31 @@ Creates a spherical lens based on:
 
 # Hint: thin lenses
 
-If `l` is set to zero, an ideal [`ThinLens`](@ref) will be created. However, note that the acutal lens thickness will be different from zero.
+If `l` is set to zero, an ideal [`ThinLens`](@ref) will be created. However, note that the actual lens thickness will be different from zero.
 """
 function SphericalLens(r1::Real, r2::Real, l::Real, d::Real = 1inch, n::Function = λ -> 1.5)
-    # Determine lens SDF
-    shape::Nullable{AbstractSDF} = nothing
     # # Test for thin lens
     if iszero(l)
         shape = ThinLensSDF(r1, r2, d)
         # goto to avoid overwrite
-        @goto lens_creator
-    end
-    # Test for cylinder lens
-    if isinf(r1) && isinf(r2)
+    elseif isinf(r1) && isinf(r2)# Test for cylinder lens. FIXME: This is incomplete!
         shape = CylinderSDF(d / 2, l / 2)
-        @goto lens_creator
-    end
-    # Test for plano lens
-    if isinf(r2)
+    elseif isinf(r2) # Test for plano lens
         if r1 > 0
             shape = PlanoConvexLensSDF(r1, l, d)
         elseif r1 < 0
             shape = PlanoConcaveLensSDF(abs(r1), l, d)
         end
-        @goto lens_creator
-    end
-    # Test for bi-convex/concave or meniscus
-    if r1 > 0 && r2 > 0
+    elseif r1 > 0 && r2 > 0 # Test for bi-convex/concave or meniscus
         shape = BiConvexLensSDF(r1, r2, l, d)
-    end
-    if r1 < 0 && r2 < 0
+    elseif r1 < 0 && r2 < 0
         shape = BiConcaveLensSDF(abs(r1), abs(r2), l, d)
-    end
-    if r1 > 0 && r2 < 0
+    elseif r1 > 0 && r2 < 0
         shape = ConvexConcaveLensSDF(r1, abs(r2), l, d)
+    else
+        throw(DomainError("Could not find suitable lens SDF for the given parameters"))
     end
     # Create lens
-    @label lens_creator
-    if isnothing(shape)
-        error("Could not find suitable lens SDF")
-    end
     return Lens(uuid4(), shape, n)
 end
 
@@ -193,7 +178,7 @@ function interact3d(::AbstractSystem,
     ray = gauss.chief.rays[ray_id]
     l = length(gauss)
     T = transpose(orientation(shape(pd)))
-    P = ray.pos + ray.dir * ray.intersection.t
+    P = ray.pos + ray.dir * length(ray.intersection)
     shape_pos = position(shape(pd))
     Threads.@threads for (j, y) in collect(enumerate(pd.y))     # row column major order?
         @inbounds for (i, x) in enumerate(pd.x)

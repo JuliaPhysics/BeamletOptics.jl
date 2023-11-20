@@ -26,7 +26,10 @@ function Base.length(ray::Ray{T}) where {T}
 end
 
 intersection(ray::Ray) = ray.intersection
-intersection!(ray::Ray, intersection) = (ray.intersection = intersection)
+function intersection!(ray::Ray{T}, _intersection::Nullable{Intersection{T}}) where {T}
+     ray.intersection = _intersection
+     return nothing
+end
 
 parameters(ray::Ray) = ray.parameters
 parameters!(ray::Ray, parameters) = (ray.parameters = parameters)

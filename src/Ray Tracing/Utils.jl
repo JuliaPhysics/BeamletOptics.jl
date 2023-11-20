@@ -35,7 +35,7 @@ function rotate3d(reference::AbstractVector, θ)
     cost = cos(θ)
     sint = sin(θ)
     ux, uy, uz = reference
-    R = @SMatrix [
+    R = @SArray [
         cost+ux^2*(1-cost) ux*uy*(1-cost)-uz*sint ux*uz*(1-cost)+uy*sint
         uy*ux*(1-cost)+uz*sint cost+uy^2*(1-cost) uy*uz*(1-cost)-ux*sint
         uz*ux*(1-cost)-uy*sint uz*uy*(1-cost)+ux*sint cost+uz^2*(1-cost)
@@ -61,12 +61,12 @@ function align3d(start::AbstractVector{A}, target::AbstractVector{B}) where {A, 
         return SMatrix{3,3}(one(T)I)
     end
     if cosA ≈ -1
-        return @SMatrix [-one(T) zero(T) zero(T);
+        return @SArray [-one(T) zero(T) zero(T);
                         zero(T) -one(T) zero(T);
                         zero(T) zero(T) one(T)]
     end
     k = 1 / (1 + cosA)
-    R = @SMatrix [
+    R = @SArray [
         rx^2*k+cosA rx*ry*k+rz rx*rz*k-ry
         ry*rx*k-rz ry^2*k+cosA ry*rz*k+rx
         rz*rx*k+ry rz*ry*k-rx rz^2*k+cosA

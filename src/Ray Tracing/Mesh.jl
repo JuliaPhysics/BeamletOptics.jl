@@ -33,7 +33,7 @@ mutable struct Mesh{T} <: AbstractMesh{T}
     id::UUID
     vertices::Matrix{T}
     faces::Matrix{Int}
-    dir::Mat{3, 3, T}
+    dir::Matrix{T}
     pos::Point3{T}
     scale::T
 end
@@ -96,13 +96,13 @@ function rotate3d!(shape::AbstractMesh, axis, θ)
 end
 
 function xrotate3d!(shape::AbstractMesh{T}, θ) where {T}
-    rotate3d!(shape, @SVector(T[one(T), zero(T), zero(T)]), θ)
+    rotate3d!(shape, @SArray(T[one(T), zero(T), zero(T)]), θ)
 end
 function yrotate3d!(shape::AbstractMesh{T}, θ) where {T}
-    rotate3d!(shape, @SVector(T[zero(T), one(T), zero(T)]), θ)
+    rotate3d!(shape, @SArray(T[zero(T), one(T), zero(T)]), θ)
 end
 function zrotate3d!(shape::AbstractMesh{T}, θ) where {T}
-    rotate3d!(shape, @SVector(T[zero(T), zero(T), one(T)]), θ)
+    rotate3d!(shape, @SArray(T[zero(T), zero(T), one(T)]), θ)
 end
 
 """

@@ -120,13 +120,13 @@ function SCDI.rotate3d!(group::ObjectGroup, axis, θ)
 end
 
 function SCDI.xrotate3d!(group::ObjectGroup{T}, θ) where {T}
-    SCDI.rotate3d!(group, @SVector(T[one(T), zero(T), zero(T)]), θ)
+    SCDI.rotate3d!(group, @SArray(T[one(T), zero(T), zero(T)]), θ)
 end
 function SCDI.yrotate3d!(group::ObjectGroup{T}, θ) where {T}
-    SCDI.rotate3d!(group, @SVector(T[zero(T), one(T), zero(T)]), θ)
+    SCDI.rotate3d!(group, @SArray(T[zero(T), one(T), zero(T)]), θ)
 end
 function SCDI.zrotate3d!(group::ObjectGroup{T}, θ) where {T}
-    SCDI.rotate3d!(group, @SVector(T[zero(T), zero(T), one(T)]), θ)
+    SCDI.rotate3d!(group, @SArray(T[zero(T), zero(T), one(T)]), θ)
 end
 
 Base.show(::IO, ::MIME"text/plain", group::ObjectGroup) = print_tree(group)

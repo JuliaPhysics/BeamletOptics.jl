@@ -3,16 +3,13 @@
 
 Render `mesh` into the specified 3D-`axis`.
 """
-function render_object!(axis, mesh::AbstractMesh)
-    mesh!(axis, vertices(mesh), faces(mesh), transparency = true)
-    return nothing
-end
+render_object!(::Any, mesh::AbstractMesh) = nothing
 
-render_object!(axis, ::AbstractEntity) = nothing
+render_object!(::Any, ::AbstractEntity) = nothing
 render_object!(axis, object::AbstractObject) = render_object!(axis, shape(object))
 
 """
-    render_system!(axis::Axis3, system::System)
+    render_system!(axis, system::System)
 
 Render all objects contained in the `system`.
 """
@@ -32,16 +29,15 @@ function render_ray!(axis, ray::AbstractRay; color = :blue, flen = 1.0)
     if isnothing(intersection(ray))
         len = flen
     else
-        len = ray.intersection.t
+        len = length(ray.intersection)
     end
     temp = ray.pos + len * ray.dir
-    lines!(axis,
-        [ray.pos[1], temp[1]],
-        [ray.pos[2], temp[2]],
-        [ray.pos[3], temp[3]],
-        color = color)
+
+    _render_ray!(axis, ray, temp; color)
+
     return nothing
 end
+_render_ray!(::Any, ::AbstractRay, ::AbstractVector; color = :blue) = nothing
 
 """
     render_beam!(axis, beam::Beam; color=:blue, flen=1.0)
@@ -98,7 +94,7 @@ function render_beam!(axis,
             Xt = R[1, 1] * X + R[1, 2] * Y + R[1, 3] * Z .+ ray.pos[1]
             Yt = R[2, 1] * X + R[2, 2] * Y + R[2, 3] * Z .+ ray.pos[2]
             Zt = R[3, 1] * X + R[3, 2] * Y + R[3, 3] * Z .+ ray.pos[3]
-            surface!(axis, Xt, Yt, Zt, transparency = true, colormap = [color, color])
+            render_gaussian_beam_surface!(axis, Xt, Yt, Zt; transparency = true, colormap = [color, color])
             # Bump length tracker
             if !isnothing(intersection(ray))
                 l += length(ray)
@@ -113,22 +109,20 @@ function render_beam!(axis,
     end
     return nothing
 end
+render_gaussian_beam_surface!(::Any, X, Y, Z; kwargs...) = nothing
 
 """
-    render_object_normals!(axis::Axis3, mesh::Mesh; l=0.01)
+    render_object_normals!(axis, mesh::Mesh; l=0.01)
 
 Helper function to visualize the `mesh` normals of an object. The normals are displayed with a standard `l`ength of 0.01
 """
 function render_object_normals!(axis, mesh::Mesh; l = 0.01)
     for fID in 1:size(mesh.faces)[1]
         nml = normal3d(mesh, fID)
-        pos = mesh.vertices[mesh.faces[fID, 1], :]
+        pos = @view mesh.vertices[mesh.faces[fID, 1], :]
         vec = pos + l * nml
-        lines!(axis,
-            [pos[1], vec[1]],
-            [pos[2], vec[2]],
-            [pos[3], vec[3]],
-            color = :blue)
+        _render_object_normal!(axis, pos, vec; color=blue)
     end
     return nothing
 end
+_render_object_normal!(::Any, ::AbstractVector, ::AbstractVector; color = :blue) = nothing

@@ -45,9 +45,10 @@ function render_object!(axis, s::AbstractSDF)
     march(mc)
     vertices = transpose(reinterpret(reshape, Float32, mc.vertices))
     faces = transpose(reinterpret(reshape, Int64, mc.triangles))
-    mesh!(axis, vertices, faces, transparency = true)
+    render_sdf_mesh!(axis, vertices, faces, transparency = true)
     return nothing
 end
+render_sdf_mesh!(::Any, vertices, faces; transparency = true) = nothing
 
 """
     normal3d(s::AbstractSDF, pos)
@@ -178,7 +179,7 @@ Implements cylinder SDF. Cylinder is initially orientated along the y-axis and s
 """
 mutable struct CylinderSDF{T} <: AbstractSDF{T}
     const id::UUID
-    dir::Mat{3, 3, T}
+    dir::Matrix{T}
     pos::Point3{T}
     radius::T
     height::T
@@ -203,7 +204,7 @@ Implements SDF of a sphere which is cut off in the x-z-plane at some point along
 """
 mutable struct CutSphereSDF{T} <: AbstractSDF{T}
     const id::UUID
-    dir::Mat{3, 3, T}
+    dir::Matrix{T}
     pos::Point3{T}
     radius::T
     height::T
@@ -261,7 +262,7 @@ Implements the SDF of an ideal spherical lens which is composed of two joint cut
 """
 mutable struct ThinLensSDF{T} <: AbstractSphericalLensSDF{T}
     const id::UUID
-    dir::Mat{3, 3, T}
+    dir::Matrix{T}
     pos::Point3{T}
     front::CutSphereSDF{T}
     back::CutSphereSDF{T}
@@ -306,7 +307,7 @@ Implements a cylindrical lens SDF with two convex surfaces and a cylindrical mid
 """
 mutable struct BiConvexLensSDF{T} <: AbstractSphericalLensSDF{T}
     const id::UUID
-    dir::Mat{3, 3, T}
+    dir::Matrix{T}
     pos::Point3{T}
     front::CutSphereSDF{T}
     back::CutSphereSDF{T}
@@ -357,7 +358,7 @@ Implements a cylindrical lens SDF with two concave surfaces and a cylindrical mi
 """
 mutable struct BiConcaveLensSDF{T} <: AbstractSphericalLensSDF{T}
     const id::UUID
-    dir::Mat{3, 3, T}
+    dir::Matrix{T}
     pos::Point3{T}
     front::SphereSDF{T}
     back::SphereSDF{T}
@@ -408,7 +409,7 @@ Implements a cylindrical lens SDF with one convex and one planar surface.
 """
 mutable struct PlanoConvexLensSDF{T} <: AbstractSphericalLensSDF{T}
     const id::UUID
-    dir::Mat{3, 3, T}
+    dir::Matrix{T}
     pos::Point3{T}
     front::CutSphereSDF{T}
     back::CylinderSDF{T}
@@ -451,7 +452,7 @@ Implements a cylindrical lens SDF with one concave and one planar surface.
 """
 mutable struct PlanoConcaveLensSDF{T} <: AbstractSphericalLensSDF{T}
     const id::UUID
-    dir::Mat{3, 3, T}
+    dir::Matrix{T}
     pos::Point3{T}
     front::SphereSDF{T}
     back::CylinderSDF{T}
@@ -496,7 +497,7 @@ Implements a cylindrical lens SDF with one convex and one concave surface, as we
 """
 mutable struct ConvexConcaveLensSDF{T} <: AbstractSphericalLensSDF{T}
     const id::UUID
-    dir::Mat{3, 3, T}
+    dir::Matrix{T}
     pos::Point3{T}
     front::CutSphereSDF{T}
     back::SphereSDF{T}

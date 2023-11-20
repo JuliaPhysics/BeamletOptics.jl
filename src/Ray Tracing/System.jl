@@ -231,7 +231,7 @@ function retrace_system!(system::System, gauss::GaussianBeamlet{T}) where {T <: 
         intersect_w = intersect3d(obj, w_ray)
         intersect_d = intersect3d(obj, d_ray)
         # Test if intersections are still valid
-        if any(isnothing.((intersect_c, intersect_w, intersect_d)))
+        if any(isnothing, (intersect_c, intersect_w, intersect_d))
             cutoff = i
             break
         end
@@ -246,7 +246,7 @@ function retrace_system!(system::System, gauss::GaussianBeamlet{T}) where {T <: 
         intersection!(d_ray, intersect_d)
         # Test if interaction is still valid
         interaction = interact3d(system, object(system, id(intersect_c)), gauss, i)
-        if i < n_c
+        if !isnothing(interaction) && i < n_c
             replace!(gauss, interaction, i + 1) # NOT THREAD-SAFE
         end
     end
@@ -282,15 +282,16 @@ The condition for continued tracing is that the last `beam` intersection hits no
 - `retrace::Bool=true` (optional): Flag to indicate if the system should be retraced. Default is true.
 """
 function solve_system!(system::System, beam::AbstractBeam; r_max = 20, retrace = true)
+    B = nodetype(beam)
     # Retrace system, use stateless iterator for appendability
     if retrace
-        for node in StatelessBFS(beam)
-            retrace_system!(system, node)
+        for node::B in StatelessBFS(beam)
+            retrace_system!(system, node::B)
         end
     end
     # Trace starting of each leaf in beam tree
-    for leaf in Leaves(beam)
-        for beam in StatelessBFS(leaf)
+    for leaf::B in Leaves(beam)
+        for beam::B in StatelessBFS(leaf)
             if isnothing(_last_beam_intersection(beam))
                 trace_system!(system, beam, r_max = r_max)
             end
