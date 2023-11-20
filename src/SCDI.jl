@@ -1,17 +1,13 @@
 module SCDI
 
 using LinearAlgebra: norm, normalize, normalize!, dot, cross, I
-# TODO: Where is FileIO actually used!?
-using FileIO
 using UUIDs: UUID, uuid4
 using MarchingCubes: MC, march
 using Trapz: trapz
 using PrecompileTools: @setup_workload, @compile_workload
-# TODO: Expell MakieCore here and move the rendering logic into an extension
-using MakieCore: lines!, mesh!, surface!
-using StaticArrays: @SMatrix, @SVector, SMatrix
+using StaticArrays: @SArray, @SArray, SMatrix
 using GeometryBasics: Point3, Point2, Mat
-using AbstractTrees: AbstractTrees, parent, children, NodeType, nodetype, print_tree, HasNodeType, Leaves, StatelessBFS, PostOrderDFS, PreOrderDFS
+using AbstractTrees: AbstractTrees, parent, children, NodeType, nodetype, nodevalue, print_tree, HasNodeType, Leaves, StatelessBFS, PostOrderDFS, PreOrderDFS
 
 import Base: length
 

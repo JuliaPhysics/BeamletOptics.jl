@@ -123,7 +123,7 @@ Subtypes of `AbstractBeam` must implement the following:
 abstract type AbstractBeam{T <: Real} <: AbstractEntity end
 
 AbstractTrees.NodeType(::Type{<:AbstractBeam{T}}) where {T} = HasNodeType()
-AbstractTrees.nodetype(::Type{<:AbstractBeam{T}}) where {T} = AbstractBeam{T}
+AbstractTrees.nodetype(TT::Type{<:AbstractBeam{T}}) where {T} = TT
 
 AbstractTrees.parent(beam::AbstractBeam) = beam.parent
 parent!(beam::B, parent::B) where {B <: AbstractBeam} = (beam.parent = parent)
@@ -262,7 +262,7 @@ function reset_translation3d!(shape::AbstractShape{T}) where {T}
     return nothing
 end
 
-reset_rotation3d!(shape::AbstractShape{T}) where {T} = (shape.dir = Mat{3, 3, T}(I))
+reset_rotation3d!(shape::AbstractShape{T}) where {T} = (shape.dir = Matrix{T}(I, 3, 3))
 
 render_shape!(::Any, ::AbstractShape) = nothing
 render_shape_normals!(::Any, ::AbstractShape) = nothing
