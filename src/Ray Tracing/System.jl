@@ -27,17 +27,17 @@ objects(system::System) = Leaves(system.objects)
 
 Find a specific object in the `system` based on its unique `obj_id`.
 """
-function object(system::System, obj_id::UUID)
+function object(system::System, obj_id::UUID)::Union{AbstractObject, Nothing}
     for object in objects(system)
-        if id(object) == obj_id
+        if id(object) === obj_id
             return object
         end
     end
     # If no match
-    return error("Object ID not in system")
+    return nothing
 end
 
-object(::System, ::Nothing) = error("Object ID not set. This should not happen!")
+object(::System, ::Nothing) = nothing
 
 function trace_system!(::System, beam::B; r_max = 0) where {B <: AbstractBeam}
     @warn "Tracing for $B not implemented"
@@ -53,7 +53,7 @@ end
     intersection::Nullable{Intersection{R}} = nothing
     for object in objects(system)
         # Find shortest intersection
-        temp = intersect3d(object, ray)
+        temp::Nullable{Intersection{R}} = intersect3d(object, ray)
         # Ignore miss
         if isnothing(temp)
             continue
