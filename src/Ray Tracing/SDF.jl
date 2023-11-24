@@ -11,6 +11,15 @@ Subtypes of `AbstractSDF` should implement all reqs. of `AbstractShape` as well 
 """
 abstract type AbstractSDF{T} <: AbstractShape{T} end
 
+function orientation!(sdf::AbstractSDF, dir)
+    sdf.dir = dir
+    transposed_orientation!(sdf, copy(transpose(dir)))
+end
+
+transposed_orientation(sdf::AbstractSDF) = sdf.transposed_dir
+
+transposed_orientation!(sdf::AbstractSDF, tdir) = (sdf.transposed_dir = tdir)
+
 """
     _world_to_sdf(sdf, point)
 
@@ -19,7 +28,7 @@ If rotations are applied, the rotation is applied around the local sdf coordinat
 """
 function _world_to_sdf(sdf::AbstractSDF, point)
     # transforms world coords to sdf coords
-    T = transpose(orientation(sdf))
+    T = transposed_orientation(sdf)
     # rotates around local xyz system
     return T * (point - position(sdf))
 end
@@ -164,7 +173,8 @@ end
 
 SphereSDF(r::T) where {T} = SphereSDF{T}(uuid4(), zeros(T, 3), r)
 
-orientation(::SphereSDF{T}) where {T} = Matrix{T}(I, 3, 3)
+orientation(::SphereSDF{T}) where {T} = SArray{Tuple{3,3}, T}(I)
+transposed_orientation(::SphereSDF{T}) where {T} = SArray{Tuple{3,3}, T}(I)
 orientation!(::SphereSDF, ::Any) = nothing
 
 function sdf(sphere::SphereSDF, point)
@@ -179,7 +189,8 @@ Implements cylinder SDF. Cylinder is initially orientated along the y-axis and s
 """
 mutable struct CylinderSDF{T} <: AbstractSDF{T}
     const id::UUID
-    dir::Matrix{T}
+    dir::SMatrix{3, 3, T, 9}
+    transposed_dir::SMatrix{3, 3, T, 9}
     pos::Point3{T}
     radius::T
     height::T
@@ -187,7 +198,12 @@ end
 
 function CylinderSDF(r::R, h::H) where {R, H}
     T = promote_type(R, H)
-    return CylinderSDF{T}(uuid4(), Matrix{T}(I, 3, 3), Point3{T}(0), r, h)
+    return CylinderSDF{T}(uuid4(),
+        Matrix{T}(I, 3, 3),
+        Matrix{T}(I, 3, 3),
+        Point3{T}(0),
+        r,
+        h)
 end
 
 function sdf(cylinder::CylinderSDF, point)
@@ -204,7 +220,8 @@ Implements SDF of a sphere which is cut off in the x-z-plane at some point along
 """
 mutable struct CutSphereSDF{T} <: AbstractSDF{T}
     const id::UUID
-    dir::Matrix{T}
+    dir::SMatrix{3, 3, T, 9}
+    transposed_dir::SMatrix{3, 3, T, 9}
     pos::Point3{T}
     radius::T
     height::T
@@ -222,12 +239,18 @@ function CutSphereSDF(radius::R, height::H) where {R, H}
     end
     T = promote_type(R, H)
     w = sqrt(radius^2 - height^2)
-    return CutSphereSDF{T}(uuid4(), Matrix{T}(I, 3, 3), zeros(T, 3), radius, height, w)
+    return CutSphereSDF{T}(uuid4(),
+        Matrix{T}(I, 3, 3),
+        Matrix{T}(I, 3, 3),
+        zeros(T, 3),
+        radius,
+        height,
+        w)
 end
 
 function sdf(cs::CutSphereSDF, point)
     p = _world_to_sdf(cs, point)
-    q = Point2(norm([p[1], p[3]]), p[2])
+    q = Point2(norm(Point2(p[1], p[3])), p[2])
     s = max((cs.height - cs.radius) * q[1]^2 + cs.w^2 * (cs.height + cs.radius - 2 * q[2]),
         cs.height * q[1] - cs.w * q[2])
     if s < 0
@@ -262,7 +285,8 @@ Implements the SDF of an ideal spherical lens which is composed of two joint cut
 """
 mutable struct ThinLensSDF{T} <: AbstractSphericalLensSDF{T}
     const id::UUID
-    dir::Matrix{T}
+    dir::SMatrix{3, 3, T, 9}
+    transposed_dir::SMatrix{3, 3, T, 9}
     pos::Point3{T}
     front::CutSphereSDF{T}
     back::CutSphereSDF{T}
@@ -292,7 +316,12 @@ function ThinLensSDF(r1::L, r2::M, d::O = 1inch) where {L, M, O}
     # Rotate and move back cut sphere
     zrotate3d!(back, deg2rad(180))
     translate3d!(back, [0, s2, 0])
-    return ThinLensSDF{T}(uuid4(), Matrix{T}(I, 3, 3), zeros(T, 3), front, back)
+    return ThinLensSDF{T}(uuid4(),
+        Matrix{T}(I, 3, 3),
+        Matrix{T}(I, 3, 3),
+        zeros(T, 3),
+        front,
+        back)
 end
 
 function sdf(tl::ThinLensSDF, pos)
@@ -307,7 +336,8 @@ Implements a cylindrical lens SDF with two convex surfaces and a cylindrical mid
 """
 mutable struct BiConvexLensSDF{T} <: AbstractSphericalLensSDF{T}
     const id::UUID
-    dir::Matrix{T}
+    dir::SMatrix{3, 3, T, 9}
+    transposed_dir::SMatrix{3, 3, T, 9}
     pos::Point3{T}
     front::CutSphereSDF{T}
     back::CutSphereSDF{T}
@@ -343,7 +373,13 @@ function BiConvexLensSDF(r1::L, r2::M, l::N, d::O = 1inch) where {L, M, N, O}
     translate3d!(front, [0, -s1 + l / 2, 0])
     zrotate3d!(back, deg2rad(180))
     translate3d!(back, [0, s2 - l / 2, 0])
-    return BiConvexLensSDF{T}(uuid4(), Matrix{T}(I, 3, 3), zeros(T, 3), front, back, mid)
+    return BiConvexLensSDF{T}(uuid4(),
+        Matrix{T}(I, 3, 3),
+        Matrix{T}(I, 3, 3),
+        zeros(T, 3),
+        front,
+        back,
+        mid)
 end
 
 function sdf(bcl::BiConvexLensSDF, pos)
@@ -358,7 +394,8 @@ Implements a cylindrical lens SDF with two concave surfaces and a cylindrical mi
 """
 mutable struct BiConcaveLensSDF{T} <: AbstractSphericalLensSDF{T}
     const id::UUID
-    dir::Matrix{T}
+    dir::SMatrix{3, 3, T, 9}
+    transposed_dir::SMatrix{3, 3, T, 9}
     pos::Point3{T}
     front::SphereSDF{T}
     back::SphereSDF{T}
@@ -394,7 +431,13 @@ function BiConcaveLensSDF(r1::L, r2::M, l::N, d::O = 1inch) where {L, M, N, O}
     # Shift and rotate subtraction spheres into position
     translate3d!(front, [0, (r1 + l / 2 - s1), 0])
     translate3d!(back, [0, -(r2 + l / 2 - s2), 0])
-    return BiConcaveLensSDF{T}(uuid4(), Matrix{T}(I, 3, 3), zeros(T, 3), front, back, mid)
+    return BiConcaveLensSDF{T}(uuid4(),
+        Matrix{T}(I, 3, 3),
+        Matrix{T}(I, 3, 3),
+        zeros(T, 3),
+        front,
+        back,
+        mid)
 end
 
 function sdf(bcl::BiConcaveLensSDF, pos)
@@ -409,7 +452,8 @@ Implements a cylindrical lens SDF with one convex and one planar surface.
 """
 mutable struct PlanoConvexLensSDF{T} <: AbstractSphericalLensSDF{T}
     const id::UUID
-    dir::Matrix{T}
+    dir::SMatrix{3, 3, T, 9}
+    transposed_dir::SMatrix{3, 3, T, 9}
     pos::Point3{T}
     front::CutSphereSDF{T}
     back::CylinderSDF{T}
@@ -437,7 +481,12 @@ function PlanoConvexLensSDF(r::R, l::L, d::D = 1inch) where {R, L, D}
     back = CylinderSDF(d / 2, l / 2)
     # Shift and rotate cut spheres into position
     translate3d!(front, [0, -s + l / 2, 0])
-    return PlanoConvexLensSDF{T}(uuid4(), Matrix{T}(I, 3, 3), zeros(T, 3), front, back)
+    return PlanoConvexLensSDF{T}(uuid4(),
+        Matrix{T}(I, 3, 3),
+        Matrix{T}(I, 3, 3),
+        zeros(T, 3),
+        front,
+        back)
 end
 
 function sdf(pcl::PlanoConvexLensSDF, pos)
@@ -452,7 +501,8 @@ Implements a cylindrical lens SDF with one concave and one planar surface.
 """
 mutable struct PlanoConcaveLensSDF{T} <: AbstractSphericalLensSDF{T}
     const id::UUID
-    dir::Matrix{T}
+    dir::SMatrix{3, 3, T, 9}
+    transposed_dir::SMatrix{3, 3, T, 9}
     pos::Point3{T}
     front::SphereSDF{T}
     back::CylinderSDF{T}
@@ -482,7 +532,12 @@ function PlanoConcaveLensSDF(r::R, l::L, d::D = 1inch) where {R, L, D}
     back = CylinderSDF(d / 2, l / 2)
     # Shift and rotate subtraction sphere into position
     translate3d!(front, [0, (r + l / 2 - s), 0])
-    return PlanoConcaveLensSDF{T}(uuid4(), Matrix{T}(I, 3, 3), zeros(T, 3), front, back)
+    return PlanoConcaveLensSDF{T}(uuid4(),
+        Matrix{T}(I, 3, 3),
+        Matrix{T}(I, 3, 3),
+        zeros(T, 3),
+        front,
+        back)
 end
 
 function sdf(pcl::PlanoConcaveLensSDF, pos)
@@ -497,7 +552,8 @@ Implements a cylindrical lens SDF with one convex and one concave surface, as we
 """
 mutable struct ConvexConcaveLensSDF{T} <: AbstractSphericalLensSDF{T}
     const id::UUID
-    dir::Matrix{T}
+    dir::SMatrix{3, 3, T, 9}
+    transposed_dir::SMatrix{3, 3, T, 9}
     pos::Point3{T}
     front::CutSphereSDF{T}
     back::SphereSDF{T}
@@ -536,6 +592,7 @@ function ConvexConcaveLensSDF(r1::L, r2::M, l::N, d::O = 1inch) where {L, M, N, 
     translate3d!(front, [0, (-s1 + l / 2), 0])
     translate3d!(back, [0, -(r2 + l / 2 - s2), 0])
     return ConvexConcaveLensSDF{T}(uuid4(),
+        Matrix{T}(I, 3, 3),
         Matrix{T}(I, 3, 3),
         zeros(T, 3),
         front,

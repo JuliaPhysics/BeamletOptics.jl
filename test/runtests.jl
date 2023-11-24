@@ -564,7 +564,7 @@ end
             beam)
         # Test getters
         @test SCDI.object(system, SCDI.id(o1)) == o1
-        @test_throws "Object ID not in system" SCDI.object(system, SCDI.id(o2))
+        @test isnothing(SCDI.object(system, SCDI.id(o2)))
     end
 
     # Setup circular multipass cell with flat mirrors
