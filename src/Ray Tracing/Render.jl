@@ -9,11 +9,11 @@ render_object!(::Any, ::AbstractEntity) = nothing
 render_object!(axis, object::AbstractObject) = render_object!(axis, shape(object))
 
 """
-    render_system!(axis, system::System)
+    render_system!(axis, system::AbstractSystem)
 
 Render all objects contained in the `system`.
 """
-function render_system!(axis, system::System)
+function render_system!(axis, system::AbstractSystem)
     # Avoid use of objects(system)
     for object in system.objects
         render_object!(axis, object)
