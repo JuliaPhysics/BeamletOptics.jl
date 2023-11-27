@@ -64,7 +64,7 @@ Subtypes of `AbstractEntity` should implement the following:
 """
 abstract type AbstractEntity end
 
-id(entity::AbstractEntity) = entity.id
+id(entity::AbstractEntity)::UUID = entity.id
 id(::Any) = nothing
 
 """
@@ -410,14 +410,14 @@ mutable struct Parameters{T}
     λ::T
     n::T
     I::T
-    P::Vector{Complex{T}}
+    P::Point2{Complex{T}}
 end
 
 "Prototype constructor for `Parameters`"
 function Parameters(λ::L = 1000e-9,
         n::N = 1,
         intensity::I = 1,
-        polarization::Vector{P} = [0, 0]) where {L, N, I, P}
+        polarization::Point2{P} = Point2(0, 0)) where {L, N, I, P}
     T = promote_type(L, N, I, P)
     return Parameters{T}(λ, n, intensity, polarization)
 end

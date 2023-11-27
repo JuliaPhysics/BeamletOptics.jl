@@ -37,24 +37,25 @@ Subtypes of `AbstractRefractiveOptic` should implement all supertype reqs as wel
 # Fields
 - `n::Function`: a function which returns the refractive index for a wavelength λ
 """
-abstract type AbstractRefractiveOptic <: AbstractObject end
+abstract type AbstractRefractiveOptic{T} <: AbstractObject end
 
 refractive_index(object::AbstractRefractiveOptic) = object.n
+refractive_index(object::AbstractRefractiveOptic{<: Function}, λ::Real)::Float64 = object.n(λ)
 
 function interact3d(::AbstractSystem,
-        object::AbstractRefractiveOptic,
+        object::AbstractRefractiveOptic{T},
         ::Beam{R},
-        ray::Ray{R}) where {R}
+        ray::Ray{R}) where {T, R}
     # Check dir. of ray and surface normal
     normal = intersection(ray).n
     λ = wavelength(ray)
     if dot(direction(ray), normal) < 0
         # "Outside prism"
         n1 = 1.0
-        n2 = refractive_index(object)(λ)
+        n2 = refractive_index(object, λ)
     else
         # "Inside prism"
-        n1 = refractive_index(object)(λ)
+        n1 = refractive_index(object, λ)
         n2 = 1.0
         normal *= -1
     end
@@ -66,7 +67,7 @@ function interact3d(::AbstractSystem,
         Ray{R}(uuid4(), npos, ndir, nothing, Parameters(λ, n2)))
 end
 
-struct Lens{S <: AbstractShape, T <: Function} <: AbstractRefractiveOptic
+struct Lens{S <: AbstractShape, T <: Function} <: AbstractRefractiveOptic{T}
     id::UUID
     shape::S
     n::T
@@ -127,7 +128,7 @@ function ThinLens(R1::Real, R2::Real, d::Real, n::Function)
     return Lens(uuid4(), shape, n)
 end
 
-struct Prism{S <: AbstractShape, T <: Function} <: AbstractRefractiveOptic
+struct Prism{S <: AbstractShape, T <: Function} <: AbstractRefractiveOptic{T}
     id::UUID
     shape::S
     n::T

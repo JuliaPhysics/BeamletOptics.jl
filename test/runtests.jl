@@ -620,6 +620,24 @@ end
               SCDI.id(mirrors[(n_mirrors + 1) ÷ 2 + 2])
     end
 
+    @testset "Testing StaticSystem tracing" begin
+        # same testset as before
+        system = SCDI.StaticSystem(mirrors)
+        first_ray = SCDI.Ray(origin, dir)
+        beam = SCDI.Beam(first_ray)
+        # Test trace_system!
+        nmax = 10
+        SCDI.trace_system!(system, beam, r_max = nmax)
+        @test length(SCDI.rays(beam)) == nmax
+        SCDI.trace_system!(system, beam, r_max = 1000000)
+        @test length(SCDI.rays(beam)) == n_mirrors + 1
+        first_ray_dir = SCDI.direction(first_ray)
+        last_ray_dir = SCDI.direction(last(SCDI.rays(beam)))
+        @test 180 - rad2deg(SCDI.angle3d(first_ray_dir, last_ray_dir)) ≈ 2 * Δθ
+        @test SCDI.id(SCDI.intersection(first_ray)) ==
+              SCDI.id(mirrors[(n_mirrors + 1) ÷ 2 + 2])
+    end
+
     @testset "Testing system retracing" begin
         system = SCDI.System(mirrors)
         first_ray = SCDI.Ray(origin, dir)
@@ -630,7 +648,7 @@ end
         if t1.time < t2.time
             @warn "Retracing took longer than tracing, something might be bugged...\n   Tracing: $(t1.time) s\n   Retracing: $(t2.time) s"
         end
-    end
+    end    
 end
 
 @testset "Object groups" begin
