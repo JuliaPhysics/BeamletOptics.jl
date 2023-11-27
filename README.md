@@ -32,7 +32,7 @@ Documentation can be found here: https://optical-air-data.pages.gitlab.dlr.de/di
     - [ ] phase shift due to ref. index change
     - [ ] Multi-body container type, i.e. telescope, for easy kinematics
 - Mechanics
-    - [ ] element group handling
+    - [x] element group handling
     - [ ] vibration of optical elements
 - Plotting
     - [ ] automatic plot updates using Makie Observable/Buffer
@@ -42,7 +42,7 @@ Documentation can be found here: https://optical-air-data.pages.gitlab.dlr.de/di
     - [x] Möller-Trumbore-algorithm test
     - [x] generic mesh intersection test
     - [x] solve_system()/trace_system() test
-    - [ ] interact() tests 
+    - [x] interact() tests 
     - [x] more Lens/Meshlikes tests
 
 ## Known bugs
@@ -56,6 +56,7 @@ Documentation can be found here: https://optical-air-data.pages.gitlab.dlr.de/di
 - [x] GaussianBeamlet efield calculation fails at beam waist
 - [ ] point_on_beam calculation can be incorrect at optical surfaces
 - [ ] intersection calculation can be incorrect if two objects "touch"
+- [ ] inconsistent rotation behavior for shapes of type Mesh 
 
 ## Comments
 

@@ -196,6 +196,7 @@ Subtypes of `AbstractShape` should implement the following:
 
 ## Kinematic:
 - `translate3d!`: the object is moved by a translation vector relative to its current position
+- `translate_to3d!`: the object is moved towards the target position
 - `rotate3d!`: the object is rotated by an angle around a reference vector
 - `xrotate3d!`: rotation around the x-axis
 - `yrotate3d!`: rotation around the y-axis
@@ -233,6 +234,17 @@ Translates the `pos`ition of `shape` by the `offset`-vector.
 """
 function translate3d!(shape::AbstractShape, offset)
     position!(shape, position(shape) + offset)
+    return nothing
+end
+
+"""
+    translate_to3d!(shape::AbstractShape, target)
+
+Translates the `shape` to the `target` position. 
+"""
+function translate_to3d!(shape::AbstractShape, target)
+    current = position(shape)
+    translate3d!(shape, target - current)
     return nothing
 end
 
@@ -293,7 +305,7 @@ Subtypes of `AbstractObject` must implement the following:
 ## Functions:
 - [`intersect3d`](@ref): returns the intersection between the object and an incoming ray, defaults to the intersection with `shape(object)`
 - [`interact3d`](@ref): defines the optical interaction, should return `nothing` or an [`AbstractInteraction`](@ref)
-- for the kinematic API, all corresponding functions should be forwarded to i.e. `rotate3d!(shape(object))`
+- for the kinematic API, all corresponding functions should be forwarded to the underlying [`AbstractShape`](@ref) i.e. `rotate3d!(shape(object))`
 """
 abstract type AbstractObject <: AbstractEntity end
 
@@ -328,11 +340,7 @@ end
 
 translate3d!(object::AbstractObject, offset) = translate3d!(shape(object), offset)
 
-function translate_to3d!(obj::AbstractObject, pos)
-    current = position(obj)
-    translate3d!(obj, pos - current)
-    return nothing
-end
+translate_to3d!(object::AbstractObject, target) = translate_to3d!(shape(object), target)
 
 rotate3d!(object::AbstractObject, axis, θ) = rotate3d!(shape(object), axis, θ)
 
@@ -356,7 +364,7 @@ Subtypes of `AbstractObjectGroup` must implement the following:
 - `objects`: stores objects or additional subgroups of objects, allows for hierarchical structures
 
 ## Functions:
-- for the kinematic API, all corresponding functions must be implemented
+- for the kinematic API, all corresponding functions of [`AbstractObject`](@ref) must be implemented
 """
 abstract type AbstractObjectGroup <: AbstractObject end
 

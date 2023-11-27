@@ -14,7 +14,8 @@ render_object!(axis, object::AbstractObject) = render_object!(axis, shape(object
 Render all objects contained in the `system`.
 """
 function render_system!(axis, system::System)
-    for object in objects(system)
+    # Avoid use of objects(system)
+    for object in system.objects
         render_object!(axis, object)
     end
     return nothing

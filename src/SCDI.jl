@@ -22,6 +22,7 @@ include("Ray Tracing/SDF.jl")
 include("Ray Tracing/Gaussian.jl")
 include("Ray Tracing/System.jl")
 include("Ray Tracing/Interactions.jl")
+include("Ray Tracing/Groups.jl")
 include("Ray Tracing/Render.jl")
 
 if get(ENV, "CI", "false") == "false"

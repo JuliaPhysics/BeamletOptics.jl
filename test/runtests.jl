@@ -101,7 +101,7 @@ end
     @test isdefined(SCDI, :AbstractBeam)
     @test isdefined(SCDI, :AbstractShape)
     @test isdefined(SCDI, :AbstractObject)
-    # @test isdefined(SCDI, :AbstractObjectGroup)
+    @test isdefined(SCDI, :AbstractObjectGroup)
     @test isdefined(SCDI, :Intersection)
     @test isdefined(SCDI, :Parameters)
     @test isdefined(SCDI, :AbstractInteraction)
@@ -630,6 +630,96 @@ end
         if t1.time < t2.time
             @warn "Retracing took longer than tracing, something might be bugged...\n   Tracing: $(t1.time) s\n   Retracing: $(t2.time) s"
         end
+    end
+end
+
+@testset "Object groups" begin
+    mutable struct TestPoint{T} <: SCDI.AbstractShape{T}
+        pos::Point3{T}
+        dir::Matrix{T}
+    end
+    
+    TestPoint(position::AbstractArray{T}) where T<:Real = TestPoint{T}(Point3{T}(position), Matrix{T}(I, 3, 3))
+    
+    struct GroupTestObject <: SCDI.AbstractObject
+        id::UUID
+        shape::TestPoint{<:Real}
+    end
+    
+    GroupTestObject(position::AbstractArray) = GroupTestObject(uuid4(), TestPoint(position))
+    
+    n = 8
+    xs = [cos(x) for x in LinRange(0, 2pi*(n-1)/n, n)]
+    ys = [sin(x) for x in LinRange(0, 2pi*(n-1)/n, n)]
+    
+    center = GroupTestObject(zeros(3))
+    circle = SCDI.ObjectGroup([
+        GroupTestObject([xs[i], ys[i], 0]) for i in eachindex(xs)
+    ])
+        
+    objects = SCDI.ObjectGroup([center, circle])
+        
+    # Translation test
+    target = [3,0,0]
+    SCDI.translate_to3d!(objects, target)
+        
+    @testset "translate3d" begin
+        # Test if all objects/subgroups have been translated
+        @test SCDI.position(objects) == target
+        @test SCDI.position(center) == target
+        @test SCDI.position(circle) == target
+        for (i, obj) in enumerate(SCDI.objects(circle))
+            @test SCDI.position(obj) == [xs[i], ys[i], 0] + target
+        end
+    end
+        
+    # Rotation test
+    angle = 2π/n
+    SCDI.rotate3d!(objects, [0,0,1], angle)
+        
+    @testset "rotate3d" begin
+        # Test if all objects/subgroups have been rotated relative to the origin
+        Rt = SCDI.rotate3d([0,0,1], angle)
+        xt = circshift(xs, -1)
+        yt = circshift(ys, -1)
+        @test SCDI.orientation(objects) == Rt
+        @test SCDI.orientation(center) == Rt
+        @test SCDI.orientation(circle) == Rt
+        for (i, obj) in enumerate(SCDI.objects(circle))
+            @test SCDI.orientation(obj) == Rt
+            @test SCDI.position(obj) ≈ [xt[i], yt[i], 0] + target
+        end 
+    end
+
+    # Reset test
+    SCDI.reset_translation3d!(objects)
+    SCDI.reset_rotation3d!(objects)
+
+    @testset "reset functions" begin
+        Ri = Matrix{Float64}(I, 3, 3) 
+        # Test if objects are reset correctly
+        @test SCDI.position(objects) == zeros(3)
+        @test SCDI.position(center) == zeros(3)
+        @test SCDI.position(circle) == zeros(3)
+        @test SCDI.orientation(objects) == Ri
+        @test SCDI.orientation(center) == Ri
+        @test SCDI.orientation(circle) == Ri
+        for (i, obj) in enumerate(SCDI.objects(circle))
+            @test SCDI.orientation(obj) == Ri
+            @test SCDI.position(obj) == zeros(3)
+        end 
+    end
+
+    @testset "System compatibility" begin
+        # Test if objects in ObjectGroup are exposed correctly when iterating
+        system = SCDI.System(objects)
+        ctr = 0
+        # Only the objects within the groups should be exposed
+        for obj in SCDI.objects(system)
+            @test isa(obj, GroupTestObject)
+            ctr += 1
+        end
+        @test ctr == n+1
     end
 end
 
