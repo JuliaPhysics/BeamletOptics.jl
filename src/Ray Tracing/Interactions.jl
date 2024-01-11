@@ -6,14 +6,38 @@ A generic type to represent `AbstractObject`s which reflect incoming rays. The m
 """
 abstract type AbstractReflectiveOptic <: AbstractObject end
 
+"""
+    interact3d(AbstractReflectiveOptic, Ray)
+
+Implements the reflection of a [`Ray`](@ref) via the normal at the intersection point on an optical surface.
+"""
 function interact3d(::AbstractSystem,
         ::AbstractReflectiveOptic,
-        ::Beam{R},
-        ray::Ray{R}) where {R <: Real}
+        ::Beam{T, R},
+        ray::R) where {T <: Real, R <: Ray{T}}
     normal = intersection(ray).n
     npos = position(ray) + length(ray) * direction(ray)
     ndir = reflection3d(direction(ray), normal)
-    return BeamInteraction{R}(nothing, Ray{R}(uuid4(), npos, ndir, nothing, ray.parameters))
+    return BeamInteraction{T, R}(nothing, Ray{T}(uuid4(), npos, ndir, nothing, wavelength(ray), refractive_index(ray)))
+end
+
+"""
+    interact3d(AbstractReflectiveOptic, PolarizedRay)
+
+Implements the ideal reflection of a [`PolarizedRay`](@ref) via the normal at the intersection point on an optical surface.
+A Jones matrix of [-1 0 0; 0 1 0] is assumed as per Peatross (2015, 2023 Ed. p. 154) and Yun et al. (see [`PolarizedRay`](@ref) for more information).
+"""
+function interact3d(::AbstractSystem,
+    ::AbstractReflectiveOptic,
+    ::Beam{T, R},
+    ray::R) where {T <: Real, R <: PolarizedRay{T}}
+    normal = normal3d(intersection(ray))
+    npos = position(ray) + length(ray) * direction(ray)
+    ndir = reflection3d(direction(ray), normal)
+    # Jones reflection matrix
+    J = @SArray [-1 0 0; 0 1 0; 0 0 1]
+    E0 = _calculate_global_E0(direction(ray), ndir, J, polarization(ray))
+    return BeamInteraction{T, R}(nothing, PolarizedRay{T}(uuid4(), npos, ndir, nothing, wavelength(ray), refractive_index(ray), E0))
 end
 
 """
@@ -32,7 +56,7 @@ end
 A generic type to represent `AbstractObject`s which refract incoming rays. The main function of `interact3d` should be akin to [`refraction3d`](@ref).
 
 # Implementation reqs.
-Subtypes of `AbstractRefractiveOptic` should implement all supertype reqs as well as:
+Subtypes of `AbstractRefractiveOptic` should implement all supertype reqs. as well as:
 
 # Fields
 - `n::Function`: a function which returns the refractive index for a wavelength λ
@@ -42,12 +66,18 @@ abstract type AbstractRefractiveOptic{T} <: AbstractObject end
 refractive_index(object::AbstractRefractiveOptic) = object.n
 refractive_index(object::AbstractRefractiveOptic{<: Function}, λ::Real)::Float64 = object.n(λ)
 
+"""
+    interact3d(AbstractRefractiveOptic, Ray)
+
+Implements the refraction of a [`Ray`](@ref) at an optical surface. The "outside" ref. index is always assumed to be 1.
+At the critical angle, total internal reflection occurs (see [`refraction3d`](@ref)).
+"""
 function interact3d(::AbstractSystem,
-        object::AbstractRefractiveOptic{T},
-        ::Beam{R},
-        ray::Ray{R}) where {T, R}
+        object::AbstractRefractiveOptic,
+        ::Beam{T, R},
+        ray::R) where {T <: Real, R <: Ray{T}}
     # Check dir. of ray and surface normal
-    normal = intersection(ray).n
+    normal = normal3d(intersection(ray))
     λ = wavelength(ray)
     if dot(direction(ray), normal) < 0
         # "Outside prism"
@@ -60,11 +90,58 @@ function interact3d(::AbstractSystem,
         normal *= -1
     end
     # Calculate new dir. and pos.
-    ndir = refraction3d(direction(ray), normal, n1, n2)
+    ndir = refraction3d(direction(ray), normal, n1, n2) # FIXME: in case of TIR, n2 is not correctly set to object ref. index
     npos = position(ray) + length(ray) * direction(ray)
     # Hint is the current object ID
-    return BeamInteraction{R}(id(object),
-        Ray{R}(uuid4(), npos, ndir, nothing, Parameters(λ, n2)))
+    return BeamInteraction{T, R}(id(object),
+        Ray{T}(uuid4(), npos, ndir, nothing, wavelength(ray), n2))
+end
+
+"""
+    interact3d(AbstractRefractiveOptic, PolarizedRay)
+
+Implements the refraction of a [`PolarizedRay`](@ref) at an uncoated optical surface. The "outside" ref. index is always assumed to be 1.
+Reflection and transmission values are calculated via the [`fresnel_coefficients`](@ref). Stray light is not tracked.
+In the case of total internal reflection, only the reflected light is traced.
+"""
+function interact3d(system::AbstractSystem, optic::AbstractRefractiveOptic, ::Beam{T,R}, ray::R) where {T<:Real,R<:PolarizedRay{T}}
+    lambda = wavelength(ray)
+    normal = normal3d(intersection(ray))
+    raypos = position(ray) + length(ray) * direction(ray)
+    if dot(direction(ray), normal) < 0
+        # Entering optic
+        n1 = refractive_index(ray)
+        n2 = refractive_index(optic, lambda)
+        # Hint to test optic again
+        hint = id(optic)
+    else
+        # Exiting optic
+        n1 = refractive_index(optic, lambda)
+        n2 = refractive_index(system)
+        hint = nothing
+        # Flip normal for refraction3d
+        normal = -normal
+    end
+    # Calculate (and correct into 1. quadrant) the angle of incidence
+    θi = angle3d(direction(ray), -normal)
+    # Get Fresnel coefficients
+    rs, rp, ts, tp = fresnel_coefficients(θi, n2/n1)
+    # Optical interaction
+    if is_internally_reflected(rp, rs)
+        # Update hint and outgoing ref. index
+        hint = id(optic)
+        n2 = refractive_index(optic, lambda)
+        # Calculate reflection
+        new_dir = reflection3d(direction(ray), normal)
+        J = [-rs 0 0; 0 rp 0; 0 0 1]
+    else
+        # Calculate refraction
+        new_dir = refraction3d(direction(ray), normal, n1, n2)
+        J = [ts 0 0; 0 tp 0; 0 0 1]
+    end
+    # Calculate new polarization
+    E0 = _calculate_global_E0(direction(ray), new_dir, J, polarization(ray))
+    return BeamInteraction{T, R}(hint, PolarizedRay{T}(uuid4(), raypos, new_dir, nothing, wavelength(ray), n2, E0))
 end
 
 struct Lens{S <: AbstractShape, T <: Function} <: AbstractRefractiveOptic{T}
@@ -100,7 +177,6 @@ function SphericalLens(r1::Real, r2::Real, l::Real, d::Real = 1inch, n::Function
     # # Test for thin lens
     if iszero(l)
         shape = ThinLensSDF(r1, r2, d)
-        # goto to avoid overwrite
     elseif isinf(r1) && isinf(r2)# Test for cylinder lens. FIXME: This is incomplete!
         shape = CylinderSDF(d / 2, l / 2)
     elseif isinf(r2) # Test for plano lens
@@ -279,23 +355,41 @@ end
 
 Base.isvalid(bs::BeamSplitter) = reflectance(bs)^2 + transmittance(bs)^2 ≈ 1
 
-@inline function _beamsplitter_transmitted_beam(ray::Ray)
+@inline function _beamsplitter_transmitted_beam(::BeamSplitter, ray::Ray)
     pos = position(ray) + length(ray) * direction(ray)
     dir = direction(ray)
     return Beam(Ray(pos, dir, wavelength(ray)))
 end
 
-@inline function _beamsplitter_reflected_beam(ray::Ray)
+@inline function _beamsplitter_reflected_beam(::BeamSplitter, ray::Ray)
     normal = normal3d(intersection(ray))
     pos = position(ray) + length(ray) * direction(ray)
     dir = reflection3d(direction(ray), normal)
     return Beam(Ray(pos, dir, wavelength(ray)))
 end
 
-function interact3d(::AbstractSystem, ::BeamSplitter, beam::Beam{R}, ray::Ray{R}) where {R}
+function _beamsplitter_transmitted_beam(bs::BeamSplitter, ray::PolarizedRay)
+    J = @SArray [transmittance(bs) 0 0; 0 transmittance(bs) 0; 0 0 1]
+    pos = position(ray) + length(ray) * direction(ray)
+    dir = direction(ray)
+    E0 =  _calculate_global_E0(dir, dir, J, polarization(ray))
+    return Beam(PolarizedRay(pos, dir, wavelength(ray), E0))
+end
+
+function _beamsplitter_reflected_beam(bs::BeamSplitter, ray::PolarizedRay)
+    J = @SArray [-reflectance(bs) 0 0; 0 reflectance(bs) 0; 0 0 1]
+    normal = normal3d(intersection(ray))
+    pos = position(ray) + length(ray) * direction(ray)
+    in_dir = direction(ray)
+    out_dir = reflection3d(in_dir, normal)
+    E0 =  _calculate_global_E0(in_dir, out_dir, J, polarization(ray))
+    return Beam(PolarizedRay(pos, out_dir, wavelength(ray), E0))
+end
+
+function interact3d(::AbstractSystem, bs::BeamSplitter, beam::Beam{T, R}, ray::R) where {T<:Real, R<:AbstractRay{T}}
     # Push transmitted and reflected beams to system
     children!(beam,
-        [_beamsplitter_transmitted_beam(ray), _beamsplitter_reflected_beam(ray)])
+        [_beamsplitter_transmitted_beam(bs, ray), _beamsplitter_reflected_beam(bs, ray)])
     # Stop for beam spawning
     return nothing
 end
@@ -308,17 +402,17 @@ For more information refer to [`ThinBeamSplitter`](@ref).
 """
 function interact3d(::AbstractSystem, bs::BeamSplitter, gauss::GaussianBeamlet, ray_id::Int)
     # Transmitted gauss
-    chief = _beamsplitter_transmitted_beam(rays(gauss.chief)[ray_id])
-    waist = _beamsplitter_transmitted_beam(rays(gauss.waist)[ray_id])
-    divergence = _beamsplitter_transmitted_beam(rays(gauss.divergence)[ray_id])
+    chief = _beamsplitter_transmitted_beam(bs, rays(gauss.chief)[ray_id])
+    waist = _beamsplitter_transmitted_beam(bs, rays(gauss.waist)[ray_id])
+    divergence = _beamsplitter_transmitted_beam(bs, rays(gauss.divergence)[ray_id])
     λ = wavelength(gauss)
     w0 = gauss_parameters(gauss, length(gauss))[4]
     E0 = transmittance(bs) * beam_amplitude(gauss)
     t = GaussianBeamlet(chief, waist, divergence, λ, w0, E0)
     # Reflected gauss
-    chief = _beamsplitter_reflected_beam(rays(gauss.chief)[ray_id])
-    waist = _beamsplitter_reflected_beam(rays(gauss.waist)[ray_id])
-    divergence = _beamsplitter_reflected_beam(rays(gauss.divergence)[ray_id])
+    chief = _beamsplitter_reflected_beam(bs, rays(gauss.chief)[ray_id])
+    waist = _beamsplitter_reflected_beam(bs, rays(gauss.waist)[ray_id])
+    divergence = _beamsplitter_reflected_beam(bs, rays(gauss.divergence)[ray_id])
     λ = wavelength(gauss)
     w0 = gauss_parameters(gauss, length(gauss))[4]
     E0 = reflectance(bs) * beam_amplitude(gauss)

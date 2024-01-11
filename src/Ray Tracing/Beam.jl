@@ -2,43 +2,65 @@
     Beam
 
 Stores the rays that are calculated from geometric optics when propagating through an optical system.
+The `Beam` type is parametrically defined by the [`AbstractRay`](@ref) subtype that it stores.
 
 # Fields
 - `id`: beam ID (uuid4)
-- `rays`: vector of `Ray` objects, representing the rays that make up the beam
+- `rays`: vector of `AbstractRay` objects, representing the rays that make up the beam
 - `parent`: reference to the parent beam, if any ([`Nullable`](@ref) to account for the root beam which has no parent)
 - `children`: vector of child beams, each child beam represents a branching or bifurcation of the original beam, i.e. beam-splitting
 """
-mutable struct Beam{T} <: AbstractBeam{T}
+mutable struct Beam{T, R <: AbstractRay{T}} <: AbstractBeam{T, R}
     id::UUID
-    rays::Vector{Ray{T}}
-    parent::Nullable{Beam{T}}
-    children::Vector{Beam{T}}
+    rays::Vector{R}
+    parent::Nullable{Beam{T, R}}
+    children::Vector{Beam{T, R}}
 end
 
 rays(b::Beam) = b.rays
 
 Base.push!(b::Beam, ray::AbstractRay) = push!(b.rays, ray)
 
-Beam(ray::Ray{T}) where {T} = Beam{T}(uuid4(), [ray], nothing, Vector{Beam{T}}())
+function Beam(ray::R) where {T, R <: AbstractRay{T}}
+    Beam{T, R}(uuid4(), [ray], nothing, Vector{Beam{T, R}}())
+end
 
-struct BeamInteraction{R <: Real} <: AbstractInteraction
+struct BeamInteraction{T <: Real, R <: AbstractRay{T}} <: AbstractInteraction
     id::Nullable{UUID}
-    ray::Ray{R}
+    ray::R
 end
 
 Base.push!(b::Beam, interaction::BeamInteraction) = push!(b, interaction.ray)
 
-function Base.replace!(beam::Beam{T}, interaction::BeamInteraction{T}, index::Int) where {T}
+function Base.replace!(beam::Beam{<:Real, <:Ray}, interaction::BeamInteraction{<:Real, <:Ray}, index::Int)
     position!(rays(beam)[index], position(interaction.ray))
     direction!(rays(beam)[index], direction(interaction.ray))
-    parameters!(rays(beam)[index], parameters(interaction.ray))
+    wavelength!(rays(beam)[index], wavelength(interaction.ray))
+    refractive_index!(rays(beam)[index], refractive_index(interaction.ray))
 end
 
-function _modify_beam_head!(old::Beam{T}, new::Beam{T}) where {T <: Real}
+function Base.replace!(beam::Beam{<:Real, <:PolarizedRay}, interaction::BeamInteraction{<:Real, <:PolarizedRay}, index::Int)
+    position!(rays(beam)[index], position(interaction.ray))
+    direction!(rays(beam)[index], direction(interaction.ray))
+    wavelength!(rays(beam)[index], wavelength(interaction.ray))
+    refractive_index!(rays(beam)[index], refractive_index(interaction.ray))
+    polarization!(rays(beam)[index], polarization(interaction.ray))
+end
+
+function _modify_beam_head!(old::Beam{T, R}, new::Beam{T, R}) where {T<:Real, R<:Ray{T}}
     position!(first(rays(old)), position(first(rays(new))))
     direction!(first(rays(old)), direction(first(rays(new))))
-    parameters!(first(rays(old)), parameters(first(rays(new))))
+    wavelength!(first(rays(old)), wavelength(first(rays(new))))
+    refractive_index!(first(rays(old)), refractive_index(first(rays(new))))
+    return nothing
+end
+
+function _modify_beam_head!(old::Beam{T, R}, new::Beam{T, R}) where {T<:Real, R<:PolarizedRay{T}}
+    position!(first(rays(old)), position(first(rays(new))))
+    direction!(first(rays(old)), direction(first(rays(new))))
+    wavelength!(first(rays(old)), wavelength(first(rays(new))))
+    refractive_index!(first(rays(old)), refractive_index(first(rays(new))))
+    polarization!(first(rays(old)), polarization(first(rays(new))))
     return nothing
 end
 

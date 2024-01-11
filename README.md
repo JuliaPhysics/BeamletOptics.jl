@@ -47,7 +47,8 @@ Documentation can be found here: https://optical-air-data.pages.gitlab.dlr.de/di
 
 ## Known bugs
 
-- [ ] inconsistent use of nm, m, mm (i.e. in Ray constructor, Parameters)
+- [ ] interact3d for AbstractRefractiveOptic/Abstract Ray: n2 not correctly set in case of TIR
+- [ ] inconsistent use of nm, m, mm (i.e. in Ray constructor)
 - [x] align3d rotation incorrect if start = -target
 - [ ] @code_warntype for interact(Lens, Beam)
 - [ ] change names for functions that return matrices

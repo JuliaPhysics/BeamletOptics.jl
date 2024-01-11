@@ -26,6 +26,25 @@ function normal3d(target, reference)
 end
 
 """
+    normal3d(input)
+
+Returns a **random** vector with unit length that is perpendicular to the `input` vector.
+"""
+function normal3d(input::AbstractArray)
+    # Gram-Schmidt method with random init
+    new = rand(3)
+    # Account for non-normed input vector
+    new -= dot(new, input) * input / norm(input)^2
+    return normalize(new)
+end
+
+function normal3d(input::Point3)
+    new = rand(Point3)
+    new -= dot(new, input) * input / norm(input)^2
+    return normalize(new)
+end
+
+"""
     rotate3d(reference::Vector, θ)
 
 Returns the rotation matrix that will rotate a vector around the reference axis at an angle
@@ -143,7 +162,11 @@ end
 
 Calculates the refraction between an input vector `dir` and surface `normal` vector  in 3D-space.\\
 `n1` is the "outside" refractive index and `n2` is the "inside" refractive index.\\
+
 Vectors `dir` and `normal` must have **unit length**!
+
+# Total internal reflection
+If the critical angle for n1, n2 and the incident angle is reached, the ray is reflected instead!
 """
 function refraction3d(dir, normal, n1, n2)
     # dir and normal must have unit length!
@@ -221,5 +244,39 @@ Calculates the E-field phasor in [V/m] for a given intensity `I` and phase ϕ. V
 """
 electric_field(I::Real, Z=Z_vacuum, ϕ=0) = sqrt(2 * I * Z) * exp(im * ϕ)
 
-"Calculates the intensity in [W/m²] for a given electric field phasor `E`. Vacuum wave impedance is assumed."
-intensity(E::Complex, Z=Z_vacuum) = abs2(E) / (2 * Z)
+"Calculates the intensity in [W/m²] for a given complex electric field phasor `E`. Vacuum wave impedance is assumed."
+intensity(E::Number, Z=Z_vacuum) = abs2(E) / (2 * Z)
+
+"""
+fresnel_coefficients(θ, n)
+
+Calculates the complex Fresnel coefficients for reflection and transmission based on the incident angle `θ` in [rad]
+and the refractive index ratio `n = n₂ / n₁`. Returns rₛ, rₚ, tₛ and tₚ.
+
+# Signs
+The signs of rₛ, rₚ are based on the definition by Fowles (1975, 2nd Ed. p. 44) and Peatross (2015, 2023 Ed. p. 78)
+"""
+function fresnel_coefficients(θ::T, n::Number) where T
+    C = Complex{T}
+    cost = cos(θ)
+    n2s2 = sqrt(C(n^2 - sin(θ)^2))
+    # Calculate coefficients for reflection/transmission
+    rs = (cost - n2s2) / (cost + n2s2)
+    rp = (-n^2 * cost + n2s2) / (n^2 * cost + n2s2)
+    ts = rs + 1
+    tp = 2*n*cost / (n^2 * cost + n2s2)
+    return rs, rp, ts, tp
+end
+
+function fresnel_coefficients(θ::AbstractArray{T}, n::Number) where T
+    rs = Vector{Complex{T}}(undef, length(θ))
+    rp = Vector{Complex{T}}(undef, length(θ))
+    ts = Vector{Complex{T}}(undef, length(θ))
+    tp = Vector{Complex{T}}(undef, length(θ))
+    for (i, theta) in enumerate(θ)
+        rs[i], rp[i], ts[i], tp[i] = fresnel_coefficients(theta, n)
+    end
+    return rs, rp, ts, tp
+end
+
+is_internally_reflected(rp::Number, rs::Number) = isapprox(abs2(rs), 1, atol=1e-6) && isapprox(abs2(rp), 1, atol=1e-6)

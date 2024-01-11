@@ -30,8 +30,8 @@ Compared to `System` this way defining the system is less flexible, i.e. no elem
 can be added or removed after construction but it allows for more performant ray-tracing.
 
 !!! warning
-This type uses long tuples for storing the elements. This container should not be used
-for very large optical systems as it puts a lot of stress onto the compiler.
+    This type uses long tuples for storing the elements. This container should not be used
+    for very large optical systems as it puts a lot of stress onto the compiler.
 
 # Fields
 - `id::UUID`: system ID (uuid4)
@@ -90,7 +90,7 @@ function retrace_system!(::AbstractSystem, beam::B) where {B <: AbstractBeam}
     return nothing
 end
 
-@inline function trace_all(system::AbstractSystem, ray::Ray{R}) where {R}
+@inline function trace_all(system::AbstractSystem, ray::AbstractRay{R}) where {R}
     intersection::Nullable{Intersection{R}} = nothing
     for object in objects(system)
         # Find shortest intersection
@@ -112,7 +112,7 @@ end
     return intersection
 end
 
-@inline function trace_one(system::AbstractSystem, ray::Ray{R}, hint::UUID) where {R}
+@inline function trace_one(system::AbstractSystem, ray::AbstractRay{R}, hint::UUID) where {R}
     # Trace against hinted object
     intersection = intersect3d(object(system, hint), ray)
     # If hinted object is not intersected, trace the entire system
@@ -123,7 +123,7 @@ end
 end
 
 @inline function tracing_step!(system::AbstractSystem,
-        ray::Ray{R},
+        ray::AbstractRay{R},
         hint::Nullable{UUID}) where {R <: Real}
     if isnothing(hint)
         # Test against all objects in system
@@ -315,7 +315,7 @@ function retrace_system!(system::AbstractSystem, gauss::GaussianBeamlet{T}) wher
 end
 
 """
-    solve_system!(system::System, beam::AbstractBeam; r_max=20, retrace=true)
+    solve_system!(system::System, beam::AbstractBeam; r_max=100, retrace=true)
 
 Manage the tracing of an `AbstractBeam` through an optical `system`. The function retraces the `beam` if possible and then proceeds to trace each leaf of the beam tree through the system.
 The condition to stop ray tracing is that the last `beam` intersection is `nothing` or the beam interaction is `nothing`. Then, the system is considered to be solved.
@@ -324,10 +324,10 @@ A maximum number of rays per `beam` (`r_max`) can be specified in order to avoid
 # Arguments
 - `system::System`: The optical system in which the beam will be traced.
 - `beam::AbstractBeam`: The beam object to be traced through the system.
-- `r_max::Int=20` (optional): Maximum number of tracing iterations for each leaf. Default is 20.
+- `r_max::Int=20` (optional): Maximum number of tracing iterations for each leaf. Default is 100.
 - `retrace::Bool=true` (optional): Flag to indicate if the system should be retraced. Default is true.
 """
-function solve_system!(system::AbstractSystem, beam::AbstractBeam; r_max = 20, retrace = true)
+function solve_system!(system::AbstractSystem, beam::AbstractBeam; r_max = 100, retrace = true)
     B = nodetype(beam)
     # Retrace system, use stateless iterator for appendability
     if retrace
@@ -346,12 +346,12 @@ function solve_system!(system::AbstractSystem, beam::AbstractBeam; r_max = 20, r
     return nothing
 end
 
-function AbstractTrees.printnode(io::IO, node::B; kw...) where {B <: SCDI.AbstractObject}
+function AbstractTrees.printnode(io::IO, node::B; kw...) where {B <: AbstractObject}
     show(io, B)
 end
 function AbstractTrees.printnode(io::IO,
         node::B;
-        kw...) where {B <: SCDI.AbstractObjectGroup}
+        kw...) where {B <: AbstractObjectGroup}
     show(io, B)
 end
 

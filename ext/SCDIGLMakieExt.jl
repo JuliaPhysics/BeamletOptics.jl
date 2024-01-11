@@ -1,10 +1,11 @@
 module SCDIGLMakieExt
 
-using SCDI: faces, vertices, AbstractMesh, AbstractRay
-import SCDI: render_object!,
+using SCDI: faces, vertices, AbstractMesh, AbstractRay, Beam, PolarizedRay, intensity, rays
+import SCDI: render_object!, render_ray!, _render_beam!,
     _render_ray!, render_gaussian_beam_surface!, _render_object_normal!, render_sdf_mesh!
-using GLMakie: Axis3, mesh!, surface!, lines!
+using GLMakie: Axis3, mesh!, surface!, lines!, RGBAf
 using GeometryBasics: Point2, Point3
+using AbstractTrees: PreOrderDFS
 
 function render_object!(axis::Axis3, mesh::AbstractMesh)
     mesh!(axis, vertices(mesh), faces(mesh), transparency = true)
@@ -20,6 +21,17 @@ function _render_ray!(axis::Axis3,
         [ray.pos[2], ray_end[2]],
         [ray.pos[3], ray_end[3]],
         color=color)
+    return nothing
+end
+
+function _render_beam!(axis, beam::Beam{T, R}; color=:red, flen=1.0) where {T<:Real, R<:PolarizedRay{T}}
+    I0 = intensity(first(rays(beam)))
+    for child in PreOrderDFS(beam)
+        for ray in rays(child)
+            I = intensity(ray)
+            render_ray!(axis, ray, color = RGBAf(1,0,0, I/I0), flen = flen)
+        end
+    end
     return nothing
 end
 
