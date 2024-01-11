@@ -4,11 +4,11 @@
 Ray representation of the **unastigmatic** Gaussian beam as per J. Arnaud (1985).
 The beam quality `M2` is fully considered via the divergence angle.
 """
-mutable struct GaussianBeamlet{T} <: AbstractBeam{T}
+mutable struct GaussianBeamlet{T} <: AbstractBeam{T, Ray{T}}
     id::UUID
-    chief::Beam{T}
-    waist::Beam{T}
-    divergence::Beam{T}
+    chief::Beam{T, Ray{T}}
+    waist::Beam{T, Ray{T}}
+    divergence::Beam{T, Ray{T}}
     λ::T
     w0::T
     E0::Complex{T}
@@ -16,9 +16,9 @@ mutable struct GaussianBeamlet{T} <: AbstractBeam{T}
     children::Vector{GaussianBeamlet{T}}
 end
 
-function GaussianBeamlet(chief::Beam{T},
-        waist::Beam{T},
-        div::Beam{T},
+function GaussianBeamlet(chief::Beam{T, Ray{T}},
+        waist::Beam{T, Ray{T}},
+        div::Beam{T, Ray{T}},
         λ::T,
         w0::T,
         E0::Complex{T}) where {T <: Real}
@@ -129,7 +129,7 @@ function GaussianBeamlet(chief::Ray{T},
     div_dir = normalize(direction(chief) + bob_the_builder * tan(θ))
     η = Ray(position(chief), div_dir, λ)
     # Ensure that lambda is correct
-    chief.parameters.λ = λ
+    wavelength!(chief, λ)
     # Calculate E0 based on P0, assume zero initial phase offset
     I0 = 2 * P0 / (π * w0^2)
     E0 = electric_field(I0)
@@ -157,7 +157,6 @@ Calculate the local waist radius and Gouy phase of an unastigmatic Gaussian beam
 function gauss_parameters(gauss::GaussianBeamlet,
         z::Real;
         hint = nothing)
-
     if isnothing(hint)
         p0, index = point_on_beam(gauss, z)
     else

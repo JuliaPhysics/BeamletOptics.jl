@@ -54,6 +54,15 @@ function render_beam!(axis, beam::Beam; color = :blue, flen = 1.0)
     return nothing
 end
 
+# """
+#     render_beam!(axis, beam::Beam{Real, PolarizedRay}; color = :red, flen=1.0)
+
+# Render a [`PolarizedRay`](@ref) beam. The line alpha is lowered in relation to the beam starting intensity
+# """
+# render_beam!(axis, beam::Beam{T, R}; color=:red, flen=1.0) where {T<:Real, R<:PolarizedRay{T}} = _render_beam!(axis, beam, color=color, flen=flen)
+
+_render_beam!(::Any, ::AbstractBeam; color=:red, flen=1.0) = nothing
+
 """
     render_beam!(axis, gauss::GaussianBeamlet; color=:red, flen=0.1, show_beams=false)
 
@@ -62,12 +71,21 @@ Render the surface of a `GaussianBeamlet` as `color`. With `show_beams` the gene
 - `chief` ray: red
 - `divergence` ray: green
 - `waist` ray: blue
+
+# Keyword args
+- `color = :red`: color of the beam as per the Makie syntax, i.e. :blue
+- `flen = 0.1`: length of the final beam in case of no intersection
+-`show_beams = false`: plot the generating rays of the [`GaussianBeamlet`](@ref)
+-`r_res::Int = 50`: radial resolution of the beam
+-`z_res::Int = 100`: resolution along the optical axis of the beam
 """
 function render_beam!(axis,
         gauss::GaussianBeamlet{T};
         color = :red,
         flen = 0.1,
-        show_beams = false) where {T}
+        show_beams = false,
+        r_res = 50,
+        z_res = 100) where {T}
     for child in PreOrderDFS(gauss)
         # Length tracking variable
         p = AbstractTrees.parent(child)
@@ -80,11 +98,11 @@ function render_beam!(axis,
         for ray in rays(child.chief)
             # Generate local u, v coords
             if isnothing(intersection(ray))
-                u = LinRange(0, flen, 50)
+                u = LinRange(0, flen, z_res)
             else
-                u = LinRange(0, length(ray), 50)
+                u = LinRange(0, length(ray), z_res)
             end
-            v = LinRange(0, 2π, 20)
+            v = LinRange(0, 2π, r_res)
             # Calculate beam surface at origin along y-axis
             w = gauss_parameters(child, u .+ l)[1]
             X = [w[i] * cos(v) for (i, u) in enumerate(u), v in v]
@@ -122,7 +140,7 @@ function render_object_normals!(axis, mesh::Mesh; l = 0.01)
         nml = normal3d(mesh, fID)
         pos = @view mesh.vertices[mesh.faces[fID, 1], :]
         vec = pos + l * nml
-        _render_object_normal!(axis, pos, vec; color=blue)
+        _render_object_normal!(axis, pos, vec; color=:blue)
     end
     return nothing
 end

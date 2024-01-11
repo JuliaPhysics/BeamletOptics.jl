@@ -6,21 +6,31 @@ using UUIDs
 using AbstractTrees
 
 @testset "Utilities" begin
-    @testset "Testing euclidic norm utilites" begin
-        v = [1.0, 0.0, 1.0]
-        @test isapprox(norm(v), sqrt(2))
-        @test isapprox(SCDI.normalize(v), [sqrt(2) / 2, 0, sqrt(2) / 2])
-        SCDI.normalize!(v)
-        @test isapprox(v, [sqrt(2) / 2, 0, sqrt(2) / 2])
+    @testset "Testing normal3d" begin
+        @testset "normal3d(v) with Array" begin
+            v = [1., 1, 1]
+            k = SCDI.normal3d(v)
+            @test dot(v, k) ≈ 0 atol=1e-14
+            @test norm(k) ≈ 1
+        end
+    
+        @testset "normal3d(v) with Point3" begin
+            v = Point3(1., 1, 1)
+            k = SCDI.normal3d(v)
+            @test dot(v, k) ≈ 0 atol=1e-14
+            @test norm(k) ≈ 1
+        end
+    
+        @testset "normal3d(v, w) right hand rule and unit length" begin
+            orth = SCDI.normal3d([2, 0, 0], [0, 0, 1])
+            @test isapprox(orth, [0, -1, 0])
+        end
     end
 
-    @debug "Testing normal3d for right hand rule and unit length"
-    orth = SCDI.normal3d([2, 0, 0], [0, 0, 1])
-    @test isapprox(orth, [0, -1, 0])
-
-    @debug "Testing rotate3d for clockwise dir. and conservation of length"
-    Rot = SCDI.rotate3d([0, 0, 1], π / 2)
-    @test isapprox(Rot * [1, 0, 0], [0, 1, 0])
+    @testset "Testing rotate3d for clockwise dir. and conservation of length" begin
+        Rot = SCDI.rotate3d([0, 0, 1], π / 2)
+        @test isapprox(Rot * [1, 0, 0], [0, 1, 0])
+    end
 
     @testset "Testing align3d for rotation and conservation of length" begin
         # Start vector must have unit length!
@@ -92,6 +102,63 @@ using AbstractTrees
             end
         end
     end
+
+    @testset "Fresnel equations" begin
+        @testset "Vacuum-glass: normal incidence" begin
+            n = 1.5
+            θ = 0.0
+            rs, rp, ts, tp = SCDI.fresnel_coefficients(θ, n)
+            @test real(rs) ≈ (1-n)/(1+n)
+            @test real(rs) ≈ real(rp)
+            @test real(tp) ≈ 2/(1+n)
+            @test real(tp) ≈ real(ts)
+        end
+        
+        @testset "Vacuum-glass: Brewster angle" begin
+            n = 1.5
+            θb = atan(n)
+            rs, rp, ts, tp = SCDI.fresnel_coefficients(θb, n)
+            @test real(rp) ≈ 0
+        end
+        
+        @testset "Vacuum-glass: grazing incidence" begin
+            n = 1.5
+            θ = π/2
+            rs, rp, ts, tp = SCDI.fresnel_coefficients(θ, n)
+            @test real(rs) ≈ -1
+            @test real(rp) ≈ 1
+            @test real(ts) ≈ 0
+            @test real(tp) ≈ 0 atol=2e-16
+        end
+        
+        @testset "Glass-vacuum: normal incidence" begin
+            n = 1/1.5
+            θ = 0.0
+            rs, rp, ts, tp = SCDI.fresnel_coefficients(θ, n)
+            @test real(rs) ≈ (1-n)/(1+n)
+            @test real(rs) ≈ real(rp)
+            @test real(tp) ≈ 2/(1+n)
+            @test real(tp) ≈ real(ts)
+        end
+        
+        @testset "Glass-vacuum: Brewster angle" begin
+            n = 1/1.5
+            θb = atan(n)
+            rs, rp, ts, tp = SCDI.fresnel_coefficients(θb, n)
+            @test real(rp) ≈ 0 atol=2e-16
+        end
+        
+        @testset "Glass-vacuum: Total internal reflection" begin
+            n = 1/1.5
+            θc = asin(n)
+            rs, rp, ts, tp = SCDI.fresnel_coefficients(θc, n)
+            @test SCDI.is_internally_reflected(rp, rs)
+            @test real(rs) ≈ 1
+            @test real(rp) ≈ -1
+            @test real(ts) ≈ 2
+            @test real(tp) ≈ 3 atol=1e-15
+        end
+    end
 end
 
 @testset "Types" begin
@@ -103,7 +170,6 @@ end
     @test isdefined(SCDI, :AbstractObject)
     @test isdefined(SCDI, :AbstractObjectGroup)
     @test isdefined(SCDI, :Intersection)
-    @test isdefined(SCDI, :Parameters)
     @test isdefined(SCDI, :AbstractInteraction)
 
     # Generate test structs
@@ -127,20 +193,34 @@ end
     mutable struct TestRay{T} <: SCDI.AbstractRay{T}
         pos::Vector{T}
         dir::Vector{T}
+        λ::T
+        n::T
     end
+
+    TestRay(pos::AbstractArray{T}, dir::AbstractArray{T}) where T = TestRay(pos, dir, T(1000e-9), T(1))
 
     Base.length(::TestRay) = π
 
     @testset "AbstractRay" begin
         r = TestRay([0.0, 0, 0], [1.0, 0, 0])
+        # Test getters
         @test SCDI.position(r) == r.pos
         @test SCDI.direction(r) == r.dir
+        @test SCDI.wavelength(r) == r.λ
+        @test SCDI.refractive_index(r) == r.n
+        # Test setters
         n_pos = [1, 1, 1]
         n_dir = [1.0, 1, 0]
+        n_lam = 532e-9
+        n_rfi = 1.5
         SCDI.position!(r, n_pos)
         SCDI.direction!(r, n_dir)
+        SCDI.wavelength!(r, n_lam)
+        SCDI.refractive_index!(r, n_rfi)
         @test SCDI.position(r) == n_pos
         @test SCDI.direction(r) ≈ n_dir .* (sqrt(2) / 2)
+        @test SCDI.wavelength(r) == n_lam
+        @test SCDI.refractive_index(r) == n_rfi
         @test length(r) == π
         # Test ray-plane intersection
         plane_pos = [1, 0, -1]
@@ -156,7 +236,7 @@ end
         @test isnothing(is_3)
     end
 
-    mutable struct TestBeam{T} <: SCDI.AbstractBeam{T}
+    mutable struct TestBeam{T} <: SCDI.AbstractBeam{T, TestRay{T}}
         id::UUID
         parent::SCDI.Nullable{TestBeam}
         children::Vector{TestBeam}
@@ -502,16 +582,40 @@ end
 
     # Orientation-less test point sdf
     mutable struct TestPointSDF{T} <: SCDI.AbstractSDF{T}
-        pos::Point3{T}
+        position::Point3{T}
+        orientation::Matrix{T}
     end
-
-    TestPointSDF(p::AbstractArray{T}) where {T} = TestPointSDF{T}(Point3{T}(p))
+    
+    TestPointSDF(p::AbstractArray{T}) where {T} = TestPointSDF{T}(Point3{T}(p), Matrix{T}(I, 3, 3))
+    TestPointSDF(T = Float64) = TestPointSDF{T}(Point3{T}(0), Matrix{T}(I, 3, 3))
+    
+    SCDI.position(tps::TestPointSDF) = tps.position
+    SCDI.position!(tps::TestPointSDF{T}, new::Point3{T}) where T = (tps.position = new)
+    
+    SCDI.orientation(tps::TestPointSDF) = tps.orientation
+    SCDI.orientation!(tps::TestPointSDF{T}, new::Matrix{T}) where T = (tps.orientation = new)
+    
+    SCDI.transposed_orientation(tps::TestPointSDF) = transpose(tps.orientation)
+    SCDI.transposed_orientation!(::TestPointSDF, ::Any) = nothing
 
     orientation(::TestPointSDF{T}) where {T} = Matrix{T}(I, 3, 3)
     orientation!(::TestPointSDF, ::Any) = nothing
 
-    function SCDI.sdf(tp::TestPointSDF, point)
-        return norm(SCDI.position(tp) - point)
+    function SCDI.sdf(tps::TestPointSDF, point)
+        p = SCDI._world_to_sdf(tps, point)
+        return norm(p)
+    end
+
+    @testset "Testing kinematics and transforms" begin
+        point = TestPointSDF()
+        t = 10
+        θ = deg2rad(30)
+        SCDI.translate3d!(point, [t, 0, 0])
+        SCDI.rotate3d!(point, [0,1,0], θ)
+        pt = SCDI._world_to_sdf(point, [0,0,0])
+        @test pt[1] ≈ -t * cos(θ)
+        @test pt[2] ≈ 0
+        @test pt[3] ≈ -t * sin(θ)
     end
 
     @testset "Testing intersect3d" begin
@@ -546,10 +650,8 @@ end
 end
 
 @testset "System" begin
-    include("Cube.jl")
-
     @testset "Testing implementation" begin
-        struct SystemTestBeam{T} <: SCDI.AbstractBeam{T} end
+        struct SystemTestBeam{T} <: SCDI.AbstractBeam{T, SCDI.Ray{T}} end
         struct SystemTestObject <: SCDI.AbstractObject
             id::UUID
         end
@@ -648,7 +750,7 @@ end
         if t1.time < t2.time
             @warn "Retracing took longer than tracing, something might be bugged...\n   Tracing: $(t1.time) s\n   Retracing: $(t2.time) s"
         end
-    end    
+    end
 end
 
 @testset "Object groups" begin
@@ -656,31 +758,30 @@ end
         pos::Point3{T}
         dir::Matrix{T}
     end
-    
-    TestPoint(position::AbstractArray{T}) where T<:Real = TestPoint{T}(Point3{T}(position), Matrix{T}(I, 3, 3))
-    
+
+    TestPoint(position::AbstractArray{T}) where {T <: Real} = TestPoint{T}(Point3{T}(position),
+        Matrix{T}(I, 3, 3))
+
     struct GroupTestObject <: SCDI.AbstractObject
         id::UUID
         shape::TestPoint{<:Real}
     end
-    
+
     GroupTestObject(position::AbstractArray) = GroupTestObject(uuid4(), TestPoint(position))
-    
+
     n = 8
-    xs = [cos(x) for x in LinRange(0, 2pi*(n-1)/n, n)]
-    ys = [sin(x) for x in LinRange(0, 2pi*(n-1)/n, n)]
-    
+    xs = [cos(x) for x in LinRange(0, 2pi * (n - 1) / n, n)]
+    ys = [sin(x) for x in LinRange(0, 2pi * (n - 1) / n, n)]
+
     center = GroupTestObject(zeros(3))
-    circle = SCDI.ObjectGroup([
-        GroupTestObject([xs[i], ys[i], 0]) for i in eachindex(xs)
-    ])
-        
+    circle = SCDI.ObjectGroup([GroupTestObject([xs[i], ys[i], 0]) for i in eachindex(xs)])
+
     objects = SCDI.ObjectGroup([center, circle])
-        
+
     # Translation test
-    target = [3,0,0]
+    target = [3, 0, 0]
     SCDI.translate_to3d!(objects, target)
-        
+
     @testset "translate3d" begin
         # Test if all objects/subgroups have been translated
         @test SCDI.position(objects) == target
@@ -690,14 +791,14 @@ end
             @test SCDI.position(obj) == [xs[i], ys[i], 0] + target
         end
     end
-        
+
     # Rotation test
-    angle = 2π/n
-    SCDI.rotate3d!(objects, [0,0,1], angle)
-        
+    angle = 2π / n
+    SCDI.rotate3d!(objects, [0, 0, 1], angle)
+
     @testset "rotate3d" begin
         # Test if all objects/subgroups have been rotated relative to the origin
-        Rt = SCDI.rotate3d([0,0,1], angle)
+        Rt = SCDI.rotate3d([0, 0, 1], angle)
         xt = circshift(xs, -1)
         yt = circshift(ys, -1)
         @test SCDI.orientation(objects) == Rt
@@ -706,7 +807,7 @@ end
         for (i, obj) in enumerate(SCDI.objects(circle))
             @test SCDI.orientation(obj) == Rt
             @test SCDI.position(obj) ≈ [xt[i], yt[i], 0] + target
-        end 
+        end
     end
 
     # Reset test
@@ -714,7 +815,7 @@ end
     SCDI.reset_rotation3d!(objects)
 
     @testset "reset functions" begin
-        Ri = Matrix{Float64}(I, 3, 3) 
+        Ri = Matrix{Float64}(I, 3, 3)
         # Test if objects are reset correctly
         @test SCDI.position(objects) == zeros(3)
         @test SCDI.position(center) == zeros(3)
@@ -725,7 +826,7 @@ end
         for (i, obj) in enumerate(SCDI.objects(circle))
             @test SCDI.orientation(obj) == Ri
             @test SCDI.position(obj) == zeros(3)
-        end 
+        end
     end
 
     @testset "System compatibility" begin
@@ -737,7 +838,7 @@ end
             @test isa(obj, GroupTestObject)
             ctr += 1
         end
-        @test ctr == n+1
+        @test ctr == n + 1
     end
 end
 
@@ -1106,7 +1207,6 @@ end
         SCDI.translate3d!(pd, [-l_0, 0, 0])
         SCDI.zrotate3d!(bs, deg2rad(45))
         SCDI.zrotate3d!(m1, deg2rad(90))
-        # SCDI.zrotate3d!(m2, deg2rad(1))
         SCDI.zrotate3d!(pd, deg2rad(90))
 
         system = SCDI.System([m1, m2, bs, pd])
@@ -1187,6 +1287,216 @@ end
             # Compare solutions, units V/m
             @test all(isapprox.(Re_analytical, Re_numerical, atol = 5e-2))
             @test all(isapprox.(Im_analytical, Im_numerical, atol = 5e-2))
+        end
+    end
+end
+
+@testset "Polarized rays" begin
+    @testset "Polarization transforms" begin
+        # Reflection matrix and lin. x-pol
+        J = [-1 0 0; 0 1 0; 0 0 1]
+        E0 = [1, 0, 0]
+        
+        @testset "90° reflection" begin
+            in_dir = [0,0,1]
+            out_dir = [1,0,0]
+            @test SCDI._calculate_global_E0(in_dir, out_dir, J, E0) ≈ [0,0,-1]
+        end
+
+        @testset "0° reflection" begin
+            in_dir = [0,0,1]
+            out_dir = [0,0,-1]
+            @test SCDI._calculate_global_E0(in_dir, out_dir, J, E0) ≈ [-1,0,0]
+        end
+    end
+
+    @testset "Mirror reflections" begin
+        # Setup system as in https://opg.optica.org/ao/fulltext.cfm?uri=ao-50-18-2855&id=218813
+        m1 = PlanoMirror(1.)
+        m2 = PlanoMirror(1.)
+        m3 = PlanoMirror(1.)
+        SCDI.translate3d!(m2, [2,0,0])
+        SCDI.translate3d!(m3, [2,2,0])
+        SCDI.zrotate3d!(m1, deg2rad(-90))
+        SCDI.yrotate3d!(m1, deg2rad(45))
+        SCDI.zrotate3d!(m2, deg2rad(45))
+        SCDI.xrotate3d!(m3, deg2rad(135))
+        
+        system = SCDI.StaticSystem([m1, m2, m3])
+        
+        I0_1 = 1
+        I0_2 = 5
+        lin_x_pol = [I0_1,0,0]
+        lin_y_pol = [0,I0_2,0]
+        
+        # Beam of polarized rays
+        ray = SCDI.PolarizedRay([0.,0,-2], [0,0,1], 1000e-9, lin_x_pol)
+        beam = SCDI.Beam(ray)
+        
+        @testset "x-Polarization" begin
+            SCDI.polarization!(ray, lin_x_pol)
+            # test tracing
+            SCDI.solve_system!(system, beam)
+            @test SCDI.polarization(beam.rays[1]) ≈ lin_x_pol
+            @test SCDI.polarization(beam.rays[2]) ≈ [0,0,-I0_1]
+            @test SCDI.polarization(beam.rays[3]) ≈ [0,0, I0_1]
+            @test SCDI.polarization(beam.rays[4]) ≈ [0,-I0_1,0]
+            @test length(beam) == 6.0
+        end
+        
+        @testset "y-Polarization" begin
+            SCDI.polarization!(ray, lin_y_pol)
+            SCDI.translate3d!(m3, [0,2,0])
+            # test retracing
+            SCDI.solve_system!(system, beam)
+            @test SCDI.polarization(beam.rays[1]) ≈ lin_y_pol
+            @test SCDI.polarization(beam.rays[2]) ≈ [0,-I0_2,0]
+            @test SCDI.polarization(beam.rays[3]) ≈ [ I0_2,0,0]
+            @test SCDI.polarization(beam.rays[4]) ≈ [-I0_2,0,0]
+            @test length(beam) == 8.0
+        end
+    end
+
+    @testset "Brewster windows" begin
+        brewster_angle(n) = atan(n)
+        # Testcase based on 5 successive Brewster windows
+        n = 1.5
+        θb = brewster_angle(n)
+        d = 0.1
+        # Calculate transmission efficiency
+        rs, rp, ts, tp = SCDI.fresnel_coefficients(θb, n)
+        Ts = 1 - abs2(rs)
+        Tp = 1 - abs2(rp)
+        # Setup testcase
+        s1 = Cube((1., d, 1.))
+        s2 = Cube((1., d, 1.))
+        s3 = Cube((1., d, 1.))
+        s4 = Cube((1., d, 1.))
+        s5 = Cube((1., d, 1.))
+        l1 = SCDI.Lens(uuid4(), s1, x->n)
+        l2 = SCDI.Lens(uuid4(), s2, x->n)
+        l3 = SCDI.Lens(uuid4(), s3, x->n)
+        l4 = SCDI.Lens(uuid4(), s4, x->n)
+        l5 = SCDI.Lens(uuid4(), s5, x->n)
+        SCDI.translate3d!.([l1, l2, l3, l4, l5], Ref([-0.5,-d/2,-0.5]))
+        SCDI.set_new_origin3d!.(SCDI.shape.([l1, l2, l3, l4, l5]))
+        SCDI.translate3d!(l2, [0,0.5, -1d/2])
+        SCDI.translate3d!(l3, [0,1.0, -2d/2])
+        SCDI.translate3d!(l4, [0,1.5, -3d/2])
+        SCDI.translate3d!(l5, [0,2.0, -4d/2])
+        SCDI.xrotate3d!.([l1, l2, l3, l4, l5], -θb)
+        # Solve system of s- and p-polarized beams
+        system = SCDI.StaticSystem([l1, l2, l3, l4, l5])
+        x_pol_ray = SCDI.PolarizedRay([-0.1, -1, 0], [0, 1., 0], 1000e-9, [SCDI.electric_field(1), 0, 0])
+        z_pol_ray = SCDI.PolarizedRay([+0.1, -1, 0], [0, 1., 0], 1000e-9, [0, 0, SCDI.electric_field(1)])
+        s_beam = SCDI.Beam(x_pol_ray)
+        p_beam = SCDI.Beam(z_pol_ray)
+        SCDI.solve_system!(system, s_beam)
+        SCDI.solve_system!(system, p_beam)
+        # Since system is non-focussing, calculate pseudo-intensity
+        pseudo_Is = abs2(SCDI.polarization(last(SCDI.rays(s_beam)))[1]) / (2*SCDI.Z_vacuum)
+        pseudo_Ip = abs2(SCDI.polarization(last(SCDI.rays(p_beam)))[3]) / (2*SCDI.Z_vacuum)
+        # Test against m interfaces
+        m = length(system.objects) * 2
+        @test pseudo_Is ≈ Ts^m
+        @test pseudo_Ip ≈ Tp^m
+    end
+
+    @testset "Fresnel rhomb" begin
+        # Create Fresnel rhomb with n=1.5 and θ=53.3° for quarter-wave plate effect
+        n = 1.5
+        s1 = Cube((0.5,1.25,0.5), deg2rad(53.3))
+        l1 = SCDI.Lens(uuid4(), s1, x->n)
+        SCDI.translate3d!(l1, [-0.25, 0, -0.25])
+        SCDI.set_new_origin3d!(s1)
+        # Rotate prism to obtain 45° beam input polarization
+        SCDI.yrotate3d!(l1, deg2rad(135))
+        # Solve system
+        system = SCDI.StaticSystem([l1])
+        ray = SCDI.PolarizedRay([0, -1, 0], [0, 1., 0], 1000e-9, [0, 0, SCDI.electric_field(1)])
+        beam = SCDI.Beam(ray)
+        SCDI.solve_system!(system, beam)
+        # Assumes propagation along the y-axis after rhomb, calculate polarization state
+        Ex = getindex.(SCDI.polarization.(beam.rays), 1)
+        Ey = getindex.(SCDI.polarization.(beam.rays), 2)
+        Ez = getindex.(SCDI.polarization.(beam.rays), 3)
+        # Test for circular polarization and Ey error
+        phi = angle(last(Ez)) - angle(last(Ex))
+        @test phi ≈ π/2
+        @test abs(last(Ey)) < 2e-14
+    end
+
+    @testset "Mach-Zehnder Interferometer" begin
+        # setup MZI
+        m1 = PlanoMirror(SCDI.inch)
+        m2 = PlanoMirror(SCDI.inch)
+        b1 = SCDI.ThinBeamSplitter(SCDI.inch, 0.5)
+        b2 = SCDI.ThinBeamSplitter(SCDI.inch, 0.5)
+        
+        system = SCDI.StaticSystem([m1, m2, b1, b2])
+        
+        SCDI.translate3d!(b1, [0*SCDI.inch, 0*SCDI.inch, 0])
+        SCDI.translate3d!(b2, [2*SCDI.inch, 2*SCDI.inch, 0])
+        SCDI.translate3d!(m1, [0*SCDI.inch, 2*SCDI.inch, 0])
+        SCDI.translate3d!(m2, [2*SCDI.inch, 0*SCDI.inch, 0])
+        
+        # Rotate with consideration to mirror/bs normal
+        SCDI.zrotate3d!(b1, deg2rad(360-135))
+        SCDI.zrotate3d!(b2, deg2rad(45))
+        SCDI.zrotate3d!(m1, deg2rad(360-135))
+        SCDI.zrotate3d!(m2, deg2rad(45))
+    
+        ray = SCDI.PolarizedRay([0, -0.1, 0], [0., 1., 0], 1000e-9, [0, 0, 1])
+        beam = SCDI.Beam(ray)
+        
+        @testset "z-polarized ray along y-axis" begin
+            # Solve with z-polarized ray along y-axis
+            SCDI.polarization!(ray, [0, 0, 1])
+            SCDI.solve_system!(system, beam)
+    
+            # Extract E0s: t - transmitted, r - reflected
+            t = beam.children[1].rays[1].E0
+            r = beam.children[2].rays[1].E0
+            tr = beam.children[1].rays[2].E0
+            rr = beam.children[2].rays[2].E0
+            trt = beam.children[1].children[1].rays[1].E0
+            trr = beam.children[1].children[2].rays[1].E0
+            rrt = beam.children[2].children[1].rays[1].E0
+            rrr = beam.children[2].children[2].rays[1].E0
+    
+            # Test phase flips
+            @test t[3] ≈ sqrt(2)/2
+            @test r[3] ≈ -sqrt(2)/2
+            @test tr[3] ≈ -sqrt(2)/2
+            @test rr[3] ≈ sqrt(2)/2
+            @test trt ≈ rrr
+            @test trr ≈ rrt
+        end
+    
+        @testset "x-polarized ray along y-axis" begin
+            # Test num. of leaves before retracing
+            @test length(collect(Leaves(beam))) == 4
+            # Retrace with z-polarized ray along y-axis
+            SCDI.polarization!(ray, [1, 0, 0])
+            SCDI.solve_system!(system, beam)
+    
+            # Extract E0s: t - transmitted, r - reflected
+            t = beam.children[1].rays[1].E0
+            r = beam.children[2].rays[1].E0
+            tr = beam.children[1].rays[2].E0
+            rr = beam.children[2].rays[2].E0
+            trt = beam.children[1].children[1].rays[1].E0
+            trr = beam.children[1].children[2].rays[1].E0
+            rrt = beam.children[2].children[1].rays[1].E0
+            rrr = beam.children[2].children[2].rays[1].E0
+    
+            # Test phase flips
+            @test t[1] ≈ sqrt(2)/2
+            @test r[2] ≈ -sqrt(2)/2
+            @test tr ≈ r
+            @test rr ≈ t
+            @test trt ≈ rrr
+            @test trr ≈ rrt
         end
     end
 end

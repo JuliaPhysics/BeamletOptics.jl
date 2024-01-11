@@ -8,6 +8,7 @@ Types:
             GaussianBeamlet
         AbstractRay
             Ray
+            PolarizedRay
         AbstractInteraction
             BeamInteraction
             GaussianBeamletInteraction
@@ -38,7 +39,6 @@ Types:
             AbstractObjectGroup
                 ObjectGroup
         Intersection
-    Parameters
 
 Core Functions:
     intersect3d(AbstractObject, AbstractRay)
@@ -74,10 +74,62 @@ A generic type for a container type which holds objects, beams, etc.
 """
 abstract type AbstractSystem <: AbstractEntity end
 
+refractive_index(::AbstractSystem) = 1.0
+
+"""
+    Intersection{T}
+
+Stores some data resulting from ray tracing a `System`. This information can be used, i.e. for retracing.
+
+# Fields:
+- `t`: length of the ray parametrization in [m]
+- `n`: normal vector at the point of intersection
+- `id`: index of the intersected object in the `System` object-vector
+"""
+mutable struct Intersection{T} <: AbstractEntity
+    t::T
+    n::Point3{T}
+    id::Nullable{UUID}
+end
+
+function Intersection(t::T, n::AbstractVector{T}, id::Nullable{UUID}) where {T}
+    length(n) == 3 || throw(ArgumentError("`n` has to be of length 3"))
+    Intersection(t, Point3{T}(n), id)
+end
+
+Base.length(intersection::Intersection) = intersection.t
+
+normal3d(intersection::Intersection) = intersection.n
+
 """
     AbstractRay{T<:Real} <: AbstractEntity
 
-A generic type for a ray/line in 3D-space. Must have a `pos`ition, `dir`ection and `len`gth, defined as 3D-vectors and a scalar.
+An implementation for a geometrical optics ray in R³. In general, a `AbstractRay` is described by ``\\vec{p} + t\\cdot\\vec{d}`` with ``t\\in(0,\\infty)``. 
+`AbstractRay`s are intended to model the propagation of light between optical interactions according to the laws of geometrical optics.
+To store the result of a ray tracing solution, refer to [`AbstractBeam`](@ref).
+
+# Intersections:
+Since the length of a ray can not be known before solving an optical system, the [`Intersection`](@ref)-type is used.
+This [`Nullable`](@ref) type can represent the intersection with an optical element, or lack thereof.
+
+# Implementation reqs.
+Subtypes of `AbstractBeam` must implement the following:
+
+## Fields:
+- `pos`: a R³-vector that stores the current position ``\\vec{p}``
+- `dir`: a R³-vector that stores the current direction ``\\vec{d}``
+- `intersection`: a `Nullable` field that stores the current intersection or `nothing`
+- `λ`: wavelength in [m]
+- `n`: refractive index along the ray length
+
+# Additional information
+
+!!! info "Ray length"
+    Base.`length`: this function is used to return the length of the `AbstractRay` (if no intersection exists, the ray length is `Inf`)
+
+!!! warning "Ray direction"
+    Many functions assume that the `dir`ection vector has unit length (i.e. ``|\\vec{p}| = 1``). 
+    Violating this assumption might lead to spurious results.
 """
 abstract type AbstractRay{T <: Real} <: AbstractEntity end
 
@@ -90,7 +142,24 @@ function direction!(ray::AbstractRay, dir)
     return nothing
 end
 
-Base.length(ray::AbstractRay) = ray.len
+wavelength(ray::AbstractRay) = ray.λ
+wavelength!(ray::AbstractRay, λ) = (ray.λ = λ)
+
+refractive_index(ray::AbstractRay) = ray.n
+refractive_index!(ray::AbstractRay, n) = (ray.n = n)
+
+intersection(ray::AbstractRay) = ray.intersection
+function intersection!(ray::AbstractRay{T}, _intersection::Nullable{Intersection{T}}) where {T}
+     ray.intersection = _intersection
+     return nothing
+end
+
+function Base.length(ray::AbstractRay)
+    if isnothing(intersection(ray))
+        return Inf
+    end
+    return length(intersection(ray))
+end
 
 """
     intersect3d(plane_position, plane_normal, ray)
@@ -106,12 +175,35 @@ function intersect3d(plane_position::AbstractArray,
 end
 
 """
-    AbstractBeam <: AbstractEntity
+    line_point_distance3d(ray, point)
+
+Returns value for the shortest distance between the `ray` (extended to ∞) and `point`.
+"""
+line_point_distance3d(ray::AbstractRay, point) = line_point_distance3d(position(ray),
+    direction(ray),
+    point)
+
+"""
+    angle3d(ray::AbstractRay, intersect::Intersection=intersection(ray))
+
+Calculates the angle between a `ray` and its or some other `intersection`.
+"""
+function angle3d(ray::AbstractRay, intersect::Intersection = intersection(ray))
+    return angle3d(direction(ray), normal3d(intersect))
+end
+
+"""
+    AbstractBeam{T <: Real, R <: AbstractRay{T}} <: AbstractEntity
 
 A generic type for a container type which holds rays, beams etc.
 
 # Implementation reqs.
 Subtypes of `AbstractBeam` must implement the following:
+
+## Parametrization:
+A subtype of `AbstractBeam` is parameterized by its main data type `T <: Real`, as well as the underlying ray representation `R <: AbstractRay{T}`.
+If a beam is to be compatible with different [`AbstractRay`](@ref) implementations, it must be parameterized by `T` and `R`.
+However, it can also be set to a fixed type for `T` and `R`, i.e. `MyBeam <: AbstractBeam{Float32, MyRay}`.
 
 ## Fields:
 - `parent`: a [`Nullable`](@ref) field that holds the same type as the subtype, used for tree navigation
@@ -119,11 +211,12 @@ Subtypes of `AbstractBeam` must implement the following:
 
 ## Functions:
 - `_modify_beam_head!`: modifies the beam path for retracing purposes
+- `_last_beam_intersection`: returns the last `Beam` intersection
 """
-abstract type AbstractBeam{T <: Real} <: AbstractEntity end
+abstract type AbstractBeam{T <: Real, R <: AbstractRay{T}} <: AbstractEntity end
 
-AbstractTrees.NodeType(::Type{<:AbstractBeam{T}}) where {T} = HasNodeType()
-AbstractTrees.nodetype(TT::Type{<:AbstractBeam{T}}) where {T} = TT
+AbstractTrees.NodeType(::Type{<:AbstractBeam{T, R}}) where {T, R} = HasNodeType()
+AbstractTrees.nodetype(beamtype::Type{<:AbstractBeam{T, R}}) where {T, R} = beamtype
 
 AbstractTrees.parent(beam::AbstractBeam) = beam.parent
 parent!(beam::B, parent::B) where {B <: AbstractBeam} = (beam.parent = parent)
@@ -331,10 +424,10 @@ end
 """
     interact3d(::AbstractSystem, object::AbstractObject, ::AbstractBeam)
 
-Defines optical interactions between beams and objects, defaults to `nothing` which ends the ray tracer.
+Defines optical interactions between beams/rays and objects, defaults to `nothing` which stops the ray tracer.
 """
-function interact3d(::AbstractSystem, object::AbstractObject, ::AbstractBeam, ::AbstractRay)
-    @warn lazy"No interact3d method defined for:" typeof(object)
+function interact3d(::AbstractSystem, ::ObjectType, ::AbstractBeam, ::RayType) where {ObjectType<:AbstractObject, RayType<:AbstractRay}
+    @warn lazy"No interact3d method defined for:" ObjectType RayType
     return nothing
 end
 
@@ -369,58 +462,6 @@ Subtypes of `AbstractObjectGroup` must implement the following:
 abstract type AbstractObjectGroup <: AbstractObject end
 
 AbstractTrees.children(group::AbstractObjectGroup) = group.objects
-
-"""
-    Intersection{T}
-
-Stores some data resulting from ray tracing a `System`. This information can be used, i.e. for retracing.
-
-# Fields:
-- `t`: length of the ray parametrization in [m]
-- `n`: normal vector at the point of intersection
-- `id`: index of the intersected object in the `System` object-vector
-"""
-mutable struct Intersection{T} <: AbstractEntity
-    t::T
-    n::Point3{T}
-    id::Nullable{UUID}
-end
-
-function Intersection(t::T, n::AbstractVector{T}, id::Nullable{UUID}) where {T}
-    length(n) == 3 || throw(ArgumentError("`n` has to be of length 3"))
-    Intersection(t, Point3{T}(n), id)
-end
-
-Base.length(intersection::Intersection) = intersection.t
-
-normal3d(intersection::Intersection) = intersection.n
-
-"""
-    Parameters{T}
-
-Stores the optical parameters that are relevant for the propagation of a ray through an optical system. See also `Ray{T}`.
-
-# Fields:
-- `λ`: wavelength in [m]
-- `n`: refractive index along the beam path
-- `I`: intensity value [**currently a placeholder**]
-- `P`: polarization vector (either Stokes or Jones formalism, tbd.) [**currently a placeholder**]
-"""
-mutable struct Parameters{T}
-    λ::T
-    n::T
-    I::T
-    P::Point2{Complex{T}}
-end
-
-"Prototype constructor for `Parameters`"
-function Parameters(λ::L = 1000e-9,
-        n::N = 1,
-        intensity::I = 1,
-        polarization::Point2{P} = Point2(0, 0)) where {L, N, I, P}
-    T = promote_type(L, N, I, P)
-    return Parameters{T}(λ, n, intensity, polarization)
-end
 
 """
     AbstractInteraction <: AbstractEntity
