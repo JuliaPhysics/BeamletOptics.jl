@@ -122,3 +122,52 @@ function PlanoMirror(scale::T) where {T <: Real}
         scale)
     return SCDI.Mirror(uuid4(), shape)
 end
+
+#
+mutable struct AstigmaticGaussianBeamlet{T} <: SCDI.AbstractBeam{T, SCDI.PolarizedRay{T}}
+    id::UUID
+    c::SCDI.Beam{T, SCDI.PolarizedRay{T}}       # chief
+    wx::SCDI.Beam{T, SCDI.Ray{T}}               # waist x
+    wy::SCDI.Beam{T, SCDI.Ray{T}}               # waist y
+    dx::SCDI.Beam{T, SCDI.Ray{T}}               # div. x
+    dy::SCDI.Beam{T, SCDI.Ray{T}}               # div. y
+    parent::SCDI.Nullable{AstigmaticGaussianBeamlet{T}}
+    children::Vector{AstigmaticGaussianBeamlet{T}}
+end
+
+function AstigmaticGaussianBeamlet(
+    c::SCDI.Beam{T, SCDI.PolarizedRay{T}},
+    wx::SCDI.Beam{T, SCDI.Ray{T}},
+    wy::SCDI.Beam{T, SCDI.Ray{T}},
+    dx::SCDI.Beam{T, SCDI.Ray{T}},
+    dy::SCDI.Beam{T, SCDI.Ray{T}}
+    ) where {T <: Real}
+return AstigmaticGaussianBeamlet{T}(uuid4(), c, wx, wy, dx, dy,
+    nothing,
+    Vector{AstigmaticGaussianBeamlet{T}}())
+end
+
+function AstigmaticGaussianBeamlet(
+    position,
+    direction,
+    λ = 1000e-9,
+    w0 = 1e-3;
+    M2 = 1,
+    E0 = [0, 0, 1])
+    # Create orthogonal vectors for construction purposes (right-handed)
+    s1 = SCDI.normal3d(direction)
+    s2 = cross(direction, s1)
+    # Divergence angle in rad
+    θ = SCDI.divergence_angle(λ, w0, M2)
+    # Waist rays
+    wx = SCDI.Ray(position + s1 * w0, direction, λ)
+    wy = SCDI.Ray(position + s2 * w0, direction, λ)
+    # Divergence ray
+    div_dir_x = normalize(direction + s1 * tan(θ))
+    div_dir_y = normalize(direction + s2 * tan(θ))
+    dx = SCDI.Ray(position, div_dir_x, λ)
+    dy = SCDI.Ray(position, div_dir_y, λ)
+    # Chief ray
+    c = SCDI.PolarizedRay(position, direction, λ, E0)
+    return AstigmaticGaussianBeamlet(SCDI.Beam(c), SCDI.Beam(wx), SCDI.Beam(wy), SCDI.Beam(dx), SCDI.Beam(dy))
+end
