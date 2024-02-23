@@ -169,15 +169,91 @@ end
 point_on_beam(gauss::GaussianBeamlet, t::Real) = point_on_beam(gauss.chief, t)
 
 """
-    gauss_parameters(gauss::GaussianBeamlet, z; hint::Union{Nothing, Tuple{Int, Vector{<:Real}}}=nothing)
+    paraprincipal_ray_parameters(c::AbstractRay, w::AbstractRay, d::AbstractRay, p0)
+
+Calculates the heights and slopes of the waist and divergence ray as per the publication:
+
+**DeJager, Donald, and Mark Noethen. "Gaussian beam parameters that use Coddington-based Y-Nu paraprincipal ray tracing." Applied Optics 31.13 (1992): 2199-2205.**
+
+To calculate a signed slope in 3D, the vector between p0 and the orthogonal point on the div./waist ray is used as a reference, yielding an angle around 90°.
+Larger than 90° is treated as a positive slope and vice versa. This method fails if the div. or waist ray height is zero, which occurs at beam waists!
+
+# Arguments
+- `c`: [`AbstractRay`](@ref) representing the chief ray
+- `w`: [`AbstractRay`](@ref) representing the waist ray
+- `d`: [`AbstractRay`](@ref) representing the divergence ray
+- `p0`: point on chief ray for which the ray heights and slopes are calculated
+
+# Returns
+- `h_w`: waist ray height
+- `s_w`: waist ray slope
+- `h_d`: div. ray height
+_ `s_d`: div. ray slope
+"""
+function paraprincipal_ray_parameters(c::AbstractRay, w::AbstractRay, d::AbstractRay, p0)
+    # waist ray height and slope at point p0 along chief ray
+    l = line_plane_distance3d(p0, direction(c), position(w), direction(w))
+    y = position(w) + l * direction(w) - p0
+    h_w = norm(y)
+    y /= h_w
+    s_w = tan(π / 2 - angle3d(y, direction(w)))
+    # divergence ray height and slope at point p0 along chief ray
+    l = line_plane_distance3d(p0, direction(c), position(d), direction(d))
+    y = position(d) + l * direction(d) - p0
+    h_d = norm(y)
+    y /= h_d
+    s_d = tan(π / 2 - angle3d(y, direction(d)))
+    return h_w, s_w, h_d, s_d
+end
+
+"""
+    gauss_parameters(c::AbstractRay, w::AbstractRay, d::AbstractRay, p0)
+
+Calculates the parameters of the stigmatic Gaussian beam as described by D. DeJager (1992).
+
+# Arguments
+- `c`: [`AbstractRay`](@ref) representing the chief ray
+- `w`: [`AbstractRay`](@ref) representing the waist ray
+- `d`: [`AbstractRay`](@ref) representing the divergence ray
+- `p0`: point on chief ray for which the ray heights and slopes are calculated
+
+# Returns
+- `w`: local radius
+- `R`: curvature, i.e. 1/r where r is the radius of curvature
+- `ψ`: Gouy phase (note that -atan definition is used)
+- `w0`: local beam waist radius
+- `Hn`: optical invariant H divided by ref. index n
+"""
+function gauss_parameters(c::AbstractRay, w::AbstractRay, d::AbstractRay, p0)
+    # heights and slopes, optical invariant H/n
+    h_w, s_w, h_d, s_d = paraprincipal_ray_parameters(c, w, d, p0) 
+    Hn = abs(h_w * s_d - h_d * s_w)
+    # beam parameters
+    E_kt = h_d * s_d + h_w * s_w
+    F_kt = sqrt(s_d^2 + s_w^2)
+    w = sqrt(h_d^2 + h_w^2)
+    R = E_kt / w^2
+    z = E_kt / F_kt^2
+    ψ = -atan(1, √(1 / (R * z) - 1))
+    w0 = Hn / F_kt
+    # Catch NaNs at beam waist and correct Gouy phase sign based on curvature sign
+    isnan(R) ? R = zero(R) : nothing
+    isnan(ψ) ? ψ = zero(ψ) : nothing
+    isnan(w0) ? w0 = w : nothing
+    R < 0 ? ψ = -ψ : nothing
+    return w, R, ψ, w0, Hn
+end
+
+"""
+    gauss_parameters(gauss::GaussianBeamlet, z; hint::=nothing)
 
 Calculate the local waist radius and Gouy phase of an unastigmatic Gaussian beamlet at a specific distance `z` based on the method of J. Arnaud (1985) and D. DeJager (1992).
 
 # Arguments
 
-- `gauss`: the GaussianBeamlet object for which parameters are to be calculated.
+- `gauss`: the GaussianBeamlet for which parameters are to be calculated.
 - `z`: the position along the beam at which to calculate the parameters.
-- `hint`: an optional hint parameter for the relevant point/index of the appropriate beam segment. If not provided, the function will automatically select the ray.
+- `hint`: an optional hint parameter `Union{Nothing, Tuple{Int, Vector{<:Real}}}` for the relevant point/index of the appropriate beam segment. If not provided, the function will automatically select the ray.
 
 # Returns
 
@@ -194,55 +270,21 @@ function gauss_parameters(gauss::GaussianBeamlet,
     else
         p0, index = hint
     end
+    
     chief = gauss.chief.rays[index]
+    div = gauss.divergence.rays[index]
+    waist = gauss.waist.rays[index]
+
     n = refractive_index(chief)
     λ = wavelength(gauss)
 
-    #=
-    Divergence ray height and slope (same for waist ray)
-    - find divergence ray "height" and "slope" at intersection point y0 with target plane at p0 of chief ray
-    - ray height "y_d" is length between p0 and y0
-    - ray slope "m_d" is angle between vector p0 -> y0 and divergence ray direction -> gives unambiguous angle for signed ray slope calculation
-    - fails if y_d is zero -> catch R=Inf, ψ=0 and H=λ/π
-    =#
-    div = gauss.divergence.rays[index]
-    intersection_len = line_plane_distance3d(p0,
-        direction(chief),
-        position(div),
-        direction(div))
-    y0 = position(div) + intersection_len * direction(div) - p0
-    y_d = norm(y0)
-    y0 /= y_d
-    m_d = tan(π / 2 - angle3d(y0, direction(div)))
-    # Waist ray height and slope
-    waist = gauss.waist.rays[index]
-    intersection_len = line_plane_distance3d(p0,
-        direction(chief),
-        position(waist),
-        direction(waist))
-    y0 = position(waist) + intersection_len * direction(waist) - p0
-    y_w = norm(y0)
-    y0 /= y_w
-    m_w = tan(π / 2 - angle3d(y0, direction(waist)))
-    # Beam parameters as per Arnaud (1985) and DeJager (1992)
-    H = abs(n * (y_w * m_d - y_d * m_w))
+    w, R, ψ, w0, Hn = gauss_parameters(chief, waist, div, p0)
+    
     # Test optical invariant
-    if !isapprox(H, λ / π, atol = 1e-6)
-        H = λ / π
-        println("H not fulfilled at z=$z")
+    if !isapprox(Hn, λ / π, atol = 1e-6)
+        println("H/n not fulfilled at z=$z")
     end
-    E_kt = y_d * m_d + y_w * m_w
-    F_kt = sqrt(m_d^2 + m_w^2)
-    w = sqrt(y_d^2 + y_w^2)
-    R = E_kt / w^2
-    z = E_kt / F_kt^2
-    ψ = -atan(1, √(1 / (R * z) - 1))
-    w0 = H / (n * F_kt)
-    # Catch NaNs and correct Gouy phase sign based on curvature sign
-    isnan(R) ? R = zero(R) : nothing
-    isnan(ψ) ? ψ = zero(ψ) : nothing
-    isnan(w0) ? w0 = w : nothing
-    R < 0 ? ψ = -ψ : nothing
+    
     return w, R, ψ, w0
 end
 
@@ -266,7 +308,6 @@ end
     electric_field(gauss::GaussianBeamlet, r, z)
 
 Calculates the electric field phasor [V/m] of `gauss` at the radial and longitudinal positions `r` and `z`.
-Optionally, buffer vectors `g_b` and `p_b` can be passed.
 """
 function electric_field(gauss::GaussianBeamlet, r, z)
     point, index = point_on_beam(gauss, z)
