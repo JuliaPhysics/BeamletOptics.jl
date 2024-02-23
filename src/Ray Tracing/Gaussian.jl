@@ -229,7 +229,7 @@ function gauss_parameters(gauss::GaussianBeamlet,
     # Test optical invariant
     if !isapprox(H, λ / π, atol = 1e-6)
         H = λ / π
-        # println("H not fulfilled at z=$z")
+        println("H not fulfilled at z=$z")
     end
     E_kt = y_d * m_d + y_w * m_w
     F_kt = sqrt(m_d^2 + m_w^2)
