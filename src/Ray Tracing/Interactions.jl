@@ -36,7 +36,7 @@ function interact3d(::AbstractSystem,
     ndir = reflection3d(direction(ray), normal)
     # Jones reflection matrix
     J = @SArray [-1 0 0; 0 1 0; 0 0 1]
-    E0 = _calculate_global_E0(direction(ray), ndir, J, polarization(ray))
+    E0 = _calculate_global_E0(direction(ray), ndir, J, electric_field(ray))
     return BeamInteraction{T, R}(nothing, PolarizedRay{T}(uuid4(), npos, ndir, nothing, wavelength(ray), refractive_index(ray), E0))
 end
 
@@ -140,7 +140,7 @@ function interact3d(system::AbstractSystem, optic::AbstractRefractiveOptic, ::Be
         J = [ts 0 0; 0 tp 0; 0 0 1]
     end
     # Calculate new polarization
-    E0 = _calculate_global_E0(direction(ray), new_dir, J, polarization(ray))
+    E0 = _calculate_global_E0(direction(ray), new_dir, J, electric_field(ray))
     return BeamInteraction{T, R}(hint, PolarizedRay{T}(uuid4(), raypos, new_dir, nothing, wavelength(ray), n2, E0))
 end
 
@@ -372,7 +372,7 @@ function _beamsplitter_transmitted_beam(bs::BeamSplitter, ray::PolarizedRay)
     J = @SArray [transmittance(bs) 0 0; 0 transmittance(bs) 0; 0 0 1]
     pos = position(ray) + length(ray) * direction(ray)
     dir = direction(ray)
-    E0 =  _calculate_global_E0(dir, dir, J, polarization(ray))
+    E0 =  _calculate_global_E0(dir, dir, J, electric_field(ray))
     return Beam(PolarizedRay(pos, dir, wavelength(ray), E0))
 end
 
@@ -382,7 +382,7 @@ function _beamsplitter_reflected_beam(bs::BeamSplitter, ray::PolarizedRay)
     pos = position(ray) + length(ray) * direction(ray)
     in_dir = direction(ray)
     out_dir = reflection3d(in_dir, normal)
-    E0 =  _calculate_global_E0(in_dir, out_dir, J, polarization(ray))
+    E0 =  _calculate_global_E0(in_dir, out_dir, J, electric_field(ray))
     return Beam(PolarizedRay(pos, out_dir, wavelength(ray), E0))
 end
 
