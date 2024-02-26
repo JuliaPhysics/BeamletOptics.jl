@@ -317,10 +317,14 @@ end
 function trace_system!(system::AbstractSystem, agb::AstigmaticGaussianBeamlet; r_max::Int = 20)
     # placeholder solver
     trace_system!(system, agb.c, r_max=r_max)
-    trace_system!(system, agb.wx, r_max=r_max)
-    trace_system!(system, agb.wy, r_max=r_max)
-    trace_system!(system, agb.dx, r_max=r_max)
-    trace_system!(system, agb.dy, r_max=r_max)
+    trace_system!(system, agb.wxp, r_max=r_max)
+    trace_system!(system, agb.wxm, r_max=r_max)
+    trace_system!(system, agb.wyp, r_max=r_max)
+    trace_system!(system, agb.wym, r_max=r_max)
+    trace_system!(system, agb.dxp, r_max=r_max)
+    trace_system!(system, agb.dxm, r_max=r_max)
+    trace_system!(system, agb.dyp, r_max=r_max)
+    trace_system!(system, agb.dym, r_max=r_max)
 end
 
 """
