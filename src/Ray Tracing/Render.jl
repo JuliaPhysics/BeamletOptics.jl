@@ -145,3 +145,12 @@ function render_object_normals!(axis, mesh::Mesh; l = 0.01)
     return nothing
 end
 _render_object_normal!(::Any, ::AbstractVector, ::AbstractVector; color = :blue) = nothing
+
+function render_beam!(axis, agb::AstigmaticGaussianBeamlet; flen = 0.1)
+    # placeholder render
+    render_beam!(axis, agb.c, flen = flen, color = :black)
+    render_beam!(axis, agb.wx, flen = flen, color = :green)
+    render_beam!(axis, agb.dx, flen = flen, color = :green)
+    render_beam!(axis, agb.wy, flen = flen, color = :red)
+    render_beam!(axis, agb.dy, flen = flen, color = :red)
+end
