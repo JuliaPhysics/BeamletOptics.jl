@@ -45,7 +45,7 @@ function Base.replace!(beam::Beam{<:Real, <:PolarizedRay}, interaction::BeamInte
     direction!(rays(beam)[index], direction(interaction.ray))
     wavelength!(rays(beam)[index], wavelength(interaction.ray))
     refractive_index!(rays(beam)[index], refractive_index(interaction.ray))
-    polarization!(rays(beam)[index], polarization(interaction.ray))
+    electric_field!(rays(beam)[index], electric_field(interaction.ray))
 end
 
 function _modify_beam_head!(old::Beam{T, R}, new::Beam{T, R}) where {T<:Real, R<:Ray{T}}
@@ -61,7 +61,7 @@ function _modify_beam_head!(old::Beam{T, R}, new::Beam{T, R}) where {T<:Real, R<
     direction!(first(rays(old)), direction(first(rays(new))))
     wavelength!(first(rays(old)), wavelength(first(rays(new))))
     refractive_index!(first(rays(old)), refractive_index(first(rays(new))))
-    polarization!(first(rays(old)), polarization(first(rays(new))))
+    electric_field!(first(rays(old)), electric_field(first(rays(new))))
     return nothing
 end
 

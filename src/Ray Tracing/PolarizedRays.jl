@@ -52,8 +52,8 @@ mutable struct PolarizedRay{T} <: AbstractRay{T}
     end
 end
 
-polarization(ray::PolarizedRay) = ray.E0
-polarization!(ray::PolarizedRay, new) = (ray.E0 = new)
+electric_field(ray::PolarizedRay) = ray.E0
+electric_field!(ray::PolarizedRay, new) = (ray.E0 = new)
 
 """
     PolarizedRay(pos, dir, λ = 1000e-9, E0 = [1, 0, 0])
