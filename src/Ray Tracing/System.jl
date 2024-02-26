@@ -353,6 +353,15 @@ function retrace_system!(system::AbstractSystem, gauss::GaussianBeamlet{T}) wher
     return nothing
 end
 
+function trace_system!(system::AbstractSystem, agb::AstigmaticGaussianBeamlet; r_max::Int = 20)
+    # placeholder solver
+    trace_system!(system, agb.c, r_max=r_max)
+    trace_system!(system, agb.wx, r_max=r_max)
+    trace_system!(system, agb.wy, r_max=r_max)
+    trace_system!(system, agb.dx, r_max=r_max)
+    trace_system!(system, agb.dy, r_max=r_max)
+end
+
 """
     solve_system!(system::System, beam::AbstractBeam; r_max=100, retrace=true)
 
