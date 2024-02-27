@@ -122,3 +122,18 @@ function PlanoMirror(scale::T) where {T <: Real}
         scale)
     return SCDI.Mirror(uuid4(), shape)
 end
+
+ellipse(t, a, b, c) = a + b * cos(t) + c * sin(t)
+
+function SCDI.render_beam!(axis, agb::SCDI.AstigmaticGaussianBeamlet; flen = 0.1, color=:red)
+    l = length(agb) + flen
+    for z = LinRange(0, l, 100)
+        ~, ~, ~, ~, B = SCDI.gauss_parameters(beam, z)
+        a = B[:, 1]
+        b = B[:, 2]
+        c = B[:, 3]
+        t = LinRange(0, 2pi, 20)
+        d = ellipse.(t, Ref(a), Ref(b), Ref(c))
+        lines!(axis, d, color=color)
+    end
+end

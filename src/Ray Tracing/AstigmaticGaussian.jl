@@ -36,7 +36,7 @@ function AstigmaticGaussianBeamlet(
     w0 = 1e-3;
     M2 = 1,
     E0 = [0, 0, 1],
-    support = [0,1,0])
+    support = nothing)
     # Create orthogonal vectors for construction purposes (right-handed)
     if isnothing(support)
         s1 = normal3d(direction)
@@ -75,6 +75,8 @@ function AstigmaticGaussianBeamlet(
     )
 end
 
+Base.length(agb::AstigmaticGaussianBeamlet) = length(agb.c)
+
 _last_beam_intersection(agb::AstigmaticGaussianBeamlet) = intersection(last(rays(agb.c)))
 
 point_on_beam(agb::AstigmaticGaussianBeamlet, t::Real) = point_on_beam(agb.c, t)
@@ -90,7 +92,20 @@ function gauss_parameters(agb::AstigmaticGaussianBeamlet, z::Real)
     wyp, ~, ~, ~, Hnyp = gauss_parameters(agb.c.rays[i], agb.wyp.rays[i], agb.dyp.rays[i], p0)
     wym, ~, ~, ~, Hnym = gauss_parameters(agb.c.rays[i], agb.wym.rays[i], agb.dym.rays[i], p0)
 
-    return wxp, wxm, wyp, wym
+    # generate basis
+    r = agb.dxp.rays[i]
+    l = line_plane_distance3d(p0, direction(agb.c.rays[i]), position(r), direction(r))
+    x = position(r) + l * direction(r) - p0
+    x = normalize(x)
+
+    r = agb.dyp.rays[i]
+    l = line_plane_distance3d(p0, direction(agb.c.rays[i]), position(r), direction(r))
+    y = position(r) + l * direction(r) - p0
+    y = normalize(y)
+    
+    z = direction(agb.c.rays[i])
+
+    return wxp, wxm, wyp, wym, [p0 x*wxp y*wyp]
 end
 
 function gauss_parameters(agb::AstigmaticGaussianBeamlet{G}, zs::AbstractArray) where {G}
@@ -99,7 +114,7 @@ function gauss_parameters(agb::AstigmaticGaussianBeamlet{G}, zs::AbstractArray) 
     wyp = Vector{G}(undef, length(zs))
     wym = Vector{G}(undef, length(zs))
     for (i, z) in enumerate(zs)
-        wxp[i], wxm[i], wyp[i], wym[i] = gauss_parameters(agb, z)
+        wxp[i], wxm[i], wyp[i], wym[i], ~ = gauss_parameters(agb, z)
     end
     return wxp, wxm, wyp, wym
 end
