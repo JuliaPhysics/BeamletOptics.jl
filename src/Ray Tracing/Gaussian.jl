@@ -1,7 +1,7 @@
 """
     GaussianBeamlet
 
-Ray representation of the **unastigmatic** Gaussian beam as per J. Arnaud (1985).
+Ray representation of the **stigmatic** Gaussian beam as per J. Arnaud (1985).
 The beam quality `M2` is fully considered via the divergence angle.
 """
 mutable struct GaussianBeamlet{T} <: AbstractBeam{T, Ray{T}}
