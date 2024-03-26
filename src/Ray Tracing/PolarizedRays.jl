@@ -45,8 +45,8 @@ mutable struct PolarizedRay{T} <: AbstractRay{T}
     E0::Point3{Complex{T}}
     function PolarizedRay{T}(id, pos, dir, intersection, λ, n, E0) where T
         # Crucial check: E0 orthogonal to ray dir.
-        if !isapprox(dot(dir, E0), 0, atol=1e-14)
-            error("Ray dir. and E0 must be orthogonal (n=$(dot(dir, E0)))")
+        if !isorthogonal(dir, E0, atol=1e-14)
+            error("Ray direction and field vector E0 must be orthogonal!")
         end
         return new{T}(id, pos, dir, intersection, λ, n, E0)
     end
@@ -65,6 +65,7 @@ function PolarizedRay(pos::AbstractArray{P},
         λ = 1000e-9,
         E0 = [electric_field(1), 0, 0]) where {P <: Real, D <: Real}
     F = promote_type(P, D)
+    dir = normalize(dir)
     return PolarizedRay{F}(uuid4(),
         Point3{F}(pos),
         normalize(Point3{F}(dir)),

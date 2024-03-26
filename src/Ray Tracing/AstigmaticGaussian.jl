@@ -38,9 +38,13 @@ function AstigmaticGaussianBeamlet(
     E0 = [0, 0, 1],
     support = nothing)
     # Create orthogonal vectors for construction purposes (right-handed)
+    direction = normalize(direction)
     if isnothing(support)
         s1 = normal3d(direction)
     else
+        if !isorthogonal(direction, support)
+            error("Ray direction and support vector must be orthogonal!")
+        end
         s1 = normalize(support)
     end
     s2 = cross(direction, s1)

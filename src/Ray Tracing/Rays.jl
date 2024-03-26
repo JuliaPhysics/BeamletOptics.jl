@@ -35,6 +35,7 @@ function Ray(pos::AbstractArray{P},
         dir::AbstractArray{D},
         λ = 1000e-9) where {P <: Real, D <: Real}
     F = promote_type(P, D)
+    dir = normalize(dir)
     return Ray{F}(uuid4(),
         Point3{F}(pos),
         normalize(Point3{F}(dir)),
