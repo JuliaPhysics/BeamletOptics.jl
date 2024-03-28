@@ -1063,7 +1063,7 @@ end
         tl = SCDI.ThinLensSDF(R1, R2, 0.025)
         lens = SCDI.Lens(uuid4(), tl, x -> nl)
         system = SCDI.System(lens)
-        SCDI.translate3d!(SCDI.shape(lens), [0, lens_y_location, 0])
+        SCDI.translate3d!(lens, [0, lens_y_location, 0])
         # Create and solve beam, calculate beam parameters
         gauss = SCDI.GaussianBeamlet(SCDI.Ray([0.0, 0, 0], [0.0, 1, 0]),
             λ,
@@ -1091,7 +1091,7 @@ end
             @test SCDI.istilted(system, gauss) == false
             @test SCDI.isparaxial(system, gauss) == true
             # Tilt lens, test again with 30° threshold for paraxial approx.
-            SCDI.zrotate3d!(SCDI.shape(lens), deg2rad(45))
+            SCDI.zrotate3d!(lens, deg2rad(45))
             SCDI.solve_system!(system, gauss)
             @test SCDI.istilted(system, gauss) == true
             @test SCDI.isparaxial(system, gauss, deg2rad(30)) == false
@@ -1118,13 +1118,15 @@ end
         nl = 1.5
         f = SCDI.lensmakers_eq(R1, -R2, nl)
         # Raytracing system (for all tests)
-        pd = SCDI.Photodetector(l, n)
+        pd_l = SCDI.Photodetector(l, n)
+        pd_s = SCDI.Photodetector(l/10, n÷10)
         ln = SCDI.ThinLens(R1, R2, d, nl)
-        SCDI.translate3d!(SCDI.shape(pd), [0, z, 0])
-        SCDI.translate3d!(SCDI.shape(ln), [0, z - f, 0])
-        system = SCDI.System(pd)
-
+        SCDI.translate3d!(pd_l, [0, z, 0])
+        SCDI.translate3d!(pd_s, [0, z, 0])
+        SCDI.translate3d!(ln, [0, z - f, 0])
+        
         @testset "Testing fringe pattern" begin
+            system = SCDI.System(pd_l)
             Δz = 5e-3   # arm length difference
             # Analytic solution
             xs = ys = LinRange(-l / 2, l / 2, n)
@@ -1137,7 +1139,7 @@ end
                 end
             end
             # Numerical solution
-            SCDI.reset_photodetector!(pd)
+            SCDI.reset_photodetector!(pd_l)
             g_1 = SCDI.GaussianBeamlet(SCDI.Ray([0.0, 0, 0], [0.0, 1, 0]),
                 λ,
                 w0,
@@ -1153,37 +1155,36 @@ end
 
             # Compare solutions
             I_analytical = SCDI.intensity.(screen)
-            I_numerical = SCDI.intensity.(pd.field)
-            Pt = SCDI.optical_power(pd)
+            I_numerical = SCDI.intensity.(pd_l.field)
+            Pt = SCDI.optical_power(pd_l)
             @test all(isapprox.(I_analytical, I_numerical, atol = 2e-1))
             @test isapprox(Pt, 2 * P0, atol = 3e-5)
         end
 
         @testset "Testing λ phase shift" begin
-            # Reset pd resolution
-            n = 100
-            P0 = 10e-3
-            SCDI.photodetector_resolution!(pd, n)
-            # Add lens to system
-            system = SCDI.System([pd, ln])
+            system = SCDI.System([pd_s, ln])
             # Numerical solution
             Δz = LinRange(0, λ, 50)
             Pt_numerical = zeros(length(Δz))
-            for (i, z) in enumerate(Δz)
-                SCDI.reset_photodetector!(pd)
+            for (i, z_i) in enumerate(Δz)
+                SCDI.reset_photodetector!(pd_s)
                 g_1 = SCDI.GaussianBeamlet(SCDI.Ray([0.0, 0, 0], [0.0, 1, 0]),
                     λ,
                     w0,
                     M2 = M2,
                     P0 = P0)
-                g_2 = SCDI.GaussianBeamlet(SCDI.Ray([0.0, z, 0], [0.0, 1, 0]),
+                g_2 = SCDI.GaussianBeamlet(SCDI.Ray([0.0, z_i, 0], [0.0, 1, 0]),
                     λ,
                     w0,
                     M2 = M2,
                     P0 = P0)
                 SCDI.solve_system!(system, g_1)
                 SCDI.solve_system!(system, g_2)
-                Pt_numerical[i] = SCDI.optical_power(pd)
+                Pt_numerical[i] = SCDI.optical_power(pd_s)
+                # Test length/opl function
+                @test length(g_1) == z
+                @test length(g_1) < length(g_1, opl=true)
+                @test length(g_2) == length(g_1) - z_i
             end
             # Analytical solution (cosine over Δz), ref. power is 4*P0 since beam splitter is missing
             Pt_analytical = 4 * P0 * [(cos(2π * z / (maximum(Δz))) + 1) / 2 for z in Δz]

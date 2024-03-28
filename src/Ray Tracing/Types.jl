@@ -154,11 +154,22 @@ function intersection!(ray::AbstractRay{T}, _intersection::Nullable{Intersection
      return nothing
 end
 
-function Base.length(ray::AbstractRay)
+"""
+    length(ray::AbstractRay; opl::Bool=false)
+
+Returns the geometric length of a `ray` between its start and intersection point. If no intersection exists, `Inf` is returned.
+The `opl` keyword can be used to calculate the `o`ptical `p`ath `l`ength instead, i.e. ``OPL = n \\cdot l``.
+Default is the geometrical length.
+"""
+function Base.length(ray::AbstractRay; opl::Bool=false)
     if isnothing(intersection(ray))
         return Inf
     end
-    return length(intersection(ray))
+    if opl        
+        return length(intersection(ray)) * refractive_index(ray)
+    else
+        return length(intersection(ray))
+    end
 end
 
 """

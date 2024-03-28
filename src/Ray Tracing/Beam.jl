@@ -67,16 +67,18 @@ end
 _last_beam_intersection(beam::Beam) = intersection(last(rays(beam)))
 
 """
-    length(beam::Beam)
+    length(beam::Beam; opl::Bool=false)
 
 Calculate the length of a beam up to the point of the last intersection.
+The `opl` keyword can be used to calculate the `o`ptical `p`ath `l`ength instead, i.e. ``OPL = \\sum_{i=0}^{k} n_i \\cdot l_i``.
+Default is the geometrical length.
 """
-function Base.length(beam::Beam{T}) where {T}
+function Base.length(beam::Beam{T}; opl::Bool=false) where {T}
     # Recursively get length of beam parents
     p = AbstractTrees.parent(beam)
     l0 = zero(T)
     if !isnothing(p)
-        l0 = length(p)
+        l0 = length(p; opl)
     end
     # Calculate ray lengths
     l = zero(T)
@@ -84,7 +86,7 @@ function Base.length(beam::Beam{T}) where {T}
         if isnothing(intersection(ray))
             break
         end
-        l += length(ray)
+        l += length(ray; opl)
     end
     return l + l0
 end

@@ -253,7 +253,7 @@ function interact3d(::AbstractSystem,
         ray_id::Int)
     # Add efield contribution to pd.field
     ray = gauss.chief.rays[ray_id]
-    l = length(gauss)
+    l = length(gauss, opl=true)
     T = transpose(orientation(shape(pd)))
     P = ray.pos + ray.dir * length(ray.intersection)
     shape_pos = position(shape(pd))

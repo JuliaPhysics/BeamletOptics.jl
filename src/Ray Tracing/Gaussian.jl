@@ -45,7 +45,7 @@ wavelength(beam::GaussianBeamlet) = beam.λ
 beam_waist(beam::GaussianBeamlet) = beam.w0
 beam_amplitude(beam::GaussianBeamlet) = beam.E0
 
-Base.length(gauss::GaussianBeamlet) = length(gauss.chief)
+Base.length(gauss::GaussianBeamlet; opl::Bool=false) = length(gauss.chief; opl)
 
 """
     parent!(beam::GaussianBeamlet, parent::GaussianBeamlet)
