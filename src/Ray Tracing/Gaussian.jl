@@ -246,7 +246,7 @@ function gauss_parameters(c::AbstractRay, w::AbstractRay, d::AbstractRay, p0)
 end
 
 """
-    gauss_parameters(gauss::GaussianBeamlet, z; hint::=nothing)
+    gauss_parameters(gauss::GaussianBeamlet, z; hint=nothing)
 
 Calculate the local waist radius and Gouy phase of an unastigmatic Gaussian beamlet at a specific distance `z` based on the method of J. Arnaud (1985) and D. DeJager (1992).
 
@@ -266,28 +266,23 @@ Calculate the local waist radius and Gouy phase of an unastigmatic Gaussian beam
 function gauss_parameters(gauss::GaussianBeamlet,
         z::Real;
         hint = nothing)
+    # If hint not provided, find values automatically
     if isnothing(hint)
         p0, index = point_on_beam(gauss, z)
     else
         p0, index = hint
     end
-    
-    
+    # Select relevant beam section
     chief = gauss.chief.rays[index]
     div = gauss.divergence.rays[index]
     waist = gauss.waist.rays[index]
-
-    n = refractive_index(chief)
+    # Calculate beam parameters
     λ = wavelength(gauss)
-
     w, R, ψ, w0, Hn = gauss_parameters(chief, waist, div, p0)
-    
     # Test optical invariant
     if !isapprox(Hn, λ / π, atol = 1e-6)
         println("H/n not fulfilled at z=$z")
     end
-    
-    
     return w, R, ψ, w0
 end
 
