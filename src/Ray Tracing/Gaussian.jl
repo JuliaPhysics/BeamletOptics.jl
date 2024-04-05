@@ -246,6 +246,83 @@ end
 
 """
     gauss_parameters(gauss::GaussianBeamlet, z; hint::=nothing)
+    paraprincipal_ray_parameters(c::AbstractRay, w::AbstractRay, d::AbstractRay, p0)
+
+Calculates the heights and slopes of the waist and divergence ray as per the publication:
+
+**DeJager, Donald, and Mark Noethen. "Gaussian beam parameters that use Coddington-based Y-Nu paraprincipal ray tracing." Applied Optics 31.13 (1992): 2199-2205.**
+
+To calculate a signed slope in 3D, the vector between p0 and the orthogonal point on the div./waist ray is used as a reference, yielding an angle around 90°.
+Larger than 90° is treated as a positive slope and vice versa. This method fails if the div. or waist ray height is zero, which occurs at beam waists!
+
+# Arguments
+- `c`: [`AbstractRay`](@ref) representing the chief ray
+- `w`: [`AbstractRay`](@ref) representing the waist ray
+- `d`: [`AbstractRay`](@ref) representing the divergence ray
+- `p0`: point on chief ray for which the ray heights and slopes are calculated
+
+# Returns
+- `h_w`: waist ray height
+- `s_w`: waist ray slope
+- `h_d`: div. ray height
+_ `s_d`: div. ray slope
+"""
+function paraprincipal_ray_parameters(c::AbstractRay, w::AbstractRay, d::AbstractRay, p0)
+    # waist ray height and slope at point p0 along chief ray
+    l = line_plane_distance3d(p0, direction(c), position(w), direction(w))
+    y = position(w) + l * direction(w) - p0
+    h_w = norm(y)
+    y /= h_w
+    s_w = tan(π / 2 - angle3d(y, direction(w)))
+    # divergence ray height and slope at point p0 along chief ray
+    l = line_plane_distance3d(p0, direction(c), position(d), direction(d))
+    y = position(d) + l * direction(d) - p0
+    h_d = norm(y)
+    y /= h_d
+    s_d = tan(π / 2 - angle3d(y, direction(d)))
+    return h_w, s_w, h_d, s_d
+end
+
+"""
+    gauss_parameters(c::AbstractRay, w::AbstractRay, d::AbstractRay, p0)
+
+Calculates the parameters of the stigmatic Gaussian beam as described by D. DeJager (1992).
+
+# Arguments
+- `c`: [`AbstractRay`](@ref) representing the chief ray
+- `w`: [`AbstractRay`](@ref) representing the waist ray
+- `d`: [`AbstractRay`](@ref) representing the divergence ray
+- `p0`: point on chief ray for which the ray heights and slopes are calculated
+
+# Returns
+- `w`: local radius
+- `R`: curvature, i.e. 1/r where r is the radius of curvature
+- `ψ`: Gouy phase (note that -atan definition is used)
+- `w0`: local beam waist radius
+- `Hn`: optical invariant H divided by ref. index n
+"""
+function gauss_parameters(c::AbstractRay, w::AbstractRay, d::AbstractRay, p0)
+    # heights and slopes, optical invariant H/n
+    h_w, s_w, h_d, s_d = paraprincipal_ray_parameters(c, w, d, p0) 
+    Hn = abs(h_w * s_d - h_d * s_w)
+    # beam parameters
+    E_kt = h_d * s_d + h_w * s_w
+    F_kt = sqrt(s_d^2 + s_w^2)
+    w = sqrt(h_d^2 + h_w^2)
+    R = E_kt / w^2
+    z = E_kt / F_kt^2
+    ψ = -atan(1, √(1 / (R * z) - 1))
+    w0 = Hn / F_kt
+    # Catch NaNs at beam waist and correct Gouy phase sign based on curvature sign
+    isnan(R) ? R = zero(R) : nothing
+    isnan(ψ) ? ψ = zero(ψ) : nothing
+    isnan(w0) ? w0 = w : nothing
+    R < 0 ? ψ = -ψ : nothing
+    return w, R, ψ, w0, Hn
+end
+
+"""
+    gauss_parameters(gauss::GaussianBeamlet, z; hint::=nothing)
 
 Calculate the local waist radius and Gouy phase of an unastigmatic Gaussian beamlet at a specific distance `z` based on the method of J. Arnaud (1985) and D. DeJager (1992).
 
@@ -271,6 +348,7 @@ function gauss_parameters(gauss::GaussianBeamlet,
         p0, index = hint
     end
     
+    
     chief = gauss.chief.rays[index]
     div = gauss.divergence.rays[index]
     waist = gauss.waist.rays[index]
@@ -284,6 +362,7 @@ function gauss_parameters(gauss::GaussianBeamlet,
     if !isapprox(Hn, λ / π, atol = 1e-6)
         println("H/n not fulfilled at z=$z")
     end
+    
     
     return w, R, ψ, w0
 end
