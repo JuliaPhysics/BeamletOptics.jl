@@ -68,7 +68,7 @@ function PolarizedRay(pos::AbstractArray{P},
     dir = normalize(dir)
     return PolarizedRay{F}(uuid4(),
         Point3{F}(pos),
-        normalize(Point3{F}(dir)),
+        Point3{F}(dir),
         nothing,
         λ,
         F(1),

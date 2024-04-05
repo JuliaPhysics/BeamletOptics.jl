@@ -140,8 +140,8 @@ end
 Tests if a `point` is in front of the plane defined by the `pos`ition and `dir`ection vectors.
 """
 function isinfrontof(point::AbstractVector, pos::AbstractVector, dir::AbstractVector)
-    los = point - pos
-    if dot(dir, los) <= 0
+    los = normalize(point - pos)
+    if dot(dir, los) ≤ 0
         return false
     else
         return true
