@@ -1,9 +1,10 @@
 """
-    Ray{T}
+    Ray{T} <: AbstractRay{T}
 
 Mutable struct to store ray information.
 
 # Fields
+
 - `id`: a UUID4 that uniquely identifies the `Ray`
 - `pos`: a point in R³ that describes the `Ray` origin
 - `dir`: a normalized vector in R³ that describes the `Ray` direction

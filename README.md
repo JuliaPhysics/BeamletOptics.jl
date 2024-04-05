@@ -21,7 +21,7 @@ Documentation can be found here: https://optical-air-data.pages.gitlab.dlr.de/di
             - [x] refraction
         - [x] Gaussian beam struct
             - [x] implement better retracing based on chief ray
-            - [ ] simple astigmatism via 5, 7, 9-ray approach
+            - [ ] astigmatism via `AstigmaticGaussianBeamlet`
 - Optics
     - [x] Lens types using mathematical surfaces
     - [x] Interference
@@ -30,12 +30,30 @@ Documentation can be found here: https://optical-air-data.pages.gitlab.dlr.de/di
         - [x] phase front via Gaussian beams
         - [ ] model coherence length via loss of contrast
     - [ ] phase shift due to ref. index change
-    - [ ] Multi-body container type, i.e. telescope, for easy kinematics
+    - [x] Multi-body container type, i.e. telescope, for easy kinematics
+    - [ ] Optical elements
+        - [ ] PlanoMirror with 3D sdf (thicc)
+            - [ ] cylindrical
+            - [ ] rectangular
+        - [ ] ConcaveMirror - cylindrical (thicc)
+        - [ ] Beamsplitter with substrate
+    - [ ] fix `Beam` / `GaussianBeamlet` constructors for more convenience
 - Mechanics
     - [x] element group handling
     - [ ] vibration of optical elements
 - Plotting
     - [ ] automatic plot updates using Makie Observable/Buffer
+    - [ ] SDF-based lens plotting rework
+- Documentation
+    - [ ] Home page
+    - [x] Basics section
+    - [ ] Tutorials
+        - [ ] Beam expander
+        - [ ] Interferometry
+    - [ ] API design
+    - [ ] Examples
+        - [ ] cool interferometry example with optomech render (stls)
+    - [x] References            
 - Test coverage
     - [x] continuous integration pipeline by O. Kliebisch
     - [x] translation and x,y,z-rotation tests

@@ -140,8 +140,8 @@ end
 Tests if a `point` is in front of the plane defined by the `pos`ition and `dir`ection vectors.
 """
 function isinfrontof(point::AbstractVector, pos::AbstractVector, dir::AbstractVector)
-    los = point - pos
-    if dot(dir, los) <= 0
+    los = normalize(point - pos)
+    if dot(dir, los) ≤ 0
         return false
     else
         return true
@@ -166,6 +166,7 @@ Calculates the refraction between an input vector `dir` and surface `normal` vec
 Vectors `dir` and `normal` must have **unit length**!
 
 # Total internal reflection
+
 If the critical angle for n1, n2 and the incident angle is reached, the ray is reflected instead!
 """
 function refraction3d(dir, normal, n1, n2)
@@ -184,12 +185,12 @@ function refraction3d(dir, normal, n1, n2)
 end
 
 """
-    lensmakers_eq(R1, R2, nl, n0=1.0)
+    lensmakers_eq(R1, R2, n)
 
-Calculates the thin lens focal length based on the radius of curvature `R1`/`R2` and the lens refractive index `nl`.
+Calculates the thin lens focal length based on the radius of curvature `R1`/`R2` and the lens refractive index `n`.
 If center of sphere is on left then R < 0. If center of sphere is on right then R > 0.
 """
-lensmakers_eq(R1, R2, nl, n0=1.0) = 1 / ((nl - n0) / n0 * (1 / R1 - 1 / R2))
+lensmakers_eq(R1, R2, n) = 1 / ((n - 1) * (1 / R1 - 1 / R2))
 
 """
     base_transform(base, base2=I(3))
@@ -214,16 +215,21 @@ wave_number(λ) = 2π / λ
 """
     electric_field(r, z, E0, w0, w, k, ψ, R) -> ComplexF64
 
-Computes the theoretical complex electric field distribution of an unastigmatic Gaussian laser beam.
+Computes the analytical complex electric field distribution of a stigmatic TEM₀₀ Gaussian beam which is described by:
+
+```math
+E(r,z) = {E_0}\\frac{{{w_0}}}{{w(z)}}\\exp\\left( { - \\frac{{{r^2}}}{{w{{(z)}^2}}}} \\right)\\exp\\left(i\\left[ {kz + \\psi + \\frac{{k{r^2}}}{2 R(z)}} \\right] \\right)
+```
 
 # Arguments
+
 - `r`: radial distance from beam origin
 - `z`: axial distance from beam origin
 - `E0`: peak electric field amplitude
 - `w0`: waist radius
 - `w`: local beam radius
 - `k`: wave number, equal to `2π/λ`
-- `ψ`: Gouy phase shift (defined as -atan(z/zr) !)
+- `ψ`: Gouy phase shift (defined as ``-\\text{atan}\\left(\\frac{z}{z_r}\\right)`` !)
 - `R`: wavefront curvature
 """
 electric_field(r::Real, z::Real, E0, w0, w, k, ψ, R) = E0 * w0 / w * exp(-r^2 / w^2) * exp(im * (k * z + ψ + (k * r^2 * R) / 2))
@@ -254,7 +260,9 @@ Calculates the complex Fresnel coefficients for reflection and transmission base
 and the refractive index ratio `n = n₂ / n₁`. Returns rₛ, rₚ, tₛ and tₚ.
 
 # Signs
-The signs of rₛ, rₚ are based on the definition by Fowles (1975, 2nd Ed. p. 44) and Peatross (2015, 2023 Ed. p. 78)
+
+!!! info
+    The signs of rₛ, rₚ are based on the definition by Fowles (1975, 2nd Ed. p. 44) and Peatross (2015, 2023 Ed. p. 78)
 """
 function fresnel_coefficients(θ::T, n::Number) where T
     C = Complex{T}

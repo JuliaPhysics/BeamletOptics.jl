@@ -1,7 +1,20 @@
+using CairoMakie
 using SCDI
 using Documenter
+using DocumenterCitations
+
+CairoMakie.activate!()
+
+try
+    mkdir(joinpath(@__DIR__, "src", "assets"))
+    @info "Created docs assets folder"
+catch
+    @info "Assets folder in docs already exists"
+end
 
 DocMeta.setdocmeta!(SCDI, :DocTestSetup, :(using SCDI); recursive=true)
+
+bib = CitationBibliography(joinpath(@__DIR__, "src", "refs.bib"))
 
 makedocs(;
     modules=[SCDI],
@@ -15,6 +28,23 @@ makedocs(;
     ),
     pages=[
         "Home" => "index.md",
-        "Example" => "example.md"
+        "Basics" => Any[
+            "Introduction" => "basics/intro.md",
+            "Rays" => "basics/rays.md",
+            "Beams" => "basics/beams.md",
+            "Optical elements" => "basics/elements.md",
+            "Optical systems" => "basics/systems.md",
+        ],
+        "Tutorials" => Any[
+            "Beam expander" => "tutorials/expander.md",
+        ],
+        "API design" => "design.md",
+        "Examples" => Any[
+            "Spherical lenses" => "examples/spherical_lenses.md",
+            "Double Gauss Lens" => "examples/double_gauss.md",
+            "Lens groups" => "examples/lens_groups.md",
+        ],
+        "Reference" => "reference.md"
     ],
+    plugins=[bib],
 )

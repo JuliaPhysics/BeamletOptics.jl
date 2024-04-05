@@ -4,9 +4,11 @@
 Provides a shape function based on signed distance functions. See https://iquilezles.org/articles/distfunctions/ for more information.
 
 # Implementation reqs.
+
 Subtypes of `AbstractSDF` should implement all reqs. of `AbstractShape` as well as the following:
 
 # Functions
+
 - `sdf(::AbstractSDF, point)`: a function that returns the signed distance for a point in 3D space
 """
 abstract type AbstractSDF{T} <: AbstractShape{T} end

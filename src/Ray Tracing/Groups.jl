@@ -5,11 +5,13 @@ A tree-like storage container for groups of objects. Can store individual object
 Main purpose is handling of, i.e., groups of lenses.
 
 ## Fields
+
 - `center`: a point in 3D space which is regarded as the reference origin of the group
 - `dir`: a 3x3 matrix that describes the common `orientation` of the group
 - `objects`: stores [`AbstractObject`](@ref), can also store subgroups of type [`AbstractObjectGroup`](@ref) 
 
 ## Kinematic
+
 A `ObjectGroup` implements the kinematic functions of [`AbstractObject`](@ref). The following logic is applied to
 
 - [`translate3d!`](@ref): all objects in the group are translated by the offset vector

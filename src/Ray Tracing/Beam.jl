@@ -1,10 +1,11 @@
 """
-    Beam
+    Beam{T, R <: AbstractRay{T}} <: AbstractBeam{T, R}
 
 Stores the rays that are calculated from geometric optics when propagating through an optical system.
 The `Beam` type is parametrically defined by the [`AbstractRay`](@ref) subtype that it stores.
 
 # Fields
+
 - `id`: beam ID (uuid4)
 - `rays`: vector of `AbstractRay` objects, representing the rays that make up the beam
 - `parent`: reference to the parent beam, if any ([`Nullable`](@ref) to account for the root beam which has no parent)

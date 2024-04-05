@@ -1,8 +1,36 @@
 """
-    GaussianBeamlet
+    GaussianBeamlet{T} <: AbstractBeam{T, Ray{T}}
 
-Ray representation of the **unastigmatic** Gaussian beam as per J. Arnaud (1985).
-The beam quality `M2` is fully considered via the divergence angle.
+Ray representation of the **stigmatic** Gaussian beam as per J. Arnaud (1985). The beam quality `M2` is fully considered via the divergence angle. 
+Formalism for beam parameter calculation based on publications:
+
+**Jacques Arnaud, "Representation of Gaussian beams by complex rays," Appl. Opt. 24, 538-543 (1985)**
+
+and
+
+**Donald DeJager and Mark Noethen, "Gaussian beam parameters that use Coddington-based Y-NU paraprincipal ray tracing," Appl. Opt. 31, 2199-2205 (1992)**
+
+# Fields
+
+- `id`: beam ID (uuid4)
+- `chief`: a [`Beam`](@ref) of [`Ray`](@ref)s to store the chief ray
+- `waist`: a [`Beam`](@ref) of [`Ray`](@ref)s to store the waist ray
+- `divergence`: a [`Beam`](@ref) of [`Ray`](@ref)s to store the divergence ray
+- `λ`: beam wavelength in [m]
+- `w0`: local beam waist radius in [m]
+- `E0`: complex field value in [V/m]
+- `parent`: reference to the parent beam, if any ([`Nullable`](@ref) to account for the root beam which has no parent)
+- `children`: vector of child beams, each child beam represents a branching or bifurcation of the original beam, i.e. beam-splitting
+
+# Additional information
+
+!!! info "Beam parameters"
+    Parameters of the beam, e.g. ``w(z)`` or ``R(z)``, can be obtained through the [`gauss_parameters`](@ref) function.
+
+!!! warning "Astigmatism and abberations"
+    It is assumed, but not forbidden, that the optical system contains non-symmetric optical elements that cause the beam to obtain
+    astigmatism or higher-order abberations. These can not be represented by the `GaussianBeamlet`.
+    Refer to **FIXME** for more information.
 """
 mutable struct GaussianBeamlet{T} <: AbstractBeam{T, Ray{T}}
     id::UUID
@@ -104,11 +132,13 @@ _last_beam_intersection(gauss::GaussianBeamlet) = intersection(last(rays(gauss.c
 Construct a Gaussian beamlet at its waist with a specified beam diameter.
 
 # Arguments
+
 - `chief`: Chief ray defining the origin of the Gaussian beamlet.
 - `λ`: Wavelength of the beamlet in [m]. Default value is 1000 nm.
 - `w0`: Beam waist (radius) in [m]. Default value is 1 mm.
 
 # Keyword Arguments
+
 - `M2`: beam quality factor
 - `P0`: beam total power in [W]
 - `support`: Support vector that can be adjusted for beamlet construction.
@@ -144,11 +174,13 @@ point_on_beam(gauss::GaussianBeamlet, t::Real) = point_on_beam(gauss.chief, t)
 Calculate the local waist radius and Gouy phase of an unastigmatic Gaussian beamlet at a specific distance `z` based on the method of J. Arnaud (1985) and D. DeJager (1992).
 
 # Arguments
+
 - `gauss`: the GaussianBeamlet object for which parameters are to be calculated.
 - `z`: the position along the beam at which to calculate the parameters.
 - `hint`: an optional hint parameter for the relevant point/index of the appropriate beam segment. If not provided, the function will automatically select the ray.
 
 # Returns
+
 - `w`: local radius
 - `R`: curvature, i.e. 1/r where r is the radius of curvature
 - `ψ`: Gouy phase (note that -atan definition is used)

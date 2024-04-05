@@ -23,6 +23,7 @@ a matrix of `faces`, i.e. the connectivity matrix of the mesh. The data is read 
 vertex matrix. For orientation and translation tracking, a `pos`itional and `dir`ectional matrix are stored.
 
 # Fields
+
 - `vertices`: (m x 3)-matrix that stores the edge points of all triangles
 - `faces`: (n x 3)-matrix that stores the connectivity data for all faces
 - `dir`: (3 x 3)-matrix that represents the current orientation of the mesh
