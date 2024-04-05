@@ -56,9 +56,11 @@ end
 A generic type to represent `AbstractObject`s which refract incoming rays. The main function of `interact3d` should be akin to [`refraction3d`](@ref).
 
 # Implementation reqs.
+
 Subtypes of `AbstractRefractiveOptic` should implement all supertype reqs. as well as:
 
 # Fields
+
 - `n::Function`: a function which returns the refractive index for a wavelength λ
 """
 abstract type AbstractRefractiveOptic{T} <: AbstractObject end
@@ -144,10 +146,29 @@ function interact3d(system::AbstractSystem, optic::AbstractRefractiveOptic, ::Be
     return BeamInteraction{T, R}(hint, PolarizedRay{T}(uuid4(), raypos, new_dir, nothing, wavelength(ray), n2, E0))
 end
 
+"""
+    Lens{S <: AbstractShape, T <: Function} <: AbstractRefractiveOptic{T}
+
+Represents an uncoated `Lens` with a homogeneous refractive index `n = n(λ)`.
+Refer to the [`SphericalLens`](@ref) constructor for more information on how to generate lenses.
+
+# Fields
+
+- `id`: lens ID (uuid4)
+- `shape`: geometry of the lens, refer to [`AbstractShape`](@ref) for more information
+- `n`: **single-argument** function that returns n(λ)
+
+# Additional information
+
+!!! info "Refractive index"
+    The chromatic dispersion of the lens is represented by a λ-dependent function for `n`
+    and must be provided by the user. For testing purposes, an anonymous function, e.g. λ -> 1.5
+    can be passed such that the lens has the same refractive index for all wavelengths.
+"""
 struct Lens{S <: AbstractShape, T <: Function} <: AbstractRefractiveOptic{T}
     id::UUID
     shape::S
-    n::T
+    n::T # FIXME: constructor check that n=n(λ), # args 
 end
 
 SphericalLens(r1, r2, l, d, n) = SphericalLens(r1, r2, l, d, λ -> n)
@@ -155,7 +176,7 @@ SphericalLens(r1, r2, l, d, n) = SphericalLens(r1, r2, l, d, λ -> n)
 """
     SphericalLens(r1, r2, l, d=1inch, n=λ->1.5)
 
-Creates a spherical lens based on:
+Creates a spherical [`Lens`](@ref) based on:
 
 - `r1`: front radius
 - `r2`: back radius
@@ -171,7 +192,7 @@ Creates a spherical lens based on:
 
 # Hint: thin lenses
 
-If `l` is set to zero, an ideal [`ThinLens`](@ref) will be created. However, note that the actual lens thickness will be different from zero.
+If `l` is set to zero, an ideal thin [`SphericalLens`](@ref) will be created. However, note that the actual lens thickness will be different from zero.
 """
 function SphericalLens(r1::Real, r2::Real, l::Real, d::Real = 1inch, n::Function = λ -> 1.5)
     # # Test for thin lens
@@ -198,12 +219,24 @@ function SphericalLens(r1::Real, r2::Real, l::Real, d::Real = 1inch, n::Function
     return Lens(uuid4(), shape, n)
 end
 
-ThinLens(R1::Real, R2::Real, d::Real, n::Real) = ThinLens(R1, R2, d, x -> n)
+"""
+    ThinLens(R1::Real, R2::Real, d::Real, n::Function)
+
+Directly creates an ideal spherical thin [`Lens`](@ref) with radii of curvature `R1` and `R2` and diameter `d`
+and refractive index `n`. 
+"""
 function ThinLens(R1::Real, R2::Real, d::Real, n::Function)
     shape = ThinLensSDF(R1, R2, d)
     return Lens(uuid4(), shape, n)
 end
+ThinLens(R1::Real, R2::Real, d::Real, n::Real) = ThinLens(R1, R2, d, x -> n)
 
+"""
+    Prism{S <: AbstractShape, T <: Function} <: AbstractRefractiveOptic{T}
+
+Essentially represents the same functionality as [`Lens`](@ref).
+Refer to its documentation. 
+"""
 struct Prism{S <: AbstractShape, T <: Function} <: AbstractRefractiveOptic{T}
     id::UUID
     shape::S
@@ -215,6 +248,31 @@ Implements photodetector, efield calculation during solve_system!
 =#
 abstract type AbstractDetector <: AbstractObject end
 
+"""
+    Photodetector{S <: AbstractShape, T} <: AbstractDetector
+
+Represents a **flat** rectangular or quadratic surface in R³ that is the active surface of a photodetector.
+The active surface is discretized in the local R² x-y-coordinate system.
+Field contributions Eᵢ are added by the corresponding [`interact3d`](@ref) method.
+
+# Fields
+
+- `id`: detector ID (uuid4)
+- `shape`: geometry of the active surface, must represent 2D-`field` in `x` any `y` dimensions
+- `x`: linear range of local x-coordinates
+- `y`: linear range of local y-coordinates
+- `field`: `size(x)` by `size(y)` matrix of complex values to store superposition E₀ 
+
+# Additional information
+
+!!! warning "Reset behavior"
+    The `Photodetector` must be reset between each call of [`solve_system!`](@ref) in order to 
+    overwrite previous results using the [`reset_photodetector!`](@ref) function.
+    Otherwise, the current result will be added onto the previous result.
+
+!!! info "Supported beams"
+    Currently, only the [`GaussianBeamlet`] is supported.
+"""
 mutable struct Photodetector{S <: AbstractShape, T} <: AbstractDetector
     const id::UUID
     const shape::S
@@ -287,6 +345,7 @@ Calculates the total optical power on `pd` in [W] by integration over the local 
 """
 optical_power(pd::Photodetector) = trapz((pd.x, pd.y), intensity(pd))
 
+"""Resets the values currently stored in `pd.field` to zero"""
 reset_photodetector!(pd::Photodetector{S, T}) where {S, T} = (pd.field .= zero(Complex{T}))
 
 """
@@ -306,6 +365,7 @@ Implements thin beam splitter, beam spawning
 =#
 abstract type AbstractBeamSplitter <: AbstractObject end
 
+"""Models a generic beam splitter"""
 struct BeamSplitter{S <: AbstractShape, T <: Real} <: AbstractBeamSplitter
     id::UUID
     shape::S
@@ -325,10 +385,12 @@ Creates a zero-thickness, lossless, non-polarizing quadratic rectangle beam spli
 - `reflectance`: determines how much light is **reflected**, i.e. 0.7 for a 70:30 splitter
 
 ## Reflectance
+
 The input value for the `reflectance` R is normed such that R² + T² = 1, where T is the `transmittance`.
 The transmittance is calculated via T = √(1 - R²).
 
 ## Phase shift
+
 Note that the reflection phase shift θᵣ ∈ [0, π] is not modeled here for simplicity, since in practice it will have no effect on the interference at the detector.
 """
 function ThinBeamSplitter(scale::T, reflectance::Real = 0.5) where {T}

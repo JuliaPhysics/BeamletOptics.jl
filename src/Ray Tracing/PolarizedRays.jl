@@ -1,5 +1,5 @@
 """
-    PolarizedRay{T}
+    PolarizedRay{T} <: AbstractRay{T}
 
 A ray type to model the propagation of an electric field vector based on the publication:
 
@@ -9,6 +9,7 @@ The geometrical ray description is identical to the standard [`Ray`](@ref). The 
 but must be transformed into global coordinates using the method described in the publication above, see also [`_calculate_global_E0`](@ref).
 
 # Fields
+
 - `id`: a UUID4 that uniquely identifies the `Ray`
 - `pos`: a point in R³ that describes the `Ray` origin
 - `dir`: a normalized vector in R³ that describes the `Ray` direction
@@ -29,7 +30,7 @@ where r and t are the complex-valued Fresnel coefficients (see also [`fresnel_co
 # Additional information
 
 !!! warning "Field vector"
-    It is assumed that the electric field vector stays orthogonal to the direction of propagation throughout the optical system.
+    It is assumed that the electric field vector ``E_0`` stays orthogonal to the direction of propagation throughout the optical system.
 
 !!! warning "Intensity"
     E0 can not be converted into an [`intensity`](@ref) value, since a single `PolarizedRay` can not directly model the change in intensity during imaging by an optical system.
@@ -79,7 +80,7 @@ If the `in`- and `out`-directions of propagation are parallel, an arbitrary basi
 # Arguments
 - `in_dir`: propagation direction before surface interaction
 - `out_dir`: propagation direction after surface interaction
-- `J`: Jones matrix extended to 3x3, i.e. [-rₛ 0 0; 0 rₚ 0; 0 0 1]
+- `J`: Jones matrix extended to 3x3, e.g. [-rₛ 0 0; 0 rₚ 0; 0 0 1] for reflection
 - `E0`: Polarization vector before surface interaction
 """
 function _calculate_global_E0(in_dir::AbstractArray, out_dir::AbstractArray, J::AbstractArray, E0::AbstractArray)

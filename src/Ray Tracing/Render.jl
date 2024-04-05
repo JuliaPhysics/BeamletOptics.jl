@@ -73,11 +73,12 @@ Render the surface of a `GaussianBeamlet` as `color`. With `show_beams` the gene
 - `waist` ray: blue
 
 # Keyword args
+
 - `color = :red`: color of the beam as per the Makie syntax, i.e. :blue
 - `flen = 0.1`: length of the final beam in case of no intersection
--`show_beams = false`: plot the generating rays of the [`GaussianBeamlet`](@ref)
--`r_res::Int = 50`: radial resolution of the beam
--`z_res::Int = 100`: resolution along the optical axis of the beam
+- `show_beams = false`: plot the generating rays of the [`GaussianBeamlet`](@ref)
+- `r_res::Int = 50`: radial resolution of the beam
+- `z_res::Int = 100`: resolution along the optical axis of the beam
 """
 function render_beam!(axis,
         gauss::GaussianBeamlet{T};

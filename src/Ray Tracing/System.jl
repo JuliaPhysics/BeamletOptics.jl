@@ -4,6 +4,7 @@
 A container storing the optical elements of, i.e. a camera lens or lab setup.
 
 # Fields
+
 - `id::UUID`: system ID (uuid4)
 - `objects`: vector containing the different objects that are part of the system (subtypes of [`AbstractObject`](@ref))
 """
@@ -18,7 +19,7 @@ System(objects::AbstractArray{<:AbstractObject}) = System(uuid4(), objects)
 """
     objects(system::System)
 
-Exposes all objects stored within the system. By exposing the [`AbstractTrees.Leaves`](@ref) only, it is ensured that `AbstractObjectGroup`s are flattened into a regular vector.
+Exposes all objects stored within the system. By exposing the `Leaves` of the tree only, it is ensured that `AbstractObjectGroup`s are flattened into a regular vector.
 """
 objects(system::System) = Leaves(system.objects)
 
@@ -34,6 +35,7 @@ can be added or removed after construction but it allows for more performant ray
     for very large optical systems as it puts a lot of stress onto the compiler.
 
 # Fields
+
 - `id::UUID`: system ID (uuid4)
 - `objects`: vector containing the different objects that are part of the system (subtypes of [`AbstractObject`](@ref))
 """
@@ -122,6 +124,19 @@ end
     return intersection
 end
 
+"""
+    tracing_step!(system::AbstractSystem, ray::AbstractRay{R}, hint::Nullable{UUID})
+
+Tests if the `ray` intersects an `object` in the optical `system`. Returns the closest intersection.
+
+# Hint UUID
+
+An optional `hint` in the form of an UUID can be provided to test against a specific object in the `system` first.
+
+!!! warning
+    If a hint is provided and the object intersection is valid, the intersection will be returned immediately.
+    However, it is not guaranteed that this is the true closest intersection. 
+"""
 @inline function tracing_step!(system::AbstractSystem,
         ray::AbstractRay{R},
         hint::Nullable{UUID}) where {R <: Real}
@@ -136,6 +151,23 @@ end
     return nothing
 end
 
+"""
+    trace_system!(system::AbstractSystem, beam::Beam{T}; r_max::Int = 20) where {T <: Real}
+
+Trace a [`Beam`](@ref) through an optical `system`. Maximum number of tracing steps can be capped by `r_max`.
+
+# Tracing logic
+
+The intersection of the last ray of the `beam` with any objects in the `system` is tested.
+If an object is hit, the optical interaction is analyzed and tracing continues. 
+Else the tracing procedure is stopped.
+
+# Arguments
+
+- `system:`: The optical system through which the GaussianBeamlet is traced.
+- `beam`: The GaussianBeamlet object to be traced.
+- `r_max`: Maximum number of tracing iterations. Default is 20.
+"""
 function trace_system!(system::AbstractSystem, beam::Beam{T}; r_max::Int = 20) where {T <: Real}
     # Test until max. number of rays in beam reached
     interaction::Nullable{BeamInteraction{T}} = nothing
@@ -203,13 +235,19 @@ end
 """
     trace_system!(system::System, gauss::GaussianBeamlet{T}; r_max::Int = 20) where {T <: Real}
 
-Trace a `GaussianBeamlet` through an optical `system`. Tracing logic is based on iteratively tracing the `GaussianBeamlet` chief ray through the system.
-The `waist` and `divergence` ray are traced subsequently.
+Trace a [`GaussianBeamlet`](@ref) through an optical `system`. Maximum number of tracing steps can be capped by `r_max`.
+
+# Tracing logic 
+
+The chief, waist and divergence beams are traced step-by-step through the `system`. 
+For each intersection after a [`tracing_step!`](@ref), the intersections are compared.
+If all rays hit the same target, the optical interaction is analyzed, else the tracing stops.
 
 # Arguments
-- `system::System`: The optical system through which the GaussianBeamlet is traced.
-- `gauss::GaussianBeamlet{T}`: The GaussianBeamlet object to be traced.
-- `r_max::Int=20` (optional): Maximum number of tracing iterations. Default is 20.
+
+- `system`: The optical system through which the GaussianBeamlet is traced.
+- `gauss`: The GaussianBeamlet object to be traced.
+- `r_max`: Maximum number of tracing iterations. Default is 20.
 """
 function trace_system!(system::AbstractSystem,
         gauss::GaussianBeamlet{T};
@@ -223,6 +261,7 @@ function trace_system!(system::AbstractSystem,
         if isnothing(intersection(ray))
             break
         end
+        # Follow up with waist and divergence ray
         id_c = id(intersection(ray))
         ray = last(rays(gauss.waist))
         tracing_step!(system, ray, hint(interaction))
@@ -322,6 +361,7 @@ The condition to stop ray tracing is that the last `beam` intersection is `nothi
 A maximum number of rays per `beam` (`r_max`) can be specified in order to avoid infinite calculations under resonant conditions, i.e. two facing mirrors.
 
 # Arguments
+
 - `system::System`: The optical system in which the beam will be traced.
 - `beam::AbstractBeam`: The beam object to be traced through the system.
 - `r_max::Int=20` (optional): Maximum number of tracing iterations for each leaf. Default is 100.

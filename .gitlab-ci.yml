@@ -3,31 +3,31 @@
     CI: "true"
   script:
     - |
-      D:/CI_Ressources/Julia-1.9.2/bin/julia.exe --project=@. -e '
+      D:/CI_Ressources/Julia-1.10.2/bin/julia.exe --project=@. -e '
         using Pkg        
         Pkg.test(coverage=true)'
 .coverage:
   coverage: /Test coverage (\d+\.\d+%)/
   after_script:
     - |
-       D:/CI_Ressources/Julia-1.9.2/bin/julia.exe -e '
+       D:/CI_Ressources/Julia-1.10.2/bin/julia.exe -e '
         using Pkg
         Pkg.add(\"Coverage\")
         using Coverage
         c, t = get_summary(process_folder())
         using Printf
         @printf \"Test coverage %.2f%%\n\" 100c / t'
-Julia 1.9:
-  image: julia:1.9
+Julia 1.10:
+  image: julia:1.10
   extends:
     - .script
     - .coverage
 pages:
-  image: julia:1.9
+  image: julia:1.10
   stage: deploy
   script:
     - |
-       D:/CI_Ressources/Julia-1.9.2/bin/julia.exe --project=docs -e '
+       D:/CI_Ressources/Julia-1.10.2/bin/julia.exe --project=docs -e '
         using Pkg
         Pkg.develop(PackageSpec(path=pwd()))
         Pkg.instantiate()
@@ -39,6 +39,6 @@ pages:
     - mv docs/build/* public/
   artifacts:
     paths:
-      - public
+      - public  
   only:
     - main

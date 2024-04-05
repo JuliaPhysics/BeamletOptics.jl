@@ -57,9 +57,11 @@ Core Functions:
 A generic type for something that exists independently.
 
 # Implementation reqs.
+
 Subtypes of `AbstractEntity` should implement the following:
 
 # Fields
+
 - `id`: a unique identifier (UUID 4)
 """
 abstract type AbstractEntity end
@@ -70,7 +72,20 @@ id(::Any) = nothing
 """
     AbstractSystem <: AbstractEntity
 
-A generic type for a container type which holds objects, beams, etc.
+A generic representation of a system of optical elements.
+
+# Implementation reqs.
+
+Subtypes of `AbstractBeam` must implement the following:
+
+## Fields:
+
+- `objects`: a vector or tuple of [`AbstractObject`](@ref)s that make up the system
+- `n`: (optional) refractive index of the surrounding medium, default value is 1.0
+
+## Functions:
+
+- `refractive_index`: returns the refractive index `n`, see above
 """
 abstract type AbstractSystem <: AbstractEntity end
 
@@ -82,6 +97,7 @@ refractive_index(::AbstractSystem) = 1.0
 Stores some data resulting from ray tracing a `System`. This information can be used, i.e. for retracing.
 
 # Fields:
+
 - `t`: length of the ray parametrization in [m]
 - `n`: normal vector at the point of intersection
 - `id`: index of the intersected object in the `System` object-vector
@@ -109,13 +125,16 @@ An implementation for a geometrical optics ray in R³. In general, a `AbstractRa
 To store the result of a ray tracing solution, refer to [`AbstractBeam`](@ref).
 
 # Intersections:
+
 Since the length of a ray can not be known before solving an optical system, the [`Intersection`](@ref)-type is used.
 This [`Nullable`](@ref) type can represent the intersection with an optical element, or lack thereof.
 
 # Implementation reqs.
+
 Subtypes of `AbstractBeam` must implement the following:
 
 ## Fields:
+
 - `pos`: a R³-vector that stores the current position ``\\vec{p}``
 - `dir`: a R³-vector that stores the current direction ``\\vec{d}``
 - `intersection`: a `Nullable` field that stores the current intersection or `nothing`
@@ -125,7 +144,8 @@ Subtypes of `AbstractBeam` must implement the following:
 # Additional information
 
 !!! info "Ray length"
-    Base.`length`: this function is used to return the length of the `AbstractRay` (if no intersection exists, the ray length is `Inf`)
+    Base.`length`: this function is used to return the length of the `AbstractRay` (if no intersection exists, the ray length is `Inf`).
+    The `opl` keyword can be used to obtain the optical path length instead.
 
 !!! warning "Ray direction"
     Many functions assume that the `dir`ection vector has unit length (i.e. ``|\\vec{p}| = 1``). 
@@ -208,19 +228,23 @@ end
 
 A generic type for a container type which holds rays, beams etc.
 
-# Implementation reqs.
-Subtypes of `AbstractBeam` must implement the following:
+# Parametrization:
 
-## Parametrization:
 A subtype of `AbstractBeam` is parameterized by its main data type `T <: Real`, as well as the underlying ray representation `R <: AbstractRay{T}`.
 If a beam is to be compatible with different [`AbstractRay`](@ref) implementations, it must be parameterized by `T` and `R`.
 However, it can also be set to a fixed type for `T` and `R`, i.e. `MyBeam <: AbstractBeam{Float32, MyRay}`.
 
+# Implementation reqs.
+
+Subtypes of `AbstractBeam` must implement the following:
+
 ## Fields:
+
 - `parent`: a [`Nullable`](@ref) field that holds the same type as the subtype, used for tree navigation
 - `children`: a vector that holds the same type as the subtype, used for sub-beam tracking, i.e. beam splitting
 
 ## Functions:
+
 - `_modify_beam_head!`: modifies the beam path for retracing purposes
 - `_last_beam_intersection`: returns the last `Beam` intersection
 """
@@ -288,17 +312,25 @@ end
 """
     AbstractShape{T<:Real} <: AbstractEntity
 
-A generic type for a shape that exists in 3D-space. Must have a `pos`ition and `dir`ection.\\
+A generic type for a shape that exists in 3D-space. Must have a `pos`ition and orientation.\\
 Types used to describe an `object` should be subtypes of `Real`.\\
 
 # Implementation reqs.
+
 Subtypes of `AbstractShape` should implement the following:
 
 ## Fields:
+
 - `pos`: a 3D-vector that stores the current `position` of the object-specific coordinate system
 - `dir`: a 3x3-matrix that represents the orthonormal basis of the object and therefore, the `orientation`
 
+## Getters/setters
+
+- [`position`](@ref) / `position!`: gets or sets the `pos`ition vector of the `AbstractShape`
+- [`orientation`](@ref) / `orientation!`: gets or sets the orientation matrix of the `AbstractShape`
+
 ## Kinematic:
+
 - `translate3d!`: the object is moved by a translation vector relative to its current position
 - `translate_to3d!`: the object is moved towards the target position
 - `rotate3d!`: the object is rotated by an angle around a reference vector
@@ -309,10 +341,12 @@ Subtypes of `AbstractShape` should implement the following:
 - `reset_rotation3d!`: rotate the `object` back into its original state
 
 ## Ray Tracing:
+
 - `intersect3d`: returns the intersection between an `AbstractShape` and `AbstractRay`, or lack thereof. See also [`Intersection`](@ref)
 
-## Rendering (with GLMakie):
-- `render_shape!`: plot the `shape` into an `Axis3` environment
+## Rendering (with Makie):
+
+- `render_shape!`: plot the `shape` into an `Axis3` or `LScene` environment
 - `render_shape_normals!`: plot the `shape` surface normals into an `Axis3` environment (optional)
 """
 abstract type AbstractShape{T <: Real} <: AbstractEntity end
@@ -323,11 +357,11 @@ function intersect3d(shape::AbstractShape, ::AbstractRay)
     return nothing
 end
 
-"Enforces that `object` has to have the field `pos` or implement `position()`."
+"Enforces that `shape` has to have the field `pos` or implement `position()`."
 position(shape::AbstractShape) = shape.pos
 position!(shape::AbstractShape, pos) = (shape.pos = pos)
 
-"Enforces that `object` has to have the field `dir` or implement `orientation()`."
+"Enforces that `shape` has to have the field `dir` or implement `orientation()`."
 orientation(shape::AbstractShape) = shape.dir
 orientation!(shape::AbstractShape, dir) = (shape.dir = dir)
 
@@ -363,12 +397,15 @@ function rotate3d!(shape::AbstractShape, axis, θ)
     return nothing
 end
 
+"""Rotates the `dir`-matrix of `shape` around the global x-axis by an angle of `θ`."""
 function xrotate3d!(shape::AbstractShape{T}, θ) where {T}
     rotate3d!(shape, Point3(one(T), zero(T), zero(T)), θ)
 end
+"""Rotates the `dir`-matrix of `shape` around the global y-axis by an angle of `θ`."""
 function yrotate3d!(shape::AbstractShape{T}, θ) where {T}
     rotate3d!(shape, Point3(zero(T), one(T), zero(T)), θ)
 end
+"""Rotates the `dir`-matrix of `shape` around the global z-axis by an angle of `θ`."""
 function zrotate3d!(shape::AbstractShape{T}, θ) where {T}
     rotate3d!(shape, Point3(zero(T), zero(T), one(T)), θ)
 end
@@ -401,12 +438,20 @@ isinfrontof(shape::AbstractShape, ray::AbstractRay) = isinfrontof(position(shape
 A generic type for 2D/3D objects. Optical elements are supposed to fall under this type.
 
 # Implementation reqs.
+
 Subtypes of `AbstractObject` must implement the following:
 
 ## Fields:
+
 - `shape`: stores an [`AbstractShape`](@ref) that represents the object geometry, called via `shape(object)`
 
+## Getters/setters
+
+- [`position`](@ref) / `position!`: gets or sets the `pos`ition vector of the `AbstractObject`
+- [`orientation`](@ref) / `orientation!`: gets or sets the orientation matrix of the `AbstractObject`
+
 ## Functions:
+
 - [`intersect3d`](@ref): returns the intersection between the object and an incoming ray, defaults to the intersection with `shape(object)`
 - [`interact3d`](@ref): defines the optical interaction, should return `nothing` or an [`AbstractInteraction`](@ref)
 - for the kinematic API, all corresponding functions should be forwarded to the underlying [`AbstractShape`](@ref) i.e. `rotate3d!(shape(object))`
@@ -415,8 +460,13 @@ abstract type AbstractObject <: AbstractEntity end
 
 shape(object::AbstractObject) = object.shape
 
+"Enforces that `object` has to have the field `pos` or implement `position()`."
 position(object::AbstractObject) = position(shape(object))
+position!(object::AbstractObject) = position!(shape(object))
+
+"Enforces that `object` has to have the field `dir` or implement `orientation()`."
 orientation(object::AbstractObject) = orientation(shape(object))
+orientation!(object::AbstractObject) = orientation!(shape(object))
 
 """
     intersect3d(object::AbstractObject, ray::AbstractRay)
@@ -424,6 +474,7 @@ orientation(object::AbstractObject) = orientation(shape(object))
 In general, the intersection between an `object` and a `ray` is defined as the intersection with `shape(object)`.
 """
 function intersect3d(object::AbstractObject, ray::AbstractRay)
+    # FIXME: isinfrontof check?
     intersection = intersect3d(shape(object), ray)
     # Ensure that the intersection knows about the object id
     if !isnothing(intersection)
@@ -462,12 +513,15 @@ reset_rotation3d!(object::AbstractObject) = reset_rotation3d!(shape(object))
 Container type for groups of optical elements, based on a tree-like data structure. Intended for easier kinematic handling of connected elements.
 
 # Implementation reqs.
+
 Subtypes of `AbstractObjectGroup` must implement the following:
 
 ## Fields:
+
 - `objects`: stores objects or additional subgroups of objects, allows for hierarchical structures
 
 ## Functions:
+
 - for the kinematic API, all corresponding functions of [`AbstractObject`](@ref) must be implemented
 """
 abstract type AbstractObjectGroup <: AbstractObject end

@@ -1,12 +1,4 @@
-```@meta
-CurrentModule = SCDI
-```
+# Home
 
-# SCDI Sim
-
-```@index
-```
-
-```@autodocs
-Modules = [SCDI]
-```
+!!! warning
+    This package requires ≥ Julia 1.9.4
