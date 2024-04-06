@@ -53,3 +53,20 @@ end
 
 RetroReflector(scale) = RetroReflector(uuid4(), RetroMesh(scale))
 
+"""
+    RectangularPlateBeamSplitter(width, thickness, n=1.5; eps_separation=1e-9)
+
+# FIXME
+"""
+function RectangularPlateBeamSplitter(width, thickness, n=1.5; eps_separation=1e-9)
+    coating = SCDI.ThinBeamSplitter(width)
+    shape = SCDI.CuboidMesh((width, thickness, width))
+    SCDI.translate3d!(shape, [
+        -width/2,
+        -thickness/2,
+        -width/2,
+    ])
+    SCDI.translate3d!(coating, [0, thickness/2 + eps_separation, 0])
+    substrate = SCDI.Prism(uuid4(), shape, _ -> n)
+    return SCDI.ObjectGroup([coating, substrate])
+end

@@ -281,8 +281,8 @@ mutable struct Photodetector{S <: AbstractShape, T} <: AbstractDetector
     field::Matrix{Complex{T}}
 end
 
-function Photodetector(scale::T, n::Int) where {T}
-    shape = QuadraticFlatMesh(scale)
+function Photodetector(width::T, n::Int) where {T}
+    shape = QuadraticFlatMesh(width)
     sz = maximum(vertices(shape))
     x = y = LinRange(-sz, sz, n)
     field = zeros(Complex{T}, n, n)
@@ -366,11 +366,11 @@ reflectance(bs::BeamSplitter) = bs.reflectance
 transmittance(bs::BeamSplitter) = bs.transmittance
 
 """
-    ThinBeamSplitter(scale::T, reflectance::Real=0.5) where {T}
+    ThinBeamSplitter(width::T, reflectance::Real=0.5) where {T}
 
 Creates a zero-thickness, lossless, non-polarizing quadratic rectangle beam splitter where
 
-- `scale`: is the edge length
+- `width`: is the edge length
 - `reflectance`: determines how much light is **reflected**, i.e. 0.7 for a 70:30 splitter
 
 ## Reflectance
@@ -382,23 +382,11 @@ The transmittance is calculated via T = √(1 - R²).
 
 Note that the reflection phase shift θᵣ ∈ [0, π] is not modeled here for simplicity, since in practice it will have no effect on the interference at the detector.
 """
-function ThinBeamSplitter(scale::T, reflectance::Real = 0.5) where {T}
+function ThinBeamSplitter(width::T, reflectance::Real = 0.5) where {T}
     if reflectance ≥ 1 || isapprox(reflectance, 0)
         error("Splitting ratio ∈ (0, 1)!")
     end
-    sz = 0.5
-    vertices = [sz 0 sz
-        sz 0 -sz
-        -sz 0 -sz
-        -sz 0 sz]
-    faces = [1 2 4
-        2 3 4]
-    shape = Mesh{T}(uuid4(),
-        vertices .* scale,
-        faces,
-        Matrix{T}(I, 3, 3),
-        T.([0, 0, 0]),
-        scale)
+    shape = QuadraticFlatMesh(width)
     Reflected = sqrt(reflectance)
     Transmitted = sqrt(1 - Reflected^2)
     return BeamSplitter(uuid4(), shape, Reflected, Transmitted)
