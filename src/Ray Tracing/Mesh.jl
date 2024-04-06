@@ -239,3 +239,89 @@ function intersect3d(object::AbstractMesh{M},
         return Intersection{T}(t0, normalize(T.(normal)), nothing)
     end
 end
+
+
+## A collection of mesh constructors
+
+"""
+    QuadraticFlatMesh(scale::Real)
+
+Creates a 2D quadratic [`Mesh`](@ref) that is centered around the origin and aligned with respect to the **y-axis**.
+Quadrat size is determined according to `scale`. Vertex normals are parallel to the positive y-axis.
+"""
+function QuadraticFlatMesh(scale::Real)
+    sz = 0.5
+    vertices = [
+        sz 0 sz
+        sz 0 -sz
+        -sz 0 -sz
+        -sz 0 sz
+    ]
+    faces = [
+        1 2 4
+        2 3 4
+    ]
+    vertices .*= scale
+    T = eltype(vertices)
+    return Mesh{T}(uuid4(),
+        vertices,
+        faces,
+        Matrix{T}(I, 3, 3),
+        T.([0, 0, 0]),
+        scale)
+end
+
+"""
+    CuboidMesh(scale::NTuple{3, T}, θ::Real=π/2) where T<:Real
+
+Constructs the [`Mesh`](@ref) of a rectangular cuboid as per the dimensions specified in the `scale` tuple. Not that the tuple entries represent x, y and z dimensions (in that order).
+In addition, one side of the mesh can be tilted by an angle `θ` in order to generate the mesh of a rhomb, see also [`Rhombus`](@ref).
+The mesh is initialized such that one corner of the cuboid lies at the origin.
+
+# Arguments
+
+- `scale`: a 3-tuple of x, y and z dimensions for the cube
+- `θ`: parallel tilt angle
+"""
+function CuboidMesh(scale::NTuple{3, T}, θ::Real=π/2) where T<:Real
+    x = scale[1]
+    y = scale[2]
+    z = scale[3]
+    dx = cos(θ)*y
+    vertices = [
+        0 0 0
+        x 0 0
+        x + dx y 0
+        0 + dx y 0
+        0 + dx y z
+        x + dx y z
+        x 0 z
+        0 0 z
+    ]
+    faces = [
+        1 3 2
+        1 4 3
+        3 4 5
+        3 5 6
+        2 3 6
+        2 6 7
+        1 8 5
+        1 5 4
+        6 5 8
+        6 8 7
+        1 7 8
+        1 2 7
+    ]
+    return Mesh{T}(uuid4(),
+        vertices,
+        faces,
+        Matrix{T}(I, 3, 3),
+        zeros(T, 3),
+        one(T))
+end
+
+"""Refer to [`CuboidMesh`](@ref)."""
+function CubeMesh(scale::Real)
+    scale = Float64(scale)
+    return CuboidMesh((scale, scale, scale))
+end

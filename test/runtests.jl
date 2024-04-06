@@ -415,9 +415,7 @@ end
     @test isdefined(SCDI, :Mesh)
 
     # Generate cube since types are defined
-    include("Cube.jl")
-
-    foo = Cube(1) # test cube
+    foo = SCDI.CubeMesh(1) # test cube
 
     @testset "Testing AbstractMesh getters" begin
         @test typeof(foo) == SCDI.Mesh{Float64}
@@ -532,7 +530,7 @@ end
     end
     @testset "Testing intersect3d" begin
         # Setup test cube and ray
-        cube = Cube(1)
+        cube = SCDI.CubeMesh(1)
         SCDI.translate3d!(cube, -0.5 * [1, 1, 1])
         SCDI.set_new_origin3d!(cube)
         ray_pos = zeros(3)
@@ -554,7 +552,7 @@ end
     @testset "Testing intersect3d - part 2" begin
         t = 5
         s = 1 # scale/2
-        cube = Cube(2 * s)
+        cube = SCDI.CubeMesh(2 * s)
         # Move cube COG to origin
         SCDI.translate3d!(cube, -[s, s, s])
         SCDI.set_new_origin3d!(cube)
@@ -674,7 +672,7 @@ end
     radius = 1
     L = 6 * radius / n_mirrors
     Δθ = 360 / (n_mirrors + 1)
-    mirrors = [PlanoMirror(L) for _ in 1:n_mirrors]
+    mirrors = [SCDI.RectangularPlanoMirror2D(L) for _ in 1:n_mirrors]
     θ = 1 * Δθ
     for m in mirrors
         point = radius * [cos(deg2rad(θ)), sin(deg2rad(θ)), 0]
@@ -1199,8 +1197,8 @@ end
         l_0 = 0.1
         pd_size = SCDI.inch / 5
         pd_resolution = 100
-        m1 = PlanoMirror(SCDI.inch)
-        m2 = PlanoMirror(SCDI.inch)
+        m1 = SCDI.RectangularPlanoMirror2D(SCDI.inch)
+        m2 = SCDI.RectangularPlanoMirror2D(SCDI.inch)
         bs = SCDI.ThinBeamSplitter(SCDI.inch, 0.5)
         pd = SCDI.Photodetector(pd_size, pd_resolution)
         SCDI.translate3d!(m1, [l_0, 0, 0])
@@ -1313,9 +1311,9 @@ end
 
     @testset "Mirror reflections" begin
         # Setup system as in https://opg.optica.org/ao/fulltext.cfm?uri=ao-50-18-2855&id=218813
-        m1 = PlanoMirror(1.)
-        m2 = PlanoMirror(1.)
-        m3 = PlanoMirror(1.)
+        m1 = SCDI.RectangularPlanoMirror2D(1.)
+        m2 = SCDI.RectangularPlanoMirror2D(1.)
+        m3 = SCDI.RectangularPlanoMirror2D(1.)
         SCDI.translate3d!(m2, [2,0,0])
         SCDI.translate3d!(m3, [2,2,0])
         SCDI.zrotate3d!(m1, deg2rad(-90))
@@ -1369,11 +1367,11 @@ end
         Ts = 1 - abs2(rs)
         Tp = 1 - abs2(rp)
         # Setup testcase
-        s1 = Cube((1., d, 1.))
-        s2 = Cube((1., d, 1.))
-        s3 = Cube((1., d, 1.))
-        s4 = Cube((1., d, 1.))
-        s5 = Cube((1., d, 1.))
+        s1 = SCDI.CuboidMesh((1., d, 1.))
+        s2 = SCDI.CuboidMesh((1., d, 1.))
+        s3 = SCDI.CuboidMesh((1., d, 1.))
+        s4 = SCDI.CuboidMesh((1., d, 1.))
+        s5 = SCDI.CuboidMesh((1., d, 1.))
         l1 = SCDI.Lens(uuid4(), s1, x->n)
         l2 = SCDI.Lens(uuid4(), s2, x->n)
         l3 = SCDI.Lens(uuid4(), s3, x->n)
@@ -1406,7 +1404,7 @@ end
     @testset "Fresnel rhomb" begin
         # Create Fresnel rhomb with n=1.5 and θ=53.3° for quarter-wave plate effect
         n = 1.5
-        s1 = Cube((0.5,1.25,0.5), deg2rad(53.3))
+        s1 = SCDI.CuboidMesh((0.5,1.25,0.5), deg2rad(53.3))
         l1 = SCDI.Lens(uuid4(), s1, x->n)
         SCDI.translate3d!(l1, [-0.25, 0, -0.25])
         SCDI.set_new_origin3d!(s1)
@@ -1429,8 +1427,8 @@ end
 
     @testset "Mach-Zehnder Interferometer" begin
         # setup MZI
-        m1 = PlanoMirror(SCDI.inch)
-        m2 = PlanoMirror(SCDI.inch)
+        m1 = SCDI.RectangularPlanoMirror2D(SCDI.inch)
+        m2 = SCDI.RectangularPlanoMirror2D(SCDI.inch)
         b1 = SCDI.ThinBeamSplitter(SCDI.inch, 0.5)
         b2 = SCDI.ThinBeamSplitter(SCDI.inch, 0.5)
         

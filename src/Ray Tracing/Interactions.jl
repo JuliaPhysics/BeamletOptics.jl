@@ -271,7 +271,7 @@ Field contributions Eᵢ are added by the corresponding [`interact3d`](@ref) met
     Otherwise, the current result will be added onto the previous result.
 
 !!! info "Supported beams"
-    Currently, only the [`GaussianBeamlet`] is supported.
+    Currently, only the [`GaussianBeamlet`](@ref) is supported.
 """
 mutable struct Photodetector{S <: AbstractShape, T} <: AbstractDetector
     const id::UUID
@@ -282,21 +282,10 @@ mutable struct Photodetector{S <: AbstractShape, T} <: AbstractDetector
 end
 
 function Photodetector(scale::T, n::Int) where {T}
-    sz = 0.5
-    vertices = [sz 0 sz
-        sz 0 -sz
-        -sz 0 -sz
-        -sz 0 sz]
-    faces = [1 2 4
-        2 3 4]
-    x = y = LinRange(-sz, sz, n) * scale
+    shape = QuadraticFlatMesh(scale)
+    sz = maximum(vertices(shape))
+    x = y = LinRange(-sz, sz, n)
     field = zeros(Complex{T}, n, n)
-    shape = Mesh{T}(uuid4(),
-        vertices .* scale,
-        faces,
-        Matrix{T}(I, 3, 3),
-        T.([0, 0, 0]),
-        scale)
     return Photodetector{typeof(shape), T}(uuid4(), shape, x, y, field)
 end
 

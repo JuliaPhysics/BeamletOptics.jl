@@ -25,6 +25,7 @@ include("Ray Tracing/System.jl")
 include("Ray Tracing/Interactions.jl")
 include("Ray Tracing/Groups.jl")
 include("Ray Tracing/Render.jl")
+include("Ray Tracing/Components.jl")
 
 if get(ENV, "CI", "false") == "false"
     @setup_workload begin
