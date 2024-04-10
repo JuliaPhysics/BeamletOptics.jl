@@ -71,7 +71,7 @@ hint(interaction::GaussianBeamletInteraction) = hint(interaction.chief)
 
 wavelength(beam::GaussianBeamlet) = beam.λ
 beam_waist(beam::GaussianBeamlet) = beam.w0
-beam_amplitude(beam::GaussianBeamlet) = beam.E0
+electric_field(beam::GaussianBeamlet) = beam.E0
 
 Base.length(gauss::GaussianBeamlet; opl::Bool=false) = length(gauss.chief; opl)
 
@@ -273,7 +273,7 @@ function electric_field(gauss::GaussianBeamlet, r, z)
     w, R, ψ, w0 = gauss_parameters(gauss, z, hint = (point, index))
     k = wave_number(wavelength(gauss))
     # Calculate new local field strength based on E0*w0 = const.
-    E0 = beam_amplitude(gauss) * (beam_waist(gauss) / w0)
+    E0 = electric_field(gauss) * (beam_waist(gauss) / w0)
     return electric_field(r, z, E0, w0, w, k, ψ, R)
 end
 

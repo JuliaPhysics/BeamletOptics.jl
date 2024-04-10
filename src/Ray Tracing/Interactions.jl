@@ -446,7 +446,7 @@ function interact3d(::AbstractSystem, bs::BeamSplitter, gauss::GaussianBeamlet, 
     divergence = _beamsplitter_transmitted_beam(bs, rays(gauss.divergence)[ray_id])
     λ = wavelength(gauss)
     w0 = gauss_parameters(gauss, length(gauss))[4]
-    E0 = transmittance(bs) * beam_amplitude(gauss)
+    E0 = transmittance(bs) * electric_field(gauss) * (beam_waist(gauss) / w0)
     t = GaussianBeamlet(chief, waist, divergence, λ, w0, E0)
     # Reflected gauss
     chief = _beamsplitter_reflected_beam(bs, rays(gauss.chief)[ray_id])
@@ -454,7 +454,7 @@ function interact3d(::AbstractSystem, bs::BeamSplitter, gauss::GaussianBeamlet, 
     divergence = _beamsplitter_reflected_beam(bs, rays(gauss.divergence)[ray_id])
     λ = wavelength(gauss)
     w0 = gauss_parameters(gauss, length(gauss))[4]
-    E0 = reflectance(bs) * beam_amplitude(gauss)
+    E0 = reflectance(bs) * electric_field(gauss) * (beam_waist(gauss) / w0)
     r = GaussianBeamlet(chief, waist, divergence, λ, w0, E0)
     children!(gauss, [t, r])
     return nothing
