@@ -9,8 +9,8 @@ using AbstractTrees: PreOrderDFS
 
 const _RenderEnv = Union{Axis3, LScene}
 
-function render_object!(axis::_RenderEnv, mesh::AbstractMesh)
-    mesh!(axis, vertices(mesh), faces(mesh), transparency = true)
+function render_object!(axis::_RenderEnv, mesh::AbstractMesh; transparency=true)
+    mesh!(axis, vertices(mesh), faces(mesh); transparency)
     return nothing
 end
 

@@ -302,3 +302,15 @@ function isparentbeam(beam::GaussianBeamlet, ray_id)
     d = isparentbeam(beam.divergence, ray_id)
     return any((c, w, d))
 end
+
+"""
+    rayleigh_range(g::GaussianBeamlet; M2=1)
+
+Returns the Rayleigh range for the **first** beam section of the [`GaussianBeamlet`](@ref) `g`.
+Note: `M2` is not stored in `g` during construction and must be specified by the user.
+"""
+function rayleigh_range(g::GaussianBeamlet; M2=1)
+    λ = wavelength(g)
+    w0 = beam_waist(g)
+    return rayleigh_range(λ, w0, M2)
+end
