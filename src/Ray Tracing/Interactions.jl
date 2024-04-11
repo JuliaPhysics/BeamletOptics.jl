@@ -302,8 +302,11 @@ function interact3d(::AbstractSystem,
     ray = gauss.chief.rays[ray_id]
     l = length(gauss, opl=true)
     T = transpose(orientation(shape(pd)))
-    P = ray.pos + ray.dir * length(ray.intersection)
+    P = position(ray) + direction(ray) * length(ray.intersection)
     shape_pos = position(shape(pd))
+    # projection scalar reduction factor
+    proj = abs(dot(direction(ray), normal3d(intersection(ray))))
+    # add efield
     Threads.@threads for j in eachindex(pd.y)     # row column major order?
         y = pd.y[j]
         @inbounds for i in eachindex(pd.x)
@@ -319,7 +322,7 @@ function interact3d(::AbstractSystem,
             if isinfrontof(p, P, ray.dir)
                 z = -z
             end
-            pd.field[i, j] += electric_field(gauss, r, l + z)
+            pd.field[i, j] += electric_field(gauss, r, l + z) * sqrt(proj)
         end
     end
     return nothing
@@ -454,7 +457,7 @@ function interact3d(::AbstractSystem, bs::BeamSplitter, gauss::GaussianBeamlet, 
     divergence = _beamsplitter_reflected_beam(bs, rays(gauss.divergence)[ray_id])
     λ = wavelength(gauss)
     w0 = gauss_parameters(gauss, length(gauss))[4]
-    E0 = reflectance(bs) * electric_field(gauss) * (beam_waist(gauss) / w0)
+    E0 = reflectance(bs) * electric_field(gauss) * (beam_waist(gauss) / w0) * exp(im*pi/2)
     r = GaussianBeamlet(chief, waist, divergence, λ, w0, E0)
     children!(gauss, [t, r])
     return nothing

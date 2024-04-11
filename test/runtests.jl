@@ -1244,7 +1244,7 @@ end
             @test all(isapprox.(path_length_analytical, path_length_numerical))
         end
 
-        @testset "Unequal armlength MI - eletrical field" begin
+        @testset "Unequal armlength MI - electrical field" begin
             λ = 635e-9
             w0 = 1e-4
             P0 = 1e-3
@@ -1276,6 +1276,8 @@ end
                     screen[i, j] += SCDI.electric_field(r, long_arm, E0, w0, λ, M2)
                 end
             end
+
+            screen *= exp(im*pi/2)
 
             Re_analytical = real.(screen)
             Im_analytical = imag.(screen)
