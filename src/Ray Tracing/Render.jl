@@ -54,13 +54,6 @@ function render_beam!(axis, beam::Beam; color = :blue, flen = 1.0)
     return nothing
 end
 
-# """
-#     render_beam!(axis, beam::Beam{Real, PolarizedRay}; color = :red, flen=1.0)
-
-# Render a [`PolarizedRay`](@ref) beam. The line alpha is lowered in relation to the beam starting intensity
-# """
-# render_beam!(axis, beam::Beam{T, R}; color=:red, flen=1.0) where {T<:Real, R<:PolarizedRay{T}} = _render_beam!(axis, beam, color=color, flen=flen)
-
 _render_beam!(::Any, ::AbstractBeam; color=:red, flen=1.0) = nothing
 
 """
@@ -114,7 +107,7 @@ function render_beam!(axis,
             Xt = R[1, 1] * X + R[1, 2] * Y + R[1, 3] * Z .+ ray.pos[1]
             Yt = R[2, 1] * X + R[2, 2] * Y + R[2, 3] * Z .+ ray.pos[2]
             Zt = R[3, 1] * X + R[3, 2] * Y + R[3, 3] * Z .+ ray.pos[3]
-            render_gaussian_beam_surface!(axis, Xt, Yt, Zt; transparency = true, colormap = [color, color])
+            render_surface!(axis, Xt, Yt, Zt; transparency = true, colormap = [color, color])
             # Bump length tracker
             if !isnothing(intersection(ray))
                 l += length(ray)
@@ -129,7 +122,7 @@ function render_beam!(axis,
     end
     return nothing
 end
-render_gaussian_beam_surface!(::Any, X, Y, Z; kwargs...) = nothing
+render_surface!(::Any, X, Y, Z; kwargs...) = nothing
 
 """
     render_object_normals!(axis, mesh::Mesh; l=0.01)
