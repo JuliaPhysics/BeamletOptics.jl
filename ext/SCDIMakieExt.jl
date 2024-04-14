@@ -2,7 +2,7 @@ module SCDIMakieExt
 
 using SCDI: faces, vertices, AbstractMesh, AbstractRay, Beam, PolarizedRay, intensity, rays
 import SCDI: render_object!, render_ray!, _render_beam!,
-    _render_ray!, render_gaussian_beam_surface!, _render_object_normal!, render_sdf_mesh!
+    _render_ray!, render_surface!, _render_object_normal!, render_sdf_mesh!
 using Makie: Axis3, LScene, mesh!, surface!, lines!, RGBAf
 using GeometryBasics: Point2, Point3
 using AbstractTrees: PreOrderDFS
@@ -39,7 +39,7 @@ function _render_beam!(axis, beam::Beam{T, R}; color=:red, flen=1.0) where {T<:R
     return nothing
 end
 
-function render_gaussian_beam_surface!(axis::_RenderEnv, X, Y, Z; kwargs...)
+function render_surface!(axis::_RenderEnv, X, Y, Z; kwargs...)
     surface!(axis, X, Y, Z; kwargs...)
 end
 
@@ -55,8 +55,5 @@ function _render_object_normal!(axis::_RenderEnv,
 end
 
 render_sdf_mesh!(axis::_RenderEnv, vertices, faces; transparency = true) = mesh!(axis, vertices, faces, transparency=transparency)
-
-# Test log statement
-@info "SCDIMakieExt compiled"
 
 end

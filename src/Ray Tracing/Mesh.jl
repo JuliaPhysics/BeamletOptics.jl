@@ -90,7 +90,7 @@ Mutating function that rotates the mesh around the specified rotation `axis` by 
 function rotate3d!(shape::AbstractMesh, axis, θ)
     # Calculate rotation matrix
     R = rotate3d(axis, θ)
-    # Translate mesh to origin, rotate, retranslate
+    # Translate mesh to origin, rotate (counter-clockwise), retranslate
     vertices!(shape, (vertices(shape) .- position(shape)') * R' .+ position(shape)')
     orientation!(shape, orientation(shape) * R)
     return nothing
