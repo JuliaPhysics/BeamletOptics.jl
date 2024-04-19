@@ -457,7 +457,17 @@ function interact3d(::AbstractSystem, bs::BeamSplitter, gauss::GaussianBeamlet, 
     divergence = _beamsplitter_reflected_beam(bs, rays(gauss.divergence)[ray_id])
     λ = wavelength(gauss)
     w0 = gauss_parameters(gauss, length(gauss))[4]
-    E0 = reflectance(bs) * electric_field(gauss) * (beam_waist(gauss) / w0) * exp(im*pi/2)
+    
+    # phase flip
+    ray = gauss.chief.rays[end]
+    df = dot(direction(ray), normal3d(intersection(ray)))
+    if df < 0
+        ϕ = π
+    else
+        ϕ = 0
+    end
+
+    E0 = reflectance(bs) * electric_field(gauss) * (beam_waist(gauss) / w0) * exp(im*ϕ)
     r = GaussianBeamlet(chief, waist, divergence, λ, w0, E0)
     children!(gauss, [t, r])
     return nothing

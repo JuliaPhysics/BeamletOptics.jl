@@ -230,7 +230,7 @@ E(r,z) = {E_0}\\frac{{{w_0}}}{{w(z)}}\\exp\\left( { - \\frac{{{r^2}}}{{w{{(z)}^2
 - `w`: local beam radius
 - `k`: wave number, equal to `2π/λ`
 - `ψ`: Gouy phase shift (defined as ``-\\text{atan}\\left(\\frac{z}{z_r}\\right)`` !)
-- `R`: wavefront curvature
+- `R`: wavefront curvature, i.e. 1/r (radius of curvature)
 """
 electric_field(r::Real, z::Real, E0, w0, w, k, ψ, R) = E0 * w0 / w * exp(-r^2 / w^2) * exp(im * (k * z + ψ + (k * r^2 * R) / 2))
 
