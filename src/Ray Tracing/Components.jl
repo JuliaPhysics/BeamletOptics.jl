@@ -72,3 +72,16 @@ function RectangularPlateBeamSplitter(width::Real, thickness::Real, n::Function;
 end
 
 RectangularPlateBeamSplitter(w::Real, t::Real, n::Real; eps_separation=1e-9) = RectangularPlateBeamSplitter(w, t, λ->n; eps_separation)
+
+function RectangularCompensatorPlate(width::W, height::H, thickness::T, n::Function) where {W<:Real,H<:Real,T<:Real}
+    shape = CuboidMesh((width, thickness, height))
+    translate3d!(shape, [
+        -width/2,
+        -thickness/2,
+        -height/2,
+    ])
+    set_new_origin3d!(shape)
+    return Prism(uuid4(), shape, n)
+end
+
+RectangularCompensatorPlate(w::Real, h::Real, t::Real, n::Real) = RectangularPlateBeamSplitter(w, h, t, λ->n)
