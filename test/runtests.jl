@@ -1237,7 +1237,7 @@ end
             end
 
             path_length_analytical = @. 2 * lambdas + 4l_0
-            optical_pwr_analytical = @. P_0 * (1 / 2 * cos(2π * (2lambdas / λ)) + 1 / 2)
+            optical_pwr_analytical = @. P_0 * (1 / 2 * cos(2π * (2lambdas / λ) + π) + 1 / 2)
 
             # Compare correct PD signal and λ shift in moving arm
             @test all(isapprox.(optical_pwr_analytical, optical_pwr_numerical, atol = 5e-6))
@@ -1273,11 +1273,9 @@ end
                 for (i, x) in enumerate(xs)
                     r = sqrt(x^2 + y^2)
                     screen[i, j] += SCDI.electric_field(r, short_arm, E0, w0, λ, M2)
-                    screen[i, j] += SCDI.electric_field(r, long_arm, E0, w0, λ, M2)
+                    screen[i, j] += SCDI.electric_field(r, long_arm, E0, w0, λ, M2) * exp(im*pi)
                 end
             end
-
-            screen *= exp(im*pi/2)
 
             Re_analytical = real.(screen)
             Im_analytical = imag.(screen)
@@ -1289,6 +1287,51 @@ end
             @test all(isapprox.(Re_analytical, Re_numerical, atol = 5e-2))
             @test all(isapprox.(Im_analytical, Im_numerical, atol = 5e-2))
         end
+    end
+
+    @testset "Testing power conservation" begin
+        # variables
+        P0 = 0.5 # W
+        l0 = 0.1 # m
+        w0 = 0.5e-3
+        λ = 1064e-9
+        
+        bs = SCDI.ThinBeamSplitter(10e-3);
+        pd_1 = SCDI.Photodetector(10e-3, 100);
+        pd_2 = SCDI.Photodetector(10e-3, 100);
+        
+        SCDI.zrotate3d!(bs, deg2rad(45))
+        SCDI.translate3d!(pd_1, [0, l0, 0])
+        SCDI.zrotate3d!(pd_1, deg2rad(180))
+        
+        SCDI.translate3d!(pd_2, [l0, 0, 0])
+        SCDI.zrotate3d!(pd_2, deg2rad(90))
+        
+        # add BS and PD orientation error
+        SCDI.zrotate3d!(bs, deg2rad(0.017))
+        SCDI.zrotate3d!(pd_1, deg2rad(10))
+        SCDI.xrotate3d!(pd_1, deg2rad(15))
+        
+        # define system and beams -> solve
+        system = SCDI.System([bs, pd_1, pd_2]);
+        
+        phis = LinRange(0, 2pi, 25)
+        p1 = similar(phis)
+        p2 = similar(phis)
+        
+        for (i, phi) in enumerate(phis)
+            l1 = SCDI.GaussianBeamlet(SCDI.Ray([0, -l0, 0], [0, 1., 0]), λ, w0; P0);
+            l2 = SCDI.GaussianBeamlet(SCDI.Ray([-l0, 0, 0], [1., 0, 0]), λ, w0; P0);
+            l1.E0 *= exp(im*phi)
+            SCDI.reset_photodetector!(pd_1)
+            SCDI.reset_photodetector!(pd_2)
+            SCDI.solve_system!(system, l1)
+            SCDI.solve_system!(system, l2)
+            p1[i] = SCDI.optical_power(pd_1)
+            p2[i] = SCDI.optical_power(pd_2)
+            # Test power conservation
+            @test p1[i] + p2[i] - 2P0 < 1e-4 # W
+        end 
     end
 end
 

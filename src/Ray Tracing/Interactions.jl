@@ -294,35 +294,42 @@ function interact3d(::AbstractSystem, ::Photodetector, ::B, ::Ray) where {B <: A
     return nothing
 end
 
-function interact3d(::AbstractSystem,
-        pd::Photodetector,
-        gauss::GaussianBeamlet,
-        ray_id::Int)
-    # Add efield contribution to pd.field
+"""
+    interact3d(::AbstractSystem, pd::Photodetector, gauss::GaussianBeamlet, ray_id::Int)
+
+Implements the [`Photodetector`](@ref) interaction with a [`GaussianBeamlet`](@ref). 
+On hit, the scalar E-field of the `gauss` is added to the current PD field matrix.
+Tilt and tip between beam and PD surface are considered via projection factors.
+"""
+function interact3d(::AbstractSystem, pd::Photodetector, gauss::GaussianBeamlet, ray_id::Int)
+    # Select final ray of chief beam 
     ray = gauss.chief.rays[ray_id]
-    l = length(gauss, opl=true)
+    l0 = length(gauss, opl=true) - length(ray, opl=true)
+    p0 = position(ray)
+    d0 = direction(ray)
+    # Preallocate transforms
     T = transpose(orientation(shape(pd)))
-    P = position(ray) + direction(ray) * length(ray.intersection)
-    shape_pos = position(shape(pd))
-    # projection scalar reduction factor
-    proj = abs(dot(direction(ray), normal3d(intersection(ray))))
-    # add efield
-    Threads.@threads for j in eachindex(pd.y)     # row column major order?
+    p = position(shape(pd))
+    # E-field projection scalar reduction factor
+    proj = abs(dot(d0, normal3d(intersection(ray))))
+    # Add current E-field contribution
+    Threads.@threads for j in eachindex(pd.y) # FIXME row column major order?
         y = pd.y[j]
         @inbounds for i in eachindex(pd.x)
             x = pd.x[i]
-            # Transform point p on PD into world coords
-            p = Point3(T[1, 1] * x + T[1, 3] * y + shape_pos[1],
-                T[2, 1] * x + T[2, 3] * y + shape_pos[2],
-                T[3, 1] * x + T[3, 3] * y + shape_pos[3])
-            r = line_point_distance3d(ray, p)
-            c = sqrt(sum(x -> (x[1] - x[2])^2, zip(P, p)))
-            z = sqrt(abs(c^2 - r^2)) # abs to protect against small neg. values
-            # Correct sign of z
-            if isinfrontof(p, P, ray.dir)
-                z = -z
-            end
-            pd.field[i, j] += electric_field(gauss, r, l + z) * sqrt(proj)
+            # Transform point p on PD into world coordinates
+            p1 = Point3(
+                T[1, 1] * x + T[1, 3] * y + p[1],
+                T[2, 1] * x + T[2, 3] * y + p[2],
+                T[3, 1] * x + T[3, 3] * y + p[3]
+            )
+            # Find projection of p1 onto Gaussian optical axis, i.e. local r and z
+            l1 = dot(p1 - p0, d0)
+            p2 = p0 + l1 * d0
+            r = norm(p1 - p2)
+            z = l0 + l1
+            # Add field contribution, projection factor accounts for beam spot stretching
+            pd.field[i, j] += electric_field(gauss, r, z) * sqrt(proj)
         end
     end
     return nothing
@@ -376,17 +383,17 @@ Creates a zero-thickness, lossless, non-polarizing quadratic rectangle beam spli
 - `width`: is the edge length
 - `reflectance`: determines how much light is **reflected**, i.e. 0.7 for a 70:30 splitter
 
-## Reflectance
+# Additional information
 
-The input value for the `reflectance` R is normed such that R² + T² = 1, where T is the `transmittance`.
-The transmittance is calculated via T = √(1 - R²).
+!!! info "Reflectance"
+    The input value for the `reflectance` R is normed such that R² + T² = 1, where T is the `transmittance`.
+    The transmittance is calculated via T = √(1 - R²).
 
-## Phase shift
-
-Note that the reflection phase shift θᵣ ∈ [0, π] is not modeled here for simplicity, since in practice it will have no effect on the interference at the detector.
+!!! warning "Reflection phase jump"
+    Note that the reflection phase jump θᵣ is implemented by the individual [`interact3d`](@ref)-methods. Refer to them for more information.
 """
 function ThinBeamSplitter(width::T, reflectance::Real = 0.5) where {T}
-    if reflectance ≥ 1 || isapprox(reflectance, 0)
+    if reflectance ≥ 1 || reflectance ≈ 0
         error("Splitting ratio ∈ (0, 1)!")
     end
     shape = QuadraticFlatMesh(width)
@@ -441,6 +448,12 @@ end
 
 Models the interaction between a [`BeamSplitter`](@ref) and a [`GaussianBeamlet`](@ref).
 For more information refer to [`ThinBeamSplitter`](@ref).
+
+# Reflection phase jump
+
+The reflection phase jump is modeled here as θᵣ = π for simplicity. This is since in practice it will have only a relative effect on the signal at the detector for interferometric setups.
+The phase jump is applied to the reflected portion of any incoming beam that faces the `BeamSplitter` normal vector, which assumes that the splitter has an unambigous normal, i.e. a 2D mesh.
+This is intended to model the effect of the Fresnel equations without full polarization calculus. 
 """
 function interact3d(::AbstractSystem, bs::BeamSplitter, gauss::GaussianBeamlet, ray_id::Int)
     # Transmitted gauss
