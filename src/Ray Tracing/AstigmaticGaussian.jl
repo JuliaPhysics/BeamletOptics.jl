@@ -36,7 +36,8 @@ function AstigmaticGaussianBeamlet(
     w0 = 1e-3;
     M2 = 1,
     E0 = [0, 0, 1],
-    support = nothing)
+    support = nothing,
+    z0 = 0)
     # Create orthogonal vectors for construction purposes (right-handed)
     direction = normalize(direction)
     if isnothing(support)
@@ -51,21 +52,21 @@ function AstigmaticGaussianBeamlet(
     # Divergence angle in rad
     θ = divergence_angle(λ, w0, M2)
     # Waist rays
-    wxp = Ray(position + s1 * w0, direction, λ)
-    wxm = Ray(position - s1 * w0, direction, λ)
-    wyp = Ray(position + s2 * w0, direction, λ)
-    wym = Ray(position - s2 * w0, direction, λ)
+    wxp = Ray(position + s1 * w0 + z0 * direction, direction, λ)
+    wxm = Ray(position - s1 * w0 + z0 * direction, direction, λ)
+    wyp = Ray(position + s2 * w0 + z0 * direction, direction, λ)
+    wym = Ray(position - s2 * w0 + z0 * direction, direction, λ)
     # Divergence ray
     div_dir_xp = normalize(direction + s1 * tan(θ))
     div_dir_xm = normalize(direction - s1 * tan(θ))
     div_dir_yp = normalize(direction + s2 * tan(θ))
     div_dir_ym = normalize(direction - s2 * tan(θ))
-    dxp = Ray(position, div_dir_xp, λ)
-    dxm = Ray(position, div_dir_xm, λ)
-    dyp = Ray(position, div_dir_yp, λ)
-    dym = Ray(position, div_dir_ym, λ)
+    dxp = Ray(position + div_dir_xp * z0, div_dir_xp, λ)
+    dxm = Ray(position + div_dir_xm * z0, div_dir_xm, λ)
+    dyp = Ray(position + div_dir_yp * z0, div_dir_yp, λ)
+    dym = Ray(position + div_dir_ym * z0, div_dir_ym, λ)
     # Chief ray
-    c = PolarizedRay(position, direction, λ, E0)
+    c = PolarizedRay(position + z0 * direction, direction, λ, E0)
     return AstigmaticGaussianBeamlet(
         Beam(c),
         Beam(wxp),
