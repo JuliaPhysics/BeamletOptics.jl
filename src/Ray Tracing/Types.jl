@@ -499,9 +499,9 @@ translate_to3d!(object::AbstractObject, target) = translate_to3d!(shape(object),
 
 rotate3d!(object::AbstractObject, axis, θ) = rotate3d!(shape(object), axis, θ)
 
-xrotate3d!(object::AbstractObject, θ) = xrotate3d!(shape(object), θ)
-yrotate3d!(object::AbstractObject, θ) = yrotate3d!(shape(object), θ)
-zrotate3d!(object::AbstractObject, θ) = zrotate3d!(shape(object), θ)
+xrotate3d!(object::AbstractObject, θ) = rotate3d!(object, Point3(1, 0, 0), θ)
+yrotate3d!(object::AbstractObject, θ) = rotate3d!(object, Point3(0, 1, 0), θ)
+zrotate3d!(object::AbstractObject, θ) = rotate3d!(object, Point3(0, 0, 1), θ)
 
 reset_translation3d!(object::AbstractObject) = reset_translation3d!(shape(object))
 
