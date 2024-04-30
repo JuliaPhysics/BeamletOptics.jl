@@ -84,4 +84,4 @@ function RectangularCompensatorPlate(width::W, height::H, thickness::T, n::Funct
     return Prism(uuid4(), shape, n)
 end
 
-RectangularCompensatorPlate(w::Real, h::Real, t::Real, n::Real) = RectangularPlateBeamSplitter(w, h, t, λ->n)
+RectangularCompensatorPlate(w::Real, h::Real, t::Real, n::Real) = RectangularCompensatorPlate(w, h, t, λ->n)
