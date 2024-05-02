@@ -77,7 +77,7 @@ function object(system::StaticSystem, obj_id::UUID)
 end
 
 function object_index(system::StaticSystem, obj_id::UUID)
-    return findfirst(object -> id(object) === obj_id, system.objects)
+    return findfirst(object -> hasid(object, obj_id), system.objects)
 end
 
 object(::AbstractSystem, ::Nothing) = nothing
