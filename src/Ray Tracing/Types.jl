@@ -63,11 +63,25 @@ Subtypes of `AbstractEntity` should implement the following:
 # Fields
 
 - `id`: a unique identifier (UUID 4)
+
+# Functions
+
+- `hasid`: a function that checks if the entity has a specific UUID, must return `true` or `false`
 """
 abstract type AbstractEntity end
 
 id(entity::AbstractEntity)::UUID = entity.id
 id(::Any) = nothing
+
+"""
+    hasid(entity::AbstractEntity, obj_id::UUID)
+
+Tests if `entity` has the requested `obj_id`. Returns `true` or `false`.
+Main purpose is to be dispatched for subtypes of [`AbstractEntity`](@ref) to implement more complex logic, i.e. objects with multiple shapes.
+"""
+function hasid(entity::AbstractEntity, obj_id::UUID)
+    return id(entity) === obj_id
+end
 
 """
     AbstractSystem <: AbstractEntity

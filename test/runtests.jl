@@ -694,13 +694,13 @@ end
         first_id = SCDI.id(mirrors[(n_mirrors + 1) ÷ 2 + 2])
         false_id = SCDI.id(mirrors[(n_mirrors + 1) ÷ 2 + 2 + 1])
         # trace_all
-        @test SCDI.id(SCDI.trace_all(system, ray)) == first_id
+        @test SCDI.hasid(SCDI.trace_all(system, ray), first_id)
         # trace_one
-        @test SCDI.id(SCDI.trace_one(system, ray, first_id)) == first_id
-        @test SCDI.id(SCDI.trace_one(system, ray, false_id)) == first_id
+        @test SCDI.hasid(SCDI.trace_one(system, ray, first_id), first_id)
+        @test SCDI.hasid(SCDI.trace_one(system, ray, false_id), first_id)
         # tracing step
         SCDI.tracing_step!(system, ray, nothing)
-        @test SCDI.id(SCDI.intersection(ray)) == first_id
+        @test SCDI.hasid(SCDI.intersection(ray), first_id)
     end
 
     @testset "Testing system tracing" begin

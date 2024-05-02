@@ -56,7 +56,7 @@ Find a specific object in the `system` based on its unique `obj_id`.
 """
 function object(system::System, obj_id::UUID)::Union{AbstractObject, Nothing}
     for object in objects(system)
-        if id(object) === obj_id
+        if hasid(object, obj_id)
             return object
         end
     end
