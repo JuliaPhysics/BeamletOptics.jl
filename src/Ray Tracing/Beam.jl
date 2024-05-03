@@ -26,6 +26,18 @@ function Beam(ray::R) where {T, R <: AbstractRay{T}}
     Beam{T, R}(uuid4(), [ray], nothing, Vector{Beam{T, R}}())
 end
 
+function Beam(pos::AbstractArray{P}, dir::AbstractArray{D}, λ::L) where {P,D,L}
+    T = promote_type(P,D,L)
+    ray = Ray(pos, dir, λ)
+    return Beam{T, Ray{T}}(uuid4(), [ray], nothing, Vector{Beam{T, Ray{T}}}())
+end
+
+function Beam(pos::AbstractArray{P}, dir::AbstractArray{D}, λ::L, E0::Vector{E}) where {P,D,L,E}
+    T = promote_type(P,D,L,E)
+    ray = PolarizedRay(pos, dir, λ, E0)
+    return Beam{T, PolarizedRay{T}}(uuid4(), [ray], nothing, Vector{Beam{T, PolarizedRay{T}}}())
+end
+
 struct BeamInteraction{T <: Real, R <: AbstractRay{T}} <: AbstractInteraction
     id::Nullable{UUID}
     ray::R
