@@ -402,22 +402,22 @@ function ThinBeamSplitter(width::T, reflectance::Real = 0.5) where {T}
     return BeamSplitter(uuid4(), shape, Reflected, Transmitted)
 end
 
-Base.isvalid(bs::BeamSplitter) = reflectance(bs)^2 + transmittance(bs)^2 ≈ 1
+Base.isvalid(bs::AbstractBeamSplitter) = reflectance(bs)^2 + transmittance(bs)^2 ≈ 1
 
-@inline function _beamsplitter_transmitted_beam(::BeamSplitter, ray::Ray)
+@inline function _beamsplitter_transmitted_beam(::AbstractBeamSplitter, ray::Ray)
     pos = position(ray) + length(ray) * direction(ray)
     dir = direction(ray)
     return Beam(Ray(pos, dir, wavelength(ray)))
 end
 
-@inline function _beamsplitter_reflected_beam(::BeamSplitter, ray::Ray)
+@inline function _beamsplitter_reflected_beam(::AbstractBeamSplitter, ray::Ray)
     normal = normal3d(intersection(ray))
     pos = position(ray) + length(ray) * direction(ray)
     dir = reflection3d(direction(ray), normal)
     return Beam(Ray(pos, dir, wavelength(ray)))
 end
 
-function _beamsplitter_transmitted_beam(bs::BeamSplitter, ray::PolarizedRay)
+function _beamsplitter_transmitted_beam(bs::AbstractBeamSplitter, ray::PolarizedRay)
     J = @SArray [transmittance(bs) 0 0; 0 transmittance(bs) 0; 0 0 1]
     pos = position(ray) + length(ray) * direction(ray)
     dir = direction(ray)
@@ -425,7 +425,7 @@ function _beamsplitter_transmitted_beam(bs::BeamSplitter, ray::PolarizedRay)
     return Beam(PolarizedRay(pos, dir, wavelength(ray), E0))
 end
 
-function _beamsplitter_reflected_beam(bs::BeamSplitter, ray::PolarizedRay)
+function _beamsplitter_reflected_beam(bs::AbstractBeamSplitter, ray::PolarizedRay)
     J = @SArray [-reflectance(bs) 0 0; 0 reflectance(bs) 0; 0 0 1]
     normal = normal3d(intersection(ray))
     pos = position(ray) + length(ray) * direction(ray)
