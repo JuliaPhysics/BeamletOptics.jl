@@ -18,7 +18,8 @@ function interact3d(::AbstractSystem,
     normal = intersection(ray).n
     npos = position(ray) + length(ray) * direction(ray)
     ndir = reflection3d(direction(ray), normal)
-    return BeamInteraction{T, R}(nothing, Ray{T}(uuid4(), npos, ndir, nothing, wavelength(ray), refractive_index(ray)))
+    return BeamInteraction{T, R}(nothing,
+        Ray{T}(uuid4(), npos, ndir, nothing, wavelength(ray), refractive_index(ray)))
 end
 
 """
@@ -28,16 +29,18 @@ Implements the ideal reflection of a [`PolarizedRay`](@ref) via the normal at th
 A Jones matrix of [-1 0 0; 0 1 0] is assumed as per Peatross (2015, 2023 Ed. p. 154) and Yun et al. (see [`PolarizedRay`](@ref) for more information).
 """
 function interact3d(::AbstractSystem,
-    ::AbstractReflectiveOptic,
-    ::Beam{T, R},
-    ray::R) where {T <: Real, R <: PolarizedRay{T}}
+        ::AbstractReflectiveOptic,
+        ::Beam{T, R},
+        ray::R) where {T <: Real, R <: PolarizedRay{T}}
     normal = normal3d(intersection(ray))
     npos = position(ray) + length(ray) * direction(ray)
     ndir = reflection3d(direction(ray), normal)
     # Jones reflection matrix
     J = @SArray [-1 0 0; 0 1 0; 0 0 1]
     E0 = _calculate_global_E0(direction(ray), ndir, J, polarization(ray))
-    return BeamInteraction{T, R}(nothing, PolarizedRay{T}(uuid4(), npos, ndir, nothing, wavelength(ray), refractive_index(ray), E0))
+    return BeamInteraction{T, R}(nothing,
+        PolarizedRay{T}(
+            uuid4(), npos, ndir, nothing, wavelength(ray), refractive_index(ray), E0))
 end
 
 """
@@ -66,7 +69,7 @@ Subtypes of `AbstractRefractiveOptic` should implement all supertype reqs. as we
 abstract type AbstractRefractiveOptic{T} <: AbstractObject end
 
 refractive_index(object::AbstractRefractiveOptic) = object.n
-refractive_index(object::AbstractRefractiveOptic{<: Function}, λ::Real)::Float64 = object.n(λ)
+refractive_index(object::AbstractRefractiveOptic{<:Function}, λ::Real)::Float64 = object.n(λ)
 
 """
     interact3d(AbstractRefractiveOptic, Ray)
@@ -106,7 +109,8 @@ Implements the refraction of a [`PolarizedRay`](@ref) at an uncoated optical sur
 Reflection and transmission values are calculated via the [`fresnel_coefficients`](@ref). Stray light is not tracked.
 In the case of total internal reflection, only the reflected light is traced.
 """
-function interact3d(system::AbstractSystem, optic::AbstractRefractiveOptic, ::Beam{T,R}, ray::R) where {T<:Real,R<:PolarizedRay{T}}
+function interact3d(system::AbstractSystem, optic::AbstractRefractiveOptic,
+        ::Beam{T, R}, ray::R) where {T <: Real, R <: PolarizedRay{T}}
     lambda = wavelength(ray)
     normal = normal3d(intersection(ray))
     raypos = position(ray) + length(ray) * direction(ray)
@@ -127,7 +131,7 @@ function interact3d(system::AbstractSystem, optic::AbstractRefractiveOptic, ::Be
     # Calculate (and correct into 1. quadrant) the angle of incidence
     θi = angle3d(direction(ray), -normal)
     # Get Fresnel coefficients
-    rs, rp, ts, tp = fresnel_coefficients(θi, n2/n1)
+    rs, rp, ts, tp = fresnel_coefficients(θi, n2 / n1)
     # Optical interaction
     if is_internally_reflected(rp, rs)
         # Update hint and outgoing ref. index
@@ -143,7 +147,8 @@ function interact3d(system::AbstractSystem, optic::AbstractRefractiveOptic, ::Be
     end
     # Calculate new polarization
     E0 = _calculate_global_E0(direction(ray), new_dir, J, polarization(ray))
-    return BeamInteraction{T, R}(hint, PolarizedRay{T}(uuid4(), raypos, new_dir, nothing, wavelength(ray), n2, E0))
+    return BeamInteraction{T, R}(
+        hint, PolarizedRay{T}(uuid4(), raypos, new_dir, nothing, wavelength(ray), n2, E0))
 end
 
 """
@@ -301,10 +306,11 @@ Implements the [`Photodetector`](@ref) interaction with a [`GaussianBeamlet`](@r
 On hit, the scalar E-field of the `gauss` is added to the current PD field matrix.
 Tilt and tip between beam and PD surface are considered via projection factors.
 """
-function interact3d(::AbstractSystem, pd::Photodetector, gauss::GaussianBeamlet, ray_id::Int)
+function interact3d(
+        ::AbstractSystem, pd::Photodetector, gauss::GaussianBeamlet, ray_id::Int)
     # Select final ray of chief beam 
     ray = gauss.chief.rays[ray_id]
-    l0 = length(gauss, opl=true) - length(ray, opl=true)
+    l0 = length(gauss, opl = true) - length(ray, opl = true)
     p0 = position(ray)
     d0 = direction(ray)
     # Preallocate transforms
@@ -404,43 +410,70 @@ end
 
 Base.isvalid(bs::AbstractBeamSplitter) = reflectance(bs)^2 + transmittance(bs)^2 ≈ 1
 
-@inline function _beamsplitter_transmitted_beam(::AbstractBeamSplitter, ray::Ray)
+@inline function _beamsplitter_transmitted_beam(
+        ::AbstractBeamSplitter, ::Beam{T, R}, ray::R) where {T <: Real, R <: Ray{T}}
     pos = position(ray) + length(ray) * direction(ray)
     dir = direction(ray)
     return Beam(Ray(pos, dir, wavelength(ray)))
 end
 
-@inline function _beamsplitter_reflected_beam(::AbstractBeamSplitter, ray::Ray)
+@inline function _beamsplitter_reflected_beam(
+        ::AbstractBeamSplitter, ::Beam{T, R}, ray::R) where {T <: Real, R <: Ray{T}}
     normal = normal3d(intersection(ray))
     pos = position(ray) + length(ray) * direction(ray)
     dir = reflection3d(direction(ray), normal)
     return Beam(Ray(pos, dir, wavelength(ray)))
 end
 
-function _beamsplitter_transmitted_beam(bs::AbstractBeamSplitter, ray::PolarizedRay)
+@inline function _beamsplitter_transmitted_beam(bs::AbstractBeamSplitter, ::Beam{T, R},
+        ray::R) where {T <: Real, R <: PolarizedRay{T}}
     J = @SArray [transmittance(bs) 0 0; 0 transmittance(bs) 0; 0 0 1]
     pos = position(ray) + length(ray) * direction(ray)
     dir = direction(ray)
-    E0 =  _calculate_global_E0(dir, dir, J, polarization(ray))
+    E0 = _calculate_global_E0(dir, dir, J, polarization(ray))
     return Beam(PolarizedRay(pos, dir, wavelength(ray), E0))
 end
 
-function _beamsplitter_reflected_beam(bs::AbstractBeamSplitter, ray::PolarizedRay)
+@inline function _beamsplitter_reflected_beam(bs::AbstractBeamSplitter, ::Beam{T, R},
+    ray::R) where {T <: Real, R <: PolarizedRay{T}}
     J = @SArray [-reflectance(bs) 0 0; 0 reflectance(bs) 0; 0 0 1]
     normal = normal3d(intersection(ray))
     pos = position(ray) + length(ray) * direction(ray)
     in_dir = direction(ray)
     out_dir = reflection3d(in_dir, normal)
-    E0 =  _calculate_global_E0(in_dir, out_dir, J, polarization(ray))
+    E0 = _calculate_global_E0(in_dir, out_dir, J, polarization(ray))
     return Beam(PolarizedRay(pos, out_dir, wavelength(ray), E0))
 end
 
-function interact3d(::AbstractSystem, bs::BeamSplitter, beam::Beam{T, R}, ray::R) where {T<:Real, R<:AbstractRay{T}}
+function interact3d(::AbstractSystem, bs::BeamSplitter, beam::Beam{T, R},
+        ray::R) where {T <: Real, R <: AbstractRay{T}}
     # Push transmitted and reflected beams to system
     children!(beam,
-        [_beamsplitter_transmitted_beam(bs, ray), _beamsplitter_reflected_beam(bs, ray)])
+        [_beamsplitter_transmitted_beam(bs, beam, ray), _beamsplitter_reflected_beam(bs, beam, ray)])
     # Stop for beam spawning
     return nothing
+end
+
+@inline function _beamsplitter_transmitted_beam(bs::AbstractBeamSplitter, gauss::GaussianBeamlet, ray_id::Int)
+    # Transmitted Gaussian (no phase flip)
+    chief = _beamsplitter_transmitted_beam(bs, gauss.chief, rays(gauss.chief)[ray_id])
+    waist = _beamsplitter_transmitted_beam(bs, gauss.waist, rays(gauss.waist)[ray_id])
+    divergence = _beamsplitter_transmitted_beam(bs, gauss.divergence, rays(gauss.divergence)[ray_id])
+    λ = wavelength(gauss)
+    w0 = gauss_parameters(gauss, length(gauss))[4]
+    E0 = transmittance(bs) * electric_field(gauss) * (beam_waist(gauss) / w0)
+    return GaussianBeamlet(chief, waist, divergence, λ, w0, E0)
+end
+
+@inline function _beamsplitter_reflected_beam(bs::AbstractBeamSplitter, gauss::GaussianBeamlet, ray_id::Int)
+    # Reflected Gaussian (no phase flip)
+    chief = _beamsplitter_reflected_beam(bs, gauss.chief, rays(gauss.chief)[ray_id])
+    waist = _beamsplitter_reflected_beam(bs, gauss.waist, rays(gauss.waist)[ray_id])
+    divergence = _beamsplitter_reflected_beam(bs, gauss.divergence, rays(gauss.divergence)[ray_id])
+    λ = wavelength(gauss)
+    w0 = gauss_parameters(gauss, length(gauss))[4]
+    E0 = reflectance(bs) * electric_field(gauss) * (beam_waist(gauss) / w0)
+    return GaussianBeamlet(chief, waist, divergence, λ, w0, E0)
 end
 
 """
@@ -456,22 +489,7 @@ The phase jump is applied to the reflected portion of any incoming beam that fac
 This is intended to model the effect of the Fresnel equations without full polarization calculus. 
 """
 function interact3d(::AbstractSystem, bs::BeamSplitter, gauss::GaussianBeamlet, ray_id::Int)
-    # Transmitted gauss
-    chief = _beamsplitter_transmitted_beam(bs, rays(gauss.chief)[ray_id])
-    waist = _beamsplitter_transmitted_beam(bs, rays(gauss.waist)[ray_id])
-    divergence = _beamsplitter_transmitted_beam(bs, rays(gauss.divergence)[ray_id])
-    λ = wavelength(gauss)
-    w0 = gauss_parameters(gauss, length(gauss))[4]
-    E0 = transmittance(bs) * electric_field(gauss) * (beam_waist(gauss) / w0)
-    t = GaussianBeamlet(chief, waist, divergence, λ, w0, E0)
-    # Reflected gauss
-    chief = _beamsplitter_reflected_beam(bs, rays(gauss.chief)[ray_id])
-    waist = _beamsplitter_reflected_beam(bs, rays(gauss.waist)[ray_id])
-    divergence = _beamsplitter_reflected_beam(bs, rays(gauss.divergence)[ray_id])
-    λ = wavelength(gauss)
-    w0 = gauss_parameters(gauss, length(gauss))[4]
-    
-    # phase flip
+    # Phase flip
     ray = gauss.chief.rays[end]
     df = dot(direction(ray), normal3d(intersection(ray)))
     if df < 0
@@ -480,8 +498,12 @@ function interact3d(::AbstractSystem, bs::BeamSplitter, gauss::GaussianBeamlet, 
         ϕ = 0
     end
 
-    E0 = reflectance(bs) * electric_field(gauss) * (beam_waist(gauss) / w0) * exp(im*ϕ)
-    r = GaussianBeamlet(chief, waist, divergence, λ, w0, E0)
+    t = _beamsplitter_transmitted_beam(bs, gauss, ray_id)
+    r = _beamsplitter_reflected_beam(bs, gauss, ray_id)
+
+    # Add conditional phase flip to reflected beam
+    r.E0 *= exp(im*ϕ)
+    
     children!(gauss, [t, r])
     return nothing
 end
