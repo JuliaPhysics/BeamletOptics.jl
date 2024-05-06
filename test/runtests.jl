@@ -1318,11 +1318,15 @@ end
         phis = LinRange(0, 2pi, 25)
         p1 = similar(phis)
         p2 = similar(phis)
+
+        l1 = SCDI.GaussianBeamlet(SCDI.Ray([0, -l0, 0], [0, 1., 0]), λ, w0; P0);
+        l2 = SCDI.GaussianBeamlet(SCDI.Ray([-l0, 0, 0], [1., 0, 0]), λ, w0; P0);
         
+        E0_buffer = l1.E0
+
         for (i, phi) in enumerate(phis)
-            l1 = SCDI.GaussianBeamlet(SCDI.Ray([0, -l0, 0], [0, 1., 0]), λ, w0; P0);
-            l2 = SCDI.GaussianBeamlet(SCDI.Ray([-l0, 0, 0], [1., 0, 0]), λ, w0; P0);
-            l1.E0 *= exp(im*phi)
+            # Iterate over relative phase shifts, use retracing
+            l1.E0 = E0_buffer*exp(im*phi)
             SCDI.reset_photodetector!(pd_1)
             SCDI.reset_photodetector!(pd_2)
             SCDI.solve_system!(system, l1)
