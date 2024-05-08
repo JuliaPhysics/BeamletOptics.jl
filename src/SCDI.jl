@@ -1,7 +1,6 @@
 module SCDI
 
 using LinearAlgebra: norm, normalize, normalize!, dot, cross, I
-using UUIDs: UUID, uuid4
 using MarchingCubes: MC, march
 using Trapz: trapz
 using PrecompileTools: @setup_workload, @compile_workload

@@ -98,7 +98,7 @@ function interact3d(system::AbstractSystem,
         normal = -normal
     end
     # Calculate new dir. and pos.
-    ndir, TIR = refraction3d(direction(ray), normal, n1, n2) # FIXME: in case of TIR, n2 is not correctly set to object ref. index
+    ndir, TIR = refraction3d(direction(ray), normal, n1, n2)
     npos = position(ray) + length(ray) * direction(ray)
     # In case of TIR, update hint and n2
     if TIR
