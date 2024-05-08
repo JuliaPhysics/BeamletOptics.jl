@@ -19,7 +19,7 @@ function interact3d(::AbstractSystem,
     npos = position(ray) + length(ray) * direction(ray)
     ndir = reflection3d(direction(ray), normal)
     return BeamInteraction{T, R}(nothing,
-        Ray{T}(uuid4(), npos, ndir, nothing, wavelength(ray), refractive_index(ray)))
+        Ray{T}(npos, ndir, nothing, wavelength(ray), refractive_index(ray)))
 end
 
 """
@@ -40,7 +40,7 @@ function interact3d(::AbstractSystem,
     E0 = _calculate_global_E0(direction(ray), ndir, J, polarization(ray))
     return BeamInteraction{T, R}(nothing,
         PolarizedRay{T}(
-            uuid4(), npos, ndir, nothing, wavelength(ray), refractive_index(ray), E0))
+            npos, ndir, nothing, wavelength(ray), refractive_index(ray), E0))
 end
 
 """
@@ -49,7 +49,6 @@ end
 Concrete implementation of a perfect mirror with arbitrary shape.
 """
 struct Mirror{S <: AbstractShape} <: AbstractReflectiveOptic
-    id::UUID
     shape::S
 end
 
@@ -77,29 +76,37 @@ refractive_index(object::AbstractRefractiveOptic{<:Function}, λ::Real)::Float64
 Implements the refraction of a [`Ray`](@ref) at an optical surface. The "outside" ref. index is always assumed to be 1.
 At the critical angle, total internal reflection occurs (see [`refraction3d`](@ref)).
 """
-function interact3d(::AbstractSystem,
-        object::AbstractRefractiveOptic,
+function interact3d(system::AbstractSystem,
+        optic::AbstractRefractiveOptic,
         ::Beam{T, R},
         ray::R) where {T <: Real, R <: Ray{T}}
     # Check dir. of ray and surface normal
     normal = normal3d(intersection(ray))
-    λ = wavelength(ray)
+    lambda = wavelength(ray)
     if dot(direction(ray), normal) < 0
-        # "Outside prism"
-        n1 = 1.0
-        n2 = refractive_index(object, λ)
+        # Entering optic
+        n1 = refractive_index(ray)
+        n2 = refractive_index(optic, lambda)
+        # Hint to test optic again
+        hint = Hint(optic)
     else
-        # "Inside prism"
-        n1 = refractive_index(object, λ)
-        n2 = 1.0
-        normal *= -1
+        # Exiting optic
+        n1 = refractive_index(optic, lambda)
+        n2 = refractive_index(system)
+        hint = nothing
+        # Flip normal for refraction3d
+        normal = -normal
     end
     # Calculate new dir. and pos.
-    ndir = refraction3d(direction(ray), normal, n1, n2) # FIXME: in case of TIR, n2 is not correctly set to object ref. index
+    ndir, TIR = refraction3d(direction(ray), normal, n1, n2) # FIXME: in case of TIR, n2 is not correctly set to object ref. index
     npos = position(ray) + length(ray) * direction(ray)
-    # Hint is the current object ID
-    return BeamInteraction{T, R}(id(object),
-        Ray{T}(uuid4(), npos, ndir, nothing, wavelength(ray), n2))
+    # In case of TIR, update hint and n2
+    if TIR
+        hint = Hint(optic)
+        n2 = refractive_index(optic, lambda)
+    end
+    return BeamInteraction{T, R}(hint,
+        Ray{T}(npos, ndir, nothing, wavelength(ray), n2))
 end
 
 """
@@ -119,7 +126,7 @@ function interact3d(system::AbstractSystem, optic::AbstractRefractiveOptic,
         n1 = refractive_index(ray)
         n2 = refractive_index(optic, lambda)
         # Hint to test optic again
-        hint = id(optic)
+        hint = Hint(optic)
     else
         # Exiting optic
         n1 = refractive_index(optic, lambda)
@@ -135,20 +142,20 @@ function interact3d(system::AbstractSystem, optic::AbstractRefractiveOptic,
     # Optical interaction
     if is_internally_reflected(rp, rs)
         # Update hint and outgoing ref. index
-        hint = id(optic)
+        hint = Hint(optic)
         n2 = refractive_index(optic, lambda)
         # Calculate reflection
         new_dir = reflection3d(direction(ray), normal)
         J = [-rs 0 0; 0 rp 0; 0 0 1]
     else
         # Calculate refraction
-        new_dir = refraction3d(direction(ray), normal, n1, n2)
+        new_dir, ~ = refraction3d(direction(ray), normal, n1, n2)
         J = [ts 0 0; 0 tp 0; 0 0 1]
     end
     # Calculate new polarization
     E0 = _calculate_global_E0(direction(ray), new_dir, J, polarization(ray))
     return BeamInteraction{T, R}(
-        hint, PolarizedRay{T}(uuid4(), raypos, new_dir, nothing, wavelength(ray), n2, E0))
+        hint, PolarizedRay{T}(raypos, new_dir, nothing, wavelength(ray), n2, E0))
 end
 
 """
@@ -159,7 +166,6 @@ Refer to the [`SphericalLens`](@ref) constructor for more information on how to 
 
 # Fields
 
-- `id`: lens ID (uuid4)
 - `shape`: geometry of the lens, refer to [`AbstractShape`](@ref) for more information
 - `n`: **single-argument** function that returns n(λ)
 
@@ -171,7 +177,6 @@ Refer to the [`SphericalLens`](@ref) constructor for more information on how to 
     can be passed such that the lens has the same refractive index for all wavelengths.
 """
 struct Lens{S <: AbstractShape, T <: Function} <: AbstractRefractiveOptic{T}
-    id::UUID
     shape::S
     n::T # FIXME: constructor check that n=n(λ), # args 
 end
@@ -221,7 +226,7 @@ function SphericalLens(r1::Real, r2::Real, l::Real, d::Real = 1inch, n::Function
         throw(DomainError("Could not find suitable lens SDF for the given parameters"))
     end
     # Create lens
-    return Lens(uuid4(), shape, n)
+    return Lens(shape, n)
 end
 
 """
@@ -232,7 +237,7 @@ and refractive index `n`.
 """
 function ThinLens(R1::Real, R2::Real, d::Real, n::Function)
     shape = ThinLensSDF(R1, R2, d)
-    return Lens(uuid4(), shape, n)
+    return Lens(shape, n)
 end
 ThinLens(R1::Real, R2::Real, d::Real, n::Real) = ThinLens(R1, R2, d, x -> n)
 
@@ -243,7 +248,6 @@ Essentially represents the same functionality as [`Lens`](@ref).
 Refer to its documentation. 
 """
 struct Prism{S <: AbstractShape, T <: Function} <: AbstractRefractiveOptic{T}
-    id::UUID
     shape::S
     n::T
 end
@@ -262,7 +266,6 @@ Field contributions Eᵢ are added by the corresponding [`interact3d`](@ref) met
 
 # Fields
 
-- `id`: detector ID (uuid4)
 - `shape`: geometry of the active surface, must represent 2D-`field` in `x` any `y` dimensions
 - `x`: linear range of local x-coordinates
 - `y`: linear range of local y-coordinates
@@ -279,7 +282,6 @@ Field contributions Eᵢ are added by the corresponding [`interact3d`](@ref) met
     Currently, only the [`GaussianBeamlet`](@ref) is supported.
 """
 mutable struct Photodetector{S <: AbstractShape, T} <: AbstractDetector
-    const id::UUID
     const shape::S
     x::LinRange{T, Int64}
     y::LinRange{T, Int64}
@@ -291,7 +293,7 @@ function Photodetector(width::T, n::Int) where {T}
     sz = maximum(vertices(shape))
     x = y = LinRange(-sz, sz, n)
     field = zeros(Complex{T}, n, n)
-    return Photodetector{typeof(shape), T}(uuid4(), shape, x, y, field)
+    return Photodetector{typeof(shape), T}(shape, x, y, field)
 end
 
 function interact3d(::AbstractSystem, ::Photodetector, ::B, ::Ray) where {B <: AbstractBeam}
@@ -372,7 +374,6 @@ abstract type AbstractBeamSplitter <: AbstractObject end
 
 """Models a generic beam splitter"""
 struct BeamSplitter{S <: AbstractShape, T <: Real} <: AbstractBeamSplitter
-    id::UUID
     shape::S
     reflectance::T
     transmittance::T
@@ -405,7 +406,7 @@ function ThinBeamSplitter(width::T, reflectance::Real = 0.5) where {T}
     shape = QuadraticFlatMesh(width)
     Reflected = sqrt(reflectance)
     Transmitted = sqrt(1 - Reflected^2)
-    return BeamSplitter(uuid4(), shape, Reflected, Transmitted)
+    return BeamSplitter(shape, Reflected, Transmitted)
 end
 
 Base.isvalid(bs::AbstractBeamSplitter) = reflectance(bs)^2 + transmittance(bs)^2 ≈ 1

@@ -10,7 +10,6 @@ but must be transformed into global coordinates using the method described in th
 
 # Fields
 
-- `id`: a UUID4 that uniquely identifies the `Ray`
 - `pos`: a point in R³ that describes the `Ray` origin
 - `dir`: a normalized vector in R³ that describes the `Ray` direction
 - `intersection`: refer to [`Intersection`](@ref)
@@ -36,10 +35,9 @@ where r and t are the complex-valued Fresnel coefficients (see also [`fresnel_co
     E0 can not be converted into an [`intensity`](@ref) value, since a single `PolarizedRay` can not directly model the change in intensity during imaging by an optical system.
 """
 mutable struct PolarizedRay{T} <: AbstractRay{T}
-    id::UUID
     pos::Point3{T}
     dir::Point3{T}
-    intersection::Nullable{Intersection{T}}
+    intersection::Nullable{Intersection}
     λ::T
     n::T
     E0::Point3{Complex{T}}
@@ -62,7 +60,7 @@ function PolarizedRay(pos::AbstractArray{P},
     if !isapprox(dot(dir, E0), 0, atol=1e-14)
         error("Ray dir. and E0 must be orthogonal (n=$(dot(dir, E0)))")
     end
-    return PolarizedRay{F}(uuid4(),
+    return PolarizedRay{F}(
         Point3{F}(pos),
         normalize(Point3{F}(dir)),
         nothing,

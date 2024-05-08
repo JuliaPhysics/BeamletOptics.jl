@@ -5,7 +5,6 @@ Mutable struct to store ray information.
 
 # Fields
 
-- `id`: a UUID4 that uniquely identifies the `Ray`
 - `pos`: a point in R³ that describes the `Ray` origin
 - `dir`: a normalized vector in R³ that describes the `Ray` direction
 - `intersection`: refer to [`Intersection`](@ref)
@@ -13,10 +12,9 @@ Mutable struct to store ray information.
 - `n`: refractive index along the beam path
 """
 mutable struct Ray{T} <: AbstractRay{T}
-    id::UUID
     pos::Point3{T}
     dir::Point3{T}
-    intersection::Nullable{Intersection{T}}
+    intersection::Nullable{Intersection}
     λ::T
     n::T
 end
@@ -35,7 +33,7 @@ function Ray(pos::AbstractArray{P},
         dir::AbstractArray{D},
         λ = 1000e-9) where {P <: Real, D <: Real}
     F = promote_type(P, D)
-    return Ray{F}(uuid4(),
+    return Ray{F}(
         Point3{F}(pos),
         normalize(Point3{F}(dir)),
         nothing,

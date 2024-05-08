@@ -12,7 +12,6 @@ and
 
 # Fields
 
-- `id`: beam ID (uuid4)
 - `chief`: a [`Beam`](@ref) of [`Ray`](@ref)s to store the chief ray
 - `waist`: a [`Beam`](@ref) of [`Ray`](@ref)s to store the waist ray
 - `divergence`: a [`Beam`](@ref) of [`Ray`](@ref)s to store the divergence ray
@@ -33,7 +32,6 @@ and
     Refer to **FIXME** for more information.
 """
 mutable struct GaussianBeamlet{T} <: AbstractBeam{T, Ray{T}}
-    id::UUID
     chief::Beam{T, Ray{T}}
     waist::Beam{T, Ray{T}}
     divergence::Beam{T, Ray{T}}
@@ -50,7 +48,7 @@ function GaussianBeamlet(chief::Beam{T, Ray{T}},
         λ::T,
         w0::T,
         E0::Complex{T}) where {T <: Real}
-    return GaussianBeamlet{T}(uuid4(),
+    return GaussianBeamlet{T}(
         chief,
         waist,
         div,
@@ -307,10 +305,10 @@ Tests if refractive elements are tilted with respect to the beamlet optical axis
 """
 istilted(system::AbstractSystem, gb::GaussianBeamlet) = !isparaxial(system, gb.chief, 0)
 
-function isparentbeam(beam::GaussianBeamlet, ray_id)
-    c = isparentbeam(beam.chief, ray_id)
-    w = isparentbeam(beam.waist, ray_id)
-    d = isparentbeam(beam.divergence, ray_id)
+function isparentbeam(beam::GaussianBeamlet, ray::AbstractRay)
+    c = isparentbeam(beam.chief, ray)
+    w = isparentbeam(beam.waist, ray)
+    d = isparentbeam(beam.divergence, ray)
     return any((c, w, d))
 end
 

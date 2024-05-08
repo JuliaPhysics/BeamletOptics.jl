@@ -31,7 +31,6 @@ vertex matrix. For orientation and translation tracking, a `pos`itional and `dir
 - `scale`: scalar value that represents the current scale of the original mesh
 """
 mutable struct Mesh{T} <: AbstractMesh{T}
-    id::UUID
     vertices::Matrix{T}
     faces::Matrix{Int}
     dir::Matrix{T}
@@ -62,7 +61,7 @@ function Mesh(mesh)
     # Initialize mesh at origin with orientation [1,0,0] scaled to mm
     # Origin and direction are converted to type T
     scale::T = 1e-3
-    return Mesh{T}(uuid4(),
+    return Mesh{T}(
         vertices * scale,
         faces,
         Matrix{T}(I, 3, 3),
@@ -211,19 +210,19 @@ function MoellerTrumboreAlgorithm(face, ray::AbstractRay{T}; kϵ = 1e-9, lϵ = 1
 end
 
 """
-    intersect3d(object::Mesh, ray::Ray)
+    intersect3d(shape::Mesh, ray::Ray)
 
-This function is a generic implementation to check if a ray intersects the object mesh.\\
+This function is a generic implementation to check if a ray intersects the shape mesh.\\
 """
-function intersect3d(object::AbstractMesh{M},
+function intersect3d(shape::AbstractMesh{M},
         ray::AbstractRay{R}) where {M <: Real, R <: Real}
-    numEl = size(faces(object), 1)
+    numEl = size(faces(shape), 1)
     # allocate all intermediate vectors once (note that this is NOT THREAD-SAFE)
     T = promote_type(M, R)
     fID::Int = 0
     t0::T = Inf
     for i in 1:numEl
-        face = @views vertices(object)[faces(object)[i, :], :]
+        face = @views vertices(shape)[faces(shape)[i, :], :]
         t = MoellerTrumboreAlgorithm(face, ray)
         # Return closest intersection
         if t < t0
@@ -234,9 +233,9 @@ function intersect3d(object::AbstractMesh{M},
     if isinf(t0)
         return nothing
     else
-        face = @views vertices(object)[faces(object)[fID, :], :]
-        normal = normal3d(object, fID)
-        return Intersection{T}(t0, normalize(T.(normal)), nothing)
+        face = @views vertices(shape)[faces(shape)[fID, :], :]
+        normal = normal3d(shape, fID)
+        return Intersection(t0, normalize(T.(normal)), shape)
     end
 end
 
@@ -263,7 +262,7 @@ function QuadraticFlatMesh(scale::Real)
     ]
     vertices .*= scale
     T = eltype(vertices)
-    return Mesh{T}(uuid4(),
+    return Mesh{T}(
         vertices,
         faces,
         Matrix{T}(I, 3, 3),
@@ -312,7 +311,7 @@ function CuboidMesh(scale::NTuple{3, T}, θ::Real=π/2) where T<:Real
         1 7 8
         1 2 7
     ]
-    return Mesh{T}(uuid4(),
+    return Mesh{T}(
         vertices,
         faces,
         Matrix{T}(I, 3, 3),

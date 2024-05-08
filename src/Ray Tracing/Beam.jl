@@ -6,13 +6,11 @@ The `Beam` type is parametrically defined by the [`AbstractRay`](@ref) subtype t
 
 # Fields
 
-- `id`: beam ID (uuid4)
 - `rays`: vector of `AbstractRay` objects, representing the rays that make up the beam
 - `parent`: reference to the parent beam, if any ([`Nullable`](@ref) to account for the root beam which has no parent)
 - `children`: vector of child beams, each child beam represents a branching or bifurcation of the original beam, i.e. beam-splitting
 """
 mutable struct Beam{T, R <: AbstractRay{T}} <: AbstractBeam{T, R}
-    id::UUID
     rays::Vector{R}
     parent::Nullable{Beam{T, R}}
     children::Vector{Beam{T, R}}
@@ -23,23 +21,23 @@ rays(b::Beam) = b.rays
 Base.push!(b::Beam, ray::AbstractRay) = push!(b.rays, ray)
 
 function Beam(ray::R) where {T, R <: AbstractRay{T}}
-    Beam{T, R}(uuid4(), [ray], nothing, Vector{Beam{T, R}}())
+    Beam{T, R}([ray], nothing, Vector{Beam{T, R}}())
 end
 
 function Beam(pos::AbstractArray{P}, dir::AbstractArray{D}, λ::L) where {P,D,L}
     T = promote_type(P,D,L)
     ray = Ray(pos, dir, λ)
-    return Beam{T, Ray{T}}(uuid4(), [ray], nothing, Vector{Beam{T, Ray{T}}}())
+    return Beam{T, Ray{T}}([ray], nothing, Vector{Beam{T, Ray{T}}}())
 end
 
 function Beam(pos::AbstractArray{P}, dir::AbstractArray{D}, λ::L, E0::Vector{E}) where {P,D,L,E}
     T = promote_type(P,D,L,E)
     ray = PolarizedRay(pos, dir, λ, E0)
-    return Beam{T, PolarizedRay{T}}(uuid4(), [ray], nothing, Vector{Beam{T, PolarizedRay{T}}}())
+    return Beam{T, PolarizedRay{T}}([ray], nothing, Vector{Beam{T, PolarizedRay{T}}}())
 end
 
 struct BeamInteraction{T <: Real, R <: AbstractRay{T}} <: AbstractInteraction
-    id::Nullable{UUID}
+    hint::Nullable{Hint}
     ray::R
 end
 
@@ -146,13 +144,13 @@ end
 Tests the angle between the `beam` direction and surface normal at each intersection.
 Mainly intended as a check for [`GaussianBeamlet`](@ref).
 """
-function isparaxial(system::AbstractSystem, beam::Beam, threshold::Real = π / 4)
+function isparaxial(::AbstractSystem, beam::Beam, threshold::Real = π / 4)
     # Test if refractive elements are hit with angle larger than threshold
     for ray in beam.rays
         if isnothing(intersection(ray))
             break
         end
-        target = object(system, id(intersection(ray)))
+        target = object((intersection(ray)))
         # Test if refractive element
         if !isa(target, AbstractRefractiveOptic)
             continue
@@ -169,21 +167,19 @@ function isparaxial(system::AbstractSystem, beam::Beam, threshold::Real = π / 4
     return true
 end
 
-function isparentbeam(beam::Beam, ray_id::UUID)
-    for ray in rays(beam)
-        if id(ray) == ray_id
-            return true
-        end
-    end
-    return false
-end
-
 """
     isparentbeam(beam, ray)
 
 Tests if the given `beam` contains the `ray` as a part of its solution.
 """
-isparentbeam(beam::Beam, ray::AbstractRay) = isparentbeam(beam, ray.id)
+function isparentbeam(beam::Beam, _ray::AbstractRay)
+    for ray in rays(beam)
+        if ray === _ray
+            return true
+        end
+    end
+    return false
+end
 
 function Base.show(io::IO, ::MIME"text/plain", beam::Beam)
     for (i, ray) in enumerate(rays(beam))
@@ -193,7 +189,7 @@ function Base.show(io::IO, ::MIME"text/plain", beam::Beam)
             println(io, "    Pos.: $(position(ray))")
             println(io, "    Dir.: $(direction(ray))")
         else
-            println(io, "    Intersects with object #$(intersection(ray).id)")
+            println(io, "    Intersects with $(typeof(object(intersection(ray))))")
             println(io, "    Pos.: $(position(ray))")
             println(io, "    Dir.: $(direction(ray))")
             println(io, "    End.: $(position(ray) .+ length(ray) .* direction(ray))")

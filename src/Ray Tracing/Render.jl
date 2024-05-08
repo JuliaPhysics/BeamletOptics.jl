@@ -5,7 +5,7 @@ Render `mesh` into the specified 3D-`axis`.
 """
 render_object!(::Any, mesh::AbstractMesh) = nothing
 
-render_object!(::Any, ::AbstractEntity) = nothing
+render_object!(::Any, ::Any) = nothing
 render_object!(axis, object::AbstractObject) = render_object!(axis, shape(object))
 
 """

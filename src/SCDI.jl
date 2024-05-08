@@ -14,7 +14,7 @@ import Base: length
 # Do not change order of inclusion!
 include("Ray Tracing/Constants.jl")
 include("Ray Tracing/Utils.jl")
-include("Ray Tracing/Types.jl")
+include("Ray Tracing/AbstractTypes/AbstractTypes.jl")
 include("Ray Tracing/Rays.jl")
 include("Ray Tracing/PolarizedRays.jl")
 include("Ray Tracing/Beam.jl")
@@ -41,8 +41,8 @@ if get(ENV, "CI", "false") == "false"
         _scale = 1
         @compile_workload begin
             # execute workload
-            plane = SCDI.Mirror(uuid4(),
-                SCDI.Mesh{Float64}(uuid4(),
+            plane = SCDI.Mirror(
+                SCDI.Mesh{Float64}(
                     _vertices,
                     _faces,
                     _dir,

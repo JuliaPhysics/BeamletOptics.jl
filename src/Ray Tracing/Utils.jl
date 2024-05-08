@@ -98,13 +98,12 @@ end
 
 Returns the angle between the `target` and `reference` vector in **rad**.
 """
-function angle3d(target::AbstractVector{T}, reference::AbstractVector{T}) where {T}
-    arg = clamp(dot(target, reference) / (norm(target) * norm(reference)), -one(T), one(T))
+function angle3d(target::AbstractArray{T}, reference::AbstractArray{R}) where {T,R}
+    G = promote_type(T,R)
+    arg = clamp(dot(target, reference) / (norm(target) * norm(reference)), -one(G), one(G))
     angle = acos(arg)
     return angle
 end
-
-angle3d(target::AbstractVector{T}, reference::AbstractVector{V}) where {T,V} = angle3d(promote(target, reference)...)
 
 """
     line_point_distance3d(pos, dir, point)
@@ -160,16 +159,24 @@ end
 """
     refraction3d(dir, normal, n1, n2)
 
-Calculates the refraction between an input vector `dir` and surface `normal` vector  in 3D-space.\\
-`n1` is the "outside" refractive index and `n2` is the "inside" refractive index.\\
+Calculates the refraction between an input vector `dir` and surface `normal` vector  in 3D-space.
+`n1` is the "outside" refractive index and `n2` is the "inside" refractive index.
+The function returns the new direction of propagation and a boolean flag to indicate if internal refraction has occured.
 
 Vectors `dir` and `normal` must have **unit length**!
 
 # Total internal reflection
 
-If the critical angle for n1, n2 and the incident angle is reached, the ray is reflected instead!
+If the critical angle for n1, n2 and the incident angle is reached, the ray is reflected internally instead!
+
+# Arguments
+
+- `dir`: direction vector of incoming ray
+- `normal`: surface normal at point of intersection
+- `n1`: index of ref. before refraction
+- `n2`: index of ref. after refraction
 """
-function refraction3d(dir, normal, n1, n2)
+function refraction3d(dir::AbstractArray, normal::AbstractArray, n1::Real, n2::Real)
     # dir and normal must have unit length!
     isapprox(norm(dir), 1) || throw(ArgumentError("dir must have  unit length"))
     isapprox(norm(normal), 1) || throw(ArgumentError("norm must have  unit length"))
@@ -178,10 +185,10 @@ function refraction3d(dir, normal, n1, n2)
     sinθt² = n^2 * (1 - cosθi^2)
     # Check for total reflection
     if sinθt² > 1.0
-        return reflection3d(dir, normal)
+        return (reflection3d(dir, normal), true)
     end
     cosθt = sqrt(1 - sinθt²)
-    return @. n * dir + (n * cosθi - cosθt) * normal
+    return (@. n * dir + (n * cosθi - cosθt) * normal, false)
 end
 
 """

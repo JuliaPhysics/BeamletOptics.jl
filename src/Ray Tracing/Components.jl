@@ -2,12 +2,12 @@
 
 function RectangularPlanoMirror2D(scale::T) where {T <: Real}
     shape = QuadraticFlatMesh(scale)
-    return Mirror(uuid4(), shape)
+    return Mirror(shape)
 end
 
 function RoundPlanoMirror(diameter::D, thickness::T) where {D<:Real,T<:Real}
     shape = CylinderSDF(diameter/2, thickness/2)
-    return Mirror(uuid4(), shape)
+    return Mirror(shape)
 end
 
 function RectangularPlanoMirror(width::W, height::H, thickness::T) where {W<:Real,H<:Real,T<:Real}
@@ -18,7 +18,7 @@ function RectangularPlanoMirror(width::W, height::H, thickness::T) where {W<:Rea
         -height/2,
     ])
     set_new_origin3d!(shape)
-    return Mirror(uuid4(), shape)
+    return Mirror(shape)
 end
 
 function SquarePlanoMirror(width::W, thickness::T) where {W<:Real,T<:Real}
@@ -26,7 +26,6 @@ function SquarePlanoMirror(width::W, thickness::T) where {W<:Real,T<:Real}
 end
 
 struct ReflectiveCube{S <: AbstractShape} <: AbstractReflectiveOptic
-    id::UUID
     shape::S
 end
 
@@ -38,7 +37,7 @@ function RetroMesh(scale::Real; T = Float64)
     faces = [1 3 2
         1 4 3
         1 2 4]
-    return Mesh{T}(uuid4(),
+    return Mesh{T}(
         vertices .* scale,
         faces,
         Matrix{T}(I, 3, 3),
@@ -47,11 +46,10 @@ function RetroMesh(scale::Real; T = Float64)
 end
 
 struct RetroReflector{S <: AbstractShape} <: AbstractReflectiveOptic
-    id::UUID
     shape::S
 end
 
-RetroReflector(scale) = RetroReflector(uuid4(), RetroMesh(scale))
+RetroReflector(scale) = RetroReflector(RetroMesh(scale))
 
 """
     RectangularPlateBeamSplitter(width, thickness, n=1.5; eps_separation=1e-9)
@@ -67,7 +65,7 @@ function RectangularPlateBeamSplitter(width::Real, thickness::Real, n::Function;
         -width/2,
     ])
     SCDI.translate3d!(coating, [0, thickness/2 + eps_separation, 0])
-    substrate = SCDI.Prism(uuid4(), shape, n)
+    substrate = SCDI.Prism(shape, n)
     return SCDI.ObjectGroup([coating, substrate])
 end
 
@@ -81,7 +79,7 @@ function RectangularCompensatorPlate(width::W, height::H, thickness::T, n::Funct
         -height/2,
     ])
     set_new_origin3d!(shape)
-    return Prism(uuid4(), shape, n)
+    return Prism(shape, n)
 end
 
 RectangularCompensatorPlate(w::Real, h::Real, t::Real, n::Real) = RectangularCompensatorPlate(w, h, t, λ->n)

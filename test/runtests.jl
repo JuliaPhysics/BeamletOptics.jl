@@ -2,7 +2,6 @@ using SCDI
 using Test
 using LinearAlgebra
 using GeometryBasics
-using UUIDs
 using AbstractTrees
 
 @testset "Utilities" begin
@@ -76,11 +75,12 @@ using AbstractTrees
             n2 = 1.5
             for θ1 in 0:(π / 8):(π / 2)
                 dir_in = [sin(θ1), 0, -cos(θ1)]
-                dir_out = SCDI.refraction3d(dir_in, normal, n1, n2)
+                dir_out, TIR = SCDI.refraction3d(dir_in, normal, n1, n2)
                 θ2 = SCDI.angle3d(-normal, dir_out)
                 # 2D-equation for refraction validation
                 θ3 = asin(n1 / n2 * sin(θ1))
                 @test isapprox(θ2, θ3)
+                @test TIR == false
             end
         end
         @testset "Test from medium into vacuum" begin
@@ -88,16 +88,18 @@ using AbstractTrees
             n2 = 1.0
             for θ1 in 0:(π / 8):(π / 2)
                 dir_in = [sin(θ1), 0, -cos(θ1)]
-                dir_out = SCDI.refraction3d(dir_in, normal, n1, n2)
+                dir_out, TIR = SCDI.refraction3d(dir_in, normal, n1, n2)
                 if θ1 > asin(n2 / n1)
                     # Test for total reflection
                     θ2 = SCDI.angle3d(dir_out, normal)
                     @test isapprox(θ1, θ2)
+                    @test TIR == true
                 else
                     # Test for refraction
                     θ2 = SCDI.angle3d(-normal, dir_out)
                     θ3 = asin(n1 / n2 * sin(θ1))
                     @test isapprox(θ2, θ3)
+                    @test TIR == false
                 end
             end
         end
@@ -162,27 +164,17 @@ using AbstractTrees
 end
 
 @testset "Types" begin
-    @test isdefined(SCDI, :AbstractEntity)
-    @test isdefined(SCDI, :AbstractSystem)
-    @test isdefined(SCDI, :AbstractRay)
-    @test isdefined(SCDI, :AbstractBeam)
     @test isdefined(SCDI, :AbstractShape)
     @test isdefined(SCDI, :AbstractObject)
     @test isdefined(SCDI, :AbstractObjectGroup)
+    @test isdefined(SCDI, :AbstractRay)
+    @test isdefined(SCDI, :AbstractBeam)
+    @test isdefined(SCDI, :AbstractSystem)
     @test isdefined(SCDI, :Intersection)
+    @test isdefined(SCDI, :Hint)
     @test isdefined(SCDI, :AbstractInteraction)
 
     # Generate test structs
-    struct TestEntity <: SCDI.AbstractEntity
-        id::UUID
-    end
-
-    @testset "AbstractEntity" begin
-        e = TestEntity(uuid4())
-        @test SCDI.id(e) == e.id
-        @test SCDI.id("Hello World") === nothing
-    end
-
     struct TestSystem <: SCDI.AbstractSystem end
 
     @testset "AbstractSystem" begin
@@ -237,12 +229,11 @@ end
     end
 
     mutable struct TestBeam{T} <: SCDI.AbstractBeam{T, TestRay{T}}
-        id::UUID
         parent::SCDI.Nullable{TestBeam}
         children::Vector{TestBeam}
     end
 
-    TestBeam() = TestBeam{Float64}(uuid4(), nothing, Vector{TestBeam{Float64}}())
+    TestBeam() = TestBeam{Float64}(nothing, Vector{TestBeam{Float64}}())
 
     @testset "AbstractBeam" begin
         # Create beam tree
@@ -279,8 +270,6 @@ end
         pos::Vector{T}
         dir::Matrix{T}
     end
-
-    SCDI.id(::TestShapeless) = nothing
 
     TestShapeless() = TestShapeless{Float64}(zeros(3), Matrix{Float64}(I, 3, 3))
 
@@ -332,11 +321,10 @@ end
     end
 
     struct TestObject <: SCDI.AbstractObject
-        id::UUID
         shape::TestShapeless{<:Real}
     end
 
-    TestObject() = TestObject(uuid4(), TestShapeless())
+    TestObject() = TestObject(TestShapeless())
 
     @testset "AbstractObject" begin
         object = TestObject()
@@ -386,7 +374,7 @@ end
 end
 
 @testset "Beams" begin
-    is = SCDI.Intersection(1.0, zeros(3), uuid4())
+    is = SCDI.Intersection(1.0, zeros(3))
     r1 = SCDI.Ray([0.0, 0, 0], [1, 0, 0])
     r2 = SCDI.Ray([1.0, 0, 0], [0, 1, 0])
     r3 = SCDI.Ray([1.0, 1, 0], [0, 0, 1])
@@ -650,11 +638,9 @@ end
 @testset "System" begin
     @testset "Testing implementation" begin
         struct SystemTestBeam{T} <: SCDI.AbstractBeam{T, SCDI.Ray{T}} end
-        struct SystemTestObject <: SCDI.AbstractObject
-            id::UUID
-        end
-        o1 = SystemTestObject(uuid4())
-        o2 = SystemTestObject(uuid4())
+        struct SystemTestObject <: SCDI.AbstractObject end
+        o1 = SystemTestObject()
+        o2 = SystemTestObject()
         system = SCDI.System(o1)
         beam = SystemTestBeam{Real}()
         # Test missing implementation warnings
@@ -662,9 +648,6 @@ end
             beam)
         @test_logs (:warn, "Retracing for $(typeof(beam)) not implemented") SCDI.retrace_system!(system,
             beam)
-        # Test getters
-        @test SCDI.object(system, SCDI.id(o1)) == o1
-        @test isnothing(SCDI.object(system, SCDI.id(o2)))
     end
 
     # Setup circular multipass cell with flat mirrors
@@ -691,16 +674,16 @@ end
     @testset "Testing tracing subroutines" begin
         system = SCDI.System(mirrors)
         ray = SCDI.Ray(origin, dir)
-        first_id = SCDI.id(mirrors[(n_mirrors + 1) ÷ 2 + 2])
-        false_id = SCDI.id(mirrors[(n_mirrors + 1) ÷ 2 + 2 + 1])
+        first_obj = mirrors[(n_mirrors + 1) ÷ 2 + 2]
+        false_obj = mirrors[(n_mirrors + 1) ÷ 2 + 2 + 1]
         # trace_all
-        @test SCDI.hasid(SCDI.trace_all(system, ray), first_id)
+        @test SCDI.object(SCDI.trace_all(system, ray)) === first_obj
         # trace_one
-        @test SCDI.hasid(SCDI.trace_one(system, ray, first_id), first_id)
-        @test SCDI.hasid(SCDI.trace_one(system, ray, false_id), first_id)
+        @test SCDI.object(SCDI.trace_one(system, ray, SCDI.Hint(first_obj))) === first_obj
+        @test SCDI.object(SCDI.trace_one(system, ray, SCDI.Hint(false_obj))) === first_obj
         # tracing step
         SCDI.tracing_step!(system, ray, nothing)
-        @test SCDI.hasid(SCDI.intersection(ray), first_id)
+        @test SCDI.object(SCDI.intersection(ray)) === first_obj
     end
 
     @testset "Testing system tracing" begin
@@ -716,8 +699,7 @@ end
         first_ray_dir = SCDI.direction(first_ray)
         last_ray_dir = SCDI.direction(last(SCDI.rays(beam)))
         @test 180 - rad2deg(SCDI.angle3d(first_ray_dir, last_ray_dir)) ≈ 2 * Δθ
-        @test SCDI.id(SCDI.intersection(first_ray)) ==
-              SCDI.id(mirrors[(n_mirrors + 1) ÷ 2 + 2])
+        @test SCDI.object(SCDI.intersection(first_ray)) === mirrors[(n_mirrors + 1) ÷ 2 + 2]
     end
 
     @testset "Testing StaticSystem tracing" begin
@@ -734,8 +716,7 @@ end
         first_ray_dir = SCDI.direction(first_ray)
         last_ray_dir = SCDI.direction(last(SCDI.rays(beam)))
         @test 180 - rad2deg(SCDI.angle3d(first_ray_dir, last_ray_dir)) ≈ 2 * Δθ
-        @test SCDI.id(SCDI.intersection(first_ray)) ==
-              SCDI.id(mirrors[(n_mirrors + 1) ÷ 2 + 2])
+        @test SCDI.object(SCDI.intersection(first_ray)) === mirrors[(n_mirrors + 1) ÷ 2 + 2]
     end
 
     @testset "Testing system retracing" begin
@@ -761,11 +742,10 @@ end
         Matrix{T}(I, 3, 3))
 
     struct GroupTestObject <: SCDI.AbstractObject
-        id::UUID
         shape::TestPoint{<:Real}
     end
 
-    GroupTestObject(position::AbstractArray) = GroupTestObject(uuid4(), TestPoint(position))
+    GroupTestObject(position::AbstractArray) = GroupTestObject(TestPoint(position))
 
     n = 8
     xs = [cos(x) for x in LinRange(0, 2pi * (n - 1) / n, n)]
@@ -855,7 +835,7 @@ end
         R2 = 1
         nl = 1.5
         tl = SCDI.ThinLensSDF(R1, R2, 0.1)
-        p = SCDI.Lens(uuid4(), tl, x -> 1.5)
+        p = SCDI.Lens(tl, x -> 1.5)
         system = SCDI.System(p)
 
         # compare numerical and analytical focal length
@@ -1059,7 +1039,7 @@ end
 
         # Numerical result
         tl = SCDI.ThinLensSDF(R1, R2, 0.025)
-        lens = SCDI.Lens(uuid4(), tl, x -> nl)
+        lens = SCDI.Lens(tl, x -> nl)
         system = SCDI.System(lens)
         SCDI.translate3d!(lens, [0, lens_y_location, 0])
         # Create and solve beam, calculate beam parameters
@@ -1421,11 +1401,11 @@ end
         s3 = SCDI.CuboidMesh((1., d, 1.))
         s4 = SCDI.CuboidMesh((1., d, 1.))
         s5 = SCDI.CuboidMesh((1., d, 1.))
-        l1 = SCDI.Lens(uuid4(), s1, x->n)
-        l2 = SCDI.Lens(uuid4(), s2, x->n)
-        l3 = SCDI.Lens(uuid4(), s3, x->n)
-        l4 = SCDI.Lens(uuid4(), s4, x->n)
-        l5 = SCDI.Lens(uuid4(), s5, x->n)
+        l1 = SCDI.Lens(s1, x->n)
+        l2 = SCDI.Lens(s2, x->n)
+        l3 = SCDI.Lens(s3, x->n)
+        l4 = SCDI.Lens(s4, x->n)
+        l5 = SCDI.Lens(s5, x->n)
         SCDI.translate3d!.([l1, l2, l3, l4, l5], Ref([-0.5,-d/2,-0.5]))
         SCDI.set_new_origin3d!.(SCDI.shape.([l1, l2, l3, l4, l5]))
         SCDI.translate3d!(l2, [0,0.5, -1d/2])
@@ -1454,7 +1434,7 @@ end
         # Create Fresnel rhomb with n=1.5 and θ=53.3° for quarter-wave plate effect
         n = 1.5
         s1 = SCDI.CuboidMesh((0.5,1.25,0.5), deg2rad(53.3))
-        l1 = SCDI.Lens(uuid4(), s1, x->n)
+        l1 = SCDI.Lens(s1, x->n)
         SCDI.translate3d!(l1, [-0.25, 0, -0.25])
         SCDI.set_new_origin3d!(s1)
         # Rotate prism to obtain 45° beam input polarization
