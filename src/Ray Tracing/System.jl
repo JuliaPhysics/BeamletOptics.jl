@@ -90,11 +90,11 @@ end
 end
 
 """
-    tracing_step!(system::AbstractSystem, ray::AbstractRay{R}, hint::Nullable{UUID})
+    tracing_step!(system::AbstractSystem, ray::AbstractRay{R}, hint::Hint)
 
 Tests if the `ray` intersects an `object` in the optical `system`. Returns the closest intersection.
 
-# Hint UUID
+# Hint
 
 An optional [`Hint`](@ref) can be provided to test against a specific object (and shape) in the `system` first.
 
@@ -102,15 +102,15 @@ An optional [`Hint`](@ref) can be provided to test against a specific object (an
     If a hint is provided and the object intersection is valid, the intersection will be returned immediately.
     However, it is not guaranteed that this is the true closest intersection. 
 """
-@inline function tracing_step!(system::AbstractSystem, ray::AbstractRay{R}, ::Nothing) where {R <: Real}
-    # Test against all objects in system
-    intersection!(ray, trace_all(system, ray))
-    return nothing
-end
-
 @inline function tracing_step!(system::AbstractSystem, ray::AbstractRay{R}, hint::Hint) where {R <: Real}
     # Test against hinted object
     intersection!(ray, trace_one(system, ray, hint))
+    return nothing
+end
+
+@inline function tracing_step!(system::AbstractSystem, ray::AbstractRay{R}, ::Nothing) where {R <: Real}
+    # Test against all objects in system
+    intersection!(ray, trace_all(system, ray))
     return nothing
 end
 
