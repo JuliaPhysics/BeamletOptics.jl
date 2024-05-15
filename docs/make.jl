@@ -41,6 +41,7 @@ makedocs(;
         "API design" => "design.md",
         "Examples" => Any[
             "Spherical lenses" => "examples/spherical_lenses.md",
+            "Aspherical lenses" => "examples/aspherical_lenses.md",
             "Double Gauss Lens" => "examples/double_gauss.md",
             "Lens groups" => "examples/lens_groups.md",
         ],

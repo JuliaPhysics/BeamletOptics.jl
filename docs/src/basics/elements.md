@@ -16,6 +16,8 @@ Some optical elements are provided with this package as is, these include:
     - [`SCDI.Mirror`](@ref)
 - Refractive optical elements
     - [`SCDI.SphericalLens`](@ref)
+    - [`SCDI.PlanoConvexAsphericalLens`](@ref)
+    - [`SCDI.PlanoConcaveAsphericalLens`](@ref)
     - [`SCDI.Prism`](@ref)
 - [`SCDI.Photodetector`](@ref)
 - [`SCDI.ThinBeamSplitter`](@ref)

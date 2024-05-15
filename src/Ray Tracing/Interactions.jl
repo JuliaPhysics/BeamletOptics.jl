@@ -178,7 +178,7 @@ Refer to the [`SphericalLens`](@ref) constructor for more information on how to 
 """
 struct Lens{S <: AbstractShape, T <: Function} <: AbstractRefractiveOptic{T}
     shape::S
-    n::T # FIXME: constructor check that n=n(λ), # args 
+    n::T # FIXME: constructor check that n=n(λ), # args
 end
 
 SphericalLens(r1, r2, l, d, n) = SphericalLens(r1, r2, l, d, λ -> n)
@@ -233,7 +233,7 @@ end
     ThinLens(R1::Real, R2::Real, d::Real, n::Function)
 
 Directly creates an ideal spherical thin [`Lens`](@ref) with radii of curvature `R1` and `R2` and diameter `d`
-and refractive index `n`. 
+and refractive index `n`.
 """
 function ThinLens(R1::Real, R2::Real, d::Real, n::Function)
     shape = ThinLensSDF(R1, R2, d)
@@ -245,12 +245,77 @@ ThinLens(R1::Real, R2::Real, d::Real, n::Real) = ThinLens(R1, R2, d, x -> n)
     Prism{S <: AbstractShape, T <: Function} <: AbstractRefractiveOptic{T}
 
 Essentially represents the same functionality as [`Lens`](@ref).
-Refer to its documentation. 
+Refer to its documentation.
 """
 struct Prism{S <: AbstractShape, T <: Function} <: AbstractRefractiveOptic{T}
     shape::S
     n::T
 end
+
+#=
+Asphere related constructors
+=#
+
+"""
+    PlanoConvexAsphericalLens(radius, conic_constant, even_coefficients, d, t, n, md = d)
+
+Creates a plano-aspherical [`Lens`](@ref) with convex shape based on:
+
+- `radius`: front radius
+- `conic_constant`: Conic constant of the aspherical surface
+- `even_coefficients`: A vector of the even aspheric coefficients
+- `d`: lens diameter
+- `t`: lens thickness
+- `n`: refractive index as a function of λ
+
+!!! note
+    Aspheric lenses are somewhat experimental at the moment. Use this feature with some caution.
+    Future versions of this package will offer a convenience constructor for abitrary mixed
+    lenses, e.g. bi-aspheres, aspheric-spheric lenses, etc. as well as odd aspheres and extended
+    aspheres.
+"""
+function PlanoConvexAsphericalLens(radius::Real, conic_constant::Real, even_coefficients::Vector{<:Real}, d::Real, t::Real, n::Real)
+    return PlanoConvexAsphericalLens(radius, conic_constant, even_coefficients, d, t, x -> n)
+end
+
+function PlanoConvexAsphericalLens(radius::Real, conic_constant::Real, even_coefficients::Vector{<:Real}, d::Real, t::Real, n::Function)
+    shape = PlanoConvexAsphericalLensSDF(radius, t, d, conic_constant, even_coefficients)
+
+    return Lens(uuid4(), shape, n)
+end
+
+"""
+    PlanoConcaveAsphericalLens(radius, conic_constant, even_coefficients, d, t, n, md = d)
+
+Creates a plano-aspherical [`Lens`](@ref) with convex shape based on:
+
+- `radius`: front radius
+- `conic_constant`: Conic constant of the aspherical surface
+- `even_coefficients`: A vector of the even aspheric coefficients
+- `d`: lens diameter
+- `t`: lens thickness
+- `n`: refractive index as a function of λ
+- `md`: mechanical diameter of the lens (defaults to `d`). If this is set to a value `md` > `d`
+        an outer flat section will be added to the lens. This can be used to model more realistic
+        lenses where this flat section is present for mounting purposes but is also an active
+        optical region for extreme lenses (HUDs, AR-wearables, etc.)
+
+!!! note
+    Aspheric lenses are somewhat experimental at the moment. Use this feature with some caution.
+    Future versions of this package will offer a convenience constructor for abitrary mixed
+    lenses, e.g. bi-aspheres, aspheric-spheric lenses, etc. as well as odd aspheres and extended
+    aspheres.
+"""
+function PlanoConcaveAsphericalLens(radius::Real, conic_constant::Real, even_coefficients::Vector{<:Real}, d::Real, t::Real, n::Real, md::Real = d)
+    return PlanoConcaveAsphericalLens(radius, conic_constant, even_coefficients, d, t, x -> n, md)
+end
+
+function PlanoConcaveAsphericalLens(radius::Real, conic_constant::Real, even_coefficients::Vector{<:Real}, d::Real, t::Real, n::Function, md::Real = d)
+    shape = PlanoConcaveAsphericalLensSDF(radius, t, d, conic_constant, even_coefficients, md)
+
+    return Lens(uuid4(), shape, n)
+end
+
 
 #=
 Implements photodetector, efield calculation during solve_system!
@@ -269,12 +334,12 @@ Field contributions Eᵢ are added by the corresponding [`interact3d`](@ref) met
 - `shape`: geometry of the active surface, must represent 2D-`field` in `x` any `y` dimensions
 - `x`: linear range of local x-coordinates
 - `y`: linear range of local y-coordinates
-- `field`: `size(x)` by `size(y)` matrix of complex values to store superposition E₀ 
+- `field`: `size(x)` by `size(y)` matrix of complex values to store superposition E₀
 
 # Additional information
 
 !!! warning "Reset behavior"
-    The `Photodetector` must be reset between each call of [`solve_system!`](@ref) in order to 
+    The `Photodetector` must be reset between each call of [`solve_system!`](@ref) in order to
     overwrite previous results using the [`reset_photodetector!`](@ref) function.
     Otherwise, the current result will be added onto the previous result.
 

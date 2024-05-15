@@ -76,7 +76,7 @@ Rotates the `dir`-matrix of `shape` around the reference-`axis` by an angle of `
 """
 function rotate3d!(shape::AbstractShape, axis, θ)
     R = rotate3d(axis, θ)
-    orientation!(shape, orientation(shape) * R)
+    orientation!(shape, R * orientation(shape))
     return nothing
 end
 
