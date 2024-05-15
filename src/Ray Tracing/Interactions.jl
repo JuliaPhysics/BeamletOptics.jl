@@ -281,7 +281,7 @@ end
 function PlanoConvexAsphericalLens(radius::Real, conic_constant::Real, even_coefficients::Vector{<:Real}, d::Real, t::Real, n::Function)
     shape = PlanoConvexAsphericalLensSDF(radius, t, d, conic_constant, even_coefficients)
 
-    return Lens(uuid4(), shape, n)
+    return Lens(shape, n)
 end
 
 """
@@ -313,7 +313,7 @@ end
 function PlanoConcaveAsphericalLens(radius::Real, conic_constant::Real, even_coefficients::Vector{<:Real}, d::Real, t::Real, n::Function, md::Real = d)
     shape = PlanoConcaveAsphericalLensSDF(radius, t, d, conic_constant, even_coefficients, md)
 
-    return Lens(uuid4(), shape, n)
+    return Lens(shape, n)
 end
 
 

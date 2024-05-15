@@ -270,7 +270,6 @@ Implements the SDF of a ring in the x-z-plane for some distance in the y axis.
 This allows to add planar outer sections to any SDF which fits inside of the ring.
 """
 mutable struct RingSDF{T} <: AbstractSDF{T}
-    const id::UUID
     dir::SMatrix{3, 3, T, 9}
     transposed_dir::SMatrix{3, 3, T, 9}
     pos::Point3{T}
@@ -286,7 +285,7 @@ Constructs a ring with `inner_radius` with a `width` and some thickness.
 """
 function RingSDF(inner_radius::R, width::W, thickness::T) where {R, W, T}
     TT = promote_type(R, W, T)
-    return RingSDF{TT}(uuid4(),
+    return RingSDF{TT}(
         Matrix{T}(I, 3, 3),
         Matrix{T}(I, 3, 3),
         zeros(T, 3),
@@ -328,7 +327,6 @@ s_merged = s1 + s2
 
 """
 mutable struct UnionSDF{T, TT <: Tuple} <: AbstractSDF{T}
-    const id::UUID
     dir::SMatrix{3, 3, T, 9}
     transposed_dir::SMatrix{3, 3, T, 9}
     pos::Point3{T}
@@ -337,7 +335,6 @@ end
 
 function UnionSDF{T}(sdfs::Vararg{AbstractSDF{T}, N}) where {T, N}
     UnionSDF{T, typeof(sdfs)}(
-        uuid4(),
         SMatrix{3,3}(one(T)*I),
         SMatrix{3,3}(one(T)*I),
         Point3{T}(zero(T)),
@@ -499,7 +496,7 @@ function BiConcaveLensSDF(r1::L, r2::M, l::N, d::O = 1inch, md::MD = d) where {L
     translate3d!(front, [0, (r1 + l / 2 - s1), 0])
     translate3d!(back, [0, -(r2 + l / 2 - s2), 0])
 
-    lens = BiConcaveLensSDF{T}(uuid4(),
+    lens = BiConcaveLensSDF{T}(
         Matrix{T}(I, 3, 3),
         Matrix{T}(I, 3, 3),
         zeros(T, 3),
@@ -598,7 +595,7 @@ function PlanoConcaveLensSDF(r::R, l::L, d::D = 1inch, md::MD = d) where {R, L, 
     back = CylinderSDF(d / 2, l / 2)
     # Shift and rotate subtraction sphere into position
     translate3d!(front, [0, (r + l / 2 - s), 0])
-    lens = PlanoConcaveLensSDF{T}(uuid4(),
+    lens = PlanoConcaveLensSDF{T}(
         Matrix{T}(I, 3, 3),
         Matrix{T}(I, 3, 3),
         zeros(T, 3),
@@ -666,7 +663,7 @@ function ConvexConcaveLensSDF(r1::L, r2::M, l::N, d::O = 1inch, md::MD = d) wher
     # Shift and rotate subtraction spheres into position
     translate3d!(front, [0, (-s1 + l / 2), 0])
     translate3d!(back, [0, -(r2 + l / 2 - s2), 0])
-    lens = ConvexConcaveLensSDF{T}(uuid4(),
+    lens = ConvexConcaveLensSDF{T}(
         Matrix{T}(I, 3, 3),
         Matrix{T}(I, 3, 3),
         zeros(T, 3),
