@@ -158,18 +158,20 @@ function retrace_system!(system::AbstractSystem, beam::Beam{T}) where {T <: Real
     interaction::Nullable{BeamInteraction{T}} = nothing
     for (i, ray) in enumerate(rays(beam))
         # Test if intersection is valid
-        isect = intersection(ray)
-        if isnothing(isect)
+        _intersection = intersection(ray)
+        if isnothing(_intersection)
             cutoff = i
             break
         end
         # Recalculate current intersection
-        intersection!(ray, intersect3d(object(intersection(ray)), ray))
+        intersection!(ray, intersect3d(shape(_intersection), ray))
         # Test if intersection is valid
         if isnothing(intersection(ray))
             cutoff = i
             break
         end
+        # Update new intersection object field
+        object!(ray.intersection, object(_intersection))
         # Test if interaction is still valid
         interaction = interact3d(system, object(intersection(ray)), beam, ray)
         if isnothing(interaction)
@@ -274,19 +276,24 @@ function retrace_system!(system::AbstractSystem, gauss::GaussianBeamlet{T}) wher
         w_ray = rays(gauss.waist)[i]
         d_ray = rays(gauss.divergence)[i]
         obj = object(intersection(c_ray))
-        intersect_c = intersect3d(obj, c_ray)
-        intersect_w = intersect3d(obj, w_ray)
-        intersect_d = intersect3d(obj, d_ray)
+        shp = shape(intersection(c_ray))
+        intersect_c = intersect3d(shp, c_ray)
+        intersect_w = intersect3d(shp, w_ray)
+        intersect_d = intersect3d(shp, d_ray)
         # Test if intersections are still valid
         if any(isnothing, (intersect_c, intersect_w, intersect_d))
             cutoff = i
             break
         end
         # Test if all beams still hit the same target
-        if !(object(intersect_c) === object(intersect_w) === object(intersect_d))
+        if !(shape(intersect_c) === shape(intersect_w) === shape(intersect_d))
             cutoff = i
             break
         end
+        # Update object field
+        object!(intersect_c, obj)
+        object!(intersect_w, obj)
+        object!(intersect_d, obj)
         # Set intersection
         intersection!(c_ray, intersect_c)
         intersection!(w_ray, intersect_w)
