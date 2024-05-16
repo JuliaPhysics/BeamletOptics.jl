@@ -3,7 +3,7 @@ module SCDIMakieExt
 using SCDI: faces, vertices, AbstractMesh, AbstractRay, Beam, PolarizedRay, intensity, rays
 import SCDI: render_object!, render_ray!, _render_beam!,
     _render_ray!, render_surface!, _render_object_normal!, render_sdf_mesh!
-using Makie: Axis3, LScene, mesh!, surface!, lines!, RGBAf
+using Makie: Axis3, LScene, mesh!, surface!, lines!, RGBAf, scatter!
 using GeometryBasics: Point2, Point3
 using AbstractTrees: PreOrderDFS
 
@@ -17,7 +17,8 @@ end
 function _render_ray!(axis::_RenderEnv,
         ray::AbstractRay,
         ray_end::AbstractVector;
-        color = :blue)
+        color = :blue,
+        show_pos = false)
     lines!(axis,
         [ray.pos[1], ray_end[1]],
         [ray.pos[2], ray_end[2]],
@@ -25,6 +26,9 @@ function _render_ray!(axis::_RenderEnv,
         color=color,
         linewidth=1.0,
         transparency=true)
+    if show_pos
+        scatter!(axis, ray.pos; color)
+    end
     return nothing
 end
 

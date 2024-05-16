@@ -26,7 +26,7 @@ end
 
 Renders a `ray` as a 3D line. If the ray has no intersection, the substitute length `flen` is used.
 """
-function render_ray!(axis, ray::AbstractRay; color = :blue, flen = 1.0)
+function render_ray!(axis, ray::AbstractRay; color = :blue, flen = 1.0, show_pos=false)
     if isnothing(intersection(ray))
         len = flen
     else
@@ -34,21 +34,21 @@ function render_ray!(axis, ray::AbstractRay; color = :blue, flen = 1.0)
     end
     temp = ray.pos + len * ray.dir
 
-    _render_ray!(axis, ray, temp; color)
+    _render_ray!(axis, ray, temp; color, show_pos)
 
     return nothing
 end
 _render_ray!(::Any, ::AbstractRay, ::AbstractVector; color = :blue) = nothing
 
 """
-    render_beam!(axis, beam::Beam; color=:blue, flen=1.0)
+    render_beam!(axis, beam::Beam; color=:blue, flen=1.0, show_pos=false)
 
 Render the entire `beam` into the specified 3D-`axis`. A `color` can be specified.
 """
-function render_beam!(axis, beam::Beam; color = :blue, flen = 1.0)
+function render_beam!(axis, beam::Beam; color = :blue, flen = 1.0, show_pos=false)
     for child in PreOrderDFS(beam)
         for ray in rays(child)
-            render_ray!(axis, ray, color = color, flen = flen)
+            render_ray!(axis, ray; color, flen, show_pos)
         end
     end
     return nothing
