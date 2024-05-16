@@ -108,7 +108,7 @@ end
 Function to find a point given a specific distance `t` along the beam. Return the ray `index` aswell.
 For negative distances, assume first ray backwards.
 """
-function point_on_beam(beam::Beam{T}, t::Real) where {T}
+function point_on_beam(beam::Beam{T}, t::Real)::Tuple{Point3{T}, Int} where {T}
     # Initialize counter to track cumulative length
     p = AbstractTrees.parent(beam)
     if isnothing(p)

@@ -369,13 +369,13 @@ end
 """
     interact3d(::AbstractSystem, pd::Photodetector, gauss::GaussianBeamlet, ray_id::Int)
 
-Implements the [`Photodetector`](@ref) interaction with a [`GaussianBeamlet`](@ref). 
+Implements the [`Photodetector`](@ref) interaction with a [`GaussianBeamlet`](@ref).
 On hit, the scalar E-field of the `gauss` is added to the current PD field matrix.
 Tilt and tip between beam and PD surface are considered via projection factors.
 """
 function interact3d(
         ::AbstractSystem, pd::Photodetector, gauss::GaussianBeamlet, ray_id::Int)
-    # Select final ray of chief beam 
+    # Select final ray of chief beam
     ray = gauss.chief.rays[ray_id]
     l0 = length(gauss, opl = true) - length(ray, opl = true)
     p0 = position(ray)
@@ -385,6 +385,7 @@ function interact3d(
     p = position(shape(pd))
     # E-field projection scalar reduction factor
     proj = abs(dot(d0, normal3d(intersection(ray))))
+
     # Add current E-field contribution
     Threads.@threads for j in eachindex(pd.y) # FIXME row column major order?
         y = pd.y[j]
@@ -552,7 +553,7 @@ For more information refer to [`ThinBeamSplitter`](@ref).
 
 The reflection phase jump is modeled here as θᵣ = π for simplicity. This is since in practice it will have only a relative effect on the signal at the detector for interferometric setups.
 The phase jump is applied to the reflected portion of any incoming beam that faces the `BeamSplitter` normal vector, which assumes that the splitter has an unambigous normal, i.e. a 2D mesh.
-This is intended to model the effect of the Fresnel equations without full polarization calculus. 
+This is intended to model the effect of the Fresnel equations without full polarization calculus.
 """
 function interact3d(::AbstractSystem, bs::BeamSplitter, gauss::GaussianBeamlet, ray_id::Int)
     # Phase flip
@@ -569,7 +570,7 @@ function interact3d(::AbstractSystem, bs::BeamSplitter, gauss::GaussianBeamlet, 
 
     # Add conditional phase flip to reflected beam
     r.E0 *= exp(im*ϕ)
-    
+
     children!(gauss, [t, r])
     return nothing
 end
