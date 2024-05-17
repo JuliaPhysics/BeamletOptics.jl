@@ -140,9 +140,9 @@ Returns the geometric length of a `ray` between its start and intersection point
 The `opl` keyword can be used to calculate the `o`ptical `p`ath `l`ength instead, i.e. ``OPL = n \\cdot l``.
 Default is the geometrical length.
 """
-function Base.length(ray::AbstractRay; opl::Bool=false)
+function Base.length(ray::AbstractRay{T}; opl::Bool=false)::T where {T}
     if isnothing(intersection(ray))
-        return Inf
+        return T(Inf)
     end
     if opl        
         return length(intersection(ray)) * refractive_index(ray)

@@ -86,20 +86,29 @@ Default is the geometrical length.
 """
 function Base.length(beam::Beam{T}; opl::Bool=false) where {T}
     # Recursively get length of beam parents
+    l0 = length_parent(beam, opl)
+    l = length_rays(beam, opl)
+    return l + l0
+end
+
+function length_parent(beam::Beam{T}, opl::Bool) where {T}
     p = AbstractTrees.parent(beam)
-    l0 = zero(T)
-    if !isnothing(p)
-        l0 = length(p; opl)
+    if isnothing(p)
+        return zero(T)
+    else
+        return length(p; opl)::T
     end
-    # Calculate ray lengths
+end
+
+function length_rays(beam::Beam{T}, opl::Bool) where {T}
     l = zero(T)
     for ray in rays(beam)
         if isnothing(intersection(ray))
             break
         end
-        l += length(ray; opl)
+        l += length(ray; opl)::T
     end
-    return l + l0
+    return l
 end
 
 """
@@ -108,13 +117,13 @@ end
 Function to find a point given a specific distance `t` along the beam. Return the ray `index` aswell.
 For negative distances, assume first ray backwards.
 """
-function point_on_beam(beam::Beam{T}, t::Real)::Tuple{Point3{T}, Int} where {T}
+function point_on_beam(beam::B, t::Real)::Tuple{Point3{T}, Int} where {T, R <: AbstractRay{T}, B <: Beam{T, R}}
     # Initialize counter to track cumulative length
     p = AbstractTrees.parent(beam)
     if isnothing(p)
-        temp = zero(t)
+        temp = zero(T)
     else
-        temp = length(p)
+        temp = length(p::B)
     end
     numEl = length(rays(beam))
     for (index, ray) in enumerate(rays(beam))
