@@ -1,7 +1,7 @@
 """
     GaussianBeamlet{T} <: AbstractBeam{T, Ray{T}}
 
-Ray representation of the **stigmatic** Gaussian beam as per J. Arnaud (1985). The beam quality `M2` is fully considered via the divergence angle. 
+Ray representation of the **stigmatic** Gaussian beam as per J. Arnaud (1985). The beam quality `M2` is fully considered via the divergence angle.
 Formalism for beam parameter calculation based on publications:
 
 **Jacques Arnaud, "Representation of Gaussian beams by complex rays," Appl. Opt. 24, 538-543 (1985)**
@@ -89,7 +89,7 @@ end
     interact3d(system::AbstractSystem, object::AbstractObject, gauss::GaussianBeamlet{R}, ray_id::Int)
 
 Generic dispatch for the [`interact3d`](@ref) method of a [`GaussianBeamlet`](@ref) with an [`AbstractObject`](@ref).
-Unless a more concrete implementation exists, the interaction of the Gaussian is assumed to be the interaction of the 
+Unless a more concrete implementation exists, the interaction of the Gaussian is assumed to be the interaction of the
 chief, waist and divergence rays with an object.
 
 # Returns
@@ -248,10 +248,11 @@ function gauss_parameters(gauss::GaussianBeamlet,
     ψ = -atan(1, √(1 / (R * z) - 1))
     w0 = H / (n * F_kt)
     # Catch NaNs and correct Gouy phase sign based on curvature sign
-    isnan(R) ? R = zero(R) : nothing
-    isnan(ψ) ? ψ = zero(ψ) : nothing
-    isnan(w0) ? w0 = w : nothing
-    R < 0 ? ψ = -ψ : nothing
+    isnan(R) && (R = zero(R))
+    isnan(ψ) && (ψ = zero(ψ))
+    isnan(w0) && (w0 = w )
+    R < 0 && (ψ = -ψ)
+
     return w, R, ψ, w0
 end
 
