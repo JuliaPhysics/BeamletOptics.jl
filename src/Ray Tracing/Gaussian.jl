@@ -71,7 +71,7 @@ wavelength(beam::GaussianBeamlet) = beam.λ
 beam_waist(beam::GaussianBeamlet) = beam.w0
 electric_field(beam::GaussianBeamlet) = beam.E0
 
-Base.length(gauss::GaussianBeamlet; opl::Bool=false) = length(gauss.chief; opl)
+Base.length(gauss::GaussianBeamlet; opl::Bool = false) = length(gauss.chief; opl)
 
 """
     parent!(beam::GaussianBeamlet, parent::GaussianBeamlet)
@@ -197,12 +197,8 @@ Calculate the local waist radius and Gouy phase of an unastigmatic Gaussian beam
 """
 function gauss_parameters(gauss::GaussianBeamlet,
         z::Real;
-        hint = nothing)
-    if isnothing(hint)
-        p0, index = point_on_beam(gauss, z)
-    else
-        p0, index = hint
-    end
+        hint = point_on_beam(gauss, z))
+    p0, index = hint
     chief = gauss.chief.rays[index]
     n = refractive_index(chief)
     λ = wavelength(gauss)
@@ -250,7 +246,7 @@ function gauss_parameters(gauss::GaussianBeamlet,
     # Catch NaNs and correct Gouy phase sign based on curvature sign
     isnan(R) && (R = zero(R))
     isnan(ψ) && (ψ = zero(ψ))
-    isnan(w0) && (w0 = w )
+    isnan(w0) && (w0 = w)
     R < 0 && (ψ = -ψ)
 
     return w, R, ψ, w0
@@ -262,21 +258,22 @@ end
 Return the parameters of the `GaussianBeamlet` along the specified positions in `zs`.
 """
 function gauss_parameters(gauss::GaussianBeamlet{G}, zs::AbstractArray) where {G}
-    w = Vector{G}(undef, length(zs))
-    R = Vector{G}(undef, length(zs))
-    ψ = Vector{G}(undef, length(zs))
-    w0 = Vector{G}(undef, length(zs))
-    for (i, z) in enumerate(zs)
-        w[i], R[i], ψ[i], w0[i] = gauss_parameters(gauss, z)
+    n = length(zs)
+    w = Vector{G}(undef, n)
+    R = Vector{G}(undef, n)
+    ψ = Vector{G}(undef, n)
+    w0 = Vector{G}(undef, n)
+    @inbounds for i in 1:n
+        w[i], R[i], ψ[i], w0[i] = gauss_parameters(gauss, zs[i])
     end
-    return w, R, ψ, w0
+    return (w, R, ψ, w0)
 end
 
 """
     electric_field(gauss::GaussianBeamlet, r, z)
 
 Calculates the electric field phasor [V/m] of `gauss` at the radial and longitudinal positions `r` and `z`.
-Optionally, buffer vectors `g_b` and `p_b` can be passed.
+
 """
 function electric_field(gauss::GaussianBeamlet, r, z)
     point, index = point_on_beam(gauss, z)
@@ -293,9 +290,11 @@ end
 Tests the angle between the waist and divergence beams and refractive surfaces.
 A target threshold of π/4 or 45° is assumed before abberations become dominant.
 """
-isparaxial(system::AbstractSystem, gb::GaussianBeamlet, threshold::Real = π / 4) = isparaxial(system,
+isparaxial(system::AbstractSystem, gb::GaussianBeamlet, threshold::Real = π / 4) = isparaxial(
+    system,
     gb.waist,
-    threshold) & isparaxial(system,
+    threshold) & isparaxial(
+    system,
     gb.divergence,
     threshold)
 
@@ -319,7 +318,7 @@ end
 Returns the Rayleigh range for the **first** beam section of the [`GaussianBeamlet`](@ref) `g`.
 Note: `M2` is not stored in `g` during construction and must be specified by the user.
 """
-function rayleigh_range(g::GaussianBeamlet; M2=1)
+function rayleigh_range(g::GaussianBeamlet; M2 = 1)
     λ = wavelength(g)
     w0 = beam_waist(g)
     return rayleigh_range(λ, w0, M2)

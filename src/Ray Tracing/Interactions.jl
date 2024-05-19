@@ -384,7 +384,12 @@ function interact3d(
     T = transpose(orientation(shape(pd)))
     p = position(shape(pd))
     # E-field projection scalar reduction factor
-    proj = abs(dot(d0, normal3d(intersection(ray))))
+    ray_int = intersection(ray)
+    isnothing(ray_int) && return nothing
+
+    # FIXME: This should not be necessary, hopefully it is fixed with making Intersection a concrete type again
+    ray_normal = convert(typeof(p0), normal3d(ray_int::Intersection))
+    proj = abs(dot(d0, ray_normal))
 
     # Add current E-field contribution
     Threads.@threads for j in eachindex(pd.y) # FIXME row column major order?

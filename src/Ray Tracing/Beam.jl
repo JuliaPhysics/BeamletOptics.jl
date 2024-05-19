@@ -123,7 +123,7 @@ function point_on_beam(beam::B, t::Real)::Tuple{Point3{T}, Int} where {T, R <: A
     if isnothing(p)
         temp = zero(T)
     else
-        temp = length(p::B)
+        temp = length(p)
     end
     numEl = length(rays(beam))
     for (index, ray) in enumerate(rays(beam))
