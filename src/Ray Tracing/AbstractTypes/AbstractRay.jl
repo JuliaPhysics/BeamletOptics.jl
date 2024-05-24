@@ -33,6 +33,13 @@ Base.length(i::Intersection) = i.t
 
 normal3d(i::Intersection) = i.n
 
+function Base.show(io::IO, ::MIME"text/plain", _intersection::Intersection)
+    println(io, "Intersected object: $(typeof(object(_intersection)))")
+    println(io, "Intersected shape: $(typeof(shape(_intersection)))")
+    println(io, "Normal vector at intersection: $(normal3d(_intersection))")
+    println(io, "Length to intersection: $(length(_intersection))")
+end
+
 """
     AbstractRay{T<:Real}
 

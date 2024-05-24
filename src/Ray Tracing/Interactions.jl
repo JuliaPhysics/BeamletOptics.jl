@@ -71,9 +71,9 @@ refractive_index(object::AbstractRefractiveOptic) = object.n
 refractive_index(object::AbstractRefractiveOptic{<:Function}, λ::Real)::Float64 = object.n(λ)
 
 """
-    interact3d(AbstractRefractiveOptic, Ray)
+    interact3d(AbstractSystem, AbstractRefractiveOptic, Beam, Ray)
 
-Implements the refraction of a [`Ray`](@ref) at an optical surface. The "outside" ref. index is always assumed to be 1.
+Implements the refraction of a [`Ray`](@ref) at an optical surface. The "outside" ref. index is obtained from the `system` unless specified otherwise.
 At the critical angle, total internal reflection occurs (see [`refraction3d`](@ref)).
 """
 function interact3d(system::AbstractSystem,
@@ -110,9 +110,9 @@ function interact3d(system::AbstractSystem,
 end
 
 """
-    interact3d(AbstractRefractiveOptic, PolarizedRay)
+    interact3d(AbstractSystem, AbstractRefractiveOptic, Beam, PolarizedRay)
 
-Implements the refraction of a [`PolarizedRay`](@ref) at an uncoated optical surface. The "outside" ref. index is always assumed to be 1.
+Implements the refraction of a [`PolarizedRay`](@ref) at an uncoated optical surface. The "outside" ref. index is obtained from the `system` unless specified otherwise.
 Reflection and transmission values are calculated via the [`fresnel_coefficients`](@ref). Stray light is not tracked.
 In the case of total internal reflection, only the reflected light is traced.
 """

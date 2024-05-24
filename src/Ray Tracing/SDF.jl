@@ -70,7 +70,7 @@ normal3d(s::AbstractSDF, pos) = numeric_gradient(s, pos)
 
 function numeric_gradient(s::AbstractSDF, pos)
     # approximate ∇ of s at pos
-    eps = 1e-7
+    eps = 1e-8
     norm = Point3(sdf(s, pos + Point3(eps, 0, 0)) - sdf(s, pos - Point3(eps, 0, 0)),
         sdf(s, pos + Point3(0, eps, 0)) - sdf(s, pos - Point3(0, eps, 0)),
         sdf(s, pos + Point3(0, 0, eps)) - sdf(s, pos - Point3(0, 0, eps)))
