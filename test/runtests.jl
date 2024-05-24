@@ -915,6 +915,7 @@ end
         SCDI.zrotate3d!(SCDI.shape(l1), π)
         SCDI.zrotate3d!(SCDI.shape(l2), π)
         SCDI.zrotate3d!(SCDI.shape(l4), π)
+        SCDI.zrotate3d!(SCDI.shape(l6), π)
         SCDI.translate3d!(SCDI.shape(l2), [0, 11.495e-3, 0])
         SCDI.translate3d!(SCDI.shape(l3), [0, 25.491e-3, 0])
         SCDI.translate3d!(SCDI.shape(l4), [0, 35.568e-3, 0])
