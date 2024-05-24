@@ -13,8 +13,8 @@ Stores data calculated by the [`intersect3d`](@ref) method. This information can
 mutable struct Intersection
     object::Nullable{AbstractObject}
     shape::Nullable{AbstractShape}
-    t::Real
-    n::Point3{Real}
+    t::Float64
+    n::Point3{Float64}
 end
 
 function Intersection(t::T, n::AbstractArray{T}) where {T}
@@ -27,7 +27,7 @@ end
 
 shape(i::Intersection) = i.shape
 object(i::Intersection) = i.object
-object!(i::Intersection, new::AbstractObject) = (i.object = new) 
+object!(i::Intersection, new::AbstractObject) = (i.object = new)
 
 Base.length(i::Intersection) = i.t
 
@@ -43,7 +43,7 @@ end
 """
     AbstractRay{T<:Real}
 
-An implementation for a geometrical optics ray in R³. In general, a `AbstractRay` is described by ``\\vec{p} + t\\cdot\\vec{d}`` with ``t\\in(0,\\infty)``. 
+An implementation for a geometrical optics ray in R³. In general, a `AbstractRay` is described by ``\\vec{p} + t\\cdot\\vec{d}`` with ``t\\in(0,\\infty)``.
 `AbstractRay`s are intended to model the propagation of light between optical interactions according to the laws of geometrical optics.
 To store the result of a ray tracing solution, refer to [`AbstractBeam`](@ref).
 
@@ -71,7 +71,7 @@ Subtypes of `AbstractBeam` must implement the following:
     The `opl` keyword can be used to obtain the optical path length instead.
 
 !!! warning "Ray direction"
-    Many functions assume that the `dir`ection vector has unit length (i.e. ``|\\vec{p}| = 1``). 
+    Many functions assume that the `dir`ection vector has unit length (i.e. ``|\\vec{p}| = 1``).
     Violating this assumption might lead to spurious results.
 """
 abstract type AbstractRay{T <: Real} end
@@ -133,7 +133,7 @@ function intersect3d(plane_position::AbstractArray,
         plane_normal::AbstractArray,
         ray::AbstractRay{T}) where {T}
     t = line_plane_distance3d(plane_position, plane_normal, position(ray), direction(ray))
-    if isnothing(t) 
+    if isnothing(t)
         return nothing
     else
         return Intersection(T(t), T.(plane_normal))
@@ -151,7 +151,7 @@ function Base.length(ray::AbstractRay{T}; opl::Bool=false)::T where {T}
     if isnothing(intersection(ray))
         return T(Inf)
     end
-    if opl        
+    if opl
         return length(intersection(ray)) * refractive_index(ray)
     else
         return length(intersection(ray))
