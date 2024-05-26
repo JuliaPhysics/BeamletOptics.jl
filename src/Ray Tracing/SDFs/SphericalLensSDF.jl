@@ -130,7 +130,7 @@ Constructs a cylindrical bi-convex lens SDF with:
 
 The spherical surfaces are constructed flush with the cylinder surface.
 """
-function BiConvexLensSDF(r1::L, r2::M, l::N, d::O = 1SCDI.inch) where {L, M, N, O}
+function BiConvexLensSDF(r1::L, r2::M, l::N, d::O = 1inch) where {L, M, N, O}
     check_sag(r1, d)
     check_sag(r2, d)
     s1 = sag(r1, d)
@@ -147,18 +147,16 @@ function BiConvexLensSDF(r1::L, r2::M, l::N, d::O = 1SCDI.inch) where {L, M, N, 
     return (front + mid + back)
 end
 
-"""
-    BiConcaveLensSDF <: AbstractSphericalLensSDF
-
-Implements a cylindrical lens SDF with two concave surfaces and a cylindrical mid section.
-"""
-mutable struct BiConcaveLensSDF{T} <: AbstractSphericalLensSDF{T}
-    dir::SMatrix{3, 3, T, 9}
-    transposed_dir::SMatrix{3, 3, T, 9}
-    pos::Point3{T}
-    front::SphereSDF{T}
-    back::SphereSDF{T}
-    mid::CylinderSDF{T}
+function BiConcaveLensSDF(r1::L, r2::M, l::N, d::O = 1inch) where {L, M, N, O}
+    # create segments
+    front = ConcaveSphericalSurfaceSDF(r1, d)
+    back = ConcaveSphericalSurfaceSDF(r2, d)
+    mid = CylinderSDF(d / 2, l / 2)
+    # Shift and rotate subtraction spheres into position
+    translate3d!(front, [0, -l / 2, 0])
+    zrotate3d!(back, π)
+    translate3d!(back, [0, l / 2, 0])
+    return (front + mid + back)
 end
 
 """
@@ -170,62 +168,21 @@ Constructs a bi-concave lens SDF with:
 - `r2` > 0: radius of convex back
 - `l`: lens thickness
 - `d`: lens diameter, default value is one inch
-- `md`: mechanical lens diameter, defaults to be identical to the lens diameter, Otherwise
-        an outer ring section will be added to the lens, if `md` > `d`.
+- `md`: mechanical lens diameter, adds an outer ring section to the lens, if `md` > `d`.
 
 The spherical surfaces are constructed flush with the cylinder surface.
 """
-function BiConcaveLensSDF(r1::L, r2::M, l::N, d::O = 1inch, md::MD = d) where {L, M, N, O, MD}
-    T = promote_type(L, M, N, O, MD)
-    check_sag(r1, d)
-    check_sag(r2, d)
-    s1 = sag(r1, d)
-    s2 = sag(r2, d)
-    # Calculate length of cylindrical section
-    l = l + s1 + s2
-    if s1 + s2 ≥ l
-        error("r1=$(r1), r2=$(r2) results in hollow lens")
+function BiConcaveLensSDF(r1::L, r2::M, l::N, d::O, md::MD) where {L, M, N, O, MD}
+    if md ≤ d
+        throw(ArgumentError("Mech. diameter must be larger than lens diameter!"))
     end
-    front = SphereSDF(r1)
-    back = SphereSDF(r2)
-    mid = CylinderSDF(d / 2, l / 2)
-    # Shift and rotate subtraction spheres into position
-    translate3d!(front, [0, (r1 + l / 2 - s1), 0])
-    translate3d!(back, [0, -(r2 + l / 2 - s2), 0])
-
-    lens = BiConcaveLensSDF{T}(
-        Matrix{T}(I, 3, 3),
-        Matrix{T}(I, 3, 3),
-        zeros(T, 3),
-        front,
-        back,
-        mid)
-
-    if md > d
-        # add an outer ring
-        ring = RingSDF(d/2, (md - d) / 2, l)
-        lens += ring
-    end
-
-    return lens
-end
-
-function sdf(bcl::BiConcaveLensSDF, pos)
-    p = _world_to_sdf(bcl, pos)
-    return max(-sdf(bcl.front, p), sdf(bcl.mid, p), -sdf(bcl.back, p))
-end
-
-"""
-    PlanoConvexLensSDF <: AbstractSphericalLensSDF
-
-Implements a cylindrical lens SDF with one convex and one planar surface.
-"""
-mutable struct PlanoConvexLensSDF{T} <: AbstractSphericalLensSDF{T}
-    dir::SMatrix{3, 3, T, 9}
-    transposed_dir::SMatrix{3, 3, T, 9}
-    pos::Point3{T}
-    front::CutSphereSDF{T}
-    back::CylinderSDF{T}
+    # generate ring-less shape
+    shape = BiConcaveLensSDF(r1, r2, l, d)
+    # add an outer ring
+    l += shape.sdfs[1].sag + shape.sdfs[3].sag
+    ring = RingSDF(d/2, (md - d) / 2, l)
+    shape += ring
+    return shape
 end
 
 """
@@ -240,16 +197,13 @@ Constructs a plano-convex lens SDF with:
 The spherical surface is constructed flush with the cylinder surface.
 """
 function PlanoConvexLensSDF(r::R, l::L, d::D = 1inch) where {R, L, D}
-    T = promote_type(R, L, D)
-    check_sag(r, d)
-    s = sag(r, d)
+    _sag = sag(r, d)
     # Calculate length of cylindrical section
-    l = l - s
-    s = r - s
-    front = CutSphereSDF(r, s)
+    l = l - _sag
+    front = ConvexSphericalSurfaceSDF(r, d)
     back = CylinderSDF(d / 2, l / 2)
     # Shift and rotate cut spheres into position
-    translate3d!(front, [0, -s + l / 2, 0])
+    translate3d!(front, [0, -l / 2, 0])
     return (front + back)
 end
 
