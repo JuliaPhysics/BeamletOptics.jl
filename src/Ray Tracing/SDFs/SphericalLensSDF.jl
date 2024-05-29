@@ -207,17 +207,13 @@ function PlanoConvexLensSDF(r::R, l::L, d::D = 1inch) where {R, L, D}
     return (front + back)
 end
 
-"""
-    PlanoConcaveLensSDF <: AbstractSphericalLensSDF
-
-Implements a cylindrical lens SDF with one concave and one planar surface.
-"""
-mutable struct PlanoConcaveLensSDF{T} <: AbstractSphericalLensSDF{T}
-    dir::SMatrix{3, 3, T, 9}
-    transposed_dir::SMatrix{3, 3, T, 9}
-    pos::Point3{T}
-    front::SphereSDF{T}
-    back::CylinderSDF{T}
+function PlanoConcaveLensSDF(r::R, l::L, d::D = 1SCDI.inch) where {R, L, D}
+    front = SCDI.CylinderSDF(d / 2, l / 2)
+    back = SCDI.ConcaveSphericalSurfaceSDF(r, d)
+    # Shift and rotate elements into position
+    SCDI.zrotate3d!(back, π)
+    SCDI.translate3d!(back, [0, l / 2, 0])
+    return (front + back)
 end
 
 """
@@ -233,38 +229,19 @@ Constructs a plano-concave lens SDF with:
 
 The spherical surface is constructed flush with the cylinder surface.
 """
-function PlanoConcaveLensSDF(r::R, l::L, d::D = 1inch, md::MD = d) where {R, L, D, MD}
-    T = promote_type(R, L, D, MD)
-    check_sag(r, d)
-    s = sag(r, d)
-    # Calculate length of cylindrical section
-    l = l + s
-    if s ≥ l
-        error("r=$(r) results in hollow lens")
+function PlanoConcaveLensSDF(r::R, l::L, d::D, md::MD) where {R, L, D, MD}
+    if md ≤ d
+        throw(ArgumentError("Mech. diameter must be larger than lens diameter!"))
     end
-    front = SphereSDF(r)
-    back = CylinderSDF(d / 2, l / 2)
-    # Shift and rotate subtraction sphere into position
-    translate3d!(front, [0, (r + l / 2 - s), 0])
-    lens = PlanoConcaveLensSDF{T}(
-        Matrix{T}(I, 3, 3),
-        Matrix{T}(I, 3, 3),
-        zeros(T, 3),
-        front,
-        back)
-
-    if md > d
-        # add an outer ring
-        ring = RingSDF(d/2, (md - d) / 2, l)
-        lens += ring
-    end
-
-    return lens
-end
-
-function sdf(pcl::PlanoConcaveLensSDF, pos)
-    p = _world_to_sdf(pcl, pos)
-    return max(-sdf(pcl.front, p), sdf(pcl.back, p))
+    # generate ring-less shape
+    shape = PlanoConcaveLensSDF(r, l, d)
+    # add an outer ring
+    _sag = shape.sdfs[2].sag
+    _l = l + _sag
+    ring = RingSDF(d/2, (md - d) / 2, _l)
+    SCDI.translate3d!(ring, [0, l/2, 0])
+    shape += ring
+    return shape
 end
 
 """
@@ -334,4 +311,28 @@ end
 function sdf(ccl::ConvexConcaveLensSDF, pos)
     p = _world_to_sdf(ccl, pos)
     return max(min(sdf(ccl.front, p), sdf(ccl.mid, p)), -sdf(ccl.back, p))
+end
+
+function render_object!(axis, css::ConcaveSphericalSurfaceSDF; color=:white)
+    radius = css.diameter/2
+    v = LinRange(0, 2π, 100)
+    r = LinRange(1e-12, 1, 100) .^ (1/2) * radius
+    # Calculate beam surface at origin along y-axis, swap w and u
+    y = sqrt.(css.radius^2 .- r.^2) .- css.radius
+    u = y
+    w = collect(r)
+    # Close conture
+    push!(u, 0) # push!(u, 0, 0)
+    push!(w, radius) # push!(w, radius, 1e-12)
+    X = [w[i] * cos(v) for (i, u) in enumerate(u), v in v]
+    Y = [u for u in u, v in v]
+    Z = [w[i] * sin(v) for (i, u) in enumerate(u), v in v]
+    # Transform into global coords
+    R = css.dir
+    P = css.pos
+    Xt = R[1, 1] * X + R[1, 2] * Y + R[1, 3] * Z .+ P[1]
+    Yt = R[2, 1] * X + R[2, 2] * Y + R[2, 3] * Z .+ P[2]
+    Zt = R[3, 1] * X + R[3, 2] * Y + R[3, 3] * Z .+ P[3]
+    render_surface!(axis, Xt, Yt, Zt; transparency = true, colormap = [color, color])
+    return nothing
 end

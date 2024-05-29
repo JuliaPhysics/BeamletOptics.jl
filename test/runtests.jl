@@ -917,8 +917,8 @@ end
         SCDI.zrotate3d!(l5, π)
         SCDI.zrotate3d!(l6, π)
         SCDI.translate3d!(l2, [0, 11.495e-3, 0])
-        SCDI.translate3d!(l3, [0, 25.491e-3, 0])
-        SCDI.translate3d!(l4, [0, 35.568e-3, 0])
+        SCDI.translate3d!(l3, [0, 16.361e-3, 0])
+        SCDI.translate3d!(l4, [0, 40.975e-3, 0])
         SCDI.translate3d!(l5, [0, 42.876e-3, 0])
         SCDI.translate3d!(l6, [0, 50.813e-3, 0])
         # Create and move group - this tests a bunch of kinematic correctness
