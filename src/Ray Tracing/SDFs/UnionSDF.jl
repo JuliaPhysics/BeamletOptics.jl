@@ -54,7 +54,7 @@ end
 function rotate3d!(u::UnionSDF, axis, θ)
     R = rotate3d(axis, θ)
     # Update group orientation
-    orientation!(u, orientation(u) * R)
+    orientation!(u, R * orientation(u))
     # Rotate all sub-SDFs around union center
     for s in u.sdfs
         rotate3d!(s, axis, θ)

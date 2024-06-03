@@ -76,7 +76,7 @@ All objects in the group are rotated around the group center via the specified a
 function rotate3d!(group::ObjectGroup, axis, θ)
     R = rotate3d(axis, θ)
     # Update group orientation
-    orientation!(group, orientation(group) * R)
+    orientation!(group, R * orientation(group))
     # Recursively rotate all subgroups and objects
     for object in objects(group)
         rotate3d!(object, axis, θ)
