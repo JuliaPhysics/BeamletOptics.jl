@@ -7,8 +7,6 @@ Types:
         CutSphereSDF
         RingSDF
         AbstractRotationallySymmetricLensSDF
-            AbstractSphericalLensSDF
-
             AbstractSphericalSurfaceSDF
                 ConvexSphericalSurfaceSDF
                 ConcaveSphericalSurfaceSDF

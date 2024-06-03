@@ -16,12 +16,14 @@ function check_sag(r, d)
 end
 
 """
-    AbstractSphericalLensSDF{T} <: AbstractSDF{T}
+    AbstractSphericalSurfaceSDF{T} <: AbstractSDF{T}
 
-An abstract type for SDFs which represent spherical lenses, i.e. biconvex or plano-concave.
+An abstract type for SDF-based volumes which represent spherical lens surfaces, i.e. convex or concave.
 """
-abstract type AbstractSphericalLensSDF{T} <: AbstractRotationallySymmetricLensSDF{T} end
 abstract type AbstractSphericalSurfaceSDF{T} <: AbstractRotationallySymmetricLensSDF{T} end
+
+"""Returns the sagitta of the `AbstractSphericalSurfaceSDF`"""
+sag(s::AbstractSphericalSurfaceSDF) = s.sag
 
 mutable struct ConcaveSphericalSurfaceSDF{T} <: AbstractSphericalSurfaceSDF{T}
     dir::SMatrix{3, 3, T, 9}
@@ -47,9 +49,9 @@ end
 function sdf(css::ConcaveSphericalSurfaceSDF, point)
     p = _world_to_sdf(css, point)
     # cylinder sdf
-    ps = p + Point3(0, css.sag/2, 0)
+    ps = p + Point3(0, sag(css)/2, 0)
     d = abs.(Point2(norm(Point2(ps[1], ps[3])), ps[2])) -
-        Point2(css.diameter/2, css.sag/2)
+        Point2(css.diameter/2, sag(css)/2)
     sdf1 = min(maximum(d), 0) + norm(max.(d, 0))
     # sphere sdf
     ps = p + Point3(0, css.radius, 0)
@@ -64,6 +66,7 @@ mutable struct ConvexSphericalSurfaceSDF{T} <: AbstractSphericalSurfaceSDF{T}
     radius::T
     height::T
     w::T
+    sag::T
 end
 
 function ConvexSphericalSurfaceSDF(radius::R, diameter::D) where {R, D}
@@ -78,7 +81,8 @@ function ConvexSphericalSurfaceSDF(radius::R, diameter::D) where {R, D}
         zeros(T, 3),
         radius,
         cutoff_height,
-        w)
+        w,
+        _sag)
 end
 
 function sdf(css::ConvexSphericalSurfaceSDF, point)
@@ -179,7 +183,7 @@ function BiConcaveLensSDF(r1::L, r2::M, l::N, d::O, md::MD) where {L, M, N, O, M
     # generate ring-less shape
     shape = BiConcaveLensSDF(r1, r2, l, d)
     # add an outer ring
-    l += shape.sdfs[1].sag + shape.sdfs[3].sag
+    l += sag(shape.sdfs[1]) + sag(shape.sdfs[3])
     ring = RingSDF(d/2, (md - d) / 2, l)
     shape += ring
     return shape
@@ -207,12 +211,12 @@ function PlanoConvexLensSDF(r::R, l::L, d::D = 1inch) where {R, L, D}
     return (front + back)
 end
 
-function PlanoConcaveLensSDF(r::R, l::L, d::D = 1SCDI.inch) where {R, L, D}
-    front = SCDI.CylinderSDF(d / 2, l / 2)
-    back = SCDI.ConcaveSphericalSurfaceSDF(r, d)
+function PlanoConcaveLensSDF(r::R, l::L, d::D = 1inch) where {R, L, D}
+    front = CylinderSDF(d / 2, l / 2)
+    back = ConcaveSphericalSurfaceSDF(r, d)
     # Shift and rotate elements into position
-    SCDI.zrotate3d!(back, π)
-    SCDI.translate3d!(back, [0, l / 2, 0])
+    zrotate3d!(back, π)
+    translate3d!(back, [0, l / 2, 0])
     return (front + back)
 end
 
@@ -236,26 +240,26 @@ function PlanoConcaveLensSDF(r::R, l::L, d::D, md::MD) where {R, L, D, MD}
     # generate ring-less shape
     shape = PlanoConcaveLensSDF(r, l, d)
     # add an outer ring
-    _sag = shape.sdfs[2].sag
+    _sag = sag(shape.sdfs[2])
     _l = l + _sag
     ring = RingSDF(d/2, (md - d) / 2, _l)
-    SCDI.translate3d!(ring, [0, l/2, 0])
+    translate3d!(ring, [0, l/2, 0])
     shape += ring
     return shape
 end
 
-"""
-    ConvexConcaveLensSDF <: AbstractSphericalLensSDF
-
-Implements a cylindrical lens SDF with one convex and one concave surface, as well as a mid section.
-"""
-mutable struct ConvexConcaveLensSDF{T} <: AbstractSphericalLensSDF{T}
-    dir::SMatrix{3, 3, T, 9}
-    transposed_dir::SMatrix{3, 3, T, 9}
-    pos::Point3{T}
-    front::CutSphereSDF{T}
-    back::SphereSDF{T}
-    mid::CylinderSDF{T}
+function ConvexConcaveLensSDF(r1::R1, r2::R2, l::L, d::D = 1inch) where {R1, R2, L, D}
+    # Create front and back surfaces
+    front = ConvexSphericalSurfaceSDF(r1, d)
+    back = ConcaveSphericalSurfaceSDF(r2, d)
+    # Calculate length of cylindrical section
+    _l = l - sag(front)
+    mid = CylinderSDF(d / 2, _l / 2)
+    # Move elements into position
+    translate3d!(front, [0, -_l / 2, 0])
+    translate3d!(back, [0, _l / 2, 0])
+    zrotate3d!(back, π)
+    return (front + mid + back)
 end
 
 """
@@ -272,45 +276,16 @@ Constructs a positive/negative meniscus lens SDF with:
 
 The spherical surface is constructed flush with the cylinder surface.
 """
-function ConvexConcaveLensSDF(r1::L, r2::M, l::N, d::O = 1inch, md::MD = d) where {L, M, N, O, MD}
-    T = promote_type(L, M, N, O, MD)
-    check_sag(r1, d)
-    check_sag(r2, d)
-    # Calculate convex and concave sag
-    s1 = sag(r1, d)
-    s2 = sag(r2, d)
-    # Calculate length of cylindrical section
-    l = l - s1 + s2
-    s1 = r1 - s1
-    if s2 ≥ l + s1
-        error("r1=$(r1), r2=$(r2) results in hollow lens")
+function ConvexConcaveLensSDF(r1::R1, r2::R2, l::L, d::D, md::MD) where {R1, R2, L, D, MD}
+    if md ≤ d
+        throw(ArgumentError("Mech. diameter must be larger than lens diameter!"))
     end
-    front = CutSphereSDF(r1, s1)
-    back = SphereSDF(r2)
-    mid = CylinderSDF(d / 2, l / 2)
-    # Shift and rotate subtraction spheres into position
-    translate3d!(front, [0, (-s1 + l / 2), 0])
-    translate3d!(back, [0, -(r2 + l / 2 - s2), 0])
-    lens = ConvexConcaveLensSDF{T}(
-        Matrix{T}(I, 3, 3),
-        Matrix{T}(I, 3, 3),
-        zeros(T, 3),
-        front,
-        back,
-        mid)
-
-    if md > d
-        # add an outer ring
-        ring = RingSDF(d/2, (md - d) / 2, l)
-        lens += ring
-    end
-
-    return lens
-end
-
-function sdf(ccl::ConvexConcaveLensSDF, pos)
-    p = _world_to_sdf(ccl, pos)
-    return max(min(sdf(ccl.front, p), sdf(ccl.mid, p)), -sdf(ccl.back, p))
+    # generate ring-less shape
+    shape = ConvexConcaveLensSDF(r1, r2, l, d)
+    _l = 2*shape.sdfs[2].height + sag(shape.sdfs[3])
+    ring = RingSDF(d/2, (md - d) / 2, _l)
+    translate3d!(ring, [0, shape.sdfs[2].height, 0])
+    return (shape + ring)
 end
 
 function render_object!(axis, css::ConcaveSphericalSurfaceSDF; color=:white)
