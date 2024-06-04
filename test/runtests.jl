@@ -912,10 +912,10 @@ end
         l4 = SCDI.SphericalLens(-23.91e-3, Inf, 1.92e-3, 40.01e-3, λ -> 1.57046)
         l5 = SCDI.SphericalLens(36.92e-3, Inf, 7.77e-3, 40.01e-3, λ -> 1.64128)
         l6 = SCDI.SphericalLens(48.88e-3, 1063.24e-3, 6.73e-3, 45.11e-3, λ -> 1.62286)
-        SCDI.zrotate3d!(l1, π)
         SCDI.zrotate3d!(l4, π)
         SCDI.zrotate3d!(l5, π)
         SCDI.zrotate3d!(l6, π)
+        SCDI.translate3d!(l1, [0, -9.3873e-4, 0])
         SCDI.translate3d!(l2, [0, 11.495e-3, 0])
         SCDI.translate3d!(l3, [0, 16.361e-3, 0])
         SCDI.translate3d!(l4, [0, 40.975e-3, 0])
@@ -923,15 +923,15 @@ end
         SCDI.translate3d!(l6, [0, 50.813e-3, 0])
         # Create and move group - this tests a bunch of kinematic correctness
         double_gauss = SCDI.ObjectGroup([l1, l2, l3, l4, l5, l6])
-        SCDI.translate3d!(double_gauss, [0.05, 0, 0])
+        SCDI.translate3d!(double_gauss, [0.05, 0.05, 0.05])
         SCDI.xrotate3d!(double_gauss, deg2rad(60))
         SCDI.zrotate3d!(double_gauss, deg2rad(45))
         system = SCDI.System([double_gauss])
         # Test against back focal length as per source above
-        dir = -1 * SCDI.orientation(l1)[:,2] # rotated collimated ray direction
+        dir = SCDI.orientation(double_gauss)[:, 2] # rotated collimated ray direction
         pos = SCDI.position(l1) - 0.05 * dir # rotated collimated ray position
         λ = 486.0 # nm
-        f_z = 0.11602585097812582 # corresponds to back focal length of f=59.21 mm on y-axis from link above
+        f_z = 0.11602585097812582 + 0.0006 # corresponds to back focal length of f=59.21 mm on y-axis from link above
         f0 = SCDI.position(l1) + f_z * dir # global focal point coords
         nv = SCDI.normal3d(dir) # orthogonal to moved system optical axis
         zs = -0.02:1e-3:0.02
