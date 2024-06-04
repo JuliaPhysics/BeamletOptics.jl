@@ -18,7 +18,21 @@ end
 """
     AbstractSphericalSurfaceSDF{T} <: AbstractSDF{T}
 
-An abstract type for SDF-based volumes which represent spherical lens surfaces, i.e. convex or concave.
+An abstract type for SDF-based volumes which represent spherical lens surfaces, i.e. [`ConvexSphericalSurfaceSDF`](@ref) or [`ConcaveSphericalSurfaceSDF`](@ref).
+
+# Implementation reqs.
+
+Subtypes of `AbstractSphericalSurfaceSDF` should implement all supertype reqs. as well as the following:
+
+## Fields:
+
+- `radius`: the radius of curvature
+- `diameter`: the lens outer diameter
+- `sag`: the lens sagitta
+
+## Lens construction
+
+It is intended that practical lens shapes are constructed from `AbstractSphericalSurfaceSDF`s using the [`UnionSDF`](@ref) type. 
 """
 abstract type AbstractSphericalSurfaceSDF{T} <: AbstractRotationallySymmetricLensSDF{T} end
 
@@ -31,6 +45,19 @@ radius(s::AbstractSphericalSurfaceSDF) = s.radius
 """Returns the lens diameter of the `AbstractSphericalSurfaceSDF`"""
 diameter(s::AbstractSphericalSurfaceSDF) = s.diameter
 
+"""
+    ConcaveSphericalSurfaceSDF
+
+[`AbstractSDF`](@ref)-based representation of a concave spherical lens surface.
+When constructed, it is assumed that the plano-surface lies at the origin and the optical axis is aligned with the `y`-axis.
+The concave surface is orientated towards negative y-values for `R > 0` and vice versa.
+
+## Fields:
+
+- `radius`: the radius of curvature of the convex spherical surface.
+- `diameter`: the outer diameter of the lens surface
+- `sag`: the sagitta of the opposing convex shape
+"""
 mutable struct ConcaveSphericalSurfaceSDF{T} <: AbstractSphericalSurfaceSDF{T}
     dir::SMatrix{3, 3, T, 9}
     transposed_dir::SMatrix{3, 3, T, 9}
@@ -40,15 +67,20 @@ mutable struct ConcaveSphericalSurfaceSDF{T} <: AbstractSphericalSurfaceSDF{T}
     sag::T
 end
 
-function ConcaveSphericalSurfaceSDF(r::R, d::D) where {R, D}
+"""
+    ConcaveSphericalSurfaceSDF(radius, diameter)
+
+Constructs a [`ConcaveSphericalSurfaceSDF`](@ref) with a specific `radius` of curvature and lens outer `diameter`.
+"""
+function ConcaveSphericalSurfaceSDF(radius::R, diameter::D) where {R, D}
     T = promote_type(R, D)
-    check_sag(r, d)
-    s = sag(r, d)
+    check_sag(radius, diameter)
+    s = sag(radius, diameter)
     return ConcaveSphericalSurfaceSDF{T}(
         Matrix{T}(I, 3, 3),
         Matrix{T}(I, 3, 3),
         Point3{T}(0),
-        r, d, s
+        radius, diameter, s
     )
 end
 
@@ -65,6 +97,20 @@ function sdf(css::ConcaveSphericalSurfaceSDF, point)
     return max(sdf1, -sdf2)
 end
 
+"""
+    ConvexSphericalSurfaceSDF
+
+[`AbstractSDF`](@ref)-based representation of a convex spherical lens surface.
+When constructed, it is assumed that the plano-surface lies at the origin and the optical axis is aligned with the `y`-axis.
+The convex surface is orientated towards negative y-values for `R > 0` and vice versa.
+
+## Fields:
+
+- `radius`: the radius of curvature of the concave spherical surface.
+- `diameter`: the outer diameter of the lens surface
+- `sag`: the sagitta of the convex shape
+- `height`: the sphere cutoff height, see also [`CutSphereSDF`](@ref)
+"""
 mutable struct ConvexSphericalSurfaceSDF{T} <: AbstractSphericalSurfaceSDF{T}
     dir::SMatrix{3, 3, T, 9}
     transposed_dir::SMatrix{3, 3, T, 9}
@@ -75,6 +121,11 @@ mutable struct ConvexSphericalSurfaceSDF{T} <: AbstractSphericalSurfaceSDF{T}
     height::T
 end
 
+"""
+    ConvexSphericalSurfaceSDF(radius, diameter)
+
+Constructs a [`ConvexSphericalSurfaceSDF`](@ref) with a specific `radius` of curvature and lens outer `diameter`.
+"""
 function ConvexSphericalSurfaceSDF(radius::R, diameter::D) where {R, D}
     T = promote_type(R, D)
     check_sag(radius, diameter)

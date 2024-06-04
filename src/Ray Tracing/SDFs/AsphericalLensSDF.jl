@@ -1,7 +1,7 @@
 abstract type AbstractAsphericalSurfaceSDF{T} <: AbstractRotationallySymmetricLensSDF{T} end
 
 """
-    ConvexAsphericalSurfaceSDF(r1, r2, l, d=1inch)
+    ConvexAsphericalSurfaceSDF
 
 Constructs an aspheric lens with a convex-like surface according to ISO10110.
 
@@ -31,7 +31,7 @@ function ConvexAsphericalSurfaceSDF(coefficients::Vector{T}, radius::T, conic_co
 end
 
 """
-    ConcaveAsphericalSurfaceSDF(r1, r2, l, d=1inch)
+    ConcaveAsphericalSurfaceSDF
 
 Constructs an aspheric lens with a concave-like surface according to ISO10110.
 
