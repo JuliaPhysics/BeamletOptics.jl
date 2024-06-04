@@ -1083,9 +1083,9 @@ end
 
     @testset "Testing propagation correctness" begin
         # Analytical result using complex q factor
-        q(q0::Complex, M::Matrix) = (M[1] * q0 + M[3]) / (M[2] * q0 + M[4])
-        R(q::Complex) = real(1 / q)
-        w(q::Complex, λ, n = 1) = sqrt(-λ / (π * n * imag(1 / q)))
+        q_ana(q0::Complex, M::Matrix) = (M[1] * q0 + M[3]) / (M[2] * q0 + M[4])
+        R_ana(q::Complex) = real(1 / q)
+        w_ana(q::Complex, λ, n = 1) = sqrt(-λ / (π * n * imag(1 / q)))
         propagate_ABCD(d) = [1 d; 0 1]
         lensmaker_ABCD(f) = [1 0; -1/f 1]
         # Beam parameters
@@ -1107,14 +1107,14 @@ end
         # Propagate using ABCD formalism
         q0 = 0 + zr * im
         for i in 1:length(ys)
-            w_analytical[i] = w(q0, λ)
-            R_analytical[i] = R(q0)
+            w_analytical[i] = w_ana(q0, λ)
+            R_analytical[i] = R_ana(q0)
             # catch first lens
             if i * dy == lens_y_location
-                q0 = q(q0, lensmaker_ABCD(f))
+                q0 = q_ana(q0, lensmaker_ABCD(f))
                 continue
             end
-            q0 = q(q0, propagate_ABCD(dy))
+            q0 = q_ana(q0, propagate_ABCD(dy))
         end
 
         # Numerical result

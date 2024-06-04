@@ -25,6 +25,12 @@ abstract type AbstractSphericalSurfaceSDF{T} <: AbstractRotationallySymmetricLen
 """Returns the sagitta of the `AbstractSphericalSurfaceSDF`"""
 sag(s::AbstractSphericalSurfaceSDF) = s.sag
 
+"""Returns the radius of curvature of the `AbstractSphericalSurfaceSDF`"""
+radius(s::AbstractSphericalSurfaceSDF) = s.radius
+
+"""Returns the lens diameter of the `AbstractSphericalSurfaceSDF`"""
+diameter(s::AbstractSphericalSurfaceSDF) = s.diameter
+
 mutable struct ConcaveSphericalSurfaceSDF{T} <: AbstractSphericalSurfaceSDF{T}
     dir::SMatrix{3, 3, T, 9}
     transposed_dir::SMatrix{3, 3, T, 9}
@@ -51,11 +57,11 @@ function sdf(css::ConcaveSphericalSurfaceSDF, point)
     # cylinder sdf
     ps = p + Point3(0, sag(css)/2, 0)
     d = abs.(Point2(norm(Point2(ps[1], ps[3])), ps[2])) -
-        Point2(css.diameter/2, sag(css)/2)
+        Point2(diameter(css)/2, sag(css)/2)
     sdf1 = min(maximum(d), 0) + norm(max.(d, 0))
     # sphere sdf
-    ps = p + Point3(0, css.radius, 0)
-    sdf2 = norm(ps) - css.radius
+    ps = p + Point3(0, radius(css), 0)
+    sdf2 = norm(ps) - radius(css)
     return max(sdf1, -sdf2)
 end
 
@@ -64,39 +70,39 @@ mutable struct ConvexSphericalSurfaceSDF{T} <: AbstractSphericalSurfaceSDF{T}
     transposed_dir::SMatrix{3, 3, T, 9}
     pos::Point3{T}
     radius::T
-    height::T
-    w::T
+    diameter::T
     sag::T
+    height::T
 end
 
 function ConvexSphericalSurfaceSDF(radius::R, diameter::D) where {R, D}
     T = promote_type(R, D)
     check_sag(radius, diameter)
     _sag = sag(radius, diameter)
-    cutoff_height = radius - _sag 
-    w = sqrt(radius^2 - cutoff_height^2)
+    cutoff_height = radius - _sag
     return ConvexSphericalSurfaceSDF{T}(
         Matrix{T}(I, 3, 3),
         Matrix{T}(I, 3, 3),
         zeros(T, 3),
         radius,
-        cutoff_height,
-        w,
-        _sag)
+        diameter,
+        _sag,
+        cutoff_height
+    )
 end
 
 function sdf(css::ConvexSphericalSurfaceSDF, point)
     p = _world_to_sdf(css, point)
     # -p[2] to align surface with neg. y-axis
     q = Point2(norm(Point2(p[1], p[3])), -p[2] + css.height)
-    s = max((css.height - css.radius) * q[1]^2 + css.w^2 * (css.height + css.radius - 2 * q[2]),
-        css.height * q[1] - css.w * q[2])
+    s = max((css.height - radius(css)) * q[1]^2 + (diameter(css)/2)^2 * (css.height + radius(css) - 2 * q[2]),
+        css.height * q[1] - diameter(css)/2 * q[2])
     if s < 0
-        return norm(q) - css.radius
-    elseif q[1] < css.w
+        return norm(q) - radius(css)
+    elseif q[1] < diameter(css)/2
         return css.height - q[2]
     else
-        return norm(q - Point2(css.w, css.height))
+        return norm(q - Point2(diameter(css)/2, css.height))
     end
 end
 
@@ -289,16 +295,39 @@ function ConvexConcaveLensSDF(r1::R1, r2::R2, l::L, d::D, md::MD) where {R1, R2,
 end
 
 function render_object!(axis, css::ConcaveSphericalSurfaceSDF; color=:white)
-    radius = css.diameter/2
+    _radius = diameter(css)/2
     v = LinRange(0, 2π, 100)
-    r = LinRange(1e-12, 1, 100) .^ (1/2) * radius
+    r = LinRange(1e-12, 1, 100) .^ (1/2) * _radius
     # Calculate beam surface at origin along y-axis, swap w and u
-    y = sqrt.(css.radius^2 .- r.^2) .- css.radius
+    y = sqrt.(radius(css)^2 .- r.^2) .- radius(css)
     u = y
     w = collect(r)
     # Close conture
     push!(u, 0) # push!(u, 0, 0)
-    push!(w, radius) # push!(w, radius, 1e-12)
+    push!(w, _radius) # push!(w, radius, 1e-12)
+    X = [w[i] * cos(v) for (i, u) in enumerate(u), v in v]
+    Y = [u for u in u, v in v]
+    Z = [w[i] * sin(v) for (i, u) in enumerate(u), v in v]
+    # Transform into global coords
+    R = css.dir
+    P = css.pos
+    Xt = R[1, 1] * X + R[1, 2] * Y + R[1, 3] * Z .+ P[1]
+    Yt = R[2, 1] * X + R[2, 2] * Y + R[2, 3] * Z .+ P[2]
+    Zt = R[3, 1] * X + R[3, 2] * Y + R[3, 3] * Z .+ P[3]
+    render_surface!(axis, Xt, Yt, Zt; transparency = true, colormap = [color, color])
+    return nothing
+end
+
+function render_object!(axis, css::ConvexSphericalSurfaceSDF; color=:white)
+    v = LinRange(0, 2π, 100)
+    r = LinRange(1e-12, 1, 100) .^ (1/2) * diameter(css)/2
+    # Calculate beam surface at origin along y-axis, swap w and u
+    y = -(sqrt.(radius(css)^2 .- r.^2) .- radius(css) .+ sag(css))
+    u = y
+    w = collect(r)
+    # Close conture
+    # push!(u, 0)
+    # push!(w, 1e-12)
     X = [w[i] * cos(v) for (i, u) in enumerate(u), v in v]
     Y = [u for u in u, v in v]
     Z = [w[i] * sin(v) for (i, u) in enumerate(u), v in v]
