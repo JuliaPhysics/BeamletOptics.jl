@@ -1,4 +1,4 @@
-abstract type AbstractAsphericalSurfaceSDF{T} <: AbstractRotationallySymmetricLensSDF{T} end
+abstract type AbstractAsphericalSurfaceSDF{T} <: AbstractRotationallySymmetricSDF{T} end
 
 """
     ConvexAsphericalSurfaceSDF

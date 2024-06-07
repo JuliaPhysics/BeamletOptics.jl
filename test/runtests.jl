@@ -838,6 +838,7 @@ end
         R2 = 1
         nl = 1.5
         tl = SCDI.ThinLensSDF(R1, R2, 0.1)
+        SCDI.translate3d!(tl, [0, -SCDI.thickness(tl)/2, 0])
         p = SCDI.Lens(tl, x -> 1.5)
         system = SCDI.System(p)
 
@@ -864,34 +865,36 @@ end
 
     @testset "Testing lens constructor" begin
         # Test against Thorlab spherical lenses
-        r1 = r2 = 34.9e-3
+        r1 = 34.9e-3
+        r2 = -r1
         l = 6.8e-3
-        LB1811 = SCDI.BiConvexLensSDF(r1, r2, l)
-        lens = SCDI.SphericalLens(r1, r2, l)
-        @test typeof(SCDI.shape(lens)) == typeof(LB1811)
-        r1 = 15.5e-3
-        r2 = Inf
+        LB1811 = SCDI.SphericalLens(r1, r2, l)
+        @test typeof(SCDI.shape(LB1811)) <: SCDI.UnionSDF
+        @test SCDI.thickness(SCDI.shape(LB1811)) == l
+        r1 = Inf
+        r2 = -15.5e-3
         l = 8.6e-3
-        LA1805 = SCDI.PlanoConvexLensSDF(r1, l)
-        lens = SCDI.SphericalLens(r1, r2, l)
-        @test typeof(SCDI.shape(lens)) == typeof(LA1805)
-        r1 = r2 = 52.0e-3
+        LA1805 = SCDI.SphericalLens(r1, r2, l)
+        @test typeof(SCDI.shape(LA1805)) <: SCDI.UnionSDF
+        @test SCDI.thickness(SCDI.shape(LA1805)) == l
+        r1 = -52.0e-3
+        r2 = -r1
         l = 3e-3
-        LD1464 = SCDI.BiConcaveLensSDF(r1, r2, l)
-        lens = SCDI.SphericalLens(-r1, -r2, l)
-        @test typeof(SCDI.shape(lens)) == typeof(LD1464)
-        r1 = 25.7e-3
-        r2 = Inf
+        LD1464 = SCDI.SphericalLens(r1, r2, l)
+        @test typeof(SCDI.shape(LD1464)) <: SCDI.UnionSDF
+        @test SCDI.thickness(SCDI.shape(LD1464)) == l
+        r1 = Inf
+        r2 = 25.7e-3
         l = 3.5e-3
-        LC1715 = SCDI.PlanoConcaveLensSDF(r1, l)
-        lens = SCDI.SphericalLens(-r1, r2, l)
-        @test typeof(SCDI.shape(lens)) == typeof(LC1715)
-        r1 = 32.1e-3
-        r2 = 82.2e-3
+        LC1715 = SCDI.SphericalLens(r1, r2, l)
+        @test typeof(SCDI.shape(LC1715)) <: SCDI.UnionSDF
+        @test SCDI.thickness(SCDI.shape(LC1715)) == l
+        r1 = -82.2e-3
+        r2 = -32.1e-3
         l = 3.6e-3
-        LE1234 = SCDI.ConvexConcaveLensSDF(r1, r2, l)
-        lens = SCDI.SphericalLens(r1, -r2, l)
-        @test typeof(SCDI.shape(lens)) == typeof(LE1234)
+        LE1234 = SCDI.SphericalLens(r1, r2, l)
+        @test typeof(SCDI.shape(LE1234)) <: SCDI.UnionSDF
+        @test SCDI.thickness(SCDI.shape(LE1234)) == l
     end
 
     @testset "Testing spherical lens SDFs" begin
@@ -906,21 +909,27 @@ end
             error("Coma dz=$dz larger than atol=$atol")
         end
         # Based on https://www.pencilofrays.com/double-gauss-sonnar-comparison/
-        l1 = SCDI.SphericalLens(48.88e-3, -182.96e-3, 8.89e-3, 52.3e-3, λ -> 1.62286)
+        l1 = SCDI.SphericalLens(48.88e-3, 182.96e-3, 8.89e-3, 52.3e-3, λ -> 1.62286)
         l2 = SCDI.SphericalLens(36.92e-3, Inf, 15.11e-3, 45.11e-3, λ -> 1.58565)
-        l3 = SCDI.SphericalLens(-23.06e-3, Inf, 2.31e-3, 45.11e-3, λ -> 1.67764)
+        l3 = SCDI.SphericalLens(Inf, 23.06e-3, 2.31e-3, 45.11e-3, λ -> 1.67764)
         l4 = SCDI.SphericalLens(-23.91e-3, Inf, 1.92e-3, 40.01e-3, λ -> 1.57046)
-        l5 = SCDI.SphericalLens(36.92e-3, Inf, 7.77e-3, 40.01e-3, λ -> 1.64128)
-        l6 = SCDI.SphericalLens(48.88e-3, 1063.24e-3, 6.73e-3, 45.11e-3, λ -> 1.62286)
-        SCDI.zrotate3d!(l4, π)
-        SCDI.zrotate3d!(l5, π)
-        SCDI.zrotate3d!(l6, π)
-        SCDI.translate3d!(l1, [0, -9.3873e-4, 0])
-        SCDI.translate3d!(l2, [0, 11.495e-3, 0])
-        SCDI.translate3d!(l3, [0, 16.361e-3, 0])
-        SCDI.translate3d!(l4, [0, 40.975e-3, 0])
-        SCDI.translate3d!(l5, [0, 42.876e-3, 0])
-        SCDI.translate3d!(l6, [0, 50.813e-3, 0])
+        l5 = SCDI.SphericalLens(Inf, -36.92e-3, 7.77e-3, 40.01e-3, λ -> 1.64128)
+        l6 = SCDI.SphericalLens(1063.24e-3, -48.88e-3, 6.73e-3, 45.11e-3, λ -> 1.62286)
+        # Calculate translation distances
+        δy = 1e-7
+        l_2 = SCDI.thickness(l1.shape) + 0.38e-3
+        l_3 = l_2 + SCDI.thickness(l2.shape) + δy
+        l_4 = l_3 + SCDI.thickness(l3.shape) + 9.14e-3 + 13.36e-3
+        l_5 = l_4 + SCDI.thickness(l4.shape) + δy
+        l_6 = l_5 + SCDI.thickness(l5.shape) + 0.38e-3
+        # Corresponds to back focal length of f=59.21 mm on y-axis from link above + "error" δf
+        δf = 7e-4
+        f_z = l_6 + SCDI.thickness(l6.shape) + 58.21e-3 + δf  
+        SCDI.translate3d!(l2, [0, l_2, 0])
+        SCDI.translate3d!(l3, [0, l_3, 0])
+        SCDI.translate3d!(l4, [0, l_4, 0])
+        SCDI.translate3d!(l5, [0, l_5, 0])
+        SCDI.translate3d!(l6, [0, l_6, 0])
         # Create and move group - this tests a bunch of kinematic correctness
         double_gauss = SCDI.ObjectGroup([l1, l2, l3, l4, l5, l6])
         SCDI.translate3d!(double_gauss, [0.05, 0.05, 0.05])
@@ -930,12 +939,11 @@ end
         # Test against back focal length as per source above
         dir = SCDI.orientation(double_gauss)[:, 2] # rotated collimated ray direction
         pos = SCDI.position(l1) - 0.05 * dir # rotated collimated ray position
-        λ = 486.0 # nm
-        f_z = 0.11602585097812582 + 0.0006 # corresponds to back focal length of f=59.21 mm on y-axis from link above
         f0 = SCDI.position(l1) + f_z * dir # global focal point coords
         nv = SCDI.normal3d(dir) # orthogonal to moved system optical axis
         zs = -0.02:1e-3:0.02
         # Define beam
+        λ = 486.0e-9
         beam = SCDI.Beam(SCDI.Ray(pos, dir, λ))
         for (i, z) in enumerate(zs)
             # use retracing by manipulating beam starting pos

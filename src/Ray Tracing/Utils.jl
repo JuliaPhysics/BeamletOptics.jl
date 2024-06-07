@@ -295,3 +295,19 @@ function fresnel_coefficients(θ::AbstractArray{T}, n::Number) where T
 end
 
 is_internally_reflected(rp::Number, rs::Number) = isapprox(abs2(rs), 1, atol=1e-6) && isapprox(abs2(rp), 1, atol=1e-6)
+
+
+"""
+    sag(r::Real, l::Real)
+
+Calculates the sag of a cut circle with radius `r` and chord length `l`
+"""
+sag(r::Real, l::Real) = r - sqrt(r^2 - 0.25 * l^2)
+
+function check_sag(r, d)
+    if abs(2r) < d 
+        throw(ArgumentError("Radius of curvature (r = $(r)) must be ≥ than half the diameter (d = $(d)) or an illegal shape results!"))
+    else
+        return nothing
+    end
+end

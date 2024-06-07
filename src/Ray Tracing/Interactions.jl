@@ -192,40 +192,23 @@ Creates a spherical [`Lens`](@ref) based on:
 - `r2`: back radius
 - `l`: lens thickness
 - `d`: lens diameter, default is one inch
-- `n`: refractive index as a function of λ
+- `n`: refractive index as a function of λ, i.e. `n = n(λ)`
 
-# Surface types
+# Notes
 
-- `r1/2 > 0`: convex
-- `r1/2 < 0`: concave
-- `r2 = Inf`: planar
+!!! info "Radius of curvature (ROC) sign"
+    The ROC is defined to be positive if the center is to the right of the surface. Otherwise it is negative.
 
-# Hint: thin lenses
-
-If `l` is set to zero, an ideal thin [`SphericalLens`](@ref) will be created. However, note that the actual lens thickness will be different from zero.
+!!! info "Thin lenses"
+    If `l` is set to zero, a [`ThinLens`](@ref) will be created. However, note that the actual lens thickness will be different from zero.
 """
 function SphericalLens(r1::Real, r2::Real, l::Real, d::Real = 1inch, n::Function = λ -> 1.5)
-    # # Test for thin lens
+    # Test for thin lens
     if iszero(l)
-        shape = ThinLensSDF(r1, r2, d)
-    elseif isinf(r1) && isinf(r2)# Test for cylinder lens. FIXME: This is incomplete!
-        shape = CylinderSDF(d / 2, l / 2)
-    elseif isinf(r2) # Test for plano lens
-        if r1 > 0
-            shape = PlanoConvexLensSDF(r1, l, d)
-        elseif r1 < 0
-            shape = PlanoConcaveLensSDF(abs(r1), l, d)
-        end
-    elseif r1 > 0 && r2 > 0 # Test for bi-convex/concave or meniscus
-        shape = BiConvexLensSDF(r1, r2, l, d)
-    elseif r1 < 0 && r2 < 0
-        shape = BiConcaveLensSDF(abs(r1), abs(r2), l, d)
-    elseif r1 > 0 && r2 < 0
-        shape = ConvexConcaveLensSDF(r1, abs(r2), l, d)
-    else
-        throw(DomainError("Could not find suitable lens SDF for the given parameters"))
+        return ThinLens(r1, r2, d, n)
     end
     # Create lens
+    shape = SphericalLensShapeConstructor(r1, r2, l, d)
     return Lens(shape, n)
 end
 

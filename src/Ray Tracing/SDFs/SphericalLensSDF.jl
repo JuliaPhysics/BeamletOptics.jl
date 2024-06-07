@@ -1,18 +1,56 @@
-abstract type AbstractRotationallySymmetricLensSDF{T} <: AbstractSDF{T} end
-
 """
-    sag(r::Real, l::Real)
+    AbstractRotationallySymmetricSDF
 
-Calculates the sag of a cut circle with radius `r` and chord length `l`
+A class of [`AbstractSDF`](@ref)s that can be used to represent rotationally symmetric lens surfaces.
+It is implicity assumed that all surfaces are represented by **closed volumes** for ray-tracing correctness.
+
+# Implementation reqs.
+
+Subtypes of `AbstractRotationallySymmetricSDF` must implement the following:
+
+## Functions:
+
+- `thickness`: this function returns the material thickness of the element along its symmetry axis
+- `diameter`: this function returns the outer diameter of the element
+
+!!! note "Shape orientation"
+    For easy compatibility between subtypes, the follwing requirements should be fulfilled:
+    1. Symmetry axis aligned onto the y-axis
+    2. Surface contour aligned towards negative y-values
+    3. Surface point with `min(y)` should satisfy `min(y) = 0` on the symmetry axis
 """
-sag(r::Real, l::Real) = r - sqrt(r^2 - 0.25 * l^2)
+abstract type AbstractRotationallySymmetricSDF{T} <: AbstractSDF{T} end
 
-function check_sag(r, d)
-    if abs(2r) < d 
-        throw(ArgumentError("Radius of curvature (r = $(r)) must be ≥ than half the diameter (d = $(d)) or an illegal shape results!"))
-    else
-        return nothing
-    end
+"""Returns the outer bounding diameter of the `AbstractRotationallySymmetricSDF`"""
+diameter(s::AbstractRotationallySymmetricSDF) = s.diameter
+
+"""Returns the on-axis thickness of the `AbstractRotationallySymmetricSDF`"""
+thickness(s::AbstractRotationallySymmetricSDF) = s.thickness
+
+mutable struct PlanoSurfaceSDF{T} <: AbstractRotationallySymmetricSDF{T}
+    dir::SMatrix{3, 3, T, 9}
+    transposed_dir::SMatrix{3, 3, T, 9}
+    pos::Point3{T}
+    thickness::T
+    diameter::T
+end
+
+function PlanoSurfaceSDF(thickness::T, diameter::D) where {T, D}
+    F = promote_type(T, D)
+    return PlanoSurfaceSDF{F}(
+        Matrix{T}(I, 3, 3),
+        Matrix{T}(I, 3, 3),
+        Point3{T}(0),
+        thickness,
+        diameter
+    )
+end
+
+function sdf(ps::PlanoSurfaceSDF, point)
+    p = _world_to_sdf(ps, point)
+    d = abs.(Point2(norm(Point2(p[1], p[3])), p[2] - thickness(ps)/2)) -
+        Point2(diameter(ps)/2, thickness(ps)/2)
+    return min(maximum(d), 0) + norm(max.(d, 0))
 end
 
 """
@@ -34,16 +72,13 @@ Subtypes of `AbstractSphericalSurfaceSDF` should implement all supertype reqs. a
 
 It is intended that practical lens shapes are constructed from `AbstractSphericalSurfaceSDF`s using the [`UnionSDF`](@ref) type. 
 """
-abstract type AbstractSphericalSurfaceSDF{T} <: AbstractRotationallySymmetricLensSDF{T} end
+abstract type AbstractSphericalSurfaceSDF{T} <: AbstractRotationallySymmetricSDF{T} end
 
 """Returns the sagitta of the `AbstractSphericalSurfaceSDF`"""
 sag(s::AbstractSphericalSurfaceSDF) = s.sag
 
 """Returns the radius of curvature of the `AbstractSphericalSurfaceSDF`"""
 radius(s::AbstractSphericalSurfaceSDF) = s.radius
-
-"""Returns the lens diameter of the `AbstractSphericalSurfaceSDF`"""
-diameter(s::AbstractSphericalSurfaceSDF) = s.diameter
 
 """
     ConcaveSphericalSurfaceSDF
@@ -66,6 +101,8 @@ mutable struct ConcaveSphericalSurfaceSDF{T} <: AbstractSphericalSurfaceSDF{T}
     diameter::T
     sag::T
 end
+
+thickness(::ConcaveSphericalSurfaceSDF) = 0
 
 """
     ConcaveSphericalSurfaceSDF(radius, diameter)
@@ -121,6 +158,8 @@ mutable struct ConvexSphericalSurfaceSDF{T} <: AbstractSphericalSurfaceSDF{T}
     height::T
 end
 
+thickness(css::ConvexSphericalSurfaceSDF) = sag(css)
+
 """
     ConvexSphericalSurfaceSDF(radius, diameter)
 
@@ -145,7 +184,7 @@ end
 function sdf(css::ConvexSphericalSurfaceSDF, point)
     p = _world_to_sdf(css, point)
     # -p[2] to align surface with neg. y-axis
-    q = Point2(norm(Point2(p[1], p[3])), -p[2] + css.height)
+    q = Point2(norm(Point2(p[1], p[3])), -p[2] + radius(css))
     s = max((css.height - radius(css)) * q[1]^2 + (diameter(css)/2)^2 * (css.height + radius(css) - 2 * q[2]),
         css.height * q[1] - diameter(css)/2 * q[2])
     if s < 0
@@ -169,12 +208,11 @@ Constructs a bi-convex thin lens SDF-based shape with:
 The spherical surfaces are constructed flush.
 """
 function ThinLensSDF(r1::L, r2::M, d::O = 1inch) where {L, M, O}
-    check_sag(r1, d)
-    check_sag(r2, d)
     # Create lens halves
     front = ConvexSphericalSurfaceSDF(r1, d)
     back = ConvexSphericalSurfaceSDF(r2, d)
     # Rotate and move back cut sphere
+    translate3d!(back, [0, thickness(front) + thickness(back), 0])
     zrotate3d!(back, π)
     return (front + back)
 end
@@ -200,11 +238,11 @@ function BiConvexLensSDF(r1::L, r2::M, l::N, d::O = 1inch) where {L, M, N, O}
     l = l - (s1 + s2)
     front = ConvexSphericalSurfaceSDF(r1, d)
     back = ConvexSphericalSurfaceSDF(r2, d)
-    mid = CylinderSDF(d / 2, l / 2)
+    mid = PlanoSurfaceSDF(l, d)
     # Shift and rotate elements into position
-    translate3d!(front, [0, -l / 2, 0])
+    translate3d!(mid, [0, thickness(front), 0])
     zrotate3d!(back, π)
-    translate3d!(back, [0, l / 2, 0])
+    translate3d!(back, [0, thickness(front) + thickness(mid) + thickness(back), 0])
     return (front + mid + back)
 end
 
@@ -212,11 +250,10 @@ function BiConcaveLensSDF(r1::L, r2::M, l::N, d::O = 1inch) where {L, M, N, O}
     # create segments
     front = ConcaveSphericalSurfaceSDF(r1, d)
     back = ConcaveSphericalSurfaceSDF(r2, d)
-    mid = CylinderSDF(d / 2, l / 2)
+    mid = PlanoSurfaceSDF(l, d)
     # Shift and rotate subtraction spheres into position
-    translate3d!(front, [0, -l / 2, 0])
     zrotate3d!(back, π)
-    translate3d!(back, [0, l / 2, 0])
+    translate3d!(back, [0, thickness(mid), 0])
     return (front + mid + back)
 end
 
@@ -240,8 +277,9 @@ function BiConcaveLensSDF(r1::L, r2::M, l::N, d::O, md::MD) where {L, M, N, O, M
     # generate ring-less shape
     shape = BiConcaveLensSDF(r1, r2, l, d)
     # add an outer ring
-    l += sag(shape.sdfs[1]) + sag(shape.sdfs[3])
-    ring = RingSDF(d/2, (md - d) / 2, l)
+    l0 = l + sag(shape.sdfs[1]) + sag(shape.sdfs[3])
+    ring = RingSDF(d/2, (md - d) / 2, l0)
+    translate3d!(ring, [0, l/2, 0])
     shape += ring
     return shape
 end
@@ -262,18 +300,18 @@ function PlanoConvexLensSDF(r::R, l::L, d::D = 1inch) where {R, L, D}
     # Calculate length of cylindrical section
     l = l - _sag
     front = ConvexSphericalSurfaceSDF(r, d)
-    back = CylinderSDF(d / 2, l / 2)
+    back = PlanoSurfaceSDF(l, d)
     # Shift and rotate cut spheres into position
-    translate3d!(front, [0, -l / 2, 0])
+    translate3d!(back, [0, thickness(front), 0])
     return (front + back)
 end
 
 function PlanoConcaveLensSDF(r::R, l::L, d::D = 1inch) where {R, L, D}
-    front = CylinderSDF(d / 2, l / 2)
+    front = PlanoSurfaceSDF(l, d)
     back = ConcaveSphericalSurfaceSDF(r, d)
     # Shift and rotate elements into position
     zrotate3d!(back, π)
-    translate3d!(back, [0, l / 2, 0])
+    translate3d!(back, [0, thickness(front), 0])
     return (front + back)
 end
 
@@ -300,7 +338,7 @@ function PlanoConcaveLensSDF(r::R, l::L, d::D, md::MD) where {R, L, D, MD}
     _sag = sag(shape.sdfs[2])
     _l = l + _sag
     ring = RingSDF(d/2, (md - d) / 2, _l)
-    translate3d!(ring, [0, l/2, 0])
+    translate3d!(ring, [0, _l/2, 0])
     shape += ring
     return shape
 end
@@ -311,10 +349,10 @@ function ConvexConcaveLensSDF(r1::R1, r2::R2, l::L, d::D = 1inch) where {R1, R2,
     back = ConcaveSphericalSurfaceSDF(r2, d)
     # Calculate length of cylindrical section
     _l = l - sag(front)
-    mid = CylinderSDF(d / 2, _l / 2)
+    mid = PlanoSurfaceSDF(l, d)
     # Move elements into position
-    translate3d!(front, [0, -_l / 2, 0])
-    translate3d!(back, [0, _l / 2, 0])
+    translate3d!(mid, [0, thickness(front), 0])
+    translate3d!(back, [0, thickness(front) + thickness(mid), 0])
     zrotate3d!(back, π)
     return (front + mid + back)
 end
@@ -373,7 +411,7 @@ function render_object!(axis, css::ConvexSphericalSurfaceSDF; color=:white)
     v = LinRange(0, 2π, 100)
     r = LinRange(1e-12, 1, 100) .^ (1/2) * diameter(css)/2
     # Calculate beam surface at origin along y-axis, swap w and u
-    y = -(sqrt.(radius(css)^2 .- r.^2) .- radius(css) .+ sag(css))
+    y = -(sqrt.(radius(css)^2 .- r.^2) .- radius(css))
     u = y
     w = collect(r)
     # Close conture
@@ -390,4 +428,45 @@ function render_object!(axis, css::ConvexSphericalSurfaceSDF; color=:white)
     Zt = R[3, 1] * X + R[3, 2] * Y + R[3, 3] * Z .+ P[3]
     render_surface!(axis, Xt, Yt, Zt; transparency = true, colormap = [color, color])
     return nothing
+end
+
+function SphericalLensShapeConstructor(r1, r2, l, d)
+    # length tracking variable
+    l0 = l
+    # determine front shape
+    if isinf(r1)
+        front = nothing
+    elseif r1 > 0
+        front = SCDI.ConvexSphericalSurfaceSDF(r1, d)
+        l0 -= SCDI.sag(front) 
+    else
+        front = SCDI.ConcaveSphericalSurfaceSDF(abs(r1), d)
+    end    
+    #determine back shape
+    if isinf(r2)
+        back = nothing
+    elseif r2 > 0
+        back = SCDI.ConcaveSphericalSurfaceSDF(r2, d)
+        SCDI.zrotate3d!(back, π)
+    else
+        back = SCDI.ConvexSphericalSurfaceSDF(abs(r2), d)
+        SCDI.zrotate3d!(back, π)
+        l0 -= SCDI.sag(back) 
+    end
+    # test if cylinder is legal 
+    if l0 ≤ 0
+        throw(ArgumentError("Lens parameters lead to cylinder section length of ≤ 0, use ThinLens instead."))
+    end
+    # design plano-plano surface, add spherical parts
+    mid = SCDI.PlanoSurfaceSDF(l0, d)
+    if !isnothing(front)
+        SCDI.translate3d!(mid, [0, SCDI.thickness(front), 0])
+        mid += front
+    end
+    if !isnothing(back)
+        SCDI.translate3d!(back, [0,  SCDI.thickness(mid) + SCDI.thickness(back), 0])
+        mid += back
+    end
+    # return shape
+    return mid
 end
