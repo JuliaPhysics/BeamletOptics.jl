@@ -26,13 +26,7 @@ mutable struct UnionSDF{T, TT <: Tuple} <: AbstractSDF{T}
     sdfs::TT
 end
 
-function thickness(u::UnionSDF)
-    t = 0
-    for sdf in u.sdfs
-        t += thickness(sdf)
-    end
-    return t
-end
+thickness(u::UnionSDF) = sum(thickness, u.sdfs)
 
 function UnionSDF{T}(sdfs::Vararg{AbstractSDF{T}, N}) where {T, N}
     UnionSDF{T, typeof(sdfs)}(

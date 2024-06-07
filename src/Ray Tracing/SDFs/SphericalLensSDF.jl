@@ -70,7 +70,7 @@ Subtypes of `AbstractSphericalSurfaceSDF` should implement all supertype reqs. a
 
 ## Lens construction
 
-It is intended that practical lens shapes are constructed from `AbstractSphericalSurfaceSDF`s using the [`UnionSDF`](@ref) type. 
+It is intended that practical lens shapes are constructed from `AbstractSphericalSurfaceSDF`s using the [`UnionSDF`](@ref) type.
 """
 abstract type AbstractSphericalSurfaceSDF{T} <: AbstractRotationallySymmetricSDF{T} end
 
@@ -102,7 +102,7 @@ mutable struct ConcaveSphericalSurfaceSDF{T} <: AbstractSphericalSurfaceSDF{T}
     sag::T
 end
 
-thickness(::ConcaveSphericalSurfaceSDF) = 0
+thickness(::ConcaveSphericalSurfaceSDF{T}) where T = zero(T)
 
 """
     ConcaveSphericalSurfaceSDF(radius, diameter)
@@ -438,10 +438,10 @@ function SphericalLensShapeConstructor(r1, r2, l, d)
         front = nothing
     elseif r1 > 0
         front = SCDI.ConvexSphericalSurfaceSDF(r1, d)
-        l0 -= SCDI.sag(front) 
+        l0 -= SCDI.sag(front)
     else
         front = SCDI.ConcaveSphericalSurfaceSDF(abs(r1), d)
-    end    
+    end
     #determine back shape
     if isinf(r2)
         back = nothing
@@ -451,9 +451,9 @@ function SphericalLensShapeConstructor(r1, r2, l, d)
     else
         back = SCDI.ConvexSphericalSurfaceSDF(abs(r2), d)
         SCDI.zrotate3d!(back, π)
-        l0 -= SCDI.sag(back) 
+        l0 -= SCDI.sag(back)
     end
-    # test if cylinder is legal 
+    # test if cylinder is legal
     if l0 ≤ 0
         throw(ArgumentError("Lens parameters lead to cylinder section length of ≤ 0, use ThinLens instead."))
     end
