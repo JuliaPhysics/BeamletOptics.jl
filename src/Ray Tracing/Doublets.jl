@@ -9,7 +9,7 @@ end
 Generates a two-component "cemented" doublet lens consisting of two spherical lenses.
 For radii sign definition, refer to the [`SphericalLens`](@ref) constructor.
 
-# Arguments 
+# Arguments
 
 - `r1`: radius of curvature for first surface
 - `r2`: radius of curvature for second (cemented) surface
@@ -30,32 +30,18 @@ function SphericalDoubletLens(r1, r2, r3, l1, l2, d, n1, n2)
 end
 
 function intersect3d(dl::DoubletLens, ray::AbstractRay)
-    # This code is stupid but whatever...
-    i_f = intersect3d(dl.front.shape, ray)
-    i_b = intersect3d(dl.back.shape, ray)
-    # Test if doublet is missed entirely
-    if isnothing(i_f) & isnothing(i_b)
-        return nothing
-    end
-    # Test if only front part is hit
-    if isnothing(i_b)
-        object!(i_f, dl)
-        return i_f
-    end
-    # Test if only back part is hit
+    i_f, i_b = intersect3d(dl.front.shape, ray), intersect3d(dl.back.shape, ray)
+
+    # Determine which intersections are valid and handle accordingly
     if isnothing(i_f)
-        object!(i_b, dl)
-        return i_b
-    end
-    # If both parts are hit, return closest intersection
-    if length(i_f) < length(i_b)
-        object!(i_f, dl)
-        return i_f
+        return isnothing(i_b) ? nothing : (object!(i_b, dl); i_b)
+    elseif isnothing(i_b)
+        return (object!(i_f, dl); i_f)
     else
-        object!(i_b, dl)
-        return i_b
+        closest_intersection = length(i_f) < length(i_b) ? i_f : i_b
+        object!(closest_intersection, dl)
+        return closest_intersection
     end
-    return nothing
 end
 
 function interact3d(system::AbstractSystem, dl::DoubletLens, beam::Beam{T, R}, ray::R) where {T <: Real, R <: Ray{T}}
@@ -68,7 +54,7 @@ function interact3d(system::AbstractSystem, dl::DoubletLens, beam::Beam{T, R}, r
         hint = Hint(dl, dl.front.shape)
     end
     return BeamInteraction(hint, i.ray)
-end 
+end
 
 function translate3d!(dl::DoubletLens, offset)
     translate3d!(dl.front, offset)
