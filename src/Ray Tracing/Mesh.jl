@@ -158,9 +158,14 @@ end
 Returns a vector with unit length that is perpendicular to the target `face`` according to
 the right-hand rule. The vertices must be listed row-wise within the face matrix.
 """
-function normal3d(object::AbstractMesh, fID::Int)
-    face = vertices(object)[faces(object)[fID, :], :]
-    n = cross((face[2, :] - face[1, :]), (face[3, :] - face[1, :]))
+function normal3d(object::AbstractMesh{T}, fID::Int) where{T}
+    @views begin
+        face = vertices(object)[faces(object)[fID, :], :]
+        n = cross(
+            (Point3{T}(face[2, :]) - Point3{T}(face[1, :])),
+            (Point3{T}(face[3, :]) - Point3{T}(face[1, :]))
+        )
+    end
     return normalize(n)
 end
 
@@ -238,7 +243,6 @@ function intersect3d(shape::AbstractMesh{M},
         return Intersection(t0, normalize(T.(normal)), shape)
     end
 end
-
 
 ## A collection of mesh constructors
 

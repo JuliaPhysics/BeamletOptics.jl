@@ -28,6 +28,9 @@ abstract type AbstractBeam{T <: Real, R <: AbstractRay{T}} end
 AbstractTrees.NodeType(::Type{<:AbstractBeam{T, R}}) where {T, R} = HasNodeType()
 AbstractTrees.nodetype(beamtype::Type{<:AbstractBeam{T, R}}) where {T, R} = beamtype
 
+Base.IteratorEltype(::Type{<:TreeIterator{<:AbstractBeam}}) = Base.HasEltype()
+Base.eltype(::Type{<:TreeIterator{T}}) where {T <: AbstractBeam} = T
+
 AbstractTrees.parent(beam::AbstractBeam) = beam.parent
 parent!(beam::B, parent::B) where {B <: AbstractBeam} = (beam.parent = parent)
 

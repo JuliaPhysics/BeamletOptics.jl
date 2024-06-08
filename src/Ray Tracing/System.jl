@@ -100,7 +100,7 @@ An optional [`Hint`](@ref) can be provided to test against a specific object (an
 
 !!! warning
     If a hint is provided and the object intersection is valid, the intersection will be returned immediately.
-    However, it is not guaranteed that this is the true closest intersection. 
+    However, it is not guaranteed that this is the true closest intersection.
 """
 @inline function tracing_step!(system::AbstractSystem, ray::AbstractRay{R}, hint::Hint) where {R <: Real}
     # Test against hinted object
@@ -123,7 +123,7 @@ Trace a [`Beam`](@ref) through an optical `system`. Maximum number of tracing st
 # Tracing logic
 
 The intersection of the last ray of the `beam` with any objects in the `system` is tested.
-If an object is hit, the optical interaction is analyzed and tracing continues. 
+If an object is hit, the optical interaction is analyzed and tracing continues.
 Else the tracing procedure is stopped.
 
 # Arguments
@@ -202,9 +202,9 @@ end
 
 Trace a [`GaussianBeamlet`](@ref) through an optical `system`. Maximum number of tracing steps can be capped by `r_max`.
 
-# Tracing logic 
+# Tracing logic
 
-The chief, waist and divergence beams are traced step-by-step through the `system`. 
+The chief, waist and divergence beams are traced step-by-step through the `system`.
 For each intersection after a [`tracing_step!`](@ref), the intersections are compared.
 If all rays hit the same target, the optical interaction is analyzed, else the tracing stops.
 
@@ -337,12 +337,11 @@ A maximum number of rays per `beam` (`r_max`) can be specified in order to avoid
 - `r_max::Int=20` (optional): Maximum number of tracing iterations for each leaf. Default is 100.
 - `retrace::Bool=true` (optional): Flag to indicate if the system should be retraced. Default is true.
 """
-function solve_system!(system::AbstractSystem, beam::AbstractBeam; r_max = 100, retrace = true)
-    B = nodetype(beam)
+function solve_system!(system::AbstractSystem, beam::B; r_max = 100, retrace = true) where {B <: AbstractBeam}
     # Retrace system, use stateless iterator for appendability
     if retrace
         for node::B in StatelessBFS(beam)
-            retrace_system!(system, node::B)
+            retrace_system!(system, node)
         end
     end
     # Trace starting of each leaf in beam tree
