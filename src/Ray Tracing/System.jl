@@ -338,20 +338,27 @@ A maximum number of rays per `beam` (`r_max`) can be specified in order to avoid
 - `retrace::Bool=true` (optional): Flag to indicate if the system should be retraced. Default is true.
 """
 function solve_system!(system::AbstractSystem, beam::B; r_max = 100, retrace = true) where {B <: AbstractBeam}
-    # Retrace system, use stateless iterator for appendability
+    # Initialize a reusable queue for breadth-first searches
+    queue = B[]
+    # Retrace system, use stateful iterator for appendability
     if retrace
-        for node::B in StatelessBFS(beam)
-            retrace_system!(system, node)
-        end
+        push!(queue, beam)
+        stateful_bfs(beam, x->retrace_system!(system, x), queue)
     end
     # Trace starting of each leaf in beam tree
-    for leaf::B in Leaves(beam)
-        for beam::B in StatelessBFS(leaf)
-            if isnothing(_last_beam_intersection(beam))
-                trace_system!(system, beam, r_max = r_max)
-            end
-        end
+    stateful_dfs_leaves(beam, leaf->begin
+        empty!(queue)
+        push!(queue, leaf)
+        stateful_bfs(leaf, x->solve_leaf!(system, x; r_max), queue)
+    end)
+    return nothing
+end
+
+function solve_leaf!(system::AbstractSystem, beam::AbstractBeam; r_max = 100)
+    if isnothing(_last_beam_intersection(beam))
+        trace_system!(system, beam, r_max = r_max)
     end
+
     return nothing
 end
 

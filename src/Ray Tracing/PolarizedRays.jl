@@ -5,7 +5,7 @@ A ray type to model the propagation of an electric field vector based on the pub
 
 **Yun, Garam, Karlton Crabtree, and Russell A. Chipman. "Three-dimensional polarization ray-tracing calculus I: definition and diattenuation." Applied optics 50.18 (2011): 2855-2865.**
 
-The geometrical ray description is identical to the standard [`Ray`](@ref). The polarization interaction can be described in local s-p-coordinates 
+The geometrical ray description is identical to the standard [`Ray`](@ref). The polarization interaction can be described in local s-p-coordinates
 but must be transformed into global coordinates using the method described in the publication above, see also [`_calculate_global_E0`](@ref).
 
 # Fields
@@ -19,7 +19,7 @@ but must be transformed into global coordinates using the method described in th
 
 # Jones matrices
 
-In local coordinates the Jones matrices in the case of reflection/refraction are defined as 
+In local coordinates the Jones matrices in the case of reflection/refraction are defined as
 
 - reflection: [-rₛ 0; 0 rₚ]
 - transmission: [tₛ 0; 0 tₚ]
@@ -58,7 +58,7 @@ function PolarizedRay(pos::AbstractArray{P},
     F = promote_type(P, D)
     # Test if E0 is orthogonal to dir. of propagation
     if !isapprox(dot(dir, E0), 0, atol=1e-14)
-        error("Ray dir. and E0 must be orthogonal (n=$(dot(dir, E0)))")
+        error(lazy"Ray dir. and E0 must be orthogonal (n=$(dot(dir, E0)))")
     end
     return PolarizedRay{F}(
         Point3{F}(pos),

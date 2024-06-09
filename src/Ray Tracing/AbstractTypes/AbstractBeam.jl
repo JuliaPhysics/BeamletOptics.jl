@@ -25,12 +25,10 @@ Subtypes of `AbstractBeam` must implement the following:
 """
 abstract type AbstractBeam{T <: Real, R <: AbstractRay{T}} end
 
-AbstractTrees.NodeType(::Type{<:AbstractBeam{T, R}}) where {T, R} = HasNodeType()
-AbstractTrees.nodetype(beamtype::Type{<:AbstractBeam{T, R}}) where {T, R} = beamtype
+AbstractTrees.NodeType(::Type{T}) where {T <: AbstractBeam} = HasNodeType()
+AbstractTrees.nodetype(::Type{T}) where {T <: AbstractBeam} = T
 
-Base.IteratorEltype(::Type{<:TreeIterator{<:AbstractBeam}}) = Base.HasEltype()
-Base.eltype(::Type{<:TreeIterator{T}}) where {T <: AbstractBeam} = T
-
+AbstractTrees.ParentLinks(::Type{<:AbstractBeam}) = AbstractTrees.StoredParents()
 AbstractTrees.parent(beam::AbstractBeam) = beam.parent
 parent!(beam::B, parent::B) where {B <: AbstractBeam} = (beam.parent = parent)
 
@@ -80,9 +78,9 @@ end
 _drop_beams!(b::B) where {B <: AbstractBeam} = (b.children = Vector{B}())
 
 function _modify_beam_head!(::B, ::B) where {B <: AbstractBeam}
-    error("_modify_beam_head not implemented for $B")
+    throw(ArgumentError(lazy"_modify_beam_head not implemented for $B"))
 end
 
 function _last_beam_intersection(::B) where {B <: AbstractBeam}
-    error("_last_beam_intersection not implemented for $B")
+    throw(ArgumentError(lazy"_last_beam_intersection not implemented for $B"))
 end

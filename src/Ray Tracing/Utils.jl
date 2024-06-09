@@ -305,9 +305,52 @@ Calculates the sag of a cut circle with radius `r` and chord length `l`
 sag(r::Real, l::Real) = r - sqrt(r^2 - 0.25 * l^2)
 
 function check_sag(r, d)
-    if abs(2r) < d 
+    if abs(2r) < d
         throw(ArgumentError("Radius of curvature (r = $(r)) must be ≥ than half the diameter (d = $(d)) or an illegal shape results!"))
     else
         return nothing
     end
+end
+
+"""
+    stateful_bfs(root::T, visitor::Function, queue=T[root]) where {T}
+
+Provides a stateful breadth-first search over the tree defined by the `root` element
+and applies the function `visitor` to each element of the tree.
+
+This is a type-stable alternative to `AbstractTrees.StatelessBFS` with only allocations for the `queue` itself.
+"""
+function stateful_bfs(root::T, visitor::Function, queue=T[root]) where {T}
+    while !isempty(queue)
+        node = popfirst!(queue)  # Dequeue the first node
+        visitor(node)  # Process the node using the visitor function
+        append!(queue, children(node))  # Enqueue the children
+    end
+
+    return nothing
+end
+
+"""
+    stateful_dfs_leaves(root::T, visitor::Function, stack=T[root]) where {T}
+
+Provides a stateful depth-first search over the tree defined by the `root` element
+and applies the function `visitor` to **all leaves** of the tree.
+
+This is a type-stable alternative to `AbstractTrees.Leaves` with only allocations for the `stack` itself.
+"""
+function stateful_dfs_leaves(root::T, visitor::Function, stack=T[root]) where {T}
+    while !isempty(stack)
+        node = pop!(stack)  # Pop the top node from the stack
+        if isempty(children(node))  # Check if the node is a leaf
+            visitor(node)
+        else
+            # Push children onto the stack in reverse order
+            _children = children(node)
+            for child in Iterators.reverse(_children)
+                push!(stack, child)
+            end
+        end
+    end
+
+    return nothing
 end
