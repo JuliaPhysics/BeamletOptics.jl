@@ -15,7 +15,7 @@ function interact3d(::AbstractSystem,
         ::AbstractReflectiveOptic,
         ::Beam{T, R},
         ray::R) where {T <: Real, R <: Ray{T}}
-    normal = intersection(ray).n
+    normal = normal3d(intersection(ray))
     npos = position(ray) + length(ray) * direction(ray)
     ndir = reflection3d(direction(ray), normal)
     return BeamInteraction{T, R}(nothing,

@@ -10,11 +10,11 @@ Stores data calculated by the [`intersect3d`](@ref) method. This information can
 - `t`: length of the ray parametrization in [m]
 - `n`: normal vector at the point of intersection
 """
-mutable struct Intersection
+mutable struct Intersection{T}
     object::Nullable{AbstractObject}
     shape::Nullable{AbstractShape}
-    t::Float64
-    n::Point3{Float64}
+    t::T
+    n::Point3{T}
 end
 
 function Intersection(t::T, n::AbstractArray{T}) where {T}

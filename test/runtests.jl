@@ -924,7 +924,7 @@ end
         l_6 = l_5 + SCDI.thickness(l5.shape) + 0.38e-3
         # Corresponds to back focal length of f=59.21 mm on y-axis from link above + "error" δf
         δf = 7e-4
-        f_z = l_6 + SCDI.thickness(l6.shape) + 58.21e-3 + δf  
+        f_z = l_6 + SCDI.thickness(l6.shape) + 58.21e-3 + δf
         SCDI.translate3d!(l2, [0, l_2, 0])
         SCDI.translate3d!(l3, [0, l_3, 0])
         SCDI.translate3d!(l4, [0, l_4, 0])
@@ -1363,33 +1363,33 @@ end
         l0 = 0.1 # m
         w0 = 0.5e-3
         λ = 1064e-9
-        
+
         bs = SCDI.ThinBeamSplitter(10e-3);
         pd_1 = SCDI.Photodetector(10e-3, 100);
         pd_2 = SCDI.Photodetector(10e-3, 100);
-        
+
         SCDI.zrotate3d!(bs, deg2rad(45))
         SCDI.translate3d!(pd_1, [0, l0, 0])
         SCDI.zrotate3d!(pd_1, deg2rad(180))
-        
+
         SCDI.translate3d!(pd_2, [l0, 0, 0])
         SCDI.zrotate3d!(pd_2, deg2rad(90))
-        
+
         # add BS and PD orientation error
         SCDI.zrotate3d!(bs, deg2rad(0.017))
         SCDI.zrotate3d!(pd_1, deg2rad(10))
         SCDI.xrotate3d!(pd_1, deg2rad(15))
-        
+
         # define system and beams -> solve
         system = SCDI.System([bs, pd_1, pd_2]);
-        
+
         phis = LinRange(0, 2pi, 25)
         p1 = similar(phis)
         p2 = similar(phis)
 
         l1 = SCDI.GaussianBeamlet(SCDI.Ray([0, -l0, 0], [0, 1., 0]), λ, w0; P0);
         l2 = SCDI.GaussianBeamlet(SCDI.Ray([-l0, 0, 0], [1., 0, 0]), λ, w0; P0);
-        
+
         E0_buffer = l1.E0
 
         for (i, phi) in enumerate(phis)
@@ -1403,7 +1403,7 @@ end
             p2[i] = SCDI.optical_power(pd_2)
             # Test power conservation
             @test p1[i] + p2[i] - 2P0 < 1e-4 # W
-        end 
+        end
     end
 end
 
