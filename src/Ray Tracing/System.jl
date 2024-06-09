@@ -223,16 +223,21 @@ function trace_system!(system::AbstractSystem,
         # Trace chief ray first
         ray = last(rays(gauss.chief))
         tracing_step!(system, ray, hint(interaction))
-        if isnothing(intersection(ray))
-            break
-        end
+        isnothing(intersection(ray)) && break
+
         # Follow up with waist and divergence ray
         obj_c = object(intersection(ray))
         ray = last(rays(gauss.waist))
         tracing_step!(system, ray, hint(interaction))
+        # if the waist ray is no longer hitting the same object as the chief ray stop here
+        isnothing(intersection(ray)) && break
+
         obj_w = object(intersection(ray))
         ray = last(rays(gauss.divergence))
         tracing_step!(system, ray, hint(interaction))
+        # if the divergence ray is no longer hitting the same object as the chief ray stop here
+        isnothing(intersection(ray)) && break
+
         obj_d = object(intersection(ray))
         # If beams do not hit same target stop tracing
         if !(obj_c === obj_w === obj_d)
