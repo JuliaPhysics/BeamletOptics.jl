@@ -1263,7 +1263,7 @@ end
         ln = SCDI.ThinLens(R1, R2, d, nl)
         SCDI.translate3d!(pd_l, [0, z, 0])
         SCDI.translate3d!(pd_s, [0, z, 0])
-        SCDI.translate3d!(ln, [0, z - f, 0])
+        SCDI.translate3d!(ln, [0, z - f - SCDI.thickness(ln.shape)/2, 0])
 
         @testset "Testing fringe pattern" begin
             system = SCDI.System(pd_l)
