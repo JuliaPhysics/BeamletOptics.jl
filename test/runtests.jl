@@ -897,17 +897,19 @@ end
         @test SCDI.thickness(SCDI.shape(LE1234)) == l
     end
 
-    @testset "Testing spherical lens SDFs" begin
-        """Test coma for rotated and translated optical system"""
-        function test_coma(ray::SCDI.AbstractRay, f0::AbstractArray, dir::AbstractArray; atol=7e-5)
-            is = SCDI.intersect3d(f0, dir, ray)
-            p0 = SCDI.position(ray) + length(is) * SCDI.direction(ray)
-            dz = norm(p0 - f0)
-            if dz ≤ atol
-                return true
-            end
-            error("Coma dz=$dz larger than atol=$atol")
+    """Test coma for rotated and translated optical system"""
+    function test_coma(ray::SCDI.AbstractRay, f0::AbstractArray, dir::AbstractArray; atol=7e-5)
+        is = SCDI.intersect3d(f0, dir, ray)
+        p0 = SCDI.position(ray) + length(is) * SCDI.direction(ray)
+        dz = norm(p0 - f0)
+        if dz ≤ atol
+            return true
+        else
+            return error("Coma dz=$dz larger than atol=$atol")
         end
+    end
+
+    @testset "Testing spherical lens SDFs" begin
         # Based on https://www.pencilofrays.com/double-gauss-sonnar-comparison/
         l1 = SCDI.SphericalLens(48.88e-3, 182.96e-3, 8.89e-3, 52.3e-3, λ -> 1.62286)
         l2 = SCDI.SphericalLens(36.92e-3, Inf, 15.11e-3, 45.11e-3, λ -> 1.58565)
@@ -954,6 +956,78 @@ end
             # Test coma at focal point
             @test test_coma(last(SCDI.rays(beam)), f0, dir, atol=7e-5)
         end
+    end
+
+    @testset "Testing doublet lenses" begin
+        # Define refractive index functions
+        function NLAK22(λ)
+            if λ ≈ 488e-9
+                return 1.6591
+            end
+            if λ ≈ 707e-9
+                return 1.6456
+            end
+            if λ ≈ 1064e-9
+                return 1.6374
+            end
+            error("No matching ref. index data for λ = $λ")
+        end
+        
+        function NSF10(λ)
+            if λ ≈ 488e-9
+                return 1.7460
+            end
+            if λ ≈ 707e-9
+                return 1.7168
+            end
+            if λ ≈ 1064e-9
+                return 1.7021
+            end
+            error("No matching ref. index data for λ = $λ")
+        end
+
+        SCDI.thickness(dl::SCDI.DoubletLens) = SCDI.thickness(SCDI.shape(dl.front)) + SCDI.thickness(SCDI.shape(dl.back))
+
+        function test_doublet(λ, bfl, δf)
+            # Thorlabs lens from https://www.thorlabs.com/thorproduct.cfm?partnumber=AC254-150-AB
+            AC254_150_AB = SCDI.SphericalDoubletLens(87.9e-3, -105.6e-3, Inf, 6e-3, 3e-3, SCDI.inch, NLAK22, NSF10)
+            # Rptate and translate to test lens kinematics
+            SCDI.translate3d!(AC254_150_AB, [0.05, 0.05, 0.05])
+            SCDI.xrotate3d!(AC254_150_AB, deg2rad(-60))
+            SCDI.zrotate3d!(AC254_150_AB, deg2rad(45))
+            # Define system
+            system = SCDI.System([AC254_150_AB])
+            # Define semi-diameter for lens ray bundle, selected for min. spherical aberrations
+            z0 = 5e-3
+            zs = LinRange(-z0, z0, 30)        
+            fs = similar(zs)
+            # Beam spawn point 
+            dir = -SCDI.orientation(AC254_150_AB.back.shape)[:,2]       # rotated collimated ray direction
+            pos = SCDI.position(AC254_150_AB.front.shape) + 0.05 * dir  # rotated collimated ray position
+            nv = SCDI.normal3d(dir)                                     # orthogonal to moved system optical axis
+            beam = SCDI.Beam(pos, -dir, λ)
+            # Calculate equivalent back focal length point
+            f_z = SCDI.thickness(AC254_150_AB) + bfl + δf
+            f0 = SCDI.position(AC254_150_AB.front.shape) + f_z * -dir        
+            for (i, z) in enumerate(zs)
+                beam.rays[1].pos = pos + z*nv
+                SCDI.solve_system!(system, beam)
+                @test length(SCDI.rays(beam)) == 4
+                @test SCDI.refractive_index.(beam.rays) == [1, NLAK22(λ), NSF10(λ), 1]
+                fs[i] = test_coma(last(SCDI.rays(beam)), f0, dir, atol=1e-6)
+            end
+            # Test center ray normal vectors
+            beam.rays[1].pos = pos + 0*nv
+            SCDI.solve_system!(system, beam)
+            for i = 1:length(beam.rays)-1
+                @test abs(dot(beam.rays[i].intersection.n, beam.rays[i].dir)) ≈ 1
+            end
+            return true
+        end
+        # Run tests for AC254_150_AB against plot data at https://www.thorlabs.com/newgrouppage9.cfm?objectgroup_id=12767
+        @test test_doublet(488e-9,  143.68e-3, -2.064e-4)
+        @test test_doublet(707e-9,  143.68e-3, 0)
+        @test test_doublet(1064e-9, 143.68e-3, +7.466e-4)        
     end
 end
 
@@ -1189,7 +1263,7 @@ end
         ln = SCDI.ThinLens(R1, R2, d, nl)
         SCDI.translate3d!(pd_l, [0, z, 0])
         SCDI.translate3d!(pd_s, [0, z, 0])
-        SCDI.translate3d!(ln, [0, z - f, 0])
+        SCDI.translate3d!(ln, [0, z - f - SCDI.thickness(ln.shape)/2, 0])
 
         @testset "Testing fringe pattern" begin
             system = SCDI.System(pd_l)
