@@ -14,7 +14,7 @@ Mutable struct to store ray information.
 mutable struct Ray{T} <: AbstractRay{T}
     pos::Point3{T}
     dir::Point3{T}
-    intersection::Nullable{<:Intersection{T}}
+    intersection::Nullable{Intersection{T}}
     λ::T
     n::T
 end

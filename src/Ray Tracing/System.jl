@@ -54,11 +54,11 @@ function retrace_system!(::AbstractSystem, beam::B) where {B <: AbstractBeam}
     return nothing
 end
 
-@inline function trace_all(system::AbstractSystem, ray::AbstractRay)
-    intersection::Nullable{Intersection} = nothing
-    for object in objects(system)
+@inline function trace_all(system::AbstractSystem, ray::AbstractRay{R}) where {R}
+    intersection::Nullable{Intersection{R}} = nothing
+    for object::AbstractObject in objects(system)
         # Find shortest intersection
-        temp::Nullable{Intersection} = intersect3d(object, ray)
+        temp::Nullable{Intersection{R}} = intersect3d(object, ray)
         # Ignore miss
         if isnothing(temp)
             continue
@@ -78,7 +78,7 @@ end
 
 @inline function trace_one(system::AbstractSystem, ray::AbstractRay{R}, hint::Hint) where {R}
     # Trace against hinted object
-    intersection = intersect3d(shape(hint), ray)
+    intersection::Nullable{Intersection{R}} = intersect3d(shape(hint)::AbstractShape{R}, ray)
     if isnothing(intersection)
         # If hinted object is not intersected, trace the entire system
         intersection = trace_all(system, ray)
@@ -281,7 +281,7 @@ function retrace_system!(system::AbstractSystem, gauss::GaussianBeamlet{T}) wher
         w_ray = rays(gauss.waist)[i]
         d_ray = rays(gauss.divergence)[i]
         obj = object(intersection(c_ray))
-        shp = shape(intersection(c_ray))
+        shp::Union{Nothing, AbstractShape{T}} = shape(intersection(c_ray))
         intersect_c = intersect3d(shp, c_ray)
         intersect_w = intersect3d(shp, w_ray)
         intersect_d = intersect3d(shp, d_ray)
