@@ -21,7 +21,7 @@ function Intersection(t::T, n::AbstractArray{T}) where {T}
     return Intersection(nothing, nothing, t, Point3{T}(n))
 end
 
-function Intersection(t::T, n::AbstractArray{T}, shape::Nullable{AbstractShape{T}}) where {T}
+function Intersection(t::T, n::AbstractArray{T}, shape::Nullable{AbstractShape}) where {T}
     return Intersection(nothing, shape, t, Point3{T}(n))
 end
 
