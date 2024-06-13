@@ -18,7 +18,7 @@ Subtypes of `AbstractBeam` must implement the following:
 """
 abstract type AbstractSystem end
 
-refractive_index(::AbstractSystem) = 1.0
+refractive_index(::AbstractSystem, λ::Real) = 1.0
 
 """
     interact3d(::AbstractSystem, object::AbstractObject, ::AbstractBeam)
@@ -35,7 +35,7 @@ end
 """
     Hint
 
-A `Hint` can be passed as part of an [`AbstractInteraction`](@ref) and will inform the tracing algorithm about which [`AbstractObject`](@ref) 
+A `Hint` can be passed as part of an [`AbstractInteraction`](@ref) and will inform the tracing algorithm about which [`AbstractObject`](@ref)
 in the [`AbstractSystem`](@ref) will be hit next. The hint does not need to result in a guaranteed [`Intersection`](@ref).
 
 # Fields

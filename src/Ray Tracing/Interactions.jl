@@ -92,7 +92,7 @@ function interact3d(system::AbstractSystem,
     else
         # Exiting optic
         n1 = refractive_index(optic, lambda)
-        n2 = refractive_index(system)
+        n2 = refractive_index(system, lambda)
         hint = nothing
         # Flip normal for refraction3d
         normal = -normal
@@ -130,7 +130,7 @@ function interact3d(system::AbstractSystem, optic::AbstractRefractiveOptic,
     else
         # Exiting optic
         n1 = refractive_index(optic, lambda)
-        n2 = refractive_index(system)
+        n2 = refractive_index(system, lambda)
         hint = nothing
         # Flip normal for refraction3d
         normal = -normal
