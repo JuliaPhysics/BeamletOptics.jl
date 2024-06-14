@@ -25,7 +25,7 @@ function SquarePlanoMirror(width::W, thickness::T) where {W<:Real,T<:Real}
     return RectangularPlanoMirror(width, width, thickness)
 end
 
-struct ReflectiveCube{S <: AbstractShape} <: AbstractReflectiveOptic
+struct ReflectiveCube{T, S <: AbstractShape{T}} <: AbstractReflectiveOptic
     shape::S
 end
 
@@ -45,7 +45,7 @@ function RetroMesh(scale::Real; T = Float64)
         scale)
 end
 
-struct RetroReflector{S <: AbstractShape} <: AbstractReflectiveOptic
+struct RetroReflector{T, S <: AbstractShape{T}} <: AbstractReflectiveOptic
     shape::S
 end
 

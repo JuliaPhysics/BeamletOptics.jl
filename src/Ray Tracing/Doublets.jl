@@ -1,6 +1,7 @@
-struct DoubletLens{T, F<:AbstractShape{T}, B<:AbstractShape{T}} <: AbstractRefractiveOptic{T}
-    front::Lens{F}
-    back::Lens{B}
+abstract type AbstractDoubletRefractiveOptic{F1 <: Function, F2 <: Function} <: AbstractRefractiveOptic{F1} end
+struct DoubletLens{T, F<:AbstractShape{T}, B<:AbstractShape{T}, F1, F2} <: AbstractDoubletRefractiveOptic{F1, F2}
+    front::Lens{F, F1}
+    back::Lens{B, F2}
 end
 
 """
