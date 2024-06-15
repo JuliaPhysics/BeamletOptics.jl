@@ -29,11 +29,11 @@ shape(object::AbstractObject) = object.shape
 
 "Enforces that `object` has to have the field `pos` or implement `position()`."
 position(object::AbstractObject) = position(shape(object))
-position!(object::AbstractObject) = position!(shape(object))
+position!(object::AbstractObject, pos) = position!(shape(object), pos)
 
 "Enforces that `object` has to have the field `dir` or implement `orientation()`."
 orientation(object::AbstractObject) = orientation(shape(object))
-orientation!(object::AbstractObject) = orientation!(shape(object))
+orientation!(object::AbstractObject, dir) = orientation!(shape(object), dir)
 
 translate3d!(object::AbstractObject, offset) = translate3d!(shape(object), offset)
 
