@@ -4,7 +4,7 @@
 
 A generic type to represent `AbstractObject`s which reflect incoming rays. The main function of `interact3d` should be akin to [`reflection3d`](@ref).
 """
-abstract type AbstractReflectiveOptic <: AbstractObject end
+abstract type AbstractReflectiveOptic{T, S <: AbstractShape{T}} <: AbstractObject{T, S} end
 
 """
     interact3d(AbstractReflectiveOptic, Ray)
@@ -48,7 +48,7 @@ end
 
 Concrete implementation of a perfect mirror with arbitrary shape.
 """
-struct Mirror{S <: AbstractShape} <: AbstractReflectiveOptic
+struct Mirror{T, S <: AbstractShape{T}} <: AbstractReflectiveOptic{T, S}
     shape::S
 end
 
@@ -65,10 +65,10 @@ Subtypes of `AbstractRefractiveOptic` should implement all supertype reqs. as we
 
 - `n::Function`: a function which returns the refractive index for a wavelength λ
 """
-abstract type AbstractRefractiveOptic{T} <: AbstractObject end
+abstract type AbstractRefractiveOptic{T, S <: AbstractShape{T}, F} <: AbstractObject{T, S} end
 
 refractive_index(object::AbstractRefractiveOptic) = object.n
-refractive_index(object::AbstractRefractiveOptic{<:Function}, λ::Real)::Float64 = object.n(λ)
+refractive_index(object::AbstractRefractiveOptic{<:Any, <:Any, <:Function}, λ::Real)::Float64 = object.n(λ)
 
 """
     interact3d(AbstractSystem, AbstractRefractiveOptic, Beam, Ray)
@@ -159,7 +159,7 @@ function interact3d(system::AbstractSystem, optic::AbstractRefractiveOptic,
 end
 
 """
-    Lens{S <: AbstractShape, T <: Function} <: AbstractRefractiveOptic{T}
+    Lens{T, S <: AbstractShape{T}, F <: Function} <: AbstractRefractiveOptic{T, S, F}
 
 Represents an uncoated `Lens` with a homogeneous refractive index `n = n(λ)`.
 Refer to the [`SphericalLens`](@ref) constructor for more information on how to generate lenses.
@@ -176,9 +176,9 @@ Refer to the [`SphericalLens`](@ref) constructor for more information on how to 
     and must be provided by the user. For testing purposes, an anonymous function, e.g. λ -> 1.5
     can be passed such that the lens has the same refractive index for all wavelengths.
 """
-struct Lens{S <: AbstractShape, T <: Function} <: AbstractRefractiveOptic{T}
+struct Lens{T, S <: AbstractShape{T}, F <: Function} <: AbstractRefractiveOptic{T, S, F}
     shape::S
-    n::T # FIXME: constructor check that n=n(λ), # args
+    n::F # FIXME: constructor check that n=n(λ), # args
 end
 
 SphericalLens(r1, r2, l, d, n) = SphericalLens(r1, r2, l, d, λ -> n)
@@ -226,12 +226,12 @@ end
 ThinLens(R1::Real, R2::Real, d::Real, n::Real) = ThinLens(R1, R2, d, x -> n)
 
 """
-    Prism{S <: AbstractShape, T <: Function} <: AbstractRefractiveOptic{T}
+    Prism{T, S <: AbstractShape{T}, F <: Function} <: AbstractRefractiveOptic{T, S, F}
 
 Essentially represents the same functionality as [`Lens`](@ref).
 Refer to its documentation.
 """
-struct Prism{S <: AbstractShape, T <: Function} <: AbstractRefractiveOptic{T}
+struct Prism{T, S <: AbstractShape{T}, F <: Function} <: AbstractRefractiveOptic{T, S, F}
     shape::S
     n::T
 end
@@ -304,10 +304,10 @@ end
 #=
 Implements photodetector, efield calculation during solve_system!
 =#
-abstract type AbstractDetector <: AbstractObject end
+abstract type AbstractDetector{T, S <: AbstractShape{T}} <: AbstractObject{T, S} end
 
 """
-    Photodetector{S <: AbstractShape, T} <: AbstractDetector
+    Photodetector{T, S <: AbstractShape{T}} <: AbstractDetector{T, S}
 
 Represents a **flat** rectangular or quadratic surface in R³ that is the active surface of a photodetector.
 The active surface is discretized in the local R² x-y-coordinate system.
@@ -330,10 +330,10 @@ Field contributions Eᵢ are added by the corresponding [`interact3d`](@ref) met
 !!! info "Supported beams"
     Currently, only the [`GaussianBeamlet`](@ref) is supported.
 """
-mutable struct Photodetector{S <: AbstractShape, T} <: AbstractDetector
+mutable struct Photodetector{T, S <: AbstractShape{T}} <: AbstractDetector{T, S}
     const shape::S
-    x::LinRange{T, Int64}
-    y::LinRange{T, Int64}
+    x::LinRange{T, Int}
+    y::LinRange{T, Int}
     field::Matrix{Complex{T}}
 end
 
@@ -342,7 +342,7 @@ function Photodetector(width::T, n::Int) where {T}
     sz = maximum(vertices(shape))
     x = y = LinRange(-sz, sz, n)
     field = zeros(Complex{T}, n, n)
-    return Photodetector{typeof(shape), T}(shape, x, y, field)
+    return Photodetector{T, typeof(shape)}(shape, x, y, field)
 end
 
 function interact3d(::AbstractSystem, ::Photodetector, ::B, ::Ray) where {B <: AbstractBeam}
@@ -408,14 +408,14 @@ Calculates the total optical power on `pd` in [W] by integration over the local 
 optical_power(pd::Photodetector) = trapz((pd.x, pd.y), intensity(pd))
 
 """Resets the values currently stored in `pd.field` to zero"""
-reset_photodetector!(pd::Photodetector{S, T}) where {S, T} = (pd.field .= zero(Complex{T}))
+reset_photodetector!(pd::Photodetector{T, S}) where {T, S} = (pd.field .= zero(Complex{T}))
 
 """
     photodetector_resolution!(pd::Photodetector, n::Int)
 
 Sets the resolution of `pd` to `n` × `n`. Note that this resets the current `pd.field`.
 """
-function photodetector_resolution!(pd::Photodetector{S, T}, n::Int) where {S, T}
+function photodetector_resolution!(pd::Photodetector{T, S}, n::Int) where {T, S}
     pd.x = LinRange(pd.x.start, pd.x.stop, n)
     pd.y = LinRange(pd.y.start, pd.y.stop, n)
     pd.field = zeros(Complex{T}, n, n)
@@ -425,10 +425,10 @@ end
 #=
 Implements thin beam splitter, beam spawning
 =#
-abstract type AbstractBeamSplitter <: AbstractObject end
+abstract type AbstractBeamSplitter{T, S <: AbstractShape{T}} <: AbstractObject{T, S} end
 
 """Models a generic beam splitter"""
-struct BeamSplitter{S <: AbstractShape, T <: Real} <: AbstractBeamSplitter
+struct BeamSplitter{T <: Real, S <: AbstractShape{T}} <: AbstractBeamSplitter{T, S}
     shape::S
     reflectance::T
     transmittance::T

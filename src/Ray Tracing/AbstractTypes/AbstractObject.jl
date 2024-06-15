@@ -23,7 +23,7 @@ Subtypes of `AbstractObject` must implement the following:
 - [`interact3d`](@ref): defines the optical interaction, should return `nothing` or an [`AbstractInteraction`](@ref)
 - for the kinematic API, all corresponding functions should be forwarded to the underlying [`AbstractShape`](@ref) i.e. `rotate3d!(shape(object))`
 """
-abstract type AbstractObject end
+abstract type AbstractObject{T, S <: AbstractShape{T}} end
 
 shape(object::AbstractObject) = object.shape
 
@@ -66,6 +66,6 @@ Subtypes of `AbstractObjectGroup` must implement the following:
 
 - for the kinematic API, all corresponding functions of [`AbstractObject`](@ref) must be implemented
 """
-abstract type AbstractObjectGroup <: AbstractObject end
+abstract type AbstractObjectGroup{T} <: AbstractObject{T, AbstractShape{T}} end
 
 AbstractTrees.children(group::AbstractObjectGroup) = group.objects
