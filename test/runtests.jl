@@ -323,8 +323,8 @@ end
         end
     end
 
-    struct TestObject <: SCDI.AbstractObject
-        shape::TestShapeless{<:Real}
+    struct TestObject{T, S <: SCDI.AbstractShape{T}} <: SCDI.AbstractObject{T, S}
+        shape::S
     end
 
     TestObject() = TestObject(TestShapeless())
@@ -641,9 +641,9 @@ end
 @testset "System" begin
     @testset "Testing implementation" begin
         struct SystemTestBeam{T} <: SCDI.AbstractBeam{T, SCDI.Ray{T}} end
-        struct SystemTestObject <: SCDI.AbstractObject end
-        o1 = SystemTestObject()
-        o2 = SystemTestObject()
+        struct SystemTestObject{T, S} <: SCDI.AbstractObject{T, S} end
+        o1 = SystemTestObject{Real, SCDI.AbstractShape{Real}}()
+        o2 = SystemTestObject{Real, SCDI.AbstractShape{Real}}()
         system = SCDI.System(o1)
         beam = SystemTestBeam{Real}()
         # Test missing implementation warnings
@@ -744,8 +744,8 @@ end
     TestPoint(position::AbstractArray{T}) where {T <: Real} = TestPoint{T}(Point3{T}(position),
         Matrix{T}(I, 3, 3))
 
-    struct GroupTestObject <: SCDI.AbstractObject
-        shape::TestPoint{<:Real}
+    struct GroupTestObject{T <: Real, S <: SCDI.AbstractShape{T}} <: SCDI.AbstractObject{T, S}
+        shape::S
     end
 
     GroupTestObject(position::AbstractArray) = GroupTestObject(TestPoint(position))
@@ -972,7 +972,7 @@ end
             end
             error("No matching ref. index data for λ = $λ")
         end
-        
+
         function NSF10(λ)
             if λ ≈ 488e-9
                 return 1.7460
@@ -999,16 +999,16 @@ end
             system = SCDI.System([AC254_150_AB])
             # Define semi-diameter for lens ray bundle, selected for min. spherical aberrations
             z0 = 5e-3
-            zs = LinRange(-z0, z0, 30)        
+            zs = LinRange(-z0, z0, 30)
             fs = similar(zs)
-            # Beam spawn point 
+            # Beam spawn point
             dir = -SCDI.orientation(AC254_150_AB.back.shape)[:,2]       # rotated collimated ray direction
             pos = SCDI.position(AC254_150_AB.front.shape) + 0.05 * dir  # rotated collimated ray position
             nv = SCDI.normal3d(dir)                                     # orthogonal to moved system optical axis
             beam = SCDI.Beam(pos, -dir, λ)
             # Calculate equivalent back focal length point
             f_z = SCDI.thickness(AC254_150_AB) + bfl + δf
-            f0 = SCDI.position(AC254_150_AB.front.shape) + f_z * -dir        
+            f0 = SCDI.position(AC254_150_AB.front.shape) + f_z * -dir
             for (i, z) in enumerate(zs)
                 beam.rays[1].pos = pos + z*nv
                 SCDI.solve_system!(system, beam)
@@ -1027,7 +1027,7 @@ end
         # Run tests for AC254_150_AB against plot data at https://www.thorlabs.com/newgrouppage9.cfm?objectgroup_id=12767
         @test test_doublet(488e-9,  143.68e-3, -2.064e-4)
         @test test_doublet(707e-9,  143.68e-3, 0)
-        @test test_doublet(1064e-9, 143.68e-3, +7.466e-4)        
+        @test test_doublet(1064e-9, 143.68e-3, +7.466e-4)
     end
 end
 
