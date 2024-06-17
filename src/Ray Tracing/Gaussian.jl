@@ -284,6 +284,8 @@ function electric_field(gauss::GaussianBeamlet, r, z)
     return electric_field(r, z, E0, w0, w, k, ψ, R)
 end
 
+optical_power(gauss::GaussianBeamlet) = intensity(electric_field(gauss)) / 2 * π * beam_waist(gauss)^2
+
 """
     isparaxial(system, gb::GaussianBeamlet, threshold=π/4)
 

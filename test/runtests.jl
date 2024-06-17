@@ -1161,6 +1161,9 @@ end
         # Compare calculate electric field at r
         @test all(isapprox.(Ea_1, En_1, atol = 1e-8))
         @test all(isapprox.(Ea_2, En_2, atol = 1e-7))
+        # Compare beam power with original value
+        @test P0 ≈ SCDI.optical_power(gauss_1)
+        @test P0 ≈ SCDI.optical_power(gauss_2)
     end
 
     @testset "Testing propagation correctness" begin
