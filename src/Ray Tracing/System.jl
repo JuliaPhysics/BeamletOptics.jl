@@ -281,7 +281,7 @@ function retrace_system!(system::AbstractSystem, gauss::GaussianBeamlet{T}) wher
         w_ray = rays(gauss.waist)[i]
         d_ray = rays(gauss.divergence)[i]
         obj = object(intersection(c_ray))
-        shp::Union{Nothing, AbstractShape{T}} = shape(intersection(c_ray))
+        shp = shape(intersection(c_ray))
         intersect_c = intersect3d(shp, c_ray)
         intersect_w = intersect3d(shp, w_ray)
         intersect_d = intersect3d(shp, d_ray)
