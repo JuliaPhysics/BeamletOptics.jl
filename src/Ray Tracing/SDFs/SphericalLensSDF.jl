@@ -257,6 +257,13 @@ function BiConcaveLensSDF(r1::L, r2::M, l::N, d::O = 1inch) where {L, M, N, O}
     return (front + mid + back)
 end
 
+function check_md(d, md)
+    if md ≤ d
+        throw(ArgumentError("Mech. diameter must be larger than lens diameter!"))
+    end
+    return nothing 
+end
+
 """
     BiConcaveLensSDF(r1, r2, l, d=1inch)
 
@@ -271,9 +278,7 @@ Constructs a bi-concave lens SDF with:
 The spherical surfaces are constructed flush with the cylinder surface.
 """
 function BiConcaveLensSDF(r1::L, r2::M, l::N, d::O, md::MD) where {L, M, N, O, MD}
-    if md ≤ d
-        throw(ArgumentError("Mech. diameter must be larger than lens diameter!"))
-    end
+    check_md(d, md)
     # generate ring-less shape
     shape = BiConcaveLensSDF(r1, r2, l, d)
     # add an outer ring
@@ -323,15 +328,12 @@ Constructs a plano-concave lens SDF with:
 - `r` > 0: front radius
 - `l`: lens thickness
 - `d`: lens diameter, default value is one inch
-- `md`: mechanical lens diameter, defaults to be identical to the lens diameter, Otherwise
-        an outer ring section will be added to the lens, if `md` > `d`.
+- `md`: mechanical lens diameter, must be > d
 
 The spherical surface is constructed flush with the cylinder surface.
 """
 function PlanoConcaveLensSDF(r::R, l::L, d::D, md::MD) where {R, L, D, MD}
-    if md ≤ d
-        throw(ArgumentError("Mech. diameter must be larger than lens diameter!"))
-    end
+    check_md(d, md)
     # generate ring-less shape
     shape = PlanoConcaveLensSDF(r, l, d)
     # add an outer ring
@@ -341,46 +343,6 @@ function PlanoConcaveLensSDF(r::R, l::L, d::D, md::MD) where {R, L, D, MD}
     translate3d!(ring, [0, _l/2, 0])
     shape += ring
     return shape
-end
-
-function ConvexConcaveLensSDF(r1::R1, r2::R2, l::L, d::D = 1inch) where {R1, R2, L, D}
-    # Create front and back surfaces
-    front = ConvexSphericalSurfaceSDF(r1, d)
-    back = ConcaveSphericalSurfaceSDF(r2, d)
-    # Calculate length of cylindrical section
-    _l = l - sag(front)
-    mid = PlanoSurfaceSDF(l, d)
-    # Move elements into position
-    translate3d!(mid, [0, thickness(front), 0])
-    translate3d!(back, [0, thickness(front) + thickness(mid), 0])
-    zrotate3d!(back, π)
-    return (front + mid + back)
-end
-
-"""
-    ConvexConcaveLensSDF(r1, r2, l, d=1inch)
-
-Constructs a positive/negative meniscus lens SDF with:
-
-- `r1` > 0: radius of convex front
-- `r2` > 0: radius of concave back
-- `l`: lens thickness
-- `d`: lens diameter, default value is one inch
-- `md`: mechanical lens diameter, defaults to be identical to the lens diameter, Otherwise
-        an outer ring section will be added to the lens, if `md` > `d`.
-
-The spherical surface is constructed flush with the cylinder surface.
-"""
-function ConvexConcaveLensSDF(r1::R1, r2::R2, l::L, d::D, md::MD) where {R1, R2, L, D, MD}
-    if md ≤ d
-        throw(ArgumentError("Mech. diameter must be larger than lens diameter!"))
-    end
-    # generate ring-less shape
-    shape = ConvexConcaveLensSDF(r1, r2, l, d)
-    _l = 2*shape.sdfs[2].height + sag(shape.sdfs[3])
-    ring = RingSDF(d/2, (md - d) / 2, _l)
-    translate3d!(ring, [0, shape.sdfs[2].height, 0])
-    return (shape + ring)
 end
 
 function render_object!(axis, css::ConcaveSphericalSurfaceSDF; color=:white)
@@ -442,7 +404,7 @@ function SphericalLensShapeConstructor(r1, r2, l, d)
     else
         front = SCDI.ConcaveSphericalSurfaceSDF(abs(r1), d)
     end
-    #determine back shape
+    # determine back shape
     if isinf(r2)
         back = nothing
     elseif r2 > 0
