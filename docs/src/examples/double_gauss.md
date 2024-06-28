@@ -6,22 +6,27 @@ This showcase is taken from the [pencilofrays.com](https://www.pencilofrays.com/
 using CairoMakie, SCDI
 
 # define spherical lenses
-l1 = SCDI.SphericalLens(48.88e-3, -182.96e-3, 8.89e-3, 52.3e-3, λ -> 1.62286)
+l1 = SCDI.SphericalLens(48.88e-3, 182.96e-3, 8.89e-3, 52.3e-3, λ -> 1.62286)
 l2 = SCDI.SphericalLens(36.92e-3, Inf, 15.11e-3, 45.11e-3, λ -> 1.58565)
-l3 = SCDI.SphericalLens(-23.06e-3, Inf, 2.31e-3, 45.11e-3, λ -> 1.67764)
+l3 = SCDI.SphericalLens(Inf, 23.06e-3, 2.31e-3, 45.11e-3, λ -> 1.67764)
 l4 = SCDI.SphericalLens(-23.91e-3, Inf, 1.92e-3, 40.01e-3, λ -> 1.57046)
-l5 = SCDI.SphericalLens(36.92e-3, Inf, 7.77e-3, 40.01e-3, λ -> 1.64128)
-l6 = SCDI.SphericalLens(48.88e-3, 1063.24e-3, 6.73e-3, 45.11e-3, λ -> 1.62286)
+l5 = SCDI.SphericalLens(Inf, -36.92e-3, 7.77e-3, 40.01e-3, λ -> 1.64128)
+l6 = SCDI.SphericalLens(1063.24e-3, -48.88e-3, 6.73e-3, 45.11e-3, λ -> 1.62286)
+
+# Calculate translation distances
+δy = 1e-7
+l_2 = SCDI.thickness(l1.shape) + 0.38e-3
+l_3 = l_2 + SCDI.thickness(l2.shape) + δy
+l_4 = l_3 + SCDI.thickness(l3.shape) + 9.14e-3 + 13.36e-3
+l_5 = l_4 + SCDI.thickness(l4.shape) + δy
+l_6 = l_5 + SCDI.thickness(l5.shape) + 0.38e-3
 
 # move elements into position
-SCDI.zrotate3d!(SCDI.shape(l1), π)
-SCDI.zrotate3d!(SCDI.shape(l2), π)
-SCDI.zrotate3d!(SCDI.shape(l4), π)
-SCDI.translate3d!(SCDI.shape(l2), [0, 11.495e-3, 0])
-SCDI.translate3d!(SCDI.shape(l3), [0, 25.491e-3, 0])
-SCDI.translate3d!(SCDI.shape(l4), [0, 35.568e-3, 0])
-SCDI.translate3d!(SCDI.shape(l5), [0, 42.876e-3, 0])
-SCDI.translate3d!(SCDI.shape(l6), [0, 50.813e-3, 0])
+SCDI.translate3d!(l2, [0, l_2, 0])
+SCDI.translate3d!(l3, [0, l_3, 0])
+SCDI.translate3d!(l4, [0, l_4, 0])
+SCDI.translate3d!(l5, [0, l_5, 0])
+SCDI.translate3d!(l6, [0, l_6, 0])
 
 system = SCDI.StaticSystem([l1, l2, l3, l4, l5, l6])
 
