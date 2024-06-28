@@ -47,31 +47,34 @@ function NBK7(λ)
     error("Ref. index for λ=$λ not available.")
 end
 
+# lens diameter 
 d = SCDI.inch
 
 # lens types
-r1 = r2 = 34.9e-3
+r1 = 34.9e-3
+r2 = -34.9e-3
 l = 6.8e-3
 LB1811 = SCDI.SphericalLens(r1, r2, l, d, NBK7)
 
-r1 = 15.5e-3
-r2 = Inf
+r1 = Inf
+r2 = -15.5e-3
 l = 8.6e-3
 LA1805 = SCDI.SphericalLens(r1, r2, l, d, NBK7)
 
-r1 = r2 = 52.0e-3
+r1 = -52e-3
+r2 = 52e-3
 l = 3e-3
-LD1464 = SCDI.SphericalLens(-r1, -r2, l, d, NBK7)
+LD1464 = SCDI.SphericalLens(r1, r2, l, d, NBK7)
 
-r1 = 25.7e-3
-r2 = Inf
+r1 = Inf
+r2 = 25.7e-3
 l = 3.5e-3
-LC1715 = SCDI.SphericalLens(-r1, r2, l, d, NBK7)
+LC1715 = SCDI.SphericalLens(r1, r2, l, d, NBK7)
 
-r1 = 32.1e-3
-r2 = 82.2e-3
+r1 = -82.2e-3
+r2 = -32.1e-3
 l = 3.6e-3
-LE1234 = SCDI.SphericalLens(r1, -r2, l, d, NBK7)
+LE1234 = SCDI.SphericalLens(r1, r2, l, d, NBK7)
 
 SCDI.translate3d!(LD1464, [0, 0*d, 0])
 SCDI.translate3d!(LB1811, [0, 1*d, 0])
