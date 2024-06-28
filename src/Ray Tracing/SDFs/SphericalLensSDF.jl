@@ -392,6 +392,22 @@ function render_object!(axis, css::ConvexSphericalSurfaceSDF; color=:white)
     return nothing
 end
 
+"""
+    SphericalLensShapeConstructor(r1, r2, l, d)
+
+Creates an [`AbstractRotationallySymmetricSDF`](@ref)-based spherical [`Lens`](@ref) shape.
+
+!!! info "Radius of curvature (ROC) sign"
+    The ROC is defined to be positive if the center is to the right of the surface. Otherwise it is negative.
+    Plano-surfaces are created through the use of `Inf`.
+
+# Input
+
+- `r1`: front radius
+- `r2`: back radius
+- `l`: lens thickness
+- `d`: lens diameter, default is one inch
+"""
 function SphericalLensShapeConstructor(r1, r2, l, d)
     # length tracking variable
     l0 = l
@@ -417,6 +433,10 @@ function SphericalLensShapeConstructor(r1, r2, l, d)
     end
     # test if cylinder is legal
     if l0 ≤ 0
+        # Catch MeniscusLensSDF
+        if sign(r1) == sign(r2)
+            return MeniscusLensSDF(r1, r2, l, d)
+        end
         throw(ArgumentError("Lens parameters lead to cylinder section length of ≤ 0, use ThinLens instead."))
     end
     # design plano-plano surface, add spherical parts

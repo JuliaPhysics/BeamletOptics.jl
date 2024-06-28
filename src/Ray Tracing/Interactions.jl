@@ -200,7 +200,7 @@ Creates a spherical [`Lens`](@ref) based on:
 
 !!! info "Radius of curvature (ROC) sign"
     The ROC is defined to be positive if the center is to the right of the surface. Otherwise it is negative.
-    To represent plano-surfaces the use of `Inf` is recommended.
+    See also [`SphericalLensShapeConstructor`](@ref).
 
 !!! info "Thin lenses"
     If `l` is set to zero, a [`ThinLens`](@ref) will be created. However, note that the actual lens thickness will be different from zero.
