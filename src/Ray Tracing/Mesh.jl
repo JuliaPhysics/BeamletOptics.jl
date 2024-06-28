@@ -278,7 +278,7 @@ end
     CuboidMesh(scale::NTuple{3, T}, θ::Real=π/2) where T<:Real
 
 Constructs the [`Mesh`](@ref) of a rectangular cuboid as per the dimensions specified in the `scale` tuple. Not that the tuple entries represent x, y and z dimensions (in that order).
-In addition, one side of the mesh can be tilted by an angle `θ` in order to generate the mesh of a rhomb, see also [`Rhombus`](@ref).
+In addition, one side of the mesh can be tilted by an angle `θ` in order to generate the mesh of a rhomb.
 The mesh is initialized such that one corner of the cuboid lies at the origin.
 
 # Arguments

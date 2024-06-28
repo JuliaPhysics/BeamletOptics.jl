@@ -23,7 +23,7 @@ refractive_index(::AbstractSystem, λ::Real) = 1.0
 """
     interact3d(::AbstractSystem, object::AbstractObject, ::AbstractBeam)
 
-Defines the optical interaction between an incoming/outgoing beam/ray of light and an optical element, must return an [`Interaction`](@ref) or `nothing`.
+Defines the optical interaction between an incoming/outgoing beam/ray of light and an optical element, must return an [`AbstractInteraction`](@ref) or `nothing`.
 The default behavior is that no interaction occurs, i.e. return of `nothing`, which should stop the system tracing procedure.
 Refer to the [`AbstractInteraction`](@ref) typedocs for more information on the return type value.
 """

@@ -3,14 +3,18 @@ using SCDI
 using Documenter
 using DocumenterCitations
 
-CairoMakie.activate!()
-
 try
-    mkdir(joinpath(@__DIR__, "src", "assets"))
-    @info "Created docs assets folder"
-catch
-    @info "Assets folder in docs already exists"
+    rm(joinpath(@__DIR__, "build"), recursive=true)
+    @info "Deleted build folder..."
+catch e
+    if isa(e, Base.IOError)
+        @info "Can't delete build folder, does not exist..."
+    else
+        rethrow(e)
+    end
 end
+
+CairoMakie.activate!()
 
 DocMeta.setdocmeta!(SCDI, :DocTestSetup, :(using SCDI); recursive=true)
 
@@ -25,6 +29,7 @@ makedocs(;
         prettyurls=get(ENV, "CI", "false") == "true",
         edit_link="main",
         assets=String[],
+        size_threshold_ignore=["reference.md"],
     ),
     pages=[
         "Home" => "index.md",
