@@ -181,6 +181,8 @@ struct Lens{T, S <: AbstractShape{T}, F <: Function} <: AbstractRefractiveOptic{
     n::F # FIXME: constructor check that n=n(λ), # args
 end
 
+thickness(l::Lens) = thickness(shape(l))
+
 SphericalLens(r1, r2, l, d, n) = SphericalLens(r1, r2, l, d, λ -> n)
 
 """

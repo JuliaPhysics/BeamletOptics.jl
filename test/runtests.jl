@@ -986,8 +986,6 @@ end
             error("No matching ref. index data for λ = $λ")
         end
 
-        SCDI.thickness(dl::SCDI.DoubletLens) = SCDI.thickness(SCDI.shape(dl.front)) + SCDI.thickness(SCDI.shape(dl.back))
-
         function test_doublet(λ, bfl, δf)
             # Thorlabs lens from https://www.thorlabs.com/thorproduct.cfm?partnumber=AC254-150-AB
             AC254_150_AB = SCDI.SphericalDoubletLens(87.9e-3, -105.6e-3, Inf, 6e-3, 3e-3, SCDI.inch, NLAK22, NSF10)

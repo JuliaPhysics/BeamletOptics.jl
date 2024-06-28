@@ -4,6 +4,8 @@ struct DoubletLens{T, F<:AbstractShape{T}, B<:AbstractShape{T}, F1, F2} <: Abstr
     back::Lens{T, B, F2}
 end
 
+thickness(dl::DoubletLens) = thickness(shape(dl.front)) + thickness(shape(dl.back))
+
 """
     SphericalDoubletLens(r1, r2, r3, l1, l2, d, n1, n2)
 
