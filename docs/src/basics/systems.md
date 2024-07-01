@@ -18,7 +18,7 @@ SCDI.solve_system!
 
 ### Tracing systems
 
-In the initial state, is is assumed that the problem consists of `objects` <: [`SCDI.AbstractObject`](@ref)s (in a system) and a `beam` <: [`SCDI.AbstractBeam`](@ref) with a defined starting position and direction. No additional information is provided, and the specific path of the beam is not known beforehand. Consequently, brute force tracing of the optical system is required, involving testing against each individual element to determine the trajectory of the beam.
+In the initial state, it is assumed that the problem consists of `objects` <: [`SCDI.AbstractObject`](@ref)s (in a system) and a `beam` <: [`SCDI.AbstractBeam`](@ref) with a defined starting position and direction. No additional information is provided, and the specific path of the beam is not known beforehand. Consequently, brute force tracing of the optical system is required, involving testing against each individual element to determine the trajectory of the beam.
 
 This non-sequential mode is comparatively safe in determining the "true" beam path, but will scale suboptimally in time-complexity with the amount of optical elements. After solving the system, the beam path is known and can be potentially reused in the future.
 
