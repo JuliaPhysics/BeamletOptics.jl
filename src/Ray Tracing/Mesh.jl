@@ -196,13 +196,13 @@ function MoellerTrumboreAlgorithm(face, ray::AbstractRay{T}; kϵ = 1e-9, lϵ = 1
     Tv = position(ray) - V1
     invDet = 1 / Det
     u = dot(Tv, Pv) * invDet
-    if (u < 0) || (u > 1)
+    if (u < 0 - eps(T)) || (u > 1 + eps(T))
         return T(Inf)
     end
     # Compute normalized v and reject if less than 0 or greater than 1
     Qv = cross(Tv, E1)
     v = dot(direction(ray), Qv) * invDet
-    if (v < 0) || (u + v > 1)
+    if (v < 0 - eps(T)) || (u + v > 1 + eps(T))
         return T(Inf)
     end
     # Compute t (type def. for t to avoid Any)
