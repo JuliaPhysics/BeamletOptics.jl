@@ -235,7 +235,7 @@ Refer to its documentation.
 """
 struct Prism{T, S <: AbstractShape{T}, F <: Function} <: AbstractRefractiveOptic{T, S, F}
     shape::S
-    n::T
+    n::F
 end
 
 #=
