@@ -1414,25 +1414,25 @@ end
         beam = SCDI.Beam(ray)
 
         @testset "x-Polarization" begin
-            SCDI.polarization!(ray, lin_x_pol)
+            SCDI.electric_field!(ray, lin_x_pol)
             # test tracing
             SCDI.solve_system!(system, beam)
-            @test SCDI.polarization(beam.rays[1]) ≈ lin_x_pol
-            @test SCDI.polarization(beam.rays[2]) ≈ [0,0,-I0_1]
-            @test SCDI.polarization(beam.rays[3]) ≈ [0,0, I0_1]
-            @test SCDI.polarization(beam.rays[4]) ≈ [0,-I0_1,0]
+            @test SCDI.electric_field(beam.rays[1]) ≈ lin_x_pol
+            @test SCDI.electric_field(beam.rays[2]) ≈ [0,0,-I0_1]
+            @test SCDI.electric_field(beam.rays[3]) ≈ [0,0, I0_1]
+            @test SCDI.electric_field(beam.rays[4]) ≈ [0,-I0_1,0]
             @test length(beam) == 6.0
         end
 
         @testset "y-Polarization" begin
-            SCDI.polarization!(ray, lin_y_pol)
+            SCDI.electric_field!(ray, lin_y_pol)
             SCDI.translate3d!(m3, [0,2,0])
             # test retracing
             SCDI.solve_system!(system, beam)
-            @test SCDI.polarization(beam.rays[1]) ≈ lin_y_pol
-            @test SCDI.polarization(beam.rays[2]) ≈ [0,-I0_2,0]
-            @test SCDI.polarization(beam.rays[3]) ≈ [ I0_2,0,0]
-            @test SCDI.polarization(beam.rays[4]) ≈ [-I0_2,0,0]
+            @test SCDI.electric_field(beam.rays[1]) ≈ lin_y_pol
+            @test SCDI.electric_field(beam.rays[2]) ≈ [0,-I0_2,0]
+            @test SCDI.electric_field(beam.rays[3]) ≈ [ I0_2,0,0]
+            @test SCDI.electric_field(beam.rays[4]) ≈ [-I0_2,0,0]
             @test length(beam) == 8.0
         end
     end
@@ -1474,8 +1474,8 @@ end
         SCDI.solve_system!(system, s_beam)
         SCDI.solve_system!(system, p_beam)
         # Since system is non-focussing, calculate pseudo-intensity
-        pseudo_Is = abs2(SCDI.polarization(last(SCDI.rays(s_beam)))[1]) / (2*SCDI.Z_vacuum)
-        pseudo_Ip = abs2(SCDI.polarization(last(SCDI.rays(p_beam)))[3]) / (2*SCDI.Z_vacuum)
+        pseudo_Is = abs2(SCDI.electric_field(last(SCDI.rays(s_beam)))[1]) / (2*SCDI.Z_vacuum)
+        pseudo_Ip = abs2(SCDI.electric_field(last(SCDI.rays(p_beam)))[3]) / (2*SCDI.Z_vacuum)
         # Test against m interfaces
         m = length(system.objects) * 2
         @test pseudo_Is ≈ Ts^m
@@ -1497,9 +1497,9 @@ end
         beam = SCDI.Beam(ray)
         SCDI.solve_system!(system, beam)
         # Assumes propagation along the y-axis after rhomb, calculate polarization state
-        Ex = getindex.(SCDI.polarization.(beam.rays), 1)
-        Ey = getindex.(SCDI.polarization.(beam.rays), 2)
-        Ez = getindex.(SCDI.polarization.(beam.rays), 3)
+        Ex = getindex.(SCDI.electric_field.(beam.rays), 1)
+        Ey = getindex.(SCDI.electric_field.(beam.rays), 2)
+        Ez = getindex.(SCDI.electric_field.(beam.rays), 3)
         # Test for circular polarization and Ey error
         phi = angle(last(Ez)) - angle(last(Ex))
         @test phi ≈ π/2
@@ -1531,7 +1531,7 @@ end
 
         @testset "z-polarized ray along y-axis" begin
             # Solve with z-polarized ray along y-axis
-            SCDI.polarization!(ray, [0, 0, 1])
+            SCDI.electric_field!(ray, [0, 0, 1])
             SCDI.solve_system!(system, beam)
 
             # Extract E0s: t - transmitted, r - reflected
@@ -1557,7 +1557,7 @@ end
             # Test num. of leaves before retracing
             @test length(collect(Leaves(beam))) == 4
             # Retrace with z-polarized ray along y-axis
-            SCDI.polarization!(ray, [1, 0, 0])
+            SCDI.electric_field!(ray, [1, 0, 0])
             SCDI.solve_system!(system, beam)
 
             # Extract E0s: t - transmitted, r - reflected

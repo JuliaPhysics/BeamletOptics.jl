@@ -28,7 +28,7 @@ end
 """
     normal3d(input)
 
-Returns a **random** vector with unit length that is perpendicular to the `input` vector.
+Returns a **random** vector with unit length that is orthogonal to the `input` vector.
 """
 function normal3d(input::AbstractArray)
     # Gram-Schmidt method with random init
@@ -145,6 +145,21 @@ function isinfrontof(point::AbstractVector, pos::AbstractVector, dir::AbstractVe
         return false
     else
         return true
+    end
+end
+
+"""
+    isorthogonal(v1, v2; atol=1e-9)
+
+Returns `true` if two vectors are orthogonal, i.e. their scalar product is zero. \\
+Returns `false` otherwise, trigger level adjustable via `atol`.
+"""
+function isorthogonal(v1::AbstractArray, v2::AbstractArray; atol=1e-9)
+    # FIXME: testcases required
+    if abs(dot(v1, v2)) ≤ atol
+        return true
+    else 
+        return false
     end
 end
 
