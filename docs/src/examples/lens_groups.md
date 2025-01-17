@@ -158,3 +158,24 @@ save("lens_groups_1.png", fig, px_per_unit=4); nothing # hide
 ```
 
 ![Lens groups - with movement](lens_groups_1.png)
+
+# Beam type compatibility
+
+We can easily switch out the type of beam we are tracing through the system using the API of this package. We will trace a single [`SCDI.GaussianBeamlet`](@ref) through the objective. Note that this example is for illustration purposes only and does not yield an accurate representation of the actual imaging preformance due to the limitations of the beam tracing method described in the [Stigmatic Beamlets](@ref) section.
+
+```@example focus_lens
+delete!(ax) # hide
+ax = Axis3(fig[1, 1], aspect=aspect, limits=limits, azimuth=0, elevation=1e-3) # hide
+hidexdecorations!(ax) # hide
+hidezdecorations!(ax) # hide
+
+beam = SCDI.GaussianBeamlet(SCDI.Ray([0, -0.05, 0], [0, 1, 0]), 1000e-9, 2.2e-2)
+SCDI.solve_system!(system, beam, r_max=40)
+
+SCDI.render_beam!(ax, beam, color=:green2)
+SCDI.render_system!(ax, system)
+
+save("lens_groups_2.png", fig, px_per_unit=4); nothing # hide
+```
+
+![Lens groups - with GaussianBeamlet](lens_groups_2.png)

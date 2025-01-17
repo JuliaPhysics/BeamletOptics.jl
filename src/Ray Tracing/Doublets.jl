@@ -4,6 +4,9 @@ struct DoubletLens{T, F<:AbstractShape{T}, B<:AbstractShape{T}, F1, F2} <: Abstr
     back::Lens{T, B, F2}
 end
 
+position(dl::DoubletLens) = position(dl.front)
+orientation(dl::DoubletLens) = orientation(dl.front)
+
 thickness(dl::DoubletLens) = thickness(shape(dl.front)) + thickness(shape(dl.back))
 
 """
