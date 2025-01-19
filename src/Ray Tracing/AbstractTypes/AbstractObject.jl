@@ -53,6 +53,7 @@ reset_rotation3d!(object::AbstractObject) = reset_rotation3d!(shape(object))
     AbstractObjectGroup <: AbstractObject
 
 Container type for groups of optical elements, based on a tree-like data structure. Intended for easier kinematic handling of connected elements.
+See also [`ObjectGroup`](@ref) for a concrete implementation.
 
 # Implementation reqs.
 

@@ -5,8 +5,8 @@ Stores data calculated by the [`intersect3d`](@ref) method. This information can
 
 # Fields:
 
-- `shape`: a reference to the [`AbstractShape`](@ref) that has been hit
 - `object`: a nullable reference to the [`AbstractObject`](@ref) that has been hit (optional but recommended)
+- `shape`: a nullable reference to the [`AbstractShape`](@ref) of the `object` that has been hit (optional but recommended)
 - `t`: length of the ray parametrization in [m]
 - `n`: normal vector at the point of intersection
 """
@@ -115,7 +115,7 @@ end
 In general, the intersection between an `object` and a `ray` is defined as the intersection with `shape(object)`.
 """
 function intersect3d(object::AbstractObject, ray::AbstractRay)
-    # FIXME: insinfrontof check?
+    # FIXME: isinfrontof check?
     intersection = intersect3d(shape(object), ray)
     # Ensure that the intersection knows about the object if intersected
     if !isnothing(intersection)

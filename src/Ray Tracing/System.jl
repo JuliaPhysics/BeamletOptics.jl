@@ -128,8 +128,8 @@ Else the tracing procedure is stopped.
 
 # Arguments
 
-- `system:`: The optical system through which the GaussianBeamlet is traced.
-- `beam`: The GaussianBeamlet object to be traced.
+- `system:`: The optical system through which the [`Beam`](@ref) is traced.
+- `beam`: The [`Beam`](@ref) object to be traced.
 - `r_max`: Maximum number of tracing iterations. Default is 20.
 """
 function trace_system!(system::AbstractSystem, beam::Beam{T}; r_max::Int = 20) where {T <: Real}
@@ -210,8 +210,8 @@ If all rays hit the same target, the optical interaction is analyzed, else the t
 
 # Arguments
 
-- `system`: The optical system through which the GaussianBeamlet is traced.
-- `gauss`: The GaussianBeamlet object to be traced.
+- `system`: The optical system through which the [`GaussianBeamlet`](@ref) is traced.
+- `gauss`: The [`GaussianBeamlet`](@ref) object to be traced.
 - `r_max`: Maximum number of tracing iterations. Default is 20.
 """
 function trace_system!(system::AbstractSystem,
