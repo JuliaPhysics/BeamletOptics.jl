@@ -5,7 +5,7 @@ A generic representation of a system of optical elements.
 
 # Implementation reqs.
 
-Subtypes of `AbstractBeam` must implement the following:
+Subtypes of `AbstractSystem` must implement the following:
 
 ## Fields:
 
@@ -14,7 +14,7 @@ Subtypes of `AbstractBeam` must implement the following:
 
 ## Functions:
 
-- `refractive_index`: returns the refractive index `n`, see above
+- `refractive_index`: returns the refractive index `n` of the system medium, see above
 """
 abstract type AbstractSystem end
 

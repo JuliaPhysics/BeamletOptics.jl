@@ -1,4 +1,4 @@
-# Spherical lenses
+# Spherical lens example
 
 This example recreates the figure shown in the [Types of elements](@ref) section of the [Optical elements](@ref) chapter. The lens parameters are taken from the [Thorlabs](https://www.thorlabs.com/) website and are listed below:
 

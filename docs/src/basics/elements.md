@@ -4,9 +4,9 @@ Optical elements serve as the building blocks for optical systems in the context
 
 To ensure compatibility with the [API design](@ref), custom optical elements must adhere to the [`SCDI.AbstractObject`](@ref) interface.
 
-!!! info
-    Equations to calculate optical effects often rely on the normal vector at the ray intersection location
-    to work correctly. It is important to ensure that this condition is fulfilled when spurious effects occur.
+!!! info "Normal vector direction definition"
+    Equations to calculate optical effects often rely on the normal vector at the ray intersection location to work correctly and point in a specific direction.
+    It is important to ensure that this condition is fulfilled when spurious effects occur.
 
 ## Types of elements
 
@@ -110,7 +110,7 @@ save("spherical_lens_showcase.png", fig, px_per_unit=4)
 nothing
 ```
 
-The spherical lenses are shown below. To recreate this figure, refer to the [Spherical lenses](@ref) example.
+The spherical lenses are shown below. To recreate this figure, refer to the [Spherical lens example](@ref).
 
 ![Spherical lens showcase](spherical_lens_showcase.png)
 
@@ -121,7 +121,7 @@ The spherical lenses are shown below. To recreate this figure, refer to the [Sph
 
 Optical elements can move around freely in three-dimensional space, which enables the modeling of kinematics within optical setups. When objects are manipulated, they are translated and rotated around their self-defined center of gravity, which is represented as a ``\mathbb{R}^3``-vector and will be referred to as its [`SCDI.position`](@ref). Additionally, the [`SCDI.orientation`](@ref) of an object, defined as its local fixed coordinate system, is represented by an orthonormal matrix in ``\mathbb{R}^3``. If the object is rotated, this matrix can be used to calculate the inverse transform into global coordinates. 
 
-!!! important
+!!! important "Optical system kinematics"
     Elements can be moved freely between each call of [`SCDI.solve_system!`](@ref). However, during tracing it is assumed that all elements remain static.
 
 For elements that implement the [`SCDI.AbstractObject`](@ref) interface, the following movement commands are provided:
@@ -138,7 +138,7 @@ For elements that implement the [`SCDI.AbstractObject`](@ref) interface, the fol
     - [`SCDI.reset_translation3d!`](@ref)
     - [`SCDI.reset_rotation3d!`](@ref)
 
-!!! important
+!!! important "Relative motion"
     Unless specified otherwise, the translation and rotation commands result in relative motions to the current position and orientation. This must be taken into account when trying to model a specific set of movements.
 
 ## Groups of optical elements
