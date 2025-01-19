@@ -1,4 +1,22 @@
 abstract type AbstractDoubletRefractiveOptic{T, F <: AbstractShape{T}, B <: AbstractShape{T}, F1 <: Function, F2 <: Function} <: AbstractRefractiveOptic{T, F, F1} end
+
+"""
+    DoubletLens
+
+Represents a two-component cemented doublet lens with two respective refractive indices `n = n(λ)`.
+See also [`SphericalDoubletLens`](@ref).
+
+# Fields
+
+- `front`: front [`Lens`](@ref) component
+- `back`: back [`Lens`](@ref) component
+
+# Additional information
+
+!!! warning "Air gap"
+    This component type strongly assumes that both lenses are mounted fully flush with respect to each other. 
+    Gaps between the components might lead to incorrect results.
+"""
 struct DoubletLens{T, F<:AbstractShape{T}, B<:AbstractShape{T}, F1, F2} <: AbstractDoubletRefractiveOptic{T, F, B, F1, F2}
     front::Lens{T, F, F1}
     back::Lens{T, B, F2}
@@ -36,8 +54,8 @@ function SphericalDoubletLens(r1, r2, r3, l1, l2, d, n1, n2)
 end
 
 function intersect3d(dl::DoubletLens, ray::AbstractRay)
-    i_f, i_b = intersect3d(dl.front.shape, ray), intersect3d(dl.back.shape, ray)
-
+    i_f = intersect3d(dl.front.shape, ray)
+    i_b = intersect3d(dl.back.shape, ray)
     # Determine which intersections are valid and handle accordingly
     if isnothing(i_f)
         return isnothing(i_b) ? nothing : (object!(i_b, dl); i_b)
