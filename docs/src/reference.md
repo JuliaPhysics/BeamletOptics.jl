@@ -7,13 +7,13 @@ Pages = ["reference.md"]
 Depth = 5
 ```
 
+# Literature 
+
+```@bibliography
+```
+
 # Index
 
 ```@autodocs
 Modules = [SCDI]
-```
-
-# Literature 
-
-```@bibliography
 ```

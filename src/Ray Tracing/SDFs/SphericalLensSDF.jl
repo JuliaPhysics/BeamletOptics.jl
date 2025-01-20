@@ -27,6 +27,17 @@ diameter(s::AbstractRotationallySymmetricSDF) = s.diameter
 """Returns the on-axis thickness of the `AbstractRotationallySymmetricSDF`"""
 thickness(s::AbstractRotationallySymmetricSDF) = s.thickness
 
+"""
+    PlanoSurfaceSDF
+
+[`AbstractSDF`](@ref)-based representation of two flat optical surfaces, i.e. equivalent to the [`CylinderSDF`](@ref).
+When constructed, it is assumed that the first flat surface lies at the origin and the optical axis is aligned with the positive `y`-axis.
+
+## Fields:
+
+- `diameter`: the outer diameter of the circular flat lens surface
+- `thickness`: the distance between the flat surfaces
+"""
 mutable struct PlanoSurfaceSDF{T} <: AbstractRotationallySymmetricSDF{T}
     dir::SMatrix{3, 3, T, 9}
     transposed_dir::SMatrix{3, 3, T, 9}

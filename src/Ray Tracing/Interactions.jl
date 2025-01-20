@@ -423,11 +423,11 @@ function photodetector_resolution!(pd::Photodetector{T, S}, n::Int) where {T, S}
 end
 
 #=
-Implements thin beam splitter, beam spawning
+Implements thin beamsplitter, beam spawning
 =#
 abstract type AbstractBeamSplitter{T, S <: AbstractShape{T}} <: AbstractObject{T, S} end
 
-"""Models a generic beam splitter"""
+"""Models a generic beamsplitter"""
 struct BeamSplitter{T <: Real, S <: AbstractShape{T}} <: AbstractBeamSplitter{T, S}
     shape::S
     reflectance::T
@@ -440,7 +440,7 @@ transmittance(bs::BeamSplitter) = bs.transmittance
 """
     ThinBeamSplitter(width::T, reflectance::Real=0.5) where {T}
 
-Creates a zero-thickness, lossless, non-polarizing quadratic rectangle beam splitter where
+Creates a zero-thickness, lossless, non-polarizing quadratic rectangle beamsplitter where
 
 - `width`: is the edge length
 - `reflectance`: determines how much light is **reflected**, i.e. 0.7 for a 70:30 splitter

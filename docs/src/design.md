@@ -14,10 +14,12 @@
 ### CPU and GPU
 
 !!! info
-    GPU processing (tracing) of optical systems not supported as is.
+    GPU processing (tracing) of optical systems is  not supported at the moment.
 
 ## Geometry representation
 
 ### Meshes
 
-### SDFs
+### Signed Distance Functions (SDFs)
+
+For an introduction into SDFs the [website of Inigo Quilez](https://iquilezles.org/articles/distfunctions/) is referred to.

@@ -1327,7 +1327,7 @@ end
                 @test length(g_1) < length(g_1, opl=true)
                 @test length(g_2) == length(g_1) - z_i
             end
-            # Analytical solution (cosine over Δz), ref. power is 4*P0 since beam splitter is missing
+            # Analytical solution (cosine over Δz), ref. power is 4*P0 since beamsplitter is missing
             Pt_analytical = 4 * P0 * [(cos(2π * z / (maximum(Δz))) + 1) / 2 for z in Δz]
 
             # Compare detectors (this also tests correct behavior when focussing the beam)

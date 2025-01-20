@@ -16,7 +16,7 @@ Subtypes of `AbstractBeam` must implement the following:
 ## Fields:
 
 - `parent`: a [`Nullable`](@ref) field that holds the same type as the subtype, used for tree navigation
-- `children`: a vector that holds the same type as the subtype, used for sub-beam tracking, i.e. beam splitting
+- `children`: a vector that holds the same type as the subtype, used for sub-beam tracking, i.e. beamsplitting
 
 ## Functions:
 
