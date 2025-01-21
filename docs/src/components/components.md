@@ -1,6 +1,6 @@
 # Optical components
 
-A collection of basic optical elements is provided with this package as is. They are tested for the correctness of their optical interactions and guaranteed to work within reasonable fidelity. For an overview, see the next section.
+A collection of basic optical elements is provided with this package as is. They are tested for the correctness of their optical interactions and are verified to work with reasonable fidelity. For an overview, see the next section.
 
 ## Component overview
 

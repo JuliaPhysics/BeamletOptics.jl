@@ -5,6 +5,17 @@ function RectangularPlanoMirror2D(scale::T) where {T <: Real}
     return Mirror(shape)
 end
 
+"""
+    RoundPlanoMirror
+
+Returns a cylindrical, flat [`Mirror`](@ref) with perfect reflectivity based on:
+
+- `diameter`: mirror diameter
+- `thickness`: mirror substrate thickness
+
+!!! note
+    It is important to consider that all surfaces of this mirror type are reflecting!
+"""
 function RoundPlanoMirror(diameter::D, thickness::T) where {D<:Real,T<:Real}
     shape = CylinderSDF(diameter/2, thickness/2)
     return Mirror(shape)
