@@ -59,6 +59,19 @@ function GaussianBeamlet(chief::Beam{T, Ray{T}},
         Vector{GaussianBeamlet{T}}())
 end
 
+"""
+    GaussianBeamletInteraction <: AbstractInteraction
+
+This type is used to store the new beamlet section resulting from on optical interaction
+between a [`GaussianBeamlet`](@ref) and some [`AbstractObject`](@ref).
+Uses the hint of the `chief` beam.
+
+# Fields
+
+- `chief`: [`Beam`](@ref) interaction
+- `waist`: [`Beam`](@ref) interaction
+- `divergence`: [`Beam`](@ref) interaction
+"""
 struct GaussianBeamletInteraction{R <: Real} <: AbstractInteraction
     chief::BeamInteraction{R}
     waist::BeamInteraction{R}

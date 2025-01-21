@@ -36,7 +36,10 @@ end
     Hint
 
 A `Hint` can be passed as part of an [`AbstractInteraction`](@ref) and will inform the tracing algorithm about which [`AbstractObject`](@ref)
-in the [`AbstractSystem`](@ref) will be hit next. The hint does not need to result in a guaranteed [`Intersection`](@ref).
+in the [`AbstractSystem`](@ref) will be hit next.
+
+!!! info 
+    The hint does not need to result in a guaranteed [`Intersection`](@ref).
 
 # Fields
 
@@ -56,9 +59,22 @@ shape(h::Hint) = h.shape
 """
     AbstractInteraction
 
-Describes how an `AbstractBeam` and an `AbstractSystem` interact with each other.
-Contains the parameters for the continuation of the `AbstractBeam`.
-Can store an optional `id` which hints at the next object intersection.
+Describes how an [`AbstractBeam`](@ref) and an [`AbstractObject`](@ref) interact with each other.
+This data type stores information from the [`interact3d`](@ref) function and provides it to the solver.
+The solver can use this data to extend the [`AbstractBeam`](@ref).
+
+# Implementation reqs.
+
+Subtypes of `AbstractInteraction` must implement the following:
+
+## Fields
+
+- `hint`: a nullable [`Hint`](@ref) for the solver (optional but recommended)
+
+## Beam data
+
+It is required that concrete implementations of this type provide some form of data on how to extend the beam.
+For instance, refer to [`BeamInteraction`](@ref) and [`GaussianBeamletInteraction`](@ref).
 """
 abstract type AbstractInteraction end
 

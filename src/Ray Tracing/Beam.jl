@@ -36,6 +36,17 @@ function Beam(pos::AbstractArray{P}, dir::AbstractArray{D}, λ::L, E0::Vector{E}
     return Beam{T, PolarizedRay{T}}([ray], nothing, Vector{Beam{T, PolarizedRay{T}}}())
 end
 
+"""
+    BeamInteraction <: AbstractInteraction
+
+This type is used to store the new [`AbstractRay`](@ref) resulting from on optical interaction
+between a [`Beam`](@ref) and some [`AbstractObject`](@ref).
+
+# Fields
+
+- `hint`: optional [`Hint`](@ref) for the solver
+- `ray`: new [`AbstractRay`](@ref) resulting from the interaction
+"""
 struct BeamInteraction{T <: Real, R <: AbstractRay{T}} <: AbstractInteraction
     hint::Nullable{Hint}
     ray::R
