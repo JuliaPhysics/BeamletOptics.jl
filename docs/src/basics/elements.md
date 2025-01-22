@@ -20,7 +20,7 @@ On the other hand, the optical behavior — how light interacts with the element
 
 ### Multi-shape objects
 
-An [`SCDI.AbstractObject`](@ref) in BeamletOptics.jl can consist of multiple [`SCDI.AbstractShape`](@ref)s, facilitating the creation of composite optical elements. For example, a lens with an anti-reflective coating could be represented as the substrate and a seperate model for the coating, each with its own geometric and optical properties.
+An [`SCDI.AbstractObject`](@ref) in BeamletOptics.jl can consist of multiple [`SCDI.AbstractShape`](@ref)s or even multiple subsidiary [`SCDI.AbstractObject`](@ref)s, facilitating the creation of composite optical elements. For example, a lens with an anti-reflective coating could be represented as the substrate and a seperate model for the coating, each with its own geometric and optical properties.
 
 !!! warning "Basic shape assumption"
     In general, the core API assumes that a [`SCDI.AbstractObject`](@ref) only has a single shape. If multiple shapes form a single object, custom implementations of solver functions must be provided. Refer to [`SCDI.DoubletLens`](@ref) for instance.

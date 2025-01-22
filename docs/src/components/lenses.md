@@ -4,7 +4,13 @@ Lenses are fundamental optical components used to focus or diverge light, making
 
 ## Spherical lenses
 
-Spherical lenses are characterized by surfaces with constant curvature, making them straightforward to model and ideal for basic imaging applications. Below, several spherical lenses are showcased:
+Spherical lenses are characterized by surfaces with constant curvature, making them straightforward to model and ideal for basic imaging applications. 
+
+```@docs; canonical=false
+SCDI.SphericalLens
+```
+
+Below, several spherical lenses are recreated from manufacturer data using the [Spherical lens constructor](@ref):
 
 - [`SCDI.GaussianBeamlet`](@ref) parameters
     - ``w_0 = 5~\text{mm}``
@@ -112,7 +118,58 @@ SCDI.SphericalLensShapeConstructor
 
 ## Doublet lenses
 
-**WIP**
+The [`SCDI.DoubletLens`](@ref) is an example for a multi-shape object as mentioned in the [Multi-shape objects](@ref) section.
+
+```@docs; canonical=false
+SCDI.DoubletLens
+```
+
+The following image shows the [AC254-150-AB](https://www.thorlabs.com/thorproduct.cfm?partnumber=AC254-150-AB) doublet lens for 488 and 707 nm. It has been created using the [`SCDI.SphericalDoubletLens`](@ref) constructor. Changes in the [`SCDI.Ray`](@ref) direction are marked with red dots (disregarding the beam spawn point).
+
+
+```@eval
+using CairoMakie, SCDI
+
+λs = [488e-9, 707e-9, 1064e-9]
+
+NLAK22 = SCDI.DiscreteRefractiveIndex(λs, [1.6591, 1.6456, 1.6374])
+NSF10 = SCDI.DiscreteRefractiveIndex(λs, [1.7460, 1.7168, 1.7021])
+
+AC254_150_AB = SCDI.SphericalDoubletLens(87.9e-3, 105.6e-3, 1000, 6e-3, 3e-3, SCDI.inch, NLAK22, NSF10)
+
+system = SCDI.System([AC254_150_AB])
+
+fig = Figure(size=(600,240))
+aspect = (1,4,1)
+limits = (-0.025, 0.025, -0.025, 0.175, -0.025, 0.025)
+ax = Axis3(fig[1,1], aspect=aspect, limits=limits, azimuth=0., elevation=1e-3)
+
+hidexdecorations!(ax)
+hidezdecorations!(ax)
+
+SCDI.render_system!(ax, system)
+
+zs_1 = LinRange(-0.011, 0.011, 6)
+zs_2 = LinRange(-0.01, 0.01, 5)
+
+for (i, z) in enumerate(zs_1)
+    beam = SCDI.Beam([0, -0.02 , z], [0,1.,0], 488e-9)
+    SCDI.solve_system!(system, beam)
+    SCDI.render_beam!(ax, beam, flen=0.15, color=RGBAf(0,0,1,0.7))
+end
+
+for (i, z) in enumerate(zs_2)
+    beam = SCDI.Beam([0, -0.02 , z], [0,1.,0], 707e-9)
+    SCDI.solve_system!(system, beam)
+    SCDI.render_beam!(ax, beam, flen=0.15, color=RGBAf(1,0,0,0.5), show_pos=true)
+end
+
+save("doublet_showcase.png", fig, px_per_unit=4)
+
+nothing
+```
+
+![Doublet lens showcase](doublet_showcase.png)
 
 ## Aspherical lenses
 
