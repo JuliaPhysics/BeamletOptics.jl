@@ -161,6 +161,39 @@ using AbstractTrees
             @test real(tp) ≈ 3 atol=1e-15
         end
     end
+    
+    @testset "Ref. index utils" begin
+        # Test data (NLAK22)
+        T1 = Float32
+        T2 = Float64
+        lambdas = T1.([488e-9, 707e-9, 1064e-9])
+        indices = T2.([1.6591, 1.6456, 1.6374])
+        ref_index = SCDI.DiscreteRefractiveIndex(lambdas, indices)
+    
+        @testset "DiscreteRefractiveIndex" begin
+            @test isdefined(SCDI, :DiscreteRefractiveIndex)
+            @test isa(ref_index, SCDI.DiscreteRefractiveIndex{T2})
+            @test ref_index(lambdas[2]) == indices[2]
+            @test_throws KeyError ref_index(lambdas[1] + 1e-9)
+            # Test constructor
+            @test_throws ArgumentError SCDI.DiscreteRefractiveIndex([1], [1,2])
+        end
+    
+        @testset "Test ref. helper function" begin
+            f1(x::Float64) = x              # fail
+            f2(x::Union{Int, Float64}) = x  # fail
+            f3(x::Real) = "a"               # fail
+            f4(x) = x, 1                    # fail
+            f5(x) = x                       # pass
+            # Test if illegal functions are detected
+            @test_throws ArgumentError SCDI.test_refractive_index_function(f1)
+            @test_throws ArgumentError SCDI.test_refractive_index_function(f2)
+            @test_throws ArgumentError SCDI.test_refractive_index_function(f3)
+            @test_throws ArgumentError SCDI.test_refractive_index_function(f4)
+            @test isnothing(SCDI.test_refractive_index_function(f5))
+            @test isnothing(SCDI.test_refractive_index_function(ref_index))
+        end
+    end
 end
 
 @testset "Types" begin
@@ -960,31 +993,9 @@ end
 
     @testset "Testing doublet lenses" begin
         # Define refractive index functions
-        function NLAK22(λ)
-            if λ ≈ 488e-9
-                return 1.6591
-            end
-            if λ ≈ 707e-9
-                return 1.6456
-            end
-            if λ ≈ 1064e-9
-                return 1.6374
-            end
-            error("No matching ref. index data for λ = $λ")
-        end
-
-        function NSF10(λ)
-            if λ ≈ 488e-9
-                return 1.7460
-            end
-            if λ ≈ 707e-9
-                return 1.7168
-            end
-            if λ ≈ 1064e-9
-                return 1.7021
-            end
-            error("No matching ref. index data for λ = $λ")
-        end
+        λs = [488e-9, 707e-9, 1064e-9]
+        NLAK22 = SCDI.DiscreteRefractiveIndex(λs, [1.6591, 1.6456, 1.6374])
+        NSF10 = SCDI.DiscreteRefractiveIndex(λs, [1.7460, 1.7168, 1.7021])
 
         function test_doublet(λ, bfl, δf)
             # Thorlabs lens from https://www.thorlabs.com/thorproduct.cfm?partnumber=AC254-150-AB

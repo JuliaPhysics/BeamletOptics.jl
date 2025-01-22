@@ -1,4 +1,10 @@
-abstract type AbstractDoubletRefractiveOptic{T, F <: AbstractShape{T}, B <: AbstractShape{T}, F1 <: Function, F2 <: Function} <: AbstractRefractiveOptic{T, F, F1} end
+abstract type AbstractDoubletRefractiveOptic{
+    T,
+    F <: AbstractShape{T},
+    B <: AbstractShape{T},
+    N1 <: RefractiveIndex,
+    N2 <: RefractiveIndex
+} <: AbstractRefractiveOptic{T, F, N1} end
 
 """
     DoubletLens
@@ -17,9 +23,9 @@ See also [`SphericalDoubletLens`](@ref).
     This component type strongly assumes that both lenses are mounted fully flush with respect to each other. 
     Gaps between the components might lead to incorrect results.
 """
-struct DoubletLens{T, F<:AbstractShape{T}, B<:AbstractShape{T}, F1, F2} <: AbstractDoubletRefractiveOptic{T, F, B, F1, F2}
-    front::Lens{T, F, F1}
-    back::Lens{T, B, F2}
+struct DoubletLens{T, F<:AbstractShape{T}, B<:AbstractShape{T}, N1<:RefractiveIndex, N2<:RefractiveIndex} <: AbstractDoubletRefractiveOptic{T, F, B, N1, N2}
+    front::Lens{T, F, N1}
+    back::Lens{T, B, N2}
 end
 
 position(dl::DoubletLens) = position(dl.front)
@@ -41,8 +47,8 @@ For radii sign definition, refer to the [`SphericalLens`](@ref) constructor.
 - `l1`: first lens thickness
 - `l2`: second lens thickness
 - `d`: lens diameter
-- `n1`: first lens refractive index fct.
-- `n1`: second lens refractive index fct.
+- `n1`: first lens [`RefractiveIndex`](@ref)
+- `n1`: second lens [`RefractiveIndex`](@ref)
 """
 function SphericalDoubletLens(r1, r2, r3, l1, l2, d, n1, n2)
     # Generate "cemented" front and back spherical lenses

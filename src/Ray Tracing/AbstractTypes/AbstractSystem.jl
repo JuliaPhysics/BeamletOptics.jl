@@ -10,11 +10,11 @@ Subtypes of `AbstractSystem` must implement the following:
 ## Fields:
 
 - `objects`: a vector or tuple of [`AbstractObject`](@ref)s that make up the system
-- `n`: (optional) refractive index of the surrounding medium, default value is 1.0
+- `n`: (optional) [`RefractiveIndex`] of the surrounding medium, default value is 1.0
 
 ## Functions:
 
-- `refractive_index`: returns the refractive index `n` of the system medium, see above
+- `refractive_index`: returns the [`RefractiveIndex`] `n` of the system medium, see above
 """
 abstract type AbstractSystem end
 

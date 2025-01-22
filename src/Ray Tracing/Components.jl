@@ -67,7 +67,7 @@ RetroReflector(scale) = RetroReflector(RetroMesh(scale))
 
 # FIXME
 """
-function RectangularPlateBeamSplitter(width::Real, thickness::Real, n::Function; eps_separation=1e-9)
+function RectangularPlateBeamSplitter(width::Real, thickness::Real, n::RefractiveIndex; eps_separation=1e-9)
     coating = SCDI.ThinBeamSplitter(width)
     shape = SCDI.CuboidMesh((width, thickness, width))
     SCDI.translate3d!(shape, [
@@ -82,7 +82,7 @@ end
 
 RectangularPlateBeamSplitter(w::Real, t::Real, n::Real; eps_separation=1e-9) = RectangularPlateBeamSplitter(w, t, λ->n; eps_separation)
 
-function RectangularCompensatorPlate(width::W, height::H, thickness::T, n::Function) where {W<:Real,H<:Real,T<:Real}
+function RectangularCompensatorPlate(width::W, height::H, thickness::T, n::RefractiveIndex) where {W<:Real,H<:Real,T<:Real}
     shape = CuboidMesh((width, thickness, height))
     translate3d!(shape, [
         -width/2,

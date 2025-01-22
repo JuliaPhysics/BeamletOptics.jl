@@ -63,12 +63,12 @@ Subtypes of `AbstractRefractiveOptic` should implement all supertype reqs. as we
 
 # Fields
 
-- `n::Function`: a function which returns the refractive index for a wavelength λ
+- `n::Function`: a function which returns the [`RefractiveIndex`](@ref) for a wavelength λ
 """
 abstract type AbstractRefractiveOptic{T, S <: AbstractShape{T}, F} <: AbstractObject{T, S} end
 
 refractive_index(object::AbstractRefractiveOptic) = object.n
-refractive_index(object::AbstractRefractiveOptic{<:Any, <:Any, <:Function}, λ::Real)::Float64 = object.n(λ)
+refractive_index(object::AbstractRefractiveOptic{<:Any, <:Any, <:RefractiveIndex}, λ::Real)::Float64 = object.n(λ)
 
 """
     interact3d(AbstractSystem, AbstractRefractiveOptic, Beam, Ray)
@@ -159,15 +159,15 @@ function interact3d(system::AbstractSystem, optic::AbstractRefractiveOptic,
 end
 
 """
-    Lens{T, S <: AbstractShape{T}, F <: Function} <: AbstractRefractiveOptic{T, S, F}
+    Lens{T, S <: AbstractShape{T}, N <: RefractiveIndex} <: AbstractRefractiveOptic{T, S, N}
 
-Represents an uncoated `Lens` with a homogeneous refractive index `n = n(λ)`.
+Represents an uncoated `Lens` with a homogeneous [`RefractiveIndex`](@ref) `n = n(λ)`.
 Refer to the [`SphericalLens`](@ref) constructor for more information on how to generate lenses.
 
 # Fields
 
 - `shape`: geometry of the lens, refer to [`AbstractShape`](@ref) for more information
-- `n`: **single-argument** function that returns n(λ)
+- `n`: [`RefractiveIndex`](@ref) function that returns n(λ)
 
 # Additional information
 
@@ -176,14 +176,18 @@ Refer to the [`SphericalLens`](@ref) constructor for more information on how to 
     and must be provided by the user. For testing purposes, an anonymous function, e.g. λ -> 1.5
     can be passed such that the lens has the same refractive index for all wavelengths.
 """
-struct Lens{T, S <: AbstractShape{T}, F <: Function} <: AbstractRefractiveOptic{T, S, F}
+struct Lens{T, S <: AbstractShape{T}, N <: RefractiveIndex} <: AbstractRefractiveOptic{T, S, N}
     shape::S
-    n::F # FIXME: constructor check that n=n(λ), # args
+    n::N
+    function Lens(shape::S, n::N) where {T<:Real, S<:AbstractShape{T}, N<:RefractiveIndex}
+        test_refractive_index_function(n)
+        return new{T, S, N}(shape, n)
+    end
 end
 
 thickness(l::Lens) = thickness(shape(l))
 
-SphericalLens(r1, r2, l, d, n) = SphericalLens(r1, r2, l, d, λ -> n)
+SphericalLens(r1, r2, l, d, n::Real) = SphericalLens(r1, r2, l, d, λ -> n)
 
 """
     SphericalLens(r1, r2, l, d=1inch, n=λ->1.5)
@@ -194,7 +198,7 @@ Creates a spherical [`Lens`](@ref) based on:
 - `r2`: back radius
 - `l`: lens thickness
 - `d`: lens diameter, default is one inch
-- `n`: refractive index as a function of λ, i.e. `n = n(λ)`
+- `n`: [`RefractiveIndex`](@ref) as a function of λ, i.e. `n = n(λ)`
 
 # Notes
 
@@ -205,7 +209,7 @@ Creates a spherical [`Lens`](@ref) based on:
 !!! info "Thin lenses"
     If `l` is set to zero, a [`ThinLens`](@ref) will be created. However, note that the actual lens thickness will be different from zero.
 """
-function SphericalLens(r1::Real, r2::Real, l::Real, d::Real = 1inch, n::Function = λ -> 1.5)
+function SphericalLens(r1::Real, r2::Real, l::Real, d::Real = 1inch, n::RefractiveIndex = λ -> 1.5)
     # Test for thin lens
     if iszero(l)
         return ThinLens(r1, r2, d, n)
@@ -219,23 +223,27 @@ end
     ThinLens(R1::Real, R2::Real, d::Real, n::Function)
 
 Directly creates an ideal spherical thin [`Lens`](@ref) with radii of curvature `R1` and `R2` and diameter `d`
-and refractive index `n`.
+and [`RefractiveIndex`](@ref) `n`.
 """
-function ThinLens(R1::Real, R2::Real, d::Real, n::Function)
+function ThinLens(R1::Real, R2::Real, d::Real, n::RefractiveIndex)
     shape = ThinLensSDF(R1, R2, d)
     return Lens(shape, n)
 end
 ThinLens(R1::Real, R2::Real, d::Real, n::Real) = ThinLens(R1, R2, d, x -> n)
 
 """
-    Prism{T, S <: AbstractShape{T}, F <: Function} <: AbstractRefractiveOptic{T, S, F}
+    Prism{T, S <: AbstractShape{T}, N <: RefractiveIndex} <: AbstractRefractiveOptic{T, S, N}
 
 Essentially represents the same functionality as [`Lens`](@ref).
 Refer to its documentation.
 """
-struct Prism{T, S <: AbstractShape{T}, F <: Function} <: AbstractRefractiveOptic{T, S, F}
+struct Prism{T, S <: AbstractShape{T}, N <: RefractiveIndex} <: AbstractRefractiveOptic{T, S, N}
     shape::S
-    n::F
+    n::N
+    function Prism(shape::S, n::N) where {T<:Real, S<:AbstractShape{T}, N<:RefractiveIndex}
+        test_refractive_index_function(n)
+        return new{T, S, N}(shape, n)
+    end
 end
 
 #=
@@ -252,7 +260,7 @@ Creates a plano-aspherical [`Lens`](@ref) with convex shape based on:
 - `even_coefficients`: A vector of the even aspheric coefficients
 - `d`: lens diameter
 - `t`: lens thickness
-- `n`: refractive index as a function of λ
+- `n`: [`RefractiveIndex`](@ref) as a function of λ
 
 !!! note
     Aspheric lenses are somewhat experimental at the moment. Use this feature with some caution.
@@ -264,9 +272,9 @@ function PlanoConvexAsphericalLens(radius::Real, conic_constant::Real, even_coef
     return PlanoConvexAsphericalLens(radius, conic_constant, even_coefficients, d, t, x -> n)
 end
 
-function PlanoConvexAsphericalLens(radius::Real, conic_constant::Real, even_coefficients::Vector{<:Real}, d::Real, t::Real, n::Function)
+function PlanoConvexAsphericalLens(radius::Real, conic_constant::Real, even_coefficients::Vector{<:Real}, d::Real, t::Real, n::RefractiveIndex)
+    test_refractive_index_function(n)
     shape = PlanoConvexAsphericalLensSDF(radius, t, d, conic_constant, even_coefficients)
-
     return Lens(shape, n)
 end
 
@@ -280,7 +288,7 @@ Creates a plano-aspherical [`Lens`](@ref) with convex shape based on:
 - `even_coefficients`: A vector of the even aspheric coefficients
 - `d`: lens diameter
 - `t`: lens thickness
-- `n`: refractive index as a function of λ
+- `n`: [`RefractiveIndex`](@ref) as a function of λ
 - `md`: mechanical diameter of the lens (defaults to `d`). If this is set to a value `md` > `d`
         an outer flat section will be added to the lens. This can be used to model more realistic
         lenses where this flat section is present for mounting purposes but is also an active
@@ -296,9 +304,9 @@ function PlanoConcaveAsphericalLens(radius::Real, conic_constant::Real, even_coe
     return PlanoConcaveAsphericalLens(radius, conic_constant, even_coefficients, d, t, x -> n, md)
 end
 
-function PlanoConcaveAsphericalLens(radius::Real, conic_constant::Real, even_coefficients::Vector{<:Real}, d::Real, t::Real, n::Function, md::Real = d)
+function PlanoConcaveAsphericalLens(radius::Real, conic_constant::Real, even_coefficients::Vector{<:Real}, d::Real, t::Real, n::RefractiveIndex, md::Real = d)
+    test_refractive_index_function(n)
     shape = PlanoConcaveAsphericalLensSDF(radius, t, d, conic_constant, even_coefficients, md)
-
     return Lens(shape, n)
 end
 

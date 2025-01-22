@@ -19,15 +19,7 @@ Spherical lenses are characterized by surfaces with constant curvature, making t
 ```@eval
 using CairoMakie, SCDI
 
-function NBK7(λ)
-    if λ ≈ 532e-9
-        return 1.5195
-    end
-    if λ ≈ 1064e-9
-        return 1.5066
-    end
-    error("Ref. index for λ=$λ not available.")
-end
+NBK7 = SCDI.DiscreteRefractiveIndex([532e-9, 1064e-9], [1.5195, 1.5066])
 
 # lens diameter 
 d = SCDI.inch

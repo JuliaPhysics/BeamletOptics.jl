@@ -354,3 +354,67 @@ function stateful_dfs_leaves(root::T, visitor::Function, stack=T[root]) where {T
 
     return nothing
 end
+
+## Refractive index utils
+"""
+    DiscreteRefractiveIndex{T}
+
+Represents a incomplete set of dispersion data where for each exact wavelength one refractive index value is stored in the `data` field.
+Can be called like a function `n = n(λ)`. Does not interpolate between data points.
+Refer to [`RefractiveIndex`](@ref) for more information.
+"""
+struct DiscreteRefractiveIndex{T}
+    data::Dict{T, T}
+end
+
+function DiscreteRefractiveIndex(λs::AbstractArray{L}, ns::AbstractArray{N}) where {L, N}
+    if length(λs) != length(ns)
+        throw(ArgumentError("Number of wavelengths must match number of ref. indices"))
+    end
+    T = promote_type(L, N)
+    d = Dict(zip(λs, ns))
+    return DiscreteRefractiveIndex{T}(d)
+end
+
+(dri::DiscreteRefractiveIndex)(λ) = dri.data[λ]
+
+"[`DiscreteRefractiveIndex`](@ref) passes test by default"
+test_refractive_index_function(::DiscreteRefractiveIndex) = nothing
+
+"""
+    test_refractive_index_function(input)
+
+Tests if `input` is callable with a single `Real` argument for the wavelength `λ` and
+returns a single `Real` value for the refractive index `n`. 
+"""
+function test_refractive_index_function(input)
+    # Test function compat for the following types of λ 
+    Ts = [Int, Float32, Float64]
+    try
+        for T in Ts
+            # Test if input accepts types
+            answer = input(one(T))
+            # Test if input returns single real value
+            if !isa(answer, Real)
+                error()
+            end
+        end
+    catch
+        error_msg = "Ref. index must be callable with a single Real argument and return a single real result."
+        throw(ArgumentError(error_msg))
+    end
+    return nothing
+end
+
+"""
+    RefractiveIndex
+
+Union type that represents valid means to pass a refractive index `n` to e.g. [`AbstractObject`](@ref)s.
+The core assumption is that:
+
+1. the refractive index is callable with a **single** `Real` argument `λ` to represent the wavelength in [m]
+2. the return value is a **single** `Real` value for the refractive index
+
+Refer to e.g. [`DiscreteRefractiveIndex`](@ref). 
+"""
+const RefractiveIndex = Union{Function, DiscreteRefractiveIndex}
