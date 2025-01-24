@@ -7,6 +7,7 @@ using PrecompileTools: @setup_workload, @compile_workload
 using StaticArrays: @SArray, @SArray, SMatrix, SArray
 using GeometryBasics: Point3, Point2, Mat
 using AbstractTrees: AbstractTrees, parent, children, NodeType, nodetype, nodevalue, print_tree, HasNodeType, Leaves, StatelessBFS, PostOrderDFS, PreOrderDFS, TreeIterator
+using InteractiveUtils: subtypes
 
 import Base: length
 

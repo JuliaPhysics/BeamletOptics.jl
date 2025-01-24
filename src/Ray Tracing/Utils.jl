@@ -418,3 +418,23 @@ The core assumption is that:
 Refer to e.g. [`DiscreteRefractiveIndex`](@ref). 
 """
 const RefractiveIndex = Union{Function, DiscreteRefractiveIndex}
+
+"""
+    list_subtypes(T::Type)
+
+Prints a tree of all subtypes, e.g. `list_subtypes(AbstractObject)`.
+"""
+function list_subtypes(T::Type, prefix::String = "", is_last::Bool = true)
+    # Print the current type
+    connector = is_last ? "└── " : "├── "
+    println(prefix * connector * string(T))
+
+    # Update the prefix for child types
+    new_prefix = prefix * (is_last ? "    " : "│   ")
+
+    # Iterate through the subtypes
+    subtypes_list = subtypes(T)
+    for (i, subtype) in enumerate(subtypes_list)
+        list_subtypes(subtype, new_prefix, i == length(subtypes_list))
+    end
+end
