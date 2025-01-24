@@ -60,7 +60,7 @@ save("plano_mirror_showcase.png", fig, px_per_unit=4); nothing
 
 ## Concave Mirrors
 
-Spherical [`SCDI.ConcaveMirror`](@ref)s can be used to focus light via reflection. The 
+Spherical [`SCDI.ConcaveSphericalMirror`](@ref)s can be used to focus light via reflection. The 
 
 ```@eval 
 using CairoMakie, SCDI
@@ -70,8 +70,8 @@ using CairoMakie, SCDI
 distance = 20e-2
 factor = 1.2
 RoC = distance/2 * factor
-m1 = SCDI.ConcaveMirror(RoC, 5e-3, 2SCDI.inch)
-m2 = SCDI.ConcaveMirror(RoC, 5e-3, 2SCDI.inch)
+m1 = SCDI.ConcaveSphericalMirror(RoC, 5e-3, 2SCDI.inch)
+m2 = SCDI.ConcaveSphericalMirror(RoC, 5e-3, 2SCDI.inch)
 
 SCDI.zrotate3d!(m1, deg2rad(180))
 SCDI.translate3d!(m2, [0, distance, 0])

@@ -78,22 +78,3 @@ function RectangularCompensatorPlate(width::W, height::H, thickness::T, n::Refra
 end
 
 RectangularCompensatorPlate(w::Real, h::Real, t::Real, n::Real) = RectangularCompensatorPlate(w, h, t, λ->n)
-
-"""
-    ConcaveMirror
-
-Constructor for a spherical mirror with a concave reflecting surface.
-See also [`Mirror`](@ref). and 
-
-# Inputs
-
-- `radius`: the spherical surface radius of curvature in [m]
-- `thickness`: substrate thickness in [m]
-- `diameter`: mirror outer diameter in [m]
-"""
-function ConcaveMirror(radius, thickness, diameter)
-    cylinder = PlanoSurfaceSDF(thickness, diameter)
-    concave = ConcaveSphericalSurfaceSDF(abs(radius), diameter)
-    shape = cylinder + concave
-    return Mirror(shape)
-end

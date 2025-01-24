@@ -81,3 +81,39 @@ function RoundPlanoMirror(diameter::D, thickness::T) where {D<:Real,T<:Real}
     shape = PlanoSurfaceSDF(thickness, diameter)
     return RoundPlanoMirror(shape)
 end
+
+"""[`ConcaveSphericalMirror`](@ref) shape type based on a [`UnionSDF`](@ref)"""
+const ConcaveSphericalMirrorShape{T} = UnionSDF{T, Tuple{ConcaveSphericalSurfaceSDF{T}, PlanoSurfaceSDF{T}}}
+
+"""
+    ConcaveSphericalMirror
+
+An ideal concave mirror with spherical reflecting surface, e.g. R = 1.
+See also [`RoundPlanoMirror`](@ref).
+
+# Fields
+
+- `shape`: a [`ConcaveSphericalMirrorShape`](@ref) that represents the substrate
+"""
+struct ConcaveSphericalMirror{T} <: AbstractReflectiveOptic{T, ConcaveSphericalMirrorShape{T}}
+    shape::ConcaveSphericalMirrorShape{T}
+end
+
+"""
+    ConcaveSphericalMirror
+
+Constructor for a spherical mirror with a concave reflecting surface.
+See also [`Mirror`](@ref). and 
+
+# Inputs
+
+- `radius`: the spherical surface radius of curvature in [m]
+- `thickness`: substrate thickness in [m]
+- `diameter`: mirror outer diameter in [m]
+"""
+function ConcaveSphericalMirror(radius, thickness, diameter)
+    cylinder = PlanoSurfaceSDF(thickness, diameter)
+    concave = ConcaveSphericalSurfaceSDF(abs(radius), diameter)
+    shape = concave + cylinder
+    return ConcaveSphericalMirror(shape)
+end
