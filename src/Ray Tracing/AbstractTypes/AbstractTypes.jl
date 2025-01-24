@@ -14,6 +14,7 @@ Types:
     AbstractSystem
     Intersection
     Interaction
+    Hint
 
 Core Functions:
     intersect3d(AbstractObject, AbstractRay)

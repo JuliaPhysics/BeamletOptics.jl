@@ -1,6 +1,6 @@
 module SCDIMakieExt
 
-using SCDI: faces, vertices, AbstractMesh, AbstractRay, Beam, PolarizedRay, intensity, rays, DummyObject
+using SCDI: faces, vertices, AbstractMesh, AbstractRay, Beam, PolarizedRay, intensity, rays, NonInteractableObject
 import SCDI: render_object!, render_ray!, _render_beam!,
     _render_ray!, render_surface!, _render_object_normal!, render_sdf_mesh!, render_dummy_mesh!
 using Makie: Axis3, LScene, mesh!, surface!, lines!, RGBAf, scatter!
@@ -60,7 +60,7 @@ end
 
 render_sdf_mesh!(axis::_RenderEnv, vertices, faces; transparency = true) = mesh!(axis, vertices, faces, transparency=transparency)
 
-function render_dummy_mesh!(axis::_RenderEnv, d::DummyObject; transparency = false)
+function render_dummy_mesh!(axis::_RenderEnv, d::NonInteractableObject; transparency = false)
     mesh = d.shape
     mesh!(axis, vertices(mesh), faces(mesh); transparency, color = :grey)
     return nothing
