@@ -21,7 +21,7 @@ A `ObjectGroup` implements the kinematic functions of [`AbstractObject`](@ref). 
 mutable struct ObjectGroup{T} <: AbstractObjectGroup{T}
     const dir::Matrix{T}
     center::Point3{T}
-    const objects::Vector{AbstractObject{T, <:AbstractShape{T}}}
+    const objects::Vector{AbstractObject}
 end
 
 position(group::ObjectGroup) = group.center

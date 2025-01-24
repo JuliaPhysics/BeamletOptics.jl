@@ -139,3 +139,4 @@ function render_object_normals!(axis, mesh::Mesh; l = 0.01)
     return nothing
 end
 _render_object_normal!(::Any, ::AbstractVector, ::AbstractVector; color = :blue) = nothing
+

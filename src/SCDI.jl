@@ -8,6 +8,7 @@ using StaticArrays: @SArray, @SArray, SMatrix, SArray
 using GeometryBasics: Point3, Point2, Mat
 using AbstractTrees: AbstractTrees, parent, children, NodeType, nodetype, nodevalue, print_tree, HasNodeType, Leaves, StatelessBFS, PostOrderDFS, PreOrderDFS, TreeIterator
 using InteractiveUtils: subtypes
+using FileIO: load
 
 import Base: length
 
@@ -23,6 +24,7 @@ include("Ray Tracing/SDFs/SDF.jl")
 include("Ray Tracing/Gaussian.jl")
 include("Ray Tracing/System.jl")
 include("Ray Tracing/Interactions.jl")
+include("Ray Tracing/OpticalComponents/Components.jl")
 include("Ray Tracing/Groups.jl")
 include("Ray Tracing/Render.jl")
 include("Ray Tracing/Components.jl")

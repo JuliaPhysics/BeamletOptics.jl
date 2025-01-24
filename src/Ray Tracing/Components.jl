@@ -5,22 +5,6 @@ function RectangularPlanoMirror2D(scale::T) where {T <: Real}
     return Mirror(shape)
 end
 
-"""
-    RoundPlanoMirror
-
-Returns a cylindrical, flat [`Mirror`](@ref) with perfect reflectivity based on:
-
-- `diameter`: mirror diameter
-- `thickness`: mirror substrate thickness
-
-!!! note
-    It is important to consider that all surfaces of this mirror type are reflecting!
-"""
-function RoundPlanoMirror(diameter::D, thickness::T) where {D<:Real,T<:Real}
-    shape = CylinderSDF(diameter/2, thickness/2)
-    return Mirror(shape)
-end
-
 function RectangularPlanoMirror(width::W, height::H, thickness::T) where {W<:Real,H<:Real,T<:Real}
     shape = CuboidMesh((width, thickness, height))
     translate3d!(shape, [
@@ -68,16 +52,16 @@ RetroReflector(scale) = RetroReflector(RetroMesh(scale))
 # FIXME
 """
 function RectangularPlateBeamSplitter(width::Real, thickness::Real, n::RefractiveIndex; eps_separation=1e-9)
-    coating = SCDI.ThinBeamSplitter(width)
-    shape = SCDI.CuboidMesh((width, thickness, width))
-    SCDI.translate3d!(shape, [
+    coating = ThinBeamSplitter(width)
+    shape = CuboidMesh((width, thickness, width))
+    translate3d!(shape, [
         -width/2,
         -thickness/2,
         -width/2,
     ])
-    SCDI.translate3d!(coating, [0, thickness/2 + eps_separation, 0])
-    substrate = SCDI.Prism(shape, n)
-    return SCDI.ObjectGroup([coating, substrate])
+    translate3d!(coating, [0, thickness/2 + eps_separation, 0])
+    substrate = Prism(shape, n)
+    return ObjectGroup([coating, substrate])
 end
 
 RectangularPlateBeamSplitter(w::Real, t::Real, n::Real; eps_separation=1e-9) = RectangularPlateBeamSplitter(w, t, λ->n; eps_separation)
@@ -94,3 +78,22 @@ function RectangularCompensatorPlate(width::W, height::H, thickness::T, n::Refra
 end
 
 RectangularCompensatorPlate(w::Real, h::Real, t::Real, n::Real) = RectangularCompensatorPlate(w, h, t, λ->n)
+
+"""
+    ConcaveMirror
+
+Constructor for a spherical mirror with a concave reflecting surface.
+See also [`Mirror`](@ref). and 
+
+# Inputs
+
+- `radius`: the spherical surface radius of curvature in [m]
+- `thickness`: substrate thickness in [m]
+- `diameter`: mirror outer diameter in [m]
+"""
+function ConcaveMirror(radius, thickness, diameter)
+    cylinder = PlanoSurfaceSDF(thickness, diameter)
+    concave = ConcaveSphericalSurfaceSDF(abs(radius), diameter)
+    shape = cylinder + concave
+    return Mirror(shape)
+end
