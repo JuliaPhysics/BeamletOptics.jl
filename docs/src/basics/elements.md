@@ -1,6 +1,6 @@
 # Optical elements
 
-Optical elements serve as the building blocks for optical systems in the context of this package, representing components such as mirrors, lenses, filters, etc. Unlike the surface/interface based representation of optical elements in other tools, they are treated as volumetric bodies in this simulation framework. Optical interactions between rays/beams and elements are defined based on the type of the element and the type of the incident beam/ray. **Note that optical elements will be referred to simply as objects moving forward**. A more detailled look into the design philosophy behind this approach is given in the [Objects and shapes](@ref) section below.
+Optical elements serve as the building blocks for optical systems in the context of this package, representing components such as mirrors, lenses, filters, etc. Unlike the surface/interface based representation of optical elements in other tools, they are treated as volumetric bodies in this simulation framework. Optical interactions between rays/beams and elements are defined based on the type of the element and the type of the incident beam/ray. **Note that optical elements will be referred to simply as objects moving forward**. A more detailed look into the design philosophy behind this approach is given in the [Objects and shapes](@ref) section below.
 
 To ensure compatibility with the [API design](@ref), custom optical elements must adhere to the [`SCDI.AbstractObject`](@ref) interface.
 
@@ -37,7 +37,7 @@ Some optical elements are provided with this package, these include:
     - [`SCDI.Photodetector`](@ref)
     - [`SCDI.ThinBeamSplitter`](@ref)
 
-For a detailled overview, refer to the [Optical components](@ref) section.
+For a detailed overview, refer to the [Optical components](@ref) section.
 
 !!! info "Custom optical elements"
     In order to implement custom geometries and optical elements, refer to the [API design](@ref) section.

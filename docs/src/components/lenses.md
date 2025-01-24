@@ -103,7 +103,7 @@ In order to model the lens surfaces shown above, the following SDF-based spheric
 - [`SCDI.MeniscusLensSDF`](@ref)
 - [`SCDI.PlanoSurfaceSDF`](@ref)
 
-They can be combined via the the [`SCDI.UnionSDF`](@ref)-API in order to enable the quasi-surface-based design of spherical lens systems.
+In general, [`SCDI.SCDI.AbstractRotationallySymmetricSDF`](@ref)s can be combined via the the [`SCDI.UnionSDF`](@ref)-API in order to enable the quasi-surface-based design of spherical lens systems.
 
 !!! hint "Spherical lens example"
     For a complex showcase, refer to the [Double Gauss Lens](@ref) example page.
