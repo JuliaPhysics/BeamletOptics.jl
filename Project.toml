@@ -22,7 +22,7 @@ SCDIMakieExt = "Makie"
 
 [compat]
 AbstractTrees = "0.4"
-GeometryBasics = "0.4"
+GeometryBasics = "0.4, 0.5"
 LinearAlgebra = "1"
 MarchingCubes = "0.1"
 PrecompileTools = "1"
