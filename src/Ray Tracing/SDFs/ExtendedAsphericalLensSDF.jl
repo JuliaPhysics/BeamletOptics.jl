@@ -147,7 +147,7 @@ end
 
 extended_aspheric_equation(r::Real, a::AbstractExtendedAsphericalSurfaceSDF) = extended_aspheric_equation(r, 1/a.radius, a.conic_constant, a.coefficients)
 
-# 2D distance functions for extended aspheres, following similar structure as original code.
+# 2D distance functions for extended aspheres
 function extended_convex_aspheric_surface_distance(r, z, c, k, d, coeffs)
     r2 = r^2
     r2_bound = (d/2)^2
@@ -237,7 +237,7 @@ function sdf(surface::ExtendedConcaveAsphericalSurfaceSDF{T}, point) where {T}
         ), zero(T))
 end
 
-# Rendering function for extended surfaces similar to previous ones.
+# Rendering function for extended surfaces. # TODO: Generalize this
 function render_object!(axis, asp::AbstractExtendedAsphericalSurfaceSDF; color=:blue)
     radius = asp.diameter/2
     v = LinRange(0, 2π, 100)
