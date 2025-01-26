@@ -1,4 +1,4 @@
-# Spherical lenses
+# Spherical lens example
 
 This example recreates the figure shown in the [Types of elements](@ref) section of the [Optical elements](@ref) chapter. The lens parameters are taken from the [Thorlabs](https://www.thorlabs.com/) website and are listed below:
 
@@ -14,16 +14,7 @@ First a function is defined that returns the refractive index ``n(\lambda)`` for
 ```@example spherical_lens_showcase
 using CairoMakie, SCDI
 
-
-function NBK7(λ)
-    if λ ≈ 532e-9
-        return 1.5195
-    end
-    if λ ≈ 1064e-9
-        return 1.5066
-    end
-    error("Ref. index for λ=$λ not available.")
-end
+NBK7 = SCDI.DiscreteRefractiveIndex([532e-9, 1064e-9], [1.5195, 1.5066])
 
 nothing # hide
 ```
@@ -35,28 +26,30 @@ Then the different spherical lenses referred to above are generated using the [`
 d = SCDI.inch
 
 # lens types
-r1 = r2 = 34.9e-3
+r1 = 34.9e-3
+r2 = -34.9e-3
 l = 6.8e-3
 LB1811 = SCDI.SphericalLens(r1, r2, l, d, NBK7)
 
-r1 = 15.5e-3
-r2 = Inf
+r1 = Inf
+r2 = -15.5e-3
 l = 8.6e-3
 LA1805 = SCDI.SphericalLens(r1, r2, l, d, NBK7)
 
-r1 = r2 = 52.0e-3
+r1 = -52e-3
+r2 = 52e-3
 l = 3e-3
-LD1464 = SCDI.SphericalLens(-r1, -r2, l, d, NBK7)
+LD1464 = SCDI.SphericalLens(r1, r2, l, d, NBK7)
 
-r1 = 25.7e-3
-r2 = Inf
+r1 = Inf
+r2 = 25.7e-3
 l = 3.5e-3
-LC1715 = SCDI.SphericalLens(-r1, r2, l, d, NBK7)
+LC1715 = SCDI.SphericalLens(r1, r2, l, d, NBK7)
 
-r1 = 32.1e-3
-r2 = 82.2e-3
+r1 = -82.2e-3
+r2 = -32.1e-3
 l = 3.6e-3
-LE1234 = SCDI.SphericalLens(r1, -r2, l, d, NBK7)
+LE1234 = SCDI.SphericalLens(r1, r2, l, d, NBK7)
 
 nothing # hide
 ```

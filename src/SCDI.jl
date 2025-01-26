@@ -1,30 +1,34 @@
 module SCDI
 
 using LinearAlgebra: norm, normalize, normalize!, dot, cross, I
-using UUIDs: UUID, uuid4
 using MarchingCubes: MC, march
 using Trapz: trapz
 using PrecompileTools: @setup_workload, @compile_workload
 using StaticArrays: @SArray, @SArray, SMatrix, SArray
 using GeometryBasics: Point3, Point2, Mat
-using AbstractTrees: AbstractTrees, parent, children, NodeType, nodetype, nodevalue, print_tree, HasNodeType, Leaves, StatelessBFS, PostOrderDFS, PreOrderDFS
+using AbstractTrees: AbstractTrees, parent, children, NodeType, nodetype, nodevalue, print_tree, HasNodeType, Leaves, StatelessBFS, PostOrderDFS, PreOrderDFS, TreeIterator
+using InteractiveUtils: subtypes
+using FileIO: load
 
 import Base: length
 
 # Do not change order of inclusion!
 include("Ray Tracing/Constants.jl")
 include("Ray Tracing/Utils.jl")
-include("Ray Tracing/Types.jl")
+include("Ray Tracing/AbstractTypes/AbstractTypes.jl")
 include("Ray Tracing/Rays.jl")
 include("Ray Tracing/PolarizedRays.jl")
 include("Ray Tracing/Beam.jl")
 include("Ray Tracing/Mesh.jl")
-include("Ray Tracing/SDF.jl")
+include("Ray Tracing/SDFs/SDF.jl")
 include("Ray Tracing/Gaussian.jl")
 include("Ray Tracing/System.jl")
 include("Ray Tracing/Interactions.jl")
+include("Ray Tracing/OpticalComponents/Components.jl")
 include("Ray Tracing/Groups.jl")
 include("Ray Tracing/Render.jl")
+include("Ray Tracing/Components.jl")
+include("Ray Tracing/Doublets.jl")
 
 if get(ENV, "CI", "false") == "false"
     @setup_workload begin
@@ -40,8 +44,8 @@ if get(ENV, "CI", "false") == "false"
         _scale = 1
         @compile_workload begin
             # execute workload
-            plane = SCDI.Mirror(uuid4(),
-                SCDI.Mesh{Float64}(uuid4(),
+            plane = SCDI.Mirror(
+                SCDI.Mesh{Float64}(
                     _vertices,
                     _faces,
                     _dir,

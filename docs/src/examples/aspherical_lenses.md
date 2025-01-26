@@ -1,6 +1,6 @@
-# Aspherical lenses
+# Aspherical lens example
 
-The package has a basic support for ISO10110 even aspheres. It is planned to extend this support in the future to include extended aspheres and maybe Q-aspheres.
+The package has a basic support for ISO 10110 even aspheres. It is planned to extend this support in the future to include extended aspheres and maybe Q-aspheres.
 As of now, there is only a convenience constructor for plano-aspheric lenses. However, you can manually construct your own complex shapes and geometries using 
 [`SCDI.ConvexAsphericalSurfaceSDF`](@ref) and [`SCDI.ConcaveAsphericalSurfaceSDF`](@ref). Multiple SDFs which represent a closed shape can be added by just adding the SDFs, see [`SCDI.UnionSDF`](@ref).
 

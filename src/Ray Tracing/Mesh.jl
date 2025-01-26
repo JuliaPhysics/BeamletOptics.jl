@@ -31,7 +31,6 @@ vertex matrix. For orientation and translation tracking, a `pos`itional and `dir
 - `scale`: scalar value that represents the current scale of the original mesh
 """
 mutable struct Mesh{T} <: AbstractMesh{T}
-    id::UUID
     vertices::Matrix{T}
     faces::Matrix{Int}
     dir::Matrix{T}
@@ -62,7 +61,7 @@ function Mesh(mesh)
     # Initialize mesh at origin with orientation [1,0,0] scaled to mm
     # Origin and direction are converted to type T
     scale::T = 1e-3
-    return Mesh{T}(uuid4(),
+    return Mesh{T}(
         vertices * scale,
         faces,
         Matrix{T}(I, 3, 3),
@@ -159,9 +158,14 @@ end
 Returns a vector with unit length that is perpendicular to the target `face`` according to
 the right-hand rule. The vertices must be listed row-wise within the face matrix.
 """
-function normal3d(object::AbstractMesh, fID::Int)
-    face = vertices(object)[faces(object)[fID, :], :]
-    n = cross((face[2, :] - face[1, :]), (face[3, :] - face[1, :]))
+function normal3d(object::AbstractMesh{T}, fID::Int) where{T}
+    @views begin
+        face = vertices(object)[faces(object)[fID, :], :]
+        n = cross(
+            (Point3{T}(face[2, :]) - Point3{T}(face[1, :])),
+            (Point3{T}(face[3, :]) - Point3{T}(face[1, :]))
+        )
+    end
     return normalize(n)
 end
 
@@ -192,13 +196,13 @@ function MoellerTrumboreAlgorithm(face, ray::AbstractRay{T}; kϵ = 1e-9, lϵ = 1
     Tv = position(ray) - V1
     invDet = 1 / Det
     u = dot(Tv, Pv) * invDet
-    if (u < 0) || (u > 1)
+    if (u < 0 - eps(T)) || (u > 1 + eps(T))
         return T(Inf)
     end
     # Compute normalized v and reject if less than 0 or greater than 1
     Qv = cross(Tv, E1)
     v = dot(direction(ray), Qv) * invDet
-    if (v < 0) || (u + v > 1)
+    if (v < 0 - eps(T)) || (u + v > 1 + eps(T))
         return T(Inf)
     end
     # Compute t (type def. for t to avoid Any)
@@ -211,19 +215,19 @@ function MoellerTrumboreAlgorithm(face, ray::AbstractRay{T}; kϵ = 1e-9, lϵ = 1
 end
 
 """
-    intersect3d(object::Mesh, ray::Ray)
+    intersect3d(shape::Mesh, ray::Ray)
 
-This function is a generic implementation to check if a ray intersects the object mesh.\\
+This function is a generic implementation to check if a ray intersects the shape mesh.\\
 """
-function intersect3d(object::AbstractMesh{M},
+function intersect3d(shape::AbstractMesh{M},
         ray::AbstractRay{R}) where {M <: Real, R <: Real}
-    numEl = size(faces(object), 1)
+    numEl = size(faces(shape), 1)
     # allocate all intermediate vectors once (note that this is NOT THREAD-SAFE)
     T = promote_type(M, R)
     fID::Int = 0
     t0::T = Inf
     for i in 1:numEl
-        face = @views vertices(object)[faces(object)[i, :], :]
+        face = @views vertices(shape)[faces(shape)[i, :], :]
         t = MoellerTrumboreAlgorithm(face, ray)
         # Return closest intersection
         if t < t0
@@ -234,8 +238,93 @@ function intersect3d(object::AbstractMesh{M},
     if isinf(t0)
         return nothing
     else
-        face = @views vertices(object)[faces(object)[fID, :], :]
-        normal = normal3d(object, fID)
-        return Intersection{T}(t0, normalize(T.(normal)), nothing)
+        face = @views vertices(shape)[faces(shape)[fID, :], :]
+        normal = normal3d(shape, fID)
+        return Intersection(t0, normalize(T.(normal)), shape)
     end
+end
+
+## A collection of mesh constructors
+
+"""
+    QuadraticFlatMesh(scale::Real)
+
+Creates a 2D quadratic [`Mesh`](@ref) that is centered around the origin and aligned with respect to the **y-axis**.
+Quadrat size is determined according to `scale`. Vertex normals are parallel to the positive y-axis.
+"""
+function QuadraticFlatMesh(scale::Real)
+    sz = 0.5
+    vertices = [
+        sz 0 sz
+        sz 0 -sz
+        -sz 0 -sz
+        -sz 0 sz
+    ]
+    faces = [
+        1 2 4
+        2 3 4
+    ]
+    vertices .*= scale
+    T = eltype(vertices)
+    return Mesh{T}(
+        vertices,
+        faces,
+        Matrix{T}(I, 3, 3),
+        T.([0, 0, 0]),
+        scale)
+end
+
+"""
+    CuboidMesh(scale::NTuple{3, T}, θ::Real=π/2) where T<:Real
+
+Constructs the [`Mesh`](@ref) of a rectangular cuboid as per the dimensions specified in the `scale` tuple. Not that the tuple entries represent x, y and z dimensions (in that order).
+In addition, one side of the mesh can be tilted by an angle `θ` in order to generate the mesh of a rhomb.
+The mesh is initialized such that one corner of the cuboid lies at the origin.
+
+# Arguments
+
+- `scale`: a 3-tuple of x, y and z dimensions for the cube
+- `θ`: parallel tilt angle
+"""
+function CuboidMesh(scale::NTuple{3, T}, θ::Real=π/2) where T<:Real
+    x = scale[1]
+    y = scale[2]
+    z = scale[3]
+    dx = cos(θ)*y
+    vertices = [
+        0 0 0
+        x 0 0
+        x + dx y 0
+        0 + dx y 0
+        0 + dx y z
+        x + dx y z
+        x 0 z
+        0 0 z
+    ]
+    faces = [
+        1 3 2
+        1 4 3
+        3 4 5
+        3 5 6
+        2 3 6
+        2 6 7
+        1 8 5
+        1 5 4
+        6 5 8
+        6 8 7
+        1 7 8
+        1 2 7
+    ]
+    return Mesh{T}(
+        vertices,
+        faces,
+        Matrix{T}(I, 3, 3),
+        zeros(T, 3),
+        one(T))
+end
+
+"""Refer to [`CuboidMesh`](@ref)."""
+function CubeMesh(scale::Real)
+    scale = Float64(scale)
+    return CuboidMesh((scale, scale, scale))
 end

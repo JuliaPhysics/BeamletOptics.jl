@@ -5,16 +5,13 @@ A container storing the optical elements of, i.e. a camera lens or lab setup.
 
 # Fields
 
-- `id::UUID`: system ID (uuid4)
 - `objects`: vector containing the different objects that are part of the system (subtypes of [`AbstractObject`](@ref))
 """
 struct System <: AbstractSystem
-    id::UUID
     objects::Vector{AbstractObject}
 end
 
-System(object::AbstractObject) = System(uuid4(), [object])
-System(objects::AbstractArray{<:AbstractObject}) = System(uuid4(), objects)
+System(object::AbstractObject) = System([object])
 
 """
     objects(system::System)
@@ -36,51 +33,16 @@ can be added or removed after construction but it allows for more performant ray
 
 # Fields
 
-- `id::UUID`: system ID (uuid4)
 - `objects`: vector containing the different objects that are part of the system (subtypes of [`AbstractObject`](@ref))
 """
 struct StaticSystem{T <: Tuple} <: AbstractSystem
-    id::UUID
     objects::T
 end
-StaticSystem(object::AbstractObject) = StaticSystem(uuid4(), (object))
+StaticSystem(object::AbstractObject) = StaticSystem((object))
 StaticSystem(object::AbstractObjectGroup) = StaticSystem([object])
-StaticSystem(objects::AbstractArray{<:AbstractObject}) = StaticSystem(uuid4(), tuple(collect(Leaves(objects))...))
+StaticSystem(objects::AbstractArray{<:AbstractObject}) = StaticSystem(tuple(collect(Leaves(objects))...))
 
 objects(system::StaticSystem) = system.objects
-
-"""
-    object(system::System, obj_id::UUID)
-
-Find a specific object in the `system` based on its unique `obj_id`.
-"""
-function object(system::System, obj_id::UUID)::Union{AbstractObject, Nothing}
-    for object in objects(system)
-        if id(object) === obj_id
-            return object
-        end
-    end
-    # If no match
-    return nothing
-end
-
-"""
-    object(system::StaticSystem, obj_id::UUID)
-
-Find a specific object in the `system` based on its unique `obj_id`.
-"""
-function object(system::StaticSystem, obj_id::UUID)
-    index = object_index(system, obj_id)
-    isnothing(index) && return nothing
-
-    return system.objects[index]
-end
-
-function object_index(system::StaticSystem, obj_id::UUID)
-    return findfirst(object -> id(object) === obj_id, system.objects)
-end
-
-object(::AbstractSystem, ::Nothing) = nothing
 
 function trace_system!(::AbstractSystem, beam::B; r_max = 0) where {B <: AbstractBeam}
     @warn "Tracing for $B not implemented"
@@ -94,7 +56,7 @@ end
 
 @inline function trace_all(system::AbstractSystem, ray::AbstractRay{R}) where {R}
     intersection::Nullable{Intersection{R}} = nothing
-    for object in objects(system)
+    for object::AbstractObject in objects(system)
         # Find shortest intersection
         temp::Nullable{Intersection{R}} = intersect3d(object, ray)
         # Ignore miss
@@ -114,42 +76,44 @@ end
     return intersection
 end
 
-@inline function trace_one(system::AbstractSystem, ray::AbstractRay{R}, hint::UUID) where {R}
+@inline function trace_one(system::AbstractSystem, ray::AbstractRay{R}, hint::Hint) where {R}
     # Trace against hinted object
-    intersection = intersect3d(object(system, hint), ray)
-    # If hinted object is not intersected, trace the entire system
+    intersection::Nullable{Intersection{R}} = intersect3d(shape(hint)::AbstractShape{R}, ray)
     if isnothing(intersection)
+        # If hinted object is not intersected, trace the entire system
         intersection = trace_all(system, ray)
+    else
+        # If hinted object is intersected, update intersection
+        object!(intersection, object(hint))
     end
     return intersection
 end
 
 """
-    tracing_step!(system::AbstractSystem, ray::AbstractRay{R}, hint::Nullable{UUID})
+    tracing_step!(system::AbstractSystem, ray::AbstractRay{R}, hint::Hint)
 
 Tests if the `ray` intersects an `object` in the optical `system`. Returns the closest intersection.
 
-# Hint UUID
+# Hint
 
-An optional `hint` in the form of an UUID can be provided to test against a specific object in the `system` first.
+An optional [`Hint`](@ref) can be provided to test against a specific object (and shape) in the `system` first.
 
 !!! warning
     If a hint is provided and the object intersection is valid, the intersection will be returned immediately.
-    However, it is not guaranteed that this is the true closest intersection. 
+    However, it is not guaranteed that this is the true closest intersection.
 """
-@inline function tracing_step!(system::AbstractSystem,
-        ray::AbstractRay{R},
-        hint::Nullable{UUID}) where {R <: Real}
-    if isnothing(hint)
-        # Test against all objects in system
-        intersection!(ray, trace_all(system, ray))
-    else
-        # Test against hinted object
-        intersection!(ray, trace_one(system, ray, hint))
-    end
-
+@inline function tracing_step!(system::AbstractSystem, ray::AbstractRay{R}, hint::Hint) where {R <: Real}
+    # Test against hinted object
+    intersection!(ray, trace_one(system, ray, hint))
     return nothing
 end
+
+@inline function tracing_step!(system::AbstractSystem, ray::AbstractRay{R}, ::Nothing) where {R <: Real}
+    # Test against all objects in system
+    intersection!(ray, trace_all(system, ray))
+    return nothing
+end
+
 
 """
     trace_system!(system::AbstractSystem, beam::Beam{T}; r_max::Int = 20) where {T <: Real}
@@ -159,13 +123,13 @@ Trace a [`Beam`](@ref) through an optical `system`. Maximum number of tracing st
 # Tracing logic
 
 The intersection of the last ray of the `beam` with any objects in the `system` is tested.
-If an object is hit, the optical interaction is analyzed and tracing continues. 
+If an object is hit, the optical interaction is analyzed and tracing continues.
 Else the tracing procedure is stopped.
 
 # Arguments
 
-- `system:`: The optical system through which the GaussianBeamlet is traced.
-- `beam`: The GaussianBeamlet object to be traced.
+- `system:`: The optical system through which the [`Beam`](@ref) is traced.
+- `beam`: The [`Beam`](@ref) object to be traced.
 - `r_max`: Maximum number of tracing iterations. Default is 20.
 """
 function trace_system!(system::AbstractSystem, beam::Beam{T}; r_max::Int = 20) where {T <: Real}
@@ -178,7 +142,7 @@ function trace_system!(system::AbstractSystem, beam::Beam{T}; r_max::Int = 20) w
         if isnothing(intersection(ray))
             break
         end
-        interaction = interact3d(system, object(system, id(intersection(ray))), beam, ray)
+        interaction = interact3d(system, object(intersection(ray)), beam, ray)
         if isnothing(interaction)
             break
         end
@@ -194,21 +158,22 @@ function retrace_system!(system::AbstractSystem, beam::Beam{T}) where {T <: Real
     interaction::Nullable{BeamInteraction{T}} = nothing
     for (i, ray) in enumerate(rays(beam))
         # Test if intersection is valid
-        isect = intersection(ray)
-        if isnothing(isect)
+        _intersection = intersection(ray)
+        if isnothing(_intersection)
             cutoff = i
             break
         end
-
         # Recalculate current intersection
-        intersection!(ray, intersect3d(object(system, id(isect)), ray))
+        intersection!(ray, intersect3d(shape(_intersection), ray))
         # Test if intersection is valid
         if isnothing(intersection(ray))
             cutoff = i
             break
         end
+        # Update new intersection object field
+        object!(ray.intersection, object(_intersection))
         # Test if interaction is still valid
-        interaction = interact3d(system, object(system, id(intersection(ray))), beam, ray)
+        interaction = interact3d(system, object(intersection(ray)), beam, ray)
         if isnothing(interaction)
             # Do not set cutoff since nothing is a valid interaction
             break
@@ -237,16 +202,16 @@ end
 
 Trace a [`GaussianBeamlet`](@ref) through an optical `system`. Maximum number of tracing steps can be capped by `r_max`.
 
-# Tracing logic 
+# Tracing logic
 
-The chief, waist and divergence beams are traced step-by-step through the `system`. 
+The chief, waist and divergence beams are traced step-by-step through the `system`.
 For each intersection after a [`tracing_step!`](@ref), the intersections are compared.
 If all rays hit the same target, the optical interaction is analyzed, else the tracing stops.
 
 # Arguments
 
-- `system`: The optical system through which the GaussianBeamlet is traced.
-- `gauss`: The GaussianBeamlet object to be traced.
+- `system`: The optical system through which the [`GaussianBeamlet`](@ref) is traced.
+- `gauss`: The [`GaussianBeamlet`](@ref) object to be traced.
 - `r_max`: Maximum number of tracing iterations. Default is 20.
 """
 function trace_system!(system::AbstractSystem,
@@ -258,23 +223,28 @@ function trace_system!(system::AbstractSystem,
         # Trace chief ray first
         ray = last(rays(gauss.chief))
         tracing_step!(system, ray, hint(interaction))
-        if isnothing(intersection(ray))
-            break
-        end
+        isnothing(intersection(ray)) && break
+
         # Follow up with waist and divergence ray
-        id_c = id(intersection(ray))
+        obj_c = object(intersection(ray))
         ray = last(rays(gauss.waist))
         tracing_step!(system, ray, hint(interaction))
-        id_w = id(intersection(ray))
+        # if the waist ray is no longer hitting the same object as the chief ray stop here
+        isnothing(intersection(ray)) && break
+
+        obj_w = object(intersection(ray))
         ray = last(rays(gauss.divergence))
         tracing_step!(system, ray, hint(interaction))
-        id_d = id(intersection(ray))
+        # if the divergence ray is no longer hitting the same object as the chief ray stop here
+        isnothing(intersection(ray)) && break
+
+        obj_d = object(intersection(ray))
         # If beams do not hit same target stop tracing
-        if !(id_c == id_w == id_d)
+        if !(obj_c === obj_w === obj_d)
             break
         end
         interaction = interact3d(system,
-            object(system, id_c),
+            obj_c,
             gauss,
             length(rays(gauss.chief)))
         if isnothing(interaction)
@@ -310,26 +280,31 @@ function retrace_system!(system::AbstractSystem, gauss::GaussianBeamlet{T}) wher
         end
         w_ray = rays(gauss.waist)[i]
         d_ray = rays(gauss.divergence)[i]
-        obj = object(system, id(intersection(c_ray)))
-        intersect_c = intersect3d(obj, c_ray)
-        intersect_w = intersect3d(obj, w_ray)
-        intersect_d = intersect3d(obj, d_ray)
+        obj = object(intersection(c_ray))
+        shp = shape(intersection(c_ray))
+        intersect_c = intersect3d(shp, c_ray)
+        intersect_w = intersect3d(shp, w_ray)
+        intersect_d = intersect3d(shp, d_ray)
         # Test if intersections are still valid
         if any(isnothing, (intersect_c, intersect_w, intersect_d))
             cutoff = i
             break
         end
         # Test if all beams still hit the same target
-        if !(id(intersect_c) == id(intersect_w) == id(intersect_d))
+        if !(shape(intersect_c) === shape(intersect_w) === shape(intersect_d))
             cutoff = i
             break
         end
+        # Update object field
+        object!(intersect_c, obj)
+        object!(intersect_w, obj)
+        object!(intersect_d, obj)
         # Set intersection
         intersection!(c_ray, intersect_c)
         intersection!(w_ray, intersect_w)
         intersection!(d_ray, intersect_d)
         # Test if interaction is still valid
-        interaction = interact3d(system, object(system, id(intersect_c)), gauss, i)
+        interaction = interact3d(system, object(intersect_c), gauss, i)
         if !isnothing(interaction) && i < n_c
             replace!(gauss, interaction, i + 1) # NOT THREAD-SAFE
         end
@@ -367,22 +342,28 @@ A maximum number of rays per `beam` (`r_max`) can be specified in order to avoid
 - `r_max::Int=20` (optional): Maximum number of tracing iterations for each leaf. Default is 100.
 - `retrace::Bool=true` (optional): Flag to indicate if the system should be retraced. Default is true.
 """
-function solve_system!(system::AbstractSystem, beam::AbstractBeam; r_max = 100, retrace = true)
-    B = nodetype(beam)
-    # Retrace system, use stateless iterator for appendability
+function solve_system!(system::AbstractSystem, beam::B; r_max = 100, retrace = true) where {B <: AbstractBeam}
+    # Initialize a reusable queue for breadth-first searches
+    queue = B[]
+    # Retrace system, use stateful iterator for appendability
     if retrace
-        for node::B in StatelessBFS(beam)
-            retrace_system!(system, node::B)
-        end
+        push!(queue, beam)
+        stateful_bfs(beam, x->retrace_system!(system, x), queue)
     end
     # Trace starting of each leaf in beam tree
-    for leaf::B in Leaves(beam)
-        for beam::B in StatelessBFS(leaf)
-            if isnothing(_last_beam_intersection(beam))
-                trace_system!(system, beam, r_max = r_max)
-            end
-        end
+    stateful_dfs_leaves(beam, leaf->begin
+        empty!(queue)
+        push!(queue, leaf)
+        stateful_bfs(leaf, x->solve_leaf!(system, x; r_max), queue)
+    end)
+    return nothing
+end
+
+function solve_leaf!(system::AbstractSystem, beam::AbstractBeam; r_max = 100)
+    if isnothing(_last_beam_intersection(beam))
+        trace_system!(system, beam, r_max = r_max)
     end
+
     return nothing
 end
 

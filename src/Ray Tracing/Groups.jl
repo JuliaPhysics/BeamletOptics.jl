@@ -8,7 +8,7 @@ Main purpose is handling of, i.e., groups of lenses.
 
 - `center`: a point in 3D space which is regarded as the reference origin of the group
 - `dir`: a 3x3 matrix that describes the common `orientation` of the group
-- `objects`: stores [`AbstractObject`](@ref), can also store subgroups of type [`AbstractObjectGroup`](@ref) 
+- `objects`: stores [`AbstractObject`](@ref), can also store subgroups of type [`AbstractObjectGroup`](@ref)
 
 ## Kinematic
 
@@ -18,7 +18,7 @@ A `ObjectGroup` implements the kinematic functions of [`AbstractObject`](@ref). 
 - [`translate_to3d!`](@ref): all objects are moved in parallel such that the group `center` is equal to the target position
 - [`rotate3d!`](@ref): all objects are rotated around the `center` point with respect to their relative position
 """
-mutable struct ObjectGroup{T} <: AbstractObjectGroup
+mutable struct ObjectGroup{T} <: AbstractObjectGroup{T}
     const dir::Matrix{T}
     center::Point3{T}
     const objects::Vector{AbstractObject}
@@ -30,7 +30,7 @@ position!(group::ObjectGroup, pos) = (group.center = pos)
 orientation(group::ObjectGroup) = group.dir
 orientation!(group::ObjectGroup, dir) = (group.dir .= dir)
 
-function ObjectGroup(v::AbstractArray{<:AbstractObject}, T = Float64)
+function ObjectGroup(v::AbstractArray, T = Float64)
     ObjectGroup{T}(Matrix{T}(I, 3, 3), Point3{T}(0), v)
 end
 
@@ -71,12 +71,12 @@ end
 """
     rotate3d!(group::ObjectGroup, axis, θ)
 
-All objects in the group are rotated around the group center via the specified angle `θ` and `axis`. 
+All objects in the group are rotated around the group center via the specified angle `θ` and `axis`.
 """
 function rotate3d!(group::ObjectGroup, axis, θ)
     R = rotate3d(axis, θ)
     # Update group orientation
-    orientation!(group, orientation(group) * R)
+    orientation!(group, R * orientation(group))
     # Recursively rotate all subgroups and objects
     for object in objects(group)
         rotate3d!(object, axis, θ)

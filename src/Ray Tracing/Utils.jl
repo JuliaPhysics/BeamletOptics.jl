@@ -98,13 +98,12 @@ end
 
 Returns the angle between the `target` and `reference` vector in **rad**.
 """
-function angle3d(target::AbstractVector{T}, reference::AbstractVector{T}) where {T}
-    arg = clamp(dot(target, reference) / (norm(target) * norm(reference)), -one(T), one(T))
+function angle3d(target::AbstractArray{T}, reference::AbstractArray{R}) where {T,R}
+    G = promote_type(T,R)
+    arg = clamp(dot(target, reference) / (norm(target) * norm(reference)), -one(G), one(G))
     angle = acos(arg)
     return angle
 end
-
-angle3d(target::AbstractVector{T}, reference::AbstractVector{V}) where {T,V} = angle3d(promote(target, reference)...)
 
 """
     line_point_distance3d(pos, dir, point)
@@ -160,16 +159,24 @@ end
 """
     refraction3d(dir, normal, n1, n2)
 
-Calculates the refraction between an input vector `dir` and surface `normal` vector  in 3D-space.\\
-`n1` is the "outside" refractive index and `n2` is the "inside" refractive index.\\
+Calculates the refraction between an input vector `dir` and surface `normal` vector  in 3D-space.
+`n1` is the "outside" refractive index and `n2` is the "inside" refractive index.
+The function returns the new direction of propagation and a boolean flag to indicate if internal refraction has occured.
 
 Vectors `dir` and `normal` must have **unit length**!
 
 # Total internal reflection
 
-If the critical angle for n1, n2 and the incident angle is reached, the ray is reflected instead!
+If the critical angle for n1, n2 and the incident angle is reached, the ray is reflected internally instead!
+
+# Arguments
+
+- `dir`: direction vector of incoming ray
+- `normal`: surface normal at point of intersection
+- `n1`: index of ref. before refraction
+- `n2`: index of ref. after refraction
 """
-function refraction3d(dir, normal, n1, n2)
+function refraction3d(dir::AbstractArray, normal::AbstractArray, n1::Real, n2::Real)
     # dir and normal must have unit length!
     isapprox(norm(dir), 1) || throw(ArgumentError("dir must have  unit length"))
     isapprox(norm(normal), 1) || throw(ArgumentError("norm must have  unit length"))
@@ -178,10 +185,10 @@ function refraction3d(dir, normal, n1, n2)
     sinθt² = n^2 * (1 - cosθi^2)
     # Check for total reflection
     if sinθt² > 1.0
-        return reflection3d(dir, normal)
+        return (reflection3d(dir, normal), true)
     end
     cosθt = sqrt(1 - sinθt²)
-    return @. n * dir + (n * cosθi - cosθt) * normal
+    return (@. n * dir + (n * cosθi - cosθt) * normal, false)
 end
 
 """
@@ -230,7 +237,7 @@ E(r,z) = {E_0}\\frac{{{w_0}}}{{w(z)}}\\exp\\left( { - \\frac{{{r^2}}}{{w{{(z)}^2
 - `w`: local beam radius
 - `k`: wave number, equal to `2π/λ`
 - `ψ`: Gouy phase shift (defined as ``-\\text{atan}\\left(\\frac{z}{z_r}\\right)`` !)
-- `R`: wavefront curvature
+- `R`: wavefront curvature, i.e. 1/r (radius of curvature)
 """
 electric_field(r::Real, z::Real, E0, w0, w, k, ψ, R) = E0 * w0 / w * exp(-r^2 / w^2) * exp(im * (k * z + ψ + (k * r^2 * R) / 2))
 
@@ -288,3 +295,146 @@ function fresnel_coefficients(θ::AbstractArray{T}, n::Number) where T
 end
 
 is_internally_reflected(rp::Number, rs::Number) = isapprox(abs2(rs), 1, atol=1e-6) && isapprox(abs2(rp), 1, atol=1e-6)
+
+
+"""
+    sag(r::Real, l::Real)
+
+Calculates the sag of a cut circle with radius `r` and chord length `l`
+"""
+sag(r::Real, l::Real) = r - sqrt(r^2 - 0.25 * l^2)
+
+function check_sag(r, d)
+    if abs(2r) < d
+        throw(ArgumentError("Radius of curvature (r = $(r)) must be ≥ than half the diameter (d = $(d)) or an illegal shape results!"))
+    else
+        return nothing
+    end
+end
+
+"""
+    stateful_bfs(root::T, visitor::Function, queue=T[root]) where {T}
+
+Provides a stateful breadth-first search over the tree defined by the `root` element
+and applies the function `visitor` to each element of the tree.
+
+This is a type-stable alternative to `AbstractTrees.StatelessBFS` with only allocations for the `queue` itself.
+"""
+function stateful_bfs(root::T, visitor::Function, queue=T[root]) where {T}
+    while !isempty(queue)
+        node = popfirst!(queue)  # Dequeue the first node
+        visitor(node)  # Process the node using the visitor function
+        append!(queue, children(node))  # Enqueue the children
+    end
+
+    return nothing
+end
+
+"""
+    stateful_dfs_leaves(root::T, visitor::Function, stack=T[root]) where {T}
+
+Provides a stateful depth-first search over the tree defined by the `root` element
+and applies the function `visitor` to **all leaves** of the tree.
+
+This is a type-stable alternative to `AbstractTrees.Leaves` with only allocations for the `stack` itself.
+"""
+function stateful_dfs_leaves(root::T, visitor::Function, stack=T[root]) where {T}
+    while !isempty(stack)
+        node = pop!(stack)  # Pop the top node from the stack
+        if isempty(children(node))  # Check if the node is a leaf
+            visitor(node)
+        else
+            # Push children onto the stack in reverse order
+            _children = children(node)
+            for child in Iterators.reverse(_children)
+                push!(stack, child)
+            end
+        end
+    end
+
+    return nothing
+end
+
+## Refractive index utils
+"""
+    DiscreteRefractiveIndex{T}
+
+Represents a incomplete set of dispersion data where for each exact wavelength one refractive index value is stored in the `data` field.
+Can be called like a function `n = n(λ)`. Does not interpolate between data points.
+Refer to [`RefractiveIndex`](@ref) for more information.
+"""
+struct DiscreteRefractiveIndex{T}
+    data::Dict{T, T}
+end
+
+function DiscreteRefractiveIndex(λs::AbstractArray{L}, ns::AbstractArray{N}) where {L, N}
+    if length(λs) != length(ns)
+        throw(ArgumentError("Number of wavelengths must match number of ref. indices"))
+    end
+    T = promote_type(L, N)
+    d = Dict(zip(λs, ns))
+    return DiscreteRefractiveIndex{T}(d)
+end
+
+(dri::DiscreteRefractiveIndex)(λ) = dri.data[λ]
+
+"[`DiscreteRefractiveIndex`](@ref) passes test by default"
+test_refractive_index_function(::DiscreteRefractiveIndex) = nothing
+
+"""
+    test_refractive_index_function(input)
+
+Tests if `input` is callable with a single `Real` argument for the wavelength `λ` and
+returns a single `Real` value for the refractive index `n`. 
+"""
+function test_refractive_index_function(input)
+    # Test function compat for the following types of λ 
+    Ts = [Int, Float32, Float64]
+    try
+        for T in Ts
+            # Test if input accepts types
+            answer = input(one(T))
+            # Test if input returns single real value
+            if !isa(answer, Real)
+                error()
+            end
+        end
+    catch
+        error_msg = "Ref. index must be callable with a single Real argument and return a single real result."
+        throw(ArgumentError(error_msg))
+    end
+    return nothing
+end
+
+"""
+    RefractiveIndex
+
+Union type that represents valid means to pass a refractive index `n` to e.g. [`AbstractObject`](@ref)s.
+The core assumption is that:
+
+1. the refractive index is callable with a **single** `Real` argument `λ` to represent the wavelength in [m]
+2. the return value is a **single** `Real` value for the refractive index
+
+Refer to e.g. [`DiscreteRefractiveIndex`](@ref). 
+"""
+const RefractiveIndex = Union{Function, DiscreteRefractiveIndex}
+
+"""
+    list_subtypes(T::Type)
+
+Prints a tree of all subtypes, e.g. `list_subtypes(AbstractObject)`.
+"""
+function list_subtypes(T::Type, prefix::String = "", is_last::Bool = true)
+    # Print the current type
+    connector = is_last ? "└── " : "├── "
+    println(prefix * connector * string(T))
+
+    # Update the prefix for child types
+    new_prefix = prefix * (is_last ? "    " : "│   ")
+
+    # Iterate through the subtypes
+    subtypes_list = subtypes(T)
+    for (i, subtype) in enumerate(subtypes_list)
+        list_subtypes(subtype, new_prefix, i == length(subtypes_list))
+    end
+end

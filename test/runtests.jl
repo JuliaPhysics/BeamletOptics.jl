@@ -2,7 +2,6 @@ using SCDI
 using Test
 using LinearAlgebra
 using GeometryBasics
-using UUIDs
 using AbstractTrees
 
 @testset "Utilities" begin
@@ -76,11 +75,12 @@ using AbstractTrees
             n2 = 1.5
             for θ1 in 0:(π / 8):(π / 2)
                 dir_in = [sin(θ1), 0, -cos(θ1)]
-                dir_out = SCDI.refraction3d(dir_in, normal, n1, n2)
+                dir_out, TIR = SCDI.refraction3d(dir_in, normal, n1, n2)
                 θ2 = SCDI.angle3d(-normal, dir_out)
                 # 2D-equation for refraction validation
                 θ3 = asin(n1 / n2 * sin(θ1))
                 @test isapprox(θ2, θ3)
+                @test TIR == false
             end
         end
         @testset "Test from medium into vacuum" begin
@@ -88,16 +88,18 @@ using AbstractTrees
             n2 = 1.0
             for θ1 in 0:(π / 8):(π / 2)
                 dir_in = [sin(θ1), 0, -cos(θ1)]
-                dir_out = SCDI.refraction3d(dir_in, normal, n1, n2)
+                dir_out, TIR = SCDI.refraction3d(dir_in, normal, n1, n2)
                 if θ1 > asin(n2 / n1)
                     # Test for total reflection
                     θ2 = SCDI.angle3d(dir_out, normal)
                     @test isapprox(θ1, θ2)
+                    @test TIR == true
                 else
                     # Test for refraction
                     θ2 = SCDI.angle3d(-normal, dir_out)
                     θ3 = asin(n1 / n2 * sin(θ1))
                     @test isapprox(θ2, θ3)
+                    @test TIR == false
                 end
             end
         end
@@ -159,30 +161,53 @@ using AbstractTrees
             @test real(tp) ≈ 3 atol=1e-15
         end
     end
+    
+    @testset "Ref. index utils" begin
+        # Test data (NLAK22)
+        T1 = Float32
+        T2 = Float64
+        lambdas = T1.([488e-9, 707e-9, 1064e-9])
+        indices = T2.([1.6591, 1.6456, 1.6374])
+        ref_index = SCDI.DiscreteRefractiveIndex(lambdas, indices)
+    
+        @testset "DiscreteRefractiveIndex" begin
+            @test isdefined(SCDI, :DiscreteRefractiveIndex)
+            @test isa(ref_index, SCDI.DiscreteRefractiveIndex{T2})
+            @test ref_index(lambdas[2]) == indices[2]
+            @test_throws KeyError ref_index(lambdas[1] + 1e-9)
+            # Test constructor
+            @test_throws ArgumentError SCDI.DiscreteRefractiveIndex([1], [1,2])
+        end
+    
+        @testset "Test ref. helper function" begin
+            f1(x::Float64) = x              # fail
+            f2(x::Union{Int, Float64}) = x  # fail
+            f3(x::Real) = "a"               # fail
+            f4(x) = x, 1                    # fail
+            f5(x) = x                       # pass
+            # Test if illegal functions are detected
+            @test_throws ArgumentError SCDI.test_refractive_index_function(f1)
+            @test_throws ArgumentError SCDI.test_refractive_index_function(f2)
+            @test_throws ArgumentError SCDI.test_refractive_index_function(f3)
+            @test_throws ArgumentError SCDI.test_refractive_index_function(f4)
+            @test isnothing(SCDI.test_refractive_index_function(f5))
+            @test isnothing(SCDI.test_refractive_index_function(ref_index))
+        end
+    end
 end
 
 @testset "Types" begin
-    @test isdefined(SCDI, :AbstractEntity)
-    @test isdefined(SCDI, :AbstractSystem)
-    @test isdefined(SCDI, :AbstractRay)
-    @test isdefined(SCDI, :AbstractBeam)
     @test isdefined(SCDI, :AbstractShape)
     @test isdefined(SCDI, :AbstractObject)
     @test isdefined(SCDI, :AbstractObjectGroup)
+    @test isdefined(SCDI, :AbstractRay)
+    @test isdefined(SCDI, :AbstractBeam)
+    @test isdefined(SCDI, :AbstractSystem)
     @test isdefined(SCDI, :Intersection)
+    @test isdefined(SCDI, :Hint)
     @test isdefined(SCDI, :AbstractInteraction)
 
     # Generate test structs
-    struct TestEntity <: SCDI.AbstractEntity
-        id::UUID
-    end
-
-    @testset "AbstractEntity" begin
-        e = TestEntity(uuid4())
-        @test SCDI.id(e) == e.id
-        @test SCDI.id("Hello World") === nothing
-    end
-
     struct TestSystem <: SCDI.AbstractSystem end
 
     @testset "AbstractSystem" begin
@@ -237,12 +262,11 @@ end
     end
 
     mutable struct TestBeam{T} <: SCDI.AbstractBeam{T, TestRay{T}}
-        id::UUID
         parent::SCDI.Nullable{TestBeam}
         children::Vector{TestBeam}
     end
 
-    TestBeam() = TestBeam{Float64}(uuid4(), nothing, Vector{TestBeam{Float64}}())
+    TestBeam() = TestBeam{Float64}(nothing, Vector{TestBeam{Float64}}())
 
     @testset "AbstractBeam" begin
         # Create beam tree
@@ -279,8 +303,6 @@ end
         pos::Vector{T}
         dir::Matrix{T}
     end
-
-    SCDI.id(::TestShapeless) = nothing
 
     TestShapeless() = TestShapeless{Float64}(zeros(3), Matrix{Float64}(I, 3, 3))
 
@@ -334,12 +356,11 @@ end
         end
     end
 
-    struct TestObject <: SCDI.AbstractObject
-        id::UUID
-        shape::TestShapeless{<:Real}
+    struct TestObject{T, S <: SCDI.AbstractShape{T}} <: SCDI.AbstractObject{T, S}
+        shape::S
     end
 
-    TestObject() = TestObject(uuid4(), TestShapeless())
+    TestObject() = TestObject(TestShapeless())
 
     @testset "AbstractObject" begin
         object = TestObject()
@@ -389,7 +410,7 @@ end
 end
 
 @testset "Beams" begin
-    is = SCDI.Intersection(1.0, zeros(3), uuid4())
+    is = SCDI.Intersection(1.0, zeros(3))
     r1 = SCDI.Ray([0.0, 0, 0], [1, 0, 0])
     r2 = SCDI.Ray([1.0, 0, 0], [0, 1, 0])
     r3 = SCDI.Ray([1.0, 1, 0], [0, 0, 1])
@@ -418,9 +439,7 @@ end
     @test isdefined(SCDI, :Mesh)
 
     # Generate cube since types are defined
-    include("Cube.jl")
-
-    foo = Cube(1) # test cube
+    foo = SCDI.CubeMesh(1) # test cube
 
     @testset "Testing AbstractMesh getters" begin
         @test typeof(foo) == SCDI.Mesh{Float64}
@@ -535,7 +554,7 @@ end
     end
     @testset "Testing intersect3d" begin
         # Setup test cube and ray
-        cube = Cube(1)
+        cube = SCDI.CubeMesh(1)
         SCDI.translate3d!(cube, -0.5 * [1, 1, 1])
         SCDI.set_new_origin3d!(cube)
         ray_pos = zeros(3)
@@ -557,7 +576,7 @@ end
     @testset "Testing intersect3d - part 2" begin
         t = 5
         s = 1 # scale/2
-        cube = Cube(2 * s)
+        cube = SCDI.CubeMesh(2 * s)
         # Move cube COG to origin
         SCDI.translate3d!(cube, -[s, s, s])
         SCDI.set_new_origin3d!(cube)
@@ -655,11 +674,9 @@ end
 @testset "System" begin
     @testset "Testing implementation" begin
         struct SystemTestBeam{T} <: SCDI.AbstractBeam{T, SCDI.Ray{T}} end
-        struct SystemTestObject <: SCDI.AbstractObject
-            id::UUID
-        end
-        o1 = SystemTestObject(uuid4())
-        o2 = SystemTestObject(uuid4())
+        struct SystemTestObject{T, S} <: SCDI.AbstractObject{T, S} end
+        o1 = SystemTestObject{Real, SCDI.AbstractShape{Real}}()
+        o2 = SystemTestObject{Real, SCDI.AbstractShape{Real}}()
         system = SCDI.System(o1)
         beam = SystemTestBeam{Real}()
         # Test missing implementation warnings
@@ -667,9 +684,6 @@ end
             beam)
         @test_logs (:warn, "Retracing for $(typeof(beam)) not implemented") SCDI.retrace_system!(system,
             beam)
-        # Test getters
-        @test SCDI.object(system, SCDI.id(o1)) == o1
-        @test isnothing(SCDI.object(system, SCDI.id(o2)))
     end
 
     # Setup circular multipass cell with flat mirrors
@@ -677,7 +691,7 @@ end
     radius = 1
     L = 6 * radius / n_mirrors
     Δθ = 360 / (n_mirrors + 1)
-    mirrors = [PlanoMirror(L) for _ in 1:n_mirrors]
+    mirrors = [SCDI.RectangularPlanoMirror2D(L) for _ in 1:n_mirrors]
     θ = 1 * Δθ
     for m in mirrors
         point = radius * [cos(deg2rad(θ)), sin(deg2rad(θ)), 0]
@@ -696,16 +710,16 @@ end
     @testset "Testing tracing subroutines" begin
         system = SCDI.System(mirrors)
         ray = SCDI.Ray(origin, dir)
-        first_id = SCDI.id(mirrors[(n_mirrors + 1) ÷ 2 + 2])
-        false_id = SCDI.id(mirrors[(n_mirrors + 1) ÷ 2 + 2 + 1])
+        first_obj = mirrors[(n_mirrors + 1) ÷ 2 + 2]
+        false_obj = mirrors[(n_mirrors + 1) ÷ 2 + 2 + 1]
         # trace_all
-        @test SCDI.id(SCDI.trace_all(system, ray)) == first_id
+        @test SCDI.object(SCDI.trace_all(system, ray)) === first_obj
         # trace_one
-        @test SCDI.id(SCDI.trace_one(system, ray, first_id)) == first_id
-        @test SCDI.id(SCDI.trace_one(system, ray, false_id)) == first_id
+        @test SCDI.object(SCDI.trace_one(system, ray, SCDI.Hint(first_obj))) === first_obj
+        @test SCDI.object(SCDI.trace_one(system, ray, SCDI.Hint(false_obj))) === first_obj
         # tracing step
         SCDI.tracing_step!(system, ray, nothing)
-        @test SCDI.id(SCDI.intersection(ray)) == first_id
+        @test SCDI.object(SCDI.intersection(ray)) === first_obj
     end
 
     @testset "Testing system tracing" begin
@@ -721,8 +735,7 @@ end
         first_ray_dir = SCDI.direction(first_ray)
         last_ray_dir = SCDI.direction(last(SCDI.rays(beam)))
         @test 180 - rad2deg(SCDI.angle3d(first_ray_dir, last_ray_dir)) ≈ 2 * Δθ
-        @test SCDI.id(SCDI.intersection(first_ray)) ==
-              SCDI.id(mirrors[(n_mirrors + 1) ÷ 2 + 2])
+        @test SCDI.object(SCDI.intersection(first_ray)) === mirrors[(n_mirrors + 1) ÷ 2 + 2]
     end
 
     @testset "Testing StaticSystem tracing" begin
@@ -739,8 +752,7 @@ end
         first_ray_dir = SCDI.direction(first_ray)
         last_ray_dir = SCDI.direction(last(SCDI.rays(beam)))
         @test 180 - rad2deg(SCDI.angle3d(first_ray_dir, last_ray_dir)) ≈ 2 * Δθ
-        @test SCDI.id(SCDI.intersection(first_ray)) ==
-              SCDI.id(mirrors[(n_mirrors + 1) ÷ 2 + 2])
+        @test SCDI.object(SCDI.intersection(first_ray)) === mirrors[(n_mirrors + 1) ÷ 2 + 2]
     end
 
     @testset "Testing system retracing" begin
@@ -765,12 +777,11 @@ end
     TestPoint(position::AbstractArray{T}) where {T <: Real} = TestPoint{T}(Point3{T}(position),
         Matrix{T}(I, 3, 3))
 
-    struct GroupTestObject <: SCDI.AbstractObject
-        id::UUID
-        shape::TestPoint{<:Real}
+    struct GroupTestObject{T <: Real, S <: SCDI.AbstractShape{T}} <: SCDI.AbstractObject{T, S}
+        shape::S
     end
 
-    GroupTestObject(position::AbstractArray) = GroupTestObject(uuid4(), TestPoint(position))
+    GroupTestObject(position::AbstractArray) = GroupTestObject(TestPoint(position))
 
     n = 8
     xs = [cos(x) for x in LinRange(0, 2pi * (n - 1) / n, n)]
@@ -860,7 +871,8 @@ end
         R2 = 1
         nl = 1.5
         tl = SCDI.ThinLensSDF(R1, R2, 0.1)
-        p = SCDI.Lens(uuid4(), tl, x -> 1.5)
+        SCDI.translate3d!(tl, [0, -SCDI.thickness(tl)/2, 0])
+        p = SCDI.Lens(tl, x -> 1.5)
         system = SCDI.System(p)
 
         # compare numerical and analytical focal length
@@ -886,77 +898,87 @@ end
 
     @testset "Testing lens constructor" begin
         # Test against Thorlab spherical lenses
-        r1 = r2 = 34.9e-3
+        r1 = 34.9e-3
+        r2 = -r1
         l = 6.8e-3
-        LB1811 = SCDI.BiConvexLensSDF(r1, r2, l)
-        lens = SCDI.SphericalLens(r1, r2, l)
-        @test typeof(SCDI.shape(lens)) == typeof(LB1811)
-        r1 = 15.5e-3
-        r2 = Inf
+        LB1811 = SCDI.SphericalLens(r1, r2, l)
+        @test typeof(SCDI.shape(LB1811)) <: SCDI.UnionSDF
+        @test SCDI.thickness(SCDI.shape(LB1811)) == l
+        r1 = Inf
+        r2 = -15.5e-3
         l = 8.6e-3
-        LA1805 = SCDI.PlanoConvexLensSDF(r1, l)
-        lens = SCDI.SphericalLens(r1, r2, l)
-        @test typeof(SCDI.shape(lens)) == typeof(LA1805)
-        r1 = r2 = 52.0e-3
+        LA1805 = SCDI.SphericalLens(r1, r2, l)
+        @test typeof(SCDI.shape(LA1805)) <: SCDI.UnionSDF
+        @test SCDI.thickness(SCDI.shape(LA1805)) == l
+        r1 = -52.0e-3
+        r2 = -r1
         l = 3e-3
-        LD1464 = SCDI.BiConcaveLensSDF(r1, r2, l)
-        lens = SCDI.SphericalLens(-r1, -r2, l)
-        @test typeof(SCDI.shape(lens)) == typeof(LD1464)
-        r1 = 25.7e-3
-        r2 = Inf
+        LD1464 = SCDI.SphericalLens(r1, r2, l)
+        @test typeof(SCDI.shape(LD1464)) <: SCDI.UnionSDF
+        @test SCDI.thickness(SCDI.shape(LD1464)) == l
+        r1 = Inf
+        r2 = 25.7e-3
         l = 3.5e-3
-        LC1715 = SCDI.PlanoConcaveLensSDF(r1, l)
-        lens = SCDI.SphericalLens(-r1, r2, l)
-        @test typeof(SCDI.shape(lens)) == typeof(LC1715)
-        r1 = 32.1e-3
-        r2 = 82.2e-3
+        LC1715 = SCDI.SphericalLens(r1, r2, l)
+        @test typeof(SCDI.shape(LC1715)) <: SCDI.UnionSDF
+        @test SCDI.thickness(SCDI.shape(LC1715)) == l
+        r1 = -82.2e-3
+        r2 = -32.1e-3
         l = 3.6e-3
-        LE1234 = SCDI.ConvexConcaveLensSDF(r1, r2, l)
-        lens = SCDI.SphericalLens(r1, -r2, l)
-        @test typeof(SCDI.shape(lens)) == typeof(LE1234)
+        LE1234 = SCDI.SphericalLens(r1, r2, l)
+        @test typeof(SCDI.shape(LE1234)) <: SCDI.UnionSDF
+        @test SCDI.thickness(SCDI.shape(LE1234)) == l
+    end
+
+    """Test coma for rotated and translated optical system"""
+    function test_coma(ray::SCDI.AbstractRay, f0::AbstractArray, dir::AbstractArray; atol=7e-5)
+        is = SCDI.intersect3d(f0, dir, ray)
+        p0 = SCDI.position(ray) + length(is) * SCDI.direction(ray)
+        dz = norm(p0 - f0)
+        if dz ≤ atol
+            return true
+        else
+            return error("Coma dz=$dz larger than atol=$atol")
+        end
     end
 
     @testset "Testing spherical lens SDFs" begin
-        """Test coma for rotated and translated optical system"""
-        function test_coma(ray::SCDI.AbstractRay, f0::AbstractArray, dir::AbstractArray; atol=7e-5)
-            is = SCDI.intersect3d(f0, dir, ray)
-            p0 = SCDI.position(ray) + length(is) * SCDI.direction(ray)
-            dz = norm(p0 - f0)
-            if dz ≤ atol
-                return true
-            end
-            error("Coma dz=$dz larger than atol=$atol")
-        end
         # Based on https://www.pencilofrays.com/double-gauss-sonnar-comparison/
-        l1 = SCDI.SphericalLens(48.88e-3, -182.96e-3, 8.89e-3, 52.3e-3, λ -> 1.62286)
+        l1 = SCDI.SphericalLens(48.88e-3, 182.96e-3, 8.89e-3, 52.3e-3, λ -> 1.62286)
         l2 = SCDI.SphericalLens(36.92e-3, Inf, 15.11e-3, 45.11e-3, λ -> 1.58565)
-        l3 = SCDI.SphericalLens(-23.06e-3, Inf, 2.31e-3, 45.11e-3, λ -> 1.67764)
+        l3 = SCDI.SphericalLens(Inf, 23.06e-3, 2.31e-3, 45.11e-3, λ -> 1.67764)
         l4 = SCDI.SphericalLens(-23.91e-3, Inf, 1.92e-3, 40.01e-3, λ -> 1.57046)
-        l5 = SCDI.SphericalLens(36.92e-3, Inf, 7.77e-3, 40.01e-3, λ -> 1.64128)
-        l6 = SCDI.SphericalLens(48.88e-3, 1063.24e-3, 6.73e-3, 45.11e-3, λ -> 1.62286)
-        SCDI.zrotate3d!(SCDI.shape(l1), π)
-        SCDI.zrotate3d!(SCDI.shape(l2), π)
-        SCDI.zrotate3d!(SCDI.shape(l4), π)
-        SCDI.translate3d!(SCDI.shape(l2), [0, 11.495e-3, 0])
-        SCDI.translate3d!(SCDI.shape(l3), [0, 25.491e-3, 0])
-        SCDI.translate3d!(SCDI.shape(l4), [0, 35.568e-3, 0])
-        SCDI.translate3d!(SCDI.shape(l5), [0, 42.876e-3, 0])
-        SCDI.translate3d!(SCDI.shape(l6), [0, 50.813e-3, 0])
+        l5 = SCDI.SphericalLens(Inf, -36.92e-3, 7.77e-3, 40.01e-3, λ -> 1.64128)
+        l6 = SCDI.SphericalLens(1063.24e-3, -48.88e-3, 6.73e-3, 45.11e-3, λ -> 1.62286)
+        # Calculate translation distances
+        δy = 1e-7
+        l_2 = SCDI.thickness(l1.shape) + 0.38e-3
+        l_3 = l_2 + SCDI.thickness(l2.shape) + δy
+        l_4 = l_3 + SCDI.thickness(l3.shape) + 9.14e-3 + 13.36e-3
+        l_5 = l_4 + SCDI.thickness(l4.shape) + δy
+        l_6 = l_5 + SCDI.thickness(l5.shape) + 0.38e-3
+        # Corresponds to back focal length of f=59.21 mm on y-axis from link above + "error" δf
+        δf = 7e-4
+        f_z = l_6 + SCDI.thickness(l6.shape) + 58.21e-3 + δf
+        SCDI.translate3d!(l2, [0, l_2, 0])
+        SCDI.translate3d!(l3, [0, l_3, 0])
+        SCDI.translate3d!(l4, [0, l_4, 0])
+        SCDI.translate3d!(l5, [0, l_5, 0])
+        SCDI.translate3d!(l6, [0, l_6, 0])
         # Create and move group - this tests a bunch of kinematic correctness
         double_gauss = SCDI.ObjectGroup([l1, l2, l3, l4, l5, l6])
-        SCDI.translate3d!(double_gauss, [0.05, 0, 0])
+        SCDI.translate3d!(double_gauss, [0.05, 0.05, 0.05])
         SCDI.xrotate3d!(double_gauss, deg2rad(60))
         SCDI.zrotate3d!(double_gauss, deg2rad(45))
         system = SCDI.System([double_gauss])
         # Test against back focal length as per source above
-        dir = -1 * SCDI.orientation(l1)[:,2] # rotated collimated ray direction
+        dir = SCDI.orientation(double_gauss)[:, 2] # rotated collimated ray direction
         pos = SCDI.position(l1) - 0.05 * dir # rotated collimated ray position
-        λ = 486.0 # nm
-        f_z = 0.11602585097812582 # corresponds to back focal length of f=59.21 mm on y-axis from link above
         f0 = SCDI.position(l1) + f_z * dir # global focal point coords
         nv = SCDI.normal3d(dir) # orthogonal to moved system optical axis
         zs = -0.02:1e-3:0.02
         # Define beam
+        λ = 486.0e-9
         beam = SCDI.Beam(SCDI.Ray(pos, dir, λ))
         for (i, z) in enumerate(zs)
             # use retracing by manipulating beam starting pos
@@ -967,6 +989,54 @@ end
             # Test coma at focal point
             @test test_coma(last(SCDI.rays(beam)), f0, dir, atol=7e-5)
         end
+    end
+
+    @testset "Testing doublet lenses" begin
+        # Define refractive index functions
+        λs = [488e-9, 707e-9, 1064e-9]
+        NLAK22 = SCDI.DiscreteRefractiveIndex(λs, [1.6591, 1.6456, 1.6374])
+        NSF10 = SCDI.DiscreteRefractiveIndex(λs, [1.7460, 1.7168, 1.7021])
+
+        function test_doublet(λ, bfl, δf)
+            # Thorlabs lens from https://www.thorlabs.com/thorproduct.cfm?partnumber=AC254-150-AB
+            AC254_150_AB = SCDI.SphericalDoubletLens(87.9e-3, -105.6e-3, Inf, 6e-3, 3e-3, SCDI.inch, NLAK22, NSF10)
+            # Rptate and translate to test lens kinematics
+            SCDI.translate3d!(AC254_150_AB, [0.05, 0.05, 0.05])
+            SCDI.xrotate3d!(AC254_150_AB, deg2rad(-60))
+            SCDI.zrotate3d!(AC254_150_AB, deg2rad(45))
+            # Define system
+            system = SCDI.System([AC254_150_AB])
+            # Define semi-diameter for lens ray bundle, selected for min. spherical aberrations
+            z0 = 5e-3
+            zs = LinRange(-z0, z0, 30)
+            fs = similar(zs)
+            # Beam spawn point
+            dir = -SCDI.orientation(AC254_150_AB.back.shape)[:,2]       # rotated collimated ray direction
+            pos = SCDI.position(AC254_150_AB.front.shape) + 0.05 * dir  # rotated collimated ray position
+            nv = SCDI.normal3d(dir)                                     # orthogonal to moved system optical axis
+            beam = SCDI.Beam(pos, -dir, λ)
+            # Calculate equivalent back focal length point
+            f_z = SCDI.thickness(AC254_150_AB) + bfl + δf
+            f0 = SCDI.position(AC254_150_AB.front.shape) + f_z * -dir
+            for (i, z) in enumerate(zs)
+                beam.rays[1].pos = pos + z*nv
+                SCDI.solve_system!(system, beam)
+                @test length(SCDI.rays(beam)) == 4
+                @test SCDI.refractive_index.(beam.rays) == [1, NLAK22(λ), NSF10(λ), 1]
+                fs[i] = test_coma(last(SCDI.rays(beam)), f0, dir, atol=1e-6)
+            end
+            # Test center ray normal vectors
+            beam.rays[1].pos = pos + 0*nv
+            SCDI.solve_system!(system, beam)
+            for i = 1:length(beam.rays)-1
+                @test abs(dot(beam.rays[i].intersection.n, beam.rays[i].dir)) ≈ 1
+            end
+            return true
+        end
+        # Run tests for AC254_150_AB against plot data at https://www.thorlabs.com/newgrouppage9.cfm?objectgroup_id=12767
+        @test test_doublet(488e-9,  143.68e-3, -2.064e-4)
+        @test test_doublet(707e-9,  143.68e-3, 0)
+        @test test_doublet(1064e-9, 143.68e-3, +7.466e-4)
     end
 end
 
@@ -1100,13 +1170,16 @@ end
         # Compare calculate electric field at r
         @test all(isapprox.(Ea_1, En_1, atol = 1e-8))
         @test all(isapprox.(Ea_2, En_2, atol = 1e-7))
+        # Compare beam power with original value
+        @test P0 ≈ SCDI.optical_power(gauss_1)
+        @test P0 ≈ SCDI.optical_power(gauss_2)
     end
 
     @testset "Testing propagation correctness" begin
         # Analytical result using complex q factor
-        q(q0::Complex, M::Matrix) = (M[1] * q0 + M[3]) / (M[2] * q0 + M[4])
-        R(q::Complex) = real(1 / q)
-        w(q::Complex, λ, n = 1) = sqrt(-λ / (π * n * imag(1 / q)))
+        q_ana(q0::Complex, M::Matrix) = (M[1] * q0 + M[3]) / (M[2] * q0 + M[4])
+        R_ana(q::Complex) = real(1 / q)
+        w_ana(q::Complex, λ, n = 1) = sqrt(-λ / (π * n * imag(1 / q)))
         propagate_ABCD(d) = [1 d; 0 1]
         lensmaker_ABCD(f) = [1 0; -1/f 1]
         # Beam parameters
@@ -1128,19 +1201,19 @@ end
         # Propagate using ABCD formalism
         q0 = 0 + zr * im
         for i in 1:length(ys)
-            w_analytical[i] = w(q0, λ)
-            R_analytical[i] = R(q0)
+            w_analytical[i] = w_ana(q0, λ)
+            R_analytical[i] = R_ana(q0)
             # catch first lens
             if i * dy == lens_y_location
-                q0 = q(q0, lensmaker_ABCD(f))
+                q0 = q_ana(q0, lensmaker_ABCD(f))
                 continue
             end
-            q0 = q(q0, propagate_ABCD(dy))
+            q0 = q_ana(q0, propagate_ABCD(dy))
         end
 
         # Numerical result
         tl = SCDI.ThinLensSDF(R1, R2, 0.025)
-        lens = SCDI.Lens(uuid4(), tl, x -> nl)
+        lens = SCDI.Lens(tl, x -> nl)
         system = SCDI.System(lens)
         SCDI.translate3d!(lens, [0, lens_y_location, 0])
         # Create and solve beam, calculate beam parameters
@@ -1202,7 +1275,7 @@ end
         ln = SCDI.ThinLens(R1, R2, d, nl)
         SCDI.translate3d!(pd_l, [0, z, 0])
         SCDI.translate3d!(pd_s, [0, z, 0])
-        SCDI.translate3d!(ln, [0, z - f, 0])
+        SCDI.translate3d!(ln, [0, z - f - SCDI.thickness(ln.shape)/2, 0])
 
         @testset "Testing fringe pattern" begin
             system = SCDI.System(pd_l)
@@ -1265,7 +1338,7 @@ end
                 @test length(g_1) < length(g_1, opl=true)
                 @test length(g_2) == length(g_1) - z_i
             end
-            # Analytical solution (cosine over Δz), ref. power is 4*P0 since beam splitter is missing
+            # Analytical solution (cosine over Δz), ref. power is 4*P0 since beamsplitter is missing
             Pt_analytical = 4 * P0 * [(cos(2π * z / (maximum(Δz))) + 1) / 2 for z in Δz]
 
             # Compare detectors (this also tests correct behavior when focussing the beam)
@@ -1278,8 +1351,8 @@ end
         l_0 = 0.1
         pd_size = SCDI.inch / 5
         pd_resolution = 100
-        m1 = PlanoMirror(SCDI.inch)
-        m2 = PlanoMirror(SCDI.inch)
+        m1 = SCDI.RectangularPlanoMirror2D(SCDI.inch)
+        m2 = SCDI.RectangularPlanoMirror2D(SCDI.inch)
         bs = SCDI.ThinBeamSplitter(SCDI.inch, 0.5)
         pd = SCDI.Photodetector(pd_size, pd_resolution)
         SCDI.translate3d!(m1, [l_0, 0, 0])
@@ -1318,14 +1391,14 @@ end
             end
 
             path_length_analytical = @. 2 * lambdas + 4l_0
-            optical_pwr_analytical = @. P_0 * (1 / 2 * cos(2π * (2lambdas / λ)) + 1 / 2)
+            optical_pwr_analytical = @. P_0 * (1 / 2 * cos(2π * (2lambdas / λ) + π) + 1 / 2)
 
             # Compare correct PD signal and λ shift in moving arm
             @test all(isapprox.(optical_pwr_analytical, optical_pwr_numerical, atol = 5e-6))
             @test all(isapprox.(path_length_analytical, path_length_numerical))
         end
 
-        @testset "Unequal armlength MI - eletrical field" begin
+        @testset "Unequal armlength MI - electrical field" begin
             λ = 635e-9
             w0 = 1e-4
             P0 = 1e-3
@@ -1354,7 +1427,7 @@ end
                 for (i, x) in enumerate(xs)
                     r = sqrt(x^2 + y^2)
                     screen[i, j] += SCDI.electric_field(r, short_arm, E0, w0, λ, M2)
-                    screen[i, j] += SCDI.electric_field(r, long_arm, E0, w0, λ, M2)
+                    screen[i, j] += SCDI.electric_field(r, long_arm, E0, w0, λ, M2) * exp(im*pi)
                 end
             end
 
@@ -1367,6 +1440,55 @@ end
             # Compare solutions, units V/m
             @test all(isapprox.(Re_analytical, Re_numerical, atol = 5e-2))
             @test all(isapprox.(Im_analytical, Im_numerical, atol = 5e-2))
+        end
+    end
+
+    @testset "Testing power conservation" begin
+        # variables
+        P0 = 0.5 # W
+        l0 = 0.1 # m
+        w0 = 0.5e-3
+        λ = 1064e-9
+
+        bs = SCDI.ThinBeamSplitter(10e-3);
+        pd_1 = SCDI.Photodetector(10e-3, 100);
+        pd_2 = SCDI.Photodetector(10e-3, 100);
+
+        SCDI.zrotate3d!(bs, deg2rad(45))
+        SCDI.translate3d!(pd_1, [0, l0, 0])
+        SCDI.zrotate3d!(pd_1, deg2rad(180))
+
+        SCDI.translate3d!(pd_2, [l0, 0, 0])
+        SCDI.zrotate3d!(pd_2, deg2rad(90))
+
+        # add BS and PD orientation error
+        SCDI.zrotate3d!(bs, deg2rad(0.017))
+        SCDI.zrotate3d!(pd_1, deg2rad(10))
+        SCDI.xrotate3d!(pd_1, deg2rad(15))
+
+        # define system and beams -> solve
+        system = SCDI.System([bs, pd_1, pd_2]);
+
+        phis = LinRange(0, 2pi, 25)
+        p1 = similar(phis)
+        p2 = similar(phis)
+
+        l1 = SCDI.GaussianBeamlet(SCDI.Ray([0, -l0, 0], [0, 1., 0]), λ, w0; P0);
+        l2 = SCDI.GaussianBeamlet(SCDI.Ray([-l0, 0, 0], [1., 0, 0]), λ, w0; P0);
+
+        E0_buffer = l1.E0
+
+        for (i, phi) in enumerate(phis)
+            # Iterate over relative phase shifts, use retracing
+            l1.E0 = E0_buffer*exp(im*phi)
+            SCDI.reset_photodetector!(pd_1)
+            SCDI.reset_photodetector!(pd_2)
+            SCDI.solve_system!(system, l1)
+            SCDI.solve_system!(system, l2)
+            p1[i] = SCDI.optical_power(pd_1)
+            p2[i] = SCDI.optical_power(pd_2)
+            # Test power conservation
+            @test p1[i] + p2[i] - 2P0 < 1e-4 # W
         end
     end
 end
@@ -1392,9 +1514,9 @@ end
 
     @testset "Mirror reflections" begin
         # Setup system as in https://opg.optica.org/ao/fulltext.cfm?uri=ao-50-18-2855&id=218813
-        m1 = PlanoMirror(1.)
-        m2 = PlanoMirror(1.)
-        m3 = PlanoMirror(1.)
+        m1 = SCDI.RectangularPlanoMirror2D(1.)
+        m2 = SCDI.RectangularPlanoMirror2D(1.)
+        m3 = SCDI.RectangularPlanoMirror2D(1.)
         SCDI.translate3d!(m2, [2,0,0])
         SCDI.translate3d!(m3, [2,2,0])
         SCDI.zrotate3d!(m1, deg2rad(-90))
@@ -1448,16 +1570,16 @@ end
         Ts = 1 - abs2(rs)
         Tp = 1 - abs2(rp)
         # Setup testcase
-        s1 = Cube((1., d, 1.))
-        s2 = Cube((1., d, 1.))
-        s3 = Cube((1., d, 1.))
-        s4 = Cube((1., d, 1.))
-        s5 = Cube((1., d, 1.))
-        l1 = SCDI.Lens(uuid4(), s1, x->n)
-        l2 = SCDI.Lens(uuid4(), s2, x->n)
-        l3 = SCDI.Lens(uuid4(), s3, x->n)
-        l4 = SCDI.Lens(uuid4(), s4, x->n)
-        l5 = SCDI.Lens(uuid4(), s5, x->n)
+        s1 = SCDI.CuboidMesh((1., d, 1.))
+        s2 = SCDI.CuboidMesh((1., d, 1.))
+        s3 = SCDI.CuboidMesh((1., d, 1.))
+        s4 = SCDI.CuboidMesh((1., d, 1.))
+        s5 = SCDI.CuboidMesh((1., d, 1.))
+        l1 = SCDI.Lens(s1, x->n)
+        l2 = SCDI.Lens(s2, x->n)
+        l3 = SCDI.Lens(s3, x->n)
+        l4 = SCDI.Lens(s4, x->n)
+        l5 = SCDI.Lens(s5, x->n)
         SCDI.translate3d!.([l1, l2, l3, l4, l5], Ref([-0.5,-d/2,-0.5]))
         SCDI.set_new_origin3d!.(SCDI.shape.([l1, l2, l3, l4, l5]))
         SCDI.translate3d!(l2, [0,0.5, -1d/2])
@@ -1485,8 +1607,8 @@ end
     @testset "Fresnel rhomb" begin
         # Create Fresnel rhomb with n=1.5 and θ=53.3° for quarter-wave plate effect
         n = 1.5
-        s1 = Cube((0.5,1.25,0.5), deg2rad(53.3))
-        l1 = SCDI.Lens(uuid4(), s1, x->n)
+        s1 = SCDI.CuboidMesh((0.5,1.25,0.5), deg2rad(53.3))
+        l1 = SCDI.Lens(s1, x->n)
         SCDI.translate3d!(l1, [-0.25, 0, -0.25])
         SCDI.set_new_origin3d!(s1)
         # Rotate prism to obtain 45° beam input polarization
@@ -1508,8 +1630,8 @@ end
 
     @testset "Mach-Zehnder Interferometer" begin
         # setup MZI
-        m1 = PlanoMirror(SCDI.inch)
-        m2 = PlanoMirror(SCDI.inch)
+        m1 = SCDI.RectangularPlanoMirror2D(SCDI.inch)
+        m2 = SCDI.RectangularPlanoMirror2D(SCDI.inch)
         b1 = SCDI.ThinBeamSplitter(SCDI.inch, 0.5)
         b2 = SCDI.ThinBeamSplitter(SCDI.inch, 0.5)
 
