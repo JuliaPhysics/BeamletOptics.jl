@@ -1,6 +1,6 @@
 # Beams
 
-As mentioned in the [Rays](@ref) section, a beam within the context of this package serves as a data structure for storing collections of rays, forming the backbone of the simulation framework. Beams are intended to be designed as [AbstractTrees](https://github.com/JuliaCollections/AbstractTrees.jl) to allow for ray bifurcations, e.g. in the case of optical elements such as beam splitters. The [`SCDI.solve_system!`](@ref) function relies on this data structure to perform ray tracing computations within optical systems. 
+As mentioned in the [Rays](@ref) section, a beam within the context of this package serves as a data structure for storing collections of rays, forming the backbone of the simulation framework. Beams are intended to be designed as [AbstractTrees](https://github.com/JuliaCollections/AbstractTrees.jl) to allow for ray bifurcations, e.g. in the case of optical elements such as beamsplitters. The [`SCDI.solve_system!`](@ref) function relies on this data structure to perform ray tracing computations within optical systems. 
 
 To ensure compatibility and extensibility, beam types must adhere to the [`SCDI.AbstractBeam`](@ref) interface. Refer to its documentation for more information.
 
@@ -75,7 +75,10 @@ Without extensions of the original method, the following key assumptions must be
 - the Gaussian may not be clipped by hard apertures
 - Lagrange invariant must be fulfilled
 
-Various versions of this approach have been implemented under different names in commercial software, most notably [FRED](https://photonengr.com/fred-software/) and [Code V](https://www.synopsys.com/optical-solutions/codev.html), as well as in open source software, e.g. [Raypier](https://github.com/bryancole/raypier_optics) (based on Cython, maintenance status not known).
+Various versions of this approach have been implemented under different names in commercial software, most notably [FRED](https://photonengr.com/fred-software/) and [Code V](https://www.synopsys.com/optical-solutions/codev.html), as well as in open source software, e.g. 
+
+- [Raypier](https://github.com/bryancole/raypier_optics) - based on Cython, maintenance status not known
+- [Poke](https://github.com/Jashcraf/poke) - based on Zemax API and Python, maintained by J. Ashcraft et al. [Ashcraft:2022](@cite)
 
 This package implements the above method via the [`SCDI.GaussianBeamlet`](@ref) and the `SCDI.AstigmaticGaussianBeamlet` (**Work in progress**).
 
@@ -90,7 +93,7 @@ SCDI.GaussianBeamlet
 A [`SCDI.GaussianBeamlet`](@ref) can be constructed via:
 
 ```@docs; canonical=false
-SCDI.GaussianBeamlet(::SCDI.Ray, ::Any, ::Any)
+SCDI.GaussianBeamlet(::AbstractArray{<:Real}, ::AbstractArray{<:Real}, ::Real, ::Real)
 ```
 
 #### Obtaining the beam parameters 
@@ -104,7 +107,7 @@ hidexdecorations!(rend) # hide
 hidezdecorations!(rend) # hide
 
 # render beam first
-beam = SCDI.GaussianBeamlet(SCDI.Ray([0, -0.1, 0], [0, 1, 0.0]), 1550e-9, 20e-3)
+beam = SCDI.GaussianBeamlet([0, -0.1, 0], [0, 1, 0.0], 1550e-9, 20e-3)
 SCDI.solve_system!(system, beam)
 SCDI.render_beam!(rend, beam, flen=0.1, r_res=100, z_res=1000)
 

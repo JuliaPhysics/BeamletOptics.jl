@@ -5,12 +5,11 @@ A ray type to model the propagation of an electric field vector based on the pub
 
 **Yun, Garam, Karlton Crabtree, and Russell A. Chipman. "Three-dimensional polarization ray-tracing calculus I: definition and diattenuation." Applied optics 50.18 (2011): 2855-2865.**
 
-The geometrical ray description is identical to the standard [`Ray`](@ref). The polarization interaction can be described in local s-p-coordinates 
+The geometrical ray description is identical to the standard [`Ray`](@ref). The polarization interaction can be described in local s-p-coordinates
 but must be transformed into global coordinates using the method described in the publication above, see also [`_calculate_global_E0`](@ref).
 
 # Fields
 
-- `id`: a UUID4 that uniquely identifies the `Ray`
 - `pos`: a point in R³ that describes the `Ray` origin
 - `dir`: a normalized vector in R³ that describes the `Ray` direction
 - `intersection`: refer to [`Intersection`](@ref)
@@ -20,7 +19,7 @@ but must be transformed into global coordinates using the method described in th
 
 # Jones matrices
 
-In local coordinates the Jones matrices in the case of reflection/refraction are defined as 
+In local coordinates the Jones matrices in the case of reflection/refraction are defined as
 
 - reflection: [-rₛ 0; 0 rₚ]
 - transmission: [tₛ 0; 0 tₚ]
@@ -36,10 +35,9 @@ where r and t are the complex-valued Fresnel coefficients (see also [`fresnel_co
     E0 can not be converted into an [`intensity`](@ref) value, since a single `PolarizedRay` can not directly model the change in intensity during imaging by an optical system.
 """
 mutable struct PolarizedRay{T} <: AbstractRay{T}
-    id::UUID
     pos::Point3{T}
     dir::Point3{T}
-    intersection::Nullable{Intersection{T}}
+    intersection::Nullable{Intersection}
     λ::T
     n::T
     E0::Point3{Complex{T}}
@@ -60,9 +58,9 @@ function PolarizedRay(pos::AbstractArray{P},
     F = promote_type(P, D)
     # Test if E0 is orthogonal to dir. of propagation
     if !isapprox(dot(dir, E0), 0, atol=1e-14)
-        error("Ray dir. and E0 must be orthogonal (n=$(dot(dir, E0)))")
+        error(lazy"Ray dir. and E0 must be orthogonal (n=$(dot(dir, E0)))")
     end
-    return PolarizedRay{F}(uuid4(),
+    return PolarizedRay{F}(
         Point3{F}(pos),
         normalize(Point3{F}(dir)),
         nothing,

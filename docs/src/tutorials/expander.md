@@ -97,7 +97,7 @@ beam = SCDI.Beam(ray)
 
 SCDI.solve_system!(system, beam)
 
-SCDI.render_beam!(ax, beam)
+SCDI.render_beam!(ax, beam, show_pos=true)
 
 save("expander_one_beam.png", fig, px_per_unit=4); nothing # hide
 ```

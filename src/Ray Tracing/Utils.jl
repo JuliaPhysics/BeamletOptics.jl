@@ -98,13 +98,12 @@ end
 
 Returns the angle between the `target` and `reference` vector in **rad**.
 """
-function angle3d(target::AbstractVector{T}, reference::AbstractVector{T}) where {T}
-    arg = clamp(dot(target, reference) / (norm(target) * norm(reference)), -one(T), one(T))
+function angle3d(target::AbstractArray{T}, reference::AbstractArray{R}) where {T,R}
+    G = promote_type(T,R)
+    arg = clamp(dot(target, reference) / (norm(target) * norm(reference)), -one(G), one(G))
     angle = acos(arg)
     return angle
 end
-
-angle3d(target::AbstractVector{T}, reference::AbstractVector{V}) where {T,V} = angle3d(promote(target, reference)...)
 
 """
     line_point_distance3d(pos, dir, point)
@@ -151,7 +150,8 @@ end
 """
     reflection3d(dir, normal)
 
-Calculates the reflection between an input vector `dir` and surface normal vector `normal` in 3D-space
+Calculates the reflection between an input vector `dir` and surface `normal` vector in R³.
+Vectors `dir` and `normal` must have **unit length**!
 """
 function reflection3d(dir, normal)
     return dir - 2 * dot(dir, normal) * normal
@@ -160,16 +160,24 @@ end
 """
     refraction3d(dir, normal, n1, n2)
 
-Calculates the refraction between an input vector `dir` and surface `normal` vector  in 3D-space.\\
-`n1` is the "outside" refractive index and `n2` is the "inside" refractive index.\\
+Calculates the refraction between an input vector `dir` and surface `normal` vector in R³.
+`n1` is the "outside" refractive index and `n2` is the "inside" refractive index.
+The function returns the new direction of propagation and a boolean flag to indicate if internal refraction has occured.
 
 Vectors `dir` and `normal` must have **unit length**!
 
 # Total internal reflection
 
-If the critical angle for n1, n2 and the incident angle is reached, the ray is reflected instead!
+If the critical angle for n1, n2 and the incident angle is reached, the ray is reflected internally instead!
+
+# Arguments
+
+- `dir`: direction vector of incoming ray
+- `normal`: surface normal at point of intersection
+- `n1`: index of ref. before refraction
+- `n2`: index of ref. after refraction
 """
-function refraction3d(dir, normal, n1, n2)
+function refraction3d(dir::AbstractArray, normal::AbstractArray, n1::Real, n2::Real)
     # dir and normal must have unit length!
     isapprox(norm(dir), 1) || throw(ArgumentError("dir must have  unit length"))
     isapprox(norm(normal), 1) || throw(ArgumentError("norm must have  unit length"))
@@ -178,10 +186,10 @@ function refraction3d(dir, normal, n1, n2)
     sinθt² = n^2 * (1 - cosθi^2)
     # Check for total reflection
     if sinθt² > 1.0
-        return reflection3d(dir, normal)
+        return (reflection3d(dir, normal), true)
     end
     cosθt = sqrt(1 - sinθt²)
-    return @. n * dir + (n * cosθi - cosθt) * normal
+    return (@. n * dir + (n * cosθi - cosθt) * normal, false)
 end
 
 """
@@ -230,7 +238,7 @@ E(r,z) = {E_0}\\frac{{{w_0}}}{{w(z)}}\\exp\\left( { - \\frac{{{r^2}}}{{w{{(z)}^2
 - `w`: local beam radius
 - `k`: wave number, equal to `2π/λ`
 - `ψ`: Gouy phase shift (defined as ``-\\text{atan}\\left(\\frac{z}{z_r}\\right)`` !)
-- `R`: wavefront curvature
+- `R`: wavefront curvature, i.e. 1/r (radius of curvature)
 """
 electric_field(r::Real, z::Real, E0, w0, w, k, ψ, R) = E0 * w0 / w * exp(-r^2 / w^2) * exp(im * (k * z + ψ + (k * r^2 * R) / 2))
 
@@ -288,3 +296,175 @@ function fresnel_coefficients(θ::AbstractArray{T}, n::Number) where T
 end
 
 is_internally_reflected(rp::Number, rs::Number) = isapprox(abs2(rs), 1, atol=1e-6) && isapprox(abs2(rp), 1, atol=1e-6)
+
+
+"""
+    sag(r::Real, l::Real)
+
+Calculates the sag of a cut circle with radius `r` and chord length `l`
+"""
+sag(r::Real, l::Real) = r - sqrt(r^2 - 0.25 * l^2)
+
+function check_sag(r, d)
+    if abs(2r) < d
+        throw(ArgumentError("Radius of curvature (r = $(r)) must be ≥ than half the diameter (d = $(d)) or an illegal shape results!"))
+    else
+        return nothing
+    end
+end
+
+## Refractive index utils
+"""
+    DiscreteRefractiveIndex{T}
+
+Represents a incomplete set of dispersion data where for each exact wavelength one refractive index value is stored in the `data` field.
+Can be called like a function `n = n(λ)`. Does not interpolate between data points.
+Refer to [`RefractiveIndex`](@ref) for more information.
+"""
+struct DiscreteRefractiveIndex{T}
+    data::Dict{T, T}
+end
+
+function DiscreteRefractiveIndex(λs::AbstractArray{L}, ns::AbstractArray{N}) where {L, N}
+    if length(λs) != length(ns)
+        throw(ArgumentError("Number of wavelengths must match number of ref. indices"))
+    end
+    T = promote_type(L, N)
+    d = Dict(zip(λs, ns))
+    return DiscreteRefractiveIndex{T}(d)
+end
+
+(dri::DiscreteRefractiveIndex)(λ) = dri.data[λ]
+
+"[`DiscreteRefractiveIndex`](@ref) passes test by default"
+test_refractive_index_function(::DiscreteRefractiveIndex) = nothing
+
+"""
+    test_refractive_index_function(input)
+
+Tests if `input` is callable with a single `Real` argument for the wavelength `λ` and
+returns a single `Real` value for the refractive index `n`.
+"""
+function test_refractive_index_function(input)
+    # Test function compat for the following types of λ
+    Ts = [Int, Float32, Float64]
+    try
+        for T in Ts
+            # Test if input accepts types
+            answer = input(one(T))
+            # Test if input returns single real value
+            if !isa(answer, Real)
+                error()
+            end
+        end
+    catch
+        error_msg = "Ref. index must be callable with a single Real argument and return a single real result."
+        throw(ArgumentError(error_msg))
+    end
+    return nothing
+end
+
+"""
+    RefractiveIndex
+
+Union type that represents valid means to pass a refractive index `n` to e.g. [`AbstractObject`](@ref)s.
+The core assumption is that:
+
+1. the refractive index is callable with a **single** `Number` argument `λ` to represent the wavelength in [m]
+2. the return value is a **single** `Number` value for the refractive index
+
+Refer to e.g. [`DiscreteRefractiveIndex`](@ref).
+"""
+const RefractiveIndex = Union{Function, DiscreteRefractiveIndex}
+
+"""
+    list_subtypes(T::Type; max_depth::Int=5)
+
+Prints a tree of all subtypes, e.g. `list_subtypes(AbstractObject)`.
+Maximum exploration depth can be limited by passing `max_depth`.
+Returns the total number of types encountered.
+"""
+function list_subtypes(parent::Type, is_last=true, prefix="", depth=1; max_depth=10)
+    # Determine children of parent type
+    children = subtypes(parent)
+    num_children = length(children)
+    # Print out parent type information
+    connector = is_last ? "└── " : "├── "
+    msg = prefix * connector * string(parent)
+    println(msg)
+    # Return to parent function if childless
+    if iszero(num_children)
+        return 0
+    end
+    # Extend prefix string based on layer depth
+    if is_last
+        prefix = prefix * "    "
+    else
+        prefix = prefix * "│   "
+    end
+    # Check if max tree depth has been reached
+    if depth > max_depth
+        msg = prefix * "└── " * "$num_children more ..."
+        println(msg)
+        return num_children
+    end
+    # Delve deeper into tree
+    for child in children[1:end-1]
+        num_children += list_subtypes(child, false, prefix, depth+1; max_depth)
+    end
+    num_children += list_subtypes(last(children), true, prefix, depth+1; max_depth)
+    # If tree/branch has been resolved, return total number of types found.
+    if depth == 1
+        msg = "\n" * "At least $num_children types have been found."
+        println(msg)
+    end
+    return num_children
+end
+
+"""
+    countlines_in_dir(dir)
+
+Counts the number of lines of all `.jl` files in `dir`.
+"""
+function countlines_in_dir(dir::String)
+    l = 0
+    items = readdir(dir)
+    for item in items
+        path = joinpath(dir, item)
+        if isfile(path) && endswith(path, ".jl")
+            li = countlines(path)
+            l += li
+            println("$li lines of code in $path")
+        end
+        if isdir(path)
+            l += countlines_in_dir(path)
+        end
+    end
+    return l
+end
+
+"""
+    ToDO
+"""
+function find_zero_bisection(f, a, b; tol=1e-10, max_iter=1000)
+    fa = f(a)
+    fb = f(b)
+    if sign(fa) == sign(fb)
+        error("Bisection requires a sign change: f(a)=$(fa), f(b)=$(fb)")
+    end
+    for i in 1:max_iter
+        mid = (a + b) / 2
+        fmid = f(mid)
+        if abs(fmid) < tol
+            return mid
+        end
+        if sign(fa) == sign(fmid)
+            a = mid
+            fa = fmid
+        else
+            b = mid
+            fb = fmid
+        end
+    end
+    error("Bisection did not converge after $max_iter iterations")
+end

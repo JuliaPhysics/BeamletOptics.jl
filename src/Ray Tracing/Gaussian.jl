@@ -1,7 +1,7 @@
 """
     GaussianBeamlet{T} <: AbstractBeam{T, Ray{T}}
 
-Ray representation of the **stigmatic** Gaussian beam as per J. Arnaud (1985). The beam quality `M2` is fully considered via the divergence angle. 
+Ray representation of the **stigmatic** Gaussian beam as per J. Arnaud (1985). The beam quality `M2` is fully considered via the divergence angle.
 Formalism for beam parameter calculation based on publications:
 
 **Jacques Arnaud, "Representation of Gaussian beams by complex rays," Appl. Opt. 24, 538-543 (1985)**
@@ -12,7 +12,6 @@ and
 
 # Fields
 
-- `id`: beam ID (uuid4)
 - `chief`: a [`Beam`](@ref) of [`Ray`](@ref)s to store the chief ray
 - `waist`: a [`Beam`](@ref) of [`Ray`](@ref)s to store the waist ray
 - `divergence`: a [`Beam`](@ref) of [`Ray`](@ref)s to store the divergence ray
@@ -33,7 +32,6 @@ and
     Refer to **FIXME** for more information.
 """
 mutable struct GaussianBeamlet{T} <: AbstractBeam{T, Ray{T}}
-    id::UUID
     chief::Beam{T, Ray{T}}
     waist::Beam{T, Ray{T}}
     divergence::Beam{T, Ray{T}}
@@ -50,7 +48,7 @@ function GaussianBeamlet(chief::Beam{T, Ray{T}},
         λ::T,
         w0::T,
         E0::Complex{T}) where {T <: Real}
-    return GaussianBeamlet{T}(uuid4(),
+    return GaussianBeamlet{T}(
         chief,
         waist,
         div,
@@ -61,19 +59,43 @@ function GaussianBeamlet(chief::Beam{T, Ray{T}},
         Vector{GaussianBeamlet{T}}())
 end
 
+"""
+    GaussianBeamletInteraction <: AbstractInteraction
+
+This type is used to store the new beamlet section resulting from on optical interaction
+between a [`GaussianBeamlet`](@ref) and some [`AbstractObject`](@ref).
+Uses the hint of the `chief` beam.
+
+# Fields
+
+- `chief`: [`Beam`](@ref) interaction
+- `waist`: [`Beam`](@ref) interaction
+- `divergence`: [`Beam`](@ref) interaction
+"""
 struct GaussianBeamletInteraction{R <: Real} <: AbstractInteraction
     chief::BeamInteraction{R}
     waist::BeamInteraction{R}
     divergence::BeamInteraction{R}
 end
 
-hint(interaction::GaussianBeamletInteraction) = hint(interaction.chief)
+hint(i::GaussianBeamletInteraction) = hint(i.chief)
+hint!(i::GaussianBeamletInteraction, new_hint::Nullable{Hint}) = hint!(i.chief, new_hint)
 
 wavelength(beam::GaussianBeamlet) = beam.λ
 beam_waist(beam::GaussianBeamlet) = beam.w0
 electric_field(beam::GaussianBeamlet) = beam.E0
+refractive_index(beam::GaussianBeamlet, id::Int) = refractive_index(rays(beam.chief)[id])
+function refractive_index!(beam::GaussianBeamlet, id::Int, n_new::Real)
+    refractive_index!(rays(beam.chief)[id], n_new)
+    refractive_index!(rays(beam.waist)[id], n_new)
+    refractive_index!(rays(beam.divergence)[id], n_new)
+    return nothing
+end
 
-Base.length(gauss::GaussianBeamlet; opl::Bool=false) = length(gauss.chief; opl)
+Base.length(gauss::GaussianBeamlet) = length(gauss.chief)
+optical_path_length(gauss::GaussianBeamlet) = optical_path_length(gauss.chief)
+
+isentering(beam::GaussianBeamlet, id::Int) = isentering(rays(beam.chief)[id])
 
 """
     parent!(beam::GaussianBeamlet, parent::GaussianBeamlet)
@@ -87,6 +109,17 @@ function parent!(child::GaussianBeamlet, parent::GaussianBeamlet)
     return nothing
 end
 
+"""
+    interact3d(system::AbstractSystem, object::AbstractObject, gauss::GaussianBeamlet{R}, ray_id::Int)
+
+Generic dispatch for the [`interact3d`](@ref) method of a [`GaussianBeamlet`](@ref) with an [`AbstractObject`](@ref).
+Unless a more concrete implementation exists, the interaction of the Gaussian is assumed to be the interaction of the
+chief, waist and divergence rays with an object.
+
+# Returns
+
+The `interact3d` method for the [`GaussianBeamlet`](@ref) must return a `GaussianBeamletInteraction`.
+"""
 function interact3d(system::AbstractSystem,
         object::AbstractObject,
         gauss::GaussianBeamlet{R},
@@ -127,43 +160,115 @@ end
 _last_beam_intersection(gauss::GaussianBeamlet) = intersection(last(rays(gauss.chief)))
 
 """
-    GaussianBeamlet(chief::Ray{T}, λ=1000e-9, w0=1e-3; M2=1, P0=1e-3, support=[0, 0, 1])
+    _beams_hits_same_shape(gauss, id)
 
-Construct a Gaussian beamlet at its waist with a specified beam diameter.
+Tests if all rays at section `id` of `gauss` hit the same object shape.
+Returns `true` or `false`.
+"""
+@inline function _beams_hits_same_shape(gauss::GaussianBeamlet, id::Int)::Bool
+    c = intersection(rays(gauss.chief)[id])
+    w = intersection(rays(gauss.waist)[id])
+    d = intersection(rays(gauss.divergence)[id])
+    are_nothing = isnothing.((c, w, d))
+    if any(are_nothing)
+        return all(are_nothing)
+    end
+    return shape(c) === shape(w) === shape(d)
+end
+
+"""
+    GaussianBeamlet(position, direction, λ, w0; kwargs...)
+
+Constructs a Gaussian beamlet at its waist with the specified beam parameters.
 
 # Arguments
 
-- `chief`: Chief ray defining the origin of the Gaussian beamlet.
-- `λ`: Wavelength of the beamlet in [m]. Default value is 1000 nm.
-- `w0`: Beam waist (radius) in [m]. Default value is 1 mm.
+The following inputs and arguments can be used to configure the beamlet:
 
-# Keyword Arguments
+## Inputs
 
-- `M2`: beam quality factor
-- `P0`: beam total power in [W]
-- `support`: Support vector that can be adjusted for beamlet construction.
+- `position`: origin of the beamlet
+- `direction`: direction of the beamlet
+- `λ`: wavelength of the beamlet in [m]. Default value is 1000 nm.
+- `w0`: beam waist (radius) in [m]. Default value is 1 mm.
+
+## Keyword Arguments
+
+- `M2`: beam quality factor. Default is 1
+- `P0`: beam total power in [W]. Default is 1 mW
+- `z0`: beam waist offset in [m]. Default is 0 m
+- `support`: [`Nullable`](@ref) support vector for the construction of the waist and div rays
+
+# Additional information
+
+!!! tip "Waist offset"
+    The `z0` keyword arg. can be used in order to spawn a beam where the waist is not located at the
+    specified `position`, but rather at an offset `z0` in [m] along the chief ray axis.
+
+!!! info "Support vector"
+    In order to calculate the basis vectors required for the beamlet construction, a random orthogonal vector is chosen.
+    If results fluctuate due to the randomness of this vector, make sure to specify a fixed orthogonal `support` vector.
 """
-function GaussianBeamlet(chief::Ray{T},
-        λ = 1000e-9,
-        w0 = 1e-3;
-        M2 = 1,
-        P0 = 1e-3,
-        support = [0, 0, 1]) where {T}
-    # Create orthogonal vector for construction purposes
-    bob_the_builder = normal3d(direction(chief), support)
+function GaussianBeamlet(
+    position::AbstractArray{P},
+    direction::AbstractArray{D}, 
+    λ::L = 1e-6,
+    w0::Real = 1e-3;
+    M2::Real = 1,
+    P0::Real = 1e-3,
+    z0::Real = 0,
+    support::Nullable{AbstractArray} = nothing
+    ) where {P<:Real, D<:Real, L<:Real}
+    # T = promote_type(P, D, L)
+    dir = normalize(direction)
+    # Create orthogonal vector for construction purposes (right-handed)
+    if isnothing(support)
+        s1 = normal3d(dir)
+    else
+        # FIXME check for orthogonality (see Pol. astigm. beamlet MR)
+        s1 = support
+    end
+    s1 = normalize(s1)
     # Divergence angle in rad
-    θ = divergence_angle(λ, w0, M2)
+    tanθ = tan(divergence_angle(λ, w0, M2))
     # Waist ray
-    ξ = Ray(position(chief) + bob_the_builder * w0, direction(chief), λ)
-    # Divergence ray
-    div_dir = normalize(direction(chief) + bob_the_builder * tan(θ))
-    η = Ray(position(chief), div_dir, λ)
-    # Ensure that lambda is correct
-    wavelength!(chief, λ)
+    wst = Ray(position + s1 * w0, dir, λ)
+    # Divergence ray (Δz determines waist pos. at z0 along optical axis)
+    div_dir = normalize(dir + s1 * tanθ)
+    Δz = -z0 * tanθ
+    div = Ray(position + s1 * Δz, div_dir, λ)
+    # Chief ray
+    chf = Ray(position, dir, λ)
     # Calculate E0 based on P0, assume zero initial phase offset
     I0 = 2 * P0 / (π * w0^2)
     E0 = electric_field(I0)
-    return GaussianBeamlet(Beam(chief), Beam(ξ), Beam(η), λ, w0, E0)
+    return GaussianBeamlet(
+        Beam(chf),
+        Beam(wst),
+        Beam(div),
+        λ,
+        w0,
+        E0
+    )
+end
+
+global gb_constructor_warn = true
+
+function GaussianBeamlet(chief::Ray{T}, λ=1e-6, w0=1e-3; M2=1, P0=1e-3, support = [0,0,1]) where T
+    if gb_constructor_warn
+        @warn "The GaussianBeamlet(::Ray, ...) constructor will be deprecated in the future"
+        global gb_constructor_warn = false
+    end
+    s1 = normal3d(direction(chief), support)
+    return GaussianBeamlet(
+        position(chief),
+        direction(chief),
+        λ,
+        w0;
+        M2,
+        P0,
+        support = s1
+    )
 end
 
 point_on_beam(gauss::GaussianBeamlet, t::Real) = point_on_beam(gauss.chief, t)
@@ -188,12 +293,8 @@ Calculate the local waist radius and Gouy phase of an unastigmatic Gaussian beam
 """
 function gauss_parameters(gauss::GaussianBeamlet,
         z::Real;
-        hint = nothing)
-    if isnothing(hint)
-        p0, index = point_on_beam(gauss, z)
-    else
-        p0, index = hint
-    end
+        hint = point_on_beam(gauss, z))
+    p0, index = hint
     chief = gauss.chief.rays[index]
     n = refractive_index(chief)
     λ = wavelength(gauss)
@@ -239,10 +340,11 @@ function gauss_parameters(gauss::GaussianBeamlet,
     ψ = -atan(1, √(1 / (R * z) - 1))
     w0 = H / (n * F_kt)
     # Catch NaNs and correct Gouy phase sign based on curvature sign
-    isnan(R) ? R = zero(R) : nothing
-    isnan(ψ) ? ψ = zero(ψ) : nothing
-    isnan(w0) ? w0 = w : nothing
-    R < 0 ? ψ = -ψ : nothing
+    isnan(R) && (R = zero(R))
+    isnan(ψ) && (ψ = zero(ψ))
+    isnan(w0) && (w0 = w)
+    R < 0 && (ψ = -ψ)
+
     return w, R, ψ, w0
 end
 
@@ -252,21 +354,22 @@ end
 Return the parameters of the `GaussianBeamlet` along the specified positions in `zs`.
 """
 function gauss_parameters(gauss::GaussianBeamlet{G}, zs::AbstractArray) where {G}
-    w = Vector{G}(undef, length(zs))
-    R = Vector{G}(undef, length(zs))
-    ψ = Vector{G}(undef, length(zs))
-    w0 = Vector{G}(undef, length(zs))
-    for (i, z) in enumerate(zs)
-        w[i], R[i], ψ[i], w0[i] = gauss_parameters(gauss, z)
+    n = length(zs)
+    w = Vector{G}(undef, n)
+    R = Vector{G}(undef, n)
+    ψ = Vector{G}(undef, n)
+    w0 = Vector{G}(undef, n)
+    @inbounds for i in 1:n
+        w[i], R[i], ψ[i], w0[i] = gauss_parameters(gauss, zs[i])
     end
-    return w, R, ψ, w0
+    return (w, R, ψ, w0)
 end
 
 """
     electric_field(gauss::GaussianBeamlet, r, z)
 
 Calculates the electric field phasor [V/m] of `gauss` at the radial and longitudinal positions `r` and `z`.
-Optionally, buffer vectors `g_b` and `p_b` can be passed.
+
 """
 function electric_field(gauss::GaussianBeamlet, r, z)
     point, index = point_on_beam(gauss, z)
@@ -277,15 +380,19 @@ function electric_field(gauss::GaussianBeamlet, r, z)
     return electric_field(r, z, E0, w0, w, k, ψ, R)
 end
 
+optical_power(gauss::GaussianBeamlet) = intensity(electric_field(gauss)) / 2 * π * beam_waist(gauss)^2
+
 """
     isparaxial(system, gb::GaussianBeamlet, threshold=π/4)
 
 Tests the angle between the waist and divergence beams and refractive surfaces.
 A target threshold of π/4 or 45° is assumed before abberations become dominant.
 """
-isparaxial(system::AbstractSystem, gb::GaussianBeamlet, threshold::Real = π / 4) = isparaxial(system,
+isparaxial(system::AbstractSystem, gb::GaussianBeamlet, threshold::Real = π / 4) = isparaxial(
+    system,
     gb.waist,
-    threshold) & isparaxial(system,
+    threshold) & isparaxial(
+    system,
     gb.divergence,
     threshold)
 
@@ -296,9 +403,21 @@ Tests if refractive elements are tilted with respect to the beamlet optical axis
 """
 istilted(system::AbstractSystem, gb::GaussianBeamlet) = !isparaxial(system, gb.chief, 0)
 
-function isparentbeam(beam::GaussianBeamlet, ray_id)
-    c = isparentbeam(beam.chief, ray_id)
-    w = isparentbeam(beam.waist, ray_id)
-    d = isparentbeam(beam.divergence, ray_id)
+function isparentbeam(beam::GaussianBeamlet, ray::AbstractRay)
+    c = isparentbeam(beam.chief, ray)
+    w = isparentbeam(beam.waist, ray)
+    d = isparentbeam(beam.divergence, ray)
     return any((c, w, d))
+end
+
+"""
+    rayleigh_range(g::GaussianBeamlet; M2=1)
+
+Returns the Rayleigh range for the **first** beam section of the [`GaussianBeamlet`](@ref) `g`.
+Note: `M2` is not stored in `g` during construction and must be specified by the user.
+"""
+function rayleigh_range(g::GaussianBeamlet; M2 = 1)
+    λ = wavelength(g)
+    w0 = beam_waist(g)
+    return rayleigh_range(λ, w0, M2)
 end

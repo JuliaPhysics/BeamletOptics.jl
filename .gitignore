@@ -19,6 +19,5 @@ snoop_compile/
 /Manifest.toml
 /docs/Manifest.toml
 /docs/build/
-/test/test.jl
-/test/asph.jl
-/test/zoom_lens.jl
+
+/scripts
