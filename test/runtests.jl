@@ -863,7 +863,8 @@ end
     xs = [cos(x) for x in LinRange(0, 2pi * (n - 1) / n, n)]
     ys = [sin(x) for x in LinRange(0, 2pi * (n - 1) / n, n)]
 
-    center = GroupTestObject(zeros(3))
+    # Test center with Float32, rest with Float64
+    center = GroupTestObject(zeros(Float32, 3))
     circle = SCDI.ObjectGroup([GroupTestObject([xs[i], ys[i], 0]) for i in eachindex(xs)])
 
     objects = SCDI.ObjectGroup([center, circle])
@@ -892,7 +893,7 @@ end
         xt = circshift(xs, -1)
         yt = circshift(ys, -1)
         @test SCDI.orientation(objects) == Rt
-        @test SCDI.orientation(center) == Rt
+        @test SCDI.orientation(center) ≈ Rt
         @test SCDI.orientation(circle) == Rt
         for (i, obj) in enumerate(SCDI.objects(circle))
             @test SCDI.orientation(obj) == Rt

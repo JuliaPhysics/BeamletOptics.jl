@@ -18,10 +18,10 @@ A `ObjectGroup` implements the kinematic functions of [`AbstractObject`](@ref). 
 - [`translate_to3d!`](@ref): all objects are moved in parallel such that the group `center` is equal to the target position
 - [`rotate3d!`](@ref): all objects are rotated around the `center` point with respect to their relative position
 """
-mutable struct ObjectGroup{T, TT <: Tuple{Vararg{AbstractObject{T}}}} <: AbstractObjectGroup{T}
+mutable struct ObjectGroup{T, O <: Tuple{Vararg{AbstractObject}}} <: AbstractObjectGroup{T}
     dir::SMatrix{3, 3, T, 9}
     center::Point3{T}
-    const objects::TT
+    const objects::O
 end
 
 shape_trait_of(::ObjectGroup) = MultiShape()
@@ -35,8 +35,8 @@ orientation(group::ObjectGroup) = group.dir
 orientation!(group::ObjectGroup, dir) = (group.dir = dir)
 
 ObjectGroup(v::AbstractArray, T = Float64) = ObjectGroup(tuple(v...), T)
-function ObjectGroup(v::TT, T = Float64) where {TT <: Tuple}
-    ObjectGroup{T, TT}(SMatrix{3,3}(one(T)*I), Point3{T}(0), v)
+function ObjectGroup(v::V, T = Float64) where {V <: Tuple}
+    ObjectGroup{T, V}(SMatrix{3,3}(one(T)*I), Point3{T}(0), v)
 end
 
 """
