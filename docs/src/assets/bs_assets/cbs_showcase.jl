@@ -1,4 +1,4 @@
-using GLMakie, SCDI
+using CairoMakie, SCDI
 
 file_dir = @__DIR__
 

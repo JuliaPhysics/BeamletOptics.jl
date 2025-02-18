@@ -1,4 +1,4 @@
-using GLMakie
+using CairoMakie
 using SCDI
 
 cm = 1e-2

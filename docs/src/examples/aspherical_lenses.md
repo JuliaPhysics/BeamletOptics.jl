@@ -64,7 +64,7 @@ and traced using this package. This example is taken from [Pencil of Rays](https
 The whole system consists of three complex-shaped aspherical lenses, a filter and a cover glass in front of a sensor plane. All five components can be easily modeled using the `generalized_lens_shape_constructor` helper and shifted in space using the kinematic API. The field has to be modeled manually.
 
 ```@example mobile_lens
-using SCDI, GLMakie
+using CairoMakie, SCDI
 
 ## mobile-kyocera-3P_USP8558939.zmx
 
