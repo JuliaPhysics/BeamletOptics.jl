@@ -9,6 +9,7 @@ using GeometryBasics: Point3, Point2, Mat
 using AbstractTrees: AbstractTrees, parent, children, NodeType, nodetype, nodevalue, print_tree, HasNodeType, Leaves, StatelessBFS, PostOrderDFS, PreOrderDFS, TreeIterator
 using InteractiveUtils: subtypes
 using FileIO: load
+using MeshIO
 
 import Base: length
 
