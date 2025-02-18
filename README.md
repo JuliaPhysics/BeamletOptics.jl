@@ -33,9 +33,9 @@ Documentation can be found here: https://optical-air-data.pages.gitlab.dlr.de/di
     - [x] Multi-body container type, i.e. telescope, for easy kinematics
     - [ ] Optical elements
         - [ ] PlanoMirror with 3D sdf (thicc)
-            - [ ] cylindrical
+            - [x] cylindrical
             - [ ] rectangular
-        - [ ] ConcaveMirror - cylindrical (thicc)
+        - [x] ConcaveMirror - cylindrical (thicc)
         - [ ] Beamsplitter with substrate
     - [ ] fix `Beam` / `GaussianBeamlet` constructors for more convenience
 - Mechanics
@@ -48,7 +48,7 @@ Documentation can be found here: https://optical-air-data.pages.gitlab.dlr.de/di
     - [ ] Home page
     - [x] Basics section
     - [ ] Tutorials
-        - [ ] Beam expander
+        - [x] Beam expander
         - [ ] Interferometry
     - [ ] API design
     - [ ] Examples

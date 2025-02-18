@@ -10,7 +10,7 @@ As is, the package provides two basic system types: [`SCDI.System`](@ref) and [`
 
 ## Tracing logic
 
-In order to solve optical system, this package uses a hybrid sequential and non-sequential mode. Which mode is being used is determined automatically by the [`SCDI.solve_system!`](@ref) function. This will be explained in more detail below.
+In order to solve optical systems, this package uses a hybrid sequential and non-sequential mode. Which mode is being used is determined automatically by the [`SCDI.solve_system!`](@ref) function. This will be explained in more detail below.
 
 ```@docs; canonical=false
 SCDI.solve_system!
@@ -22,14 +22,14 @@ In the initial state, is is assumed that the problem consists of `objects` <: [`
 
 This non-sequential mode is comparatively safe in determining the "true" beam path, but will scale suboptimally in time-complexity with the amount of optical elements. After solving the system, the beam path is known and can be potentially reused in the future.
 
-!!! info
-    The order in which objects appear in the system object vector/tuple is not considered for the purpose of tracing or retracing.
+!!! info "Object order"
+    Unlike with classic, surface-based ray tracers, the order in which objects are listed in the [`SCDI.System`](@ref) object vector/tuple is not considered for the purpose of tracing or retracing.
 
 ### Retracing systems
 
 Once a system has been traced for the first time, the system and beam can be solved again. However, this time the solver will try to reuse as much information from the previous run as possible by testing if the previous beam trajectory is still valid in a sequential tracing mode. Retracing systems assumes that the kinematic changes (e.g. optomechanical aligment) between the current tracing procedure and the previous one are small. If an intersection along the beam trajectory becomes invalid, the solver will perform a non-sequential trace for all invalidated parts of the beam.
 
-!!! warning
-    The  implemented standard retracing procedure can handle invalidations under certain conditions. However, one case that will lead to a **silent error** is if an element in the system is moved such that it **blocks the beam path between two other elements**. The retracer will not be able to detect this, since the testing of the previous intersection will return a valid intersection.
+!!! warning "Retracing blocked beam paths"
+    The  implemented standard retracing procedure can handle beam path invalidations under certain conditions. However, one case that will lead to a **silent error** is if an element in the system is moved such that it **blocks the beam path between two other elements**. The retracer will not be able to detect this, since the testing of the previous intersection will return a valid intersection.
 
     If this kind of situation must be modeled, e.g. in the case of an optical chopper wheel, retracing should be disabled.

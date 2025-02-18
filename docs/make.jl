@@ -3,14 +3,18 @@ using SCDI
 using Documenter
 using DocumenterCitations
 
-CairoMakie.activate!()
-
 try
-    mkdir(joinpath(@__DIR__, "src", "assets"))
-    @info "Created docs assets folder"
-catch
-    @info "Assets folder in docs already exists"
+    rm(joinpath(@__DIR__, "build"), recursive=true)
+    @info "Deleted build folder..."
+catch e
+    if isa(e, Base.IOError)
+        @info "Can't delete build folder, does not exist..."
+    else
+        rethrow(e)
+    end
 end
+
+CairoMakie.activate!()
 
 DocMeta.setdocmeta!(SCDI, :DocTestSetup, :(using SCDI); recursive=true)
 
@@ -25,6 +29,7 @@ makedocs(;
         prettyurls=get(ENV, "CI", "false") == "true",
         edit_link="main",
         assets=String[],
+        size_threshold_ignore=["reference.md"],
     ),
     pages=[
         "Home" => "index.md",
@@ -35,16 +40,25 @@ makedocs(;
             "Optical elements" => "basics/elements.md",
             "Optical systems" => "basics/systems.md",
         ],
+        "Components" => Any[
+            "Overview" => "components/components.md",
+            "Mirrors" => "components/mirrors.md",
+            "Lenses" => "components/lenses.md",
+            "Beamsplitters" => "components/beamsplitters.md",
+            "Detectors" => "components/detectors.md",
+        ],
         "Tutorials" => Any[
             "Beam expander" => "tutorials/expander.md",
+            "Michelson interferometer" => "tutorials/michelson.md"
         ],
         "API design" => "design.md",
         "Examples" => Any[
             "Spherical lenses" => "examples/spherical_lenses.md",
             "Aspherical lenses" => "examples/aspherical_lenses.md",
-            "Double Gauss Lens" => "examples/double_gauss.md",
+            "Double Gauss lens" => "examples/double_gauss.md",
             "Lens groups" => "examples/lens_groups.md",
         ],
+        "Dev. guide" => "guide.md",
         "Reference" => "reference.md"
     ],
     plugins=[bib],

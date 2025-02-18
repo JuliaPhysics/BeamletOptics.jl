@@ -5,8 +5,15 @@ Render `mesh` into the specified 3D-`axis`.
 """
 render_object!(::Any, mesh::AbstractMesh) = nothing
 
-render_object!(::Any, ::AbstractEntity) = nothing
-render_object!(axis, object::AbstractObject) = render_object!(axis, shape(object))
+render_object!(::Any, ::Any) = nothing
+render_object!(axis, object::AbstractObject) = render_object!(axis, shape_trait_of(object), object)
+render_object!(axis, ::SingleShape, object) = render_object!(axis, shape(object))
+function render_object!(ax, ::MultiShape, object::AbstractObject)
+    for _object in shape(object)
+        render_object!(ax, _object)
+    end
+    return nothing
+end
 
 """
     render_system!(axis, system::AbstractSystem)
@@ -26,7 +33,7 @@ end
 
 Renders a `ray` as a 3D line. If the ray has no intersection, the substitute length `flen` is used.
 """
-function render_ray!(axis, ray::AbstractRay; color = :blue, flen = 1.0)
+function render_ray!(axis, ray::AbstractRay; color = :blue, flen = 1.0, show_pos=false)
     if isnothing(intersection(ray))
         len = flen
     else
@@ -34,21 +41,21 @@ function render_ray!(axis, ray::AbstractRay; color = :blue, flen = 1.0)
     end
     temp = ray.pos + len * ray.dir
 
-    _render_ray!(axis, ray, temp; color)
+    _render_ray!(axis, ray, temp; color, show_pos)
 
     return nothing
 end
 _render_ray!(::Any, ::AbstractRay, ::AbstractVector; color = :blue) = nothing
 
 """
-    render_beam!(axis, beam::Beam; color=:blue, flen=1.0)
+    render_beam!(axis, beam::Beam; color=:blue, flen=1.0, show_pos=false)
 
 Render the entire `beam` into the specified 3D-`axis`. A `color` can be specified.
 """
-function render_beam!(axis, beam::Beam; color = :blue, flen = 1.0)
+function render_beam!(axis, beam::Beam; color = :blue, flen = 1.0, show_pos=false)
     for child in PreOrderDFS(beam)
         for ray in rays(child)
-            render_ray!(axis, ray, color = color, flen = flen)
+            render_ray!(axis, ray; color, flen, show_pos)
         end
     end
     return nothing
@@ -139,3 +146,4 @@ function render_object_normals!(axis, mesh::Mesh; l = 0.01)
     return nothing
 end
 _render_object_normal!(::Any, ::AbstractVector, ::AbstractVector; color = :blue) = nothing
+
