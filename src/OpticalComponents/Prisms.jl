@@ -24,7 +24,7 @@ Creates a right angle symmetric [`Prism`](@ref). The prism is *not aligned* with
 - `height`: in [m]
 - `n`: [`RefractiveIndex`](@ref) of the prism
 """
-function RightAnglePrism(leg_length::Real, height::Real, n::SCDI.RefractiveIndex)
-    shape = SCDI.RightAnglePrismSDF(leg_length, height)
-    return SCDI.Prism(shape, n)
+function RightAnglePrism(leg_length::Real, height::Real, n::BeamletOptics.RefractiveIndex)
+    shape = BeamletOptics.RightAnglePrismSDF(leg_length, height)
+    return Prism(shape, n)
 end

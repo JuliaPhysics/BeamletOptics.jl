@@ -1,14 +1,14 @@
-using CairoMakie, SCDI
+using CairoMakie, BeamletOptics
 
 const mm = 1e-3
 
 ##
-lens = SCDI.ThinLens(50mm, 50mm, SCDI.inch, 1.5)
+lens = ThinLens(50mm, 50mm, BeamletOptics.inch, 1.5)
 
-sd = SCDI.Spotdetector(10e-3)
-SCDI.translate3d!(sd, [0, 50mm, 0])
+sd = Spotdetector(10e-3)
+translate3d!(sd, [0, 50mm, 0])
 
-system = SCDI.System([lens, sd])
+system = System([lens, sd])
 
 ## render system
 system_fig = Figure(size=(600,300))
@@ -19,28 +19,28 @@ system_ax = Axis3(system_fig[1,1], aspect=aspect, limits=limits, azimuth=-1, ele
 hidedecorations!(system_ax)
 hidespines!(system_ax)
 
-SCDI.render_system!(system_ax, system)
+render_system!(system_ax, system)
 
-beam = SCDI.Beam([0,-50mm,0], [0,1,0], 1e-6)
+beam = Beam([0,-50mm,0], [0,1,0], 1e-6)
 
-aperture = SCDI.inch*0.8
+aperture = BeamletOptics.inch*0.8
 
 zs = LinRange(-aperture/2, aperture/2, 25)
 
 for z in zs
-    x = SCDI.position(first(beam.rays))[1]
-    y = SCDI.position(first(beam.rays))[2]
-    SCDI.position!(first(beam.rays), Point3{Float64}(x, y, z))
-    SCDI.solve_system!(system, beam)
-    SCDI.render_beam!(system_ax, beam, show_pos=true)
+    x = BeamletOptics.position(first(beam.rays))[1]
+    y = BeamletOptics.position(first(beam.rays))[2]
+    BeamletOptics.position!(first(beam.rays), Point3{Float64}(x, y, z))
+    solve_system!(system, beam)
+    render_beam!(system_ax, beam, show_pos=true)
 end
 
 ## render diagram
 n_rings = 20
 n_rays = 5000
-SCDI.create_spot_diagram(system, beam, aperture; n_rings, n_rays)
+BeamletOptics.create_spot_diagram(system, beam, aperture; n_rings, n_rays)
 # Rerun for time without compile
-t1 = @timed SCDI.create_spot_diagram(system, beam, aperture; n_rings, n_rays)
+t1 = @timed BeamletOptics.create_spot_diagram(system, beam, aperture; n_rings, n_rays)
 
 spot_fig = Figure(size=(600,400))
 spot_ax = Axis(spot_fig[1,1], aspect=1, xlabel="x [mm]", ylabel="y [mm]")

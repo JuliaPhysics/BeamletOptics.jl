@@ -1,4 +1,4 @@
-name = "SCDI"
+name = "BeamletOptics"
 uuid = "c387492b-ffec-4e51-9a46-bd230226031c"
 authors = ["uitt_hu <hugo.uittenbosch@dlr.de>"]
 version = "0.6.1"
@@ -19,7 +19,7 @@ Trapz = "592b5752-818d-11e9-1e9a-2b8ca4a44cd1"
 Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 
 [extensions]
-SCDIMakieExt = "Makie"
+BeamletOpticsMakieExt = "Makie"
 
 [compat]
 AbstractTrees = "0.4"

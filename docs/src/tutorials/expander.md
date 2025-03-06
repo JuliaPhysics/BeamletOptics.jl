@@ -1,6 +1,6 @@
 # Beam expander
 
-This section will help you to run your first simulation using this package. We will start by modeling a simple [Keplerian beam expander](https://www.thorlabs.us/newgrouppage9.cfm?objectgroup_id=14648). For this tutorial, we will use two thin spherical lenses (see also [`SCDI.SphericalLens`](@ref)) to magnify a collimated beam. The focal length of an ideal thin lens ([`SCDI.lensmakers_eq`](@ref)) can be calculated via
+This section will help you to run your first simulation using this package. We will start by modeling a simple [Keplerian beam expander](https://www.thorlabs.us/newgrouppage9.cfm?objectgroup_id=14648). For this tutorial, we will use two thin spherical lenses (see also [`SphericalLens`](@ref)) to magnify a collimated beam. The focal length of an ideal thin lens ([`BeamletOptics.lensmakers_eq`](@ref)) can be calculated via
 
 ```math
 \frac{1}{f} \approx (n_L - 1) \cdot \left( \frac{1}{R_1} - \frac{1}{R_2} \right)
@@ -13,23 +13,23 @@ where ``n_L`` is the lens refractive index and ``R_{1/2}`` are the radii of curv
 We start by defining two lenses and calculating their analytical focal lengths `f1` and `f2`, which will be required later:
 
 ```@example beam_expander
-using CairoMakie, SCDI
+using CairoMakie, BeamletOptics
 
 # Lens 1
 R11 = 20e-3
 R12 = 60e-3
 nl1 = 1.5
-d1 = SCDI.inch
-f1 = SCDI.lensmakers_eq(R11, -R12, nl1)
-l1 = SCDI.SphericalLens(R11, R12, 0, d1, λ->nl1)
+d1 = BeamletOptics.inch
+f1 = BeamletOptics.lensmakers_eq(R11, -R12, nl1)
+l1 = SphericalLens(R11, R12, 0, d1, λ->nl1)
 
 # Lens 2
 R21 = 60e-3
 R22 = 90e-3
 nl2 = 1.5
-d2 = 2*SCDI.inch
-f2 = SCDI.lensmakers_eq(R21, -R22, nl2)
-l2 = SCDI.SphericalLens(R21, R22, 0, d2, λ->nl1)
+d2 = 2*BeamletOptics.inch
+f2 = BeamletOptics.lensmakers_eq(R21, -R22, nl2)
+l2 = SphericalLens(R21, R22, 0, d2, λ->nl1)
 
 M = f2/f1
 
@@ -51,12 +51,12 @@ We then define that our optical system consists of the lens elements `l1` and `l
 
 ```@example beam_expander
 # define system and move elements
-system = SCDI.System([l1, l2])
+system = System([l1, l2])
 
-SCDI.zrotate3d!(l1, deg2rad(180))
-SCDI.zrotate3d!(l2, deg2rad(180))
+zrotate3d!(l1, deg2rad(180))
+zrotate3d!(l2, deg2rad(180))
 
-SCDI.translate3d!(l2, [0, f1+f2, 0])
+translate3d!(l2, [0, f1+f2, 0])
 ```
 
 Note that the second lens has been moved by the combined focal length `f1+f2` along the y-axis. To visualize what we have done so far, we will use the plotting helper functions that are based on the [Makie](https://docs.makie.org/stable/) package.
@@ -70,7 +70,7 @@ ax = Axis3(fig[1,1], aspect=aspect, limits=limits, azimuth=0., elevation=1e-3)
 hidexdecorations!(ax)
 hidezdecorations!(ax)
 
-SCDI.render_system!(ax, system)
+render_system!(ax, system)
 
 save("expander_no_beams.png", fig, px_per_unit=4); nothing # hide
 ```
@@ -79,25 +79,25 @@ save("expander_no_beams.png", fig, px_per_unit=4); nothing # hide
 
 We can see that both lenses have been placed along the (optical) y-axis.   
 
-!!! info
+!!! tip "3D viewing"
     In practice it is recommend to replace `Axis3` with a `LScene` and use `GLMakie` for a better viewing experience, i.e. `ax = LScene(fig[1,1])`.
 
 ### Propagating beams through the system
 
-We will now define a single beam that propagates through our optical system. First, we start by defining a [`SCDI.Ray`](@ref) with a starting position and direction that is used to generate a [`SCDI.Beam`](@ref). This beam can then be propagated through the expander using the [`SCDI.solve_system!`](@ref) function:
+We will now define a single beam that propagates through our optical system. First, we start by defining a [`Ray`](@ref) with a starting position and direction that is used to generate a [`Beam`](@ref). This beam can then be propagated through the expander using the [`solve_system!`](@ref) function:
 
 ```@example beam_expander
 # Propagate a single ray through the system
 start_pos = [0, -0.15, 4e-3]
 start_dir = [0, 1., 0]
 
-ray = SCDI.Ray(start_pos, start_dir)
+ray = Ray(start_pos, start_dir)
 
-beam = SCDI.Beam(ray)
+beam = Beam(ray)
 
-SCDI.solve_system!(system, beam)
+solve_system!(system, beam)
 
-SCDI.render_beam!(ax, beam, show_pos=true)
+render_beam!(ax, beam, show_pos=true)
 
 save("expander_one_beam.png", fig, px_per_unit=4); nothing # hide
 ```
@@ -112,9 +112,9 @@ If we perform this step for different z-values of the ray starting position, we 
 # Propagate multiple rays through the system
 zs = -4e-3:2e-3:4e-3
 for z in zs
-    b = SCDI.Beam(SCDI.Ray([0, -0.15, z], [0, 1., 0]))
-    SCDI.solve_system!(system, b)
-    SCDI.render_beam!(ax, b)
+    b = Beam(Ray([0, -0.15, z], [0, 1., 0]))
+    solve_system!(system, b)
+    render_beam!(ax, b)
 end
 
 save("expander_all_beams.png", fig, px_per_unit=4); nothing # hide
@@ -122,15 +122,15 @@ save("expander_all_beams.png", fig, px_per_unit=4); nothing # hide
 
 ![Beam Expander](expander_all_beams.png)
 
-Let us also propagate some rays throug the outer region of the magnifier. We will color them red.
+Let us also propagate some rays through the outer region of the magnifier. We will color them red.
 
 ```@example beam_expander
 # Propagate rays through edge region
 zs = 6e-3:2e-3:8e-3
 for z in cat(-zs, zs; dims=1)
-    b = SCDI.Beam(SCDI.Ray([0, -0.15, z], [0, 1., 0]))
-    SCDI.solve_system!(system, b)
-    SCDI.render_beam!(ax, b, color=:red)
+    b = Beam(Ray([0, -0.15, z], [0, 1., 0]))
+    solve_system!(system, b)
+    render_beam!(ax, b, color=:red)
 end
 
 save("expander_abberations.png", fig, px_per_unit=4); nothing # hide

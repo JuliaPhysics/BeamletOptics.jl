@@ -231,17 +231,15 @@ isinfrontof(shape::AbstractShape, ray::AbstractRay) = isinfrontof(position(shape
 Tests whether the ray is entering a shape based on the orientation of the `ray` direction and surface normal.
 If no intersection is present, default behavior is to return `false`.
 """
-isentering(r::SCDI.AbstractRay) = isentering(r, SCDI.intersection(r))
-isentering(r::SCDI.AbstractRay, i::SCDI.Intersection) = isentering(SCDI.direction(r), SCDI.normal3d(i))
+isentering(r::BeamletOptics.AbstractRay) = isentering(r, BeamletOptics.intersection(r))
+isentering(r::BeamletOptics.AbstractRay, i::BeamletOptics.Intersection) = isentering(BeamletOptics.direction(r), BeamletOptics.normal3d(i))
 isentering(d::AbstractArray, n::AbstractArray) = dot(d, n) < 0
-isentering(::SCDI.AbstractRay, ::Nothing) = false
+isentering(::BeamletOptics.AbstractRay, ::Nothing) = false
 
 """
     refraction3d(ray, n2)
 
 Calculates the new direction of a `ray` entering into a new medium with ref. index `n2`.
-
-# FIXME needs testset
 """
 function refraction3d(ray::AbstractRay, n2)
     dir = direction(ray)

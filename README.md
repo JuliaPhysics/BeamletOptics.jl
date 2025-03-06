@@ -1,82 +1,38 @@
-# SCDI Sim
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./docs/src/assets/logo-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="./docs/src/assets/logo.svg">
+    <img src="./docs/src/assets/logo.svg" alt="BeamletOptics.jl logo" width="400">
+  </picture>
+</div>
 
-This project implements a forward model to simulate different aspects of a single crystal dispersion interferometer (SCDI) setup.
+# About
 
-## Documentation
+**BeamletOptics.jl**, or **BMO** for short, is a 3D Gaussian beamlet tracing software mainly intended for the simulation of breadboard optical setups -- e.g. laser interferometers -- with simple components like lenses or beamsplitters. It offers a flexible kinematic API for the easy placement and movement of components.
 
-Documentation can be found here: https://optical-air-data.pages.gitlab.dlr.de/dispersionsinterferometer/scdi-sim/
+[For more information, refer to the documentation.](https://optical-air-data.pages.gitlab.dlr.de/dispersionsinterferometer/BeamletOptics-sim/)
 
-## Features 
+# Features
 
-- Complex ray tracing
-    - Utilities
-        - [x] basic translation/rotation tools
-        - [x] basic STL data input
-        - [x] reset functionality for rotation/translation
-    - Rays        
-        - [x] basic intersection testing
-        - [x] basic propagation routine over n elements
-        - [x] basic optical elements (lens/mirror)
-            - [x] reflection
-            - [x] refraction
-        - [x] Gaussian beam struct
-            - [x] implement better retracing based on chief ray
-            - [ ] astigmatism via `AstigmaticGaussianBeamlet`
-- Optics
-    - [x] Lens types using mathematical surfaces
-    - [x] Interference
-        - [x] optical intensity distribution on detector
-        - [x] model interference of Gaussian beams
-        - [x] phase front via Gaussian beams
-        - [ ] model coherence length via loss of contrast
-    - [ ] phase shift due to ref. index change
-    - [x] Multi-body container type, i.e. telescope, for easy kinematics
-    - [ ] Optical elements
-        - [ ] PlanoMirror with 3D sdf (thicc)
-            - [x] cylindrical
-            - [ ] rectangular
-        - [x] ConcaveMirror - cylindrical (thicc)
-        - [ ] Beamsplitter with substrate
-    - [ ] fix `Beam` / `GaussianBeamlet` constructors for more convenience
-- Mechanics
-    - [x] element group handling
-    - [ ] vibration of optical elements
-- Plotting
-    - [ ] automatic plot updates using Makie Observable/Buffer
-    - [ ] SDF-based lens plotting rework
-- Documentation
-    - [ ] Home page
-    - [x] Basics section
-    - [ ] Tutorials
-        - [x] Beam expander
-        - [ ] Interferometry
-    - [ ] API design
-    - [ ] Examples
-        - [ ] cool interferometry example with optomech render (stls)
-    - [x] References            
-- Test coverage
-    - [x] continuous integration pipeline by O. Kliebisch
-    - [x] translation and x,y,z-rotation tests
-    - [x] Möller-Trumbore-algorithm test
-    - [x] generic mesh intersection test
-    - [x] solve_system()/trace_system() test
-    - [x] interact() tests 
-    - [x] more Lens/Meshlikes tests
+- Hybrid sequential and non-sequential 3D ray tracing without paraxial approximation
+- TEM₀₀ Gaussian beamlet models
+- Various optical components
+    - Mirrors
+    - Lenses
+    - Beamsplitters
+    - Detectors
+- Surface-like modeling of rotationally symmetrical lens systems
+- Extendable API design for the implementation of custom optical interactions
+- Easy visualization via the [Makie](https://github.com/MakieOrg/Makie.jl) package
 
-## Known bugs
+# Installation
 
-- [ ] interact3d for AbstractRefractiveOptic/Abstract Ray: n2 not correctly set in case of TIR
-- [ ] inconsistent use of nm, m, mm (i.e. in Ray constructor)
-- [x] align3d rotation incorrect if start = -target
-- [ ] @code_warntype for interact(Lens, Beam)
-- [ ] change names for functions that return matrices
-- [ ] weird results for high level-of-detail meshes
-- [x] SDFs and meshes rotate in opposite directions
-- [x] GaussianBeamlet efield calculation fails at beam waist
-- [ ] point_on_beam calculation can be incorrect at optical surfaces
-- [ ] intersection calculation can be incorrect if two objects "touch"
-- [ ] inconsistent rotation behavior for shapes of type Mesh 
+To install this package in your current project environment, enter the Pkg REPL-mode via `]` and `add BeamletOptics` or in the REPL enter:
 
-## Comments
+```julia
+using Pkg; Pkg.add("BeamletOptics")
+```
 
-- none
+# Examples
+
+For a variety of illustrated examples and tutorials, refer to the **Tutorials** and **Examples** sections of the documentation linked to above.

@@ -194,3 +194,28 @@ function intersect3d(object::AbstractSDF, ray::AbstractRay)
     # Return no intersection else
     return nothing
 end
+
+# generic SDF transformations
+"""
+    op_revolve_z(p, sdf2d::Function, offset)
+
+Calculates the SDF at point `p` for the given 2D-SDF function with `offset` by revolving
+the 2D shape around the z-axis.
+
+"""
+function op_revolve_z(p::Point3{T}, sdf2d::Function, offset = zero(T)) where {T <: Real}
+    q = Point2(norm(Point2(p[1], p[2])) - offset, p[3])
+    return sdf2d(q)
+end
+
+"""
+    op_revolve_y(p, sdf2d::Function, offset)
+
+Calculates the SDF at point `p` for the given 2D-SDF function with `offset` by revolving
+the 2D shape around the y-axis.
+
+"""
+function op_revolve_y(p::Point3{T}, sdf2d::Function, offset = zero(T)) where {T <: Real}
+    q = Point2(norm(Point2(p[1], p[3])) - offset, p[2])
+    return sdf2d(q)
+end

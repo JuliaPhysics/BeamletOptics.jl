@@ -27,7 +27,12 @@ end
 """
     Spotdetector(width)
 
-Generates a quadratic [`Spotdetector`](@ref) with the specified `width` in [m].
+Generates a quadratic rectangular 2D [`Spotdetector`](@ref) that is aligned with the **negative y-axis**.
+Refer to the type docs for more information.
+
+# Inputs:
+
+- `width`: edge length in [m]
 """
 function Spotdetector(width::W) where W<:AbstractFloat
     # Spawn mesh, align with neg. y-axis, empty data field

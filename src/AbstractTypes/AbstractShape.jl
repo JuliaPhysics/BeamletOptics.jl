@@ -106,7 +106,7 @@ end
 Rotates the `shape` such that its local y-axis aligns with the `target_axis`.
 """
 function align3d!(shape::AbstractShape, target_axis)
-    R = align3d(SCDI.orientation(shape)[:,2], target_axis)
+    R = align3d(BeamletOptics.orientation(shape)[:,2], target_axis)
     orientation!(shape, R * orientation(shape))
     return nothing
 end

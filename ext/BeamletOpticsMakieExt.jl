@@ -1,7 +1,7 @@
-module SCDIMakieExt
+module BeamletOpticsMakieExt
 
-using SCDI: faces, vertices, AbstractMesh, AbstractRay, Beam, PolarizedRay, intensity, rays, NonInteractableObject
-import SCDI: render_object!, render_ray!, _render_beam!,
+using BeamletOptics: faces, vertices, AbstractMesh, AbstractRay, Beam, PolarizedRay, intensity, rays, NonInteractableObject
+import BeamletOptics: render_object!, render_ray!, _render_beam!,
     _render_ray!, render_surface!, _render_object_normal!, render_sdf_mesh!, render_dummy_mesh!
 using Makie: Axis3, LScene, mesh!, surface!, lines!, RGBAf, scatter!
 using GeometryBasics: Point2, Point3

@@ -1,7 +1,7 @@
 #=
 Generate a hierarchy of all AbstractSDFs via:
 
-    list_subtypes(SCDI.AbstractSDF)
+    list_subtypes(BeamletOptics.AbstractSDF)
 
 =#
 

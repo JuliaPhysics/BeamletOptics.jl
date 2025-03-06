@@ -450,21 +450,21 @@ function SphericalLensShapeConstructor(r1, r2, l, d)
     if isinf(r1)
         front = nothing
     elseif r1 > 0
-        front = SCDI.ConvexSphericalSurfaceSDF(r1, d)
-        l0 -= SCDI.sag(front)
+        front = BeamletOptics.ConvexSphericalSurfaceSDF(r1, d)
+        l0 -= BeamletOptics.sag(front)
     else
-        front = SCDI.ConcaveSphericalSurfaceSDF(abs(r1), d)
+        front = BeamletOptics.ConcaveSphericalSurfaceSDF(abs(r1), d)
     end
     # determine back shape
     if isinf(r2)
         back = nothing
     elseif r2 > 0
-        back = SCDI.ConcaveSphericalSurfaceSDF(r2, d)
-        SCDI.zrotate3d!(back, π)
+        back = BeamletOptics.ConcaveSphericalSurfaceSDF(r2, d)
+        zrotate3d!(back, π)
     else
-        back = SCDI.ConvexSphericalSurfaceSDF(abs(r2), d)
-        SCDI.zrotate3d!(back, π)
-        l0 -= SCDI.sag(back)
+        back = BeamletOptics.ConvexSphericalSurfaceSDF(abs(r2), d)
+        zrotate3d!(back, π)
+        l0 -= BeamletOptics.sag(back)
     end
     # test if cylinder is legal
     if l0 ≤ 0
@@ -475,13 +475,13 @@ function SphericalLensShapeConstructor(r1, r2, l, d)
         throw(ArgumentError("Lens parameters lead to cylinder section length of ≤ 0, use ThinLens instead."))
     end
     # design plano-plano surface, add spherical parts
-    mid = SCDI.PlanoSurfaceSDF(l0, d)
+    mid = BeamletOptics.PlanoSurfaceSDF(l0, d)
     if !isnothing(front)
-        SCDI.translate3d!(mid, [0, SCDI.thickness(front), 0])
+        translate3d!(mid, [0, BeamletOptics.thickness(front), 0])
         mid += front
     end
     if !isnothing(back)
-        SCDI.translate3d!(back, [0,  SCDI.thickness(mid) + SCDI.thickness(back), 0])
+        translate3d!(back, [0,  BeamletOptics.thickness(mid) + BeamletOptics.thickness(back), 0])
         mid += back
     end
     # return shape
