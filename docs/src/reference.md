@@ -15,5 +15,5 @@ Depth = 5
 # Index
 
 ```@autodocs
-Modules = [SCDI]
+Modules = [BeamletOptics]
 ```

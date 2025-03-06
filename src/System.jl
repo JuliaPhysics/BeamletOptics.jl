@@ -361,7 +361,7 @@ function retrace_system!(system::AbstractSystem, gauss::GaussianBeamlet{T}) wher
             intersection!(d_ray, intersect3d(_object, d_ray))
         else
             _object = object(_hint)
-            _shape = SCDI.shape(_hint)
+            _shape = BeamletOptics.shape(_hint)
             intersection!(c_ray, intersect3d(_shape, c_ray))
             intersection!(w_ray, intersect3d(_shape, w_ray))
             intersection!(d_ray, intersect3d(_shape, d_ray))

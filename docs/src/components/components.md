@@ -10,9 +10,9 @@ Depth = 2
 ```
 ## Component list
 
-When using this package in the REPL, a tree view of all implemented [`SCDI.AbstractObject`](@ref)s can be generated via the [`SCDI.list_subtypes`](@ref) helper function. Note that this function is not able to determine all available constructors.
+When using this package in the REPL, a tree view of all implemented [`BeamletOptics.AbstractObject`](@ref)s can be generated via the [`BeamletOptics.list_subtypes`](@ref) helper function. Note that this function is not able to determine all available constructors.
 
 ```@repl
-using SCDI # hide
-SCDI.list_subtypes(SCDI.AbstractObject);
+using BeamletOptics # hide
+BeamletOptics.list_subtypes(BeamletOptics.AbstractObject);
 ```

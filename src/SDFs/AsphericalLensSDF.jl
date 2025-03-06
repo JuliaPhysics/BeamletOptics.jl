@@ -151,18 +151,6 @@ function gradient_aspheric_equation(r, c, k, α_coeffs)
 end
 
 """
-    op_revolve(p, sdf2d::Function, offset)
-
-Calculates the SDF at point `p` for the given 2D-SDF function with `offset` by revolving
-the 2D shape around the z-axis.
-
-"""
-function op_revolve(p::Point3{T}, sdf2d::Function, offset = zero(T)) where {T <: Real}
-    q = Point2(norm(Point2(p[1], p[2])) - offset, p[3])
-    return sdf2d(q)
-end
-
-"""
     sd_line_segment(p, a, b)
 
 Returns the signed distance from point `p` to the line segment described by the points `a`
@@ -321,7 +309,7 @@ function sdf(surface::ConvexAsphericalSurfaceSDF{T}, point) where {T}
     # optical axis.
     _pp = Point3{T}(p_local[1], p_local[3], p_local[2]) # xzy
     # rotate 2D sdf around the optical axis
-    sdf_v = op_revolve(_pp,
+    sdf_v = op_revolve_z(_pp,
         x -> convex_aspheric_surface_distance(
             x[1],
             x[2],
@@ -342,7 +330,7 @@ function sdf(surface::ConcaveAsphericalSurfaceSDF{T}, point) where {T}
     # optical axis.
     _pp = Point3{T}(p_local[1], p_local[3], p_local[2]) # xzy
     # rotate 2D sdf around the optical axis
-    sdf_v = op_revolve(_pp,
+    sdf_v = op_revolve_z(_pp,
         x -> concave_aspheric_surface_distance(
             x[1],
             x[2],
@@ -505,10 +493,10 @@ function generalized_lens_shape_constructor(r1, r2, l, d1, d2 = d1;
         front = nothing
     elseif front_kind === :spherical
         if r1 > 0
-            front = SCDI.ConvexSphericalSurfaceSDF(r1, d1)
-            l0 -= SCDI.sag(front)
+            front = BeamletOptics.ConvexSphericalSurfaceSDF(r1, d1)
+            l0 -= BeamletOptics.sag(front)
         else
-            front = SCDI.ConcaveSphericalSurfaceSDF(abs(r1), d1)
+            front = BeamletOptics.ConcaveSphericalSurfaceSDF(abs(r1), d1)
         end
     elseif front_kind === :aspherical
         if front_coeffs === nothing
@@ -530,12 +518,12 @@ function generalized_lens_shape_constructor(r1, r2, l, d1, d2 = d1;
         back = nothing
     elseif back_kind === :spherical
         if r2 > 0
-            back = SCDI.ConcaveSphericalSurfaceSDF(r2, d2)
-            SCDI.zrotate3d!(back, π)
+            back = BeamletOptics.ConcaveSphericalSurfaceSDF(r2, d2)
+            zrotate3d!(back, π)
         else
-            back = SCDI.ConvexSphericalSurfaceSDF(abs(r2), d2)
-            SCDI.zrotate3d!(back, π)
-            l0 -= SCDI.sag(back)
+            back = BeamletOptics.ConvexSphericalSurfaceSDF(abs(r2), d2)
+            zrotate3d!(back, π)
+            l0 -= BeamletOptics.sag(back)
         end
     elseif back_kind === :aspherical
         if back_coeffs === nothing

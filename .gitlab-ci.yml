@@ -32,8 +32,8 @@ pages:
         Pkg.develop(PackageSpec(path=pwd()))
         Pkg.instantiate()
         using Documenter: doctest
-        using SCDI
-        doctest(SCDI)
+        using BeamletOptics
+        doctest(BeamletOptics)
         include(\"docs/make.jl\")'
     - mkdir -p public
     - mv docs/build/* public/

@@ -1,18 +1,18 @@
 # Lenses
 
-Lenses are fundamental optical components used to focus or diverge light, making them essential for constructing imaging systems. The [`SCDI.AbstractRefractiveOptic`](@ref) type provides a general definition of components that refract light. This package includes a variety of rotationally symmetric lens models to simulate simple imaging setups. All lens models provided as part of this package are based on SDFs. Refer to the [Signed Distance Functions (SDFs)](@ref) section for more information.
+Lenses are fundamental optical components used to focus or diverge light, making them essential for constructing imaging systems. The [`BeamletOptics.AbstractRefractiveOptic`](@ref) type provides a general definition of components that refract light. This package includes a variety of rotationally symmetric lens models to simulate simple imaging setups. All lens models provided as part of this package are based on SDFs. Refer to the [Signed Distance Functions (SDFs)](@ref) section for more information.
 
 ## Spherical lenses
 
 Spherical lenses are characterized by surfaces with constant curvature, making them straightforward to model and ideal for basic imaging applications. 
 
 ```@docs; canonical=false
-SCDI.SphericalLens
+SphericalLens
 ```
 
 Below, several spherical lenses are recreated from manufacturer data using the [Spherical lens constructor](@ref):
 
-- [`SCDI.GaussianBeamlet`](@ref) parameters
+- [`GaussianBeamlet`](@ref) parameters
     - ``w_0 = 5~\text{mm}``
     - ``\lambda=532~\text{nm}``
 - Lenses (in order of appearance)
@@ -38,46 +38,46 @@ save("spherical_lens_showcase.png", fig, px_per_unit=4); nothing
 
 In order to model the lens surfaces shown above, the following SDF-based spherical lens shapes have been implemented:
 
-- [`SCDI.ConvexSphericalSurfaceSDF`](@ref)
-- [`SCDI.ConcaveSphericalSurfaceSDF`](@ref)
-- [`SCDI.MeniscusLensSDF`](@ref)
-- [`SCDI.PlanoSurfaceSDF`](@ref)
+- [`BeamletOptics.ConvexSphericalSurfaceSDF`](@ref)
+- [`BeamletOptics.ConcaveSphericalSurfaceSDF`](@ref)
+- [`BeamletOptics.MeniscusLensSDF`](@ref)
+- [`BeamletOptics.PlanoSurfaceSDF`](@ref)
 
-In general, [`SCDI.AbstractLensSDF`](@ref)s can be combined via the the [`SCDI.UnionSDF`](@ref)-API in order to enable the quasi-surface-based design of spherical lens systems.
+In general, [`BeamletOptics.AbstractLensSDF`](@ref)s can be combined via the the [`BeamletOptics.UnionSDF`](@ref)-API in order to enable the quasi-surface-based design of spherical lens systems.
 
 !!! hint "Spherical lens example"
     For a complex showcase, refer to the [Double Gauss lens](@ref) example page.
 
 ### Spherical lens constructor
 
-The quasi-surface-based design API mentioned above is based on the [`SCDI.SphericalLensShapeConstructor`](@ref). It builds lenses based on input curvatures, the lens thickness and refractive index as follows:
+The quasi-surface-based design API mentioned above is based on the [`BeamletOptics.SphericalLensShapeConstructor`](@ref). It builds lenses based on input curvatures, the lens thickness and refractive index as follows:
 
 ```@docs; canonical=false
-SCDI.SphericalLensShapeConstructor
+BeamletOptics.SphericalLensShapeConstructor
 ```
 
 ## Doublet lenses
 
-The [`SCDI.DoubletLens`](@ref) is an example for a multi-shape object as mentioned in the [Multi-shape objects](@ref) section.
+The [`DoubletLens`](@ref) is an example for a multi-shape object as mentioned in the [Multi-shape objects](@ref) section.
 
 ```@docs; canonical=false
-SCDI.SphericalDoubletLens(::Any, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any)
+SphericalDoubletLens(::Any, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any)
 ```
 
-The following image shows the [AC254-150-AB](https://www.thorlabs.com/thorproduct.cfm?partnumber=AC254-150-AB) doublet lens for 488 and 707 nm. It has been created using the [`SCDI.SphericalDoubletLens`](@ref) constructor shown above. Changes in the [`SCDI.Ray`](@ref) direction are marked with red dots (disregarding the beam spawn point).
+The following image shows the [AC254-150-AB](https://www.thorlabs.com/thorproduct.cfm?partnumber=AC254-150-AB) doublet lens for 488 and 707 nm. It has been created using the [`SphericalDoubletLens`](@ref) constructor shown above. Changes in the [`Ray`](@ref) direction are marked with red dots (disregarding the beam spawn point).
 
 
 ```@eval
-using CairoMakie, SCDI
+using CairoMakie, BeamletOptics
 
 λs = [488e-9, 707e-9, 1064e-9]
 
-NLAK22 = SCDI.DiscreteRefractiveIndex(λs, [1.6591, 1.6456, 1.6374])
-NSF10 = SCDI.DiscreteRefractiveIndex(λs, [1.7460, 1.7168, 1.7021])
+NLAK22 = BeamletOptics.DiscreteRefractiveIndex(λs, [1.6591, 1.6456, 1.6374])
+NSF10 = BeamletOptics.DiscreteRefractiveIndex(λs, [1.7460, 1.7168, 1.7021])
 
-AC254_150_AB = SCDI.SphericalDoubletLens(87.9e-3, 105.6e-3, 1000, 6e-3, 3e-3, SCDI.inch, NLAK22, NSF10)
+AC254_150_AB = SphericalDoubletLens(87.9e-3, 105.6e-3, 1000, 6e-3, 3e-3, BeamletOptics.inch, NLAK22, NSF10)
 
-system = SCDI.System([AC254_150_AB])
+system = System([AC254_150_AB])
 
 fig = Figure(size=(600,240))
 aspect = (1,4,1)
@@ -87,21 +87,21 @@ ax = Axis3(fig[1,1], aspect=aspect, limits=limits, azimuth=0., elevation=1e-3)
 hidedecorations!(ax)
 hidespines!(ax)
 
-SCDI.render_system!(ax, system)
+render_system!(ax, system)
 
 zs_1 = LinRange(-0.011, 0.011, 6)
 zs_2 = LinRange(-0.01, 0.01, 5)
 
 for (i, z) in enumerate(zs_1)
-    beam = SCDI.Beam([0, -0.02 , z], [0,1.,0], 488e-9)
-    SCDI.solve_system!(system, beam)
-    SCDI.render_beam!(ax, beam, flen=0.15, color=RGBAf(0,0,1,0.7))
+    beam = Beam([0, -0.02 , z], [0,1.,0], 488e-9)
+    solve_system!(system, beam)
+    render_beam!(ax, beam, flen=0.15, color=RGBAf(0,0,1,0.7))
 end
 
 for (i, z) in enumerate(zs_2)
-    beam = SCDI.Beam([0, -0.02 , z], [0,1.,0], 707e-9)
-    SCDI.solve_system!(system, beam)
-    SCDI.render_beam!(ax, beam, flen=0.15, color=RGBAf(1,0,0,0.5), show_pos=true)
+    beam = Beam([0, -0.02 , z], [0,1.,0], 707e-9)
+    solve_system!(system, beam)
+    render_beam!(ax, beam, flen=0.15, color=RGBAf(1,0,0,0.5), show_pos=true)
 end
 
 save("doublet_showcase.png", fig, px_per_unit=4)
@@ -120,17 +120,17 @@ To construct a lens with any possible combination of convex/concave, spherical/a
 - The back surface is an aspherical concave surface which first curves outwards before change slope and curving invards, giving a more "convex" like character while still beeing a concave lens by definition. Also this surface extends towards the full outer diameter.
 
 ```@example
-using CairoMakie, SCDI
+using CairoMakie, BeamletOptics
 
-L3 = SCDI.Lens(
-    SCDI.generalized_lens_shape_constructor(3.618e-3, 2.161e-3, 0.7e-3, 3.04e-3, 3.7e-3;
+L3 = Lens(
+    BeamletOptics.generalized_lens_shape_constructor(3.618e-3, 2.161e-3, 0.7e-3, 3.04e-3, 3.7e-3;
         front_kind = :aspherical, front_k=-44.874,front_coeffs=[0,-0.14756*(1e3)^3, 0.035194*(1e3)^5, -0.0032262*(1e3)^7, 0.0018592*(1e3)^9, 0.00036658*(1e3)^11, -0.00016039*(1e3)^13, -3.1846e-5*(1e3)^15],
         back_kind = :aspherical, back_k=-10.719, back_coeffs=[0,-0.096568*(1e3)^3, 0.026771*(1e3)^5, -0.011261*(1e3)^7, 0.0019879*(1e3)^9, 0.00015579*(1e3)^11, -0.00012433*(1e3)^13, 1.5264e-5*(1e3)^15]
     ),
     n -> 1.580200
 )
 
-system = SCDI.System([L3])
+system = System([L3])
 
 fig = Figure(size=(600,240))
 ax = Axis3(fig[1,1], aspect=:data, azimuth=0., elevation=1e-3)
@@ -138,7 +138,7 @@ ax = Axis3(fig[1,1], aspect=:data, azimuth=0., elevation=1e-3)
 hidedecorations!(ax)
 hidespines!(ax)
 
-SCDI.render_system!(ax, system)
+render_system!(ax, system)
 
 fig
 ```
@@ -147,5 +147,5 @@ fig
     Refer to the [Simple aspherical lens example](@ref) for a showcase on how to implement a plano-convex asphere.
 
 ```@docs; canonical=false
-SCDI.generalized_lens_shape_constructor
+BeamletOptics.generalized_lens_shape_constructor
 ```

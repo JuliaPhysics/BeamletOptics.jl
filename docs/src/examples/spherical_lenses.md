@@ -12,58 +12,58 @@ This example recreates the figure shown in the [Types of elements](@ref) section
 First a function is defined that returns the refractive index ``n(\lambda)`` for the relevent wavelengths. 
 
 ```@example spherical_lens_showcase
-using CairoMakie, SCDI
+using CairoMakie, BeamletOptics
 
-NBK7 = SCDI.DiscreteRefractiveIndex([532e-9, 1064e-9], [1.5195, 1.5066])
+NBK7 = BeamletOptics.DiscreteRefractiveIndex([532e-9, 1064e-9], [1.5195, 1.5066])
 
 nothing # hide
 ```
 
-Then the different spherical lenses referred to above are generated using the [`SCDI.SphericalLens`](@ref) convenience constructor.
+Then the different spherical lenses referred to above are generated using the [`SphericalLens`](@ref) convenience constructor.
 
 ```@example spherical_lens_showcase
 # lens diameter 
-d = SCDI.inch
+d = BeamletOptics.inch
 
 # lens types
 r1 = 34.9e-3
 r2 = -34.9e-3
 l = 6.8e-3
-LB1811 = SCDI.SphericalLens(r1, r2, l, d, NBK7)
+LB1811 = SphericalLens(r1, r2, l, d, NBK7)
 
 r1 = Inf
 r2 = -15.5e-3
 l = 8.6e-3
-LA1805 = SCDI.SphericalLens(r1, r2, l, d, NBK7)
+LA1805 = SphericalLens(r1, r2, l, d, NBK7)
 
 r1 = -52e-3
 r2 = 52e-3
 l = 3e-3
-LD1464 = SCDI.SphericalLens(r1, r2, l, d, NBK7)
+LD1464 = SphericalLens(r1, r2, l, d, NBK7)
 
 r1 = Inf
 r2 = 25.7e-3
 l = 3.5e-3
-LC1715 = SCDI.SphericalLens(r1, r2, l, d, NBK7)
+LC1715 = SphericalLens(r1, r2, l, d, NBK7)
 
 r1 = -82.2e-3
 r2 = -32.1e-3
 l = 3.6e-3
-LE1234 = SCDI.SphericalLens(r1, r2, l, d, NBK7)
+LE1234 = SphericalLens(r1, r2, l, d, NBK7)
 
 nothing # hide
 ```
 
-The lenses are then moved into arbitray positions along the y-axis for the showcase. A [`SCDI.GaussianBeamlet`](@ref) with ``\lambda = 532~\text{nm}`` and ``w_0 = 5~\text{mm}`` is used for this purpose.
+The lenses are then moved into arbitray positions along the y-axis for the showcase. A [`GaussianBeamlet`](@ref) with ``\lambda = 532~\text{nm}`` and ``w_0 = 5~\text{mm}`` is used for this purpose.
 
 ```@example spherical_lens_showcase
-SCDI.translate3d!(LD1464, [0, 0*d, 0])
-SCDI.translate3d!(LB1811, [0, 1*d, 0])
-SCDI.translate3d!(LC1715, [0, 2*d, 0])
-SCDI.translate3d!(LE1234, [0, 3*d, 0])
-SCDI.translate3d!(LA1805, [0, 4*d, 0])
+translate3d!(LD1464, [0, 0*d, 0])
+translate3d!(LB1811, [0, 1*d, 0])
+translate3d!(LC1715, [0, 2*d, 0])
+translate3d!(LE1234, [0, 3*d, 0])
+translate3d!(LA1805, [0, 4*d, 0])
 
-system = SCDI.StaticSystem([
+system = StaticSystem([
     LB1811,
     LA1805,
     LD1464,
@@ -71,8 +71,8 @@ system = SCDI.StaticSystem([
     LE1234
 ])
 
-beam = SCDI.GaussianBeamlet([0, -0.05, 0], [0, 1, 0], 532e-9, 5e-3)
-SCDI.solve_system!(system, beam)
+beam = GaussianBeamlet([0, -0.05, 0], [0, 1, 0], 532e-9, 5e-3)
+solve_system!(system, beam)
 
 nothing # hide
 ```
@@ -89,8 +89,8 @@ ax = Axis3(fig[1,1], aspect=aspect, limits=limits, azimuth=0., elevation=1e-3)
 hidexdecorations!(ax)
 hidezdecorations!(ax)
 
-SCDI.render_beam!(ax, beam, color=:green2)
-SCDI.render_system!(ax, system)
+render_beam!(ax, beam, color=:green2)
+render_system!(ax, system)
 
 save("spherical_lens_showcase.png", fig, px_per_unit=4); nothing # hide
 ```

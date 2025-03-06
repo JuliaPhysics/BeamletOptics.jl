@@ -29,7 +29,18 @@ mutable struct Photodetector{T, S <: AbstractShape{T}} <: AbstractDetector{T, S}
     field::Matrix{Complex{T}}
 end
 
-function Photodetector(width::T, n::Int) where {T}
+"""
+    Photodetector(width, n)
+
+Spawns a quadratic rectangular 2D [`Photodetector`](@ref) that is aligned with the **positive y-axis**.
+Refer to the type docs for more information.
+
+# Inputs:
+
+- `width`: edge length in [m]
+- `n`: field discretization factor, higher results in more computational cost
+"""
+function Photodetector(width::T, n::Int) where {T<:Real}
     shape = QuadraticFlatMesh(width)
     sz = maximum(vertices(shape))
     x = y = LinRange(-sz, sz, n)

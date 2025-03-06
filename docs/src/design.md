@@ -25,6 +25,6 @@
 For an introduction into SDFs the [website of Inigo Quilez](https://iquilezles.org/articles/distfunctions/) is referred to. The following shapes have been implemented:
 
 ```@repl
-using SCDI # hide
-SCDI.list_subtypes(SCDI.AbstractSDF);
+using BeamletOptics # hide
+BeamletOptics.list_subtypes(BeamletOptics.AbstractSDF);
 ```

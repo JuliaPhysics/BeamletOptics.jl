@@ -1,29 +1,29 @@
 # Optical systems
 
-A collection of optical elements is referred to as a system in the context of this package. Optical systems are used together with beams for the [`SCDI.solve_system!`](@ref) function. In general, optical systems must fulfill the [`SCDI.AbstractSystem`](@ref) interface in order to be compatible with the standard solvers in this package:
+A collection of optical elements is referred to as a system in the context of this package. Optical systems are used together with beams for the [`solve_system!`](@ref) function. In general, optical systems must fulfill the [`BeamletOptics.AbstractSystem`](@ref) interface in order to be compatible with the standard solvers in this package:
 
 ```@docs; canonical=false
-SCDI.AbstractSystem
+BeamletOptics.AbstractSystem
 ```
 
-As is, the package provides two basic system types: [`SCDI.System`](@ref) and [`SCDI.StaticSystem`](@ref). Refer to the [Beam expander](@ref) tutorial for an example on how to define a simple optical system.
+As is, the package provides two basic system types: [`System`](@ref) and [`StaticSystem`](@ref). Refer to the [Beam expander](@ref) tutorial for an example on how to define a simple optical system.
 
 ## Tracing logic
 
-In order to solve optical systems, this package uses a hybrid sequential and non-sequential mode. Which mode is being used is determined automatically by the [`SCDI.solve_system!`](@ref) function. This will be explained in more detail below.
+In order to solve optical systems, this package uses a hybrid sequential and non-sequential mode. Which mode is being used is determined automatically by the [`solve_system!`](@ref) function. This will be explained in more detail below.
 
 ```@docs; canonical=false
-SCDI.solve_system!
+solve_system!
 ```
 
 ### Tracing systems
 
-In the initial state, is is assumed that the problem consists of `objects` <: [`SCDI.AbstractObject`](@ref)s (in a system) and a `beam` <: [`SCDI.AbstractBeam`](@ref) with a defined starting position and direction. No additional information is provided, and the specific path of the beam is not known beforehand. Consequently, brute force tracing of the optical system is required, involving testing against each individual element to determine the trajectory of the beam.
+In the initial state, is is assumed that the problem consists of `objects` <: [`BeamletOptics.AbstractObject`](@ref)s (in a system) and a `beam` <: [`BeamletOptics.AbstractBeam`](@ref) with a defined starting position and direction. No additional information is provided, and the specific path of the beam is not known beforehand. Consequently, brute force tracing of the optical system is required, involving testing against each individual element to determine the trajectory of the beam.
 
 This non-sequential mode is comparatively safe in determining the "true" beam path, but will scale suboptimally in time-complexity with the amount of optical elements. After solving the system, the beam path is known and can be potentially reused in the future.
 
 !!! info "Object order"
-    Unlike with classic, surface-based ray tracers, the order in which objects are listed in the [`SCDI.System`](@ref) object vector/tuple is not considered for the purpose of tracing or retracing.
+    Unlike with classic, surface-based ray tracers, the order in which objects are listed in the [`System`](@ref) object vector/tuple is not considered for the purpose of tracing or retracing.
 
 ### Retracing systems
 

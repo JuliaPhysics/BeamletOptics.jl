@@ -1,5 +1,5 @@
 using CairoMakie
-using SCDI
+using BeamletOptics
 using Documenter
 using DocumenterCitations
 
@@ -16,20 +16,21 @@ end
 
 CairoMakie.activate!()
 
-DocMeta.setdocmeta!(SCDI, :DocTestSetup, :(using SCDI); recursive=true)
+DocMeta.setdocmeta!(BeamletOptics, :DocTestSetup, :(using BeamletOptics); recursive=true)
 
 bib = CitationBibliography(joinpath(@__DIR__, "src", "refs.bib"))
 
 makedocs(;
-    modules=[SCDI],
+    modules=[BeamletOptics],
     authors="Hugo Uittenbosch <hugo.uittenbosch@dlr.de> and contributors",
     repo="https://gitlab.dlr.de/optical-air-data/dispersionsinterferometer/scdi-sim/-/blob/{commit}{path}#L{line}",
-    sitename="SCDI Sim",
+    sitename="BeamletOptics",
     format=Documenter.HTML(;
         prettyurls=get(ENV, "CI", "false") == "true",
         edit_link="main",
         assets=String[],
         size_threshold_ignore=["reference.md"],
+        sidebar_sitename = false,
     ),
     pages=[
         "Home" => "index.md",

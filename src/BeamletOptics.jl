@@ -1,4 +1,4 @@
-module SCDI
+module BeamletOptics
 
 using LinearAlgebra: norm, normalize, normalize!, dot, cross, I, tr
 using MarchingCubes: MC, march
@@ -14,22 +14,21 @@ using MeshIO
 import Base: length
 
 # Do not change order of inclusion!
-include("Ray Tracing/Constants.jl")
-include("Ray Tracing/Utils.jl")
-include("Ray Tracing/AbstractTypes/AbstractTypes.jl")
-include("Ray Tracing/Rays.jl")
-include("Ray Tracing/PolarizedRays.jl")
-include("Ray Tracing/Beam.jl")
-include("Ray Tracing/Mesh.jl")
-include("Ray Tracing/SDFs/SDF.jl")
-include("Ray Tracing/Gaussian.jl")
-include("Ray Tracing/System.jl")
-include("Ray Tracing/OpticalComponents/Components.jl")
-include("Ray Tracing/Groups.jl")
-include("Ray Tracing/Render.jl")
+include("Constants.jl")
+include("Utils.jl")
+include("AbstractTypes/AbstractTypes.jl")
+include("Rays.jl")
+include("PolarizedRays.jl")
+include("Beam.jl")
+include("Mesh.jl")
+include("SDFs/SDF.jl")
+include("Gaussian.jl")
+include("System.jl")
+include("OpticalComponents/Components.jl")
+include("Groups.jl")
+include("Render.jl")
+include("Exports.jl")
 
-if get(ENV, "CI", "false") == "false"
-    include("CompileWorkload.jl")
-end
+include("Workloads/precompile.jl")
 
 end # module

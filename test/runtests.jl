@@ -1,4 +1,4 @@
-using SCDI
+using BeamletOptics
 using Test
 using LinearAlgebra
 using GeometryBasics
@@ -8,26 +8,26 @@ using AbstractTrees
     @testset "Testing normal3d" begin
         @testset "normal3d(v) with Array" begin
             v = [1., 1, 1]
-            k = SCDI.normal3d(v)
+            k = BeamletOptics.normal3d(v)
             @test dot(v, k) ≈ 0 atol=1e-14
             @test norm(k) ≈ 1
         end
 
         @testset "normal3d(v) with Point3" begin
             v = Point3(1., 1, 1)
-            k = SCDI.normal3d(v)
+            k = BeamletOptics.normal3d(v)
             @test dot(v, k) ≈ 0 atol=1e-14
             @test norm(k) ≈ 1
         end
 
         @testset "normal3d(v, w) right hand rule and unit length" begin
-            orth = SCDI.normal3d([2, 0, 0], [0, 0, 1])
+            orth = BeamletOptics.normal3d([2, 0, 0], [0, 0, 1])
             @test isapprox(orth, [0, -1, 0])
         end
     end
 
     @testset "Testing rotate3d for clockwise dir. and conservation of length" begin
-        Rot = SCDI.rotate3d([0, 0, 1], π / 2)
+        Rot = BeamletOptics.rotate3d([0, 0, 1], π / 2)
         @test isapprox(Rot * [1, 0, 0], [0, 1, 0])
     end
 
@@ -36,35 +36,35 @@ using AbstractTrees
         start = [1, 0, 0]
         # Test parallel case
         target = [1, 0, 0]
-        T = SCDI.align3d(start, target)
+        T = BeamletOptics.align3d(start, target)
         @test T * start ≈ target
         # Test parallel opposite case
         target = [-1, 0, 0]
-        T = SCDI.align3d(start, target)
+        T = BeamletOptics.align3d(start, target)
         @test T * start ≈ target
         # Test norm and 45° rotation
         target = [1.0, 1.0, 0.0]
-        T = SCDI.align3d(start, target)
+        T = BeamletOptics.align3d(start, target)
         @test T * start ≈ normalize(target)
     end
 
     @debug "Testing angle3d for resulting angle"
-    a = SCDI.angle3d([1, 0, 0], [0, 0, 1])
+    a = BeamletOptics.angle3d([1, 0, 0], [0, 0, 1])
     @test isapprox(a, π / 2)
 
     @testset "Testing line_point_distance3d and isinfrontof" begin
         pos = [0, 0, 0]
         dir = [1, 0, 0]
         point = [5, 1, 1]
-        d = SCDI.line_point_distance3d(pos, dir, point)
+        d = BeamletOptics.line_point_distance3d(pos, dir, point)
         @test isapprox(d, √2)
 
-        @test SCDI.isinfrontof(point, pos, dir) == true
+        @test BeamletOptics.isinfrontof(point, pos, dir) == true
     end
 
     @testset "Testing reflection3d" begin
         for dx in -1:1, dy in -1:1
-            @test isapprox(SCDI.reflection3d([dx, dy, 1], [0, 0, -1]), [dx, dy, -1])
+            @test isapprox(BeamletOptics.reflection3d([dx, dy, 1], [0, 0, -1]), [dx, dy, -1])
         end
     end
 
@@ -75,8 +75,8 @@ using AbstractTrees
             n2 = 1.5
             for θ1 in 0:(π / 8):(π / 2)
                 dir_in = [sin(θ1), 0, -cos(θ1)]
-                dir_out, TIR = SCDI.refraction3d(dir_in, normal, n1, n2)
-                θ2 = SCDI.angle3d(-normal, dir_out)
+                dir_out, TIR = BeamletOptics.refraction3d(dir_in, normal, n1, n2)
+                θ2 = BeamletOptics.angle3d(-normal, dir_out)
                 # 2D-equation for refraction validation
                 θ3 = asin(n1 / n2 * sin(θ1))
                 @test isapprox(θ2, θ3)
@@ -88,15 +88,15 @@ using AbstractTrees
             n2 = 1.0
             for θ1 in 0:(π / 8):(π / 2)
                 dir_in = [sin(θ1), 0, -cos(θ1)]
-                dir_out, TIR = SCDI.refraction3d(dir_in, normal, n1, n2)
+                dir_out, TIR = BeamletOptics.refraction3d(dir_in, normal, n1, n2)
                 if θ1 > asin(n2 / n1)
                     # Test for total reflection
-                    θ2 = SCDI.angle3d(dir_out, normal)
+                    θ2 = BeamletOptics.angle3d(dir_out, normal)
                     @test isapprox(θ1, θ2)
                     @test TIR == true
                 else
                     # Test for refraction
-                    θ2 = SCDI.angle3d(-normal, dir_out)
+                    θ2 = BeamletOptics.angle3d(-normal, dir_out)
                     θ3 = asin(n1 / n2 * sin(θ1))
                     @test isapprox(θ2, θ3)
                     @test TIR == false
@@ -109,7 +109,7 @@ using AbstractTrees
         @testset "Vacuum-glass: normal incidence" begin
             n = 1.5
             θ = 0.0
-            rs, rp, ts, tp = SCDI.fresnel_coefficients(θ, n)
+            rs, rp, ts, tp = BeamletOptics.fresnel_coefficients(θ, n)
             @test real(rs) ≈ (1-n)/(1+n)
             @test real(rs) ≈ real(rp)
             @test real(tp) ≈ 2/(1+n)
@@ -119,14 +119,14 @@ using AbstractTrees
         @testset "Vacuum-glass: Brewster angle" begin
             n = 1.5
             θb = atan(n)
-            rs, rp, ts, tp = SCDI.fresnel_coefficients(θb, n)
+            rs, rp, ts, tp = BeamletOptics.fresnel_coefficients(θb, n)
             @test real(rp) ≈ 0
         end
 
         @testset "Vacuum-glass: grazing incidence" begin
             n = 1.5
             θ = π/2
-            rs, rp, ts, tp = SCDI.fresnel_coefficients(θ, n)
+            rs, rp, ts, tp = BeamletOptics.fresnel_coefficients(θ, n)
             @test real(rs) ≈ -1
             @test real(rp) ≈ 1
             @test real(ts) ≈ 0
@@ -136,7 +136,7 @@ using AbstractTrees
         @testset "Glass-vacuum: normal incidence" begin
             n = 1/1.5
             θ = 0.0
-            rs, rp, ts, tp = SCDI.fresnel_coefficients(θ, n)
+            rs, rp, ts, tp = BeamletOptics.fresnel_coefficients(θ, n)
             @test real(rs) ≈ (1-n)/(1+n)
             @test real(rs) ≈ real(rp)
             @test real(tp) ≈ 2/(1+n)
@@ -146,15 +146,15 @@ using AbstractTrees
         @testset "Glass-vacuum: Brewster angle" begin
             n = 1/1.5
             θb = atan(n)
-            rs, rp, ts, tp = SCDI.fresnel_coefficients(θb, n)
+            rs, rp, ts, tp = BeamletOptics.fresnel_coefficients(θb, n)
             @test real(rp) ≈ 0 atol=2e-16
         end
 
         @testset "Glass-vacuum: Total internal reflection" begin
             n = 1/1.5
             θc = asin(n)
-            rs, rp, ts, tp = SCDI.fresnel_coefficients(θc, n)
-            @test SCDI.is_internally_reflected(rp, rs)
+            rs, rp, ts, tp = BeamletOptics.fresnel_coefficients(θc, n)
+            @test BeamletOptics.is_internally_reflected(rp, rs)
             @test real(rs) ≈ 1
             @test real(rp) ≈ -1
             @test real(ts) ≈ 2
@@ -168,15 +168,15 @@ using AbstractTrees
         T2 = Float64
         lambdas = T1.([488e-9, 707e-9, 1064e-9])
         indices = T2.([1.6591, 1.6456, 1.6374])
-        ref_index = SCDI.DiscreteRefractiveIndex(lambdas, indices)
+        ref_index = BeamletOptics.DiscreteRefractiveIndex(lambdas, indices)
 
         @testset "DiscreteRefractiveIndex" begin
-            @test isdefined(SCDI, :DiscreteRefractiveIndex)
-            @test isa(ref_index, SCDI.DiscreteRefractiveIndex{T2})
+            @test isdefined(BeamletOptics, :DiscreteRefractiveIndex)
+            @test isa(ref_index, BeamletOptics.DiscreteRefractiveIndex{T2})
             @test ref_index(lambdas[2]) == indices[2]
             @test_throws KeyError ref_index(lambdas[1] + 1e-9)
             # Test constructor
-            @test_throws ArgumentError SCDI.DiscreteRefractiveIndex([1], [1,2])
+            @test_throws ArgumentError BeamletOptics.DiscreteRefractiveIndex([1], [1,2])
         end
 
         @testset "Test ref. helper function" begin
@@ -186,36 +186,36 @@ using AbstractTrees
             f4(x) = x, 1                    # fail
             f5(x) = x                       # pass
             # Test if illegal functions are detected
-            @test_throws ArgumentError SCDI.test_refractive_index_function(f1)
-            @test_throws ArgumentError SCDI.test_refractive_index_function(f2)
-            @test_throws ArgumentError SCDI.test_refractive_index_function(f3)
-            @test_throws ArgumentError SCDI.test_refractive_index_function(f4)
-            @test isnothing(SCDI.test_refractive_index_function(f5))
-            @test isnothing(SCDI.test_refractive_index_function(ref_index))
+            @test_throws ArgumentError BeamletOptics.test_refractive_index_function(f1)
+            @test_throws ArgumentError BeamletOptics.test_refractive_index_function(f2)
+            @test_throws ArgumentError BeamletOptics.test_refractive_index_function(f3)
+            @test_throws ArgumentError BeamletOptics.test_refractive_index_function(f4)
+            @test isnothing(BeamletOptics.test_refractive_index_function(f5))
+            @test isnothing(BeamletOptics.test_refractive_index_function(ref_index))
         end
     end
 end
 
 @testset "Types" begin
-    @test isdefined(SCDI, :AbstractShape)
-    @test isdefined(SCDI, :AbstractObject)
-    @test isdefined(SCDI, :AbstractObjectGroup)
-    @test isdefined(SCDI, :AbstractRay)
-    @test isdefined(SCDI, :AbstractBeam)
-    @test isdefined(SCDI, :AbstractSystem)
-    @test isdefined(SCDI, :Intersection)
-    @test isdefined(SCDI, :Hint)
-    @test isdefined(SCDI, :AbstractInteraction)
+    @test isdefined(BeamletOptics, :AbstractShape)
+    @test isdefined(BeamletOptics, :AbstractObject)
+    @test isdefined(BeamletOptics, :AbstractObjectGroup)
+    @test isdefined(BeamletOptics, :AbstractRay)
+    @test isdefined(BeamletOptics, :AbstractBeam)
+    @test isdefined(BeamletOptics, :AbstractSystem)
+    @test isdefined(BeamletOptics, :Intersection)
+    @test isdefined(BeamletOptics, :Hint)
+    @test isdefined(BeamletOptics, :AbstractInteraction)
 
     # Generate test structs
-    struct TestSystem <: SCDI.AbstractSystem end
+    struct TestSystem <: BeamletOptics.AbstractSystem end
 
     @testset "AbstractSystem" begin
         # no tests
         sys = TestSystem()
     end
 
-    mutable struct TestRay{T} <: SCDI.AbstractRay{T}
+    mutable struct TestRay{T} <: BeamletOptics.AbstractRay{T}
         pos::Vector{T}
         dir::Vector{T}
         λ::T
@@ -229,23 +229,23 @@ end
     @testset "AbstractRay" begin
         r = TestRay([0.0, 0, 0], [1.0, 0, 0])
         # Test getters
-        @test SCDI.position(r) == r.pos
-        @test SCDI.direction(r) == r.dir
-        @test SCDI.wavelength(r) == r.λ
-        @test SCDI.refractive_index(r) == r.n
+        @test BeamletOptics.position(r) == r.pos
+        @test BeamletOptics.direction(r) == r.dir
+        @test BeamletOptics.wavelength(r) == r.λ
+        @test BeamletOptics.refractive_index(r) == r.n
         # Test setters
         n_pos = [1, 1, 1]
         n_dir = [1.0, 1, 0]
         n_lam = 532e-9
         n_rfi = 1.5
-        SCDI.position!(r, n_pos)
-        SCDI.direction!(r, n_dir)
-        SCDI.wavelength!(r, n_lam)
-        SCDI.refractive_index!(r, n_rfi)
-        @test SCDI.position(r) == n_pos
-        @test SCDI.direction(r) ≈ n_dir .* (sqrt(2) / 2)
-        @test SCDI.wavelength(r) == n_lam
-        @test SCDI.refractive_index(r) == n_rfi
+        BeamletOptics.position!(r, n_pos)
+        BeamletOptics.direction!(r, n_dir)
+        BeamletOptics.wavelength!(r, n_lam)
+        BeamletOptics.refractive_index!(r, n_rfi)
+        @test BeamletOptics.position(r) == n_pos
+        @test BeamletOptics.direction(r) ≈ n_dir .* (sqrt(2) / 2)
+        @test BeamletOptics.wavelength(r) == n_lam
+        @test BeamletOptics.refractive_index(r) == n_rfi
         @test length(r) == π
         # Test ray-plane intersection
         plane_pos = [1, 0, -1]
@@ -253,16 +253,16 @@ end
         plane_nml_2 = [1, 0, 0]
         plane_nml_3 = [0, 0, 1]
         ray = TestRay([0.0, 0, 0], [1.0, 0, 0])
-        is_1 = SCDI.intersect3d(plane_pos, plane_nml_1, ray)
-        is_2 = SCDI.intersect3d(plane_pos, plane_nml_2, ray)
-        is_3 = SCDI.intersect3d(plane_pos, plane_nml_3, ray)
+        is_1 = BeamletOptics.intersect3d(plane_pos, plane_nml_1, ray)
+        is_2 = BeamletOptics.intersect3d(plane_pos, plane_nml_2, ray)
+        is_3 = BeamletOptics.intersect3d(plane_pos, plane_nml_3, ray)
         @test length(is_1) == 2
         @test length(is_2) == 1
         @test isnothing(is_3)
     end
 
-    mutable struct TestBeam{T} <: SCDI.AbstractBeam{T, TestRay{T}}
-        parent::SCDI.Nullable{TestBeam}
+    mutable struct TestBeam{T} <: BeamletOptics.AbstractBeam{T, TestRay{T}}
+        parent::BeamletOptics.Nullable{TestBeam}
         children::Vector{TestBeam}
     end
 
@@ -276,13 +276,13 @@ end
         group = [cb1, cb2]
         cb3 = TestBeam()
         # Add children to root, cb2
-        SCDI.children!(root, group)
-        SCDI.children!(cb2, cb3)
+        BeamletOptics.children!(root, group)
+        BeamletOptics.children!(cb2, cb3)
         # Test tree structure
         @test treeheight(root) == 2
         @test treebreadth(root) == 2
-        @test SCDI.children(root) == group
-        @test first(SCDI.children(cb2)) === cb3
+        @test BeamletOptics.children(root) == group
+        @test first(BeamletOptics.children(cb2)) === cb3
         # Test parent connection
         @test AbstractTrees.parent(root) === nothing
         @test AbstractTrees.parent(cb1) === root
@@ -290,16 +290,16 @@ end
         @test AbstractTrees.parent(cb3) === cb2
         # Replace bottom child
         cbr = TestBeam()
-        @test_throws "_modify_beam_head not implemented for $(typeof(cb2))" SCDI.children!(cb2,
+        @test_throws "_modify_beam_head not implemented for $(typeof(cb2))" BeamletOptics.children!(cb2,
             cbr)
         # Test child removal
-        SCDI._drop_beams!(cb2)
-        @test isempty(SCDI.children(cb2))
+        BeamletOptics._drop_beams!(cb2)
+        @test isempty(BeamletOptics.children(cb2))
         # Stuff
-        @test_throws "_last_beam_intersection not implemented for $(typeof(cb2))" SCDI._last_beam_intersection(cb2)
+        @test_throws "_last_beam_intersection not implemented for $(typeof(cb2))" BeamletOptics._last_beam_intersection(cb2)
     end
 
-    mutable struct TestShapeless{T} <: SCDI.AbstractShape{T}
+    mutable struct TestShapeless{T} <: BeamletOptics.AbstractShape{T}
         pos::Vector{T}
         dir::Matrix{T}
     end
@@ -311,57 +311,57 @@ end
         dir = Matrix{Float64}(I, 3, 3)
         shape = TestShapeless(pos, dir)
         # Test get/set
-        @test SCDI.position(shape) == pos
-        @test SCDI.orientation(shape) == dir
+        @test BeamletOptics.position(shape) == pos
+        @test BeamletOptics.orientation(shape) == dir
         n_pos = [1, 1, 1]
-        n_dir = SCDI.rotate3d([0, 0, 1], π / 4)
-        SCDI.position!(shape, n_pos)
-        SCDI.orientation!(shape, n_dir)
-        @test SCDI.position(shape) == n_pos
-        @test SCDI.orientation(shape) == n_dir
+        n_dir = BeamletOptics.rotate3d([0, 0, 1], π / 4)
+        BeamletOptics.position!(shape, n_pos)
+        BeamletOptics.orientation!(shape, n_dir)
+        @test BeamletOptics.position(shape) == n_pos
+        @test BeamletOptics.orientation(shape) == n_dir
         # Test translation
-        SCDI.translate3d!(shape, n_pos)
-        @test SCDI.position(shape) == 2 * n_pos
-        SCDI.reset_translation3d!(shape)
-        @test SCDI.position(shape) == zeros(3)
+        translate3d!(shape, n_pos)
+        @test BeamletOptics.position(shape) == 2 * n_pos
+        reset_translation3d!(shape)
+        @test BeamletOptics.position(shape) == zeros(3)
         # Test rotation for counter-clockwise in right-hand coord. system
         dir = Matrix{Float64}(I, 3, 3)
-        SCDI.orientation!(shape, dir)
-        SCDI.rotate3d!(shape, [0, 0, 1], deg2rad(45))
-        @test all(SCDI.orientation(shape)[[1,2,5]] .≈ sqrt(2)/2)
-        @test SCDI.orientation(shape)[4] ≈ -sqrt(2)/2
-        SCDI.rotate3d!(shape, [0, 0, 1], deg2rad(135))
-        @test SCDI.orientation(shape)[1:4:9] == [-1, -1, 1]
-        SCDI.xrotate3d!(shape, π)
-        SCDI.yrotate3d!(shape, π)
-        SCDI.zrotate3d!(shape, π)
-        SCDI.reset_rotation3d!(shape)
-        @test SCDI.orientation(shape) == dir
+        BeamletOptics.orientation!(shape, dir)
+        rotate3d!(shape, [0, 0, 1], deg2rad(45))
+        @test all(BeamletOptics.orientation(shape)[[1,2,5]] .≈ sqrt(2)/2)
+        @test BeamletOptics.orientation(shape)[4] ≈ -sqrt(2)/2
+        rotate3d!(shape, [0, 0, 1], deg2rad(135))
+        @test BeamletOptics.orientation(shape)[1:4:9] == [-1, -1, 1]
+        xrotate3d!(shape, π)
+        yrotate3d!(shape, π)
+        zrotate3d!(shape, π)
+        reset_rotation3d!(shape)
+        @test BeamletOptics.orientation(shape) == dir
         # Test align3d
         target_vec = normalize([1,1,1])
-        SCDI.align3d!(shape, target_vec)
-        @test SCDI.orientation(shape)[:,2] ≈ target_vec
-        SCDI.reset_rotation3d!(shape)
+        align3d!(shape, target_vec)
+        @test BeamletOptics.orientation(shape)[:,2] ≈ target_vec
+        reset_rotation3d!(shape)
         # The following test are expected to do nothing but not throw exceptions
         ray = TestRay([0.0, 0, 0], [1.0, 0, 0])
-        @test_logs (:warn, "No intersect3d method defined for:") SCDI.intersect3d(shape,
+        @test_logs (:warn, "No intersect3d method defined for:") BeamletOptics.intersect3d(shape,
             ray)
 
         @testset "Testing AbstractRay - AbstractShape" begin
             shape = TestShapeless([1, 0, 0], Matrix{Int}(I, 3, 3))
             ray = TestRay([0.0, 0, 0], [1.0, 0, 0])
-            @test SCDI.isinfrontof(shape, ray) == true
-            SCDI.direction!(ray, -[1, 0, 0])
-            @test SCDI.isinfrontof(shape, ray) == false
-            SCDI.direction!(ray, [0, 1, 0])
-            @test SCDI.isinfrontof(shape, ray) == false
-            SCDI.direction!(ray, [1.0, 1, 0])
-            @test SCDI.isinfrontof(shape, ray) == true
-            @test norm(SCDI.direction(ray)) ≈ 1
+            @test BeamletOptics.isinfrontof(shape, ray) == true
+            BeamletOptics.direction!(ray, -[1, 0, 0])
+            @test BeamletOptics.isinfrontof(shape, ray) == false
+            BeamletOptics.direction!(ray, [0, 1, 0])
+            @test BeamletOptics.isinfrontof(shape, ray) == false
+            BeamletOptics.direction!(ray, [1.0, 1, 0])
+            @test BeamletOptics.isinfrontof(shape, ray) == true
+            @test norm(BeamletOptics.direction(ray)) ≈ 1
         end
     end
 
-    struct TestObject{T, S <: SCDI.AbstractShape{T}} <: SCDI.AbstractObject{T, S}
+    struct TestObject{T, S <: BeamletOptics.AbstractShape{T}} <: BeamletOptics.AbstractObject{T, S}
         shape::S
     end
 
@@ -369,29 +369,29 @@ end
 
     @testset "AbstractObject" begin
         object = TestObject()
-        @test isa(SCDI.shape(object), TestShapeless)
+        @test isa(BeamletOptics.shape(object), TestShapeless)
         # Test forwarding of kin. API to object shape
-        @test SCDI.position(object) == SCDI.position(SCDI.shape(object))
-        @test SCDI.position(object) == SCDI.position(SCDI.shape(object))
-        SCDI.translate3d!(object, ones(3))
-        SCDI.rotate3d!(object, [0, 0, 1], π)
-        @test SCDI.position(object) == ones(3)
-        @test SCDI.orientation(object)[1:4:9] == [-1, -1, 1]
-        SCDI.reset_translation3d!(object)
-        SCDI.reset_rotation3d!(object)
-        @test SCDI.position(object) == zeros(3)
-        @test SCDI.orientation(object)[1:4:9] == ones(3)
+        @test BeamletOptics.position(object) == BeamletOptics.position(BeamletOptics.shape(object))
+        @test BeamletOptics.position(object) == BeamletOptics.position(BeamletOptics.shape(object))
+        translate3d!(object, ones(3))
+        rotate3d!(object, [0, 0, 1], π)
+        @test BeamletOptics.position(object) == ones(3)
+        @test BeamletOptics.orientation(object)[1:4:9] == [-1, -1, 1]
+        reset_translation3d!(object)
+        reset_rotation3d!(object)
+        @test BeamletOptics.position(object) == zeros(3)
+        @test BeamletOptics.orientation(object)[1:4:9] == ones(3)
         # Test translate_to3d
         target_pos = [1, 3, 9]
-        SCDI.translate_to3d!(object, target_pos)
-        @test SCDI.position(object) == target_pos
+        translate_to3d!(object, target_pos)
+        @test BeamletOptics.position(object) == target_pos
 
         @testset "Testing interact3d" begin
             sys = TestSystem()
             obj = TestObject()
             ray = TestRay(zeros(3), ones(3))
             beam = TestBeam()
-            @test_logs (:warn, "No interact3d method defined for:") SCDI.interact3d(sys,
+            @test_logs (:warn, "No interact3d method defined for:") BeamletOptics.interact3d(sys,
                 obj,
                 beam,
                 ray)===nothing
@@ -403,173 +403,187 @@ end
     # Testing constructor
     pos = [0, 0, 0]
     dir = [1.0, 1, 0]
-    ray = SCDI.Ray(pos, dir)
+    ray = Ray(pos, dir)
     @test ismutable(ray)
-    @test isa(ray, SCDI.Ray{Float64})
+    @test isa(ray, Ray{Float64})
     @test isnothing(ray.intersection)
     @test isinf(length(ray))
     @test isapprox(norm(ray.dir), 1)
     # Test helper functions
-    @test SCDI.line_point_distance3d(ray, [1, 1, 0]) == 0
-    @test SCDI.line_point_distance3d(ray, [-1, 1, 0]) == sqrt(2)
+    @test BeamletOptics.line_point_distance3d(ray, [1, 1, 0]) == 0
+    @test BeamletOptics.line_point_distance3d(ray, [-1, 1, 0]) == sqrt(2)
 
     @testset "Testing isentering" begin
-        r1 = SCDI.Ray([0,0,0], [0,1,0])
-        r2 = SCDI.Ray([0,0,0], [0,1,0])
-        r3 = SCDI.Ray([0,0,0], [0,1,0])
-        i1 = SCDI.Intersection(nothing, nothing, 0., Point3(0,1.,0))
-        i2 = SCDI.Intersection(nothing, nothing, 0., Point3(0,-1.,0))
-        SCDI.intersection!(r1, i1)
-        SCDI.intersection!(r2, i2)
-        @test !SCDI.isentering(r1)
-        @test SCDI.isentering(r2)
-        @test !SCDI.isentering(r3)
+        r1 = Ray([0,0,0], [0,1,0])
+        r2 = Ray([0,0,0], [0,1,0])
+        r3 = Ray([0,0,0], [0,1,0])
+        i1 = BeamletOptics.Intersection(nothing, nothing, 0., Point3(0,1.,0))
+        i2 = BeamletOptics.Intersection(nothing, nothing, 0., Point3(0,-1.,0))
+        BeamletOptics.intersection!(r1, i1)
+        BeamletOptics.intersection!(r2, i2)
+        @test !BeamletOptics.isentering(r1)
+        @test BeamletOptics.isentering(r2)
+        @test !BeamletOptics.isentering(r3)
+    end
+
+    @testset "Testing refraction3d" begin
+        n1 = 1
+        n2 = 1.5
+        dir = normalize([0,1,0])
+        ray = Ray(zeros(3), dir)
+        nml = normalize(Point3{Float64}(0, -1, 1))
+        BeamletOptics.intersection!(ray, BeamletOptics.Intersection(nothing, nothing, 1.0, nml))
+        @test BeamletOptics.refraction3d(dir, nml, n1, n2) == BeamletOptics.refraction3d(ray, n2)
+        # test for correct exit normal flip
+        nml *= -1
+        BeamletOptics.intersection!(ray, BeamletOptics.Intersection(nothing, nothing, 1.0, nml))
+        @test BeamletOptics.refraction3d(dir, -nml, n1, n2) == BeamletOptics.refraction3d(ray, n2)
     end
 end
 
 @testset "Beams" begin
-    is = SCDI.Intersection(1.0, zeros(3))
-    r1 = SCDI.Ray([0.0, 0, 0], [1, 0, 0])
-    r2 = SCDI.Ray([1.0, 0, 0], [0, 1, 0])
-    r3 = SCDI.Ray([1.0, 1, 0], [0, 0, 1])
-    r4 = SCDI.Ray([1.0, 1, 1], [1, 0, 0])
-    SCDI.intersection!(r1, is)
-    SCDI.intersection!(r2, is)
-    SCDI.intersection!(r3, is)
-    SCDI.intersection!(r4, nothing)
+    is = BeamletOptics.Intersection(1.0, zeros(3))
+    r1 = Ray([0.0, 0, 0], [1, 0, 0])
+    r2 = Ray([1.0, 0, 0], [0, 1, 0])
+    r3 = Ray([1.0, 1, 0], [0, 0, 1])
+    r4 = Ray([1.0, 1, 1], [1, 0, 0])
+    BeamletOptics.intersection!(r1, is)
+    BeamletOptics.intersection!(r2, is)
+    BeamletOptics.intersection!(r3, is)
+    BeamletOptics.intersection!(r4, nothing)
     # Test beam
-    beam = SCDI.Beam(r1)
+    beam = Beam(r1)
     push!(beam, r2)
     push!(beam, r3)
     push!(beam, r4)
     @test length(beam) == 3
-    @test SCDI.point_on_beam(beam, 0) == ([0, 0, 0], 1)
-    @test SCDI.point_on_beam(beam, 1) == ([1, 0, 0], 2)
-    @test SCDI.point_on_beam(beam, 2) == ([1, 1, 0], 3)
-    @test SCDI.point_on_beam(beam, 3) == ([1, 1, 1], 4)
-    @test SCDI.point_on_beam(beam, 10) == ([8, 1, 1], 4)
-    @test SCDI.isparentbeam(beam, r2) == true
+    @test BeamletOptics.point_on_beam(beam, 0) == ([0, 0, 0], 1)
+    @test BeamletOptics.point_on_beam(beam, 1) == ([1, 0, 0], 2)
+    @test BeamletOptics.point_on_beam(beam, 2) == ([1, 1, 0], 3)
+    @test BeamletOptics.point_on_beam(beam, 3) == ([1, 1, 1], 4)
+    @test BeamletOptics.point_on_beam(beam, 10) == ([8, 1, 1], 4)
+    @test BeamletOptics.isparentbeam(beam, r2) == true
 end
 
 @testset "Mesh" begin
     # NOTE: the "Mesh" testset is mutating. Errors/fails might lead to subsequent tests failing too!
-    @test isdefined(SCDI, :AbstractMesh)
-    @test isdefined(SCDI, :Mesh)
+    @test isdefined(BeamletOptics, :AbstractMesh)
+    @test isdefined(BeamletOptics, :Mesh)
 
     # Generate cube since types are defined
-    foo = SCDI.CubeMesh(1) # test cube
-    bar = SCDI.CubeMesh(1) # reference cube
+    foo = BeamletOptics.CubeMesh(1) # test cube
+    bar = BeamletOptics.CubeMesh(1) # reference cube
 
     to_origin = -0.5 * [1, 1, 1]
 
     @testset "Testing AbstractMesh getters" begin
-        @test typeof(foo) == SCDI.Mesh{Float64}
-        @test SCDI.vertices(foo) == foo.vertices
-        @test SCDI.faces(foo) == foo.faces
-        @test SCDI.orientation(foo) == foo.dir
-        @test SCDI.position(foo) == foo.pos
-        @test SCDI.scale(foo) == foo.scale
+        @test typeof(foo) == BeamletOptics.Mesh{Float64}
+        @test BeamletOptics.vertices(foo) == foo.vertices
+        @test BeamletOptics.faces(foo) == foo.faces
+        @test BeamletOptics.orientation(foo) == foo.dir
+        @test BeamletOptics.position(foo) == foo.pos
+        @test BeamletOptics.scale(foo) == foo.scale
     end
 
     @testset "Testing translate3d!" begin
-        SCDI.translate3d!(foo, to_origin) # move COG to origin
-        @test minimum(SCDI.vertices(foo)[:, 1]) == -0.5
-        @test minimum(SCDI.vertices(foo)[:, 2]) == -0.5
-        @test minimum(SCDI.vertices(foo)[:, 3]) == -0.5
-        @test maximum(SCDI.vertices(foo)[:, 1]) == 0.5
-        @test maximum(SCDI.vertices(foo)[:, 2]) == 0.5
-        @test maximum(SCDI.vertices(foo)[:, 3]) == 0.5
-        @test all(SCDI.position(foo) .== -0.5)
+        translate3d!(foo, to_origin) # move COG to origin
+        @test minimum(BeamletOptics.vertices(foo)[:, 1]) == -0.5
+        @test minimum(BeamletOptics.vertices(foo)[:, 2]) == -0.5
+        @test minimum(BeamletOptics.vertices(foo)[:, 3]) == -0.5
+        @test maximum(BeamletOptics.vertices(foo)[:, 1]) == 0.5
+        @test maximum(BeamletOptics.vertices(foo)[:, 2]) == 0.5
+        @test maximum(BeamletOptics.vertices(foo)[:, 3]) == 0.5
+        @test all(BeamletOptics.position(foo) .== -0.5)
     end
 
     @testset "Testing set_new_origin3d!" begin
-        SCDI.set_new_origin3d!(foo)
-        @test SCDI.position(foo) == zeros(3)
+        BeamletOptics.set_new_origin3d!(foo)
+        @test BeamletOptics.position(foo) == zeros(3)
     end
 
     @testset "Testing x/y/zrotate3d!" begin
         @testset "Testing rotate3d!" begin
-            SCDI.rotate3d!(foo, [1, 0, 0], π / 4)
-            @test isapprox(minimum(SCDI.vertices(foo)[:, 1]), -0.5)
-            @test isapprox(minimum(SCDI.vertices(foo)[:, 2]), -√2 / 2)
-            @test isapprox(minimum(SCDI.vertices(foo)[:, 3]), -√2 / 2)
-            @test isapprox(maximum(SCDI.vertices(foo)[:, 1]), 0.5)
-            @test isapprox(maximum(SCDI.vertices(foo)[:, 2]), √2 / 2)
-            @test isapprox(maximum(SCDI.vertices(foo)[:, 3]), √2 / 2)
+            rotate3d!(foo, [1, 0, 0], π / 4)
+            @test isapprox(minimum(BeamletOptics.vertices(foo)[:, 1]), -0.5)
+            @test isapprox(minimum(BeamletOptics.vertices(foo)[:, 2]), -√2 / 2)
+            @test isapprox(minimum(BeamletOptics.vertices(foo)[:, 3]), -√2 / 2)
+            @test isapprox(maximum(BeamletOptics.vertices(foo)[:, 1]), 0.5)
+            @test isapprox(maximum(BeamletOptics.vertices(foo)[:, 2]), √2 / 2)
+            @test isapprox(maximum(BeamletOptics.vertices(foo)[:, 3]), √2 / 2)
             # Return to original rotation
-            SCDI.rotate3d!(foo, [1, 0, 0], -π / 4)
+            rotate3d!(foo, [1, 0, 0], -π / 4)
         end
 
         @testset "Testing xrotate3d!" begin
-            SCDI.xrotate3d!(foo, π / 4)
-            @test isapprox(minimum(SCDI.vertices(foo)[:, 1]), -0.5)
-            @test isapprox(minimum(SCDI.vertices(foo)[:, 2]), -√2 / 2)
-            @test isapprox(minimum(SCDI.vertices(foo)[:, 3]), -√2 / 2)
-            @test isapprox(maximum(SCDI.vertices(foo)[:, 1]), 0.5)
-            @test isapprox(maximum(SCDI.vertices(foo)[:, 2]), √2 / 2)
-            @test isapprox(maximum(SCDI.vertices(foo)[:, 3]), √2 / 2)
+            xrotate3d!(foo, π / 4)
+            @test isapprox(minimum(BeamletOptics.vertices(foo)[:, 1]), -0.5)
+            @test isapprox(minimum(BeamletOptics.vertices(foo)[:, 2]), -√2 / 2)
+            @test isapprox(minimum(BeamletOptics.vertices(foo)[:, 3]), -√2 / 2)
+            @test isapprox(maximum(BeamletOptics.vertices(foo)[:, 1]), 0.5)
+            @test isapprox(maximum(BeamletOptics.vertices(foo)[:, 2]), √2 / 2)
+            @test isapprox(maximum(BeamletOptics.vertices(foo)[:, 3]), √2 / 2)
         end
 
         @testset "Testing yrotate3d!" begin
-            SCDI.yrotate3d!(foo, π / 2)
-            @test isapprox(minimum(SCDI.vertices(foo)[:, 1]), -√2 / 2)
-            @test isapprox(minimum(SCDI.vertices(foo)[:, 2]), -√2 / 2)
-            @test isapprox(minimum(SCDI.vertices(foo)[:, 3]), -0.5)
-            @test isapprox(maximum(SCDI.vertices(foo)[:, 1]), √2 / 2)
-            @test isapprox(maximum(SCDI.vertices(foo)[:, 2]), √2 / 2)
-            @test isapprox(maximum(SCDI.vertices(foo)[:, 3]), 0.5)
+            yrotate3d!(foo, π / 2)
+            @test isapprox(minimum(BeamletOptics.vertices(foo)[:, 1]), -√2 / 2)
+            @test isapprox(minimum(BeamletOptics.vertices(foo)[:, 2]), -√2 / 2)
+            @test isapprox(minimum(BeamletOptics.vertices(foo)[:, 3]), -0.5)
+            @test isapprox(maximum(BeamletOptics.vertices(foo)[:, 1]), √2 / 2)
+            @test isapprox(maximum(BeamletOptics.vertices(foo)[:, 2]), √2 / 2)
+            @test isapprox(maximum(BeamletOptics.vertices(foo)[:, 3]), 0.5)
         end
 
         @testset "Testing zrotate3d!" begin
-            SCDI.zrotate3d!(foo, π / 4)
-            @test isapprox(minimum(SCDI.vertices(foo)[:, 1]), -0.5)
-            @test isapprox(minimum(SCDI.vertices(foo)[:, 2]), -0.5)
-            @test isapprox(minimum(SCDI.vertices(foo)[:, 3]), -0.5)
-            @test isapprox(maximum(SCDI.vertices(foo)[:, 1]), 0.5)
-            @test isapprox(maximum(SCDI.vertices(foo)[:, 2]), 0.5)
-            @test isapprox(maximum(SCDI.vertices(foo)[:, 3]), 0.5)
+            zrotate3d!(foo, π / 4)
+            @test isapprox(minimum(BeamletOptics.vertices(foo)[:, 1]), -0.5)
+            @test isapprox(minimum(BeamletOptics.vertices(foo)[:, 2]), -0.5)
+            @test isapprox(minimum(BeamletOptics.vertices(foo)[:, 3]), -0.5)
+            @test isapprox(maximum(BeamletOptics.vertices(foo)[:, 1]), 0.5)
+            @test isapprox(maximum(BeamletOptics.vertices(foo)[:, 2]), 0.5)
+            @test isapprox(maximum(BeamletOptics.vertices(foo)[:, 3]), 0.5)
         end
 
         # Testing orientation of dir matrix
-        @test SCDI.orientation(foo)[[3, 5, 7]] == [-1, 1, 1]
+        @test BeamletOptics.orientation(foo)[[3, 5, 7]] == [-1, 1, 1]
     end
 
     # center bar reference cube at origin
-    SCDI.translate3d!(bar, to_origin)
-    SCDI.set_new_origin3d!(bar)
+    translate3d!(bar, to_origin)
+    BeamletOptics.set_new_origin3d!(bar)
 
     @testset "Testing reset_rotation3d!" begin
-        SCDI.translate3d!(foo, [1, 2, 3])
-        SCDI.reset_translation3d!(foo)
-        SCDI.reset_rotation3d!(foo)
-        @test SCDI.position(foo) == zeros(3)
-        @test SCDI.orientation(foo) ≈ SCDI.orientation(bar)
-        @test SCDI.vertices(foo) ≈ SCDI.vertices(bar)
+        translate3d!(foo, [1, 2, 3])
+        reset_translation3d!(foo)
+        reset_rotation3d!(foo)
+        @test BeamletOptics.position(foo) == zeros(3)
+        @test BeamletOptics.orientation(foo) ≈ BeamletOptics.orientation(bar)
+        @test BeamletOptics.vertices(foo) ≈ BeamletOptics.vertices(bar)
     end
 
     @testset "Testing align3d!" begin
-        SCDI.align3d!(foo, normalize([0, 1, 1]))
-        @test SCDI.position(foo) == zeros(3)
-        @test SCDI.orientation(foo)[:,1] ≈ [1, 0,     0]
-        @test SCDI.orientation(foo)[:,2] ≈ [0, √2/2,  √2/2]
-        @test SCDI.orientation(foo)[:,3] ≈ [0, -√2/2, √2/2]
-        SCDI.reset_rotation3d!(foo)
+        align3d!(foo, normalize([0, 1, 1]))
+        @test BeamletOptics.position(foo) == zeros(3)
+        @test BeamletOptics.orientation(foo)[:,1] ≈ [1, 0,     0]
+        @test BeamletOptics.orientation(foo)[:,2] ≈ [0, √2/2,  √2/2]
+        @test BeamletOptics.orientation(foo)[:,3] ≈ [0, -√2/2, √2/2]
+        reset_rotation3d!(foo)
     end
 
     @testset "Testing normal" begin
-        normal = SCDI.normal3d(foo, 1)
+        normal = BeamletOptics.normal3d(foo, 1)
         @test isapprox(normal, [0, 0, -1])
     end
 
     @testset "Testing scale3d!" begin
-        SCDI.scale3d!(foo, 2)
-        @test isapprox(minimum(SCDI.vertices(foo)[:, 1]), -1)
-        @test isapprox(minimum(SCDI.vertices(foo)[:, 2]), -1)
-        @test isapprox(minimum(SCDI.vertices(foo)[:, 3]), -1)
-        @test isapprox(maximum(SCDI.vertices(foo)[:, 1]), 1)
-        @test isapprox(maximum(SCDI.vertices(foo)[:, 2]), 1)
-        @test isapprox(maximum(SCDI.vertices(foo)[:, 3]), 1)
-        @test SCDI.scale(foo) == 2
+        BeamletOptics.scale3d!(foo, 2)
+        @test isapprox(minimum(BeamletOptics.vertices(foo)[:, 1]), -1)
+        @test isapprox(minimum(BeamletOptics.vertices(foo)[:, 2]), -1)
+        @test isapprox(minimum(BeamletOptics.vertices(foo)[:, 3]), -1)
+        @test isapprox(maximum(BeamletOptics.vertices(foo)[:, 1]), 1)
+        @test isapprox(maximum(BeamletOptics.vertices(foo)[:, 2]), 1)
+        @test isapprox(maximum(BeamletOptics.vertices(foo)[:, 3]), 1)
+        @test BeamletOptics.scale(foo) == 2
     end
 
     @testset "Testing Moeller-Trumbore algorithm" begin
@@ -580,75 +594,75 @@ end
         # ray at origin pointing along z-axis
         pos = [0.0, 0, 0]
         dir = [0.0, 0, 1]
-        ray = SCDI.Ray(pos, dir)
+        ray = Ray(pos, dir)
         # Preallocate memory
-        @test isapprox(SCDI.MoellerTrumboreAlgorithm(face, ray), t)
+        @test isapprox(BeamletOptics.MoellerTrumboreAlgorithm(face, ray), t)
         # Check allocations (WARNING: function must have been compiled once for before this test!)
-        alloc = @allocated SCDI.MoellerTrumboreAlgorithm(face, ray)
+        alloc = @allocated BeamletOptics.MoellerTrumboreAlgorithm(face, ray)
         if alloc > 16
             @warn "Allocated number of bytes for MTA larger than expected!" alloc
         end
     end
     @testset "Testing intersect3d" begin
         # Setup test cube and ray
-        cube = SCDI.CubeMesh(1)
-        SCDI.translate3d!(cube, -0.5 * [1, 1, 1])
-        SCDI.set_new_origin3d!(cube)
+        cube = BeamletOptics.CubeMesh(1)
+        translate3d!(cube, -0.5 * [1, 1, 1])
+        BeamletOptics.set_new_origin3d!(cube)
         ray_pos = zeros(3)
         ray_dir = [1.0, 0, 0]
-        ray = SCDI.Ray(ray_pos, ray_dir)
+        ray = Ray(ray_pos, ray_dir)
         # Rotate cube 360°, calculate intersection distance
         θ = 0:1:359
         l = zeros(length(θ))
         for (i, ~) in enumerate(θ)
-            intersection = SCDI.intersect3d(cube, ray)
+            intersection = BeamletOptics.intersect3d(cube, ray)
             l[i] = length(intersection)
-            SCDI.zrotate3d!(cube, deg2rad(step(θ)))
+            zrotate3d!(cube, deg2rad(step(θ)))
         end
         # Test if 0/45° distances are correct
-        @test all(l[1:90:end] .≈ SCDI.scale(cube) * 1 / 2)
-        @test all(l[(1 + 45):90:end] .≈ SCDI.scale(cube) * sqrt(2) / 2)
+        @test all(l[1:90:end] .≈ BeamletOptics.scale(cube) * 1 / 2)
+        @test all(l[(1 + 45):90:end] .≈ BeamletOptics.scale(cube) * sqrt(2) / 2)
     end
 
     @testset "Testing intersect3d - part 2" begin
         t = 5
         s = 1 # scale/2
-        cube = SCDI.CubeMesh(2 * s)
+        cube = BeamletOptics.CubeMesh(2 * s)
         # Move cube COG to origin
-        SCDI.translate3d!(cube, -[s, s, s])
-        SCDI.set_new_origin3d!(cube)
+        translate3d!(cube, -[s, s, s])
+        BeamletOptics.set_new_origin3d!(cube)
         # Align cube edge at t units from origin
-        SCDI.translate3d!(cube, [t + s, 0, 0])
+        translate3d!(cube, [t + s, 0, 0])
         pos = [0, 0, 0]
         steps = 10
         for z in (-s):(s / steps):s
             # Ray constructed each time for unit-length dir
             dir = [t, 0, z]
-            ray = SCDI.Ray(pos, dir)
-            @test isapprox(SCDI.intersect3d(cube, ray).t, sqrt(t^2 + z^2))
+            ray = Ray(pos, dir)
+            @test isapprox(BeamletOptics.intersect3d(cube, ray).t, sqrt(t^2 + z^2))
         end
     end
 
     @testset "Testing constructors" begin
         @testset "Testing RectangularFlatMesh" begin
-            rfm = SCDI.RectangularFlatMesh(2.,1)
-            @test SCDI.vertices(rfm) == [1 0 0.5; 1 0 -0.5; -1 0 -0.5; -1 0 0.5]
-            @test SCDI.normal3d(rfm, 1) == [0, 1, 0]
+            rfm = BeamletOptics.RectangularFlatMesh(2.,1)
+            @test BeamletOptics.vertices(rfm) == [1 0 0.5; 1 0 -0.5; -1 0 -0.5; -1 0 0.5]
+            @test BeamletOptics.normal3d(rfm, 1) == [0, 1, 0]
         end
 
         @testset "Testing QuadraticFlatMesh" begin
-            qfm = SCDI.QuadraticFlatMesh(4.)
-            @test SCDI.vertices(qfm) == [2 0 2; 2 0 -2; -2 0 -2; -2 0 2]
-            @test SCDI.normal3d(qfm, 1) == [0, 1, 0]
+            qfm = BeamletOptics.QuadraticFlatMesh(4.)
+            @test BeamletOptics.vertices(qfm) == [2 0 2; 2 0 -2; -2 0 -2; -2 0 2]
+            @test BeamletOptics.normal3d(qfm, 1) == [0, 1, 0]
         end
     end
 
     @testset "Testing CircularFlatMesh" begin
         # Testing constructor
         n = 4
-        cm = SCDI.CircularFlatMesh(1f0, n)
-        v = SCDI.vertices(cm)
-        f = SCDI.faces(cm)
+        cm = BeamletOptics.CircularFlatMesh(1f0, n)
+        v = BeamletOptics.vertices(cm)
+        f = BeamletOptics.faces(cm)
 
         # testing vertices
         @test v[1,:] ≈ zeros(3)
@@ -664,22 +678,22 @@ end
 
         # testing normal vectors
         for i = 1:n
-            @test SCDI.normal3d(cm, i) ≈ [0,-1,0]
+            @test BeamletOptics.normal3d(cm, i) ≈ [0,-1,0]
         end
     end
 end
 
 @testset "SDFs" begin
     @testset "Testing type definitions" begin
-        @test isdefined(SCDI, :AbstractSDF)
-        @test isdefined(SCDI, :SphereSDF)
-        @test isdefined(SCDI, :CylinderSDF)
-        @test isdefined(SCDI, :CutSphereSDF)
-        @test isdefined(SCDI, :ThinLensSDF)
+        @test isdefined(BeamletOptics, :AbstractSDF)
+        @test isdefined(BeamletOptics, :SphereSDF)
+        @test isdefined(BeamletOptics, :CylinderSDF)
+        @test isdefined(BeamletOptics, :CutSphereSDF)
+        @test isdefined(BeamletOptics, :ThinLensSDF)
     end
 
     # Orientation-less test point sdf
-    mutable struct TestPointSDF{T} <: SCDI.AbstractSDF{T}
+    mutable struct TestPointSDF{T} <: BeamletOptics.AbstractSDF{T}
         position::Point3{T}
         orientation::Matrix{T}
     end
@@ -687,20 +701,20 @@ end
     TestPointSDF(p::AbstractArray{T}) where {T} = TestPointSDF{T}(Point3{T}(p), Matrix{T}(I, 3, 3))
     TestPointSDF(T = Float64) = TestPointSDF{T}(Point3{T}(0), Matrix{T}(I, 3, 3))
 
-    SCDI.position(tps::TestPointSDF) = tps.position
-    SCDI.position!(tps::TestPointSDF{T}, new::Point3{T}) where T = (tps.position = new)
+    BeamletOptics.position(tps::TestPointSDF) = tps.position
+    BeamletOptics.position!(tps::TestPointSDF{T}, new::Point3{T}) where T = (tps.position = new)
 
-    SCDI.orientation(tps::TestPointSDF) = tps.orientation
-    SCDI.orientation!(tps::TestPointSDF{T}, new::Matrix{T}) where T = (tps.orientation = new)
+    BeamletOptics.orientation(tps::TestPointSDF) = tps.orientation
+    BeamletOptics.orientation!(tps::TestPointSDF{T}, new::Matrix{T}) where T = (tps.orientation = new)
 
-    SCDI.transposed_orientation(tps::TestPointSDF) = transpose(tps.orientation)
-    SCDI.transposed_orientation!(::TestPointSDF, ::Any) = nothing
+    BeamletOptics.transposed_orientation(tps::TestPointSDF) = transpose(tps.orientation)
+    BeamletOptics.transposed_orientation!(::TestPointSDF, ::Any) = nothing
 
     orientation(::TestPointSDF{T}) where {T} = Matrix{T}(I, 3, 3)
     orientation!(::TestPointSDF, ::Any) = nothing
 
-    function SCDI.sdf(tps::TestPointSDF, point)
-        p = SCDI._world_to_sdf(tps, point)
+    function BeamletOptics.sdf(tps::TestPointSDF, point)
+        p = BeamletOptics._world_to_sdf(tps, point)
         return norm(p)
     end
 
@@ -708,9 +722,9 @@ end
         point = TestPointSDF()
         t = 10
         θ = deg2rad(30)
-        SCDI.translate3d!(point, [t, 0, 0])
-        SCDI.rotate3d!(point, [0,1,0], θ)
-        pt = SCDI._world_to_sdf(point, [0,0,0])
+        translate3d!(point, [t, 0, 0])
+        rotate3d!(point, [0,1,0], θ)
+        pt = BeamletOptics._world_to_sdf(point, [0,0,0])
         @test pt[1] ≈ -t * cos(θ)
         @test pt[2] ≈ 0
         @test pt[3] ≈ -t * sin(θ)
@@ -719,15 +733,15 @@ end
     @testset "Testing intersect3d" begin
         t = 10.0
         point = TestPointSDF(zeros(3))
-        SCDI.translate3d!(point, [t, 0, 0])
+        translate3d!(point, [t, 0, 0])
 
-        r1 = SCDI.Ray(zeros(3), [1.0, 0, 0])
-        r2 = SCDI.Ray(zeros(3), [1.0, 1, 0])
-        r3 = SCDI.Ray(zeros(3), [1.0, 0, 1])
+        r1 = Ray(zeros(3), [1.0, 0, 0])
+        r2 = Ray(zeros(3), [1.0, 1, 0])
+        r3 = Ray(zeros(3), [1.0, 0, 1])
 
-        i1 = SCDI.intersect3d(point, r1)
-        i2 = SCDI.intersect3d(point, r2)
-        i3 = SCDI.intersect3d(point, r3)
+        i1 = BeamletOptics.intersect3d(point, r1)
+        i2 = BeamletOptics.intersect3d(point, r2)
+        i3 = BeamletOptics.intersect3d(point, r3)
 
         @test length(i1) == t
         @test isnothing(i2)
@@ -737,28 +751,28 @@ end
     @testset "Testing normal3d" begin
         point = TestPointSDF(zeros(3))
         offset = [5, 0, 0]
-        SCDI.translate3d!(point, offset)
+        translate3d!(point, offset)
         p1 = [1, 0, 0]
         p2 = [0, 1, 0]
         p3 = [0, 0, 1]
-        @test SCDI.normal3d(point, p1 + offset) == p1
-        @test SCDI.normal3d(point, p2 + offset) == p2
-        @test SCDI.normal3d(point, p3 + offset) == p3
+        @test BeamletOptics.normal3d(point, p1 + offset) == p1
+        @test BeamletOptics.normal3d(point, p2 + offset) == p2
+        @test BeamletOptics.normal3d(point, p3 + offset) == p3
     end
 end
 
 @testset "System" begin
     @testset "Testing implementation" begin
-        struct SystemTestBeam{T} <: SCDI.AbstractBeam{T, SCDI.Ray{T}} end
-        struct SystemTestObject{T, S} <: SCDI.AbstractObject{T, S} end
-        o1 = SystemTestObject{Real, SCDI.AbstractShape{Real}}()
-        o2 = SystemTestObject{Real, SCDI.AbstractShape{Real}}()
-        system = SCDI.System(o1)
+        struct SystemTestBeam{T} <: BeamletOptics.AbstractBeam{T, Ray{T}} end
+        struct SystemTestObject{T, S} <: BeamletOptics.AbstractObject{T, S} end
+        o1 = SystemTestObject{Real, BeamletOptics.AbstractShape{Real}}()
+        o2 = SystemTestObject{Real, BeamletOptics.AbstractShape{Real}}()
+        system = System(o1)
         beam = SystemTestBeam{Real}()
         # Test missing implementation warnings
-        @test_logs (:warn, "Tracing for $(typeof(beam)) not implemented") SCDI.trace_system!(system,
+        @test_logs (:warn, "Tracing for $(typeof(beam)) not implemented") BeamletOptics.trace_system!(system,
             beam)
-        @test_logs (:warn, "Retracing for $(typeof(beam)) not implemented") SCDI.retrace_system!(system,
+        @test_logs (:warn, "Retracing for $(typeof(beam)) not implemented") BeamletOptics.retrace_system!(system,
             beam)
     end
 
@@ -767,77 +781,77 @@ end
     radius = 1
     L = 6 * radius / n_mirrors
     Δθ = 360 / (n_mirrors + 1)
-    mirrors = [SCDI.SquarePlanoMirror2D(L) for _ in 1:n_mirrors]
+    mirrors = [SquarePlanoMirror2D(L) for _ in 1:n_mirrors]
     θ = 1 * Δθ
     for m in mirrors
         point = radius * [cos(deg2rad(θ)), sin(deg2rad(θ)), 0]
-        SCDI.zrotate3d!(m, deg2rad(θ))
-        SCDI.translate3d!(m, point)
+        zrotate3d!(m, deg2rad(θ))
+        translate3d!(m, point)
         θ += Δθ
     end
-    SCDI.zrotate3d!.(mirrors, deg2rad(90))
+    zrotate3d!.(mirrors, deg2rad(90))
 
     # Initial ray orientation and position
     dir = [-1, 0, 0]
-    Rot = SCDI.rotate3d([0, 0, 1], deg2rad(Δθ * 1))
+    Rot = BeamletOptics.rotate3d([0, 0, 1], deg2rad(Δθ * 1))
     dir = Vector(Rot * dir)
     origin = [radius, 0, 0] + -1 * dir
 
     @testset "Testing tracing subroutines" begin
-        system = SCDI.System(mirrors)
-        ray = SCDI.Ray(origin, dir)
+        system = System(mirrors)
+        ray = Ray(origin, dir)
         first_obj = mirrors[(n_mirrors + 1) ÷ 2 + 2]
         false_obj = mirrors[(n_mirrors + 1) ÷ 2 + 2 + 1]
         # trace_all
-        @test SCDI.object(SCDI.trace_all(system, ray)) === first_obj
+        @test BeamletOptics.object(BeamletOptics.trace_all(system, ray)) === first_obj
         # trace_one
-        @test SCDI.object(SCDI.trace_one(system, ray, SCDI.Hint(first_obj))) === first_obj
-        @test SCDI.object(SCDI.trace_one(system, ray, SCDI.Hint(false_obj))) === first_obj
+        @test BeamletOptics.object(BeamletOptics.trace_one(system, ray, BeamletOptics.Hint(first_obj))) === first_obj
+        @test BeamletOptics.object(BeamletOptics.trace_one(system, ray, BeamletOptics.Hint(false_obj))) === first_obj
         # tracing step
-        SCDI.tracing_step!(system, ray, nothing)
-        @test SCDI.object(SCDI.intersection(ray)) === first_obj
+        BeamletOptics.tracing_step!(system, ray, nothing)
+        @test BeamletOptics.object(BeamletOptics.intersection(ray)) === first_obj
     end
 
     @testset "Testing system tracing" begin
-        system = SCDI.System(mirrors)
-        first_ray = SCDI.Ray(origin, dir)
-        beam = SCDI.Beam(first_ray)
+        system = System(mirrors)
+        first_ray = Ray(origin, dir)
+        beam = Beam(first_ray)
         # Test trace_system!
         nmax = 10
-        SCDI.trace_system!(system, beam, r_max = nmax)
-        @test length(SCDI.rays(beam)) == nmax
-        SCDI.trace_system!(system, beam, r_max = 1000000)
-        @test length(SCDI.rays(beam)) == n_mirrors + 1
-        first_ray_dir = SCDI.direction(first_ray)
-        last_ray_dir = SCDI.direction(last(SCDI.rays(beam)))
-        @test 180 - rad2deg(SCDI.angle3d(first_ray_dir, last_ray_dir)) ≈ 2 * Δθ
-        @test SCDI.object(SCDI.intersection(first_ray)) === mirrors[(n_mirrors + 1) ÷ 2 + 2]
+        BeamletOptics.trace_system!(system, beam, r_max = nmax)
+        @test length(BeamletOptics.rays(beam)) == nmax
+        BeamletOptics.trace_system!(system, beam, r_max = 1000000)
+        @test length(BeamletOptics.rays(beam)) == n_mirrors + 1
+        first_ray_dir = BeamletOptics.direction(first_ray)
+        last_ray_dir = BeamletOptics.direction(last(BeamletOptics.rays(beam)))
+        @test 180 - rad2deg(BeamletOptics.angle3d(first_ray_dir, last_ray_dir)) ≈ 2 * Δθ
+        @test BeamletOptics.object(BeamletOptics.intersection(first_ray)) === mirrors[(n_mirrors + 1) ÷ 2 + 2]
     end
 
     @testset "Testing StaticSystem tracing" begin
         # same testset as before
-        system = SCDI.StaticSystem(mirrors)
-        first_ray = SCDI.Ray(origin, dir)
-        beam = SCDI.Beam(first_ray)
+        system = StaticSystem(mirrors)
+        first_ray = Ray(origin, dir)
+        beam = Beam(first_ray)
         # Test trace_system!
         nmax = 10
-        SCDI.trace_system!(system, beam, r_max = nmax)
-        @test length(SCDI.rays(beam)) == nmax
-        SCDI.trace_system!(system, beam, r_max = 1000000)
-        @test length(SCDI.rays(beam)) == n_mirrors + 1
-        first_ray_dir = SCDI.direction(first_ray)
-        last_ray_dir = SCDI.direction(last(SCDI.rays(beam)))
-        @test 180 - rad2deg(SCDI.angle3d(first_ray_dir, last_ray_dir)) ≈ 2 * Δθ
-        @test SCDI.object(SCDI.intersection(first_ray)) === mirrors[(n_mirrors + 1) ÷ 2 + 2]
+        BeamletOptics.trace_system!(system, beam, r_max = nmax)
+        @test length(BeamletOptics.rays(beam)) == nmax
+        BeamletOptics.trace_system!(system, beam, r_max = 1000000)
+        @test length(BeamletOptics.rays(beam)) == n_mirrors + 1
+        first_ray_dir = BeamletOptics.direction(first_ray)
+        last_ray_dir = BeamletOptics.direction(last(BeamletOptics.rays(beam)))
+        @test 180 - rad2deg(BeamletOptics.angle3d(first_ray_dir, last_ray_dir)) ≈ 2 * Δθ
+        @test BeamletOptics.object(BeamletOptics.intersection(first_ray)) === mirrors[(n_mirrors + 1) ÷ 2 + 2]
     end
 
     @testset "Testing system retracing" begin
-        system = SCDI.System(mirrors)
-        first_ray = SCDI.Ray(origin, dir)
-        beam = SCDI.Beam(first_ray)
-        t1 = @timed SCDI.trace_system!(system, beam, r_max = 1000000)
-        t2 = @timed SCDI.retrace_system!(system, beam) # for precompilation
-        t2 = @timed SCDI.retrace_system!(system, beam)
+        system = System(mirrors)
+        first_ray = Ray(origin, dir)
+        beam = Beam(first_ray)
+        t1 = @timed BeamletOptics.trace_system!(system, beam, r_max = 1000000)
+        t2 = @timed BeamletOptics.retrace_system!(system, beam) # for precompilation
+        t2 = @timed BeamletOptics.retrace_system!(system, beam)
         if t1.time < t2.time
             @warn "Retracing took longer than tracing, something might be bugged...\n   Tracing: $(t1.time) s\n   Retracing: $(t2.time) s"
         end
@@ -845,7 +859,7 @@ end
 end
 
 @testset "Object groups" begin
-    mutable struct TestPoint{T} <: SCDI.AbstractShape{T}
+    mutable struct TestPoint{T} <: BeamletOptics.AbstractShape{T}
         pos::Point3{T}
         dir::Matrix{T}
     end
@@ -853,7 +867,7 @@ end
     TestPoint(position::AbstractArray{T}) where {T <: Real} = TestPoint{T}(Point3{T}(position),
         Matrix{T}(I, 3, 3))
 
-    struct GroupTestObject{T <: Real, S <: SCDI.AbstractShape{T}} <: SCDI.AbstractObject{T, S}
+    struct GroupTestObject{T <: Real, S <: BeamletOptics.AbstractShape{T}} <: BeamletOptics.AbstractObject{T, S}
         shape::S
     end
 
@@ -865,67 +879,67 @@ end
 
     # Test center with Float32, rest with Float64
     center = GroupTestObject(zeros(Float32, 3))
-    circle = SCDI.ObjectGroup([GroupTestObject([xs[i], ys[i], 0]) for i in eachindex(xs)])
+    circle = ObjectGroup([GroupTestObject([xs[i], ys[i], 0]) for i in eachindex(xs)])
 
-    objects = SCDI.ObjectGroup([center, circle])
+    objects = ObjectGroup([center, circle])
 
     # Translation test
     target = [3, 0, 0]
-    SCDI.translate_to3d!(objects, target)
+    translate_to3d!(objects, target)
 
     @testset "translate3d" begin
         # Test if all objects/subgroups have been translated
-        @test SCDI.position(objects) == target
-        @test SCDI.position(center) == target
-        @test SCDI.position(circle) == target
-        for (i, obj) in enumerate(SCDI.objects(circle))
-            @test SCDI.position(obj) == [xs[i], ys[i], 0] + target
+        @test BeamletOptics.position(objects) == target
+        @test BeamletOptics.position(center) == target
+        @test BeamletOptics.position(circle) == target
+        for (i, obj) in enumerate(BeamletOptics.objects(circle))
+            @test BeamletOptics.position(obj) == [xs[i], ys[i], 0] + target
         end
     end
 
     # Rotation test
     angle = 2π / n
-    SCDI.rotate3d!(objects, [0, 0, 1], angle)
+    rotate3d!(objects, [0, 0, 1], angle)
 
     @testset "rotate3d" begin
         # Test if all objects/subgroups have been rotated relative to the origin
-        Rt = SCDI.rotate3d([0, 0, 1], angle)
+        Rt = BeamletOptics.rotate3d([0, 0, 1], angle)
         xt = circshift(xs, -1)
         yt = circshift(ys, -1)
-        @test SCDI.orientation(objects) == Rt
-        @test SCDI.orientation(center) ≈ Rt
-        @test SCDI.orientation(circle) == Rt
-        for (i, obj) in enumerate(SCDI.objects(circle))
-            @test SCDI.orientation(obj) == Rt
-            @test SCDI.position(obj) ≈ [xt[i], yt[i], 0] + target
+        @test BeamletOptics.orientation(objects) == Rt
+        @test BeamletOptics.orientation(center) ≈ Rt
+        @test BeamletOptics.orientation(circle) == Rt
+        for (i, obj) in enumerate(BeamletOptics.objects(circle))
+            @test BeamletOptics.orientation(obj) == Rt
+            @test BeamletOptics.position(obj) ≈ [xt[i], yt[i], 0] + target
         end
     end
 
     # Reset test
-    SCDI.reset_translation3d!(objects)
-    SCDI.reset_rotation3d!(objects)
+    reset_translation3d!(objects)
+    reset_rotation3d!(objects)
 
     @testset "reset functions" begin
         Ri = Matrix{Float64}(I, 3, 3)
         # Test if objects are reset correctly to initial positioning
-        @test SCDI.position(objects) == zeros(3)
-        @test SCDI.position(center) == zeros(3)
-        @test SCDI.position(circle) == zeros(3)
-        @test SCDI.orientation(objects) == Ri
-        @test SCDI.orientation(center) ≈ Ri
-        @test SCDI.orientation(circle) ≈ Ri
-        for (i, obj) in enumerate(Leaves(SCDI.objects(circle)))
-            @test isapprox(SCDI.position(obj)[1], xs[i], atol=5e-16)
-            @test isapprox(SCDI.position(obj)[2], ys[i], atol=5e-16)
+        @test BeamletOptics.position(objects) == zeros(3)
+        @test BeamletOptics.position(center) == zeros(3)
+        @test BeamletOptics.position(circle) == zeros(3)
+        @test BeamletOptics.orientation(objects) == Ri
+        @test BeamletOptics.orientation(center) ≈ Ri
+        @test BeamletOptics.orientation(circle) ≈ Ri
+        for (i, obj) in enumerate(Leaves(BeamletOptics.objects(circle)))
+            @test isapprox(BeamletOptics.position(obj)[1], xs[i], atol=5e-16)
+            @test isapprox(BeamletOptics.position(obj)[2], ys[i], atol=5e-16)
         end
     end
 
     @testset "System compatibility" begin
         # Test if objects in ObjectGroup are exposed correctly when iterating
-        system = SCDI.System(objects)
+        system = System(objects)
         ctr = 0
         # Only the objects within the groups should be exposed
-        for obj in SCDI.objects(system)
+        for obj in BeamletOptics.objects(system)
             @test isa(obj, GroupTestObject)
             ctr += 1
         end
@@ -935,11 +949,11 @@ end
 
 @testset "Spherical Lenses" begin
     @testset "Testing type definitions" begin
-        @test isdefined(SCDI, :AbstractSDF)
-        @test isdefined(SCDI, :SphereSDF)
-        @test isdefined(SCDI, :CylinderSDF)
-        @test isdefined(SCDI, :CutSphereSDF)
-        @test isdefined(SCDI, :ThinLensSDF)
+        @test isdefined(BeamletOptics, :AbstractSDF)
+        @test isdefined(BeamletOptics, :SphereSDF)
+        @test isdefined(BeamletOptics, :CylinderSDF)
+        @test isdefined(BeamletOptics, :CutSphereSDF)
+        @test isdefined(BeamletOptics, :ThinLensSDF)
     end
 
     @testset "Thin lens focal length" begin
@@ -947,13 +961,13 @@ end
         R1 = 1
         R2 = 1
         nl = 1.5
-        tl = SCDI.ThinLensSDF(R1, R2, 0.1)
-        SCDI.translate3d!(tl, [0, -SCDI.thickness(tl)/2, 0])
-        p = SCDI.Lens(tl, x -> 1.5)
-        system = SCDI.System(p)
+        tl = BeamletOptics.ThinLensSDF(R1, R2, 0.1)
+        translate3d!(tl, [0, -BeamletOptics.thickness(tl)/2, 0])
+        p = Lens(tl, x -> 1.5)
+        system = System(p)
 
         # compare numerical and analytical focal length
-        f_analytical = SCDI.lensmakers_eq(R1, -R2, nl)
+        f_analytical = BeamletOptics.lensmakers_eq(R1, -R2, nl)
         zs = -0.04:0.01:0.04
         for (i, z) in enumerate(zs)
             # skip optical axis ray
@@ -962,12 +976,12 @@ end
             end
             xs = 0.1:0.1:1.5
             df = zeros(Float64, length(xs))
-            ray = SCDI.Ray([0, -0.5, z], [0, 1, 0], 1e3)
-            beam = SCDI.Beam(ray)
-            SCDI.solve_system!(system, beam)
+            ray = Ray([0, -0.5, z], [0, 1, 0], 1e3)
+            beam = Beam(ray)
+            solve_system!(system, beam)
             # test if numerical and analytical focal length agree
             for (i, x) in enumerate(xs)
-                df[i] = SCDI.line_point_distance3d(beam.rays[end], [0, x, 0])
+                df[i] = BeamletOptics.line_point_distance3d(beam.rays[end], [0, x, 0])
             end
             @test xs[findmin(df)[2]] ≈ f_analytical
         end
@@ -978,39 +992,39 @@ end
         r1 = 34.9e-3
         r2 = -r1
         l = 6.8e-3
-        LB1811 = SCDI.SphericalLens(r1, r2, l)
-        @test typeof(SCDI.shape(LB1811)) <: SCDI.UnionSDF
-        @test SCDI.thickness(SCDI.shape(LB1811)) == l
+        LB1811 = SphericalLens(r1, r2, l)
+        @test typeof(BeamletOptics.shape(LB1811)) <: BeamletOptics.UnionSDF
+        @test BeamletOptics.thickness(BeamletOptics.shape(LB1811)) == l
         r1 = Inf
         r2 = -15.5e-3
         l = 8.6e-3
-        LA1805 = SCDI.SphericalLens(r1, r2, l)
-        @test typeof(SCDI.shape(LA1805)) <: SCDI.UnionSDF
-        @test SCDI.thickness(SCDI.shape(LA1805)) == l
+        LA1805 = SphericalLens(r1, r2, l)
+        @test typeof(BeamletOptics.shape(LA1805)) <: BeamletOptics.UnionSDF
+        @test BeamletOptics.thickness(BeamletOptics.shape(LA1805)) == l
         r1 = -52.0e-3
         r2 = -r1
         l = 3e-3
-        LD1464 = SCDI.SphericalLens(r1, r2, l)
-        @test typeof(SCDI.shape(LD1464)) <: SCDI.UnionSDF
-        @test SCDI.thickness(SCDI.shape(LD1464)) == l
+        LD1464 = SphericalLens(r1, r2, l)
+        @test typeof(BeamletOptics.shape(LD1464)) <: BeamletOptics.UnionSDF
+        @test BeamletOptics.thickness(BeamletOptics.shape(LD1464)) == l
         r1 = Inf
         r2 = 25.7e-3
         l = 3.5e-3
-        LC1715 = SCDI.SphericalLens(r1, r2, l)
-        @test typeof(SCDI.shape(LC1715)) <: SCDI.UnionSDF
-        @test SCDI.thickness(SCDI.shape(LC1715)) == l
+        LC1715 = SphericalLens(r1, r2, l)
+        @test typeof(BeamletOptics.shape(LC1715)) <: BeamletOptics.UnionSDF
+        @test BeamletOptics.thickness(BeamletOptics.shape(LC1715)) == l
         r1 = -82.2e-3
         r2 = -32.1e-3
         l = 3.6e-3
-        LE1234 = SCDI.SphericalLens(r1, r2, l)
-        @test typeof(SCDI.shape(LE1234)) <: SCDI.UnionSDF
-        @test SCDI.thickness(SCDI.shape(LE1234)) == l
+        LE1234 = SphericalLens(r1, r2, l)
+        @test typeof(BeamletOptics.shape(LE1234)) <: BeamletOptics.UnionSDF
+        @test BeamletOptics.thickness(BeamletOptics.shape(LE1234)) == l
     end
 
     """Test coma for rotated and translated optical system"""
-    function test_coma(ray::SCDI.AbstractRay, f0::AbstractArray, dir::AbstractArray; atol=7e-5)
-        is = SCDI.intersect3d(f0, dir, ray)
-        p0 = SCDI.position(ray) + length(is) * SCDI.direction(ray)
+    function test_coma(ray::BeamletOptics.AbstractRay, f0::AbstractArray, dir::AbstractArray; atol=7e-5)
+        is = BeamletOptics.intersect3d(f0, dir, ray)
+        p0 = BeamletOptics.position(ray) + length(is) * BeamletOptics.direction(ray)
         dz = norm(p0 - f0)
         if dz ≤ atol
             return true
@@ -1021,90 +1035,90 @@ end
 
     @testset "Testing spherical lens SDFs" begin
         # Based on https://www.pencilofrays.com/double-gauss-sonnar-comparison/
-        l1 = SCDI.SphericalLens(48.88e-3, 182.96e-3, 8.89e-3, 52.3e-3, λ -> 1.62286)
-        l2 = SCDI.SphericalLens(36.92e-3, Inf, 15.11e-3, 45.11e-3, λ -> 1.58565)
-        l3 = SCDI.SphericalLens(Inf, 23.06e-3, 2.31e-3, 45.11e-3, λ -> 1.67764)
-        l4 = SCDI.SphericalLens(-23.91e-3, Inf, 1.92e-3, 40.01e-3, λ -> 1.57046)
-        l5 = SCDI.SphericalLens(Inf, -36.92e-3, 7.77e-3, 40.01e-3, λ -> 1.64128)
-        l6 = SCDI.SphericalLens(1063.24e-3, -48.88e-3, 6.73e-3, 45.11e-3, λ -> 1.62286)
+        l1 = SphericalLens(48.88e-3, 182.96e-3, 8.89e-3, 52.3e-3, λ -> 1.62286)
+        l2 = SphericalLens(36.92e-3, Inf, 15.11e-3, 45.11e-3, λ -> 1.58565)
+        l3 = SphericalLens(Inf, 23.06e-3, 2.31e-3, 45.11e-3, λ -> 1.67764)
+        l4 = SphericalLens(-23.91e-3, Inf, 1.92e-3, 40.01e-3, λ -> 1.57046)
+        l5 = SphericalLens(Inf, -36.92e-3, 7.77e-3, 40.01e-3, λ -> 1.64128)
+        l6 = SphericalLens(1063.24e-3, -48.88e-3, 6.73e-3, 45.11e-3, λ -> 1.62286)
         # Calculate translation distances
         δy = 1e-7
-        l_2 = SCDI.thickness(l1.shape) + 0.38e-3
-        l_3 = l_2 + SCDI.thickness(l2.shape) + δy
-        l_4 = l_3 + SCDI.thickness(l3.shape) + 9.14e-3 + 13.36e-3
-        l_5 = l_4 + SCDI.thickness(l4.shape) + δy
-        l_6 = l_5 + SCDI.thickness(l5.shape) + 0.38e-3
+        l_2 = BeamletOptics.thickness(l1.shape) + 0.38e-3
+        l_3 = l_2 + BeamletOptics.thickness(l2.shape) + δy
+        l_4 = l_3 + BeamletOptics.thickness(l3.shape) + 9.14e-3 + 13.36e-3
+        l_5 = l_4 + BeamletOptics.thickness(l4.shape) + δy
+        l_6 = l_5 + BeamletOptics.thickness(l5.shape) + 0.38e-3
         # Corresponds to back focal length of f=59.21 mm on y-axis from link above + "error" δf
         δf = 7e-4
-        f_z = l_6 + SCDI.thickness(l6.shape) + 58.21e-3 + δf
-        SCDI.translate3d!(l2, [0, l_2, 0])
-        SCDI.translate3d!(l3, [0, l_3, 0])
-        SCDI.translate3d!(l4, [0, l_4, 0])
-        SCDI.translate3d!(l5, [0, l_5, 0])
-        SCDI.translate3d!(l6, [0, l_6, 0])
+        f_z = l_6 + BeamletOptics.thickness(l6.shape) + 58.21e-3 + δf
+        translate3d!(l2, [0, l_2, 0])
+        translate3d!(l3, [0, l_3, 0])
+        translate3d!(l4, [0, l_4, 0])
+        translate3d!(l5, [0, l_5, 0])
+        translate3d!(l6, [0, l_6, 0])
         # Create and move group - this tests a bunch of kinematic correctness
-        double_gauss = SCDI.ObjectGroup([l1, l2, l3, l4, l5, l6])
-        SCDI.translate3d!(double_gauss, [0.05, 0.05, 0.05])
-        SCDI.xrotate3d!(double_gauss, deg2rad(60))
-        SCDI.zrotate3d!(double_gauss, deg2rad(45))
-        system = SCDI.System([double_gauss])
+        double_gauss = ObjectGroup([l1, l2, l3, l4, l5, l6])
+        translate3d!(double_gauss, [0.05, 0.05, 0.05])
+        xrotate3d!(double_gauss, deg2rad(60))
+        zrotate3d!(double_gauss, deg2rad(45))
+        system = System([double_gauss])
         # Test against back focal length as per source above
-        dir = SCDI.orientation(double_gauss)[:, 2] # rotated collimated ray direction
-        pos = SCDI.position(l1) - 0.05 * dir # rotated collimated ray position
-        f0 = SCDI.position(l1) + f_z * dir # global focal point coords
-        nv = SCDI.normal3d(dir) # orthogonal to moved system optical axis
+        dir = BeamletOptics.orientation(double_gauss)[:, 2] # rotated collimated ray direction
+        pos = BeamletOptics.position(l1) - 0.05 * dir # rotated collimated ray position
+        f0 = BeamletOptics.position(l1) + f_z * dir # global focal point coords
+        nv = BeamletOptics.normal3d(dir) # orthogonal to moved system optical axis
         zs = -0.02:1e-3:0.02
         # Define beam
         λ = 486.0e-9
-        beam = SCDI.Beam(SCDI.Ray(pos, dir, λ))
+        beam = Beam(Ray(pos, dir, λ))
         for (i, z) in enumerate(zs)
             # use retracing by manipulating beam starting pos
             beam.rays[1].pos = pos + z*nv
-            SCDI.solve_system!(system, beam)
+            solve_system!(system, beam)
             # Test correct beam # of rays
-            @test length(SCDI.rays(beam)) == 13
+            @test length(BeamletOptics.rays(beam)) == 13
             # Test coma at focal point
-            @test test_coma(last(SCDI.rays(beam)), f0, dir, atol=7e-5)
+            @test test_coma(last(BeamletOptics.rays(beam)), f0, dir, atol=7e-5)
         end
     end
 
     @testset "Testing doublet lenses" begin
         # Define refractive index functions
         λs = [488e-9, 707e-9, 1064e-9]
-        NLAK22 = SCDI.DiscreteRefractiveIndex(λs, [1.6591, 1.6456, 1.6374])
-        NSF10 = SCDI.DiscreteRefractiveIndex(λs, [1.7460, 1.7168, 1.7021])
+        NLAK22 = BeamletOptics.DiscreteRefractiveIndex(λs, [1.6591, 1.6456, 1.6374])
+        NSF10 = BeamletOptics.DiscreteRefractiveIndex(λs, [1.7460, 1.7168, 1.7021])
 
         function test_doublet(λ, bfl, δf)
             # Thorlabs lens from https://www.thorlabs.com/thorproduct.cfm?partnumber=AC254-150-AB
-            AC254_150_AB = SCDI.SphericalDoubletLens(87.9e-3, -105.6e-3, Inf, 6e-3, 3e-3, SCDI.inch, NLAK22, NSF10)
+            AC254_150_AB = SphericalDoubletLens(87.9e-3, -105.6e-3, Inf, 6e-3, 3e-3, BeamletOptics.inch, NLAK22, NSF10)
             # Rptate and translate to test lens kinematics
-            SCDI.translate3d!(AC254_150_AB, [0.05, 0.05, 0.05])
-            SCDI.xrotate3d!(AC254_150_AB, deg2rad(-60))
-            SCDI.zrotate3d!(AC254_150_AB, deg2rad(45))
+            translate3d!(AC254_150_AB, [0.05, 0.05, 0.05])
+            xrotate3d!(AC254_150_AB, deg2rad(-60))
+            zrotate3d!(AC254_150_AB, deg2rad(45))
             # Define system
-            system = SCDI.System([AC254_150_AB])
+            system = System([AC254_150_AB])
             # Define semi-diameter for lens ray bundle, selected for min. spherical aberrations
             z0 = 5e-3
             zs = LinRange(-z0, z0, 30)
             fs = similar(zs)
             # Beam spawn point
-            dir = -SCDI.orientation(AC254_150_AB.back.shape)[:,2]       # rotated collimated ray direction
-            pos = SCDI.position(AC254_150_AB.front.shape) + 0.05 * dir  # rotated collimated ray position
-            nv = SCDI.normal3d(dir)                                     # orthogonal to moved system optical axis
-            beam = SCDI.Beam(pos, -dir, λ)
+            dir = -BeamletOptics.orientation(AC254_150_AB.back.shape)[:,2]       # rotated collimated ray direction
+            pos = BeamletOptics.position(AC254_150_AB.front.shape) + 0.05 * dir  # rotated collimated ray position
+            nv = BeamletOptics.normal3d(dir)                                     # orthogonal to moved system optical axis
+            beam = Beam(pos, -dir, λ)
             # Calculate equivalent back focal length point
-            f_z = SCDI.thickness(AC254_150_AB) + bfl + δf
-            f0 = SCDI.position(AC254_150_AB.front.shape) + f_z * -dir
+            f_z = BeamletOptics.thickness(AC254_150_AB) + bfl + δf
+            f0 = BeamletOptics.position(AC254_150_AB.front.shape) + f_z * -dir
             for (i, z) in enumerate(zs)
                 beam.rays[1].pos = pos + z*nv
-                SCDI.solve_system!(system, beam)
-                @test length(SCDI.rays(beam)) == 4
-                @test SCDI.refractive_index.(beam.rays) == [1, NLAK22(λ), NSF10(λ), 1]
-                fs[i] = test_coma(last(SCDI.rays(beam)), f0, dir, atol=1e-6)
+                solve_system!(system, beam)
+                @test length(BeamletOptics.rays(beam)) == 4
+                @test BeamletOptics.refractive_index.(beam.rays) == [1, NLAK22(λ), NSF10(λ), 1]
+                fs[i] = test_coma(last(BeamletOptics.rays(beam)), f0, dir, atol=1e-6)
             end
             # Test center ray normal vectors
             beam.rays[1].pos = pos + 0*nv
-            SCDI.solve_system!(system, beam)
+            solve_system!(system, beam)
             for i = 1:length(beam.rays)-1
                 @test abs(dot(beam.rays[i].intersection.n, beam.rays[i].dir)) ≈ 1
             end
@@ -1119,8 +1133,8 @@ end
 
 @testset "Aspherical Lenses" begin
     @testset "Testing type definitions" begin
-        @test isdefined(SCDI, :ConvexAsphericalSurfaceSDF)
-        @test isdefined(SCDI, :ConcaveAsphericalSurfaceSDF)
+        @test isdefined(BeamletOptics, :ConvexAsphericalSurfaceSDF)
+        @test isdefined(BeamletOptics, :ConcaveAsphericalSurfaceSDF)
     end
 
     @testset "Testing aspherical lens SDFs" begin
@@ -1140,22 +1154,22 @@ end
         # refractive index of BK-7 @ 1310 nm (design wavelength)
         n = 1.5036
 
-        lens = SCDI.Lens(
-            SCDI.generalized_lens_shape_constructor(R, Inf, ct, d; front_kind=:aspherical, front_k=k, front_coeffs=A),
+        lens = Lens(
+            BeamletOptics.generalized_lens_shape_constructor(R, Inf, ct, d; front_kind=:aspherical, front_k=k, front_coeffs=A),
             x -> n
         )
 
-        system = SCDI.System(lens)
+        system = System(lens)
 
         surf_errors = zeros(100)
 
         for (i, z) in enumerate(range(-0.02, 0.02, 100))
-            ray = SCDI.Ray(Point3(0.0, -0.1, z), Point3(0.0, 1.0, 0))
-            beam = SCDI.Beam(ray)
-            SCDI.solve_system!(system, beam, r_max=40)
+            ray = Ray(Point3(0.0, -0.1, z), Point3(0.0, 1.0, 0))
+            beam = Beam(ray)
+            solve_system!(system, beam, r_max=40)
 
-            surf_errors[i] = (SCDI.position(beam.rays[begin]) + length(beam.rays[begin]) .* SCDI.direction(beam.rays[begin]))[2] -
-                        SCDI.aspheric_equation(ray.pos[3], 1/R, k, A)
+            surf_errors[i] = (BeamletOptics.position(beam.rays[begin]) + length(beam.rays[begin]) .* BeamletOptics.direction(beam.rays[begin]))[2] -
+                        BeamletOptics.aspheric_equation(ray.pos[3], 1/R, k, A)
         end
 
         # FIXME: The atol is actually derived from the raymarching epsilon. If this is puts
@@ -1163,9 +1177,9 @@ end
         @test all(x->isapprox(x, 0.0; atol=1e-10), surf_errors)
 
         # test if the working distance is correct
-        ray = SCDI.Ray([0.0, -0.1, 0.02], [0.0, 1.0, 0])
-        beam = SCDI.Beam(ray)
-        SCDI.solve_system!(system, beam, r_max=40)
+        ray = Ray([0.0, -0.1, 0.02], [0.0, 1.0, 0])
+        beam = Beam(ray)
+        solve_system!(system, beam, r_max=40)
 
         dist = -beam.rays[end].pos[3]/beam.rays[end].dir[3]
         α = asind(beam.rays[end].dir[3])
@@ -1180,29 +1194,29 @@ end
         r2 = Inf
         l = 8.2e-3
         d = 25.4e-3
-        shape = SCDI.generalized_lens_shape_constructor(r1, r2, l, d)
+        shape = BeamletOptics.generalized_lens_shape_constructor(r1, r2, l, d)
 
         # test edge thickness
-        @test SCDI.thickness(shape.sdfs[1]) ≈ 2e-3 atol=1e-4
+        @test BeamletOptics.thickness(shape.sdfs[1]) ≈ 2e-3 atol=1e-4
 
         ## Thorlabs LB1761, bi-convex
         r1 = 24.5e-3
         r2 = -24.5e-3
         l = 9.0e-3
         d = 25.4e-3
-        shape = SCDI.generalized_lens_shape_constructor(r1, r2, l, d)
+        shape = BeamletOptics.generalized_lens_shape_constructor(r1, r2, l, d)
 
         # test edge thickness
-        @test SCDI.thickness(shape.sdfs[1]) ≈ 1.9e-3 atol=1e-4
+        @test BeamletOptics.thickness(shape.sdfs[1]) ≈ 1.9e-3 atol=1e-4
 
         ## Thorlabs LC1715, plano-concave
         r1 = Inf
         r2 = 25.7e-3
         l = 3.5e-3
         d = 25.4e-3
-        shape = SCDI.generalized_lens_shape_constructor(r1, r2, l, d)
+        shape = BeamletOptics.generalized_lens_shape_constructor(r1, r2, l, d)
 
-        @test SCDI.sag(shape.sdfs[2]) + SCDI.thickness(shape.sdfs[1]) ≈ 0.006858 atol=1e-4
+        @test BeamletOptics.sag(shape.sdfs[2]) + BeamletOptics.thickness(shape.sdfs[1]) ≈ 0.006858 atol=1e-4
 
         ## Thorlabs LD2297, bi-concave
         r1 = -39.6e-3
@@ -1210,9 +1224,9 @@ end
         l = 3.0e-3
         d = 25.4e-3
 
-        shape = SCDI.generalized_lens_shape_constructor(r1, r2, l, d)
+        shape = BeamletOptics.generalized_lens_shape_constructor(r1, r2, l, d)
 
-        @test SCDI.sag(shape.sdfs[2]) + SCDI.sag(shape.sdfs[3]) + SCDI.thickness(shape.sdfs[1]) ≈ 0.0072 atol=1e-4
+        @test BeamletOptics.sag(shape.sdfs[2]) + BeamletOptics.sag(shape.sdfs[3]) + BeamletOptics.thickness(shape.sdfs[1]) ≈ 0.0072 atol=1e-4
 
         ## Thorlabs LBF254-040, best-form
         r1 = 134.6e-3
@@ -1220,10 +1234,10 @@ end
         l = 6.5e-3
         d = 25.4e-3
 
-        shape = SCDI.generalized_lens_shape_constructor(r1, r2, l, d)
+        shape = BeamletOptics.generalized_lens_shape_constructor(r1, r2, l, d)
 
         # test edge thickness
-        @test SCDI.thickness(shape.sdfs[1]) ≈ 2.286e-3 atol=1e-4
+        @test BeamletOptics.thickness(shape.sdfs[1]) ≈ 2.286e-3 atol=1e-4
 
         ## Thorlabs LE1234, positive meniscus
         r1 = -82.2e-3
@@ -1231,10 +1245,10 @@ end
         l = 3.6e-3
         d = 25.4e-3
 
-        shape = SCDI.generalized_lens_shape_constructor(r1, r2, l, d)
+        shape = BeamletOptics.generalized_lens_shape_constructor(r1, r2, l, d)
 
         # test edge thickness
-        @test SCDI.thickness(shape.sdfs[1]) + SCDI.sag(shape.sdfs[2]) ≈ 2e-3 atol=1e-4
+        @test BeamletOptics.thickness(shape.sdfs[1]) + BeamletOptics.sag(shape.sdfs[2]) ≈ 2e-3 atol=1e-4
 
         ## Thorlabs LF1822, negative meniscus
         r1 = -33.7e-3
@@ -1242,10 +1256,10 @@ end
         l = 3.0e-3
         d = 25.4e-3
 
-        shape = SCDI.generalized_lens_shape_constructor(r1, r2, l, d)
+        shape = BeamletOptics.generalized_lens_shape_constructor(r1, r2, l, d)
 
         # test edge thickness
-        @test SCDI.thickness(shape.sdfs[1]) + SCDI.sag(shape.sdfs[2]) ≈ 4.7e-3 atol=1e-4
+        @test BeamletOptics.thickness(shape.sdfs[1]) + BeamletOptics.sag(shape.sdfs[2]) ≈ 4.7e-3 atol=1e-4
 
         ## Generic "true" meniscus
         r1 = 103.4371e-3
@@ -1253,75 +1267,75 @@ end
         l = 1.5e-3
         d = 55e-3
 
-        m_shape = SCDI.generalized_lens_shape_constructor(r1, r2, l, d)
+        m_shape = BeamletOptics.generalized_lens_shape_constructor(r1, r2, l, d)
 
         # test axis thickness
-        @test SCDI.thickness(m_shape) ≈ l
+        @test BeamletOptics.thickness(m_shape) ≈ l
     end
 
     @testset "Complex aspherical imaging system" begin
         # setup system
-        L1 = SCDI.Lens(
-            SCDI.generalized_lens_shape_constructor(1.054e-3, 2.027e-3, 0.72e-3, 1.333024e-3, 1.216472e-3;
+        L1 = Lens(
+            BeamletOptics.generalized_lens_shape_constructor(1.054e-3, 2.027e-3, 0.72e-3, 1.333024e-3, 1.216472e-3;
                 front_kind = :aspherical, front_k=-0.14294,front_coeffs=[0,0.038162*(1e3)^3, 0.06317*(1e3)^5, -0.020792*(1e3)^7, 0.18432*(1e3)^9, -0.04827*(1e3)^11, 0.094529*(1e3)^13],
                 back_kind = :aspherical, back_k=8.0226, back_coeffs=[0,0.0074974*(1e3)^3, 0.064686*(1e3)^5, 0.19354*(1e3)^7, -0.50703*(1e3)^9, -0.34529*(1e3)^11, 5.9938*(1e3)^13]
             ),
             n -> 1.580200
         )
         
-        L2 = SCDI.Lens(
-            SCDI.generalized_lens_shape_constructor(-3.116e-3, -4.835e-3, 0.55e-3, 1.4e-3, 1.9e-3;
+        L2 = Lens(
+            BeamletOptics.generalized_lens_shape_constructor(-3.116e-3, -4.835e-3, 0.55e-3, 1.4e-3, 1.9e-3;
                 front_kind = :aspherical, front_k=-49.984,front_coeffs=[0,-0.31608*(1e3)^3, 0.34755*(1e3)^5, -0.17102*(1e3)^7, -0.41506*(1e3)^9, -1.342*(1e3)^11, 5.0594*(1e3)^13, -2.7483*(1e3)^15],
                 back_kind = :aspherical, back_k=1.6674, back_coeffs=[0,-0.079727*(1e3)^3, 0.13899*(1e3)^5, -0.044057*(1e3)^7, -0.019369*(1e3)^9, 0.016993*(1e3)^11, 0.093716*(1e3)^13, -0.080329*(1e3)^15]
             ),
             n -> 1.804700
         )
         
-        SCDI.translate3d!(L2, [0, SCDI.thickness(L1) + 0.39e-3,0])
+        translate3d!(L2, [0, BeamletOptics.thickness(L1) + 0.39e-3,0])
 
-        L3 = SCDI.Lens(
-            SCDI.generalized_lens_shape_constructor(3.618e-3, 2.161e-3, 0.7e-3, 3.04e-3, 3.7e-3;
+        L3 = Lens(
+            BeamletOptics.generalized_lens_shape_constructor(3.618e-3, 2.161e-3, 0.7e-3, 3.04e-3, 3.7e-3;
                 front_kind = :aspherical, front_k=-44.874,front_coeffs=[0,-0.14756*(1e3)^3, 0.035194*(1e3)^5, -0.0032262*(1e3)^7, 0.0018592*(1e3)^9, 0.00036658*(1e3)^11, -0.00016039*(1e3)^13, -3.1846e-5*(1e3)^15],
                 back_kind = :aspherical, back_k=-10.719, back_coeffs=[0,-0.096568*(1e3)^3, 0.026771*(1e3)^5, -0.011261*(1e3)^7, 0.0019879*(1e3)^9, 0.00015579*(1e3)^11, -0.00012433*(1e3)^13, 1.5264e-5*(1e3)^15]
             ),
             n -> 1.580200
         )
 
-        SCDI.translate_to3d!(L3, SCDI.position(L2))
-        SCDI.translate3d!(L3, [0, SCDI.thickness(L2) + 0.63e-3,0])
+        translate_to3d!(L3, BeamletOptics.position(L2))
+        translate3d!(L3, [0, BeamletOptics.thickness(L2) + 0.63e-3,0])
 
-        Filt = SCDI.Lens(
-            SCDI.generalized_lens_shape_constructor(Inf, Inf, 0.15e-3, 4.2e-3),
+        Filt = Lens(
+            BeamletOptics.generalized_lens_shape_constructor(Inf, Inf, 0.15e-3, 4.2e-3),
             n -> 1.516800
         )
 
-        SCDI.translate_to3d!(Filt, SCDI.position(L3))
-        SCDI.translate3d!(Filt, [0, SCDI.thickness(L3) + 0.19e-3,0])
+        translate_to3d!(Filt, BeamletOptics.position(L3))
+        translate3d!(Filt, [0, BeamletOptics.thickness(L3) + 0.19e-3,0])
 
-        Cover = SCDI.Lens(
-            SCDI.generalized_lens_shape_constructor(Inf, Inf, 0.5e-3, 4.9e-3),
+        Cover = Lens(
+            BeamletOptics.generalized_lens_shape_constructor(Inf, Inf, 0.5e-3, 4.9e-3),
             n -> 1.469200
         )
-        SCDI.translate_to3d!(Cover, SCDI.position(Filt))
-        SCDI.translate3d!(Cover, [0, SCDI.thickness(Filt) + 0.18e-3,0])
+        translate_to3d!(Cover, BeamletOptics.position(Filt))
+        translate3d!(Cover, [0, BeamletOptics.thickness(Filt) + 0.18e-3,0])
 
         # test thickness
-        @test SCDI.thickness(L1) ≈ 0.72e-3
-        @test SCDI.thickness(L2) ≈ 0.55e-3
-        @test SCDI.thickness(L3) ≈ 0.7e-3
-        @test SCDI.thickness(Filt) ≈ 0.15e-3
-        @test SCDI.thickness(Cover) ≈ 0.5e-3
+        @test BeamletOptics.thickness(L1) ≈ 0.72e-3
+        @test BeamletOptics.thickness(L2) ≈ 0.55e-3
+        @test BeamletOptics.thickness(L3) ≈ 0.7e-3
+        @test BeamletOptics.thickness(Filt) ≈ 0.15e-3
+        @test BeamletOptics.thickness(Cover) ≈ 0.5e-3
 
-        system = SCDI.System([L1, L2, L3, Filt, Cover])
+        system = System([L1, L2, L3, Filt, Cover])
 
         # 0° beams
         beams = [
-            SCDI.Beam([0, -0.5e-3, -1.3e-3/2], [0, 1, 0], 0.5876e-6),
-            SCDI.Beam([0, -0.5e-3, 0], [0, 1, 0], 0.5876e-6),
-            SCDI.Beam([0, -0.5e-3, 1.3e-3/2], [0, 1, 0], 0.5876e-6)
+            Beam([0, -0.5e-3, -1.3e-3/2], [0, 1, 0], 0.5876e-6),
+            Beam([0, -0.5e-3, 0], [0, 1, 0], 0.5876e-6),
+            Beam([0, -0.5e-3, 1.3e-3/2], [0, 1, 0], 0.5876e-6)
         ]
         for beam in beams                
-            SCDI.solve_system!(system, beam, r_max=50)
+            solve_system!(system, beam, r_max=50)
             f_pos = last(beam.rays).pos + 0.12e-3*last(beam.rays).dir
 
             # test if the beam is correctly focussed
@@ -1332,20 +1346,20 @@ end
 
 @testset "Gaussian beamlet" begin
     @testset "Testing type definitions" begin
-        @test isdefined(SCDI, :GaussianBeamlet)
+        @test isdefined(BeamletOptics, :GaussianBeamlet)
     end
 
     @testset "Testing analytical equations" begin
         λ = 500e-9
         w0 = 1e-3
         M2 = 1
-        zR = SCDI.rayleigh_range(λ, w0, M2)
+        zR = BeamletOptics.rayleigh_range(λ, w0, M2)
         # Test Rayleigh range and div. angle against Paschotta (https://www.rp-photonics.com/gaussian_beams.html)
         @test isapprox(zR, 6.28, atol = 1e-2)
-        @test isapprox(SCDI.beam_waist(zR, w0, zR), sqrt(2) * w0)
-        @test isapprox(SCDI.gouy_phase(zR, zR), -π / 4)
-        @test isapprox(SCDI.wavefront_curvature(zR, zR), 1 / (2 * zR))
-        @test isapprox(SCDI.divergence_angle(λ, w0, M2), 159e-6, atol = 1e-6)
+        @test isapprox(BeamletOptics.beam_waist(zR, w0, zR), sqrt(2) * w0)
+        @test isapprox(BeamletOptics.gouy_phase(zR, zR), -π / 4)
+        @test isapprox(BeamletOptics.wavefront_curvature(zR, zR), 1 / (2 * zR))
+        @test isapprox(BeamletOptics.divergence_angle(λ, w0, M2), 159e-6, atol = 1e-6)
     end
 
     @testset "Testing parameter correctness" begin
@@ -1359,34 +1373,34 @@ end
         w0_2 = 2e-3         # m
         M2_1 = 1e-3         # m
         M2_2 = 2e-3         # m
-        E0_1 = SCDI.electric_field(2 * P0 / (π * w0_1^2))
-        E0_2 = SCDI.electric_field(2 * P0 / (π * w0_2^2))
-        gauss_1 = SCDI.GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0],
+        E0_1 = BeamletOptics.electric_field(2 * P0 / (π * w0_1^2))
+        E0_2 = BeamletOptics.electric_field(2 * P0 / (π * w0_2^2))
+        gauss_1 = GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0],
             λ_1,
             w0_1,
             M2 = M2_1,
             P0 = P0)
-        gauss_2 = SCDI.GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0],
+        gauss_2 = GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0],
             λ_2,
             w0_2,
             M2 = M2_2,
             P0 = P0)
         # Calculate analytical values
-        zr_1 = SCDI.rayleigh_range(λ_1, w0_1, M2_1)
-        zr_2 = SCDI.rayleigh_range(λ_2, w0_2, M2_2)
-        wa_1 = SCDI.beam_waist.(y, w0_1, zr_1)
-        wa_2 = SCDI.beam_waist.(y, w0_2, zr_2)
-        Ra_1 = SCDI.wavefront_curvature.(y, zr_1)
-        Ra_2 = SCDI.wavefront_curvature.(y, zr_2)
-        ψa_1 = SCDI.gouy_phase.(y, zr_1)
-        ψa_2 = SCDI.gouy_phase.(y, zr_2)
-        Ea_1 = SCDI.electric_field.(r, y, E0_1, w0_1, λ_1, M2_1)
-        Ea_2 = SCDI.electric_field.(r, y, E0_2, w0_2, λ_2, M2_2)
+        zr_1 = BeamletOptics.rayleigh_range(λ_1, w0_1, M2_1)
+        zr_2 = BeamletOptics.rayleigh_range(λ_2, w0_2, M2_2)
+        wa_1 = BeamletOptics.beam_waist.(y, w0_1, zr_1)
+        wa_2 = BeamletOptics.beam_waist.(y, w0_2, zr_2)
+        Ra_1 = BeamletOptics.wavefront_curvature.(y, zr_1)
+        Ra_2 = BeamletOptics.wavefront_curvature.(y, zr_2)
+        ψa_1 = BeamletOptics.gouy_phase.(y, zr_1)
+        ψa_2 = BeamletOptics.gouy_phase.(y, zr_2)
+        Ea_1 = BeamletOptics.electric_field.(r, y, E0_1, w0_1, λ_1, M2_1)
+        Ea_2 = BeamletOptics.electric_field.(r, y, E0_2, w0_2, λ_2, M2_2)
         # Calculate numerical values
-        wn_1, Rn_1, ψn_1, w0n_1 = SCDI.gauss_parameters(gauss_1, y)
-        wn_2, Rn_2, ψn_2, w0n_2 = SCDI.gauss_parameters(gauss_2, y)
-        En_1 = [SCDI.electric_field(gauss_1, r, yi) for yi in y]
-        En_2 = [SCDI.electric_field(gauss_2, r, yi) for yi in y]
+        wn_1, Rn_1, ψn_1, w0n_1 = BeamletOptics.gauss_parameters(gauss_1, y)
+        wn_2, Rn_2, ψn_2, w0n_2 = BeamletOptics.gauss_parameters(gauss_2, y)
+        En_1 = [BeamletOptics.electric_field(gauss_1, r, yi) for yi in y]
+        En_2 = [BeamletOptics.electric_field(gauss_2, r, yi) for yi in y]
         # Compare beam diameter within 0.1 nm
         @test all(isapprox.(wa_1, wn_1, atol = 1e-10))
         @test all(isapprox.(wa_2, wn_2, atol = 1e-10))
@@ -1403,8 +1417,8 @@ end
         @test all(isapprox.(Ea_1, En_1, atol = 1e-8))
         @test all(isapprox.(Ea_2, En_2, atol = 1e-7))
         # Compare beam power with original value
-        @test P0 ≈ SCDI.optical_power(gauss_1)
-        @test P0 ≈ SCDI.optical_power(gauss_2)
+        @test P0 ≈ BeamletOptics.optical_power(gauss_1)
+        @test P0 ≈ BeamletOptics.optical_power(gauss_2)
     end
 
     @testset "Testing propagation correctness" begin
@@ -1418,13 +1432,13 @@ end
         λ = 1000e-9
         w0 = 1e-3
         M2 = 1
-        zr = SCDI.rayleigh_range(λ, w0, M2)
+        zr = BeamletOptics.rayleigh_range(λ, w0, M2)
         # Lens parameters
         R1 = 1
         R2 = 1
         lens_y_location = 0.1
         nl = 1.5
-        f = SCDI.lensmakers_eq(R1, -R2, nl)
+        f = BeamletOptics.lensmakers_eq(R1, -R2, nl)
         # Stuff
         dy = 0.001
         ys = 0:dy:1.5
@@ -1444,18 +1458,18 @@ end
         end
 
         # Numerical result
-        tl = SCDI.ThinLensSDF(R1, R2, 0.025)
-        lens = SCDI.Lens(tl, x -> nl)
-        system = SCDI.System(lens)
-        SCDI.translate3d!(lens, [0, lens_y_location, 0])
+        tl = BeamletOptics.ThinLensSDF(R1, R2, 0.025)
+        lens = Lens(tl, x -> nl)
+        system = System(lens)
+        translate3d!(lens, [0, lens_y_location, 0])
         # Create and solve beam, calculate beam parameters
-        gauss = SCDI.GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0],
+        gauss = GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0],
             λ,
             w0,
             support = [1, 0, 0],
             M2 = 1)
-        SCDI.solve_system!(system, gauss)
-        w_numerical, R_numerical, ψ_numerical, w0_numerical = SCDI.gauss_parameters(gauss,
+        solve_system!(system, gauss)
+        w_numerical, R_numerical, ψ_numerical, w0_numerical = BeamletOptics.gauss_parameters(gauss,
             ys)
         # Compare beam radius to within 1 μm
         @test all(isapprox.(w_analytical, w_numerical, atol = 1e-6))
@@ -1472,13 +1486,13 @@ end
 
         @testset "Testing isparaxial and istilted" begin
             # Before lens rotation
-            @test SCDI.istilted(system, gauss) == false
-            @test SCDI.isparaxial(system, gauss) == true
+            @test BeamletOptics.istilted(system, gauss) == false
+            @test BeamletOptics.isparaxial(system, gauss) == true
             # Tilt lens, test again with 30° threshold for paraxial approx.
-            SCDI.zrotate3d!(lens, deg2rad(45))
-            SCDI.solve_system!(system, gauss)
-            @test SCDI.istilted(system, gauss) == true
-            @test SCDI.isparaxial(system, gauss, deg2rad(30)) == false
+            zrotate3d!(lens, deg2rad(45))
+            solve_system!(system, gauss)
+            @test BeamletOptics.istilted(system, gauss) == true
+            @test BeamletOptics.isparaxial(system, gauss, deg2rad(30)) == false
         end
     end
 end
@@ -1487,25 +1501,25 @@ end
     @testset "Testing Spotdetector" begin
         # Set up tilted spot detection screens
         α = 45
-        sd = SCDI.Spotdetector(1.)
-        system = SCDI.System([sd])
-        SCDI.translate3d!(sd, [0,1,0])
-        SCDI.zrotate3d!(sd, deg2rad(α))
-        beam = SCDI.Beam([0,0,0], [0,1,0], 1e-6)
+        sd = Spotdetector(1.)
+        system = System([sd])
+        translate3d!(sd, [0,1,0])
+        zrotate3d!(sd, deg2rad(α))
+        beam = Beam([0,0,0], [0,1,0], 1e-6)
         # Trace beams in x-y-plane
         xs = LinRange(-0.25, 0.25, 10)
         for x in xs
-            SCDI.position!(first(beam.rays), Point3{Float64}(x, 0, 0))
-            SCDI.solve_system!(system, beam)
+            BeamletOptics.position!(first(beam.rays), Point3{Float64}(x, 0, 0))
+            solve_system!(system, beam)
             # compare ray intersection to stored data
             data = last(sd.data)
             ray = last(beam.rays)
-            pos_ray = SCDI.position(ray) + length(SCDI.intersection(ray)) * SCDI.direction(ray)
-            pos_dta = SCDI.position(sd) + SCDI.orientation(sd)[:,1] * data[1]
+            pos_ray = BeamletOptics.position(ray) + length(BeamletOptics.intersection(ray)) * BeamletOptics.direction(ray)
+            pos_dta = BeamletOptics.position(sd) + BeamletOptics.orientation(sd)[:,1] * data[1]
             @test pos_ray ≈ pos_dta
         end
         # Test reset function
-        SCDI.reset_detector!(sd)
+        BeamletOptics.reset_detector!(sd)
         @test isempty(sd.data)
     end
 end
@@ -1518,8 +1532,8 @@ end
         M2 = 1
         P0 = 1e-3
         I0 = 2 * P0 / (π * w0^2)
-        E0 = SCDI.electric_field(I0)
-        zR = SCDI.rayleigh_range(λ, w0, M2)
+        E0 = BeamletOptics.electric_field(I0)
+        zR = BeamletOptics.rayleigh_range(λ, w0, M2)
         # Detector parameters
         z = 0.1     # distance to detector
         l = 1e-2    # detector size
@@ -1527,17 +1541,17 @@ end
         # Lens parameters
         R1 = R2 = d = 0.01
         nl = 1.5
-        f = SCDI.lensmakers_eq(R1, -R2, nl)
+        f = BeamletOptics.lensmakers_eq(R1, -R2, nl)
         # Raytracing system (for all tests)
-        pd_l = SCDI.Photodetector(l, n)
-        pd_s = SCDI.Photodetector(l/10, n÷10)
-        ln = SCDI.ThinLens(R1, R2, d, nl)
-        SCDI.translate3d!(pd_l, [0, z, 0])
-        SCDI.translate3d!(pd_s, [0, z, 0])
-        SCDI.translate3d!(ln, [0, z - f - SCDI.thickness(ln.shape)/2, 0])
+        pd_l = Photodetector(l, n)
+        pd_s = Photodetector(l/10, n÷10)
+        ln = ThinLens(R1, R2, d, nl)
+        translate3d!(pd_l, [0, z, 0])
+        translate3d!(pd_s, [0, z, 0])
+        translate3d!(ln, [0, z - f - BeamletOptics.thickness(ln.shape)/2, 0])
 
         @testset "Testing fringe pattern" begin
-            system = SCDI.System(pd_l)
+            system = System(pd_l)
             Δz = 5e-3   # arm length difference
             # Analytic solution
             xs = ys = LinRange(-l / 2, l / 2, n)
@@ -1545,56 +1559,56 @@ end
             for (j, y) in enumerate(ys)
                 for (i, x) in enumerate(xs)
                     r = sqrt(x^2 + y^2)
-                    screen[i, j] += SCDI.electric_field(r, z, E0, w0, λ, M2)
-                    screen[i, j] += SCDI.electric_field(r, z + Δz, E0, w0, λ, M2)
+                    screen[i, j] += BeamletOptics.electric_field(r, z, E0, w0, λ, M2)
+                    screen[i, j] += BeamletOptics.electric_field(r, z + Δz, E0, w0, λ, M2)
                 end
             end
             # Numerical solution
-            SCDI.reset_detector!(pd_l)
-            g_1 = SCDI.GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0],
+            BeamletOptics.reset_detector!(pd_l)
+            g_1 = GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0],
                 λ,
                 w0,
                 M2 = M2,
                 P0 = P0)
-            g_2 = SCDI.GaussianBeamlet([0.0, -Δz, 0], [0.0, 1, 0],
+            g_2 = GaussianBeamlet([0.0, -Δz, 0], [0.0, 1, 0],
                 λ,
                 w0,
                 M2 = M2,
                 P0 = P0)
-            SCDI.solve_system!(system, g_1)
-            SCDI.solve_system!(system, g_2)
+            solve_system!(system, g_1)
+            solve_system!(system, g_2)
 
             # Compare solutions
-            I_analytical = SCDI.intensity.(screen)
-            I_numerical = SCDI.intensity.(pd_l.field)
-            Pt = SCDI.optical_power(pd_l)
+            I_analytical = BeamletOptics.intensity.(screen)
+            I_numerical = BeamletOptics.intensity.(pd_l.field)
+            Pt = BeamletOptics.optical_power(pd_l)
             @test all(isapprox.(I_analytical, I_numerical, atol = 2e-1))
             @test isapprox(Pt, 2 * P0, atol = 3e-5)
         end
 
         @testset "Testing λ phase shift" begin
-            system = SCDI.System([pd_s, ln])
+            system = System([pd_s, ln])
             # Numerical solution
             Δz = LinRange(0, λ, 50)
             Pt_numerical = zeros(length(Δz))
             for (i, z_i) in enumerate(Δz)
-                SCDI.reset_detector!(pd_s)
-                g_1 = SCDI.GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0],
+                BeamletOptics.reset_detector!(pd_s)
+                g_1 = GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0],
                     λ,
                     w0,
                     M2 = M2,
                     P0 = P0)
-                g_2 = SCDI.GaussianBeamlet([0.0, z_i, 0], [0.0, 1, 0],
+                g_2 = GaussianBeamlet([0.0, z_i, 0], [0.0, 1, 0],
                     λ,
                     w0,
                     M2 = M2,
                     P0 = P0)
-                SCDI.solve_system!(system, g_1)
-                SCDI.solve_system!(system, g_2)
-                Pt_numerical[i] = SCDI.optical_power(pd_s)
+                solve_system!(system, g_1)
+                solve_system!(system, g_2)
+                Pt_numerical[i] = BeamletOptics.optical_power(pd_s)
                 # Test length/opl function
                 @test length(g_1) == z
-                @test length(g_1) < SCDI.optical_path_length(g_1)
+                @test length(g_1) < BeamletOptics.optical_path_length(g_1)
                 @test length(g_2) == length(g_1) - z_i
             end
             # Analytical solution (cosine over Δz), ref. power is 4*P0 since beamsplitter is missing
@@ -1608,20 +1622,20 @@ end
     @testset "Michelson Interferometer" begin
         # setup Michelson Interferometer
         l_0 = 0.1
-        pd_size = SCDI.inch / 5
+        pd_size = BeamletOptics.inch / 5
         pd_resolution = 100
-        m1 = SCDI.SquarePlanoMirror2D(SCDI.inch)
-        m2 = SCDI.SquarePlanoMirror2D(SCDI.inch)
-        bs = SCDI.ThinBeamsplitter(SCDI.inch, reflectance=0.5)
-        pd = SCDI.Photodetector(pd_size, pd_resolution)
-        SCDI.translate3d!(m1, [l_0, 0, 0])
-        SCDI.translate3d!(m2, [0, l_0, 0])
-        SCDI.translate3d!(pd, [-l_0, 0, 0])
-        SCDI.zrotate3d!(bs, deg2rad(45))
-        SCDI.zrotate3d!(m1, deg2rad(90))
-        SCDI.zrotate3d!(pd, deg2rad(90))
+        m1 = SquarePlanoMirror2D(BeamletOptics.inch)
+        m2 = SquarePlanoMirror2D(BeamletOptics.inch)
+        bs = ThinBeamsplitter(BeamletOptics.inch, reflectance=0.5)
+        pd = Photodetector(pd_size, pd_resolution)
+        translate3d!(m1, [l_0, 0, 0])
+        translate3d!(m2, [0, l_0, 0])
+        translate3d!(pd, [-l_0, 0, 0])
+        zrotate3d!(bs, deg2rad(45))
+        zrotate3d!(m1, deg2rad(90))
+        zrotate3d!(pd, deg2rad(90))
 
-        system = SCDI.System([m1, m2, bs, pd])
+        system = System([m1, m2, bs, pd])
 
         # Test correct values for reflectivity/transmission
         @test isvalid(bs)
@@ -1630,7 +1644,7 @@ end
             # setup 635 nm laser with 0.1 mm waist for fast divergence
             λ = 635e-9
             P_0 = 5e-3
-            beam = SCDI.GaussianBeamlet([0, -l_0, 0], [0, 1.0, 0], λ, 1e-4, P0 = P_0)
+            beam = GaussianBeamlet([0, -l_0, 0], [0, 1.0, 0], λ, 1e-4, P0 = P_0)
 
             # Shift mirror #2 by -λ to +λ
             lambdas = LinRange(-λ, λ, 200)
@@ -1639,13 +1653,13 @@ end
             optical_pwr_numerical = zeros(length(lambdas))
 
             for (i, lambda) in enumerate(lambdas)
-                SCDI.translate_to3d!(m2, [0, l_0, 0] + [0, lambda, 0])
-                SCDI.reset_detector!(pd)
-                SCDI.solve_system!(system, beam)
+                translate_to3d!(m2, [0, l_0, 0] + [0, lambda, 0])
+                BeamletOptics.reset_detector!(pd)
+                solve_system!(system, beam)
 
                 # Moving mirror path length
                 path_length_numerical[i] = length(beam.children[1].children[2])
-                optical_pwr_numerical[i] = SCDI.optical_power(pd)
+                optical_pwr_numerical[i] = BeamletOptics.optical_power(pd)
             end
 
             path_length_analytical = @. 2 * lambdas + 4l_0
@@ -1662,18 +1676,18 @@ end
             P0 = 1e-3
             M2 = 1
             I0 = 2 * P0 / (π * w0^2)
-            E0 = SCDI.electric_field(I0) * 1 / sqrt(2)^2
-            zR = SCDI.rayleigh_range(λ, w0, M2)
+            E0 = BeamletOptics.electric_field(I0) * 1 / sqrt(2)^2
+            zR = BeamletOptics.rayleigh_range(λ, w0, M2)
 
-            beam = SCDI.GaussianBeamlet([0, -l_0, 0], [0, 1.0, 0], λ, w0, P0 = P0, M2 = M2)
+            beam = GaussianBeamlet([0, -l_0, 0], [0, 1.0, 0], λ, w0, P0 = P0, M2 = M2)
 
             # arm length diff
             Δl = 1 * l_0
-            SCDI.translate_to3d!(m2, [0, l_0 + Δl, 0])
+            translate_to3d!(m2, [0, l_0 + Δl, 0])
 
             # numerical solution
-            SCDI.reset_detector!(pd)
-            SCDI.solve_system!(system, beam)
+            BeamletOptics.reset_detector!(pd)
+            solve_system!(system, beam)
 
             # analytical solution
             short_arm = 4l_0
@@ -1683,8 +1697,8 @@ end
             for (j, y) in enumerate(ys)
                 for (i, x) in enumerate(xs)
                     r = sqrt(x^2 + y^2)
-                    screen[i, j] += SCDI.electric_field(r, short_arm, E0, w0, λ, M2)
-                    screen[i, j] += SCDI.electric_field(r, long_arm, E0, w0, λ, M2) * exp(im*pi)
+                    screen[i, j] += BeamletOptics.electric_field(r, short_arm, E0, w0, λ, M2)
+                    screen[i, j] += BeamletOptics.electric_field(r, long_arm, E0, w0, λ, M2) * exp(im*pi)
                 end
             end
 
@@ -1707,43 +1721,43 @@ end
         w0 = 0.5e-3
         λ = 1064e-9
 
-        bs = SCDI.ThinBeamsplitter(10e-3);
-        pd_1 = SCDI.Photodetector(10e-3, 100);
-        pd_2 = SCDI.Photodetector(10e-3, 100);
+        bs = ThinBeamsplitter(10e-3);
+        pd_1 = Photodetector(10e-3, 100);
+        pd_2 = Photodetector(10e-3, 100);
 
-        SCDI.zrotate3d!(bs, deg2rad(45))
-        SCDI.translate3d!(pd_1, [0, l0, 0])
-        SCDI.zrotate3d!(pd_1, deg2rad(180))
+        zrotate3d!(bs, deg2rad(45))
+        translate3d!(pd_1, [0, l0, 0])
+        zrotate3d!(pd_1, deg2rad(180))
 
-        SCDI.translate3d!(pd_2, [l0, 0, 0])
-        SCDI.zrotate3d!(pd_2, deg2rad(90))
+        translate3d!(pd_2, [l0, 0, 0])
+        zrotate3d!(pd_2, deg2rad(90))
 
         # add BS and PD orientation error
-        SCDI.zrotate3d!(bs, deg2rad(0.017))
-        SCDI.zrotate3d!(pd_1, deg2rad(10))
-        SCDI.xrotate3d!(pd_1, deg2rad(15))
+        zrotate3d!(bs, deg2rad(0.017))
+        zrotate3d!(pd_1, deg2rad(10))
+        xrotate3d!(pd_1, deg2rad(15))
 
         # define system and beams -> solve
-        system = SCDI.System([bs, pd_1, pd_2]);
+        system = System([bs, pd_1, pd_2]);
 
         phis = LinRange(0, 2pi, 25)
         p1 = similar(phis)
         p2 = similar(phis)
 
-        l1 = SCDI.GaussianBeamlet([0, -l0, 0], [0, 1., 0], λ, w0; P0);
-        l2 = SCDI.GaussianBeamlet([-l0, 0, 0], [1., 0, 0], λ, w0; P0);
+        l1 = GaussianBeamlet([0, -l0, 0], [0, 1., 0], λ, w0; P0);
+        l2 = GaussianBeamlet([-l0, 0, 0], [1., 0, 0], λ, w0; P0);
 
         E0_buffer = l1.E0
 
         for (i, phi) in enumerate(phis)
             # Iterate over relative phase shifts, use retracing
             l1.E0 = E0_buffer*exp(im*phi)
-            SCDI.reset_detector!(pd_1)
-            SCDI.reset_detector!(pd_2)
-            SCDI.solve_system!(system, l1)
-            SCDI.solve_system!(system, l2)
-            p1[i] = SCDI.optical_power(pd_1)
-            p2[i] = SCDI.optical_power(pd_2)
+            BeamletOptics.reset_detector!(pd_1)
+            BeamletOptics.reset_detector!(pd_2)
+            solve_system!(system, l1)
+            solve_system!(system, l2)
+            p1[i] = BeamletOptics.optical_power(pd_1)
+            p2[i] = BeamletOptics.optical_power(pd_2)
             # Test power conservation
             @test p1[i] + p2[i] - 2P0 < 1e-4 # W
         end
@@ -1759,29 +1773,29 @@ end
         @testset "90° reflection" begin
             in_dir = [0,0,1]
             out_dir = [1,0,0]
-            @test SCDI._calculate_global_E0(in_dir, out_dir, J, E0) ≈ [0,0,-1]
+            @test BeamletOptics._calculate_global_E0(in_dir, out_dir, J, E0) ≈ [0,0,-1]
         end
 
         @testset "0° reflection" begin
             in_dir = [0,0,1]
             out_dir = [0,0,-1]
-            @test SCDI._calculate_global_E0(in_dir, out_dir, J, E0) ≈ [-1,0,0]
+            @test BeamletOptics._calculate_global_E0(in_dir, out_dir, J, E0) ≈ [-1,0,0]
         end
     end
 
     @testset "Mirror reflections" begin
         # Setup system as in https://opg.optica.org/ao/fulltext.cfm?uri=ao-50-18-2855&id=218813
-        m1 = SCDI.SquarePlanoMirror2D(1.)
-        m2 = SCDI.SquarePlanoMirror2D(1.)
-        m3 = SCDI.SquarePlanoMirror2D(1.)
-        SCDI.translate3d!(m2, [2,0,0])
-        SCDI.translate3d!(m3, [2,2,0])
-        SCDI.zrotate3d!(m1, deg2rad(-90))
-        SCDI.yrotate3d!(m1, deg2rad(45))
-        SCDI.zrotate3d!(m2, deg2rad(45))
-        SCDI.xrotate3d!(m3, deg2rad(135))
+        m1 = SquarePlanoMirror2D(1.)
+        m2 = SquarePlanoMirror2D(1.)
+        m3 = SquarePlanoMirror2D(1.)
+        translate3d!(m2, [2,0,0])
+        translate3d!(m3, [2,2,0])
+        zrotate3d!(m1, deg2rad(-90))
+        yrotate3d!(m1, deg2rad(45))
+        zrotate3d!(m2, deg2rad(45))
+        xrotate3d!(m3, deg2rad(135))
 
-        system = SCDI.StaticSystem([m1, m2, m3])
+        system = StaticSystem([m1, m2, m3])
 
         I0_1 = 1
         I0_2 = 5
@@ -1789,29 +1803,29 @@ end
         lin_y_pol = [0,I0_2,0]
 
         # Beam of polarized rays
-        ray = SCDI.PolarizedRay([0.,0,-2], [0,0,1], 1000e-9, lin_x_pol)
-        beam = SCDI.Beam(ray)
+        ray = PolarizedRay([0.,0,-2], [0,0,1], 1000e-9, lin_x_pol)
+        beam = Beam(ray)
 
         @testset "x-Polarization" begin
-            SCDI.polarization!(ray, lin_x_pol)
+            BeamletOptics.polarization!(ray, lin_x_pol)
             # test tracing
-            SCDI.solve_system!(system, beam)
-            @test SCDI.polarization(beam.rays[1]) ≈ lin_x_pol
-            @test SCDI.polarization(beam.rays[2]) ≈ [0,0,-I0_1]
-            @test SCDI.polarization(beam.rays[3]) ≈ [0,0, I0_1]
-            @test SCDI.polarization(beam.rays[4]) ≈ [0,-I0_1,0]
+            solve_system!(system, beam)
+            @test BeamletOptics.polarization(beam.rays[1]) ≈ lin_x_pol
+            @test BeamletOptics.polarization(beam.rays[2]) ≈ [0,0,-I0_1]
+            @test BeamletOptics.polarization(beam.rays[3]) ≈ [0,0, I0_1]
+            @test BeamletOptics.polarization(beam.rays[4]) ≈ [0,-I0_1,0]
             @test length(beam) == 6.0
         end
 
         @testset "y-Polarization" begin
-            SCDI.polarization!(ray, lin_y_pol)
-            SCDI.translate3d!(m3, [0,2,0])
+            BeamletOptics.polarization!(ray, lin_y_pol)
+            translate3d!(m3, [0,2,0])
             # test retracing
-            SCDI.solve_system!(system, beam)
-            @test SCDI.polarization(beam.rays[1]) ≈ lin_y_pol
-            @test SCDI.polarization(beam.rays[2]) ≈ [0,-I0_2,0]
-            @test SCDI.polarization(beam.rays[3]) ≈ [ I0_2,0,0]
-            @test SCDI.polarization(beam.rays[4]) ≈ [-I0_2,0,0]
+            solve_system!(system, beam)
+            @test BeamletOptics.polarization(beam.rays[1]) ≈ lin_y_pol
+            @test BeamletOptics.polarization(beam.rays[2]) ≈ [0,-I0_2,0]
+            @test BeamletOptics.polarization(beam.rays[3]) ≈ [ I0_2,0,0]
+            @test BeamletOptics.polarization(beam.rays[4]) ≈ [-I0_2,0,0]
             @test length(beam) == 8.0
         end
     end
@@ -1823,38 +1837,38 @@ end
         θb = brewster_angle(n)
         d = 0.1
         # Calculate transmission efficiency
-        rs, rp, ts, tp = SCDI.fresnel_coefficients(θb, n)
+        rs, rp, ts, tp = BeamletOptics.fresnel_coefficients(θb, n)
         Ts = 1 - abs2(rs)
         Tp = 1 - abs2(rp)
         # Setup testcase
-        s1 = SCDI.CuboidMesh(1., d, 1.)
-        s2 = SCDI.CuboidMesh(1., d, 1.)
-        s3 = SCDI.CuboidMesh(1., d, 1.)
-        s4 = SCDI.CuboidMesh(1., d, 1.)
-        s5 = SCDI.CuboidMesh(1., d, 1.)
-        l1 = SCDI.Lens(s1, x->n)
-        l2 = SCDI.Lens(s2, x->n)
-        l3 = SCDI.Lens(s3, x->n)
-        l4 = SCDI.Lens(s4, x->n)
-        l5 = SCDI.Lens(s5, x->n)
-        SCDI.translate3d!.([l1, l2, l3, l4, l5], Ref([-0.5,-d/2,-0.5]))
-        SCDI.set_new_origin3d!.(SCDI.shape.([l1, l2, l3, l4, l5]))
-        SCDI.translate3d!(l2, [0,0.5, -1d/2])
-        SCDI.translate3d!(l3, [0,1.0, -2d/2])
-        SCDI.translate3d!(l4, [0,1.5, -3d/2])
-        SCDI.translate3d!(l5, [0,2.0, -4d/2])
-        SCDI.xrotate3d!.([l1, l2, l3, l4, l5], -θb)
+        s1 = BeamletOptics.CuboidMesh(1., d, 1.)
+        s2 = BeamletOptics.CuboidMesh(1., d, 1.)
+        s3 = BeamletOptics.CuboidMesh(1., d, 1.)
+        s4 = BeamletOptics.CuboidMesh(1., d, 1.)
+        s5 = BeamletOptics.CuboidMesh(1., d, 1.)
+        l1 = Lens(s1, x->n)
+        l2 = Lens(s2, x->n)
+        l3 = Lens(s3, x->n)
+        l4 = Lens(s4, x->n)
+        l5 = Lens(s5, x->n)
+        translate3d!.([l1, l2, l3, l4, l5], Ref([-0.5,-d/2,-0.5]))
+        BeamletOptics.set_new_origin3d!.(BeamletOptics.shape.([l1, l2, l3, l4, l5]))
+        translate3d!(l2, [0,0.5, -1d/2])
+        translate3d!(l3, [0,1.0, -2d/2])
+        translate3d!(l4, [0,1.5, -3d/2])
+        translate3d!(l5, [0,2.0, -4d/2])
+        xrotate3d!.([l1, l2, l3, l4, l5], -θb)
         # Solve system of s- and p-polarized beams
-        system = SCDI.StaticSystem([l1, l2, l3, l4, l5])
-        x_pol_ray = SCDI.PolarizedRay([-0.1, -1, 0], [0, 1., 0], 1000e-9, [SCDI.electric_field(1), 0, 0])
-        z_pol_ray = SCDI.PolarizedRay([+0.1, -1, 0], [0, 1., 0], 1000e-9, [0, 0, SCDI.electric_field(1)])
-        s_beam = SCDI.Beam(x_pol_ray)
-        p_beam = SCDI.Beam(z_pol_ray)
-        SCDI.solve_system!(system, s_beam)
-        SCDI.solve_system!(system, p_beam)
+        system = StaticSystem([l1, l2, l3, l4, l5])
+        x_pol_ray = PolarizedRay([-0.1, -1, 0], [0, 1., 0], 1000e-9, [BeamletOptics.electric_field(1), 0, 0])
+        z_pol_ray = PolarizedRay([+0.1, -1, 0], [0, 1., 0], 1000e-9, [0, 0, BeamletOptics.electric_field(1)])
+        s_beam = Beam(x_pol_ray)
+        p_beam = Beam(z_pol_ray)
+        solve_system!(system, s_beam)
+        solve_system!(system, p_beam)
         # Since system is non-focussing, calculate pseudo-intensity
-        pseudo_Is = abs2(SCDI.polarization(last(SCDI.rays(s_beam)))[1]) / (2*SCDI.Z_vacuum)
-        pseudo_Ip = abs2(SCDI.polarization(last(SCDI.rays(p_beam)))[3]) / (2*SCDI.Z_vacuum)
+        pseudo_Is = abs2(BeamletOptics.polarization(last(BeamletOptics.rays(s_beam)))[1]) / (2*BeamletOptics.Z_vacuum)
+        pseudo_Ip = abs2(BeamletOptics.polarization(last(BeamletOptics.rays(p_beam)))[3]) / (2*BeamletOptics.Z_vacuum)
         # Test against m interfaces
         m = length(system.objects) * 2
         @test pseudo_Is ≈ Ts^m
@@ -1864,21 +1878,21 @@ end
     @testset "Fresnel rhomb" begin
         # Create Fresnel rhomb with n=1.5 and θ=53.3° for quarter-wave plate effect
         n = 1.5
-        s1 = SCDI.CuboidMesh(0.5,1.25,0.5, deg2rad(53.3))
-        l1 = SCDI.Lens(s1, x->n)
-        SCDI.translate3d!(l1, [-0.25, 0, -0.25])
-        SCDI.set_new_origin3d!(s1)
+        s1 = BeamletOptics.CuboidMesh(0.5,1.25,0.5, deg2rad(53.3))
+        l1 = Lens(s1, x->n)
+        translate3d!(l1, [-0.25, 0, -0.25])
+        BeamletOptics.set_new_origin3d!(s1)
         # Rotate prism to obtain 45° beam input polarization
-        SCDI.yrotate3d!(l1, deg2rad(135))
+        yrotate3d!(l1, deg2rad(135))
         # Solve system
-        system = SCDI.StaticSystem([l1])
-        ray = SCDI.PolarizedRay([0, -1, 0], [0, 1., 0], 1000e-9, [0, 0, SCDI.electric_field(1)])
-        beam = SCDI.Beam(ray)
-        SCDI.solve_system!(system, beam)
+        system = StaticSystem([l1])
+        ray = PolarizedRay([0, -1, 0], [0, 1., 0], 1000e-9, [0, 0, BeamletOptics.electric_field(1)])
+        beam = Beam(ray)
+        solve_system!(system, beam)
         # Assumes propagation along the y-axis after rhomb, calculate polarization state
-        Ex = getindex.(SCDI.polarization.(beam.rays), 1)
-        Ey = getindex.(SCDI.polarization.(beam.rays), 2)
-        Ez = getindex.(SCDI.polarization.(beam.rays), 3)
+        Ex = getindex.(BeamletOptics.polarization.(beam.rays), 1)
+        Ey = getindex.(BeamletOptics.polarization.(beam.rays), 2)
+        Ez = getindex.(BeamletOptics.polarization.(beam.rays), 3)
         # Test for circular polarization and Ey error
         phi = angle(last(Ez)) - angle(last(Ex))
         @test phi ≈ π/2
@@ -1887,31 +1901,31 @@ end
 
     @testset "Mach-Zehnder Interferometer" begin
         # setup MZI
-        m1 = SCDI.SquarePlanoMirror2D(SCDI.inch)
-        m2 = SCDI.SquarePlanoMirror2D(SCDI.inch)
-        b1 = SCDI.ThinBeamsplitter(SCDI.inch, reflectance=0.5)
-        b2 = SCDI.ThinBeamsplitter(SCDI.inch, reflectance=0.5)
+        m1 = SquarePlanoMirror2D(BeamletOptics.inch)
+        m2 = SquarePlanoMirror2D(BeamletOptics.inch)
+        b1 = ThinBeamsplitter(BeamletOptics.inch, reflectance=0.5)
+        b2 = ThinBeamsplitter(BeamletOptics.inch, reflectance=0.5)
 
-        system = SCDI.StaticSystem([m1, m2, b1, b2])
+        system = StaticSystem([m1, m2, b1, b2])
 
-        SCDI.translate3d!(b1, [0*SCDI.inch, 0*SCDI.inch, 0])
-        SCDI.translate3d!(b2, [2*SCDI.inch, 2*SCDI.inch, 0])
-        SCDI.translate3d!(m1, [0*SCDI.inch, 2*SCDI.inch, 0])
-        SCDI.translate3d!(m2, [2*SCDI.inch, 0*SCDI.inch, 0])
+        translate3d!(b1, [0*BeamletOptics.inch, 0*BeamletOptics.inch, 0])
+        translate3d!(b2, [2*BeamletOptics.inch, 2*BeamletOptics.inch, 0])
+        translate3d!(m1, [0*BeamletOptics.inch, 2*BeamletOptics.inch, 0])
+        translate3d!(m2, [2*BeamletOptics.inch, 0*BeamletOptics.inch, 0])
 
         # Rotate with consideration to mirror/bs normal
-        SCDI.zrotate3d!(b1, deg2rad(360-135))
-        SCDI.zrotate3d!(b2, deg2rad(45))
-        SCDI.zrotate3d!(m1, deg2rad(360-135))
-        SCDI.zrotate3d!(m2, deg2rad(45))
+        zrotate3d!(b1, deg2rad(360-135))
+        zrotate3d!(b2, deg2rad(45))
+        zrotate3d!(m1, deg2rad(360-135))
+        zrotate3d!(m2, deg2rad(45))
 
-        ray = SCDI.PolarizedRay([0, -0.1, 0], [0., 1., 0], 1000e-9, [0, 0, 1])
-        beam = SCDI.Beam(ray)
+        ray = PolarizedRay([0, -0.1, 0], [0., 1., 0], 1000e-9, [0, 0, 1])
+        beam = Beam(ray)
 
         @testset "z-polarized ray along y-axis" begin
             # Solve with z-polarized ray along y-axis
-            SCDI.polarization!(ray, [0, 0, 1])
-            SCDI.solve_system!(system, beam)
+            BeamletOptics.polarization!(ray, [0, 0, 1])
+            solve_system!(system, beam)
 
             # Extract E0s: t - transmitted, r - reflected
             t = beam.children[1].rays[1].E0
@@ -1936,8 +1950,8 @@ end
             # Test num. of leaves before retracing
             @test length(collect(Leaves(beam))) == 4
             # Retrace with z-polarized ray along y-axis
-            SCDI.polarization!(ray, [1, 0, 0])
-            SCDI.solve_system!(system, beam)
+            BeamletOptics.polarization!(ray, [1, 0, 0])
+            solve_system!(system, beam)
 
             # Extract E0s: t - transmitted, r - reflected
             t = beam.children[1].rays[1].E0
@@ -1967,16 +1981,16 @@ end
         # Init splitter
         N0 = 1.5
         mm = 1e-3
-        pbs = SCDI.RectangularPlateBeamsplitter(36mm, 25mm, 1mm, n->N0)
-        system = SCDI.System([pbs])
-        beam = SCDI.Beam([0,-50mm,0], [0,1,0], 1e-6)
+        pbs = RectangularPlateBeamsplitter(36mm, 25mm, 1mm, n->N0)
+        system = System([pbs])
+        beam = Beam([0,-50mm,0], [0,1,0], 1e-6)
         # Trace normally
-        SCDI.zrotate3d!(pbs, deg2rad(45))
-        SCDI.solve_system!(system, beam)
+        zrotate3d!(pbs, deg2rad(45))
+        solve_system!(system, beam)
 
         @testset "Test pos/dir" begin
-            @test SCDI.position(pbs) == zeros(3)
-            @test SCDI.orientation(pbs) ≈ SCDI.orientation(pbs.substrate)
+            @test BeamletOptics.position(pbs) == zeros(3)
+            @test BeamletOptics.orientation(pbs) ≈ BeamletOptics.orientation(pbs.substrate)
         end
 
         @testset "Test children after tracing" begin
@@ -1988,17 +2002,17 @@ end
             @test length(t) == 2
             @test length(r) == 1
             # correct ref. index
-            @test all(SCDI.refractive_index.(p) .== 1)
-            @test all(SCDI.refractive_index.(t) .== [N0, 1])
-            @test all(SCDI.refractive_index.(r) .== 1)
+            @test all(BeamletOptics.refractive_index.(p) .== 1)
+            @test all(BeamletOptics.refractive_index.(t) .== [N0, 1])
+            @test all(BeamletOptics.refractive_index.(r) .== 1)
             # correct dir
-            @test SCDI.direction(first(p)) ≈ SCDI.direction(last(t))
-            @test SCDI.direction(first(r)) ≈ [1,0,0]
+            @test BeamletOptics.direction(first(p)) ≈ BeamletOptics.direction(last(t))
+            @test BeamletOptics.direction(first(r)) ≈ [1,0,0]
         end
 
         # Retrace backside
-        SCDI.zrotate3d!(pbs, π)
-        SCDI.solve_system!(system, beam)
+        zrotate3d!(pbs, π)
+        solve_system!(system, beam)
 
         @testset "Test children after retracing" begin
             p = beam.rays
@@ -2009,77 +2023,77 @@ end
             @test length(t) == 1
             @test length(r) == 2
             # correct ref. index
-            @test all(SCDI.refractive_index.(p) .== [1, N0])
-            @test all(SCDI.refractive_index.(t) .== 1)
-            @test all(SCDI.refractive_index.(r) .== [N0, 1])
+            @test all(BeamletOptics.refractive_index.(p) .== [1, N0])
+            @test all(BeamletOptics.refractive_index.(t) .== 1)
+            @test all(BeamletOptics.refractive_index.(r) .== [N0, 1])
             # correct dir
-            @test SCDI.direction(first(p)) ≈ SCDI.direction(last(t))
-            @test SCDI.direction(last(r)) ≈ [1,0,0]
+            @test BeamletOptics.direction(first(p)) ≈ BeamletOptics.direction(last(t))
+            @test BeamletOptics.direction(last(r)) ≈ [1,0,0]
         end
     end
 
     @testset "Testing CubeBeamsplitter with Beam" begin
         # Init splitter
-        cbs = SCDI.CubeBeamsplitter(25e-3, n->N0)
-        SCDI.translate3d!(cbs, [0, 50mm, 0])
-        system = SCDI.System([cbs])
-        beam = SCDI.Beam([0,0,0], [0,1,0], 1e-6)
+        cbs = CubeBeamsplitter(25e-3, n->N0)
+        translate3d!(cbs, [0, 50mm, 0])
+        system = System([cbs])
+        beam = Beam([0,0,0], [0,1,0], 1e-6)
 
         @testset "Initial CBS tracing" begin
             # Trace normally
-            SCDI.solve_system!(system, beam)
+            solve_system!(system, beam)
             # Test correct ray length, ref. indices, dirs
-            p = SCDI.rays(beam)
-            t = SCDI.rays(beam.children[1])
-            r = SCDI.rays(beam.children[2])
+            p = BeamletOptics.rays(beam)
+            t = BeamletOptics.rays(beam.children[1])
+            r = BeamletOptics.rays(beam.children[2])
 
             @test length(p) == 2
             @test length(r) == 2
             @test length(t) == 2
-            @test SCDI.refractive_index.(p) == [1, N0]
-            @test SCDI.refractive_index.(t) == [N0, 1]
-            @test SCDI.refractive_index.(r) == [N0, 1]
-            @test SCDI.direction(last(t)) ≈ SCDI.direction(first(p))
-            @test SCDI.direction(last(r)) ≈ [-1,0,0]
+            @test BeamletOptics.refractive_index.(p) == [1, N0]
+            @test BeamletOptics.refractive_index.(t) == [N0, 1]
+            @test BeamletOptics.refractive_index.(r) == [N0, 1]
+            @test BeamletOptics.direction(last(t)) ≈ BeamletOptics.direction(first(p))
+            @test BeamletOptics.direction(last(r)) ≈ [-1,0,0]
         end
 
         @testset "Retrace after 45° CBS rotation" begin
             # Retrace
-            SCDI.zrotate3d!(cbs, π/2)
-            SCDI.solve_system!(system, beam)
+            zrotate3d!(cbs, π/2)
+            solve_system!(system, beam)
 
             # Test correct ray dirs
-            p = SCDI.rays(beam)
-            t = SCDI.rays(beam.children[1])
-            r = SCDI.rays(beam.children[2])
+            p = BeamletOptics.rays(beam)
+            t = BeamletOptics.rays(beam.children[1])
+            r = BeamletOptics.rays(beam.children[2])
 
-            @test SCDI.direction(last(t)) == SCDI.direction(first(p))
-            @test SCDI.direction(last(t)) == [0,1,0]
+            @test BeamletOptics.direction(last(t)) == BeamletOptics.direction(first(p))
+            @test BeamletOptics.direction(last(t)) == [0,1,0]
         end
 
         @testset "Retrace CBS backside" begin
             # Retrace backside
-            SCDI.zrotate3d!(cbs, π/2)
-            SCDI.solve_system!(system, beam)
+            zrotate3d!(cbs, π/2)
+            solve_system!(system, beam)
 
             # Test correct ray length, ref. indices, dirs
-            p = SCDI.rays(beam)
-            t = SCDI.rays(beam.children[1])
-            r = SCDI.rays(beam.children[2])
+            p = BeamletOptics.rays(beam)
+            t = BeamletOptics.rays(beam.children[1])
+            r = BeamletOptics.rays(beam.children[2])
 
             @test length(p) == 2
             @test length(r) == 2
             @test length(t) == 2
-            @test SCDI.refractive_index.(p) == [1, N0]
-            @test SCDI.refractive_index.(t) == [N0, 1]
-            @test SCDI.refractive_index.(r) == [N0, 1]
-            @test SCDI.direction(last(t)) ≈ SCDI.direction(first(p))
-            @test SCDI.direction(last(r)) ≈ [-1,0,0]
+            @test BeamletOptics.refractive_index.(p) == [1, N0]
+            @test BeamletOptics.refractive_index.(t) == [N0, 1]
+            @test BeamletOptics.refractive_index.(r) == [N0, 1]
+            @test BeamletOptics.direction(last(t)) ≈ BeamletOptics.direction(first(p))
+            @test BeamletOptics.direction(last(r)) ≈ [-1,0,0]
         end
     end
 end
 
 @testset "Aqua" begin
     using Aqua
-    Aqua.test_all(SCDI)
+    Aqua.test_all(BeamletOptics)
 end

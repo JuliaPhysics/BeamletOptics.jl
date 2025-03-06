@@ -1,7 +1,7 @@
 function plot_and_save_fresnel_coeffs(n1, n2; save_fig::Bool=false, path::String=@__DIR__)
     n = n2/n1
     θ = deg2rad.(0:.01:90)
-    rs, rp, ts, tp = SCDI.fresnel_coefficients(θ, n)
+    rs, rp, ts, tp = BeamletOptics.fresnel_coefficients(θ, n)
 
     coeff = Figure(size=(500,300))
     ax1 = Axis(coeff[1,1], xlabel="θ [°]", ylabel="Real.", title="n₁ = $n1, n₂ = $n2")
