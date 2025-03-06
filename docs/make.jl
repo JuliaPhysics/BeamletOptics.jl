@@ -23,7 +23,7 @@ bib = CitationBibliography(joinpath(@__DIR__, "src", "refs.bib"))
 makedocs(;
     modules=[BeamletOptics],
     authors="Hugo Uittenbosch <hugo.uittenbosch@dlr.de> and contributors",
-    repo="https://gitlab.dlr.de/optical-air-data/dispersionsinterferometer/scdi-sim/-/blob/{commit}{path}#L{line}",
+    repo="https://gitlab.dlr.de/optical-air-data/dispersionsinterferometer/BeamletOptics/-/blob/{commit}{path}#L{line}",
     sitename="BeamletOptics",
     format=Documenter.HTML(;
         prettyurls=get(ENV, "CI", "false") == "true",
