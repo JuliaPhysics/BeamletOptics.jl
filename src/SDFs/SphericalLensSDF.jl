@@ -558,8 +558,46 @@ function _sdf(s::SphericalSurface, ::BackwardOrientation)
     return back
 end
 
-sdf(s::SphericalSurface, ::ForwardLeftMeniscusOrientation) = ConvexSphericalSurfaceSDF(radius(s), diameter(s))
-sdf(s::SphericalSurface, ::BackwardLeftMeniscusOrientation) = SphereSDF(radius(s))
+struct StandardSurface{T} <: AbstractRotationallySymmetricSurface{T}
+    radius::T
+    diameter::T
+    mechanical_diameter::T
+end
+StandardSurface(radius::T, diameter::T) where T = StandardSurface{T}(radius, diameter, diameter)
 
-sdf(s::SphericalSurface, ::ForwardRightMeniscusOrientation) = SphereSDF(abs(radius(s)))
-sdf(s::SphericalSurface, ::BackwardRightMeniscusOrientation) = ConvexSphericalSurfaceSDF(abs(radius(s)), diameter(s))
+mechanical_diameter(s::StandardSurface) = s.mechanical_diameter
+
+edge_thickness(::StandardSurface, sd::AbstractSphericalSurfaceSDF) = abs(sag(sd))
+
+function sdf(s::StandardSurface, ot::AbstractOrientationType)
+    isinf(radius(s)) && return nothing
+
+    return _sdf(s, ot)
+end
+
+function _sdf(s::StandardSurface, ::ForwardOrientation)
+    front = if radius(s) > 0
+        ConvexSphericalSurfaceSDF(radius(s), diameter(s))
+    else
+        ConcaveSphericalSurfaceSDF(abs(radius(s)), diameter(s))
+    end
+
+    return front
+end
+
+function _sdf(s::StandardSurface, ::BackwardOrientation)
+    back = if radius(s) > 0
+        ConcaveSphericalSurfaceSDF(radius(s), diameter(s))
+    else
+        ConvexSphericalSurfaceSDF(abs(radius(s)), diameter(s))
+    end
+    zrotate3d!(back, π)
+
+    return back
+end
+
+sdf(s::StandardSurface, ::ForwardLeftMeniscusOrientation) = ConvexSphericalSurfaceSDF(radius(s), diameter(s))
+sdf(s::StandardSurface, ::BackwardLeftMeniscusOrientation) = SphereSDF(radius(s))
+
+sdf(s::StandardSurface, ::ForwardRightMeniscusOrientation) = SphereSDF(abs(radius(s)))
+sdf(s::StandardSurface, ::BackwardRightMeniscusOrientation) = ConvexSphericalSurfaceSDF(abs(radius(s)), diameter(s))

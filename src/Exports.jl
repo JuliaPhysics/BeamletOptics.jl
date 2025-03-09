@@ -26,6 +26,9 @@ export Lens, DoubletLens, ThinLens, SphericalLens, SphericalDoubletLens
 # surfaces
 export SphericalSurface, EvenAsphericalSurface
 
+# surfaces
+export StandardSurface, EvenAsphericSurface
+
 # prisms
 export Prism, RightAnglePrism
 

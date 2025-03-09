@@ -1127,8 +1127,8 @@ end
         l = 8.2e-3
         d = 25.4e-3
         lens = Lens(
-            SphericalSurface(r1, d),
-            SphericalSurface(Inf, d),
+            StandardSurface(r1, d),
+            StandardSurface(Inf, d),
             l,
             n -> 1.458
         )
@@ -1146,8 +1146,8 @@ end
         l = 9.0e-3
         d = 25.4e-3
         lens = Lens(
-            SphericalSurface(r1, d),
-            SphericalSurface(r2, d),
+            StandardSurface(r1, d),
+            StandardSurface(r2, d),
             l,
             n -> 1.517
         )
@@ -1166,8 +1166,8 @@ end
         l = 3.5e-3
         d = 25.4e-3
         lens = Lens(
-            SphericalSurface(r1, d),
-            SphericalSurface(r2, d),
+            StandardSurface(r1, d),
+            StandardSurface(r2, d),
             l,
             n -> 1.517
         )
@@ -1184,8 +1184,8 @@ end
         l = 3.0e-3
         d = 25.4e-3
         lens = Lens(
-            SphericalSurface(r1, d),
-            SphericalSurface(r2, d),
+            StandardSurface(r1, d),
+            StandardSurface(r2, d),
             l,
             n -> 1.517
         )
@@ -1203,8 +1203,8 @@ end
         l = 6.5e-3
         d = 25.4e-3
         lens = Lens(
-            SphericalSurface(r1, d),
-            SphericalSurface(r2, d),
+            StandardSurface(r1, d),
+            StandardSurface(r2, d),
             l,
             n -> 1.517
         )
@@ -1222,8 +1222,8 @@ end
         l = 3.6e-3
         d = 25.4e-3
         lens = Lens(
-            SphericalSurface(r1, d),
-            SphericalSurface(r2, d),
+            StandardSurface(r1, d),
+            StandardSurface(r2, d),
             l,
             n -> 1.517
         )
@@ -1241,8 +1241,8 @@ end
         l = 3.0e-3
         d = 25.4e-3
         lens = Lens(
-            SphericalSurface(r1, d),
-            SphericalSurface(r2, d),
+            StandardSurface(r1, d),
+            StandardSurface(r2, d),
             l,
             n -> 1.517
         )
@@ -1261,8 +1261,8 @@ end
         l = 1.5e-3
         d = 55e-3
         lens = Lens(
-            SphericalSurface(r1, d),
-            SphericalSurface(r2, d),
+            StandardSurface(r1, d),
+            StandardSurface(r2, d),
             l,
             n -> 1.517
         )
@@ -1297,9 +1297,7 @@ end
         n = 1.5036
 
         lens = Lens(
-            EvenAsphericalSurface(R, d, k, A),
-            SphericalSurface(Inf, d),
-            ct,
+            BeamletOptics.generalized_lens_shape_constructor(R, Inf, ct, d; front_kind=:aspherical, front_k=k, front_coeffs=A),
             x -> n
         )
 
