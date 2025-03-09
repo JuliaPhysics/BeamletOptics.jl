@@ -143,13 +143,77 @@ Refer to the [`SphericalLens`](@ref) constructor for more information on how to 
     and must be provided by the user. For testing purposes, an anonymous function, e.g. λ -> 1.5
     can be passed such that the lens has the same refractive index for all wavelengths.
 """
-struct Lens{T, S <: AbstractShape{T}, N <: RefractiveIndex} <: AbstractRefractiveOptic{T, S, N}
+struct Lens{T, S <: AbstractShape{T}, N <: RefractiveIndex} <:
+       AbstractRefractiveOptic{T, S, N}
     shape::S
     n::N
-    function Lens(shape::S, n::N) where {T<:Real, S<:AbstractShape{T}, N<:RefractiveIndex}
+    function Lens(
+            shape::S, n::N) where {T <: Real, S <: AbstractShape{T}, N <: RefractiveIndex}
         test_refractive_index_function(n)
         return new{T, S, N}(shape, n)
     end
 end
 
 thickness(l::Lens) = thickness(shape(l))
+
+function Lens(front_surface::AbstractSurface, back_surface::AbstractSurface,
+        center_thickness::Real, n::RefractiveIndex)
+    # Define effective (optical and mechanical) diameters:
+    d_mid = min(diameter(front_surface), diameter(back_surface))
+    md_mid = max(mechanical_diameter(front_surface), mechanical_diameter(back_surface))
+
+    # Initialize remaining cylindrical section length.
+    l0 = center_thickness
+
+    # Front Surface
+    front = sdf(front_surface, ForwardOrientation())
+    l0 -= isnothing(front) ? zero(l0) : thickness(front)
+
+    # Back Surface
+    back = sdf(back_surface, BackwardOrientation())
+    l0 -= isnothing(back) ? zero(l0) : thickness(back)
+
+    # Use MeniscusLensSDF if cylinder length is non-positive
+    if l0 ≤ 0
+        if sign(radius(front_surface)) == sign(radius(back_surface))
+            shape = meniscus_lens_sdf(front_surface, front, back_surface, back, center_thickness)
+        else
+            throw(ArgumentError("Lens parameters lead to cylinder section length of ≤ 0, use ThinLens instead."))
+        end
+    else
+        # Construct central plano surface and add front/back surfaces
+        mid = PlanoSurfaceSDF(l0, d_mid)
+        if front !== nothing
+            translate3d!(mid, [0, thickness(front), 0])
+            mid += front
+        end
+        if back !== nothing
+            translate3d!(back, [0, thickness(mid) + thickness(back), 0])
+            mid += back
+        end
+        shape = mid
+    end
+
+    # Add mechanical ring if md_mid > d_mid
+    if md_mid > d_mid
+        ring_thickness = thickness(mid)
+        ring_center = position(mid)[2] + ring_thickness / 2
+        if front !== nothing
+            net_thickness = (thickness(front) - edge_thickness(front_surface, front))
+            ring_thickness -= net_thickness
+            ring_center += net_thickness / 2
+        end
+        if back !== nothing
+            net_thickness = (thickness(back) - edge_thickness(back_surface, back))
+            ring_thickness -= net_thickness
+            ring_center += net_thickness / 2
+        end
+        ring = RingSDF(d_mid / 2, (md_mid - d_mid) / 2, ring_thickness)
+        translate3d!(ring, [0, ring_center, 0])
+        shape += ring
+    elseif md_mid < d_mid
+        @warn "Mechanical diameter is less than clear aperture; parameter md has been ignored."
+    end
+
+    return Lens(shape, n)
+end

@@ -760,3 +760,57 @@ function generalized_meniscus_lens_sdf(
 
     return lens
 end
+
+struct EvenAsphericSurface{T} <: AbstractRotationallySymmetricSurface{T}
+    standard::StandardSurface{T}
+    conic_constant::T
+    coefficients::Vector{T}
+end
+function EvenAsphericSurface(radius::T1, diameter::T2, conic_constant::T3, coefficients::AbstractVector{T4}, mechanical_diameter::T5=diameter) where {T1, T2, T3, T4, T5}
+    T = promote_type(T1, T2, T3, T4, T5)
+    st = StandardSurface{T}(radius, diameter, mechanical_diameter)
+
+    return EvenAsphericSurface{T}(
+        st,
+        conic_constant,
+        coefficients
+    )
+end
+radius(s::EvenAsphericSurface) = radius(s.standard)
+diameter(s::EvenAsphericSurface) = diameter(s.standard)
+mechanical_diameter(s::EvenAsphericSurface) = mechanical_diameter(s.standard)
+
+function edge_thickness(s::EvenAsphericSurface, ::AbstractAsphericalSurfaceSDF)
+    return abs(aspheric_equation(
+        diameter(s) / 2,
+        1 / radius(s),
+        s.conic_constant,
+        s.coefficients
+    ))
+end
+
+function sdf(s::EvenAsphericSurface, ot::AbstractOrientationType)
+    isinf(radius(s)) && return nothing
+
+    return _sdf(s, ot)
+end
+
+function _sdf(s::EvenAsphericSurface, ::ForwardOrientation)
+    front = if radius(s) > 0
+        ConvexAsphericalSurfaceSDF(s.coefficients, radius(s), s.conic_constant, diameter(s))
+    else
+        ConcaveAsphericalSurfaceSDF(s.coefficients, radius(s), s.conic_constant, diameter(s))
+    end
+
+    return front
+end
+
+function _sdf(s::EvenAsphericSurface, ::BackwardOrientation)
+    back = if radius(s) > 0
+        ConcaveAsphericalSurfaceSDF(s.coefficients, radius(s), s.conic_constant, diameter(s))
+    else
+        ConvexAsphericalSurfaceSDF(s.coefficients, radius(s), s.conic_constant, diameter(s))
+    end
+
+    return back
+end

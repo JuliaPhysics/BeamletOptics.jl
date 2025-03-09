@@ -1131,6 +1131,171 @@ end
     end
 end
 
+@testset "Surfaces" begin
+    function working_distance(lens, offset_z)
+        ray = Ray([0.0, -1.0, offset_z], [0.0, 1.0, 0])
+        system = System([lens])
+        beam = Beam(ray)
+        solve_system!(system, beam)
+
+        dist = -beam.rays[end].pos[3]/beam.rays[end].dir[3]
+        α = asind(beam.rays[end].dir[3])
+        wd = cosd(α) * dist
+
+        return wd
+    end
+
+    @testset "Lens construction from surfaces" begin
+        ## Thorlabs LA4052, plano-convex
+        r1 = 16.1e-3
+        r2 = Inf
+        l = 8.2e-3
+        d = 25.4e-3
+        lens = Lens(
+            StandardSurface(r1, d),
+            StandardSurface(Inf, d),
+            l,
+            n -> 1.458
+        )
+
+        # test lens thickness
+        @test BeamletOptics.thickness(lens) ≈ l
+        # test edge thickness
+        @test BeamletOptics.thickness(BeamletOptics.shape(lens).sdfs[1]) ≈ 2e-3 atol=1e-4
+        # test back focal length
+        @test working_distance(lens, 0.05*d/2) ≈ 29.5e-3 atol=1e-4
+
+        ## Thorlabs LB1761, bi-convex
+        r1 = 24.5e-3
+        r2 = -24.5e-3
+        l = 9.0e-3
+        d = 25.4e-3
+        lens = Lens(
+            StandardSurface(r1, d),
+            StandardSurface(r2, d),
+            l,
+            n -> 1.517
+        )
+        shape = lens.shape
+
+        # test lens thickness
+        @test BeamletOptics.thickness(lens) ≈ l
+        # test edge thickness
+        @test BeamletOptics.thickness(shape.sdfs[1]) ≈ 1.9e-3 atol=1e-4
+        # test back focal length
+        @test working_distance(lens, 0.05*d/2) ≈ 22.2e-3 atol=1e-3
+
+        ## Thorlabs LC1715, plano-concave
+        r1 = Inf
+        r2 = 25.7e-3
+        l = 3.5e-3
+        d = 25.4e-3
+        lens = Lens(
+            StandardSurface(r1, d),
+            StandardSurface(r2, d),
+            l,
+            n -> 1.517
+        )
+        shape = lens.shape
+
+        # test lens thickness
+        @test BeamletOptics.thickness(lens) ≈ l
+        # test edge thickness
+        @test BeamletOptics.sag(shape.sdfs[2]) + BeamletOptics.thickness(shape.sdfs[1]) ≈ 0.006858 atol=1e-4
+
+        ## Thorlabs LD2297, bi-concave
+        r1 = -39.6e-3
+        r2 = 39.6e-3
+        l = 3.0e-3
+        d = 25.4e-3
+        lens = Lens(
+            StandardSurface(r1, d),
+            StandardSurface(r2, d),
+            l,
+            n -> 1.517
+        )
+        shape = lens.shape
+
+        # test lens thickness
+        @test BeamletOptics.thickness(lens) ≈ l
+
+        @test BeamletOptics.sag(shape.sdfs[2]) + BeamletOptics.sag(shape.sdfs[3]) + BeamletOptics.thickness(shape.sdfs[1]) ≈ 0.0072 atol=1e-4
+
+        ## Thorlabs LBF254-040, best-form
+        r1 = 134.6e-3
+        r2 = -24.0e-3
+        l = 6.5e-3
+        d = 25.4e-3
+        lens = Lens(
+            StandardSurface(r1, d),
+            StandardSurface(r2, d),
+            l,
+            n -> 1.517
+        )
+        shape = lens.shape
+
+        # test lens thickness
+        @test BeamletOptics.thickness(lens) ≈ l
+
+        # test edge thickness
+        @test BeamletOptics.thickness(shape.sdfs[1]) ≈ 2.286e-3 atol=1e-4
+
+        ## Thorlabs LE1234, positive meniscus
+        r1 = -82.2e-3
+        r2 = -32.1e-3
+        l = 3.6e-3
+        d = 25.4e-3
+        lens = Lens(
+            StandardSurface(r1, d),
+            StandardSurface(r2, d),
+            l,
+            n -> 1.517
+        )
+        shape = lens.shape
+
+        # test lens thickness
+        @test BeamletOptics.thickness(lens) ≈ l
+
+        # test edge thickness
+        @test BeamletOptics.thickness(shape.sdfs[1]) + BeamletOptics.sag(shape.sdfs[2]) ≈ 2e-3 atol=1e-4
+
+        ## Thorlabs LF1822, negative meniscus
+        r1 = -33.7e-3
+        r2 = -100.0e-3
+        l = 3.0e-3
+        d = 25.4e-3
+        lens = Lens(
+            StandardSurface(r1, d),
+            StandardSurface(r2, d),
+            l,
+            n -> 1.517
+        )
+        shape = lens.shape
+
+        # test lens thickness
+        @test BeamletOptics.thickness(lens) ≈ l
+
+        # test edge thickness
+        @test BeamletOptics.thickness(shape.sdfs[1]) + BeamletOptics.sag(shape.sdfs[2]) ≈ 4.7e-3 atol=1e-4
+
+        ## Generic "true" meniscus
+        r1 = 103.4371e-3
+        r2 = 61.14925e-3
+        l = 1.5e-3
+        d = 55e-3
+        lens = Lens(
+            StandardSurface(r1, d),
+            StandardSurface(r2, d),
+            l,
+            n -> 1.517
+        )
+        shape = lens.shape
+
+        # test lens thickness
+        @test BeamletOptics.thickness(lens) ≈ l
+    end
+end
+
 @testset "Aspherical Lenses" begin
     @testset "Testing type definitions" begin
         @test isdefined(BeamletOptics, :ConvexAsphericalSurfaceSDF)
@@ -1188,91 +1353,6 @@ end
         @test wd ≈ 93.2e-3 atol=1e-4
     end
 
-    @testset "Generalized lens shape constructors" begin
-        ## Thorlabs LA4052, plano-convex
-        r1 = 16.1e-3
-        r2 = Inf
-        l = 8.2e-3
-        d = 25.4e-3
-        shape = BeamletOptics.generalized_lens_shape_constructor(r1, r2, l, d)
-
-        # test edge thickness
-        @test BeamletOptics.thickness(shape.sdfs[1]) ≈ 2e-3 atol=1e-4
-
-        ## Thorlabs LB1761, bi-convex
-        r1 = 24.5e-3
-        r2 = -24.5e-3
-        l = 9.0e-3
-        d = 25.4e-3
-        shape = BeamletOptics.generalized_lens_shape_constructor(r1, r2, l, d)
-
-        # test edge thickness
-        @test BeamletOptics.thickness(shape.sdfs[1]) ≈ 1.9e-3 atol=1e-4
-
-        ## Thorlabs LC1715, plano-concave
-        r1 = Inf
-        r2 = 25.7e-3
-        l = 3.5e-3
-        d = 25.4e-3
-        shape = BeamletOptics.generalized_lens_shape_constructor(r1, r2, l, d)
-
-        @test BeamletOptics.sag(shape.sdfs[2]) + BeamletOptics.thickness(shape.sdfs[1]) ≈ 0.006858 atol=1e-4
-
-        ## Thorlabs LD2297, bi-concave
-        r1 = -39.6e-3
-        r2 = 39.6e-3
-        l = 3.0e-3
-        d = 25.4e-3
-
-        shape = BeamletOptics.generalized_lens_shape_constructor(r1, r2, l, d)
-
-        @test BeamletOptics.sag(shape.sdfs[2]) + BeamletOptics.sag(shape.sdfs[3]) + BeamletOptics.thickness(shape.sdfs[1]) ≈ 0.0072 atol=1e-4
-
-        ## Thorlabs LBF254-040, best-form
-        r1 = 134.6e-3
-        r2 = -24.0e-3
-        l = 6.5e-3
-        d = 25.4e-3
-
-        shape = BeamletOptics.generalized_lens_shape_constructor(r1, r2, l, d)
-
-        # test edge thickness
-        @test BeamletOptics.thickness(shape.sdfs[1]) ≈ 2.286e-3 atol=1e-4
-
-        ## Thorlabs LE1234, positive meniscus
-        r1 = -82.2e-3
-        r2 = -32.1e-3
-        l = 3.6e-3
-        d = 25.4e-3
-
-        shape = BeamletOptics.generalized_lens_shape_constructor(r1, r2, l, d)
-
-        # test edge thickness
-        @test BeamletOptics.thickness(shape.sdfs[1]) + BeamletOptics.sag(shape.sdfs[2]) ≈ 2e-3 atol=1e-4
-
-        ## Thorlabs LF1822, negative meniscus
-        r1 = -33.7e-3
-        r2 = -100.0e-3
-        l = 3.0e-3
-        d = 25.4e-3
-
-        shape = BeamletOptics.generalized_lens_shape_constructor(r1, r2, l, d)
-
-        # test edge thickness
-        @test BeamletOptics.thickness(shape.sdfs[1]) + BeamletOptics.sag(shape.sdfs[2]) ≈ 4.7e-3 atol=1e-4
-
-        ## Generic "true" meniscus
-        r1 = 103.4371e-3
-        r2 = 61.14925e-3
-        l = 1.5e-3
-        d = 55e-3
-
-        m_shape = BeamletOptics.generalized_lens_shape_constructor(r1, r2, l, d)
-
-        # test axis thickness
-        @test BeamletOptics.thickness(m_shape) ≈ l
-    end
-
     @testset "Complex aspherical imaging system" begin
         # setup system
         L1 = Lens(
@@ -1282,7 +1362,7 @@ end
             ),
             n -> 1.580200
         )
-        
+
         L2 = Lens(
             BeamletOptics.generalized_lens_shape_constructor(-3.116e-3, -4.835e-3, 0.55e-3, 1.4e-3, 1.9e-3;
                 front_kind = :aspherical, front_k=-49.984,front_coeffs=[0,-0.31608*(1e3)^3, 0.34755*(1e3)^5, -0.17102*(1e3)^7, -0.41506*(1e3)^9, -1.342*(1e3)^11, 5.0594*(1e3)^13, -2.7483*(1e3)^15],
@@ -1290,7 +1370,7 @@ end
             ),
             n -> 1.804700
         )
-        
+
         translate3d!(L2, [0, BeamletOptics.thickness(L1) + 0.39e-3,0])
 
         L3 = Lens(
@@ -1334,7 +1414,7 @@ end
             Beam([0, -0.5e-3, 0], [0, 1, 0], 0.5876e-6),
             Beam([0, -0.5e-3, 1.3e-3/2], [0, 1, 0], 0.5876e-6)
         ]
-        for beam in beams                
+        for beam in beams
             solve_system!(system, beam, r_max=50)
             f_pos = last(beam.rays).pos + 0.12e-3*last(beam.rays).dir
 
