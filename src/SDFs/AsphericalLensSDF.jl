@@ -303,7 +303,7 @@ end
 
 function sdf(surface::ConvexAsphericalSurfaceSDF{T}, point) where {T}
     p_local = _world_to_sdf(surface, point)
-    # standard logic is to have the z-axis as optical axis, so the aspheric code is written
+    # spherical logic is to have the z-axis as optical axis, so the aspheric code is written
     # with that convention in mind so everything matches ISO10110/textbook definitions.
     # We reinterpret the coordinates here, so xz is the transversal direction and y is the
     # optical axis.
@@ -324,7 +324,7 @@ end
 
 function sdf(surface::ConcaveAsphericalSurfaceSDF{T}, point) where {T}
     p_local = _world_to_sdf(surface, point)
-    # standard logic is to have the z-axis as optical axis, so the aspheric code is written
+    # spherical logic is to have the z-axis as optical axis, so the aspheric code is written
     # with that convention in mind so everything matches ISO10110/textbook definitions.
     # We reinterpret the coordinates here, so xz is the transversal direction and y is the
     # optical axis.
@@ -439,7 +439,7 @@ function PlanoConcaveAsphericalLensSDF(r::R, l::L, d::D, k::K, α_coeffs::Abstra
 end
 
 struct EvenAsphericSurface{T} <: AbstractRotationallySymmetricSurface{T}
-    standard::SphericalSurface{T}
+    spherical::SphericalSurface{T}
     conic_constant::T
     coefficients::Vector{T}
 end
@@ -454,9 +454,9 @@ function EvenAsphericSurface(radius::T1, diameter::T2, conic_constant::T3, coeff
         coefficients
     )
 end
-radius(s::EvenAsphericSurface) = radius(s.standard)
-diameter(s::EvenAsphericSurface) = diameter(s.standard)
-mechanical_diameter(s::EvenAsphericSurface) = mechanical_diameter(s.standard)
+radius(s::EvenAsphericSurface) = radius(s.spherical)
+diameter(s::EvenAsphericSurface) = diameter(s.spherical)
+mechanical_diameter(s::EvenAsphericSurface) = mechanical_diameter(s.spherical)
 
 function edge_sag(s::EvenAsphericSurface{T}, ::AbstractAsphericalSurfaceSDF) where T
     sag = aspheric_equation(
