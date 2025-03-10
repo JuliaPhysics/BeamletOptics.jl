@@ -138,8 +138,8 @@ function meniscus_lens_sdf(front_surface::AbstractSurface{T1}, front::AbstractSD
 
     # Compute sag values at the clear aperture:
     # Use d1 for the front and d2 for the back.
-    convex_sag = edge_thickness(front_surface, front)
-    concave_sag = edge_thickness(back_surface, back)
+    convex_sag = edge_sag(front_surface, front)
+    concave_sag = edge_sag(back_surface, back)
 
     cylinder_l = center_thickness - convex_sag + concave_sag
     if cylinder_l ≤ 0

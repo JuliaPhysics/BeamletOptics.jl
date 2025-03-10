@@ -215,5 +215,54 @@ nothing
 
 ![Doublet lens showcase](doublet_showcase.png)
 
-!!! tip "Spherical lens example"
-    For a complex showcase featuring spherical singlet and doublet lenses, refer to the [Double Gauss lens](@ref) example page.
+## Aspherical lenses
+
+Aspherical lenses offer more advanced control over aberrations, enabling higher performance in specialized optical systems. The package offers surface support for rotationally symetrical [aspheric lenses](https://en.wikipedia.org/wiki/Aspheric_lens) that adhere to the DIN ISO 10110 convention with even terms.
+
+To construct a lens with any possible combination of convex/concave, spherical/aspherical surfaces you can use the `Lens` constructor. A complex example of such a lens might look like the following example. This lens has the following peculiarities:
+- The front surface is an aspherical convex surface with a clear diameter smaller than the full mechanical diameter
+- The back surface is an aspherical concave surface which first curves outwards before change slope and curving invards, giving a more "convex" like character while still beeing a concave lens by definition. Also this surface extends towards the full outer diameter.
+
+```@example
+using CairoMakie, BeamletOptics
+
+L3 = Lens(
+        EvenAsphericSurface(
+            3.618e-3, # r
+            3.04e-3, # d
+            -44.874, # conic
+            [0,-0.14756*(1e3)^3, 0.035194*(1e3)^5, -0.0032262*(1e3)^7,
+            0.0018592*(1e3)^9, 0.00036658*(1e3)^11, -0.00016039*(1e3)^13,
+            -3.1846e-5*(1e3)^15] # coeffs
+        ),
+        EvenAsphericSurface(
+            2.161e-3, # r
+            3.7e-3, # d
+            -10.719, # conic
+            [0,-0.096568*(1e3)^3, 0.026771*(1e3)^5, -0.011261*(1e3)^7,
+            0.0019879*(1e3)^9, 0.00015579*(1e3)^11, -0.00012433*(1e3)^13,
+            1.5264e-5*(1e3)^15] # coeffs
+        ),
+        0.7e-3, # center_thickness
+        n -> 1.580200
+    )
+
+system = System([L3])
+
+fig = Figure(size=(600,240))
+ax = Axis3(fig[1,1], aspect=:data, azimuth=0., elevation=1e-3)
+
+hidedecorations!(ax)
+hidespines!(ax)
+
+render_system!(ax, system)
+
+fig
+```
+
+!!! hint "Aspherical lens example"
+    Refer to the [Simple aspherical lens example](@ref) for a showcase on how to implement a plano-convex asphere.
+
+```@docs; canonical=false
+BeamletOptics.Lens
+```

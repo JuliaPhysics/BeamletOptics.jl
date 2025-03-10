@@ -494,24 +494,24 @@ function _sdf(s::SphericalSurface, ::BackwardOrientation)
     return back
 end
 
-struct StandardSurface{T} <: AbstractRotationallySymmetricSurface{T}
+struct SphericalSurface{T} <: AbstractRotationallySymmetricSurface{T}
     radius::T
     diameter::T
     mechanical_diameter::T
 end
-StandardSurface(radius::T, diameter::T) where T = StandardSurface{T}(radius, diameter, diameter)
+SphericalSurface(radius::T, diameter::T) where T = SphericalSurface{T}(radius, diameter, diameter)
 
-mechanical_diameter(s::StandardSurface) = s.mechanical_diameter
+mechanical_diameter(s::SphericalSurface) = s.mechanical_diameter
 
-edge_thickness(::StandardSurface, sd::AbstractSphericalSurfaceSDF) = abs(sag(sd))
+edge_sag(::SphericalSurface, sd::AbstractSphericalSurfaceSDF) = abs(sag(sd))
 
-function sdf(s::StandardSurface, ot::AbstractOrientationType)
+function sdf(s::SphericalSurface, ot::AbstractOrientationType)
     isinf(radius(s)) && return nothing
 
     return _sdf(s, ot)
 end
 
-function _sdf(s::StandardSurface, ::ForwardOrientation)
+function _sdf(s::SphericalSurface, ::ForwardOrientation)
     front = if radius(s) > 0
         ConvexSphericalSurfaceSDF(radius(s), diameter(s))
     else
@@ -521,7 +521,7 @@ function _sdf(s::StandardSurface, ::ForwardOrientation)
     return front
 end
 
-function _sdf(s::StandardSurface, ::BackwardOrientation)
+function _sdf(s::SphericalSurface, ::BackwardOrientation)
     back = if radius(s) > 0
         ConcaveSphericalSurfaceSDF(radius(s), diameter(s))
     else
@@ -532,8 +532,8 @@ function _sdf(s::StandardSurface, ::BackwardOrientation)
     return back
 end
 
-sdf(s::StandardSurface, ::ForwardLeftMeniscusOrientation) = ConvexSphericalSurfaceSDF(radius(s), diameter(s))
-sdf(s::StandardSurface, ::BackwardLeftMeniscusOrientation) = SphereSDF(radius(s))
+sdf(s::SphericalSurface, ::ForwardLeftMeniscusOrientation) = ConvexSphericalSurfaceSDF(radius(s), diameter(s))
+sdf(s::SphericalSurface, ::BackwardLeftMeniscusOrientation) = SphereSDF(radius(s))
 
-sdf(s::StandardSurface, ::ForwardRightMeniscusOrientation) = SphereSDF(abs(radius(s)))
-sdf(s::StandardSurface, ::BackwardRightMeniscusOrientation) = ConvexSphericalSurfaceSDF(abs(radius(s)), diameter(s))
+sdf(s::SphericalSurface, ::ForwardRightMeniscusOrientation) = SphereSDF(abs(radius(s)))
+sdf(s::SphericalSurface, ::BackwardRightMeniscusOrientation) = ConvexSphericalSurfaceSDF(abs(radius(s)), diameter(s))
