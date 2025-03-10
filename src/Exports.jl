@@ -24,10 +24,7 @@ export Mirror, SquarePlanoMirror2D, RectangularPlanoMirror, SquarePlanoMirror, R
 export Lens, DoubletLens, ThinLens, SphericalLens, SphericalDoubletLens
 
 # surfaces
-export SphericalSurface, EvenAsphericalSurface
-
-# surfaces
-export StandardSurface, EvenAsphericSurface
+export SphericalSurface, EvenAsphericSurface
 
 # prisms
 export Prism, RightAnglePrism

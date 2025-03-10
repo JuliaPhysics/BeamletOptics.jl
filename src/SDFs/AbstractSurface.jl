@@ -51,10 +51,10 @@ It is assumed that mechanical_diameter(s) >= diameter(s) always holds.
 mechanical_diameter(s::AbstractRotationallySymmetricSurface) = diameter(s)
 
 """
-Returns the thickness of the surface at it edge, i.e. at `diameter(s)`
+Returns the sagitta of the surface at it edge, i.e. at `diameter(s)`
 
 """
-edge_thickness(s::AbstractRotationallySymmetricSurface, ::AbstractSDF) = s.edge_thickness
+edge_sag(s::AbstractRotationallySymmetricSurface, ::AbstractSDF) = s.edge_sag
 
 abstract type AbstractOrientationType end
 

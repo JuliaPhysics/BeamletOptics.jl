@@ -282,9 +282,7 @@ fig
 
 Aspherical lenses offer more advanced control over aberrations, enabling higher performance in specialized optical systems. The package offers surface support for rotationally symetrical [aspheric lenses](https://en.wikipedia.org/wiki/Aspheric_lens) that adhere to the DIN ISO 10110 convention with even terms.
 
-To construct a lens with any possible combination of convex/concave, spherical/aspherical surfaces you can use the [`Lens`](@ref) constructor with the [`EvenAsphericalSurface`](@ref) surface specification type. 
-
-A complex example of such a lens might look like the following example. This lens has the following peculiarities:
+To construct a lens with any possible combination of convex/concave, spherical/aspherical surfaces you can use the `Lens` constructor. A complex example of such a lens might look like the following example. This lens has the following peculiarities:
 - The front surface is an aspherical convex surface with a clear diameter smaller than the full mechanical diameter
 - The back surface is an aspherical concave surface which first curves outwards before change slope and curving invards, giving a more "convex" like character while still beeing a concave lens by definition. Also this surface extends towards the full outer diameter.
 
@@ -292,7 +290,7 @@ A complex example of such a lens might look like the following example. This len
 using CairoMakie, BeamletOptics
 
 L3 = Lens(
-        EvenAsphericalSurface(
+        EvenAsphericSurface(
             3.618e-3, # r
             3.04e-3, # d
             -44.874, # conic
@@ -300,7 +298,7 @@ L3 = Lens(
             0.0018592*(1e3)^9, 0.00036658*(1e3)^11, -0.00016039*(1e3)^13,
             -3.1846e-5*(1e3)^15] # coeffs
         ),
-        EvenAsphericalSurface(
+        EvenAsphericSurface(
             2.161e-3, # r
             3.7e-3, # d
             -10.719, # conic
@@ -329,5 +327,5 @@ fig
     Refer to the [Simple aspherical lens example](@ref) for a showcase on how to implement a plano-convex asphere.
 
 ```@docs; canonical=false
-Lens
+BeamletOptics.Lens
 ```

@@ -438,99 +438,15 @@ function PlanoConcaveAsphericalLensSDF(r::R, l::L, d::D, k::K, α_coeffs::Abstra
     return (front + back)
 end
 
-"""
-    EvenAsphericalSurface{T} <: AbstractRotationallySymmetricSurface{T}
-
-A type representing an aspherical optical surface defined by its radius of curvature,
-clear (optical) diameter, conic constant, aspheric coefficients and mechanical diameter.
-This surface is rotationally symmetric about its optical axis.
-
-# Fields
-- `spherical::SphericalSurface{T}`: The base spherical surface portion of the asphere.
-- `conic_constant::T`: The conic constant defining the deviation from a spherical shape.
-- `coefficients::AbstractVector{T}`: A vector of even aspheric coefficients for higher-order corrections.
-
-"""
-struct EvenAsphericalSurface{T} <: AbstractRotationallySymmetricSurface{T}
-    spherical::SphericalSurface{T}
-    conic_constant::T
-    coefficients::Vector{T}
-end
-
-"""
-    EvenAsphericalSurface(radius, diameter, conic_constant, coefficients::AbstractVector, mechanical_diameter = diameter)
-
-Construct a `EvenAsphericalSurface` given the radius of curvature, the optical diameter, conic
-constant, the aspheric coefficients and optionally the mechanical diameter.
-This constructor automatically sets the mechanical diameter equal to the optical diameter.
-
-# Arguments
-- `radius`: The radius of curvature of the base spherical surface.
-- `diameter`: The clear (optical) diameter of the surface.
-- `conic_constant`: The conic constant defining the deviation from a spherical shape.
-- `coefficients::AbstractVector`: A vector of even aspheric coefficients for higher-order corrections.
-- `mechanical_diameter`: The mechanical diameter of the surface; if not provided, it defaults to `diameter`.
-
-"""
-function EvenAsphericalSurface(radius::T1, diameter::T2, conic_constant::T3, coefficients::AbstractVector{T4}, mechanical_diameter::T5=diameter) where {T1, T2, T3, T4, T5}
-    T = promote_type(T1, T2, T3, T4, T5)
-    st = SphericalSurface{T}(radius, diameter, mechanical_diameter)
-
-    return EvenAsphericalSurface{T}(
-        st,
-        conic_constant,
-        coefficients
-    )
-end
-radius(s::EvenAsphericalSurface) = radius(s.spherical)
-diameter(s::EvenAsphericalSurface) = diameter(s.spherical)
-mechanical_diameter(s::EvenAsphericalSurface) = mechanical_diameter(s.spherical)
-
-function edge_sag(s::EvenAsphericalSurface{T}, ::AbstractAsphericalSurfaceSDF) where T
-    sag = aspheric_equation(
-        diameter(s) / 2,
-        1 / radius(s),
-        s.conic_constant,
-        s.coefficients
-    )
-
-    return sag
-end
-
-function sdf(s::EvenAsphericalSurface, ot::AbstractOrientationType)
-    isinf(radius(s)) && return nothing
-
-    return _sdf(s, ot)
-end
-
-function _sdf(s::EvenAsphericalSurface, ::ForwardOrientation)
-    front = if radius(s) > 0
-        ConvexAsphericalSurfaceSDF(s.coefficients, radius(s), s.conic_constant, diameter(s))
-    else
-        ConcaveAsphericalSurfaceSDF(s.coefficients, radius(s), s.conic_constant, diameter(s))
-    end
-
-    return front
-end
-
-function _sdf(s::EvenAsphericalSurface, ::BackwardOrientation)
-    back = if radius(s) > 0
-        ConcaveAsphericalSurfaceSDF(s.coefficients, radius(s), s.conic_constant, diameter(s))
-    else
-        ConvexAsphericalSurfaceSDF(s.coefficients, radius(s), s.conic_constant, diameter(s))
-    end
-
-    return back
-end
-
 struct EvenAsphericSurface{T} <: AbstractRotationallySymmetricSurface{T}
-    standard::StandardSurface{T}
+    standard::SphericalSurface{T}
     conic_constant::T
     coefficients::Vector{T}
 end
+
 function EvenAsphericSurface(radius::T1, diameter::T2, conic_constant::T3, coefficients::AbstractVector{T4}, mechanical_diameter::T5=diameter) where {T1, T2, T3, T4, T5}
     T = promote_type(T1, T2, T3, T4, T5)
-    st = StandardSurface{T}(radius, diameter, mechanical_diameter)
+    st = SphericalSurface{T}(radius, diameter, mechanical_diameter)
 
     return EvenAsphericSurface{T}(
         st,
@@ -542,13 +458,15 @@ radius(s::EvenAsphericSurface) = radius(s.standard)
 diameter(s::EvenAsphericSurface) = diameter(s.standard)
 mechanical_diameter(s::EvenAsphericSurface) = mechanical_diameter(s.standard)
 
-function edge_thickness(s::EvenAsphericSurface, ::AbstractAsphericalSurfaceSDF)
-    return abs(aspheric_equation(
+function edge_sag(s::EvenAsphericSurface{T}, ::AbstractAsphericalSurfaceSDF) where T
+    sag = aspheric_equation(
         diameter(s) / 2,
         1 / radius(s),
         s.conic_constant,
         s.coefficients
-    ))
+    )
+
+    return sag
 end
 
 function sdf(s::EvenAsphericSurface, ot::AbstractOrientationType)
