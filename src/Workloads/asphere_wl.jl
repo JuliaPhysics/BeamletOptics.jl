@@ -15,7 +15,7 @@
 
     @compile_workload begin
         lens = Lens(
-            EvenAsphericSurface(R, d, k, A),
+            EvenAsphericalSurface(R, d, k, A),
             SphericalSurface(Inf, d),
             ct,
             _n -> n
