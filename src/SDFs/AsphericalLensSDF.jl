@@ -439,7 +439,7 @@ function PlanoConcaveAsphericalLensSDF(r::R, l::L, d::D, k::K, α_coeffs::Abstra
 end
 
 struct EvenAsphericSurface{T} <: AbstractRotationallySymmetricSurface{T}
-    standard::SphericalSurface{T}
+    spherical::SphericalSurface{T}
     conic_constant::T
     coefficients::Vector{T}
 end
@@ -454,9 +454,9 @@ function EvenAsphericSurface(radius::T1, diameter::T2, conic_constant::T3, coeff
         coefficients
     )
 end
-radius(s::EvenAsphericSurface) = radius(s.standard)
-diameter(s::EvenAsphericSurface) = diameter(s.standard)
-mechanical_diameter(s::EvenAsphericSurface) = mechanical_diameter(s.standard)
+radius(s::EvenAsphericSurface) = radius(s.spherical)
+diameter(s::EvenAsphericSurface) = diameter(s.spherical)
+mechanical_diameter(s::EvenAsphericSurface) = mechanical_diameter(s.spherical)
 
 function edge_sag(s::EvenAsphericSurface{T}, ::AbstractAsphericalSurfaceSDF) where T
     sag = aspheric_equation(
