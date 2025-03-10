@@ -438,27 +438,27 @@ function PlanoConcaveAsphericalLensSDF(r::R, l::L, d::D, k::K, α_coeffs::Abstra
     return (front + back)
 end
 
-struct EvenAsphericSurface{T} <: AbstractRotationallySymmetricSurface{T}
+struct EvenAsphericalSurface{T} <: AbstractRotationallySymmetricSurface{T}
     spherical::SphericalSurface{T}
     conic_constant::T
     coefficients::Vector{T}
 end
 
-function EvenAsphericSurface(radius::T1, diameter::T2, conic_constant::T3, coefficients::AbstractVector{T4}, mechanical_diameter::T5=diameter) where {T1, T2, T3, T4, T5}
+function EvenAsphericalSurface(radius::T1, diameter::T2, conic_constant::T3, coefficients::AbstractVector{T4}, mechanical_diameter::T5=diameter) where {T1, T2, T3, T4, T5}
     T = promote_type(T1, T2, T3, T4, T5)
     st = SphericalSurface{T}(radius, diameter, mechanical_diameter)
 
-    return EvenAsphericSurface{T}(
+    return EvenAsphericalSurface{T}(
         st,
         conic_constant,
         coefficients
     )
 end
-radius(s::EvenAsphericSurface) = radius(s.spherical)
-diameter(s::EvenAsphericSurface) = diameter(s.spherical)
-mechanical_diameter(s::EvenAsphericSurface) = mechanical_diameter(s.spherical)
+radius(s::EvenAsphericalSurface) = radius(s.spherical)
+diameter(s::EvenAsphericalSurface) = diameter(s.spherical)
+mechanical_diameter(s::EvenAsphericalSurface) = mechanical_diameter(s.spherical)
 
-function edge_sag(s::EvenAsphericSurface{T}, ::AbstractAsphericalSurfaceSDF) where T
+function edge_sag(s::EvenAsphericalSurface{T}, ::AbstractAsphericalSurfaceSDF) where T
     sag = aspheric_equation(
         diameter(s) / 2,
         1 / radius(s),
@@ -469,13 +469,13 @@ function edge_sag(s::EvenAsphericSurface{T}, ::AbstractAsphericalSurfaceSDF) whe
     return sag
 end
 
-function sdf(s::EvenAsphericSurface, ot::AbstractOrientationType)
+function sdf(s::EvenAsphericalSurface, ot::AbstractOrientationType)
     isinf(radius(s)) && return nothing
 
     return _sdf(s, ot)
 end
 
-function _sdf(s::EvenAsphericSurface, ::ForwardOrientation)
+function _sdf(s::EvenAsphericalSurface, ::ForwardOrientation)
     front = if radius(s) > 0
         ConvexAsphericalSurfaceSDF(s.coefficients, radius(s), s.conic_constant, diameter(s))
     else
@@ -485,7 +485,7 @@ function _sdf(s::EvenAsphericSurface, ::ForwardOrientation)
     return front
 end
 
-function _sdf(s::EvenAsphericSurface, ::BackwardOrientation)
+function _sdf(s::EvenAsphericalSurface, ::BackwardOrientation)
     back = if radius(s) > 0
         ConcaveAsphericalSurfaceSDF(s.coefficients, radius(s), s.conic_constant, diameter(s))
     else

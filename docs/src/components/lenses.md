@@ -123,7 +123,7 @@ To construct a lens with any possible combination of convex/concave, spherical/a
 using CairoMakie, BeamletOptics
 
 L3 = Lens(
-        EvenAsphericSurface(
+        EvenAsphericalSurface(
             3.618e-3, # r
             3.04e-3, # d
             -44.874, # conic
@@ -131,7 +131,7 @@ L3 = Lens(
             0.0018592*(1e3)^9, 0.00036658*(1e3)^11, -0.00016039*(1e3)^13,
             -3.1846e-5*(1e3)^15] # coeffs
         ),
-        EvenAsphericSurface(
+        EvenAsphericalSurface(
             2.161e-3, # r
             3.7e-3, # d
             -10.719, # conic
