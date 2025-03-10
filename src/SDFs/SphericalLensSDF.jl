@@ -494,11 +494,37 @@ function _sdf(s::SphericalSurface, ::BackwardOrientation)
     return back
 end
 
+"""
+    SphericalSurface{T} <: AbstractRotationallySymmetricSurface{T}
+
+A type representing a spherical optical surface defined by its radius of curvature, clear (optical) diameter,
+and mechanical diameter. This surface is rotationally symmetric about its optical axis.
+
+# Fields
+- `radius::T`: The radius of curvature of the spherical surface. A positive value indicates that the
+  center of curvature lies to the right of the vertex (following ISO 10110).
+- `diameter::T`: The clear (optical) aperture of the surface.
+- `mechanical_diameter::T`: The overall mechanical diameter of the surface. In many cases, this is equal
+  to the optical diameter, but it can be set independently if the mechanical mount requires a larger dimension.
+
+"""
 struct SphericalSurface{T} <: AbstractRotationallySymmetricSurface{T}
     radius::T
     diameter::T
     mechanical_diameter::T
 end
+
+"""
+    SphericalSurface(radius::T, diameter::T) where T
+
+Construct a `SphericalSurface` given the radius of curvature and the optical diameter.
+This constructor automatically sets the mechanical diameter equal to the optical diameter.
+
+# Arguments
+- `radius::T`: The radius of curvature of the surface.
+- `diameter::T`: The clear (optical) diameter of the surface.
+
+"""
 SphericalSurface(radius::T, diameter::T) where T = SphericalSurface{T}(radius, diameter, diameter)
 
 mechanical_diameter(s::SphericalSurface) = s.mechanical_diameter
