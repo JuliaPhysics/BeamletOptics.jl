@@ -18,10 +18,10 @@ components
 export Mirror, SquarePlanoMirror2D, RectangularPlanoMirror, SquarePlanoMirror, RoundPlanoMirror, ConcaveSphericalMirror, RightAnglePrismMirror
 
 # lenses
-export Lens, DoubletLens, ThinLens, SphericalLens, SphericalDoubletLens, generalized_lens_shape_constructor
+export Lens, DoubletLens, ThinLens, SphericalLens, SphericalDoubletLens
 
 # surfaces
-export StandardSurface, EvenAsphericSurface
+export SphericalSurface, EvenAsphericSurface
 
 # prisms
 export Prism, RightAnglePrism

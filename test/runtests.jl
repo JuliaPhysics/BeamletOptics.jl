@@ -1152,8 +1152,8 @@ end
         l = 8.2e-3
         d = 25.4e-3
         lens = Lens(
-            StandardSurface(r1, d),
-            StandardSurface(Inf, d),
+            SphericalSurface(r1, d),
+            SphericalSurface(Inf, d),
             l,
             n -> 1.458
         )
@@ -1171,8 +1171,8 @@ end
         l = 9.0e-3
         d = 25.4e-3
         lens = Lens(
-            StandardSurface(r1, d),
-            StandardSurface(r2, d),
+            SphericalSurface(r1, d),
+            SphericalSurface(r2, d),
             l,
             n -> 1.517
         )
@@ -1191,8 +1191,8 @@ end
         l = 3.5e-3
         d = 25.4e-3
         lens = Lens(
-            StandardSurface(r1, d),
-            StandardSurface(r2, d),
+            SphericalSurface(r1, d),
+            SphericalSurface(r2, d),
             l,
             n -> 1.517
         )
@@ -1209,8 +1209,8 @@ end
         l = 3.0e-3
         d = 25.4e-3
         lens = Lens(
-            StandardSurface(r1, d),
-            StandardSurface(r2, d),
+            SphericalSurface(r1, d),
+            SphericalSurface(r2, d),
             l,
             n -> 1.517
         )
@@ -1227,8 +1227,8 @@ end
         l = 6.5e-3
         d = 25.4e-3
         lens = Lens(
-            StandardSurface(r1, d),
-            StandardSurface(r2, d),
+            SphericalSurface(r1, d),
+            SphericalSurface(r2, d),
             l,
             n -> 1.517
         )
@@ -1246,8 +1246,8 @@ end
         l = 3.6e-3
         d = 25.4e-3
         lens = Lens(
-            StandardSurface(r1, d),
-            StandardSurface(r2, d),
+            SphericalSurface(r1, d),
+            SphericalSurface(r2, d),
             l,
             n -> 1.517
         )
@@ -1265,8 +1265,8 @@ end
         l = 3.0e-3
         d = 25.4e-3
         lens = Lens(
-            StandardSurface(r1, d),
-            StandardSurface(r2, d),
+            SphericalSurface(r1, d),
+            SphericalSurface(r2, d),
             l,
             n -> 1.517
         )
@@ -1284,8 +1284,8 @@ end
         l = 1.5e-3
         d = 55e-3
         lens = Lens(
-            StandardSurface(r1, d),
-            StandardSurface(r2, d),
+            SphericalSurface(r1, d),
+            SphericalSurface(r2, d),
             l,
             n -> 1.517
         )
@@ -1320,7 +1320,9 @@ end
         n = 1.5036
 
         lens = Lens(
-            BeamletOptics.generalized_lens_shape_constructor(R, Inf, ct, d; front_kind=:aspherical, front_k=k, front_coeffs=A),
+            EvenAsphericSurface(R, d, k, A),
+            SphericalSurface(Inf, d),
+            ct,
             x -> n
         )
 
@@ -1356,28 +1358,64 @@ end
     @testset "Complex aspherical imaging system" begin
         # setup system
         L1 = Lens(
-            BeamletOptics.generalized_lens_shape_constructor(1.054e-3, 2.027e-3, 0.72e-3, 1.333024e-3, 1.216472e-3;
-                front_kind = :aspherical, front_k=-0.14294,front_coeffs=[0,0.038162*(1e3)^3, 0.06317*(1e3)^5, -0.020792*(1e3)^7, 0.18432*(1e3)^9, -0.04827*(1e3)^11, 0.094529*(1e3)^13],
-                back_kind = :aspherical, back_k=8.0226, back_coeffs=[0,0.0074974*(1e3)^3, 0.064686*(1e3)^5, 0.19354*(1e3)^7, -0.50703*(1e3)^9, -0.34529*(1e3)^11, 5.9938*(1e3)^13]
+            EvenAsphericSurface(
+                1.054e-3, # r
+                1.333024e-3, # d
+                -0.14294, # conic
+                 [0,0.038162*(1e3)^3, 0.06317*(1e3)^5, -0.020792*(1e3)^7, 0.18432*(1e3)^9,
+                 -0.04827*(1e3)^11, 0.094529*(1e3)^13] # coeffs
             ),
+            EvenAsphericSurface(
+                2.027e-3, # r
+                1.216472e-3, # d
+                8.0226, # conic
+                [0,0.0074974*(1e3)^3, 0.064686*(1e3)^5, 0.19354*(1e3)^7, -0.50703*(1e3)^9,
+                -0.34529*(1e3)^11, 5.9938*(1e3)^13] # coeffs
+            ),
+            0.72e-3, # center thickness
             n -> 1.580200
         )
 
         L2 = Lens(
-            BeamletOptics.generalized_lens_shape_constructor(-3.116e-3, -4.835e-3, 0.55e-3, 1.4e-3, 1.9e-3;
-                front_kind = :aspherical, front_k=-49.984,front_coeffs=[0,-0.31608*(1e3)^3, 0.34755*(1e3)^5, -0.17102*(1e3)^7, -0.41506*(1e3)^9, -1.342*(1e3)^11, 5.0594*(1e3)^13, -2.7483*(1e3)^15],
-                back_kind = :aspherical, back_k=1.6674, back_coeffs=[0,-0.079727*(1e3)^3, 0.13899*(1e3)^5, -0.044057*(1e3)^7, -0.019369*(1e3)^9, 0.016993*(1e3)^11, 0.093716*(1e3)^13, -0.080329*(1e3)^15]
+            EvenAsphericSurface(
+                -3.116e-3, # r
+                1.4e-3, # d
+                -49.984, # conic
+                [0,-0.31608*(1e3)^3, 0.34755*(1e3)^5, -0.17102*(1e3)^7, -0.41506*(1e3)^9,
+                -1.342*(1e3)^11, 5.0594*(1e3)^13, -2.7483*(1e3)^15] # coeffs
             ),
+            EvenAsphericSurface(
+                -4.835e-3, # r
+                1.9e-3, # d
+                1.6674, # conic
+                [0,-0.079727*(1e3)^3, 0.13899*(1e3)^5, -0.044057*(1e3)^7,
+                -0.019369*(1e3)^9, 0.016993*(1e3)^11, 0.093716*(1e3)^13,
+                -0.080329*(1e3)^15] # coeffs
+            ),
+            0.55e-3, # center_thickness
             n -> 1.804700
         )
 
         translate3d!(L2, [0, BeamletOptics.thickness(L1) + 0.39e-3,0])
 
         L3 = Lens(
-            BeamletOptics.generalized_lens_shape_constructor(3.618e-3, 2.161e-3, 0.7e-3, 3.04e-3, 3.7e-3;
-                front_kind = :aspherical, front_k=-44.874,front_coeffs=[0,-0.14756*(1e3)^3, 0.035194*(1e3)^5, -0.0032262*(1e3)^7, 0.0018592*(1e3)^9, 0.00036658*(1e3)^11, -0.00016039*(1e3)^13, -3.1846e-5*(1e3)^15],
-                back_kind = :aspherical, back_k=-10.719, back_coeffs=[0,-0.096568*(1e3)^3, 0.026771*(1e3)^5, -0.011261*(1e3)^7, 0.0019879*(1e3)^9, 0.00015579*(1e3)^11, -0.00012433*(1e3)^13, 1.5264e-5*(1e3)^15]
+            EvenAsphericSurface(
+                3.618e-3, # r
+                3.04e-3, # d
+                -44.874, # conic
+                [0,-0.14756*(1e3)^3, 0.035194*(1e3)^5, -0.0032262*(1e3)^7,
+                0.0018592*(1e3)^9, 0.00036658*(1e3)^11, -0.00016039*(1e3)^13,
+                -3.1846e-5*(1e3)^15] # coeffs
             ),
+            EvenAsphericSurface(
+                2.161e-3, # r
+                3.7e-3, # d
+                -10.719, # conic
+                [0,-0.096568*(1e3)^3, 0.026771*(1e3)^5, -0.011261*(1e3)^7,
+                0.0019879*(1e3)^9, 0.00015579*(1e3)^11, -0.00012433*(1e3)^13,
+                1.5264e-5*(1e3)^15] # coeffs
+            ),
+            0.7e-3, # center_thickness
             n -> 1.580200
         )
 
@@ -1385,7 +1423,9 @@ end
         translate3d!(L3, [0, BeamletOptics.thickness(L2) + 0.63e-3,0])
 
         Filt = Lens(
-            BeamletOptics.generalized_lens_shape_constructor(Inf, Inf, 0.15e-3, 4.2e-3),
+            SphericalSurface(Inf, 4.2e-3),
+            SphericalSurface(Inf, 4.2e-3),
+            0.15e-3,
             n -> 1.516800
         )
 
@@ -1393,7 +1433,9 @@ end
         translate3d!(Filt, [0, BeamletOptics.thickness(L3) + 0.19e-3,0])
 
         Cover = Lens(
-            BeamletOptics.generalized_lens_shape_constructor(Inf, Inf, 0.5e-3, 4.9e-3),
+            SphericalSurface(Inf, 4.9e-3),
+            SphericalSurface(Inf, 4.9e-3),
+            0.5e-3,
             n -> 1.469200
         )
         translate_to3d!(Cover, BeamletOptics.position(Filt))

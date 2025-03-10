@@ -199,14 +199,14 @@ function Lens(front_surface::AbstractSurface, back_surface::AbstractSurface,
         ring_thickness = thickness(mid)
         ring_center = position(mid)[2] + ring_thickness / 2
         if front !== nothing
-            net_thickness = (thickness(front) - edge_thickness(front_surface, front))
-            ring_thickness -= net_thickness
-            ring_center += net_thickness / 2
+            s = edge_sag(front_surface, front)
+            ring_thickness -= s
+            ring_center += s / 2
         end
         if back !== nothing
-            net_thickness = (thickness(back) - edge_thickness(back_surface, back))
-            ring_thickness -= net_thickness
-            ring_center += net_thickness / 2
+            s = edge_sag(back_surface, back)
+            ring_thickness += s
+            ring_center += s / 2
         end
         ring = RingSDF(d_mid / 2, (md_mid - d_mid) / 2, ring_thickness)
         translate3d!(ring, [0, ring_center, 0])
