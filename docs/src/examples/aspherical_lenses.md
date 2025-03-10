@@ -19,7 +19,7 @@ d = 50e-3
 n = 1.5036
 
 lens = Lens(
-        EvenAsphericSurface(R, d, k, A),
+        EvenAsphericalSurface(R, d, k, A),
         SphericalSurface(Inf, d),
         ct,
         x -> n
@@ -65,14 +65,14 @@ using CairoMakie, BeamletOptics
 
 # construct the first lens
 L1 = Lens(
-        EvenAsphericSurface(
+        EvenAsphericalSurface(
             1.054e-3, # r
             1.333024e-3, # d
             -0.14294, # conic
              [0,0.038162*(1e3)^3, 0.06317*(1e3)^5, -0.020792*(1e3)^7, 0.18432*(1e3)^9,
              -0.04827*(1e3)^11, 0.094529*(1e3)^13] # coeffs
         ),
-        EvenAsphericSurface(
+        EvenAsphericalSurface(
             2.027e-3, # r
             1.216472e-3, # d
             8.0226, # conic
@@ -85,14 +85,14 @@ L1 = Lens(
 
 # construct the second lens
 L2 = Lens(
-        EvenAsphericSurface(
+        EvenAsphericalSurface(
             -3.116e-3, # r
             1.4e-3, # d
             -49.984, # conic
             [0,-0.31608*(1e3)^3, 0.34755*(1e3)^5, -0.17102*(1e3)^7, -0.41506*(1e3)^9,
             -1.342*(1e3)^11, 5.0594*(1e3)^13, -2.7483*(1e3)^15] # coeffs
         ),
-        EvenAsphericSurface(
+        EvenAsphericalSurface(
             -4.835e-3, # r
             1.9e-3, # d
             1.6674, # conic
@@ -109,7 +109,7 @@ translate3d!(L2, [0, BeamletOptics.thickness(L1) + 0.39e-3,0])
 
 # construct the third lens
 L3 = Lens(
-        EvenAsphericSurface(
+        EvenAsphericalSurface(
             3.618e-3, # r
             3.04e-3, # d
             -44.874, # conic
@@ -117,7 +117,7 @@ L3 = Lens(
             0.0018592*(1e3)^9, 0.00036658*(1e3)^11, -0.00016039*(1e3)^13,
             -3.1846e-5*(1e3)^15] # coeffs
         ),
-        EvenAsphericSurface(
+        EvenAsphericalSurface(
             2.161e-3, # r
             3.7e-3, # d
             -10.719, # conic
