@@ -111,6 +111,51 @@ nothing
 
 ![Doublet lens showcase](doublet_showcase.png)
 
+## Constructing generic/mixed lens shapes
+
+For lenses in the field there is great variety and mixture of different shapes, 
+e.g. spherical/aspherical lenses in combinations. So far we have only covered the
+construction of "pure" lenses which consist of only one lens shape type.
+
+Usually a lens is block of a transparent, dielectric material with two optically active
+surfaces (fancy special cases using the sides of the lens as well exist, e.g. for HUD displays). It is common to describe such a lens by specifying the properties of the two surfaces and the material in between.
+
+BeamletOptics.jl however, works with closed volume shapes for all of its optical elements
+and any erroneous (i.e. non-watertight) SDF might result in unphysical behaviour.
+
+To make it easy to specify lenses using the conventional way, the `AbstractSurface` API is introduced. This is API is a shim for using surfaces specifications and translate them to SDFs as good as possbile. This does not mean that BeamletOptics.jl works with these surfaces directly for ray tracing. 
+
+Currently the following surface types exist:
+
+```@repl
+using BeamletOptics # hide
+BeamletOptics.list_subtypes(BeamletOptics.AbstractSurface);
+```
+
+A `Lens`(@ref) can be then constructed easily with the following function call:
+
+
+```@docs; canonical=false
+Lens(::AbstractSurface, ::AbstractSurface, ::Real, ::RefractiveIndex)
+```
+
+### Spherical Surface
+
+The bi-convex lens LB1811 (see above) consists of two spherical surfaces and can be also constructed like this:
+
+```@example
+NBK7 = BeamletOptics.DiscreteRefractiveIndex([532e-9, 1064e-9], [1.5195, 1.5066])
+
+# lens diameter 
+d = BeamletOptics.inch
+
+# lens types
+r1 = 34.9e-3
+r2 = -34.9e-3
+l = 6.8e-3
+LB1811 = Lens(r1, r2, l, d, NBK7)
+```
+
 ## Aspherical lenses
 
 Aspherical lenses offer more advanced control over aberrations, enabling higher performance in specialized optical systems. The package offers surface support for rotationally symetrical [aspheric lenses](https://en.wikipedia.org/wiki/Aspheric_lens) that adhere to the DIN ISO 10110 convention with even terms.
