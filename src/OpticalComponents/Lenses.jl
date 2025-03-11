@@ -170,10 +170,10 @@ If your specification results in a meniscus lens, only spherical meniscus lenses
 supported at the moment.
 """
 function Lens(
-    front_surface::AbstractSurface, 
-    back_surface::AbstractSurface,
-    center_thickness::Real, 
-    n::RefractiveIndex)
+        front_surface::AbstractSurface,
+        back_surface::AbstractSurface,
+        center_thickness::Real,
+        n::RefractiveIndex)
     # Define effective (optical and mechanical) diameters:
     d_mid = min(diameter(front_surface), diameter(back_surface))
     md_mid = max(mechanical_diameter(front_surface), mechanical_diameter(back_surface))
@@ -192,7 +192,16 @@ function Lens(
     # Use MeniscusLensSDF if cylinder length is non-positive
     if l0 ≤ 0
         if sign(radius(front_surface)) == sign(radius(back_surface))
-            shape = meniscus_lens_sdf(front_surface, front, back_surface, back, center_thickness)
+            shape = meniscus_lens_sdf(
+                front_surface, front, back_surface, back, center_thickness)
+            # add an outer ring if necessary
+            if md_mid > d_mid
+                _thickness = thickness(shape.cylinder)
+                pos = position(shape.cylinder)
+                ring = RingSDF(d / 2, (md_mid - d_mid) / 2, _thickness)
+                translate3d!(ring, [0, pos[2] + _thickness / 2, 0])
+                shape += ring
+            end
         else
             throw(ArgumentError("Lens parameters lead to cylinder section length of ≤ 0, use ThinLens instead."))
         end
@@ -208,27 +217,27 @@ function Lens(
             mid += back
         end
         shape = mid
-    end
 
-    # Add mechanical ring if md_mid > d_mid
-    if md_mid > d_mid
-        ring_thickness = thickness(mid)
-        ring_center = position(mid)[2] + ring_thickness / 2
-        if front !== nothing
-            s = edge_sag(front_surface, front)
-            ring_thickness -= s
-            ring_center += s / 2
+        # Add mechanical ring if md_mid > d_mid
+        if md_mid > d_mid
+            ring_thickness = thickness(mid)
+            ring_center = position(mid)[2] + ring_thickness / 2
+            if front !== nothing
+                s = edge_sag(front_surface, front)
+                ring_thickness -= s
+                ring_center += s / 2
+            end
+            if back !== nothing
+                s = edge_sag(back_surface, back)
+                ring_thickness += s
+                ring_center += s / 2
+            end
+            ring = RingSDF(d_mid / 2, (md_mid - d_mid) / 2, ring_thickness)
+            translate3d!(ring, [0, ring_center, 0])
+            shape += ring
+        elseif md_mid < d_mid
+            @warn "Mechanical diameter is less than clear aperture; parameter md has been ignored."
         end
-        if back !== nothing
-            s = edge_sag(back_surface, back)
-            ring_thickness += s
-            ring_center += s / 2
-        end
-        ring = RingSDF(d_mid / 2, (md_mid - d_mid) / 2, ring_thickness)
-        translate3d!(ring, [0, ring_center, 0])
-        shape += ring
-    elseif md_mid < d_mid
-        @warn "Mechanical diameter is less than clear aperture; parameter md has been ignored."
     end
 
     return Lens(shape, n)
