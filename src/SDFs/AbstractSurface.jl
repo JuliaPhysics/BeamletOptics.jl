@@ -3,18 +3,6 @@
 
 A generic type for a surface which is basically an information storage type in order to build
 shapes (volumes) from a combination of surfaces.
-
-# Implementation reqs.
-
-ToDo
-
-## Getters/setters
-
-ToDo
-
-## Functions:
-
-ToDo
 """
 abstract type AbstractSurface{T} end
 
@@ -22,6 +10,20 @@ abstract type AbstractSurface{T} end
     AbstractRotationallySymmetricSurface{T} <: AbstractSurface{T}
 
 A surface type which is rotationally symmetric around one axis.
+
+# Implementation reqs.
+
+Subtypes of `AbstractShape` should implement the following:
+
+## Getters/setters
+
+- [`radius`](@ref) : Returns the radius of curvature of the `AbstractRotationallySymmetricSurface`
+- [`diameter`](@ref) : Returns the clear optical diameter of the `AbstractRotationallySymmetricSurface`
+- [`mechanical_diameter`](@ref) : Returns the mechanical diameter of the `AbstractRotationallySymmetricSurface`
+- [`edge_sag`](@ref) : Returns the edge sagitta of the `AbstractRotationallySymmetricSurface`
+
+## Functions:
+- [`sdf`](@ref) : Converts the surface spefification of `AbstractRotationallySymmetricSurface` into an `AbstractSDF`
 """
 abstract type AbstractRotationallySymmetricSurface{T} <: AbstractSurface{T} end
 
