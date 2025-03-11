@@ -157,7 +157,7 @@ function reset_rotation3d!(mesh::AbstractMesh{T}) where {T}
     axis = 1/(2*sin(θ)) * [R[3,2]-R[2,3], R[1,3]-R[3,1], R[2,1]-R[1,2]]
     # Reset mesh rotation
     rotate3d!(mesh, axis, -θ)
-    # Reset orientation field 
+    # Reset orientation field
     orientation!(mesh, Matrix{T}(I, 3, 3))
     return nothing
 end
@@ -218,13 +218,13 @@ function MoellerTrumboreAlgorithm(face, ray::AbstractRay{T}; kϵ = 1e-9, lϵ = 1
     Tv = position(ray) - V1
     invDet = 1 / Det
     u = dot(Tv, Pv) * invDet
-    if (u < 0 - eps(T)) || (u > 1 + eps(T))
+    if (u < 0 - kϵ) || (u > 1 + kϵ)
         return T(Inf)
     end
     # Compute normalized v and reject if less than 0 or greater than 1
     Qv = cross(Tv, E1)
     v = dot(direction(ray), Qv) * invDet
-    if (v < 0 - eps(T)) || (u + v > 1 + eps(T))
+    if (v < 0 - kϵ) || (u + v > 1 + kϵ)
         return T(Inf)
     end
     # Compute t (type def. for t to avoid Any)
@@ -344,7 +344,7 @@ function CircularFlatMesh(radius::T, n::Int=30) where T<:Real
         Matrix{T}(I, 3, 3),
         zeros(T, 3),
         one(T)
-    )    
+    )
 end
 
 """

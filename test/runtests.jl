@@ -1282,7 +1282,7 @@ end
             ),
             n -> 1.580200
         )
-        
+
         L2 = Lens(
             BeamletOptics.generalized_lens_shape_constructor(-3.116e-3, -4.835e-3, 0.55e-3, 1.4e-3, 1.9e-3;
                 front_kind = :aspherical, front_k=-49.984,front_coeffs=[0,-0.31608*(1e3)^3, 0.34755*(1e3)^5, -0.17102*(1e3)^7, -0.41506*(1e3)^9, -1.342*(1e3)^11, 5.0594*(1e3)^13, -2.7483*(1e3)^15],
@@ -1290,7 +1290,7 @@ end
             ),
             n -> 1.804700
         )
-        
+
         translate3d!(L2, [0, BeamletOptics.thickness(L1) + 0.39e-3,0])
 
         L3 = Lens(
@@ -1334,7 +1334,7 @@ end
             Beam([0, -0.5e-3, 0], [0, 1, 0], 0.5876e-6),
             Beam([0, -0.5e-3, 1.3e-3/2], [0, 1, 0], 0.5876e-6)
         ]
-        for beam in beams                
+        for beam in beams
             solve_system!(system, beam, r_max=50)
             f_pos = last(beam.rays).pos + 0.12e-3*last(beam.rays).dir
 
@@ -2090,6 +2090,25 @@ end
             @test BeamletOptics.direction(last(t)) ≈ BeamletOptics.direction(first(p))
             @test BeamletOptics.direction(last(r)) ≈ [-1,0,0]
         end
+    end
+end
+
+@testset "Bug fixes" begin
+
+    @testset "Issue#14" begin
+        pd_res = 1000
+        pd = BeamletOptics.Photodetector(10e-3, pd_res)
+        BeamletOptics.zrotate3d!(pd, deg2rad(90))
+        BeamletOptics.translate3d!(pd, [0.46, 0, 0])
+        # Setup beam
+        y_0 = 0.2
+        beam = BeamletOptics.GaussianBeamlet([0, y_0, 0], [0.46, -y_0, 0], 532e-9, 2.5e-3, P0 = 10e-3)
+        # Solve system
+        system = BeamletOptics.System([pd])
+        BeamletOptics.reset_detector!(pd)
+        BeamletOptics.solve_system!(system, beam)
+
+        @test BeamletOptics.optical_power(pd) ≈ 10e-3 atol=1e-5
     end
 end
 
