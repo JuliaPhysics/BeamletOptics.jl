@@ -156,8 +156,11 @@ end
 
 thickness(l::Lens) = thickness(shape(l))
 
-function Lens(front_surface::AbstractSurface, back_surface::AbstractSurface,
-        center_thickness::Real, n::RefractiveIndex)
+function Lens(
+    front_surface::AbstractSurface, 
+    back_surface::AbstractSurface,
+    center_thickness::Real, 
+    n::RefractiveIndex)
     # Define effective (optical and mechanical) diameters:
     d_mid = min(diameter(front_surface), diameter(back_surface))
     md_mid = max(mechanical_diameter(front_surface), mechanical_diameter(back_surface))
