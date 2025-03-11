@@ -227,7 +227,7 @@ surfaces (fancy special cases using the sides of the lens as well exist, e.g. fo
 BeamletOptics.jl however, works with closed volume shapes for all of its optical elements
 and any erroneous (i.e. non-watertight) SDF might result in unphysical behaviour.
 
-To make it easy to specify lenses using the conventional way, the [`BeamletOptics.AbstractSurface`](@ref) API is introduced. This is API is a shim for using surfaces specifications and translate them to SDFs as good as possbile. This does not mean that BeamletOptics.jl works with these surfaces directly for ray tracing. 
+To make it easy to specify lenses using the conventional way, the `AbstractSurface` API is introduced. This is API is a shim for using surfaces specifications and translate them to SDFs as good as possbile. This does not mean that BeamletOptics.jl works with these surfaces directly for ray tracing. 
 
 Currently the following surface types exist:
 
@@ -236,11 +236,11 @@ using BeamletOptics # hide
 BeamletOptics.list_subtypes(BeamletOptics.AbstractSurface);
 ```
 
-A [`Lens`](@ref) can be then constructed easily with the following function call:
+A `Lens`(@ref) can be then constructed easily with the following function call:
 
 
 ```@docs; canonical=false
-Lens(::BeamletOptics.AbstractSurface, ::BeamletOptics.AbstractSurface, ::Real, ::BeamletOptics.RefractiveIndex)
+Lens(::AbstractSurface, ::AbstractSurface, ::Real, ::RefractiveIndex)
 ```
 
 ### Spherical Surface
@@ -248,7 +248,6 @@ Lens(::BeamletOptics.AbstractSurface, ::BeamletOptics.AbstractSurface, ::Real, :
 The bi-convex lens LB1811 (see above) consists of two spherical surfaces and can be also constructed like this:
 
 ```@example
-using CairoMakie, BeamletOptics
 NBK7 = BeamletOptics.DiscreteRefractiveIndex([532e-9, 1064e-9], [1.5195, 1.5066])
 
 # lens diameter 
@@ -258,24 +257,7 @@ d = BeamletOptics.inch
 r1 = 34.9e-3
 r2 = -34.9e-3
 l = 6.8e-3
-LB1811 = Lens(
-    SphericalSurface(r1, d),
-    SphericalSurface(r2, d),
-    l, 
-    NBK7
-)
-
-system = System([LB1811])
-
-fig = Figure(size=(600,240))
-ax = Axis3(fig[1,1], aspect=:data, azimuth=0., elevation=1e-3)
-
-hidedecorations!(ax)
-hidespines!(ax)
-
-render_system!(ax, system)
-
-fig
+LB1811 = Lens(r1, r2, l, d, NBK7)
 ```
 
 ## Aspherical lenses
