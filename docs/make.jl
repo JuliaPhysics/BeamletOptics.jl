@@ -34,6 +34,16 @@ makedocs(;
     ),
     pages=[
         "Home" => "index.md",
+        "Tutorials" => Any[
+            "Beam expander" => "tutorials/expander.md",
+            "Michelson interferometer" => "tutorials/michelson.md"
+        ],
+        "Examples" => Any[
+            "Spherical lenses" => "examples/spherical_lenses.md",
+            "Aspherical lenses" => "examples/aspherical_lenses.md",
+            "Double Gauss lens" => "examples/double_gauss.md",
+            "Lens groups" => "examples/lens_groups.md",
+        ],
         "Basics" => Any[
             "Introduction" => "basics/intro.md",
             "Rays" => "basics/rays.md",
@@ -48,18 +58,10 @@ makedocs(;
             "Beamsplitters" => "components/beamsplitters.md",
             "Detectors" => "components/detectors.md",
         ],
-        "Tutorials" => Any[
-            "Beam expander" => "tutorials/expander.md",
-            "Michelson interferometer" => "tutorials/michelson.md"
+        "Dev. Doc." => Any[
+            "Dev. Guide" => "guide.md",
+            "API design" => "design.md",
         ],
-        "API design" => "design.md",
-        "Examples" => Any[
-            "Spherical lenses" => "examples/spherical_lenses.md",
-            "Aspherical lenses" => "examples/aspherical_lenses.md",
-            "Double Gauss lens" => "examples/double_gauss.md",
-            "Lens groups" => "examples/lens_groups.md",
-        ],
-        "Dev. guide" => "guide.md",
         "Reference" => "reference.md"
     ],
     plugins=[bib],
