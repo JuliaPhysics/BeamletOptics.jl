@@ -29,14 +29,14 @@ function CutCylinderSDF(radius::R, diameter::D, height::H) where {R, D, H}
     )
     # rotate/shift in position
     xrotate3d!(s, π / 2)
-    translate3d!(s, [0, (radius - √(radius^2 - (diameter/2)^2)), 0])
+    translate3d!(s, [0, (radius - √(radius^2 - (diameter / 2)^2)), 0])
 
     return s
 end
 
-thickness(s::CutCylinderSDF) = abs(s.radius - √(s.radius^2 - (s.diameter/2)^2))
+thickness(s::CutCylinderSDF) = abs(s.radius - √(s.radius^2 - (s.diameter / 2)^2))
 
-function sdf(s::CutCylinderSDF{T}, point) where T
+function sdf(s::CutCylinderSDF{T}, point) where {T}
     p = _world_to_sdf(s, point)
 
     return op_extrude_x(
@@ -44,22 +44,21 @@ function sdf(s::CutCylinderSDF{T}, point) where T
         _p -> sdf_cut_disk(
             _p,
             s.radius,
-            √(s.radius^2 - (s.diameter/2)^2)
+            √(s.radius^2 - (s.diameter / 2)^2)
         ),
         s.height / 2
     )
 end
 
 function sdf_cut_disk(point::Point2, r, h)
-    w = √(r^2-h^2)
+    w = √(r^2 - h^2)
     p = Point2(abs(point[1]), point[2])
 
-    s = max((h-r)*p[1]^2+w^2*(h+r-2*p[2]), h*p[1] -w*p[2])
+    s = max((h - r) * p[1]^2 + w^2 * (h + r - 2 * p[2]), h * p[1] - w * p[2])
 
-    return (s < 0) ?        norm(p) - r  :
-            (p[1] < w) ?    h - p[2] :
-                            norm(p-Point2(w, h))
-
+    return (s < 0) ? norm(p) - r :
+           (p[1] < w) ? h - p[2] :
+           norm(p - Point2(w, h))
 end
 
 abstract type AbstractCylindricSurface{T} <: AbstractSurface{T} end
@@ -101,7 +100,8 @@ This constructor automatically sets the mechanical diameter equal to the optical
 - `diameter::T`: The clear (optical) diameter of the surface.
 - `height::T`: The height/length of the uncurved surface direction.
 """
-CylindricSurface(radius::T, diameter::T, height::T) where T = CylindricSurface{T}(radius, diameter, height, diameter)
+CylindricSurface(radius::T, diameter::T, height::T) where {T} = CylindricSurface{T}(
+    radius, diameter, height, diameter)
 
 edge_sag(::CylindricSurface, sd::CutCylinderSDF) = thickness(sd)
 
