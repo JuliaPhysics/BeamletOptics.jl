@@ -10,6 +10,9 @@ export System, StaticSystem, solve_system!
 # object group
 export ObjectGroup
 
+# additional
+export DiscreteRefractiveIndex
+
 #=
 components
 =#

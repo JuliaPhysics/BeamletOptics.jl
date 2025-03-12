@@ -72,8 +72,8 @@ using CairoMakie, BeamletOptics
 
 λs = [488e-9, 707e-9, 1064e-9]
 
-NLAK22 = BeamletOptics.DiscreteRefractiveIndex(λs, [1.6591, 1.6456, 1.6374])
-NSF10 = BeamletOptics.DiscreteRefractiveIndex(λs, [1.7460, 1.7168, 1.7021])
+NLAK22 = DiscreteRefractiveIndex(λs, [1.6591, 1.6456, 1.6374])
+NSF10 = DiscreteRefractiveIndex(λs, [1.7460, 1.7168, 1.7021])
 
 AC254_150_AB = SphericalDoubletLens(87.9e-3, 105.6e-3, 1000, 6e-3, 3e-3, BeamletOptics.inch, NLAK22, NSF10)
 
@@ -145,7 +145,7 @@ The bi-convex lens LB1811 (see above) consists of two spherical surfaces and can
 
 ```@example
 using CairoMakie, BeamletOptics
-NBK7 = BeamletOptics.DiscreteRefractiveIndex([532e-9, 1064e-9], [1.5195, 1.5066])
+NBK7 = DiscreteRefractiveIndex([532e-9, 1064e-9], [1.5195, 1.5066])
 
 # lens diameter 
 d = BeamletOptics.inch
@@ -188,44 +188,25 @@ A complex example of such a lens might look like the following example. This len
 using CairoMakie, BeamletOptics
 
 L3 = Lens(
-        EvenAsphericalSurface(
-            3.618e-3, # r
-            3.04e-3, # d
-            -44.874, # conic
-            [0,-0.14756*(1e3)^3, 0.035194*(1e3)^5, -0.0032262*(1e3)^7,
-            0.0018592*(1e3)^9, 0.00036658*(1e3)^11, -0.00016039*(1e3)^13,
-            -3.1846e-5*(1e3)^15] # coeffs
-        ),
-        EvenAsphericalSurface(
-            2.161e-3, # r
-            3.7e-3, # d
-            -10.719, # conic
-            [0,-0.096568*(1e3)^3, 0.026771*(1e3)^5, -0.011261*(1e3)^7,
-            0.0019879*(1e3)^9, 0.00015579*(1e3)^11, -0.00012433*(1e3)^13,
-            1.5264e-5*(1e3)^15] # coeffs
-        ),
-        0.7e-3, # center_thickness
-        n -> 1.580200
-    )
-        EvenAsphericalSurface(
-            3.618e-3, # r
-            3.04e-3, # d
-            -44.874, # conic
-            [0,-0.14756*(1e3)^3, 0.035194*(1e3)^5, -0.0032262*(1e3)^7,
-            0.0018592*(1e3)^9, 0.00036658*(1e3)^11, -0.00016039*(1e3)^13,
-            -3.1846e-5*(1e3)^15] # coeffs
-        ),
-        EvenAsphericalSurface(
-            2.161e-3, # r
-            3.7e-3, # d
-            -10.719, # conic
-            [0,-0.096568*(1e3)^3, 0.026771*(1e3)^5, -0.011261*(1e3)^7,
-            0.0019879*(1e3)^9, 0.00015579*(1e3)^11, -0.00012433*(1e3)^13,
-            1.5264e-5*(1e3)^15] # coeffs
-        ),
-        0.7e-3, # center_thickness
-        n -> 1.580200
-    )
+    EvenAsphericalSurface(
+        3.618e-3,               # r
+        3.04e-3,                # d
+        -44.874,                # conic
+        [0,-0.14756*(1e3)^3, 0.035194*(1e3)^5, -0.0032262*(1e3)^7,
+        0.0018592*(1e3)^9, 0.00036658*(1e3)^11, -0.00016039*(1e3)^13,
+        -3.1846e-5*(1e3)^15]    # coeffs
+    ),
+    EvenAsphericalSurface(
+        2.161e-3,               # r
+        3.7e-3,                 # d
+        -10.719,                # conic
+        [0,-0.096568*(1e3)^3, 0.026771*(1e3)^5, -0.011261*(1e3)^7,
+        0.0019879*(1e3)^9, 0.00015579*(1e3)^11, -0.00012433*(1e3)^13,
+        1.5264e-5*(1e3)^15]     # coeffs
+    ),
+    0.7e-3,                     # center_thickness
+    n -> 1.580200               # refractive index
+)
 
 system = System([L3])
 
