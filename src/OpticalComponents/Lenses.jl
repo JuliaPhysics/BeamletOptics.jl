@@ -157,7 +157,7 @@ end
 thickness(l::Lens) = thickness(shape(l))
 
 """
-     Lens(front_surface::AbstractSurface, back_surface::AbstractSurface, center_thickness::Real, n::RefractiveIndex)
+     Lens(front_surface::AbstractRotationallySymmetricSurface, back_surface::AbstractRotationallySymmetricSurface, center_thickness::Real, n::RefractiveIndex)
 
 Constructs a new `Lens` object using the surface specifications `front_surface` and
 `back_surface` and the `center_thickness`. These inputs are used to construct a `UnionSDF`(@ref)
@@ -170,8 +170,8 @@ If your specification results in a meniscus lens, only spherical meniscus lenses
 supported at the moment.
 """
 function Lens(
-        front_surface::AbstractSurface,
-        back_surface::AbstractSurface,
+        front_surface::AbstractRotationallySymmetricSurface,
+        back_surface::AbstractRotationallySymmetricSurface,
         center_thickness::Real,
         n::RefractiveIndex)
     # Define effective (optical and mechanical) diameters:
