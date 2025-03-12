@@ -58,8 +58,8 @@ makedocs(;
             "Beamsplitters" => "components/beamsplitters.md",
             "Detectors" => "components/detectors.md",
         ],
-        "Developer Documentation" => Any[
-            "Dev. guide" => "guide.md",
+        "Dev. Doc." => Any[
+            "Dev. Guide" => "guide.md",
             "API design" => "design.md",
         ],
         "Reference" => "reference.md"
