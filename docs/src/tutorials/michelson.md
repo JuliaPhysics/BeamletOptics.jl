@@ -137,7 +137,7 @@ The beamsplitter splits the beam into a reference and probe beam path. In this s
 reset_beamlet!(beam)
 
 # define NBK7 ref. index for λ
-NBK7 = BeamletOptics.DiscreteRefractiveIndex([632.8e-9], [1.51509])
+NBK7 = DiscreteRefractiveIndex([632.8e-9], [1.51509])
 
 cbs = CubeBeamsplitter(BeamletOptics.inch, NBK7)
 

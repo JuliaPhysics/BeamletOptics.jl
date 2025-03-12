@@ -168,15 +168,15 @@ using AbstractTrees
         T2 = Float64
         lambdas = T1.([488e-9, 707e-9, 1064e-9])
         indices = T2.([1.6591, 1.6456, 1.6374])
-        ref_index = BeamletOptics.DiscreteRefractiveIndex(lambdas, indices)
+        ref_index = DiscreteRefractiveIndex(lambdas, indices)
 
         @testset "DiscreteRefractiveIndex" begin
             @test isdefined(BeamletOptics, :DiscreteRefractiveIndex)
-            @test isa(ref_index, BeamletOptics.DiscreteRefractiveIndex{T2})
+            @test isa(ref_index, DiscreteRefractiveIndex{T2})
             @test ref_index(lambdas[2]) == indices[2]
             @test_throws KeyError ref_index(lambdas[1] + 1e-9)
             # Test constructor
-            @test_throws ArgumentError BeamletOptics.DiscreteRefractiveIndex([1], [1,2])
+            @test_throws ArgumentError DiscreteRefractiveIndex([1], [1,2])
         end
 
         @testset "Test ref. helper function" begin
@@ -1085,8 +1085,8 @@ end
     @testset "Testing doublet lenses" begin
         # Define refractive index functions
         λs = [488e-9, 707e-9, 1064e-9]
-        NLAK22 = BeamletOptics.DiscreteRefractiveIndex(λs, [1.6591, 1.6456, 1.6374])
-        NSF10 = BeamletOptics.DiscreteRefractiveIndex(λs, [1.7460, 1.7168, 1.7021])
+        NLAK22 = DiscreteRefractiveIndex(λs, [1.6591, 1.6456, 1.6374])
+        NSF10 = DiscreteRefractiveIndex(λs, [1.7460, 1.7168, 1.7021])
 
         function test_doublet(λ, bfl, δf)
             # Thorlabs lens from https://www.thorlabs.com/thorproduct.cfm?partnumber=AC254-150-AB

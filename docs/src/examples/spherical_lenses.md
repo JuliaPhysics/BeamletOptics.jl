@@ -14,7 +14,7 @@ First a function is defined that returns the refractive index ``n(\lambda)`` for
 ```@example spherical_lens_showcase
 using CairoMakie, BeamletOptics
 
-NBK7 = BeamletOptics.DiscreteRefractiveIndex([532e-9, 1064e-9], [1.5195, 1.5066])
+NBK7 = DiscreteRefractiveIndex([532e-9, 1064e-9], [1.5195, 1.5066])
 
 nothing # hide
 ```

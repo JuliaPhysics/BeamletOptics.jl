@@ -72,8 +72,8 @@ using CairoMakie, BeamletOptics
 
 λs = [488e-9, 707e-9, 1064e-9]
 
-NLAK22 = BeamletOptics.DiscreteRefractiveIndex(λs, [1.6591, 1.6456, 1.6374])
-NSF10 = BeamletOptics.DiscreteRefractiveIndex(λs, [1.7460, 1.7168, 1.7021])
+NLAK22 = DiscreteRefractiveIndex(λs, [1.6591, 1.6456, 1.6374])
+NSF10 = DiscreteRefractiveIndex(λs, [1.7460, 1.7168, 1.7021])
 
 AC254_150_AB = SphericalDoubletLens(87.9e-3, 105.6e-3, 1000, 6e-3, 3e-3, BeamletOptics.inch, NLAK22, NSF10)
 
@@ -145,7 +145,7 @@ The bi-convex lens LB1811 (see above) consists of two spherical surfaces and can
 
 ```@example
 using CairoMakie, BeamletOptics
-NBK7 = BeamletOptics.DiscreteRefractiveIndex([532e-9, 1064e-9], [1.5195, 1.5066])
+NBK7 = DiscreteRefractiveIndex([532e-9, 1064e-9], [1.5195, 1.5066])
 
 # lens diameter 
 d = BeamletOptics.inch

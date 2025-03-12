@@ -19,7 +19,7 @@ splitter_origin = [18.81cm, 23.5cm,0]
 
 asset_dir = @__DIR__
 
-NBK7 = BeamletOptics.DiscreteRefractiveIndex([632.8e-9], [1.51509])
+NBK7 = DiscreteRefractiveIndex([632.8e-9], [1.51509])
 
 ## Laser
 laser_assembly = MeshDummy(joinpath(asset_dir, "Laser Assembly.stl"))
