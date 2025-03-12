@@ -241,3 +241,80 @@ function Lens(
 
     return Lens(shape, n)
 end
+
+function Lens(
+        front_surface::Union{Nothing, AbstractCylindricSurface},
+        back_surface::Union{Nothing, AbstractCylindricSurface},
+        center_thickness::Real,
+        n::RefractiveIndex)
+    # Initialize remaining box section length.
+    l0 = center_thickness
+
+    # Front Surface
+    front = isnothing(front_surface) ? nothing : sdf(front_surface, ForwardOrientation())
+    l0 -= isnothing(front) ? zero(l0) : thickness(front)
+
+    # Back Surface
+    back = isnothing(back_surface) ? nothing : sdf(back_surface, BackwardOrientation())
+    l0 -= isnothing(back) ? zero(l0) : thickness(back)
+
+    # validate
+    if front_surface !== nothing && back_surface !== nothing
+        height(front_surface) != height(back_surface) && throw(ArgumentError("height of front and back surface have to match for cylindric lenses"))
+
+        d_mid = min(diameter(front_surface), diameter(back_surface))
+        md_mid = max(mechanical_diameter(front_surface), mechanical_diameter(back_surface))
+        h = height(front_surface)
+    elseif front_surface !== nothing
+        d_mid = diameter(front_surface)
+        md_mid = mechanical_diameter(front_surface)
+        h = height(front_surface)
+    elseif back_surface !== nothing
+        d_mid = diameter(back_surface)
+        md_mid = mechanical_diameter(back_surface)
+        h = height(back_surface)
+    else
+        throw(ArgumentError("Both surfaces cannot be nothing"))
+    end
+
+    # Check if the center section is positive
+    if l0 ≤ 0
+        throw(ArgumentError("Lens parameters lead to a box section length of ≤ 0"))
+    else
+        # Construct central box and add front/back surfaces
+        mid = BoxSDF(h, l0, d_mid)
+        if front !== nothing
+            translate3d!(mid, [0, thickness(front) + l0/2, 0])
+            mid += front
+        end
+        if back !== nothing
+            translate3d!(back, [0, thickness(mid) + thickness(back), 0])
+            mid += back
+        end
+        shape = mid
+
+        # Add mechanical ring if md_mid > d_mid
+        if md_mid > d_mid
+            throw(ArgumentError("Mechanical diameters not yet implemented for cylindric lenses"))
+            # ring_thickness = thickness(mid)
+            # ring_center = position(mid)[2] + ring_thickness / 2
+            # if front !== nothing
+            #     s = edge_sag(front_surface, front)
+            #     ring_thickness -= s
+            #     ring_center += s / 2
+            # end
+            # if back !== nothing
+            #     s = edge_sag(back_surface, back)
+            #     ring_thickness += s
+            #     ring_center += s / 2
+            # end
+            # ring = RingSDF(d_mid / 2, (md_mid - d_mid) / 2, ring_thickness)
+            # translate3d!(ring, [0, ring_center, 0])
+            # shape += ring
+        elseif md_mid < d_mid
+            @warn "Mechanical diameter is less than clear aperture; parameter md has been ignored."
+        end
+    end
+
+    return Lens(shape, n)
+end
