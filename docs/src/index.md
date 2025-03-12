@@ -24,12 +24,20 @@ For this purpose, the package implements a traditional ray tracing solver. This 
 - Extendable [API design](@ref) for the implementation of custom optical interactions
 - Easy visualization via the Makie package
 
-## Installation
+## Getting started
+
+Refer to the sections below if this is your first time using this package.
+
+### Installation
 
 !!! warning
     This package requires Julia ≥ 1.9.4
 
 You can add this package to your project by entering the package manager (press `]` in the REPL) and typing `add BeamletOptics`. It is also recommended that you `add GLMakie`. You can include this package into your current scope via `using BeamletOptics`. If a Makie version is loaded before or after the inclusion of this package, the extension provided as part of this package will enable additional visualization functions. 
+
+### Tutorials
+
+Follow the [Beam expander](@ref) and [Michelson interferometer](@ref) tutorials for a quick start into the package interface.
 
 ## Citation and license
 
@@ -77,9 +85,3 @@ In order to warrant a 1.0.0 release tag, the following features will need to be 
 - 🔳 Visualization
     - 🔳 automatic Makie plot updates (e.g. some form of "interactive" mode)
     - 🔳 Better Lens surface plots based on multiple dispatch
-
-### Known issues
-
-- 🔳 weird results for high level-of-detail meshes
-- 🔳 [`BeamletOptics.point_on_beam`](@ref) calculation can be incorrect at optical surfaces
-- 🔳 intersection calculation can be incorrect if two objects "touch"
