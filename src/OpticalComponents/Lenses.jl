@@ -165,9 +165,8 @@ made up by the appropriate sub-SDFs to represent the correct shape for the lens.
 
 The material properties are supplied via the `n` parameter.
 
-!!! warning
-If your specification results in a meniscus lens, only spherical meniscus lenses are
-supported at the moment.
+!!! warning "Meniscus"
+    If your specification results in a meniscus lens, only spherical meniscus lenses are supported at the moment.
 """
 function Lens(
         front_surface::AbstractSurface,
