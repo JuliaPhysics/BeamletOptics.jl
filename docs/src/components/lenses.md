@@ -207,6 +207,25 @@ L3 = Lens(
         0.7e-3, # center_thickness
         n -> 1.580200
     )
+        EvenAsphericalSurface(
+            3.618e-3, # r
+            3.04e-3, # d
+            -44.874, # conic
+            [0,-0.14756*(1e3)^3, 0.035194*(1e3)^5, -0.0032262*(1e3)^7,
+            0.0018592*(1e3)^9, 0.00036658*(1e3)^11, -0.00016039*(1e3)^13,
+            -3.1846e-5*(1e3)^15] # coeffs
+        ),
+        EvenAsphericalSurface(
+            2.161e-3, # r
+            3.7e-3, # d
+            -10.719, # conic
+            [0,-0.096568*(1e3)^3, 0.026771*(1e3)^5, -0.011261*(1e3)^7,
+            0.0019879*(1e3)^9, 0.00015579*(1e3)^11, -0.00012433*(1e3)^13,
+            1.5264e-5*(1e3)^15] # coeffs
+        ),
+        0.7e-3, # center_thickness
+        n -> 1.580200
+    )
 
 system = System([L3])
 
@@ -225,5 +244,5 @@ fig
     Refer to the [Simple aspherical lens example](@ref) for a showcase on how to implement a plano-convex asphere.
 
 ```@docs; canonical=false
-Lens
+BeamletOptics.Lens
 ```

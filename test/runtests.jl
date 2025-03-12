@@ -2215,6 +2215,25 @@ end
     end
 end
 
+@testset "Bug fixes" begin
+
+    @testset "Issue#14" begin
+        pd_res = 1000
+        pd = BeamletOptics.Photodetector(10e-3, pd_res)
+        BeamletOptics.zrotate3d!(pd, deg2rad(90))
+        BeamletOptics.translate3d!(pd, [0.46, 0, 0])
+        # Setup beam
+        y_0 = 0.2
+        beam = BeamletOptics.GaussianBeamlet([0, y_0, 0], [0.46, -y_0, 0], 532e-9, 2.5e-3, P0 = 10e-3)
+        # Solve system
+        system = BeamletOptics.System([pd])
+        BeamletOptics.reset_detector!(pd)
+        BeamletOptics.solve_system!(system, beam)
+
+        @test BeamletOptics.optical_power(pd) ≈ 10e-3 atol=1e-5
+    end
+end
+
 @testset "Aqua" begin
     using Aqua
     Aqua.test_all(BeamletOptics)
