@@ -136,7 +136,7 @@ A [`Lens`](@ref) can be then constructed easily with the following function call
 
 
 ```@docs; canonical=false
-Lens(::BeamletOptics.AbstractSurface, ::BeamletOptics.AbstractSurface, ::Real, ::BeamletOptics.RefractiveIndex)
+Lens(::BeamletOptics.AbstractRotationallySymmetricSurface, ::BeamletOptics.AbstractRotationallySymmetricSurface, ::Real, ::BeamletOptics.RefractiveIndex)
 ```
 
 ### Spherical Surface
