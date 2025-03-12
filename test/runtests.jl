@@ -177,7 +177,7 @@ using AbstractTrees
             @test ref_index(lambdas[2]) == indices[2]
             @test_throws KeyError ref_index(lambdas[1] + 1e-9)
             # Test constructor
-            @test_throws ArgumentError DiscreteRefractiveIndex([1], [1, 2])
+            @test_throws ArgumentError DiscreteRefractiveIndex([1], [1,2])
         end
 
         @testset "Test ref. helper function" begin
