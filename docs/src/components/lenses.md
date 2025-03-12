@@ -123,7 +123,7 @@ surfaces (fancy special cases using the sides of the lens as well exist, e.g. fo
 BeamletOptics.jl however, works with closed volume shapes for all of its optical elements
 and any erroneous (i.e. non-watertight) SDF might result in unphysical behaviour.
 
-To make it easy to specify lenses using the conventional way, the `BeamletOptics.AbstractSurface` API is introduced. This is API is a shim for using surfaces specifications and translate them to SDFs as good as possbile. This does not mean that BeamletOptics.jl works with these surfaces directly for ray tracing. 
+To make it easy to specify lenses using the conventional way, the [`BeamletOptics.AbstractSurface`](@ref) API is introduced. This is API is a shim for using surfaces specifications and translate them to SDFs as good as possbile. This does not mean that BeamletOptics.jl works with these surfaces directly for ray tracing. 
 
 Currently the following surface types exist:
 
@@ -132,7 +132,7 @@ using BeamletOptics # hide
 BeamletOptics.list_subtypes(BeamletOptics.AbstractSurface);
 ```
 
-A `Lens`(@ref) can be then constructed easily with the following function call:
+A [`Lens`](@ref) can be then constructed easily with the following function call:
 
 
 ```@docs; canonical=false
@@ -178,7 +178,7 @@ fig
 
 Aspherical lenses offer more advanced control over aberrations, enabling higher performance in specialized optical systems. The package offers surface support for rotationally symetrical [aspheric lenses](https://en.wikipedia.org/wiki/Aspheric_lens) that adhere to the DIN ISO 10110 convention with even terms.
 
-To construct a lens with any possible combination of convex/concave, spherical/aspherical surfaces you can use the `Lens`(@ref) constructor with the `EvenAsphericalSurface`(@ref) surface specification type. 
+To construct a lens with any possible combination of convex/concave, spherical/aspherical surfaces you can use the [`Lens`](@ref) constructor with the [`EvenAsphericalSurface`](@ref) surface specification type. 
 
 A complex example of such a lens might look like the following example. This lens has the following peculiarities:
 - The front surface is an aspherical convex surface with a clear diameter smaller than the full mechanical diameter
@@ -225,5 +225,5 @@ fig
     Refer to the [Simple aspherical lens example](@ref) for a showcase on how to implement a plano-convex asphere.
 
 ```@docs; canonical=false
-BeamletOptics.Lens
+Lens
 ```
