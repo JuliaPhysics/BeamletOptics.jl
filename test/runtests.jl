@@ -177,7 +177,7 @@ using AbstractTrees
             @test ref_index(lambdas[2]) == indices[2]
             @test_throws KeyError ref_index(lambdas[1] + 1e-9)
             # Test constructor
-            @test_throws ArgumentError DiscreteRefractiveIndex([1], [1,2])
+            @test_throws ArgumentError DiscreteRefractiveIndex([1], [1, 2])
         end
 
         @testset "Test ref. helper function" begin
@@ -1104,6 +1104,50 @@ end
         @test test_doublet(707e-9, 143.68e-3, 0)
         @test test_doublet(1064e-9, 143.68e-3, +7.466e-4)
     end
+
+    @testset "Testing spherical lens SDFs" begin
+        # Based on https://www.pencilofrays.com/double-gauss-sonnar-comparison/
+        l1 = SphericalLens(48.88e-3, 182.96e-3, 8.89e-3, 52.3e-3, λ -> 1.62286)
+        l23 = SphericalDoubletLens(36.92e-3, Inf, 23.06e-3, 15.11e-3, 2.31e-3,
+            45.11e-3, λ -> 1.58565, λ -> 1.67764)
+        l45 = SphericalDoubletLens(-23.91e-3, Inf, -36.92e-3, 1.92e-3, 7.77e-3,
+            40.01e-3, λ -> 1.57046, λ -> 1.64128)
+        l6 = SphericalLens(1063.24e-3, -48.88e-3, 6.73e-3, 45.11e-3, λ -> 1.62286)
+        # Calculate translation distances
+        l_23 = BeamletOptics.thickness(l1) + 0.38e-3
+        l_45 = l_23 + BeamletOptics.thickness(l23) + 9.14e-3 + 13.36e-3
+        l_6 = l_45 + BeamletOptics.thickness(l45) + 0.38e-3
+        # Corresponds to back focal length of f=59.21 mm on y-axis from link above + "error" δf
+        δf = 7e-4
+        f_z = l_6 + BeamletOptics.thickness(l6.shape) + 58.21e-3 + δf
+        translate3d!(l23, [0, l_23, 0])
+        translate3d!(l45, [0, l_45, 0])
+        translate3d!(l6, [0, l_6, 0])
+        # Create and move group - this tests a bunch of kinematic correctness
+        double_gauss = ObjectGroup([l1, l23, l45, l6])
+        translate3d!(double_gauss, [0.05, 0.05, 0.05])
+        xrotate3d!(double_gauss, deg2rad(60))
+        zrotate3d!(double_gauss, deg2rad(45))
+        system = System([double_gauss])
+        # Test against back focal length as per source above
+        dir = BeamletOptics.orientation(double_gauss)[:, 2] # rotated collimated ray direction
+        pos = BeamletOptics.position(l1) - 0.05 * dir # rotated collimated ray position
+        f0 = BeamletOptics.position(l1) + f_z * dir # global focal point coords
+        nv = BeamletOptics.normal3d(dir) # orthogonal to moved system optical axis
+        zs = -0.02:1e-3:0.02
+        # Define beam
+        λ = 486.0e-9
+        beam = Beam(Ray(pos, dir, λ))
+        for (i, z) in enumerate(zs)
+            # use retracing by manipulating beam starting pos
+            beam.rays[1].pos = pos + z * nv
+            solve_system!(system, beam)
+            # Test correct beam # of rays
+            @test length(BeamletOptics.rays(beam)) == 11
+            # Test coma at focal point
+            @test test_coma(last(BeamletOptics.rays(beam)), f0, dir, atol = 7e-5)
+        end
+    end
 end
 
 @testset "Surfaces" begin
@@ -1136,9 +1180,9 @@ end
         # test lens thickness
         @test BeamletOptics.thickness(lens) ≈ l
         # test edge thickness
-        @test BeamletOptics.thickness(BeamletOptics.shape(lens).sdfs[1]) ≈ 2e-3 atol=1e-4
+        @test BeamletOptics.thickness(BeamletOptics.shape(lens).sdfs[1])≈2e-3 atol=1e-4
         # test back focal length
-        @test working_distance(lens, 0.05*d/2) ≈ 29.5e-3 atol=1e-4
+        @test working_distance(lens, 0.05 * d / 2)≈29.5e-3 atol=1e-4
 
         ## Thorlabs LB1761, bi-convex
         r1 = 24.5e-3
@@ -1156,9 +1200,9 @@ end
         # test lens thickness
         @test BeamletOptics.thickness(lens) ≈ l
         # test edge thickness
-        @test BeamletOptics.thickness(shape.sdfs[1]) ≈ 1.9e-3 atol=1e-4
+        @test BeamletOptics.thickness(shape.sdfs[1])≈1.9e-3 atol=1e-4
         # test back focal length
-        @test working_distance(lens, 0.05*d/2) ≈ 22.2e-3 atol=1e-3
+        @test working_distance(lens, 0.05 * d / 2)≈22.2e-3 atol=1e-3
 
         ## Thorlabs LC1715, plano-concave
         r1 = Inf
@@ -1176,7 +1220,8 @@ end
         # test lens thickness
         @test BeamletOptics.thickness(lens) ≈ l
         # test edge thickness
-        @test BeamletOptics.sag(shape.sdfs[2]) + BeamletOptics.thickness(shape.sdfs[1]) ≈ 0.006858 atol=1e-4
+        @test BeamletOptics.sag(shape.sdfs[2]) +
+              BeamletOptics.thickness(shape.sdfs[1])≈0.006858 atol=1e-4
 
         ## Thorlabs LD2297, bi-concave
         r1 = -39.6e-3
@@ -1288,7 +1333,7 @@ end
         # conic constant
         k = -0.789119
         # even aspheric coefficients
-        A = [0, 2.10405e-7*(1e3)^3, 1.76468e-11*(1e3)^5, 1.02641e-15*(1e3)^7]
+        A = [0, 2.10405e-7 * (1e3)^3, 1.76468e-11 * (1e3)^5, 1.02641e-15 * (1e3)^7]
         # center thickness
         ct = 10.2e-3
         # diameter
@@ -1310,26 +1355,26 @@ end
         for (i, z) in enumerate(range(-0.02, 0.02, 100))
             ray = Ray(Point3(0.0, -0.1, z), Point3(0.0, 1.0, 0))
             beam = Beam(ray)
-            solve_system!(system, beam, r_max=40)
+            solve_system!(system, beam, r_max = 40)
 
             surf_errors[i] = (BeamletOptics.position(beam.rays[begin]) + length(beam.rays[begin]) .* BeamletOptics.direction(beam.rays[begin]))[2] -
-                        BeamletOptics.aspheric_equation(ray.pos[3], 1/R, k, A)
+                             BeamletOptics.aspheric_equation(ray.pos[3], 1 / R, k, A)
         end
 
         # FIXME: The atol is actually derived from the raymarching epsilon. If this is puts
         # into a configurable option, this should be changed as well.
-        @test all(x->isapprox(x, 0.0; atol=1e-10), surf_errors)
+        @test all(x -> isapprox(x, 0.0; atol = 1e-10), surf_errors)
 
         # test if the working distance is correct
         ray = Ray([0.0, -0.1, 0.02], [0.0, 1.0, 0])
         beam = Beam(ray)
-        solve_system!(system, beam, r_max=40)
+        solve_system!(system, beam, r_max = 40)
 
-        dist = -beam.rays[end].pos[3]/beam.rays[end].dir[3]
+        dist = -beam.rays[end].pos[3] / beam.rays[end].dir[3]
         α = asind(beam.rays[end].dir[3])
         wd = cosd(α) * dist
 
-        @test wd ≈ 93.2e-3 atol=1e-4
+        @test wd≈93.2e-3 atol=1e-4
     end
 
     @testset "Complex aspherical imaging system" begin
@@ -1339,15 +1384,17 @@ end
                 1.054e-3, # r
                 1.333024e-3, # d
                 -0.14294, # conic
-                 [0,0.038162*(1e3)^3, 0.06317*(1e3)^5, -0.020792*(1e3)^7, 0.18432*(1e3)^9,
-                 -0.04827*(1e3)^11, 0.094529*(1e3)^13] # coeffs
+                [0, 0.038162 * (1e3)^3, 0.06317 * (1e3)^5,
+                    -0.020792 * (1e3)^7, 0.18432 * (1e3)^9,
+                    -0.04827 * (1e3)^11, 0.094529 * (1e3)^13] # coeffs
             ),
             EvenAsphericalSurface(
                 2.027e-3, # r
                 1.216472e-3, # d
                 8.0226, # conic
-                [0,0.0074974*(1e3)^3, 0.064686*(1e3)^5, 0.19354*(1e3)^7, -0.50703*(1e3)^9,
-                -0.34529*(1e3)^11, 5.9938*(1e3)^13] # coeffs
+                [0, 0.0074974 * (1e3)^3, 0.064686 * (1e3)^5,
+                    0.19354 * (1e3)^7, -0.50703 * (1e3)^9,
+                    -0.34529 * (1e3)^11, 5.9938 * (1e3)^13] # coeffs
             ),
             0.72e-3, # center thickness
             n -> 1.580200
@@ -1358,39 +1405,40 @@ end
                 -3.116e-3, # r
                 1.4e-3, # d
                 -49.984, # conic
-                [0,-0.31608*(1e3)^3, 0.34755*(1e3)^5, -0.17102*(1e3)^7, -0.41506*(1e3)^9,
-                -1.342*(1e3)^11, 5.0594*(1e3)^13, -2.7483*(1e3)^15] # coeffs
+                [0, -0.31608 * (1e3)^3, 0.34755 * (1e3)^5,
+                    -0.17102 * (1e3)^7, -0.41506 * (1e3)^9,
+                    -1.342 * (1e3)^11, 5.0594 * (1e3)^13, -2.7483 * (1e3)^15] # coeffs
             ),
             EvenAsphericalSurface(
                 -4.835e-3, # r
                 1.9e-3, # d
                 1.6674, # conic
-                [0,-0.079727*(1e3)^3, 0.13899*(1e3)^5, -0.044057*(1e3)^7,
-                -0.019369*(1e3)^9, 0.016993*(1e3)^11, 0.093716*(1e3)^13,
-                -0.080329*(1e3)^15] # coeffs
+                [0, -0.079727 * (1e3)^3, 0.13899 * (1e3)^5, -0.044057 * (1e3)^7,
+                    -0.019369 * (1e3)^9, 0.016993 * (1e3)^11, 0.093716 * (1e3)^13,
+                    -0.080329 * (1e3)^15] # coeffs
             ),
             0.55e-3, # center_thickness
             n -> 1.804700
         )
 
-        translate3d!(L2, [0, BeamletOptics.thickness(L1) + 0.39e-3,0])
+        translate3d!(L2, [0, BeamletOptics.thickness(L1) + 0.39e-3, 0])
 
         L3 = Lens(
             EvenAsphericalSurface(
                 3.618e-3, # r
                 3.04e-3, # d
                 -44.874, # conic
-                [0,-0.14756*(1e3)^3, 0.035194*(1e3)^5, -0.0032262*(1e3)^7,
-                0.0018592*(1e3)^9, 0.00036658*(1e3)^11, -0.00016039*(1e3)^13,
-                -3.1846e-5*(1e3)^15] # coeffs
+                [0, -0.14756 * (1e3)^3, 0.035194 * (1e3)^5, -0.0032262 * (1e3)^7,
+                    0.0018592 * (1e3)^9, 0.00036658 * (1e3)^11, -0.00016039 * (1e3)^13,
+                    -3.1846e-5 * (1e3)^15] # coeffs
             ),
             EvenAsphericalSurface(
                 2.161e-3, # r
                 3.7e-3, # d
                 -10.719, # conic
-                [0,-0.096568*(1e3)^3, 0.026771*(1e3)^5, -0.011261*(1e3)^7,
-                0.0019879*(1e3)^9, 0.00015579*(1e3)^11, -0.00012433*(1e3)^13,
-                1.5264e-5*(1e3)^15] # coeffs
+                [0, -0.096568 * (1e3)^3, 0.026771 * (1e3)^5, -0.011261 * (1e3)^7,
+                    0.0019879 * (1e3)^9, 0.00015579 * (1e3)^11, -0.00012433 * (1e3)^13,
+                    1.5264e-5 * (1e3)^15] # coeffs
             ),
             0.7e-3, # center_thickness
             n -> 1.580200
@@ -1434,8 +1482,8 @@ end
             Beam([0, -0.5e-3, 1.3e-3 / 2], [0, 1, 0], 0.5876e-6)
         ]
         for beam in beams
-            solve_system!(system, beam, r_max=50)
-            f_pos = last(beam.rays).pos + 0.12e-3*last(beam.rays).dir
+            solve_system!(system, beam, r_max = 50)
+            f_pos = last(beam.rays).pos + 0.12e-3 * last(beam.rays).dir
 
             # test if the beam is correctly focussed
             @test f_pos[3]≈0 atol=1e-7
