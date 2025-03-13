@@ -29,7 +29,7 @@ function CutCylinderSDF(radius::R, diameter::D, height::H) where {R, D, H}
     )
     # rotate/shift in position
     xrotate3d!(s, π / 2)
-    translate3d!(s, [0, (radius - √(radius^2 - (diameter / 2)^2)), 0])
+    translate3d!(s, [0, radius, 0])
 
     return s
 end
