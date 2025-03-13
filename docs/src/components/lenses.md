@@ -164,13 +164,13 @@ fig # hide
 
 ## Doublet lenses
 
-The [`DoubletLens`](@ref) is an example for a multi-shape object as mentioned in the [Multi-shape objects](@ref) section. For spherical doublet lenses the [`SphericalDoubletLens`](@ref) constructor can be used.
+The [`DoubletLens`](@ref) is an example for a multi-shape object as mentioned in the [Multi-shape objects](@ref) section. For spherical doublet lenses the following constructor can be used.
 
 ```@docs; canonical=false
 SphericalDoubletLens(::Any, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any)
 ```
 
-The following image shows the [AC254-150-AB](https://www.thorlabs.com/thorproduct.cfm?partnumber=AC254-150-AB) doublet lens for 488 and 707 nm. It has been created using the [`SphericalDoubletLens`](@ref) constructor shown above. Changes in the [`Ray`](@ref) direction are marked with red dots (disregarding the beam spawn point).
+The following image shows the [AC254-150-AB](https://www.thorlabs.com/thorproduct.cfm?partnumber=AC254-150-AB) doublet lens for 488 and 707 nm. It has been created using the [`SphericalDoubletLens`](@ref) constructor shown above.
 
 
 ```@eval
@@ -185,10 +185,8 @@ AC254_150_AB = SphericalDoubletLens(87.9e-3, 105.6e-3, 1000, 6e-3, 3e-3, Beamlet
 
 system = System([AC254_150_AB])
 
-fig = Figure(size=(600,240))
-aspect = (1,4,1)
-limits = (-0.025, 0.025, -0.025, 0.175, -0.025, 0.025)
-ax = Axis3(fig[1,1], aspect=aspect, limits=limits, azimuth=0., elevation=1e-3)
+fig = Figure(size=(600,170))
+ax = Axis3(fig[1,1], aspect=:data, azimuth=0., elevation=1e-3)
 
 hidedecorations!(ax)
 hidespines!(ax)
