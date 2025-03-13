@@ -13,7 +13,6 @@ Creates a spherical [`Lens`](@ref) based on:
 
 !!! info "Radius of curvature (ROC) sign"
     The ROC is defined to be positive if the center is to the right of the surface. Otherwise it is negative.
-    See also [`SphericalLensShapeConstructor`](@ref).
 
 !!! info "Thin lenses"
     If `l` is set to zero, a [`ThinLens`](@ref) will be created. However, note that the actual lens thickness will be different from zero.
@@ -24,8 +23,12 @@ function SphericalLens(r1::Real, r2::Real, l::Real, d::Real = 1inch, n::Refracti
         return ThinLens(r1, r2, d, n)
     end
     # Create lens
-    shape = SphericalLensShapeConstructor(r1, r2, l, d)
-    return Lens(shape, n)
+    return Lens(
+        SphericalSurface(r1, d),
+        SphericalSurface(r2, d),
+        l,
+        n
+    )
 end
 
 SphericalLens(r1, r2, l, d, n::Real) = SphericalLens(r1, r2, l, d, λ -> n)

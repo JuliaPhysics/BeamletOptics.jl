@@ -10,6 +10,9 @@ export System, StaticSystem, solve_system!
 # object group
 export ObjectGroup
 
+# additional
+export DiscreteRefractiveIndex
+
 #=
 components
 =#
@@ -18,7 +21,10 @@ components
 export Mirror, SquarePlanoMirror2D, RectangularPlanoMirror, SquarePlanoMirror, RoundPlanoMirror, ConcaveSphericalMirror, RightAnglePrismMirror
 
 # lenses
-export Lens, DoubletLens, ThinLens, SphericalLens, SphericalDoubletLens, generalized_lens_shape_constructor
+export Lens, DoubletLens, ThinLens, SphericalLens, SphericalDoubletLens
+
+# surfaces
+export SphericalSurface, EvenAsphericalSurface
 
 # prisms
 export Prism, RightAnglePrism

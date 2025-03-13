@@ -428,62 +428,74 @@ function render_object!(axis, css::ConvexSphericalSurfaceSDF; color=:white)
 end
 
 """
-    SphericalLensShapeConstructor(r1, r2, l, d)
+    SphericalSurface{T} <: AbstractRotationallySymmetricSurface{T}
 
-Creates an [`AbstractLensSDF`](@ref)-based spherical [`Lens`](@ref) shape.
+A type representing a spherical optical surface defined by its radius of curvature, clear (optical) diameter,
+and mechanical diameter. This surface is rotationally symmetric about its optical axis.
 
-!!! info "Radius of curvature (ROC) sign"
-    The ROC is defined to be positive if the center is to the right of the surface. Otherwise it is negative.
-    Plano-surfaces are created through the use of `Inf`.
+# Fields
+- `radius::T`: The radius of curvature of the spherical surface. A positive value indicates that the
+  center of curvature lies to the right of the vertex (following ISO 10110).
+- `diameter::T`: The clear (optical) aperture of the surface.
+- `mechanical_diameter::T`: The overall mechanical diameter of the surface. In many cases, this is equal
+  to the optical diameter, but it can be set independently if the mechanical mount requires a larger dimension.
 
-# Input
-
-- `r1`: front radius
-- `r2`: back radius
-- `l`: lens thickness
-- `d`: lens diameter, default is one inch
 """
-function SphericalLensShapeConstructor(r1, r2, l, d)
-    # length tracking variable
-    l0 = l
-    # determine front shape
-    if isinf(r1)
-        front = nothing
-    elseif r1 > 0
-        front = BeamletOptics.ConvexSphericalSurfaceSDF(r1, d)
-        l0 -= BeamletOptics.sag(front)
-    else
-        front = BeamletOptics.ConcaveSphericalSurfaceSDF(abs(r1), d)
-    end
-    # determine back shape
-    if isinf(r2)
-        back = nothing
-    elseif r2 > 0
-        back = BeamletOptics.ConcaveSphericalSurfaceSDF(r2, d)
-        zrotate3d!(back, π)
-    else
-        back = BeamletOptics.ConvexSphericalSurfaceSDF(abs(r2), d)
-        zrotate3d!(back, π)
-        l0 -= BeamletOptics.sag(back)
-    end
-    # test if cylinder is legal
-    if l0 ≤ 0
-        # Catch MeniscusLensSDF
-        if sign(r1) == sign(r2)
-            return MeniscusLensSDF(r1, r2, l, d)
-        end
-        throw(ArgumentError("Lens parameters lead to cylinder section length of ≤ 0, use ThinLens instead."))
-    end
-    # design plano-plano surface, add spherical parts
-    mid = BeamletOptics.PlanoSurfaceSDF(l0, d)
-    if !isnothing(front)
-        translate3d!(mid, [0, BeamletOptics.thickness(front), 0])
-        mid += front
-    end
-    if !isnothing(back)
-        translate3d!(back, [0,  BeamletOptics.thickness(mid) + BeamletOptics.thickness(back), 0])
-        mid += back
-    end
-    # return shape
-    return mid
+struct SphericalSurface{T} <: AbstractRotationallySymmetricSurface{T}
+    radius::T
+    diameter::T
+    mechanical_diameter::T
 end
+
+"""
+    SphericalSurface(radius, diameter)
+
+Construct a `SphericalSurface` given the radius of curvature and the optical diameter.
+This constructor automatically sets the mechanical diameter equal to the optical diameter.
+
+# Arguments
+- `radius`: The radius of curvature of the surface.
+- `diameter`: The clear (optical) diameter of the surface.
+
+"""
+function SphericalSurface(radius::R, diameter::D) where {R<:Real, D<:Real}
+    T = promote_type(R, D)
+    return SphericalSurface{T}(T(radius), T(diameter), T(diameter))
+end
+
+mechanical_diameter(s::SphericalSurface) = s.mechanical_diameter
+
+edge_sag(::SphericalSurface, sd::AbstractSphericalSurfaceSDF) = abs(sag(sd))
+
+function sdf(s::SphericalSurface, ot::AbstractOrientationType)
+    isinf(radius(s)) && return nothing
+
+    return _sdf(s, ot)
+end
+
+function _sdf(s::SphericalSurface, ::ForwardOrientation)
+    front = if radius(s) > 0
+        ConvexSphericalSurfaceSDF(radius(s), diameter(s))
+    else
+        ConcaveSphericalSurfaceSDF(abs(radius(s)), diameter(s))
+    end
+
+    return front
+end
+
+function _sdf(s::SphericalSurface, ::BackwardOrientation)
+    back = if radius(s) > 0
+        ConcaveSphericalSurfaceSDF(radius(s), diameter(s))
+    else
+        ConvexSphericalSurfaceSDF(abs(radius(s)), diameter(s))
+    end
+    zrotate3d!(back, π)
+
+    return back
+end
+
+sdf(s::SphericalSurface, ::ForwardLeftMeniscusOrientation) = ConvexSphericalSurfaceSDF(radius(s), diameter(s))
+sdf(s::SphericalSurface, ::BackwardLeftMeniscusOrientation) = SphereSDF(radius(s))
+
+sdf(s::SphericalSurface, ::ForwardRightMeniscusOrientation) = SphereSDF(abs(radius(s)))
+sdf(s::SphericalSurface, ::BackwardRightMeniscusOrientation) = ConvexSphericalSurfaceSDF(abs(radius(s)), diameter(s))

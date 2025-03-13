@@ -15,9 +15,9 @@
 
     @compile_workload begin
         lens = Lens(
-            BeamletOptics.generalized_lens_shape_constructor(R, Inf, ct, d;
-                front_kind = :aspherical, front_k = k, front_coeffs = A
-            ),
+            EvenAsphericalSurface(R, d, k, A),
+            SphericalSurface(Inf, d),
+            ct,
             _n -> n
         )
 
