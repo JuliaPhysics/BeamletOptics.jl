@@ -1,11 +1,6 @@
 # Simple aspherical lens example
 
-The package has a basic support for ISO 10110 even aspheres. It is planned to extend this support in the future to include extended aspheres and maybe Q-aspheres.
-
-!!! note
-    Aspheric lenses are somewhat experimental at the moment. Use this feature with some caution when building unconventional lenses. Default/simple aspheres work fine.        
-
-The following example shows the most simple usage of the plano-aspheric asphere constructor based on the [Thorlabs AL50100J](https://www.thorlabs.com/thorproduct.cfm?partnumber=AL50100J) aspheric lens:
+The package has a basic support for ISO 10110 even aspheres. It is planned to extend this support in the future to include extended aspheres and maybe Q-aspheres. The following example shows the most simple usage of the plano-aspheric asphere constructor based on the [Thorlabs AL50100J](https://www.thorlabs.com/thorproduct.cfm?partnumber=AL50100J) aspheric lens:
 
 ```@example aspheric_lens
 using CairoMakie, BeamletOptics

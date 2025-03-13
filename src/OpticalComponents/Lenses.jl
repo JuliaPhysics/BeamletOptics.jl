@@ -129,7 +129,7 @@ end
     Lens{T, S <: AbstractShape{T}, N <: RefractiveIndex} <: AbstractRefractiveOptic{T, S, N}
 
 Represents an uncoated `Lens` with a homogeneous [`RefractiveIndex`](@ref) `n = n(λ)`.
-Refer to the [`SphericalLens`](@ref) constructor for more information on how to generate lenses.
+Refer to the [`Lens`](@ref) and [`SphericalLens`](@ref) constructors for more information on how to generate lenses.
 
 # Fields
 
@@ -161,7 +161,7 @@ thickness(l::Lens) = thickness(shape(l))
 
 Constructs a new [`Lens`](@ref) object using the surface specifications `front_surface` and
 `back_surface` and the `center_thickness`. These inputs are used to construct a [`UnionSDF`](@ref)
-made up by the appropriate sub-SDFs to represent the correct shape for the lens.
+that consists of the appropriate sub-SDFs to represent the shape of the lens.
 
 The material properties are supplied via the `n` parameter.
 
