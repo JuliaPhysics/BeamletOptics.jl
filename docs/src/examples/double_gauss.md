@@ -7,28 +7,21 @@ using CairoMakie, BeamletOptics
 
 # define spherical lenses
 l1 = SphericalLens(48.88e-3, 182.96e-3, 8.89e-3, 52.3e-3, λ -> 1.62286)
-l2 = SphericalLens(36.92e-3, Inf, 15.11e-3, 45.11e-3, λ -> 1.58565)
-l3 = SphericalLens(Inf, 23.06e-3, 2.31e-3, 45.11e-3, λ -> 1.67764)
-l4 = SphericalLens(-23.91e-3, Inf, 1.92e-3, 40.01e-3, λ -> 1.57046)
-l5 = SphericalLens(Inf, -36.92e-3, 7.77e-3, 40.01e-3, λ -> 1.64128)
+l23 = SphericalDoubletLens(36.92e-3, Inf, 23.06e-3, 15.11e-3, 2.31e-3, 45.11e-3, λ -> 1.58565, λ -> 1.67764)
+l45 = SphericalDoubletLens(-23.91e-3, Inf, -36.92e-3, 1.92e-3, 7.77e-3, 40.01e-3, λ -> 1.57046, λ -> 1.64128)
 l6 = SphericalLens(1063.24e-3, -48.88e-3, 6.73e-3, 45.11e-3, λ -> 1.62286)
 
 # Calculate translation distances
-δy = 1e-7
-l_2 = BeamletOptics.thickness(l1.shape) + 0.38e-3
-l_3 = l_2 + BeamletOptics.thickness(l2.shape) + δy
-l_4 = l_3 + BeamletOptics.thickness(l3.shape) + 9.14e-3 + 13.36e-3
-l_5 = l_4 + BeamletOptics.thickness(l4.shape) + δy
-l_6 = l_5 + BeamletOptics.thickness(l5.shape) + 0.38e-3
+l_23 = BeamletOptics.thickness(l1) + 0.38e-3
+l_45 = l_23 + BeamletOptics.thickness(l23) + 9.14e-3 + 13.36e-3
+l_6 = l_45 + BeamletOptics.thickness(l45) + 0.38e-3
 
 # move elements into position
-translate3d!(l2, [0, l_2, 0])
-translate3d!(l3, [0, l_3, 0])
-translate3d!(l4, [0, l_4, 0])
-translate3d!(l5, [0, l_5, 0])
+translate3d!(l23, [0, l_23, 0])
+translate3d!(l45, [0, l_45, 0])
 translate3d!(l6, [0, l_6, 0])
 
-system = StaticSystem([l1, l2, l3, l4, l5, l6])
+system = StaticSystem([l1, l23, l45, l6])
 
 nothing # hide
 ```
@@ -39,9 +32,7 @@ In the next step, we will define a `Figure` and `Axis3` environment in which the
 ```@example double_gauss
 # generate render
 fig = Figure(size=(600,380))
-aspect = (1,2,1)
-limits = (-0.05, 0.05, -0.05, 0.15, -0.05, 0.05)
-ax = Axis3(fig[1,1]; aspect, limits, azimuth=0, elevation=1e-3)
+ax = Axis3(fig[1,1]; aspect=:data, azimuth=0, elevation=1e-3)
 
 # hide decorations for vis. purposes
 hidexdecorations!(ax)

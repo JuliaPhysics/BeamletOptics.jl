@@ -303,7 +303,7 @@ end
 
 function sdf(surface::ConvexAsphericalSurfaceSDF{T}, point) where {T}
     p_local = _world_to_sdf(surface, point)
-    # standard logic is to have the z-axis as optical axis, so the aspheric code is written
+    # spherical logic is to have the z-axis as optical axis, so the aspheric code is written
     # with that convention in mind so everything matches ISO10110/textbook definitions.
     # We reinterpret the coordinates here, so xz is the transversal direction and y is the
     # optical axis.
@@ -324,7 +324,7 @@ end
 
 function sdf(surface::ConcaveAsphericalSurfaceSDF{T}, point) where {T}
     p_local = _world_to_sdf(surface, point)
-    # standard logic is to have the z-axis as optical axis, so the aspheric code is written
+    # spherical logic is to have the z-axis as optical axis, so the aspheric code is written
     # with that convention in mind so everything matches ISO10110/textbook definitions.
     # We reinterpret the coordinates here, so xz is the transversal direction and y is the
     # optical axis.
@@ -439,324 +439,86 @@ function PlanoConcaveAsphericalLensSDF(r::R, l::L, d::D, k::K, α_coeffs::Abstra
 end
 
 """
-    generalized_lens_shape_constructor(r1, r2, l, d1, d2=d1; md1=d1, md2=d2,
-                                     front_kind::Symbol = :spherical, front_k = 0, front_coeffs = nothing,
-                                     back_kind::Symbol  = :spherical, back_k  = 0, back_coeffs  = nothing)
+    EvenAsphericalSurface{T} <: AbstractRotationallySymmetricSurface{T}
 
-Constructs an `<: AbstractLensSDF` representing a rotationally symmetric lens whose
-surfaces may be spherical or aspherical.
+A type representing an aspherical optical surface defined by its radius of curvature,
+clear (optical) diameter, conic constant, aspheric coefficients and mechanical diameter.
+This surface is rotationally symmetric about its optical axis.
 
-# Arguments
-- `r1`: Front surface curvature (radius). A positive value indicates a convex-like front surface.
-- `r2`: Back surface curvature (radius). A positive value indicates a concave-like back surface.
-- `l`: Axial thickness of the lens.
-- `d1`: Clear (optical) diameter for the front surface.
-- `d2`: Clear (optical) diameter for the back surface (defaults to `d1`).
-- `md1`: Mechanical diameter for the front; if greater than `d1`, an outer ring is added (defaults to `d1`).
-- `md2`: Mechanical diameter for the back; if greater than `d2`, an outer ring is added (defaults to `d2`).
+# Fields
+- `spherical::SphericalSurface{T}`: The base spherical surface portion of the asphere.
+- `conic_constant::T`: The conic constant defining the deviation from a spherical shape.
+- `coefficients::AbstractVector{T}`: A vector of even aspheric coefficients for higher-order corrections.
 
-# Keyword Options (for surface type)
-- `front_kind`: Either `:spherical` (default) or `:aspherical` for the front surface.
-- `front_k`: Conic constant for the front surface (used if `front_kind == :aspherical`).
-- `front_coeffs`: Vector of even aspheric coefficients for the front surface (used if `front_kind == :aspherical`).
-- `back_kind`: Either `:spherical` (default) or `:aspherical` for the back surface.
-- `back_k`: Conic constant for the back surface (used if `back_kind == :aspherical`).
-- `back_coeffs`: Vector of even aspheric coefficients for the back surface (used if `back_kind == :aspherical`).
-
-# Description
-The function constructs the lens shape by first computing a central plano (cylindrical)
-section with a diameter equal to the smaller of the two clear apertures (`min(d1, d2)`).
-The curved front and back surfaces are constructed using the specified surface type
-(spherical or aspherical) with their respective clear apertures. If aspheric surfaces
-are used, the sag at the clear edge is computed via the aspheric equation.
-Mechanical diameters (`md1`, `md2`) allow for adding an outer ring if they exceed
-the corresponding optical diameters. If the remaining cylindrical section length
-(after subtracting the sag contributions) is non-positive, the function falls back
-to constructing a meniscus lens using `MeniscusLensSDF`.
-
-Returns an object of type `<: AbstractLensSDF` representing the composite lens.
 """
-function generalized_lens_shape_constructor(r1, r2, l, d1, d2 = d1;
-        md1 = d1, md2 = d2,
-        front_kind::Symbol = :spherical, front_k = 0, front_coeffs = nothing,
-        back_kind::Symbol = :spherical, back_k = 0, back_coeffs = nothing)
-
-    # Define effective (optical and mechanical) diameters:
-    d_mid = min(d1, d2)
-    md_mid = max(md1, md2)
-
-    # Initialize remaining cylindrical section length.
-    l0 = l
-
-    # --- Front Surface ---
-    if isinf(r1)
-        front = nothing
-    elseif front_kind === :spherical
-        if r1 > 0
-            front = BeamletOptics.ConvexSphericalSurfaceSDF(r1, d1)
-            l0 -= BeamletOptics.sag(front)
-        else
-            front = BeamletOptics.ConcaveSphericalSurfaceSDF(abs(r1), d1)
-        end
-    elseif front_kind === :aspherical
-        if front_coeffs === nothing
-            throw(ArgumentError("front_coeffs must be provided for aspherical front surface"))
-        end
-        if r1 > 0
-            front = ConvexAsphericalSurfaceSDF(front_coeffs, r1, front_k, d1)
-            s_front = aspheric_equation(d1 / 2, 1 / r1, front_k, front_coeffs)
-            l0 -= abs(s_front)
-        else
-            front = ConcaveAsphericalSurfaceSDF(front_coeffs, r1, front_k, d1)
-        end
-    else
-        throw(ArgumentError("Unsupported front_kind: " * front_kind))
-    end
-
-    # --- Back Surface ---
-    if isinf(r2)
-        back = nothing
-    elseif back_kind === :spherical
-        if r2 > 0
-            back = BeamletOptics.ConcaveSphericalSurfaceSDF(r2, d2)
-            zrotate3d!(back, π)
-        else
-            back = BeamletOptics.ConvexSphericalSurfaceSDF(abs(r2), d2)
-            zrotate3d!(back, π)
-            l0 -= BeamletOptics.sag(back)
-        end
-    elseif back_kind === :aspherical
-        if back_coeffs === nothing
-            throw(ArgumentError("back_coeffs must be provided for aspherical back surface"))
-        end
-        if r2 > 0
-            back = ConcaveAsphericalSurfaceSDF(back_coeffs, r2, back_k, d2)
-            l0 -= thickness(back)
-        else
-            back = ConvexAsphericalSurfaceSDF(back_coeffs, r2, back_k, d2)
-            s_back = aspheric_equation(d2 / 2, 1 / r2, back_k, back_coeffs)
-            l0 -= abs(s_back)
-        end
-    else
-        throw(ArgumentError("Unsupported back_kind: " * back_kind))
-    end
-
-    # --- Use MeniscusLensSDF if cylinder length is non-positive ---
-    if l0 ≤ 0
-        if sign(r1) == sign(r2)
-            return generalized_meniscus_lens_sdf(r1, r2, l, d1, md1, d2, md2;
-                front_kind = front_kind, front_k = front_k, front_coeffs = front_coeffs,
-                back_kind = back_kind, back_k = back_k, back_coeffs = back_coeffs)
-        end
-        throw(ArgumentError("Lens parameters lead to cylinder section length of ≤ 0, use ThinLens instead."))
-    end
-
-    # --- Construct central plano surface and add spherical/aspherical parts ---
-    mid = PlanoSurfaceSDF(l0, d_mid)
-    if front !== nothing
-        translate3d!(mid, [0, thickness(front), 0])
-        mid += front
-    end
-    if back !== nothing
-        translate3d!(back, [0, thickness(mid) + thickness(back), 0])
-        mid += back
-    end
-
-    # --- Add mechanical ring if md_mid > d_mid ---
-    if md_mid > d_mid
-        ring_thickness = thickness(mid)
-        ring_center = position(mid)[2] + ring_thickness / 2
-        if front !== nothing
-            if front_kind === :spherical
-                s = abs(sag(front))
-            elseif front_kind === :aspherical
-                s = aspheric_equation(d1 / 2, 1 / r1, front_k, front_coeffs)
-            else
-                throw(ArgumentError("Unsupported front_kind: " * front_kind))
-            end
-            ring_thickness -= s
-            ring_center += s / 2
-        end
-        if back !== nothing
-            if back_kind === :spherical
-                s = abs(sag(back))
-            elseif back_kind === :aspherical
-                s = aspheric_equation(d2 / 2, 1 / r2, back_k, back_coeffs)
-            else
-                throw(ArgumentError("Unsupported back_kind: " * back_kind))
-            end
-            ring_thickness += s
-            ring_center += s / 2
-        end
-        ring = RingSDF(d_mid / 2, (md_mid - d_mid) / 2, ring_thickness)
-        translate3d!(ring, [0, ring_center, 0])
-        mid += ring
-    elseif md_mid < d_mid
-        @warn "Mechanical diameter is less than clear aperture; parameter md has been ignored."
-    end
-
-    return mid
+struct EvenAsphericalSurface{T} <: AbstractRotationallySymmetricSurface{T}
+    spherical::SphericalSurface{T}
+    conic_constant::T
+    coefficients::Vector{T}
 end
 
 """
-    generalized_meniscus_lens_sdf(r1, r2, l, d1, d2=d1; md1=d1, md2=d2,
-                                  front_kind::Symbol = :spherical, front_k = 0, front_coeffs = nothing,
-                                  back_kind::Symbol  = :spherical, back_k  = 0, back_coeffs  = nothing)
+    EvenAsphericalSurface(radius, diameter, conic_constant, coefficients::AbstractVector, mechanical_diameter = diameter)
 
-Constructs an [`AbstractLensSDF`] meniscus lens whose surfaces can be either spherical or aspherical.
-This function supports independent specification of the clear (optical) diameters and mechanical diameters
-for the front and back surfaces. The clear diameter for the front surface is given by `d1` and for the
-back surface by `d2` (defaulting to `d1`). Similarly, the mechanical diameters are specified by `md1` and
-`md2` (defaulting to `d1` and `d2`, respectively). If a mechanical diameter exceeds the corresponding clear
-diameter, an outer ring is added on that side. The curvature signs follow ISO 10110 (a positive value means
-the center lies to the right). If the computed cylindrical section thickness becomes non-positive, an error is thrown.
+Construct a `EvenAsphericalSurface` given the radius of curvature, the optical diameter, conic
+constant, the aspheric coefficients and optionally the mechanical diameter.
+This constructor automatically sets the mechanical diameter equal to the optical diameter.
 
 # Arguments
-- `r1`: Front surface curvature (radius). A positive value produces a convex-like front surface.
-- `r2`: Back surface curvature (radius). A positive value produces a concave-like back surface.
-- `l`: Total axial thickness of the lens.
-- `d1`: Clear (optical) diameter of the front surface.
-- `d2`: Clear (optical) diameter of the back surface (default: `d1`).
-- `md1`: Mechanical diameter for the front surface (default: `d1`).
-- `md2`: Mechanical diameter for the back surface (default: `d2`).
+- `radius`: The radius of curvature of the base spherical surface.
+- `diameter`: The clear (optical) diameter of the surface.
+- `conic_constant`: The conic constant defining the deviation from a spherical shape.
+- `coefficients::AbstractVector`: A vector of even aspheric coefficients for higher-order corrections.
+- `mechanical_diameter`: The mechanical diameter of the surface; if not provided, it defaults to `diameter`.
 
-# Keyword Options (for surface types)
-- `front_kind`: Surface type for the front; either `:spherical` (default) or `:aspherical`.
-- `front_k`: Conic constant for the front surface (used if `front_kind == :aspherical`).
-- `front_coeffs`: Vector of even aspheric coefficients for the front surface (used if `front_kind == :aspherical`).
-- `back_kind`: Surface type for the back; either `:spherical` (default) or `:aspherical`.
-- `back_k`: Conic constant for the back surface (used if `back_kind == :aspherical`).
-- `back_coeffs`: Vector of even aspheric coefficients for the back surface (used if `back_kind == :aspherical`).
-
-# Description
-This function constructs a composite meniscus lens by:
-  1. Building a front surface using `r1` and clear diameter `d1` (with the specified surface model),
-  2. Building a back surface using `r2` and clear diameter `d2` (with the specified surface model),
-  3. Constructing a central plano (cylindrical) section whose diameter is the minimum of `d1` and `d2`,
-     with an effective thickness adjusted by subtracting the sag from the front and adding the sag from the back.
-Mechanical diameters (`md1` and `md2`) are used to determine if an outer ring should be added; the effective
-mechanical diameter is taken as `max(md1, md2)`, and if it exceeds the clear aperture (i.e. `min(d1, d2)`),
-an outer ring is appended. If the resulting cylindrical section length is non-positive, an error is thrown.
-
-Returns a meniscus lens object of type [`MeniscusLensSDF{T, S1, S2}`] representing the composite lens.
 """
-function generalized_meniscus_lens_sdf(
-        r1::R1, r2::R2, l::L, d1::D, d2::D = d1, md1::MD = d1, md2::MD = d2;
-        front_kind::Symbol = :spherical, front_k = 0, front_coeffs = nothing,
-        back_kind::Symbol = :spherical, back_k = 0, back_coeffs = nothing) where {
-        R1, R2, L, D, MD}
-    T = promote_type(R1, R2, L, D)
-    # Determine orientation: for left‐facing (r₁, r₂ > 0) front is convex and back is concave;
-    # for right‐facing (r₁, r₂ < 0) front is concave and back is convex.
-    if sign(r1) == sign(r2) > 0
-        orientation = :left_facing
-        convex_val = r1
-        concave_val = r2
-    elseif sign(r1) == sign(r2) < 0
-        orientation = :right_facing
-        convex_val = abs(r2)
-        concave_val = abs(r1)
-    else
-        throw(ArgumentError("Invalid sign combination for r₁ and r₂"))
-    end
+function EvenAsphericalSurface(radius::T1, diameter::T2, conic_constant::T3, coefficients::AbstractVector{T4}, mechanical_diameter::T5=diameter) where {T1, T2, T3, T4, T5}
+    T = promote_type(T1, T2, T3, T4, T5)
+    st = SphericalSurface{T}(radius, diameter, mechanical_diameter)
 
-    # Compute sag values at the clear aperture:
-    # Use d1 for the front and d2 for the back.
-    convex_sag = front_kind == :spherical ?
-                 sag(convex_val, d1) :
-                 abs(aspheric_equation(d1 / 2, 1 / convex_val, front_k, front_coeffs))
-    concave_sag = back_kind == :spherical ?
-                  sag(concave_val, d2) :
-                  abs(aspheric_equation(d2 / 2, 1 / concave_val, back_k, back_coeffs))
+    return EvenAsphericalSurface{T}(
+        st,
+        conic_constant,
+        coefficients
+    )
+end
+radius(s::EvenAsphericalSurface) = radius(s.spherical)
+diameter(s::EvenAsphericalSurface) = diameter(s.spherical)
+mechanical_diameter(s::EvenAsphericalSurface) = mechanical_diameter(s.spherical)
 
-    cylinder_l = l - convex_sag + concave_sag
-    if cylinder_l ≤ 0
-        throw(ErrorException("Lens parameters lead to zero lens edge thickness"))
-    end
-
-    # Spawn sub-shapes.
-    if orientation == :left_facing
-        front_surface = front_kind == :spherical ?
-                        ConvexSphericalSurfaceSDF(convex_val, d1) :
-                        ConvexAsphericalSurfaceSDF(front_coeffs, convex_val, front_k, d1)
-        back_surface = back_kind == :spherical ?
-                       SphereSDF(concave_val) :
-                       ConcaveAsphericalSurfaceSDF(back_coeffs, concave_val, back_k, d2)
-    else  # right-facing: front is concave, back is convex.
-        front_surface = front_kind == :spherical ?
-                        SphereSDF(concave_val) :
-                        ConcaveAsphericalSurfaceSDF(front_coeffs, concave_val, front_k, d2)
-        back_surface = back_kind == :spherical ?
-                       ConvexSphericalSurfaceSDF(convex_val, d1) :
-                       ConvexAsphericalSurfaceSDF(back_coeffs, convex_val, back_k, d1)
-    end
-
-    # Use effective optical diameter d_mid = min(d1, d2)
-    d_mid = min(d1, d2)
-    cylinder = PlanoSurfaceSDF(cylinder_l, d_mid)
-
-    # Position the sub-shapes.
-    if orientation == :left_facing
-        translate3d!(cylinder, [0, thickness(front_surface), 0])
-        translate3d!(back_surface, [0, concave_val + l, 0])
-        convex_shape = front_surface
-        concave_shape = back_surface
-    else
-        translate3d!(back_surface, [0, -concave_val, 0])
-        translate3d!(cylinder, [0, -concave_sag, 0])
-        zrotate3d!(front_surface, π)
-        translate3d!(front_surface, [0, thickness(cylinder) - concave_sag + convex_sag, 0])
-        convex_shape = back_surface
-        concave_shape = front_surface
-    end
-
-    # Build the composite meniscus lens.
-    lens = MeniscusLensSDF{T, typeof(convex_shape), typeof(concave_shape)}(
-        Matrix{T}(I, 3, 3),
-        Matrix{T}(I, 3, 3),
-        Point3{T}(0),
-        convex_shape,
-        cylinder,
-        concave_shape,
-        l
+function edge_sag(s::EvenAsphericalSurface{T}, ::AbstractAsphericalSurfaceSDF) where T
+    sag = aspheric_equation(
+        diameter(s) / 2,
+        1 / radius(s),
+        s.conic_constant,
+        s.coefficients
     )
 
-    # Effective mechanical diameter: md_mid = max(md1, md2)
-    md_mid = max(md1, md2)
-    if md_mid > d_mid
-        # For a meniscus lens the overall optical thickness is l.
-        ring_thickness = l
-        ring_center = l / 2
-        # Adjust for the sag of the front surface (use d1).
-        if front_surface !== nothing
-            if front_kind == :spherical
-                s = abs(sag(front_surface))
-            elseif front_kind == :aspherical
-                s = abs(aspheric_equation(d1 / 2, 1 / r1, front_k, front_coeffs))
-            else
-                throw(ArgumentError("Unsupported front_kind: $front_kind"))
-            end
-            ring_thickness += (s < 0 ? abs(s) : 0.0)
-            ring_center += (s < 0 ? s / 2 : 0.0)
-        end
-        # Adjust for the sag of the back surface (use d2).
-        if back_surface !== nothing
-            if back_kind == :spherical
-                s = abs(sag(back_surface))
-            elseif back_kind == :aspherical
-                s = abs(aspheric_equation(d2 / 2, 1 / r2, back_k, back_coeffs))
-            else
-                throw(ArgumentError("Unsupported back_kind: $back_kind"))
-            end
-            ring_thickness += (s < 0 ? abs(s) : 0.0)
-            ring_center += (s < 0 ? s / 2 : 0.0)
-        end
-        ring = RingSDF(d_mid / 2, (md_mid - d_mid) / 2, ring_thickness)
-        translate3d!(ring, [0, ring_center, 0])
-        lens += ring
-    elseif md_mid < d_mid
-        @warn "Mechanical diameter is less than clear aperture; parameter md has been ignored."
+    return sag
+end
+
+function sdf(s::EvenAsphericalSurface, ot::AbstractOrientationType)
+    isinf(radius(s)) && return nothing
+
+    return _sdf(s, ot)
+end
+
+function _sdf(s::EvenAsphericalSurface, ::ForwardOrientation)
+    front = if radius(s) > 0
+        ConvexAsphericalSurfaceSDF(s.coefficients, radius(s), s.conic_constant, diameter(s))
+    else
+        ConcaveAsphericalSurfaceSDF(s.coefficients, radius(s), s.conic_constant, diameter(s))
     end
 
-    return lens
+    return front
+end
+
+function _sdf(s::EvenAsphericalSurface, ::BackwardOrientation)
+    back = if radius(s) > 0
+        ConcaveAsphericalSurfaceSDF(s.coefficients, radius(s), s.conic_constant, diameter(s))
+    else
+        ConvexAsphericalSurfaceSDF(s.coefficients, radius(s), s.conic_constant, diameter(s))
+    end
+
+    return back
 end
