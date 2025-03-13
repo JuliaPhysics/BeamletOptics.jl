@@ -10,7 +10,7 @@
 
 **BeamletOptics.jl**, or **BMO** for short, is a 3D Gaussian beamlet tracing software mainly intended for the simulation of breadboard optical setups -- e.g. laser interferometers -- with simple components like lenses or beamsplitters. It offers a flexible kinematic API for the easy placement and movement of components.
 
-[For more information, refer to the documentation.](https://optical-air-data.pages.gitlab.dlr.de/dispersionsinterferometer/BeamletOptics/)
+[For more information, refer to the documentation.](https://optical-air-data.pages.gitlab.dlr.de/dispersionsinterferometer/beamletoptics/)
 
 # Features
 

@@ -1,6 +1,6 @@
 using CairoMakie, BeamletOptics
 
-NBK7 = BeamletOptics.DiscreteRefractiveIndex([532e-9, 1064e-9], [1.5195, 1.5066])
+NBK7 = DiscreteRefractiveIndex([532e-9, 1064e-9], [1.5195, 1.5066])
 
 # lens diameter 
 d = BeamletOptics.inch
