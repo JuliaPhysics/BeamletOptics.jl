@@ -159,11 +159,16 @@ thickness(l::Lens) = thickness(shape(l))
 """
      Lens(front_surface::AbstractRotationallySymmetricSurface, back_surface::AbstractRotationallySymmetricSurface, center_thickness::Real, n::RefractiveIndex)
 
-Constructs a new `Lens` object using the surface specifications `front_surface` and
-`back_surface` and the `center_thickness`. These inputs are used to construct a `UnionSDF`(@ref)
+Constructs a new [`Lens`](@ref) object using the surface specifications `front_surface` and
+`back_surface` and the `center_thickness`. These inputs are used to construct a [`UnionSDF`](@ref)
 made up by the appropriate sub-SDFs to represent the correct shape for the lens.
 
 The material properties are supplied via the `n` parameter.
+
+# Additional information
+
+!!! info "Radius of curvature (ROC) sign definition"
+    The ROC is defined to be positive if the center is to the right of the surface. Otherwise it is negative.
 
 !!! warning "Meniscus"
     If your specification results in a meniscus lens, only spherical meniscus lenses are supported at the moment.

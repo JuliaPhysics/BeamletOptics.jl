@@ -428,67 +428,6 @@ function render_object!(axis, css::ConvexSphericalSurfaceSDF; color=:white)
 end
 
 """
-    SphericalLensShapeConstructor(r1, r2, l, d)
-
-Creates an [`AbstractLensSDF`](@ref)-based spherical [`Lens`](@ref) shape.
-
-!!! info "Radius of curvature (ROC) sign"
-    The ROC is defined to be positive if the center is to the right of the surface. Otherwise it is negative.
-    Plano-surfaces are created through the use of `Inf`.
-
-# Input
-
-- `r1`: front radius
-- `r2`: back radius
-- `l`: lens thickness
-- `d`: lens diameter, default is one inch
-"""
-function SphericalLensShapeConstructor(r1, r2, l, d)
-    # length tracking variable
-    l0 = l
-    # determine front shape
-    if isinf(r1)
-        front = nothing
-    elseif r1 > 0
-        front = BeamletOptics.ConvexSphericalSurfaceSDF(r1, d)
-        l0 -= BeamletOptics.sag(front)
-    else
-        front = BeamletOptics.ConcaveSphericalSurfaceSDF(abs(r1), d)
-    end
-    # determine back shape
-    if isinf(r2)
-        back = nothing
-    elseif r2 > 0
-        back = BeamletOptics.ConcaveSphericalSurfaceSDF(r2, d)
-        zrotate3d!(back, π)
-    else
-        back = BeamletOptics.ConvexSphericalSurfaceSDF(abs(r2), d)
-        zrotate3d!(back, π)
-        l0 -= BeamletOptics.sag(back)
-    end
-    # test if cylinder is legal
-    if l0 ≤ 0
-        # Catch MeniscusLensSDF
-        if sign(r1) == sign(r2)
-            return MeniscusLensSDF(r1, r2, l, d)
-        end
-        throw(ArgumentError("Lens parameters lead to cylinder section length of ≤ 0, use ThinLens instead."))
-    end
-    # design plano-plano surface, add spherical parts
-    mid = BeamletOptics.PlanoSurfaceSDF(l0, d)
-    if !isnothing(front)
-        translate3d!(mid, [0, BeamletOptics.thickness(front), 0])
-        mid += front
-    end
-    if !isnothing(back)
-        translate3d!(back, [0,  BeamletOptics.thickness(mid) + BeamletOptics.thickness(back), 0])
-        mid += back
-    end
-    # return shape
-    return mid
-end
-
-"""
     SphericalSurface{T} <: AbstractRotationallySymmetricSurface{T}
 
 A type representing a spherical optical surface defined by its radius of curvature, clear (optical) diameter,
