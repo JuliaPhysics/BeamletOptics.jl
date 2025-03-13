@@ -161,7 +161,7 @@ thickness(l::Lens) = thickness(shape(l))
 
 Constructs a new [`Lens`](@ref) object using the surface specifications `front_surface` and
 `back_surface` and the `center_thickness`. These inputs are used to construct a [`UnionSDF`](@ref)
-made up by the appropriate sub-SDFs to represent the correct shape for the lens.
+that consists of the appropriate sub-SDFs to represent the shape of the lens.
 
 The material properties are supplied via the `n` parameter.
 

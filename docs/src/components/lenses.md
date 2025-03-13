@@ -164,7 +164,7 @@ fig # hide
 
 ## Doublet lenses
 
-The [`DoubletLens`](@ref) is an example for a multi-shape object as mentioned in the [Multi-shape objects](@ref) section. For spherical doublet lenses the following constructor can be used.
+The [`DoubletLens`](@ref) is an example for a multi-shape object as mentioned in the [Multi-shape objects](@ref) section. For spherical doublet lenses the [`SphericalDoubletLens`](@ref) constructor can be used.
 
 ```@docs; canonical=false
 SphericalDoubletLens(::Any, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any)
@@ -215,119 +215,5 @@ nothing
 
 ![Doublet lens showcase](doublet_showcase.png)
 
-## Constructing generic/mixed lens shapes
-
-For lenses in the field there is great variety and mixture of different shapes, 
-e.g. spherical/aspherical lenses in combinations. So far we have only covered the
-construction of "pure" lenses which consist of only one lens shape type.
-
-Usually a lens is block of a transparent, dielectric material with two optically active
-surfaces (fancy special cases using the sides of the lens as well exist, e.g. for HUD displays). It is common to describe such a lens by specifying the properties of the two surfaces and the material in between.
-
-BeamletOptics.jl however, works with closed volume shapes for all of its optical elements
-and any erroneous (i.e. non-watertight) SDF might result in unphysical behaviour.
-
-To make it easy to specify lenses using the conventional way, the `BeamletOptics.AbstractSurface` API is introduced. This is API is a shim for using surfaces specifications and translate them to SDFs as good as possbile. This does not mean that BeamletOptics.jl works with these surfaces directly for ray tracing. 
-
-Currently the following surface types exist:
-
-```@repl
-using BeamletOptics # hide
-BeamletOptics.list_subtypes(BeamletOptics.AbstractSurface);
-```
-
-A `Lens`(@ref) can be then constructed easily with the following function call:
-
-
-```@docs; canonical=false
-Lens(::BeamletOptics.AbstractRotationallySymmetricSurface, ::BeamletOptics.AbstractRotationallySymmetricSurface, ::Real, ::BeamletOptics.RefractiveIndex)
-```
-
-### Spherical Surface
-
-The bi-convex lens LB1811 (see above) consists of two spherical surfaces and can be also constructed like this:
-
-```@example
-using CairoMakie, BeamletOptics
-NBK7 = DiscreteRefractiveIndex([532e-9, 1064e-9], [1.5195, 1.5066])
-
-# lens diameter 
-d = BeamletOptics.inch
-
-# lens types
-r1 = 34.9e-3
-r2 = -34.9e-3
-l = 6.8e-3
-LB1811 = Lens(
-    SphericalSurface(r1, d),
-    SphericalSurface(r2, d),
-    l, 
-    NBK7
-)
-
-system = System([LB1811])
-
-fig = Figure(size=(600,240))
-ax = Axis3(fig[1,1], aspect=:data, azimuth=0., elevation=1e-3)
-
-hidedecorations!(ax)
-hidespines!(ax)
-
-render_system!(ax, system)
-
-fig
-```
-
-## Aspherical lenses
-
-Aspherical lenses offer more advanced control over aberrations, enabling higher performance in specialized optical systems. The package offers surface support for rotationally symetrical [aspheric lenses](https://en.wikipedia.org/wiki/Aspheric_lens) that adhere to the DIN ISO 10110 convention with even terms.
-
-To construct a lens with any possible combination of convex/concave, spherical/aspherical surfaces you can use the `Lens`(@ref) constructor with the `EvenAsphericalSurface`(@ref) surface specification type. 
-
-A complex example of such a lens might look like the following example. This lens has the following peculiarities:
-- The front surface is an aspherical convex surface with a clear diameter smaller than the full mechanical diameter
-- The back surface is an aspherical concave surface which first curves outwards before change slope and curving invards, giving a more "convex" like character while still beeing a concave lens by definition. Also this surface extends towards the full outer diameter.
-
-```@example
-using CairoMakie, BeamletOptics
-
-L3 = Lens(
-    EvenAsphericalSurface(
-        3.618e-3,               # r
-        3.04e-3,                # d
-        -44.874,                # conic
-        [0,-0.14756*(1e3)^3, 0.035194*(1e3)^5, -0.0032262*(1e3)^7,
-        0.0018592*(1e3)^9, 0.00036658*(1e3)^11, -0.00016039*(1e3)^13,
-        -3.1846e-5*(1e3)^15]    # coeffs
-    ),
-    EvenAsphericalSurface(
-        2.161e-3,               # r
-        3.7e-3,                 # d
-        -10.719,                # conic
-        [0,-0.096568*(1e3)^3, 0.026771*(1e3)^5, -0.011261*(1e3)^7,
-        0.0019879*(1e3)^9, 0.00015579*(1e3)^11, -0.00012433*(1e3)^13,
-        1.5264e-5*(1e3)^15]     # coeffs
-    ),
-    0.7e-3,                     # center_thickness
-    n -> 1.580200               # refractive index
-)
-
-system = System([L3])
-
-fig = Figure(size=(600,240))
-ax = Axis3(fig[1,1], aspect=:data, azimuth=0., elevation=1e-3)
-
-hidedecorations!(ax)
-hidespines!(ax)
-
-render_system!(ax, system)
-
-fig
-```
-
-!!! hint "Aspherical lens example"
-    Refer to the [Simple aspherical lens example](@ref) for a showcase on how to implement a plano-convex asphere.
-
-```@docs; canonical=false
-BeamletOptics.Lens
-```
+!!! tip "Spherical lens example"
+    For a complex showcase featuring spherical singlet and doublet lenses, refer to the [Double Gauss lens](@ref) example page.
