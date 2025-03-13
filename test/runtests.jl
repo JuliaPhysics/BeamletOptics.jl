@@ -7,16 +7,16 @@ using AbstractTrees
 @testset "Utilities" begin
     @testset "Testing normal3d" begin
         @testset "normal3d(v) with Array" begin
-            v = [1., 1, 1]
+            v = [1.0, 1, 1]
             k = BeamletOptics.normal3d(v)
-            @test dot(v, k) ≈ 0 atol=1e-14
+            @test dot(v, k)≈0 atol=1e-14
             @test norm(k) ≈ 1
         end
 
         @testset "normal3d(v) with Point3" begin
-            v = Point3(1., 1, 1)
+            v = Point3(1.0, 1, 1)
             k = BeamletOptics.normal3d(v)
-            @test dot(v, k) ≈ 0 atol=1e-14
+            @test dot(v, k)≈0 atol=1e-14
             @test norm(k) ≈ 1
         end
 
@@ -64,7 +64,8 @@ using AbstractTrees
 
     @testset "Testing reflection3d" begin
         for dx in -1:1, dy in -1:1
-            @test isapprox(BeamletOptics.reflection3d([dx, dy, 1], [0, 0, -1]), [dx, dy, -1])
+            @test isapprox(
+                BeamletOptics.reflection3d([dx, dy, 1], [0, 0, -1]), [dx, dy, -1])
         end
     end
 
@@ -110,9 +111,9 @@ using AbstractTrees
             n = 1.5
             θ = 0.0
             rs, rp, ts, tp = BeamletOptics.fresnel_coefficients(θ, n)
-            @test real(rs) ≈ (1-n)/(1+n)
+            @test real(rs) ≈ (1 - n) / (1 + n)
             @test real(rs) ≈ real(rp)
-            @test real(tp) ≈ 2/(1+n)
+            @test real(tp) ≈ 2 / (1 + n)
             @test real(tp) ≈ real(ts)
         end
 
@@ -125,40 +126,40 @@ using AbstractTrees
 
         @testset "Vacuum-glass: grazing incidence" begin
             n = 1.5
-            θ = π/2
+            θ = π / 2
             rs, rp, ts, tp = BeamletOptics.fresnel_coefficients(θ, n)
             @test real(rs) ≈ -1
             @test real(rp) ≈ 1
             @test real(ts) ≈ 0
-            @test real(tp) ≈ 0 atol=2e-16
+            @test real(tp)≈0 atol=2e-16
         end
 
         @testset "Glass-vacuum: normal incidence" begin
-            n = 1/1.5
+            n = 1 / 1.5
             θ = 0.0
             rs, rp, ts, tp = BeamletOptics.fresnel_coefficients(θ, n)
-            @test real(rs) ≈ (1-n)/(1+n)
+            @test real(rs) ≈ (1 - n) / (1 + n)
             @test real(rs) ≈ real(rp)
-            @test real(tp) ≈ 2/(1+n)
+            @test real(tp) ≈ 2 / (1 + n)
             @test real(tp) ≈ real(ts)
         end
 
         @testset "Glass-vacuum: Brewster angle" begin
-            n = 1/1.5
+            n = 1 / 1.5
             θb = atan(n)
             rs, rp, ts, tp = BeamletOptics.fresnel_coefficients(θb, n)
-            @test real(rp) ≈ 0 atol=2e-16
+            @test real(rp)≈0 atol=2e-16
         end
 
         @testset "Glass-vacuum: Total internal reflection" begin
-            n = 1/1.5
+            n = 1 / 1.5
             θc = asin(n)
             rs, rp, ts, tp = BeamletOptics.fresnel_coefficients(θc, n)
             @test BeamletOptics.is_internally_reflected(rp, rs)
             @test real(rs) ≈ 1
             @test real(rp) ≈ -1
             @test real(ts) ≈ 2
-            @test real(tp) ≈ 3 atol=1e-15
+            @test real(tp)≈3 atol=1e-15
         end
     end
 
@@ -176,7 +177,7 @@ using AbstractTrees
             @test ref_index(lambdas[2]) == indices[2]
             @test_throws KeyError ref_index(lambdas[1] + 1e-9)
             # Test constructor
-            @test_throws ArgumentError DiscreteRefractiveIndex([1], [1,2])
+            @test_throws ArgumentError DiscreteRefractiveIndex([1], [1, 2])
         end
 
         @testset "Test ref. helper function" begin
@@ -222,7 +223,8 @@ end
         n::T
     end
 
-    TestRay(pos::AbstractArray{T}, dir::AbstractArray{T}) where T = TestRay(pos, dir, T(1000e-9), T(1))
+    TestRay(pos::AbstractArray{T}, dir::AbstractArray{T}) where {T} = TestRay(
+        pos, dir, T(1000e-9), T(1))
 
     Base.length(::TestRay) = π
 
@@ -290,7 +292,8 @@ end
         @test AbstractTrees.parent(cb3) === cb2
         # Replace bottom child
         cbr = TestBeam()
-        @test_throws "_modify_beam_head not implemented for $(typeof(cb2))" BeamletOptics.children!(cb2,
+        @test_throws "_modify_beam_head not implemented for $(typeof(cb2))" BeamletOptics.children!(
+            cb2,
             cbr)
         # Test child removal
         BeamletOptics._drop_beams!(cb2)
@@ -328,8 +331,8 @@ end
         dir = Matrix{Float64}(I, 3, 3)
         BeamletOptics.orientation!(shape, dir)
         rotate3d!(shape, [0, 0, 1], deg2rad(45))
-        @test all(BeamletOptics.orientation(shape)[[1,2,5]] .≈ sqrt(2)/2)
-        @test BeamletOptics.orientation(shape)[4] ≈ -sqrt(2)/2
+        @test all(BeamletOptics.orientation(shape)[[1, 2, 5]] .≈ sqrt(2) / 2)
+        @test BeamletOptics.orientation(shape)[4] ≈ -sqrt(2) / 2
         rotate3d!(shape, [0, 0, 1], deg2rad(135))
         @test BeamletOptics.orientation(shape)[1:4:9] == [-1, -1, 1]
         xrotate3d!(shape, π)
@@ -338,13 +341,14 @@ end
         reset_rotation3d!(shape)
         @test BeamletOptics.orientation(shape) == dir
         # Test align3d
-        target_vec = normalize([1,1,1])
+        target_vec = normalize([1, 1, 1])
         align3d!(shape, target_vec)
-        @test BeamletOptics.orientation(shape)[:,2] ≈ target_vec
+        @test BeamletOptics.orientation(shape)[:, 2] ≈ target_vec
         reset_rotation3d!(shape)
         # The following test are expected to do nothing but not throw exceptions
         ray = TestRay([0.0, 0, 0], [1.0, 0, 0])
-        @test_logs (:warn, "No intersect3d method defined for:") BeamletOptics.intersect3d(shape,
+        @test_logs (:warn, "No intersect3d method defined for:") BeamletOptics.intersect3d(
+            shape,
             ray)
 
         @testset "Testing AbstractRay - AbstractShape" begin
@@ -361,7 +365,8 @@ end
         end
     end
 
-    struct TestObject{T, S <: BeamletOptics.AbstractShape{T}} <: BeamletOptics.AbstractObject{T, S}
+    struct TestObject{T, S <: BeamletOptics.AbstractShape{T}} <:
+           BeamletOptics.AbstractObject{T, S}
         shape::S
     end
 
@@ -371,8 +376,10 @@ end
         object = TestObject()
         @test isa(BeamletOptics.shape(object), TestShapeless)
         # Test forwarding of kin. API to object shape
-        @test BeamletOptics.position(object) == BeamletOptics.position(BeamletOptics.shape(object))
-        @test BeamletOptics.position(object) == BeamletOptics.position(BeamletOptics.shape(object))
+        @test BeamletOptics.position(object) ==
+              BeamletOptics.position(BeamletOptics.shape(object))
+        @test BeamletOptics.position(object) ==
+              BeamletOptics.position(BeamletOptics.shape(object))
         translate3d!(object, ones(3))
         rotate3d!(object, [0, 0, 1], π)
         @test BeamletOptics.position(object) == ones(3)
@@ -391,7 +398,8 @@ end
             obj = TestObject()
             ray = TestRay(zeros(3), ones(3))
             beam = TestBeam()
-            @test_logs (:warn, "No interact3d method defined for:") BeamletOptics.interact3d(sys,
+            @test_logs (:warn, "No interact3d method defined for:") BeamletOptics.interact3d(
+                sys,
                 obj,
                 beam,
                 ray)===nothing
@@ -414,11 +422,11 @@ end
     @test BeamletOptics.line_point_distance3d(ray, [-1, 1, 0]) == sqrt(2)
 
     @testset "Testing isentering" begin
-        r1 = Ray([0,0,0], [0,1,0])
-        r2 = Ray([0,0,0], [0,1,0])
-        r3 = Ray([0,0,0], [0,1,0])
-        i1 = BeamletOptics.Intersection(nothing, nothing, 0., Point3(0,1.,0))
-        i2 = BeamletOptics.Intersection(nothing, nothing, 0., Point3(0,-1.,0))
+        r1 = Ray([0, 0, 0], [0, 1, 0])
+        r2 = Ray([0, 0, 0], [0, 1, 0])
+        r3 = Ray([0, 0, 0], [0, 1, 0])
+        i1 = BeamletOptics.Intersection(nothing, nothing, 0.0, Point3(0, 1.0, 0))
+        i2 = BeamletOptics.Intersection(nothing, nothing, 0.0, Point3(0, -1.0, 0))
         BeamletOptics.intersection!(r1, i1)
         BeamletOptics.intersection!(r2, i2)
         @test !BeamletOptics.isentering(r1)
@@ -429,15 +437,19 @@ end
     @testset "Testing refraction3d" begin
         n1 = 1
         n2 = 1.5
-        dir = normalize([0,1,0])
+        dir = normalize([0, 1, 0])
         ray = Ray(zeros(3), dir)
         nml = normalize(Point3{Float64}(0, -1, 1))
-        BeamletOptics.intersection!(ray, BeamletOptics.Intersection(nothing, nothing, 1.0, nml))
-        @test BeamletOptics.refraction3d(dir, nml, n1, n2) == BeamletOptics.refraction3d(ray, n2)
+        BeamletOptics.intersection!(
+            ray, BeamletOptics.Intersection(nothing, nothing, 1.0, nml))
+        @test BeamletOptics.refraction3d(dir, nml, n1, n2) ==
+              BeamletOptics.refraction3d(ray, n2)
         # test for correct exit normal flip
         nml *= -1
-        BeamletOptics.intersection!(ray, BeamletOptics.Intersection(nothing, nothing, 1.0, nml))
-        @test BeamletOptics.refraction3d(dir, -nml, n1, n2) == BeamletOptics.refraction3d(ray, n2)
+        BeamletOptics.intersection!(
+            ray, BeamletOptics.Intersection(nothing, nothing, 1.0, nml))
+        @test BeamletOptics.refraction3d(dir, -nml, n1, n2) ==
+              BeamletOptics.refraction3d(ray, n2)
     end
 end
 
@@ -564,9 +576,9 @@ end
     @testset "Testing align3d!" begin
         align3d!(foo, normalize([0, 1, 1]))
         @test BeamletOptics.position(foo) == zeros(3)
-        @test BeamletOptics.orientation(foo)[:,1] ≈ [1, 0,     0]
-        @test BeamletOptics.orientation(foo)[:,2] ≈ [0, √2/2,  √2/2]
-        @test BeamletOptics.orientation(foo)[:,3] ≈ [0, -√2/2, √2/2]
+        @test BeamletOptics.orientation(foo)[:, 1] ≈ [1, 0, 0]
+        @test BeamletOptics.orientation(foo)[:, 2] ≈ [0, √2 / 2, √2 / 2]
+        @test BeamletOptics.orientation(foo)[:, 3] ≈ [0, -√2 / 2, √2 / 2]
         reset_rotation3d!(foo)
     end
 
@@ -589,8 +601,8 @@ end
     @testset "Testing Moeller-Trumbore algorithm" begin
         t = 5
         face = [1 1 t
-            -1 1 t
-            0 -1 t]
+                -1 1 t
+                0 -1 t]
         # ray at origin pointing along z-axis
         pos = [0.0, 0, 0]
         dir = [0.0, 0, 1]
@@ -645,13 +657,13 @@ end
 
     @testset "Testing constructors" begin
         @testset "Testing RectangularFlatMesh" begin
-            rfm = BeamletOptics.RectangularFlatMesh(2.,1)
+            rfm = BeamletOptics.RectangularFlatMesh(2.0, 1)
             @test BeamletOptics.vertices(rfm) == [1 0 0.5; 1 0 -0.5; -1 0 -0.5; -1 0 0.5]
             @test BeamletOptics.normal3d(rfm, 1) == [0, 1, 0]
         end
 
         @testset "Testing QuadraticFlatMesh" begin
-            qfm = BeamletOptics.QuadraticFlatMesh(4.)
+            qfm = BeamletOptics.QuadraticFlatMesh(4.0)
             @test BeamletOptics.vertices(qfm) == [2 0 2; 2 0 -2; -2 0 -2; -2 0 2]
             @test BeamletOptics.normal3d(qfm, 1) == [0, 1, 0]
         end
@@ -660,25 +672,25 @@ end
     @testset "Testing CircularFlatMesh" begin
         # Testing constructor
         n = 4
-        cm = BeamletOptics.CircularFlatMesh(1f0, n)
+        cm = BeamletOptics.CircularFlatMesh(1.0f0, n)
         v = BeamletOptics.vertices(cm)
         f = BeamletOptics.faces(cm)
 
         # testing vertices
-        @test v[1,:] ≈ zeros(3)
-        @test v[2,:] ≈ [1,0,0]
-        @test v[3,:] ≈ [0,0,1]
-        @test v[4,:] ≈ [-1,0,0]
-        @test v[5,:] ≈ [0,0,-1]
+        @test v[1, :] ≈ zeros(3)
+        @test v[2, :] ≈ [1, 0, 0]
+        @test v[3, :] ≈ [0, 0, 1]
+        @test v[4, :] ≈ [-1, 0, 0]
+        @test v[5, :] ≈ [0, 0, -1]
 
         # testing faces
-        @test f[:,1] == ones(4)
-        @test f[:,2] == [2,3,4,5]
-        @test f[:,3] == [3,4,5,2]
+        @test f[:, 1] == ones(4)
+        @test f[:, 2] == [2, 3, 4, 5]
+        @test f[:, 3] == [3, 4, 5, 2]
 
         # testing normal vectors
-        for i = 1:n
-            @test BeamletOptics.normal3d(cm, i) ≈ [0,-1,0]
+        for i in 1:n
+            @test BeamletOptics.normal3d(cm, i) ≈ [0, -1, 0]
         end
     end
 end
@@ -698,14 +710,15 @@ end
         orientation::Matrix{T}
     end
 
-    TestPointSDF(p::AbstractArray{T}) where {T} = TestPointSDF{T}(Point3{T}(p), Matrix{T}(I, 3, 3))
+    TestPointSDF(p::AbstractArray{T}) where {T} = TestPointSDF{T}(
+        Point3{T}(p), Matrix{T}(I, 3, 3))
     TestPointSDF(T = Float64) = TestPointSDF{T}(Point3{T}(0), Matrix{T}(I, 3, 3))
 
     BeamletOptics.position(tps::TestPointSDF) = tps.position
-    BeamletOptics.position!(tps::TestPointSDF{T}, new::Point3{T}) where T = (tps.position = new)
+    BeamletOptics.position!(tps::TestPointSDF{T}, new::Point3{T}) where {T} = (tps.position = new)
 
     BeamletOptics.orientation(tps::TestPointSDF) = tps.orientation
-    BeamletOptics.orientation!(tps::TestPointSDF{T}, new::Matrix{T}) where T = (tps.orientation = new)
+    BeamletOptics.orientation!(tps::TestPointSDF{T}, new::Matrix{T}) where {T} = (tps.orientation = new)
 
     BeamletOptics.transposed_orientation(tps::TestPointSDF) = transpose(tps.orientation)
     BeamletOptics.transposed_orientation!(::TestPointSDF, ::Any) = nothing
@@ -723,8 +736,8 @@ end
         t = 10
         θ = deg2rad(30)
         translate3d!(point, [t, 0, 0])
-        rotate3d!(point, [0,1,0], θ)
-        pt = BeamletOptics._world_to_sdf(point, [0,0,0])
+        rotate3d!(point, [0, 1, 0], θ)
+        pt = BeamletOptics._world_to_sdf(point, [0, 0, 0])
         @test pt[1] ≈ -t * cos(θ)
         @test pt[2] ≈ 0
         @test pt[3] ≈ -t * sin(θ)
@@ -770,9 +783,11 @@ end
         system = System(o1)
         beam = SystemTestBeam{Real}()
         # Test missing implementation warnings
-        @test_logs (:warn, "Tracing for $(typeof(beam)) not implemented") BeamletOptics.trace_system!(system,
+        @test_logs (:warn, "Tracing for $(typeof(beam)) not implemented") BeamletOptics.trace_system!(
+            system,
             beam)
-        @test_logs (:warn, "Retracing for $(typeof(beam)) not implemented") BeamletOptics.retrace_system!(system,
+        @test_logs (:warn, "Retracing for $(typeof(beam)) not implemented") BeamletOptics.retrace_system!(
+            system,
             beam)
     end
 
@@ -805,8 +820,10 @@ end
         # trace_all
         @test BeamletOptics.object(BeamletOptics.trace_all(system, ray)) === first_obj
         # trace_one
-        @test BeamletOptics.object(BeamletOptics.trace_one(system, ray, BeamletOptics.Hint(first_obj))) === first_obj
-        @test BeamletOptics.object(BeamletOptics.trace_one(system, ray, BeamletOptics.Hint(false_obj))) === first_obj
+        @test BeamletOptics.object(BeamletOptics.trace_one(
+            system, ray, BeamletOptics.Hint(first_obj))) === first_obj
+        @test BeamletOptics.object(BeamletOptics.trace_one(
+            system, ray, BeamletOptics.Hint(false_obj))) === first_obj
         # tracing step
         BeamletOptics.tracing_step!(system, ray, nothing)
         @test BeamletOptics.object(BeamletOptics.intersection(ray)) === first_obj
@@ -825,7 +842,8 @@ end
         first_ray_dir = BeamletOptics.direction(first_ray)
         last_ray_dir = BeamletOptics.direction(last(BeamletOptics.rays(beam)))
         @test 180 - rad2deg(BeamletOptics.angle3d(first_ray_dir, last_ray_dir)) ≈ 2 * Δθ
-        @test BeamletOptics.object(BeamletOptics.intersection(first_ray)) === mirrors[(n_mirrors + 1) ÷ 2 + 2]
+        @test BeamletOptics.object(BeamletOptics.intersection(first_ray)) ===
+              mirrors[(n_mirrors + 1) ÷ 2 + 2]
     end
 
     @testset "Testing StaticSystem tracing" begin
@@ -842,7 +860,8 @@ end
         first_ray_dir = BeamletOptics.direction(first_ray)
         last_ray_dir = BeamletOptics.direction(last(BeamletOptics.rays(beam)))
         @test 180 - rad2deg(BeamletOptics.angle3d(first_ray_dir, last_ray_dir)) ≈ 2 * Δθ
-        @test BeamletOptics.object(BeamletOptics.intersection(first_ray)) === mirrors[(n_mirrors + 1) ÷ 2 + 2]
+        @test BeamletOptics.object(BeamletOptics.intersection(first_ray)) ===
+              mirrors[(n_mirrors + 1) ÷ 2 + 2]
     end
 
     @testset "Testing system retracing" begin
@@ -864,10 +883,12 @@ end
         dir::Matrix{T}
     end
 
-    TestPoint(position::AbstractArray{T}) where {T <: Real} = TestPoint{T}(Point3{T}(position),
+    TestPoint(position::AbstractArray{T}) where {T <: Real} = TestPoint{T}(
+        Point3{T}(position),
         Matrix{T}(I, 3, 3))
 
-    struct GroupTestObject{T <: Real, S <: BeamletOptics.AbstractShape{T}} <: BeamletOptics.AbstractObject{T, S}
+    struct GroupTestObject{T <: Real, S <: BeamletOptics.AbstractShape{T}} <:
+           BeamletOptics.AbstractObject{T, S}
         shape::S
     end
 
@@ -929,8 +950,8 @@ end
         @test BeamletOptics.orientation(center) ≈ Ri
         @test BeamletOptics.orientation(circle) ≈ Ri
         for (i, obj) in enumerate(Leaves(BeamletOptics.objects(circle)))
-            @test isapprox(BeamletOptics.position(obj)[1], xs[i], atol=5e-16)
-            @test isapprox(BeamletOptics.position(obj)[2], ys[i], atol=5e-16)
+            @test isapprox(BeamletOptics.position(obj)[1], xs[i], atol = 5e-16)
+            @test isapprox(BeamletOptics.position(obj)[2], ys[i], atol = 5e-16)
         end
     end
 
@@ -962,7 +983,7 @@ end
         R2 = 1
         nl = 1.5
         tl = BeamletOptics.ThinLensSDF(R1, R2, 0.1)
-        translate3d!(tl, [0, -BeamletOptics.thickness(tl)/2, 0])
+        translate3d!(tl, [0, -BeamletOptics.thickness(tl) / 2, 0])
         p = Lens(tl, x -> 1.5)
         system = System(p)
 
@@ -1022,7 +1043,8 @@ end
     end
 
     """Test coma for rotated and translated optical system"""
-    function test_coma(ray::BeamletOptics.AbstractRay, f0::AbstractArray, dir::AbstractArray; atol=7e-5)
+    function test_coma(ray::BeamletOptics.AbstractRay, f0::AbstractArray,
+            dir::AbstractArray; atol = 7e-5)
         is = BeamletOptics.intersect3d(f0, dir, ray)
         p0 = BeamletOptics.position(ray) + length(is) * BeamletOptics.direction(ray)
         dz = norm(p0 - f0)
@@ -1033,31 +1055,76 @@ end
         end
     end
 
+    @testset "Testing doublet lenses" begin
+        # Define refractive index functions
+        λs = [488e-9, 707e-9, 1064e-9]
+        NLAK22 = DiscreteRefractiveIndex(λs, [1.6591, 1.6456, 1.6374])
+        NSF10 = DiscreteRefractiveIndex(λs, [1.7460, 1.7168, 1.7021])
+
+        function test_doublet(λ, bfl, δf)
+            # Thorlabs lens from https://www.thorlabs.com/thorproduct.cfm?partnumber=AC254-150-AB
+            AC254_150_AB = SphericalDoubletLens(
+                87.9e-3, -105.6e-3, Inf, 6e-3, 3e-3, BeamletOptics.inch, NLAK22, NSF10)
+            # Rptate and translate to test lens kinematics
+            translate3d!(AC254_150_AB, [0.05, 0.05, 0.05])
+            xrotate3d!(AC254_150_AB, deg2rad(-60))
+            zrotate3d!(AC254_150_AB, deg2rad(45))
+            # Define system
+            system = System([AC254_150_AB])
+            # Define semi-diameter for lens ray bundle, selected for min. spherical aberrations
+            z0 = 5e-3
+            zs = LinRange(-z0, z0, 30)
+            fs = similar(zs)
+            # Beam spawn point
+            dir = -BeamletOptics.orientation(AC254_150_AB.back.shape)[:, 2]       # rotated collimated ray direction
+            pos = BeamletOptics.position(AC254_150_AB.front.shape) + 0.05 * dir  # rotated collimated ray position
+            nv = BeamletOptics.normal3d(dir)                                     # orthogonal to moved system optical axis
+            beam = Beam(pos, -dir, λ)
+            # Calculate equivalent back focal length point
+            f_z = BeamletOptics.thickness(AC254_150_AB) + bfl + δf
+            f0 = BeamletOptics.position(AC254_150_AB.front.shape) + f_z * -dir
+            for (i, z) in enumerate(zs)
+                beam.rays[1].pos = pos + z * nv
+                solve_system!(system, beam)
+                @test length(BeamletOptics.rays(beam)) == 4
+                @test BeamletOptics.refractive_index.(beam.rays) ==
+                      [1, NLAK22(λ), NSF10(λ), 1]
+                fs[i] = test_coma(last(BeamletOptics.rays(beam)), f0, dir, atol = 1e-6)
+            end
+            # Test center ray normal vectors
+            beam.rays[1].pos = pos + 0 * nv
+            solve_system!(system, beam)
+            for i in 1:(length(beam.rays) - 1)
+                @test abs(dot(beam.rays[i].intersection.n, beam.rays[i].dir)) ≈ 1
+            end
+            return true
+        end
+        # Run tests for AC254_150_AB against plot data at https://www.thorlabs.com/newgrouppage9.cfm?objectgroup_id=12767
+        @test test_doublet(488e-9, 143.68e-3, -2.064e-4)
+        @test test_doublet(707e-9, 143.68e-3, 0)
+        @test test_doublet(1064e-9, 143.68e-3, +7.466e-4)
+    end
+
     @testset "Testing spherical lens SDFs" begin
         # Based on https://www.pencilofrays.com/double-gauss-sonnar-comparison/
         l1 = SphericalLens(48.88e-3, 182.96e-3, 8.89e-3, 52.3e-3, λ -> 1.62286)
-        l2 = SphericalLens(36.92e-3, Inf, 15.11e-3, 45.11e-3, λ -> 1.58565)
-        l3 = SphericalLens(Inf, 23.06e-3, 2.31e-3, 45.11e-3, λ -> 1.67764)
-        l4 = SphericalLens(-23.91e-3, Inf, 1.92e-3, 40.01e-3, λ -> 1.57046)
-        l5 = SphericalLens(Inf, -36.92e-3, 7.77e-3, 40.01e-3, λ -> 1.64128)
+        l23 = SphericalDoubletLens(36.92e-3, Inf, 23.06e-3, 15.11e-3, 2.31e-3,
+            45.11e-3, λ -> 1.58565, λ -> 1.67764)
+        l45 = SphericalDoubletLens(-23.91e-3, Inf, -36.92e-3, 1.92e-3, 7.77e-3,
+            40.01e-3, λ -> 1.57046, λ -> 1.64128)
         l6 = SphericalLens(1063.24e-3, -48.88e-3, 6.73e-3, 45.11e-3, λ -> 1.62286)
         # Calculate translation distances
-        δy = 1e-7
-        l_2 = BeamletOptics.thickness(l1.shape) + 0.38e-3
-        l_3 = l_2 + BeamletOptics.thickness(l2.shape) + δy
-        l_4 = l_3 + BeamletOptics.thickness(l3.shape) + 9.14e-3 + 13.36e-3
-        l_5 = l_4 + BeamletOptics.thickness(l4.shape) + δy
-        l_6 = l_5 + BeamletOptics.thickness(l5.shape) + 0.38e-3
+        l_23 = BeamletOptics.thickness(l1) + 0.38e-3
+        l_45 = l_23 + BeamletOptics.thickness(l23) + 9.14e-3 + 13.36e-3
+        l_6 = l_45 + BeamletOptics.thickness(l45) + 0.38e-3
         # Corresponds to back focal length of f=59.21 mm on y-axis from link above + "error" δf
         δf = 7e-4
         f_z = l_6 + BeamletOptics.thickness(l6.shape) + 58.21e-3 + δf
-        translate3d!(l2, [0, l_2, 0])
-        translate3d!(l3, [0, l_3, 0])
-        translate3d!(l4, [0, l_4, 0])
-        translate3d!(l5, [0, l_5, 0])
+        translate3d!(l23, [0, l_23, 0])
+        translate3d!(l45, [0, l_45, 0])
         translate3d!(l6, [0, l_6, 0])
         # Create and move group - this tests a bunch of kinematic correctness
-        double_gauss = ObjectGroup([l1, l2, l3, l4, l5, l6])
+        double_gauss = ObjectGroup([l1, l23, l45, l6])
         translate3d!(double_gauss, [0.05, 0.05, 0.05])
         xrotate3d!(double_gauss, deg2rad(60))
         zrotate3d!(double_gauss, deg2rad(45))
@@ -1073,61 +1140,13 @@ end
         beam = Beam(Ray(pos, dir, λ))
         for (i, z) in enumerate(zs)
             # use retracing by manipulating beam starting pos
-            beam.rays[1].pos = pos + z*nv
+            beam.rays[1].pos = pos + z * nv
             solve_system!(system, beam)
             # Test correct beam # of rays
-            @test length(BeamletOptics.rays(beam)) == 13
+            @test length(BeamletOptics.rays(beam)) == 11
             # Test coma at focal point
-            @test test_coma(last(BeamletOptics.rays(beam)), f0, dir, atol=7e-5)
+            @test test_coma(last(BeamletOptics.rays(beam)), f0, dir, atol = 7e-5)
         end
-    end
-
-    @testset "Testing doublet lenses" begin
-        # Define refractive index functions
-        λs = [488e-9, 707e-9, 1064e-9]
-        NLAK22 = DiscreteRefractiveIndex(λs, [1.6591, 1.6456, 1.6374])
-        NSF10 = DiscreteRefractiveIndex(λs, [1.7460, 1.7168, 1.7021])
-
-        function test_doublet(λ, bfl, δf)
-            # Thorlabs lens from https://www.thorlabs.com/thorproduct.cfm?partnumber=AC254-150-AB
-            AC254_150_AB = SphericalDoubletLens(87.9e-3, -105.6e-3, Inf, 6e-3, 3e-3, BeamletOptics.inch, NLAK22, NSF10)
-            # Rptate and translate to test lens kinematics
-            translate3d!(AC254_150_AB, [0.05, 0.05, 0.05])
-            xrotate3d!(AC254_150_AB, deg2rad(-60))
-            zrotate3d!(AC254_150_AB, deg2rad(45))
-            # Define system
-            system = System([AC254_150_AB])
-            # Define semi-diameter for lens ray bundle, selected for min. spherical aberrations
-            z0 = 5e-3
-            zs = LinRange(-z0, z0, 30)
-            fs = similar(zs)
-            # Beam spawn point
-            dir = -BeamletOptics.orientation(AC254_150_AB.back.shape)[:,2]       # rotated collimated ray direction
-            pos = BeamletOptics.position(AC254_150_AB.front.shape) + 0.05 * dir  # rotated collimated ray position
-            nv = BeamletOptics.normal3d(dir)                                     # orthogonal to moved system optical axis
-            beam = Beam(pos, -dir, λ)
-            # Calculate equivalent back focal length point
-            f_z = BeamletOptics.thickness(AC254_150_AB) + bfl + δf
-            f0 = BeamletOptics.position(AC254_150_AB.front.shape) + f_z * -dir
-            for (i, z) in enumerate(zs)
-                beam.rays[1].pos = pos + z*nv
-                solve_system!(system, beam)
-                @test length(BeamletOptics.rays(beam)) == 4
-                @test BeamletOptics.refractive_index.(beam.rays) == [1, NLAK22(λ), NSF10(λ), 1]
-                fs[i] = test_coma(last(BeamletOptics.rays(beam)), f0, dir, atol=1e-6)
-            end
-            # Test center ray normal vectors
-            beam.rays[1].pos = pos + 0*nv
-            solve_system!(system, beam)
-            for i = 1:length(beam.rays)-1
-                @test abs(dot(beam.rays[i].intersection.n, beam.rays[i].dir)) ≈ 1
-            end
-            return true
-        end
-        # Run tests for AC254_150_AB against plot data at https://www.thorlabs.com/newgrouppage9.cfm?objectgroup_id=12767
-        @test test_doublet(488e-9,  143.68e-3, -2.064e-4)
-        @test test_doublet(707e-9,  143.68e-3, 0)
-        @test test_doublet(1064e-9, 143.68e-3, +7.466e-4)
     end
 end
 
@@ -1138,7 +1157,7 @@ end
         beam = Beam(ray)
         solve_system!(system, beam)
 
-        dist = -beam.rays[end].pos[3]/beam.rays[end].dir[3]
+        dist = -beam.rays[end].pos[3] / beam.rays[end].dir[3]
         α = asind(beam.rays[end].dir[3])
         wd = cosd(α) * dist
 
@@ -1161,9 +1180,9 @@ end
         # test lens thickness
         @test BeamletOptics.thickness(lens) ≈ l
         # test edge thickness
-        @test BeamletOptics.thickness(BeamletOptics.shape(lens).sdfs[1]) ≈ 2e-3 atol=1e-4
+        @test BeamletOptics.thickness(BeamletOptics.shape(lens).sdfs[1])≈2e-3 atol=1e-4
         # test back focal length
-        @test working_distance(lens, 0.05*d/2) ≈ 29.5e-3 atol=1e-4
+        @test working_distance(lens, 0.05 * d / 2)≈29.5e-3 atol=1e-4
 
         ## Thorlabs LB1761, bi-convex
         r1 = 24.5e-3
@@ -1181,9 +1200,9 @@ end
         # test lens thickness
         @test BeamletOptics.thickness(lens) ≈ l
         # test edge thickness
-        @test BeamletOptics.thickness(shape.sdfs[1]) ≈ 1.9e-3 atol=1e-4
+        @test BeamletOptics.thickness(shape.sdfs[1])≈1.9e-3 atol=1e-4
         # test back focal length
-        @test working_distance(lens, 0.05*d/2) ≈ 22.2e-3 atol=1e-3
+        @test working_distance(lens, 0.05 * d / 2)≈22.2e-3 atol=1e-3
 
         ## Thorlabs LC1715, plano-concave
         r1 = Inf
@@ -1201,7 +1220,8 @@ end
         # test lens thickness
         @test BeamletOptics.thickness(lens) ≈ l
         # test edge thickness
-        @test BeamletOptics.sag(shape.sdfs[2]) + BeamletOptics.thickness(shape.sdfs[1]) ≈ 0.006858 atol=1e-4
+        @test BeamletOptics.sag(shape.sdfs[2]) +
+              BeamletOptics.thickness(shape.sdfs[1])≈0.006858 atol=1e-4
 
         ## Thorlabs LD2297, bi-concave
         r1 = -39.6e-3
@@ -1219,7 +1239,8 @@ end
         # test lens thickness
         @test BeamletOptics.thickness(lens) ≈ l
 
-        @test BeamletOptics.sag(shape.sdfs[2]) + BeamletOptics.sag(shape.sdfs[3]) + BeamletOptics.thickness(shape.sdfs[1]) ≈ 0.0072 atol=1e-4
+        @test BeamletOptics.sag(shape.sdfs[2]) + BeamletOptics.sag(shape.sdfs[3]) +
+              BeamletOptics.thickness(shape.sdfs[1])≈0.0072 atol=1e-4
 
         ## Thorlabs LBF254-040, best-form
         r1 = 134.6e-3
@@ -1238,7 +1259,7 @@ end
         @test BeamletOptics.thickness(lens) ≈ l
 
         # test edge thickness
-        @test BeamletOptics.thickness(shape.sdfs[1]) ≈ 2.286e-3 atol=1e-4
+        @test BeamletOptics.thickness(shape.sdfs[1])≈2.286e-3 atol=1e-4
 
         ## Thorlabs LE1234, positive meniscus
         r1 = -82.2e-3
@@ -1257,7 +1278,7 @@ end
         @test BeamletOptics.thickness(lens) ≈ l
 
         # test edge thickness
-        @test BeamletOptics.thickness(shape.sdfs[1]) + BeamletOptics.sag(shape.sdfs[2]) ≈ 2e-3 atol=1e-4
+        @test BeamletOptics.thickness(shape.sdfs[1]) + BeamletOptics.sag(shape.sdfs[2])≈2e-3 atol=1e-4
 
         ## Thorlabs LF1822, negative meniscus
         r1 = -33.7e-3
@@ -1276,7 +1297,8 @@ end
         @test BeamletOptics.thickness(lens) ≈ l
 
         # test edge thickness
-        @test BeamletOptics.thickness(shape.sdfs[1]) + BeamletOptics.sag(shape.sdfs[2]) ≈ 4.7e-3 atol=1e-4
+        @test BeamletOptics.thickness(shape.sdfs[1]) +
+              BeamletOptics.sag(shape.sdfs[2])≈4.7e-3 atol=1e-4
 
         ## Generic "true" meniscus
         r1 = 103.4371e-3
@@ -1311,7 +1333,7 @@ end
         # conic constant
         k = -0.789119
         # even aspheric coefficients
-        A = [0, 2.10405e-7*(1e3)^3, 1.76468e-11*(1e3)^5, 1.02641e-15*(1e3)^7]
+        A = [0, 2.10405e-7 * (1e3)^3, 1.76468e-11 * (1e3)^5, 1.02641e-15 * (1e3)^7]
         # center thickness
         ct = 10.2e-3
         # diameter
@@ -1333,26 +1355,26 @@ end
         for (i, z) in enumerate(range(-0.02, 0.02, 100))
             ray = Ray(Point3(0.0, -0.1, z), Point3(0.0, 1.0, 0))
             beam = Beam(ray)
-            solve_system!(system, beam, r_max=40)
+            solve_system!(system, beam, r_max = 40)
 
             surf_errors[i] = (BeamletOptics.position(beam.rays[begin]) + length(beam.rays[begin]) .* BeamletOptics.direction(beam.rays[begin]))[2] -
-                        BeamletOptics.aspheric_equation(ray.pos[3], 1/R, k, A)
+                             BeamletOptics.aspheric_equation(ray.pos[3], 1 / R, k, A)
         end
 
         # FIXME: The atol is actually derived from the raymarching epsilon. If this is puts
         # into a configurable option, this should be changed as well.
-        @test all(x->isapprox(x, 0.0; atol=1e-10), surf_errors)
+        @test all(x -> isapprox(x, 0.0; atol = 1e-10), surf_errors)
 
         # test if the working distance is correct
         ray = Ray([0.0, -0.1, 0.02], [0.0, 1.0, 0])
         beam = Beam(ray)
-        solve_system!(system, beam, r_max=40)
+        solve_system!(system, beam, r_max = 40)
 
-        dist = -beam.rays[end].pos[3]/beam.rays[end].dir[3]
+        dist = -beam.rays[end].pos[3] / beam.rays[end].dir[3]
         α = asind(beam.rays[end].dir[3])
         wd = cosd(α) * dist
 
-        @test wd ≈ 93.2e-3 atol=1e-4
+        @test wd≈93.2e-3 atol=1e-4
     end
 
     @testset "Complex aspherical imaging system" begin
@@ -1362,15 +1384,17 @@ end
                 1.054e-3, # r
                 1.333024e-3, # d
                 -0.14294, # conic
-                 [0,0.038162*(1e3)^3, 0.06317*(1e3)^5, -0.020792*(1e3)^7, 0.18432*(1e3)^9,
-                 -0.04827*(1e3)^11, 0.094529*(1e3)^13] # coeffs
+                [0, 0.038162 * (1e3)^3, 0.06317 * (1e3)^5,
+                    -0.020792 * (1e3)^7, 0.18432 * (1e3)^9,
+                    -0.04827 * (1e3)^11, 0.094529 * (1e3)^13] # coeffs
             ),
             EvenAsphericalSurface(
                 2.027e-3, # r
                 1.216472e-3, # d
                 8.0226, # conic
-                [0,0.0074974*(1e3)^3, 0.064686*(1e3)^5, 0.19354*(1e3)^7, -0.50703*(1e3)^9,
-                -0.34529*(1e3)^11, 5.9938*(1e3)^13] # coeffs
+                [0, 0.0074974 * (1e3)^3, 0.064686 * (1e3)^5,
+                    0.19354 * (1e3)^7, -0.50703 * (1e3)^9,
+                    -0.34529 * (1e3)^11, 5.9938 * (1e3)^13] # coeffs
             ),
             0.72e-3, # center thickness
             n -> 1.580200
@@ -1381,46 +1405,47 @@ end
                 -3.116e-3, # r
                 1.4e-3, # d
                 -49.984, # conic
-                [0,-0.31608*(1e3)^3, 0.34755*(1e3)^5, -0.17102*(1e3)^7, -0.41506*(1e3)^9,
-                -1.342*(1e3)^11, 5.0594*(1e3)^13, -2.7483*(1e3)^15] # coeffs
+                [0, -0.31608 * (1e3)^3, 0.34755 * (1e3)^5,
+                    -0.17102 * (1e3)^7, -0.41506 * (1e3)^9,
+                    -1.342 * (1e3)^11, 5.0594 * (1e3)^13, -2.7483 * (1e3)^15] # coeffs
             ),
             EvenAsphericalSurface(
                 -4.835e-3, # r
                 1.9e-3, # d
                 1.6674, # conic
-                [0,-0.079727*(1e3)^3, 0.13899*(1e3)^5, -0.044057*(1e3)^7,
-                -0.019369*(1e3)^9, 0.016993*(1e3)^11, 0.093716*(1e3)^13,
-                -0.080329*(1e3)^15] # coeffs
+                [0, -0.079727 * (1e3)^3, 0.13899 * (1e3)^5, -0.044057 * (1e3)^7,
+                    -0.019369 * (1e3)^9, 0.016993 * (1e3)^11, 0.093716 * (1e3)^13,
+                    -0.080329 * (1e3)^15] # coeffs
             ),
             0.55e-3, # center_thickness
             n -> 1.804700
         )
 
-        translate3d!(L2, [0, BeamletOptics.thickness(L1) + 0.39e-3,0])
+        translate3d!(L2, [0, BeamletOptics.thickness(L1) + 0.39e-3, 0])
 
         L3 = Lens(
             EvenAsphericalSurface(
                 3.618e-3, # r
                 3.04e-3, # d
                 -44.874, # conic
-                [0,-0.14756*(1e3)^3, 0.035194*(1e3)^5, -0.0032262*(1e3)^7,
-                0.0018592*(1e3)^9, 0.00036658*(1e3)^11, -0.00016039*(1e3)^13,
-                -3.1846e-5*(1e3)^15] # coeffs
+                [0, -0.14756 * (1e3)^3, 0.035194 * (1e3)^5, -0.0032262 * (1e3)^7,
+                    0.0018592 * (1e3)^9, 0.00036658 * (1e3)^11, -0.00016039 * (1e3)^13,
+                    -3.1846e-5 * (1e3)^15] # coeffs
             ),
             EvenAsphericalSurface(
                 2.161e-3, # r
                 3.7e-3, # d
                 -10.719, # conic
-                [0,-0.096568*(1e3)^3, 0.026771*(1e3)^5, -0.011261*(1e3)^7,
-                0.0019879*(1e3)^9, 0.00015579*(1e3)^11, -0.00012433*(1e3)^13,
-                1.5264e-5*(1e3)^15] # coeffs
+                [0, -0.096568 * (1e3)^3, 0.026771 * (1e3)^5, -0.011261 * (1e3)^7,
+                    0.0019879 * (1e3)^9, 0.00015579 * (1e3)^11, -0.00012433 * (1e3)^13,
+                    1.5264e-5 * (1e3)^15] # coeffs
             ),
             0.7e-3, # center_thickness
             n -> 1.580200
         )
 
         translate_to3d!(L3, BeamletOptics.position(L2))
-        translate3d!(L3, [0, BeamletOptics.thickness(L2) + 0.63e-3,0])
+        translate3d!(L3, [0, BeamletOptics.thickness(L2) + 0.63e-3, 0])
 
         Filt = Lens(
             SphericalSurface(Inf, 4.2e-3),
@@ -1430,7 +1455,7 @@ end
         )
 
         translate_to3d!(Filt, BeamletOptics.position(L3))
-        translate3d!(Filt, [0, BeamletOptics.thickness(L3) + 0.19e-3,0])
+        translate3d!(Filt, [0, BeamletOptics.thickness(L3) + 0.19e-3, 0])
 
         Cover = Lens(
             SphericalSurface(Inf, 4.9e-3),
@@ -1439,7 +1464,7 @@ end
             n -> 1.469200
         )
         translate_to3d!(Cover, BeamletOptics.position(Filt))
-        translate3d!(Cover, [0, BeamletOptics.thickness(Filt) + 0.18e-3,0])
+        translate3d!(Cover, [0, BeamletOptics.thickness(Filt) + 0.18e-3, 0])
 
         # test thickness
         @test BeamletOptics.thickness(L1) ≈ 0.72e-3
@@ -1452,16 +1477,16 @@ end
 
         # 0° beams
         beams = [
-            Beam([0, -0.5e-3, -1.3e-3/2], [0, 1, 0], 0.5876e-6),
+            Beam([0, -0.5e-3, -1.3e-3 / 2], [0, 1, 0], 0.5876e-6),
             Beam([0, -0.5e-3, 0], [0, 1, 0], 0.5876e-6),
-            Beam([0, -0.5e-3, 1.3e-3/2], [0, 1, 0], 0.5876e-6)
+            Beam([0, -0.5e-3, 1.3e-3 / 2], [0, 1, 0], 0.5876e-6)
         ]
         for beam in beams
-            solve_system!(system, beam, r_max=50)
-            f_pos = last(beam.rays).pos + 0.12e-3*last(beam.rays).dir
+            solve_system!(system, beam, r_max = 50)
+            f_pos = last(beam.rays).pos + 0.12e-3 * last(beam.rays).dir
 
             # test if the beam is correctly focussed
-            @test f_pos[3] ≈ 0 atol=1e-7
+            @test f_pos[3]≈0 atol=1e-7
         end
     end
 end
@@ -1591,7 +1616,8 @@ end
             support = [1, 0, 0],
             M2 = 1)
         solve_system!(system, gauss)
-        w_numerical, R_numerical, ψ_numerical, w0_numerical = BeamletOptics.gauss_parameters(gauss,
+        w_numerical, R_numerical, ψ_numerical, w0_numerical = BeamletOptics.gauss_parameters(
+            gauss,
             ys)
         # Compare beam radius to within 1 μm
         @test all(isapprox.(w_analytical, w_numerical, atol = 1e-6))
@@ -1623,11 +1649,11 @@ end
     @testset "Testing Spotdetector" begin
         # Set up tilted spot detection screens
         α = 45
-        sd = Spotdetector(1.)
+        sd = Spotdetector(1.0)
         system = System([sd])
-        translate3d!(sd, [0,1,0])
+        translate3d!(sd, [0, 1, 0])
         zrotate3d!(sd, deg2rad(α))
-        beam = Beam([0,0,0], [0,1,0], 1e-6)
+        beam = Beam([0, 0, 0], [0, 1, 0], 1e-6)
         # Trace beams in x-y-plane
         xs = LinRange(-0.25, 0.25, 10)
         for x in xs
@@ -1636,8 +1662,10 @@ end
             # compare ray intersection to stored data
             data = last(sd.data)
             ray = last(beam.rays)
-            pos_ray = BeamletOptics.position(ray) + length(BeamletOptics.intersection(ray)) * BeamletOptics.direction(ray)
-            pos_dta = BeamletOptics.position(sd) + BeamletOptics.orientation(sd)[:,1] * data[1]
+            pos_ray = BeamletOptics.position(ray) +
+                      length(BeamletOptics.intersection(ray)) * BeamletOptics.direction(ray)
+            pos_dta = BeamletOptics.position(sd) +
+                      BeamletOptics.orientation(sd)[:, 1] * data[1]
             @test pos_ray ≈ pos_dta
         end
         # Test reset function
@@ -1666,11 +1694,11 @@ end
         f = BeamletOptics.lensmakers_eq(R1, -R2, nl)
         # Raytracing system (for all tests)
         pd_l = Photodetector(l, n)
-        pd_s = Photodetector(l/10, n÷10)
+        pd_s = Photodetector(l / 10, n ÷ 10)
         ln = ThinLens(R1, R2, d, nl)
         translate3d!(pd_l, [0, z, 0])
         translate3d!(pd_s, [0, z, 0])
-        translate3d!(ln, [0, z - f - BeamletOptics.thickness(ln.shape)/2, 0])
+        translate3d!(ln, [0, z - f - BeamletOptics.thickness(ln.shape) / 2, 0])
 
         @testset "Testing fringe pattern" begin
             system = System(pd_l)
@@ -1748,7 +1776,7 @@ end
         pd_resolution = 100
         m1 = SquarePlanoMirror2D(BeamletOptics.inch)
         m2 = SquarePlanoMirror2D(BeamletOptics.inch)
-        bs = ThinBeamsplitter(BeamletOptics.inch, reflectance=0.5)
+        bs = ThinBeamsplitter(BeamletOptics.inch, reflectance = 0.5)
         pd = Photodetector(pd_size, pd_resolution)
         translate3d!(m1, [l_0, 0, 0])
         translate3d!(m2, [0, l_0, 0])
@@ -1819,8 +1847,10 @@ end
             for (j, y) in enumerate(ys)
                 for (i, x) in enumerate(xs)
                     r = sqrt(x^2 + y^2)
-                    screen[i, j] += BeamletOptics.electric_field(r, short_arm, E0, w0, λ, M2)
-                    screen[i, j] += BeamletOptics.electric_field(r, long_arm, E0, w0, λ, M2) * exp(im*pi)
+                    screen[i, j] += BeamletOptics.electric_field(
+                        r, short_arm, E0, w0, λ, M2)
+                    screen[i, j] += BeamletOptics.electric_field(
+                        r, long_arm, E0, w0, λ, M2) * exp(im * pi)
                 end
             end
 
@@ -1843,9 +1873,9 @@ end
         w0 = 0.5e-3
         λ = 1064e-9
 
-        bs = ThinBeamsplitter(10e-3);
-        pd_1 = Photodetector(10e-3, 100);
-        pd_2 = Photodetector(10e-3, 100);
+        bs = ThinBeamsplitter(10e-3)
+        pd_1 = Photodetector(10e-3, 100)
+        pd_2 = Photodetector(10e-3, 100)
 
         zrotate3d!(bs, deg2rad(45))
         translate3d!(pd_1, [0, l0, 0])
@@ -1860,20 +1890,20 @@ end
         xrotate3d!(pd_1, deg2rad(15))
 
         # define system and beams -> solve
-        system = System([bs, pd_1, pd_2]);
+        system = System([bs, pd_1, pd_2])
 
         phis = LinRange(0, 2pi, 25)
         p1 = similar(phis)
         p2 = similar(phis)
 
-        l1 = GaussianBeamlet([0, -l0, 0], [0, 1., 0], λ, w0; P0);
-        l2 = GaussianBeamlet([-l0, 0, 0], [1., 0, 0], λ, w0; P0);
+        l1 = GaussianBeamlet([0, -l0, 0], [0, 1.0, 0], λ, w0; P0)
+        l2 = GaussianBeamlet([-l0, 0, 0], [1.0, 0, 0], λ, w0; P0)
 
         E0_buffer = l1.E0
 
         for (i, phi) in enumerate(phis)
             # Iterate over relative phase shifts, use retracing
-            l1.E0 = E0_buffer*exp(im*phi)
+            l1.E0 = E0_buffer * exp(im * phi)
             BeamletOptics.reset_detector!(pd_1)
             BeamletOptics.reset_detector!(pd_2)
             solve_system!(system, l1)
@@ -1893,25 +1923,25 @@ end
         E0 = [1, 0, 0]
 
         @testset "90° reflection" begin
-            in_dir = [0,0,1]
-            out_dir = [1,0,0]
-            @test BeamletOptics._calculate_global_E0(in_dir, out_dir, J, E0) ≈ [0,0,-1]
+            in_dir = [0, 0, 1]
+            out_dir = [1, 0, 0]
+            @test BeamletOptics._calculate_global_E0(in_dir, out_dir, J, E0) ≈ [0, 0, -1]
         end
 
         @testset "0° reflection" begin
-            in_dir = [0,0,1]
-            out_dir = [0,0,-1]
-            @test BeamletOptics._calculate_global_E0(in_dir, out_dir, J, E0) ≈ [-1,0,0]
+            in_dir = [0, 0, 1]
+            out_dir = [0, 0, -1]
+            @test BeamletOptics._calculate_global_E0(in_dir, out_dir, J, E0) ≈ [-1, 0, 0]
         end
     end
 
     @testset "Mirror reflections" begin
         # Setup system as in https://opg.optica.org/ao/fulltext.cfm?uri=ao-50-18-2855&id=218813
-        m1 = SquarePlanoMirror2D(1.)
-        m2 = SquarePlanoMirror2D(1.)
-        m3 = SquarePlanoMirror2D(1.)
-        translate3d!(m2, [2,0,0])
-        translate3d!(m3, [2,2,0])
+        m1 = SquarePlanoMirror2D(1.0)
+        m2 = SquarePlanoMirror2D(1.0)
+        m3 = SquarePlanoMirror2D(1.0)
+        translate3d!(m2, [2, 0, 0])
+        translate3d!(m3, [2, 2, 0])
         zrotate3d!(m1, deg2rad(-90))
         yrotate3d!(m1, deg2rad(45))
         zrotate3d!(m2, deg2rad(45))
@@ -1921,11 +1951,11 @@ end
 
         I0_1 = 1
         I0_2 = 5
-        lin_x_pol = [I0_1,0,0]
-        lin_y_pol = [0,I0_2,0]
+        lin_x_pol = [I0_1, 0, 0]
+        lin_y_pol = [0, I0_2, 0]
 
         # Beam of polarized rays
-        ray = PolarizedRay([0.,0,-2], [0,0,1], 1000e-9, lin_x_pol)
+        ray = PolarizedRay([0.0, 0, -2], [0, 0, 1], 1000e-9, lin_x_pol)
         beam = Beam(ray)
 
         @testset "x-Polarization" begin
@@ -1933,21 +1963,21 @@ end
             # test tracing
             solve_system!(system, beam)
             @test BeamletOptics.polarization(beam.rays[1]) ≈ lin_x_pol
-            @test BeamletOptics.polarization(beam.rays[2]) ≈ [0,0,-I0_1]
-            @test BeamletOptics.polarization(beam.rays[3]) ≈ [0,0, I0_1]
-            @test BeamletOptics.polarization(beam.rays[4]) ≈ [0,-I0_1,0]
+            @test BeamletOptics.polarization(beam.rays[2]) ≈ [0, 0, -I0_1]
+            @test BeamletOptics.polarization(beam.rays[3]) ≈ [0, 0, I0_1]
+            @test BeamletOptics.polarization(beam.rays[4]) ≈ [0, -I0_1, 0]
             @test length(beam) == 6.0
         end
 
         @testset "y-Polarization" begin
             BeamletOptics.polarization!(ray, lin_y_pol)
-            translate3d!(m3, [0,2,0])
+            translate3d!(m3, [0, 2, 0])
             # test retracing
             solve_system!(system, beam)
             @test BeamletOptics.polarization(beam.rays[1]) ≈ lin_y_pol
-            @test BeamletOptics.polarization(beam.rays[2]) ≈ [0,-I0_2,0]
-            @test BeamletOptics.polarization(beam.rays[3]) ≈ [ I0_2,0,0]
-            @test BeamletOptics.polarization(beam.rays[4]) ≈ [-I0_2,0,0]
+            @test BeamletOptics.polarization(beam.rays[2]) ≈ [0, -I0_2, 0]
+            @test BeamletOptics.polarization(beam.rays[3]) ≈ [I0_2, 0, 0]
+            @test BeamletOptics.polarization(beam.rays[4]) ≈ [-I0_2, 0, 0]
             @test length(beam) == 8.0
         end
     end
@@ -1963,34 +1993,38 @@ end
         Ts = 1 - abs2(rs)
         Tp = 1 - abs2(rp)
         # Setup testcase
-        s1 = BeamletOptics.CuboidMesh(1., d, 1.)
-        s2 = BeamletOptics.CuboidMesh(1., d, 1.)
-        s3 = BeamletOptics.CuboidMesh(1., d, 1.)
-        s4 = BeamletOptics.CuboidMesh(1., d, 1.)
-        s5 = BeamletOptics.CuboidMesh(1., d, 1.)
-        l1 = Lens(s1, x->n)
-        l2 = Lens(s2, x->n)
-        l3 = Lens(s3, x->n)
-        l4 = Lens(s4, x->n)
-        l5 = Lens(s5, x->n)
-        translate3d!.([l1, l2, l3, l4, l5], Ref([-0.5,-d/2,-0.5]))
+        s1 = BeamletOptics.CuboidMesh(1.0, d, 1.0)
+        s2 = BeamletOptics.CuboidMesh(1.0, d, 1.0)
+        s3 = BeamletOptics.CuboidMesh(1.0, d, 1.0)
+        s4 = BeamletOptics.CuboidMesh(1.0, d, 1.0)
+        s5 = BeamletOptics.CuboidMesh(1.0, d, 1.0)
+        l1 = Lens(s1, x -> n)
+        l2 = Lens(s2, x -> n)
+        l3 = Lens(s3, x -> n)
+        l4 = Lens(s4, x -> n)
+        l5 = Lens(s5, x -> n)
+        translate3d!.([l1, l2, l3, l4, l5], Ref([-0.5, -d / 2, -0.5]))
         BeamletOptics.set_new_origin3d!.(BeamletOptics.shape.([l1, l2, l3, l4, l5]))
-        translate3d!(l2, [0,0.5, -1d/2])
-        translate3d!(l3, [0,1.0, -2d/2])
-        translate3d!(l4, [0,1.5, -3d/2])
-        translate3d!(l5, [0,2.0, -4d/2])
+        translate3d!(l2, [0, 0.5, -1d / 2])
+        translate3d!(l3, [0, 1.0, -2d / 2])
+        translate3d!(l4, [0, 1.5, -3d / 2])
+        translate3d!(l5, [0, 2.0, -4d / 2])
         xrotate3d!.([l1, l2, l3, l4, l5], -θb)
         # Solve system of s- and p-polarized beams
         system = StaticSystem([l1, l2, l3, l4, l5])
-        x_pol_ray = PolarizedRay([-0.1, -1, 0], [0, 1., 0], 1000e-9, [BeamletOptics.electric_field(1), 0, 0])
-        z_pol_ray = PolarizedRay([+0.1, -1, 0], [0, 1., 0], 1000e-9, [0, 0, BeamletOptics.electric_field(1)])
+        x_pol_ray = PolarizedRay(
+            [-0.1, -1, 0], [0, 1.0, 0], 1000e-9, [BeamletOptics.electric_field(1), 0, 0])
+        z_pol_ray = PolarizedRay(
+            [+0.1, -1, 0], [0, 1.0, 0], 1000e-9, [0, 0, BeamletOptics.electric_field(1)])
         s_beam = Beam(x_pol_ray)
         p_beam = Beam(z_pol_ray)
         solve_system!(system, s_beam)
         solve_system!(system, p_beam)
         # Since system is non-focussing, calculate pseudo-intensity
-        pseudo_Is = abs2(BeamletOptics.polarization(last(BeamletOptics.rays(s_beam)))[1]) / (2*BeamletOptics.Z_vacuum)
-        pseudo_Ip = abs2(BeamletOptics.polarization(last(BeamletOptics.rays(p_beam)))[3]) / (2*BeamletOptics.Z_vacuum)
+        pseudo_Is = abs2(BeamletOptics.polarization(last(BeamletOptics.rays(s_beam)))[1]) /
+                    (2 * BeamletOptics.Z_vacuum)
+        pseudo_Ip = abs2(BeamletOptics.polarization(last(BeamletOptics.rays(p_beam)))[3]) /
+                    (2 * BeamletOptics.Z_vacuum)
         # Test against m interfaces
         m = length(system.objects) * 2
         @test pseudo_Is ≈ Ts^m
@@ -2000,15 +2034,16 @@ end
     @testset "Fresnel rhomb" begin
         # Create Fresnel rhomb with n=1.5 and θ=53.3° for quarter-wave plate effect
         n = 1.5
-        s1 = BeamletOptics.CuboidMesh(0.5,1.25,0.5, deg2rad(53.3))
-        l1 = Lens(s1, x->n)
+        s1 = BeamletOptics.CuboidMesh(0.5, 1.25, 0.5, deg2rad(53.3))
+        l1 = Lens(s1, x -> n)
         translate3d!(l1, [-0.25, 0, -0.25])
         BeamletOptics.set_new_origin3d!(s1)
         # Rotate prism to obtain 45° beam input polarization
         yrotate3d!(l1, deg2rad(135))
         # Solve system
         system = StaticSystem([l1])
-        ray = PolarizedRay([0, -1, 0], [0, 1., 0], 1000e-9, [0, 0, BeamletOptics.electric_field(1)])
+        ray = PolarizedRay(
+            [0, -1, 0], [0, 1.0, 0], 1000e-9, [0, 0, BeamletOptics.electric_field(1)])
         beam = Beam(ray)
         solve_system!(system, beam)
         # Assumes propagation along the y-axis after rhomb, calculate polarization state
@@ -2017,7 +2052,7 @@ end
         Ez = getindex.(BeamletOptics.polarization.(beam.rays), 3)
         # Test for circular polarization and Ey error
         phi = angle(last(Ez)) - angle(last(Ex))
-        @test phi ≈ π/2
+        @test phi ≈ π / 2
         @test abs(last(Ey)) < 2e-14
     end
 
@@ -2025,23 +2060,23 @@ end
         # setup MZI
         m1 = SquarePlanoMirror2D(BeamletOptics.inch)
         m2 = SquarePlanoMirror2D(BeamletOptics.inch)
-        b1 = ThinBeamsplitter(BeamletOptics.inch, reflectance=0.5)
-        b2 = ThinBeamsplitter(BeamletOptics.inch, reflectance=0.5)
+        b1 = ThinBeamsplitter(BeamletOptics.inch, reflectance = 0.5)
+        b2 = ThinBeamsplitter(BeamletOptics.inch, reflectance = 0.5)
 
         system = StaticSystem([m1, m2, b1, b2])
 
-        translate3d!(b1, [0*BeamletOptics.inch, 0*BeamletOptics.inch, 0])
-        translate3d!(b2, [2*BeamletOptics.inch, 2*BeamletOptics.inch, 0])
-        translate3d!(m1, [0*BeamletOptics.inch, 2*BeamletOptics.inch, 0])
-        translate3d!(m2, [2*BeamletOptics.inch, 0*BeamletOptics.inch, 0])
+        translate3d!(b1, [0 * BeamletOptics.inch, 0 * BeamletOptics.inch, 0])
+        translate3d!(b2, [2 * BeamletOptics.inch, 2 * BeamletOptics.inch, 0])
+        translate3d!(m1, [0 * BeamletOptics.inch, 2 * BeamletOptics.inch, 0])
+        translate3d!(m2, [2 * BeamletOptics.inch, 0 * BeamletOptics.inch, 0])
 
         # Rotate with consideration to mirror/bs normal
-        zrotate3d!(b1, deg2rad(360-135))
+        zrotate3d!(b1, deg2rad(360 - 135))
         zrotate3d!(b2, deg2rad(45))
-        zrotate3d!(m1, deg2rad(360-135))
+        zrotate3d!(m1, deg2rad(360 - 135))
         zrotate3d!(m2, deg2rad(45))
 
-        ray = PolarizedRay([0, -0.1, 0], [0., 1., 0], 1000e-9, [0, 0, 1])
+        ray = PolarizedRay([0, -0.1, 0], [0.0, 1.0, 0], 1000e-9, [0, 0, 1])
         beam = Beam(ray)
 
         @testset "z-polarized ray along y-axis" begin
@@ -2060,10 +2095,10 @@ end
             rrr = beam.children[2].children[2].rays[1].E0
 
             # Test phase flips
-            @test t[3] ≈ sqrt(2)/2
-            @test r[3] ≈ -sqrt(2)/2
-            @test tr[3] ≈ -sqrt(2)/2
-            @test rr[3] ≈ sqrt(2)/2
+            @test t[3] ≈ sqrt(2) / 2
+            @test r[3] ≈ -sqrt(2) / 2
+            @test tr[3] ≈ -sqrt(2) / 2
+            @test rr[3] ≈ sqrt(2) / 2
             @test trt ≈ rrr
             @test trr ≈ rrt
         end
@@ -2086,8 +2121,8 @@ end
             rrr = beam.children[2].children[2].rays[1].E0
 
             # Test phase flips
-            @test t[1] ≈ sqrt(2)/2
-            @test r[2] ≈ -sqrt(2)/2
+            @test t[1] ≈ sqrt(2) / 2
+            @test r[2] ≈ -sqrt(2) / 2
             @test tr ≈ r
             @test rr ≈ t
             @test trt ≈ rrr
@@ -2103,9 +2138,9 @@ end
         # Init splitter
         N0 = 1.5
         mm = 1e-3
-        pbs = RectangularPlateBeamsplitter(36mm, 25mm, 1mm, n->N0)
+        pbs = RectangularPlateBeamsplitter(36mm, 25mm, 1mm, n -> N0)
         system = System([pbs])
-        beam = Beam([0,-50mm,0], [0,1,0], 1e-6)
+        beam = Beam([0, -50mm, 0], [0, 1, 0], 1e-6)
         # Trace normally
         zrotate3d!(pbs, deg2rad(45))
         solve_system!(system, beam)
@@ -2129,7 +2164,7 @@ end
             @test all(BeamletOptics.refractive_index.(r) .== 1)
             # correct dir
             @test BeamletOptics.direction(first(p)) ≈ BeamletOptics.direction(last(t))
-            @test BeamletOptics.direction(first(r)) ≈ [1,0,0]
+            @test BeamletOptics.direction(first(r)) ≈ [1, 0, 0]
         end
 
         # Retrace backside
@@ -2150,16 +2185,16 @@ end
             @test all(BeamletOptics.refractive_index.(r) .== [N0, 1])
             # correct dir
             @test BeamletOptics.direction(first(p)) ≈ BeamletOptics.direction(last(t))
-            @test BeamletOptics.direction(last(r)) ≈ [1,0,0]
+            @test BeamletOptics.direction(last(r)) ≈ [1, 0, 0]
         end
     end
 
     @testset "Testing CubeBeamsplitter with Beam" begin
         # Init splitter
-        cbs = CubeBeamsplitter(25e-3, n->N0)
+        cbs = CubeBeamsplitter(25e-3, n -> N0)
         translate3d!(cbs, [0, 50mm, 0])
         system = System([cbs])
-        beam = Beam([0,0,0], [0,1,0], 1e-6)
+        beam = Beam([0, 0, 0], [0, 1, 0], 1e-6)
 
         @testset "Initial CBS tracing" begin
             # Trace normally
@@ -2176,12 +2211,12 @@ end
             @test BeamletOptics.refractive_index.(t) == [N0, 1]
             @test BeamletOptics.refractive_index.(r) == [N0, 1]
             @test BeamletOptics.direction(last(t)) ≈ BeamletOptics.direction(first(p))
-            @test BeamletOptics.direction(last(r)) ≈ [-1,0,0]
+            @test BeamletOptics.direction(last(r)) ≈ [-1, 0, 0]
         end
 
         @testset "Retrace after 45° CBS rotation" begin
             # Retrace
-            zrotate3d!(cbs, π/2)
+            zrotate3d!(cbs, π / 2)
             solve_system!(system, beam)
 
             # Test correct ray dirs
@@ -2190,12 +2225,12 @@ end
             r = BeamletOptics.rays(beam.children[2])
 
             @test BeamletOptics.direction(last(t)) == BeamletOptics.direction(first(p))
-            @test BeamletOptics.direction(last(t)) == [0,1,0]
+            @test BeamletOptics.direction(last(t)) == [0, 1, 0]
         end
 
         @testset "Retrace CBS backside" begin
             # Retrace backside
-            zrotate3d!(cbs, π/2)
+            zrotate3d!(cbs, π / 2)
             solve_system!(system, beam)
 
             # Test correct ray length, ref. indices, dirs
@@ -2210,13 +2245,12 @@ end
             @test BeamletOptics.refractive_index.(t) == [N0, 1]
             @test BeamletOptics.refractive_index.(r) == [N0, 1]
             @test BeamletOptics.direction(last(t)) ≈ BeamletOptics.direction(first(p))
-            @test BeamletOptics.direction(last(r)) ≈ [-1,0,0]
+            @test BeamletOptics.direction(last(r)) ≈ [-1, 0, 0]
         end
     end
 end
 
 @testset "Bug fixes" begin
-
     @testset "Issue#14" begin
         pd_res = 1000
         pd = BeamletOptics.Photodetector(10e-3, pd_res)
@@ -2224,13 +2258,14 @@ end
         BeamletOptics.translate3d!(pd, [0.46, 0, 0])
         # Setup beam
         y_0 = 0.2
-        beam = BeamletOptics.GaussianBeamlet([0, y_0, 0], [0.46, -y_0, 0], 532e-9, 2.5e-3, P0 = 10e-3)
+        beam = BeamletOptics.GaussianBeamlet(
+            [0, y_0, 0], [0.46, -y_0, 0], 532e-9, 2.5e-3, P0 = 10e-3)
         # Solve system
         system = BeamletOptics.System([pd])
         BeamletOptics.reset_detector!(pd)
         BeamletOptics.solve_system!(system, beam)
 
-        @test BeamletOptics.optical_power(pd) ≈ 10e-3 atol=1e-5
+        @test BeamletOptics.optical_power(pd)≈10e-3 atol=1e-5
     end
 end
 
