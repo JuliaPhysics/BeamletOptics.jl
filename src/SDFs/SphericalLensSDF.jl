@@ -448,17 +448,20 @@ struct SphericalSurface{T} <: AbstractRotationallySymmetricSurface{T}
 end
 
 """
-    SphericalSurface(radius::T, diameter::T) where T
+    SphericalSurface(radius, diameter)
 
 Construct a `SphericalSurface` given the radius of curvature and the optical diameter.
 This constructor automatically sets the mechanical diameter equal to the optical diameter.
 
 # Arguments
-- `radius::T`: The radius of curvature of the surface.
-- `diameter::T`: The clear (optical) diameter of the surface.
+- `radius`: The radius of curvature of the surface.
+- `diameter`: The clear (optical) diameter of the surface.
 
 """
-SphericalSurface(radius::T, diameter::T) where T = SphericalSurface{T}(radius, diameter, diameter)
+function SphericalSurface(radius::R, diameter::D) where {R<:Real, D<:Real}
+    T = promote_type(R, D)
+    return SphericalSurface{T}(T(radius), T(diameter), T(diameter))
+end
 
 mechanical_diameter(s::SphericalSurface) = s.mechanical_diameter
 
