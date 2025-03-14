@@ -65,7 +65,7 @@ end
 """
     ConcaveCylinderSDF <: AbstractSDF
 
-Implements the `SDF` of a concave cut cylinder with radius `r`, diameter `d` and height `h`.
+Implements the `SDF` of a concave cylinder with radius `r`, diameter `d` and height `h`.
 """
 mutable struct ConcaveCylinderSDF{T} <: AbstractSDF{T}
     dir::SMatrix{3, 3, T, 9}
@@ -79,7 +79,7 @@ end
 """
     ConcaveCylinderSDF(radius, diameter, height)
 
-Constructs a concave cut cylinder with radius `r`, diameter `d` and height `h` in [m].
+Constructs a concave cylinder with radius `r`, diameter `d` and height `h` in [m].
 """
 function ConcaveCylinderSDF(radius::R, diameter::D, height::H) where {R, D, H}
     T = promote_type(R, D, H)
