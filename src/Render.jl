@@ -147,3 +147,15 @@ function render_object_normals!(axis, mesh::Mesh; l = 0.01)
 end
 _render_object_normal!(::Any, ::AbstractVector, ::AbstractVector; color = :blue) = nothing
 
+function render_beam!(axis, agb::AstigmaticGaussianBeamlet; flen = 0.1)
+    # placeholder render
+    render_beam!(axis, agb.c, flen = flen, color = :black)
+    render_beam!(axis, agb.wxp, flen = flen, color = :green)
+    render_beam!(axis, agb.wxm, flen = flen, color = :green)
+    render_beam!(axis, agb.dxp, flen = flen, color = :green)
+    render_beam!(axis, agb.dxm, flen = flen, color = :green)
+    render_beam!(axis, agb.wyp, flen = flen, color = :red)
+    render_beam!(axis, agb.wym, flen = flen, color = :red)
+    render_beam!(axis, agb.dyp, flen = flen, color = :red)
+    render_beam!(axis, agb.dym, flen = flen, color = :red)
+end

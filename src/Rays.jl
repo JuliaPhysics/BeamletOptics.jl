@@ -33,9 +33,10 @@ function Ray(pos::AbstractArray{P},
         dir::AbstractArray{D},
         λ::L = 1000e-9) where {P <: Real, D <: Real, L<:Real}
     F = promote_type(P, D, L)
+    dir = normalize(dir)
     return Ray{F}(
         Point3{F}(pos),
-        normalize(Point3{F}(dir)),
+        Point3{F}(dir),
         nothing,
         F(λ),
         F(1))
