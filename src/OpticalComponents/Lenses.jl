@@ -288,8 +288,9 @@ function Lens(
     else
         # Construct central box and add front/back surfaces
         mid = BoxSDF(h, l0, d_mid)
+        translate3d!(mid, [0, l0/2, 0])
         if front !== nothing
-            translate3d!(mid, [0, thickness(front) + l0/2, 0])
+            translate3d!(mid, [0, thickness(front), 0])
             mid += front
         end
         if back !== nothing
