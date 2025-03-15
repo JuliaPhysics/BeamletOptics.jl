@@ -1,18 +1,18 @@
-abstract type AbstractACylindricalSurfaceSDF{T} <: AbstractCylindricalSurfaceSDF{T} end
+abstract type AbstractAcylindricalSurfaceSDF{T} <: AbstractCylindricalSurfaceSDF{T} end
 
-conic_constant(s::AbstractACylindricalSurfaceSDF) = s.conic_constant
-coefficients(s::AbstractACylindricalSurfaceSDF) = s.coefficients
+conic_constant(s::AbstractAcylindricalSurfaceSDF) = s.conic_constant
+coefficients(s::AbstractAcylindricalSurfaceSDF) = s.coefficients
 
-function aspheric_equation(r::Real, a::AbstractACylindricalSurfaceSDF)
+function aspheric_equation(r::Real, a::AbstractAcylindricalSurfaceSDF)
     aspheric_equation(r, 1 / a.radius, a.conic_constant, a.coefficients)
 end
 
 """
-    AconvexCylinderSDF{T} <: AbstractACylindricalSurfaceSDF{T}
+    AconvexCylinderSDF{T} <: AbstractAcylindricalSurfaceSDF{T}
 
 Implements the `SDF` of a cut cylinder with radius `r`, diameter `d` and height `h`.
 """
-mutable struct AconvexCylinderSDF{T} <: AbstractACylindricalSurfaceSDF{T}
+mutable struct AconvexCylinderSDF{T} <: AbstractAcylindricalSurfaceSDF{T}
     dir::SMatrix{3,3,T,9}
     transposed_dir::SMatrix{3,3,T,9}
     pos::Point3{T}
@@ -74,11 +74,11 @@ function sdf(s::AconvexCylinderSDF{T}, point) where {T}
 end
 
 """
-    AconcaveCylinderSDF{T} <: AbstractACylindricalSurfaceSDF{T}
+    AconcaveCylinderSDF{T} <: AbstractAcylindricalSurfaceSDF{T}
 
 Implements the `SDF` of a concave cylinder with radius `r`, diameter `d` and height `h`.
 """
-mutable struct AconcaveCylinderSDF{T} <: AbstractACylindricalSurfaceSDF{T}
+mutable struct AconcaveCylinderSDF{T} <: AbstractAcylindricalSurfaceSDF{T}
     dir::SMatrix{3,3,T,9}
     transposed_dir::SMatrix{3,3,T,9}
     pos::Point3{T}
@@ -142,13 +142,13 @@ end
 
 # Surface API implementation
 
-abstract type AbstractACylindricalSurface{T} <: AbstractCylindricalSurface{T} end
+abstract type AbstractAcylindricalSurface{T} <: AbstractCylindricalSurface{T} end
 
-conic_constant(s::AbstractACylindricalSurface) = s.conic_constant
-coefficients(s::AbstractACylindricalSurface) = s.coefficients
+conic_constant(s::AbstractAcylindricalSurface) = s.conic_constant
+coefficients(s::AbstractAcylindricalSurface) = s.coefficients
 
 """
-    ACylindricalSurface{T} <: AbstractACylindricalSurface{T}
+    AcylindricalSurface{T} <: AbstractAcylindricalSurface{T}
 
 A type representing an acylindric optical surface defined by its radius of curvature, diameter,
 height, mechanical diameter, conic constant and even aspheric coefficients.
@@ -164,7 +164,7 @@ It is therefore a cylindric surface with a deviation from the perfect cylindric 
   to the optical diameter, but it can be set independently if the mechanical mount requires a larger dimension.
 
 """
-struct ACylindricalSurface{T} <: AbstractACylindricalSurface{T}
+struct AcylindricalSurface{T} <: AbstractAcylindricalSurface{T}
     radius::T
     diameter::T
     height::T
@@ -174,7 +174,7 @@ struct ACylindricalSurface{T} <: AbstractACylindricalSurface{T}
 end
 
 """
-    ACylindricalSurface(radius, diameter, height, conic_constant, coefficients)
+    AcylindricalSurface(radius, diameter, height, conic_constant, coefficients)
 
 Construct a `CylindricalSurface` given the radius of curvature, optical diameter and height.
 This constructor automatically sets the mechanical diameter equal to the optical diameter.
@@ -186,14 +186,14 @@ This constructor automatically sets the mechanical diameter equal to the optical
 - `conic_constant::T` : The conic_constant of the curved surface
 - `coefficients::Vector{T}` : The coefficients of the even aspherical equation for the curved surface.
 """
-function ACylindricalSurface(radius::T1, diameter::T2, height::T3, conic_constant::T4, coefficients::AbstractVector{T5}) where {T1,T2,T3,T4,T5}
+function AcylindricalSurface(radius::T1, diameter::T2, height::T3, conic_constant::T4, coefficients::AbstractVector{T5}) where {T1,T2,T3,T4,T5}
     T = promote_type(T1, T2, T3, T4, T5)
 
-    return ACylindricalSurface{T}(
+    return AcylindricalSurface{T}(
         radius, diameter, height, conic_constant, coefficients, diameter)
 end
 
-function edge_sag(s::ACylindricalSurface{T}, ::AbstractACylindricalSurfaceSDF) where T
+function edge_sag(s::AcylindricalSurface{T}, ::AbstractAcylindricalSurfaceSDF) where T
     sag = aspheric_equation(
         diameter(s) / 2,
         1 / radius(s),
@@ -204,13 +204,13 @@ function edge_sag(s::ACylindricalSurface{T}, ::AbstractACylindricalSurfaceSDF) w
     return sag
 end
 
-function sdf(s::ACylindricalSurface, ot::AbstractOrientationType)
+function sdf(s::AcylindricalSurface, ot::AbstractOrientationType)
     isinf(radius(s)) && return nothing
 
     return _sdf(s, ot)
 end
 
-function _sdf(s::ACylindricalSurface, ::ForwardOrientation)
+function _sdf(s::AcylindricalSurface, ::ForwardOrientation)
     front = if radius(s) > 0
         AconvexCylinderSDF(radius(s), diameter(s), height(s), conic_constant(s), coefficients(s))
     else
@@ -220,7 +220,7 @@ function _sdf(s::ACylindricalSurface, ::ForwardOrientation)
     return front
 end
 
-function _sdf(s::ACylindricalSurface, ::BackwardOrientation)
+function _sdf(s::AcylindricalSurface, ::BackwardOrientation)
     back = if radius(s) > 0
         AconcaveCylinderSDF(radius(s), diameter(s), height(s), conic_constant(s), coefficients(s))
     else
@@ -230,7 +230,7 @@ function _sdf(s::ACylindricalSurface, ::BackwardOrientation)
     return back
 end
 
-function bounding_sphere(s::AbstractACylindricalSurfaceSDF{T}) where T
+function bounding_sphere(s::AbstractAcylindricalSurfaceSDF{T}) where T
     y = aspheric_equation(diameter(s) / 2, s)
     z = diameter(s) / 2
     x = height(s) / 2
@@ -240,7 +240,7 @@ function bounding_sphere(s::AbstractACylindricalSurfaceSDF{T}) where T
 end
 
 # custom render code
-function render_object!(axis, acyl::AbstractACylindricalSurfaceSDF; color=:red)
+function render_object!(axis, acyl::AbstractAcylindricalSurfaceSDF; color=:red)
     r = diameter(acyl) / 2
     w_vals = LinRange(-r, r, 100)           # aperture coordinate
     z_vals = LinRange(-height(acyl) / 2, height(acyl) / 2, 20)  # extrusion coordinate
@@ -264,7 +264,7 @@ function render_object!(axis, acyl::AbstractACylindricalSurfaceSDF; color=:red)
     return nothing
 end
 
-function render_acylindric_cap!(axis, acyl::AbstractACylindricalSurfaceSDF, top::Bool; color=:red)
+function render_acylindric_cap!(axis, acyl::AbstractAcylindricalSurfaceSDF, top::Bool; color=:red)
     r = diameter(acyl) / 2
     h = height(acyl)
     Xval = top ? (h / 2) : -(h / 2)   # local X coordinate for top or bottom cap
@@ -300,7 +300,7 @@ function render_acylindric_cap!(axis, acyl::AbstractACylindricalSurfaceSDF, top:
     return nothing
 end
 
-function render_acylindric_caps!(axis, acyl::AbstractACylindricalSurfaceSDF; color=:red)
+function render_acylindric_caps!(axis, acyl::AbstractAcylindricalSurfaceSDF; color=:red)
     render_acylindric_cap!(axis, acyl, true; color=color)  # top
     render_acylindric_cap!(axis, acyl, false; color=color)  # bottom
     return nothing

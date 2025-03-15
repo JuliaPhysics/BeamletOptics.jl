@@ -1541,6 +1541,50 @@ end
     end
 
     @testset "Convex/cav acylinder lenses" begin
+        # Thorlabs AYL2520, plano-convex
+        radius = 15.538e-3
+        diameter = 25e-3
+        height = 50e-3
+        conic_constant = -1.0
+        ct = 7.5e-3
+        lens = Lens(
+        BeamletOptics.AcylindricalSurface(
+            radius,
+            diameter,
+            height,
+            conic_constant,
+            [0, 1.1926075e-5*(1e3)^3, -2.9323497e-9*(1e3)^5, -1.8718889e-11*(1e3)^7, -1.7009961e-14*(1e3)^9, 3.5481542e-17*(1e3)^11, 6.5241296e-20*(1e3)^13]),
+            nothing,
+            ct,
+            n -> 1.777
+        )
+
+        # test lens thickness
+        @test BeamletOptics.thickness(lens) ≈ ct
+
+        # test back focal length
+        @test working_distance(lens, 0.05 * diameter / 2) ≈ 15.8e-3 atol=1e-4
+
+        # Thorlabs AYL2520, plano-convex (inverted)
+        radius = -15.538e-3
+        diameter = 25e-3
+        height = 50e-3
+        conic_constant = -1.0
+        ct = 7.5e-3
+        lens = Lens(
+        BeamletOptics.AcylindricalSurface(
+            radius,
+            diameter,
+            height,
+            conic_constant,
+            [0, 1.1926075e-5*(1e3)^3, -2.9323497e-9*(1e3)^5, -1.8718889e-11*(1e3)^7, -1.7009961e-14*(1e3)^9, 3.5481542e-17*(1e3)^11, 6.5241296e-20*(1e3)^13]),
+            nothing,
+            ct,
+            n -> 1.777
+        )
+
+        # test lens thickness
+        @test BeamletOptics.thickness(lens) ≈ ct
     end
 end
 
