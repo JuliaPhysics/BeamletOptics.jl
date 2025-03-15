@@ -132,10 +132,6 @@ end
 
 abstract type AbstractAcylindricSurface{T} <: AbstractCylindricSurface{T} end
 
-mechanical_diameter(s::AbstractCylindricSurface) = s.mechanical_diameter
-radius(s::AbstractCylindricSurface) = s.radius
-diameter(s::AbstractCylindricSurface) = s.diameter
-height(s::AbstractCylindricSurface) = s.height
 conic_constant(s::AbstractAcylindricSurface) = s.conic_constant
 coefficients(s::AbstractAcylindricSurface) = s.coefficients
 
