@@ -1,9 +1,29 @@
+
 """
-    CutCylinderSDF <: AbstractSDF
+    AbstractCylindriccalSurfaceSDF <: AbstractAsphericalSurfaceSDF{T}
+
+A class of [`AbstractSDF`](@ref)s that can be used to represent cylindric non-rotationally symmetric lens surfaces.
+It is implicity assumed that all surfaces are represented by **closed volumes** for ray-tracing correctness.
+
+# Implementation reqs.
+
+Subtypes of `AbstractCylindricalSurfaceSDF` must implement the following additional methods.
+
+## Functions:
+
+- `height`: this function returns the height of the cylinder part of the surface
+"""
+abstract type AbstractCylindricalSurfaceSDF{T} <: AbstractLensSDF{T} end
+
+"""Returns the cylindric height of the `AbstractCylindricalSurfaceSDF`"""
+height(s::AbstractCylindricalSurfaceSDF) = s.height
+
+"""
+    ConvexCylinderSDF <: AbstractSDF
 
 Implements the `SDF` of a cut cylinder with radius `r`, diameter `d` and height `h`.
 """
-mutable struct CutCylinderSDF{T} <: AbstractSDF{T}
+mutable struct ConvexCylinderSDF{T} <: AbstractLensSDF{T}
     dir::SMatrix{3, 3, T, 9}
     transposed_dir::SMatrix{3, 3, T, 9}
     pos::Point3{T}
@@ -13,13 +33,13 @@ mutable struct CutCylinderSDF{T} <: AbstractSDF{T}
 end
 
 """
-    CutCylinderSDF(radius, diameter, height)
+    ConvexCylinderSDF(radius, diameter, height)
 
 Constructs a cut cylinder with radius `r`, diameter `d` and height `h` in [m].
 """
-function CutCylinderSDF(radius::R, diameter::D, height::H) where {R, D, H}
+function ConvexCylinderSDF(radius::R, diameter::D, height::H) where {R, D, H}
     T = promote_type(R, D, H)
-    s = CutCylinderSDF{T}(
+    s = ConvexCylinderSDF{T}(
         Matrix{T}(I, 3, 3),
         Matrix{T}(I, 3, 3),
         Point3{T}(0),
@@ -34,9 +54,9 @@ function CutCylinderSDF(radius::R, diameter::D, height::H) where {R, D, H}
     return s
 end
 
-thickness(s::CutCylinderSDF) = abs(sag(s.radius, s.diameter))
+thickness(s::ConvexCylinderSDF) = abs(sag(s.radius, s.diameter))
 
-function sdf(s::CutCylinderSDF{T}, point) where {T}
+function sdf(s::ConvexCylinderSDF{T}, point) where {T}
     p = _world_to_sdf(s, point)
 
     return op_extrude_x(
@@ -67,7 +87,7 @@ end
 
 Implements the `SDF` of a concave cylinder with radius `r`, diameter `d` and height `h`.
 """
-mutable struct ConcaveCylinderSDF{T} <: AbstractSDF{T}
+mutable struct ConcaveCylinderSDF{T} <: AbstractLensSDF{T}
     dir::SMatrix{3, 3, T, 9}
     transposed_dir::SMatrix{3, 3, T, 9}
     pos::Point3{T}
@@ -159,7 +179,7 @@ This constructor automatically sets the mechanical diameter equal to the optical
 CylindricSurface(radius::T, diameter::T, height::T) where {T} = CylindricSurface{T}(
     radius, diameter, height, diameter)
 
-edge_sag(::CylindricSurface, sd::CutCylinderSDF) = thickness(sd)
+edge_sag(::CylindricSurface, sd::ConvexCylinderSDF) = thickness(sd)
 edge_sag(::CylindricSurface, sd::ConcaveCylinderSDF) = thickness(sd.cut_cylinder_sdf)
 
 function sdf(s::CylindricSurface, ot::AbstractOrientationType)
@@ -170,7 +190,7 @@ end
 
 function _sdf(s::CylindricSurface, ::ForwardOrientation)
     front = if radius(s) > 0
-        CutCylinderSDF(radius(s), diameter(s), height(s))
+        ConvexCylinderSDF(radius(s), diameter(s), height(s))
     else
         ConcaveCylinderSDF(radius(s), diameter(s), height(s))
     end
@@ -182,7 +202,7 @@ function _sdf(s::CylindricSurface, ::BackwardOrientation)
     back = if radius(s) > 0
         ConcaveCylinderSDF(radius(s), diameter(s), height(s))
     else
-        CutCylinderSDF(-radius(s), diameter(s), s.height)
+        ConvexCylinderSDF(-radius(s), diameter(s), s.height)
     end
 
     return back
