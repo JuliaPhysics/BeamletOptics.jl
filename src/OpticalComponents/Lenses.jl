@@ -251,7 +251,9 @@ function Lens(
         front_surface::Union{Nothing, AbstractCylindricSurface},
         back_surface::Union{Nothing, AbstractCylindricSurface},
         center_thickness::Real,
-        n::RefractiveIndex)
+        n::RefractiveIndex;
+        circular=false,
+        circular_radius=Inf)
     # Initialize remaining box section length.
     l0 = center_thickness
 

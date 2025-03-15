@@ -1,6 +1,6 @@
 
 """
-    AbstractCylindriccalSurfaceSDF <: AbstractAsphericalSurfaceSDF{T}
+    AbstractCylindricalSurfaceSDF <: AbstractLensSDF{T}
 
 A class of [`AbstractSDF`](@ref)s that can be used to represent cylindric non-rotationally symmetric lens surfaces.
 It is implicity assumed that all surfaces are represented by **closed volumes** for ray-tracing correctness.
@@ -12,11 +12,14 @@ Subtypes of `AbstractCylindricalSurfaceSDF` must implement the following additio
 ## Functions:
 
 - `height`: this function returns the height of the cylinder part of the surface
+- `radius`: this function returns the radius of the cylinder surface curvature
 """
 abstract type AbstractCylindricalSurfaceSDF{T} <: AbstractLensSDF{T} end
 
 """Returns the cylindric height of the `AbstractCylindricalSurfaceSDF`"""
 height(s::AbstractCylindricalSurfaceSDF) = s.height
+"""Returns the radius of the `AbstractCylindricalSurfaceSDF`"""
+radius(s::AbstractCylindricalSurfaceSDF) = s.radius
 
 """
     ConvexCylinderSDF <: AbstractSDF
