@@ -303,22 +303,21 @@ function Lens(
 
         # Add mechanical ring if md_mid > d_mid
         if md_mid > d_mid
-            throw(ArgumentError("Mechanical diameters not yet implemented for cylindric lenses"))
-            # ring_thickness = thickness(mid)
-            # ring_center = position(mid)[2] + ring_thickness / 2
-            # if front !== nothing
-            #     s = edge_sag(front_surface, front)
-            #     ring_thickness -= s
-            #     ring_center += s / 2
-            # end
-            # if back !== nothing
-            #     s = edge_sag(back_surface, back)
-            #     ring_thickness += s
-            #     ring_center += s / 2
-            # end
-            # ring = RingSDF(d_mid / 2, (md_mid - d_mid) / 2, ring_thickness)
-            # translate3d!(ring, [0, ring_center, 0])
-            # shape += ring
+            ring_thickness = thickness(mid)
+            ring_center = position(mid)[2] + ring_thickness / 2
+            if front !== nothing
+                s = edge_sag(front_surface, front)
+                ring_thickness -= s
+                ring_center += s / 2
+            end
+            if back !== nothing
+                s = edge_sag(back_surface, back)
+                ring_thickness += s
+                ring_center += s / 2
+            end
+            ring = RingSDF(d_mid / 2, (md_mid - d_mid) / 2, ring_thickness)
+            translate3d!(ring, [0, ring_center, 0])
+            shape += ring
         elseif md_mid < d_mid
             @warn "Mechanical diameter is less than clear aperture; parameter md has been ignored."
         end
