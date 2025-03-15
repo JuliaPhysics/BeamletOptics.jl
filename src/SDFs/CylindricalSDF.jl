@@ -140,15 +140,15 @@ end
 
 # Surface API implementation
 
-abstract type AbstractCylindricSurface{T} <: AbstractSurface{T} end
+abstract type AbstractCylindricalSurface{T} <: AbstractSurface{T} end
 
-mechanical_diameter(s::AbstractCylindricSurface) = s.mechanical_diameter
-radius(s::AbstractCylindricSurface) = s.radius
-diameter(s::AbstractCylindricSurface) = s.diameter
-height(s::AbstractCylindricSurface) = s.height
+mechanical_diameter(s::AbstractCylindricalSurface) = s.mechanical_diameter
+radius(s::AbstractCylindricalSurface) = s.radius
+diameter(s::AbstractCylindricalSurface) = s.diameter
+height(s::AbstractCylindricalSurface) = s.height
 
 """
-    CylindricSurface{T} <: AbstractCylindricSurface{T}
+    CylindricalSurface{T} <: AbstractCylindricalSurface{T}
 
 A type representing a cylindric optical surface defined by its radius of curvature, diameter,
 height and mechanical diameter
@@ -161,7 +161,7 @@ height and mechanical diameter
   to the optical diameter, but it can be set independently if the mechanical mount requires a larger dimension.
 
 """
-struct CylindricSurface{T} <: AbstractCylindricSurface{T}
+struct CylindricalSurface{T} <: AbstractCylindricalSurface{T}
     radius::T
     diameter::T
     height::T
@@ -169,9 +169,9 @@ struct CylindricSurface{T} <: AbstractCylindricSurface{T}
 end
 
 """
-    CylindricSurface(radius::T, diameter::T, height::T) where T
+    CylindricalSurface(radius::T, diameter::T, height::T) where T
 
-Construct a `CylindricSurface` given the radius of curvature, optical diameter and height.
+Construct a `CylindricalSurface` given the radius of curvature, optical diameter and height.
 This constructor automatically sets the mechanical diameter equal to the optical diameter.
 
 # Arguments
@@ -179,19 +179,19 @@ This constructor automatically sets the mechanical diameter equal to the optical
 - `diameter::T`: The clear (optical) diameter of the surface.
 - `height::T`: The height/length of the uncurved surface direction.
 """
-CylindricSurface(radius::T, diameter::T, height::T) where {T} = CylindricSurface{T}(
+CylindricalSurface(radius::T, diameter::T, height::T) where {T} = CylindricalSurface{T}(
     radius, diameter, height, diameter)
 
-edge_sag(::CylindricSurface, sd::ConvexCylinderSDF) = thickness(sd)
-edge_sag(::CylindricSurface, sd::ConcaveCylinderSDF) = thickness(sd.cut_cylinder_sdf)
+edge_sag(::CylindricalSurface, sd::ConvexCylinderSDF) = thickness(sd)
+edge_sag(::CylindricalSurface, sd::ConcaveCylinderSDF) = thickness(sd.cut_cylinder_sdf)
 
-function sdf(s::CylindricSurface, ot::AbstractOrientationType)
+function sdf(s::CylindricalSurface, ot::AbstractOrientationType)
     isinf(radius(s)) && return nothing
 
     return _sdf(s, ot)
 end
 
-function _sdf(s::CylindricSurface, ::ForwardOrientation)
+function _sdf(s::CylindricalSurface, ::ForwardOrientation)
     front = if radius(s) > 0
         ConvexCylinderSDF(radius(s), diameter(s), height(s))
     else
@@ -201,7 +201,7 @@ function _sdf(s::CylindricSurface, ::ForwardOrientation)
     return front
 end
 
-function _sdf(s::CylindricSurface, ::BackwardOrientation)
+function _sdf(s::CylindricalSurface, ::BackwardOrientation)
     back = if radius(s) > 0
         ConcaveCylinderSDF(radius(s), diameter(s), height(s))
     else

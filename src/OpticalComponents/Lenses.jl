@@ -248,8 +248,8 @@ function Lens(
 end
 
 function Lens(
-        front_surface::Union{Nothing, AbstractCylindricSurface},
-        back_surface::Union{Nothing, AbstractCylindricSurface},
+        front_surface::Union{Nothing, AbstractCylindricalSurface},
+        back_surface::Union{Nothing, AbstractCylindricalSurface},
         center_thickness::Real,
         n::RefractiveIndex;
         circular=false,

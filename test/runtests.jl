@@ -1491,6 +1491,59 @@ end
     end
 end
 
+@testset "Cylindrical Lenses" begin
+    function working_distance(lens, offset_z)
+        ray = Ray([0.0, -1.0, offset_z], [0.0, 1.0, 0])
+        system = System([lens])
+        beam = Beam(ray)
+        solve_system!(system, beam)
+
+        dist = -beam.rays[end].pos[3] / beam.rays[end].dir[3]
+        α = asind(beam.rays[end].dir[3])
+        wd = cosd(α) * dist
+
+        return wd
+    end
+    @testset "Convex/cav cylinder lenses" begin
+        # Thorlabs LJ1878L2, plano-convex
+        r = 5.2e-3
+        d = 10e-3
+        h = 20e-3
+        ct = 5.9e-3
+        lens = Lens(
+            CylindricalSurface(r, d, h),
+            nothing,
+            ct,
+            n -> 1.517
+        )
+
+        # test lens thickness
+        @test BeamletOptics.thickness(lens) ≈ ct
+        # test edge thickness
+        @test BeamletOptics.thickness(BeamletOptics.shape(lens).sdfs[1])≈2.12e-3 atol=1e-4
+        # test back focal length
+        @test working_distance(lens, 0.05 * d / 2)≈6.1e-3 atol=1e-4
+
+        # Thorlabs LK1900L1, plano-concave
+        r = -13.1e-3
+        d = 16e-3
+        h = 18e-3
+        ct = 2.0e-3
+        lens = Lens(
+            CylindricalSurface(r, d, h),
+            nothing,
+            ct,
+            n -> 1.517
+        )
+
+        # test lens thickness
+        @test BeamletOptics.thickness(lens) ≈ ct
+    end
+
+    @testset "Convex/cav acylinder lenses" begin
+    end
+end
+
 @testset "Gaussian beamlet" begin
     @testset "Testing type definitions" begin
         @test isdefined(BeamletOptics, :GaussianBeamlet)
