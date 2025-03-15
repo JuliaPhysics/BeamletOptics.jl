@@ -247,13 +247,29 @@ function Lens(
     return Lens(shape, n)
 end
 
+"""
+     Lens(front_surface::Union{Nothing, AbstractCylindricalSurface}, back_surface::Union{Nothing, AbstractCylindricalSurface}, center_thickness::Real, n::RefractiveIndex)
+
+Constructs a new [`Lens`](@ref) object using the cylindric surface specifications `front_surface` and
+`back_surface` and the `center_thickness`. These inputs are used to construct a [`UnionSDF`](@ref)
+that consists of the appropriate sub-SDFs to represent the shape of the lens.
+
+This method of `Lens` is specific for cylindric lenses and has some limitations:
+    - The cylinder height of both surfaces has to be identical
+    - No mixture with non-cylindric surfaces is supported at the moment
+
+The material properties are supplied via the `n` parameter.
+
+# Additional information
+
+!!! info "Radius of curvature (ROC) sign definition"
+    The ROC is defined to be positive if the center is to the right of the surface. Otherwise it is negative.
+"""
 function Lens(
         front_surface::Union{Nothing, AbstractCylindricalSurface},
         back_surface::Union{Nothing, AbstractCylindricalSurface},
         center_thickness::Real,
-        n::RefractiveIndex;
-        circular=false,
-        circular_radius=Inf)
+        n::RefractiveIndex)
     # Initialize remaining box section length.
     l0 = center_thickness
 
