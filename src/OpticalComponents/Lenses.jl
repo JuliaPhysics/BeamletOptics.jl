@@ -247,6 +247,13 @@ function Lens(
     return Lens(shape, n)
 end
 
+Lens(front_surface::AbstractRotationallySymmetricSurface, center_thickness::Real, n::RefractiveIndex) = Lens(
+    front_surface,
+    CircularSurface(diameter(front_surface)),
+    center_thickness,
+    n
+)
+
 """
      Lens(front_surface::AbstractCylindricalSurface, back_surface::AbstractCylindricalSurface, center_thickness::Real, n::RefractiveIndex)
 
@@ -325,6 +332,13 @@ function Lens(
 
     return Lens(shape, n)
 end
+
+Lens(front_surface::AbstractCylindricalSurface, center_thickness::Real, n::RefractiveIndex) = Lens(
+    front_surface,
+    RectangularSurface(diameter(front_surface)),
+    center_thickness,
+    n
+)
 
 function cylindric_lens_outer_parameters(f::AbstractCylindricalSurface, b::AbstractCylindricalSurface)
     height(f) != height(b) && throw(ArgumentError("height of front and back surface have to match for cylindric lenses"))
