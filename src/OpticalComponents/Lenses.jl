@@ -248,7 +248,7 @@ function Lens(
 end
 
 """
-     Lens(front_surface::Union{Nothing, AbstractCylindricalSurface}, back_surface::Union{Nothing, AbstractCylindricalSurface}, center_thickness::Real, n::RefractiveIndex)
+     Lens(front_surface::AbstractCylindricalSurface, back_surface::AbstractCylindricalSurface, center_thickness::Real, n::RefractiveIndex)
 
 Constructs a new [`Lens`](@ref) object using the cylindric surface specifications `front_surface` and
 `back_surface` and the `center_thickness`. These inputs are used to construct a [`UnionSDF`](@ref)
@@ -266,39 +266,23 @@ The material properties are supplied via the `n` parameter.
     The ROC is defined to be positive if the center is to the right of the surface. Otherwise it is negative.
 """
 function Lens(
-        front_surface::Union{Nothing, AbstractCylindricalSurface},
-        back_surface::Union{Nothing, AbstractCylindricalSurface},
+        front_surface::AbstractCylindricalSurface,
+        back_surface::AbstractCylindricalSurface,
         center_thickness::Real,
         n::RefractiveIndex)
     # Initialize remaining box section length.
     l0 = center_thickness
 
     # Front Surface
-    front = isnothing(front_surface) ? nothing : sdf(front_surface, ForwardOrientation())
+    front = sdf(front_surface, ForwardOrientation())
     l0 -= isnothing(front) ? zero(l0) : thickness(front)
 
     # Back Surface
-    back = isnothing(back_surface) ? nothing : sdf(back_surface, BackwardOrientation())
+    back = sdf(back_surface, BackwardOrientation())
     l0 -= isnothing(back) ? zero(l0) : thickness(back)
 
     # validate
-    if front_surface !== nothing && back_surface !== nothing
-        height(front_surface) != height(back_surface) && throw(ArgumentError("height of front and back surface have to match for cylindric lenses"))
-
-        d_mid = min(diameter(front_surface), diameter(back_surface))
-        md_mid = max(mechanical_diameter(front_surface), mechanical_diameter(back_surface))
-        h = height(front_surface)
-    elseif front_surface !== nothing
-        d_mid = diameter(front_surface)
-        md_mid = mechanical_diameter(front_surface)
-        h = height(front_surface)
-    elseif back_surface !== nothing
-        d_mid = diameter(back_surface)
-        md_mid = mechanical_diameter(back_surface)
-        h = height(back_surface)
-    else
-        throw(ArgumentError("Both surfaces cannot be nothing"))
-    end
+    d_mid, md_mid, h = cylindric_lens_outer_parameters(front_surface, back_surface)
 
     # Check if the center section is positive
     if l0 ≤ 0
@@ -340,4 +324,30 @@ function Lens(
     end
 
     return Lens(shape, n)
+end
+
+function cylindric_lens_outer_parameters(f::AbstractCylindricalSurface, b::AbstractCylindricalSurface)
+    height(f) != height(b) && throw(ArgumentError("height of front and back surface have to match for cylindric lenses"))
+
+    d_mid = min(diameter(f), diameter(b))
+    md_mid = max(mechanical_diameter(f), mechanical_diameter(b))
+    h = height(f)
+
+    return d_mid, md_mid, h
+end
+
+function cylindric_lens_outer_parameters(f::AbstractCylindricalSurface, ::RectangularSurface)
+    d_mid = diameter(f)
+    md_mid = mechanical_diameter(f)
+    h = height(f)
+
+    return d_mid, md_mid, h
+end
+
+cylindric_lens_outer_parameters(f::RectangularSurface, b::AbstractCylindricalSurface) = cylindric_lens_outer_parameters(b, f)
+
+function cylindric_lens_outer_parameters(::RectangularSurface, ::RectangularSurface)
+    throw(ArgumentError("Both cylindric surfaces must not be rectangular surfaces.
+    If you intend to build a rectangular plate, use `BoxSDF` directly and pass it
+    to `Lens` as shape."))
 end

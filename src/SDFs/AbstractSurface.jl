@@ -23,7 +23,7 @@ Subtypes of `AbstractShape` should implement the following:
 - [`edge_sag`](@ref) : Returns the edge sagitta of the `AbstractRotationallySymmetricSurface`
 
 ## Functions:
-- [`sdf(::AbstractRotationallySymmetricSurface, ::Union{Nothing, AbstractOrientationType})`](@ref) : 
+- [`sdf(::AbstractRotationallySymmetricSurface, ::Union{Nothing, AbstractOrientationType})`](@ref) :
     Converts the surface specification of `AbstractRotationallySymmetricSurface` into an `AbstractSDF`
 """
 abstract type AbstractRotationallySymmetricSurface{T} <: AbstractSurface{T} end
@@ -70,7 +70,7 @@ struct BackwardLeftMeniscusOrientation <: AbstractOrientationType end
 struct BackwardRightMeniscusOrientation <: AbstractOrientationType end
 
 """
-Takes the surface specification `s` and and optional `AbstractOrientationType` as 
+Takes the surface specification `s` and and optional `AbstractOrientationType` as
 trait parameter and returns a corresponding `AbstractSDF` type.
 
 !!! note
@@ -82,3 +82,19 @@ which posesses a surface with the given specs on one side and most often a bound
 """
 sdf(s::AbstractRotationallySymmetricSurface, ::Union{Nothing, AbstractOrientationType}) = throw(ArgumentError(lazy"sdf of $(typeof(s)) not implemented"))
 sdf(s::AbstractRotationallySymmetricSurface) = sdf(s, nothing)
+
+
+"""
+    CircularSurface{T} <: AbstractRotationallySurface{T}
+
+A type representing a planar circular surface, which is only parametrized by its `diameter`.
+
+# Fields
+- `diameter::T`: The diameter of the planar surface
+
+"""
+struct CircularSurface{T} <: AbstractRotationallySymmetricSurface{T}
+    diameter::T
+end
+
+sdf(::CircularSurface, ::AbstractOrientationType) = nothing

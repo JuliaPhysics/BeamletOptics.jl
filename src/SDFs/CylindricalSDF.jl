@@ -210,3 +210,20 @@ function _sdf(s::CylindricalSurface, ::BackwardOrientation)
 
     return back
 end
+
+"""
+    RectangularSurface{T} <: AbstracCylindricalSurface{T}
+
+A type representing a planar rectangular surface, which is only parametrized by its `size`.
+
+# Fields
+- `size::T`: The size of the planar surface
+
+"""
+struct RectangularSurface{T} <: AbstractCylindricalSurface{T}
+    size::T
+end
+
+diameter(s::RectangularSurface) = s.size
+
+sdf(::RectangularSurface, ::AbstractOrientationType) = nothing

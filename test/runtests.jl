@@ -1172,7 +1172,7 @@ end
         d = 25.4e-3
         lens = Lens(
             SphericalSurface(r1, d),
-            SphericalSurface(Inf, d),
+            CircularSurface(d),
             l,
             n -> 1.458
         )
@@ -1343,7 +1343,7 @@ end
 
         lens = Lens(
             EvenAsphericalSurface(R, d, k, A),
-            SphericalSurface(Inf, d),
+            CircularSurface(d),
             ct,
             x -> n
         )
@@ -1448,8 +1448,8 @@ end
         translate3d!(L3, [0, BeamletOptics.thickness(L2) + 0.63e-3, 0])
 
         Filt = Lens(
-            SphericalSurface(Inf, 4.2e-3),
-            SphericalSurface(Inf, 4.2e-3),
+            CircularSurface(4.2e-3),
+            CircularSurface(4.2e-3),
             0.15e-3,
             n -> 1.516800
         )
@@ -1458,8 +1458,8 @@ end
         translate3d!(Filt, [0, BeamletOptics.thickness(L3) + 0.19e-3, 0])
 
         Cover = Lens(
-            SphericalSurface(Inf, 4.9e-3),
-            SphericalSurface(Inf, 4.9e-3),
+            CircularSurface(4.9e-3),
+            CircularSurface(4.9e-3),
             0.5e-3,
             n -> 1.469200
         )
@@ -1512,7 +1512,7 @@ end
         ct = 5.9e-3
         lens = Lens(
             CylindricalSurface(r, d, h),
-            nothing,
+            RectangularSurface(d),
             ct,
             n -> 1.517
         )
@@ -1531,7 +1531,7 @@ end
         ct = 2.0e-3
         lens = Lens(
             CylindricalSurface(r, d, h),
-            nothing,
+            RectangularSurface(d),
             ct,
             n -> 1.517
         )
@@ -1548,13 +1548,14 @@ end
         conic_constant = -1.0
         ct = 7.5e-3
         lens = Lens(
-        BeamletOptics.AcylindricalSurface(
-            radius,
-            diameter,
-            height,
-            conic_constant,
-            [0, 1.1926075e-5*(1e3)^3, -2.9323497e-9*(1e3)^5, -1.8718889e-11*(1e3)^7, -1.7009961e-14*(1e3)^9, 3.5481542e-17*(1e3)^11, 6.5241296e-20*(1e3)^13]),
-            nothing,
+            BeamletOptics.AcylindricalSurface(
+                radius,
+                diameter,
+                height,
+                conic_constant,
+                [0, 1.1926075e-5*(1e3)^3, -2.9323497e-9*(1e3)^5, -1.8718889e-11*(1e3)^7, -1.7009961e-14*(1e3)^9, 3.5481542e-17*(1e3)^11, 6.5241296e-20*(1e3)^13]
+            ),
+            RectangularSurface(diameter),
             ct,
             n -> 1.777
         )
@@ -1572,13 +1573,14 @@ end
         conic_constant = -1.0
         ct = 7.5e-3
         lens = Lens(
-        BeamletOptics.AcylindricalSurface(
-            radius,
-            diameter,
-            height,
-            conic_constant,
-            [0, 1.1926075e-5*(1e3)^3, -2.9323497e-9*(1e3)^5, -1.8718889e-11*(1e3)^7, -1.7009961e-14*(1e3)^9, 3.5481542e-17*(1e3)^11, 6.5241296e-20*(1e3)^13]),
-            nothing,
+            BeamletOptics.AcylindricalSurface(
+                radius,
+                diameter,
+                height,
+                conic_constant,
+                [0, 1.1926075e-5*(1e3)^3, -2.9323497e-9*(1e3)^5, -1.8718889e-11*(1e3)^7, -1.7009961e-14*(1e3)^9, 3.5481542e-17*(1e3)^11, 6.5241296e-20*(1e3)^13]
+            ),
+            RectangularSurface(diameter),
             ct,
             n -> 1.777
         )
