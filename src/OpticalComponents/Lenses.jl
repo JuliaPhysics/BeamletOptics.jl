@@ -369,6 +369,13 @@ end
 
 cylindric_lens_outer_parameters(f::RectangularSurface, b::AbstractCylindricalSurface) = cylindric_lens_outer_parameters(b, f)
 
+function cylindric_lens_outer_parameters(f::RectangularSurface, b::RectangularSurface)
+    d_mid = diameter(f)
+    md_mid = mechanical_diameter(f)
+
+    return d_mid, md_mid, d_mid
+end
+
 function Lens(front_surface::RectangularSurface, back_surface::RectangularSurface, center_thickness::Real, n::RefractiveIndex)
     d_mid = min(diameter(front_surface), diameter(back_surface))
     mid = BoxSDF(d_mid, center_thickness, d_mid)
