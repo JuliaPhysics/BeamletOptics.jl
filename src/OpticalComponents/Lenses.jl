@@ -254,6 +254,15 @@ Lens(front_surface::AbstractRotationallySymmetricSurface, center_thickness::Real
     n
 )
 
+function Lens(front_surface::CircularSurface, back_surface::CircularSurface, center_thickness::Real, n::RefractiveIndex)
+    d_mid = min(diameter(front_surface), diameter(back_surface))
+
+    return Lens(
+        PlanoSurfaceSDF(center_thickness, d_mid),
+        n
+    )
+end
+
 """
      Lens(front_surface::AbstractCylindricalSurface, back_surface::AbstractCylindricalSurface, center_thickness::Real, n::RefractiveIndex)
 
@@ -360,8 +369,13 @@ end
 
 cylindric_lens_outer_parameters(f::RectangularSurface, b::AbstractCylindricalSurface) = cylindric_lens_outer_parameters(b, f)
 
-function cylindric_lens_outer_parameters(::RectangularSurface, ::RectangularSurface)
-    throw(ArgumentError("Both cylindric surfaces must not be rectangular surfaces.
-    If you intend to build a rectangular plate, use `BoxSDF` directly and pass it
-    to `Lens` as shape."))
+function Lens(front_surface::RectangularSurface, back_surface::RectangularSurface, center_thickness::Real, n::RefractiveIndex)
+    d_mid = min(diameter(front_surface), diameter(back_surface))
+    mid = BoxSDF(d_mid, center_thickness, d_mid)
+    translate3d!(mid, [0, center_thickness/2, 0])
+
+    return Lens(
+        mid,
+        n
+    )
 end
