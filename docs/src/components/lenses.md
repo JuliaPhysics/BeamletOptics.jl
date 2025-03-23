@@ -177,8 +177,7 @@ d = 10e-3   # diameter/width of the cylindric portion
 h = 20e-3   # height/length of the cylinder
 ct = 5.9e-3 # center thickness
 lens = Lens(
-    CylindricalSurface(r, d, h),
-    nothing,
+    CylindricalSurface(r, d, h),    
     ct,
     n -> 1.517
 )
@@ -208,12 +207,12 @@ conic_constant = -1.0
 
 lens = Lens(
     BeamletOptics.AcylindricalSurface(
-        radius,
-        diameter,
-        height,
-        conic_constant,
-        [0, 1.1926075e-5*(1e3)^3, -2.9323497e-9*(1e3)^5, -1.8718889e-11*(1e3)^7, -1.7009961e-14*(1e3)^9, 3.5481542e-17*(1e3)^11, 6.5241296e-20*(1e3)^13]),
-        nothing,
+            radius,
+            diameter,
+            height,
+            conic_constant,
+            [0, 1.1926075e-5*(1e3)^3, -2.9323497e-9*(1e3)^5, -1.8718889e-11*(1e3)^7, -1.7009961e-14*(1e3)^9, 3.     5481542e-17*(1e3)^11, 6.5241296e-20*(1e3)^13]
+        ),        
         7.5e-3,
         n -> 1.777
     )
