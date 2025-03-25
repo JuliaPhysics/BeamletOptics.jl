@@ -1,10 +1,10 @@
-using BMO
+using BeamletOptics
 using Test
 using LinearAlgebra
 using GeometryBasics
 using AbstractTrees
 
-const BMO = BMO
+const BMO = BeamletOptics
 
 @testset "Utilities" begin
     @testset "Testing normal3d" begin
@@ -2341,6 +2341,23 @@ end
             @test BMO.direction(last(r)) ≈ [-1, 0, 0]
         end
     end
+end
+
+@testset "Intersectable objects" begin
+    # Setup dummy cube
+    cube_shape = BMO.CubeMesh(1)
+    cube_object = IntersectableObject(cube_shape)
+    translate3d!(cube_object, -[0.5, 0, 0.5])
+    translate3d!(cube_object, [0, 5, 0])
+    # Test with dummy beam
+    beam = Beam([0, 0, 0], [0, 1, 0], 1e-6)
+    system = System([cube_object])
+    solve_system!(system, beam)
+    # Test nothing interaction
+    @test length(BMO.rays(beam)) == 1
+    @test BMO.object(BMO.intersection(last(BMO.rays(beam)))) == cube_object
+    @test BMO.shape(BMO.intersection(last(BMO.rays(beam)))) == cube_shape
+    @test isnothing(BMO.interact3d(system, cube_object, beam, first(BMO.rays(beam))))
 end
 
 @testset "Bug fixes" begin
