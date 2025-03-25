@@ -36,7 +36,7 @@ export Photodetector, Spotdetector
 export ThinBeamsplitter, RoundThinBeamsplitter, RectangularPlateBeamsplitter, RoundPlateBeamsplitter, CubeBeamsplitter, RectangularCompensatorPlate
 
 # dummies
-export NonInteractableObject, MeshDummy
+export NonInteractableObject, MeshDummy, IntersectableObject
 
 # misc
 export Retroreflector
