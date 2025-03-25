@@ -12,10 +12,22 @@ Lens
 
 In practice, a great variety and mixture of different lens shapes exists -- e.g. spherical and aspherical lenses surfaces and all combinations thereof. Usually a lens is a block of a transparent, dielectric material with two optically active surfaces (fancy special cases using the sides of the lens as well exist, e.g. for HUD displays). It is common to describe such a lens by specifying the properties of the two surfaces and the material in between. This package, however, works with closed volume shapes for all of its optical elements and any erroneous (i.e. non-watertight) SDF might result in unphysical behaviour. Refer to the [Geometry representation](@ref) section for more information.
 
+!!! tip "Lens constructors"
+    One of the following constructors can be used to generate lens objects:
+
+    - [`Lens`](@ref) constructor
+        - capable constructor for a wide combination of surface types (spherical, aspherical, etc.)
+    - [`SphericalLens`](@ref) constructor
+        - simplified constructor for spherical surfaces
+
+    Refer to the specific documentation or enter e.g. `? Lens` into the REPL to learn more about the constructors and their interfaces, as well as sign definitions and so on.
+
+### Surface based lens construction
+
 To make it easier to specify lenses similar to established optical simulation frameworks, e.g. [Zemax](https://www.ansys.com/products/optics/ansys-zemax-opticstudio), the [`BeamletOptics.AbstractSurface`](@ref) API can be used. This is a helper interface for surfaces specifications and interprets them to the corresponding SDF-based volume representation. 
 
-!!! info
-    It is important to note that BeamletOptics.jl does not work with these surfaces representations directly for ray tracing. All shapes must be closed volumes. 
+!!! warning
+    It is important to note that BMO does not work with these surfaces representations directly for ray tracing. All shapes are translated to closed volumes internally. 
 
 Currently the following surface types are implemented:
 
@@ -33,7 +45,7 @@ Lens(::BeamletOptics.AbstractRotationallySymmetricSurface, ::BeamletOptics.Abstr
 
 ### Lens constructor example
 
-In practice, this works as follows. The bi-convex [LB1811](https://www.thorlabs.com/thorproduct.cfm?partnumber=LB1811) lens consists of two spherical surfaces and can be constructed like this:
+In practice, this works as follows: the bi-convex [LB1811](https://www.thorlabs.com/thorproduct.cfm?partnumber=LB1811) lens consists of two spherical surfaces and can be constructed like this:
 
 ```@example
 using CairoMakie, BeamletOptics # hide
@@ -77,7 +89,7 @@ In order to model the lens surfaces shown above, the following SDF-based spheric
 - [`BeamletOptics.MeniscusLensSDF`](@ref)
 - [`BeamletOptics.PlanoSurfaceSDF`](@ref)
 
-The [`BeamletOptics.AbstractSurface`](@ref) will translate surface specifications into volume representations using the sub-volumes above. This is achieved by combining the sub-volumes via the [`BeamletOptics.UnionSDF`](@ref)-API in order to enable the quasi-surface-based design of spherical lens systems.
+The [`BeamletOptics.AbstractSurface`](@ref) will translate surface specifications into volume representations using the sub-volumes above. This is achieved by combining the sub-volumes via the [`BeamletOptics.UnionSDF`](@ref)-API in order to enable the quasi-surface-based design of spherical lens systems. Additional distance functions have been implemented in order to model aspherical and cylinder lenses. 
 
 ## Spherical lenses
 
