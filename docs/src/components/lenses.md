@@ -179,7 +179,7 @@ fig # hide
 Cylindrical lenses are non-rotationally symmetric lenses where a spherical or aspherical curvature is present only in one dimension, i.e. leading to a cylindrical shape.
 Thus, they focus or collimate light only in one dimension. This package currently supports convex/concave cylindrical and acylindrical lenses with an even aspheric deviation from the cylindrical shape.
 
-A plano-convex cylindrical lens can be constructed in the following way. Note that for this lens type a plano-surface can be constructed by passing `nothing` to the lens constructor:
+A plano-convex cylindrical lens can be constructed in the following way. Note that for this lens type a plano-surface can be constructed by passing a [`RectangularFlatSurface`](@ref) to the lens constructor:
 
 ```@example
 using CairoMakie, BeamletOptics # hide
