@@ -2343,21 +2343,33 @@ end
     end
 end
 
-@testset "Intersectable objects" begin
-    # Setup dummy cube
+@testset "Dummy objects" begin
+    # Setup dummy cube and test beam
     cube_shape = BMO.CubeMesh(1)
-    cube_object = IntersectableObject(cube_shape)
-    translate3d!(cube_object, -[0.5, 0, 0.5])
-    translate3d!(cube_object, [0, 5, 0])
-    # Test with dummy beam
-    beam = Beam([0, 0, 0], [0, 1, 0], 1e-6)
-    system = System([cube_object])
-    solve_system!(system, beam)
-    # Test nothing interaction
-    @test length(BMO.rays(beam)) == 1
-    @test BMO.object(BMO.intersection(last(BMO.rays(beam)))) == cube_object
-    @test BMO.shape(BMO.intersection(last(BMO.rays(beam)))) == cube_shape
-    @test isnothing(BMO.interact3d(system, cube_object, beam, first(BMO.rays(beam))))
+    translate3d!(cube_shape, -[0.5, 0, 0.5])
+    translate3d!(cube_shape, [0, 5, 0])
+    @testset "IntersectableObject" begin
+        beam = Beam([0, 0, 0], [0, 1, 0], 1e-6)
+        intersectable = IntersectableObject(cube_shape)
+        system = System([intersectable])
+        solve_system!(system, beam)
+        # Test nothing interaction
+        @test length(BMO.rays(beam)) == 1
+        @test BMO.object(BMO.intersection(last(BMO.rays(beam)))) == intersectable
+        @test BMO.shape(BMO.intersection(last(BMO.rays(beam)))) == cube_shape
+        @test isnothing(BMO.interact3d(system, intersectable, beam, first(BMO.rays(beam))))
+    end
+
+    @testset "NonInteractableObject" begin
+        beam = Beam([0, 0, 0], [0, 1, 0], 1e-6)
+        noninteract = NonInteractableObject(cube_shape)
+        system = System([noninteract])
+        solve_system!(system, beam)
+        # Test nothing interaction and intersection
+        @test length(BMO.rays(beam)) == 1
+        @test isnothing(BMO.intersection(last(BMO.rays(beam))))
+        @test isnothing(BMO.interact3d(system, noninteract, beam, first(BMO.rays(beam))))
+    end
 end
 
 @testset "Bug fixes" begin
