@@ -10,7 +10,7 @@ To ensure compatibility with the [API design](@ref), custom optical elements mus
 
 ## Objects and shapes
 
-In BeamletOptics.jl, the distinction between an *object* and its geometric representation (*shape*) is a central design principle. This separation is intended to ensure flexibility and modularity in modeling optical components.
+In BMO, the distinction between an *object* and its geometric representation (*shape*) is a central design principle. This separation is intended to ensure flexibility and modularity in modeling optical components.
 
 ### Separation of geometry and optical interactions
 

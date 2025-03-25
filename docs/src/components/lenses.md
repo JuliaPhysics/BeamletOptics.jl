@@ -12,10 +12,22 @@ Lens
 
 In practice, a great variety and mixture of different lens shapes exists -- e.g. spherical and aspherical lenses surfaces and all combinations thereof. Usually a lens is a block of a transparent, dielectric material with two optically active surfaces (fancy special cases using the sides of the lens as well exist, e.g. for HUD displays). It is common to describe such a lens by specifying the properties of the two surfaces and the material in between. This package, however, works with closed volume shapes for all of its optical elements and any erroneous (i.e. non-watertight) SDF might result in unphysical behaviour. Refer to the [Geometry representation](@ref) section for more information.
 
+!!! tip "Lens constructors"
+    One of the following constructors can be used to generate lens objects:
+
+    - [`Lens`](@ref) constructor
+        - capable constructor for a wide combination of surface types (spherical, aspherical, etc.)
+    - [`SphericalLens`](@ref) constructor
+        - simplified constructor for spherical surfaces
+
+    Refer to the specific documentation or enter e.g. `? Lens` into the REPL to learn more about the constructors and their interfaces, as well as sign definitions and so on.
+
+### Surface based lens construction
+
 To make it easier to specify lenses similar to established optical simulation frameworks, e.g. [Zemax](https://www.ansys.com/products/optics/ansys-zemax-opticstudio), the [`BeamletOptics.AbstractSurface`](@ref) API can be used. This is a helper interface for surfaces specifications and interprets them to the corresponding SDF-based volume representation. 
 
-!!! info
-    It is important to note that BeamletOptics.jl does not work with these surfaces representations directly for ray tracing. All shapes must be closed volumes. 
+!!! warning
+    It is important to note that BMO does not work with these surfaces representations directly for ray tracing. All shapes are translated to closed volumes internally. 
 
 Currently the following surface types are implemented:
 
@@ -33,7 +45,7 @@ Lens(::BeamletOptics.AbstractRotationallySymmetricSurface, ::BeamletOptics.Abstr
 
 ### Lens constructor example
 
-In practice, this works as follows. The bi-convex [LB1811](https://www.thorlabs.com/thorproduct.cfm?partnumber=LB1811) lens consists of two spherical surfaces and can be constructed like this:
+In practice, this works as follows: the bi-convex [LB1811](https://www.thorlabs.com/thorproduct.cfm?partnumber=LB1811) lens consists of two spherical surfaces and can be constructed like this:
 
 ```@example
 using CairoMakie, BeamletOptics # hide
@@ -77,7 +89,7 @@ In order to model the lens surfaces shown above, the following SDF-based spheric
 - [`BeamletOptics.MeniscusLensSDF`](@ref)
 - [`BeamletOptics.PlanoSurfaceSDF`](@ref)
 
-The [`BeamletOptics.AbstractSurface`](@ref) will translate surface specifications into volume representations using the sub-volumes above. This is achieved by combining the sub-volumes via the [`BeamletOptics.UnionSDF`](@ref)-API in order to enable the quasi-surface-based design of spherical lens systems.
+The [`BeamletOptics.AbstractSurface`](@ref) will translate surface specifications into volume representations using the sub-volumes above. This is achieved by combining the sub-volumes via the [`BeamletOptics.UnionSDF`](@ref)-API in order to enable the quasi-surface-based design of spherical lens systems. Additional distance functions have been implemented in order to model aspherical and cylinder lenses. 
 
 ## Spherical lenses
 
@@ -161,6 +173,73 @@ fig # hide
 
 !!! tip "Aspherical lens example"
     Refer to the [Simple aspherical lens example](@ref) for a showcase on how to implement a plano-convex asphere.
+
+## Cylindrical lenses
+
+Cylindrical lenses are non-rotationally symmetric lenses where a spherical or aspherical curvature is present only in one dimension, i.e. leading to a cylindrical shape.
+Thus, they focus or collimate light only in one dimension. This package currently supports convex/concave cylindrical and acylindrical lenses with an even aspheric deviation from the cylindrical shape.
+
+A plano-convex cylindrical lens can be constructed in the following way. Note that for this lens type a plano-surface can be constructed by passing a [`RectangularFlatSurface`](@ref) to the lens constructor:
+
+```@example
+using CairoMakie, BeamletOptics # hide
+
+r = 5.2e-3  # radius
+d = 10e-3   # diameter/width of the cylindric portion
+h = 20e-3   # height/length of the cylinder
+ct = 5.9e-3 # center thickness
+lens = Lens(
+    CylindricalSurface(r, d, h),    
+    ct,
+    n -> 1.517
+)
+
+fig = Figure() # hide
+
+ax = Axis3(fig[1,1], aspect=:data, azimuth=-pi/4, elevation=deg2rad(30)) # hide
+
+hidedecorations!(ax) # hide
+hidespines!(ax) # hide
+
+render_object!(ax,lens) # hide
+
+fig # hide
+
+```
+
+An acylindrical lens can easily be constructed using the [AcylindricalSurface](@ref) surface type:
+
+```@example
+using CairoMakie, BeamletOptics # hide
+
+radius = -15.538e-3
+diameter = 25e-3
+height = 50e-3
+conic_constant = -1.0
+
+lens = Lens(
+    BeamletOptics.AcylindricalSurface(
+            radius,
+            diameter,
+            height,
+            conic_constant,
+            [0, 1.1926075e-5*(1e3)^3, -2.9323497e-9*(1e3)^5, -1.8718889e-11*(1e3)^7, -1.7009961e-14*(1e3)^9, 3.5481542e-17*(1e3)^11, 6.5241296e-20*(1e3)^13]
+        ),        
+        7.5e-3,
+        n -> 1.777
+    )
+
+fig = Figure() # hide
+
+ax = Axis3(fig[1,1], aspect=:data, azimuth=-pi/4, elevation=deg2rad(30)) # hide
+
+hidedecorations!(ax) # hide
+hidespines!(ax) # hide
+
+render_object!(ax,lens) # hide
+
+fig # hide
+```
 
 ## Doublet lenses
 

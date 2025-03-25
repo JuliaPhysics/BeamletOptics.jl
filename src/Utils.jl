@@ -325,6 +325,16 @@ struct DiscreteRefractiveIndex{T}
     data::Dict{T, T}
 end
 
+"""
+    DiscreteRefractiveIndex(λs, n)
+
+Creates a [`DiscreteRefractiveIndex`](@ref) dictionary where each wavelength in `λs` is mapped onto an exact exact refractive index in `ns`.
+
+# Inputs
+
+- `λs`: array of wavelengths
+- `ns`: array of refractive indices
+"""
 function DiscreteRefractiveIndex(λs::AbstractArray{L}, ns::AbstractArray{N}) where {L, N}
     if length(λs) != length(ns)
         throw(ArgumentError("Number of wavelengths must match number of ref. indices"))

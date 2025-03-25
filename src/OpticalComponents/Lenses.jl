@@ -246,3 +246,143 @@ function Lens(
 
     return Lens(shape, n)
 end
+
+Lens(front_surface::AbstractRotationallySymmetricSurface, center_thickness::Real, n::RefractiveIndex) = Lens(
+    front_surface,
+    CircularFlatSurface(diameter(front_surface)),
+    center_thickness,
+    n
+)
+
+function Lens(front_surface::CircularFlatSurface, back_surface::CircularFlatSurface, center_thickness::Real, n::RefractiveIndex)
+    d_mid = min(diameter(front_surface), diameter(back_surface))
+
+    return Lens(
+        PlanoSurfaceSDF(center_thickness, d_mid),
+        n
+    )
+end
+
+"""
+     Lens(front_surface::AbstractCylindricalSurface, back_surface::AbstractCylindricalSurface, center_thickness::Real, n::RefractiveIndex)
+
+Constructs a new [`Lens`](@ref) object using the cylindric surface specifications `front_surface` and
+`back_surface` and the `center_thickness`. These inputs are used to construct a [`UnionSDF`](@ref)
+that consists of the appropriate sub-SDFs to represent the shape of the lens.
+
+This method of `Lens` is specific for cylindric lenses and has some limitations:
+    - The cylinder height of both surfaces has to be identical
+    - No mixture with non-cylindric surfaces is supported at the moment
+
+The material properties are supplied via the `n` parameter.
+
+# Additional information
+
+!!! info "Radius of curvature (ROC) sign definition"
+    The ROC is defined to be positive if the center is to the right of the surface. Otherwise it is negative.
+"""
+function Lens(
+        front_surface::AbstractCylindricalSurface,
+        back_surface::AbstractCylindricalSurface,
+        center_thickness::Real,
+        n::RefractiveIndex)
+    # Initialize remaining box section length.
+    l0 = center_thickness
+
+    # Front Surface
+    front = sdf(front_surface, ForwardOrientation())
+    l0 -= isnothing(front) ? zero(l0) : thickness(front)
+
+    # Back Surface
+    back = sdf(back_surface, BackwardOrientation())
+    l0 -= isnothing(back) ? zero(l0) : thickness(back)
+
+    # validate
+    d_mid, md_mid, h = cylindric_lens_outer_parameters(front_surface, back_surface)
+
+    # Check if the center section is positive
+    if l0 ≤ 0
+        throw(ArgumentError("Lens parameters lead to a box section length of ≤ 0"))
+    else
+        # Construct central box and add front/back surfaces
+        mid = BoxSDF(h, l0, d_mid)
+        translate3d!(mid, [0, l0/2, 0])
+        if front !== nothing
+            translate3d!(mid, [0, thickness(front), 0])
+            mid += front
+        end
+        if back !== nothing
+            translate3d!(back, [0, thickness(mid) + thickness(back), 0])
+            mid += back
+        end
+        shape = mid
+
+        # Add mechanical ring if md_mid > d_mid
+        if md_mid > d_mid
+            ring_thickness = thickness(mid)
+            ring_center = position(mid)[2] + ring_thickness / 2
+            if front !== nothing
+                s = edge_sag(front_surface, front)
+                ring_thickness -= s
+                ring_center += s / 2
+            end
+            if back !== nothing
+                s = edge_sag(back_surface, back)
+                ring_thickness += s
+                ring_center += s / 2
+            end
+            ring = RingSDF(d_mid / 2, (md_mid - d_mid) / 2, ring_thickness)
+            translate3d!(ring, [0, ring_center, 0])
+            shape += ring
+        elseif md_mid < d_mid
+            @warn "Mechanical diameter is less than clear aperture; parameter md has been ignored."
+        end
+    end
+
+    return Lens(shape, n)
+end
+
+Lens(front_surface::AbstractCylindricalSurface, center_thickness::Real, n::RefractiveIndex) = Lens(
+    front_surface,
+    RectangularFlatSurface(diameter(front_surface)),
+    center_thickness,
+    n
+)
+
+function cylindric_lens_outer_parameters(f::AbstractCylindricalSurface, b::AbstractCylindricalSurface)
+    height(f) != height(b) && throw(ArgumentError("height of front and back surface have to match for cylindric lenses"))
+
+    d_mid = min(diameter(f), diameter(b))
+    md_mid = max(mechanical_diameter(f), mechanical_diameter(b))
+    h = height(f)
+
+    return d_mid, md_mid, h
+end
+
+function cylindric_lens_outer_parameters(f::AbstractCylindricalSurface, ::RectangularFlatSurface)
+    d_mid = diameter(f)
+    md_mid = mechanical_diameter(f)
+    h = height(f)
+
+    return d_mid, md_mid, h
+end
+
+cylindric_lens_outer_parameters(f::RectangularFlatSurface, b::AbstractCylindricalSurface) = cylindric_lens_outer_parameters(b, f)
+
+function cylindric_lens_outer_parameters(f::RectangularFlatSurface, b::RectangularFlatSurface)
+    d_mid = diameter(f)
+    md_mid = mechanical_diameter(f)
+
+    return d_mid, md_mid, d_mid
+end
+
+function Lens(front_surface::RectangularFlatSurface, back_surface::RectangularFlatSurface, center_thickness::Real, n::RefractiveIndex)
+    d_mid = min(diameter(front_surface), diameter(back_surface))
+    mid = BoxSDF(d_mid, center_thickness, d_mid)
+    translate3d!(mid, [0, center_thickness/2, 0])
+
+    return Lens(
+        mid,
+        n
+    )
+end

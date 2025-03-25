@@ -1,7 +1,7 @@
 name = "BeamletOptics"
 uuid = "c387492b-ffec-4e51-9a46-bd230226031c"
 authors = ["Hugo Uittenbosch <hugo.uittenbosch@dlr.de>, Oliver Kliebisch <oliver.kliebisch@dlr.de> and Thomas Dekorsy <thomas.dekorsy@dlr.de>"]
-version = "0.8.0"
+version = "0.8.1"
 
 [deps]
 AbstractTrees = "1520ce14-60c1-5f80-bbc7-55ef81b5835c"
@@ -25,12 +25,12 @@ BeamletOpticsMakieExt = "Makie"
 AbstractTrees = "0.4"
 Aqua = "0.8"
 FileIO = "1"
-MeshIO = "0.5"
 GeometryBasics = "0.5"
 InteractiveUtils = "1"
 LinearAlgebra = "1"
 Makie = "0.22"
 MarchingCubes = "0.1"
+MeshIO = "0.5"
 PrecompileTools = "1"
 StaticArrays = "1"
 Test = "1"
