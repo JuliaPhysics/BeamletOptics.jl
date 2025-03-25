@@ -1448,7 +1448,7 @@ end
         translate3d!(L3, [0, BMO.thickness(L2) + 0.63e-3, 0])
 
         Filt = Lens(
-            CircularSurface(4.2e-3),
+            CircularFlatSurface(4.2e-3),
             0.15e-3,
             n -> 1.516800
         )
@@ -1457,7 +1457,7 @@ end
         translate3d!(Filt, [0, BMO.thickness(L3) + 0.19e-3, 0])
 
         Cover = Lens(
-            CircularSurface(4.9e-3),
+            CircularFlatSurface(4.9e-3),
             0.5e-3,
             n -> 1.469200
         )

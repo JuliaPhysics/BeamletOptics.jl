@@ -249,12 +249,12 @@ end
 
 Lens(front_surface::AbstractRotationallySymmetricSurface, center_thickness::Real, n::RefractiveIndex) = Lens(
     front_surface,
-    CircularSurface(diameter(front_surface)),
+    CircularFlatSurface(diameter(front_surface)),
     center_thickness,
     n
 )
 
-function Lens(front_surface::CircularSurface, back_surface::CircularSurface, center_thickness::Real, n::RefractiveIndex)
+function Lens(front_surface::CircularFlatSurface, back_surface::CircularFlatSurface, center_thickness::Real, n::RefractiveIndex)
     d_mid = min(diameter(front_surface), diameter(back_surface))
 
     return Lens(
@@ -344,7 +344,7 @@ end
 
 Lens(front_surface::AbstractCylindricalSurface, center_thickness::Real, n::RefractiveIndex) = Lens(
     front_surface,
-    RectangularSurface(diameter(front_surface)),
+    RectangularFlatSurface(diameter(front_surface)),
     center_thickness,
     n
 )
@@ -359,7 +359,7 @@ function cylindric_lens_outer_parameters(f::AbstractCylindricalSurface, b::Abstr
     return d_mid, md_mid, h
 end
 
-function cylindric_lens_outer_parameters(f::AbstractCylindricalSurface, ::RectangularSurface)
+function cylindric_lens_outer_parameters(f::AbstractCylindricalSurface, ::RectangularFlatSurface)
     d_mid = diameter(f)
     md_mid = mechanical_diameter(f)
     h = height(f)
@@ -367,16 +367,16 @@ function cylindric_lens_outer_parameters(f::AbstractCylindricalSurface, ::Rectan
     return d_mid, md_mid, h
 end
 
-cylindric_lens_outer_parameters(f::RectangularSurface, b::AbstractCylindricalSurface) = cylindric_lens_outer_parameters(b, f)
+cylindric_lens_outer_parameters(f::RectangularFlatSurface, b::AbstractCylindricalSurface) = cylindric_lens_outer_parameters(b, f)
 
-function cylindric_lens_outer_parameters(f::RectangularSurface, b::RectangularSurface)
+function cylindric_lens_outer_parameters(f::RectangularFlatSurface, b::RectangularFlatSurface)
     d_mid = diameter(f)
     md_mid = mechanical_diameter(f)
 
     return d_mid, md_mid, d_mid
 end
 
-function Lens(front_surface::RectangularSurface, back_surface::RectangularSurface, center_thickness::Real, n::RefractiveIndex)
+function Lens(front_surface::RectangularFlatSurface, back_surface::RectangularFlatSurface, center_thickness::Real, n::RefractiveIndex)
     d_mid = min(diameter(front_surface), diameter(back_surface))
     mid = BoxSDF(d_mid, center_thickness, d_mid)
     translate3d!(mid, [0, center_thickness/2, 0])

@@ -89,7 +89,7 @@ sdf(s::AbstractRotationallySymmetricSurface) = sdf(s, nothing)
 
 
 """
-    CircularSurface{T} <: AbstractRotationallySurface{T}
+    CircularFlatSurface{T} <: AbstractRotationallySurface{T}
 
 A type representing a planar circular surface, which is only parametrized by its `diameter`.
 
@@ -97,8 +97,8 @@ A type representing a planar circular surface, which is only parametrized by its
 - `diameter::T`: The diameter of the planar surface
 
 """
-struct CircularSurface{T} <: AbstractRotationallySymmetricSurface{T}
+struct CircularFlatSurface{T} <: AbstractRotationallySymmetricSurface{T}
     diameter::T
 end
 
-sdf(::CircularSurface, ::AbstractOrientationType) = nothing
+sdf(::CircularFlatSurface, ::AbstractOrientationType) = nothing
