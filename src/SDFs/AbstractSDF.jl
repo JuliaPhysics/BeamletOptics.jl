@@ -219,3 +219,31 @@ function op_revolve_y(p::Point3{T}, sdf2d::Function, offset = zero(T)) where {T 
     q = Point2(norm(Point2(p[1], p[3])) - offset, p[2])
     return sdf2d(q)
 end
+
+"""
+    op_extrude_z(p, sdf2d::Function, height)
+
+Calculates the SDF at point `p` for the given 2D-SDF function and extrudes the shape to
+`height` along the z-axis.
+
+"""
+function op_extrude_z(p::Point3{T}, sdf2d::Function, height::Real) where {T <: Real}
+    d = sdf2d(Point2(p[1], p[2]))
+    w = Point2(d, abs(p[3]) - height)
+
+    return min(max(w[1], w[2]), zero(T)) + norm(max.(w, zero(T)))
+end
+
+"""
+    op_extrude_x(p, sdf2d::Function, height)
+
+Calculates the SDF at point `p` for the given 2D-SDF function and extrudes the shape to
+`height` along the x-axis.
+
+"""
+function op_extrude_x(p::Point3{T}, sdf2d::Function, height::Real) where {T <: Real}
+    d = sdf2d(Point2(p[2], p[3]))
+    w = Point2(d, abs(p[1]) - height)
+
+    return min(max(w[1], w[2]), zero(T)) + norm(max.(w, zero(T)))
+end

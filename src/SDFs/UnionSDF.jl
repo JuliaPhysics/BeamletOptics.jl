@@ -34,7 +34,7 @@ Calculates the thickness of a union of [`AbstractLensSDF`](@ref)s.
 function thickness(u::UnionSDF{T}) where T
     t = zero(T)
     for s in u.sdfs
-        if typeof(s) <: AbstractLensSDF
+        if hasmethod(thickness, Tuple{typeof(s)})
             t += thickness(s)
         end
     end

@@ -24,7 +24,7 @@ export Mirror, SquarePlanoMirror2D, RectangularPlanoMirror, SquarePlanoMirror, R
 export Lens, DoubletLens, ThinLens, SphericalLens, SphericalDoubletLens
 
 # surfaces
-export SphericalSurface, EvenAsphericalSurface
+export CircularFlatSurface, RectangularFlatSurface, SphericalSurface, EvenAsphericalSurface, CylindricalSurface, AcylindricalSurface
 
 # prisms
 export Prism, RightAnglePrism
@@ -36,7 +36,7 @@ export Photodetector, Spotdetector
 export ThinBeamsplitter, RoundThinBeamsplitter, RectangularPlateBeamsplitter, RoundPlateBeamsplitter, CubeBeamsplitter, RectangularCompensatorPlate
 
 # dummies
-export NonInteractableObject, MeshDummy
+export NonInteractableObject, MeshDummy, IntersectableObject
 
 # misc
 export Retroreflector
