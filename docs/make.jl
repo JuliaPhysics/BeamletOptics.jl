@@ -3,17 +3,6 @@ using BeamletOptics
 using Documenter
 using DocumenterCitations
 
-try
-    rm(joinpath(@__DIR__, "build"), recursive=true)
-    @info "Deleted build folder..."
-catch e
-    if isa(e, Base.IOError)
-        @info "Can't delete build folder, does not exist..."
-    else
-        rethrow(e)
-    end
-end
-
 CairoMakie.activate!()
 
 DocMeta.setdocmeta!(BeamletOptics, :DocTestSetup, :(using BeamletOptics); recursive=true)
@@ -23,11 +12,11 @@ bib = CitationBibliography(joinpath(@__DIR__, "src", "refs.bib"))
 makedocs(;
     modules=[BeamletOptics],
     authors="Hugo Uittenbosch <hugo.uittenbosch@dlr.de> and contributors",
-    repo="https://gitlab.dlr.de/optical-air-data/dispersionsinterferometer/beamletoptics/-/blob/{commit}{path}#L{line}",
-    sitename="BeamletOptics",
+    sitename="BeamletOptics.jl",
     format=Documenter.HTML(;
         prettyurls=get(ENV, "CI", "false") == "true",
-        edit_link="main",
+        canonical="https://StackEnjoyer.github.io/BeamletOptics.jl",
+        edit_link="master",
         assets=String[],
         size_threshold_ignore=["reference.md"],
         sidebar_sitename = false,
@@ -65,4 +54,9 @@ makedocs(;
         "Reference" => "reference.md"
     ],
     plugins=[bib],
+)
+
+deploydocs(;
+    repo="github.com/StackEnjoyer/BeamletOptics.jl.git",
+    devbranch="master",
 )
