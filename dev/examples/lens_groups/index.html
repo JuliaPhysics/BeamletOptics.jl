@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Lens groups · BeamletOptics.jl</title><meta name="title" content="Lens groups · BeamletOptics.jl"/><meta property="og:title" content="Lens groups · BeamletOptics.jl"/><meta property="twitter:title" content="Lens groups · BeamletOptics.jl"/><meta name="description" content="Documentation for BeamletOptics.jl."/><meta property="og:description" content="Documentation for BeamletOptics.jl."/><meta property="twitter:description" content="Documentation for BeamletOptics.jl."/><meta property="og:url" content="https://StackEnjoyer.github.io/BeamletOptics.jl/examples/lens_groups/"/><meta property="twitter:url" content="https://StackEnjoyer.github.io/BeamletOptics.jl/examples/lens_groups/"/><link rel="canonical" href="https://StackEnjoyer.github.io/BeamletOptics.jl/examples/lens_groups/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img class="docs-light-only" src="../../assets/logo.svg" alt="BeamletOptics.jl logo"/><img class="docs-dark-only" src="../../assets/logo-dark.svg" alt="BeamletOptics.jl logo"/></a><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><span class="tocitem">Tutorials</span><ul><li><a class="tocitem" href="../../tutorials/expander/">Beam expander</a></li><li><a class="tocitem" href="../../tutorials/michelson/">Michelson interferometer</a></li></ul></li><li><span class="tocitem">Examples</span><ul><li><a class="tocitem" href="../spherical_lenses/">Spherical lenses</a></li><li><a class="tocitem" href="../aspherical_lenses/">Aspherical lenses</a></li><li><a class="tocitem" href="../double_gauss/">Double Gauss lens</a></li><li class="is-active"><a class="tocitem" href>Lens groups</a><ul class="internal"><li class="toplevel"><a class="tocitem" href="#Moving-groups"><span>Moving groups</span></a></li><li class="toplevel"><a class="tocitem" href="#Beam-type-compatibility"><span>Beam type compatibility</span></a></li></ul></li></ul></li><li><span class="tocitem">Basics</span><ul><li><a class="tocitem" href="../../basics/intro/">Introduction</a></li><li><a class="tocitem" href="../../basics/rays/">Rays</a></li><li><a class="tocitem" href="../../basics/beams/">Beams</a></li><li><a class="tocitem" href="../../basics/elements/">Optical elements</a></li><li><a class="tocitem" href="../../basics/systems/">Optical systems</a></li></ul></li><li><span class="tocitem">Components</span><ul><li><a class="tocitem" href="../../components/components/">Overview</a></li><li><a class="tocitem" href="../../components/mirrors/">Mirrors</a></li><li><a class="tocitem" href="../../components/lenses/">Lenses</a></li><li><a class="tocitem" href="../../components/beamsplitters/">Beamsplitters</a></li><li><a class="tocitem" href="../../components/detectors/">Detectors</a></li></ul></li><li><span class="tocitem">Developer Documentation</span><ul><li><a class="tocitem" href="../../guide/">Dev. guide</a></li><li><a class="tocitem" href="../../design/">API design</a></li></ul></li><li><a class="tocitem" href="../../reference/">Reference</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href>Lens groups</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Lens groups</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/StackEnjoyer/BeamletOptics.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/StackEnjoyer/BeamletOptics.jl/blob/master/docs/src/examples/lens_groups.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Lens-groups"><a class="docs-heading-anchor" href="#Lens-groups">Lens groups</a><a id="Lens-groups-1"></a><a class="docs-heading-anchor-permalink" href="#Lens-groups" title="Permalink"></a></h1><p>This example highlights the capabilities of <a href="../../reference/#BeamletOptics.ObjectGroup"><code>ObjectGroup</code></a>s. Several groups of optics will be defined and then traced like an ordinary <a href="../../reference/#BeamletOptics.System"><code>System</code></a> of optical elements.</p><pre><code class="language-julia hljs">using CairoMakie, BeamletOptics
+
+# focus group
+l1 = SphericalDoubletLens(103.4371e-3, 61.14925e-3, -603.2959e-3, 1.5e-3, 10.03975e-3, 55e-3, 1.963000, 1.603112)
+l2 = SphericalLens(49.97282e-3, 168.2416e-3, 8.622723e-3, 52e-3, 1.603001)
+
+l_2 = BeamletOptics.thickness(l1) + 1e-4
+translate3d!(l2, [0, l_2, 0])
+
+focus_group = ObjectGroup([l1, l2])</code></pre><pre><code class="language-julia hljs"># variator
+l3 = SphericalLens(100.3834e-3, 16.72327e-3, 1e-3, 28.00995e-3, λ -&gt; 1.603112)
+l4 = SphericalLens(-30.28003e-3, 21.29033e-3, 0.5e-3, 22.31297e-3, λ -&gt; 1.764500)
+l5 = SphericalLens(23.06904e-3, 243.5999e-3, 3.2e-3, 22.12162e-3, λ -&gt; 1.963000)
+
+l_3 = l_2 + BeamletOptics.thickness(l2) + 1.1e-3
+l_4 = l_3 + BeamletOptics.thickness(l3) + 7.25496e-3
+l_5 = l_4 + BeamletOptics.thickness(l4) + 0.5e-3
+translate3d!(l3, [0, l_3, 0])
+translate3d!(l4, [0, l_4, 0])
+translate3d!(l5, [0, l_5, 0])
+
+variator_group = ObjectGroup([l3, l4, l5])</code></pre><pre><code class="language-julia hljs"># compensator
+l6 = SphericalLens(-24.31747e-3, -255.5571e-3, 1e-3, 17.70449e-3, λ -&gt; 1.638539)
+compensator = l6
+
+l_6 = l_5 + BeamletOptics.thickness(l5) + 40.889e-3
+translate3d!(l6, [0, l_6, 0])
+
+# master I
+l7 = SphericalLens(Inf, Inf, 1.2e-3, 19.896e-3, λ -&gt; 1.516330)
+l8 = SphericalLens(1207.65e-3, -28.39078e-3, 2.4e-3, 21.05932e-3, λ -&gt; 1.583126)
+l9 = SphericalLens(74.34233e-3, -62.52319e-3, 2.4e-3, 21.61478e-3, λ -&gt; 1.570989)
+l10 = SphericalLens(42.10459e-3, -128.0055e-3, 2.4e-3, 20.88128e-3, λ -&gt; 1.583126)
+l11 = SphericalLens(28.62223e-3, 378.3789e-3, 2.4e-3, 19.26452e-3, λ -&gt; 1.651000)
+l12 = SphericalLens(-40.92189e-3, 41.10496e-3, 1e-3, 18.17719e-3, λ -&gt; 1.854779)
+
+l_7 = l_6 + BeamletOptics.thickness(l6) + 4.765141e-3
+l_8 = l_7 + BeamletOptics.thickness(l7) + 1e-3
+l_9 = l_8 + BeamletOptics.thickness(l8) + 0.2e-3
+l_10 = l_9 + BeamletOptics.thickness(l9) + 1e-3
+l_11 = l_10 + BeamletOptics.thickness(l10) + 0.1e-3
+l_12 = l_11 + BeamletOptics.thickness(l11) + 1.583061e-3
+translate3d!(l7, [0, l_7, 0])
+translate3d!(l8, [0, l_8, 0])
+translate3d!(l9, [0, l_9, 0])
+translate3d!(l10, [0, l_10, 0])
+translate3d!(l11, [0, l_11, 0])
+translate3d!(l12, [0, l_12, 0])
+
+master_group_I = ObjectGroup([l7, l8, l9, l10, l11, l12])</code></pre><pre><code class="language-julia hljs"># master II
+l13 = SphericalLens(34.65626e-3, -45.71147e-3, 2.4e-3, 15.6e-3, λ -&gt; 1.762001)
+l14 = SphericalLens(27.08863e-3, 11.38107e-3, 1e-3, 14.40932e-3, λ -&gt; 1.761821)
+l15 = SphericalLens(20.49712e-3, -203.9304e-3, 2.4e-3, 14.40932e-3, λ -&gt; 1.693501)
+l16 = SphericalLens(Inf, Inf, 4e-3, 12.92286e-3, λ -&gt; 1.522494)
+
+l_13 = l_12 + BeamletOptics.thickness(l12) + 11.97864e-3
+l_14 = l_13 + BeamletOptics.thickness(l13) + 0.1e-3
+l_15 = l_14 + BeamletOptics.thickness(l14) + 1.428573e-3
+l_16 = l_15 + BeamletOptics.thickness(l15) + 0.2e-3
+translate3d!(l13, [0, l_13, 0])
+translate3d!(l14, [0, l_14, 0])
+translate3d!(l15, [0, l_15, 0])
+translate3d!(l16, [0, l_16, 0])
+
+master_group_II = ObjectGroup([l13, l14, l15, l16])</code></pre><pre><code class="language-julia hljs"># zoom lens
+lens = ObjectGroup([focus_group, variator_group, compensator, master_group_I, master_group_II])
+system = System(lens)</code></pre><pre><code class="language-julia hljs"># generate render
+fig = Figure(size=(600, 380))
+aspect = (1,2,1)
+limits = (-0.05, 0.05, -0.05, 0.15, -0.05, 0.05)
+ax = Axis3(fig[1, 1], aspect=aspect, limits=limits, azimuth=0, elevation=1e-3)
+# hide decorations for vis. purposes
+hidexdecorations!(ax)
+hidezdecorations!(ax)
+
+render_system!(ax, system)
+
+for z in LinRange(-0.003, 0.003, 5)
+    ray = Ray([0, -0.05, z], [0, 1.0, 0])
+    beam = Beam(ray)
+    solve_system!(system, beam, r_max=40)
+    render_beam!(ax, beam, flen=0.1)
+end</code></pre><p><img src="../lens_groups_0.png" alt="Lens groups - no movement"/></p><h1 id="Moving-groups"><a class="docs-heading-anchor" href="#Moving-groups">Moving groups</a><a id="Moving-groups-1"></a><a class="docs-heading-anchor-permalink" href="#Moving-groups" title="Permalink"></a></h1><p>Now the variator and compensator will be moved in order to simulate a zooming effect.</p><pre><code class="language-julia hljs">function compensator_movement(x)
+    if x &lt; 0 || x &gt; 42.75e-3
+        error(&quot;x out of bounds&quot;)
+    end
+    return 1e3*0.01169*x^2 - 0.4155*x
+end
+
+Δx_variator = 40e-3
+Δx_compensator = compensator_movement(Δx_variator)
+
+translate3d!(variator_group, [0, Δx_variator, 0])
+translate3d!(compensator, [0, Δx_compensator, 0])
+
+
+render_system!(ax, system)
+
+for z in LinRange(-0.022, 0.022, 5)
+    ray = Ray([0, -0.05, z], [0, 1.0, 0])
+    beam = Beam(ray)
+    solve_system!(system, beam, r_max=40)
+    render_beam!(ax, beam, flen=0.1)
+end</code></pre><p><img src="../lens_groups_1.png" alt="Lens groups - with movement"/></p><h1 id="Beam-type-compatibility"><a class="docs-heading-anchor" href="#Beam-type-compatibility">Beam type compatibility</a><a id="Beam-type-compatibility-1"></a><a class="docs-heading-anchor-permalink" href="#Beam-type-compatibility" title="Permalink"></a></h1><p>We can easily switch out the type of beam we are tracing through the system using the API of this package. We will trace a single <a href="../../reference/#BeamletOptics.GaussianBeamlet"><code>GaussianBeamlet</code></a> through the objective. Note that this example is for illustration purposes only and does not yield an accurate representation of the actual imaging preformance due to the limitations of the beam tracing method described in the <a href="../../basics/beams/#Stigmatic-Beamlets">Stigmatic Beamlets</a> section.</p><pre><code class="language-julia hljs">beam = GaussianBeamlet([0, -0.05, 0], [0, 1, 0], 1000e-9, 2.2e-2)
+solve_system!(system, beam, r_max=40)
+
+render_beam!(ax, beam, color=:green2)
+render_system!(ax, system)</code></pre><p><img src="../lens_groups_2.png" alt="Lens groups - with GaussianBeamlet"/></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../double_gauss/">« Double Gauss lens</a><a class="docs-footer-nextpage" href="../../basics/intro/">Introduction »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.9.0 on <span class="colophon-date" title="Wednesday 26 March 2025 13:07">Wednesday 26 March 2025</span>. Using Julia version 1.11.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
