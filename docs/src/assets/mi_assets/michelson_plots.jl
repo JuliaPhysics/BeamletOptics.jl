@@ -1,13 +1,24 @@
 ## intro fig
-intro_fig = Figure(size=(600, 380))
-intro_ax = Axis3(intro_fig[1,1], aspect=:data, elevation=0.4, azimuth=8.7)
+GLMakie.activate!(ssao=true)
 
-hidedecorations!(intro_ax)
-hidespines!(intro_ax)
+const camera_view = [
+-0.707107   0.707107  -5.55112e-17   0.0188074;
+-0.498749  -0.498749   0.708871      0.222826;
+ 0.501247   0.501247   0.705338     -0.759889;
+ 0.0        0.0        0.0           1.0;
+]
 
-render_system!(intro_ax, system)
+intro_fig = Figure(size=(600, 600))
+display(intro_fig)
+ax = LScene(intro_fig[1,1])
+render_system!(ax, system)
 
-save("mi_intro_fig.png", intro_fig, px_per_unit=4)
+ax.show_axis[] = false
+ax.scene.camera.view[] = camera_view
+
+sleep(1e-2)
+
+save("mi_intro_fig.png", intro_fig, px_per_unit=4, update=false)
 
 ## laser fig
 λ = 632.8e-9

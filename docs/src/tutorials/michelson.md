@@ -17,7 +17,9 @@ In this tutorial, a simple [Michelson Interferometer](https://www.rp-photonics.c
 All figures you will see below are pregenerated. The full code and all 3D assets are available in the following files:
 
 ```@example michelson
-using CairoMakie, BeamletOptics
+using GLMakie, BeamletOptics
+
+GLMakie.activate!()
 
 file_dir = joinpath(@__DIR__, "..", "assets", "mi_assets")
 
