@@ -1,4 +1,5 @@
 using CairoMakie
+using GLMakie
 using BeamletOptics
 using Documenter
 using DocumenterCitations
@@ -56,7 +57,11 @@ makedocs(;
     plugins=[bib],
 )
 
-deploydocs(;
+deploy_flag = false
+
+if deploy_flag
+    deploydocs(;
     repo="github.com/StackEnjoyer/BeamletOptics.jl.git",
     devbranch="master",
-)
+    )
+end
