@@ -19,6 +19,8 @@ All figures you will see below are pregenerated. The full code and all 3D assets
 ```@example michelson
 using GLMakie, BeamletOptics
 
+const BMO = BeamletOptics
+
 GLMakie.activate!()
 
 file_dir = joinpath(@__DIR__, "..", "assets", "mi_assets")

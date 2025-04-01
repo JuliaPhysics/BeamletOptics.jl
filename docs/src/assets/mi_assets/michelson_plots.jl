@@ -1,24 +1,14 @@
 ## intro fig
 GLMakie.activate!(ssao=true)
 
-const camera_view = [
--0.707107   0.707107  -5.55112e-17   0.0188074;
--0.498749  -0.498749   0.708871      0.222826;
- 0.501247   0.501247   0.705338     -0.759889;
- 0.0        0.0        0.0           1.0;
+const intro_camera_view = [
+    -0.707107   0.707107  -5.55112e-17   0.0188074;
+    -0.498749  -0.498749   0.708871      0.222826;
+     0.501247   0.501247   0.705338     -0.759889;
+     0.0        0.0        0.0           1.0;
 ]
 
-intro_fig = Figure(size=(600, 600))
-display(intro_fig)
-ax = LScene(intro_fig[1,1])
-render_system!(ax, system)
-
-ax.show_axis[] = false
-ax.scene.camera.view[] = camera_view
-
-sleep(1e-2)
-
-save("mi_intro_fig.png", intro_fig, px_per_unit=4, update=false)
+take_screenshot("mi_intro_fig.png", system, nothing; size=(600, 600), view=intro_camera_view)
 
 ## laser fig
 λ = 632.8e-9
@@ -52,24 +42,20 @@ lines!(waist_ax, zs*1e2, -w * 1e3, color=RGBAf(1,0,0,.5), linestyle=:dashdot)
 hlines!(waist_ax, 0, color=:black)
 text!(waist_ax, "Optical axis")
 
-save("mi_waist_curve.png", params_fig, px_per_unit=4)
+save("mi_waist_curve.png", params_fig, px_per_unit=8)
 
 ## mirror fig
 system = System([laser_assembly, mirror_assembly])
 solve_system!(system, beam)
 
-mirror_fig = Figure(size=(600, 300))
-mirror_ax = Axis3(mirror_fig[1,1], aspect=:data, elevation=0.4, azimuth=2π)
+const mirror_camera_view = [
+    -0.383435   0.923568  -2.35922e-16  -0.105822
+    -0.259272  -0.107641   0.959787      0.0303688
+     0.886429   0.368016   0.280729     -0.286356
+     0.0        0.0        0.0           1.0
+]
 
-hidedecorations!(mirror_ax)
-hidespines!(mirror_ax)
-
-render_system!(mirror_ax, system)
-render_object!(mirror_ax, rpm)
-render_beam!(mirror_ax, beam, flen=10cm)
-render_object!(mirror_ax, laser_assembly)
-
-save("mi_corner_mirror.png", mirror_fig, px_per_unit=4)
+take_screenshot("mi_corner_mirror.png", system, beam; view=mirror_camera_view)
 
 ## splitter fig
 reset_beamlet!(beam)
