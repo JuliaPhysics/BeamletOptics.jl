@@ -1,5 +1,5 @@
 ## intro fig
-GLMakie.activate!(ssao=true)
+GLMakie.activate!(; ssao=true)
 
 const intro_camera_view = [
     -0.707107   0.707107  -5.55112e-17   0.0188074;
