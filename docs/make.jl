@@ -57,11 +57,7 @@ makedocs(;
     plugins=[bib],
 )
 
-deploy_flag = false
-
-if deploy_flag
-    deploydocs(;
+deploydocs(;
     repo="github.com/StackEnjoyer/BeamletOptics.jl.git",
     devbranch="master",
-    )
-end
+)

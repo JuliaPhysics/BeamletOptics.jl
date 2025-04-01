@@ -11,7 +11,7 @@ function take_screenshot(
     view::BMO.Nullable{AbstractMatrix} = nothing,
     flen::Real = 10e-2,
     px_per_unit::Int = 8,
-    color::Union{Symbol, RGBf, RGBAf}
+    color::Union{Symbol, RGBf, RGBAf} = :red
     )
     fig = Figure(; size)
     display(fig)
