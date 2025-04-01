@@ -70,19 +70,19 @@ jobs:
           Pkg.develop(PackageSpec(path=pwd()))
           Pkg.instantiate()
       - uses: julia-actions/julia-buildpkg@v1
-      # Replace the built-in deployment step with a custom one that wraps the command in xvfb-run.
+      # Run docs in xvfb environment
       - name: Deploy documentation with xvfb
         run: |
           xvfb-run julia --project=docs --color=yes -e 'using Documenter; include("docs/make.jl")'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
-      # Optionally, wrap your doctests with xvfb-run if needed
+      # Run doctests in xvfb environment
       - name: Run doctests with xvfb
-        shell: julia --project=docs --color=yes {0}
         run: |
           xvfb-run julia --project=docs --color=yes -e '
             using Documenter: DocMeta, doctest;
             using BeamletOptics;
             DocMeta.setdocmeta!(BeamletOptics, :DocTestSetup, :(using BeamletOptics); recursive=true);
             doctest(BeamletOptics)
+          '
