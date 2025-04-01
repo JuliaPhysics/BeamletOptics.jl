@@ -74,8 +74,7 @@ fig = Figure(size=(600,240))
 aspect = (1,4,1)
 limits = (-0.025, 0.025, -0.05, 0.15, -0.025, 0.025)
 ax = Axis3(fig[1,1], aspect=aspect, limits=limits, azimuth=0., elevation=1e-3)
-hidexdecorations!(ax)
-hidezdecorations!(ax)
+hidedecorations!(ax)
 
 render_system!(ax, system)
 

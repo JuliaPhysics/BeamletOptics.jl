@@ -66,16 +66,14 @@ solve_system!(system, beam)
 splitter_fig = Figure(size=(600, 440))
 splitter_ax = Axis3(splitter_fig[1,1], aspect=:data, elevation=pi/2, azimuth=2pi)
 
-hidedecorations!(splitter_ax)
-hidespines!(splitter_ax)
+const splitter_view = [
+    -0.725337   0.688394  -9.71445e-17  -0.0445975
+    -0.170124  -0.179254   0.968982      0.0972088
+     0.667041   0.702838   0.247132     -0.421977
+     0.0        0.0        0.0           1.0
+]
 
-render_system!(splitter_ax, system)
-render_object!(splitter_ax, cbs)
-render_beam!(splitter_ax, beam, flen=10cm)
-render_object!(splitter_ax, rpm)
-render_object!(splitter_ax, laser_assembly)
-
-save("mi_beamsplitter.png", splitter_fig, px_per_unit=4)
+take_screenshot("mi_beamsplitter.png", system, beam; size=(600, 400), view=splitter_view, flen=5cm)
 
 ## arms fig
 reset_beamlet!(beam)
@@ -89,16 +87,14 @@ system = System([
 ])
 solve_system!(system, beam)
 
-arm_fig = Figure(size=(600, 390))
-arm_ax = Axis3(arm_fig[1,1], aspect=:data, elevation=0.45, azimuth=5.3)
+const mi_arms_view = [
+    0.774958   0.632013  8.60423e-16  -0.197367
+    -0.234631   0.287698  0.928535      0.0332977
+    0.586847  -0.719576  0.371244     -0.422447
+    0.0        0.0       0.0           1.0
+]
 
-hidedecorations!(arm_ax)
-hidespines!(arm_ax)
-
-render_system!(arm_ax, system)
-render_beam!(arm_ax, beam, flen=20cm)
-
-save("mi_arms.png", arm_fig, px_per_unit=4)
+take_screenshot("mi_arms.png", system, beam; size=(600, 250), view=mi_arms_view)
 
 ## system figure
 reset_beamlet!(beam)
@@ -114,21 +110,14 @@ system = System([
 
 solve_system!(system, beam)
 
-pd_fig = Figure(size=(600, 550))
-pd_ax = Axis3(pd_fig[1,1], aspect=:data, elevation=pi/2, azimuth=2pi)
+const pd_view = [
+    -0.909654   0.415368  9.71445e-16   0.10082
+    -0.188776  -0.413419  0.890757      0.100153
+     0.369992   0.81028   0.45448      -0.466288
+     0.0        0.0       0.0           1.0
+]
 
-hidedecorations!(pd_ax)
-hidespines!(pd_ax)
-
-render_system!(pd_ax, system)
-render_object!(pd_ax, cbs)
-render_beam!(pd_ax, beam)
-render_object!(pd_ax, laser_assembly)
-render_object!(pd_ax, rpm)
-render_object!(pd_ax, m1)
-render_object!(pd_ax, m2)
-
-save("mi_pd.png", pd_fig, px_per_unit=4)
+take_screenshot("mi_pd.png", system, beam; size=(600, 600), view=pd_view, flen=5cm)
 
 ## fringe plot
 fringes_fig = Figure(size=(600, 270))

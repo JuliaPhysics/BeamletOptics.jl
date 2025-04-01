@@ -197,7 +197,7 @@ system = System([rpm, cbs, m1, m2, pd])
 solve_system!(system, beam)
 ```
 
-Below you can find a top-down rendering of the interferometer with the [PDA10A2](https://www.thorlabs.com/thorproduct.cfm?partnumber=PDA10A2) detector. The detector is connected to the cage system with a [SM1L30C](https://www.thorlabs.com/thorproduct.cfm?partnumber=SM1L30C) lens tube and a [CP33T/M](https://www.thorlabs.com/thorproduct.cfm?partnumber=CP33T/M) adapter. Once the `solve_system!` command has been executed, you can inspect the detector’s data to observe interference fringes and measure optical power. This typically involves examining the detector’s stored field array, which will be discussed in the next section.
+Below you can find a rendering of the interferometer with the [PDA10A2](https://www.thorlabs.com/thorproduct.cfm?partnumber=PDA10A2) Si-detector. The device is connected to the cage system with a [SM1L30C](https://www.thorlabs.com/thorproduct.cfm?partnumber=SM1L30C) lens tube and a [CP33T/M](https://www.thorlabs.com/thorproduct.cfm?partnumber=CP33T/M) adapter. Once the `solve_system!` command has been executed, you can inspect the detector’s data to observe interference fringes and measure optical power. This typically involves examining the detector’s stored field array, which will be discussed in the next section.
 
 ![Photodetector](mi_pd.png)
 
