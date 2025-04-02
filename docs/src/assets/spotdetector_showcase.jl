@@ -1,4 +1,4 @@
-using CairoMakie, BeamletOptics
+using GLMakie, BeamletOptics
 
 const mm = 1e-3
 
