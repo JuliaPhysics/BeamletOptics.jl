@@ -88,13 +88,13 @@ system = System([
 solve_system!(system, beam)
 
 const mi_arms_view = [
-    0.774958   0.632013  8.60423e-16  -0.197367
-    -0.234631   0.287698  0.928535      0.0332977
-    0.586847  -0.719576  0.371244     -0.422447
-    0.0        0.0       0.0           1.0
+    -0.00057493  -1.0          -2.91976e-16   0.23897
+    0.511649    -0.000294162   0.859195     -0.0413112
+   -0.859195     0.000493977   0.511649     -0.258694
+    0.0          0.0           0.0           1.0
 ]
 
-take_screenshot("mi_arms.png", system, beam; size=(600, 250), view=mi_arms_view)
+take_screenshot("mi_arms.png", system, beam; size=(600, 500), view=mi_arms_view, px_per_unit=8)
 
 ## system figure
 reset_beamlet!(beam)

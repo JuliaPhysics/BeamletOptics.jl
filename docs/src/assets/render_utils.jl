@@ -11,7 +11,8 @@ function take_screenshot(
     view::BMO.Nullable{AbstractMatrix} = nothing,
     flen::Real = 10e-2,
     px_per_unit::Int = 8,
-    color::Union{Symbol, RGBf, RGBAf} = :red
+    color::Union{Symbol, RGBf, RGBAf} = :red,
+    optional_rendering_fct::BMO.Nullable{Function} = nothing
     )
     fig = Figure(; size)
     display(fig)
@@ -24,6 +25,9 @@ function take_screenshot(
     end
     if !isnothing(view)
         set_view(ax, view)
+    end
+    if !isnothing(optional_rendering_fct)
+        optional_rendering_fct(fig, ax)
     end
     hide_axis(ax)
     save(fname, fig; px_per_unit, update = false)
