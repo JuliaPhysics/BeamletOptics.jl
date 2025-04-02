@@ -60,4 +60,5 @@ makedocs(;
 deploydocs(;
     repo="github.com/StackEnjoyer/BeamletOptics.jl.git",
     devbranch="master",
+    push_preview=true,
 )
