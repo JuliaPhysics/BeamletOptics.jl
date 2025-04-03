@@ -224,21 +224,55 @@ function Lens(
 
         # Add mechanical ring if md_mid > d_mid
         if md_mid > d_mid
-            ring_thickness = thickness(mid)
-            ring_center = position(mid)[2] + ring_thickness / 2
-            if front !== nothing
-                s = edge_sag(front_surface, front)
-                ring_thickness -= s
-                ring_center += s / 2
+            if diameter(back_surface) > diameter(front_surface)
+                # add ring around section up to back surface
+                ring_thickness = l0 + thickness(front)
+                ring_center = position(mid)[2] + ring_thickness / 2
+                if front !== nothing
+                    s = edge_sag(front_surface, front)
+                    ring_thickness -= s
+                    ring_center += s / 2
+                end
+                ring = RingSDF(diameter(front_surface)/2, (diameter(back_surface) - diameter(front_surface)) / 2, ring_thickness)
+                translate3d!(ring, [0, ring_center, 0])
+                shape += ring
+
+                if md_mid > diameter(back_surface)
+                    # add second ring around the outer perimeter defined by diameter(back_surface)
+                    ring_thickness = thickness(mid)
+                    ring_center = position(mid)[2] + ring_thickness / 2
+                    if front !== nothing
+                        s = edge_sag(front_surface, front)
+                        ring_thickness -= s
+                        ring_center += s / 2
+                    end
+                    if back !== nothing
+                        s = edge_sag(back_surface, back)
+                        ring_thickness += s
+                        ring_center += s / 2
+                    end
+                    ring = RingSDF(diameter(back_surface) / 2, (md_mid - diameter(back_surface)) / 2, ring_thickness)
+                    translate3d!(ring, [0, ring_center, 0])
+                    shape += ring
+                end
+            else
+                # add one outer ring
+                ring_thickness = thickness(mid)
+                ring_center = position(mid)[2] + ring_thickness / 2
+                if front !== nothing
+                    s = edge_sag(front_surface, front)
+                    ring_thickness -= s
+                    ring_center += s / 2
+                end
+                if back !== nothing
+                    s = edge_sag(back_surface, back)
+                    ring_thickness += s
+                    ring_center += s / 2
+                end
+                ring = RingSDF(d_mid / 2, (md_mid - d_mid) / 2, ring_thickness)
+                translate3d!(ring, [0, ring_center, 0])
+                shape += ring
             end
-            if back !== nothing
-                s = edge_sag(back_surface, back)
-                ring_thickness += s
-                ring_center += s / 2
-            end
-            ring = RingSDF(d_mid / 2, (md_mid - d_mid) / 2, ring_thickness)
-            translate3d!(ring, [0, ring_center, 0])
-            shape += ring
         elseif md_mid < d_mid
             @warn "Mechanical diameter is less than clear aperture; parameter md has been ignored."
         end
