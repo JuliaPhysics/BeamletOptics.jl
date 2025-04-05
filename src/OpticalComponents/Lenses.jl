@@ -222,73 +222,86 @@ function Lens(
         end
         shape = mid
 
-        # Add mechanical ring if md_mid > d_mid
-        if md_mid > d_mid
-            if diameter(back_surface) > diameter(front_surface)
-                # add ring around section up to back surface
-                ring_thickness = l0 + thickness(front)
-                ring_center = position(mid)[2] + ring_thickness / 2
-                if front !== nothing
-                    s = edge_sag(front_surface, front)
-                    ring_thickness -= s
-                    ring_center += s / 2
-                end
-                ring = RingSDF(diameter(front_surface)/2, (diameter(back_surface) - diameter(front_surface)) / 2, ring_thickness)
-                translate3d!(ring, [0, ring_center, 0])
-                shape += ring
+        d_front = diameter(front_surface)
+        d_back = diameter(back_surface)
+        d_min = min(d_front, d_back)
+        d_max = max(d_front, d_back)
 
-                if md_mid > diameter(back_surface)
-                    # add second ring around the outer perimeter defined by diameter(back_surface)
-                    ring_thickness = thickness(mid)
-                    ring_center = position(mid)[2] + ring_thickness / 2
+        if md_mid < d_min
+            @warn "Mechanical diameter is less than clear aperture; parameter md has been ignored."
+        else
+            # add leveling ring if there is a step between front and back clear apertures
+            if d_front != d_back
+                if d_back > d_front
+                    # Step exists on the front side: level front to match back.
+                    leveling_thickness = l0 + (front !== nothing ? thickness(front) : 0)
                     if front !== nothing
-                        s = edge_sag(front_surface, front)
-                        ring_thickness -= s
-                        ring_center += s / 2
+                        s_front = edge_sag(front_surface, front)
+                        leveling_thickness -= s_front
                     end
+                    leveling_center = position(mid)[2] +
+                                      (l0 + (front !== nothing ? thickness(front) : 0)) / 2
+                    if front !== nothing
+                        leveling_center += s_front / 2
+                    end
+                    ring = RingSDF(d_front / 2, (d_back - d_front) / 2, leveling_thickness)
+                    translate3d!(ring, [0, leveling_center, 0])
+                    shape += ring
+                else  # d_front > d_back
+                    # Step exists on the back side: level back to match front.
+                    leveling_thickness = l0 + (back !== nothing ? thickness(back) : 0)
                     if back !== nothing
-                        s = edge_sag(back_surface, back)
-                        ring_thickness += s
-                        ring_center += s / 2
+                        s_back = edge_sag(back_surface, back)
+                        leveling_thickness += s_back
                     end
-                    ring = RingSDF(diameter(back_surface) / 2, (md_mid - diameter(back_surface)) / 2, ring_thickness)
-                    translate3d!(ring, [0, ring_center, 0])
+                    leveling_center = position(mid)[2] +
+                                      (l0 + (back !== nothing ? thickness(back) : 0)) / 2 +
+                                      ((front !== nothing ? thickness(front) : 0))
+                    if back !== nothing
+                        leveling_center += s_back / 2
+                    end
+                    ring = RingSDF(d_back / 2, (d_front - d_back) / 2, leveling_thickness)
+                    translate3d!(ring, [0, leveling_center, 0])
                     shape += ring
                 end
-            else
-                # add one outer ring
-                ring_thickness = thickness(mid)
-                ring_center = position(mid)[2] + ring_thickness / 2
+            end
+
+            # add outer ring if the mechanical diameter exceeds the larger clear aperture.
+            if md_mid > d_max
+                outer_thickness = thickness(mid)
+                outer_center = position(mid)[2] + outer_thickness / 2
                 if front !== nothing
-                    s = edge_sag(front_surface, front)
-                    ring_thickness -= s
-                    ring_center += s / 2
+                    s_front = edge_sag(front_surface, front)
+                    outer_thickness -= s_front
+                    outer_center += s_front / 2
                 end
                 if back !== nothing
-                    s = edge_sag(back_surface, back)
-                    ring_thickness += s
-                    ring_center += s / 2
+                    s_back = edge_sag(back_surface, back)
+                    outer_thickness += s_back
+                    outer_center += s_back / 2
                 end
-                ring = RingSDF(d_mid / 2, (md_mid - d_mid) / 2, ring_thickness)
-                translate3d!(ring, [0, ring_center, 0])
+                ring = RingSDF(d_max / 2, (md_mid - d_max) / 2, outer_thickness)
+                translate3d!(ring, [0, outer_center, 0])
                 shape += ring
             end
-        elseif md_mid < d_mid
-            @warn "Mechanical diameter is less than clear aperture; parameter md has been ignored."
         end
     end
 
     return Lens(shape, n)
 end
 
-Lens(front_surface::AbstractRotationallySymmetricSurface, center_thickness::Real, n::RefractiveIndex) = Lens(
-    front_surface,
-    CircularFlatSurface(diameter(front_surface)),
-    center_thickness,
-    n
-)
+function Lens(front_surface::AbstractRotationallySymmetricSurface,
+        center_thickness::Real, n::RefractiveIndex)
+    Lens(
+        front_surface,
+        CircularFlatSurface(diameter(front_surface)),
+        center_thickness,
+        n
+    )
+end
 
-function Lens(front_surface::CircularFlatSurface, back_surface::CircularFlatSurface, center_thickness::Real, n::RefractiveIndex)
+function Lens(front_surface::CircularFlatSurface, back_surface::CircularFlatSurface,
+        center_thickness::Real, n::RefractiveIndex)
     d_mid = min(diameter(front_surface), diameter(back_surface))
 
     return Lens(
@@ -340,7 +353,7 @@ function Lens(
     else
         # Construct central box and add front/back surfaces
         mid = BoxSDF(h, l0, d_mid)
-        translate3d!(mid, [0, l0/2, 0])
+        translate3d!(mid, [0, l0 / 2, 0])
         if front !== nothing
             translate3d!(mid, [0, thickness(front), 0])
             mid += front
@@ -376,15 +389,20 @@ function Lens(
     return Lens(shape, n)
 end
 
-Lens(front_surface::AbstractCylindricalSurface, center_thickness::Real, n::RefractiveIndex) = Lens(
-    front_surface,
-    RectangularFlatSurface(diameter(front_surface)),
-    center_thickness,
-    n
-)
+function Lens(front_surface::AbstractCylindricalSurface,
+        center_thickness::Real, n::RefractiveIndex)
+    Lens(
+        front_surface,
+        RectangularFlatSurface(diameter(front_surface)),
+        center_thickness,
+        n
+    )
+end
 
-function cylindric_lens_outer_parameters(f::AbstractCylindricalSurface, b::AbstractCylindricalSurface)
-    height(f) != height(b) && throw(ArgumentError("height of front and back surface have to match for cylindric lenses"))
+function cylindric_lens_outer_parameters(
+        f::AbstractCylindricalSurface, b::AbstractCylindricalSurface)
+    height(f) != height(b) &&
+        throw(ArgumentError("height of front and back surface have to match for cylindric lenses"))
 
     d_mid = min(diameter(f), diameter(b))
     md_mid = max(mechanical_diameter(f), mechanical_diameter(b))
@@ -393,7 +411,8 @@ function cylindric_lens_outer_parameters(f::AbstractCylindricalSurface, b::Abstr
     return d_mid, md_mid, h
 end
 
-function cylindric_lens_outer_parameters(f::AbstractCylindricalSurface, ::RectangularFlatSurface)
+function cylindric_lens_outer_parameters(
+        f::AbstractCylindricalSurface, ::RectangularFlatSurface)
     d_mid = diameter(f)
     md_mid = mechanical_diameter(f)
     h = height(f)
@@ -401,19 +420,24 @@ function cylindric_lens_outer_parameters(f::AbstractCylindricalSurface, ::Rectan
     return d_mid, md_mid, h
 end
 
-cylindric_lens_outer_parameters(f::RectangularFlatSurface, b::AbstractCylindricalSurface) = cylindric_lens_outer_parameters(b, f)
+function cylindric_lens_outer_parameters(
+        f::RectangularFlatSurface, b::AbstractCylindricalSurface)
+    cylindric_lens_outer_parameters(b, f)
+end
 
-function cylindric_lens_outer_parameters(f::RectangularFlatSurface, b::RectangularFlatSurface)
+function cylindric_lens_outer_parameters(
+        f::RectangularFlatSurface, b::RectangularFlatSurface)
     d_mid = diameter(f)
     md_mid = mechanical_diameter(f)
 
     return d_mid, md_mid, d_mid
 end
 
-function Lens(front_surface::RectangularFlatSurface, back_surface::RectangularFlatSurface, center_thickness::Real, n::RefractiveIndex)
+function Lens(front_surface::RectangularFlatSurface, back_surface::RectangularFlatSurface,
+        center_thickness::Real, n::RefractiveIndex)
     d_mid = min(diameter(front_surface), diameter(back_surface))
     mid = BoxSDF(d_mid, center_thickness, d_mid)
-    translate3d!(mid, [0, center_thickness/2, 0])
+    translate3d!(mid, [0, center_thickness / 2, 0])
 
     return Lens(
         mid,
