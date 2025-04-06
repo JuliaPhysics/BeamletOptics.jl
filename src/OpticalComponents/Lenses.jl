@@ -184,15 +184,15 @@ function Lens(
 
     # Initialize remaining cylindrical section length.
     l0 = center_thickness
-
+    @info l0
     # Front Surface
     front = sdf(front_surface, ForwardOrientation())
     l0 -= isnothing(front) ? zero(l0) : thickness(front)
-
+    @info l0
     # Back Surface
     back = sdf(back_surface, BackwardOrientation())
     l0 -= isnothing(back) ? zero(l0) : thickness(back)
-
+    @info l0
     # Use MeniscusLensSDF if cylinder length is non-positive
     if l0 ≤ 0
         if sign(radius(front_surface)) == sign(radius(back_surface))
@@ -221,7 +221,7 @@ function Lens(
             mid += back
         end
         shape = mid
-
+        @info l0
         d_front = diameter(front_surface)
         d_back = diameter(back_surface)
         d_min = min(d_front, d_back)
@@ -234,34 +234,37 @@ function Lens(
             if d_front != d_back
                 if d_back > d_front
                     # Step exists on the front side: level front to match back.
-                    leveling_thickness = l0 + (front !== nothing ? thickness(front) : 0)
+                    leveling_thickness = l0
                     if front !== nothing
                         s_front = edge_sag(front_surface, front)
-                        leveling_thickness -= s_front
+                        if s_front < 0
+                            # edge curves towards negative so it is a concave type shape,
+                            # which has to be covered by the ring
+                            leveling_thickness += abs(s_front) + thickness(front)
+                        end
                     end
-                    leveling_center = position(mid)[2] +
-                                      (l0 + (front !== nothing ? thickness(front) : 0)) / 2
-                    if front !== nothing
-                        leveling_center += s_front / 2
-                    end
+
                     ring = RingSDF(d_front / 2, (d_back - d_front) / 2, leveling_thickness)
-                    translate3d!(ring, [0, leveling_center, 0])
+                    translate3d!(ring, [0, edge_sag(front_surface, front) + leveling_thickness / 2, 0])
                     shape += ring
                 else  # d_front > d_back
                     # Step exists on the back side: level back to match front.
-                    leveling_thickness = l0 + (back !== nothing ? thickness(back) : 0)
+                    leveling_thickness = l0
                     if back !== nothing
                         s_back = edge_sag(back_surface, back)
-                        leveling_thickness += s_back
+                        if (s_back - thickness(back)) > 0
+                            # edge curves towards positive so it is a concave type shape,
+                            # which has to be covered by the ring
+                            leveling_thickness += abs(s_back) + thickness(back)
+                        end
                     end
                     leveling_center = position(mid)[2] +
-                                      (l0 + (back !== nothing ? thickness(back) : 0)) / 2 +
-                                      ((front !== nothing ? thickness(front) : 0))
+                                      (l0/2 + (back !== nothing ? edge_sag(back_surface, back) : 0))
                     if back !== nothing
                         leveling_center += s_back / 2
                     end
                     ring = RingSDF(d_back / 2, (d_front - d_back) / 2, leveling_thickness)
-                    translate3d!(ring, [0, leveling_center, 0])
+                    translate3d!(ring, [0, thickness(front) + leveling_thickness/2, 0])
                     shape += ring
                 end
             end

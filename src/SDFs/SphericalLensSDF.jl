@@ -465,7 +465,7 @@ end
 
 mechanical_diameter(s::SphericalSurface) = s.mechanical_diameter
 
-edge_sag(::SphericalSurface, sd::AbstractSphericalSurfaceSDF) = abs(sag(sd))
+edge_sag(::SphericalSurface, sd::AbstractSphericalSurfaceSDF) = sag(sd)
 
 function sdf(s::SphericalSurface, ot::AbstractOrientationType)
     isinf(radius(s)) && return nothing
