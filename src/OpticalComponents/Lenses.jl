@@ -184,15 +184,12 @@ function Lens(
 
     # Initialize remaining cylindrical section length.
     l0 = center_thickness
-    @info l0
     # Front Surface
     front = sdf(front_surface, ForwardOrientation())
     l0 -= isnothing(front) ? zero(l0) : thickness(front)
-    @info l0
     # Back Surface
     back = sdf(back_surface, BackwardOrientation())
     l0 -= isnothing(back) ? zero(l0) : thickness(back)
-    @info l0
     # Use MeniscusLensSDF if cylinder length is non-positive
     if l0 ≤ 0
         if sign(radius(front_surface)) == sign(radius(back_surface))
@@ -221,7 +218,7 @@ function Lens(
             mid += back
         end
         shape = mid
-        @info l0
+
         d_front = diameter(front_surface)
         d_back = diameter(back_surface)
         d_min = min(d_front, d_back)
