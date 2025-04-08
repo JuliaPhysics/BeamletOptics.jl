@@ -21,6 +21,6 @@ interact3d(::AbstractSystem, ::NonInteractableObject, ::AbstractBeam, ::Abstract
 
 MeshDummy(loadpath::String) = NonInteractableObject(Mesh(load(loadpath)))
 
-render_object!(axis, dummy::NonInteractableObject) = render_dummy_mesh!(axis, dummy)
+render_object!(axis, dummy::NonInteractableObject; kwargs...) = render_dummy_mesh!(axis, dummy; kwargs...)
 
-render_dummy_mesh!(::Any, ::NonInteractableObject) = nothing
+render_dummy_mesh!(::Any, ::NonInteractableObject; kwargs...) = nothing

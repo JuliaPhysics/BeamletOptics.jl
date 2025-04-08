@@ -60,9 +60,9 @@ end
 
 render_sdf_mesh!(axis::_RenderEnv, vertices, faces; transparency = true) = mesh!(axis, vertices, faces, transparency=transparency)
 
-function render_dummy_mesh!(axis::_RenderEnv, d::NonInteractableObject; transparency = false)
+function render_dummy_mesh!(axis::_RenderEnv, d::NonInteractableObject; transparency = false, kwargs...)
     mesh = d.shape
-    mesh!(axis, vertices(mesh), faces(mesh); transparency, color = :grey)
+    mesh!(axis, vertices(mesh), faces(mesh); transparency, color = :grey, kwargs...)
     return nothing
 end
 
