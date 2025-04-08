@@ -1316,6 +1316,39 @@ end
 
         # test lens thickness
         @test BMO.thickness(lens) ≈ l
+
+        # test ring generation
+        NBK7 = DiscreteRefractiveIndex([532e-9, 1064e-9], [1.5195, 1.5066])
+        mm = 1e-3
+
+        s1 = Lens(
+            SphericalSurface(38.184mm, 2*1.840mm, 2*2.380mm),
+            SphericalSurface(3.467mm, 2*2.060mm, 2*2.380mm),
+            0.5mm,
+            NBK7
+        )
+
+        @test 2*s1.shape.sdfs[5].hthickness ≈ 0.001134 atol=1e-6
+
+        s2 = Lens(
+            SphericalSurface(3.467mm, 2*2.060mm, 2*2.380mm),
+            SphericalSurface(-5.020mm, 2*2.380mm, 2*2.380mm),
+            2.5mm,
+            NBK7
+        )
+
+        @test 2*s2.shape.sdfs[4].hthickness ≈ 0.001221590 atol=1e-8
+
+        # doublet test case
+        s1 = SphericalSurface(7.744mm, 2*2.812mm, 2*3mm)
+        s2 = SphericalSurface(-3.642mm, 2*3mm)
+        s3 = SphericalSurface(-14.413mm, 2*2.812mm, 2*3mm)
+
+        dl21 = Lens(s1, s2, 3.4mm, NBK7)
+        dl22 = Lens(s2, s3, 1.0mm, NBK7)
+
+        @test 2*dl21.shape.sdfs[4].hthickness ≈ 0.001294398 atol=1e-6
+        @test 2*dl22.shape.sdfs[4].hthickness ≈ 0.000723025 atol=1e-6
     end
 end
 
@@ -1486,6 +1519,11 @@ end
             # test if the beam is correctly focussed
             @test f_pos[3]≈0 atol=1e-7
         end
+
+        # test rings
+        @test 2*L1.shape.sdfs[4].hthickness ≈ 0.00060839 atol=1e-6
+        @test 2*L2.shape.sdfs[4].hthickness ≈ 0.00057497 atol=1e-6
+        @test 2*L3.shape.sdfs[4].hthickness ≈ 0.00048395 atol=1e-6
     end
 end
 
