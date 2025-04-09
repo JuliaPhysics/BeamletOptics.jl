@@ -1,4 +1,5 @@
 using CairoMakie
+using GLMakie
 using BeamletOptics
 using Documenter
 using DocumenterCitations
@@ -11,7 +12,7 @@ bib = CitationBibliography(joinpath(@__DIR__, "src", "refs.bib"))
 
 makedocs(;
     modules=[BeamletOptics],
-    authors="Hugo Uittenbosch <hugo.uittenbosch@dlr.de> and contributors",
+    authors="Hugo Uittenbosch <hugo.uittenbosch@dlr.de>, Oliver Kliebisch <oliver.kliebisch@dlr.de> and contributors",
     sitename="BeamletOptics.jl",
     format=Documenter.HTML(;
         prettyurls=get(ENV, "CI", "false") == "true",
@@ -59,4 +60,5 @@ makedocs(;
 deploydocs(;
     repo="github.com/StackEnjoyer/BeamletOptics.jl.git",
     devbranch="master",
+    push_preview=false,
 )

@@ -1,13 +1,14 @@
 ## intro fig
-intro_fig = Figure(size=(600, 380))
-intro_ax = Axis3(intro_fig[1,1], aspect=:data, elevation=0.4, azimuth=8.7)
+GLMakie.activate!(; ssao=true)
 
-hidedecorations!(intro_ax)
-hidespines!(intro_ax)
+const intro_camera_view = [
+    -0.707107   0.707107  -5.55112e-17   0.0188074;
+    -0.498749  -0.498749   0.708871      0.222826;
+     0.501247   0.501247   0.705338     -0.759889;
+     0.0        0.0        0.0           1.0;
+]
 
-render_system!(intro_ax, system)
-
-save("mi_intro_fig.png", intro_fig, px_per_unit=4)
+take_screenshot("mi_intro_fig.png", system, nothing; size=(600, 600), view=intro_camera_view)
 
 ## laser fig
 λ = 632.8e-9
@@ -41,24 +42,20 @@ lines!(waist_ax, zs*1e2, -w * 1e3, color=RGBAf(1,0,0,.5), linestyle=:dashdot)
 hlines!(waist_ax, 0, color=:black)
 text!(waist_ax, "Optical axis")
 
-save("mi_waist_curve.png", params_fig, px_per_unit=4)
+save("mi_waist_curve.png", params_fig, px_per_unit=8)
 
 ## mirror fig
 system = System([laser_assembly, mirror_assembly])
 solve_system!(system, beam)
 
-mirror_fig = Figure(size=(600, 300))
-mirror_ax = Axis3(mirror_fig[1,1], aspect=:data, elevation=0.4, azimuth=2π)
+const mirror_camera_view = [
+    -0.383435   0.923568  -2.35922e-16  -0.105822
+    -0.259272  -0.107641   0.959787      0.0303688
+     0.886429   0.368016   0.280729     -0.286356
+     0.0        0.0        0.0           1.0
+]
 
-hidedecorations!(mirror_ax)
-hidespines!(mirror_ax)
-
-render_system!(mirror_ax, system)
-render_object!(mirror_ax, rpm)
-render_beam!(mirror_ax, beam, flen=10cm)
-render_object!(mirror_ax, laser_assembly)
-
-save("mi_corner_mirror.png", mirror_fig, px_per_unit=4)
+take_screenshot("mi_corner_mirror.png", system, beam; view=mirror_camera_view)
 
 ## splitter fig
 reset_beamlet!(beam)
@@ -69,16 +66,14 @@ solve_system!(system, beam)
 splitter_fig = Figure(size=(600, 440))
 splitter_ax = Axis3(splitter_fig[1,1], aspect=:data, elevation=pi/2, azimuth=2pi)
 
-hidedecorations!(splitter_ax)
-hidespines!(splitter_ax)
+const splitter_view = [
+    -0.725337   0.688394  -9.71445e-17  -0.0445975
+    -0.170124  -0.179254   0.968982      0.0972088
+     0.667041   0.702838   0.247132     -0.421977
+     0.0        0.0        0.0           1.0
+]
 
-render_system!(splitter_ax, system)
-render_object!(splitter_ax, cbs)
-render_beam!(splitter_ax, beam, flen=10cm)
-render_object!(splitter_ax, rpm)
-render_object!(splitter_ax, laser_assembly)
-
-save("mi_beamsplitter.png", splitter_fig, px_per_unit=4)
+take_screenshot("mi_beamsplitter.png", system, beam; size=(600, 400), view=splitter_view, flen=5cm)
 
 ## arms fig
 reset_beamlet!(beam)
@@ -92,16 +87,14 @@ system = System([
 ])
 solve_system!(system, beam)
 
-arm_fig = Figure(size=(600, 390))
-arm_ax = Axis3(arm_fig[1,1], aspect=:data, elevation=0.45, azimuth=5.3)
+const mi_arms_view = [
+    -0.00057493  -1.0          -2.91976e-16   0.23897
+    0.511649    -0.000294162   0.859195     -0.0413112
+   -0.859195     0.000493977   0.511649     -0.258694
+    0.0          0.0           0.0           1.0
+]
 
-hidedecorations!(arm_ax)
-hidespines!(arm_ax)
-
-render_system!(arm_ax, system)
-render_beam!(arm_ax, beam, flen=20cm)
-
-save("mi_arms.png", arm_fig, px_per_unit=4)
+take_screenshot("mi_arms.png", system, beam; size=(600, 500), view=mi_arms_view, px_per_unit=8)
 
 ## system figure
 reset_beamlet!(beam)
@@ -117,21 +110,14 @@ system = System([
 
 solve_system!(system, beam)
 
-pd_fig = Figure(size=(600, 550))
-pd_ax = Axis3(pd_fig[1,1], aspect=:data, elevation=pi/2, azimuth=2pi)
+const pd_view = [
+    -0.909654   0.415368  9.71445e-16   0.10082
+    -0.188776  -0.413419  0.890757      0.100153
+     0.369992   0.81028   0.45448      -0.466288
+     0.0        0.0       0.0           1.0
+]
 
-hidedecorations!(pd_ax)
-hidespines!(pd_ax)
-
-render_system!(pd_ax, system)
-render_object!(pd_ax, cbs)
-render_beam!(pd_ax, beam)
-render_object!(pd_ax, laser_assembly)
-render_object!(pd_ax, rpm)
-render_object!(pd_ax, m1)
-render_object!(pd_ax, m2)
-
-save("mi_pd.png", pd_fig, px_per_unit=4)
+take_screenshot("mi_pd.png", system, beam; size=(600, 600), view=pd_view, flen=5cm)
 
 ## fringe plot
 fringes_fig = Figure(size=(600, 270))

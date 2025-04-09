@@ -1,4 +1,10 @@
-using CairoMakie, BeamletOptics
+using GLMakie, BeamletOptics
+
+const BMO = BeamletOptics
+
+GLMakie.activate!(; ssao=true)
+
+Base.include(@__MODULE__, "render_utils.jl")
 
 # relative to the .md file location from which this code is included
 asset_dir = joinpath(@__DIR__, "..", "assets")
@@ -31,20 +37,16 @@ translate_to3d!(m4, [0,    dy,     0])
 
 system = StaticSystem([m1, m2, m3, m4])
 
-fig = Figure(size=(600, 300))
-limits = (-0.05, 0.15, -0.1, 0.4, -0.1, 0.05)
-aspect = (2,5,1.5)
-ax = Axis3(fig[1,1], aspect=aspect, limits=limits, azimuth=0.0, elevation=pi/2)
-
-hidedecorations!(ax)
-hidespines!(ax)
-
 beam = GaussianBeamlet([0, -0.2, 0], [0, 1, 0], 532e-9, 1e-3)
 
 solve_system!(system, beam, r_max=100)
 
-render_object!(ax, m1)
-render_object!(ax, m4)
-render_object!(ax, m2)
-render_object!(ax, m3)
-render_beam!(ax, beam, flen=0.2, color=RGBf(0,1,0))
+## mirror render
+const mirror_camera = [
+    0.723093   0.69075   2.498e-16  -0.075801
+    -0.281368   0.294543  0.913278    0.0368553
+    0.630847  -0.660385  0.407338   -0.254999
+    0.0        0.0       0.0         1.0
+]
+
+

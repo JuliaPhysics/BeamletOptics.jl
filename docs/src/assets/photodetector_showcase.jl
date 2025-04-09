@@ -1,4 +1,4 @@
-using CairoMakie, BeamletOptics
+using GLMakie, BeamletOptics
 
 pd = Photodetector(1e-3, 1000)
 pd_body = MeshDummy(joinpath(asset_dir, "FDS010.stl"))
