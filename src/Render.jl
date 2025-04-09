@@ -1,30 +1,5 @@
-"""
-    render_object!(axis, mesh::AbstractMesh)
-
-Render `mesh` into the specified 3D-`axis`.
-"""
-render_object!(::Any, mesh::AbstractMesh) = nothing
-
-render_object!(::Any, ::Any) = nothing
-render_object!(axis, object::AbstractObject) = render_object!(axis, shape_trait_of(object), object)
-render_object!(axis, ::SingleShape, object) = render_object!(axis, shape(object))
-function render_object!(ax, ::MultiShape, object::AbstractObject)
-    for _object in shape(object)
-        render_object!(ax, _object)
-    end
-    return nothing
-end
-
-"""
-    render_system!(axis, system::AbstractSystem)
-
-Render all objects contained in the `system`.
-"""
-function render_system!(axis, system::AbstractSystem)
-    # Avoid use of objects(system)
-    for object in system.objects
-        render_object!(axis, object)
-    end
+function render!(::Any, ::Any, kwargs...)
+    @warn "It appears no suitable Makie backend is loaded to trigger BeamletOpticsMakieExt"
     return nothing
 end
 
