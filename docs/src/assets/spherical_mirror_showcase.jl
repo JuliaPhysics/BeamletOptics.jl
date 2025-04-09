@@ -1,4 +1,4 @@
-using CairoMakie, BeamletOptics
+using GLMakie, BeamletOptics
 
 distance = 20e-2
 factor = 1.2

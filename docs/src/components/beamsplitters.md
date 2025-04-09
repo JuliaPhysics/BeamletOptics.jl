@@ -38,7 +38,7 @@ file_dir = joinpath(@__DIR__, "..", "assets", "bs_assets")
 
 Base.include(@__MODULE__, joinpath(file_dir, "pbs_showcase.jl"))
 
-save("pbs_showcase.png", fig, px_per_unit=4); nothing
+take_screenshot("pbs_showcase.png", system, beam; size=(600, 400), view=pbs_view, px_per_unit=8, optional_rendering_fct=test)
 ```
 
 ![Plate beamsplitter showcase](pbs_showcase.png)
@@ -66,7 +66,7 @@ file_dir = joinpath(@__DIR__, "..", "assets", "bs_assets")
 
 Base.include(@__MODULE__, joinpath(file_dir, "cbs_showcase.jl"))
 
-save("cbs_showcase.png", fig, px_per_unit=4); nothing
+take_screenshot("cbs_showcase.png", system, beam; size=(600, 400), view=mzi_view, px_per_unit=8)
 ```
 
 A classic application of cube beamsplitters is in Mach–Zehnder interferometers, where two beamsplitters combine with additional mirrors to form two optical paths that later recombine. The figure below shows a rudimentary Mach–Zehnder arrangement using two cube beamsplitters and two [`RightAnglePrismMirror`](@ref)s:

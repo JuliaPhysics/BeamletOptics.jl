@@ -29,7 +29,7 @@ file_dir = joinpath(@__DIR__, "..", "assets")
 
 Base.include(@__MODULE__, joinpath(file_dir, "plano_mirror_showcase.jl"))
 
-save("plano_mirror_showcase.png", fig, px_per_unit=4); nothing
+take_screenshot("plano_mirror_showcase.png", system, beam; size=(600, 400), view=mirror_camera, color=RGBf(0,1,0), flen=.4)
 ```
 
 ![Plano mirror showcase](plano_mirror_showcase.png)

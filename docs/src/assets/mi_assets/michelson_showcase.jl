@@ -1,3 +1,5 @@
+include(joinpath(@__DIR__, "..", "render_utils.jl"))
+
 function reset_beamlet!(beam::GaussianBeamlet)
     BeamletOptics._drop_beams!(beam)
     r_c = first(BeamletOptics.rays(beam.chief))

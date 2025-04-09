@@ -58,6 +58,11 @@ jobs:
         with:
           version: '1'
       - uses: julia-actions/cache@v2
+      # Install OpenGL dependencies for headless rendering
+      - name: Install OpenGL dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb mesa-utils
       - name: Configure doc environment
         shell: julia --project=docs --color=yes {0}
         run: |
@@ -65,14 +70,19 @@ jobs:
           Pkg.develop(PackageSpec(path=pwd()))
           Pkg.instantiate()
       - uses: julia-actions/julia-buildpkg@v1
-      - uses: julia-actions/julia-docdeploy@v1
+      # Run docs in xvfb environment
+      - name: Deploy documentation with xvfb
+        run: |
+          xvfb-run julia --project=docs --color=yes -e 'using Documenter; include("docs/make.jl")'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
-      - name: Run doctests
-        shell: julia --project=docs --color=yes {0}
+      # Run doctests in xvfb environment
+      - name: Run doctests with xvfb
         run: |
-          using Documenter: DocMeta, doctest
-          using BeamletOptics
-          DocMeta.setdocmeta!(BeamletOptics, :DocTestSetup, :(using BeamletOptics); recursive=true)
-          doctest(BeamletOptics)
+          xvfb-run julia --project=docs --color=yes -e '
+            using Documenter: DocMeta, doctest;
+            using BeamletOptics;
+            DocMeta.setdocmeta!(BeamletOptics, :DocTestSetup, :(using BeamletOptics); recursive=true);
+            doctest(BeamletOptics)
+          '
