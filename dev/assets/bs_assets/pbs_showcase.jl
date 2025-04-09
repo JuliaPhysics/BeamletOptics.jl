@@ -1,4 +1,10 @@
-using CairoMakie, BeamletOptics
+using GLMakie, BeamletOptics
+
+const BMO = BeamletOptics
+
+GLMakie.activate!(; ssao=true)
+
+Base.include(@__MODULE__, joinpath("..", "render_utils.jl"))
 
 mm = 1e-3
 n = 1.5
@@ -12,35 +18,31 @@ cmp_mount = MeshDummy(joinpath(file_dir, "PBS Mount.stl"))
 
 cmp_assembly = ObjectGroup([cmp, cmp_mount])
 
-zrotate3d!(cbs_assembly, deg2rad(-45))
-zrotate3d!(cmp_assembly, deg2rad(45))
+zrotate3d!(cbs_assembly, deg2rad(45))
+zrotate3d!(cmp_assembly, deg2rad(-45))
 
 translate3d!(cmp_assembly, [0, 100mm, 0])
 
 system = System([cbs_assembly, cmp_assembly])
 
-beam = GaussianBeamlet([0,-40mm,0], [0, 11, 0], 1e-6, 5e-4)
+beam = GaussianBeamlet([0,-100mm,0], [0, 11, 0], 1e-6, 5e-4)
 
 solve_system!(system, beam)
 
-fig = Figure(size=(600, 320))
-ax = Axis3(fig[1,1]; aspect=:data,  azimuth=0, elevation=pi/2)
+##
+function test(fig, ax)
+    splitter_substrate = ax.scene.plots[2]
+    splitter_coating = ax.scene.plots[3]
+    compensator = ax.scene.plots[5]
+    
+    splitter_substrate.color[] = :white
+    splitter_coating.color[] = :magenta
+    compensator.color[] = :white
+end
 
-render_object!(ax, cbs_mount)
-render_object!(ax, cbs)
-render_object!(ax, cmp_mount)
-render_object!(ax, cmp)
-render_beam!(ax, beam, flen=60mm, color=:red)
-
-hidedecorations!(ax)
-hidespines!(ax)
-
-fp = ax.scene.plots[14]
-ct = ax.scene.plots[15]
-cm = ax.scene.plots[17]
-
-fp.color[] = :white
-ct.color[] = :magenta
-cm.color[] = :white
-
-fig
+const pbs_view = [
+    0.0940287   0.995569   -3.19189e-16  -0.048146
+    -0.498165    0.0470503   0.865805      0.0176688
+     0.861969   -0.0814105   0.500382     -0.155093
+     0.0         0.0         0.0           1.0
+]
