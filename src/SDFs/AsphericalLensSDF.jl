@@ -27,7 +27,8 @@ mutable struct ConvexAsphericalSurfaceSDF{T} <: AbstractAsphericalSurfaceSDF{T}
 end
 
 function thickness(s::ConvexAsphericalSurfaceSDF)
-    abs(aspheric_equation(s.diameter / 2, 1 / s.radius, s.conic_constant, s.coefficients))
+    sag = aspheric_equation(s.diameter / 2, 1 / s.radius, s.conic_constant, s.coefficients)
+    return s.max_sag[1] > 0 && sag < 0 ? s.max_sag[1] : abs(sag)
 end
 
 # Constructor for ConvexAsphericalSurfaceSDF
