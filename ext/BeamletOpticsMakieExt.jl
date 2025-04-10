@@ -52,6 +52,7 @@ render!(::_RenderEnv, ::T; kwargs...) where T<:Any = throw(RenderNotImplementedE
 include("RenderSDF.jl")
 include("RenderMesh.jl")
 include("RenderObjects.jl")
+include("RenderPresets.jl")
 
 # function _render_ray!(axis::_RenderEnv,
 #         ray::AbstractRay,
@@ -95,14 +96,6 @@ include("RenderObjects.jl")
 #         [pos[2], vec[2]],
 #         [pos[3], vec[3]],
 #         color=color)
-# end
-
-# render_sdf_mesh!(axis::_RenderEnv, vertices, faces; transparency = true) = mesh!(axis, vertices, faces, transparency=transparency)
-
-# function render_dummy_mesh!(axis::_RenderEnv, d::NonInteractableObject; transparency = false, kwargs...)
-#     mesh = d.shape
-#     mesh!(axis, vertices(mesh), faces(mesh); transparency, color = :grey, kwargs...)
-#     return nothing
 # end
 
 end
