@@ -1,7 +1,7 @@
 module BeamletOpticsMakieExt
 
 using BeamletOptics
-import BeamletOptics: render!
+import BeamletOptics: render!, RenderException
 
 const BMO = BeamletOptics
 
@@ -24,13 +24,30 @@ const _RenderTypes = Union{
     BMO.AbstractSystem,
 }
 
-function render!(::A, ::Any; kwargs...) where A<:Any
-    throw(ErrorException("render! not implemented for axis type $A"))
+struct InvalidAxisError <: RenderException
+    msg::String
+    ax::Type
+    function InvalidAxisError(ax::Type)
+        msg = "Invalid axis input of type $ax, must be LScene or Axis3"
+        return new(msg, ax)
+    end
 end
 
-function render!(::_RenderEnv, ::T; kwargs...) where T<:Any
-    throw(ErrorException("render! not implemented for type $T"))
+struct RenderNotImplementedError <: RenderException
+    msg::String
+    t::Type
+    function RenderNotImplementedError(t::Type)
+        if !(t<:_RenderTypes)
+            throw(ErrorException("Type $t not supported"))
+        end
+        msg = "Render function not implemented for type $t"
+        return new(msg, t)
+    end
 end
+
+render!(::A, ::Any; kwargs...) where A<:Any = throw(InvalidAxisError(A))
+
+render!(::_RenderEnv, ::T; kwargs...) where T<:Any = throw(RenderNotImplementedError(T))
 
 include("RenderSDF.jl")
 include("RenderMesh.jl")

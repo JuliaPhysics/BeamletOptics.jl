@@ -1,7 +1,17 @@
-function render!(::Any, ::Any, kwargs...)
-    @warn "It appears no suitable Makie backend is loaded to trigger BeamletOpticsMakieExt"
-    return nothing
+abstract type RenderException <: Exception end
+
+message(e::RenderException) = e.msg
+showerror(io::IO, e::RenderException) = print(io, message(e))
+
+mutable struct MissingBackendError <: RenderException
+    msg::String
+    function MissingBackendError()
+        msg = "It appears no suitable Makie backend is loaded in this session."
+        return new(msg)
+    end
 end
+
+render!(::Any, ::Any, kwargs...) = throw(MissingBackendError())
 
 """
     render_ray!(axis, ray::AbstractRay; color=:blue, flen=1.0)
