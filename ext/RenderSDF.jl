@@ -19,7 +19,7 @@ function render!(ax::_RenderEnv, s::BMO.AbstractSDF; kwargs...)
     return nothing
 end
 
-function render!(ax::_RenderEnv, s::UnionSDF; kwargs...)
+function render!(ax::_RenderEnv, s::BMO.UnionSDF; kwargs...)
     for sdf in s.sdfs
         render!(ax, sdf; kwargs...)
     end
