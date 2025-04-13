@@ -168,8 +168,8 @@ function meniscus_lens_sdf(front_surface::AbstractSurface{T1}, front::AbstractSD
     else
         translate3d!(back, [0, -abs(radius(front_surface)), 0])
         translate3d!(cylinder, [0, -concave_sag, 0])
-        zrotate3d!(front_surface, π)
-        translate3d!(front_surface, [0, thickness(cylinder) - concave_sag + convex_sag, 0])
+        zrotate3d!(front, π)
+        translate3d!(front, [0, thickness(cylinder) - concave_sag + convex_sag, 0])
         convex_shape = back
         concave_shape = front
     end
