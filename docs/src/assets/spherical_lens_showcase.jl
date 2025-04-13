@@ -56,5 +56,5 @@ ax = Axis3(fig[1,1], aspect=aspect, limits=limits, azimuth=0., elevation=1e-3)
 hidedecorations!(ax)
 hidespines!(ax)
 
-render_beam!(ax, beam, color=:green2)
-render_system!(ax, system)
+render!(ax, beam, color=:green2)
+render!(ax, system)

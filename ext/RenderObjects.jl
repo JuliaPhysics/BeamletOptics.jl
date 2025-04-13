@@ -16,7 +16,7 @@ function render!(ax::_RenderEnv, ::BMO.MultiShape, obj; kwargs...)
 end
 
 """
-    render_system!(ax::_RenderEnv, sys::AbstractSystem)
+    render!(ax::_RenderEnv, sys::AbstractSystem)
 
 Render all objects contained in the `sys`tem.
 """

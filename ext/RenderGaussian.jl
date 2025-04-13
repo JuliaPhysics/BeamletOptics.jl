@@ -1,5 +1,5 @@
 """
-    render_beam!(ax, gauss::GaussianBeamlet; color=:red, flen=0.1, show_beams=false)
+    render!(ax, gauss::GaussianBeamlet; color=:red, flen=0.1, show_beams=false)
 
 Render the surface of a `GaussianBeamlet` as `color`. With `show_beams` the generating rays are plotted as follows:
 
@@ -15,7 +15,7 @@ Render the surface of a `GaussianBeamlet` as `color`. With `show_beams` the gene
 - `r_res::Int = 50`: radial resolution of the beam
 - `z_res::Int = 100`: resolution along the optical axis of the beam
 """
-function render_beam!(
+function render!(
         ax::_RenderEnv,
         gauss::GaussianBeamlet{T};
         color = :red,

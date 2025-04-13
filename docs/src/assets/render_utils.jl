@@ -18,10 +18,10 @@ function take_screenshot(
     display(fig)
     ax = LScene(fig[1,1])
     if !isnothing(system)
-        render_system!(ax, system)
+        render!(ax, system)
     end
     if !isnothing(beam)
-        render_beam!(ax, beam; flen, color)
+        render!(ax, beam; flen, color)
     end
     if !isnothing(view)
         set_view(ax, view)

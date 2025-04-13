@@ -89,8 +89,8 @@ ax = Axis3(fig[1,1], aspect=aspect, limits=limits, azimuth=0., elevation=1e-3)
 hidexdecorations!(ax)
 hidezdecorations!(ax)
 
-render_beam!(ax, beam, color=:green2)
-render_system!(ax, system)
+render!(ax, beam, color=:green2)
+render!(ax, system)
 
 save("spherical_lens_showcase.png", fig, px_per_unit=4); nothing # hide
 ```

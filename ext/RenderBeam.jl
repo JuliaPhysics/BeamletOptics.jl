@@ -1,5 +1,5 @@
 """
-    render_ray!(axis, ray::AbstractRay; color=:blue, flen=1.0)
+    render!(axis, ray::AbstractRay; color=:blue, flen=1.0)
 
 Renders a `ray` as a 3D line. If the ray has no intersection, the substitute length `flen` is used.
 """
@@ -26,7 +26,7 @@ function render!(ax::_RenderEnv, ray::BMO.AbstractRay; color = :blue, flen = 1.0
 end
 
 """
-    render_beam!(axis, beam::Beam; color=:blue, flen=1.0, show_pos=false)
+    render!(axis, beam::Beam; color=:blue, flen=1.0, show_pos=false)
 
 Render the entire `beam` into the specified 3D-`axis`. A `color` can be specified.
 """

@@ -36,14 +36,14 @@ rend = Axis3(fig[1,1], aspect=(1,5,1), limits=(-0.05, 0.05, -0.1, 0.4, -0.05, 0.
 hidexdecorations!(rend)
 hidezdecorations!(rend)
 
-render_system!(rend, system)
+render!(rend, system)
 
 zs = LinRange(-0.025, 0.025, 7)
 
 for z in zs
     beam = Beam(Ray([0, -0.1, z], [0, 1, 0.0], 1550e-9))
     solve_system!(system, beam)
-    render_beam!(rend, beam, flen=0.1)
+    render!(rend, beam, flen=0.1)
 end
 
 save("telescope_with_beams.png", fig, px_per_unit=4); nothing # hide
@@ -109,10 +109,10 @@ hidezdecorations!(rend) # hide
 # render beam first
 beam = GaussianBeamlet([0, -0.1, 0], [0, 1, 0.0], 1550e-9, 20e-3)
 solve_system!(system, beam)
-render_beam!(rend, beam, flen=0.1, r_res=100, z_res=1000)
+render!(rend, beam, flen=0.1, r_res=100, z_res=1000)
 
 # render system to overlay beam
-render_system!(rend, system)
+render!(rend, system)
 
 save("telescope_with_gaussian.png", fig, px_per_unit=4); nothing # hide
 ```

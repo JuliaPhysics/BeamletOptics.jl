@@ -75,7 +75,7 @@ ax = Axis3(fig[1,1], aspect=:data, azimuth=0., elevation=1e-3) # hide
 hidedecorations!(ax) # hide
 hidespines!(ax) # hide
 
-render_system!(ax, system) # hide
+render!(ax, system) # hide
 
 fig # hide
 ```
@@ -270,7 +270,7 @@ ax = Axis3(fig[1,1], aspect=:data, azimuth=0., elevation=1e-3)
 hidedecorations!(ax)
 hidespines!(ax)
 
-render_system!(ax, system)
+render!(ax, system)
 
 zs_1 = LinRange(-0.011, 0.011, 6)
 zs_2 = LinRange(-0.01, 0.01, 5)
@@ -278,13 +278,13 @@ zs_2 = LinRange(-0.01, 0.01, 5)
 for (i, z) in enumerate(zs_1)
     beam = Beam([0, -0.02 , z], [0,1.,0], 488e-9)
     solve_system!(system, beam)
-    render_beam!(ax, beam, flen=0.15, color=RGBAf(0,0,1,0.7))
+    render!(ax, beam, flen=0.15, color=RGBAf(0,0,1,0.7))
 end
 
 for (i, z) in enumerate(zs_2)
     beam = Beam([0, -0.02 , z], [0,1.,0], 707e-9)
     solve_system!(system, beam)
-    render_beam!(ax, beam, flen=0.15, color=RGBAf(1,0,0,0.5))
+    render!(ax, beam, flen=0.15, color=RGBAf(1,0,0,0.5))
 end
 
 save("doublet_showcase.png", fig, px_per_unit=4)

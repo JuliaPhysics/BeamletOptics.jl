@@ -170,8 +170,8 @@ save("mi_powerplot.png", power_fig, px_per_unit=4)
 ##
 # fig = Figure()
 # ax = LScene(fig[1,1])
-# render_system!(ax, system)
-# render_beam!(ax, beam)
+# render!(ax, system)
+# render!(ax, beam)
 # BeamletOptics.render_object_normals!(ax, pd.shape)
 
 # fig
