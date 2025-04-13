@@ -1,5 +1,5 @@
 """
-    render_object!(axis, s::AbstractSDF)
+    render!(ax::_RenderEnv, s::BMO.AbstractSDF; kwargs...)
 
 Render the surface of `s` based on the marching cubes algorithm.
 """
@@ -17,4 +17,10 @@ function render!(ax::_RenderEnv, s::BMO.AbstractSDF; kwargs...)
     faces = transpose(reinterpret(reshape, Int64, mc.triangles))
     mesh!(ax, vertices, faces; kwargs...)
     return nothing
+end
+
+function render!(ax::_RenderEnv, s::UnionSDF; kwargs...)
+    for sdf in s.sdfs
+        render!(ax, sdf; kwargs...)
+    end
 end

@@ -166,7 +166,7 @@ ax = Axis3(fig[1,1], aspect=:data, azimuth=0., elevation=1e-3) # hide
 hidedecorations!(ax) # hide
 hidespines!(ax) # hide
 
-render_object!(ax, L3) # hide
+render!(ax, L3) # hide
 
 fig # hide
 ```
@@ -201,7 +201,7 @@ ax = Axis3(fig[1,1], aspect=:data, azimuth=-pi/4, elevation=deg2rad(30)) # hide
 hidedecorations!(ax) # hide
 hidespines!(ax) # hide
 
-render_object!(ax,lens) # hide
+render!(ax,lens) # hide
 
 fig # hide
 
@@ -236,7 +236,7 @@ ax = Axis3(fig[1,1], aspect=:data, azimuth=-pi/4, elevation=deg2rad(30)) # hide
 hidedecorations!(ax) # hide
 hidespines!(ax) # hide
 
-render_object!(ax,lens) # hide
+render!(ax,lens) # hide
 
 fig # hide
 ```

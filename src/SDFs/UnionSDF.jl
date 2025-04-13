@@ -80,9 +80,3 @@ function rotate3d!(u::UnionSDF, axis, θ)
     end
     return nothing
 end
-
-function render_object!(axis, s::UnionSDF)
-    for sdf in s.sdfs
-        render_object!(axis, sdf)
-    end
-end

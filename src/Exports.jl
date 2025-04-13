@@ -42,4 +42,4 @@ export NonInteractableObject, MeshDummy, IntersectableObject
 export Retroreflector
 
 # render
-export render_beam!, render_object!, render_system!, render!
+export render!

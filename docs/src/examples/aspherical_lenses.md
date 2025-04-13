@@ -43,7 +43,7 @@ for z in -0.02:0.001:0.02
 
     render_beam!(ax, beam, flen=0.1)
 end
-render_object!(ax, lens)
+render!(ax, lens)
 
 save("aspherical_lens_showcase.png", fig, px_per_unit=4); nothing # hide
 
