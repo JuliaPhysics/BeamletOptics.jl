@@ -11,4 +11,9 @@ mutable struct MissingBackendError <: RenderException
     end
 end
 
+"""
+    render!(axis, thing; kwargs...)
+
+Test docs for `render!`, FIXME
+"""
 render!(::Any, ::Any, kwargs...) = throw(MissingBackendError())

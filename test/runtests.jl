@@ -2410,6 +2410,10 @@ end
     end
 end
 
+@testset "Render" begin
+    @test_throws BMO.MissingBackendError render!(nothing, nothing)
+end
+
 @testset "Bug fixes" begin
     @testset "Issue#14" begin
         pd_res = 1000

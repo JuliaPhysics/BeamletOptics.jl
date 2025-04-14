@@ -1,7 +1,11 @@
-function render!(ax::_RenderEnv, obj::BMO.AbstractObject; kwargs...)
-    render!(ax, BMO.shape_trait_of(obj), obj; kwargs...)
-    return nothing
-end
+"""
+    render!(ax, obj; kwargs...)
+
+FIXME
+"""
+render!(ax::_RenderEnv, obj::BMO.AbstractObject; kwargs...) = _render!(ax, obj; kwargs...)
+
+_render!(ax::_RenderEnv, obj::BMO.AbstractObject; kwargs...) = render!(ax, BMO.shape_trait_of(obj), obj; kwargs...)
 
 function render!(ax::_RenderEnv, ::BMO.SingleShape, obj; kwargs...)
     render!(ax, BMO.shape(obj); kwargs...)

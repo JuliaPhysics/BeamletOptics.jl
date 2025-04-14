@@ -55,21 +55,7 @@ include("RenderGaussian.jl")
 include("RenderSDF.jl")
 include("RenderMesh.jl")
 include("RenderObjects.jl")
+include("RenderLenses.jl")
 include("RenderPresets.jl")
-
-function render_surface!(axis::_RenderEnv, X, Y, Z; kwargs...)
-    surface!(axis, X, Y, Z; kwargs...)
-end
-
-# function _render_object_normal!(axis::_RenderEnv,
-#         pos::AbstractVector,
-#         vec::AbstractVector;
-#         color = :blue)
-#     lines!(axis,
-#         [pos[1], vec[1]],
-#         [pos[2], vec[2]],
-#         [pos[3], vec[3]],
-#         color=color)
-# end
 
 end

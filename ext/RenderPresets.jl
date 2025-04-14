@@ -1,13 +1,6 @@
-# function render_dummy_mesh!(axis::_RenderEnv, d::NonInteractableObject; transparency = false, kwargs...)
-#     mesh = d.shape
-#     mesh!(axis, vertices(mesh), faces(mesh); transparency, color = :grey, kwargs...)
-#     return nothing
-# end
+render!(ax::_RenderEnv, refr::BMO.AbstractRefractiveOptic; kwargs...) = _render!(ax, refr; transparency=true, color=:white, kwargs...)
+render!(ax::_RenderEnv, refl::BMO.AbstractReflectiveOptic; kwargs...) = _render!(ax, refl; transparency=false, color=:silver, kwargs...)
 
-render!(ax::_RenderEnv, dummy::BMO.NonInteractableObject; transparency=false, color=:grey, kwargs...) = render!(
-    ax,
-    BMO.shape(dummy);
-    transparency,
-    color,
-    kwargs...
-)
+render!(ax::_RenderEnv, bs::ThinBeamsplitter; kwargs...) = _render!(ax, bs; transparency=false, color=:magenta, kwargs...)
+
+render!(ax::_RenderEnv, nino::BMO.NonInteractableObject; kwargs...) = _render!(ax, nino; transparency=false, color=:grey, kwargs...)
