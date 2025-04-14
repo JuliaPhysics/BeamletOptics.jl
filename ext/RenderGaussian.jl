@@ -27,7 +27,7 @@ function render!(
     ) where {T}
     for child in PreOrderDFS(gauss)
         # Length tracking variable
-        p = AbstractTrees.parent(child)
+        p = child.parent # FIXME: `AbstractTrees` not defined error
         if isnothing(p)
             l = zero(T)
         else
