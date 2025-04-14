@@ -119,11 +119,7 @@ function interact3d(
     e2 = @view orient[:, 3]   # local y-axis
     origin_pd = position(shape(pd))
 
-    ray_int = intersection(ray)
-    isnothing(ray_int) && return nothing
-
-    # FIXME: can we assume all rays to have a λ property?
-    k = 2π / ray.λ
+    k = 2π / wavelength(ray)
 
     # Loop over the detector grid points
     Threads.@threads for j in eachindex(pd.y)
