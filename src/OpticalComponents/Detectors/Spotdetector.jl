@@ -71,10 +71,10 @@ Uses retracing of an input `beam`. **System must be aligned onto the global y-ax
 # Inputs
 
 - `aperture`: maximum aperture diameter in [m]
-- `n_rings`: maximum number of concentric rings
-- `n_rays`: total number of retracing runs, i.e. "spawned beams"
+- `num_rings`: maximum number of concentric rings
+- `num_rays`: total number of retracing runs, i.e. "spawned beams"
 """
-function create_spot_diagram(system::AbstractSystem, beam::Beam{T}, aperture::Real; n_rings::Int=20, n_rays::Int=1000) where T
+function create_spot_diagram(system::AbstractSystem, beam::Beam{T}, aperture::Real; num_rings::Int=20, num_rays::Int=1000) where T
     # test if detector present
     _objects = collect(objects(system))
     has_spotdetector = typeof.(_objects) .<: Spotdetector
@@ -88,26 +88,12 @@ function create_spot_diagram(system::AbstractSystem, beam::Beam{T}, aperture::Re
     sd = _objects[obj_index[1]]
     # reset detector
     reset_detector!(sd)
-    # setup concentric beam rings
-    r_max = aperture/2
-    rs = LinRange(0, r_max, n_rings)
-    # determine length step ds via total circumference
-    u_total = 0
-    for (i, r) in enumerate(rs)
-        i == 0 && continue
-        u_total += 2π*r
-    end
-    ds = u_total/n_rays
-    # Retrace input beam
-    for r in rs
-        n_rays = round(Int, 2π*r / ds)
-        xs = [cos(x)*r for x in LinRange(0, 2pi * (n_rays - 1) / n_rays, n_rays)]
-        zs = [sin(x)*r for x in LinRange(0, 2pi * (n_rays - 1) / n_rays, n_rays)]
-        for i in eachindex(xs)
-            y = position(first(beam.rays))[2]
-            position!(first(beam.rays), Point3{Float64}(xs[i], y, zs[i]))
-            solve_system!(system, beam)
-        end 
-    end
+    # spawn collimated beam source
+    ray = first(rays(beam))
+    pos = position(ray)
+    dir = direction(ray)
+    λ = wavelength(ray)
+    cs = CollimatedSource(pos, dir, aperture, λ; num_rays, num_rings)
+    solve_system!(system, cs)
     return nothing
 end

@@ -50,7 +50,7 @@ function PointSource(
     end
     # define basis vectors
     dir = normalize(dir)
-    b1 = normal3d(dir)
+    b1 = normal3d(dir) # random seed
     b2 = normal3d(dir, b1)
     θ_NA = LinRange(0, θ, num_rings)
     # define buffer
@@ -107,7 +107,7 @@ function CollimatedSource(
     push!(beams, Beam(Ray(pos, dir, λ)))
     num_rays -= 1
     # setup concentric beam ring radii
-    b1 = normal3d(dir)
+    b1 = normal3d(dir) # random seed
     r_max = diameter/2
     radii = LinRange(0, r_max, num_rings)[2:end]
     # calculate total accumulated circumference of all rings
