@@ -84,4 +84,55 @@ function PointSource(
     return PointSource(NA, beams)
 end
 
-export PointSource
+struct CollimatedSource{T, R<:AbstractRay{T}} <: AbstractBeamGroup{T,R}
+    beams::Vector{Beam{T, R}}
+end
+
+"""
+    CollimatedSource
+
+FIXME
+"""
+function CollimatedSource(
+        pos::AbstractArray{P},
+        dir::AbstractArray{D1},
+        diameter::D2,
+        λ::L;
+        num_rings::Int=20,
+        num_rays::Int=1000
+    ) where {P, D1, D2, L}
+    T = promote_type(P, D1, D2, L)
+    # define buffer
+    beams = Vector{Beam{T, Ray{T}}}()
+    push!(beams, Beam(Ray(pos, dir, λ)))
+    num_rays -= 1
+    # setup concentric beam ring radii
+    b1 = normal3d(dir)
+    r_max = diameter/2
+    radii = LinRange(0, r_max, num_rings)[2:end]
+    # calculate total accumulated circumference of all rings
+    circm = radii*2π
+    total = sum(circm)
+    ds = total / num_rays
+    # calculate number of rays per ring
+    n_rays = round.(Int, circm / ds)
+    # correct n_rays to match num_rays
+    n_rays[end] += (num_rays - sum(n_rays))
+    # Generate beam rings
+    for (i, r) in enumerate(radii)
+        numEl = n_rays[i]
+        if iszero(numEl)
+            continue
+        end
+        dphi = 2π / numEl
+        RotMat = rotate3d(dir, dphi)
+        helper = b1 * r
+        for _ = 1:numEl
+            push!(beams, Beam(pos + helper, dir, λ))
+            helper = RotMat * helper
+        end
+    end
+    return CollimatedSource(beams)
+end
+
+export PointSource, CollimatedSource
