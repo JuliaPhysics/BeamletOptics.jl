@@ -26,6 +26,7 @@ include("Gaussian.jl")
 include("System.jl")
 include("OpticalComponents/Components.jl")
 include("Groups.jl")
+include("BeamGroups.jl")
 include("Render.jl")
 include("Exports.jl")
 

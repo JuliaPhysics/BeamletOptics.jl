@@ -478,3 +478,5 @@ function find_zero_bisection(f, a, b; tol=1e-10, max_iter=1000)
     end
     error("Bisection did not converge after $max_iter iterations")
 end
+
+numerical_aperture(θ::Real, n::Real=1.0) = n*sin(θ) # FIXME docs + tests

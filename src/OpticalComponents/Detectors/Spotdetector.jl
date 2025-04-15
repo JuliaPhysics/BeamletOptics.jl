@@ -70,7 +70,7 @@ Uses retracing of an input `beam`. **System must be aligned onto the global y-ax
 
 # Inputs
 
-- `aperture`: maximum aperture diamter in [m]
+- `aperture`: maximum aperture diameter in [m]
 - `n_rings`: maximum number of concentric rings
 - `n_rays`: total number of retracing runs, i.e. "spawned beams"
 """
