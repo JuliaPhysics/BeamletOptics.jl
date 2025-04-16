@@ -64,6 +64,7 @@ function interact3d(
         ::AbstractSystem, pd::Photodetector, gauss::GaussianBeamlet, ray_id::Int)
     # Select final ray of chief beam
     ray = gauss.chief.rays[ray_id]
+    # Subtract ray length from optical path l0 (calculated seperately with projection l1)
     l0 = optical_path_length(gauss) - optical_path_length(ray)
     p0 = position(ray)
     d0 = direction(ray)
