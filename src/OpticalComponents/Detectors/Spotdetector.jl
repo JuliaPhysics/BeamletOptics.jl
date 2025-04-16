@@ -24,6 +24,8 @@ mutable struct Spotdetector{T} <: AbstractDetector{T, Mesh{T}}
     hw::T
 end
 
+push!(sd::Spotdetector{T}, new::Point2{T}) where T = push!(sd.data, new)
+
 """
     Spotdetector(width)
 
@@ -54,7 +56,7 @@ function interact3d(::AbstractSystem, sd::Spotdetector, beam::Beam{T, R}, ray::R
     z = dot(loc_pos, orientation(sd)[:,3])
     # Push point into data field
     d = Point2{T}(x, z)
-    push!(sd.data, d)
+    push!(sd, d)
     return nothing
 end
 
