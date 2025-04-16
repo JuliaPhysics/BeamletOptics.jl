@@ -220,7 +220,7 @@ hm = heatmap!(heat1, pd.x, pd.y, BeamletOptics.intensity(pd), colormap=:viridis)
 
 # rotate m1, reset pd field data, resolve system
 zrotate3d!(m1, 1e-3)
-BeamletOptics.reset_detector!(pd)
+reset_detector!(pd)
 solve_system!(system, beam)
 
 hm = heatmap!(heat2, pd.x, pd.y, BeamletOptics.intensity(pd), colormap=:viridis)
@@ -229,7 +229,7 @@ hm = heatmap!(heat2, pd.x, pd.y, BeamletOptics.intensity(pd), colormap=:viridis)
 By experimenting with different mirror angles, arm lengths, or beamsplitter properties, you can observe how interference fringes evolve and gain insights into the stability and sensitivity of the interferometric setup. This can be important to optimize alignment and achieve high contrast fringes.
 
 !!! info "Statefulness"
-    Many steps of the simulation process mutate the data structures of the `system` and `beam`. If you run the above code multiple times odd effects might occur, since with each run the mirror is moved by one mrad. This is also important for the use of the correct use of the detector via the [`BeamletOptics.reset_detector!`](@ref) function. For more information, refer to the [Detectors](@ref) chapter.
+    Many steps of the simulation process mutate the data structures of the `system` and `beam`. If you run the above code multiple times odd effects might occur, since with each run the mirror is moved by one mrad. This is also important for the use of the correct use of the detector via the [`reset_detector!`](@ref) function. For more information, refer to the [Detectors](@ref) chapter.
 
 ## Running successive simulations
 
@@ -248,7 +248,7 @@ P = zeros(n+1)
 
 # Run sim
 for i in eachindex(P)
-    BeamletOptics.reset_detector!(pd)
+    reset_detector!(pd)
     solve_system!(system, beam)
     P[i] = BeamletOptics.optical_power(pd)
     # translate by Δy

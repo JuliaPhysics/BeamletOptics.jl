@@ -5,7 +5,7 @@ Detectors provide a way to evaluate beam data during optical simulations. They a
 Detectors are supposed to fall under the [`BeamletOptics.AbstractDetector`](@ref) type, which defines a interface for detector implementations.
 
 !!! warning "Resetting detectors"
-    In general, the data stored in a detector is not automatically reset between calls of [`solve_system!`](@ref). This task is placed within the responsibility of the user. A detector reset can be performed with the [`BeamletOptics.reset_detector!`](@ref) function.
+    In general, the data stored in a detector is not automatically reset between calls of [`solve_system!`](@ref). This task is placed within the responsibility of the user. A detector reset can be performed with the [`reset_detector!`](@ref) function.
 
 ## Photodetector type
 
