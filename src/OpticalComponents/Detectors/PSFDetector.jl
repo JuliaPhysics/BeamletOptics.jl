@@ -23,7 +23,7 @@ struct PSFDetector{T} <: AbstractDetector{T, Mesh{T}}
     solved::Ref{Bool}
 end
 
-reset!(psf::PSFDetector) = (empty!(psf.data); psf.solved[] = false)    
+empty!(psf::PSFDetector) = (empty!(psf.data); psf.solved[] = false)    
 
 Base.push!(psf::PSFDetector, new::PSFData) = push!(psf.data, new)
 

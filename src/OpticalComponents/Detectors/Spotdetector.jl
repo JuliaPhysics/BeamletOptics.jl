@@ -16,7 +16,7 @@ The intersection points are stored in local coordinates of the detector with res
     Check the normal vector orientation of the detector plane if the spot diagram looks mirrored.
 
 !!! warning "Reset behavior"
-    Spot diagram data must be manually reset between traces via [`reset!`](@ref)
+    Spot diagram data must be manually reset between traces via [`empty!`](@ref)
 """
 mutable struct Spotdetector{T} <: AbstractDetector{T, Mesh{T}}
     const shape::Mesh{T}
@@ -45,7 +45,7 @@ function Spotdetector(width::W) where W<:AbstractFloat
 end
 
 """Resets the stored spot diagram data"""
-reset!(sd::Spotdetector) = empty!(sd.data)
+empty!(sd::Spotdetector) = empty!(sd.data)
 
 function interact3d(::AbstractSystem, sd::Spotdetector, beam::Beam{T, R}, ray::R) where {T <: Real, R <: AbstractRay{T}}
     # Calculate intersection in global coordinates
@@ -89,7 +89,7 @@ function create_spot_diagram(system::AbstractSystem, beam::Beam{T}, aperture::Re
     end
     sd = _objects[obj_index[1]]
     # reset detector
-    reset!(sd)
+    empty!(sd)
     # spawn collimated beam source
     ray = first(rays(beam))
     pos = position(ray)

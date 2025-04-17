@@ -1800,7 +1800,7 @@ end
             @test pos_ray ≈ pos_dta
         end
         # Test reset function
-        BMO.reset!(sd)
+        empty!(sd)
         @test isempty(sd.data)
     end
 end
@@ -1845,7 +1845,7 @@ end
                 end
             end
             # Numerical solution
-            BMO.reset!(pd_l)
+            empty!(pd_l)
             g_1 = GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0],
                 λ,
                 w0,
@@ -1873,7 +1873,7 @@ end
             Δz = LinRange(0, λ, 50)
             Pt_numerical = zeros(length(Δz))
             for (i, z_i) in enumerate(Δz)
-                BMO.reset!(pd_s)
+                empty!(pd_s)
                 g_1 = GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0],
                     λ,
                     w0,
@@ -1935,7 +1935,7 @@ end
 
             for (i, lambda) in enumerate(lambdas)
                 translate_to3d!(m2, [0, l_0, 0] + [0, lambda, 0])
-                BMO.reset!(pd)
+                empty!(pd)
                 solve_system!(system, beam)
 
                 # Moving mirror path length
@@ -1967,7 +1967,7 @@ end
             translate_to3d!(m2, [0, l_0 + Δl, 0])
 
             # numerical solution
-            BMO.reset!(pd)
+            empty!(pd)
             solve_system!(system, beam)
 
             # analytical solution
@@ -2035,8 +2035,8 @@ end
         for (i, phi) in enumerate(phis)
             # Iterate over relative phase shifts, use retracing
             l1.E0 = E0_buffer * exp(im * phi)
-            BMO.reset!(pd_1)
-            BMO.reset!(pd_2)
+            empty!(pd_1)
+            empty!(pd_2)
             solve_system!(system, l1)
             solve_system!(system, l2)
             p1[i] = BMO.optical_power(pd_1)
@@ -2422,7 +2422,7 @@ end
             [0, y_0, 0], [0.46, -y_0, 0], 532e-9, 2.5e-3, P0 = 10e-3)
         # Solve system
         system = BMO.System([pd])
-        BMO.reset!(pd)
+        empty!(pd)
         BMO.solve_system!(system, beam)
 
         @test BMO.optical_power(pd)≈10e-3 atol=1e-5
