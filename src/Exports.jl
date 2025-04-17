@@ -30,7 +30,7 @@ export CircularFlatSurface, RectangularFlatSurface, SphericalSurface, EvenAspher
 export Prism, RightAnglePrism
 
 # detectors
-export Photodetector, Spotdetector, PSFDetector, reset_detector!
+export Photodetector, Spotdetector, PSFDetector, reset!
 
 # splitters
 export ThinBeamsplitter, RoundThinBeamsplitter, RectangularPlateBeamsplitter, RoundPlateBeamsplitter, CubeBeamsplitter, RectangularCompensatorPlate
