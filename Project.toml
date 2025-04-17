@@ -1,7 +1,7 @@
 name = "BeamletOptics"
 uuid = "c387492b-ffec-4e51-9a46-bd230226031c"
 authors = ["Hugo Uittenbosch <hugo.uittenbosch@dlr.de>, Oliver Kliebisch <oliver.kliebisch@dlr.de> and Thomas Dekorsy <thomas.dekorsy@dlr.de>"]
-version = "0.8.5"
+version = "0.9.0"
 
 
 [deps]
