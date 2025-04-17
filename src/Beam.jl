@@ -94,7 +94,7 @@ _last_beam_intersection(beam::Beam) = intersection(last(rays(beam)))
 Calculate the length of a beam up to the point of the last intersection.
 
 !!! tip
-Use `optical_path_length(bream)` to get the optical path length instead.
+    Use [`optical_path_length`](@ref) to get the optical path length instead.
 """
 function Base.length(beam::Beam{T}) where {T}
     # Recursively get length of beam parents
@@ -106,7 +106,7 @@ end
 """
     optical_path_length(beam::Beam)
 
-Calculate the `o`ptical `p`ath `l`ength, i.e. ``OPL = n \\cdot l``.
+Calculate the optical path length of the `beam`, i.e. ``\\mathrm{OPL} = n \\cdot l``.
 """
 function optical_path_length(beam::Beam{T}) where {T}
     p = AbstractTrees.parent(beam)
