@@ -45,7 +45,7 @@ function Spotdetector(width::W) where W<:AbstractFloat
 end
 
 """Resets the stored spot diagram data"""
-reset!(sd::Spotdetector{T}) where T = (sd.data = Vector{Point2{T}}())
+reset!(sd::Spotdetector) = empty!(sd.data)
 
 function interact3d(::AbstractSystem, sd::Spotdetector, beam::Beam{T, R}, ray::R) where {T <: Real, R <: AbstractRay{T}}
     # Calculate intersection in global coordinates
