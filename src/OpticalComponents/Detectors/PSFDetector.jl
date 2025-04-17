@@ -66,7 +66,7 @@ function intensity(psf::PSFDetector{T}, sz::Real=T(1e-5), n::Int=100) where T
             p = origin_pd + x * e1 + y * e2
             # Add all field contributions
             acc = zero(Complex{T})
-            @inbounds @simd for h in det.data
+            @inbounds @simd for h in psf.data
                 l = dot(p - position(h), direction(h))
                 acc += projection_factor(h) * cis(wavenumber(h) * (optical_path_length(h) + l))
             end
