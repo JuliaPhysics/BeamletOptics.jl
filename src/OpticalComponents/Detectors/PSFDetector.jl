@@ -49,11 +49,65 @@ function interact3d(::AbstractSystem, psf::PSFDetector, beam::Beam{T, Ray{T}}, r
     return nothing
 end
 
-function intensity(psf::PSFDetector{T}, sz::Real=T(1e-5), n::Int=100) where T
-    xs = LinRange(-sz/2, sz/2, n)
-    ys = LinRange(-sz/2, sz/2, n)
+function calc_local_pos(psf::PSFDetector{T}) where T
+    hits_2D = Vector{Point2{T}}(undef, length(psf.data))
+    for (i, h) in enumerate(psf.data)
+        hit = position(h)
+        loc_pos = hit - position(psf)
+        x = dot(loc_pos, orientation(psf)[:,1])
+        z = dot(loc_pos, orientation(psf)[:,3])
+        hits_2D[i] = Point2(T(x), T(z))
+    end
+    return hits_2D
+end
+
+function calc_local_lims(psf::PSFDetector{T}; crop_factor::Real=1) where T
+    hits_2D = calc_local_pos(psf)
+    x_min = 0
+    x_max = 0
+    y_min = 0
+    y_max = 0    
+    for (i, p) in enumerate(hits_2D)
+        # ignore the center beam due to small angle spot diagram "bug"
+        # refer to https://github.com/StackEnjoyer/BeamletOptics.jl/issues/11
+        if i == 1
+            continue
+        end
+        # replace 0 vals
+        if i == 2
+            x_min = p[1]
+            x_max = p[1]
+            y_min = p[2]
+            y_max = p[2]
+            continue
+        end
+        p[1] < x_min ? x_min = p[1] : nothing
+        p[1] > x_max ? x_max = p[1] : nothing
+        p[2] < y_min ? y_min = p[2] : nothing
+        p[2] > y_max ? y_max = p[2] : nothing
+    end
+    # Apply crop factor around box center
+    x_halfwidth = 0.5(x_max - x_min)
+    y_halfwidth = 0.5(y_max - y_min)
+    x_center = x_min + x_halfwidth
+    y_center = y_min + y_halfwidth
+    x_min = x_center - x_halfwidth * crop_factor
+    x_max = x_center + x_halfwidth * crop_factor
+    y_min = y_center - y_halfwidth * crop_factor
+    y_max = y_center + y_halfwidth * crop_factor
+    return x_min, x_max, y_min, y_max
+end
+
+
+function intensity(psf::PSFDetector{T}; n::Int=100, crop_factor::Real=1) where T
+    # automatically calculate limits
+    x_min, x_max, y_min, y_max = calc_local_lims(psf; crop_factor)
+    xs = LinRange(x_min, x_max, n)
+    ys = LinRange(y_min, y_max, n)
+    # Buffer field
     field = zeros(Complex{T}, n, n)
     
+    # PD local coordinate axis
     orient = orientation(psf)
     @views e1, e2 = orient[:, 1], orient[:, 3]
     origin_pd = position(psf)
