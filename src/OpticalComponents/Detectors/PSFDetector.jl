@@ -23,7 +23,7 @@ struct PSFDetector{T} <: AbstractDetector{T, Mesh{T}}
     solved::Ref{Bool}
 end
 
-empty!(psf::PSFDetector) = (empty!(psf.data); psf.solved[] = false)    
+empty!(psf::PSFDetector) = (empty!(psf.data); psf.solved[] = false)
 
 Base.push!(psf::PSFDetector, new::PSFData) = push!(psf.data, new)
 
@@ -54,19 +54,19 @@ function calc_local_pos(psf::PSFDetector{T}) where T
     for (i, h) in enumerate(psf.data)
         hit = position(h)
         loc_pos = hit - position(psf)
-        x = dot(loc_pos, orientation(psf)[:,1])
-        z = dot(loc_pos, orientation(psf)[:,3])
+        @views x = dot(loc_pos, Point3(orientation(psf)[:,1]))
+        @views z = dot(loc_pos, Point3(orientation(psf)[:,3]))
         hits_2D[i] = Point2(T(x), T(z))
     end
     return hits_2D
 end
 
-function calc_local_lims(psf::PSFDetector{T}; crop_factor::Real=1) where T
+function calc_local_lims(psf::PSFDetector{T}; crop_factor::Real=one(T)) where T
     hits_2D = calc_local_pos(psf)
-    x_min = 0
-    x_max = 0
-    y_min = 0
-    y_max = 0    
+    x_min = zero(T)
+    x_max = zero(T)
+    y_min = zero(T)
+    y_max = zero(T)
     for (i, p) in enumerate(hits_2D)
         # ignore the center beam due to small angle spot diagram "bug"
         # refer to https://github.com/StackEnjoyer/BeamletOptics.jl/issues/11
@@ -98,7 +98,6 @@ function calc_local_lims(psf::PSFDetector{T}; crop_factor::Real=1) where T
     return x_min, x_max, y_min, y_max
 end
 
-
 function intensity(psf::PSFDetector{T}; n::Int=100, crop_factor::Real=1) where T
     # automatically calculate limits
     x_min, x_max, y_min, y_max = calc_local_lims(psf; crop_factor)
@@ -106,12 +105,12 @@ function intensity(psf::PSFDetector{T}; n::Int=100, crop_factor::Real=1) where T
     ys = LinRange(y_min, y_max, n)
     # Buffer field
     field = zeros(Complex{T}, n, n)
-    
+
     # PD local coordinate axis
     orient = orientation(psf)
-    @views e1, e2 = orient[:, 1], orient[:, 3]
+    @views e1, e2 = Point3(orient[:, 1]), Point3(orient[:, 3])
     origin_pd = position(psf)
-    
+
     Threads.@threads for j in eachindex(ys)
         y = ys[j]
         @inbounds for i in eachindex(xs)
@@ -119,7 +118,7 @@ function intensity(psf::PSFDetector{T}; n::Int=100, crop_factor::Real=1) where T
             # Global detector surface point coordinate
             p = origin_pd + x * e1 + y * e2
             # Add all field contributions
-            acc = zero(Complex{T})
+            acc = zero(complex(T))
             @inbounds @simd for h in psf.data
                 l = dot(p - position(h), direction(h))
                 acc += projection_factor(h) * cis(wavenumber(h) * (optical_path_length(h) + l))
