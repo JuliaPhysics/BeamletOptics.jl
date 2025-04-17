@@ -73,38 +73,51 @@ const BMO = BeamletOptics
 
     @testset "Testing refraction3d" begin
         normal = [0, 0, 1]
+        # Define angle range
+        small_angles = 0:1e-7:5e-5
+        large_angles = last(small_angles):(π / 1000):(π / 2)
+        θs = cat(small_angles, large_angles; dims=1)
         @testset "Test from vacuum into medium" begin
             n1 = 1.0
-            n2 = 1.5
-            for θ1 in 0:(π / 8):(π / 2)
+            n2 = 1.62286
+            θ_num = similar(θs)
+            θ_ana = similar(θs)
+            TIR = Vector{Bool}(undef, length(θs))
+            for (i, θ1) in enumerate(θs)
                 dir_in = [sin(θ1), 0, -cos(θ1)]
-                dir_out, TIR = BMO.refraction3d(dir_in, normal, n1, n2)
-                θ2 = BMO.angle3d(-normal, dir_out)
+                dir_out, TIR[i] = BMO.refraction3d(dir_in, normal, n1, n2)
+                θ_num[i] = BMO.angle3d(-normal, dir_out)
                 # 2D-equation for refraction validation
-                θ3 = asin(n1 / n2 * sin(θ1))
-                @test isapprox(θ2, θ3)
-                @test TIR == false
+                θ_ana[i] = asin(n1 / n2 * sin(θ1))
+        
             end
+            @test isapprox(θ_num, θ_ana)
+            @test all(TIR .== false)
         end
         @testset "Test from medium into vacuum" begin
-            n1 = 1.5
+            n1 = 1.62286
             n2 = 1.0
-            for θ1 in 0:(π / 8):(π / 2)
+            θ2 = similar(θs)
+            θ3 = similar(θs)
+            TIR_num = Vector{Bool}(undef, length(θs))
+            TIR_ana = similar(TIR_num)
+            for (i, θ1) in enumerate(θs)
                 dir_in = [sin(θ1), 0, -cos(θ1)]
-                dir_out, TIR = BMO.refraction3d(dir_in, normal, n1, n2)
+                dir_out, TIR_num[i] = BMO.refraction3d(dir_in, normal, n1, n2)
                 if θ1 > asin(n2 / n1)
                     # Test for total reflection
-                    θ2 = BMO.angle3d(dir_out, normal)
-                    @test isapprox(θ1, θ2)
-                    @test TIR == true
+                    θ2[i] = BMO.angle3d(dir_out, normal)
+                    θ3[i] = θ1
+                    TIR_ana[i] = true
                 else
                     # Test for refraction
-                    θ2 = BMO.angle3d(-normal, dir_out)
-                    θ3 = asin(n1 / n2 * sin(θ1))
-                    @test isapprox(θ2, θ3)
-                    @test TIR == false
+                    θ2[i] = BMO.angle3d(-normal, dir_out)
+                    θ3[i] = asin(n1 / n2 * sin(θ1))
+                    TIR_ana[i] = false
                 end
             end
+            @test isapprox(θ2, θ3)
+            @test TIR_ana == TIR_num
         end
     end
 
