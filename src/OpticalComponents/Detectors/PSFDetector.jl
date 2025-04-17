@@ -23,7 +23,7 @@ struct PSFDetector{T} <: AbstractDetector{T, Mesh{T}}
     solved::Ref{Bool}
 end
 
-reset!(psf::PSFDetector{T}) = (empty!(psf.data); psf.solved[] = false)    
+reset!(psf::PSFDetector) = (empty!(psf.data); psf.solved[] = false)    
 
 Base.push!(psf::PSFDetector, new::PSFData) = push!(psf.data, new)
 
@@ -55,7 +55,7 @@ function intensity(psf::PSFDetector{T}, sz::Real=T(1e-5), n::Int=100) where T
     field = zeros(Complex{T}, n, n)
     
     orient = orientation(psf)
-    e1, e2 = @view orient[:, 1], @view orient[:, 3]
+    @views e1, e2 = orient[:, 1], orient[:, 3]
     origin_pd = position(psf)
     
     Threads.@threads for j in eachindex(ys)
