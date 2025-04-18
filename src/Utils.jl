@@ -180,7 +180,7 @@ If the critical angle for n1, n2 and the incident angle is reached, the ray is r
 function refraction3d(dir::AbstractArray, normal::AbstractArray, n1::Real, n2::Real)
     # dir and normal must have unit length!
     isapprox(norm(dir), 1) || throw(ArgumentError("dir must have  unit length"))
-    isapprox(norm(normal), 1) || throw(ArgumentError("norm must have  unit length"))
+    isapprox(norm(normal), 1) || throw(ArgumentError(lazy"norm must have  unit length: $(norm(normal))"))
     n = n1 / n2
     cosθi = -dot(normal, dir)
     sinθt² = n^2 * (1 - cosθi^2)

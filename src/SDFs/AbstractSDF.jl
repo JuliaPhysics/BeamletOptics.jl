@@ -98,7 +98,7 @@ render_sdf_mesh!(::Any, vertices, faces; transparency = true) = nothing
 
 Computes the normal vector of `s` at `pos`.
 """
-normal3d(s::AbstractSDF, pos) = numeric_gradient(s, pos)
+normal3d(s::AbstractSDF, pos) = normal_fd(s, pos)
 
 function numeric_gradient(s::AbstractSDF, pos)
     # approximate ∇ of s at pos
@@ -107,6 +107,14 @@ function numeric_gradient(s::AbstractSDF, pos)
         sdf(s, pos + Point3(0, eps, 0)) - sdf(s, pos - Point3(0, eps, 0)),
         sdf(s, pos + Point3(0, 0, eps)) - sdf(s, pos - Point3(0, 0, eps)))
     return normalize(norm)
+end
+
+function normal_fd(s::AbstractSDF, p)
+    normal = normalize(gradient(x->sdf(s, x), p))
+    all(!isnan, normal) && return normal
+
+    # fallback
+    return numeric_gradient(s, p)
 end
 
 """
