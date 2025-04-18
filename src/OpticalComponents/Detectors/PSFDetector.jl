@@ -68,13 +68,8 @@ function calc_local_lims(psf::PSFDetector{T}; crop_factor::Real=one(T)) where T
     y_min = zero(T)
     y_max = zero(T)
     for (i, p) in enumerate(hits_2D)
-        # ignore the center beam due to small angle spot diagram "bug"
-        # refer to https://github.com/StackEnjoyer/BeamletOptics.jl/issues/11
-        if i == 1
-            continue
-        end
         # replace 0 vals
-        if i == 2
+        if i == 1
             x_min = p[1]
             x_max = p[1]
             y_min = p[2]
