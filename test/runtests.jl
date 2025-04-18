@@ -1080,7 +1080,7 @@ end
             # Thorlabs lens from https://www.thorlabs.com/thorproduct.cfm?partnumber=AC254-150-AB
             AC254_150_AB = SphericalDoubletLens(
                 87.9e-3, -105.6e-3, Inf, 6e-3, 3e-3, BMO.inch, NLAK22, NSF10)
-            # Rptate and translate to test lens kinematics
+            # Rotate and translate to test lens kinematics
             translate3d!(AC254_150_AB, [0.05, 0.05, 0.05])
             xrotate3d!(AC254_150_AB, deg2rad(-60))
             zrotate3d!(AC254_150_AB, deg2rad(45))
@@ -1118,50 +1118,6 @@ end
         @test test_doublet(488e-9, 143.68e-3, -2.064e-4)
         @test test_doublet(707e-9, 143.68e-3, 0)
         @test test_doublet(1064e-9, 143.68e-3, +7.466e-4)
-    end
-
-    @testset "Testing spherical lens SDFs" begin
-        # Based on https://www.pencilofrays.com/double-gauss-sonnar-comparison/
-        l1 = SphericalLens(48.88e-3, 182.96e-3, 8.89e-3, 52.3e-3, λ -> 1.62286)
-        l23 = SphericalDoubletLens(36.92e-3, Inf, 23.06e-3, 15.11e-3, 2.31e-3,
-            45.11e-3, λ -> 1.58565, λ -> 1.67764)
-        l45 = SphericalDoubletLens(-23.91e-3, Inf, -36.92e-3, 1.92e-3, 7.77e-3,
-            40.01e-3, λ -> 1.57046, λ -> 1.64128)
-        l6 = SphericalLens(1063.24e-3, -48.88e-3, 6.73e-3, 45.11e-3, λ -> 1.62286)
-        # Calculate translation distances
-        l_23 = BMO.thickness(l1) + 0.38e-3
-        l_45 = l_23 + BMO.thickness(l23) + 9.14e-3 + 13.36e-3
-        l_6 = l_45 + BMO.thickness(l45) + 0.38e-3
-        # Corresponds to back focal length of f=59.21 mm on y-axis from link above + "error" δf
-        δf = 7e-4
-        f_z = l_6 + BMO.thickness(l6.shape) + 58.21e-3 + δf
-        translate3d!(l23, [0, l_23, 0])
-        translate3d!(l45, [0, l_45, 0])
-        translate3d!(l6, [0, l_6, 0])
-        # Create and move group - this tests a bunch of kinematic correctness
-        double_gauss = ObjectGroup([l1, l23, l45, l6])
-        translate3d!(double_gauss, [0.05, 0.05, 0.05])
-        xrotate3d!(double_gauss, deg2rad(60))
-        zrotate3d!(double_gauss, deg2rad(45))
-        system = System([double_gauss])
-        # Test against back focal length as per source above
-        dir = BMO.orientation(double_gauss)[:, 2] # rotated collimated ray direction
-        pos = BMO.position(l1) - 0.05 * dir # rotated collimated ray position
-        f0 = BMO.position(l1) + f_z * dir # global focal point coords
-        nv = BMO.normal3d(dir) # orthogonal to moved system optical axis
-        zs = -0.02:1e-3:0.02
-        # Define beam
-        λ = 486.0e-9
-        beam = Beam(Ray(pos, dir, λ))
-        for (i, z) in enumerate(zs)
-            # use retracing by manipulating beam starting pos
-            beam.rays[1].pos = pos + z * nv
-            solve_system!(system, beam)
-            # Test correct beam # of rays
-            @test length(BMO.rays(beam)) == 11
-            # Test coma at focal point
-            @test test_coma(last(BMO.rays(beam)), f0, dir, atol = 7e-5)
-        end
     end
 end
 
@@ -2420,6 +2376,77 @@ end
         @test length(BMO.rays(beam)) == 1
         @test isnothing(BMO.intersection(last(BMO.rays(beam))))
         @test isnothing(BMO.interact3d(system, noninteract, beam, first(BMO.rays(beam))))
+    end
+end
+
+@testset "Double Gauss lens" begin
+    """Tests hit distance to detector origin"""
+    function test_coma(pd::Spotdetector; atol=7e-5)
+        for hit in pd.data
+            if norm(hit) > atol
+                return false
+            end
+        end
+        return true
+    end
+    
+    # Based on https://www.pencilofrays.com/double-gauss-sonnar-comparison/
+    l1 = SphericalLens(48.88e-3, 182.96e-3, 8.89e-3, 52.3e-3, λ -> 1.62286)
+    l23 = SphericalDoubletLens(36.92e-3, Inf, 23.06e-3, 15.11e-3, 2.31e-3,
+    45.11e-3, λ -> 1.58565, λ -> 1.67764)
+    l45 = SphericalDoubletLens(-23.91e-3, Inf, -36.92e-3, 1.92e-3, 7.77e-3,
+    40.01e-3, λ -> 1.57046, λ -> 1.64128)
+    l6 = SphericalLens(1063.24e-3, -48.88e-3, 6.73e-3, 45.11e-3, λ -> 1.62286)
+    # Calculate translation distances
+    l_23 = BMO.thickness(l1) + 0.38e-3
+    l_45 = l_23 + BMO.thickness(l23) + 9.14e-3 + 13.36e-3
+    l_6 = l_45 + BMO.thickness(l45) + 0.38e-3
+    # Corresponds to back focal length of f=59.21 mm on y-axis from link above + "error" δf
+    δf = 7e-4
+    f_z = l_6 + BMO.thickness(l6.shape) + 58.21e-3 + δf
+    translate3d!(l23, [0, l_23, 0])
+    translate3d!(l45, [0, l_45, 0])
+    translate3d!(l6, [0, l_6, 0])
+    # Create and move group - this tests a bunch of kinematic correctness
+    double_gauss = ObjectGroup([l1, l23, l45, l6])
+    
+    # Spawn Spotdetector, move to "focus"
+    detector = Spotdetector(5e-3)
+    translate3d!(detector, [0,f_z,0])    
+    # Setup test, rotate and translate to test correct kinematics
+    test_setup = ObjectGroup([double_gauss, detector])
+    translate3d!(test_setup, [0.05, 0.05, 0.05])
+    xrotate3d!(test_setup, deg2rad(60))
+    zrotate3d!(test_setup, deg2rad(45))    
+    system = System([test_setup])
+    
+    @testset "Test with collimated source" begin    
+        ## Test against back focal length as per source above
+        dir = BMO.orientation(double_gauss)[:, 2] # rotated collimated ray direction
+        pos = BMO.position(l1) - 0.05 * dir # rotated collimated ray position    
+        source = CollimatedSource(pos, dir, 0.04, 486.0e-9, num_rays=1000, num_rings=10)    
+        solve_system!(system, source)    
+        @test test_coma(detector, atol=2e-5)
+    end
+    
+    # Reset test scenario back to origin, y-axis alignment
+    reset_rotation3d!(test_setup)
+    reset_translation3d!(test_setup)
+    translate_to3d!(detector, [0, 0.147, 0])
+    
+    @testset "Test with point source (wide)" begin
+        source = PointSource([0, -0.5, 0], [0, 1 ,0], deg2rad(2), 486.0e-9, num_rays=1000, num_rings=10)
+        empty!(detector)
+        solve_system!(system, source)
+        @test test_coma(detector, atol=6e-5)
+    end
+    
+    @testset "Test with point source (narrow)" begin
+        # Tests regression for https://github.com/StackEnjoyer/BeamletOptics.jl/issues/11
+        source = PointSource([0, -0.5, 0], [0, 1 ,0], 5e-5, 486.0e-9, num_rays=1000, num_rings=10)
+        empty!(detector)
+        solve_system!(system, source)
+        @test test_coma(detector, atol=2e-7)
     end
 end
 
