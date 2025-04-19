@@ -31,7 +31,7 @@ The amount of beam rings between the center ray and half-spread-angle `θ` can b
 
 # Arguments
 
-The following inputs and arguments can be used to configure the [`PointSource`]:
+The following inputs and arguments can be used to configure the [`PointSource`](@ref):
 
 ## Inputs
 
@@ -132,7 +132,7 @@ The amount of beam rings between the center ray and outer `diameter` can be spec
 
 # Arguments
 
-The following inputs and arguments can be used to configure the [`PointSource`]:
+The following inputs and arguments can be used to configure the [`CollimatedSource`](@ref):
 
 ## Inputs
 
