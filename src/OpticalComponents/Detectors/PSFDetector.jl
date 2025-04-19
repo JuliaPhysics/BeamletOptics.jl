@@ -93,7 +93,7 @@ function calc_local_lims(psf::PSFDetector{T}; crop_factor::Real=one(T)) where T
     return x_min, x_max, y_min, y_max
 end
 
-function intensity(psf::PSFDetector{T}; n::Int=100, crop_factor::Real=1) where T
+function intensity(psf::PSFDetector{T}; n::Int=100, crop_factor::Real=1, normalization=:strehl) where T
     # automatically calculate limits
     x_min, x_max, y_min, y_max = calc_local_lims(psf; crop_factor)
     xs = LinRange(x_min, x_max, n)
@@ -121,5 +121,29 @@ function intensity(psf::PSFDetector{T}; n::Int=100, crop_factor::Real=1) where T
             field[i,j] = acc
         end
     end
-    return xs, ys, abs2.(field)
+
+    _intensity = abs2.(field)
+
+    if normalization === :strehl
+        S = strehl(psf)
+        _intensity ./= maximum(_intensity)
+        _intensity .*= S
+    end
+
+    return xs, ys, _intensity
+end
+
+function strehl(psf::PSFDetector{T}) where {T}
+    k = psf.data[1].k
+    ops = optical_path_length.(psf.data)
+
+    μ = sum(ops) / length(ops)
+    num = zero(complex(T))
+    den = zero(T)
+    for h in psf.data
+        w = projection_factor(h)
+        num += w * cis(k * (optical_path_length(h) - μ))
+        den += w
+    end
+    return abs2(num / den)
 end
