@@ -60,6 +60,6 @@ Below an optical system consisting of a collection of collimated [`Beam`](@ref)s
 
 ![Thin lens setup](spot_diagram_system.png)
 
-The beam bundle used to generate the spot diagram was created via the [`BeamletOptics.create_spot_diagram`](@ref) function, which is a trivial way to retrace a single beam through an on-axis system. The resulting spot diagram of the lens shown above is visualized below.
+The beam bundle used to generate the spot diagram was created via the [`CollimatedSource`](@ref) constructor. The resulting spot diagram of the lens shown above is visualized below.
 
 ![Spot diagram showcase](spot_diagram_showcase.png)
