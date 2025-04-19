@@ -124,7 +124,7 @@ diameter(cs::CollimatedSource) = cs.diameter
     CollimatedSource(pos, dir, diameter, λ; num_rings, num_rays)
 
 Spawns a bundle of collimated [`Beam`](@ref)s at the specified `pos`ition and `dir`ection.
-The source is modelled as a ring of concentric beam fans centered around the center beam.
+The source is modelled as a ring of concentric beam rings around the center beam.
 The amount of beam rings between the center ray and outer `diameter` can be specified via `num_rings`.
 
 !!! info
