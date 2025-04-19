@@ -61,41 +61,48 @@ function calc_local_pos(psf::PSFDetector{T}) where T
     return hits_2D
 end
 
-function calc_local_lims(psf::PSFDetector{T}; crop_factor::Real=one(T)) where T
-    hits_2D = calc_local_pos(psf)
-    x_min = zero(T)
-    x_max = zero(T)
-    y_min = zero(T)
-    y_max = zero(T)
-    for (i, p) in enumerate(hits_2D)
-        # replace 0 vals
-        if i == 1
-            x_min = p[1]
-            x_max = p[1]
-            y_min = p[2]
-            y_max = p[2]
-            continue
-        end
-        p[1] < x_min ? x_min = p[1] : nothing
-        p[1] > x_max ? x_max = p[1] : nothing
-        p[2] < y_min ? y_min = p[2] : nothing
-        p[2] > y_max ? y_max = p[2] : nothing
+"""
+    calc_local_lims(psf; crop_factor=1, center=:centroid)
+
+Compute a symmetric [x_min,x_max]×[y_min,y_max] box around the PSF’s weighted centroid.
+
+• If `center==:centroid` (the default), uses
+    x0 = ∑ wᵢ·xᵢ / ∑ wᵢ,  y0 = ∑ wᵢ·yᵢ / ∑ wᵢ
+  with wᵢ = projection_factor.
+• If `center==:bbox`, falls back to the midpoint of [min,max].
+
+Returns `(x_min, x_max, y_min, y_max)`.
+"""
+function calc_local_lims(psf::PSFDetector{T};
+                         crop_factor::Real=one(T),
+                         center::Symbol = :centroid) where T
+
+    # get all hit‐points in local (x,y)
+    hits = calc_local_pos(psf)
+    xs = getindex.(hits,1)
+    ys = getindex.(hits,2)
+
+    # choose center
+    if center == :centroid
+        w_sum = sum(projection_factor, psf.data)
+        x0 = sum(x -> (projection_factor(x[1]) * x[2]), zip(psf.data, xs)) / w_sum
+        y0 = sum(x -> (projection_factor(x[1]) * x[2]), zip(psf.data, ys)) / w_sum
+    else
+        x0 = (minimum(xs) + maximum(xs)) / 2
+        y0 = (minimum(ys) + maximum(ys)) / 2
     end
-    # Apply crop factor around box center
-    x_halfwidth = 0.5(x_max - x_min)
-    y_halfwidth = 0.5(y_max - y_min)
-    x_center = x_min + x_halfwidth
-    y_center = y_min + y_halfwidth
-    x_min = x_center - x_halfwidth * crop_factor
-    x_max = x_center + x_halfwidth * crop_factor
-    y_min = y_center - y_halfwidth * crop_factor
-    y_max = y_center + y_halfwidth * crop_factor
-    return x_min, x_max, y_min, y_max
+
+    # half‐widths
+    dx = maximum(x->abs(x - x0), xs)
+    dy = maximum(y->abs(y - y0), ys)
+    hwx, hwy = dx*crop_factor, dy*crop_factor
+
+    return x0 - hwx, x0 + hwx, y0 - hwy, y0 + hwy, x0, y0
 end
 
 function intensity(psf::PSFDetector{T}; n::Int=100, crop_factor::Real=1, normalization=:strehl) where T
     # automatically calculate limits
-    x_min, x_max, y_min, y_max = calc_local_lims(psf; crop_factor)
+    x_min, x_max, y_min, y_max, x0, y0 = calc_local_lims(psf; crop_factor)
     xs = LinRange(x_min, x_max, n)
     ys = LinRange(y_min, y_max, n)
     # Buffer field
@@ -126,8 +133,7 @@ function intensity(psf::PSFDetector{T}; n::Int=100, crop_factor::Real=1, normali
 
     if normalization === :strehl
         S = strehl(psf)
-        _intensity ./= maximum(_intensity)
-        _intensity .*= S
+        _intensity .*= S / maximum(_intensity)
     end
 
     return xs, ys, _intensity
