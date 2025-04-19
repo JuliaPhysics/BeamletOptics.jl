@@ -10,9 +10,11 @@ beams(bg::AbstractBeamGroup) = bg.beams
 position(bg::AbstractBeamGroup) = position(first(rays(first(beams(bg)))))
 direction(bg::AbstractBeamGroup) = direction(first(rays(first(beams(bg)))))
 
+wavelength(bg::AbstractBeamGroup) = wavelength(first(rays(first(beams(bg)))))
+
 function solve_system!(system::AbstractSystem, bg::AbstractBeamGroup; kwargs...)
-    for beam in beams(bg)
-        solve_system!(system, beam; kwargs...)
+    for _beam in beams(bg)
+        solve_system!(system, _beam; kwargs...)
     end
     return nothing
 end
@@ -24,9 +26,11 @@ function Base.show(io::IO, ::MIME"text/plain", bg::AbstractBeamGroup)
 end
 
 struct PointSource{T, R<:AbstractRay{T}} <: AbstractBeamGroup{T,R}
-    NA::T
     beams::Vector{Beam{T, R}}
+    NA::T
 end
+
+numerical_aperture(ps::PointSource) = ps.NA
 
 """
     PointSource
@@ -37,16 +41,16 @@ function PointSource(
         pos::AbstractArray{P},
         dir::AbstractArray{D},
         θ::H,
-        λ::L;
-        num_rays::Int=1000,
-        num_rings::Int=10
+        λ::L = 1e-6;
+        num_rings::Int=10,
+        num_rays::Int=100*num_rings,
     ) where {P, D, H, L}
     T = promote_type(P, D, H, L)
-    if num_rays < num_rings
-        @warn "# of rays should be > than # of rings"
+    if num_rays < num_rings*20
+        throw(ErrorException("No. of rays should be atleast 20x no. of rings (passed: $num_rays, req: $(num_rings*20))"))
     end
     if θ ≥ pi
-        throw(ErrorException("Point source openign half-angle θ must be ≤ π"))
+        throw(ErrorException("Point source opening half-angle θ must be ≤ π"))
     end
     # define basis vectors
     dir = normalize(dir)
@@ -81,12 +85,15 @@ function PointSource(
         end
     end
     NA = numerical_aperture(θ)
-    return PointSource(NA, beams)
+    return PointSource(beams, NA)
 end
 
 struct CollimatedSource{T, R<:AbstractRay{T}} <: AbstractBeamGroup{T,R}
     beams::Vector{Beam{T, R}}
+    diameter::T
 end
+
+diameter(cs::CollimatedSource) = cs.diameter
 
 """
     CollimatedSource
@@ -97,11 +104,14 @@ function CollimatedSource(
         pos::AbstractArray{P},
         dir::AbstractArray{D1},
         diameter::D2,
-        λ::L;
-        num_rings::Int=20,
-        num_rays::Int=1000
+        λ::L = 1e-6;
+        num_rings::Int=10,
+        num_rays::Int=100*num_rings,
     ) where {P, D1, D2, L}
     T = promote_type(P, D1, D2, L)
+    if num_rays < num_rings*20
+        throw(ErrorException("No. of rays should be atleast 20x no. of rings (passed: $num_rays, req: $(num_rings*20))"))
+    end
     # define buffer
     beams = Vector{Beam{T, Ray{T}}}()
     push!(beams, Beam(Ray(pos, dir, λ)))
@@ -132,7 +142,7 @@ function CollimatedSource(
             helper = RotMat * helper
         end
     end
-    return CollimatedSource(beams)
+    return CollimatedSource(beams, T(diameter))
 end
 
 export PointSource, CollimatedSource

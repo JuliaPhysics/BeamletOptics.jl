@@ -50,9 +50,10 @@ const BMO = BeamletOptics
         @test T * start ≈ normalize(target)
     end
 
-    @debug "Testing angle3d for resulting angle"
-    a = BMO.angle3d([1, 0, 0], [0, 0, 1])
-    @test isapprox(a, π / 2)
+    @testset "Testing angle3d for resulting angle" begin
+        a = BMO.angle3d([1, 0, 0], [0, 0, 1])
+        @test isapprox(a, π / 2)
+    end
 
     @testset "Testing line_point_distance3d and isinfrontof" begin
         pos = [0, 0, 0]
@@ -209,6 +210,12 @@ const BMO = BeamletOptics
             @test isnothing(BMO.test_refractive_index_function(f5))
             @test isnothing(BMO.test_refractive_index_function(ref_index))
         end
+    end
+
+    @testset "Numerical aperture" begin
+        n0 = 1.5
+        theta = deg2rad(45)
+        BMO.numerical_aperture(theta, n0) == n0 * sin(theta)
     end
 end
 
@@ -490,6 +497,112 @@ end
     @test BMO.point_on_beam(beam, 3) == ([1, 1, 1], 4)
     @test BMO.point_on_beam(beam, 10) == ([8, 1, 1], 4)
     @test BMO.isparentbeam(beam, r2) == true
+end
+
+@testset "Beam groups" begin
+    @testset "AbstractBeamGroup definitions" begin
+        @test isdefined(BMO, :AbstractBeamGroup)
+        
+        struct BeamTestGroup{T} <: BMO.AbstractBeamGroup{T, Ray{T}}
+            central_beam::BMO.Beam{T, Ray{T}}
+        end
+        
+        struct BeamTestSystem <: BMO.AbstractSystem end
+        BMO.objects(::BeamTestSystem) = [nothing]
+        BMO.intersect3d(::Nothing, ::BMO.AbstractRay) = nothing
+        BMO.interact3d(::Nothing) = nothing
+        
+        BMO.beams(tg::BeamTestGroup) = [tg.central_beam]
+        
+        pos = [0,0,0]
+        dir = [0,1,0]
+        lambda = 1064e-9
+        
+        tg = BeamTestGroup(BMO.Beam(pos, dir, lambda))
+        
+        @test BMO.position(tg) == pos
+        @test BMO.direction(tg) == dir
+        @test BMO.wavelength(tg) == lambda
+        
+        ts = BeamTestSystem()
+        
+        @test isnothing(solve_system!(ts, tg))
+    end
+
+    @testset "Point source" begin
+        # define parameters
+        lambda = 486.0e-9
+        pos = [0, -0.5, 0]
+        dir = [0, 1, 1]
+        alpha = deg2rad(2)
+        NA = BMO.numerical_aperture(alpha)
+        num_rays = 1000
+        num_rings = 10
+        
+        source = PointSource(pos, dir, alpha, lambda; num_rays, num_rings)
+        
+        @testset "Testing point source getters" begin
+            @test BMO.numerical_aperture(source) == NA
+            @test BMO.position(source) == pos
+            @test BMO.direction(source) ≈ normalize(dir)
+        end
+        
+        @testset "Testing point source max. spread" begin
+            last_ray = first(BMO.rays(last(BMO.beams(source))))
+            @test BMO.angle3d(dir, BMO.direction(last_ray)) ≈ alpha atol = 1e-14
+            @test BMO.position(last_ray) == pos
+            @test length(BMO.beams(source)) == num_rays
+        end
+        
+        @testset "Testing generated angles" begin
+            angles = BMO.angle3d.(Ref(dir), BMO.direction.(first.(BMO.rays.(BMO.beams(source)))))
+            generated_angles = unique(round.(angles, digits=11))
+            required_angles = LinRange(0, alpha, num_rings)
+            @test generated_angles ≈ required_angles
+        end
+    
+        @testset "Testing throw errors" begin
+            @test_throws ErrorException PointSource(pos, dir, 1.1*π, lambda; num_rays, num_rings)
+            @test_throws ErrorException PointSource(pos, dir, alpha, lambda; num_rays=100, num_rings=10)
+        end
+    end
+
+    @testset "Collimated source" begin
+        # define parameters
+        lambda = 486.0e-9
+        pos = [0, -0.5, 0]
+        dir = [0, 1, 0]
+        diameter = 2BMO.inch
+        num_rays = 500
+        num_rings = 5
+        
+        source = CollimatedSource(pos, dir, diameter; num_rays, num_rings)
+        
+        @testset "Testing coll. source getters" begin 
+            @test BMO.diameter(source) == diameter
+            @test BMO.position(source) == pos
+            @test BMO.direction(source) == dir
+            @test BMO.wavelength(source) == 1e-6
+        end
+        
+        @testset "Testing coll. source max. spread diameter" begin
+            last_ray = first(BMO.rays(last(BMO.beams(source))))
+            @test BMO.direction(last_ray) == dir
+            @test norm(BMO.position(last_ray) - pos) ≈ diameter/2
+            @test length(BMO.beams(source)) == num_rays
+        end
+        
+        @testset "Testing coll. source generated positions" begin
+            radii = norm.(BMO.position.(first.(BMO.rays.(BMO.beams(source)))) .- Ref(pos))
+            generated_pos = unique(round.(radii, digits=11))
+            required_pos = LinRange(0, diameter/2, num_rings)
+            @test generated_pos ≈ required_pos
+        end
+
+        @testset "Testing throw errors" begin
+            @test_throws ErrorException CollimatedSource(pos, dir, diameter; num_rays=100, num_rings=10)
+        end
+    end
 end
 
 @testset "Mesh" begin
@@ -2424,7 +2537,7 @@ end
         ## Test against back focal length as per source above
         dir = BMO.orientation(double_gauss)[:, 2] # rotated collimated ray direction
         pos = BMO.position(l1) - 0.05 * dir # rotated collimated ray position    
-        source = CollimatedSource(pos, dir, 0.04, 486.0e-9, num_rays=1000, num_rings=10)    
+        source = CollimatedSource(pos, dir, 0.04, 486.0e-9, num_rays=1000, num_rings=10)
         solve_system!(system, source)    
         @test test_coma(detector, atol=2e-5)
     end

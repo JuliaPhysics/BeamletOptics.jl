@@ -479,4 +479,10 @@ function find_zero_bisection(f, a, b; tol=1e-10, max_iter=1000)
     error("Bisection did not converge after $max_iter iterations")
 end
 
-numerical_aperture(θ::Real, n::Real=1.0) = n*sin(θ) # FIXME docs + tests
+"""
+    numerical_aperture(θ, n=1)
+
+Returns the `NA` for a opening half-angle `θ` and scalar ref. index `n`.
+For more information refer to [this website](https://www.rp-photonics.com/numerical_aperture.html).
+"""
+numerical_aperture(θ::Real, n::Real=1.0) = n*sin(θ)
