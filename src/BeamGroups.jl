@@ -1,30 +1,17 @@
 """
-    AbstractBeamGroup
+    PointSource <: AbstractBeamGroup
 
-FIXME
+Represents a cone of [`Beam`](@ref)s being emitted from a single point in space.
+
+# Fields
+
+- `beams`: a vector of all [`Beam`](@ref)s originating from the source
+- `NA`: the [`numerical_aperture`](@ref) of the point source spread angle
+
+# Functions
+
+- `numerical_aperture`: returns the NA of the source
 """
-abstract type AbstractBeamGroup{T <: Real, R <: AbstractRay{T}} end
-
-beams(bg::AbstractBeamGroup) = bg.beams
-
-position(bg::AbstractBeamGroup) = position(first(rays(first(beams(bg)))))
-direction(bg::AbstractBeamGroup) = direction(first(rays(first(beams(bg)))))
-
-wavelength(bg::AbstractBeamGroup) = wavelength(first(rays(first(beams(bg)))))
-
-function solve_system!(system::AbstractSystem, bg::AbstractBeamGroup; kwargs...)
-    for _beam in beams(bg)
-        solve_system!(system, _beam; kwargs...)
-    end
-    return nothing
-end
-
-function Base.show(io::IO, ::MIME"text/plain", bg::AbstractBeamGroup)
-    println(io, "Subtype of AbstractBeamGroup")
-    println(io, "   # of beams: $(length(beams(bg)))")
-    return nothing
-end
-
 struct PointSource{T, R<:AbstractRay{T}} <: AbstractBeamGroup{T,R}
     beams::Vector{Beam{T, R}}
     NA::T
@@ -33,9 +20,33 @@ end
 numerical_aperture(ps::PointSource) = ps.NA
 
 """
-    PointSource
+    PointSource(pos, dir, θ, λ; num_rings, num_rays)
 
-FIXME
+Spawns a point source of [`Beam`](@ref)s at the specified `pos`ition and `dir`ection.
+The point source is modelled as a collection of concentric beam fans centered around the center beam.
+The amount of beam rings between the center ray and half-spread-angle `θ` can be specified via `num_rings`.
+
+!!! info
+    Note that for correct sampling, the number of rays should be atleast 20x the number of rings.
+
+# Arguments
+
+The following inputs and arguments can be used to configure the [`PointSource`](@ref):
+
+## Inputs
+
+- `pos`: center beam starting position
+- `dir`: center beam starting direction
+- `θ`: half spread angle
+- `λ = 1e-6`: wavelength in [m], default val. is 1000 nm
+
+## Keyword Arguments
+
+- `num_rings`: number of concentric beam rings, default is 10
+- `num_rays`: total number of rays in the source, default is 100x num_rings
+
+!!! warning 
+    The basis for the beam generation is generated randomly. 
 """
 function PointSource(
         pos::AbstractArray{P},
@@ -88,6 +99,20 @@ function PointSource(
     return PointSource(beams, NA)
 end
 
+"""
+    CollimatedSource <: AbstractBeamGroup
+
+Represents a parallel bundle of [`Beam`](@ref)s being emitted from a disk in space.
+
+# Fields
+
+- `beams`: a vector of all [`Beam`](@ref)s originating from the source
+- `diameter`: the diameter of the outermost beam ring
+
+# Functions
+
+- `diameter`: returns the diameter of the source
+"""
 struct CollimatedSource{T, R<:AbstractRay{T}} <: AbstractBeamGroup{T,R}
     beams::Vector{Beam{T, R}}
     diameter::T
@@ -96,9 +121,33 @@ end
 diameter(cs::CollimatedSource) = cs.diameter
 
 """
-    CollimatedSource
+    CollimatedSource(pos, dir, diameter, λ; num_rings, num_rays)
 
-FIXME
+Spawns a bundle of collimated [`Beam`](@ref)s at the specified `pos`ition and `dir`ection.
+The source is modelled as a ring of concentric beam rings around the center beam.
+The amount of beam rings between the center ray and outer `diameter` can be specified via `num_rings`.
+
+!!! info
+    Note that for correct sampling, the number of rays should be atleast 20x the number of rings.
+
+# Arguments
+
+The following inputs and arguments can be used to configure the [`CollimatedSource`](@ref):
+
+## Inputs
+
+- `pos`: center beam starting position
+- `dir`: center beam starting direction
+- `diameter`: outer beam bundle diameter in [m] 
+- `λ = 1e-6`: wavelength in [m], default val. is 1000 nm
+
+## Keyword Arguments
+
+- `num_rings`: number of concentric beam rings, default is 10
+- `num_rays`: total number of rays in the source, default is 100x num_rings
+
+!!! warning 
+    The basis for the beam generation is generated randomly. 
 """
 function CollimatedSource(
         pos::AbstractArray{P},
