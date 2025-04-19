@@ -24,12 +24,24 @@ function Beam(ray::R) where {T, R <: AbstractRay{T}}
     Beam{T, R}([ray], nothing, Vector{Beam{T, R}}())
 end
 
+"""
+    Beam(pos, dir, λ)
+
+Spawns a [`Beam`](@ref) at the start `pos`ition in the specified `dir`ection
+with the wavelength `λ`.
+"""
 function Beam(pos::AbstractArray{P}, dir::AbstractArray{D}, λ::L) where {P,D,L}
     T = promote_type(P,D,L)
     ray = Ray(pos, dir, λ)
     return Beam{T, Ray{T}}([ray], nothing, Vector{Beam{T, Ray{T}}}())
 end
 
+"""
+    Beam(pos, dir, λ, E0)
+
+Spawns a [`Beam`](@ref) of [`PolarizedRay`](@ref)s at the start `pos`ition in the specified `dir`ection
+with the wavelength `λ` and electric field vector `E0`
+"""
 function Beam(pos::AbstractArray{P}, dir::AbstractArray{D}, λ::L, E0::Vector{E}) where {P,D,L,E}
     T = promote_type(P,D,L,E)
     ray = PolarizedRay(pos, dir, λ, E0)
