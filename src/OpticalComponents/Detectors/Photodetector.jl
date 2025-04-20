@@ -100,48 +100,6 @@ function interact3d(
     return nothing
 end
 
-"""
-    interact3d(::AbstractSystem, pd::Photodetector, beam::Beam{T, R}, ray_id::R) where {T, R <: AbstractRay}
-
-Implements the [`Photodetector`](@ref) interaction with a [`Beam`](@ref).
-On hit, the scalar E-field of a plane wave is added to the current PD field matrix.
-Tilt and tip between beam and PD surface are considered via projection factors.
-"""
-function interact3d(
-    ::AbstractSystem, pd::Photodetector, beam::Beam{T, R}, ray::R) where {T, R <: AbstractRay}
-
-    # Optical path length difference
-    l0 = optical_path_length(beam) - optical_path_length(ray)
-    p0 = position(ray)
-    d0 = direction(ray)
-
-    orient = orientation(shape(pd))
-    e1 = @view orient[:, 1]   # local x-axis
-    e2 = @view orient[:, 3]   # local y-axis
-    origin_pd = position(shape(pd))
-
-    k = 2π / wavelength(ray)
-
-    # Loop over the detector grid points
-    Threads.@threads for j in eachindex(pd.y)
-        y = pd.y[j]
-        @inbounds for i in eachindex(pd.x)
-            x = pd.x[i]
-            # Convert detector local coordinates (x,y) to world coordinates
-            p1 = origin_pd + x * e1 + y * e2
-
-            # Project the vector from the ray's position to the grid point onto d0.
-            l1 = dot(p1 - p0, d0)
-            # Compute the effective optical path length (z) relative to the flat phase reference.
-            z = l0 + l1
-            phase = exp(im * k * z)
-
-            pd.field[i, j] += phase
-        end
-    end
-    return nothing
-end
-
 intensity(pd::Photodetector) = intensity.(pd.field)
 
 """
