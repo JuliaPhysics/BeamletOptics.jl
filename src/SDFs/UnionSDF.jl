@@ -86,3 +86,12 @@ function render_object!(axis, s::UnionSDF)
         render_object!(axis, sdf)
     end
 end
+
+# Without this function it is not possible for SDFs encapsulated in a UnionSDF
+# to specialize normal3d as always the generic normal3d function is called.
+function normal3d(s::UnionSDF, pos)
+    # find the closes sub-sdf and call its normal method
+    idx = argmin(abs(sdf(_sdf, pos)) for _sdf in s.sdfs)
+
+    return normal3d(s.sdfs[idx], pos)
+end

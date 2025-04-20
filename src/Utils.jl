@@ -20,7 +20,7 @@ const NullableVector{T} = Union{Vector{T},Nothing} where {T}
 Returns a vector with unit length that is perpendicular to the target and an additional
 reference vector. Vector orientation is determined according to right-hand rule.
 """
-function normal3d(target, reference)
+function normal3d(target::AbstractVector, reference::AbstractVector)
     n = cross(target, reference)
     return normalize(n)
 end
