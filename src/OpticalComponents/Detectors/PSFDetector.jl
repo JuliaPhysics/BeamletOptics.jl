@@ -100,11 +100,28 @@ function calc_local_lims(psf::PSFDetector{T};
     return x0 - hwx, x0 + hwx, z0 - hwy, z0 + hwy
 end
 
-function intensity(psf::PSFDetector{T}; n::Int=100, crop_factor::Real=1, normalization=:strehl, x0_shift::Real=0, z0_shift::Real=0) where T
+function intensity(psf::PSFDetector{T};
+        n::Int=100,
+        crop_factor::Real=1,
+        normalization=:strehl,
+        x_min = Inf,
+        x_max = Inf,
+        z_min = Inf,
+        z_max = Inf,
+        x0_shift::Real=0,
+        z0_shift::Real=0) where T
     # automatically calculate limits
-    x_min, x_max, z_min, z_max = calc_local_lims(psf; crop_factor)
-    xs = LinRange(x_min, x_max, n) .+ x0_shift
-    zs = LinRange(z_min, z_max, n) .+ z0_shift
+    _x_min, _x_max, _z_min, _z_max = calc_local_lims(psf; crop_factor)
+    if x_min != Inf && x_max != Inf
+        _x_min = x_min
+        _x_max = x_max
+    end
+    if z_min != Inf && z_max != Inf
+        _z_min = x_min
+        _z_max = x_max
+    end
+    xs = LinRange(_x_min, _x_max, n) .+ x0_shift
+    zs = LinRange(_z_min, _z_max, n) .+ z0_shift
     # Buffer field
     field = zeros(Complex{T}, n, n)
 
