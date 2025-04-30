@@ -31,6 +31,7 @@ export Prism, RightAnglePrism
 
 # detectors
 export Photodetector, Spotdetector, PSFDetector
+export intensity
 
 # splitters
 export ThinBeamsplitter, RoundThinBeamsplitter, RectangularPlateBeamsplitter, RoundPlateBeamsplitter, CubeBeamsplitter, RectangularCompensatorPlate

@@ -63,3 +63,14 @@ Below an optical system consisting of a collection of collimated [`Beam`](@ref)s
 The beam bundle used to generate the spot diagram was created via the [`CollimatedSource`](@ref) constructor. The resulting spot diagram of the lens shown above is visualized below.
 
 ![Spot diagram showcase](spot_diagram_showcase.png)
+
+## Point-spread-function detector type
+
+
+```@docs; canonical=false
+PSFDetector(::Real)
+```
+
+```@docs; canonical=false
+intensity(::PSFDetector)
+```

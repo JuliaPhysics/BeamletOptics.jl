@@ -17,6 +17,30 @@ function PSFData(hit::AbstractArray{H}, dir::AbstractArray{D}, opl::O, proj::P, 
     return PSFData{T}(T.(hit), T.(dir), T(opl), T(proj), T(wavenumber))
 end
 
+
+"""
+    PSFDetector{T} <: AbstractDetector{T, Mesh{T}}
+
+Represents a **flat** quadratic surface in R³ for capturing the point spread function of a `<: AbstractSystem`
+The active surface is discretized in the local R² x-y-coordinate system.
+Ray hits are recorded by the corresponding [`interact3d`](@ref) method.
+
+# Fields
+
+- `shape`: geometry of the active surface, must represent 2D-`field` in `x` any `y` dimensions
+- `data` : A vector of `PSFData` capturing the information about each ray hit.
+- `solved`: A flag to track if the detector has already been solved.
+
+# Additional information
+
+!!! warning "Reset behavior"
+    The `PSFDetector` must be reset between each call of [`solve_system!`](@ref) in order to
+    overwrite previous results using the [`empty!`](@ref) function.
+    Otherwise, the current result will be added onto the previous result.
+
+!!! info "Supported beams"
+    Currently, only the [`Beam`](@ref) is supported.
+"""
 struct PSFDetector{T} <: AbstractDetector{T, Mesh{T}}
     shape::Mesh{T}
     data::Vector{PSFData{T}}
@@ -27,7 +51,17 @@ empty!(psf::PSFDetector) = (empty!(psf.data); psf.solved[] = false)
 
 Base.push!(psf::PSFDetector, new::PSFData) = push!(psf.data, new)
 
-function PSFDetector(width::W) where W <: AbstractFloat
+"""
+    Photodetector(width)
+
+Spawns a quadratic rectangular 2D [`PSFDetector`](@ref) that is aligned with the **positive y-axis**.
+Refer to the type docs for more information.
+
+# Inputs:
+
+- `width`: edge length in [m]
+"""
+function PSFDetector(width::W) where W <: Real
     # Spawn mesh, align with neg. y-axis, empty data field
     shape = QuadraticFlatMesh(width)
     zrotate3d!(shape, π)
@@ -35,6 +69,13 @@ function PSFDetector(width::W) where W <: AbstractFloat
     return PSFDetector(shape, data, Ref(false))
 end
 
+"""
+    interact3d(::AbstractSystem, psf::PSFDetector, beam::Beam{T, Ray{T}}, ray::Ray{T}) where T
+
+Implements the [`PSFDetector`](@ref) interaction with a [`Beam`](@ref).
+On hit, the hit position, direction, optical path length, wavelength and projection factor
+are captured and stored with the `data` field of the detector.
+"""
 function interact3d(::AbstractSystem, psf::PSFDetector, beam::Beam{T, Ray{T}}, ray::Ray{T}) where T
     # Global hit pos
     hit_3D = position(ray) + length(ray) * direction(ray)
@@ -100,10 +141,52 @@ function calc_local_lims(psf::PSFDetector{T};
     return x0 - hwx, x0 + hwx, z0 - hwy, z0 + hwy
 end
 
+"""
+    intensity(psf::PSFDetector{T};
+              n::Int=100,
+              crop_factor::Real=1,
+              x_min = Inf,
+              x_max = Inf,
+              z_min = Inf,
+              z_max = Inf,
+              x0_shift::Real=0,
+              z0_shift::Real=0) where T
+
+Compute the two‐dimensional point‐spread function (PSF) of an optical system
+as captured by a `PSFDetector`.  The returned intensity map is sampled
+on a regular `n×n` grid in the detector’s local (x,z)-plane.
+
+# Keyword Arguments
+- `n::Int=100`
+  Number of sample points per axis.
+- `crop_factor::Real=1`
+  Scales the half‐width of the sampling window returned by
+  `calc_local_lims`; values >1 expand, <1 shrink.
+- `x_min, x_max, z_min, z_max`
+  Manually override the sampling bounds in the local x or z directions.
+  If left as `Inf`, the bounds from `calc_local_lims` are used.
+- `x0_shift::Real=0, z0_shift::Real=0`
+  Apply a constant offset to the entire x or z coordinate arrays,
+  useful for recentring or testing alignment.
+
+# Returns
+A tuple `(xs, zs, I)` where
+- `xs::LinRange{T}` and `zs::LinRange{T}` are the sampled coordinates
+  in the detector’s local x and z axes,
+- `I::Matrix{T}` is the corresponding raw/unscaled intensity map
+
+!!! note "Resetting detectors"
+
+    Be sure to call `empty!(psf)` before each new measurement if reusing the same detector.
+
+!!! note "Scaling"
+
+    The returned values are raw/unscaled and not a Strehl ration. This feature is not
+    yet added. In future versions a pupil finder along with a Strehl estimator will be added.
+"""
 function intensity(psf::PSFDetector{T};
         n::Int=100,
         crop_factor::Real=1,
-        normalization=:strehl,
         x_min = Inf,
         x_max = Inf,
         z_min = Inf,
@@ -146,27 +229,5 @@ function intensity(psf::PSFDetector{T};
         end
     end
 
-    _intensity = abs2.(field)
-
-    if normalization === :strehl
-        S = strehl(psf)
-        _intensity .*= S / maximum(_intensity)
-    end
-
-    return xs, zs, _intensity
-end
-
-function strehl(psf::PSFDetector{T}) where {T}
-    k = psf.data[1].k
-    ops = optical_path_length.(psf.data)
-
-    μ = sum(ops) / length(ops)
-    num = zero(complex(T))
-    den = zero(T)
-    for h in psf.data
-        w = projection_factor(h)
-        num += w * cis(k * (optical_path_length(h) - μ))
-        den += w
-    end
-    return abs2(num / den)
+    return xs, zs, abs2.(field)
 end
