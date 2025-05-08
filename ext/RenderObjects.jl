@@ -1,7 +1,22 @@
 """
     render!(ax, obj; kwargs...)
 
-FIXME
+Renders the `obj`ect into the specified `ax`is. Additional `kwargs` can be piped through to the backend.
+
+# Examples
+
+It is recommended to use the following snippet in order to generate plots:
+
+```julia
+using GLMakie, BeamletOptics
+
+fig = Figure()
+ax = LScene(fig[1,1]) # or Axis3
+render!(ax, my_BMO_obj; color=:white)
+```
+
+Additional keyword arguments can be passed. Refer to the `Makie` and `BeamletOptics` documentation for supported options
+for each object and beam type.
 """
 render!(ax::_RenderEnv, obj::BMO.AbstractObject; kwargs...) = _render!(ax, obj; kwargs...)
 

@@ -56,6 +56,7 @@ include("RenderSDF.jl")
 include("RenderMesh.jl")
 include("RenderObjects.jl")
 include("RenderLenses.jl")
+include("RenderCylinderLenses.jl")
 include("RenderPresets.jl")
 
 end

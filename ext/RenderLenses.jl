@@ -22,7 +22,7 @@ function render!(axis::_RenderEnv, css::BMO.ConcaveSphericalSurfaceSDF; color=:w
     return nothing
 end
 
-function render_object!(axis::_RenderEnv, css::BMO.ConvexSphericalSurfaceSDF; color=:white, kwargs...)
+function render!(axis::_RenderEnv, css::BMO.ConvexSphericalSurfaceSDF; color=:white, kwargs...)
     v = LinRange(0, 2π, 100)
     r = LinRange(1e-12, 1, 100) .^ (1/2) * BMO.diameter(css)/2
     # Calculate beam surface at origin along y-axis, swap w and u
