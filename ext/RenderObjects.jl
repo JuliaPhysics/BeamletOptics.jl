@@ -1,7 +1,7 @@
 """
-    render!(ax, obj; kwargs...)
+    render!(ax, object; kwargs...)
 
-Renders the `obj`ect into the specified `ax`is. Additional `kwargs` can be piped through to the backend.
+Renders the `object` into the specified `ax`is. Additional `kwargs` can be piped through to the backend.
 
 # Examples
 
@@ -16,10 +16,11 @@ render!(ax, my_BMO_obj; color=:white)
 ```
 
 Additional keyword arguments can be passed. Refer to the `Makie` and `BeamletOptics` documentation for supported options
-for each object and beam type.
+for each `object`.
 """
 render!(ax::_RenderEnv, obj::BMO.AbstractObject; kwargs...) = _render!(ax, obj; kwargs...)
 
+# Dispatch helper fct. for RenderPresets.jl, do not remove
 _render!(ax::_RenderEnv, obj::BMO.AbstractObject; kwargs...) = render!(ax, BMO.shape_trait_of(obj), obj; kwargs...)
 
 function render!(ax::_RenderEnv, ::BMO.SingleShape, obj; kwargs...)

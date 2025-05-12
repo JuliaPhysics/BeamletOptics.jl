@@ -5,14 +5,14 @@ Renders a `ray` as a 3D line into the specified `axis`.
 
 # Keyword args
 
-- `flen`: plotted length of the infinite ray in case of no intersection in [m], default is 1.0
-- `show_pos`: marks the starting position of the `ray` with a sphere, default is false
+- `flen = 1.0`: plotted length of the infinite ray in case of no intersection in [m]
+- `show_pos = false`: marks the starting position of the `ray` with a sphere
 
 # Makie kwargs
 
-- `color`: default is :blue
-- `linewidth`: default is 1.0
-- `transparency`: default is true
+- `color = :blue`: ray color
+- `linewidth = 1.0`: ray line width
+- `transparency = true`: ray transparency
 
 Additional kwargs can be passed into the line plot.
 """

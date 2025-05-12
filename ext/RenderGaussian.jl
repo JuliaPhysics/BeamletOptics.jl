@@ -1,28 +1,39 @@
 """
-    render!(ax, gauss::GaussianBeamlet; color=:red, flen=0.1, show_beams=false)
+    render!(ax, gauss::GaussianBeamlet; kwargs...)
 
-Render the surface of a `GaussianBeamlet` as `color`. With `show_beams` the generating rays are plotted as follows:
+Render the 1/e² envelope of the `GaussianBeamlet` into the specified `axis`.
 
-- `chief` ray: red
-- `divergence` ray: green
-- `waist` ray: blue
+With `show_beams = true` the generating rays are overlayed into the axis as follows:
+
+- `chief` beam: red
+- `divergence` beam: green
+- `waist` beam: blue
 
 # Keyword args
 
-- `color = :red`: color of the beam as per the Makie syntax, i.e. :blue
-- `flen = 0.1`: length of the final beam in case of no intersection
 - `show_beams = false`: plot the generating rays of the [`GaussianBeamlet`](@ref)
+- `flen = 0.1`: length of the final beam in case of no intersection
 - `r_res::Int = 50`: radial resolution of the beam
 - `z_res::Int = 100`: resolution along the optical axis of the beam
+
+# Makie kwargs
+
+- `color = :red`
+- `transparency = true`
+
+Additional kwargs can be passed into the surface plot of the Gaussian envelope.
 """
 function render!(
-        ax::_RenderEnv,
+        axis::_RenderEnv,
         gauss::GaussianBeamlet{T};
-        color = :red,
-        flen = 0.1,
+        # kwargs
         show_beams = false,
         r_res = 50,
         z_res = 100,
+        flen = 0.1,
+        # Makie kwargs
+        color = :red,
+        transparency = true,
         kwargs...
     ) where {T}
     for child in PreOrderDFS(gauss)
@@ -53,7 +64,7 @@ function render!(
             Yt = R[2, 1] * X + R[2, 2] * Y + R[2, 3] * Z .+ BMO.position(ray)[2]
             Zt = R[3, 1] * X + R[3, 2] * Y + R[3, 3] * Z .+ BMO.position(ray)[3]
 
-            surface!(ax, Xt, Yt, Zt; transparency = true, colormap = [color, color], kwargs...)
+            surface!(axis, Xt, Yt, Zt; transparency, colormap = [color, color], kwargs...)
 
             # Bump length tracker
             if !isnothing(BMO.intersection(ray))
@@ -62,9 +73,9 @@ function render!(
         end
         # Optionally, plot generating rays
         if show_beams
-            render!(ax, child.chief; flen, color = :red)
-            render!(ax, child.divergence; flen, color = :green)
-            render!(ax, child.waist; flen, color = :blue)
+            render!(axis, child.chief; transparency, flen, color = :red)
+            render!(axis, child.divergence; transparency, flen, color = :green)
+            render!(axis, child.waist; transparency, flen, color = :blue)
         end
     end
     return nothing
