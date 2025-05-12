@@ -3,7 +3,6 @@ function render!(
         acyl::BMO.AbstractAcylindricalSurfaceSDF;
         # Makie kwargs
         color=:white,
-        transparency=true,
         kwargs...
     )
     r = BMO.diameter(acyl) / 2
@@ -24,7 +23,7 @@ function render!(
     Yt = R[2, 1] .* X_local .+ R[2, 2] .* Y_local .+ R[2, 3] .* Z_local .+ P[2]
     Zt = R[3, 1] .* X_local .+ R[3, 2] .* Y_local .+ R[3, 3] .* Z_local .+ P[3]
 
-    surface!(axis, Xt, Yt, Zt; transparency, colormap=[color, color], kwargs...)
+    surface!(axis, Xt, Yt, Zt; colormap=[color, color], kwargs...)
     render_acylindric_caps!(axis, acyl; color)
     return nothing
 end
@@ -35,7 +34,6 @@ function render_acylindric_cap!(
         top::Bool;
         # Makie kwargs
         color = :white,
-        transparency = true,
         kwargs...
     )
     r = BMO.diameter(acyl) / 2
@@ -69,7 +67,7 @@ function render_acylindric_cap!(
     Yt = R[2, 1] .* X_local .+ R[2, 2] .* Y_local .+ R[2, 3] .* Z_local .+ P[2]
     Zt = R[3, 1] .* X_local .+ R[3, 2] .* Y_local .+ R[3, 3] .* Z_local .+ P[3]
 
-    surface!(axis, Xt, Yt, Zt; transparency, colormap=[color, color], kwargs...)
+    surface!(axis, Xt, Yt, Zt; colormap=[color, color], kwargs...)
     return nothing
 end
 

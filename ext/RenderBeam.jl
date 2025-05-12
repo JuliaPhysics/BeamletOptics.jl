@@ -44,6 +44,7 @@ function render!(
         transparency,
         kwargs...
     )
+    
     if show_pos
         scatter!(axis, ray.pos; color)
     end

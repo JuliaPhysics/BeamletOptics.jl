@@ -1,3 +1,15 @@
+"""
+    render!(axis, mesh; kwargs...)
+
+Renders the `mesh` into the specified `axis`.
+
+# Keyword args
+
+- `show_normals = false`: shows a small line
+- `show_normals_length = 0.01`:
+
+# Makie kwargs
+"""
 function render!(
         ax::_RenderEnv,
         mesh::BMO.AbstractMesh;
