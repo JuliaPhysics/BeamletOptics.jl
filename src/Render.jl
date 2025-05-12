@@ -35,7 +35,7 @@ If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown
 
 All concrete implementations of `render!` must adhere to the following minimal interface:
 
-**render(axis, thing; kwargs...)**
+`render!(axis, thing; kwargs...)`
 
 - `axis`: an axis type of the union of `LScene` or `Axis3`
 - `thing`: an abstract or concrete object or beam type

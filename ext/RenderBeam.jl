@@ -1,9 +1,33 @@
 """
-    render!(axis, ray::AbstractRay; color=:blue, flen=1.0)
+    render!(axis, ray; kwargs...)
 
-Renders a `ray` as a 3D line. If the ray has no intersection, the substitute length `flen` is used.
+Renders a `ray` as a 3D line into the specified `axis`.
+
+# Keyword args
+
+- `flen`: plotted length of the infinite ray in case of no intersection in [m], default is 1.0
+- `show_pos`: marks the starting position of the `ray` with a sphere, default is false
+
+# Makie kwargs
+
+- `color`: default is :blue
+- `linewidth`: default is 1.0
+- `transparency`: default is true
+
+Additional kwargs can be passed into the line plot.
 """
-function render!(ax::_RenderEnv, ray::BMO.AbstractRay; color = :blue, flen = 1.0, show_pos=false)
+function render!(
+        axis::_RenderEnv,
+        ray::BMO.AbstractRay;
+        # kwargs
+        flen = 1.0,
+        show_pos = false,
+        # Makie kwargs
+        color = :blue,
+        linewidth = 1.0,
+        transparency = true,
+        kwargs...
+    )
     if isnothing(BMO.intersection(ray))
         len = flen
     else
@@ -11,29 +35,39 @@ function render!(ax::_RenderEnv, ray::BMO.AbstractRay; color = :blue, flen = 1.0
     end
     temp = BMO.position(ray) + len * BMO.direction(ray)
 
-    lines!(ax,
+    lines!(axis,
         [BMO.position(ray)[1], temp[1]],
         [BMO.position(ray)[2], temp[2]],
-        [BMO.position(ray)[3], temp[3]],
-        color=color,
-        linewidth=1.0,
-        transparency=true)
+        [BMO.position(ray)[3], temp[3]];
+        color,
+        linewidth,
+        transparency,
+        kwargs...
+    )
     if show_pos
-        scatter!(ax, ray.pos; color)
+        scatter!(axis, ray.pos; color)
     end
 
     return nothing
 end
 
 """
-    render!(axis, beam::Beam; color=:blue, flen=1.0, show_pos=false)
+    render!(axis, beam; kwargs...)
 
-Render the entire `beam` into the specified 3D-`axis`. A `color` can be specified.
+Render the entire `beam` of rays into the specified 3D-`axis`.
+
+# Keyword args
+
+Refer to the plotting method of the `AbstractRay` for a list of keyword arguments.
 """
-function render!(ax::_RenderEnv, beam::Beam; color = :blue, flen = 1.0, show_pos=false)
+function render!(
+        axis::_RenderEnv,
+        beam::Beam;
+        kwargs...
+    )
     for child in PreOrderDFS(beam)
         for ray in BMO.rays(child)
-            render!(ax, ray; color, flen, show_pos)
+            render!(axis, ray; kwargs...)
         end
     end
     return nothing
