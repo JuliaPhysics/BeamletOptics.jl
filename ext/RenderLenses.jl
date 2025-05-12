@@ -1,4 +1,11 @@
-function render!(axis::_RenderEnv, css::BMO.ConcaveSphericalSurfaceSDF; color=:white, kwargs...)
+function render!(
+        axis::_RenderEnv,
+        css::BMO.ConcaveSphericalSurfaceSDF;
+        # Makie kwargs
+        color = :white,
+        transparency = true,
+        kwargs...
+    )
     _radius = BMO.diameter(css)/2
     v = LinRange(0, 2π, 100)
     r = LinRange(1e-12, 1, 100) .^ (1/2) * _radius
@@ -18,11 +25,18 @@ function render!(axis::_RenderEnv, css::BMO.ConcaveSphericalSurfaceSDF; color=:w
     Xt = R[1, 1] * X + R[1, 2] * Y + R[1, 3] * Z .+ P[1]
     Yt = R[2, 1] * X + R[2, 2] * Y + R[2, 3] * Z .+ P[2]
     Zt = R[3, 1] * X + R[3, 2] * Y + R[3, 3] * Z .+ P[3]
-    surface!(axis, Xt, Yt, Zt; transparency = true, colormap = [color, color], kwargs...)
+    surface!(axis, Xt, Yt, Zt; transparency, colormap = [color, color], kwargs...)
     return nothing
 end
 
-function render!(axis::_RenderEnv, css::BMO.ConvexSphericalSurfaceSDF; color=:white, kwargs...)
+function render!(
+        axis::_RenderEnv,
+        css::BMO.ConvexSphericalSurfaceSDF;
+        # Makie kwargs
+        color = :white,
+        transparency = true,
+        kwargs...
+    )
     v = LinRange(0, 2π, 100)
     r = LinRange(1e-12, 1, 100) .^ (1/2) * BMO.diameter(css)/2
     # Calculate beam surface at origin along y-axis, swap w and u
@@ -41,11 +55,17 @@ function render!(axis::_RenderEnv, css::BMO.ConvexSphericalSurfaceSDF; color=:wh
     Xt = R[1, 1] * X + R[1, 2] * Y + R[1, 3] * Z .+ P[1]
     Yt = R[2, 1] * X + R[2, 2] * Y + R[2, 3] * Z .+ P[2]
     Zt = R[3, 1] * X + R[3, 2] * Y + R[3, 3] * Z .+ P[3]
-    surface!(axis, Xt, Yt, Zt; transparency = true, colormap = [color, color], kwargs...)
+    surface!(axis, Xt, Yt, Zt; transparency, colormap = [color, color], kwargs...)
     return nothing
 end
 
-function render!(axis::_RenderEnv, asp::BMO.AbstractAsphericalSurfaceSDF; color = :white, kwargs...)
+function render!(
+        axis::_RenderEnv,
+        asp::BMO.AbstractAsphericalSurfaceSDF;
+        color = :white,
+        transparency = true,
+        kwargs...
+    )
     radius = asp.diameter / 2
     v = LinRange(0, 2π, 100)
     r = LinRange(1e-12, radius, 50)
@@ -72,6 +92,6 @@ function render!(axis::_RenderEnv, asp::BMO.AbstractAsphericalSurfaceSDF; color 
     Xt = R[1, 1] * X + R[1, 2] * Y + R[1, 3] * Z .+ P[1]
     Yt = R[2, 1] * X + R[2, 2] * Y + R[2, 3] * Z .+ P[2]
     Zt = R[3, 1] * X + R[3, 2] * Y + R[3, 3] * Z .+ P[3]
-    surface!(axis, Xt, Yt, Zt; transparency = true, colormap = [color, color], kwargs...)
+    surface!(axis, Xt, Yt, Zt; transparency, colormap = [color, color], kwargs...)
     return nothing
 end

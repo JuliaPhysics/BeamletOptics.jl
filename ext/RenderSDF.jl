@@ -1,7 +1,9 @@
 """
-    render!(ax::_RenderEnv, s::BMO.AbstractSDF; kwargs...)
+    render!(ax, sdf; kwargs...)
 
-Render the surface of `s` based on the marching cubes algorithm.
+Render the surface of the `sdf` based on the marching cubes algorithm into the specified `axis`.
+
+Additional kwargs can be passed into the mesh plot.
 """
 function render!(ax::_RenderEnv, s::BMO.AbstractSDF; kwargs...)
     # Get object limits

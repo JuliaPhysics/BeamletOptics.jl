@@ -1,4 +1,11 @@
-function render!(axis::_RenderEnv, acyl::BMO.AbstractAcylindricalSurfaceSDF; color=:white, kwargs...)
+function render!(
+        axis::_RenderEnv,
+        acyl::BMO.AbstractAcylindricalSurfaceSDF;
+        # Makie kwargs
+        color=:white,
+        transparency=true,
+        kwargs...
+    )
     r = BMO.diameter(acyl) / 2
     w_vals = LinRange(-r, r, 100)           # aperture coordinate
     z_vals = LinRange(-BMO.height(acyl) / 2, BMO.height(acyl) / 2, 20)  # extrusion coordinate
@@ -17,12 +24,20 @@ function render!(axis::_RenderEnv, acyl::BMO.AbstractAcylindricalSurfaceSDF; col
     Yt = R[2, 1] .* X_local .+ R[2, 2] .* Y_local .+ R[2, 3] .* Z_local .+ P[2]
     Zt = R[3, 1] .* X_local .+ R[3, 2] .* Y_local .+ R[3, 3] .* Z_local .+ P[3]
 
-    surface!(axis, Xt, Yt, Zt; transparency=true, colormap=[color, color], kwargs...)
+    surface!(axis, Xt, Yt, Zt; transparency, colormap=[color, color], kwargs...)
     render_acylindric_caps!(axis, acyl; color)
     return nothing
 end
 
-function render_acylindric_cap!(axis, acyl::BMO.AbstractAcylindricalSurfaceSDF, top::Bool; color=:white, kwargs...)
+function render_acylindric_cap!(
+        axis::_RenderEnv,
+        acyl::BMO.AbstractAcylindricalSurfaceSDF,
+        top::Bool;
+        # Makie kwargs
+        color = :white,
+        transparency = true,
+        kwargs...
+    )
     r = BMO.diameter(acyl) / 2
     h = BMO.height(acyl)
     Xval = top ? (h / 2) : -(h / 2)   # local X coordinate for top or bottom cap
@@ -54,12 +69,12 @@ function render_acylindric_cap!(axis, acyl::BMO.AbstractAcylindricalSurfaceSDF, 
     Yt = R[2, 1] .* X_local .+ R[2, 2] .* Y_local .+ R[2, 3] .* Z_local .+ P[2]
     Zt = R[3, 1] .* X_local .+ R[3, 2] .* Y_local .+ R[3, 3] .* Z_local .+ P[3]
 
-    surface!(axis, Xt, Yt, Zt; transparency=true, colormap=[color, color], kwargs...)
+    surface!(axis, Xt, Yt, Zt; transparency, colormap=[color, color], kwargs...)
     return nothing
 end
 
-function render_acylindric_caps!(axis::_RenderEnv, acyl::BMO.AbstractAcylindricalSurfaceSDF; color=:white, kwargs...)
-    render_acylindric_cap!(axis, acyl, true; color=color, kwargs...)  # top
-    render_acylindric_cap!(axis, acyl, false; color=color, kwargs...)  # bottom
+function render_acylindric_caps!(axis::_RenderEnv, acyl::BMO.AbstractAcylindricalSurfaceSDF; kwargs...)
+    render_acylindric_cap!(axis, acyl, true; kwargs...)  # top
+    render_acylindric_cap!(axis, acyl, false; kwargs...)  # bottom
     return nothing
 end
