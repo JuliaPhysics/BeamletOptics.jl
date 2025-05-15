@@ -46,7 +46,13 @@ function render!(
     )
     
     if show_pos
+        # start point
         scatter!(axis, ray.pos; color)
+
+        # end point
+        if !isnothing(BMO.intersection(ray))
+            scatter!(axis, temp; color)
+        end
     end
 
     return nothing
