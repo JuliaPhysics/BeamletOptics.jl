@@ -79,6 +79,7 @@ Various versions of this approach have been implemented under different names in
 
 - [Raypier](https://github.com/bryancole/raypier_optics) - based on Cython, maintenance status not known
 - [Poke](https://github.com/Jashcraf/poke) - based on Zemax API and Python, maintained by J. Ashcraft et al. [Ashcraft:2022](@cite)
+- [IfoCAD](https://www.aei.mpg.de/ifocad-de) - maintenance status not known, refer to Wanner et al. [Wanner:2017](@cite)
 
 This package implements the above method via the [`GaussianBeamlet`](@ref) and the `BeamletOptics.AstigmaticGaussianBeamlet` (**Work in progress**).
 
