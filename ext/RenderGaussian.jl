@@ -28,6 +28,7 @@ function render!(
         gauss::GaussianBeamlet{T};
         # kwargs
         show_beams = false,
+        show_pos = false,
         r_res = 50,
         z_res = 100,
         flen = 0.1,
@@ -73,9 +74,9 @@ function render!(
         end
         # Optionally, plot generating rays
         if show_beams
-            render!(axis, child.chief; transparency, flen, color = :red)
-            render!(axis, child.divergence; transparency, flen, color = :green)
-            render!(axis, child.waist; transparency, flen, color = :blue)
+            render!(axis, child.chief; show_pos, transparency, flen, color = :red)
+            render!(axis, child.divergence; show_pos, transparency, flen, color = :green)
+            render!(axis, child.waist; show_pos, transparency, flen, color = :blue)
         end
     end
     return nothing
