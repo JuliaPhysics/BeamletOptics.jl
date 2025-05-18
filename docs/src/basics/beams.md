@@ -51,6 +51,51 @@ save("telescope_with_beams.png", fig, px_per_unit=4); nothing # hide
 
 ![Telescope with beams](telescope_with_beams.png)
 
+## Beam groups
+
+For convenience, the [`BeamletOptics.AbstractBeamGroup`](@ref) offers a container-like interface for groups of [`Beam`](@ref)s as commonly used in other software packages. The following concrete implementations are currently provided:
+
+```@repl
+using BeamletOptics # hide
+BeamletOptics.list_subtypes(BeamletOptics.AbstractBeamGroup);
+```
+
+Refer to the following sections for convenience constructors to generate the sources listed above.
+
+### Collimated beam source
+
+The collimated beam source is ideal to model light coming from a focal plane at infinity. This is useful for simulating plane wavefronts. You can define a collimated monochromatic [`Beam`](@ref) source as follows:
+
+```@docs; canonical=false
+CollimatedSource(::AbstractArray{<:Real}, ::AbstractArray{<:Real}, ::Real, ::Real)
+```
+
+```@eval
+file_dir = joinpath(@__DIR__, "..", "assets")
+Base.include(@__MODULE__, joinpath(file_dir, "collimated_showcase.jl"))
+save(joinpath(@__DIR__, "collimated_beam_source.png"), cs_fig; px_per_unit=8, update = false)
+```
+
+![Collimated group of beams](collimated_beam_source.png)
+
+### Point beam source
+
+The `PointSource` type is used to model emission from a spatially localized source that radiates [`Beam`](@ref)s in a range of directions. This is commonly used to simulate conical emission patterns, such as light emerging from a fiber tip or a light source for a lens objective with a known focal distance. You can specify the origin and a propagation direction, which are then used to construct the monochromatic `PointSource`.
+
+```@docs; canonical=false
+PointSource(::AbstractArray{<:Real}, ::AbstractArray{<:Real}, ::Real, ::Real)
+```
+
+Below you can find an exemplary illustration of a `PointSource`.
+
+```@eval
+file_dir = joinpath(@__DIR__, "..", "assets")
+Base.include(@__MODULE__, joinpath(file_dir, "point_showcase.jl"))
+save(joinpath(@__DIR__, "point_beam_source.png"), ps_fig; px_per_unit=8, update = false)
+```
+
+![Point source of beams](point_beam_source.png)
+
 ## Gaussian beamlet
 
 Lasers are common devices in modern optical laboratories. Modeling their propagation through an optical setup can be of interest when planning new experiments. Geometrical ray tracing struggles to capture the propagation of a laser beam correctly, since it can not inherently capture the wave nature of, e.g., the [Gaussian beam](https://www.rp-photonics.com/gaussian_beams.html).

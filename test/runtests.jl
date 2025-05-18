@@ -529,6 +529,8 @@ end
         @test isnothing(solve_system!(ts, tg))
     end
 
+    is_strictly_sorted(v) = all(diff(v) .> 0)
+
     @testset "Point source" begin
         # define parameters
         lambda = 486.0e-9
@@ -555,10 +557,21 @@ end
         end
         
         @testset "Testing generated angles" begin
-            angles = BMO.angle3d.(Ref(dir), BMO.direction.(first.(BMO.rays.(BMO.beams(source)))))
+            # Test for center ray 0 deg, generated spread angles etc.
+            directions = BMO.direction.(first.(BMO.rays.(BMO.beams(source))))
+            angles = BMO.angle3d.(Ref(dir), directions)
             generated_angles = unique(round.(angles, digits=11))
             required_angles = LinRange(0, alpha, num_rings)
             @test generated_angles ≈ required_angles
+            # Test for only one center ray, strictly increasing rays per ring
+            rays_per_angle = zeros(Int, length(required_angles))
+            for (i, _required) in enumerate(required_angles)
+                rays_per_angle[i] = count(_required .≈ angles)
+            end
+            @test first(rays_per_angle) == 1
+            @test is_strictly_sorted(rays_per_angle)
+            # Test if all generated rays are unique
+            @test length(unique(directions)) == length(directions)
         end
     
         @testset "Testing throw errors" begin
@@ -593,10 +606,21 @@ end
         end
         
         @testset "Testing coll. source generated positions" begin
-            radii = norm.(BMO.position.(first.(BMO.rays.(BMO.beams(source)))) .- Ref(pos))
+            # Test for center ray 0 offset, generated radii
+            positions = BMO.position.(first.(BMO.rays.(BMO.beams(source))))
+            radii = norm.(positions .- Ref(pos))
             generated_pos = unique(round.(radii, digits=11))
             required_pos = LinRange(0, diameter/2, num_rings)
             @test generated_pos ≈ required_pos
+            # Test for only one center ray, strictly increasing rays per ring
+            rays_per_radius = zeros(Int, length(required_pos))
+            for (i, _required) in enumerate(required_pos)
+                rays_per_radius[i] = count(_required .≈ radii)
+            end
+            @test first(rays_per_radius) == 1
+            @test is_strictly_sorted(rays_per_radius)
+            # Test if all generated rays are unique
+            @test length(unique(positions)) == length(positions)
         end
 
         @testset "Testing throw errors" begin

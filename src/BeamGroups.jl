@@ -46,7 +46,7 @@ The following inputs and arguments can be used to configure the [`PointSource`](
 - `num_rays`: total number of rays in the source, default is 100x num_rings
 
 !!! warning 
-    The basis for the beam generation is generated randomly. 
+    The orthogonal basis vectors for the beam generation are generated randomly.
 """
 function PointSource(
         pos::AbstractArray{P},
@@ -55,7 +55,7 @@ function PointSource(
         λ::L = 1e-6;
         num_rings::Int=10,
         num_rays::Int=100*num_rings,
-    ) where {P, D, H, L}
+    ) where {P<:Real, D<:Real, H<:Real, L<:Real}
     T = promote_type(P, D, H, L)
     if num_rays < num_rings*20
         throw(ErrorException("No. of rays should be atleast 20x no. of rings (passed: $num_rays, req: $(num_rings*20))"))
@@ -147,7 +147,7 @@ The following inputs and arguments can be used to configure the [`CollimatedSour
 - `num_rays`: total number of rays in the source, default is 100x num_rings
 
 !!! warning 
-    The basis for the beam generation is generated randomly. 
+    The orthogonal basis vectors for the beam generation are generated randomly.
 """
 function CollimatedSource(
         pos::AbstractArray{P},
@@ -156,7 +156,7 @@ function CollimatedSource(
         λ::L = 1e-6;
         num_rings::Int=10,
         num_rays::Int=100*num_rings,
-    ) where {P, D1, D2, L}
+    ) where {P<:Real, D1<:Real, D2<:Real, L<:Real}
     T = promote_type(P, D1, D2, L)
     if num_rays < num_rings*20
         throw(ErrorException("No. of rays should be atleast 20x no. of rings (passed: $num_rays, req: $(num_rings*20))"))
@@ -193,5 +193,3 @@ function CollimatedSource(
     end
     return CollimatedSource(beams, T(diameter))
 end
-
-export PointSource, CollimatedSource
