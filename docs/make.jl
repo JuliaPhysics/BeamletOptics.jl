@@ -40,6 +40,7 @@ makedocs(;
             "Beams" => "basics/beams.md",
             "Optical elements" => "basics/elements.md",
             "Optical systems" => "basics/systems.md",
+            "Visualization" => "basics/render.md"
         ],
         "Components" => Any[
             "Overview" => "components/components.md",
