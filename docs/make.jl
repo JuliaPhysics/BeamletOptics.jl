@@ -26,6 +26,7 @@ makedocs(;
         "Home" => "index.md",
         "Tutorials" => Any[
             "Beam expander" => "tutorials/expander.md",
+            "Miniature microscope" => "tutorials/microscope.md",
             "Michelson interferometer" => "tutorials/michelson.md"
         ],
         "Examples" => Any[

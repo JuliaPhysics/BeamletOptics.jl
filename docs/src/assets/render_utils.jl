@@ -1,6 +1,12 @@
 get_view(ls::LScene) = ls.scene.camera.view[]
 set_view(ls::LScene, new::AbstractMatrix) = (ls.scene.camera.view[] = new)
 
+function set_orthographic(ax::LScene)
+    cam = cameracontrols(ax.scene)
+    cam.fov[] = 1
+    return nothing
+end
+
 hide_axis(ls::LScene) = (ls.show_axis[] = false)
 
 function take_screenshot(
