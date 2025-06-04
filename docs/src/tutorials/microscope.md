@@ -1,4 +1,4 @@
-```@setup plots
+```@setup miniscope
 using GLMakie, BeamletOptics
 
 const BMO = BeamletOptics
@@ -20,11 +20,22 @@ The UCLA Miniscope is a lightweight microscope that utilizes 2-photon fluorescen
 5. Trace a [`Beam`](@ref) through the optical system
 6. Visualize the results 
 
-All specifications for the optical system and CAD files are taken from this [repository](https://github.com/golshanilab/UCLA_2P_Miniscope) under GNU GPL-3.0.
+All specifications for the optical system and CAD files are taken from the UCLA miniscope [repository](https://github.com/golshanilab/UCLA_2P_Miniscope) under GNU GPL-3.0.
 
 ![Test](test.png)
 
-## Thingy
+## How to follow this tutorial
+
+All figures you will see below are pregenerated. The full code and all 3D assets are available in the following files:
+
+```@example miniscope
+path = normpath(tutorial_dir) # hide
+@info "Files located at:" path # hide
+```
+
+If you want to reproduce the plots in this tutorial by yourself, it is recommend that you use the `render!` function as described in the [Visualization](@ref) section.
+
+## Miniscope objective lenses
 
 This tutorial will focus on modeling the return path of the fluorescence light. Based on the design files provided in the resources above, we will start by defining the first lens along the optical path. This plano-convex lens can be generated via three approaches:
 
@@ -48,7 +59,7 @@ obj_lens_1 = Lens(surf_1, surf_2, 1.3mm, NBK7)
 
 Note that `obj_lens_1` is a single `Lens` entity once spawned and can be manipulated in 3D-space as described in the section: [Moving optical elements](@ref).
 
-## Building the objective group
+### Building the objective group
 
 To build the second and third lens elements of the objective group we will proceed as above. However, these lenses are spherical doublets formed by two lenses bonded with an optical adhesive. They are also more complex in shape, featuring a mechanical outer diameter. For the second lens the generating code is provided below. Two [`Lens`](@ref)es can be combined into a [`DoubletLens`](@ref). Correct "assembly" of the lens parts is the responsibility of the user.
 
@@ -90,3 +101,9 @@ objective_group = ObjectGroup([obj_lens_1, obj_lens_2, tube_lens])
 ```
 
 The `objective_group` locks all elements in place with respect to their relative positions and allows for combined translations and rotations of the elements.
+
+### Visualizing the lenses
+
+## The rest
+
+## Tracing some beams
