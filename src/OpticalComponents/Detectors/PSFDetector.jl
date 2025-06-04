@@ -181,7 +181,7 @@ A tuple `(xs, zs, I)` where
 
 !!! note "Scaling"
 
-    The returned values are raw/unscaled and not a Strehl ration. This feature is not
+    The returned values are raw/unscaled and not a Strehl ratio. This feature is not
     yet added. In future versions a pupil finder along with a Strehl estimator will be added.
 """
 function intensity(psf::PSFDetector{T};
