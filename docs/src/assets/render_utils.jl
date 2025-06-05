@@ -38,3 +38,5 @@ function take_screenshot(
     hide_axis(ax)
     save(fname, fig; px_per_unit, update = false)
 end
+
+arrow!(ax::LScene, pos, dir; color=:blue) = arrows!(ax, [Point3(pos)], [Point3(dir*5e-3)], arrowsize=Vec3f(1e-3, 1e-3, 1e-3); color)
