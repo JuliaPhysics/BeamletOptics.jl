@@ -1,7 +1,7 @@
 module BeamletOpticsMakieExt
 
 using BeamletOptics
-import BeamletOptics: render!, RenderException
+import BeamletOptics: render!, RenderException, _RenderTypes
 
 const BMO = BeamletOptics
 
@@ -13,15 +13,6 @@ using MarchingCubes: MC, march
 const _RenderEnv = Union{
     Axis3,
     LScene,
-}
-
-const _RenderTypes = Union{
-    BMO.AbstractRay,
-    BMO.AbstractBeam,
-    BMO.AbstractShape,
-    BMO.AbstractObject,
-    BMO.AbstractObjectGroup,
-    BMO.AbstractSystem,
 }
 
 struct InvalidAxisError <: RenderException
@@ -45,9 +36,9 @@ struct RenderNotImplementedError <: RenderException
     end
 end
 
-render!(::A, ::Any; kwargs...) where A<:Any = throw(InvalidAxisError(A))
+render!(::A, ::_RenderTypes; kwargs...) where A<:Any = throw(InvalidAxisError(A))
 
-render!(::_RenderEnv, ::T; kwargs...) where T<:Any = throw(RenderNotImplementedError(T))
+render!(::_RenderEnv, ::T; kwargs...) where T<:_RenderTypes = throw(RenderNotImplementedError(T))
 
 # include order dependant!
 include("RenderBeam.jl")

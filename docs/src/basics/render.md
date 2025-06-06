@@ -7,7 +7,7 @@ As mentioned in other sections of this documentation, the [Makie](https://docs.m
 The main function provided for visualization purposes is the [`render!`](@ref) function. 
 
 ```@docs; canonical=false
-render!(::Any, ::Any)
+render!(::Any, ::BeamletOptics._RenderTypes)
 ```
 
 If a suitable backend is loaded, additional dispatched `render!` functions will become available. For instance, this allows the plotting of a [`GaussianBeamlet`](@ref).
@@ -21,8 +21,8 @@ julia> using BeamletOptics
 
 julia> methods(render!)
 # 1 method for generic function "render!" from BeamletOptics:
- [1] render!(::Any, ::Any, kwargs...)
-     @ c:\Users\pers_on\.julia\dev\BeamletOptics\src\Render.jl:46
+ [1] render!(::Any, ::Union{BeamletOptics.AbstractSystem, BeamletOptics.AbstractBeam, BeamletOptics.AbstractObject, BeamletOptics.AbstractObjectGroup, BeamletOptics.AbstractRay, BeamletOptics.AbstractShape}, kwargs...)
+     @ C:\Users\anon\.julia\dev\BeamletOptics\src\Render.jl:56
 
 julia> axis = nothing;
 
@@ -32,7 +32,7 @@ julia> render!(axis, mirror)
 ERROR: It appears no suitable Makie backend is loaded in this session.
 Stacktrace:
  [1] render!(::Nothing, ::RoundPlanoMirror{Float64})
-   @ BeamletOptics c:\Users\pers_on\.julia\dev\BeamletOptics\src\Render.jl:46
+   @ BeamletOptics c:\Users\anon\.julia\dev\BeamletOptics\src\Render.jl:46
  [2] top-level scope
    @ REPL[5]:1
 ```
@@ -45,12 +45,12 @@ julia> using GLMakie
 julia> methods(render!)
 # 21 methods for generic function "render!" from BeamletOptics:
   [1] render!(ax::Union{Axis3, LScene}, s::BeamletOptics.UnionSDF; kwargs...)
-     @ BeamletOpticsMakieExt C:\Users\pers_on\.julia\dev\BeamletOptics\ext\RenderSDF.jl:32
+     @ BeamletOpticsMakieExt C:\Users\anon\.julia\dev\BeamletOptics\ext\RenderSDF.jl:32
   [2] render!(axis::Union{Axis3, LScene}, css::BeamletOptics.ConcaveSphericalSurfaceSDF; color, kwargs...)
-     @ BeamletOpticsMakieExt C:\Users\pers_on\.julia\dev\BeamletOptics\ext\RenderLenses.jl:1
+     @ BeamletOpticsMakieExt C:\Users\anon\.julia\dev\BeamletOptics\ext\RenderLenses.jl:1
   [3] render!(axis::Union{Axis3, LScene}, css::BeamletOptics.ConvexSphericalSurfaceSDF; color, kwargs...)
-     @ BeamletOpticsMakieExt C:\Users\pers_on\.julia\dev\BeamletOptics\ext\RenderLenses.jl:31
+     @ BeamletOpticsMakieExt C:\Users\anon\.julia\dev\BeamletOptics\ext\RenderLenses.jl:31
   [4] render!(axis::Union{Axis3, LScene}, acyl::BeamletOptics.AbstractAcylindricalSurfaceSDF; color, kwargs...)
-     @ BeamletOpticsMakieExt C:\Users\pers_on\.julia\dev\BeamletOptics\ext\RenderCylinderLenses.jl:1
+     @ BeamletOpticsMakieExt C:\Users\anon\.julia\dev\BeamletOptics\ext\RenderCylinderLenses.jl:1
   [5] etc...
 ```

@@ -16,6 +16,16 @@ mutable struct MissingBackendError <: RenderException
     end
 end
 
+"""A collection of all types from BMO which might be renderable in principle."""
+const _RenderTypes = Union{
+    AbstractRay,
+    AbstractBeam,
+    AbstractShape,
+    AbstractObject,
+    AbstractObjectGroup,
+    AbstractSystem,
+}
+
 """
     render!(axis, thing; kwargs...)
 
@@ -43,4 +53,4 @@ All concrete implementations of `render!` must adhere to the following minimal i
 
 Refer to the `BeamletOptics` extension docs for `Makie` for more information.
 """
-render!(::Any, ::Any, kwargs...) = throw(MissingBackendError())
+render!(::Any, ::_RenderTypes, kwargs...) = throw(MissingBackendError())
