@@ -131,14 +131,14 @@ Assembling the objective group requires that the individual lens elements be tra
 ```julia
 translate_to3d!(obj_lens_2, [0, BMO.position(obj_lens_1)[2] + BMO.thickness(obj_lens_1) + 3.344mm, 0])
 translate_to3d!(tube_lens, [0, BMO.position(obj_lens_2)[2] + BMO.thickness(obj_lens_2) + 2mm, 0])
-objective_group = ObjectGroup([obj_lens_1, obj_lens_2, tube_lens])
+obj_group = ObjectGroup([obj_lens_1, obj_lens_2, tube_lens])
 ```
 
-The `objective_group` locks all elements in place with respect to their relative positions and allows for combined translations and rotations of the elements.
+The [`ObjectGroup`](@ref) locks all elements in place with respect to their relative positions and allows for combined translations and rotations of the elements.
 
 ### Visualizing the lenses
 
-In order to visualize what we have done so far, we will use `GLMakie` to create a 3D representation of the `BMO` geometry representation. The following code will be used.
+In order to visualize what we have done so far, we will use `GLMakie` to create a 3D plot of the `BMO` geometry representation. The following code will be used.
 
 ```julia
 # define rgba for lens look
@@ -146,10 +146,8 @@ lens_color() = RGBf(0.678, 0.847, 0.902)
 lens_color(alpha) = RGBAf(0.678, 0.847, 0.902, alpha)
 
 # generate figure
-fig = Figure(size=(600, 300))
-display(fig)
+fig = Figure()
 ax = LScene(fig[1,1])
-hide_axis(ax)
 render!(ax, obj_lens_1, transparency=true, color=lens_color(0.5))
 render!(ax, obj_lens_2, transparency=true, color=lens_color(0.5))
 render!(ax, tube_lens, transparency=true, color=lens_color(0.5))
@@ -159,6 +157,67 @@ The generated figure can be seen below. A dashdot line has been added to indicat
 
 ![Miniscope objective lenses](full_objective_lens.png)
 
-## The rest
+## The filter and collection group
 
-## Tracing some beams
+The miniscope features a dichroic beamsplitter to seperate the emission path from the imaging optics. For the imaging path, the beamsplitter is followed by two filters and a collection lens. For the purpose of this tutorial, we will model the beamsplitter and filters as simple glass plates, i.e. [`Prism`](@ref)s. However, for an accurate representation, we will first have to move the lens group into position. This involves a rotation around the x-axis by 90°. We can achieve this simply with the following command. Note that the pivot point lies at the origin.
+
+```julia
+xrotate3d!(obj_group, deg2rad(90))
+```
+
+### Modeling the dichroic filter
+
+Spawning the "filter" works as detailled above. Using a [`Prism`](@ref) to represent the dispersive properties of the substrate glass is functionally equal to using a `Lens` and serves simply to indicate that this element is not for imaging purposes. Use the following snippet to create the element. Note that the element is moved to its global absolute position. This data is taken from the CAD model provided in the repository.
+
+```julia
+## Dichroic "splitter" - glass plate
+shape = BMO.CuboidMesh(8mm, 1mm, 8.5mm)
+translate3d!(shape, [-4mm, 0.0mm, -4.25mm])
+BMO.set_new_origin3d!(shape)
+splitter = Prism(shape, NBK7)
+# Move to global position from origin
+translate3d!(splitter, [0, 0, 18.677mm])
+xrotate3d!(splitter, deg2rad(45))
+```
+
+### Modeling the collection group
+
+For the collection group filters we use the same approach as above. The collection lens parameters are derived from the Zemax file and the parametrization works analogously as in the section: [Building the objective group](@ref)
+
+```julia
+ef_1 = Prism(BMO.PlanoSurfaceSDF(1mm, 4mm), NBK7)
+ef_2 = Prism(BMO.PlanoSurfaceSDF(1mm, 4mm), NBK7)
+
+collect_lens = Lens(
+    SphericalSurface(6.580mm, 4.5mm),
+    SphericalSurface(-6.580mm, 4.5mm),
+    2.6mm,
+    NLASF44
+)
+
+translate3d!(collect_lens, [0, BMO.position(ef_1)[2] + BMO.thickness(ef_1) + 0.1mm, 0])
+translate3d!(ef_2, [0, BMO.position(collect_lens)[2] + BMO.thickness(collect_lens) + 0.25mm, 0])
+
+collect_group = ObjectGroup([ef_1, collect_lens, ef_2])
+
+# Move to global position from origin
+xrotate3d!(collect_group, deg2rad(90))
+translate3d!(collect_group, [0, 0.332mm, 21.937mm])
+```
+
+Finally, we can define a [`System`](@ref) that stores all optical elements for the following ray tracing procedure. 
+
+```julia
+system = System([obj_group, filter, collect_group])
+```
+
+Elements can still be moved mutably while being inside the `system` and their final position is considered when running the [`solve_system!`](@ref) command. Visualizing the system can be easily achieved via `render!(ax, system; # kwargs go here)`. The full optical system is shown below.
+
+![Full miniscope optical system](full_optical_system.png)
+
+## Geometrical ray tracing of the miniscope
+
+Finally we are ready to perform the ray tracing step.
+
+!!! warning
+    This section is under construction and requires the `PointSource` type...

@@ -81,19 +81,19 @@ function objective_group()
     return _objective_group
 end
 
-function dichroic_filter()
+function dichroic_splitter()
     ## Dichroic "filter" - glass plate
     shape = BMO.CuboidMesh(8mm, 1mm, 8.5mm)
     translate3d!(shape, [-4mm, 0.0mm, -4.25mm])
     BMO.set_new_origin3d!(shape)
-    translate3d!(shape, [0, 0, 18.677mm])
-    xrotate3d!(shape, deg2rad(45))
-    filter = Lens(shape, NBK7)
-    return filter
+    splitter = Prism(shape, NBK7)
+    translate3d!(splitter, [0, 0, 18.677mm])
+    xrotate3d!(splitter, deg2rad(45))
+    return splitter
 end
 
 function emission_filter()
-    ef = Lens(BMO.PlanoSurfaceSDF(1mm, 4mm), NBK7)
+    ef = Prism(BMO.PlanoSurfaceSDF(1mm, 4mm), NBK7)
     return ef
 end
 
@@ -120,11 +120,13 @@ function collection_group()
     return collect_group
 end
 
+optical_system() = System([objective_group(), dichroic_splitter(), collection_group()])
+
 ##
 miniscope = miniscope_body()
 obj_group = objective_group()
-df = dichroic_filter()
-cg = collection_group()
+dichro = dichroic_splitter()
+col_group = collection_group()
 
 c_view = [
  -0.481504   0.876444  -4.16334e-17   0.00569819
@@ -148,8 +150,8 @@ ax = LScene(
 hide_axis(ax)
 render!(ax, miniscope, transparency=true, alpha=0.05)
 render!(ax, obj_group, transparency=false, color=lens_color())
-render!(ax, df, transparency=false, color=lens_color())
-render!(ax, cg, transparency=false, color=lens_color())
+render!(ax, dichro, transparency=false, color=lens_color())
+render!(ax, col_group, transparency=false, color=lens_color())
 
 set_view(ax, c_view)
 save("ucla_intro_fig.png", fig; px_per_unit=8, update = false)
@@ -234,3 +236,22 @@ c_view = [
 
 set_view(ax, c_view)
 save("full_objective_lens.png", fig; px_per_unit=8, update = false)
+
+##
+fig = Figure(size=(600,400))
+display(fig)
+ax = LScene(fig[1,1])
+hide_axis(ax)
+render!(ax, obj_group, transparency=false, color=lens_color())
+render!(ax, dichro, transparency=false, color=lens_color())
+render!(ax, col_group, transparency=false, color=lens_color())
+
+c_view = [
+ -0.710179   0.704021  -1.94289e-16  -0.00085023
+ -0.261364  -0.26365    0.928535     -0.0135835
+  0.653709   0.659426   0.371244     -0.0419803
+  0.0        0.0        0.0           1.0
+]
+
+set_view(ax, c_view)
+save("full_optical_system.png", fig; px_per_unit=8, update = false)
