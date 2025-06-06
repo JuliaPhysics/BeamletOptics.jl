@@ -2411,7 +2411,9 @@ end
 end
 
 @testset "Render" begin
-    @test_throws BMO.MissingBackendError render!(nothing, nothing)
+    axis = nothing
+    cube = BMO.CubeMesh(1)
+    @test_throws BMO.MissingBackendError render!(axis, cube)
 end
 
 @testset "Bug fixes" begin
