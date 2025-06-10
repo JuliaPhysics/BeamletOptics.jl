@@ -1,6 +1,7 @@
 ```@setup beams
 beam_showcase_dir = joinpath(@__DIR__, "..", "assets", "beam_renders")
 
+include(joinpath(beam_showcase_dir, "beam_showcase.jl"))
 include(joinpath(beam_showcase_dir, "gb_showcase.jl"))
 ```
 
@@ -18,44 +19,9 @@ A minimal implementation of the [`BeamletOptics.AbstractBeam`](@ref) type is pro
 Beam
 ```
 
-The propagation of multiple parallel beams through an imaging system is illustrated below. The [Beam expander](@ref) tutorial covers the use of the [`Beam`](@ref) in more detail. A ray tracing example using [`Beam`](@ref)s is shown below.
+The propagation of multiple parallel beams through an imaging system is illustrated below. The [Beam expander](@ref) tutorial covers the use of the [`Beam`](@ref) in more detail. A ray tracing example through an arbitrary system using a [`Beam`](@ref) is shown below. Individual [`Ray`](@ref) segments are marked by their starting position and direction.
 
-```@example telescope_with_beams
-using CairoMakie, BeamletOptics
-
-# setup system
-LA1353 = SphericalLens(103e-3, Inf, 10.1e-3, 75e-3, λ->1.5007)
-LA1131 = SphericalLens(25.8e-3, Inf, 5.3e-3, BeamletOptics.inch, λ->1.5007)
-LA1805 = SphericalLens(15.5e-3, Inf, 8.6e-3, BeamletOptics.inch, λ->1.5007)
-
-zrotate3d!(LA1353, deg2rad(180))
-zrotate3d!(LA1805, deg2rad(180))
-
-translate3d!(LA1131, [0, 0.25, 0])
-translate3d!(LA1805, [0, 0.29, 0])
-
-system = System([LA1353, LA1131, LA1805])
-
-# create render
-fig = Figure(size=(600,220))
-rend = Axis3(fig[1,1], aspect=(1,5,1), limits=(-0.05, 0.05, -0.1, 0.4, -0.05, 0.05), azimuth=0, elevation=1e-3)
-hidexdecorations!(rend)
-hidezdecorations!(rend)
-
-render!(rend, system)
-
-zs = LinRange(-0.025, 0.025, 7)
-
-for z in zs
-    beam = Beam(Ray([0, -0.1, z], [0, 1, 0.0], 1550e-9))
-    solve_system!(system, beam)
-    render!(rend, beam, flen=0.1)
-end
-
-save("telescope_with_beams.png", fig, px_per_unit=4); nothing # hide
-```
-
-![Telescope with beams](telescope_with_beams.png)
+![Beam structure](beam_showcase.png)
 
 ## Gaussian beamlet
 

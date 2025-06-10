@@ -39,4 +39,4 @@ function take_screenshot(
     save(fname, fig; px_per_unit, update = false)
 end
 
-arrow!(ax::LScene, pos, dir; color=:blue) = arrows!(ax, [Point3(pos)], [Point3(dir*5e-3)], arrowsize=Vec3f(1e-3, 1e-3, 1e-3); color)
+arrow!(ax::LScene, pos, dir; color=:blue, scale=1) = arrows!(ax, [Point3(pos)], [Point3(dir*5e-3*scale)], arrowsize=Vec3f(1e-3, 1e-3, 1e-3)*scale; color)
