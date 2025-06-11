@@ -14,9 +14,7 @@ display(cs_fig)
 cs_ax = LScene(cs_fig[1,1])
 hide_axis(cs_ax)
 
-for i = 1:1:length(BMO.beams(cs))
-    render!(cs_ax, BMO.beams(cs)[i], show_pos=true, flen=0.05, color=:red)
-end
+render!(cs_ax, cs, show_pos=true, flen=0.05, color=:red, render_every=1)
 
 cs_view = [
     0.26513     0.964213    7.68482e-16  -0.0180273

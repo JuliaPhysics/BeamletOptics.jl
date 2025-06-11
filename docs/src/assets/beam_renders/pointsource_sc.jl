@@ -14,9 +14,7 @@ display(ps_fig)
 ps_ax = LScene(ps_fig[1,1])
 hide_axis(ps_ax)
 
-for i = 1:1:length(BMO.beams(ps))
-    render!(ps_ax, BMO.beams(ps)[i], show_pos=true, flen=0.1, color=:red)
-end
+render!(ps_ax, ps, show_pos=true, flen=0.1, color=:red)
 
 ps_view = [
     0.00272773   0.999996     5.03287e-16  -0.0584386
