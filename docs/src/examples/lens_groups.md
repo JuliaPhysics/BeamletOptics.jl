@@ -108,13 +108,13 @@ ax = Axis3(fig[1, 1], aspect=aspect, limits=limits, azimuth=0, elevation=1e-3)
 hidexdecorations!(ax)
 hidezdecorations!(ax)
 
-render_system!(ax, system)
+render!(ax, system)
 
 for z in LinRange(-0.003, 0.003, 5)
     ray = Ray([0, -0.05, z], [0, 1.0, 0])
     beam = Beam(ray)
     solve_system!(system, beam, r_max=40)
-    render_beam!(ax, beam, flen=0.1)
+    render!(ax, beam, flen=0.1)
 end
 
 save("lens_groups_0.png", fig, px_per_unit=4); nothing # hide
@@ -145,13 +145,13 @@ ax = Axis3(fig[1, 1], aspect=aspect, limits=limits, azimuth=0, elevation=1e-3) #
 hidexdecorations!(ax) # hide
 hidezdecorations!(ax) # hide
 
-render_system!(ax, system)
+render!(ax, system)
 
 for z in LinRange(-0.022, 0.022, 5)
     ray = Ray([0, -0.05, z], [0, 1.0, 0])
     beam = Beam(ray)
     solve_system!(system, beam, r_max=40)
-    render_beam!(ax, beam, flen=0.1)
+    render!(ax, beam, flen=0.1)
 end
 
 save("lens_groups_1.png", fig, px_per_unit=4); nothing # hide
@@ -172,8 +172,8 @@ hidezdecorations!(ax) # hide
 beam = GaussianBeamlet([0, -0.05, 0], [0, 1, 0], 1000e-9, 2.2e-2)
 solve_system!(system, beam, r_max=40)
 
-render_beam!(ax, beam, color=:green2)
-render_system!(ax, system)
+render!(ax, beam, color=:green2)
+render!(ax, system)
 
 save("lens_groups_2.png", fig, px_per_unit=4); nothing # hide
 ```

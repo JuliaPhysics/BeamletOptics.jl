@@ -36,8 +36,7 @@ Subtypes of `AbstractShape` should implement the following:
 
 ## Rendering (with Makie):
 
-- `render_shape!`: plot the `shape` into an `Axis3` or `LScene` environment
-- `render_shape_normals!`: plot the `shape` surface normals into an `Axis3` environment (optional)
+Refer to the [`render!`](@ref) documentation.
 """
 abstract type AbstractShape{T <: Real} end
 
@@ -113,6 +112,3 @@ end
 
 """Resets the `shape` rotation angles to zero."""
 reset_rotation3d!(shape::AbstractShape{T}) where {T} = orientation!(shape, Matrix{T}(I, 3, 3))
-
-render_shape!(::Any, ::AbstractShape) = nothing
-render_shape_normals!(::Any, ::AbstractShape) = nothing

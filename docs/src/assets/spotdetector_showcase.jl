@@ -19,7 +19,7 @@ system_ax = Axis3(system_fig[1,1], aspect=aspect, limits=limits, azimuth=-1, ele
 hidedecorations!(system_ax)
 hidespines!(system_ax)
 
-render_system!(system_ax, system)
+render!(system_ax, system)
 
 beam = Beam([0,-50mm,0], [0,1,0], 1e-6)
 
@@ -32,7 +32,7 @@ for z in zs
     y = BeamletOptics.position(first(beam.rays))[2]
     BeamletOptics.position!(first(beam.rays), Point3{Float64}(x, y, z))
     solve_system!(system, beam)
-    render_beam!(system_ax, beam, show_pos=true)
+    render!(system_ax, beam, show_pos=true)
 end
 
 ## render diagram

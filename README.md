@@ -15,7 +15,7 @@
 [![Aqua](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
 [![DOI](https://zenodo.org/badge/955172301.svg)](https://doi.org/10.5281/zenodo.15090783)
 
-**BeamletOptics.jl**, or **BMO** for short, is a 3D Gaussian beamlet tracing software mainly intended for the simulation of breadboard optical setups -- e.g. laser interferometers -- with simple components like lenses or beamsplitters. It offers a flexible kinematic API for the easy placement and movement of components.
+**BeamletOptics.jl**, or **BMO** for short, is a 3D Gaussian beamlet tracing package mainly intended for the simulation of breadboard optical setups -- e.g. laser interferometers -- with simple components like lenses or beamsplitters. It offers a flexible kinematic API for the easy placement and movement of components.
 
 [For more information, refer to the documentation.](https://StackEnjoyer.github.io/BeamletOptics.jl/stable/)
 
