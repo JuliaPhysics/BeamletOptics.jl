@@ -50,9 +50,10 @@ const BMO = BeamletOptics
         @test T * start ≈ normalize(target)
     end
 
-    @debug "Testing angle3d for resulting angle"
-    a = BMO.angle3d([1, 0, 0], [0, 0, 1])
-    @test isapprox(a, π / 2)
+    @testset "Testing angle3d for resulting angle" begin
+        a = BMO.angle3d([1, 0, 0], [0, 0, 1])
+        @test isapprox(a, π / 2)
+    end
 
     @testset "Testing line_point_distance3d and isinfrontof" begin
         pos = [0, 0, 0]
@@ -73,38 +74,51 @@ const BMO = BeamletOptics
 
     @testset "Testing refraction3d" begin
         normal = [0, 0, 1]
+        # Define angle range
+        small_angles = 0:1e-7:5e-5
+        large_angles = last(small_angles):(π / 1000):(π / 2)
+        θs = cat(small_angles, large_angles; dims=1)
         @testset "Test from vacuum into medium" begin
             n1 = 1.0
-            n2 = 1.5
-            for θ1 in 0:(π / 8):(π / 2)
+            n2 = 1.62286
+            θ_num = similar(θs)
+            θ_ana = similar(θs)
+            TIR = Vector{Bool}(undef, length(θs))
+            for (i, θ1) in enumerate(θs)
                 dir_in = [sin(θ1), 0, -cos(θ1)]
-                dir_out, TIR = BMO.refraction3d(dir_in, normal, n1, n2)
-                θ2 = BMO.angle3d(-normal, dir_out)
+                dir_out, TIR[i] = BMO.refraction3d(dir_in, normal, n1, n2)
+                θ_num[i] = BMO.angle3d(-normal, dir_out)
                 # 2D-equation for refraction validation
-                θ3 = asin(n1 / n2 * sin(θ1))
-                @test isapprox(θ2, θ3)
-                @test TIR == false
+                θ_ana[i] = asin(n1 / n2 * sin(θ1))
+        
             end
+            @test isapprox(θ_num, θ_ana)
+            @test all(TIR .== false)
         end
         @testset "Test from medium into vacuum" begin
-            n1 = 1.5
+            n1 = 1.62286
             n2 = 1.0
-            for θ1 in 0:(π / 8):(π / 2)
+            θ2 = similar(θs)
+            θ3 = similar(θs)
+            TIR_num = Vector{Bool}(undef, length(θs))
+            TIR_ana = similar(TIR_num)
+            for (i, θ1) in enumerate(θs)
                 dir_in = [sin(θ1), 0, -cos(θ1)]
-                dir_out, TIR = BMO.refraction3d(dir_in, normal, n1, n2)
+                dir_out, TIR_num[i] = BMO.refraction3d(dir_in, normal, n1, n2)
                 if θ1 > asin(n2 / n1)
                     # Test for total reflection
-                    θ2 = BMO.angle3d(dir_out, normal)
-                    @test isapprox(θ1, θ2)
-                    @test TIR == true
+                    θ2[i] = BMO.angle3d(dir_out, normal)
+                    θ3[i] = θ1
+                    TIR_ana[i] = true
                 else
                     # Test for refraction
-                    θ2 = BMO.angle3d(-normal, dir_out)
-                    θ3 = asin(n1 / n2 * sin(θ1))
-                    @test isapprox(θ2, θ3)
-                    @test TIR == false
+                    θ2[i] = BMO.angle3d(-normal, dir_out)
+                    θ3[i] = asin(n1 / n2 * sin(θ1))
+                    TIR_ana[i] = false
                 end
             end
+            @test isapprox(θ2, θ3)
+            @test TIR_ana == TIR_num
         end
     end
 
@@ -196,6 +210,12 @@ const BMO = BeamletOptics
             @test isnothing(BMO.test_refractive_index_function(f5))
             @test isnothing(BMO.test_refractive_index_function(ref_index))
         end
+    end
+
+    @testset "Numerical aperture" begin
+        n0 = 1.5
+        theta = deg2rad(45)
+        BMO.numerical_aperture(theta, n0) == n0 * sin(theta)
     end
 end
 
@@ -477,6 +497,136 @@ end
     @test BMO.point_on_beam(beam, 3) == ([1, 1, 1], 4)
     @test BMO.point_on_beam(beam, 10) == ([8, 1, 1], 4)
     @test BMO.isparentbeam(beam, r2) == true
+end
+
+@testset "Beam groups" begin
+    @testset "AbstractBeamGroup definitions" begin
+        @test isdefined(BMO, :AbstractBeamGroup)
+        
+        struct BeamTestGroup{T} <: BMO.AbstractBeamGroup{T, Ray{T}}
+            central_beam::BMO.Beam{T, Ray{T}}
+        end
+        
+        struct BeamTestSystem <: BMO.AbstractSystem end
+        BMO.objects(::BeamTestSystem) = [nothing]
+        BMO.intersect3d(::Nothing, ::BMO.AbstractRay) = nothing
+        BMO.interact3d(::Nothing) = nothing
+        
+        BMO.beams(tg::BeamTestGroup) = [tg.central_beam]
+        
+        pos = [0,0,0]
+        dir = [0,1,0]
+        lambda = 1064e-9
+        
+        tg = BeamTestGroup(BMO.Beam(pos, dir, lambda))
+        
+        @test BMO.position(tg) == pos
+        @test BMO.direction(tg) == dir
+        @test BMO.wavelength(tg) == lambda
+        
+        ts = BeamTestSystem()
+        
+        @test isnothing(solve_system!(ts, tg))
+    end
+
+    is_strictly_sorted(v) = all(diff(v) .> 0)
+
+    @testset "Point source" begin
+        # define parameters
+        lambda = 486.0e-9
+        pos = [0, -0.5, 0]
+        dir = [0, 1, 1]
+        alpha = deg2rad(2)
+        NA = BMO.numerical_aperture(alpha)
+        num_rays = 1000
+        num_rings = 10
+        
+        source = PointSource(pos, dir, alpha, lambda; num_rays, num_rings)
+        
+        @testset "Testing point source getters" begin
+            @test BMO.numerical_aperture(source) == NA
+            @test BMO.position(source) == pos
+            @test BMO.direction(source) ≈ normalize(dir)
+        end
+        
+        @testset "Testing point source max. spread" begin
+            last_ray = first(BMO.rays(last(BMO.beams(source))))
+            @test BMO.angle3d(dir, BMO.direction(last_ray)) ≈ alpha atol = 1e-14
+            @test BMO.position(last_ray) == pos
+            @test length(BMO.beams(source)) == num_rays
+        end
+        
+        @testset "Testing generated angles" begin
+            # Test for center ray 0 deg, generated spread angles etc.
+            directions = BMO.direction.(first.(BMO.rays.(BMO.beams(source))))
+            angles = BMO.angle3d.(Ref(dir), directions)
+            generated_angles = unique(round.(angles, digits=11))
+            required_angles = LinRange(0, alpha, num_rings)
+            @test generated_angles ≈ required_angles
+            # Test for only one center ray, strictly increasing rays per ring
+            rays_per_angle = zeros(Int, length(required_angles))
+            for (i, _required) in enumerate(required_angles)
+                rays_per_angle[i] = count(_required .≈ angles)
+            end
+            @test first(rays_per_angle) == 1
+            @test is_strictly_sorted(rays_per_angle)
+            # Test if all generated rays are unique
+            @test length(unique(directions)) == length(directions)
+        end
+    
+        @testset "Testing throw errors" begin
+            @test_throws ErrorException PointSource(pos, dir, 1.1*π, lambda; num_rays, num_rings)
+            @test_throws ErrorException PointSource(pos, dir, alpha, lambda; num_rays=100, num_rings=10)
+        end
+    end
+
+    @testset "Collimated source" begin
+        # define parameters
+        lambda = 486.0e-9
+        pos = [0, -0.5, 0]
+        dir = [0, 1, 0]
+        diameter = 2BMO.inch
+        num_rays = 500
+        num_rings = 5
+        
+        source = CollimatedSource(pos, dir, diameter; num_rays, num_rings)
+        
+        @testset "Testing coll. source getters" begin 
+            @test BMO.diameter(source) == diameter
+            @test BMO.position(source) == pos
+            @test BMO.direction(source) == dir
+            @test BMO.wavelength(source) == 1e-6
+        end
+        
+        @testset "Testing coll. source max. spread diameter" begin
+            last_ray = first(BMO.rays(last(BMO.beams(source))))
+            @test BMO.direction(last_ray) == dir
+            @test norm(BMO.position(last_ray) - pos) ≈ diameter/2
+            @test length(BMO.beams(source)) == num_rays
+        end
+        
+        @testset "Testing coll. source generated positions" begin
+            # Test for center ray 0 offset, generated radii
+            positions = BMO.position.(first.(BMO.rays.(BMO.beams(source))))
+            radii = norm.(positions .- Ref(pos))
+            generated_pos = unique(round.(radii, digits=11))
+            required_pos = LinRange(0, diameter/2, num_rings)
+            @test generated_pos ≈ required_pos
+            # Test for only one center ray, strictly increasing rays per ring
+            rays_per_radius = zeros(Int, length(required_pos))
+            for (i, _required) in enumerate(required_pos)
+                rays_per_radius[i] = count(_required .≈ radii)
+            end
+            @test first(rays_per_radius) == 1
+            @test is_strictly_sorted(rays_per_radius)
+            # Test if all generated rays are unique
+            @test length(unique(positions)) == length(positions)
+        end
+
+        @testset "Testing throw errors" begin
+            @test_throws ErrorException CollimatedSource(pos, dir, diameter; num_rays=100, num_rings=10)
+        end
+    end
 end
 
 @testset "Mesh" begin
@@ -1067,7 +1217,7 @@ end
             # Thorlabs lens from https://www.thorlabs.com/thorproduct.cfm?partnumber=AC254-150-AB
             AC254_150_AB = SphericalDoubletLens(
                 87.9e-3, -105.6e-3, Inf, 6e-3, 3e-3, BMO.inch, NLAK22, NSF10)
-            # Rptate and translate to test lens kinematics
+            # Rotate and translate to test lens kinematics
             translate3d!(AC254_150_AB, [0.05, 0.05, 0.05])
             xrotate3d!(AC254_150_AB, deg2rad(-60))
             zrotate3d!(AC254_150_AB, deg2rad(45))
@@ -1105,50 +1255,6 @@ end
         @test test_doublet(488e-9, 143.68e-3, -2.064e-4)
         @test test_doublet(707e-9, 143.68e-3, 0)
         @test test_doublet(1064e-9, 143.68e-3, +7.466e-4)
-    end
-
-    @testset "Testing spherical lens SDFs" begin
-        # Based on https://www.pencilofrays.com/double-gauss-sonnar-comparison/
-        l1 = SphericalLens(48.88e-3, 182.96e-3, 8.89e-3, 52.3e-3, λ -> 1.62286)
-        l23 = SphericalDoubletLens(36.92e-3, Inf, 23.06e-3, 15.11e-3, 2.31e-3,
-            45.11e-3, λ -> 1.58565, λ -> 1.67764)
-        l45 = SphericalDoubletLens(-23.91e-3, Inf, -36.92e-3, 1.92e-3, 7.77e-3,
-            40.01e-3, λ -> 1.57046, λ -> 1.64128)
-        l6 = SphericalLens(1063.24e-3, -48.88e-3, 6.73e-3, 45.11e-3, λ -> 1.62286)
-        # Calculate translation distances
-        l_23 = BMO.thickness(l1) + 0.38e-3
-        l_45 = l_23 + BMO.thickness(l23) + 9.14e-3 + 13.36e-3
-        l_6 = l_45 + BMO.thickness(l45) + 0.38e-3
-        # Corresponds to back focal length of f=59.21 mm on y-axis from link above + "error" δf
-        δf = 7e-4
-        f_z = l_6 + BMO.thickness(l6.shape) + 58.21e-3 + δf
-        translate3d!(l23, [0, l_23, 0])
-        translate3d!(l45, [0, l_45, 0])
-        translate3d!(l6, [0, l_6, 0])
-        # Create and move group - this tests a bunch of kinematic correctness
-        double_gauss = ObjectGroup([l1, l23, l45, l6])
-        translate3d!(double_gauss, [0.05, 0.05, 0.05])
-        xrotate3d!(double_gauss, deg2rad(60))
-        zrotate3d!(double_gauss, deg2rad(45))
-        system = System([double_gauss])
-        # Test against back focal length as per source above
-        dir = BMO.orientation(double_gauss)[:, 2] # rotated collimated ray direction
-        pos = BMO.position(l1) - 0.05 * dir # rotated collimated ray position
-        f0 = BMO.position(l1) + f_z * dir # global focal point coords
-        nv = BMO.normal3d(dir) # orthogonal to moved system optical axis
-        zs = -0.02:1e-3:0.02
-        # Define beam
-        λ = 486.0e-9
-        beam = Beam(Ray(pos, dir, λ))
-        for (i, z) in enumerate(zs)
-            # use retracing by manipulating beam starting pos
-            beam.rays[1].pos = pos + z * nv
-            solve_system!(system, beam)
-            # Test correct beam # of rays
-            @test length(BMO.rays(beam)) == 11
-            # Test coma at focal point
-            @test test_coma(last(BMO.rays(beam)), f0, dir, atol = 7e-5)
-        end
     end
 end
 
@@ -1800,7 +1906,7 @@ end
             @test pos_ray ≈ pos_dta
         end
         # Test reset function
-        BMO.reset_detector!(sd)
+        empty!(sd)
         @test isempty(sd.data)
     end
 end
@@ -1845,7 +1951,7 @@ end
                 end
             end
             # Numerical solution
-            BMO.reset_detector!(pd_l)
+            empty!(pd_l)
             g_1 = GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0],
                 λ,
                 w0,
@@ -1873,7 +1979,7 @@ end
             Δz = LinRange(0, λ, 50)
             Pt_numerical = zeros(length(Δz))
             for (i, z_i) in enumerate(Δz)
-                BMO.reset_detector!(pd_s)
+                empty!(pd_s)
                 g_1 = GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0],
                     λ,
                     w0,
@@ -1935,7 +2041,7 @@ end
 
             for (i, lambda) in enumerate(lambdas)
                 translate_to3d!(m2, [0, l_0, 0] + [0, lambda, 0])
-                BMO.reset_detector!(pd)
+                empty!(pd)
                 solve_system!(system, beam)
 
                 # Moving mirror path length
@@ -1967,7 +2073,7 @@ end
             translate_to3d!(m2, [0, l_0 + Δl, 0])
 
             # numerical solution
-            BMO.reset_detector!(pd)
+            empty!(pd)
             solve_system!(system, beam)
 
             # analytical solution
@@ -2035,8 +2141,8 @@ end
         for (i, phi) in enumerate(phis)
             # Iterate over relative phase shifts, use retracing
             l1.E0 = E0_buffer * exp(im * phi)
-            BMO.reset_detector!(pd_1)
-            BMO.reset_detector!(pd_2)
+            empty!(pd_1)
+            empty!(pd_2)
             solve_system!(system, l1)
             solve_system!(system, l2)
             p1[i] = BMO.optical_power(pd_1)
@@ -2416,6 +2522,77 @@ end
     @test_throws BMO.MissingBackendError render!(axis, cube)
 end
 
+@testset "Double Gauss lens" begin
+    """Tests hit distance to detector origin"""
+    function test_coma(pd::Spotdetector; atol=7e-5)
+        for hit in pd.data
+            if norm(hit) > atol
+                return false
+            end
+        end
+        return true
+    end
+    
+    # Based on https://www.pencilofrays.com/double-gauss-sonnar-comparison/
+    l1 = SphericalLens(48.88e-3, 182.96e-3, 8.89e-3, 52.3e-3, λ -> 1.62286)
+    l23 = SphericalDoubletLens(36.92e-3, Inf, 23.06e-3, 15.11e-3, 2.31e-3,
+    45.11e-3, λ -> 1.58565, λ -> 1.67764)
+    l45 = SphericalDoubletLens(-23.91e-3, Inf, -36.92e-3, 1.92e-3, 7.77e-3,
+    40.01e-3, λ -> 1.57046, λ -> 1.64128)
+    l6 = SphericalLens(1063.24e-3, -48.88e-3, 6.73e-3, 45.11e-3, λ -> 1.62286)
+    # Calculate translation distances
+    l_23 = BMO.thickness(l1) + 0.38e-3
+    l_45 = l_23 + BMO.thickness(l23) + 9.14e-3 + 13.36e-3
+    l_6 = l_45 + BMO.thickness(l45) + 0.38e-3
+    # Corresponds to back focal length of f=59.21 mm on y-axis from link above + "error" δf
+    δf = 7e-4
+    f_z = l_6 + BMO.thickness(l6.shape) + 58.21e-3 + δf
+    translate3d!(l23, [0, l_23, 0])
+    translate3d!(l45, [0, l_45, 0])
+    translate3d!(l6, [0, l_6, 0])
+    # Create and move group - this tests a bunch of kinematic correctness
+    double_gauss = ObjectGroup([l1, l23, l45, l6])
+    
+    # Spawn Spotdetector, move to "focus"
+    detector = Spotdetector(5e-3)
+    translate3d!(detector, [0,f_z,0])    
+    # Setup test, rotate and translate to test correct kinematics
+    test_setup = ObjectGroup([double_gauss, detector])
+    translate3d!(test_setup, [0.05, 0.05, 0.05])
+    xrotate3d!(test_setup, deg2rad(60))
+    zrotate3d!(test_setup, deg2rad(45))    
+    system = System([test_setup])
+    
+    @testset "Test with collimated source" begin    
+        ## Test against back focal length as per source above
+        dir = BMO.orientation(double_gauss)[:, 2] # rotated collimated ray direction
+        pos = BMO.position(l1) - 0.05 * dir # rotated collimated ray position    
+        source = CollimatedSource(pos, dir, 0.04, 486.0e-9, num_rays=1000, num_rings=10)
+        solve_system!(system, source)    
+        @test test_coma(detector, atol=2e-5)
+    end
+    
+    # Reset test scenario back to origin, y-axis alignment
+    reset_rotation3d!(test_setup)
+    reset_translation3d!(test_setup)
+    translate_to3d!(detector, [0, 0.147, 0])
+    
+    @testset "Test with point source (wide)" begin
+        source = PointSource([0, -0.5, 0], [0, 1 ,0], deg2rad(2), 486.0e-9, num_rays=1000, num_rings=10)
+        empty!(detector)
+        solve_system!(system, source)
+        @test test_coma(detector, atol=6e-5)
+    end
+    
+    @testset "Test with point source (narrow)" begin
+        # Tests regression for https://github.com/StackEnjoyer/BeamletOptics.jl/issues/11
+        source = PointSource([0, -0.5, 0], [0, 1 ,0], 5e-5, 486.0e-9, num_rays=1000, num_rings=10)
+        empty!(detector)
+        solve_system!(system, source)
+        @test test_coma(detector, atol=2e-7)
+    end
+end
+
 @testset "Bug fixes" begin
     @testset "Issue#14" begin
         pd_res = 1000
@@ -2428,7 +2605,7 @@ end
             [0, y_0, 0], [0.46, -y_0, 0], 532e-9, 2.5e-3, P0 = 10e-3)
         # Solve system
         system = BMO.System([pd])
-        BMO.reset_detector!(pd)
+        empty!(pd)
         BMO.solve_system!(system, beam)
 
         @test BMO.optical_power(pd)≈10e-3 atol=1e-5

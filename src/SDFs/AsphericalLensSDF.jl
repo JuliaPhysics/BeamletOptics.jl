@@ -1,5 +1,9 @@
 abstract type AbstractAsphericalSurfaceSDF{T} <: AbstractLensSDF{T} end
 
+# Fall back to the numeric gradient for aspheres, as AD-gradients seem
+# instable/wrong in edge cases at the moment. See https://github.com/StackEnjoyer/BeamletOptics.jl/issues/11
+normal3d(s::AbstractAsphericalSurfaceSDF, pos) = numeric_gradient(s, pos)
+
 """
     ConvexAsphericalSurfaceSDF
 
@@ -308,7 +312,7 @@ function sdf(surface::ConvexAsphericalSurfaceSDF{T}, point) where {T}
     # with that convention in mind so everything matches ISO10110/textbook definitions.
     # We reinterpret the coordinates here, so xz is the transversal direction and y is the
     # optical axis.
-    _pp = Point3{T}(p_local[1], p_local[3], p_local[2]) # xzy
+    _pp = Point3(p_local[1], p_local[3], p_local[2]) # xzy
     # rotate 2D sdf around the optical axis
     sdf_v = op_revolve_z(_pp,
         x -> convex_aspheric_surface_distance(
@@ -329,7 +333,7 @@ function sdf(surface::ConcaveAsphericalSurfaceSDF{T}, point) where {T}
     # with that convention in mind so everything matches ISO10110/textbook definitions.
     # We reinterpret the coordinates here, so xz is the transversal direction and y is the
     # optical axis.
-    _pp = Point3{T}(p_local[1], p_local[3], p_local[2]) # xzy
+    _pp = Point3(p_local[1], p_local[3], p_local[2]) # xzy
     # rotate 2D sdf around the optical axis
     sdf_v = op_revolve_z(_pp,
         x -> concave_aspheric_surface_distance(

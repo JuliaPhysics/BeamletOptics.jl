@@ -2,7 +2,7 @@
 export translate3d!, translate_to3d!, rotate3d!, xrotate3d!, yrotate3d!, zrotate3d!, align3d!, reset_translation3d!, reset_rotation3d!
 
 # ray and beam type export
-export Ray, PolarizedRay, Beam, GaussianBeamlet
+export Ray, PolarizedRay, Beam, PointSource, CollimatedSource, GaussianBeamlet
 
 # system
 export System, StaticSystem, solve_system!
@@ -30,7 +30,7 @@ export CircularFlatSurface, RectangularFlatSurface, SphericalSurface, EvenAspher
 export Prism, RightAnglePrism
 
 # detectors
-export Photodetector, Spotdetector
+export Photodetector, Spotdetector, intensity
 
 # splitters
 export ThinBeamsplitter, RoundThinBeamsplitter, RectangularPlateBeamsplitter, RoundPlateBeamsplitter, CubeBeamsplitter, RectangularCompensatorPlate

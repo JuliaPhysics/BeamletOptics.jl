@@ -23,3 +23,7 @@ If you want to edit the package documentation locally, follow these steps:
 4. Run the `make.jl` file
 
 Changes you have made will then be saved into the `build` folder. You can host the website locally by opening the `index.html` starting page.
+
+### Section titles
+
+When creating a custom section in the documentation, you should avoid naming the section the same way as your type, e.g. for `MyCustomType` you should not create a section that is called `# MyCustomType`. The reason for this is that the `@ref` macro will confuse the docstring of your type with the section header, leading to undefined behavior for any links pointing to the embedded docstring via `[`MyCustomType`](@ref)`.

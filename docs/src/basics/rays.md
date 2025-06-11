@@ -48,7 +48,8 @@ Below the Fresnel coefficients for different ``n_1 \rightarrow n_2`` interfaces 
 First, the Fresnel coefficients for ``n_1 = 1.0`` to ``n_2 = 1.5`` will be calculated. The angle of incidence ``\theta`` refers to the plane of incidence in the `s`enkrecht and `p`arallel coordinate system. Note that the imaginary part of the coefficents is shown by the dash-dotted lines.
 
 ```@example fresnel_vacuum_glass
-using CairoMakie #hide
+using CairoMakie # hide
+CairoMakie.activate!() # hide
 using BeamletOptics
 include("fresnel.jl") # hide
 

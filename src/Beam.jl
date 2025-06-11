@@ -24,12 +24,24 @@ function Beam(ray::R) where {T, R <: AbstractRay{T}}
     Beam{T, R}([ray], nothing, Vector{Beam{T, R}}())
 end
 
+"""
+    Beam(pos, dir, λ)
+
+Spawns a [`Beam`](@ref) at the start `pos`ition in the specified `dir`ection
+with the wavelength `λ`.
+"""
 function Beam(pos::AbstractArray{P}, dir::AbstractArray{D}, λ::L) where {P,D,L}
     T = promote_type(P,D,L)
     ray = Ray(pos, dir, λ)
     return Beam{T, Ray{T}}([ray], nothing, Vector{Beam{T, Ray{T}}}())
 end
 
+"""
+    Beam(pos, dir, λ, E0)
+
+Spawns a [`Beam`](@ref) of [`PolarizedRay`](@ref)s at the start `pos`ition in the specified `dir`ection
+with the wavelength `λ` and electric field vector `E0`
+"""
 function Beam(pos::AbstractArray{P}, dir::AbstractArray{D}, λ::L, E0::Vector{E}) where {P,D,L,E}
     T = promote_type(P,D,L,E)
     ray = PolarizedRay(pos, dir, λ, E0)
@@ -94,7 +106,7 @@ _last_beam_intersection(beam::Beam) = intersection(last(rays(beam)))
 Calculate the length of a beam up to the point of the last intersection.
 
 !!! tip
-Use `optical_path_length(bream)` to get the optical path length instead.
+    Use [`optical_path_length`](@ref) to get the optical path length instead.
 """
 function Base.length(beam::Beam{T}) where {T}
     # Recursively get length of beam parents
@@ -106,7 +118,7 @@ end
 """
     optical_path_length(beam::Beam)
 
-Calculate the `o`ptical `p`ath `l`ength, i.e. ``OPL = n \\cdot l``.
+Calculate the optical path length of the `beam`, i.e. ``\\mathrm{OPL} = n \\cdot l``.
 """
 function optical_path_length(beam::Beam{T}) where {T}
     p = AbstractTrees.parent(beam)

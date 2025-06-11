@@ -3,6 +3,8 @@ beam_showcase_dir = joinpath(@__DIR__, "..", "assets", "beam_renders")
 
 include(joinpath(beam_showcase_dir, "beam_showcase.jl"))
 include(joinpath(beam_showcase_dir, "gb_showcase.jl"))
+include(joinpath(beam_showcase_dir, "collimated_sc.jl"))
+include(joinpath(beam_showcase_dir, "pointsource_sc.jl"))
 ```
 
 # Beams
@@ -22,6 +24,39 @@ Beam
 A ray tracing example through an arbitrary system using a [`Beam`](@ref) is shown below. Individual [`Ray`](@ref) segments are marked by their starting position and direction. The [Beam expander](@ref) and [Miniature microscope](@ref) tutorial covers the use of the [`Beam`](@ref) in more detail. 
 
 ![Beam structure](beam_showcase.png)
+
+## Beam groups
+
+For convenience, the [`BeamletOptics.AbstractBeamGroup`](@ref) offers a container-like interface for groups of [`Beam`](@ref)s as commonly used in other software packages. The following concrete implementations are currently provided:
+
+```@repl
+using BeamletOptics # hide
+BeamletOptics.list_subtypes(BeamletOptics.AbstractBeamGroup);
+```
+
+Refer to the following sections for convenience constructors to generate the sources listed above.
+
+### Collimated beam source
+
+The collimated beam source is ideal to model light coming from a focal plane at infinity. This is useful for simulating plane wavefronts. You can define a collimated monochromatic [`Beam`](@ref) source as follows:
+
+```@docs; canonical=false
+CollimatedSource(::AbstractArray{<:Real}, ::AbstractArray{<:Real}, ::Real, ::Real)
+```
+
+![Collimated group of beams](collimated_beam_source.png)
+
+### Point beam source
+
+The `PointSource` type is used to model emission from a spatially localized source that radiates [`Beam`](@ref)s in a range of directions. This is commonly used to simulate conical emission patterns, such as light emerging from a fiber tip or a light source for a lens objective with a known focal distance. You can specify the origin and a propagation direction, which are then used to construct the monochromatic `PointSource`.
+
+```@docs; canonical=false
+PointSource(::AbstractArray{<:Real}, ::AbstractArray{<:Real}, ::Real, ::Real)
+```
+
+Below you can find an exemplary illustration of a `PointSource`.
+
+![Point source of beams](point_beam_source.png)
 
 ## Gaussian beamlet
 

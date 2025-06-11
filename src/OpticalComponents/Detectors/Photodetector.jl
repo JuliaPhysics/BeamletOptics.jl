@@ -16,7 +16,7 @@ Field contributions Eᵢ are added by the corresponding [`interact3d`](@ref) met
 
 !!! warning "Reset behavior"
     The `Photodetector` must be reset between each call of [`solve_system!`](@ref) in order to
-    overwrite previous results using the [`reset_detector!`](@ref) function.
+    overwrite previous results using the [`empty!`](@ref) function.
     Otherwise, the current result will be added onto the previous result.
 
 !!! info "Supported beams"
@@ -64,6 +64,7 @@ function interact3d(
         ::AbstractSystem, pd::Photodetector, gauss::GaussianBeamlet, ray_id::Int)
     # Select final ray of chief beam
     ray = gauss.chief.rays[ray_id]
+    # Subtract ray length from optical path l0 (calculated seperately with projection l1)
     l0 = optical_path_length(gauss) - optical_path_length(ray)
     p0 = position(ray)
     d0 = direction(ray)
@@ -109,7 +110,7 @@ Calculates the total optical power on `pd` in [W] by integration over the local 
 optical_power(pd::Photodetector) = trapz((pd.x, pd.y), intensity(pd))
 
 """Resets the values currently stored in `pd.field` to zero"""
-reset_detector!(pd::Photodetector{T, S}) where {T, S} = (pd.field .= zero(Complex{T}))
+empty!(pd::Photodetector{T, S}) where {T, S} = (pd.field .= zero(Complex{T}))
 
 """
     photodetector_resolution!(pd::Photodetector, n::Int)
