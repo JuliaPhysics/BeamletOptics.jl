@@ -1,6 +1,12 @@
 get_view(ls::LScene) = ls.scene.camera.view[]
 set_view(ls::LScene, new::AbstractMatrix) = (ls.scene.camera.view[] = new)
 
+function set_orthographic(ax::LScene)
+    cam = cameracontrols(ax.scene)
+    cam.fov[] = 1
+    return nothing
+end
+
 hide_axis(ls::LScene) = (ls.show_axis[] = false)
 
 function take_screenshot(
@@ -18,10 +24,10 @@ function take_screenshot(
     display(fig)
     ax = LScene(fig[1,1])
     if !isnothing(system)
-        render_system!(ax, system)
+        render!(ax, system)
     end
     if !isnothing(beam)
-        render_beam!(ax, beam; flen, color)
+        render!(ax, beam; flen, color)
     end
     if !isnothing(view)
         set_view(ax, view)
@@ -32,3 +38,8 @@ function take_screenshot(
     hide_axis(ax)
     save(fname, fig; px_per_unit, update = false)
 end
+
+arrow!(ax::LScene, pos, dir; color=:blue, scale=1) = arrows!(ax, [Point3(pos)], [Point3(dir*5e-3*scale)], arrowsize=Vec3f(1e-3, 1e-3, 1e-3)*scale; color)
+
+lens_color() = RGBf(0.678, 0.847, 0.902)
+lens_color(alpha) = RGBAf(0.678, 0.847, 0.902, alpha)
