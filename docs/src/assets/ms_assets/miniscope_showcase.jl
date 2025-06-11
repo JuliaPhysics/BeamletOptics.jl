@@ -9,9 +9,6 @@ include(joinpath(@__DIR__, "..", "render_utils.jl"))
 const cm = 1e-2
 const mm = 1e-3
 
-lens_color() = RGBf(0.678, 0.847, 0.902)
-lens_color(alpha) = RGBAf(0.678, 0.847, 0.902, alpha)
-
 λ_green = 546.1e-9
 λ_red   = 656.3e-9
 lambdas = [λ_green, λ_red]

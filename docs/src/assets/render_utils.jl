@@ -40,3 +40,6 @@ function take_screenshot(
 end
 
 arrow!(ax::LScene, pos, dir; color=:blue, scale=1) = arrows!(ax, [Point3(pos)], [Point3(dir*5e-3*scale)], arrowsize=Vec3f(1e-3, 1e-3, 1e-3)*scale; color)
+
+lens_color() = RGBf(0.678, 0.847, 0.902)
+lens_color(alpha) = RGBAf(0.678, 0.847, 0.902, alpha)

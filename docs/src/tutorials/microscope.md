@@ -6,7 +6,6 @@ const BMO = BeamletOptics
 tutorial_dir = joinpath(@__DIR__, "..", "assets", "ms_assets")
 
 include(joinpath(tutorial_dir, "miniscope_showcase.jl"))
-include(joinpath(tutorial_dir, "miniscope_plots.jl"))
 ```
 
 # Miniature microscope
