@@ -220,3 +220,5 @@ Finally we are ready to perform the ray tracing step.
 
 !!! warning
     This section is under construction and requires the `PointSource` type...
+
+![Miniscope optical path](miniscope_trace.png)

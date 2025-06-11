@@ -117,7 +117,7 @@ function collection_group()
     return collect_group
 end
 
-optical_system() = System([objective_group(), dichroic_splitter(), collection_group()])
+optical_system_group() = ObjectGroup([objective_group(), dichroic_splitter(), collection_group()])
 
 ##
 miniscope = miniscope_body()
@@ -175,7 +175,7 @@ c_view = [
 set_view(ax, c_view)
 save("objective_lens_1.png", fig; px_per_unit=8, update = false)
 
-##
+## lens 2 render
 fig = Figure(size=(600, 200)) 
 display(fig)
 ax = LScene(fig[1,1])
@@ -234,7 +234,7 @@ c_view = [
 set_view(ax, c_view)
 save("full_objective_lens.png", fig; px_per_unit=8, update = false)
 
-##
+## full optical system render
 fig = Figure(size=(600,400))
 display(fig)
 ax = LScene(fig[1,1])
@@ -252,3 +252,38 @@ c_view = [
 
 set_view(ax, c_view)
 save("full_optical_system.png", fig; px_per_unit=8, update = false)
+
+##
+osg = optical_system_group()
+system = System([osg])
+xrotate3d!(osg, deg2rad(-90))
+
+ps_green = PointSource([0, -0.77mm, .25mm], [0, 1, 0], deg2rad(15), λ_green, num_rays=100, num_rings=5)
+ps_red = PointSource([0, -0.77mm, -.25mm], [0, 1, 0], deg2rad(15), λ_red, num_rays=100, num_rings=5)
+
+solve_system!(system, ps_green)
+solve_system!(system, ps_red)
+
+##
+fig = Figure(size=(600,200))
+ax = LScene(fig[1,1])
+hide_axis(ax)
+
+render!(ax, system; color=lens_color())
+render!(ax, ps_green; color=:green2, render_every=1, flen=3mm, show_pos=false)
+render!(ax, ps_red; color=:red, render_every=1, flen=3mm, show_pos=false)
+
+display(fig)
+
+set_orthographic(ax)
+
+c_view = [
+ 0  1   0   -0.015
+ 0  0   1   0
+ 1  0   0   -0.55
+ 0  0   0   1
+]
+
+set_view(ax, c_view)
+
+save("miniscope_trace.png", fig; px_per_unit=8, update = false)
