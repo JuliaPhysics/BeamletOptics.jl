@@ -337,13 +337,13 @@ end
         shape = TestShapeless(pos, dir)
         # Test get/set
         @test BMO.position(shape) == pos
-        @test BMO.orientation(shape) == dir
+        @test orientation(shape) == dir
         n_pos = [1, 1, 1]
         n_dir = BMO.rotate3d([0, 0, 1], π / 4)
         BMO.position!(shape, n_pos)
         BMO.orientation!(shape, n_dir)
         @test position(shape) == n_pos
-        @test BMO.orientation(shape) == n_dir
+        @test orientation(shape) == n_dir
         # Test translation
         translate3d!(shape, n_pos)
         @test position(shape) == 2 * n_pos
@@ -353,19 +353,19 @@ end
         dir = Matrix{Float64}(I, 3, 3)
         BMO.orientation!(shape, dir)
         rotate3d!(shape, [0, 0, 1], deg2rad(45))
-        @test all(BMO.orientation(shape)[[1, 2, 5]] .≈ sqrt(2) / 2)
-        @test BMO.orientation(shape)[4] ≈ -sqrt(2) / 2
+        @test all(orientation(shape)[[1, 2, 5]] .≈ sqrt(2) / 2)
+        @test orientation(shape)[4] ≈ -sqrt(2) / 2
         rotate3d!(shape, [0, 0, 1], deg2rad(135))
-        @test BMO.orientation(shape)[1:4:9] == [-1, -1, 1]
+        @test orientation(shape)[1:4:9] == [-1, -1, 1]
         xrotate3d!(shape, π)
         yrotate3d!(shape, π)
         zrotate3d!(shape, π)
         reset_rotation3d!(shape)
-        @test BMO.orientation(shape) == dir
+        @test orientation(shape) == dir
         # Test align3d
         target_vec = normalize([1, 1, 1])
         align3d!(shape, target_vec)
-        @test BMO.orientation(shape)[:, 2] ≈ target_vec
+        @test orientation(shape)[:, 2] ≈ target_vec
         reset_rotation3d!(shape)
         # The following test are expected to do nothing but not throw exceptions
         ray = TestRay([0.0, 0, 0], [1.0, 0, 0])
@@ -405,11 +405,11 @@ end
         translate3d!(object, ones(3))
         rotate3d!(object, [0, 0, 1], π)
         @test position(object) == ones(3)
-        @test BMO.orientation(object)[1:4:9] == [-1, -1, 1]
+        @test orientation(object)[1:4:9] == [-1, -1, 1]
         reset_translation3d!(object)
         reset_rotation3d!(object)
         @test position(object) == zeros(3)
-        @test BMO.orientation(object)[1:4:9] == ones(3)
+        @test orientation(object)[1:4:9] == ones(3)
         # Test translate_to3d
         target_pos = [1, 3, 9]
         translate_to3d!(object, target_pos)
@@ -644,7 +644,7 @@ end
         @test typeof(foo) == BMO.Mesh{Float64}
         @test BMO.vertices(foo) == foo.vertices
         @test BMO.faces(foo) == foo.faces
-        @test BMO.orientation(foo) == foo.dir
+        @test orientation(foo) == foo.dir
         @test position(foo) == foo.pos
         @test BMO.scale(foo) == foo.scale
     end
@@ -709,7 +709,7 @@ end
         end
 
         # Testing orientation of dir matrix
-        @test BMO.orientation(foo)[[3, 5, 7]] == [-1, 1, 1]
+        @test orientation(foo)[[3, 5, 7]] == [-1, 1, 1]
     end
 
     # center bar reference cube at origin
@@ -721,16 +721,16 @@ end
         reset_translation3d!(foo)
         reset_rotation3d!(foo)
         @test position(foo) == zeros(3)
-        @test BMO.orientation(foo) ≈ BMO.orientation(bar)
+        @test orientation(foo) ≈ orientation(bar)
         @test BMO.vertices(foo) ≈ BMO.vertices(bar)
     end
 
     @testset "Testing align3d!" begin
         align3d!(foo, normalize([0, 1, 1]))
         @test position(foo) == zeros(3)
-        @test BMO.orientation(foo)[:, 1] ≈ [1, 0, 0]
-        @test BMO.orientation(foo)[:, 2] ≈ [0, √2 / 2, √2 / 2]
-        @test BMO.orientation(foo)[:, 3] ≈ [0, -√2 / 2, √2 / 2]
+        @test orientation(foo)[:, 1] ≈ [1, 0, 0]
+        @test orientation(foo)[:, 2] ≈ [0, √2 / 2, √2 / 2]
+        @test orientation(foo)[:, 3] ≈ [0, -√2 / 2, √2 / 2]
         reset_rotation3d!(foo)
     end
 
@@ -1079,11 +1079,11 @@ end
         Rt = BMO.rotate3d([0, 0, 1], angle)
         xt = circshift(xs, -1)
         yt = circshift(ys, -1)
-        @test BMO.orientation(objects) == Rt
-        @test BMO.orientation(center) ≈ Rt
-        @test BMO.orientation(circle) == Rt
+        @test orientation(objects) == Rt
+        @test orientation(center) ≈ Rt
+        @test orientation(circle) == Rt
         for (i, obj) in enumerate(BMO.objects(circle))
-            @test BMO.orientation(obj) == Rt
+            @test orientation(obj) == Rt
             @test position(obj) ≈ [xt[i], yt[i], 0] + target
         end
     end
@@ -1098,9 +1098,9 @@ end
         @test position(objects) == zeros(3)
         @test position(center) == zeros(3)
         @test position(circle) == zeros(3)
-        @test BMO.orientation(objects) == Ri
-        @test BMO.orientation(center) ≈ Ri
-        @test BMO.orientation(circle) ≈ Ri
+        @test orientation(objects) == Ri
+        @test orientation(center) ≈ Ri
+        @test orientation(circle) ≈ Ri
         for (i, obj) in enumerate(Leaves(BMO.objects(circle)))
             @test isapprox(position(obj)[1], xs[i], atol = 5e-16)
             @test isapprox(position(obj)[2], ys[i], atol = 5e-16)
@@ -1228,7 +1228,7 @@ end
             zs = LinRange(-z0, z0, 30)
             fs = similar(zs)
             # Beam spawn point
-            dir = -BMO.orientation(AC254_150_AB.back.shape)[:, 2]       # rotated collimated ray direction
+            dir = -orientation(AC254_150_AB.back.shape)[:, 2]       # rotated collimated ray direction
             pos = position(AC254_150_AB.front.shape) + 0.05 * dir  # rotated collimated ray position
             nv = BMO.normal3d(dir)                                     # orthogonal to moved system optical axis
             beam = Beam(pos, -dir, λ)
@@ -1902,7 +1902,7 @@ end
             pos_ray = position(ray) +
                       length(BMO.intersection(ray)) * BMO.direction(ray)
             pos_dta = position(sd) +
-                      BMO.orientation(sd)[:, 1] * data[1]
+                      orientation(sd)[:, 1] * data[1]
             @test pos_ray ≈ pos_dta
         end
         # Test reset function
@@ -2384,7 +2384,7 @@ end
 
         @testset "Test pos/dir" begin
             @test position(pbs) == zeros(3)
-            @test BMO.orientation(pbs) ≈ BMO.orientation(pbs.substrate)
+            @test orientation(pbs) ≈ orientation(pbs.substrate)
         end
 
         @testset "Test children after tracing" begin
@@ -2565,7 +2565,7 @@ end
     
     @testset "Test with collimated source" begin    
         ## Test against back focal length as per source above
-        dir = BMO.orientation(double_gauss)[:, 2] # rotated collimated ray direction
+        dir = orientation(double_gauss)[:, 2] # rotated collimated ray direction
         pos = position(l1) - 0.05 * dir # rotated collimated ray position    
         source = CollimatedSource(pos, dir, 0.04, 486.0e-9, num_rays=1000, num_rings=10)
         solve_system!(system, source)    

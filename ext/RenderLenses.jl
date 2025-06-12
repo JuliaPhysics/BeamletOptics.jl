@@ -19,7 +19,7 @@ function render!(
     Y = [u for u in u, v in v]
     Z = [w[i] * sin(v) for (i, u) in enumerate(u), v in v]
     # Transform into global coords
-    R = BMO.orientation(css)
+    R = orientation(css)
     P = position(css)
     Xt = R[1, 1] * X + R[1, 2] * Y + R[1, 3] * Z .+ P[1]
     Yt = R[2, 1] * X + R[2, 2] * Y + R[2, 3] * Z .+ P[2]
@@ -48,7 +48,7 @@ function render!(
     Y = [u for u in u, v in v]
     Z = [w[i] * sin(v) for (i, u) in enumerate(u), v in v]
     # Transform into global coords
-    R = BMO.orientation(css)
+    R = orientation(css)
     P = position(css)
     Xt = R[1, 1] * X + R[1, 2] * Y + R[1, 3] * Z .+ P[1]
     Yt = R[2, 1] * X + R[2, 2] * Y + R[2, 3] * Z .+ P[2]
@@ -84,7 +84,7 @@ function render!(
     Y = [u for u in u, v in v]
     Z = [w[i] * sin(v) for (i, u) in enumerate(u), v in v]
     # Transform into global coords
-    R = BMO.orientation(asp)
+    R = orientation(asp)
     P = position(asp)
     Xt = R[1, 1] * X + R[1, 2] * Y + R[1, 3] * Z .+ P[1]
     Yt = R[2, 1] * X + R[2, 2] * Y + R[2, 3] * Z .+ P[2]
