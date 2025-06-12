@@ -37,11 +37,20 @@ shape_trait_of(::AbstractObject) = SingleShape()
 "Dispatch the shape function based on the [`AbstractShapeTrait`](@ref) of the [`AbstractObject`](@ref)"
 shape(object::AbstractObject) = shape(shape_trait_of(object), object)
 
-"Enforces that `object` has to have the field `pos` or implement `position()`."
+"""
+    position(object) -> Point3
+
+Returns the current `position` of the `object` in R³ as a `Point3` where (x, y, z) in a right-hand coordinate system.
+"""
 position(object::AbstractObject) = position(shape_trait_of(object), object)
 position!(object::AbstractObject, pos) = position!(shape_trait_of(object), object, pos)
 
-"Enforces that `object` has to have the field `dir` or implement `orientation()`."
+"""
+    orientation(object) -> Matrix
+
+Returns the current `orientation` of the `object` in R³ as a matrix.
+The matrix represents the local fixed-body coordinate system.
+"""
 orientation(object::AbstractObject) = orientation(shape_trait_of(object), object)
 orientation!(object::AbstractObject, dir) = orientation!(shape_trait_of(object), object, dir)
 
