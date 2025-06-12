@@ -1135,7 +1135,7 @@ end
         R2 = 1
         nl = 1.5
         tl = BMO.ThinLensSDF(R1, R2, 0.1)
-        translate3d!(tl, [0, -BMO.thickness(tl) / 2, 0])
+        translate3d!(tl, [0, -thickness(tl) / 2, 0])
         p = Lens(tl, x -> 1.5)
         system = System(p)
 
@@ -1167,31 +1167,31 @@ end
         l = 6.8e-3
         LB1811 = SphericalLens(r1, r2, l)
         @test typeof(BMO.shape(LB1811)) <: BMO.UnionSDF
-        @test BMO.thickness(BMO.shape(LB1811)) == l
+        @test thickness(BMO.shape(LB1811)) == l
         r1 = Inf
         r2 = -15.5e-3
         l = 8.6e-3
         LA1805 = SphericalLens(r1, r2, l)
         @test typeof(BMO.shape(LA1805)) <: BMO.UnionSDF
-        @test BMO.thickness(BMO.shape(LA1805)) == l
+        @test thickness(BMO.shape(LA1805)) == l
         r1 = -52.0e-3
         r2 = -r1
         l = 3e-3
         LD1464 = SphericalLens(r1, r2, l)
         @test typeof(BMO.shape(LD1464)) <: BMO.UnionSDF
-        @test BMO.thickness(BMO.shape(LD1464)) == l
+        @test thickness(BMO.shape(LD1464)) == l
         r1 = Inf
         r2 = 25.7e-3
         l = 3.5e-3
         LC1715 = SphericalLens(r1, r2, l)
         @test typeof(BMO.shape(LC1715)) <: BMO.UnionSDF
-        @test BMO.thickness(BMO.shape(LC1715)) == l
+        @test thickness(BMO.shape(LC1715)) == l
         r1 = -82.2e-3
         r2 = -32.1e-3
         l = 3.6e-3
         LE1234 = SphericalLens(r1, r2, l)
         @test typeof(BMO.shape(LE1234)) <: BMO.UnionSDF
-        @test BMO.thickness(BMO.shape(LE1234)) == l
+        @test thickness(BMO.shape(LE1234)) == l
     end
 
     """Test coma for rotated and translated optical system"""
@@ -1233,7 +1233,7 @@ end
             nv = BMO.normal3d(dir)                                     # orthogonal to moved system optical axis
             beam = Beam(pos, -dir, λ)
             # Calculate equivalent back focal length point
-            f_z = BMO.thickness(AC254_150_AB) + bfl + δf
+            f_z = thickness(AC254_150_AB) + bfl + δf
             f0 = BMO.position(AC254_150_AB.front.shape) + f_z * -dir
             for (i, z) in enumerate(zs)
                 beam.rays[1].pos = pos + z * nv
@@ -1285,9 +1285,9 @@ end
         )
 
         # test lens thickness
-        @test BMO.thickness(lens) ≈ l
+        @test thickness(lens) ≈ l
         # test edge thickness
-        @test BMO.thickness(BMO.shape(lens).sdfs[1])≈2e-3 atol=1e-4
+        @test thickness(BMO.shape(lens).sdfs[1])≈2e-3 atol=1e-4
         # test back focal length
         @test working_distance(lens, 0.05 * d / 2)≈29.5e-3 atol=1e-4
 
@@ -1305,9 +1305,9 @@ end
         shape = lens.shape
 
         # test lens thickness
-        @test BMO.thickness(lens) ≈ l
+        @test thickness(lens) ≈ l
         # test edge thickness
-        @test BMO.thickness(shape.sdfs[1])≈1.9e-3 atol=1e-4
+        @test thickness(shape.sdfs[1])≈1.9e-3 atol=1e-4
         # test back focal length
         @test working_distance(lens, 0.05 * d / 2)≈22.2e-3 atol=1e-3
 
@@ -1325,10 +1325,10 @@ end
         shape = lens.shape
 
         # test lens thickness
-        @test BMO.thickness(lens) ≈ l
+        @test thickness(lens) ≈ l
         # test edge thickness
         @test BMO.sag(shape.sdfs[2]) +
-              BMO.thickness(shape.sdfs[1])≈0.006858 atol=1e-4
+              thickness(shape.sdfs[1])≈0.006858 atol=1e-4
 
         ## Thorlabs LD2297, bi-concave
         r1 = -39.6e-3
@@ -1344,10 +1344,10 @@ end
         shape = lens.shape
 
         # test lens thickness
-        @test BMO.thickness(lens) ≈ l
+        @test thickness(lens) ≈ l
 
         @test BMO.sag(shape.sdfs[2]) + BMO.sag(shape.sdfs[3]) +
-              BMO.thickness(shape.sdfs[1])≈0.0072 atol=1e-4
+              thickness(shape.sdfs[1])≈0.0072 atol=1e-4
 
         ## Thorlabs LBF254-040, best-form
         r1 = 134.6e-3
@@ -1363,10 +1363,10 @@ end
         shape = lens.shape
 
         # test lens thickness
-        @test BMO.thickness(lens) ≈ l
+        @test thickness(lens) ≈ l
 
         # test edge thickness
-        @test BMO.thickness(shape.sdfs[1])≈2.286e-3 atol=1e-4
+        @test thickness(shape.sdfs[1])≈2.286e-3 atol=1e-4
 
         ## Thorlabs LE1234, positive meniscus
         r1 = -82.2e-3
@@ -1382,10 +1382,10 @@ end
         shape = lens.shape
 
         # test lens thickness
-        @test BMO.thickness(lens) ≈ l
+        @test thickness(lens) ≈ l
 
         # test edge thickness
-        @test BMO.thickness(shape.sdfs[1]) + BMO.sag(shape.sdfs[2])≈2e-3 atol=1e-4
+        @test thickness(shape.sdfs[1]) + BMO.sag(shape.sdfs[2])≈2e-3 atol=1e-4
 
         ## Thorlabs LF1822, negative meniscus
         r1 = -33.7e-3
@@ -1401,10 +1401,10 @@ end
         shape = lens.shape
 
         # test lens thickness
-        @test BMO.thickness(lens) ≈ l
+        @test thickness(lens) ≈ l
 
         # test edge thickness
-        @test BMO.thickness(shape.sdfs[1]) +
+        @test thickness(shape.sdfs[1]) +
               BMO.sag(shape.sdfs[2])≈4.7e-3 atol=1e-4
 
         ## Generic "true" meniscus
@@ -1421,7 +1421,7 @@ end
         shape = lens.shape
 
         # test lens thickness
-        @test BMO.thickness(lens) ≈ l
+        @test thickness(lens) ≈ l
 
         # test ring generation
         NBK7 = DiscreteRefractiveIndex([532e-9, 1064e-9], [1.5195, 1.5066])
@@ -1560,7 +1560,7 @@ end
             n -> 1.804700
         )
 
-        translate3d!(L2, [0, BMO.thickness(L1) + 0.39e-3, 0])
+        translate3d!(L2, [0, thickness(L1) + 0.39e-3, 0])
 
         L3 = Lens(
             EvenAsphericalSurface(
@@ -1584,7 +1584,7 @@ end
         )
 
         translate_to3d!(L3, BMO.position(L2))
-        translate3d!(L3, [0, BMO.thickness(L2) + 0.63e-3, 0])
+        translate3d!(L3, [0, thickness(L2) + 0.63e-3, 0])
 
         Filt = Lens(
             CircularFlatSurface(4.2e-3),
@@ -1593,7 +1593,7 @@ end
         )
 
         translate_to3d!(Filt, BMO.position(L3))
-        translate3d!(Filt, [0, BMO.thickness(L3) + 0.19e-3, 0])
+        translate3d!(Filt, [0, thickness(L3) + 0.19e-3, 0])
 
         Cover = Lens(
             CircularFlatSurface(4.9e-3),
@@ -1601,14 +1601,14 @@ end
             n -> 1.469200
         )
         translate_to3d!(Cover, BMO.position(Filt))
-        translate3d!(Cover, [0, BMO.thickness(Filt) + 0.18e-3, 0])
+        translate3d!(Cover, [0, thickness(Filt) + 0.18e-3, 0])
 
         # test thickness
-        @test BMO.thickness(L1) ≈ 0.72e-3
-        @test BMO.thickness(L2) ≈ 0.55e-3
-        @test BMO.thickness(L3) ≈ 0.7e-3
-        @test BMO.thickness(Filt) ≈ 0.15e-3
-        @test BMO.thickness(Cover) ≈ 0.5e-3
+        @test thickness(L1) ≈ 0.72e-3
+        @test thickness(L2) ≈ 0.55e-3
+        @test thickness(L3) ≈ 0.7e-3
+        @test thickness(Filt) ≈ 0.15e-3
+        @test thickness(Cover) ≈ 0.5e-3
 
         system = System([L1, L2, L3, Filt, Cover])
 
@@ -1659,9 +1659,9 @@ end
         )
 
         # test lens thickness
-        @test BMO.thickness(lens) ≈ ct
+        @test thickness(lens) ≈ ct
         # test edge thickness
-        @test BMO.thickness(BMO.shape(lens).sdfs[1])≈2.12e-3 atol=1e-4
+        @test thickness(BMO.shape(lens).sdfs[1])≈2.12e-3 atol=1e-4
         # test back focal length
         @test working_distance(lens, 0.05 * d / 2)≈6.1e-3 atol=1e-4
 
@@ -1677,7 +1677,7 @@ end
         )
 
         # test lens thickness
-        @test BMO.thickness(lens) ≈ ct
+        @test thickness(lens) ≈ ct
     end
 
     @testset "Convex/cav acylinder lenses" begin
@@ -1700,7 +1700,7 @@ end
         )
 
         # test lens thickness
-        @test BMO.thickness(lens) ≈ ct
+        @test thickness(lens) ≈ ct
 
         # test back focal length
         @test working_distance(lens, 0.05 * diameter / 2) ≈ 15.8e-3 atol=1e-4
@@ -1724,7 +1724,7 @@ end
         )
 
         # test lens thickness
-        @test BMO.thickness(lens) ≈ ct
+        @test thickness(lens) ≈ ct
     end
 end
 
@@ -1935,7 +1935,7 @@ end
         ln = ThinLens(R1, R2, d, nl)
         translate3d!(pd_l, [0, z, 0])
         translate3d!(pd_s, [0, z, 0])
-        translate3d!(ln, [0, z - f - BMO.thickness(ln.shape) / 2, 0])
+        translate3d!(ln, [0, z - f - thickness(ln.shape) / 2, 0])
 
         @testset "Testing fringe pattern" begin
             system = System(pd_l)
@@ -2541,12 +2541,12 @@ end
     40.01e-3, λ -> 1.57046, λ -> 1.64128)
     l6 = SphericalLens(1063.24e-3, -48.88e-3, 6.73e-3, 45.11e-3, λ -> 1.62286)
     # Calculate translation distances
-    l_23 = BMO.thickness(l1) + 0.38e-3
-    l_45 = l_23 + BMO.thickness(l23) + 9.14e-3 + 13.36e-3
-    l_6 = l_45 + BMO.thickness(l45) + 0.38e-3
+    l_23 = thickness(l1) + 0.38e-3
+    l_45 = l_23 + thickness(l23) + 9.14e-3 + 13.36e-3
+    l_6 = l_45 + thickness(l45) + 0.38e-3
     # Corresponds to back focal length of f=59.21 mm on y-axis from link above + "error" δf
     δf = 7e-4
-    f_z = l_6 + BMO.thickness(l6.shape) + 58.21e-3 + δf
+    f_z = l_6 + thickness(l6.shape) + 58.21e-3 + δf
     translate3d!(l23, [0, l_23, 0])
     translate3d!(l45, [0, l_45, 0])
     translate3d!(l6, [0, l_6, 0])

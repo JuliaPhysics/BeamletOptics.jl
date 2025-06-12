@@ -21,7 +21,7 @@ components
 export Mirror, SquarePlanoMirror2D, RectangularPlanoMirror, SquarePlanoMirror, RoundPlanoMirror, ConcaveSphericalMirror, RightAnglePrismMirror
 
 # lenses
-export Lens, DoubletLens, ThinLens, SphericalLens, SphericalDoubletLens
+export Lens, DoubletLens, ThinLens, SphericalLens, SphericalDoubletLens, thickness
 
 # surfaces
 export CircularFlatSurface, RectangularFlatSurface, SphericalSurface, EvenAsphericalSurface, CylindricalSurface, AcylindricalSurface

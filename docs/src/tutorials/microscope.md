@@ -70,7 +70,7 @@ NLAK22  = DiscreteRefractiveIndex(lambdas, [1.65391, 1.64760])
 NLASF44 = DiscreteRefractiveIndex(lambdas, [1.80832, 1.79901])
 ```
 
-Note that the tupel ($\lambda_{1}$, $\lambda_{2}$) is mapped onto ($n_{1}$, $n_{2}$). For more information, refer to the [`DiscreteRefractiveIndex`](@ref) docs.
+Note that the data for ($\lambda_{1}$, $\lambda_{2}$) is mapped onto ($n_{1}$, $n_{2}$). For more information, refer to the [`DiscreteRefractiveIndex`](@ref) docs.
 
 ### Specifying the lens shape
 
@@ -89,7 +89,7 @@ Note that `obj_lens_1` is a single `Lens` entity once spawned and can be manipul
 
 ### Building the objective group
 
-To build the second and third lens elements of the objective group we will proceed as above. However, these lenses are spherical doublets formed by two lenses bonded with an optical adhesive. They are also more complex in shape, featuring a mechanical outer diameter. For the second lens the generating code is provided below. Two [`Lens`](@ref)es can be combined into a [`DoubletLens`](@ref). Correct "assembly" of the lens parts is the responsibility of the user.
+To build the second and third lens elements of the objective group we will proceed as above. However, these lenses are spherical doublets formed by two lenses bonded with an optical adhesive in practice. They are also more complex in shape, featuring a mechanical outer diameter. For the second lens the generating code is provided below. Two [`Lens`](@ref)es can be combined into a [`DoubletLens`](@ref). Correct "assembly" of the lens parts is the responsibility of the user.
 
 ```julia
 # Objective lens 2 - define surfaces
@@ -100,12 +100,12 @@ surf_3 = SphericalSurface(-5.020mm, 2*2.380mm)
 dl11 = Lens(surf_1, surf_2, 0.5mm, NSF4)
 dl12 = Lens(surf_2, surf_3, 2.5mm, NLAK22)
 # Move back lens into position
-translate3d!(dl12, [0, BMO.thickness(dl11), 0])
+translate3d!(dl12, [0, thickness(dl11), 0])
 # Spawn doublet
 obj_lens_2 = DoubletLens(dl11, dl12)
 ```
 
-The lens parts `dl11` and `dl12` are joined together by moving `dl12` along the y-axis by a distance equal to the on-axis thickness of `dl11`.
+The lens parts `dl11` and `dl12` are joined together by moving `dl12` along the y-axis by a distance equal to the on-axis [`thickness`](@ref) of `dl11`.
 
 ![Second objective lens](objective_lens_2.png)
 
@@ -121,15 +121,15 @@ surf_2 = SphericalSurface(-3.642mm, 2*3mm)
 surf_3 = SphericalSurface(-14.413mm, 2*2.812mm, 2*3mm)
 dl21 = Lens(surf_1, surf_2, 3.4mm, NLAK22)
 dl22 = Lens(surf_2, surf_3, 1.0mm, NSF4)
-translate3d!(dl22, [0, BMO.thickness(dl21), 0])
+translate3d!(dl22, [0, thickness(dl21), 0])
 tube_lens = DoubletLens(dl21, dl22)
 ```
 
 Assembling the objective group requires that the individual lens elements be translated into position along the optical axis. This is achieved in the code below by taking the current [`BeamletOptics.position`](@ref) of the elements and adding the on-axis `thickness` in addition to the element distancing taken from the specification.
 
 ```julia
-translate_to3d!(obj_lens_2, [0, BMO.position(obj_lens_1)[2] + BMO.thickness(obj_lens_1) + 3.344mm, 0])
-translate_to3d!(tube_lens, [0, BMO.position(obj_lens_2)[2] + BMO.thickness(obj_lens_2) + 2mm, 0])
+translate_to3d!(obj_lens_2, [0, BMO.position(obj_lens_1)[2] + thickness(obj_lens_1) + 3.344mm, 0])
+translate_to3d!(tube_lens, [0, BMO.position(obj_lens_2)[2] + thickness(obj_lens_2) + 2mm, 0])
 obj_group = ObjectGroup([obj_lens_1, obj_lens_2, tube_lens])
 ```
 
@@ -194,8 +194,8 @@ collect_lens = Lens(
     NLASF44
 )
 
-translate3d!(collect_lens, [0, BMO.position(ef_1)[2] + BMO.thickness(ef_1) + 0.1mm, 0])
-translate3d!(ef_2, [0, BMO.position(collect_lens)[2] + BMO.thickness(collect_lens) + 0.25mm, 0])
+translate3d!(collect_lens, [0, BMO.position(ef_1)[2] + thickness(ef_1) + 0.1mm, 0])
+translate3d!(ef_2, [0, BMO.position(collect_lens)[2] + thickness(collect_lens) + 0.25mm, 0])
 
 collect_group = ObjectGroup([ef_1, collect_lens, ef_2])
 
