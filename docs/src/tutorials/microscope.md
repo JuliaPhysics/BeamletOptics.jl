@@ -125,7 +125,7 @@ translate3d!(dl22, [0, thickness(dl21), 0])
 tube_lens = DoubletLens(dl21, dl22)
 ```
 
-Assembling the objective group requires that the individual lens elements be translated into position along the optical axis. This is achieved in the code below by taking the current [`BeamletOptics.position`](@ref) of the elements and adding the on-axis `thickness` in addition to the element distancing taken from the specification.
+Assembling the objective group requires that the individual lens elements be translated into position along the optical axis. This is achieved in the code below by taking the current [`position`](@ref) of the elements and adding the on-axis `thickness` in addition to the element distancing taken from the specification.
 
 ```julia
 translate_to3d!(obj_lens_2, [0, position(obj_lens_1)[2] + thickness(obj_lens_1) + 3.344mm, 0])
