@@ -42,7 +42,7 @@ shape(object::AbstractObject) = shape(shape_trait_of(object), object)
 
 Returns the current `position` of the `object` in R³ as a `Point3` where (x, y, z) in a right-hand coordinate system.
 """
-position(object::AbstractObject) = position(shape_trait_of(object), object)
+Base.position(object::AbstractObject) = position(shape_trait_of(object), object)
 position!(object::AbstractObject, pos) = position!(shape_trait_of(object), object, pos)
 
 """

@@ -18,7 +18,7 @@ function render!(
 
     # Transform to global coordinates:
     R = BMO.orientation(acyl)
-    P = BMO.position(acyl)
+    P = position(acyl)
     Xt = R[1, 1] .* X_local .+ R[1, 2] .* Y_local .+ R[1, 3] .* Z_local .+ P[1]
     Yt = R[2, 1] .* X_local .+ R[2, 2] .* Y_local .+ R[2, 3] .* Z_local .+ P[2]
     Zt = R[3, 1] .* X_local .+ R[3, 2] .* Y_local .+ R[3, 3] .* Z_local .+ P[3]
@@ -62,7 +62,7 @@ function render_acylindric_cap!(
 
     # Transform local -> global
     R = BMO.orientation(acyl)
-    P = BMO.position(acyl)
+    P = position(acyl)
     Xt = R[1, 1] .* X_local .+ R[1, 2] .* Y_local .+ R[1, 3] .* Z_local .+ P[1]
     Yt = R[2, 1] .* X_local .+ R[2, 2] .* Y_local .+ R[2, 3] .* Z_local .+ P[2]
     Zt = R[3, 1] .* X_local .+ R[3, 2] .* Y_local .+ R[3, 3] .* Z_local .+ P[3]

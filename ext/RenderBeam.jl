@@ -33,12 +33,12 @@ function render!(
     else
         len = length(BMO.intersection(ray))
     end
-    temp = BMO.position(ray) + len * BMO.direction(ray)
+    temp = position(ray) + len * BMO.direction(ray)
 
     lines!(axis,
-        [BMO.position(ray)[1], temp[1]],
-        [BMO.position(ray)[2], temp[2]],
-        [BMO.position(ray)[3], temp[3]];
+        [position(ray)[1], temp[1]],
+        [position(ray)[2], temp[2]],
+        [position(ray)[3], temp[3]];
         color,
         linewidth,
         transparency,

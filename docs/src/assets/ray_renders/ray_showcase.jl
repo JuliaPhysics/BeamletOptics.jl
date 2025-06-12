@@ -31,7 +31,7 @@ zrotate3d!(cube, deg2rad(-30))
 
 ray_pos = [0mm,5mm,5mm]
 ray_pos = [5mm,1mm,10mm]
-ray_dir = BMO.position(cube) - ray_pos + [5mm, 0, 1mm]
+ray_dir = position(cube) - ray_pos + [5mm, 0, 1mm]
 ray = Ray(ray_pos, ray_dir)
 
 ray_dir = BMO.direction(ray)

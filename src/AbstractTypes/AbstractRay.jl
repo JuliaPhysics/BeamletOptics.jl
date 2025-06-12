@@ -76,7 +76,7 @@ Subtypes of `AbstractBeam` must implement the following:
 """
 abstract type AbstractRay{T <: Real} end
 
-position(ray::AbstractRay) = ray.pos
+Base.position(ray::AbstractRay) = ray.pos
 position!(ray::AbstractRay, pos) = (ray.pos = pos)
 
 direction(ray::AbstractRay) = ray.dir

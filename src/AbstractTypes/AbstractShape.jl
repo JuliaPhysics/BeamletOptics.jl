@@ -41,7 +41,7 @@ Refer to the [`render!`](@ref) documentation.
 abstract type AbstractShape{T <: Real} end
 
 "Enforces that `shape` has to have the field `pos` or implement `position()`."
-position(shape::AbstractShape) = shape.pos
+Base.position(shape::AbstractShape) = shape.pos
 position!(shape::AbstractShape, pos) = (shape.pos = pos)
 
 "Enforces that `shape` has to have the field `dir` or implement `orientation()`."

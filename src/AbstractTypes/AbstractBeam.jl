@@ -113,7 +113,7 @@ abstract type AbstractBeamGroup{T <: Real, R <: AbstractRay{T}} end
 
 beams(bg::AbstractBeamGroup) = bg.beams
 
-position(bg::AbstractBeamGroup) = position(first(rays(first(beams(bg)))))
+Base.position(bg::AbstractBeamGroup) = position(first(rays(first(beams(bg)))))
 direction(bg::AbstractBeamGroup) = direction(first(rays(first(beams(bg)))))
 
 wavelength(bg::AbstractBeamGroup) = wavelength(first(rays(first(beams(bg)))))

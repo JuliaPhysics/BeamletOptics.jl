@@ -71,8 +71,8 @@ function objective_group()
     obj_lens_1 = objective_lens_1()
     obj_lens_2 = objective_lens_2()
     tube_lens = tube_doublet()
-    translate_to3d!(obj_lens_2, [0, BMO.position(obj_lens_1)[2] + thickness(obj_lens_1) + 3.344mm, 0])
-    translate_to3d!(tube_lens, [0, BMO.position(obj_lens_2)[2] + thickness(obj_lens_2) + 2mm, 0])
+    translate_to3d!(obj_lens_2, [0, position(obj_lens_1)[2] + thickness(obj_lens_1) + 3.344mm, 0])
+    translate_to3d!(tube_lens, [0, position(obj_lens_2)[2] + thickness(obj_lens_2) + 2mm, 0])
     _objective_group = ObjectGroup([obj_lens_1, obj_lens_2, tube_lens])
     xrotate3d!(_objective_group, deg2rad(90))
     return _objective_group
@@ -106,8 +106,8 @@ function collection_group()
         NLASF44
     )
 
-    translate3d!(collect_lens, [0, BMO.position(ef_1)[2] + thickness(ef_1) + 0.1mm, 0])
-    translate3d!(ef_2, [0, BMO.position(collect_lens)[2] + thickness(collect_lens) + 0.25mm, 0])
+    translate3d!(collect_lens, [0, position(ef_1)[2] + thickness(ef_1) + 0.1mm, 0])
+    translate3d!(ef_2, [0, position(collect_lens)[2] + thickness(collect_lens) + 0.25mm, 0])
 
     collect_group = ObjectGroup([ef_1, collect_lens, ef_2])
 
@@ -201,8 +201,8 @@ set_view(ax, c_view)
 save("objective_lens_2.png", fig; px_per_unit=8, update = false)
 
 ## full group render
-translate_to3d!(obj_lens_2, [0, BMO.position(obj_lens_1)[2] + thickness(obj_lens_1) + 3.344mm, 0])
-translate_to3d!(tube_lens, [0, BMO.position(obj_lens_2)[2] + thickness(obj_lens_2) + 2mm, 0])
+translate_to3d!(obj_lens_2, [0, position(obj_lens_1)[2] + thickness(obj_lens_1) + 3.344mm, 0])
+translate_to3d!(tube_lens, [0, position(obj_lens_2)[2] + thickness(obj_lens_2) + 2mm, 0])
 
 fig = Figure(size=(600, 300))
 display(fig)
@@ -212,9 +212,9 @@ render!(ax, obj_lens_1, transparency=true, color=lens_color(0.5))
 render!(ax, obj_lens_2, transparency=true, color=lens_color(0.5))
 render!(ax, tube_lens, transparency=true, color=lens_color(0.5))
 
-tp1 = BMO.position(obj_lens_1) + [0, -.5mm, 2mm]
-tp2 = BMO.position(obj_lens_2) + [0, .2mm, 3mm]
-tp3 = BMO.position(tube_lens) + [0, 1.3mm, 4mm]
+tp1 = position(obj_lens_1) + [0, -.5mm, 2mm]
+tp2 = position(obj_lens_2) + [0, .2mm, 3mm]
+tp3 = position(tube_lens) + [0, 1.3mm, 4mm]
 
 text!(tp1, text="obj_lens_1")
 text!(tp2, text="obj_lens_2")

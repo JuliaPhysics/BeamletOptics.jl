@@ -128,8 +128,8 @@ tube_lens = DoubletLens(dl21, dl22)
 Assembling the objective group requires that the individual lens elements be translated into position along the optical axis. This is achieved in the code below by taking the current [`BeamletOptics.position`](@ref) of the elements and adding the on-axis `thickness` in addition to the element distancing taken from the specification.
 
 ```julia
-translate_to3d!(obj_lens_2, [0, BMO.position(obj_lens_1)[2] + thickness(obj_lens_1) + 3.344mm, 0])
-translate_to3d!(tube_lens, [0, BMO.position(obj_lens_2)[2] + thickness(obj_lens_2) + 2mm, 0])
+translate_to3d!(obj_lens_2, [0, position(obj_lens_1)[2] + thickness(obj_lens_1) + 3.344mm, 0])
+translate_to3d!(tube_lens, [0, position(obj_lens_2)[2] + thickness(obj_lens_2) + 2mm, 0])
 obj_group = ObjectGroup([obj_lens_1, obj_lens_2, tube_lens])
 ```
 
@@ -194,8 +194,8 @@ collect_lens = Lens(
     NLASF44
 )
 
-translate3d!(collect_lens, [0, BMO.position(ef_1)[2] + thickness(ef_1) + 0.1mm, 0])
-translate3d!(ef_2, [0, BMO.position(collect_lens)[2] + thickness(collect_lens) + 0.25mm, 0])
+translate3d!(collect_lens, [0, position(ef_1)[2] + thickness(ef_1) + 0.1mm, 0])
+translate3d!(ef_2, [0, position(collect_lens)[2] + thickness(collect_lens) + 0.25mm, 0])
 
 collect_group = ObjectGroup([ef_1, collect_lens, ef_2])
 
