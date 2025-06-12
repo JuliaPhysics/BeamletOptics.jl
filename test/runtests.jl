@@ -875,9 +875,6 @@ end
     BMO.transposed_orientation(tps::TestPointSDF) = transpose(tps.orientation)
     BMO.transposed_orientation!(::TestPointSDF, ::Any) = nothing
 
-    orientation(::TestPointSDF{T}) where {T} = Matrix{T}(I, 3, 3)
-    orientation!(::TestPointSDF, ::Any) = nothing
-
     function BMO.sdf(tps::TestPointSDF, point)
         p = BMO._world_to_sdf(tps, point)
         return norm(p)
