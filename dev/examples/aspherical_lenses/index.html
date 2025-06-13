@@ -110,7 +110,7 @@ L3 = Lens(
     )
 
 # first translate the lens to the L2 position, then shift it by the relative offset with respect to L2
-translate_to3d!(L3, BeamletOptics.position(L2))
+translate_to3d!(L3, position(L2))
 translate3d!(L3, [0, BeamletOptics.thickness(L2) + 0.63e-3,0])
 
 # construct the filter by setting the radius to Inf for front/back, resulting in a parallel plate
@@ -122,7 +122,7 @@ Filt = Lens(
     )
 
 # same principle as for L3
-translate_to3d!(Filt, BeamletOptics.position(L3))
+translate_to3d!(Filt, position(L3))
 translate3d!(Filt, [0, BeamletOptics.thickness(L3) + 0.19e-3,0])
 
 # Construct the cover glass and shift into position
@@ -132,7 +132,7 @@ Cover = Lens(
         0.5e-3,
         n -&gt; 1.469200
     )
-translate_to3d!(Cover, BeamletOptics.position(Filt))
+translate_to3d!(Cover, position(Filt))
 translate3d!(Cover, [0, BeamletOptics.thickness(Filt) + 0.18e-3,0])
 
 system = System([L1, L2, L3, Filt, Cover])
@@ -170,4 +170,4 @@ for beam in beams
         solve_system!(system, abeam, r_max=50)
         render!(ax, abeam, flen=0.12e-3*(1+sind(angle)), color = colors[i], show_pos=true)
     end
-end</code></pre><p><img src="../aspherical_lens_mobile.png" alt="Mobile lens with comples aspheres"/></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../spherical_lenses/">« Spherical lenses</a><a class="docs-footer-nextpage" href="../double_gauss/">Double Gauss lens »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.12.0 on <span class="colophon-date" title="Wednesday 11 June 2025 11:14">Wednesday 11 June 2025</span>. Using Julia version 1.11.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+end</code></pre><p><img src="../aspherical_lens_mobile.png" alt="Mobile lens with comples aspheres"/></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../spherical_lenses/">« Spherical lenses</a><a class="docs-footer-nextpage" href="../double_gauss/">Double Gauss lens »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.12.0 on <span class="colophon-date" title="Friday 13 June 2025 11:10">Friday 13 June 2025</span>. Using Julia version 1.11.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

@@ -50,7 +50,7 @@ function objective_lens_2()
     surf_3 = SphericalSurface(-5.020mm, 2*2.380mm)
     dl11 = Lens(surf_1, surf_2, 0.5mm, NSF4)
     dl12 = Lens(surf_2, surf_3, 2.5mm, NLAK22)
-    translate3d!(dl12, [0, BMO.thickness(dl11), 0])
+    translate3d!(dl12, [0, thickness(dl11), 0])
     obj_lens_2 = DoubletLens(dl11, dl12)
     return obj_lens_2
 end
@@ -62,7 +62,7 @@ function tube_doublet()
     surf_3 = SphericalSurface(-14.413mm, 2*2.812mm, 2*3mm)
     dl21 = Lens(surf_1, surf_2, 3.4mm, NLAK22)
     dl22 = Lens(surf_2, surf_3, 1.0mm, NSF4)
-    translate3d!(dl22, [0, BMO.thickness(dl21), 0])
+    translate3d!(dl22, [0, thickness(dl21), 0])
     tube_lens = DoubletLens(dl21, dl22)
     return tube_lens
 end
@@ -71,8 +71,8 @@ function objective_group()
     obj_lens_1 = objective_lens_1()
     obj_lens_2 = objective_lens_2()
     tube_lens = tube_doublet()
-    translate_to3d!(obj_lens_2, [0, BMO.position(obj_lens_1)[2] + BMO.thickness(obj_lens_1) + 3.344mm, 0])
-    translate_to3d!(tube_lens, [0, BMO.position(obj_lens_2)[2] + BMO.thickness(obj_lens_2) + 2mm, 0])
+    translate_to3d!(obj_lens_2, [0, position(obj_lens_1)[2] + thickness(obj_lens_1) + 3.344mm, 0])
+    translate_to3d!(tube_lens, [0, position(obj_lens_2)[2] + thickness(obj_lens_2) + 2mm, 0])
     _objective_group = ObjectGroup([obj_lens_1, obj_lens_2, tube_lens])
     xrotate3d!(_objective_group, deg2rad(90))
     return _objective_group
@@ -106,8 +106,8 @@ function collection_group()
         NLASF44
     )
 
-    translate3d!(collect_lens, [0, BMO.position(ef_1)[2] + BMO.thickness(ef_1) + 0.1mm, 0])
-    translate3d!(ef_2, [0, BMO.position(collect_lens)[2] + BMO.thickness(collect_lens) + 0.25mm, 0])
+    translate3d!(collect_lens, [0, position(ef_1)[2] + thickness(ef_1) + 0.1mm, 0])
+    translate3d!(ef_2, [0, position(collect_lens)[2] + thickness(collect_lens) + 0.25mm, 0])
 
     collect_group = ObjectGroup([ef_1, collect_lens, ef_2])
 
@@ -117,7 +117,7 @@ function collection_group()
     return collect_group
 end
 
-optical_system() = System([objective_group(), dichroic_splitter(), collection_group()])
+optical_system_group() = ObjectGroup([objective_group(), dichroic_splitter(), collection_group()])
 
 ##
 miniscope = miniscope_body()
@@ -175,7 +175,7 @@ c_view = [
 set_view(ax, c_view)
 save("objective_lens_1.png", fig; px_per_unit=8, update = false)
 
-##
+## lens 2 render
 fig = Figure(size=(600, 200)) 
 display(fig)
 ax = LScene(fig[1,1])
@@ -201,8 +201,8 @@ set_view(ax, c_view)
 save("objective_lens_2.png", fig; px_per_unit=8, update = false)
 
 ## full group render
-translate_to3d!(obj_lens_2, [0, BMO.position(obj_lens_1)[2] + BMO.thickness(obj_lens_1) + 3.344mm, 0])
-translate_to3d!(tube_lens, [0, BMO.position(obj_lens_2)[2] + BMO.thickness(obj_lens_2) + 2mm, 0])
+translate_to3d!(obj_lens_2, [0, position(obj_lens_1)[2] + thickness(obj_lens_1) + 3.344mm, 0])
+translate_to3d!(tube_lens, [0, position(obj_lens_2)[2] + thickness(obj_lens_2) + 2mm, 0])
 
 fig = Figure(size=(600, 300))
 display(fig)
@@ -212,9 +212,9 @@ render!(ax, obj_lens_1, transparency=true, color=lens_color(0.5))
 render!(ax, obj_lens_2, transparency=true, color=lens_color(0.5))
 render!(ax, tube_lens, transparency=true, color=lens_color(0.5))
 
-tp1 = BMO.position(obj_lens_1) + [0, -.5mm, 2mm]
-tp2 = BMO.position(obj_lens_2) + [0, .2mm, 3mm]
-tp3 = BMO.position(tube_lens) + [0, 1.3mm, 4mm]
+tp1 = position(obj_lens_1) + [0, -.5mm, 2mm]
+tp2 = position(obj_lens_2) + [0, .2mm, 3mm]
+tp3 = position(tube_lens) + [0, 1.3mm, 4mm]
 
 text!(tp1, text="obj_lens_1")
 text!(tp2, text="obj_lens_2")
@@ -234,7 +234,7 @@ c_view = [
 set_view(ax, c_view)
 save("full_objective_lens.png", fig; px_per_unit=8, update = false)
 
-##
+## full optical system render
 fig = Figure(size=(600,400))
 display(fig)
 ax = LScene(fig[1,1])
@@ -252,3 +252,38 @@ c_view = [
 
 set_view(ax, c_view)
 save("full_optical_system.png", fig; px_per_unit=8, update = false)
+
+##
+osg = optical_system_group()
+system = System([osg])
+
+# for tutorial
+ps_green = PointSource([0, 0, -0.5mm], [0, 0, 1], deg2rad(20), λ_green, num_rays=1000, num_rings=5)
+ps_red =   PointSource([0, 0, -0.5mm], [0, 0, 1], deg2rad(30), λ_red,   num_rays=1000, num_rings=5)
+
+solve_system!(system, ps_green)
+solve_system!(system, ps_red)
+
+##
+fig = Figure(size=(600,200))
+ax = LScene(fig[1,1])
+hide_axis(ax)
+
+render!(ax, system; color=lens_color())
+render!(ax, ps_green;   color=RGBAf(0,1,0,1.00), render_every=5, flen=3mm, show_pos=false)
+render!(ax, ps_red;     color=RGBAf(1,0,0,0.25), render_every=5, flen=3mm, show_pos=false)
+
+display(fig)
+
+set_orthographic(ax)
+
+c_view = [
+  0  0   1 -0.015
+  0 -1   0  0
+  1  0   0 -0.55
+  0  0   0  1
+]
+
+set_view(ax, c_view)
+
+save("miniscope_trace.png", fig; px_per_unit=8, update = false)

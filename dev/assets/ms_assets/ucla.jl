@@ -38,7 +38,7 @@ surf_3 = SphericalSurface(-5.020mm, 2*2.380mm)
 dl11 = Lens(surf_1, surf_2, 0.5mm, NBK7)
 dl12 = Lens(surf_2, surf_3, 2.5mm, NBK7)
 
-translate3d!(dl12, [0, BMO.thickness(dl11), 0])
+translate3d!(dl12, [0, thickness(dl11), 0])
 
 obj_lens_2 = DoubletLens(dl11, dl12)
 
@@ -58,13 +58,13 @@ end
 dl21 = Lens(surf_1, surf_2, 3.4mm, NBK7)
 dl22 = Lens(surf_2, surf_3, 1.0mm, NBK7)
 
-translate3d!(dl22, [0, BMO.thickness(dl21), 0])
+translate3d!(dl22, [0, thickness(dl21), 0])
 
 tube_lens = DoubletLens(dl21, dl22)
 
 ## Objective group
-translate_to3d!(obj_lens_2, [0, BMO.position(obj_lens_1)[2] + BMO.thickness(obj_lens_1) + 3.344mm, 0])
-translate_to3d!(tube_lens, [0, BMO.position(obj_lens_2)[2] + BMO.thickness(obj_lens_2) + 2mm, 0])
+translate_to3d!(obj_lens_2, [0, position(obj_lens_1)[2] + thickness(obj_lens_1) + 3.344mm, 0])
+translate_to3d!(tube_lens, [0, position(obj_lens_2)[2] + thickness(obj_lens_2) + 2mm, 0])
 
 objective_group = ObjectGroup([obj_lens_1, obj_lens_2, tube_lens])
 
@@ -91,8 +91,8 @@ collect_lens = Lens(
     NBK7
 )
 
-translate3d!(collect_lens, [0, BMO.position(ef_1)[2] + BMO.thickness(ef_1) + 0.1mm, 0])
-translate3d!(ef_2, [0, BMO.position(collect_lens)[2] + BMO.thickness(collect_lens) + 0.25mm, 0])
+translate3d!(collect_lens, [0, position(ef_1)[2] + thickness(ef_1) + 0.1mm, 0])
+translate3d!(ef_2, [0, position(collect_lens)[2] + thickness(collect_lens) + 0.25mm, 0])
 
 collect_group = ObjectGroup([ef_1, collect_lens, ef_2])
 
