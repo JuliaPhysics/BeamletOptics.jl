@@ -237,11 +237,10 @@ solve_system!(system, ps_red)
 The results can be visualized with the following script:
 
 ```julia
-fig = Figure(size=(600,200))
+fig = Figure()
 ax = LScene(fig[1,1])
-hide_axis(ax)
 
-render!(ax, system;   color=lens_color())
+render!(ax, system)
 render!(ax, ps_green; color=RGBAf(0,1,0,1.00), render_every=5, flen=3mm, show_pos=false)
 render!(ax, ps_red;   color=RGBAf(1,0,0,0.25), render_every=5, flen=3mm, show_pos=false)
 ```
