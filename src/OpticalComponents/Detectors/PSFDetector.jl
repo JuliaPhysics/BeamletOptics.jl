@@ -6,7 +6,7 @@ struct PSFData{T}
     k::T
 end
 
-position(data::PSFData) = data.hit
+Base.position(data::PSFData) = data.hit
 direction(data::PSFData) = data.dir
 optical_path_length(data::PSFData) = data.opl
 wavenumber(data::PSFData) = data.k
