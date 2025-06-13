@@ -84,7 +84,7 @@ which posesses a surface with the given specs on one side and most often a bound
 !!! info
     Always keep in mind that this package performs closed-volume baced ray tracing using either SDFs or meshes.
 """
-sdf(::AbstractRotationallySymmetricSurface, ::Union{Nothing, AbstractOrientationType}) = throw(ArgumentError(lazy"sdf of $(typeof(s)) not implemented"))
+sdf(s::AbstractRotationallySymmetricSurface, ::Union{Nothing, AbstractOrientationType}) = throw(ArgumentError(lazy"sdf of $(typeof(s)) not implemented"))
 sdf(s::AbstractRotationallySymmetricSurface) = sdf(s, nothing)
 
 

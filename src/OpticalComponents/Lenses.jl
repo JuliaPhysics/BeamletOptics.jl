@@ -199,7 +199,7 @@ function Lens(
             if md_mid > d_mid
                 _thickness = thickness(shape.cylinder)
                 pos = position(shape.cylinder)
-                ring = RingSDF(d / 2, (md_mid - d_mid) / 2, _thickness)
+                ring = RingSDF(d_mid / 2, (md_mid - d_mid) / 2, _thickness)
                 translate3d!(ring, [0, pos[2] + _thickness / 2, 0])
                 shape += ring
             end
