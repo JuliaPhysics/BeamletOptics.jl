@@ -41,6 +41,8 @@ shape(object::AbstractObject) = shape(shape_trait_of(object), object)
     position(object) -> Point3
 
 Returns the current `position` of the `object` in R³ as a `Point3` where (x, y, z) in a right-hand coordinate system.
+
+In general, `position(object)` returns `position(shape(object))` unless specified otherwise.
 """
 Base.position(object::AbstractObject) = position(shape_trait_of(object), object)
 position!(object::AbstractObject, pos) = position!(shape_trait_of(object), object, pos)
@@ -50,6 +52,8 @@ position!(object::AbstractObject, pos) = position!(shape_trait_of(object), objec
 
 Returns the current `orientation` of the `object` in R³ as a matrix.
 The matrix represents the local fixed-body coordinate system.
+
+In general, `orientation(object)` returns `orientation(shape(object))` unless specified otherwise.
 """
 orientation(object::AbstractObject) = orientation(shape_trait_of(object), object)
 orientation!(object::AbstractObject, dir) = orientation!(shape_trait_of(object), object, dir)

@@ -216,9 +216,37 @@ Elements can still be moved mutably while being inside the `system` and their fi
 
 ## Geometrical ray tracing of the miniscope
 
-Finally we are ready to perform the ray tracing step.
+Finally we are ready to perform the ray tracing step. This requires us to have a defined `system` and one or more `beam`s for the `solve_system!(system, beam)` function. For more information on this topic, refer to the section: [Tracing systems](@ref). 
 
-!!! warning
-    This section is under construction and requires the `PointSource` type...
+This package provides the convenience [`PointSource`](@ref) which will allows us to model a spread fan of light rays easily. We will define two monochromatic sources for the wavelengths specified above:
+
+```julia
+ps_green = PointSource([0, 0, -0.5mm], [0, 0, 1], deg2rad(20), λ_green, num_rays=1000, num_rings=5)
+ps_red =   PointSource([0, 0, -0.5mm], [0, 0, 1], deg2rad(30), λ_red,   num_rays=1000, num_rings=5)
+```
+
+The sources for $\lambda_{546.1~\mathrm{nm}}$ and $\lambda_{656.3~\mathrm{nm}}$ are initialized 0.5mm below the first optical surface of the imaging system with half-spread-angles of 20° and 30°, respectively. It is important to note that this value was chosen in order to roughly match the illustrated optical path in the miniscope publication [Madruga:2024; Fig. 1](@cite). Feel free to play around the initialization values and observe how they influence the result of the optical path. Further, each source is initialized with a total of 1000 rays layered in 5 rings, where the first "ring" is a single beam along the optical axis.
+
+In order to calculate the optical path, simply run the following command:
+
+```julia
+solve_system!(system, ps_green)
+solve_system!(system, ps_red)
+```
+
+The results can be visualized with the following script:
+
+```julia
+fig = Figure(size=(600,200))
+ax = LScene(fig[1,1])
+hide_axis(ax)
+
+render!(ax, system;   color=lens_color())
+render!(ax, ps_green; color=RGBAf(0,1,0,1.00), render_every=5, flen=3mm, show_pos=false)
+render!(ax, ps_red;   color=RGBAf(1,0,0,0.25), render_every=5, flen=3mm, show_pos=false)
+```
+
+For the plotting of the `PointSource` we will use the `render_every` keyword argument in order to only display every fifth beam. The `flen` keyword limits the length of the final, non-intersecting ray to 3mm after its last interaction. Below, the resulting figure is displayed (rotated by 90°):
+
 
 ![Miniscope optical path](miniscope_trace.png)

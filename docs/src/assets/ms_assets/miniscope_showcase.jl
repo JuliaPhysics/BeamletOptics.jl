@@ -256,10 +256,10 @@ save("full_optical_system.png", fig; px_per_unit=8, update = false)
 ##
 osg = optical_system_group()
 system = System([osg])
-xrotate3d!(osg, deg2rad(-90))
 
-ps_green = PointSource([0, -0.77mm, .25mm], [0, 1, 0], deg2rad(15), λ_green, num_rays=100, num_rings=5)
-ps_red = PointSource([0, -0.77mm, -.25mm], [0, 1, 0], deg2rad(15), λ_red, num_rays=100, num_rings=5)
+# for tutorial
+ps_green = PointSource([0, 0, -0.5mm], [0, 0, 1], deg2rad(20), λ_green, num_rays=1000, num_rings=5)
+ps_red =   PointSource([0, 0, -0.5mm], [0, 0, 1], deg2rad(30), λ_red,   num_rays=1000, num_rings=5)
 
 solve_system!(system, ps_green)
 solve_system!(system, ps_red)
@@ -270,18 +270,18 @@ ax = LScene(fig[1,1])
 hide_axis(ax)
 
 render!(ax, system; color=lens_color())
-render!(ax, ps_green; color=:green2, render_every=1, flen=3mm, show_pos=false)
-render!(ax, ps_red; color=:red, render_every=1, flen=3mm, show_pos=false)
+render!(ax, ps_green;   color=RGBAf(0,1,0,1.00), render_every=5, flen=3mm, show_pos=false)
+render!(ax, ps_red;     color=RGBAf(1,0,0,0.25), render_every=5, flen=3mm, show_pos=false)
 
 display(fig)
 
 set_orthographic(ax)
 
 c_view = [
- 0  1   0   -0.015
- 0  0   1   0
- 1  0   0   -0.55
- 0  0   0   1
+  0  0   1 -0.015
+  0 -1   0  0
+  1  0   0 -0.55
+  0  0   0  1
 ]
 
 set_view(ax, c_view)
