@@ -37,7 +37,7 @@ The following inputs and arguments can be used to configure the [`PointSource`](
 
 - `pos`: center beam starting position
 - `dir`: center beam starting direction
-- `θ`: half spread angle
+- `θ`: half spread angle in rad
 - `λ = 1e-6`: wavelength in [m], default val. is 1000 nm
 
 ## Keyword Arguments

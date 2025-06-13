@@ -253,7 +253,7 @@ end
     @testset "AbstractRay" begin
         r = TestRay([0.0, 0, 0], [1.0, 0, 0])
         # Test getters
-        @test BMO.position(r) == r.pos
+        @test position(r) == r.pos
         @test BMO.direction(r) == r.dir
         @test BMO.wavelength(r) == r.λ
         @test BMO.refractive_index(r) == r.n
@@ -266,7 +266,7 @@ end
         BMO.direction!(r, n_dir)
         BMO.wavelength!(r, n_lam)
         BMO.refractive_index!(r, n_rfi)
-        @test BMO.position(r) == n_pos
+        @test position(r) == n_pos
         @test BMO.direction(r) ≈ n_dir .* (sqrt(2) / 2)
         @test BMO.wavelength(r) == n_lam
         @test BMO.refractive_index(r) == n_rfi
@@ -337,35 +337,35 @@ end
         shape = TestShapeless(pos, dir)
         # Test get/set
         @test BMO.position(shape) == pos
-        @test BMO.orientation(shape) == dir
+        @test orientation(shape) == dir
         n_pos = [1, 1, 1]
         n_dir = BMO.rotate3d([0, 0, 1], π / 4)
         BMO.position!(shape, n_pos)
         BMO.orientation!(shape, n_dir)
-        @test BMO.position(shape) == n_pos
-        @test BMO.orientation(shape) == n_dir
+        @test position(shape) == n_pos
+        @test orientation(shape) == n_dir
         # Test translation
         translate3d!(shape, n_pos)
-        @test BMO.position(shape) == 2 * n_pos
+        @test position(shape) == 2 * n_pos
         reset_translation3d!(shape)
-        @test BMO.position(shape) == zeros(3)
+        @test position(shape) == zeros(3)
         # Test rotation for counter-clockwise in right-hand coord. system
         dir = Matrix{Float64}(I, 3, 3)
         BMO.orientation!(shape, dir)
         rotate3d!(shape, [0, 0, 1], deg2rad(45))
-        @test all(BMO.orientation(shape)[[1, 2, 5]] .≈ sqrt(2) / 2)
-        @test BMO.orientation(shape)[4] ≈ -sqrt(2) / 2
+        @test all(orientation(shape)[[1, 2, 5]] .≈ sqrt(2) / 2)
+        @test orientation(shape)[4] ≈ -sqrt(2) / 2
         rotate3d!(shape, [0, 0, 1], deg2rad(135))
-        @test BMO.orientation(shape)[1:4:9] == [-1, -1, 1]
+        @test orientation(shape)[1:4:9] == [-1, -1, 1]
         xrotate3d!(shape, π)
         yrotate3d!(shape, π)
         zrotate3d!(shape, π)
         reset_rotation3d!(shape)
-        @test BMO.orientation(shape) == dir
+        @test orientation(shape) == dir
         # Test align3d
         target_vec = normalize([1, 1, 1])
         align3d!(shape, target_vec)
-        @test BMO.orientation(shape)[:, 2] ≈ target_vec
+        @test orientation(shape)[:, 2] ≈ target_vec
         reset_rotation3d!(shape)
         # The following test are expected to do nothing but not throw exceptions
         ray = TestRay([0.0, 0, 0], [1.0, 0, 0])
@@ -398,22 +398,22 @@ end
         object = TestObject()
         @test isa(BMO.shape(object), TestShapeless)
         # Test forwarding of kin. API to object shape
-        @test BMO.position(object) ==
-              BMO.position(BMO.shape(object))
-        @test BMO.position(object) ==
-              BMO.position(BMO.shape(object))
+        @test position(object) ==
+              position(BMO.shape(object))
+        @test position(object) ==
+              position(BMO.shape(object))
         translate3d!(object, ones(3))
         rotate3d!(object, [0, 0, 1], π)
-        @test BMO.position(object) == ones(3)
-        @test BMO.orientation(object)[1:4:9] == [-1, -1, 1]
+        @test position(object) == ones(3)
+        @test orientation(object)[1:4:9] == [-1, -1, 1]
         reset_translation3d!(object)
         reset_rotation3d!(object)
-        @test BMO.position(object) == zeros(3)
-        @test BMO.orientation(object)[1:4:9] == ones(3)
+        @test position(object) == zeros(3)
+        @test orientation(object)[1:4:9] == ones(3)
         # Test translate_to3d
         target_pos = [1, 3, 9]
         translate_to3d!(object, target_pos)
-        @test BMO.position(object) == target_pos
+        @test position(object) == target_pos
 
         @testset "Testing interact3d" begin
             sys = TestSystem()
@@ -520,7 +520,7 @@ end
         
         tg = BeamTestGroup(BMO.Beam(pos, dir, lambda))
         
-        @test BMO.position(tg) == pos
+        @test position(tg) == pos
         @test BMO.direction(tg) == dir
         @test BMO.wavelength(tg) == lambda
         
@@ -545,14 +545,14 @@ end
         
         @testset "Testing point source getters" begin
             @test BMO.numerical_aperture(source) == NA
-            @test BMO.position(source) == pos
+            @test position(source) == pos
             @test BMO.direction(source) ≈ normalize(dir)
         end
         
         @testset "Testing point source max. spread" begin
             last_ray = first(BMO.rays(last(BMO.beams(source))))
             @test BMO.angle3d(dir, BMO.direction(last_ray)) ≈ alpha atol = 1e-14
-            @test BMO.position(last_ray) == pos
+            @test position(last_ray) == pos
             @test length(BMO.beams(source)) == num_rays
         end
         
@@ -593,7 +593,7 @@ end
         
         @testset "Testing coll. source getters" begin 
             @test BMO.diameter(source) == diameter
-            @test BMO.position(source) == pos
+            @test position(source) == pos
             @test BMO.direction(source) == dir
             @test BMO.wavelength(source) == 1e-6
         end
@@ -601,13 +601,13 @@ end
         @testset "Testing coll. source max. spread diameter" begin
             last_ray = first(BMO.rays(last(BMO.beams(source))))
             @test BMO.direction(last_ray) == dir
-            @test norm(BMO.position(last_ray) - pos) ≈ diameter/2
+            @test norm(position(last_ray) - pos) ≈ diameter/2
             @test length(BMO.beams(source)) == num_rays
         end
         
         @testset "Testing coll. source generated positions" begin
             # Test for center ray 0 offset, generated radii
-            positions = BMO.position.(first.(BMO.rays.(BMO.beams(source))))
+            positions = position.(first.(BMO.rays.(BMO.beams(source))))
             radii = norm.(positions .- Ref(pos))
             generated_pos = unique(round.(radii, digits=11))
             required_pos = LinRange(0, diameter/2, num_rings)
@@ -644,8 +644,8 @@ end
         @test typeof(foo) == BMO.Mesh{Float64}
         @test BMO.vertices(foo) == foo.vertices
         @test BMO.faces(foo) == foo.faces
-        @test BMO.orientation(foo) == foo.dir
-        @test BMO.position(foo) == foo.pos
+        @test orientation(foo) == foo.dir
+        @test position(foo) == foo.pos
         @test BMO.scale(foo) == foo.scale
     end
 
@@ -657,12 +657,12 @@ end
         @test maximum(BMO.vertices(foo)[:, 1]) == 0.5
         @test maximum(BMO.vertices(foo)[:, 2]) == 0.5
         @test maximum(BMO.vertices(foo)[:, 3]) == 0.5
-        @test all(BMO.position(foo) .== -0.5)
+        @test all(position(foo) .== -0.5)
     end
 
     @testset "Testing set_new_origin3d!" begin
         BMO.set_new_origin3d!(foo)
-        @test BMO.position(foo) == zeros(3)
+        @test position(foo) == zeros(3)
     end
 
     @testset "Testing x/y/zrotate3d!" begin
@@ -709,7 +709,7 @@ end
         end
 
         # Testing orientation of dir matrix
-        @test BMO.orientation(foo)[[3, 5, 7]] == [-1, 1, 1]
+        @test orientation(foo)[[3, 5, 7]] == [-1, 1, 1]
     end
 
     # center bar reference cube at origin
@@ -720,17 +720,17 @@ end
         translate3d!(foo, [1, 2, 3])
         reset_translation3d!(foo)
         reset_rotation3d!(foo)
-        @test BMO.position(foo) == zeros(3)
-        @test BMO.orientation(foo) ≈ BMO.orientation(bar)
+        @test position(foo) == zeros(3)
+        @test orientation(foo) ≈ orientation(bar)
         @test BMO.vertices(foo) ≈ BMO.vertices(bar)
     end
 
     @testset "Testing align3d!" begin
         align3d!(foo, normalize([0, 1, 1]))
-        @test BMO.position(foo) == zeros(3)
-        @test BMO.orientation(foo)[:, 1] ≈ [1, 0, 0]
-        @test BMO.orientation(foo)[:, 2] ≈ [0, √2 / 2, √2 / 2]
-        @test BMO.orientation(foo)[:, 3] ≈ [0, -√2 / 2, √2 / 2]
+        @test position(foo) == zeros(3)
+        @test orientation(foo)[:, 1] ≈ [1, 0, 0]
+        @test orientation(foo)[:, 2] ≈ [0, √2 / 2, √2 / 2]
+        @test orientation(foo)[:, 3] ≈ [0, -√2 / 2, √2 / 2]
         reset_rotation3d!(foo)
     end
 
@@ -874,9 +874,6 @@ end
 
     BMO.transposed_orientation(tps::TestPointSDF) = transpose(tps.orientation)
     BMO.transposed_orientation!(::TestPointSDF, ::Any) = nothing
-
-    orientation(::TestPointSDF{T}) where {T} = Matrix{T}(I, 3, 3)
-    orientation!(::TestPointSDF, ::Any) = nothing
 
     function BMO.sdf(tps::TestPointSDF, point)
         p = BMO._world_to_sdf(tps, point)
@@ -1062,11 +1059,11 @@ end
 
     @testset "translate3d" begin
         # Test if all objects/subgroups have been translated
-        @test BMO.position(objects) == target
-        @test BMO.position(center) == target
-        @test BMO.position(circle) == target
+        @test position(objects) == target
+        @test position(center) == target
+        @test position(circle) == target
         for (i, obj) in enumerate(BMO.objects(circle))
-            @test BMO.position(obj) == [xs[i], ys[i], 0] + target
+            @test position(obj) == [xs[i], ys[i], 0] + target
         end
     end
 
@@ -1079,12 +1076,12 @@ end
         Rt = BMO.rotate3d([0, 0, 1], angle)
         xt = circshift(xs, -1)
         yt = circshift(ys, -1)
-        @test BMO.orientation(objects) == Rt
-        @test BMO.orientation(center) ≈ Rt
-        @test BMO.orientation(circle) == Rt
+        @test orientation(objects) == Rt
+        @test orientation(center) ≈ Rt
+        @test orientation(circle) == Rt
         for (i, obj) in enumerate(BMO.objects(circle))
-            @test BMO.orientation(obj) == Rt
-            @test BMO.position(obj) ≈ [xt[i], yt[i], 0] + target
+            @test orientation(obj) == Rt
+            @test position(obj) ≈ [xt[i], yt[i], 0] + target
         end
     end
 
@@ -1095,15 +1092,15 @@ end
     @testset "reset functions" begin
         Ri = Matrix{Float64}(I, 3, 3)
         # Test if objects are reset correctly to initial positioning
-        @test BMO.position(objects) == zeros(3)
-        @test BMO.position(center) == zeros(3)
-        @test BMO.position(circle) == zeros(3)
-        @test BMO.orientation(objects) == Ri
-        @test BMO.orientation(center) ≈ Ri
-        @test BMO.orientation(circle) ≈ Ri
+        @test position(objects) == zeros(3)
+        @test position(center) == zeros(3)
+        @test position(circle) == zeros(3)
+        @test orientation(objects) == Ri
+        @test orientation(center) ≈ Ri
+        @test orientation(circle) ≈ Ri
         for (i, obj) in enumerate(Leaves(BMO.objects(circle)))
-            @test isapprox(BMO.position(obj)[1], xs[i], atol = 5e-16)
-            @test isapprox(BMO.position(obj)[2], ys[i], atol = 5e-16)
+            @test isapprox(position(obj)[1], xs[i], atol = 5e-16)
+            @test isapprox(position(obj)[2], ys[i], atol = 5e-16)
         end
     end
 
@@ -1135,7 +1132,7 @@ end
         R2 = 1
         nl = 1.5
         tl = BMO.ThinLensSDF(R1, R2, 0.1)
-        translate3d!(tl, [0, -BMO.thickness(tl) / 2, 0])
+        translate3d!(tl, [0, -thickness(tl) / 2, 0])
         p = Lens(tl, x -> 1.5)
         system = System(p)
 
@@ -1167,38 +1164,38 @@ end
         l = 6.8e-3
         LB1811 = SphericalLens(r1, r2, l)
         @test typeof(BMO.shape(LB1811)) <: BMO.UnionSDF
-        @test BMO.thickness(BMO.shape(LB1811)) == l
+        @test thickness(BMO.shape(LB1811)) == l
         r1 = Inf
         r2 = -15.5e-3
         l = 8.6e-3
         LA1805 = SphericalLens(r1, r2, l)
         @test typeof(BMO.shape(LA1805)) <: BMO.UnionSDF
-        @test BMO.thickness(BMO.shape(LA1805)) == l
+        @test thickness(BMO.shape(LA1805)) == l
         r1 = -52.0e-3
         r2 = -r1
         l = 3e-3
         LD1464 = SphericalLens(r1, r2, l)
         @test typeof(BMO.shape(LD1464)) <: BMO.UnionSDF
-        @test BMO.thickness(BMO.shape(LD1464)) == l
+        @test thickness(BMO.shape(LD1464)) == l
         r1 = Inf
         r2 = 25.7e-3
         l = 3.5e-3
         LC1715 = SphericalLens(r1, r2, l)
         @test typeof(BMO.shape(LC1715)) <: BMO.UnionSDF
-        @test BMO.thickness(BMO.shape(LC1715)) == l
+        @test thickness(BMO.shape(LC1715)) == l
         r1 = -82.2e-3
         r2 = -32.1e-3
         l = 3.6e-3
         LE1234 = SphericalLens(r1, r2, l)
         @test typeof(BMO.shape(LE1234)) <: BMO.UnionSDF
-        @test BMO.thickness(BMO.shape(LE1234)) == l
+        @test thickness(BMO.shape(LE1234)) == l
     end
 
     """Test coma for rotated and translated optical system"""
     function test_coma(ray::BMO.AbstractRay, f0::AbstractArray,
             dir::AbstractArray; atol = 7e-5)
         is = BMO.intersect3d(f0, dir, ray)
-        p0 = BMO.position(ray) + length(is) * BMO.direction(ray)
+        p0 = position(ray) + length(is) * BMO.direction(ray)
         dz = norm(p0 - f0)
         if dz ≤ atol
             return true
@@ -1228,13 +1225,13 @@ end
             zs = LinRange(-z0, z0, 30)
             fs = similar(zs)
             # Beam spawn point
-            dir = -BMO.orientation(AC254_150_AB.back.shape)[:, 2]       # rotated collimated ray direction
-            pos = BMO.position(AC254_150_AB.front.shape) + 0.05 * dir  # rotated collimated ray position
+            dir = -orientation(AC254_150_AB.back.shape)[:, 2]       # rotated collimated ray direction
+            pos = position(AC254_150_AB.front.shape) + 0.05 * dir  # rotated collimated ray position
             nv = BMO.normal3d(dir)                                     # orthogonal to moved system optical axis
             beam = Beam(pos, -dir, λ)
             # Calculate equivalent back focal length point
-            f_z = BMO.thickness(AC254_150_AB) + bfl + δf
-            f0 = BMO.position(AC254_150_AB.front.shape) + f_z * -dir
+            f_z = thickness(AC254_150_AB) + bfl + δf
+            f0 = position(AC254_150_AB.front.shape) + f_z * -dir
             for (i, z) in enumerate(zs)
                 beam.rays[1].pos = pos + z * nv
                 solve_system!(system, beam)
@@ -1285,9 +1282,9 @@ end
         )
 
         # test lens thickness
-        @test BMO.thickness(lens) ≈ l
+        @test thickness(lens) ≈ l
         # test edge thickness
-        @test BMO.thickness(BMO.shape(lens).sdfs[1])≈2e-3 atol=1e-4
+        @test thickness(BMO.shape(lens).sdfs[1])≈2e-3 atol=1e-4
         # test back focal length
         @test working_distance(lens, 0.05 * d / 2)≈29.5e-3 atol=1e-4
 
@@ -1305,9 +1302,9 @@ end
         shape = lens.shape
 
         # test lens thickness
-        @test BMO.thickness(lens) ≈ l
+        @test thickness(lens) ≈ l
         # test edge thickness
-        @test BMO.thickness(shape.sdfs[1])≈1.9e-3 atol=1e-4
+        @test thickness(shape.sdfs[1])≈1.9e-3 atol=1e-4
         # test back focal length
         @test working_distance(lens, 0.05 * d / 2)≈22.2e-3 atol=1e-3
 
@@ -1325,10 +1322,10 @@ end
         shape = lens.shape
 
         # test lens thickness
-        @test BMO.thickness(lens) ≈ l
+        @test thickness(lens) ≈ l
         # test edge thickness
         @test BMO.sag(shape.sdfs[2]) +
-              BMO.thickness(shape.sdfs[1])≈0.006858 atol=1e-4
+              thickness(shape.sdfs[1])≈0.006858 atol=1e-4
 
         ## Thorlabs LD2297, bi-concave
         r1 = -39.6e-3
@@ -1344,10 +1341,10 @@ end
         shape = lens.shape
 
         # test lens thickness
-        @test BMO.thickness(lens) ≈ l
+        @test thickness(lens) ≈ l
 
         @test BMO.sag(shape.sdfs[2]) + BMO.sag(shape.sdfs[3]) +
-              BMO.thickness(shape.sdfs[1])≈0.0072 atol=1e-4
+              thickness(shape.sdfs[1])≈0.0072 atol=1e-4
 
         ## Thorlabs LBF254-040, best-form
         r1 = 134.6e-3
@@ -1363,10 +1360,10 @@ end
         shape = lens.shape
 
         # test lens thickness
-        @test BMO.thickness(lens) ≈ l
+        @test thickness(lens) ≈ l
 
         # test edge thickness
-        @test BMO.thickness(shape.sdfs[1])≈2.286e-3 atol=1e-4
+        @test thickness(shape.sdfs[1])≈2.286e-3 atol=1e-4
 
         ## Thorlabs LE1234, positive meniscus
         r1 = -82.2e-3
@@ -1382,10 +1379,10 @@ end
         shape = lens.shape
 
         # test lens thickness
-        @test BMO.thickness(lens) ≈ l
+        @test thickness(lens) ≈ l
 
         # test edge thickness
-        @test BMO.thickness(shape.sdfs[1]) + BMO.sag(shape.sdfs[2])≈2e-3 atol=1e-4
+        @test thickness(shape.sdfs[1]) + BMO.sag(shape.sdfs[2])≈2e-3 atol=1e-4
 
         ## Thorlabs LF1822, negative meniscus
         r1 = -33.7e-3
@@ -1401,10 +1398,10 @@ end
         shape = lens.shape
 
         # test lens thickness
-        @test BMO.thickness(lens) ≈ l
+        @test thickness(lens) ≈ l
 
         # test edge thickness
-        @test BMO.thickness(shape.sdfs[1]) +
+        @test thickness(shape.sdfs[1]) +
               BMO.sag(shape.sdfs[2])≈4.7e-3 atol=1e-4
 
         ## Generic "true" meniscus
@@ -1421,7 +1418,7 @@ end
         shape = lens.shape
 
         # test lens thickness
-        @test BMO.thickness(lens) ≈ l
+        @test thickness(lens) ≈ l
 
         # test ring generation
         NBK7 = DiscreteRefractiveIndex([532e-9, 1064e-9], [1.5195, 1.5066])
@@ -1496,7 +1493,7 @@ end
             beam = Beam(ray)
             solve_system!(system, beam, r_max = 40)
 
-            surf_errors[i] = (BMO.position(beam.rays[begin]) + length(beam.rays[begin]) .* BMO.direction(beam.rays[begin]))[2] -
+            surf_errors[i] = (position(beam.rays[begin]) + length(beam.rays[begin]) .* BMO.direction(beam.rays[begin]))[2] -
                              BMO.aspheric_equation(ray.pos[3], 1 / R, k, A)
         end
 
@@ -1560,7 +1557,7 @@ end
             n -> 1.804700
         )
 
-        translate3d!(L2, [0, BMO.thickness(L1) + 0.39e-3, 0])
+        translate3d!(L2, [0, thickness(L1) + 0.39e-3, 0])
 
         L3 = Lens(
             EvenAsphericalSurface(
@@ -1583,8 +1580,8 @@ end
             n -> 1.580200
         )
 
-        translate_to3d!(L3, BMO.position(L2))
-        translate3d!(L3, [0, BMO.thickness(L2) + 0.63e-3, 0])
+        translate_to3d!(L3, position(L2))
+        translate3d!(L3, [0, thickness(L2) + 0.63e-3, 0])
 
         Filt = Lens(
             CircularFlatSurface(4.2e-3),
@@ -1592,23 +1589,23 @@ end
             n -> 1.516800
         )
 
-        translate_to3d!(Filt, BMO.position(L3))
-        translate3d!(Filt, [0, BMO.thickness(L3) + 0.19e-3, 0])
+        translate_to3d!(Filt, position(L3))
+        translate3d!(Filt, [0, thickness(L3) + 0.19e-3, 0])
 
         Cover = Lens(
             CircularFlatSurface(4.9e-3),
             0.5e-3,
             n -> 1.469200
         )
-        translate_to3d!(Cover, BMO.position(Filt))
-        translate3d!(Cover, [0, BMO.thickness(Filt) + 0.18e-3, 0])
+        translate_to3d!(Cover, position(Filt))
+        translate3d!(Cover, [0, thickness(Filt) + 0.18e-3, 0])
 
         # test thickness
-        @test BMO.thickness(L1) ≈ 0.72e-3
-        @test BMO.thickness(L2) ≈ 0.55e-3
-        @test BMO.thickness(L3) ≈ 0.7e-3
-        @test BMO.thickness(Filt) ≈ 0.15e-3
-        @test BMO.thickness(Cover) ≈ 0.5e-3
+        @test thickness(L1) ≈ 0.72e-3
+        @test thickness(L2) ≈ 0.55e-3
+        @test thickness(L3) ≈ 0.7e-3
+        @test thickness(Filt) ≈ 0.15e-3
+        @test thickness(Cover) ≈ 0.5e-3
 
         system = System([L1, L2, L3, Filt, Cover])
 
@@ -1659,9 +1656,9 @@ end
         )
 
         # test lens thickness
-        @test BMO.thickness(lens) ≈ ct
+        @test thickness(lens) ≈ ct
         # test edge thickness
-        @test BMO.thickness(BMO.shape(lens).sdfs[1])≈2.12e-3 atol=1e-4
+        @test thickness(BMO.shape(lens).sdfs[1])≈2.12e-3 atol=1e-4
         # test back focal length
         @test working_distance(lens, 0.05 * d / 2)≈6.1e-3 atol=1e-4
 
@@ -1677,7 +1674,7 @@ end
         )
 
         # test lens thickness
-        @test BMO.thickness(lens) ≈ ct
+        @test thickness(lens) ≈ ct
     end
 
     @testset "Convex/cav acylinder lenses" begin
@@ -1700,7 +1697,7 @@ end
         )
 
         # test lens thickness
-        @test BMO.thickness(lens) ≈ ct
+        @test thickness(lens) ≈ ct
 
         # test back focal length
         @test working_distance(lens, 0.05 * diameter / 2) ≈ 15.8e-3 atol=1e-4
@@ -1724,7 +1721,7 @@ end
         )
 
         # test lens thickness
-        @test BMO.thickness(lens) ≈ ct
+        @test thickness(lens) ≈ ct
     end
 end
 
@@ -1899,10 +1896,10 @@ end
             # compare ray intersection to stored data
             data = last(sd.data)
             ray = last(beam.rays)
-            pos_ray = BMO.position(ray) +
+            pos_ray = position(ray) +
                       length(BMO.intersection(ray)) * BMO.direction(ray)
-            pos_dta = BMO.position(sd) +
-                      BMO.orientation(sd)[:, 1] * data[1]
+            pos_dta = position(sd) +
+                      orientation(sd)[:, 1] * data[1]
             @test pos_ray ≈ pos_dta
         end
         # Test reset function
@@ -1935,7 +1932,7 @@ end
         ln = ThinLens(R1, R2, d, nl)
         translate3d!(pd_l, [0, z, 0])
         translate3d!(pd_s, [0, z, 0])
-        translate3d!(ln, [0, z - f - BMO.thickness(ln.shape) / 2, 0])
+        translate3d!(ln, [0, z - f - thickness(ln.shape) / 2, 0])
 
         @testset "Testing fringe pattern" begin
             system = System(pd_l)
@@ -2383,8 +2380,8 @@ end
         solve_system!(system, beam)
 
         @testset "Test pos/dir" begin
-            @test BMO.position(pbs) == zeros(3)
-            @test BMO.orientation(pbs) ≈ BMO.orientation(pbs.substrate)
+            @test position(pbs) == zeros(3)
+            @test orientation(pbs) ≈ orientation(pbs.substrate)
         end
 
         @testset "Test children after tracing" begin
@@ -2516,6 +2513,12 @@ end
     end
 end
 
+@testset "Render" begin
+    axis = nothing
+    cube = BMO.CubeMesh(1)
+    @test_throws BMO.MissingBackendError render!(axis, cube)
+end
+
 @testset "Double Gauss lens" begin
     """Tests hit distance to detector origin"""
     function test_coma(pd::Spotdetector; atol=7e-5)
@@ -2535,12 +2538,12 @@ end
     40.01e-3, λ -> 1.57046, λ -> 1.64128)
     l6 = SphericalLens(1063.24e-3, -48.88e-3, 6.73e-3, 45.11e-3, λ -> 1.62286)
     # Calculate translation distances
-    l_23 = BMO.thickness(l1) + 0.38e-3
-    l_45 = l_23 + BMO.thickness(l23) + 9.14e-3 + 13.36e-3
-    l_6 = l_45 + BMO.thickness(l45) + 0.38e-3
+    l_23 = thickness(l1) + 0.38e-3
+    l_45 = l_23 + thickness(l23) + 9.14e-3 + 13.36e-3
+    l_6 = l_45 + thickness(l45) + 0.38e-3
     # Corresponds to back focal length of f=59.21 mm on y-axis from link above + "error" δf
     δf = 7e-4
-    f_z = l_6 + BMO.thickness(l6.shape) + 58.21e-3 + δf
+    f_z = l_6 + thickness(l6.shape) + 58.21e-3 + δf
     translate3d!(l23, [0, l_23, 0])
     translate3d!(l45, [0, l_45, 0])
     translate3d!(l6, [0, l_6, 0])
@@ -2559,8 +2562,8 @@ end
     
     @testset "Test with collimated source" begin    
         ## Test against back focal length as per source above
-        dir = BMO.orientation(double_gauss)[:, 2] # rotated collimated ray direction
-        pos = BMO.position(l1) - 0.05 * dir # rotated collimated ray position    
+        dir = orientation(double_gauss)[:, 2] # rotated collimated ray direction
+        pos = position(l1) - 0.05 * dir # rotated collimated ray position    
         source = CollimatedSource(pos, dir, 0.04, 486.0e-9, num_rays=1000, num_rings=10)
         solve_system!(system, source)    
         @test test_coma(detector, atol=2e-5)

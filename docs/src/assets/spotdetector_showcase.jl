@@ -19,7 +19,7 @@ system_ax = Axis3(system_fig[1,1], aspect=aspect, limits=limits, azimuth=-1, ele
 hidedecorations!(system_ax)
 hidespines!(system_ax)
 
-render_system!(system_ax, system)
+render!(system_ax, system)
 
 beam = Beam([0,-50mm,0], [0,1,0], 1e-6)
 
@@ -31,9 +31,7 @@ cs = CollimatedSource([0,-50mm,0], [0,1,0], aperture, 1e-6; num_rings, num_rays)
 
 t1 = @timed solve_system!(system, cs)
 
-for i = 1:50:length(BeamletOptics.beams(cs))
-    render_beam!(system_ax, BeamletOptics.beams(cs)[i], color=:blue, show_pos=true)
-end
+render!(system_ax, cs, color=:blue, show_pos=true, render_every=50)
 
 ## render diagram
 spot_fig = Figure(size=(600,400))

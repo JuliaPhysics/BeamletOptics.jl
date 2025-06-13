@@ -28,7 +28,7 @@ shape_trait_of(::ObjectGroup) = MultiShape()
 
 shape(o::ObjectGroup) = o.objects
 
-position(group::ObjectGroup) = group.center
+Base.position(group::ObjectGroup) = group.center
 position!(group::ObjectGroup, pos) = (group.center = pos)
 
 orientation(group::ObjectGroup) = group.dir
