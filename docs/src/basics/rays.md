@@ -1,3 +1,9 @@
+```@setup rays
+ray_showcase_dir = joinpath(@__DIR__, "..", "assets", "ray_renders")
+
+include(joinpath(ray_showcase_dir, "ray_showcase.jl"))
+```
+
 # Rays
 
 Individual monochromatic rays form the basic building blocks to describe the propagation of light through an optical system using geometrical optics. In general, the ray path in the context of this package is described by 
@@ -6,17 +12,19 @@ Individual monochromatic rays form the basic building blocks to describe the pro
 \vec{x}(t) = \vec{p} + t \cdot \vec{d}
 ```
 
-where ``\vec{p}`` and ``\vec{d}`` are the position and direction ``\mathbb{R}^3``-vectors, respectively. The ray length ``t`` is used to describe the geometrical length of the ray. This assumes that the [`BeamletOptics.RefractiveIndex](@ref) along the ray path is constant. If after solving an optical system a ray intersection is determined, a new ray must be spawned to model an arbitrary light path. This data is stored, e.g., in a [`Beam`](@ref). More on this can be found in the [Beams](@ref) chapter. 
+where ``\vec{p}`` and ``\vec{d}`` are the position and direction ``\mathbb{R}^3``-vectors, respectively. The ray length ``t`` is used to describe the geometrical length of the ray. This assumes that the [`BeamletOptics.RefractiveIndex`](@ref) along the ray path is constant. If after solving an optical system a ray intersection is determined, a new ray must be spawned to model an arbitrary light path. This data is stored, e.g., in a [`Beam`](@ref). More on this can be found in the [Beams](@ref) chapter. 
 
 ## Basic `Ray`
 
-The generic type that describes geometrical rays is [`BeamletOptics.AbstractRay`](@ref). Refer to its documentation for more information about what data is used to model light propagation. A minimal implementation of this API (i.e. subtype) is provided by [`Ray`](@ref):
+The generic type that describes geometrical rays is [`BeamletOptics.AbstractRay`](@ref). Refer to its documentation for more information about what data is used to model light propagation. A minimal implementation of this API (i.e. subtype) is provided by the [`Ray`](@ref):
 
 ```@docs; canonical=false
 Ray
 ```
 
-This ray type is able to model reflection and [refraction](https://www.rp-photonics.com/refraction.html), using Snell's law, within the paraxial approximation. A single ray only ever describes the optical path between its starting point and the closest intersection, e.g. the surface of a [`Lens`](@ref).
+This ray type is able to model reflection and [refraction](https://www.rp-photonics.com/refraction.html), using Snell's law, within the limits of geometrical optics. A single ray only ever describes the optical path between its starting point and the closest intersection, e.g. the surface of a [`Lens`](@ref). A visualization is shown below. The `position` of the `Ray` is stored in relation to a global coordinate system. The normed direction is indicated by the blue arrow. The `Ray` intersects with a shape and stores this data in the `intersection` field. This includes the length until the point of intersection (marked as a dashed blue line) and the normal vector at the intersected surface (marked by a black arrow). 
+
+![Basic ray plot](ray_showcase.png)
 
 ## Polarized Rays
 
@@ -40,7 +48,8 @@ Below the Fresnel coefficients for different ``n_1 \rightarrow n_2`` interfaces 
 First, the Fresnel coefficients for ``n_1 = 1.0`` to ``n_2 = 1.5`` will be calculated. The angle of incidence ``\theta`` refers to the plane of incidence in the `s`enkrecht and `p`arallel coordinate system. Note that the imaginary part of the coefficents is shown by the dash-dotted lines.
 
 ```@example fresnel_vacuum_glass
-using CairoMakie #hide
+using CairoMakie # hide
+CairoMakie.activate!() # hide
 using BeamletOptics
 include("fresnel.jl") # hide
 

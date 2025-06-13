@@ -41,8 +41,8 @@ using GLMakie, BeamletOptics
 
 fig = Figure()
 ax = LScene(fig[1,1])
-render_system!(ax, system)
-render_beam!(ax, beam, flen=1e-2)
+render!(ax, system)
+render!(ax, beam, flen=1e-2)
 ```
 
 The `flen` keyword sets the plotted length of "infinite" beams to 10 cm. Using the `LScene` environment will allow for easy viewing of the optical system and beam path. When the `system` or `beam` change, the plot will not update automatically. Rerunning the plot code above is necessary in this case.

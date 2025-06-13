@@ -26,6 +26,6 @@ beam = Beam(Ray([0, distance/2, 7e-3], [0.17, 1, 0]))
 
 solve_system!(system, beam, r_max=100)
 
-render_beam!(ax, beam, flen=0.1)
-render_object!(ax, m1)
-render_object!(ax, m2)
+render!(ax, beam, flen=0.1)
+render!(ax, m1)
+render!(ax, m2)

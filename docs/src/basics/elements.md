@@ -41,7 +41,7 @@ For a detailed overview, refer to the [Optical components](@ref) section.
 
 ## Moving optical elements
 
-Optical elements can move around freely in three-dimensional space, which enables the modeling of kinematics within optical setups. When objects are manipulated, they are translated and rotated around their self-defined center of gravity, which is represented as a ``\mathbb{R}^3``-vector and will be referred to as its [`BeamletOptics.position`](@ref). Additionally, the [`BeamletOptics.orientation`](@ref) of an object, defined as its local fixed coordinate system, is represented by an orthonormal matrix in ``\mathbb{R}^3``. If the object is rotated, this matrix can be used to calculate the inverse transform into global coordinates. 
+Optical elements can move around freely in three-dimensional space, which enables the modeling of kinematics within optical setups. When objects are manipulated, they are translated and rotated around their self-defined center of gravity, which is represented as a ``\mathbb{R}^3``-vector and will be referred to as its [`position`](@ref). Additionally, the [`orientation`](@ref) of an object, defined as its local fixed coordinate system, is represented by an orthonormal matrix in ``\mathbb{R}^3``. If the object is rotated, this matrix can be used to calculate the inverse transform into global coordinates. 
 
 !!! important "Optical system kinematics"
     Elements can be moved freely between each call of [`solve_system!`](@ref). However, during tracing it is assumed that all elements remain static.
