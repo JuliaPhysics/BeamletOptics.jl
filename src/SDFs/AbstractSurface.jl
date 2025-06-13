@@ -75,14 +75,14 @@ struct BackwardRightMeniscusOrientation <: AbstractOrientationType end
 Takes the surface specification and an optional `AbstractOrientationType` as
 trait parameter and returns a corresponding `AbstractSDF` type.
 
-# Surface vs. volume based tracing 
+# Surface vs. volume based tracing
 
 This function is a mere convenience provider for users coming from other optic simulations frameworks which
 are surface oriented. The goal of this function is to return the best matching closed volume SDF
 which posesses a surface with the given specs on one side and most often a boundary and planar surface on the other side.
 
 !!! info
-    Always keep in mind that this package performs closed-volume baced ray tracing using either SDFs or meshes. 
+    Always keep in mind that this package performs closed-volume baced ray tracing using either SDFs or meshes.
 """
 sdf(::AbstractRotationallySymmetricSurface, ::Union{Nothing, AbstractOrientationType}) = throw(ArgumentError(lazy"sdf of $(typeof(s)) not implemented"))
 sdf(s::AbstractRotationallySymmetricSurface) = sdf(s, nothing)

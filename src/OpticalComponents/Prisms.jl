@@ -13,6 +13,8 @@ struct Prism{T, S <: AbstractShape{T}, N <: RefractiveIndex} <: AbstractRefracti
     end
 end
 
+thickness(p::Prism) = thickness(shape(p))
+
 """
     RightAnglePrism(leg_length, height, n)
 
