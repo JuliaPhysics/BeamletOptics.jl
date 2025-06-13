@@ -10,8 +10,9 @@ using AbstractTrees: AbstractTrees, parent, children, NodeType, nodetype, nodeva
 using InteractiveUtils: subtypes
 using FileIO: load
 using MeshIO
+using ForwardDiff: gradient
 
-import Base: length, showerror
+import Base: length, push!, empty!
 
 # Do not change order of inclusion!
 include("Constants.jl")
@@ -20,12 +21,13 @@ include("AbstractTypes/AbstractTypes.jl")
 include("Rays.jl")
 include("PolarizedRays.jl")
 include("Beam.jl")
+include("BeamGroups.jl")
 include("Mesh.jl")
 include("SDFs/SDF.jl")
 include("Gaussian.jl")
 include("System.jl")
 include("OpticalComponents/Components.jl")
-include("Groups.jl")
+include("ObjectGroups.jl")
 include("Render.jl")
 include("Exports.jl")
 

@@ -130,7 +130,7 @@ hidedecorations!(heat2)
 hm = heatmap!(heat1, pd.x*1e3, pd.y*1e3, BeamletOptics.intensity(pd), colormap=:viridis)
 
 zrotate3d!(m1, 1e-3)
-BeamletOptics.reset_detector!(pd)
+empty!(pd)
 solve_system!(system, beam)
 
 hm = heatmap!(heat2, pd.x*1e3, pd.y*1e3, BeamletOptics.intensity(pd), colormap=:viridis)
@@ -148,7 +148,7 @@ n = 100
 P = zeros(n+1)
 
 for i in eachindex(P)
-    BeamletOptics.reset_detector!(pd)
+    empty!(pd)
     solve_system!(system, beam)
     P[i] = BeamletOptics.optical_power(pd)
     # translate by Δy

@@ -55,7 +55,7 @@ end
 function sdf(s::AconvexCylinderSDF{T}, point) where {T}
     p = _world_to_sdf(s, point)
 
-    _pp = Point3{T}(p[1], p[3], p[2]) # xzy
+    _pp = Point3(p[1], p[3], p[2]) # xzy
     # rotate 2D sdf around the optical axis
     sdf_v = op_extrude_x(_pp,
         x -> convex_aspheric_surface_distance(
@@ -122,7 +122,7 @@ end
 function sdf(s::AconcaveCylinderSDF{T}, point) where {T}
     p = _world_to_sdf(s, point)
 
-    _pp = Point3{T}(p[1], p[3], p[2]) # xzy
+    _pp = Point3(p[1], p[3], p[2]) # xzy
     # rotate 2D sdf around the optical axis
     sdf_v = op_extrude_x(_pp,
         x -> concave_aspheric_surface_distance(

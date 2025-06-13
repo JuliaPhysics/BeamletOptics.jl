@@ -61,9 +61,9 @@ function render!(
             Z = [w[i] * sin(v) for (i, u) in enumerate(u), v in v]
             # Transform into world coords
             R = BMO.align3d([0, 1, 0], ray.dir)
-            Xt = R[1, 1] * X + R[1, 2] * Y + R[1, 3] * Z .+ BMO.position(ray)[1]
-            Yt = R[2, 1] * X + R[2, 2] * Y + R[2, 3] * Z .+ BMO.position(ray)[2]
-            Zt = R[3, 1] * X + R[3, 2] * Y + R[3, 3] * Z .+ BMO.position(ray)[3]
+            Xt = R[1, 1] * X + R[1, 2] * Y + R[1, 3] * Z .+ position(ray)[1]
+            Yt = R[2, 1] * X + R[2, 2] * Y + R[2, 3] * Z .+ position(ray)[2]
+            Zt = R[3, 1] * X + R[3, 2] * Y + R[3, 3] * Z .+ position(ray)[3]
 
             surface!(axis, Xt, Yt, Zt; transparency, colormap = [color, color], kwargs...)
 

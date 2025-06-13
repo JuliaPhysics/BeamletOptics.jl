@@ -20,7 +20,7 @@ const NullableVector{T} = Union{Vector{T},Nothing} where {T}
 Returns a vector with unit length that is perpendicular to the target and an additional
 reference vector. Vector orientation is determined according to right-hand rule.
 """
-function normal3d(target, reference)
+function normal3d(target::AbstractVector, reference::AbstractVector)
     n = cross(target, reference)
     return normalize(n)
 end
@@ -180,7 +180,7 @@ If the critical angle for n1, n2 and the incident angle is reached, the ray is r
 function refraction3d(dir::AbstractArray, normal::AbstractArray, n1::Real, n2::Real)
     # dir and normal must have unit length!
     isapprox(norm(dir), 1) || throw(ArgumentError("dir must have  unit length"))
-    isapprox(norm(normal), 1) || throw(ArgumentError("norm must have  unit length"))
+    isapprox(norm(normal), 1) || throw(ArgumentError(lazy"norm must have  unit length: $(norm(normal))"))
     n = n1 / n2
     cosθi = -dot(normal, dir)
     sinθt² = n^2 * (1 - cosθi^2)
@@ -478,3 +478,11 @@ function find_zero_bisection(f, a, b; tol=1e-10, max_iter=1000)
     end
     error("Bisection did not converge after $max_iter iterations")
 end
+
+"""
+    numerical_aperture(θ, n=1)
+
+Returns the `NA` for a opening half-angle `θ` and scalar ref. index `n`.
+For more information refer to [this website](https://www.rp-photonics.com/numerical_aperture.html).
+"""
+numerical_aperture(θ::Real, n::Real=1.0) = n*sin(θ)

@@ -52,12 +52,12 @@ render!(ax, m2)
 render!(ax, m3)
 render!(ax, prism; color=RGBAf(1, 1, 1, .25))
 
-arrow!(ax, BMO.position(first(BMO.rays(beam))), BMO.direction(first(BMO.rays(beam))); scale=2)
+arrow!(ax, position(first(BMO.rays(beam))), BMO.direction(first(BMO.rays(beam))); scale=2)
 
 
 for _ray in BMO.rays(beam)
     dir = BMO.direction(_ray)
-    pos = BMO.position(_ray)
+    pos = position(_ray)
     arrow!(ax, pos, dir; scale=2)
 end
 

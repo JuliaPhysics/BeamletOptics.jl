@@ -84,3 +84,42 @@ end
 function _last_beam_intersection(::B) where {B <: AbstractBeam}
     throw(ArgumentError(lazy"_last_beam_intersection not implemented for $B"))
 end
+
+"""
+    AbstractBeamGroup
+
+Provides a generic container type interface for bundles of [`Beam`](@ref)s. 
+This interface assumes that there exists a central beam around which the bundle propagates,
+e.g. akin to an optical axis.
+
+# Implementation reqs.
+
+Subtypes of `AbstractBeamGroup` must implement the following:
+
+## Fields:
+
+- `beams`: a vector or tuple of [`Beam`](@ref)s
+
+## Functions:
+
+If the `beams` field does not exist, the following getters must be dispatched:
+
+- `beams`: getter for the `beams` field or equivalent return type
+- `position`: getter for the starting position of the central [`Beam`](@ref)
+- `direction`: getter for the starting direction of the central [`Beam`](@ref)
+- `wavelength`: getter for the common wavelength of the beam bundle
+"""
+abstract type AbstractBeamGroup{T <: Real, R <: AbstractRay{T}} end
+
+beams(bg::AbstractBeamGroup) = bg.beams
+
+Base.position(bg::AbstractBeamGroup) = position(first(rays(first(beams(bg)))))
+direction(bg::AbstractBeamGroup) = direction(first(rays(first(beams(bg)))))
+
+wavelength(bg::AbstractBeamGroup) = wavelength(first(rays(first(beams(bg)))))
+
+function Base.show(io::IO, ::MIME"text/plain", bg::AbstractBeamGroup)
+    println(io, "Subtype of AbstractBeamGroup")
+    println(io, "   # of beams: $(length(beams(bg)))")
+    return nothing
+end

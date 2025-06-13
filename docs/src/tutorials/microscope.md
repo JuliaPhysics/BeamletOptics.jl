@@ -70,7 +70,7 @@ NLAK22  = DiscreteRefractiveIndex(lambdas, [1.65391, 1.64760])
 NLASF44 = DiscreteRefractiveIndex(lambdas, [1.80832, 1.79901])
 ```
 
-Note that the tupel ($\lambda_{1}$, $\lambda_{2}$) is mapped onto ($n_{1}$, $n_{2}$). For more information, refer to the [`DiscreteRefractiveIndex`](@ref) docs.
+Note that the data for ($\lambda_{1}$, $\lambda_{2}$) is mapped onto ($n_{1}$, $n_{2}$). For more information, refer to the [`DiscreteRefractiveIndex`](@ref) docs.
 
 ### Specifying the lens shape
 
@@ -89,7 +89,7 @@ Note that `obj_lens_1` is a single `Lens` entity once spawned and can be manipul
 
 ### Building the objective group
 
-To build the second and third lens elements of the objective group we will proceed as above. However, these lenses are spherical doublets formed by two lenses bonded with an optical adhesive. They are also more complex in shape, featuring a mechanical outer diameter. For the second lens the generating code is provided below. Two [`Lens`](@ref)es can be combined into a [`DoubletLens`](@ref). Correct "assembly" of the lens parts is the responsibility of the user.
+To build the second and third lens elements of the objective group we will proceed as above. However, these lenses are spherical doublets formed by two lenses bonded with an optical adhesive in practice. They are also more complex in shape, featuring a mechanical outer diameter. For the second lens the generating code is provided below. Two [`Lens`](@ref)es can be combined into a [`DoubletLens`](@ref). Correct "assembly" of the lens parts is the responsibility of the user.
 
 ```julia
 # Objective lens 2 - define surfaces
@@ -100,12 +100,12 @@ surf_3 = SphericalSurface(-5.020mm, 2*2.380mm)
 dl11 = Lens(surf_1, surf_2, 0.5mm, NSF4)
 dl12 = Lens(surf_2, surf_3, 2.5mm, NLAK22)
 # Move back lens into position
-translate3d!(dl12, [0, BMO.thickness(dl11), 0])
+translate3d!(dl12, [0, thickness(dl11), 0])
 # Spawn doublet
 obj_lens_2 = DoubletLens(dl11, dl12)
 ```
 
-The lens parts `dl11` and `dl12` are joined together by moving `dl12` along the y-axis by a distance equal to the on-axis thickness of `dl11`.
+The lens parts `dl11` and `dl12` are joined together by moving `dl12` along the y-axis by a distance equal to the on-axis [`thickness`](@ref) of `dl11`.
 
 ![Second objective lens](objective_lens_2.png)
 
@@ -121,15 +121,15 @@ surf_2 = SphericalSurface(-3.642mm, 2*3mm)
 surf_3 = SphericalSurface(-14.413mm, 2*2.812mm, 2*3mm)
 dl21 = Lens(surf_1, surf_2, 3.4mm, NLAK22)
 dl22 = Lens(surf_2, surf_3, 1.0mm, NSF4)
-translate3d!(dl22, [0, BMO.thickness(dl21), 0])
+translate3d!(dl22, [0, thickness(dl21), 0])
 tube_lens = DoubletLens(dl21, dl22)
 ```
 
-Assembling the objective group requires that the individual lens elements be translated into position along the optical axis. This is achieved in the code below by taking the current [`BeamletOptics.position`](@ref) of the elements and adding the on-axis `thickness` in addition to the element distancing taken from the specification.
+Assembling the objective group requires that the individual lens elements be translated into position along the optical axis. This is achieved in the code below by taking the current [`position`](@ref) of the elements and adding the on-axis `thickness` in addition to the element distancing taken from the specification.
 
 ```julia
-translate_to3d!(obj_lens_2, [0, BMO.position(obj_lens_1)[2] + BMO.thickness(obj_lens_1) + 3.344mm, 0])
-translate_to3d!(tube_lens, [0, BMO.position(obj_lens_2)[2] + BMO.thickness(obj_lens_2) + 2mm, 0])
+translate_to3d!(obj_lens_2, [0, position(obj_lens_1)[2] + thickness(obj_lens_1) + 3.344mm, 0])
+translate_to3d!(tube_lens, [0, position(obj_lens_2)[2] + thickness(obj_lens_2) + 2mm, 0])
 obj_group = ObjectGroup([obj_lens_1, obj_lens_2, tube_lens])
 ```
 
@@ -194,8 +194,8 @@ collect_lens = Lens(
     NLASF44
 )
 
-translate3d!(collect_lens, [0, BMO.position(ef_1)[2] + BMO.thickness(ef_1) + 0.1mm, 0])
-translate3d!(ef_2, [0, BMO.position(collect_lens)[2] + BMO.thickness(collect_lens) + 0.25mm, 0])
+translate3d!(collect_lens, [0, position(ef_1)[2] + thickness(ef_1) + 0.1mm, 0])
+translate3d!(ef_2, [0, position(collect_lens)[2] + thickness(collect_lens) + 0.25mm, 0])
 
 collect_group = ObjectGroup([ef_1, collect_lens, ef_2])
 
@@ -216,7 +216,36 @@ Elements can still be moved mutably while being inside the `system` and their fi
 
 ## Geometrical ray tracing of the miniscope
 
-Finally we are ready to perform the ray tracing step.
+Finally we are ready to perform the ray tracing step. This requires us to have a defined `system` and one or more `beam`s for the `solve_system!(system, beam)` function. For more information on this topic, refer to the section: [Tracing systems](@ref). 
 
-!!! warning
-    This section is under construction and requires the `PointSource` type...
+This package provides the convenience [`PointSource`](@ref) which will allows us to model a spread fan of light rays easily. We will define two monochromatic sources for the wavelengths specified above:
+
+```julia
+ps_green = PointSource([0, 0, -0.5mm], [0, 0, 1], deg2rad(20), λ_green, num_rays=1000, num_rings=5)
+ps_red =   PointSource([0, 0, -0.5mm], [0, 0, 1], deg2rad(30), λ_red,   num_rays=1000, num_rings=5)
+```
+
+The sources for $\lambda_{546.1~\mathrm{nm}}$ and $\lambda_{656.3~\mathrm{nm}}$ are initialized 0.5mm below the first optical surface of the imaging system with half-spread-angles of 20° and 30°, respectively. It is important to note that this value was chosen in order to roughly match the illustrated optical path in the miniscope publication [Madruga:2024; Fig. 1](@cite). Feel free to play around the initialization values and observe how they influence the result of the optical path. Further, each source is initialized with a total of 1000 rays layered in 5 rings, where the first "ring" is a single beam along the optical axis.
+
+In order to calculate the optical path, simply run the following command:
+
+```julia
+solve_system!(system, ps_green)
+solve_system!(system, ps_red)
+```
+
+The results can be visualized with the following script:
+
+```julia
+fig = Figure()
+ax = LScene(fig[1,1])
+
+render!(ax, system)
+render!(ax, ps_green; color=RGBAf(0,1,0,1.00), render_every=5, flen=3mm, show_pos=false)
+render!(ax, ps_red;   color=RGBAf(1,0,0,0.25), render_every=5, flen=3mm, show_pos=false)
+```
+
+For the plotting of the `PointSource` we will use the `render_every` keyword argument in order to only display every fifth beam. The `flen` keyword limits the length of the final, non-intersecting ray to 3mm after its last interaction. Below, the resulting figure is displayed (rotated by 90°):
+
+
+![Miniscope optical path](miniscope_trace.png)

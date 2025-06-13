@@ -32,7 +32,7 @@ shape_trait_of(::DoubletLens) = MultiShape()
 
 shape(dl::DoubletLens) = (dl.front, dl.back)
 
-position(dl::DoubletLens) = position(dl.front)
+Base.position(dl::DoubletLens) = position(dl.front)
 orientation(dl::DoubletLens) = orientation(dl.front)
 
 thickness(dl::DoubletLens) = thickness(shape(dl.front)) + thickness(shape(dl.back))

@@ -33,12 +33,12 @@ function render!(
     else
         len = length(BMO.intersection(ray))
     end
-    temp = BMO.position(ray) + len * BMO.direction(ray)
+    temp = position(ray) + len * BMO.direction(ray)
 
     lines!(axis,
-        [BMO.position(ray)[1], temp[1]],
-        [BMO.position(ray)[2], temp[2]],
-        [BMO.position(ray)[3], temp[3]];
+        [position(ray)[1], temp[1]],
+        [position(ray)[2], temp[2]],
+        [position(ray)[3], temp[3]];
         color,
         linewidth,
         transparency,
@@ -76,6 +76,32 @@ function render!(
         for ray in BMO.rays(child)
             render!(axis, ray; kwargs...)
         end
+    end
+    return nothing
+end
+
+"""
+    render!(axis, beam_group; kwargs...)
+
+Renders the [`BeamletOptics.AbstractBeamGroup`](@ref) into the specified `axis`.
+
+# Keywords arguments
+
+- `render_every = 5`: renders only every e.g. fifth individual beam in the group
+
+Refer to the plotting method of the `AbstractRay` for further keyword arguments.
+"""
+function render!(
+        axis::_RenderEnv,
+        beam_group::BMO.AbstractBeamGroup;
+        # kwargs
+        render_every::Int=5,
+        # Makie kwargs
+        kwargs...
+    )
+    numEl = length(BMO.beams(beam_group))
+    for i = 1:render_every:numEl
+        render!(axis, BMO.beams(beam_group)[i]; kwargs...)
     end
     return nothing
 end

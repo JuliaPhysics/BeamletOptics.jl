@@ -32,7 +32,7 @@ struct SingleShape <: AbstractShapeTrait end
 
 shape(::SingleShape, object::AbstractObject) = object.shape
 
-position(::SingleShape, object::AbstractObject) = position(shape(object))
+Base.position(::SingleShape, object::AbstractObject) = position(shape(object))
 position!(::SingleShape, object::AbstractObject, pos) = position!(shape(object), pos)
 
 orientation(::SingleShape, object::AbstractObject) = orientation(shape(object))
@@ -74,7 +74,7 @@ struct MultiShape <: AbstractShapeTrait end
 
 shape(::MultiShape, ::O) where O <: AbstractObject = shape_getter_not_implemented_error(MultiShape, O)
 
-position(::MultiShape, object::AbstractObject) = position(first(shape(object)))
+Base.position(::MultiShape, object::AbstractObject) = position(first(shape(object)))
 position!(::MultiShape, object::AbstractObject, ::Any) = nothing
 
 orientation(::MultiShape, object::AbstractObject) = orientation(first(shape(object)))

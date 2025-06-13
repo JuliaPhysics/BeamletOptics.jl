@@ -12,7 +12,7 @@ Individual monochromatic rays form the basic building blocks to describe the pro
 \vec{x}(t) = \vec{p} + t \cdot \vec{d}
 ```
 
-where ``\vec{p}`` and ``\vec{d}`` are the position and direction ``\mathbb{R}^3``-vectors, respectively. The ray length ``t`` is used to describe the geometrical length of the ray. This assumes that the [`BeamletOptics.RefractiveIndex](@ref) along the ray path is constant. If after solving an optical system a ray intersection is determined, a new ray must be spawned to model an arbitrary light path. This data is stored, e.g., in a [`Beam`](@ref). More on this can be found in the [Beams](@ref) chapter. 
+where ``\vec{p}`` and ``\vec{d}`` are the position and direction ``\mathbb{R}^3``-vectors, respectively. The ray length ``t`` is used to describe the geometrical length of the ray. This assumes that the [`BeamletOptics.RefractiveIndex`](@ref) along the ray path is constant. If after solving an optical system a ray intersection is determined, a new ray must be spawned to model an arbitrary light path. This data is stored, e.g., in a [`Beam`](@ref). More on this can be found in the [Beams](@ref) chapter. 
 
 ## Basic `Ray`
 
@@ -48,7 +48,8 @@ Below the Fresnel coefficients for different ``n_1 \rightarrow n_2`` interfaces 
 First, the Fresnel coefficients for ``n_1 = 1.0`` to ``n_2 = 1.5`` will be calculated. The angle of incidence ``\theta`` refers to the plane of incidence in the `s`enkrecht and `p`arallel coordinate system. Note that the imaginary part of the coefficents is shown by the dash-dotted lines.
 
 ```@example fresnel_vacuum_glass
-using CairoMakie #hide
+using CairoMakie # hide
+CairoMakie.activate!() # hide
 using BeamletOptics
 include("fresnel.jl") # hide
 
