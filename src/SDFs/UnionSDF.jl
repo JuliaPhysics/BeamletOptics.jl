@@ -81,12 +81,6 @@ function rotate3d!(u::UnionSDF, axis, θ)
     return nothing
 end
 
-function render_object!(axis, s::UnionSDF)
-    for sdf in s.sdfs
-        render_object!(axis, sdf)
-    end
-end
-
 # Without this function it is not possible for SDFs encapsulated in a UnionSDF
 # to specialize normal3d as always the generic normal3d function is called.
 function normal3d(s::UnionSDF, pos)

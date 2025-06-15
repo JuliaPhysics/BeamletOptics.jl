@@ -12,7 +12,7 @@ using FileIO: load
 using MeshIO
 using ForwardDiff: gradient
 
-import Base: length, push!, empty!
+import Base: length, push!, empty!, position
 
 # Do not change order of inclusion!
 include("Constants.jl")

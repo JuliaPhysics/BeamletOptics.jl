@@ -33,7 +33,7 @@ rend = Axis3(detector_fig[1,1], aspect=:data, limits=limits, azimuth=5.43, eleva
 hidedecorations!(rend)
 hidespines!(rend)
 
-render_object!(rend, pd_body)
-render_object!(rend, pd)
-render_beam!(rend, g2)
-render_beam!(rend, g1)
+render!(rend, pd_body)
+render!(rend, pd)
+render!(rend, g2)
+render!(rend, g1)

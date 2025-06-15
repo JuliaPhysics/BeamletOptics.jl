@@ -348,37 +348,6 @@ function sdf(surface::ConcaveAsphericalSurfaceSDF{T}, point) where {T}
     return sdf_v
 end
 
-function render_object!(axis, asp::AbstractAsphericalSurfaceSDF; color = :red)
-    radius = asp.diameter / 2
-    v = LinRange(0, 2π, 100)
-    r = LinRange(1e-12, radius, 50)
-    # Calculate beam surface at origin along y-axis, swap w and u
-    y = aspheric_equation.(r, Ref(asp))
-    u = y
-    w = collect(r)
-    if isa(asp, ConvexAsphericalSurfaceSDF)
-        push!(u, u[end])
-        push!(w, 1e-12)
-    elseif isa(asp, ConcaveAsphericalSurfaceSDF)
-        push!(u, 0, 0)
-        push!(w, radius, 1e-12)
-    else
-        @warn "No suitable render fct. for $(typeof(asp))"
-        return nothing
-    end
-    X = [w[i] * cos(v) for (i, u) in enumerate(u), v in v]
-    Y = [u for u in u, v in v]
-    Z = [w[i] * sin(v) for (i, u) in enumerate(u), v in v]
-    # Transform into global coords
-    R = asp.dir
-    P = asp.pos
-    Xt = R[1, 1] * X + R[1, 2] * Y + R[1, 3] * Z .+ P[1]
-    Yt = R[2, 1] * X + R[2, 2] * Y + R[2, 3] * Z .+ P[2]
-    Zt = R[3, 1] * X + R[3, 2] * Y + R[3, 3] * Z .+ P[3]
-    render_surface!(axis, Xt, Yt, Zt; transparency = true, colormap = [color, color])
-    return nothing
-end
-
 """
     PlanoConvexAsphericalLensSDF(r, l, d=1inch)
 

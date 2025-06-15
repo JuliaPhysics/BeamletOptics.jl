@@ -183,7 +183,7 @@ CylindricalSurface(radius::T, diameter::T, height::T) where {T} = CylindricalSur
     radius, diameter, height, diameter)
 
 edge_sag(::CylindricalSurface, sd::ConvexCylinderSDF) = thickness(sd)
-edge_sag(::CylindricalSurface, sd::ConcaveCylinderSDF) = thickness(sd.cut_cylinder_sdf)
+edge_sag(::CylindricalSurface, sd::ConcaveCylinderSDF) = thickness(sd)
 
 function sdf(s::CylindricalSurface, ot::AbstractOrientationType)
     isinf(radius(s)) && return nothing

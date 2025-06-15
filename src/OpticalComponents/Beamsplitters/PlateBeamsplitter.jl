@@ -35,7 +35,7 @@ abstract type AbstractPlateBeamsplitter{T, S} <: AbstractBeamsplitter{T, S} end
 coating(pbs::AbstractPlateBeamsplitter) = pbs.coating
 substrate(pbs::AbstractPlateBeamsplitter) = pbs.substrate
 
-position(pbs::AbstractPlateBeamsplitter) = position(coating(pbs))
+Base.position(pbs::AbstractPlateBeamsplitter) = position(coating(pbs))
 
 orientation(pbs::AbstractPlateBeamsplitter) = orientation(substrate(pbs))
 

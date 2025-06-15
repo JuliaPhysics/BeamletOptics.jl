@@ -26,8 +26,8 @@ laser_ax = Axis3(laser_fig[1,1], aspect=:data, elevation=0, azimuth=2π)
 hidedecorations!(laser_ax)
 hidespines!(laser_ax)
 
-render_beam!(laser_ax, beam, flen=30cm)
-render_object!(laser_ax, laser_assembly)
+render!(laser_ax, beam, flen=30cm)
+render!(laser_ax, laser_assembly)
 
 save("mi_laser_assembly.png", laser_fig, px_per_unit=4)
 
@@ -170,8 +170,8 @@ save("mi_powerplot.png", power_fig, px_per_unit=4)
 ##
 # fig = Figure()
 # ax = LScene(fig[1,1])
-# render_system!(ax, system)
-# render_beam!(ax, beam)
+# render!(ax, system)
+# render!(ax, beam)
 # BeamletOptics.render_object_normals!(ax, pd.shape)
 
 # fig

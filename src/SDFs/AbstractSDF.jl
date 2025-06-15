@@ -72,28 +72,6 @@ function bounding_box(s::AbstractSDF)
 end
 
 """
-    render_object!(axis, s::AbstractSDF)
-
-Render the surface of `s` based on the marching cubes algorithm.
-"""
-function render_object!(axis, s::AbstractSDF)
-    # Get object limits
-    xmin, xmax, ymin, ymax, zmin, zmax = bounding_box(s)
-
-    x = LinRange(xmin - 1e-4, xmax + 1e-4, 100)
-    y = LinRange(ymin - 1e-4, ymax + 1e-4, 100)
-    z = LinRange(zmin - 1e-4, zmax + 1e-4, 100)
-    sdf_values = Float32.([sdf(s, [i, j, k]) for i in x, j in y, k in z])
-    mc = MC(sdf_values; x = Float32.(x), y = Float32.(y), z = Float32.(z))
-    march(mc)
-    vertices = transpose(reinterpret(reshape, Float32, mc.vertices))
-    faces = transpose(reinterpret(reshape, Int64, mc.triangles))
-    render_sdf_mesh!(axis, vertices, faces, transparency = true)
-    return nothing
-end
-render_sdf_mesh!(::Any, vertices, faces; transparency = true) = nothing
-
-"""
     normal3d(s::AbstractSDF, pos)
 
 Computes the normal vector of `s` at `pos`.
@@ -112,7 +90,6 @@ end
 function normal_fd(s::AbstractSDF, p)
     normal = normalize(gradient(x->sdf(s, x), p))
     all(!isnan, normal) && return normal
-
     # fallback
     return numeric_gradient(s, p)
 end

@@ -1,5 +1,6 @@
 # kinematic export
 export translate3d!, translate_to3d!, rotate3d!, xrotate3d!, yrotate3d!, zrotate3d!, align3d!, reset_translation3d!, reset_rotation3d!
+export position, orientation
 
 # ray and beam type export
 export Ray, PolarizedRay, Beam, PointSource, CollimatedSource, GaussianBeamlet
@@ -21,7 +22,7 @@ components
 export Mirror, SquarePlanoMirror2D, RectangularPlanoMirror, SquarePlanoMirror, RoundPlanoMirror, ConcaveSphericalMirror, RightAnglePrismMirror
 
 # lenses
-export Lens, DoubletLens, ThinLens, SphericalLens, SphericalDoubletLens
+export Lens, DoubletLens, ThinLens, SphericalLens, SphericalDoubletLens, thickness
 
 # surfaces
 export CircularFlatSurface, RectangularFlatSurface, SphericalSurface, EvenAsphericalSurface, CylindricalSurface, AcylindricalSurface
@@ -30,8 +31,7 @@ export CircularFlatSurface, RectangularFlatSurface, SphericalSurface, EvenAspher
 export Prism, RightAnglePrism
 
 # detectors
-export Photodetector, Spotdetector, PSFDetector
-export intensity
+export Photodetector, Spotdetector, PSFDetector, intensity
 
 # splitters
 export ThinBeamsplitter, RoundThinBeamsplitter, RectangularPlateBeamsplitter, RoundPlateBeamsplitter, CubeBeamsplitter, RectangularCompensatorPlate
@@ -43,4 +43,4 @@ export NonInteractableObject, MeshDummy, IntersectableObject
 export Retroreflector
 
 # render
-export render_beam!, render_object!, render_system!
+export render!
