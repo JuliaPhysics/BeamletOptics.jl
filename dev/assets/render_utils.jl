@@ -39,7 +39,24 @@ function take_screenshot(
     save(fname, fig; px_per_unit, update = false)
 end
 
-arrow!(ax::LScene, pos, dir; color=:blue, scale=1) = arrows!(ax, [Point3(pos)], [Point3(dir*5e-3*scale)], arrowsize=Vec3f(1e-3, 1e-3, 1e-3)*scale; color)
+arrow!(
+    ax::LScene,
+    pos::AbstractVector,
+    dir::AbstractVector;
+    # Custom kwargs
+    scale=1,
+    # Makie kwargs
+    color=:blue,
+    tiplength=0.2,
+    tipradius=0.1,
+    ) = arrows3d!(
+        ax,
+        [Point3(pos)],
+        [Point3(dir*5e-3*scale)];
+        tiplength,
+        tipradius,
+        color
+)
 
 lens_color() = RGBf(0.678, 0.847, 0.902)
 lens_color(alpha) = RGBAf(0.678, 0.847, 0.902, alpha)
