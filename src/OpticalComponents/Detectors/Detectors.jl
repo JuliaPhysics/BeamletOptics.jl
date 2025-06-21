@@ -11,7 +11,7 @@ Subtypes of `AbstractDetector` should implement all supertype requirements as we
 ## Functions
 
 - `interact3d`: see e.g. [`Photodetector`](@ref) for reference
-- `reset_detector!`: resets data stored in the detector, see below
+- `empty!`: resets data stored in the detector, see below
 
 # Additional information
 
@@ -27,16 +27,16 @@ Only if the data can be accumulated sequentially, multiple beam interactions can
 ## Data reset
 
 Since e.g. E-field data is supposed to be accumulated by mutability of the detector data, the burden of resetting the data for a new solver call
-is placed on the user. This function should be called `reset_detector!`.
+is placed on the user. This function should be called `empty!`.
 """
 abstract type AbstractDetector{T, S <: AbstractShape{T}} <: AbstractObject{T, S} end
 
 """
-    reset_detector!(detector)
+    empty!(detector)
 
 Resets the field data of the `detector`. Must be implemented for each concrete subtype of [`AbstractDetector`](@ref).
 """
-function reset_detector!(::D) where D <: AbstractDetector
+function empty!(::D) where D <: AbstractDetector
     @warn "Detector reset logic for $D not implemented"
     return nothing
 end

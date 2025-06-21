@@ -20,7 +20,3 @@ intersect3d(::NonInteractableObject, ::AbstractRay) = nothing
 interact3d(::AbstractSystem, ::NonInteractableObject, ::AbstractBeam, ::AbstractRay) = nothing
 
 MeshDummy(loadpath::String) = NonInteractableObject(Mesh(load(loadpath)))
-
-render_object!(axis, dummy::NonInteractableObject) = render_dummy_mesh!(axis, dummy)
-
-render_dummy_mesh!(::Any, ::NonInteractableObject) = nothing

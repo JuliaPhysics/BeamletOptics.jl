@@ -41,9 +41,9 @@ for z in -0.02:0.001:0.02
     beam = Beam(ray)
     solve_system!(system, beam, r_max=40)
 
-    render_beam!(ax, beam, flen=0.1)
+    render!(ax, beam, flen=0.1)
 end
-render_object!(ax, lens)
+render!(ax, lens)
 
 save("aspherical_lens_showcase.png", fig, px_per_unit=4); nothing # hide
 
@@ -130,7 +130,7 @@ L3 = Lens(
     )
 
 # first translate the lens to the L2 position, then shift it by the relative offset with respect to L2
-translate_to3d!(L3, BeamletOptics.position(L2))
+translate_to3d!(L3, position(L2))
 translate3d!(L3, [0, BeamletOptics.thickness(L2) + 0.63e-3,0])
 
 # construct the filter by setting the radius to Inf for front/back, resulting in a parallel plate
@@ -142,7 +142,7 @@ Filt = Lens(
     )
 
 # same principle as for L3
-translate_to3d!(Filt, BeamletOptics.position(L3))
+translate_to3d!(Filt, position(L3))
 translate3d!(Filt, [0, BeamletOptics.thickness(L3) + 0.19e-3,0])
 
 # Construct the cover glass and shift into position
@@ -152,7 +152,7 @@ Cover = Lens(
         0.5e-3,
         n -> 1.469200
     )
-translate_to3d!(Cover, BeamletOptics.position(Filt))
+translate_to3d!(Cover, position(Filt))
 translate3d!(Cover, [0, BeamletOptics.thickness(Filt) + 0.18e-3,0])
 
 system = System([L1, L2, L3, Filt, Cover])
@@ -162,7 +162,7 @@ ax = Axis3(fig[1,1], aspect=:data, azimuth=0.0, elevation=.0)
 hidedecorations!(ax)
 hidespines!(ax)
 
-render_system!(ax, system)
+render!(ax, system)
 
 # 0° beams
 beams = [
@@ -175,7 +175,7 @@ colors = [:blue, :green, :red, :yellow, :magenta, :cyan]
 for beam in beams    
     i = 1
     solve_system!(system, beam, r_max=50)
-    render_beam!(ax, beam, flen=0.12e-3, color = colors[i], show_pos=true)
+    render!(ax, beam, flen=0.12e-3, color = colors[i], show_pos=true)
     # use the 0° beams to construct all other beam sets
 
     pos = beam.rays[1].pos + BeamletOptics.intersection(beam.rays[1]).t*beam.rays[1].dir
@@ -188,7 +188,7 @@ for beam in beams
 
         # trace through system
         solve_system!(system, abeam, r_max=50)
-        render_beam!(ax, abeam, flen=0.12e-3*(1+sind(angle)), color = colors[i], show_pos=true)
+        render!(ax, abeam, flen=0.12e-3*(1+sind(angle)), color = colors[i], show_pos=true)
     end
 end
 

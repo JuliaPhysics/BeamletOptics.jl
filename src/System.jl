@@ -473,6 +473,13 @@ function solve_system!(system::AbstractSystem, beam::B; r_max::Int = 100, retrac
     return nothing
 end
 
+function solve_system!(system::AbstractSystem, bg::AbstractBeamGroup; kwargs...)
+    for _beam in beams(bg)
+        solve_system!(system, _beam; kwargs...)
+    end
+    return nothing
+end
+
 @inline function solve_leaf!(system::AbstractSystem, beam::AbstractBeam; r_max = 100)
     if isnothing(_last_beam_intersection(beam))
         trace_system!(system, beam, r_max = r_max)

@@ -1,6 +1,6 @@
 # Spherical lens example
 
-This example recreates the figure shown in the [Types of elements](@ref) section of the [Optical elements](@ref) chapter. The lens parameters are taken from the [Thorlabs](https://www.thorlabs.com/) website and are listed below:
+This example recreates the figure shown in the [Spherical lenses](@ref) section of the [Lenses](@ref) chapter. The lens parameters are taken from the [Thorlabs](https://www.thorlabs.com/) website and are listed below:
 
 - Lenses (in order of appearance)
     - [LD1464](https://www.thorlabs.com/thorproduct.cfm?partnumber=LD1464)
@@ -89,8 +89,8 @@ ax = Axis3(fig[1,1], aspect=aspect, limits=limits, azimuth=0., elevation=1e-3)
 hidexdecorations!(ax)
 hidezdecorations!(ax)
 
-render_beam!(ax, beam, color=:green2)
-render_system!(ax, system)
+render!(ax, beam, color=:green2)
+render!(ax, system)
 
 save("spherical_lens_showcase.png", fig, px_per_unit=4); nothing # hide
 ```

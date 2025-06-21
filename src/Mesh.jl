@@ -112,7 +112,7 @@ Aligns the local `mesh` y-axis onto the `target_axis`.
 """
 function align3d!(mesh::AbstractMesh, target_axis)
     # Calculate rotation matrix
-    R = align3d(BeamletOptics.orientation(mesh)[:,2], target_axis)
+    R = align3d(orientation(mesh)[:,2], target_axis)
     # Translate mesh to origin, rotate (counter-clockwise), retranslate
     vertices!(mesh, (vertices(mesh) .- position(mesh)') * R' .+ position(mesh)')
     orientation!(mesh, orientation(mesh) * R)

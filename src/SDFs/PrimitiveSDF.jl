@@ -36,6 +36,8 @@ function BoxSDF(x::X, y::Y, z::Z) where {X<:Real, Y<:Real, Z<:Real}
     )
 end
 
+thickness(s::BoxSDF) = 2*s.dimensions[2]
+
 function sdf(box::BoxSDF{T}, point) where T
     p = _world_to_sdf(box, point)
     q = abs.(p) - box.dimensions

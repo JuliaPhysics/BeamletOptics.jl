@@ -23,7 +23,7 @@ Subtypes of `AbstractShape` should implement the following:
 - [`edge_sag`](@ref) : Returns the edge sagitta of the `AbstractRotationallySymmetricSurface`
 
 ## Functions:
-- [`sdf(::AbstractRotationallySymmetricSurface, ::Union{Nothing, AbstractOrientationType})`](@ref) : 
+- [`sdf(::AbstractRotationallySymmetricSurface, ::Union{Nothing, AbstractOrientationType})`](@ref) :
     Converts the surface specification of `AbstractRotationallySymmetricSurface` into an `AbstractSDF`
 """
 abstract type AbstractRotationallySymmetricSurface{T} <: AbstractSurface{T} end
@@ -70,15 +70,35 @@ struct BackwardLeftMeniscusOrientation <: AbstractOrientationType end
 struct BackwardRightMeniscusOrientation <: AbstractOrientationType end
 
 """
-Takes the surface specification `s` and and optional `AbstractOrientationType` as 
+    sdf(::AbstractRotationallySymmetricSurface, ::Union{Nothing, AbstractOrientationType})
+
+Takes the surface specification and an optional `AbstractOrientationType` as
 trait parameter and returns a corresponding `AbstractSDF` type.
 
-!!! note
-Always keep in mind that BeamletOptics.jl performs closed-volume baced ray tracing using
-either SDFs or meshes. This function is a mere convenience provider for users coming from other RayTracers which
+# Surface vs. volume based tracing
+
+This function is a mere convenience provider for users coming from other optic simulations frameworks which
 are surface oriented. The goal of this function is to return the best matching closed volume SDF
 which posesses a surface with the given specs on one side and most often a boundary and planar surface on the other side.
 
+!!! info
+    Always keep in mind that this package performs closed-volume baced ray tracing using either SDFs or meshes.
 """
 sdf(s::AbstractRotationallySymmetricSurface, ::Union{Nothing, AbstractOrientationType}) = throw(ArgumentError(lazy"sdf of $(typeof(s)) not implemented"))
 sdf(s::AbstractRotationallySymmetricSurface) = sdf(s, nothing)
+
+
+"""
+    CircularFlatSurface{T} <: AbstractRotationallySurface{T}
+
+A type representing a planar circular surface, which is only parametrized by its `diameter`.
+
+# Fields
+- `diameter::T`: The diameter of the planar surface
+
+"""
+struct CircularFlatSurface{T} <: AbstractRotationallySymmetricSurface{T}
+    diameter::T
+end
+
+sdf(::CircularFlatSurface, ::AbstractOrientationType) = nothing

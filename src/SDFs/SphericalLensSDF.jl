@@ -380,53 +380,6 @@ function PlanoConcaveLensSDF(r::R, l::L, d::D, md::MD) where {R, L, D, MD}
     return shape
 end
 
-function render_object!(axis, css::ConcaveSphericalSurfaceSDF; color=:white)
-    _radius = diameter(css)/2
-    v = LinRange(0, 2π, 100)
-    r = LinRange(1e-12, 1, 100) .^ (1/2) * _radius
-    # Calculate beam surface at origin along y-axis, swap w and u
-    y = sqrt.(radius(css)^2 .- r.^2) .- radius(css)
-    u = y
-    w = collect(r)
-    # Close conture
-    push!(u, 0) # push!(u, 0, 0)
-    push!(w, _radius) # push!(w, radius, 1e-12)
-    X = [w[i] * cos(v) for (i, u) in enumerate(u), v in v]
-    Y = [u for u in u, v in v]
-    Z = [w[i] * sin(v) for (i, u) in enumerate(u), v in v]
-    # Transform into global coords
-    R = css.dir
-    P = css.pos
-    Xt = R[1, 1] * X + R[1, 2] * Y + R[1, 3] * Z .+ P[1]
-    Yt = R[2, 1] * X + R[2, 2] * Y + R[2, 3] * Z .+ P[2]
-    Zt = R[3, 1] * X + R[3, 2] * Y + R[3, 3] * Z .+ P[3]
-    render_surface!(axis, Xt, Yt, Zt; transparency = true, colormap = [color, color])
-    return nothing
-end
-
-function render_object!(axis, css::ConvexSphericalSurfaceSDF; color=:white)
-    v = LinRange(0, 2π, 100)
-    r = LinRange(1e-12, 1, 100) .^ (1/2) * diameter(css)/2
-    # Calculate beam surface at origin along y-axis, swap w and u
-    y = -(sqrt.(radius(css)^2 .- r.^2) .- radius(css))
-    u = y
-    w = collect(r)
-    # Close conture
-    # push!(u, 0)
-    # push!(w, 1e-12)
-    X = [w[i] * cos(v) for (i, u) in enumerate(u), v in v]
-    Y = [u for u in u, v in v]
-    Z = [w[i] * sin(v) for (i, u) in enumerate(u), v in v]
-    # Transform into global coords
-    R = css.dir
-    P = css.pos
-    Xt = R[1, 1] * X + R[1, 2] * Y + R[1, 3] * Z .+ P[1]
-    Yt = R[2, 1] * X + R[2, 2] * Y + R[2, 3] * Z .+ P[2]
-    Zt = R[3, 1] * X + R[3, 2] * Y + R[3, 3] * Z .+ P[3]
-    render_surface!(axis, Xt, Yt, Zt; transparency = true, colormap = [color, color])
-    return nothing
-end
-
 """
     SphericalSurface{T} <: AbstractRotationallySymmetricSurface{T}
 
@@ -465,7 +418,7 @@ end
 
 mechanical_diameter(s::SphericalSurface) = s.mechanical_diameter
 
-edge_sag(::SphericalSurface, sd::AbstractSphericalSurfaceSDF) = abs(sag(sd))
+edge_sag(::SphericalSurface, sd::AbstractSphericalSurfaceSDF) = sag(sd)
 
 function sdf(s::SphericalSurface, ot::AbstractOrientationType)
     isinf(radius(s)) && return nothing

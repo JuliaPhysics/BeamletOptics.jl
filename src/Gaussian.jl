@@ -2,7 +2,7 @@
     GaussianBeamlet{T} <: AbstractBeam{T, Ray{T}}
 
 Ray representation of the **stigmatic** Gaussian beam as per J. Arnaud (1985). The beam quality `M2` is fully considered via the divergence angle.
-Formalism for beam parameter calculation based on publications:
+The formalism for the beam parameter calculation is based on the following publications:
 
 **Jacques Arnaud, "Representation of Gaussian beams by complex rays," Appl. Opt. 24, 538-543 (1985)**
 
@@ -27,9 +27,8 @@ and
     Parameters of the beam, e.g. ``w(z)`` or ``R(z)``, can be obtained through the [`gauss_parameters`](@ref) function.
 
 !!! warning "Astigmatism and abberations"
-    It is assumed, but not forbidden, that the optical system contains non-symmetric optical elements that cause the beam to obtain
+    It is assumed, but not forbidden, that the optical system contains non-flat or non-parabolic beam-surface-interactions that cause the beam to obtain
     astigmatism or higher-order abberations. These can not be represented by the `GaussianBeamlet`.
-    Refer to **FIXME** for more information.
 """
 mutable struct GaussianBeamlet{T} <: AbstractBeam{T, Ray{T}}
     chief::Beam{T, Ray{T}}
