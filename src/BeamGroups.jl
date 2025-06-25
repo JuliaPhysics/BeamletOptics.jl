@@ -201,7 +201,7 @@ Generates `N` rays with *equal area per ray* across a circular pupil
 using the deterministic sunflower (Fibonacci) pattern.
 
 !!! note
-This is merely a `CollimatedSource`(@ref) constructor which uses Fibonacci sampling
+This is merely a [`CollimatedSource`](@ref) constructor which uses Fibonacci sampling
 instead of a linear grid.
 """
 function UniformDiscSource(pos, dir, D, λ=1e-6; N=1_000)
