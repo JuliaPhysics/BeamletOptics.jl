@@ -54,7 +54,7 @@ individual beams becomes important, e.g. for calculating a point spread function
 UniformDiscSource
 ```
 
-![Collimated unfiform group of beams](collimated_uniform_beam_source.png)
+![Collimated uniform group of beams](collimated_uniform_beam_source.png)
 
 ### Point beam source
 
