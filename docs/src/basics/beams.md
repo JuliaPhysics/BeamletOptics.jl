@@ -44,6 +44,8 @@ The collimated beam source is ideal to model light coming from a focal plane at 
 CollimatedSource(::AbstractArray{<:Real}, ::AbstractArray{<:Real}, ::Real, ::Real)
 ```
 
+![Collimated group of beams](collimated_beam_source.png)
+
 A special constructor called [`UniformDiscSource`](@ref) is available, which offers an equal-area
 sampling (Fibonnaci-pattern) sampling and is thus favorable in situations where the weighting of the
 individual beams becomes important, e.g. for calculating a point spread function using [`PSFDetector`](@ref).
@@ -52,7 +54,7 @@ individual beams becomes important, e.g. for calculating a point spread function
 UniformDiscSource
 ```
 
-![Collimated group of beams](collimated_beam_source.png)
+![Collimated unfiform group of beams](collimated_uniform_beam_source.png)
 
 ### Point beam source
 
