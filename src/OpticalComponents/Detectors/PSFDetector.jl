@@ -145,6 +145,7 @@ end
     intensity(psf::PSFDetector{T};
               n::Int=100,
               crop_factor::Real=1,
+              center::Symbol=:centroid,
               x_min = Inf,
               x_max = Inf,
               z_min = Inf,
@@ -162,6 +163,10 @@ on a regular `n×n` grid in the detector’s local (x,z)-plane.
 - `crop_factor::Real=1`
   Scales the half‐width of the sampling window returned by
   `calc_local_lims`; values >1 expand, <1 shrink.
+- `center::Symbol=:centroid`
+  How the sampling window is centred.
+  `:centroid` uses the projection‑weighted centroid,
+  `:bbox` uses the geometric mid‑point of the bounding box.
 - `x_min, x_max, z_min, z_max`
   Manually override the sampling bounds in the local x or z directions.
   If left as `Inf`, the bounds from `calc_local_lims` are used.
@@ -187,6 +192,7 @@ A tuple `(xs, zs, I)` where
 function intensity(psf::PSFDetector{T};
         n::Int=100,
         crop_factor::Real=1,
+        center::Symbol=:centroid,
         x_min = Inf,
         x_max = Inf,
         z_min = Inf,
@@ -194,14 +200,14 @@ function intensity(psf::PSFDetector{T};
         x0_shift::Real=0,
         z0_shift::Real=0) where T
     # automatically calculate limits
-    _x_min, _x_max, _z_min, _z_max = calc_local_lims(psf; crop_factor)
+    _x_min, _x_max, _z_min, _z_max = calc_local_lims(psf; crop_factor=crop_factor, center=center)
     if x_min != Inf && x_max != Inf
         _x_min = x_min
         _x_max = x_max
     end
     if z_min != Inf && z_max != Inf
-        _z_min = x_min
-        _z_max = x_max
+        _z_min = z_min
+        _z_max = z_max
     end
     xs = LinRange(_x_min, _x_max, n) .+ x0_shift
     zs = LinRange(_z_min, _z_max, n) .+ z0_shift
