@@ -27,7 +27,7 @@ set_view(cs_ax, cs_view)
 save("collimated_beam_source.png", cs_fig; px_per_unit=8, update = false)
 
 ## uniform disc source
-cs = UniformDiscSource([0,0,0], [0,1,0], 15e-3; N=100)
+cs = UniformDiscSource([0,0,0], [0,1,0], 15e-3; num_rays=100)
 
 cs_fig = Figure(; size=(600,200))
 display(cs_fig)
