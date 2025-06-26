@@ -156,17 +156,17 @@ d = 75.0e-3
 l = 15e-3
 radius = 76.68e-3
 A = [0*(1e3)^1, 2.7709219e-8*(1e3)^3, 6.418186e-13*(1e3)^5, -1.5724014e-17*(1e3)^7, -2.7768768e-21*(1e3)^9, -2.590162e-25*(1e3)^11]
-AL75150 = BeamletOptics.Lens(
+AL75150 = Lens(
     EvenAsphericalSurface(radius, d, k, A),
     l,
     n -> 1.5006520430
 )
 
-BeamletOptics.xrotate3d!(AL75150, deg2rad(-0.5))
+xrotate3d!(AL75150, deg2rad(-0.5))
 
 pd = PSFDetector(15e-3)
 
-BeamletOptics.translate3d!(pd, [0, 158.1779e-3, 0.0])
+translate3d!(pd, [0, 158.1779e-3, 0.0])
 system = System([AL75150, pd])
 
 ps = UniformDiscSource([0, -0.1, 0], [0,1,0], 0.8*d, 1550e-9)
