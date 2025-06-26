@@ -29,7 +29,6 @@ Ray hits are recorded by the corresponding [`interact3d`](@ref) method.
 
 - `shape`: geometry of the active surface, must represent 2D-`field` in `x` any `y` dimensions
 - `data` : A vector of `PSFData` capturing the information about each ray hit.
-- `solved`: A flag to track if the detector has already been solved.
 
 # Additional information
 
@@ -44,10 +43,9 @@ Ray hits are recorded by the corresponding [`interact3d`](@ref) method.
 struct PSFDetector{T} <: AbstractDetector{T, Mesh{T}}
     shape::Mesh{T}
     data::Vector{PSFData{T}}
-    solved::Ref{Bool}
 end
 
-empty!(psf::PSFDetector) = (empty!(psf.data); psf.solved[] = false)
+empty!(psf::PSFDetector) = (empty!(psf.data))
 
 Base.push!(psf::PSFDetector, new::PSFData) = push!(psf.data, new)
 
@@ -66,7 +64,7 @@ function PSFDetector(width::W) where W <: Real
     shape = QuadraticFlatMesh(width)
     zrotate3d!(shape, π)
     data = Vector{PSFData{W}}()
-    return PSFDetector(shape, data, Ref(false))
+    return PSFDetector(shape, data)
 end
 
 """
