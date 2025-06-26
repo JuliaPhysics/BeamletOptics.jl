@@ -26,7 +26,7 @@ save("pd_showcase.png", detector_fig, px_per_unit=4)
 nothing
 ```
 
-The `interact3d` model of the [`Photodetector`](@ref) can store complex electric field (E-field) values from intersecting [`GaussianBeamlet`](@ref)s, enabling the reconstruction of spatial intensity distribution across its active surface. This data can be used to calculate e.g. beam interference patterns via the [`BeamletOptics.intensity`](@ref) function. The [`BeamletOptics.optical_power`](@ref) method can be used in order to obtain the total optical power at the detector. Below a rendered example of a detector model ([FDS010](https://www.thorlabs.com/thorproduct.cfm?partnumber=FDS010)) can be seen. The detector active area is marked in blue (1x1 mm²). 
+The `interact3d` model of the [`Photodetector`](@ref) can store complex electric field (E-field) values from intersecting [`GaussianBeamlet`](@ref)s, enabling the reconstruction of spatial intensity distribution across its active surface. This data can be used to calculate e.g. beam interference patterns via the [`intensity`](@ref) function. The [`BeamletOptics.optical_power`](@ref) method can be used in order to obtain the total optical power at the detector. Below a rendered example of a detector model ([FDS010](https://www.thorlabs.com/thorproduct.cfm?partnumber=FDS010)) can be seen. The detector active area is marked in blue (1x1 mm²). 
 
 ![Photodetector showcase](pd_showcase.png)
 
@@ -76,7 +76,7 @@ The package offers a simple method to estimate the point spread function of a sy
 currently limited and requires careful assessment by the user, if the results are to be trusted.
 
 To analyze the PSF of a imaging system a [`PSFDetector`](@ref) is added to the system at the plane
-and orientation, where the PSF is requested. This is the same approach as for the other detector types.
+and orientation where the PSF is requested. This is the same approach as for the other detector types.
 
 ```@docs; canonical=false
 PSFDetector(::Real)
@@ -88,8 +88,8 @@ The intensity map together with the coordinate system of the detector can be ret
 intensity(::PSFDetector)
 ```
 
-When dealing with a collimated source as the input to your optical system, where you want to calculate the PSF, *DO NOT* use the [`CollimatedSource`](@ref) beam group directly but instead use
-the [`UniformDiscSource`](@ref) constructor. This function returns a `CollimatedSource` with an equal-area sampling, which correctly weighs the outer beams in relation to the inner beams. Otherwise the results might be wrong.
+!!! warning
+    When dealing with a collimated source as the input to your optical system, where you want to calculate the PSF, **DO NOT** use the [`CollimatedSource`](@ref) beam group directly but instead use the [`UniformDiscSource`](@ref) constructor. This function returns a `CollimatedSource` with an equal-area sampling, which correctly weights the outer beams in relation to the inner beams. Otherwise the results might be wrong.
 
 
 ```@eval

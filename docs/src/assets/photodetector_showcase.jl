@@ -21,7 +21,7 @@ solve_system!(system, g2)
 ## render fringes
 fringes_fig = Figure()
 heat = Axis(fringes_fig[1, 1], xlabel="x [mm]", ylabel="y [mm]", aspect=1)
-hm = heatmap!(heat, pd.x*1e3, pd.y*1e3, BeamletOptics.intensity(pd), colormap=:viridis)
+hm = heatmap!(heat, pd.x*1e3, pd.y*1e3, intensity(pd), colormap=:viridis)
 cb = Colorbar(fringes_fig[1, 2], hm, label="Intensity [W/m²]")
 
 ## render system
