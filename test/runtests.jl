@@ -2591,27 +2591,27 @@ end
 end
 
 @testset "Point-spread functions" begin
+    # parameters for an almost thin-lens
+    l = 1e-3
+    R1 = 100e-3
+    R2 = Inf
+    d = 25.4e-3
+    n = 1.5
+    λ = 1e-6    
+    D = 15e-3
+    num_rays = 1000
+    
+    # plane wave source
+    cs = UniformDiscSource([0, -10e-3, 0], [0, 1, 0], D, λ; num_rays)
+    
+    # test lens
+    lens = SphericalLens(R1, R2, l, d, x -> n)
+    
+    # PSF detector
+    psfd = PSFDetector(10e-3)
+    translate3d!(psfd, [0, 200e-3 + 0.13e-3, 0])
+
     @testset "Airy-disc test" begin
-        # parameters for an almost thin-lens
-        l = 1e-3
-        R1 = 100e-3
-        R2 = Inf
-        d = 25.4e-3
-        n = 1.5
-        λ = 1e-6
-
-        D = 15e-3
-
-        # plane wave source
-        cs = UniformDiscSource([0, -10e-3, 0], [0, 1, 0], D, λ)
-
-        # test lens
-        lens = SphericalLens(R1, R2, l, d, x -> n)
-
-        # PSF detector
-        psfd = PSFDetector(10e-3)
-        translate3d!(psfd, [0, 200e-3 + 0.13e-3, 0])
-
         # build system and solve it
         sys = System([lens, psfd])
         solve_system!(sys, cs)
@@ -2628,6 +2628,14 @@ end
         airy_min = 1.22*λ*200e-3/D
 
         @test abs(num_min) ≈ airy_min rtol=1e-2
+    end
+
+    @testset "PSFDetector reset" begin
+        # Test if data in psfd
+        @test length(psfd.data) == num_rays
+        # Empty psfd and test
+        empty!(psfd)
+        @test isempty(psfd.data)
     end
 end
 
