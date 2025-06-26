@@ -195,29 +195,51 @@ function CollimatedSource(
 end
 
 """
-    UniformDiscSource(pos, dir, diameter, λ; N=1_000)
+    UniformDiscSource(pos, dir, diameter, λ; num_rays=1_000)
 
-Generates `N` rays with *equal area per ray* across a circular pupil
+Generates a ray fan with *equal area per ray* across a circular pupil
 using the deterministic sunflower (Fibonacci) pattern.
 
 !!! note
     This is merely a [`CollimatedSource`](@ref) constructor which uses Fibonacci sampling
     instead of a linear grid.
+
+# Arguments
+
+The following inputs and arguments can be used to configure the underlying [`CollimatedSource`](@ref):
+
+## Inputs
+
+- `pos`: center beam starting position
+- `dir`: center beam starting direction
+- `diameter`: outer beam bundle diameter in [m]
+- `λ = 1e-6`: wavelength in [m]
+
+## Keyword Arguments
+
+- `num_rays=1000`: total number of rays in the source
 """
-function UniformDiscSource(pos, dir, D, λ=1e-6; N=1_000)
-    T  = promote_type(eltype(pos), eltype(dir), typeof(D), typeof(λ))
-    R  = D / 2
+function UniformDiscSource(
+        pos::AbstractArray{P},
+        dir::AbstractArray{D1},
+        diameter::D2,
+        λ::L=1e-6;
+        # kwargs
+        num_rays::Int=1_000
+    ) where {P<:Real, D1<:Real, D2<:Real, L<:Real}
+    T  = promote_type(P, D1, D2, L)
+    R  = diameter / 2
     φ0 = 2π / (1 + √5)         # golden angle
-    beams = Vector{Beam{T,Ray{T}}}(undef, N)
+    beams = Vector{Beam{T,Ray{T}}}(undef, num_rays)
     # orthogonal basis in the pupil plane
     e1 = normal3d(dir)
     e2 = normalize(cross(dir, e1))
-    for k in 0:N-1
-        ρ  = √((k + 0.5)/N)     # equal-area radius
+    for k in 0:num_rays-1
+        ρ  = √((k + 0.5)/num_rays)     # equal-area radius
         φ  = k * φ0
         r  = R * ρ
         x  =  r * cos(φ) * e1 + r * sin(φ) * e2
         beams[k+1] = Beam(pos + x, dir, λ)
     end
-    return CollimatedSource(beams, T(D))
+    return CollimatedSource(beams, T(diameter))
 end
