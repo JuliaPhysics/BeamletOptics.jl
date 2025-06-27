@@ -127,13 +127,13 @@ heat2 = Axis(fringes_fig[1, 2], xlabel="x [mm]", ylabel="y [mm]", title="After r
 hidedecorations!(heat1)
 hidedecorations!(heat2)
 
-hm = heatmap!(heat1, pd.x*1e3, pd.y*1e3, BeamletOptics.intensity(pd), colormap=:viridis)
+hm = heatmap!(heat1, pd.x*1e3, pd.y*1e3, intensity(pd), colormap=:viridis)
 
 zrotate3d!(m1, 1e-3)
 empty!(pd)
 solve_system!(system, beam)
 
-hm = heatmap!(heat2, pd.x*1e3, pd.y*1e3, BeamletOptics.intensity(pd), colormap=:viridis)
+hm = heatmap!(heat2, pd.x*1e3, pd.y*1e3, intensity(pd), colormap=:viridis)
 
 save("mi_fringes.png", fringes_fig, px_per_unit=4)
 
