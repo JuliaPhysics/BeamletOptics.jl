@@ -44,3 +44,4 @@ end
 # include concrete detectors
 include("Photodetector.jl")
 include("Spotdetector.jl")
+include("PSFDetector.jl")

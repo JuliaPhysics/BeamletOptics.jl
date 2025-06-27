@@ -46,6 +46,16 @@ CollimatedSource(::AbstractArray{<:Real}, ::AbstractArray{<:Real}, ::Real, ::Rea
 
 ![Collimated group of beams](collimated_beam_source.png)
 
+A special constructor called [`UniformDiscSource`](@ref) is available, which offers an equal-area
+sampling (Fibonnaci-pattern) sampling and is thus favorable in situations where the weighting of the
+individual beams becomes important, e.g. for calculating a point spread function using [`PSFDetector`](@ref).
+
+```@docs; canonical=false
+UniformDiscSource
+```
+
+![Collimated uniform group of beams](collimated_uniform_beam_source.png)
+
 ### Point beam source
 
 The `PointSource` type is used to model emission from a spatially localized source that radiates [`Beam`](@ref)s in a range of directions. This is commonly used to simulate conical emission patterns, such as light emerging from a fiber tip or a light source for a lens objective with a known focal distance. You can specify the origin and a propagation direction, which are then used to construct the monochromatic `PointSource`.

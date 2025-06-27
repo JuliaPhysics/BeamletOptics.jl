@@ -45,7 +45,7 @@ The following inputs and arguments can be used to configure the [`PointSource`](
 - `num_rings`: number of concentric beam rings, default is 10
 - `num_rays`: total number of rays in the source, default is 100x num_rings
 
-!!! warning 
+!!! warning
     The orthogonal basis vectors for the beam generation are generated randomly.
 """
 function PointSource(
@@ -138,7 +138,7 @@ The following inputs and arguments can be used to configure the [`CollimatedSour
 
 - `pos`: center beam starting position
 - `dir`: center beam starting direction
-- `diameter`: outer beam bundle diameter in [m] 
+- `diameter`: outer beam bundle diameter in [m]
 - `λ = 1e-6`: wavelength in [m], default val. is 1000 nm
 
 ## Keyword Arguments
@@ -146,7 +146,7 @@ The following inputs and arguments can be used to configure the [`CollimatedSour
 - `num_rings`: number of concentric beam rings, default is 10
 - `num_rays`: total number of rays in the source, default is 100x num_rings
 
-!!! warning 
+!!! warning
     The orthogonal basis vectors for the beam generation are generated randomly.
 """
 function CollimatedSource(
@@ -190,6 +190,56 @@ function CollimatedSource(
             push!(beams, Beam(pos + helper, dir, λ))
             helper = RotMat * helper
         end
+    end
+    return CollimatedSource(beams, T(diameter))
+end
+
+"""
+    UniformDiscSource(pos, dir, diameter, λ; num_rays=1_000)
+
+Generates a ray fan with *equal area per ray* across a circular pupil
+using the deterministic sunflower (Fibonacci) pattern.
+
+!!! note
+    This is merely a [`CollimatedSource`](@ref) constructor which uses Fibonacci sampling
+    instead of a linear grid.
+
+# Arguments
+
+The following inputs and arguments can be used to configure the underlying [`CollimatedSource`](@ref):
+
+## Inputs
+
+- `pos`: center beam starting position
+- `dir`: center beam starting direction
+- `diameter`: outer beam bundle diameter in [m]
+- `λ = 1e-6`: wavelength in [m]
+
+## Keyword Arguments
+
+- `num_rays=1000`: total number of rays in the source
+"""
+function UniformDiscSource(
+        pos::AbstractArray{P},
+        dir::AbstractArray{D1},
+        diameter::D2,
+        λ::L=1e-6;
+        # kwargs
+        num_rays::Int=1_000
+    ) where {P<:Real, D1<:Real, D2<:Real, L<:Real}
+    T  = promote_type(P, D1, D2, L)
+    R  = diameter / 2
+    φ0 = 2π / (1 + √5)         # golden angle
+    beams = Vector{Beam{T,Ray{T}}}(undef, num_rays)
+    # orthogonal basis in the pupil plane
+    e1 = normal3d(dir)
+    e2 = normalize(cross(dir, e1))
+    for k in 0:num_rays-1
+        ρ  = √((k + 0.5)/num_rays)     # equal-area radius
+        φ  = k * φ0
+        r  = R * ρ
+        x  =  r * cos(φ) * e1 + r * sin(φ) * e2
+        beams[k+1] = Beam(pos + x, dir, λ)
     end
     return CollimatedSource(beams, T(diameter))
 end
