@@ -216,14 +216,14 @@ fringes_fig = Figure()
 heat1 = Axis(fringes_fig[1, 1], aspect=1)
 heat2 = Axis(fringes_fig[1, 2], aspect=1)
 
-hm = heatmap!(heat1, pd.x, pd.y, BeamletOptics.intensity(pd), colormap=:viridis)
+hm = heatmap!(heat1, pd.x, pd.y, intensity(pd), colormap=:viridis)
 
 # rotate m1, reset pd field data, resolve system
 zrotate3d!(m1, 1e-3)
 empty!(pd)
 solve_system!(system, beam)
 
-hm = heatmap!(heat2, pd.x, pd.y, BeamletOptics.intensity(pd), colormap=:viridis)
+hm = heatmap!(heat2, pd.x, pd.y, intensity(pd), colormap=:viridis)
 ```
 
 By experimenting with different mirror angles, arm lengths, or beamsplitter properties, you can observe how interference fringes evolve and gain insights into the stability and sensitivity of the interferometric setup. This can be important to optimize alignment and achieve high contrast fringes.
