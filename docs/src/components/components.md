@@ -5,7 +5,7 @@ A collection of basic optical elements is provided with this package as is. They
 ## Component overview
 
 ```@contents
-Pages = ["mirrors.md", "lenses.md", "beamsplitters.md", "detectors.md"]
+Pages = ["mirrors.md", "lenses.md", "beamsplitters.md", "polarization_optics.md", "detectors.md"]
 Depth = 2
 ```
 ## Listing available components

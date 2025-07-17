@@ -48,6 +48,7 @@ makedocs(;
             "Mirrors" => "components/mirrors.md",
             "Lenses" => "components/lenses.md",
             "Beamsplitters" => "components/beamsplitters.md",
+            "Polarization optics" => "components/polarization_optics.md",
             "Detectors" => "components/detectors.md",
         ],
         "Developer Documentation" => Any[
