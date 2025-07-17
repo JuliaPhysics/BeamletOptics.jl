@@ -35,12 +35,14 @@ export Photodetector, Spotdetector, PSFDetector, intensity
 
 # splitters
 export ThinBeamsplitter, RoundThinBeamsplitter, RectangularPlateBeamsplitter, RoundPlateBeamsplitter, CubeBeamsplitter, RectangularCompensatorPlate
+export PolarizingCubeBeamsplitter, PolarizingThinBeamsplitter
 
 # dummies
 export NonInteractableObject, MeshDummy, IntersectableObject
 
 # misc
 export Retroreflector
+export Waveplate, QuarterWaveplate, HalfWaveplate
 
 # render
 export render!
