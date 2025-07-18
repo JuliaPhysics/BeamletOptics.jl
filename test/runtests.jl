@@ -2517,6 +2517,17 @@ end
         solve_system!(system, beam)
         @test length(beam.children) == 2
     end
+
+    @testset "Polarizing isolator" begin
+        iso = PolarizingIsolator(0.02, λ->1.5, offset=0.01)
+        translate3d!(iso, [0, 0.05, 0])
+        system = StaticSystem([iso])
+        pol = [1.0, 0.0, 0.0]
+        ray = PolarizedRay([0.0, 0.0, 0.0], [0,1,0], 1000e-9, pol)
+        beam = Beam(ray)
+        solve_system!(system, beam)
+        @test length(beam.children) == 2
+    end
 end
 
 @testset "Dummy objects" begin

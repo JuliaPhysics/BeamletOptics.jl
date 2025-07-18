@@ -38,6 +38,7 @@ export ThinBeamsplitter, RoundThinBeamsplitter, RectangularPlateBeamsplitter, Ro
 export PolarizingCubeBeamsplitter, PolarizingThinBeamsplitter
 export RoundPolarizingThinBeamsplitter
 export RectangularPolarizingPlateBeamsplitter, RoundPolarizingPlateBeamsplitter
+export PolarizingIsolator
 
 # dummies
 export NonInteractableObject, MeshDummy, IntersectableObject
