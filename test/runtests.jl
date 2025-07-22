@@ -2582,7 +2582,7 @@ end
     end
 
     @testset "Test with point source (narrow)" begin
-        # Tests regression for https://github.com/StackEnjoyer/BeamletOptics.jl/issues/11
+        # Tests regression for https://github.com/JuliaPhysics/BeamletOptics.jl/issues/11
         source = PointSource([0, -0.5, 0], [0, 1 ,0], 5e-5, 486.0e-9, num_rays=1000, num_rings=10)
         empty!(detector)
         solve_system!(system, source)

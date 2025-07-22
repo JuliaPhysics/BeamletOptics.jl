@@ -16,7 +16,7 @@ makedocs(;
     sitename="BeamletOptics.jl",
     format=Documenter.HTML(;
         prettyurls=get(ENV, "CI", "false") == "true",
-        canonical="https://StackEnjoyer.github.io/BeamletOptics.jl",
+        canonical="https://JuliaPhysics.github.io/BeamletOptics.jl",
         edit_link="master",
         assets=String[],
         size_threshold_ignore=["reference.md"],
@@ -60,7 +60,7 @@ makedocs(;
 )
 
 deploydocs(;
-    repo="github.com/StackEnjoyer/BeamletOptics.jl.git",
+    repo="github.com/JuliaPhysics/BeamletOptics.jl.git",
     devbranch="master",
     push_preview=false,
 )
