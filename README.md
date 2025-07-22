@@ -11,7 +11,7 @@
 [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://juliaphysics.github.io/BeamletOptics.jl/stable/)
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://juliaphysics.github.io/BeamletOptics.jl/dev/)
 [![Build Status](https://github.com/JuliaPhysics/BeamletOptics.jl/actions/workflows/CI.yml/badge.svg?branch=master)](https://github.com/JuliaPhysics/BeamletOptics.jl/actions/workflows/CI.yml?query=branch%3Amaster)
-[![Coverage](https://codecov.io/gh/JuliaPhysics/BeamletOptics.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/StackEnjoyer/BeamletOptics.jl)
+[![Coverage](https://codecov.io/gh/JuliaPhysics/BeamletOptics.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/JuliaPhysics/BeamletOptics.jl)
 [![Aqua](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
 [![DOI](https://zenodo.org/badge/955172301.svg)](https://doi.org/10.5281/zenodo.15090783)
 
