@@ -17,9 +17,8 @@ function interact3d(::AbstractSystem,
 
     # Jones polarization filter matrix
     J_polfilter = @SArray [1 0 0; 0 0 0; 0 0 1]
-    J = inv(o) * J_polfilter * o # Update jones matrice according to filter orientation in space
 
-    E0 = _calculate_global_E0(direction(ray), ndir, J, polarization(ray))
+    E0 = _calculate_global_E0(polfilter, ray, ndir, J_polfilter)
 
     return BeamInteraction{T, R}(nothing,
         PolarizedRay{T}(npos, ndir, nothing, wavelength(ray), refractive_index(ray), E0))
