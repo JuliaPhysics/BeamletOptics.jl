@@ -41,7 +41,7 @@ Follow the [Beam expander](@ref) and [Michelson interferometer](@ref) tutorials 
 
 ## Citation and license
 
-The BeamletOptics package is made available under the MIT license. If you use this package for your research, we encourage you to cite it. For your convenience, a BibTeX entry is provided in the **FIXME** file.
+The BeamletOptics package is made available under the MIT license. If you use this package for your research, we encourage you to cite it. For your convenience, a BibTeX entry is provided as part of the package (CITATION.bib) or on [Zenodo](https://zenodo.org/records/15090784).
 
 ## Similar packages
 

@@ -72,33 +72,11 @@ function bounding_box(s::AbstractSDF)
 end
 
 """
-    render_object!(axis, s::AbstractSDF)
-
-Render the surface of `s` based on the marching cubes algorithm.
-"""
-function render_object!(axis, s::AbstractSDF)
-    # Get object limits
-    xmin, xmax, ymin, ymax, zmin, zmax = bounding_box(s)
-
-    x = LinRange(xmin - 1e-4, xmax + 1e-4, 100)
-    y = LinRange(ymin - 1e-4, ymax + 1e-4, 100)
-    z = LinRange(zmin - 1e-4, zmax + 1e-4, 100)
-    sdf_values = Float32.([sdf(s, [i, j, k]) for i in x, j in y, k in z])
-    mc = MC(sdf_values; x = Float32.(x), y = Float32.(y), z = Float32.(z))
-    march(mc)
-    vertices = transpose(reinterpret(reshape, Float32, mc.vertices))
-    faces = transpose(reinterpret(reshape, Int64, mc.triangles))
-    render_sdf_mesh!(axis, vertices, faces, transparency = true)
-    return nothing
-end
-render_sdf_mesh!(::Any, vertices, faces; transparency = true) = nothing
-
-"""
     normal3d(s::AbstractSDF, pos)
 
 Computes the normal vector of `s` at `pos`.
 """
-normal3d(s::AbstractSDF, pos) = numeric_gradient(s, pos)
+normal3d(s::AbstractSDF, pos) = normal_fd(s, pos)
 
 function numeric_gradient(s::AbstractSDF, pos)
     # approximate ∇ of s at pos
@@ -107,6 +85,13 @@ function numeric_gradient(s::AbstractSDF, pos)
         sdf(s, pos + Point3(0, eps, 0)) - sdf(s, pos - Point3(0, eps, 0)),
         sdf(s, pos + Point3(0, 0, eps)) - sdf(s, pos - Point3(0, 0, eps)))
     return normalize(norm)
+end
+
+function normal_fd(s::AbstractSDF, p)
+    normal = normalize(gradient(x->sdf(s, x), p))
+    all(!isnan, normal) && return normal
+    # fallback
+    return numeric_gradient(s, p)
 end
 
 """
@@ -218,4 +203,32 @@ the 2D shape around the y-axis.
 function op_revolve_y(p::Point3{T}, sdf2d::Function, offset = zero(T)) where {T <: Real}
     q = Point2(norm(Point2(p[1], p[3])) - offset, p[2])
     return sdf2d(q)
+end
+
+"""
+    op_extrude_z(p, sdf2d::Function, height)
+
+Calculates the SDF at point `p` for the given 2D-SDF function and extrudes the shape to
+`height` along the z-axis.
+
+"""
+function op_extrude_z(p::Point3{T}, sdf2d::Function, height::Real) where {T <: Real}
+    d = sdf2d(Point2(p[1], p[2]))
+    w = Point2(d, abs(p[3]) - height)
+
+    return min(max(w[1], w[2]), zero(T)) + norm(max.(w, zero(T)))
+end
+
+"""
+    op_extrude_x(p, sdf2d::Function, height)
+
+Calculates the SDF at point `p` for the given 2D-SDF function and extrudes the shape to
+`height` along the x-axis.
+
+"""
+function op_extrude_x(p::Point3{T}, sdf2d::Function, height::Real) where {T <: Real}
+    d = sdf2d(Point2(p[2], p[3]))
+    w = Point2(d, abs(p[1]) - height)
+
+    return min(max(w[1], w[2]), zero(T)) + norm(max.(w, zero(T)))
 end

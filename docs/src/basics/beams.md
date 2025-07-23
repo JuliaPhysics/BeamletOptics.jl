@@ -1,3 +1,12 @@
+```@setup beams
+beam_showcase_dir = joinpath(@__DIR__, "..", "assets", "beam_renders")
+
+include(joinpath(beam_showcase_dir, "beam_showcase.jl"))
+include(joinpath(beam_showcase_dir, "gb_showcase.jl"))
+include(joinpath(beam_showcase_dir, "collimated_sc.jl"))
+include(joinpath(beam_showcase_dir, "pointsource_sc.jl"))
+```
+
 # Beams
 
 As mentioned in the [Rays](@ref) section, a beam within the context of this package serves as a data structure for storing collections of rays, forming the backbone of the simulation framework. Beams are intended to be designed as [AbstractTrees](https://github.com/JuliaCollections/AbstractTrees.jl) to allow for ray bifurcations, e.g. in the case of optical elements such as beamsplitters. The [`solve_system!`](@ref) function relies on this data structure to perform ray tracing computations within optical systems. 
@@ -12,48 +21,56 @@ A minimal implementation of the [`BeamletOptics.AbstractBeam`](@ref) type is pro
 Beam
 ```
 
-The propagation of multiple parallel beams through an imaging system is illustrated below. The [Beam expander](@ref) tutorial covers the use of the [`Beam`](@ref) in more detail. A ray tracing example using [`Beam`](@ref)s is shown below.
+A ray tracing example through an arbitrary system using a [`Beam`](@ref) is shown below. Individual [`Ray`](@ref) segments are marked by their starting position and direction. The [Beam expander](@ref) and [Miniature microscope](@ref) tutorial covers the use of the [`Beam`](@ref) in more detail. 
 
-```@example telescope_with_beams
-using CairoMakie, BeamletOptics
+![Beam structure](beam_showcase.png)
 
-# setup system
-LA1353 = SphericalLens(103e-3, Inf, 10.1e-3, 75e-3, λ->1.5007)
-LA1131 = SphericalLens(25.8e-3, Inf, 5.3e-3, BeamletOptics.inch, λ->1.5007)
-LA1805 = SphericalLens(15.5e-3, Inf, 8.6e-3, BeamletOptics.inch, λ->1.5007)
+## Beam groups
 
-zrotate3d!(LA1353, deg2rad(180))
-zrotate3d!(LA1805, deg2rad(180))
+For convenience, the [`BeamletOptics.AbstractBeamGroup`](@ref) offers a container-like interface for groups of [`Beam`](@ref)s as commonly used in other software packages. The following concrete implementations are currently provided:
 
-translate3d!(LA1131, [0, 0.25, 0])
-translate3d!(LA1805, [0, 0.29, 0])
-
-system = System([LA1353, LA1131, LA1805])
-
-# create render
-fig = Figure(size=(600,220))
-rend = Axis3(fig[1,1], aspect=(1,5,1), limits=(-0.05, 0.05, -0.1, 0.4, -0.05, 0.05), azimuth=0, elevation=1e-3)
-hidexdecorations!(rend)
-hidezdecorations!(rend)
-
-render_system!(rend, system)
-
-zs = LinRange(-0.025, 0.025, 7)
-
-for z in zs
-    beam = Beam(Ray([0, -0.1, z], [0, 1, 0.0], 1550e-9))
-    solve_system!(system, beam)
-    render_beam!(rend, beam, flen=0.1)
-end
-
-save("telescope_with_beams.png", fig, px_per_unit=4); nothing # hide
+```@repl
+using BeamletOptics # hide
+BeamletOptics.list_subtypes(BeamletOptics.AbstractBeamGroup);
 ```
 
-![Telescope with beams](telescope_with_beams.png)
+Refer to the following sections for convenience constructors to generate the sources listed above.
+
+### Collimated beam source
+
+The collimated beam source is ideal to model light coming from a focal plane at infinity. This is useful for simulating plane wavefronts. You can define a collimated monochromatic [`Beam`](@ref) source as follows:
+
+```@docs; canonical=false
+CollimatedSource(::AbstractArray{<:Real}, ::AbstractArray{<:Real}, ::Real, ::Real)
+```
+
+![Collimated group of beams](collimated_beam_source.png)
+
+A special constructor called [`UniformDiscSource`](@ref) is available, which offers an equal-area
+sampling (Fibonnaci-pattern) sampling and is thus favorable in situations where the weighting of the
+individual beams becomes important, e.g. for calculating a point spread function using [`PSFDetector`](@ref).
+
+```@docs; canonical=false
+UniformDiscSource
+```
+
+![Collimated uniform group of beams](collimated_uniform_beam_source.png)
+
+### Point beam source
+
+The `PointSource` type is used to model emission from a spatially localized source that radiates [`Beam`](@ref)s in a range of directions. This is commonly used to simulate conical emission patterns, such as light emerging from a fiber tip or a light source for a lens objective with a known focal distance. You can specify the origin and a propagation direction, which are then used to construct the monochromatic `PointSource`.
+
+```@docs; canonical=false
+PointSource(::AbstractArray{<:Real}, ::AbstractArray{<:Real}, ::Real, ::Real)
+```
+
+Below you can find an exemplary illustration of a `PointSource`.
+
+![Point source of beams](point_beam_source.png)
 
 ## Gaussian beamlet
 
-Lasers are common devices in modern optical laboratories. Modeling their propagation through an optical setup can be of interest when planning new experiments. Geometrical ray tracing struggles to capture the propagation of a laser beam correctly, since it can not inherently capture the wave nature of, e.g., the [Gaussian beam](https://www.rp-photonics.com/gaussian_beams.html).
+Lasers are common devices in modern optical laboratories. Modeling their propagation through an optical setup can be of interest when planning new experiments. Geometrical ray tracing struggles to capture the propagation of a laser beam correctly, since it can not inherently capture the wave nature of e.g. the [Gaussian beam](https://www.rp-photonics.com/gaussian_beams.html).
 
 The electric field of the ``\text{TEM}_{00}`` spatial Gaussian mode can be calculated analytically using the [`BeamletOptics.electric_field`](@ref) function: 
 
@@ -79,12 +96,15 @@ Various versions of this approach have been implemented under different names in
 
 - [Raypier](https://github.com/bryancole/raypier_optics) - based on Cython, maintenance status not known
 - [Poke](https://github.com/Jashcraf/poke) - based on Zemax API and Python, maintained by J. Ashcraft et al. [Ashcraft:2022](@cite)
+- [IfoCAD](https://www.aei.mpg.de/ifocad-de) - maintenance status not known, refer to Wanner et al. [Wanner:2017](@cite)
 
 This package implements the above method via the [`GaussianBeamlet`](@ref) and the `BeamletOptics.AstigmaticGaussianBeamlet` (**Work in progress**).
 
 ### Stigmatic Beamlets
 
-The [`GaussianBeamlet`](@ref) implements the [`BeamletOptics.AbstractBeam`](@ref) interface and can be used to model the propagation of a monochromatic Gaussian (``\text{TEM}_{00}``-mode) through optical system where all optics lie on the optical axis, e.g. no tip and/or tilt dealignment, and abberations can be neglected.
+The [`GaussianBeamlet`](@ref) implements the [`BeamletOptics.AbstractBeam`](@ref) interface and can be used to model the propagation of a monochromatic Gaussian (``\text{TEM}_{00}``-mode) through optical system where all optics lie on the optical axis, e.g. no tip and/or tilt dealignment, and abberations can be neglected. It is represented by a `chief` (red), `waist` (blue) and `divergence` (green) beam. See below how these beans are placed in relation to the envelope of the Gaussian beam.
+
+![Complex ray tracing I](gbtest1.png)
 
 ```@docs; canonical=false
 GaussianBeamlet
@@ -98,46 +118,11 @@ GaussianBeamlet(::AbstractArray{<:Real}, ::AbstractArray{<:Real}, ::Real, ::Real
 
 #### Obtaining the beam parameters 
 
-Below the telescope lens system from the [Basic beam](@ref) section is traced again using a Gaussian beamlet with ``\lambda = 1550~\text{nm}`` and ``w_0 = 25~\text{mm}``. The beam origin is 100 mm in front of the global origin.
+Once a `GaussianBeamlet` has been traced through an optical system, several parameters might be of interest for further analysis. In order to relate the traced geometrical beams/rays to the Gaussian parameters, the publications of Arnaud, Herloski et al. and DeJager et al. are used [Arnaud1968, Herloski1983, DeJager1992](@cite). Consider the following system where a Gaussian beam with arbitrary parameters has been traced through a lens using the approach outlined in the [Complex ray tracing](@ref) section.
 
-```@example telescope_with_beams
-fig = Figure(size=(600, 220)) # hide
-rend = Axis3(fig[1,1], aspect=(1,5,1), limits=(-0.05, 0.05, -0.1, 0.4, -0.05, 0.05), azimuth=0, elevation=1e-3) # hide
-hidexdecorations!(rend) # hide
-hidezdecorations!(rend) # hide
+![Complex ray tracing II](gbtest2.png)
 
-# render beam first
-beam = GaussianBeamlet([0, -0.1, 0], [0, 1, 0.0], 1550e-9, 20e-3)
-solve_system!(system, beam)
-render_beam!(rend, beam, flen=0.1, r_res=100, z_res=1000)
-
-# render system to overlay beam
-render_system!(rend, system)
-
-save("telescope_with_gaussian.png", fig, px_per_unit=4); nothing # hide
-```
-
-![Telescope with Gaussian beamlet](telescope_with_gaussian.png)
-
-In order to relate the traced geometrical beams/rays to the Gaussian parameters of interest, the publications of Arnaud, Herloski et al. and DeJager et al. are used [Arnaud1968, Herloski1983, DeJager1992](@cite). These are implemented in the [`BeamletOptics.gauss_parameters`](@ref) function. Below the local waist radius and curvature ``R = r^{-1}`` have been calculated for the system above.
-
-```@example telescope_with_beams
-zs = 0:1e-5:0.5
-w, R, ψ, w0 = BeamletOptics.gauss_parameters(beam, zs)
-
-params = Figure(size=(600, 250)) # hide
-waist = Axis(params[1,1], yscale=log10, ylabel="w(z) [m]") # hide
-lines!(waist, zs, w, color=:blue) # hide
-
-curv = Axis(params[2,1], yscale=log10, yaxisposition = :right, xlabel="z (along beam optical axis) [m]", ylabel="|R(z)| [m⁻¹]") # hide
-lines!(curv, zs, abs.(R) .+ 1, color=:red) # hide
-
-linkxaxes!(waist, curv) # hide
-hidexdecorations!(waist, grid=false) # hide
-rowgap!(params.layout, 1, 0) # hide
-
-save("gauss_parameters.png", params, px_per_unit=4); nothing # hide
-```
+The user can obtain parameters such as the beam waist radius, the radius of curvature and more using the [`BeamletOptics.gauss_parameters`](@ref) function. Below the local waist radius and curvature ``R = r^{-1}`` have been calculated for the example above.
 
 ![Gauss beam parameters](gauss_parameters.png)
 

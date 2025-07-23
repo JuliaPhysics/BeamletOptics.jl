@@ -1,18 +1,8 @@
 using CairoMakie
+using GLMakie
 using BeamletOptics
 using Documenter
 using DocumenterCitations
-
-try
-    rm(joinpath(@__DIR__, "build"), recursive=true)
-    @info "Deleted build folder..."
-catch e
-    if isa(e, Base.IOError)
-        @info "Can't delete build folder, does not exist..."
-    else
-        rethrow(e)
-    end
-end
 
 CairoMakie.activate!()
 
@@ -22,12 +12,12 @@ bib = CitationBibliography(joinpath(@__DIR__, "src", "refs.bib"))
 
 makedocs(;
     modules=[BeamletOptics],
-    authors="Hugo Uittenbosch <hugo.uittenbosch@dlr.de> and contributors",
-    repo="https://gitlab.dlr.de/optical-air-data/dispersionsinterferometer/beamletoptics/-/blob/{commit}{path}#L{line}",
-    sitename="BeamletOptics",
+    authors="Hugo Uittenbosch <hugo.uittenbosch@dlr.de>, Oliver Kliebisch <oliver.kliebisch@dlr.de> and contributors",
+    sitename="BeamletOptics.jl",
     format=Documenter.HTML(;
         prettyurls=get(ENV, "CI", "false") == "true",
-        edit_link="main",
+        canonical="https://JuliaPhysics.github.io/BeamletOptics.jl",
+        edit_link="master",
         assets=String[],
         size_threshold_ignore=["reference.md"],
         sidebar_sitename = false,
@@ -36,6 +26,7 @@ makedocs(;
         "Home" => "index.md",
         "Tutorials" => Any[
             "Beam expander" => "tutorials/expander.md",
+            "Miniature microscope" => "tutorials/microscope.md",
             "Michelson interferometer" => "tutorials/michelson.md"
         ],
         "Examples" => Any[
@@ -50,6 +41,7 @@ makedocs(;
             "Beams" => "basics/beams.md",
             "Optical elements" => "basics/elements.md",
             "Optical systems" => "basics/systems.md",
+            "Visualization" => "basics/render.md"
         ],
         "Components" => Any[
             "Overview" => "components/components.md",
@@ -65,4 +57,10 @@ makedocs(;
         "Reference" => "reference.md"
     ],
     plugins=[bib],
+)
+
+deploydocs(;
+    repo="github.com/JuliaPhysics/BeamletOptics.jl.git",
+    devbranch="master",
+    push_preview=false,
 )

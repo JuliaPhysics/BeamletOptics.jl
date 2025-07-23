@@ -34,7 +34,7 @@ Calculates the thickness of a union of [`AbstractLensSDF`](@ref)s.
 function thickness(u::UnionSDF{T}) where T
     t = zero(T)
     for s in u.sdfs
-        if typeof(s) <: AbstractLensSDF
+        if hasmethod(thickness, Tuple{typeof(s)})
             t += thickness(s)
         end
     end
@@ -81,8 +81,11 @@ function rotate3d!(u::UnionSDF, axis, θ)
     return nothing
 end
 
-function render_object!(axis, s::UnionSDF)
-    for sdf in s.sdfs
-        render_object!(axis, sdf)
-    end
+# Without this function it is not possible for SDFs encapsulated in a UnionSDF
+# to specialize normal3d as always the generic normal3d function is called.
+function normal3d(s::UnionSDF, pos)
+    # find the closes sub-sdf and call its normal method
+    idx = argmin(sdf(_sdf, pos) for _sdf in s.sdfs)
+
+    return normal3d(s.sdfs[idx], pos)
 end

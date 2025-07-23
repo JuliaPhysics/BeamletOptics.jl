@@ -74,10 +74,9 @@ fig = Figure(size=(600,240))
 aspect = (1,4,1)
 limits = (-0.025, 0.025, -0.05, 0.15, -0.025, 0.025)
 ax = Axis3(fig[1,1], aspect=aspect, limits=limits, azimuth=0., elevation=1e-3)
-hidexdecorations!(ax)
-hidezdecorations!(ax)
+hidedecorations!(ax)
 
-render_system!(ax, system)
+render!(ax, system)
 
 save("expander_no_beams.png", fig, px_per_unit=4); nothing # hide
 ```
@@ -104,7 +103,7 @@ beam = Beam(ray)
 
 solve_system!(system, beam)
 
-render_beam!(ax, beam, show_pos=true)
+render!(ax, beam, show_pos=true)
 
 save("expander_one_beam.png", fig, px_per_unit=4); nothing # hide
 ```
@@ -121,7 +120,7 @@ zs = -4e-3:2e-3:4e-3
 for z in zs
     b = Beam(Ray([0, -0.15, z], [0, 1., 0]))
     solve_system!(system, b)
-    render_beam!(ax, b)
+    render!(ax, b)
 end
 
 save("expander_all_beams.png", fig, px_per_unit=4); nothing # hide
@@ -137,7 +136,7 @@ zs = 6e-3:2e-3:8e-3
 for z in cat(-zs, zs; dims=1)
     b = Beam(Ray([0, -0.15, z], [0, 1., 0]))
     solve_system!(system, b)
-    render_beam!(ax, b, color=:red)
+    render!(ax, b, color=:red)
 end
 
 save("expander_abberations.png", fig, px_per_unit=4); nothing # hide

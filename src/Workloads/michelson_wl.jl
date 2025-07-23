@@ -61,7 +61,7 @@
         solve_system!(system, beam)
 
         ##
-        reset_detector!(pd)
+        empty!(pd)
         translate3d!(m1, [5e-9, 0, 0])
         solve_system!(system, beam)
         p = optical_power(pd)

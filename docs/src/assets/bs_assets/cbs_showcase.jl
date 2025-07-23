@@ -1,6 +1,10 @@
-using CairoMakie, BeamletOptics
+using GLMakie, BeamletOptics
 
-file_dir = @__DIR__
+const BMO = BeamletOptics
+
+GLMakie.activate!(; ssao=true)
+
+Base.include(@__MODULE__, joinpath("..", "render_utils.jl"))
 
 mm = 1e-3
 n = 1.5
@@ -36,16 +40,15 @@ zrotate3d!(m2_assembly, deg2rad(135))
 
 system = System([cbs1_assembly, cbs2_assembly, m1_assembly, m2_assembly])
 
-beam = GaussianBeamlet([0,-60mm,0], [0, 1, 0], 1e-6, 1e-3)
+beam = GaussianBeamlet([0,-200mm,0], [0, 1, 0], 1e-6, 1e-3)
 
 solve_system!(system, beam)
 
-fig = Figure(size=(600, 470))
-ax = Axis3(fig[1,1]; aspect=:data,  azimuth=0, elevation=pi/2)
+##
 
-render_object!.(ax, [cbs1_mount, cbs2_mount, m1_mount, m2_mount])
-render_object!.(ax, [cbs1, cbs2, m1, m2])
-render_beam!(ax, beam, flen=40mm, color=:red)
-
-hidedecorations!(ax)
-hidespines!(ax)
+const mzi_view = [
+    -0.691546   0.722333  -5.27356e-16  -0.0997083
+    -0.540886  -0.517833   0.662791      0.0538701
+    0.478755   0.45835    0.748805     -0.3149
+    0.0        0.0        0.0           1.0
+]

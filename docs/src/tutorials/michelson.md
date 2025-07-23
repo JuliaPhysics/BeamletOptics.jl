@@ -17,7 +17,11 @@ In this tutorial, a simple [Michelson Interferometer](https://www.rp-photonics.c
 All figures you will see below are pregenerated. The full code and all 3D assets are available in the following files:
 
 ```@example michelson
-using CairoMakie, BeamletOptics
+using GLMakie, BeamletOptics
+
+const BMO = BeamletOptics
+
+GLMakie.activate!()
 
 file_dir = joinpath(@__DIR__, "..", "assets", "mi_assets")
 
@@ -37,8 +41,8 @@ using GLMakie, BeamletOptics
 
 fig = Figure()
 ax = LScene(fig[1,1])
-render_system!(ax, system)
-render_beam!(ax, beam, flen=1e-2)
+render!(ax, system)
+render!(ax, beam, flen=1e-2)
 ```
 
 The `flen` keyword sets the plotted length of "infinite" beams to 10 cm. Using the `LScene` environment will allow for easy viewing of the optical system and beam path. When the `system` or `beam` change, the plot will not update automatically. Rerunning the plot code above is necessary in this case.
@@ -193,7 +197,7 @@ system = System([rpm, cbs, m1, m2, pd])
 solve_system!(system, beam)
 ```
 
-Below you can find a top-down rendering of the interferometer with the [PDA10A2](https://www.thorlabs.com/thorproduct.cfm?partnumber=PDA10A2) detector. The detector is connected to the cage system with a [SM1L30C](https://www.thorlabs.com/thorproduct.cfm?partnumber=SM1L30C) lens tube and a [CP33T/M](https://www.thorlabs.com/thorproduct.cfm?partnumber=CP33T/M) adapter. Once the `solve_system!` command has been executed, you can inspect the detector’s data to observe interference fringes and measure optical power. This typically involves examining the detector’s stored field array, which will be discussed in the next section.
+Below you can find a rendering of the interferometer with the [PDA10A2](https://www.thorlabs.com/thorproduct.cfm?partnumber=PDA10A2) Si-detector. The device is connected to the cage system with a [SM1L30C](https://www.thorlabs.com/thorproduct.cfm?partnumber=SM1L30C) lens tube and a [CP33T/M](https://www.thorlabs.com/thorproduct.cfm?partnumber=CP33T/M) adapter. Once the `solve_system!` command has been executed, you can inspect the detector’s data to observe interference fringes and measure optical power. This typically involves examining the detector’s stored field array, which will be discussed in the next section.
 
 ![Photodetector](mi_pd.png)
 
@@ -212,20 +216,20 @@ fringes_fig = Figure()
 heat1 = Axis(fringes_fig[1, 1], aspect=1)
 heat2 = Axis(fringes_fig[1, 2], aspect=1)
 
-hm = heatmap!(heat1, pd.x, pd.y, BeamletOptics.intensity(pd), colormap=:viridis)
+hm = heatmap!(heat1, pd.x, pd.y, intensity(pd), colormap=:viridis)
 
 # rotate m1, reset pd field data, resolve system
 zrotate3d!(m1, 1e-3)
-BeamletOptics.reset_detector!(pd)
+empty!(pd)
 solve_system!(system, beam)
 
-hm = heatmap!(heat2, pd.x, pd.y, BeamletOptics.intensity(pd), colormap=:viridis)
+hm = heatmap!(heat2, pd.x, pd.y, intensity(pd), colormap=:viridis)
 ```
 
 By experimenting with different mirror angles, arm lengths, or beamsplitter properties, you can observe how interference fringes evolve and gain insights into the stability and sensitivity of the interferometric setup. This can be important to optimize alignment and achieve high contrast fringes.
 
 !!! info "Statefulness"
-    Many steps of the simulation process mutate the data structures of the `system` and `beam`. If you run the above code multiple times odd effects might occur, since with each run the mirror is moved by one mrad. This is also important for the use of the correct use of the detector via the [`BeamletOptics.reset_detector!`](@ref) function. For more information, refer to the [Detectors](@ref) chapter.
+    Many steps of the simulation process mutate the data structures of the `system` and `beam`. If you run the above code multiple times odd effects might occur, since with each run the mirror is moved by one mrad. This is also important for the use of the correct use of the detector via the [`empty!`](@ref) function. For more information, refer to the [Detectors](@ref) chapter.
 
 ## Running successive simulations
 
@@ -244,7 +248,7 @@ P = zeros(n+1)
 
 # Run sim
 for i in eachindex(P)
-    BeamletOptics.reset_detector!(pd)
+    empty!(pd)
     solve_system!(system, beam)
     P[i] = BeamletOptics.optical_power(pd)
     # translate by Δy

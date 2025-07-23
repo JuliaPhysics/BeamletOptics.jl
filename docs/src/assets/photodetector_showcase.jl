@@ -1,4 +1,4 @@
-using CairoMakie, BeamletOptics
+using GLMakie, BeamletOptics
 
 pd = Photodetector(1e-3, 1000)
 pd_body = MeshDummy(joinpath(asset_dir, "FDS010.stl"))
@@ -21,7 +21,7 @@ solve_system!(system, g2)
 ## render fringes
 fringes_fig = Figure()
 heat = Axis(fringes_fig[1, 1], xlabel="x [mm]", ylabel="y [mm]", aspect=1)
-hm = heatmap!(heat, pd.x*1e3, pd.y*1e3, BeamletOptics.intensity(pd), colormap=:viridis)
+hm = heatmap!(heat, pd.x*1e3, pd.y*1e3, intensity(pd), colormap=:viridis)
 cb = Colorbar(fringes_fig[1, 2], hm, label="Intensity [W/m²]")
 
 ## render system
@@ -33,7 +33,7 @@ rend = Axis3(detector_fig[1,1], aspect=:data, limits=limits, azimuth=5.43, eleva
 hidedecorations!(rend)
 hidespines!(rend)
 
-render_object!(rend, pd_body)
-render_object!(rend, pd)
-render_beam!(rend, g2)
-render_beam!(rend, g1)
+render!(rend, pd_body)
+render!(rend, pd)
+render!(rend, g2)
+render!(rend, g1)

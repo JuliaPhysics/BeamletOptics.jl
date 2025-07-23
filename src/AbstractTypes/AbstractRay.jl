@@ -76,7 +76,7 @@ Subtypes of `AbstractBeam` must implement the following:
 """
 abstract type AbstractRay{T <: Real} end
 
-position(ray::AbstractRay) = ray.pos
+Base.position(ray::AbstractRay) = ray.pos
 position!(ray::AbstractRay, pos) = (ray.pos = pos)
 
 direction(ray::AbstractRay) = ray.dir
@@ -178,7 +178,7 @@ end
 """
     optical_path_length(ray::AbstractRay{T}) where {T}
 
-Calculate the `o`ptical `p`ath `l`ength, i.e. ``OPL = n \\cdot l``.
+Calculate the optical path length of the `ray`, i.e. ``\\mathrm{OPL} = n \\cdot l``.
 """
 function optical_path_length(ray::AbstractRay{T}) where {T}
     isnothing(intersection(ray)) && return T(Inf)
@@ -191,7 +191,7 @@ end
 Returns the geometric length of a `ray` between its start and intersection point. If no intersection exists, `Inf` is returned.
 
 !!! tip
-Use `optical_path_length(ray)` to get the optical path length instead.
+    Use [`optical_path_length`](@ref) to get the optical path length instead.
 """
 Base.length(ray::AbstractRay{T}) where {T} = geom_length(ray)
 

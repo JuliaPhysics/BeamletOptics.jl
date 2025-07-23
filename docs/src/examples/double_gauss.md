@@ -38,7 +38,7 @@ ax = Axis3(fig[1,1]; aspect=:data, azimuth=0, elevation=1e-3)
 hidexdecorations!(ax)
 hidezdecorations!(ax)
 
-render_system!(ax, system)
+render!(ax, system)
 ```
 
 For interactive viewing it is recommended that a `LScene` is used instead of the `Axis3` with the [GLMakie](https://docs.makie.org/stable/) backend. At this point the `system` can be solved. A [`Beam`](@ref) consisting of [`Ray`](@ref)s with the wavelength mentioned above will be used for tracing.
@@ -49,7 +49,7 @@ zs = LinRange(-0.02, 0.02, 10)
 for (i, z) in enumerate(zs)
     beam = Beam(Ray([0, -0.05, z], [0, 1, 0], λ))
     solve_system!(system, beam)
-    render_beam!(ax, beam, flen=0.1)
+    render!(ax, beam, flen=0.1)
 end
 
 save("double_gauss.png", fig, px_per_unit=4); nothing # hide
@@ -75,14 +75,14 @@ ax = Axis3(fig[1,1]; aspect, limits, azimuth=0, elevation=1e-3)
 hidexdecorations!(ax)
 hidezdecorations!(ax)
 
-render_system!(ax, tl_system)
+render!(ax, tl_system)
 
 λ = 486.0 # nm
 zs = LinRange(-0.02, 0.02, 10)
 for (i, z) in enumerate(zs)
     beam = Beam(Ray([0, -0.05, z], [0, 1, 0], λ))
     solve_system!(tl_system, beam)
-    render_beam!(ax, beam, flen=0.2)
+    render!(ax, beam, flen=0.2)
 end
 
 save("thin_lens_f100.png", fig, px_per_unit=4); nothing # hide

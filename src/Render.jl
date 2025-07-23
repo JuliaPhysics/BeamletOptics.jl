@@ -1,149 +1,56 @@
-"""
-    render_object!(axis, mesh::AbstractMesh)
+abstract type RenderException <: Exception end
 
-Render `mesh` into the specified 3D-`axis`.
-"""
-render_object!(::Any, mesh::AbstractMesh) = nothing
+message(e::RenderException) = e.msg
+showerror(io::IO, e::RenderException) = print(io, message(e))
 
-render_object!(::Any, ::Any) = nothing
-render_object!(axis, object::AbstractObject) = render_object!(axis, shape_trait_of(object), object)
-render_object!(axis, ::SingleShape, object) = render_object!(axis, shape(object))
-function render_object!(ax, ::MultiShape, object::AbstractObject)
-    for _object in shape(object)
-        render_object!(ax, _object)
+"""
+    MissingBackendError
+
+Custom `Exception` type that indicates that the `Makie` extension of `BeamletOptics` has not been loaded correctly.
+"""
+mutable struct MissingBackendError <: RenderException
+    msg::String
+    function MissingBackendError()
+        msg = "It appears no suitable Makie backend is loaded in this session."
+        return new(msg)
     end
-    return nothing
 end
 
-"""
-    render_system!(axis, system::AbstractSystem)
-
-Render all objects contained in the `system`.
-"""
-function render_system!(axis, system::AbstractSystem)
-    # Avoid use of objects(system)
-    for object in system.objects
-        render_object!(axis, object)
-    end
-    return nothing
-end
+"""A collection of all types from BMO which might be renderable in principle."""
+const _RenderTypes = Union{
+    AbstractRay,
+    AbstractBeam,
+    AbstractShape,
+    AbstractObject,
+    AbstractObjectGroup,
+    AbstractSystem,
+}
 
 """
-    render_ray!(axis, ray::AbstractRay; color=:blue, flen=1.0)
+    render!(axis, thing; kwargs...)
 
-Renders a `ray` as a 3D line. If the ray has no intersection, the substitute length `flen` is used.
+The `render!` function allows for the visualization of optical system and beams under the condition that a suitable backend is loaded.
+This means that either one of the following packages must be loaded in combination with `BeamletOptics` via `using`:
+
+1. GLMakie 
+    - preferred for 3D viewing
+    - use `LScene` or `Axis3` environments
+2. CairoMakie 
+    - preferred for the generation of high-quality .pngs
+    - only `Axis3` is supported
+
+If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
+
+# Implementations reqs.
+
+All concrete implementations of `render!` must adhere to the following minimal interface:
+
+`render!(axis, thing; kwargs...)`
+
+- `axis`: an axis type of the union of `LScene` or `Axis3`
+- `thing`: an abstract or concrete object or beam type
+- `kwargs`: custom or `Makie` keyword arguments that are passed to the underlying backend
+
+Refer to the `BeamletOptics` extension docs for `Makie` for more information.
 """
-function render_ray!(axis, ray::AbstractRay; color = :blue, flen = 1.0, show_pos=false)
-    if isnothing(intersection(ray))
-        len = flen
-    else
-        len = length(ray.intersection)
-    end
-    temp = ray.pos + len * ray.dir
-
-    _render_ray!(axis, ray, temp; color, show_pos)
-
-    return nothing
-end
-_render_ray!(::Any, ::AbstractRay, ::AbstractVector; color = :blue) = nothing
-
-"""
-    render_beam!(axis, beam::Beam; color=:blue, flen=1.0, show_pos=false)
-
-Render the entire `beam` into the specified 3D-`axis`. A `color` can be specified.
-"""
-function render_beam!(axis, beam::Beam; color = :blue, flen = 1.0, show_pos=false)
-    for child in PreOrderDFS(beam)
-        for ray in rays(child)
-            render_ray!(axis, ray; color, flen, show_pos)
-        end
-    end
-    return nothing
-end
-
-_render_beam!(::Any, ::AbstractBeam; color=:red, flen=1.0) = nothing
-
-"""
-    render_beam!(axis, gauss::GaussianBeamlet; color=:red, flen=0.1, show_beams=false)
-
-Render the surface of a `GaussianBeamlet` as `color`. With `show_beams` the generating rays are plotted as follows:
-
-- `chief` ray: red
-- `divergence` ray: green
-- `waist` ray: blue
-
-# Keyword args
-
-- `color = :red`: color of the beam as per the Makie syntax, i.e. :blue
-- `flen = 0.1`: length of the final beam in case of no intersection
-- `show_beams = false`: plot the generating rays of the [`GaussianBeamlet`](@ref)
-- `r_res::Int = 50`: radial resolution of the beam
-- `z_res::Int = 100`: resolution along the optical axis of the beam
-"""
-function render_beam!(axis,
-        gauss::GaussianBeamlet{T};
-        color = :red,
-        flen = 0.1,
-        show_beams = false,
-        r_res = 50,
-        z_res = 100) where {T}
-    for child in PreOrderDFS(gauss)
-        # Length tracking variable
-        p = AbstractTrees.parent(child)
-        if isnothing(p)
-            l = zero(T)
-        else
-            l = length(p)
-        end
-        # Render each ray segment
-        for ray in rays(child.chief)
-            # Generate local u, v coords
-            if isnothing(intersection(ray))
-                u = LinRange(0, flen, z_res)
-            else
-                u = LinRange(0, length(ray), z_res)
-            end
-            v = LinRange(0, 2π, r_res)
-            # Calculate beam surface at origin along y-axis
-            w = gauss_parameters(child, u .+ l)[1]
-            X = [w[i] * cos(v) for (i, u) in enumerate(u), v in v]
-            Y = [u for u in u, v in v]
-            Z = [w[i] * sin(v) for (i, u) in enumerate(u), v in v]
-            # Transform into world coords
-            R = align3d([0, 1, 0], ray.dir)
-            Xt = R[1, 1] * X + R[1, 2] * Y + R[1, 3] * Z .+ ray.pos[1]
-            Yt = R[2, 1] * X + R[2, 2] * Y + R[2, 3] * Z .+ ray.pos[2]
-            Zt = R[3, 1] * X + R[3, 2] * Y + R[3, 3] * Z .+ ray.pos[3]
-            render_surface!(axis, Xt, Yt, Zt; transparency = true, colormap = [color, color])
-            # Bump length tracker
-            if !isnothing(intersection(ray))
-                l += length(ray)
-            end
-        end
-        # Optionally, plot generating rays
-        if show_beams
-            render_beam!(axis, child.chief, flen = flen, color = :red)
-            render_beam!(axis, child.divergence, flen = flen, color = :green)
-            render_beam!(axis, child.waist, flen = flen, color = :blue)
-        end
-    end
-    return nothing
-end
-render_surface!(::Any, X, Y, Z; kwargs...) = nothing
-
-"""
-    render_object_normals!(axis, mesh::Mesh; l=0.01)
-
-Helper function to visualize the `mesh` normals of an object. The normals are displayed with a standard `l`ength of 0.01
-"""
-function render_object_normals!(axis, mesh::Mesh; l = 0.01)
-    for fID in 1:size(mesh.faces)[1]
-        nml = normal3d(mesh, fID)
-        pos = @view mesh.vertices[mesh.faces[fID, 1], :]
-        vec = pos + l * nml
-        _render_object_normal!(axis, pos, vec; color=:blue)
-    end
-    return nothing
-end
-_render_object_normal!(::Any, ::AbstractVector, ::AbstractVector; color = :blue) = nothing
-
+render!(::Any, ::_RenderTypes, kwargs...) = throw(MissingBackendError())
