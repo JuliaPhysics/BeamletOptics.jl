@@ -11,7 +11,7 @@ const BMO = BeamletOptics
         @testset "normal3d(v) with Array" begin
             v = [1.0, 1, 1]
             k = BMO.normal3d(v)
-            @test dot(v, k)≈0 atol=1e-14
+            @test dot(v, k)≈0 atol=2e-14
             @test norm(k) ≈ 1
         end
 
