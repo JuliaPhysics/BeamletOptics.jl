@@ -100,6 +100,7 @@ end
 
 function _calculate_global_E0(object::AbstractObject, ray::PolarizedRay, out_dir::AbstractArray, J::AbstractArray)
     # Update Jones matrix according to global object orientation
+    @info "this is wrong"
     _J = inv(orientation(object)) * J * orientation(object)
     return _calculate_global_E0(direction(ray), out_dir, _J, polarization(ray)) 
 end

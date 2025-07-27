@@ -90,7 +90,7 @@ end
     J = @SArray [transmittance(bs) 0 0; 0 transmittance(bs) 0; 0 0 1]
     pos = position(ray) + length(ray) * direction(ray)
     dir = direction(ray)
-    E0 = _calculate_global_E0(dir, dir, J, polarization(ray))
+    E0 = _calculate_global_E0(bs, ray, dir, J)
     return Beam(PolarizedRay(pos, dir, wavelength(ray), E0))
 end
 
@@ -101,7 +101,7 @@ end
     pos = position(ray) + length(ray) * direction(ray)
     in_dir = direction(ray)
     out_dir = reflection3d(in_dir, normal)
-    E0 = _calculate_global_E0(in_dir, out_dir, J, polarization(ray))
+    E0 = _calculate_global_E0(bs, ray, out_dir, J)
     return Beam(PolarizedRay(pos, out_dir, wavelength(ray), E0))
 end
 

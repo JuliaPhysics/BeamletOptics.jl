@@ -120,7 +120,7 @@ function interact3d(system::AbstractSystem, optic::AbstractRefractiveOptic,
         J = [ts 0 0; 0 tp 0; 0 0 1]
     end
     # Calculate new polarization
-    E0 = _calculate_global_E0(direction(ray), new_dir, J, polarization(ray))
+    E0 = _calculate_global_E0(optic, ray, new_dir, J)
     return BeamInteraction{T, R}(
         hint, PolarizedRay{T}(raypos, new_dir, nothing, wavelength(ray), n2, E0))
 end
