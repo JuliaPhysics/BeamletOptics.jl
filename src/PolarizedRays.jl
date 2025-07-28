@@ -79,6 +79,10 @@ Base.setindex!(A::AbstractJonesMatrix, v, i::Int, j::Int) = (A.data[i, j] = v)
 
 struct SPBasis{T} <: AbstractJonesMatrix{T}
     data::Matrix{T}
+    function SPBasis(j11::J11, j12::J12, j21::J21, j22::J22) where {J11, J12, J21, J22}
+        T = promote_type(J11, J12, J21, J22)
+        return new{T}([j11 j12 0; j21 j22 0; 0 0 1])
+    end
 end
 
 struct XYBasis{T} <: AbstractJonesMatrix{T}
