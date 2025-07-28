@@ -79,15 +79,32 @@ Base.setindex!(A::AbstractJonesMatrix, v, i::Int, j::Int) = (A.data[i, j] = v)
 
 struct SPBasis{T} <: AbstractJonesMatrix{T}
     data::Matrix{T}
-    function SPBasis(j11::J11, j12::J12, j21::J21, j22::J22) where {J11, J12, J21, J22}
-        T = promote_type(J11, J12, J21, J22)
-        return new{T}([j11 j12 0; j21 j22 0; 0 0 1])
-    end
+end
+
+function SPBasis(j11::Number, j12::Number, j21::Number, j22::Number)
+    T = promote_type(
+        typeof(j11),
+        typeof(j12),
+        typeof(j21),
+        typeof(j22),
+    )
+    return SPBasis{T}(T.([j11 j12 0; j21 j22 0; 0 0 1]))
 end
 
 struct XYBasis{T} <: AbstractJonesMatrix{T}
     data::Matrix{T}
 end
+
+function XYBasis(j11::Number, j12::Number, j21::Number, j22::Number)
+    T = promote_type(
+        typeof(j11),
+        typeof(j12),
+        typeof(j21),
+        typeof(j22),
+    )
+    return XYBasis{T}(T.([j11 j12 0; j21 j22 0; 0 0 1]))
+end
+
 """
     _calculate_global_E0(in_dir, out_dir, J, E0)
 
@@ -117,11 +134,10 @@ function _calculate_global_E0(in_dir::AbstractArray, out_dir::AbstractArray, J::
     return O_out * J * O_in * E0
 end
 
-function _calculate_global_E0(object::AbstractObject, ray::PolarizedRay, out_dir::AbstractArray, J::XYBasis)
+function _calculate_global_E0(object::AbstractObject, ray::PolarizedRay, ::AbstractArray, J::XYBasis)
     # Update Jones matrix according to global object orientation
-    @info "this is wrong"
-    _J = inv(orientation(object)) * J * orientation(object)
-    return _calculate_global_E0(direction(ray), out_dir, _J, polarization(ray)) 
+    #FIXME "This is 100% wrong"
+    return transpose(orientation(object)) * J * orientation(object) * polarization(ray)
 end
 
 function _calculate_global_E0(::AbstractObject, ray::PolarizedRay, out_dir::AbstractArray, J::SPBasis)
