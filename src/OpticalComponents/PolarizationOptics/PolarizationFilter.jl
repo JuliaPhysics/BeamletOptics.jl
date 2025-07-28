@@ -16,7 +16,7 @@ function interact3d(::AbstractSystem,
     o = orientation(polfilter)
 
     # Jones polarization filter matrix
-    J_polfilter = @SArray [1 0 0; 0 0 0; 0 0 1]
+    J_polfilter = SPBasis([1 0 0; 0 0 0; 0 0 1])
 
     E0 = _calculate_global_E0(polfilter, ray, ndir, J_polfilter)
 

@@ -69,6 +69,21 @@ function PolarizedRay(pos::AbstractArray{P},
         E0)
 end
 
+#FIXME: revert to static array for speed
+abstract type AbstractJonesMatrix{T} <: AbstractMatrix{T} end
+
+# Required methods for AbstractArray
+Base.size(A::AbstractJonesMatrix) = size(A.data)
+Base.getindex(A::AbstractJonesMatrix, i::Int, j::Int) = A.data[i, j]
+Base.setindex!(A::AbstractJonesMatrix, v, i::Int, j::Int) = (A.data[i, j] = v)
+
+struct SPBasis{T} <: AbstractJonesMatrix{T}
+    data::Matrix{T}
+end
+
+struct XYBasis{T} <: AbstractJonesMatrix{T}
+    data::Matrix{T}
+end
 """
     _calculate_global_E0(in_dir, out_dir, J, E0)
 
@@ -81,7 +96,7 @@ If the `in`- and `out`-directions of propagation are parallel, an arbitrary basi
 - `J`: Jones matrix extended to 3x3, e.g. [-rₛ 0 0; 0 rₚ 0; 0 0 1] for reflection
 - `E0`: Polarization vector before surface interaction
 """
-function _calculate_global_E0(in_dir::AbstractArray, out_dir::AbstractArray, J::AbstractArray, E0::AbstractArray)
+function _calculate_global_E0(in_dir::AbstractArray, out_dir::AbstractArray, J::SPBasis, E0::AbstractArray)
     s = cross(in_dir, out_dir)
     # Test if in and out dir. are parallel
     if norm(s) ≈ 0
@@ -98,9 +113,14 @@ function _calculate_global_E0(in_dir::AbstractArray, out_dir::AbstractArray, J::
     return O_out * J * O_in * E0
 end
 
-function _calculate_global_E0(object::AbstractObject, ray::PolarizedRay, out_dir::AbstractArray, J::AbstractArray)
+function _calculate_global_E0(object::AbstractObject, ray::PolarizedRay, out_dir::AbstractArray, J::XYBasis)
     # Update Jones matrix according to global object orientation
     @info "this is wrong"
     _J = inv(orientation(object)) * J * orientation(object)
     return _calculate_global_E0(direction(ray), out_dir, _J, polarization(ray)) 
+end
+
+function _calculate_global_E0(::AbstractObject, ray::PolarizedRay, out_dir::AbstractArray, J::SPBasis)
+    # Update Jones matrix according to global object orientation
+    return _calculate_global_E0(direction(ray), out_dir, J, polarization(ray)) 
 end

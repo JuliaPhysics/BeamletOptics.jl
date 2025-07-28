@@ -2153,7 +2153,7 @@ end
 @testset "Polarized rays" begin
     @testset "Polarization transforms" begin
         # Reflection matrix and lin. x-pol
-        J = [-1 0 0; 0 1 0; 0 0 1]
+        J = BMO.SPBasis([-1 0 0; 0 1 0; 0 0 1])
         E0 = [1, 0, 0]
 
         @testset "90° reflection" begin

@@ -87,7 +87,7 @@ end
 
 @inline function _beamsplitter_transmitted_beam(bs::AbstractBeamsplitter, ::Beam{T, R},
         ray::R) where {T <: Real, R <: PolarizedRay{T}}
-    J = @SArray [transmittance(bs) 0 0; 0 transmittance(bs) 0; 0 0 1]
+    J = SPBasis([transmittance(bs) 0 0; 0 transmittance(bs) 0; 0 0 1])
     pos = position(ray) + length(ray) * direction(ray)
     dir = direction(ray)
     E0 = _calculate_global_E0(bs, ray, dir, J)
@@ -96,7 +96,7 @@ end
 
 @inline function _beamsplitter_reflected_beam(bs::AbstractBeamsplitter, ::Beam{T, R},
     ray::R) where {T <: Real, R <: PolarizedRay{T}}
-    J = @SArray [-reflectance(bs) 0 0; 0 reflectance(bs) 0; 0 0 1]
+    J = SPBasis([-reflectance(bs) 0 0; 0 reflectance(bs) 0; 0 0 1])
     normal = normal3d(intersection(ray))
     pos = position(ray) + length(ray) * direction(ray)
     in_dir = direction(ray)
