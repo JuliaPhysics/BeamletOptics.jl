@@ -2159,13 +2159,15 @@ end
         @testset "90° reflection" begin
             in_dir = [0, 0, 1]
             out_dir = [1, 0, 0]
-            @test BMO._calculate_global_E0(in_dir, out_dir, J, E0) ≈ [0, 0, -1]
+            nml = normalize([1, 0, -1])
+            @test BMO._calculate_global_E0(in_dir, out_dir, nml, J, E0) ≈ [0, 0, -1]
         end
 
         @testset "0° reflection" begin
             in_dir = [0, 0, 1]
             out_dir = [0, 0, -1]
-            @test BMO._calculate_global_E0(in_dir, out_dir, J, E0) ≈ [-1, 0, 0]
+            nml = normalize([0, 0, -1])
+            @test BMO._calculate_global_E0(in_dir, out_dir, nml, J, E0) ≈ [-1, 0, 0]
         end
     end
 

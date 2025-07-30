@@ -15,6 +15,25 @@ fields which can containing nothing.
 const NullableVector{T} = Union{Vector{T},Nothing} where {T}
 
 """
+    isparallel3d(v1, v2)
+
+Tests if `v1` is parallel to `v2`.
+
+!!! warning
+    Assumes that `v1` and `v2` have **unit length**.
+"""
+isparallel3d(v1::AbstractArray, v2::AbstractArray) = isapprox(abs(dot(v1, v2)), 1, atol=eps())
+#FIXME add isparallel3d tests
+
+"""
+    isorthogonal3d(v1, v2)
+
+Tests if `v1` and `v2` are orthogonal.
+"""
+isorthogonal3d(v1::AbstractArray, v2::AbstractArray) = isapprox(dot(v1, v2), 0, atol=eps())
+#FIXME add isorthogonal3d tests
+
+"""
     normal3d(target, reference)
 
 Returns a vector with unit length that is perpendicular to the target and an additional
@@ -48,7 +67,7 @@ end
     rotate3d(reference::Vector, θ)
 
 Returns the rotation matrix that will rotate a vector around the reference axis at an angle
-θ in radians. Vector length is maintained. Rotation in clockwise direction?
+θ in radians. Vector length is maintained. Counter-clockwise rotation in a right-hand coord. system. 
 """
 function rotate3d(reference::AbstractVector, θ)
     cost = cos(θ)
@@ -296,7 +315,6 @@ function fresnel_coefficients(θ::AbstractArray{T}, n::Number) where T
 end
 
 is_internally_reflected(rp::Number, rs::Number) = isapprox(abs2(rs), 1, atol=1e-6) && isapprox(abs2(rp), 1, atol=1e-6)
-
 
 """
     sag(r::Real, l::Real)

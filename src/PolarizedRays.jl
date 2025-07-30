@@ -117,13 +117,21 @@ If the `in`- and `out`-directions of propagation are parallel, an arbitrary basi
 - `J`: Jones matrix extended to 3x3, e.g. [-rₛ 0 0; 0 rₚ 0; 0 0 1] for reflection
 - `E0`: Polarization vector before surface interaction
 """
-function _calculate_global_E0(in_dir::AbstractArray, out_dir::AbstractArray, J::SPBasis, E0::AbstractArray)
-    s = cross(in_dir, out_dir)
-    # Test if in and out dir. are parallel
-    if norm(s) ≈ 0
-        # Choose arbitrary s-, p-basis.
-        s = normal3d(in_dir)
+function _calculate_global_E0(in_dir::AbstractArray, out_dir::AbstractArray, normal::AbstractArray, J::AbstractMatrix, E0::AbstractArray)
+    # Choose basis vectors
+    if !isparallel3d(in_dir, out_dir)
+        v = out_dir
+    else
+        v = normal
     end
+    # test if in-dir and normal are parallel
+    if isparallel3d(in_dir, normal)
+        # v = normal3d(in_dir)
+        @info round.(J, digits=3)
+        return J * E0
+    end
+    # Calculate support vector
+    s = cross(in_dir, v)
     s = normalize(s)
     # Calculate transforms
     p1 = cross(in_dir, s)
@@ -134,13 +142,23 @@ function _calculate_global_E0(in_dir::AbstractArray, out_dir::AbstractArray, J::
     return O_out * J * O_in * E0
 end
 
-function _calculate_global_E0(object::AbstractObject, ray::PolarizedRay, ::AbstractArray, J::XYBasis)
+function _calculate_global_E0(object::AbstractObject, ray::PolarizedRay, out_dir::AbstractArray, J::XYBasis)
+    in_dir = direction(ray)
+    normal = normal3d(intersection(ray))
+    E0 = polarization(ray)
     # Update Jones matrix according to global object orientation
-    #FIXME "This is 100% wrong"
-    return transpose(orientation(object)) * J * orientation(object) * polarization(ray)
+    R = orientation(object)
+    J_glbl = R * J * transpose(R)
+    E0_local = _calculate_global_E0(in_dir, out_dir, normal, J_glbl, E0)
+    # Retransform
+    E0_global = transpose(R) * E0_local
+    return E0_global
 end
 
 function _calculate_global_E0(::AbstractObject, ray::PolarizedRay, out_dir::AbstractArray, J::SPBasis)
     # Update Jones matrix according to global object orientation
-    return _calculate_global_E0(direction(ray), out_dir, J, polarization(ray)) 
+    in_dir = direction(ray)
+    normal = normal3d(intersection(ray))
+    E0 = polarization(ray)
+    return _calculate_global_E0(in_dir, out_dir, normal, J, E0)
 end

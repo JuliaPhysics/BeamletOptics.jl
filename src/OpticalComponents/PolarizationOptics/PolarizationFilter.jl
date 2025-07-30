@@ -3,9 +3,8 @@ struct PolarizationFilter{T, S <: AbstractShape{T}} <: AbstractObject{T, S}
     JMat::XYBasis
 end
 
-function PolarizationFilter(size::T) where {T <: Real}
+function PolarizationFilter(size::T, JMat=XYBasis(1, 0, 0, 0)) where {T <: Real}
     shape = QuadraticFlatMesh(size)
-    JMat = XYBasis(1, 0, 0,0)
     return PolarizationFilter(shape, JMat)
 end
 
