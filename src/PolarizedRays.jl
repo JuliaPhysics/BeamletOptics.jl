@@ -126,8 +126,6 @@ function _calculate_global_E0(in_dir::AbstractArray, out_dir::AbstractArray, nor
     end
     # test if in-dir and normal are parallel
     if isparallel3d(in_dir, normal)
-        # v = normal3d(in_dir)
-        @info round.(J, digits=3)
         return J * E0
     end
     # Calculate support vector
@@ -135,14 +133,20 @@ function _calculate_global_E0(in_dir::AbstractArray, out_dir::AbstractArray, nor
     s = normalize(s)
     # Calculate transforms
     p1 = cross(in_dir, s)
-    p2 = cross(out_dir, s)
     O_in = [s'; p1'; in_dir']
-    O_out = [s p2 out_dir]
+    # Fallback method as per eq. 17
+    if isparallel3d(in_dir, out_dir)
+        O_out = transpose(O_in)
+    else
+        p2 = cross(out_dir, s)
+        O_out = [s p2 out_dir]
+    end
     # Calculate new E0
     return O_out * J * O_in * E0
 end
 
 function _calculate_global_E0(object::AbstractObject, ray::PolarizedRay, out_dir::AbstractArray, J::XYBasis)
+    # _k = 2*π*refractive_index(ray) / wavelength(ray)
     in_dir = direction(ray)
     normal = normal3d(intersection(ray))
     E0 = polarization(ray)
@@ -150,9 +154,7 @@ function _calculate_global_E0(object::AbstractObject, ray::PolarizedRay, out_dir
     R = orientation(object)
     J_glbl = R * J * transpose(R)
     E0_local = _calculate_global_E0(in_dir, out_dir, normal, J_glbl, E0)
-    # Retransform
-    E0_global = transpose(R) * E0_local
-    return E0_global
+    return E0_local
 end
 
 function _calculate_global_E0(::AbstractObject, ray::PolarizedRay, out_dir::AbstractArray, J::SPBasis)
