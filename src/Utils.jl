@@ -18,11 +18,10 @@ const NullableVector{T} = Union{Vector{T},Nothing} where {T}
     isparallel3d(v1, v2)
 
 Tests if `v1` is parallel to `v2`.
-
-!!! warning
-    Assumes that `v1` and `v2` have **unit length**.
 """
-isparallel3d(v1::AbstractArray, v2::AbstractArray) = isapprox(abs(dot(v1, v2)), 1, atol=eps())
+function isparallel3d(v1::AbstractArray, v2::AbstractArray)
+    return isapprox(abs(dot(normalize(v1), normalize(v2))), 1, atol=eps())
+end
 #FIXME add isparallel3d tests
 
 """
