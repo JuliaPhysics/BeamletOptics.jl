@@ -17,6 +17,7 @@ const NullableVector{T} = Union{Vector{T},Nothing} where {T}
 include("LinearAlgebraUtils.jl")
 include("OpticUtils.jl")
 include("RefractiveIndexUtils.jl")
+include("MiscUtils.jl")
 
 """
     ToDO
