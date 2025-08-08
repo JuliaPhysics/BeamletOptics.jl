@@ -16,7 +16,7 @@ import Base: length, push!, empty!, position
 
 # Do not change order of inclusion!
 include("Constants.jl")
-include("Utils.jl")
+include("Utils/Utils.jl")
 include("AbstractTypes/AbstractTypes.jl")
 include("Rays.jl")
 include("PolarizedRays.jl")

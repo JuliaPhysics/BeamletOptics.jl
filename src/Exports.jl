@@ -12,7 +12,7 @@ export System, StaticSystem, solve_system!
 export ObjectGroup
 
 # additional
-export DiscreteRefractiveIndex
+export DiscreteRefractiveIndex, SellmeierEquation
 
 #=
 components

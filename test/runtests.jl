@@ -186,6 +186,8 @@ const BMO = BeamletOptics
         lambdas = T1.([488e-9, 707e-9, 1064e-9])
         indices = T2.([1.6591, 1.6456, 1.6374])
         ref_index = DiscreteRefractiveIndex(lambdas, indices)
+        ref_sellm = SellmeierEquation(0.6961663, 0.4079426, 0.8974794,
+                                      0.0684043^2, 0.1162414^2, 9.896161^2)
 
         @testset "DiscreteRefractiveIndex" begin
             @test isdefined(BMO, :DiscreteRefractiveIndex)
@@ -194,6 +196,18 @@ const BMO = BeamletOptics
             @test_throws KeyError ref_index(lambdas[1] + 1e-9)
             # Test constructor
             @test_throws ArgumentError DiscreteRefractiveIndex([1], [1, 2])
+        end
+
+        @testset "SellmeierEquation" begin
+            # Known reference index for fused silica at 500 nm
+            @test isapprox(ref_sellm(500e-9), 1.4623, atol=3e-5)
+            # Check that wavelength in μm gives same result as m (via internal conversion)
+            λ_m = 1.0e-6
+            λ_um = 1.0
+            @test isapprox(ref_sellm(λ_m), ref_sellm(λ_um * 1e-6), atol=1e-12)
+            # Check monotonic decrease of n with λ in the visible range
+            n_vis = [ref_sellm(λ) for λ in (400:50:700) .* 1e-9]
+            @test all(diff(n_vis) .< 0)
         end
 
         @testset "Test ref. helper function" begin
@@ -209,6 +223,7 @@ const BMO = BeamletOptics
             @test_throws ArgumentError BMO.test_refractive_index_function(f4)
             @test isnothing(BMO.test_refractive_index_function(f5))
             @test isnothing(BMO.test_refractive_index_function(ref_index))
+            @test isnothing(BMO.test_refractive_index_function(ref_sellm))
         end
     end
 
