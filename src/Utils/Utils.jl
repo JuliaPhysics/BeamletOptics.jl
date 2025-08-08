@@ -18,30 +18,3 @@ include("LinearAlgebraUtils.jl")
 include("OpticUtils.jl")
 include("RefractiveIndexUtils.jl")
 include("MiscUtils.jl")
-
-"""
-    ToDO
-"""
-function find_zero_bisection(f, a, b; tol=1e-10, max_iter=1000)
-    fa = f(a)
-    fb = f(b)
-    if sign(fa) == sign(fb)
-        error("Bisection requires a sign change: f(a)=$(fa), f(b)=$(fb)")
-    end
-    for i in 1:max_iter
-        mid = (a + b) / 2
-        fmid = f(mid)
-        if abs(fmid) < tol
-            return mid
-        end
-        if sign(fa) == sign(fmid)
-            a = mid
-            fa = fmid
-        else
-            b = mid
-            fb = fmid
-        end
-    end
-    error("Bisection did not converge after $max_iter iterations")
-end
-

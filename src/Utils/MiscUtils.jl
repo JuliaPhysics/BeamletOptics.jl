@@ -63,3 +63,46 @@ function countlines_in_dir(dir::String)
     end
     return l
 end
+
+"""
+    find_zero_bisection(f, a, b; tol=1e-10, max_iter=1000)
+
+
+Finds a root of the scalar function `f` on `[a, b]` using the bisection method.
+Requires `sign(f(a)) ≠ sign(f(b))`. Stops when `abs(f(mid)) < tol` or after `max_iter`
+iterations, returning the current midpoint.
+
+# Arguments
+
+- `f`: function `Real -> Real`
+- `a`: lower interval bound
+- `b`: upper interval bound
+- `tol`: absolute function tolerance (default `1e-10`)
+- `max_iter`: maximum iterations (default `1000`)
+
+# Errors
+
+Throws if there is no sign change on `[a, b]` or if convergence is not reached within `max_iter`.
+"""
+function find_zero_bisection(f, a, b; tol=1e-10, max_iter=1000)
+    fa = f(a)
+    fb = f(b)
+    if sign(fa) == sign(fb)
+        throw(ErrorException("Bisection requires a sign change: f(a)=$(fa), f(b)=$(fb)"))
+    end
+    for _ in 1:max_iter
+        mid = (a + b) / 2
+        fmid = f(mid)
+        if abs(fmid) < tol
+            return mid
+        end
+        if sign(fa) == sign(fmid)
+            a = mid
+            fa = fmid
+        else
+            b = mid
+            fb = fmid
+        end
+    end
+    throw(ErrorException("Bisection did not converge after $max_iter iterations"))
+end
