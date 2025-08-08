@@ -217,6 +217,13 @@ const BMO = BeamletOptics
         theta = deg2rad(45)
         BMO.numerical_aperture(theta, n0) == n0 * sin(theta)
     end
+
+    @testset "Testing bisection finder" begin
+        f(x) = x^2 + 1
+        g(x) = x^3 + x^2
+        @test_throws ErrorException BMO.find_zero_bisection(f, -1, 1)
+        @test_throws ErrorException BMO.find_zero_bisection(g, -2, 1; tol=5e-16, max_iter=10)
+    end
 end
 
 @testset "Types" begin
