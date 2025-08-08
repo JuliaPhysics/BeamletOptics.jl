@@ -477,7 +477,7 @@ function find_zero_bisection(f, a, b; tol=1e-10, max_iter=1000)
     fa = f(a)
     fb = f(b)
     if sign(fa) == sign(fb)
-        error("Bisection requires a sign change: f(a)=$(fa), f(b)=$(fb)")
+        throw(ErrorException("Bisection requires a sign change: f(a)=$(fa), f(b)=$(fb)"))
     end
     for _ in 1:max_iter
         mid = (a + b) / 2
