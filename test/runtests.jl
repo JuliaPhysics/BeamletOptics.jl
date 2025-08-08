@@ -232,6 +232,13 @@ const BMO = BeamletOptics
         theta = deg2rad(45)
         BMO.numerical_aperture(theta, n0) == n0 * sin(theta)
     end
+
+    @testset "Interferometric visibility" begin
+        Iphi(phi, V) = V*sin(phi) + 1 
+        V = 0.85
+        pwr = [Iphi(phi, V) for phi = LinRange(0, 2pi, 1000)]
+        @test BMO.visibility(pwr) ≈ V atol=2e-6
+    end
 end
 
 @testset "Types" begin
