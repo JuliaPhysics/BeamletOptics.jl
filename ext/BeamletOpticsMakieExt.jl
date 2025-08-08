@@ -5,7 +5,7 @@ import BeamletOptics: render!, RenderException, _RenderTypes, get_view, set_view
 
 const BMO = BeamletOptics
 
-using Makie: Axis3, LScene, mesh!, surface!, lines!, RGBAf, scatter!
+using Makie: Axis3, LScene, mesh!, surface!, lines!, RGBf, RGBAf, scatter!
 using GeometryBasics: Point2, Point3
 using AbstractTrees: PreOrderDFS
 using MarchingCubes: MC, march
