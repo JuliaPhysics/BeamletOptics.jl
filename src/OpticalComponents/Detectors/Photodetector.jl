@@ -3,7 +3,13 @@
 
 Represents a **flat** rectangular or quadratic surface in R³ that is the active surface of a photodetector.
 The active surface is discretized in the local R² x-y-coordinate system.
+
 Field contributions Eᵢ are added by the corresponding [`interact3d`](@ref) method.
+
+# Functions
+
+- intensity values for the detector surface can be calulcated via [`intensity`](@ref)
+- the total measured power can be calculated via [`optical_power`](@ref)
 
 # Fields
 
