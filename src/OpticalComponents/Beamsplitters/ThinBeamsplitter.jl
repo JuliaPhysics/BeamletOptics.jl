@@ -161,7 +161,7 @@ function interact3d(::AbstractSystem, bs::ThinBeamsplitter, gauss::GaussianBeaml
     r = _beamsplitter_reflected_beam(bs, gauss, ray_id)
 
     # Add conditional phase flip to reflected beam
-    r.E0 *= exp(im*ϕ)
+    electric_field!(r, electric_field(r) * exp(im*ϕ))
 
     children!(gauss, [t, r])
     return nothing

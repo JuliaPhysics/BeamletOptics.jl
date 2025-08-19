@@ -6,6 +6,9 @@ using AbstractTrees
 
 const BMO = BeamletOptics
 
+const mm = 1e-3
+const inch = 25.4mm
+
 @testset "Utilities" begin
     @testset "Testing normal3d" begin
         @testset "normal3d(v) with Array" begin
@@ -1961,7 +1964,7 @@ end
         ln = ThinLens(R1, R2, d, nl)
         translate3d!(pd_l, [0, z, 0])
         translate3d!(pd_s, [0, z, 0])
-        translate3d!(ln, [0, z - f - thickness(ln.shape) / 2, 0])
+        translate3d!(ln, [0, z - f - thickness(ln) / 2, 0])
 
         @testset "Testing fringe pattern" begin
             system = System(pd_l)
@@ -2020,9 +2023,9 @@ end
                 solve_system!(system, g_2)
                 Pt_numerical[i] = BMO.optical_power(pd_s)
                 # Test length/opl function
-                @test length(g_1) == z
-                @test length(g_1) < BMO.optical_path_length(g_1)
-                @test length(g_2) == length(g_1) - z_i
+                @test length(g_1) ≈ z
+                @test length(g_1) ≈ BMO.optical_path_length(g_1) - thickness(ln) * (nl - 1)
+                @test length(g_2) ≈ length(g_1) - z_i
             end
             # Analytical solution (cosine over Δz), ref. power is 4*P0 since beamsplitter is missing
             Pt_analytical = 4 * P0 * [(cos(2π * z / (maximum(Δz))) + 1) / 2 for z in Δz]
@@ -2350,14 +2353,14 @@ end
             solve_system!(system, beam)
 
             # Extract E0s: t - transmitted, r - reflected
-            t = beam.children[1].rays[1].E0
-            r = beam.children[2].rays[1].E0
-            tr = beam.children[1].rays[2].E0
-            rr = beam.children[2].rays[2].E0
-            trt = beam.children[1].children[1].rays[1].E0
-            trr = beam.children[1].children[2].rays[1].E0
-            rrt = beam.children[2].children[1].rays[1].E0
-            rrr = beam.children[2].children[2].rays[1].E0
+            t = BMO.polarization(beam.children[1].rays[1])
+            r = BMO.polarization(beam.children[2].rays[1])
+            tr = BMO.polarization(beam.children[1].rays[2])
+            rr = BMO.polarization(beam.children[2].rays[2])
+            trt = BMO.polarization(beam.children[1].children[1].rays[1])
+            trr = BMO.polarization(beam.children[1].children[2].rays[1])
+            rrt = BMO.polarization(beam.children[2].children[1].rays[1])
+            rrr = BMO.polarization(beam.children[2].children[2].rays[1])
 
             # Test phase flips
             @test t[3] ≈ sqrt(2) / 2
@@ -2376,14 +2379,14 @@ end
             solve_system!(system, beam)
 
             # Extract E0s: t - transmitted, r - reflected
-            t = beam.children[1].rays[1].E0
-            r = beam.children[2].rays[1].E0
-            tr = beam.children[1].rays[2].E0
-            rr = beam.children[2].rays[2].E0
-            trt = beam.children[1].children[1].rays[1].E0
-            trr = beam.children[1].children[2].rays[1].E0
-            rrt = beam.children[2].children[1].rays[1].E0
-            rrr = beam.children[2].children[2].rays[1].E0
+            t = BMO.polarization(beam.children[1].rays[1])
+            r = BMO.polarization(beam.children[2].rays[1])
+            tr = BMO.polarization(beam.children[1].rays[2])
+            rr = BMO.polarization(beam.children[2].rays[2])
+            trt = BMO.polarization(beam.children[1].children[1].rays[1])
+            trr = BMO.polarization(beam.children[1].children[2].rays[1])
+            rrt = BMO.polarization(beam.children[2].children[1].rays[1])
+            rrr = BMO.polarization(beam.children[2].children[2].rays[1])
 
             # Test phase flips
             @test t[1] ≈ sqrt(2) / 2
@@ -2686,6 +2689,101 @@ end
         BMO.solve_system!(system, beam)
 
         @test BMO.optical_power(pd)≈10e-3 atol=1e-5
+    end
+
+    @testset "Issue#22 and Issue#23" begin
+        # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/22
+        # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/23
+        
+        mutable struct TestSubstrate{T, S <: BMO.AbstractShape{T}, N} <: BMO.AbstractRefractiveOptic{T, S, N}
+            const shape::S
+            n::N
+        end
+        
+        BMO.refractive_index(ts::TestSubstrate, ::Real) = ts.n
+        set_index(ts::TestSubstrate, new) = (ts.n = new)
+        get_index(ts::TestSubstrate) = ts.n
+        
+        "Shifts the phase of the beamlet by a specific amount in [rad]."
+        function shift_phase(gb::BMO.GaussianBeamlet, phase::Real)
+            BMO.electric_field!(gb, BMO.electric_field(gb) * exp(im*phase))
+            return nothing
+        end
+        
+        ref_signal(ϕ, A) = (cos(ϕ)+1)/2 * A
+        
+        # setup system for tests below
+        splitter = CubeBeamsplitter(10mm, n->1)
+        substrate_length = 10mm
+        substrate = TestSubstrate(BMO.CylinderSDF(5mm, substrate_length/2), 1.5)
+        
+        detector = Photodetector(10mm, 250)
+        
+        translate3d!(substrate, [0, -25mm, 0])
+        translate3d!(detector, [0, 40mm, 0])
+        
+        system = System([substrate, splitter, detector])
+        
+        start_offset = 50mm
+        
+        @testset "Testing electric_field calculation - non-imaging ref. index change" begin
+            indices = (1, 10, 100, 1000)
+            for index in indices
+                set_index(substrate, index)
+                phi = LinRange(0, 2pi, 30)
+                int = zeros(length(phi))
+                for (i, p) in enumerate(phi)
+                    gb_prb = GaussianBeamlet([0, -start_offset, 0], [0, 1, 0], 1e-6, .5mm)
+                    gb_ref = GaussianBeamlet([start_offset, 0, 0], [-1, 0, 0], 1e-6, .5mm)
+                    empty!(detector)
+                    shift_phase(gb_ref, p)
+                    solve_system!(system, gb_prb)
+                    solve_system!(system, gb_ref)
+                    int[i] = BMO.optical_power(detector)
+                end
+                @test isapprox(BMO.visibility(int), 1, atol=1e-2)
+            end
+        end
+        
+        @testset "Testing electric_field calculation - ref. index based phase shift" begin
+            λ = 1e-6
+            gb_prb = GaussianBeamlet([0, -start_offset, 0], [0, 1, 0], λ, .5mm)
+            gb_ref = GaussianBeamlet([start_offset, 0, 0], [-1, 0, 0], λ, .5mm)
+            
+            n_lambdas = substrate_length / BMO.wavelength(gb_prb)
+            
+            n_factors = LinRange(0, 1, 50)
+            pwr = zeros(length(n_factors))
+            # Increase ref. index of substrate until one additional λ of OPL has been introduced
+            for (i, nf) in enumerate(n_factors)
+                set_index(substrate, 1 + 1/n_lambdas * nf)        
+                empty!(detector)
+                solve_system!(system, gb_prb)
+                solve_system!(system, gb_ref)        
+                @test isapprox(BMO.optical_power(detector), ref_signal(2pi*nf, 2e-3), atol=1e-8)
+                pwr[i] = BMO.optical_power(detector)
+            end
+            # Test if opl difference is indeed one λ
+            delta = BMO.optical_path_length(gb_prb)
+            delta -= BMO.optical_path_length(gb_ref)
+            delta /= λ
+            @test delta ≈ 1
+        end
+        
+        @testset "Testing electric_field mutation during retracing" begin    
+            gb_prb = GaussianBeamlet([0, -start_offset, 0], [0, 1, 0], 1e-6, .5mm)
+            gb_ref = GaussianBeamlet([start_offset, 0, 0], [-1, 0, 0], 1e-6, .5mm)    
+            phis = LinRange(0, 2pi, 50)
+            pwr = zeros(length(phis))
+            # Vary starting phase by 0...2pi via retracing    
+            for (i, phi) in enumerate(phis)
+                empty!(detector)
+                solve_system!(system, gb_prb)
+                solve_system!(system, gb_ref)
+                @test isapprox(BMO.optical_power(detector), ref_signal(phi, 2e-3), atol=1e-8)
+                shift_phase(gb_prb, step(phis))
+            end
+        end
     end
 end
 

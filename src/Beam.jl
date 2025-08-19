@@ -81,6 +81,7 @@ function Base.replace!(beam::Beam{<:Real, <:PolarizedRay}, interaction::BeamInte
     polarization!(rays(beam)[index], polarization(interaction.ray))
 end
 
+"Used mainly for retracing. Updates beam children data."
 function _modify_beam_head!(old::Beam{T, R}, new::Beam{T, R}) where {T<:Real, R<:Ray{T}}
     position!(first(rays(old)), position(first(rays(new))))
     direction!(first(rays(old)), direction(first(rays(new))))
@@ -89,6 +90,7 @@ function _modify_beam_head!(old::Beam{T, R}, new::Beam{T, R}) where {T<:Real, R<
     return nothing
 end
 
+"Used mainly for retracing. Updates beam children data."
 function _modify_beam_head!(old::Beam{T, R}, new::Beam{T, R}) where {T<:Real, R<:PolarizedRay{T}}
     position!(first(rays(old)), position(first(rays(new))))
     direction!(first(rays(old)), direction(first(rays(new))))

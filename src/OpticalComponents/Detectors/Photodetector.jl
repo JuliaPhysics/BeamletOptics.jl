@@ -71,7 +71,7 @@ function interact3d(
     # Select final ray of chief beam
     ray = gauss.chief.rays[ray_id]
     # Subtract ray length from optical path l0 (calculated seperately with projection l1)
-    l0 = optical_path_length(gauss) - optical_path_length(ray)
+    l0 = length(gauss) - length(ray)
     p0 = position(ray)
     d0 = direction(ray)
     # Preallocate transforms
