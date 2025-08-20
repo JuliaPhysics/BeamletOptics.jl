@@ -91,18 +91,24 @@ function SPBasis(j11::Number, j12::Number, j21::Number, j22::Number)
     return SPBasis{T}(T.([j11 j12 0; j21 j22 0; 0 0 1]))
 end
 
-struct XYBasis{T} <: AbstractJonesMatrix{T}
+"""
+    XZBasis <: AbstractJonesMatrix
+
+Stores the Jones matrix entries for a polarizing optical element that is aligned 
+with the global y-axis as the optical axis. 
+"""
+struct XZBasis{T} <: AbstractJonesMatrix{T}
     data::Matrix{T}
 end
 
-function XYBasis(j11::Number, j12::Number, j21::Number, j22::Number)
+function XZBasis(j11::Number, j12::Number, j21::Number, j22::Number)
     T = promote_type(
         typeof(j11),
         typeof(j12),
         typeof(j21),
         typeof(j22),
     )
-    return XYBasis{T}(T.([j11 j12 0; j21 j22 0; 0 0 1]))
+    return XZBasis{T}(T.([j11 0 j12; 0 1 0; j21 0 j22]))
 end
 
 """
@@ -145,7 +151,7 @@ function _calculate_global_E0(in_dir::AbstractArray, out_dir::AbstractArray, nor
     return O_out * J * O_in * E0
 end
 
-function _calculate_global_E0(object::AbstractObject, ray::PolarizedRay, out_dir::AbstractArray, J::XYBasis)
+function _calculate_global_E0(object::AbstractObject, ray::PolarizedRay, out_dir::AbstractArray, J::XZBasis)
     # _k = 2*π*refractive_index(ray) / wavelength(ray)
     in_dir = direction(ray)
     normal = normal3d(intersection(ray))
