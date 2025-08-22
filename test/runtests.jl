@@ -30,6 +30,18 @@ const inch = 25.4mm
             @test isapprox(orth, [0, -1, 0])
         end
     end
+ 
+    @testset "Testing isparallel3d and isorthogonal3d" begin
+        v1 = [1,0,0]
+        v2 = [1,0,eps()]
+        v3 = BMO.normal3d(v1)
+        # test parallel
+        @test BMO.isparallel3d(v1, v2)
+        @test !BMO.isparallel3d(v1, v3)
+        # test orthogonal
+        @test !BMO.isorthogonal3d(v1, v2)
+        @test BMO.isorthogonal3d(v1, v3)
+    end
 
     @testset "Testing rotate3d for clockwise dir. and conservation of length" begin
         Rot = BMO.rotate3d([0, 0, 1], π / 2)
@@ -230,7 +242,7 @@ const inch = 25.4mm
         end
     end
 
-    @testset "Numerical aperture" begin
+    @testset "Testing numerical aperture util." begin
         n0 = 1.5
         theta = deg2rad(45)
         BMO.numerical_aperture(theta, n0) == n0 * sin(theta)
@@ -243,11 +255,33 @@ const inch = 25.4mm
         @test_throws ErrorException BMO.find_zero_bisection(g, -2, 1; tol=5e-16, max_iter=10)
     end
 
-    @testset "Interferometric visibility" begin
+    @testset "Testing interferometric visibility util." begin
         Iphi(phi, V) = V*sin(phi) + 1 
         V = 0.85
         pwr = [Iphi(phi, V) for phi = LinRange(0, 2pi, 1000)]
         @test BMO.visibility(pwr) ≈ V atol=2e-6
+    end
+
+    @testset "Testing polarization state utils." begin
+        lin1 = [1, 0, 0]
+        lin2 = [-1, 1, 0]
+        circ = normalize([1,1*exp(im*pi/2),0])
+        ellp = [1, exp(im*pi/2) * 2, 0]
+        
+        @test BMO.islinear(lin1)
+        @test BMO.islinear(lin2)
+        @test !BMO.islinear(circ)
+        @test !BMO.islinear(ellp)
+        
+        @test !BMO.iscircular(lin1)
+        @test !BMO.iscircular(lin2)
+        @test BMO.iscircular(circ)
+        @test !BMO.iscircular(ellp)
+        
+        @test !BMO.iselliptical(lin1)
+        @test !BMO.iselliptical(lin2)
+        @test !BMO.iselliptical(circ)
+        @test BMO.iselliptical(ellp)
     end
 end
 
@@ -2185,21 +2219,25 @@ end
 @testset "Polarized rays" begin
     @testset "Polarization transforms" begin
         # Reflection matrix and lin. x-pol
-        J = BMO.SPBasis([-1 0 0; 0 1 0; 0 0 1])
+        J = BMO.SPBasis(-1, 0, 0, 1)
         E0 = [1, 0, 0]
 
         @testset "90° reflection" begin
             in_dir = [0, 0, 1]
             out_dir = [1, 0, 0]
             nml = normalize([1, 0, -1])
-            @test BMO._calculate_global_E0(in_dir, out_dir, nml, J, E0) ≈ [0, 0, -1]
+            P90 = BMO._calculate_global_E0(in_dir, out_dir, nml, J)
+            @test P90 * E0 ≈ [0, 0, -1]
+            @test P90 * in_dir ≈ out_dir
         end
 
         @testset "0° reflection" begin
             in_dir = [0, 0, 1]
             out_dir = [0, 0, -1]
             nml = normalize([0, 0, -1])
-            @test BMO._calculate_global_E0(in_dir, out_dir, nml, J, E0) ≈ [-1, 0, 0]
+            P00 = BMO._calculate_global_E0(in_dir, out_dir, nml, J)
+            @test P00 * E0 ≈ [-1, 0, 0]
+            @test P00 * in_dir ≈ out_dir
         end
     end
 

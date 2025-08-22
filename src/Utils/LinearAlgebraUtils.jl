@@ -6,15 +6,15 @@ Tests if `v1` is parallel to `v2`.
 function isparallel3d(v1::AbstractArray, v2::AbstractArray)
     return isapprox(abs(dot(normalize(v1), normalize(v2))), 1, atol=eps())
 end
-#FIXME add isparallel3d tests
 
 """
-    isorthogonal3d(v1, v2)
+    isorthogonal3d(v1, v2; atol=eps())
 
-Tests if `v1` and `v2` are orthogonal.
+Tests if `v1` and `v2` are orthogonal. Additional abs. tolerance can be passed via `atol`
 """
-isorthogonal3d(v1::AbstractArray, v2::AbstractArray) = isapprox(dot(v1, v2), 0, atol=eps())
-#FIXME add isorthogonal3d tests
+function isorthogonal3d(v1::AbstractArray, v2::AbstractArray; atol=eps())
+    return isapprox(dot(v1, v2), 0; atol)
+end
 
 """
     normal3d(target, reference)
