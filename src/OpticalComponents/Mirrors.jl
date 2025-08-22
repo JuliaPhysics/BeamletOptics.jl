@@ -61,7 +61,7 @@ function interact3d(::AbstractSystem,
     npos = position(ray) + length(ray) * direction(ray)
     ndir = reflection3d(direction(ray), normal)
     # Jones reflection matrix
-    J = SPBasis([-1 0 0; 0 1 0; 0 0 1])
+    J = SPBasis(-1, 0, 0, 1)
     E0 = _calculate_global_E0(obj, ray, ndir, J)
     return BeamInteraction{T, R}(nothing,
         PolarizedRay{T}(
