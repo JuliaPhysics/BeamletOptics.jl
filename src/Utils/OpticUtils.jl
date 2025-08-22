@@ -180,12 +180,12 @@ end
 """
     islinear
 
-Tests if the polarization state is linear.
+Tests if the polarization state is linear. Refer to Yun paper.
 """
 function islinear(E::AbstractArray)
     phis = angle.(E)
-    phis .-= maximum(phis)
-    phis .= abs.(phis)
+    phis = phis .- maximum(phis)
+    phis = abs.(phis)
     deg0 = phis .≈ 0
     degπ = phis .≈ π
     if all(deg0 .| degπ)
@@ -197,7 +197,7 @@ end
 """
     iscircular
 
-Tests if the polarization state is circular.
+Tests if the polarization state is circular. Refer to Yun paper.
 """
 function iscircular(R, I; atol=eps())
     if !isapprox(dot(R, I), 0; atol)

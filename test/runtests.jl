@@ -33,7 +33,7 @@ const inch = 25.4mm
  
     @testset "Testing isparallel3d and isorthogonal3d" begin
         v1 = [1,0,0]
-        v2 = [1,0,eps()]
+        v2 = Point3(1,0,eps())
         v3 = BMO.normal3d(v1)
         # test parallel
         @test BMO.isparallel3d(v1, v2)
