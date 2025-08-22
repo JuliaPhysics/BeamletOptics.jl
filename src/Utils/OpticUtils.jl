@@ -176,3 +176,43 @@ function visibility(opt_pwr)
     I_min = minimum(opt_pwr)
     return (I_max - I_min) / (I_max + I_min)
 end 
+
+"""
+    islinear
+
+Tests if the polarization state is linear.
+"""
+function islinear(E::AbstractArray)
+    phis = angle.(E)
+    phis .-= maximum(phis)
+    phis .= abs.(phis)
+    deg0 = phis .≈ 0
+    degπ = phis .≈ π
+    if all(deg0 .| degπ)
+        return true
+    end
+    return false
+end
+
+"""
+    iscircular
+
+Tests if the polarization state is circular.
+"""
+function iscircular(R, I; atol=eps())
+    if !isapprox(dot(R, I), 0; atol)
+        return false
+    end
+    if !isapprox(norm(R), norm(I); atol)
+        return false
+    end
+    return true
+end
+iscircular(E::AbstractArray) = iscircular(real(E), imag(E))
+
+"""
+    iselliptical
+
+Tests if the polarization state is elliptical.
+"""
+iselliptical(E::AbstractArray) = !islinear(E) && !iscircular(E)
