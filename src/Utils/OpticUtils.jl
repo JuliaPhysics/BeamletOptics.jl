@@ -31,7 +31,8 @@ If the critical angle for n1, n2 and the incident angle is reached, the ray is r
 function refraction3d(dir::AbstractArray, normal::AbstractArray, n1::Real, n2::Real)
     # dir and normal must have unit length!
     isapprox(norm(dir), 1) || throw(ArgumentError("dir must have  unit length"))
-    isapprox(norm(normal), 1) || throw(ArgumentError(lazy"norm must have  unit length: $(norm(normal))"))
+    isapprox(norm(normal), 1) ||
+        throw(ArgumentError(lazy"norm must have  unit length: $(norm(normal))"))
     n = n1 / n2
     cosθi = -dot(normal, dir)
     sinθt² = n^2 * (1 - cosθi^2)
@@ -51,9 +52,7 @@ If center of sphere is on left then R < 0. If center of sphere is on right then 
 """
 lensmakers_eq(R1, R2, n) = 1 / ((n - 1) * (1 / R1 - 1 / R2))
 
-
-
-rayleigh_range(λ, w0, M2, n=1) = π * n * w0^2 / λ / M2
+rayleigh_range(λ, w0, M2, n = 1) = π * n * w0^2 / λ / M2
 
 beam_waist(z, w0, zr) = w0 * sqrt(1 + (z / zr)^2)
 
@@ -85,9 +84,11 @@ E(r,z) = {E_0}\\frac{{{w_0}}}{{w(z)}}\\exp\\left( { - \\frac{{{r^2}}}{{w{{(z)}^2
 - `ψ`: Gouy phase shift (defined as ``-\\text{atan}\\left(\\frac{z}{z_r}\\right)`` !)
 - `R`: wavefront curvature, i.e. 1/r (radius of curvature)
 """
-electric_field(r::Real, z::Real, E0, w0, w, k, ψ, R) = E0 * w0 / w * exp(-r^2 / w^2) * exp(im * (k * z + ψ + (k * r^2 * R) / 2))
+electric_field(r::Real, z::Real, E0, w0, w, k, ψ, R) = E0 * w0 / w * exp(-r^2 / w^2) *
+                                                       exp(im *
+                                                           (k * z + ψ + (k * r^2 * R) / 2))
 
-function electric_field(r::Real, z::Real, E0, w0, λ, M2=1)
+function electric_field(r::Real, z::Real, E0, w0, λ, M2 = 1)
     zr = rayleigh_range(λ, w0, M2)
     w = beam_waist(z, w0, zr)
     k = wave_number(λ)
@@ -101,10 +102,10 @@ end
 
 Calculates the E-field phasor in [V/m] for a given intensity `I` and phase ϕ. Vacuum wave impedance is assumed.
 """
-electric_field(I::Real, Z=Z_vacuum, ϕ=0) = sqrt(2 * I * Z) * exp(im * ϕ)
+electric_field(I::Real, Z = Z_vacuum, ϕ = 0) = sqrt(2 * I * Z) * exp(im * ϕ)
 
 "Calculates the intensity in [W/m²] for a given complex electric field phasor `E`. Vacuum wave impedance is assumed."
-intensity(E::Number, Z=Z_vacuum) = abs2(E) / (2 * Z)
+intensity(E::Number, Z = Z_vacuum) = abs2(E) / (2 * Z)
 
 """
 fresnel_coefficients(θ, n)
@@ -117,7 +118,7 @@ and the refractive index ratio `n = n₂ / n₁`. Returns rₛ, rₚ, tₛ and t
 !!! info
     The signs of rₛ, rₚ are based on the definition by Fowles (1975, 2nd Ed. p. 44) and Peatross (2015, 2023 Ed. p. 78)
 """
-function fresnel_coefficients(θ::T, n::Number) where T
+function fresnel_coefficients(θ::T, n::Number) where {T}
     C = Complex{T}
     cost = cos(θ)
     n2s2 = sqrt(C(n^2 - sin(θ)^2))
@@ -125,11 +126,11 @@ function fresnel_coefficients(θ::T, n::Number) where T
     rs = (cost - n2s2) / (cost + n2s2)
     rp = (-n^2 * cost + n2s2) / (n^2 * cost + n2s2)
     ts = rs + 1
-    tp = 2*n*cost / (n^2 * cost + n2s2)
+    tp = 2 * n * cost / (n^2 * cost + n2s2)
     return rs, rp, ts, tp
 end
 
-function fresnel_coefficients(θ::AbstractArray{T}, n::Number) where T
+function fresnel_coefficients(θ::AbstractArray{T}, n::Number) where {T}
     rs = Vector{Complex{T}}(undef, length(θ))
     rp = Vector{Complex{T}}(undef, length(θ))
     ts = Vector{Complex{T}}(undef, length(θ))
@@ -140,7 +141,9 @@ function fresnel_coefficients(θ::AbstractArray{T}, n::Number) where T
     return rs, rp, ts, tp
 end
 
-is_internally_reflected(rp::Number, rs::Number) = isapprox(abs2(rs), 1, atol=1e-6) && isapprox(abs2(rp), 1, atol=1e-6)
+function is_internally_reflected(rp::Number, rs::Number)
+    isapprox(abs2(rs), 1, atol = 1e-6) && isapprox(abs2(rp), 1, atol = 1e-6)
+end
 
 """
     sag(r::Real, l::Real)
@@ -163,7 +166,7 @@ end
 Returns the `NA` for a opening half-angle `θ` and scalar ref. index `n`.
 For more information refer to [this website](https://www.rp-photonics.com/numerical_aperture.html).
 """
-numerical_aperture(θ::Real, n::Real=1.0) = n*sin(θ)
+numerical_aperture(θ::Real, n::Real = 1.0) = n * sin(θ)
 
 """
     visibility(opt_pwr)
@@ -175,7 +178,7 @@ function visibility(opt_pwr)
     I_max = maximum(opt_pwr)
     I_min = minimum(opt_pwr)
     return (I_max - I_min) / (I_max + I_min)
-end 
+end
 
 """
     islinear
@@ -183,15 +186,14 @@ end
 Tests if the polarization state is linear. Refer to Yun paper.
 """
 function islinear(E::AbstractArray)
-    phis = angle.(E)
-    phis = phis .- maximum(phis)
-    phis = abs.(phis)
-    deg0 = phis .≈ 0
-    degπ = phis .≈ π
-    if all(deg0 .| degπ)
-        return true
+    maxphi = maximum(angle, E)
+    for x in E
+        d = abs(angle(x) - maxphi)
+        if !(isapprox(d, 0) || isapprox(d, π))
+            return false
+        end
     end
-    return false
+    return true
 end
 
 """
@@ -199,7 +201,7 @@ end
 
 Tests if the polarization state is circular. Refer to Yun paper.
 """
-function iscircular(R, I; atol=eps())
+function iscircular(R, I; atol = eps())
     if !isapprox(dot(R, I), 0; atol)
         return false
     end

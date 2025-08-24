@@ -1,6 +1,10 @@
-struct PolarizationFilter{T, S <: AbstractShape{T}} <: AbstractObject{T, S}
+struct PolarizationFilter{T, S <: AbstractShape{T}} <: AbstractObject{T,S}
     shape::S
-    JMat::GlobalJonesBasis
+    JMat::GlobalJonesBasis{T}
+end
+
+function PolarizationFilter(shape::S, J::GlobalJonesBasis{TJ}) where {TS, S<:AbstractShape{TS}, TJ}
+    return PolarizationFilter{TS,S}(shape, GlobalJonesBasis{TS}(J))
 end
 
 function PolarizationFilter(size::T, JMat=XZBasis(1, 0, 0, 0)) where {T <: Real}

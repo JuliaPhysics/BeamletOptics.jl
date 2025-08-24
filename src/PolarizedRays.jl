@@ -56,7 +56,7 @@ mutable struct PolarizedRay{T} <: AbstractRay{T}
         end
         return new{M}(
             Point3{M}(pos),
-            Point3{M}(dir), 
+            Point3{M}(dir),
             int,
             M(λ),
             M(n),
@@ -94,7 +94,6 @@ function PolarizedRay(
     )
 end
 
-#FIXME: revert to static array for speed
 abstract type AbstractJonesMatrix{T} <: AbstractMatrix{T} end
 
 # Required methods for AbstractArray
@@ -109,7 +108,7 @@ Stores the s-p-basis Jones matrix coefficients. Must be defined for x-y-aligned 
 where z is the optical axis.
 """
 struct LocalJonesBasis{T} <: AbstractJonesMatrix{T}
-    data::Matrix{T}
+    data::SMatrix{3, 3, T, 9}
 end
 
 function SPBasis(j11::Number, j12::Number, j21::Number, j22::Number)
@@ -119,26 +118,33 @@ function SPBasis(j11::Number, j12::Number, j21::Number, j22::Number)
         typeof(j21),
         typeof(j22),
     )
-    return LocalJonesBasis{T}(T.([j11 j12 0; j21 j22 0; 0 0 1]))
+    return LocalJonesBasis{T}(SMatrix{3, 3, T, 9}(j11, j12, 0, j21, j22, 0, 0, 0, 1))
 end
 
 """
     XZBasis <: AbstractJonesMatrix
 
-Stores the Jones matrix entries for a polarizing optical element that is aligned 
-with the global y-axis as the optical axis. 
+Stores the Jones matrix entries for a polarizing optical element that is aligned
+with the global y-axis as the optical axis.
 """
 struct GlobalJonesBasis{T} <: AbstractJonesMatrix{T}
-    data::Matrix{T}
-    function GlobalJonesBasis(J::AbstractMatrix)
-        T = eltype(J)
-        return new{T}(J)
-    end
+    data::SMatrix{3, 3, T, 9}
 end
 
-XYBasis(j11::Number, j12::Number, j21::Number, j22::Number) = GlobalJonesBasis([j11 j12 0; j21 j22 0; 0 0 1])
-XZBasis(j11::Number, j12::Number, j21::Number, j22::Number) = GlobalJonesBasis([j11 0 j12; 0 1 0; j21 0 j22])
-YZBasis(j11::Number, j12::Number, j21::Number, j22::Number) = GlobalJonesBasis([1 0 0; 0 j22 j21; 0 j12 j11])
+# Generic path for any AbstractMatrix
+function GlobalJonesBasis(J::AbstractMatrix)
+    size(J) != (3, 3) && throw(ArgumentError("GlobalJonesBasis expects a 3×3 matrix"))
+    T = eltype(J)
+    return GlobalJonesBasis{T}(SMatrix{3,3,T,9}(J))
+end
+
+# Data type conversion constructor
+GlobalJonesBasis{T}(J::GlobalJonesBasis) where {T} =
+    GlobalJonesBasis{T}(SMatrix{3,3,T,9}(J.data))
+
+XYBasis(j11::Number, j12::Number, j21::Number, j22::Number) = GlobalJonesBasis(@SArray([j11 j12 0; j21 j22 0; 0 0 1]))
+XZBasis(j11::Number, j12::Number, j21::Number, j22::Number) = GlobalJonesBasis(@SArray([j11 0 j12; 0 1 0; j21 0 j22]))
+YZBasis(j11::Number, j12::Number, j21::Number, j22::Number) = GlobalJonesBasis(@SArray([1 0 0; 0 j22 j21; 0 j12 j11]))
 
 """
     _calculate_global_E0(in_dir, out_dir, normal, J)
@@ -162,7 +168,7 @@ function _calculate_global_E0(in_dir::AbstractArray, out_dir::AbstractArray, nor
     end
     # test if in-dir and normal are parallel
     if isparallel3d(in_dir, normal)
-        # FIXME does this really work for normal s-p-incidence 
+        # FIXME does this really work for normal s-p-incidence
         v = normal3d(in_dir)
     end
     # Calculate support vector
@@ -170,17 +176,22 @@ function _calculate_global_E0(in_dir::AbstractArray, out_dir::AbstractArray, nor
     s = normalize(s)
     # Calculate transforms
     p1 = cross(in_dir, s)
-    O_in = [s'; p1'; in_dir']
+    O_in = vcat(s', p1', in_dir')
     # Fallback method as per eq. 17
     if isparallel3d(in_dir, out_dir) && !(in_dir ≈ -out_dir)
-        O_out = transpose(O_in)
+        O_out = hcat(s, p1, in_dir)
     else
         p2 = cross(out_dir, s)
-        O_out = [s p2 out_dir]
+        O_out = hcat(s, p2, out_dir)
     end
     # Calculate new E0
     P = O_out * J * O_in
     return P
+end
+
+# unwrap the Local/GlobalJonesBasis types to allow static array optimization to happen
+function _calculate_global_E0(in_dir::AbstractArray, out_dir::AbstractArray, normal::AbstractArray, J::Union{LocalJonesBasis, GlobalJonesBasis})
+    _calculate_global_E0(in_dir, out_dir, normal, J.data)
 end
 
 function _calculate_global_E0(object::AbstractObject, ray::PolarizedRay, out_dir::AbstractArray, J::GlobalJonesBasis)

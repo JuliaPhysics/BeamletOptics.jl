@@ -33,7 +33,7 @@ vertex matrix. For orientation and translation tracking, a `pos`itional and `dir
 mutable struct Mesh{T} <: AbstractMesh{T}
     vertices::Matrix{T}
     faces::Matrix{Int}
-    dir::Matrix{T}
+    dir::SMatrix{3, 3, T, 9}
     pos::Point3{T}
     scale::T
 end
