@@ -101,6 +101,9 @@ Base.size(A::AbstractJonesMatrix) = size(A.data)
 Base.getindex(A::AbstractJonesMatrix, i::Int, j::Int) = A.data[i, j]
 Base.setindex!(A::AbstractJonesMatrix, v, i::Int, j::Int) = (A.data[i, j] = v)
 
+"Getter fct. for the static array in the `AbstractJonesMatrix`"
+static_data(A::AbstractJonesMatrix) = A.data
+
 """
     LocalJonesBasis
 
@@ -140,7 +143,7 @@ end
 
 # Data type conversion constructor
 GlobalJonesBasis{T}(J::GlobalJonesBasis) where {T} =
-    GlobalJonesBasis{T}(SMatrix{3,3,T,9}(J.data))
+    GlobalJonesBasis{T}(SMatrix{3,3,T,9}(static_data(J)))
 
 XYBasis(j11::Number, j12::Number, j21::Number, j22::Number) = GlobalJonesBasis(@SArray([j11 j12 0; j21 j22 0; 0 0 1]))
 XZBasis(j11::Number, j12::Number, j21::Number, j22::Number) = GlobalJonesBasis(@SArray([j11 0 j12; 0 1 0; j21 0 j22]))
@@ -159,7 +162,7 @@ is chosen for the s- and p-components.
 - `normal`: surface normal at the point of intersection
 - `J`: Jones matrix extended to 3x3, e.g. [-rₛ 0 0; 0 rₚ 0; 0 0 1] for reflection
 """
-function _calculate_global_E0(in_dir::AbstractArray, out_dir::AbstractArray, normal::AbstractArray, J::AbstractMatrix)
+function _calculate_global_E0(in_dir::AbstractArray, out_dir::AbstractArray, normal::AbstractArray, J::LocalJonesBasis)
     # Choose basis vectors
     if !isparallel3d(in_dir, out_dir)
         v = out_dir
@@ -168,7 +171,7 @@ function _calculate_global_E0(in_dir::AbstractArray, out_dir::AbstractArray, nor
     end
     # test if in-dir and normal are parallel
     if isparallel3d(in_dir, normal)
-        # FIXME does this really work for normal s-p-incidence
+        # Does this really always work for normal s-p-incidence?
         v = normal3d(in_dir)
     end
     # Calculate support vector
@@ -190,25 +193,8 @@ function _calculate_global_E0(in_dir::AbstractArray, out_dir::AbstractArray, nor
 end
 
 # unwrap the Local/GlobalJonesBasis types to allow static array optimization to happen
-function _calculate_global_E0(in_dir::AbstractArray, out_dir::AbstractArray, normal::AbstractArray, J::Union{LocalJonesBasis, GlobalJonesBasis})
-    _calculate_global_E0(in_dir, out_dir, normal, J.data)
-end
-
-function _calculate_global_E0(object::AbstractObject, ray::PolarizedRay, out_dir::AbstractArray, J::GlobalJonesBasis)
-    in_dir = direction(ray)
-    E0 = polarization(ray)
-    if !isparallel3d(in_dir, out_dir)
-        # FIXME not sure how good this entire implementation works
-        throw(ErrorException("Thin film polarizer _calculate_global_E0 only works if no direction change occurs."))
-    end
-    # Transform Jones matrix according to global object orientation
-    R = orientation(object)
-    P = R * J * transpose(R)
-    # Calculate projection of P into ray-E0-transverse plane
-    # Note: this in general violates P*in_dir = out_dir
-    Q = I - in_dir * transpose(in_dir)
-    P = Q * P * transpose(Q) # technically Q == transpose(Q)
-    return P*E0
+function _calculate_global_E0(in_dir::AbstractArray, out_dir::AbstractArray, normal::AbstractArray, J::AbstractJonesMatrix)
+    _calculate_global_E0(in_dir, out_dir, normal, static_data(J))
 end
 
 function _calculate_global_E0(::AbstractObject, ray::PolarizedRay, out_dir::AbstractArray, J::LocalJonesBasis)
