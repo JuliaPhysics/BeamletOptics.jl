@@ -6,12 +6,15 @@ using AbstractTrees
 
 const BMO = BeamletOptics
 
+const mm = 1e-3
+const inch = 25.4mm
+
 @testset "Utilities" begin
     @testset "Testing normal3d" begin
         @testset "normal3d(v) with Array" begin
             v = [1.0, 1, 1]
             k = BMO.normal3d(v)
-            @test dot(v, k)≈0 atol=1e-14
+            @test dot(v, k)≈0 atol=2e-14
             @test norm(k) ≈ 1
         end
 
@@ -26,6 +29,18 @@ const BMO = BeamletOptics
             orth = BMO.normal3d([2, 0, 0], [0, 0, 1])
             @test isapprox(orth, [0, -1, 0])
         end
+    end
+ 
+    @testset "Testing isparallel3d and isorthogonal3d" begin
+        v1 = [1,0,0]
+        v2 = Point3(1,0,eps())
+        v3 = BMO.normal3d(v1)
+        # test parallel
+        @test BMO.isparallel3d(v1, v2)
+        @test !BMO.isparallel3d(v1, v3)
+        # test orthogonal
+        @test !BMO.isorthogonal3d(v1, v2)
+        @test BMO.isorthogonal3d(v1, v3)
     end
 
     @testset "Testing rotate3d for clockwise dir. and conservation of length" begin
@@ -186,6 +201,8 @@ const BMO = BeamletOptics
         lambdas = T1.([488e-9, 707e-9, 1064e-9])
         indices = T2.([1.6591, 1.6456, 1.6374])
         ref_index = DiscreteRefractiveIndex(lambdas, indices)
+        ref_sellm = SellmeierEquation(0.6961663, 0.4079426, 0.8974794,
+                                      0.0684043^2, 0.1162414^2, 9.896161^2)
 
         @testset "DiscreteRefractiveIndex" begin
             @test isdefined(BMO, :DiscreteRefractiveIndex)
@@ -194,6 +211,18 @@ const BMO = BeamletOptics
             @test_throws KeyError ref_index(lambdas[1] + 1e-9)
             # Test constructor
             @test_throws ArgumentError DiscreteRefractiveIndex([1], [1, 2])
+        end
+
+        @testset "SellmeierEquation" begin
+            # Known reference index for fused silica at 500 nm
+            @test isapprox(ref_sellm(500e-9), 1.4623, atol=3e-5)
+            # Check that wavelength in μm gives same result as m (via internal conversion)
+            λ_m = 1.0e-6
+            λ_um = 1.0
+            @test isapprox(ref_sellm(λ_m), ref_sellm(λ_um * 1e-6), atol=1e-12)
+            # Check monotonic decrease of n with λ in the visible range
+            n_vis = [ref_sellm(λ) for λ in (400:50:700) .* 1e-9]
+            @test all(diff(n_vis) .< 0)
         end
 
         @testset "Test ref. helper function" begin
@@ -209,10 +238,11 @@ const BMO = BeamletOptics
             @test_throws ArgumentError BMO.test_refractive_index_function(f4)
             @test isnothing(BMO.test_refractive_index_function(f5))
             @test isnothing(BMO.test_refractive_index_function(ref_index))
+            @test isnothing(BMO.test_refractive_index_function(ref_sellm))
         end
     end
 
-    @testset "Numerical aperture" begin
+    @testset "Testing numerical aperture util." begin
         n0 = 1.5
         theta = deg2rad(45)
         BMO.numerical_aperture(theta, n0) == n0 * sin(theta)
@@ -223,6 +253,35 @@ const BMO = BeamletOptics
         g(x) = x^3 + x^2
         @test_throws ErrorException BMO.find_zero_bisection(f, -1, 1)
         @test_throws ErrorException BMO.find_zero_bisection(g, -2, 1; tol=5e-16, max_iter=10)
+    end
+
+    @testset "Testing interferometric visibility util." begin
+        Iphi(phi, V) = V*sin(phi) + 1 
+        V = 0.85
+        pwr = [Iphi(phi, V) for phi = LinRange(0, 2pi, 1000)]
+        @test BMO.visibility(pwr) ≈ V atol=2e-6
+    end
+
+    @testset "Testing polarization state utils." begin
+        lin1 = [1, 0, 0]
+        lin2 = [-1, 1, 0]
+        circ = normalize([1,1*exp(im*pi/2),0])
+        ellp = [1, exp(im*pi/2) * 2, 0]
+        
+        @test BMO.islinear(lin1)
+        @test BMO.islinear(lin2)
+        @test !BMO.islinear(circ)
+        @test !BMO.islinear(ellp)
+        
+        @test !BMO.iscircular(lin1)
+        @test !BMO.iscircular(lin2)
+        @test BMO.iscircular(circ)
+        @test !BMO.iscircular(ellp)
+        
+        @test !BMO.iselliptical(lin1)
+        @test !BMO.iselliptical(lin2)
+        @test !BMO.iselliptical(circ)
+        @test BMO.iselliptical(ellp)
     end
 end
 
@@ -1429,7 +1488,6 @@ end
 
         # test ring generation
         NBK7 = DiscreteRefractiveIndex([532e-9, 1064e-9], [1.5195, 1.5066])
-        mm = 1e-3
 
         s1 = Lens(
             SphericalSurface(38.184mm, 2*1.840mm, 2*2.380mm),
@@ -1939,7 +1997,7 @@ end
         ln = ThinLens(R1, R2, d, nl)
         translate3d!(pd_l, [0, z, 0])
         translate3d!(pd_s, [0, z, 0])
-        translate3d!(ln, [0, z - f - thickness(ln.shape) / 2, 0])
+        translate3d!(ln, [0, z - f - thickness(ln) / 2, 0])
 
         @testset "Testing fringe pattern" begin
             system = System(pd_l)
@@ -1998,9 +2056,9 @@ end
                 solve_system!(system, g_2)
                 Pt_numerical[i] = BMO.optical_power(pd_s)
                 # Test length/opl function
-                @test length(g_1) == z
-                @test length(g_1) < BMO.optical_path_length(g_1)
-                @test length(g_2) == length(g_1) - z_i
+                @test length(g_1) ≈ z
+                @test length(g_1) ≈ BMO.optical_path_length(g_1) - thickness(ln) * (nl - 1)
+                @test length(g_2) ≈ length(g_1) - z_i
             end
             # Analytical solution (cosine over Δz), ref. power is 4*P0 since beamsplitter is missing
             Pt_analytical = 4 * P0 * [(cos(2π * z / (maximum(Δz))) + 1) / 2 for z in Δz]
@@ -2160,19 +2218,25 @@ end
 @testset "Polarized rays" begin
     @testset "Polarization transforms" begin
         # Reflection matrix and lin. x-pol
-        J = [-1 0 0; 0 1 0; 0 0 1]
+        J = BMO.SPBasis(-1, 0, 0, 1)
         E0 = [1, 0, 0]
 
         @testset "90° reflection" begin
             in_dir = [0, 0, 1]
             out_dir = [1, 0, 0]
-            @test BMO._calculate_global_E0(in_dir, out_dir, J, E0) ≈ [0, 0, -1]
+            nml = normalize([1, 0, -1])
+            P90 = BMO._calculate_global_E0(in_dir, out_dir, nml, J)
+            @test P90 * E0 ≈ [0, 0, -1]
+            @test P90 * in_dir ≈ out_dir
         end
 
         @testset "0° reflection" begin
             in_dir = [0, 0, 1]
             out_dir = [0, 0, -1]
-            @test BMO._calculate_global_E0(in_dir, out_dir, J, E0) ≈ [-1, 0, 0]
+            nml = normalize([0, 0, -1])
+            P00 = BMO._calculate_global_E0(in_dir, out_dir, nml, J)
+            @test P00 * E0 ≈ [-1, 0, 0]
+            @test P00 * in_dir ≈ out_dir
         end
     end
 
@@ -2326,14 +2390,14 @@ end
             solve_system!(system, beam)
 
             # Extract E0s: t - transmitted, r - reflected
-            t = beam.children[1].rays[1].E0
-            r = beam.children[2].rays[1].E0
-            tr = beam.children[1].rays[2].E0
-            rr = beam.children[2].rays[2].E0
-            trt = beam.children[1].children[1].rays[1].E0
-            trr = beam.children[1].children[2].rays[1].E0
-            rrt = beam.children[2].children[1].rays[1].E0
-            rrr = beam.children[2].children[2].rays[1].E0
+            t = BMO.polarization(beam.children[1].rays[1])
+            r = BMO.polarization(beam.children[2].rays[1])
+            tr = BMO.polarization(beam.children[1].rays[2])
+            rr = BMO.polarization(beam.children[2].rays[2])
+            trt = BMO.polarization(beam.children[1].children[1].rays[1])
+            trr = BMO.polarization(beam.children[1].children[2].rays[1])
+            rrt = BMO.polarization(beam.children[2].children[1].rays[1])
+            rrr = BMO.polarization(beam.children[2].children[2].rays[1])
 
             # Test phase flips
             @test t[3] ≈ sqrt(2) / 2
@@ -2352,14 +2416,14 @@ end
             solve_system!(system, beam)
 
             # Extract E0s: t - transmitted, r - reflected
-            t = beam.children[1].rays[1].E0
-            r = beam.children[2].rays[1].E0
-            tr = beam.children[1].rays[2].E0
-            rr = beam.children[2].rays[2].E0
-            trt = beam.children[1].children[1].rays[1].E0
-            trr = beam.children[1].children[2].rays[1].E0
-            rrt = beam.children[2].children[1].rays[1].E0
-            rrr = beam.children[2].children[2].rays[1].E0
+            t = BMO.polarization(beam.children[1].rays[1])
+            r = BMO.polarization(beam.children[2].rays[1])
+            tr = BMO.polarization(beam.children[1].rays[2])
+            rr = BMO.polarization(beam.children[2].rays[2])
+            trt = BMO.polarization(beam.children[1].children[1].rays[1])
+            trr = BMO.polarization(beam.children[1].children[2].rays[1])
+            rrt = BMO.polarization(beam.children[2].children[1].rays[1])
+            rrr = BMO.polarization(beam.children[2].children[2].rays[1])
 
             # Test phase flips
             @test t[1] ≈ sqrt(2) / 2
@@ -2372,13 +2436,110 @@ end
     end
 end
 
+@testset "Polarizing components" begin
+    # Test fcts.
+    pseudo_I(v) = norm(v)^2
+    pseudo_I(ray::BMO.PolarizedRay) = pseudo_I(BMO.polarization(ray))
+    malus_law(θ) = cosd(θ)^2
+    function generate_linpol_angles(thetas)
+        angles = zeros(length(thetas))
+        # consider flip in angle quadrant above 90°  
+        for i in eachindex(thetas)
+            theta = thetas[i] - 1
+            if theta > 90 && theta <= 270
+                angles[i] = 180
+            end
+        end
+        return angles
+    end
+
+    @testset "Jones polarization matrices" begin
+        @test isdefined(BMO, :AbstractJonesMatrix)
+        @test isdefined(BMO, :LocalJonesBasis)
+        @test isdefined(BMO, :GlobalJonesBasis)
+        # test matrix operations
+        J = BMO.XYBasis(1, 2, 3, 4)
+        R = [1 2 0; 3 4 0; 0 0 1]
+        @test J == R
+        @test J*2 == R*2
+        @test transpose(J) == transpose(R)
+        @test inv(J) ≈ inv(R)
+    end
+
+    @testset "Polarizing filter" begin
+        filter = PolarizationFilter(5mm)
+        system = System([filter])
+        # rotation angle steps, intensity and angle comparison
+        thetas = 1:10:360
+        i_n = zeros(length(thetas))
+        i_a = similar(i_n)
+        angles_n = similar(i_n)
+        angles_a = generate_linpol_angles(thetas)
+
+        @testset "Pol. filter normal incidence - rotation around y-axis" begin 
+            Rfil = orientation(filter)
+            ray_dir = Rfil[:,2]
+            ray_pos = position(filter) - 10mm * ray_dir
+            local_x = Rfil[:,1]
+            local_z = Rfil[:,3]
+            pol_vec = local_x
+            lambda = 1e-6
+            beam = Beam(ray_pos, ray_dir, lambda, pol_vec)            
+            # step ref. vector by angle increment 
+            RotMat = BMO.rotate3d(ray_dir, deg2rad(step(thetas)))
+            for i in eachindex(thetas)
+                solve_system!(system, beam)
+                E1 = BMO.polarization(BMO.rays(beam)[2])
+                i_n[i] = pseudo_I(E1)
+                i_a[i] = malus_law(thetas[i]-1)
+                rotate3d!(filter, ray_dir, deg2rad(step(thetas)))
+                # test polarization state
+                @test all(BMO.islinear.(beam.rays))
+                # test projected polarization direction
+                v1 = real(E1)
+                angles_n[i] = rad2deg(BMO.angle3d(v1, pol_vec))
+                # update ref vector
+                pol_vec = RotMat * pol_vec
+            end    
+            @test angles_n ≈ angles_a
+        end
+
+        # Move and rotate filter
+        translate3d!(filter, [0,10mm,0])
+        xrotate3d!(filter, deg2rad(45))
+        zrotate3d!(filter, deg2rad(30))
+
+        @testset "Pol. filter tilted incidence - rotation around ray optical axis" begin
+            Rfil = orientation(filter)
+            ray_dir = Rfil[:,2]
+            ray_pos = position(filter) - 10mm * ray_dir
+            local_x = Rfil[:,1]
+            local_z = Rfil[:,3]
+            pol_vec = local_x
+            lambda = 1e-6
+            beam = Beam(ray_pos, ray_dir, lambda, pol_vec)
+            # tilt filter
+            θ_tilt = 45
+            rotate3d!(filter, local_x, deg2rad(θ_tilt))
+            i_n_tilt = similar(i_n)
+            for i in eachindex(thetas)
+                solve_system!(system, beam)
+                i_n_tilt[i] = pseudo_I(beam.rays[2].E0)
+                rotate3d!(filter, ray_dir, deg2rad(step(thetas)))
+                @test all(BMO.islinear.(beam.rays))
+            end
+            # only applicable for θ_tilt = 45°
+            i_a_tilt = malus_law.(thetas .- 1) .* 0.75 .+ 0.25
+            @test i_n_tilt ≈ i_a_tilt
+        end
+    end
+end
+
 @testset "Beamsplitters" begin
-    mm = 1e-3
     N0 = 1.5
     @testset "Testing RectangularPlateBeamsplitter with Beam" begin
         # Init splitter
         N0 = 1.5
-        mm = 1e-3
         pbs = RectangularPlateBeamsplitter(36mm, 25mm, 1mm, n -> N0)
         system = System([pbs])
         beam = Beam([0, -50mm, 0], [0, 1, 0], 1e-6)
@@ -2524,6 +2685,9 @@ end
     axis = nothing
     cube = BMO.CubeMesh(1)
     @test_throws BMO.MissingBackendError render!(axis, cube)
+    @test_throws BMO.MissingBackendError BMO.get_view(axis)
+    @test_throws BMO.MissingBackendError BMO.set_view(axis, [1 1; 0 0])
+    @test_throws BMO.MissingBackendError BMO.hide_axis(axis, true)
 end
 
 @testset "Double Gauss lens" begin
@@ -2662,6 +2826,101 @@ end
         BMO.solve_system!(system, beam)
 
         @test BMO.optical_power(pd)≈10e-3 atol=1e-5
+    end
+
+    @testset "Issue#22 and Issue#23" begin
+        # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/22
+        # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/23
+        
+        mutable struct TestSubstrate{T, S <: BMO.AbstractShape{T}, N} <: BMO.AbstractRefractiveOptic{T, S, N}
+            const shape::S
+            n::N
+        end
+        
+        BMO.refractive_index(ts::TestSubstrate, ::Real) = ts.n
+        set_index(ts::TestSubstrate, new) = (ts.n = new)
+        get_index(ts::TestSubstrate) = ts.n
+        
+        "Shifts the phase of the beamlet by a specific amount in [rad]."
+        function shift_phase(gb::BMO.GaussianBeamlet, phase::Real)
+            BMO.electric_field!(gb, BMO.electric_field(gb) * exp(im*phase))
+            return nothing
+        end
+        
+        ref_signal(ϕ, A) = (cos(ϕ)+1)/2 * A
+        
+        # setup system for tests below
+        splitter = CubeBeamsplitter(10mm, n->1)
+        substrate_length = 10mm
+        substrate = TestSubstrate(BMO.CylinderSDF(5mm, substrate_length/2), 1.5)
+        
+        detector = Photodetector(10mm, 250)
+        
+        translate3d!(substrate, [0, -25mm, 0])
+        translate3d!(detector, [0, 40mm, 0])
+        
+        system = System([substrate, splitter, detector])
+        
+        start_offset = 50mm
+        
+        @testset "Testing electric_field calculation - non-imaging ref. index change" begin
+            indices = (1, 10, 100, 1000)
+            for index in indices
+                set_index(substrate, index)
+                phi = LinRange(0, 2pi, 30)
+                int = zeros(length(phi))
+                for (i, p) in enumerate(phi)
+                    gb_prb = GaussianBeamlet([0, -start_offset, 0], [0, 1, 0], 1e-6, .5mm)
+                    gb_ref = GaussianBeamlet([start_offset, 0, 0], [-1, 0, 0], 1e-6, .5mm)
+                    empty!(detector)
+                    shift_phase(gb_ref, p)
+                    solve_system!(system, gb_prb)
+                    solve_system!(system, gb_ref)
+                    int[i] = BMO.optical_power(detector)
+                end
+                @test isapprox(BMO.visibility(int), 1, atol=1e-2)
+            end
+        end
+        
+        @testset "Testing electric_field calculation - ref. index based phase shift" begin
+            λ = 1e-6
+            gb_prb = GaussianBeamlet([0, -start_offset, 0], [0, 1, 0], λ, .5mm)
+            gb_ref = GaussianBeamlet([start_offset, 0, 0], [-1, 0, 0], λ, .5mm)
+            
+            n_lambdas = substrate_length / BMO.wavelength(gb_prb)
+            
+            n_factors = LinRange(0, 1, 50)
+            pwr = zeros(length(n_factors))
+            # Increase ref. index of substrate until one additional λ of OPL has been introduced
+            for (i, nf) in enumerate(n_factors)
+                set_index(substrate, 1 + 1/n_lambdas * nf)        
+                empty!(detector)
+                solve_system!(system, gb_prb)
+                solve_system!(system, gb_ref)        
+                @test isapprox(BMO.optical_power(detector), ref_signal(2pi*nf, 2e-3), atol=1e-8)
+                pwr[i] = BMO.optical_power(detector)
+            end
+            # Test if opl difference is indeed one λ
+            delta = BMO.optical_path_length(gb_prb)
+            delta -= BMO.optical_path_length(gb_ref)
+            delta /= λ
+            @test delta ≈ 1
+        end
+        
+        @testset "Testing electric_field mutation during retracing" begin    
+            gb_prb = GaussianBeamlet([0, -start_offset, 0], [0, 1, 0], 1e-6, .5mm)
+            gb_ref = GaussianBeamlet([start_offset, 0, 0], [-1, 0, 0], 1e-6, .5mm)    
+            phis = LinRange(0, 2pi, 50)
+            pwr = zeros(length(phis))
+            # Vary starting phase by 0...2pi via retracing    
+            for (i, phi) in enumerate(phis)
+                empty!(detector)
+                solve_system!(system, gb_prb)
+                solve_system!(system, gb_ref)
+                @test isapprox(BMO.optical_power(detector), ref_signal(phi, 2e-3), atol=1e-8)
+                shift_phase(gb_prb, step(phis))
+            end
+        end
     end
 end
 

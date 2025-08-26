@@ -81,8 +81,10 @@ hint(i::GaussianBeamletInteraction) = hint(i.chief)
 hint!(i::GaussianBeamletInteraction, new_hint::Nullable{Hint}) = hint!(i.chief, new_hint)
 
 wavelength(beam::GaussianBeamlet) = beam.λ
+wavelength!(beam::GaussianBeamlet, new) = (beam.λ = new)
 beam_waist(beam::GaussianBeamlet) = beam.w0
 electric_field(beam::GaussianBeamlet) = beam.E0
+electric_field!(beam::GaussianBeamlet{T}, new) where T = (beam.E0 = Complex{T}(new))
 refractive_index(beam::GaussianBeamlet, id::Int) = refractive_index(rays(beam.chief)[id])
 function refractive_index!(beam::GaussianBeamlet, id::Int, n_new::Real)
     refractive_index!(rays(beam.chief)[id], n_new)
@@ -154,6 +156,8 @@ function _modify_beam_head!(old::GaussianBeamlet{T},
     _modify_beam_head!(old.chief, new.chief)
     _modify_beam_head!(old.waist, new.waist)
     _modify_beam_head!(old.divergence, new.divergence)
+    wavelength!(old, wavelength(new))
+    electric_field!(old, electric_field(new))
 end
 
 _last_beam_intersection(gauss::GaussianBeamlet) = intersection(last(rays(gauss.chief)))
@@ -253,6 +257,7 @@ end
 
 global gb_constructor_warn = true
 
+#FIXME remove deprecated constructor until end of 2025
 function GaussianBeamlet(chief::Ray{T}, λ=1e-6, w0=1e-3; M2=1, P0=1e-3, support = [0,0,1]) where T
     if gb_constructor_warn
         @warn "The GaussianBeamlet(::Ray, ...) constructor will be deprecated in the future"
@@ -275,7 +280,7 @@ point_on_beam(gauss::GaussianBeamlet, t::Real) = point_on_beam(gauss.chief, t)
 """
     gauss_parameters(gauss::GaussianBeamlet, z; hint::Union{Nothing, Tuple{Int, Vector{<:Real}}}=nothing)
 
-Calculate the local waist radius and Gouy phase of an unastigmatic Gaussian beamlet at a specific distance `z` based on the method of J. Arnaud (1985) and D. DeJager (1992).
+Calculate the local waist radius and Gouy phase of an unastigmatic Gaussian beamlet at a specific cartesian distance `z` based on the method of J. Arnaud (1985) and D. DeJager (1992).
 
 # Arguments
 
@@ -290,14 +295,15 @@ Calculate the local waist radius and Gouy phase of an unastigmatic Gaussian beam
 - `ψ`: Gouy phase (note that -atan definition is used)
 - `w0`: local beam waist radius
 """
-function gauss_parameters(gauss::GaussianBeamlet,
+function gauss_parameters(
+        gauss::GaussianBeamlet,
         z::Real;
-        hint = point_on_beam(gauss, z))
+        hint = point_on_beam(gauss, z)
+    )
     p0, index = hint
     chief = gauss.chief.rays[index]
-    n = refractive_index(chief)
-    λ = wavelength(gauss)
-
+    div = gauss.divergence.rays[index]
+    waist = gauss.waist.rays[index]
     #=
     Divergence ray height and slope (same for waist ray)
     - find divergence ray "height" and "slope" at intersection point y0 with target plane at p0 of chief ray
@@ -305,7 +311,6 @@ function gauss_parameters(gauss::GaussianBeamlet,
     - ray slope "m_d" is angle between vector p0 -> y0 and divergence ray direction -> gives unambiguous angle for signed ray slope calculation
     - fails if y_d is zero -> catch R=Inf, ψ=0 and H=λ/π
     =#
-    div = gauss.divergence.rays[index]
     intersection_len = line_plane_distance3d(p0,
         direction(chief),
         position(div),
@@ -315,7 +320,6 @@ function gauss_parameters(gauss::GaussianBeamlet,
     y0 /= y_d
     m_d = tan(π / 2 - angle3d(y0, direction(div)))
     # Waist ray height and slope
-    waist = gauss.waist.rays[index]
     intersection_len = line_plane_distance3d(p0,
         direction(chief),
         position(waist),
@@ -325,8 +329,10 @@ function gauss_parameters(gauss::GaussianBeamlet,
     y0 /= y_w
     m_w = tan(π / 2 - angle3d(y0, direction(waist)))
     # Beam parameters as per Arnaud (1985) and DeJager (1992)
+    n = refractive_index(chief)
     H = abs(n * (y_w * m_d - y_d * m_w))
     # Test optical invariant
+    λ = wavelength(gauss)
     if !isapprox(H, λ / π, atol = 1e-6)
         H = λ / π
         # println("H not fulfilled at z=$z")
@@ -343,7 +349,6 @@ function gauss_parameters(gauss::GaussianBeamlet,
     isnan(ψ) && (ψ = zero(ψ))
     isnan(w0) && (w0 = w)
     R < 0 && (ψ = -ψ)
-
     return w, R, ψ, w0
 end
 
@@ -367,8 +372,11 @@ end
 """
     electric_field(gauss::GaussianBeamlet, r, z)
 
-Calculates the electric field phasor [V/m] of `gauss` at the radial and longitudinal positions `r` and `z`.
+Calculates the electric field phasor [V/m] of the [`GaussianBeamlet`](@ref) at the radial and longitudinal positions `r` and `z`.
+This function also considers phase changes due to changes in the [`optical_path_length`](@ref) of the beamlet.
 
+!!! warning
+    Note that `z` and `r` must be specified as cartesian distances. Using the optical path length for `z` can lead to false results.
 """
 function electric_field(gauss::GaussianBeamlet, r, z)
     point, index = point_on_beam(gauss, z)
@@ -376,7 +384,11 @@ function electric_field(gauss::GaussianBeamlet, r, z)
     k = wave_number(wavelength(gauss))
     # Calculate new local field strength based on E0*w0 = const.
     E0 = electric_field(gauss) * (beam_waist(gauss) / w0)
-    return electric_field(r, z, E0, w0, w, k, ψ, R)
+    # Calculate phase change due to optical path length
+    Δl = optical_path_length(gauss) - length(gauss)
+    # Note: geometrical length changes considered in `electric_field` call below 
+    ref_ϕ = Δl / wavelength(gauss) * 2π
+    return electric_field(r, z, E0, w0, w, k, ψ, R) * exp(im*ref_ϕ)
 end
 
 optical_power(gauss::GaussianBeamlet) = intensity(electric_field(gauss)) / 2 * π * beam_waist(gauss)^2

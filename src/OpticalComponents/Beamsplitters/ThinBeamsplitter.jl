@@ -87,21 +87,21 @@ end
 
 @inline function _beamsplitter_transmitted_beam(bs::AbstractBeamsplitter, ::Beam{T, R},
         ray::R) where {T <: Real, R <: PolarizedRay{T}}
-    J = @SArray [transmittance(bs) 0 0; 0 transmittance(bs) 0; 0 0 1]
+    J = SPBasis(transmittance(bs), 0, 0, transmittance(bs))
     pos = position(ray) + length(ray) * direction(ray)
     dir = direction(ray)
-    E0 = _calculate_global_E0(dir, dir, J, polarization(ray))
+    E0 = _calculate_global_E0(bs, ray, dir, J)
     return Beam(PolarizedRay(pos, dir, wavelength(ray), E0))
 end
 
 @inline function _beamsplitter_reflected_beam(bs::AbstractBeamsplitter, ::Beam{T, R},
     ray::R) where {T <: Real, R <: PolarizedRay{T}}
-    J = @SArray [-reflectance(bs) 0 0; 0 reflectance(bs) 0; 0 0 1]
+    J = SPBasis(-reflectance(bs), 0, 0, reflectance(bs))
     normal = normal3d(intersection(ray))
     pos = position(ray) + length(ray) * direction(ray)
     in_dir = direction(ray)
     out_dir = reflection3d(in_dir, normal)
-    E0 = _calculate_global_E0(in_dir, out_dir, J, polarization(ray))
+    E0 = _calculate_global_E0(bs, ray, out_dir, J)
     return Beam(PolarizedRay(pos, out_dir, wavelength(ray), E0))
 end
 
@@ -161,7 +161,7 @@ function interact3d(::AbstractSystem, bs::ThinBeamsplitter, gauss::GaussianBeaml
     r = _beamsplitter_reflected_beam(bs, gauss, ray_id)
 
     # Add conditional phase flip to reflected beam
-    r.E0 *= exp(im*ϕ)
+    electric_field!(r, electric_field(r) * exp(im*ϕ))
 
     children!(gauss, [t, r])
     return nothing

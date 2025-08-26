@@ -12,7 +12,7 @@ export System, StaticSystem, solve_system!
 export ObjectGroup
 
 # additional
-export DiscreteRefractiveIndex
+export DiscreteRefractiveIndex, SellmeierEquation
 
 #=
 components
@@ -35,6 +35,9 @@ export Photodetector, Spotdetector, PSFDetector, intensity
 
 # splitters
 export ThinBeamsplitter, RoundThinBeamsplitter, RectangularPlateBeamsplitter, RoundPlateBeamsplitter, CubeBeamsplitter, RectangularCompensatorPlate
+
+# polarizing components
+export PolarizationFilter
 
 # dummies
 export NonInteractableObject, MeshDummy, IntersectableObject

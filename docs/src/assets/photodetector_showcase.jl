@@ -12,9 +12,6 @@ system = System([pd])
 g1 = GaussianBeamlet([0,-20e-3,0], [0,1,1e-3], 532e-9, 1e-5)
 g2 = GaussianBeamlet([0,-20e-3,0], [0,1,0], 532e-9, 5e-4)
 
-ϕ = 0
-g2.E0 *= exp(im*ϕ)
-
 solve_system!(system, g1)
 solve_system!(system, g2)
 

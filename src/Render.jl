@@ -54,3 +54,8 @@ All concrete implementations of `render!` must adhere to the following minimal i
 Refer to the `BeamletOptics` extension docs for `Makie` for more information.
 """
 render!(::Any, ::_RenderTypes, kwargs...) = throw(MissingBackendError())
+
+get_view(::Any) = throw(MissingBackendError())
+set_view(::Any, ::AbstractMatrix) = throw(MissingBackendError())
+
+hide_axis(::Any, ::Bool) = throw(MissingBackendError())

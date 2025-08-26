@@ -39,6 +39,18 @@ end
 """
     Beam(pos, dir, λ, E0)
 
+Spawns a [`Beam`](@ref) at the start `pos`ition in the specified `dir`ection
+with the wavelength `λ` and field vector `E0`.
+"""
+function Beam(pos::AbstractArray{P}, dir::AbstractArray{D}, λ::L, E0) where {P,D,L}
+    T = promote_type(P,D,L)
+    ray = PolarizedRay(pos, dir, λ, E0)
+    return Beam{T, PolarizedRay{T}}([ray], nothing, Vector{Beam{T, PolarizedRay{T}}}())
+end
+
+"""
+    Beam(pos, dir, λ, E0)
+
 Spawns a [`Beam`](@ref) of [`PolarizedRay`](@ref)s at the start `pos`ition in the specified `dir`ection
 with the wavelength `λ` and electric field vector `E0`
 """
@@ -81,6 +93,7 @@ function Base.replace!(beam::Beam{<:Real, <:PolarizedRay}, interaction::BeamInte
     polarization!(rays(beam)[index], polarization(interaction.ray))
 end
 
+"Used mainly for retracing. Updates beam children data."
 function _modify_beam_head!(old::Beam{T, R}, new::Beam{T, R}) where {T<:Real, R<:Ray{T}}
     position!(first(rays(old)), position(first(rays(new))))
     direction!(first(rays(old)), direction(first(rays(new))))
@@ -89,6 +102,7 @@ function _modify_beam_head!(old::Beam{T, R}, new::Beam{T, R}) where {T<:Real, R<
     return nothing
 end
 
+"Used mainly for retracing. Updates beam children data."
 function _modify_beam_head!(old::Beam{T, R}, new::Beam{T, R}) where {T<:Real, R<:PolarizedRay{T}}
     position!(first(rays(old)), position(first(rays(new))))
     direction!(first(rays(old)), direction(first(rays(new))))

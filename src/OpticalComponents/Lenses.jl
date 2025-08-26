@@ -113,14 +113,14 @@ function interact3d(system::AbstractSystem, optic::AbstractRefractiveOptic,
         n2 = refractive_index(optic, lambda)
         # Calculate reflection
         new_dir = reflection3d(direction(ray), normal)
-        J = [-rs 0 0; 0 rp 0; 0 0 1]
+        J = SPBasis(-rs, 0, 0, rp)
     else
         # Calculate refraction
         new_dir, ~ = refraction3d(direction(ray), normal, n1, n2)
-        J = [ts 0 0; 0 tp 0; 0 0 1]
+        J = SPBasis(ts, 0, 0, tp)
     end
     # Calculate new polarization
-    E0 = _calculate_global_E0(direction(ray), new_dir, J, polarization(ray))
+    E0 = _calculate_global_E0(optic, ray, new_dir, J)
     return BeamInteraction{T, R}(
         hint, PolarizedRay{T}(raypos, new_dir, nothing, wavelength(ray), n2, E0))
 end
