@@ -1488,7 +1488,6 @@ end
 
         # test ring generation
         NBK7 = DiscreteRefractiveIndex([532e-9, 1064e-9], [1.5195, 1.5066])
-        mm = 1e-3
 
         s1 = Lens(
             SphericalSurface(38.184mm, 2*1.840mm, 2*2.380mm),
@@ -2537,12 +2536,10 @@ end
 end
 
 @testset "Beamsplitters" begin
-    mm = 1e-3
     N0 = 1.5
     @testset "Testing RectangularPlateBeamsplitter with Beam" begin
         # Init splitter
         N0 = 1.5
-        mm = 1e-3
         pbs = RectangularPlateBeamsplitter(36mm, 25mm, 1mm, n -> N0)
         system = System([pbs])
         beam = Beam([0, -50mm, 0], [0, 1, 0], 1e-6)
@@ -2688,6 +2685,9 @@ end
     axis = nothing
     cube = BMO.CubeMesh(1)
     @test_throws BMO.MissingBackendError render!(axis, cube)
+    @test_throws BMO.MissingBackendError BMO.get_view(axis)
+    @test_throws BMO.MissingBackendError BMO.set_view(axis, [1 1; 0 0])
+    @test_throws BMO.MissingBackendError BMO.hide_axis(axis, true)
 end
 
 @testset "Double Gauss lens" begin
