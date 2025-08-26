@@ -125,7 +125,7 @@ function SPBasis(j11::Number, j12::Number, j21::Number, j22::Number)
 end
 
 """
-    XZBasis <: AbstractJonesMatrix
+    GlobalJonesBasis <: AbstractJonesMatrix
 
 Stores the Jones matrix entries for a polarizing optical element that is aligned
 with the global y-axis as the optical axis.
