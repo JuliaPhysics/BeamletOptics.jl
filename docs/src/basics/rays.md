@@ -28,7 +28,7 @@ This ray type is able to model reflection and [refraction](https://www.rp-photon
 
 ## Polarized Rays
 
-In order to model the effect of polarizing elements, e.g. a ``\lambda/4``-plate, the polarization ray tracing calculus of Yun et. al is used [Yun2011_1, Yun2011_2](@cite). This formalism allows to model the effects of said elements on the electric field vector ``E_0`` using the [Jones formalism](https://www.rp-photonics.com/polarization_of_light.html) in global coordinates:
+In order to model the effect of polarizing elements, the polarization ray tracing calculus of Yun et. al is used [Yun2011_1, Yun2011_2](@cite). This formalism allows to model the effects of said elements on the electric field vector ``E_0`` using the [Jones formalism](https://www.rp-photonics.com/polarization_of_light.html) in global coordinates:
 
 ```@docs; canonical=false
 PolarizedRay

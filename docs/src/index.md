@@ -78,6 +78,7 @@ In order to warrant a 1.0.0 release tag, the following features will need to be 
         - 🔳 Wave plates (λ/2 and λ/4)
         - 🔳 Retarders
         - 🔳 Faraday rotators
+        - ✅ Polarizing thin-film filters
     - 🔳 Isolators
     - 🔳 Modulators
         - 🔳 AOM

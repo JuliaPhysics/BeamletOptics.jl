@@ -14,13 +14,14 @@ function PolarizationFilter(shape::S, J::GlobalJonesBasis{TJ}, cs) where {TS, S<
 end
 
 """
-    PolarizationFilter(size; cutoff_strength)
+    PolarizationFilter(edge_length; cutoff_strength)
 
-Spawns a thin, rectangular [`PolarizationFilter`](@ref) with the edge length as specified via the `size` in [m].
-The filter is aligned with the global y-axis and transmits along the x-axis.
+Spawns a thin, rectangular [`PolarizationFilter`](@ref). The `edge_length` has to be specified in [m].
+The filter is aligned with the global y-axis and transmits along the x-axis, while blocking polarization components
+along the global z-axis.
 """
-function PolarizationFilter(size::Real; cutoff_strength=eps())
-    shape = QuadraticFlatMesh(size)
+function PolarizationFilter(edge_length::Real; cutoff_strength=eps())
+    shape = QuadraticFlatMesh(edge_length)
     # Rotate normals against pos. y-axis
     zrotate3d!(shape, π)
     set_new_origin3d!(shape)
