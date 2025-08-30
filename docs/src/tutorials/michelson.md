@@ -73,9 +73,10 @@ To represent the HeNe beam in code, we use the [`GaussianBeamlet`](@ref) with pa
 λ = 632.8e-9
 w0 = 0.65e-3 / 2
 
-θ_ideal = BeamletOptics.divergence_angle(λ, w0, 1) * 1e3
+θ_spec = 1.4e-3 / 2  # half-angle
+θ_ideal = BeamletOptics.divergence_angle(λ, w0, 1)
 
-M2 = 1.4 / θ_ideal
+M2 = θ_spec / θ_ideal
 
 beam = GaussianBeamlet(
     [0.0, 0.0, 0.0],   # Beam origin
