@@ -1,6 +1,6 @@
 """
     AbstractJonesPolarizer <: AbstractObject
-    
+
 Represents infinitesimally thin components that change the polarization state of incoming [`PolarizedRay`](@ref)s via global Jones matrix calculus.
 Rather than using the generic Yun ray tracing scheme as referred to in the `PolarizedRay` docs, this element interacts with
 the global E-field vector `E0` by using a [`GlobalJonesBasis`](@ref) and projecting the entries into the transverse plane defined
@@ -45,3 +45,4 @@ function _calculate_global_E0(object::AbstractJonesPolarizer, ray::PolarizedRay,
 end
 
 include("PolarizationFilter.jl")
+include("Waveplates.jl")
