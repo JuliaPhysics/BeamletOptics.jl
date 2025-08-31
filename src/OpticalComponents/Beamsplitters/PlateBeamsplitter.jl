@@ -157,6 +157,59 @@ function RoundPlateBeamsplitter(
     return RoundPlateBeamsplitter(substrate, coating)
 end
 
+"""
+    RectangularPolarizingPlateBeamsplitter <: AbstractPlateBeamsplitter
+
+A plate beamsplitter with a rectangular substrate and an ideal polarizing
+splitting coating.
+"""
+struct RectangularPolarizingPlateBeamsplitter{T} <: AbstractPlateBeamsplitter{T, RectangularPlateBeamsplitterShape{T}}
+    substrate::Prism{T, BoxSDF{T}}
+    coating::PolarizingBeamSplitter{T, Mesh{T}}
+end
+
+"""
+    RectangularPolarizingPlateBeamsplitter(width, height, thickness, n)
+"""
+function RectangularPolarizingPlateBeamsplitter(
+        width::Real,
+        height::Real,
+        thickness::Real,
+        n::RefractiveIndex
+    )
+    substrate_shape = BoxSDF(width, thickness, height)
+    substrate = Prism(substrate_shape, n)
+    translate3d!(substrate, [0, thickness/2, 0])
+    coating = PolarizingBeamSplitter(width, height)
+    zrotate3d!(coating, π)
+    return RectangularPolarizingPlateBeamsplitter(substrate, coating)
+end
+
+"""
+    RoundPolarizingPlateBeamsplitter <: AbstractPlateBeamsplitter
+
+A plate beamsplitter with a cylindrical substrate and an ideal polarizing
+splitting coating.
+"""
+struct RoundPolarizingPlateBeamsplitter{T} <: AbstractPlateBeamsplitter{T, RoundPlateBeamsplitterShape{T}}
+    substrate::Prism{T, PlanoSurfaceSDF{T}}
+    coating::PolarizingBeamSplitter{T, Mesh{T}}
+end
+
+"""
+    RoundPolarizingPlateBeamsplitter(diameter, thickness, n)
+"""
+function RoundPolarizingPlateBeamsplitter(
+        diameter::Real,
+        thickness::Real,
+        n::RefractiveIndex
+    )
+    substrate_shape = PlanoSurfaceSDF(thickness, diameter)
+    substrate = Prism(substrate_shape, n)
+    coating = PolarizingBeamSplitter(CircularFlatMesh(diameter/2))
+    return RoundPolarizingPlateBeamsplitter(substrate, coating)
+end
+
 function intersect3d(pbs::AbstractPlateBeamsplitter, ray::AbstractRay)
     # this is sooooooo stupid but necessary to ensure correct intersection... 
     ic = intersect3d(coating(pbs), ray)

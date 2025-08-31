@@ -2361,6 +2361,111 @@ end
         @test abs(last(Ey)) < 2e-14
     end
 
+    @testset "Wave plates" begin
+        @testset "HWP before polarizing beamsplitter" begin
+            hwp = BMO.HalfWaveplate(0.01, 0.01)
+            BMO.yrotate3d!(hwp, deg2rad(22.5))
+            pbs = BMO.PolarizingBeamSplitter(0.01, 0.01)
+            BMO.translate3d!(pbs, [0, 0.01, 0])
+            system = StaticSystem([hwp, pbs])
+            E0 = BMO.electric_field(1)
+            ray = PolarizedRay([0, -0.05, 0], [0, 1.0, 0], 1000e-9, [E0, 0, 0])
+            beam = Beam(ray)
+            solve_system!(system, beam)
+            tE = BMO.polarization(first(BMO.rays(beam.children[1])))
+            rE = BMO.polarization(first(BMO.rays(beam.children[2])))
+            It = abs2(tE[1]) / abs2(E0)
+            Ir = abs2(rE[3]) / abs2(E0)
+            @test It + Ir ≈ 1 atol=1e-6
+            @test It > 0 && Ir > 0
+        end
+
+        @testset "HWP before polarizing cube beamsplitter" begin
+            hwp = BMO.HalfWaveplate(0.01, 0.01)
+            BMO.yrotate3d!(hwp, deg2rad(22.5))
+            pcbs = BMO.PolarizingCubeBeamsplitter(0.01, n -> 1.0)
+            BMO.translate3d!(pcbs, [0, 0.015, 0])
+            system = StaticSystem([hwp, pcbs])
+            E0 = BMO.electric_field(1)
+            ray = PolarizedRay([0, -0.05, 0], [0, 1.0, 0], 1000e-9, [E0, 0, 0])
+            beam = Beam(ray)
+            solve_system!(system, beam)
+            @test !isempty(BMO.rays(beam.children[1]))
+            @test !isempty(BMO.rays(beam.children[2]))
+        end
+
+        @testset "HWP before tilted polarizing cube beamsplitter" begin
+            hwp = BMO.HalfWaveplate(0.01, 0.01)
+            BMO.yrotate3d!(hwp, deg2rad(22.5))
+            pcbs = BMO.PolarizingCubeBeamsplitter(0.01, n -> 1.0)
+            BMO.translate3d!(pcbs, [0, 0.015, 0])
+            BMO.xrotate3d!(pcbs, deg2rad(10))
+            system = StaticSystem([hwp, pcbs])
+            E0 = BMO.electric_field(1)
+            ray = PolarizedRay([0, -0.05, 0], [0, 1.0, 0], 1000e-9, [E0, 0, 0])
+            beam = Beam(ray)
+            solve_system!(system, beam)
+            @test !isempty(BMO.rays(beam.children[1]))
+            @test !isempty(BMO.rays(beam.children[2]))
+        end
+
+        @testset "Polarizing plate beamsplitter splits 45° polarization" begin
+            ppbs = BMO.RectangularPolarizingPlateBeamsplitter(0.01, 0.01, 0.005, n -> 1.0)
+            BMO.translate3d!(ppbs, [0, 0.01, 0])
+            system = StaticSystem([ppbs])
+            E0 = BMO.electric_field(1)
+            E = E0 / sqrt(2)
+            ray = PolarizedRay([0, -0.05, 0], [0, 1.0, 0], 1000e-9, [E, 0, E])
+            beam = Beam(ray)
+            solve_system!(system, beam)
+            tE = BMO.polarization(last(BMO.rays(beam.children[1])))
+            rE = BMO.polarization(last(BMO.rays(beam.children[2])))
+            It = abs2(tE[1]) / abs2(E0)
+            Ir = abs2(rE[3]) / abs2(E0)
+            @test It ≈ 0.5 atol=1e-6
+            @test Ir ≈ 0.5 atol=1e-6
+        end
+
+        @testset "QWP mirror roundtrip" begin
+            qwp = BMO.QuarterWaveplate(0.01, 0.01)
+            BMO.yrotate3d!(qwp, deg2rad(45))
+            mir = BMO.Mirror(BMO.RectangularFlatMesh(0.02, 0.02))
+            BMO.translate3d!(mir, [0, 0.02, 0])
+            system = StaticSystem([qwp, mir])
+            E0 = BMO.electric_field(1)
+            ray = PolarizedRay([0, -0.05, 0], [0, 1.0, 0], 1000e-9, [E0, 0, 0])
+            beam = Beam(ray)
+            solve_system!(system, beam)
+            finalE = BMO.polarization(last(BMO.rays(beam)))
+            Ix = abs2(finalE[1]) / abs2(E0)
+            Iz = abs2(finalE[3]) / abs2(E0)
+            @test Ix ≈ 0 atol=1e-6
+            @test Iz ≈ 1 atol=1e-6
+        end
+
+        @testset "Roundtrip with HWP, PBSC, QWP, mirror" begin
+            hwp = BMO.HalfWaveplate(0.01, 0.01)
+            BMO.yrotate3d!(hwp, deg2rad(45))
+            pcbs = BMO.PolarizingCubeBeamsplitter(0.01, n -> 1.0)
+            BMO.translate3d!(pcbs, [0, 0.015, 0])
+            qwp = BMO.QuarterWaveplate(0.01, 0.01)
+            BMO.yrotate3d!(qwp, deg2rad(45))
+            BMO.translate3d!(qwp, [0, 0.03, 0])
+            mir = BMO.Mirror(BMO.RectangularFlatMesh(0.02, 0.02))
+            BMO.translate3d!(mir, [0, 0.05, 0])
+            system = StaticSystem([hwp, pcbs, qwp, mir])
+            E0 = BMO.electric_field(1)
+            ray = PolarizedRay([0, -0.05, 0], [0, 1.0, 0], 1000e-9, [0, 0, E0])
+            beam = Beam(ray)
+            solve_system!(system, beam)
+            rE0 = BMO.polarization(first(BMO.rays(beam.children[2])))
+            @test abs2(rE0[3]) / abs2(E0) ≈ 0 atol=1e-6
+            rE = BMO.polarization(first(BMO.rays(beam.children[1].children[2])))
+            Ir = abs2(rE[3]) / abs2(E0)
+            @test Ir ≈ 1 atol=1e-6
+        end
+    end
+
     @testset "Mach-Zehnder Interferometer" begin
         # setup MZI
         m1 = SquarePlanoMirror2D(BMO.inch)
