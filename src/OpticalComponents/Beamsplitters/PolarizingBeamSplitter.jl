@@ -32,12 +32,8 @@ end
     normal = normal3d(intersection(ray))
     in_dir = direction(ray)
     out_dir = reflection3d(in_dir, normal)
-    slow = SVector{3,T}(orientation(shape(pbs))[:,3])
-    slow -= out_dir * dot(slow, out_dir)
-    slow = normalize(slow)
-    pol = SVector{3,Complex{T}}(polarization(ray))
-    Ez = dot(pol, slow)
-    E0 = slow * Ez
+    J = XZBasis(zero(T), zero(T), zero(T), one(T))    
+    E0 = _calculate_global_E0(pbs, ray, out_dir, J)
     return Beam(PolarizedRay(pos, out_dir, wavelength(ray), E0))
 end
 
@@ -46,4 +42,15 @@ function interact3d(::AbstractSystem, pbs::PolarizingBeamSplitter,
     children!(beam, [_pbs_transmitted_beam(pbs, beam, ray),
                     _pbs_reflected_beam(pbs, beam, ray)])
     return nothing
+end
+
+function _calculate_global_E0(pbs::PolarizingBeamSplitter, ray::PolarizedRay, out_dir::AbstractArray, J::GlobalJonesBasis)
+    in_dir = direction(ray)
+    E0 = polarization(ray)
+    R = orientation(pbs)
+    P = R * J * transpose(R)
+    Q_in = I - in_dir * transpose(in_dir)
+    Q_out = I - out_dir * transpose(out_dir)
+    P = Q_out * P * Q_in
+    return P * E0
 end
