@@ -47,18 +47,6 @@ Convenience constructor for a `Waveplate` with retardance `π/2`.
 QuarterWaveplate(width::Real, height::Real) = Waveplate(width, height, π/2)
 
 """
-    interact3d(AbstractSystem, Waveplate, Beam, Ray)
-
-Non‑polarized rays pass through a `Waveplate` without modification.
-"""
-function interact3d(::AbstractSystem, wp::Waveplate, ::Beam{T,R},
-        ray::R) where {T<:Real, R<:Ray{T}}
-    pos = position(ray) + length(ray) * direction(ray)
-    return BeamInteraction{T,R}(nothing,
-        Ray{T}(pos, direction(ray), nothing, wavelength(ray), refractive_index(ray)))
-end
-
-"""
     interact3d(AbstractSystem, Waveplate, Beam, PolarizedRay)
 
 Applies the Jones matrix of the wave plate to the polarization state of the
