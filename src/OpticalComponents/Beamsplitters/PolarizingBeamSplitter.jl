@@ -1,6 +1,4 @@
 
-using StaticArrays
-
 """
     PolarizingBeamSplitter{T,S} <: AbstractBeamsplitter{T,S}
 
@@ -52,4 +50,3 @@ function interact3d(::AbstractSystem, pbs::PolarizingBeamSplitter,
                     _pbs_reflected_beam(pbs, beam, ray)])
     return nothing
 end
-
