@@ -65,7 +65,7 @@ The laser source for this interferometer will be a HeNe laser, e.g. the [HRS015B
 
 - wavelength `λ ≈ 632.8 nm`
 - waist diameter `d0 ≈ 0.65 mm`
-- beam divergence angle `θ ≈ 1.4 mrad`
+- beam divergence **full** angle `θ ≈ 1.4 mrad`
 
 To represent the HeNe beam in code, we use the [`GaussianBeamlet`](@ref) with parameters derived from the manufacturer data. The snippet below demonstrates how to initialize the beam. We can calculate the ideal divergence angle of the beam for the given wavelength and waist diameter and derive the [beam quality factor M²](https://www.rp-photonics.com/beam_quality.html) from there.
 
@@ -73,7 +73,7 @@ To represent the HeNe beam in code, we use the [`GaussianBeamlet`](@ref) with pa
 λ = 632.8e-9
 w0 = 0.65e-3 / 2
 
-θ_spec = 1.4e-3 / 2  # half-angle
+θ_spec = 1.4e-3 / 2  # half-angle in mrad
 θ_ideal = BeamletOptics.divergence_angle(λ, w0, 1)
 
 M2 = θ_spec / θ_ideal
