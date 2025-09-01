@@ -26,6 +26,18 @@ Refer to the [`_calculate_global_E0`](@ref) implementation for more information.
 """
 abstract type AbstractJonesPolarizer{T, S} <: AbstractObject{T, S} end
 
+"""
+    interact3d(AbstractSystem, AbstractJonesPolarizer, Beam, Ray)
+
+Non‑polarized rays pass through a [`AbstractJonesPolarizer`](@ref). without modification.
+"""
+function interact3d(::AbstractSystem, ::AbstractJonesPolarizer, ::Beam{T,R},
+        ray::R) where {T<:Real, R<:Ray{T}}
+    pos = position(ray) + length(ray) * direction(ray)
+    return BeamInteraction{T,R}(nothing,
+        Ray{T}(pos, direction(ray), nothing, wavelength(ray), refractive_index(ray)))
+end
+
 function _calculate_global_E0(object::AbstractJonesPolarizer, ray::PolarizedRay, out_dir::AbstractArray, J::GlobalJonesBasis)
     in_dir = direction(ray)
     E0 = polarization(ray)
