@@ -20,12 +20,9 @@ PolarizingBeamSplitter(width::Real, height::Real) =
         ::Beam{T,R}, ray::R) where {T<:Real,R<:PolarizedRay{T}}
     pos = position(ray) + length(ray) * direction(ray)
     dir = direction(ray)
-    fast = SVector{3,T}(orientation(shape(pbs))[:,1])
-    fast -= dir * dot(fast, dir)
-    fast = normalize(fast)
-    pol = SVector{3,Complex{T}}(polarization(ray))
-    Ex = dot(pol, fast)
-    E0 = fast * Ex
+    J = XZBasis(one(T), zero(T), zero(T), zero(T))
+    polfilter = PolarizationFilter(shape(pbs), J, zero(T))
+    E0 = _calculate_global_E0(polfilter, ray, dir, J)
     return Beam(PolarizedRay(pos, dir, wavelength(ray), E0))
 end
 

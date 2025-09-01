@@ -1,7 +1,7 @@
 using StaticArrays
 
 """
-    Waveplate{T,S} <: AbstractObject{T,S}
+    Waveplate{T,S} <: AbstractJonesPolarizer{T,S}
 
 Thin retardation plate acting only on the polarization state of a `PolarizedRay`.
 The wave plate is modelled as a zero-thickness element described by a 2D
@@ -13,7 +13,7 @@ plate. Rotating the object therefore rotates the fast axis accordingly.
 - `shape`: 2D shape describing the physical aperture of the plate
 - `retardance`: phase delay between fast and slow axis in radians
 """
-struct Waveplate{T,S<:AbstractShape{T}} <: AbstractObject{T,S}
+struct Waveplate{T,S<:AbstractShape{T}} <: AbstractJonesPolarizer{T,S}
     shape::S
     retardance::T
 end
@@ -67,19 +67,10 @@ incoming ray. The plate does not alter the direction of propagation.
 function interact3d(::AbstractSystem, wp::Waveplate, ::Beam{T,R},
         ray::R) where {T<:Real, R<:PolarizedRay{T}}
     pos = position(ray) + length(ray) * direction(ray)
-    dir_vec = SVector{3,T}(direction(ray))
-    # Fast axis is local x-axis of the shape, slow axis is local z-axis
-    fast = normalize(SVector{3,T}(orientation(shape(wp))[:,1]))
-    slow = normalize(SVector{3,T}(orientation(shape(wp))[:,3]))
-    O_in = SMatrix{3,3,T}(vcat(fast', slow', dir_vec'))
-    O_out = SMatrix{3,3,T}(hcat(fast, slow, dir_vec))
-    J = @SMatrix [one(Complex{T}) 0 0;
-                   0 exp(im*wp.retardance) 0;
-                   0 0 one(Complex{T})]
-    E_local = O_in * polarization(ray)
-    E_local = J * E_local
-    E0 = O_out * E_local
-    new_ray = PolarizedRay(pos, direction(ray), wavelength(ray), E0)
+    dir = direction(ray)
+    J = XZBasis(one(Complex{T}), zero(Complex{T}), zero(Complex{T}), exp(im * wp.retardance))
+    E0 = _calculate_global_E0(wp, ray, dir, J)
+    new_ray = PolarizedRay(pos, dir, wavelength(ray), E0)
     refractive_index!(new_ray, refractive_index(ray))
     return BeamInteraction{T,R}(nothing, new_ray)
 end
