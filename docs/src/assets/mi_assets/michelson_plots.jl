@@ -1,22 +1,11 @@
-## intro fig
-GLMakie.activate!(; ssao=true)
-
-const intro_camera_view = [
-    -0.707107   0.707107  -5.55112e-17   0.0188074;
-    -0.498749  -0.498749   0.708871      0.222826;
-     0.501247   0.501247   0.705338     -0.759889;
-     0.0        0.0        0.0           1.0;
-]
-
-take_screenshot("mi_intro_fig.png", system, nothing; size=(600, 600), view=intro_camera_view)
-
 ## laser fig
 λ = 632.8e-9
 w0 = 0.65e-3 / 2
 
-θ_ideal = BeamletOptics.divergence_angle(λ, w0, 1) * 1e3
+θ_spec = 1.4e-3 / 2  # half-angle in mrad
+θ_ideal = BeamletOptics.divergence_angle(λ, w0, 1)
 
-M2 = 1.4 / θ_ideal
+M2 = θ_spec / θ_ideal
 
 beam = GaussianBeamlet([0.,0,0], [0.,1,0], λ, w0; M2)
 
@@ -175,3 +164,15 @@ save("mi_powerplot.png", power_fig, px_per_unit=4)
 # BeamletOptics.render_object_normals!(ax, pd.shape)
 
 # fig
+
+## intro fig
+GLMakie.activate!(; ssao=true)
+
+const intro_camera_view = [
+    -0.707107   0.707107  -5.55112e-17   0.0188074;
+    -0.498749  -0.498749   0.708871      0.222826;
+     0.501247   0.501247   0.705338     -0.759889;
+     0.0        0.0        0.0           1.0;
+]
+
+take_screenshot("mi_intro_fig.png", system, beam; size=(600, 600), view=intro_camera_view)

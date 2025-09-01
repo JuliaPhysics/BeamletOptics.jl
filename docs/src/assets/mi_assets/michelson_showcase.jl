@@ -56,7 +56,7 @@ arm_2 = ObjectGroup([m2, arm_holder_2])
 
 # PD
 pd_holder = MeshDummy(joinpath(asset_dir, "PD Assembly.stl"))
-pd = Photodetector(8e-3, 200)
+pd = Photodetector(5e-3, 200)
 translate3d!(pd, [0, -12cm, 0])
 
 pd_assembly = ObjectGroup([pd, pd_holder])
