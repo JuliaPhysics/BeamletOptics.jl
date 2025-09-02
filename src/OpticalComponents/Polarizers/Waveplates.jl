@@ -3,10 +3,12 @@ using StaticArrays
 """
     Waveplate{T,S} <: AbstractJonesPolarizer{T,S}
 
-Thin retardation plate acting only on the polarization state of a `PolarizedRay`.
-The wave plate is modelled as a zero-thickness element described by a 2D
-`AbstractShape`. The local `x`-axis of the shape represents the fast axis of the
-plate. Rotating the object therefore rotates the fast axis accordingly.
+The wave plate is modeled as a zero‑thickness element described by a 2D
+`AbstractShape`. The surface normal points along the local `y`‑axis, and the
+local `x`‑axis marks the fast axis of the retarder. Rotating the object therefore
+rotates the fast axis in global coordinates. The plate does not deflect rays; it
+merely imposes a phase delay between field components parallel to the fast
+(`x`) and slow (`z`) axes.
 
 # Fields
 
