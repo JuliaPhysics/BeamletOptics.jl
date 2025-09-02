@@ -1,7 +1,7 @@
 using StaticArrays
 
 """
-    Waveplate{T,S} <: AbstractJonesPolarizer{T,S}
+    Waveplate{T,S,R} <: AbstractJonesPolarizer{T,S}
 
 The wave plate is modeled as a zero‑thickness element described by a 2D
 `AbstractShape`. The surface normal points along the local `y`‑axis, and the
@@ -13,15 +13,22 @@ merely imposes a phase delay between field components parallel to the fast
 # Fields
 
 - `shape`: 2D shape describing the physical aperture of the plate
-- `retardance`: phase delay between fast and slow axis in radians
+- `retardance`: function of wavelength returning the phase delay between fast
+  and slow axis in radians
 """
-struct Waveplate{T,S<:AbstractShape{T}} <: AbstractJonesPolarizer{T,S}
+struct Waveplate{T,S<:AbstractShape{T},R} <: AbstractJonesPolarizer{T,S}
     shape::S
-    retardance::T
+    retardance::R
 end
 
+struct ConstantRetardance{T}
+    value::T
+end
+
+@inline (c::ConstantRetardance{T})(::Real) where {T} = c.value
+
 Waveplate(shape::S, retardance::Real) where {T,S<:AbstractShape{T}} =
-    Waveplate{T,S}(shape, T(retardance))
+    Waveplate{T,S,ConstantRetardance{T}}(shape, ConstantRetardance(T(retardance)))
 
 shape(wp::Waveplate) = wp.shape
 
@@ -34,10 +41,10 @@ fast axis coincides with the local `x`-axis of the shape. Providing `width` and
 `height` creates a rectangular plate while supplying a single `diameter`
 argument creates a circular plate.
 """
-Waveplate(width::Real, height::Real, retardance::Real) =
+Waveplate(width::Real, height::Real, retardance) =
     Waveplate(RectangularFlatMesh(width, height), retardance)
 
-Waveplate(diameter::Real, retardance::Real) =
+Waveplate(diameter::Real, retardance) =
     Waveplate(CircularFlatMesh(diameter/2), retardance)
 
 """
@@ -68,7 +75,8 @@ function interact3d(::AbstractSystem, wp::Waveplate, ::Beam{T,R},
         ray::R) where {T<:Real, R<:PolarizedRay{T}}
     pos = position(ray) + length(ray) * direction(ray)
     dir = direction(ray)
-    J = XZBasis(one(Complex{T}), zero(Complex{T}), zero(Complex{T}), exp(im * wp.retardance))
+    φ = wp.retardance(wavelength(ray))
+    J = XZBasis(one(Complex{T}), zero(Complex{T}), zero(Complex{T}), exp(im * φ))
     E0 = _calculate_global_E0(wp, ray, dir, J)
     new_ray = PolarizedRay(pos, dir, wavelength(ray), E0)
     refractive_index!(new_ray, refractive_index(ray))

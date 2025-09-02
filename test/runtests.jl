@@ -2381,6 +2381,21 @@ end
             @test abs2(E[3]) / abs2(E0) ≈ sind(60)^2 atol=1e-6
         end
 
+        @testset "Wavelength dependent retardance" begin
+            λ0 = 1000e-9
+            retardance(λ) = π * (λ / λ0)
+            hwp = BMO.Waveplate(0.01, 0.01, retardance)
+            BMO.yrotate3d!(hwp, deg2rad(30))
+            system = StaticSystem([hwp])
+            E0 = BMO.electric_field(1)
+            ray = PolarizedRay([0, -0.05, 0], [0, 1.0, 0], λ0, [E0, 0, 0])
+            beam = Beam(ray)
+            solve_system!(system, beam)
+            E = BMO.polarization(last(BMO.rays(beam)))
+            @test abs2(E[1]) / abs2(E0) ≈ cosd(60)^2 atol=1e-6
+            @test abs2(E[3]) / abs2(E0) ≈ sind(60)^2 atol=1e-6
+        end
+
         @testset "Quarter-waveplate creates circular polarization" begin
             qwp = BMO.QuarterWaveplate(0.01, 0.01)
             BMO.yrotate3d!(qwp, deg2rad(45))
