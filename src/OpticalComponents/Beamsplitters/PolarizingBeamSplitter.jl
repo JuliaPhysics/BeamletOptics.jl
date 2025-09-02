@@ -2,10 +2,16 @@
 """
     PolarizingBeamSplitter{T,S} <: AbstractBeamsplitter{T,S}
 
-Ideal polarizing plate that splits the incoming `PolarizedRay` into two beams.
-The component is modelled as a zero thickness surface described by a 2D shape.
-The local `x`-axis defines the transmitted polarization while the local `z`-axis
-defines the reflected polarization.
+Ideal polarizing plate that separates an incoming `PolarizedRay` into
+transmitted and reflected beams. The device is represented by a zero‑thickness
+surface whose orientation sets the splitting axes:
+
+- local `x`‑axis → transmitted (Ex) polarization component
+- local `z`‑axis → reflected (Ez) polarization component
+
+Rotate the underlying shape to align these axes with the desired global
+polarization directions. Incoming rays are assumed to strike the plate from the
+positive local `y` direction.
 """
 struct PolarizingBeamSplitter{T,S<:AbstractShape{T}} <: AbstractBeamsplitter{T,S}
     shape::S
@@ -21,8 +27,7 @@ PolarizingBeamSplitter(width::Real, height::Real) =
     pos = position(ray) + length(ray) * direction(ray)
     dir = direction(ray)
     J = XZBasis(one(T), zero(T), zero(T), zero(T))
-    polfilter = PolarizationFilter(shape(pbs), J, zero(T))
-    E0 = _calculate_global_E0(polfilter, ray, dir, J)
+    E0 = _calculate_global_E0(pbs, ray, dir, J)
     return Beam(PolarizedRay(pos, dir, wavelength(ray), E0))
 end
 
@@ -42,15 +47,4 @@ function interact3d(::AbstractSystem, pbs::PolarizingBeamSplitter,
     children!(beam, [_pbs_transmitted_beam(pbs, beam, ray),
                     _pbs_reflected_beam(pbs, beam, ray)])
     return nothing
-end
-
-function _calculate_global_E0(pbs::PolarizingBeamSplitter, ray::PolarizedRay, out_dir::AbstractArray, J::GlobalJonesBasis)
-    in_dir = direction(ray)
-    E0 = polarization(ray)
-    R = orientation(pbs)
-    P = R * J * transpose(R)
-    Q_in = I - in_dir * transpose(in_dir)
-    Q_out = I - out_dir * transpose(out_dir)
-    P = Q_out * P * Q_in
-    return P * E0
 end

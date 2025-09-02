@@ -123,8 +123,12 @@ end
 """
     PolarizingCubeBeamsplitter <: AbstractBeamsplitter
 
-A cuboid beamsplitter that uses an ideal polarization-dependent splitting
-coating.
+A cuboid beamsplitter that uses an ideal polarization‑dependent splitting
+coating. The internal coating behaves like a [`PolarizingBeamSplitter`](@ref):
+its local `x`‑axis transmits and the `z`‑axis reflects the incoming
+polarization components. The coating is mounted at 45° relative to the
+incoming `y` direction of the cube, so rotating the cube rotates these axes
+accordingly.
 """
 struct PolarizingCubeBeamsplitter{T} <: AbstractBeamsplitter{T, CubeBeamsplitterShape{T}}
     front::Prism{T, RightAnglePrismSDF{T}}
