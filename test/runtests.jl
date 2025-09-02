@@ -2362,6 +2362,61 @@ end
     end
 
     @testset "Wave plates" begin
+        @testset "Round waveplate uses circular mesh" begin
+            hwp = BMO.HalfWaveplate(0.01)
+            @test size(BMO.faces(BMO.shape(hwp)), 1) == 30
+            qwp = BMO.QuarterWaveplate(0.01)
+            @test size(BMO.faces(BMO.shape(qwp)), 1) == 30
+        end
+        @testset "Half-waveplate rotates linear polarization" begin
+            hwp = BMO.HalfWaveplate(0.01, 0.01)
+            BMO.yrotate3d!(hwp, deg2rad(30))
+            system = StaticSystem([hwp])
+            E0 = BMO.electric_field(1)
+            ray = PolarizedRay([0, -0.05, 0], [0, 1.0, 0], 1000e-9, [E0, 0, 0])
+            beam = Beam(ray)
+            solve_system!(system, beam)
+            E = BMO.polarization(last(BMO.rays(beam)))
+            @test abs2(E[1]) / abs2(E0) ≈ cosd(60)^2 atol=1e-6
+            @test abs2(E[3]) / abs2(E0) ≈ sind(60)^2 atol=1e-6
+        end
+
+        @testset "Quarter-waveplate creates circular polarization" begin
+            qwp = BMO.QuarterWaveplate(0.01, 0.01)
+            BMO.yrotate3d!(qwp, deg2rad(45))
+            system = StaticSystem([qwp])
+            E0 = BMO.electric_field(1)
+            ray = PolarizedRay([0, -0.05, 0], [0, 1.0, 0], 1000e-9, [E0, 0, 0])
+            beam = Beam(ray)
+            solve_system!(system, beam)
+            E = BMO.polarization(last(BMO.rays(beam)))
+            @test abs(E[1]) ≈ abs(E[3]) atol=1e-6
+            @test angle(E[3]) - angle(E[1]) ≈ π/2 atol=1e-6
+        end
+
+        @testset "Polarizing beam splitter separates linear polarizations" begin
+            pbs = BMO.PolarizingBeamSplitter(0.01, 0.01)
+            BMO.translate3d!(pbs, [0, 0.01, 0])
+            system = StaticSystem([pbs])
+            E0 = BMO.electric_field(1)
+
+            rayx = PolarizedRay([0, -0.05, 0], [0, 1.0, 0], 1000e-9, [E0, 0, 0])
+            beamx = Beam(rayx)
+            solve_system!(system, beamx)
+            tx = BMO.polarization(first(BMO.rays(beamx.children[1])))
+            rx = BMO.polarization(first(BMO.rays(beamx.children[2])))
+            @test abs2(tx[1]) / abs2(E0) ≈ 1 atol=1e-6
+            @test abs2(rx[3]) / abs2(E0) ≈ 0 atol=1e-6
+
+            rayz = PolarizedRay([0, -0.05, 0], [0, 1.0, 0], 1000e-9, [0, 0, E0])
+            beamz = Beam(rayz)
+            solve_system!(system, beamz)
+            tz = BMO.polarization(first(BMO.rays(beamz.children[1])))
+            rz = BMO.polarization(first(BMO.rays(beamz.children[2])))
+            @test abs2(tz[1]) / abs2(E0) ≈ 0 atol=1e-6
+            @test abs2(rz[3]) / abs2(E0) ≈ 1 atol=1e-6
+        end
+
         @testset "HWP before polarizing beamsplitter" begin
             hwp = BMO.HalfWaveplate(0.01, 0.01)
             BMO.yrotate3d!(hwp, deg2rad(22.5))
