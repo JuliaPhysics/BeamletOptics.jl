@@ -39,8 +39,8 @@ abstract type AbstractJonesMatrix{T} <: AbstractMatrix{T} end
 
 # Required methods for AbstractArray
 Base.size(A::AbstractJonesMatrix) = size(A.data)
-Base.getindex(A::AbstractJonesMatrix, i::Int, j::Int) = A.data[i, j]
-Base.setindex!(A::AbstractJonesMatrix, v, i::Int, j::Int) = (A.data[i, j] = v)
+Base.getindex(A::AbstractJonesMatrix, i::Int, j::Int) = getindex(A.data, i, j)
+Base.setindex!(A::AbstractJonesMatrix, v, i::Int, j::Int) = setindex!(A.data, v, i, j)
 
 "Getter fct. for the static array in the `AbstractJonesMatrix`"
 static_data(A::AbstractJonesMatrix) = A.data
@@ -147,15 +147,15 @@ function _calculate_global_E0(::AbstractObject, ray::PolarizedRay, out_dir::Abst
     return P*E0
 end
 
-function _calculate_global_E0(object::AbstractObject, ray::PolarizedRay, out_dir::AbstractArray, J::GlobalJonesBasis)    
+function _calculate_global_E0(object::AbstractObject, ray::PolarizedRay, out_dir::AbstractArray, J::GlobalJonesBasis)
     in_dir = direction(ray)
     E0 = polarization(ray)
     # Transform Jones matrix according to global object orientation
     R = orientation(object)
     P = R * J * transpose(R)
-    
+
     Q_in = I - in_dir * transpose(in_dir)
-    Q_out = I - out_dir * transpose(out_dir)    
+    Q_out = I - out_dir * transpose(out_dir)
     P = Q_out * P * Q_in
     return P * E0
 end
