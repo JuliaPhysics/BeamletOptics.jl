@@ -61,7 +61,7 @@ QuarterWaveplate
 
 ## Polarizing beam splitters
 
-These components are the polarizing counterparts of the beam splitters described in the [Beamsplitters](@ref) section. As a proto-component, the [PolarizingBeamSplitter](@ref) is provided, which is a thin (i.e thickness of zero) component. This component will transmit a parallel polarized light (i.e. aligned with the x-axis of the component) and reflect perpendicular polarized light (aligned with the z-axis).
+These components are the polarizing counterparts of the beamsplitters described in the [Beamsplitters](@ref) section. As a proto-component, the [PolarizingBeamSplitter](@ref) is provided, which is a thin (i.e thickness of zero) component. This component will transmit parallel polarized light (i.e. aligned with the x-axis of the component) and reflect perpendicular polarized light (aligned with the z-axis).
 
 Futhermore a plate beamsplitter and polarizing beam splitter cubes can be constructed, which use the [PolarizingBeamSplitter](@ref) as a coating-type component but correspond better to real elements which also have dispersive effects besides their polarizatioon.
 

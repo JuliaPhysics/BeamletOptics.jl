@@ -26,7 +26,7 @@ abstract type AbstractJonesPolarizer{T, S} <: AbstractObject{T, S} end
 """
     interact3d(AbstractSystem, AbstractJonesPolarizer, Beam, Ray)
 
-Non‑polarized rays pass through a [`AbstractJonesPolarizer`](@ref). without modification.
+Non‑polarized [`Ray`](@ref)s pass through an [`AbstractJonesPolarizer`](@ref). without modification.
 """
 function interact3d(::AbstractSystem, ::AbstractJonesPolarizer, ::Beam{T,R},
         ray::R) where {T<:Real, R<:Ray{T}}
