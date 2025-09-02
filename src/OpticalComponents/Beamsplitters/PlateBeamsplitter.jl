@@ -1,7 +1,7 @@
 """
     AbstractPlateBeamsplitter <: AbstractBeamsplitter
 
-A generic type to represent an [`AbstractBeamsplitter`](@ref) that consists of a substrate with a 
+A generic type to represent an [`AbstractBeamsplitter`](@ref) that consists of a substrate with a
 single coated face at which a beam splitting interaction occurs.
 
 # Implementation reqs.
@@ -133,7 +133,7 @@ The coating is centered at the origin. See also [`RectangularPlateBeamsplitter`]
 - `thickness`: substrate thickness along the z-axis in [m]
 - `n`: the [`RefractiveIndex`](@ref) of the substrate
 
-# Keywords 
+# Keywords
 
 - `reflectance`: defines the splitting ratio in [-], i.e. R = 0 ... 1.0
 """
@@ -205,7 +205,7 @@ function RoundPolarizingPlateBeamsplitter(
 end
 
 function intersect3d(pbs::AbstractPlateBeamsplitter, ray::AbstractRay)
-    # this is sooooooo stupid but necessary to ensure correct intersection... 
+    # this is sooooooo stupid but necessary to ensure correct intersection...
     ic = intersect3d(coating(pbs), ray)
     is = intersect3d(substrate(pbs), ray)
     if isnothing(ic) & isnothing(is)
@@ -298,16 +298,16 @@ function interact3d(
             # transmitted ray is refracted into substrate
             _nt = n_optics
             _nr = n_system
-            n_c, _ = refraction3d(rays(gauss.chief)[id], n_optics) 
-            n_w, _ = refraction3d(rays(gauss.waist)[id], n_optics) 
-            n_d, _ = refraction3d(rays(gauss.divergence)[id], n_optics) 
+            n_c, _ = refraction3d(rays(gauss.chief)[id], n_optics)
+            n_w, _ = refraction3d(rays(gauss.waist)[id], n_optics)
+            n_d, _ = refraction3d(rays(gauss.divergence)[id], n_optics)
         else
             # transmitted ray is refracted into environment
             _nt = n_system
             _nr = n_optics
-            n_c, _ = refraction3d(rays(gauss.chief)[id], n_system) 
-            n_w, _ = refraction3d(rays(gauss.waist)[id], n_system) 
-            n_d, _ = refraction3d(rays(gauss.divergence)[id], n_system) 
+            n_c, _ = refraction3d(rays(gauss.chief)[id], n_system)
+            n_w, _ = refraction3d(rays(gauss.waist)[id], n_system)
+            n_d, _ = refraction3d(rays(gauss.divergence)[id], n_system)
         end
         # Update children ref. index and dir. due to refraction
         refractive_index!(gauss.children[1], 1, _nt)
