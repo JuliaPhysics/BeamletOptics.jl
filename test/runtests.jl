@@ -2396,6 +2396,19 @@ end
             @test abs2(E[3]) / abs2(E0) ≈ sind(60)^2 atol=1e-6
         end
 
+        @testset "Arbitrary Jones matrix" begin
+            J = BMO.XZBasis(0, 1, 1, 0)
+            wp = BMO.Waveplate(0.01, 0.01, J)
+            system = StaticSystem([wp])
+            E0 = BMO.electric_field(1)
+            ray = PolarizedRay([0, -0.05, 0], [0, 1.0, 0], 1000e-9, [E0, 0, 0])
+            beam = Beam(ray)
+            solve_system!(system, beam)
+            E = BMO.polarization(last(BMO.rays(beam)))
+            @test abs2(E[1]) < 1e-12
+            @test abs2(E[3]) / abs2(E0) ≈ 1 atol=1e-6
+        end
+
         @testset "Quarter-waveplate creates circular polarization" begin
             qwp = BMO.QuarterWaveplate(0.01, 0.01)
             BMO.yrotate3d!(qwp, deg2rad(45))

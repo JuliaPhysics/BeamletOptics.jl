@@ -7,19 +7,23 @@ The wave plate is modeled as a zero‑thickness element described by a 2D
 `AbstractShape`. The surface normal points along the local `y`‑axis, and the
 local `x`‑axis marks the fast axis of the retarder. Rotating the object therefore
 rotates the fast axis in global coordinates. The plate does not deflect rays; it
-merely imposes a phase delay between field components parallel to the fast
-(`x`) and slow (`z`) axes.
+merely imposes a polarization change described by a global Jones matrix.
 
 # Fields
 
 - `shape`: 2D shape describing the physical aperture of the plate
-- `retardance`: function of wavelength returning the phase delay between fast
-  and slow axis in radians
+- `jones`: function of wavelength returning the Jones matrix of the plate
 """
 struct Waveplate{T,S<:AbstractShape{T},R} <: AbstractJonesPolarizer{T,S}
     shape::S
-    retardance::R
+    jones::R
 end
+
+struct ConstantJones{T}
+    value::GlobalJonesBasis{T}
+end
+
+@inline (c::ConstantJones{T})(::Real) where {T} = c.value
 
 struct ConstantRetardance{T}
     value::T
@@ -27,8 +31,24 @@ end
 
 @inline (c::ConstantRetardance{T})(::Real) where {T} = c.value
 
+struct RetardanceJones{T,R}
+    retardance::R
+end
+
+@inline (r::RetardanceJones{T,R})(λ::Real) where {T,R} =
+    XZBasis(one(Complex{T}), zero(Complex{T}), zero(Complex{T}),
+            exp(im * r.retardance(λ)))
+
+Waveplate(shape::S, J::GlobalJonesBasis{TJ}) where {TS,S<:AbstractShape{TS},TJ} =
+    Waveplate{TS,S,ConstantJones{TS}}(shape, ConstantJones{TS}(GlobalJonesBasis{TS}(J)))
+
 Waveplate(shape::S, retardance::Real) where {T,S<:AbstractShape{T}} =
-    Waveplate{T,S,ConstantRetardance{T}}(shape, ConstantRetardance(T(retardance)))
+    Waveplate{T,S,RetardanceJones{T,ConstantRetardance{T}}}(shape,
+        RetardanceJones{T,ConstantRetardance{T}}(ConstantRetardance(T(retardance))))
+
+Waveplate(shape::S, retardance::R) where {T,S<:AbstractShape{T},R<:Function} =
+    Waveplate{T,S,RetardanceJones{T,R}}(shape,
+        RetardanceJones{T,R}(retardance))
 
 shape(wp::Waveplate) = wp.shape
 
@@ -75,8 +95,7 @@ function interact3d(::AbstractSystem, wp::Waveplate, ::Beam{T,R},
         ray::R) where {T<:Real, R<:PolarizedRay{T}}
     pos = position(ray) + length(ray) * direction(ray)
     dir = direction(ray)
-    φ = wp.retardance(wavelength(ray))
-    J = XZBasis(one(Complex{T}), zero(Complex{T}), zero(Complex{T}), exp(im * φ))
+    J = wp.jones(wavelength(ray))
     E0 = _calculate_global_E0(wp, ray, dir, J)
     new_ray = PolarizedRay(pos, dir, wavelength(ray), E0)
     refractive_index!(new_ray, refractive_index(ray))
