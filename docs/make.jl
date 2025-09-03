@@ -24,17 +24,17 @@ makedocs(;
     ),
     pages=[
         "Home" => "index.md",
-        "Tutorials" => Any[
-            "Beam expander" => "tutorials/expander.md",
-            "Miniature microscope" => "tutorials/microscope.md",
-            "Michelson interferometer" => "tutorials/michelson.md"
-        ],
-        "Examples" => Any[
-            "Spherical lenses" => "examples/spherical_lenses.md",
-            "Aspherical lenses" => "examples/aspherical_lenses.md",
-            "Double Gauss lens" => "examples/double_gauss.md",
-            "Lens groups" => "examples/lens_groups.md",
-        ],
+        # "Tutorials" => Any[
+        #     "Beam expander" => "tutorials/expander.md",
+        #     "Miniature microscope" => "tutorials/microscope.md",
+        #     "Michelson interferometer" => "tutorials/michelson.md"
+        # ],
+        # "Examples" => Any[
+        #     "Spherical lenses" => "examples/spherical_lenses.md",
+        #     "Aspherical lenses" => "examples/aspherical_lenses.md",
+        #     "Double Gauss lens" => "examples/double_gauss.md",
+        #     "Lens groups" => "examples/lens_groups.md",
+        # ],
         "Basics" => Any[
             "Introduction" => "basics/intro.md",
             "Rays" => "basics/rays.md",
@@ -43,17 +43,23 @@ makedocs(;
             "Optical systems" => "basics/systems.md",
             "Visualization" => "basics/render.md"
         ],
-        "Components" => Any[
-            "Overview" => "components/components.md",
-            "Mirrors" => "components/mirrors.md",
-            "Lenses" => "components/lenses.md",
-            "Beamsplitters" => "components/beamsplitters.md",
-            "Detectors" => "components/detectors.md",
-            "Polarizers" => "components/polarizers.md",
-        ],
+        # "Components" => Any[
+        #     "Overview" => "components/components.md",
+        #     "Mirrors" => "components/mirrors.md",
+        #     "Lenses" => "components/lenses.md",
+        #     "Beamsplitters" => "components/beamsplitters.md",
+        #     "Detectors" => "components/detectors.md",
+        #     "Polarizing components" => "components/polarizers.md",
+        # ],
         "Developer Documentation" => Any[
-            "Dev. guide" => "guide.md",
-            "API design" => "design.md",
+            "Developer guide" => "guide.md",
+            "API design" => Any[
+                "Introduction" => "api/api.md",
+                "Conventions" => "api/conventions.md",
+                "Core Design" => "api/core.md",
+                "Geometry" => "api/geometry.md",
+                "Contributors" => "api/contributors.md"
+            ],
         ],
         "Reference" => "reference.md"
     ],
