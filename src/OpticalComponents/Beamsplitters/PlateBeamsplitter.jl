@@ -1,7 +1,7 @@
 """
     AbstractPlateBeamsplitter <: AbstractBeamsplitter
 
-A generic type to represent an [`AbstractBeamsplitter`](@ref) that consists of a substrate with a 
+A generic type to represent an [`AbstractBeamsplitter`](@ref) that consists of a substrate with a
 single coated face at which a beam splitting interaction occurs.
 
 # Implementation reqs.
@@ -139,7 +139,7 @@ The coating is centered at the origin. See also [`RectangularPlateBeamsplitter`]
 - `thickness`: substrate thickness along the z-axis in [m]
 - `n`: the [`RefractiveIndex`](@ref) of the substrate
 
-# Keywords 
+# Keywords
 
 - `reflectance`: defines the splitting ratio in [-], i.e. R = 0 ... 1.0
 """
@@ -157,8 +157,61 @@ function RoundPlateBeamsplitter(
     return RoundPlateBeamsplitter(substrate, coating)
 end
 
+"""
+    RectangularPolarizingPlateBeamsplitter <: AbstractPlateBeamsplitter
+
+A plate beamsplitter with a rectangular substrate and an ideal polarizing
+splitting coating.
+"""
+struct RectangularPolarizingPlateBeamsplitter{T} <: AbstractPlateBeamsplitter{T, RectangularPlateBeamsplitterShape{T}}
+    substrate::Prism{T, BoxSDF{T}}
+    coating::PolarizingBeamSplitter{T, Mesh{T}}
+end
+
+"""
+    RectangularPolarizingPlateBeamsplitter(width, height, thickness, n)
+"""
+function RectangularPolarizingPlateBeamsplitter(
+        width::Real,
+        height::Real,
+        thickness::Real,
+        n::RefractiveIndex
+    )
+    substrate_shape = BoxSDF(width, thickness, height)
+    substrate = Prism(substrate_shape, n)
+    translate3d!(substrate, [0, thickness/2, 0])
+    coating = PolarizingBeamSplitter(width, height)
+    zrotate3d!(coating, π)
+    return RectangularPolarizingPlateBeamsplitter(substrate, coating)
+end
+
+"""
+    RoundPolarizingPlateBeamsplitter <: AbstractPlateBeamsplitter
+
+A plate beamsplitter with a cylindrical substrate and an ideal polarizing
+splitting coating.
+"""
+struct RoundPolarizingPlateBeamsplitter{T} <: AbstractPlateBeamsplitter{T, RoundPlateBeamsplitterShape{T}}
+    substrate::Prism{T, PlanoSurfaceSDF{T}}
+    coating::PolarizingBeamSplitter{T, Mesh{T}}
+end
+
+"""
+    RoundPolarizingPlateBeamsplitter(diameter, thickness, n)
+"""
+function RoundPolarizingPlateBeamsplitter(
+        diameter::Real,
+        thickness::Real,
+        n::RefractiveIndex
+    )
+    substrate_shape = PlanoSurfaceSDF(thickness, diameter)
+    substrate = Prism(substrate_shape, n)
+    coating = PolarizingBeamSplitter(CircularFlatMesh(diameter/2))
+    return RoundPolarizingPlateBeamsplitter(substrate, coating)
+end
+
 function intersect3d(pbs::AbstractPlateBeamsplitter, ray::AbstractRay)
-    # this is sooooooo stupid but necessary to ensure correct intersection... 
+    # this is sooooooo stupid but necessary to ensure correct intersection...
     ic = intersect3d(coating(pbs), ray)
     is = intersect3d(substrate(pbs), ray)
     if isnothing(ic) & isnothing(is)
@@ -251,16 +304,16 @@ function interact3d(
             # transmitted ray is refracted into substrate
             _nt = n_optics
             _nr = n_system
-            n_c, _ = refraction3d(rays(gauss.chief)[id], n_optics) 
-            n_w, _ = refraction3d(rays(gauss.waist)[id], n_optics) 
-            n_d, _ = refraction3d(rays(gauss.divergence)[id], n_optics) 
+            n_c, _ = refraction3d(rays(gauss.chief)[id], n_optics)
+            n_w, _ = refraction3d(rays(gauss.waist)[id], n_optics)
+            n_d, _ = refraction3d(rays(gauss.divergence)[id], n_optics)
         else
             # transmitted ray is refracted into environment
             _nt = n_system
             _nr = n_optics
-            n_c, _ = refraction3d(rays(gauss.chief)[id], n_system) 
-            n_w, _ = refraction3d(rays(gauss.waist)[id], n_system) 
-            n_d, _ = refraction3d(rays(gauss.divergence)[id], n_system) 
+            n_c, _ = refraction3d(rays(gauss.chief)[id], n_system)
+            n_w, _ = refraction3d(rays(gauss.waist)[id], n_system)
+            n_d, _ = refraction3d(rays(gauss.divergence)[id], n_system)
         end
         # Update children ref. index and dir. due to refraction
         refractive_index!(gauss.children[1], 1, _nt)

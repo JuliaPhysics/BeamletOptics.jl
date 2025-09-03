@@ -49,7 +49,7 @@ makedocs(;
             "Lenses" => "components/lenses.md",
             "Beamsplitters" => "components/beamsplitters.md",
             "Detectors" => "components/detectors.md",
-            "Polarizers" => "components/polarizers.md",
+            "Polarizing components" => "components/polarizers.md",
         ],
         "Developer Documentation" => Any[
             "Dev. guide" => "guide.md",

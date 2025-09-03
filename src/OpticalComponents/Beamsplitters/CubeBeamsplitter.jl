@@ -119,3 +119,70 @@ function interact3d(
         return interaction
     end
 end
+
+"""
+    PolarizingCubeBeamsplitter <: AbstractBeamsplitter
+
+A cuboid beamsplitter that uses an ideal polarization‑dependent splitting
+coating. The internal coating behaves like a [`PolarizingBeamSplitter`](@ref):
+its local `x`‑axis transmits and the `z`‑axis reflects the incoming
+polarization components. The coating is mounted at 45° relative to the
+incoming `y` direction of the cube, so rotating the cube rotates these axes
+accordingly.
+"""
+struct PolarizingCubeBeamsplitter{T} <: AbstractBeamsplitter{T, CubeBeamsplitterShape{T}}
+    front::Prism{T, RightAnglePrismSDF{T}}
+    back::Prism{T, RightAnglePrismSDF{T}}
+    coating::PolarizingBeamSplitter{T, Mesh{T}}
+end
+
+shape_trait_of(::PolarizingCubeBeamsplitter) = MultiShape()
+
+shape(cbs::PolarizingCubeBeamsplitter) = (cbs.front, cbs.back, cbs.coating)
+
+refractive_index(cbs::PolarizingCubeBeamsplitter, λ::Real) = refractive_index(cbs.front, λ)
+
+"""
+    PolarizingCubeBeamsplitter(leg_length, n)
+
+Creates a `PolarizingCubeBeamsplitter`. The cuboid is centered at the origin and
+the coating is orientated at 45° with respect to the y-axis.
+
+# Inputs
+
+- `leg_length`: the x-, y- and z-edge length in [m]
+- `n`: the [`RefractiveIndex`](@ref) of the front and back prism
+"""
+function PolarizingCubeBeamsplitter(leg_length::Real, n::RefractiveIndex)
+    front = RightAnglePrism(leg_length, leg_length, n)
+    back = RightAnglePrism(leg_length, leg_length, n)
+    bs = PolarizingBeamSplitter(√2 * leg_length, leg_length)
+    zrotate3d!(back, deg2rad(180))
+    zrotate3d!(bs, deg2rad(180 - 45))
+    set_new_origin3d!(shape(bs))
+    return PolarizingCubeBeamsplitter(front, back, bs)
+end
+
+function interact3d(
+    system::AbstractSystem,
+    cbs::PolarizingCubeBeamsplitter,
+    beam::Beam{T, R},
+    ray::R) where {T <: Real, R <: PolarizedRay{T}}
+    if shape(intersection(ray)) === shape(cbs.front)
+        interaction = interact3d(system, cbs.front, beam, ray)
+        hint!(interaction, Hint(cbs, shape(cbs.coating)))
+        return interaction
+    end
+    if shape(intersection(ray)) === shape(cbs.coating)
+        interact3d(system, cbs.coating, beam, ray)
+        _n = refractive_index(cbs, wavelength(ray))
+        refractive_index!(first(rays(beam.children[1])), _n)
+        refractive_index!(first(rays(beam.children[2])), _n)
+        return nothing
+    end
+    if shape(intersection(ray)) === shape(cbs.back)
+        interaction = interact3d(system, cbs.back, beam, ray)
+        hint!(interaction, Hint(cbs, shape(cbs.coating)))
+        return interaction
+    end
+end
