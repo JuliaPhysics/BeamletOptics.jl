@@ -10,7 +10,7 @@ In order to ensure implicit and explicit compliance with large parts of the API,
 Commonly, the z-axis is used as the principal optical axis when defining equations or alignment of optical systems and models. **This is not the case for BMO**, which uses the global y-axis in positive direction as the "global optical axis" in which effects are described. This is motivated by the plotting axes of [Makie](https://docs.makie.org/stable/), which uses a coordinate system where the x- and y-axis form the horizontal plane and the z-axis is orthogonal (upwards).
 
 !!! info
-    For (optical) equations that are depended on a global coordinate system, use a basis where the **global y-axis (`[1,0,0]`)** is the optical axis and the x-z-axes form the transverse plane. Global propagation along this axis is defined with a direction vector of `[0,1,0]`.
+    For (optical) equations that are depended on a global coordinate system, use a basis where the **global y-axis (`[0,1,0]`)** is the optical axis and the x-z-axes form the transverse plane. Global propagation along this axis is defined with a direction vector of `[0,1,0]`.
 
 ## Right-handedness
 
