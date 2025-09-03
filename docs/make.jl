@@ -69,5 +69,5 @@ makedocs(;
 deploydocs(;
     repo="github.com/JuliaPhysics/BeamletOptics.jl.git",
     devbranch="master",
-    push_preview=false,
+    push_preview=true,
 )
