@@ -4,6 +4,7 @@ GLMakie.activate!(; ssao=true)
 
 const mm = 1e-3
 
+##
 l = 1e-3
 R1 = 100e-3
 R2 = Inf
@@ -28,6 +29,8 @@ srf = Axis3(fringes_fig[1, 1], xlabel="x [µm]", ylabel="z [µm]", elevation=0.9
 hm = surface!(srf, x*1e6, z*1e6, I_num, colormap=:viridis)
 
 hidezdecorations!(srf)
+
+save("psf_airy_showcase.png", fringes_fig, px_per_unit=4)
 
 ##
 k = -0.675
@@ -59,3 +62,5 @@ xs, ys, _intensity = intensity(pd, n=801, x_min=-25e-6, x_max=25e-6, z_min=-25e-
 ax = Axis(asph_fig[1,1], xlabel="x [µm]", ylabel="z [µm]", aspect=1)
 
 hm = heatmap!(xs*1e6, ys*1e6, _intensity)
+
+save("psf_tilted_showcase.png", asph_fig, px_per_unit=4)
