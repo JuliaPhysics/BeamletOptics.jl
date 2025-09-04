@@ -1,5 +1,7 @@
 using GLMakie, BeamletOptics
 
+GLMakie.activate!(; ssao=true)
+
 const mm = 1e-3
 
 l = 1e-3

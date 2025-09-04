@@ -1,5 +1,7 @@
 using GLMakie, BeamletOptics
 
+GLMakie.activate!(; ssao=true)
+
 pd = Photodetector(1e-3, 1000)
 pd_body = MeshDummy(joinpath(asset_dir, "FDS010.stl"))
 zrotate3d!(pd_body, π)
