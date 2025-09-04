@@ -60,3 +60,5 @@ hidespines!(ax)
 
 render!(ax, beam, color=:green2)
 render!(ax, system)
+
+save("spherical_lens_showcase.png", fig; px_per_unit=4, update = false)

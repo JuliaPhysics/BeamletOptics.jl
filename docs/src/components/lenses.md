@@ -1,3 +1,12 @@
+```@setup lenses
+include(joinpath(@__DIR__, "..", "assets", "cond_save.jl"))
+
+lens_showcase_dir = joinpath(@__DIR__, "..", "assets", "lens_assets")
+
+conditional_include(joinpath(lens_showcase_dir, "lens_constructor_showcase.jl"))
+conditional_include(joinpath(lens_showcase_dir, "spherical_lens_showcase.jl"))
+``` 
+
 # Lenses
 
 Lenses are fundamental optical components used to focus or diverge light, making them essential for constructing imaging systems. The [`BeamletOptics.AbstractRefractiveOptic`](@ref) type provides a general definition of components that refract light. This package includes a variety of rotationally symmetric lens models to simulate simple imaging setups. All lens models provided as part of this package are based on SDFs. Refer to the [Signed Distance Functions (SDFs)](@ref) section for more information.
@@ -47,9 +56,7 @@ Lens(::BeamletOptics.AbstractRotationallySymmetricSurface, ::BeamletOptics.Abstr
 
 In practice, this works as follows: the bi-convex [LB1811](https://www.thorlabs.com/thorproduct.cfm?partnumber=LB1811) lens consists of two spherical surfaces and can be constructed like this:
 
-```@example
-using CairoMakie, BeamletOptics # hide
-
+```julia
 # refractive index of NBK7 for 532 and 1064 nm
 NBK7 = DiscreteRefractiveIndex([532e-9, 1064e-9], [1.5195, 1.5066])
 
@@ -66,19 +73,9 @@ LB1811 = Lens(
     l, 
     NBK7
 )
-
-system = System([LB1811]) # hide
-
-fig = Figure(size=(600,240)) # hide
-ax = Axis3(fig[1,1], aspect=:data, azimuth=0., elevation=1e-3) # hide
-
-hidedecorations!(ax) # hide
-hidespines!(ax) # hide
-
-render!(ax, system) # hide
-
-fig # hide
 ```
+
+![Lens constructor](lens_constructor.png)
 
 ### SDF-based spherical lenses
 
@@ -112,14 +109,6 @@ Below, several spherical lenses are recreated from manufacturer data.
     - [LA1805](https://www.thorlabs.com/thorproduct.cfm?partnumber=LA1805)
 
 The spherical lenses are shown below. To recreate this figure, refer to the [Spherical lens example](@ref).
-
-```@eval
-file_dir = joinpath(@__DIR__, "..", "assets")
-
-Base.include(@__MODULE__, joinpath(file_dir, "spherical_lens_showcase.jl"))
-
-save("spherical_lens_showcase.png", fig, px_per_unit=4); nothing
-```
 
 ![Spherical lens showcase](spherical_lens_showcase.png)
 
