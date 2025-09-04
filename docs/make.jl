@@ -4,8 +4,6 @@ using BeamletOptics
 using Documenter
 using DocumenterCitations
 
-CairoMakie.activate!()
-
 DocMeta.setdocmeta!(BeamletOptics, :DocTestSetup, :(using BeamletOptics); recursive=true)
 
 bib = CitationBibliography(joinpath(@__DIR__, "src", "refs.bib"))
@@ -24,17 +22,17 @@ makedocs(;
     ),
     pages=[
         "Home" => "index.md",
-        # "Tutorials" => Any[
-        #     "Beam expander" => "tutorials/expander.md",
-        #     "Miniature microscope" => "tutorials/microscope.md",
-        #     "Michelson interferometer" => "tutorials/michelson.md"
-        # ],
-        # "Examples" => Any[
-        #     "Spherical lenses" => "examples/spherical_lenses.md",
-        #     "Aspherical lenses" => "examples/aspherical_lenses.md",
-        #     "Double Gauss lens" => "examples/double_gauss.md",
-        #     "Lens groups" => "examples/lens_groups.md",
-        # ],
+        "Tutorials" => Any[
+            "Beam expander" => "tutorials/expander.md",
+            "Miniature microscope" => "tutorials/microscope.md",
+            "Michelson interferometer" => "tutorials/michelson.md"
+        ],
+        "Examples" => Any[
+            "Spherical lenses" => "examples/spherical_lenses.md",
+            "Aspherical lenses" => "examples/aspherical_lenses.md",
+            "Double Gauss lens" => "examples/double_gauss.md",
+            "Lens groups" => "examples/lens_groups.md",
+        ],
         "Basics" => Any[
             "Introduction" => "basics/intro.md",
             "Rays" => "basics/rays.md",
@@ -43,14 +41,14 @@ makedocs(;
             "Optical systems" => "basics/systems.md",
             "Visualization" => "basics/render.md"
         ],
-        # "Components" => Any[
-        #     "Overview" => "components/components.md",
-        #     "Mirrors" => "components/mirrors.md",
-        #     "Lenses" => "components/lenses.md",
-        #     "Beamsplitters" => "components/beamsplitters.md",
-        #     "Detectors" => "components/detectors.md",
-        #     "Polarizing components" => "components/polarizers.md",
-        # ],
+        "Components" => Any[
+            "Overview" => "components/components.md",
+            "Mirrors" => "components/mirrors.md",
+            "Lenses" => "components/lenses.md",
+            "Beamsplitters" => "components/beamsplitters.md",
+            "Detectors" => "components/detectors.md",
+            "Polarizing components" => "components/polarizers.md",
+        ],
         "Developer Documentation" => Any[
             "Developer guide" => "guide.md",
             "API design" => Any[
@@ -69,5 +67,5 @@ makedocs(;
 deploydocs(;
     repo="github.com/JuliaPhysics/BeamletOptics.jl.git",
     devbranch="master",
-    push_preview=true,
+    push_preview=true, # set to false before merging PR into master
 )
