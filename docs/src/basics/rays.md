@@ -1,7 +1,9 @@
 ```@setup rays
+include(joinpath(@__DIR__, "..", "assets", "cond_save.jl"))
+
 ray_showcase_dir = joinpath(@__DIR__, "..", "assets", "ray_renders")
 
-include(joinpath(ray_showcase_dir, "ray_showcase.jl"))
+conditional_include(joinpath(ray_showcase_dir, "ray_showcase.jl"))
 ```
 
 # Rays

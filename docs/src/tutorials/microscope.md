@@ -1,11 +1,9 @@
 ```@setup miniscope
-using GLMakie, BeamletOptics
-
-const BMO = BeamletOptics
+include(joinpath(@__DIR__, "..", "assets", "cond_save.jl"))
 
 tutorial_dir = joinpath(@__DIR__, "..", "assets", "ms_assets")
 
-include(joinpath(tutorial_dir, "miniscope_showcase.jl"))
+conditional_include(joinpath(tutorial_dir, "miniscope_showcase.jl"))
 ```
 
 # Miniature microscope

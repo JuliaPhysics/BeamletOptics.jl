@@ -1,10 +1,12 @@
 ```@setup beams
+include(joinpath(@__DIR__, "..", "assets", "cond_save.jl"))
+
 beam_showcase_dir = joinpath(@__DIR__, "..", "assets", "beam_renders")
 
-include(joinpath(beam_showcase_dir, "beam_showcase.jl"))
-include(joinpath(beam_showcase_dir, "gb_showcase.jl"))
-include(joinpath(beam_showcase_dir, "collimated_sc.jl"))
-include(joinpath(beam_showcase_dir, "pointsource_sc.jl"))
+conditional_include(joinpath(beam_showcase_dir, "beam_showcase.jl"))
+conditional_include(joinpath(beam_showcase_dir, "gb_showcase.jl"))
+conditional_include(joinpath(beam_showcase_dir, "collimated_sc.jl"))
+conditional_include(joinpath(beam_showcase_dir, "pointsource_sc.jl"))
 ```
 
 # Beams
