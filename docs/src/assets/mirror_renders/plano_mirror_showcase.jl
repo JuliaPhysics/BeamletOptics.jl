@@ -1,17 +1,14 @@
 using GLMakie, BeamletOptics
 
-const BMO = BeamletOptics
-
 GLMakie.activate!(; ssao=true)
 
-Base.include(@__MODULE__, "render_utils.jl")
+const BMO = BeamletOptics
 
-# relative to the .md file location from which this code is included
-asset_dir = joinpath(@__DIR__, "..", "assets")
+include(joinpath(@__DIR__, "..", "render_utils.jl"))
 
 function spawn_mirror_mount()
     m1 = RoundPlanoMirror(1BeamletOptics.inch, 6e-3)
-    holder = MeshDummy(joinpath(asset_dir, "Mirror_Post.stl"))
+    holder = MeshDummy(joinpath(@__DIR__, "Mirror_Post.stl"))
     translate_to3d!(holder, [0,0,-(5.68e-2)])
     BeamletOptics.set_new_origin3d!(holder)
     mirror_mount = ObjectGroup([holder, m1])
@@ -42,11 +39,20 @@ beam = GaussianBeamlet([0, -0.2, 0], [0, 1, 0], 532e-9, 1e-3)
 solve_system!(system, beam, r_max=100)
 
 ## mirror render
-const mirror_camera = [
+mirror_camera = [
     0.723093   0.69075   2.498e-16  -0.075801
     -0.281368   0.294543  0.913278    0.0368553
     0.630847  -0.660385  0.407338   -0.254999
     0.0        0.0       0.0         1.0
 ]
 
+fig = Figure(size=(600, 400)) 
+display(fig)
+ax = LScene(fig[1,1])
+hide_axis(ax)
 
+render!(ax, system)
+render!(ax, beam; color=RGBf(0,1,0), flen=.4)
+
+set_view(ax, mirror_camera)
+save("plano_mirror_showcase.png", fig; px_per_unit=8, update = false)
