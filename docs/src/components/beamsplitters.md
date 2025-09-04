@@ -1,3 +1,12 @@
+```@setup beamsplitters
+include(joinpath(@__DIR__, "..", "assets", "cond_save.jl"))
+
+bs_showcase_dir = joinpath(@__DIR__, "..", "assets", "bs_assets")
+
+conditional_include(joinpath(bs_showcase_dir, "pbs_showcase.jl"))
+conditional_include(joinpath(bs_showcase_dir, "cbs_showcase.jl"))
+``` 
+
 # Beamsplitters
 
 Beamsplitters are used to split beams of light, enabling the separation of an incoming beam into reflected and transmitted parts. In this package, beamsplitters are implemented via the [`BeamletOptics.AbstractBeamsplitter`](@ref) interface. This type loosely defines the interaction logic used for the tracing and retracing of optical systems that incorporate these devices. When a beam is
@@ -33,14 +42,6 @@ RectangularPlateBeamsplitter(::Real, ::Real, ::Real, ::BeamletOptics.RefractiveI
 
 A common application involves that this type of beamsplitter is paired with a compensator plate. Below an exemplary illustration of such a setup is shown, where the beamsplitter reflects part of the incoming beam perpendiculary. A [`RectangularCompensatorPlate`](@ref) ensures that the parallel path offset is corrected.
 
-```@eval
-file_dir = joinpath(@__DIR__, "..", "assets", "bs_assets")
-
-Base.include(@__MODULE__, joinpath(file_dir, "pbs_showcase.jl"))
-
-take_screenshot("pbs_showcase.png", system, beam; size=(600, 400), view=pbs_view, px_per_unit=8, optional_rendering_fct=test)
-```
-
 ![Plate beamsplitter showcase](pbs_showcase.png)
 
 The depicted system consist of a rectangular beamsplitter (e.g. [BSW26R](https://www.thorlabs.com/thorproduct.cfm?partnumber=BSW26R)) in combination with a compensator plate (e.g. [BCP42R](https://www.thorlabs.com/thorproduct.cfm?partnumber=BCP42R)). They are both mounted in [KM2536](https://www.thorlabs.com/thorproduct.cfm?partnumber=KM2536) kinematic mounts. The splitter substrate thickness is exaggerated for the purpose of illustration.
@@ -59,14 +60,6 @@ The [`CubeBeamsplitter`](@ref) is composed of two [`RightAnglePrism`](@ref)s wit
 
 ```@docs; canonical=false
 CubeBeamsplitter(::Real, ::BeamletOptics.RefractiveIndex)
-```
-
-```@eval
-file_dir = joinpath(@__DIR__, "..", "assets", "bs_assets")
-
-Base.include(@__MODULE__, joinpath(file_dir, "cbs_showcase.jl"))
-
-take_screenshot("cbs_showcase.png", system, beam; size=(600, 400), view=mzi_view, px_per_unit=8)
 ```
 
 A classic application of cube beamsplitters is in Mach–Zehnder interferometers, where two beamsplitters combine with additional mirrors to form two optical paths that later recombine. The figure below shows a rudimentary Mach–Zehnder arrangement using two cube beamsplitters and two [`RightAnglePrismMirror`](@ref)s:
