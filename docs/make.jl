@@ -50,13 +50,15 @@ makedocs(;
             "Polarizing components" => "components/polarizers.md",
         ],
         "Developer Documentation" => Any[
-            "Developer guide" => "api/devguide.md",
+            "Developer guide" => Any[
+                "Contributing" => "api/contribute.md",
+                "Documentation development" => "api/docdev.md"
+            ],
             "API design" => Any[
                 "Introduction" => "api/api.md",
                 "Conventions" => "api/conventions.md",
                 "Core design" => "api/core.md",
                 "Geometry" => "api/geometry.md",
-                "Contributors" => "api/contributors.md"
             ],
         ],
         "Reference" => "reference.md"
