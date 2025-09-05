@@ -10,7 +10,7 @@ The BMO package is intended to provide optical simulation capabilites with as mu
 
 ## Intersect-Interact-Repeat-Loop
 
-The first three principles will be elaborated upon in more detail in the [Geometry representation](@ref) section. For the latter two design decisions, the following high-level solver schematic is used to explain the steps that are performed when calling [`solve_system!`](@ref) with an input system and beam:
+The first three principles will be elaborated upon in more detail in the [Geometry representation](@ref) section. For the latter two design decisions, the following high-level solver schematic can be used to abstract the steps that are performed when calling [`solve_system!`](@ref) with an input system and beam:
 
 ```@raw html
 <img src="iir_loop.svg" alt="my figure" style="width:100%; height:auto;"/>
@@ -29,7 +29,7 @@ The next sections will focus on the **Intersection** and **Interaction** steps.
 
 ## Intersections
 
-Calculating intersections between straight lines, i.e. rays from geometrical optics, and surfaces is a central challenge of every geometrical optics simulator. This must be done with high numerical precision, since many optical effects are sensitive on the order of the wavelength of the light under consideration with respect to position and direction [CITATION NEEDED]. In order to define this mathematically or algorithmically, many different methods exist [CITATION NEEDED]. The first question is, how is the geometry of the problem defined. This topic is treated in the [Geometry representation](@ref) section. The second question concerns then the algorithm or equation that allows to calculate the point of intersection between a ray and the surface of the element. This function is called `intersect3d` and is, at its core, defined for each `shape` and `ray`:
+Calculating intersections between straight lines, i.e. rays, and surfaces is a central challenge for every geometrical optics simulator. This must be done with high numerical precision, since many optical effects are sensitive on the order of the wavelength of the light under consideration with respect to position and direction [CITATION NEEDED]. In order to define this mathematically or algorithmically, many different methods exist [CITATION NEEDED]. The first question is, how is the geometry of the problem defined. This topic is treated in the [Geometry representation](@ref) section. The second question concerns then the algorithm or equation that allows to calculate the point of intersection between a ray and the surface of the element. This function is called `intersect3d` and is, at its core, defined for each `shape` and `ray`:
 
 ```@docs; canonical=false
 BeamletOptics.intersect3d(::BeamletOptics.AbstractShape, ::BeamletOptics.AbstractRay)
