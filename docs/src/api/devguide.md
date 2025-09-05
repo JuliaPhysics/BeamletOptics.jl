@@ -24,11 +24,11 @@ If you want to edit the package documentation locally, follow these steps:
 
 Changes you have made will then be saved into the `build` folder. You can host the website locally by opening the `index.html` starting page.
 
-### Section titles
+## Section titles
 
 When creating a custom section in the documentation, you should avoid naming the section the same way as your type, e.g. for `MyCustomType` you should not create a section that is called `# MyCustomType`. The reason for this is that the `@ref` macro will confuse the docstring of your type with the section header, leading to undefined behavior for any links pointing to the embedded docstring via `[`MyCustomType`](@ref)`.
 
-### Creating figures
+## Creating figures
 
 In general, you can generate and include figures into your documentation section any way you see fit. We strongly urge you to use the existing `CairoMakie` or `GLMakie` backend. However, with the increasing amount of plots and corresponding scripts the build time for the docs in a local environment has become unsustainable. Therefore, for the BMO docs we recommend that you adhere to the following design pattern:
 
@@ -46,3 +46,6 @@ In general, you can generate and include figures into your documentation section
 4. Load the image within your markdown file via `![My figure](my_fig.png)`
 
 Examples for this pattern can be found at the top of most .md files of the documentation, e.g. `beamsplitters.md`.
+
+!!! tip
+    Usage of placeholders can be disabled for each script via the `use_placeholder=false` keyword argument. It can also be deactivated globally by setting `GLOBAL_USE_PLACEHOLDERS=false` in the `cond_save.jl` file.
