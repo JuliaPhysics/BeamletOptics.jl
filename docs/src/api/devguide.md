@@ -30,10 +30,11 @@ When creating a custom section in the documentation, you should avoid naming the
 
 ### Creating figures
 
-In general, you can generate and include figures into your documentation section any way you see fit. However, with the increasing amount of plots and corresponding scripts the build time for the docs in a local environment has become unsustainable. Therefore, for the BMO docs we recommend that you adhere to the following design pattern:
+In general, you can generate and include figures into your documentation section any way you see fit. We strongly urge you to use the existing `CairoMakie` or `GLMakie` backend. However, with the increasing amount of plots and corresponding scripts the build time for the docs in a local environment has become unsustainable. Therefore, for the BMO docs we recommend that you adhere to the following design pattern:
 
 1. Place your code in a standalone `.jl`-script within the `docs\src\assets` folder. 
     - refer to existing scripts for a rough guideline
+    - do not forget to activate the appropriate backend via e.g. `GLMakie.activate!()`
 2. Make sure that each figure in your script is saved via a `save("my_fig.png", my_fig, ...)` statement
     - files will be saved with respect to the calling environment
 3. In the markdown file that contains your documentation and should load your images, do the following:

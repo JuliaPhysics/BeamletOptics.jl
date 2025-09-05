@@ -1,9 +1,10 @@
 ```@setup rays
 include(joinpath(@__DIR__, "..", "assets", "cond_save.jl"))
 
-ray_showcase_dir = joinpath(@__DIR__, "..", "assets", "ray_renders")
+ray_showcase_dir = joinpath(@__DIR__, "..", "assets", "ray_assets")
 
 conditional_include(joinpath(ray_showcase_dir, "ray_showcase.jl"))
+conditional_include(joinpath(ray_showcase_dir, "fresnel_coeffs.jl"))
 ```
 
 # Rays
@@ -49,12 +50,7 @@ Below the Fresnel coefficients for different ``n_1 \rightarrow n_2`` interfaces 
 
 First, the Fresnel coefficients for ``n_1 = 1.0`` to ``n_2 = 1.5`` will be calculated. The angle of incidence ``\theta`` refers to the plane of incidence in the `s`enkrecht and `p`arallel coordinate system. Note that the imaginary part of the coefficents is shown by the dash-dotted lines.
 
-```@example fresnel_vacuum_glass
-using CairoMakie # hide
-CairoMakie.activate!() # hide
-using BeamletOptics
-include("fresnel.jl") # hide
-
+```julia
 # Angle of incidence
 θ = deg2rad.(0:.01:90)
 
@@ -64,9 +60,9 @@ n2 = 1.5
 
 # Calculate complex Fresnel coefficients
 rs, rp, ts, tp = BeamletOptics.fresnel_coefficients(θ, n2/n1)
-
-plot_and_save_fresnel_coeffs(n1, n2, save_fig=false) # hide
 ```
+
+![Vacuum to glass](vac_to_glass.png)
 
 Note that for this example, the imaginary part of the coefficients is zero for all considered `θ`s.
 
@@ -74,13 +70,13 @@ Note that for this example, the imaginary part of the coefficients is zero for a
 
 For a glass-vacuum interface with ``n_1 = 1.5`` to ``n_2 = 1.0`` the coefficients are calculated likewise. Note the unsteadiness of the coefficients at around 40°. This is the critical angle where [TIR](https://www.rp-photonics.com/total_internal_reflection.html) occurs.
 
-```@example fresnel_vacuum_glass
+```julia
 # Define refractive indices - glass to vacuum
 n1 = 1.5
 n2 = 1.0
 
 # Calculate complex Fresnel coefficients
 rs, rp, ts, tp = BeamletOptics.fresnel_coefficients(θ, n2/n1)
-
-plot_and_save_fresnel_coeffs(n1, n2, save_fig=false) # hide
 ```
+
+![Glass to vacuum](glass_to_vac.png)
