@@ -1,12 +1,13 @@
 using GLMakie, BeamletOptics
 
-const BMO = BeamletOptics
-
 GLMakie.activate!(; ssao=true)
+
+const BMO = BeamletOptics
+const mm = 1e-3
 
 include(joinpath(@__DIR__, "..", "render_utils.jl"))
 
-mm = 1e-3
+##
 n = 1.5
 
 cbs1 = CubeBeamsplitter(BeamletOptics.inch, _->n)
