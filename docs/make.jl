@@ -50,7 +50,7 @@ makedocs(;
             "Polarizing components" => "components/polarizers.md",
         ],
         "Developer Documentation" => Any[
-            "Developer guide" => "guide.md",
+            "Developer guide" => "api/devguide.md",
             "API design" => Any[
                 "Introduction" => "api/api.md",
                 "Conventions" => "api/conventions.md",
