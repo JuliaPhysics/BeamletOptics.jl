@@ -54,7 +54,7 @@ makedocs(;
             "API design" => Any[
                 "Introduction" => "api/api.md",
                 "Conventions" => "api/conventions.md",
-                "Core Design" => "api/core.md",
+                "Core design" => "api/core.md",
                 "Geometry" => "api/geometry.md",
                 "Contributors" => "api/contributors.md"
             ],
