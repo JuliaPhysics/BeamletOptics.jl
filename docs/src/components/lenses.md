@@ -5,6 +5,7 @@ lens_showcase_dir = joinpath(@__DIR__, "..", "assets", "lens_assets")
 
 conditional_include(joinpath(lens_showcase_dir, "lens_constructor_showcase.jl"))
 conditional_include(joinpath(lens_showcase_dir, "spherical_lens_showcase.jl"))
+conditional_include(joinpath(lens_showcase_dir, "aspherical_lens_showcase.jl"))
 ``` 
 
 # Lenses
@@ -125,9 +126,7 @@ A complex example of such a lens might look like the following example. This len
 !!! warning
     Aspheric lenses are somewhat experimental at the moment. Use this feature with some caution when building unconventional lenses. Default/simple aspheres work fine.   
 
-```@example
-using CairoMakie, BeamletOptics # hide
-
+```julia
 L3 = Lens(
     EvenAsphericalSurface(
         3.618e-3,               # r
@@ -148,17 +147,9 @@ L3 = Lens(
     0.7e-3,                     # center_thickness
     n -> 1.580200               # refractive index
 )
-
-fig = Figure(size=(600,240)) # hide
-ax = Axis3(fig[1,1], aspect=:data, azimuth=0., elevation=1e-3) # hide
-
-hidedecorations!(ax) # hide
-hidespines!(ax) # hide
-
-render!(ax, L3) # hide
-
-fig # hide
 ```
+
+![Aspherical lens showcase](aspherical_lens_showcase.png)
 
 !!! tip "Aspherical lens example"
     Refer to the [Simple aspherical lens example](@ref) for a showcase on how to implement a plano-convex asphere.
