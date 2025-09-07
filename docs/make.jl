@@ -22,16 +22,18 @@ makedocs(;
     ),
     pages=[
         "Home" => "index.md",
-        "Tutorials" => Any[
-            "Beam expander" => "tutorials/expander.md",
-            "Miniature microscope" => "tutorials/microscope.md",
-            "Michelson interferometer" => "tutorials/michelson.md"
-        ],
-        "Examples" => Any[
-            "Spherical lenses" => "examples/spherical_lenses.md",
-            "Aspherical lenses" => "examples/aspherical_lenses.md",
-            "Double Gauss lens" => "examples/double_gauss.md",
-            "Lens groups" => "examples/lens_groups.md",
+        "Getting started" => Any[
+            "Tutorials" => Any[
+                "Beam expander" => "tutorials/expander.md",
+                "Miniature microscope" => "tutorials/microscope.md",
+                "Michelson interferometer" => "tutorials/michelson.md"
+            ],
+            "Examples" => Any[
+                "Spherical lenses" => "examples/spherical_lenses.md",
+                "Aspherical lenses" => "examples/aspherical_lenses.md",
+                "Double Gauss lens" => "examples/double_gauss.md",
+                "Lens groups" => "examples/lens_groups.md",
+            ],
         ],
         "Basics" => Any[
             "Introduction" => "basics/intro.md",

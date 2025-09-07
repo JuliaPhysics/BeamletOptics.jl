@@ -2,6 +2,7 @@ render!(ax::_RenderEnv, refr::BMO.AbstractRefractiveOptic; kwargs...) = _render!
 render!(ax::_RenderEnv, refl::BMO.AbstractReflectiveOptic; kwargs...) = _render!(ax, refl; transparency=false, color=:silver, kwargs...)
 
 render!(ax::_RenderEnv, lens::Lens; kwargs...) = _render!(ax, lens; transparency=true, color=RGBf(0.678, 0.847, 0.902), alpha=0.5, kwargs...)
+render!(ax::_RenderEnv, lens::DoubletLens; kwargs...) = _render!(ax, lens; transparency=true, color=RGBf(0.678, 0.847, 0.902), alpha=0.5, kwargs...)
 
 render!(ax::_RenderEnv, bs::ThinBeamsplitter; kwargs...) = _render!(ax, bs; transparency=true, color=:magenta, kwargs...)
 
