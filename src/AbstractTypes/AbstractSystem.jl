@@ -39,11 +39,12 @@ A `Hint` can be passed as part of an [`AbstractInteraction`](@ref) and will info
 in the [`AbstractSystem`](@ref) will be hit next.
 
 !!! info 
-    The hint does not need to result in a guaranteed [`Intersection`](@ref).
+    The `Hint` does not need to result in a guaranteed [`Intersection`](@ref). However, if the hinted shape is intersected, it will
+    be immediatly assumed as the correct global intersection.
 
 # Fields
 
-- `object`: the object that might or will be intersected as next
+- `object`: the object that might or will be intersected next
 - `shape`: the underlying shape that will be intersected next, i.e. `shape(object)`, relevant for multi-shape objects
 """
 struct Hint
