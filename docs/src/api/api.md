@@ -6,6 +6,6 @@ This section is intended for users that want to change the internals of BMO. You
     The developer section is very much WIP...
 
 ```@contents
-Pages = ["conventions.md", "core.md", "geometry.md"]
+Pages = ["conventions.md", "core.md", "geometry.md", "meshes.md", "sdfs.md"]
 Depth = 2
 ```

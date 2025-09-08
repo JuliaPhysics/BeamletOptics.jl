@@ -4,6 +4,6 @@ This section of the documentation is intended for users that want to dive deeper
 
 ## Basics overview
 ```@contents
-Pages = ["rays.md", "beams.md", "elements.md", "systems.md"]
+Pages = ["rays.md", "beams.md", "elements.md", "systems.md", "render.md"]
 Depth = 3
 ```

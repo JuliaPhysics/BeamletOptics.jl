@@ -20,3 +20,11 @@ All **coordinate systems** are or must be defined **right-handed**! All normal v
 
 All **rotations** are or must be performed in a **counter-clockwise** manner for a positive rotation angle ``\theta > 0`` and vice-versa!
 For a definition of rotation matrix order, refer to this [article](https://dominicplein.medium.com/extrinsic-intrinsic-rotation-do-i-multiply-from-right-or-left-357c38c1abfd).
+
+## Normal vector direction
+
+For a closed volume BMO assumes that the surface normal vector points outside of the volume.
+
+!!! info "Normal vector direction definition"
+    Equations to calculate optical effects often rely on the normal vector at the ray intersection location to work correctly and point in a specific direction.
+    It is important to ensure that this condition is fulfilled when spurious effects occur.

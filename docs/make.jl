@@ -60,7 +60,11 @@ makedocs(;
                 "Introduction" => "api/api.md",
                 "Conventions" => "api/conventions.md",
                 "Core design" => "api/core.md",
-                "Geometry" => "api/geometry.md",
+                "Geometry" => Any[
+                    "Geometry representation" => "api/geometry.md",
+                    "Meshes" => "api/meshes.md",
+                    "SDFs" => "api/sdfs.md",
+                ],
             ],
         ],
         "Reference" => "reference.md"

@@ -223,7 +223,7 @@ fig # hide
 
 ## Doublet lenses
 
-The [`DoubletLens`](@ref) is an example for a multi-shape object as mentioned in the [Multi-shape objects](@ref) section. For spherical doublet lenses the following constructor can be used.
+The [`DoubletLens`](@ref) is an example for a multi-shape object as mentioned in the [Single and multi-shaped objects](@ref) section. For spherical doublet lenses the following constructor can be used.
 
 ```@docs; canonical=false
 SphericalDoubletLens(::Any, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any)
