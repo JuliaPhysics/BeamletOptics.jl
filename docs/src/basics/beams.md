@@ -128,11 +128,11 @@ The user can obtain parameters such as the beam waist radius, the radius of curv
 
 ![Gauss beam parameters](gauss_parameters.png)
 
-### Astigmatic Polarized Beamlets
+## Astigmatic Polarized Beamlets
 
 - Assumptions
     - homogeneous polarization distribution across waist
     - Lagrange invariant
 
-!!! info
-    WORK IN PROGRESS
+!!! warning
+    NOT YET IMPLEMENTED

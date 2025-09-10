@@ -1,23 +1,13 @@
-# Optical elements
+# Optical components
 
-Optical elements serve as the building blocks for optical systems in the context of this package, representing components such as mirrors, lenses, filters, etc. 
+Optical elements serve as the building blocks for optical systems in the context of this package, representing components such as mirrors, lenses, filters and so on. A collection of basic optical elements is provided with this package as is. They are tested for the correctness of their optical interactions and are verified to work with reasonable fidelity. For detailed documentation, refer to the following table of contents. 
 
-## Types of elements
+## Component overview
 
-Some optical elements are provided with this package, these include e.g.:
-
-- Reflective optical elements
-    - [`RoundPlanoMirror`](@ref)
-- Refractive optical elements
-    - [`SphericalLens`](@ref)
-- Misc.
-    - [`Photodetector`](@ref)
-    - [`ThinBeamsplitter`](@ref)
-
-For a detailed overview, refer to the [Optical components](@ref) section.
-
-!!! info "Custom optical elements"
-    In order to implement custom geometries and optical elements, visit the [API design](@ref) section.
+```@contents
+Pages = ["mirrors.md", "lenses.md", "beamsplitters.md", "detectors.md", "polarizers.md"]
+Depth = 2
+```
 
 ## Moving optical elements
 
@@ -52,3 +42,11 @@ For the easier representation of a group of [`BeamletOptics.AbstractObject`](@re
 ObjectGroup
 ```
 
+## Listing available components
+
+When using this package in the REPL, a tree view of all implemented [`BeamletOptics.AbstractObject`](@ref)s can be generated via the [`BeamletOptics.list_subtypes`](@ref) helper function. Note that this function is not able to determine all available constructors.
+
+```@repl
+using BeamletOptics # hide
+BeamletOptics.list_subtypes(BeamletOptics.AbstractObject);
+```

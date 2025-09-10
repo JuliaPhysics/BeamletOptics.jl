@@ -1,7 +1,7 @@
 ```@setup lenses
-include(joinpath(@__DIR__, "..", "assets", "cond_save.jl"))
+include(joinpath(@__DIR__, "..", "..", "assets", "cond_save.jl"))
 
-lens_showcase_dir = joinpath(@__DIR__, "..", "assets", "lens_assets")
+lens_showcase_dir = joinpath(@__DIR__, "..", "..", "assets", "lens_assets")
 
 conditional_include(joinpath(lens_showcase_dir, "lens_constructor_showcase.jl"))
 conditional_include(joinpath(lens_showcase_dir, "spherical_lens_showcase.jl"))
