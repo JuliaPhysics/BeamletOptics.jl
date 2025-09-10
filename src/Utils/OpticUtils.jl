@@ -174,10 +174,11 @@ numerical_aperture(θ::Real, n::Real = 1.0) = n * sin(θ)
 Calculates e.g. the interferometric contrast from a series of optical power measurements.
 For more information go [here](https://en.wikipedia.org/wiki/Interferometric_visibility).
 """
-function visibility(opt_pwr)
+visibility(I_min::Real, I_max::Real) = (I_max - I_min) / (I_max + I_min) 
+function visibility(opt_pwr::AbstractArray)
     I_max = maximum(opt_pwr)
     I_min = minimum(opt_pwr)
-    return (I_max - I_min) / (I_max + I_min)
+    return visibility(I_min, I_max)
 end
 
 """
