@@ -6,6 +6,7 @@ lens_showcase_dir = joinpath(@__DIR__, "..", "..", "assets", "lens_assets")
 conditional_include(joinpath(lens_showcase_dir, "lens_constructor_showcase.jl"))
 conditional_include(joinpath(lens_showcase_dir, "spherical_lens_showcase.jl"))
 conditional_include(joinpath(lens_showcase_dir, "aspherical_lens_showcase.jl"))
+conditional_include(joinpath(lens_showcase_dir, "spherical_doublet_showcase.jl"))
 ``` 
 
 # Lenses
@@ -229,48 +230,7 @@ The [`DoubletLens`](@ref) is an example for a multi-shape object as mentioned in
 SphericalDoubletLens(::Any, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any)
 ```
 
-The following image shows the [AC254-150-AB](https://www.thorlabs.com/thorproduct.cfm?partnumber=AC254-150-AB) doublet lens for 488 and 707 nm. It has been created using the [`SphericalDoubletLens`](@ref) constructor shown above.
-
-
-```@eval
-using CairoMakie, BeamletOptics
-
-λs = [488e-9, 707e-9, 1064e-9]
-
-NLAK22 = DiscreteRefractiveIndex(λs, [1.6591, 1.6456, 1.6374])
-NSF10 = DiscreteRefractiveIndex(λs, [1.7460, 1.7168, 1.7021])
-
-AC254_150_AB = SphericalDoubletLens(87.9e-3, 105.6e-3, 1000, 6e-3, 3e-3, BeamletOptics.inch, NLAK22, NSF10)
-
-system = System([AC254_150_AB])
-
-fig = Figure(size=(600,170))
-ax = Axis3(fig[1,1], aspect=:data, azimuth=0., elevation=1e-3)
-
-hidedecorations!(ax)
-hidespines!(ax)
-
-render!(ax, system)
-
-zs_1 = LinRange(-0.011, 0.011, 6)
-zs_2 = LinRange(-0.01, 0.01, 5)
-
-for (i, z) in enumerate(zs_1)
-    beam = Beam([0, -0.02 , z], [0,1.,0], 488e-9)
-    solve_system!(system, beam)
-    render!(ax, beam, flen=0.15, color=RGBAf(0,0,1,0.7))
-end
-
-for (i, z) in enumerate(zs_2)
-    beam = Beam([0, -0.02 , z], [0,1.,0], 707e-9)
-    solve_system!(system, beam)
-    render!(ax, beam, flen=0.15, color=RGBAf(1,0,0,0.5))
-end
-
-save("doublet_showcase.png", fig, px_per_unit=4)
-
-nothing
-```
+The following image shows the [AC254-150-AB](https://www.thorlabs.com/thorproduct.cfm?partnumber=AC254-150-AB) doublet lens for 488 and 707 nm, colored blue and red respectively. It has been created using the [`SphericalDoubletLens`](@ref) constructor shown above.
 
 ![Doublet lens showcase](doublet_showcase.png)
 

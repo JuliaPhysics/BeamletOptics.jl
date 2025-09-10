@@ -1,9 +1,17 @@
+```@setup double_gauss
+include(joinpath(@__DIR__, "..", "assets", "cond_save.jl"))
+
+dir = joinpath(@__DIR__, "..", "assets", "examples")
+
+conditional_include(joinpath(dir, "lens_groups.jl"))
+``` 
+
 # Lens groups
 
 This example highlights the capabilities of [`ObjectGroup`](@ref)s. Several groups of optics will be defined and then traced like an ordinary [`System`](@ref) of optical elements.
 
-```@example focus_lens
-using CairoMakie, BeamletOptics
+```julia
+using GLMakie, BeamletOptics
 
 # focus group
 l1 = SphericalDoubletLens(103.4371e-3, 61.14925e-3, -603.2959e-3, 1.5e-3, 10.03975e-3, 55e-3, 1.963000, 1.603112)
@@ -14,10 +22,6 @@ translate3d!(l2, [0, l_2, 0])
 
 focus_group = ObjectGroup([l1, l2])
 
-nothing # hide
-```
-
-```@example focus_lens
 # variator
 l3 = SphericalLens(100.3834e-3, 16.72327e-3, 1e-3, 28.00995e-3, λ -> 1.603112)
 l4 = SphericalLens(-30.28003e-3, 21.29033e-3, 0.5e-3, 22.31297e-3, λ -> 1.764500)
@@ -32,10 +36,6 @@ translate3d!(l5, [0, l_5, 0])
 
 variator_group = ObjectGroup([l3, l4, l5])
 
-nothing # hide
-```
-
-```@example focus_lens
 # compensator
 l6 = SphericalLens(-24.31747e-3, -255.5571e-3, 1e-3, 17.70449e-3, λ -> 1.638539)
 compensator = l6
@@ -66,10 +66,6 @@ translate3d!(l12, [0, l_12, 0])
 
 master_group_I = ObjectGroup([l7, l8, l9, l10, l11, l12])
 
-nothing # hide
-```
-
-```@example focus_lens
 # master II
 l13 = SphericalLens(34.65626e-3, -45.71147e-3, 2.4e-3, 15.6e-3, λ -> 1.762001)
 l14 = SphericalLens(27.08863e-3, 11.38107e-3, 1e-3, 14.40932e-3, λ -> 1.761821)
@@ -87,46 +83,40 @@ translate3d!(l16, [0, l_16, 0])
 
 master_group_II = ObjectGroup([l13, l14, l15, l16])
 
-nothing # hide
-```
-
-```@example focus_lens
 # zoom lens
 lens = ObjectGroup([focus_group, variator_group, compensator, master_group_I, master_group_II])
-system = System(lens)
 
-nothing # hide
+system = System(lens)
 ```
 
-```@example focus_lens
-# generate render
-fig = Figure(size=(600, 380))
-aspect = (1,2,1)
-limits = (-0.05, 0.05, -0.05, 0.15, -0.05, 0.05)
-ax = Axis3(fig[1, 1], aspect=aspect, limits=limits, azimuth=0, elevation=1e-3)
-# hide decorations for vis. purposes
-hidexdecorations!(ax)
-hidezdecorations!(ax)
+The following figure shows the individual component groups in different colors. The variator and compensator elements have been colored green and yellow, respectively. 
+
+![Lens groups - overview](lens_groups_0.png)
+
+In order to simulate a collimated beam of light, the [`UniformDiscSource`](@ref) can be used.
+
+```julia
+source = UniformDiscSource([0,-10cm,0], [0,1,0], 6mm, 1e-6; num_rays=100)
+solve_system!(system, source)
+```
+
+Note that the wavelength `1e-6` does not change the result of the tracing solution, since the refractive indices have not been specified as a function of the wavelength (e.g. via an anonymous function, [`DiscreteRefractiveIndex`](@ref) or [`SellmeierEquation`](@ref)). The ray paths can be visualized via the following code
+
+```julia
+fig = Figure()
+ax = LScene(fig[1,1])
 
 render!(ax, system)
-
-for z in LinRange(-0.003, 0.003, 5)
-    ray = Ray([0, -0.05, z], [0, 1.0, 0])
-    beam = Beam(ray)
-    solve_system!(system, beam, r_max=40)
-    render!(ax, beam, flen=0.1)
-end
-
-save("lens_groups_0.png", fig, px_per_unit=4); nothing # hide
+render!(ax, source; flen=10cm, color=RGBAf(0,0,1,0.1), render_every=1)
 ```
 
-![Lens groups - no movement](lens_groups_0.png)
+![Lens groups - no movement](lens_groups_1.png)
 
 # Moving groups
 
 Now the variator and compensator will be moved in order to simulate a zooming effect.
 
-```@example focus_lens
+```julia
 function compensator_movement(x)
     if x < 0 || x > 42.75e-3
         error("x out of bounds")
@@ -140,42 +130,10 @@ end
 translate3d!(variator_group, [0, Δx_variator, 0])
 translate3d!(compensator, [0, Δx_compensator, 0])
 
-delete!(ax) # hide
-ax = Axis3(fig[1, 1], aspect=aspect, limits=limits, azimuth=0, elevation=1e-3) # hide
-hidexdecorations!(ax) # hide
-hidezdecorations!(ax) # hide
-
-render!(ax, system)
-
-for z in LinRange(-0.022, 0.022, 5)
-    ray = Ray([0, -0.05, z], [0, 1.0, 0])
-    beam = Beam(ray)
-    solve_system!(system, beam, r_max=40)
-    render!(ax, beam, flen=0.1)
-end
-
-save("lens_groups_1.png", fig, px_per_unit=4); nothing # hide
+source = UniformDiscSource([0,-10cm,0], [0,1,0], 44mm, 1e-6; num_rays=100)
+solve_system!(system, source)
 ```
 
-![Lens groups - with movement](lens_groups_1.png)
+Rendering is performed as for the previous figure. The disc source diameter has been increased manually in order to fill out the aperture in this zoom state.
 
-# Beam type compatibility
-
-We can easily switch out the type of beam we are tracing through the system using the API of this package. We will trace a single [`GaussianBeamlet`](@ref) through the objective. Note that this example is for illustration purposes only and does not yield an accurate representation of the actual imaging preformance due to the limitations of the beam tracing method described in the [Stigmatic Beamlets](@ref) section.
-
-```@example focus_lens
-delete!(ax) # hide
-ax = Axis3(fig[1, 1], aspect=aspect, limits=limits, azimuth=0, elevation=1e-3) # hide
-hidexdecorations!(ax) # hide
-hidezdecorations!(ax) # hide
-
-beam = GaussianBeamlet([0, -0.05, 0], [0, 1, 0], 1000e-9, 2.2e-2)
-solve_system!(system, beam, r_max=40)
-
-render!(ax, beam, color=:green2)
-render!(ax, system)
-
-save("lens_groups_2.png", fig, px_per_unit=4); nothing # hide
-```
-
-![Lens groups - with GaussianBeamlet](lens_groups_2.png)
+![Lens groups - with movement](lens_groups_2.png)

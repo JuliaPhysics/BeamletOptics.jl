@@ -4,6 +4,7 @@ GLMakie.activate!(; ssao=true)
 
 const BMO = BeamletOptics
 const mm = 1e-3
+const cm = 10mm
 
 include(joinpath(@__DIR__, "..", "render_utils.jl"))
 
@@ -81,31 +82,82 @@ master_group_II = ObjectGroup([l13, l14, l15, l16])
 lens = ObjectGroup([focus_group, variator_group, compensator, master_group_I, master_group_II])
 system = System(lens)
 
-## source
-source = UniformDiscSource([0,-50mm,0], [0,1,0], 6mm, 1e-6; num_rays=100)
+##
+cview = [
+  0.0114358   0.999935    -2.42861e-17  -0.0612223
+ -0.395347    0.00452142   0.918521     -0.000169032
+  0.918461   -0.0105041    0.395373     -3.57792
+  0.0         0.0          0.0           1.0
+]
 
+fig = Figure(size=(600,300))
+ax = LScene(fig[1,1])
+
+set_orthographic(ax)
+
+render!(ax, focus_group; color=:red)
+render!(ax, variator_group; color=:green)
+render!(ax, compensator; color=:yellow)
+render!(ax, master_group_I; color=:magenta)
+render!(ax, master_group_II; color=:blue)
+
+display(fig)
+hide_axis(ax)
+set_view(ax, cview)
+save("lens_groups_0.png", fig; px_per_unit=4, update = false)
+
+## source
+source = UniformDiscSource([0,-10cm,0], [0,1,0], 6mm, 1e-6; num_rays=100)
 solve_system!(system, source)
 
 ## fig
-# fig = Figure(size=(600,380))
-# display(fig)
-# ax = LScene(fig[1,1])
-# hide_axis(ax)
+cview = [
+ -0.534004   0.845482  1.66533e-16  -0.0473972
+ -0.688101  -0.434603  0.581065      0.0196012
+  0.49128    0.310291  0.813857     -0.138515
+  0.0        0.0       0.0           1.0
+]
 
-# render!(ax, system)
-# render!(ax, source; flen=10mm)
-
-##
-fig = Figure(size=(600, 380))
-aspect = (1,2,1)
-limits = (-0.05, 0.05, -0.05, 0.15, -0.05, 0.05)
-ax = Axis3(fig[1, 1], aspect=aspect, limits=limits, azimuth=0, elevation=1e-3)
-# hide decorations for vis. purposes
-hidexdecorations!(ax)
-hidezdecorations!(ax)
+fig = Figure(size=(600,380))
+ax = LScene(fig[1,1])
 
 render!(ax, system)
-render!(ax, source; flen=10mm, render_every=1)
+render!(ax, source; flen=10cm, color=RGBAf(0,0,1,0.1), render_every=1)
 
-save("lens_groups_0.png", fig; px_per_unit=4, update = false)
+display(fig)
+hide_axis(ax)
+set_view(ax, cview)
+save("lens_groups_1.png", fig; px_per_unit=4, update = false)
+
+## variator
+function compensator_movement(x)
+    if x < 0 || x > 42.75e-3
+        error("x out of bounds")
+    end
+    return 1e3*0.01169*x^2 - 0.4155*x
+end
+
+Δx_variator = 40e-3
+Δx_compensator = compensator_movement(Δx_variator)
+
+translate3d!(variator_group, [0, Δx_variator, 0])
+translate3d!(compensator, [0, Δx_compensator, 0])
+
+##
+source = UniformDiscSource([0,-10cm,0], [0,1,0], 44mm, 1e-6; num_rays=100)
+solve_system!(system, source)
+
+##
+fig = Figure(size=(600,380))
+ax = LScene(fig[1,1])
+
+render!(ax, system)
+render!(ax, source; flen=10cm, color=RGBAf(0,0,1,0.1), render_every=1)
+
+display(fig)
+hide_axis(ax)
+set_view(ax, cview)
+save("lens_groups_2.png", fig; px_per_unit=4, update = false)
+
+
 
