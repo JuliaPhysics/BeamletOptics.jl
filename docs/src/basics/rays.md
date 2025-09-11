@@ -17,7 +17,7 @@ Individual monochromatic rays form the basic building blocks to describe the pro
 
 where ``\vec{p}`` and ``\vec{d}`` are the position and direction ``\mathbb{R}^3``-vectors, respectively. The ray length ``t`` is used to describe the geometrical length of the ray. This assumes that the [`BeamletOptics.RefractiveIndex`](@ref) along the ray path is constant. If after solving an optical system a ray intersection is determined, a new ray must be spawned to model an arbitrary light path. This data is stored, e.g., in a [`Beam`](@ref). More on this can be found in the [Beams](@ref) chapter. 
 
-## Basic `Ray`
+## Basic rays
 
 The generic type that describes geometrical rays is [`BeamletOptics.AbstractRay`](@ref). Refer to its documentation for more information about what data is used to model light propagation. A minimal implementation of this API (i.e. subtype) is provided by the [`Ray`](@ref):
 
@@ -29,7 +29,7 @@ This ray type is able to model reflection and [refraction](https://www.rp-photon
 
 ![Basic ray plot](ray_showcase.png)
 
-## Polarized Rays
+## Polarized rays
 
 In order to model the effect of polarizing elements, the polarization ray tracing calculus of Yun et. al is used [Yun2011_1, Yun2011_2](@cite). This formalism allows to model the effects of said elements on the electric field vector ``E_0`` using the [Jones formalism](https://www.rp-photonics.com/polarization_of_light.html) in global coordinates:
 

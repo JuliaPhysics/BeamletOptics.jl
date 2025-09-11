@@ -35,7 +35,7 @@ Calculating intersections between straight lines, i.e. rays, and surfaces is a c
 BeamletOptics.intersect3d(::BeamletOptics.AbstractShape, ::BeamletOptics.AbstractRay)
 ```
 
-Regardless of the underlying concrete implementation, each call of `intersect3d` must return the following type:
+Regardless of the underlying concrete implementation, each call of `intersect3d` must return `nothing` or the following type:
 
 ```@docs; canonical=false
 BeamletOptics.Intersection

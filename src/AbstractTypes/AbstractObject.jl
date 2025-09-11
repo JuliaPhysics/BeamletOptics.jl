@@ -1,7 +1,7 @@
 """
     AbstractObject
 
-A generic type for 2D/3D objects that can be used to model optical elements. The geometry of the object is represented via a [`AbstractShape`](@ref).
+A generic type for 2D/3D objects that can be used to model optical elements. The geometry of the object is represented via an [`AbstractShape`](@ref).
 The optical effect that occurs between the object and an incoming ray/beam of light is modeled via its [`interact3d`](@ref) method.
 
 # Implementation reqs.

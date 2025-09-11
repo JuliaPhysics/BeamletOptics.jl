@@ -9,7 +9,7 @@ conditional_include(joinpath(mirror_showcase_dir, "spherical_mirror_showcase.jl"
 
 # Mirrors
 
-A common optical element with a straight-forward optical interaction. This kind of component is in general defined as a [`BeamletOptics.AbstractReflectiveOptic`](@ref). For a basic [`Ray`](@ref) the interaction is simply defined by the [`BeamletOptics.reflection3d`](@ref) function. A more complex algorithm is required when when a [`PolarizedRay`](@ref) interacts with a reflecting surface. The polarization calculus that is performed is explained in the [Polarized Rays](@ref) section. Below, some of the concrete implemented mirror types are shown. In general, the [`Mirror`](@ref) is used as a concrete type to represent an arbitrary reflecting shape.
+A common optical element with a straight-forward optical interaction. This kind of component is in general defined as a [`BeamletOptics.AbstractReflectiveOptic`](@ref). For a basic [`Ray`](@ref) the interaction is simply defined by the [`BeamletOptics.reflection3d`](@ref) function. A more complex algorithm is required when when a [`PolarizedRay`](@ref) interacts with a reflecting surface. The polarization calculus that is performed is explained in the [Polarized rays](@ref) section. Below, some of the concrete implemented mirror types are shown. In general, the [`Mirror`](@ref) is used as a concrete type to represent an arbitrary reflecting shape.
 
 ```@docs; canonical=false
 Mirror
