@@ -1,9 +1,9 @@
 ```@setup rays
 include(joinpath(@__DIR__, "..", "assets", "cond_save.jl"))
 
-ray_showcase_dir = joinpath(@__DIR__, "..", "assets")
+dir = joinpath(@__DIR__, "..", "assets")
 
-conditional_include(joinpath(ray_showcase_dir, "raymarching.jl"), use_placeholder=false)
+conditional_include(joinpath(dir, "raymarching.jl"))
 ```
 
 # Signed Distance Functions (SDFs)
