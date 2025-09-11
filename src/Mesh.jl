@@ -239,7 +239,7 @@ end
 """
     intersect3d(mesh::Mesh, ray::Ray)
 
-This function is a generic implementation to check if a ray intersects the shape mesh.\\
+This function is a generic implementation to check if a `ray` intersects the `mesh`.\\
 """
 function intersect3d(mesh::AbstractMesh{M},
         ray::AbstractRay{R}) where {M <: Real, R <: Real}
