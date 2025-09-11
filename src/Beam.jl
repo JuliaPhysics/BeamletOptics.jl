@@ -25,12 +25,12 @@ function Beam(ray::R) where {T, R <: AbstractRay{T}}
 end
 
 """
-    Beam(pos, dir, λ)
+    Beam(pos, dir, λ=1e-6)
 
 Spawns a [`Beam`](@ref) at the start `pos`ition in the specified `dir`ection
-with the wavelength `λ`.
+with the wavelength `λ = 1000 nm`.
 """
-function Beam(pos::AbstractArray{P}, dir::AbstractArray{D}, λ::L) where {P,D,L}
+function Beam(pos::AbstractArray{P}, dir::AbstractArray{D}, λ::L=1e-6) where {P,D,L}
     T = promote_type(P,D,L)
     ray = Ray(pos, dir, λ)
     return Beam{T, Ray{T}}([ray], nothing, Vector{Beam{T, Ray{T}}}())
