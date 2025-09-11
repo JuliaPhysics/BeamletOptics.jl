@@ -117,9 +117,9 @@ Trace a [`Beam`](@ref) through an optical `system`. Maximum number of tracing st
 
 # Tracing logic
 
-The intersection of the last ray of the `beam` with any objects in the `system` is tested.
-If an object is hit, the optical interaction is analyzed and tracing continues.
-Else the tracing procedure is stopped.
+The intersection of the last ray of the `beam` with any objects contained within the `system` is tested.
+If an object is hit, the optical interaction is calculated. If no interaction occurs or no 
+further objects are hit, the tracing procedure is stopped.
 
 # Arguments
 
@@ -156,7 +156,7 @@ end
 """
     retrace_system!(system, beam)
 
-This function tries to reuse data from a previous solution in order to solve the `system` using a sequential approach.
+This function tries to reuse data from a previously solved `beam` in order to solve the `system` againg using a sequential approach.
 
 # Retracing
 
@@ -184,6 +184,11 @@ The retracing logic for an already solved `beam` loops over the rays and childre
       - remove all beam tail rays after current `ray`
       - remove all beam children
       - reset beam tail ray intersection to nothing
+
+!!! warning "Retracing blocked beam paths"
+    The  implemented standard retracing procedure can handle beam path invalidations under certain conditions. However, one case that will lead to a **silent error** is if an element in the system is moved such that it **blocks the beam path between two other elements**. The retracer will not be able to detect this, since the testing of the previous intersection will return a valid intersection.
+
+    If this kind of situation must be modeled, e.g. in the case of an optical chopper wheel, retracing should be disabled.
 """
 function retrace_system!(system::AbstractSystem, beam::Beam{T, R}) where {T <: Real, R <: AbstractRay{T}}
     # Cleanup flags

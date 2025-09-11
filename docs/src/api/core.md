@@ -29,7 +29,7 @@ The next sections will focus on the **Intersection** and **Interaction** steps.
 
 ## Intersections
 
-Calculating intersections between straight lines, i.e. rays, and surfaces is a central challenge for every geometrical optics simulator. This must be done with high numerical precision, since many optical effects are sensitive on the order of the wavelength of the light under consideration with respect to position and direction [CITATION NEEDED]. In order to define this mathematically or algorithmically, many different methods exist [CITATION NEEDED]. The first question is, how is the geometry of the problem defined. This topic is treated in the [Geometry representation](@ref) section. The second question concerns then the algorithm or equation that allows to calculate the point of intersection between a ray and the surface of the element. This function is called `intersect3d` and is, at its core, defined for each `shape` and `ray`:
+Calculating intersections between straight lines, i.e. rays, and surfaces is a central challenge for every geometrical optics simulator. This must be done with high numerical precision, since many optical effects are sensitive on the order of the wavelength of the light under consideration with respect to position and direction [Hecht:2018; p. 265 ff](@cite). In order to define this mathematically or algorithmically, many different methods exist [Hanrahan:1989](@cite). The first question is, how is the geometry of the problem defined. This topic is treated in the [Geometry representation](@ref) section. The second question concerns then the algorithm or equation that allows to calculate the point of intersection between a ray and the surface of the element. This function is called `intersect3d` and is, at its core, defined for each `shape` and `ray`:
 
 ```@docs; canonical=false
 BeamletOptics.intersect3d(::BeamletOptics.AbstractShape, ::BeamletOptics.AbstractRay)
@@ -42,10 +42,6 @@ BeamletOptics.Intersection
 ```
 
 Since an optical element can consist of multiple joint shapes, the return type must store which specific part of the object was hit.
-
-### Intersection logic
-
-**TODO**
 
 ## Interactions
 
@@ -75,6 +71,29 @@ The main reason for this is the intersection ambiguity encountered at interfaces
 
 !!! tip
     Use of the `Hint` interface is primarily intended for multishape objects with joint surfaces.
+
+## Tracing logic
+
+### Tracing systems
+
+In the initial state, is is assumed that the problem consists of `objects <: AbstractObject` (in a system) and a `beam <: AbstractBeam` with a defined starting position and direction. No additional information is provided, and the specific path of the beam is not known beforehand. Consequently, brute force tracing of the optical system is required, involving testing against each individual element to determine the trajectory of the beam.
+
+```@docs; canonical=false
+BeamletOptics.trace_system!
+```
+
+This non-sequential mode is comparatively safe in determining the "true" beam path, but will scale suboptimally in time-complexity with the amount of optical elements. After solving the system, the beam path is known and can be potentially reused in the future.
+
+!!! info "Object order"
+    Unlike with classic, surface-based ray tracers, the order in which objects are listed in the [`System`](@ref) object vector/tuple is not considered for the purpose of tracing or retracing.
+
+### Retracing systems
+
+Once a system has been traced for the first time, the system and beam can be solved again. However, this time the solver will try to reuse as much information from the previous run as possible by testing if the previous beam trajectory is still valid in a sequential tracing mode. Retracing systems assumes that the kinematic changes (e.g. optomechanical aligment) between the current tracing procedure and the previous one are small. If an intersection along the beam trajectory becomes invalid, the solver will perform a non-sequential trace for all invalidated parts of the beam.
+
+```@docs; canonical=false
+BeamletOptics.retrace_system!
+```
 
 ## CPU and GPU support
 
