@@ -23,13 +23,13 @@
      inkscape:pagecheckerboard="0"
      inkscape:deskcolor="#d1d1d1"
      inkscape:document-units="mm"
-     showgrid="true"
-     inkscape:zoom="1.4142136"
-     inkscape:cx="128.69343"
-     inkscape:cy="190.56527"
+     showgrid="false"
+     inkscape:zoom="2.0000001"
+     inkscape:cx="165.25"
+     inkscape:cy="178.25"
      inkscape:window-width="2560"
      inkscape:window-height="1351"
-     inkscape:window-x="2551"
+     inkscape:window-x="-9"
      inkscape:window-y="-9"
      inkscape:window-maximized="1"
      inkscape:current-layer="layer1"
@@ -47,7 +47,7 @@
        opacity="0.14901961"
        empspacing="5"
        enabled="true"
-       visible="true" />
+       visible="false" />
     <inkscape:page
        x="0"
        y="0"
@@ -274,15 +274,15 @@
          transform="translate(-23.000002,17.389034)">
         <text
            xml:space="preserve"
-           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.52777px;font-family:'CMU Sans Serif';-inkscape-font-specification:'CMU Sans Serif';text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#1a1a1a;stroke:none;stroke-width:0.135467"
-           x="81.460487"
-           y="168.70406"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;font-family:'CMU Sans Serif';-inkscape-font-specification:'CMU Sans Serif';text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#1a1a1a;stroke:none;stroke-width:0.135467"
+           x="82.670914"
+           y="168.49356"
            id="text9-1-9"><tspan
              sodipodi:role="line"
              id="tspan9-4-8"
-             style="stroke-width:0.135467"
-             x="81.460487"
-             y="168.70406">Intersection</tspan></text>
+             style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;font-family:Arial;-inkscape-font-specification:Arial;stroke-width:0.135467"
+             x="82.670914"
+             y="168.49356">Intersection</tspan></text>
         <rect
            style="fill:none;stroke:#000000;stroke-width:0.135467"
            id="rect10-2-6"
@@ -298,15 +298,15 @@
          transform="translate(-21.750002,17.389034)">
         <text
            xml:space="preserve"
-           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.52777px;font-family:'CMU Sans Serif';-inkscape-font-specification:'CMU Sans Serif';text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#1a1a1a;stroke:none;stroke-width:0.135467"
-           x="70.821991"
-           y="188.70406"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;font-family:'CMU Sans Serif';-inkscape-font-specification:'CMU Sans Serif';text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#1a1a1a;stroke:none;stroke-width:0.135467"
+           x="72.126457"
+           y="188.49356"
            id="text1-2-0"><tspan
              sodipodi:role="line"
              id="tspan1-2-2"
-             style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:'CMU Sans Serif';-inkscape-font-specification:'CMU Sans Serif';fill:#1a1a1a;stroke:none;stroke-width:0.135467"
-             x="70.821991"
-             y="188.70406">Interaction</tspan></text>
+             style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;font-family:Arial;-inkscape-font-specification:Arial;fill:#1a1a1a;stroke:none;stroke-width:0.135467"
+             x="72.126457"
+             y="188.49356">Interaction</tspan></text>
         <rect
            style="fill:none;stroke:#000000;stroke-width:0.135467"
            id="rect11-1-8"
@@ -335,7 +335,7 @@
          id="text16-8-5"><tspan
            sodipodi:role="line"
            id="tspan16-9-0"
-           style="font-size:2.82222px;fill:#000000;stroke:none;stroke-width:0.135467"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;font-family:Arial;-inkscape-font-specification:Arial;fill:#000000;stroke:none;stroke-width:0.135467"
            x="59.143673"
            y="196.51352">Yes</tspan></text>
       <text
@@ -346,7 +346,7 @@
          id="text17-2-9"><tspan
            sodipodi:role="line"
            id="tspan17-7-0"
-           style="font-size:2.82222px;stroke-width:0.135467"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;font-family:Arial;-inkscape-font-specification:Arial;stroke-width:0.135467"
            x="71.678932"
            y="196.47389">No</tspan></text>
       <text
@@ -357,7 +357,7 @@
          id="text16-8-5-8"><tspan
            sodipodi:role="line"
            id="tspan16-9-0-6"
-           style="font-size:2.82222px;fill:#000000;stroke:none;stroke-width:0.135467"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;font-family:Arial;-inkscape-font-specification:Arial;fill:#000000;stroke:none;stroke-width:0.135467"
            x="49"
            y="216">Yes</tspan></text>
       <text
@@ -368,7 +368,7 @@
          id="text17-2-9-0"><tspan
            sodipodi:role="line"
            id="tspan17-7-0-2"
-           style="font-size:2.82222px;stroke-width:0.135467"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;font-family:Arial;-inkscape-font-specification:Arial;stroke-width:0.135467"
            x="61.535259"
            y="215.96037">No</tspan></text>
       <path
@@ -392,13 +392,13 @@
       <text
          xml:space="preserve"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;font-family:'CMU Sans Serif';-inkscape-font-specification:'CMU Sans Serif';text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#000000;stroke:none;stroke-width:0.135467"
-         x="50.804264"
+         x="50.02372"
          y="175.83676"
          id="text21-1-8"><tspan
            sodipodi:role="line"
            id="tspan21-2-9"
-           style="font-size:2.82222px;fill:#000000;stroke:none;stroke-width:0.135467"
-           x="50.804264"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;font-family:Arial;-inkscape-font-specification:Arial;fill:#000000;stroke:none;stroke-width:0.135467"
+           x="50.02372"
            y="175.83676">Repeat</tspan></text>
       <rect
          style="fill:none;stroke:#000000;stroke-width:0.352778;stroke-dasharray:none;stroke-dashoffset:0"
@@ -411,15 +411,15 @@
          ry="0.26459393" />
       <text
          xml:space="preserve"
-         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.52777px;font-family:'CMU Sans Serif';-inkscape-font-specification:'CMU Sans Serif';text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#000000;stroke:none;stroke-width:0.352777;stroke-dasharray:none;stroke-dashoffset:0"
-         x="54.917339"
-         y="169.92944"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;font-family:'CMU Sans Serif';-inkscape-font-specification:'CMU Sans Serif';text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#000000;stroke:none;stroke-width:0.352777;stroke-dasharray:none;stroke-dashoffset:0"
+         x="57.306664"
+         y="169.7045"
          id="text33"><tspan
            sodipodi:role="line"
            id="tspan33"
-           style="fill:#000000;stroke:none;stroke-width:0.352778"
-           x="54.917339"
-           y="169.92944">Kinematic Solution</tspan></text>
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;font-family:Arial;-inkscape-font-specification:Arial;fill:#000000;stroke:none;stroke-width:0.352778"
+           x="57.306664"
+           y="169.7045">Kinematic Solution</tspan></text>
       <rect
          style="fill:none;stroke:#000000;stroke-width:0.352777;stroke-dasharray:none;stroke-dashoffset:0"
          id="rect34"
@@ -460,14 +460,14 @@
       <text
          xml:space="preserve"
          style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82223px;font-family:'CMU Sans Serif';-inkscape-font-specification:'CMU Sans Serif';text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.352777;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
-         x="31.94994"
-         y="153.68245"
+         x="31.391144"
+         y="153.7045"
          id="text35"><tspan
            sodipodi:role="line"
            id="tspan35"
-           style="fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.352778"
-           x="31.94994"
-           y="153.68245">Time-domain Solution</tspan></text>
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Arial;-inkscape-font-specification:Arial;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.352778"
+           x="31.391144"
+           y="153.7045">Time-domain Solution</tspan></text>
       <g
          id="g36"
          transform="matrix(0.69909196,0,0,0.69909196,21.974062,169.30147)">
@@ -482,30 +482,30 @@
            ry="0.26459393" />
         <text
            xml:space="preserve"
-           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82223px;font-family:'CMU Sans Serif';-inkscape-font-specification:'CMU Sans Serif';text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;opacity:1;fill:#ff0000;fill-opacity:1;stroke:none;stroke-width:0.176389;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
-           x="20.924442"
-           y="47.883099"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.52311px;font-family:'CMU Sans Serif';-inkscape-font-specification:'CMU Sans Serif';text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;opacity:1;fill:#ff0000;fill-opacity:1;stroke:none;stroke-width:0.166232;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+           x="20.861185"
+           y="47.768147"
            id="text36"><tspan
              sodipodi:role="line"
              id="tspan36"
-             style="stroke:none;stroke-width:0.176389"
-             x="20.924442"
-             y="47.883099">Feedback</tspan></text>
+             style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.52311px;font-family:Arial;-inkscape-font-specification:Arial;stroke:none;stroke-width:0.166232"
+             x="20.861185"
+             y="47.768147">Feedback</tspan></text>
       </g>
       <g
          id="g15-6-6"
          transform="translate(-28,22.389029)">
         <text
            xml:space="preserve"
-           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.52777px;font-family:'CMU Sans Serif';-inkscape-font-specification:'CMU Sans Serif';text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#1a1a1a;stroke:none;stroke-width:0.135467"
-           x="101.57903"
-           y="183.41898"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;font-family:'CMU Sans Serif';-inkscape-font-specification:'CMU Sans Serif';text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#1a1a1a;stroke:none;stroke-width:0.135467"
+           x="102.09027"
+           y="183.2469"
            id="text10-8-0"><tspan
              sodipodi:role="line"
              id="tspan10-5-2"
-             style="stroke-width:0.135467"
-             x="101.57903"
-             y="183.41898">Stop</tspan></text>
+             style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222px;font-family:Arial;-inkscape-font-specification:Arial;stroke-width:0.135467"
+             x="102.09027"
+             y="183.2469">Stop</tspan></text>
         <rect
            style="fill:none;stroke:#000000;stroke-width:0.135467"
            id="rect12-7-4"
@@ -547,35 +547,35 @@
            transform="translate(7.4259743)">
           <text
              xml:space="preserve"
-             style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.52777px;font-family:'CMU Sans Serif';-inkscape-font-specification:'CMU Sans Serif';text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#008000;stroke:none;stroke-width:0.135467;stroke-dasharray:none;stroke-dashoffset:0"
+             style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222222px;font-family:'CMU Sans Serif';-inkscape-font-specification:'CMU Sans Serif';text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#008000;stroke:none;stroke-width:0.135467;stroke-dasharray:none;stroke-dashoffset:0"
              x="93.711815"
              y="208.43082"
              id="text30-7"><tspan
                sodipodi:role="line"
                id="tspan30-9"
-               style="fill:#008000;stroke:none;stroke-width:0.135467"
+               style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Arial;-inkscape-font-specification:Arial;fill:#008000;stroke:none;stroke-width:0.135467;font-size:2.82222222px"
                x="93.711815"
                y="208.43082">Optics modeling</tspan></text>
           <text
              xml:space="preserve"
-             style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.52777px;font-family:'CMU Sans Serif';-inkscape-font-specification:'CMU Sans Serif';text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#008000;stroke:none;stroke-width:0.135467;stroke-dasharray:none;stroke-dashoffset:0"
+             style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222222px;font-family:'CMU Sans Serif';-inkscape-font-specification:'CMU Sans Serif';text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#008000;stroke:none;stroke-width:0.135467;stroke-dasharray:none;stroke-dashoffset:0"
              x="93.567131"
              y="213.59021"
              id="text31-3"><tspan
                sodipodi:role="line"
                id="tspan31-1"
-               style="stroke-width:0.135467"
+               style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Arial;-inkscape-font-specification:Arial;stroke-width:0.135467;font-size:2.82222222px"
                x="93.567131"
                y="213.59021">Beam bifurcations</tspan></text>
           <text
              xml:space="preserve"
-             style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.52777px;font-family:'CMU Sans Serif';-inkscape-font-specification:'CMU Sans Serif';text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#008000;stroke:none;stroke-width:0.135467;stroke-dasharray:none;stroke-dashoffset:0"
+             style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222222px;font-family:'CMU Sans Serif';-inkscape-font-specification:'CMU Sans Serif';text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#008000;stroke:none;stroke-width:0.135467;stroke-dasharray:none;stroke-dashoffset:0"
              x="93.574028"
              y="218.53214"
              id="text32-9"><tspan
                sodipodi:role="line"
                id="tspan32-8"
-               style="stroke-width:0.135467"
+               style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Arial;-inkscape-font-specification:Arial;stroke-width:0.135467;font-size:2.82222222px"
                x="93.574028"
                y="218.53214">Interaction hints</tspan></text>
         </g>
@@ -601,35 +601,35 @@
            transform="translate(12.335894)">
           <text
              xml:space="preserve"
-             style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.52777px;font-family:'CMU Sans Serif';-inkscape-font-specification:'CMU Sans Serif';text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#0000ff;stroke:none;stroke-width:0.135467;stroke-dasharray:none;stroke-dashoffset:0"
+             style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222222px;font-family:'CMU Sans Serif';-inkscape-font-specification:'CMU Sans Serif';text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#0000ff;stroke:none;stroke-width:0.135467;stroke-dasharray:none;stroke-dashoffset:0"
              x="88.767456"
              y="178.45517"
              id="text22-4-5"><tspan
                sodipodi:role="line"
                id="tspan22-1-2"
-               style="fill:#0000ff;stroke:none;stroke-width:0.135467"
+               style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Arial;-inkscape-font-specification:Arial;fill:#0000ff;stroke:none;stroke-width:0.135467;font-size:2.82222222px"
                x="88.767456"
                y="178.45517">Geometry representation</tspan></text>
           <text
              xml:space="preserve"
-             style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.52777px;font-family:'CMU Sans Serif';-inkscape-font-specification:'CMU Sans Serif';text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#0000ff;stroke:none;stroke-width:0.135467;stroke-dasharray:none;stroke-dashoffset:0"
+             style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222222px;font-family:'CMU Sans Serif';-inkscape-font-specification:'CMU Sans Serif';text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#0000ff;stroke:none;stroke-width:0.135467;stroke-dasharray:none;stroke-dashoffset:0"
              x="88.667557"
              y="183.46715"
              id="text23-2-7"><tspan
                sodipodi:role="line"
                id="tspan23-0-6"
-               style="stroke-width:0.135467"
+               style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Arial;-inkscape-font-specification:Arial;stroke-width:0.135467;font-size:2.82222222px"
                x="88.667557"
                y="183.46715">Intersection algorithms</tspan></text>
           <text
              xml:space="preserve"
-             style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:3.52777px;font-family:'CMU Sans Serif';-inkscape-font-specification:'CMU Sans Serif';text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#0000ff;stroke:none;stroke-width:0.135467;stroke-dasharray:none;stroke-dashoffset:0"
+             style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:2.82222222px;font-family:'CMU Sans Serif';-inkscape-font-specification:'CMU Sans Serif';text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#0000ff;stroke:none;stroke-width:0.135467;stroke-dasharray:none;stroke-dashoffset:0"
              x="88.664108"
              y="188.61507"
              id="text24-0-1"><tspan
                sodipodi:role="line"
                id="tspan24-1-4"
-               style="stroke-width:0.135467"
+               style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Arial;-inkscape-font-specification:Arial;stroke-width:0.135467;font-size:2.82222222px"
                x="88.664108"
                y="188.61507">Normal vector calculation</tspan></text>
         </g>
@@ -652,13 +652,13 @@
       <text
          xml:space="preserve"
          style="font-size:2.82223px;font-family:'CMU Sans Serif';-inkscape-font-specification:'CMU Sans Serif';text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#ff0000;fill-opacity:0.996078;stroke:none;stroke-width:0.176389;stroke-opacity:0.996078"
-         x="39"
+         x="39.095284"
          y="160.99998"
          id="text4"><tspan
            sodipodi:role="line"
            id="tspan4"
-           style="fill:#ff0000;stroke:none;stroke-width:0.176389"
-           x="39"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Arial;-inkscape-font-specification:Arial;fill:#ff0000;stroke:none;stroke-width:0.176389"
+           x="39.095284"
            y="160.99998">Alignment updates</tspan></text>
     </g>
   </g>
