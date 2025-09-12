@@ -2245,8 +2245,8 @@ end
 
     @testset "Test error messages" begin
         # Test dir. error msg
-        @test_throws ErrorException PolarizedRayRay(zeros(3), zeros(3))
-        @test_throws ErrorException PolarizedRayRay(zeros(3), ones(3)*eps())
+        @test_throws ErrorException PolarizedRay(zeros(3), zeros(3))
+        @test_throws ErrorException PolarizedRay(zeros(3), ones(3)*eps())
         # Test polarization orthogonal error msg
         @test_throws ErrorException PolarizedRay(zeros(3), [0,1,0], 1e-6, [0,1,1])
     end
