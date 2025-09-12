@@ -36,13 +36,13 @@ zs_1 = LinRange(-0.011, 0.011, 50)
 # zs_2 = LinRange(-0.01, 0.01, 5)
 
 for (i, z) in enumerate(zs_1)
-    beam = Beam([0, -0.02 , z], [0,1.,0], 488e-9)
+    local beam = Beam([0, -0.02 , z], [0,1.,0], 488e-9)
     solve_system!(system, beam)
     render!(ax, beam, flen=0.15, color=RGBAf(0,0,1,0.7), show_pos=false)
 end
 
 for (i, z) in enumerate(zs_1)
-    beam = Beam([0, -0.02 , z], [0,1.,0], 707e-9)
+    local beam = Beam([0, -0.02 , z], [0,1.,0], 707e-9)
     solve_system!(system, beam)
     render!(ax, beam, flen=0.15, color=RGBAf(1,0,0,0.5), show_pos=false)
 end

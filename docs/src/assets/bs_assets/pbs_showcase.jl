@@ -1,12 +1,13 @@
 using GLMakie, BeamletOptics
 
-const BMO = BeamletOptics
-
 GLMakie.activate!(; ssao=true)
+
+const BMO = BeamletOptics
+const mm = 1e-3
 
 include(joinpath(@__DIR__, "..", "render_utils.jl"))
 
-mm = 1e-3
+##
 n = 1.5
 cbs = RectangularPlateBeamsplitter(36mm, 25mm, 5mm, _->n)
 cbs_mount = MeshDummy(joinpath(@__DIR__, "PBS Mount.stl"))
