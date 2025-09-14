@@ -9,36 +9,6 @@ end
 
 hide_axis(ls::LScene) = (ls.show_axis[] = false)
 
-function take_screenshot(
-    fname::String,
-    system::BMO.Nullable{BMO.AbstractSystem},
-    beam::BMO.Nullable{BMO.AbstractBeam};
-    size::Tuple{Int, Int} = (600, 300),
-    view::BMO.Nullable{AbstractMatrix} = nothing,
-    flen::Real = 10e-2,
-    px_per_unit::Int = 8,
-    color::Union{Symbol, RGBf, RGBAf} = :red,
-    optional_rendering_fct::BMO.Nullable{Function} = nothing
-    )
-    fig = Figure(; size)
-    display(fig)
-    ax = LScene(fig[1,1])
-    if !isnothing(system)
-        render!(ax, system)
-    end
-    if !isnothing(beam)
-        render!(ax, beam; flen, color)
-    end
-    if !isnothing(view)
-        set_view(ax, view)
-    end
-    if !isnothing(optional_rendering_fct)
-        optional_rendering_fct(fig, ax)
-    end
-    hide_axis(ax)
-    save(fname, fig; px_per_unit, update = false)
-end
-
 arrow!(
     ax::LScene,
     pos::AbstractVector,
@@ -57,6 +27,14 @@ arrow!(
         tipradius,
         color
 )
+
+function render_sphere!(ax, pos, r; kwargs...)
+    # catch small radii render bug by capping min. radius
+    if r < 1e-5
+        r = 1e-5
+    end
+    render!(ax, BMO.SphereSDF(Point3{Float64}(pos), Float64(r)); transparency=true, kwargs...)
+end
 
 lens_color() = RGBf(0.678, 0.847, 0.902)
 lens_color(alpha) = RGBAf(0.678, 0.847, 0.902, alpha)
