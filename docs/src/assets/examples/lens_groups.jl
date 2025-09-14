@@ -1,19 +1,14 @@
-```@setup double_gauss
-include(joinpath(@__DIR__, "..", "assets", "cond_save.jl"))
+using GLMakie, CairoMakie, BeamletOptics
 
-dir = joinpath(@__DIR__, "..", "assets", "examples")
+GLMakie.activate!(; ssao=true)
 
-conditional_include(joinpath(dir, "lens_groups.jl"))
-``` 
+const BMO = BeamletOptics
+const mm = 1e-3
+const cm = 10mm
 
-# Lens groups
+include(joinpath(@__DIR__, "..", "render_utils.jl"))
 
-This example highlights the capabilities of [`ObjectGroup`](@ref)s. Several groups of optics will be defined and then traced like an ordinary [`System`](@ref) of optical elements.
-
-```julia
-using GLMakie, BeamletOptics
-
-# focus group
+## focus group
 l1 = SphericalDoubletLens(103.4371e-3, 61.14925e-3, -603.2959e-3, 1.5e-3, 10.03975e-3, 55e-3, 1.963000, 1.603112)
 l2 = SphericalLens(49.97282e-3, 168.2416e-3, 8.622723e-3, 52e-3, 1.603001)
 
@@ -22,7 +17,7 @@ translate3d!(l2, [0, l_2, 0])
 
 focus_group = ObjectGroup([l1, l2])
 
-# variator
+## variator
 l3 = SphericalLens(100.3834e-3, 16.72327e-3, 1e-3, 28.00995e-3, λ -> 1.603112)
 l4 = SphericalLens(-30.28003e-3, 21.29033e-3, 0.5e-3, 22.31297e-3, λ -> 1.764500)
 l5 = SphericalLens(23.06904e-3, 243.5999e-3, 3.2e-3, 22.12162e-3, λ -> 1.963000)
@@ -36,7 +31,7 @@ translate3d!(l5, [0, l_5, 0])
 
 variator_group = ObjectGroup([l3, l4, l5])
 
-# compensator
+## compensator
 l6 = SphericalLens(-24.31747e-3, -255.5571e-3, 1e-3, 17.70449e-3, λ -> 1.638539)
 compensator = l6
 
@@ -66,7 +61,7 @@ translate3d!(l12, [0, l_12, 0])
 
 master_group_I = ObjectGroup([l7, l8, l9, l10, l11, l12])
 
-# master II
+## master II
 l13 = SphericalLens(34.65626e-3, -45.71147e-3, 2.4e-3, 15.6e-3, λ -> 1.762001)
 l14 = SphericalLens(27.08863e-3, 11.38107e-3, 1e-3, 14.40932e-3, λ -> 1.761821)
 l15 = SphericalLens(20.49712e-3, -203.9304e-3, 2.4e-3, 14.40932e-3, λ -> 1.693501)
@@ -83,40 +78,58 @@ translate3d!(l16, [0, l_16, 0])
 
 master_group_II = ObjectGroup([l13, l14, l15, l16])
 
-# zoom lens
+## zoom lens
 lens = ObjectGroup([focus_group, variator_group, compensator, master_group_I, master_group_II])
-
 system = System(lens)
-```
 
-The following figure shows the individual component groups in different colors. The variator and compensator elements have been colored green and yellow, respectively. 
+##
+cview = [
+  0.0114358   0.999935    -2.42861e-17  -0.0612223
+ -0.395347    0.00452142   0.918521     -0.000169032
+  0.918461   -0.0105041    0.395373     -3.57792
+  0.0         0.0          0.0           1.0
+]
 
-![Lens groups - overview](lens_groups_0.png)
+fig = Figure(size=(600,300))
+ax = LScene(fig[1,1])
 
-In order to simulate a collimated beam of light, the [`UniformDiscSource`](@ref) can be used.
+set_orthographic(ax)
 
-```julia
+render!(ax, focus_group; color=:red)
+render!(ax, variator_group; color=:green)
+render!(ax, compensator; color=:yellow)
+render!(ax, master_group_I; color=:magenta)
+render!(ax, master_group_II; color=:blue)
+
+display(fig)
+hide_axis(ax)
+set_view(ax, cview)
+save("lens_groups_0.png", fig; px_per_unit=4, update = false)
+
+## source
 source = UniformDiscSource([0,-10cm,0], [0,1,0], 6mm, 1e-6; num_rays=100)
 solve_system!(system, source)
-```
 
-Note that the wavelength `1e-6` does not change the result of the tracing solution, since the refractive indices have not been specified as a function of the wavelength (e.g. via an anonymous function, [`DiscreteRefractiveIndex`](@ref) or [`SellmeierEquation`](@ref)). The ray paths can be visualized via the following code
+## fig
+cview = [
+ -0.534004   0.845482  1.66533e-16  -0.0473972
+ -0.688101  -0.434603  0.581065      0.0196012
+  0.49128    0.310291  0.813857     -0.138515
+  0.0        0.0       0.0           1.0
+]
 
-```julia
-fig = Figure()
+fig = Figure(size=(600,380))
 ax = LScene(fig[1,1])
 
 render!(ax, system)
 render!(ax, source; flen=10cm, color=RGBAf(0,0,1,0.1), render_every=1)
-```
 
-![Lens groups - no movement](lens_groups_1.png)
+display(fig)
+hide_axis(ax)
+set_view(ax, cview)
+save("lens_groups_1.png", fig; px_per_unit=4, update = false)
 
-# Moving groups
-
-Now the variator and compensator will be moved in order to simulate a zooming effect.
-
-```julia
+## variator
 function compensator_movement(x)
     if x < 0 || x > 42.75e-3
         error("x out of bounds")
@@ -130,10 +143,21 @@ end
 translate3d!(variator_group, [0, Δx_variator, 0])
 translate3d!(compensator, [0, Δx_compensator, 0])
 
+##
 source = UniformDiscSource([0,-10cm,0], [0,1,0], 44mm, 1e-6; num_rays=100)
 solve_system!(system, source)
-```
 
-Rendering is performed as for the previous figure. The disc source diameter has been increased manually in order to fill out the aperture in this zoom state.
+##
+fig = Figure(size=(600,380))
+ax = LScene(fig[1,1])
 
-![Lens groups - with movement](lens_groups_2.png)
+render!(ax, system)
+render!(ax, source; flen=10cm, color=RGBAf(0,0,1,0.1), render_every=1)
+
+display(fig)
+hide_axis(ax)
+set_view(ax, cview)
+save("lens_groups_2.png", fig; px_per_unit=4, update = false)
+
+
+

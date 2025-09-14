@@ -43,7 +43,11 @@ end
 
 Parametric type constructor for struct Mesh. Takes data of type `GeometryBasics.Mesh` and extracts the
 vertices and faces. The mesh is initialized at the global origin. Data type of Mesh is variably selected based on
-type of vertex data (i.e `Float32`). Mesh data is scaled by factor 1e-3, assuming m scale.
+type of vertex data (i.e `Float32`).
+
+!!! tip
+    Mesh vertex data is scaled by factor 1e-3, assuming [m] scale. Ensure that the export program is adjusted accordingly
+    when scaling issues occur.
 """
 function Mesh(mesh)
     # Determine mesh data type (i.e. Float32)
@@ -239,7 +243,7 @@ end
 """
     intersect3d(mesh::Mesh, ray::Ray)
 
-This function is a generic implementation to check if a ray intersects the shape mesh.\\
+This function is a generic implementation to check if a `ray` intersects the `mesh`.\\
 """
 function intersect3d(mesh::AbstractMesh{M},
         ray::AbstractRay{R}) where {M <: Real, R <: Real}

@@ -21,7 +21,7 @@ abstract type AbstractSystem end
 refractive_index(::AbstractSystem, λ::Real) = 1.0
 
 """
-    interact3d(::AbstractSystem, object::AbstractObject, ::AbstractBeam)
+    interact3d(::AbstractSystem, object::AbstractObject, ::AbstractBeam, ::AbstractRay)
 
 Defines the optical interaction between an incoming/outgoing beam/ray of light and an optical element, must return an [`AbstractInteraction`](@ref) or `nothing`.
 The default behavior is that no interaction occurs, i.e. return of `nothing`, which should stop the system tracing procedure.
@@ -39,11 +39,12 @@ A `Hint` can be passed as part of an [`AbstractInteraction`](@ref) and will info
 in the [`AbstractSystem`](@ref) will be hit next.
 
 !!! info 
-    The hint does not need to result in a guaranteed [`Intersection`](@ref).
+    The `Hint` does not need to result in a guaranteed [`Intersection`](@ref). However, if the hinted shape is intersected, it will
+    be immediatly assumed as the correct global intersection.
 
 # Fields
 
-- `object`: the object that might or will be intersected as next
+- `object`: the object that might or will be intersected next
 - `shape`: the underlying shape that will be intersected next, i.e. `shape(object)`, relevant for multi-shape objects
 """
 struct Hint
@@ -74,7 +75,7 @@ Subtypes of `AbstractInteraction` must implement the following:
 ## Beam data
 
 It is required that concrete implementations of this type provide some form of data on how to extend the beam.
-For instance, refer to [`BeamInteraction`](@ref) and [`GaussianBeamletInteraction`](@ref).
+For instance, refer to the[`BeamInteraction`](@ref) and [`GaussianBeamletInteraction`](@ref).
 """
 abstract type AbstractInteraction end
 

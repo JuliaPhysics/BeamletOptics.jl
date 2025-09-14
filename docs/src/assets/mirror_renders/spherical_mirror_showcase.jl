@@ -1,5 +1,11 @@
 using GLMakie, BeamletOptics
 
+GLMakie.activate!(; ssao=true)
+
+const BMO = BeamletOptics
+
+include(joinpath(@__DIR__, "..", "render_utils.jl"))
+
 distance = 20e-2
 factor = 1.2
 RoC = distance/2 * factor
@@ -29,3 +35,5 @@ solve_system!(system, beam, r_max=100)
 render!(ax, beam, flen=0.1)
 render!(ax, m1)
 render!(ax, m2)
+
+save("concave_mirror_showcase.png", fig; px_per_unit=8)

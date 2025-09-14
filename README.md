@@ -42,4 +42,4 @@ using Pkg; Pkg.add("BeamletOptics")
 
 # Examples
 
-For a variety of illustrated examples and tutorials, refer to the **Tutorials** and **Examples** sections of the documentation linked to above.
+For a variety of illustrated examples and tutorials, refer to the **Tutorials** and **Examples** in the **Getting started** sections of the documentation linked to above.

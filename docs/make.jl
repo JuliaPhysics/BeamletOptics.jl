@@ -4,8 +4,6 @@ using BeamletOptics
 using Documenter
 using DocumenterCitations
 
-CairoMakie.activate!()
-
 DocMeta.setdocmeta!(BeamletOptics, :DocTestSetup, :(using BeamletOptics); recursive=true)
 
 bib = CitationBibliography(joinpath(@__DIR__, "src", "refs.bib"))
@@ -22,38 +20,52 @@ makedocs(;
         size_threshold_ignore=["reference.md"],
         sidebar_sitename = false,
     ),
+    pagesonly=true,
     pages=[
         "Home" => "index.md",
-        "Tutorials" => Any[
-            "Beam expander" => "tutorials/expander.md",
-            "Miniature microscope" => "tutorials/microscope.md",
-            "Michelson interferometer" => "tutorials/michelson.md"
-        ],
-        "Examples" => Any[
-            "Spherical lenses" => "examples/spherical_lenses.md",
-            "Aspherical lenses" => "examples/aspherical_lenses.md",
-            "Double Gauss lens" => "examples/double_gauss.md",
-            "Lens groups" => "examples/lens_groups.md",
+        "Getting started" => Any[
+            "Tutorials" => Any[
+                "Beam expander"             => joinpath("tutorials", "expander.md"),
+                "Miniature microscope"      => joinpath("tutorials", "microscope.md"),
+                "Michelson interferometer"  => joinpath("tutorials", "michelson.md"),
+            ],
+            "Examples" => Any[
+                "Spherical lenses"          => joinpath("examples", "spherical_lenses.md"),
+                "Aspherical lenses"         => joinpath("examples", "aspherical_lenses.md"),
+                "Double Gauss lens"         => joinpath("examples", "double_gauss.md"),
+                "Lens groups"               => joinpath("examples", "lens_groups.md"),
+            ],
         ],
         "Basics" => Any[
-            "Introduction" => "basics/intro.md",
-            "Rays" => "basics/rays.md",
-            "Beams" => "basics/beams.md",
-            "Optical elements" => "basics/elements.md",
-            "Optical systems" => "basics/systems.md",
-            "Visualization" => "basics/render.md"
-        ],
-        "Components" => Any[
-            "Overview" => "components/components.md",
-            "Mirrors" => "components/mirrors.md",
-            "Lenses" => "components/lenses.md",
-            "Beamsplitters" => "components/beamsplitters.md",
-            "Detectors" => "components/detectors.md",
-            "Polarizers" => "components/polarizers.md",
+            "Introduction"                  => joinpath("basics", "intro.md"),
+            "Rays"                          => joinpath("basics", "rays.md"),
+            "Beams"                         => joinpath("basics", "beams.md"),
+            "Optical components" => Any[
+                "Overview"                  => joinpath("basics", "components", "components.md"),
+                "Mirrors"                   => joinpath("basics", "components", "mirrors.md"),
+                "Lenses"                    => joinpath("basics", "components", "lenses.md"),
+                "Beamsplitters"             => joinpath("basics", "components", "beamsplitters.md"),
+                "Detectors"                 => joinpath("basics", "components", "detectors.md"),
+                "Polarizing components"     => joinpath("basics", "components", "polarizers.md"),
+            ],
+            "Optical systems"               => joinpath("basics", "systems.md"),
+            "Visualization"                 => joinpath("basics", "render.md"),
         ],
         "Developer Documentation" => Any[
-            "Dev. guide" => "guide.md",
-            "API design" => "design.md",
+            "Developer guide" => Any[
+                "Contributing"              => joinpath("api", "contribute.md"),
+                "Documentation development" => joinpath("api", "docdev.md"),
+            ],
+            "API design" => Any[
+                "Introduction"              => joinpath("api", "api.md"),
+                "Conventions"               => joinpath("api", "conventions.md"),
+                "Core design"               => joinpath("api", "core.md"),
+                "Geometry" => Any[
+                    "Geometry representation"   => joinpath("api", "geometry.md"),
+                    "Meshes"                    => joinpath("api", "meshes.md"),
+                    "SDFs"                      => joinpath("api", "sdfs.md"),
+                ],
+            ],
         ],
         "Reference" => "reference.md"
     ],

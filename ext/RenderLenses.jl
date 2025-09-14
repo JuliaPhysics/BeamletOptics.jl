@@ -70,16 +70,6 @@ function render!(
     y = BMO.aspheric_equation.(r, Ref(asp))
     u = y
     w = collect(r)
-    if isa(asp, BMO.ConvexAsphericalSurfaceSDF)
-        push!(u, u[end])
-        push!(w, 1e-12)
-    elseif isa(asp, BMO.ConcaveAsphericalSurfaceSDF)
-        push!(u, 0, 0)
-        push!(w, radius, 1e-12)
-    else
-        @warn "No suitable render fct. for $(typeof(asp))"
-        return nothing
-    end
     X = [w[i] * cos(v) for (i, u) in enumerate(u), v in v]
     Y = [u for u in u, v in v]
     Z = [w[i] * sin(v) for (i, u) in enumerate(u), v in v]
@@ -89,6 +79,6 @@ function render!(
     Xt = R[1, 1] * X + R[1, 2] * Y + R[1, 3] * Z .+ P[1]
     Yt = R[2, 1] * X + R[2, 2] * Y + R[2, 3] * Z .+ P[2]
     Zt = R[3, 1] * X + R[3, 2] * Y + R[3, 3] * Z .+ P[3]
-    surface!(axis, Xt, Yt, Zt; colormap = [color, color], kwargs...)
+    surface!(axis, Xt, Yt, Zt; colormap = [color, color], invert_normals=true, kwargs...)
     return nothing
 end

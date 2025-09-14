@@ -1,3 +1,14 @@
+```@setup lenses
+include(joinpath(@__DIR__, "..", "..", "assets", "cond_save.jl"))
+
+lens_showcase_dir = joinpath(@__DIR__, "..", "..", "assets", "lens_assets")
+
+conditional_include(joinpath(lens_showcase_dir, "lens_constructor_showcase.jl"))
+conditional_include(joinpath(lens_showcase_dir, "spherical_lens_showcase.jl"))
+conditional_include(joinpath(lens_showcase_dir, "aspherical_lens_showcase.jl"))
+conditional_include(joinpath(lens_showcase_dir, "spherical_doublet_showcase.jl"))
+``` 
+
 # Lenses
 
 Lenses are fundamental optical components used to focus or diverge light, making them essential for constructing imaging systems. The [`BeamletOptics.AbstractRefractiveOptic`](@ref) type provides a general definition of components that refract light. This package includes a variety of rotationally symmetric lens models to simulate simple imaging setups. All lens models provided as part of this package are based on SDFs. Refer to the [Signed Distance Functions (SDFs)](@ref) section for more information.
@@ -47,9 +58,7 @@ Lens(::BeamletOptics.AbstractRotationallySymmetricSurface, ::BeamletOptics.Abstr
 
 In practice, this works as follows: the bi-convex [LB1811](https://www.thorlabs.com/thorproduct.cfm?partnumber=LB1811) lens consists of two spherical surfaces and can be constructed like this:
 
-```@example
-using CairoMakie, BeamletOptics # hide
-
+```julia
 # refractive index of NBK7 for 532 and 1064 nm
 NBK7 = DiscreteRefractiveIndex([532e-9, 1064e-9], [1.5195, 1.5066])
 
@@ -66,19 +75,9 @@ LB1811 = Lens(
     l, 
     NBK7
 )
-
-system = System([LB1811]) # hide
-
-fig = Figure(size=(600,240)) # hide
-ax = Axis3(fig[1,1], aspect=:data, azimuth=0., elevation=1e-3) # hide
-
-hidedecorations!(ax) # hide
-hidespines!(ax) # hide
-
-render!(ax, system) # hide
-
-fig # hide
 ```
+
+![Lens constructor](lens_constructor.png)
 
 ### SDF-based spherical lenses
 
@@ -113,14 +112,6 @@ Below, several spherical lenses are recreated from manufacturer data.
 
 The spherical lenses are shown below. To recreate this figure, refer to the [Spherical lens example](@ref).
 
-```@eval
-file_dir = joinpath(@__DIR__, "..", "assets")
-
-Base.include(@__MODULE__, joinpath(file_dir, "spherical_lens_showcase.jl"))
-
-save("spherical_lens_showcase.png", fig, px_per_unit=4); nothing
-```
-
 ![Spherical lens showcase](spherical_lens_showcase.png)
 
 ## Aspherical lenses
@@ -136,9 +127,7 @@ A complex example of such a lens might look like the following example. This len
 !!! warning
     Aspheric lenses are somewhat experimental at the moment. Use this feature with some caution when building unconventional lenses. Default/simple aspheres work fine.   
 
-```@example
-using CairoMakie, BeamletOptics # hide
-
+```julia
 L3 = Lens(
     EvenAsphericalSurface(
         3.618e-3,               # r
@@ -159,17 +148,9 @@ L3 = Lens(
     0.7e-3,                     # center_thickness
     n -> 1.580200               # refractive index
 )
-
-fig = Figure(size=(600,240)) # hide
-ax = Axis3(fig[1,1], aspect=:data, azimuth=0., elevation=1e-3) # hide
-
-hidedecorations!(ax) # hide
-hidespines!(ax) # hide
-
-render!(ax, L3) # hide
-
-fig # hide
 ```
+
+![Aspherical lens showcase](aspherical_lens_showcase.png)
 
 !!! tip "Aspherical lens example"
     Refer to the [Simple aspherical lens example](@ref) for a showcase on how to implement a plano-convex asphere.
@@ -243,54 +224,13 @@ fig # hide
 
 ## Doublet lenses
 
-The [`DoubletLens`](@ref) is an example for a multi-shape object as mentioned in the [Multi-shape objects](@ref) section. For spherical doublet lenses the following constructor can be used.
+The [`DoubletLens`](@ref) is an example for a multi-shape object as mentioned in the [Single and multi-shaped objects](@ref) section. For spherical doublet lenses the following constructor can be used.
 
 ```@docs; canonical=false
 SphericalDoubletLens(::Any, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any)
 ```
 
-The following image shows the [AC254-150-AB](https://www.thorlabs.com/thorproduct.cfm?partnumber=AC254-150-AB) doublet lens for 488 and 707 nm. It has been created using the [`SphericalDoubletLens`](@ref) constructor shown above.
-
-
-```@eval
-using CairoMakie, BeamletOptics
-
-λs = [488e-9, 707e-9, 1064e-9]
-
-NLAK22 = DiscreteRefractiveIndex(λs, [1.6591, 1.6456, 1.6374])
-NSF10 = DiscreteRefractiveIndex(λs, [1.7460, 1.7168, 1.7021])
-
-AC254_150_AB = SphericalDoubletLens(87.9e-3, 105.6e-3, 1000, 6e-3, 3e-3, BeamletOptics.inch, NLAK22, NSF10)
-
-system = System([AC254_150_AB])
-
-fig = Figure(size=(600,170))
-ax = Axis3(fig[1,1], aspect=:data, azimuth=0., elevation=1e-3)
-
-hidedecorations!(ax)
-hidespines!(ax)
-
-render!(ax, system)
-
-zs_1 = LinRange(-0.011, 0.011, 6)
-zs_2 = LinRange(-0.01, 0.01, 5)
-
-for (i, z) in enumerate(zs_1)
-    beam = Beam([0, -0.02 , z], [0,1.,0], 488e-9)
-    solve_system!(system, beam)
-    render!(ax, beam, flen=0.15, color=RGBAf(0,0,1,0.7))
-end
-
-for (i, z) in enumerate(zs_2)
-    beam = Beam([0, -0.02 , z], [0,1.,0], 707e-9)
-    solve_system!(system, beam)
-    render!(ax, beam, flen=0.15, color=RGBAf(1,0,0,0.5))
-end
-
-save("doublet_showcase.png", fig, px_per_unit=4)
-
-nothing
-```
+The following image shows the [AC254-150-AB](https://www.thorlabs.com/thorproduct.cfm?partnumber=AC254-150-AB) doublet lens for 488 and 707 nm, colored blue and red respectively. It has been created using the [`SphericalDoubletLens`](@ref) constructor shown above.
 
 ![Doublet lens showcase](doublet_showcase.png)
 

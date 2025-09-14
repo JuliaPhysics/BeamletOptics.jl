@@ -50,6 +50,9 @@ mutable struct PolarizedRay{T} <: AbstractRay{T}
             E0::AbstractArray{<:Union{E, Complex{E}}}
         ) where {T, P, D, L, N, E}
         M = promote_type(T, P, D, L, N, E)
+        if isapprox(norm(dir), 0, atol=1e-14)
+            throw(ErrorException("Direction vector to short for normalization."))
+        end
         # This test is very important and must be performed for each pol. ray
         if !isorthogonal3d(dir, E0; atol=1e-14)
             throw(ErrorException("Ray dir. and E0 must be orthogonal."))

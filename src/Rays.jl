@@ -33,6 +33,9 @@ function Ray(pos::AbstractArray{P},
         dir::AbstractArray{D},
         λ::L = 1000e-9) where {P <: Real, D <: Real, L<:Real}
     F = promote_type(P, D, L)
+    if isapprox(norm(dir), 0, atol=1e-14)
+        throw(ErrorException("Direction vector to short for normalization."))
+    end
     return Ray{F}(
         Point3{F}(pos),
         normalize(Point3{F}(dir)),

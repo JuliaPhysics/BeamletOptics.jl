@@ -508,6 +508,9 @@ end
     # Test helper functions
     @test BMO.line_point_distance3d(ray, [1, 1, 0]) == 0
     @test BMO.line_point_distance3d(ray, [-1, 1, 0]) == sqrt(2)
+    # Test error msg
+    @test_throws ErrorException Ray(zeros(3), zeros(3))
+    @test_throws ErrorException Ray(zeros(3), ones(3)*eps())
 
     @testset "Testing isentering" begin
         r1 = Ray([0, 0, 0], [0, 1, 0])
@@ -2238,6 +2241,14 @@ end
             @test P00 * E0 ≈ [-1, 0, 0]
             @test P00 * in_dir ≈ out_dir
         end
+    end
+
+    @testset "Test error messages" begin
+        # Test dir. error msg
+        @test_throws ErrorException PolarizedRay(zeros(3), zeros(3))
+        @test_throws ErrorException PolarizedRay(zeros(3), ones(3)*eps())
+        # Test polarization orthogonal error msg
+        @test_throws ErrorException PolarizedRay(zeros(3), [0,1,0], 1e-6, [0,1,1])
     end
 
     @testset "Mirror reflections" begin

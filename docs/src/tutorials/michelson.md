@@ -1,3 +1,13 @@
+```@setup michelson
+using BeamletOptics
+
+include(joinpath(@__DIR__, "..", "assets", "cond_save.jl"))
+
+michelson_dir = joinpath(@__DIR__, "..", "assets", "mi_assets")
+
+conditional_include(joinpath(michelson_dir, "michelson_showcase.jl"))
+```
+
 # Michelson interferometer
 
 In this tutorial, a simple [Michelson Interferometer](https://www.rp-photonics.com/michelson_interferometers.html) will be built step by step, using some core functions and components of this package. You will learn how to:
@@ -17,18 +27,7 @@ In this tutorial, a simple [Michelson Interferometer](https://www.rp-photonics.c
 All figures you will see below are pregenerated. The full code and all 3D assets are available in the following files:
 
 ```@example michelson
-using GLMakie, BeamletOptics
-
-const BMO = BeamletOptics
-
-GLMakie.activate!()
-
-file_dir = joinpath(@__DIR__, "..", "assets", "mi_assets")
-
-include(joinpath(file_dir, "michelson_showcase.jl"))
-include(joinpath(file_dir, "michelson_plots.jl"))
-
-path = normpath(file_dir) # hide
+path = normpath(michelson_dir) # hide
 @info "Files located at:" path # hide
 ```
 

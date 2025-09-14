@@ -1,7 +1,10 @@
 ```@setup rays
-ray_showcase_dir = joinpath(@__DIR__, "..", "assets", "ray_renders")
+include(joinpath(@__DIR__, "..", "assets", "cond_save.jl"))
 
-include(joinpath(ray_showcase_dir, "ray_showcase.jl"))
+ray_showcase_dir = joinpath(@__DIR__, "..", "assets", "ray_assets")
+
+conditional_include(joinpath(ray_showcase_dir, "ray_showcase.jl"))
+conditional_include(joinpath(ray_showcase_dir, "fresnel_coeffs.jl"))
 ```
 
 # Rays
@@ -14,7 +17,7 @@ Individual monochromatic rays form the basic building blocks to describe the pro
 
 where ``\vec{p}`` and ``\vec{d}`` are the position and direction ``\mathbb{R}^3``-vectors, respectively. The ray length ``t`` is used to describe the geometrical length of the ray. This assumes that the [`BeamletOptics.RefractiveIndex`](@ref) along the ray path is constant. If after solving an optical system a ray intersection is determined, a new ray must be spawned to model an arbitrary light path. This data is stored, e.g., in a [`Beam`](@ref). More on this can be found in the [Beams](@ref) chapter. 
 
-## Basic `Ray`
+## Basic rays
 
 The generic type that describes geometrical rays is [`BeamletOptics.AbstractRay`](@ref). Refer to its documentation for more information about what data is used to model light propagation. A minimal implementation of this API (i.e. subtype) is provided by the [`Ray`](@ref):
 
@@ -26,7 +29,7 @@ This ray type is able to model reflection and [refraction](https://www.rp-photon
 
 ![Basic ray plot](ray_showcase.png)
 
-## Polarized Rays
+## Polarized rays
 
 In order to model the effect of polarizing elements, the polarization ray tracing calculus of Yun et. al is used [Yun2011_1, Yun2011_2](@cite). This formalism allows to model the effects of said elements on the electric field vector ``E_0`` using the [Jones formalism](https://www.rp-photonics.com/polarization_of_light.html) in global coordinates:
 
@@ -47,12 +50,7 @@ Below the Fresnel coefficients for different ``n_1 \rightarrow n_2`` interfaces 
 
 First, the Fresnel coefficients for ``n_1 = 1.0`` to ``n_2 = 1.5`` will be calculated. The angle of incidence ``\theta`` refers to the plane of incidence in the `s`enkrecht and `p`arallel coordinate system. Note that the imaginary part of the coefficents is shown by the dash-dotted lines.
 
-```@example fresnel_vacuum_glass
-using CairoMakie # hide
-CairoMakie.activate!() # hide
-using BeamletOptics
-include("fresnel.jl") # hide
-
+```julia
 # Angle of incidence
 θ = deg2rad.(0:.01:90)
 
@@ -62,9 +60,9 @@ n2 = 1.5
 
 # Calculate complex Fresnel coefficients
 rs, rp, ts, tp = BeamletOptics.fresnel_coefficients(θ, n2/n1)
-
-plot_and_save_fresnel_coeffs(n1, n2, save_fig=false) # hide
 ```
+
+![Vacuum to glass](vac_to_glass.png)
 
 Note that for this example, the imaginary part of the coefficients is zero for all considered `θ`s.
 
@@ -72,13 +70,13 @@ Note that for this example, the imaginary part of the coefficients is zero for a
 
 For a glass-vacuum interface with ``n_1 = 1.5`` to ``n_2 = 1.0`` the coefficients are calculated likewise. Note the unsteadiness of the coefficients at around 40°. This is the critical angle where [TIR](https://www.rp-photonics.com/total_internal_reflection.html) occurs.
 
-```@example fresnel_vacuum_glass
+```julia
 # Define refractive indices - glass to vacuum
 n1 = 1.5
 n2 = 1.0
 
 # Calculate complex Fresnel coefficients
 rs, rp, ts, tp = BeamletOptics.fresnel_coefficients(θ, n2/n1)
-
-plot_and_save_fresnel_coeffs(n1, n2, save_fig=false) # hide
 ```
+
+![Glass to vacuum](glass_to_vac.png)

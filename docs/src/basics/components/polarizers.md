@@ -5,7 +5,7 @@ Polarizers in the context of this package are optical elements that select or mo
 1. 3D polarization ray-tracing calculus
 2. 3D modified Jones matrix calculus
 
-For more information on the first method refer to the section: [Polarized Rays](@ref). For the second approach, elements fall under the category of the [`BeamletOptics.AbstractJonesPolarizer`](@ref).
+For more information on the first method refer to the section: [Polarized rays](@ref). For the second approach, elements fall under the category of the [`BeamletOptics.AbstractJonesPolarizer`](@ref).
 
 ```@docs; canonical=false
 BeamletOptics.AbstractJonesPolarizer

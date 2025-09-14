@@ -13,3 +13,5 @@ end
 
 set_new_origin3d!(d::IntersectableObject) = set_new_origin3d!(d.shape)
 interact3d(::AbstractSystem, ::IntersectableObject, ::AbstractBeam, ::AbstractRay) = nothing
+
+IntersectableObject(loadpath::String) = IntersectableObject(Mesh(load(loadpath)))

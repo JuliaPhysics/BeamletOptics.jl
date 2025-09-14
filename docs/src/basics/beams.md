@@ -1,10 +1,12 @@
 ```@setup beams
+include(joinpath(@__DIR__, "..", "assets", "cond_save.jl"))
+
 beam_showcase_dir = joinpath(@__DIR__, "..", "assets", "beam_renders")
 
-include(joinpath(beam_showcase_dir, "beam_showcase.jl"))
-include(joinpath(beam_showcase_dir, "gb_showcase.jl"))
-include(joinpath(beam_showcase_dir, "collimated_sc.jl"))
-include(joinpath(beam_showcase_dir, "pointsource_sc.jl"))
+conditional_include(joinpath(beam_showcase_dir, "beam_showcase.jl"))
+conditional_include(joinpath(beam_showcase_dir, "gb_showcase.jl"))
+conditional_include(joinpath(beam_showcase_dir, "collimated_sc.jl"))
+conditional_include(joinpath(beam_showcase_dir, "pointsource_sc.jl"))
 ```
 
 # Beams
@@ -126,11 +128,11 @@ The user can obtain parameters such as the beam waist radius, the radius of curv
 
 ![Gauss beam parameters](gauss_parameters.png)
 
-### Astigmatic Polarized Beamlets
+## Astigmatic Polarized Beamlets
 
 - Assumptions
     - homogeneous polarization distribution across waist
     - Lagrange invariant
 
-!!! info
-    WORK IN PROGRESS
+!!! warning
+    NOT YET IMPLEMENTED

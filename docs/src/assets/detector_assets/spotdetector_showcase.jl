@@ -1,5 +1,7 @@
 using GLMakie, BeamletOptics
 
+GLMakie.activate!(; ssao=true)
+
 const mm = 1e-3
 
 ##
@@ -31,7 +33,9 @@ cs = CollimatedSource([0,-50mm,0], [0,1,0], aperture, 1e-6; num_rings, num_rays)
 
 t1 = @timed solve_system!(system, cs)
 
-render!(system_ax, cs, color=:blue, show_pos=true, render_every=50)
+render!(system_ax, cs, color=:blue, show_pos=false, render_every=50)
+
+save("spot_diagram_system.png", system_fig, px_per_unit=4)
 
 ## render diagram
 spot_fig = Figure(size=(600,400))
@@ -48,4 +52,4 @@ leg_string = "
 
 Legend(spot_fig[1,2], [sc], [leg_string], "Quick stats.")
 
-spot_fig
+save("spot_diagram_showcase.png", spot_fig, px_per_unit=4)
