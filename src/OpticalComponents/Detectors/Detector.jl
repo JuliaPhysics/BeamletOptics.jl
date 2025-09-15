@@ -1,6 +1,16 @@
-abstract type AbstractDetectorHit end
+#=
+TODO
+1. replace ray hits content with actual ray data type?
+2. implement intensity for ray, pray and gbeamlet
+3. implement generic autolims
+4. think about solutions for post-solve kinematic changes of Detector
+=#
 
-struct RayHit{T} <: AbstractDetectorHit
+abstract type AbstractDetectorHit end
+abstract type AbstractRayHit{T} <: AbstractDetectorHit end
+abstract type AbstractBeamletHit{T} <: AbstractDetectorHit end
+
+struct RayHit{T} <: AbstractRayHit{T}
     hit::Point3{T}
     dir::Point3{T}
     proj::T
@@ -8,7 +18,7 @@ struct RayHit{T} <: AbstractDetectorHit
     k::T
 end
 
-struct PolarizedRayHit{T} <: AbstractDetectorHit
+struct PolarizedRayHit{T} <: AbstractRayHit{T}
     hit::Point3{T}
     dir::Point3{T}
     E0::Point3{Complex{T}}
@@ -16,7 +26,7 @@ struct PolarizedRayHit{T} <: AbstractDetectorHit
     k::T
 end
 
-struct GaussianBeamletHit{T} <: AbstractDetectorHit
+struct GaussianBeamletHit{T} <: AbstractBeamletHit{T}
     gauss::GaussianBeamlet{T}
     id::Int 
 end
@@ -28,7 +38,7 @@ mutable struct Detector{T, S <: AbstractShape{T}} <: AbstractDetector{T, S}
 end
 
 function Detector(len::Real, cont=false)
-    shape = BMO.QuadraticFlatMesh(len)
+    shape = QuadraticFlatMesh(len)
     return Detector(shape, nothing, cont)
 end 
 
@@ -99,4 +109,23 @@ function interact3d(::AbstractSystem, d::Detector, g::GaussianBeamlet{R}, id::In
         # Continue tracing
         throw(ErrorException("Not yet implemented."))
     end
+end
+
+spot_diagram(d::Detector) = spot_diagram(d, hits(d))
+
+function spot_diagram(d::Detector, hits::Vector{<:AbstractRayHit{T}}) where T
+    res = Vector{Point2{T}}(undef, length(hits))
+    # Transform global into local detector coordinates
+    for (i, h) in enumerate(hits)
+        hit_pos = h.hit
+        loc_pos = hit_pos - position(d)
+        x = dot(loc_pos, orientation(d)[:,1])
+        z = dot(loc_pos, orientation(d)[:,3])
+        res[i] = Point2{T}(x, z)
+    end
+    return res
+end
+
+function spot_diagram(::Detector, hits::Vector{B}) where B<:AbstractBeamletHit
+    throw(ErrorException("Spot diagram not available for $B"))
 end
