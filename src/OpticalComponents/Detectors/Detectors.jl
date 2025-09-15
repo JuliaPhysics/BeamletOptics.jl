@@ -45,3 +45,4 @@ end
 include("Photodetector.jl")
 include("Spotdetector.jl")
 include("PSFDetector.jl")
+include("Detector.jl")
