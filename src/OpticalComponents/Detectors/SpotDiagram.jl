@@ -1,15 +1,14 @@
 spot_diagram(d::Detector) = spot_diagram(d, hits(d))
 
-function spot_diagram(d::Detector, hits::Vector{<:AbstractRayHit{T}}) where T
+function spot_diagram(detector::Detector, hits::Vector{<:AbstractRayHit{T}}) where T
     res = Vector{Point2{T}}(undef, length(hits))
     # Transform global into local detector coordinates
-    for (i, h) in enumerate(hits)
-        ray = h.ray
+    for (i, hit) in enumerate(hits)
         # Global hit pos
-        hit_pos = position(ray) + length(ray) * direction(ray)
-        loc_pos = hit_pos - position(d)
-        x = dot(loc_pos, orientation(d)[:,1])
-        z = dot(loc_pos, orientation(d)[:,3])
+        hit_pos = position(hit)
+        loc_pos = hit_pos - position(detector)
+        x = dot(loc_pos, orientation(detector)[:,1])
+        z = dot(loc_pos, orientation(detector)[:,3])
         res[i] = Point2{T}(x, z)
     end
     return res

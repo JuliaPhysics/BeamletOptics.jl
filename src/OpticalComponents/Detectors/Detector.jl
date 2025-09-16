@@ -1,9 +1,8 @@
 #=
 TODO
-1. replace ray hits content with actual ray data type?
-2. implement intensity for ray, pray and gbeamlet
-3. implement generic autolims
-4. think about solutions for post-solve kinematic changes of Detector
+1. implement intensity for ray, pray and gbeamlet
+2. implement generic autolims
+3. think about solutions for post-solve kinematic changes of Detector
 =#
 
 abstract type AbstractDetectorHit end
