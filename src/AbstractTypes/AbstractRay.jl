@@ -88,6 +88,8 @@ end
 wavelength(ray::AbstractRay) = ray.λ
 wavelength!(ray::AbstractRay, λ) = (ray.λ = λ)
 
+wavenumber(ray::AbstractRay) = 2π/wavelength(ray)
+
 refractive_index(ray::AbstractRay) = ray.n
 refractive_index!(ray::AbstractRay, n) = (ray.n = n)
 

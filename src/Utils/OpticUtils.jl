@@ -62,7 +62,7 @@ wavefront_curvature(z, zr) = z / (z^2 + zr^2) # 1/r
 
 divergence_angle(λ, w0, M2) = M2 * λ / (π * w0)
 
-wave_number(λ) = 2π / λ
+wavenumber(λ) = 2π / λ
 
 """
     electric_field(r, z, E0, w0, w, k, ψ, R) -> ComplexF64
@@ -91,7 +91,7 @@ electric_field(r::Real, z::Real, E0, w0, w, k, ψ, R) = E0 * w0 / w * exp(-r^2 /
 function electric_field(r::Real, z::Real, E0, w0, λ, M2 = 1)
     zr = rayleigh_range(λ, w0, M2)
     w = beam_waist(z, w0, zr)
-    k = wave_number(λ)
+    k = wavenumber(λ)
     ψ = gouy_phase(z, zr)
     R = wavefront_curvature(z, zr)
     return electric_field(r, z, E0, w0, w, k, ψ, R)
