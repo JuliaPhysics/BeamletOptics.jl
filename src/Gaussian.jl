@@ -381,7 +381,7 @@ This function also considers phase changes due to changes in the [`optical_path_
 function electric_field(gauss::GaussianBeamlet, r, z)
     point, index = point_on_beam(gauss, z)
     w, R, ψ, w0 = gauss_parameters(gauss, z, hint = (point, index))
-    k = wave_number(wavelength(gauss))
+    k = wavenumber(wavelength(gauss))
     # Calculate new local field strength based on E0*w0 = const.
     E0 = electric_field(gauss) * (beam_waist(gauss) / w0)
     # Calculate phase change due to optical path length
