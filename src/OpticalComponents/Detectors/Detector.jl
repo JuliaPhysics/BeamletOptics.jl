@@ -32,15 +32,22 @@ struct GaussianBeamletHit{T} <: AbstractBeamletHit{T}
     id::Int 
 end
 
+position(g::GaussianBeamletHit) = position(g.gauss.chief.rays[g.id])
+direction(g::GaussianBeamletHit) = direction(g.gauss.chief.rays[g.id])
+length(g::GaussianBeamletHit) = length(g.gauss) - length(g.gauss.chief.rays[g.id])
+
+projection_factor(g::GaussianBeamletHit) = abs(dot(direction(g), normal3d(intersection(g.gauss.chief.rays[g.id]))))
+
 mutable struct Detector{T, S <: AbstractShape{T}} <: AbstractDetector{T, S}
     const shape::S
+    const edgln::T
     hits::NullableVector{<:AbstractDetectorHit}
     stop::Bool
 end
 
-function Detector(len::Real, cont=false)
+function Detector(len::Real, stop=true)
     shape = QuadraticFlatMesh(len)
-    return Detector(shape, nothing, cont)
+    return Detector(shape, len, nothing, stop)
 end
 
 empty!(d::Detector) = hits!(d, nothing)
