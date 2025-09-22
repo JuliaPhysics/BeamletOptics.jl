@@ -115,7 +115,7 @@ sys = System([lens, psfd])
 solve_system!(sys, cs)
 
 # retrieve intensity
-x, z, I_num = intensity(psfd; n=500, crop_factor=5)
+x, z, I_num = intensity(psfd; n=500, crop_factor=10)
 ```
 
 Visualizing the result yields the expected Airy-disk pattern.

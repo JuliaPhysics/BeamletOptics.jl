@@ -1,10 +1,12 @@
 #=
 TODO
 1. implement intensity for 
-    1. ray
+    1. ray ✓
     2. pray
     3. gbeamlet ✓
-2. implement generic autolims
+2. implement autolims
+    1. rays ✓
+    2. gbeamlet
 3. think about solutions for post-solve kinematic changes of Detector
 =#
 
@@ -15,6 +17,7 @@ abstract type AbstractBeamletHit{T} <: AbstractDetectorHit end
 position(hit::AbstractRayHit) = position(hit.ray) + length(hit.ray) * direction(hit.ray)
 direction(hit::AbstractRayHit) = direction(hit.ray)
 optical_path_length(hit::AbstractRayHit) = hit.opl
+wavenumber(hit::AbstractRayHit) = wavenumber(hit.ray)
 
 struct RayHit{T} <: AbstractRayHit{T}
     ray::Ray{T}
