@@ -1,6 +1,9 @@
 #=
 TODO
-1. implement intensity for ray, pray and gbeamlet
+1. implement intensity for 
+    1. ray
+    2. pray
+    3. gbeamlet ✓
 2. implement generic autolims
 3. think about solutions for post-solve kinematic changes of Detector
 =#
