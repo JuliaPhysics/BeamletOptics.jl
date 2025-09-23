@@ -1,9 +1,9 @@
 """
-    calc_local_pos(pd::Detector)
+    calc_local_pos(pd::Detector; kwargs...)
 
 Calculates the hit position of all registered hits in local detector coordinates.
 """
-calc_local_pos(pd::Detector) = calc_local_pos(pd, hits(pd))
+calc_local_pos(pd::Detector; kwargs...) = calc_local_pos(pd, hits(pd); kwargs...)
 
 function calc_local_pos(
         position::AbstractArray,
@@ -35,6 +35,45 @@ end
 
 function calc_local_pos(::Detector, ::Vector{B}) where B<:AbstractBeamletHit
     throw(ErrorException("calc_local_pos not available for $B"))
+end
+
+#FIXME docs
+function calc_local_pos(
+        pd::Detector,
+        hits::Vector{GaussianBeamletHit{T}};
+        # kwargs
+        crop_factor::Real=one(T),
+        num_spots::Int=50
+    ) where T
+    # Calculate waist projections in local (x, z) coordinates
+    ts = LinRange(0, 2pi, num_spots)
+    p0 = position(pd)
+    # Left-handed coord. sys. due to pd mesh rotation
+    ex = -orientation(pd)[:,1]
+    ey = orientation(pd)[:,2]
+    ez = orientation(pd)[:,3]
+    pts_2D = Vector{Point2{T}}()
+    # Caclulate spots
+    for hit in hits
+        # Determine waist radius at intersection point
+        waist_radius, ~, ~, ~ = gauss_parameters(hit.gauss, length(hit.gauss))
+        waist_radius *= crop_factor
+        # build basis vectors
+        dir = direction(hit)
+        nd1 = normal3d(dir)
+        nd2 = cross(dir, nd1)        
+        origin = hit_point(hit)
+        # Calculate 3D waist circle of points
+        pts_3D = ellipse(ts, origin, waist_radius*nd1, waist_radius*nd2)
+        # Project 3D points onto plane, calculate local (x, z) coords
+        for (i, pt) in enumerate(pts_3D)
+            dist = line_plane_distance3d(p0, ey, pt, dir)
+            pts_3D[i] = pt + dist * dir
+        end        
+        new_pts = calc_local_pos(p0, ex, ez, pts_3D)
+        append!(pts_2D, new_pts)
+    end
+    return pts_2D
 end
 
 """
