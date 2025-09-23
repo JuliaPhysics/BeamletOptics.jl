@@ -7,24 +7,29 @@ TODO
 2. implement autolims
     1. rays ✓
     2. gbeamlet
-3. think about solutions for post-solve kinematic changes of Detector
+3. fix GB hit getter syntax
+4. think about solutions for post-solve kinematic changes of Detector
 =#
 
 abstract type AbstractDetectorHit end
 abstract type AbstractRayHit{T} <: AbstractDetectorHit end
 abstract type AbstractBeamletHit{T} <: AbstractDetectorHit end
 
-position(hit::AbstractRayHit) = position(hit.ray) + length(hit.ray) * direction(hit.ray)
+position(hit::AbstractRayHit) = position(hit.ray)
 direction(hit::AbstractRayHit) = direction(hit.ray)
+
+length(hit::AbstractRayHit) = length(hit.ray)
 optical_path_length(hit::AbstractRayHit) = hit.opl
 wavenumber(hit::AbstractRayHit) = wavenumber(hit.ray)
+
+hit_point(hit::AbstractRayHit) = position(hit) + length(hit.ray) * direction(hit)
+
+projection_factor(hit::AbstractRayHit) = abs(dot(direction(hit), normal3d(intersection(hit.ray))))
 
 struct RayHit{T} <: AbstractRayHit{T}
     ray::Ray{T}
     opl::T
 end
-
-projection_factor(hit::RayHit) = abs(dot(direction(hit), normal3d(intersection(hit.ray))))
 
 struct PolarizedRayHit{T} <: AbstractRayHit{T}
     ray::PolarizedRay{T}
@@ -38,21 +43,25 @@ struct GaussianBeamletHit{T} <: AbstractBeamletHit{T}
     id::Int 
 end
 
-position(g::GaussianBeamletHit) = position(g.gauss.chief.rays[g.id])
-direction(g::GaussianBeamletHit) = direction(g.gauss.chief.rays[g.id])
-length(g::GaussianBeamletHit) = length(g.gauss) - length(g.gauss.chief.rays[g.id])
+position(hit::GaussianBeamletHit) = position(hit.gauss.chief.rays[hit.id])
+direction(hit::GaussianBeamletHit) = direction(hit.gauss.chief.rays[hit.id])
 
-projection_factor(g::GaussianBeamletHit) = abs(dot(direction(g), normal3d(intersection(g.gauss.chief.rays[g.id]))))
+length(hit::GaussianBeamletHit) = length(hit.gauss) - length(hit.gauss.chief.rays[hit.id])
+
+hit_point(hit::GaussianBeamletHit) = position(hit) + length(hit.gauss.chief.rays[hit.id]) * direction(hit)
+
+projection_factor(hit::GaussianBeamletHit) = abs(dot(direction(hit), normal3d(intersection(hit.gauss.chief.rays[hit.id]))))
 
 mutable struct Detector{T, S <: AbstractShape{T}} <: AbstractDetector{T, S}
     const shape::S
-    const edgln::T
+    const edgln::T  # remove once autolims for all hit types exist
     hits::NullableVector{<:AbstractDetectorHit}
     stop::Bool
 end
 
 function Detector(len::Real, stop=true)
     shape = QuadraticFlatMesh(len)
+    zrotate3d!(shape, π)
     return Detector(shape, len, nothing, stop)
 end
 
