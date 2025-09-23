@@ -106,3 +106,9 @@ function find_zero_bisection(f, a, b; tol=1e-10, max_iter=1000)
     end
     throw(ErrorException("Bisection did not converge after $max_iter iterations"))
 end
+
+#FIXME docs
+ellipse(t, a, b, c) = a + b * cos(t) + c * sin(t)
+
+#FIXME docs
+ellipse(ts::AbstractArray, a, b, c) = [ellipse(t, a, b, c) for t in ts]
