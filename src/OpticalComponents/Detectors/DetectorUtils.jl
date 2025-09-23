@@ -6,22 +6,31 @@ Calculates the hit position of all registered hits in local detector coordinates
 calc_local_pos(pd::Detector) = calc_local_pos(pd, hits(pd))
 
 function calc_local_pos(
+        position::AbstractArray,
+        local_x::AbstractArray,
+        local_z::AbstractArray,
+        hits_3D::Vector{Point3{T}}
+    ) where T
+    # Transform global into local detector coordinates
+    hits_2D = Vector{Point2{T}}(undef, length(hits_3D))
+    for (i, hit) in enumerate(hits_3D)
+        loc_pos = hit - position
+        @views x = dot(loc_pos, local_x)
+        @views z = dot(loc_pos, local_z)
+        hits_2D[i] = Point2{T}(T(x), T(z))
+    end
+    return hits_2D
+end
+
+function calc_local_pos(
         pd::Detector,
         hits::Vector{<:AbstractRayHit{T}}
     ) where T
     pd_pos = position(pd)
     local_x = orientation(pd)[:, 1]
     local_z = orientation(pd)[:, 3]
-    # Transform global into local detector coordinates
-    hits_2D = Vector{Point2{T}}(undef, length(hits))
-    for (i, hit) in enumerate(hits)
-        _hit = position(hit)
-        loc_pos = _hit - pd_pos
-        @views x = dot(loc_pos, local_x)
-        @views z = dot(loc_pos, local_z)
-        hits_2D[i] = Point2{T}(T(x), T(z))
-    end
-    return hits_2D
+    hits_3D = hit_point.(hits)
+    return calc_local_pos(pd_pos, local_x, local_z, hits_3D)
 end
 
 function calc_local_pos(::Detector, ::Vector{B}) where B<:AbstractBeamletHit
@@ -81,6 +90,11 @@ function calc_local_lims(::Detector, ::Vector{B}) where B<:AbstractBeamletHit
     throw(ErrorException("calc_local_lims not available for $B"))
 end
 
+"""
+    calc_local_lims(...)
+
+Assumes that the beamlet is approximately cylindrical around its optical axis at the point of intersection. 
+"""
 function calc_local_lims(
         pd::Detector,
         hits::Vector{GaussianBeamletHit{G}};
@@ -88,4 +102,6 @@ function calc_local_lims(
         kwargs...
     ) where G
     
+    
+
 end
