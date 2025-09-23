@@ -138,9 +138,13 @@ function calc_local_lims(
         pd::Detector,
         hits::Vector{GaussianBeamletHit{G}};
         # kwargs
+        crop_factor::Real=one(T),
+        num_spots::Int=50,
         kwargs...
     ) where G
-    
-    
-
+    local_hits = calc_local_pos(pd; crop_factor, num_spots, kwargs...)
+    xs = getindex.(local_hits, 1)
+    zs = getindex.(local_hits, 2)
+    # min/max limits
+    return minimum(xs), maximum(xs), minimum(zs), maximum(zs)
 end
