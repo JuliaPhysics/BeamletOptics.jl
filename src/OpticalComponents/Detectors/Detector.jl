@@ -15,7 +15,7 @@ TODO
     3. electric_field ✓
     4. intensity ✓
     5. ellipse ✓
-    6. Detector
+    6. Detector 
 6. replace old detectors and fix docs/testcases
     1. Photodetector
     2. Spotdetector
@@ -63,14 +63,69 @@ hit_point(hit::GaussianBeamletHit) = position(hit) + length(hit.gauss.chief.rays
 
 projection_factor(hit::GaussianBeamletHit) = abs(dot(direction(hit), normal3d(intersection(hit.gauss.chief.rays[hit.id]))))
 
+"""
+    Detector <: AbstractDetector
+
+Represents a **flat** rectangular or quadratic, infinitesimally thin surface in R³.
+The detector surface is a detection screen that captures incoming ray or beamlet data.
+The active surface is discretized in the local R² x-y-coordinate system.
+If configured, beams or beamlets can continue tracing after hitting the detector.
+
+# Hits 
+
+Hits are represented via the [`AbstractDetectorHit`](@ref) interface. An empty detector is able to 
+detect any kind of incoming hit, but as soon as the initial hit type has been determined, all following
+hits must share the same type, i.e. no cross-interaction between hit types is allowed.
+
+# Functions
+
+The following functions allow a posteriori evaluation of hit contributions via e.g. `f(detector)`.
+Refer to the respective function documentation.
+
+- [`spot_diagram`](@ref)
+- [`electric_field`](@ref)
+- [`intensity`](@ref)
+
+# Additional information
+
+In general, the detection surface is represented by a flat [`Mesh`](@ref) that has been rotated such that
+the surface normals point towards the negative y-axis for the initial positioning. This allows for the definition
+of a **left-handed** (x, z) surface coordinate system, where incoming beams intersect against the detector surface normal.   
+
+!!! warning "Reset behavior"
+    The `Photodetector` must be reset between each call of [`solve_system!`](@ref) in order to
+    overwrite previous results using the [`empty!`](@ref) function.
+    Otherwise, the current result will be added onto the previous result.
+
+# Fields
+
+- `shape`
+  geometry of the active surface, must represent 2D-`field` in `x` any `y` dimensions,
+  normal vector direction must adhere to definition above
+- `hits`
+  a [`NullableVector`](@ref) of hit data, resetable via `empty!`
+- `stop`
+  a boolean value that allows for continued tracing after "passing through" the detector
+
+"""
 mutable struct Detector{T, S <: AbstractShape{T}} <: AbstractDetector{T, S}
     const shape::S
     hits::NullableVector{<:AbstractDetectorHit}
     stop::Bool
 end
 
-function Detector(len::Real, stop=true)
-    shape = QuadraticFlatMesh(len)
+"""
+    Detector(edge_length, stop)
+
+Spawns a quadratic [`Detector`](@ref) surface that is aligned with the neg. y-axis.
+The detector edge length can be configured via `edge_length`.
+Additionally, continued tracing can be configured via the `stop` flag where
+
+- `true` indicates continued tracing
+- `false` stops the incoming beams as with any hard target 
+"""
+function Detector(edge_length::Real, stop::Bool=true)
+    shape = QuadraticFlatMesh(edge_length)
     # rotate surface normal along neg. y-axis
     zrotate3d!(shape, π)
     return Detector(shape, nothing, stop)
