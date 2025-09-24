@@ -6,9 +6,14 @@ TODO
     3. gbeamlet ✓
 2. implement autolims
     1. rays ✓
-    2. gbeamlet
+    2. gbeamlet ✓
 3. fix GB hit getter syntax
 4. think about solutions for post-solve kinematic changes of Detector
+5. add docs and testcases to fcts
+    1. calc_local_pos
+    2. calc_local_lims
+    3. electric_field
+    4. ellipse
 =#
 
 abstract type AbstractDetectorHit end
@@ -138,7 +143,7 @@ function interact3d(::AbstractSystem, d::Detector, g::GaussianBeamlet{R}, id::In
         # Stop solver (hard target)
         return nothing
     else
-        # Continue tracing
+        # Continue tracing # FIXME
         throw(ErrorException("Continued tracing for GaussianBeamlet not yet implemented."))
     end
 end
