@@ -542,6 +542,22 @@ end
         @test BMO.refraction3d(dir, -nml, n1, n2) ==
               BMO.refraction3d(ray, n2)
     end
+
+    @testset "Testing ellipse" begin
+        ts = LinRange(0, 2pi, 1000)
+        p0 = Point2(1,1)
+        r1 = [0,1]
+        # 45° deg inclination
+        r2 = [1,1.]
+        pts = BMO.ellipse(ts, p0, r1, r2)
+        x = getindex.(pts, 1)
+        z = getindex.(pts, 2)
+        # test min/max values of 2D bounding box
+        @test isapprox(maximum(x), 2, atol=1e-5)
+        @test isapprox(minimum(x), 0, atol=1e-5)
+        @test isapprox(maximum(z), 1+sqrt(2), atol=1e-5)
+        @test isapprox(minimum(z), 1-sqrt(2), atol=1e-5)
+    end
 end
 
 @testset "Beams" begin

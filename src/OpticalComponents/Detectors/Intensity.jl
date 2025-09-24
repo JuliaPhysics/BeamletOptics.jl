@@ -3,8 +3,7 @@
 
 Compute a two‐dimensional electric field based on incoming rays or beams as captured by a [`Detector`](@ref).
 The returned E-field map is sampled on a regular `n×n` grid in the detector’s local (x,z)-plane.
-
-todo: left-handed coord. sys
+Note that the `pd` local coordinates are given in a (x, z) basis where the normal vector forms a left-handed system.
 
 !!! note "Resetting detectors"
     Be sure to call `empty!(pd)` before each new measurement if reusing the same detector.
@@ -171,7 +170,7 @@ end
 Calculates the intensity distribution on the [`Detector`](@ref) via
 
 ```math
-I = \\frac{|E|^2}{2\\cdot Z}
+I = \\frac{|E|^2}{2 \\cdot Z}
 ```
 
 where E is the electric field value and Z is the wave impedance. In general, vacuum wave impedance is assumed.

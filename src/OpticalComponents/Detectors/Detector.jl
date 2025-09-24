@@ -9,11 +9,17 @@ TODO
     2. gbeamlet ✓
 3. fix GB hit getter syntax
 4. think about solutions for post-solve kinematic changes of Detector
-5. add docs and testcases to fcts
-    1. calc_local_pos
-    2. calc_local_lims
-    3. electric_field
-    4. ellipse
+5. add docs to fcts
+    1. calc_local_pos ✓
+    2. calc_local_lims ✓
+    3. electric_field ✓
+    4. intensity ✓
+    5. ellipse ✓
+    6. Detector
+6. replace old detectors and fix docs/testcases
+    1. Photodetector
+    2. Spotdetector
+    3. PSFDetector
 =#
 
 abstract type AbstractDetectorHit end
@@ -59,15 +65,15 @@ projection_factor(hit::GaussianBeamletHit) = abs(dot(direction(hit), normal3d(in
 
 mutable struct Detector{T, S <: AbstractShape{T}} <: AbstractDetector{T, S}
     const shape::S
-    const edgln::T  # remove once autolims for all hit types exist
     hits::NullableVector{<:AbstractDetectorHit}
     stop::Bool
 end
 
 function Detector(len::Real, stop=true)
     shape = QuadraticFlatMesh(len)
+    # rotate surface normal along neg. y-axis
     zrotate3d!(shape, π)
-    return Detector(shape, len, nothing, stop)
+    return Detector(shape, nothing, stop)
 end
 
 empty!(d::Detector) = hits!(d, nothing)

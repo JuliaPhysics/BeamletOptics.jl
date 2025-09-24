@@ -107,8 +107,15 @@ function find_zero_bisection(f, a, b; tol=1e-10, max_iter=1000)
     throw(ErrorException("Bisection did not converge after $max_iter iterations"))
 end
 
-#FIXME docs
-ellipse(t, a, b, c) = a + b * cos(t) + c * sin(t)
+"""
+    ellipse(t, a, b, c)
 
-#FIXME docs
+Returns a point in Rⁿ that lies on an n-dim. ellipse that is parametrized by 
+
+- `t`: circumference control variable ∈ [0, 2π]
+- `a`: center point
+- `b, c`: conjugate diameter vectors
+"""
+ellipse(t::Real, a::AbstractArray, b::AbstractArray, c::AbstractArray) = a + b * cos(t) + c * sin(t)
+
 ellipse(ts::AbstractArray, a, b, c) = [ellipse(t, a, b, c) for t in ts]

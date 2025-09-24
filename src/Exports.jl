@@ -31,7 +31,7 @@ export CircularFlatSurface, RectangularFlatSurface, SphericalSurface, EvenAspher
 export Prism, RightAnglePrism
 
 # detectors
-export Photodetector, Spotdetector, PSFDetector, Detector, intensity
+export Photodetector, Spotdetector, PSFDetector, Detector, electric_field, intensity, spot_diagram
 
 # splitters
 export ThinBeamsplitter, RoundThinBeamsplitter, RectangularPlateBeamsplitter, RoundPlateBeamsplitter, CubeBeamsplitter, RectangularCompensatorPlate
