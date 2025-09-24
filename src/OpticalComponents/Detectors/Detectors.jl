@@ -42,7 +42,6 @@ function empty!(::D) where D <: AbstractDetector
 end
 
 # include concrete detectors
-include("Photodetector.jl")
 include("Spotdetector.jl")
 include("PSFDetector.jl")
 

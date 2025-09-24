@@ -4,19 +4,23 @@ TODO
     1. ray ✓
     2. pray
     3. gbeamlet ✓
-2. implement autolims
+2. implement autolims ✓
     1. rays ✓
     2. gbeamlet ✓
 3. fix GB hit getter syntax
 4. think about solutions for post-solve kinematic changes of Detector
-5. add docs to fcts
+5. add docs to fcts ✓
     1. calc_local_pos ✓
     2. calc_local_lims ✓
     3. electric_field ✓
     4. intensity ✓
     5. ellipse ✓
-    6. Detector 
-6. replace old detectors and fix docs/testcases
+    6. Detector ✓
+6. replace old detectors and fix testcases
+    1. Photodetector ✓
+    2. Spotdetector
+    3. PSFDetector
+7. replace old detectors and fix docs
     1. Photodetector
     2. Spotdetector
     3. PSFDetector
@@ -93,7 +97,7 @@ the surface normals point towards the negative y-axis for the initial positionin
 of a **left-handed** (x, z) surface coordinate system, where incoming beams intersect against the detector surface normal.   
 
 !!! warning "Reset behavior"
-    The `Photodetector` must be reset between each call of [`solve_system!`](@ref) in order to
+    The `Detector` must be reset between each call of [`solve_system!`](@ref) in order to
     overwrite previous results using the [`empty!`](@ref) function.
     Otherwise, the current result will be added onto the previous result.
 

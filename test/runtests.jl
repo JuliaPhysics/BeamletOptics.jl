@@ -2011,8 +2011,8 @@ end
         nl = 1.5
         f = BMO.lensmakers_eq(R1, -R2, nl)
         # Raytracing system (for all tests)
-        pd_l = Photodetector(l, n)
-        pd_s = Photodetector(l / 10, n ÷ 10)
+        pd_l = Detector(l) # n
+        pd_s = Detector(l / 10) # n ÷ 10
         ln = ThinLens(R1, R2, d, nl)
         translate3d!(pd_l, [0, z, 0])
         translate3d!(pd_s, [0, z, 0])
@@ -2047,9 +2047,9 @@ end
             solve_system!(system, g_2)
 
             # Compare solutions
-            I_analytical = BMO.intensity.(screen)
-            I_numerical = BMO.intensity.(pd_l.field)
-            Pt = BMO.optical_power(pd_l)
+            I_analytical = intensity.(screen)
+            ~, ~, I_numerical = intensity(pd_l; n, x_min=-l/2, x_max=l/2, z_min=-l/2, z_max=l/2)
+            Pt = optical_power(pd_l; n, x_min=-l/2, x_max=l/2, z_min=-l/2, z_max=l/2)
             @test all(isapprox.(I_analytical, I_numerical, atol = 2e-1))
             @test isapprox(Pt, 2 * P0, atol = 3e-5)
         end
@@ -2095,7 +2095,7 @@ end
         m1 = SquarePlanoMirror2D(BMO.inch)
         m2 = SquarePlanoMirror2D(BMO.inch)
         bs = ThinBeamsplitter(BMO.inch, reflectance = 0.5)
-        pd = Photodetector(pd_size, pd_resolution)
+        pd = Detector(pd_size)
         translate3d!(m1, [l_0, 0, 0])
         translate3d!(m2, [0, l_0, 0])
         translate3d!(pd, [-l_0, 0, 0])
@@ -2127,7 +2127,15 @@ end
 
                 # Moving mirror path length
                 path_length_numerical[i] = length(beam.children[1].children[2])
-                optical_pwr_numerical[i] = BMO.optical_power(pd)
+                optical_pwr_numerical[i] = BMO.optical_power(
+                    pd;
+                    # restore pre-v0.11 behavior, e.g. no autolims
+                    n=pd_resolution,
+                    x_min=-pd_size/2,
+                    x_max=pd_size/2,
+                    z_min=-pd_size/2,
+                    z_max=pd_size/2
+                )
             end
 
             path_length_analytical = @. 2 * lambdas + 4l_0
@@ -2157,10 +2165,12 @@ end
             empty!(pd)
             solve_system!(system, beam)
 
+            xs, ys, Efield = electric_field(pd; n=pd_resolution)
+
             # analytical solution
             short_arm = 4l_0
             long_arm = short_arm + 2Δl
-            xs = ys = LinRange(-pd_size / 2, pd_size / 2, pd_resolution)
+            # xs = ys = LinRange(-pd_size / 2, pd_size / 2, pd_resolution)
             screen = zeros(ComplexF64, length(xs), length(ys))
             for (j, y) in enumerate(ys)
                 for (i, x) in enumerate(xs)
@@ -2175,8 +2185,8 @@ end
             Re_analytical = real.(screen)
             Im_analytical = imag.(screen)
 
-            Re_numerical = real(pd.field)
-            Im_numerical = imag(pd.field)
+            Re_numerical = real(Efield)
+            Im_numerical = imag(Efield)
 
             # Compare solutions, units V/m
             @test all(isapprox.(Re_analytical, Re_numerical, atol = 5e-2))
@@ -2192,8 +2202,9 @@ end
         λ = 1064e-9
 
         bs = ThinBeamsplitter(10e-3)
-        pd_1 = Photodetector(10e-3, 100)
-        pd_2 = Photodetector(10e-3, 100)
+        pd_resolution = 100
+        pd_1 = Detector(10e-3)
+        pd_2 = Detector(10e-3)
 
         zrotate3d!(bs, deg2rad(45))
         translate3d!(pd_1, [0, l0, 0])
@@ -2840,7 +2851,8 @@ end
 @testset "Bug fixes" begin
     @testset "Issue#14" begin
         pd_res = 1000
-        pd = BMO.Photodetector(10e-3, pd_res)
+        pd_size = 10mm
+        pd = Detector(pd_size)
         BMO.zrotate3d!(pd, deg2rad(90))
         BMO.translate3d!(pd, [0.46, 0, 0])
         # Setup beam
@@ -2852,7 +2864,17 @@ end
         empty!(pd)
         BMO.solve_system!(system, beam)
 
-        @test BMO.optical_power(pd)≈10e-3 atol=1e-5
+        pd_pwr = optical_power(
+            pd;
+            # restore pre-v0.11 behavior, e.g. no autolims
+            n=pd_res,
+            x_min=-pd_size/2,
+            x_max=pd_size/2,
+            z_min=-pd_size/2,
+            z_max=pd_size/2
+        )
+
+        @test pd_pwr≈10e-3 atol=1e-5
     end
 
     @testset "Issue#22 and Issue#23" begin
@@ -2881,7 +2903,9 @@ end
         substrate_length = 10mm
         substrate = TestSubstrate(BMO.CylinderSDF(5mm, substrate_length/2), 1.5)
         
-        detector = Photodetector(10mm, 250)
+        pd_size = 10mm
+        pd_res = 250
+        detector = Detector(pd_size)
         
         translate3d!(substrate, [0, -25mm, 0])
         translate3d!(detector, [0, 40mm, 0])
@@ -2923,9 +2947,17 @@ end
                 set_index(substrate, 1 + 1/n_lambdas * nf)        
                 empty!(detector)
                 solve_system!(system, gb_prb)
-                solve_system!(system, gb_ref)        
-                @test isapprox(BMO.optical_power(detector), ref_signal(2pi*nf, 2e-3), atol=1e-8)
-                pwr[i] = BMO.optical_power(detector)
+                solve_system!(system, gb_ref)
+                pd_pwr = optical_power(
+                    detector;
+                    # restore pre-v0.11 behavior, e.g. no autolims
+                    n=pd_res,
+                    x_min=-pd_size/2,
+                    x_max=pd_size/2,
+                    z_min=-pd_size/2,
+                    z_max=pd_size/2
+                )
+                @test isapprox(pd_pwr, ref_signal(2pi*nf, 2e-3), atol=1e-8)
             end
             # Test if opl difference is indeed one λ
             delta = BMO.optical_path_length(gb_prb)
@@ -2944,7 +2976,16 @@ end
                 empty!(detector)
                 solve_system!(system, gb_prb)
                 solve_system!(system, gb_ref)
-                @test isapprox(BMO.optical_power(detector), ref_signal(phi, 2e-3), atol=1e-8)
+                pd_pwr = optical_power(
+                    detector;
+                    # restore pre-v0.11 behavior, e.g. no autolims
+                    n=pd_res,
+                    x_min=-pd_size/2,
+                    x_max=pd_size/2,
+                    z_min=-pd_size/2,
+                    z_max=pd_size/2
+                )
+                @test isapprox(pd_pwr, ref_signal(phi, 2e-3), atol=1e-8)
                 shift_phase(gb_prb, step(phis))
             end
         end

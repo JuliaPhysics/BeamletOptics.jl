@@ -30,7 +30,7 @@
         arm_2 = ObjectGroup([m2])
 
         # PD
-        pd = Photodetector(8e-3, 200)
+        pd = Detector(8e-3)
         translate3d!(pd, [0, -12cm, 0])
 
         pd_assembly = ObjectGroup([pd])

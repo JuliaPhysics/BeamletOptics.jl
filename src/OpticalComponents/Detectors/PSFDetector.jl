@@ -50,7 +50,7 @@ empty!(psf::PSFDetector) = (empty!(psf.data))
 Base.push!(psf::PSFDetector, new::PSFData) = push!(psf.data, new)
 
 """
-    Photodetector(width)
+    PSFDetector(width)
 
 Spawns a quadratic rectangular 2D [`PSFDetector`](@ref) that is aligned with the **positive y-axis**.
 Refer to the type docs for more information.

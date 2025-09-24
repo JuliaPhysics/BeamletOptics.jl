@@ -183,11 +183,12 @@ function intensity(pd::Detector, Z::Number = Z_vacuum; kwargs...)
 end
 
 """
-    optical_power(pd::Detector)
+    optical_power(pd::Detector; kwargs...)
 
 Calculates the total optical power on `pd` in [W] by integration over the local intensity.
+For more information on keyword argument options, refer to the [`electric_field`](@ref) docs.
 """
-function optical_power(pd::Detector)
-    x, y, I = intensity(pd)
+function optical_power(pd::Detector; kwargs...)
+    x, y, I = intensity(pd; kwargs...)
     return trapz((x, y), I)
 end
