@@ -31,7 +31,8 @@ function calc_local_pos(
         hits::Vector{<:AbstractRayHit{T}}
     ) where T
     pd_pos = position(pd)
-    local_x = orientation(pd)[:, 1]
+    # left handed coord. sys. for correct (x, z) orientation
+    local_x = -orientation(pd)[:, 1]
     local_z = orientation(pd)[:, 3]
     hits_3D = hit_point.(hits)
     return calc_local_pos(pd_pos, local_x, local_z, hits_3D)
