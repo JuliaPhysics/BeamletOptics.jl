@@ -9,52 +9,39 @@ const BMO = BeamletOptics
 const mm = 1e-3
 const inch = 25.4mm
 
+# order or inclusion matters!
+
 include(joinpath(@__DIR__, "TestUtils.jl"))
 include(joinpath(@__DIR__, "TestAbstractTypes.jl"))
 include(joinpath(@__DIR__, "TestRays.jl"))
 include(joinpath(@__DIR__, "TestBeams.jl"))
 include(joinpath(@__DIR__, "TestBeamGroups.jl"))
+
+# Test geometry representation
 include(joinpath(@__DIR__, "Geometry", "TestMesh.jl"))
 include(joinpath(@__DIR__, "Geometry", "TestSDFs.jl"))
 include(joinpath(@__DIR__, "TestSystem.jl"))
 include(joinpath(@__DIR__, "TestObjectGroups.jl"))
+
+# Test lens models
 include(joinpath(@__DIR__, "Lenses", "TestSphericalLenses.jl"))
 include(joinpath(@__DIR__, "Lenses", "TestSurfaces.jl"))
 include(joinpath(@__DIR__, "Lenses", "TestAsphericalLenses.jl"))
 include(joinpath(@__DIR__, "Lenses", "TestCylindricalLenses.jl"))
-include(joinpath(@__DIR__, "Lenses", "TestDoubleGaussLens.jl"))
+
 include(joinpath(@__DIR__, "TestGaussianBeamlet.jl"))
 
-@testset "Detectors" begin
-    @testset "Testing Spotdetector" begin
-        # Set up tilted spot detection screens
-        α = 45
-        sd = Detector(1.0)
-        system = System([sd])
-        translate3d!(sd, [0, 1, 0])
-        zrotate3d!(sd, deg2rad(α))
-        beam = Beam([0, 0, 0], [0, 1, 0], 1e-6)
-        # Trace beams in x-y-plane
-        xs = LinRange(-0.25, 0.25, 10)
-        pts = Vector{Point3{Float64}}(undef, length(xs))
-        for (i, x) in enumerate(xs)
-            BMO.position!(first(beam.rays), Point3{Float64}(x, 0, 0))
-            solve_system!(system, beam)
-            # compare ray intersection to stored data
-            hit = last(BMO.hits(sd))
-            pos_dta = BMO.hit_point(hit)
-            ray = last(beam.rays)
-            pos_ray = position(ray) +
-                      length(BMO.intersection(ray)) * BMO.direction(ray)
-            @test pos_ray ≈ pos_dta
-        end
-        # Test spot diagram projection
-        pts = spot_diagram(sd)
-        # Test reset function
-        empty!(sd)
-        @test isnothing(BMO.hits(sd))
-    end
-end
+# Test component models
+include(joinpath(@__DIR__, "Components", "TestDummies.jl"))
+include(joinpath(@__DIR__, "Components", "TestDetector.jl"))
+include(joinpath(@__DIR__, "Components", "TestBeamsplitters.jl"))
+
+# Test end-to-end models
+include(joinpath(@__DIR__, "E2E", "TestDoubleGaussLens.jl"))
+include(joinpath(@__DIR__, "E2E", "TestMichelson.jl"))
+
+# Test regressions
+include(joinpath(@__DIR__, "TestBugFixes.jl"))
 
 @testset "Interference" begin
     @testset "Pre-Beamsplitter tests with seperate beams" begin
@@ -148,113 +135,6 @@ end
 
             # Compare detectors (this also tests correct behavior when focussing the beam)
             @test all(isapprox.(Pt_numerical, Pt_analytical, atol = 1e-4))
-        end
-    end
-
-    @testset "Michelson Interferometer" begin
-        # setup Michelson Interferometer
-        l_0 = 0.1
-        pd_size = BMO.inch / 5
-        pd_resolution = 100
-        m1 = SquarePlanoMirror2D(BMO.inch)
-        m2 = SquarePlanoMirror2D(BMO.inch)
-        bs = ThinBeamsplitter(BMO.inch, reflectance = 0.5)
-        pd = Detector(pd_size)
-        translate3d!(m1, [l_0, 0, 0])
-        translate3d!(m2, [0, l_0, 0])
-        translate3d!(pd, [-l_0, 0, 0])
-        zrotate3d!(bs, deg2rad(45))
-        zrotate3d!(m1, deg2rad(90))
-        zrotate3d!(pd, deg2rad(90))
-
-        system = System([m1, m2, bs, pd])
-
-        # Test correct values for reflectivity/transmission
-        @test isvalid(bs)
-
-        @testset "Equal armlength MI - integrated power" begin
-            # setup 635 nm laser with 0.1 mm waist for fast divergence
-            λ = 635e-9
-            P_0 = 5e-3
-            beam = GaussianBeamlet([0, -l_0, 0], [0, 1.0, 0], λ, 1e-4, P0 = P_0)
-
-            # Shift mirror #2 by -λ to +λ
-            lambdas = LinRange(-λ, λ, 200)
-
-            path_length_numerical = zeros(length(lambdas))
-            optical_pwr_numerical = zeros(length(lambdas))
-
-            for (i, lambda) in enumerate(lambdas)
-                translate_to3d!(m2, [0, l_0, 0] + [0, lambda, 0])
-                empty!(pd)
-                solve_system!(system, beam)
-
-                # Moving mirror path length
-                path_length_numerical[i] = length(beam.children[1].children[2])
-                optical_pwr_numerical[i] = BMO.optical_power(
-                    pd;
-                    # restore pre-v0.11 behavior, e.g. no autolims
-                    n=pd_resolution,
-                    x_min=-pd_size/2,
-                    x_max=pd_size/2,
-                    z_min=-pd_size/2,
-                    z_max=pd_size/2
-                )
-            end
-
-            path_length_analytical = @. 2 * lambdas + 4l_0
-            optical_pwr_analytical = @. P_0 * (1 / 2 * cos(2π * (2lambdas / λ) + π) + 1 / 2)
-
-            # Compare correct PD signal and λ shift in moving arm
-            @test all(isapprox.(optical_pwr_analytical, optical_pwr_numerical, atol = 5e-6))
-            @test all(isapprox.(path_length_analytical, path_length_numerical))
-        end
-
-        @testset "Unequal armlength MI - electrical field" begin
-            λ = 635e-9
-            w0 = 1e-4
-            P0 = 1e-3
-            M2 = 1
-            I0 = 2 * P0 / (π * w0^2)
-            E0 = BMO.electric_field(I0) * 1 / sqrt(2)^2
-            zR = BMO.rayleigh_range(λ, w0, M2)
-
-            beam = GaussianBeamlet([0, -l_0, 0], [0, 1.0, 0], λ, w0, P0 = P0, M2 = M2)
-
-            # arm length diff
-            Δl = 1 * l_0
-            translate_to3d!(m2, [0, l_0 + Δl, 0])
-
-            # numerical solution
-            empty!(pd)
-            solve_system!(system, beam)
-
-            xs, ys, Efield = electric_field(pd; n=pd_resolution)
-
-            # analytical solution
-            short_arm = 4l_0
-            long_arm = short_arm + 2Δl
-            # xs = ys = LinRange(-pd_size / 2, pd_size / 2, pd_resolution)
-            screen = zeros(ComplexF64, length(xs), length(ys))
-            for (j, y) in enumerate(ys)
-                for (i, x) in enumerate(xs)
-                    r = sqrt(x^2 + y^2)
-                    screen[i, j] += BMO.electric_field(
-                        r, short_arm, E0, w0, λ, M2)
-                    screen[i, j] += BMO.electric_field(
-                        r, long_arm, E0, w0, λ, M2) * exp(im * pi)
-                end
-            end
-
-            Re_analytical = real.(screen)
-            Im_analytical = imag.(screen)
-
-            Re_numerical = real(Efield)
-            Im_numerical = imag(Efield)
-
-            # Compare solutions, units V/m
-            @test all(isapprox.(Re_analytical, Re_numerical, atol = 5e-2))
-            @test all(isapprox.(Im_analytical, Im_numerical, atol = 5e-2))
         end
     end
 
@@ -637,152 +517,6 @@ end
     end
 end
 
-@testset "Beamsplitters" begin
-    N0 = 1.5
-    @testset "Testing RectangularPlateBeamsplitter with Beam" begin
-        # Init splitter
-        N0 = 1.5
-        pbs = RectangularPlateBeamsplitter(36mm, 25mm, 1mm, n -> N0)
-        system = System([pbs])
-        beam = Beam([0, -50mm, 0], [0, 1, 0], 1e-6)
-        # Trace normally
-        zrotate3d!(pbs, deg2rad(45))
-        solve_system!(system, beam)
-
-        @testset "Test pos/dir" begin
-            @test position(pbs) == zeros(3)
-            @test orientation(pbs) ≈ orientation(pbs.substrate)
-        end
-
-        @testset "Test children after tracing" begin
-            p = beam.rays
-            t = beam.children[1].rays
-            r = beam.children[2].rays
-            # no of rays
-            @test length(p) == 1
-            @test length(t) == 2
-            @test length(r) == 1
-            # correct ref. index
-            @test all(BMO.refractive_index.(p) .== 1)
-            @test all(BMO.refractive_index.(t) .== [N0, 1])
-            @test all(BMO.refractive_index.(r) .== 1)
-            # correct dir
-            @test BMO.direction(first(p)) ≈ BMO.direction(last(t))
-            @test BMO.direction(first(r)) ≈ [1, 0, 0]
-        end
-
-        # Retrace backside
-        zrotate3d!(pbs, π)
-        solve_system!(system, beam)
-
-        @testset "Test children after retracing" begin
-            p = beam.rays
-            t = beam.children[1].rays
-            r = beam.children[2].rays
-            # no of rays
-            @test length(p) == 2
-            @test length(t) == 1
-            @test length(r) == 2
-            # correct ref. index
-            @test all(BMO.refractive_index.(p) .== [1, N0])
-            @test all(BMO.refractive_index.(t) .== 1)
-            @test all(BMO.refractive_index.(r) .== [N0, 1])
-            # correct dir
-            @test BMO.direction(first(p)) ≈ BMO.direction(last(t))
-            @test BMO.direction(last(r)) ≈ [1, 0, 0]
-        end
-    end
-
-    @testset "Testing CubeBeamsplitter with Beam" begin
-        # Init splitter
-        cbs = CubeBeamsplitter(25e-3, n -> N0)
-        translate3d!(cbs, [0, 50mm, 0])
-        system = System([cbs])
-        beam = Beam([0, 0, 0], [0, 1, 0], 1e-6)
-
-        @testset "Initial CBS tracing" begin
-            # Trace normally
-            solve_system!(system, beam)
-            # Test correct ray length, ref. indices, dirs
-            p = BMO.rays(beam)
-            t = BMO.rays(beam.children[1])
-            r = BMO.rays(beam.children[2])
-
-            @test length(p) == 2
-            @test length(r) == 2
-            @test length(t) == 2
-            @test BMO.refractive_index.(p) == [1, N0]
-            @test BMO.refractive_index.(t) == [N0, 1]
-            @test BMO.refractive_index.(r) == [N0, 1]
-            @test BMO.direction(last(t)) ≈ BMO.direction(first(p))
-            @test BMO.direction(last(r)) ≈ [-1, 0, 0]
-        end
-
-        @testset "Retrace after 45° CBS rotation" begin
-            # Retrace
-            zrotate3d!(cbs, π / 2)
-            solve_system!(system, beam)
-
-            # Test correct ray dirs
-            p = BMO.rays(beam)
-            t = BMO.rays(beam.children[1])
-            r = BMO.rays(beam.children[2])
-
-            @test BMO.direction(last(t)) == BMO.direction(first(p))
-            @test BMO.direction(last(t)) == [0, 1, 0]
-        end
-
-        @testset "Retrace CBS backside" begin
-            # Retrace backside
-            zrotate3d!(cbs, π / 2)
-            solve_system!(system, beam)
-
-            # Test correct ray length, ref. indices, dirs
-            p = BMO.rays(beam)
-            t = BMO.rays(beam.children[1])
-            r = BMO.rays(beam.children[2])
-
-            @test length(p) == 2
-            @test length(r) == 2
-            @test length(t) == 2
-            @test BMO.refractive_index.(p) == [1, N0]
-            @test BMO.refractive_index.(t) == [N0, 1]
-            @test BMO.refractive_index.(r) == [N0, 1]
-            @test BMO.direction(last(t)) ≈ BMO.direction(first(p))
-            @test BMO.direction(last(r)) ≈ [-1, 0, 0]
-        end
-    end
-end
-
-@testset "Dummy objects" begin
-    # Setup dummy cube and test beam
-    cube_shape = BMO.CubeMesh(1)
-    translate3d!(cube_shape, -[0.5, 0, 0.5])
-    translate3d!(cube_shape, [0, 5, 0])
-    @testset "IntersectableObject" begin
-        beam = Beam([0, 0, 0], [0, 1, 0], 1e-6)
-        intersectable = IntersectableObject(cube_shape)
-        system = System([intersectable])
-        solve_system!(system, beam)
-        # Test nothing interaction
-        @test length(BMO.rays(beam)) == 1
-        @test BMO.object(BMO.intersection(last(BMO.rays(beam)))) == intersectable
-        @test BMO.shape(BMO.intersection(last(BMO.rays(beam)))) == cube_shape
-        @test isnothing(BMO.interact3d(system, intersectable, beam, first(BMO.rays(beam))))
-    end
-
-    @testset "NonInteractableObject" begin
-        beam = Beam([0, 0, 0], [0, 1, 0], 1e-6)
-        noninteract = NonInteractableObject(cube_shape)
-        system = System([noninteract])
-        solve_system!(system, beam)
-        # Test nothing interaction and intersection
-        @test length(BMO.rays(beam)) == 1
-        @test isnothing(BMO.intersection(last(BMO.rays(beam))))
-        @test isnothing(BMO.interact3d(system, noninteract, beam, first(BMO.rays(beam))))
-    end
-end
-
 @testset "Render" begin
     axis = nothing
     cube = BMO.CubeMesh(1)
@@ -790,199 +524,6 @@ end
     @test_throws BMO.MissingBackendError BMO.get_view(axis)
     @test_throws BMO.MissingBackendError BMO.set_view(axis, [1 1; 0 0])
     @test_throws BMO.MissingBackendError BMO.hide_axis(axis, true)
-end
-
-@testset "Point-spread functions" begin
-    # parameters for an almost thin-lens
-    l = 1e-3
-    R1 = 100e-3
-    R2 = Inf
-    d = 25.4e-3
-    n = 1.5
-    λ = 1e-6    
-    D = 15e-3
-    num_rays = 1000
-    
-    # plane wave source
-    cs = UniformDiscSource([0, -10e-3, 0], [0, 1, 0], D, λ; num_rays)
-    
-    # test lens
-    lens = SphericalLens(R1, R2, l, d, x -> n)
-    
-    # PSF detector
-    psfd = PSFDetector(10e-3)
-    translate3d!(psfd, [0, 200e-3 + 0.13e-3, 0])
-
-    @testset "Airy-disc test" begin
-        # build system and solve it
-        sys = System([lens, psfd])
-        solve_system!(sys, cs)
-
-        # get PSF
-        x, y, I_num = intensity(psfd; n=500, crop_factor=5, center=:bbox)
-
-        # get numerical first zero of the Airy-disk
-        ci = argmax(I_num)
-        ix_ctr, jx_ctr = Tuple(ci)
-        num_min = x[argmin(I_num[:, jx_ctr])]   # first zero through the centre column
-
-        # theoretical Airy-disk 1st zero
-        airy_min = 1.22*λ*200e-3/D
-
-        @test abs(num_min) ≈ airy_min rtol=1e-2
-    end
-
-    @testset "PSFDetector reset" begin
-        # Test if data in psfd
-        @test length(psfd.data) == num_rays
-        # Empty psfd and test
-        empty!(psfd)
-        @test isempty(psfd.data)
-    end
-end
-
-@testset "Bug fixes" begin
-    @testset "Issue#14" begin
-        pd_res = 1000
-        pd_size = 10mm
-        pd = Detector(pd_size)
-        BMO.zrotate3d!(pd, deg2rad(90))
-        BMO.translate3d!(pd, [0.46, 0, 0])
-        # Setup beam
-        y_0 = 0.2
-        beam = BMO.GaussianBeamlet(
-            [0, y_0, 0], [0.46, -y_0, 0], 532e-9, 2.5e-3, P0 = 10e-3)
-        # Solve system
-        system = BMO.System([pd])
-        empty!(pd)
-        BMO.solve_system!(system, beam)
-
-        pd_pwr = optical_power(
-            pd;
-            # restore pre-v0.11 behavior, e.g. no autolims
-            n=pd_res,
-            x_min=-pd_size/2,
-            x_max=pd_size/2,
-            z_min=-pd_size/2,
-            z_max=pd_size/2
-        )
-
-        @test pd_pwr≈10e-3 atol=1e-5
-    end
-
-    @testset "Issue#22 and Issue#23" begin
-        # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/22
-        # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/23
-        
-        mutable struct TestSubstrate{T, S <: BMO.AbstractShape{T}, N} <: BMO.AbstractRefractiveOptic{T, S, N}
-            const shape::S
-            n::N
-        end
-        
-        BMO.refractive_index(ts::TestSubstrate, ::Real) = ts.n
-        set_index(ts::TestSubstrate, new) = (ts.n = new)
-        get_index(ts::TestSubstrate) = ts.n
-        
-        "Shifts the phase of the beamlet by a specific amount in [rad]."
-        function shift_phase(gb::BMO.GaussianBeamlet, phase::Real)
-            BMO.electric_field!(gb, BMO.electric_field(gb) * exp(im*phase))
-            return nothing
-        end
-        
-        ref_signal(ϕ, A) = (cos(ϕ)+1)/2 * A
-        
-        # setup system for tests below
-        splitter = CubeBeamsplitter(10mm, n->1)
-        substrate_length = 10mm
-        substrate = TestSubstrate(BMO.CylinderSDF(5mm, substrate_length/2), 1.5)
-        
-        pd_size = 10mm
-        pd_res = 250
-        detector = Detector(pd_size)
-        
-        translate3d!(substrate, [0, -25mm, 0])
-        translate3d!(detector, [0, 40mm, 0])
-        
-        system = System([substrate, splitter, detector])
-        
-        start_offset = 50mm
-        
-        @testset "Testing electric_field calculation - non-imaging ref. index change" begin
-            indices = (1, 10, 100, 1000)
-            for index in indices
-                set_index(substrate, index)
-                phi = LinRange(0, 2pi, 30)
-                int = zeros(length(phi))
-                for (i, p) in enumerate(phi)
-                    gb_prb = GaussianBeamlet([0, -start_offset, 0], [0, 1, 0], 1e-6, .5mm)
-                    gb_ref = GaussianBeamlet([start_offset, 0, 0], [-1, 0, 0], 1e-6, .5mm)
-                    empty!(detector)
-                    shift_phase(gb_ref, p)
-                    solve_system!(system, gb_prb)
-                    solve_system!(system, gb_ref)
-                    int[i] = BMO.optical_power(detector)
-                end
-                @test isapprox(BMO.visibility(int), 1, atol=1e-2)
-            end
-        end
-        
-        @testset "Testing electric_field calculation - ref. index based phase shift" begin
-            λ = 1e-6
-            gb_prb = GaussianBeamlet([0, -start_offset, 0], [0, 1, 0], λ, .5mm)
-            gb_ref = GaussianBeamlet([start_offset, 0, 0], [-1, 0, 0], λ, .5mm)
-            
-            n_lambdas = substrate_length / BMO.wavelength(gb_prb)
-            
-            n_factors = LinRange(0, 1, 50)
-            pwr = zeros(length(n_factors))
-            # Increase ref. index of substrate until one additional λ of OPL has been introduced
-            for (i, nf) in enumerate(n_factors)
-                set_index(substrate, 1 + 1/n_lambdas * nf)        
-                empty!(detector)
-                solve_system!(system, gb_prb)
-                solve_system!(system, gb_ref)
-                pd_pwr = optical_power(
-                    detector;
-                    # restore pre-v0.11 behavior, e.g. no autolims
-                    n=pd_res,
-                    x_min=-pd_size/2,
-                    x_max=pd_size/2,
-                    z_min=-pd_size/2,
-                    z_max=pd_size/2
-                )
-                @test isapprox(pd_pwr, ref_signal(2pi*nf, 2e-3), atol=1e-8)
-            end
-            # Test if opl difference is indeed one λ
-            delta = BMO.optical_path_length(gb_prb)
-            delta -= BMO.optical_path_length(gb_ref)
-            delta /= λ
-            @test delta ≈ 1
-        end
-        
-        @testset "Testing electric_field mutation during retracing" begin    
-            gb_prb = GaussianBeamlet([0, -start_offset, 0], [0, 1, 0], 1e-6, .5mm)
-            gb_ref = GaussianBeamlet([start_offset, 0, 0], [-1, 0, 0], 1e-6, .5mm)    
-            phis = LinRange(0, 2pi, 50)
-            pwr = zeros(length(phis))
-            # Vary starting phase by 0...2pi via retracing    
-            for (i, phi) in enumerate(phis)
-                empty!(detector)
-                solve_system!(system, gb_prb)
-                solve_system!(system, gb_ref)
-                pd_pwr = optical_power(
-                    detector;
-                    # restore pre-v0.11 behavior, e.g. no autolims
-                    n=pd_res,
-                    x_min=-pd_size/2,
-                    x_max=pd_size/2,
-                    z_min=-pd_size/2,
-                    z_max=pd_size/2
-                )
-                @test isapprox(pd_pwr, ref_signal(phi, 2e-3), atol=1e-8)
-                shift_phase(gb_prb, step(phis))
-            end
-        end
-    end
 end
 
 @testset "Aqua" begin
