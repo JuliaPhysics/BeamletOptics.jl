@@ -7,6 +7,8 @@ const BMO = BeamletOptics
 
 const mm = 1e-3
 
+@testset "Detector" begin
+
 @testset "Testing spot diagram" begin
     # Init system and one ring beam
     pd = Detector(10e-3)
@@ -35,7 +37,8 @@ const mm = 1e-3
     @test isnothing(BMO.hits(pd))
 end
 
-@testset "Point-spread functions" begin
+##
+@testset "Testing point spread function" begin
     # parameters for an almost thin-lens
     l = 1e-3
     R1 = 100e-3
@@ -53,7 +56,7 @@ end
     lens = SphericalLens(R1, R2, l, d, x -> n)
     
     # PSF detector
-    psfd = PSFDetector(10e-3)
+    psfd = Detector(10e-3)
     translate3d!(psfd, [0, 200e-3 + 0.13e-3, 0])
 
     @testset "Airy-disc test" begin
@@ -75,14 +78,113 @@ end
         @test abs(num_min) ≈ airy_min rtol=1e-2
     end
 
-    @testset "PSFDetector reset" begin
+    @testset "Detector reset" begin
         # Test if data in psfd
-        @test length(psfd.data) == num_rays
+        @test length(BMO.hits(psfd)) == num_rays
         # Empty psfd and test
         empty!(psfd)
-        @test isempty(psfd.data)
+        @test isnothing(BMO.hits(psfd))
     end
 end
 
+##
 
+@testset "Testing Gaussian beamlet interference" begin
+    @testset "Pre-Beamsplitter tests with seperate beams" begin
+        # Gauss beam parameters (selected for ring fringes)
+        w0 = 0.01e-3
+        λ = 1000e-9
+        M2 = 1
+        P0 = 1e-3
+        I0 = 2 * P0 / (π * w0^2)
+        E0 = BMO.electric_field(I0)
+        zR = BMO.rayleigh_range(λ, w0, M2)
+        # Detector parameters
+        z = 0.1     # distance to detector
+        l = 1e-2    # detector size
+        n = 1000    # detector grid resolution
+        # Lens parameters
+        R1 = R2 = d = 0.01
+        nl = 1.5
+        f = BMO.lensmakers_eq(R1, -R2, nl)
+        # Raytracing system (for all tests)
+        pd_l = Detector(l) # n
+        pd_s = Detector(l / 10) # n ÷ 10
+        ln = ThinLens(R1, R2, d, nl)
+        translate3d!(pd_l, [0, z, 0])
+        translate3d!(pd_s, [0, z, 0])
+        translate3d!(ln, [0, z - f - thickness(ln) / 2, 0])
+
+        @testset "Testing fringe pattern" begin
+            system = System(pd_l)
+            Δz = 5e-3   # arm length difference
+            # Analytic solution
+            xs = ys = LinRange(-l / 2, l / 2, n)
+            screen = zeros(ComplexF64, length(xs), length(ys))
+            for (j, y) in enumerate(ys)
+                for (i, x) in enumerate(xs)
+                    r = sqrt(x^2 + y^2)
+                    screen[i, j] += BMO.electric_field(r, z, E0, w0, λ, M2)
+                    screen[i, j] += BMO.electric_field(r, z + Δz, E0, w0, λ, M2)
+                end
+            end
+            # Numerical solution
+            empty!(pd_l)
+            g_1 = GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0],
+                λ,
+                w0,
+                M2 = M2,
+                P0 = P0)
+            g_2 = GaussianBeamlet([0.0, -Δz, 0], [0.0, 1, 0],
+                λ,
+                w0,
+                M2 = M2,
+                P0 = P0)
+            solve_system!(system, g_1)
+            solve_system!(system, g_2)
+
+            # Compare solutions
+            I_analytical = intensity.(screen)
+            ~, ~, I_numerical = intensity(pd_l; n, x_min=-l/2, x_max=l/2, z_min=-l/2, z_max=l/2)
+            Pt = optical_power(pd_l; n, x_min=-l/2, x_max=l/2, z_min=-l/2, z_max=l/2)
+            @test all(isapprox.(I_analytical, I_numerical, atol = 2e-1))
+            @test isapprox(Pt, 2 * P0, atol = 3e-5)
+        end
+
+        @testset "Testing λ phase shift" begin
+            system = System([pd_s, ln])
+            # Numerical solution
+            Δz = LinRange(0, λ, 50)
+            Pt_numerical = zeros(length(Δz))
+            for (i, z_i) in enumerate(Δz)
+                empty!(pd_s)
+                g_1 = GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0],
+                    λ,
+                    w0,
+                    M2 = M2,
+                    P0 = P0)
+                g_2 = GaussianBeamlet([0.0, z_i, 0], [0.0, 1, 0],
+                    λ,
+                    w0,
+                    M2 = M2,
+                    P0 = P0)
+                solve_system!(system, g_1)
+                solve_system!(system, g_2)
+                Pt_numerical[i] = BMO.optical_power(pd_s)
+                # Test length/opl function
+                @test length(g_1) ≈ z
+                @test length(g_1) ≈ BMO.optical_path_length(g_1) - thickness(ln) * (nl - 1)
+                @test length(g_2) ≈ length(g_1) - z_i
+            end
+            # Analytical solution (cosine over Δz), ref. power is 4*P0 since beamsplitter is missing
+            Pt_analytical = 4 * P0 * [(cos(2π * z / (maximum(Δz))) + 1) / 2 for z in Δz]
+
+            # Compare detectors (this also tests correct behavior when focussing the beam)
+            @test all(isapprox.(Pt_numerical, Pt_analytical, atol = 1e-4))
+        end
+    end
 end
+
+end # TESTSET
+
+end # MODULE

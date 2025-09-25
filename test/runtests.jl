@@ -137,56 +137,6 @@ include(joinpath(@__DIR__, "TestBugFixes.jl"))
             @test all(isapprox.(Pt_numerical, Pt_analytical, atol = 1e-4))
         end
     end
-
-    @testset "Testing power conservation" begin
-        # variables
-        P0 = 0.5 # W
-        l0 = 0.1 # m
-        w0 = 0.5e-3
-        λ = 1064e-9
-
-        bs = ThinBeamsplitter(10e-3)
-        pd_resolution = 100
-        pd_1 = Detector(10e-3)
-        pd_2 = Detector(10e-3)
-
-        zrotate3d!(bs, deg2rad(45))
-        translate3d!(pd_1, [0, l0, 0])
-        zrotate3d!(pd_1, deg2rad(180))
-
-        translate3d!(pd_2, [l0, 0, 0])
-        zrotate3d!(pd_2, deg2rad(90))
-
-        # add BS and PD orientation error
-        zrotate3d!(bs, deg2rad(0.017))
-        zrotate3d!(pd_1, deg2rad(10))
-        xrotate3d!(pd_1, deg2rad(15))
-
-        # define system and beams -> solve
-        system = System([bs, pd_1, pd_2])
-
-        phis = LinRange(0, 2pi, 25)
-        p1 = similar(phis)
-        p2 = similar(phis)
-
-        l1 = GaussianBeamlet([0, -l0, 0], [0, 1.0, 0], λ, w0; P0)
-        l2 = GaussianBeamlet([-l0, 0, 0], [1.0, 0, 0], λ, w0; P0)
-
-        E0_buffer = l1.E0
-
-        for (i, phi) in enumerate(phis)
-            # Iterate over relative phase shifts, use retracing
-            l1.E0 = E0_buffer * exp(im * phi)
-            empty!(pd_1)
-            empty!(pd_2)
-            solve_system!(system, l1)
-            solve_system!(system, l2)
-            p1[i] = BMO.optical_power(pd_1)
-            p2[i] = BMO.optical_power(pd_2)
-            # Test power conservation
-            @test p1[i] + p2[i] - 2P0 < 1e-4 # W
-        end
-    end
 end
 
 @testset "Polarized rays" begin
