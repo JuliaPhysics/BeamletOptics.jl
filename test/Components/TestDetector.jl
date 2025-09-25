@@ -37,7 +37,6 @@ const mm = 1e-3
     @test isnothing(BMO.hits(pd))
 end
 
-##
 @testset "Testing point spread function" begin
     # parameters for an almost thin-lens
     l = 1e-3
@@ -86,8 +85,6 @@ end
         @test isnothing(BMO.hits(psfd))
     end
 end
-
-##
 
 @testset "Testing Gaussian beamlet interference" begin
     @testset "Pre-Beamsplitter tests with seperate beams" begin
