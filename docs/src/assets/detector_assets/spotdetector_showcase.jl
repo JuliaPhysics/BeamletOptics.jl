@@ -7,7 +7,7 @@ const mm = 1e-3
 ##
 lens = ThinLens(50mm, 50mm, BeamletOptics.inch, 1.5)
 
-sd = Spotdetector(10e-3)
+sd = Detector(10e-3)
 translate3d!(sd, [0, 50mm, 0])
 
 system = System([lens, sd])

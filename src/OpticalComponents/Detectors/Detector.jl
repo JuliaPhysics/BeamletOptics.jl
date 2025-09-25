@@ -1,31 +1,3 @@
-#=
-TODO
-1. implement intensity for 
-    1. ray ✓
-    2. pray
-    3. gbeamlet ✓
-2. implement autolims ✓
-    1. rays ✓
-    2. gbeamlet ✓
-3. fix GB hit getter syntax
-4. think about solutions for post-solve kinematic changes of Detector
-5. add docs to fcts ✓
-    1. calc_local_pos ✓
-    2. calc_local_lims ✓
-    3. electric_field ✓
-    4. intensity ✓
-    5. ellipse ✓
-    6. Detector ✓
-6. replace old detectors and fix testcases
-    1. Photodetector ✓
-    2. Spotdetector
-    3. PSFDetector
-7. replace old detectors and fix docs
-    1. Photodetector
-    2. Spotdetector
-    3. PSFDetector
-=#
-
 abstract type AbstractDetectorHit end
 abstract type AbstractRayHit{T} <: AbstractDetectorHit end
 abstract type AbstractBeamletHit{T} <: AbstractDetectorHit end
