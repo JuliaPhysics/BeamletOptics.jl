@@ -1,6 +1,54 @@
+"""
+    AbstractDetectorHit
+
+Abstract supertype for all [`Detector`](@ref) hit records.
+
+A hit of this type encapsulates the interaction of a ray or beamlet with the [`Detector`](@ref) 
+surface. Instead of directly accumulating values (e.g. optical power), the hit 
+object stores all relevant information about the incident field for a posteriori
+evaluation (such as plotting, power integration, or polarization analysis).
+
+Concrete subtypes include:
+
+- [`RayHit`](@ref) — unpolarized geometric ray
+- [`PolarizedRayHit`](@ref) — ray carrying a polarization state
+- [`GaussianBeamletHit`](@ref) — single Gaussian beamlet
+"""
 abstract type AbstractDetectorHit end
+
+"""
+    AbstractRayHit{T} <: AbstractDetectorHit
+
+Abstract supertype for detector hits produced by [`AbstractRay`](@ref)s. 
+Provides a common interface for extracting positional and optical path 
+information from rays stored in a detector hit.
+Currently the following concrete types are implemented:
+
+- [`RayHit`](@ref)
+- [`PolarizedRayHit`](@ref)
+
+# Implementation reqs.
+
+Subtypes of `AbstractRayHit` must implement the following:
+
+## Fields
+
+- `ray`: stores the `AbstractRay` that has intersected the detector
+- `opl`: stores the [`optical_path_length`](@ref) of the parent beam (incl. the ray)
+
+## Functions
+
+The interface provides the following functions for the fields above:
+
+- `position`: returns the `ray` position
+- `direction`: returns the `ray` direction
+- `length`: returns the `ray` length
+- `optical_path_length`: returns the `opl`
+- `wavenumber`: returns the `ray` wavenumber
+- `hit_point`: returns the R³ point of intersection
+- `projection_factor`: returns the scalar projection between the surface normal and ray dir.
+"""
 abstract type AbstractRayHit{T} <: AbstractDetectorHit end
-abstract type AbstractBeamletHit{T} <: AbstractDetectorHit end
 
 position(hit::AbstractRayHit) = position(hit.ray)
 direction(hit::AbstractRayHit) = direction(hit.ray)
@@ -13,11 +61,13 @@ hit_point(hit::AbstractRayHit) = position(hit) + length(hit.ray) * direction(hit
 
 projection_factor(hit::AbstractRayHit) = abs(dot(direction(hit), normal3d(intersection(hit.ray))))
 
+"Stores a [`Ray`](@ref) hit"
 struct RayHit{T} <: AbstractRayHit{T}
     ray::Ray{T}
     opl::T
 end
 
+"Stores a [`PolarizedRay`](@ref) hit"
 struct PolarizedRayHit{T} <: AbstractRayHit{T}
     ray::PolarizedRay{T}
     opl::T
@@ -25,6 +75,16 @@ end
 
 polarization(hit::PolarizedRayHit) = polarization(hit.ray)
 
+"""
+    AbstractBeamletHit
+
+Stores beamlet hits. Currently implemented:
+
+- [`GaussianBeamletHit`](@ref)
+"""
+abstract type AbstractBeamletHit{T} <: AbstractDetectorHit end
+
+"Stores a [`GaussianBeamlet`]"
 struct GaussianBeamletHit{T} <: AbstractBeamletHit{T}
     gauss::GaussianBeamlet{T}
     id::Int 
