@@ -43,25 +43,29 @@ function list_subtypes(parent::Type, is_last=true, prefix="", depth=1; max_depth
 end
 
 """
-    countlines_in_dir(dir)
+    countlines_in_dir(dir, ext=[".jl", ".md"])
 
-Counts the number of lines of all `.jl` files in `dir`.
+Counts the number of lines and files of all files in `dir` that have the specified file `ext`ension.
 """
-function countlines_in_dir(dir::String)
+function countlines_in_dir(dir::String, ext::Union{String, Vector{String}}=[".jl", ".md"])
     l = 0
+    f = 0
     items = readdir(dir)
     for item in items
         path = joinpath(dir, item)
-        if isfile(path) && endswith(path, ".jl")
+        if isfile(path) && any(endswith.(path, ext))
             li = countlines(path)
             l += li
-            println("$li lines of code in $path")
+            f += 1
+            println("$li LOC in $path")
         end
         if isdir(path)
-            l += countlines_in_dir(path)
+            ln, fn = countlines_in_dir(path, ext) 
+            l += ln
+            f += fn
         end
     end
-    return l
+    return l, f
 end
 
 """
