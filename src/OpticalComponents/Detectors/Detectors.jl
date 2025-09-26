@@ -2,7 +2,7 @@
     AbstractDetector <: AbstractObject
 
 A generic representation of a detector that evaluates [`AbstractBeam`](@ref) data during interaction.
-Refer to [`Photodetector`](@ref) for more information.
+Refer to e.g. [`Detector`](@ref) for more information.
 
 # Implementation reqs.
 
@@ -10,7 +10,7 @@ Subtypes of `AbstractDetector` should implement all supertype requirements as we
 
 ## Functions
 
-- `interact3d`: see e.g. [`Photodetector`](@ref) for reference
+- `interact3d`: see e.g. [`Detector`](@ref) for reference
 - `empty!`: resets data stored in the detector, see below
 
 # Additional information
