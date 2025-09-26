@@ -32,7 +32,7 @@ const mm = 1e-3
         @testset "Equal armlength MI - integrated power" begin
             # setup 635 nm laser with 0.1 mm waist for fast divergence
             λ = 635e-9
-            P_0 = 5e-3
+            P_0 = 5mm
             beam = GaussianBeamlet([0, -l_0, 0], [0, 1.0, 0], λ, 1e-4, P0 = P_0)
             
             # Shift mirror #2 by -λ to +λ
@@ -69,7 +69,7 @@ const mm = 1e-3
         @testset "Unequal armlength MI - electrical field" begin
             λ = 635e-9
             w0 = 1e-4
-            P0 = 1e-3
+            P0 = 1mm
             M2 = 1
             I0 = 2 * P0 / (π * w0^2)
             E0 = BMO.electric_field(I0) * 1 / sqrt(2)^2
@@ -117,13 +117,13 @@ const mm = 1e-3
         # variables
         P0 = 0.5 # W
         l0 = 0.1 # m
-        w0 = 0.5e-3
+        w0 = 0.5mm
         λ = 1064e-9
         
-        bs = ThinBeamsplitter(10e-3)
+        bs = ThinBeamsplitter(10mm)
         pd_resolution = 100
-        pd_1 = Detector(10e-3)
-        pd_2 = Detector(10e-3)
+        pd_1 = Detector(10mm)
+        pd_2 = Detector(10mm)
         
         zrotate3d!(bs, deg2rad(45))
         translate3d!(pd_1, [0, l0, 0])
