@@ -39,13 +39,13 @@ end
 
 @testset "Testing point spread function" begin
     # parameters for an almost thin-lens
-    l = 1e-3
-    R1 = 100e-3
+    l = 1mm
+    R1 = 100mm
     R2 = Inf
-    d = 25.4e-3
+    d = 25.4mm
     n = 1.5
     λ = 1e-6    
-    D = 15e-3
+    D = 15mm
     num_rays = 1000
     
     # plane wave source
@@ -55,8 +55,9 @@ end
     lens = SphericalLens(R1, R2, l, d, x -> n)
     
     # PSF detector
+    x_shift = y_shift = -2mm
     psfd = Detector(10e-3)
-    translate3d!(psfd, [0, 200e-3 + 0.13e-3, 0])
+    translate3d!(psfd, [x_shift, 200e-3 + 0.13e-3, y_shift])
 
     @testset "Airy-disc test" begin
         # build system and solve it
@@ -72,7 +73,7 @@ end
         num_min = x[argmin(I_num[:, jx_ctr])]   # first zero through the centre column
 
         # theoretical Airy-disk 1st zero
-        airy_min = 1.22*λ*200e-3/D
+        airy_min = 1.22*λ*200e-3/D - x_shift
 
         @test abs(num_min) ≈ airy_min rtol=1e-2
     end

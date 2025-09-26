@@ -84,16 +84,20 @@ Stores beamlet hits. Currently implemented:
 """
 abstract type AbstractBeamletHit{T} <: AbstractDetectorHit end
 
-"Stores a [`GaussianBeamlet`]"
+"""
+    GaussianBeamletHit{T} <: AbstractBeamletHit{T}
+
+Stores a [`GaussianBeamlet`], where `l0` represents the length of the parent beam
+up until the current beam section, identified by the `id` index.
+"""
 struct GaussianBeamletHit{T} <: AbstractBeamletHit{T}
     gauss::GaussianBeamlet{T}
+    l0::T
     id::Int 
 end
 
 position(hit::GaussianBeamletHit) = position(hit.gauss.chief.rays[hit.id])
 direction(hit::GaussianBeamletHit) = direction(hit.gauss.chief.rays[hit.id])
-
-length(hit::GaussianBeamletHit) = length(hit.gauss) - length(hit.gauss.chief.rays[hit.id])
 
 hit_point(hit::GaussianBeamletHit) = position(hit) + length(hit.gauss.chief.rays[hit.id]) * direction(hit)
 
@@ -235,7 +239,8 @@ function interact3d(::AbstractSystem, d::Detector, beam::Beam{T, R}, ray::R) whe
 end
 
 function interact3d(::AbstractSystem, d::Detector, g::GaussianBeamlet{R}, id::Int) where {R}
-    push!(d, GaussianBeamletHit(g, id))
+    l0 = length(g) - length(g.chief.rays[id])
+    push!(d, GaussianBeamletHit(g, l0, id))
     if stop(d)
         # Stop solver (hard target)
         return nothing

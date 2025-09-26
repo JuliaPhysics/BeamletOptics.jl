@@ -96,7 +96,7 @@ function electric_field(
                 p0 = position(hit)
                 d0 = direction(hit)
                 # important: calculate l0 with geometric length for local r, z
-                l0 = length(hit)
+                l0 = hit.l0
                 proj = projection_factor(hit)
                 # Find projection of p1 onto Gaussian optical axis, i.e. local r and z
                 l1 = dot(p1 - p0, d0)
@@ -142,7 +142,7 @@ function electric_field(
 
     # PD local coordinate axis
     orient = orientation(pd)
-    @views e1, e2 = Point3(orient[:, 1]), Point3(orient[:, 3])
+    @views e1, e2 = Point3(-orient[:, 1]), Point3(orient[:, 3])
     origin_pd = position(pd)
 
     Threads.@threads for j in eachindex(zs)
