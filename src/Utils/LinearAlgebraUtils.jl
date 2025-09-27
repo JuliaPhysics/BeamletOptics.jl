@@ -30,27 +30,44 @@ end
 """
     normal3d(input)
 
-Returns a **random** vector with unit length that is perpendicular to the `input` vector.
+Returns a vector with unit length that is perpendicular to the `input` vector.
+The orientation is chosen deterministically to guarantee reproducible bases.
 """
-function normal3d(input::AbstractArray)
-    # Gram-Schmidt method with random init
-    new = rand(3)
-    # Account for non-normed input vector
-    new -= dot(new, input) * input / norm(input)^2
-    return normalize(new)
+@inline function _orthogonal_basis_vector(v::SVector{3,T}) where {T}
+    if abs(v[1]) > abs(v[2])
+        inv_len = inv(sqrt(v[1]^2 + v[3]^2))
+        return SVector(-v[3] * inv_len, zero(T), v[1] * inv_len)
+    else
+        inv_len = inv(sqrt(v[2]^2 + v[3]^2))
+        return SVector(zero(T), v[3] * inv_len, -v[2] * inv_len)
+    end
 end
 
-function normal3d(input::Point3)
-    new = rand(Point3)
-    new -= dot(new, input) * input / norm(input)^2
-    return normalize(new)
+function normal3d(input::AbstractArray)
+    T = float(eltype(input))
+    v = normalize(SVector{3,T}(Tuple(input)))
+    n = _orthogonal_basis_vector(v)
+    # stabilize output type
+    if input isa SVector
+        return convert(typeof(input), n)
+    elseif input isa AbstractVector
+        return collect(n)
+    else
+        return convert(typeof(input), n)
+    end
+end
+
+function normal3d(input::Point3{T}) where T
+    v = normalize(SVector{3,T}(Tuple(input)))
+    n = _orthogonal_basis_vector(v)
+    return Point3(n...)
 end
 
 """
     rotate3d(reference::Vector, θ)
 
 Returns the rotation matrix that will rotate a vector around the reference axis at an angle
-θ in radians. Vector length is maintained. Counter-clockwise rotation in a right-hand coord. system. 
+θ in radians. Vector length is maintained. Counter-clockwise rotation in a right-hand coord. system.
 """
 function rotate3d(reference::AbstractVector, θ)
     cost = cos(θ)
