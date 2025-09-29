@@ -85,9 +85,9 @@ function electric_field(
     local_z = Point3(orientation(pd)[:,3])
     origin = position(pd)
     # Calculate field superposition
-    for j in eachindex(zs) # FIXME row column major order?
+    Threads.@threads for j in eachindex(zs) # FIXME row column major order?
         z = zs[j]
-        for i in eachindex(xs)
+        @inbounds for i in eachindex(xs)
             x = xs[i] 
             # Transform point p on PD into world coordinates
             p1 = origin + x * local_x + z * local_z
