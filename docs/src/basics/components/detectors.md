@@ -111,21 +111,21 @@ d = 25.4e-3
 n = 1.5
 λ = 1e-6
 
-# generate uniform source, lens and PSF detector
+# generate uniform source, lens and detector
 cs = UniformDiscSource([0, -10mm, 0], [0, 1, 0], 15e-3, λ)
 lens = SphericalLens(R1, R2, l, d, x -> n)
-psfd = PSFDetector(10e-3)
+detector = Detector(10e-3)
 
 # shift detector into focus
-translate3d!(psfd, [0, 200mm + 0.13mm, 0])
+translate3d!(detector, [0, 200mm + 0.13mm, 0])
 
 # build system
-sys = System([lens, psfd])
+sys = System([lens, detector])
 
 solve_system!(sys, cs)
 
 # retrieve intensity
-x, z, I_num = intensity(psfd; n=500, crop_factor=10)
+x, z, I_num = intensity(detector; n=500, crop_factor=10)
 ```
 
 Visualizing the result yields the expected Airy-disk pattern.
@@ -151,10 +151,10 @@ AL75150 = Lens(
 
 xrotate3d!(AL75150, deg2rad(-0.5))
 
-pd = PSFDetector(15e-3)
+detector = Detector(15e-3)
 
-translate3d!(pd, [0, 158.1779e-3, 0.0])
-system = System([AL75150, pd])
+translate3d!(detector, [0, 158.1779e-3, 0.0])
+system = System([AL75150, detector])
 
 ps = UniformDiscSource([0, -0.1, 0], [0,1,0], 0.8*d, 1550e-9)
 
