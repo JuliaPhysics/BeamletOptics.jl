@@ -33,6 +33,8 @@ cs = CollimatedSource([0,-50mm,0], [0,1,0], aperture, 1e-6; num_rings, num_rays)
 
 t1 = @timed solve_system!(system, cs)
 
+spots = spot_diagram(sd)
+
 render!(system_ax, cs, color=:blue, show_pos=false, render_every=50)
 
 save("spot_diagram_system.png", system_fig, px_per_unit=4)
@@ -40,7 +42,7 @@ save("spot_diagram_system.png", system_fig, px_per_unit=4)
 ## render diagram
 spot_fig = Figure(size=(600,400))
 spot_ax = Axis(spot_fig[1,1], aspect=1, xlabel="x [mm]", ylabel="y [mm]")
-sc = scatter!(spot_ax, sd.data, markersize=3, color=:blue)
+sc = scatter!(spot_ax, spots, markersize=3, color=:blue)
 
 extime = trunc(t1.time*1e3, digits=2)
 

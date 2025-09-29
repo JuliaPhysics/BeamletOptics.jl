@@ -5,7 +5,7 @@ include(joinpath(@__DIR__, "..", "assets", "cond_save.jl"))
 
 michelson_dir = joinpath(@__DIR__, "..", "assets", "mi_assets")
 
-conditional_include(joinpath(michelson_dir, "michelson_showcase.jl"), use_placeholder=false)
+conditional_include(joinpath(michelson_dir, "michelson_showcase.jl"))
 ```
 
 # Michelson interferometer

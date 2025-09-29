@@ -1,6 +1,6 @@
 # Conventions
 
-In order to ensure implicit and explicit compliance with large parts of the API, the following conventions need to be used. Below you can find some essential conventions that need to be followed. For specific components or parts of the code base, refer to the documentation if certain guidelines need to be followed.
+In order to ensure implicit and explicit compliance with large parts of the API, the following conventions need to be used unless specified otherwise. Below you can find some essential conventions. For specific components or parts of the code base, refer to the respective documentation if certain guidelines need to be followed.
 
 !!! warning
     Failure to comply with the following conventions can lead to spurious effects and silent bugs when using the API of this package!
