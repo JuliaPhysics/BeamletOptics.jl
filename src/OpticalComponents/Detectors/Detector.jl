@@ -146,12 +146,14 @@ of a **left-handed** (x, z) surface coordinate system, where incoming beams inte
   a [`NullableVector`](@ref) of hit data, resetable via `empty!`
 - `stop`
   a boolean value that allows for continued tracing after "passing through" the detector
-
+- `lock`
+  locks the `Detector` for multithreading-safe `push!`ing to the hits vector
 """
 mutable struct Detector{T, S <: AbstractShape{T}} <: AbstractDetector{T, S}
     const shape::S
     hits::NullableVector{<:AbstractDetectorHit}
     stop::Bool
+    lock::ReentrantLock
 end
 
 """
@@ -168,7 +170,7 @@ function Detector(edge_length::Real, stop::Bool=true)
     shape = QuadraticFlatMesh(edge_length)
     # rotate surface normal along neg. y-axis
     zrotate3d!(shape, π)
-    return Detector(shape, nothing, stop)
+    return Detector(shape, nothing, stop, ReentrantLock())
 end
 
 empty!(d::Detector) = hits!(d, nothing)
@@ -180,13 +182,16 @@ hits!(d::Detector, new) = (d.hits = new)
 stop(d::Detector) = d.stop
 
 function push!(d::Detector, new::AbstractDetectorHit)
-    # set data type on first push
-    if isnothing(hits(d))
-        hits!(d, [new])
-        return nothing
+    # Lock d to avoid race conditions
+    lock(d.lock) do 
+        # set data type on first push
+        if isnothing(hits(d))
+            hits!(d, [new])
+            return nothing
+        end
+        # if new<:AbstractData does not match, throws push! error 
+        push!(hits(d), new)
     end
-    # if new<:AbstractData does not match, throws push! error 
-    push!(hits(d), new)
 end
 
 function interact3d(::AbstractSystem, d::Detector, beam::Beam{T, R}, ray::R) where {T <: Real, R <: Ray{T}}
