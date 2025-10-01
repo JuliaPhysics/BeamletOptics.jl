@@ -155,7 +155,7 @@ function calc_local_lims(
         pd::Detector,
         ::Vector{GaussianBeamletHit{G}};
         # kwargs
-        crop_factor::Real=one(T),
+        crop_factor::Real=one(G),
         num_spots::Int=50
     ) where G
     local_hits = calc_local_pos(pd; crop_factor, num_spots)
