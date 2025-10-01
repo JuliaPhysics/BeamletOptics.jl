@@ -51,6 +51,10 @@ surface. Instead of directly accumulating values (e.g. optical power), the hit
 object stores all relevant information about the incident field for a posteriori
 evaluation (such as plotting, power integration, or polarization analysis).
 
+!!! info
+    Note that new subtypes of `AbstractDetectorHit` must be manually added to the `Detector`
+    definition to be eligible.
+
 Concrete subtypes include:
 
 - [`RayHit`](@ref) — unpolarized geometric ray
@@ -186,19 +190,26 @@ of a **left-handed** (x, z) surface coordinate system, where incoming beams inte
 
 # Fields
 
-- `shape`
+- `shape`:
   geometry of the active surface, must represent 2D-`field` in `x` any `y` dimensions,
   normal vector direction must adhere to definition above
-- `hits`
-  a [`NullableVector`](@ref) of hit data, resetable via `empty!`
-- `stop`
+- `hits`:
+  a union of `Nothing` and all implemented [`AbstractDetectorHit`](@ref)s, resettable via `empty!`
+  (note that only one type is allowed at any time)
+- `stop`:
   a boolean value that allows for continued tracing after "passing through" the detector
-- `lock`
+- `lock`:
   locks the `Detector` for multithreading-safe `push!`ing to the hits vector
 """
 mutable struct Detector{T, S <: AbstractShape{T}} <: AbstractDetector{T, S}
     const shape::S
-    hits::NullableVector{<:AbstractDetectorHit}
+    # direct reference to avoid UnionAny from AbstractDetectorHit
+    hits::Union{
+        Nothing,
+        Vector{RayHit{T}},
+        Vector{PolarizedRayHit{T}},
+        Vector{GaussianBeamletHit{T}}
+    }
     stop::Bool
     lock::ReentrantLock
 end
