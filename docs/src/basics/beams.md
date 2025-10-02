@@ -50,7 +50,7 @@ CollimatedSource(::AbstractArray{<:Real}, ::AbstractArray{<:Real}, ::Real, ::Rea
 
 A special constructor called [`UniformDiscSource`](@ref) is available, which offers an equal-area
 sampling (Fibonnaci-pattern) sampling and is thus favorable in situations where the weighting of the
-individual beams becomes important, e.g. for calculating a point spread function using [`PSFDetector`](@ref).
+individual beams becomes important, e.g. for calculating a point spread function using the [`intensity`](@ref) function.
 
 ```@docs; canonical=false
 UniformDiscSource

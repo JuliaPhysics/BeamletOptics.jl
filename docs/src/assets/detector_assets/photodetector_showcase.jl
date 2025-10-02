@@ -3,7 +3,7 @@ using GLMakie, BeamletOptics
 GLMakie.activate!(; ssao=true)
 
 ##
-pd = Photodetector(1e-3, 1000)
+pd = Detector(1e-3)
 pd_body = MeshDummy(joinpath(@__DIR__, "FDS010.stl"))
 zrotate3d!(pd_body, π)
 translate3d!(pd, [0,-3e-3,0])
@@ -18,13 +18,18 @@ g2 = GaussianBeamlet([0,-20e-3,0], [0,1,0], 532e-9, 5e-4)
 solve_system!(system, g1)
 solve_system!(system, g2)
 
+x, y, I = intensity(pd, n=1000)
+spots = spot_diagram(pd)
+
 ## render fringes
 fringes_fig = Figure()
 heat = Axis(fringes_fig[1, 1], xlabel="x [mm]", ylabel="y [mm]", aspect=1)
-hm = heatmap!(heat, pd.x*1e3, pd.y*1e3, intensity(pd), colormap=:viridis)
+hm = heatmap!(heat, x*1e3, y*1e3, I, colormap=:viridis)
 cb = Colorbar(fringes_fig[1, 2], hm, label="Intensity [W/m²]")
 
-save("fringes_showcase.png", fringes_fig; px_per_unit=4)
+scatter!(heat, spots*1e3; color=:red, markersize=4)
+
+save("fringes_showcase.png", fringes_fig; px_per_unit=8)
 
 ## render system
 detector_fig = Figure(size=(600, 280))

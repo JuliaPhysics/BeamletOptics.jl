@@ -62,7 +62,8 @@ arm_2 = ObjectGroup([m2, arm_holder_2])
 
 # PD
 pd_holder = MeshDummy(joinpath(asset_dir, "PD Assembly.stl"))
-pd = Photodetector(5e-3, 200)
+pd_size = 5mm
+pd = Detector(pd_size)
 translate3d!(pd, [0, -12cm, 0])
 
 pd_assembly = ObjectGroup([pd, pd_holder])
@@ -235,6 +236,16 @@ set_view(ax, pd_view)
 save("mi_pd.png", fig; px_per_unit=8, update = false)
 
 ## fringe plot
+x, y, I = intensity(
+    pd,
+    n=200,
+    x_min=-pd_size/2,
+    x_max= pd_size/2,
+    z_min=-pd_size/2,
+    z_max= pd_size/2,
+)
+spots = spot_diagram(pd)
+
 fringes_fig = Figure(size=(600, 270))
 heat1 = Axis(fringes_fig[1, 1], xlabel="x [mm]", ylabel="y [mm]", title="Before rotation", aspect=1)
 heat2 = Axis(fringes_fig[1, 2], xlabel="x [mm]", ylabel="y [mm]", title="After rotation", aspect=1, yaxisposition=:right)
@@ -242,13 +253,25 @@ heat2 = Axis(fringes_fig[1, 2], xlabel="x [mm]", ylabel="y [mm]", title="After r
 hidedecorations!(heat1)
 hidedecorations!(heat2)
 
-hm = heatmap!(heat1, pd.x*1e3, pd.y*1e3, intensity(pd), colormap=:viridis)
+hm = heatmap!(heat1, x*1e3, y*1e3, I, colormap=:viridis)
+scatter!(heat1, spots*1e3; color=:red, markersize=2)
 
 zrotate3d!(m1, 1e-3)
 empty!(pd)
 solve_system!(system, beam)
 
-hm = heatmap!(heat2, pd.x*1e3, pd.y*1e3, intensity(pd), colormap=:viridis)
+x, y, I = intensity(
+    pd,
+    n=200,
+    x_min=-pd_size/2,
+    x_max= pd_size/2,
+    z_min=-pd_size/2,
+    z_max= pd_size/2,
+)
+spots = spot_diagram(pd)
+
+hm = heatmap!(heat2, x*1e3, y*1e3, I, colormap=:viridis)
+scatter!(heat2, spots*1e3; color=:red, markersize=2)
 
 save("mi_fringes.png", fringes_fig, px_per_unit=4)
 
@@ -265,7 +288,7 @@ P = zeros(n+1)
 for i in eachindex(P)
     empty!(pd)
     solve_system!(system, beam)
-    P[i] = BeamletOptics.optical_power(pd)
+    P[i] = optical_power(pd)
     # translate by Δy
     translate3d!(m2, [0, Δy, 0])
 end

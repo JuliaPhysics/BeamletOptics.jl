@@ -14,7 +14,7 @@ In this tutorial, a simple [Michelson Interferometer](https://www.rp-photonics.c
 
 1. Define a simple laser source representation (i.e. a [`GaussianBeamlet`](@ref)).
 2. Create and position optical elements (splitter, mirrors).
-3. Add a [`Photodetector`](@ref) to capture interference patterns.
+3. Add a [`Detector`](@ref) to capture interference patterns.
 4. Run a simple simulation featuring moving components
 
 ![Intro figure](mi_intro_fig.png)
@@ -181,13 +181,13 @@ The following figure shows two 1" mirrors mounted in [KC1L/M](https://www.thorla
 
 ## Adding the detector
 
-The final step in creating a functional interferometer simulation is to add a [`Photodetector`](@ref) that captures the field data of the incoming beamlets.
+The final step in creating a functional interferometer simulation is to add a [`Detector`](@ref) that captures the field data of the incoming beamlets.
 
 ```julia
 reset_beamlet!(beam)
 
-# define detector with 8x8 mm active area and 200x200 resolution
-pd = Photodetector(8e-3, 200)
+# define detector with 5x5 mm active area
+pd = Detector(5e-3)
 
 # move detector into position
 translate_to3d!(pd, [18.81cm, 9.595cm, 0])
@@ -205,25 +205,51 @@ With the detector in place, the Michelson interferometer is now fully "operation
 
 ## Visualizing the fringes
 
-Once the beam has been split, reflected, and recombined on the `pd`, you can visualize the resulting intensity distribution to observe interference effects. In many interferometer setups, small adjustments -- such as rotating a mirror or slightly shifting its position -- introduce a spatial difference between the wavefronts of the beams, causing interference fringes to appear. Below is a comparison of the photodetector’s intensity data before (left) and after a slight rotation of mirror `m1` by 1 mrad (right). Initially, the wavefronts may overlap closely in space, producing a relatively uniform spot. After rotation, the mismatch occurs, creating a series of bright and dark fringes due to constructive and destructive interference:
+Once the beam has been split, reflected, and recombined on the `pd`, you can visualize the resulting intensity distribution to observe interference effects. In many interferometer setups, small adjustments -- such as rotating a mirror or slightly shifting its position -- introduce a spatial difference between the wavefronts of the beams, causing interference fringes to appear. Below is a comparison of the photodetector’s intensity data before (left) and after a slight rotation of mirror `m1` by 1 mrad (right). Initially, the wavefronts may overlap closely in space, producing a relatively uniform spot. After rotation, the mismatch occurs, creating a series of bright and dark fringes due to constructive and destructive interference. The beam 1/e² waists are included as dotted circles:
 
 ![Interferometer fringes](mi_fringes.png)
 
 You can recreate this figure by running the following code:
 
 ```julia
-fringes_fig = Figure()
-heat1 = Axis(fringes_fig[1, 1], aspect=1)
-heat2 = Axis(fringes_fig[1, 2], aspect=1)
+# evaluate intensity, overwrite autlims 
+x, y, I = intensity(
+    pd,
+    n=200,
+    x_min=-pd_size/2,
+    x_max= pd_size/2,
+    z_min=-pd_size/2,
+    z_max= pd_size/2,
+)
+spots = spot_diagram(pd)
 
-hm = heatmap!(heat1, pd.x, pd.y, intensity(pd), colormap=:viridis)
+fringes_fig = Figure(size=(600, 270))
+heat1 = Axis(fringes_fig[1, 1], xlabel="x [mm]", ylabel="y [mm]", title="Before rotation", aspect=1)
+heat2 = Axis(fringes_fig[1, 2], xlabel="x [mm]", ylabel="y [mm]", title="After rotation", aspect=1, yaxisposition=:right)
 
-# rotate m1, reset pd field data, resolve system
+hidedecorations!(heat1)
+hidedecorations!(heat2)
+
+hm = heatmap!(heat1, x*1e3, y*1e3, I, colormap=:viridis)
+scatter!(heat1, spots*1e3; color=:red, markersize=2)
+
 zrotate3d!(m1, 1e-3)
 empty!(pd)
 solve_system!(system, beam)
 
-hm = heatmap!(heat2, pd.x, pd.y, intensity(pd), colormap=:viridis)
+# reevaluate intensity, overwrite autlims 
+x, y, I = intensity(
+    pd,
+    n=200,
+    x_min=-pd_size/2,
+    x_max= pd_size/2,
+    z_min=-pd_size/2,
+    z_max= pd_size/2,
+)
+spots = spot_diagram(pd)
+
+hm = heatmap!(heat2, x*1e3, y*1e3, I, colormap=:viridis)
+scatter!(heat2, spots*1e3; color=:red, markersize=2)
 ```
 
 By experimenting with different mirror angles, arm lengths, or beamsplitter properties, you can observe how interference fringes evolve and gain insights into the stability and sensitivity of the interferometric setup. This can be important to optimize alignment and achieve high contrast fringes.
@@ -250,7 +276,7 @@ P = zeros(n+1)
 for i in eachindex(P)
     empty!(pd)
     solve_system!(system, beam)
-    P[i] = BeamletOptics.optical_power(pd)
+    P[i] = optical_power(pd)
     # translate by Δy
     translate3d!(m2, [0, Δy, 0])
 end

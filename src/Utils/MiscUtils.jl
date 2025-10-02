@@ -43,25 +43,29 @@ function list_subtypes(parent::Type, is_last=true, prefix="", depth=1; max_depth
 end
 
 """
-    countlines_in_dir(dir)
+    countlines_in_dir(dir, ext=[".jl", ".md"])
 
-Counts the number of lines of all `.jl` files in `dir`.
+Counts the number of lines and files of all files in `dir` that have the specified file `ext`ension.
 """
-function countlines_in_dir(dir::String)
+function countlines_in_dir(dir::String, ext::Union{String, Vector{String}}=[".jl", ".md"])
     l = 0
+    f = 0
     items = readdir(dir)
     for item in items
         path = joinpath(dir, item)
-        if isfile(path) && endswith(path, ".jl")
+        if isfile(path) && any(endswith.(path, ext))
             li = countlines(path)
             l += li
-            println("$li lines of code in $path")
+            f += 1
+            println("$li LOC in $path")
         end
         if isdir(path)
-            l += countlines_in_dir(path)
+            ln, fn = countlines_in_dir(path, ext) 
+            l += ln
+            f += fn
         end
     end
-    return l
+    return l, f
 end
 
 """
@@ -106,3 +110,16 @@ function find_zero_bisection(f, a, b; tol=1e-10, max_iter=1000)
     end
     throw(ErrorException("Bisection did not converge after $max_iter iterations"))
 end
+
+"""
+    ellipse(t, a, b, c)
+
+Returns a point in Rⁿ that lies on an n-dim. ellipse that is parametrized by 
+
+- `t`: circumference control variable ∈ [0, 2π]
+- `a`: center point
+- `b, c`: conjugate diameter vectors
+"""
+ellipse(t::Real, a::AbstractArray, b::AbstractArray, c::AbstractArray) = a + b * cos(t) + c * sin(t)
+
+ellipse(ts::AbstractArray, a, b, c) = [ellipse(t, a, b, c) for t in ts]

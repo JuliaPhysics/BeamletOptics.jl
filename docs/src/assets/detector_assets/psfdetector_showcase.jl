@@ -15,7 +15,7 @@ n = 1.5
 cs = UniformDiscSource([0, -10mm, 0], [0, 1, 0], 15e-3, λ)
 lens = SphericalLens(R1, R2, l, d, x -> n)
 
-psfd = PSFDetector(10e-3)
+psfd = Detector(10e-3)
 translate3d!(psfd, [0, 200mm + 0.13mm, 0])
 
 sys = System([lens, psfd])
@@ -46,7 +46,7 @@ AL75150 = Lens(
 
 xrotate3d!(AL75150, deg2rad(-0.5))
 
-pd = PSFDetector(15e-3)
+pd = Detector(15e-3)
 
 translate3d!(pd, [0, 158.1779e-3, 0.0])
 system = System([AL75150, pd])
