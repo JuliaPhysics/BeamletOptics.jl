@@ -73,7 +73,7 @@ function calc_local_pos(
         # build basis vectors
         dir = direction(hit)
         nd1 = normal3d(dir)
-        nd2 = cross(dir, nd1)        
+        nd2 = cross(dir, nd1)
         origin = hit_point(hit)
         # Calculate 3D waist circle of points
         pts_3D = ellipse(ts, origin, waist_radius*nd1, waist_radius*nd2)
@@ -81,7 +81,7 @@ function calc_local_pos(
         for (i, pt) in enumerate(pts_3D)
             dist = line_plane_distance3d(p0, ey, pt, dir)
             pts_3D[i] = pt + dist * dir
-        end        
+        end
         new_pts = calc_local_pos(p0, ex, ez, pts_3D)
         append!(pts_2D, new_pts)
     end
@@ -125,9 +125,22 @@ function calc_local_lims(
 
     # choose center
     if center == :centroid
-        w_sum = sum(projection_factor, hits)
-        x0 = sum(x -> (projection_factor(x[1]) * x[2]), zip(hits, xs)) / w_sum
-        z0 = sum(x -> (projection_factor(x[1]) * x[2]), zip(hits, zs)) / w_sum
+        w_sum = zero(T)
+        wx_sum = zero(T)
+        wz_sum = zero(T)
+        @inbounds for idx in eachindex(hits, xs, zs)
+            w = T(projection_factor(hits[idx]))
+            w_sum += w
+            wx_sum = muladd(w, xs[idx], wx_sum)
+            wz_sum = muladd(w, zs[idx], wz_sum)
+        end
+        if iszero(w_sum)
+            x0 = (minimum(xs) + maximum(xs)) / 2
+            z0 = (minimum(zs) + maximum(zs)) / 2
+        else
+            x0 = wx_sum / w_sum
+            z0 = wz_sum / w_sum
+        end
     else
         x0 = (minimum(xs) + maximum(xs)) / 2
         z0 = (minimum(zs) + maximum(zs)) / 2
@@ -144,8 +157,8 @@ end
 """
     calc_local_lims(pd::Detector, hits::Vector{GaussianBeamletHit}; crop_factor=1, num_spots=50, kwargs...)
 
-Computes a 2D bounding box around the circular or elliptical waist of [`GaussianBeamlet`](@ref) hits.    
-Assumes that the beamlet is approximately cylindrical around its optical axis at the point of intersection. 
+Computes a 2D bounding box around the circular or elliptical waist of [`GaussianBeamlet`](@ref) hits.
+Assumes that the beamlet is approximately cylindrical around its optical axis at the point of intersection.
 
 # Keyword arguments
 
