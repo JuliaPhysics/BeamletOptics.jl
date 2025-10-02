@@ -1,3 +1,45 @@
+abstract type AbstractCenterAlgorithm end
+
+struct Centroid <: AbstractCenterAlgorithm end
+struct MinMax <: AbstractCenterAlgorithm end
+
+"""
+    calc_center_point(::AbstractCenterAlgorithm, xs::Vector{T}, zs::Vector{T}, projection_factor::Vector{T}) where T
+
+Calculates a central 2D point based on a distribution of points, specified by `xs` and `zs`.
+The algorithm can be selected by specifying a concrete `AbstractCenterAlgorithm`.
+In addition, projection factors for each hit point can be passed.
+
+Returns `(x0, z0)`.
+"""
+calc_center_point(::ACA, ::Any, ::Any, ::Any) where ACA<:AbstractCenterAlgorithm = throw(ErrorException("calc_center_point not available for $ACA"))
+
+function calc_center_point(::Centroid, xs::Vector{T}, zs::Vector{T}, projection_factor::Vector{T}) where T
+    w_sum = zero(T)
+    wx_sum = zero(T)
+    wz_sum = zero(T)
+    @inbounds for idx in eachindex(xs, zs, projection_factor)
+        w = T(projection_factor[idx])
+        w_sum += w
+        wx_sum = muladd(w, xs[idx], wx_sum)
+        wz_sum = muladd(w, zs[idx], wz_sum)
+    end
+    if iszero(w_sum)
+        x0 = (minimum(xs) + maximum(xs)) / 2
+        z0 = (minimum(zs) + maximum(zs)) / 2
+    else
+        x0 = wx_sum / w_sum
+        z0 = wz_sum / w_sum
+    end
+    return x0, z0
+end
+
+function calc_center_point(::MinMax, xs::Vector{T}, zs::Vector{T}, ::Vector{T}) where T
+    x0 = (minimum(xs) + maximum(xs)) / 2
+    z0 = (minimum(zs) + maximum(zs)) / 2
+    return x0, z0
+end
+
 """
     calc_local_pos(pd::Detector; kwargs...)
 
@@ -100,14 +142,14 @@ function calc_local_lims(::Detector, ::Vector{B}) where B<:AbstractDetectorHit
 end
 
 """
-    calc_local_lims(pd::Detector, hits::Vector{<:AbstractRayHit}; crop_factor=1, center=:centroid)
+    calc_local_lims(pd::Detector, hits::Vector{<:AbstractRayHit}; crop_factor=1, center=Centroid())
 
 Compute a symmetric [x_min,x_max]×[z_min,z_max] box around the hit positions weighted centroid for ray-based spot diagrams.
 
-• If `center==:centroid` (the default), uses
+• If `center==Centroid()` (the default), uses
     x0 = ∑ wᵢ·xᵢ / ∑ wᵢ,  z0 = ∑ wᵢ·yᵢ / ∑ wᵢ
   with wᵢ = projection_factor.
-• If `center==:bbox`, falls back to the midpoint of [min,max].
+• If `center==MinMax()`, falls back to the midpoint of [min,max].
 
 Returns `(x_min, x_max, z_min, z_max)`.
 """
@@ -116,41 +158,19 @@ function calc_local_lims(
         hits::Vector{<:AbstractRayHit{T}};
         # kwargs
         crop_factor::Real=one(T),
-        center::Symbol=:centroid
+        center::AbstractCenterAlgorithm=Centroid()
     ) where T
     # get all hit‐points in local (x,y)
     local_hits = calc_local_pos(pd)
     xs = getindex.(local_hits, 1)
     zs = getindex.(local_hits, 2)
-
-    # choose center
-    if center == :centroid
-        w_sum = zero(T)
-        wx_sum = zero(T)
-        wz_sum = zero(T)
-        @inbounds for idx in eachindex(hits, xs, zs)
-            w = T(projection_factor(hits[idx]))
-            w_sum += w
-            wx_sum = muladd(w, xs[idx], wx_sum)
-            wz_sum = muladd(w, zs[idx], wz_sum)
-        end
-        if iszero(w_sum)
-            x0 = (minimum(xs) + maximum(xs)) / 2
-            z0 = (minimum(zs) + maximum(zs)) / 2
-        else
-            x0 = wx_sum / w_sum
-            z0 = wz_sum / w_sum
-        end
-    else
-        x0 = (minimum(xs) + maximum(xs)) / 2
-        z0 = (minimum(zs) + maximum(zs)) / 2
-    end
-
+    # calculate center
+    x0, z0 = calc_center_point(center, xs, zs, projection_factor.(hits))
     # half‐widths
     dx = maximum(x->abs(x - x0), xs)
     dy = maximum(y->abs(y - z0), zs)
     hwx, hwy = dx*crop_factor, dy*crop_factor
-
+    # return rect. grid limits
     return x0 - hwx, x0 + hwx, z0 - hwy, z0 + hwy
 end
 

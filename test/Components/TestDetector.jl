@@ -65,7 +65,7 @@ end
         solve_system!(sys, cs)
 
         # get PSF
-        x, y, I_num = intensity(psfd; n=500, crop_factor=5, center=:bbox)
+        x, y, I_num = intensity(psfd; n=500, crop_factor=5, center=MinMax())
 
         # get numerical first zero of the Airy-disk
         ci = argmax(I_num)

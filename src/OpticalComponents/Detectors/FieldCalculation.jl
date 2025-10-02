@@ -26,10 +26,10 @@ The following generic kwargs can be used for all hit types:
 
 ## Ray specific keyword arguments
 
-- `center::Symbol=:centroid`
+- `center::AbstractCenterAlgorithm=Centroid()`
   How the sampling window is centred.
-  `:centroid` uses the projection‑weighted centroid,
-  `:bbox` uses the geometric mid‑point of the bounding box.
+  `Centroid()` uses the projection‑weighted centroid,
+  `MinMax()` uses the geometric mid‑point of the bounding box.
 
 !!! note "Scaling"
     The returned values for ray hits correspond to the E-field of the point spread function.
@@ -117,7 +117,7 @@ function electric_field(
         # kwargs
         n::Int=100,
         crop_factor::Real=1,
-        center::Symbol=:centroid,
+        center::AbstractCenterAlgorithm=Centroid(),
         x_min = Inf,
         x_max = Inf,
         z_min = Inf,
