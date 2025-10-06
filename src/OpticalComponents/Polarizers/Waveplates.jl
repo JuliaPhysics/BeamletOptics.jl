@@ -1,5 +1,3 @@
-using StaticArrays
-
 """
     Waveplate{T,S,R} <: AbstractJonesPolarizer{T,S}
 
@@ -101,4 +99,3 @@ function interact3d(::AbstractSystem, wp::Waveplate, ::Beam{T,R},
     refractive_index!(new_ray, refractive_index(ray))
     return BeamInteraction{T,R}(nothing, new_ray)
 end
-
