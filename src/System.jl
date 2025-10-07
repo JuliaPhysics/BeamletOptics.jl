@@ -433,11 +433,11 @@ function retrace_system!(system::AbstractSystem, gauss::GaussianBeamlet{T}) wher
 end
 
 """
-    solve_system!(system::System, beam::AbstractBeam; r_max=100, retrace=true)
+    solve_system!(system::System, beam::AbstractBeam; r_max=100, retrace=true, depth_max=typemax(Int))
 
 Manage the tracing of an `AbstractBeam` through an optical `system`. The function retraces the `beam` if possible and then proceeds to trace each leaf of the beam tree through the system.
 The condition to stop ray tracing is that the last `beam` intersection is `nothing` or the beam interaction is `nothing`. Then, the system is considered to be solved.
-A maximum number of rays per `beam` (`r_max`) can be specified in order to avoid infinite calculations under resonant conditions, i.e. two facing mirrors.
+A maximum number of rays per `beam` (`r_max`) can be specified in order to avoid infinite calculations under resonant conditions, i.e. two facing mirrors. Likewise, `depth_max` limits how many branching levels are explored when new sub-beams are generated (for example, by beamsplitters) so that the tree cannot grow without bound.
 
 # Arguments
 
@@ -445,21 +445,28 @@ A maximum number of rays per `beam` (`r_max`) can be specified in order to avoid
 - `beam::AbstractBeam`: The beam object to be traced through the system.
 - `r_max::Int=100` (optional): Maximum number of tracing iterations for each leaf. Default is 100.
 - `retrace::Bool=true` (optional): Flag to indicate if the system should be retraced. Default is true.
+- `depth_max::Int=typemax(Int)` (optional): Maximum number of branching levels explored from the root beam. Default allows unlimited depth.
 """
-function solve_system!(system::AbstractSystem, beam::B; r_max::Int = 100, retrace::Bool = true) where {B <: AbstractBeam}
-    # Initialize a queue for BFS with the root beam.
-    queue = [beam]
+function solve_system!(
+        system::AbstractSystem,
+        beam::B;
+        r_max::Int = 100,
+        retrace::Bool = true,
+        depth_max::Int = typemax(Int),
+    ) where {B <: AbstractBeam}
+    queue = Tuple{B, Int}[(beam, 0)]
     while !isempty(queue)
-        current = popfirst!(queue)  # Process beams in FIFO order.
-        # Optionally retrace the current beam.
+        current, depth = popfirst!(queue)
         if retrace
             retrace_system!(system, current)
         end
-        # Process the current leaf beam.
         solve_leaf!(system, current; r_max=r_max)
-        # Enqueue all child beams for subsequent processing.
-        for child in children(current)  # 'children' returns an iterable of sub-beams.
-            push!(queue, child)
+        if depth < depth_max
+            for child in children(current)
+                push!(queue, (child, depth + 1))
+            end
+        else
+            _drop_beams!(current)
         end
     end
     return nothing
