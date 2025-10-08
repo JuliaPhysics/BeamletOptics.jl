@@ -454,19 +454,26 @@ function solve_system!(
         retrace::Bool = true,
         depth_max::Int = typemax(Int),
     ) where {B <: AbstractBeam}
-    queue = Tuple{B, Int}[(beam, 0)]
+    queue = Tuple{B, Int}[(beam, 1)]
     while !isempty(queue)
+         # Process beams in FIFO order.
         current, depth = popfirst!(queue)
+         # Optionally retrace the current beam.
         if retrace
             retrace_system!(system, current)
         end
+        # Process the current leaf beam.
         solve_leaf!(system, current; r_max=r_max)
-        if depth < depth_max
-            for child in children(current)
+        # Check if the maximum branching depth has been reached.
+        if depth <= depth_max
+             # Enqueue all child beams for subsequent processing.
+            for child in children(current) # 'children' returns an iterable of sub-beams.
                 push!(queue, (child, depth + 1))
             end
         else
+            # Maximum braching depth is reached. Remove childrens of the current beam because they will not be solved.
             _drop_beams!(current)
+            @debug lazy"Maximum branching depth of $depth_max levels reached."
         end
     end
     return nothing
