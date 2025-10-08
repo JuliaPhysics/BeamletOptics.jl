@@ -122,6 +122,20 @@ const mm = 1e-3
             @test BMO.direction(last(r)) ≈ [-1, 0, 0]
         end
     end
+
+    @testset "depth_max branch limiting" begin
+        beamsplitter = CubeBeamsplitter(25e-3, n -> N0)
+        translate3d!(beamsplitter, [0, 50mm, 0])
+        system = System([beamsplitter])
+
+        beam = Beam([0, 0, 0], [0, 1, 0], 1e-6)
+        solve_system!(system, beam; depth_max=0)
+        @test isempty(beam.children)
+
+        beam = Beam([0, 0, 0], [0, 1, 0], 1e-6)
+        solve_system!(system, beam; depth_max=1)
+        @test length(beam.children) == 2
+    end
 end
 
 end
