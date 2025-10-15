@@ -1,6 +1,7 @@
 module TestDetector
 
 using BeamletOptics
+using GeometryBasics
 using Test
 
 const BMO = BeamletOptics
@@ -180,6 +181,38 @@ end
             # Compare detectors (this also tests correct behavior when focussing the beam)
             @test all(isapprox.(Pt_numerical, Pt_analytical, atol = 1e-4))
         end
+    end
+end
+
+@testset "Issue #42" begin
+    # Tests regressions of https://github.com/JuliaPhysics/BeamletOptics.jl/issues/42
+    
+    @testset "Testing RayHit mutability / retracing" begin
+        # Setup system
+        m1 = RoundPlanoMirror(25mm, 5mm)
+        pd = Detector(50mm)
+        sys = System([m1, pd])
+        translate_to3d!(m1, [0,50mm,0])
+        translate_to3d!(pd, [0,50mm,50mm])
+        xrotate3d!(m1, deg2rad(-40))
+        xrotate3d!(pd, deg2rad(90))
+        beam = Beam([0,0,0], [0, 1, 0])
+        # get hits at every step and once after all (hits_ref)
+        hits_std = Vector{Point2{Float64}}()
+        for i = 1:11
+            solve_system!(sys, beam)
+            # get point directly
+            push!(hits_std, last(spot_diagram(pd)))
+            # rotate mirror
+            if i != 11
+                xrotate3d!(m1, deg2rad(-1))
+            end
+        end
+        hits_ref = spot_diagram(pd)
+        # test correct number of unique hits
+        @test length(hits_std) == length(hits_ref)
+        @test length(hits_std) == length(unique(hits_std))
+        @test length(hits_ref) == length(unique(hits_ref))
     end
 end
 

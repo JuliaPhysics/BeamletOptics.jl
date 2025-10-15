@@ -97,30 +97,57 @@ The interface provides the following functions for the fields above:
 """
 abstract type AbstractRayHit{T} <: AbstractDetectorHit end
 
-position(hit::AbstractRayHit) = position(hit.ray)
-direction(hit::AbstractRayHit) = direction(hit.ray)
+position(hit::AbstractRayHit) = hit.pos
+direction(hit::AbstractRayHit) = hit.dir
+normal3d(hit::AbstractRayHit) = hit.nml
 
-length(hit::AbstractRayHit) = length(hit.ray)
+# length(hit::AbstractRayHit) = length(hit.ray)
 optical_path_length(hit::AbstractRayHit) = hit.opl
-wavenumber(hit::AbstractRayHit) = wavenumber(hit.ray)
+wavelength(hit::AbstractRayHit) = hit.λ
+wavenumber(hit::AbstractRayHit) = wavenumber(wavelength(hit))
 
-hit_point(hit::AbstractRayHit) = position(hit) + length(hit.ray) * direction(hit)
+hit_point(h::AbstractRayHit) = h.hit
 
-projection_factor(hit::AbstractRayHit) = abs(dot(direction(hit), normal3d(intersection(hit.ray))))
+projection_factor(hit::AbstractRayHit) = abs(dot(direction(hit), normal3d(hit)))
 
 "Stores a [`Ray`](@ref) hit"
 struct RayHit{T} <: AbstractRayHit{T}
-    ray::Ray{T}
+    pos::Point3{T}
+    dir::Point3{T}
+    nml::Point3{T}
+    hit::Point3{T}
     opl::T
+    λ::T
+    function RayHit(ray::Ray{T}, opl) where T
+        # ray data
+        pos = position(ray)
+        dir = direction(ray)
+        nml = normal3d(intersection(ray))
+        hit = pos + length(ray) * dir
+        return new{T}(pos, dir, nml, hit, opl, wavelength(ray))
+    end
 end
 
 "Stores a [`PolarizedRay`](@ref) hit"
 struct PolarizedRayHit{T} <: AbstractRayHit{T}
-    ray::PolarizedRay{T}
+    pos::Point3{T}
+    dir::Point3{T}
+    nml::Point3{T}
+    hit::Point3{T}
     opl::T
+    λ::T
+    E0::Point3{Complex{T}}
+    function PolarizedRayHit(ray::PolarizedRay{T}, opl) where T
+        # ray data
+        pos = position(ray)
+        dir = direction(ray)
+        nml = normal3d(intersection(ray))
+        hit = pos + length(ray) * dir
+        return new{T}(pos, dir, nml, hit, opl, wavelength(ray), polarization(ray))
+    end
 end
 
-polarization(hit::PolarizedRayHit) = polarization(hit.ray)
+polarization(hit::PolarizedRayHit) = hit.E0
 
 """
     AbstractBeamletHit
