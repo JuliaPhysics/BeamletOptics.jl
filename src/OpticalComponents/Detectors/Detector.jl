@@ -80,8 +80,7 @@ Subtypes of `AbstractRayHit` must implement the following:
 
 ## Fields
 
-- `ray`: stores the `AbstractRay` that has intersected the detector
-- `opl`: stores the [`optical_path_length`](@ref) of the parent beam (incl. the ray)
+This type must provide all fields required to satisfy the getter functions listed below.
 
 ## Functions
 
@@ -89,10 +88,14 @@ The interface provides the following functions for the fields above:
 
 - `position`: returns the `ray` position
 - `direction`: returns the `ray` direction
-- `length`: returns the `ray` length
+- `normal3d`: returns the surface normal at the point of intersection
+
 - `optical_path_length`: returns the `opl`
+- `wavelength`: returns the `ray` wavelength
 - `wavenumber`: returns the `ray` wavenumber
+
 - `hit_point`: returns the R³ point of intersection
+
 - `projection_factor`: returns the scalar projection between the surface normal and ray dir.
 """
 abstract type AbstractRayHit{T} <: AbstractDetectorHit end
@@ -101,7 +104,6 @@ position(hit::AbstractRayHit) = hit.pos
 direction(hit::AbstractRayHit) = hit.dir
 normal3d(hit::AbstractRayHit) = hit.nml
 
-# length(hit::AbstractRayHit) = length(hit.ray)
 optical_path_length(hit::AbstractRayHit) = hit.opl
 wavelength(hit::AbstractRayHit) = hit.λ
 wavenumber(hit::AbstractRayHit) = wavenumber(wavelength(hit))
