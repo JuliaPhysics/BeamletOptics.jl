@@ -260,7 +260,7 @@ global gb_constructor_warn = true
 #FIXME remove deprecated constructor until end of 2025
 function GaussianBeamlet(chief::Ray{T}, λ=1e-6, w0=1e-3; M2=1, P0=1e-3, support = [0,0,1]) where T
     if gb_constructor_warn
-        @warn "The GaussianBeamlet(::Ray, ...) constructor will be deprecated in the future"
+        @warn "The GaussianBeamlet(::Ray, ...) constructor will be deprecated at the end of 2025"
         global gb_constructor_warn = false
     end
     s1 = normal3d(direction(chief), support)
