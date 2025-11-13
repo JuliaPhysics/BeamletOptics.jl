@@ -204,7 +204,7 @@ If no intersection occurs, `Inf` is returned. `kϵ` is the abort threshold for b
 `lϵ` is the threshold for negative values of `t`.
 This algorithm is fast due to multiple breakout conditions.
 """
-function MoellerTrumboreAlgorithm(face, ray::AbstractRay{T}; kϵ = 1e-9, lϵ = 1e-9) where {T}
+function MoellerTrumboreAlgorithm(face, ray::AbstractRay{T}; kϵ = 1e-9, lϵ = 0) where {T}
     V1 = Point3(face[1, 1], face[1, 2], face[1, 3])
     V2 = Point3(face[2, 1], face[2, 2], face[2, 3])
     V3 = Point3(face[3, 1], face[3, 2], face[3, 3])
@@ -234,9 +234,9 @@ function MoellerTrumboreAlgorithm(face, ray::AbstractRay{T}; kϵ = 1e-9, lϵ = 1
     # Compute t (type def. for t to avoid Any)
     t::T = dot(E2, Qv) * invDet
     # Return intersection only if "in front of" ray origin
-    if t < lϵ
-        return T(Inf)
-    end
+    # if t < lϵ
+    #     return T(Inf)
+    # end
     return t
 end
 
@@ -255,8 +255,8 @@ function intersect3d(mesh::AbstractMesh{M},
     for i in 1:numEl
         face = @views vertices(mesh)[faces(mesh)[i, :], :]
         t = MoellerTrumboreAlgorithm(face, ray)
-        # Return closest intersection
-        if t < t0
+        # Return closest (unsigned) face intersection
+        if abs(t) < t0
             t0 = t
             fID = i
         end
