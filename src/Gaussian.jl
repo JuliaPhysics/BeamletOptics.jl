@@ -255,26 +255,6 @@ function GaussianBeamlet(
     )
 end
 
-global gb_constructor_warn = true
-
-#FIXME remove deprecated constructor until end of 2025
-function GaussianBeamlet(chief::Ray{T}, λ=1e-6, w0=1e-3; M2=1, P0=1e-3, support = [0,0,1]) where T
-    if gb_constructor_warn
-        @warn "The GaussianBeamlet(::Ray, ...) constructor will be deprecated at the end of 2025"
-        global gb_constructor_warn = false
-    end
-    s1 = normal3d(direction(chief), support)
-    return GaussianBeamlet(
-        position(chief),
-        direction(chief),
-        λ,
-        w0;
-        M2,
-        P0,
-        support = s1
-    )
-end
-
 point_on_beam(gauss::GaussianBeamlet, t::Real) = point_on_beam(gauss.chief, t)
 
 """
