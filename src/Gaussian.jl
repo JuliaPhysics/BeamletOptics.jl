@@ -258,61 +258,49 @@ end
 point_on_beam(gauss::GaussianBeamlet, t::Real) = point_on_beam(gauss.chief, t)
 
 """
-    gauss_parameters(gauss::GaussianBeamlet, z; hint::Union{Nothing, Tuple{Int, Vector{<:Real}}}=nothing)
+    gauss_parameters(pos_0, pos_w, pos_d, dir_c, dir_w, dir_d, λ, n)
 
-Calculate the local waist radius and Gouy phase of an unastigmatic Gaussian beamlet at a specific cartesian distance `z` based on the method of J. Arnaud (1985) and D. DeJager (1992).
+Calculates the beam parameters of a [`GaussianBeamlet`](@ref) based on the chief, waist and divergence ray position and direction.
 
-# Arguments
+# Approach
 
-- `gauss`: the GaussianBeamlet object for which parameters are to be calculated.
-- `z`: the position along the beam at which to calculate the parameters.
-- `hint`: an optional hint parameter for the relevant point/index of the appropriate beam segment. If not provided, the function will automatically select the ray.
+Find the waist and divergence ray "2D" heights and slopes with respect to the chief ray.
 
-# Returns
+1. find divergence ray "height" and "slope" at intersection point y0 with target plane at p0 of chief ray
+2. ray height "y_d" is length between p0 and y0
+3. ray slope "m_d" is angle between vector p0 -> y0 and divergence ray direction -> gives unambiguous angle for signed ray slope calculation
+4. fails if y_d is zero -> catch R=Inf, ψ=0 and H=λ/π
 
-- `w`: local radius
-- `R`: curvature, i.e. 1/r where r is the radius of curvature
-- `ψ`: Gouy phase (note that -atan definition is used)
-- `w0`: local beam waist radius
+Refer to the publication of D. DeJager (1992).
 """
 function gauss_parameters(
-        gauss::GaussianBeamlet,
-        z::Real;
-        hint = point_on_beam(gauss, z)
+        # positions 
+        pos_0::AbstractArray,   # point on beam
+        pos_w::AbstractArray,   # start of waist ray
+        pos_d::AbstractArray,   # start of div. ray
+        # directions
+        dir_c::AbstractArray,   # dir. of chief ray
+        dir_w::AbstractArray,   # dir. of waist ray
+        dir_d::AbstractArray,   # dir. of div. ray
+        # parameters
+        λ::Real,                # wavelength
+        n::Real                 # ref. index
     )
-    p0, index = hint
-    chief = gauss.chief.rays[index]
-    div = gauss.divergence.rays[index]
-    waist = gauss.waist.rays[index]
-    #=
-    Divergence ray height and slope (same for waist ray)
-    - find divergence ray "height" and "slope" at intersection point y0 with target plane at p0 of chief ray
-    - ray height "y_d" is length between p0 and y0
-    - ray slope "m_d" is angle between vector p0 -> y0 and divergence ray direction -> gives unambiguous angle for signed ray slope calculation
-    - fails if y_d is zero -> catch R=Inf, ψ=0 and H=λ/π
-    =#
-    intersection_len = line_plane_distance3d(p0,
-        direction(chief),
-        position(div),
-        direction(div))
-    y0 = position(div) + intersection_len * direction(div) - p0
+    # Divergence ray height and slope
+    intersection_len = line_plane_distance3d(pos_0, dir_c, pos_d, dir_d)
+    y0 = pos_d + intersection_len * dir_d - pos_0
     y_d = norm(y0)
     y0 /= y_d
-    m_d = tan(π / 2 - angle3d(y0, direction(div)))
+    m_d = tan(π / 2 - angle3d(y0, dir_d))
     # Waist ray height and slope
-    intersection_len = line_plane_distance3d(p0,
-        direction(chief),
-        position(waist),
-        direction(waist))
-    y0 = position(waist) + intersection_len * direction(waist) - p0
+    intersection_len = line_plane_distance3d(pos_0, dir_c, pos_w, dir_w)
+    y0 = pos_w + intersection_len * dir_w - pos_0
     y_w = norm(y0)
     y0 /= y_w
-    m_w = tan(π / 2 - angle3d(y0, direction(waist)))
+    m_w = tan(π / 2 - angle3d(y0, dir_w))
     # Beam parameters as per Arnaud (1985) and DeJager (1992)
-    n = refractive_index(chief)
     H = abs(n * (y_w * m_d - y_d * m_w))
     # Test optical invariant
-    λ = wavelength(gauss)
     if !isapprox(H, λ / π, atol = 1e-6)
         H = λ / π
         # println("H not fulfilled at z=$z")
@@ -330,6 +318,45 @@ function gauss_parameters(
     isnan(w0) && (w0 = w)
     R < 0 && (ψ = -ψ)
     return w, R, ψ, w0
+end
+
+"""
+    gauss_parameters(gauss::GaussianBeamlet, z; hint::Union{Nothing, Tuple{Int, Vector{<:Real}}}=nothing)
+
+Calculates the local waist radius and Gouy phase of an unastigmatic Gaussian beamlet at a specific cartesian distance `z` based on the method of J. Arnaud (1985) and D. DeJager (1992).
+
+# Arguments
+
+- `gauss`: the GaussianBeamlet object for which parameters are to be calculated.
+- `z`: the position along the beam at which to calculate the parameters.
+- `hint`: an optional hint parameter for the relevant point/index of the appropriate beam segment. If not provided, the function will automatically select the ray.
+
+# Returns
+
+- `w`: local radius
+- `R`: curvature, i.e. 1/r where r is the radius of curvature
+- `ψ`: Gouy phase (note that -atan definition is used)
+- `w0`: local beam waist radius
+"""
+function gauss_parameters(
+        gauss::GaussianBeamlet,
+        z::Real;
+        # kwargs
+        hint = point_on_beam(gauss, z)
+    )
+    pos_0, index = hint
+    # index rays
+    chief = gauss.chief.rays[index]
+    div = gauss.divergence.rays[index]
+    waist = gauss.waist.rays[index]
+    # ray starting positions
+    pos_d = position(div)
+    pos_w = position(waist)
+    # ray directions
+    dir_c = direction(chief)
+    dir_d = direction(div)
+    dir_w = direction(waist)
+    return gauss_parameters(pos_0, pos_w, pos_d, dir_c, dir_w, dir_d, wavelength(gauss), refractive_index(chief))
 end
 
 """
@@ -389,7 +416,7 @@ isparaxial(system::AbstractSystem, gb::GaussianBeamlet, threshold::Real = π / 4
 
 """
     istilted(system::System, gb::GaussianBeamlet)
-
+ 
 Tests if refractive elements are tilted with respect to the beamlet optical axis, i.e. introduce simple astigmatism.
 """
 istilted(system::AbstractSystem, gb::GaussianBeamlet) = !isparaxial(system, gb.chief, 0)
