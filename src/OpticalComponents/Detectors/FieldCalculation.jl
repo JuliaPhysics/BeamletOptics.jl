@@ -104,7 +104,7 @@ function electric_field(
                 r_gb = norm(p1 - p2)
                 z_gb = l0 + l1
                 # Add field contribution, projection factor accounts for beam spot stretching
-                field[i, j] += electric_field(hit.gauss, r_gb, z_gb) * sqrt(proj)
+                field[i, j] += electric_field(hit, r_gb, z_gb) * sqrt(proj)
             end
         end
     end

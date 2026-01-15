@@ -110,7 +110,7 @@ function calc_local_pos(
     # Caclulate spots
     for hit in hits
         # Determine waist radius at intersection point
-        waist_radius, ~, ~, ~ = gauss_parameters(hit.gauss, length(hit.gauss))
+        waist_radius, ~, ~, ~ = gauss_parameters(hit, hit_point(hit))
         waist_radius *= crop_factor
         # build basis vectors
         dir = direction(hit)
