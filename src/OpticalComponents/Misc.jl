@@ -31,7 +31,7 @@ The shape is represented by a tetrahedral [`Mesh`](@ref).
 
 - `mesh`: shape of the `Retroreflector`
 """
-struct Retroreflector{T} <: AbstractReflectiveOptic{T, Mesh{T}}
+struct Retroreflector{T} <: AbstractReflectiveOptic{T}
     mesh::Mesh{T}
 end
 

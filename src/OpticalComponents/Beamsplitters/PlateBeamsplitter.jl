@@ -30,7 +30,7 @@ If the concrete implementation does not define the above fields, the following g
     This type uses the [`Hint`](@ref)-API in order to ensure that the splitting interaction is correctly
     triggered at the coating.
 """
-abstract type AbstractPlateBeamsplitter{T, S} <: AbstractBeamsplitter{T, S} end
+abstract type AbstractPlateBeamsplitter{T} <: AbstractBeamsplitter{T} end
 
 coating(pbs::AbstractPlateBeamsplitter) = pbs.coating
 substrate(pbs::AbstractPlateBeamsplitter) = pbs.substrate
@@ -44,9 +44,6 @@ shape_trait_of(::AbstractPlateBeamsplitter) = MultiShape()
 shape(pbs::AbstractPlateBeamsplitter) = (substrate(pbs), coating(pbs))
 
 refractive_index(pbs::AbstractPlateBeamsplitter, λ::Real) = refractive_index(substrate(pbs), λ)
-
-"""Placeholder type for the  shape of a [`RectangularPlateBeamsplitter`](@ref)"""
-struct RectangularPlateBeamsplitterShape{T} <: AbstractShape{T} end
 
 """
     RectangularPlateBeamsplitter <: AbstractPlateBeamsplitter
@@ -64,7 +61,7 @@ For more information refer to the [`AbstractPlateBeamsplitter`](@ref) docs.
 !!! info "Kinematic center"
     The center of kinematics of this splitter lies at the center of the coating.
 """
-struct RectangularPlateBeamsplitter{T} <: AbstractPlateBeamsplitter{T, RectangularPlateBeamsplitterShape{T}}
+struct RectangularPlateBeamsplitter{T} <: AbstractPlateBeamsplitter{T}
     substrate::Prism{T, BoxSDF{T}}
     coating::ThinBeamsplitter{T, Mesh{T}}
 end
@@ -103,9 +100,6 @@ function RectangularPlateBeamsplitter(
     return RectangularPlateBeamsplitter(substrate, coating)
 end
 
-"""Placeholder type for the  shape of a [`RoundPlateBeamsplitterShape`](@ref)"""
-struct RoundPlateBeamsplitterShape{T} <: AbstractShape{T} end
-
 """
     RoundPlateBeamsplitter <: AbstractPlateBeamsplitter
 
@@ -122,7 +116,7 @@ For more information refer to the [`AbstractPlateBeamsplitter`](@ref) docs.
 !!! info "Kinematic center"
     The center of kinematics of this splitter lies at the center of the coating.
 """
-struct RoundPlateBeamsplitter{T} <: AbstractPlateBeamsplitter{T, RoundPlateBeamsplitterShape{T}}
+struct RoundPlateBeamsplitter{T} <: AbstractPlateBeamsplitter{T}
     substrate::Prism{T, PlanoSurfaceSDF{T}}
     coating::ThinBeamsplitter{T, Mesh{T}}
 end

@@ -19,7 +19,7 @@ For more information refer to the [`AbstractPlateBeamsplitter`](@ref) docs.
     In order to model gap-free beam propagation, the `interact3d` model relies heavily on the [`Hint`](@ref)-API.
     If the `front` or `back` substrate is hit, the `Hint` will ensure that the beam intersects the `coating`.
 """
-struct CubeBeamsplitter{T} <: AbstractBeamsplitter{T, CubeBeamsplitterShape{T}}
+struct CubeBeamsplitter{T} <: AbstractBeamsplitter{T}
     front::Prism{T, RightAnglePrismSDF{T}}
     back::Prism{T, RightAnglePrismSDF{T}}
     coating::ThinBeamsplitter{T, Mesh{T}}

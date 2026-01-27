@@ -24,7 +24,7 @@ Refer to the [`_calculate_global_E0`](@ref) implementation for more information.
 !!! info
     The validity of this approach is still under consideration for non-normal incidence.
 """
-abstract type AbstractJonesPolarizer{T, S} <: AbstractObject{T} end
+abstract type AbstractJonesPolarizer{T} <: AbstractObject{T} end
 
 function _calculate_global_E0(object::AbstractJonesPolarizer, ray::PolarizedRay, out_dir::AbstractArray, J::GlobalJonesBasis)
     in_dir = direction(ray)

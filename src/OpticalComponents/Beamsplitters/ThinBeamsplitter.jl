@@ -13,7 +13,7 @@ Represents a 2D beam-splitting device.
     Note that the `transmittance` should be calculated from an input `reflectance` in order
     to ensure that R² + T² = 1.
 """
-struct ThinBeamsplitter{T <: Real, S <: AbstractShape{T}} <: AbstractBeamsplitter{T, S}
+struct ThinBeamsplitter{T <: Real, S <: AbstractShape{T}} <: AbstractBeamsplitter{T}
     shape::S
     reflectance::T
     transmittance::T

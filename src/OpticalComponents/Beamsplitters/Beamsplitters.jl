@@ -24,7 +24,7 @@ The `interact3d` function should then return `nothing` in order to stop the trac
 - `_beamsplitter_transmitted_beam`: optional helper function
 - `_beamsplitter_reflected_beam`: optical helper function
 """
-abstract type AbstractBeamsplitter{T, S <: AbstractShape{T}} <: AbstractObject{T} end
+abstract type AbstractBeamsplitter{T} <: AbstractObject{T} end
 
 # order of inclusion matters
 include("ThinBeamsplitter.jl")

@@ -29,7 +29,7 @@ Only if the data can be accumulated sequentially, multiple beam interactions can
 Since e.g. E-field data is supposed to be accumulated by mutability of the detector data, the burden of resetting the data for a new solver call
 is placed on the user. This function should be called `empty!`.
 """
-abstract type AbstractDetector{T, S <: AbstractShape{T}} <: AbstractObject{T} end
+abstract type AbstractDetector{T} <: AbstractObject{T} end
 
 """
     empty!(detector)
@@ -201,7 +201,7 @@ of a **left-handed** (x, z) surface coordinate system, where incoming beams inte
 - `lock`:
   locks the `Detector` for multithreading-safe `push!`ing to the hits vector
 """
-mutable struct Detector{T, S <: AbstractShape{T}} <: AbstractDetector{T, S}
+mutable struct Detector{T, S <: AbstractShape{T}} <: AbstractDetector{T}
     const shape::S
     # direct reference to avoid UnionAny from AbstractDetectorHit
     hits::Union{

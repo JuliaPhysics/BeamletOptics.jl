@@ -3,7 +3,7 @@
 
 Represents a zero-thickness, ideal polarization filter. 
 """
-struct PolarizationFilter{T, S <: AbstractShape{T}} <: AbstractJonesPolarizer{T,S}
+struct PolarizationFilter{T, S <: AbstractShape{T}} <: AbstractJonesPolarizer{T}
     shape::S
     JMat::GlobalJonesBasis{T}
     cutoff::T

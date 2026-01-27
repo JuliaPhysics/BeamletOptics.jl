@@ -27,7 +27,7 @@ by specialized subtypes.
 !!! info "Polarization ray tracing"
     Fresnel coefficients during reflection are set such that no reflection losses occur (i.e. `|rₚ| = |rₛ| = 1`).
 """
-abstract type AbstractReflectiveOptic{T, S <: AbstractShape{T}} <: AbstractObject{T} end
+abstract type AbstractReflectiveOptic{T} <: AbstractObject{T} end
 
 # FIXME Require reflectivity field/function for interaction with PolarizedRay
 
@@ -76,7 +76,7 @@ Concrete implementation of a perfect mirror (R = 1) with arbitrary shape.
 !!! warning "Reflecting surfaces"
     It is important to consider that **all** surfaces of this mirror type are reflecting!
 """
-struct Mirror{T, S <: AbstractShape{T}} <: AbstractReflectiveOptic{T, S}
+struct Mirror{T, S <: AbstractShape{T}} <: AbstractReflectiveOptic{T}
     shape::S
 end
 
@@ -144,7 +144,7 @@ See also [`Mirror`](@ref).
 
 - `shape`: a [`PlanoSurfaceSDF`](@ref) that represents the substrate
 """
-struct RoundPlanoMirror{T} <: AbstractReflectiveOptic{T, PlanoSurfaceSDF{T}}
+struct RoundPlanoMirror{T} <: AbstractReflectiveOptic{T}
     shape::PlanoSurfaceSDF{T}
 end
 
@@ -176,7 +176,7 @@ See also [`RoundPlanoMirror`](@ref).
 
 - `shape`: a [`ConcaveSphericalMirrorShape`](@ref) that represents the substrate
 """
-struct ConcaveSphericalMirror{T} <: AbstractReflectiveOptic{T, ConcaveSphericalMirrorShape{T}}
+struct ConcaveSphericalMirror{T} <: AbstractReflectiveOptic{T}
     shape::ConcaveSphericalMirrorShape{T}
 end
 
@@ -209,7 +209,7 @@ See also [`Mirror`](@ref).
 
 - `shape`: a [`RightAnglePrismSDF`](@ref) that represents the substrate
 """
-struct RightAnglePrismMirror{T} <: AbstractReflectiveOptic{T, RightAnglePrismSDF{T}}
+struct RightAnglePrismMirror{T} <: AbstractReflectiveOptic{T}
     shape::RightAnglePrismSDF{T}
 end
 
