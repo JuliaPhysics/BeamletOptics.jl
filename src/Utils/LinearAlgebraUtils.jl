@@ -113,15 +113,33 @@ function align3d(start::AbstractVector{A}, target::AbstractVector{B}) where {A, 
 end
 
 """
-    angle3d(target::AbstractVector, reference::AbstractVector)
+    angle3d(target::AbstractVector, start::AbstractVector)
 
-Returns the angle between the `target` and `reference` vector in **rad**.
+Returns the angle between the `target` and `start` vector in **rad**.
 """
-function angle3d(target::AbstractArray{T}, reference::AbstractArray{R}) where {T,R}
+function angle3d(target::AbstractArray{T}, start::AbstractArray{R}) where {T,R}
     G = promote_type(T,R)
-    arg = clamp(dot(target, reference) / (norm(target) * norm(reference)), -one(G), one(G))
+    arg = clamp(dot(target, start) / (norm(target) * norm(start)), -one(G), one(G))
     angle = acos(arg)
     return angle
+end
+
+"""
+    angle3d(target::AbstractArray, start::AbstractArray, reference::AbstractArray)
+
+Returns the angle between the `target` and `start` vector in **rad**. In addition, a `reference` axis must be specified.
+This axis is used in order to determine the angle sign of rotation according to the **right hand rule**.
+"""
+function angle3d(target::AbstractArray{T}, start::AbstractArray{S}, reference::AbstractArray{R}) where {T,S,R}
+    G = promote_type(T,S,R)
+    θ = angle3d(target, start)
+    # get angle sign
+    c = cross(start, target)
+    if dot(c, reference) > zero(G)
+        return θ
+    else
+        return -θ
+    end
 end
 
 """

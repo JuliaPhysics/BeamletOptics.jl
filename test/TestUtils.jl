@@ -66,6 +66,13 @@ const BMO = BeamletOptics
     @testset "Testing angle3d for resulting angle" begin
         a = BMO.angle3d([1, 0, 0], [0, 0, 1])
         @test isapprox(a, π / 2)
+        # test signed angles
+        b1 = BMO.angle3d([1,0,0], [0,1,0], [0,0,1])
+        b2 = BMO.angle3d([1,0,0], [0,-1,0], [0,0,1])
+        b3 = BMO.angle3d([1,1,0], [1,0,1], -[0,0,1])
+        @test b1 ≈ -π/2
+        @test b2 ≈ π/2
+        @test b3 ≈ -deg2rad(60)
     end
 
     @testset "Testing line_point_distance3d and isinfrontof" begin
