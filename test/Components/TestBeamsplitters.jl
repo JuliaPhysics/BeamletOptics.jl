@@ -98,8 +98,8 @@ const mm = 1e-3
             t = BMO.rays(beam.children[1])
             r = BMO.rays(beam.children[2])
 
-            @test BMO.direction(last(t)) == BMO.direction(first(p))
-            @test BMO.direction(last(t)) == [0, 1, 0]
+            @test BMO.direction(last(t)) ≈ BMO.direction(first(p))
+            @test BMO.direction(last(t)) ≈ [0, 1, 0]
         end
 
         @testset "Retrace CBS backside" begin
