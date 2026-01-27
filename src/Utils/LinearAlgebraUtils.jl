@@ -70,6 +70,9 @@ Returns the rotation matrix that will rotate a vector around the reference axis 
 θ in radians. Vector length is maintained. Counter-clockwise rotation in a right-hand coord. system.
 """
 function rotate3d(reference::AbstractVector, θ)
+    if isnan(θ) || isinf(θ)
+        throw(ArgumentError("θ must be real and not Inf or NaN"))
+    end
     cost = cos(θ)
     sint = sin(θ)
     ux, uy, uz = reference

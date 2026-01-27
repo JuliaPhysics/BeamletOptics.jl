@@ -44,6 +44,8 @@ const BMO = BeamletOptics
     @testset "Testing rotate3d for clockwise dir. and conservation of length" begin
         Rot = BMO.rotate3d([0, 0, 1], π / 2)
         @test isapprox(Rot * [1, 0, 0], [0, 1, 0])
+        @test_throws ArgumentError BMO.rotate3d([0, 0, 1], Inf)
+        @test_throws ArgumentError BMO.rotate3d([0, 0, 1], NaN)
     end
 
     @testset "Testing align3d for rotation and conservation of length" begin
