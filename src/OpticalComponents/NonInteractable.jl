@@ -11,7 +11,7 @@ A passive [`AbstractObject`](@ref) which does not interact with the ray tracing 
     This type is intended mainly for visualization purposes, e.g. kinematic mount [`Mesh`](@ref)s, or similar applications.
     In essence, this object behaves fully transparent. The `intersect3d` and `interact3d` methods default to `nothing`.
 """
-struct NonInteractableObject{T, S <: AbstractShape{T}} <: AbstractObject{T, S}
+struct NonInteractableObject{T, S <: AbstractShape{T}} <: AbstractObject{T}
     shape::S
 end
 

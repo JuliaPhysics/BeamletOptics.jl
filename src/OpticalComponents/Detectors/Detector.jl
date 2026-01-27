@@ -29,7 +29,7 @@ Only if the data can be accumulated sequentially, multiple beam interactions can
 Since e.g. E-field data is supposed to be accumulated by mutability of the detector data, the burden of resetting the data for a new solver call
 is placed on the user. This function should be called `empty!`.
 """
-abstract type AbstractDetector{T, S <: AbstractShape{T}} <: AbstractObject{T, S} end
+abstract type AbstractDetector{T, S <: AbstractShape{T}} <: AbstractObject{T} end
 
 """
     empty!(detector)

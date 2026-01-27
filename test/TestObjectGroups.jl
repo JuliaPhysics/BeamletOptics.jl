@@ -18,8 +18,7 @@ const BMO = BeamletOptics
         Point3{T}(position),
         Matrix{T}(I, 3, 3))
 
-    struct GroupTestObject{T <: Real, S <: BMO.AbstractShape{T}} <:
-           BMO.AbstractObject{T, S}
+    struct GroupTestObject{T <: Real, S <: BMO.AbstractShape{T}} <: BMO.AbstractObject{T}
         shape::S
     end
 

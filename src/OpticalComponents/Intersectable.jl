@@ -7,7 +7,7 @@ A passive [`AbstractObject`](@ref) which can be hit by a beam. In this case, the
 
 - `shape`: an [`AbstractShape`](@ref)
 """
-struct IntersectableObject{T, S <: AbstractShape{T}} <: AbstractObject{T, S}
+struct IntersectableObject{T, S <: AbstractShape{T}} <: AbstractObject{T}
     shape::S
 end
 

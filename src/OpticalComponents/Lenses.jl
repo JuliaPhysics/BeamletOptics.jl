@@ -32,7 +32,7 @@ by specialized subtypes.
     Fresnel coefficients at the point of refraction are calculated via the [`fresnel_coefficients`](@ref) function with the
     refractive index data of the substrate and the previous medium.
 """
-abstract type AbstractRefractiveOptic{T, S <: AbstractShape{T}, F} <: AbstractObject{T, S} end
+abstract type AbstractRefractiveOptic{T, S <: AbstractShape{T}, F} <: AbstractObject{T} end
 
 refractive_index(object::AbstractRefractiveOptic) = object.n
 refractive_index(object::AbstractRefractiveOptic{<:Any, <:Any, <:RefractiveIndex}, λ::Real)::Float64 = object.n(λ)

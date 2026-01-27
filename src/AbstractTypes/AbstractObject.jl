@@ -29,7 +29,7 @@ is dispatched.
 
 - [`interact3d`](@ref): defines the optical interaction, the return type must be `Nothing` or an [`AbstractInteraction`](@ref)
 """
-abstract type AbstractObject{T <: Real, S <: AbstractShape{T}} end
+abstract type AbstractObject{T <: Real} end
 
 "Default trait"
 shape_trait_of(::AbstractObject) = SingleShape()
@@ -92,6 +92,6 @@ Subtypes of `AbstractObjectGroup` must implement the following:
 
 - for the kinematic API, all corresponding functions of [`AbstractObject`](@ref) must be implemented
 """
-abstract type AbstractObjectGroup{T} <: AbstractObject{T, AbstractShape{T}} end
+abstract type AbstractObjectGroup{T} <: AbstractObject{T} end
 
 AbstractTrees.children(group::AbstractObjectGroup) = group.objects

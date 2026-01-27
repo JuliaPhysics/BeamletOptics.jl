@@ -176,8 +176,7 @@ const BMO = BeamletOptics
         end
     end
 
-    struct TestObject{T, S <: BMO.AbstractShape{T}} <:
-           BMO.AbstractObject{T, S}
+    struct TestObject{T, S <: BMO.AbstractShape{T}} <: BMO.AbstractObject{T}
         shape::S
     end
 

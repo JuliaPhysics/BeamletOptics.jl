@@ -10,7 +10,7 @@ const BMO = BeamletOptics
 @testset "System" begin
     @testset "Testing implementation" begin
         struct SystemTestBeam{T} <: BMO.AbstractBeam{T, Ray{T}} end
-        struct SystemTestObject{T, S} <: BMO.AbstractObject{T, S} end
+        struct SystemTestObject{T, S} <: BMO.AbstractObject{T} end
         o1 = SystemTestObject{Real, BMO.AbstractShape{Real}}()
         o2 = SystemTestObject{Real, BMO.AbstractShape{Real}}()
         system = System(o1)

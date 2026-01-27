@@ -27,7 +27,7 @@ by specialized subtypes.
 !!! info "Polarization ray tracing"
     Fresnel coefficients during reflection are set such that no reflection losses occur (i.e. `|rₚ| = |rₛ| = 1`).
 """
-abstract type AbstractReflectiveOptic{T, S <: AbstractShape{T}} <: AbstractObject{T, S} end
+abstract type AbstractReflectiveOptic{T, S <: AbstractShape{T}} <: AbstractObject{T} end
 
 # FIXME Require reflectivity field/function for interaction with PolarizedRay
 
