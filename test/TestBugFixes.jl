@@ -38,7 +38,7 @@ end
     # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/22
     # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/23
     
-    mutable struct TestSubstrate{T, S <: BMO.AbstractShape{T}, N} <: BMO.AbstractRefractiveOptic{T, S, N}
+    mutable struct TestSubstrate{T, S <: BMO.AbstractShape{T}, N} <: BMO.AbstractRefractiveOptic{T, N}
         const shape::S
         n::N
     end

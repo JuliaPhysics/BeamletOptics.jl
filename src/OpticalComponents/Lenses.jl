@@ -32,10 +32,10 @@ by specialized subtypes.
     Fresnel coefficients at the point of refraction are calculated via the [`fresnel_coefficients`](@ref) function with the
     refractive index data of the substrate and the previous medium.
 """
-abstract type AbstractRefractiveOptic{T, S <: AbstractShape{T}, F} <: AbstractObject{T} end
+abstract type AbstractRefractiveOptic{T, F} <: AbstractObject{T} end
 
 refractive_index(object::AbstractRefractiveOptic) = object.n
-refractive_index(object::AbstractRefractiveOptic{<:Any, <:Any, <:RefractiveIndex}, λ::Real)::Float64 = object.n(λ)
+refractive_index(object::AbstractRefractiveOptic{<:Any, <:RefractiveIndex}, λ::Real)::Float64 = object.n(λ)
 
 """
     interact3d(AbstractSystem, AbstractRefractiveOptic, Beam, Ray)
@@ -126,7 +126,7 @@ function interact3d(system::AbstractSystem, optic::AbstractRefractiveOptic,
 end
 
 """
-    Lens{T, S <: AbstractShape{T}, N <: RefractiveIndex} <: AbstractRefractiveOptic{T, S, N}
+    Lens{T, S <: AbstractShape{T}, N <: RefractiveIndex} <: AbstractRefractiveOptic{T, N}
 
 Represents an uncoated `Lens` with a homogeneous [`RefractiveIndex`](@ref) `n = n(λ)`.
 Refer to the [`Lens`](@ref) and [`SphericalLens`](@ref) constructors for more information on how to generate lenses.
@@ -143,8 +143,7 @@ Refer to the [`Lens`](@ref) and [`SphericalLens`](@ref) constructors for more in
     and must be provided by the user. For testing purposes, an anonymous function, e.g. λ -> 1.5
     can be passed such that the lens has the same refractive index for all wavelengths.
 """
-struct Lens{T, S <: AbstractShape{T}, N <: RefractiveIndex} <:
-       AbstractRefractiveOptic{T, S, N}
+struct Lens{T, S <: AbstractShape{T}, N <: RefractiveIndex} <: AbstractRefractiveOptic{T, N}
     shape::S
     n::N
     function Lens(

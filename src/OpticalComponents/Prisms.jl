@@ -1,10 +1,10 @@
 """
-    Prism{T, S <: AbstractShape{T}, N <: RefractiveIndex} <: AbstractRefractiveOptic{T, S, N}
+    Prism{T, S <: AbstractShape{T}, N <: RefractiveIndex} <: AbstractRefractiveOptic{T, N}
 
 Essentially represents the same functionality as [`Lens`](@ref).
 Refer to its documentation.
 """
-struct Prism{T, S <: AbstractShape{T}, N <: RefractiveIndex} <: AbstractRefractiveOptic{T, S, N}
+struct Prism{T, S <: AbstractShape{T}, N <: RefractiveIndex} <: AbstractRefractiveOptic{T, N}
     shape::S
     n::N
     function Prism(shape::S, n::N) where {T<:Real, S<:AbstractShape{T}, N<:RefractiveIndex}
@@ -26,7 +26,7 @@ Creates a right angle symmetric [`Prism`](@ref). The prism is *not aligned* with
 - `height`: in [m]
 - `n`: [`RefractiveIndex`](@ref) of the prism
 """
-function RightAnglePrism(leg_length::Real, height::Real, n::BeamletOptics.RefractiveIndex)
-    shape = BeamletOptics.RightAnglePrismSDF(leg_length, height)
+function RightAnglePrism(leg_length::Real, height::Real, n::RefractiveIndex)
+    shape = RightAnglePrismSDF(leg_length, height)
     return Prism(shape, n)
 end

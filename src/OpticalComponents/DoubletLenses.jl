@@ -4,7 +4,7 @@ abstract type AbstractDoubletRefractiveOptic{
     B <: AbstractShape{T},
     N1 <: RefractiveIndex,
     N2 <: RefractiveIndex
-} <: AbstractRefractiveOptic{T, F, N1} end
+} <: AbstractRefractiveOptic{T, N1} end
 
 """
     DoubletLens
