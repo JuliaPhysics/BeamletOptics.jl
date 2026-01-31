@@ -38,7 +38,7 @@ end
     normal = normal3d(intersection(ray))
     in_dir = direction(ray)
     out_dir = reflection3d(in_dir, normal)
-    J = XZBasis(zero(T), zero(T), zero(T), one(T))
+    J = XZBasis(zero(T), zero(T), zero(T), -one(T))
     E0 = _calculate_global_E0(pbs, ray, out_dir, J)
     return Beam(PolarizedRay(pos, out_dir, wavelength(ray), E0))
 end
