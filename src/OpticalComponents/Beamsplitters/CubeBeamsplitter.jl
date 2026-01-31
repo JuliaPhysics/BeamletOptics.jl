@@ -34,7 +34,7 @@ refractive_index(cbs::CubeBeamsplitter, λ::Real) = refractive_index(cbs.front, 
 """
     CubeBeamsplitter(leg_length, n; reflectance=0.5)
 
-Creates a [`CubeBeamsplitter`](@ref). The cuboid is centered at the origin. The splitter 
+Creates a [`CubeBeamsplitter`](@ref). The cuboid is centered at the origin. The splitter
 coating is orientated at a 45° angle with respect to the y-axis.
 
 # Inputs
@@ -42,29 +42,29 @@ coating is orientated at a 45° angle with respect to the y-axis.
 - `leg_length`: the x-, y- and z-edge length in [m]
 - `n`: the [`RefractiveIndex`](@ref) of the front and back prism
 
-# Keywords 
+# Keywords
 
 - `reflectance`: defines the splitting ratio in [-], i.e. R = 0 ... 1.0
 """
 function CubeBeamsplitter(
         leg_length::Real,
         n::RefractiveIndex;
-        reflectance::Real=0.5
-    )
+        reflectance::Real = 0.5
+)
     front = RightAnglePrism(leg_length, leg_length, n)
     back = RightAnglePrism(leg_length, leg_length, n)
-    bs = ThinBeamsplitter(√2*leg_length, leg_length; reflectance)
+    bs = ThinBeamsplitter(√2 * leg_length, leg_length; reflectance)
     zrotate3d!(back, deg2rad(180))
-    zrotate3d!(bs, deg2rad(180-45))
+    zrotate3d!(bs, deg2rad(180 - 45))
     set_new_origin3d!(shape(bs))
     return CubeBeamsplitter(front, back, bs)
 end
 
 function interact3d(
-    system::AbstractSystem,
-    cbs::CubeBeamsplitter,
-    beam::Beam{T, R},
-    ray::R) where {T <: Real, R <: AbstractRay{T}}
+        system::AbstractSystem,
+        cbs::CubeBeamsplitter,
+        beam::Beam{T, R},
+        ray::R) where {T <: Real, R <: AbstractRay{T}}
     # Front prism interaction
     if shape(intersection(ray)) === shape(cbs.front)
         interaction = interact3d(system, cbs.front, beam, ray)
@@ -92,10 +92,10 @@ function interact3d(
 end
 
 function interact3d(
-    system::AbstractSystem,
-    cbs::CubeBeamsplitter,
-    gauss::GaussianBeamlet,
-    id::Int)
+        system::AbstractSystem,
+        cbs::CubeBeamsplitter,
+        gauss::GaussianBeamlet,
+        id::Int)
     _shape = shape(intersection(rays(gauss.chief)[id]))
     # Front prism interaction
     if _shape === shape(cbs.front)
@@ -130,7 +130,7 @@ polarization components. The coating is mounted at 45° relative to the
 incoming `y` direction of the cube, so rotating the cube rotates these axes
 accordingly.
 """
-struct PolarizingCubeBeamsplitter{T} <: AbstractBeamsplitter{T, CubeBeamsplitterShape{T}}
+struct PolarizingCubeBeamsplitter{T} <: AbstractBeamsplitter{T}
     front::Prism{T, RightAnglePrismSDF{T}}
     back::Prism{T, RightAnglePrismSDF{T}}
     coating::PolarizingBeamSplitter{T, Mesh{T}}
@@ -164,10 +164,10 @@ function PolarizingCubeBeamsplitter(leg_length::Real, n::RefractiveIndex)
 end
 
 function interact3d(
-    system::AbstractSystem,
-    cbs::PolarizingCubeBeamsplitter,
-    beam::Beam{T, R},
-    ray::R) where {T <: Real, R <: PolarizedRay{T}}
+        system::AbstractSystem,
+        cbs::PolarizingCubeBeamsplitter,
+        beam::Beam{T, R},
+        ray::R) where {T <: Real, R <: PolarizedRay{T}}
     if shape(intersection(ray)) === shape(cbs.front)
         interaction = interact3d(system, cbs.front, beam, ray)
         hint!(interaction, Hint(cbs, shape(cbs.coating)))

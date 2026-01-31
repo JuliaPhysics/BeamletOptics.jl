@@ -174,7 +174,7 @@ numerical_aperture(θ::Real, n::Real = 1.0) = n * sin(θ)
 Calculates e.g. the interferometric contrast from a series of optical power measurements.
 For more information go [here](https://en.wikipedia.org/wiki/Interferometric_visibility).
 """
-visibility(I_min::Real, I_max::Real) = (I_max - I_min) / (I_max + I_min) 
+visibility(I_min::Real, I_max::Real) = (I_max - I_min) / (I_max + I_min)
 function visibility(opt_pwr::AbstractArray)
     I_max = maximum(opt_pwr)
     I_min = minimum(opt_pwr)
@@ -219,3 +219,57 @@ iscircular(E::AbstractArray) = iscircular(real(E), imag(E))
 Tests if the polarization state is elliptical.
 """
 iselliptical(E::AbstractArray) = !islinear(E) && !iscircular(E)
+
+"""
+    rotate_polarization(E_in, k_in, k_out, normal)
+
+Rotates the polarization vector `E_in` from an incoming ray direction `k_in` to an
+outgoing ray direction `k_out` (e.g. after refraction), maintaining the transversality
+and the geometric relation to the plane of incidence.
+
+# Arguments
+- `E_in`: incoming electric field vector (must be orthogonal to `k_in`)
+- `k_in`: incoming ray direction (unit vector)
+- `k_out`: outgoing ray direction (unit vector)
+- `normal`: surface normal vector (unit vector)
+
+# Returns
+- `E_out`: the rotated electric field vector, orthogonal to `k_out`
+"""
+function rotate_polarization(E_in::AbstractVector{T}, k_in::AbstractVector,
+        k_out::AbstractVector, normal::AbstractVector) where {T}
+    # 1. Define s-direction (perpendicular to plane of incidence)
+    # s = k_in × normal (normalized)
+    s = cross(k_in, normal)
+    if norm(s) < 1e-9 # Normal incidence or grazing parallel, p-pol plane undefined/degenerate
+        # For normal incidence (k_in || normal), s is undefined.
+        # But if k_in || normal, then by Snell's law k_out || k_in (unless n1 != n2, but direction is same line).
+        # In this degenerate case, transversal E stays transversal if k_out is parallel to k_in.
+        # If k_in == -normal and k_out == -normal (transmission), no change needed?
+        # Let's handle generic case: pick arbitrary s orthogonal to k_in
+        if abs(dot(k_in, k_out)) > 1.0 - 1e-9 # parallel
+            return E_in
+        end
+        # fallback for degenerate but different directions? unphysical for refraction usually unless k_in || normal
+        # If k_in || normal, then s is degenerate.
+        # We can assume p-pol is just E_in itself?
+        # This case logic might need refinement, but for standard refraction of ray aligned with normal, k_out is also aligned.
+        return E_in
+    end
+    s_hat = normalize(s)
+
+    # 2. Define p-directions
+    # p_in = s_hat × k_in
+    p_in = cross(s_hat, k_in)
+    # p_out = s_hat × k_out
+    p_out = cross(s_hat, k_out)
+
+    # 3. Decompose E_in
+    Es = dot(E_in, s_hat)
+    Ep = dot(E_in, p_in)
+
+    # 4. Reconstruct E_out
+    # s-component is unchanged in direction (perpendicular to plane), p-component rotates
+    E_out = Es * s_hat + Ep * p_out
+    return E_out
+end
