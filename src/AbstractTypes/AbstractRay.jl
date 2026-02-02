@@ -64,6 +64,11 @@ Subtypes of `AbstractBeam` must implement the following:
 - `λ`: wavelength in [m]
 - `n`: refractive index along the ray path
 
+## Functions:
+
+- `empty!`: resets the ray to its initial, unsolved state
+- `intersect3d`: calculates the [`Intersection`](@ref) between a ray and a shape
+
 # Additional information
 
 !!! info "Ray length"
@@ -98,6 +103,8 @@ function intersection!(ray::AbstractRay, _intersection::Nullable{Intersection})
      ray.intersection = _intersection
      return nothing
 end
+
+Base.empty!(ray::AbstractRay) = intersection!(ray, nothing)
 
 """
     intersect3d(shape::AbstractShape, ::AbstractRay)

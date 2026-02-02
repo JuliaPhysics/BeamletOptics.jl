@@ -22,6 +22,7 @@ Subtypes of `AbstractBeam` must implement the following:
 
 - `_modify_beam_head!`: modifies the beam path for retracing purposes
 - `_last_beam_intersection`: returns the last `Beam` intersection
+- `empty!`: resets the beam to its unsolved state
 """
 abstract type AbstractBeam{T <: Real, R <: AbstractRay{T}} end
 
@@ -83,6 +84,10 @@ end
 
 function _last_beam_intersection(::B) where {B <: AbstractBeam}
     throw(ArgumentError(lazy"_last_beam_intersection not implemented for $B"))
+end
+
+function Base.empty!(::B) where {B <: AbstractBeam}
+    throw(ArgumentError(lazy"empty! not implemented for $B"))
 end
 
 """
