@@ -334,12 +334,12 @@ function _make_lens_shape(
             if md_mid > d_max
                 outer_thickness = thickness(final_side) # Use cylinder
                 outer_center = position(final_side)[2] + outer_thickness / 2
-                if front !== nothing
+                if front !== nothing && thickness(front) == 0
                     s_front = edge_sag(front_surface, front)
                     outer_thickness -= s_front
                     outer_center += s_front / 2
                 end
-                if back !== nothing
+                if back !== nothing && thickness(back) == 0
                     s_back = edge_sag(back_surface, back)
                     outer_thickness += s_back
                     outer_center += s_back / 2

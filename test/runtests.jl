@@ -26,6 +26,7 @@ include(joinpath(@__DIR__, "Lenses", "TestCylindricalLenses.jl"))
 # Test component models
 include(joinpath(@__DIR__, "Components", "TestDummies.jl"))
 include(joinpath(@__DIR__, "Components", "TestDetector.jl"))
+include(joinpath(@__DIR__, "Components", "TestCoatings.jl"))
 include(joinpath(@__DIR__, "Components", "TestBeamsplitters.jl"))
 include(joinpath(@__DIR__, "Components", "TestPolarizers.jl"))
 

@@ -20,57 +20,60 @@ const mm = 1e-3
     system = BMO.System([pd])
     empty!(pd)
     BMO.solve_system!(system, beam)
-    
+
     pd_pwr = optical_power(
         pd;
         # restore pre-v0.11 behavior, e.g. no autolims
-        n=pd_res,
-        x_min=-pd_size/2,
-        x_max=pd_size/2,
-        z_min=-pd_size/2,
-        z_max=pd_size/2
+        n = pd_res,
+        x_min = -pd_size / 2,
+        x_max = pd_size / 2,
+        z_min = -pd_size / 2,
+        z_max = pd_size / 2
     )
-    
+
     @test pd_pwr≈10e-3 atol=1e-5
 end
 
 @testset "Issue#22 and Issue#23" begin
     # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/22
     # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/23
-    
-    mutable struct TestSubstrate{T, S <: BMO.AbstractShape{T}, N} <: BMO.AbstractRefractiveOptic{T, N}
+
+    mutable struct TestSubstrate{T, S <: BMO.AbstractShape{T}, N} <:
+                   BMO.AbstractRefractiveOptic{T, N, BMO.Uncoated}
         const shape::S
         n::N
     end
-    
+
+    BMO.coating(::TestSubstrate) = BMO.Uncoated()
+
     BMO.refractive_index(ts::TestSubstrate, ::Real) = ts.n
     set_index(ts::TestSubstrate, new) = (ts.n = new)
     get_index(ts::TestSubstrate) = ts.n
-    
+
     "Shifts the phase of the beamlet by a specific amount in [rad]."
     function shift_phase(gb::BMO.GaussianBeamlet, phase::Real)
-        BMO.electric_field!(gb, BMO.electric_field(gb) * exp(im*phase))
+        BMO.electric_field!(gb, BMO.electric_field(gb) * exp(im * phase))
         return nothing
     end
-    
-    ref_signal(ϕ, A) = (cos(ϕ)+1)/2 * A
-    
+
+    ref_signal(ϕ, A) = (cos(ϕ) + 1) / 2 * A
+
     # setup system for tests below
-    splitter = CubeBeamsplitter(10mm, n->1)
+    splitter = CubeBeamsplitter(10mm, n -> 1)
     substrate_length = 10mm
-    substrate = TestSubstrate(BMO.CylinderSDF(5mm, substrate_length/2), 1.5)
-    
+    substrate = TestSubstrate(BMO.CylinderSDF(5mm, substrate_length / 2), 1.5)
+
     pd_size = 10mm
     pd_res = 250
     detector = Detector(pd_size)
-    
+
     translate3d!(substrate, [0, -25mm, 0])
     translate3d!(detector, [0, 40mm, 0])
-    
+
     system = System([substrate, splitter, detector])
-    
+
     start_offset = 50mm
-    
+
     @testset "Testing electric_field calculation - non-imaging ref. index change" begin
         indices = (1, 10, 100, 1000)
         for index in indices
@@ -78,43 +81,43 @@ end
             phi = LinRange(0, 2pi, 30)
             int = zeros(length(phi))
             for (i, p) in enumerate(phi)
-                gb_prb = GaussianBeamlet([0, -start_offset, 0], [0, 1, 0], 1e-6, .5mm)
-                gb_ref = GaussianBeamlet([start_offset, 0, 0], [-1, 0, 0], 1e-6, .5mm)
+                gb_prb = GaussianBeamlet([0, -start_offset, 0], [0, 1, 0], 1e-6, 0.5mm)
+                gb_ref = GaussianBeamlet([start_offset, 0, 0], [-1, 0, 0], 1e-6, 0.5mm)
                 empty!(detector)
                 shift_phase(gb_ref, p)
                 solve_system!(system, gb_prb)
                 solve_system!(system, gb_ref)
                 int[i] = BMO.optical_power(detector)
             end
-            @test isapprox(BMO.visibility(int), 1, atol=1e-2)
+            @test isapprox(BMO.visibility(int), 1, atol = 1e-2)
         end
     end
-    
+
     @testset "Testing electric_field calculation - ref. index based phase shift" begin
         λ = 1e-6
-        gb_prb = GaussianBeamlet([0, -start_offset, 0], [0, 1, 0], λ, .5mm)
-        gb_ref = GaussianBeamlet([start_offset, 0, 0], [-1, 0, 0], λ, .5mm)
-        
+        gb_prb = GaussianBeamlet([0, -start_offset, 0], [0, 1, 0], λ, 0.5mm)
+        gb_ref = GaussianBeamlet([start_offset, 0, 0], [-1, 0, 0], λ, 0.5mm)
+
         n_lambdas = substrate_length / BMO.wavelength(gb_prb)
-        
+
         n_factors = LinRange(0, 1, 50)
         pwr = zeros(length(n_factors))
         # Increase ref. index of substrate until one additional λ of OPL has been introduced
         for (i, nf) in enumerate(n_factors)
-            set_index(substrate, 1 + 1/n_lambdas * nf)        
+            set_index(substrate, 1 + 1 / n_lambdas * nf)
             empty!(detector)
             solve_system!(system, gb_prb)
             solve_system!(system, gb_ref)
             pd_pwr = optical_power(
                 detector;
                 # restore pre-v0.11 behavior, e.g. no autolims
-                n=pd_res,
-                x_min=-pd_size/2,
-                x_max=pd_size/2,
-                z_min=-pd_size/2,
-                z_max=pd_size/2
+                n = pd_res,
+                x_min = -pd_size / 2,
+                x_max = pd_size / 2,
+                z_min = -pd_size / 2,
+                z_max = pd_size / 2
             )
-            @test isapprox(pd_pwr, ref_signal(2pi*nf, 2e-3), atol=1e-8)
+            @test isapprox(pd_pwr, ref_signal(2pi * nf, 2e-3), atol = 1e-8)
         end
         # Test if opl difference is indeed one λ
         delta = BMO.optical_path_length(gb_prb)
@@ -122,13 +125,13 @@ end
         delta /= λ
         @test delta ≈ 1
     end
-    
-    @testset "Testing electric_field mutation during retracing" begin    
-        gb_prb = GaussianBeamlet([0, -start_offset, 0], [0, 1, 0], 1e-6, .5mm)
-        gb_ref = GaussianBeamlet([start_offset, 0, 0], [-1, 0, 0], 1e-6, .5mm)    
+
+    @testset "Testing electric_field mutation during retracing" begin
+        gb_prb = GaussianBeamlet([0, -start_offset, 0], [0, 1, 0], 1e-6, 0.5mm)
+        gb_ref = GaussianBeamlet([start_offset, 0, 0], [-1, 0, 0], 1e-6, 0.5mm)
         phis = LinRange(0, 2pi, 50)
         pwr = zeros(length(phis))
-        # Vary starting phase by 0...2pi via retracing    
+        # Vary starting phase by 0...2pi via retracing
         for (i, phi) in enumerate(phis)
             empty!(detector)
             solve_system!(system, gb_prb)
@@ -136,13 +139,13 @@ end
             pd_pwr = optical_power(
                 detector;
                 # restore pre-v0.11 behavior, e.g. no autolims
-                n=pd_res,
-                x_min=-pd_size/2,
-                x_max=pd_size/2,
-                z_min=-pd_size/2,
-                z_max=pd_size/2
+                n = pd_res,
+                x_min = -pd_size / 2,
+                x_max = pd_size / 2,
+                z_min = -pd_size / 2,
+                z_max = pd_size / 2
             )
-            @test isapprox(pd_pwr, ref_signal(phi, 2e-3), atol=1e-8)
+            @test isapprox(pd_pwr, ref_signal(phi, 2e-3), atol = 1e-8)
             shift_phase(gb_prb, step(phis))
         end
     end

@@ -51,15 +51,18 @@ function CubeBeamsplitter(
         n::RefractiveIndex;
         reflectance::Real = 0.5
 )
-    front = RightAnglePrism(leg_length, leg_length, n)
-    back = RightAnglePrism(leg_length, leg_length, n)
+    # Use AR coating for prism faces to ensure 100% transmission to the splitter
+    ar = SimpleCoating(0.0)
+    front = RightAnglePrism(leg_length, leg_length, n, ar)
+    back = RightAnglePrism(leg_length, leg_length, n, ar)
+    # Rotate back prism to form the other half of the cube
+    zrotate3d!(back, π)
+
     bs = ThinBeamsplitter(√2 * leg_length, leg_length; reflectance)
     zrotate3d!(bs, deg2rad(180 - 45))
     set_new_origin3d!(shape(bs))
-    # We use Uncoated() for the prism faces as default in CBS?
-    # Or ideally allowing users to specify AR coatings on faces.
-    # For now, default Uncoated() matches previous behavior.
-    return CubeBeamsplitter{typeof(leg_length), typeof(n), Uncoated}(front, back, bs)
+
+    return CubeBeamsplitter{typeof(leg_length), typeof(n), typeof(ar)}(front, back, bs)
 end
 
 function interact3d(
