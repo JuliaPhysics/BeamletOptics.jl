@@ -34,7 +34,19 @@ abstract type AbstractObject{T <: Real} end
 "Default trait"
 shape_trait_of(::AbstractObject) = SingleShape()
 
-"Dispatch the shape function based on the [`AbstractShapeTrait`](@ref) of the [`AbstractObject`](@ref)"
+"""
+    shape(::AbstractObject)
+
+Returns all component shapes of the object for a [`MultiShape`](@ref) or a single shape for a [`SingleShape`](@ref).
+E.g. for a custom multi-shape object the user of this API needs to define:
+
+`BeamletOptics.shape(obj::MyObject) = (obj.front, obj.back)`
+
+!!! warning
+    Whenever your object consists of nested structures (e.g. [`ObjectGroup`](@ref)s or other [`MultiShape`](@ref)s) 
+    it is the responsibility of the user to ensure that **each atomic shape, i.e. `SingleShape`, is only listed once**.
+    Failure to ensure this can lead to spurious behaviour when using the kinematic API.
+"""
 shape(object::AbstractObject) = shape(shape_trait_of(object), object)
 
 """
@@ -64,9 +76,9 @@ translate_to3d!(object::AbstractObject, target) = translate_to3d!(shape_trait_of
 
 rotate3d!(object::AbstractObject, axis, θ) = rotate3d!(shape_trait_of(object), object, axis, θ)
 
-xrotate3d!(object::AbstractObject, θ) = rotate3d!(object, Point3(1, 0, 0), θ)
-yrotate3d!(object::AbstractObject, θ) = rotate3d!(object, Point3(0, 1, 0), θ)
-zrotate3d!(object::AbstractObject, θ) = rotate3d!(object, Point3(0, 0, 1), θ)
+xrotate3d!(object::AbstractObject{T}, θ) where T = rotate3d!(object, Point3{T}(one(T), 0, 0), θ)
+yrotate3d!(object::AbstractObject{T}, θ) where T = rotate3d!(object, Point3{T}(0, one(T), 0), θ)
+zrotate3d!(object::AbstractObject{T}, θ) where T = rotate3d!(object, Point3{T}(0, 0, one(T)), θ)
 
 align3d!(object::AbstractObject, axis) = align3d!(shape_trait_of(object), object, axis)
 
