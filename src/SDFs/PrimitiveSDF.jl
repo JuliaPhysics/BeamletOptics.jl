@@ -26,19 +26,19 @@ Creates a [`BoxSDF`](@ref) with:
 - `y`: y-dir. edge length in [m]
 - `z`: z-dir. edge length in [m]
 """
-function BoxSDF(x::X, y::Y, z::Z) where {X<:Real, Y<:Real, Z<:Real}
+function BoxSDF(x::X, y::Y, z::Z) where {X <: Real, Y <: Real, Z <: Real}
     T = promote_type(X, Y, Z)
     return BoxSDF{T}(
-        Matrix{T}(I, 3, 3),
-        Matrix{T}(I, 3, 3),
+        SMatrix{3, 3, T}(I),
+        SMatrix{3, 3, T}(I),
         Point3{T}(0),
-        Point3{T}(x/2, y/2, z/2)
+        Point3{T}(x / 2, y / 2, z / 2)
     )
 end
 
-thickness(s::BoxSDF) = 2*s.dimensions[2]
+thickness(s::BoxSDF) = 2 * s.dimensions[2]
 
-function sdf(box::BoxSDF{T}, point) where T
+function sdf(box::BoxSDF{T}, point) where {T}
     p = _world_to_sdf(box, point)
     q = abs.(p) - box.dimensions
     l = norm(max.(q, zero(T))) + min(max(q[1], max(q[2], q[3])), zero(T))
@@ -68,7 +68,7 @@ function CylinderSDF(r::R, h::H) where {R, H}
         h)
 end
 
-function sdf(cylinder::CylinderSDF{T}, point) where T
+function sdf(cylinder::CylinderSDF{T}, point) where {T}
     p = _world_to_sdf(cylinder, point)
     d = abs.(Point2(norm(Point2(p[1], p[3])), p[2])) -
         Point2(cylinder.radius, cylinder.height)
@@ -162,7 +162,8 @@ end
 function sdf(ring::RingSDF, point)
     p = _world_to_sdf(ring, point)
 
-    return sdf_box(Point2(norm(Point2(p[1], p[3]))- ring.inner_radius, p[2]), Point2(ring.hwidth, ring.hthickness))
+    return sdf_box(Point2(norm(Point2(p[1], p[3])) - ring.inner_radius, p[2]),
+        Point2(ring.hwidth, ring.hthickness))
 end
 
 """
@@ -198,10 +199,10 @@ function RightAnglePrismSDF(leg_length::L, height::H) where {L, H}
         Matrix{T}(I, 3, 3),
         Matrix{T}(I, 3, 3),
         Point3{T}(0),
-        Point3{T}(leg_length/2, leg_length/2, height/2))
+        Point3{T}(leg_length / 2, leg_length / 2, height / 2))
 end
 
-function sdf(prism:: RightAnglePrismSDF{T}, point) where T
+function sdf(prism::RightAnglePrismSDF{T}, point) where {T}
     p = _world_to_sdf(prism, point)
     q = abs.(p) - prism.dimensions
     box_dist = norm(max.(q, zero(T))) + min(max(q[1], max(q[2], q[3])), zero(T))

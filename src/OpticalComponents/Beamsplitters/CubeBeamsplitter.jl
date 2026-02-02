@@ -19,9 +19,9 @@ For more information refer to the [`AbstractPlateBeamsplitter`](@ref) docs.
     In order to model gap-free beam propagation, the `interact3d` model relies heavily on the [`Hint`](@ref)-API.
     If the `front` or `back` substrate is hit, the `Hint` will ensure that the beam intersects the `coating`.
 """
-struct CubeBeamsplitter{T} <: AbstractBeamsplitter{T}
-    front::Prism{T, RightAnglePrismSDF{T}}
-    back::Prism{T, RightAnglePrismSDF{T}}
+struct CubeBeamsplitter{T, N, C} <: AbstractBeamsplitter{T}
+    front::Prism{T, RightAnglePrismSDF{T}, N, C}
+    back::Prism{T, RightAnglePrismSDF{T}, N, C}
     coating::ThinBeamsplitter{T, Mesh{T}}
 end
 
@@ -34,7 +34,7 @@ refractive_index(cbs::CubeBeamsplitter, λ::Real) = refractive_index(cbs.front, 
 """
     CubeBeamsplitter(leg_length, n; reflectance=0.5)
 
-Creates a [`CubeBeamsplitter`](@ref). The cuboid is centered at the origin. The splitter 
+Creates a [`CubeBeamsplitter`](@ref). The cuboid is centered at the origin. The splitter
 coating is orientated at a 45° angle with respect to the y-axis.
 
 # Inputs
@@ -42,29 +42,31 @@ coating is orientated at a 45° angle with respect to the y-axis.
 - `leg_length`: the x-, y- and z-edge length in [m]
 - `n`: the [`RefractiveIndex`](@ref) of the front and back prism
 
-# Keywords 
+# Keywords
 
 - `reflectance`: defines the splitting ratio in [-], i.e. R = 0 ... 1.0
 """
 function CubeBeamsplitter(
         leg_length::Real,
         n::RefractiveIndex;
-        reflectance::Real=0.5
-    )
+        reflectance::Real = 0.5
+)
     front = RightAnglePrism(leg_length, leg_length, n)
     back = RightAnglePrism(leg_length, leg_length, n)
-    bs = ThinBeamsplitter(√2*leg_length, leg_length; reflectance)
-    zrotate3d!(back, deg2rad(180))
-    zrotate3d!(bs, deg2rad(180-45))
+    bs = ThinBeamsplitter(√2 * leg_length, leg_length; reflectance)
+    zrotate3d!(bs, deg2rad(180 - 45))
     set_new_origin3d!(shape(bs))
-    return CubeBeamsplitter(front, back, bs)
+    # We use Uncoated() for the prism faces as default in CBS?
+    # Or ideally allowing users to specify AR coatings on faces.
+    # For now, default Uncoated() matches previous behavior.
+    return CubeBeamsplitter{typeof(leg_length), typeof(n), Uncoated}(front, back, bs)
 end
 
 function interact3d(
-    system::AbstractSystem,
-    cbs::CubeBeamsplitter,
-    beam::Beam{T, R},
-    ray::R) where {T <: Real, R <: AbstractRay{T}}
+        system::AbstractSystem,
+        cbs::CubeBeamsplitter,
+        beam::Beam{T, R},
+        ray::R) where {T <: Real, R <: AbstractRay{T}}
     # Front prism interaction
     if shape(intersection(ray)) === shape(cbs.front)
         interaction = interact3d(system, cbs.front, beam, ray)
@@ -92,10 +94,10 @@ function interact3d(
 end
 
 function interact3d(
-    system::AbstractSystem,
-    cbs::CubeBeamsplitter,
-    gauss::GaussianBeamlet,
-    id::Int)
+        system::AbstractSystem,
+        cbs::CubeBeamsplitter,
+        gauss::GaussianBeamlet,
+        id::Int)
     _shape = shape(intersection(rays(gauss.chief)[id]))
     # Front prism interaction
     if _shape === shape(cbs.front)

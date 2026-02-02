@@ -1,6 +1,8 @@
 # Order of inclusion matters!
 
+include("Coatings.jl")
 include("Mirrors.jl")
+
 include("Lenses.jl")
 include("Prisms.jl")
 include("SphericalLenses.jl")

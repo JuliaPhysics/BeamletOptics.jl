@@ -5,7 +5,7 @@ Optical elements serve as the building blocks for optical systems in the context
 ## Component overview
 
 ```@contents
-Pages = ["mirrors.md", "lenses.md", "beamsplitters.md", "detectors.md", "polarizers.md"]
+Pages = ["coatings.md", "mirrors.md", "lenses.md", "beamsplitters.md", "detectors.md", "polarizers.md"]
 Depth = 2
 ```
 

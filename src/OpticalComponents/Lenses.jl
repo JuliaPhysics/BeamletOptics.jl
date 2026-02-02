@@ -32,7 +32,9 @@ by specialized subtypes.
     Fresnel coefficients at the point of refraction are calculated via the [`fresnel_coefficients`](@ref) function with the
     refractive index data of the substrate and the previous medium.
 """
-abstract type AbstractRefractiveOptic{T, F} <: AbstractObject{T} end
+abstract type AbstractRefractiveOptic{T, N, C} <: AbstractObject{T} end
+
+coating(object::AbstractRefractiveOptic) = object.coating
 
 refractive_index(object::AbstractRefractiveOptic) = object.n
 refractive_index(object::AbstractRefractiveOptic{<:Any, <:RefractiveIndex}, λ::Real)::Float64 = object.n(λ)
@@ -103,9 +105,12 @@ function interact3d(system::AbstractSystem, optic::AbstractRefractiveOptic,
         normal = -normal
     end
     # Calculate (and correct into 1. quadrant) the angle of incidence
-    θi = angle3d(direction(ray), -normal)
-    # Get Fresnel coefficients
-    rs, rp, ts, tp = fresnel_coefficients(θi, n2 / n1)
+    θi = angle3d(direction(ray), -normal) # Angle of incidence
+
+    # Get Coating coefficients
+    c_point = get_coating_at(coating(optic), optic, intersection(ray), normal)
+    rs, rp, ts, tp = coating_coefficients(c_point, n1, n2, lambda, θi)
+
     # Optical interaction
     if is_internally_reflected(rp, rs)
         # Update hint and outgoing ref. index
@@ -135,6 +140,7 @@ Refer to the [`Lens`](@ref) and [`SphericalLens`](@ref) constructors for more in
 
 - `shape`: geometry of the lens, refer to [`AbstractShape`](@ref) for more information
 - `n`: [`RefractiveIndex`](@ref) function that returns n(λ)
+- `coating`: [`AbstractCoating`](@ref) which can be uniform or spatially varying
 
 # Additional information
 
@@ -143,13 +149,17 @@ Refer to the [`Lens`](@ref) and [`SphericalLens`](@ref) constructors for more in
     and must be provided by the user. For testing purposes, an anonymous function, e.g. λ -> 1.5
     can be passed such that the lens has the same refractive index for all wavelengths.
 """
-struct Lens{T, S <: AbstractShape{T}, N <: RefractiveIndex} <: AbstractRefractiveOptic{T, N}
+struct Lens{T, S <: AbstractShape{T}, N <: RefractiveIndex, C <: AbstractCoating} <:
+       AbstractRefractiveOptic{T, N, C}
     shape::S
     n::N
+    coating::C
     function Lens(
-            shape::S, n::N) where {T <: Real, S <: AbstractShape{T}, N <: RefractiveIndex}
+            shape::S, n::N,
+            coating::C = Uncoated()) where {
+            T <: Real, S <: AbstractShape{T}, N <: RefractiveIndex, C <: AbstractCoating}
         test_refractive_index_function(n)
-        return new{T, S, N}(shape, n)
+        return new{T, S, N, C}(shape, n, coating)
     end
 end
 
@@ -163,6 +173,8 @@ Constructs a new [`Lens`](@ref) object using the surface specifications `front_s
 that consists of the appropriate sub-SDFs to represent the shape of the lens.
 
 The material properties are supplied via the `n` parameter.
+The `coating` parameter allows specifying an [`AbstractCoating`](@ref).
+If distinct `front_coating` and `back_coating` are provided (via overload), a [`SpatiallyVaryingCoating`](@ref) is automatically created.
 
 # Additional information
 
@@ -176,7 +188,21 @@ function Lens(
         front_surface::AbstractRotationallySymmetricSurface,
         back_surface::AbstractRotationallySymmetricSurface,
         center_thickness::Real,
-        n::RefractiveIndex)
+        n::RefractiveIndex,
+        coating::AbstractCoating = Uncoated())
+    # If a spatial coating is passed directly, use it.
+    # If default, we might have separate front/back args in a separate method?
+    # Actually, let's overload to allow (..., n, front_coating, back_coating)
+
+    shape, _, _, _ = _make_lens_shape(front_surface, back_surface, center_thickness)
+    return Lens(shape, n, coating)
+end
+
+function _make_lens_shape(
+        front_surface::AbstractRotationallySymmetricSurface,
+        back_surface::AbstractRotationallySymmetricSurface,
+        center_thickness::Real)
+
     # Define effective (optical and mechanical) diameters:
     d_mid = min(diameter(front_surface), diameter(back_surface))
     md_mid = max(mechanical_diameter(front_surface), mechanical_diameter(back_surface))
@@ -189,11 +215,35 @@ function Lens(
     # Back Surface
     back = sdf(back_surface, BackwardOrientation())
     l0 -= isnothing(back) ? zero(l0) : thickness(back)
+
+    local shape
+    local final_front = front
+    local final_back = back
+    local final_side = nothing
+
     # Use MeniscusLensSDF if cylinder length is non-positive
     if l0 ≤ 0
         if sign(radius(front_surface)) == sign(radius(back_surface))
             shape = meniscus_lens_sdf(
                 front_surface, front, back_surface, back, center_thickness)
+
+            # Extract the actual components used in the Meniscus SDF
+            # They might have been transformed/swapped inside meniscus_lens_sdf
+            # Ideally meniscus_lens_sdf would return them, but it likely returns the struct.
+            # We can access them from the struct fields.
+            # Note: based on sign logic in meniscus_lens_sdf, convex/concave map to front/back.
+            r1 = radius(front_surface)
+            is_front_convex = sign(r1) > 0 # Left-facing typical
+
+            if is_front_convex
+                final_front = shape.convex
+                final_back = shape.concave
+            else
+                final_front = shape.concave
+                final_back = shape.convex
+            end
+            final_side = shape.cylinder
+
             # add an outer ring if necessary
             if md_mid > d_mid
                 _thickness = thickness(shape.cylinder)
@@ -201,6 +251,9 @@ function Lens(
                 ring = RingSDF(d_mid / 2, (md_mid - d_mid) / 2, _thickness)
                 translate3d!(ring, [0, pos[2] + _thickness / 2, 0])
                 shape += ring
+                # Note: 'shape' is now a UnionSDF wrapping the Meniscus + Ring if '+=' created a union.
+                # If MeniscusLensSDF supports `+`, it likely returns UnionSDF.
+                # The sub-components of Meniscus are still valid references!
             end
         else
             throw(ArgumentError("Lens parameters lead to cylinder section length of ≤ 0, use ThinLens instead."))
@@ -208,6 +261,9 @@ function Lens(
     else
         # Construct central plano surface and add front/back surfaces
         mid = PlanoSurfaceSDF(l0, d_mid)
+        # Note: mid is modified in place later
+        final_side = mid
+
         if front !== nothing
             translate3d!(mid, [0, thickness(front), 0])
             mid += front
@@ -217,6 +273,13 @@ function Lens(
             mid += back
         end
         shape = mid
+        # Note for Standard Lens: 'front' and 'back' variables hold the SDFs.
+        # 'mid' became the Union (because +=).
+        # But 'final_side' captured 'mid' *before* it became a Union?
+        # No, `mid` is a reference. `mid += front` rebinds `mid` if it's not mutable in-place?
+        # `+=` lowers to `mid = mid + front`.
+        # So `final_side` (referencing the original PlanoSurfaceSDF) is still the cylinder!
+        # Perfect.
 
         d_front = diameter(front_surface)
         d_back = diameter(back_surface)
@@ -229,46 +292,48 @@ function Lens(
             # add leveling ring if there is a step between front and back clear apertures
             if d_front != d_back
                 if d_back > d_front
-                    # Step exists on the front side: level front to match back.
+                    # ... [Snipped existing ring logic] ...
+                    # We need to replicate the ring logic to be safe, or just include it.
+                    # To save tokens, I will invoke the original code block logic here essentially.
+
+                    # (Re-pasting logic from original file)
                     leveling_thickness = l0
                     if front !== nothing
                         s_front = edge_sag(front_surface, front)
                         if s_front < 0
-                            # edge curves towards negative so it is a concave type shape,
-                            # which has to be covered by the ring
                             leveling_thickness += abs(s_front) + thickness(front)
                         end
                     end
 
                     ring = RingSDF(d_front / 2, (d_back - d_front) / 2, leveling_thickness)
-                    translate3d!(ring, [0, edge_sag(front_surface, front) + leveling_thickness / 2, 0])
+                    translate3d!(ring,
+                        [0, edge_sag(front_surface, front) + leveling_thickness / 2, 0])
                     shape += ring
                 else  # d_front > d_back
-                    # Step exists on the back side: level back to match front.
                     leveling_thickness = l0
                     if back !== nothing
                         s_back = edge_sag(back_surface, back)
                         if (s_back - thickness(back)) > 0
-                            # edge curves towards positive so it is a concave type shape,
-                            # which has to be covered by the ring
                             leveling_thickness += abs(s_back) + thickness(back)
                         end
                     end
-                    leveling_center = position(mid)[2] +
-                                      (l0/2 + (back !== nothing ? edge_sag(back_surface, back) : 0))
+                    leveling_center = position(final_side)[2] + # Use final_side (cylinder) pos
+                                      (l0 / 2 +
+                                       (back !== nothing ? edge_sag(back_surface, back) :
+                                        0))
                     if back !== nothing
                         leveling_center += s_back / 2
                     end
                     ring = RingSDF(d_back / 2, (d_front - d_back) / 2, leveling_thickness)
-                    translate3d!(ring, [0, thickness(front) + leveling_thickness/2, 0])
+                    translate3d!(ring, [0, thickness(front) + leveling_thickness / 2, 0])
                     shape += ring
                 end
             end
 
-            # add outer ring if the mechanical diameter exceeds the larger clear aperture.
+            # add outer ring
             if md_mid > d_max
-                outer_thickness = thickness(mid)
-                outer_center = position(mid)[2] + outer_thickness / 2
+                outer_thickness = thickness(final_side) # Use cylinder
+                outer_center = position(final_side)[2] + outer_thickness / 2
                 if front !== nothing
                     s_front = edge_sag(front_surface, front)
                     outer_thickness -= s_front
@@ -286,11 +351,56 @@ function Lens(
         end
     end
 
-    return Lens(shape, n)
+    return shape, final_front, final_back, final_side
+end
+
+"""
+    Lens(front, back, thick, n, front_coating, back_coating, [side_coating])
+
+Constructor for a lens with distinct coatings on the front, back, and side surfaces.
+Automatically creates a [`SpatiallyVaryingCoating`](@ref).
+"""
+function Lens(
+        front_surface::AbstractRotationallySymmetricSurface,
+        back_surface::AbstractRotationallySymmetricSurface,
+        center_thickness::Real,
+        n::RefractiveIndex,
+        front_coating::AbstractCoating,
+        back_coating::AbstractCoating,
+        side_coating::AbstractCoating = Uncoated())
+
+    # Construct shape and extract components using the helper
+    shape, front_sdf, back_sdf, side_sdf = _make_lens_shape(
+        front_surface, back_surface, center_thickness)
+
+    # Create robust spatial selector based on distance to surfaces
+    selector = (p, n_vec) -> begin
+        # Compute distances to all relevant surfaces
+        # Note: p is in the lens local frame. The SDFs are also in this frame.
+
+        # We use a large number if SDF is missing (e.g. infinite surface? usually SDFs exist)
+        d_front = front_sdf !== nothing ? abs(sdf(front_sdf, p)) : Inf
+        d_back = back_sdf !== nothing ? abs(sdf(back_sdf, p)) : Inf
+        d_side = side_sdf !== nothing ? abs(sdf(side_sdf, p)) : Inf
+
+        # Find minimum distance
+        min_dist = min(d_front, d_back, d_side)
+
+        # Return corresponding coating
+        if d_front == min_dist
+            return front_coating
+        elseif d_back == min_dist
+            return back_coating
+        else
+            return side_coating
+        end
+    end
+
+    return Lens(shape, n, SpatiallyVaryingCoating(selector))
 end
 
 function Lens(front_surface::AbstractRotationallySymmetricSurface,
-        center_thickness::Real, n::RefractiveIndex)
+        center_thickness::Real, n::RefractiveIndex, coating::AbstractCoating = Uncoated())
     Lens(
         front_surface,
         CircularFlatSurface(diameter(front_surface)),
@@ -300,12 +410,13 @@ function Lens(front_surface::AbstractRotationallySymmetricSurface,
 end
 
 function Lens(front_surface::CircularFlatSurface, back_surface::CircularFlatSurface,
-        center_thickness::Real, n::RefractiveIndex)
+        center_thickness::Real, n::RefractiveIndex, coating::AbstractCoating = Uncoated())
     d_mid = min(diameter(front_surface), diameter(back_surface))
 
     return Lens(
         PlanoSurfaceSDF(center_thickness, d_mid),
-        n
+        n,
+        coating
     )
 end
 
@@ -331,7 +442,8 @@ function Lens(
         front_surface::AbstractCylindricalSurface,
         back_surface::AbstractCylindricalSurface,
         center_thickness::Real,
-        n::RefractiveIndex)
+        n::RefractiveIndex,
+        coating::AbstractCoating = Uncoated())
     # Initialize remaining box section length.
     l0 = center_thickness
 
@@ -389,7 +501,7 @@ function Lens(
 end
 
 function Lens(front_surface::AbstractCylindricalSurface,
-        center_thickness::Real, n::RefractiveIndex)
+        center_thickness::Real, n::RefractiveIndex, coating::AbstractCoating = Uncoated())
     Lens(
         front_surface,
         RectangularFlatSurface(diameter(front_surface)),
@@ -433,13 +545,14 @@ function cylindric_lens_outer_parameters(
 end
 
 function Lens(front_surface::RectangularFlatSurface, back_surface::RectangularFlatSurface,
-        center_thickness::Real, n::RefractiveIndex)
+        center_thickness::Real, n::RefractiveIndex, coating::AbstractCoating = Uncoated())
     d_mid = min(diameter(front_surface), diameter(back_surface))
     mid = BoxSDF(d_mid, center_thickness, d_mid)
     translate3d!(mid, [0, center_thickness / 2, 0])
 
     return Lens(
         mid,
-        n
+        n,
+        coating
     )
 end

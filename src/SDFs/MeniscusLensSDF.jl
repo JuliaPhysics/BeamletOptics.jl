@@ -87,8 +87,8 @@ function MeniscusLensSDF(r1::R1, r2::R2, l::L, d::D = 1inch) where {R1, R2, L, D
 
     # Return shape
     return MeniscusLensSDF{T, typeof(convex_surface), typeof(concave_surface)}(
-        Matrix{T}(I, 3, 3),
-        Matrix{T}(I, 3, 3),
+        SMatrix{3, 3, T}(I),
+        SMatrix{3, 3, T}(I),
         Point3{T}(0),
         convex_surface, cylinder, concave_surface,
         l

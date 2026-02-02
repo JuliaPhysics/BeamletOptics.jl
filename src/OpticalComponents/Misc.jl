@@ -7,12 +7,12 @@ can be adjusted using `T` (default: Float64).
 """
 function RetroMesh(scale::Real; T = Float64)
     vertices = [0 0 0
-        1 0 0
-        0 1 0
-        0 0 1]
+                1 0 0
+                0 1 0
+                0 0 1]
     faces = [1 3 2
-        1 4 3
-        1 2 4]
+             1 4 3
+             1 2 4]
     return Mesh{T}(
         vertices .* scale,
         faces,
@@ -31,7 +31,7 @@ The shape is represented by a tetrahedral [`Mesh`](@ref).
 
 - `mesh`: shape of the `Retroreflector`
 """
-struct Retroreflector{T} <: AbstractReflectiveOptic{T}
+struct Retroreflector{T} <: AbstractReflectiveOptic{T, Uncoated}
     mesh::Mesh{T}
 end
 
