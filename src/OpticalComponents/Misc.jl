@@ -36,6 +36,7 @@ struct Retroreflector{T} <: AbstractReflectiveOptic{T, Uncoated}
 end
 
 shape(rr::Retroreflector) = rr.mesh
+coating(::Retroreflector) = Uncoated()
 
 """
     Retroreflector(scale)

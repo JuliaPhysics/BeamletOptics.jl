@@ -405,7 +405,8 @@ function Lens(front_surface::AbstractRotationallySymmetricSurface,
         front_surface,
         CircularFlatSurface(diameter(front_surface)),
         center_thickness,
-        n
+        n,
+        coating
     )
 end
 
