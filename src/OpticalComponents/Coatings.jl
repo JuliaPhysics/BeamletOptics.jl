@@ -95,10 +95,6 @@ function SimpleCoating(R::Real)
     return SimpleCoating((λ, θ) -> T, (λ, θ) -> R)
 end
 
-function SimpleCoating(T::Function, R::Function)
-    return SimpleCoating{Function, Function}(T, R)
-end
-
 function coating_coefficients(c::SimpleCoating, n_in, n_out, λ, θ)
     # Get power coefficients (Intensity)
     R_power = c.reflection isa Function ? c.reflection(λ, θ) : c.reflection
@@ -202,23 +198,24 @@ function MultilayerCoating(layers::Vector{<:ThinFilmLayer})
 end
 
 """
-    transfer_matrix(layer, λ, θ, polarization)
+    _layer_matrix(layer, n, λ, θ, pol)
 
-Calculates the characteristic matrix for a single layer.
+Calculates the characteristic matrix for a single thin film layer.
 """
-function _layer_matrix(layer::ThinFilmLayer, n_prev, λ, θ, pol::Symbol)
-    n = layer.material(λ)
-    d = layer.thickness
+function _layer_matrix(layer::ThinFilmLayer, n, λ, θ, pol::Symbol)
+    # Phase thickness
+    δ = 2π / λ * n * layer.thickness * cos(θ)
 
-    # Snell's law to find angle in this layer
-    # n_prev * sin(theta_prev) = n * sin(theta_this)
-    # We actually need the invariant quantity from the incident medium
-    # n0 * sin(theta0) = n * sin(theta)
-    # So we should pass the transverse propagation constant or "effective index"
+    # Admittance
+    η = if pol === :s
+        n * cos(θ)
+    else # p-polarization
+        n / cos(θ)
+    end
 
-    # Let's re-architect the TMM loop to handle this correctly.
-    # See `coating_coefficients` implementation below.
-    return nothing
+    # Characteristic matrix
+    return @SMatrix [cos(δ) (im / η)*sin(δ);
+                     im*η*sin(δ) cos(δ)]
 end
 
 function coating_coefficients(c::MultilayerCoating, n_in, n_out, λ, θ)
