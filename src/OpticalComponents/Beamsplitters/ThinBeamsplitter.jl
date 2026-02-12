@@ -1,7 +1,7 @@
 """
     ThinBeamsplitter <: AbstractBeamsplitter
 
-Represents a 2D beam-splitting device. 
+Represents a 2D beam-splitting device.
 
 # Fields
 
@@ -60,13 +60,15 @@ function RoundThinBeamsplitter(diameter::Real; reflectance::Real = 0.5)
     if reflectance ≥ 1 || reflectance ≈ 0
         error("Splitting ratio ∈ (0, 1)!")
     end
-    shape = CircularFlatMesh(diameter/2)
+    shape = CircularFlatMesh(diameter / 2)
     R = sqrt(reflectance)
     T = sqrt(1 - R^2)
     return ThinBeamsplitter(shape, R, T)
 end
 
-ThinBeamsplitter(width::Real; reflectance::Real=0.5) = ThinBeamsplitter(width, width; reflectance)
+function ThinBeamsplitter(width::Real; reflectance::Real = 0.5)
+    ThinBeamsplitter(width, width; reflectance)
+end
 
 Base.isvalid(bs::AbstractBeamsplitter) = reflectance(bs)^2 + transmittance(bs)^2 ≈ 1
 
@@ -91,17 +93,23 @@ end
     pos = position(ray) + length(ray) * direction(ray)
     dir = direction(ray)
     E0 = _calculate_global_E0(bs, ray, dir, J)
+    # Enforce orthogonality (Gram-Schmidt)
+    E0 -= dot(dir, E0) * dir
     return Beam(PolarizedRay(pos, dir, wavelength(ray), E0))
 end
 
 @inline function _beamsplitter_reflected_beam(bs::AbstractBeamsplitter, ::Beam{T, R},
-    ray::R) where {T <: Real, R <: PolarizedRay{T}}
-    J = SPBasis(-reflectance(bs), 0, 0, reflectance(bs))
+        ray::R) where {T <: Real, R <: PolarizedRay{T}}
+    # Symmetric reflection for non-polarizing BS behavior (preserve polarization state)
+    J = SPBasis(reflectance(bs), 0, 0, reflectance(bs))
     normal = normal3d(intersection(ray))
     pos = position(ray) + length(ray) * direction(ray)
     in_dir = direction(ray)
     out_dir = reflection3d(in_dir, normal)
     E0 = _calculate_global_E0(bs, ray, out_dir, J)
+    # Enforce orthogonality (Gram-Schmidt)
+    E0 -= dot(out_dir, E0) * out_dir
+    return Beam(PolarizedRay(pos, out_dir, wavelength(ray), E0))
     return Beam(PolarizedRay(pos, out_dir, wavelength(ray), E0))
 end
 
@@ -109,27 +117,32 @@ function interact3d(::AbstractSystem, bs::ThinBeamsplitter, beam::Beam{T, R},
         ray::R) where {T <: Real, R <: AbstractRay{T}}
     # Push transmitted and reflected beams to system
     children!(beam,
-        [_beamsplitter_transmitted_beam(bs, beam, ray), _beamsplitter_reflected_beam(bs, beam, ray)])
+        [_beamsplitter_transmitted_beam(bs, beam, ray),
+            _beamsplitter_reflected_beam(bs, beam, ray)])
     # Stop for beam spawning
     return nothing
 end
 
-@inline function _beamsplitter_transmitted_beam(bs::AbstractBeamsplitter, gauss::GaussianBeamlet, ray_id::Int)
+@inline function _beamsplitter_transmitted_beam(
+        bs::AbstractBeamsplitter, gauss::GaussianBeamlet, ray_id::Int)
     # Transmitted Gaussian (no phase flip)
     chief = _beamsplitter_transmitted_beam(bs, gauss.chief, rays(gauss.chief)[ray_id])
     waist = _beamsplitter_transmitted_beam(bs, gauss.waist, rays(gauss.waist)[ray_id])
-    divergence = _beamsplitter_transmitted_beam(bs, gauss.divergence, rays(gauss.divergence)[ray_id])
+    divergence = _beamsplitter_transmitted_beam(
+        bs, gauss.divergence, rays(gauss.divergence)[ray_id])
     λ = wavelength(gauss)
     w0 = gauss_parameters(gauss, length(gauss))[4]
     E0 = transmittance(bs) * electric_field(gauss) * (beam_waist(gauss) / w0)
     return GaussianBeamlet(chief, waist, divergence, λ, w0, E0)
 end
 
-@inline function _beamsplitter_reflected_beam(bs::AbstractBeamsplitter, gauss::GaussianBeamlet, ray_id::Int)
+@inline function _beamsplitter_reflected_beam(
+        bs::AbstractBeamsplitter, gauss::GaussianBeamlet, ray_id::Int)
     # Reflected Gaussian (no phase flip)
     chief = _beamsplitter_reflected_beam(bs, gauss.chief, rays(gauss.chief)[ray_id])
     waist = _beamsplitter_reflected_beam(bs, gauss.waist, rays(gauss.waist)[ray_id])
-    divergence = _beamsplitter_reflected_beam(bs, gauss.divergence, rays(gauss.divergence)[ray_id])
+    divergence = _beamsplitter_reflected_beam(
+        bs, gauss.divergence, rays(gauss.divergence)[ray_id])
     λ = wavelength(gauss)
     w0 = gauss_parameters(gauss, length(gauss))[4]
     E0 = reflectance(bs) * electric_field(gauss) * (beam_waist(gauss) / w0)
@@ -147,7 +160,8 @@ The reflection phase jump is modeled here as θᵣ = π for simplicity. This is 
 The phase jump is applied to the reflected portion of any incoming beam that faces the [`ThinBeamsplitter`](@ref) normal vector, which assumes that the splitter has an unambigous normal, i.e. a 2D mesh.
 This is intended to model the effect of the Fresnel equations without full polarization calculus.
 """
-function interact3d(::AbstractSystem, bs::ThinBeamsplitter, gauss::GaussianBeamlet, ray_id::Int)
+function interact3d(
+        ::AbstractSystem, bs::ThinBeamsplitter, gauss::GaussianBeamlet, ray_id::Int)
     # Phase flip
     ray = gauss.chief.rays[ray_id]
     df = dot(direction(ray), normal3d(intersection(ray)))
@@ -161,7 +175,7 @@ function interact3d(::AbstractSystem, bs::ThinBeamsplitter, gauss::GaussianBeaml
     r = _beamsplitter_reflected_beam(bs, gauss, ray_id)
 
     # Add conditional phase flip to reflected beam
-    electric_field!(r, electric_field(r) * exp(im*ϕ))
+    electric_field!(r, electric_field(r) * exp(im * ϕ))
 
     children!(gauss, [t, r])
     return nothing

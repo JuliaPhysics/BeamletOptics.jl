@@ -4,7 +4,7 @@
 Tests if `v1` is parallel to `v2`.
 """
 function isparallel3d(v1::AbstractArray, v2::AbstractArray)
-    return isapprox(abs(dot(normalize(v1), normalize(v2))), 1, atol=eps())
+    return isapprox(abs(dot(normalize(v1), normalize(v2))), 1, atol = 1e-10)
 end
 
 """
@@ -12,7 +12,7 @@ end
 
 Tests if `v1` and `v2` are orthogonal. Additional abs. tolerance can be passed via `atol`
 """
-function isorthogonal3d(v1::AbstractArray, v2::AbstractArray; atol=eps())
+function isorthogonal3d(v1::AbstractArray, v2::AbstractArray; atol = eps())
     return isapprox(dot(v1, v2), 0; atol)
 end
 
@@ -33,7 +33,7 @@ end
 Returns a vector with unit length that is perpendicular to the `input` vector.
 The orientation is chosen deterministically to guarantee reproducible bases.
 """
-@inline function _orthogonal_basis_vector(v::SVector{3,T}) where {T}
+@inline function _orthogonal_basis_vector(v::SVector{3, T}) where {T}
     if abs(v[1]) > abs(v[2])
         inv_len = inv(sqrt(v[1]^2 + v[3]^2))
         return SVector(-v[3] * inv_len, zero(T), v[1] * inv_len)
@@ -45,7 +45,7 @@ end
 
 function normal3d(input::AbstractArray)
     T = float(eltype(input))
-    v = normalize(SVector{3,T}(Tuple(input)))
+    v = normalize(SVector{3, T}(Tuple(input)))
     n = _orthogonal_basis_vector(v)
     # stabilize output type
     if input isa SVector
@@ -57,8 +57,8 @@ function normal3d(input::AbstractArray)
     end
 end
 
-function normal3d(input::Point3{T}) where T
-    v = normalize(SVector{3,T}(Tuple(input)))
+function normal3d(input::Point3{T}) where {T}
+    v = normalize(SVector{3, T}(Tuple(input)))
     n = _orthogonal_basis_vector(v)
     return Point3(n...)
 end
@@ -76,11 +76,9 @@ function rotate3d(reference::AbstractVector, θ)
     cost = cos(θ)
     sint = sin(θ)
     ux, uy, uz = reference
-    R = @SArray [
-        cost+ux^2*(1-cost) ux*uy*(1-cost)-uz*sint ux*uz*(1-cost)+uy*sint
-        uy*ux*(1-cost)+uz*sint cost+uy^2*(1-cost) uy*uz*(1-cost)-ux*sint
-        uz*ux*(1-cost)-uy*sint uz*uy*(1-cost)+ux*sint cost+uz^2*(1-cost)
-    ]
+    R = @SArray [cost+ux^2 * (1 - cost) ux * uy * (1 - cost)-uz * sint ux * uz * (1 - cost)+uy * sint
+                 uy * ux * (1 - cost)+uz * sint cost+uy^2 * (1 - cost) uy * uz * (1 - cost)-ux * sint
+                 uz * ux * (1 - cost)-uy * sint uz * uy * (1 - cost)+ux * sint cost+uz^2 * (1 - cost)]
     return R
 end
 
@@ -99,7 +97,7 @@ function align3d(start::AbstractVector{A}, target::AbstractVector{B}) where {A, 
     cosA = dot(start, target)
     # if start and target are already (almost) parallel return unity
     if cosA ≈ 1
-        return SMatrix{3,3}(one(T)I)
+        return SMatrix{3, 3}(one(T)I)
     end
     if cosA ≈ -1
         return @SArray [-one(T) zero(T) zero(T);
@@ -107,11 +105,9 @@ function align3d(start::AbstractVector{A}, target::AbstractVector{B}) where {A, 
                         zero(T) zero(T) one(T)]
     end
     k = 1 / (1 + cosA)
-    R = @SArray [
-        rx^2*k+cosA rx*ry*k+rz rx*rz*k-ry
-        ry*rx*k-rz ry^2*k+cosA ry*rz*k+rx
-        rz*rx*k+ry rz*ry*k-rx rz^2*k+cosA
-    ]
+    R = @SArray [rx^2 * k+cosA rx * ry * k+rz rx * rz * k-ry
+                 ry * rx * k-rz ry^2 * k+cosA ry * rz * k+rx
+                 rz * rx * k+ry rz * ry * k-rx rz^2 * k+cosA]
     return R
 end
 
@@ -120,8 +116,8 @@ end
 
 Returns the angle between the `target` and `start` vector in **rad**.
 """
-function angle3d(target::AbstractArray{T}, start::AbstractArray{R}) where {T,R}
-    G = promote_type(T,R)
+function angle3d(target::AbstractArray{T}, start::AbstractArray{R}) where {T, R}
+    G = promote_type(T, R)
     arg = clamp(dot(target, start) / (norm(target) * norm(start)), -one(G), one(G))
     angle = acos(arg)
     return angle
@@ -133,8 +129,9 @@ end
 Returns the angle between the `target` and `start` vector in **rad**. In addition, a `reference` axis must be specified.
 This axis is used in order to determine the angle sign of rotation according to the **right hand rule**.
 """
-function angle3d(target::AbstractArray{T}, start::AbstractArray{S}, reference::AbstractArray{R}) where {T,S,R}
-    G = promote_type(T,S,R)
+function angle3d(target::AbstractArray{T}, start::AbstractArray{S},
+        reference::AbstractArray{R}) where {T, S, R}
+    G = promote_type(T, S, R)
     θ = angle3d(target, start)
     # get angle sign
     c = cross(start, target)
@@ -162,7 +159,8 @@ end
 
 Returns the distance between a line and an infinitely large plane which are characterized by their `position` and `normal`/`direction`.
 """
-function line_plane_distance3d(plane_position::AbstractArray, plane_normal::AbstractArray, line_position::AbstractArray, line_direction::AbstractArray)
+function line_plane_distance3d(plane_position::AbstractArray, plane_normal::AbstractArray,
+        line_position::AbstractArray, line_direction::AbstractArray)
     denom = dot(plane_normal, line_direction)
     if abs(denom) > 1e-6
         # explicit dot product for perfomance
@@ -193,4 +191,4 @@ end
 Return the base transformation matrix for transforming from vectors given
 relative to `base2` into `base`.
 """
-base_transform(base, base2=I(3)) = base \ base2
+base_transform(base, base2 = I(3)) = base \ base2

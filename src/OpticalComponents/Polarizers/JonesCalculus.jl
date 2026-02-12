@@ -28,10 +28,10 @@ abstract type AbstractJonesPolarizer{T} <: AbstractObject{T} end
 
 Non‑polarized [`Ray`](@ref)s pass through an [`AbstractJonesPolarizer`](@ref). without modification.
 """
-function interact3d(::AbstractSystem, ::AbstractJonesPolarizer, ::Beam{T,R},
-        ray::R) where {T<:Real, R<:Ray{T}}
+function interact3d(::AbstractSystem, ::AbstractJonesPolarizer, ::Beam{T, R},
+        ray::R) where {T <: Real, R <: Ray{T}}
     pos = position(ray) + length(ray) * direction(ray)
-    return BeamInteraction{T,R}(nothing,
+    return BeamInteraction{T, R}(nothing,
         Ray{T}(pos, direction(ray), nothing, wavelength(ray), refractive_index(ray)))
 end
 
@@ -60,7 +60,7 @@ function SPBasis(j11::Number, j12::Number, j21::Number, j22::Number)
         typeof(j11),
         typeof(j12),
         typeof(j21),
-        typeof(j22),
+        typeof(j22)
     )
     return LocalJonesBasis{T}(SMatrix{3, 3, T, 9}(j11, j12, 0, j21, j22, 0, 0, 0, 1))
 end
@@ -79,16 +79,23 @@ end
 function GlobalJonesBasis(J::AbstractMatrix)
     size(J) != (3, 3) && throw(ArgumentError("GlobalJonesBasis expects a 3×3 matrix"))
     T = eltype(J)
-    return GlobalJonesBasis{T}(SMatrix{3,3,T,9}(J))
+    return GlobalJonesBasis{T}(SMatrix{3, 3, T, 9}(J))
 end
 
 # Data type conversion constructor
-GlobalJonesBasis{T}(J::GlobalJonesBasis) where {T} =
-    GlobalJonesBasis{T}(SMatrix{3,3,T,9}(static_data(J)))
+function GlobalJonesBasis{T}(J::GlobalJonesBasis) where {T}
+    GlobalJonesBasis{T}(SMatrix{3, 3, T, 9}(static_data(J)))
+end
 
-XYBasis(j11::Number, j12::Number, j21::Number, j22::Number) = GlobalJonesBasis(@SArray([j11 j12 0; j21 j22 0; 0 0 1]))
-XZBasis(j11::Number, j12::Number, j21::Number, j22::Number) = GlobalJonesBasis(@SArray([j11 0 j12; 0 1 0; j21 0 j22]))
-YZBasis(j11::Number, j12::Number, j21::Number, j22::Number) = GlobalJonesBasis(@SArray([1 0 0; 0 j22 j21; 0 j12 j11]))
+function XYBasis(j11::Number, j12::Number, j21::Number, j22::Number)
+    GlobalJonesBasis(@SArray([j11 j12 0; j21 j22 0; 0 0 1]))
+end
+function XZBasis(j11::Number, j12::Number, j21::Number, j22::Number)
+    GlobalJonesBasis(@SArray([j11 0 j12; 0 1 0; j21 0 j22]))
+end
+function YZBasis(j11::Number, j12::Number, j21::Number, j22::Number)
+    GlobalJonesBasis(@SArray([1 0 0; 0 j22 j21; 0 j12 j11]))
+end
 
 """
     _calculate_global_E0(in_dir, out_dir, normal, J)
@@ -103,7 +110,8 @@ is chosen for the s- and p-components.
 - `normal`: surface normal at the point of intersection
 - `J`: Jones matrix extended to 3x3, e.g. [-rₛ 0 0; 0 rₚ 0; 0 0 1] for reflection
 """
-function _calculate_global_E0(in_dir::AbstractArray, out_dir::AbstractArray, normal::AbstractArray, J::LocalJonesBasis)
+function _calculate_global_E0(in_dir::AbstractArray, out_dir::AbstractArray,
+        normal::AbstractArray, J::LocalJonesBasis)
     # Choose basis vectors
     if !isparallel3d(in_dir, out_dir)
         v = out_dir
@@ -134,20 +142,23 @@ function _calculate_global_E0(in_dir::AbstractArray, out_dir::AbstractArray, nor
 end
 
 # unwrap the Local/GlobalJonesBasis types to allow static array optimization to happen
-function _calculate_global_E0(in_dir::AbstractArray, out_dir::AbstractArray, normal::AbstractArray, J::AbstractJonesMatrix)
+function _calculate_global_E0(in_dir::AbstractArray, out_dir::AbstractArray,
+        normal::AbstractArray, J::AbstractJonesMatrix)
     _calculate_global_E0(in_dir, out_dir, normal, static_data(J))
 end
 
-function _calculate_global_E0(::AbstractObject, ray::PolarizedRay, out_dir::AbstractArray, J::LocalJonesBasis)
+function _calculate_global_E0(
+        ::AbstractObject, ray::PolarizedRay, out_dir::AbstractArray, J::LocalJonesBasis)
     # Update Jones matrix according to global object orientation
     in_dir = direction(ray)
     normal = normal3d(intersection(ray))
     E0 = polarization(ray)
     P = _calculate_global_E0(in_dir, out_dir, normal, J)
-    return P*E0
+    return P * E0
 end
 
-function _calculate_global_E0(object::AbstractObject, ray::PolarizedRay, out_dir::AbstractArray, J::GlobalJonesBasis)
+function _calculate_global_E0(object::AbstractObject, ray::PolarizedRay,
+        out_dir::AbstractArray, J::GlobalJonesBasis)
     in_dir = direction(ray)
     E0 = polarization(ray)
     # Transform Jones matrix according to global object orientation
