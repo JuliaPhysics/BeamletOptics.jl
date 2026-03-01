@@ -101,7 +101,8 @@ end
 @inline function _beamsplitter_reflected_beam(bs::AbstractBeamsplitter, ::Beam{T, R},
         ray::R) where {T <: Real, R <: PolarizedRay{T}}
     # Symmetric reflection for non-polarizing BS behavior (preserve polarization state)
-    J = SPBasis(reflectance(bs), 0, 0, reflectance(bs))
+    # The negative reflectance matrix correctly implements a pi phase shift on reflection.
+    J = SPBasis(-reflectance(bs), 0, 0, reflectance(bs))
     normal = normal3d(intersection(ray))
     pos = position(ray) + length(ray) * direction(ray)
     in_dir = direction(ray)

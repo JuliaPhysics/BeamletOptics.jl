@@ -276,23 +276,20 @@ function interact3d(
         child_ray = first(rays(beam.children[1]))
         direction!(child_ray, n_d)
         if child_ray isa PolarizedRay
+            # Use proper Yun calculus to apply Fresnel coefficients for the refraction
+            # instead of an unphysical geometric rotation placeholder.
             in_dir = direction(ray)
             nml = normal3d(intersection(ray))
-            # we need to make sure the normal points towards the incoming ray for the rotation math
-            # refraction3d handles this internally but here we need consistent nml
-            # rotate_polarization uses cross(k_in, normal) to find s-vector.
-            # If normal is flipped, s flips, p flips?
-            # s = k x n. p = s x k. E = Es*s + Ep*p.
-            # If n -> -n: s -> -s. p -> (-s) x k = -p.
-            # E_out = Es*(-s) + Ep*(-p) = -E_out_original?
-            # Phase shift of pi if normal is flipped?
-            # standard normal should be opposed to ray? Or surface normal?
-            # OpticUtils `refraction3d` expects normal.
-            # rotate_polarization logic should ideally be robust or specify normal convention.
-            # Let's use the normal from intersection, assuming consistent usage.
 
-            # Note: direction(ray) is k_in. n_d is k_out.
-            new_E0 = rotate_polarization(polarization(child_ray), in_dir, n_d, nml)
+            # The normal should point against the incoming ray for accurate incidence angle
+            dot(in_dir, nml) > 0 && (nml = -nml)
+
+            θi = angle3d(in_dir, -nml)
+            rs, rp, ts, tp = fresnel_coefficients(θi, _nt / _nr)
+
+            # Use Jones matrix approach for transmission
+            J = SPBasis(ts, 0, 0, tp)
+            new_E0 = _calculate_global_E0(pbs, ray, n_d, J)
             polarization!(child_ray, new_E0)
         end
         return nothing

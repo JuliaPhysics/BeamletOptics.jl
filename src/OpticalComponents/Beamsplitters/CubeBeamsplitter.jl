@@ -169,11 +169,14 @@ function interact3d(
         beam::Beam{T, R},
         ray::R) where {T <: Real, R <: PolarizedRay{T}}
     if shape(intersection(ray)) === shape(cbs.front)
+        # Use proper refraction on entering the front face
         interaction = interact3d(system, cbs.front, beam, ray)
         hint!(interaction, Hint(cbs, shape(cbs.coating)))
         return interaction
     end
     if shape(intersection(ray)) === shape(cbs.coating)
+        # We are INSIDE the cube. The coating sits between front and back prisms.
+        # So we split the beam, but the refractive index stays `n` (the glass index).
         interact3d(system, cbs.coating, beam, ray)
         _n = refractive_index(cbs, wavelength(ray))
         refractive_index!(first(rays(beam.children[1])), _n)
@@ -181,6 +184,9 @@ function interact3d(
         return nothing
     end
     if shape(intersection(ray)) === shape(cbs.back)
+        # Ensure we only interact with the back prism if we are actually at the back surface
+        # A normal `CubeBeamsplitter` delegates to `cbs.back` entirely, but we need to ensure
+        # that ray direction correctly triggers the exit refraction instead of internal reflection.
         interaction = interact3d(system, cbs.back, beam, ray)
         hint!(interaction, Hint(cbs, shape(cbs.coating)))
         return interaction

@@ -59,6 +59,20 @@ const mm = 1e-3
 
         # Check orthogonality (THIS WAS THE BUG)
         @test abs(dot(BMO.direction(trans_ray_p), BMO.polarization(trans_ray_p))) < 1e-9
+
+        # Power Conservation Test
+        # I_in = I_reflected_front + I_transmitted + I_reflected
+        # But our system just treats entering substrate:
+        # Beam hits front face -> trans + refl.
+        # Trans hits coating -> trans + refl (internal).
+
+        # Let's just trace the whole system and sum up the intensity of all leaves
+        leaves = collect(AbstractTrees.Leaves(beam_p))
+        total_power_out = sum(abs2.(BMO.polarization(first(BMO.rays(leaf))))
+        for leaf in leaves)
+        power_in = abs2(E0_p[1]) + abs2(E0_p[2]) + abs2(E0_p[3])
+
+        @test total_power_out≈power_in atol=1e-6
     end
 
     @testset "PolarizingCubeBeamsplitter (n > 1)" begin
@@ -123,6 +137,12 @@ const mm = 1e-3
             # Check orthogonality
             @test abs(dot(BMO.direction(r), BMO.polarization(r))) < 1e-9
         end
+
+        # Power conservation for Cube Beamsplitter
+        total_power_out = sum(abs2.(BMO.polarization(first(BMO.rays(leaf))))
+        for leaf in leaves)
+        power_in = abs2(E0_p[1]) + abs2(E0_p[2]) + abs2(E0_p[3])
+        @test total_power_out≈power_in atol=1e-6
     end
 end
 end
