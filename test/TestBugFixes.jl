@@ -1,6 +1,7 @@
 module TestBugFixes
 
 using BeamletOptics
+using LinearAlgebra
 using Test
 
 const BMO = BeamletOptics
@@ -145,6 +146,24 @@ end
             @test isapprox(pd_pwr, ref_signal(phi, 2e-3), atol=1e-8)
             shift_phase(gb_prb, step(phis))
         end
+    end
+end
+
+@testset "Issue#51" begin
+    # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/51
+    mirror = BeamletOptics.ConcaveSphericalMirror(0.1,0.01,0.2)
+    system = StaticSystem([mirror])
+    beam = Beam([0, -0.19, 0.07], [0.0, 1, 0])
+    solve_system!(system, beam)
+    r1 = BMO.rays(beam)[1]
+    r2 = BMO.rays(beam)[2]
+    r3 = BMO.rays(beam)[3]
+    @testset "Testing SDF sphere marching surface bug regression" begin
+        @test length(BMO.rays(beam)) == 3
+        @test BMO.object(BMO.intersection(r1)) === mirror
+        @test BMO.object(BMO.intersection(r2)) === mirror
+        @test isnothing(BMO.intersection(r3))
+        @test dot(BMO.direction(r1), BMO.direction(r3)) < 0
     end
 end
 
