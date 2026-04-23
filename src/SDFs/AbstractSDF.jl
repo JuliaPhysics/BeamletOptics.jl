@@ -105,22 +105,30 @@ function _raymarch_outside(shape::AbstractSDF{S},
         num_iter = 1000,
         eps = eps_ray) where {S, R}
     T = promote_type(S, R)
+    # check initial distance from surface
     dist = sdf(shape, pos)
-    t0 = dist
+    t0 = zero(T)    
+    # bump sphere marching starting pos away from surface
+    if dist < eps
+        bump = eps * 100
+        pos = pos + bump * dir
+        t0 += bump
+        # recalculate distance from the "bumped" position
+        dist = sdf(shape, pos)
+    end
+    # perform sphere/ray marching
     i = 1
-    # march the ray based on the last returned distance
     while i <= num_iter
         pos = pos + dist * dir
-        dist = sdf(shape, pos)
         t0 += dist
+        dist = sdf(shape, pos)
         i += 1
-        # surface has been reached if distance is less than tolerance (highly convex surfaces can require many iterations)
+        # check if surface hit detected 
         if dist < eps
             normal = normal3d(shape, pos)
             return Intersection(t0, normal, shape)
         end
     end
-    # return no intersection if tolerance has not been reached or actual miss occurs
     return nothing
 end
 
@@ -175,6 +183,8 @@ function intersect3d(object::AbstractSDF, ray::AbstractRay)
     n = normal3d(object, pos)
     if dot(dir, n) ≤ 0
         return _raymarch_inside(object, pos, dir)
+    else
+        return _raymarch_outside(object, pos, dir)
     end
     # Return no intersection else
     return nothing
