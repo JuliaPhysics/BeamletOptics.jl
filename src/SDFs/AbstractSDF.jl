@@ -1,7 +1,6 @@
 const eps_srf = 1e-9     # helps to decide if on SDF surface
 const eps_ray = 1e-10     # helps to terminate outside ray marching routine
 const eps_ins = 1e-0      # internal ray marching length step
-const eps_bump = 1e-6
 
 """
     AbstractSDF <: AbstractShape
@@ -89,7 +88,7 @@ function numeric_gradient(s::AbstractSDF, pos)
 end
 
 function normal_fd(s::AbstractSDF, p)
-    normal = normalize(gradient(x->sdf(s, x), p))
+    normal = normalize(gradient(x -> sdf(s, x), p))
     all(!isnan, normal) && return normal
     # fallback
     return numeric_gradient(s, p)
@@ -106,28 +105,28 @@ function _raymarch_outside(shape::AbstractSDF{S},
         num_iter = 1000,
         eps = eps_ray) where {S, R}
     T = promote_type(S, R)
-    # check initial distance from surface
     dist = sdf(shape, pos)
-    t0 = zero(T)    
-    # bump sphere marching starting pos away from surface
-    if dist < eps
-        bump = eps_bump
-        pos = pos + bump * dir
-        t0 += bump
-        # recalculate distance from the "bumped" position
-        dist = sdf(shape, pos)
-    end
-    # perform sphere/ray marching
+    t0 = zero(T)
+
+    # `escaped` tracks if the ray has definitively moved away from the surface
+    escaped = dist > eps
     i = 1
     while i <= num_iter
-        pos = pos + dist * dir
-        t0 += dist
+        # enforce a minimum step of `eps` to prevent the ray from getting stuck if it starts directly on the surface (dist ≈ 0)
+        step_size = max(dist, eps)
+        pos = pos + step_size * dir
+        t0 += step_size
         dist = sdf(shape, pos)
         i += 1
-        # check if surface hit detected 
-        if dist < eps
+
+        if dist > eps
+            escaped = true
+        elseif escaped
             normal = normal3d(shape, pos)
-            return Intersection(t0, normal, shape)
+            # Filter out false positive hits caused by numerical noise when leaving an SDF.
+            if !(dot(dir, normal) > eps)
+                return Intersection(t0, normal, shape)
+            end
         end
     end
     return nothing
