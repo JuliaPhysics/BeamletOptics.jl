@@ -1,6 +1,7 @@
 const eps_srf = 1e-9     # helps to decide if on SDF surface
 const eps_ray = 1e-10     # helps to terminate outside ray marching routine
 const eps_ins = 1e-0      # internal ray marching length step
+const eps_bump = 1e-6
 
 """
     AbstractSDF <: AbstractShape
@@ -110,7 +111,7 @@ function _raymarch_outside(shape::AbstractSDF{S},
     t0 = zero(T)    
     # bump sphere marching starting pos away from surface
     if dist < eps
-        bump = eps * 100
+        bump = eps_bump
         pos = pos + bump * dir
         t0 += bump
         # recalculate distance from the "bumped" position
