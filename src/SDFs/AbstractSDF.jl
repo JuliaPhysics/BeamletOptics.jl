@@ -112,8 +112,12 @@ function _raymarch_outside(shape::AbstractSDF{S},
     escaped = dist > eps
     i = 1
     while i <= num_iter
-        # enforce a minimum step of `eps` to prevent the ray from getting stuck if it starts directly on the surface (dist ≈ 0)
-        step_size = max(dist, eps)
+        # When trapped in the surface noise floor (dist < eps), we slowly accelerate the minimum step
+        # proportionally to the distance traveled (t0 * 0.01). 
+        # This logarithmic escape prevents exhausting num_iter on highly inaccurate SDFs, 
+        # while bounding the blind step to 1% of the traveled distance to prevent tunneling.
+        min_step = escaped ? eps : (eps + t0 * 0.01)
+        step_size = max(dist, min_step)
         pos = pos + step_size * dir
         t0 += step_size
         dist = sdf(shape, pos)
