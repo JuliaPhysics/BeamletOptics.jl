@@ -111,7 +111,6 @@ end
     # Enforce orthogonality (Gram-Schmidt)
     E0 -= dot(out_dir, E0) * out_dir
     return Beam(PolarizedRay(pos, out_dir, wavelength(ray), E0))
-    return Beam(PolarizedRay(pos, out_dir, wavelength(ray), E0))
 end
 
 function interact3d(::AbstractSystem, bs::ThinBeamsplitter, beam::Beam{T, R},
