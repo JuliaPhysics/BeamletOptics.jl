@@ -167,7 +167,7 @@ function _calculate_global_E0(object::AbstractObject, ray::PolarizedRay,
 
     Q_in = I - in_dir * transpose(in_dir)
     Q_out = I - out_dir * transpose(out_dir)
-    P = Q_out * P * Q_in
+    P = Q_out * P * Q_in + out_dir * transpose(in_dir)
     return P * E0
 end
 
