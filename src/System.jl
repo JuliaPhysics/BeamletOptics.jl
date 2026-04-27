@@ -675,12 +675,12 @@ end
 end
 
 function AbstractTrees.printnode(io::IO, node::B; kw...) where {B <: AbstractObject}
-    show(io, B)
+    show(io, node)
 end
 function AbstractTrees.printnode(io::IO,
         node::B;
         kw...) where {B <: AbstractObjectGroup}
-    show(io, B)
+    show(io, node)
 end
 
 Base.show(::IO, ::MIME"text/plain", system::System) =

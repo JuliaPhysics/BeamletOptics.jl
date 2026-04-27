@@ -164,6 +164,18 @@ function parent!(child::AstigmaticGaussianBeamlet, parent::AstigmaticGaussianBea
     return nothing
 end
 
+function Base.show(io::IO, agb::AstigmaticGaussianBeamlet)
+    p0 = position(first(rays(agb.c)))
+    d0 = direction(first(rays(agb.c)))
+    λ  = wavelength(agb)
+    _, w1, w2 = waist_parameters(agb, 0.0)
+    print(io, "AstigmaticGaussianBeamlet(pos: $p0, dir: $d0, λ: $λ, w_x: $(norm(w1)), w_y: $(norm(w2)))")
+end
+
+# AbstractTrees integration
+AbstractTrees.children(agb::AstigmaticGaussianBeamlet) = agb.children
+AbstractTrees.nodevalue(agb::AstigmaticGaussianBeamlet) = agb
+
 """
     AstigmaticGaussianBeamletInteraction <: AbstractInteraction
 
@@ -463,4 +475,34 @@ as the reference normalization.
 """
 function electric_field(agb::AstigmaticGaussianBeamlet, r::AbstractArray, z::Real)
     return parabasal_field(agb, r, z; z_norm = 0.0)
+end
+
+"""
+    intensity(agb::AstigmaticGaussianBeamlet, r, z)
+
+Compute the optical intensity [W/m²] of the beamlet at position `(r, z)`.
+"""
+function intensity(agb::AstigmaticGaussianBeamlet, r::AbstractArray, z::Real)
+    E = electric_field(agb, r, z)
+    return 0.5 * norm(E)^2 # Assuming vacuum impedance normalization for simplicity in this package
+end
+
+"""
+    rayleigh_range(agb::AstigmaticGaussianBeamlet)
+
+Returns the Rayleigh range for the x and y axes of the beamlet as a tuple `(z_rx, z_ry)`.
+"""
+function rayleigh_range(agb::AstigmaticGaussianBeamlet)
+    λ = wavelength(agb)
+    _, w1, w2 = waist_parameters(agb, 0.0)
+    return (rayleigh_range(λ, norm(w1)), rayleigh_range(λ, norm(w2)))
+end
+
+"""
+    gauss_parameters(agb::AstigmaticGaussianBeamlet, z)
+
+Returns the elliptical waist parameters `(p0, w1, w2)` at distance `z`.
+"""
+function gauss_parameters(agb::AstigmaticGaussianBeamlet, z::Real)
+    return waist_parameters(agb, z)
 end
