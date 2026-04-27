@@ -88,7 +88,7 @@ function numeric_gradient(s::AbstractSDF, pos)
 end
 
 function normal_fd(s::AbstractSDF, p)
-    normal = normalize(gradient(x->sdf(s, x), p))
+    normal = normalize(gradient(x -> sdf(s, x), p))
     all(!isnan, normal) && return normal
     # fallback
     return numeric_gradient(s, p)
@@ -106,21 +106,33 @@ function _raymarch_outside(shape::AbstractSDF{S},
         eps = eps_ray) where {S, R}
     T = promote_type(S, R)
     dist = sdf(shape, pos)
-    t0 = dist
+    t0 = zero(T)
+
+    # `escaped` tracks if the ray has definitively moved away from the surface
+    escaped = dist > eps
     i = 1
-    # march the ray based on the last returned distance
     while i <= num_iter
-        pos = pos + dist * dir
+        # When trapped in the surface noise floor (dist < eps), we slowly accelerate the minimum step
+        # proportionally to the distance traveled (t0 * 0.01). 
+        # This logarithmic escape prevents exhausting num_iter on highly inaccurate SDFs, 
+        # while bounding the blind step to 1% of the traveled distance to prevent tunneling.
+        min_step = escaped ? eps : (eps + t0 * 0.01)
+        step_size = max(dist, min_step)
+        pos = pos + step_size * dir
+        t0 += step_size
         dist = sdf(shape, pos)
-        t0 += dist
         i += 1
-        # surface has been reached if distance is less than tolerance (highly convex surfaces can require many iterations)
-        if dist < eps
+
+        if dist > eps
+            escaped = true
+        elseif escaped
             normal = normal3d(shape, pos)
-            return Intersection(t0, normal, shape)
+            # Filter out false positive hits caused by numerical noise when leaving an SDF.
+            if !(dot(dir, normal) > eps)
+                return Intersection(t0, normal, shape)
+            end
         end
     end
-    # return no intersection if tolerance has not been reached or actual miss occurs
     return nothing
 end
 
@@ -175,6 +187,8 @@ function intersect3d(object::AbstractSDF, ray::AbstractRay)
     n = normal3d(object, pos)
     if dot(dir, n) ≤ 0
         return _raymarch_inside(object, pos, dir)
+    else
+        return _raymarch_outside(object, pos, dir)
     end
     # Return no intersection else
     return nothing
