@@ -131,6 +131,48 @@ function calc_local_pos(
 end
 
 """
+    calc_local_pos(pd::Detector, hits::Vector{AstigmaticGaussianBeamletHit}; crop_factor=1, num_spots=50)
+
+Calculates a projected ellipse of 2D hit spots for each hit of an [`AstigmaticGaussianBeamlet`](@ref)
+on the [`Detector`](@ref).
+"""
+function calc_local_pos(
+        pd::Detector,
+        hits::Vector{AstigmaticGaussianBeamletHit{T}};
+        # kwargs
+        crop_factor::Real=one(T),
+        num_spots::Int=50
+    ) where T
+    # Calculate waist projections in local (x, z) coordinates
+    ts = LinRange(0, 2pi, num_spots)
+    p0 = position(pd)
+    # Left-handed coord. sys. due to pd mesh rotation
+    ex = -orientation(pd)[:,1]
+    ey = orientation(pd)[:,2]
+    ez = orientation(pd)[:,3]
+    pts_2D = Vector{Point2{T}}()
+    for hit in hits
+        # Use waist_parameters to get true elliptical axes at intersection point
+        _, w1, w2 = waist_parameters(hit.agb, length(hit.agb))
+        w1 *= crop_factor
+        w2 *= crop_factor
+        
+        dir = direction(hit)
+        origin = hit_point(hit)
+        # Calculate 3D elliptical waist
+        pts_3D = [origin + w1 * cos(t) + w2 * sin(t) for t in ts]
+        # Project 3D points onto plane
+        for (i, pt) in enumerate(pts_3D)
+            dist = line_plane_distance3d(p0, ey, pt, dir)
+            pts_3D[i] = pt + dist * dir
+        end
+        new_pts = calc_local_pos(p0, ex, ez, pts_3D)
+        append!(pts_2D, new_pts)
+    end
+    return pts_2D
+end
+
+"""
     calc_local_lims(pd::Detector; kwargs...)
 
 Calculates the limiting values for the flat E-field evaluation grid based on the detector data.
@@ -187,6 +229,25 @@ For available keyword args., refer to the corresponding [`calc_local_pos`](@ref)
 function calc_local_lims(
         pd::Detector,
         ::Vector{GaussianBeamletHit{G}};
+        # kwargs
+        crop_factor::Real=one(G),
+        num_spots::Int=50
+    ) where G
+    local_hits = calc_local_pos(pd; crop_factor, num_spots)
+    xs = getindex.(local_hits, 1)
+    zs = getindex.(local_hits, 2)
+    # min/max limits
+    return minimum(xs), maximum(xs), minimum(zs), maximum(zs)
+end
+
+"""
+    calc_local_lims(pd::Detector, hits::Vector{AstigmaticGaussianBeamletHit}; crop_factor=1, num_spots=50, kwargs...)
+
+Computes a 2D bounding box around the elliptical waist of [`AstigmaticGaussianBeamlet`](@ref) hits.
+"""
+function calc_local_lims(
+        pd::Detector,
+        hits::Vector{AstigmaticGaussianBeamletHit{G}};
         # kwargs
         crop_factor::Real=one(G),
         num_spots::Int=50

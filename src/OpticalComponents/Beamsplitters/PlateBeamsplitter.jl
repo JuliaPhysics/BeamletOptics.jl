@@ -267,3 +267,62 @@ function interact3d(
     # if nothing worked, return nothing
     return nothing
 end
+
+function interact3d(
+    system::AbstractSystem,
+    pbs::AbstractPlateBeamsplitter,
+    agb::AstigmaticGaussianBeamlet,
+    id::Int
+    )
+    _shape = shape(intersection(rays(agb.c)[id]))
+    # Substrate interaction
+    if _shape === shape(substrate(pbs))
+        interaction = interact3d(system, substrate(pbs), agb, id)
+        hint!(interaction, Hint(pbs, shape(coating(pbs))))
+        return interaction
+    end
+    # Splitter interaction
+    if _shape === shape(coating(pbs))
+        interact3d(system, coating(pbs), agb, id)
+        # Update refractive index and calculate refraction
+        λ = wavelength(rays(agb.c)[id])
+        n_optics = refractive_index(pbs, λ)
+        n_system = refractive_index(system, λ)
+        if isentering(agb, id)
+            # transmitted ray is refracted into substrate
+            _nt = n_optics
+            _nr = n_system
+        else
+            # transmitted ray is refracted into environment
+            _nt = n_system
+            _nr = n_optics
+        end
+        # Update children ref. index
+        refractive_index!(agb.children[1], 1, _nt)
+        refractive_index!(agb.children[2], 1, _nr)
+        # Calculate refracted directions for transmitted child's component beams
+        n_target = isentering(agb, id) ? n_optics : n_system
+        for beam in _component_beams(agb.children[1])
+            ray_i = rays(beam == agb.children[1].c ? agb.c : beam)[id]
+            # Use the source beam at this segment for refraction calculation
+            src_beam = nothing
+            if beam === agb.children[1].c;     src_beam = agb.c
+            elseif beam === agb.children[1].wxp; src_beam = agb.wxp
+            elseif beam === agb.children[1].wxm; src_beam = agb.wxm
+            elseif beam === agb.children[1].wyp; src_beam = agb.wyp
+            elseif beam === agb.children[1].wym; src_beam = agb.wym
+            elseif beam === agb.children[1].dxp; src_beam = agb.dxp
+            elseif beam === agb.children[1].dxm; src_beam = agb.dxm
+            elseif beam === agb.children[1].dyp; src_beam = agb.dyp
+            elseif beam === agb.children[1].dym; src_beam = agb.dym
+            end
+            if !isnothing(src_beam)
+                n_d, _ = refraction3d(rays(src_beam)[id], n_target)
+                direction!(first(rays(beam)), n_d)
+            end
+        end
+        return nothing
+    end
+    # if nothing worked, return nothing
+    return nothing
+end

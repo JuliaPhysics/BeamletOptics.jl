@@ -43,6 +43,7 @@ render!(::_RenderEnv, ::T; kwargs...) where T<:_RenderTypes = throw(RenderNotImp
 # include order dependant!
 include("RenderBeam.jl")
 include("RenderGaussian.jl")
+include("RenderAstigmaticGaussian.jl")
 include("RenderSDF.jl")
 include("RenderMesh.jl")
 include("RenderObjects.jl")

@@ -46,3 +46,27 @@ function interact3d(::AbstractSystem,
     return BeamInteraction{T, R}(nothing,
         PolarizedRay{T}(npos, ndir, nothing, wavelength(ray), refractive_index(ray), E0))
 end
+
+function interact3d(system::AbstractSystem,
+        polfilter::PolarizationFilter,
+        agb::AstigmaticGaussianBeamlet{T},
+        id::Int) where {T <: Real}
+    chief = rays(agb.c)[id]
+    
+    # Interaction for chief ray
+    i_c = interact3d(system, polfilter, agb.c, chief)
+    isnothing(i_c) && return nothing
+    
+    # Auxiliary rays do not change polarization (purely geometric)
+    # They just propagate to the interface
+    npos = position(chief) + length(chief) * direction(chief)
+    
+    # Construct the AstigmaticGaussianBeamletInteraction
+    # For auxiliary rays, we just need the new rays starting at npos
+    aux_ints = map(b -> begin
+        r = rays(b)[id]
+        BeamInteraction{T, Ray{T}}(nothing, Ray(npos, direction(r), wavelength(r)))
+    end, _aux_beams(agb))
+    
+    return AstigmaticGaussianBeamletInteraction{T}(i_c, aux_ints...)
+end

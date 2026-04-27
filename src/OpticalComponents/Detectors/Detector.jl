@@ -143,12 +143,29 @@ struct GaussianBeamletHit{T} <: AbstractBeamletHit{T}
     id::Int 
 end
 
+"""
+    AstigmaticGaussianBeamletHit{T} <: AbstractBeamletHit{T}
+
+Stores an [`AstigmaticGaussianBeamlet`], where `l0` represents the length of the parent beam
+up until the current beam section, identified by the `id` index.
+"""
+struct AstigmaticGaussianBeamletHit{T} <: AbstractBeamletHit{T}
+    agb::AstigmaticGaussianBeamlet{T}
+    l0::T
+    id::Int 
+end
+
 position(hit::GaussianBeamletHit) = position(hit.gauss.chief.rays[hit.id])
 direction(hit::GaussianBeamletHit) = direction(hit.gauss.chief.rays[hit.id])
 
+position(hit::AstigmaticGaussianBeamletHit) = position(hit.agb.c.rays[hit.id])
+direction(hit::AstigmaticGaussianBeamletHit) = direction(hit.agb.c.rays[hit.id])
+
 hit_point(hit::GaussianBeamletHit) = position(hit) + length(hit.gauss.chief.rays[hit.id]) * direction(hit)
+hit_point(hit::AstigmaticGaussianBeamletHit) = position(hit) + length(hit.agb.c.rays[hit.id]) * direction(hit)
 
 projection_factor(hit::GaussianBeamletHit) = abs(dot(direction(hit), normal3d(intersection(hit.gauss.chief.rays[hit.id]))))
+projection_factor(hit::AstigmaticGaussianBeamletHit) = abs(dot(direction(hit), normal3d(intersection(hit.agb.c.rays[hit.id]))))
 
 """
     Detector <: AbstractDetector
@@ -208,7 +225,8 @@ mutable struct Detector{T, S <: AbstractShape{T}} <: AbstractDetector{T}
         Nothing,
         Vector{RayHit{T}},
         Vector{PolarizedRayHit{T}},
-        Vector{GaussianBeamletHit{T}}
+        Vector{GaussianBeamletHit{T}},
+        Vector{AstigmaticGaussianBeamletHit{T}}
     }
     stop::Bool
     lock::ReentrantLock
@@ -310,6 +328,18 @@ function interact3d(::AbstractSystem, d::Detector, g::GaussianBeamlet{R}, id::In
     else
         # Continue tracing # FIXME
         throw(ErrorException("Continued tracing for GaussianBeamlet not yet implemented."))
+    end
+end
+
+function interact3d(::AbstractSystem, d::Detector, agb::AstigmaticGaussianBeamlet{R}, id::Int) where {R}
+    l0 = length(agb) - length(agb.c.rays[id])
+    push!(d, AstigmaticGaussianBeamletHit(agb, l0, id))
+    if stop(d)
+        # Stop solver (hard target)
+        return nothing
+    else
+        # Continue tracing # FIXME
+        throw(ErrorException("Continued tracing for AstigmaticGaussianBeamlet not yet implemented."))
     end
 end
 

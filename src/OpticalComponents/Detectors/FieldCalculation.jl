@@ -50,22 +50,24 @@ A tuple `(xs, zs, E)` where
 """
 electric_field(d::Detector; kwargs...) = electric_field(d, hits(d); kwargs...)
 
-electric_field(d::Detector, ::Nothing; kwargs...) = throw(ErrorException("No hits available on detector."))
+function electric_field(d::Detector, ::Nothing; kwargs...)
+    throw(ErrorException("No hits available on detector."))
+end
 
 function electric_field(
         pd::Detector,
         hits::Vector{GaussianBeamletHit{G}};
         # kwargs
-        n::Int=100,
-        crop_factor::Real=1.5,
-        num_spots::Int=50,
+        n::Int = 100,
+        crop_factor::Real = 1.5,
+        num_spots::Int = 50,
         x_min = Inf,
         x_max = Inf,
         z_min = Inf,
         z_max = Inf,
-        x0_shift::Real=0,
-        z0_shift::Real=0
-    ) where G
+        x0_shift::Real = 0,
+        z0_shift::Real = 0
+) where {G}
     # Calculate autolims
     _x_min, _x_max, _z_min, _z_max = calc_local_lims(pd; crop_factor, num_spots)
     if x_min != Inf && x_max != Inf
@@ -81,14 +83,14 @@ function electric_field(
     # Preallocate e-field matrix
     field = zeros(Complex{G}, n, n)
     # PD local coordinate axes (left-handed coords.)
-    local_x = Point3(-orientation(pd)[:,1])  # flipped sign due to rotated pd mesh
-    local_z = Point3(orientation(pd)[:,3])
+    local_x = Point3(-orientation(pd)[:, 1])  # flipped sign due to rotated pd mesh
+    local_z = Point3(orientation(pd)[:, 3])
     origin = position(pd)
     # Calculate field superposition
     Threads.@threads for j in eachindex(zs) # FIXME row column major order?
         z = zs[j]
         @inbounds for i in eachindex(xs)
-            x = xs[i] 
+            x = xs[i]
             # Transform point p on PD into world coordinates
             p1 = origin + x * local_x + z * local_z
             # Add E-field contribution for each hit
@@ -110,21 +112,74 @@ function electric_field(
     end
     return xs, zs, field
 end
+function electric_field(
+        pd::Detector,
+        hits::Vector{AstigmaticGaussianBeamletHit{G}};
+        # kwargs
+        n::Int = 100,
+        crop_factor::Real = 1.5,
+        num_spots::Int = 50,
+        x_min = Inf,
+        x_max = Inf,
+        z_min = Inf,
+        z_max = Inf,
+        x0_shift::Real = 0,
+        z0_shift::Real = 0
+) where {G}
+    # Calculate autolims
+    _x_min, _x_max, _z_min, _z_max = calc_local_lims(pd; crop_factor, num_spots)
+    if x_min != Inf && x_max != Inf
+        _x_min = x_min
+        _x_max = x_max
+    end
+    if z_min != Inf && z_max != Inf
+        _z_min = z_min
+        _z_max = z_max
+    end
+    xs = LinRange(_x_min, _x_max, n) .+ x0_shift
+    zs = LinRange(_z_min, _z_max, n) .+ z0_shift
+    # Preallocate e-field matrix
+    field = zeros(Complex{G}, n, n)
+    # PD local coordinate axes (left-handed coords.)
+    local_x = Point3(-orientation(pd)[:, 1])
+    local_z = Point3(orientation(pd)[:, 3])
+    origin = position(pd)
+    # Calculate field superposition
+    Threads.@threads for j in eachindex(zs)
+        z_grid = zs[j]
+        @inbounds for i in eachindex(xs)
+            x_grid = xs[i]
+            p1 = origin + x_grid * local_x + z_grid * local_z
+            for hit in hits
+                p0 = position(hit)
+                d0 = direction(hit)
+                l0 = hit.l0
+                proj = projection_factor(hit)
+                l1 = dot(p1 - p0, d0)
+                p2 = p0 + l1 * d0
+                r_vec = p1 - p2
+                z_gb = l0 + l1
+                field[i, j] += electric_field(hit.agb, r_vec, z_gb) * sqrt(proj)
+            end
+        end
+    end
+    return xs, zs, field
+end
 
 function electric_field(
         pd::Detector,
         hits::Vector{RayHit{R}};
         # kwargs
-        n::Int=100,
-        crop_factor::Real=1,
-        center::AbstractCenterAlgorithm=Centroid(),
+        n::Int = 100,
+        crop_factor::Real = 1,
+        center::AbstractCenterAlgorithm = Centroid(),
         x_min = Inf,
         x_max = Inf,
         z_min = Inf,
         z_max = Inf,
-        x0_shift::Real=0,
-        z0_shift::Real=0
-    ) where R
+        x0_shift::Real = 0,
+        z0_shift::Real = 0
+) where {R}
     # automatically calculate limits
     _x_min, _x_max, _z_min, _z_max = calc_local_lims(pd; crop_factor, center)
     if x_min != Inf && x_max != Inf
@@ -155,9 +210,10 @@ function electric_field(
             acc = zero(complex(R))
             @inbounds @simd for hit in hits
                 l = dot(p - hit_point(hit), direction(hit))
-                acc += projection_factor(hit) * cis(wavenumber(hit) * (optical_path_length(hit) + l))
+                acc += projection_factor(hit) *
+                       cis(wavenumber(hit) * (optical_path_length(hit) + l))
             end
-            field[i,j] = acc
+            field[i, j] = acc
         end
     end
 

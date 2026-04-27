@@ -3,7 +3,7 @@ export translate3d!, translate_to3d!, rotate3d!, xrotate3d!, yrotate3d!, zrotate
 export position, orientation
 
 # ray and beam type export
-export Ray, PolarizedRay, Beam, PointSource, CollimatedSource, UniformDiscSource, GaussianBeamlet
+export Ray, PolarizedRay, Beam, PointSource, CollimatedSource, UniformDiscSource, GaussianBeamlet, AstigmaticGaussianBeamlet
 
 # system
 export System, StaticSystem, solve_system!
