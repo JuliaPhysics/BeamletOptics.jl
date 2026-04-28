@@ -3,7 +3,7 @@ export translate3d!, translate_to3d!, rotate3d!, xrotate3d!, yrotate3d!, zrotate
 export position, orientation
 
 # ray and beam type export
-export Ray, PolarizedRay, Beam, PointSource, CollimatedSource, UniformDiscSource, GaussianBeamlet, AstigmaticGaussianBeamlet, rayleigh_range
+export Ray, PolarizedRay, Beam, PointSource, CollimatedSource, UniformDiscSource, GaussianBeamlet, AstigmaticGaussianBeamlet, rayleigh_range, rays, point_on_beam, normal3d
 
 # system
 export System, StaticSystem, solve_system!
@@ -31,7 +31,7 @@ export CircularFlatSurface, RectangularFlatSurface, SphericalSurface, EvenAspher
 export Prism, RightAnglePrism
 
 # detectors
-export Detector, electric_field, intensity, spot_diagram, optical_power, Centroid, MinMax
+export Detector, electric_field, intensity, spot_diagram, optical_power, gauss_parameters, Centroid, MinMax
 
 # splitters
 export ThinBeamsplitter, RoundThinBeamsplitter, RectangularPlateBeamsplitter, RoundPlateBeamsplitter, CubeBeamsplitter, RectangularCompensatorPlate
