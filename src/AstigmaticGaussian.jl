@@ -51,9 +51,11 @@ end
 
 """
     AstigmaticGaussianBeamlet(position, direction, λ, w0; kwargs...)
+    AstigmaticGaussianBeamlet(position, direction, λ, w0_x, w0_y; kwargs...)
 
 Constructs an astigmatic Gaussian beamlet at its waist with the specified beam parameters.
-In the initial (stigmatic) configuration, the beam has circular symmetry with waist radius `w0`.
+In the 4-argument version, the beam has circular symmetry with waist radius `w0`.
+In the 5-argument version, independent waists `w0_x` and `w0_y` can be specified.
 
 # Arguments
 
@@ -63,11 +65,12 @@ In the initial (stigmatic) configuration, the beam has circular symmetry with wa
 - `direction`: direction of the beamlet
 - `λ`: wavelength of the beamlet in [m]. Default value is 1000 nm.
 - `w0`: beam waist (radius) in [m]. Default value is 1 mm.
+- `w0_x`, `w0_y`: independent beam waists in [m].
 
 ## Keyword Arguments
 
-- `M2`: beam quality factor. Default is 1
-- `E0`: electric field vector in [V/m]. Default is [0, 0, 1]
+- `M2`, `M2_x`, `M2_y`: beam quality factors. Default is 1
+- `E0`: electric field vector in [V/m]. Default is `nothing` (aligned with support axes to ensure orthogonality).
 - `support`: optional support vector for basis construction
 - `z0`: beam waist offset in [m]. Default is 0 m
 """
@@ -77,7 +80,22 @@ function AstigmaticGaussianBeamlet(
         λ = 1000e-9,
         w0 = 1e-3;
         M2 = 1,
-        E0 = [0, 0, 1],
+        E0 = nothing,
+        support = nothing,
+        z0 = 0)
+    return AstigmaticGaussianBeamlet(position, direction, λ, w0, w0; M2_x = M2,
+        M2_y = M2, E0 = E0, support = support, z0 = z0)
+end
+
+function AstigmaticGaussianBeamlet(
+        position,
+        direction,
+        λ,
+        w0_x,
+        w0_y;
+        M2_x = 1,
+        M2_y = 1,
+        E0 = nothing,
         support = nothing,
         z0 = 0)
     # Create orthogonal vectors for construction purposes (right-handed)
@@ -91,18 +109,29 @@ function AstigmaticGaussianBeamlet(
         s1 = normalize(support)
     end
     s2 = cross(direction, s1)
-    # Divergence angle in rad
-    θ = divergence_angle(λ, w0, M2)
+
+    # Handle default or non-orthogonal polarization
+    if isnothing(E0)
+        E0 = s1 # Default to linear polarization along first transverse axis
+    elseif !isorthogonal3d(direction, E0)
+        # If user provided E0 but it's not orthogonal, project it.
+        # This is a convenience for tilted setups.
+        E0 = normalize(E0 - dot(E0, direction) * direction)
+    end
+
+    # Divergence angles
+    θx = divergence_angle(λ, w0_x, M2_x)
+    θy = divergence_angle(λ, w0_y, M2_y)
     # Waist rays
-    wxp = Ray(position + s1 * w0 + z0 * direction, direction, λ)
-    wxm = Ray(position - s1 * w0 + z0 * direction, direction, λ)
-    wyp = Ray(position + s2 * w0 + z0 * direction, direction, λ)
-    wym = Ray(position - s2 * w0 + z0 * direction, direction, λ)
-    # Divergence ray
-    div_dir_xp = normalize(direction + s1 * tan(θ))
-    div_dir_xm = normalize(direction - s1 * tan(θ))
-    div_dir_yp = normalize(direction + s2 * tan(θ))
-    div_dir_ym = normalize(direction - s2 * tan(θ))
+    wxp = Ray(position + s1 * w0_x + z0 * direction, direction, λ)
+    wxm = Ray(position - s1 * w0_x + z0 * direction, direction, λ)
+    wyp = Ray(position + s2 * w0_y + z0 * direction, direction, λ)
+    wym = Ray(position - s2 * w0_y + z0 * direction, direction, λ)
+    # Divergence rays
+    div_dir_xp = normalize(direction + s1 * tan(θx))
+    div_dir_xm = normalize(direction - s1 * tan(θx))
+    div_dir_yp = normalize(direction + s2 * tan(θy))
+    div_dir_ym = normalize(direction - s2 * tan(θy))
     dxp = Ray(position + div_dir_xp * z0, div_dir_xp, λ)
     dxm = Ray(position + div_dir_xm * z0, div_dir_xm, λ)
     dyp = Ray(position + div_dir_yp * z0, div_dir_yp, λ)
@@ -167,9 +196,10 @@ end
 function Base.show(io::IO, agb::AstigmaticGaussianBeamlet)
     p0 = position(first(rays(agb.c)))
     d0 = direction(first(rays(agb.c)))
-    λ  = wavelength(agb)
+    λ = wavelength(agb)
     _, w1, w2 = waist_parameters(agb, 0.0)
-    print(io, "AstigmaticGaussianBeamlet(pos: $p0, dir: $d0, λ: $λ, w_x: $(norm(w1)), w_y: $(norm(w2)))")
+    print(io,
+        "AstigmaticGaussianBeamlet(pos: $p0, dir: $d0, λ: $λ, w_x: $(norm(w1)), w_y: $(norm(w2)))")
 end
 
 # AbstractTrees integration
@@ -470,7 +500,7 @@ end
 """
     electric_field(agb, r, z)
 
-Convenience wrapper for [`parabasal_field`](@ref) using the beamlet's starting position (z=0) 
+Convenience wrapper for [`parabasal_field`](@ref) using the beamlet's starting position (z=0)
 as the reference normalization.
 """
 function electric_field(agb::AstigmaticGaussianBeamlet, r::AbstractArray, z::Real)
