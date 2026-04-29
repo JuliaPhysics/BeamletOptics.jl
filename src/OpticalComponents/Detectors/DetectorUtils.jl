@@ -202,8 +202,8 @@ function calc_local_lims(
         crop_factor::Real=one(T),
         center::AbstractCenterAlgorithm=Centroid()
     ) where T
-    # get all hit‐points in local (x,y)
-    local_hits = calc_local_pos(pd)
+    # get provided hit‐points in local (x,y)
+    local_hits = calc_local_pos(pd, hits)
     xs = getindex.(local_hits, 1)
     zs = getindex.(local_hits, 2)
     # calculate center
@@ -228,12 +228,12 @@ For available keyword args., refer to the corresponding [`calc_local_pos`](@ref)
 """
 function calc_local_lims(
         pd::Detector,
-        ::Vector{GaussianBeamletHit{G}};
+        hits::Vector{GaussianBeamletHit{G}};
         # kwargs
         crop_factor::Real=one(G),
         num_spots::Int=50
     ) where G
-    local_hits = calc_local_pos(pd; crop_factor, num_spots)
+    local_hits = calc_local_pos(pd, hits; crop_factor, num_spots)
     xs = getindex.(local_hits, 1)
     zs = getindex.(local_hits, 2)
     # min/max limits
@@ -252,7 +252,7 @@ function calc_local_lims(
         crop_factor::Real=one(G),
         num_spots::Int=50
     ) where G
-    local_hits = calc_local_pos(pd; crop_factor, num_spots)
+    local_hits = calc_local_pos(pd, hits; crop_factor, num_spots)
     xs = getindex.(local_hits, 1)
     zs = getindex.(local_hits, 2)
     # min/max limits

@@ -59,7 +59,7 @@ mutable struct PolarizedRay{T} <: AbstractRay{T}
         end
         return new{M}(
             Point3{M}(pos),
-            Point3{M}(dir),
+            normalize(Point3{M}(dir)),
             int,
             M(λ),
             M(n),
@@ -89,7 +89,7 @@ function PolarizedRay(
     F = promote_type(P, D, L, E)
     return PolarizedRay{F}(
         Point3{F}(pos),
-        Point3{F}(dir),
+        normalize(Point3{F}(dir)),
         nothing,
         F(λ),
         F(1),
