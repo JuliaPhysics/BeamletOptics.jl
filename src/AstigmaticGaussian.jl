@@ -493,7 +493,7 @@ function parabasal_field(
     w = (ξ1 * dot(u2, r) - ξ2 * dot(u1, r)) / (2 * area)
     k = 2π / wavelength(chief)
 
-    ψ = sqrt(area_ref / area) * exp(im * k * conj(w))
+    ψ = sqrt(area_ref / area) * exp(im * k * (z + conj(w)))
     return E_ref_amp * ψ
 end
 
