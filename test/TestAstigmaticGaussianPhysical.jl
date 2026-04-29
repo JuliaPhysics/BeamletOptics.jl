@@ -115,8 +115,8 @@ const mm = 1e-3
         for z_eval in [0.01, 0.03, 0.05]
             E = BMO.electric_field(beam, [0, 0, 0], z_eval)
             actual_phase = angle(E * exp(-im * k * z_eval))
-            # AGB uses conj() convention → positive Gouy phase
-            expected_gouy = +(0.5 * atan(z_eval / zRx) + 0.5 * atan(z_eval / zRy))
+            # AGB now matches standard convention → negative Gouy phase
+            expected_gouy = -(0.5 * atan(z_eval / zRx) + 0.5 * atan(z_eval / zRy))
             @test isapprox(actual_phase, expected_gouy; atol = 1e-3)
         end
     end

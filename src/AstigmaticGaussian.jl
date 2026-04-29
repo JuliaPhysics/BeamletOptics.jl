@@ -417,10 +417,12 @@ of the beam cross-section ellipse.
 """
 function waist_parameters(agb::AstigmaticGaussianBeamlet, z::Real)
     h1, _, h2, _, p0 = parabasal_ray_parameters(agb, z)
-    # Real(h) carries the waist-ray offset, imag(h) the divergence-ray offset;
-    # their sum reconstructs the ellipse axes in the transverse plane.
-    w1 = real(h1) + imag(h1)
-    w2 = real(h2) + imag(h2)
+    # The magnitude of the complex ray height |h(z)| gives the Gaussian spot size w(z).
+    # We use (real+imag) as a direction vector and scale it to norm(h).
+    v1 = real(h1) + imag(h1)
+    v2 = real(h2) + imag(h2)
+    w1 = iszero(v1) ? v1 : v1 * (norm(h1) / norm(v1))
+    w2 = iszero(v2) ? v2 : v2 * (norm(h2) / norm(v2))
     return p0, w1, w2
 end
 
@@ -493,7 +495,9 @@ function parabasal_field(
     w = (ξ1 * dot(u2, r) - ξ2 * dot(u1, r)) / (2 * area)
     k = 2π / wavelength(chief)
 
-    ψ = sqrt(area_ref / area) * exp(im * k * (z + conj(w)))
+    # area_ref / area is essentially (1 / (1 + i*z/zr))^2 for stigmatic beams.
+    # We take the conjugate of the sqrt to get the standard -atan(z/zr) Gouy phase.
+    ψ = conj(sqrt(area_ref / area)) * exp(im * k * (z + conj(w)))
     return E_ref_amp * ψ
 end
 
