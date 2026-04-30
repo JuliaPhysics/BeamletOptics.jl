@@ -24,6 +24,7 @@ function render!(
         r_res = 64,
         z_res = 100,
         flen = 0.1,
+        show_waist = false,
         # Makie kwargs
         color = :red,
         transparency = true,
@@ -41,9 +42,11 @@ function render!(
         params = [BMO.waist_parameters(child, u) for u in us]
         
         # Build surface mesh matrices
-        Xt = [BMO.ellipse(v, p[1], p[2], p[3])[1] for p in params, v in vs]
-        Yt = [BMO.ellipse(v, p[1], p[2], p[3])[2] for p in params, v in vs]
-        Zt = [BMO.ellipse(v, p[1], p[2], p[3])[3] for p in params, v in vs]
+        pts = [BMO.ellipse(v, p[1], p[2], p[3]) for p in params, v in vs]
+
+        Xt = getindex.(pts, 1)
+        Yt = getindex.(pts, 2)
+        Zt = getindex.(pts, 3)
 
         # Render the envelope as a smooth surface
         surface!(axis, Xt, Yt, Zt; 
@@ -62,6 +65,11 @@ function render!(
             render!(axis, child.wxm; show_pos, flen, color = :blue)
             render!(axis, child.dym; show_pos, flen, color = :cyan)
             render!(axis, child.wym; show_pos, flen, color = :magenta)
+        end
+
+        # Optionally, plot waist ellipse
+        if show_waist
+            scatter!.(axis, pts; color)
         end
     end
     return axis
