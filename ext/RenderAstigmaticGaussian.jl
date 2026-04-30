@@ -21,12 +21,12 @@ function render!(
         # kwargs
         show_beams = false,
         show_pos = false,
-        flen = 0.1,
-        z_res = 100,
         r_res = 64,
+        z_res = 100,
+        flen = 0.1,
         # Makie kwargs
         color = :red,
-        alpha = 0.3,
+        transparency = true,
         kwargs...
     ) where {T}
     
@@ -48,8 +48,7 @@ function render!(
         # Render the envelope as a smooth surface
         surface!(axis, Xt, Yt, Zt; 
             color = fill(color, size(Xt)), 
-            alpha = alpha, 
-            transparency = true, 
+            transparency, 
             kwargs...)
 
         # Optionally, plot generating rays
@@ -59,6 +58,10 @@ function render!(
             render!(axis, child.wxp; show_pos, flen, color = :blue)
             render!(axis, child.dyp; show_pos, flen, color = :cyan)
             render!(axis, child.wyp; show_pos, flen, color = :magenta)
+            render!(axis, child.dxm; show_pos, flen, color = :green)
+            render!(axis, child.wxm; show_pos, flen, color = :blue)
+            render!(axis, child.dym; show_pos, flen, color = :cyan)
+            render!(axis, child.wym; show_pos, flen, color = :magenta)
         end
     end
     return axis
