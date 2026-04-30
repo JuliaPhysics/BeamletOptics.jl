@@ -30,9 +30,6 @@ function render!(
         kwargs...
     ) where {T}
     
-    # Helper to calculate a point on the elliptical cross-section
-    ellipse(t, p0, w1, w2) = p0 + w1 * cos(t) + w2 * sin(t)
-
     for child in PreOrderDFS(agb)
         l = length(child) + flen
         
@@ -44,9 +41,9 @@ function render!(
         params = [BMO.waist_parameters(child, u) for u in us]
         
         # Build surface mesh matrices
-        Xt = [ellipse(v, p[1], p[2], p[3])[1] for p in params, v in vs]
-        Yt = [ellipse(v, p[1], p[2], p[3])[2] for p in params, v in vs]
-        Zt = [ellipse(v, p[1], p[2], p[3])[3] for p in params, v in vs]
+        Xt = [BMO.ellipse(v, p[1], p[2], p[3])[1] for p in params, v in vs]
+        Yt = [BMO.ellipse(v, p[1], p[2], p[3])[2] for p in params, v in vs]
+        Zt = [BMO.ellipse(v, p[1], p[2], p[3])[3] for p in params, v in vs]
 
         # Render the envelope as a smooth surface
         surface!(axis, Xt, Yt, Zt; 
