@@ -364,16 +364,17 @@ function parabasal_ray_parameters(agb::AstigmaticGaussianBeamlet, p0, i)
     h1_imag_p, u1_imag_p = _ray_to_plane_projection(p0, pn, rays(agb.wxp)[i])
     h1_imag_m, u1_imag_m = _ray_to_plane_projection(p0, pn, rays(agb.wxm)[i])
 
-    h1 = 0.5 * ((h1_real_p - h1_real_m) + im * (h1_imag_p - h1_imag_m))
-    u1 = 0.5 * ((u1_real_p - u1_real_m) + im * (u1_imag_p - u1_imag_m))
+    # h1 = waist + i * divergence (Standard complex ray convention)
+    h1 = 0.5 * ((h1_imag_p - h1_imag_m) + im * (h1_real_p - h1_real_m))
+    u1 = 0.5 * ((u1_imag_p - u1_imag_m) + im * (u1_real_p - u1_real_m))
 
     h2_real_p, u2_real_p = _ray_to_plane_projection(p0, pn, rays(agb.dyp)[i])
     h2_real_m, u2_real_m = _ray_to_plane_projection(p0, pn, rays(agb.dym)[i])
     h2_imag_p, u2_imag_p = _ray_to_plane_projection(p0, pn, rays(agb.wyp)[i])
     h2_imag_m, u2_imag_m = _ray_to_plane_projection(p0, pn, rays(agb.wym)[i])
 
-    h2 = 0.5 * ((h2_real_p - h2_real_m) + im * (h2_imag_p - h2_imag_m))
-    u2 = 0.5 * ((u2_real_p - u2_real_m) + im * (u2_imag_p - u2_imag_m))
+    h2 = 0.5 * ((h2_imag_p - h2_imag_m) + im * (h2_real_p - h2_real_m))
+    u2 = 0.5 * ((u2_imag_p - u2_imag_m) + im * (u2_real_p - u2_real_m))
 
     return h1, u1, h2, u2, p0
 end
@@ -488,7 +489,7 @@ function parabasal_field(
         agb::AstigmaticGaussianBeamlet,
         r::AbstractArray,
         z::Real;
-        E_ref_amp::Union{Nothing, Real} = nothing,
+        E_ref_amp::Union{Nothing, Number} = nothing,
         area_ref::Union{Nothing, Complex} = nothing,
         z_norm::Real = 0.0
 )
@@ -510,7 +511,12 @@ function parabasal_field(
             area_ref = _pseudo_cross2d(h1n, h2n, dirn)
         end
         if E_ref_amp === nothing
-            E_ref_amp = norm(polarization(chiefn))
+            # Extract complex amplitude (scalar projection) to preserve phase
+            E_vec = polarization(chiefn)
+            E_ref_amp = norm(E_vec) # Default to magnitude for scalar field
+            # If we want to support phase coherence between multiple beams,
+            # we can store the complex scalar projection if a reference is known.
+            # For now, we use the magnitude but allow user to override with complex.
         end
     end
 
@@ -539,9 +545,9 @@ function parabasal_field(
     k0 = 2π / wavelength(chief)
 
     # area_ref / area is essentially (1 / (1 + i*z/zr))^2 for stigmatic beams.
-    # take the conjugate of the sqrt to get the standard -atan(z/zr) Gouy phase.
-    # the phase includes the OPL correction Δl to ensure coherence in media.
-    ψ = conj(sqrt(area_ref / area)) * exp(im * k0 * (z + conj(w) + Δl))
+    # It provides the correct amplitude scaling and negative Gouy phase.
+    # The phase includes the OPL correction Δl to ensure coherence in media.
+    ψ = sqrt(area_ref / area) * exp(im * k0 * (z + w + Δl))
     return E_ref_amp * ψ
 end
 
