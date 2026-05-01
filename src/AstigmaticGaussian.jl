@@ -432,10 +432,20 @@ function waist_parameters(agb::AstigmaticGaussianBeamlet, z::Real)
     h1, _, h2, _, _ = parabasal_ray_parameters(agb, p0, i)
 
     # Physical axis estimation using the spot size magnitude |h|.
-    # This provides a phase-invariant visualization of the beam envelope.
-    # We use the real parts as the directional basis for the rendered ellipse.
-    w1 = norm(h1) * normalize(real(h1))
-    w2 = norm(h2) * normalize(real(h2))
+    # We use the real part (divergence) as the primary basis for the ellipse axes;
+    # if it's zero (exactly at the waist), we fall back to the imaginary part.
+    w1_dir = real(h1)
+    if norm(w1_dir) < 1e-12
+        w1_dir = imag(h1)
+    end
+    
+    w2_dir = real(h2)
+    if norm(w2_dir) < 1e-12
+        w2_dir = imag(h2)
+    end
+
+    w1 = norm(h1) * normalize(w1_dir)
+    w2 = norm(h2) * normalize(w2_dir)
 
     return p0, w1, w2
 end
