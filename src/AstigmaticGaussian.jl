@@ -356,15 +356,24 @@ function parabasal_ray_parameters(agb::AstigmaticGaussianBeamlet, p0, i)
     chief = rays(agb.c)[i]
     pn = direction(chief)
 
-    h1_real, u1_real = _ray_to_plane_projection(p0, pn, rays(agb.dxp)[i])
-    h1_imag, u1_imag = _ray_to_plane_projection(p0, pn, rays(agb.wxp)[i])
-    h1 = h1_real + im * h1_imag
-    u1 = u1_real + im * u1_imag
+    # Use central difference (plus - minus) / 2 for robust h estimation
+    # This captures the beam envelope width correctly even if the chief ray
+    # is slightly offset from the beam center due to aberrations.
+    h1_real_p, u1_real_p = _ray_to_plane_projection(p0, pn, rays(agb.dxp)[i])
+    h1_real_m, u1_real_m = _ray_to_plane_projection(p0, pn, rays(agb.dxm)[i])
+    h1_imag_p, u1_imag_p = _ray_to_plane_projection(p0, pn, rays(agb.wxp)[i])
+    h1_imag_m, u1_imag_m = _ray_to_plane_projection(p0, pn, rays(agb.wxm)[i])
 
-    h2_real, u2_real = _ray_to_plane_projection(p0, pn, rays(agb.dyp)[i])
-    h2_imag, u2_imag = _ray_to_plane_projection(p0, pn, rays(agb.wyp)[i])
-    h2 = h2_real + im * h2_imag
-    u2 = u2_real + im * u2_imag
+    h1 = 0.5 * ((h1_real_p - h1_real_m) + im * (h1_imag_p - h1_imag_m))
+    u1 = 0.5 * ((u1_real_p - u1_real_m) + im * (u1_imag_p - u1_imag_m))
+
+    h2_real_p, u2_real_p = _ray_to_plane_projection(p0, pn, rays(agb.dyp)[i])
+    h2_real_m, u2_real_m = _ray_to_plane_projection(p0, pn, rays(agb.dym)[i])
+    h2_imag_p, u2_imag_p = _ray_to_plane_projection(p0, pn, rays(agb.wyp)[i])
+    h2_imag_m, u2_imag_m = _ray_to_plane_projection(p0, pn, rays(agb.wym)[i])
+
+    h2 = 0.5 * ((h2_real_p - h2_real_m) + im * (h2_imag_p - h2_imag_m))
+    u2 = 0.5 * ((u2_real_p - u2_real_m) + im * (u2_imag_p - u2_imag_m))
 
     return h1, u1, h2, u2, p0
 end
@@ -403,9 +412,12 @@ function optical_power(agb::AstigmaticGaussianBeamlet)
     chiefn = rays(agb.c)[in_]
     dirn = direction(chiefn)
     h1n, _, h2n, _, _ = parabasal_ray_parameters(agb, p0n, in_)
-    area_ref = _pseudo_cross2d(h1n, h2n, dirn)
+    area_ref = abs(_pseudo_cross2d(h1n, h2n, dirn))
     E_ref_amp = norm(polarization(chiefn))
-    return 0.5 * π * abs(area_ref) * E_ref_amp^2
+    # Corrected power: P = I_peak * π * w0x * w0y / 2
+    # We use the built-in intensity function to account for wave impedance
+    I_ref = intensity(E_ref_amp)
+    return 0.5 * π * area_ref * I_ref
 end
 
 """
@@ -416,13 +428,15 @@ Returns `(p0, w1, w2)` where `w1` and `w2` are 3D vectors describing the semi-ax
 of the beam cross-section ellipse.
 """
 function waist_parameters(agb::AstigmaticGaussianBeamlet, z::Real)
-    h1, _, h2, _, p0 = parabasal_ray_parameters(agb, z)
-    # The magnitude of the complex ray height |h(z)| gives the Gaussian spot size w(z).
-    # We use (real+imag) as a direction vector and scale it to norm(h).
-    v1 = real(h1) + imag(h1)
-    v2 = real(h2) + imag(h2)
-    w1 = iszero(v1) ? v1 : v1 * (norm(h1) / norm(v1))
-    w2 = iszero(v2) ? v2 : v2 * (norm(h2) / norm(v2))
+    p0, i = point_on_beam(agb, z)
+    h1, _, h2, _, _ = parabasal_ray_parameters(agb, p0, i)
+
+    # Physical axis estimation using the spot size magnitude |h|.
+    # This provides a phase-invariant visualization of the beam envelope.
+    # We use the real parts as the directional basis for the rendered ellipse.
+    w1 = norm(h1) * normalize(real(h1))
+    w2 = norm(h2) * normalize(real(h2))
+
     return p0, w1, w2
 end
 
@@ -477,13 +491,17 @@ function parabasal_field(
     end
 
     # Lazy init of reference normalization (computed once if not supplied)
-    if E_ref_amp === nothing || area_ref === nothing
+    if area_ref === nothing || E_ref_amp === nothing
         p0n, in_ = point_on_beam(agb, z_norm)
         chiefn = rays(agb.c)[in_]
-        dirn = direction(chiefn)
-        h1n, _, h2n, _, _ = parabasal_ray_parameters(agb, p0n, in_)
-        area_ref = _pseudo_cross2d(h1n, h2n, dirn)
-        E_ref_amp = norm(polarization(chiefn))
+        if area_ref === nothing
+            dirn = direction(chiefn)
+            h1n, _, h2n, _, _ = parabasal_ray_parameters(agb, p0n, in_)
+            area_ref = _pseudo_cross2d(h1n, h2n, dirn)
+        end
+        if E_ref_amp === nothing
+            E_ref_amp = norm(polarization(chiefn))
+        end
     end
 
     h1, u1, h2, u2, _ = parabasal_ray_parameters(agb, p0, i)
@@ -493,11 +511,27 @@ function parabasal_field(
     ξ2 = _pseudo_cross2d(h2, r, dir)
 
     w = (ξ1 * dot(u2, r) - ξ2 * dot(u1, r)) / (2 * area)
-    k = 2π / wavelength(chief)
+
+    # Phase correction for refractive index (OPL - geometric length)
+    p_parent = agb.parent
+    l_parent = isnothing(p_parent) ? 0.0 : length(p_parent)
+    opl_parent = isnothing(p_parent) ? 0.0 : optical_path_length(p_parent)
+
+    Δl = opl_parent - l_parent
+    z_sum = l_parent
+    for j in 1:(i-1)
+        ray_j = rays(agb.c)[j]
+        Δl += optical_path_length(ray_j) - length(ray_j)
+        z_sum += length(ray_j)
+    end
+    Δl += (refractive_index(chief) - 1) * (z - z_sum)
+
+    k0 = 2π / wavelength(chief)
 
     # area_ref / area is essentially (1 / (1 + i*z/zr))^2 for stigmatic beams.
-    # We take the conjugate of the sqrt to get the standard -atan(z/zr) Gouy phase.
-    ψ = conj(sqrt(area_ref / area)) * exp(im * k * (z + conj(w)))
+    # take the conjugate of the sqrt to get the standard -atan(z/zr) Gouy phase.
+    # the phase includes the OPL correction Δl to ensure coherence in media.
+    ψ = conj(sqrt(area_ref / area)) * exp(im * k0 * (z + conj(w) + Δl))
     return E_ref_amp * ψ
 end
 
@@ -509,6 +543,22 @@ as the reference normalization.
 """
 function electric_field(agb::AstigmaticGaussianBeamlet, r::AbstractArray, z::Real)
     return parabasal_field(agb, r, z; z_norm = 0.0)
+end
+
+"""
+    polarized_field(agb, r, z)
+
+Compute the complex **vector** electric field [V/m] of the [`AstigmaticGaussianBeamlet`](@ref)
+at position `(r, z)`. Returns a 3D vector.
+"""
+function polarized_field(agb::AstigmaticGaussianBeamlet, r::AbstractArray, z::Real)
+    p0, i = point_on_beam(agb, z)
+    chief = rays(agb.c)[i]
+    E_vec = polarization(chief)
+    # The complex scalar field already includes the propagation phase and Gouy phase.
+    # We normalize to the chief ray's polarization magnitude to avoid double-counting amplitude.
+    ψ = parabasal_field(agb, r, z; E_ref_amp = 1.0)
+    return E_vec * ψ
 end
 
 """
