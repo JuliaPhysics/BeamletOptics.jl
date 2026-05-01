@@ -357,24 +357,23 @@ function parabasal_ray_parameters(agb::AstigmaticGaussianBeamlet, p0, i)
     pn = direction(chief)
 
     # Use central difference (plus - minus) / 2 for robust h estimation
-    # This captures the beam envelope width correctly even if the chief ray
-    # is slightly offset from the beam center due to aberrations.
-    h1_real_p, u1_real_p = _ray_to_plane_projection(p0, pn, rays(agb.dxp)[i])
-    h1_real_m, u1_real_m = _ray_to_plane_projection(p0, pn, rays(agb.dxm)[i])
-    h1_imag_p, u1_imag_p = _ray_to_plane_projection(p0, pn, rays(agb.wxp)[i])
-    h1_imag_m, u1_imag_m = _ray_to_plane_projection(p0, pn, rays(agb.wxm)[i])
+    # h = waist + i * divergence (Standard complex ray convention)
+    # The real part comes from the waist rays, the imaginary from the divergence rays.
+    h1_real_p, u1_real_p = _ray_to_plane_projection(p0, pn, rays(agb.wxp)[i])
+    h1_real_m, u1_real_m = _ray_to_plane_projection(p0, pn, rays(agb.wxm)[i])
+    h1_imag_p, u1_imag_p = _ray_to_plane_projection(p0, pn, rays(agb.dxp)[i])
+    h1_imag_m, u1_imag_m = _ray_to_plane_projection(p0, pn, rays(agb.dxm)[i])
 
-    # h1 = waist + i * divergence (Standard complex ray convention)
-    h1 = 0.5 * ((h1_imag_p - h1_imag_m) + im * (h1_real_p - h1_real_m))
-    u1 = 0.5 * ((u1_imag_p - u1_imag_m) + im * (u1_real_p - u1_real_m))
+    h1 = 0.5 * ((h1_real_p - h1_real_m) + im * (h1_imag_p - h1_imag_m))
+    u1 = 0.5 * ((u1_real_p - u1_real_m) + im * (u1_imag_p - u1_imag_m))
 
-    h2_real_p, u2_real_p = _ray_to_plane_projection(p0, pn, rays(agb.dyp)[i])
-    h2_real_m, u2_real_m = _ray_to_plane_projection(p0, pn, rays(agb.dym)[i])
-    h2_imag_p, u2_imag_p = _ray_to_plane_projection(p0, pn, rays(agb.wyp)[i])
-    h2_imag_m, u2_imag_m = _ray_to_plane_projection(p0, pn, rays(agb.wym)[i])
+    h2_real_p, u2_real_p = _ray_to_plane_projection(p0, pn, rays(agb.wyp)[i])
+    h2_real_m, u2_real_m = _ray_to_plane_projection(p0, pn, rays(agb.wym)[i])
+    h2_imag_p, u2_imag_p = _ray_to_plane_projection(p0, pn, rays(agb.dyp)[i])
+    h2_imag_m, u2_imag_m = _ray_to_plane_projection(p0, pn, rays(agb.dym)[i])
 
-    h2 = 0.5 * ((h2_imag_p - h2_imag_m) + im * (h2_real_p - h2_real_m))
-    u2 = 0.5 * ((u2_imag_p - u2_imag_m) + im * (u2_real_p - u2_real_m))
+    h2 = 0.5 * ((h2_real_p - h2_real_m) + im * (h2_imag_p - h2_imag_m))
+    u2 = 0.5 * ((u2_real_p - u2_real_m) + im * (u2_imag_p - u2_imag_m))
 
     return h1, u1, h2, u2, p0
 end
@@ -432,14 +431,14 @@ function waist_parameters(agb::AstigmaticGaussianBeamlet, z::Real)
     p0, i = point_on_beam(agb, z)
     h1, _, h2, _, _ = parabasal_ray_parameters(agb, p0, i)
 
-    # Physical axis estimation using the spot size magnitude |h|.
-    # We use the real part (divergence) as the primary basis for the ellipse axes;
-    # if it's zero (exactly at the waist), we fall back to the imaginary part.
+    # Physical axis estimation using the complex ray height h.
+    # The real part (waist ray) defines the beam semi-axis directions.
+    # If the waist ray crosses zero (e.g. at an image plane), we fall back to the divergence ray (imaginary part).
     w1_dir = real(h1)
     if norm(w1_dir) < 1e-12
         w1_dir = imag(h1)
     end
-    
+
     w2_dir = real(h2)
     if norm(w2_dir) < 1e-12
         w2_dir = imag(h2)
@@ -454,10 +453,10 @@ end
 """
     _pseudo_cross2d(a, b, c)
 
-Calculates the triple product `(a × b) ⋅ c`.
+Calculates the triple product `(a × b) ⋅ c` using a non-conjugating dot product.
 """
 @inline function _pseudo_cross2d(a::AbstractArray, b::AbstractArray, c::AbstractArray)
-    return dot(cross(a, b), c)
+    return sum(cross(a, b) .* c)
 end
 
 """
@@ -526,9 +525,8 @@ function parabasal_field(
     ξ2 = _pseudo_cross2d(h2, r, dir)
 
     # Complex quadratic phase term w = r^T Q r / 2
-    # Conjugate w to yield a stable Gaussian profile (positive imaginary part)
-    # and positive wavefront curvature.
-    w = conj((ξ1 * dot(u2, r) - ξ2 * dot(u1, r)) / (2 * area))
+    # We use sum(u .* r) to compute the non-conjugating dot product r^T u.
+    w = (ξ1 * sum(u2 .* r) - ξ2 * sum(u1 .* r)) / (2 * area)
 
     # Phase correction for refractive index (OPL - geometric length)
     p_parent = agb.parent
@@ -537,7 +535,7 @@ function parabasal_field(
 
     Δl = opl_parent - l_parent
     z_sum = l_parent
-    for j in 1:(i-1)
+    for j in 1:(i - 1)
         ray_j = rays(agb.c)[j]
         Δl += optical_path_length(ray_j) - length(ray_j)
         z_sum += length(ray_j)
@@ -547,9 +545,9 @@ function parabasal_field(
     k0 = 2π / wavelength(chief)
 
     # area_ref / area is essentially (1 / (1 + i*z/zr))^2 for stigmatic beams.
-    # We conjugate the sqrt to get the standard -atan(z/zr) Gouy phase.
+    # The sqrt gives the standard -atan(z/zr) Gouy phase natively.
     # The phase includes the OPL correction Δl to ensure coherence in media.
-    ψ = conj(sqrt(area_ref / area)) * exp(im * k0 * (z + w + Δl))
+    ψ = sqrt(area_ref / area) * exp(im * k0 * (z + w + Δl))
     return E_ref_amp * ψ
 end
 
