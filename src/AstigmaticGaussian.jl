@@ -454,11 +454,10 @@ end
 """
     _pseudo_cross2d(a, b, c)
 
-Project the 3-D cross product onto the chief-ray direction:
-this generalises the 2-D cross product to the complex parabasal basis.
+Calculates the triple product `(a × b) ⋅ c`.
 """
 @inline function _pseudo_cross2d(a::AbstractArray, b::AbstractArray, c::AbstractArray)
-    return conj(dot(cross(a, b), c))
+    return dot(cross(a, b), c)
 end
 
 """
@@ -526,7 +525,10 @@ function parabasal_field(
     ξ1 = _pseudo_cross2d(h1, r, dir)
     ξ2 = _pseudo_cross2d(h2, r, dir)
 
-    w = (ξ1 * dot(u2, r) - ξ2 * dot(u1, r)) / (2 * area)
+    # Complex quadratic phase term w = r^T Q r / 2
+    # Conjugate w to yield a stable Gaussian profile (positive imaginary part)
+    # and positive wavefront curvature.
+    w = conj((ξ1 * dot(u2, r) - ξ2 * dot(u1, r)) / (2 * area))
 
     # Phase correction for refractive index (OPL - geometric length)
     p_parent = agb.parent
@@ -545,9 +547,9 @@ function parabasal_field(
     k0 = 2π / wavelength(chief)
 
     # area_ref / area is essentially (1 / (1 + i*z/zr))^2 for stigmatic beams.
-    # It provides the correct amplitude scaling and negative Gouy phase.
+    # We conjugate the sqrt to get the standard -atan(z/zr) Gouy phase.
     # The phase includes the OPL correction Δl to ensure coherence in media.
-    ψ = sqrt(area_ref / area) * exp(im * k0 * (z + w + Δl))
+    ψ = conj(sqrt(area_ref / area)) * exp(im * k0 * (z + w + Δl))
     return E_ref_amp * ψ
 end
 
