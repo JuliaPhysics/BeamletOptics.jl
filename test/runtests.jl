@@ -35,6 +35,7 @@ include(joinpath(@__DIR__, "Components", "TestPolarizers.jl"))
 include(joinpath(@__DIR__, "E2E", "TestDoubleGaussLens.jl"))
 include(joinpath(@__DIR__, "E2E", "TestMichelson.jl"))
 include(joinpath(@__DIR__, "E2E", "TestMachZehnder.jl"))
+include(joinpath(@__DIR__, "E2E", "TestFraunhofer.jl"))
 
 # Test regressions
 include(joinpath(@__DIR__, "TestBugFixes.jl"))

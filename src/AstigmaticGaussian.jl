@@ -379,6 +379,25 @@ function parabasal_ray_parameters(agb::AstigmaticGaussianBeamlet, p0, i)
 end
 
 """
+    check_optical_invariant(agb, i)
+
+Evaluate the complex optical invariant `h1 . u2 - h2 . u1 = 0` at segment `i`.
+Returns `true` if the invariant holds (paraxial assumption is valid), and `false` otherwise.
+"""
+function check_optical_invariant(agb::AstigmaticGaussianBeamlet, i::Int)
+    chief = rays(agb.c)[i]
+    p0 = position(chief)
+    # Re-evaluate parameters for this segment specifically to check the invariant
+    h1, u1, h2, u2, _ = parabasal_ray_parameters(agb, p0, i)
+    inv_val = sum(h1 .* u2) - sum(h2 .* u1)
+    if abs(inv_val) > 1e-6
+        @warn lazy"Parabasal optical invariant violation at segment $i: |h1.u2 - h2.u1| = $(abs(inv_val)). The paraxial astigmatic Gaussian beam tracing assumptions have broken down."
+        return false
+    end
+    return true
+end
+
+"""
     parabasal_ray_parameters(agb, z)
 
 Compute the parabasal ray parameters at distance `z` along the beam.

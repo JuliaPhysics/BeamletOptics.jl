@@ -489,6 +489,11 @@ function trace_system!(system::AbstractSystem,
         # Add rays to beamlet
         push!(agb, interaction)
         seg_counter += 1
+        
+        # Verify that the paraxial assumptions still hold for the new segment
+        if !check_optical_invariant(agb, seg_counter)
+            break
+        end
     end
     return nothing
 end
@@ -589,6 +594,16 @@ function retrace_system!(system::AbstractSystem,
             # Valid new interaction, drop children and add new ray
             cleanup_children = true
             push!(agb, _interaction)
+        end
+
+        # Verify that the paraxial assumptions still hold for the new segment
+        if !check_optical_invariant(agb, i + 1)
+            cleanup_tail = true
+            cutoff = i
+            break
+        end
+        
+        if i >= n_c
             break
         end
     end
