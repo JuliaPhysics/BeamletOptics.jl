@@ -159,6 +159,9 @@ end
 @inline _aux_beams(agb::AstigmaticGaussianBeamlet) = (
     agb.wxp, agb.wxm, agb.wyp, agb.wym, agb.dxp, agb.dxm, agb.dyp, agb.dym)
 
+# Implementation of AbstractBeam interface
+rays(agb::AstigmaticGaussianBeamlet) = rays(agb.c)
+
 Base.length(agb::AstigmaticGaussianBeamlet) = length(agb.c)
 optical_path_length(agb::AstigmaticGaussianBeamlet) = optical_path_length(agb.c)
 
@@ -170,6 +173,8 @@ point_on_beam(agb::AstigmaticGaussianBeamlet, t::Real) = point_on_beam(agb.c, t)
 
 wavelength(agb::AstigmaticGaussianBeamlet) = wavelength(first(rays(agb.c)))
 direction(agb::AstigmaticGaussianBeamlet) = direction(first(rays(agb.c)))
+Base.position(agb::AstigmaticGaussianBeamlet) = position(first(rays(agb.c)))
+polarization(agb::AstigmaticGaussianBeamlet) = polarization(first(rays(agb.c)))
 
 function refractive_index(agb::AstigmaticGaussianBeamlet, id::Int)
     return refractive_index(rays(agb.c)[id])
@@ -514,8 +519,8 @@ function parabasal_field(
     chief = rays(agb.c)[i]
     dir = direction(chief)
 
-    if !isorthogonal3d(dir, r)
-        error("r must lie in plane at p0/dir")
+    if !isorthogonal3d(dir, r; atol=1e-10)
+        error("r must lie in plane at p0/dir (dot product: $(dot(dir, r)))")
     end
 
     # Lazy init of reference normalization (computed once if not supplied)
@@ -540,6 +545,10 @@ function parabasal_field(
     h1, u1, h2, u2, _ = parabasal_ray_parameters(agb, p0, i)
 
     area = _pseudo_cross2d(h1, h2, dir)
+    # Regularization to prevent division by zero at caustics or NaN propagation
+    if isnan(area) || abs(area) < 1e-25
+        area = Complex(1e-25, 1e-25)
+    end
     ξ1 = _pseudo_cross2d(h1, r, dir)
     ξ2 = _pseudo_cross2d(h2, r, dir)
 

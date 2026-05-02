@@ -130,9 +130,57 @@ The user can obtain parameters such as the beam waist radius, the radius of curv
 
 ## Astigmatic Polarized Beamlets
 
-- Assumptions
-    - homogeneous polarization distribution across waist
-    - Lagrange invariant
+Standard stigmatic beamlets are limited to symmetric systems. For modeling arbitrary optical systems—including off-axis components, tilted lenses, or complex media like atmospheric turbulence—the package provides the [`AstigmaticGaussianBeamlet`](@ref). This type implements the **Parabasal Gaussian Beamlet** formalism TODO: Add citations
 
-!!! warning
-    NOT YET IMPLEMENTED
+### Formalism
+
+An astigmatic beamlet is represented by a cluster of **9 rays**:
+1.  **Chief Ray**: A [`PolarizedRay`](@ref) defining the central path and polarization state.
+2.  **Eight Auxiliary Rays**: Four "positional" rays (waist $x+, x-, y+, y-$) and four "directional" rays (divergence $x+, x-, y+, y-$) that track the complex curvature matrix $\mathbf{Q}(z)$ through the system.
+
+The complex scalar field at a local transverse position $\mathbf{r}$ is given by:
+```math
+\psi(\mathbf{r}, z) = \sqrt{\frac{A_{ref}}{A(z)}} \exp\left[ i k \left( z + \Delta l + \frac{1}{2} \mathbf{r}^T \mathbf{Q}(z) \mathbf{r} \right) \right]
+```
+where $A(z)$ is the complex beam area and $\Delta l$ is the accumulated optical path length difference. Note that the quadratic phase term uses the **analytic bilinear form** $\mathbf{r}^T \mathbf{u}$ rather than the conjugated dot product to ensure consistency in the complex domain.
+
+### API and Usage
+
+#### Construction
+
+You can construct a single astigmatic beamlet with a specified waist and polarization:
+```julia
+using BeamletOptics
+# A 10mm waist beamlet propagating along Y, polarized along X
+agb = AstigmaticGaussianBeamlet([0,0,0], [0,1,0], 1064e-9, 10e-3; E0 = [1,0,0])
+```
+
+#### Astigmatic Beam Groups
+
+For complex sources, the package provides the [`AstigmaticBeamGroup`](@ref) container. Several constructors are available for different scenarios:
+
+*   [`GaussianBeamletDecomposition`](@ref): Tiling a large Gaussian beam into many small stable beamlets.
+*   [`WavefrontBeamletDecomposition`](@ref): Importing an arbitrary complex field (e.g. from a phase screen or camera data).
+*   [`CollimatedGaussianBeamletSource`](@ref): A square grid of parallel beamlets (ideal for aperture diffraction).
+*   [`SphericalGaussianBeamletSource`](@ref): A point-like source emitting a cone of beamlets (ideal for focused/divergent beams).
+
+#### Field Calculation
+
+To obtain the physical vector electric field [V/m] at any point:
+```julia
+# Field at world position (x, y, z)
+E_vec = polarized_field(agb, [0.01, 0, 0], 10.0)
+```
+
+```julia
+# Decompose a field from a detector into a new AstigmaticBeamGroup
+beams = WavefrontBeamletDecomposition(x, z, amplitude, phase, dir, λ)
+
+# Solve system (propagate all beamlets to next segment)
+solve_system!(system, beams)
+```
+
+### Key Assumptions
+- **Paraxiality**: The auxiliary rays must remain within the paraxial regime relative to the chief ray.
+- **Analytic Continuity**: Quadratic phase calculations use the bilinear dot product to avoid unphysical conjugation of complex ray parameters.
+- **Power Conservation**: The decomposition methods automatically scale amplitudes to preserve total field energy regardless of grid resolution.

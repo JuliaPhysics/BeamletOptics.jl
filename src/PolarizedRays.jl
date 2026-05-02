@@ -54,8 +54,8 @@ mutable struct PolarizedRay{T} <: AbstractRay{T}
             throw(ErrorException("Direction vector to short for normalization."))
         end
         # This test is very important and must be performed for each pol. ray
-        if !isorthogonal3d(dir, E0; atol=1e-14)
-            throw(ErrorException("Ray dir. and E0 must be orthogonal."))
+        if !isorthogonal3d(dir, E0; atol=1e-12)
+            error("Ray dir. and E0 must be orthogonal (dot product: $(dot(dir, E0)))")
         end
         return new{M}(
             Point3{M}(pos),

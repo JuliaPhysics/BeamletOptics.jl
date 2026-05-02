@@ -4,6 +4,7 @@ export position, orientation
 
 # ray and beam type export
 export Ray, PolarizedRay, Beam, PointSource, CollimatedSource, UniformDiscSource, GaussianBeamlet, AstigmaticGaussianBeamlet, rayleigh_range, rays, point_on_beam, normal3d
+export CollimatedGaussianBeamletSource, GaussianBeamletDecomposition, SphericalGaussianBeamletSource, WavefrontBeamletDecomposition, AstigmaticBeamGroup
 
 # system
 export System, StaticSystem, solve_system!

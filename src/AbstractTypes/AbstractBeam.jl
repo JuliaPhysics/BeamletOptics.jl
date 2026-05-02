@@ -113,6 +113,10 @@ abstract type AbstractBeamGroup{T <: Real, R <: AbstractRay{T}} end
 
 beams(bg::AbstractBeamGroup) = bg.beams
 
+Base.length(bg::AbstractBeamGroup) = length(beams(bg))
+Base.iterate(bg::AbstractBeamGroup, state...) = iterate(beams(bg), state...)
+Base.getindex(bg::AbstractBeamGroup, i::Int) = getindex(beams(bg), i)
+
 Base.position(bg::AbstractBeamGroup) = position(first(rays(first(beams(bg)))))
 direction(bg::AbstractBeamGroup) = direction(first(rays(first(beams(bg)))))
 

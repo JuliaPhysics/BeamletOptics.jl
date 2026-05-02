@@ -19,17 +19,11 @@ const nm = 1e-9
     Δ = D / n_beams
     w0s = Δ
 
-    xs = LinRange(-D / 2 + Δ / 2, D / 2 - Δ / 2, n_beams)
-    zs = LinRange(-D / 2 + Δ / 2, D / 2 - Δ / 2, n_beams)
+    beams = CollimatedGaussianBeamletSource([0.0, 0.0, 0.0], [0.0, 1.0, 0.0], D, λ, w0s; n_grid=n_beams)
 
-    beams = AstigmaticGaussianBeamlet{Float64}[]
-
-    for x in xs
-        for z in zs
-            # Unit amplitude plane wave
-            b = AstigmaticGaussianBeamlet([x, 0, z], [0, 1.0, 0], λ, w0s; E0 = [0, 0, 1.0])
-            push!(beams, b)
-        end
+    # Set electric field amplitude to point along z-axis to match previous test
+    for b in beams
+        BeamletOptics.polarization!(b.c.rays[1], [0.0, 0.0, 1.0])
     end
 
     # Physical detector large enough to catch all divergence rays
