@@ -27,7 +27,7 @@ For this purpose, the package implements a traditional ray tracing solver. This 
 ## Installation
 
 !!! warning
-    This package requires Julia ≥ 1.9.4
+    This package requires Julia ≥ 1.10
 
 You can add this package to your project by entering the package manager (press `]` in the REPL) and typing `add BeamletOptics`. It is also recommended that you `add GLMakie`. You can include this package into your current scope via `using BeamletOptics`. If a Makie version is loaded before or after the inclusion of this package, the extension provided as part of this package will enable additional visualization functions. 
 
@@ -65,9 +65,9 @@ In order to warrant a 1.0.0 release tag, the following features will need to be 
 ### Additional features
 
 - 🔳 Beamlet tracing
-    - 🟩 Implementation of the full polarized astigmatic Gaussian beamlet formalism
+    - ✅ Implementation of the full polarized astigmatic Gaussian beamlet formalism
         - refer to Worku et al. (2017/2020), Greynolds (1985)
-    - 🔳 Support for (trivial) forms of 2D-field decomposition, e.g. tophat
+    - ✅ Support for (trivial) forms of 2D-field decomposition, e.g. tophat
     - 🔳 Modeling of the coherence length and contrast influence
 - 🔳 Components
     - 🟩 Polarizing optics (based on Jones formalism)
