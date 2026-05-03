@@ -7,6 +7,7 @@ conditional_include(joinpath(beam_showcase_dir, "beam_showcase.jl"))
 conditional_include(joinpath(beam_showcase_dir, "gb_showcase.jl"))
 conditional_include(joinpath(beam_showcase_dir, "collimated_sc.jl"))
 conditional_include(joinpath(beam_showcase_dir, "pointsource_sc.jl"))
+conditional_include(joinpath(beam_showcase_dir, "agb_ds_showcase.jl"))
 ```
 
 # Beams
@@ -184,3 +185,13 @@ solve_system!(system, beams)
 - **Paraxiality**: The auxiliary rays must remain within the paraxial regime relative to the chief ray.
 - **Analytic Continuity**: Quadratic phase calculations use the bilinear dot product to avoid unphysical conjugation of complex ray parameters.
 - **Power Conservation**: The decomposition methods automatically scale amplitudes to preserve total field energy regardless of grid resolution.
+
+### Example: Double Slit Diffraction
+
+One of the most powerful applications of the AGB framework is the simulation of coherent diffraction from complex apertures. By using [`WavefrontBeamletDecomposition`](@ref), any arbitrary aperture mask (including phase-varying masks) can be decomposed into a set of coherent beamlets.
+
+In the example below, a classic double-slit mask (10 µm width, 100 µm separation) is decomposed and propagated 0.2 meters. The simulation perfectly reproduces the textbook Fraunhofer diffraction pattern, showcasing both the individual slit diffraction (envelope) and the coherent interference fringes.
+
+![Double Slit Experiment Visualization](agb_doubleslit_experiment.png)
+
+This example demonstrates the package's ability to maintain phase coherence across thousands of beamlets—a prerequisite for high-fidelity modeling of systems like Atmospheric Turbulence or Phase-Modulating SLMs.

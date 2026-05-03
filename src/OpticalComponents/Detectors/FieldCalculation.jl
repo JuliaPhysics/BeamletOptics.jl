@@ -112,6 +112,7 @@ function electric_field(
     end
     return xs, zs, field
 end
+
 function electric_field(
         pd::Detector,
         hits::Vector{AstigmaticGaussianBeamletHit{G}};
