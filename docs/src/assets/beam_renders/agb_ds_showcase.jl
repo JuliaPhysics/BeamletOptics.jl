@@ -105,15 +105,15 @@ end
 # Axis 2: 2D Intensity Map (Zoomed)
 ax2d = Axis(fig[1, 2],
     title = "Diffraction Pattern (Detector Plane)",
-    xlabel = "X [mm]", ylabel = "Z [mm]", yticks = -1:2:1,
+    xlabel = "x [mm]", ylabel = "z [mm]", yticks = -1:2:1,
     aspect = DataAspect())
 hm = heatmap!(ax2d, xs_eval .* 1000, zs_eval .* 1000, I, colormap = :magma)
 ylims!(-1.1, 1.1)
 
 # Axis 3: 1D Cross-section
 ax1d = Axis(fig[2, 2],
-    title = "Interference Fringes (X-slice)",
-    xlabel = "X Position [mm]", ylabel = "Intensity",
+    title = "Interference Fringes (x-slice)",
+    xlabel = "x Position [mm]", ylabel = "Intensity",
     yticksvisible = false, yticklabelsvisible = false)
 lines!(ax1d, xs_eval .* 1000, I[:, size(I, 2) ÷ 2], color = :red, linewidth = 2)
 
