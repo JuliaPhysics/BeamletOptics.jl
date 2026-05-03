@@ -139,11 +139,33 @@ An astigmatic beamlet is represented by a cluster of **9 rays**:
 1.  **Chief Ray**: A [`PolarizedRay`](@ref) defining the central path and polarization state.
 2.  **Eight Auxiliary Rays**: Four "positional" rays (waist $x+, x-, y+, y-$) and four "directional" rays (divergence $x+, x-, y+, y-$) that track the complex curvature matrix $\mathbf{Q}(z)$ through the system.
 
-The complex scalar field at a local transverse position $\mathbf{r}$ is given by:
+The reduced complex amplitude of the Gaussian beamlet is computed as:
 ```math
-\psi(\mathbf{r}, z) = \sqrt{\frac{A_{ref}}{A(z)}} \exp\left[ i k \left( z + \Delta l + \frac{1}{2} \mathbf{r}^T \mathbf{Q}(z) \mathbf{r} \right) \right]
+\psi(\mathbf{r}) = \frac{E_0}{\sqrt{\mathbf{h}_1 \times \mathbf{h}_2}} \cdot \exp \left( i k \frac{(\mathbf{h}_1 \times \mathbf{r})(\mathbf{u}_2 \cdot \mathbf{r}) - (\mathbf{h}_2 \times \mathbf{r})(\mathbf{u}_1 \cdot \mathbf{r})}{2 \mathbf{h}_1 \times \mathbf{h}_2} \right)
 ```
-where $A(z)$ is the complex beam area and $\Delta l$ is the accumulated optical path length difference. Note that the quadratic phase term uses the **analytic bilinear form** $\mathbf{r}^T \mathbf{u}$ rather than the conjugated dot product to ensure consistency in the complex domain.
+where $\mathbf{h}_{1,2}$ and $\mathbf{u}_{1,2}$ are the two-dimensional complex ray height and angle vectors on the plane perpendicular to the chief ray. The phase factor due to the optical path length of the central ray ($e^{i k (z + \Delta L)}$) is added to this reduced field during the final superposition of multiple beamlets. 
+
+For the paraxial Gaussian beam to be unique, the complex ray vectors must satisfy the **vanishing complex optical invariant**:
+```math
+\mathbf{h}_1 \times \mathbf{u}_2 - \mathbf{h}_2 \times \mathbf{u}_1 = 0
+```
+This ensures that the complex curvature matrix $\mathbf{Q}$ is symmetric, a fundamental requirement for physical Gaussian beams.
+
+### The Curvature Matrix $\mathbf{Q}$
+
+The relationship between the auxiliary rays and the complex curvature of the beam is defined by the matrix equation $\mathbf{Q} = \mathbf{U}\mathbf{H}^{-1}$. By arranging the transverse components of the complex rays into $2 \times 2$ matrices $\mathbf{H} = [\mathbf{h}_1, \mathbf{h}_2]$ and $\mathbf{U} = [\mathbf{u}_1, \mathbf{u}_2]$, we can solve for the individual components of $\mathbf{Q}$:
+
+```math
+\mathbf{Q} = \frac{1}{\mathbf{h}_1 \times \mathbf{h}_2} \begin{bmatrix} 
+u_{1x} h_{2y} - u_{2x} h_{1y} & u_{2x} h_{1x} - u_{1x} h_{2x} \\
+u_{1y} h_{2y} - u_{2y} h_{1y} & u_{2y} h_{1x} - u_{1y} h_{2x}
+\end{bmatrix}
+```
+
+The diagonal elements $Q_{xx}$ and $Q_{yy}$ describe the phase curvature (and beam width) along the primary axes, while the off-diagonal elements $Q_{xy}$ (which must equal $Q_{yx}$ for a paraxial beam) describe the **general astigmatism** or twist of the wavefront. This representation allows the package to track complex, rotating beam profiles as they propagate through non-orthogonal optical systems.
+
+!!! note "Analytic Bilinear Form"
+    All vector operations in the formulas above ($\cdot, \times$) and the matrix product $\mathbf{r}^T \mathbf{Q} \mathbf{r}$ use the **analytic bilinear form** rather than the conjugated dot product. This preservation of analytic continuity is essential for the stability of Gaussian beamlets in the complex domain.
 
 ### API and Usage
 
