@@ -6,6 +6,7 @@ using LinearAlgebra
 
 const BMO = BeamletOptics
 const mm = 1e-3
+const nm = 1e-9
 
 @testset "AGB Physical Validation" begin
 
@@ -381,6 +382,47 @@ const mm = 1e-3
         I_agb_norm = I_agb / maximum(I_agb)
         I_gb_norm = I_gb / maximum(I_gb)
         @test all(isapprox.(I_agb_norm, I_gb_norm; rtol = 1e-3))
+    end
+
+    @testset "Invariant Violation Test" begin
+        λ = 532nm
+        w0 = 0.1mm
+
+        # Create a highly non-paraxial setup:
+        # A flat plate tilted at an extreme angle (80 degrees)
+        surf1 = BMO.CircularFlatSurface(10.0mm)
+        surf2 = BMO.CircularFlatSurface(10.0mm)
+
+        # n=2.0 (high index)
+        lens = BMO.Lens(surf1, surf2, 1.0mm, λ -> 2.0)
+
+        # Tilt the lens by 80 degrees
+        BMO.zrotate3d!(lens, deg2rad(80))
+        BMO.translate3d!(lens, [0, 1.0mm, 0])
+
+        # Set threshold very low via Ref
+        old_threshold = BeamletOptics.INVARIANT_THRESHOLD[]
+        BeamletOptics.INVARIANT_THRESHOLD[] = 1e-12
+
+        system = BMO.System([lens])
+
+        # Create a beamlet pointing at the lens
+        beam = AstigmaticGaussianBeamlet(
+            [0.0, 0, 0], [0, 1, 0], λ, 0.05mm; support = [1, 0, 0])
+
+        # Reset beam for the actual test
+        beam = AstigmaticGaussianBeamlet(
+            [0.4mm, 0, 0], [0, 1, 0], λ, 0.05mm; support = [1, 0, 0])
+
+        @test_logs (:warn, r"Lagrange invariant violation") match_mode = :any BMO.solve_system!(
+            system, beam)
+
+        # Verify that the beam stopped tracing once the invariant failed
+        # (solve_system calls trace_system! which has a break on invariant failure)
+        @test length(BMO.rays(beam.c)) < 10 # It should stop early
+        
+        # Reset threshold
+        BMO.INVARIANT_THRESHOLD[] = old_threshold
     end
 end # outer testset
 

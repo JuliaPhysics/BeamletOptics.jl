@@ -1,3 +1,5 @@
+const INVARIANT_THRESHOLD = Ref(parse(Float64, get(ENV, "BMO_INVARIANT_THRESHOLD", "1e-6")))
+
 """
     AstigmaticGaussianBeamlet{T} <: AbstractBeam{T, PolarizedRay{T}}
 
@@ -361,24 +363,19 @@ function parabasal_ray_parameters(agb::AstigmaticGaussianBeamlet, p0, i)
     chief = rays(agb.c)[i]
     pn = direction(chief)
 
-    # Use central difference (plus - minus) / 2 for robust h estimation
-    # h = waist + i * divergence (Standard complex ray convention)
-    # The real part comes from the waist rays, the imaginary from the divergence rays.
+    # Use only the positive (p) set for the primary parameter calculation.
+    # The negative (m) set is reserved for independent invariant checks in `check_optical_invariant`.
     h1_real_p, u1_real_p = _ray_to_plane_projection(p0, pn, rays(agb.wxp)[i])
-    h1_real_m, u1_real_m = _ray_to_plane_projection(p0, pn, rays(agb.wxm)[i])
     h1_imag_p, u1_imag_p = _ray_to_plane_projection(p0, pn, rays(agb.dxp)[i])
-    h1_imag_m, u1_imag_m = _ray_to_plane_projection(p0, pn, rays(agb.dxm)[i])
 
-    h1 = 0.5 * ((h1_real_p - h1_real_m) + im * (h1_imag_p - h1_imag_m))
-    u1 = 0.5 * ((u1_real_p - u1_real_m) + im * (u1_imag_p - u1_imag_m))
+    h1 = h1_real_p + im * h1_imag_p
+    u1 = u1_real_p + im * u1_imag_p
 
     h2_real_p, u2_real_p = _ray_to_plane_projection(p0, pn, rays(agb.wyp)[i])
-    h2_real_m, u2_real_m = _ray_to_plane_projection(p0, pn, rays(agb.wym)[i])
     h2_imag_p, u2_imag_p = _ray_to_plane_projection(p0, pn, rays(agb.dyp)[i])
-    h2_imag_m, u2_imag_m = _ray_to_plane_projection(p0, pn, rays(agb.dym)[i])
 
-    h2 = 0.5 * ((h2_real_p - h2_real_m) + im * (h2_imag_p - h2_imag_m))
-    u2 = 0.5 * ((u2_real_p - u2_real_m) + im * (u2_imag_p - u2_imag_m))
+    h2 = h2_real_p + im * h2_imag_p
+    u2 = u2_real_p + im * u2_imag_p
 
     return h1, u1, h2, u2, p0
 end
@@ -392,14 +389,59 @@ Returns `true` if the invariant holds (paraxial assumption is valid), and `false
 function check_optical_invariant(agb::AstigmaticGaussianBeamlet, i::Int)
     chief = rays(agb.c)[i]
     p0 = position(chief)
-    # Re-evaluate parameters for this segment specifically to check the invariant
-    h1, u1, h2, u2, _ = parabasal_ray_parameters(agb, p0, i)
-    inv_val = sum(h1 .* u2) - sum(h2 .* u1)
-    if abs(inv_val) > 1e-6
-        @warn lazy"Parabasal optical invariant violation at segment $i: |h1.u2 - h2.u1| = $(abs(inv_val)). The paraxial astigmatic Gaussian beam tracing assumptions have broken down."
-        return false
+    pn = direction(chief)
+    λ = wavelength(chief)
+    n = refractive_index(agb, i)
+
+    # Helper to compute h, u from a pair of rays (waist, divergence)
+    # and a sign s (s=1 for positive set, s=-1 for negative set).
+    f = (wr, dr, s) -> begin
+        hw, uw = _ray_to_plane_projection(p0, pn, rays(wr)[i])
+        hd, ud = _ray_to_plane_projection(p0, pn, rays(dr)[i])
+        # I expect the 'm' rays to be on the opposite side of the chief ray,
+        # so lets multiply by s to bring them into the same coordinate frame.
+        return s * (hw + im * hd), s * (uw + im * ud)
     end
-    return true
+
+    h1p, u1p = f(agb.wxp, agb.dxp, 1)
+    h1m, u1m = f(agb.wxm, agb.dxm, -1)
+    h2p, u2p = f(agb.wyp, agb.dyp, 1)
+    h2m, u2m = f(agb.wym, agb.dym, -1)
+
+    # Check Coupling Invariant: h1 . u2 - h2 . u1 = 0
+    # check all 4 combinations of positive and negative sets.
+    combinations = (
+        (h1p, u1p, h2p, u2p, "p-p"),
+        (h1p, u1p, h2m, u2m, "p-m"),
+        (h1m, u1m, h2p, u2p, "m-p"),
+        (h1m, u1m, h2m, u2m, "m-m")
+    )
+
+    all_pass = true
+    for (h1, u1, h2, u2, label) in combinations
+        inv_val = sum(h1 .* u2) - sum(h2 .* u1)
+        if abs(inv_val) > INVARIANT_THRESHOLD[]
+            @warn lazy"Parabasal coupling invariant violation ($label) at segment $i: |h1.u2 - h2.u1| = $(abs(inv_val)). The paraxial astigmatic Gaussian beam tracing assumptions have broken down."
+            all_pass = false
+        end
+    end
+
+    # Check Lagrange Invariant (Area Invariant): n * Im(h* . u) = λ/π
+    # This ensures that each axis individually behaves like a valid Gaussian.
+    H_target = λ / π
+    sets = (
+        (h1p, u1p, "x-p"), (h1m, u1m, "x-m"),
+        (h2p, u2p, "y-p"), (h2m, u2m, "y-m")
+    )
+    for (h, u, label) in sets
+        H = n * imag(sum(conj(h) .* u))
+        if !isapprox(H, H_target, atol = INVARIANT_THRESHOLD[])
+            @warn lazy"Lagrange invariant violation ($label) at segment $i: H=$H, target=$H_target. The beamlet has likely encountered an object that violates the paraxial assumption."
+            all_pass = false
+        end
+    end
+
+    return all_pass
 end
 
 """
@@ -519,7 +561,7 @@ function parabasal_field(
     chief = rays(agb.c)[i]
     dir = direction(chief)
 
-    if !isorthogonal3d(dir, r; atol=1e-10)
+    if !isorthogonal3d(dir, r; atol = 1e-10)
         error("r must lie in plane at p0/dir (dot product: $(dot(dir, r)))")
     end
 
