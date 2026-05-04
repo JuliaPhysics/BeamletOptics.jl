@@ -21,10 +21,10 @@ end
 a = 10e-6           # Slit width (10 µm)
 d = 100e-6          # Slit separation (100 µm)
 L = 0.2             # Propagation distance (0.2 m)
-W = 0.5e-3          # Tighter window (0.5 mm)
-nx = 251            # dx = 2 µm (10 beamlets per slit)
+W = 0.5e-3          # calculation window (0.5 mm)
+nx = 251            # resolution
 
-# 2. Define the Aperture Mask (Double Slit)
+# Define the Aperture Mask (Double Slit)
 x = LinRange(-W / 2, W / 2, nx)
 z = LinRange(-W / 2, W / 2, nx)
 amplitude = zeros(nx, nx)
