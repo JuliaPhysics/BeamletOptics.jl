@@ -3,6 +3,12 @@
 
 Render the 1/e² envelope of the [`AstigmaticGaussianBeamlet`](@ref) as a smooth 3D surface.
 
+With `show_beams = true` the generating rays are overlayed into the axis as follows:
+
+- `chief` beam: red
+- `divergence` beam: green
+- `waist` beam: blue
+
 # Keyword args
 
 - `show_beams = false`: plot the generating rays (chief, waist, divergence)
@@ -13,7 +19,7 @@ Render the 1/e² envelope of the [`AstigmaticGaussianBeamlet`](@ref) as a smooth
 # Makie kwargs
 
 - `color = :red`
-- `alpha = 0.3`: transparency of the envelope
+- `transparency = true`
 """
 function render!(
         axis::_RenderEnv,
@@ -56,15 +62,15 @@ function render!(
 
         # Optionally, plot generating rays
         if show_beams
-            render!(axis, child.c; show_pos, flen, color = :red)
+            render!(axis, child.c; show_pos, flen,   color = :red)
             render!(axis, child.dxp; show_pos, flen, color = :green)
-            render!(axis, child.wxp; show_pos, flen, color = :blue)
-            render!(axis, child.dyp; show_pos, flen, color = :cyan)
-            render!(axis, child.wyp; show_pos, flen, color = :magenta)
+            render!(axis, child.dyp; show_pos, flen, color = :green)
             render!(axis, child.dxm; show_pos, flen, color = :green)
+            render!(axis, child.dym; show_pos, flen, color = :green)
+            render!(axis, child.wxp; show_pos, flen, color = :blue)
+            render!(axis, child.wyp; show_pos, flen, color = :blue)
             render!(axis, child.wxm; show_pos, flen, color = :blue)
-            render!(axis, child.dym; show_pos, flen, color = :cyan)
-            render!(axis, child.wym; show_pos, flen, color = :magenta)
+            render!(axis, child.wym; show_pos, flen, color = :blue)
         end
 
         # Optionally, plot waist ellipse
