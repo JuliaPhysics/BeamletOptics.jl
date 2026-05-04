@@ -4,8 +4,8 @@ include(joinpath(@__DIR__, "..", "..", "assets", "cond_save.jl"))
 detector_showcase_dir = joinpath(@__DIR__, "..", "..", "assets", "detector_assets")
 
 conditional_include(joinpath(detector_showcase_dir, "spotdetector_showcase.jl"))
-conditional_include(joinpath(detector_showcase_dir, "photodetector_showcase.jl"), use_placeholder=false)
-conditional_include(joinpath(detector_showcase_dir, "psfdetector_showcase.jl"), use_placeholder=false)
+conditional_include(joinpath(detector_showcase_dir, "photodetector_showcase.jl"))
+conditional_include(joinpath(detector_showcase_dir, "psfdetector_showcase.jl"))
 ```
 
 # Detectors
