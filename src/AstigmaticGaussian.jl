@@ -526,7 +526,10 @@ function waist_parameters(agb::AstigmaticGaussianBeamlet, z::Real)
     w1 = norm(h1) * normalize(w1_dir)
     w2 = norm(h2) * normalize(w2_dir)
 
-    return p0, w1, w2
+    # Get waist sizes for unification
+    _, _, _, _, _, w01, w02 = gauss_parameters(agb, z)
+
+    return p0, w1, w2, w01, w02
 end
 
 """
@@ -718,4 +721,17 @@ function gauss_parameters(agb::AstigmaticGaussianBeamlet, z::Real)
     ψ = -0.5 * angle(area)
 
     return (w1, w2, R1, R2, ψ, w01, w02)
+end
+
+function waist_parameters(agb::AstigmaticGaussianBeamlet{G}, zs::AbstractArray) where {G}
+    n = length(zs)
+    p0 = Vector{Point3{G}}(undef, n)
+    w1 = Vector{Point3{G}}(undef, n)
+    w2 = Vector{Point3{G}}(undef, n)
+    w01 = Vector{G}(undef, n)
+    w02 = Vector{G}(undef, n)
+    @inbounds for i in 1:n
+        p0[i], w1[i], w2[i], w01[i], w02[i] = waist_parameters(agb, zs[i])
+    end
+    return (p0, w1, w2, w01, w02)
 end

@@ -32,7 +32,7 @@ export CircularFlatSurface, RectangularFlatSurface, SphericalSurface, EvenAspher
 export Prism, RightAnglePrism
 
 # detectors
-export Detector, electric_field, intensity, spot_diagram, optical_power, gauss_parameters, Centroid, MinMax
+export Detector, electric_field, intensity, spot_diagram, optical_power, gauss_parameters, waist_parameters, Centroid, MinMax
 
 # splitters
 export ThinBeamsplitter, RoundThinBeamsplitter, RectangularPlateBeamsplitter, RoundPlateBeamsplitter, CubeBeamsplitter, RectangularCompensatorPlate

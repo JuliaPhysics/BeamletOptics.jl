@@ -377,7 +377,22 @@ function waist_parameters(gb::GaussianBeamlet, z::Real)
         s1 = normalize(vec)
     end
     s2 = cross(dir, s1)
-    return p0, w * s1, w * s2
+    # Get waist size for unification
+    _, _, _, w0 = gauss_parameters(gb, z)
+    return p0, w * s1, w * s2, w0, w0
+end
+
+function waist_parameters(gauss::GaussianBeamlet{G}, zs::AbstractArray) where {G}
+    n = length(zs)
+    p0 = Vector{Point3{G}}(undef, n)
+    w1 = Vector{Point3{G}}(undef, n)
+    w2 = Vector{Point3{G}}(undef, n)
+    w01 = Vector{G}(undef, n)
+    w02 = Vector{G}(undef, n)
+    @inbounds for i in 1:n
+        p0[i], w1[i], w2[i], w01[i], w02[i] = waist_parameters(gauss, zs[i])
+    end
+    return (p0, w1, w2, w01, w02)
 end
 
 """
