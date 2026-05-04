@@ -273,6 +273,9 @@ Fraunhofer or Fresnel diffraction).
 - `λ`: Wavelength.
 - `w0s`: Sub-waist of each individual beamlet. For smooth overlap, `w0s ≈ D / n_grid`.
 - `n_grid`: Number of beamlets along one axis (default `20` yields `400` total beamlets).
+- `basis`: Orientation of the macroscopic sampling grid. Determines the 3D directions corresponding to the `x` and `y` grid axes.
+- `randomize_axes`: If `true`, the internal principal axes of each individual beamlet are randomly rotated. This averages out numerical grid-alignment biases and is essential for preserving rotational symmetry in focused spots (e.g. Airy disks).
+- `rng`: Random number generator to use for `randomize_axes`.
 """
 function CollimatedGaussianBeamletSource(
         pos::AbstractArray{P},
@@ -280,13 +283,16 @@ function CollimatedGaussianBeamletSource(
         D::D2,
         λ::L,
         w0s::W;
-        n_grid::Int = 20
+        n_grid::Int = 20,
+        basis::Union{Nothing, Tuple{AbstractVector, AbstractVector}} = nothing,
+        randomize_axes::Bool = false,
+        rng = Random.GLOBAL_RNG
 ) where {P <: Real, D1 <: Real, D2 <: Real, L <: Real, W <: Real}
     T = promote_type(P, D1, D2, L, W)
     dir_n = normalize(dir)
-    # Create orthogonal basis for the square grid
-    e1 = normal3d(dir_n)
-    e2 = normalize(cross(dir_n, e1))
+    # Use provided basis or fallback to automatic orthogonal basis
+    e1 = isnothing(basis) ? normal3d(dir_n) : normalize(basis[1])
+    e2 = isnothing(basis) ? normalize(cross(dir_n, e1)) : normalize(basis[2])
 
     beams = Vector{AstigmaticGaussianBeamlet{T}}()
     Δ = D / n_grid
@@ -297,7 +303,16 @@ function CollimatedGaussianBeamletSource(
     for x in xs
         for y in ys
             offset = x * e1 + y * e2
-            b = AstigmaticGaussianBeamlet(pos + offset, dir_n, λ, w0s)
+            # Support vector for the beamlet axes
+            if randomize_axes
+                base_s = normal3d(dir_n)
+                ortho_s = cross(dir_n, base_s)
+                phi = 2π * rand(rng)
+                local_support = base_s * cos(phi) + ortho_s * sin(phi)
+            else
+                local_support = nothing
+            end
+            b = AstigmaticGaussianBeamlet(pos + offset, dir_n, λ, w0s; support = local_support)
             push!(beams, b)
         end
     end
@@ -320,6 +335,9 @@ coherent superposition of the sub-beamlets.
 - `λ`: Wavelength.
 - `n_grid`: Number of beamlets along one axis (default `20` yields `400` total beamlets).
 - `overlap`: Scaling factor for the sub-waist relative to grid spacing (default `1.2` ensures smooth overlap).
+- `basis`: Orientation of the macroscopic sampling grid. Determines the 3D directions corresponding to the `x` and `y` grid axes.
+- `randomize_axes`: If `true`, the internal principal axes of each individual beamlet are randomly rotated. This averages out numerical grid-alignment biases and is essential for preserving rotational symmetry in focused spots.
+- `rng`: Random number generator to use for `randomize_axes`.
 """
 function GaussianBeamletDecomposition(
         pos::AbstractArray{P},
@@ -327,12 +345,16 @@ function GaussianBeamletDecomposition(
         w0::W,
         λ::L;
         n_grid::Int = 20,
-        overlap::Float64 = 1.2
+        overlap::Float64 = 1.2,
+        basis::Union{Nothing, Tuple{AbstractVector, AbstractVector}} = nothing,
+        randomize_axes::Bool = false,
+        rng = Random.GLOBAL_RNG
 ) where {P <: Real, D1 <: Real, W <: Real, L <: Real}
     T = promote_type(P, D1, W, L)
     dir_n = normalize(dir)
-    e1 = normal3d(dir_n)
-    e2 = normalize(cross(dir_n, e1))
+    # Use provided basis or fallback to automatic orthogonal basis
+    e1 = isnothing(basis) ? normal3d(dir_n) : normalize(basis[1])
+    e2 = isnothing(basis) ? normalize(cross(dir_n, e1)) : normalize(basis[2])
 
     # We tile over a 4*w0 x 4*w0 area to capture the macroscopic Gaussian tails
     D = 4 * w0
@@ -355,8 +377,17 @@ function GaussianBeamletDecomposition(
                 # Normalization factor for coherent superposition
                 norm_factor = (Δ^2) / (π * w0s^2)
                 # Standard linear polarization along e1
+                # Support vector for the beamlet axes
+                if randomize_axes
+                    base_s = normal3d(dir_n)
+                    ortho_s = cross(dir_n, base_s)
+                    phi = 2π * rand(rng)
+                    local_support = base_s * cos(phi) + ortho_s * sin(phi)
+                else
+                    local_support = nothing
+                end
                 b = AstigmaticGaussianBeamlet(
-                    pos + offset, dir_n, λ, w0s; E0 = amp * e1 * norm_factor)
+                    pos + offset, dir_n, λ, w0s; E0 = amp * e1 * norm_factor, support = local_support)
                 push!(beams, b)
             end
         end
@@ -383,6 +414,9 @@ adjacent beamlets in the grid.
 - `num_rings`: Number of concentric angular rings.
 - `num_rays`: Total number of beamlets to generate.
 - `overlap`: Scaling factor for the sub-waist divergence (default `1.2` ensures smooth overlap).
+- `basis`: Optional reference vector (e.g. `[1,0,0]`) to define the starting azimuthal angle for the source rings.
+- `randomize_axes`: If `true`, the internal principal axes of each individual beamlet are randomly rotated. This averages out numerical artifacts in the far-field focus.
+- `rng`: Random number generator to use for `randomize_axes`.
 """
 function SphericalGaussianBeamletSource(
         pos::AbstractArray{P},
@@ -391,7 +425,10 @@ function SphericalGaussianBeamletSource(
         λ::L;
         num_rings::Int = 10,
         num_rays::Int = 100 * num_rings,
-        overlap::Float64 = 1.2
+        overlap::Float64 = 1.2,
+        basis::Union{Nothing, AbstractVector} = nothing,
+        randomize_axes::Bool = false,
+        rng = Random.GLOBAL_RNG
 ) where {P <: Real, D <: Real, H <: Real, L <: Real}
     T = promote_type(P, D, H, L)
     if num_rays < num_rings * 20
@@ -408,8 +445,8 @@ function SphericalGaussianBeamletSource(
     w0s = λ / (π * overlap * Δθ)
 
     dir_n = normalize(dir)
-    b1 = normal3d(dir_n)
-    b2 = normal3d(dir_n, b1)
+    b1 = isnothing(basis) ? normal3d(dir_n) : normalize(basis - dot(basis, dir_n) * dir_n)
+    b2 = normalize(cross(dir_n, b1))
     θ_NA = LinRange(0, θ, num_rings)
 
     beams = Vector{AstigmaticGaussianBeamlet{T}}()
@@ -438,7 +475,16 @@ function SphericalGaussianBeamletSource(
         for _ in 1:numEl
             # Polarization is set via the E0 kwarg. We could try to project it properly,
             # but default linear works for paraxial-ish cones.
-            push!(beams, AstigmaticGaussianBeamlet(pos, cdir, λ, w0s))
+            # Support vector for the beamlet axes
+            if randomize_axes
+                base_s = normal3d(cdir)
+                ortho_s = cross(cdir, base_s)
+                phi = 2π * rand(rng)
+                local_support = base_s * cos(phi) + ortho_s * sin(phi)
+            else
+                local_support = nothing
+            end
+            push!(beams, AstigmaticGaussianBeamlet(pos, cdir, λ, w0s; support = local_support))
             cdir = RotMat * cdir
         end
     end
@@ -465,7 +511,9 @@ propagate them through a `BeamletOptics` system.
 - `λ`: Wavelength.
 - `threshold`: Relative amplitude threshold below which beamlets are not spawned (saves computation).
 - `overlap`: Scaling factor for the sub-waist relative to grid spacing (default `1.2` ensures smooth overlap).
-- `basis`: Optional `Tuple(e1, e2)` of orthogonal vectors defining the local coordinate system of the input grid. If `nothing`, an automatic basis is generated.
+- `basis`: Orientation of the macroscopic sampling grid. Determines the 3D directions corresponding to the `x` and `y` input axes.
+- `randomize_axes`: If `true`, the internal principal axes of each individual beamlet are randomly rotated. This averages out numerical grid-alignment biases and helps preserve rotational symmetry in focused patterns.
+- `rng`: Random number generator to use for `randomize_axes`.
 """
 function WavefrontBeamletDecomposition(
         x::AbstractVector{P1},
@@ -476,7 +524,9 @@ function WavefrontBeamletDecomposition(
         λ::L;
         threshold::Float64 = 1e-4,
         overlap::Float64 = 1.2,
-        basis::Union{Nothing, Tuple{AbstractVector, AbstractVector}} = nothing
+        basis::Union{Nothing, Tuple{AbstractVector, AbstractVector}} = nothing,
+        randomize_axes::Bool = false,
+        rng = Random.GLOBAL_RNG
 ) where {P1 <: Real, P2 <: Real, A <: Real, Ph <: Real, D <: Real, L <: Real}
     T = promote_type(P1, P2, A, Ph, D, L)
 
@@ -561,7 +611,18 @@ function WavefrontBeamletDecomposition(
             norm_factor = (dx * dy) / (π * w0s^2)
             E0_complex = normalize(pol_axis) * (amp * exp(im * ph) * norm_factor)
 
-            b = AstigmaticGaussianBeamlet(pos, local_dir, λ, w0s; E0 = E0_complex)
+            # Support vector for the beamlet axes
+            if randomize_axes
+                # Randomly rotate the basis around the local direction
+                base_s = normal3d(local_dir)
+                ortho_s = cross(local_dir, base_s)
+                phi = 2π * rand(rng)
+                local_support = base_s * cos(phi) + ortho_s * sin(phi)
+            else
+                local_support = nothing
+            end
+            
+            b = AstigmaticGaussianBeamlet(pos, local_dir, λ, w0s; E0 = E0_complex, support = local_support)
             push!(beams, b)
         end
     end

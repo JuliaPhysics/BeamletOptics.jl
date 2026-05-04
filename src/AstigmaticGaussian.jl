@@ -72,7 +72,8 @@ In the 5-argument version, independent waists `w0_x` and `w0_y` can be specified
 ## Keyword Arguments
 
 - `M2`, `M2_x`, `M2_y`: beam quality factors. Default is 1
-- `E0`: electric field vector in [V/m]. Default is `nothing` (aligned with support axes to ensure orthogonality).
+- `P0`: beam total power in [W]. Default is 1 mW.
+- `E0`: electric field vector in [V/m]. Default is `nothing` (aligned with support axes, scaled by `P0`).
 - `support`: optional support vector for basis construction
 - `z0`: beam waist offset in [m]. Default is 0 m
 """
@@ -82,11 +83,12 @@ function AstigmaticGaussianBeamlet(
         λ = 1000e-9,
         w0 = 1e-3;
         M2 = 1,
+        P0 = 1e-3,
         E0 = nothing,
         support = nothing,
         z0 = 0)
     return AstigmaticGaussianBeamlet(position, direction, λ, w0, w0; M2_x = M2,
-        M2_y = M2, E0 = E0, support = support, z0 = z0)
+        M2_y = M2, P0 = P0, E0 = E0, support = support, z0 = z0)
 end
 
 function AstigmaticGaussianBeamlet(
@@ -97,6 +99,7 @@ function AstigmaticGaussianBeamlet(
         w0_y;
         M2_x = 1,
         M2_y = 1,
+        P0 = 1e-3,
         E0 = nothing,
         support = nothing,
         z0 = 0)
@@ -112,13 +115,18 @@ function AstigmaticGaussianBeamlet(
     end
     s2 = cross(direction, s1)
 
-    # Handle default or non-orthogonal polarization
+    # Handle polarization and power
     if isnothing(E0)
-        E0 = s1 # Default to linear polarization along first transverse axis
-    elseif !isorthogonal3d(direction, E0)
-        # If user provided E0 but it's not orthogonal, project it.
-        # This is a convenience for tilted setups.
-        E0 = normalize(E0 - dot(E0, direction) * direction)
+        # Calculate E0 magnitude based on P0
+        I0 = (2 * P0) / (π * w0_x * w0_y)
+        E_phasor = electric_field(I0)
+        E0 = s1 .* E_phasor # Default to linear polarization along first transverse axis
+    else
+        if !isorthogonal3d(direction, E0)
+            # If user provided E0 but it's not orthogonal, project it.
+            # This is a convenience for tilted setups.
+            E0 = E0 .- dot(E0, direction) .* direction
+        end
     end
 
     # Divergence angles
@@ -177,6 +185,11 @@ wavelength(agb::AstigmaticGaussianBeamlet) = wavelength(first(rays(agb.c)))
 direction(agb::AstigmaticGaussianBeamlet) = direction(first(rays(agb.c)))
 Base.position(agb::AstigmaticGaussianBeamlet) = position(first(rays(agb.c)))
 polarization(agb::AstigmaticGaussianBeamlet) = polarization(first(rays(agb.c)))
+
+electric_field(agb::AstigmaticGaussianBeamlet) = polarization(agb)
+function electric_field!(agb::AstigmaticGaussianBeamlet, new_E0)
+    polarization!(first(rays(agb.c)), new_E0)
+end
 
 function refractive_index(agb::AstigmaticGaussianBeamlet, id::Int)
     return refractive_index(rays(agb.c)[id])
@@ -669,10 +682,40 @@ function rayleigh_range(agb::AstigmaticGaussianBeamlet)
 end
 
 """
-    gauss_parameters(agb::AstigmaticGaussianBeamlet, z)
+    gauss_parameters(agb::AstigmaticGaussianBeamlet, z::Real)
 
-Returns the elliptical waist parameters `(p0, w1, w2)` at distance `z`.
+Compute the scalar Gaussian beam parameters at distance `z`.
+Returns a tuple `(w1, w2, R1, R2, ψ, w01, w02)` where:
+- `w1`, `w2`: beam radii along the principal axes
+- `R1`, `R2`: radii of curvature along the principal axes
+- `ψ`: total Gouy phase shift
+- `w01`, `w02`: waist radii along the principal axes
 """
 function gauss_parameters(agb::AstigmaticGaussianBeamlet, z::Real)
-    return waist_parameters(agb, z)
+    p0, i = point_on_beam(agb, z)
+    h1, u1, h2, u2, _ = parabasal_ray_parameters(agb, p0, i)
+    n = refractive_index(agb, i)
+    λ = wavelength(agb)
+    T = typeof(λ)
+    dir = direction(rays(agb.c)[i])
+
+    # Axis 1
+    w1 = norm(h1)
+    invR1 = real(sum(u1 .* conj.(h1))) / w1^2
+    R1 = isapprox(invR1, 0, atol = 1e-20) ? T(Inf) : 1 / invR1
+    H1 = abs(n * imag(sum(h1 .* conj.(u1))))
+    w01 = H1 / (n * norm(u1))
+
+    # Axis 2
+    w2 = norm(h2)
+    invR2 = real(sum(u2 .* conj.(h2))) / w2^2
+    R2 = isapprox(invR2, 0, atol = 1e-20) ? T(Inf) : 1 / invR2
+    H2 = abs(n * imag(sum(h2 .* conj.(u2))))
+    w02 = H2 / (n * norm(u2))
+
+    # Total Gouy phase
+    area = _pseudo_cross2d(h1, h2, dir)
+    ψ = -0.5 * angle(area)
+
+    return (w1, w2, R1, R2, ψ, w01, w02)
 end

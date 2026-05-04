@@ -191,7 +191,8 @@ const nm = 1e-9
             E = BMO.polarization(chief)
             d = BMO.direction(chief)
             @test abs(dot(real.(E), d)) < 1e-10
-            @test isapprox(norm(E), 1.0; atol = 1e-10)
+            # Ensure magnitude corresponds to the default P0 = 1e-3
+            @test isapprox(BMO.optical_power(beam), 1e-3; atol = 1e-10)
         end
     end
 

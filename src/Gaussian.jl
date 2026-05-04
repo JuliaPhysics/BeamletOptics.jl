@@ -214,7 +214,7 @@ The following inputs and arguments can be used to configure the beamlet:
 """
 function GaussianBeamlet(
     position::AbstractArray{P},
-    direction::AbstractArray{D}, 
+    direction::AbstractArray{D},
     λ::L = 1e-6,
     w0::Real = 1e-3;
     M2::Real = 1,
@@ -349,7 +349,35 @@ function gauss_parameters(
     isnan(ψ) && (ψ = zero(ψ))
     isnan(w0) && (w0 = w)
     R < 0 && (ψ = -ψ)
-    return w, R, ψ, w0
+    return (w, R, ψ, w0)
+end
+
+"""
+    waist_parameters(gb, z)
+
+Compute the position and cross-section axes at distance `z` along the beam.
+For a stigmatic `GaussianBeamlet`, the cross-section is circular, and the axes are
+determined by the orientation of the auxiliary waist ray.
+Returns `(p0, w1, w2)`.
+"""
+function waist_parameters(gb::GaussianBeamlet, z::Real)
+    p0, i = point_on_beam(gb, z)
+    w, _, _, _ = gauss_parameters(gb, z, hint = (p0, i))
+    chief = rays(gb.chief)[i]
+    waist = rays(gb.waist)[i]
+    dir = direction(chief)
+    # Recover the basis vector from the auxiliary waist ray
+    # p_waist = p_chief + w * s1
+    vec = position(waist) - p0
+    # Project to transverse plane to be sure
+    vec = vec - dot(vec, dir) * dir
+    if norm(vec) < 1e-12
+        s1 = normal3d(dir)
+    else
+        s1 = normalize(vec)
+    end
+    s2 = cross(dir, s1)
+    return p0, w * s1, w * s2
 end
 
 """
@@ -386,7 +414,7 @@ function electric_field(gauss::GaussianBeamlet, r, z)
     E0 = electric_field(gauss) * (beam_waist(gauss) / w0)
     # Calculate phase change due to optical path length
     Δl = optical_path_length(gauss) - length(gauss)
-    # Note: geometrical length changes considered in `electric_field` call below 
+    # Note: geometrical length changes considered in `electric_field` call below
     ref_ϕ = Δl / wavelength(gauss) * 2π
     return electric_field(r, z, E0, w0, w, k, ψ, R) * exp(im*ref_ϕ)
 end

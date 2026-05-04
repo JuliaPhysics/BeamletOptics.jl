@@ -62,12 +62,16 @@ function render!(
             bs = getindex.(params, 2)
             cs = getindex.(params, 3)
 
-            b0 = first(bs)
-            c0 = first(cs)
-
-            # flip ellipse basis vectors if necessary
-            bs[findall(dot.(bs, b0) .< 0)] .*= -1
-            cs[findall(dot.(cs, c0) .< 0)] .*= -1
+            # Ensure elliptical basis vectors (bs, cs) vary smoothly along the segment
+            # to prevent mesh twisting/flips, especially when passing through a focus.
+            for j in 2:length(bs)
+                if dot(bs[j], bs[j-1]) < 0
+                    bs[j] *= -1
+                end
+                if dot(cs[j], cs[j-1]) < 0
+                    cs[j] *= -1
+                end
+            end
 
             # Build surface mesh matrices
             pts = Matrix{Point3{T}}(undef, length(params), length(vs))
