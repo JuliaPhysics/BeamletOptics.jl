@@ -9,6 +9,7 @@ using Makie: Axis3, LScene, mesh!, surface!, lines!, RGBf, RGBAf, scatter!
 using GeometryBasics: Point2, Point3
 using AbstractTrees: PreOrderDFS
 using MarchingCubes: MC, march
+using LinearAlgebra: dot
 
 const _RenderEnv = Union{
     Axis3,

@@ -36,29 +36,67 @@ function render!(
         transparency = true,
         kwargs...
     ) where {T}
-    
+    vs = LinRange(0, 2π, r_res)
     for child in PreOrderDFS(agb)
-        l = length(child) + flen
-        
-        # Longitudinal and angular ranges
-        us = LinRange(0, l, z_res)
-        vs = LinRange(0, 2π, r_res)
-        
-        # Precompute waist parameters at each z
-        params = [BMO.waist_parameters(child, u) for u in us]
-        
-        # Build surface mesh matrices
-        pts = [BMO.ellipse(v, p[1], p[2], p[3]) for p in params, v in vs]
+        # Length tracking variable
+        p = child.parent
+        if isnothing(p)
+            l = zero(T)
+        else
+            l = length(p)
+        end
 
-        Xt = getindex.(pts, 1)
-        Yt = getindex.(pts, 2)
-        Zt = getindex.(pts, 3)
+        for ray in BMO.rays(child.c)
+            # Calculate local segment length
+            if isnothing(BMO.intersection(ray))
+                l_local = flen
+            else
+                l_local = length(ray)
+            end
+            us = LinRange(0, l_local, z_res) .+ l
+            # Precompute waist parameters at each z
+            params = [BMO.waist_parameters(child, u) for u in us]
 
-        # Render the envelope as a smooth surface
-        surface!(axis, Xt, Yt, Zt; 
-            color = fill(color, size(Xt)), 
-            transparency, 
-            kwargs...)
+            # sort params b and c
+            ps = getindex.(params, 1)
+            bs = getindex.(params, 2)
+            cs = getindex.(params, 3)
+
+            b0 = first(bs)
+            c0 = first(cs)
+
+            # flip ellipse basis vectors if necessary
+            bs[findall(dot.(bs, b0) .< 0)] .*= -1
+            cs[findall(dot.(cs, c0) .< 0)] .*= -1
+
+            # Build surface mesh matrices
+            pts = Matrix{Point3{T}}(undef, length(params), length(vs))
+
+            for i in eachindex(params)
+                pts[i, :] = [BMO.ellipse(v, ps[i], bs[i], cs[i]) for v in vs]
+            end
+            
+            Xt = getindex.(pts, 1)
+            Yt = getindex.(pts, 2)
+            Zt = getindex.(pts, 3)
+
+            # Render the envelope as a smooth surface
+            surface!(axis, Xt, Yt, Zt; 
+                color = fill(color, size(Xt)), 
+                transparency, 
+                kwargs...
+            )
+
+            # Optionally, plot waist ellipse
+            if show_waist
+                scatter!.(axis, pts; color)
+            end
+
+            # Bump length tracker
+            if !isnothing(BMO.intersection(ray))
+                l += length(ray)
+            end
+        end
 
         # Optionally, plot generating rays
         if show_beams
@@ -73,10 +111,7 @@ function render!(
             render!(axis, child.wym; show_pos, flen, color = :blue)
         end
 
-        # Optionally, plot waist ellipse
-        if show_waist
-            scatter!.(axis, pts; color)
-        end
+
     end
     return axis
 end
