@@ -138,7 +138,7 @@ function trace_system!(
         # kwargs
         r_max::Int = 100,
         kwargs...
-    ) where {T <: Real, R <: AbstractRay{T}}
+) where {T <: Real, R <: AbstractRay{T}}
     # Test until max. number of rays in beam reached
     interaction::Nullable{BeamInteraction{T, R}} = nothing
     while length(rays(beam)) < r_max
@@ -207,7 +207,7 @@ function retrace_system!(
         beam::Beam{T, R};
         # kwargs
         kwargs...
-    ) where {T <: Real, R <: AbstractRay{T}}
+) where {T <: Real, R <: AbstractRay{T}}
     # Cleanup flags
     cleanup_children = false
     cleanup_tail = false
@@ -299,7 +299,7 @@ function trace_system!(
         # kwargs...
         r_max::Int = 100,
         kwargs...
-    ) where {T <: Real}
+) where {T <: Real}
     # Test until bundle is stopped
     interaction::Nullable{GaussianBeamletInteraction{T}} = nothing
     # Buffer variable
@@ -354,7 +354,7 @@ function retrace_system!(
         gauss::GaussianBeamlet{T};
         # kwargs
         kwargs...
-    ) where {T <: Real}
+) where {T <: Real}
     # Cleanup flags
     cleanup_children = false
     cleanup_tail = false
@@ -470,9 +470,9 @@ function trace_system!(
         system::AbstractSystem,
         agb::AstigmaticGaussianBeamlet{T};
         # kwargs
-        r_max::Int=100,
-        check_invariant::Bool=true
-    ) where {T <: Real}
+        r_max::Int = 100,
+        check_invariant::Bool = true
+) where {T <: Real}
     interaction::Nullable{AstigmaticGaussianBeamletInteraction{T}} = nothing
     seg_counter::Int = length(rays(agb.c))
     aux = _aux_beams(agb)
@@ -510,7 +510,7 @@ function trace_system!(
         # Add rays to beamlet
         push!(agb, interaction)
         seg_counter += 1
-        
+
         # Verify that the paraxial assumptions still hold for the new segment
         if check_invariant && !check_optical_invariant(agb, seg_counter)
             break
@@ -530,8 +530,8 @@ function retrace_system!(
         system::AbstractSystem,
         agb::AstigmaticGaussianBeamlet{T};
         # kwargs
-        check_invariant::Bool=true
-    ) where {T <: Real}
+        check_invariant::Bool = true
+) where {T <: Real}
     # Cleanup flags
     cleanup_children = false
     cleanup_tail = false
@@ -627,7 +627,7 @@ function retrace_system!(
             cutoff = i
             break
         end
-        
+
         if i >= n_c
             break
         end
@@ -679,7 +679,7 @@ function solve_system!(
         retrace::Bool = true,
         depth_max::Int = typemax(Int),
         check_invariant::Bool = true
-    ) where {B <: AbstractBeam}
+) where {B <: AbstractBeam}
     queue = Tuple{B, Int}[(beam, 1)]
     while !isempty(queue)
         # Process beams in FIFO order.

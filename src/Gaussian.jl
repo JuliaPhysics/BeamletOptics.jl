@@ -84,7 +84,7 @@ wavelength(beam::GaussianBeamlet) = beam.λ
 wavelength!(beam::GaussianBeamlet, new) = (beam.λ = new)
 beam_waist(beam::GaussianBeamlet) = beam.w0
 electric_field(beam::GaussianBeamlet) = beam.E0
-electric_field!(beam::GaussianBeamlet{T}, new) where T = (beam.E0 = Complex{T}(new))
+electric_field!(beam::GaussianBeamlet{T}, new) where {T} = (beam.E0 = Complex{T}(new))
 refractive_index(beam::GaussianBeamlet, id::Int) = refractive_index(rays(beam.chief)[id])
 function refractive_index!(beam::GaussianBeamlet, id::Int, n_new::Real)
     refractive_index!(rays(beam.chief)[id], n_new)
@@ -213,15 +213,15 @@ The following inputs and arguments can be used to configure the beamlet:
     If results fluctuate due to the randomness of this vector, make sure to specify a fixed orthogonal `support` vector.
 """
 function GaussianBeamlet(
-    position::AbstractArray{P},
-    direction::AbstractArray{D},
-    λ::L = 1e-6,
-    w0::Real = 1e-3;
-    M2::Real = 1,
-    P0::Real = 1e-3,
-    z0::Real = 0,
-    support::Nullable{AbstractArray} = nothing
-    ) where {P<:Real, D<:Real, L<:Real}
+        position::AbstractArray{P},
+        direction::AbstractArray{D},
+        λ::L = 1e-6,
+        w0::Real = 1e-3;
+        M2::Real = 1,
+        P0::Real = 1e-3,
+        z0::Real = 0,
+        support::Nullable{AbstractArray} = nothing
+) where {P <: Real, D <: Real, L <: Real}
     # T = promote_type(P, D, L)
     dir = normalize(direction)
     # Create orthogonal vector for construction purposes (right-handed)
@@ -279,7 +279,7 @@ function gauss_parameters(
         gauss::GaussianBeamlet,
         z::Real;
         hint = point_on_beam(gauss, z)
-    )
+)
     p0, index = hint
     chief = gauss.chief.rays[index]
     div = gauss.divergence.rays[index]
@@ -411,10 +411,12 @@ function electric_field(gauss::GaussianBeamlet, r, z)
     Δl = optical_path_length(gauss) - length(gauss)
     # Note: geometrical length changes considered in `electric_field` call below
     ref_ϕ = Δl / wavelength(gauss) * 2π
-    return electric_field(r, z, E0, w0, w, k, ψ, R) * exp(im*ref_ϕ)
+    return electric_field(r, z, E0, w0, w, k, ψ, R) * exp(im * ref_ϕ)
 end
 
-optical_power(gauss::GaussianBeamlet) = intensity(electric_field(gauss)) / 2 * π * beam_waist(gauss)^2
+function optical_power(gauss::GaussianBeamlet)
+    intensity(electric_field(gauss)) / 2 * π * beam_waist(gauss)^2
+end
 
 """
     isparaxial(system, gb::GaussianBeamlet, threshold=π/4)

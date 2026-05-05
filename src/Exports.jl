@@ -1,10 +1,14 @@
 # kinematic export
-export translate3d!, translate_to3d!, rotate3d!, xrotate3d!, yrotate3d!, zrotate3d!, align3d!, reset_translation3d!, reset_rotation3d!
+export translate3d!, translate_to3d!, rotate3d!, xrotate3d!, yrotate3d!, zrotate3d!,
+       align3d!, reset_translation3d!, reset_rotation3d!
 export position, direction, orientation
 
 # ray and beam type export
-export Ray, PolarizedRay, Beam, PointSource, CollimatedSource, UniformDiscSource, GaussianBeamlet, AstigmaticGaussianBeamlet, rayleigh_range, rays, point_on_beam, normal3d
-export CollimatedGaussianBeamletSource, GaussianBeamletDecomposition, SphericalGaussianBeamletSource, WavefrontBeamletDecomposition, AstigmaticBeamGroup
+export Ray, PolarizedRay, Beam, PointSource, CollimatedSource, UniformDiscSource,
+       GaussianBeamlet, AstigmaticGaussianBeamlet, rayleigh_range, rays, point_on_beam,
+       normal3d
+export CollimatedGaussianBeamletSource, GaussianBeamletDecomposition,
+       SphericalGaussianBeamletSource, WavefrontBeamletDecomposition, AstigmaticBeamGroup
 
 # system
 export System, StaticSystem, solve_system!
@@ -20,22 +24,26 @@ components
 =#
 
 # mirrors
-export Mirror, SquarePlanoMirror2D, RectangularPlanoMirror, SquarePlanoMirror, RoundPlanoMirror, ConcaveSphericalMirror, RightAnglePrismMirror
+export Mirror, SquarePlanoMirror2D, RectangularPlanoMirror, SquarePlanoMirror,
+       RoundPlanoMirror, ConcaveSphericalMirror, RightAnglePrismMirror
 
 # lenses
 export Lens, DoubletLens, ThinLens, SphericalLens, SphericalDoubletLens, thickness
 
 # surfaces
-export CircularFlatSurface, RectangularFlatSurface, SphericalSurface, EvenAsphericalSurface, CylindricalSurface, AcylindricalSurface
+export CircularFlatSurface, RectangularFlatSurface, SphericalSurface, EvenAsphericalSurface,
+       CylindricalSurface, AcylindricalSurface
 
 # prisms
 export Prism, RightAnglePrism
 
 # detectors
-export Detector, electric_field, intensity, spot_diagram, optical_power, gauss_parameters, waist_parameters, Centroid, MinMax
+export Detector, electric_field, intensity, spot_diagram, optical_power, gauss_parameters,
+       waist_parameters, Centroid, MinMax
 
 # splitters
-export ThinBeamsplitter, RoundThinBeamsplitter, RectangularPlateBeamsplitter, RoundPlateBeamsplitter, CubeBeamsplitter, RectangularCompensatorPlate
+export ThinBeamsplitter, RoundThinBeamsplitter, RectangularPlateBeamsplitter,
+       RoundPlateBeamsplitter, CubeBeamsplitter, RectangularCompensatorPlate
 
 # polarizing components
 export PolarizationFilter

@@ -415,13 +415,13 @@ const nm = 1e-9
         beam = AstigmaticGaussianBeamlet(
             [0.4mm, 0, 0], [0, 1, 0], λ, 0.05mm; support = [1, 0, 0])
 
-        @test_logs (:warn, r"Lagrange invariant violation") match_mode = :any BMO.solve_system!(
+        @test_logs (:warn, r"Lagrange invariant violation") match_mode=:any BMO.solve_system!(
             system, beam)
 
         # Verify that the beam stopped tracing once the invariant failed
         # (solve_system calls trace_system! which has a break on invariant failure)
         @test length(BMO.rays(beam.c)) < 10 # It should stop early
-        
+
         # Reset threshold
         BMO.INVARIANT_THRESHOLD[] = old_threshold
     end

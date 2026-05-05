@@ -210,7 +210,7 @@ end
 
         # Initial trace: 1 segment (2 rays)
         agb = AstigmaticGaussianBeamlet([0, 0, 0], [0, 1, 0], 1e-6, 1mm)
-        
+
         with_logger(NullLogger()) do
             solve_system!(system, agb)
 
