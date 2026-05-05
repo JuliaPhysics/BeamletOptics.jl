@@ -1,4 +1,3 @@
-const INVARIANT_THRESHOLD = Ref(parse(Float64, get(ENV, "BMO_INVARIANT_THRESHOLD", "1e-6")))
 
 """
     AstigmaticGaussianBeamlet{T} <: AbstractBeam{T, PolarizedRay{T}}
@@ -80,10 +79,10 @@ In the 5-argument version, independent waists `w0_x` and `w0_y` can be specified
 function AstigmaticGaussianBeamlet(
         position,
         direction,
-        λ = 1000e-9,
-        w0 = 1e-3;
+        λ = get_default_wavelength(),
+        w0 = get_default_waist();
         M2 = 1,
-        P0 = 1e-3,
+        P0 = get_default_power(),
         E0 = nothing,
         support = nothing,
         z0 = 0)
@@ -394,12 +393,13 @@ function parabasal_ray_parameters(agb::AstigmaticGaussianBeamlet, p0, i)
 end
 
 """
-    check_optical_invariant(agb, i)
+    check_optical_invariant(agb, i; threshold = get_invariant_threshold())
 
 Evaluate the complex optical invariant `h1 . u2 - h2 . u1 = 0` at segment `i`.
-Returns `true` if the invariant holds (paraxial assumption is valid), and `false` otherwise.
+Returns `true` if the invariant holds (within `threshold`), and `false` otherwise.
 """
-function check_optical_invariant(agb::AstigmaticGaussianBeamlet, i::Int)
+function check_optical_invariant(agb::AstigmaticGaussianBeamlet, i::Int;
+        threshold::Real = get_invariant_threshold())
     chief = rays(agb.c)[i]
     p0 = position(chief)
     pn = direction(chief)
@@ -433,7 +433,7 @@ function check_optical_invariant(agb::AstigmaticGaussianBeamlet, i::Int)
     all_pass = true
     for (h1, u1, h2, u2, label) in combinations
         inv_val = sum(h1 .* u2) - sum(h2 .* u1)
-        if abs(inv_val) > INVARIANT_THRESHOLD[]
+        if abs(inv_val) > threshold
             @warn lazy"Parabasal coupling invariant violation ($label) at segment $i: |h1.u2 - h2.u1| = $(abs(inv_val)). The paraxial astigmatic Gaussian beam tracing assumptions have broken down."
             all_pass = false
         end
@@ -448,7 +448,7 @@ function check_optical_invariant(agb::AstigmaticGaussianBeamlet, i::Int)
     )
     for (h, u, label) in sets
         H = n * imag(sum(conj(h) .* u))
-        if !isapprox(H, H_target, atol = INVARIANT_THRESHOLD[])
+        if !isapprox(H, H_target, atol = threshold)
             @warn lazy"Lagrange invariant violation ($label) at segment $i: H=$H, target=$H_target. The beamlet has likely encountered an object that violates the paraxial assumption."
             all_pass = false
         end
@@ -577,7 +577,7 @@ function parabasal_field(
     chief = rays(agb.c)[i]
     dir = direction(chief)
 
-    if !isorthogonal3d(dir, r; atol = 1e-10)
+    if !isorthogonal3d(dir, r; atol = Config.get_orthogonality_threshold())
         error("r must lie in plane at p0/dir (dot product: $(dot(dir, r)))")
     end
 

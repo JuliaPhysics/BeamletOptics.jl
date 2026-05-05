@@ -199,8 +199,7 @@ end
 
     # We need a system where we can trigger an invariant violation during retrace.
     # We'll use a very small invariant threshold to make it easy to trigger.
-    old_threshold = BMO.INVARIANT_THRESHOLD[]
-    BMO.INVARIANT_THRESHOLD[] = 1e-15 # Extremely strict
+    strict_threshold = 1e-15
 
     try
         # A simple plane surface
@@ -210,9 +209,10 @@ end
 
         # Initial trace: 1 segment (2 rays)
         agb = AstigmaticGaussianBeamlet([0, 0, 0], [0, 1, 0], 1e-6, 1mm)
-
+        
         with_logger(NullLogger()) do
-            solve_system!(system, agb)
+            # Use strict threshold for this call
+            solve_system!(system, agb; threshold = strict_threshold)
 
             n_initial = length(BMO.rays(agb.c))
             @test n_initial == 2
@@ -222,15 +222,14 @@ end
             BMO.translate3d!(surf, [0, 10mm, 0])
 
             # Also tilt it or change parameters to trigger invariant violation if possible.
-            BMO.retrace_system!(system, agb)
+            BMO.retrace_system!(system, agb; threshold = strict_threshold)
         end
 
         # Verification of consistency
         lengths = map(b -> length(BMO.rays(b)), BMO._component_beams(agb))
         @test all(==(lengths[1]), lengths)
-
-    finally
-        BMO.INVARIANT_THRESHOLD[] = old_threshold
+    catch e
+        rethrow(e)
     end
 end
 

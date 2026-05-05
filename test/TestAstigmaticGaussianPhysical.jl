@@ -401,9 +401,8 @@ const nm = 1e-9
         BMO.zrotate3d!(lens, deg2rad(80))
         BMO.translate3d!(lens, [0, 1.0mm, 0])
 
-        # Set threshold very low via Ref
-        old_threshold = BeamletOptics.INVARIANT_THRESHOLD[]
-        BeamletOptics.INVARIANT_THRESHOLD[] = 1e-12
+        # Set threshold very low to trigger violation
+        strict_threshold = 1e-12
 
         system = BMO.System([lens])
 
@@ -416,14 +415,11 @@ const nm = 1e-9
             [0.4mm, 0, 0], [0, 1, 0], λ, 0.05mm; support = [1, 0, 0])
 
         @test_logs (:warn, r"Lagrange invariant violation") match_mode=:any BMO.solve_system!(
-            system, beam)
+            system, beam; threshold = strict_threshold)
 
         # Verify that the beam stopped tracing once the invariant failed
         # (solve_system calls trace_system! which has a break on invariant failure)
         @test length(BMO.rays(beam.c)) < 10 # It should stop early
-
-        # Reset threshold
-        BMO.INVARIANT_THRESHOLD[] = old_threshold
     end
 end # outer testset
 

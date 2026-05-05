@@ -19,6 +19,12 @@ import Base: length, push!, empty!, position
 
 # Do not change order of inclusion!
 include("Constants.jl")
+include("Config.jl")
+using .Config: get_invariant_threshold, set_invariant_threshold!,
+             get_sdf_surface_threshold, get_sdf_raymarch_eps, get_sdf_inside_step,
+             get_internal_reflection_threshold, get_line_plane_intersection_threshold,
+             get_orthogonality_threshold, get_default_r_max, get_default_depth_max,
+             get_default_wavelength, get_default_waist, get_default_power
 include("Utils/Utils.jl")
 include("AbstractTypes/AbstractTypes.jl")
 include("Rays.jl")

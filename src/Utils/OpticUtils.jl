@@ -142,7 +142,8 @@ function fresnel_coefficients(θ::AbstractArray{T}, n::Number) where {T}
 end
 
 function is_internally_reflected(rp::Number, rs::Number)
-    isapprox(abs2(rs), 1, atol = 1e-6) && isapprox(abs2(rp), 1, atol = 1e-6)
+    isapprox(abs2(rs), 1, atol = Config.get_internal_reflection_threshold()) &&
+        isapprox(abs2(rp), 1, atol = Config.get_internal_reflection_threshold())
 end
 
 """

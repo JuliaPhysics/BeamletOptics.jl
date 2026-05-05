@@ -338,6 +338,8 @@ coherent superposition of the sub-beamlets.
 - `basis`: Orientation of the macroscopic sampling grid. Determines the 3D directions corresponding to the `x` and `y` grid axes.
 - `randomize_axes`: If `true`, the internal principal axes of each individual beamlet are randomly rotated. This averages out numerical grid-alignment biases and is essential for preserving rotational symmetry in focused spots.
 - `rng`: Random number generator to use for `randomize_axes`.
+- `P0`: Total power of the macroscopic Gaussian beam in [W].
+- `E0`: Optional Jones vector defining the polarization and initial phase of the beam. If `nothing`, defaults to linear polarization along the first grid axis.
 """
 function GaussianBeamletDecomposition(
         pos::AbstractArray{P},
@@ -348,13 +350,25 @@ function GaussianBeamletDecomposition(
         overlap::Float64 = 1.2,
         basis::Union{Nothing, Tuple{AbstractVector, AbstractVector}} = nothing,
         randomize_axes::Bool = false,
-        rng = Random.GLOBAL_RNG
+        rng = Random.GLOBAL_RNG,
+        P0::Real = get_default_power(),
+        E0 = nothing
 ) where {P <: Real, D1 <: Real, W <: Real, L <: Real}
     T = promote_type(P, D1, W, L)
     dir_n = normalize(dir)
     # Use provided basis or fallback to automatic orthogonal basis
     e1 = isnothing(basis) ? normal3d(dir_n) : normalize(basis[1])
     e2 = isnothing(basis) ? normalize(cross(dir_n, e1)) : normalize(basis[2])
+
+    # Determine macroscopic peak amplitude
+    if isnothing(E0)
+        I0 = (2 * P0) / (π * w0^2)
+        E_phasor = T(electric_field(I0))
+        pol = e1
+    else
+        E_phasor = one(T)
+        pol = E0
+    end
 
     # We tile over a 4*w0 x 4*w0 area to capture the macroscopic Gaussian tails
     D = 4 * w0
@@ -387,7 +401,7 @@ function GaussianBeamletDecomposition(
                     local_support = nothing
                 end
                 b = AstigmaticGaussianBeamlet(
-                    pos + offset, dir_n, λ, w0s; E0 = amp * e1 * norm_factor, support = local_support)
+                    pos + offset, dir_n, λ, w0s; E0 = (amp * norm_factor * E_phasor) .* pol, support = local_support)
                 push!(beams, b)
             end
         end
@@ -417,6 +431,8 @@ adjacent beamlets in the grid.
 - `basis`: Optional reference vector (e.g. `[1,0,0]`) to define the starting azimuthal angle for the source rings.
 - `randomize_axes`: If `true`, the internal principal axes of each individual beamlet are randomly rotated. This averages out numerical artifacts in the far-field focus.
 - `rng`: Random number generator to use for `randomize_axes`.
+- `P0`: Total power of the spherical source in [W].
+- `E0`: Optional Jones vector defining the polarization and phase of the spherical wave.
 """
 function SphericalGaussianBeamletSource(
         pos::AbstractArray{P},
@@ -428,7 +444,9 @@ function SphericalGaussianBeamletSource(
         overlap::Float64 = 1.2,
         basis::Union{Nothing, AbstractVector} = nothing,
         randomize_axes::Bool = false,
-        rng = Random.GLOBAL_RNG
+        rng = Random.GLOBAL_RNG,
+        P0::Real = get_default_power(),
+        E0 = nothing
 ) where {P <: Real, D <: Real, H <: Real, L <: Real}
     T = promote_type(P, D, H, L)
     if num_rays < num_rings * 20
@@ -449,10 +467,14 @@ function SphericalGaussianBeamletSource(
     b2 = normalize(cross(dir_n, b1))
     θ_NA = LinRange(0, θ, num_rings)
 
+    # Initial ray count for power distribution
+    total_rays = num_rays
+    P_sub = P0 / total_rays
+
     beams = Vector{AstigmaticGaussianBeamlet{T}}()
 
     # Central beamlet
-    push!(beams, AstigmaticGaussianBeamlet(pos, dir_n, λ, w0s))
+    push!(beams, AstigmaticGaussianBeamlet(pos, dir_n, λ, w0s; P0 = P_sub, E0 = E0))
     num_rays -= 1
 
     # Calculate circumference weights
@@ -484,7 +506,7 @@ function SphericalGaussianBeamletSource(
             else
                 local_support = nothing
             end
-            push!(beams, AstigmaticGaussianBeamlet(pos, cdir, λ, w0s; support = local_support))
+            push!(beams, AstigmaticGaussianBeamlet(pos, cdir, λ, w0s; P0 = P_sub, E0 = E0, support = local_support))
             cdir = RotMat * cdir
         end
     end
@@ -514,6 +536,7 @@ propagate them through a `BeamletOptics` system.
 - `basis`: Orientation of the macroscopic sampling grid. Determines the 3D directions corresponding to the `x` and `y` input axes.
 - `randomize_axes`: If `true`, the internal principal axes of each individual beamlet are randomly rotated. This averages out numerical grid-alignment biases and helps preserve rotational symmetry in focused patterns.
 - `rng`: Random number generator to use for `randomize_axes`.
+- `E0`: Optional reference polarization vector or Jones vector. If `nothing`, defaults to linear polarization along the first grid axis.
 """
 function WavefrontBeamletDecomposition(
         x::AbstractVector{P1},
@@ -526,7 +549,8 @@ function WavefrontBeamletDecomposition(
         overlap::Float64 = 1.2,
         basis::Union{Nothing, Tuple{AbstractVector, AbstractVector}} = nothing,
         randomize_axes::Bool = false,
-        rng = Random.GLOBAL_RNG
+        rng = Random.GLOBAL_RNG,
+        E0 = nothing
 ) where {P1 <: Real, P2 <: Real, A <: Real, Ph <: Real, D <: Real, L <: Real}
     T = promote_type(P1, P2, A, Ph, D, L)
 
@@ -598,8 +622,9 @@ function WavefrontBeamletDecomposition(
 
             # Complex amplitude (E0 vector)
             # The E0 vector MUST be orthogonal to local_dir.
-            # We project the macroscopic polarization (e1_v) onto the plane orthogonal to local_dir:
-            pol_axis = e1_v .- dot(e1_v, local_dir) .* local_dir
+            # We project the macroscopic polarization (E0 or e1_v) onto the plane orthogonal to local_dir:
+            base_pol = isnothing(E0) ? e1_v : E0
+            pol_axis = base_pol .- dot(base_pol, local_dir) .* local_dir
             if norm(pol_axis) < 1e-6
                 pol_axis = e2_v .- dot(e2_v, local_dir) .* local_dir
             end
@@ -621,7 +646,7 @@ function WavefrontBeamletDecomposition(
             else
                 local_support = nothing
             end
-            
+
             b = AstigmaticGaussianBeamlet(pos, local_dir, λ, w0s; E0 = E0_complex, support = local_support)
             push!(beams, b)
         end

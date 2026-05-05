@@ -215,10 +215,10 @@ The following inputs and arguments can be used to configure the beamlet:
 function GaussianBeamlet(
         position::AbstractArray{P},
         direction::AbstractArray{D},
-        λ::L = 1e-6,
-        w0::Real = 1e-3;
+        λ::L = get_default_wavelength(),
+        w0::Real = get_default_waist();
         M2::Real = 1,
-        P0::Real = 1e-3,
+        P0::Real = get_default_power(),
         z0::Real = 0,
         support::Nullable{AbstractArray} = nothing
 ) where {P <: Real, D <: Real, L <: Real}
@@ -313,7 +313,7 @@ function gauss_parameters(
     H = abs(n * (y_w * m_d - y_d * m_w))
     # Test optical invariant
     λ = wavelength(gauss)
-    if !isapprox(H, λ / π, atol = 1e-6)
+    if !isapprox(H, λ / π, atol = Config.get_invariant_threshold())
         H = λ / π
         # println("H not fulfilled at z=$z")
     end

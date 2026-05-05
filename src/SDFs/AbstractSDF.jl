@@ -1,6 +1,3 @@
-const eps_srf = 1e-9     # helps to decide if on SDF surface
-const eps_ray = 1e-10     # helps to terminate outside ray marching routine
-const eps_ins = 1e-0      # internal ray marching length step
 
 """
     AbstractSDF <: AbstractShape
@@ -103,7 +100,7 @@ function _raymarch_outside(shape::AbstractSDF{S},
         pos::AbstractArray{R},
         dir::AbstractArray{R},
         num_iter = 1000,
-        eps = eps_ray) where {S, R}
+        eps = Config.get_sdf_raymarch_eps()) where {S, R}
     T = promote_type(S, R)
     dist = sdf(shape, pos)
     t0 = zero(T)
@@ -145,7 +142,7 @@ function _raymarch_inside(object::AbstractSDF{S},
         pos::AbstractArray{R},
         dir::AbstractArray{R},
         num_iter = 1000,
-        dl = eps_ins) where {S, R}
+        dl = Config.get_sdf_inside_step()) where {S, R}
     # this method assumes semi-concave objects, i.e. might fail depending on the choice of dl
     T = promote_type(S, R)
     t0::T = 0
@@ -180,7 +177,7 @@ function intersect3d(object::AbstractSDF, ray::AbstractRay)
     dir = direction(ray)
     d = sdf(object, pos)
     # Test if outside of sdf, else inside
-    if d > eps_srf
+    if d > Config.get_sdf_surface_threshold()
         return _raymarch_outside(object, pos, dir)
     end
     # Test if normal and ray dir oppose or align to determine if ray exits object

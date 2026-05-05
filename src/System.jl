@@ -459,7 +459,7 @@ function retrace_system!(
 end
 
 """
-    trace_system!(system, agb::AstigmaticGaussianBeamlet; r_max=100, check_invariant=true)
+    trace_system!(system, agb::AstigmaticGaussianBeamlet; r_max = get_default_r_max(), check_invariant = true, threshold = get_invariant_threshold())
 
 Trace an [`AstigmaticGaussianBeamlet`](@ref) through an optical `system`.
 All 9 component beams (chief + 8 parabasal) are traced in lockstep:
@@ -470,8 +470,9 @@ function trace_system!(
         system::AbstractSystem,
         agb::AstigmaticGaussianBeamlet{T};
         # kwargs
-        r_max::Int = 100,
-        check_invariant::Bool = true
+        r_max::Int = get_default_r_max(),
+        check_invariant::Bool = true,
+        threshold::Real = get_invariant_threshold()
 ) where {T <: Real}
     interaction::Nullable{AstigmaticGaussianBeamletInteraction{T}} = nothing
     seg_counter::Int = length(rays(agb.c))
@@ -512,7 +513,7 @@ function trace_system!(
         seg_counter += 1
 
         # Verify that the paraxial assumptions still hold for the new segment
-        if check_invariant && !check_optical_invariant(agb, seg_counter)
+        if check_invariant && !check_optical_invariant(agb, seg_counter; threshold = threshold)
             break
         end
     end
@@ -520,7 +521,7 @@ function trace_system!(
 end
 
 """
-    retrace_system!(system, agb::AstigmaticGaussianBeamlet; check_invariant=true)
+    retrace_system!(system, agb::AstigmaticGaussianBeamlet; check_invariant=true, threshold = get_invariant_threshold())
 
 Retrace the beam stored in [`AstigmaticGaussianBeamlet`](@ref) through the optical
 `system`. All 9 component ray intersections and interactions are recalculated.
@@ -530,7 +531,8 @@ function retrace_system!(
         system::AbstractSystem,
         agb::AstigmaticGaussianBeamlet{T};
         # kwargs
-        check_invariant::Bool = true
+        check_invariant::Bool = true,
+        threshold::Real = get_invariant_threshold()
 ) where {T <: Real}
     # Cleanup flags
     cleanup_children = false
@@ -622,7 +624,7 @@ function retrace_system!(
         end
 
         # Verify that the paraxial assumptions still hold for the new segment
-        if check_invariant && !check_optical_invariant(agb, i + 1)
+        if check_invariant && !check_optical_invariant(agb, i + 1; threshold = threshold)
             cleanup_tail = true
             cutoff = i
             break
@@ -666,19 +668,21 @@ A maximum number of rays per `beam` (`r_max`) can be specified in order to avoid
 
 ## Keyword Arguments
 
-- `r_max = 100`: Maximum number of tracing iterations for each leaf. Default is 100.
+- `r_max = get_default_r_max()`: Maximum number of tracing iterations for each leaf.
 - `retrace = true`: Flag to indicate if the system should be retraced. Default is true.
-- `depth_max = typemax(Int)`: Maximum number of branching levels explored from the root beam. Default allows unlimited depth.
+- `depth_max = get_default_depth_max()`: Maximum number of branching levels explored from the root beam.
 - `check_invariant = true`: enables or disables optical invariant checks where applicable
+- `threshold = get_invariant_threshold()`: threshold for paraxial invariant checks
 """
 function solve_system!(
         system::AbstractSystem,
         beam::B;
         # kwargs
-        r_max::Int = 100,
+        r_max::Int = get_default_r_max(),
         retrace::Bool = true,
-        depth_max::Int = typemax(Int),
-        check_invariant::Bool = true
+        depth_max::Int = get_default_depth_max(),
+        check_invariant::Bool = true,
+        threshold::Real = get_invariant_threshold()
 ) where {B <: AbstractBeam}
     queue = Tuple{B, Int}[(beam, 1)]
     while !isempty(queue)
@@ -686,10 +690,10 @@ function solve_system!(
         current, depth = popfirst!(queue)
         # Optionally retrace the current beam.
         if retrace
-            retrace_system!(system, current; check_invariant)
+            retrace_system!(system, current; check_invariant, threshold)
         end
         # Process the current leaf beam.
-        solve_leaf!(system, current; r_max, check_invariant)
+        solve_leaf!(system, current; r_max, check_invariant, threshold)
         # Check if the maximum branching depth has been reached.
         if depth <= depth_max
             # Enqueue all child beams for subsequent processing.
