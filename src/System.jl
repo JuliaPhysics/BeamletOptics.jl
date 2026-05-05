@@ -429,9 +429,9 @@ function retrace_system!(
     end
     # Drop all disconnected rays after last valid intersection, reset tail intersection to nothing
     if cleanup_tail
-        deleteat!(rays(gauss.chief), (cutoff + 1):n_c)
-        deleteat!(rays(gauss.waist), (cutoff + 1):n_w)
-        deleteat!(rays(gauss.divergence), (cutoff + 1):n_d)
+        deleteat!(rays(gauss.chief), (cutoff + 1):length(rays(gauss.chief)))
+        deleteat!(rays(gauss.waist), (cutoff + 1):length(rays(gauss.waist)))
+        deleteat!(rays(gauss.divergence), (cutoff + 1):length(rays(gauss.divergence)))
     end
     if reset_intersection
         intersection!(last(rays(gauss.chief)), nothing)
@@ -613,10 +613,9 @@ function retrace_system!(system::AbstractSystem,
     end
     # Drop all disconnected rays after last valid intersection, reset tail intersection
     if cleanup_tail
-        deleteat!(rays(agb.c), (cutoff + 1):n_c)
+        deleteat!(rays(agb.c), (cutoff + 1):length(rays(agb.c)))
         for beam in aux
-            n_b = length(rays(beam))
-            deleteat!(rays(beam), (cutoff + 1):n_b)
+            deleteat!(rays(beam), (cutoff + 1):length(rays(beam)))
         end
     end
     if reset_intersection
