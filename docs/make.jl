@@ -39,7 +39,12 @@ makedocs(;
         "Basics" => Any[
             "Introduction"                  => joinpath("basics", "intro.md"),
             "Rays"                          => joinpath("basics", "rays.md"),
-            "Beams"                         => joinpath("basics", "beams.md"),
+            "Beams" => Any[
+                "Basic beam"                => joinpath("basics", "beams", "beams.md"),
+                "Stigmatic Gaussian"        => joinpath("basics", "beams", "stigmatic_beam.md"),
+                "Astigmatic Gaussian"       => joinpath("basics", "beams", "astigmatic_beam.md"),
+                "Beam groups"               => joinpath("basics", "beams", "beam_groups.md"),
+            ],
             "Optical components" => Any[
                 "Overview"                  => joinpath("basics", "components", "components.md"),
                 "Mirrors"                   => joinpath("basics", "components", "mirrors.md"),

@@ -34,6 +34,7 @@ function render!(
         # Makie kwargs
         color = :red,
         transparency = true,
+        markersize=10,
         kwargs...
     ) where {T}
     vs = LinRange(0, 2π, r_res)
@@ -93,7 +94,7 @@ function render!(
 
             # Optionally, plot waist ellipse
             if show_waist
-                scatter!.(axis, pts; color)
+                scatter!.(axis, pts; color, markersize)
             end
 
             # Bump length tracker
