@@ -130,10 +130,15 @@ further objects are hit, the tracing procedure is stopped.
 
 - `system:`: The optical system through which the [`Beam`](@ref) is traced.
 - `beam`: The [`Beam`](@ref) object to be traced.
-- `r_max`: Maximum number of tracing iterations. Default is 20.
+- `r_max`: Maximum number of tracing iterations. Default is 100.
 """
-function trace_system!(system::AbstractSystem, beam::Beam{T, R};
-        r_max::Int = 20) where {T <: Real, R <: AbstractRay{T}}
+function trace_system!(
+        system::AbstractSystem,
+        beam::Beam{T, R};
+        # kwargs
+        r_max::Int = 100,
+        kwargs...
+    ) where {T <: Real, R <: AbstractRay{T}}
     # Test until max. number of rays in beam reached
     interaction::Nullable{BeamInteraction{T, R}} = nothing
     while length(rays(beam)) < r_max
@@ -198,7 +203,11 @@ The retracing logic for an already solved `beam` loops over the rays and childre
     If this kind of situation must be modeled, e.g. in the case of an optical chopper wheel, retracing should be disabled.
 """
 function retrace_system!(
-        system::AbstractSystem, beam::Beam{T, R}) where {T <: Real, R <: AbstractRay{T}}
+        system::AbstractSystem,
+        beam::Beam{T, R};
+        # kwargs
+        kwargs...
+    ) where {T <: Real, R <: AbstractRay{T}}
     # Cleanup flags
     cleanup_children = false
     cleanup_tail = false
@@ -282,11 +291,15 @@ If all rays hit the same target, the optical interaction is analyzed, else the t
 
 - `system`: The optical system through which the [`GaussianBeamlet`](@ref) is traced.
 - `gauss`: The [`GaussianBeamlet`](@ref) object to be traced.
-- `r_max`: Maximum number of tracing iterations. Default is 20.
+- `r_max`: Maximum number of tracing iterations. Default is 100.
 """
-function trace_system!(system::AbstractSystem,
+function trace_system!(
+        system::AbstractSystem,
         gauss::GaussianBeamlet{T};
-        r_max::Int = 20) where {T <: Real}
+        # kwargs...
+        r_max::Int = 100,
+        kwargs...
+    ) where {T <: Real}
     # Test until bundle is stopped
     interaction::Nullable{GaussianBeamletInteraction{T}} = nothing
     # Buffer variable
@@ -337,7 +350,11 @@ Retrace the beam stored in `GaussianBeamlet` through the optical `system`. Chief
 All rays must hit the same object, or the retracing step is aborted. If retracing is stopped before the end of the beam is reached, further rays are dropped.
 """
 function retrace_system!(
-        system::AbstractSystem, gauss::GaussianBeamlet{T}) where {T <: Real}
+        system::AbstractSystem,
+        gauss::GaussianBeamlet{T};
+        # kwargs
+        kwargs...
+    ) where {T <: Real}
     # Cleanup flags
     cleanup_children = false
     cleanup_tail = false
@@ -442,16 +459,20 @@ function retrace_system!(
 end
 
 """
-    trace_system!(system, agb::AstigmaticGaussianBeamlet; r_max=20)
+    trace_system!(system, agb::AstigmaticGaussianBeamlet; r_max=100, check_invariant=true)
 
 Trace an [`AstigmaticGaussianBeamlet`](@ref) through an optical `system`.
 All 9 component beams (chief + 8 parabasal) are traced in lockstep:
 the chief ray is traced first for each intersection, followed by the auxiliary rays.
 All rays must hit the same shape; otherwise tracing stops.
 """
-function trace_system!(system::AbstractSystem,
+function trace_system!(
+        system::AbstractSystem,
         agb::AstigmaticGaussianBeamlet{T};
-        r_max::Int = 20) where {T <: Real}
+        # kwargs
+        r_max::Int=100,
+        check_invariant::Bool=true
+    ) where {T <: Real}
     interaction::Nullable{AstigmaticGaussianBeamletInteraction{T}} = nothing
     seg_counter::Int = length(rays(agb.c))
     aux = _aux_beams(agb)
@@ -491,7 +512,7 @@ function trace_system!(system::AbstractSystem,
         seg_counter += 1
         
         # Verify that the paraxial assumptions still hold for the new segment
-        if !check_optical_invariant(agb, seg_counter)
+        if check_invariant && !check_optical_invariant(agb, seg_counter)
             break
         end
     end
@@ -499,14 +520,18 @@ function trace_system!(system::AbstractSystem,
 end
 
 """
-    retrace_system!(system, agb::AstigmaticGaussianBeamlet)
+    retrace_system!(system, agb::AstigmaticGaussianBeamlet; check_invariant=true)
 
 Retrace the beam stored in [`AstigmaticGaussianBeamlet`](@ref) through the optical
 `system`. All 9 component ray intersections and interactions are recalculated.
 All rays must hit the same object, or the retracing step is aborted.
 """
-function retrace_system!(system::AbstractSystem,
-        agb::AstigmaticGaussianBeamlet{T}) where {T <: Real}
+function retrace_system!(
+        system::AbstractSystem,
+        agb::AstigmaticGaussianBeamlet{T};
+        # kwargs
+        check_invariant::Bool=true
+    ) where {T <: Real}
     # Cleanup flags
     cleanup_children = false
     cleanup_tail = false
@@ -597,7 +622,7 @@ function retrace_system!(system::AbstractSystem,
         end
 
         # Verify that the paraxial assumptions still hold for the new segment
-        if !check_optical_invariant(agb, i + 1)
+        if check_invariant && !check_optical_invariant(agb, i + 1)
             cleanup_tail = true
             cutoff = i
             break
@@ -638,27 +663,33 @@ A maximum number of rays per `beam` (`r_max`) can be specified in order to avoid
 
 - `system::System`: The optical system in which the beam will be traced.
 - `beam::AbstractBeam`: The beam object to be traced through the system.
-- `r_max::Int=100` (optional): Maximum number of tracing iterations for each leaf. Default is 100.
-- `retrace::Bool=true` (optional): Flag to indicate if the system should be retraced. Default is true.
-- `depth_max::Int=typemax(Int)` (optional): Maximum number of branching levels explored from the root beam. Default allows unlimited depth.
+
+## Keyword Arguments
+
+- `r_max = 100`: Maximum number of tracing iterations for each leaf. Default is 100.
+- `retrace = true`: Flag to indicate if the system should be retraced. Default is true.
+- `depth_max = typemax(Int)`: Maximum number of branching levels explored from the root beam. Default allows unlimited depth.
+- `check_invariant = true`: enables or disables optical invariant checks where applicable
 """
 function solve_system!(
         system::AbstractSystem,
         beam::B;
+        # kwargs
         r_max::Int = 100,
         retrace::Bool = true,
-        depth_max::Int = typemax(Int)
-) where {B <: AbstractBeam}
+        depth_max::Int = typemax(Int),
+        check_invariant::Bool = true
+    ) where {B <: AbstractBeam}
     queue = Tuple{B, Int}[(beam, 1)]
     while !isempty(queue)
         # Process beams in FIFO order.
         current, depth = popfirst!(queue)
         # Optionally retrace the current beam.
         if retrace
-            retrace_system!(system, current)
+            retrace_system!(system, current; check_invariant)
         end
         # Process the current leaf beam.
-        solve_leaf!(system, current; r_max = r_max)
+        solve_leaf!(system, current; r_max, check_invariant)
         # Check if the maximum branching depth has been reached.
         if depth <= depth_max
             # Enqueue all child beams for subsequent processing.
@@ -681,9 +712,9 @@ function solve_system!(system::AbstractSystem, bg::AbstractBeamGroup; kwargs...)
     return nothing
 end
 
-@inline function solve_leaf!(system::AbstractSystem, beam::AbstractBeam; r_max = 100)
+@inline function solve_leaf!(system::AbstractSystem, beam::AbstractBeam; kwargs...)
     if isnothing(_last_beam_intersection(beam))
-        trace_system!(system, beam, r_max = r_max)
+        trace_system!(system, beam; kwargs...)
     end
     return nothing
 end
