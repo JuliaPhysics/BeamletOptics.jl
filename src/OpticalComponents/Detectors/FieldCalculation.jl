@@ -87,27 +87,30 @@ function electric_field(
     local_z = Point3(orientation(pd)[:, 3])
     origin = position(pd)
     # Calculate field superposition
-    Threads.@threads for j in eachindex(zs) # FIXME row column major order?
-        z = zs[j]
+    Threads.@threads for j in eachindex(zs)
+        z_grid = zs[j]
+        # Hoist z-grid math out of inner loop
+        p_row = origin + z_grid * local_z
+        
         @inbounds for i in eachindex(xs)
-            x = xs[i]
-            # Transform point p on PD into world coordinates
-            p1 = origin + x * local_x + z * local_z
-            # Add E-field contribution for each hit
+            x_grid = xs[i]
+            p1 = p_row + x_grid * local_x
+            
+            acc = Complex{G}(0.0)
             for hit in hits
-                p0 = position(hit)
-                d0 = direction(hit)
-                # important: calculate l0 with geometric length for local r, z
-                l0 = hit.l0
-                proj = projection_factor(hit)
-                # Find projection of p1 onto Gaussian optical axis, i.e. local r and z
-                l1 = dot(p1 - p0, d0)
-                p2 = p0 + l1 * d0
-                r_gb = norm(p1 - p2)
-                z_gb = l0 + l1
-                # Add field contribution, projection factor accounts for beam spot stretching
-                field[i, j] += electric_field(hit.gauss, r_gb, z_gb) * sqrt(proj)
+                v = p1 - hit.p0
+                l1 = _pseudo_dot(v, hit.d0)
+                
+                # Transverse distance r
+                r_vec = v - l1 * hit.d0
+                r = norm(r_vec)
+                
+                # Distance along beam
+                z = hit.l0 + l1
+                
+                acc += electric_field(hit.gauss, r, z) * hit.sqrt_proj
             end
+            field[i, j] = acc
         end
     end
     return xs, zs, field
@@ -148,20 +151,50 @@ function electric_field(
     # Calculate field superposition
     Threads.@threads for j in eachindex(zs)
         z_grid = zs[j]
+        # Hoist z-grid math out of inner loop
+        p_row = origin + z_grid * local_z
+        
         @inbounds for i in eachindex(xs)
             x_grid = xs[i]
-            p1 = origin + x_grid * local_x + z_grid * local_z
+            p1 = p_row + x_grid * local_x
+            
+            acc = Complex{G}(0.0)
             for hit in hits
-                p0 = position(hit)
-                d0 = direction(hit)
-                l0 = hit.l0
-                proj = projection_factor(hit)
-                l1 = dot(p1 - p0, d0)
-                p2 = p0 + l1 * d0
-                r_vec = p1 - p2
-                z_gb = l0 + l1
-                field[i, j] += electric_field(hit.agb, r_vec, z_gb) * sqrt(proj)
+                v = p1 - hit.p0
+                l1 = _pseudo_dot(v, hit.d0)
+                r_vec = v - l1 * hit.d0
+                
+                # Linear parabasal propagation within the segment
+                # h(L1) = h0 + L1 * u0
+                # u(L1) = u0
+                h1_z = hit.h1 + l1 * hit.u1
+                h2_z = hit.h2 + l1 * hit.u2
+                
+                # Optimized field kernel
+                area_z = _pseudo_cross2d(h1_z, h2_z, hit.d0)
+                # Regularization
+                if abs(area_z) < 1e-25
+                    area_z = Complex{G}(1e-25, 1e-25)
+                end
+                
+                ξ1 = _pseudo_cross2d(h1_z, r_vec, hit.d0)
+                ξ2 = _pseudo_cross2d(h2_z, r_vec, hit.d0)
+                
+                # Complex quadratic phase term w = r^T Q r / 2
+                w = (ξ1 * _pseudo_dot(hit.u2, r_vec) - ξ2 * _pseudo_dot(hit.u1, r_vec)) / (2 * area_z)
+                
+                # Chief ray refractive index correction (n-1)*l1
+                # The cached Δl includes parent OPL and previous segments.
+                n_eff = refractive_index(hit.agb, hit.id)
+                phase_corr = (n_eff - 1) * l1
+                
+                # Field ψ = √(area_ref / area) * exp(i * k * (z + w + Δl))
+                z_total = hit.l0 + l1
+                ψ = sqrt(hit.area_ref / area_z) * exp(im * hit.k0 * (z_total + w + hit.Δl + phase_corr))
+                
+                acc += (hit.E_ref_amp * ψ) * hit.sqrt_proj
             end
+            field[i, j] = acc
         end
     end
     return xs, zs, field

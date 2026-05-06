@@ -36,7 +36,7 @@ abstract type AbstractDetector{T} <: AbstractObject{T} end
 
 Resets the field data of the `detector`. Must be implemented for each concrete subtype of [`AbstractDetector`](@ref).
 """
-function empty!(::D) where D <: AbstractDetector
+function empty!(::D) where {D <: AbstractDetector}
     @warn "Detector reset logic for $D not implemented"
     return nothing
 end
@@ -46,8 +46,8 @@ end
 
 Abstract supertype for all [`Detector`](@ref) hit records.
 
-A hit of this type encapsulates the interaction of a ray or beamlet with the [`Detector`](@ref) 
-surface. Instead of directly accumulating values (e.g. optical power), the hit 
+A hit of this type encapsulates the interaction of a ray or beamlet with the [`Detector`](@ref)
+surface. Instead of directly accumulating values (e.g. optical power), the hit
 object stores all relevant information about the incident field for a posteriori
 evaluation (such as plotting, power integration, or polarization analysis).
 
@@ -66,8 +66,8 @@ abstract type AbstractDetectorHit end
 """
     AbstractRayHit{T} <: AbstractDetectorHit
 
-Abstract supertype for detector hits produced by [`AbstractRay`](@ref)s. 
-Provides a common interface for extracting positional and optical path 
+Abstract supertype for detector hits produced by [`AbstractRay`](@ref)s.
+Provides a common interface for extracting positional and optical path
 information from rays stored in a detector hit.
 Currently the following concrete types are implemented:
 
@@ -106,7 +106,9 @@ wavenumber(hit::AbstractRayHit) = wavenumber(hit.ray)
 
 hit_point(hit::AbstractRayHit) = position(hit) + length(hit.ray) * direction(hit)
 
-projection_factor(hit::AbstractRayHit) = abs(dot(direction(hit), normal3d(intersection(hit.ray))))
+function projection_factor(hit::AbstractRayHit)
+    abs(dot(direction(hit), normal3d(intersection(hit.ray))))
+end
 
 "Stores a [`Ray`](@ref) hit"
 struct RayHit{T} <: AbstractRayHit{T}
@@ -140,7 +142,11 @@ up until the current beam section, identified by the `id` index.
 struct GaussianBeamletHit{T} <: AbstractBeamletHit{T}
     gauss::GaussianBeamlet{T}
     l0::T
-    id::Int 
+    id::Int
+    # Cache
+    p0::Point3{T}
+    d0::Point3{T}
+    sqrt_proj::T
 end
 
 """
@@ -152,7 +158,19 @@ up until the current beam section, identified by the `id` index.
 struct AstigmaticGaussianBeamletHit{T} <: AbstractBeamletHit{T}
     agb::AstigmaticGaussianBeamlet{T}
     l0::T
-    id::Int 
+    id::Int
+    # Cache
+    p0::Point3{T}
+    d0::Point3{T}
+    h1::Point3{Complex{T}}
+    u1::Point3{Complex{T}}
+    h2::Point3{Complex{T}}
+    u2::Point3{Complex{T}}
+    area_ref::Complex{T}
+    k0::T
+    Δl::T
+    E_ref_amp::Complex{T}
+    sqrt_proj::T
 end
 
 position(hit::GaussianBeamletHit) = position(hit.gauss.chief.rays[hit.id])
@@ -161,11 +179,19 @@ direction(hit::GaussianBeamletHit) = direction(hit.gauss.chief.rays[hit.id])
 position(hit::AstigmaticGaussianBeamletHit) = position(hit.agb.c.rays[hit.id])
 direction(hit::AstigmaticGaussianBeamletHit) = direction(hit.agb.c.rays[hit.id])
 
-hit_point(hit::GaussianBeamletHit) = position(hit) + length(hit.gauss.chief.rays[hit.id]) * direction(hit)
-hit_point(hit::AstigmaticGaussianBeamletHit) = position(hit) + length(hit.agb.c.rays[hit.id]) * direction(hit)
+function hit_point(hit::GaussianBeamletHit)
+    position(hit) + length(hit.gauss.chief.rays[hit.id]) * direction(hit)
+end
+function hit_point(hit::AstigmaticGaussianBeamletHit)
+    position(hit) + length(hit.agb.c.rays[hit.id]) * direction(hit)
+end
 
-projection_factor(hit::GaussianBeamletHit) = abs(dot(direction(hit), normal3d(intersection(hit.gauss.chief.rays[hit.id]))))
-projection_factor(hit::AstigmaticGaussianBeamletHit) = abs(dot(direction(hit), normal3d(intersection(hit.agb.c.rays[hit.id]))))
+function projection_factor(hit::GaussianBeamletHit)
+    abs(dot(direction(hit), normal3d(intersection(hit.gauss.chief.rays[hit.id]))))
+end
+function projection_factor(hit::AstigmaticGaussianBeamletHit)
+    abs(dot(direction(hit), normal3d(intersection(hit.agb.c.rays[hit.id]))))
+end
 
 """
     Detector <: AbstractDetector
@@ -175,9 +201,9 @@ The detector surface is a detection screen that captures incoming ray or beamlet
 The active surface is discretized in the local R² x-y-coordinate system.
 If configured, beams or beamlets can continue tracing after hitting the detector.
 
-# Hits 
+# Hits
 
-Hits are represented via the [`AbstractDetectorHit`](@ref) interface. An empty detector is able to 
+Hits are represented via the [`AbstractDetectorHit`](@ref) interface. An empty detector is able to
 detect any kind of incoming hit, but as soon as the initial hit type has been determined, all following
 hits must share the same type, i.e. no cross-interaction between hit types is allowed.
 
@@ -194,7 +220,7 @@ Refer to the respective function documentation.
 
 In general, the detection surface is represented by a flat [`Mesh`](@ref) that has been rotated such that
 the surface normals point towards the negative y-axis for the initial positioning. This allows for the definition
-of a **left-handed** (x, z) surface coordinate system, where incoming beams intersect against the detector surface normal.   
+of a **left-handed** (x, z) surface coordinate system, where incoming beams intersect against the detector surface normal.
 
 !!! warning "Reset behavior"
     The `Detector` must be reset between each call of [`solve_system!`](@ref) in order to
@@ -240,9 +266,9 @@ The detector edge length can be configured via `edge_length`.
 Additionally, continued tracing can be configured via the `stop` flag where
 
 - `true` indicates continued tracing
-- `false` stops the incoming beams as with any hard target 
+- `false` stops the incoming beams as with any hard target
 """
-function Detector(edge_length::Real, stop::Bool=true)
+function Detector(edge_length::Real, stop::Bool = true)
     shape = QuadraticFlatMesh(edge_length)
     # rotate surface normal along neg. y-axis
     zrotate3d!(shape, π)
@@ -259,18 +285,19 @@ stop(d::Detector) = d.stop
 
 function push!(d::Detector, new::AbstractDetectorHit)
     # Lock d to avoid race conditions
-    lock(d.lock) do 
+    lock(d.lock) do
         # set data type on first push
         if isnothing(hits(d))
             hits!(d, [new])
             return nothing
         end
-        # if new<:AbstractData does not match, throws push! error 
+        # if new<:AbstractData does not match, throws push! error
         push!(hits(d), new)
     end
 end
 
-function interact3d(::AbstractSystem, d::Detector, beam::Beam{T, R}, ray::R) where {T <: Real, R <: Ray{T}}
+function interact3d(::AbstractSystem, d::Detector, beam::Beam{T, R},
+        ray::R) where {T <: Real, R <: Ray{T}}
     # Optical path length and wavenumber
     opl = optical_path_length(beam)
     # Push hit data into detector, determine stop
@@ -282,7 +309,7 @@ function interact3d(::AbstractSystem, d::Detector, beam::Beam{T, R}, ray::R) whe
     else
         # Continue tracing with hit pos. as starting
         return BeamInteraction{T, R}(
-            nothing, 
+            nothing,
             Ray{T}(
                 position(hit),
                 direction(hit),
@@ -294,7 +321,8 @@ function interact3d(::AbstractSystem, d::Detector, beam::Beam{T, R}, ray::R) whe
     end
 end
 
-function interact3d(::AbstractSystem, d::Detector, beam::Beam{T, R}, ray::R) where {T <: Real, R <: PolarizedRay{T}}
+function interact3d(::AbstractSystem, d::Detector, beam::Beam{T, R},
+        ray::R) where {T <: Real, R <: PolarizedRay{T}}
     # Optical path length and wavenumber
     opl = optical_path_length(beam)
     # Push hit data into detector, determine stop
@@ -321,7 +349,13 @@ end
 
 function interact3d(::AbstractSystem, d::Detector, g::GaussianBeamlet{R}, id::Int) where {R}
     l0 = length(g) - length(g.chief.rays[id])
-    push!(d, GaussianBeamletHit(g, l0, id))
+    # Pre-calculate cache
+    ray = g.chief.rays[id]
+    p0 = position(ray)
+    d0 = direction(ray)
+    sqrt_proj = sqrt(abs(dot(d0, normal3d(intersection(ray)))))
+
+    push!(d, GaussianBeamletHit(g, l0, id, p0, d0, sqrt_proj))
     if stop(d)
         # Stop solver (hard target)
         return nothing
@@ -331,9 +365,51 @@ function interact3d(::AbstractSystem, d::Detector, g::GaussianBeamlet{R}, id::In
     end
 end
 
-function interact3d(::AbstractSystem, d::Detector, agb::AstigmaticGaussianBeamlet{R}, id::Int) where {R}
+function interact3d(system::AbstractSystem, d::Detector,
+        agb::AstigmaticGaussianBeamlet{R}, id::Int) where {R}
     l0 = length(agb) - length(agb.c.rays[id])
-    push!(d, AstigmaticGaussianBeamletHit(agb, l0, id))
+
+    # Pre-calculate cache
+    chief = rays(agb.c)[id]
+    p0 = position(chief)
+    d0 = direction(chief)
+    k0 = 2π / wavelength(chief)
+    sqrt_proj = sqrt(abs(dot(d0, normal3d(intersection(chief)))))
+
+    # Parabasal parameters at segment start (p0)
+    h1, u1, h2, u2, _ = parabasal_ray_parameters(agb, p0, id)
+
+    # Reference normalization at z=0
+    p0n, in_ = point_on_beam(agb, 0.0)
+    dirn = direction(rays(agb.c)[in_])
+    h1n, _, h2n, _, _ = parabasal_ray_parameters(agb, p0n, in_)
+    area_ref = _pseudo_cross2d(h1n, h2n, dirn)
+
+    # Extract complex reference amplitude
+    E_vec = polarization(rays(agb.c)[in_])
+    E_ref_amp = Complex{R}(norm(E_vec)) # Default to magnitude to match parabasal_field
+
+    # OPL correction (Δl)
+    p_parent = agb.parent
+    l_parent = isnothing(p_parent) ? 0.0 : length(p_parent)
+    opl_parent = isnothing(p_parent) ? 0.0 : optical_path_length(p_parent)
+
+    Δl = opl_parent - l_parent
+    z_sum = l_parent
+    for j in 1:(id - 1)
+        ray_j = rays(agb.c)[j]
+        Δl += optical_path_length(ray_j) - length(ray_j)
+        z_sum += length(ray_j)
+    end
+    # Note: the (n-1)*z term in parabasal_field depends on (z - z_sum).
+    # Since we extract parameters at p0, z_sum is exactly the cumulative length to p0.
+    # So (n-1)*(z - z_sum) = (n-1)*L1, which we handle in the loop.
+    # The Δl we cache here is the constant part.
+
+    push!(d,
+        AstigmaticGaussianBeamletHit(
+            agb, l0, id, p0, d0, h1, u1, h2, u2, area_ref, k0, Δl, E_ref_amp, sqrt_proj
+        ))
     if stop(d)
         # Stop solver (hard target)
         return nothing
