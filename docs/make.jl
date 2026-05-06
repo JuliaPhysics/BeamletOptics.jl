@@ -34,6 +34,7 @@ makedocs(;
                 "Aspherical lenses"         => joinpath("examples", "aspherical_lenses.md"),
                 "Double Gauss lens"         => joinpath("examples", "double_gauss.md"),
                 "Lens groups"               => joinpath("examples", "lens_groups.md"),
+                "Double slit"               => joinpath("examples", "double_slit.md"),
             ],
         ],
         "Basics" => Any[

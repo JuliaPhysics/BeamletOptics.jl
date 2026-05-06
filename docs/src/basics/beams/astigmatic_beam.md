@@ -4,7 +4,6 @@ include(joinpath(@__DIR__, "..", "..", "assets", "cond_save.jl"))
 beam_showcase_dir = joinpath(@__DIR__, "..", "..", "assets", "beam_renders")
 
 conditional_include(joinpath(beam_showcase_dir, "agb_showcase.jl"), use_placeholder=false)
-conditional_include(joinpath(beam_showcase_dir, "agb_ds_showcase.jl"), use_placeholder=true)
 ```
 
 # Astigmatic polarized beamlets
@@ -22,7 +21,7 @@ Similar to the Gauss model presented in [Stigmatic Beamlets](@ref) chapter, an a
 These rays can be thought of tracking the complex curvature matrix $\mathbf{Q}(z)$ through the system. The key assumptions made in order for this formalism to hold are:
 
 - **Paraxiality**: the auxiliary rays must remain within the paraxial regime relative to the chief ray.
-- **Locally parabolical surfaces**: since only astigmatism can be captured, each surface interaction must be approximately parabolical
+- **Parabolic interaction**: since only astigmatism can be captured, each surface interaction must be approximately parabolical
 - **Homogeneous polarization**: the polarization state of the traced field is assumed to be homogeneous over each beamlet
 
 The initial ordering of the geometric beams is shown in the figure below. The colors represent the chief (red), waist (blue) and divergence (green) beams.
@@ -38,7 +37,7 @@ where $\mathbf{h}_{1,2}$ and $\mathbf{u}_{1,2}$ are the two-dimensional complex 
 
 ![Astigmatic ray tracing II](agbtest2.png)
 
-While the above beam closely matches the example given in the previous section ([Obtaining the beam parameters](@ref)), the real advantage of this extended method lies in the tracing of non-symmetric systems. For a tilted two cylinder lens system, the following result with strong astigmatic effects is obtained. Multiple waist slices are marked with red dots.
+While the above beam closely matches the example Gaussian given in the previous section ([Obtaining the beam parameters](@ref)), the real advantage of this extended method lies in the tracing of non-symmetric systems. For a tilted two cylinder lens system, the following result with strong astigmatic effects is obtained. Multiple waist slices are marked with red dots.
 
 ![Astigmatic ray tracing III](agbtest3.png)
 
@@ -93,13 +92,3 @@ beams = WavefrontBeamletDecomposition(x, z, amplitude, phase, dir, λ)
 # Solve system (propagate all beamlets to next segment)
 solve_system!(system, beams)
 ```
-
-## Example: Double Slit Diffraction
-
-One of the most powerful applications of the AGB framework is the simulation of coherent diffraction from complex apertures. By using [`WavefrontBeamletDecomposition`](@ref), any arbitrary aperture mask (including phase-varying masks) can be decomposed into a set of coherent beamlets.
-
-In the example below, a classic double-slit mask (10 µm width, 100 µm separation) is decomposed and propagated 0.2 meters. The simulation perfectly reproduces the textbook Fraunhofer diffraction pattern, showcasing both the individual slit diffraction (envelope) and the coherent interference fringes.
-
-![Double Slit Experiment Visualization](agb_doubleslit_experiment.png)
-
-This example demonstrates the package's ability to maintain phase coherence across thousands of beamlets—a prerequisite for high-fidelity modeling of systems like Atmospheric Turbulence or Phase-Modulating SLMs.
