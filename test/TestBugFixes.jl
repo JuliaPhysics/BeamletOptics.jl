@@ -201,36 +201,32 @@ end
     # We'll use a very small invariant threshold to make it easy to trigger.
     strict_threshold = 1e-15
 
-    try
-        # A simple plane surface
-        surf = RoundPlanoMirror(50mm, 5mm)
-        BMO.translate3d!(surf, [0, 50mm, 0])
-        system = System([surf])
+    # A simple plane surface
+    surf = RoundPlanoMirror(50mm, 5mm)
+    BMO.translate3d!(surf, [0, 50mm, 0])
+    system = System([surf])
 
-        # Initial trace: 1 segment (2 rays)
-        agb = AstigmaticGaussianBeamlet([0, 0, 0], [0, 1, 0], 1e-6, 1mm)
-        
-        with_logger(NullLogger()) do
-            # Use strict threshold for this call
-            solve_system!(system, agb; threshold = strict_threshold)
+    # Initial trace: 1 segment (2 rays)
+    agb = AstigmaticGaussianBeamlet([0, 0, 0], [0, 1, 0], 1e-6, 1mm)
 
-            n_initial = length(BMO.rays(agb.c))
-            @test n_initial == 2
+    with_logger(NullLogger()) do
+        # Use strict threshold for this call
+        solve_system!(system, agb; threshold = strict_threshold)
 
-            # Now move the surface further away such that retracing will
-            # reach the old tail and try to push a new segment.
-            BMO.translate3d!(surf, [0, 10mm, 0])
+        n_initial = length(BMO.rays(agb.c))
+        @test n_initial == 2
 
-            # Also tilt it or change parameters to trigger invariant violation if possible.
-            BMO.retrace_system!(system, agb; threshold = strict_threshold)
-        end
+        # Now move the surface further away such that retracing will
+        # reach the old tail and try to push a new segment.
+        BMO.translate3d!(surf, [0, 10mm, 0])
 
-        # Verification of consistency
-        lengths = map(b -> length(BMO.rays(b)), BMO._component_beams(agb))
-        @test all(==(lengths[1]), lengths)
-    catch e
-        rethrow(e)
+        # Also tilt it or change parameters to trigger invariant violation if possible.
+        BMO.retrace_system!(system, agb; threshold = strict_threshold)
     end
+
+    # Verification of consistency
+    lengths = map(b -> length(BMO.rays(b)), BMO._component_beams(agb))
+    @test all(==(lengths[1]), lengths)
 end
 
 end # MODULE

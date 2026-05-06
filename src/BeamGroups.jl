@@ -340,6 +340,7 @@ coherent superposition of the sub-beamlets.
 - `rng`: Random number generator to use for `randomize_axes`.
 - `P0`: Total power of the macroscopic Gaussian beam in [W].
 - `E0`: Optional Jones vector defining the polarization and initial phase of the beam. If `nothing`, defaults to linear polarization along the first grid axis.
+- `threshold`: Relative amplitude below which beamlets are not spawned (default `1e-4`).
 """
 function GaussianBeamletDecomposition(
         pos::AbstractArray{P},
@@ -352,7 +353,8 @@ function GaussianBeamletDecomposition(
         randomize_axes::Bool = false,
         rng = Random.GLOBAL_RNG,
         P0::Real = get_default_power(),
-        E0 = nothing
+        E0 = nothing,
+        threshold::Float64 = 1e-4
 ) where {P <: Real, D1 <: Real, W <: Real, L <: Real}
     T = promote_type(P, D1, W, L)
     dir_n = normalize(dir)
@@ -387,7 +389,7 @@ function GaussianBeamletDecomposition(
             # Macroscopic Gaussian envelope amplitude weighting
             amp = exp(-(x^2 + y^2) / w0^2)
             # Threshold to avoid tracing zero-amplitude beamlets
-            if amp > 1e-4
+            if amp > threshold
                 # Normalization factor for coherent superposition
                 norm_factor = (Δ^2) / (π * w0s^2)
                 # Standard linear polarization along e1
@@ -567,8 +569,9 @@ function WavefrontBeamletDecomposition(
     dx = nx > 1 ? (x[2] - x[1]) : 1.0
     dy = ny > 1 ? (y[2] - y[1]) : 1.0
 
-    # The waist is chosen to perfectly overlap with adjacent grid points
-    w0s = T(max(dx, dy) * overlap)
+    # Per-axis sub-waists for correct overlap on non-square grids
+    w0s_x = T(dx * overlap)
+    w0s_y = T(dy * overlap)
     k = 2π / λ
 
     beams = Vector{AstigmaticGaussianBeamlet{T}}()
@@ -607,7 +610,7 @@ function WavefrontBeamletDecomposition(
 
             # Ensure valid angles and handle NaNs
             if isnan(sin_θx) || isnan(sin_θy) || (sin_θx^2 + sin_θy^2 > 1.0)
-                @warn "Phase gradient too steep or NaN at ($i, $j); skipping."
+                @warn lazy"Phase gradient too steep or NaN at ($i, $j); skipping."
                 continue
             end
 
@@ -630,10 +633,9 @@ function WavefrontBeamletDecomposition(
             end
 
             # Normalization factor for power conservation:
-            # When summing Gaussians exp(-r^2/w0^2) on a grid with spacing dx, dy,
-            # the coherent sum is approximately S = π * w0^2 / (dx * dy).
-            # To ensure the reconstructed field has amplitude 'amp', we must scale by 1/S.
-            norm_factor = (dx * dy) / (π * w0s^2)
+            # Each sub-beamlet represents a cell of area dx*dy. The Gaussian overlap
+            # integral is π*w0_x*w0_y, so we scale by 1/S = (dx*dy) / (π*w0_x*w0_y).
+            norm_factor = (dx * dy) / (π * w0s_x * w0s_y)
             E0_complex = normalize(pol_axis) * (amp * exp(im * ph) * norm_factor)
 
             # Support vector for the beamlet axes
@@ -647,7 +649,7 @@ function WavefrontBeamletDecomposition(
                 local_support = nothing
             end
 
-            b = AstigmaticGaussianBeamlet(pos, local_dir, λ, w0s; E0 = E0_complex, support = local_support)
+            b = AstigmaticGaussianBeamlet(pos, local_dir, λ, w0s_x, w0s_y; E0 = E0_complex, support = local_support)
             push!(beams, b)
         end
     end

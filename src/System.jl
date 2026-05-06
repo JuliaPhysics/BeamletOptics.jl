@@ -116,7 +116,7 @@ end
 end
 
 """
-    trace_system!(system::AbstractSystem, beam::Beam{T}; r_max::Int = 20) where {T <: Real}
+    trace_system!(system::AbstractSystem, beam::Beam{T}; r_max = get_default_r_max()) where {T <: Real}
 
 Trace a [`Beam`](@ref) through an optical `system`. Maximum number of tracing steps can be capped by `r_max`.
 
@@ -130,13 +130,13 @@ further objects are hit, the tracing procedure is stopped.
 
 - `system:`: The optical system through which the [`Beam`](@ref) is traced.
 - `beam`: The [`Beam`](@ref) object to be traced.
-- `r_max`: Maximum number of tracing iterations. Default is 100.
+- `r_max`: Maximum number of tracing iterations.
 """
 function trace_system!(
         system::AbstractSystem,
         beam::Beam{T, R};
         # kwargs
-        r_max::Int = 100,
+        r_max::Int = get_default_r_max(),
         kwargs...
 ) where {T <: Real, R <: AbstractRay{T}}
     # Test until max. number of rays in beam reached
@@ -277,7 +277,7 @@ function retrace_system!(
 end
 
 """
-    trace_system!(system::System, gauss::GaussianBeamlet{T}; r_max::Int = 20) where {T <: Real}
+    trace_system!(system::System, gauss::GaussianBeamlet{T}; r_max = get_default_r_max()) where {T <: Real}
 
 Trace a [`GaussianBeamlet`](@ref) through an optical `system`. Maximum number of tracing steps can be capped by `r_max`.
 
@@ -291,13 +291,13 @@ If all rays hit the same target, the optical interaction is analyzed, else the t
 
 - `system`: The optical system through which the [`GaussianBeamlet`](@ref) is traced.
 - `gauss`: The [`GaussianBeamlet`](@ref) object to be traced.
-- `r_max`: Maximum number of tracing iterations. Default is 100.
+- `r_max`: Maximum number of tracing iterations.
 """
 function trace_system!(
         system::AbstractSystem,
         gauss::GaussianBeamlet{T};
         # kwargs...
-        r_max::Int = 100,
+        r_max::Int = get_default_r_max(),
         kwargs...
 ) where {T <: Real}
     # Test until bundle is stopped

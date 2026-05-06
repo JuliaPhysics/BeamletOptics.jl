@@ -1,4 +1,3 @@
-
 """
     AstigmaticGaussianBeamlet{T} <: AbstractBeam{T, PolarizedRay{T}}
 
@@ -98,7 +97,7 @@ function AstigmaticGaussianBeamlet(
         w0_y;
         M2_x = 1,
         M2_y = 1,
-        P0 = 1e-3,
+        P0 = get_default_power(),
         E0 = nothing,
         support = nothing,
         z0 = 0)
@@ -182,7 +181,7 @@ point_on_beam(agb::AstigmaticGaussianBeamlet, t::Real) = point_on_beam(agb.c, t)
 
 wavelength(agb::AstigmaticGaussianBeamlet) = wavelength(first(rays(agb.c)))
 direction(agb::AstigmaticGaussianBeamlet) = direction(first(rays(agb.c)))
-Base.position(agb::AstigmaticGaussianBeamlet) = position(first(rays(agb.c)))
+position(agb::AstigmaticGaussianBeamlet) = position(first(rays(agb.c)))
 polarization(agb::AstigmaticGaussianBeamlet) = polarization(first(rays(agb.c)))
 
 electric_field(agb::AstigmaticGaussianBeamlet) = polarization(agb)
@@ -537,8 +536,20 @@ end
 
 Calculates the triple product `(a × b) ⋅ c` using a non-conjugating dot product.
 """
-@inline function _pseudo_cross2d(a::AbstractArray, b::AbstractArray, c::AbstractArray)
-    return sum(cross(a, b) .* c)
+@inline function _pseudo_cross2d(a, b, c)
+    # Scalar triple product (a × b) ⋅ c
+    return (a[2] * b[3] - a[3] * b[2]) * c[1] +
+           (a[3] * b[1] - a[1] * b[3]) * c[2] +
+           (a[1] * b[2] - a[2] * b[1]) * c[3]
+end
+
+"""
+    _pseudo_dot(a, b)
+
+Calculates the non-conjugating dot product `a ⋅ b = Σ aᵢbᵢ`.
+"""
+@inline function _pseudo_dot(a, b)
+    return a[1] * b[1] + a[2] * b[2] + a[3] * b[3]
 end
 
 """
@@ -611,8 +622,8 @@ function parabasal_field(
     ξ2 = _pseudo_cross2d(h2, r, dir)
 
     # Complex quadratic phase term w = r^T Q r / 2
-    # We use sum(u .* r) to compute the non-conjugating dot product r^T u.
-    w = (ξ1 * sum(u2 .* r) - ξ2 * sum(u1 .* r)) / (2 * area)
+    # We use _pseudo_dot to compute the non-conjugating dot product r^T u.
+    w = (ξ1 * _pseudo_dot(u2, r) - ξ2 * _pseudo_dot(u1, r)) / (2 * area)
 
     # Phase correction for refractive index (OPL - geometric length)
     p_parent = agb.parent
@@ -704,16 +715,28 @@ function gauss_parameters(agb::AstigmaticGaussianBeamlet, z::Real)
 
     # Axis 1
     w1 = norm(h1)
-    invR1 = real(sum(u1 .* conj.(h1))) / w1^2
+    # real(sum(u1 .* conj.(h1)))
+    invR1 = (real(u1[1]) * real(h1[1]) + imag(u1[1]) * imag(h1[1]) +
+             real(u1[2]) * real(h1[2]) + imag(u1[2]) * imag(h1[2]) +
+             real(u1[3]) * real(h1[3]) + imag(u1[3]) * imag(h1[3])) / w1^2
     R1 = isapprox(invR1, 0, atol = 1e-20) ? T(Inf) : 1 / invR1
-    H1 = abs(n * imag(sum(h1 .* conj.(u1))))
+    # imag(sum(h1 .* conj.(u1)))
+    H1 = abs(n * (imag(h1[1]) * real(u1[1]) - real(h1[1]) * imag(u1[1]) +
+              imag(h1[2]) * real(u1[2]) - real(h1[2]) * imag(u1[2]) +
+              imag(h1[3]) * real(u1[3]) - real(h1[3]) * imag(u1[3])))
     w01 = H1 / (n * norm(u1))
 
     # Axis 2
     w2 = norm(h2)
-    invR2 = real(sum(u2 .* conj.(h2))) / w2^2
+    # real(sum(u2 .* conj.(h2)))
+    invR2 = (real(u2[1]) * real(h2[1]) + imag(u2[1]) * imag(h2[1]) +
+             real(u2[2]) * real(h2[2]) + imag(u2[2]) * imag(h2[2]) +
+             real(u2[3]) * real(h2[3]) + imag(u2[3]) * imag(h2[3])) / w2^2
     R2 = isapprox(invR2, 0, atol = 1e-20) ? T(Inf) : 1 / invR2
-    H2 = abs(n * imag(sum(h2 .* conj.(u2))))
+    # imag(sum(h2 .* conj.(u2)))
+    H2 = abs(n * (imag(h2[1]) * real(u2[1]) - real(h2[1]) * imag(u2[1]) +
+              imag(h2[2]) * real(u2[2]) - real(h2[2]) * imag(u2[2]) +
+              imag(h2[3]) * real(u2[3]) - real(h2[3]) * imag(u2[3])))
     w02 = H2 / (n * norm(u2))
 
     # Total Gouy phase
