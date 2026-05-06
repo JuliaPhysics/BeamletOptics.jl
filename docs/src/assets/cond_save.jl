@@ -22,13 +22,29 @@ function conditional_include(fname::String; use_placeholder::Bool=!haskey(ENV, "
     if use_placeholder        
         content = read(fname, String)
         # match save("filename")
-        pattern = r"""save\(\s*"([^"]+)"""
-        filenames = [m.captures[1] for m in eachmatch(pattern, content)]
-        for f in filenames
-            fig = Figure(size=(600,300))
+        pattern = Regex("save\\(\\s*\\\"([^\\\"]+)\\\"\\s*,\\s*([a-zA-Z_][a-zA-Z0-9_]*)")
+        for match in eachmatch(pattern, content)
+            save_name = match.captures[1]
+            fig_name = match.captures[2]
+            offset = match.offset
+            prior_content = content[1:offset]
+            # find last missing fig_name variable match
+            npattern = Regex("\\Q$fig_name\\E\\s*=\\s*Figure\\(.*?size\\s*=\\s*\\(([\\d]+)\\s*,\\s*([\\d]+)\\)")
+            matches = collect(eachmatch(npattern, prior_content))
+            if !isempty(matches)
+                nmatch = last(matches)
+                _width =  parse(Int, nmatch.captures[1])
+                _height = parse(Int, nmatch.captures[2])
+            else
+                @info "Using default height for $fig_name"
+                _width =  600
+                _height = 300
+            end
+            # save placeholder
+            fig = Figure(size=(_width, _height))
             Box(fig[1, 1], color = :gray)
-            save(f, fig)
-            @info "Saving placeholder for $f"
+            save(save_name, fig)
+            @info "Saving placeholder for $save_name (Size: $_width x $_height, fig_var_name=$fig_name)"
         end
     else
         @info "Running script for $fname"

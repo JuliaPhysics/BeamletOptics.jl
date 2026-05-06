@@ -23,9 +23,9 @@ s = System([l])
 
 translate3d!(l, [0, 30e-3, 0])
 
-fig = Figure(size=(600,300))
-display(fig)
-ax = LScene(fig[1,1])
+fig1 = Figure(size=(600,300))
+display(fig1)
+ax = LScene(fig1[1,1])
 hide_axis(ax)
 
 render!(ax, agb; flen=0.1-0.03, show_beams=true, show_pos=true, color=RGBAf(1,0,0,0.1))
@@ -33,7 +33,7 @@ render!(ax, agb; flen=0.1-0.03, show_beams=true, show_pos=true, color=RGBAf(1,0,
 set_orthographic(ax)
 set_view(ax, c_view)
 
-save("agbtest1.png", fig; px_per_unit=8, update = false)
+save("agbtest1.png", fig1; px_per_unit=8, update = false)
 
 ##
 solve_system!(s, agb; check_invariant=false)
