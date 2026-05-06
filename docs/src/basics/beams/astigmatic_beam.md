@@ -19,7 +19,13 @@ Similar to the Gauss model presented in [Stigmatic Beamlets](@ref) chapter, an a
 2.  **Waist Rays**: four "positional" rays (waist $x+, x-, y+, y-$)
 3.  **Divergence Rays**: four "directional" rays (divergence $x+, x-, y+, y-$)
 
-These rays can be thought of tracking the complex curvature matrix $\mathbf{Q}(z)$ through the system. The initial ordering of these geometric beams is shown in the figure below. The colors represent the chief (red), waist (blue) and divergence (green) beams.
+These rays can be thought of tracking the complex curvature matrix $\mathbf{Q}(z)$ through the system. The key assumptions made in order for this formalism to hold are:
+
+- **Paraxiality**: the auxiliary rays must remain within the paraxial regime relative to the chief ray.
+- **Locally parabolical surfaces**: since only astigmatism can be captured, each surface interaction must be approximately parabolical
+- **Homogeneous polarization**: the polarization state of the traced field is assumed to be homogeneous over each beamlet
+
+The initial ordering of the geometric beams is shown in the figure below. The colors represent the chief (red), waist (blue) and divergence (green) beams.
 
 ![Astigmatic ray tracing I](agbtest1.png)
 
@@ -28,7 +34,7 @@ As with the [`GaussianBeamlet`](@ref), tracing these rays through a system allow
 ```math
 \psi(\mathbf{r}) = \frac{E_0}{\sqrt{\mathbf{h}_1 \times \mathbf{h}_2}} \cdot \exp \left( i k \frac{(\mathbf{h}_1 \times \mathbf{r})(\mathbf{u}_2 \cdot \mathbf{r}) - (\mathbf{h}_2 \times \mathbf{r})(\mathbf{u}_1 \cdot \mathbf{r})}{2 \mathbf{h}_1 \times \mathbf{h}_2} \right) \,,
 ```
-where $\mathbf{h}_{1,2}$ and $\mathbf{u}_{1,2}$ are the two-dimensional complex ray height and angle vectors on the plane perpendicular to the chief ray [Greynolds:1986_1, Wilhelm:2001, Greynolds:2014](@cite). By also tracing the 3D-field vector based on the formalism introduced in [Polarized rays](@ref) section, polarization effects can be considered when calculating $\psi$ [Worku:2017](@cite). For a simple lens setup, the resulting waist is illustrated in the image below.
+where $\mathbf{h}_{1,2}$ and $\mathbf{u}_{1,2}$ are the two-dimensional complex ray height and angle vectors on the plane perpendicular to the chief ray [Greynolds:1986_1, Wilhelm:2001, Greynolds:2014](@cite). By also tracing a 3D-field vector along the chief ray based on the formalism introduced in the [Polarized rays](@ref) section, polarization effects can be considered when calculating $\psi$ [Worku:2017](@cite). For a simple lens setup, the resulting waist is illustrated in the image below.
 
 ![Astigmatic ray tracing II](agbtest2.png)
 
@@ -36,7 +42,7 @@ While the above beam closely matches the example given in the previous section (
 
 ![Astigmatic ray tracing III](agbtest3.png)
 
-The phase factor due to the optical path length of the central ray ($e^{i k (z + \Delta L)}$) is added to the reduced field $\psi$ during the final field calculation of each beamlet. 
+The phase factor due to the optical path length of the central ray ($e^{i k (z + \Delta L)}$) is added to the reduced field $\psi$ during the final field calculation for each beamlet. 
 
 !!! info "Optical invariant"
     In order to ensure the correctness of the traced beamlet, the complex ray vectors must satisfy the **vanishing complex optical invariant**:
@@ -56,7 +62,7 @@ u_{1y} h_{2y} - u_{2y} h_{1y} & u_{2y} h_{1x} - u_{1y} h_{2x}
 \end{bmatrix}
 ```
 
-The diagonal elements $Q_{xx}$ and $Q_{yy}$ describe the phase curvature (and beam width) along the primary axes, while the off-diagonal elements $Q_{xy}$ (which must equal $Q_{yx}$ for a paraxial beam) describe the **general astigmatism** or twist of the wavefront. This representation allows the package to track complex, rotating beam profiles as they propagate through non-orthogonal optical systems. More information can be found in the works of Kochkina (2013) and Ashcraft et al. (2024) [Kochkina:2013, Ashcraft:2024](@cite).
+The diagonal elements $Q_{xx}$ and $Q_{yy}$ describe the phase curvature (and beam width) along the primary axes, while the off-diagonal elements $Q_{xy}$ (which must equal $Q_{yx}$ for a paraxial beam) describe the **general astigmatism** or twist of the wavefront. This representation allows the formalism to track complex, rotating beam profiles as they propagate through non-orthogonal optical systems. It is important to note that this matrix is not directly tracked during beamlet propagation in **BMO**. More information can be found in the works of Kochkina (2013) and Ashcraft et al. (2024) [Kochkina:2013, Ashcraft:2024](@cite).
 
 !!! note "Analytic Bilinear Form"
     All vector operations in the formulas above ($\cdot, \times$) and the matrix product $\mathbf{r}^T \mathbf{Q} \mathbf{r}$ use the **analytic bilinear form** rather than the conjugated dot product. This preservation of analytic continuity is essential for the stability of Gaussian beamlets in the complex domain.
@@ -87,11 +93,6 @@ beams = WavefrontBeamletDecomposition(x, z, amplitude, phase, dir, λ)
 # Solve system (propagate all beamlets to next segment)
 solve_system!(system, beams)
 ```
-
-## Key Assumptions
-- **Paraxiality**: The auxiliary rays must remain within the paraxial regime relative to the chief ray.
-- **Analytic Continuity**: Quadratic phase calculations use the bilinear dot product to avoid unphysical conjugation of complex ray parameters.
-- **Power Conservation**: The decomposition methods automatically scale amplitudes to preserve total field energy regardless of grid resolution.
 
 ## Example: Double Slit Diffraction
 
