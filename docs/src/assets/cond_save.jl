@@ -22,7 +22,7 @@ function conditional_include(fname::String; use_placeholder::Bool=!haskey(ENV, "
     if use_placeholder        
         content = read(fname, String)
         # match save("filename") but ignore comments, i.e. # save(...)
-        pattern = Regex("^[ \\t]*save\\(\\s*\\\"([^\\\"]+)\\\"\\s*,\\s*([a-zA-Z_][a-zA-Z0-9_]*)")
+        pattern = Regex("^[ \\t]*save\\(\\s*\"([^\"]+)\"\\s*,\\s*([a-zA-Z_][a-zA-Z0-9_]*)", "m")
         for match in eachmatch(pattern, content)
             save_name = match.captures[1]
             fig_name = match.captures[2]
