@@ -21,8 +21,8 @@ function conditional_include(fname::String; use_placeholder::Bool=!haskey(ENV, "
     # Check if to run script
     if use_placeholder        
         content = read(fname, String)
-        # match save("filename")
-        pattern = Regex("save\\(\\s*\\\"([^\\\"]+)\\\"\\s*,\\s*([a-zA-Z_][a-zA-Z0-9_]*)")
+        # match save("filename") but ignore comments, i.e. # save(...)
+        pattern = Regex("^[ \\t]*save\\(\\s*\\\"([^\\\"]+)\\\"\\s*,\\s*([a-zA-Z_][a-zA-Z0-9_]*)")
         for match in eachmatch(pattern, content)
             save_name = match.captures[1]
             fig_name = match.captures[2]
@@ -42,7 +42,14 @@ function conditional_include(fname::String; use_placeholder::Bool=!haskey(ENV, "
             end
             # save placeholder
             fig = Figure(size=(_width, _height))
-            Box(fig[1, 1], color = :gray)
+            ax = Axis(fig[1,1], backgroundcolor=:gray)
+            hidedecorations!(ax)
+            text!(ax, 0, 0;
+                text="$save_name\n($_width x $_height)",
+                align=(:center, :center),
+                color=:white,
+                fontsize=20
+            )
             save(save_name, fig)
             @info "Saving placeholder for $save_name (Size: $_width x $_height, fig_var_name=$fig_name)"
         end

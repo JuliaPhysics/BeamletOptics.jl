@@ -79,7 +79,7 @@ beam = AstigmaticGaussianBeamlet([0., 0, z_os], dir, λ0, w0; E0, support=[0,0,1
 solve_system!(system, beam; check_invariant=false)
 
 ##
-fig = Figure(size=(600,300))
+fig = Figure(size=(600,400))
 display(fig)
 ax = LScene(fig[1,1])
 hide_axis(ax)
@@ -88,10 +88,10 @@ render!(ax, l2; color=RGBAf(1, 1, 1, .2))
 render!(ax, beam; color=RGBAf(1,0,0,0.2), z_res=4, r_res=20, show_waist=true, markersize=4, flen=0.1)
 
 view = [
-  0.714009   0.700137  -1.38778e-16  -0.0666259
- -0.219833   0.224189   0.949428     -0.0103548
-  0.664729  -0.6779     0.313986     -0.0439393
-  0.0        0.0        0.0           1.0
+  0.763832   0.645415  3.88578e-16  -0.0541476
+ -0.444252   0.525762  0.725407     -0.0339012
+  0.468188  -0.554089  0.68832      -0.0967937
+  0.0        0.0       0.0           1.0
 ]
 
 set_view(ax, view)
