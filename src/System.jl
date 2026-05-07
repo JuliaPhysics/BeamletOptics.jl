@@ -513,7 +513,8 @@ function trace_system!(
         seg_counter += 1
 
         # Verify that the paraxial assumptions still hold for the new segment
-        if check_invariant && !check_optical_invariant(agb, seg_counter; threshold = threshold)
+        if check_invariant &&
+           !check_optical_invariant(agb, seg_counter; threshold = threshold)
             break
         end
     end
@@ -710,15 +711,16 @@ function solve_system!(
 end
 
 function solve_system!(system::AbstractSystem, bg::AbstractBeamGroup; kwargs...)
-    for _beam in beams(bg)
+    Threads.@threads for _beam in beams(bg)
         solve_system!(system, _beam; kwargs...)
     end
     return nothing
 end
 
-@inline function solve_leaf!(system::AbstractSystem, beam::AbstractBeam; kwargs...)
+@inline function solve_leaf!(
+        system::AbstractSystem, beam::AbstractBeam; r_max = get_default_r_max(), kwargs...)
     if isnothing(_last_beam_intersection(beam))
-        trace_system!(system, beam; kwargs...)
+        trace_system!(system, beam; r_max, kwargs...)
     end
     return nothing
 end

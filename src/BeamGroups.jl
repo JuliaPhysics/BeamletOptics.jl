@@ -575,33 +575,41 @@ function WavefrontBeamletDecomposition(
     k = 2π / λ
 
     beams = Vector{AstigmaticGaussianBeamlet{T}}()
+    sizehint!(beams, ceil(Int, nx * ny * 0.1)) # Conservative estimate
+    beams_lock = ReentrantLock()
     max_amp = maximum(amplitude)
 
-    for i in 1:nx
+    Threads.@threads for i in 1:nx
         for j in 1:ny
             amp = amplitude[i, j]
+            if isnan(amp) || amp < max_amp * threshold
+                continue
+            end
             ph = phase[i, j]
-            if isnan(amp) || isnan(ph) || amp < max_amp * threshold
+            if isnan(ph)
                 continue
             end
 
-            # Compute local phase gradients using central differences (fallback to forward/backward at edges)
+            # Compute local phase gradients using central differences
+            # Use mod2pi wrap to avoid slow angle(exp(im*x))
+            _wrap = Δ -> mod2pi(Δ + π) - π
+            
             if i > 1 && i < nx
-                dφ_dx = (angle(exp(im * (phase[i + 1, j] - phase[i, j]))) +
-                         angle(exp(im * (phase[i, j] - phase[i - 1, j])))) / (2dx)
+                dφ_dx = (_wrap(phase[i + 1, j] - ph) +
+                         _wrap(ph - phase[i - 1, j])) / (2dx)
             elseif i == 1
-                dφ_dx = angle(exp(im * (phase[i + 1, j] - phase[i, j]))) / dx
+                dφ_dx = _wrap(phase[i + 1, j] - ph) / dx
             else
-                dφ_dx = angle(exp(im * (phase[i, j] - phase[i - 1, j]))) / dx
+                dφ_dx = _wrap(ph - phase[i - 1, j]) / dx
             end
 
             if j > 1 && j < ny
-                dφ_dy = (angle(exp(im * (phase[i, j + 1] - phase[i, j]))) +
-                         angle(exp(im * (phase[i, j] - phase[i, j - 1])))) / (2dy)
+                dφ_dy = (_wrap(phase[i, j + 1] - ph) +
+                         _wrap(ph - phase[i, j - 1])) / (2dy)
             elseif j == 1
-                dφ_dy = angle(exp(im * (phase[i, j + 1] - phase[i, j]))) / dy
+                dφ_dy = _wrap(phase[i, j + 1] - ph) / dy
             else
-                dφ_dy = angle(exp(im * (phase[i, j] - phase[i, j - 1]))) / dy
+                dφ_dy = _wrap(ph - phase[i, j - 1]) / dy
             end
 
             # Convert phase gradient to angular deviation (Eikonal equation: ∇φ = k * sin(θ))
@@ -650,7 +658,9 @@ function WavefrontBeamletDecomposition(
             end
 
             b = AstigmaticGaussianBeamlet(pos, local_dir, λ, w0s_x, w0s_y; E0 = E0_complex, support = local_support)
-            push!(beams, b)
+            lock(beams_lock) do
+                push!(beams, b)
+            end
         end
     end
 
