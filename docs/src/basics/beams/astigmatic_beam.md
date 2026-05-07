@@ -8,21 +8,25 @@ conditional_include(joinpath(beam_showcase_dir, "agb_showcase.jl"), use_placehol
 
 # Astigmatic polarized beamlets
 
-Standard stigmatic beamlets are limited to symmetric systems. For the modeling of arbitrary optical systems, including off-axis components, tilted lenses, or complex media like atmospheric turbulence, the package provides the [`AstigmaticGaussianBeamlet`](@ref). This type implements the astigmatic Gaussian beamlet formalism initially proposed by Greynolds (1986) [Greynolds:1986_1, Greynolds:1986_2](@cite).
+Standard stigmatic beamlets are limited to symmetric systems. For the modeling of arbitrary optical systems, including off-axis components, tilted lenses, or complex media like atmospheric turbulence, the package provides the [`AstigmaticGaussianBeamlet`](@ref). This type implements the astigmatic Gaussian beamlet ray tracing formalism initially proposed by Greynolds (1986) [Greynolds:1986_1, Greynolds:1986_2](@cite).
+
+However, this idea has been referred to in multiple ways over the last few decades, including but not limited to: Gaussian Beamlet Tracing (GBT), Fat Ray Tracing (FRT), Parabasal Ray Tracing (PRT), Complex Ray Tracing (CRT), Gauss Beamlet Propagation (GBP) and Beam Synthesis Propagation (BSP).
 
 ## Formalism
 
-Similar to the Gauss model presented in [Stigmatic Beamlets](@ref) chapter, an astigmatic beamlet can represented by a cluster of **9 rays**:
+Similar to the Gauss model presented in the [Stigmatic beamlets](@ref) chapter, an astigmatic beamlet can represented by a cluster of **9 rays**:
 
-1.  **Chief Ray**: a [`PolarizedRay`](@ref) defining the central path and polarization state.
-2.  **Waist Rays**: four "positional" rays (waist $x+, x-, y+, y-$)
-3.  **Divergence Rays**: four "directional" rays (divergence $x+, x-, y+, y-$)
+!!! tip "Ray representation"
+    1.  **Chief Ray**: a [`PolarizedRay`](@ref) defining the central path and polarization state.
+    2.  **Waist Rays**: four "positional" rays (waist $x+, x-, y+, y-$)
+    3.  **Divergence Rays**: four "directional" rays (divergence $x+, x-, y+, y-$)
 
 These rays can be thought of tracking the complex curvature matrix $\mathbf{Q}(z)$ through the system. The key assumptions made in order for this formalism to hold are:
 
-- **Paraxiality**: the auxiliary rays must remain within the paraxial regime relative to the chief ray.
-- **Parabolic interaction**: since only astigmatism can be captured, each surface interaction must be approximately parabolical
-- **Homogeneous polarization**: the polarization state of the traced field is assumed to be homogeneous over each beamlet
+!!! info "Key assumptions"
+    1. **Paraxiality**: the auxiliary rays must remain within the paraxial regime relative to the chief ray.
+    2. **Parabolic interaction**: since only astigmatism can be captured, each surface interaction must be approximately parabolical
+    3. **Homogeneous polarization**: the polarization state of the traced field is assumed to be homogeneous over each beamlet
 
 The initial ordering of the geometric beams is shown in the figure below. The colors represent the chief (red), waist (blue) and divergence (green) beams.
 
@@ -41,7 +45,7 @@ While the above beam closely matches the example Gaussian given in the previous 
 
 ![Astigmatic ray tracing III](agbtest3.png)
 
-The phase factor due to the optical path length of the central ray ($e^{i k (z + \Delta L)}$) is added to the reduced field $\psi$ during the final field calculation for each beamlet. 
+The phase factor due to the optical path length of the central ray ($e^{i k (z + \Delta L)}$) is added to the reduced field $\psi$ during the final field calculation for each beamlet. More information on the mathemathics behind this formalism can be found below in [The Curvature Matrix $\mathbf{Q}$](@ref) section.
 
 !!! info "Optical invariant"
     In order to ensure the correctness of the traced beamlet, the complex ray vectors must satisfy the **vanishing complex optical invariant**:
@@ -49,6 +53,36 @@ The phase factor due to the optical path length of the central ray ($e^{i k (z +
     \mathbf{h}_1 \times \mathbf{u}_2 - \mathbf{h}_2 \times \mathbf{u}_1 = 0
     ```
     This ensures that the complex curvature matrix $\mathbf{Q}$ is symmetric, since the beamlet formalism can not capture higher-order abberations.
+
+## Astigmatic beamlets
+
+You can construct a single astigmatic beamlet with a specified waist and polarization:
+
+```@docs; canonical=false
+AstigmaticGaussianBeamlet(::AbstractArray, ::AbstractArray, ::Real, ::Real)
+```
+
+The constructor will spawn an `AstigmaticGaussianBeamlet` which is implemented as follows:
+
+```@docs; canonical=false
+AstigmaticGaussianBeamlet
+```
+
+### Calculating astigmatic beam parameters
+
+To obtain the physical vector electric field [V/m] at any point:
+```julia
+# Field at world position (x, y, z)
+E_vec = polarized_field(agb, [0.01, 0, 0], 10.0)
+```
+
+```julia
+# Decompose a field from a detector into a new AstigmaticBeamGroup
+beams = WavefrontBeamletDecomposition(x, z, amplitude, phase, dir, λ)
+
+# Solve system (propagate all beamlets to next segment)
+solve_system!(system, beams)
+```
 
 ## The Curvature Matrix $\mathbf{Q}$
 
@@ -65,30 +99,3 @@ The diagonal elements $Q_{xx}$ and $Q_{yy}$ describe the phase curvature (and be
 
 !!! note "Analytic Bilinear Form"
     All vector operations in the formulas above ($\cdot, \times$) and the matrix product $\mathbf{r}^T \mathbf{Q} \mathbf{r}$ use the **analytic bilinear form** rather than the conjugated dot product. This preservation of analytic continuity is essential for the stability of Gaussian beamlets in the complex domain.
-
-## API and Usage
-
-### Construction
-
-You can construct a single astigmatic beamlet with a specified waist and polarization:
-```julia
-using BeamletOptics
-# A 10mm waist beamlet propagating along Y, polarized along X
-agb = AstigmaticGaussianBeamlet([0,0,0], [0,1,0], 1064e-9, 10e-3; E0 = [1,0,0])
-```
-
-### Field Calculation
-
-To obtain the physical vector electric field [V/m] at any point:
-```julia
-# Field at world position (x, y, z)
-E_vec = polarized_field(agb, [0.01, 0, 0], 10.0)
-```
-
-```julia
-# Decompose a field from a detector into a new AstigmaticBeamGroup
-beams = WavefrontBeamletDecomposition(x, z, amplitude, phase, dir, λ)
-
-# Solve system (propagate all beamlets to next segment)
-solve_system!(system, beams)
-```

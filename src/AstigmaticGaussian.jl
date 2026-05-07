@@ -1,9 +1,15 @@
 """
     AstigmaticGaussianBeamlet{T} <: AbstractBeam{T, PolarizedRay{T}}
 
-Ray representation of a general **astigmatic** Gaussian beam using the parabasal ray
-formalism. The beam is described by a chief `PolarizedRay` and 8 auxiliary `Ray`s
-that encode the waist and divergence in two orthogonal transverse axes.
+Complex ray representation of a general **astigmatic** Gaussian beam as per the formalism described by A. Greynolds (1986) and N. Worku (2017).
+The beam is described by a chief [`PolarizedRay`](@ref) and 8 auxiliary [`Ray`](@ref)s that encode the waist radius and divergence in two orthogonal transverse axes.
+The beam quality `M2` is considered via the divergence angle. All equations are based on the following publications:
+
+**Alan Greynolds, "Vector formulation of the ray-equivalent method for general Gaussian beam propagation." Curr. Dev. Opt. Eng. Diffraction Phenom. Vol. 679. SPIE, 1986**
+
+and
+
+**Norman Worku and Herbert Gross, "Vectorial field propagation through high NA objectives using polarized Gaussian beam decomposition." OTOM XIV. Vol. 10347. SPIE, 2017**
 
 # Fields
 
@@ -18,6 +24,11 @@ that encode the waist and divergence in two orthogonal transverse axes.
 - `dym`: divergence y-negative [`Beam`](@ref) of [`Ray`](@ref)s
 - `parent`:   reference to the parent beam (or `nothing`)
 - `children`: vector of child beams (e.g. after beam-splitting)
+
+# Additional information
+
+!!! info "Waist and field calculation"
+    For a given beamlet the Gaussian beam parameters can be obtained via the [`gauss_parameters`](@ref) function.
 """
 mutable struct AstigmaticGaussianBeamlet{T} <: AbstractBeam{T, PolarizedRay{T}}
     c::Beam{T, PolarizedRay{T}}       # chief
@@ -74,33 +85,42 @@ In the 5-argument version, independent waists `w0_x` and `w0_y` can be specified
 - `E0`: electric field vector in [V/m]. Default is `nothing` (aligned with support axes, scaled by `P0`).
 - `support`: optional support vector for basis construction
 - `z0`: beam waist offset in [m]. Default is 0 m
+
+# Additional information
+
+!!! warning "Optical invariant check"
+    When using the `solve_system!` function, the beamlet invariant will be checked for each interaction. If the invariant is violated, tracing will be stopped.
 """
 function AstigmaticGaussianBeamlet(
-        position,
-        direction,
-        λ = get_default_wavelength(),
-        w0 = get_default_waist();
-        M2 = 1,
-        P0 = get_default_power(),
-        E0 = nothing,
-        support = nothing,
-        z0 = 0)
-    return AstigmaticGaussianBeamlet(position, direction, λ, w0, w0; M2_x = M2,
-        M2_y = M2, P0 = P0, E0 = E0, support = support, z0 = z0)
+        position::AbstractArray,
+        direction::AbstractArray,
+        λ::Real = get_default_wavelength(),
+        w0::Real = get_default_waist();
+        # kwargs
+        M2::Real = 1,
+        P0::Real = get_default_power(),
+        E0::Union{Nothing, AbstractArray{<:Number}} = nothing,
+        support::Union{Nothing, AbstractArray{<:Real}} = nothing,
+        z0::Real = 0
+    )
+    return AstigmaticGaussianBeamlet(position, direction, λ, w0, w0;
+        M2_x = M2, M2_y = M2, P0, E0, support, z0)
 end
 
 function AstigmaticGaussianBeamlet(
-        position,
-        direction,
-        λ,
-        w0_x,
-        w0_y;
-        M2_x = 1,
-        M2_y = 1,
-        P0 = get_default_power(),
-        E0 = nothing,
-        support = nothing,
-        z0 = 0)
+        position::AbstractArray,
+        direction::AbstractArray,
+        λ::Real,
+        w0_x::Real,
+        w0_y::Real;
+        # kwargs
+        M2_x::Real = 1,
+        M2_y::Real = 1,
+        P0::Real = get_default_power(),
+        E0::Union{Nothing, AbstractArray{<:Number}} = nothing,
+        support::Union{Nothing, AbstractArray{<:Real}} = nothing,
+        z0::Real = 0
+    )
     # Create orthogonal vectors for construction purposes (right-handed)
     direction = normalize(direction)
     if isnothing(support)
