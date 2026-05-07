@@ -4,7 +4,7 @@
 Ray representation of the **stigmatic** Gaussian beam as per J. Arnaud (1985). The beam quality `M2` is fully considered via the divergence angle.
 The formalism for the beam parameter calculation is based on the following publications:
 
-**Jacques Arnaud, "Representation of Gaussian beams by complex rays," Appl. Opt. 24, 538-543 (1985)**
+**Jacques Arnaud, "Representation of Gaussian beams by complex rays." Appl. Opt. 24, 538-543 (1985)**
 
 and
 

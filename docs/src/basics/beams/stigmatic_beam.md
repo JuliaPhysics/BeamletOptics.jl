@@ -30,15 +30,15 @@ Without extensions of the original method, the following key assumptions must be
 - the Gaussian may not be clipped by hard apertures
 - Lagrange invariant must be fulfilled
 
-Various versions of this approach have been implemented under different names in commercial software, most notably [FRED](https://photonengr.com/fred-software/) and [Code V](https://www.synopsys.com/optical-solutions/codev.html), as well as in open source software, e.g. 
+Various versions of this approach have been implemented under different names in commercial software, most notably [FRED](https://photonengr.com/fred-software/), [Code V](https://www.synopsys.com/optical-solutions/codev.html) and [QUADOA](https://www.quadoa.com), as well as in open source software, e.g. 
 
 - [Raypier](https://github.com/bryancole/raypier_optics) - based on Cython, maintenance status not known
 - [Poke](https://github.com/Jashcraf/poke) - based on Zemax API and Python, maintained by J. Ashcraft et al. [Ashcraft:2022](@cite)
 - [IfoCAD](https://www.aei.mpg.de/ifocad-de) - maintenance status not known, refer to Wanner et al. [Wanner:2017](@cite)
 
-This package implements the above method via the stigmatic [`GaussianBeamlet`](@ref) and the [`AstigmaticGaussianBeamlet`](@ref), which is presented in more detail later.
+This package implements the above method via the stigmatic [`GaussianBeamlet`](@ref) and the [`AstigmaticGaussianBeamlet`](@ref), the latter of which is presented in more detail in the [Astigmatic polarized beamlets](@ref) chapter.
 
-## Stigmatic Beamlets
+## Stigmatic beamlets
 
 The [`GaussianBeamlet`](@ref) implements the [`BeamletOptics.AbstractBeam`](@ref) interface and can be used to model the propagation of a monochromatic Gaussian (``\text{TEM}_{00}``-mode) through optical system where all optics lie on the optical axis, e.g. no tip and/or tilt dealignment, and abberations can be neglected. It is represented by a `chief` (red), `waist` (blue) and `divergence` (green) beam. See below how these beams are placed in relation to the envelope of the Gaussian beam.
 
