@@ -147,6 +147,7 @@ struct GaussianBeamletHit{T} <: AbstractBeamletHit{T}
     p0::Point3{T}
     d0::Point3{T}
     sqrt_proj::T
+    w_max::T
 end
 
 """
@@ -169,8 +170,10 @@ struct AstigmaticGaussianBeamletHit{T} <: AbstractBeamletHit{T}
     area_ref::Complex{T}
     k0::T
     Δl::T
+    n_eff::T
     E_ref_amp::Complex{T}
     sqrt_proj::T
+    w_max::T
 end
 
 position(hit::GaussianBeamletHit) = position(hit.gauss.chief.rays[hit.id])
@@ -355,7 +358,11 @@ function interact3d(::AbstractSystem, d::Detector, g::GaussianBeamlet{R}, id::In
     d0 = direction(ray)
     sqrt_proj = sqrt(abs(dot(d0, normal3d(intersection(ray)))))
 
-    push!(d, GaussianBeamletHit(g, l0, id, p0, d0, sqrt_proj))
+    # Calculate actual beam radius at detector for auto-limits
+    w_at_detector, _, _, _ = gauss_parameters(g, length(g))
+    w_max = w_at_detector
+
+    push!(d, GaussianBeamletHit(g, l0, id, p0, d0, sqrt_proj, w_max))
     if stop(d)
         # Stop solver (hard target)
         return nothing
@@ -402,13 +409,16 @@ function interact3d(system::AbstractSystem, d::Detector,
         z_sum += length(ray_j)
     end
     # Note: the (n-1)*z term in parabasal_field depends on (z - z_sum).
-    # Since we extract parameters at p0, z_sum is exactly the cumulative length to p0.
-    # So (n-1)*(z - z_sum) = (n-1)*L1, which we handle in the loop.
-    # The Δl we cache here is the constant part.
+    # Propagate semi-axes to detector for w_max (auto-limits)
+    H1 = h1 + length(chief) * u1
+    H2 = h2 + length(chief) * u2
+    w_max = max(norm(H1), norm(H2))
+    n_eff = refractive_index(agb, id)
 
     push!(d,
         AstigmaticGaussianBeamletHit(
-            agb, l0, id, p0, d0, h1, u1, h2, u2, area_ref, k0, Δl, E_ref_amp, sqrt_proj
+            agb, l0, id, p0, d0, h1, u1, h2, u2, area_ref, k0, Δl,
+            n_eff, E_ref_amp, sqrt_proj, w_max
         ))
     if stop(d)
         # Stop solver (hard target)

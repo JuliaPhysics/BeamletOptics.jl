@@ -2,7 +2,7 @@
     electric_field(pd::Detector; kwargs...)
 
 Compute a two‐dimensional electric field based on incoming rays or beams as captured by a [`Detector`](@ref).
-The returned E-field map is sampled on a regular `n×n` grid in the detector’s local (x,z)-plane.
+The returned E-field map is sampled on a regular `n×n` grid in the detector's local (x,z)-plane.
 Note that the `pd` local coordinates are given in a (x, z) basis where the normal vector forms a left-handed system.
 
 !!! note "Resetting detectors"
@@ -45,7 +45,7 @@ The following generic kwargs can be used for all hit types:
 
 A tuple `(xs, zs, E)` where
 - `xs::LinRange{T}` and `zs::LinRange{T}` are the sampled coordinates
-  in the detector’s local x and z axes,
+  in the detector's local x and z axes,
 - `E::Matrix{Complex{T}}` is the corresponding raw/unscaled intensity map
 """
 electric_field(d::Detector; kwargs...) = electric_field(d, hits(d); kwargs...)
@@ -66,7 +66,8 @@ function electric_field(
         z_min = Inf,
         z_max = Inf,
         x0_shift::Real = 0,
-        z0_shift::Real = 0
+        z0_shift::Real = 0,
+        kwargs...
 ) where {G}
     # Calculate autolims
     _x_min, _x_max, _z_min, _z_max = calc_local_lims(pd; crop_factor, num_spots)
@@ -91,23 +92,23 @@ function electric_field(
         z_grid = zs[j]
         # Hoist z-grid math out of inner loop
         p_row = origin + z_grid * local_z
-        
+
         @inbounds for i in eachindex(xs)
             x_grid = xs[i]
             p1 = p_row + x_grid * local_x
-            
+
             acc = Complex{G}(0.0)
             for hit in hits
                 v = p1 - hit.p0
                 l1 = _pseudo_dot(v, hit.d0)
-                
+
                 # Transverse distance r
                 r_vec = v - l1 * hit.d0
                 r = norm(r_vec)
-                
+
                 # Distance along beam
                 z = hit.l0 + l1
-                
+
                 acc += electric_field(hit.gauss, r, z) * hit.sqrt_proj
             end
             field[i, j] = acc
@@ -121,14 +122,15 @@ function electric_field(
         hits::Vector{AstigmaticGaussianBeamletHit{G}};
         # kwargs
         n::Int = 100,
-        crop_factor::Real = 1.5,
+        crop_factor::Real = 3.0,
         num_spots::Int = 50,
         x_min = Inf,
         x_max = Inf,
         z_min = Inf,
         z_max = Inf,
         x0_shift::Real = 0,
-        z0_shift::Real = 0
+        z0_shift::Real = 0,
+        kwargs...
 ) where {G}
     # Calculate autolims
     _x_min, _x_max, _z_min, _z_max = calc_local_lims(pd; crop_factor, num_spots)
@@ -153,45 +155,34 @@ function electric_field(
         z_grid = zs[j]
         # Hoist z-grid math out of inner loop
         p_row = origin + z_grid * local_z
-        
+
         @inbounds for i in eachindex(xs)
             x_grid = xs[i]
             p1 = p_row + x_grid * local_x
-            
+
             acc = Complex{G}(0.0)
             for hit in hits
                 v = p1 - hit.p0
                 l1 = _pseudo_dot(v, hit.d0)
                 r_vec = v - l1 * hit.d0
-                
-                # Linear parabasal propagation within the segment
-                # h(L1) = h0 + L1 * u0
-                # u(L1) = u0
+
                 h1_z = hit.h1 + l1 * hit.u1
                 h2_z = hit.h2 + l1 * hit.u2
-                
-                # Optimized field kernel
                 area_z = _pseudo_cross2d(h1_z, h2_z, hit.d0)
-                # Regularization
                 if abs(area_z) < 1e-25
                     area_z = Complex{G}(1e-25, 1e-25)
                 end
-                
+
                 ξ1 = _pseudo_cross2d(h1_z, r_vec, hit.d0)
                 ξ2 = _pseudo_cross2d(h2_z, r_vec, hit.d0)
-                
-                # Complex quadratic phase term w = r^T Q r / 2
-                w = (ξ1 * _pseudo_dot(hit.u2, r_vec) - ξ2 * _pseudo_dot(hit.u1, r_vec)) / (2 * area_z)
-                
-                # Chief ray refractive index correction (n-1)*l1
-                # The cached Δl includes parent OPL and previous segments.
-                n_eff = refractive_index(hit.agb, hit.id)
-                phase_corr = (n_eff - 1) * l1
-                
-                # Field ψ = √(area_ref / area) * exp(i * k * (z + w + Δl))
+                w = (ξ1 * _pseudo_dot(hit.u2, r_vec) -
+                     ξ2 * _pseudo_dot(hit.u1, r_vec)) / (2 * area_z)
+
+                phase_corr = (hit.n_eff - 1) * l1
                 z_total = hit.l0 + l1
-                ψ = sqrt(hit.area_ref / area_z) * exp(im * hit.k0 * (z_total + w + hit.Δl + phase_corr))
-                
+                ψ = sqrt(hit.area_ref / area_z) *
+                    cis(hit.k0 * (z_total + w + hit.Δl + phase_corr))
+
                 acc += (hit.E_ref_amp * ψ) * hit.sqrt_proj
             end
             field[i, j] = acc
@@ -212,7 +203,8 @@ function electric_field(
         z_min = Inf,
         z_max = Inf,
         x0_shift::Real = 0,
-        z0_shift::Real = 0
+        z0_shift::Real = 0,
+        kwargs...
 ) where {R}
     # automatically calculate limits
     _x_min, _x_max, _z_min, _z_max = calc_local_lims(pd; crop_factor, center)
@@ -242,8 +234,9 @@ function electric_field(
             p = origin_pd + x * e1 + z * e2
             # Add all field contributions
             acc = zero(complex(R))
-            @inbounds @simd for hit in hits
-                l = dot(p - hit_point(hit), direction(hit))
+            for hit in hits
+                p_hit = position(hit) + length(hit) * direction(hit)
+                l = dot(p - p_hit, direction(hit))
                 acc += projection_factor(hit) *
                        cis(wavenumber(hit) * (optical_path_length(hit) + l))
             end
