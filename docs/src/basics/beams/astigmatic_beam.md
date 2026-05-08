@@ -27,8 +27,9 @@ These rays can be thought of tracking the complex curvature matrix $\mathbf{Q}(z
     1. **Paraxiality**: the auxiliary rays must remain within the paraxial regime relative to the chief ray.
     2. **Parabolic interaction**: since only astigmatism can be captured, each surface interaction must be approximately parabolical
     3. **Homogeneous polarization**: the polarization state of the traced field is assumed to be homogeneous over each beamlet
+    4. **Matched scale**: the beamlet must be smaller than the optical element it interacts with, see also 2.
 
-The initial ordering of the geometric beams is shown in the figure below. The colors represent the chief (red), waist (blue) and divergence (green) beams.
+The initial ordering of the geometric beams/rays is shown in the figure below. The colors represent the chief (red), waist (blue) and divergence (green) beams.
 
 ![Astigmatic ray tracing I](agbtest1.png)
 

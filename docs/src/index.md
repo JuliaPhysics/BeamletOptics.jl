@@ -44,6 +44,7 @@ The BeamletOptics package is made available under the MIT license. If you use th
 A variety of packages and tools exist that implement similar approaches or offer optics modeling capabilities. Within the Julia ecosystem, the following packages need to be mentioned:
 
 - [OpticSim.jl](https://github.com/brianguenter/OpticSim.jl)
+- [FluxOptics.jl](https://github.com/anscoil/FluxOptics.jl)
 - [ABCDMatrixOptics.jl](https://github.com/JuliaPhysics/ABCDMatrixOptics.jl)
 - [WaveOpticsPropagation.jl](https://github.com/JuliaPhysics/WaveOpticsPropagation.jl)
 
