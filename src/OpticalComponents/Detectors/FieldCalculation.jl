@@ -109,7 +109,7 @@ function electric_field(
                 # Distance along beam
                 z = hit.l0 + l1
 
-                acc += electric_field(hit.gauss, r, z) * hit.sqrt_proj
+                acc += electric_field(hit.gauss, r, z; hint = (hit.p0 + l1 * hit.d0, hit.id)) * hit.sqrt_proj
             end
             field[i, j] = acc
         end
@@ -226,6 +226,15 @@ function electric_field(
     @views e1, e2 = Point3(-orient[:, 1]), Point3(orient[:, 3])
     origin_pd = position(pd)
 
+    hit_data = map(hits) do hit
+        dir = direction(hit)
+        p_hit = position(hit) + length(hit) * dir
+        proj = projection_factor(hit)
+        k = wavenumber(hit)
+        opl = optical_path_length(hit)
+        (p_hit, dir, proj, k, opl)
+    end
+
     Threads.@threads for j in eachindex(zs)
         z = zs[j]
         @inbounds for i in eachindex(xs)
@@ -234,11 +243,9 @@ function electric_field(
             p = origin_pd + x * e1 + z * e2
             # Add all field contributions
             acc = zero(complex(R))
-            for hit in hits
-                p_hit = position(hit) + length(hit) * direction(hit)
-                l = dot(p - p_hit, direction(hit))
-                acc += projection_factor(hit) *
-                       cis(wavenumber(hit) * (optical_path_length(hit) + l))
+            for (p_hit, dir, proj, k, opl) in hit_data
+                l = dot(p - p_hit, dir)
+                acc += proj * cis(k * (opl + l))
             end
             field[i, j] = acc
         end

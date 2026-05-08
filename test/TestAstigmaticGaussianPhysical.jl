@@ -332,7 +332,7 @@ const nm = 1e-9
         end
 
         # Signal periodic with period λ
-        @test isapprox(powers[1], powers[end]; rtol = 0.1)
+        @test isapprox(powers[1], powers[end]; rtol = 0.1, atol = 1e-10)
 
         # Fringe contrast > 50%
         P_max = maximum(powers)

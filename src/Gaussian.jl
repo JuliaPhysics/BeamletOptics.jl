@@ -401,8 +401,8 @@ This function also considers phase changes due to changes in the [`optical_path_
 !!! warning
     Note that `z` and `r` must be specified as cartesian distances. Using the optical path length for `z` can lead to false results.
 """
-function electric_field(gauss::GaussianBeamlet, r, z)
-    point, index = point_on_beam(gauss, z)
+function electric_field(gauss::GaussianBeamlet, r, z; hint = point_on_beam(gauss, z))
+    point, index = hint
     w, R, ψ, w0 = gauss_parameters(gauss, z, hint = (point, index))
     k = wavenumber(wavelength(gauss))
     # Calculate new local field strength based on E0*w0 = const.

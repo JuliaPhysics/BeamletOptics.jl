@@ -348,13 +348,33 @@ end
 Tests if all 9 component rays at section `id` hit the same object shape.
 """
 @inline function _beams_hits_same_shape(agb::AstigmaticGaussianBeamlet, id::Int)::Bool
-    ints = map(b -> intersection(rays(b)[id]), _component_beams(agb))
-    are_nothing = isnothing.(ints)
-    if any(are_nothing)
-        return all(are_nothing)
+    i1 = intersection(rays(agb.c)[id])
+    if isnothing(i1)
+        isnothing(intersection(rays(agb.wxp)[id])) || return false
+        isnothing(intersection(rays(agb.wxm)[id])) || return false
+        isnothing(intersection(rays(agb.wyp)[id])) || return false
+        isnothing(intersection(rays(agb.wym)[id])) || return false
+        isnothing(intersection(rays(agb.dxp)[id])) || return false
+        isnothing(intersection(rays(agb.dxm)[id])) || return false
+        isnothing(intersection(rays(agb.dyp)[id])) || return false
+        isnothing(intersection(rays(agb.dym)[id])) || return false
+        return true
+    else
+        s0 = shape(i1)
+        _check = b -> begin
+            int = intersection(rays(b)[id])
+            !isnothing(int) && shape(int) === s0
+        end
+        _check(agb.wxp) || return false
+        _check(agb.wxm) || return false
+        _check(agb.wyp) || return false
+        _check(agb.wym) || return false
+        _check(agb.dxp) || return false
+        _check(agb.dxm) || return false
+        _check(agb.dyp) || return false
+        _check(agb.dym) || return false
+        return true
     end
-    s0 = shape(ints[1])
-    return all(i -> shape(i) === s0, ints[2:end])
 end
 
 function isparentbeam(beam::AstigmaticGaussianBeamlet, ray::AbstractRay)
@@ -624,10 +644,8 @@ function parabasal_field(
         if E_ref_amp === nothing
             # Extract complex amplitude (scalar projection) to preserve phase
             E_vec = polarization(chiefn)
-            E_ref_amp = norm(E_vec) # Default to magnitude for scalar field
-            # If we want to support phase coherence between multiple beams,
-            # we can store the complex scalar projection if a reference is known.
-            # For now, we use the magnitude but allow user to override with complex.
+            max_idx = argmax(abs.(E_vec))
+            E_ref_amp = Complex(norm(E_vec) * cis(angle(E_vec[max_idx])))
         end
     end
 
