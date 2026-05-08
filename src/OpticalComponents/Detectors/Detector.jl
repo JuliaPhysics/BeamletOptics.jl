@@ -394,7 +394,8 @@ function interact3d(system::AbstractSystem, d::Detector,
 
     # Extract complex reference amplitude
     E_vec = polarization(rays(agb.c)[in_])
-    E_ref_amp = Complex{R}(norm(E_vec)) # Default to magnitude to match parabasal_field
+    max_idx = argmax(abs.(E_vec))
+    E_ref_amp = Complex{R}(norm(E_vec) * cis(angle(E_vec[max_idx])))
 
     # OPL correction (Δl)
     p_parent = agb.parent
