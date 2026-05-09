@@ -100,3 +100,26 @@ The diagonal elements $Q_{xx}$ and $Q_{yy}$ describe the phase curvature (and be
 
 !!! note "Analytic Bilinear Form"
     All vector operations in the formulas above ($\cdot, \times$) and the matrix product $\mathbf{r}^T \mathbf{Q} \mathbf{r}$ use the **analytic bilinear form** rather than the conjugated dot product. This preservation of analytic continuity is essential for the stability of Gaussian beamlets in the complex domain.
+
+## Physical Beam Cross-Section
+
+While the complex curvature matrix $\mathbf{Q}$ determines the phase and amplitude of the field, extracting the physical $1/e^2$ irradiance footprint (the principal axes of the beam ellipse) requires calculating the spot covariance matrix. This relates directly to the internal code of the `waist_parameters` function.
+
+As explicitly modeled for general astigmatic Gaussian beams [KochkinaAO:2013](@cite), the matrix describing this intensity ellipse is directly derived from $\operatorname{Im}(\mathbf{Q})$. The eigendecomposition of this matrix (or its inverse) yields eigenvalues that correspond exactly to the squared physical semi-axes of the beam. 
+
+```
+The spatial spot matrix $\mathbf{S}$, which describes the boundary of this intensity ellipse, is proportional to $\operatorname{Im}(\mathbf{Q})^{-1}$. A fundamental property of Hamiltonian optics (the symplectic invariant) dictates that for any physically valid, non-twisted Gaussian beam, the imaginary part of the curvature matrix satisfies:
+```math
+\operatorname{Im}(\mathbf{Q}) = (\mathbf{H} \mathbf{H}^\dagger)^{-1}
+```
+This identity implies that the spatial spot covariance matrix $\mathbf{S}$, which defines the beam envelope, is directly proportional to the outer product of the complex ray height matrix: $\mathbf{S} \propto \mathbf{H} \mathbf{H}^\dagger$.
+
+In **BeamletOptics**, this calculation is mapped directly to the 3D global coordinate system. Using the two complex 3D ray vectors $\mathbf{h}_1$ and $\mathbf{h}_2$, the $3 \times 3$ physical covariance matrix is formed by taking the real part of the tensor product:
+```math
+\mathbf{S} = \operatorname{Re}(\mathbf{h}_1 \mathbf{h}_1^\dagger + \mathbf{h}_2 \mathbf{h}_2^\dagger)
+```
+Expanding the complex vectors into their real and imaginary parts ($\mathbf{h} = \mathbf{h}_r + i \mathbf{h}_i$), this is implemented as:
+```math
+\mathbf{S} = \mathbf{h}_{1r} \mathbf{h}_{1r}^T + \mathbf{h}_{1i} \mathbf{h}_{1i}^T + \mathbf{h}_{2r} \mathbf{h}_{2r}^T + \mathbf{h}_{2i} \mathbf{h}_{2i}^T
+```
+To find the true physical principal axes of the general astigmatic beam, the `waist_parameters` function computes the eigendecomposition of this symmetric matrix $\mathbf{S}$. The resulting eigenvectors provide the orientation, while the square roots of the eigenvalues provide the lengths of the orthogonal major and minor 3D semi-axes. This approach ensures an objective and stable definition of the intensity footprint, even in systems where the beam undergoes rapid rotation, skew, or non-orthogonal transformations [KochkinaAO:2013, Arnaud1968, Worku:2017](@cite).

@@ -57,6 +57,30 @@ const nm = 1e-9
         @test all(BMO.position(b) ≈ pos for b in bg)
     end
 
+    @testset "EllipticalGaussianBeamletSource" begin
+        θ_x = 0.2
+        θ_y = 0.1
+        bg = EllipticalGaussianBeamletSource(pos, dir, θ_x, θ_y, λ; num_rings = 5, num_rays = 500)
+        @test bg isa AstigmaticBeamGroup
+
+        @test length(bg) == 500
+        # Check they all originate from pos
+        @test all(BMO.position(b) ≈ pos for b in bg)
+
+        # Check directions are within the elliptical cone
+        dir_n = normalize(dir)
+        b1 = BMO.normal3d(dir_n)
+        b2 = cross(dir_n, b1)
+        
+        for b in bg
+            d = BMO.direction(b)
+            # project on tangent plane using local basis
+            u = dot(d, b1) / dot(d, dir_n)
+            v = dot(d, b2) / dot(d, dir_n)
+            @test (u / tan(θ_x))^2 + (v / tan(θ_y))^2 <= 1.05
+        end
+    end
+
     @testset "WavefrontBeamletDecomposition" begin
         # Generate a synthetic wavefront (a tilted plane wave)
         nx, ny = 11, 11

@@ -58,3 +58,4 @@ For complex sources, the package provides the [`AstigmaticBeamGroup`](@ref) cont
 - [`WavefrontBeamletDecomposition`](@ref): Importing an arbitrary complex field (e.g. from a phase screen or camera data).
 - [`CollimatedGaussianBeamletSource`](@ref): A square grid of parallel beamlets (ideal for aperture diffraction).
 - [`SphericalGaussianBeamletSource`](@ref): A point-like source emitting a cone of beamlets (ideal for focused/divergent beams).
+- [`EllipticalGaussianBeamletSource`](@ref): A point-like source emitting an elliptical cone of beamlets (ideal for sources with different fast/slow axis divergence).

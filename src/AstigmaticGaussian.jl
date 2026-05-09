@@ -107,6 +107,28 @@ function AstigmaticGaussianBeamlet(
         M2_x = M2, M2_y = M2, P0, E0, support, z0)
 end
 
+"""
+    AstigmaticGaussianBeamlet(position, direction, λ, w0_x, w0_y; kwargs...)
+
+Constructs an astigmatic Gaussian beamlet with independent waists `w0_x` and `w0_y`.
+This constructor supports modeling astigmatic sources where the waists in X and Y are at different locations along the beam axis.
+
+# Arguments
+- `position`: Global reference point of the beamlet.
+- `direction`: Propagation direction vector.
+- `λ`: Wavelength.
+- `w0_x`: Waist radius in the X direction (defined by the support vector).
+- `w0_y`: Waist radius in the Y direction.
+
+# Keyword Arguments
+- `z0_x`: Position of the X waist relative to `position` along the propagation axis. Defaults to `z0`.
+- `z0_y`: Position of the Y waist relative to `position` along the propagation axis. Defaults to `z0`.
+- `z0`: Default waist position if `z0_x` and `z0_y` are not specified. Also defines the starting point of the chief ray as `position + z0 * direction`.
+- `M2_x`, `M2_y`: Beam quality factors. Default is 1.
+- `P0`: Total power in [W].
+- `E0`: Optional Jones vector for polarization.
+- `support`: Optional vector orthogonal to `direction` to define the X axis.
+"""
 function AstigmaticGaussianBeamlet(
         position::AbstractArray,
         direction::AbstractArray,
@@ -119,7 +141,9 @@ function AstigmaticGaussianBeamlet(
         P0::Real = get_default_power(),
         E0::Union{Nothing, AbstractArray{<:Number}} = nothing,
         support::Union{Nothing, AbstractArray{<:Real}} = nothing,
-        z0::Real = 0
+        z0::Real = 0,
+        z0_x::Real = z0,
+        z0_y::Real = z0
 )
     # Create orthogonal vectors for construction purposes (right-handed)
     direction = normalize(direction)
@@ -151,19 +175,19 @@ function AstigmaticGaussianBeamlet(
     θx = divergence_angle(λ, w0_x, M2_x)
     θy = divergence_angle(λ, w0_y, M2_y)
     # Waist rays
-    wxp = Ray(position + s1 * w0_x + z0 * direction, direction, λ)
-    wxm = Ray(position - s1 * w0_x + z0 * direction, direction, λ)
-    wyp = Ray(position + s2 * w0_y + z0 * direction, direction, λ)
-    wym = Ray(position - s2 * w0_y + z0 * direction, direction, λ)
+    wxp = Ray(position + s1 * w0_x + z0_x * direction, direction, λ)
+    wxm = Ray(position - s1 * w0_x + z0_x * direction, direction, λ)
+    wyp = Ray(position + s2 * w0_y + z0_y * direction, direction, λ)
+    wym = Ray(position - s2 * w0_y + z0_y * direction, direction, λ)
     # Divergence rays
     div_dir_xp = normalize(direction + s1 * tan(θx))
     div_dir_xm = normalize(direction - s1 * tan(θx))
     div_dir_yp = normalize(direction + s2 * tan(θy))
     div_dir_ym = normalize(direction - s2 * tan(θy))
-    dxp = Ray(position + div_dir_xp * z0, div_dir_xp, λ)
-    dxm = Ray(position + div_dir_xm * z0, div_dir_xm, λ)
-    dyp = Ray(position + div_dir_yp * z0, div_dir_yp, λ)
-    dym = Ray(position + div_dir_ym * z0, div_dir_ym, λ)
+    dxp = Ray(position + div_dir_xp * z0_x, div_dir_xp, λ)
+    dxm = Ray(position + div_dir_xm * z0_x, div_dir_xm, λ)
+    dyp = Ray(position + div_dir_yp * z0_y, div_dir_yp, λ)
+    dym = Ray(position + div_dir_ym * z0_y, div_dir_ym, λ)
     # Chief ray
     c = PolarizedRay(position + z0 * direction, direction, λ, E0)
     return AstigmaticGaussianBeamlet(

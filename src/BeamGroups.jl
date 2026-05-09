@@ -517,6 +517,127 @@ function SphericalGaussianBeamletSource(
 end
 
 """
+    EllipticalGaussianBeamletSource(pos, dir, θ_x, θ_y, λ; num_rings=10, num_rays=100*num_rings, ...)
+
+Spawns a coherent array of `AstigmaticGaussianBeamlet`s distributed on an elliptical cap.
+This is ideal for modelling sources with different divergences in the fast and slow axes,
+such as tapered amplifiers or edge-emitting laser diodes.
+
+# Arguments
+- `pos`: Origin point of the spherical wave.
+- `dir`: Central propagation direction.
+- `θ_x`, `θ_y`: Half spread angles in radians for the two principal axes.
+- `λ`: Wavelength.
+- `num_rings`: Number of concentric angular rings.
+- `num_rays`: Total number of beamlets to generate.
+- `overlap`: Scaling factor for the sub-waist divergence (default `1.2` ensures smooth overlap).
+- `basis`: Optional reference vector (e.g. `[1,0,0]`) to define the starting azimuthal angle for the source rings.
+- `randomize_axes`: If `true`, the internal principal axes of each individual beamlet are randomly rotated.
+- `rng`: Random number generator to use for `randomize_axes`.
+- `P0`: Total power of the source in [W].
+- `E0`: Optional Jones vector defining the polarization and phase of the wave.
+"""
+function EllipticalGaussianBeamletSource(
+        pos::AbstractArray{P},
+        dir::AbstractArray{D},
+        θ_x::H1,
+        θ_y::H2,
+        λ::L;
+        num_rings::Int = 10,
+        num_rays::Int = 100 * num_rings,
+        overlap::Float64 = 1.2,
+        basis::Union{Nothing, AbstractVector} = nothing,
+        randomize_axes::Bool = false,
+        rng = Random.GLOBAL_RNG,
+        P0::Real = get_default_power(),
+        E0 = nothing
+) where {P <: Real, D <: Real, H1 <: Real, H2 <: Real, L <: Real}
+    T = promote_type(P, D, H1, H2, L)
+    if num_rays < num_rings * 20
+        throw(ErrorException("No. of beamlets should be atleast 20x no. of rings (passed: $num_rays, req: $(num_rings*20))"))
+    end
+    if θ_x ≥ pi/2 || θ_y ≥ pi/2
+        throw(ErrorException("Elliptical source opening half-angles θ_x and θ_y must be < π/2"))
+    end
+
+    # Calculate optimal sub-waist
+    # We use the geometric mean of the angles to estimate the average ring spacing
+    θ_avg = sqrt(θ_x * θ_y)
+    Δθ = θ_avg / num_rings
+    w0s = λ / (π * overlap * Δθ)
+
+    dir_n = normalize(dir)
+    b1 = isnothing(basis) ? normal3d(dir_n) : normalize(basis - dot(basis, dir_n) * dir_n)
+    b2 = normalize(cross(dir_n, b1))
+    
+    # We use tangent space to define the elliptical rings
+    tx = tan(θ_x)
+    ty = tan(θ_y)
+
+    total_rays = num_rays
+    P_sub = P0 / total_rays
+
+    beams = Vector{AstigmaticGaussianBeamlet{T}}()
+
+    # Central beamlet
+    push!(beams, AstigmaticGaussianBeamlet(pos, dir_n, λ, w0s; P0 = P_sub, E0 = E0))
+    num_rays -= 1
+
+    # Ring normalized radii
+    ρs = LinRange(0, 1, num_rings + 1)[2:end]
+
+    # Calculate approximate circumference of each elliptical ring to distribute rays
+    # Ramanujan's approximation for ellipse circumference: C ≈ π [3(a+b) - sqrt((3a+b)(a+3b))]
+    circm = zeros(num_rings)
+    for (i, ρ) in enumerate(ρs)
+        a = ρ * tx
+        b = ρ * ty
+        circm[i] = π * (3*(a+b) - sqrt((3a+b)*(a+3b)))
+    end
+    
+    total_circm = sum(circm)
+    ds = total_circm / num_rays
+
+    n_rays = round.(Int, circm / ds)
+    n_rays[end] += (num_rays - sum(n_rays))
+
+    for (i, ρ) in enumerate(ρs)
+        numEl = n_rays[i]
+        if iszero(numEl)
+            continue
+        end
+        
+        a = ρ * tx
+        b = ρ * ty
+        
+        # We use equal steps in the parametric angle t.
+        # This ensures perfect symmetry and robust coverage.
+        ts = LinRange(0, 2π, numEl + 1)[1:end-1]
+        for t in ts
+            # Parametric equation of ellipse in tangent plane
+            u = a * cos(t)
+            v = b * sin(t)
+            
+            # The 3D direction vector
+            cdir = normalize(dir_n + u * b1 + v * b2)
+            
+            # Support vector for the beamlet axes
+            if randomize_axes
+                base_s = normal3d(cdir)
+                ortho_s = cross(cdir, base_s)
+                phi = 2π * rand(rng)
+                local_support = base_s * cos(phi) + ortho_s * sin(phi)
+            else
+                local_support = nothing
+            end
+            push!(beams, AstigmaticGaussianBeamlet(pos, cdir, λ, w0s; P0 = P_sub, E0 = E0, support = local_support))
+        end
+    end
+
+    return AstigmaticBeamGroup(beams)
+end
+
+"""
     WavefrontBeamletDecomposition(x, y, amplitude, phase, dir, λ; threshold=1e-4)
 
 Decomposes an arbitrary complex scalar field (defined by a spatial `amplitude` and `phase`
