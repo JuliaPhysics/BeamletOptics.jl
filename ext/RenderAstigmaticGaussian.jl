@@ -34,9 +34,9 @@ function render!(
         # Makie kwargs
         color = :red,
         transparency = true,
-        markersize=10,
+        markersize = 10,
         kwargs...
-    ) where {T}
+) where {T}
     vs = LinRange(0, 2π, r_res)
     for child in PreOrderDFS(agb)
         # Length tracking variable
@@ -68,17 +68,17 @@ function render!(
             for j in 2:length(bs)
                 b_new = bs[j]
                 c_new = cs[j]
-                b_old = bs[j-1]
-                c_old = cs[j-1]
+                b_old = bs[j - 1]
+                c_old = cs[j - 1]
 
-                # 1. Preserve handedness (prevent inside-out mesh flips)
+                # preserve handedness (prevent inside-out mesh flips)
                 cross_old = cross(b_old, c_old)
                 cross_new = cross(b_new, c_new)
                 if dot(cross_new, cross_old) < 0
                     b_new = -b_new
                 end
 
-                # 2. Optimal rotation to align with previous slice (Parallel Transport)
+                # optimal rotation to align with previous slice (Parallel Transport)
                 # MUST normalize to prevent magnitude-bias from twisting the mesh when major/minor axes swap!
                 bn = normalize(b_new)
                 cn = normalize(c_new)
@@ -102,15 +102,15 @@ function render!(
             for i in eachindex(params)
                 pts[i, :] = [BMO.ellipse(v, ps[i], bs[i], cs[i]) for v in vs]
             end
-            
+
             Xt = getindex.(pts, 1)
             Yt = getindex.(pts, 2)
             Zt = getindex.(pts, 3)
 
             # Render the envelope as a smooth surface
-            surface!(axis, Xt, Yt, Zt; 
-                color = fill(color, size(Xt)), 
-                transparency, 
+            surface!(axis, Xt, Yt, Zt;
+                color = fill(color, size(Xt)),
+                transparency,
                 kwargs...
             )
 
@@ -127,7 +127,7 @@ function render!(
 
         # Optionally, plot generating rays
         if show_beams
-            render!(axis, child.c; show_pos, flen,   color = :red)
+            render!(axis, child.c; show_pos, flen, color = :red)
             render!(axis, child.dxp; show_pos, flen, color = :green)
             render!(axis, child.dyp; show_pos, flen, color = :green)
             render!(axis, child.dxm; show_pos, flen, color = :green)
@@ -137,8 +137,6 @@ function render!(
             render!(axis, child.wxm; show_pos, flen, color = :blue)
             render!(axis, child.wym; show_pos, flen, color = :blue)
         end
-
-
     end
     return axis
 end

@@ -102,7 +102,7 @@ function AstigmaticGaussianBeamlet(
         E0::Union{Nothing, AbstractArray{<:Number}} = nothing,
         support::Union{Nothing, AbstractArray{<:Real}} = nothing,
         z0::Real = 0
-    )
+)
     return AstigmaticGaussianBeamlet(position, direction, λ, w0, w0;
         M2_x = M2, M2_y = M2, P0, E0, support, z0)
 end
@@ -120,7 +120,7 @@ function AstigmaticGaussianBeamlet(
         E0::Union{Nothing, AbstractArray{<:Number}} = nothing,
         support::Union{Nothing, AbstractArray{<:Real}} = nothing,
         z0::Real = 0
-    )
+)
     # Create orthogonal vectors for construction purposes (right-handed)
     direction = normalize(direction)
     if isnothing(support)
@@ -414,11 +414,11 @@ function parabasal_ray_parameters(agb::AstigmaticGaussianBeamlet, p0, i)
     chief = rays(agb.c)[i]
     pn = direction(chief)
 
-    # We use the central difference (averaging positive and negative rays)
-    # to compute the parabasal parameters. This cancels out first-order asymmetric 
-    # aberrations (like coma) and provides a much more stable O(h^2) estimate of the 
-    # beam's Gaussian properties compared to a forward difference (just using p-rays).
-    
+    # A Gaussian beam must model the local wavefront strictly up to its quadratic Taylor term.
+    # Since ray direction is the local wavefront slope (u(x) = dW/dx = W_x + W_xx*x + 0.5*W_xxx*x^2),
+    # the central difference (p - m)/2 perfectly isolates the pure paraxial curvature (W_xx)
+    # and mathematically cancels out asymmetric higher-order aberrations like cubic coma (W_xxx).
+
     # X-axis Waist (Real Part)
     h1_real_p, u1_real_p = _ray_to_plane_projection(p0, pn, rays(agb.wxp)[i])
     h1_real_m, u1_real_m = _ray_to_plane_projection(p0, pn, rays(agb.wxm)[i])
@@ -462,49 +462,26 @@ function check_optical_invariant(agb::AstigmaticGaussianBeamlet, i::Int;
         threshold::Real = get_invariant_threshold())
     chief = rays(agb.c)[i]
     p0 = position(chief)
-    pn = direction(chief)
     λ = wavelength(chief)
     n = refractive_index(agb, i)
 
-    # Helper to compute h, u from a pair of rays (waist, divergence)
-    # and a sign s (s=1 for positive set, s=-1 for negative set).
-    f = (wr, dr, s) -> begin
-        hw, uw = _ray_to_plane_projection(p0, pn, rays(wr)[i])
-        hd, ud = _ray_to_plane_projection(p0, pn, rays(dr)[i])
-        # I expect the 'm' rays to be on the opposite side of the chief ray,
-        # so lets multiply by s to bring them into the same coordinate frame.
-        return s * (hw + im * hd), s * (uw + im * ud)
-    end
-
-    h1p, u1p = f(agb.wxp, agb.dxp, 1)
-    h1m, u1m = f(agb.wxm, agb.dxm, -1)
-    h2p, u2p = f(agb.wyp, agb.dyp, 1)
-    h2m, u2m = f(agb.wym, agb.dym, -1)
-
-    # Check Coupling Invariant: h1 . u2 - h2 . u1 = 0
-    # check all 4 combinations of positive and negative sets.
-    combinations = (
-        (h1p, u1p, h2p, u2p, "p-p"),
-        (h1p, u1p, h2m, u2m, "p-m"),
-        (h1m, u1m, h2p, u2p, "m-p"),
-        (h1m, u1m, h2m, u2m, "m-m")
-    )
+    h1, u1, h2, u2, _ = parabasal_ray_parameters(agb, p0, i)
 
     all_pass = true
-    for (h1, u1, h2, u2, label) in combinations
-        inv_val = sum(h1 .* u2) - sum(h2 .* u1)
-        if abs(inv_val) > threshold
-            @warn lazy"Parabasal coupling invariant violation ($label) at segment $i: |h1.u2 - h2.u1| = $(abs(inv_val)). The paraxial astigmatic Gaussian beam tracing assumptions have broken down."
-            all_pass = false
-        end
+
+    # Check Coupling Invariant: h1 . u2 - h2 . u1 = 0
+    inv_val = sum(h1 .* u2) - sum(h2 .* u1)
+    if abs(inv_val) > threshold
+        @warn lazy"Parabasal coupling invariant violation at segment $i: |h1.u2 - h2.u1| = $(abs(inv_val)). The paraxial astigmatic Gaussian beam tracing assumptions have broken down."
+        all_pass = false
     end
 
     # Check Lagrange Invariant (Area Invariant): n * Im(h* . u) = λ/π
     # This ensures that each axis individually behaves like a valid Gaussian.
     H_target = λ / π
     sets = (
-        (h1p, u1p, "x-p"), (h1m, u1m, "x-m"),
-        (h2p, u2p, "y-p"), (h2m, u2m, "y-m")
+        (h1, u1, "x"),
+        (h2, u2, "y")
     )
     for (h, u, label) in sets
         H = n * imag(sum(conj(h) .* u))
@@ -563,27 +540,35 @@ end
     waist_parameters(agb, z)
 
 Compute the position and elliptical waist axes at distance `z` along the beam.
-Returns `(p0, w1, w2)` where `w1` and `w2` are 3D vectors describing the semi-axes
+Returns `(p0, w1, w2, w01, w02)` where `w1` and `w2` are 3D vectors describing the semi-axes
 of the beam cross-section ellipse.
 """
 function waist_parameters(agb::AstigmaticGaussianBeamlet, z::Real)
     p0, i = point_on_beam(agb, z)
+
+    # Extract the complex vectors h1 and h2 representing the amplitude matrix H from the paraxial rays.
     h1, _, h2, _, _ = parabasal_ray_parameters(agb, p0, i)
 
     # Physical axis estimation using the complex ray height h.
     # The true orthogonal principal axes of the beam cross-section are
     # the eigenvectors of the spot covariance matrix S.
+
+    # Split the complex vectors into real and imaginary parts to compute the outer product.
     h1r, h1i = real(h1), imag(h1)
     h2r, h2i = real(h2), imag(h2)
 
+    # Compute the real part of the outer tensor product H * H^dagger, yielding the spatial covariance matrix of the beam intensity.
     S = h1r * h1r' + h1i * h1i' + h2r * h2r' + h2i * h2i'
 
+    # Perform an eigendecomposition to find the principal axes (eigenvectors) and variances (eigenvalues) of the beam cross-section.
     F = eigen(Symmetric(S))
-    
+
     # F.values are sorted in ascending order. Rank is 2 (plane orthogonal to propagation direction).
+    # The 3x3 matrix has rank 2 in the transverse plane, so we discard the zero eigenvalue and take the two positive variances (squared radii).
     v1 = max(zero(eltype(S)), F.values[2])
     v2 = max(zero(eltype(S)), F.values[3])
 
+    # Scale the normalized eigenvectors by the square root of the eigenvalues to obtain the physical half-axis vectors of the elliptical spot.
     w1 = sqrt(v1) * F.vectors[:, 2]
     w2 = sqrt(v2) * F.vectors[:, 3]
 

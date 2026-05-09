@@ -401,8 +401,8 @@ const nm = 1e-9
         BMO.zrotate3d!(lens, deg2rad(80))
         BMO.translate3d!(lens, [0, 1.0mm, 0])
 
-        # Set threshold very low to trigger violation
-        strict_threshold = 1e-12
+        # Set threshold very low to trigger violation (central diffs are very accurate)
+        strict_threshold = 1e-13
 
         system = BMO.System([lens])
 
