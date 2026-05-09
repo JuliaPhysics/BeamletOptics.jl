@@ -107,7 +107,6 @@ While the complex curvature matrix $\mathbf{Q}$ determines the phase and amplitu
 
 As explicitly modeled for general astigmatic Gaussian beams [KochkinaAO:2013](@cite), the matrix describing this intensity ellipse is directly derived from $\operatorname{Im}(\mathbf{Q})$. The eigendecomposition of this matrix (or its inverse) yields eigenvalues that correspond exactly to the squared physical semi-axes of the beam. 
 
-```
 The spatial spot matrix $\mathbf{S}$, which describes the boundary of this intensity ellipse, is proportional to $\operatorname{Im}(\mathbf{Q})^{-1}$. A fundamental property of Hamiltonian optics (the symplectic invariant) dictates that for any physically valid, non-twisted Gaussian beam, the imaginary part of the curvature matrix satisfies:
 ```math
 \operatorname{Im}(\mathbf{Q}) = (\mathbf{H} \mathbf{H}^\dagger)^{-1}
