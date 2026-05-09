@@ -16,7 +16,13 @@ mutable struct Beam{T, R <: AbstractRay{T}} <: AbstractBeam{T, R}
     children::Vector{Beam{T, R}}
 end
 
+"""
+    rays(beam::Beam)
+
+Returns the vector of rays that make up the `beam`.
+"""
 rays(b::Beam) = b.rays
+
 
 Base.push!(b::Beam, ray::AbstractRay) = push!(b.rays, ray)
 
