@@ -129,7 +129,8 @@ function calc_local_pos(
             # 3D waist point
             pt = origin + waist_radius * (cos_t[k] * nd1 + sin_t[k] * nd2)
             # Project onto detector plane along ray direction
-            dist = dot(p0 - pt, ey) / dot(dir, ey)
+            dist = line_plane_distance3d(p0, ey, pt, dir)
+            isnothing(dist) && continue
             p_proj = pt + dist * dir
             
             # Local coordinates
@@ -180,11 +181,12 @@ function calc_local_pos(
         for k in 1:num_spots
             pt = origin + cos_t[k] * h1 + sin_t[k] * h2
             # Project onto detector plane along ray direction
-            dist = dot(p0 - pt, ey) / dot(dir, ey)
+            dist = line_plane_distance3d(p0, ey, pt, dir)
+            isnothing(dist) && continue
             p_proj = pt + dist * dir
             
             v = p_proj - p0
-            push!(pts_2D, Point2{T}(dot(v, ex), dot(v, ez)))
+            push!(pts_2D, Point2{T}(real(dot(v, ex)), real(dot(v, ez))))
         end
     end
     return pts_2D
