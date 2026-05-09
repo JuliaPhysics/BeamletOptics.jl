@@ -66,12 +66,34 @@ function render!(
             # Ensure elliptical basis vectors (bs, cs) vary smoothly along the segment
             # to prevent mesh twisting/flips, especially when passing through a focus.
             for j in 2:length(bs)
-                if dot(bs[j], bs[j-1]) < 0
-                    bs[j] *= -1
+                b_new = bs[j]
+                c_new = cs[j]
+                b_old = bs[j-1]
+                c_old = cs[j-1]
+
+                # 1. Preserve handedness (prevent inside-out mesh flips)
+                cross_old = cross(b_old, c_old)
+                cross_new = cross(b_new, c_new)
+                if dot(cross_new, cross_old) < 0
+                    b_new = -b_new
                 end
-                if dot(cs[j], cs[j-1]) < 0
-                    cs[j] *= -1
-                end
+
+                # 2. Optimal rotation to align with previous slice (Parallel Transport)
+                # MUST normalize to prevent magnitude-bias from twisting the mesh when major/minor axes swap!
+                bn = normalize(b_new)
+                cn = normalize(c_new)
+                bo = normalize(b_old)
+                co = normalize(c_old)
+
+                X = dot(bn, bo) + dot(cn, co)
+                Y = dot(cn, bo) - dot(bn, co)
+                phi = atan(Y, X)
+
+                cos_phi = cos(phi)
+                sin_phi = sin(phi)
+
+                bs[j] = b_new * cos_phi + c_new * sin_phi
+                cs[j] = -b_new * sin_phi + c_new * cos_phi
             end
 
             # Build surface mesh matrices

@@ -1,6 +1,6 @@
 module BeamletOptics
 
-using LinearAlgebra: norm, normalize, normalize!, dot, cross, I, tr
+using LinearAlgebra: norm, normalize, normalize!, dot, cross, I, tr, eigen, Symmetric
 using MarchingCubes: MC, march
 using Trapz: trapz
 using PrecompileTools: @setup_workload, @compile_workload

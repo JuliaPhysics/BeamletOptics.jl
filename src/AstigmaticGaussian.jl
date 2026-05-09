@@ -414,19 +414,40 @@ function parabasal_ray_parameters(agb::AstigmaticGaussianBeamlet, p0, i)
     chief = rays(agb.c)[i]
     pn = direction(chief)
 
-    # Use only the positive (p) set for the primary parameter calculation.
-    # The negative (m) set is reserved for independent invariant checks in `check_optical_invariant`.
+    # We use the central difference (averaging positive and negative rays)
+    # to compute the parabasal parameters. This cancels out first-order asymmetric 
+    # aberrations (like coma) and provides a much more stable O(h^2) estimate of the 
+    # beam's Gaussian properties compared to a forward difference (just using p-rays).
+    
+    # X-axis Waist (Real Part)
     h1_real_p, u1_real_p = _ray_to_plane_projection(p0, pn, rays(agb.wxp)[i])
+    h1_real_m, u1_real_m = _ray_to_plane_projection(p0, pn, rays(agb.wxm)[i])
+    h1_real = (h1_real_p - h1_real_m) / 2
+    u1_real = (u1_real_p - u1_real_m) / 2
+
+    # X-axis Divergence (Imaginary Part)
     h1_imag_p, u1_imag_p = _ray_to_plane_projection(p0, pn, rays(agb.dxp)[i])
+    h1_imag_m, u1_imag_m = _ray_to_plane_projection(p0, pn, rays(agb.dxm)[i])
+    h1_imag = (h1_imag_p - h1_imag_m) / 2
+    u1_imag = (u1_imag_p - u1_imag_m) / 2
 
-    h1 = h1_real_p + im * h1_imag_p
-    u1 = u1_real_p + im * u1_imag_p
+    h1 = h1_real + im * h1_imag
+    u1 = u1_real + im * u1_imag
 
+    # Y-axis Waist (Real Part)
     h2_real_p, u2_real_p = _ray_to_plane_projection(p0, pn, rays(agb.wyp)[i])
-    h2_imag_p, u2_imag_p = _ray_to_plane_projection(p0, pn, rays(agb.dyp)[i])
+    h2_real_m, u2_real_m = _ray_to_plane_projection(p0, pn, rays(agb.wym)[i])
+    h2_real = (h2_real_p - h2_real_m) / 2
+    u2_real = (u2_real_p - u2_real_m) / 2
 
-    h2 = h2_real_p + im * h2_imag_p
-    u2 = u2_real_p + im * u2_imag_p
+    # Y-axis Divergence (Imaginary Part)
+    h2_imag_p, u2_imag_p = _ray_to_plane_projection(p0, pn, rays(agb.dyp)[i])
+    h2_imag_m, u2_imag_m = _ray_to_plane_projection(p0, pn, rays(agb.dym)[i])
+    h2_imag = (h2_imag_p - h2_imag_m) / 2
+    u2_imag = (u2_imag_p - u2_imag_m) / 2
+
+    h2 = h2_real + im * h2_imag
+    u2 = u2_real + im * u2_imag
 
     return h1, u1, h2, u2, p0
 end
@@ -550,20 +571,21 @@ function waist_parameters(agb::AstigmaticGaussianBeamlet, z::Real)
     h1, _, h2, _, _ = parabasal_ray_parameters(agb, p0, i)
 
     # Physical axis estimation using the complex ray height h.
-    # The real part (waist ray) defines the beam semi-axis directions.
-    # If the waist ray crosses zero (e.g. at an image plane), we fall back to the divergence ray (imaginary part).
-    w1_dir = real(h1)
-    if norm(w1_dir) < 1e-12
-        w1_dir = imag(h1)
-    end
+    # The true orthogonal principal axes of the beam cross-section are
+    # the eigenvectors of the spot covariance matrix S.
+    h1r, h1i = real(h1), imag(h1)
+    h2r, h2i = real(h2), imag(h2)
 
-    w2_dir = real(h2)
-    if norm(w2_dir) < 1e-12
-        w2_dir = imag(h2)
-    end
+    S = h1r * h1r' + h1i * h1i' + h2r * h2r' + h2i * h2i'
 
-    w1 = norm(h1) * normalize(w1_dir)
-    w2 = norm(h2) * normalize(w2_dir)
+    F = eigen(Symmetric(S))
+    
+    # F.values are sorted in ascending order. Rank is 2 (plane orthogonal to propagation direction).
+    v1 = max(zero(eltype(S)), F.values[2])
+    v2 = max(zero(eltype(S)), F.values[3])
+
+    w1 = sqrt(v1) * F.vectors[:, 2]
+    w2 = sqrt(v2) * F.vectors[:, 3]
 
     # Get waist sizes for unification
     _, _, _, _, _, w01, w02 = gauss_parameters(agb, z)

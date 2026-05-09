@@ -33,7 +33,7 @@ const nm = 1e-9
     @testset "GaussianBeamletDecomposition" begin
         w0 = 1mm
         # A 21x21 grid will trim beamlets with amp < 1e-4, so length will be < 441
-        bg = GaussianBeamletDecomposition(pos, dir, w0, λ; n_grid = 21)
+        bg = GaussianBeamletDecomposition(pos, dir, λ, w0; n_grid = 21)
         @test bg isa AstigmaticBeamGroup
         beams = BMO.beams(bg)
 

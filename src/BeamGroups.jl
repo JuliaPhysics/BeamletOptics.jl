@@ -320,7 +320,7 @@ function CollimatedGaussianBeamletSource(
 end
 
 """
-    GaussianBeamletDecomposition(pos, dir, w0, λ; n_grid=20)
+    GaussianBeamletDecomposition(pos, dir, λ, w0; n_grid=20)
 
 Decomposes a macroscopic Gaussian beam of waist `w0` into an `n_grid × n_grid`
 array of microscopic `AstigmaticGaussianBeamlet`s. This allows the accurate
@@ -331,8 +331,8 @@ coherent superposition of the sub-beamlets.
 # Arguments
 - `pos`: Waist center position of the macroscopic beam.
 - `dir`: Propagation direction.
-- `w0`: Macroscopic beam waist.
 - `λ`: Wavelength.
+- `w0`: Macroscopic beam waist.
 - `n_grid`: Number of beamlets along one axis (default `20` yields `400` total beamlets).
 - `overlap`: Scaling factor for the sub-waist relative to grid spacing (default `1.2` ensures smooth overlap).
 - `basis`: Orientation of the macroscopic sampling grid. Determines the 3D directions corresponding to the `x` and `y` grid axes.
@@ -345,8 +345,8 @@ coherent superposition of the sub-beamlets.
 function GaussianBeamletDecomposition(
         pos::AbstractArray{P},
         dir::AbstractArray{D1},
-        w0::W,
-        λ::L;
+        λ::L,
+        w0::W;
         n_grid::Int = 20,
         overlap::Float64 = 1.2,
         basis::Union{Nothing, Tuple{AbstractVector, AbstractVector}} = nothing,
