@@ -128,6 +128,11 @@ This constructor supports modeling astigmatic sources where the waists in X and 
 - `P0`: Total power in [W].
 - `E0`: Optional Jones vector for polarization.
 - `support`: Optional vector orthogonal to `direction` to define the X axis.
+
+# Additional information
+
+!!! warning "Optical invariant check"
+    When using the `solve_system!` function, the beamlet invariant will be checked for each interaction. If the invariant is violated, tracing will be stopped.
 """
 function AstigmaticGaussianBeamlet(
         position::AbstractArray,
