@@ -755,7 +755,7 @@ Compute the optical intensity [W/m²] of the beamlet at position `(r, z)`.
 """
 function intensity(agb::AstigmaticGaussianBeamlet, r::AbstractArray, z::Real)
     E = electric_field(agb, r, z)
-    return 0.5 * norm(E)^2 # Assuming vacuum impedance normalization for simplicity in this package
+    return intensity(E)
 end
 
 """
