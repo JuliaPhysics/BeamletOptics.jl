@@ -189,10 +189,11 @@ function AstigmaticGaussianBeamlet(
     div_dir_xm = normalize(direction - s1 * tan(θx))
     div_dir_yp = normalize(direction + s2 * tan(θy))
     div_dir_ym = normalize(direction - s2 * tan(θy))
-    dxp = Ray(position + div_dir_xp * z0_x, div_dir_xp, λ)
-    dxm = Ray(position + div_dir_xm * z0_x, div_dir_xm, λ)
-    dyp = Ray(position + div_dir_yp * z0_y, div_dir_yp, λ)
-    dym = Ray(position + div_dir_ym * z0_y, div_dir_ym, λ)
+    # Corrected divergence ray positions to ensure waist is at z0_x and z0_y
+    dxp = Ray(position - z0_x * s1 * tan(θx), div_dir_xp, λ)
+    dxm = Ray(position + z0_x * s1 * tan(θx), div_dir_xm, λ)
+    dyp = Ray(position - z0_y * s2 * tan(θy), div_dir_yp, λ)
+    dym = Ray(position + z0_y * s2 * tan(θy), div_dir_ym, λ)
     # Chief ray
     c = PolarizedRay(position + z0 * direction, direction, λ, E0)
     return AstigmaticGaussianBeamlet(

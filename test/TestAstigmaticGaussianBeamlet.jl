@@ -59,6 +59,27 @@ const BMO = BeamletOptics
         @test norm(w2) ≈ w0 atol=1e-6
     end
 
+    @testset "Waist parameters with offsets" begin
+        z0_x = 0.05
+        z0_y = 0.10
+        beam = AstigmaticGaussianBeamlet(
+            [0.0, 0, 0], [0, 1, 0], λ0, w0, 2*w0;
+            z0_x = z0_x, z0_y = z0_y,
+            E0=[0,0,1], support=[1,0,0]
+        )
+        
+        # X waist should be at z0_x
+        _, wx_waist, _ = BMO.waist_parameters(beam, z0_x)
+        @test norm(wx_waist) ≈ w0 atol=1e-6
+        
+        # Y waist should be at z0_y
+        _, _, wy_waist = BMO.waist_parameters(beam, z0_y)
+        @test norm(wy_waist) ≈ 2*w0 atol=1e-6
+        
+        # Verify invariants hold
+        @test BMO.check_optical_invariant(beam, 1; threshold=1e-12)
+    end
+
     @testset "Lens interaction" begin
         s1 = BMO.CylinderSDF(BMO.inch / 2, BMO.inch)
         l1 = BMO.Lens(s1, n -> 1.5)
