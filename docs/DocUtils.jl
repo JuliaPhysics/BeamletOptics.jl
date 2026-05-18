@@ -76,7 +76,19 @@ end
 """
     prerender_include(fname::String, cname::String)
 
+This function runs the build script and places the images within the docs\\src folder when run outside of the CI/CD pipeline.
+It is recommended to use this approach when the rendered image is too computationally intensive for the github runner.
+    
+# Arguments
 
+- `fname`: points to the BMO render script
+- `cname`: points to the executing markdown script
+
+!!! info
+    It is highly recommended that the `@__FILE__` macro is passed into `cname` within the executing markdown block.
+    E.g. within a .md file:
+
+    `Main.DocUtils.prerender_include("myscript.jl", @__FILE__)`
 """
 function prerender_include(fname::String, cname::String)
     location = replace_build_with_src(dirname(cname))
