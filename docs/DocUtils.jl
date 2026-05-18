@@ -1,6 +1,7 @@
 module DocUtils
 
 using GLMakie: Figure, Axis, hidedecorations!, text!, save
+using Dates: now
 
 const GLOBAL_USE_PLACEHOLDERS = true
 
@@ -57,8 +58,58 @@ function conditional_include(fname::String; use_placeholder::Bool=!haskey(ENV, "
         end
     else
         @info "Running script for $fname"
+        t1 = now()
         include(fname)
+        t2 = now()
+        @info " Runtime: $(t2-t1)"
     end
+end
+
+function replace_build_with_src(path::String)
+    clean_path = abspath(path)
+    build_segment = joinpath("docs", "build")
+    src_segment   = joinpath("docs", "src")
+    src_path = replace(clean_path, build_segment => src_segment)
+    return src_path
+end
+
+"""
+    prerender_include(fname::String, cname::String)
+
+
+"""
+function prerender_include(fname::String, cname::String)
+    location = replace_build_with_src(dirname(cname))
+    content = read(fname, String)
+    pattern = Regex("^[ \\t]*save\\(\\s*\"([^\"]+)\"\\s*,\\s*([a-zA-Z_][a-zA-Z0-9_]*)", "m")
+    all_files_there = true
+    for match in eachmatch(pattern, content)
+        # check if file already exists
+        save_name = match.captures[1]
+        if !isfile(joinpath(location, save_name))
+            if haskey(ENV, "CI")
+                throw(ErrorException("Running $fname in CI pipeline, missing $save_name at $location"))
+            end
+            all_files_there = false
+            break
+        end
+    end
+    # if all pre-rendered files exist, do nothing
+    if all_files_there
+        @info "Found pre-rendered images for $fname"
+        return nothing
+    end
+    # if files missing, run script
+    @warn "Detected missing pre-rendered file/s for script $fname, running..."
+    include(fname)
+    # scan for figs, copy to src folder
+    for match in eachmatch(pattern, content)
+        save_name = match.captures[1]
+        path_name = dirname(cname)
+        @info "Copying $save_name from \\build to \\src"
+        cp(joinpath(path_name, save_name), joinpath(location, save_name); force=true)
+    end
+    return nothing
 end
 
 end
