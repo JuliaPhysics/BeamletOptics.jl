@@ -1,9 +1,7 @@
 ```@setup double_slit
-include(joinpath(@__DIR__, "..", "assets", "cond_save.jl"))
-
 beam_showcase_dir = joinpath(@__DIR__, "..", "assets", "examples")
 
-conditional_include(joinpath(beam_showcase_dir, "double_slit.jl"))
+Main.DocUtils.conditional_include(joinpath(beam_showcase_dir, "double_slit.jl"))
 ```
 
 ## Double slit diffraction

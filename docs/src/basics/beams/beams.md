@@ -1,9 +1,7 @@
 ```@setup beams
-include(joinpath(@__DIR__, "..", "..", "assets", "cond_save.jl"))
-
 beam_showcase_dir = joinpath(@__DIR__, "..", "..", "assets", "beam_renders")
 
-conditional_include(joinpath(beam_showcase_dir, "beam_showcase.jl"))
+Main.DocUtils.conditional_include(joinpath(beam_showcase_dir, "beam_showcase.jl"))
 ```
 
 # Beams

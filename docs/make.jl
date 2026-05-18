@@ -4,7 +4,14 @@ using BeamletOptics
 using Documenter
 using DocumenterCitations
 
-DocMeta.setdocmeta!(BeamletOptics, :DocTestSetup, :(using BeamletOptics); recursive=true)
+include(joinpath(@__DIR__, "DocUtils.jl"))
+
+DocMeta.setdocmeta!(
+    BeamletOptics,
+    :DocTestSetup,
+    :(using BeamletOptics);
+    recursive=true
+)
 
 bib = CitationBibliography(joinpath(@__DIR__, "src", "refs.bib"))
 

@@ -5,6 +5,14 @@ This section of the documentation is intended for users that want to dive deeper
 ## Basics overview
 
 ```@contents
-Pages = ["rays.md", "beams.md", joinpath("components", "components.md"), "systems.md", "render.md", "components\\test.md"]
+Pages = [
+    "rays.md",
+    joinpath("beams", "beams.md"),
+    joinpath("beams", "stigmatic_beam.md"),
+    joinpath("beams", "astigmatic_beam.md"),
+    joinpath("components", "components.md"),
+    "systems.md",
+    "render.md",
+]
 Depth = 2
 ```

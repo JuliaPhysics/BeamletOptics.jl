@@ -62,7 +62,6 @@ end
 
 """
     AstigmaticGaussianBeamlet(position, direction, λ, w0; kwargs...)
-    AstigmaticGaussianBeamlet(position, direction, λ, w0_x, w0_y; kwargs...)
 
 Constructs an astigmatic Gaussian beamlet at its waist with the specified beam parameters.
 In the 4-argument version, the beam has circular symmetry with waist radius `w0`.

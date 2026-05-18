@@ -1,9 +1,7 @@
 ```@setup astigmatic_beamlet
-include(joinpath(@__DIR__, "..", "..", "assets", "cond_save.jl"))
-
 beam_showcase_dir = joinpath(@__DIR__, "..", "..", "assets", "beam_renders")
 
-conditional_include(joinpath(beam_showcase_dir, "agb_showcase.jl"), use_placeholder=false)
+Main.DocUtils.conditional_include(joinpath(beam_showcase_dir, "agb_showcase.jl"))
 ```
 
 # Astigmatic polarized beamlets

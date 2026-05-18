@@ -1,4 +1,6 @@
-using GLMakie
+module DocUtils
+
+using GLMakie: Figure, Axis, hidedecorations!, text!, save
 
 const GLOBAL_USE_PLACEHOLDERS = true
 
@@ -57,4 +59,6 @@ function conditional_include(fname::String; use_placeholder::Bool=!haskey(ENV, "
         @info "Running script for $fname"
         include(fname)
     end
+end
+
 end

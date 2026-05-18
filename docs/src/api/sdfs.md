@@ -1,9 +1,7 @@
 ```@setup rays
-include(joinpath(@__DIR__, "..", "assets", "cond_save.jl"))
-
 dir = joinpath(@__DIR__, "..", "assets")
 
-conditional_include(joinpath(dir, "raymarching.jl"))
+Main.DocUtils.conditional_include(joinpath(dir, "raymarching.jl"))
 ```
 
 # Signed Distance Functions (SDFs)
