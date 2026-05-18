@@ -1,8 +1,8 @@
 ```@setup beam_groups
 beam_showcase_dir = joinpath(@__DIR__, "..", "..", "assets", "beam_renders")
 
-Main.DocUtils.conditional_include(joinpath(beam_showcase_dir, "collimated_sc.jl"), use_placeholder=true)
-Main.DocUtils.conditional_include(joinpath(beam_showcase_dir, "pointsource_sc.jl"), use_placeholder=true)
+Main.DocUtils.conditional_include(joinpath(beam_showcase_dir, "collimated_sc.jl"))
+Main.DocUtils.conditional_include(joinpath(beam_showcase_dir, "pointsource_sc.jl"))
 ```
 
 # Beam groups
