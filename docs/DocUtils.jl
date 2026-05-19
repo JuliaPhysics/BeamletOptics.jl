@@ -78,6 +78,7 @@ end
 
 This function runs the build script and places the images within the docs\\src folder when run outside of the CI/CD pipeline.
 It is recommended to use this approach when the rendered image is too computationally intensive for the github runner.
+If a prerendered image already exists, it has to be **deleted manually** in order to trigger a re-run.
     
 # Arguments
 
