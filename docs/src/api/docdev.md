@@ -27,10 +27,9 @@ In general, you can generate and include figures into your documentation section
     - files will be saved with respect to the calling environment
 3. In the markdown file that contains your documentation and should load your images, do the following:
     1. create a `@setup` code block
-    2. include the `conditional_include` via e.g. `include(joinpath(@__DIR__, "..", "assets", "cond_save.jl"))`
-        - ensure that the relative file path is correct
-    3. load your script during build via `conditional_include`
-        - more info on this function is provided in the `cond_save.jl` file
+    2. load your script during build via `Main.DocUtils.conditional_include`
+        - more info on this function is provided in the `DocUtils.jl` file
+    3. Or, alternatively use `Main.DocUtils.prerender_include` to generate the image locally
 4. Load the image within your markdown file via `![My figure](my_fig.png)`
 
 Examples for this pattern can be found at the top of most .md files of the documentation, e.g. `beamsplitters.md`.

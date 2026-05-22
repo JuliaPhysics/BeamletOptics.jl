@@ -107,25 +107,87 @@ function calc_local_pos(
     ey = orientation(pd)[:,2]
     ez = orientation(pd)[:,3]
     pts_2D = Vector{Point2{T}}()
-    # Caclulate spots
+    sizehint!(pts_2D, length(hits) * num_spots)
+    
+    # Pre-calculate trig
+    sin_t = sin.(ts)
+    cos_t = cos.(ts)
+
+    # Calculate spots
     for hit in hits
-        # Determine waist radius at intersection point
-        waist_radius, ~, ~, ~ = gauss_parameters(hit.gauss, length(hit.gauss))
-        waist_radius *= crop_factor
+        # Use cached w_max (radius at detector)
+        waist_radius = hit.w_max * crop_factor
+        
         # build basis vectors
-        dir = direction(hit)
+        dir = hit.d0
         nd1 = normal3d(dir)
         nd2 = cross(dir, nd1)
         origin = hit_point(hit)
-        # Calculate 3D waist circle of points
-        pts_3D = ellipse(ts, origin, waist_radius*nd1, waist_radius*nd2)
-        # Project 3D points onto plane, calculate local (x, z) coords
-        for (i, pt) in enumerate(pts_3D)
+        
+        # Calculate spots and project
+        for k in 1:num_spots
+            # 3D waist point
+            pt = origin + waist_radius * (cos_t[k] * nd1 + sin_t[k] * nd2)
+            # Project onto detector plane along ray direction
             dist = line_plane_distance3d(p0, ey, pt, dir)
-            pts_3D[i] = pt + dist * dir
+            isnothing(dist) && continue
+            p_proj = pt + dist * dir
+            
+            # Local coordinates
+            v = p_proj - p0
+            push!(pts_2D, Point2{T}(dot(v, ex), dot(v, ez)))
         end
-        new_pts = calc_local_pos(p0, ex, ez, pts_3D)
-        append!(pts_2D, new_pts)
+    end
+    return pts_2D
+end
+
+"""
+    calc_local_pos(pd::Detector, hits::Vector{AstigmaticGaussianBeamletHit}; crop_factor=1, num_spots=50)
+
+Calculates a projected ellipse of 2D hit spots for each hit of an [`AstigmaticGaussianBeamlet`](@ref)
+on the [`Detector`](@ref).
+"""
+function calc_local_pos(
+        pd::Detector,
+        hits::Vector{AstigmaticGaussianBeamletHit{T}};
+        # kwargs
+        crop_factor::Real=one(T),
+        num_spots::Int=50
+    ) where T
+    # Calculate waist projections in local (x, z) coordinates
+    ts = LinRange(0, 2pi, num_spots)
+    p0 = position(pd)
+    # Left-handed coord. sys. due to pd mesh rotation
+    ex = -orientation(pd)[:,1]
+    ey = orientation(pd)[:,2]
+    ez = orientation(pd)[:,3]
+    pts_2D = Vector{Point2{T}}()
+    sizehint!(pts_2D, length(hits) * num_spots)
+
+    sin_t = sin.(ts)
+    cos_t = cos.(ts)
+
+    for hit in hits
+        # Use cached parabasal parameters at segment start
+        # Propagate to detector (end of segment)
+        # chief segment length
+        l_seg = length(rays(hit.agb.c)[hit.id])
+        h1 = (hit.h1 + l_seg * hit.u1) * crop_factor
+        h2 = (hit.h2 + l_seg * hit.u2) * crop_factor
+        
+        dir = hit.d0
+        origin = hit_point(hit)
+        
+        for k in 1:num_spots
+            pt = origin + cos_t[k] * h1 + sin_t[k] * h2
+            # Project onto detector plane along ray direction
+            dist = line_plane_distance3d(p0, ey, pt, dir)
+            isnothing(dist) && continue
+            p_proj = pt + dist * dir
+            
+            v = p_proj - p0
+            push!(pts_2D, Point2{T}(real(dot(v, ex)), real(dot(v, ez))))
+        end
     end
     return pts_2D
 end
@@ -160,8 +222,8 @@ function calc_local_lims(
         crop_factor::Real=one(T),
         center::AbstractCenterAlgorithm=Centroid()
     ) where T
-    # get all hit‐points in local (x,y)
-    local_hits = calc_local_pos(pd)
+    # get provided hit‐points in local (x,y)
+    local_hits = calc_local_pos(pd, hits)
     xs = getindex.(local_hits, 1)
     zs = getindex.(local_hits, 2)
     # calculate center
@@ -186,14 +248,40 @@ For available keyword args., refer to the corresponding [`calc_local_pos`](@ref)
 """
 function calc_local_lims(
         pd::Detector,
-        ::Vector{GaussianBeamletHit{G}};
-        # kwargs
-        crop_factor::Real=one(G),
-        num_spots::Int=50
-    ) where G
-    local_hits = calc_local_pos(pd; crop_factor, num_spots)
-    xs = getindex.(local_hits, 1)
-    zs = getindex.(local_hits, 2)
-    # min/max limits
-    return minimum(xs), maximum(xs), minimum(zs), maximum(zs)
+        hits::Vector{H};
+        crop_factor::Real=1.5,
+        kwargs...
+    ) where {T, H <: AbstractBeamletHit{T}}
+    
+    pos_pd = position(pd)
+    ex = -orientation(pd)[:, 1]
+    ez = orientation(pd)[:, 3]
+    
+    xmin = T(Inf)
+    xmax = T(-Inf)
+    zmin = T(Inf)
+    zmax = T(-Inf)
+    
+    for hit in hits
+        # Center in local coords
+        p_hit = hit_point(hit) - pos_pd
+        x = dot(p_hit, ex)
+        z = dot(p_hit, ez)
+        
+        # Conservative bounding box using cached w_max
+        # w_max is the maximum semi-axis at the detector plane
+        w = hit.w_max * crop_factor
+        
+        xmin = min(xmin, x - w)
+        xmax = max(xmax, x + w)
+        zmin = min(zmin, z - w)
+        zmax = max(zmax, z + w)
+    end
+    
+    # Handle empty or invalid hits
+    if xmin > xmax
+        return (T(0), T(0), T(0), T(0))
+    end
+    
+    return (xmin, xmax, zmin, zmax)
 end

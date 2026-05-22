@@ -4,7 +4,14 @@ using BeamletOptics
 using Documenter
 using DocumenterCitations
 
-DocMeta.setdocmeta!(BeamletOptics, :DocTestSetup, :(using BeamletOptics); recursive=true)
+include(joinpath(@__DIR__, "DocUtils.jl"))
+
+DocMeta.setdocmeta!(
+    BeamletOptics,
+    :DocTestSetup,
+    :(using BeamletOptics);
+    recursive=true
+)
 
 bib = CitationBibliography(joinpath(@__DIR__, "src", "refs.bib"))
 
@@ -34,12 +41,18 @@ makedocs(;
                 "Aspherical lenses"         => joinpath("examples", "aspherical_lenses.md"),
                 "Double Gauss lens"         => joinpath("examples", "double_gauss.md"),
                 "Lens groups"               => joinpath("examples", "lens_groups.md"),
+                "Double slit"               => joinpath("examples", "double_slit.md"),
             ],
         ],
         "Basics" => Any[
             "Introduction"                  => joinpath("basics", "intro.md"),
             "Rays"                          => joinpath("basics", "rays.md"),
-            "Beams"                         => joinpath("basics", "beams.md"),
+            "Beams" => Any[
+                "Basic beam"                => joinpath("basics", "beams", "beams.md"),
+                "Stigmatic Gaussian"        => joinpath("basics", "beams", "stigmatic_beam.md"),
+                "Astigmatic Gaussian"       => joinpath("basics", "beams", "astigmatic_beam.md"),
+                "Beam groups"               => joinpath("basics", "beams", "beam_groups.md"),
+            ],
             "Optical components" => Any[
                 "Overview"                  => joinpath("basics", "components", "components.md"),
                 "Mirrors"                   => joinpath("basics", "components", "mirrors.md"),

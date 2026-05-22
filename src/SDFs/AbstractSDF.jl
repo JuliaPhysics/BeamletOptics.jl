@@ -1,6 +1,3 @@
-const eps_srf = 1e-9     # helps to decide if on SDF surface
-const eps_ray = 1e-10     # helps to terminate outside ray marching routine
-const eps_ins = 1e-0      # internal ray marching length step
 
 """
     AbstractSDF <: AbstractShape
@@ -88,7 +85,7 @@ function numeric_gradient(s::AbstractSDF, pos)
 end
 
 function normal_fd(s::AbstractSDF, p)
-    normal = normalize(gradient(x->sdf(s, x), p))
+    normal = normalize(gradient(x -> sdf(s, x), p))
     all(!isnan, normal) && return normal
     # fallback
     return numeric_gradient(s, p)
@@ -103,24 +100,36 @@ function _raymarch_outside(shape::AbstractSDF{S},
         pos::AbstractArray{R},
         dir::AbstractArray{R},
         num_iter = 1000,
-        eps = eps_ray) where {S, R}
+        eps = Config.get_sdf_raymarch_eps()) where {S, R}
     T = promote_type(S, R)
     dist = sdf(shape, pos)
-    t0 = dist
+    t0 = zero(T)
+
+    # `escaped` tracks if the ray has definitively moved away from the surface
+    escaped = dist > eps
     i = 1
-    # march the ray based on the last returned distance
     while i <= num_iter
-        pos = pos + dist * dir
+        # When trapped in the surface noise floor (dist < eps), we slowly accelerate the minimum step
+        # proportionally to the distance traveled (t0 * 0.01). 
+        # This logarithmic escape prevents exhausting num_iter on highly inaccurate SDFs, 
+        # while bounding the blind step to 1% of the traveled distance to prevent tunneling.
+        min_step = escaped ? eps : (eps + t0 * 0.01)
+        step_size = max(dist, min_step)
+        pos = pos + step_size * dir
+        t0 += step_size
         dist = sdf(shape, pos)
-        t0 += dist
         i += 1
-        # surface has been reached if distance is less than tolerance (highly convex surfaces can require many iterations)
-        if dist < eps
+
+        if dist > eps
+            escaped = true
+        elseif escaped
             normal = normal3d(shape, pos)
-            return Intersection(t0, normal, shape)
+            # Filter out false positive hits caused by numerical noise when leaving an SDF.
+            if !(dot(dir, normal) > eps)
+                return Intersection(t0, normal, shape)
+            end
         end
     end
-    # return no intersection if tolerance has not been reached or actual miss occurs
     return nothing
 end
 
@@ -133,7 +142,7 @@ function _raymarch_inside(object::AbstractSDF{S},
         pos::AbstractArray{R},
         dir::AbstractArray{R},
         num_iter = 1000,
-        dl = eps_ins) where {S, R}
+        dl = Config.get_sdf_inside_step()) where {S, R}
     # this method assumes semi-concave objects, i.e. might fail depending on the choice of dl
     T = promote_type(S, R)
     t0::T = 0
@@ -168,13 +177,15 @@ function intersect3d(object::AbstractSDF, ray::AbstractRay)
     dir = direction(ray)
     d = sdf(object, pos)
     # Test if outside of sdf, else inside
-    if d > eps_srf
+    if d > Config.get_sdf_surface_threshold()
         return _raymarch_outside(object, pos, dir)
     end
     # Test if normal and ray dir oppose or align to determine if ray exits object
     n = normal3d(object, pos)
     if dot(dir, n) ≤ 0
         return _raymarch_inside(object, pos, dir)
+    else
+        return _raymarch_outside(object, pos, dir)
     end
     # Return no intersection else
     return nothing

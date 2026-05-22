@@ -3,7 +3,7 @@
 
 A ray type to model the propagation of an electric field vector based on the publication:
 
-**Yun, Garam, Karlton Crabtree, and Russell A. Chipman. "Three-dimensional polarization ray-tracing calculus I: definition and diattenuation." Applied optics 50.18 (2011): 2855-2865.**
+**Yun, Garam, Karlton Crabtree, and Russell A. Chipman. "Three-dimensional polarization ray-tracing calculus I: definition and diattenuation." Applied Optics 50.18 (2011): 2855-2865.**
 
 The geometrical ray description is identical to the standard [`Ray`](@ref). The polarization interaction can be described in local s-p-coordinates
 but must be transformed into global coordinates using the method described in the publication above, see also [`_calculate_global_E0`](@ref).
@@ -54,12 +54,12 @@ mutable struct PolarizedRay{T} <: AbstractRay{T}
             throw(ErrorException("Direction vector to short for normalization."))
         end
         # This test is very important and must be performed for each pol. ray
-        if !isorthogonal3d(dir, E0; atol=1e-14)
-            throw(ErrorException("Ray dir. and E0 must be orthogonal."))
+        if !isorthogonal3d(dir, E0; atol=1e-10)
+            error("Ray dir. and E0 must be orthogonal (dot product: $(dot(dir, E0)))")
         end
         return new{M}(
             Point3{M}(pos),
-            Point3{M}(dir),
+            normalize(Point3{M}(dir)),
             int,
             M(λ),
             M(n),

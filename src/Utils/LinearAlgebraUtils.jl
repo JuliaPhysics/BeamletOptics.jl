@@ -162,7 +162,7 @@ Returns the distance between a line and an infinitely large plane which are char
 function line_plane_distance3d(plane_position::AbstractArray, plane_normal::AbstractArray,
         line_position::AbstractArray, line_direction::AbstractArray)
     denom = dot(plane_normal, line_direction)
-    if abs(denom) > 1e-6
+    if abs(denom) > Config.get_line_plane_intersection_threshold()
         # explicit dot product for perfomance
         c = dot(plane_position - line_position, plane_normal)
         t = c / denom

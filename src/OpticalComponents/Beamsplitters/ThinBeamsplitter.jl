@@ -180,3 +180,56 @@ function interact3d(
     children!(gauss, [t, r])
     return nothing
 end
+
+@inline function _beamsplitter_transmitted_beam(
+        bs::AbstractBeamsplitter, agb::AstigmaticGaussianBeamlet, ray_id::Int)
+    c = _beamsplitter_transmitted_beam(bs, agb.c, rays(agb.c)[ray_id])
+    wxp = _beamsplitter_transmitted_beam(bs, agb.wxp, rays(agb.wxp)[ray_id])
+    wxm = _beamsplitter_transmitted_beam(bs, agb.wxm, rays(agb.wxm)[ray_id])
+    wyp = _beamsplitter_transmitted_beam(bs, agb.wyp, rays(agb.wyp)[ray_id])
+    wym = _beamsplitter_transmitted_beam(bs, agb.wym, rays(agb.wym)[ray_id])
+    dxp = _beamsplitter_transmitted_beam(bs, agb.dxp, rays(agb.dxp)[ray_id])
+    dxm = _beamsplitter_transmitted_beam(bs, agb.dxm, rays(agb.dxm)[ray_id])
+    dyp = _beamsplitter_transmitted_beam(bs, agb.dyp, rays(agb.dyp)[ray_id])
+    dym = _beamsplitter_transmitted_beam(bs, agb.dym, rays(agb.dym)[ray_id])
+    return AstigmaticGaussianBeamlet(c, wxp, wxm, wyp, wym, dxp, dxm, dyp, dym)
+end
+
+@inline function _beamsplitter_reflected_beam(
+        bs::AbstractBeamsplitter, agb::AstigmaticGaussianBeamlet, ray_id::Int)
+    c = _beamsplitter_reflected_beam(bs, agb.c, rays(agb.c)[ray_id])
+    wxp = _beamsplitter_reflected_beam(bs, agb.wxp, rays(agb.wxp)[ray_id])
+    wxm = _beamsplitter_reflected_beam(bs, agb.wxm, rays(agb.wxm)[ray_id])
+    wyp = _beamsplitter_reflected_beam(bs, agb.wyp, rays(agb.wyp)[ray_id])
+    wym = _beamsplitter_reflected_beam(bs, agb.wym, rays(agb.wym)[ray_id])
+    dxp = _beamsplitter_reflected_beam(bs, agb.dxp, rays(agb.dxp)[ray_id])
+    dxm = _beamsplitter_reflected_beam(bs, agb.dxm, rays(agb.dxm)[ray_id])
+    dyp = _beamsplitter_reflected_beam(bs, agb.dyp, rays(agb.dyp)[ray_id])
+    dym = _beamsplitter_reflected_beam(bs, agb.dym, rays(agb.dym)[ray_id])
+    return AstigmaticGaussianBeamlet(c, wxp, wxm, wyp, wym, dxp, dxm, dyp, dym)
+end
+
+"""
+    interact3d(::AbstractSystem, bs::ThinBeamsplitter, agb::AstigmaticGaussianBeamlet, ray_id::Int)
+
+Models the interaction between a [`ThinBeamsplitter`](@ref) and an [`AstigmaticGaussianBeamlet`](@ref).
+The reflection phase jump θᵣ = π is applied to the reflected child beam.
+"""
+function interact3d(
+        ::AbstractSystem, bs::ThinBeamsplitter, agb::AstigmaticGaussianBeamlet, ray_id::Int)
+    # Phase flip
+    ray = rays(agb.c)[ray_id]
+    df = dot(direction(ray), normal3d(intersection(ray)))
+    ϕ = df < 0 ? π : 0
+
+    t = _beamsplitter_transmitted_beam(bs, agb, ray_id)
+    r = _beamsplitter_reflected_beam(bs, agb, ray_id)
+
+    # Add conditional phase flip to reflected beam chief polarization
+    chief_ray = first(rays(r.c))
+    E_new = polarization(chief_ray) * exp(im * ϕ)
+    polarization!(chief_ray, E_new)
+
+    children!(agb, [t, r])
+    return nothing
+end

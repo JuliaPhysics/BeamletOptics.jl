@@ -344,3 +344,47 @@ function interact3d(
     # if nothing worked, return nothing
     return nothing
 end
+
+function interact3d(
+    system::AbstractSystem,
+    pbs::AbstractPlateBeamsplitter,
+    agb::AstigmaticGaussianBeamlet,
+    id::Int
+    )
+    _shape = shape(intersection(rays(agb.c)[id]))
+    # Substrate interaction
+    if _shape === shape(substrate(pbs))
+        interaction = interact3d(system, substrate(pbs), agb, id)
+        hint!(interaction, Hint(pbs, shape(coating(pbs))))
+        return interaction
+    end
+    # Splitter interaction
+    if _shape === shape(coating(pbs))
+        interact3d(system, coating(pbs), agb, id)
+        # Update refractive index and calculate refraction
+        λ = wavelength(rays(agb.c)[id])
+        n_optics = refractive_index(pbs, λ)
+        n_system = refractive_index(system, λ)
+        if isentering(agb, id)
+            # transmitted ray is refracted into substrate
+            _nt = n_optics
+            _nr = n_system
+        else
+            # transmitted ray is refracted into environment
+            _nt = n_system
+            _nr = n_optics
+        end
+        # Update children ref. index
+        refractive_index!(agb.children[1], 1, _nt)
+        refractive_index!(agb.children[2], 1, _nr)
+        # Calculate refracted directions for transmitted child's component beams
+        n_target = isentering(agb, id) ? n_optics : n_system
+        for (beam, pbeam) in zip(_component_beams(agb.children[1]), _component_beams(agb))
+            n_d, _ = refraction3d(rays(pbeam)[id], n_target)
+            direction!(first(rays(beam)), n_d)
+        end
+        return nothing
+    end
+    # if nothing worked, return nothing
+    return nothing
+end

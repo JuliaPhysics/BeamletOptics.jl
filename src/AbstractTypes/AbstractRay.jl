@@ -79,7 +79,13 @@ abstract type AbstractRay{T <: Real} end
 Base.position(ray::AbstractRay) = ray.pos
 position!(ray::AbstractRay, pos) = (ray.pos = pos)
 
+"""
+    direction(ray::AbstractRay)
+
+Returns the direction vector of the `ray`.
+"""
 direction(ray::AbstractRay) = ray.dir
+
 function direction!(ray::AbstractRay, dir)
     ray.dir = normalize(dir)
     return nothing

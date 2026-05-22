@@ -1,9 +1,14 @@
 # kinematic export
-export translate3d!, translate_to3d!, rotate3d!, xrotate3d!, yrotate3d!, zrotate3d!, align3d!, reset_translation3d!, reset_rotation3d!
-export position, orientation
+export translate3d!, translate_to3d!, rotate3d!, xrotate3d!, yrotate3d!, zrotate3d!,
+       align3d!, reset_translation3d!, reset_rotation3d!
+export position, direction, orientation
 
 # ray and beam type export
-export Ray, PolarizedRay, Beam, PointSource, CollimatedSource, UniformDiscSource, GaussianBeamlet
+export Ray, PolarizedRay, Beam, PointSource, CollimatedSource, UniformDiscSource,
+       GaussianBeamlet, AstigmaticGaussianBeamlet, rayleigh_range, rays, point_on_beam,
+       normal3d
+export CollimatedGaussianBeamletSource, GaussianBeamletDecomposition,
+       SphericalGaussianBeamletSource, EllipticalGaussianBeamletSource, WavefrontBeamletDecomposition, AstigmaticBeamGroup
 
 # system
 export System, StaticSystem, solve_system!
@@ -19,22 +24,26 @@ components
 =#
 
 # mirrors
-export Mirror, SquarePlanoMirror2D, RectangularPlanoMirror, SquarePlanoMirror, RoundPlanoMirror, ConcaveSphericalMirror, RightAnglePrismMirror
+export Mirror, SquarePlanoMirror2D, RectangularPlanoMirror, SquarePlanoMirror,
+       RoundPlanoMirror, ConcaveSphericalMirror, RightAnglePrismMirror
 
 # lenses
 export Lens, DoubletLens, ThinLens, SphericalLens, SphericalDoubletLens, thickness
 
 # surfaces
-export CircularFlatSurface, RectangularFlatSurface, SphericalSurface, EvenAsphericalSurface, CylindricalSurface, AcylindricalSurface
+export CircularFlatSurface, RectangularFlatSurface, SphericalSurface, EvenAsphericalSurface,
+       CylindricalSurface, AcylindricalSurface
 
 # prisms
 export Prism, RightAnglePrism
 
 # detectors
-export Detector, electric_field, intensity, spot_diagram, optical_power, Centroid, MinMax
+export Detector, electric_field, intensity, spot_diagram, optical_power, gauss_parameters,
+       waist_parameters, Centroid, MinMax
 
 # splitters
-export ThinBeamsplitter, RoundThinBeamsplitter, RectangularPlateBeamsplitter, RoundPlateBeamsplitter, CubeBeamsplitter, RectangularCompensatorPlate
+export ThinBeamsplitter, RoundThinBeamsplitter, RectangularPlateBeamsplitter,
+       RoundPlateBeamsplitter, CubeBeamsplitter, RectangularCompensatorPlate
 export PolarizingBeamSplitter, PolarizingCubeBeamsplitter, RectangularPolarizingPlateBeamsplitter, RoundPolarizingPlateBeamsplitter
 
 # polarizing components
@@ -44,7 +53,11 @@ export PolarizationFilter
 export NonInteractableObject, MeshDummy, IntersectableObject
 
 # misc
-export Retroreflector
+export Retroreflector, get_invariant_threshold, set_invariant_threshold!,
+    get_sdf_surface_threshold, get_sdf_raymarch_eps, get_sdf_inside_step,
+    get_internal_reflection_threshold, get_line_plane_intersection_threshold,
+    get_orthogonality_threshold, get_default_r_max, get_default_depth_max,
+    get_default_wavelength, get_default_waist, get_default_power
 
 # polarization components
 export Waveplate, HalfWaveplate, QuarterWaveplate

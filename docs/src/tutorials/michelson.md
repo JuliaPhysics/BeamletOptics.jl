@@ -1,11 +1,9 @@
 ```@setup michelson
 using BeamletOptics
 
-include(joinpath(@__DIR__, "..", "assets", "cond_save.jl"))
-
 michelson_dir = joinpath(@__DIR__, "..", "assets", "mi_assets")
 
-conditional_include(joinpath(michelson_dir, "michelson_showcase.jl"))
+Main.DocUtils.conditional_include(joinpath(michelson_dir, "michelson_showcase.jl"))
 ```
 
 # Michelson interferometer

@@ -13,7 +13,16 @@ Thumbs.db
 *.jl.mem
 .vscode
 
+# ignore image formats
 *.png
+*.gif
+*.svg
+
+# allow pre-rendered images within docs folder
+!docs/src/**/*.png
+!docs/src/**/*.gif
+!docs/src/**/*.svg
+
 snoop_compile/
 
 /Manifest.toml

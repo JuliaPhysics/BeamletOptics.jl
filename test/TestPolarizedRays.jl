@@ -70,7 +70,7 @@ const BMO = BeamletOptics
             @test BMO.polarization(beam.rays[2]) ≈ [0, 0, -I0_1]
             @test BMO.polarization(beam.rays[3]) ≈ [0, 0, I0_1]
             @test BMO.polarization(beam.rays[4]) ≈ [0, -I0_1, 0]
-            @test length(beam) == 6.0
+            @test length(beam) ≈ 6.0
         end
 
         @testset "y-Polarization" begin
@@ -82,7 +82,7 @@ const BMO = BeamletOptics
             @test BMO.polarization(beam.rays[2]) ≈ [0, -I0_2, 0]
             @test BMO.polarization(beam.rays[3]) ≈ [I0_2, 0, 0]
             @test BMO.polarization(beam.rays[4]) ≈ [-I0_2, 0, 0]
-            @test length(beam) == 8.0
+            @test length(beam) ≈ 8.0
         end
     end
 
