@@ -9,10 +9,11 @@ using Makie: Axis3, LScene, mesh!, surface!, lines!, RGBf, RGBAf, scatter!
 using GeometryBasics: Point2, Point3
 using AbstractTrees: PreOrderDFS
 using MarchingCubes: MC, march
+using LinearAlgebra: dot, cross, normalize
 
 const _RenderEnv = Union{
     Axis3,
-    LScene,
+    LScene
 }
 
 struct InvalidAxisError <: RenderException
@@ -28,7 +29,7 @@ struct RenderNotImplementedError <: RenderException
     msg::String
     t::Type
     function RenderNotImplementedError(t::Type)
-        if !(t<:_RenderTypes)
+        if !(t <: _RenderTypes)
             throw(ErrorException("Type $t not supported"))
         end
         msg = "Render function not implemented for type $t"
@@ -36,13 +37,16 @@ struct RenderNotImplementedError <: RenderException
     end
 end
 
-render!(::A, ::_RenderTypes; kwargs...) where A<:Any = throw(InvalidAxisError(A))
+render!(::A, ::_RenderTypes; kwargs...) where {A <: Any} = throw(InvalidAxisError(A))
 
-render!(::_RenderEnv, ::T; kwargs...) where T<:_RenderTypes = throw(RenderNotImplementedError(T))
+function render!(::_RenderEnv, ::T; kwargs...) where {T <: _RenderTypes}
+    throw(RenderNotImplementedError(T))
+end
 
 # include order dependant!
 include("RenderBeam.jl")
 include("RenderGaussian.jl")
+include("RenderAstigmaticGaussian.jl")
 include("RenderSDF.jl")
 include("RenderMesh.jl")
 include("RenderObjects.jl")
@@ -80,6 +84,6 @@ end
 
 Hides the axis markers in the `LScene`. Can be toggled via `hide`.
 """
-hide_axis(ls::LScene, hide::Bool=true) = (ls.show_axis[] = !hide)
+hide_axis(ls::LScene, hide::Bool = true) = (ls.show_axis[] = !hide)
 
 end

@@ -2,7 +2,7 @@
     electric_field(pd::Detector; kwargs...)
 
 Compute a two‐dimensional electric field based on incoming rays or beams as captured by a [`Detector`](@ref).
-The returned E-field map is sampled on a regular `n×n` grid in the detector’s local (x,z)-plane.
+The returned E-field map is sampled on a regular `n×n` grid in the detector's local (x,z)-plane.
 Note that the `pd` local coordinates are given in a (x, z) basis where the normal vector forms a left-handed system.
 
 !!! note "Resetting detectors"
@@ -45,27 +45,30 @@ The following generic kwargs can be used for all hit types:
 
 A tuple `(xs, zs, E)` where
 - `xs::LinRange{T}` and `zs::LinRange{T}` are the sampled coordinates
-  in the detector’s local x and z axes,
+  in the detector's local x and z axes,
 - `E::Matrix{Complex{T}}` is the corresponding raw/unscaled intensity map
 """
 electric_field(d::Detector; kwargs...) = electric_field(d, hits(d); kwargs...)
 
-electric_field(d::Detector, ::Nothing; kwargs...) = throw(ErrorException("No hits available on detector."))
+function electric_field(d::Detector, ::Nothing; kwargs...)
+    throw(ErrorException("No hits available on detector."))
+end
 
 function electric_field(
         pd::Detector,
         hits::Vector{GaussianBeamletHit{G}};
         # kwargs
-        n::Int=100,
-        crop_factor::Real=1.5,
-        num_spots::Int=50,
+        n::Int = 100,
+        crop_factor::Real = 1.5,
+        num_spots::Int = 50,
         x_min = Inf,
         x_max = Inf,
         z_min = Inf,
         z_max = Inf,
-        x0_shift::Real=0,
-        z0_shift::Real=0
-    ) where G
+        x0_shift::Real = 0,
+        z0_shift::Real = 0,
+        kwargs...
+) where {G}
     # Calculate autolims
     _x_min, _x_max, _z_min, _z_max = calc_local_lims(pd; crop_factor, num_spots)
     if x_min != Inf && x_max != Inf
@@ -81,31 +84,108 @@ function electric_field(
     # Preallocate e-field matrix
     field = zeros(Complex{G}, n, n)
     # PD local coordinate axes (left-handed coords.)
-    local_x = Point3(-orientation(pd)[:,1])  # flipped sign due to rotated pd mesh
-    local_z = Point3(orientation(pd)[:,3])
+    local_x = Point3(-orientation(pd)[:, 1])  # flipped sign due to rotated pd mesh
+    local_z = Point3(orientation(pd)[:, 3])
     origin = position(pd)
     # Calculate field superposition
-    Threads.@threads for j in eachindex(zs) # FIXME row column major order?
-        z = zs[j]
+    Threads.@threads for j in eachindex(zs)
+        z_grid = zs[j]
+        # Hoist z-grid math out of inner loop
+        p_row = origin + z_grid * local_z
+
         @inbounds for i in eachindex(xs)
-            x = xs[i] 
-            # Transform point p on PD into world coordinates
-            p1 = origin + x * local_x + z * local_z
-            # Add E-field contribution for each hit
+            x_grid = xs[i]
+            p1 = p_row + x_grid * local_x
+
+            acc = Complex{G}(0.0)
             for hit in hits
-                p0 = position(hit)
-                d0 = direction(hit)
-                # important: calculate l0 with geometric length for local r, z
-                l0 = hit.l0
-                proj = projection_factor(hit)
-                # Find projection of p1 onto Gaussian optical axis, i.e. local r and z
-                l1 = dot(p1 - p0, d0)
-                p2 = p0 + l1 * d0
-                r_gb = norm(p1 - p2)
-                z_gb = l0 + l1
-                # Add field contribution, projection factor accounts for beam spot stretching
-                field[i, j] += electric_field(hit.gauss, r_gb, z_gb) * sqrt(proj)
+                v = p1 - hit.p0
+                l1 = _pseudo_dot(v, hit.d0)
+
+                # Transverse distance r
+                r_vec = v - l1 * hit.d0
+                r = norm(r_vec)
+
+                # Distance along beam
+                z = hit.l0 + l1
+
+                acc += electric_field(hit.gauss, r, z; hint = (hit.p0 + l1 * hit.d0, hit.id)) * hit.sqrt_proj
             end
+            field[i, j] = acc
+        end
+    end
+    return xs, zs, field
+end
+
+function electric_field(
+        pd::Detector,
+        hits::Vector{AstigmaticGaussianBeamletHit{G}};
+        # kwargs
+        n::Int = 100,
+        crop_factor::Real = 3.0,
+        num_spots::Int = 50,
+        x_min = Inf,
+        x_max = Inf,
+        z_min = Inf,
+        z_max = Inf,
+        x0_shift::Real = 0,
+        z0_shift::Real = 0,
+        kwargs...
+) where {G}
+    # Calculate autolims
+    _x_min, _x_max, _z_min, _z_max = calc_local_lims(pd; crop_factor, num_spots)
+    if x_min != Inf && x_max != Inf
+        _x_min = x_min
+        _x_max = x_max
+    end
+    if z_min != Inf && z_max != Inf
+        _z_min = z_min
+        _z_max = z_max
+    end
+    xs = LinRange(_x_min, _x_max, n) .+ x0_shift
+    zs = LinRange(_z_min, _z_max, n) .+ z0_shift
+    # Preallocate e-field matrix
+    field = zeros(Complex{G}, n, n)
+    # PD local coordinate axes (left-handed coords.)
+    local_x = Point3(-orientation(pd)[:, 1])
+    local_z = Point3(orientation(pd)[:, 3])
+    origin = position(pd)
+    # Calculate field superposition
+    Threads.@threads for j in eachindex(zs)
+        z_grid = zs[j]
+        # Hoist z-grid math out of inner loop
+        p_row = origin + z_grid * local_z
+
+        @inbounds for i in eachindex(xs)
+            x_grid = xs[i]
+            p1 = p_row + x_grid * local_x
+
+            acc = Complex{G}(0.0)
+            for hit in hits
+                v = p1 - hit.p0
+                l1 = _pseudo_dot(v, hit.d0)
+                r_vec = v - l1 * hit.d0
+
+                h1_z = hit.h1 + l1 * hit.u1
+                h2_z = hit.h2 + l1 * hit.u2
+                area_z = _pseudo_cross2d(h1_z, h2_z, hit.d0)
+                if abs(area_z) < 1e-25
+                    area_z = Complex{G}(1e-25, 1e-25)
+                end
+
+                ξ1 = _pseudo_cross2d(h1_z, r_vec, hit.d0)
+                ξ2 = _pseudo_cross2d(h2_z, r_vec, hit.d0)
+                w = (ξ1 * _pseudo_dot(hit.u2, r_vec) -
+                     ξ2 * _pseudo_dot(hit.u1, r_vec)) / (2 * area_z)
+
+                phase_corr = (hit.n_eff - 1) * l1
+                z_total = hit.l0 + l1
+                ψ = sqrt(hit.area_ref / area_z) *
+                    cis(hit.k0 * (z_total + w + hit.Δl + phase_corr))
+
+                acc += (hit.E_ref_amp * ψ) * hit.sqrt_proj
+            end
+            field[i, j] = acc
         end
     end
     return xs, zs, field
@@ -115,16 +195,17 @@ function electric_field(
         pd::Detector,
         hits::Vector{RayHit{R}};
         # kwargs
-        n::Int=100,
-        crop_factor::Real=1,
-        center::AbstractCenterAlgorithm=Centroid(),
+        n::Int = 100,
+        crop_factor::Real = 1,
+        center::AbstractCenterAlgorithm = Centroid(),
         x_min = Inf,
         x_max = Inf,
         z_min = Inf,
         z_max = Inf,
-        x0_shift::Real=0,
-        z0_shift::Real=0
-    ) where R
+        x0_shift::Real = 0,
+        z0_shift::Real = 0,
+        kwargs...
+) where {R}
     # automatically calculate limits
     _x_min, _x_max, _z_min, _z_max = calc_local_lims(pd; crop_factor, center)
     if x_min != Inf && x_max != Inf
@@ -145,6 +226,15 @@ function electric_field(
     @views e1, e2 = Point3(-orient[:, 1]), Point3(orient[:, 3])
     origin_pd = position(pd)
 
+    hit_data = map(hits) do hit
+        dir = direction(hit)
+        p_hit = position(hit) + length(hit) * dir
+        proj = projection_factor(hit)
+        k = wavenumber(hit)
+        opl = optical_path_length(hit)
+        (p_hit, dir, proj, k, opl)
+    end
+
     Threads.@threads for j in eachindex(zs)
         z = zs[j]
         @inbounds for i in eachindex(xs)
@@ -153,11 +243,11 @@ function electric_field(
             p = origin_pd + x * e1 + z * e2
             # Add all field contributions
             acc = zero(complex(R))
-            @inbounds @simd for hit in hits
-                l = dot(p - hit_point(hit), direction(hit))
-                acc += projection_factor(hit) * cis(wavenumber(hit) * (optical_path_length(hit) + l))
+            for (p_hit, dir, proj, k, opl) in hit_data
+                l = dot(p - p_hit, dir)
+                acc += proj * cis(k * (opl + l))
             end
-            field[i,j] = acc
+            field[i, j] = acc
         end
     end
 

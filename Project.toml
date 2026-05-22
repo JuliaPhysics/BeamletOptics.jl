@@ -1,7 +1,7 @@
 name = "BeamletOptics"
 uuid = "c387492b-ffec-4e51-9a46-bd230226031c"
+version = "0.13.0"
 authors = ["Hugo Uittenbosch <hugo.uittenbosch@dlr.de>, Oliver Kliebisch <oliver.kliebisch@dlr.de> and Thomas Dekorsy <thomas.dekorsy@dlr.de>"]
-version = "0.12.1"
 
 [deps]
 AbstractTrees = "1520ce14-60c1-5f80-bbc7-55ef81b5835c"
@@ -13,6 +13,8 @@ LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MarchingCubes = "299715c1-40a9-479a-aaf9-4a633d36f717"
 MeshIO = "7269a6da-0436-5bbc-96c2-40638cbb6118"
 PrecompileTools = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
+Preferences = "21216c6a-2e73-6563-6e65-726566657250"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Trapz = "592b5752-818d-11e9-1e9a-2b8ca4a44cd1"
 
@@ -30,18 +32,22 @@ ForwardDiff = "0.10, 1.0.1"
 GeometryBasics = "0.5"
 InteractiveUtils = "1"
 LinearAlgebra = "1"
+Logging = "1"
 Makie = "0.22, 0.23, 0.24"
 MarchingCubes = "0.1"
 MeshIO = "0.5"
 PrecompileTools = "1"
+Preferences = "1.5.2"
+Random = "1"
 StaticArrays = "1"
 Test = "1"
 Trapz = "2"
-julia = "1.9.4"
+julia = "1.10"
 
 [extras]
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
+Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Aqua", "Test"]
+test = ["Aqua", "Test", "Logging"]

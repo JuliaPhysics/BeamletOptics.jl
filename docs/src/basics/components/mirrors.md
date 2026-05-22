@@ -1,10 +1,8 @@
 ```@setup mirrors
-include(joinpath(@__DIR__, "..", "..", "assets", "cond_save.jl"))
-
 mirror_showcase_dir = joinpath(@__DIR__, "..", "..", "assets", "mirror_renders")
 
-conditional_include(joinpath(mirror_showcase_dir, "plano_mirror_showcase.jl"))
-conditional_include(joinpath(mirror_showcase_dir, "spherical_mirror_showcase.jl"))
+Main.DocUtils.conditional_include(joinpath(mirror_showcase_dir, "plano_mirror_showcase.jl"))
+Main.DocUtils.conditional_include(joinpath(mirror_showcase_dir, "spherical_mirror_showcase.jl"))
 ```
 
 # Mirrors
