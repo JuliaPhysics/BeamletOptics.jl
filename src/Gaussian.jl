@@ -338,7 +338,7 @@ end
 Compute the position and cross-section axes at distance `z` along the beam.
 For a stigmatic `GaussianBeamlet`, the cross-section is circular, and the axes are
 determined by the orientation of the auxiliary waist ray.
-Returns `(p0, w1, w2)`.
+Returns the vectors `(p0, w1, w2)` and scalar waist radii `(w0, w0)`.
 """
 function waist_parameters(gb::GaussianBeamlet, z::Real)
     p0, i = point_on_beam(gb, z)

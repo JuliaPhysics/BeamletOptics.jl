@@ -79,6 +79,35 @@ const mm = 1e-3
             @test isapprox(w * crop_factor, ymax, atol=1e-8)
         end
     end
+
+    @testset "Testing calc_local_pos with AstigmaticGaussianBeamlet" begin
+        # setup test beam
+        offset = 150mm
+        agb = AstigmaticGaussianBeamlet([0,0,0], [0,1,0])
+        w, ~, ~, ~ = gauss_parameters(agb, offset)
+        # setup untilted detector
+        pd = Detector(5mm)
+        translate_to3d!(pd, [0, offset, 0])
+        xrotate3d!(pd, deg2rad(45))
+        system = System([pd])
+        @testset "Untilted detector projection" begin
+            solve_system!(system, agb)
+            crop_factor = 2
+            num_spots = 1000
+            pts = BMO.calc_local_pos(pd; num_spots, crop_factor)
+            # find local bounding box
+            xmin = minimum(getindex.(pts, 1))
+            xmax = maximum(getindex.(pts, 1))
+            ymin = minimum(getindex.(pts, 2))
+            ymax = maximum(getindex.(pts, 2))
+            # test num spots and correct circle dims
+            @test length(pts) == num_spots
+            @test isapprox(w * crop_factor, -xmin, atol=5e-6)
+            @test isapprox(w * crop_factor, xmax, atol=5e-6)
+            @test isapprox(w * crop_factor * sqrt(2), -ymin, atol=5e-6)
+            @test isapprox(w * crop_factor * sqrt(2), ymax, atol=5e-6)
+        end
+    end
 end
 
 end # MODULE
