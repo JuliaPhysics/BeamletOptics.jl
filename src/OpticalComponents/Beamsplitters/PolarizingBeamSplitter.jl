@@ -50,3 +50,39 @@ function interact3d(::AbstractSystem, pbs::PolarizingBeamSplitter,
             _pbs_reflected_beam(pbs, beam, ray)])
     return nothing
 end
+
+@inline function _pbs_transmitted_beam(
+        pbs::PolarizingBeamSplitter, agb::AstigmaticGaussianBeamlet, ray_id::Int)
+    c = _pbs_transmitted_beam(pbs, agb.c, rays(agb.c)[ray_id])
+    wxp = _beamsplitter_transmitted_beam(pbs, agb.wxp, rays(agb.wxp)[ray_id])
+    wxm = _beamsplitter_transmitted_beam(pbs, agb.wxm, rays(agb.wxm)[ray_id])
+    wyp = _beamsplitter_transmitted_beam(pbs, agb.wyp, rays(agb.wyp)[ray_id])
+    wym = _beamsplitter_transmitted_beam(pbs, agb.wym, rays(agb.wym)[ray_id])
+    dxp = _beamsplitter_transmitted_beam(pbs, agb.dxp, rays(agb.dxp)[ray_id])
+    dxm = _beamsplitter_transmitted_beam(pbs, agb.dxm, rays(agb.dxm)[ray_id])
+    dyp = _beamsplitter_transmitted_beam(pbs, agb.dyp, rays(agb.dyp)[ray_id])
+    dym = _beamsplitter_transmitted_beam(pbs, agb.dym, rays(agb.dym)[ray_id])
+    return AstigmaticGaussianBeamlet(c, wxp, wxm, wyp, wym, dxp, dxm, dyp, dym)
+end
+
+@inline function _pbs_reflected_beam(
+        pbs::PolarizingBeamSplitter, agb::AstigmaticGaussianBeamlet, ray_id::Int)
+    c = _pbs_reflected_beam(pbs, agb.c, rays(agb.c)[ray_id])
+    wxp = _beamsplitter_reflected_beam(pbs, agb.wxp, rays(agb.wxp)[ray_id])
+    wxm = _beamsplitter_reflected_beam(pbs, agb.wxm, rays(agb.wxm)[ray_id])
+    wyp = _beamsplitter_reflected_beam(pbs, agb.wyp, rays(agb.wyp)[ray_id])
+    wym = _beamsplitter_reflected_beam(pbs, agb.wym, rays(agb.wym)[ray_id])
+    dxp = _beamsplitter_reflected_beam(pbs, agb.dxp, rays(agb.dxp)[ray_id])
+    dxm = _beamsplitter_reflected_beam(pbs, agb.dxm, rays(agb.dxm)[ray_id])
+    dyp = _beamsplitter_reflected_beam(pbs, agb.dyp, rays(agb.dyp)[ray_id])
+    dym = _beamsplitter_reflected_beam(pbs, agb.dym, rays(agb.dym)[ray_id])
+    return AstigmaticGaussianBeamlet(c, wxp, wxm, wyp, wym, dxp, dxm, dyp, dym)
+end
+
+function interact3d(
+        ::AbstractSystem, pbs::PolarizingBeamSplitter, agb::AstigmaticGaussianBeamlet, ray_id::Int)
+    t = _pbs_transmitted_beam(pbs, agb, ray_id)
+    r = _pbs_reflected_beam(pbs, agb, ray_id)
+    children!(agb, [t, r])
+    return nothing
+end

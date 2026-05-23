@@ -292,6 +292,29 @@ const mm = 1e-3
             Ir = abs2(rE[3]) / abs2(E0)
             @test Ir ≈ 1 atol=1e-6
         end
+
+        @testset "AstigmaticGaussianBeamlet with Polarizers" begin
+            # 1. PolarizationFilter
+            filter = PolarizationFilter(20mm)
+            system1 = System([filter])
+            agb1 = AstigmaticGaussianBeamlet([0.0, -50mm, 0.0], [0.0, 1.0, 0.0], 1000e-9, 1mm;
+                E0=[1.0, 0.0, 0.0], support=[0.0, 0.0, 1.0])
+            solve_system!(system1, agb1)
+            # Should pass through with polarization preserved
+            @test BMO.polarization(last(BMO.rays(agb1.c))) ≈ [1.0, 0.0, 0.0]
+
+            # 2. Waveplate
+            hwp = HalfWaveplate(20mm, 20mm)
+            BMO.yrotate3d!(hwp, deg2rad(30))
+            system2 = System([hwp])
+            agb2 = AstigmaticGaussianBeamlet([0.0, -50mm, 0.0], [0.0, 1.0, 0.0], 1000e-9, 1mm;
+                E0=[1.0, 0.0, 0.0], support=[0.0, 0.0, 1.0])
+            solve_system!(system2, agb2)
+            # Final polarization vector rotated to [cos(60°), 0, -sin(60°)]
+            final_pol = BMO.polarization(last(BMO.rays(agb2.c)))
+            expected = [cosd(60), 0.0, -sind(60)]
+            @test final_pol ≈ expected atol=1e-6
+        end
     end
 end
 

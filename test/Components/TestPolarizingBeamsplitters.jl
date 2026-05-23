@@ -149,5 +149,33 @@ const mm = 1e-3
         # With n=1.5, amplitude is -0.96
         @test real(BMO.polarization(refl_ray)[3])≈-0.96 atol=1e-6
     end
+
+    @testset "AstigmaticGaussianBeamlet with Polarizing Beamsplitters" begin
+        # 1. Thin PolarizingBeamSplitter
+        pbs = PolarizingBeamSplitter(20mm, 20mm)
+        system1 = System([pbs])
+        agb1 = AstigmaticGaussianBeamlet([0.0, -50mm, 0.0], [0.0, 1.0, 0.0], 1000e-9, 1mm;
+            E0=[1.0, 0.0, 1.0]/sqrt(2), support=[1.0, 0.0, 0.0])
+        solve_system!(system1, agb1)
+        @test length(children(agb1)) == 2
+        @test isa(children(agb1)[1], AstigmaticGaussianBeamlet)
+        @test isa(children(agb1)[2], AstigmaticGaussianBeamlet)
+        
+        # 2. PolarizingCubeBeamsplitter
+        pcbs = PolarizingCubeBeamsplitter(20mm, n -> 1.0)
+        system2 = System([pcbs])
+        agb2 = AstigmaticGaussianBeamlet([0.0, -50mm, 0.0], [0.0, 1.0, 0.0], 1000e-9, 1mm;
+            E0=[1.0, 0.0, 1.0]/sqrt(2), support=[1.0, 0.0, 0.0])
+        solve_system!(system2, agb2)
+        @test length(children(agb2)) == 2
+
+        # 3. RectangularPolarizingPlateBeamsplitter
+        ppbs = RectangularPolarizingPlateBeamsplitter(20mm, 20mm, 5mm, n -> 1.0)
+        system3 = System([ppbs])
+        agb3 = AstigmaticGaussianBeamlet([0.0, -50mm, 0.0], [0.0, 1.0, 0.0], 1000e-9, 1mm;
+            E0=[1.0, 0.0, 1.0]/sqrt(2), support=[1.0, 0.0, 0.0])
+        solve_system!(system3, agb3)
+        @test length(children(agb3)) == 2
+    end
 end
 end
