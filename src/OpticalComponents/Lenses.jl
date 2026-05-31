@@ -88,7 +88,7 @@ end
 """
     interact3d(AbstractSystem, AbstractRefractiveOptic, Beam, PolarizedRay)
 
-Implements the refraction of a [`PolarizedRay`](@ref) at uncoated optical surface. The "outside" ref. index is obtained from the `system` unless specified otherwise.
+Implements the refraction of a [`PolarizedRay`](@ref) at uncoated optical surfaces. The "outside" ref. index is obtained from the `system` unless specified otherwise.
 Reflection and transmission values are calculated via the [`fresnel_coefficients`](@ref). Stray light is not tracked.
 In the case of total internal reflection, only the reflected light is traced.
 """
@@ -257,7 +257,8 @@ function Lens(
                     end
 
                     ring = RingSDF(d_front / 2, (d_back - d_front) / 2, leveling_thickness)
-                    translate3d!(ring, [0, edge_sag(front_surface, front) + leveling_thickness / 2, 0])
+                    translate3d!(ring,
+                        [0, edge_sag(front_surface, front) + leveling_thickness / 2, 0])
                     shape += ring
                 else  # d_front > d_back
                     # Step exists on the back side: level back to match front.
@@ -271,12 +272,14 @@ function Lens(
                         end
                     end
                     leveling_center = position(mid)[2] +
-                                      (l0/2 + (back !== nothing ? edge_sag(back_surface, back) : 0))
+                                      (l0 / 2 +
+                                       (back !== nothing ? edge_sag(back_surface, back) :
+                                        0))
                     if back !== nothing
                         leveling_center += s_back / 2
                     end
                     ring = RingSDF(d_back / 2, (d_front - d_back) / 2, leveling_thickness)
-                    translate3d!(ring, [0, thickness(front) + leveling_thickness/2, 0])
+                    translate3d!(ring, [0, thickness(front) + leveling_thickness / 2, 0])
                     shape += ring
                 end
             end

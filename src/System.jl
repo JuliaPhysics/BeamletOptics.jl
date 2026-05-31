@@ -56,180 +56,8 @@ function retrace_system!(::AbstractSystem, beam::B) where {B <: AbstractBeam}
     return nothing
 end
 
-@inline function trace_all(system::AbstractSystem, ray::AbstractRay{R}) where {R}
-    tol = get_coincident_boundary_tolerance()
-    best_t = R(Inf)
-    best_int = nothing
-    coin_1 = nothing
-    coin_2 = nothing
-
-    # Find the closest intersection and collect any coincident ones at the same distance
-    for obj in objects(system)
-        temp = intersect3d(obj, ray)
-        if temp === nothing
-            continue
-        end
-        t = length(temp)
-
-        # Ignore self-intersection (t ≈ 0)
-        if t <= tol
-            continue
-        end
-
-        if t < best_t - tol
-            best_t = t
-            best_int = temp
-            coin_1 = nothing
-            coin_2 = nothing
-        elseif abs(t - best_t) <= tol
-            if coin_1 === nothing
-                coin_1 = temp
-            elseif coin_2 === nothing
-                coin_2 = temp
-            end
-        end
-    end
-
-    if best_int === nothing
-        return nothing
-    end
-
-    # Tie-break coincident boundaries
-    if coin_1 === nothing
-        return best_int
-    end
-
-    # Determine if any of the valid intersections is a thin interface
-    primary = nothing
-    if is_thin_interface(object(best_int))
-        primary = best_int
-    elseif is_thin_interface(object(coin_1))
-        primary = coin_1
-    elseif coin_2 !== nothing && is_thin_interface(object(coin_2))
-        primary = coin_2
-    end
-
-    if primary !== nothing
-        # Case 1: Thin interface (coating) between two media. Return the coating
-        # as primary, and link the exiting and entering objects to resolve indices.
-        exiting_obj = nothing
-        entering_obj = nothing
-
-        # Examine best_int
-        if best_int !== primary
-            obj_best = object(best_int)
-            if obj_best !== nothing
-                if dot(direction(ray), normal3d(best_int)) > 0
-                    exiting_obj = obj_best
-                else
-                    entering_obj = obj_best
-                end
-            end
-        end
-
-        # Examine coin_1
-        if coin_1 !== primary
-            obj_c1 = object(coin_1)
-            if obj_c1 !== nothing
-                if dot(direction(ray), normal3d(coin_1)) > 0
-                    exiting_obj = obj_c1
-                else
-                    entering_obj = obj_c1
-                end
-            end
-        end
-
-        # Examine coin_2
-        if coin_2 !== nothing && coin_2 !== primary
-            obj_c2 = object(coin_2)
-            if obj_c2 !== nothing
-                if dot(direction(ray), normal3d(coin_2)) > 0
-                    exiting_obj = obj_c2
-                else
-                    entering_obj = obj_c2
-                end
-            end
-        end
-
-        primary.coincident_object = exiting_obj
-        primary.coincident_object_2 = entering_obj
-        return primary
-    else
-        # Case 2: Touching refractive boundaries (doublet contact). Return the
-        # exiting shape as primary, and link the entering shape as coincident_object.
-        exiting_int = nothing
-        entering_int = nothing
-
-        # Examine best_int
-        if dot(direction(ray), normal3d(best_int)) > 0
-            exiting_int = best_int
-        else
-            entering_int = best_int
-        end
-
-        # Examine coin_1
-        if dot(direction(ray), normal3d(coin_1)) > 0
-            exiting_int = coin_1
-        else
-            entering_int = coin_1
-        end
-
-        # Examine coin_2
-        if coin_2 !== nothing
-            if dot(direction(ray), normal3d(coin_2)) > 0
-                exiting_int = coin_2
-            else
-                entering_int = coin_2
-            end
-        end
-
-        if exiting_int !== nothing && entering_int !== nothing
-            exiting_int.coincident_object = object(entering_int)
-            return exiting_int
-        elseif exiting_int !== nothing
-            return exiting_int
-        else
-            return best_int
-        end
-    end
-end
-
-@inline function trace_one(
-        system::AbstractSystem, ray::AbstractRay{R}, hint::Hint) where {R}
-    tol = get_coincident_boundary_tolerance()
-    # Trace against hinted shape of object first
-    primary::Nullable{Intersection{R}} = intersect3d(
-        shape(hint)::AbstractShape{R}, ray)
-    if primary === nothing
-        # If hinted object is not intersected, trace the entire system
-        return trace_all(system, ray)
-    end
-
-    object!(primary, object(hint))
-    t_best = length(primary)
-    if t_best <= tol
-        # Ignore self-intersection/coincident boundary re-entry
-        return trace_all(system, ray)
-    end
-
-    # Gather other intersections at the same distance to resolve cement/contact transitions
-    coin_1 = nothing
-    coin_2 = nothing
-    for obj in objects(system)
-        if obj === object(hint)
-            continue
-        end
-        temp = intersect3d(obj, ray)
-        if temp !== nothing && abs(length(temp) - t_best) <= tol
-            if coin_1 === nothing
-                coin_1 = temp
-            elseif coin_2 === nothing
-                coin_2 = temp
-            end
-        end
-    end
-
-    # If no coincident intersections, just return primary
+@inline function _tie_break_coincident(ray::AbstractRay, primary, coin_1, coin_2)
+    # Tie-break coincident boundaries without allocating array/tuples
     if coin_1 === nothing
         return primary
     end
@@ -327,6 +155,85 @@ end
             return primary
         end
     end
+end
+
+@inline function trace_all(system::AbstractSystem, ray::AbstractRay{R}) where {R}
+    tol = get_coincident_boundary_tolerance()
+    best_t = R(Inf)
+    best_int = nothing
+    coin_1 = nothing
+    coin_2 = nothing
+
+    # Find the closest intersection and collect any coincident ones at the same distance
+    for obj in objects(system)
+        temp = intersect3d(obj, ray)
+        if temp === nothing
+            continue
+        end
+        t = length(temp)
+
+        # Ignore self-intersection (t ≈ 0)
+        if t <= tol
+            continue
+        end
+
+        if t < best_t - tol
+            best_t = t
+            best_int = temp
+            coin_1 = nothing
+            coin_2 = nothing
+        elseif abs(t - best_t) <= tol
+            if coin_1 === nothing
+                coin_1 = temp
+            elseif coin_2 === nothing
+                coin_2 = temp
+            end
+        end
+    end
+
+    if best_int === nothing
+        return nothing
+    end
+
+    return _tie_break_coincident(ray, best_int, coin_1, coin_2)
+end
+
+@inline function trace_one(
+        system::AbstractSystem, ray::AbstractRay{R}, hint::Hint) where {R}
+    tol = get_coincident_boundary_tolerance()
+    # Trace against hinted shape of object first
+    primary::Nullable{Intersection{R}} = intersect3d(
+        shape(hint)::AbstractShape{R}, ray)
+    if primary === nothing
+        # If hinted object is not intersected, trace the entire system
+        return trace_all(system, ray)
+    end
+
+    object!(primary, object(hint))
+    t_best = length(primary)
+    if t_best <= tol
+        # Ignore self-intersection/coincident boundary re-entry
+        return trace_all(system, ray)
+    end
+
+    # Gather other intersections at the same distance to resolve cement/contact transitions
+    coin_1 = nothing
+    coin_2 = nothing
+    for obj in objects(system)
+        if obj === object(hint)
+            continue
+        end
+        temp = intersect3d(obj, ray)
+        if temp !== nothing && abs(length(temp) - t_best) <= tol
+            if coin_1 === nothing
+                coin_1 = temp
+            elseif coin_2 === nothing
+                coin_2 = temp
+            end
+        end
+    end
+
+    return _tie_break_coincident(ray, primary, coin_1, coin_2)
 end
 
 """
