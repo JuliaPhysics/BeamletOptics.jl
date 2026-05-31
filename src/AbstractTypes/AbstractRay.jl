@@ -9,20 +9,29 @@ Stores data calculated by the [`intersect3d`](@ref) method. This information can
 - `shape`: a [`Nullable`](@ref) reference to the [`AbstractShape`](@ref) of the `object` that has been hit (optional but recommended)
 - `t`: length of the ray parametrization in [m]
 - `n`: normal vector at the point of intersection
+- `coincident_object`: a [`Nullable`](@ref) reference to the adjacent/exiting [`AbstractObject`](@ref) sharing the boundary (for doublets or coatings)
+- `coincident_object_2`: a [`Nullable`](@ref) reference to the adjacent/entering [`AbstractObject`](@ref) sharing the boundary (for coatings)
 """
 mutable struct Intersection{T}
     object::Nullable{AbstractObject}
     shape::Nullable{AbstractShape}
     t::T
     n::Point3{T}
+    coincident_object::Nullable{AbstractObject}
+    coincident_object_2::Nullable{AbstractObject}
 end
 
 function Intersection(t::T, n::AbstractArray{T}) where {T}
-    return Intersection(nothing, nothing, t, Point3{T}(n))
+    return Intersection(nothing, nothing, t, Point3{T}(n), nothing, nothing)
 end
 
 function Intersection(t::T, n::AbstractArray{T}, shape::Nullable{AbstractShape}) where {T}
-    return Intersection(nothing, shape, t, Point3{T}(n))
+    return Intersection(nothing, shape, t, Point3{T}(n), nothing, nothing)
+end
+
+function Intersection(object::Nullable{AbstractObject}, shape::Nullable{AbstractShape}, t::Real, n::Point3{S}) where {S}
+    T = promote_type(typeof(t), S)
+    return Intersection{T}(object, shape, T(t), Point3{T}(n), nothing, nothing)
 end
 
 shape(i::Intersection) = i.shape

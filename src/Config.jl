@@ -48,6 +48,8 @@ get_sdf_inside_step() = SDF_INSIDE_STEP
 const INTERNAL_REFLECTION_THRESHOLD = @load_preference("internal_reflection_threshold", 1e-6)
 const LINE_PLANE_INTERSECTION_THRESHOLD = @load_preference("line_plane_intersection_threshold", 1e-6)
 const ORTHOGONALITY_THRESHOLD = @load_preference("orthogonality_threshold", 1e-10)
+const COINCIDENT_BOUNDARY_TOLERANCE = @load_preference("coincident_boundary_tolerance", 1e-7)
+const INDEX_MATCHING_TOLERANCE = @load_preference("index_matching_tolerance", 1e-5)
 
 """
     get_internal_reflection_threshold()
@@ -69,6 +71,20 @@ get_line_plane_intersection_threshold() = LINE_PLANE_INTERSECTION_THRESHOLD
 Returns the global configuration threshold for orthogonality checks (e.g., beam support axes).
 """
 get_orthogonality_threshold() = ORTHOGONALITY_THRESHOLD
+
+"""
+    get_coincident_boundary_tolerance()
+
+Returns the global configuration threshold for identifying coincident boundaries (e.g., doublet lenses, prism-coating).
+"""
+get_coincident_boundary_tolerance() = COINCIDENT_BOUNDARY_TOLERANCE
+
+"""
+    get_index_matching_tolerance()
+
+Returns the global configuration threshold for comparing refractive indices at interfaces.
+"""
+get_index_matching_tolerance() = INDEX_MATCHING_TOLERANCE
 
 
 # --- Tracing Defaults ---

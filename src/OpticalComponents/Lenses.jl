@@ -37,6 +37,8 @@ abstract type AbstractRefractiveOptic{T, F} <: AbstractObject{T} end
 refractive_index(object::AbstractRefractiveOptic) = object.n
 refractive_index(object::AbstractRefractiveOptic{<:Any, <:RefractiveIndex}, λ::Real)::Float64 = object.n(λ)
 
+is_refractive(::AbstractRefractiveOptic) = true
+
 """
     interact3d(AbstractSystem, AbstractRefractiveOptic, Beam, Ray)
 
@@ -48,7 +50,8 @@ function interact3d(system::AbstractSystem,
         ::Beam{T, R},
         ray::R) where {T <: Real, R <: Ray{T}}
     # Check dir. of ray and surface normal
-    normal = normal3d(intersection(ray))
+    int = intersection(ray)
+    normal = normal3d(int)
     lambda = wavelength(ray)
     if isentering(ray)
         # Entering optic
@@ -59,8 +62,14 @@ function interact3d(system::AbstractSystem,
     else
         # Exiting optic
         n1 = refractive_index(optic, lambda)
-        n2 = refractive_index(system, lambda)
-        hint = nothing
+        coin_obj = int.coincident_object
+        if !isnothing(coin_obj) && is_refractive(coin_obj)
+            n2 = refractive_index(coin_obj, lambda)
+            hint = Hint(coin_obj)
+        else
+            n2 = refractive_index(system, lambda)
+            hint = nothing
+        end
         # Flip normal for refraction3d
         normal = -normal
     end
@@ -79,14 +88,15 @@ end
 """
     interact3d(AbstractSystem, AbstractRefractiveOptic, Beam, PolarizedRay)
 
-Implements the refraction of a [`PolarizedRay`](@ref) at an uncoated optical surface. The "outside" ref. index is obtained from the `system` unless specified otherwise.
+Implements the refraction of a [`PolarizedRay`](@ref) at uncoated optical surface. The "outside" ref. index is obtained from the `system` unless specified otherwise.
 Reflection and transmission values are calculated via the [`fresnel_coefficients`](@ref). Stray light is not tracked.
 In the case of total internal reflection, only the reflected light is traced.
 """
 function interact3d(system::AbstractSystem, optic::AbstractRefractiveOptic,
         ::Beam{T, R}, ray::R) where {T <: Real, R <: PolarizedRay{T}}
     lambda = wavelength(ray)
-    normal = normal3d(intersection(ray))
+    int = intersection(ray)
+    normal = normal3d(int)
     raypos = position(ray) + length(ray) * direction(ray)
     if isentering(ray)
         # Entering optic
@@ -97,8 +107,14 @@ function interact3d(system::AbstractSystem, optic::AbstractRefractiveOptic,
     else
         # Exiting optic
         n1 = refractive_index(optic, lambda)
-        n2 = refractive_index(system, lambda)
-        hint = nothing
+        coin_obj = int.coincident_object
+        if !isnothing(coin_obj) && is_refractive(coin_obj)
+            n2 = refractive_index(coin_obj, lambda)
+            hint = Hint(coin_obj)
+        else
+            n2 = refractive_index(system, lambda)
+            hint = nothing
+        end
         # Flip normal for refraction3d
         normal = -normal
     end

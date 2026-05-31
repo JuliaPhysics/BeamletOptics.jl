@@ -4,7 +4,7 @@ abstract type AbstractDoubletRefractiveOptic{
     B <: AbstractShape{T},
     N1 <: RefractiveIndex,
     N2 <: RefractiveIndex
-} <: AbstractRefractiveOptic{T, N1} end
+} <: AbstractObjectGroup{T} end
 
 """
     DoubletLens
@@ -28,9 +28,25 @@ struct DoubletLens{T, F<:AbstractShape{T}, B<:AbstractShape{T}, N1<:RefractiveIn
     back::Lens{T, B, N2}
 end
 
+function DoubletLens(front::Lens{T, F, N1}, back::Lens{T, B, N2}) where {T, F, B, N1, N2}
+    # Check if they are flush and aligned along the optical axis
+    rel_pos = position(back) - position(front)
+    opt_axis = orientation(front)[:, 2]
+    expected_offset = thickness(front)
+    if !isapprox(rel_pos, expected_offset * opt_axis, atol=1e-5)
+        @warn "Doublet components are not aligned flush along the optical axis (expected offset $(expected_offset)m along orientation axis, got $(rel_pos)m). This may cause tracing errors at coincident boundaries."
+    end
+    if !isapprox(orientation(front), orientation(back), atol=1e-5)
+        @warn "Doublet components do not have matching orientation. This may cause tracing errors at coincident boundaries."
+    end
+    return DoubletLens{T, F, B, N1, N2}(front, back)
+end
+
 shape_trait_of(::DoubletLens) = MultiShape()
 
 shape(dl::DoubletLens) = (dl.front, dl.back)
+
+objects(dl::DoubletLens) = (dl.front, dl.back)
 
 Base.position(dl::DoubletLens) = position(dl.front)
 orientation(dl::DoubletLens) = orientation(dl.front)
@@ -52,7 +68,7 @@ For radii sign definition, refer to the [`SphericalLens`](@ref) constructor.
 - `l2`: second lens thickness
 - `d`: lens diameter
 - `n1`: first lens [`RefractiveIndex`](@ref)
-- `n1`: second lens [`RefractiveIndex`](@ref)
+- `n2`: second lens [`RefractiveIndex`](@ref)
 """
 function SphericalDoubletLens(r1, r2, r3, l1, l2, d, n1, n2)
     # Generate "cemented" front and back spherical lenses
@@ -61,16 +77,4 @@ function SphericalDoubletLens(r1, r2, r3, l1, l2, d, n1, n2)
     # Move doublet parts into position
     translate3d!(back, [0, thickness(shape(front)), 0])
     return DoubletLens(front, back)
-end
-
-function interact3d(system::AbstractSystem, dl::DoubletLens, beam::Beam{T, R}, ray::R) where {T <: Real, R <: Ray{T}}
-    # Interaction logic: if front is hit, hint to back and vice versa
-    if shape(intersection(ray)) === shape(dl.front)
-        i = interact3d(system, dl.front, beam, ray)
-        hint = Hint(dl, dl.back.shape)
-    elseif shape(intersection(ray)) === shape(dl.back)
-        i = interact3d(system, dl.back, beam, ray)
-        hint = Hint(dl, dl.front.shape)
-    end
-    return BeamInteraction(hint, i.ray)
 end
