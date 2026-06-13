@@ -1,3 +1,15 @@
+abstract type AbstractPlateComponent{T} <: AbstractObjectGroup{T} end
+
+coating(p::AbstractPlateComponent) = p.coating
+substrate(p::AbstractPlateComponent) = p.substrate
+
+Base.position(p::AbstractPlateComponent) = position(coating(p))
+orientation(p::AbstractPlateComponent) = orientation(substrate(p))
+shape_trait_of(::AbstractPlateComponent) = MultiShape()
+shape(p::AbstractPlateComponent) = (substrate(p), coating(p))
+objects(p::AbstractPlateComponent) = (substrate(p), coating(p))
+refractive_index(p::AbstractPlateComponent, λ::Real) = refractive_index(substrate(p), λ)
+
 """
     AbstractPlateBeamsplitter <: AbstractBeamsplitter
 
@@ -30,22 +42,7 @@ If the concrete implementation does not define the above fields, the following g
     This type uses the [`Hint`](@ref)-API in order to ensure that the splitting interaction is correctly
     triggered at the coating.
 """
-abstract type AbstractPlateBeamsplitter{T} <: AbstractObjectGroup{T} end
-
-coating(pbs::AbstractPlateBeamsplitter) = pbs.coating
-substrate(pbs::AbstractPlateBeamsplitter) = pbs.substrate
-
-Base.position(pbs::AbstractPlateBeamsplitter) = position(coating(pbs))
-
-orientation(pbs::AbstractPlateBeamsplitter) = orientation(substrate(pbs))
-
-shape_trait_of(::AbstractPlateBeamsplitter) = MultiShape()
-
-shape(pbs::AbstractPlateBeamsplitter) = (substrate(pbs), coating(pbs))
-
-objects(pbs::AbstractPlateBeamsplitter) = (substrate(pbs), coating(pbs))
-
-refractive_index(pbs::AbstractPlateBeamsplitter, λ::Real) = refractive_index(substrate(pbs), λ)
+abstract type AbstractPlateBeamsplitter{T} <: AbstractPlateComponent{T} end
 
 """
     RectangularPlateBeamsplitter <: AbstractPlateBeamsplitter
@@ -63,9 +60,9 @@ For more information refer to the [`AbstractPlateBeamsplitter`](@ref) docs.
 !!! info "Kinematic center"
     The center of kinematics of this splitter lies at the center of the coating.
 """
-struct RectangularPlateBeamsplitter{T} <: AbstractPlateBeamsplitter{T}
+struct RectangularPlateBeamsplitter{T, M} <: AbstractPlateBeamsplitter{T}
     substrate::Prism{T, BoxSDF{T}}
-    coating::ThinBeamsplitter{T, Mesh{T}}
+    coating::Coating{T, Mesh{T}, M}
 end
 
 """
@@ -99,7 +96,8 @@ function RectangularPlateBeamsplitter(
     # rotate splitter "coating" into pos
     coating = ThinBeamsplitter(width, height; reflectance)
     zrotate3d!(coating, π)
-    return RectangularPlateBeamsplitter(substrate, coating)
+    M = typeof(coating.model)
+    return RectangularPlateBeamsplitter{typeof(width), M}(substrate, coating)
 end
 
 """
@@ -118,9 +116,9 @@ For more information refer to the [`AbstractPlateBeamsplitter`](@ref) docs.
 !!! info "Kinematic center"
     The center of kinematics of this splitter lies at the center of the coating.
 """
-struct RoundPlateBeamsplitter{T} <: AbstractPlateBeamsplitter{T}
+struct RoundPlateBeamsplitter{T, M} <: AbstractPlateBeamsplitter{T}
     substrate::Prism{T, PlanoSurfaceSDF{T}}
-    coating::ThinBeamsplitter{T, Mesh{T}}
+    coating::Coating{T, Mesh{T}, M}
 end
 
 """
@@ -150,5 +148,6 @@ function RoundPlateBeamsplitter(
     substrate = Prism(substrate_shape, n)
     # round splitter coating
     coating = RoundThinBeamsplitter(diameter; reflectance)
-    return RoundPlateBeamsplitter(substrate, coating)
+    M = typeof(coating.model)
+    return RoundPlateBeamsplitter{typeof(diameter), M}(substrate, coating)
 end

@@ -37,7 +37,7 @@ PolarizedRay
 
 ### Fresnel coefficients
 
-This package uses the equations of Fowles [Fowles1989; p. 44](@cite) and Peatross [Peatross2015; p. 78](@cite) to determine the [Fresnel coefficents](https://www.rp-photonics.com/fresnel_equations.html) at a given surface where the [`PolarizedRay`](@ref) enters from a medium with (complex) refractive index ``n_1`` into a medium with ``n_2``. The ability to define coatings is currently not included. 
+This package uses the equations of Fowles [Fowles1989; p. 44](@cite) and Peatross [Peatross2015; p. 78](@cite) to determine the [Fresnel coefficents](https://www.rp-photonics.com/fresnel_equations.html) at a given surface where the [`PolarizedRay`](@ref) enters from a medium with (complex) refractive index ``n_1`` into a medium with ``n_2``. Physical coatings can be attached to interfaces to modify these coefficients (supporting custom phase shifts, polarization-selective behaviors, and multi-layer thin films); see the [Coatings](@ref) section for details. 
 
 !!! warning
     When a [`PolarizedRay`](@ref) interacts with a refractive medium, e.g. an [`BeamletOptics.AbstractRefractiveOptic`](@ref), the default tracing behaviour is to only trace the refracted and ignore the reflected ray, unless [Total Internal Reflection (TIR)](https://www.rp-photonics.com/total_internal_reflection.html) occurs. 

@@ -193,7 +193,8 @@ end
 
 function electric_field(
         pd::Detector,
-        hits::Vector{RayHit{R}};
+        hits::Vector{<:AbstractRayHit{R}};
+
         # kwargs
         n::Int = 100,
         crop_factor::Real = 1,

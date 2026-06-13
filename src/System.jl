@@ -812,6 +812,7 @@ A maximum number of rays per `beam` (`r_max`) can be specified in order to avoid
 - `depth_max = get_default_depth_max()`: Maximum number of branching levels explored from the root beam.
 - `check_invariant = true`: enables or disables optical invariant checks where applicable
 - `threshold = get_invariant_threshold()`: threshold for paraxial invariant checks
+- `power_cutoff = 0.0`: power threshold below which sub-beams/split paths are dropped to prevent infinite branching
 """
 function solve_system!(
         system::AbstractSystem,
@@ -821,12 +822,18 @@ function solve_system!(
         retrace::Bool = true,
         depth_max::Int = get_default_depth_max(),
         check_invariant::Bool = true,
-        threshold::Real = get_invariant_threshold()
+        threshold::Real = get_invariant_threshold(),
+        power_cutoff::Real = 0.0
 ) where {B <: AbstractBeam}
     queue = Tuple{B, Int}[(beam, 1)]
     while !isempty(queue)
         # Process beams in FIFO order.
         current, depth = popfirst!(queue)
+        # Check power cutoff before tracing the current beam.
+        if optical_power(current) < power_cutoff
+            _drop_beams!(current)
+            continue
+        end
         # Optionally retrace the current beam.
         if retrace
             retrace_system!(system, current; check_invariant, threshold)

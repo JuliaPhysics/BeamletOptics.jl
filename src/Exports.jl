@@ -45,8 +45,15 @@ export Detector, electric_field, intensity, spot_diagram, optical_power, gauss_p
 export ThinBeamsplitter, RoundThinBeamsplitter, RectangularPlateBeamsplitter,
        RoundPlateBeamsplitter, CubeBeamsplitter, RectangularCompensatorPlate
 
+# coatings
+export Coating, Uncoated, SimpleARCoating, SimpleHRCoating, SimpleBeamsplitterCoating,
+       JonesCoating, ThinFilmCoating, CoatedRefractive, CoatedLens, CoatedMirror, get_jones_matrix,
+       with_coatings
+
 # polarizing components
-export PolarizationFilter
+export PolarizationFilter, PolarizingCubeBeamsplitter, Waveplate, HalfWavePlate, QuarterWavePlate, RectangularPlateWaveplate, RoundPlateWaveplate,
+       PolarizingBeamSplitter, RectangularPolarizingPlateBeamsplitter, RoundPolarizingPlateBeamsplitter,
+       HalfWaveplate, QuarterWaveplate
 
 # dummies
 export NonInteractableObject, MeshDummy, IntersectableObject

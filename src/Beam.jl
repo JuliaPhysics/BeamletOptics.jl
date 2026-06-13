@@ -269,3 +269,21 @@ function Base.show(io::IO, ::MIME"text/plain", beam::Beam)
     end
     return nothing
 end
+
+"""
+    optical_power(beam::Beam{T, <:Ray{T}})
+
+Returns the weight of the last ray in the beam, representing its current power.
+"""
+optical_power(beam::Beam{T, <:Ray{T}}) where {T} = isempty(rays(beam)) ? zero(T) : weight(last(rays(beam)))
+
+"""
+    optical_power(beam::Beam{T, <:PolarizedRay{T}})
+
+Returns the intensity of the polarization vector of the last ray in the beam, representing its current power.
+"""
+function optical_power(beam::Beam{T, <:PolarizedRay{T}}) where {T}
+    isempty(rays(beam)) && return zero(T)
+    return abs2(norm(polarization(last(rays(beam)))))
+end
+

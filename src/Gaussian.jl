@@ -125,6 +125,11 @@ function interact3d(system::AbstractSystem,
         object::AbstractObject,
         gauss::GaussianBeamlet{R},
         ray_id::Int) where {R}
+    coated_obj, coating = resolve_coated_boundary(system, object, gauss.chief.rays[ray_id])
+    if coated_obj !== nothing
+        return interact3d(system, coated_obj, gauss, ray_id)
+    end
+
     i_c = interact3d(system, object, gauss.chief, rays(gauss.chief)[ray_id])
     i_w = interact3d(system, object, gauss.waist, rays(gauss.waist)[ray_id])
     i_d = interact3d(system, object, gauss.divergence, rays(gauss.divergence)[ray_id])

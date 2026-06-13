@@ -106,7 +106,7 @@ end
 """
     AbstractBeamGroup
 
-Provides a generic container type interface for bundles of [`Beam`](@ref)s. 
+Provides a generic container type interface for bundles of [`Beam`](@ref)s.
 This interface assumes that there exists a central beam around which the bundle propagates,
 e.g. akin to an optical axis.
 
@@ -145,3 +145,10 @@ function Base.show(io::IO, ::MIME"text/plain", bg::AbstractBeamGroup)
     println(io, "   # of beams: $(length(beams(bg)))")
     return nothing
 end
+
+"""
+    optical_power(beam::AbstractBeam)
+
+Returns the optical power of the beam. Default fallback returns `1.0` (representing 100% normalized power).
+"""
+optical_power(::AbstractBeam{T, R}) where {T <: Real, R} = one(T)

@@ -34,10 +34,10 @@ function DoubletLens(front::Lens{T, F, N1}, back::Lens{T, B, N2}) where {T, F, B
     opt_axis = orientation(front)[:, 2]
     expected_offset = thickness(front)
     if !isapprox(rel_pos, expected_offset * opt_axis, atol=1e-5)
-        @warn "Doublet components are not aligned flush along the optical axis (expected offset $(expected_offset)m along orientation axis, got $(rel_pos)m). This may cause tracing errors at coincident boundaries."
+        @warn "Doublet components are not aligned flush along the optical axis (expected offset $(expected_offset)m along orientation axis, got $(rel_pos)m). Ensure they were created in the default orientation before assembly. This may cause tracing errors at coincident boundaries."
     end
     if !isapprox(orientation(front), orientation(back), atol=1e-5)
-        @warn "Doublet components do not have matching orientation. This may cause tracing errors at coincident boundaries."
+        @warn "Doublet components do not have matching orientation. Ensure they were created in the default orientation before assembly. This may cause tracing errors at coincident boundaries."
     end
     return DoubletLens{T, F, B, N1, N2}(front, back)
 end

@@ -313,6 +313,11 @@ function interact3d(system::AbstractSystem,
         object::AbstractObject,
         agb::AstigmaticGaussianBeamlet{R},
         ray_id::Int) where {R}
+    coated_obj, coating = resolve_coated_boundary(system, object, agb.c.rays[ray_id])
+    if coated_obj !== nothing
+        return interact3d(system, coated_obj, agb, ray_id)
+    end
+
     i_c = interact3d(system, object, agb.c, rays(agb.c)[ray_id])
     i_wxp = interact3d(system, object, agb.wxp, rays(agb.wxp)[ray_id])
     i_wxm = interact3d(system, object, agb.wxm, rays(agb.wxm)[ray_id])

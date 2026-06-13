@@ -17,7 +17,10 @@ mutable struct Ray{T} <: AbstractRay{T}
     intersection::Nullable{Intersection{T}}
     λ::T
     n::T
+    weight::T
 end
+
+Ray{T}(pos, dir, int, λ, n) where {T} = Ray{T}(pos, dir, int, λ, n, one(T))
 
 """
     Ray(pos, dir, λ=1000e-9)
@@ -41,5 +44,10 @@ function Ray(pos::AbstractArray{P},
         normalize(Point3{F}(dir)),
         nothing,
         F(λ),
-        F(1))
+        F(1),
+        F(1)
+    )
 end
+
+weight(ray::Ray) = ray.weight
+weight!(ray::Ray, w::Real) = (ray.weight = w)

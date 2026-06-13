@@ -19,7 +19,7 @@ get_invariant_threshold() = INVARIANT_THRESHOLD
 
 # --- SDF & Ray Marching ---
 const SDF_SURFACE_THRESHOLD = @load_preference("sdf_surface_threshold", 1e-9)
-const SDF_RAYMARCH_EPS = @load_preference("sdf_raymarch_eps", 1e-10)
+const SDF_RAYMARCH_EPS = @load_preference("sdf_raymarch_eps", 1e-13)
 const SDF_INSIDE_STEP = @load_preference("sdf_inside_step", 1.0)
 
 """

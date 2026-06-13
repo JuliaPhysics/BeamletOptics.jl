@@ -9,9 +9,8 @@ For more information refer to the [`AbstractPlateBeamsplitter`](@ref) docs.
 
 # Fields
 
-- `front`: the forward facing substrate, represented by a [`RightAnglePrism`](@ref)
+- `front`: the forward facing substrate, represented by a coated prism ([`CoatedRefractive`](@ref) wrapping a [`RightAnglePrism`](@ref))
 - `back`: the backward facing substrate, represented by a [`RightAnglePrism`](@ref)
-- `coating`: a rectangular [`ThinBeamsplitter`](@ref) that represents the splitting interface
 
 # Additional information
 
@@ -19,17 +18,16 @@ For more information refer to the [`AbstractPlateBeamsplitter`](@ref) docs.
     In order to model gap-free beam propagation, the `interact3d` model relies heavily on the [`Hint`](@ref)-API.
     If the `front` or `back` substrate is hit, the `Hint` will ensure that the beam intersects the `coating`.
 """
-struct CubeBeamsplitter{T} <: AbstractObjectGroup{T}
-    front::Prism{T, RightAnglePrismSDF{T}}
-    back::Prism{T, RightAnglePrismSDF{T}}
-    coating::ThinBeamsplitter{T, Mesh{T}}
+struct CubeBeamsplitter{T, F, B} <: AbstractObjectGroup{T}
+    front::F
+    back::B
 end
 
 shape_trait_of(::CubeBeamsplitter) = MultiShape()
 
-shape(cbs::CubeBeamsplitter) = (cbs.front, cbs.back, cbs.coating)
+shape(cbs::CubeBeamsplitter) = (cbs.front, cbs.back)
 
-objects(cbs::CubeBeamsplitter) = (cbs.front, cbs.back, cbs.coating)
+objects(cbs::CubeBeamsplitter) = (cbs.front, cbs.back)
 
 refractive_index(cbs::CubeBeamsplitter, λ::Real) = refractive_index(cbs.front, λ)
 
@@ -53,11 +51,18 @@ function CubeBeamsplitter(
         n::RefractiveIndex;
         reflectance::Real=0.5
     )
-    front = RightAnglePrism(leg_length, leg_length, n)
+    front_prism = RightAnglePrism(leg_length, leg_length, n)
     back = RightAnglePrism(leg_length, leg_length, n)
-    bs = ThinBeamsplitter(√2*leg_length, leg_length; reflectance)
     zrotate3d!(back, deg2rad(180))
-    zrotate3d!(bs, deg2rad(180-45))
-    set_new_origin3d!(shape(bs))
-    return CubeBeamsplitter(front, back, bs)
+
+    coat_bs = SimpleBeamsplitterCoating(
+        sqrt(reflectance), sqrt(reflectance),
+        sqrt(1.0 - reflectance), sqrt(1.0 - reflectance)
+    )
+
+    T = typeof(leg_length)
+    coatings = (:hypotenuse => coat_bs,)
+    front = CoatedRefractive{T, typeof(front_prism), typeof(coatings)}(front_prism, coatings)
+
+    return CubeBeamsplitter{T, typeof(front), typeof(back)}(front, back)
 end

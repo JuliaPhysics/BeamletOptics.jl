@@ -152,6 +152,12 @@ XYBasis(j11::Number, j12::Number, j21::Number, j22::Number) = GlobalJonesBasis(@
 XZBasis(j11::Number, j12::Number, j21::Number, j22::Number) = GlobalJonesBasis(@SArray([j11 0 j12; 0 1 0; j21 0 j22]))
 YZBasis(j11::Number, j12::Number, j21::Number, j22::Number) = GlobalJonesBasis(@SArray([1 0 0; 0 j22 j21; 0 j12 j11]))
 
+Base.:*(val::Number, J::GlobalJonesBasis) = GlobalJonesBasis(val * static_data(J))
+Base.:*(J::GlobalJonesBasis, val::Number) = GlobalJonesBasis(static_data(J) * val)
+
+Base.:*(val::Number, J::LocalJonesBasis) = LocalJonesBasis(val * static_data(J))
+Base.:*(J::LocalJonesBasis, val::Number) = LocalJonesBasis(static_data(J) * val)
+
 """
     _calculate_global_E0(in_dir, out_dir, normal, J)
 
