@@ -9,6 +9,21 @@ const BMO = BeamletOptics
 const mm = 1e-3
 
 @testset "Polarizing Beamsplitters" begin
+    @testset "Polarizing PlateBeamsplitter Constructor Type Promotion" begin
+        n(λ) = 1.5
+        # Passing integer dimensions to RectangularPolarizingPlateBeamsplitter
+        rppbs = RectangularPolarizingPlateBeamsplitter(10, 10, 2, n)
+        @test rppbs isa RectangularPolarizingPlateBeamsplitter{Float64}
+        @test rppbs.substrate isa Prism{Float64, BMO.BoxSDF{Float64}}
+        @test rppbs.coating isa Coating{Float64}
+
+        # Passing integer dimensions to RoundPolarizingPlateBeamsplitter
+        round_ppbs = RoundPolarizingPlateBeamsplitter(20, 2, n)
+        @test round_ppbs isa RoundPolarizingPlateBeamsplitter{Float64}
+        @test round_ppbs.substrate isa Prism{Float64, BMO.PlanoSurfaceSDF{Float64}}
+        @test round_ppbs.coating isa Coating{Float64}
+    end
+
     @testset "RectangularPolarizingPlateBeamsplitter (n > 1)" begin
         # Substrate n=1.5
         n_val = 1.5

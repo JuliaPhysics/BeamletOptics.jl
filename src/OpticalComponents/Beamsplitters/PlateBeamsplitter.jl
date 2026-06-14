@@ -89,15 +89,16 @@ function RectangularPlateBeamsplitter(
         n::RefractiveIndex;
         reflectance::Real=0.5
     )
+    T = float(promote_type(typeof(width), typeof(height), typeof(thickness)))
     # create substrate prism and move into pos
-    substrate_shape = BoxSDF(width, thickness, height)
+    substrate_shape = BoxSDF(T(width), T(thickness), T(height))
     substrate = Prism(substrate_shape, n)
-    translate3d!(substrate, [0, thickness/2, 0])
+    translate3d!(substrate, [T(0), T(thickness/2), T(0)])
     # rotate splitter "coating" into pos
-    coating = ThinBeamsplitter(width, height; reflectance)
-    zrotate3d!(coating, π)
+    coating = ThinBeamsplitter(T(width), T(height); reflectance=T(reflectance))
+    zrotate3d!(coating, T(π))
     M = typeof(coating.model)
-    return RectangularPlateBeamsplitter{typeof(width), M}(substrate, coating)
+    return RectangularPlateBeamsplitter{T, M}(substrate, coating)
 end
 
 """
@@ -143,11 +144,12 @@ function RoundPlateBeamsplitter(
         n::RefractiveIndex;
         reflectance::Real=0.5
     )
+    T = float(promote_type(typeof(diameter), typeof(thickness)))
     # create substrate cylinder prism
-    substrate_shape = PlanoSurfaceSDF(thickness, diameter)
+    substrate_shape = PlanoSurfaceSDF(T(thickness), T(diameter))
     substrate = Prism(substrate_shape, n)
     # round splitter coating
-    coating = RoundThinBeamsplitter(diameter; reflectance)
+    coating = RoundThinBeamsplitter(T(diameter); reflectance=T(reflectance))
     M = typeof(coating.model)
-    return RoundPlateBeamsplitter{typeof(diameter), M}(substrate, coating)
+    return RoundPlateBeamsplitter{T, M}(substrate, coating)
 end

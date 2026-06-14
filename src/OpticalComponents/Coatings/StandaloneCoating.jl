@@ -275,7 +275,10 @@ function interact3d(::Splitting, system::AbstractSystem, coating::Coating{T},
     if dot(direction(ray), normal) > 0
         normal = -normal
     end
-    dir_t, _ = refraction3d(direction(ray), normal, refractive_index(ray), n_transmitted)
+    dir_t, TIR = refraction3d(direction(ray), normal, refractive_index(ray), n_transmitted)
+    if TIR
+        return interact3d(Reflective(), system, coating, beam, ray)
+    end
     dir_r = reflection3d(direction(ray), normal)
 
     pos = position(ray) + length(ray) * direction(ray)
@@ -305,7 +308,10 @@ function interact3d(::Splitting, system::AbstractSystem, coating::Coating{T},
     if dot(direction(ray), normal) > 0
         normal = -normal
     end
-    dir_t, _ = refraction3d(direction(ray), normal, refractive_index(ray), n_transmitted)
+    dir_t, TIR = refraction3d(direction(ray), normal, refractive_index(ray), n_transmitted)
+    if TIR
+        return interact3d(Reflective(), system, coating, beam, ray)
+    end
     dir_r = reflection3d(direction(ray), normal)
 
     pos = position(ray) + length(ray) * direction(ray)
@@ -369,8 +375,17 @@ function interact3d(::Splitting, system::AbstractSystem, coating::Coating{T},
         normal = -normal
     end
 
-    c_dir_t, _ = refraction3d(
+    c_dir_t, TIR = refraction3d(
         direction(c_ray), normal, refractive_index(c_ray), n_transmitted)
+    if TIR
+        i_c = interact3d(Reflective(), system, coating, gauss.chief, rays(gauss.chief)[ray_id])
+        i_w = interact3d(Reflective(), system, coating, gauss.waist, rays(gauss.waist)[ray_id])
+        i_d = interact3d(Reflective(), system, coating, gauss.divergence, rays(gauss.divergence)[ray_id])
+        if any(isnothing, (i_c, i_w, i_d))
+            return nothing
+        end
+        return GaussianBeamletInteraction{T}(i_c, i_w, i_d)
+    end
     w_dir_t, _ = refraction3d(
         direction(w_ray), normal, refractive_index(w_ray), n_transmitted)
     d_dir_t, _ = refraction3d(
@@ -464,6 +479,24 @@ function interact3d(::Splitting, system::AbstractSystem, coating::Coating{T},
     from_front = dot(direction(c_ray), normal) < 0
     if !from_front
         normal = -normal
+    end
+
+    _, TIR = refraction3d(direction(c_ray), normal, refractive_index(c_ray), n_transmitted)
+    if TIR
+        i_c = interact3d(Reflective(), system, coating, agb.c, rays(agb.c)[ray_id])
+        i_wxp = interact3d(Reflective(), system, coating, agb.wxp, rays(agb.wxp)[ray_id])
+        i_wxm = interact3d(Reflective(), system, coating, agb.wxm, rays(agb.wxm)[ray_id])
+        i_wyp = interact3d(Reflective(), system, coating, agb.wyp, rays(agb.wyp)[ray_id])
+        i_wym = interact3d(Reflective(), system, coating, agb.wym, rays(agb.wym)[ray_id])
+        i_dxp = interact3d(Reflective(), system, coating, agb.dxp, rays(agb.dxp)[ray_id])
+        i_dxm = interact3d(Reflective(), system, coating, agb.dxm, rays(agb.dxm)[ray_id])
+        i_dyp = interact3d(Reflective(), system, coating, agb.dyp, rays(agb.dyp)[ray_id])
+        i_dym = interact3d(Reflective(), system, coating, agb.dym, rays(agb.dym)[ray_id])
+        if any(isnothing, (i_c, i_wxp, i_wxm, i_wyp, i_wym, i_dxp, i_dxm, i_dyp, i_dym))
+            return nothing
+        end
+        return AstigmaticGaussianBeamletInteraction{T}(
+            i_c, i_wxp, i_wxm, i_wyp, i_wym, i_dxp, i_dxm, i_dyp, i_dym)
     end
 
     dirs_t = (

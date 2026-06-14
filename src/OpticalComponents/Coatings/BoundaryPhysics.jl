@@ -70,7 +70,12 @@ function interact_refractive_boundary(
         λ,
         from_front
 ) where {T, R <: Ray{T}}
-    ndir_t, _ = refraction3d(direction(ray), normal, n_incident, n_transmitted)
+    ndir_t, TIR = refraction3d(direction(ray), normal, n_incident, n_transmitted)
+    if TIR
+        return interact_refractive_boundary(
+            Reflective(), system, substrate_obj, coating_model, beam,
+            ray, n_incident, n_transmitted, hint, normal, λ, from_front)
+    end
     ndir_r = reflection3d(direction(ray), normal)
     npos = position(ray) + length(ray) * direction(ray)
 
@@ -155,7 +160,12 @@ function interact_refractive_boundary(
         λ,
         from_front
 ) where {T, R <: PolarizedRay{T}}
-    ndir_t, _ = refraction3d(direction(ray), normal, n_incident, n_transmitted)
+    ndir_t, TIR = refraction3d(direction(ray), normal, n_incident, n_transmitted)
+    if TIR
+        return interact_refractive_boundary(
+            Reflective(), system, substrate_obj, coating_model, beam,
+            ray, n_incident, n_transmitted, hint, normal, λ, from_front)
+    end
     ndir_r = reflection3d(direction(ray), normal)
     npos = position(ray) + length(ray) * direction(ray)
 

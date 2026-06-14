@@ -272,6 +272,35 @@ function interact3d_behavior(::CoatingBehavior, system::AbstractSystem, cl::Coat
     return AstigmaticGaussianBeamletInteraction{T}(
         i_c, i_wxp, i_wxm, i_wyp, i_wym, i_dxp, i_dxm, i_dyp, i_dym)
 end
+function interact3d_reflective(system::AbstractSystem, cl::CoatedRefractive, coating_model, beam::AbstractBeam, ray::AbstractRay)
+    int = intersection(ray)
+    normal = normal3d(int)
+    from_front = dot(direction(ray), normal) < 0
+    λ = wavelength(ray)
+    n_substrate = refractive_index(cl.optic, λ)
+
+    if isentering(ray)
+        n_incident = refractive_index(ray)
+        n_transmitted = n_substrate
+        hint = Hint(cl.optic)
+    else
+        n_incident = n_substrate
+        coin_obj = int.coincident_object
+        if !isnothing(coin_obj) && is_refractive(coin_obj)
+            n_transmitted = refractive_index(coin_obj, λ)
+            hint = Hint(coin_obj)
+        else
+            n_transmitted = refractive_index(system, λ)
+            hint = nothing
+        end
+        normal = -normal
+    end
+    return interact_refractive_boundary(Reflective(), system, cl.optic, coating_model, beam, ray, n_incident, n_transmitted, hint, normal, λ, from_front)
+end
+
+function interact3d_reflective(system::AbstractSystem, cl::CoatedMirror, coating_model, beam::AbstractBeam, ray::AbstractRay)
+    return interact_reflective_boundary(system, cl.optic, coating_model, beam, ray)
+end
 
 function interact_splitting_boundary(
         system::AbstractSystem,
@@ -321,7 +350,17 @@ function interact_splitting_boundary(
 
     from_front = entering_coated
 
-    c_dir_t, _ = refraction3d(direction(c_ray), normal, n_incident, n_transmitted)
+    c_dir_t, TIR = refraction3d(direction(c_ray), normal, n_incident, n_transmitted)
+    if TIR
+        T_type = eltype(position(c_ray))
+        i_c = interact3d_reflective(system, coated, coating_model, gauss.chief, rays(gauss.chief)[ray_id])
+        i_w = interact3d_reflective(system, coated, coating_model, gauss.waist, rays(gauss.waist)[ray_id])
+        i_d = interact3d_reflective(system, coated, coating_model, gauss.divergence, rays(gauss.divergence)[ray_id])
+        if any(isnothing, (i_c, i_w, i_d))
+            return nothing
+        end
+        return GaussianBeamletInteraction{T_type}(i_c, i_w, i_d)
+    end
     w_dir_t, _ = refraction3d(direction(w_ray), normal, n_incident, n_transmitted)
     d_dir_t, _ = refraction3d(direction(d_ray), normal, n_incident, n_transmitted)
 
@@ -413,6 +452,25 @@ function interact_splitting_boundary(
             n_transmitted = refractive_index(system, λ)
         end
         normal = -normal_coated
+    end
+
+    _, TIR = refraction3d(direction(c_ray), normal, n_incident, n_transmitted)
+    if TIR
+        T_type = eltype(position(c_ray))
+        i_c = interact3d_reflective(system, coated, coating_model, agb.c, rays(agb.c)[ray_id])
+        i_wxp = interact3d_reflective(system, coated, coating_model, agb.wxp, rays(agb.wxp)[ray_id])
+        i_wxm = interact3d_reflective(system, coated, coating_model, agb.wxm, rays(agb.wxm)[ray_id])
+        i_wyp = interact3d_reflective(system, coated, coating_model, agb.wyp, rays(agb.wyp)[ray_id])
+        i_wym = interact3d_reflective(system, coated, coating_model, agb.wym, rays(agb.wym)[ray_id])
+        i_dxp = interact3d_reflective(system, coated, coating_model, agb.dxp, rays(agb.dxp)[ray_id])
+        i_dxm = interact3d_reflective(system, coated, coating_model, agb.dxm, rays(agb.dxm)[ray_id])
+        i_dyp = interact3d_reflective(system, coated, coating_model, agb.dyp, rays(agb.dyp)[ray_id])
+        i_dym = interact3d_reflective(system, coated, coating_model, agb.dym, rays(agb.dym)[ray_id])
+        if any(isnothing, (i_c, i_wxp, i_wxm, i_wyp, i_wym, i_dxp, i_dxm, i_dyp, i_dym))
+            return nothing
+        end
+        return AstigmaticGaussianBeamletInteraction{T_type}(
+            i_c, i_wxp, i_wxm, i_wyp, i_wym, i_dxp, i_dxm, i_dyp, i_dym)
     end
 
     dirs_t = (

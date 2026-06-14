@@ -1,5 +1,6 @@
 using Test
 using BeamletOptics
+using LinearAlgebra
 const BMO = BeamletOptics
 
 @testset "Coatings and Coated Components" begin
@@ -219,45 +220,49 @@ const BMO = BeamletOptics
         # Let's define a plano-planar lens of glass (n = 1.5)
         n_glass = λ -> 1.5
         planar_lens = SphericalLens(Inf, Inf, 1e-3, 10e-3, n_glass)
-        
+
         # Splitting coating (bare index jump splitting)
-        splitting_coating = ThinFilmCoating(Float64[], Float64[]; behavior = BMO.Splitting())
-        
+        splitting_coating = ThinFilmCoating(
+            Float64[], Float64[]; behavior = BMO.Splitting())
+
         # External Normal Reflection (Air to Glass)
         coated_lens_ext = CoatedLens(planar_lens, front = splitting_coating)
         system_ext = System([coated_lens_ext])
-        
+
         gauss_ext = GaussianBeamlet([0.0, -5e-3, 0.0], [0.0, 1.0, 0.0], 1000e-9, 1e-3)
         solve_system!(system_ext, gauss_ext; retrace = false)
-        
+
         @test length(gauss_ext.children) == 2
         t_ext = gauss_ext.children[1]
         r_ext = gauss_ext.children[2]
         @test electric_field(r_ext) / electric_field(gauss_ext) ≈ -0.2 atol=1e-8
-        
+
         # Internal Normal Reflection (Glass to Air)
         coated_lens_int = CoatedLens(planar_lens, back = splitting_coating)
         system_int = System([coated_lens_int])
-        
+
         gauss_int = GaussianBeamlet([0.0, -5e-3, 0.0], [0.0, 1.0, 0.0], 1000e-9, 1e-3)
         solve_system!(system_int, gauss_int; retrace = false)
-        
+
         @test length(gauss_int.children) == 2
         t_int = gauss_int.children[1]
         r_int = gauss_int.children[2]
         @test electric_field(r_int) / electric_field(gauss_int) ≈ 0.2 atol=1e-8
-        
+
         # Consistency of Polarization and Amplitude for AstigmaticGaussianBeamlet
-        p_ray_ext = PolarizedRay([0.0, -5e-3, 0.0], [0.0, 1.0, 0.0], 1000e-9, [1.0, 0.0, 0.0])
+        p_ray_ext = PolarizedRay(
+            [0.0, -5e-3, 0.0], [0.0, 1.0, 0.0], 1000e-9, [1.0, 0.0, 0.0])
         p_beam = Beam(p_ray_ext)
-        solve_system!(system_ext, p_beam; retrace=false)
-        
+        solve_system!(system_ext, p_beam; retrace = false)
+
         @test length(p_beam.children) == 2
         p_r = first(rays(p_beam.children[2]))
-        
-        agb_ext = AstigmaticGaussianBeamlet([0.0, -5e-3, 0.0], [0.0, 1.0, 0.0], 1000e-9, 1e-3; E0=[1.0, 0.0, 0.0], support=[0.0, 0.0, 1.0])
-        solve_system!(system_ext, agb_ext; retrace=false)
-        
+
+        agb_ext = AstigmaticGaussianBeamlet(
+            [0.0, -5e-3, 0.0], [0.0, 1.0, 0.0], 1000e-9, 1e-3;
+            E0 = [1.0, 0.0, 0.0], support = [0.0, 0.0, 1.0])
+        solve_system!(system_ext, agb_ext; retrace = false)
+
         @test length(agb_ext.children) == 2
         agb_r = agb_ext.children[2]
         agb_r_chief = first(rays(agb_r.c))
@@ -280,5 +285,106 @@ const BMO = BeamletOptics
         # Non-zero reflection/transmission due to finite thickness
         @test abs(rs) > 0.0
         @test abs(ts) > 0.0
+    end
+
+    @testset "TIR on Splitting Boundaries" begin
+        # Plano-planar lens (n = 1.5) with back surface coated with splitting coating
+        n_glass = λ -> 1.5
+        planar_lens = SphericalLens(Inf, Inf, 1e-3, 10e-3, n_glass)
+        splitting_coating = ThinFilmCoating(
+            Float64[], Float64[]; behavior = BMO.Splitting())
+        coated_lens = CoatedLens(planar_lens, back = splitting_coating)
+        system = System([coated_lens])
+
+        # Single Ray starting inside the glass lens heading towards the back surface at 45 degrees
+        # Normal to back surface is [0.0, 1.0, 0.0]
+        # Ray direction: normalize([1.0, 1.0, 0.0]), which has 45 deg angle of incidence
+        dir_45 = normalize([1.0, 1.0, 0.0])
+        ray = Ray{Float64}([0.0, -0.4e-3, 0.0], dir_45, nothing, 1000e-9, 1.5)
+        beam = Beam(ray)
+        solve_system!(system, beam; retrace = false)
+
+        # Under TIR, the ray should reflect (direction [1/√2, -1/√2, 0.0]) and stay in glass (n=1.5)
+        # Then it hits the front surface (normal [0.0, -1.0, 0.0]) and exits into air.
+        @test length(rays(beam)) >= 3
+        refl_ray = rays(beam)[3]
+        @test refl_ray.dir[1] ≈ 1 / sqrt(2)
+        @test refl_ray.dir[2] ≈ -1 / sqrt(2)
+        @test refl_ray.n ≈ 1.5
+        @test isempty(beam.children) # No children created!
+
+        # Polarized Ray starting inside the glass lens
+        pray = PolarizedRay{Float64}(
+            [0.0, -0.4e-3, 0.0], dir_45, nothing, 1000e-9, 1.5, [0.0, 0.0, 1.0])
+        pbeam = Beam(pray)
+        solve_system!(system, pbeam; retrace = false)
+        @test length(rays(pbeam)) >= 3
+        refl_pray = rays(pbeam)[3]
+        @test refl_pray.dir[1] ≈ 1 / sqrt(2)
+        @test refl_pray.dir[2] ≈ -1 / sqrt(2)
+        @test refl_pray.n ≈ 1.5
+        @test isempty(pbeam.children)
+
+        # Gaussian Beamlet starting inside the glass lens
+        chief_ray = Ray{Float64}([0.0, -0.4e-3, 0.0], dir_45, nothing, 1000e-9, 1.5)
+        waist_ray = Ray{Float64}([0.0, -0.4e-3, 0.1e-3], dir_45, nothing, 1000e-9, 1.5)
+        div_ray = Ray{Float64}(
+            [0.0, -0.4e-3, 0.0], normalize([1.0, 1.0, 0.01]), nothing, 1000e-9, 1.5)
+        chief_beam = Beam(chief_ray)
+        waist_beam = Beam(waist_ray)
+        div_beam = Beam(div_ray)
+        gauss = GaussianBeamlet(
+            chief_beam, waist_beam, div_beam, 1000e-9, 1e-3, 1.0 + 0.0im)
+        solve_system!(system, gauss; retrace = false)
+        @test isempty(gauss.children) # Should not split under TIR!
+    end
+
+    @testset "Frustrated Total Internal Reflection (FTIR) on Splitting Boundaries" begin
+        # Glass index n=1.5
+        n_glass = λ -> 1.5
+
+        # 100 nm air gap splitting coating (index 1.0, thickness 100nm)
+        ftir_coating = ThinFilmCoating(1.0, 100e-9; behavior = BMO.Splitting())
+
+        # Two plano-planar lenses made of glass
+        lens_front = SphericalLens(Inf, Inf, 1e-3, 10e-3, n_glass)
+        lens_back = SphericalLens(Inf, Inf, 1e-3, 10e-3, n_glass)
+
+        # Coat the back of the front lens with our air gap coating
+        dl_front_coated = CoatedLens(lens_front; back = ftir_coating)
+
+        # Place the back lens right after the front lens (thickness is 1mm)
+        translate3d!(lens_back, [0.0, 1e-3, 0.0])
+
+        system = System([dl_front_coated, lens_back])
+
+        # Launch a ray inside the front lens hitting the coated boundary at 45 degrees
+        # (Incident angle 45 deg > critical angle 41.8 deg, but because the transmitted
+        # medium is also glass (n=1.5), it does not trigger the bulk TIR check).
+        dir_45 = normalize([1.0, 1.0, 0.0])
+        ray = Ray{Float64}([0.0, -0.4e-3, 0.0], dir_45, nothing, 1000e-9, 1.5)
+        beam = Beam(ray)
+
+        solve_system!(system, beam; retrace = false, depth_max = 1)
+
+        # Verify that FTIR allows both reflection and transmission (splitting happens)
+        @test length(beam.children) == 2
+
+        t_child = beam.children[1]
+        r_child = beam.children[2]
+
+        @test length(BMO.rays(t_child)) >= 1
+        @test length(BMO.rays(r_child)) >= 1
+
+        t_ray = first(BMO.rays(t_child))
+        r_ray = first(BMO.rays(r_child))
+
+        # Verify weight/power distribution. T and R should be non-zero and sum to ~1.
+        # Since T is non-zero, evanescent coupling/frustration is working.
+        T_weight = BMO.weight(t_ray)
+        R_weight = BMO.weight(r_ray)
+        @test T_weight > 0.0
+        @test R_weight > 0.0
+        @test T_weight + R_weight≈1.0 atol=1e-5
     end
 end

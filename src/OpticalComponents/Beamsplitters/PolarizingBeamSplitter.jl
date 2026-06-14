@@ -56,13 +56,14 @@ function RectangularPolarizingPlateBeamsplitter(
         thickness::Real,
         n::RefractiveIndex
 )
-    substrate_shape = BoxSDF(width, thickness, height)
+    T = float(promote_type(typeof(width), typeof(height), typeof(thickness)))
+    substrate_shape = BoxSDF(T(width), T(thickness), T(height))
     substrate = Prism(substrate_shape, n)
-    translate3d!(substrate, [0, thickness / 2, 0])
-    coating = PolarizingBeamSplitter(width, height)
-    zrotate3d!(coating, π)
+    translate3d!(substrate, [T(0), T(thickness / 2), T(0)])
+    coating = PolarizingBeamSplitter(T(width), T(height))
+    zrotate3d!(coating, T(π))
     M = typeof(coating.model)
-    return RectangularPolarizingPlateBeamsplitter{typeof(width), M}(substrate, coating)
+    return RectangularPolarizingPlateBeamsplitter{T, M}(substrate, coating)
 end
 
 """
@@ -84,9 +85,10 @@ function RoundPolarizingPlateBeamsplitter(
         thickness::Real,
         n::RefractiveIndex
 )
-    substrate_shape = PlanoSurfaceSDF(thickness, diameter)
+    T = float(promote_type(typeof(diameter), typeof(thickness)))
+    substrate_shape = PlanoSurfaceSDF(T(thickness), T(diameter))
     substrate = Prism(substrate_shape, n)
-    coating = PolarizingBeamSplitter(CircularFlatMesh(diameter / 2))
+    coating = PolarizingBeamSplitter(CircularFlatMesh(T(diameter) / 2))
     M = typeof(coating.model)
-    return RoundPolarizingPlateBeamsplitter{typeof(diameter), M}(substrate, coating)
+    return RoundPolarizingPlateBeamsplitter{T, M}(substrate, coating)
 end
