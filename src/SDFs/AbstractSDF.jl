@@ -167,12 +167,46 @@ function _raymarch_inside(object::AbstractSDF{S},
     return nothing
 end
 
+function intersects_bounding_sphere(object::AbstractSDF, ray::AbstractRay)
+    bs = bounding_sphere(object)
+    if bs === nothing
+        return true # fallback if not implemented, we must raymarch
+    end
+    c_local, r = bs
+    
+    # transform ray to local SDF coordinates
+    local_pos = _world_to_sdf(object, position(ray))
+    local_dir = transposed_orientation(object) * direction(ray)
+    
+    # Ray-sphere intersection (a*t^2 + 2*b*t + c = 0)
+    # a = 1 (since dir is normalized and rotation preserves length)
+    v = local_pos - c_local
+    b = dot(v, local_dir)
+    c = dot(v, v) - r^2
+    
+    # if origin is outside (c > 0) and ray points away (b > 0), then it misses
+    if c > 0 && b > 0
+        return false
+    end
+    
+    # Discriminant
+    if b^2 - c < 0
+        return false
+    end
+    
+    return true
+end
+
 """
     intersect3d(sphere::AbstractSphere, ray::Ray)
 
 Intersection algorithm for sdf based shapes.
 """
 function intersect3d(object::AbstractSDF, ray::AbstractRay)
+    if !intersects_bounding_sphere(object, ray)
+        return nothing
+    end
+
     pos = position(ray)
     dir = direction(ray)
     d = sdf(object, pos)

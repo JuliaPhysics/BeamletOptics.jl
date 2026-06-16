@@ -55,6 +55,45 @@ function sdf(s::UnionSDF, pos)
     return minimum(sdf(_sdf, pos) for _sdf in s.sdfs)
 end
 
+function bounding_sphere(u::UnionSDF{T}) where T
+    c_merged = Point3{T}(0)
+    r_merged = zero(T)
+    initialized = false
+    for s in u.sdfs
+        bs = bounding_sphere(s)
+        if bs === nothing
+            return nothing
+        end
+        c_local, r = bs
+        c_world = orientation(s) * c_local + position(s)
+        if !initialized
+            c_merged = c_world
+            r_merged = r
+            initialized = true
+        else
+            c2, r2 = c_world, r
+            d = norm(c_merged - c2)
+            if d + r2 <= r_merged
+                continue
+            elseif d + r_merged <= r2
+                c_merged = c2
+                r_merged = r2
+            else
+                new_r = (d + r_merged + r2) / 2
+                if d > 0
+                    c_merged = c_merged + (new_r - r_merged) * ((c2 - c_merged) / d)
+                end
+                r_merged = new_r
+            end
+        end
+    end
+    if !initialized
+        return nothing
+    end
+    c_local_union = _world_to_sdf(u, c_merged)
+    return (c_local_union, r_merged)
+end
+
 Base.:+(s1::AbstractSDF{T}, s2::AbstractSDF{T}) where T = UnionSDF{T}(s1, s2)
 Base.:+(union::UnionSDF{T}, sdf::AbstractSDF{T}) where T = UnionSDF{T}(union.sdfs..., sdf)
 Base.:+(sdf::AbstractSDF{T}, union::UnionSDF{T}) where T = UnionSDF{T}(sdf, union.sdfs...)

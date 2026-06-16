@@ -45,6 +45,10 @@ function sdf(box::BoxSDF{T}, point) where T
     return l
 end
 
+function bounding_sphere(s::BoxSDF{T}) where T
+    return (Point3{T}(0), norm(s.dimensions))
+end
+
 """
     CylinderSDF <: AbstractSDF
 
@@ -73,6 +77,10 @@ function sdf(cylinder::CylinderSDF{T}, point) where T
     d = abs.(Point2(norm(Point2(p[1], p[3])), p[2])) -
         Point2(cylinder.radius, cylinder.height)
     return min(maximum(d), zero(T)) + norm(max.(d, zero(T)))
+end
+
+function bounding_sphere(s::CylinderSDF{T}) where T
+    return (Point3{T}(0), sqrt(s.radius^2 + (s.height / 2)^2))
 end
 
 """
@@ -123,6 +131,10 @@ function sdf(cs::CutSphereSDF, point)
     end
 end
 
+function bounding_sphere(s::CutSphereSDF{T}) where T
+    return (Point3{T}(0), s.radius)
+end
+
 """
     RingSDF <: AbstractSDF
 
@@ -163,6 +175,11 @@ function sdf(ring::RingSDF, point)
     p = _world_to_sdf(ring, point)
 
     return sdf_box(Point2(norm(Point2(p[1], p[3]))- ring.inner_radius, p[2]), Point2(ring.hwidth, ring.hthickness))
+end
+
+function bounding_sphere(s::RingSDF{T}) where T
+    r = sqrt((s.inner_radius + s.hwidth)^2 + s.hthickness^2)
+    return (Point3{T}(0), r)
 end
 
 """
@@ -207,4 +224,8 @@ function sdf(prism:: RightAnglePrismSDF{T}, point) where T
     box_dist = norm(max.(q, zero(T))) + min(max(q[1], max(q[2], q[3])), zero(T))
     pln_dist = (p[1] + p[2]) / sqrt(2)
     return max(box_dist, pln_dist)
+end
+
+function bounding_sphere(s::RightAnglePrismSDF{T}) where T
+    return (Point3{T}(0), norm(s.dimensions))
 end

@@ -64,6 +64,11 @@ function sdf(ps::PlanoSurfaceSDF{T}, point) where T
     return min(maximum(d), zero(T)) + norm(max.(d, zero(T)))
 end
 
+function bounding_sphere(s::PlanoSurfaceSDF{T}) where T
+    r = sqrt((s.diameter / 2)^2 + (s.thickness / 2)^2)
+    return (Point3{T}(0, s.thickness / 2, 0), r)
+end
+
 """
     SphereSDF
 
@@ -86,6 +91,10 @@ orientation!(::SphereSDF, ::Any) = nothing
 function sdf(sphere::SphereSDF, point)
     p = _world_to_sdf(sphere, point)
     return norm(p) - sphere.radius
+end
+
+function bounding_sphere(s::SphereSDF{T}) where T
+    return (Point3{T}(0), s.radius)
 end
 
 """
@@ -169,6 +178,11 @@ function sdf(css::ConcaveSphericalSurfaceSDF{T}, point) where T
     return max(sdf1, -sdf2)
 end
 
+function bounding_sphere(s::ConcaveSphericalSurfaceSDF{T}) where T
+    r = sqrt((s.diameter / 2)^2 + (s.sag / 2)^2)
+    return (Point3{T}(0, s.sag / 2, 0), r)
+end
+
 """
     ConvexSphericalSurfaceSDF
 
@@ -229,6 +243,11 @@ function sdf(css::ConvexSphericalSurfaceSDF, point)
     else
         return norm(q - Point2(diameter(css)/2, css.height))
     end
+end
+
+function bounding_sphere(s::ConvexSphericalSurfaceSDF{T}) where T
+    r = sqrt((s.diameter / 2)^2 + (s.sag / 2)^2)
+    return (Point3{T}(0, s.sag / 2, 0), r)
 end
 
 """
