@@ -29,6 +29,20 @@ by specialized subtypes.
 """
 abstract type AbstractReflectiveOptic{T} <: AbstractObject{T} end
 
+@inline function resolve_coincident_boundary(exiting_int, entering_int, ::AbstractObject, ::AbstractReflectiveOptic)
+    entering_int.coincident_object = object(exiting_int)
+    return entering_int
+end
+
+@inline function resolve_coincident_boundary(exiting_int, entering_int, ::AbstractReflectiveOptic, ::AbstractObject)
+    exiting_int.coincident_object = object(entering_int)
+    return exiting_int
+end
+
+@inline function resolve_coincident_boundary(exiting_int, entering_int, ::AbstractReflectiveOptic, ::AbstractReflectiveOptic)
+    exiting_int.coincident_object = object(entering_int)
+    return exiting_int
+end
 # FIXME Require reflectivity field/function for interaction with PolarizedRay
 
 function interact3d(system::AbstractSystem,

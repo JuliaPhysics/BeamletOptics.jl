@@ -56,6 +56,14 @@ function retrace_system!(::AbstractSystem, beam::B) where {B <: AbstractBeam}
     return nothing
 end
 
+@inline resolve_coincident_boundary(exiting_int, entering_int) = 
+    resolve_coincident_boundary(exiting_int, entering_int, object(exiting_int), object(entering_int))
+
+@inline function resolve_coincident_boundary(exiting_int, entering_int, ::AbstractObject, ::AbstractObject)
+    exiting_int.coincident_object = object(entering_int)
+    return exiting_int
+end
+
 @inline function trace_all(system::AbstractSystem, ray::AbstractRay{R}) where {R}
     tol = get_coincident_boundary_tolerance()
     best_t = R(Inf)
@@ -116,8 +124,7 @@ end
         return thin_primary
     else
         if exiting_int !== nothing && entering_int !== nothing
-            exiting_int.coincident_object = object(entering_int)
-            return exiting_int
+            return resolve_coincident_boundary(exiting_int, entering_int)
         elseif exiting_int !== nothing
             return exiting_int
         elseif entering_int !== nothing
@@ -185,8 +192,7 @@ end
         return thin_primary
     else
         if exiting_int !== nothing && entering_int !== nothing
-            exiting_int.coincident_object = object(entering_int)
-            return exiting_int
+            return resolve_coincident_boundary(exiting_int, entering_int)
         elseif exiting_int !== nothing
             return exiting_int
         elseif entering_int !== nothing

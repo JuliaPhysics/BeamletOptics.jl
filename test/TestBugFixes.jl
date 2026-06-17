@@ -229,4 +229,40 @@ end
     @test all(==(lengths[1]), lengths)
 end
 
+@testset "Coincident refractive-reflective boundary" begin
+    # Test for coincident boundary bug where a mirror placed exactly at the lens/glass back boundary
+    # is correctly processed and reflects rays instead of letting them leak/refract straight through.
+    
+    λ = 354.84e-9
+    B1, B2, B3 = 0.6961663, 0.4079426, 0.8974794
+    C1, C2, C3 = 0.0684043^2, 0.1162414^2, 9.896161^2
+    SE = SellmeierEquation(B1, B2, B3, C1, C2, C3)
+    
+    d_glass = 17.5mm
+    L_bs = 30mm
+    
+    # Lens element (glass block)
+    glass_block = Lens(RectangularFlatSurface(L_bs), RectangularFlatSurface(L_bs), d_glass, SE)
+    translate3d!(glass_block, [0.0, L_bs/2, 0.0])
+    
+    # Mirror placed EXACTLY at the back face of the glass block (no gap, gap = 0.0)
+    mirror = SquarePlanoMirror(L_bs, 5mm)
+    translate3d!(mirror, [0.0, L_bs/2 + d_glass, 0.0])
+    
+    # Detector placed to capture the returning reflected ray
+    detector = Detector(16mm)
+    translate3d!(detector, [0.0, -10mm, 0.0])
+    
+    # Beam pointing along +y, starting at y = 10 mm
+    beam = GaussianBeamlet([0.0, 10mm, 0.0], [0.0, 1.0, 0.0], λ, 0.5mm)
+    
+    system = System([glass_block, mirror, detector])
+    
+    empty!(detector)
+    solve_system!(system, beam)
+    
+    @test detector.hits !== nothing
+    @test length(detector.hits) == 1
+end
+
 end # MODULE
