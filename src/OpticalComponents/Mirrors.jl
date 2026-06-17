@@ -29,21 +29,23 @@ by specialized subtypes.
 """
 abstract type AbstractReflectiveOptic{T} <: AbstractObject{T} end
 
-@inline function resolve_coincident_boundary(exiting_int, entering_int, ::AbstractObject, ::AbstractReflectiveOptic)
+@inline function resolve_coincident_boundary(
+        exiting_int, entering_int, ::AbstractObject, ::AbstractReflectiveOptic)
     entering_int.coincident_object = object(exiting_int)
     return entering_int
 end
 
-@inline function resolve_coincident_boundary(exiting_int, entering_int, ::AbstractReflectiveOptic, ::AbstractObject)
+@inline function resolve_coincident_boundary(
+        exiting_int, entering_int, ::AbstractReflectiveOptic, ::AbstractObject)
     exiting_int.coincident_object = object(entering_int)
     return exiting_int
 end
 
-@inline function resolve_coincident_boundary(exiting_int, entering_int, ::AbstractReflectiveOptic, ::AbstractReflectiveOptic)
+@inline function resolve_coincident_boundary(
+        exiting_int, entering_int, ::AbstractReflectiveOptic, ::AbstractReflectiveOptic)
     exiting_int.coincident_object = object(entering_int)
     return exiting_int
 end
-# FIXME Require reflectivity field/function for interaction with PolarizedRay
 
 function interact3d(system::AbstractSystem,
         optic::AbstractReflectiveOptic,
@@ -87,16 +89,17 @@ The front reflecting surface is normal to the y-axis and lies at the origin.
 
 # Inputs
 
-- `width`:      of the mirror in x-direction [m] 
-- `height`:     of the mirror in z-direction [m] 
-- `thickness`:  of the mirror in y-direction [m] 
+- `width`:      of the mirror in x-direction [m]
+- `height`:     of the mirror in z-direction [m]
+- `thickness`:  of the mirror in y-direction [m]
 """
-function RectangularPlanoMirror(width::W, height::H, thickness::T) where {W<:Real,H<:Real,T<:Real}
+function RectangularPlanoMirror(
+        width::W, height::H, thickness::T) where {W <: Real, H <: Real, T <: Real}
     shape = CuboidMesh(width, thickness, height)
     translate3d!(shape, [
-        -width/2,       # x
+        -width / 2,       # x
         0,              # y
-        -height/2,      # z
+        -height / 2      # z
     ])
     set_new_origin3d!(shape)
     return Mirror(shape)
@@ -114,7 +117,7 @@ See also [`RectangularPlanoMirror`](@ref).
 - `width`: the side length of the square mirror in x- and y-direction [m]
 - `thickness`: of the mirror in [m]
 """
-function SquarePlanoMirror(width::W, thickness::T) where {W<:Real,T<:Real}
+function SquarePlanoMirror(width::W, thickness::T) where {W <: Real, T <: Real}
     return RectangularPlanoMirror(width, width, thickness)
 end
 
@@ -142,13 +145,14 @@ Returns a cylindrical, flat [`RoundPlanoMirror`](@ref) with perfect reflectivity
 - `diameter`: mirror diameter in [m]
 - `thickness`: mirror substrate thickness in [m]
 """
-function RoundPlanoMirror(diameter::D, thickness::T) where {D<:Real,T<:Real}
+function RoundPlanoMirror(diameter::D, thickness::T) where {D <: Real, T <: Real}
     shape = PlanoSurfaceSDF(thickness, diameter)
     return RoundPlanoMirror(shape)
 end
 
 """[`ConcaveSphericalMirror`](@ref) shape type based on a [`UnionSDF`](@ref)"""
-const ConcaveSphericalMirrorShape{T} = UnionSDF{T, Tuple{ConcaveSphericalSurfaceSDF{T}, PlanoSurfaceSDF{T}}}
+const ConcaveSphericalMirrorShape{T} = UnionSDF{
+    T, Tuple{ConcaveSphericalSurfaceSDF{T}, PlanoSurfaceSDF{T}}}
 
 """
     ConcaveSphericalMirror <: AbstractReflectiveOptic
@@ -168,7 +172,7 @@ end
     ConcaveSphericalMirror(radius, thickness, diameter)
 
 Constructor for a spherical mirror with a concave reflecting surface. The component is aligned with the positive y-axis.
-See also [`ConcaveSphericalMirror`](@ref). 
+See also [`ConcaveSphericalMirror`](@ref).
 
 # Inputs
 
@@ -204,11 +208,11 @@ Constructs a right angle prism mirror. The primary surface is aligned with the p
 
 # Inputs
 
-- `leg_length`: edge length in x and y in [m] 
+- `leg_length`: edge length in x and y in [m]
 - `height`: in z-axis in [m]
 """
 function RightAnglePrismMirror(leg_length::Real, height::Real)
     shape = RightAnglePrismSDF(leg_length, height)
-    zrotate3d!(shape, deg2rad(45+180))
+    zrotate3d!(shape, deg2rad(45 + 180))
     return RightAnglePrismMirror(shape)
 end
