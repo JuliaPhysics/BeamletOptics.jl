@@ -56,7 +56,9 @@ function bounding_box(s::AbstractSDF)
         ymax = 1000 - sdf(s, Point3(0, 1000, 0))
         zmax = 1000 - sdf(s, Point3(0, 0, 1000))
     else
-        center, r = bounding_sphere(s)
+        c_local, r = bounding_sphere(s)
+        # Transform center from local SDF coordinates to world coordinates
+        center = orientation(s) * c_local + position(s)
         xmin = center[1] - r
         xmax = center[1] + r
         ymin = center[2] - r
