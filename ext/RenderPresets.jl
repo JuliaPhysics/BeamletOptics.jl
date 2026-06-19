@@ -1,5 +1,8 @@
-render!(ax::_RenderEnv, refr::BMO.AbstractRefractiveOptic; kwargs...) = _render!(ax, refr; transparency=true, color=:white, kwargs...)
+render!(ax::_RenderEnv, refr::BMO.AbstractRefractiveOptic; kwargs...) = _render!(ax, refr; transparency=true, color=RGBf(0.678, 0.847, 0.902), alpha=0.5, kwargs...)
 render!(ax::_RenderEnv, refl::BMO.AbstractReflectiveOptic; kwargs...) = _render!(ax, refl; transparency=false, color=:silver, kwargs...)
+
+render!(ax::_RenderEnv, cl::BMO.CoatedRefractive; kwargs...) = render!(ax, cl.optic; kwargs...)
+render!(ax::_RenderEnv, cm::BMO.CoatedMirror; kwargs...) = render!(ax, cm.optic; kwargs...)
 
 render!(ax::_RenderEnv, lens::Lens; kwargs...) = _render!(ax, lens; transparency=true, color=RGBf(0.678, 0.847, 0.902), alpha=0.5, kwargs...)
 render!(ax::_RenderEnv, lens::DoubletLens; kwargs...) = _render!(ax, lens; transparency=true, color=RGBf(0.678, 0.847, 0.902), alpha=0.5, kwargs...)
