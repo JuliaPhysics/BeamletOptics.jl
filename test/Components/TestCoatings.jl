@@ -387,4 +387,43 @@ const BMO = BeamletOptics
         @test R_weight > 0.0
         @test T_weight + R_weight≈1.0 atol=1e-5
     end
+
+    @testset "Backwards Ray Coincident Boundary Bug" begin
+        # Issue: Rays tracing backwards through a coincident coated boundary
+        # had flipped refractive indices because of `isentering` relying on intersection primary object.
+        n1_doublet = λ -> 1.5
+        n2_doublet = λ -> 1.6
+
+        dl_front = SphericalLens(Inf, -100e-3, 5e-3, 10e-3, n1_doublet)
+        dl_back = SphericalLens(-100e-3, Inf, 5e-3, 10e-3, n2_doublet)
+
+        coat_cement = SimpleARCoating(0.01)
+        dl_front_coated = CoatedLens(dl_front; back = coat_cement)
+
+        translate3d!(dl_back, [0, thickness(dl_front), 0])
+
+        # Reverse order to ensure dl_back is the primary coincident object
+        system_rev = System([dl_back, dl_front_coated])
+
+        # Ray starts behind the back lens and travels backwards
+        ray_bwd = PolarizedRay([0.0, 12e-3, 0.0], [0.0, -1.0, 0.0], 1000e-9, [1.0, 0.0, 0.0])
+        beam_bwd = Beam(ray_bwd)
+        solve_system!(system_rev, beam_bwd; retrace = false)
+
+        @test length(rays(beam_bwd)) >= 3
+        # Ray 1: Air to dl_back (y=12e-3 to 10e-3)
+        # Ray 2: Inside dl_back (y=10e-3 to 5e-3)
+        # Ray 3: Inside dl_front (y=5e-3 to 0.0)
+        
+        r2 = rays(beam_bwd)[2]
+        @test r2.n ≈ 1.6
+        
+        r3 = rays(beam_bwd)[3]
+        @test r3.n ≈ 1.5
+        
+        # Verify amplitude scaling: transmission from 1.0 to 1.6 (Uncoated), then 1.6 to 1.5 (SimpleARCoating)
+        expected_amp = (2 * 1.0 / (1.0 + 1.6)) * sqrt(0.99)
+        pol3 = BMO.polarization(r3)
+        @test abs(pol3[1]) ≈ expected_amp
+    end
 end

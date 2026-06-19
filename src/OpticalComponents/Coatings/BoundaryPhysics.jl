@@ -183,6 +183,14 @@ function interact_refractive_boundary(
     return nothing
 end
 
+"""
+    _base_optic(obj)
+
+Helper to extract the underlying optic from an object wrapper for coincident boundary evaluation.
+Overridden by `CoatedComponent` wrappers.
+"""
+_base_optic(obj) = obj
+
 # Main entry points for interact_refractive_boundary
 function interact_refractive_boundary(
         system::AbstractSystem,
@@ -192,18 +200,27 @@ function interact_refractive_boundary(
         ray::R
 ) where {T, R <: AbstractRay{T}}
     int = intersection(ray)
-    normal = normal3d(int)
-    from_front = dot(direction(ray), normal) < 0
     λ = wavelength(ray)
     n_substrate = refractive_index(substrate_obj, λ)
+    
+    obj = object(int)
+    is_substrate = (_base_optic(obj) === substrate_obj)
+    
+    normal = normal3d(int)
+    if !is_substrate
+        normal = -normal
+    end
+    
+    entering_substrate = dot(direction(ray), normal) < 0
+    from_front = entering_substrate
 
-    if isentering(ray)
+    if entering_substrate
         n_incident = refractive_index(ray)
         n_transmitted = n_substrate
         hint = Hint(substrate_obj)
     else
         n_incident = n_substrate
-        coin_obj = int.coincident_object
+        coin_obj = is_substrate ? int.coincident_object : obj
         if !isnothing(coin_obj) && is_refractive(coin_obj)
             n_transmitted = refractive_index(coin_obj, λ)
             hint = Hint(coin_obj)
@@ -228,16 +245,26 @@ function interact_reflective_boundary(
         beam::AbstractBeam{T, R},
         ray::R
 ) where {T, R <: Ray{T}}
-    normal = normal3d(intersection(ray))
-    from_front = dot(direction(ray), normal) < 0
+    int = intersection(ray)
+    obj = object(int)
+    is_substrate = (_base_optic(obj) === substrate_obj)
+    
+    normal = normal3d(int)
+    if !is_substrate
+        normal = -normal
+    end
+    
+    entering_substrate = dot(direction(ray), normal) < 0
+    from_front = entering_substrate
+    
     npos = position(ray) + length(ray) * direction(ray)
     ndir = reflection3d(direction(ray), normal)
 
     λ = wavelength(ray)
     n_incident = refractive_index(ray)
     n_transmitted = n_incident
-    int = intersection(ray)
-    coin_obj = int.coincident_object
+    
+    coin_obj = is_substrate ? int.coincident_object : obj
     if !isnothing(coin_obj) && is_refractive(coin_obj)
         n_transmitted = refractive_index(coin_obj, λ)
     else
@@ -262,16 +289,26 @@ function interact_reflective_boundary(
         beam::AbstractBeam{T, R},
         ray::R
 ) where {T, R <: PolarizedRay{T}}
-    normal = normal3d(intersection(ray))
-    from_front = dot(direction(ray), normal) < 0
+    int = intersection(ray)
+    obj = object(int)
+    is_substrate = (_base_optic(obj) === substrate_obj)
+    
+    normal = normal3d(int)
+    if !is_substrate
+        normal = -normal
+    end
+    
+    entering_substrate = dot(direction(ray), normal) < 0
+    from_front = entering_substrate
+    
     npos = position(ray) + length(ray) * direction(ray)
     ndir = reflection3d(direction(ray), normal)
 
     λ = wavelength(ray)
     n_incident = refractive_index(ray)
     n_transmitted = n_incident
-    int = intersection(ray)
-    coin_obj = int.coincident_object
+    
+    coin_obj = is_substrate ? int.coincident_object : obj
     if !isnothing(coin_obj) && is_refractive(coin_obj)
         n_transmitted = refractive_index(coin_obj, λ)
     else

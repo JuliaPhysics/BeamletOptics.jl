@@ -77,6 +77,8 @@ end
 const CoatedComponent = Union{CoatedRefractive, CoatedMirror}
 const CoatedLens = CoatedRefractive
 
+_base_optic(cl::CoatedComponent) = cl.optic
+
 # Dispatch helpers for extracting coating models
 _coating_model(c::AbstractCoating) = c.model
 _coating_model(c) = c
@@ -274,18 +276,27 @@ function interact3d_behavior(::CoatingBehavior, system::AbstractSystem, cl::Coat
 end
 function interact3d_reflective(system::AbstractSystem, cl::CoatedRefractive, coating_model, beam::AbstractBeam, ray::AbstractRay)
     int = intersection(ray)
-    normal = normal3d(int)
-    from_front = dot(direction(ray), normal) < 0
     λ = wavelength(ray)
     n_substrate = refractive_index(cl.optic, λ)
+    
+    obj = object(int)
+    is_substrate = (_base_optic(obj) === cl.optic)
+    
+    normal = normal3d(int)
+    if !is_substrate
+        normal = -normal
+    end
+    
+    entering_substrate = dot(direction(ray), normal) < 0
+    from_front = entering_substrate
 
-    if isentering(ray)
+    if entering_substrate
         n_incident = refractive_index(ray)
         n_transmitted = n_substrate
         hint = Hint(cl.optic)
     else
         n_incident = n_substrate
-        coin_obj = int.coincident_object
+        coin_obj = is_substrate ? int.coincident_object : obj
         if !isnothing(coin_obj) && is_refractive(coin_obj)
             n_transmitted = refractive_index(coin_obj, λ)
             hint = Hint(coin_obj)
@@ -431,7 +442,7 @@ function interact_splitting_boundary(
     substrate_obj = coated.optic
     n_substrate = refractive_index(substrate_obj, λ)
 
-    is_coated_obj = (object(int) === coated || object(int) === coated.optic)
+    is_coated_obj = (_base_optic(object(int)) === coated.optic)
     normal_coated = normal3d(int)
     if !is_coated_obj
         normal_coated = -normal_coated
