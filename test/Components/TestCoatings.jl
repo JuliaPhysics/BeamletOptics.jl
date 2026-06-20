@@ -235,7 +235,7 @@ const BMO = BeamletOptics
         @test length(gauss_ext.children) == 2
         t_ext = gauss_ext.children[1]
         r_ext = gauss_ext.children[2]
-        @test electric_field(r_ext) / electric_field(gauss_ext) ≈ -0.2 atol=1e-8
+        @test electric_field(r_ext) / electric_field(gauss_ext)≈-0.2 atol=1e-8
 
         # Internal Normal Reflection (Glass to Air)
         coated_lens_int = CoatedLens(planar_lens, back = splitting_coating)
@@ -247,7 +247,7 @@ const BMO = BeamletOptics
         @test length(gauss_int.children) == 2
         t_int = gauss_int.children[1]
         r_int = gauss_int.children[2]
-        @test electric_field(r_int) / electric_field(gauss_int) ≈ 0.2 atol=1e-8
+        @test electric_field(r_int) / electric_field(gauss_int)≈0.2 atol=1e-8
 
         # Consistency of Polarization and Amplitude for AstigmaticGaussianBeamlet
         p_ray_ext = PolarizedRay(
@@ -266,7 +266,7 @@ const BMO = BeamletOptics
         @test length(agb_ext.children) == 2
         agb_r = agb_ext.children[2]
         agb_r_chief = first(rays(agb_r.c))
-        @test agb_r_chief.E0 ≈ p_r.E0 atol=1e-8
+        @test agb_r_chief.E0≈p_r.E0 atol=1e-8
     end
 
     @testset "Complex Refractive Index ThinFilmCoating" begin
@@ -406,7 +406,8 @@ const BMO = BeamletOptics
         system_rev = System([dl_back, dl_front_coated])
 
         # Ray starts behind the back lens and travels backwards
-        ray_bwd = PolarizedRay([0.0, 12e-3, 0.0], [0.0, -1.0, 0.0], 1000e-9, [1.0, 0.0, 0.0])
+        ray_bwd = PolarizedRay(
+            [0.0, 12e-3, 0.0], [0.0, -1.0, 0.0], 1000e-9, [1.0, 0.0, 0.0])
         beam_bwd = Beam(ray_bwd)
         solve_system!(system_rev, beam_bwd; retrace = false)
 
@@ -414,16 +415,119 @@ const BMO = BeamletOptics
         # Ray 1: Air to dl_back (y=12e-3 to 10e-3)
         # Ray 2: Inside dl_back (y=10e-3 to 5e-3)
         # Ray 3: Inside dl_front (y=5e-3 to 0.0)
-        
+
         r2 = rays(beam_bwd)[2]
         @test r2.n ≈ 1.6
-        
+
         r3 = rays(beam_bwd)[3]
         @test r3.n ≈ 1.5
-        
+
         # Verify amplitude scaling: transmission from 1.0 to 1.6 (Uncoated), then 1.6 to 1.5 (SimpleARCoating)
         expected_amp = (2 * 1.0 / (1.0 + 1.6)) * sqrt(0.99)
         pol3 = BMO.polarization(r3)
         @test abs(pol3[1]) ≈ expected_amp
+    end
+
+    @testset "Flat shape coatings checks" begin
+        # Test degenerate collinear vertex check in is_flat_shape
+        mesh_3d = BMO.CuboidMesh(1.0, 1.0, 1.0)
+        # Force the first three vertices to be collinear
+        mesh_3d.vertices[1, :] = [0.0, 0.0, 0.0]
+        mesh_3d.vertices[2, :] = [1.0, 0.0, 0.0]
+        mesh_3d.vertices[3, :] = [2.0, 0.0, 0.0]
+        @test !BMO.is_flat_shape(mesh_3d)
+
+        # Test ArgumentError on flat shape with both front and back coatings
+        flat_mesh = BMO.QuadraticFlatMesh(10e-3)
+        coat1 = SimpleARCoating(0.0)
+        coat2 = SimpleHRCoating(1.0)
+
+        mirror = Mirror(flat_mesh)
+        @test_throws ArgumentError with_coatings(mirror, front = coat1, back = coat2)
+    end
+
+    @testset "Show methods and Display" begin
+        repr_plain(x) = repr(MIME"text/plain"(), x)
+        # Test models show
+        @test repr_plain(Uncoated()) == "Uncoated"
+        @test repr_plain(SimpleARCoating(0.05)) == "SimpleARCoating(R = 0.05)"
+        @test repr_plain(SimpleHRCoating(0.98)) == "SimpleHRCoating(R = 0.98)"
+        @test repr_plain(SimpleBeamsplitterCoating(0.5, 0.5, 0.5, 0.5)) == "SimpleBeamsplitterCoating(rs = 0.5 + 0.0im, rp = 0.5 + 0.0im, ts = 0.5 + 0.0im, tp = 0.5 + 0.0im)"
+        @test repr_plain(JonesCoating(BMO.SPBasis(1,0,0,1))) == "JonesCoating(behavior = Transmissive())"
+        @test repr_plain(ThinFilmCoating(1.38, 200e-9)) == "ThinFilmCoating(1 layers, behavior = Transmissive())"
+
+        # Test coated components show
+        lens = SphericalLens(100e-3, -100e-3, 5e-3, 10e-3, λ -> 1.5)
+        cl = CoatedRefractive(lens, front = SimpleARCoating(0.02))
+        @test occursin("CoatedRefractive", repr_plain(cl))
+        @test occursin("SimpleARCoating", repr_plain(cl))
+
+        mirror = SquarePlanoMirror2D(10e-3)
+        cm = CoatedMirror(mirror, front = SimpleHRCoating(0.99))
+        @test occursin("CoatedMirror", repr_plain(cm))
+        @test occursin("SimpleHRCoating", repr_plain(cm))
+    end
+
+    @testset "Absorptive behavior" begin
+        # Standalone absorptive coating
+        struct DummyAbsorptiveCoating
+            behavior::Absorptive
+        end
+        BMO.coating_behavior(::DummyAbsorptiveCoating) = Absorptive()
+        
+        flat_mesh = BMO.QuadraticFlatMesh(10e-3)
+        abs_coat = Coating(flat_mesh, DummyAbsorptiveCoating(Absorptive()))
+
+        system = System([abs_coat])
+        ray = Ray([0.0, -5e-3, 0.0], [0.0, 1.0, 0.0], 1000e-9)
+        beam = Beam(ray)
+        solve_system!(system, beam; retrace = false)
+        # Ray should be terminated (absorbed) at the interface, so only 1 ray exists in the beam
+        @test length(rays(beam)) == 1
+
+        # CoatedRefractive with absorptive coating
+        cl_abs = SphericalLens(100e-3, -100e-3, 5e-3, 10e-3, λ -> 1.5) |> with_coatings(front = DummyAbsorptiveCoating(Absorptive()))
+        system_cl = System([cl_abs])
+        beam_cl = Beam(Ray([0.0, -10e-3, 0.0], [0.0, 1.0, 0.0], 1000e-9))
+        solve_system!(system_cl, beam_cl; retrace = false)
+        @test length(rays(beam_cl)) == 1
+
+        # CoatedMirror with absorptive coating
+        cm_abs = SquarePlanoMirror2D(10e-3) |> with_coatings(front = DummyAbsorptiveCoating(Absorptive()))
+        system_cm = System([cm_abs])
+        beam_cm = Beam(Ray([0.0, -10e-3, 0.0], [0.0, 1.0, 0.0], 1000e-9))
+        solve_system!(system_cm, beam_cm; retrace = false)
+        @test length(rays(beam_cm)) == 1
+    end
+
+    @testset "Wavelength-dependent coatings and dynamic behavior" begin
+        # Dynamic behavior based on ray properties
+        struct DynamicARCoating end
+        # behaves as Transmissive for λ < 800nm, Reflective for λ >= 800nm
+        BMO.coating_behavior(::DynamicARCoating, ray) = BMO.wavelength(ray) < 800e-9 ? Transmissive() : Reflective()
+        BMO.get_jones_matrix(::DynamicARCoating, θi, λ, n1, n2, is_reflected; from_front=true) = BMO.SPBasis(1.0, 0, 0, 1.0)
+
+        flat_mesh = BMO.QuadraticFlatMesh(10e-3)
+        dyn_coat = Coating(flat_mesh, DynamicARCoating())
+        system = System([dyn_coat])
+
+        # λ = 600nm -> should transmit
+        beam_t = Beam(Ray([0.0, -5e-3, 0.0], [0.0, 1.0, 0.0], 600e-9))
+        solve_system!(system, beam_t; retrace = false)
+        @test length(rays(beam_t)) == 2
+        @test rays(beam_t)[2].dir[2] ≈ 1.0
+
+        # λ = 900nm -> should reflect
+        beam_r = Beam(Ray([0.0, -5e-3, 0.0], [0.0, 1.0, 0.0], 900e-9))
+        solve_system!(system, beam_r; retrace = false)
+        @test length(rays(beam_r)) == 2
+        @test rays(beam_r)[2].dir[2] ≈ -1.0
+
+        # ThinFilmCoating with dispersion function n(λ)
+        n_disp = λ -> λ < 800e-9 ? 1.38 : 1.6
+        coat_disp = ThinFilmCoating(n_disp, 200e-9)
+        rs_short, _, _, _ = fresnel_coefficients(coat_disp, 0.0, 600e-9, 1.0, 1.5)
+        rs_long, _, _, _ = fresnel_coefficients(coat_disp, 0.0, 900e-9, 1.0, 1.5)
+        @test rs_short != rs_long
     end
 end

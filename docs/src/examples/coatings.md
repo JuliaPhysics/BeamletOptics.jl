@@ -123,14 +123,14 @@ ns = [nH, nL, nH, nL, nH, nL, nH, nL, nH]
 ds = [λ0 / (4 * n) for n in ns]
 
 # Construct the thin-film coating model
-filter_coating = ThinFilmCoating(ns, ds; behavior = BMO.Reflective())
+filter_coating = ThinFilmCoating(ns, ds; behavior = Reflective())
 
 # Evaluate reflectance over a spectrum range
 wavelengths = range(400e-9, 1200e-9, length=200)
 reflectances = Float64[]
 
 for wl in wavelengths
-    rs, rp, ts, tp = BMO.fresnel_coefficients(filter_coating, 0.0, wl, 1.0, 1.5)
+    rs, rp, ts, tp = fresnel_coefficients(filter_coating, 0.0, wl, 1.0, 1.5)
     push!(reflectances, abs(rs)^2)
 end
 
@@ -164,8 +164,8 @@ transmissions = Float64[]
 
 for d in gap_thicknesses
     # Model the air gap of thickness d
-    gap_coating = ThinFilmCoating([n_gap], [d]; behavior = BMO.Splitting())
-    rs, rp, ts, tp = BMO.fresnel_coefficients(gap_coating, θi, λ, n_glass, n_glass)
+    gap_coating = ThinFilmCoating([n_gap], [d]; behavior = Splitting())
+    rs, rp, ts, tp = fresnel_coefficients(gap_coating, θi, λ, n_glass, n_glass)
     
     # Power transmission transmissivity is |ts|^2 (since indices are matched)
     push!(transmissions, abs(ts)^2)

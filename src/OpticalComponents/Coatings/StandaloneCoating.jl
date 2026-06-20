@@ -57,6 +57,8 @@ function intersect3d(::SingleShape, coating::Coating, ray::AbstractRay)
         wn = normal3d(int)
         parent_shape = shape(coating)
         local_n = transposed_orientation(parent_shape) * wn
+        # A threshold of 0.5 corresponds to cos(60°), restricting the interaction
+        # to rays hitting the surface within a ±60° angle of the target normal direction.
         if dot(local_n, coating.normal_filter) <= 0.5
             return nothing
         end
@@ -101,7 +103,8 @@ function interact3d(::Transmissive, system::AbstractSystem, coating::Coating{T},
     n_transmitted, _ = _coating_media(system, ray, int)
 
     normal = normal3d(int)
-    if dot(direction(ray), normal) > 0
+    from_front = dot(direction(ray), normal) < 0
+    if !from_front
         normal = -normal
     end
 
@@ -138,10 +141,9 @@ function interact3d(::Transmissive, system::AbstractSystem, coating::Coating{T},
         hint = isnothing(entered_obj) ? nothing : Hint(entered_obj)
 
         J_r = get_jones_matrix(coating.model, angle3d(direction(ray), -normal),
-            wavelength(ray), refractive_index(ray), n_transmitted, true)
-        R_coeff = 0.5 *
-                  (abs2(J_r[1, 1]) + abs2(J_r[1, 2]) + abs2(J_r[2, 1]) + abs2(J_r[2, 2]))
-        T_coeff = 1.0 - R_coeff
+            wavelength(ray), refractive_index(ray), n_transmitted, true; from_front = from_front)
+        R_coeff = clamp(unpolarized_reflectance(J_r), 0.0, 1.0)
+        T_coeff = clamp(1.0 - R_coeff, 0.0, 1.0)
     end
 
     return BeamInteraction{T, R}(
@@ -154,7 +156,8 @@ function interact3d(::Transmissive, system::AbstractSystem, coating::Coating{T},
     n_transmitted, _ = _coating_media(system, ray, int)
 
     normal = normal3d(int)
-    if dot(direction(ray), normal) > 0
+    from_front = dot(direction(ray), normal) < 0
+    if !from_front
         normal = -normal
     end
 
@@ -177,7 +180,7 @@ function interact3d(::Transmissive, system::AbstractSystem, coating::Coating{T},
         hint = isnothing(incident_obj) ? nothing : Hint(incident_obj)
 
         J = get_jones_matrix(coating.model, angle3d(direction(ray), -normal),
-            wavelength(ray), refractive_index(ray), n_transmitted, true)
+            wavelength(ray), refractive_index(ray), n_transmitted, true; from_front = from_front)
     else
         n_out = n_transmitted
 
@@ -193,7 +196,7 @@ function interact3d(::Transmissive, system::AbstractSystem, coating::Coating{T},
         hint = isnothing(entered_obj) ? nothing : Hint(entered_obj)
 
         J = get_jones_matrix(coating.model, angle3d(direction(ray), -normal),
-            wavelength(ray), refractive_index(ray), n_transmitted, false)
+            wavelength(ray), refractive_index(ray), n_transmitted, false; from_front = from_front)
     end
 
     E0 = _calculate_global_E0(coating, ray, ndir, J)
@@ -206,7 +209,8 @@ function interact3d(::Reflective, system::AbstractSystem, coating::Coating{T},
         ::Beam{T, R}, ray::R) where {T, R <: Ray{T}}
     int = intersection(ray)
     normal = normal3d(int)
-    if dot(direction(ray), normal) > 0
+    from_front = dot(direction(ray), normal) < 0
+    if !from_front
         normal = -normal
     end
 
@@ -226,8 +230,8 @@ function interact3d(::Reflective, system::AbstractSystem, coating::Coating{T},
 
     n_transmitted, _ = _coating_media(system, ray, int)
     J_r = get_jones_matrix(coating.model, angle3d(direction(ray), -normal),
-        wavelength(ray), refractive_index(ray), n_transmitted, true)
-    R_coeff = 0.5 * (abs2(J_r[1, 1]) + abs2(J_r[1, 2]) + abs2(J_r[2, 1]) + abs2(J_r[2, 2]))
+        wavelength(ray), refractive_index(ray), n_transmitted, true; from_front = from_front)
+    R_coeff = clamp(unpolarized_reflectance(J_r), 0.0, 1.0)
 
     return BeamInteraction{T, R}(
         hint, Ray{T}(npos, ndir, nothing, wavelength(ray),
@@ -238,7 +242,8 @@ function interact3d(::Reflective, system::AbstractSystem, coating::Coating{T},
         ::Beam{T, R}, ray::R) where {T, R <: PolarizedRay{T}}
     int = intersection(ray)
     normal = normal3d(int)
-    if dot(direction(ray), normal) > 0
+    from_front = dot(direction(ray), normal) < 0
+    if !from_front
         normal = -normal
     end
 
@@ -259,7 +264,7 @@ function interact3d(::Reflective, system::AbstractSystem, coating::Coating{T},
     n_transmitted, _ = _coating_media(system, ray, int)
 
     J = get_jones_matrix(coating.model, angle3d(direction(ray), -normal),
-        wavelength(ray), refractive_index(ray), n_transmitted, true)
+        wavelength(ray), refractive_index(ray), n_transmitted, true; from_front = from_front)
     E0 = _calculate_global_E0(coating, ray, ndir, J)
     return BeamInteraction{T, R}(hint,
         PolarizedRay{T}(npos, ndir, nothing, wavelength(ray), refractive_index(ray), E0))
@@ -269,10 +274,11 @@ end
 function interact3d(::Splitting, system::AbstractSystem, coating::Coating{T},
         beam::Beam{T, R}, ray::R) where {T, R <: Ray{T}}
     int = intersection(ray)
-    n_transmitted, n_reflected = _coating_media(system, ray, int)
+    n_transmitted, _ = _coating_media(system, ray, int)
 
     normal = normal3d(int)
-    if dot(direction(ray), normal) > 0
+    from_front = dot(direction(ray), normal) < 0
+    if !from_front
         normal = -normal
     end
     dir_t, TIR = refraction3d(direction(ray), normal, refractive_index(ray), n_transmitted)
@@ -284,15 +290,15 @@ function interact3d(::Splitting, system::AbstractSystem, coating::Coating{T},
     pos = position(ray) + length(ray) * direction(ray)
 
     J_r = get_jones_matrix(coating.model, angle3d(direction(ray), -normal),
-        wavelength(ray), refractive_index(ray), n_transmitted, true)
-    R_coeff = 0.5 * (abs2(J_r[1, 1]) + abs2(J_r[1, 2]) + abs2(J_r[2, 1]) + abs2(J_r[2, 2]))
-    T_coeff = 1.0 - R_coeff
+        wavelength(ray), refractive_index(ray), n_transmitted, true; from_front = from_front)
+    R_coeff = clamp(unpolarized_reflectance(J_r), 0.0, 1.0)
+    T_coeff = clamp(1.0 - R_coeff, 0.0, 1.0)
 
     beam_t = Beam(Ray{T}(
         Point3{T}(pos), Point3{T}(dir_t), nothing, wavelength(ray), n_transmitted, weight(ray) *
                                                                                    T_coeff))
     beam_r = Beam(Ray{T}(
-        Point3{T}(pos), Point3{T}(dir_r), nothing, wavelength(ray), n_reflected, weight(ray) *
+        Point3{T}(pos), Point3{T}(dir_r), nothing, wavelength(ray), refractive_index(ray), weight(ray) *
                                                                                  R_coeff))
 
     children!(beam, (beam_t, beam_r))
@@ -302,10 +308,11 @@ end
 function interact3d(::Splitting, system::AbstractSystem, coating::Coating{T},
         beam::Beam{T, R}, ray::R) where {T, R <: PolarizedRay{T}}
     int = intersection(ray)
-    n_transmitted, n_reflected = _coating_media(system, ray, int)
+    n_transmitted, _ = _coating_media(system, ray, int)
 
     normal = normal3d(int)
-    if dot(direction(ray), normal) > 0
+    from_front = dot(direction(ray), normal) < 0
+    if !from_front
         normal = -normal
     end
     dir_t, TIR = refraction3d(direction(ray), normal, refractive_index(ray), n_transmitted)
@@ -317,16 +324,16 @@ function interact3d(::Splitting, system::AbstractSystem, coating::Coating{T},
     pos = position(ray) + length(ray) * direction(ray)
 
     J_t = get_jones_matrix(coating.model, angle3d(direction(ray), -normal),
-        wavelength(ray), refractive_index(ray), n_transmitted, false)
+        wavelength(ray), refractive_index(ray), n_transmitted, false; from_front = from_front)
     J_r = get_jones_matrix(coating.model, angle3d(direction(ray), -normal),
-        wavelength(ray), refractive_index(ray), n_transmitted, true)
+        wavelength(ray), refractive_index(ray), n_transmitted, true; from_front = from_front)
 
     E0_t = _calculate_global_E0(coating, ray, dir_t, J_t)
     E0_r = _calculate_global_E0(coating, ray, dir_r, J_r)
 
     beam_t = Beam(PolarizedRay{T}(
         pos, dir_t, nothing, wavelength(ray), n_transmitted, E0_t))
-    beam_r = Beam(PolarizedRay{T}(pos, dir_r, nothing, wavelength(ray), n_reflected, E0_r))
+    beam_r = Beam(PolarizedRay{T}(pos, dir_r, nothing, wavelength(ray), refractive_index(ray), E0_r))
 
     children!(beam, (beam_t, beam_r))
     return nothing
@@ -353,6 +360,9 @@ function interact3d(::CoatingBehavior, system::AbstractSystem, coating::Coating{
     return GaussianBeamletInteraction{T}(i_c, i_w, i_d)
 end
 
+# TODO: There is significant code duplication between the splitting boundary functions
+# in StandaloneCoating.jl and CoatedComponents.jl. A shared helper that accepts
+# a media-resolution callback could unify these ~500 lines.
 function interact3d(::Splitting, system::AbstractSystem, coating::Coating{T},
         gauss::GaussianBeamlet, ray_id::Int) where {T}
     # Ensure all component rays have valid intersections to prevent clipping crashes
@@ -363,11 +373,8 @@ function interact3d(::Splitting, system::AbstractSystem, coating::Coating{T},
     end
 
     c_ray = gauss.chief.rays[ray_id]
-    w_ray = gauss.waist.rays[ray_id]
-    d_ray = gauss.divergence.rays[ray_id]
-
     int = intersection(c_ray)
-    n_transmitted, n_reflected = _coating_media(system, c_ray, int)
+    n_transmitted, _ = _coating_media(system, c_ray, int)
 
     normal = normal3d(int)
     from_front = dot(direction(c_ray), normal) < 0
@@ -375,59 +382,26 @@ function interact3d(::Splitting, system::AbstractSystem, coating::Coating{T},
         normal = -normal
     end
 
-    c_dir_t, TIR = refraction3d(
-        direction(c_ray), normal, refractive_index(c_ray), n_transmitted)
-    if TIR
-        i_c = interact3d(Reflective(), system, coating, gauss.chief, rays(gauss.chief)[ray_id])
-        i_w = interact3d(Reflective(), system, coating, gauss.waist, rays(gauss.waist)[ray_id])
-        i_d = interact3d(Reflective(), system, coating, gauss.divergence, rays(gauss.divergence)[ray_id])
-        if any(isnothing, (i_c, i_w, i_d))
-            return nothing
+    return _propagate_splitting_gaussian_beamlet(
+        system,
+        coating,
+        coating.model,
+        gauss,
+        ray_id,
+        refractive_index(c_ray),
+        n_transmitted,
+        normal,
+        from_front,
+        () -> begin
+            i_c = interact3d(Reflective(), system, coating, gauss.chief, rays(gauss.chief)[ray_id])
+            i_w = interact3d(Reflective(), system, coating, gauss.waist, rays(gauss.waist)[ray_id])
+            i_d = interact3d(Reflective(), system, coating, gauss.divergence, rays(gauss.divergence)[ray_id])
+            if any(isnothing, (i_c, i_w, i_d))
+                return nothing
+            end
+            return GaussianBeamletInteraction{T}(i_c, i_w, i_d)
         end
-        return GaussianBeamletInteraction{T}(i_c, i_w, i_d)
-    end
-    w_dir_t, _ = refraction3d(
-        direction(w_ray), normal, refractive_index(w_ray), n_transmitted)
-    d_dir_t, _ = refraction3d(
-        direction(d_ray), normal, refractive_index(d_ray), n_transmitted)
-
-    c_dir_r = reflection3d(direction(c_ray), normal)
-    w_dir_r = reflection3d(direction(w_ray), normal)
-    d_dir_r = reflection3d(direction(d_ray), normal)
-
-    pos = position(c_ray) + length(c_ray) * direction(c_ray)
-
-    J_t = get_jones_matrix(coating.model, angle3d(direction(c_ray), -normal),
-        wavelength(c_ray), refractive_index(c_ray), n_transmitted, false; from_front = from_front)
-    J_r = get_jones_matrix(coating.model, angle3d(direction(c_ray), -normal),
-        wavelength(c_ray), refractive_index(c_ray), n_transmitted, true; from_front = from_front)
-
-    # Spawn transmitted
-    λ = wavelength(c_ray)
-    chief_t = Beam(Ray{T}(pos, c_dir_t, nothing, λ, n_transmitted))
-    waist_t = Beam(Ray{T}(
-        position(w_ray) + length(w_ray) * direction(w_ray), w_dir_t, nothing, λ, n_transmitted))
-    divergent_t = Beam(Ray{T}(
-        position(d_ray) + length(d_ray) * direction(d_ray), d_dir_t, nothing, λ, n_transmitted))
-
-    w0_t = gauss_parameters(gauss, length(gauss))[4]
-    t_val = J_t[1, 1]
-    E0_t = t_val * electric_field(gauss) * (beam_waist(gauss) / w0_t)
-    t = GaussianBeamlet(chief_t, waist_t, divergent_t, wavelength(gauss), w0_t, E0_t)
-
-    # Spawn reflected
-    chief_r = Beam(Ray{T}(pos, c_dir_r, nothing, λ, n_reflected))
-    waist_r = Beam(Ray{T}(
-        position(w_ray) + length(w_ray) * direction(w_ray), w_dir_r, nothing, λ, n_reflected))
-    divergent_r = Beam(Ray{T}(
-        position(d_ray) + length(d_ray) * direction(d_ray), d_dir_r, nothing, λ, n_reflected))
-    w0_r = w0_t
-    r_val = -J_r[1, 1]
-    E0_r = r_val * electric_field(gauss) * (beam_waist(gauss) / w0_r)
-    r = GaussianBeamlet(chief_r, waist_r, divergent_r, wavelength(gauss), w0_r, E0_r)
-
-    children!(gauss, (t, r))
-    return nothing
+    )
 end
 
 function interact3d(system::AbstractSystem, coating::Coating{T},
@@ -453,7 +427,8 @@ function interact3d(::CoatingBehavior, system::AbstractSystem, coating::Coating{
         return nothing
     end
     return AstigmaticGaussianBeamletInteraction{T}(
-        i_c, i_wxp, i_wxm, i_wyp, i_wym, i_dxp, i_dxm, i_dyp, i_dym)
+        i_c, i_wxp, i_wxm, i_wyp, i_wym, i_dxp, i_dxm, i_dyp, i_dym
+    )
 end
 
 function interact3d(::Splitting, system::AbstractSystem, coating::Coating{T},
@@ -473,7 +448,7 @@ function interact3d(::Splitting, system::AbstractSystem, coating::Coating{T},
 
     c_ray = rays(agb.c)[ray_id]
     int = intersection(c_ray)
-    n_transmitted, n_reflected = _coating_media(system, c_ray, int)
+    n_transmitted, _ = _coating_media(system, c_ray, int)
 
     normal = normal3d(int)
     from_front = dot(direction(c_ray), normal) < 0
@@ -481,142 +456,37 @@ function interact3d(::Splitting, system::AbstractSystem, coating::Coating{T},
         normal = -normal
     end
 
-    _, TIR = refraction3d(direction(c_ray), normal, refractive_index(c_ray), n_transmitted)
-    if TIR
-        i_c = interact3d(Reflective(), system, coating, agb.c, rays(agb.c)[ray_id])
-        i_wxp = interact3d(Reflective(), system, coating, agb.wxp, rays(agb.wxp)[ray_id])
-        i_wxm = interact3d(Reflective(), system, coating, agb.wxm, rays(agb.wxm)[ray_id])
-        i_wyp = interact3d(Reflective(), system, coating, agb.wyp, rays(agb.wyp)[ray_id])
-        i_wym = interact3d(Reflective(), system, coating, agb.wym, rays(agb.wym)[ray_id])
-        i_dxp = interact3d(Reflective(), system, coating, agb.dxp, rays(agb.dxp)[ray_id])
-        i_dxm = interact3d(Reflective(), system, coating, agb.dxm, rays(agb.dxm)[ray_id])
-        i_dyp = interact3d(Reflective(), system, coating, agb.dyp, rays(agb.dyp)[ray_id])
-        i_dym = interact3d(Reflective(), system, coating, agb.dym, rays(agb.dym)[ray_id])
-        if any(isnothing, (i_c, i_wxp, i_wxm, i_wyp, i_wym, i_dxp, i_dxm, i_dyp, i_dym))
-            return nothing
+    return _propagate_splitting_astigmatic_beamlet(
+        system,
+        coating,
+        coating.model,
+        agb,
+        ray_id,
+        refractive_index(c_ray),
+        n_transmitted,
+        normal,
+        from_front,
+        () -> begin
+            i_c = interact3d(Reflective(), system, coating, agb.c, rays(agb.c)[ray_id])
+            i_wxp = interact3d(Reflective(), system, coating, agb.wxp, rays(agb.wxp)[ray_id])
+            i_wxm = interact3d(Reflective(), system, coating, agb.wxm, rays(agb.wxm)[ray_id])
+            i_wyp = interact3d(Reflective(), system, coating, agb.wyp, rays(agb.wyp)[ray_id])
+            i_wym = interact3d(Reflective(), system, coating, agb.wym, rays(agb.wym)[ray_id])
+            i_dxp = interact3d(Reflective(), system, coating, agb.dxp, rays(agb.dxp)[ray_id])
+            i_dxm = interact3d(Reflective(), system, coating, agb.dxm, rays(agb.dxm)[ray_id])
+            i_dyp = interact3d(Reflective(), system, coating, agb.dyp, rays(agb.dyp)[ray_id])
+            i_dym = interact3d(Reflective(), system, coating, agb.dym, rays(agb.dym)[ray_id])
+            if any(isnothing, (i_c, i_wxp, i_wxm, i_wyp, i_wym, i_dxp, i_dxm, i_dyp, i_dym))
+                return nothing
+            end
+            return AstigmaticGaussianBeamletInteraction{T}(
+                i_c, i_wxp, i_wxm, i_wyp, i_wym, i_dxp, i_dxm, i_dyp, i_dym)
         end
-        return AstigmaticGaussianBeamletInteraction{T}(
-            i_c, i_wxp, i_wxm, i_wyp, i_wym, i_dxp, i_dxm, i_dyp, i_dym)
-    end
-
-    dirs_t = (
-        refraction3d(rays(agb.c)[ray_id], n_transmitted)[1],
-        refraction3d(rays(agb.wxp)[ray_id], n_transmitted)[1],
-        refraction3d(rays(agb.wxm)[ray_id], n_transmitted)[1],
-        refraction3d(rays(agb.wyp)[ray_id], n_transmitted)[1],
-        refraction3d(rays(agb.wym)[ray_id], n_transmitted)[1],
-        refraction3d(rays(agb.dxp)[ray_id], n_transmitted)[1],
-        refraction3d(rays(agb.dxm)[ray_id], n_transmitted)[1],
-        refraction3d(rays(agb.dyp)[ray_id], n_transmitted)[1],
-        refraction3d(rays(agb.dym)[ray_id], n_transmitted)[1]
     )
-    dirs_r = (
-        reflection3d(
-            direction(rays(agb.c)[ray_id]), normal3d(intersection(rays(agb.c)[ray_id]))),
-        reflection3d(direction(rays(agb.wxp)[ray_id]),
-            normal3d(intersection(rays(agb.wxp)[ray_id]))),
-        reflection3d(direction(rays(agb.wxm)[ray_id]),
-            normal3d(intersection(rays(agb.wxm)[ray_id]))),
-        reflection3d(direction(rays(agb.wyp)[ray_id]),
-            normal3d(intersection(rays(agb.wyp)[ray_id]))),
-        reflection3d(direction(rays(agb.wym)[ray_id]),
-            normal3d(intersection(rays(agb.wym)[ray_id]))),
-        reflection3d(direction(rays(agb.dxp)[ray_id]),
-            normal3d(intersection(rays(agb.dxp)[ray_id]))),
-        reflection3d(direction(rays(agb.dxm)[ray_id]),
-            normal3d(intersection(rays(agb.dxm)[ray_id]))),
-        reflection3d(direction(rays(agb.dyp)[ray_id]),
-            normal3d(intersection(rays(agb.dyp)[ray_id]))),
-        reflection3d(direction(rays(agb.dym)[ray_id]),
-            normal3d(intersection(rays(agb.dym)[ray_id])))
-    )
-    # Transmitted
-    λ = wavelength(c_ray)
-    J_t = get_jones_matrix(coating.model, angle3d(direction(c_ray), -normal),
-        λ, refractive_index(c_ray), n_transmitted, false; from_front = from_front)
-    J_r = get_jones_matrix(coating.model, angle3d(direction(c_ray), -normal),
-        λ, refractive_index(c_ray), n_transmitted, true; from_front = from_front)
-
-    E0_t = _calculate_global_E0(coating, c_ray, dirs_t[1], J_t)
-    E0_r = _calculate_global_E0(coating, c_ray, dirs_r[1], J_r)
-
-    chief_t = Beam(PolarizedRay{T}(
-        position(c_ray) + length(c_ray) * direction(c_ray), dirs_t[1], nothing, λ, n_transmitted, E0_t))
-    wxp_t = Beam(Ray{T}(
-        position(rays(agb.wxp)[ray_id]) +
-        length(rays(agb.wxp)[ray_id]) * direction(rays(agb.wxp)[ray_id]),
-        dirs_t[2], nothing, λ, n_transmitted))
-    wxm_t = Beam(Ray{T}(
-        position(rays(agb.wxm)[ray_id]) +
-        length(rays(agb.wxm)[ray_id]) * direction(rays(agb.wxm)[ray_id]),
-        dirs_t[3], nothing, λ, n_transmitted))
-    wyp_t = Beam(Ray{T}(
-        position(rays(agb.wyp)[ray_id]) +
-        length(rays(agb.wyp)[ray_id]) * direction(rays(agb.wyp)[ray_id]),
-        dirs_t[4], nothing, λ, n_transmitted))
-    wym_t = Beam(Ray{T}(
-        position(rays(agb.wym)[ray_id]) +
-        length(rays(agb.wym)[ray_id]) * direction(rays(agb.wym)[ray_id]),
-        dirs_t[5], nothing, λ, n_transmitted))
-    dxp_t = Beam(Ray{T}(
-        position(rays(agb.dxp)[ray_id]) +
-        length(rays(agb.dxp)[ray_id]) * direction(rays(agb.dxp)[ray_id]),
-        dirs_t[6], nothing, λ, n_transmitted))
-    dxm_t = Beam(Ray{T}(
-        position(rays(agb.dxm)[ray_id]) +
-        length(rays(agb.dxm)[ray_id]) * direction(rays(agb.dxm)[ray_id]),
-        dirs_t[7], nothing, λ, n_transmitted))
-    dyp_t = Beam(Ray{T}(
-        position(rays(agb.dyp)[ray_id]) +
-        length(rays(agb.dyp)[ray_id]) * direction(rays(agb.dyp)[ray_id]),
-        dirs_t[8], nothing, λ, n_transmitted))
-    dym_t = Beam(Ray{T}(
-        position(rays(agb.dym)[ray_id]) +
-        length(rays(agb.dym)[ray_id]) * direction(rays(agb.dym)[ray_id]),
-        dirs_t[9], nothing, λ, n_transmitted))
-
-    t = AstigmaticGaussianBeamlet(
-        chief_t, wxp_t, wxm_t, wyp_t, wym_t, dxp_t, dxm_t, dyp_t, dym_t)
-
-    # Reflected
-    chief_r = Beam(PolarizedRay{T}(
-        position(c_ray) + length(c_ray) * direction(c_ray), dirs_r[1], nothing, λ, n_reflected, E0_r))
-    wxp_r = Beam(Ray{T}(
-        position(rays(agb.wxp)[ray_id]) +
-        length(rays(agb.wxp)[ray_id]) * direction(rays(agb.wxp)[ray_id]),
-        dirs_r[2], nothing, λ, n_reflected))
-    wxm_r = Beam(Ray{T}(
-        position(rays(agb.wxm)[ray_id]) +
-        length(rays(agb.wxm)[ray_id]) * direction(rays(agb.wxm)[ray_id]),
-        dirs_r[3], nothing, λ, n_reflected))
-    wyp_r = Beam(Ray{T}(
-        position(rays(agb.wyp)[ray_id]) +
-        length(rays(agb.wyp)[ray_id]) * direction(rays(agb.wyp)[ray_id]),
-        dirs_r[4], nothing, λ, n_reflected))
-    wym_r = Beam(Ray{T}(
-        position(rays(agb.wym)[ray_id]) +
-        length(rays(agb.wym)[ray_id]) * direction(rays(agb.wym)[ray_id]),
-        dirs_r[5], nothing, λ, n_reflected))
-    dxp_r = Beam(Ray{T}(
-        position(rays(agb.dxp)[ray_id]) +
-        length(rays(agb.dxp)[ray_id]) * direction(rays(agb.dxp)[ray_id]),
-        dirs_r[6], nothing, λ, n_reflected))
-    dxm_r = Beam(Ray{T}(
-        position(rays(agb.dxm)[ray_id]) +
-        length(rays(agb.dxm)[ray_id]) * direction(rays(agb.dxm)[ray_id]),
-        dirs_r[7], nothing, λ, n_reflected))
-    dyp_r = Beam(Ray{T}(
-        position(rays(agb.dyp)[ray_id]) +
-        length(rays(agb.dyp)[ray_id]) * direction(rays(agb.dyp)[ray_id]),
-        dirs_r[8], nothing, λ, n_reflected))
-    dym_r = Beam(Ray{T}(
-        position(rays(agb.dym)[ray_id]) +
-        length(rays(agb.dym)[ray_id]) * direction(rays(agb.dym)[ray_id]),
-        dirs_r[9], nothing, λ, n_reflected))
-
-    r = AstigmaticGaussianBeamlet(
-        chief_r, wxp_r, wxm_r, wyp_r, wym_r, dxp_r, dxm_r, dyp_r, dym_r)
-
-    children!(agb, (t, r))
-    return nothing
 end
+
+# Absorptive behavior
+interact3d(::Absorptive, ::AbstractSystem, ::Coating{T}, ::AbstractBeam, ::AbstractRay) where {T} = nothing
+interact3d(::Absorptive, ::AbstractSystem, ::Coating{T}, ::GaussianBeamlet, ::Int) where {T} = nothing
+interact3d(::Absorptive, ::AbstractSystem, ::Coating{T}, ::AstigmaticGaussianBeamlet, ::Int) where {T} = nothing
+

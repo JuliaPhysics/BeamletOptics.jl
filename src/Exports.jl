@@ -48,7 +48,7 @@ export ThinBeamsplitter, RoundThinBeamsplitter, RectangularPlateBeamsplitter,
 # coatings
 export Coating, Uncoated, SimpleARCoating, SimpleHRCoating, SimpleBeamsplitterCoating,
        JonesCoating, ThinFilmCoating, CoatedRefractive, CoatedLens, CoatedMirror, get_jones_matrix,
-       with_coatings
+       with_coatings, fresnel_coefficients, Transmissive, Reflective, Splitting, Absorptive, coating_behavior
 
 # polarizing components
 export PolarizationFilter, PolarizingCubeBeamsplitter, Waveplate, HalfWavePlate, QuarterWavePlate, RectangularPlateWaveplate, RoundPlateWaveplate,

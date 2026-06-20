@@ -3,7 +3,10 @@
 """
     AbstractCoating{T} <: AbstractObject{T}
 
-Base abstract type for all optical coating models and interface properties.
+Base abstract type for standalone coating *objects* — thin coated boundaries that exist as
+independent optical components in a system. This is distinct from coating *models* (such as
+`SimpleARCoating`, `ThinFilmCoating`, etc.) which define the physical interaction properties
+but are not optical objects themselves.
 """
 abstract type AbstractCoating{T} <: AbstractObject{T} end
 
@@ -15,7 +18,7 @@ is_thin_interface(::AbstractCoating) = true
 
 Abstract trait representing the physical interaction behavior of a coating boundary.
 The core physics engine dispatches ray and beamlet propagation logic based on this trait.
-Subtypes are `Transmissive`, `Reflective`, and `Splitting`.
+Subtypes are `Transmissive`, `Reflective`, `Splitting`, and `Absorptive`.
 """
 abstract type CoatingBehavior end
 
@@ -39,6 +42,14 @@ struct Reflective <: CoatingBehavior end
 Trait indicating a beam-splitting coating boundary that explicitly splits each incoming ray into both a transmitted and a reflected child ray.
 """
 struct Splitting <: CoatingBehavior end
+
+"""
+    Absorptive <: CoatingBehavior
+
+Trait indicating a coating boundary that absorbs incident light. Rays hitting an absorptive
+coating are terminated (the interaction returns `nothing`).
+"""
+struct Absorptive <: CoatingBehavior end
 
 # Coating models
 """
@@ -64,6 +75,10 @@ coating_behavior(::Uncoated) = Transmissive()
 
 A simplified Anti-Reflective (AR) coating model defined by a constant power reflectance `R`.
 Behaves as `Transmissive`.
+
+!!! warning "Angle Independence"
+    This model returns constant coefficients regardless of angle of incidence, wavelength,
+    or refractive index ratio. For angle-dependent AR behavior, use [`ThinFilmCoating`](@ref).
 """
 struct SimpleARCoating
     R::Float64
@@ -76,6 +91,10 @@ coating_behavior(::SimpleARCoating) = Transmissive()
 
 A simplified Highly Reflective (HR) coating model defined by a constant power reflectance `R`.
 Behaves as `Reflective`.
+
+!!! warning "Angle Independence"
+    This model returns constant coefficients regardless of angle of incidence, wavelength,
+    or refractive index ratio. For angle-dependent HR behavior, use [`ThinFilmCoating`](@ref).
 """
 struct SimpleHRCoating
     R::Float64
@@ -122,9 +141,14 @@ coating_behavior(c::JonesCoating) = c.behavior
     ThinFilmCoating(ns::Vector, ds::Vector{<:Real}; behavior = Transmissive())
     ThinFilmCoating(n, d::Real; behavior = Transmissive())
 
-A physical thin-film interference coating model defined by a stack of refractive indices `ns` and physical thicknesses `ds` (in mm).
+A physical thin-film interference coating model defined by a stack of refractive indices `ns` and physical thicknesses `ds` (in same unit as wavelength, typically m).
 Indices can be static real numbers or dispersion functions `f(λ) -> n`.
 Calculates exact complex Fresnel coefficients using the characteristic transfer matrix method.
+
+!!! tip "Empty Layer Stack"
+    Passing empty vectors `ThinFilmCoating(Float64[], Float64[])` creates a bare interface
+    that yields the standard Fresnel coefficients for the surrounding media. This is useful
+    for modeling splitting at an uncoated index boundary.
 """
 struct ThinFilmCoating{N <: Tuple, D <: Tuple, B <: CoatingBehavior}
     ns::N
@@ -155,7 +179,24 @@ function get_jones_matrix(::Uncoated, θi, λ, n1, n2, is_reflected; from_front:
     end
 end
 
-function fresnel_coefficients(c::SimpleARCoating, θi, λ, n1, n2)
+"""
+    unpolarized_reflectance(J)
+
+Compute the average power reflectance from a Jones reflection matrix for unpolarized light.
+
+!!! warning "Absorption"
+    For non-absorbing coatings, `T = 1 - R` holds exactly. For absorbing coatings (complex
+    refractive index layers in a `ThinFilmCoating`), the absorbed fraction is lost and
+    `T + R < 1`. Plain `Ray` types use `T = 1 - R`, which silently assigns the absorbed
+    fraction to transmission. Use `PolarizedRay` for physically correct treatment of
+    absorbing coatings.
+"""
+@inline unpolarized_reflectance(J) = 0.5 * (abs2(J[1, 1]) + abs2(J[1, 2]) + abs2(J[2, 1]) + abs2(J[2, 2]))
+
+# Shared implementation for simplified constant-reflectance coating models
+const SimpleReflectanceCoating = Union{SimpleARCoating, SimpleHRCoating}
+
+function fresnel_coefficients(c::SimpleReflectanceCoating, θi, λ, n1, n2)
     R = c.R
     T = 1.0 - R
     rs = -sqrt(R)
@@ -166,27 +207,7 @@ function fresnel_coefficients(c::SimpleARCoating, θi, λ, n1, n2)
 end
 
 function get_jones_matrix(
-        c::SimpleARCoating, θi, λ, n1, n2, is_reflected; from_front::Bool = true)
-    rs, rp, ts, tp = fresnel_coefficients(c, θi, λ, n1, n2)
-    if is_reflected
-        return SPBasis(-rs, 0, 0, rp)
-    else
-        return SPBasis(ts, 0, 0, tp)
-    end
-end
-
-function fresnel_coefficients(c::SimpleHRCoating, θi, λ, n1, n2)
-    R = c.R
-    T = 1.0 - R
-    rs = -sqrt(R)
-    rp = sqrt(R)
-    ts = sqrt(T)
-    tp = sqrt(T)
-    return rs, rp, ts, tp
-end
-
-function get_jones_matrix(
-        c::SimpleHRCoating, θi, λ, n1, n2, is_reflected; from_front::Bool = true)
+        c::SimpleReflectanceCoating, θi, λ, n1, n2, is_reflected; from_front::Bool = true)
     rs, rp, ts, tp = fresnel_coefficients(c, θi, λ, n1, n2)
     if is_reflected
         return SPBasis(-rs, 0, 0, rp)
@@ -318,6 +339,10 @@ function fresnel_coefficients(c::ThinFilmCoating, θi::Real, λ::Real,
     Bp = m11_p + η2p * m12_p
     Cp = m21_p + η2p * m22_p
     rp = (η1p * Bp - Cp) / (η1p * Bp + Cp)
+    # The p-transmission coefficient includes an extra cosθi/cosθt factor to convert from
+    # the "field at boundary" to the "propagating field" convention. This asymmetry with ts
+    # is physically correct: the s-polarization boundary condition is symmetric, while the
+    # p-polarization requires the obliquity factor (Hecht/Born-Wolf convention).
     tp = (2.0 * η1p / (η1p * Bp + Cp)) * (cosθi / cosθt)
 
     return rs, rp, ts, tp
@@ -332,3 +357,12 @@ function get_jones_matrix(
         return SPBasis(ts, 0, 0, tp)
     end
 end
+
+# Base.show methods for coating models
+Base.show(io::IO, ::MIME"text/plain", ::Uncoated) = print(io, "Uncoated")
+Base.show(io::IO, ::MIME"text/plain", c::SimpleARCoating) = print(io, "SimpleARCoating(R = ", c.R, ")")
+Base.show(io::IO, ::MIME"text/plain", c::SimpleHRCoating) = print(io, "SimpleHRCoating(R = ", c.R, ")")
+Base.show(io::IO, ::MIME"text/plain", c::SimpleBeamsplitterCoating) = print(io, "SimpleBeamsplitterCoating(rs = ", c.rs, ", rp = ", c.rp, ", ts = ", c.ts, ", tp = ", c.tp, ")")
+Base.show(io::IO, ::MIME"text/plain", c::JonesCoating) = print(io, "JonesCoating(behavior = ", c.behavior, ")")
+Base.show(io::IO, ::MIME"text/plain", c::ThinFilmCoating) = print(io, "ThinFilmCoating(", length(c.ns), " layers, behavior = ", c.behavior, ")")
+

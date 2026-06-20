@@ -13,6 +13,7 @@ Every coating has an associated `CoatingBehavior` trait. The core ray-tracing en
 * **`Transmissive`**: Light is refracted through the interface into the adjacent medium. (Default for `Uncoated`, `SimpleARCoating`).
 * **`Reflective`**: Light is reflected back into the incident medium. (Default for `SimpleHRCoating`).
 * **`Splitting`**: The incident ray is explicitly split into both a transmitted ray and a reflected ray. (Default for `SimpleBeamsplitterCoating`, or when modeling beamsplitter interfaces).
+* **`Absorptive`**: Light is immediately absorbed (terminated) at the interface, generating no child rays or beamlets.
 
 ### Custom / Dynamic Coating Behaviors
 

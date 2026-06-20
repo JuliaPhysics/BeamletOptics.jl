@@ -34,18 +34,40 @@ is_flat_shape(::AbstractShape) = false
 function is_flat_shape(mesh::Mesh)
     n = size(mesh.vertices, 1)
     n < 3 && return true
+
+    # Find a non-collinear triplet of vertices to define the plane
     v1 = @view mesh.vertices[1, :]
-    v2 = @view mesh.vertices[2, :]
-    v3 = @view mesh.vertices[3, :]
-    n_vec = cross(v2 - v1, v3 - v1)
-    n_norm = norm(n_vec)
-    if n_norm < 1e-12
-        return true
+
+    # Find the first vertex vi that is not coincident with v1
+    i = 2
+    while i <= n && norm(mesh.vertices[i, :] - v1) < 1e-12
+        i += 1
     end
+    i > n && return true  # All vertices are coincident (degenerate, flat)
+    vi = @view mesh.vertices[i, :]
+
+    # Find the first vertex vj such that v1, vi, vj are non-collinear
+    j = i + 1
+    n_vec = cross(vi - v1, vi - v1)  # Initial dummy value
+    n_norm = 0.0
+    found = false
+    while j <= n
+        vj = @view mesh.vertices[j, :]
+        n_vec = cross(vi - v1, vj - v1)
+        n_norm = norm(n_vec)
+        if n_norm >= 1e-12
+            found = true
+            break
+        end
+        j += 1
+    end
+    !found && return true  # All vertices are collinear (line of points, flat)
+
+    # Check if all other vertices lie in the defined plane
     n_vec = n_vec / n_norm
-    for i in 4:n
-        vi = @view mesh.vertices[i, :]
-        if abs(dot(vi - v1, n_vec)) > 1e-6
+    for k in 1:n
+        vk = @view mesh.vertices[k, :]
+        if abs(dot(vk - v1, n_vec)) > 1e-6
             return false
         end
     end
@@ -85,6 +107,12 @@ _coating_model(c) = c
 
 # Shared coatings tuple constructor helper
 function _build_coatings_tuple(parent_shape::AbstractShape, front, back)
+    if is_flat_shape(parent_shape)
+        if !isnothing(front) && !isnothing(back)
+            throw(ArgumentError("Cannot specify both front and back coatings for a flat (2D) shape."))
+        end
+    end
+
     f_side = is_flat_shape(parent_shape) ? :either : :front
     b_side = is_flat_shape(parent_shape) ? :either : :back
 
@@ -148,6 +176,7 @@ rotate3d!(cl::CoatedComponent, axis, θ) = rotate3d!(cl.optic, axis, θ)
 refractive_index(cl::CoatedRefractive) = refractive_index(cl.optic)
 refractive_index(cl::CoatedRefractive, λ::Real) = refractive_index(cl.optic, λ)
 is_refractive(::CoatedRefractive) = true
+is_refractive(::CoatedMirror) = false
 thickness(cl::CoatedRefractive) = thickness(cl.optic)
 
 # Get matching coating for a hit
@@ -212,6 +241,9 @@ function interact3d(system::AbstractSystem,
         beam::Beam{T, R},
         ray::R) where {T <: Real, R <: AbstractRay{T}}
     coating_model = get_coating_model_at_hit(cl, ray)
+    if coating_behavior(coating_model, ray) isa Absorptive
+        return nothing
+    end
     return interact_refractive_boundary(system, cl.optic, coating_model, beam, ray)
 end
 
@@ -220,6 +252,9 @@ function interact3d(system::AbstractSystem,
         beam::Beam{T, R},
         ray::R) where {T <: Real, R <: AbstractRay{T}}
     coating_model = get_coating_model_at_hit(cm, ray)
+    if coating_behavior(coating_model, ray) isa Absorptive
+        return nothing
+    end
     return interact_reflective_boundary(system, cm.optic, coating_model, beam, ray)
 end
 
@@ -313,6 +348,9 @@ function interact3d_reflective(system::AbstractSystem, cl::CoatedMirror, coating
     return interact_reflective_boundary(system, cl.optic, coating_model, beam, ray)
 end
 
+# TODO: There is significant code duplication between the splitting boundary functions
+# in StandaloneCoating.jl and CoatedComponents.jl. A shared helper that accepts
+# a media-resolution callback could unify these ~500 lines.
 function interact_splitting_boundary(
         system::AbstractSystem,
         coated::CoatedComponent,
@@ -328,15 +366,12 @@ function interact_splitting_boundary(
     end
 
     c_ray = gauss.chief.rays[ray_id]
-    w_ray = gauss.waist.rays[ray_id]
-    d_ray = gauss.divergence.rays[ray_id]
-
     int = intersection(c_ray)
     λ = wavelength(c_ray)
     substrate_obj = coated.optic
     n_substrate = refractive_index(substrate_obj, λ)
 
-    is_coated_obj = (object(int) === coated || object(int) === coated.optic)
+    is_coated_obj = (_base_optic(object(int)) === coated.optic)
     normal_coated = normal3d(int)
     if !is_coated_obj
         normal_coated = -normal_coated
@@ -361,59 +396,27 @@ function interact_splitting_boundary(
 
     from_front = entering_coated
 
-    c_dir_t, TIR = refraction3d(direction(c_ray), normal, n_incident, n_transmitted)
-    if TIR
-        T_type = eltype(position(c_ray))
-        i_c = interact3d_reflective(system, coated, coating_model, gauss.chief, rays(gauss.chief)[ray_id])
-        i_w = interact3d_reflective(system, coated, coating_model, gauss.waist, rays(gauss.waist)[ray_id])
-        i_d = interact3d_reflective(system, coated, coating_model, gauss.divergence, rays(gauss.divergence)[ray_id])
-        if any(isnothing, (i_c, i_w, i_d))
-            return nothing
+    return _propagate_splitting_gaussian_beamlet(
+        system,
+        coated,
+        coating_model,
+        gauss,
+        ray_id,
+        n_incident,
+        n_transmitted,
+        normal,
+        from_front,
+        () -> begin
+            i_c = interact3d_reflective(system, coated, coating_model, gauss.chief, rays(gauss.chief)[ray_id])
+            i_w = interact3d_reflective(system, coated, coating_model, gauss.waist, rays(gauss.waist)[ray_id])
+            i_d = interact3d_reflective(system, coated, coating_model, gauss.divergence, rays(gauss.divergence)[ray_id])
+            if any(isnothing, (i_c, i_w, i_d))
+                return nothing
+            end
+            T_type = eltype(position(c_ray))
+            return GaussianBeamletInteraction{T_type}(i_c, i_w, i_d)
         end
-        return GaussianBeamletInteraction{T_type}(i_c, i_w, i_d)
-    end
-    w_dir_t, _ = refraction3d(direction(w_ray), normal, n_incident, n_transmitted)
-    d_dir_t, _ = refraction3d(direction(d_ray), normal, n_incident, n_transmitted)
-
-    c_dir_r = reflection3d(direction(c_ray), normal)
-    w_dir_r = reflection3d(direction(w_ray), normal)
-    d_dir_r = reflection3d(direction(d_ray), normal)
-
-    pos = position(c_ray) + length(c_ray) * direction(c_ray)
-
-    J_t = get_jones_matrix(coating_model, angle3d(direction(c_ray), -normal),
-        λ, n_incident, n_transmitted, false; from_front=from_front)
-    J_r = get_jones_matrix(coating_model, angle3d(direction(c_ray), -normal),
-        λ, n_incident, n_transmitted, true; from_front=from_front)
-
-    T = eltype(pos)
-
-    # Spawn transmitted
-    chief_t = Beam(Ray{T}(pos, c_dir_t, nothing, λ, n_transmitted))
-    waist_t = Beam(Ray{T}(
-        position(w_ray) + length(w_ray) * direction(w_ray), w_dir_t, nothing, λ, n_transmitted))
-    divergent_t = Beam(Ray{T}(
-        position(d_ray) + length(d_ray) * direction(d_ray), d_dir_t, nothing, λ, n_transmitted))
-
-    w0_t = gauss_parameters(gauss, length(gauss))[4]
-    t_val = J_t[1, 1]
-    E0_t = t_val * electric_field(gauss) * (beam_waist(gauss) / w0_t)
-    t = GaussianBeamlet(chief_t, waist_t, divergent_t, wavelength(gauss), w0_t, E0_t)
-
-    # Spawn reflected
-    chief_r = Beam(Ray{T}(pos, c_dir_r, nothing, λ, n_incident))
-    waist_r = Beam(Ray{T}(
-        position(w_ray) + length(w_ray) * direction(w_ray), w_dir_r, nothing, λ, n_incident))
-    divergent_r = Beam(Ray{T}(
-        position(d_ray) + length(d_ray) * direction(d_ray), d_dir_r, nothing, λ, n_incident))
-
-    w0_r = w0_t
-    r_val = -J_r[1, 1]
-    E0_r = r_val * electric_field(gauss) * (beam_waist(gauss) / w0_r)
-    r = GaussianBeamlet(chief_r, waist_r, divergent_r, wavelength(gauss), w0_r, E0_r)
-
-    children!(gauss, (t, r))
-    return nothing
+    )
 end
 
 function interact_splitting_boundary(
@@ -465,149 +468,36 @@ function interact_splitting_boundary(
         normal = -normal_coated
     end
 
-    _, TIR = refraction3d(direction(c_ray), normal, n_incident, n_transmitted)
-    if TIR
-        T_type = eltype(position(c_ray))
-        i_c = interact3d_reflective(system, coated, coating_model, agb.c, rays(agb.c)[ray_id])
-        i_wxp = interact3d_reflective(system, coated, coating_model, agb.wxp, rays(agb.wxp)[ray_id])
-        i_wxm = interact3d_reflective(system, coated, coating_model, agb.wxm, rays(agb.wxm)[ray_id])
-        i_wyp = interact3d_reflective(system, coated, coating_model, agb.wyp, rays(agb.wyp)[ray_id])
-        i_wym = interact3d_reflective(system, coated, coating_model, agb.wym, rays(agb.wym)[ray_id])
-        i_dxp = interact3d_reflective(system, coated, coating_model, agb.dxp, rays(agb.dxp)[ray_id])
-        i_dxm = interact3d_reflective(system, coated, coating_model, agb.dxm, rays(agb.dxm)[ray_id])
-        i_dyp = interact3d_reflective(system, coated, coating_model, agb.dyp, rays(agb.dyp)[ray_id])
-        i_dym = interact3d_reflective(system, coated, coating_model, agb.dym, rays(agb.dym)[ray_id])
-        if any(isnothing, (i_c, i_wxp, i_wxm, i_wyp, i_wym, i_dxp, i_dxm, i_dyp, i_dym))
-            return nothing
-        end
-        return AstigmaticGaussianBeamletInteraction{T_type}(
-            i_c, i_wxp, i_wxm, i_wyp, i_wym, i_dxp, i_dxm, i_dyp, i_dym)
-    end
-
-    dirs_t = (
-        refraction3d(rays(agb.c)[ray_id], n_transmitted)[1],
-        refraction3d(rays(agb.wxp)[ray_id], n_transmitted)[1],
-        refraction3d(rays(agb.wxm)[ray_id], n_transmitted)[1],
-        refraction3d(rays(agb.wyp)[ray_id], n_transmitted)[1],
-        refraction3d(rays(agb.wym)[ray_id], n_transmitted)[1],
-        refraction3d(rays(agb.dxp)[ray_id], n_transmitted)[1],
-        refraction3d(rays(agb.dxm)[ray_id], n_transmitted)[1],
-        refraction3d(rays(agb.dyp)[ray_id], n_transmitted)[1],
-        refraction3d(rays(agb.dym)[ray_id], n_transmitted)[1]
-    )
-    dirs_r = (
-        reflection3d(
-            direction(rays(agb.c)[ray_id]), normal3d(intersection(rays(agb.c)[ray_id]))),
-        reflection3d(direction(rays(agb.wxp)[ray_id]),
-            normal3d(intersection(rays(agb.wxp)[ray_id]))),
-        reflection3d(direction(rays(agb.wxm)[ray_id]),
-            normal3d(intersection(rays(agb.wxm)[ray_id]))),
-        reflection3d(direction(rays(agb.wyp)[ray_id]),
-            normal3d(intersection(rays(agb.wyp)[ray_id]))),
-        reflection3d(direction(rays(agb.wym)[ray_id]),
-            normal3d(intersection(rays(agb.wym)[ray_id]))),
-        reflection3d(direction(rays(agb.dxp)[ray_id]),
-            normal3d(intersection(rays(agb.dxp)[ray_id]))),
-        reflection3d(direction(rays(agb.dxm)[ray_id]),
-            normal3d(intersection(rays(agb.dxm)[ray_id]))),
-        reflection3d(direction(rays(agb.dyp)[ray_id]),
-            normal3d(intersection(rays(agb.dyp)[ray_id]))),
-        reflection3d(direction(rays(agb.dym)[ray_id]),
-            normal3d(intersection(rays(agb.dym)[ray_id])))
-    )
-
     from_front = entering_coated
 
-    J_t = get_jones_matrix(coating_model, angle3d(direction(c_ray), -normal),
-        λ, n_incident, n_transmitted, false; from_front=from_front)
-    J_r = get_jones_matrix(coating_model, angle3d(direction(c_ray), -normal),
-        λ, n_incident, n_transmitted, true; from_front=from_front)
-
-    E0_t = _calculate_global_E0(coated, c_ray, dirs_t[1], J_t)
-    E0_r = _calculate_global_E0(coated, c_ray, dirs_r[1], J_r)
-
-    T = eltype(position(c_ray))
-
-    # Spawn transmitted
-    chief_t = Beam(PolarizedRay{T}(
-        position(c_ray) + length(c_ray) * direction(c_ray), dirs_t[1], nothing, λ, n_transmitted, E0_t))
-    wxp_t = Beam(Ray{T}(
-        position(rays(agb.wxp)[ray_id]) +
-        length(rays(agb.wxp)[ray_id]) * direction(rays(agb.wxp)[ray_id]),
-        dirs_t[2], nothing, λ, n_transmitted))
-    wxm_t = Beam(Ray{T}(
-        position(rays(agb.wxm)[ray_id]) +
-        length(rays(agb.wxm)[ray_id]) * direction(rays(agb.wxm)[ray_id]),
-        dirs_t[3], nothing, λ, n_transmitted))
-    wyp_t = Beam(Ray{T}(
-        position(rays(agb.wyp)[ray_id]) +
-        length(rays(agb.wyp)[ray_id]) * direction(rays(agb.wyp)[ray_id]),
-        dirs_t[4], nothing, λ, n_transmitted))
-    wym_t = Beam(Ray{T}(
-        position(rays(agb.wym)[ray_id]) +
-        length(rays(agb.wym)[ray_id]) * direction(rays(agb.wym)[ray_id]),
-        dirs_t[5], nothing, λ, n_transmitted))
-    dxp_t = Beam(Ray{T}(
-        position(rays(agb.dxp)[ray_id]) +
-        length(rays(agb.dxp)[ray_id]) * direction(rays(agb.dxp)[ray_id]),
-        dirs_t[6], nothing, λ, n_transmitted))
-    dxm_t = Beam(Ray{T}(
-        position(rays(agb.dxm)[ray_id]) +
-        length(rays(agb.dxm)[ray_id]) * direction(rays(agb.dxm)[ray_id]),
-        dirs_t[7], nothing, λ, n_transmitted))
-    dyp_t = Beam(Ray{T}(
-        position(rays(agb.dyp)[ray_id]) +
-        length(rays(agb.dyp)[ray_id]) * direction(rays(agb.dyp)[ray_id]),
-        dirs_t[8], nothing, λ, n_transmitted))
-    dym_t = Beam(Ray{T}(
-        position(rays(agb.dym)[ray_id]) +
-        length(rays(agb.dym)[ray_id]) * direction(rays(agb.dym)[ray_id]),
-        dirs_t[9], nothing, λ, n_transmitted))
-
-    t = AstigmaticGaussianBeamlet(
-        chief_t, wxp_t, wxm_t, wyp_t, wym_t, dxp_t, dxm_t, dyp_t, dym_t)
-
-    # Reflected
-    chief_r = Beam(PolarizedRay{T}(
-        position(c_ray) + length(c_ray) * direction(c_ray), dirs_r[1], nothing, λ, n_incident, E0_r))
-    wxp_r = Beam(Ray{T}(
-        position(rays(agb.wxp)[ray_id]) +
-        length(rays(agb.wxp)[ray_id]) * direction(rays(agb.wxp)[ray_id]),
-        dirs_r[2], nothing, λ, n_incident))
-    wxm_r = Beam(Ray{T}(
-        position(rays(agb.wxm)[ray_id]) +
-        length(rays(agb.wxm)[ray_id]) * direction(rays(agb.wxm)[ray_id]),
-        dirs_r[3], nothing, λ, n_incident))
-    wyp_r = Beam(Ray{T}(
-        position(rays(agb.wyp)[ray_id]) +
-        length(rays(agb.wyp)[ray_id]) * direction(rays(agb.wyp)[ray_id]),
-        dirs_r[4], nothing, λ, n_incident))
-    wym_r = Beam(Ray{T}(
-        position(rays(agb.wym)[ray_id]) +
-        length(rays(agb.wym)[ray_id]) * direction(rays(agb.wym)[ray_id]),
-        dirs_r[5], nothing, λ, n_incident))
-    dxp_r = Beam(Ray{T}(
-        position(rays(agb.dxp)[ray_id]) +
-        length(rays(agb.dxp)[ray_id]) * direction(rays(agb.dxp)[ray_id]),
-        dirs_r[6], nothing, λ, n_incident))
-    dxm_r = Beam(Ray{T}(
-        position(rays(agb.dxm)[ray_id]) +
-        length(rays(agb.dxm)[ray_id]) * direction(rays(agb.dxm)[ray_id]),
-        dirs_r[7], nothing, λ, n_incident))
-    dyp_r = Beam(Ray{T}(
-        position(rays(agb.dyp)[ray_id]) +
-        length(rays(agb.dyp)[ray_id]) * direction(rays(agb.dyp)[ray_id]),
-        dirs_r[8], nothing, λ, n_incident))
-    dym_r = Beam(Ray{T}(
-        position(rays(agb.dym)[ray_id]) +
-        length(rays(agb.dym)[ray_id]) * direction(rays(agb.dym)[ray_id]),
-        dirs_r[9], nothing, λ, n_incident))
-
-    r = AstigmaticGaussianBeamlet(
-        chief_r, wxp_r, wxm_r, wyp_r, wym_r, dxp_r, dxm_r, dyp_r, dym_r)
-
-    children!(agb, (t, r))
-    return nothing
+    return _propagate_splitting_astigmatic_beamlet(
+        system,
+        coated,
+        coating_model,
+        agb,
+        ray_id,
+        n_incident,
+        n_transmitted,
+        normal,
+        from_front,
+        () -> begin
+            i_c = interact3d_reflective(system, coated, coating_model, agb.c, rays(agb.c)[ray_id])
+            i_wxp = interact3d_reflective(system, coated, coating_model, agb.wxp, rays(agb.wxp)[ray_id])
+            i_wxm = interact3d_reflective(system, coated, coating_model, agb.wxm, rays(agb.wxm)[ray_id])
+            i_wyp = interact3d_reflective(system, coated, coating_model, agb.wyp, rays(agb.wyp)[ray_id])
+            i_wym = interact3d_reflective(system, coated, coating_model, agb.wym, rays(agb.wym)[ray_id])
+            i_dxp = interact3d_reflective(system, coated, coating_model, agb.dxp, rays(agb.dxp)[ray_id])
+            i_dxm = interact3d_reflective(system, coated, coating_model, agb.dxm, rays(agb.dxm)[ray_id])
+            i_dyp = interact3d_reflective(system, coated, coating_model, agb.dyp, rays(agb.dyp)[ray_id])
+            i_dym = interact3d_reflective(system, coated, coating_model, agb.dym, rays(agb.dym)[ray_id])
+            if any(isnothing, (i_c, i_wxp, i_wxm, i_wyp, i_wym, i_dxp, i_dxm, i_dyp, i_dym))
+                return nothing
+            end
+            T_type = eltype(position(c_ray))
+            return AstigmaticGaussianBeamletInteraction{T_type}(
+                i_c, i_wxp, i_wxm, i_wyp, i_wym, i_dxp, i_dxm, i_dyp, i_dym)
+        end
+    )
 end
 
 # Fluent API / Pipeline helper
@@ -651,3 +541,8 @@ end
 function with_coatings(mirror::AbstractReflectiveOptic; front = nothing, back = nothing)
     CoatedMirror(mirror; front = front, back = back)
 end
+
+# Base.show methods for coated components
+Base.show(io::IO, ::MIME"text/plain", cr::CoatedRefractive) = print(io, "CoatedRefractive(", cr.optic, ", coatings = ", cr.coatings, ")")
+Base.show(io::IO, ::MIME"text/plain", cm::CoatedMirror) = print(io, "CoatedMirror(", cm.optic, ", coatings = ", cm.coatings, ")")
+
