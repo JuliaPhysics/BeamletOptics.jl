@@ -1,0 +1,10 @@
+{
+    "folders": [
+        {
+            "path": ".."
+        }
+    ],
+    "settings": {
+        "julia.environmentPath": "/Users/oliver/.julia/dev/BeamletOptics/docs"
+    }
+}

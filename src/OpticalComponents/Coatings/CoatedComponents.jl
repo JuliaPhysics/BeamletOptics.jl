@@ -130,8 +130,6 @@ function _build_coatings_tuple(parent_shape::AbstractShape, front, back)
     end
 end
 
-
-
 function CoatedRefractive(
         optic::AbstractRefractiveOptic; front = nothing, back = nothing)
     coatings = _build_coatings_tuple(shape(optic), front, back)
@@ -193,18 +191,24 @@ function get_coating_model_at_hit(coated::CoatedComponent, ray::AbstractRay)
     return get_matching_coating(coated.coatings, shape(coated), local_p, local_n)
 end
 
-function get_coating_model_at_hit(coated::CoatedComponent, gauss::GaussianBeamlet, ray_id::Int)
+function get_coating_model_at_hit(
+        coated::CoatedComponent, gauss::GaussianBeamlet, ray_id::Int)
     return get_coating_model_at_hit(coated, gauss.chief.rays[ray_id])
 end
 
-function get_coating_model_at_hit(coated::CoatedComponent, agb::AstigmaticGaussianBeamlet, ray_id::Int)
+function get_coating_model_at_hit(
+        coated::CoatedComponent, agb::AstigmaticGaussianBeamlet, ray_id::Int)
     return get_coating_model_at_hit(coated, agb.c.rays[ray_id])
 end
 
 # Coincident boundary resolution dispatch helpers
-resolve_coated_boundary(system::AbstractSystem, obj::AbstractObject, ray::AbstractRay) = resolve_coated_boundary_dispatch(obj, system, ray)
+function resolve_coated_boundary(
+        system::AbstractSystem, obj::AbstractObject, ray::AbstractRay)
+    resolve_coated_boundary_dispatch(obj, system, ray)
+end
 
-function resolve_coated_boundary_dispatch(obj::CoatedComponent, system::AbstractSystem, ray::AbstractRay)
+function resolve_coated_boundary_dispatch(
+        obj::CoatedComponent, system::AbstractSystem, ray::AbstractRay)
     coating = get_coating_model_at_hit(obj, ray)
     if !(coating isa Uncoated)
         return obj, coating
@@ -212,11 +216,17 @@ function resolve_coated_boundary_dispatch(obj::CoatedComponent, system::Abstract
     return resolve_coincident_coatings(intersection(ray), system, ray)
 end
 
-resolve_coated_boundary_dispatch(::AbstractObject, system::AbstractSystem, ray::AbstractRay) = resolve_coincident_coatings(intersection(ray), system, ray)
+function resolve_coated_boundary_dispatch(
+        ::AbstractObject, system::AbstractSystem, ray::AbstractRay)
+    resolve_coincident_coatings(intersection(ray), system, ray)
+end
 
-resolve_coincident_coatings(::Nothing, system::AbstractSystem, ray::AbstractRay) = (nothing, Uncoated())
+function resolve_coincident_coatings(::Nothing, system::AbstractSystem, ray::AbstractRay)
+    (nothing, Uncoated())
+end
 
-function resolve_coincident_coatings(int::Intersection, system::AbstractSystem, ray::AbstractRay)
+function resolve_coincident_coatings(
+        int::Intersection, system::AbstractSystem, ray::AbstractRay)
     res1 = check_coincident_coating(int.coincident_object, ray)
     res1 !== nothing && return res1
     res2 = check_coincident_coating(int.coincident_object_2, ray)
@@ -263,14 +273,18 @@ function interact3d(
         system::AbstractSystem, cl::CoatedComponent, gauss::GaussianBeamlet, ray_id::Int)
     coating_model = get_coating_model_at_hit(cl, gauss, ray_id)
     chief_ray = rays(gauss.chief)[ray_id]
-    return interact3d_behavior(coating_behavior(coating_model, chief_ray), system, cl, coating_model, gauss, ray_id)
+    return interact3d_behavior(coating_behavior(coating_model, chief_ray),
+        system, cl, coating_model, gauss, ray_id)
 end
 
-function interact3d_behavior(::Splitting, system::AbstractSystem, cl::CoatedComponent, coating_model, gauss::GaussianBeamlet, ray_id::Int)
+function interact3d_behavior(::Splitting, system::AbstractSystem, cl::CoatedComponent,
+        coating_model, gauss::GaussianBeamlet, ray_id::Int)
     return interact_splitting_boundary(system, cl, coating_model, gauss, ray_id)
 end
 
-function interact3d_behavior(::CoatingBehavior, system::AbstractSystem, cl::CoatedComponent, coating_model, gauss::GaussianBeamlet, ray_id::Int)
+function interact3d_behavior(
+        ::CoatingBehavior, system::AbstractSystem, cl::CoatedComponent,
+        coating_model, gauss::GaussianBeamlet, ray_id::Int)
     i_c = interact3d(system, cl, gauss.chief, rays(gauss.chief)[ray_id])
     i_w = interact3d(system, cl, gauss.waist, rays(gauss.waist)[ray_id])
     i_d = interact3d(system, cl, gauss.divergence, rays(gauss.divergence)[ray_id])
@@ -285,14 +299,18 @@ function interact3d(
         system::AbstractSystem, cl::CoatedComponent, agb::AstigmaticGaussianBeamlet, ray_id::Int)
     coating_model = get_coating_model_at_hit(cl, agb, ray_id)
     chief_ray = rays(agb.c)[ray_id]
-    return interact3d_behavior(coating_behavior(coating_model, chief_ray), system, cl, coating_model, agb, ray_id)
+    return interact3d_behavior(
+        coating_behavior(coating_model, chief_ray), system, cl, coating_model, agb, ray_id)
 end
 
-function interact3d_behavior(::Splitting, system::AbstractSystem, cl::CoatedComponent, coating_model, agb::AstigmaticGaussianBeamlet, ray_id::Int)
+function interact3d_behavior(::Splitting, system::AbstractSystem, cl::CoatedComponent,
+        coating_model, agb::AstigmaticGaussianBeamlet, ray_id::Int)
     return interact_splitting_boundary(system, cl, coating_model, agb, ray_id)
 end
 
-function interact3d_behavior(::CoatingBehavior, system::AbstractSystem, cl::CoatedComponent, coating_model, agb::AstigmaticGaussianBeamlet, ray_id::Int)
+function interact3d_behavior(
+        ::CoatingBehavior, system::AbstractSystem, cl::CoatedComponent,
+        coating_model, agb::AstigmaticGaussianBeamlet, ray_id::Int)
     i_c = interact3d(system, cl, agb.c, rays(agb.c)[ray_id])
     i_wxp = interact3d(system, cl, agb.wxp, rays(agb.wxp)[ray_id])
     i_wxm = interact3d(system, cl, agb.wxm, rays(agb.wxm)[ray_id])
@@ -309,19 +327,21 @@ function interact3d_behavior(::CoatingBehavior, system::AbstractSystem, cl::Coat
     return AstigmaticGaussianBeamletInteraction{T}(
         i_c, i_wxp, i_wxm, i_wyp, i_wym, i_dxp, i_dxm, i_dyp, i_dym)
 end
-function interact3d_reflective(system::AbstractSystem, cl::CoatedRefractive, coating_model, beam::AbstractBeam, ray::AbstractRay)
+
+function interact3d_reflective(system::AbstractSystem, cl::CoatedRefractive,
+        coating_model, beam::AbstractBeam, ray::AbstractRay)
     int = intersection(ray)
     λ = wavelength(ray)
     n_substrate = refractive_index(cl.optic, λ)
-    
+
     obj = object(int)
     is_substrate = (_base_optic(obj) === cl.optic)
-    
+
     normal = normal3d(int)
     if !is_substrate
         normal = -normal
     end
-    
+
     entering_substrate = dot(direction(ray), normal) < 0
     from_front = entering_substrate
 
@@ -341,16 +361,16 @@ function interact3d_reflective(system::AbstractSystem, cl::CoatedRefractive, coa
         end
         normal = -normal
     end
-    return interact_refractive_boundary(Reflective(), system, cl.optic, coating_model, beam, ray, n_incident, n_transmitted, hint, normal, λ, from_front)
+    return interact_refractive_boundary(
+        Reflective(), system, cl.optic, coating_model, beam, ray,
+        n_incident, n_transmitted, hint, normal, λ, from_front)
 end
 
-function interact3d_reflective(system::AbstractSystem, cl::CoatedMirror, coating_model, beam::AbstractBeam, ray::AbstractRay)
+function interact3d_reflective(system::AbstractSystem, cl::CoatedMirror,
+        coating_model, beam::AbstractBeam, ray::AbstractRay)
     return interact_reflective_boundary(system, cl.optic, coating_model, beam, ray)
 end
 
-# TODO: There is significant code duplication between the splitting boundary functions
-# in StandaloneCoating.jl and CoatedComponents.jl. A shared helper that accepts
-# a media-resolution callback could unify these ~500 lines.
 function interact_splitting_boundary(
         system::AbstractSystem,
         coated::CoatedComponent,
@@ -407,9 +427,12 @@ function interact_splitting_boundary(
         normal,
         from_front,
         () -> begin
-            i_c = interact3d_reflective(system, coated, coating_model, gauss.chief, rays(gauss.chief)[ray_id])
-            i_w = interact3d_reflective(system, coated, coating_model, gauss.waist, rays(gauss.waist)[ray_id])
-            i_d = interact3d_reflective(system, coated, coating_model, gauss.divergence, rays(gauss.divergence)[ray_id])
+            i_c = interact3d_reflective(
+                system, coated, coating_model, gauss.chief, rays(gauss.chief)[ray_id])
+            i_w = interact3d_reflective(
+                system, coated, coating_model, gauss.waist, rays(gauss.waist)[ray_id])
+            i_d = interact3d_reflective(system, coated, coating_model, gauss.divergence,
+                rays(gauss.divergence)[ray_id])
             if any(isnothing, (i_c, i_w, i_d))
                 return nothing
             end
@@ -481,15 +504,24 @@ function interact_splitting_boundary(
         normal,
         from_front,
         () -> begin
-            i_c = interact3d_reflective(system, coated, coating_model, agb.c, rays(agb.c)[ray_id])
-            i_wxp = interact3d_reflective(system, coated, coating_model, agb.wxp, rays(agb.wxp)[ray_id])
-            i_wxm = interact3d_reflective(system, coated, coating_model, agb.wxm, rays(agb.wxm)[ray_id])
-            i_wyp = interact3d_reflective(system, coated, coating_model, agb.wyp, rays(agb.wyp)[ray_id])
-            i_wym = interact3d_reflective(system, coated, coating_model, agb.wym, rays(agb.wym)[ray_id])
-            i_dxp = interact3d_reflective(system, coated, coating_model, agb.dxp, rays(agb.dxp)[ray_id])
-            i_dxm = interact3d_reflective(system, coated, coating_model, agb.dxm, rays(agb.dxm)[ray_id])
-            i_dyp = interact3d_reflective(system, coated, coating_model, agb.dyp, rays(agb.dyp)[ray_id])
-            i_dym = interact3d_reflective(system, coated, coating_model, agb.dym, rays(agb.dym)[ray_id])
+            i_c = interact3d_reflective(
+                system, coated, coating_model, agb.c, rays(agb.c)[ray_id])
+            i_wxp = interact3d_reflective(
+                system, coated, coating_model, agb.wxp, rays(agb.wxp)[ray_id])
+            i_wxm = interact3d_reflective(
+                system, coated, coating_model, agb.wxm, rays(agb.wxm)[ray_id])
+            i_wyp = interact3d_reflective(
+                system, coated, coating_model, agb.wyp, rays(agb.wyp)[ray_id])
+            i_wym = interact3d_reflective(
+                system, coated, coating_model, agb.wym, rays(agb.wym)[ray_id])
+            i_dxp = interact3d_reflective(
+                system, coated, coating_model, agb.dxp, rays(agb.dxp)[ray_id])
+            i_dxm = interact3d_reflective(
+                system, coated, coating_model, agb.dxm, rays(agb.dxm)[ray_id])
+            i_dyp = interact3d_reflective(
+                system, coated, coating_model, agb.dyp, rays(agb.dyp)[ray_id])
+            i_dym = interact3d_reflective(
+                system, coated, coating_model, agb.dym, rays(agb.dym)[ray_id])
             if any(isnothing, (i_c, i_wxp, i_wxm, i_wyp, i_wym, i_dxp, i_dxm, i_dyp, i_dym))
                 return nothing
             end
@@ -507,7 +539,7 @@ end
     with_coatings(optic, coatings::Pair...)
     with_coatings(optic; front=nothing, back=nothing)
 
-Fluent API helper to attach coatings to an optical component. 
+Fluent API helper to attach coatings to an optical component.
 Returns a `CoatedRefractive` or `CoatedMirror` depending on the type of `optic`.
 
 # Examples
@@ -543,6 +575,9 @@ function with_coatings(mirror::AbstractReflectiveOptic; front = nothing, back = 
 end
 
 # Base.show methods for coated components
-Base.show(io::IO, ::MIME"text/plain", cr::CoatedRefractive) = print(io, "CoatedRefractive(", cr.optic, ", coatings = ", cr.coatings, ")")
-Base.show(io::IO, ::MIME"text/plain", cm::CoatedMirror) = print(io, "CoatedMirror(", cm.optic, ", coatings = ", cm.coatings, ")")
-
+function Base.show(io::IO, ::MIME"text/plain", cr::CoatedRefractive)
+    print(io, "CoatedRefractive(", cr.optic, ", coatings = ", cr.coatings, ")")
+end
+function Base.show(io::IO, ::MIME"text/plain", cm::CoatedMirror)
+    print(io, "CoatedMirror(", cm.optic, ", coatings = ", cm.coatings, ")")
+end
