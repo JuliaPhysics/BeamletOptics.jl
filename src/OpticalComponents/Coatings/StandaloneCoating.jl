@@ -298,8 +298,9 @@ function interact3d(::Splitting, system::AbstractSystem, coating::Coating{T},
         Point3{T}(pos), Point3{T}(dir_t), nothing, wavelength(ray), n_transmitted, weight(ray) *
                                                                                    T_coeff))
     beam_r = Beam(Ray{T}(
-        Point3{T}(pos), Point3{T}(dir_r), nothing, wavelength(ray), refractive_index(ray), weight(ray) *
-                                                                                 R_coeff))
+        Point3{T}(pos), Point3{T}(dir_r), nothing, wavelength(ray),
+        refractive_index(ray), weight(ray) *
+                               R_coeff))
 
     children!(beam, (beam_t, beam_r))
     return nothing
@@ -333,7 +334,8 @@ function interact3d(::Splitting, system::AbstractSystem, coating::Coating{T},
 
     beam_t = Beam(PolarizedRay{T}(
         pos, dir_t, nothing, wavelength(ray), n_transmitted, E0_t))
-    beam_r = Beam(PolarizedRay{T}(pos, dir_r, nothing, wavelength(ray), refractive_index(ray), E0_r))
+    beam_r = Beam(PolarizedRay{T}(
+        pos, dir_r, nothing, wavelength(ray), refractive_index(ray), E0_r))
 
     children!(beam, (beam_t, beam_r))
     return nothing
@@ -360,9 +362,6 @@ function interact3d(::CoatingBehavior, system::AbstractSystem, coating::Coating{
     return GaussianBeamletInteraction{T}(i_c, i_w, i_d)
 end
 
-# TODO: There is significant code duplication between the splitting boundary functions
-# in StandaloneCoating.jl and CoatedComponents.jl. A shared helper that accepts
-# a media-resolution callback could unify these ~500 lines.
 function interact3d(::Splitting, system::AbstractSystem, coating::Coating{T},
         gauss::GaussianBeamlet, ray_id::Int) where {T}
     # Ensure all component rays have valid intersections to prevent clipping crashes
@@ -393,9 +392,12 @@ function interact3d(::Splitting, system::AbstractSystem, coating::Coating{T},
         normal,
         from_front,
         () -> begin
-            i_c = interact3d(Reflective(), system, coating, gauss.chief, rays(gauss.chief)[ray_id])
-            i_w = interact3d(Reflective(), system, coating, gauss.waist, rays(gauss.waist)[ray_id])
-            i_d = interact3d(Reflective(), system, coating, gauss.divergence, rays(gauss.divergence)[ray_id])
+            i_c = interact3d(
+                Reflective(), system, coating, gauss.chief, rays(gauss.chief)[ray_id])
+            i_w = interact3d(
+                Reflective(), system, coating, gauss.waist, rays(gauss.waist)[ray_id])
+            i_d = interact3d(Reflective(), system, coating, gauss.divergence,
+                rays(gauss.divergence)[ray_id])
             if any(isnothing, (i_c, i_w, i_d))
                 return nothing
             end
@@ -468,14 +470,22 @@ function interact3d(::Splitting, system::AbstractSystem, coating::Coating{T},
         from_front,
         () -> begin
             i_c = interact3d(Reflective(), system, coating, agb.c, rays(agb.c)[ray_id])
-            i_wxp = interact3d(Reflective(), system, coating, agb.wxp, rays(agb.wxp)[ray_id])
-            i_wxm = interact3d(Reflective(), system, coating, agb.wxm, rays(agb.wxm)[ray_id])
-            i_wyp = interact3d(Reflective(), system, coating, agb.wyp, rays(agb.wyp)[ray_id])
-            i_wym = interact3d(Reflective(), system, coating, agb.wym, rays(agb.wym)[ray_id])
-            i_dxp = interact3d(Reflective(), system, coating, agb.dxp, rays(agb.dxp)[ray_id])
-            i_dxm = interact3d(Reflective(), system, coating, agb.dxm, rays(agb.dxm)[ray_id])
-            i_dyp = interact3d(Reflective(), system, coating, agb.dyp, rays(agb.dyp)[ray_id])
-            i_dym = interact3d(Reflective(), system, coating, agb.dym, rays(agb.dym)[ray_id])
+            i_wxp = interact3d(
+                Reflective(), system, coating, agb.wxp, rays(agb.wxp)[ray_id])
+            i_wxm = interact3d(
+                Reflective(), system, coating, agb.wxm, rays(agb.wxm)[ray_id])
+            i_wyp = interact3d(
+                Reflective(), system, coating, agb.wyp, rays(agb.wyp)[ray_id])
+            i_wym = interact3d(
+                Reflective(), system, coating, agb.wym, rays(agb.wym)[ray_id])
+            i_dxp = interact3d(
+                Reflective(), system, coating, agb.dxp, rays(agb.dxp)[ray_id])
+            i_dxm = interact3d(
+                Reflective(), system, coating, agb.dxm, rays(agb.dxm)[ray_id])
+            i_dyp = interact3d(
+                Reflective(), system, coating, agb.dyp, rays(agb.dyp)[ray_id])
+            i_dym = interact3d(
+                Reflective(), system, coating, agb.dym, rays(agb.dym)[ray_id])
             if any(isnothing, (i_c, i_wxp, i_wxm, i_wyp, i_wym, i_dxp, i_dxm, i_dyp, i_dym))
                 return nothing
             end
@@ -486,7 +496,15 @@ function interact3d(::Splitting, system::AbstractSystem, coating::Coating{T},
 end
 
 # Absorptive behavior
-interact3d(::Absorptive, ::AbstractSystem, ::Coating{T}, ::AbstractBeam, ::AbstractRay) where {T} = nothing
-interact3d(::Absorptive, ::AbstractSystem, ::Coating{T}, ::GaussianBeamlet, ::Int) where {T} = nothing
-interact3d(::Absorptive, ::AbstractSystem, ::Coating{T}, ::AstigmaticGaussianBeamlet, ::Int) where {T} = nothing
-
+function interact3d(::Absorptive, ::AbstractSystem, ::Coating{T},
+        ::AbstractBeam, ::AbstractRay) where {T}
+    nothing
+end
+function interact3d(
+        ::Absorptive, ::AbstractSystem, ::Coating{T}, ::GaussianBeamlet, ::Int) where {T}
+    nothing
+end
+function interact3d(::Absorptive, ::AbstractSystem, ::Coating{T},
+        ::AstigmaticGaussianBeamlet, ::Int) where {T}
+    nothing
+end
