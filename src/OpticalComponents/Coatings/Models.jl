@@ -289,9 +289,13 @@ function fresnel_coefficients(c::ThinFilmCoating, θi::Real, λ::Real,
     N_layers = length(c.ns)
     layer_indices = from_front ? (1:N_layers) : (N_layers:-1:1)
 
+    # Pre-evaluate dynamic dispersion functions to guarantee type stability in the inner loop
+    n_vals = map(n -> ComplexF64(n isa Function ? n(λ) : n), c.ns)
+    d_vals = c.ds
+
     for j in layer_indices
-        nj_val = ComplexF64(c.ns[j] isa Function ? c.ns[j](λ) : c.ns[j])
-        dj = c.ds[j]
+        nj_val = n_vals[j]
+        dj = d_vals[j]
 
         cosθj = sqrt(1.0 - (n1 / nj_val)^2 * sinθi^2)
         δj = (2π / λ) * nj_val * dj * cosθj
