@@ -35,7 +35,7 @@ by specialized subtypes.
 abstract type AbstractRefractiveOptic{T, F} <: AbstractObject{T} end
 
 refractive_index(object::AbstractRefractiveOptic) = object.n
-refractive_index(object::AbstractRefractiveOptic{<:Any, <:RefractiveIndex}, λ::Real)::Float64 = object.n(λ)
+refractive_index(object::AbstractRefractiveOptic{<:Any, <:RefractiveIndex}, λ::Real) = object.n(λ)
 
 is_refractive(::AbstractRefractiveOptic) = true
 

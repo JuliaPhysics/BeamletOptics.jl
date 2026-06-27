@@ -18,7 +18,7 @@ Subtypes of `AbstractSystem` must implement the following:
 """
 abstract type AbstractSystem end
 
-refractive_index(::AbstractSystem, λ::Real) = 1.0
+refractive_index(::AbstractSystem, λ::Real) = one(λ)
 
 """
     interact3d(::AbstractSystem, object::AbstractObject, ::AbstractBeam, ::AbstractRay)
