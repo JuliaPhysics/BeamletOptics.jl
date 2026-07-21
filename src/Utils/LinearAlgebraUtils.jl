@@ -102,9 +102,13 @@ function align3d(start::AbstractVector{A}, target::AbstractVector{B}) where {A, 
         return SMatrix{3,3}(one(T)I)
     end
     if cosA ≈ -1
-        return @SArray [-one(T) zero(T) zero(T);
-                        zero(T) -one(T) zero(T);
-                        zero(T) zero(T) one(T)]
+        u = normal3d(start)
+        ux, uy, uz = u
+        return @SArray [
+            2*ux^2-one(T)  2*ux*uy         2*ux*uz
+            2*uy*ux        2*uy^2-one(T)  2*uy*uz
+            2*uz*ux        2*uz*uy        2*uz^2-one(T)
+        ]
     end
     k = 1 / (1 + cosA)
     R = @SArray [

@@ -188,13 +188,25 @@ function _calculate_global_E0(in_dir::AbstractArray, out_dir::AbstractArray, nor
     s = normalize(s)
     # Calculate transforms
     p1 = cross(in_dir, s)
-    O_in = vcat(s', p1', in_dir')
+    O_in = @SArray [
+        s[1]       s[2]       s[3];
+        p1[1]      p1[2]      p1[3];
+        in_dir[1]  in_dir[2]  in_dir[3]
+    ]
     # Fallback method as per eq. 17
     if isparallel3d(in_dir, out_dir) && !(in_dir ≈ -out_dir)
-        O_out = hcat(s, p1, in_dir)
+        O_out = @SArray [
+            s[1]  p1[1]  in_dir[1];
+            s[2]  p1[2]  in_dir[2];
+            s[3]  p1[3]  in_dir[3]
+        ]
     else
         p2 = cross(out_dir, s)
-        O_out = hcat(s, p2, out_dir)
+        O_out = @SArray [
+            s[1]  p2[1]  out_dir[1];
+            s[2]  p2[2]  out_dir[2];
+            s[3]  p2[3]  out_dir[3]
+        ]
     end
     # Calculate new E0
     P = O_out * J * O_in
