@@ -248,7 +248,7 @@ function OffAxisParabolicMirror(
         angle::Real = 90,
         thickness::Union{Real, Nothing} = nothing
     )
-    T = promote_type(typeof(rfl), typeof(diameter), typeof(angle))
+    T = float(promote_type(typeof(rfl), typeof(diameter), typeof(angle), typeof(thickness === nothing ? 0.0 : thickness)))
     angle_rad = deg2rad(angle)
 
     f = T(rfl * (cos(angle_rad / 2)^2))

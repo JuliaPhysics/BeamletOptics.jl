@@ -26,7 +26,7 @@ mutable struct OffAxisParaboloidSDF{T} <: AbstractSDF{T}
 end
 
 function OffAxisParaboloidSDF(f::F, x_off::X, diameter::D, thickness::Th) where {F<:Real, X<:Real, D<:Real, Th<:Real}
-    T = promote_type(F, X, D, Th)
+    T = float(promote_type(F, X, D, Th))
     return OffAxisParaboloidSDF{T}(
         T(f), T(x_off), T(diameter), T(thickness),
         Point3{T}(0),
