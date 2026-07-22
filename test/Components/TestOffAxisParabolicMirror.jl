@@ -31,6 +31,14 @@ const nm = 1e-9
         @test sdf.x_off ≈ 200mm * sin(deg2rad(60))
     end
 
+    @testset "Integer Input Promotion" begin
+        oap_int = OffAxisParabolicMirror(1, 1; angle = 90)
+        sdf_int = BMO.shape(oap_int)
+        @test sdf_int.f isa Float64
+        @test sdf_int.f ≈ 0.5
+        @test sdf_int.x_off ≈ 1.0
+    end
+
     @testset "Raytracing Focus Precision (90°)" begin
         rfl = 200mm
         d = 60mm
