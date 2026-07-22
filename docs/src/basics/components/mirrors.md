@@ -3,6 +3,7 @@ mirror_showcase_dir = joinpath(@__DIR__, "..", "..", "assets", "mirror_renders")
 
 Main.DocUtils.conditional_include(joinpath(mirror_showcase_dir, "plano_mirror_showcase.jl"))
 Main.DocUtils.conditional_include(joinpath(mirror_showcase_dir, "spherical_mirror_showcase.jl"))
+Main.DocUtils.conditional_include(joinpath(mirror_showcase_dir, "oap_mirror_showcase.jl"))
 ```
 
 # Mirrors
@@ -49,3 +50,19 @@ The following constructor allows the spawning of concave spherical mirrors.
 ConcaveSphericalMirror(::Real, ::Real, ::Real)
 ```
 
+## Off-Axis Parabolic Mirrors
+
+The [`OffAxisParabolicMirror`](@ref) represents an off-axis parabolic (OAP) mirror used for achromatic focusing and beam deflection without introducing spherical aberration.
+
+Its geometry is constructed from a parent paraboloid with focal length $f$ and off-axis distance $x_{\text{off}}$, parameterized by the Reflected Focal Length ($RFL$) and deflection angle $\theta_d$ (default 90°):
+
+$$f = RFL \cdot \cos^2\left(\frac{\theta_d}{2}\right), \quad x_{\text{off}} = RFL \cdot \sin(\theta_d)$$
+
+![Off-Axis Parabolic mirror showcase](oap_mirror_showcase.png)
+
+The following constructors allow the spawning of off-axis parabolic mirrors and their signed distance functions.
+
+```@docs; canonical=false
+OffAxisParabolicMirror(::Real, ::Real)
+OffAxisParaboloidSDF
+```

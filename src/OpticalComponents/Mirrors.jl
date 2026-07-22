@@ -229,3 +229,37 @@ function RightAnglePrismMirror(leg_length::Real, height::Real)
     zrotate3d!(shape, T(deg2rad(45 + 180)))
     return RightAnglePrismMirror(shape)
 end
+
+"""
+    OffAxisParabolicMirror(rfl, diameter; angle=90, thickness=nothing)
+
+Constructs an Off-Axis Parabolic (OAP) [`Mirror`](@ref) from:
+
+# Inputs
+
+- `rfl`:        Reflected Focal Length (distance from aperture center to focus) [m]
+- `diameter`:   Mirror aperture diameter [m]
+- `angle`:      Deflection angle in degrees (default: 90°)
+- `thickness`:  Substrate thickness in [m] (default: calculated automatically to ensure solid backing)
+"""
+function OffAxisParabolicMirror(
+        rfl::Real,
+        diameter::Real;
+        angle::Real = 90,
+        thickness::Union{Real, Nothing} = nothing
+    )
+    T = promote_type(typeof(rfl), typeof(diameter), typeof(angle))
+    angle_rad = deg2rad(angle)
+
+    f = T(rfl * (cos(angle_rad / 2)^2))
+    x_off = T(rfl * sin(angle_rad))
+
+    r_max = T(diameter / 2)
+    sag_max = abs(-(((r_max + x_off)^2 - x_off^2) / (4 * f)))
+
+    t = thickness === nothing ? max(T(diameter / 2), sag_max + T(10e-3)) : T(thickness)
+
+    oap_sdf = OffAxisParaboloidSDF(f, x_off, T(diameter), t)
+    return Mirror(oap_sdf)
+end
+
