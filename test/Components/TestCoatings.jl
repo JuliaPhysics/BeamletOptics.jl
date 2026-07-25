@@ -530,4 +530,20 @@ const BMO = BeamletOptics
         rs_long, _, _, _ = fresnel_coefficients(coat_disp, 0.0, 900e-9, 1.0, 1.5)
         @test rs_short != rs_long
     end
+
+    @testset "Coated Doublet Lens" begin
+        n1 = 1.5
+        n2 = 1.6
+        ar = SimpleARCoating(0.0)
+
+        doublet = SphericalDoubletLens(50e-3, -50e-3, -100e-3, 5e-3, 3e-3, 25e-3, n1, n2; front_coating = ar, back_coating = ar)
+        @test doublet.front isa CoatedRefractive
+        @test doublet.back isa CoatedRefractive
+
+        sys = System([doublet])
+        beam = Beam(Ray([0.0, -10e-3, 0.0], [0.0, 1.0, 0.0], 589e-9))
+        solve_system!(sys, beam; retrace = false)
+        @test length(rays(beam)) == 4 # Initial ray + 3 surface transitions
+    end
 end
+
