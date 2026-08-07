@@ -76,8 +76,9 @@ The reflecting surface is normal to the y-axis.
 
 - `edge_length`: the edge length of the square mirror in [m]
 """
-function SquarePlanoMirror2D(size::T) where {T <: Real}
-    shape = QuadraticFlatMesh(size)
+function SquarePlanoMirror2D(size::Real)
+    T = float(typeof(size))
+    shape = QuadraticFlatMesh(T(size))
     return Mirror(shape)
 end
 
@@ -93,13 +94,13 @@ The front reflecting surface is normal to the y-axis and lies at the origin.
 - `height`:     of the mirror in z-direction [m]
 - `thickness`:  of the mirror in y-direction [m]
 """
-function RectangularPlanoMirror(
-        width::W, height::H, thickness::T) where {W <: Real, H <: Real, T <: Real}
-    shape = CuboidMesh(width, thickness, height)
+function RectangularPlanoMirror(width::Real, height::Real, thickness::Real)
+    T = float(promote_type(typeof(width), typeof(height), typeof(thickness)))
+    shape = CuboidMesh(T(width), T(thickness), T(height))
     translate3d!(shape, [
-        -width / 2,       # x
-        0,              # y
-        -height / 2      # z
+        -T(width) / 2,    # x
+        T(0),             # y
+        -T(height) / 2    # z
     ])
     set_new_origin3d!(shape)
     return Mirror(shape)
@@ -117,7 +118,7 @@ See also [`RectangularPlanoMirror`](@ref).
 - `width`: the side length of the square mirror in x- and y-direction [m]
 - `thickness`: of the mirror in [m]
 """
-function SquarePlanoMirror(width::W, thickness::T) where {W <: Real, T <: Real}
+function SquarePlanoMirror(width::Real, thickness::Real)
     return RectangularPlanoMirror(width, width, thickness)
 end
 
@@ -145,8 +146,9 @@ Returns a cylindrical, flat [`RoundPlanoMirror`](@ref) with perfect reflectivity
 - `diameter`: mirror diameter in [m]
 - `thickness`: mirror substrate thickness in [m]
 """
-function RoundPlanoMirror(diameter::D, thickness::T) where {D <: Real, T <: Real}
-    shape = PlanoSurfaceSDF(thickness, diameter)
+function RoundPlanoMirror(diameter::Real, thickness::Real)
+    T = float(promote_type(typeof(diameter), typeof(thickness)))
+    shape = PlanoSurfaceSDF(T(thickness), T(diameter))
     return RoundPlanoMirror(shape)
 end
 
@@ -181,8 +183,9 @@ See also [`ConcaveSphericalMirror`](@ref).
 - `diameter`: mirror outer diameter in [m]
 """
 function ConcaveSphericalMirror(radius::Real, thickness::Real, diameter::Real)
-    cylinder = PlanoSurfaceSDF(thickness, diameter)
-    concave = ConcaveSphericalSurfaceSDF(abs(radius), diameter)
+    T = float(promote_type(typeof(radius), typeof(thickness), typeof(diameter)))
+    cylinder = PlanoSurfaceSDF(T(thickness), T(diameter))
+    concave = ConcaveSphericalSurfaceSDF(abs(T(radius)), T(diameter))
     shape = concave + cylinder
     return ConcaveSphericalMirror(shape)
 end
@@ -212,7 +215,8 @@ Constructs a right angle prism mirror. The primary surface is aligned with the p
 - `height`: in z-axis in [m]
 """
 function RightAnglePrismMirror(leg_length::Real, height::Real)
-    shape = RightAnglePrismSDF(leg_length, height)
-    zrotate3d!(shape, deg2rad(45 + 180))
+    T = float(promote_type(typeof(leg_length), typeof(height)))
+    shape = RightAnglePrismSDF(T(leg_length), T(height))
+    zrotate3d!(shape, T(deg2rad(45 + 180)))
     return RightAnglePrismMirror(shape)
 end

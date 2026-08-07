@@ -368,14 +368,8 @@ function interact3d_reflective(system::AbstractSystem, cl::CoatedMirror,
     return interact_reflective_boundary(system, cl.optic, coating_model, beam, ray)
 end
 
-function interact_splitting_boundary(
-        system::AbstractSystem,
-        coated::CoatedComponent,
-        coating_model,
-        gauss::GaussianBeamlet,
-        ray_id::Int
-)
-    c_ray = rays(gauss.chief)[ray_id]
+@inline function _resolve_coated_splitting_context(
+        system::AbstractSystem, coated::CoatedComponent, c_ray::AbstractRay)
     int = intersection(c_ray)
     λ = wavelength(c_ray)
     substrate_obj = coated.optic
@@ -405,6 +399,19 @@ function interact_splitting_boundary(
     end
 
     from_front = entering_coated
+    return (n_incident, n_transmitted, normal, from_front)
+end
+
+function interact_splitting_boundary(
+        system::AbstractSystem,
+        coated::CoatedComponent,
+        coating_model,
+        gauss::GaussianBeamlet,
+        ray_id::Int
+)
+    c_ray = rays(gauss.chief)[ray_id]
+    n_incident, n_transmitted, normal, from_front =
+        _resolve_coated_splitting_context(system, coated, c_ray)
 
     return _propagate_splitting_gaussian_beamlet(
         system,
@@ -439,35 +446,8 @@ function interact_splitting_boundary(
     end
 
     c_ray = rays(agb.c)[ray_id]
-    int = intersection(c_ray)
-    λ = wavelength(c_ray)
-    substrate_obj = coated.optic
-    n_substrate = refractive_index(substrate_obj, λ)
-
-    is_coated_obj = (_base_optic(object(int)) === coated.optic)
-    normal_coated = normal3d(int)
-    if !is_coated_obj
-        normal_coated = -normal_coated
-    end
-
-    entering_coated = dot(direction(c_ray), normal_coated) < 0
-
-    if entering_coated
-        n_incident = refractive_index(c_ray)
-        n_transmitted = n_substrate
-        normal = normal_coated
-    else
-        n_incident = n_substrate
-        other_obj = is_coated_obj ? int.coincident_object : object(int)
-        if !isnothing(other_obj) && is_refractive(other_obj)
-            n_transmitted = refractive_index(other_obj, λ)
-        else
-            n_transmitted = refractive_index(system, λ)
-        end
-        normal = -normal_coated
-    end
-
-    from_front = entering_coated
+    n_incident, n_transmitted, normal, from_front =
+        _resolve_coated_splitting_context(system, coated, c_ray)
 
     return _propagate_splitting_astigmatic_beamlet(
         system,

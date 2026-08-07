@@ -56,7 +56,7 @@ function retrace_system!(::AbstractSystem, beam::B) where {B <: AbstractBeam}
     return nothing
 end
 
-@inline resolve_coincident_boundary(exiting_int, entering_int) = 
+@inline resolve_coincident_boundary(exiting_int, entering_int) =
     resolve_coincident_boundary(exiting_int, entering_int, object(exiting_int), object(entering_int))
 
 @inline function resolve_coincident_boundary(exiting_int, entering_int, ::AbstractObject, ::AbstractObject)
@@ -91,7 +91,7 @@ end
             thin_primary = nothing
             exiting_int = nothing
             entering_int = nothing
-            
+
             if is_thin_interface(object(temp))
                 thin_primary = temp
             else
@@ -156,7 +156,7 @@ end
     thin_primary = nothing
     exiting_int = nothing
     entering_int = nothing
-    
+
     if is_thin_interface(object(primary))
         thin_primary = primary
     else
@@ -414,30 +414,25 @@ function trace_system!(
     interaction::Nullable{GaussianBeamletInteraction{T}} = nothing
     # Buffer variable
     seg_counter::Int = length(rays(gauss.chief))
+    beams = _component_beams(gauss)
     while seg_counter < r_max
-        # Trace chief ray first
-        ray = last(rays(gauss.chief))
-        tracing_step!(system, ray, hint(interaction))
-        isnothing(intersection(ray)) && break
-        _object = object(intersection(ray))
-        # Follow up with waist ray
-        ray = last(rays(gauss.waist))
-        tracing_step!(system, ray, hint(interaction))
-        # if the waist ray is no longer hitting the same object as the chief ray stop here
-        isnothing(intersection(ray)) && break
-        # Follow up with divergence ray
-        ray = last(rays(gauss.divergence))
-        tracing_step!(system, ray, hint(interaction))
-        # if the divergence ray is no longer hitting the same object as the chief ray stop here
-        isnothing(intersection(ray)) && break
-        # If beams do not hit same target stop tracing
-        if !_beams_hits_same_shape(gauss, seg_counter)
-            # Ensure that no intersection artifacts remain
-            intersection!(last(rays(gauss.chief)), nothing)
-            intersection!(last(rays(gauss.waist)), nothing)
-            intersection!(last(rays(gauss.divergence)), nothing)
+        h = hint(interaction)
+        stopped = false
+        for b in beams
+            r = last(rays(b))
+            tracing_step!(system, r, h)
+            if isnothing(intersection(r))
+                stopped = true
+                break
+            end
+        end
+        if stopped || !_beams_hits_same_shape(gauss, seg_counter)
+            for b in beams
+                intersection!(last(rays(b)), nothing)
+            end
             break
         end
+        _object = object(intersection(last(rays(gauss.chief))))
         # Calculate interaction
         interaction = interact3d(system,
             _object,
@@ -473,11 +468,10 @@ function retrace_system!(
     # Buffer variables
     _interaction::Nullable{GaussianBeamletInteraction{T}} = nothing
     _hint::Nullable{Hint} = nothing
+    beams = _component_beams(gauss)
     # Test if gauss beam is healthy
     n_c = length(rays(gauss.chief))
-    n_w = length(rays(gauss.waist))
-    n_d = length(rays(gauss.divergence))
-    if !(n_c == n_w == n_d)
+    if !all(b -> length(rays(b)) == n_c, beams)
         error("Gaussian beamlet is broken")
     end
     # Iterate over chief rays
@@ -492,16 +486,16 @@ function retrace_system!(
             break
         end
         # Recalculate current intersection
-        w_ray = rays(gauss.waist)[i]
-        d_ray = rays(gauss.divergence)[i]
         if isnothing(_hint)
-            intersection!(c_ray, trace_all(system, c_ray))
-            intersection!(w_ray, trace_all(system, w_ray))
-            intersection!(d_ray, trace_all(system, d_ray))
+            for b in beams
+                r = rays(b)[i]
+                intersection!(r, trace_all(system, r))
+            end
         else
-            intersection!(c_ray, trace_one(system, c_ray, _hint))
-            intersection!(w_ray, trace_one(system, w_ray, _hint))
-            intersection!(d_ray, trace_one(system, d_ray, _hint))
+            for b in beams
+                r = rays(b)[i]
+                intersection!(r, trace_one(system, r, _hint))
+            end
         end
         # Test if all beams still hit the same target
         if !_beams_hits_same_shape(gauss, i)
@@ -519,11 +513,10 @@ function retrace_system!(
             cutoff = i
             break
         end
-        # Update object field
         _object = object(intersection(c_ray))
-        object!(intersection(c_ray), _object)
-        object!(intersection(w_ray), _object)
-        object!(intersection(d_ray), _object)
+        for b in beams
+            object!(intersection(rays(b)[i]), _object)
+        end
         # Test if interaction is still valid
         _interaction = interact3d(system, _object, gauss, i)
         # Catch hint

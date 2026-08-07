@@ -19,7 +19,8 @@ function ThinBeamsplitter(shape::AbstractShape{T}; reflectance::Real = 0.5) wher
 end
 
 function ThinBeamsplitter(width::Real, height::Real; reflectance::Real = 0.5)
-    return ThinBeamsplitter(RectangularFlatMesh(width, height); reflectance)
+    T = float(promote_type(typeof(width), typeof(height)))
+    return ThinBeamsplitter(RectangularFlatMesh(T(width), T(height)); reflectance = T(reflectance))
 end
 
 function ThinBeamsplitter(width::Real; reflectance::Real = 0.5)
@@ -32,7 +33,8 @@ end
 Creates a circular [`ThinBeamsplitter`](@ref).
 """
 function RoundThinBeamsplitter(diameter::Real; reflectance::Real = 0.5)
-    return ThinBeamsplitter(CircularFlatMesh(diameter / 2); reflectance)
+    T = float(typeof(diameter))
+    return ThinBeamsplitter(CircularFlatMesh(T(diameter) / 2); reflectance = T(reflectance))
 end
 
 # Check validity of the split coefficients

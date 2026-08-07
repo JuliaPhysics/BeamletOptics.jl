@@ -18,8 +18,9 @@ function PolarizationFilter(shape::AbstractShape{T}; cutoff_strength=eps(T)) whe
 end
 
 function PolarizationFilter(edge_length::Real; cutoff_strength=eps())
-    shape = QuadraticFlatMesh(edge_length)
-    zrotate3d!(shape, π)
+    T = float(typeof(edge_length))
+    shape = QuadraticFlatMesh(T(edge_length))
+    zrotate3d!(shape, T(π))
     set_new_origin3d!(shape)
     return PolarizationFilter(shape; cutoff_strength)
 end

@@ -25,11 +25,13 @@ function PolarizingBeamSplitter(shape::AbstractShape{T}) where {T}
 end
 
 function PolarizingBeamSplitter(width::Real, height::Real)
-    return PolarizingBeamSplitter(RectangularFlatMesh(width, height))
+    T = float(promote_type(typeof(width), typeof(height)))
+    return PolarizingBeamSplitter(RectangularFlatMesh(T(width), T(height)))
 end
 
 function PolarizingBeamSplitter(diameter::Real)
-    return PolarizingBeamSplitter(CircularFlatMesh(diameter / 2))
+    T = float(typeof(diameter))
+    return PolarizingBeamSplitter(CircularFlatMesh(T(diameter) / 2))
 end
 
 #=
