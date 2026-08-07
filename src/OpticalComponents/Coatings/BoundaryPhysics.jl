@@ -195,17 +195,11 @@ Overridden by `CoatedComponent` wrappers.
 """
 _base_optic(obj) = obj
 
-# Main entry points for interact_refractive_boundary
-function interact_refractive_boundary(
-        system::AbstractSystem,
-        substrate_obj::AbstractObject{T},
-        coating_model,
-        beam::AbstractBeam{T, R},
-        ray::R
-) where {T, R <: AbstractRay{T}}
+@inline function _resolve_interface_context(
+        system::AbstractSystem, substrate_obj::AbstractObject, ray::AbstractRay)
     int = intersection(ray)
     λ = wavelength(ray)
-    n_substrate = refractive_index(substrate_obj, λ)
+    n_substrate = is_refractive(substrate_obj) ? refractive_index(substrate_obj, λ) : refractive_index(system, λ)
     
     obj = object(int)
     is_substrate = (_base_optic(obj) === substrate_obj)
@@ -221,7 +215,7 @@ function interact_refractive_boundary(
     if entering_substrate
         n_incident = refractive_index(ray)
         n_transmitted = n_substrate
-        hint = Hint(substrate_obj)
+        hint = is_refractive(substrate_obj) ? Hint(substrate_obj) : nothing
     else
         n_incident = n_substrate
         coin_obj = is_substrate ? int.coincident_object : obj
@@ -234,7 +228,19 @@ function interact_refractive_boundary(
         end
         normal = -normal
     end
+    return (normal, n_incident, n_transmitted, hint, λ, from_front)
+end
 
+# Main entry points for interact_refractive_boundary
+function interact_refractive_boundary(
+        system::AbstractSystem,
+        substrate_obj::AbstractObject{T},
+        coating_model,
+        beam::AbstractBeam{T, R},
+        ray::R
+) where {T, R <: AbstractRay{T}}
+    normal, n_incident, n_transmitted, hint, λ, from_front =
+        _resolve_interface_context(system, substrate_obj, ray)
     behavior = coating_behavior(coating_model, ray)
     return interact_refractive_boundary(
         behavior, system, substrate_obj, coating_model, beam,
@@ -249,31 +255,11 @@ function interact_reflective_boundary(
         beam::AbstractBeam{T, R},
         ray::R
 ) where {T, R <: Ray{T}}
-    int = intersection(ray)
-    obj = object(int)
-    is_substrate = (_base_optic(obj) === substrate_obj)
-    
-    normal = normal3d(int)
-    if !is_substrate
-        normal = -normal
-    end
-    
-    entering_substrate = dot(direction(ray), normal) < 0
-    from_front = entering_substrate
+    normal, n_incident, n_transmitted, _, λ, from_front =
+        _resolve_interface_context(system, substrate_obj, ray)
     
     npos = position(ray) + length(ray) * direction(ray)
     ndir = reflection3d(direction(ray), normal)
-
-    λ = wavelength(ray)
-    n_incident = refractive_index(ray)
-    n_transmitted = n_incident
-    
-    coin_obj = is_substrate ? int.coincident_object : obj
-    if !isnothing(coin_obj) && is_refractive(coin_obj)
-        n_transmitted = refractive_index(coin_obj, λ)
-    else
-        n_transmitted = refractive_index(system, λ)
-    end
 
     J_r = if coating_model isa Uncoated
         SPBasis(-1, 0, 0, 1)
@@ -293,31 +279,11 @@ function interact_reflective_boundary(
         beam::AbstractBeam{T, R},
         ray::R
 ) where {T, R <: PolarizedRay{T}}
-    int = intersection(ray)
-    obj = object(int)
-    is_substrate = (_base_optic(obj) === substrate_obj)
-    
-    normal = normal3d(int)
-    if !is_substrate
-        normal = -normal
-    end
-    
-    entering_substrate = dot(direction(ray), normal) < 0
-    from_front = entering_substrate
+    normal, n_incident, n_transmitted, _, λ, from_front =
+        _resolve_interface_context(system, substrate_obj, ray)
     
     npos = position(ray) + length(ray) * direction(ray)
     ndir = reflection3d(direction(ray), normal)
- 
-    λ = wavelength(ray)
-    n_incident = refractive_index(ray)
-    n_transmitted = n_incident
-    
-    coin_obj = is_substrate ? int.coincident_object : obj
-    if !isnothing(coin_obj) && is_refractive(coin_obj)
-        n_transmitted = refractive_index(coin_obj, λ)
-    else
-        n_transmitted = refractive_index(system, λ)
-    end
 
     J = if coating_model isa Uncoated
         SPBasis(-1, 0, 0, 1)

@@ -392,16 +392,9 @@ function interact3d(::Splitting, system::AbstractSystem, coating::Coating{T},
         normal,
         from_front,
         () -> begin
-            i_c = interact3d(
-                Reflective(), system, coating, gauss.chief, rays(gauss.chief)[ray_id])
-            i_w = interact3d(
-                Reflective(), system, coating, gauss.waist, rays(gauss.waist)[ray_id])
-            i_d = interact3d(Reflective(), system, coating, gauss.divergence,
-                rays(gauss.divergence)[ray_id])
-            if any(isnothing, (i_c, i_w, i_d))
-                return nothing
-            end
-            return GaussianBeamletInteraction{T}(i_c, i_w, i_d)
+            ints = _interact3d_reflective_component_beams(system, coating, coating.model, gauss, ray_id)
+            isnothing(ints) && return nothing
+            return GaussianBeamletInteraction{T}(ints...)
         end
     )
 end
@@ -415,36 +408,16 @@ end
 
 function interact3d(::CoatingBehavior, system::AbstractSystem, coating::Coating{T},
         agb::AstigmaticGaussianBeamlet, ray_id::Int) where {T}
-    # Non-splitting behaviors fall back to individual ray tracing
-    i_c = interact3d(system, coating, agb.c, rays(agb.c)[ray_id])
-    i_wxp = interact3d(system, coating, agb.wxp, rays(agb.wxp)[ray_id])
-    i_wxm = interact3d(system, coating, agb.wxm, rays(agb.wxm)[ray_id])
-    i_wyp = interact3d(system, coating, agb.wyp, rays(agb.wyp)[ray_id])
-    i_wym = interact3d(system, coating, agb.wym, rays(agb.wym)[ray_id])
-    i_dxp = interact3d(system, coating, agb.dxp, rays(agb.dxp)[ray_id])
-    i_dxm = interact3d(system, coating, agb.dxm, rays(agb.dxm)[ray_id])
-    i_dyp = interact3d(system, coating, agb.dyp, rays(agb.dyp)[ray_id])
-    i_dym = interact3d(system, coating, agb.dym, rays(agb.dym)[ray_id])
-    if any(isnothing, (i_c, i_wxp, i_wxm, i_wyp, i_wym, i_dxp, i_dxm, i_dyp, i_dym))
-        return nothing
-    end
-    return AstigmaticGaussianBeamletInteraction{T}(
-        i_c, i_wxp, i_wxm, i_wyp, i_wym, i_dxp, i_dxm, i_dyp, i_dym
-    )
+    ints = _interact3d_component_beams(system, coating, agb, ray_id)
+    isnothing(ints) && return nothing
+    return AstigmaticGaussianBeamletInteraction{T}(ints...)
 end
 
 function interact3d(::Splitting, system::AbstractSystem, coating::Coating{T},
         agb::AstigmaticGaussianBeamlet, ray_id::Int) where {T}
     # Ensure all component rays have valid intersections to prevent clipping crashes
-    if isnothing(intersection(rays(agb.c)[ray_id])) ||
-       isnothing(intersection(rays(agb.wxp)[ray_id])) ||
-       isnothing(intersection(rays(agb.wxm)[ray_id])) ||
-       isnothing(intersection(rays(agb.wyp)[ray_id])) ||
-       isnothing(intersection(rays(agb.wym)[ray_id])) ||
-       isnothing(intersection(rays(agb.dxp)[ray_id])) ||
-       isnothing(intersection(rays(agb.dxm)[ray_id])) ||
-       isnothing(intersection(rays(agb.dyp)[ray_id])) ||
-       isnothing(intersection(rays(agb.dym)[ray_id]))
+    beams = _component_beams(agb)
+    if any(b -> isnothing(intersection(rays(b)[ray_id])), beams)
         return nothing
     end
 
@@ -469,28 +442,9 @@ function interact3d(::Splitting, system::AbstractSystem, coating::Coating{T},
         normal,
         from_front,
         () -> begin
-            i_c = interact3d(Reflective(), system, coating, agb.c, rays(agb.c)[ray_id])
-            i_wxp = interact3d(
-                Reflective(), system, coating, agb.wxp, rays(agb.wxp)[ray_id])
-            i_wxm = interact3d(
-                Reflective(), system, coating, agb.wxm, rays(agb.wxm)[ray_id])
-            i_wyp = interact3d(
-                Reflective(), system, coating, agb.wyp, rays(agb.wyp)[ray_id])
-            i_wym = interact3d(
-                Reflective(), system, coating, agb.wym, rays(agb.wym)[ray_id])
-            i_dxp = interact3d(
-                Reflective(), system, coating, agb.dxp, rays(agb.dxp)[ray_id])
-            i_dxm = interact3d(
-                Reflective(), system, coating, agb.dxm, rays(agb.dxm)[ray_id])
-            i_dyp = interact3d(
-                Reflective(), system, coating, agb.dyp, rays(agb.dyp)[ray_id])
-            i_dym = interact3d(
-                Reflective(), system, coating, agb.dym, rays(agb.dym)[ray_id])
-            if any(isnothing, (i_c, i_wxp, i_wxm, i_wyp, i_wym, i_dxp, i_dxm, i_dyp, i_dym))
-                return nothing
-            end
-            return AstigmaticGaussianBeamletInteraction{T}(
-                i_c, i_wxp, i_wxm, i_wyp, i_wym, i_dxp, i_dxm, i_dyp, i_dym)
+            ints = _interact3d_reflective_component_beams(system, coating, coating.model, agb, ray_id)
+            isnothing(ints) && return nothing
+            return AstigmaticGaussianBeamletInteraction{T}(ints...)
         end
     )
 end

@@ -167,6 +167,8 @@ end
 
 _last_beam_intersection(gauss::GaussianBeamlet) = intersection(last(rays(gauss.chief)))
 
+@inline _component_beams(gauss::GaussianBeamlet) = (gauss.chief, gauss.waist, gauss.divergence)
+
 """
     _beams_hits_same_shape(gauss, id)
 
