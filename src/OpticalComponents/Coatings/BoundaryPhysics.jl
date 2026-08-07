@@ -365,12 +365,12 @@ function _propagate_splitting_gaussian_beamlet(
     w_ray = gauss.waist.rays[ray_id]
     d_ray = gauss.divergence.rays[ray_id]
 
-    c_dir_t, TIR = refraction3d(direction(c_ray), normal, n_incident, n_transmitted)
-    if TIR
+    c_dir_t, TIR_c = refraction3d(direction(c_ray), normal, n_incident, n_transmitted)
+    w_dir_t, TIR_w = refraction3d(direction(w_ray), normal, n_incident, n_transmitted)
+    d_dir_t, TIR_d = refraction3d(direction(d_ray), normal, n_incident, n_transmitted)
+    if TIR_c || TIR_w || TIR_d
         return tir_callback()
     end
-    w_dir_t, _ = refraction3d(direction(w_ray), normal, n_incident, n_transmitted)
-    d_dir_t, _ = refraction3d(direction(d_ray), normal, n_incident, n_transmitted)
 
     c_dir_r = reflection3d(direction(c_ray), normal)
     w_dir_r = reflection3d(direction(w_ray), normal)
@@ -430,21 +430,31 @@ function _propagate_splitting_astigmatic_beamlet(
     c_ray = rays(agb.c)[ray_id]
     λ = wavelength(c_ray)
 
-    _, TIR = refraction3d(direction(c_ray), normal, n_incident, n_transmitted)
-    if TIR
+    res_c   = refraction3d(direction(c_ray), normal, n_incident, n_transmitted)
+    res_wxp = refraction3d(direction(rays(agb.wxp)[ray_id]), normal, n_incident, n_transmitted)
+    res_wxm = refraction3d(direction(rays(agb.wxm)[ray_id]), normal, n_incident, n_transmitted)
+    res_wyp = refraction3d(direction(rays(agb.wyp)[ray_id]), normal, n_incident, n_transmitted)
+    res_wym = refraction3d(direction(rays(agb.wym)[ray_id]), normal, n_incident, n_transmitted)
+    res_dxp = refraction3d(direction(rays(agb.dxp)[ray_id]), normal, n_incident, n_transmitted)
+    res_dxm = refraction3d(direction(rays(agb.dxm)[ray_id]), normal, n_incident, n_transmitted)
+    res_dyp = refraction3d(direction(rays(agb.dyp)[ray_id]), normal, n_incident, n_transmitted)
+    res_dym = refraction3d(direction(rays(agb.dym)[ray_id]), normal, n_incident, n_transmitted)
+
+    if res_c[2] || res_wxp[2] || res_wxm[2] || res_wyp[2] || res_wym[2] ||
+       res_dxp[2] || res_dxm[2] || res_dyp[2] || res_dym[2]
         return tir_callback()
     end
 
     dirs_t = (
-        refraction3d(rays(agb.c)[ray_id], n_transmitted)[1],
-        refraction3d(rays(agb.wxp)[ray_id], n_transmitted)[1],
-        refraction3d(rays(agb.wxm)[ray_id], n_transmitted)[1],
-        refraction3d(rays(agb.wyp)[ray_id], n_transmitted)[1],
-        refraction3d(rays(agb.wym)[ray_id], n_transmitted)[1],
-        refraction3d(rays(agb.dxp)[ray_id], n_transmitted)[1],
-        refraction3d(rays(agb.dxm)[ray_id], n_transmitted)[1],
-        refraction3d(rays(agb.dyp)[ray_id], n_transmitted)[1],
-        refraction3d(rays(agb.dym)[ray_id], n_transmitted)[1]
+        res_c[1],
+        res_wxp[1],
+        res_wxm[1],
+        res_wyp[1],
+        res_wym[1],
+        res_dxp[1],
+        res_dxm[1],
+        res_dyp[1],
+        res_dym[1]
     )
     dirs_r = (
         reflection3d(

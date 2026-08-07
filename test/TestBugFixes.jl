@@ -265,4 +265,46 @@ end
     @test length(detector.hits) == 1
 end
 
+@testset "Auxiliary beamlet TIR before splitting" begin
+    struct Splitting5050Coating end
+    BMO.coating_behavior(::Splitting5050Coating, ray) = Splitting()
+    BMO.get_jones_matrix(::Splitting5050Coating, θi, λ, n1, n2, is_reflected; from_front=true) = BMO.SPBasis(1/sqrt(2), 0, 0, 1/sqrt(2))
+
+    mesh = BMO.QuadraticFlatMesh(100mm)
+    coating = Coating(mesh, Splitting5050Coating(), normal_filter=[0.0, -1.0, 0.0])
+    
+    # Ray incident from n_incident = 1.5 to n_transmitted = 1.0 (glass to air)
+    # Critical angle = asin(1/1.5) ≈ 41.8103 deg
+    # Chief ray angle = 41.7 deg (refracts, near critical angle)
+    θ = deg2rad(41.7)
+    dir_c = [sin(θ), cos(θ), 0.0]
+    
+    # Waist size 0.001mm (1 um) gives divergence angle large enough for divergence ray to exceed critical angle
+    w0 = 0.001mm
+    λ = 1000e-9
+    
+    gauss = GaussianBeamlet([0.0, -10mm, 0.0], dir_c, λ, w0)
+    
+    n_inc = 1.5
+    n_trans = 1.0
+    normal = [0.0, -1.0, 0.0]
+    
+    tir_triggered = false
+    cb = () -> (tir_triggered = true; return nothing)
+    
+    BMO._propagate_splitting_gaussian_beamlet(
+        System([coating]), coating, Splitting5050Coating(), gauss, 1, n_inc, n_trans, normal, true, cb
+    )
+    @test tir_triggered
+
+    agb = AstigmaticGaussianBeamlet([0.0, -10mm, 0.0], dir_c, λ, w0)
+    tir_triggered_agb = false
+    cb_agb = () -> (tir_triggered_agb = true; return nothing)
+    
+    BMO._propagate_splitting_astigmatic_beamlet(
+        System([coating]), coating, Splitting5050Coating(), agb, 1, n_inc, n_trans, normal, true, cb_agb
+    )
+    @test tir_triggered_agb
+end
+
 end # MODULE
