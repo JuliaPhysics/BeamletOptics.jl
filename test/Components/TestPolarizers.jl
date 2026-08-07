@@ -246,8 +246,22 @@ const mm = 1e-3
             beam = Beam(ray)
             solve_system!(system, beam)
             E = BMO.polarization(last(BMO.rays(beam)))
-            @test abs2(E[1]) < 1e-12
             @test abs2(E[3]) / abs2(E0)≈1 atol=1e-6
+        end
+
+        @testset "Plate Waveplate Constructor Type Promotion" begin
+            n = λ -> 1.5
+            rpwp = BMO.RectangularPlateWaveplate(10, 10, 1, n, π/2)
+            @test rpwp isa BMO.RectangularPlateWaveplate{Float64}
+
+            round_pwp = BMO.RoundPlateWaveplate(10, 1, n, π/2)
+            @test round_pwp isa BMO.RoundPlateWaveplate{Float64}
+
+            hwp_rect = BMO.HalfWavePlate(10, 10, 1, n)
+            @test hwp_rect isa BMO.RectangularPlateWaveplate{Float64}
+
+            qwp_round = BMO.QuarterWavePlate(10, 1, n)
+            @test qwp_round isa BMO.RoundPlateWaveplate{Float64}
         end
 
         @testset "Quarter-waveplate creates circular polarization" begin

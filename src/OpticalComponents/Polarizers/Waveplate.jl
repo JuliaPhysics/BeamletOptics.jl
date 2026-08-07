@@ -72,14 +72,15 @@ function RectangularPlateWaveplate(
         retardance::Union{Real, Function};
         fast_axis_angle::Real=0.0
 )
-    substrate_shape = BoxSDF(width, thickness, height)
+    T = float(promote_type(typeof(width), typeof(height), typeof(thickness)))
+    substrate_shape = BoxSDF(T(width), T(thickness), T(height))
     substrate = Prism(substrate_shape, n)
-    translate3d!(substrate, [0, thickness/2, 0])
+    translate3d!(substrate, [T(0), T(thickness/2), T(0)])
     
-    coating_shape = RectangularFlatMesh(width, height)
-    zrotate3d!(coating_shape, π)
+    coating_shape = RectangularFlatMesh(T(width), T(height))
+    zrotate3d!(coating_shape, T(π))
     set_new_origin3d!(coating_shape)
-    yrotate3d!(coating_shape, -fast_axis_angle)
+    yrotate3d!(coating_shape, -T(fast_axis_angle))
     
     JMat = if retardance isa Function
         λ -> XZBasis(exp(-im * retardance(λ) / 2), 0, 0, exp(im * retardance(λ) / 2))
@@ -88,7 +89,6 @@ function RectangularPlateWaveplate(
     end
     coating = Waveplate(coating_shape, JMat)
     
-    T = promote_type(typeof(width), typeof(height), typeof(thickness))
     M = typeof(coating.model)
     return RectangularPlateWaveplate{T, M}(substrate, coating)
 end
@@ -110,11 +110,12 @@ function RoundPlateWaveplate(
         retardance::Union{Real, Function};
         fast_axis_angle::Real=0.0
 )
-    substrate_shape = PlanoSurfaceSDF(thickness, diameter)
+    T = float(promote_type(typeof(diameter), typeof(thickness)))
+    substrate_shape = PlanoSurfaceSDF(T(thickness), T(diameter))
     substrate = Prism(substrate_shape, n)
     
-    coating_shape = CircularFlatMesh(diameter / 2)
-    yrotate3d!(coating_shape, -fast_axis_angle)
+    coating_shape = CircularFlatMesh(T(diameter) / 2)
+    yrotate3d!(coating_shape, -T(fast_axis_angle))
     
     JMat = if retardance isa Function
         λ -> XZBasis(exp(-im * retardance(λ) / 2), 0, 0, exp(im * retardance(λ) / 2))
@@ -123,7 +124,6 @@ function RoundPlateWaveplate(
     end
     coating = Waveplate(coating_shape, JMat)
     
-    T = promote_type(typeof(diameter), typeof(thickness))
     M = typeof(coating.model)
     return RoundPlateWaveplate{T, M}(substrate, coating)
 end

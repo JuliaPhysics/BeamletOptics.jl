@@ -27,7 +27,7 @@ Creates a [`BoxSDF`](@ref) with:
 - `z`: z-dir. edge length in [m]
 """
 function BoxSDF(x::X, y::Y, z::Z) where {X<:Real, Y<:Real, Z<:Real}
-    T = promote_type(X, Y, Z)
+    T = float(promote_type(X, Y, Z))
     return BoxSDF{T}(
         Matrix{T}(I, 3, 3),
         Matrix{T}(I, 3, 3),
@@ -62,8 +62,8 @@ mutable struct CylinderSDF{T} <: AbstractSDF{T}
     height::T
 end
 
-function CylinderSDF(r::R, h::H) where {R, H}
-    T = promote_type(R, H)
+function CylinderSDF(r::R, h::H) where {R<:Real, H<:Real}
+    T = float(promote_type(R, H))
     return CylinderSDF{T}(
         Matrix{T}(I, 3, 3),
         Matrix{T}(I, 3, 3),
