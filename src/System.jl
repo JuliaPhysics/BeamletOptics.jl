@@ -64,6 +64,22 @@ end
     return exiting_int
 end
 
+@inline function _resolve_coincident_group(thin_primary, exiting_int, entering_int, fallback_int)
+    if thin_primary !== nothing
+        thin_primary.coincident_object = exiting_int !== nothing ? object(exiting_int) : nothing
+        thin_primary.coincident_object_2 = entering_int !== nothing ? object(entering_int) : nothing
+        return thin_primary
+    elseif exiting_int !== nothing && entering_int !== nothing
+        return resolve_coincident_boundary(exiting_int, entering_int)
+    elseif exiting_int !== nothing
+        return exiting_int
+    elseif entering_int !== nothing
+        return entering_int
+    else
+        return fallback_int
+    end
+end
+
 @inline function trace_all(system::AbstractSystem, ray::AbstractRay{R}) where {R}
     tol = get_coincident_boundary_tolerance()
     best_t = R(Inf)
@@ -75,64 +91,28 @@ end
     # Find the closest intersection and collect any coincident ones at the same distance
     for obj in objects(system)
         temp = intersect3d(obj, ray)
-        if temp === nothing
-            continue
-        end
+        (temp === nothing || length(temp) <= tol) && continue
         t = length(temp)
-
-        # Ignore self-intersection (t ≈ 0)
-        if t <= tol
-            continue
-        end
 
         if t < best_t - tol
             best_t = t
             best_int = temp
-            thin_primary = nothing
-            exiting_int = nothing
-            entering_int = nothing
-
-            if is_thin_interface(object(temp))
-                thin_primary = temp
-            else
-                if dot(direction(ray), normal3d(temp)) > 0
-                    exiting_int = temp
-                else
-                    entering_int = temp
-                end
-            end
-        elseif abs(t - best_t) <= tol
-            if is_thin_interface(object(temp))
-                thin_primary = temp
-            else
-                if dot(direction(ray), normal3d(temp)) > 0
-                    exiting_int = temp
-                else
-                    entering_int = temp
-                end
-            end
+            thin_primary = exiting_int = entering_int = nothing
+        elseif abs(t - best_t) > tol
+            continue
         end
-    end
 
-    if best_int === nothing
-        return nothing
-    end
-
-    if thin_primary !== nothing
-        thin_primary.coincident_object = exiting_int !== nothing ? object(exiting_int) : nothing
-        thin_primary.coincident_object_2 = entering_int !== nothing ? object(entering_int) : nothing
-        return thin_primary
-    else
-        if exiting_int !== nothing && entering_int !== nothing
-            return resolve_coincident_boundary(exiting_int, entering_int)
-        elseif exiting_int !== nothing
-            return exiting_int
-        elseif entering_int !== nothing
-            return entering_int
+        if is_thin_interface(object(temp))
+            thin_primary = temp
+        elseif dot(direction(ray), normal3d(temp)) > 0
+            exiting_int = temp
         else
-            return best_int
+            entering_int = temp
         end
     end
+
+    best_int === nothing && return nothing
+    return _resolve_coincident_group(thin_primary, exiting_int, entering_int, best_int)
 end
 
 @inline function trace_one(
@@ -159,12 +139,10 @@ end
 
     if is_thin_interface(object(primary))
         thin_primary = primary
+    elseif dot(direction(ray), normal3d(primary)) > 0
+        exiting_int = primary
     else
-        if dot(direction(ray), normal3d(primary)) > 0
-            exiting_int = primary
-        else
-            entering_int = primary
-        end
+        entering_int = primary
     end
 
     # Gather other intersections at the same distance to resolve cement/contact transitions
@@ -176,31 +154,15 @@ end
         if temp !== nothing && abs(length(temp) - t_best) <= tol
             if is_thin_interface(object(temp))
                 thin_primary = temp
+            elseif dot(direction(ray), normal3d(temp)) > 0
+                exiting_int = temp
             else
-                if dot(direction(ray), normal3d(temp)) > 0
-                    exiting_int = temp
-                else
-                    entering_int = temp
-                end
+                entering_int = temp
             end
         end
     end
 
-    if thin_primary !== nothing
-        thin_primary.coincident_object = exiting_int !== nothing ? object(exiting_int) : nothing
-        thin_primary.coincident_object_2 = entering_int !== nothing ? object(entering_int) : nothing
-        return thin_primary
-    else
-        if exiting_int !== nothing && entering_int !== nothing
-            return resolve_coincident_boundary(exiting_int, entering_int)
-        elseif exiting_int !== nothing
-            return exiting_int
-        elseif entering_int !== nothing
-            return entering_int
-        else
-            return primary
-        end
-    end
+    return _resolve_coincident_group(thin_primary, exiting_int, entering_int, primary)
 end
 
 """
