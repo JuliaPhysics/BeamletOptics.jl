@@ -52,7 +52,7 @@ If center of sphere is on left then R < 0. If center of sphere is on right then 
 """
 lensmakers_eq(R1, R2, n) = 1 / ((n - 1) * (1 / R1 - 1 / R2))
 
-rayleigh_range(λ, w0, M2, n = 1) = π * n * w0^2 / λ / M2
+rayleigh_range(λ, w0, M2 = 1, n = 1) = π * n * w0^2 / λ / M2
 
 beam_waist(z, w0, zr) = w0 * sqrt(1 + (z / zr)^2)
 

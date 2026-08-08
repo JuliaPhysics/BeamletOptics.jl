@@ -208,7 +208,11 @@ function AstigmaticGaussianBeamlet(
     )
 end
 
-"""Return a tuple of all 9 component beams of the [`AstigmaticGaussianBeamlet`](@ref)."""
+"""
+    _component_beams(agb::AstigmaticGaussianBeamlet)
+
+Returns a tuple of all 9 component [`Beam`](@ref)s (chief and 8 auxiliary waist/divergence beams).
+"""
 @inline _component_beams(agb::AstigmaticGaussianBeamlet) = (
     agb.c, agb.wxp, agb.wxm, agb.wyp, agb.wym, agb.dxp, agb.dxm, agb.dyp, agb.dym)
 
@@ -268,14 +272,6 @@ function Base.show(io::IO, agb::AstigmaticGaussianBeamlet)
     print(io,
         "AstigmaticGaussianBeamlet(pos: $p0, dir: $d0, λ: $λ, w_x: $(norm(w1)), w_y: $(norm(w2)))")
 end
-
-"""
-    _component_beams(agb::AstigmaticGaussianBeamlet)
-
-Returns a tuple of all 9 component [`Beam`](@ref)s (chief and 8 auxiliary waist/divergence beams).
-"""
-@inline _component_beams(agb::AstigmaticGaussianBeamlet) =
-    (agb.c, agb.wxp, agb.wxm, agb.wyp, agb.wym, agb.dxp, agb.dxm, agb.dyp, agb.dym)
 
 # AbstractTrees integration
 AbstractTrees.children(agb::AstigmaticGaussianBeamlet) = agb.children
@@ -772,14 +768,14 @@ function intensity(agb::AstigmaticGaussianBeamlet, r::AbstractArray, z::Real)
 end
 
 """
-    rayleigh_range(agb::AstigmaticGaussianBeamlet)
+    rayleigh_range(agb::AstigmaticGaussianBeamlet; M2=1)
 
 Returns the Rayleigh range for the x and y axes of the beamlet as a tuple `(z_rx, z_ry)`.
 """
-function rayleigh_range(agb::AstigmaticGaussianBeamlet)
+function rayleigh_range(agb::AstigmaticGaussianBeamlet; M2 = 1)
     λ = wavelength(agb)
     _, w1, w2 = waist_parameters(agb, 0.0)
-    return (rayleigh_range(λ, norm(w1)), rayleigh_range(λ, norm(w2)))
+    return (rayleigh_range(λ, norm(w1), M2), rayleigh_range(λ, norm(w2), M2))
 end
 
 """

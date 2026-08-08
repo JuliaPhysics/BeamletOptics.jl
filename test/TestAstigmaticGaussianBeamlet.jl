@@ -59,6 +59,18 @@ const BMO = BeamletOptics
         @test norm(w2) ≈ w0 atol=1e-6
     end
 
+    @testset "Rayleigh range" begin
+        beam = AstigmaticGaussianBeamlet([0.0, 0, 0], [0, 1, 0], λ0, w0; E0=[0,0,1], support=[0,0,1])
+        rx, ry = BMO.rayleigh_range(beam)
+        expected_zr = π * w0^2 / λ0
+        @test rx ≈ expected_zr atol=1e-6
+        @test ry ≈ expected_zr atol=1e-6
+        
+        rx2, ry2 = BMO.rayleigh_range(beam; M2=2.0)
+        @test rx2 ≈ expected_zr / 2.0 atol=1e-6
+        @test ry2 ≈ expected_zr / 2.0 atol=1e-6
+    end
+
     @testset "Waist parameters with offsets" begin
         z0_x = 0.05
         z0_y = 0.10
