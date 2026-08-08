@@ -317,25 +317,14 @@ function interact3d(system::AbstractSystem,
         object::AbstractObject,
         agb::AstigmaticGaussianBeamlet{R},
         ray_id::Int) where {R}
-    coated_obj, coating = resolve_coated_boundary(system, object, agb.c.rays[ray_id])
+    coated_obj, coating = resolve_coated_boundary(system, object, rays(agb.c)[ray_id])
     if coated_obj !== nothing
         return interact3d(system, coated_obj, agb, ray_id)
     end
 
-    i_c = interact3d(system, object, agb.c, rays(agb.c)[ray_id])
-    i_wxp = interact3d(system, object, agb.wxp, rays(agb.wxp)[ray_id])
-    i_wxm = interact3d(system, object, agb.wxm, rays(agb.wxm)[ray_id])
-    i_wyp = interact3d(system, object, agb.wyp, rays(agb.wyp)[ray_id])
-    i_wym = interact3d(system, object, agb.wym, rays(agb.wym)[ray_id])
-    i_dxp = interact3d(system, object, agb.dxp, rays(agb.dxp)[ray_id])
-    i_dxm = interact3d(system, object, agb.dxm, rays(agb.dxm)[ray_id])
-    i_dyp = interact3d(system, object, agb.dyp, rays(agb.dyp)[ray_id])
-    i_dym = interact3d(system, object, agb.dym, rays(agb.dym)[ray_id])
-    if any(isnothing, (i_c, i_wxp, i_wxm, i_wyp, i_wym, i_dxp, i_dxm, i_dyp, i_dym))
-        return nothing
-    end
-    return AstigmaticGaussianBeamletInteraction{R}(
-        i_c, i_wxp, i_wxm, i_wyp, i_wym, i_dxp, i_dxm, i_dyp, i_dym)
+    ints = map(b -> interact3d(system, object, b, rays(b)[ray_id]), _component_beams(agb))
+    any(isnothing, ints) && return nothing
+    return AstigmaticGaussianBeamletInteraction{R}(ints...)
 end
 
 function Base.push!(agb::AstigmaticGaussianBeamlet{T},
