@@ -269,6 +269,14 @@ function Base.show(io::IO, agb::AstigmaticGaussianBeamlet)
         "AstigmaticGaussianBeamlet(pos: $p0, dir: $d0, λ: $λ, w_x: $(norm(w1)), w_y: $(norm(w2)))")
 end
 
+"""
+    _component_beams(agb::AstigmaticGaussianBeamlet)
+
+Returns a tuple of all 9 component [`Beam`](@ref)s (chief and 8 auxiliary waist/divergence beams).
+"""
+@inline _component_beams(agb::AstigmaticGaussianBeamlet) =
+    (agb.c, agb.wxp, agb.wxm, agb.wyp, agb.wym, agb.dxp, agb.dxm, agb.dyp, agb.dym)
+
 # AbstractTrees integration
 AbstractTrees.children(agb::AstigmaticGaussianBeamlet) = agb.children
 AbstractTrees.nodevalue(agb::AstigmaticGaussianBeamlet) = agb

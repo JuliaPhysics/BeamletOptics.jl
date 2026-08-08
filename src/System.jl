@@ -64,6 +64,12 @@ end
     return exiting_int
 end
 
+"""
+    _resolve_coincident_group(thin_primary, exiting_int, entering_int, fallback_int)
+
+Resolves the primary intersection and assigns adjacent coincident objects for thin-interface coatings
+and flush bulk optical boundaries (e.g., cemented doublet lenses).
+"""
 @inline function _resolve_coincident_group(thin_primary, exiting_int, entering_int, fallback_int)
     if thin_primary !== nothing
         thin_primary.coincident_object = exiting_int !== nothing ? object(exiting_int) : nothing

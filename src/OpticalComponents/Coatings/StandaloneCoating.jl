@@ -90,6 +90,42 @@ end
     return n_transmitted, n_reflected
 end
 
+"""
+    _resolve_coincident_hint(system, ray, int, is_entering)
+
+Resolves the target object hint (`Hint`) at a standalone coating boundary by comparing the ray's
+current refractive index against the coincident adjacent objects (`coincident_object` and `coincident_object_2`).
+If `is_entering` is `true`, returns the object entered upon transmission; otherwise returns the object remaining in upon reflection.
+"""
+@inline function _resolve_coincident_hint(
+        system::AbstractSystem, ray::AbstractRay, int::Intersection, is_entering::Bool)
+    n_exit = int.coincident_object
+    n_enter = int.coincident_object_2
+    (isnothing(n_exit) && isnothing(n_enter)) && return nothing
+
+    λ = wavelength(ray)
+    n_sys = refractive_index(system, λ)
+    n_exit_val = isnothing(n_exit) ? n_sys :
+                 (is_refractive(n_exit) ? refractive_index(n_exit, λ) : n_sys)
+
+    tol = get_index_matching_tolerance()
+    is_matching = abs(refractive_index(ray) - n_exit_val) < tol
+    target_obj = is_entering ? (is_matching ? n_enter : n_exit) : (is_matching ? n_exit : n_enter)
+    return isnothing(target_obj) ? nothing : Hint(target_obj)
+end
+
+"""
+    _resolve_coating_normal(ray, int)
+
+Computes the interface normal vector aligned against the incoming ray direction (`-normal`), along with
+the boolean `from_front` flag indicating whether the ray hit the interface from the front side.
+"""
+@inline function _resolve_coating_normal(ray::AbstractRay, int::Intersection)
+    normal = normal3d(int)
+    from_front = dot(direction(ray), normal) < 0
+    return from_front ? normal : -normal, from_front
+end
+
 # Route interact3d through coating_behavior trait
 function interact3d(system::AbstractSystem, coating::Coating{T},
         beam::AbstractBeam, ray::AbstractRay) where {T}
@@ -101,12 +137,7 @@ function interact3d(::Transmissive, system::AbstractSystem, coating::Coating{T},
         ::Beam{T, R}, ray::R) where {T, R <: Ray{T}}
     int = intersection(ray)
     n_transmitted, _ = _coating_media(system, ray, int)
-
-    normal = normal3d(int)
-    from_front = dot(direction(ray), normal) < 0
-    if !from_front
-        normal = -normal
-    end
+    normal, from_front = _resolve_coating_normal(ray, int)
 
     ndir, TIR = refraction3d(direction(ray), normal, refractive_index(ray), n_transmitted)
     npos = position(ray) + length(ray) * direction(ray)
@@ -114,31 +145,11 @@ function interact3d(::Transmissive, system::AbstractSystem, coating::Coating{T},
     if TIR
         ndir = reflection3d(direction(ray), normal)
         n_out = refractive_index(ray)
-
-        tol = get_index_matching_tolerance()
-        n_exit = isnothing(int.coincident_object) ? nothing : int.coincident_object
-        n_enter = isnothing(int.coincident_object_2) ? nothing : int.coincident_object_2
-
-        λ = wavelength(ray)
-        n_sys = refractive_index(system, λ)
-        n_exit_val = isnothing(n_exit) ? n_sys :
-                     (is_refractive(n_exit) ? refractive_index(n_exit, λ) : n_sys)
-        incident_obj = abs(refractive_index(ray) - n_exit_val) < tol ? n_exit : n_enter
-        hint = isnothing(incident_obj) ? nothing : Hint(incident_obj)
+        hint = _resolve_coincident_hint(system, ray, int, false)
         T_coeff = 1.0
     else
         n_out = n_transmitted
-
-        tol = get_index_matching_tolerance()
-        n_exit = isnothing(int.coincident_object) ? nothing : int.coincident_object
-        n_enter = isnothing(int.coincident_object_2) ? nothing : int.coincident_object_2
-
-        λ = wavelength(ray)
-        n_sys = refractive_index(system, λ)
-        n_exit_val = isnothing(n_exit) ? n_sys :
-                     (is_refractive(n_exit) ? refractive_index(n_exit, λ) : n_sys)
-        entered_obj = abs(refractive_index(ray) - n_exit_val) < tol ? n_enter : n_exit
-        hint = isnothing(entered_obj) ? nothing : Hint(entered_obj)
+        hint = _resolve_coincident_hint(system, ray, int, true)
 
         J_r = get_jones_matrix(coating.model, angle3d(direction(ray), -normal),
             wavelength(ray), refractive_index(ray), n_transmitted, true; from_front = from_front)
@@ -154,12 +165,7 @@ function interact3d(::Transmissive, system::AbstractSystem, coating::Coating{T},
         ::Beam{T, R}, ray::R) where {T, R <: PolarizedRay{T}}
     int = intersection(ray)
     n_transmitted, _ = _coating_media(system, ray, int)
-
-    normal = normal3d(int)
-    from_front = dot(direction(ray), normal) < 0
-    if !from_front
-        normal = -normal
-    end
+    normal, from_front = _resolve_coating_normal(ray, int)
 
     ndir, TIR = refraction3d(direction(ray), normal, refractive_index(ray), n_transmitted)
     npos = position(ray) + length(ray) * direction(ray)
@@ -167,33 +173,13 @@ function interact3d(::Transmissive, system::AbstractSystem, coating::Coating{T},
     if TIR
         ndir = reflection3d(direction(ray), normal)
         n_out = refractive_index(ray)
-
-        tol = get_index_matching_tolerance()
-        n_exit = isnothing(int.coincident_object) ? nothing : int.coincident_object
-        n_enter = isnothing(int.coincident_object_2) ? nothing : int.coincident_object_2
-
-        λ = wavelength(ray)
-        n_sys = refractive_index(system, λ)
-        n_exit_val = isnothing(n_exit) ? n_sys :
-                     (is_refractive(n_exit) ? refractive_index(n_exit, λ) : n_sys)
-        incident_obj = abs(refractive_index(ray) - n_exit_val) < tol ? n_exit : n_enter
-        hint = isnothing(incident_obj) ? nothing : Hint(incident_obj)
+        hint = _resolve_coincident_hint(system, ray, int, false)
 
         J = get_jones_matrix(coating.model, angle3d(direction(ray), -normal),
             wavelength(ray), refractive_index(ray), n_transmitted, true; from_front = from_front)
     else
         n_out = n_transmitted
-
-        tol = get_index_matching_tolerance()
-        n_exit = isnothing(int.coincident_object) ? nothing : int.coincident_object
-        n_enter = isnothing(int.coincident_object_2) ? nothing : int.coincident_object_2
-
-        λ = wavelength(ray)
-        n_sys = refractive_index(system, λ)
-        n_exit_val = isnothing(n_exit) ? n_sys :
-                     (is_refractive(n_exit) ? refractive_index(n_exit, λ) : n_sys)
-        entered_obj = abs(refractive_index(ray) - n_exit_val) < tol ? n_enter : n_exit
-        hint = isnothing(entered_obj) ? nothing : Hint(entered_obj)
+        hint = _resolve_coincident_hint(system, ray, int, true)
 
         J = get_jones_matrix(coating.model, angle3d(direction(ray), -normal),
             wavelength(ray), refractive_index(ray), n_transmitted, false; from_front = from_front)
@@ -208,25 +194,12 @@ end
 function interact3d(::Reflective, system::AbstractSystem, coating::Coating{T},
         ::Beam{T, R}, ray::R) where {T, R <: Ray{T}}
     int = intersection(ray)
-    normal = normal3d(int)
-    from_front = dot(direction(ray), normal) < 0
-    if !from_front
-        normal = -normal
-    end
+    normal, from_front = _resolve_coating_normal(ray, int)
 
     ndir = reflection3d(direction(ray), normal)
     npos = position(ray) + length(ray) * direction(ray)
 
-    tol = get_index_matching_tolerance()
-    n_exit = isnothing(int.coincident_object) ? nothing : int.coincident_object
-    n_enter = isnothing(int.coincident_object_2) ? nothing : int.coincident_object_2
-
-    λ = wavelength(ray)
-    n_sys = refractive_index(system, λ)
-    n_exit_val = isnothing(n_exit) ? n_sys :
-                 (is_refractive(n_exit) ? refractive_index(n_exit, λ) : n_sys)
-    incident_obj = abs(refractive_index(ray) - n_exit_val) < tol ? n_exit : n_enter
-    hint = isnothing(incident_obj) ? nothing : Hint(incident_obj)
+    hint = _resolve_coincident_hint(system, ray, int, false)
 
     n_transmitted, _ = _coating_media(system, ray, int)
     J_r = get_jones_matrix(coating.model, angle3d(direction(ray), -normal),
@@ -241,25 +214,12 @@ end
 function interact3d(::Reflective, system::AbstractSystem, coating::Coating{T},
         ::Beam{T, R}, ray::R) where {T, R <: PolarizedRay{T}}
     int = intersection(ray)
-    normal = normal3d(int)
-    from_front = dot(direction(ray), normal) < 0
-    if !from_front
-        normal = -normal
-    end
+    normal, from_front = _resolve_coating_normal(ray, int)
 
     ndir = reflection3d(direction(ray), normal)
     npos = position(ray) + length(ray) * direction(ray)
 
-    tol = get_index_matching_tolerance()
-    n_exit = isnothing(int.coincident_object) ? nothing : int.coincident_object
-    n_enter = isnothing(int.coincident_object_2) ? nothing : int.coincident_object_2
-
-    λ = wavelength(ray)
-    n_sys = refractive_index(system, λ)
-    n_exit_val = isnothing(n_exit) ? n_sys :
-                 (is_refractive(n_exit) ? refractive_index(n_exit, λ) : n_sys)
-    incident_obj = abs(refractive_index(ray) - n_exit_val) < tol ? n_exit : n_enter
-    hint = isnothing(incident_obj) ? nothing : Hint(incident_obj)
+    hint = _resolve_coincident_hint(system, ray, int, false)
 
     n_transmitted, _ = _coating_media(system, ray, int)
 
@@ -275,12 +235,8 @@ function interact3d(::Splitting, system::AbstractSystem, coating::Coating{T},
         beam::Beam{T, R}, ray::R) where {T, R <: Ray{T}}
     int = intersection(ray)
     n_transmitted, _ = _coating_media(system, ray, int)
+    normal, from_front = _resolve_coating_normal(ray, int)
 
-    normal = normal3d(int)
-    from_front = dot(direction(ray), normal) < 0
-    if !from_front
-        normal = -normal
-    end
     dir_t, TIR = refraction3d(direction(ray), normal, refractive_index(ray), n_transmitted)
     if TIR
         return interact3d(Reflective(), system, coating, beam, ray)
@@ -310,12 +266,8 @@ function interact3d(::Splitting, system::AbstractSystem, coating::Coating{T},
         beam::Beam{T, R}, ray::R) where {T, R <: PolarizedRay{T}}
     int = intersection(ray)
     n_transmitted, _ = _coating_media(system, ray, int)
+    normal, from_front = _resolve_coating_normal(ray, int)
 
-    normal = normal3d(int)
-    from_front = dot(direction(ray), normal) < 0
-    if !from_front
-        normal = -normal
-    end
     dir_t, TIR = refraction3d(direction(ray), normal, refractive_index(ray), n_transmitted)
     if TIR
         return interact3d(Reflective(), system, coating, beam, ray)
@@ -374,12 +326,7 @@ function interact3d(::Splitting, system::AbstractSystem, coating::Coating{T},
     c_ray = gauss.chief.rays[ray_id]
     int = intersection(c_ray)
     n_transmitted, _ = _coating_media(system, c_ray, int)
-
-    normal = normal3d(int)
-    from_front = dot(direction(c_ray), normal) < 0
-    if !from_front
-        normal = -normal
-    end
+    normal, from_front = _resolve_coating_normal(c_ray, int)
 
     return _propagate_splitting_gaussian_beamlet(
         system,
@@ -424,12 +371,7 @@ function interact3d(::Splitting, system::AbstractSystem, coating::Coating{T},
     c_ray = rays(agb.c)[ray_id]
     int = intersection(c_ray)
     n_transmitted, _ = _coating_media(system, c_ray, int)
-
-    normal = normal3d(int)
-    from_front = dot(direction(c_ray), normal) < 0
-    if !from_front
-        normal = -normal
-    end
+    normal, from_front = _resolve_coating_normal(c_ray, int)
 
     return _propagate_splitting_astigmatic_beamlet(
         system,
