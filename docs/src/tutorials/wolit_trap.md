@@ -1,6 +1,6 @@
 # Wedge interference filter light trap (WOLIT)
 
-This example demonstrates how to implement a custom angle-dependent thin film interference filter coating and simulate a He-Ne laser wedge light trap (Wedge Optical Light Trap / WOLIT).
+This example demonstrates how to implement a custom angle-dependent thin film interference filter coating and simulate a He-Ne laser wedge light trap (Wedge Optical Light Trap / WOLIT) as described by Ewers & Lorbeer (2019) [Ewers:2019](@cite).
 
 ---
 
