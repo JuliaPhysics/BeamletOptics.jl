@@ -88,30 +88,31 @@ function electric_field(
     local_z = Point3(orientation(pd)[:, 3])
     origin = position(pd)
     # Calculate field superposition
-    Threads.@threads for j in eachindex(zs)
-        z_grid = zs[j]
-        # Hoist z-grid math out of inner loop
-        p_row = origin + z_grid * local_z
+    for hit in hits
+        # Pre-compute hit constants
+        p0 = hit.p0
+        d0 = hit.d0
+        gauss = hit.gauss
+        l0 = hit.l0
+        id = hit.id
+        sqrt_proj = hit.sqrt_proj
 
-        @inbounds for i in eachindex(xs)
-            x_grid = xs[i]
-            p1 = p_row + x_grid * local_x
+        Threads.@threads for j in eachindex(zs)
+            z_grid = zs[j]
+            p_row = origin + z_grid * local_z
 
-            acc = Complex{G}(0.0)
-            for hit in hits
-                v = p1 - hit.p0
-                l1 = _pseudo_dot(v, hit.d0)
+            @inbounds for i in eachindex(xs)
+                x_grid = xs[i]
+                p1 = p_row + x_grid * local_x
 
-                # Transverse distance r
-                r_vec = v - l1 * hit.d0
+                v = p1 - p0
+                l1 = _pseudo_dot(v, d0)
+                r_vec = v - l1 * d0
                 r = norm(r_vec)
+                z = l0 + l1
 
-                # Distance along beam
-                z = hit.l0 + l1
-
-                acc += electric_field(hit.gauss, r, z; hint = (hit.p0 + l1 * hit.d0, hit.id)) * hit.sqrt_proj
+                field[i, j] += electric_field(gauss, r, z; hint = (p0 + l1 * d0, id)) * sqrt_proj
             end
-            field[i, j] = acc
         end
     end
     return xs, zs, field
@@ -150,42 +151,52 @@ function electric_field(
     local_x = Point3(-orientation(pd)[:, 1])
     local_z = Point3(orientation(pd)[:, 3])
     origin = position(pd)
-    # Calculate field superposition
-    Threads.@threads for j in eachindex(zs)
-        z_grid = zs[j]
-        # Hoist z-grid math out of inner loop
-        p_row = origin + z_grid * local_z
 
-        @inbounds for i in eachindex(xs)
-            x_grid = xs[i]
-            p1 = p_row + x_grid * local_x
+    # Calculate field superposition with hoisted hit invariants
+    for hit in hits
+        d0 = hit.d0
+        h1 = hit.h1
+        u1 = hit.u1
+        h2 = hit.h2
+        u2 = hit.u2
+        p0 = hit.p0
+        l0 = hit.l0
+        k0 = hit.k0
+        Δl = hit.Δl
+        n_eff = hit.n_eff
+        area_ref = hit.area_ref
+        E_ref_amp = hit.E_ref_amp
+        sqrt_proj = hit.sqrt_proj
 
-            acc = Complex{G}(0.0)
-            for hit in hits
-                v = p1 - hit.p0
-                l1 = _pseudo_dot(v, hit.d0)
-                r_vec = v - l1 * hit.d0
+        Threads.@threads for j in eachindex(zs)
+            z_grid = zs[j]
+            p_row = origin + z_grid * local_z
 
-                h1_z = hit.h1 + l1 * hit.u1
-                h2_z = hit.h2 + l1 * hit.u2
-                area_z = _pseudo_cross2d(h1_z, h2_z, hit.d0)
+            @inbounds for i in eachindex(xs)
+                x_grid = xs[i]
+                p1 = p_row + x_grid * local_x
+
+                v = p1 - p0
+                l1 = _pseudo_dot(v, d0)
+                r_vec = v - l1 * d0
+
+                h1_z = h1 + l1 * u1
+                h2_z = h2 + l1 * u2
+                area_z = _pseudo_cross2d(h1_z, h2_z, d0)
                 if abs(area_z) < 1e-25
                     area_z = Complex{G}(1e-25, 1e-25)
                 end
 
-                ξ1 = _pseudo_cross2d(h1_z, r_vec, hit.d0)
-                ξ2 = _pseudo_cross2d(h2_z, r_vec, hit.d0)
-                w = (ξ1 * _pseudo_dot(hit.u2, r_vec) -
-                     ξ2 * _pseudo_dot(hit.u1, r_vec)) / (2 * area_z)
+                ξ1 = _pseudo_cross2d(h1_z, r_vec, d0)
+                ξ2 = _pseudo_cross2d(h2_z, r_vec, d0)
+                w = (ξ1 * _pseudo_dot(u2, r_vec) - ξ2 * _pseudo_dot(u1, r_vec)) / (2 * area_z)
 
-                phase_corr = (hit.n_eff - 1) * l1
-                z_total = hit.l0 + l1
-                ψ = sqrt(hit.area_ref / area_z) *
-                    cis(hit.k0 * (z_total + w + hit.Δl + phase_corr))
+                phase_corr = (n_eff - 1) * l1
+                z_total = l0 + l1
+                ψ = sqrt(area_ref / area_z) * cis(k0 * (z_total + w + Δl + phase_corr))
 
-                acc += (hit.E_ref_amp * ψ) * hit.sqrt_proj
+                field[i, j] += (E_ref_amp * ψ) * sqrt_proj
             end
-            field[i, j] = acc
         end
     end
     return xs, zs, field

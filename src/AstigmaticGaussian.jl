@@ -721,6 +721,73 @@ function parabasal_field(
 end
 
 """
+    parabasal_field(agb, rs::AbstractArray{<:AbstractVector}, z; kwargs...)
+
+Batch version of [`parabasal_field`](@ref) evaluating the scalar electric field across an array of
+transverse offsets `rs` at longitudinal position `z`. Hoists chief-ray invariants (z-segment,
+parabasal parameters, reference area, OPL phase shift) for accelerated evaluation.
+"""
+function parabasal_field(
+        agb::AstigmaticGaussianBeamlet,
+        rs::AbstractArray{V},
+        z::Real;
+        E_ref_amp::Union{Nothing, Number} = nothing,
+        area_ref::Union{Nothing, Complex} = nothing,
+        z_norm::Real = 0.0
+) where {V <: AbstractArray}
+    p0, i = point_on_beam(agb, z)
+    chief = rays(agb.c)[i]
+    dir = direction(chief)
+
+    if area_ref === nothing || E_ref_amp === nothing
+        p0n, in_ = point_on_beam(agb, z_norm)
+        chiefn = rays(agb.c)[in_]
+        if area_ref === nothing
+            dirn = direction(chiefn)
+            h1n, _, h2n, _, _ = parabasal_ray_parameters(agb, p0n, in_)
+            area_ref = _pseudo_cross2d(h1n, h2n, dirn)
+        end
+        if E_ref_amp === nothing
+            E_vec = polarization(chiefn)
+            max_idx = argmax(abs.(E_vec))
+            E_ref_amp = Complex(norm(E_vec) * cis(angle(E_vec[max_idx])))
+        end
+    end
+
+    h1, u1, h2, u2, _ = parabasal_ray_parameters(agb, p0, i)
+    area = _pseudo_cross2d(h1, h2, dir)
+    if isnan(area) || abs(area) < 1e-25
+        area = Complex(1e-25, 1e-25)
+    end
+
+    p_parent = agb.parent
+    l_parent = isnothing(p_parent) ? 0.0 : length(p_parent)
+    opl_parent = isnothing(p_parent) ? 0.0 : optical_path_length(p_parent)
+
+    Δl = opl_parent - l_parent
+    z_sum = l_parent
+    for j in 1:(i - 1)
+        ray_j = rays(agb.c)[j]
+        Δl += optical_path_length(ray_j) - length(ray_j)
+        z_sum += length(ray_j)
+    end
+    Δl += (refractive_index(chief) - 1) * (z - z_sum)
+
+    k0 = 2π / wavelength(chief)
+    gouy_opl_factor = E_ref_amp * sqrt(area_ref / area) * exp(im * k0 * (z + Δl))
+
+    res = Array{ComplexF64}(undef, size(rs))
+    for idx in eachindex(rs)
+        r = rs[idx]
+        ξ1 = _pseudo_cross2d(h1, r, dir)
+        ξ2 = _pseudo_cross2d(h2, r, dir)
+        w = (ξ1 * _pseudo_dot(u2, r) - ξ2 * _pseudo_dot(u1, r)) / (2 * area)
+        res[idx] = gouy_opl_factor * exp(im * k0 * w)
+    end
+    return res
+end
+
+"""
     electric_field(agb, r, z)
 
 Convenience wrapper for [`parabasal_field`](@ref) using the beamlet's starting position (z=0)
@@ -728,6 +795,22 @@ as the reference normalization.
 """
 function electric_field(agb::AstigmaticGaussianBeamlet, r::AbstractArray, z::Real)
     return parabasal_field(agb, r, z; z_norm = 0.0)
+end
+
+"""
+    electric_field!(E_out, agb, rs, z)
+
+In-place batch evaluation of scalar electric field phasors into pre-allocated array `E_out`.
+"""
+function electric_field!(
+        E_out::AbstractArray,
+        agb::AstigmaticGaussianBeamlet,
+        rs::AbstractArray,
+        z::Real
+)
+    fields = parabasal_field(agb, rs, z; z_norm = 0.0)
+    copyto!(E_out, fields)
+    return E_out
 end
 
 """

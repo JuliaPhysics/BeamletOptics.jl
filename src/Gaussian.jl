@@ -407,7 +407,7 @@ This function also considers phase changes due to changes in the [`optical_path_
 !!! warning
     Note that `z` and `r` must be specified as cartesian distances. Using the optical path length for `z` can lead to false results.
 """
-function electric_field(gauss::GaussianBeamlet, r, z; hint = point_on_beam(gauss, z))
+function electric_field(gauss::GaussianBeamlet, r::Real, z::Real; hint = point_on_beam(gauss, z))
     point, index = hint
     w, R, ψ, w0 = gauss_parameters(gauss, z, hint = (point, index))
     k = wavenumber(wavelength(gauss))
@@ -418,6 +418,38 @@ function electric_field(gauss::GaussianBeamlet, r, z; hint = point_on_beam(gauss
     # Note: geometrical length changes considered in `electric_field` call below
     ref_ϕ = Δl / wavelength(gauss) * 2π
     return electric_field(r, z, E0, w0, w, k, ψ, R) * exp(im * ref_ϕ)
+end
+
+"""
+    electric_field(gauss::GaussianBeamlet, rs::AbstractArray, z::Real)
+
+Batch evaluation of electric field phasors across an array of transverse positions `rs` at distance `z`.
+"""
+function electric_field(gauss::GaussianBeamlet, rs::AbstractArray, z::Real)
+    res = Array{ComplexF64}(undef, size(rs))
+    electric_field!(res, gauss, rs, z)
+    return res
+end
+
+"""
+    electric_field!(E_out::AbstractArray, gauss::GaussianBeamlet, rs::AbstractArray, z::Real)
+
+In-place batch evaluation of electric field phasors into pre-allocated array `E_out`.
+"""
+function electric_field!(E_out::AbstractArray, gauss::GaussianBeamlet, rs::AbstractArray, z::Real)
+    hint = point_on_beam(gauss, z)
+    point, index = hint
+    w, R, ψ, w0 = gauss_parameters(gauss, z, hint = (point, index))
+    k = wavenumber(wavelength(gauss))
+    E0 = electric_field(gauss) * (beam_waist(gauss) / w0)
+    Δl = optical_path_length(gauss) - length(gauss)
+    ref_ϕ = Δl / wavelength(gauss) * 2π
+
+    for idx in eachindex(rs)
+        r = rs[idx]
+        E_out[idx] = electric_field(r, z, E0, w0, w, k, ψ, R) * exp(im * ref_ϕ)
+    end
+    return E_out
 end
 
 function optical_power(gauss::GaussianBeamlet)

@@ -71,6 +71,22 @@ const BMO = BeamletOptics
         @test ry2 ≈ expected_zr / 2.0 atol=1e-6
     end
 
+    @testset "Batch and In-place Field Evaluation" begin
+        beam = AstigmaticGaussianBeamlet([0.0, 0, 0], [0, 1, 0], λ0, w0; E0=[0,0,1], support=[0,0,1])
+        dir = normalize([0, 1, 0])
+        ex = normalize(cross(dir, [0,0,1]))
+        z_eval = 0.05
+        rs = [ex * r for r in LinRange(-2e-4, 2e-4, 11)]
+
+        E_single = [BMO.parabasal_field(beam, r, z_eval) for r in rs]
+        E_batch = BMO.parabasal_field(beam, rs, z_eval)
+        @test E_batch ≈ E_single
+
+        E_out = zeros(ComplexF64, size(rs))
+        BMO.electric_field!(E_out, beam, rs, z_eval)
+        @test E_out ≈ E_single
+    end
+
     @testset "Waist parameters with offsets" begin
         z0_x = 0.05
         z0_y = 0.10

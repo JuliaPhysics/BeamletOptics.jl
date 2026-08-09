@@ -228,8 +228,15 @@ end
 function resolve_coincident_coatings(
         int::Intersection, system::AbstractSystem, ray::AbstractRay)
     res1 = check_coincident_coating(int.coincident_object, ray)
-    res1 !== nothing && return res1
     res2 = check_coincident_coating(int.coincident_object_2, ray)
+    if res1 !== nothing && res2 !== nothing
+        obj1, coat1 = res1
+        obj2, coat2 = res2
+        if typeof(coat1) != typeof(coat2) || coat1 != coat2
+            @warn "Conflicting coatings detected at coincident boundary between $(typeof(obj1)) and $(typeof(obj2)): $(typeof(coat1)) vs $(typeof(coat2)). Using $(typeof(coat1))."
+        end
+    end
+    res1 !== nothing && return res1
     res2 !== nothing && return res2
     return nothing, Uncoated()
 end
