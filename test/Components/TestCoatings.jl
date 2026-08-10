@@ -545,5 +545,14 @@ const BMO = BeamletOptics
         solve_system!(sys, beam; retrace = false)
         @test length(rays(beam)) == 4 # Initial ray + 3 surface transitions
     end
+
+    @testset "Unified Coating Transmittance and Reflectance API" begin
+        ar = SimpleARCoating(0.01) # R=1%
+        R = coating_reflectance(ar, 0.0, 1064e-9, 1.0, 1.5)
+        T = coating_transmittance(ar, 0.0, 1064e-9, 1.0, 1.5)
+        @test R ≈ 0.01 atol=1e-6
+        @test T ≈ 0.99 atol=1e-6
+        @test R + T ≈ 1.0 atol=1e-6
+    end
 end
 

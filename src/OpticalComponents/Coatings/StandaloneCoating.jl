@@ -151,10 +151,8 @@ function interact3d(::Transmissive, system::AbstractSystem, coating::Coating{T},
         n_out = n_transmitted
         hint = _resolve_coincident_hint(system, ray, int, true)
 
-        J_r = get_jones_matrix(coating.model, angle3d(direction(ray), -normal),
-            wavelength(ray), refractive_index(ray), n_transmitted, true; from_front = from_front)
-        R_coeff = clamp(unpolarized_reflectance(J_r), 0.0, 1.0)
-        T_coeff = clamp(1.0 - R_coeff, 0.0, 1.0)
+        θi = angle3d(direction(ray), -normal)
+        T_coeff = coating_transmittance(coating.model, θi, wavelength(ray), refractive_index(ray), n_transmitted; from_front = from_front)
     end
 
     return BeamInteraction{T, R}(
@@ -174,18 +172,15 @@ function interact3d(::Transmissive, system::AbstractSystem, coating::Coating{T},
         ndir = reflection3d(direction(ray), normal)
         n_out = refractive_index(ray)
         hint = _resolve_coincident_hint(system, ray, int, false)
-
-        J = get_jones_matrix(coating.model, angle3d(direction(ray), -normal),
-            wavelength(ray), refractive_index(ray), n_transmitted, true; from_front = from_front)
+        E0 = polarization(ray)
     else
         n_out = n_transmitted
         hint = _resolve_coincident_hint(system, ray, int, true)
-
         J = get_jones_matrix(coating.model, angle3d(direction(ray), -normal),
             wavelength(ray), refractive_index(ray), n_transmitted, false; from_front = from_front)
+        E0 = _calculate_global_E0(coating, ray, ndir, J)
     end
 
-    E0 = _calculate_global_E0(coating, ray, ndir, J)
     return BeamInteraction{T, R}(
         hint, PolarizedRay{T}(npos, ndir, nothing, wavelength(ray), n_out, E0))
 end
@@ -202,9 +197,8 @@ function interact3d(::Reflective, system::AbstractSystem, coating::Coating{T},
     hint = _resolve_coincident_hint(system, ray, int, false)
 
     n_transmitted, _ = _coating_media(system, ray, int)
-    J_r = get_jones_matrix(coating.model, angle3d(direction(ray), -normal),
-        wavelength(ray), refractive_index(ray), n_transmitted, true; from_front = from_front)
-    R_coeff = clamp(unpolarized_reflectance(J_r), 0.0, 1.0)
+    θi = angle3d(direction(ray), -normal)
+    R_coeff = coating_reflectance(coating.model, θi, wavelength(ray), refractive_index(ray), n_transmitted; from_front = from_front)
 
     return BeamInteraction{T, R}(
         hint, Ray{T}(npos, ndir, nothing, wavelength(ray),
@@ -245,10 +239,9 @@ function interact3d(::Splitting, system::AbstractSystem, coating::Coating{T},
 
     pos = position(ray) + length(ray) * direction(ray)
 
-    J_r = get_jones_matrix(coating.model, angle3d(direction(ray), -normal),
-        wavelength(ray), refractive_index(ray), n_transmitted, true; from_front = from_front)
-    R_coeff = clamp(unpolarized_reflectance(J_r), 0.0, 1.0)
-    T_coeff = clamp(1.0 - R_coeff, 0.0, 1.0)
+    θi = angle3d(direction(ray), -normal)
+    R_coeff = coating_reflectance(coating.model, θi, wavelength(ray), refractive_index(ray), n_transmitted; from_front = from_front)
+    T_coeff = coating_transmittance(coating.model, θi, wavelength(ray), refractive_index(ray), n_transmitted; from_front = from_front)
 
     beam_t = Beam(Ray{T}(
         Point3{T}(pos), Point3{T}(dir_t), nothing, wavelength(ray), n_transmitted, weight(ray) *

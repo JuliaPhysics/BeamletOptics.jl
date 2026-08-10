@@ -70,6 +70,8 @@ Represents an uncoated dielectric boundary. Behaves as `Transmissive` by default
 struct Uncoated end
 coating_behavior(::Uncoated) = Transmissive()
 
+@inline get_coating_behavior(c) = coating_behavior(c)
+
 """
     SimpleARCoating(R::Float64 = 0.0)
 
@@ -192,6 +194,33 @@ Compute the average power reflectance from a Jones reflection matrix for unpolar
     absorbing coatings.
 """
 @inline unpolarized_reflectance(J) = 0.5 * (abs2(J[1, 1]) + abs2(J[1, 2]) + abs2(J[2, 1]) + abs2(J[2, 2]))
+
+"""
+    unpolarized_transmittance(J)
+
+Compute the average power transmittance from a Jones transmission matrix for unpolarized light.
+"""
+@inline unpolarized_transmittance(J) = 0.5 * (abs2(J[1, 1]) + abs2(J[1, 2]) + abs2(J[2, 1]) + abs2(J[2, 2]))
+
+"""
+    coating_reflectance(coating, θi, λ, n1, n2; from_front=true)
+
+Compute the unpolarized power reflectance R ∈ [0, 1] of a coating model at angle of incidence `θi`.
+"""
+function coating_reflectance(c, θi, λ, n1, n2; from_front::Bool = true)
+    J_r = get_jones_matrix(c, θi, λ, n1, n2, true; from_front = from_front)
+    return clamp(unpolarized_reflectance(J_r), 0.0, 1.0)
+end
+
+"""
+    coating_transmittance(coating, θi, λ, n1, n2; from_front=true)
+
+Compute the unpolarized power transmittance T ∈ [0, 1] of a coating model at angle of incidence `θi`.
+"""
+function coating_transmittance(c, θi, λ, n1, n2; from_front::Bool = true)
+    J_t = get_jones_matrix(c, θi, λ, n1, n2, false; from_front = from_front)
+    return clamp(unpolarized_transmittance(J_t), 0.0, 1.0)
+end
 
 # Shared implementation for simplified constant-reflectance coating models
 const SimpleReflectanceCoating = Union{SimpleARCoating, SimpleHRCoating}

@@ -28,7 +28,7 @@ export Mirror, SquarePlanoMirror2D, RectangularPlanoMirror, SquarePlanoMirror,
        RoundPlanoMirror, ConcaveSphericalMirror, RightAnglePrismMirror
 
 # lenses
-export Lens, DoubletLens, ThinLens, SphericalLens, SphericalDoubletLens, thickness
+export Lens, DoubletLens, ThinLens, SphericalLens, SphericalDoubletLens, AsphericalDoubletLens, thickness
 
 # surfaces
 export CircularFlatSurface, RectangularFlatSurface, SphericalSurface, EvenAsphericalSurface,
@@ -48,7 +48,8 @@ export ThinBeamsplitter, RoundThinBeamsplitter, RectangularPlateBeamsplitter,
 # coatings
 export Coating, Uncoated, SimpleARCoating, SimpleHRCoating, SimpleBeamsplitterCoating,
        JonesCoating, ThinFilmCoating, CoatedRefractive, CoatedLens, CoatedMirror, get_jones_matrix,
-       with_coatings, fresnel_coefficients, Transmissive, Reflective, Splitting, Absorptive, coating_behavior
+       with_coatings, fresnel_coefficients, CoatingBehavior, Transmissive, Reflective, Splitting, Absorptive,
+       coating_behavior, get_coating_behavior, coating_transmittance, coating_reflectance, unpolarized_transmittance
 
 # polarizing components
 export PolarizationFilter, PolarizingCubeBeamsplitter, Waveplate, HalfWavePlate, QuarterWavePlate, RectangularPlateWaveplate, RoundPlateWaveplate,

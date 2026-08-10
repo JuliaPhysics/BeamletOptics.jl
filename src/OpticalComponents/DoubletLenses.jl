@@ -83,3 +83,24 @@ function SphericalDoubletLens(r1, r2, r3, l1, l2, d, n1, n2; front_coating = not
     translate3d!(back, [0, thickness(shape(front)), 0])
     return DoubletLens(front, back; front_coating = front_coating, back_coating = back_coating)
 end
+
+"""
+    AsphericalDoubletLens(r1, r2, r3, l1, l2, d, n1, n2; k1=0, k2=0, k3=0, front_coating=nothing, back_coating=nothing)
+
+Generates a two-component "cemented" doublet lens consisting of two aspherical lens elements with conic constants `k1`, `k2`, and `k3`.
+"""
+function AsphericalDoubletLens(
+        r1, r2, r3, l1, l2, d, n1, n2;
+        k1 = 0, k2 = 0, k3 = 0,
+        front_coating = nothing, back_coating = nothing
+)
+    s1 = EvenAsphericalSurface(r1, d, k1, Float64[0.0])
+    s2 = EvenAsphericalSurface(r2, d, k2, Float64[0.0])
+    s3 = EvenAsphericalSurface(r3, d, k3, Float64[0.0])
+    n1_func = (n1 isa Real) ? (λ -> n1) : test_refractive_index_function(n1)
+    n2_func = (n2 isa Real) ? (λ -> n2) : test_refractive_index_function(n2)
+    front = Lens(s1, s2, l1, n1_func)
+    back = Lens(s2, s3, l2, n2_func)
+    translate3d!(back, [0, thickness(shape(front)), 0])
+    return DoubletLens(front, back; front_coating = front_coating, back_coating = back_coating)
+end

@@ -24,12 +24,8 @@ function interact_refractive_boundary(
         T_coeff = 1.0
     else
         n_out = n_transmitted
-        J_r = get_jones_matrix(coating_model, angle3d(direction(ray), -normal), λ, n_incident, n_transmitted, true; from_front=from_front)
-        R_coeff = clamp(unpolarized_reflectance(J_r), 0.0, 1.0)
-        # Warning: Computing T = 1 - R assumes zero absorption (lossless coating).
-        # This is physically incorrect for metallic/absorbing coatings where T + R < 1.
-        # Plain Ray types will overestimate transmission; PolarizedRay should be used instead.
-        T_coeff = clamp(1.0 - R_coeff, 0.0, 1.0)
+        θi = angle3d(direction(ray), -normal)
+        T_coeff = coating_transmittance(coating_model, θi, λ, n_incident, n_transmitted; from_front=from_front)
     end
     return BeamInteraction{T, R}(hint, Ray{T}(npos, ndir, nothing, λ, n_out, weight(ray) * T_coeff))
 end
@@ -52,8 +48,8 @@ function interact_refractive_boundary(
     npos = position(ray) + length(ray) * direction(ray)
     n_out = n_incident
     hint_out = isentering(ray) ? nothing : Hint(substrate_obj)
-    J_r = get_jones_matrix(coating_model, angle3d(direction(ray), -normal), λ, n_incident, n_transmitted, true; from_front=from_front)
-    R_coeff = clamp(unpolarized_reflectance(J_r), 0.0, 1.0)
+    θi = angle3d(direction(ray), -normal)
+    R_coeff = coating_reflectance(coating_model, θi, λ, n_incident, n_transmitted; from_front=from_front)
     return BeamInteraction{T, R}(hint_out, Ray{T}(npos, ndir, nothing, λ, n_out, weight(ray) * R_coeff))
 end
 
@@ -80,12 +76,9 @@ function interact_refractive_boundary(
     ndir_r = reflection3d(direction(ray), normal)
     npos = position(ray) + length(ray) * direction(ray)
 
-    J_r = get_jones_matrix(coating_model, angle3d(direction(ray), -normal), λ, n_incident, n_transmitted, true; from_front=from_front)
-    R_coeff = clamp(unpolarized_reflectance(J_r), 0.0, 1.0)
-    # Warning: Computing T = 1 - R assumes zero absorption (lossless coating).
-    # This is physically incorrect for metallic/absorbing coatings where T + R < 1.
-    # Plain Ray types will overestimate transmission; PolarizedRay should be used instead.
-    T_coeff = clamp(1.0 - R_coeff, 0.0, 1.0)
+    θi = angle3d(direction(ray), -normal)
+    R_coeff = coating_reflectance(coating_model, θi, λ, n_incident, n_transmitted; from_front=from_front)
+    T_coeff = coating_transmittance(coating_model, θi, λ, n_incident, n_transmitted; from_front=from_front)
 
     beam_t = Beam(Ray{T}(npos, ndir_t, nothing, λ, n_transmitted, weight(ray) * T_coeff))
     beam_r = Beam(Ray{T}(npos, ndir_r, nothing, λ, n_incident, weight(ray) * R_coeff))

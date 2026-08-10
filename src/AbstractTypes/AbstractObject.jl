@@ -109,3 +109,10 @@ is_refractive(::AbstractObject) = false
 Fallback implementation checking if an object is a zero-thickness boundary interface (like thin beamsplitter coatings or thin film coatings). Returns `false`.
 """
 is_thin_interface(::AbstractObject) = false
+
+"""
+    refractive_index(object::AbstractObject) -> Real
+
+Default fallback returning the refractive index of `object` at the default wavelength ([`get_default_wavelength`](@ref)).
+"""
+refractive_index(object::AbstractObject) = refractive_index(object, get_default_wavelength())
