@@ -62,12 +62,28 @@ Falls back to `coating_behavior(coating)` for static behaviors.
 """
 coating_behavior(c, ray) = coating_behavior(c)
 
+# Surface and Coating models, traits, and structs
+
+"""
+    AbstractSurfaceModel
+
+Base abstract type for all optical surface physics models (coatings, diffusers, diffractive surfaces, absorbing apertures, etc.).
+"""
+abstract type AbstractSurfaceModel end
+
+"""
+    AbstractCoatingModel <: AbstractSurfaceModel
+
+Base abstract type for thin-film, Jones, and dielectric coating models.
+"""
+abstract type AbstractCoatingModel <: AbstractSurfaceModel end
+
 """
     Uncoated
 
 Represents an uncoated dielectric boundary. Behaves as `Transmissive` by default.
 """
-struct Uncoated end
+struct Uncoated <: AbstractCoatingModel end
 coating_behavior(::Uncoated) = Transmissive()
 
 @inline get_coating_behavior(c) = coating_behavior(c)
@@ -82,7 +98,7 @@ Behaves as `Transmissive`.
     This model returns constant coefficients regardless of angle of incidence, wavelength,
     or refractive index ratio. For angle-dependent AR behavior, use [`ThinFilmCoating`](@ref).
 """
-struct SimpleARCoating
+struct SimpleARCoating <: AbstractCoatingModel
     R::Float64
 end
 SimpleARCoating() = SimpleARCoating(0.0)
@@ -98,7 +114,7 @@ Behaves as `Reflective`.
     This model returns constant coefficients regardless of angle of incidence, wavelength,
     or refractive index ratio. For angle-dependent HR behavior, use [`ThinFilmCoating`](@ref).
 """
-struct SimpleHRCoating
+struct SimpleHRCoating <: AbstractCoatingModel
     R::Float64
 end
 SimpleHRCoating() = SimpleHRCoating(1.0)
@@ -116,7 +132,7 @@ Behaves as `Splitting`.
     scales the resulting Jones matrix by the boundary impedance factor to ensure that ray intensity
     strictly maps to optical power.
 """
-struct SimpleBeamsplitterCoating
+struct SimpleBeamsplitterCoating <: AbstractCoatingModel
     rs::ComplexF64
     rp::ComplexF64
     ts::ComplexF64
@@ -130,7 +146,7 @@ coating_behavior(::SimpleBeamsplitterCoating) = Splitting()
 A fully generalized coating defined by its transmitted and reflected Jones matrices.
 The Jones matrices can be constants (e.g. `SPBasis`) or functions taking wavelength `λ` and returning a `JonesMatrix`.
 """
-struct JonesCoating{JT, JR}
+struct JonesCoating{JT, JR} <: AbstractCoatingModel
     jones_trans::JT
     jones_refl::JR
     behavior::CoatingBehavior
@@ -152,7 +168,7 @@ Calculates exact complex Fresnel coefficients using the characteristic transfer 
     that yields the standard Fresnel coefficients for the surrounding media. This is useful
     for modeling splitting at an uncoated index boundary.
 """
-struct ThinFilmCoating{N <: Tuple, D <: Tuple, B <: CoatingBehavior}
+struct ThinFilmCoating{N <: Tuple, D <: Tuple, B <: CoatingBehavior} <: AbstractCoatingModel
     ns::N
     ds::D
     behavior::B

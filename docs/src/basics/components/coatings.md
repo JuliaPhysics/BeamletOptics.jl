@@ -114,3 +114,31 @@ If you want to represent a thin, free-floating coated interface (such as a flat 
 ```@docs; canonical=false
 BeamletOptics.Coating
 ```
+
+---
+
+## Supporting Coatings in Custom Components
+
+If you are developing a custom optical component type `MyOptic <: AbstractObject` and want it to natively support coatings via `with_coatings`, follow these steps:
+
+1. **Include a `coatings` field in your struct**:
+   Parametrize the struct with `coatings::C` (defaulting to `()`), where `C <: Tuple`.
+   ```julia
+   struct MyOptic{T, S, C <: Tuple} <: AbstractRefractiveOptic{T}
+       shape::S
+       coatings::C
+   end
+   ```
+
+2. **Implement `_attach_coatings`**:
+   Define `_attach_coatings` for your component type to construct a new instance with the updated coating tuple:
+   ```julia
+   function BeamletOptics._attach_coatings(optic::MyOptic, new_coatings::Tuple)
+       return MyOptic(optic.shape, new_coatings)
+   end
+   ```
+   Once `_attach_coatings` is defined, `with_coatings(optic, ...)` and `coatings(optic)` work automatically out-of-the-box!
+
+3. **Ray Interaction Dispatch**:
+   If your component inherits from `AbstractRefractiveOptic` or `AbstractReflectiveOptic`, the core ray-tracing engine automatically resolves active coatings via `resolve_coated_boundary` during ray-tracing without requiring any custom `interact3d` code.
+

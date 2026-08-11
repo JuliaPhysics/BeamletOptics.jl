@@ -36,6 +36,33 @@ function face_id(shape::AbstractShape, local_n::AbstractVector)
     end
 end
 
+# Specialization for BoxSDF
+function face_id(shape::BoxSDF, local_n::AbstractVector)
+    ny = local_n[2]
+    nx = local_n[1]
+    nz = local_n[3]
+    d_front = ny
+    d_back = -ny
+    d_right = nx
+    d_left = -nx
+    d_top = nz
+    d_bottom = -nz
+    best_face = argmax((d_front, d_back, d_right, d_left, d_top, d_bottom))
+    return (:front, :back, :right, :left, :top, :bottom)[best_face]
+end
+
+# Specialization for CylinderSDF
+function face_id(shape::CylinderSDF, local_n::AbstractVector)
+    ny = local_n[2]
+    if ny > 0.5
+        return :top
+    elseif ny < -0.5
+        return :bottom
+    else
+        return :side
+    end
+end
+
 # Specialization for RightAnglePrismSDF
 function face_id(shape::RightAnglePrismSDF, local_n::AbstractVector)
     # Face normals:

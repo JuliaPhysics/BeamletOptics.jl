@@ -8,6 +8,10 @@ function eval_filter(face::Symbol, shape::AbstractShape, local_p, local_n)
     if face === :either || face === :all
         return true
     end
+    tag = surface_tag(shape, local_p, local_n)
+    if tag !== :unknown
+        return tag === face
+    end
     return face_id(shape, local_n) === face
 end
 

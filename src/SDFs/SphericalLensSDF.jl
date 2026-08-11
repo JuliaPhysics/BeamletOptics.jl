@@ -93,6 +93,16 @@ function sdf(sphere::SphereSDF, point)
     return norm(p) - sphere.radius
 end
 
+function normal3d(sphere::SphereSDF, point)
+    p = _world_to_sdf(sphere, point)
+    return normalize(p)
+end
+
+function surface_tag(sphere::SphereSDF, point, normal)
+    p = _world_to_sdf(sphere, point)
+    return p[2] >= 0 ? :front : :back
+end
+
 function bounding_sphere(s::SphereSDF{T}) where {T}
     return (Point3{T}(0), s.radius)
 end
@@ -466,6 +476,21 @@ function _sdf(s::SphericalSurface, ::BackwardOrientation)
     zrotate3d!(back, π)
 
     return back
+end
+
+function surface_tag(lens::AbstractLensSDF, point, normal)
+    p = _world_to_sdf(lens, point)
+    half_d = diameter(lens) / 2
+    r_xy = sqrt(p[1]^2 + p[3]^2)
+    if r_xy >= half_d - 1e-4
+        return :side
+    end
+    t = thickness(lens)
+    if p[2] < t / 2
+        return :front
+    else
+        return :back
+    end
 end
 
 function sdf(s::SphericalSurface, ::ForwardLeftMeniscusOrientation)

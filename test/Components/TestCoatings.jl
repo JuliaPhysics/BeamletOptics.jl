@@ -595,6 +595,39 @@ const BMO = BeamletOptics
         @test T ≈ 0.99 atol=1e-6
         @test R + T ≈ 1.0 atol=1e-6
     end
+
+    @testset "Analytic Normals and Surface Tags" begin
+        box = BMO.BoxSDF(10e-3, 20e-3, 30e-3)
+        p_front = BMO.Point3(0.0, 10e-3, 0.0)
+        n_analytic = BMO.normal3d(box, p_front)
+        n_fd = BMO.normal_fd(box, p_front)
+        @test n_analytic ≈ n_fd atol=1e-4
+        @test BMO.surface_tag(box, p_front, n_analytic) === :front
+
+        cyl = BMO.CylinderSDF(5e-3, 10e-3)
+        p_top = BMO.Point3(0.0, 5e-3, 0.0)
+        n_top = BMO.normal3d(cyl, p_top)
+        @test n_top ≈ [0.0, 1.0, 0.0] atol=1e-4
+        @test BMO.surface_tag(cyl, p_top, n_top) === :top
+
+        p_side = BMO.Point3(5e-3, 0.0, 0.0)
+        n_side = BMO.normal3d(cyl, p_side)
+        @test n_side ≈ [1.0, 0.0, 0.0] atol=1e-4
+        @test BMO.surface_tag(cyl, p_side, n_side) === :side
+
+        sph = BMO.SphereSDF(10e-3)
+        p_sph = BMO.Point3(0.0, 10e-3, 0.0)
+        n_sph = BMO.normal3d(sph, p_sph)
+        @test n_sph ≈ [0.0, 1.0, 0.0] atol=1e-4
+        @test BMO.surface_tag(sph, p_sph, n_sph) === :front
+    end
+
+    @testset "AbstractSurfaceModel Hierarchy" begin
+        @test SimpleARCoating() isa AbstractCoatingModel
+        @test SimpleARCoating() isa AbstractSurfaceModel
+        @test Uncoated() isa AbstractSurfaceModel
+        @test ThinFilmCoating([], []) isa AbstractSurfaceModel
+    end
 end
 
 
