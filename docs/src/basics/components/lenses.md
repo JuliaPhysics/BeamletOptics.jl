@@ -32,7 +32,7 @@ In practice, a great variety and mixture of different lens shapes exists -- e.g.
     Refer to the specific documentation or enter e.g. `? Lens` into the REPL to learn more about the constructors and their interfaces, as well as sign definitions and so on.
 
 !!! tip "Coated Lenses"
-    To model lenses with customized reflective or anti-reflective boundaries (such as AR coatings on the front/back faces), refer to the [Coatings](@ref) section. You can construct a coated lens using the fluent API `lens |> with_coatings(front = SimpleARCoating(0.01))` or via `CoatedRefractive` / `CoatedLens`.
+    To model lenses with customized reflective or anti-reflective boundaries (such as AR coatings on the front/back faces), refer to the [Coatings](@ref) section. You can construct a coated lens using the `with_coatings` API (e.g. `lens |> with_coatings(front = SimpleARCoating(0.01))`).
 
 ### Surface based lens construction
 

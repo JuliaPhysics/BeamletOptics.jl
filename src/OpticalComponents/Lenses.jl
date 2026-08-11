@@ -50,10 +50,11 @@ function interact3d(system::AbstractSystem,
         beam::Beam{T, R},
         ray::R) where {T <: Real, R <: AbstractRay{T}}
     coated_obj, coating = resolve_coated_boundary(system, optic, ray)
-    if coated_obj !== nothing
-        return interact3d(system, coated_obj, beam, ray)
+    target_obj = isnothing(coated_obj) ? optic : coated_obj
+    if coating_behavior(coating, ray) isa Absorptive
+        return nothing
     end
-    return interact_refractive_boundary(system, optic, Uncoated(), beam, ray)
+    return interact_refractive_boundary(system, target_obj, coating, beam, ray)
 end
 
 """
@@ -74,13 +75,14 @@ Refer to the [`Lens`](@ref) and [`SphericalLens`](@ref) constructors for more in
     and must be provided by the user. For testing purposes, an anonymous function, e.g. λ -> 1.5
     can be passed such that the lens has the same refractive index for all wavelengths.
 """
-struct Lens{T, S <: AbstractShape{T}, N <: RefractiveIndex} <: AbstractRefractiveOptic{T, N}
+struct Lens{T, S <: AbstractShape{T}, N <: RefractiveIndex, C <: Tuple} <: AbstractRefractiveOptic{T, N}
     shape::S
     n::N
+    coatings::C
     function Lens(
-            shape::S, n::N) where {T <: Real, S <: AbstractShape{T}, N <: RefractiveIndex}
+            shape::S, n::N, coatings::C = ()) where {T <: Real, S <: AbstractShape{T}, N <: RefractiveIndex, C <: Tuple}
         test_refractive_index_function(n)
-        return new{T, S, N}(shape, n)
+        return new{T, S, N, C}(shape, n, coatings)
     end
 end
 

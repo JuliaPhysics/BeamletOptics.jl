@@ -1,4 +1,7 @@
-# Coated unified components (CoatedLens, CoatedMirror) and fluent API pipeline helpers
+# Coated unified components and fluent API pipeline helpers using pure composition
+
+# Generic getter for coatings property on any AbstractObject
+coatings(obj::AbstractObject) = hasproperty(obj, :coatings) ? getproperty(obj, :coatings) : ()
 
 # Matching Helpers for Coated Components
 function eval_filter(face::Symbol, shape::AbstractShape, local_p, local_n)
@@ -74,33 +77,6 @@ function is_flat_shape(mesh::Mesh)
     return true
 end
 
-# Composite Groups / Unified wrappers
-"""
-    CoatedRefractive{T, L, C} <: AbstractRefractiveOptic{T, RefractiveIndex}
-
-Wrapper type that attaches a tuple of coating models to an `AbstractRefractiveOptic`.
-"""
-struct CoatedRefractive{T, L <: AbstractRefractiveOptic{T}, C} <:
-       AbstractRefractiveOptic{T, RefractiveIndex}
-    optic::L
-    coatings::C
-end
-
-"""
-    CoatedMirror{T, M, C} <: AbstractReflectiveOptic{T}
-
-Wrapper type that attaches a tuple of coating models to an `AbstractReflectiveOptic`.
-"""
-struct CoatedMirror{T, M <: AbstractReflectiveOptic{T}, C} <: AbstractReflectiveOptic{T}
-    optic::M
-    coatings::C
-end
-
-const CoatedComponent = Union{CoatedRefractive, CoatedMirror}
-const CoatedLens = CoatedRefractive
-
-_base_optic(cl::CoatedComponent) = cl.optic
-
 # Dispatch helpers for extracting coating models
 _coating_model(c::AbstractCoating) = c.model
 _coating_model(c) = c
@@ -130,108 +106,60 @@ function _build_coatings_tuple(parent_shape::AbstractShape, front, back)
     end
 end
 
-function CoatedRefractive(
-        optic::AbstractRefractiveOptic; front = nothing, back = nothing)
-    coatings = _build_coatings_tuple(shape(optic), front, back)
-    return CoatedRefractive(optic, coatings)
-end
-
-function CoatedMirror(
-        mirror::AbstractReflectiveOptic; front = nothing, back = nothing)
-    coatings = _build_coatings_tuple(shape(mirror), front, back)
-    return CoatedMirror(mirror, coatings)
-end
-
-function Base.getproperty(cr::CoatedRefractive, sym::Symbol)
-    if sym === :lens
-        return getfield(cr, :optic)
-    else
-        return getfield(cr, sym)
-    end
-end
-
-function Base.getproperty(cm::CoatedMirror, sym::Symbol)
-    if sym === :mirror
-        return getfield(cm, :optic)
-    else
-        return getfield(cm, sym)
-    end
-end
-
-# Unified forwarding methods
-shape_trait_of(::CoatedComponent) = SingleShape()
-shape(cl::CoatedComponent) = shape(cl.optic)
-
-Base.position(cl::CoatedComponent) = position(cl.optic)
-position!(cl::CoatedComponent, pos) = position!(cl.optic, pos)
-orientation(cl::CoatedComponent) = orientation(cl.optic)
-orientation!(cl::CoatedComponent, dir) = orientation!(cl.optic, dir)
-translate3d!(cl::CoatedComponent, offset) = translate3d!(cl.optic, offset)
-translate_to3d!(cl::CoatedComponent, target) = translate_to3d!(cl.optic, target)
-rotate3d!(cl::CoatedComponent, axis, θ) = rotate3d!(cl.optic, axis, θ)
-
-# CoatedRefractive specific forwards
-refractive_index(cl::CoatedRefractive) = refractive_index(cl.optic)
-refractive_index(cl::CoatedRefractive, λ::Real) = refractive_index(cl.optic, λ)
-is_refractive(::CoatedRefractive) = true
-is_refractive(::CoatedMirror) = false
-thickness(cl::CoatedRefractive) = thickness(cl.optic)
-
-# Active constituent SDF helper for CSG / composite shapes
+# Active constituent SDF helper for CSG / composite shapes (allocation-free)
 active_constituent_sdf(s::AbstractShape, p_hit) = s
 
 function active_constituent_sdf(s::UnionSDF, p_hit)
-    idx = argmin(map(_sdf -> abs(sdf(_sdf, p_hit)), s.sdfs))
-    return active_constituent_sdf(s.sdfs[idx], p_hit)
+    min_d = typemax(Float64)
+    best_idx = 1
+    for i in 1:length(s.sdfs)
+        d = abs(sdf(s.sdfs[i], p_hit))
+        if d < min_d
+            min_d = d
+            best_idx = i
+        end
+    end
+    return active_constituent_sdf(s.sdfs[best_idx], p_hit)
 end
 
 # Get matching coating for a hit
-function get_coating_model_at_hit(coated::CoatedComponent, ray::AbstractRay)
+function get_coating_model_at_hit(obj::AbstractObject, ray::AbstractRay)
+    obj_coatings = coatings(obj)
     int = intersection(ray)
     isnothing(int) && return Uncoated()
     p_hit = position(ray) + length(ray) * direction(ray)
 
-    parent_shape = shape(coated)
+    parent_shape = shape(obj)
     local_p = world_to_local(parent_shape, p_hit)
     n_world = normal3d(int)
-    if object(int) !== coated && object(int) !== coated.optic
+    if object(int) !== obj
         n_world = -n_world
     end
     local_n = transposed_orientation(parent_shape) * n_world
 
-    hit_sub_sdf = active_constituent_sdf(parent_shape, p_hit)
-    coatings = hasproperty(hit_sub_sdf, :coatings) ? getproperty(hit_sub_sdf, :coatings) : coated.coatings
-    return get_matching_coating(coatings, parent_shape, local_p, local_n)
+    hit_sub_sdf = isnothing(int.shape) ? active_constituent_sdf(parent_shape, p_hit) : int.shape
+    coat_list = hasproperty(hit_sub_sdf, :coatings) ? getproperty(hit_sub_sdf, :coatings) : obj_coatings
+    return get_matching_coating(coat_list, parent_shape, local_p, local_n)
 end
 
 function get_coating_model_at_hit(
-        coated::CoatedComponent, gauss::GaussianBeamlet, ray_id::Int)
-    return get_coating_model_at_hit(coated, gauss.chief.rays[ray_id])
+        obj::AbstractObject, gauss::GaussianBeamlet, ray_id::Int)
+    return get_coating_model_at_hit(obj, gauss.chief.rays[ray_id])
 end
 
 function get_coating_model_at_hit(
-        coated::CoatedComponent, agb::AstigmaticGaussianBeamlet, ray_id::Int)
-    return get_coating_model_at_hit(coated, agb.c.rays[ray_id])
+        obj::AbstractObject, agb::AstigmaticGaussianBeamlet, ray_id::Int)
+    return get_coating_model_at_hit(obj, agb.c.rays[ray_id])
 end
 
 # Coincident boundary resolution dispatch helpers
 function resolve_coated_boundary(
         system::AbstractSystem, obj::AbstractObject, ray::AbstractRay)
-    resolve_coated_boundary_dispatch(obj, system, ray)
-end
-
-function resolve_coated_boundary_dispatch(
-        obj::CoatedComponent, system::AbstractSystem, ray::AbstractRay)
     coating = get_coating_model_at_hit(obj, ray)
     if !(coating isa Uncoated)
         return obj, coating
     end
     return resolve_coincident_coatings(intersection(ray), system, ray)
-end
-
-function resolve_coated_boundary_dispatch(
-        ::AbstractObject, system::AbstractSystem, ray::AbstractRay)
-    resolve_coincident_coatings(intersection(ray), system, ray)
 end
 
 function resolve_coincident_coatings(::Nothing, system::AbstractSystem, ray::AbstractRay)
@@ -255,37 +183,13 @@ function resolve_coincident_coatings(
 end
 
 check_coincident_coating(::Nothing, ray::AbstractRay) = nothing
-check_coincident_coating(::AbstractObject, ray::AbstractRay) = nothing
 
-function check_coincident_coating(obj::CoatedComponent, ray::AbstractRay)
+function check_coincident_coating(obj::AbstractObject, ray::AbstractRay)
     coating = get_coating_model_at_hit(obj, ray)
     if !(coating isa Uncoated)
         return (obj, coating)
     end
     return nothing
-end
-
-# interact3d definitions for CoatedComponent single-ray propagation
-function interact3d(system::AbstractSystem,
-        cl::CoatedRefractive,
-        beam::Beam{T, R},
-        ray::R) where {T <: Real, R <: AbstractRay{T}}
-    coating_model = get_coating_model_at_hit(cl, ray)
-    if coating_behavior(coating_model, ray) isa Absorptive
-        return nothing
-    end
-    return interact_refractive_boundary(system, cl.optic, coating_model, beam, ray)
-end
-
-function interact3d(system::AbstractSystem,
-        cm::CoatedMirror,
-        beam::Beam{T, R},
-        ray::R) where {T <: Real, R <: AbstractRay{T}}
-    coating_model = get_coating_model_at_hit(cm, ray)
-    if coating_behavior(coating_model, ray) isa Absorptive
-        return nothing
-    end
-    return interact_reflective_boundary(system, cm.optic, coating_model, beam, ray)
 end
 
 @inline function _interact3d_component_beams(system::AbstractSystem, target::AbstractObject, beamlet, ray_id::Int)
@@ -300,59 +204,42 @@ end
     return any(isnothing, ints) ? nothing : ints
 end
 
-# interact3d definitions for CoatedComponent beamlet propagation using trait dispatch
-function interact3d(
-        system::AbstractSystem, cl::CoatedComponent, gauss::GaussianBeamlet, ray_id::Int)
-    coating_model = get_coating_model_at_hit(cl, gauss, ray_id)
-    chief_ray = rays(gauss.chief)[ray_id]
-    return interact3d_behavior(coating_behavior(coating_model, chief_ray),
-        system, cl, coating_model, gauss, ray_id)
-end
-
-function interact3d_behavior(::Splitting, system::AbstractSystem, cl::CoatedComponent,
+# interact3d definitions for beamlet propagation using trait dispatch
+function interact3d_behavior(::Splitting, system::AbstractSystem, obj::AbstractObject,
         coating_model, gauss::GaussianBeamlet, ray_id::Int)
-    return interact_splitting_boundary(system, cl, coating_model, gauss, ray_id)
+    return interact_splitting_boundary(system, obj, coating_model, gauss, ray_id)
 end
 
 function interact3d_behavior(
-        ::CoatingBehavior, system::AbstractSystem, cl::CoatedComponent,
+        ::CoatingBehavior, system::AbstractSystem, obj::AbstractObject,
         coating_model, gauss::GaussianBeamlet, ray_id::Int)
-    ints = _interact3d_component_beams(system, cl, gauss, ray_id)
+    ints = _interact3d_component_beams(system, obj, gauss, ray_id)
     isnothing(ints) && return nothing
     T = eltype(position(gauss.chief.rays[ray_id]))
     return GaussianBeamletInteraction{T}(ints...)
 end
 
-function interact3d(
-        system::AbstractSystem, cl::CoatedComponent, agb::AstigmaticGaussianBeamlet, ray_id::Int)
-    coating_model = get_coating_model_at_hit(cl, agb, ray_id)
-    chief_ray = rays(agb.c)[ray_id]
-    return interact3d_behavior(
-        coating_behavior(coating_model, chief_ray), system, cl, coating_model, agb, ray_id)
-end
-
-function interact3d_behavior(::Splitting, system::AbstractSystem, cl::CoatedComponent,
+function interact3d_behavior(::Splitting, system::AbstractSystem, obj::AbstractObject,
         coating_model, agb::AstigmaticGaussianBeamlet, ray_id::Int)
-    return interact_splitting_boundary(system, cl, coating_model, agb, ray_id)
+    return interact_splitting_boundary(system, obj, coating_model, agb, ray_id)
 end
 
 function interact3d_behavior(
-        ::CoatingBehavior, system::AbstractSystem, cl::CoatedComponent,
+        ::CoatingBehavior, system::AbstractSystem, obj::AbstractObject,
         coating_model, agb::AstigmaticGaussianBeamlet, ray_id::Int)
-    ints = _interact3d_component_beams(system, cl, agb, ray_id)
+    ints = _interact3d_component_beams(system, obj, agb, ray_id)
     isnothing(ints) && return nothing
     T = eltype(position(agb.c.rays[ray_id]))
     return AstigmaticGaussianBeamletInteraction{T}(ints...)
 end
 
-function interact3d_reflective(system::AbstractSystem, cl::CoatedRefractive,
+function interact3d_reflective(system::AbstractSystem, obj::AbstractRefractiveOptic,
         coating_model, beam::AbstractBeam, ray::AbstractRay)
     int = intersection(ray)
     λ = wavelength(ray)
-    n_substrate = refractive_index(cl.optic, λ)
+    n_substrate = refractive_index(obj, λ)
 
-    obj = object(int)
-    is_substrate = (_base_optic(obj) === cl.optic)
+    is_substrate = (_base_optic(object(int)) === obj)
 
     normal = normal3d(int)
     if !is_substrate
@@ -365,10 +252,10 @@ function interact3d_reflective(system::AbstractSystem, cl::CoatedRefractive,
     if entering_substrate
         n_incident = refractive_index(ray)
         n_transmitted = n_substrate
-        hint = Hint(cl.optic)
+        hint = Hint(obj)
     else
         n_incident = n_substrate
-        coin_obj = is_substrate ? int.coincident_object : obj
+        coin_obj = is_substrate ? int.coincident_object : object(int)
         if !isnothing(coin_obj) && is_refractive(coin_obj)
             n_transmitted = refractive_index(coin_obj, λ)
             hint = Hint(coin_obj)
@@ -379,25 +266,24 @@ function interact3d_reflective(system::AbstractSystem, cl::CoatedRefractive,
         normal = -normal
     end
     return interact_refractive_boundary(
-        Reflective(), system, cl.optic, coating_model, beam, ray,
+        Reflective(), system, obj, coating_model, beam, ray,
         n_incident, n_transmitted, hint, normal, λ, from_front)
 end
 
-function interact3d_reflective(system::AbstractSystem, cl::CoatedMirror,
+function interact3d_reflective(system::AbstractSystem, obj::AbstractReflectiveOptic,
         coating_model, beam::AbstractBeam, ray::AbstractRay)
-    return interact_reflective_boundary(system, cl.optic, coating_model, beam, ray)
+    return interact_reflective_boundary(system, obj, coating_model, beam, ray)
 end
 
 @inline function _resolve_coated_splitting_context(
-        system::AbstractSystem, coated::CoatedComponent, c_ray::AbstractRay)
+        system::AbstractSystem, obj::AbstractObject, c_ray::AbstractRay)
     int = intersection(c_ray)
     λ = wavelength(c_ray)
-    substrate_obj = coated.optic
-    n_substrate = refractive_index(substrate_obj, λ)
+    n_substrate = is_refractive(obj) ? refractive_index(obj, λ) : refractive_index(system, λ)
 
-    is_coated_obj = (_base_optic(object(int)) === coated.optic)
+    is_target_obj = (_base_optic(object(int)) === obj)
     normal_coated = normal3d(int)
-    if !is_coated_obj
+    if !is_target_obj
         normal_coated = -normal_coated
     end
 
@@ -409,7 +295,7 @@ end
         normal = normal_coated
     else
         n_incident = n_substrate
-        other_obj = is_coated_obj ? int.coincident_object : object(int)
+        other_obj = is_target_obj ? int.coincident_object : object(int)
         if !isnothing(other_obj) && is_refractive(other_obj)
             n_transmitted = refractive_index(other_obj, λ)
         else
@@ -424,18 +310,18 @@ end
 
 function interact_splitting_boundary(
         system::AbstractSystem,
-        coated::CoatedComponent,
+        obj::AbstractObject,
         coating_model,
         gauss::GaussianBeamlet,
         ray_id::Int
 )
     c_ray = rays(gauss.chief)[ray_id]
     n_incident, n_transmitted, normal, from_front =
-        _resolve_coated_splitting_context(system, coated, c_ray)
+        _resolve_coated_splitting_context(system, obj, c_ray)
 
     return _propagate_splitting_gaussian_beamlet(
         system,
-        coated,
+        obj,
         coating_model,
         gauss,
         ray_id,
@@ -444,7 +330,7 @@ function interact_splitting_boundary(
         normal,
         from_front,
         () -> begin
-            ints = _interact3d_reflective_component_beams(system, coated, coating_model, gauss, ray_id)
+            ints = _interact3d_reflective_component_beams(system, obj, coating_model, gauss, ray_id)
             isnothing(ints) && return nothing
             T_type = eltype(position(c_ray))
             return GaussianBeamletInteraction{T_type}(ints...)
@@ -454,7 +340,7 @@ end
 
 function interact_splitting_boundary(
         system::AbstractSystem,
-        coated::CoatedComponent,
+        obj::AbstractObject,
         coating_model,
         agb::AstigmaticGaussianBeamlet,
         ray_id::Int
@@ -467,11 +353,11 @@ function interact_splitting_boundary(
 
     c_ray = rays(agb.c)[ray_id]
     n_incident, n_transmitted, normal, from_front =
-        _resolve_coated_splitting_context(system, coated, c_ray)
+        _resolve_coated_splitting_context(system, obj, c_ray)
 
     return _propagate_splitting_astigmatic_beamlet(
         system,
-        coated,
+        obj,
         coating_model,
         agb,
         ray_id,
@@ -480,7 +366,7 @@ function interact_splitting_boundary(
         normal,
         from_front,
         () -> begin
-            ints = _interact3d_reflective_component_beams(system, coated, coating_model, agb, ray_id)
+            ints = _interact3d_reflective_component_beams(system, obj, coating_model, agb, ray_id)
             isnothing(ints) && return nothing
             T_type = eltype(position(c_ray))
             return AstigmaticGaussianBeamletInteraction{T_type}(ints...)
@@ -495,8 +381,8 @@ end
     with_coatings(optic, coatings::Pair...)
     with_coatings(optic; front=nothing, back=nothing)
 
-Fluent API helper to attach coatings to an optical component.
-Returns a `CoatedRefractive` or `CoatedMirror` depending on the type of `optic`.
+Fluent API helper to attach coatings to an optical component natively.
+Returns a new instance of the same optic type with coatings attached.
 
 # Examples
 ```julia
@@ -509,31 +395,20 @@ function with_coatings(coatings::Pair...)
     obj -> with_coatings(obj, coatings...)
 end
 
-function with_coatings(lens::AbstractRefractiveOptic, coatings::Pair...)
+function with_coatings(obj::AbstractObject, coatings::Pair...)
     mapped = map(c -> (c.first => _coating_model(c.second)), coatings)
-    return CoatedRefractive(lens, mapped)
+    return _attach_coatings(obj, mapped)
 end
 
-function with_coatings(mirror::AbstractReflectiveOptic, coatings::Pair...)
-    mapped = map(c -> (c.first => _coating_model(c.second)), coatings)
-    return CoatedMirror(mirror, mapped)
-end
-
-# Keyword variants
 function with_coatings(; front = nothing, back = nothing)
     obj -> with_coatings(obj; front = front, back = back)
 end
-function with_coatings(lens::AbstractRefractiveOptic; front = nothing, back = nothing)
-    CoatedRefractive(lens; front = front, back = back)
-end
-function with_coatings(mirror::AbstractReflectiveOptic; front = nothing, back = nothing)
-    CoatedMirror(mirror; front = front, back = back)
+
+function with_coatings(obj::AbstractObject; front = nothing, back = nothing)
+    mapped = _build_coatings_tuple(shape(obj), front, back)
+    return _attach_coatings(obj, mapped)
 end
 
-# Base.show methods for coated components
-function Base.show(io::IO, ::MIME"text/plain", cr::CoatedRefractive)
-    print(io, "CoatedRefractive(", cr.optic, ", coatings = ", cr.coatings, ")")
-end
-function Base.show(io::IO, ::MIME"text/plain", cm::CoatedMirror)
-    print(io, "CoatedMirror(", cm.optic, ", coatings = ", cm.coatings, ")")
-end
+_attach_coatings(lens::Lens, c_tuple) = Lens(lens.shape, lens.n, c_tuple)
+_attach_coatings(prism::Prism, c_tuple) = Prism(prism.shape, prism.n, c_tuple)
+_attach_coatings(mirror::Mirror, c_tuple) = Mirror(mirror.shape, c_tuple)

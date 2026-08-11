@@ -28,8 +28,8 @@ struct DoubletLens{T, F <: AbstractRefractiveOptic{T}, B <: AbstractRefractiveOp
     back::B
 
     function DoubletLens(front::F, back::B; front_coating = nothing, back_coating = nothing) where {T, F <: AbstractRefractiveOptic{T}, B <: AbstractRefractiveOptic{T}}
-        f_coated = !isnothing(front_coating) ? CoatedRefractive(front; front = front_coating) : front
-        b_coated = !isnothing(back_coating) ? CoatedRefractive(back; back = back_coating) : back
+        f_coated = !isnothing(front_coating) ? with_coatings(front; front = front_coating) : front
+        b_coated = !isnothing(back_coating) ? with_coatings(back; back = back_coating) : back
 
         # Check if they are flush and aligned along the optical axis
         rel_pos = position(b_coated) - position(f_coated)

@@ -31,19 +31,14 @@ The shape is represented by a tetrahedral [`Mesh`](@ref).
 
 - `mesh`: shape of the `Retroreflector`
 """
-struct Retroreflector{T} <: AbstractReflectiveOptic{T}
+struct Retroreflector{T, C <: Tuple} <: AbstractReflectiveOptic{T}
     mesh::Mesh{T}
+    coatings::C
+    function Retroreflector(mesh::Mesh{T}, coatings::C = ()) where {T, C <: Tuple}
+        return new{T, C}(mesh, coatings)
+    end
 end
 
 shape(rr::Retroreflector) = rr.mesh
-
-"""
-    Retroreflector(scale)
-
-Spawns a [`Retroreflector`](@ref).
-
-# Inputs
-
-- `scale`: a scaling factor for the size of the retroreflector, e.g. `1e-3` for 1 mm
-"""
-Retroreflector(scale::Real) = Retroreflector(RetroMesh(scale))
+Retroreflector(scale::Real; coatings = ()) = Retroreflector(RetroMesh(scale), coatings)
+_attach_coatings(rr::Retroreflector, c_tuple) = Retroreflector(rr.mesh, c_tuple)

@@ -143,7 +143,7 @@ const BMO = BeamletOptics
     # Coat the cemented boundary between dl_front and dl_back
     coat_cement = SimpleARCoating(0.01) # 1% reflectance
 
-    dl_front_coated = CoatedLens(dl_front; back = coat_cement)
+    dl_front_coated = with_coatings(dl_front, back = coat_cement)
 
     # Move back lens flush with front lens
     translate3d!(dl_back, [0, thickness(dl_front), 0])
@@ -170,11 +170,11 @@ const BMO = BeamletOptics
     hr_model = SimpleHRCoating(1.0)
 
     base_lens_flat = SphericalLens(Inf, Inf, 1e-3, 10e-3, n_air)
-    coated_segmented = CoatedLens(
-        base_lens_flat, Pair{Any, Any}[
-            left_half => ar_model,
-            right_half => hr_model
-        ])
+    coated_segmented = with_coatings(
+        base_lens_flat,
+        left_half => ar_model,
+        right_half => hr_model
+    )
 
     system_seg = System([coated_segmented])
 
@@ -198,9 +198,7 @@ const BMO = BeamletOptics
     n_prism = λ -> 1.5
     prism_base = RightAnglePrism(10e-3, 10e-3, n_prism)
     # Coat the hypotenuse with HR, keep other legs uncoated
-    coated_prism = CoatedLens(prism_base, Pair{Any, Any}[
-        :hypotenuse => hr_model
-    ])
+    coated_prism = with_coatings(prism_base, :hypotenuse => hr_model)
 
     system_prism = System([coated_prism])
     # Send a ray entering from Leg 2 (y=-5e-3), hitting hypotenuse (x+y=0), reflecting out of Leg 1 (x=-5e-3)
@@ -226,7 +224,7 @@ const BMO = BeamletOptics
             Float64[], Float64[]; behavior = BMO.Splitting())
 
         # External Normal Reflection (Air to Glass)
-        coated_lens_ext = CoatedLens(planar_lens, front = splitting_coating)
+        coated_lens_ext = with_coatings(planar_lens, front = splitting_coating)
         system_ext = System([coated_lens_ext])
 
         gauss_ext = GaussianBeamlet([0.0, -5e-3, 0.0], [0.0, 1.0, 0.0], 1000e-9, 1e-3)
@@ -238,7 +236,7 @@ const BMO = BeamletOptics
         @test electric_field(r_ext) / electric_field(gauss_ext)≈-0.2 atol=1e-8
 
         # Internal Normal Reflection (Glass to Air)
-        coated_lens_int = CoatedLens(planar_lens, back = splitting_coating)
+        coated_lens_int = with_coatings(planar_lens, back = splitting_coating)
         system_int = System([coated_lens_int])
 
         gauss_int = GaussianBeamlet([0.0, -5e-3, 0.0], [0.0, 1.0, 0.0], 1000e-9, 1e-3)
@@ -293,7 +291,7 @@ const BMO = BeamletOptics
         planar_lens = SphericalLens(Inf, Inf, 1e-3, 10e-3, n_glass)
         splitting_coating = ThinFilmCoating(
             Float64[], Float64[]; behavior = BMO.Splitting())
-        coated_lens = CoatedLens(planar_lens, back = splitting_coating)
+        coated_lens = with_coatings(planar_lens, back = splitting_coating)
         system = System([coated_lens])
 
         # Single Ray starting inside the glass lens heading towards the back surface at 45 degrees
@@ -351,7 +349,7 @@ const BMO = BeamletOptics
         lens_back = SphericalLens(Inf, Inf, 1e-3, 10e-3, n_glass)
 
         # Coat the back of the front lens with our air gap coating
-        dl_front_coated = CoatedLens(lens_front; back = ftir_coating)
+        dl_front_coated = with_coatings(lens_front; back = ftir_coating)
 
         # Place the back lens right after the front lens (thickness is 1mm)
         translate3d!(lens_back, [0.0, 1e-3, 0.0])
@@ -398,7 +396,7 @@ const BMO = BeamletOptics
         dl_back = SphericalLens(-100e-3, Inf, 5e-3, 10e-3, n2_doublet)
 
         coat_cement = SimpleARCoating(0.01)
-        dl_front_coated = CoatedLens(dl_front; back = coat_cement)
+        dl_front_coated = with_coatings(dl_front; back = coat_cement)
 
         translate3d!(dl_back, [0, thickness(dl_front), 0])
 
@@ -458,14 +456,14 @@ const BMO = BeamletOptics
 
         # Test coated components show
         lens = SphericalLens(100e-3, -100e-3, 5e-3, 10e-3, λ -> 1.5)
-        cl = CoatedRefractive(lens, front = SimpleARCoating(0.02))
-        @test occursin("CoatedRefractive", repr_plain(cl))
-        @test occursin("SimpleARCoating", repr_plain(cl))
+        cl = with_coatings(lens, front = SimpleARCoating(0.02))
+        @test cl isa Lens
+        @test BMO.coatings(cl) != ()
 
         mirror = SquarePlanoMirror2D(10e-3)
-        cm = CoatedMirror(mirror, front = SimpleHRCoating(0.99))
-        @test occursin("CoatedMirror", repr_plain(cm))
-        @test occursin("SimpleHRCoating", repr_plain(cm))
+        cm = with_coatings(mirror, front = SimpleHRCoating(0.99))
+        @test cm isa Mirror
+        @test BMO.coatings(cm) != ()
     end
 
     @testset "Absorptive behavior" begin
@@ -537,8 +535,10 @@ const BMO = BeamletOptics
         ar = SimpleARCoating(0.0)
 
         doublet = SphericalDoubletLens(50e-3, -50e-3, -100e-3, 5e-3, 3e-3, 25e-3, n1, n2; front_coating = ar, back_coating = ar)
-        @test doublet.front isa CoatedRefractive
-        @test doublet.back isa CoatedRefractive
+        @test doublet.front isa Lens
+        @test doublet.back isa Lens
+        @test BMO.coatings(doublet.front) != ()
+        @test BMO.coatings(doublet.back) != ()
 
         sys = System([doublet])
         beam = Beam(Ray([0.0, -10e-3, 0.0], [0.0, 1.0, 0.0], 589e-9))
@@ -562,13 +562,18 @@ const BMO = BeamletOptics
         @test BMO.active_constituent_sdf(u_shape, p2) isa BMO.AbstractSphericalSurfaceSDF
 
         n_glass = λ -> 1.5
-        struct CompoundLens{T} <: BMO.AbstractRefractiveOptic{T, BMO.RefractiveIndex}
+        struct CompoundLens{T, C <: Tuple} <: BMO.AbstractRefractiveOptic{T, BMO.RefractiveIndex}
             shape::BMO.UnionSDF{T}
             n::Function
+            coatings::C
+            function CompoundLens(shape::BMO.UnionSDF{T}, n::Function, coatings::C = ()) where {T, C <: Tuple}
+                return new{T, C}(shape, n, coatings)
+            end
         end
-        BMO.shape_trait_of(::CompoundLens) = SingleShape()
+        BMO.shape_trait_of(::CompoundLens) = BMO.SingleShape()
         BMO.shape(c::CompoundLens) = c.shape
         BMO.refractive_index(c::CompoundLens, λ::Real) = c.n(λ)
+        BMO._attach_coatings(c::CompoundLens, c_tuple) = CompoundLens(c.shape, c.n, c_tuple)
 
         compound = CompoundLens(u_shape, n_glass)
         coated_compound = compound |> with_coatings(front = SimpleARCoating(0.02))

@@ -49,8 +49,7 @@ function PolarizingCubeBeamsplitter(
     )
 
     T = typeof(leg_length)
-    coatings = (:hypotenuse => coat_bs,)
-    front = CoatedRefractive{T, typeof(front_prism), typeof(coatings)}(front_prism, coatings)
+    front = with_coatings(front_prism, :hypotenuse => coat_bs)
 
     return PolarizingCubeBeamsplitter{T, typeof(front), typeof(back)}(front, back)
 end

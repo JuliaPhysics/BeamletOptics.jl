@@ -51,7 +51,12 @@ function interact3d(system::AbstractSystem,
         optic::AbstractReflectiveOptic,
         beam::Beam{T, R},
         ray::R) where {T <: Real, R <: AbstractRay{T}}
-    return interact_reflective_boundary(system, optic, Uncoated(), beam, ray)
+    coated_obj, coating = resolve_coated_boundary(system, optic, ray)
+    target_obj = isnothing(coated_obj) ? optic : coated_obj
+    if coating_behavior(coating, ray) isa Absorptive
+        return nothing
+    end
+    return interact_reflective_boundary(system, target_obj, coating, beam, ray)
 end
 
 """
@@ -62,8 +67,12 @@ Concrete implementation of a perfect mirror (R = 1) with arbitrary shape.
 !!! warning "Reflecting surfaces"
     It is important to consider that **all** surfaces of this mirror type are reflecting!
 """
-struct Mirror{T, S <: AbstractShape{T}} <: AbstractReflectiveOptic{T}
+struct Mirror{T, S <: AbstractShape{T}, C <: Tuple} <: AbstractReflectiveOptic{T}
     shape::S
+    coatings::C
+    function Mirror(shape::S, coatings::C = ()) where {T <: Real, S <: AbstractShape{T}, C <: Tuple}
+        return new{T, S, C}(shape, coatings)
+    end
 end
 
 """

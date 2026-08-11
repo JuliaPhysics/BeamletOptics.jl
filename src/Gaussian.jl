@@ -126,8 +126,13 @@ function interact3d(system::AbstractSystem,
         gauss::GaussianBeamlet{R},
         ray_id::Int) where {R}
     coated_obj, coating = resolve_coated_boundary(system, object, gauss.chief.rays[ray_id])
-    if coated_obj !== nothing
-        return interact3d(system, coated_obj, gauss, ray_id)
+    if !(coating isa Uncoated)
+        target_obj = isnothing(coated_obj) ? object : coated_obj
+        if coating_behavior(coating, gauss.chief.rays[ray_id]) isa Absorptive
+            return nothing
+        end
+        return interact3d_behavior(coating_behavior(coating, gauss.chief.rays[ray_id]),
+            system, target_obj, coating, gauss, ray_id)
     end
 
     i_c = interact3d(system, object, gauss.chief, rays(gauss.chief)[ray_id])

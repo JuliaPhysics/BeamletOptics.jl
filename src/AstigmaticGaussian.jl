@@ -318,8 +318,13 @@ function interact3d(system::AbstractSystem,
         agb::AstigmaticGaussianBeamlet{R},
         ray_id::Int) where {R}
     coated_obj, coating = resolve_coated_boundary(system, object, rays(agb.c)[ray_id])
-    if coated_obj !== nothing
-        return interact3d(system, coated_obj, agb, ray_id)
+    if !(coating isa Uncoated)
+        target_obj = isnothing(coated_obj) ? object : coated_obj
+        if coating_behavior(coating, rays(agb.c)[ray_id]) isa Absorptive
+            return nothing
+        end
+        return interact3d_behavior(coating_behavior(coating, rays(agb.c)[ray_id]),
+            system, target_obj, coating, agb, ray_id)
     end
 
     ints = map(b -> interact3d(system, object, b, rays(b)[ray_id]), _component_beams(agb))

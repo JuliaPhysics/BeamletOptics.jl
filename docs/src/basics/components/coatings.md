@@ -78,12 +78,11 @@ BeamletOptics.ThinFilmCoating
 
 ## Applying Coatings to Components
 
-You can attach coatings to standard optical components (like lenses or mirrors) using the fluent `with_coatings` API or by directly constructing `CoatedRefractive` or `CoatedMirror` wrappers.
+You can attach coatings natively to optical components (like lenses or mirrors) using the `with_coatings` API or by passing `coatings` when constructing the component.
 
 ```@docs; canonical=false
 BeamletOptics.with_coatings
-BeamletOptics.CoatedRefractive
-BeamletOptics.CoatedMirror
+BeamletOptics.coatings
 ```
 
 ### Face-Selective Coating
@@ -104,30 +103,6 @@ coated_prism = with_coatings(prism, :hypotenuse => SimpleHRCoating(), :leg1 => S
 
 # Spatial predicate: coat only the left half (x < 0) of a lens surface
 left_half_ar = with_coatings(lens, ((p, n) -> p[1] < 0) => SimpleARCoating())
-```
-
-### Direct Construction
-
-Instead of using the `with_coatings` API, you can directly construct the wrapper types `CoatedRefractive` (which also has the alias `CoatedLens`) and `CoatedMirror` using keyword arguments or explicit coating tuples.
-
-#### Using Keyword Arguments
-For convenience, you can pass `front` and `back` keyword arguments to attach coatings directly to the front/back surfaces:
-```julia
-# Direct construction of a coated lens
-coated_lens = CoatedLens(lens; front = SimpleARCoating(), back = SimpleARCoating())
-
-# Direct construction of a coated mirror
-coated_mirror = CoatedMirror(mirror; front = SimpleHRCoating())
-```
-
-#### Using Explicit Coating Tuples
-You can also construct the wrappers by passing a tuple of filter-to-coating-model pairs. This is particularly useful for complex multi-face shapes (like prisms) or when programmatically applying coatings:
-```julia
-# Attach coatings to specific faces of a prism via mapping tuples
-coated_prism = CoatedRefractive(prism, (
-    :hypotenuse => SimpleHRCoating(),
-    :leg1 => SimpleARCoating()
-))
 ```
 
 ---
