@@ -188,7 +188,7 @@ coating_behavior(c::ThinFilmCoating) = c.behavior
 # fresnel_coefficients interface
 fresnel_coefficients(::Uncoated, θi, λ, n1, n2) = fresnel_coefficients(θi, n2 / n1)
 
-function get_jones_matrix(::Uncoated, θi, λ, n1, n2, is_reflected; from_front::Bool = true)
+function get_jones_matrix(::Uncoated, θi, λ, n1, n2, is_reflected; from_front::Bool = true, local_p = nothing)
     rs, rp, ts, tp = fresnel_coefficients(θi, n2 / n1)
     if is_reflected
         return SPBasis(-rs, 0, 0, rp)
@@ -219,22 +219,22 @@ Compute the average power transmittance from a Jones transmission matrix for unp
 @inline unpolarized_transmittance(J) = 0.5 * (abs2(J[1, 1]) + abs2(J[1, 2]) + abs2(J[2, 1]) + abs2(J[2, 2]))
 
 """
-    coating_reflectance(coating, θi, λ, n1, n2; from_front=true)
+    coating_reflectance(coating, θi, λ, n1, n2; from_front=true, local_p=nothing)
 
 Compute the unpolarized power reflectance R ∈ [0, 1] of a coating model at angle of incidence `θi`.
 """
-function coating_reflectance(c, θi, λ, n1, n2; from_front::Bool = true)
-    J_r = get_jones_matrix(c, θi, λ, n1, n2, true; from_front = from_front)
+function coating_reflectance(c, θi, λ, n1, n2; from_front::Bool = true, local_p = nothing)
+    J_r = get_jones_matrix(c, θi, λ, n1, n2, true; from_front = from_front, local_p = local_p)
     return clamp(unpolarized_reflectance(J_r), 0.0, 1.0)
 end
 
 """
-    coating_transmittance(coating, θi, λ, n1, n2; from_front=true)
+    coating_transmittance(coating, θi, λ, n1, n2; from_front=true, local_p=nothing)
 
 Compute the unpolarized power transmittance T ∈ [0, 1] of a coating model at angle of incidence `θi`.
 """
-function coating_transmittance(c, θi, λ, n1, n2; from_front::Bool = true)
-    J_t = get_jones_matrix(c, θi, λ, n1, n2, false; from_front = from_front)
+function coating_transmittance(c, θi, λ, n1, n2; from_front::Bool = true, local_p = nothing)
+    J_t = get_jones_matrix(c, θi, λ, n1, n2, false; from_front = from_front, local_p = local_p)
     return clamp(unpolarized_transmittance(J_t), 0.0, 1.0)
 end
 
@@ -252,7 +252,7 @@ function fresnel_coefficients(c::SimpleReflectanceCoating, θi, λ, n1, n2)
 end
 
 function get_jones_matrix(
-        c::SimpleReflectanceCoating, θi, λ, n1, n2, is_reflected; from_front::Bool = true)
+        c::SimpleReflectanceCoating, θi, λ, n1, n2, is_reflected; from_front::Bool = true, local_p = nothing)
     rs, rp, ts, tp = fresnel_coefficients(c, θi, λ, n1, n2)
     if is_reflected
         return SPBasis(-rs, 0, 0, rp)
@@ -263,7 +263,7 @@ end
 
 fresnel_coefficients(c::SimpleBeamsplitterCoating, θi, λ, n1, n2) = (c.rs, c.rp, c.ts, c.tp)
 
-function get_jones_matrix(c::SimpleBeamsplitterCoating, θi, λ, n1, n2, is_reflected; from_front::Bool=true)
+function get_jones_matrix(c::SimpleBeamsplitterCoating, θi, λ, n1, n2, is_reflected; from_front::Bool = true, local_p = nothing)
     if is_reflected
         rs = from_front ? c.rs : -c.rs
         rp = from_front ? c.rp : -c.rp
@@ -286,7 +286,7 @@ end
 @inline _eval_jones(j::Function, λ::Real) = j(λ)
 
 function get_jones_matrix(
-        c::JonesCoating, θi, λ, n1, n2, is_reflected; from_front::Bool = true)
+        c::JonesCoating, θi, λ, n1, n2, is_reflected; from_front::Bool = true, local_p = nothing)
     if is_reflected
         return _eval_jones(c.jones_refl, λ)
     else
@@ -306,7 +306,24 @@ function get_jones_matrix(
     end
 end
 
-function fresnel_coefficients(c::ThinFilmCoating, θi::Real, λ::Real,
+"""
+    coating_properties(coating, λ)
+    coating_properties(coating, λ, local_p)
+
+Query coating optical properties at wavelength `λ` and local spatial position `local_p`.
+Falls back to `coating_properties(coating, λ)` for spatially uniform coatings.
+"""
+coating_properties(c::AbstractCoatingModel, λ::Real) = ()
+
+function coating_properties(c::ThinFilmCoating, λ::Real)
+    n_vals = map(n -> ComplexF64(n isa Function ? n(λ) : n), c.ns)
+    return n_vals, c.ds
+end
+
+coating_properties(c::AbstractCoatingModel, λ::Real, local_p::AbstractVector) = coating_properties(c, λ)
+coating_properties(c::AbstractCoatingModel, λ::Real, ::Nothing) = coating_properties(c, λ)
+
+function _fresnel_coefficients_matrix(n_vals, d_vals, θi::Real, λ::Real,
         n1::Number, n2::Number; from_front::Bool = true)
     sinθi = sin(θi)
     cosθi = cos(θi)
@@ -320,7 +337,6 @@ function fresnel_coefficients(c::ThinFilmCoating, θi::Real, λ::Real,
     η2p = n2 / cosθt
 
     # Initialize characteristic transfer matrices to Identity
-    # Using scalar variables rather than matrices to prevent heap allocation in tight raymarching loops
     m11_s = complex(1.0, 0.0)
     m12_s = complex(0.0, 0.0)
     m21_s = complex(0.0, 0.0)
@@ -331,12 +347,8 @@ function fresnel_coefficients(c::ThinFilmCoating, θi::Real, λ::Real,
     m21_p = complex(0.0, 0.0)
     m22_p = complex(1.0, 0.0)
 
-    N_layers = length(c.ns)
+    N_layers = length(n_vals)
     layer_indices = from_front ? (1:N_layers) : (N_layers:-1:1)
-
-    # Pre-evaluate dynamic dispersion functions to guarantee type stability in the inner loop
-    n_vals = map(n -> ComplexF64(n isa Function ? n(λ) : n), c.ns)
-    d_vals = c.ds
 
     for j in layer_indices
         nj_val = n_vals[j]
@@ -388,23 +400,92 @@ function fresnel_coefficients(c::ThinFilmCoating, θi::Real, λ::Real,
     Bp = m11_p + η2p * m12_p
     Cp = m21_p + η2p * m22_p
     rp = (η1p * Bp - Cp) / (η1p * Bp + Cp)
-    # The p-transmission coefficient includes an extra cosθi/cosθt factor to convert from
-    # the "field at boundary" to the "propagating field" convention. This asymmetry with ts
-    # is physically correct: the s-polarization boundary condition is symmetric, while the
-    # p-polarization requires the obliquity factor (Hecht/Born-Wolf convention).
     tp = (2.0 * η1p / (η1p * Bp + Cp)) * (cosθi / cosθt)
 
     return rs, rp, ts, tp
 end
 
+function fresnel_coefficients(c::ThinFilmCoating, θi::Real, λ::Real,
+        n1::Number, n2::Number; from_front::Bool = true)
+    ns, ds = coating_properties(c, λ)
+    return _fresnel_coefficients_matrix(ns, ds, θi, λ, n1, n2; from_front = from_front)
+end
+
 function get_jones_matrix(
-        c::ThinFilmCoating, θi, λ, n1, n2, is_reflected; from_front::Bool = true)
+        c::ThinFilmCoating, θi, λ, n1, n2, is_reflected; from_front::Bool = true, local_p = nothing)
     rs, rp, ts, tp = fresnel_coefficients(c, θi, λ, n1, n2; from_front = from_front)
     if is_reflected
         return SPBasis(-rs, 0, 0, rp)
     else
         return SPBasis(ts, 0, 0, tp)
     end
+end
+
+"""
+    GradedThinFilmCoating(thickness_func, base_coating::ThinFilmCoating)
+
+A spatially graded thin-film coating where layer thicknesses are scaled spatially by
+`thickness_func(local_p)` at hit point `local_p`.
+"""
+struct GradedThinFilmCoating{F, C <: ThinFilmCoating} <: AbstractCoatingModel
+    thickness_func::F
+    base_coating::C
+end
+
+coating_behavior(g::GradedThinFilmCoating) = coating_behavior(g.base_coating)
+
+function coating_properties(g::GradedThinFilmCoating, λ::Real, local_p::AbstractVector)
+    factor = Float64(g.thickness_func(local_p))
+    ns, ds = coating_properties(g.base_coating, λ)
+    return ns, ds .* factor
+end
+
+function get_jones_matrix(
+        g::GradedThinFilmCoating, θi, λ, n1, n2, is_reflected; from_front::Bool = true, local_p = nothing)
+    factor = isnothing(local_p) ? 1.0 : Float64(g.thickness_func(local_p))
+    ns, ds = coating_properties(g.base_coating, λ)
+    ds_graded = ds .* factor
+    rs, rp, ts, tp = _fresnel_coefficients_matrix(ns, ds_graded, θi, λ, n1, n2; from_front = from_front)
+    if is_reflected
+        return SPBasis(-rs, 0, 0, rp)
+    else
+        return SPBasis(ts, 0, 0, tp)
+    end
+end
+
+"""
+    CompositeSurfaceModel(models::AbstractSurfaceModel...)
+
+Composes multiple optical surface physics models sequentially.
+Reflectance and transmittance matrices are multiplied across sub-models.
+"""
+struct CompositeSurfaceModel{T <: Tuple{Vararg{AbstractSurfaceModel}}} <: AbstractSurfaceModel
+    models::T
+end
+
+CompositeSurfaceModel(models::AbstractSurfaceModel...) = CompositeSurfaceModel(models)
+
+function coating_behavior(comp::CompositeSurfaceModel)
+    behaviors = map(coating_behavior, comp.models)
+    if any(b -> b isa Absorptive, behaviors)
+        return Absorptive()
+    elseif any(b -> b isa Splitting, behaviors)
+        return Splitting()
+    elseif any(b -> b isa Reflective, behaviors)
+        return Reflective()
+    else
+        return Transmissive()
+    end
+end
+
+function get_jones_matrix(
+        comp::CompositeSurfaceModel, θi, λ, n1, n2, is_reflected; from_front::Bool = true, local_p = nothing)
+    J_tot = get_jones_matrix(comp.models[1], θi, λ, n1, n2, is_reflected; from_front = from_front, local_p = local_p)
+    for i in 2:length(comp.models)
+        J_i = get_jones_matrix(comp.models[i], θi, λ, n1, n2, is_reflected; from_front = from_front, local_p = local_p)
+        J_tot = J_i * J_tot
+    end
+    return J_tot
 end
 
 # Base.show methods for coating models
@@ -414,4 +495,6 @@ Base.show(io::IO, ::MIME"text/plain", c::SimpleHRCoating) = print(io, "SimpleHRC
 Base.show(io::IO, ::MIME"text/plain", c::SimpleBeamsplitterCoating) = print(io, "SimpleBeamsplitterCoating(rs = ", c.rs, ", rp = ", c.rp, ", ts = ", c.ts, ", tp = ", c.tp, ")")
 Base.show(io::IO, ::MIME"text/plain", c::JonesCoating) = print(io, "JonesCoating(behavior = ", c.behavior, ")")
 Base.show(io::IO, ::MIME"text/plain", c::ThinFilmCoating) = print(io, "ThinFilmCoating(", length(c.ns), " layers, behavior = ", c.behavior, ")")
+Base.show(io::IO, ::MIME"text/plain", c::GradedThinFilmCoating) = print(io, "GradedThinFilmCoating(base = ", c.base_coating, ")")
+Base.show(io::IO, ::MIME"text/plain", c::CompositeSurfaceModel) = print(io, "CompositeSurfaceModel(", length(c.models), " models)")
 

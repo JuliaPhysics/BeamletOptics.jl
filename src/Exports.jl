@@ -47,7 +47,7 @@ export ThinBeamsplitter, RoundThinBeamsplitter, RectangularPlateBeamsplitter,
 
 # coatings
 export Coating, AbstractSurfaceModel, AbstractCoatingModel, Uncoated, SimpleARCoating, SimpleHRCoating, SimpleBeamsplitterCoating,
-       JonesCoating, ThinFilmCoating, coatings, get_jones_matrix,
+       JonesCoating, ThinFilmCoating, GradedThinFilmCoating, CompositeSurfaceModel, coatings, get_jones_matrix,
        with_coatings, fresnel_coefficients, CoatingBehavior, Transmissive, Reflective, Splitting, Absorptive,
        coating_behavior, get_coating_behavior, coating_transmittance, coating_reflectance, unpolarized_transmittance
 

@@ -74,6 +74,18 @@ A physical multi-layer thin-film stack defined by a vector of refractive indices
 BeamletOptics.ThinFilmCoating
 ```
 
+### Graded Thin-Film Coating
+A spatially graded thin-film coating where layer thicknesses vary across the surface according to a spatial scaling function `thickness_func(local_p)` at local hit point `local_p`.
+```@docs; canonical=false
+BeamletOptics.GradedThinFilmCoating
+```
+
+### Composite Surface Model
+Composes multiple surface physics models sequentially. Reflection and transmission Jones matrices are multiplied across sub-models.
+```@docs; canonical=false
+BeamletOptics.CompositeSurfaceModel
+```
+
 ---
 
 ## Applying Coatings to Components
@@ -90,19 +102,20 @@ When coating a lens or prism, you can target specific faces by passing a `Pair` 
 
 The filter pattern can be:
 * A `Symbol` representing a named face of the shape (e.g., `:front`, `:back`, `:side` for rotationally symmetric lenses, or `:hypotenuse`, `:leg1`, `:leg2` for a `RightAnglePrism`).
+* A `Tuple` or `Set` of `Symbol`s targeting multiple faces at once (e.g., `(:front, :back) => SimpleARCoating()`).
 * An orientation vector (`AbstractVector`), matching faces whose local normal vector has a positive dot product with the orientation vector.
 * A spatial predicate function `(local_pos, local_normal) -> Bool`.
 
 #### Examples
 ```julia
-# Coat only the front of a lens
-coated_lens = lens |> with_coatings(front = SimpleARCoating())
+# Coat both front and back of a lens in one selector
+coated_lens = lens |> with_coatings((:front, :back) => SimpleARCoating())
 
 # Coat the hypotenuse of a prism with HR, and Leg 1 with AR
 coated_prism = with_coatings(prism, :hypotenuse => SimpleHRCoating(), :leg1 => SimpleARCoating())
 
-# Spatial predicate: coat only the left half (x < 0) of a lens surface
-left_half_ar = with_coatings(lens, ((p, n) -> p[1] < 0) => SimpleARCoating())
+# Deepcopy shape when coating to avoid mutating shared inner shape instances
+isolated_coated_lens = with_coatings(lens, :front => SimpleARCoating(); deepcopy_shape = true)
 ```
 
 ---
@@ -117,7 +130,7 @@ BeamletOptics.Coating
 
 ---
 
-## Supporting Coatings in Custom Components
+## Supporting Coatings in Custom Components (Developer Guide)
 
 If you are developing a custom optical component type `MyOptic <: AbstractObject` and want it to natively support coatings via `with_coatings`, follow these steps:
 
@@ -131,10 +144,11 @@ If you are developing a custom optical component type `MyOptic <: AbstractObject
    ```
 
 2. **Implement `_attach_coatings`**:
-   Define `_attach_coatings` for your component type to construct a new instance with the updated coating tuple:
+   Define `_attach_coatings` for your component type to construct a new instance with the updated coating tuple. Support the `deepcopy_shape` keyword argument:
    ```julia
-   function BeamletOptics._attach_coatings(optic::MyOptic, new_coatings::Tuple)
-       return MyOptic(optic.shape, new_coatings)
+   function BeamletOptics._attach_coatings(optic::MyOptic, new_coatings::Tuple; deepcopy_shape::Bool = false)
+       shape_inst = deepcopy_shape ? deepcopy(optic.shape) : optic.shape
+       return MyOptic(shape_inst, new_coatings)
    end
    ```
    Once `_attach_coatings` is defined, `with_coatings(optic, ...)` and `coatings(optic)` work automatically out-of-the-box!

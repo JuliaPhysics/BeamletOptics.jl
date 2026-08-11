@@ -3,7 +3,7 @@
 # Generic getter for coatings property on any AbstractObject
 coatings(obj::AbstractObject) = hasproperty(obj, :coatings) ? getproperty(obj, :coatings) : ()
 
-# Matching Helpers for Coated Components
+# # Matching Helpers for Coated Components
 function eval_filter(face::Symbol, shape::AbstractShape, local_p, local_n)
     if face === :either || face === :all
         return true
@@ -15,7 +15,23 @@ function eval_filter(face::Symbol, shape::AbstractShape, local_p, local_n)
     return face_id(shape, local_n) === face
 end
 
-function eval_filter(filter_vec::AbstractVector, shape::AbstractShape, local_p, local_n)
+function eval_filter(faces::Union{Tuple{Vararg{Symbol}}, AbstractSet{Symbol}}, shape::AbstractShape, local_p, local_n)
+    tag = surface_tag(shape, local_p, local_n)
+    if tag !== :unknown
+        return tag in faces
+    end
+    return face_id(shape, local_n) in faces
+end
+
+function eval_filter(faces::AbstractVector{Symbol}, shape::AbstractShape, local_p, local_n)
+    tag = surface_tag(shape, local_p, local_n)
+    if tag !== :unknown
+        return tag in faces
+    end
+    return face_id(shape, local_n) in faces
+end
+
+function eval_filter(filter_vec::AbstractVector{<:Real}, shape::AbstractShape, local_p, local_n)
     return dot(local_n, filter_vec) > 0.0
 end
 
@@ -62,24 +78,142 @@ function is_flat_shape(mesh::Mesh)
         vj = @view mesh.vertices[j, :]
         n_vec = cross(vi - v1, vj - v1)
         n_norm = norm(n_vec)
-        if n_norm >= 1e-12
+        if n_norm > 1e-12
             found = true
             break
         end
         j += 1
     end
-    !found && return true  # All vertices are collinear (line of points, flat)
+    !found && return true
 
-    # Check if all other vertices lie in the defined plane
-    n_vec = n_vec / n_norm
+    # Normal vector of plane
+    n_flat = n_vec / n_norm
+
+    # Check if all remaining vertices lie on the plane
     for k in 1:n
         vk = @view mesh.vertices[k, :]
-        if abs(dot(vk - v1, n_vec)) > 1e-6
+        if abs(dot(vk - v1, n_flat)) > 1e-6
             return false
         end
     end
     return true
 end
+
+# Interaction Dispatch Strategy for Coated Components
+function _resolve_coated_splitting_context(system, obj, ray)
+    shape_obj = shape(obj)
+    p_hit = world_to_local(shape_obj, position(ray))
+    n_hit = world_to_local(shape_obj, normal3d(intersection(ray)))
+    c_model = get_matching_coating(coatings(obj), shape_obj, p_hit, n_hit)
+
+    # Detect if ray is entering or exiting the shape
+    from_front = dot(direction(ray), normal3d(intersection(ray))) < 0.0
+    n_incident = from_front ? refractive_index(system, ray) : refractive_index(obj, wavelength(ray))
+    n_transmitted = from_front ? refractive_index(obj, wavelength(ray)) : refractive_index(system, ray)
+
+    return c_model, n_incident, n_transmitted, normal3d(intersection(ray)), from_front
+end
+
+function resolve_coated_boundary(system, obj, ray)
+    shape_obj = shape(obj)
+    p_hit = world_to_local(shape_obj, position(ray))
+    n_hit = world_to_local(shape_obj, normal3d(intersection(ray)))
+    coating_model = get_matching_coating(coatings(obj), shape_obj, p_hit, n_hit)
+    behavior = coating_behavior(coating_model, ray)
+
+    return coating_model, behavior
+end
+
+function _interact3d_reflective_component_beams(system, obj, coating_model, agb, ray_id)
+    c_ray = agb.c.rays[ray_id]
+    shape_obj = shape(obj)
+    p_hit = world_to_local(shape_obj, position(c_ray))
+    n_hit = world_to_local(shape_obj, normal3d(intersection(c_ray)))
+    from_front = dot(direction(c_ray), normal3d(intersection(c_ray))) < 0.0
+    n1 = from_front ? refractive_index(system, c_ray) : refractive_index(obj, wavelength(c_ray))
+    n2 = from_front ? refractive_index(obj, wavelength(c_ray)) : refractive_index(system, c_ray)
+    normal = normal3d(intersection(c_ray))
+
+    refl_agb = copy(agb)
+    refl_agb.c.rays[ray_id] = reflect(c_ray, normal)
+    return (agb, refl_agb)
+end
+
+function interact3d_splitting_polarized_ray(system, obj, ray)
+    c_model, n_incident, n_transmitted, normal, from_front =
+        _resolve_coated_splitting_context(system, obj, ray)
+
+    return _propagate_splitting_polarized_ray(
+        system, obj, c_model, ray, n_incident, n_transmitted, normal, from_front
+    )
+end
+
+function interact3d_splitting_astigmatic_beamlet(system, obj, agb, ray_id)
+    c_ray = agb.c.rays[ray_id]
+    coating_model, n_incident, n_transmitted, normal, from_front =
+        _resolve_coated_splitting_context(system, obj, c_ray)
+
+    return _propagate_splitting_astigmatic_beamlet(
+        system,
+        obj,
+        coating_model,
+        agb,
+        ray_id,
+        n_incident,
+        n_transmitted,
+        normal,
+        from_front,
+        () -> begin
+            ints = _interact3d_reflective_component_beams(system, obj, coating_model, agb, ray_id)
+            isnothing(ints) && return nothing
+            T_type = eltype(position(c_ray))
+            return AstigmaticGaussianBeamletInteraction{T_type}(ints...)
+        end
+    )
+end
+
+# Fluent API / Pipeline helper
+"""
+    with_coatings(coatings::Pair...; deepcopy_shape=false)
+    with_coatings(; front=nothing, back=nothing, deepcopy_shape=false)
+    with_coatings(optic, coatings::Pair...; deepcopy_shape=false)
+    with_coatings(optic; front=nothing, back=nothing, deepcopy_shape=false)
+
+Fluent API helper to attach coatings to an optical component natively.
+Returns a new instance of the same optic type with coatings attached.
+When `deepcopy_shape=true`, deepcopies the inner shape before attaching coatings to avoid shared mutation.
+
+# Examples
+```julia
+with_coatings(lens, :front => AR, :back => HR)
+with_coatings(lens, (:front, :back) => SimpleARCoating())
+with_coatings(mirror, :either => HR; deepcopy_shape=true)
+```
+"""
+function with_coatings(coatings::Pair...; deepcopy_shape::Bool = false)
+    obj -> with_coatings(obj, coatings...; deepcopy_shape = deepcopy_shape)
+end
+
+function with_coatings(obj::AbstractObject, coatings::Pair...; deepcopy_shape::Bool = false)
+    mapped = map(c -> (c.first => _coating_model(c.second)), coatings)
+    return _attach_coatings(obj, mapped; deepcopy_shape = deepcopy_shape)
+end
+
+function with_coatings(; front = nothing, back = nothing, deepcopy_shape::Bool = false)
+    obj -> with_coatings(obj; front = front, back = back, deepcopy_shape = deepcopy_shape)
+end
+
+function with_coatings(obj::AbstractObject; front = nothing, back = nothing, deepcopy_shape::Bool = false)
+    mapped = _build_coatings_tuple(shape(obj), front, back)
+    return _attach_coatings(obj, mapped; deepcopy_shape = deepcopy_shape)
+end
+
+_attach_coatings(lens::Lens, c_tuple; deepcopy_shape::Bool = false) =
+    Lens(deepcopy_shape ? deepcopy(lens.shape) : lens.shape, lens.n, c_tuple)
+_attach_coatings(prism::Prism, c_tuple; deepcopy_shape::Bool = false) =
+    Prism(deepcopy_shape ? deepcopy(prism.shape) : prism.shape, prism.n, c_tuple)
+_attach_coatings(mirror::Mirror, c_tuple; deepcopy_shape::Bool = false) =
+    Mirror(deepcopy_shape ? deepcopy(mirror.shape) : mirror.shape, c_tuple)
 
 # Dispatch helpers for extracting coating models
 _coating_model(c::AbstractCoating) = c.model
@@ -377,42 +511,3 @@ function interact_splitting_boundary(
         end
     )
 end
-
-# Fluent API / Pipeline helper
-"""
-    with_coatings(coatings::Pair...)
-    with_coatings(; front=nothing, back=nothing)
-    with_coatings(optic, coatings::Pair...)
-    with_coatings(optic; front=nothing, back=nothing)
-
-Fluent API helper to attach coatings to an optical component natively.
-Returns a new instance of the same optic type with coatings attached.
-
-# Examples
-```julia
-with_coatings(lens, :front => AR, :back => HR)
-with_coatings(lens, :side => SimpleARCoating())
-with_coatings(mirror, :either => HR)
-```
-"""
-function with_coatings(coatings::Pair...)
-    obj -> with_coatings(obj, coatings...)
-end
-
-function with_coatings(obj::AbstractObject, coatings::Pair...)
-    mapped = map(c -> (c.first => _coating_model(c.second)), coatings)
-    return _attach_coatings(obj, mapped)
-end
-
-function with_coatings(; front = nothing, back = nothing)
-    obj -> with_coatings(obj; front = front, back = back)
-end
-
-function with_coatings(obj::AbstractObject; front = nothing, back = nothing)
-    mapped = _build_coatings_tuple(shape(obj), front, back)
-    return _attach_coatings(obj, mapped)
-end
-
-_attach_coatings(lens::Lens, c_tuple) = Lens(lens.shape, lens.n, c_tuple)
-_attach_coatings(prism::Prism, c_tuple) = Prism(prism.shape, prism.n, c_tuple)
-_attach_coatings(mirror::Mirror, c_tuple) = Mirror(mirror.shape, c_tuple)

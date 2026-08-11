@@ -503,7 +503,7 @@ const BMO = BeamletOptics
         struct DynamicARCoating end
         # behaves as Transmissive for λ < 800nm, Reflective for λ >= 800nm
         BMO.coating_behavior(::DynamicARCoating, ray) = BMO.wavelength(ray) < 800e-9 ? Transmissive() : Reflective()
-        BMO.get_jones_matrix(::DynamicARCoating, θi, λ, n1, n2, is_reflected; from_front=true) = BMO.SPBasis(1.0, 0, 0, 1.0)
+        BMO.get_jones_matrix(::DynamicARCoating, θi, λ, n1, n2, is_reflected; from_front=true, kwargs...) = BMO.SPBasis(1.0, 0, 0, 1.0)
 
         flat_mesh = BMO.QuadraticFlatMesh(10e-3)
         dyn_coat = Coating(flat_mesh, DynamicARCoating())
@@ -573,7 +573,7 @@ const BMO = BeamletOptics
         BMO.shape_trait_of(::CompoundLens) = BMO.SingleShape()
         BMO.shape(c::CompoundLens) = c.shape
         BMO.refractive_index(c::CompoundLens, λ::Real) = c.n(λ)
-        BMO._attach_coatings(c::CompoundLens, c_tuple) = CompoundLens(c.shape, c.n, c_tuple)
+        BMO._attach_coatings(c::CompoundLens, c_tuple; deepcopy_shape::Bool = false) = CompoundLens(deepcopy_shape ? deepcopy(c.shape) : c.shape, c.n, c_tuple)
 
         compound = CompoundLens(u_shape, n_glass)
         coated_compound = compound |> with_coatings(front = SimpleARCoating(0.02))
@@ -627,6 +627,53 @@ const BMO = BeamletOptics
         @test SimpleARCoating() isa AbstractSurfaceModel
         @test Uncoated() isa AbstractSurfaceModel
         @test ThinFilmCoating([], []) isa AbstractSurfaceModel
+    end
+
+    @testset "Multi-Face Selector Syntax" begin
+        lens = BMO.SphericalLens(25e-3, 50e-3, 50e-3)
+        coated = BMO.with_coatings(lens, (:front, :back) => BMO.SimpleARCoating(0.01))
+        
+        p_front = BMO.Point3(0.0, -2e-3, 0.0)
+        p_back = BMO.Point3(0.0, 2e-3, 0.0)
+        n_front = BMO.Point3(0.0, -1.0, 0.0)
+        n_back = BMO.Point3(0.0, 1.0, 0.0)
+
+        @test BMO.get_matching_coating(BMO.coatings(coated), BMO.shape(coated), p_front, n_front) isa BMO.SimpleARCoating
+        @test BMO.get_matching_coating(BMO.coatings(coated), BMO.shape(coated), p_back, n_back) isa BMO.SimpleARCoating
+    end
+
+    @testset "CompositeSurfaceModel" begin
+        ar1 = BMO.SimpleARCoating(0.05) # R=0.05, T=0.95
+        ar2 = BMO.SimpleARCoating(0.10) # R=0.10, T=0.90
+        comp = BMO.CompositeSurfaceModel(ar1, ar2)
+        @test BMO.coating_behavior(comp) isa BMO.Transmissive
+
+        J = BMO.get_jones_matrix(comp, 0.0, 632.8e-9, 1.0, 1.5, false)
+        T_val = BMO.unpolarized_transmittance(J)
+        @test T_val ≈ (0.95 * 0.90) atol=1e-4
+    end
+
+    @testset "deepcopy_shape option in with_coatings" begin
+        lens = BMO.SphericalLens(25e-3, 50e-3, 50e-3)
+        c1 = BMO.with_coatings(lens, :front => BMO.SimpleARCoating(0.01); deepcopy_shape=false)
+        c2 = BMO.with_coatings(lens, :front => BMO.SimpleARCoating(0.01); deepcopy_shape=true)
+
+        @test c1.shape === lens.shape
+        @test c2.shape !== lens.shape
+    end
+
+    @testset "GradedThinFilmCoating" begin
+        tf = BMO.ThinFilmCoating([1.38], [150e-9])
+        graded = BMO.GradedThinFilmCoating(p -> 1.0 + 0.1 * p[1], tf)
+        @test BMO.coating_behavior(graded) isa BMO.Transmissive
+
+        p1 = BMO.Point3(0.0, 0.0, 0.0)
+        p2 = BMO.Point3(1.0, 0.0, 0.0)
+
+        J1 = BMO.get_jones_matrix(graded, 0.0, 632.8e-9, 1.0, 1.5, false; local_p=p1)
+        J2 = BMO.get_jones_matrix(graded, 0.0, 632.8e-9, 1.0, 1.5, false; local_p=p2)
+
+        @test BMO.unpolarized_transmittance(J1) != BMO.unpolarized_transmittance(J2)
     end
 end
 
