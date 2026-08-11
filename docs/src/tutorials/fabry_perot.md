@@ -108,7 +108,7 @@ Introducing a wedge angle means the beam's reflections off the cavity mirrors ar
 
 To model this physical phenomenon accurately, we must use an `AstigmaticGaussianBeamlet` (AGB) rather than a circular `GaussianBeamlet`. The AGB dynamically updates its full 3D complex curvature matrix at each tilted surface crossing, capturing the realistic spatial profiles of the interfering beams.
 
-To build the wedged cavity, we construct the setup using two separate flat `CoatedLens` objects so we can orient them independently:
+To build the wedged cavity, we construct the setup using two separate flat `SphericalLens` objects with coatings so we can orient them independently:
 
 ```@example fabry_perot
 # Wedge angle

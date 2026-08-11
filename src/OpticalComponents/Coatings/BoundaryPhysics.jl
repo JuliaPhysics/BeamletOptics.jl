@@ -195,7 +195,7 @@ _base_optic(obj) = obj
     n_substrate = is_refractive(substrate_obj) ? refractive_index(substrate_obj, λ) : refractive_index(system, λ)
     
     obj = object(int)
-    is_substrate = (_base_optic(obj) === substrate_obj)
+    is_substrate = (shape(obj) === shape(substrate_obj))
     
     normal = normal3d(int)
     if !is_substrate

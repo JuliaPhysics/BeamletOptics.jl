@@ -1,6 +1,11 @@
 # Coated unified components and fluent API pipeline helpers using pure composition
 
 # Generic getter for coatings property on any AbstractObject
+"""
+    coatings(obj::AbstractObject)
+
+Return the tuple of surface coating definitions attached to `obj`. Returns `()` if the object has no coatings.
+"""
 coatings(obj::AbstractObject) = hasproperty(obj, :coatings) ? getproperty(obj, :coatings) : ()
 
 # # Matching Helpers for Coated Components
@@ -102,7 +107,7 @@ end
 # Interaction Dispatch Strategy for Coated Components
 function _resolve_coated_splitting_context(system, obj, ray)
     shape_obj = shape(obj)
-    p_hit = world_to_local(shape_obj, position(ray))
+    p_hit = world_to_local(shape_obj, position(ray) + length(ray) * direction(ray))
     n_hit = world_to_local(shape_obj, normal3d(intersection(ray)))
     c_model = get_matching_coating(coatings(obj), shape_obj, p_hit, n_hit)
 
@@ -116,18 +121,17 @@ end
 
 function resolve_coated_boundary(system, obj, ray)
     shape_obj = shape(obj)
-    p_hit = world_to_local(shape_obj, position(ray))
+    p_hit = world_to_local(shape_obj, position(ray) + length(ray) * direction(ray))
     n_hit = world_to_local(shape_obj, normal3d(intersection(ray)))
     coating_model = get_matching_coating(coatings(obj), shape_obj, p_hit, n_hit)
-    behavior = coating_behavior(coating_model, ray)
 
-    return coating_model, behavior
+    return obj, coating_model
 end
 
 function _interact3d_reflective_component_beams(system, obj, coating_model, agb, ray_id)
     c_ray = agb.c.rays[ray_id]
     shape_obj = shape(obj)
-    p_hit = world_to_local(shape_obj, position(c_ray))
+    p_hit = world_to_local(shape_obj, position(c_ray) + length(c_ray) * direction(c_ray))
     n_hit = world_to_local(shape_obj, normal3d(intersection(c_ray)))
     from_front = dot(direction(c_ray), normal3d(intersection(c_ray))) < 0.0
     n1 = from_front ? refractive_index(system, c_ray) : refractive_index(obj, wavelength(c_ray))

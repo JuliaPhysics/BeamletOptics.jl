@@ -112,9 +112,8 @@ zrotate3d!(mirror1, -α/2)
 
 # Mirror 2: custom coated flat glass lens substrate (filter) at y = 0, size 20mm
 # The bottom face is AR coated and the top face is the WolitFilterCoating
-#m2_base = Lens(RectangularFlatSurface(15mm), RectangularFlatSurface(15mm), 1mm, λ -> 1.5)
-m2_base = Lens(CylindricalSurface(Inf, 2mm, 15mm), CylindricalSurface(Inf, 2mm, 15mm), 0.5mm, λ -> 1.5)
-coated_lens2 = CoatedLens(m2_base; front = SimpleARCoating(0.0), back = wolit_coating)
+m2_base = SphericalLens(Inf, Inf, 0.5mm, 15mm, λ -> 1.5)
+coated_lens2 = m2_base |> with_coatings(front = SimpleARCoating(0.0), back = wolit_coating)
 translate3d!(coated_lens2, [0.0, -1.0mm, 0.0])
 zrotate3d!(coated_lens2, α/2)
 

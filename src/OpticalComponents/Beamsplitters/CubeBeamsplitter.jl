@@ -9,7 +9,7 @@ For more information refer to the [`AbstractPlateBeamsplitter`](@ref) docs.
 
 # Fields
 
-- `front`: the forward facing substrate, represented by a coated prism ([`CoatedRefractive`](@ref) wrapping a [`RightAnglePrism`](@ref))
+- `front`: the forward facing substrate, represented by a coated prism (coated [`RightAnglePrism`](@ref))
 - `back`: the backward facing substrate, represented by a [`RightAnglePrism`](@ref)
 
 # Additional information

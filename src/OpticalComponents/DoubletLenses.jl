@@ -14,8 +14,8 @@ See also [`SphericalDoubletLens`](@ref).
 
 # Fields
 
-- `front`: front [`Lens`](@ref) component (or [`CoatedRefractive`](@ref))
-- `back`: back [`Lens`](@ref) component (or [`CoatedRefractive`](@ref))
+- `front`: front [`Lens`](@ref) component
+- `back`: back [`Lens`](@ref) component
 
 # Additional information
 

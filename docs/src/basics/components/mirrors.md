@@ -14,7 +14,7 @@ Mirror
 ```
 
 !!! tip "Coated Mirrors"
-    To model mirrors with customized reflecting behaviors (such as specific power reflectance $R$ or thin-film multilayer coatings), see the [Coatings](@ref) section. You can construct a coated mirror using the fluent API `mirror |> with_coatings(front = SimpleHRCoating(0.999))` or via `CoatedMirror`.
+    To model mirrors with customized reflecting behaviors (such as specific power reflectance $R$ or thin-film multilayer coatings), see the [Coatings](@ref) section. You can construct a coated mirror using the fluent API `mirror |> with_coatings(front = SimpleHRCoating(0.999))`.
 
 
 The following constructors can be used to generate flat reflecting shapes. Additional types are explained below.

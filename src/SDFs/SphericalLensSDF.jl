@@ -479,7 +479,7 @@ function _sdf(s::SphericalSurface, ::BackwardOrientation)
 end
 
 function surface_tag(lens::AbstractLensSDF, point, normal)
-    p = _world_to_sdf(lens, point)
+    p = point
     half_d = diameter(lens) / 2
     r_xy = sqrt(p[1]^2 + p[3]^2)
     if r_xy >= half_d - 1e-4
