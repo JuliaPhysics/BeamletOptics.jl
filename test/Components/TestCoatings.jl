@@ -546,6 +546,42 @@ const BMO = BeamletOptics
         @test length(rays(beam)) == 4 # Initial ray + 3 surface transitions
     end
 
+    @testset "CSG UnionSDF Coating Resolution" begin
+        lens1 = SphericalLens(50e-3, -50e-3, 5e-3, 10e-3, 1.5)
+        lens2 = SphericalLens(100e-3, -100e-3, 5e-3, 10e-3, 1.5)
+        translate3d!(lens2, [0.0, 20e-3, 0.0])
+
+        s1 = BMO.shape(lens1)
+        s2 = BMO.shape(lens2)
+        u_shape = s1 + s2
+
+        p1 = BMO.position(s1) + [0.0, -2.5e-3, 0.0]
+        p2 = BMO.position(s2) + [0.0, -2.5e-3, 0.0]
+
+        @test BMO.active_constituent_sdf(u_shape, p1) isa BMO.AbstractSphericalSurfaceSDF
+        @test BMO.active_constituent_sdf(u_shape, p2) isa BMO.AbstractSphericalSurfaceSDF
+
+        n_glass = λ -> 1.5
+        struct CompoundLens{T} <: BMO.AbstractRefractiveOptic{T, BMO.RefractiveIndex}
+            shape::BMO.UnionSDF{T}
+            n::Function
+        end
+        BMO.shape_trait_of(::CompoundLens) = SingleShape()
+        BMO.shape(c::CompoundLens) = c.shape
+        BMO.refractive_index(c::CompoundLens, λ::Real) = c.n(λ)
+
+        compound = CompoundLens(u_shape, n_glass)
+        coated_compound = compound |> with_coatings(front = SimpleARCoating(0.02))
+
+        sys = System([coated_compound])
+        beam = Beam(Ray([0.0, -10e-3, 0.0], [0.0, 1.0, 0.0], 1000e-9))
+        solve_system!(sys, beam; retrace = false)
+
+        model1 = BMO.get_coating_model_at_hit(coated_compound, rays(beam)[1])
+        @test model1 isa SimpleARCoating
+        @test model1.R ≈ 0.02
+    end
+
     @testset "Unified Coating Transmittance and Reflectance API" begin
         ar = SimpleARCoating(0.01) # R=1%
         R = coating_reflectance(ar, 0.0, 1064e-9, 1.0, 1.5)
@@ -555,4 +591,5 @@ const BMO = BeamletOptics
         @test R + T ≈ 1.0 atol=1e-6
     end
 end
+
 

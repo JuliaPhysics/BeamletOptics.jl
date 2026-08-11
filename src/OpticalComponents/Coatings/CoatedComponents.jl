@@ -177,18 +177,31 @@ is_refractive(::CoatedRefractive) = true
 is_refractive(::CoatedMirror) = false
 thickness(cl::CoatedRefractive) = thickness(cl.optic)
 
+# Active constituent SDF helper for CSG / composite shapes
+active_constituent_sdf(s::AbstractShape, p_hit) = s
+
+function active_constituent_sdf(s::UnionSDF, p_hit)
+    idx = argmin(map(_sdf -> abs(sdf(_sdf, p_hit)), s.sdfs))
+    return active_constituent_sdf(s.sdfs[idx], p_hit)
+end
+
 # Get matching coating for a hit
 function get_coating_model_at_hit(coated::CoatedComponent, ray::AbstractRay)
     int = intersection(ray)
     isnothing(int) && return Uncoated()
     p_hit = position(ray) + length(ray) * direction(ray)
-    local_p = world_to_local(shape(coated), p_hit)
+
+    parent_shape = shape(coated)
+    local_p = world_to_local(parent_shape, p_hit)
     n_world = normal3d(int)
     if object(int) !== coated && object(int) !== coated.optic
         n_world = -n_world
     end
-    local_n = transposed_orientation(shape(coated)) * n_world
-    return get_matching_coating(coated.coatings, shape(coated), local_p, local_n)
+    local_n = transposed_orientation(parent_shape) * n_world
+
+    hit_sub_sdf = active_constituent_sdf(parent_shape, p_hit)
+    coatings = hasproperty(hit_sub_sdf, :coatings) ? getproperty(hit_sub_sdf, :coatings) : coated.coatings
+    return get_matching_coating(coatings, parent_shape, local_p, local_n)
 end
 
 function get_coating_model_at_hit(
