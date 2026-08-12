@@ -84,7 +84,7 @@ normal3d(s::AbstractSDF, pos) = normal_fd(s, pos)
 Returns a symbolic surface tag (e.g. `:front`, `:back`, `:side`, `:top`, `:bottom`) for a hit point on the SDF.
 Defaults to `:unknown` if no tag is implemented for the given SDF.
 """
-surface_tag(s::AbstractSDF, point) = surface_tag(s, point, normal3d(s, point))
+surface_tag(s::AbstractSDF, point) = surface_tag(s, _world_to_sdf(s, point), transposed_orientation(s) * normal3d(s, point))
 surface_tag(s::AbstractSDF, point, normal) = face_id(s, normal)
 
 function numeric_gradient(s::AbstractSDF, pos)

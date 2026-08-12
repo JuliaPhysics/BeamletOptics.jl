@@ -98,8 +98,7 @@ function normal3d(sphere::SphereSDF, point)
     return normalize(p)
 end
 
-function surface_tag(sphere::SphereSDF, point, normal)
-    p = _world_to_sdf(sphere, point)
+function surface_tag(sphere::SphereSDF, p, normal)
     return p[2] >= 0 ? :front : :back
 end
 
