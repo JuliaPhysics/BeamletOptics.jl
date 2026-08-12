@@ -450,9 +450,12 @@ const BMO = BeamletOptics
         @test repr_plain(Uncoated()) == "Uncoated"
         @test repr_plain(SimpleARCoating(0.05)) == "SimpleARCoating(R = 0.05)"
         @test repr_plain(SimpleHRCoating(0.98)) == "SimpleHRCoating(R = 0.98)"
-        @test repr_plain(SimpleBeamsplitterCoating(0.5, 0.5, 0.5, 0.5)) == "SimpleBeamsplitterCoating(rs = 0.5 + 0.0im, rp = 0.5 + 0.0im, ts = 0.5 + 0.0im, tp = 0.5 + 0.0im)"
-        @test repr_plain(JonesCoating(BMO.SPBasis(1,0,0,1))) == "JonesCoating(behavior = Transmissive())"
-        @test repr_plain(ThinFilmCoating(1.38, 200e-9)) == "ThinFilmCoating(1 layers, behavior = Transmissive())"
+        @test repr_plain(SimpleBeamsplitterCoating(0.5, 0.5, 0.5, 0.5)) ==
+              "SimpleBeamsplitterCoating(rs = 0.5 + 0.0im, rp = 0.5 + 0.0im, ts = 0.5 + 0.0im, tp = 0.5 + 0.0im)"
+        @test repr_plain(JonesCoating(BMO.SPBasis(1, 0, 0, 1))) ==
+              "JonesCoating(behavior = Transmissive())"
+        @test repr_plain(ThinFilmCoating(1.38, 200e-9)) ==
+              "ThinFilmCoating(1 layers, behavior = Transmissive())"
 
         # Test coated components show
         lens = SphericalLens(100e-3, -100e-3, 5e-3, 10e-3, λ -> 1.5)
@@ -472,7 +475,7 @@ const BMO = BeamletOptics
             behavior::Absorptive
         end
         BMO.coating_behavior(::DummyAbsorptiveCoating) = Absorptive()
-        
+
         flat_mesh = BMO.QuadraticFlatMesh(10e-3)
         abs_coat = Coating(flat_mesh, DummyAbsorptiveCoating(Absorptive()))
 
@@ -484,14 +487,16 @@ const BMO = BeamletOptics
         @test length(rays(beam)) == 1
 
         # CoatedRefractive with absorptive coating
-        cl_abs = SphericalLens(100e-3, -100e-3, 5e-3, 10e-3, λ -> 1.5) |> with_coatings(front = DummyAbsorptiveCoating(Absorptive()))
+        cl_abs = SphericalLens(100e-3, -100e-3, 5e-3, 10e-3, λ -> 1.5) |>
+                 with_coatings(front = DummyAbsorptiveCoating(Absorptive()))
         system_cl = System([cl_abs])
         beam_cl = Beam(Ray([0.0, -10e-3, 0.0], [0.0, 1.0, 0.0], 1000e-9))
         solve_system!(system_cl, beam_cl; retrace = false)
         @test length(rays(beam_cl)) == 1
 
         # CoatedMirror with absorptive coating
-        cm_abs = SquarePlanoMirror2D(10e-3) |> with_coatings(front = DummyAbsorptiveCoating(Absorptive()))
+        cm_abs = SquarePlanoMirror2D(10e-3) |>
+                 with_coatings(front = DummyAbsorptiveCoating(Absorptive()))
         system_cm = System([cm_abs])
         beam_cm = Beam(Ray([0.0, -10e-3, 0.0], [0.0, 1.0, 0.0], 1000e-9))
         solve_system!(system_cm, beam_cm; retrace = false)
@@ -502,8 +507,10 @@ const BMO = BeamletOptics
         # Dynamic behavior based on ray properties
         struct DynamicARCoating end
         # behaves as Transmissive for λ < 800nm, Reflective for λ >= 800nm
-        BMO.coating_behavior(::DynamicARCoating, ray) = BMO.wavelength(ray) < 800e-9 ? Transmissive() : Reflective()
-        BMO.get_jones_matrix(::DynamicARCoating, θi, λ, n1, n2, is_reflected; from_front=true, kwargs...) = BMO.SPBasis(1.0, 0, 0, 1.0)
+        BMO.coating_behavior(::DynamicARCoating, ray) = BMO.wavelength(ray) < 800e-9 ?
+                                                        Transmissive() : Reflective()
+        BMO.get_jones_matrix(::DynamicARCoating, θi, λ, n1, n2, is_reflected; from_front = true, kwargs...) = BMO.SPBasis(
+            1.0, 0, 0, 1.0)
 
         flat_mesh = BMO.QuadraticFlatMesh(10e-3)
         dyn_coat = Coating(flat_mesh, DynamicARCoating())
@@ -534,7 +541,8 @@ const BMO = BeamletOptics
         n2 = 1.6
         ar = SimpleARCoating(0.0)
 
-        doublet = SphericalDoubletLens(50e-3, -50e-3, -100e-3, 5e-3, 3e-3, 25e-3, n1, n2; front_coating = ar, back_coating = ar)
+        doublet = SphericalDoubletLens(50e-3, -50e-3, -100e-3, 5e-3, 3e-3, 25e-3, n1,
+            n2; front_coating = ar, back_coating = ar)
         @test doublet.front isa Lens
         @test doublet.back isa Lens
         @test BMO.coatings(doublet.front) != ()
@@ -562,18 +570,21 @@ const BMO = BeamletOptics
         @test BMO.active_constituent_sdf(u_shape, p2) isa BMO.AbstractSphericalSurfaceSDF
 
         n_glass = λ -> 1.5
-        struct CompoundLens{T, C <: Tuple} <: BMO.AbstractRefractiveOptic{T, BMO.RefractiveIndex}
+        struct CompoundLens{T, C <: Tuple} <:
+               BMO.AbstractRefractiveOptic{T, BMO.RefractiveIndex}
             shape::BMO.UnionSDF{T}
             n::Function
             coatings::C
-            function CompoundLens(shape::BMO.UnionSDF{T}, n::Function, coatings::C = ()) where {T, C <: Tuple}
+            function CompoundLens(shape::BMO.UnionSDF{T}, n::Function,
+                    coatings::C = ()) where {T, C <: Tuple}
                 return new{T, C}(shape, n, coatings)
             end
         end
         BMO.shape_trait_of(::CompoundLens) = BMO.SingleShape()
         BMO.shape(c::CompoundLens) = c.shape
         BMO.refractive_index(c::CompoundLens, λ::Real) = c.n(λ)
-        BMO._attach_coatings(c::CompoundLens, c_tuple; deepcopy_shape::Bool = false) = CompoundLens(deepcopy_shape ? deepcopy(c.shape) : c.shape, c.n, c_tuple)
+        BMO._attach_coatings(c::CompoundLens, c_tuple; deepcopy_shape::Bool = false) = CompoundLens(
+            deepcopy_shape ? deepcopy(c.shape) : c.shape, c.n, c_tuple)
 
         compound = CompoundLens(u_shape, n_glass)
         coated_compound = compound |> with_coatings(front = SimpleARCoating(0.02))
@@ -591,9 +602,9 @@ const BMO = BeamletOptics
         ar = SimpleARCoating(0.01) # R=1%
         R = coating_reflectance(ar, 0.0, 1064e-9, 1.0, 1.5)
         T = coating_transmittance(ar, 0.0, 1064e-9, 1.0, 1.5)
-        @test R ≈ 0.01 atol=1e-6
-        @test T ≈ 0.99 atol=1e-6
-        @test R + T ≈ 1.0 atol=1e-6
+        @test R≈0.01 atol=1e-6
+        @test T≈0.99 atol=1e-6
+        @test R + T≈1.0 atol=1e-6
     end
 
     @testset "Analytic Normals and Surface Tags" begin
@@ -601,24 +612,24 @@ const BMO = BeamletOptics
         p_front = BMO.Point3(0.0, 10e-3, 0.0)
         n_analytic = BMO.normal3d(box, p_front)
         n_fd = BMO.normal_fd(box, p_front)
-        @test n_analytic ≈ n_fd atol=1e-4
+        @test n_analytic≈n_fd atol=1e-4
         @test BMO.surface_tag(box, p_front, n_analytic) === :front
 
         cyl = BMO.CylinderSDF(5e-3, 10e-3)
         p_top = BMO.Point3(0.0, 5e-3, 0.0)
         n_top = BMO.normal3d(cyl, p_top)
-        @test n_top ≈ [0.0, 1.0, 0.0] atol=1e-4
+        @test n_top≈[0.0, 1.0, 0.0] atol=1e-4
         @test BMO.surface_tag(cyl, p_top, n_top) === :top
 
         p_side = BMO.Point3(5e-3, 0.0, 0.0)
         n_side = BMO.normal3d(cyl, p_side)
-        @test n_side ≈ [1.0, 0.0, 0.0] atol=1e-4
+        @test n_side≈[1.0, 0.0, 0.0] atol=1e-4
         @test BMO.surface_tag(cyl, p_side, n_side) === :side
 
         sph = BMO.SphereSDF(10e-3)
         p_sph = BMO.Point3(0.0, 10e-3, 0.0)
         n_sph = BMO.normal3d(sph, p_sph)
-        @test n_sph ≈ [0.0, 1.0, 0.0] atol=1e-4
+        @test n_sph≈[0.0, 1.0, 0.0] atol=1e-4
         @test BMO.surface_tag(sph, p_sph, n_sph) === :front
     end
 
@@ -632,14 +643,17 @@ const BMO = BeamletOptics
     @testset "Multi-Face Selector Syntax" begin
         lens = BMO.SphericalLens(25e-3, 50e-3, 50e-3)
         coated = BMO.with_coatings(lens, (:front, :back) => BMO.SimpleARCoating(0.01))
-        
+
         p_front = BMO.Point3(0.0, -2e-3, 0.0)
         p_back = BMO.Point3(0.0, 2e-3, 0.0)
         n_front = BMO.Point3(0.0, -1.0, 0.0)
         n_back = BMO.Point3(0.0, 1.0, 0.0)
 
-        @test BMO.get_matching_coating(BMO.coatings(coated), BMO.shape(coated), p_front, n_front) isa BMO.SimpleARCoating
-        @test BMO.get_matching_coating(BMO.coatings(coated), BMO.shape(coated), p_back, n_back) isa BMO.SimpleARCoating
+        @test BMO.get_matching_coating(
+            BMO.coatings(coated), BMO.shape(coated), p_front, n_front) isa
+              BMO.SimpleARCoating
+        @test BMO.get_matching_coating(
+            BMO.coatings(coated), BMO.shape(coated), p_back, n_back) isa BMO.SimpleARCoating
     end
 
     @testset "CompositeSurfaceModel" begin
@@ -650,13 +664,15 @@ const BMO = BeamletOptics
 
         J = BMO.get_jones_matrix(comp, 0.0, 632.8e-9, 1.0, 1.5, false)
         T_val = BMO.unpolarized_transmittance(J)
-        @test T_val ≈ (0.95 * 0.90) atol=1e-4
+        @test T_val≈(0.95 * 0.90) atol=1e-4
     end
 
     @testset "deepcopy_shape option in with_coatings" begin
         lens = BMO.SphericalLens(25e-3, 50e-3, 50e-3)
-        c1 = BMO.with_coatings(lens, :front => BMO.SimpleARCoating(0.01); deepcopy_shape=false)
-        c2 = BMO.with_coatings(lens, :front => BMO.SimpleARCoating(0.01); deepcopy_shape=true)
+        c1 = BMO.with_coatings(
+            lens, :front => BMO.SimpleARCoating(0.01); deepcopy_shape = false)
+        c2 = BMO.with_coatings(
+            lens, :front => BMO.SimpleARCoating(0.01); deepcopy_shape = true)
 
         @test c1.shape === lens.shape
         @test c2.shape !== lens.shape
@@ -670,11 +686,76 @@ const BMO = BeamletOptics
         p1 = BMO.Point3(0.0, 0.0, 0.0)
         p2 = BMO.Point3(1.0, 0.0, 0.0)
 
-        J1 = BMO.get_jones_matrix(graded, 0.0, 632.8e-9, 1.0, 1.5, false; local_p=p1)
-        J2 = BMO.get_jones_matrix(graded, 0.0, 632.8e-9, 1.0, 1.5, false; local_p=p2)
+        J1 = BMO.get_jones_matrix(graded, 0.0, 632.8e-9, 1.0, 1.5, false; local_p = p1)
+        J2 = BMO.get_jones_matrix(graded, 0.0, 632.8e-9, 1.0, 1.5, false; local_p = p2)
 
         @test BMO.unpolarized_transmittance(J1) != BMO.unpolarized_transmittance(J2)
     end
+
+    @testset "Coating Engine Bug Prevention & Surface Tag Contracts" begin
+        # Test surface_tag 1-arg vs 3-arg contract on translated/rotated Lens SDFs
+        lens = SphericalLens(25.0e-3, 50.0e-3, 5.0e-3, 10.0e-3) # thickness = 5mm, y ranges from 0 to 5mm
+        translate3d!(lens, [1.0e-3, 2.0e-3, 3.0e-3])
+        zrotate3d!(lens, π / 4)
+
+        shape_lens = BMO.shape(lens)
+        world_front_pt = position(lens) + orientation(lens) * BMO.Point3(0.0, -1.0e-3, 0.0) # y < 0
+        world_back_pt = position(lens) + orientation(lens) * BMO.Point3(0.0, 6.0e-3, 0.0) # y > 5mm
+
+        # 1-arg surface_tag takes world coordinates and returns correct tag
+        @test BMO.surface_tag(shape_lens, world_front_pt) === :front
+        @test BMO.surface_tag(shape_lens, world_back_pt) === :back
+
+        # 3-arg surface_tag takes local coordinates and returns identical tag
+        local_front_pt = BMO._world_to_sdf(shape_lens, world_front_pt)
+        local_back_pt = BMO._world_to_sdf(shape_lens, world_back_pt)
+        @test BMO.surface_tag(shape_lens, local_front_pt, BMO.Point3(0.0, -1.0, 0.0)) ===
+              :front
+        @test BMO.surface_tag(shape_lens, local_back_pt, BMO.Point3(0.0, 1.0, 0.0)) ===
+              :back
+
+        # Test spatial hit position resolution in resolve_coated_boundary
+        # Front face has AR coating (R=0), back face has Beamsplitter coating (R=0.8)
+        ar_coat = SimpleARCoating(0.0)
+        bs_coat = SimpleBeamsplitterCoating(0.8, 0.8, 0.2, 0.2)
+        coated_lens = lens |> with_coatings(front = ar_coat, back = bs_coat)
+
+        sys = System([coated_lens])
+
+        # Ray starting outside front face targeting lens (s-polarized along z-axis)
+        ray_dir = orientation(lens) * BMO.Point3(0.0, 1.0, 0.0)
+        ray_in = PolarizedRay(
+            world_front_pt - 10.0e-3 * ray_dir, ray_dir, 632.8e-9, [0.0, 0.0, 1.0])
+        beam_in = Beam(ray_in)
+        solve_system!(sys, beam_in; retrace = false)
+        ray_hit = BMO.rays(beam_in)[1]
+
+        # Test boundary resolution at hit point (front face)
+        _, coating_front = BMO.resolve_coated_boundary(sys, coated_lens, ray_hit)
+        @test coating_front === ar_coat
+
+        # Substrate object identity matching in interface context
+        # Check that shape matching detects substrate correctly (6th return element is is_substrate)
+        ctx = BMO._resolve_interface_context(sys, coated_lens, ray_hit)
+        @test ctx[6] === true # is_substrate is true for coated_lens
+
+        # Fabry-Pérot cavity tracing onto detector test
+        m1 = SphericalLens(Inf, Inf, 0.5e-3, 5.0e-3) |>
+             with_coatings(front = SimpleBeamsplitterCoating(0.8, 0.8, 0.2, 0.2),
+            back = SimpleARCoating(0.0))
+        m2 = SphericalLens(Inf, Inf, 0.5e-3, 5.0e-3) |>
+             with_coatings(front = SimpleBeamsplitterCoating(0.8, 0.8, 0.2, 0.2),
+            back = SimpleARCoating(0.0))
+        translate3d!(m2, [0.0, 1.0e-3, 0.0])
+
+        det = Detector(10.0e-3)
+        translate3d!(det, [0.0, 5.0e-3, 0.0])
+
+        fp_sys = System([m1, m2, det])
+        fp_beam = Beam(PolarizedRay(
+            [0.0, -1.0e-3, 0.0], [0.0, 1.0, 0.0], 632.8e-9, [0.0, 0.0, 1.0]))
+        solve_system!(fp_sys, fp_beam; r_max = 50, retrace = false)
+
+        @test !isnothing(BMO.hits(det)) && length(BMO.hits(det)) > 0
+    end
 end
-
-
