@@ -90,7 +90,7 @@ get_index_matching_tolerance() = INDEX_MATCHING_TOLERANCE
 # --- Tracing Defaults ---
 const DEFAULT_R_MAX = @load_preference("default_r_max", 100)
 const DEFAULT_DEPTH_MAX = @load_preference("default_depth_max", typemax(Int))
-const DEFAULT_POWER_CUTOFF = @load_preference("default_power_cutoff", 1e-6)
+const DEFAULT_POWER_CUTOFF = @load_preference("default_power_cutoff", 0.0)
 
 """
     get_default_r_max()
