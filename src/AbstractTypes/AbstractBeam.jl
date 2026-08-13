@@ -30,7 +30,12 @@ AbstractTrees.nodetype(::Type{T}) where {T <: AbstractBeam} = T
 
 AbstractTrees.ParentLinks(::Type{<:AbstractBeam}) = AbstractTrees.StoredParents()
 AbstractTrees.parent(beam::AbstractBeam) = beam.parent
-parent!(beam::B, parent::B) where {B <: AbstractBeam} = (beam.parent = parent)
+function parent!(beam::B, parent::B) where {B <: AbstractBeam}
+    if beam !== parent
+        beam.parent = parent
+    end
+    return nothing
+end
 
 AbstractTrees.children(b::AbstractBeam) = b.children
 

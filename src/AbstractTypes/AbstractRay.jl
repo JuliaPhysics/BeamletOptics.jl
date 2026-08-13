@@ -12,7 +12,7 @@ Stores data calculated by the [`intersect3d`](@ref) method. This information can
 - `coincident_object`: a [`Nullable`](@ref) reference to the adjacent/exiting [`AbstractObject`](@ref) sharing the boundary (for doublets or coatings)
 - `coincident_object_2`: a [`Nullable`](@ref) reference to the adjacent/entering [`AbstractObject`](@ref) sharing the boundary (for coatings)
 """
-mutable struct Intersection{T}
+mutable struct Intersection{T <: Real}
     object::Nullable{AbstractObject}
     shape::Nullable{AbstractShape}
     t::T
@@ -22,11 +22,11 @@ mutable struct Intersection{T}
 end
 
 function Intersection(t::T, n::AbstractArray{T}) where {T}
-    return Intersection(nothing, nothing, t, Point3{T}(n), nothing, nothing)
+    return Intersection{T}(nothing, nothing, t, Point3{T}(n), nothing, nothing)
 end
 
 function Intersection(t::T, n::AbstractArray{T}, shape::Nullable{AbstractShape}) where {T}
-    return Intersection(nothing, shape, t, Point3{T}(n), nothing, nothing)
+    return Intersection{T}(nothing, shape, t, Point3{T}(n), nothing, nothing)
 end
 
 function Intersection(object::Nullable{AbstractObject}, shape::Nullable{AbstractShape}, t::Real, n::Point3{S}) where {S}
@@ -36,7 +36,7 @@ end
 
 shape(i::Intersection) = i.shape
 object(i::Intersection) = i.object
-object!(i::Intersection, new::AbstractObject) = (i.object = new)
+object!(i::Intersection, new::Nullable{AbstractObject}) = (i.object = new; return i)
 
 Base.length(i::Intersection) = i.t
 
@@ -113,6 +113,15 @@ function intersection!(ray::AbstractRay, _intersection::Nullable{Intersection})
      ray.intersection = _intersection
      return nothing
 end
+
+"""
+    bounding_sphere(obj)
+
+Returns `(c_local, r)` where `c_local` is the center of the bounding sphere in local coordinates and `r` is its radius, or `nothing` if not implemented.
+"""
+bounding_sphere(::Any) = nothing
+
+
 
 """
     intersect3d(shape::AbstractShape, ::AbstractRay)

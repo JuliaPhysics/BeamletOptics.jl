@@ -125,7 +125,7 @@ end
         system::AbstractSystem, ray::AbstractRay{R}, hint::Hint) where {R}
     tol = get_coincident_boundary_tolerance()
     # Trace against hinted shape of object first
-    primary::Nullable{Intersection{R}} = intersect3d(
+    primary = intersect3d(
         shape(hint)::AbstractShape{R}, ray)
     if primary === nothing
         # If hinted object is not intersected, trace the entire system
@@ -315,16 +315,17 @@ function retrace_system!(
         else
             intersection!(ray, trace_one(system, ray, _hint))
         end
-        # Test if intersection is valid
-        if isnothing(intersection(ray))
+        # Test if intersection and object are valid
+        int = intersection(ray)
+        _obj = isnothing(int) ? nothing : object(int)
+        if isnothing(_obj)
             cleanup_children = true
             cleanup_tail = true
             reset_intersection = true
             cutoff = i
             break
         end
-        # Test if interaction is still valid
-        _interaction = interact3d(system, object(intersection(ray)), beam, ray)
+        _interaction = interact3d(system, _obj, beam, ray)
         # Catch hint
         _hint = hint(_interaction)
         if isnothing(_interaction)
@@ -401,6 +402,9 @@ function trace_system!(
             break
         end
         _object = object(intersection(last(rays(gauss.chief))))
+        if isnothing(_object)
+            break
+        end
         # Calculate interaction
         interaction = interact3d(system,
             _object,
@@ -444,15 +448,6 @@ function retrace_system!(
     end
     # Iterate over chief rays
     for (i, c_ray) in enumerate(rays(gauss.chief))
-        # Test if intersection is valid
-        _intersection = intersection(c_ray)
-        if isnothing(_intersection)
-            cleanup_children = true
-            cleanup_tail = true
-            reset_intersection = true
-            cutoff = i
-            break
-        end
         # Recalculate current intersection
         if isnothing(_hint)
             for b in beams
@@ -473,17 +468,19 @@ function retrace_system!(
             cutoff = i
             break
         end
-        # Test if valid intersection
-        if isnothing(intersection(c_ray))
+        # Test if valid intersection and object
+        c_int = intersection(c_ray)
+        _object = isnothing(c_int) ? nothing : object(c_int)
+        if isnothing(_object)
             cleanup_children = true
             cleanup_tail = true
             reset_intersection = true
             cutoff = i
             break
         end
-        _object = object(intersection(c_ray))
         for b in beams
-            object!(intersection(rays(b)[i]), _object)
+            r_int = intersection(rays(b)[i])
+            !isnothing(r_int) && object!(r_int, _object)
         end
         # Test if interaction is still valid
         _interaction = interact3d(system, _object, gauss, i)
@@ -571,6 +568,9 @@ function trace_system!(
             end
             break
         end
+        if isnothing(_object)
+            break
+        end
         # Calculate interaction
         interaction = interact3d(system, _object, agb, seg_counter)
         if isnothing(interaction)
@@ -624,15 +624,6 @@ function retrace_system!(
 
     # Iterate over chief rays
     for (i, c_ray) in enumerate(rays(agb.c))
-        # Test if intersection is valid
-        _intersection = intersection(c_ray)
-        if isnothing(_intersection)
-            cleanup_children = true
-            cleanup_tail = true
-            reset_intersection = true
-            cutoff = i
-            break
-        end
         # Recalculate current intersection
         if isnothing(_hint)
             intersection!(c_ray, trace_all(system, c_ray))
@@ -653,16 +644,16 @@ function retrace_system!(
             cutoff = i
             break
         end
-        # Test if valid intersection
-        if isnothing(intersection(c_ray))
+        # Test if valid intersection and object
+        c_int = intersection(c_ray)
+        _object = isnothing(c_int) ? nothing : object(c_int)
+        if isnothing(_object)
             cleanup_children = true
             cleanup_tail = true
             reset_intersection = true
             cutoff = i
             break
         end
-        # Update object field
-        _object = object(intersection(c_ray))
         object!(intersection(c_ray), _object)
         for beam in aux
             r_int = intersection(rays(beam)[i])
@@ -692,7 +683,9 @@ function retrace_system!(
 
         # Verify that the paraxial assumptions still hold for the new segment
         if check_invariant && !check_optical_invariant(agb, i + 1; threshold = threshold)
+            cleanup_children = true
             cleanup_tail = true
+            reset_intersection = true
             cutoff = i
             break
         end
@@ -754,9 +747,11 @@ function solve_system!(
         power_cutoff::Real = 0.0
 ) where {B <: AbstractBeam}
     queue = Tuple{B, Int}[(beam, 1)]
-    while !isempty(queue)
-        # Process beams in FIFO order.
-        current, depth = popfirst!(queue)
+    head = 1
+    while head <= length(queue)
+        # Process beams in FIFO order without O(K) array shifts.
+        current, depth = queue[head]
+        head += 1
         # Check power cutoff before tracing the current beam.
         if optical_power(current) < power_cutoff
             _drop_beams!(current)
@@ -784,8 +779,8 @@ function solve_system!(
 end
 
 function solve_system!(system::AbstractSystem, bg::AbstractBeamGroup; kwargs...)
-    Threads.@threads for _beam in beams(bg)
-        solve_system!(system, _beam; kwargs...)
+    @sync for _beam in beams(bg)
+        Threads.@spawn solve_system!(system, _beam; kwargs...)
     end
     return nothing
 end

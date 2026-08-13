@@ -754,7 +754,7 @@ const BMO = BeamletOptics
         fp_sys = System([m1, m2, det])
         fp_beam = Beam(PolarizedRay(
             [0.0, -1.0e-3, 0.0], [0.0, 1.0, 0.0], 632.8e-9, [0.0, 0.0, 1.0]))
-        solve_system!(fp_sys, fp_beam; r_max = 50, retrace = false)
+        solve_system!(fp_sys, fp_beam; r_max = 50, depth_max = 12, retrace = false)
 
         @test !isnothing(BMO.hits(det)) && length(BMO.hits(det)) > 0
     end

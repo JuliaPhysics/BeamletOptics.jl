@@ -141,16 +141,21 @@ end
 Calculate the optical path length of the `beam`, i.e. ``\\mathrm{OPL} = n \\cdot l``.
 """
 function optical_path_length(beam::Beam{T}) where {T}
-    p = AbstractTrees.parent(beam)
-    l0 = isnothing(p) ? zero(T) : optical_path_length(p)
-    for ray in rays(beam)
-        if isnothing(intersection(ray))
+    l0 = zero(T)
+    curr = beam
+    visited = Set{UInt}()
+    while curr !== nothing
+        id = objectid(curr)
+        if id in visited
             break
         end
-
-        l0 += optical_path_length(ray)
+        push!(visited, id)
+        for ray in rays(curr)
+            isnothing(intersection(ray)) && break
+            l0 += optical_path_length(ray)
+        end
+        curr = AbstractTrees.parent(curr)
     end
-
     return l0
 end
 

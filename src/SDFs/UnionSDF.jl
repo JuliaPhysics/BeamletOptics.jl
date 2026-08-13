@@ -170,3 +170,14 @@ function normal3d(s::UnionSDF, pos)
 
     return normal3d(s.sdfs[idx], pos)
 end
+
+function surface_tag(u::UnionSDF, point)
+    p_local = _world_to_sdf(u, point)
+    idx = argmin(sdf(_sdf, p_local) for _sdf in u.sdfs)
+    return surface_tag(u.sdfs[idx], p_local)
+end
+
+function surface_tag(u::UnionSDF, point, normal)
+    idx = argmin(sdf(_sdf, point) for _sdf in u.sdfs)
+    return surface_tag(u.sdfs[idx], point, normal)
+end
