@@ -733,7 +733,7 @@ A maximum number of rays per `beam` (`r_max`) can be specified in order to avoid
 - `depth_max = get_default_depth_max()`: Maximum number of branching levels explored from the root beam.
 - `check_invariant = true`: enables or disables optical invariant checks where applicable
 - `threshold = get_invariant_threshold()`: threshold for paraxial invariant checks
-- `power_cutoff = 0.0`: power threshold below which sub-beams/split paths are dropped to prevent infinite branching
+- `power_cutoff = get_default_power_cutoff()`: power threshold below which sub-beams/split paths are dropped to prevent infinite branching (default: 1e-6)
 """
 function solve_system!(
         system::AbstractSystem,
@@ -744,7 +744,7 @@ function solve_system!(
         depth_max::Int = get_default_depth_max(),
         check_invariant::Bool = true,
         threshold::Real = get_invariant_threshold(),
-        power_cutoff::Real = 0.0
+        power_cutoff::Real = get_default_power_cutoff()
 ) where {B <: AbstractBeam}
     queue = Tuple{B, Int}[(beam, 1)]
     head = 1

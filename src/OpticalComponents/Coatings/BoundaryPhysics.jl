@@ -343,6 +343,10 @@ function _propagate_splitting_gaussian_beamlet(
     J_r = get_jones_matrix(coating_model, angle3d(direction(c_ray), -normal),
         λ, n_incident, n_transmitted, true; from_front=from_front)
 
+    if !iszero(J_t[1, 2]) || !iszero(J_t[2, 1]) || !iszero(J_r[1, 2]) || !iszero(J_r[2, 1])
+        @warn "Jones matrix contains off-diagonal cross-polarization terms. Scalar GaussianBeamlet only tracks diagonal transmission J[1,1]. Use AstigmaticGaussianBeamlet for full vector polarization." maxlog = 1
+    end
+
     # Spawn transmitted
     chief_t = Beam(Ray{T}(pos, c_dir_t, nothing, λ, n_transmitted))
     waist_t = Beam(Ray{T}(

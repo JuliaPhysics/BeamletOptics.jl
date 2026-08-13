@@ -202,12 +202,11 @@ end
 
 Compute the average power reflectance from a Jones reflection matrix for unpolarized light.
 
-!!! warning "Absorption"
+!!! note "Absorption"
     For non-absorbing coatings, `T = 1 - R` holds exactly. For absorbing coatings (complex
-    refractive index layers in a `ThinFilmCoating`), the absorbed fraction is lost and
-    `T + R < 1`. Plain `Ray` types use `T = 1 - R`, which silently assigns the absorbed
-    fraction to transmission. Use `PolarizedRay` for physically correct treatment of
-    absorbing coatings.
+    refractive index layers in a `ThinFilmCoating`), the absorbed fraction is accounted for such
+    that `T + R < 1`. Both `Ray` and `PolarizedRay` derive `T` via `coating_transmittance`
+    and `R` via `coating_reflectance` so that absorbed power `A = 1 - R - T` is properly deducted.
 """
 @inline unpolarized_reflectance(J) = 0.5 * (abs2(J[1, 1]) + abs2(J[1, 2]) + abs2(J[2, 1]) + abs2(J[2, 2]))
 
