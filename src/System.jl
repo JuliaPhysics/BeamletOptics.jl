@@ -56,10 +56,11 @@ function retrace_system!(::AbstractSystem, beam::B) where {B <: AbstractBeam}
     return nothing
 end
 
-@inline resolve_coincident_boundary(exiting_int, entering_int) =
-    resolve_coincident_boundary(exiting_int, entering_int, object(exiting_int), object(entering_int))
+@inline resolve_coincident_boundary(exiting_int, entering_int) = resolve_coincident_boundary(
+    exiting_int, entering_int, object(exiting_int), object(entering_int))
 
-@inline function resolve_coincident_boundary(exiting_int, entering_int, ::AbstractObject, ::AbstractObject)
+@inline function resolve_coincident_boundary(
+        exiting_int, entering_int, ::AbstractObject, ::AbstractObject)
     exiting_int.coincident_object = object(entering_int)
     return exiting_int
 end
@@ -70,10 +71,13 @@ end
 Resolves the primary intersection and assigns adjacent coincident objects for thin-interface coatings
 and flush bulk optical boundaries (e.g., cemented doublet lenses).
 """
-@inline function _resolve_coincident_group(thin_primary, exiting_int, entering_int, fallback_int)
+@inline function _resolve_coincident_group(
+        thin_primary, exiting_int, entering_int, fallback_int)
     if thin_primary !== nothing
-        thin_primary.coincident_object = exiting_int !== nothing ? object(exiting_int) : nothing
-        thin_primary.coincident_object_2 = entering_int !== nothing ? object(entering_int) : nothing
+        thin_primary.coincident_object = exiting_int !== nothing ? object(exiting_int) :
+                                         nothing
+        thin_primary.coincident_object_2 = entering_int !== nothing ? object(entering_int) :
+                                           nothing
         return thin_primary
     elseif exiting_int !== nothing && entering_int !== nothing
         return resolve_coincident_boundary(exiting_int, entering_int)
@@ -733,7 +737,7 @@ A maximum number of rays per `beam` (`r_max`) can be specified in order to avoid
 - `depth_max = get_default_depth_max()`: Maximum number of branching levels explored from the root beam.
 - `check_invariant = true`: enables or disables optical invariant checks where applicable
 - `threshold = get_invariant_threshold()`: threshold for paraxial invariant checks
-- `power_cutoff = get_default_power_cutoff()`: power threshold below which sub-beams/split paths are dropped to prevent infinite branching (default: 1e-6)
+- `power_cutoff = get_default_power_cutoff()`: power threshold below which sub-beams/split paths are dropped to prevent infinite branching (default: 0.0)
 """
 function solve_system!(
         system::AbstractSystem,
