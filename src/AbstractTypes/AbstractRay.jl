@@ -208,7 +208,7 @@ Calculate the optical path length of the `ray`, i.e. ``\\mathrm{OPL} = n \\cdot 
 """
 function optical_path_length(ray::AbstractRay{T}) where {T}
     isnothing(intersection(ray)) && return T(Inf)
-    return length(intersection(ray)) * refractive_index(ray)
+    return length(intersection(ray)) * real(refractive_index(ray))
 end
 
 """

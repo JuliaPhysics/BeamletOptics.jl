@@ -28,12 +28,12 @@ If the critical angle for n1, n2 and the incident angle is reached, the ray is r
 - `n1`: index of ref. before refraction
 - `n2`: index of ref. after refraction
 """
-function refraction3d(dir::AbstractArray, normal::AbstractArray, n1::Real, n2::Real)
+function refraction3d(dir::AbstractArray, normal::AbstractArray, n1::Number, n2::Number)
     # dir and normal must have unit length!
     isapprox(norm(dir), 1) || throw(ArgumentError("dir must have  unit length"))
     isapprox(norm(normal), 1) ||
         throw(ArgumentError(lazy"norm must have  unit length: $(norm(normal))"))
-    n = n1 / n2
+    n = real(n1) / real(n2)
     cosθi = -dot(normal, dir)
     sinθt² = n^2 * (1 - cosθi^2)
     # Check for total reflection

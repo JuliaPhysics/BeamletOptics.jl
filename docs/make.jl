@@ -64,7 +64,8 @@ makedocs(;
                 "Beamsplitters" => joinpath("basics", "components", "beamsplitters.md"),
                 "Detectors" => joinpath("basics", "components", "detectors.md"),
                 "Polarizing components" => joinpath("basics", "components", "polarizers.md"),
-                "Coatings" => joinpath("basics", "components", "coatings.md")
+                "Coatings" => joinpath("basics", "components", "coatings.md"),
+                "Materials & Absorption" => joinpath("basics", "components", "materials.md")
             ],
             "Optical systems" => joinpath("basics", "systems.md"),
             "Visualization" => joinpath("basics", "render.md")

@@ -34,6 +34,9 @@ In practice, a great variety and mixture of different lens shapes exists -- e.g.
 !!! tip "Coated Lenses"
     To model lenses with customized reflective or anti-reflective boundaries (such as AR coatings on the front/back faces), refer to the [Coatings](@ref) section. You can construct a coated lens using the `with_coatings` API (e.g. `lens |> with_coatings(front = SimpleARCoating(0.01))`).
 
+!!! tip "Absorbing Lenses and Gain Media"
+    Lenses can be made from absorbing materials (e.g. absorption filters) or active gain crystals (e.g. laser rods) by providing an [`AbsorbingMedium`](@ref), [`GainMedium`](@ref), or complex refractive index function `λ -> complex(n, κ)`. See the [Materials, Absorption & Gain](@ref) section for details.
+
 ### Surface based lens construction
 
 To make it easier to specify lenses similar to established optical simulation frameworks, e.g. [Zemax](https://www.ansys.com/products/optics/ansys-zemax-opticstudio), the [`BeamletOptics.AbstractSurface`](@ref) API can be used. This is a helper interface for surfaces specifications and interprets them to the corresponding SDF-based volume representation. 

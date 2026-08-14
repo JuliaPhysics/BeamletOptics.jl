@@ -17,7 +17,8 @@ export System, StaticSystem, solve_system!
 export ObjectGroup
 
 # additional
-export DiscreteRefractiveIndex, SellmeierEquation
+export RefractiveIndex, DiscreteRefractiveIndex, SellmeierEquation, AbsorbingMedium, GainMedium,
+       real_refractive_index, extinction_coefficient, absorption_coefficient, bulk_attenuation_factor
 
 #=
 components

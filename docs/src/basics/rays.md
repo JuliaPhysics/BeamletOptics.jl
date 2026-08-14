@@ -78,3 +78,13 @@ rs, rp, ts, tp = BeamletOptics.fresnel_coefficients(θ, n2/n1)
 ```
 
 ![Glass to vacuum](glass_to_vac.png)
+
+## Bulk Attenuation & Complex Media
+
+In addition to interface interactions, rays and beamlets propagating through absorbing or amplifying media experience bulk attenuation or small-signal gain according to their complex refractive index $\tilde{n} = n + i\kappa$:
+
+* **Power attenuation (`Ray`):** ``w(L) = w_0 e^{-\alpha L} = w_0 e^{-\frac{4\pi \kappa}{\lambda} L}``
+* **Electric field attenuation (`PolarizedRay`, `GaussianBeamlet`, `AstigmaticGaussianBeamlet`):** ``E(L) = E_0 e^{-\frac{\alpha}{2} L} = E_0 e^{-\frac{2\pi \kappa}{\lambda} L}``
+* **Small-signal gain:** for gain media ($\kappa < 0$), ``g = -\alpha > 0`` amplifies light as ``e^{+g L}``.
+
+For detailed information on defining absorbing materials and gain media, refer to the [Materials, Absorption & Gain](@ref) section.

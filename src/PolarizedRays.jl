@@ -39,7 +39,7 @@ mutable struct PolarizedRay{T} <: AbstractRay{T}
     dir::Point3{T}
     intersection::Nullable{Intersection{T}}
     λ::T
-    n::T
+    n::Union{T, Complex{T}}
     E0::Point3{Complex{T}}
     function PolarizedRay{T}(
             pos::AbstractArray{P},
@@ -49,7 +49,7 @@ mutable struct PolarizedRay{T} <: AbstractRay{T}
             n::N,
             E0::AbstractArray{<:Union{E, Complex{E}}}
         ) where {T, P, D, L, N, E}
-        M = promote_type(T, P, D, L, N, E)
+        M = promote_type(T, P, D, L, real(N), real(E))
         if isapprox(norm(dir), 0, atol=1e-14)
             throw(ErrorException("Direction vector to short for normalization."))
         end
@@ -62,7 +62,7 @@ mutable struct PolarizedRay{T} <: AbstractRay{T}
             normalize(Point3{M}(dir)),
             int,
             M(λ),
-            M(n),
+            (n isa Complex ? Complex{M}(n) : M(n)),
             Point3{Complex{M}}(E0)
         )
     end

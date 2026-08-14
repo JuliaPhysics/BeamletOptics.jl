@@ -17,6 +17,7 @@ function interact_refractive_boundary(
 ) where {T, R <: Ray{T}}
     ndir, TIR = refraction3d(direction(ray), normal, n_incident, n_transmitted)
     npos = position(ray) + length(ray) * direction(ray)
+    att_power, _ = bulk_attenuation_factor(n_incident, λ, length(ray))
     if TIR
         ndir = reflection3d(direction(ray), normal)
         n_out = n_incident
@@ -27,7 +28,7 @@ function interact_refractive_boundary(
         θi = angle3d(direction(ray), -normal)
         T_coeff = coating_transmittance(coating_model, θi, λ, n_incident, n_transmitted; from_front=from_front)
     end
-    return BeamInteraction{T, R}(hint, Ray{T}(npos, ndir, nothing, λ, n_out, weight(ray) * T_coeff))
+    return BeamInteraction{T, R}(hint, Ray{T}(npos, ndir, nothing, λ, n_out, weight(ray) * att_power * T_coeff))
 end
 
 function interact_refractive_boundary(
@@ -50,7 +51,8 @@ function interact_refractive_boundary(
     hint_out = isentering(ray) ? nothing : Hint(substrate_obj)
     θi = angle3d(direction(ray), -normal)
     R_coeff = coating_reflectance(coating_model, θi, λ, n_incident, n_transmitted; from_front=from_front)
-    return BeamInteraction{T, R}(hint_out, Ray{T}(npos, ndir, nothing, λ, n_out, weight(ray) * R_coeff))
+    att_power, _ = bulk_attenuation_factor(n_incident, λ, length(ray))
+    return BeamInteraction{T, R}(hint_out, Ray{T}(npos, ndir, nothing, λ, n_out, weight(ray) * att_power * R_coeff))
 end
 
 function interact_refractive_boundary(
@@ -79,9 +81,10 @@ function interact_refractive_boundary(
     θi = angle3d(direction(ray), -normal)
     R_coeff = coating_reflectance(coating_model, θi, λ, n_incident, n_transmitted; from_front=from_front)
     T_coeff = coating_transmittance(coating_model, θi, λ, n_incident, n_transmitted; from_front=from_front)
+    att_power, _ = bulk_attenuation_factor(n_incident, λ, length(ray))
 
-    beam_t = Beam(Ray{T}(npos, ndir_t, nothing, λ, n_transmitted, weight(ray) * T_coeff))
-    beam_r = Beam(Ray{T}(npos, ndir_r, nothing, λ, n_incident, weight(ray) * R_coeff))
+    beam_t = Beam(Ray{T}(npos, ndir_t, nothing, λ, n_transmitted, weight(ray) * att_power * T_coeff))
+    beam_r = Beam(Ray{T}(npos, ndir_r, nothing, λ, n_incident, weight(ray) * att_power * R_coeff))
     children!(beam, (beam_t, beam_r))
     return nothing
 end
@@ -114,7 +117,8 @@ function interact_refractive_boundary(
         J = get_jones_matrix(coating_model, angle3d(direction(ray), -normal),
             λ, n_incident, n_transmitted, false; from_front=from_front)
     end
-    E0 = _calculate_global_E0(substrate_obj, ray, ndir, J)
+    _, att_field = bulk_attenuation_factor(n_incident, λ, length(ray))
+    E0 = _calculate_global_E0(substrate_obj, ray, ndir, J) * att_field
     return BeamInteraction{T, R}(hint, PolarizedRay{T}(npos, ndir, nothing, λ, n_out, E0))
 end
 
@@ -138,7 +142,8 @@ function interact_refractive_boundary(
     hint_out = isentering(ray) ? nothing : Hint(substrate_obj)
     J = get_jones_matrix(
         coating_model, angle3d(direction(ray), -normal), λ, n_incident, n_transmitted, true; from_front=from_front)
-    E0 = _calculate_global_E0(substrate_obj, ray, ndir, J)
+    _, att_field = bulk_attenuation_factor(n_incident, λ, length(ray))
+    E0 = _calculate_global_E0(substrate_obj, ray, ndir, J) * att_field
     return BeamInteraction{T, R}(
         hint_out, PolarizedRay{T}(npos, ndir, nothing, λ, n_out, E0))
 end
@@ -171,8 +176,9 @@ function interact_refractive_boundary(
     J_r = get_jones_matrix(
         coating_model, angle3d(direction(ray), -normal), λ, n_incident, n_transmitted, true; from_front=from_front)
 
-    E0_t = _calculate_global_E0(substrate_obj, ray, ndir_t, J_t)
-    E0_r = _calculate_global_E0(substrate_obj, ray, ndir_r, J_r)
+    _, att_field = bulk_attenuation_factor(n_incident, λ, length(ray))
+    E0_t = _calculate_global_E0(substrate_obj, ray, ndir_t, J_t) * att_field
+    E0_r = _calculate_global_E0(substrate_obj, ray, ndir_r, J_r) * att_field
 
     beam_t = Beam(PolarizedRay{T}(npos, ndir_t, nothing, λ, n_transmitted, E0_t))
     beam_r = Beam(PolarizedRay{T}(npos, ndir_r, nothing, λ, n_incident, E0_r))
@@ -260,9 +266,10 @@ function interact_reflective_boundary(
         get_jones_matrix(coating_model, angle3d(direction(ray), -normal), λ, n_incident, n_transmitted, true; from_front=from_front)
     end
     R_coeff = clamp(unpolarized_reflectance(J_r), 0.0, 1.0)
+    att_power, _ = bulk_attenuation_factor(n_incident, λ, length(ray))
 
     return BeamInteraction{T, R}(
-        nothing, Ray{T}(npos, ndir, nothing, λ, n_incident, weight(ray) * R_coeff))
+        nothing, Ray{T}(npos, ndir, nothing, λ, n_incident, weight(ray) * att_power * R_coeff))
 end
 
 function interact_reflective_boundary(
@@ -284,7 +291,8 @@ function interact_reflective_boundary(
         get_jones_matrix(coating_model, angle3d(direction(ray), -normal),
             λ, n_incident, n_transmitted, true; from_front=from_front)
     end
-    E0 = _calculate_global_E0(substrate_obj, ray, ndir, J)
+    _, att_field = bulk_attenuation_factor(n_incident, λ, length(ray))
+    E0 = _calculate_global_E0(substrate_obj, ray, ndir, J) * att_field
     return BeamInteraction{T, R}(
         nothing, PolarizedRay{T}(npos, ndir, nothing, λ, refractive_index(ray), E0))
 end
@@ -347,6 +355,8 @@ function _propagate_splitting_gaussian_beamlet(
         @warn "Jones matrix contains off-diagonal cross-polarization terms. Scalar GaussianBeamlet only tracks diagonal transmission J[1,1]. Use AstigmaticGaussianBeamlet for full vector polarization." maxlog = 1
     end
 
+    _, att_field = bulk_attenuation_factor(n_incident, λ, length(c_ray))
+
     # Spawn transmitted
     chief_t = Beam(Ray{T}(pos, c_dir_t, nothing, λ, n_transmitted))
     waist_t = Beam(Ray{T}(
@@ -359,7 +369,7 @@ function _propagate_splitting_gaussian_beamlet(
     # It ignores the full Jones matrix (e.g. cross-polarization and off-diagonal elements).
     # For full polarization support, AstigmaticGaussianBeamlet should be used instead.
     t_val = J_t[1, 1]
-    E0_t = t_val * electric_field(gauss) * (beam_waist(gauss) / w0_t)
+    E0_t = t_val * electric_field(gauss) * att_field * (beam_waist(gauss) / w0_t)
     t = GaussianBeamlet(chief_t, waist_t, divergent_t, wavelength(gauss), w0_t, E0_t)
 
     # Spawn reflected
@@ -371,7 +381,7 @@ function _propagate_splitting_gaussian_beamlet(
 
     w0_r = w0_t
     r_val = -J_r[1, 1]
-    E0_r = r_val * electric_field(gauss) * (beam_waist(gauss) / w0_r)
+    E0_r = r_val * electric_field(gauss) * att_field * (beam_waist(gauss) / w0_r)
     r = GaussianBeamlet(chief_r, waist_r, divergent_r, wavelength(gauss), w0_r, E0_r)
 
     children!(gauss, (t, r))
@@ -445,8 +455,9 @@ function _propagate_splitting_astigmatic_beamlet(
     J_r = get_jones_matrix(coating_model, angle3d(direction(c_ray), -normal),
         λ, n_incident, n_transmitted, true; from_front=from_front)
 
-    E0_t = _calculate_global_E0(coated_or_coating, c_ray, dirs_t[1], J_t)
-    E0_r = _calculate_global_E0(coated_or_coating, c_ray, dirs_r[1], J_r)
+    _, att_field = bulk_attenuation_factor(n_incident, λ, length(c_ray))
+    E0_t = _calculate_global_E0(coated_or_coating, c_ray, dirs_t[1], J_t) * att_field
+    E0_r = _calculate_global_E0(coated_or_coating, c_ray, dirs_r[1], J_r) * att_field
 
     # Spawn transmitted
     chief_t = Beam(PolarizedRay{T}(
