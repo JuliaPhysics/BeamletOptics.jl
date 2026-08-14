@@ -38,7 +38,11 @@ function RoundThinBeamsplitter(diameter::Real; reflectance::Real = 0.5)
 end
 
 # Check validity of the split coefficients
-function Base.isvalid(c::Coating{T, S, SimpleBeamsplitterCoating}) where {T, S}
+function Base.isvalid(c::Coating{<:Any, <:Any, <:SimpleBeamsplitterCoating})
     model = c.model
+    return abs2(model.rs) + abs2(model.ts) ≈ 1
+end
+
+function Base.isvalid(model::SimpleBeamsplitterCoating)
     return abs2(model.rs) + abs2(model.ts) ≈ 1
 end

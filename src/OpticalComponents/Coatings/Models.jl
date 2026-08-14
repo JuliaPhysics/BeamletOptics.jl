@@ -89,7 +89,7 @@ coating_behavior(::Uncoated) = Transmissive()
 @inline get_coating_behavior(c) = coating_behavior(c)
 
 """
-    SimpleARCoating(R::Float64 = 0.0)
+    SimpleARCoating(R::Real = 0.0)
 
 A simplified Anti-Reflective (AR) coating model defined by a constant power reflectance `R`.
 Behaves as `Transmissive`.
@@ -98,14 +98,14 @@ Behaves as `Transmissive`.
     This model returns constant coefficients regardless of angle of incidence, wavelength,
     or refractive index ratio. For angle-dependent AR behavior, use [`ThinFilmCoating`](@ref).
 """
-struct SimpleARCoating <: AbstractCoatingModel
-    R::Float64
+struct SimpleARCoating{T <: Real} <: AbstractCoatingModel
+    R::T
 end
 SimpleARCoating() = SimpleARCoating(0.0)
 coating_behavior(::SimpleARCoating) = Transmissive()
 
 """
-    SimpleHRCoating(R::Float64 = 1.0)
+    SimpleHRCoating(R::Real = 1.0)
 
 A simplified Highly Reflective (HR) coating model defined by a constant power reflectance `R`.
 Behaves as `Reflective`.
@@ -114,8 +114,8 @@ Behaves as `Reflective`.
     This model returns constant coefficients regardless of angle of incidence, wavelength,
     or refractive index ratio. For angle-dependent HR behavior, use [`ThinFilmCoating`](@ref).
 """
-struct SimpleHRCoating <: AbstractCoatingModel
-    R::Float64
+struct SimpleHRCoating{T <: Real} <: AbstractCoatingModel
+    R::T
 end
 SimpleHRCoating() = SimpleHRCoating(1.0)
 coating_behavior(::SimpleHRCoating) = Reflective()
@@ -132,11 +132,15 @@ Behaves as `Splitting`.
     scales the resulting Jones matrix by the boundary impedance factor to ensure that ray intensity
     strictly maps to optical power.
 """
-struct SimpleBeamsplitterCoating <: AbstractCoatingModel
-    rs::ComplexF64
-    rp::ComplexF64
-    ts::ComplexF64
-    tp::ComplexF64
+struct SimpleBeamsplitterCoating{C <: Complex} <: AbstractCoatingModel
+    rs::C
+    rp::C
+    ts::C
+    tp::C
+end
+function SimpleBeamsplitterCoating(rs::Number, rp::Number, ts::Number, tp::Number)
+    T = promote_type(typeof(complex(rs)), typeof(complex(rp)), typeof(complex(ts)), typeof(complex(tp)))
+    return SimpleBeamsplitterCoating{T}(T(rs), T(rp), T(ts), T(tp))
 end
 coating_behavior(::SimpleBeamsplitterCoating) = Splitting()
 
@@ -175,13 +179,13 @@ struct ThinFilmCoating{N <: Tuple, D <: Tuple, B <: CoatingBehavior} <: Abstract
 end
 function ThinFilmCoating(
         n::Union{Number, Function}, d::Real; behavior::CoatingBehavior = Transmissive())
-    return ThinFilmCoating{typeof((n,)), typeof((Float64(d),)), typeof(behavior)}((n,), (Float64(d),), behavior)
+    return ThinFilmCoating((n,), (d,), behavior)
 end
 function ThinFilmCoating(ns::Union{AbstractVector, Tuple}, ds::Union{AbstractVector, Tuple};
         behavior::CoatingBehavior = Transmissive())
     ns_t = Tuple(ns)
-    ds_t = Tuple(Float64.(ds))
-    return ThinFilmCoating{typeof(ns_t), typeof(ds_t), typeof(behavior)}(ns_t, ds_t, behavior)
+    ds_t = Tuple(ds)
+    return ThinFilmCoating(ns_t, ds_t, behavior)
 end
 coating_behavior(c::ThinFilmCoating) = c.behavior
 
@@ -315,7 +319,7 @@ Falls back to `coating_properties(coating, λ)` for spatially uniform coatings.
 coating_properties(c::AbstractCoatingModel, λ::Real) = ()
 
 function coating_properties(c::ThinFilmCoating, λ::Real)
-    n_vals = map(n -> ComplexF64(n isa Function ? n(λ) : n), c.ns)
+    n_vals = map(n -> (n isa Function ? complex(n(λ)) : complex(n)), c.ns)
     return n_vals, c.ds
 end
 
@@ -353,7 +357,7 @@ function _fresnel_coefficients_matrix(n_vals, d_vals, θi::Real, λ::Real,
         nj_val = n_vals[j]
         dj = d_vals[j]
 
-        cosθj = sqrt(1.0 - (n1 / nj_val)^2 * sinθi^2)
+        cosθj = sqrt(Complex(1.0 - (n1 / nj_val)^2 * sinθi^2))
         δj = (2π / λ) * nj_val * dj * cosθj
 
         ηjs = nj_val * cosθj
@@ -434,14 +438,14 @@ end
 coating_behavior(g::GradedThinFilmCoating) = coating_behavior(g.base_coating)
 
 function coating_properties(g::GradedThinFilmCoating, λ::Real, local_p::AbstractVector)
-    factor = Float64(g.thickness_func(local_p))
+    factor = g.thickness_func(local_p)
     ns, ds = coating_properties(g.base_coating, λ)
     return ns, ds .* factor
 end
 
 function get_jones_matrix(
         g::GradedThinFilmCoating, θi, λ, n1, n2, is_reflected; from_front::Bool = true, local_p = nothing)
-    factor = isnothing(local_p) ? 1.0 : Float64(g.thickness_func(local_p))
+    factor = isnothing(local_p) ? 1.0 : g.thickness_func(local_p)
     ns, ds = coating_properties(g.base_coating, λ)
     ds_graded = ds .* factor
     rs, rp, ts, tp = _fresnel_coefficients_matrix(ns, ds_graded, θi, λ, n1, n2; from_front = from_front)

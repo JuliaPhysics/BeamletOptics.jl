@@ -758,4 +758,43 @@ const BMO = BeamletOptics
 
         @test !isnothing(BMO.hits(det)) && length(BMO.hits(det)) > 0
     end
+
+    @testset "Audit Improvements: Layer TIR Robustness & AD Compatibility" begin
+        # Real-index layer TIR in TMM without DomainError
+        # Layer index nl = 1.2, incident n1 = 1.5, substrate n2 = 1.5.
+        # At θi = 60° (sin 60° ≈ 0.866), n1 * sinθi = 1.299 > 1.2 -> TIR occurs inside layer!
+        θ_tir = π / 3
+        coat_low_index = ThinFilmCoating(1.2, 500e-9)
+        rs, rp, ts, tp = BMO.fresnel_coefficients(coat_low_index, θ_tir, 1000e-9, 1.5, 1.5)
+        @test rs isa Complex
+        @test rp isa Complex
+        @test ts isa Complex
+        @test tp isa Complex
+        # Energy conservation check
+        R_val = coating_reflectance(coat_low_index, θ_tir, 1000e-9, 1.5, 1.5)
+        T_val = coating_transmittance(coat_low_index, θ_tir, 1000e-9, 1.5, 1.5)
+        @test R_val + T_val≈1.0 atol=1e-5
+
+        # Parametric Coatings
+        ar_f32 = SimpleARCoating(Float32(0.01))
+        @test ar_f32.R isa Float32
+        hr_f32 = SimpleHRCoating(Float32(0.99))
+        @test hr_f32.R isa Float32
+        bs_gen = SimpleBeamsplitterCoating(0.5, 0.5, 0.5, 0.5)
+        @test bs_gen.rs isa ComplexF64
+
+        # ForwardDiff / Automatic Differentiation through ThinFilmCoating
+        using ForwardDiff
+        # Compute gradient of transmittance with respect to layer thickness d
+        λ_test = 632.8e-9
+        calc_trans = d -> begin
+            c = ThinFilmCoating(1.38, d)
+            coating_transmittance(c, 0.0, λ_test, 1.0, 1.5)
+        end
+        # Quarter wave thickness: d0 = λ / (4 * 1.38)
+        d0 = λ_test / (4 * 1.38)
+        grad_d = ForwardDiff.derivative(calc_trans, d0)
+        # At optimal AR thickness, transmittance is at a local extremum -> derivative is ~0
+        @test abs(grad_d) < 1e-4
+    end
 end
