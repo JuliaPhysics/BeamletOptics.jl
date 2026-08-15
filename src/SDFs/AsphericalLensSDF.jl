@@ -37,16 +37,21 @@ end
 
 # Constructor for ConvexAsphericalSurfaceSDF
 function ConvexAsphericalSurfaceSDF(
-        coefficients::Vector{T}, radius::T, conic_constant::T, diameter::T) where {T}
+        coefficients::AbstractVector{A}, radius::R, conic_constant::K, diameter::D) where {A, R, K, D}
+    T = float(promote_type(A, R, K, D))
+    coeffs_T = convert(Vector{T}, coefficients)
+    r_T = T(radius)
+    k_T = T(conic_constant)
+    d_T = T(diameter)
     return ConvexAsphericalSurfaceSDF{T}(
-        coefficients,
-        radius,
-        conic_constant,
-        diameter,
+        coeffs_T,
+        r_T,
+        k_T,
+        d_T,
         Point3{T}(0),
-        Matrix{T}(I, 3, 3),
-        Matrix{T}(I, 3, 3),
-        Point2(max_aspheric_value(1/radius, conic_constant, coefficients, diameter))
+        SMatrix{3, 3, T, 9}(one(T) * I),
+        SMatrix{3, 3, T, 9}(one(T) * I),
+        Point2{T}(max_aspheric_value(1 / r_T, k_T, coeffs_T, d_T))
     )
 end
 
@@ -75,7 +80,7 @@ Constructs an aspheric lens with a concave-like surface according to ISO10110.
     There might be unexpected effects for complex shapes which do not show a generally concave
     behavior.
 
-- `coefficients` : (even) coefficients of the asphere.
+- `coefficients` : (even) coefficients of the asphere, starting with A2 (at index 1).
 - `radius` : radius of the lens (negative!)
 - `conic_constant` : conic constant of the lens surface
 - `diameter`: lens diameter
@@ -101,18 +106,24 @@ end
 
 # Constructor for ConcaveAsphericalSurfaceSDF
 function ConcaveAsphericalSurfaceSDF(
-        coefficients::V, radius::T, conic_constant::T, diameter::T,
-        mechanical_diameter::T = diameter) where {T, V <: AbstractVector{T}}
-    return ConcaveAsphericalSurfaceSDF(
-        coefficients,
-        radius,
-        conic_constant,
-        diameter,
-        mechanical_diameter,
+        coefficients::AbstractVector{A}, radius::R, conic_constant::K, diameter::D,
+        mechanical_diameter::MD = diameter) where {A, R, K, D, MD}
+    T = float(promote_type(A, R, K, D, MD))
+    coeffs_T = convert(Vector{T}, coefficients)
+    r_T = T(radius)
+    k_T = T(conic_constant)
+    d_T = T(diameter)
+    md_T = T(mechanical_diameter)
+    return ConcaveAsphericalSurfaceSDF{T}(
+        coeffs_T,
+        r_T,
+        k_T,
+        d_T,
+        md_T,
         Point3{T}(0),
-        SMatrix{3, 3}(one(T) * I),
-        SMatrix{3, 3}(one(T) * I),
-        Point2(max_aspheric_value(1/radius, conic_constant, coefficients, diameter))
+        SMatrix{3, 3, T, 9}(one(T) * I),
+        SMatrix{3, 3, T, 9}(one(T) * I),
+        Point2{T}(max_aspheric_value(1 / r_T, k_T, coeffs_T, d_T))
     )
 end
 
@@ -122,7 +133,7 @@ aspheric_equation(r, c, k, α_coeffs)
 The aspheric surface equation. The asphere is defined by:
 - `c` : The curvature (1/radius) of the surface
 - `k` : The conic constant of the surface
-- `α_coeffs` : The (even) aspheric coefficients, starting with A4.
+- `α_coeffs` : The (even) aspheric coefficients, starting with A2 (at index 1), A4 (at index 2), etc.
 
 This function returns NaN if the square root argument becomes negative.
 
@@ -147,7 +158,7 @@ end
 function gradient_aspheric_equation(r, c, k, α_coeffs)
     Ri = 1 / c
     sqrt_arg = 1 - r^2 * (1 + k) / Ri^2
-    sqrt_arg < 0 && return NaN
+    sqrt_arg < 0 && return Point2(NaN, NaN)
     gr = 2 * r / (Ri * (√(sqrt_arg) + 1)) +
          r^3 * (1 + k) / (Ri^3 * √(sqrt_arg) * (√(sqrt_arg) + 1)^2)
     sum_r = sum(m -> 2 * (m) * α_coeffs[m] * r^(2(m - 1) + 1), eachindex(α_coeffs))
@@ -163,7 +174,9 @@ and `b`.
 """
 function sd_line_segment(p, a, b)
     pa, ba = p - a, b - a
-    h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0)
+    l2 = dot(ba, ba)
+    iszero(l2) && return norm(pa)
+    h = clamp(dot(pa, ba) / l2, 0.0, 1.0)
 
     return norm(pa - h * ba)
 end
@@ -357,7 +370,7 @@ Constructs a plano-convex aspheric lens SDF with:
 - `l`: lens thickness
 - `d`: lens diameter
 - `k` : The conic constant of the surface
-- `α_coeffs` : The (even) aspheric coefficients, starting with A4.
+- `α_coeffs` : The (even) aspheric coefficients, starting with A2 (at index 1), A4 (at index 2), etc.
 
 The spherical surface is constructed flush with the cylinder surface.
 """
@@ -384,7 +397,7 @@ Constructs a plano-concave aspheric lens SDF with:
 - `d`: lens diameter
 - `cz`: aspheric surface chip zone
 - `k` : The conic constant of the surface
-- `α_coeffs` : The (even) aspheric coefficients, starting with A4.
+- `α_coeffs` : The (even) aspheric coefficients, starting with A2 (at index 1), A4 (at index 2), etc.
 - `md`: lens mechanical diameter (default: md = d)
 
 The spherical surface is constructed flush with the cylinder surface.
@@ -442,7 +455,7 @@ This constructor automatically sets the mechanical diameter equal to the optical
 - `radius`: The radius of curvature of the base spherical surface.
 - `diameter`: The clear (optical) diameter of the surface.
 - `conic_constant`: The conic constant defining the deviation from a spherical shape.
-- `coefficients::AbstractVector`: A vector of even aspheric coefficients for higher-order corrections.
+- `coefficients::AbstractVector`: A vector of even aspheric coefficients for higher-order corrections, starting with A2 (index 1).
 - `mechanical_diameter`: The mechanical diameter of the surface; if not provided, it defaults to `diameter`.
 
 """
@@ -495,4 +508,16 @@ function _sdf(s::EvenAsphericalSurface, ::BackwardOrientation)
     end
 
     return back
+end
+
+function bounding_sphere(s::ConvexAsphericalSurfaceSDF{T}) where {T}
+    t = thickness(s)
+    r = sqrt((s.diameter / 2)^2 + (t / 2)^2)
+    return (Point3{T}(0, t / 2, 0), r)
+end
+
+function bounding_sphere(s::ConcaveAsphericalSurfaceSDF{T}) where {T}
+    t = thickness(s)
+    r = sqrt((s.mechanical_diameter / 2)^2 + (t / 2)^2)
+    return (Point3{T}(0, t / 2, 0), r)
 end
