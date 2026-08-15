@@ -460,13 +460,13 @@ This constructor automatically sets the mechanical diameter equal to the optical
 
 """
 function EvenAsphericalSurface(radius::T1, diameter::T2, conic_constant::T3, coefficients::AbstractVector{T4}, mechanical_diameter::T5=diameter) where {T1, T2, T3, T4, T5}
-    T = promote_type(T1, T2, T3, T4, T5)
-    st = SphericalSurface{T}(radius, diameter, mechanical_diameter)
+    T = float(promote_type(T1, T2, T3, T4, T5))
+    st = SphericalSurface{T}(T(radius), T(diameter), T(mechanical_diameter))
 
     return EvenAsphericalSurface{T}(
         st,
-        conic_constant,
-        coefficients
+        T(conic_constant),
+        convert(Vector{T}, coefficients)
     )
 end
 radius(s::EvenAsphericalSurface) = radius(s.spherical)
