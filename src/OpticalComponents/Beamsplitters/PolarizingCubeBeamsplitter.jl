@@ -39,8 +39,9 @@ function PolarizingCubeBeamsplitter(
         leg_length::Real,
         n::RefractiveIndex
     )
-    front_prism = RightAnglePrism(leg_length, leg_length, n)
-    back = RightAnglePrism(leg_length, leg_length, n)
+    T = float(typeof(leg_length))
+    front_prism = RightAnglePrism(T(leg_length), T(leg_length), n)
+    back = RightAnglePrism(T(leg_length), T(leg_length), n)
     zrotate3d!(back, deg2rad(180))
 
     coat_bs = SimpleBeamsplitterCoating(
@@ -48,7 +49,6 @@ function PolarizingCubeBeamsplitter(
         0.0, 1.0  # ts, tp
     )
 
-    T = typeof(leg_length)
     front = with_coatings(front_prism, :hypotenuse => coat_bs)
 
     return PolarizingCubeBeamsplitter{T, typeof(front), typeof(back)}(front, back)

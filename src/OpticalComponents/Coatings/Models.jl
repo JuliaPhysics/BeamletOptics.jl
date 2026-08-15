@@ -148,7 +148,13 @@ coating_behavior(::SimpleBeamsplitterCoating) = Splitting()
     JonesCoating(jones_trans, jones_refl = XZBasis(0,0,0,0); behavior = Transmissive())
 
 A fully generalized coating defined by its transmitted and reflected Jones matrices.
-The Jones matrices can be constants (e.g. `SPBasis`) or functions taking wavelength `λ` and returning a `JonesMatrix`.
+The Jones matrices can be constants (e.g. `SPBasis`, `XZBasis`) or functions taking wavelength `λ` and returning a `JonesMatrix`.
+
+!!! note "Transmission Scaling & Power Conservation"
+    When transmitting across an interface with different refractive indices (`n1 != n2`),
+    the transmitted Jones matrix is automatically scaled by the optical impedance factor
+    `sqrt((n1 * cos(θi)) / (n2 * cos(θt)))`. This ensures that the ray's electric field magnitude
+    `|E|²` directly maps to conserved optical power (Poynting flux).
 """
 struct JonesCoating{JT, JR} <: AbstractCoatingModel
     jones_trans::JT

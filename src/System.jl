@@ -341,7 +341,7 @@ function retrace_system!(
             break
         end
         if i < length(rays(beam))
-            # Modify following ray (NOT THREAD-SAFE)
+            # Mutate following ray in-place (confined to current beam instance)
             replace!(beam, _interaction, i + 1)
         else
             # Valid new interaction, drop children and add new ray
@@ -500,7 +500,7 @@ function retrace_system!(
         end
         # Update next beamlet section
         if i < n_c
-            # NOT THREAD-SAFE
+            # Mutate following beamlet section in-place (confined to current beamlet instance)
             replace!(gauss, _interaction, i + 1)
         else
             # Valid new interaction, drop children and add new ray
@@ -677,7 +677,7 @@ function retrace_system!(
         end
         # Update next beamlet section
         if i < n_c
-            # NOT THREAD-SAFE
+            # Mutate following beamlet section in-place (confined to current beamlet instance)
             replace!(agb, _interaction, i + 1)
         else
             # Valid new interaction, drop children and add new ray
@@ -782,6 +782,13 @@ function solve_system!(
     return nothing
 end
 
+"""
+    solve_system!(system::AbstractSystem, bg::AbstractBeamGroup; kwargs...)
+
+Solve an optical system for an entire [`AbstractBeamGroup`](@ref) in parallel across available Julia threads.
+Each beam in the group is processed independently via `Threads.@spawn`. Detector hit logging is
+safely synchronized via internal reentrant locks.
+"""
 function solve_system!(system::AbstractSystem, bg::AbstractBeamGroup; kwargs...)
     @sync for _beam in beams(bg)
         Threads.@spawn solve_system!(system, _beam; kwargs...)

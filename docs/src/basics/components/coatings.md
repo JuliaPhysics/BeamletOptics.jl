@@ -64,6 +64,9 @@ BeamletOptics.SimpleBeamsplitterCoating
 
 ### Jones Coating
 A generalized polarizing and phase-shifting boundary model defined by custom Jones matrices for transmission and reflection. The matrices can be static or functions of wavelength $\lambda$.
+
+!!! note "Optical Impedance & Power Conservation"
+    When light transmits across an index boundary with $n_1 \neq n_2$, `JonesCoating` and `SimpleBeamsplitterCoating` scale the transmitted field amplitude by the boundary impedance factor $\sqrt{\frac{n_1 \cos\theta_i}{n_2 \cos\theta_t}}$. This guarantees that ray intensity $|\mathbf{E}|^2$ strictly corresponds to optical power (conserving total Poynting flux across media with different refractive indices).
 ```@docs; canonical=false
 BeamletOptics.JonesCoating
 ```

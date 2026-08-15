@@ -609,11 +609,15 @@ const BMO = BeamletOptics
 
     @testset "Analytic Normals and Surface Tags" begin
         box = BMO.BoxSDF(10e-3, 20e-3, 30e-3)
-        p_front = BMO.Point3(0.0, 10e-3, 0.0)
-        n_analytic = BMO.normal3d(box, p_front)
-        n_fd = BMO.normal_fd(box, p_front)
-        @test n_analytic≈n_fd atol=1e-4
-        @test BMO.surface_tag(box, p_front, n_analytic) === :front
+        p_front = BMO.Point3(0.0, -10e-3, 0.0)
+        n_analytic_front = BMO.normal3d(box, p_front)
+        n_fd_front = BMO.normal_fd(box, p_front)
+        @test n_analytic_front≈n_fd_front atol=1e-4
+        @test BMO.surface_tag(box, p_front, n_analytic_front) === :front
+
+        p_back = BMO.Point3(0.0, 10e-3, 0.0)
+        n_analytic_back = BMO.normal3d(box, p_back)
+        @test BMO.surface_tag(box, p_back, n_analytic_back) === :back
 
         cyl = BMO.CylinderSDF(5e-3, 10e-3)
         p_top = BMO.Point3(0.0, 5e-3, 0.0)
@@ -627,10 +631,14 @@ const BMO = BeamletOptics
         @test BMO.surface_tag(cyl, p_side, n_side) === :side
 
         sph = BMO.SphereSDF(10e-3)
-        p_sph = BMO.Point3(0.0, 10e-3, 0.0)
-        n_sph = BMO.normal3d(sph, p_sph)
-        @test n_sph≈[0.0, 1.0, 0.0] atol=1e-4
-        @test BMO.surface_tag(sph, p_sph, n_sph) === :front
+        p_sph_front = BMO.Point3(0.0, -10e-3, 0.0)
+        n_sph_front = BMO.normal3d(sph, p_sph_front)
+        @test n_sph_front≈[0.0, -1.0, 0.0] atol=1e-4
+        @test BMO.surface_tag(sph, p_sph_front, n_sph_front) === :front
+
+        p_sph_back = BMO.Point3(0.0, 10e-3, 0.0)
+        n_sph_back = BMO.normal3d(sph, p_sph_back)
+        @test BMO.surface_tag(sph, p_sph_back, n_sph_back) === :back
     end
 
     @testset "AbstractSurfaceModel Hierarchy" begin

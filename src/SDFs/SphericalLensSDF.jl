@@ -99,7 +99,7 @@ function normal3d(sphere::SphereSDF, point)
 end
 
 function surface_tag(sphere::SphereSDF, p, normal)
-    return p[2] >= 0 ? :front : :back
+    return p[2] <= 0 ? :front : :back
 end
 
 function bounding_sphere(s::SphereSDF{T}) where {T}

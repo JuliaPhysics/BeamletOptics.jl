@@ -41,8 +41,8 @@ function face_id(shape::BoxSDF, local_n::AbstractVector)
     ny = local_n[2]
     nx = local_n[1]
     nz = local_n[3]
-    d_front = ny
-    d_back = -ny
+    d_front = -ny
+    d_back = ny
     d_right = nx
     d_left = -nx
     d_top = nz
