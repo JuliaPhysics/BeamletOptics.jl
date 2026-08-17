@@ -805,4 +805,60 @@ const BMO = BeamletOptics
         # At optimal AR thickness, transmittance is at a local extremum -> derivative is ~0
         @test abs(grad_d) < 1e-4
     end
+
+    @testset "WOLIT Trap and Coated Mirrors" begin
+        # Custom coating for WOLIT filter
+        struct WolitTestCoating
+            lambda_0::Float64
+            n_eff::Float64
+            laser_lambda::Float64
+            transmissive_model::SimpleARCoating{Float64}
+            reflective_model::SimpleHRCoating{Float64}
+        end
+        WolitTestCoating(l0, ne, ll) = WolitTestCoating(l0, ne, ll, SimpleARCoating(0.02), SimpleHRCoating(0.999))
+
+        function BMO.coating_behavior(coating::WolitTestCoating, ray)
+            int = BMO.intersection(ray)
+            normal = BMO.normal3d(int)
+            n_incident = BMO.refractive_index(ray)
+            cos_θ = abs(dot(BMO.direction(ray), normal))
+            sin_θ = sqrt(max(0.0, 1.0 - cos_θ^2))
+            sin_θ_air = n_incident * sin_θ
+            sin_θ_air = clamp(sin_θ_air, 0.0, 1.0)
+            λ_edge = coating.lambda_0 * sqrt(1.0 - sin_θ_air^2 / coating.n_eff^2)
+            return coating.laser_lambda > λ_edge ? Transmissive() : Reflective()
+        end
+
+        function BMO.get_jones_matrix(coating::WolitTestCoating, θi, λ, n1, n2, is_reflected; from_front = true)
+            sin_θ_air = clamp(n1 * sin(θi), 0.0, 1.0)
+            λ_edge = coating.lambda_0 * sqrt(1.0 - sin_θ_air^2 / coating.n_eff^2)
+            if coating.laser_lambda > λ_edge
+                return BMO.get_jones_matrix(coating.transmissive_model, θi, λ, n1, n2, is_reflected; from_front = from_front)
+            else
+                return BMO.get_jones_matrix(coating.reflective_model, θi, λ, n1, n2, is_reflected; from_front = from_front)
+            end
+        end
+
+        λ_w = 632.8e-9
+        wolit_c = WolitTestCoating(650e-9, 1.85, λ_w)
+        α_w = deg2rad(1.2)
+
+        m1_b = RectangularPlanoMirror(15e-3, 2e-3, 0.25e-3)
+        mir1 = with_coatings(m1_b; front = SimpleHRCoating(0.999))
+        translate3d!(mir1, [0.0, 1.0e-3, 0.0])
+        zrotate3d!(mir1, -α_w / 2)
+
+        m2_b = RectangularPlanoMirror(15e-3, 2e-3, 0.25e-3)
+        mir2 = with_coatings(m2_b; front = SimpleARCoating(0.0), back = wolit_c)
+        translate3d!(mir2, [0.0, -0.25e-3, 0.0])
+        zrotate3d!(mir2, α_w / 2)
+
+        wolit_sys = System([mir1, mir2])
+        ray_in = PolarizedRay([-5.5e-3, -2.5e-3, 0.0], [sin(deg2rad(26.5)), cos(deg2rad(26.5)), 0.0], λ_w, [0.0, 0.0, 1.0])
+        wolit_beam = Beam(ray_in)
+        solve_system!(wolit_sys, wolit_beam; r_max = 200, retrace = false)
+
+        @test length(rays(wolit_beam)) == 48
+    end
 end
+

@@ -53,8 +53,11 @@ function interact3d(system::AbstractSystem,
         ray::R) where {T <: Real, R <: AbstractRay{T}}
     coated_obj, coating = resolve_coated_boundary(system, optic, ray)
     target_obj = isnothing(coated_obj) ? optic : coated_obj
-    if coating_behavior(coating, ray) isa Absorptive
+    behavior = coating_behavior(coating, ray)
+    if behavior isa Absorptive
         return nothing
+    elseif !(coating isa Uncoated) && (behavior isa Transmissive || behavior isa Splitting)
+        return interact_refractive_boundary(system, target_obj, coating, beam, ray)
     end
     return interact_reflective_boundary(system, target_obj, coating, beam, ray)
 end
