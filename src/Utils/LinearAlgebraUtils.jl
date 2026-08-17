@@ -3,8 +3,8 @@
 
 Tests if `v1` is parallel to `v2`.
 """
-function isparallel3d(v1::AbstractArray, v2::AbstractArray)
-    return isapprox(abs(dot(normalize(v1), normalize(v2))), 1, atol=eps())
+function isparallel3d(v1::AbstractArray, v2::AbstractArray; atol=1e-8)
+    return isapprox(abs(dot(normalize(v1), normalize(v2))), 1; atol=atol)
 end
 
 """

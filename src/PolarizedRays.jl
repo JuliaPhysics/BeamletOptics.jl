@@ -172,40 +172,39 @@ is chosen for the s- and p-components.
 - `J`: Jones matrix extended to 3x3, e.g. [-rₛ 0 0; 0 rₚ 0; 0 0 1] for reflection
 """
 function _calculate_global_E0(in_dir::AbstractArray, out_dir::AbstractArray, normal::AbstractArray, J::LocalJonesBasis)
-    # Choose basis vectors
-    if !isparallel3d(in_dir, out_dir)
-        v = out_dir
+    k_in = normalize(in_dir)
+    k_out = normalize(out_dir)
+    n = normalize(normal)
+
+    # Test if in-dir and normal are parallel (normal incidence)
+    if isparallel3d(k_in, n)
+        s = normal3d(k_in)
     else
-        v = normal
+        s = cross(k_in, n)
+        s = normalize(s)
     end
-    # test if in-dir and normal are parallel
-    if isparallel3d(in_dir, normal)
-        # Does this really always work for normal s-p-incidence?
-        v = normal3d(in_dir)
-    end
-    # Calculate support vector
-    s = cross(in_dir, v)
-    s = normalize(s)
+
     # Calculate transforms
-    p1 = cross(in_dir, s)
+    p1 = cross(k_in, s)
     O_in = @SArray [
         s[1]       s[2]       s[3];
         p1[1]      p1[2]      p1[3];
-        in_dir[1]  in_dir[2]  in_dir[3]
+        k_in[1]    k_in[2]    k_in[3]
     ]
+
     # Fallback method as per eq. 17
-    if isparallel3d(in_dir, out_dir) && !(in_dir ≈ -out_dir)
+    if isparallel3d(k_in, k_out) && !(k_in ≈ -k_out)
         O_out = @SArray [
-            s[1]  p1[1]  in_dir[1];
-            s[2]  p1[2]  in_dir[2];
-            s[3]  p1[3]  in_dir[3]
+            s[1]  p1[1]  k_in[1];
+            s[2]  p1[2]  k_in[2];
+            s[3]  p1[3]  k_in[3]
         ]
     else
-        p2 = cross(out_dir, s)
+        p2 = cross(k_out, s)
         O_out = @SArray [
-            s[1]  p2[1]  out_dir[1];
-            s[2]  p2[2]  out_dir[2];
-            s[3]  p2[3]  out_dir[3]
+            s[1]  p2[1]  k_out[1];
+            s[2]  p2[2]  k_out[2];
+            s[3]  p2[3]  k_out[3]
         ]
     end
     # Calculate new E0

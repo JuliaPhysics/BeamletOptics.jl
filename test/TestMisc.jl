@@ -18,5 +18,5 @@ end
     using Aqua
     Aqua.test_all(BMO)
 end
-   
+
 end
