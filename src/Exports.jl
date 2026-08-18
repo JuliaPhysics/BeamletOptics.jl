@@ -17,7 +17,8 @@ export System, StaticSystem, solve_system!
 export ObjectGroup
 
 # additional
-export DiscreteRefractiveIndex, SellmeierEquation
+export RefractiveIndex, DiscreteRefractiveIndex, SellmeierEquation, AbsorbingMedium, GainMedium,
+       real_refractive_index, extinction_coefficient, absorption_coefficient, bulk_attenuation_factor
 
 #=
 components
@@ -25,10 +26,11 @@ components
 
 # mirrors
 export Mirror, SquarePlanoMirror2D, RectangularPlanoMirror, SquarePlanoMirror,
-       RoundPlanoMirror, ConcaveSphericalMirror, RightAnglePrismMirror
+       RoundPlanoMirror, ConcaveSphericalMirror, RightAnglePrismMirror,
+       OffAxisParabolicMirror, OffAxisParaboloidSDF
 
 # lenses
-export Lens, DoubletLens, ThinLens, SphericalLens, SphericalDoubletLens, thickness
+export Lens, DoubletLens, ThinLens, SphericalLens, SphericalDoubletLens, AsphericalDoubletLens, thickness
 
 # surfaces
 export CircularFlatSurface, RectangularFlatSurface, SphericalSurface, EvenAsphericalSurface,
@@ -45,8 +47,16 @@ export Detector, electric_field, intensity, spot_diagram, optical_power, gauss_p
 export ThinBeamsplitter, RoundThinBeamsplitter, RectangularPlateBeamsplitter,
        RoundPlateBeamsplitter, CubeBeamsplitter, RectangularCompensatorPlate
 
+# coatings
+export Coating, AbstractSurfaceModel, AbstractCoatingModel, Uncoated, SimpleARCoating, SimpleHRCoating, SimpleBeamsplitterCoating,
+       JonesCoating, ThinFilmCoating, GradedThinFilmCoating, CompositeSurfaceModel, coatings, get_jones_matrix,
+       with_coatings, fresnel_coefficients, CoatingBehavior, Transmissive, Reflective, Splitting, Absorptive,
+       coating_behavior, get_coating_behavior, coating_transmittance, coating_reflectance, unpolarized_transmittance
+
 # polarizing components
-export PolarizationFilter
+export PolarizationFilter, PolarizingCubeBeamsplitter, Waveplate, HalfWavePlate, QuarterWavePlate, RectangularPlateWaveplate, RoundPlateWaveplate,
+       PolarizingBeamSplitter, RectangularPolarizingPlateBeamsplitter, RoundPolarizingPlateBeamsplitter,
+       HalfWaveplate, QuarterWaveplate
 
 # dummies
 export NonInteractableObject, MeshDummy, IntersectableObject
@@ -56,7 +66,8 @@ export Retroreflector, get_invariant_threshold, set_invariant_threshold!,
     get_sdf_surface_threshold, get_sdf_raymarch_eps, get_sdf_inside_step,
     get_internal_reflection_threshold, get_line_plane_intersection_threshold,
     get_orthogonality_threshold, get_default_r_max, get_default_depth_max,
-    get_default_wavelength, get_default_waist, get_default_power
+    get_default_wavelength, get_default_waist, get_default_power,
+    get_coincident_boundary_tolerance, get_index_matching_tolerance
 
 # render
 export render!

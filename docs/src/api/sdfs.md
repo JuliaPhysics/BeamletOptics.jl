@@ -48,3 +48,30 @@ BeamletOptics.UnionSDF
 
 !!! info 
     Since two exact SDFs will only yield an exact union during boolean addition, only the `+` operator is defined. Introducing the `-` operator is still under consideration.
+
+---
+
+## Developer Guide: Implementing Custom SDFs
+
+When implementing a custom subtype `MySDF <: AbstractSDF`:
+
+1. **Required Interface**:
+   - `sdf(s::MySDF, point)`: returns the scalar distance to the surface.
+   - `bounding_sphere(s::MySDF)`: returns `(center, radius)`.
+
+2. **Analytic Normals (`normal3d`)**:
+   By default, `normal3d(s, pos)` falls back to finite-difference gradient sampling (`normal_fd`).
+   For maximum ray-tracing performance, overload `normal3d` with an exact analytical vector function whenever possible:
+   ```julia
+   function normal3d(s::MySDF, pos)
+       # return normalized normal vector in world coordinates
+   end
+   ```
+
+3. **Symbolic Surface Tags (`surface_tag`)**:
+   To support fast face-selective coating matching (e.g. `:front`, `:back`, `:side`, `:top`, `:bottom`), overload `surface_tag`:
+   ```julia
+   function surface_tag(s::MySDF, point, normal)
+       # return :front, :back, :side, etc. based on local coordinates
+   end
+   ```

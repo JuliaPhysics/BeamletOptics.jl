@@ -6,7 +6,7 @@ import BeamletOptics: render!, RenderException, _RenderTypes, get_view, set_view
 const BMO = BeamletOptics
 
 using Makie: Axis3, LScene, mesh!, surface!, lines!, RGBf, RGBAf, scatter!
-using GeometryBasics: Point2, Point3
+using GeometryBasics: Point2, Point3, TriangleFace
 using AbstractTrees: PreOrderDFS
 using MarchingCubes: MC, march
 using LinearAlgebra: dot, cross, normalize
@@ -52,6 +52,7 @@ include("RenderMesh.jl")
 include("RenderObjects.jl")
 include("RenderLenses.jl")
 include("RenderCylinderLenses.jl")
+include("RenderMirrors.jl")
 include("RenderPresets.jl")
 
 """

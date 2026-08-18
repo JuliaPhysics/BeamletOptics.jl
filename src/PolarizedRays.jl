@@ -39,7 +39,7 @@ mutable struct PolarizedRay{T} <: AbstractRay{T}
     dir::Point3{T}
     intersection::Nullable{Intersection{T}}
     λ::T
-    n::T
+    n::Union{T, Complex{T}}
     E0::Point3{Complex{T}}
     function PolarizedRay{T}(
             pos::AbstractArray{P},
@@ -49,7 +49,7 @@ mutable struct PolarizedRay{T} <: AbstractRay{T}
             n::N,
             E0::AbstractArray{<:Union{E, Complex{E}}}
         ) where {T, P, D, L, N, E}
-        M = promote_type(T, P, D, L, N, E)
+        M = promote_type(T, P, D, L, real(N), real(E))
         if isapprox(norm(dir), 0, atol=1e-14)
             throw(ErrorException("Direction vector to short for normalization."))
         end
@@ -62,7 +62,7 @@ mutable struct PolarizedRay{T} <: AbstractRay{T}
             normalize(Point3{M}(dir)),
             int,
             M(λ),
-            M(n),
+            (n isa Complex ? Complex{M}(n) : M(n)),
             Point3{Complex{M}}(E0)
         )
     end
@@ -152,6 +152,12 @@ XYBasis(j11::Number, j12::Number, j21::Number, j22::Number) = GlobalJonesBasis(@
 XZBasis(j11::Number, j12::Number, j21::Number, j22::Number) = GlobalJonesBasis(@SArray([j11 0 j12; 0 1 0; j21 0 j22]))
 YZBasis(j11::Number, j12::Number, j21::Number, j22::Number) = GlobalJonesBasis(@SArray([1 0 0; 0 j22 j21; 0 j12 j11]))
 
+Base.:*(val::Number, J::GlobalJonesBasis) = GlobalJonesBasis(val * static_data(J))
+Base.:*(J::GlobalJonesBasis, val::Number) = GlobalJonesBasis(static_data(J) * val)
+
+Base.:*(val::Number, J::LocalJonesBasis) = LocalJonesBasis(val * static_data(J))
+Base.:*(J::LocalJonesBasis, val::Number) = LocalJonesBasis(static_data(J) * val)
+
 """
     _calculate_global_E0(in_dir, out_dir, normal, J)
 
@@ -182,13 +188,25 @@ function _calculate_global_E0(in_dir::AbstractArray, out_dir::AbstractArray, nor
     s = normalize(s)
     # Calculate transforms
     p1 = cross(in_dir, s)
-    O_in = vcat(s', p1', in_dir')
+    O_in = @SArray [
+        s[1]       s[2]       s[3];
+        p1[1]      p1[2]      p1[3];
+        in_dir[1]  in_dir[2]  in_dir[3]
+    ]
     # Fallback method as per eq. 17
     if isparallel3d(in_dir, out_dir) && !(in_dir ≈ -out_dir)
-        O_out = hcat(s, p1, in_dir)
+        O_out = @SArray [
+            s[1]  p1[1]  in_dir[1];
+            s[2]  p1[2]  in_dir[2];
+            s[3]  p1[3]  in_dir[3]
+        ]
     else
         p2 = cross(out_dir, s)
-        O_out = hcat(s, p2, out_dir)
+        O_out = @SArray [
+            s[1]  p2[1]  out_dir[1];
+            s[2]  p2[2]  out_dir[2];
+            s[3]  p2[3]  out_dir[3]
+        ]
     end
     # Calculate new E0
     P = O_out * J * O_in

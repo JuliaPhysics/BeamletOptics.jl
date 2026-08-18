@@ -1,3 +1,15 @@
+abstract type AbstractPlateComponent{T} <: AbstractObjectGroup{T} end
+
+coating(p::AbstractPlateComponent) = p.coating
+substrate(p::AbstractPlateComponent) = p.substrate
+
+Base.position(p::AbstractPlateComponent) = position(coating(p))
+orientation(p::AbstractPlateComponent) = orientation(substrate(p))
+shape_trait_of(::AbstractPlateComponent) = MultiShape()
+shape(p::AbstractPlateComponent) = (substrate(p), coating(p))
+objects(p::AbstractPlateComponent) = (substrate(p), coating(p))
+refractive_index(p::AbstractPlateComponent, λ::Real) = refractive_index(substrate(p), λ)
+
 """
     AbstractPlateBeamsplitter <: AbstractBeamsplitter
 
@@ -30,20 +42,7 @@ If the concrete implementation does not define the above fields, the following g
     This type uses the [`Hint`](@ref)-API in order to ensure that the splitting interaction is correctly
     triggered at the coating.
 """
-abstract type AbstractPlateBeamsplitter{T} <: AbstractBeamsplitter{T} end
-
-coating(pbs::AbstractPlateBeamsplitter) = pbs.coating
-substrate(pbs::AbstractPlateBeamsplitter) = pbs.substrate
-
-Base.position(pbs::AbstractPlateBeamsplitter) = position(coating(pbs))
-
-orientation(pbs::AbstractPlateBeamsplitter) = orientation(substrate(pbs))
-
-shape_trait_of(::AbstractPlateBeamsplitter) = MultiShape()
-
-shape(pbs::AbstractPlateBeamsplitter) = (substrate(pbs), coating(pbs))
-
-refractive_index(pbs::AbstractPlateBeamsplitter, λ::Real) = refractive_index(substrate(pbs), λ)
+abstract type AbstractPlateBeamsplitter{T} <: AbstractPlateComponent{T} end
 
 """
     RectangularPlateBeamsplitter <: AbstractPlateBeamsplitter
@@ -61,9 +60,9 @@ For more information refer to the [`AbstractPlateBeamsplitter`](@ref) docs.
 !!! info "Kinematic center"
     The center of kinematics of this splitter lies at the center of the coating.
 """
-struct RectangularPlateBeamsplitter{T} <: AbstractPlateBeamsplitter{T}
+struct RectangularPlateBeamsplitter{T, M} <: AbstractPlateBeamsplitter{T}
     substrate::Prism{T, BoxSDF{T}}
-    coating::ThinBeamsplitter{T, Mesh{T}}
+    coating::Coating{T, Mesh{T}, M}
 end
 
 """
@@ -90,14 +89,16 @@ function RectangularPlateBeamsplitter(
         n::RefractiveIndex;
         reflectance::Real=0.5
     )
+    T = float(promote_type(typeof(width), typeof(height), typeof(thickness)))
     # create substrate prism and move into pos
-    substrate_shape = BoxSDF(width, thickness, height)
+    substrate_shape = BoxSDF(T(width), T(thickness), T(height))
     substrate = Prism(substrate_shape, n)
-    translate3d!(substrate, [0, thickness/2, 0])
+    translate3d!(substrate, [T(0), T(thickness/2), T(0)])
     # rotate splitter "coating" into pos
-    coating = ThinBeamsplitter(width, height; reflectance)
-    zrotate3d!(coating, π)
-    return RectangularPlateBeamsplitter(substrate, coating)
+    coating = ThinBeamsplitter(T(width), T(height); reflectance=T(reflectance))
+    zrotate3d!(coating, T(π))
+    M = typeof(coating.model)
+    return RectangularPlateBeamsplitter{T, M}(substrate, coating)
 end
 
 """
@@ -116,9 +117,9 @@ For more information refer to the [`AbstractPlateBeamsplitter`](@ref) docs.
 !!! info "Kinematic center"
     The center of kinematics of this splitter lies at the center of the coating.
 """
-struct RoundPlateBeamsplitter{T} <: AbstractPlateBeamsplitter{T}
+struct RoundPlateBeamsplitter{T, M} <: AbstractPlateBeamsplitter{T}
     substrate::Prism{T, PlanoSurfaceSDF{T}}
-    coating::ThinBeamsplitter{T, Mesh{T}}
+    coating::Coating{T, Mesh{T}, M}
 end
 
 """
@@ -143,171 +144,12 @@ function RoundPlateBeamsplitter(
         n::RefractiveIndex;
         reflectance::Real=0.5
     )
+    T = float(promote_type(typeof(diameter), typeof(thickness)))
     # create substrate cylinder prism
-    substrate_shape = PlanoSurfaceSDF(thickness, diameter)
+    substrate_shape = PlanoSurfaceSDF(T(thickness), T(diameter))
     substrate = Prism(substrate_shape, n)
-    # round splitter coating (neg. y-axi normals)
-    coating = RoundThinBeamsplitter(diameter; reflectance)
-    return RoundPlateBeamsplitter(substrate, coating)
-end
-
-function intersect3d(pbs::AbstractPlateBeamsplitter, ray::AbstractRay)
-    # this is sooooooo stupid but necessary to ensure correct intersection... 
-    ic = intersect3d(coating(pbs), ray)
-    is = intersect3d(substrate(pbs), ray)
-    if isnothing(ic) & isnothing(is)
-        return nothing
-    end
-    if isnothing(is)
-        object!(ic, pbs)
-        return ic
-    end
-    if isnothing(ic)
-        object!(is, pbs)
-        return is
-    end
-    # if both shapes are hit, pick the coating
-    if length(ic) ≈ length(is)
-        object!(ic, pbs)
-        return ic
-    end
-    if length(ic) < length(is)
-        object!(ic, pbs)
-        return ic
-    else
-        object!(is, pbs)
-        return is
-    end
-end
-
-function interact3d(
-    system::AbstractSystem,
-    pbs::AbstractPlateBeamsplitter,
-    beam::Beam{T, R},
-    ray::R
-    ) where {T <: Real, R <: AbstractRay{T}}
-    # Substrate interaction
-    if shape(intersection(ray)) === shape(substrate(pbs))
-        interaction = interact3d(system, substrate(pbs), beam, ray)
-        # Hint towards coating
-        hint!(interaction, Hint(pbs, shape(coating(pbs))))
-        return interaction
-    end
-    # Splitter "coating" interaction
-    if shape(intersection(ray)) === shape(coating(pbs))
-        # Beamsplitter coating interaction
-        interact3d(system, coating(pbs), beam, ray)
-        # Update refractive index and calculate refraction
-        λ = wavelength(ray)
-        n_optics = refractive_index(pbs, λ)
-        n_system = refractive_index(system, λ)
-        if isentering(ray)
-            # transmitted ray is refracted into substrate
-            _nt = n_optics
-            _nr = n_system
-            n_d, _ = refraction3d(ray, n_optics)
-        else
-            # transmitted ray is refracted into environment
-            _nt = n_system
-            _nr = n_optics
-            n_d, _ = refraction3d(ray, n_system)
-        end
-        refractive_index!(first(rays(beam.children[1])), _nt)
-        refractive_index!(first(rays(beam.children[2])), _nr)
-        direction!(first(rays(beam.children[1])), n_d)
-        return nothing
-    end
-    # if nothing worked, return nothing
-    return nothing
-end
-
-function interact3d(
-    system::AbstractSystem,
-    pbs::AbstractPlateBeamsplitter,
-    gauss::GaussianBeamlet,
-    id::Int
-    )
-    _shape = shape(intersection(rays(gauss.chief)[id]))
-    # Substrate interaction
-    if _shape === shape(substrate(pbs))
-        interaction = interact3d(system, substrate(pbs), gauss, id)
-        hint!(interaction, Hint(pbs, shape(coating(pbs))))
-        return interaction
-    end
-    # Splitter interaction
-    if _shape === shape(coating(pbs))
-        interact3d(system, coating(pbs), gauss, id)
-        # Update refractive index and calculate refraction
-        λ = wavelength(rays(gauss.chief)[id])
-        n_optics = refractive_index(pbs, λ)
-        n_system = refractive_index(system, λ)
-        if isentering(gauss, id)
-            # transmitted ray is refracted into substrate
-            _nt = n_optics
-            _nr = n_system
-            n_c, _ = refraction3d(rays(gauss.chief)[id], n_optics) 
-            n_w, _ = refraction3d(rays(gauss.waist)[id], n_optics) 
-            n_d, _ = refraction3d(rays(gauss.divergence)[id], n_optics) 
-        else
-            # transmitted ray is refracted into environment
-            _nt = n_system
-            _nr = n_optics
-            n_c, _ = refraction3d(rays(gauss.chief)[id], n_system) 
-            n_w, _ = refraction3d(rays(gauss.waist)[id], n_system) 
-            n_d, _ = refraction3d(rays(gauss.divergence)[id], n_system) 
-        end
-        # Update children ref. index and dir. due to refraction
-        refractive_index!(gauss.children[1], 1, _nt)
-        refractive_index!(gauss.children[2], 1, _nr)
-        direction!(first(rays(gauss.children[1].chief)), n_c)
-        direction!(first(rays(gauss.children[1].waist)), n_w)
-        direction!(first(rays(gauss.children[1].divergence)), n_d)
-        return nothing
-    end
-    # if nothing worked, return nothing
-    return nothing
-end
-
-function interact3d(
-    system::AbstractSystem,
-    pbs::AbstractPlateBeamsplitter,
-    agb::AstigmaticGaussianBeamlet,
-    id::Int
-    )
-    _shape = shape(intersection(rays(agb.c)[id]))
-    # Substrate interaction
-    if _shape === shape(substrate(pbs))
-        interaction = interact3d(system, substrate(pbs), agb, id)
-        hint!(interaction, Hint(pbs, shape(coating(pbs))))
-        return interaction
-    end
-    # Splitter interaction
-    if _shape === shape(coating(pbs))
-        interact3d(system, coating(pbs), agb, id)
-        # Update refractive index and calculate refraction
-        λ = wavelength(rays(agb.c)[id])
-        n_optics = refractive_index(pbs, λ)
-        n_system = refractive_index(system, λ)
-        if isentering(agb, id)
-            # transmitted ray is refracted into substrate
-            _nt = n_optics
-            _nr = n_system
-        else
-            # transmitted ray is refracted into environment
-            _nt = n_system
-            _nr = n_optics
-        end
-        # Update children ref. index
-        refractive_index!(agb.children[1], 1, _nt)
-        refractive_index!(agb.children[2], 1, _nr)
-        # Calculate refracted directions for transmitted child's component beams
-        n_target = isentering(agb, id) ? n_optics : n_system
-        for (beam, pbeam) in zip(_component_beams(agb.children[1]), _component_beams(agb))
-            n_d, _ = refraction3d(rays(pbeam)[id], n_target)
-            direction!(first(rays(beam)), n_d)
-        end
-        return nothing
-    end
-    # if nothing worked, return nothing
-    return nothing
+    # round splitter coating
+    coating = RoundThinBeamsplitter(T(diameter); reflectance=T(reflectance))
+    M = typeof(coating.model)
+    return RoundPlateBeamsplitter{T, M}(substrate, coating)
 end

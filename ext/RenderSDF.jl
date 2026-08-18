@@ -20,9 +20,19 @@ function render!(
     x = LinRange(xmin - 1e-4, xmax + 1e-4, x_resolution)
     y = LinRange(ymin - 1e-4, ymax + 1e-4, y_resolution)
     z = LinRange(zmin - 1e-4, zmax + 1e-4, z_resolution)
-    sdf_values = Float32.([BMO.sdf(sdf, [i, j, k]) for i in x, j in y, k in z])
+
+    # Evaluate SDF at world coordinates
+    sdf_values = Float32.([
+        BMO.sdf(sdf, BMO.Point3{Float64}(i, j, k))
+        for i in x, j in y, k in z
+    ])
+
     mc = MC(sdf_values; x = Float32.(x), y = Float32.(y), z = Float32.(z))
     march(mc)
+    if isempty(mc.vertices)
+        return nothing
+    end
+
     vertices = transpose(reinterpret(reshape, Float32, mc.vertices))
     faces = transpose(reinterpret(reshape, Int64, mc.triangles))
     mesh!(ax, vertices, faces; kwargs...)

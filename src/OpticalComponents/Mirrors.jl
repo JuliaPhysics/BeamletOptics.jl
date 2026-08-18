@@ -29,43 +29,34 @@ by specialized subtypes.
 """
 abstract type AbstractReflectiveOptic{T} <: AbstractObject{T} end
 
-# FIXME Require reflectivity field/function for interaction with PolarizedRay
-
-"""
-    interact3d(AbstractReflectiveOptic, Ray)
-
-Implements the reflection of a [`Ray`](@ref) via the normal at the intersection point on an optical surface.
-"""
-function interact3d(::AbstractSystem,
-        ::AbstractReflectiveOptic,
-        ::Beam{T, R},
-        ray::R) where {T <: Real, R <: Ray{T}}
-    normal = normal3d(intersection(ray))
-    npos = position(ray) + length(ray) * direction(ray)
-    ndir = reflection3d(direction(ray), normal)
-    return BeamInteraction{T, R}(nothing,
-        Ray{T}(npos, ndir, nothing, wavelength(ray), refractive_index(ray)))
+@inline function resolve_coincident_boundary(
+        exiting_int, entering_int, ::AbstractObject, ::AbstractReflectiveOptic)
+    entering_int.coincident_object = object(exiting_int)
+    return entering_int
 end
 
-"""
-    interact3d(AbstractReflectiveOptic, PolarizedRay)
+@inline function resolve_coincident_boundary(
+        exiting_int, entering_int, ::AbstractReflectiveOptic, ::AbstractObject)
+    exiting_int.coincident_object = object(entering_int)
+    return exiting_int
+end
 
-Implements the ideal reflection of a [`PolarizedRay`](@ref) via the normal at the intersection point on an optical surface.
-A Jones matrix of [-1 0 0; 0 1 0] is assumed as per Peatross (2015, 2023 Ed. p. 154) and Yun et al. (see [`PolarizedRay`](@ref) for more information).
-"""
-function interact3d(::AbstractSystem,
-        obj::AbstractReflectiveOptic,
-        ::Beam{T, R},
-        ray::R) where {T <: Real, R <: PolarizedRay{T}}
-    normal = normal3d(intersection(ray))
-    npos = position(ray) + length(ray) * direction(ray)
-    ndir = reflection3d(direction(ray), normal)
-    # Jones reflection matrix
-    J = SPBasis(-1, 0, 0, 1)
-    E0 = _calculate_global_E0(obj, ray, ndir, J)
-    return BeamInteraction{T, R}(nothing,
-        PolarizedRay{T}(
-            npos, ndir, nothing, wavelength(ray), refractive_index(ray), E0))
+@inline function resolve_coincident_boundary(
+        exiting_int, entering_int, ::AbstractReflectiveOptic, ::AbstractReflectiveOptic)
+    exiting_int.coincident_object = object(entering_int)
+    return exiting_int
+end
+
+function interact3d(system::AbstractSystem,
+        optic::AbstractReflectiveOptic,
+        beam::Beam{T, R},
+        ray::R) where {T <: Real, R <: AbstractRay{T}}
+    coated_obj, coating = resolve_coated_boundary(system, optic, ray)
+    target_obj = isnothing(coated_obj) ? optic : coated_obj
+    if coating_behavior(coating, ray) isa Absorptive
+        return nothing
+    end
+    return interact_reflective_boundary(system, target_obj, coating, beam, ray)
 end
 
 """
@@ -76,8 +67,12 @@ Concrete implementation of a perfect mirror (R = 1) with arbitrary shape.
 !!! warning "Reflecting surfaces"
     It is important to consider that **all** surfaces of this mirror type are reflecting!
 """
-struct Mirror{T, S <: AbstractShape{T}} <: AbstractReflectiveOptic{T}
+struct Mirror{T, S <: AbstractShape{T}, C <: Tuple} <: AbstractReflectiveOptic{T}
     shape::S
+    coatings::C
+    function Mirror(shape::S, coatings::C = ()) where {T <: Real, S <: AbstractShape{T}, C <: Tuple}
+        return new{T, S, C}(shape, coatings)
+    end
 end
 
 """
@@ -90,8 +85,9 @@ The reflecting surface is normal to the y-axis.
 
 - `edge_length`: the edge length of the square mirror in [m]
 """
-function SquarePlanoMirror2D(size::T) where {T <: Real}
-    shape = QuadraticFlatMesh(size)
+function SquarePlanoMirror2D(size::Real)
+    T = float(typeof(size))
+    shape = QuadraticFlatMesh(T(size))
     return Mirror(shape)
 end
 
@@ -103,16 +99,17 @@ The front reflecting surface is normal to the y-axis and lies at the origin.
 
 # Inputs
 
-- `width`:      of the mirror in x-direction [m] 
-- `height`:     of the mirror in z-direction [m] 
-- `thickness`:  of the mirror in y-direction [m] 
+- `width`:      of the mirror in x-direction [m]
+- `height`:     of the mirror in z-direction [m]
+- `thickness`:  of the mirror in y-direction [m]
 """
-function RectangularPlanoMirror(width::W, height::H, thickness::T) where {W<:Real,H<:Real,T<:Real}
-    shape = CuboidMesh(width, thickness, height)
+function RectangularPlanoMirror(width::Real, height::Real, thickness::Real)
+    T = float(promote_type(typeof(width), typeof(height), typeof(thickness)))
+    shape = CuboidMesh(T(width), T(thickness), T(height))
     translate3d!(shape, [
-        -width/2,       # x
-        0,              # y
-        -height/2,      # z
+        -T(width) / 2,    # x
+        T(0),             # y
+        -T(height) / 2    # z
     ])
     set_new_origin3d!(shape)
     return Mirror(shape)
@@ -130,7 +127,7 @@ See also [`RectangularPlanoMirror`](@ref).
 - `width`: the side length of the square mirror in x- and y-direction [m]
 - `thickness`: of the mirror in [m]
 """
-function SquarePlanoMirror(width::W, thickness::T) where {W<:Real,T<:Real}
+function SquarePlanoMirror(width::Real, thickness::Real)
     return RectangularPlanoMirror(width, width, thickness)
 end
 
@@ -158,13 +155,15 @@ Returns a cylindrical, flat [`RoundPlanoMirror`](@ref) with perfect reflectivity
 - `diameter`: mirror diameter in [m]
 - `thickness`: mirror substrate thickness in [m]
 """
-function RoundPlanoMirror(diameter::D, thickness::T) where {D<:Real,T<:Real}
-    shape = PlanoSurfaceSDF(thickness, diameter)
+function RoundPlanoMirror(diameter::Real, thickness::Real)
+    T = float(promote_type(typeof(diameter), typeof(thickness)))
+    shape = PlanoSurfaceSDF(T(thickness), T(diameter))
     return RoundPlanoMirror(shape)
 end
 
 """[`ConcaveSphericalMirror`](@ref) shape type based on a [`UnionSDF`](@ref)"""
-const ConcaveSphericalMirrorShape{T} = UnionSDF{T, Tuple{ConcaveSphericalSurfaceSDF{T}, PlanoSurfaceSDF{T}}}
+const ConcaveSphericalMirrorShape{T} = UnionSDF{
+    T, Tuple{ConcaveSphericalSurfaceSDF{T}, PlanoSurfaceSDF{T}}}
 
 """
     ConcaveSphericalMirror <: AbstractReflectiveOptic
@@ -184,7 +183,7 @@ end
     ConcaveSphericalMirror(radius, thickness, diameter)
 
 Constructor for a spherical mirror with a concave reflecting surface. The component is aligned with the positive y-axis.
-See also [`ConcaveSphericalMirror`](@ref). 
+See also [`ConcaveSphericalMirror`](@ref).
 
 # Inputs
 
@@ -193,8 +192,9 @@ See also [`ConcaveSphericalMirror`](@ref).
 - `diameter`: mirror outer diameter in [m]
 """
 function ConcaveSphericalMirror(radius::Real, thickness::Real, diameter::Real)
-    cylinder = PlanoSurfaceSDF(thickness, diameter)
-    concave = ConcaveSphericalSurfaceSDF(abs(radius), diameter)
+    T = float(promote_type(typeof(radius), typeof(thickness), typeof(diameter)))
+    cylinder = PlanoSurfaceSDF(T(thickness), T(diameter))
+    concave = ConcaveSphericalSurfaceSDF(abs(T(radius)), T(diameter))
     shape = concave + cylinder
     return ConcaveSphericalMirror(shape)
 end
@@ -220,11 +220,46 @@ Constructs a right angle prism mirror. The primary surface is aligned with the p
 
 # Inputs
 
-- `leg_length`: edge length in x and y in [m] 
+- `leg_length`: edge length in x and y in [m]
 - `height`: in z-axis in [m]
 """
 function RightAnglePrismMirror(leg_length::Real, height::Real)
-    shape = RightAnglePrismSDF(leg_length, height)
-    zrotate3d!(shape, deg2rad(45+180))
+    T = float(promote_type(typeof(leg_length), typeof(height)))
+    shape = RightAnglePrismSDF(T(leg_length), T(height))
+    zrotate3d!(shape, T(deg2rad(45 + 180)))
     return RightAnglePrismMirror(shape)
 end
+
+"""
+    OffAxisParabolicMirror(rfl, diameter; angle=90, thickness=nothing)
+
+Constructs an Off-Axis Parabolic (OAP) [`Mirror`](@ref) from:
+
+# Inputs
+
+- `rfl`:        Reflected Focal Length (distance from aperture center to focus) [m]
+- `diameter`:   Mirror aperture diameter [m]
+- `angle`:      Deflection angle in degrees (default: 90°)
+- `thickness`:  Substrate thickness in [m] (default: calculated automatically to ensure solid backing)
+"""
+function OffAxisParabolicMirror(
+        rfl::Real,
+        diameter::Real;
+        angle::Real = 90,
+        thickness::Union{Real, Nothing} = nothing
+    )
+    T = float(promote_type(typeof(rfl), typeof(diameter), typeof(angle), typeof(thickness === nothing ? 0.0 : thickness)))
+    angle_rad = deg2rad(angle)
+
+    f = T(rfl * (cos(angle_rad / 2)^2))
+    x_off = T(rfl * sin(angle_rad))
+
+    r_max = T(diameter / 2)
+    sag_max = abs(-(((r_max + x_off)^2 - x_off^2) / (4 * f)))
+
+    t = thickness === nothing ? max(T(diameter / 2), sag_max + T(10e-3)) : T(thickness)
+
+    oap_sdf = OffAxisParaboloidSDF(f, x_off, T(diameter), t)
+    return Mirror(oap_sdf)
+end
+

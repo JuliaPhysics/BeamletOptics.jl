@@ -9,25 +9,34 @@ Stores data calculated by the [`intersect3d`](@ref) method. This information can
 - `shape`: a [`Nullable`](@ref) reference to the [`AbstractShape`](@ref) of the `object` that has been hit (optional but recommended)
 - `t`: length of the ray parametrization in [m]
 - `n`: normal vector at the point of intersection
+- `coincident_object`: a [`Nullable`](@ref) reference to the adjacent/exiting [`AbstractObject`](@ref) sharing the boundary (for doublets or coatings)
+- `coincident_object_2`: a [`Nullable`](@ref) reference to the adjacent/entering [`AbstractObject`](@ref) sharing the boundary (for coatings)
 """
-mutable struct Intersection{T}
+mutable struct Intersection{T <: Real}
     object::Nullable{AbstractObject}
     shape::Nullable{AbstractShape}
     t::T
     n::Point3{T}
+    coincident_object::Nullable{AbstractObject}
+    coincident_object_2::Nullable{AbstractObject}
 end
 
 function Intersection(t::T, n::AbstractArray{T}) where {T}
-    return Intersection(nothing, nothing, t, Point3{T}(n))
+    return Intersection{T}(nothing, nothing, t, Point3{T}(n), nothing, nothing)
 end
 
 function Intersection(t::T, n::AbstractArray{T}, shape::Nullable{AbstractShape}) where {T}
-    return Intersection(nothing, shape, t, Point3{T}(n))
+    return Intersection{T}(nothing, shape, t, Point3{T}(n), nothing, nothing)
+end
+
+function Intersection(object::Nullable{AbstractObject}, shape::Nullable{AbstractShape}, t::Real, n::Point3{S}) where {S}
+    T = promote_type(typeof(t), S)
+    return Intersection{T}(object, shape, T(t), Point3{T}(n), nothing, nothing)
 end
 
 shape(i::Intersection) = i.shape
 object(i::Intersection) = i.object
-object!(i::Intersection, new::AbstractObject) = (i.object = new)
+object!(i::Intersection, new::Nullable{AbstractObject}) = (i.object = new; return i)
 
 Base.length(i::Intersection) = i.t
 
@@ -104,6 +113,15 @@ function intersection!(ray::AbstractRay, _intersection::Nullable{Intersection})
      ray.intersection = _intersection
      return nothing
 end
+
+"""
+    bounding_sphere(obj)
+
+Returns `(c_local, r)` where `c_local` is the center of the bounding sphere in local coordinates and `r` is its radius, or `nothing` if not implemented.
+"""
+bounding_sphere(::Any) = nothing
+
+
 
 """
     intersect3d(shape::AbstractShape, ::AbstractRay)
@@ -190,7 +208,7 @@ Calculate the optical path length of the `ray`, i.e. ``\\mathrm{OPL} = n \\cdot 
 """
 function optical_path_length(ray::AbstractRay{T}) where {T}
     isnothing(intersection(ray)) && return T(Inf)
-    return length(intersection(ray)) * refractive_index(ray)
+    return length(intersection(ray)) * real(refractive_index(ray))
 end
 
 """

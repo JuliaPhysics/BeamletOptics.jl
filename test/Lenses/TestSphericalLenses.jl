@@ -144,6 +144,15 @@ const mm = 1e-3
         @test test_doublet(707e-9, 143.68mm, 0)
         @test test_doublet(1064e-9, 143.68mm, +7.466e-4)
     end
+
+    @testset "AsphericalDoubletLens and Default Refractive Index Fallback" begin
+        lens = SphericalLens(50e-3, -50e-3, 5e-3, 25e-3, 1.5)
+        @test BMO.refractive_index(lens)(589e-9) ≈ 1.5 atol=1e-6
+
+        asph_doublet = AsphericalDoubletLens(50e-3, -50e-3, -100e-3, 5e-3, 3e-3, 25e-3, 1.5, 1.6; k1=0.1, k2=-0.1, k3=0.0)
+        @test asph_doublet isa DoubletLens
+        @test BMO.thickness(asph_doublet) ≈ 8e-3 atol=1e-6
+    end
 end
 
 end # MODULE

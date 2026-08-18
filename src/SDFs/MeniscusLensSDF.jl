@@ -187,3 +187,7 @@ function meniscus_lens_sdf(front_surface::AbstractSurface{T1}, front::AbstractSD
 
     return shape
 end
+
+# Specialization for MeniscusLensSDF (multi-parameter)
+reconstruct_sdf(::Type{T}, ::Type{<:MeniscusLensSDF}, dir, transposed_dir, pos, convex, cylinder, concave, thickness) where T =
+    MeniscusLensSDF{T, typeof(convex), typeof(concave)}(dir, transposed_dir, pos, convex, cylinder, concave, thickness)

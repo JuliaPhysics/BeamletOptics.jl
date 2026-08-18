@@ -9,9 +9,8 @@ For more information refer to the [`AbstractPlateBeamsplitter`](@ref) docs.
 
 # Fields
 
-- `front`: the forward facing substrate, represented by a [`RightAnglePrism`](@ref)
+- `front`: the forward facing substrate, represented by a coated prism (coated [`RightAnglePrism`](@ref))
 - `back`: the backward facing substrate, represented by a [`RightAnglePrism`](@ref)
-- `coating`: a rectangular [`ThinBeamsplitter`](@ref) that represents the splitting interface
 
 # Additional information
 
@@ -19,15 +18,16 @@ For more information refer to the [`AbstractPlateBeamsplitter`](@ref) docs.
     In order to model gap-free beam propagation, the `interact3d` model relies heavily on the [`Hint`](@ref)-API.
     If the `front` or `back` substrate is hit, the `Hint` will ensure that the beam intersects the `coating`.
 """
-struct CubeBeamsplitter{T} <: AbstractBeamsplitter{T}
-    front::Prism{T, RightAnglePrismSDF{T}}
-    back::Prism{T, RightAnglePrismSDF{T}}
-    coating::ThinBeamsplitter{T, Mesh{T}}
+struct CubeBeamsplitter{T, F, B} <: AbstractObjectGroup{T}
+    front::F
+    back::B
 end
 
 shape_trait_of(::CubeBeamsplitter) = MultiShape()
 
-shape(cbs::CubeBeamsplitter) = (cbs.front, cbs.back, cbs.coating)
+shape(cbs::CubeBeamsplitter) = (cbs.front, cbs.back)
+
+objects(cbs::CubeBeamsplitter) = (cbs.front, cbs.back)
 
 refractive_index(cbs::CubeBeamsplitter, λ::Real) = refractive_index(cbs.front, λ)
 
@@ -51,100 +51,17 @@ function CubeBeamsplitter(
         n::RefractiveIndex;
         reflectance::Real=0.5
     )
-    front = RightAnglePrism(leg_length, leg_length, n)
+    front_prism = RightAnglePrism(leg_length, leg_length, n)
     back = RightAnglePrism(leg_length, leg_length, n)
-    bs = ThinBeamsplitter(√2*leg_length, leg_length; reflectance)
     zrotate3d!(back, deg2rad(180))
-    zrotate3d!(bs, deg2rad(180-45))
-    set_new_origin3d!(shape(bs))
-    return CubeBeamsplitter(front, back, bs)
-end
 
-function interact3d(
-    system::AbstractSystem,
-    cbs::CubeBeamsplitter,
-    beam::Beam{T, R},
-    ray::R) where {T <: Real, R <: AbstractRay{T}}
-    # Front prism interaction
-    if shape(intersection(ray)) === shape(cbs.front)
-        interaction = interact3d(system, cbs.front, beam, ray)
-        # Hint towards coating
-        hint!(interaction, Hint(cbs, shape(cbs.coating)))
-        return interaction
-    end
-    # Splitter "coating" interaction
-    if shape(intersection(ray)) === shape(cbs.coating)
-        # Beamsplitter coating interaction
-        interact3d(system, cbs.coating, beam, ray)
-        # Update refractive index
-        _n = refractive_index(cbs, wavelength(ray))
-        refractive_index!(first(rays(beam.children[1])), _n)
-        refractive_index!(first(rays(beam.children[2])), _n)
-        return nothing
-    end
-    # Back prism interaction
-    if shape(intersection(ray)) === shape(cbs.back)
-        interaction = interact3d(system, cbs.back, beam, ray)
-        # Hint towards coating
-        hint!(interaction, Hint(cbs, shape(cbs.coating)))
-        return interaction
-    end
-end
+    coat_bs = SimpleBeamsplitterCoating(
+        sqrt(reflectance), sqrt(reflectance),
+        sqrt(1.0 - reflectance), sqrt(1.0 - reflectance)
+    )
 
-function interact3d(
-    system::AbstractSystem,
-    cbs::CubeBeamsplitter,
-    gauss::GaussianBeamlet,
-    id::Int)
-    _shape = shape(intersection(rays(gauss.chief)[id]))
-    # Front prism interaction
-    if _shape === shape(cbs.front)
-        interaction = interact3d(system, cbs.front, gauss, id)
-        hint!(interaction, Hint(cbs, shape(cbs.coating)))
-        return interaction
-    end
-    # Splitter "coating" interaction
-    if _shape === shape(cbs.coating)
-        interact3d(system, cbs.coating, gauss, id)
-        # Update refractive index
-        _n = refractive_index(cbs, wavelength(gauss))
-        refractive_index!(gauss.children[1], 1, _n)
-        refractive_index!(gauss.children[2], 1, _n)
-        return nothing
-    end
-    # Back prism interaction
-    if _shape === shape(cbs.back)
-        interaction = interact3d(system, cbs.back, gauss, id)
-        hint!(interaction, Hint(cbs, shape(cbs.coating)))
-        return interaction
-    end
-end
+    T = typeof(leg_length)
+    front = with_coatings(front_prism, :hypotenuse => coat_bs)
 
-function interact3d(
-    system::AbstractSystem,
-    cbs::CubeBeamsplitter,
-    agb::AstigmaticGaussianBeamlet,
-    id::Int)
-    _shape = shape(intersection(rays(agb.c)[id]))
-    # Front prism interaction
-    if _shape === shape(cbs.front)
-        interaction = interact3d(system, cbs.front, agb, id)
-        hint!(interaction, Hint(cbs, shape(cbs.coating)))
-        return interaction
-    end
-    # Splitter "coating" interaction
-    if _shape === shape(cbs.coating)
-        interact3d(system, cbs.coating, agb, id)
-        # Update refractive index
-        _n = refractive_index(cbs, wavelength(agb))
-        refractive_index!(agb.children[1], 1, _n)
-        refractive_index!(agb.children[2], 1, _n)
-        return nothing
-    end
-    # Back prism interaction
-    if _shape === shape(cbs.back)
-        interaction = interact3d(system, cbs.back, agb, id)
-        hint!(interaction, Hint(cbs, shape(cbs.coating)))
-        return interaction
-    end
+    return CubeBeamsplitter{T, typeof(front), typeof(back)}(front, back)
 end

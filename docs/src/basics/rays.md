@@ -37,7 +37,7 @@ PolarizedRay
 
 ### Fresnel coefficients
 
-This package uses the equations of Fowles [Fowles1989; p. 44](@cite) and Peatross [Peatross2015; p. 78](@cite) to determine the [Fresnel coefficents](https://www.rp-photonics.com/fresnel_equations.html) at a given surface where the [`PolarizedRay`](@ref) enters from a medium with (complex) refractive index ``n_1`` into a medium with ``n_2``. The ability to define coatings is currently not included. 
+This package uses the equations of Fowles [Fowles1989; p. 44](@cite) and Peatross [Peatross2015; p. 78](@cite) to determine the [Fresnel coefficents](https://www.rp-photonics.com/fresnel_equations.html) at a given surface where the [`PolarizedRay`](@ref) enters from a medium with (complex) refractive index ``n_1`` into a medium with ``n_2``. Physical coatings can be attached to interfaces to modify these coefficients (supporting custom phase shifts, polarization-selective behaviors, and multi-layer thin films); see the [Coatings](@ref) section for details. 
 
 !!! warning
     When a [`PolarizedRay`](@ref) interacts with a refractive medium, e.g. an [`BeamletOptics.AbstractRefractiveOptic`](@ref), the default tracing behaviour is to only trace the refracted and ignore the reflected ray, unless [Total Internal Reflection (TIR)](https://www.rp-photonics.com/total_internal_reflection.html) occurs. 
@@ -78,3 +78,13 @@ rs, rp, ts, tp = BeamletOptics.fresnel_coefficients(θ, n2/n1)
 ```
 
 ![Glass to vacuum](glass_to_vac.png)
+
+## Bulk Attenuation & Complex Media
+
+In addition to interface interactions, rays and beamlets propagating through absorbing or amplifying media experience bulk attenuation or small-signal gain according to their complex refractive index $\tilde{n} = n + i\kappa$:
+
+* **Power attenuation (`Ray`):** ``w(L) = w_0 e^{-\alpha L} = w_0 e^{-\frac{4\pi \kappa}{\lambda} L}``
+* **Electric field attenuation (`PolarizedRay`, `GaussianBeamlet`, `AstigmaticGaussianBeamlet`):** ``E(L) = E_0 e^{-\frac{\alpha}{2} L} = E_0 e^{-\frac{2\pi \kappa}{\lambda} L}``
+* **Small-signal gain:** for gain media ($\kappa < 0$), ``g = -\alpha > 0`` amplifies light as ``e^{+g L}``.
+
+For detailed information on defining absorbing materials and gain media, refer to the [Materials, Absorption & Gain](@ref) section.

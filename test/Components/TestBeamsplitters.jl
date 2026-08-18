@@ -9,6 +9,21 @@ const mm = 1e-3
 
 @testset "Beamsplitters" begin
     N0 = 1.5
+
+    @testset "PlateBeamsplitter Constructor Type Promotion" begin
+        # Passing integer dimensions to RectangularPlateBeamsplitter
+        rpbs = RectangularPlateBeamsplitter(36, 25, 1, n -> N0)
+        @test rpbs isa RectangularPlateBeamsplitter{Float64}
+        @test rpbs.substrate isa Prism{Float64, BMO.BoxSDF{Float64}}
+        @test rpbs.coating isa Coating{Float64}
+
+        # Passing integer dimensions to RoundPlateBeamsplitter
+        round_pbs = RoundPlateBeamsplitter(25, 1, n -> N0)
+        @test round_pbs isa RoundPlateBeamsplitter{Float64}
+        @test round_pbs.substrate isa Prism{Float64, BMO.PlanoSurfaceSDF{Float64}}
+        @test round_pbs.coating isa Coating{Float64}
+    end
+
     @testset "Testing RectangularPlateBeamsplitter with Beam" begin
         # Init splitter
         N0 = 1.5

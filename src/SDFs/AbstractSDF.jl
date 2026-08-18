@@ -56,13 +56,14 @@ function bounding_box(s::AbstractSDF)
         ymax = 1000 - sdf(s, Point3(0, 1000, 0))
         zmax = 1000 - sdf(s, Point3(0, 0, 1000))
     else
-        center, r = bounding_sphere(s)
-        xmin = center[1] - r
-        xmax = center[1] + r
-        ymin = center[2] - r
-        ymax = center[2] + r
-        zmin = center[3] - r
-        zmax = center[3] + r
+        center_loc, r = bounding_sphere(s)
+        center_world = position(s) + orientation(s) * center_loc
+        xmin = center_world[1] - r
+        xmax = center_world[1] + r
+        ymin = center_world[2] - r
+        ymax = center_world[2] + r
+        zmin = center_world[3] - r
+        zmax = center_world[3] + r
     end
 
     return xmin, xmax, ymin, ymax, zmin, zmax
@@ -74,6 +75,16 @@ end
 Computes the normal vector of `s` at `pos`.
 """
 normal3d(s::AbstractSDF, pos) = normal_fd(s, pos)
+
+"""
+    surface_tag(sdf::AbstractSDF, point)
+    surface_tag(sdf::AbstractSDF, point, normal)
+
+Returns a symbolic surface tag (e.g. `:front`, `:back`, `:side`, `:top`, `:bottom`) for a hit point on the SDF.
+Defaults to `:unknown` if no tag is implemented for the given SDF.
+"""
+surface_tag(s::AbstractSDF, point) = surface_tag(s, _world_to_sdf(s, point), transposed_orientation(s) * normal3d(s, point))
+surface_tag(s::AbstractSDF, point, normal) = face_id(s, normal)
 
 function numeric_gradient(s::AbstractSDF, pos)
     # approximate ∇ of s at pos
@@ -167,12 +178,46 @@ function _raymarch_inside(object::AbstractSDF{S},
     return nothing
 end
 
+function intersects_bounding_sphere(object::AbstractSDF, ray::AbstractRay)
+    bs = bounding_sphere(object)
+    if bs === nothing
+        return true # fallback if not implemented, we must raymarch
+    end
+    c_local, r = bs
+    
+    # transform ray to local SDF coordinates
+    local_pos = _world_to_sdf(object, position(ray))
+    local_dir = transposed_orientation(object) * direction(ray)
+    
+    # Ray-sphere intersection (a*t^2 + 2*b*t + c = 0)
+    # a = 1 (since dir is normalized and rotation preserves length)
+    v = local_pos - c_local
+    b = dot(v, local_dir)
+    c = dot(v, v) - r^2
+    
+    # if origin is outside (c > 0) and ray points away (b > 0), then it misses
+    if c > 0 && b > 0
+        return false
+    end
+    
+    # Discriminant
+    if b^2 - c < 0
+        return false
+    end
+    
+    return true
+end
+
 """
     intersect3d(sphere::AbstractSphere, ray::Ray)
 
 Intersection algorithm for sdf based shapes.
 """
 function intersect3d(object::AbstractSDF, ray::AbstractRay)
+    if !intersects_bounding_sphere(object, ray)
+        return nothing
+    end
+
     pos = position(ray)
     dir = direction(ray)
     d = sdf(object, pos)
