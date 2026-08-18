@@ -52,17 +52,49 @@ end
 Thick/Plate Waveplate types and methods
 =#
 
-abstract type AbstractPlateWaveplate{T} <: AbstractPlateComponent{T} end
+abstract type AbstractPlateWaveplate{T, N} <: AbstractRefractiveOptic{T, N} end
 
 """
-    RectangularPlateWaveplate{T, M} <: AbstractPlateWaveplate{T}
+    RectangularPlateWaveplate{T, S, N, C} <: AbstractPlateWaveplate{T, N}
 
-A rectangular waveplate with a bulk glass substrate and a single coated retarder face.
+A rectangular waveplate with a bulk glass substrate and a retarder coating on its front face.
 """
-struct RectangularPlateWaveplate{T, M} <: AbstractPlateWaveplate{T}
-    substrate::Prism{T, BoxSDF{T}}
-    coating::Coating{T, Mesh{T}, M}
+struct RectangularPlateWaveplate{T, S <: BoxSDF{T}, N <: RefractiveIndex, C <: Tuple} <: AbstractPlateWaveplate{T, N}
+    shape::S
+    n::N
+    coatings::C
+    function RectangularPlateWaveplate(
+            shape::S, n::N, coatings::C = ()) where {T <: Real, S <: BoxSDF{T}, N <: RefractiveIndex, C <: Tuple}
+        test_refractive_index_function(n)
+        return new{T, S, N, C}(shape, n, coatings)
+    end
 end
+
+"""
+    RoundPlateWaveplate{T, S, N, C} <: AbstractPlateWaveplate{T, N}
+
+A round (cylindrical) waveplate with a bulk glass substrate and a retarder coating on its front face.
+"""
+struct RoundPlateWaveplate{T, S <: PlanoSurfaceSDF{T}, N <: RefractiveIndex, C <: Tuple} <: AbstractPlateWaveplate{T, N}
+    shape::S
+    n::N
+    coatings::C
+    function RoundPlateWaveplate(
+            shape::S, n::N, coatings::C = ()) where {T <: Real, S <: PlanoSurfaceSDF{T}, N <: RefractiveIndex, C <: Tuple}
+        test_refractive_index_function(n)
+        return new{T, S, N, C}(shape, n, coatings)
+    end
+end
+
+_attach_coatings(pwp::RectangularPlateWaveplate, c_tuple; deepcopy_shape::Bool = false) =
+    RectangularPlateWaveplate(deepcopy_shape ? deepcopy(pwp.shape) : pwp.shape, pwp.n, c_tuple)
+
+_attach_coatings(pwp::RoundPlateWaveplate, c_tuple; deepcopy_shape::Bool = false) =
+    RoundPlateWaveplate(deepcopy_shape ? deepcopy(pwp.shape) : pwp.shape, pwp.n, c_tuple)
+
+# Compatibility accessors
+substrate(p::AbstractPlateWaveplate) = p
+coating(p::AbstractPlateWaveplate) = get_matching_coating(coatings(p), shape(p), [0.0, 0.0, 0.0], [0.0, -1.0, 0.0])
 
 function RectangularPlateWaveplate(
         width::Real,
@@ -70,37 +102,30 @@ function RectangularPlateWaveplate(
         thickness::Real,
         n::RefractiveIndex,
         retardance::Union{Real, Function};
-        fast_axis_angle::Real=0.0
+        fast_axis_angle::Real=0.0,
+        back_coating=nothing
 )
     T = float(promote_type(typeof(width), typeof(height), typeof(thickness)))
     substrate_shape = BoxSDF(T(width), T(thickness), T(height))
-    substrate = Prism(substrate_shape, n)
-    translate3d!(substrate, [T(0), T(thickness/2), T(0)])
-    
-    coating_shape = RectangularFlatMesh(T(width), T(height))
-    zrotate3d!(coating_shape, T(π))
-    set_new_origin3d!(coating_shape)
-    yrotate3d!(coating_shape, -T(fast_axis_angle))
+    translate3d!(substrate_shape, [T(0), T(thickness/2), T(0)])
+    if fast_axis_angle != 0.0
+        yrotate3d!(substrate_shape, -T(fast_axis_angle))
+    end
     
     JMat = if retardance isa Function
         λ -> XZBasis(exp(-im * retardance(λ) / 2), 0, 0, exp(im * retardance(λ) / 2))
     else
         XZBasis(exp(-im * retardance / 2), 0, 0, exp(im * retardance / 2))
     end
-    coating = Waveplate(coating_shape, JMat)
-    
-    M = typeof(coating.model)
-    return RectangularPlateWaveplate{T, M}(substrate, coating)
-end
+    coat_wp = JonesCoating(JMat)
 
-"""
-    RoundPlateWaveplate{T, M} <: AbstractPlateWaveplate{T}
+    coatings_list = if isnothing(back_coating)
+        (:front => coat_wp,)
+    else
+        (:front => coat_wp, :back => _coating_model(back_coating))
+    end
 
-A round (cylindrical) waveplate with a bulk glass substrate and a single coated retarder face.
-"""
-struct RoundPlateWaveplate{T, M} <: AbstractPlateWaveplate{T}
-    substrate::Prism{T, PlanoSurfaceSDF{T}}
-    coating::Coating{T, Mesh{T}, M}
+    return RectangularPlateWaveplate(substrate_shape, n, coatings_list)
 end
 
 function RoundPlateWaveplate(
@@ -108,34 +133,40 @@ function RoundPlateWaveplate(
         thickness::Real,
         n::RefractiveIndex,
         retardance::Union{Real, Function};
-        fast_axis_angle::Real=0.0
+        fast_axis_angle::Real=0.0,
+        back_coating=nothing
 )
     T = float(promote_type(typeof(diameter), typeof(thickness)))
     substrate_shape = PlanoSurfaceSDF(T(thickness), T(diameter))
-    substrate = Prism(substrate_shape, n)
-    
-    coating_shape = CircularFlatMesh(T(diameter) / 2)
-    yrotate3d!(coating_shape, -T(fast_axis_angle))
+    if fast_axis_angle != 0.0
+        yrotate3d!(substrate_shape, -T(fast_axis_angle))
+    end
     
     JMat = if retardance isa Function
         λ -> XZBasis(exp(-im * retardance(λ) / 2), 0, 0, exp(im * retardance(λ) / 2))
     else
         XZBasis(exp(-im * retardance / 2), 0, 0, exp(im * retardance / 2))
     end
-    coating = Waveplate(coating_shape, JMat)
-    
-    M = typeof(coating.model)
-    return RoundPlateWaveplate{T, M}(substrate, coating)
+    coat_wp = JonesCoating(JMat)
+
+    coatings_list = if isnothing(back_coating)
+        (:front => coat_wp,)
+    else
+        (:front => coat_wp, :back => _coating_model(back_coating))
+    end
+
+    return RoundPlateWaveplate(substrate_shape, n, coatings_list)
 end
 
 # Factory mapping to round/rectangular plate waveplates
-function Waveplate(diameter::Real, thickness::Real, n::RefractiveIndex, retardance::Union{Real, Function}; fast_axis_angle::Real=0.0)
-    return RoundPlateWaveplate(diameter, thickness, n, retardance; fast_axis_angle=fast_axis_angle)
+function Waveplate(diameter::Real, thickness::Real, n::RefractiveIndex, retardance::Union{Real, Function}; fast_axis_angle::Real=0.0, back_coating=nothing)
+    return RoundPlateWaveplate(diameter, thickness, n, retardance; fast_axis_angle=fast_axis_angle, back_coating=back_coating)
 end
 
-function Waveplate(width::Real, height::Real, thickness::Real, n::RefractiveIndex, retardance::Union{Real, Function}; fast_axis_angle::Real=0.0)
-    return RectangularPlateWaveplate(width, height, thickness, n, retardance; fast_axis_angle=fast_axis_angle)
+function Waveplate(width::Real, height::Real, thickness::Real, n::RefractiveIndex, retardance::Union{Real, Function}; fast_axis_angle::Real=0.0, back_coating=nothing)
+    return RectangularPlateWaveplate(width, height, thickness, n, retardance; fast_axis_angle=fast_axis_angle, back_coating=back_coating)
 end
+
 
 #=
 Waveplate Factory/Convenience Constructors
