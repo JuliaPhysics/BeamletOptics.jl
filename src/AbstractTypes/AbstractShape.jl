@@ -113,11 +113,3 @@ end
 """Resets the `shape` rotation angles to zero."""
 reset_rotation3d!(shape::AbstractShape{T}) where {T} = orientation!(
     shape, Matrix{T}(I, 3, 3))
-
-"""
-    surface_tag(shape::AbstractShape, point, normal)
-
-Returns a symbolic surface tag (e.g. `:front`, `:back`, `:side`, `:top`, `:bottom`, `:hypotenuse`, `:leg1`, `:leg2`) for a hit point on the shape.
-Delegates to `face_id(shape, normal)` by default.
-"""
-surface_tag(s::AbstractShape, point, normal) = face_id(s, normal)

@@ -86,12 +86,6 @@ struct RoundPlateWaveplate{T, S <: PlanoSurfaceSDF{T}, N <: RefractiveIndex, C <
     end
 end
 
-_attach_coatings(pwp::RectangularPlateWaveplate, c_tuple; deepcopy_shape::Bool = false) =
-    RectangularPlateWaveplate(deepcopy_shape ? deepcopy(pwp.shape) : pwp.shape, pwp.n, c_tuple)
-
-_attach_coatings(pwp::RoundPlateWaveplate, c_tuple; deepcopy_shape::Bool = false) =
-    RoundPlateWaveplate(deepcopy_shape ? deepcopy(pwp.shape) : pwp.shape, pwp.n, c_tuple)
-
 # Compatibility accessors
 substrate(p::AbstractPlateWaveplate) = p
 coating(p::AbstractPlateWaveplate) = get_matching_coating(coatings(p), shape(p), [0.0, 0.0, 0.0], [0.0, -1.0, 0.0])

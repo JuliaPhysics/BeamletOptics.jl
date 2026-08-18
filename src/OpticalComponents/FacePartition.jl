@@ -23,7 +23,7 @@ Returns a `Symbol` corresponding to the face that contains the given `local_n` v
 """
 function face_id(shape::AbstractShape, local_n::AbstractVector)
     # Default fallback for rotationally symmetric/general shapes:
-    # y-axis is the optical axis in BMO... *sigh* ... Why?
+    # y-axis is the optical axis in BMO.
     # Front is pointing in -y direction.
     # Back is pointing in +y direction.
     ny = local_n[2]
@@ -80,3 +80,11 @@ function face_id(shape::RightAnglePrismSDF, local_n::AbstractVector)
     best_face = argmax((d_hyp, d_leg1, d_leg2, d_zpos, d_zneg))
     return (:hypotenuse, :leg1, :leg2, :zpos, :zneg)[best_face]
 end
+
+"""
+    surface_tag(shape::AbstractShape, local_p, local_n)
+
+Returns a symbolic surface tag (e.g. `:front`, `:back`, `:side`, `:top`, `:bottom`, `:hypotenuse`, `:leg1`, `:leg2`)
+for a hit point on the shape. Defaults to `face_id(shape, local_n)`.
+"""
+surface_tag(s::AbstractShape, local_p, local_n) = face_id(s, local_n)

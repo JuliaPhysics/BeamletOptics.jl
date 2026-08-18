@@ -70,12 +70,6 @@ struct RoundPolarizingPlateBeamsplitter{T, S <: PlanoSurfaceSDF{T}, N <: Refract
     end
 end
 
-_attach_coatings(pbs::RectangularPolarizingPlateBeamsplitter, c_tuple; deepcopy_shape::Bool = false) =
-    RectangularPolarizingPlateBeamsplitter(deepcopy_shape ? deepcopy(pbs.shape) : pbs.shape, pbs.n, c_tuple)
-
-_attach_coatings(pbs::RoundPolarizingPlateBeamsplitter, c_tuple; deepcopy_shape::Bool = false) =
-    RoundPolarizingPlateBeamsplitter(deepcopy_shape ? deepcopy(pbs.shape) : pbs.shape, pbs.n, c_tuple)
-
 """
     RectangularPolarizingPlateBeamsplitter(width, height, thickness, n; back_coating=nothing)
 

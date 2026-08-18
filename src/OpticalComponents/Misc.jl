@@ -41,5 +41,3 @@ end
 
 shape(rr::Retroreflector) = rr.mesh
 Retroreflector(scale::Real; coatings = ()) = Retroreflector(RetroMesh(scale), coatings)
-_attach_coatings(rr::Retroreflector, c_tuple; deepcopy_shape::Bool = false) =
-    Retroreflector(deepcopy_shape ? deepcopy(rr.mesh) : rr.mesh, c_tuple)

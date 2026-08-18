@@ -477,21 +477,6 @@ function _sdf(s::SphericalSurface, ::BackwardOrientation)
     return back
 end
 
-function surface_tag(lens::AbstractLensSDF, point, normal)
-    p = point
-    half_d = diameter(lens) / 2
-    r_xy = sqrt(p[1]^2 + p[3]^2)
-    if r_xy >= half_d - 1e-4
-        return :side
-    end
-    t = thickness(lens)
-    if p[2] < t / 2
-        return :front
-    else
-        return :back
-    end
-end
-
 function sdf(s::SphericalSurface, ::ForwardLeftMeniscusOrientation)
     ConvexSphericalSurfaceSDF(radius(s), diameter(s))
 end

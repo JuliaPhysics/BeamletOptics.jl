@@ -13,27 +13,11 @@ function eval_filter(face::Symbol, shape::AbstractShape, local_p, local_n)
     if face === :either || face === :all
         return true
     end
-    tag = surface_tag(shape, local_p, local_n)
-    if tag !== :unknown
-        return tag === face
-    end
-    return face_id(shape, local_n) === face
+    return surface_tag(shape, local_p, local_n) === face
 end
 
-function eval_filter(faces::Union{Tuple{Vararg{Symbol}}, AbstractSet{Symbol}}, shape::AbstractShape, local_p, local_n)
-    tag = surface_tag(shape, local_p, local_n)
-    if tag !== :unknown
-        return tag in faces
-    end
-    return face_id(shape, local_n) in faces
-end
-
-function eval_filter(faces::AbstractVector{Symbol}, shape::AbstractShape, local_p, local_n)
-    tag = surface_tag(shape, local_p, local_n)
-    if tag !== :unknown
-        return tag in faces
-    end
-    return face_id(shape, local_n) in faces
+function eval_filter(faces::Union{AbstractArray{Symbol}, Tuple{Vararg{Symbol}}, AbstractSet{Symbol}}, shape::AbstractShape, local_p, local_n)
+    return surface_tag(shape, local_p, local_n) in faces
 end
 
 function eval_filter(filter_vec::AbstractVector{<:Real}, shape::AbstractShape, local_p, local_n)
@@ -212,12 +196,27 @@ function with_coatings(obj::AbstractObject; front = nothing, back = nothing, dee
     return _attach_coatings(obj, mapped; deepcopy_shape = deepcopy_shape)
 end
 
-_attach_coatings(lens::Lens, c_tuple; deepcopy_shape::Bool = false) =
-    Lens(deepcopy_shape ? deepcopy(lens.shape) : lens.shape, lens.n, c_tuple)
-_attach_coatings(prism::Prism, c_tuple; deepcopy_shape::Bool = false) =
-    Prism(deepcopy_shape ? deepcopy(prism.shape) : prism.shape, prism.n, c_tuple)
-_attach_coatings(mirror::Mirror, c_tuple; deepcopy_shape::Bool = false) =
-    Mirror(deepcopy_shape ? deepcopy(mirror.shape) : mirror.shape, c_tuple)
+"""
+    _attach_coatings(obj::T, c_tuple; deepcopy_shape::Bool = false) where {T <: AbstractObject}
+
+Generic fallback to attach coating definitions `c_tuple` to an optical component `obj`.
+Reconstructs the object with `(shape, [n], c_tuple)`.
+"""
+function _attach_coatings(obj::T, c_tuple; deepcopy_shape::Bool = false) where {T <: AbstractObject}
+    s = deepcopy_shape ? deepcopy(shape(obj)) : shape(obj)
+    if hasfield(T, :n)
+        return (Base.typename(T).wrapper)(s, obj.n, c_tuple)
+    else
+        return (Base.typename(T).wrapper)(s, c_tuple)
+    end
+end
+
+# Support for DoubletLens (AbstractObjectGroup)
+function with_coatings(dl::DoubletLens; front = nothing, back = nothing, deepcopy_shape::Bool = false)
+    f_coated = !isnothing(front) ? with_coatings(dl.front; front = front, deepcopy_shape = deepcopy_shape) : dl.front
+    b_coated = !isnothing(back) ? with_coatings(dl.back; back = back, deepcopy_shape = deepcopy_shape) : dl.back
+    return DoubletLens(f_coated, b_coated)
+end
 
 # Dispatch helpers for extracting coating models
 _coating_model(c::AbstractCoating) = c.model

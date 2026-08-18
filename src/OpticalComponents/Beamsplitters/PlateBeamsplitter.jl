@@ -45,12 +45,6 @@ struct RoundPlateBeamsplitter{T, S <: PlanoSurfaceSDF{T}, N <: RefractiveIndex, 
     end
 end
 
-_attach_coatings(pbs::RectangularPlateBeamsplitter, c_tuple; deepcopy_shape::Bool = false) =
-    RectangularPlateBeamsplitter(deepcopy_shape ? deepcopy(pbs.shape) : pbs.shape, pbs.n, c_tuple)
-
-_attach_coatings(pbs::RoundPlateBeamsplitter, c_tuple; deepcopy_shape::Bool = false) =
-    RoundPlateBeamsplitter(deepcopy_shape ? deepcopy(pbs.shape) : pbs.shape, pbs.n, c_tuple)
-
 # Compatibility accessors
 substrate(p::AbstractPlateBeamsplitter) = p
 coating(p::AbstractPlateBeamsplitter) = get_matching_coating(coatings(p), shape(p), [0.0, 0.0, 0.0], [0.0, -1.0, 0.0])
