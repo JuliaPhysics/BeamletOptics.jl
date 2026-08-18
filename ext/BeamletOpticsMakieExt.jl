@@ -10,6 +10,7 @@ using GeometryBasics: Point2, Point3, TriangleFace
 using AbstractTrees: PreOrderDFS
 using MarchingCubes: MC, march
 using LinearAlgebra: dot, cross, normalize
+using StaticArrays: SVector
 
 const _RenderEnv = Union{
     Axis3,
