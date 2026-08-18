@@ -47,6 +47,12 @@ end
     return exiting_int
 end
 
+@inline _interact_reflective_optic(::Absorptive, system, optic, coating, beam, ray) = nothing
+@inline _interact_reflective_optic(::Reflective, system, optic, coating, beam, ray) =
+    interact_reflective_boundary(system, optic, coating, beam, ray)
+@inline _interact_reflective_optic(::CoatingBehavior, system, optic, coating, beam, ray) =
+    is_coated(coating) ? interact_refractive_boundary(system, optic, coating, beam, ray) : interact_reflective_boundary(system, optic, coating, beam, ray)
+
 function interact3d(system::AbstractSystem,
         optic::AbstractReflectiveOptic,
         beam::Beam{T, R},
@@ -54,12 +60,7 @@ function interact3d(system::AbstractSystem,
     coated_obj, coating = resolve_coated_boundary(system, optic, ray)
     target_obj = isnothing(coated_obj) ? optic : coated_obj
     behavior = coating_behavior(coating, ray)
-    if behavior isa Absorptive
-        return nothing
-    elseif !(coating isa Uncoated) && (behavior isa Transmissive || behavior isa Splitting)
-        return interact_refractive_boundary(system, target_obj, coating, beam, ray)
-    end
-    return interact_reflective_boundary(system, target_obj, coating, beam, ray)
+    return _interact_reflective_optic(behavior, system, target_obj, coating, beam, ray)
 end
 
 """

@@ -297,7 +297,7 @@ end
 function resolve_coated_boundary(
         system::AbstractSystem, obj::AbstractObject, ray::AbstractRay)
     coating = get_coating_model_at_hit(obj, ray)
-    if !(coating isa Uncoated)
+    if is_coated(coating)
         return obj, coating
     end
     return resolve_coincident_coatings(intersection(ray), system, ray)
@@ -327,7 +327,7 @@ check_coincident_coating(::Nothing, ray::AbstractRay) = nothing
 
 function check_coincident_coating(obj::AbstractObject, ray::AbstractRay)
     coating = get_coating_model_at_hit(obj, ray)
-    if !(coating isa Uncoated)
+    if is_coated(coating)
         return (obj, coating)
     end
     return nothing
@@ -374,46 +374,18 @@ function interact3d_behavior(
     return AstigmaticGaussianBeamletInteraction{T}(ints...)
 end
 
-function interact3d_reflective(system::AbstractSystem, obj::AbstractRefractiveOptic,
-        coating_model, beam::AbstractBeam, ray::AbstractRay)
-    int = intersection(ray)
-    λ = wavelength(ray)
-    n_substrate = refractive_index(obj, λ)
-
-    is_substrate = (_base_optic(object(int)) === obj)
-
-    normal = normal3d(int)
-    if !is_substrate
-        normal = -normal
-    end
-
-    entering_substrate = dot(direction(ray), normal) < 0
-    from_front = entering_substrate
-
-    if entering_substrate
-        n_incident = refractive_index(ray)
-        n_transmitted = n_substrate
-        hint = Hint(obj)
-    else
-        n_incident = n_substrate
-        coin_obj = is_substrate ? int.coincident_object : object(int)
-        if !isnothing(coin_obj) && is_refractive(coin_obj)
-            n_transmitted = refractive_index(coin_obj, λ)
-            hint = Hint(coin_obj)
-        else
-            n_transmitted = refractive_index(system, λ)
-            hint = nothing
-        end
-        normal = -normal
-    end
-    return interact_refractive_boundary(
-        Reflective(), system, obj, coating_model, beam, ray,
-        n_incident, n_transmitted, hint, normal, λ, from_front)
-end
-
-function interact3d_reflective(system::AbstractSystem, obj::AbstractReflectiveOptic,
+function interact3d_reflective(system::AbstractSystem, obj::AbstractObject,
         coating_model, beam::AbstractBeam, ray::AbstractRay)
     return interact_reflective_boundary(system, obj, coating_model, beam, ray)
+end
+
+function interact3d_reflective(system::AbstractSystem, coating::Coating,
+        coating_model, beam::AbstractBeam, ray::AbstractRay)
+    normal, n_incident, n_transmitted, hint, λ, from_front =
+        _resolve_standalone_coating_context(system, coating, ray)
+    return interact_refractive_boundary(
+        Reflective(), system, coating, coating_model, beam,
+        ray, n_incident, n_transmitted, hint, normal, λ, from_front)
 end
 
 @inline function _resolve_coated_splitting_context(

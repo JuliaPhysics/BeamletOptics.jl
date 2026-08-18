@@ -18,19 +18,19 @@ function Waveplate(shape::AbstractShape{T}, JMat::GlobalJonesBasis) where {T}
     return Coating(shape, model)
 end
 
+@inline _retardance_jones_matrix(r::Real) = XZBasis(exp(-im * r / 2), 0, 0, exp(im * r / 2))
+@inline _retardance_jones_matrix(f::Function) = λ -> _retardance_jones_matrix(f(λ))
+@inline _retardance_jones_matrix(m::GlobalJonesBasis) = m
+
+_waveplate_model_from_sample(::Real, f::Function) = JonesCoating(_retardance_jones_matrix(f))
+_waveplate_model_from_sample(::Any, f::Function) = JonesCoating(f)
+
 function Waveplate(shape::AbstractShape{T}, retardance::Real) where {T}
-    JMat = XZBasis(exp(-im * retardance / 2), 0, 0, exp(im * retardance / 2))
-    return Waveplate(shape, JMat)
+    return Waveplate(shape, _retardance_jones_matrix(retardance))
 end
 
 function Waveplate(shape::AbstractShape{T}, f::Function) where {T}
-    test_val = f(1e-6)
-    if test_val isa Real
-        JMat = λ -> XZBasis(exp(-im * f(λ) / 2), 0, 0, exp(im * f(λ) / 2))
-        model = JonesCoating(JMat)
-    else
-        model = JonesCoating(f)
-    end
+    model = _waveplate_model_from_sample(f(1e-6), f)
     return Coating(shape, model)
 end
 
@@ -106,12 +106,7 @@ function RectangularPlateWaveplate(
         yrotate3d!(substrate_shape, -T(fast_axis_angle))
     end
     
-    JMat = if retardance isa Function
-        λ -> XZBasis(exp(-im * retardance(λ) / 2), 0, 0, exp(im * retardance(λ) / 2))
-    else
-        XZBasis(exp(-im * retardance / 2), 0, 0, exp(im * retardance / 2))
-    end
-    coat_wp = JonesCoating(JMat)
+    coat_wp = JonesCoating(_retardance_jones_matrix(retardance))
 
     coatings_list = if isnothing(back_coating)
         (:front => coat_wp,)
@@ -136,12 +131,7 @@ function RoundPlateWaveplate(
         yrotate3d!(substrate_shape, -T(fast_axis_angle))
     end
     
-    JMat = if retardance isa Function
-        λ -> XZBasis(exp(-im * retardance(λ) / 2), 0, 0, exp(im * retardance(λ) / 2))
-    else
-        XZBasis(exp(-im * retardance / 2), 0, 0, exp(im * retardance / 2))
-    end
-    coat_wp = JonesCoating(JMat)
+    coat_wp = JonesCoating(_retardance_jones_matrix(retardance))
 
     coatings_list = if isnothing(back_coating)
         (:front => coat_wp,)

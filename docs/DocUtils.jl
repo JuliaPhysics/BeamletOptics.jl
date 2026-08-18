@@ -3,7 +3,7 @@ module DocUtils
 using GLMakie: Figure, Axis, hidedecorations!, text!, save
 using Dates: now
 
-const GLOBAL_USE_PLACEHOLDERS = false
+const GLOBAL_USE_PLACEHOLDERS = true
 
 """
     conditional_include(fname; use_placeholder=!haskey(ENV, "CI"))

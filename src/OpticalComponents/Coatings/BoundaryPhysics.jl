@@ -1,4 +1,17 @@
-# Shared Refractive and Reflective Boundary Interaction Helpers
+# Helpers to resolve reflection coefficients and target object hints via multiple dispatch
+@inline _resolve_reflection_hint(substrate_obj::AbstractCoating, system::AbstractSystem, ray::AbstractRay, int::Intersection, from_front::Bool) =
+    _resolve_coincident_hint(system, ray, int, false)
+
+@inline _resolve_reflection_hint(substrate_obj::AbstractObject, system::AbstractSystem, ray::AbstractRay, int::Intersection, from_front::Bool) =
+    is_refractive(substrate_obj) ? (from_front ? nothing : Hint(substrate_obj)) : nothing
+
+@inline _reflective_coefficients(::Uncoated, θi, λ, n_inc, n_trans, from_front::Bool) = (1.0, SPBasis(-1, 0, 0, 1))
+@inline function _reflective_coefficients(coating_model, θi, λ, n_inc, n_trans, from_front::Bool)
+    J = get_jones_matrix(coating_model, θi, λ, n_inc, n_trans, true; from_front = from_front)
+    R = clamp(unpolarized_reflectance(J), 0.0, 1.0)
+    return (R, J)
+end
+
 # Dispatched helpers for interact_refractive_boundary by CoatingBehavior
 # For Ray{T}:
 function interact_refractive_boundary(
@@ -21,14 +34,15 @@ function interact_refractive_boundary(
     if TIR
         ndir = reflection3d(direction(ray), normal)
         n_out = n_incident
-        hint = Hint(substrate_obj)
+        hint_out = _resolve_reflection_hint(substrate_obj, system, ray, intersection(ray), from_front)
         T_coeff = 1.0
     else
         n_out = n_transmitted
+        hint_out = hint
         θi = angle3d(direction(ray), -normal)
         T_coeff = coating_transmittance(coating_model, θi, λ, n_incident, n_transmitted; from_front=from_front)
     end
-    return BeamInteraction{T, R}(hint, Ray{T}(npos, ndir, nothing, λ, n_out, weight(ray) * att_power * T_coeff))
+    return BeamInteraction{T, R}(hint_out, Ray{T}(npos, ndir, nothing, λ, n_out, weight(ray) * att_power * T_coeff))
 end
 
 function interact_refractive_boundary(
@@ -48,9 +62,9 @@ function interact_refractive_boundary(
     ndir = reflection3d(direction(ray), normal)
     npos = position(ray) + length(ray) * direction(ray)
     n_out = n_incident
-    hint_out = isentering(ray) ? nothing : Hint(substrate_obj)
+    hint_out = _resolve_reflection_hint(substrate_obj, system, ray, intersection(ray), from_front)
     θi = angle3d(direction(ray), -normal)
-    R_coeff = coating_reflectance(coating_model, θi, λ, n_incident, n_transmitted; from_front=from_front)
+    R_coeff, _ = _reflective_coefficients(coating_model, θi, λ, n_incident, n_transmitted, from_front)
     att_power, _ = bulk_attenuation_factor(n_incident, λ, length(ray))
     return BeamInteraction{T, R}(hint_out, Ray{T}(npos, ndir, nothing, λ, n_out, weight(ray) * att_power * R_coeff))
 end
@@ -109,17 +123,18 @@ function interact_refractive_boundary(
     if TIR
         ndir = reflection3d(direction(ray), normal)
         n_out = n_incident
-        hint = Hint(substrate_obj)
+        hint_out = _resolve_reflection_hint(substrate_obj, system, ray, intersection(ray), from_front)
         J = get_jones_matrix(coating_model, angle3d(direction(ray), -normal),
             λ, n_incident, n_transmitted, true; from_front=from_front)
     else
         n_out = n_transmitted
+        hint_out = hint
         J = get_jones_matrix(coating_model, angle3d(direction(ray), -normal),
             λ, n_incident, n_transmitted, false; from_front=from_front)
     end
     _, att_field = bulk_attenuation_factor(n_incident, λ, length(ray))
     E0 = _calculate_global_E0(substrate_obj, ray, ndir, J) * att_field
-    return BeamInteraction{T, R}(hint, PolarizedRay{T}(npos, ndir, nothing, λ, n_out, E0))
+    return BeamInteraction{T, R}(hint_out, PolarizedRay{T}(npos, ndir, nothing, λ, n_out, E0))
 end
 
 function interact_refractive_boundary(
@@ -139,9 +154,8 @@ function interact_refractive_boundary(
     ndir = reflection3d(direction(ray), normal)
     npos = position(ray) + length(ray) * direction(ray)
     n_out = n_incident
-    hint_out = isentering(ray) ? nothing : Hint(substrate_obj)
-    J = get_jones_matrix(
-        coating_model, angle3d(direction(ray), -normal), λ, n_incident, n_transmitted, true; from_front=from_front)
+    hint_out = _resolve_reflection_hint(substrate_obj, system, ray, intersection(ray), from_front)
+    _, J = _reflective_coefficients(coating_model, angle3d(direction(ray), -normal), λ, n_incident, n_transmitted, from_front)
     _, att_field = bulk_attenuation_factor(n_incident, λ, length(ray))
     E0 = _calculate_global_E0(substrate_obj, ray, ndir, J) * att_field
     return BeamInteraction{T, R}(
@@ -253,48 +267,12 @@ function interact_reflective_boundary(
         coating_model,
         beam::AbstractBeam{T, R},
         ray::R
-) where {T, R <: Ray{T}}
-    normal, n_incident, n_transmitted, _, λ, from_front =
+) where {T, R <: AbstractRay{T}}
+    normal, n_incident, n_transmitted, hint, λ, from_front =
         _resolve_interface_context(system, substrate_obj, ray)
-    
-    npos = position(ray) + length(ray) * direction(ray)
-    ndir = reflection3d(direction(ray), normal)
-
-    J_r = if coating_model isa Uncoated
-        SPBasis(-1, 0, 0, 1)
-    else
-        get_jones_matrix(coating_model, angle3d(direction(ray), -normal), λ, n_incident, n_transmitted, true; from_front=from_front)
-    end
-    R_coeff = clamp(unpolarized_reflectance(J_r), 0.0, 1.0)
-    att_power, _ = bulk_attenuation_factor(n_incident, λ, length(ray))
-
-    return BeamInteraction{T, R}(
-        nothing, Ray{T}(npos, ndir, nothing, λ, n_incident, weight(ray) * att_power * R_coeff))
-end
-
-function interact_reflective_boundary(
-        system::AbstractSystem,
-        substrate_obj::AbstractObject{T},
-        coating_model,
-        beam::AbstractBeam{T, R},
-        ray::R
-) where {T, R <: PolarizedRay{T}}
-    normal, n_incident, n_transmitted, _, λ, from_front =
-        _resolve_interface_context(system, substrate_obj, ray)
-    
-    npos = position(ray) + length(ray) * direction(ray)
-    ndir = reflection3d(direction(ray), normal)
-
-    J = if coating_model isa Uncoated
-        SPBasis(-1, 0, 0, 1)
-    else
-        get_jones_matrix(coating_model, angle3d(direction(ray), -normal),
-            λ, n_incident, n_transmitted, true; from_front=from_front)
-    end
-    _, att_field = bulk_attenuation_factor(n_incident, λ, length(ray))
-    E0 = _calculate_global_E0(substrate_obj, ray, ndir, J) * att_field
-    return BeamInteraction{T, R}(
-        nothing, PolarizedRay{T}(npos, ndir, nothing, λ, refractive_index(ray), E0))
+    return interact_refractive_boundary(
+        Reflective(), system, substrate_obj, coating_model, beam,
+        ray, n_incident, n_transmitted, hint, normal, λ, from_front)
 end
 
 # Absorptive behavior

@@ -86,6 +86,15 @@ Represents an uncoated dielectric boundary. Behaves as `Transmissive` by default
 struct Uncoated <: AbstractCoatingModel end
 coating_behavior(::Uncoated) = Transmissive()
 
+"""
+    is_coated(coating_model)
+
+Predicate indicating whether a coating model represents an active coating layer rather than an uncoated boundary (`Uncoated`).
+"""
+is_coated(::Uncoated) = false
+is_coated(::AbstractCoatingModel) = true
+is_coated(::Any) = true
+
 @inline get_coating_behavior(c) = coating_behavior(c)
 
 """
@@ -324,8 +333,11 @@ Falls back to `coating_properties(coating, λ)` for spatially uniform coatings.
 """
 coating_properties(c::AbstractCoatingModel, λ::Real) = ()
 
+@inline _eval_refractive_index(n::Function, λ::Real) = complex(n(λ))
+@inline _eval_refractive_index(n, λ::Real) = complex(n)
+
 function coating_properties(c::ThinFilmCoating, λ::Real)
-    n_vals = map(n -> (n isa Function ? complex(n(λ)) : complex(n)), c.ns)
+    n_vals = map(n -> _eval_refractive_index(n, λ), c.ns)
     return n_vals, c.ds
 end
 
@@ -474,17 +486,16 @@ end
 
 CompositeSurfaceModel(models::AbstractSurfaceModel...) = CompositeSurfaceModel(models)
 
+@inline _behavior_precedence(::Absorptive) = 4
+@inline _behavior_precedence(::Splitting) = 3
+@inline _behavior_precedence(::Reflective) = 2
+@inline _behavior_precedence(::Transmissive) = 1
+
+@inline _dominant_behavior(b1::CoatingBehavior, b2::CoatingBehavior) =
+    _behavior_precedence(b1) >= _behavior_precedence(b2) ? b1 : b2
+
 function coating_behavior(comp::CompositeSurfaceModel)
-    behaviors = map(coating_behavior, comp.models)
-    if any(b -> b isa Absorptive, behaviors)
-        return Absorptive()
-    elseif any(b -> b isa Splitting, behaviors)
-        return Splitting()
-    elseif any(b -> b isa Reflective, behaviors)
-        return Reflective()
-    else
-        return Transmissive()
-    end
+    return isempty(comp.models) ? Transmissive() : reduce(_dominant_behavior, map(coating_behavior, comp.models))
 end
 
 function get_jones_matrix(

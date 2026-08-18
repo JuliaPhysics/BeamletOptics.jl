@@ -126,170 +126,26 @@ the boolean `from_front` flag indicating whether the ray hit the interface from 
     return from_front ? normal : -normal, from_front
 end
 
-# Route interact3d through coating_behavior trait
+@inline function _resolve_standalone_coating_context(
+        system::AbstractSystem, coating::Coating, ray::AbstractRay)
+    int = intersection(ray)
+    λ = wavelength(ray)
+    n_transmitted, _ = _coating_media(system, ray, int)
+    normal, from_front = _resolve_coating_normal(ray, int)
+    hint_trans = _resolve_coincident_hint(system, ray, int, true)
+    n_incident = refractive_index(ray)
+    return (normal, n_incident, n_transmitted, hint_trans, λ, from_front)
+end
+
+# Route interact3d through coating_behavior trait into unified boundary physics engine
 function interact3d(system::AbstractSystem, coating::Coating{T},
         beam::AbstractBeam, ray::AbstractRay) where {T}
-    return interact3d(coating_behavior(coating.model, ray), system, coating, beam, ray)
-end
-
-# Transmissive behavior
-function interact3d(::Transmissive, system::AbstractSystem, coating::Coating{T},
-        ::Beam{T, R}, ray::R) where {T, R <: Ray{T}}
-    int = intersection(ray)
-    n_transmitted, _ = _coating_media(system, ray, int)
-    normal, from_front = _resolve_coating_normal(ray, int)
-
-    ndir, TIR = refraction3d(direction(ray), normal, refractive_index(ray), n_transmitted)
-    npos = position(ray) + length(ray) * direction(ray)
-    att_power, _ = bulk_attenuation_factor(refractive_index(ray), wavelength(ray), length(ray))
-
-    if TIR
-        ndir = reflection3d(direction(ray), normal)
-        n_out = refractive_index(ray)
-        hint = _resolve_coincident_hint(system, ray, int, false)
-        T_coeff = 1.0
-    else
-        n_out = n_transmitted
-        hint = _resolve_coincident_hint(system, ray, int, true)
-
-        θi = angle3d(direction(ray), -normal)
-        T_coeff = coating_transmittance(coating.model, θi, wavelength(ray), refractive_index(ray), n_transmitted; from_front = from_front)
-    end
-
-    return BeamInteraction{T, R}(
-        hint, Ray{T}(npos, ndir, nothing, wavelength(ray), n_out, weight(ray) * att_power * T_coeff))
-end
-
-function interact3d(::Transmissive, system::AbstractSystem, coating::Coating{T},
-        ::Beam{T, R}, ray::R) where {T, R <: PolarizedRay{T}}
-    int = intersection(ray)
-    n_transmitted, _ = _coating_media(system, ray, int)
-    normal, from_front = _resolve_coating_normal(ray, int)
-
-    ndir, TIR = refraction3d(direction(ray), normal, refractive_index(ray), n_transmitted)
-    npos = position(ray) + length(ray) * direction(ray)
-    _, att_field = bulk_attenuation_factor(refractive_index(ray), wavelength(ray), length(ray))
-
-    if TIR
-        ndir = reflection3d(direction(ray), normal)
-        n_out = refractive_index(ray)
-        hint = _resolve_coincident_hint(system, ray, int, false)
-        E0 = polarization(ray) * att_field
-    else
-        n_out = n_transmitted
-        hint = _resolve_coincident_hint(system, ray, int, true)
-        J = get_jones_matrix(coating.model, angle3d(direction(ray), -normal),
-            wavelength(ray), refractive_index(ray), n_transmitted, false; from_front = from_front)
-        E0 = _calculate_global_E0(coating, ray, ndir, J) * att_field
-    end
-
-    return BeamInteraction{T, R}(
-        hint, PolarizedRay{T}(npos, ndir, nothing, wavelength(ray), n_out, E0))
-end
-
-# Reflective behavior
-function interact3d(::Reflective, system::AbstractSystem, coating::Coating{T},
-        ::Beam{T, R}, ray::R) where {T, R <: Ray{T}}
-    int = intersection(ray)
-    normal, from_front = _resolve_coating_normal(ray, int)
-
-    ndir = reflection3d(direction(ray), normal)
-    npos = position(ray) + length(ray) * direction(ray)
-
-    hint = _resolve_coincident_hint(system, ray, int, false)
-
-    n_transmitted, _ = _coating_media(system, ray, int)
-    θi = angle3d(direction(ray), -normal)
-    R_coeff = coating_reflectance(coating.model, θi, wavelength(ray), refractive_index(ray), n_transmitted; from_front = from_front)
-    att_power, _ = bulk_attenuation_factor(refractive_index(ray), wavelength(ray), length(ray))
-
-    return BeamInteraction{T, R}(
-        hint, Ray{T}(npos, ndir, nothing, wavelength(ray),
-            refractive_index(ray), weight(ray) * att_power * R_coeff))
-end
-
-function interact3d(::Reflective, system::AbstractSystem, coating::Coating{T},
-        ::Beam{T, R}, ray::R) where {T, R <: PolarizedRay{T}}
-    int = intersection(ray)
-    normal, from_front = _resolve_coating_normal(ray, int)
-
-    ndir = reflection3d(direction(ray), normal)
-    npos = position(ray) + length(ray) * direction(ray)
-
-    hint = _resolve_coincident_hint(system, ray, int, false)
-
-    n_transmitted, _ = _coating_media(system, ray, int)
-
-    J = get_jones_matrix(coating.model, angle3d(direction(ray), -normal),
-        wavelength(ray), refractive_index(ray), n_transmitted, true; from_front = from_front)
-    _, att_field = bulk_attenuation_factor(refractive_index(ray), wavelength(ray), length(ray))
-    E0 = _calculate_global_E0(coating, ray, ndir, J) * att_field
-    return BeamInteraction{T, R}(hint,
-        PolarizedRay{T}(npos, ndir, nothing, wavelength(ray), refractive_index(ray), E0))
-end
-
-# Splitting behavior
-function interact3d(::Splitting, system::AbstractSystem, coating::Coating{T},
-        beam::Beam{T, R}, ray::R) where {T, R <: Ray{T}}
-    int = intersection(ray)
-    n_transmitted, _ = _coating_media(system, ray, int)
-    normal, from_front = _resolve_coating_normal(ray, int)
-
-    dir_t, TIR = refraction3d(direction(ray), normal, refractive_index(ray), n_transmitted)
-    if TIR
-        return interact3d(Reflective(), system, coating, beam, ray)
-    end
-    dir_r = reflection3d(direction(ray), normal)
-
-    pos = position(ray) + length(ray) * direction(ray)
-
-    θi = angle3d(direction(ray), -normal)
-    R_coeff = coating_reflectance(coating.model, θi, wavelength(ray), refractive_index(ray), n_transmitted; from_front = from_front)
-    T_coeff = coating_transmittance(coating.model, θi, wavelength(ray), refractive_index(ray), n_transmitted; from_front = from_front)
-    att_power, _ = bulk_attenuation_factor(refractive_index(ray), wavelength(ray), length(ray))
-
-    beam_t = Beam(Ray{T}(
-        Point3{T}(pos), Point3{T}(dir_t), nothing, wavelength(ray), n_transmitted, weight(ray) * att_power *
-                                                                                   T_coeff))
-    beam_r = Beam(Ray{T}(
-        Point3{T}(pos), Point3{T}(dir_r), nothing, wavelength(ray),
-        refractive_index(ray), weight(ray) * att_power *
-                               R_coeff))
-
-    children!(beam, (beam_t, beam_r))
-    return nothing
-end
-
-function interact3d(::Splitting, system::AbstractSystem, coating::Coating{T},
-        beam::Beam{T, R}, ray::R) where {T, R <: PolarizedRay{T}}
-    int = intersection(ray)
-    n_transmitted, _ = _coating_media(system, ray, int)
-    normal, from_front = _resolve_coating_normal(ray, int)
-
-    dir_t, TIR = refraction3d(direction(ray), normal, refractive_index(ray), n_transmitted)
-    if TIR
-        return interact3d(Reflective(), system, coating, beam, ray)
-    end
-    dir_r = reflection3d(direction(ray), normal)
-
-    pos = position(ray) + length(ray) * direction(ray)
-
-    J_t = get_jones_matrix(coating.model, angle3d(direction(ray), -normal),
-        wavelength(ray), refractive_index(ray), n_transmitted, false; from_front = from_front)
-    J_r = get_jones_matrix(coating.model, angle3d(direction(ray), -normal),
-        wavelength(ray), refractive_index(ray), n_transmitted, true; from_front = from_front)
-
-    _, att_field = bulk_attenuation_factor(refractive_index(ray), wavelength(ray), length(ray))
-    E0_t = _calculate_global_E0(coating, ray, dir_t, J_t) * att_field
-    E0_r = _calculate_global_E0(coating, ray, dir_r, J_r) * att_field
-
-    beam_t = Beam(PolarizedRay{T}(
-        pos, dir_t, nothing, wavelength(ray), n_transmitted, E0_t))
-    beam_r = Beam(PolarizedRay{T}(
-        pos, dir_r, nothing, wavelength(ray), refractive_index(ray), E0_r))
-
-    children!(beam, (beam_t, beam_r))
-    return nothing
+    normal, n_incident, n_transmitted, hint, λ, from_front =
+        _resolve_standalone_coating_context(system, coating, ray)
+    behavior = coating_behavior(coating.model, ray)
+    return interact_refractive_boundary(
+        behavior, system, coating, coating.model, beam,
+        ray, n_incident, n_transmitted, hint, normal, λ, from_front)
 end
 
 # GaussianBeamlet and AstigmaticGaussianBeamlet splitting methods
