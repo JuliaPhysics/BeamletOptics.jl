@@ -1,75 +1,65 @@
-abstract type AbstractPlateComponent{T} <: AbstractObjectGroup{T} end
+"""
+    AbstractPlateComponent <: AbstractObject
 
-coating(p::AbstractPlateComponent) = p.coating
-substrate(p::AbstractPlateComponent) = p.substrate
-
-Base.position(p::AbstractPlateComponent) = position(coating(p))
-orientation(p::AbstractPlateComponent) = orientation(substrate(p))
-shape_trait_of(::AbstractPlateComponent) = MultiShape()
-shape(p::AbstractPlateComponent) = (substrate(p), coating(p))
-objects(p::AbstractPlateComponent) = (substrate(p), coating(p))
-refractive_index(p::AbstractPlateComponent, λ::Real) = refractive_index(substrate(p), λ)
+Generic type for plate-like optical components.
+"""
+abstract type AbstractPlateComponent{T} <: AbstractObject{T} end
 
 """
-    AbstractPlateBeamsplitter <: AbstractBeamsplitter
+    AbstractPlateBeamsplitter <: AbstractRefractiveOptic
 
-A generic type to represent an [`AbstractBeamsplitter`](@ref) that consists of a substrate with a 
-single coated face at which a beam splitting interaction occurs.
-
-# Implementation reqs.
-
-Subtypes of `AbstractPlateBeamsplitter` should implement all supertype reqs. as well as:
-
-## Fields
-
-- `coating`: a [`ThinBeamsplitter`](@ref) that represents the splitter coating
-- `substrate`: a [`Prism`](@ref) that represents the substrate
-
-## Getters/setters
-
-If the concrete implementation does not define the above fields, the following getters must be defined:
-
-- `coating`: returns a [`ThinBeamsplitter`](@ref)
-- `substrate`: returns a [`Prism`](@ref)
-
-# Additional information
-
-!!! info "Object orientation"
-    This `interact3d` method of this type strongly assumes that the coating is positioned directly upon
-    a single face of the substrate with a 100% fill factor.
-
-!!! info "Interaction logic"
-    This type uses the [`Hint`](@ref)-API in order to ensure that the splitting interaction is correctly
-    triggered at the coating.
+A generic type to represent an optical plate beamsplitter where beam splitting occurs at a coated surface face.
 """
-abstract type AbstractPlateBeamsplitter{T} <: AbstractPlateComponent{T} end
+abstract type AbstractPlateBeamsplitter{T, N} <: AbstractRefractiveOptic{T, N} end
+
 
 """
-    RectangularPlateBeamsplitter <: AbstractPlateBeamsplitter
+    RectangularPlateBeamsplitter{T, S, N, C} <: AbstractPlateBeamsplitter{T, N}
 
-A plate beamsplitter with rectangular substrate and a single coated face.
-For more information refer to the [`AbstractPlateBeamsplitter`](@ref) docs.
-
-# Fields
-
-- `substrate`: a rectangular [`Prism`](@ref) that acts as the substrate
-- `coating`: a [`ThinBeamsplitter`](@ref) that acts as the coating
-
-# Additional information
-
-!!! info "Kinematic center"
-    The center of kinematics of this splitter lies at the center of the coating.
+A plate beamsplitter with a rectangular substrate and surface coatings.
 """
-struct RectangularPlateBeamsplitter{T, M} <: AbstractPlateBeamsplitter{T}
-    substrate::Prism{T, BoxSDF{T}}
-    coating::Coating{T, Mesh{T}, M}
+struct RectangularPlateBeamsplitter{T, S <: BoxSDF{T}, N <: RefractiveIndex, C <: Tuple} <: AbstractPlateBeamsplitter{T, N}
+    shape::S
+    n::N
+    coatings::C
+    function RectangularPlateBeamsplitter(
+            shape::S, n::N, coatings::C = ()) where {T <: Real, S <: BoxSDF{T}, N <: RefractiveIndex, C <: Tuple}
+        test_refractive_index_function(n)
+        return new{T, S, N, C}(shape, n, coatings)
+    end
 end
 
 """
-    RectangularPlateBeamsplitter(width, height, thickness, n; reflectance=0.5)
+    RoundPlateBeamsplitter{T, S, N, C} <: AbstractPlateBeamsplitter{T, N}
 
-Creates a [`RectangularPlateBeamsplitter`](@ref). The splitter is aligned with the negative y-axis.
-The splitter coating is centered at the origin. See also [`RoundPlateBeamsplitter`](@ref).
+A plate beamsplitter with a cylindrical substrate and surface coatings.
+"""
+struct RoundPlateBeamsplitter{T, S <: PlanoSurfaceSDF{T}, N <: RefractiveIndex, C <: Tuple} <: AbstractPlateBeamsplitter{T, N}
+    shape::S
+    n::N
+    coatings::C
+    function RoundPlateBeamsplitter(
+            shape::S, n::N, coatings::C = ()) where {T <: Real, S <: PlanoSurfaceSDF{T}, N <: RefractiveIndex, C <: Tuple}
+        test_refractive_index_function(n)
+        return new{T, S, N, C}(shape, n, coatings)
+    end
+end
+
+_attach_coatings(pbs::RectangularPlateBeamsplitter, c_tuple; deepcopy_shape::Bool = false) =
+    RectangularPlateBeamsplitter(deepcopy_shape ? deepcopy(pbs.shape) : pbs.shape, pbs.n, c_tuple)
+
+_attach_coatings(pbs::RoundPlateBeamsplitter, c_tuple; deepcopy_shape::Bool = false) =
+    RoundPlateBeamsplitter(deepcopy_shape ? deepcopy(pbs.shape) : pbs.shape, pbs.n, c_tuple)
+
+# Compatibility accessors
+substrate(p::AbstractPlateBeamsplitter) = p
+coating(p::AbstractPlateBeamsplitter) = get_matching_coating(coatings(p), shape(p), [0.0, 0.0, 0.0], [0.0, -1.0, 0.0])
+
+"""
+    RectangularPlateBeamsplitter(width, height, thickness, n; reflectance=0.5, back_coating=nothing)
+
+Creates a [`RectangularPlateBeamsplitter`](@ref). The splitter front face is centered at the origin,
+with the substrate extending along the positive y-axis.
 
 # Inputs
 
@@ -81,75 +71,77 @@ The splitter coating is centered at the origin. See also [`RoundPlateBeamsplitte
 # Keywords
 
 - `reflectance`: defines the splitting ratio in [-], i.e. R = 0 ... 1.0
+- `back_coating`: optional coating attached to the back face (e.g., [`SimpleARCoating`](@ref))
 """
 function RectangularPlateBeamsplitter(
         width::Real,
         height::Real,
         thickness::Real,
         n::RefractiveIndex;
-        reflectance::Real=0.5
+        reflectance::Real=0.5,
+        back_coating=nothing
     )
+    if reflectance >= 1 || reflectance <= 0
+        error("Splitting ratio ∈ (0, 1)!")
+    end
     T = float(promote_type(typeof(width), typeof(height), typeof(thickness)))
-    # create substrate prism and move into pos
     substrate_shape = BoxSDF(T(width), T(thickness), T(height))
-    substrate = Prism(substrate_shape, n)
-    translate3d!(substrate, [T(0), T(thickness/2), T(0)])
-    # rotate splitter "coating" into pos
-    coating = ThinBeamsplitter(T(width), T(height); reflectance=T(reflectance))
-    zrotate3d!(coating, T(π))
-    M = typeof(coating.model)
-    return RectangularPlateBeamsplitter{T, M}(substrate, coating)
+    translate3d!(substrate_shape, [T(0), T(thickness/2), T(0)])
+
+    r = sqrt(reflectance)
+    t = sqrt(1.0 - reflectance)
+    coat_bs = SimpleBeamsplitterCoating(r, r, t, t)
+
+    coatings_list = if isnothing(back_coating)
+        (:front => coat_bs,)
+    else
+        (:front => coat_bs, :back => _coating_model(back_coating))
+    end
+
+    return RectangularPlateBeamsplitter(substrate_shape, n, coatings_list)
 end
 
 """
-    RoundPlateBeamsplitter <: AbstractPlateBeamsplitter
+    RoundPlateBeamsplitter(diameter, thickness, n; reflectance=0.5, back_coating=nothing)
 
-A plate beamsplitter with cylindrical substrate and a single coated face.
-For more information refer to the [`AbstractPlateBeamsplitter`](@ref) docs.
-
-# Fields
-
-- `substrate`: a cylindrical [`Prism`](@ref) that acts as the substrate
-- `coating`: a [`RoundThinBeamsplitter`](@ref) that acts as the coating
-
-# Additional information
-
-!!! info "Kinematic center"
-    The center of kinematics of this splitter lies at the center of the coating.
-"""
-struct RoundPlateBeamsplitter{T, M} <: AbstractPlateBeamsplitter{T}
-    substrate::Prism{T, PlanoSurfaceSDF{T}}
-    coating::Coating{T, Mesh{T}, M}
-end
-
-"""
-    RoundPlateBeamsplitter(diameter, thickness, n; reflectance=0.5)
-
-Creates a [`RoundPlateBeamsplitter`](@ref). The splitter is aligned with the negative y-axis.
-The coating is centered at the origin. See also [`RectangularPlateBeamsplitter`](@ref).
+Creates a circular [`RoundPlateBeamsplitter`](@ref). The splitter front face is centered at the origin,
+with the substrate extending along the positive y-axis.
 
 # Inputs
 
 - `diameter`: x-z-plane substrate diameter in [m]
-- `thickness`: substrate thickness along the z-axis in [m]
+- `thickness`: substrate thickness along the y-axis in [m]
 - `n`: the [`RefractiveIndex`](@ref) of the substrate
 
-# Keywords 
+# Keywords
 
 - `reflectance`: defines the splitting ratio in [-], i.e. R = 0 ... 1.0
+- `back_coating`: optional coating attached to the back face (e.g., [`SimpleARCoating`](@ref))
 """
 function RoundPlateBeamsplitter(
         diameter::Real,
         thickness::Real,
         n::RefractiveIndex;
-        reflectance::Real=0.5
+        reflectance::Real=0.5,
+        back_coating=nothing
     )
+    if reflectance >= 1 || reflectance <= 0
+        error("Splitting ratio ∈ (0, 1)!")
+    end
     T = float(promote_type(typeof(diameter), typeof(thickness)))
-    # create substrate cylinder prism
     substrate_shape = PlanoSurfaceSDF(T(thickness), T(diameter))
-    substrate = Prism(substrate_shape, n)
-    # round splitter coating
-    coating = RoundThinBeamsplitter(T(diameter); reflectance=T(reflectance))
-    M = typeof(coating.model)
-    return RoundPlateBeamsplitter{T, M}(substrate, coating)
+
+    r = sqrt(reflectance)
+    t = sqrt(1.0 - reflectance)
+    coat_bs = SimpleBeamsplitterCoating(r, r, t, t)
+
+    coatings_list = if isnothing(back_coating)
+        (:front => coat_bs,)
+    else
+        (:front => coat_bs, :back => _coating_model(back_coating))
+    end
+
+    return RoundPlateBeamsplitter(substrate_shape, n, coatings_list)
 end
+
+

@@ -14,14 +14,14 @@ const mm = 1e-3
         # Passing integer dimensions to RectangularPolarizingPlateBeamsplitter
         rppbs = RectangularPolarizingPlateBeamsplitter(10, 10, 2, n)
         @test rppbs isa RectangularPolarizingPlateBeamsplitter{Float64}
-        @test rppbs.substrate isa Prism{Float64, BMO.BoxSDF{Float64}}
-        @test rppbs.coating isa Coating{Float64}
+        @test BMO.shape(rppbs) isa BMO.BoxSDF{Float64}
+        @test BMO.coatings(rppbs)[1].second isa BMO.JonesCoating
 
         # Passing integer dimensions to RoundPolarizingPlateBeamsplitter
         round_ppbs = RoundPolarizingPlateBeamsplitter(20, 2, n)
         @test round_ppbs isa RoundPolarizingPlateBeamsplitter{Float64}
-        @test round_ppbs.substrate isa Prism{Float64, BMO.PlanoSurfaceSDF{Float64}}
-        @test round_ppbs.coating isa Coating{Float64}
+        @test BMO.shape(round_ppbs) isa BMO.PlanoSurfaceSDF{Float64}
+        @test BMO.coatings(round_ppbs)[1].second isa BMO.JonesCoating
     end
 
     @testset "RectangularPolarizingPlateBeamsplitter (n > 1)" begin

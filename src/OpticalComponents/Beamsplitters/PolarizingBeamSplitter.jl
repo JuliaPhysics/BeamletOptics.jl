@@ -39,58 +39,97 @@ Plate Polarizing Beamsplitters
 =#
 
 """
-    RectangularPolarizingPlateBeamsplitter{T, M} <: AbstractPlateBeamsplitter{T}
+    RectangularPolarizingPlateBeamsplitter{T, S, N, C} <: AbstractPlateBeamsplitter{T, N}
 
-A plate beamsplitter with a rectangular substrate and an ideal polarizing
-splitting coating.
+A plate beamsplitter with a rectangular substrate and an ideal polarizing splitting coating attached to its front face.
 """
-struct RectangularPolarizingPlateBeamsplitter{T, M} <: AbstractPlateBeamsplitter{T}
-    substrate::Prism{T, BoxSDF{T}}
-    coating::Coating{T, Mesh{T}, M}
+struct RectangularPolarizingPlateBeamsplitter{T, S <: BoxSDF{T}, N <: RefractiveIndex, C <: Tuple} <: AbstractPlateBeamsplitter{T, N}
+    shape::S
+    n::N
+    coatings::C
+    function RectangularPolarizingPlateBeamsplitter(
+            shape::S, n::N, coatings::C = ()) where {T <: Real, S <: BoxSDF{T}, N <: RefractiveIndex, C <: Tuple}
+        test_refractive_index_function(n)
+        return new{T, S, N, C}(shape, n, coatings)
+    end
 end
 
 """
-    RectangularPolarizingPlateBeamsplitter(width, height, thickness, n)
+    RoundPolarizingPlateBeamsplitter{T, S, N, C} <: AbstractPlateBeamsplitter{T, N}
+
+A plate beamsplitter with a cylindrical substrate and an ideal polarizing splitting coating attached to its front face.
+"""
+struct RoundPolarizingPlateBeamsplitter{T, S <: PlanoSurfaceSDF{T}, N <: RefractiveIndex, C <: Tuple} <: AbstractPlateBeamsplitter{T, N}
+    shape::S
+    n::N
+    coatings::C
+    function RoundPolarizingPlateBeamsplitter(
+            shape::S, n::N, coatings::C = ()) where {T <: Real, S <: PlanoSurfaceSDF{T}, N <: RefractiveIndex, C <: Tuple}
+        test_refractive_index_function(n)
+        return new{T, S, N, C}(shape, n, coatings)
+    end
+end
+
+_attach_coatings(pbs::RectangularPolarizingPlateBeamsplitter, c_tuple; deepcopy_shape::Bool = false) =
+    RectangularPolarizingPlateBeamsplitter(deepcopy_shape ? deepcopy(pbs.shape) : pbs.shape, pbs.n, c_tuple)
+
+_attach_coatings(pbs::RoundPolarizingPlateBeamsplitter, c_tuple; deepcopy_shape::Bool = false) =
+    RoundPolarizingPlateBeamsplitter(deepcopy_shape ? deepcopy(pbs.shape) : pbs.shape, pbs.n, c_tuple)
+
+"""
+    RectangularPolarizingPlateBeamsplitter(width, height, thickness, n; back_coating=nothing)
+
+A plate beamsplitter with a rectangular substrate and an ideal polarizing splitting coating attached to its front face.
 """
 function RectangularPolarizingPlateBeamsplitter(
         width::Real,
         height::Real,
         thickness::Real,
-        n::RefractiveIndex
+        n::RefractiveIndex;
+        back_coating=nothing
 )
     T = float(promote_type(typeof(width), typeof(height), typeof(thickness)))
     substrate_shape = BoxSDF(T(width), T(thickness), T(height))
-    substrate = Prism(substrate_shape, n)
-    translate3d!(substrate, [T(0), T(thickness / 2), T(0)])
-    coating = PolarizingBeamSplitter(T(width), T(height))
-    zrotate3d!(coating, T(π))
-    M = typeof(coating.model)
-    return RectangularPolarizingPlateBeamsplitter{T, M}(substrate, coating)
+    translate3d!(substrate_shape, [T(0), T(thickness / 2), T(0)])
+
+    J_t = XZBasis(one(T), zero(T), zero(T), zero(T))
+    J_r = XZBasis(zero(T), zero(T), zero(T), -one(T))
+    coat_pbs = JonesCoating(J_t, J_r; behavior = Splitting())
+
+    coatings_list = if isnothing(back_coating)
+        (:front => coat_pbs,)
+    else
+        (:front => coat_pbs, :back => _coating_model(back_coating))
+    end
+
+    return RectangularPolarizingPlateBeamsplitter(substrate_shape, n, coatings_list)
 end
 
 """
-    RoundPolarizingPlateBeamsplitter{T, M} <: AbstractPlateBeamsplitter{T}
+    RoundPolarizingPlateBeamsplitter(diameter, thickness, n; back_coating=nothing)
 
-A plate beamsplitter with a cylindrical substrate and an ideal polarizing
-splitting coating.
-"""
-struct RoundPolarizingPlateBeamsplitter{T, M} <: AbstractPlateBeamsplitter{T}
-    substrate::Prism{T, PlanoSurfaceSDF{T}}
-    coating::Coating{T, Mesh{T}, M}
-end
-
-"""
-    RoundPolarizingPlateBeamsplitter(diameter, thickness, n)
+A plate beamsplitter with a cylindrical substrate and an ideal polarizing splitting coating attached to its front face.
 """
 function RoundPolarizingPlateBeamsplitter(
         diameter::Real,
         thickness::Real,
-        n::RefractiveIndex
+        n::RefractiveIndex;
+        back_coating=nothing
 )
     T = float(promote_type(typeof(diameter), typeof(thickness)))
     substrate_shape = PlanoSurfaceSDF(T(thickness), T(diameter))
-    substrate = Prism(substrate_shape, n)
-    coating = PolarizingBeamSplitter(CircularFlatMesh(T(diameter) / 2))
-    M = typeof(coating.model)
-    return RoundPolarizingPlateBeamsplitter{T, M}(substrate, coating)
+
+    J_t = XZBasis(one(T), zero(T), zero(T), zero(T))
+    J_r = XZBasis(zero(T), zero(T), zero(T), -one(T))
+    coat_pbs = JonesCoating(J_t, J_r; behavior = Splitting())
+
+    coatings_list = if isnothing(back_coating)
+        (:front => coat_pbs,)
+    else
+        (:front => coat_pbs, :back => _coating_model(back_coating))
+    end
+
+    return RoundPolarizingPlateBeamsplitter(substrate_shape, n, coatings_list)
 end
+
+
