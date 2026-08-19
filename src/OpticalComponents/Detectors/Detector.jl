@@ -301,6 +301,9 @@ end
 
 function interact3d(::AbstractSystem, d::Detector, beam::Beam{T, R},
         ray::R) where {T <: Real, R <: Ray{T}}
+    # Apply bulk attenuation over the final segment arriving at the detector
+    att_power, _ = bulk_attenuation_factor(refractive_index(ray), wavelength(ray), length(ray))
+    weight!(ray, weight(ray) * att_power)
     # Optical path length and wavenumber
     opl = optical_path_length(beam)
     # Push hit data into detector, determine stop
@@ -318,7 +321,8 @@ function interact3d(::AbstractSystem, d::Detector, beam::Beam{T, R},
                 direction(hit),
                 nothing,
                 wavelength(ray),
-                refractive_index(ray)
+                refractive_index(ray),
+                weight(ray)
             )
         )
     end
@@ -326,6 +330,9 @@ end
 
 function interact3d(::AbstractSystem, d::Detector, beam::Beam{T, R},
         ray::R) where {T <: Real, R <: PolarizedRay{T}}
+    # Apply bulk attenuation over the final segment arriving at the detector
+    _, att_field = bulk_attenuation_factor(refractive_index(ray), wavelength(ray), length(ray))
+    polarization!(ray, polarization(ray) * att_field)
     # Optical path length and wavenumber
     opl = optical_path_length(beam)
     # Push hit data into detector, determine stop

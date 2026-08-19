@@ -24,3 +24,27 @@ An `AbstractObject` can consist of multiple `AbstractShape`s or even multiple su
 BeamletOptics.SingleShape
 BeamletOptics.MultiShape
 ```
+
+---
+
+## Face Partitioning & Coordinate Transformation
+
+When custom components need to apply selective properties (such as coatings or specific surface behaviors) to different parts of their geometry, the **Face Partitioning API** is used.
+
+### Coordinate Transformation
+
+To determine where an intersection occurred relative to the local reference frame of a shape, BMO uses `world_to_local`:
+
+```@docs; canonical=false
+BeamletOptics.world_to_local
+```
+
+### Face Identification
+
+To partition the surface normal space of a shape into named faces (e.g., `:front`, `:back`, `:side`, or `:hypotenuse`), custom shapes override `face_id`:
+
+```@docs; canonical=false
+BeamletOptics.face_id
+```
+
+By default, the fallback implementation assumes that the optical axis is aligned with the `y`-axis and partitions normal space into `:front` ($n_y < -0.1$), `:back` ($n_y > 0.1$), and `:side` otherwise. Subtypes representing prisms or custom geometries should implement specialized methods to identify faces (e.g., `RightAnglePrismSDF` maps normals to `:hypotenuse`, `:leg1`, `:leg2`, `:zpos`, `:zneg`).

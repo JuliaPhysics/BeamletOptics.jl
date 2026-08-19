@@ -101,11 +101,18 @@ const BMO = BeamletOptics
         system = System(mirrors)
         first_ray = Ray(origin, dir)
         beam = Beam(first_ray)
-        t1 = @timed BMO.trace_system!(system, beam, r_max = 1000000)
-        t2 = @timed BMO.retrace_system!(system, beam) # for precompilation
-        t2 = @timed BMO.retrace_system!(system, beam)
-        if t1.time < t2.time
-            @warn "Retracing took longer than tracing, something might be bugged...\n   Tracing: $(t1.time) s\n   Retracing: $(t2.time) s"
+        
+        # Warmup
+        BMO.trace_system!(system, beam, r_max = 1000000)
+        BMO.retrace_system!(system, beam)
+
+        # Benchmark minimum execution times over iterations to eliminate OS scheduling jitter
+        N_bench = 20
+        t1_min = minimum(ntuple(_ -> (@timed BMO.trace_system!(system, Beam(Ray(origin, dir)), r_max = 1000000)).time, N_bench))
+        t2_min = minimum(ntuple(_ -> (@timed BMO.retrace_system!(system, beam)).time, N_bench))
+        
+        if t1_min < t2_min
+            @warn "Retracing took longer than tracing, something might be bugged...\n   Tracing: $(t1_min) s\n   Retracing: $(t2_min) s"
         end
     end
 end

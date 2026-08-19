@@ -61,7 +61,7 @@ end
 """
     translate_to3d!(shape::AbstractShape, target)
 
-Translates the `shape` to the `target` position. 
+Translates the `shape` to the `target` position.
 """
 function translate_to3d!(shape::AbstractShape, target)
     current = position(shape)
@@ -105,10 +105,11 @@ end
 Rotates the `shape` such that its local y-axis aligns with the `target_axis`.
 """
 function align3d!(shape::AbstractShape, target_axis)
-    R = align3d(orientation(shape)[:,2], target_axis)
+    R = align3d(orientation(shape)[:, 2], target_axis)
     orientation!(shape, R * orientation(shape))
     return nothing
 end
 
 """Resets the `shape` rotation angles to zero."""
-reset_rotation3d!(shape::AbstractShape{T}) where {T} = orientation!(shape, Matrix{T}(I, 3, 3))
+reset_rotation3d!(shape::AbstractShape{T}) where {T} = orientation!(
+    shape, Matrix{T}(I, 3, 3))

@@ -5,11 +5,7 @@ Polarizers in the context of this package are optical elements that select or mo
 1. 3D polarization ray-tracing calculus
 2. 3D modified Jones matrix calculus
 
-For more information on the first method refer to the section: [Polarized rays](@ref). For the second approach, elements fall under the category of the [`BeamletOptics.AbstractJonesPolarizer`](@ref).
-
-```@docs; canonical=false
-BeamletOptics.AbstractJonesPolarizer
-```
+For more information on the first method refer to the section: [Polarized rays](@ref). For the second approach, elements use a [`Coating`](@ref) wrapping a [`JonesCoating`](@ref) model.
 
 ## Jones matrix element representation
 
@@ -43,4 +39,39 @@ A polarisation filter or linear polarizer is the simplest practical polarizer an
 
 ```@docs; canonical=false
 PolarizationFilter(::Real)
+```
+
+---
+
+## Waveplates
+
+Waveplates (or retarders) introduce a phase shift $\Gamma$ between two orthogonal polarization components. The fast axis is aligned along the local $x$-axis and the slow axis along the local $z$-axis (with propagation along the local $y$-axis), resulting in the local retardance matrix:
+
+```math
+J_{\text{retarder}} =
+\begin{pmatrix}
+e^{-i\Gamma/2} & 0 & 0 \\
+0 & 1 & 0 \\
+0 & 0 & e^{i\Gamma/2}
+\end{pmatrix} \,.
+```
+
+This package supports both **flat** (zero-thickness) and **thick/plate** waveplates (which include a bulk glass substrate of finite thickness $d$ and index $n$). The constructors automatically distinguish between **round** shapes (by passing a single `diameter` value) and **rectangular** shapes (by passing separate `width` and `height` values).
+
+```@docs; canonical=false
+Waveplate
+HalfWavePlate
+QuarterWavePlate
+RectangularPlateWaveplate
+RoundPlateWaveplate
+```
+
+---
+
+## Polarizing Cube Beamsplitter
+
+A Polarizing Cube Beamsplitter (PBS) consists of two joined right-angle prisms, separating the s- and p-polarization components of light at the hypotenuse interface: s-polarized light is completely reflected at 90°, while p-polarized light is completely transmitted.
+
+```@docs; canonical=false
+PolarizingCubeBeamsplitter
 ```

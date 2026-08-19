@@ -102,10 +102,10 @@ function calc_local_pos(
     # Calculate waist projections in local (x, z) coordinates
     ts = LinRange(0, 2pi, num_spots)
     p0 = position(pd)
-    # Left-handed coord. sys. due to pd mesh rotation
-    ex = -orientation(pd)[:,1]
-    ey = orientation(pd)[:,2]
-    ez = orientation(pd)[:,3]
+    orient = orientation(pd)
+    ex = Point3(-orient[1, 1], -orient[2, 1], -orient[3, 1])
+    ey = Point3(orient[1, 2], orient[2, 2], orient[3, 2])
+    ez = Point3(orient[1, 3], orient[2, 3], orient[3, 3])
     pts_2D = Vector{Point2{T}}()
     sizehint!(pts_2D, length(hits) * num_spots)
     
@@ -157,10 +157,10 @@ function calc_local_pos(
     # Calculate waist projections in local (x, z) coordinates
     ts = LinRange(0, 2pi, num_spots)
     p0 = position(pd)
-    # Left-handed coord. sys. due to pd mesh rotation
-    ex = -orientation(pd)[:,1]
-    ey = orientation(pd)[:,2]
-    ez = orientation(pd)[:,3]
+    orient = orientation(pd)
+    ex = Point3(-orient[1, 1], -orient[2, 1], -orient[3, 1])
+    ey = Point3(orient[1, 2], orient[2, 2], orient[3, 2])
+    ez = Point3(orient[1, 3], orient[2, 3], orient[3, 3])
     pts_2D = Vector{Point2{T}}()
     sizehint!(pts_2D, length(hits) * num_spots)
 

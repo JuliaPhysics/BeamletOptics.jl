@@ -56,36 +56,123 @@ function retrace_system!(::AbstractSystem, beam::B) where {B <: AbstractBeam}
     return nothing
 end
 
+@inline resolve_coincident_boundary(exiting_int, entering_int) = resolve_coincident_boundary(
+    exiting_int, entering_int, object(exiting_int), object(entering_int))
+
+@inline function resolve_coincident_boundary(
+        exiting_int, entering_int, ::AbstractObject, ::AbstractObject)
+    exiting_int.coincident_object = object(entering_int)
+    return exiting_int
+end
+
+"""
+    _resolve_coincident_group(thin_primary, exiting_int, entering_int, fallback_int)
+
+Resolves the primary intersection and assigns adjacent coincident objects for thin-interface coatings
+and flush bulk optical boundaries (e.g., cemented doublet lenses).
+"""
+@inline function _resolve_coincident_group(
+        thin_primary, exiting_int, entering_int, fallback_int)
+    if thin_primary !== nothing
+        thin_primary.coincident_object = exiting_int !== nothing ? object(exiting_int) :
+                                         nothing
+        thin_primary.coincident_object_2 = entering_int !== nothing ? object(entering_int) :
+                                           nothing
+        return thin_primary
+    elseif exiting_int !== nothing && entering_int !== nothing
+        return resolve_coincident_boundary(exiting_int, entering_int)
+    elseif exiting_int !== nothing
+        return exiting_int
+    elseif entering_int !== nothing
+        return entering_int
+    else
+        return fallback_int
+    end
+end
+
 @inline function trace_all(system::AbstractSystem, ray::AbstractRay{R}) where {R}
-    result::Union{Nothing, Intersection{R}} = nothing
+    tol = get_coincident_boundary_tolerance()
+    best_t = R(Inf)
+    best_int = nothing
+    thin_primary = nothing
+    exiting_int = nothing
+    entering_int = nothing
+
+    # Find the closest intersection and collect any coincident ones at the same distance
     for obj in objects(system)
-        # Find shortest intersection
-        temp::Union{Nothing, Intersection{R}} = intersect3d(obj, ray)
-        if temp === nothing
+        temp = intersect3d(obj, ray)
+        (temp === nothing || length(temp) <= tol) && continue
+        t = length(temp)
+
+        if t < best_t - tol
+            best_t = t
+            best_int = temp
+            thin_primary = exiting_int = entering_int = nothing
+        elseif abs(t - best_t) > tol
             continue
         end
 
-        # Catch first valid intersection and replace current with closer intersection
-        if result === nothing || length(temp) < length(result)
-            result = temp
+        if is_thin_interface(object(temp))
+            thin_primary = temp
+        elseif dot(direction(ray), normal3d(temp)) > 0
+            exiting_int = temp
+        else
+            entering_int = temp
         end
     end
-    return result
+
+    best_int === nothing && return nothing
+    return _resolve_coincident_group(thin_primary, exiting_int, entering_int, best_int)
 end
 
 @inline function trace_one(
         system::AbstractSystem, ray::AbstractRay{R}, hint::Hint) where {R}
-    # Trace against hinted shape of object
-    intersection::Nullable{Intersection{R}} = intersect3d(
+    tol = get_coincident_boundary_tolerance()
+    # Trace against hinted shape of object first
+    primary = intersect3d(
         shape(hint)::AbstractShape{R}, ray)
-    if isnothing(intersection)
+    if primary === nothing
         # If hinted object is not intersected, trace the entire system
-        intersection = trace_all(system, ray)
-    else
-        # If hinted object is intersected, update intersection
-        object!(intersection, object(hint))
+        return trace_all(system, ray)
     end
-    return intersection
+
+    object!(primary, object(hint))
+    t_best = length(primary)
+    if t_best <= tol
+        # Ignore self-intersection/coincident boundary re-entry
+        return trace_all(system, ray)
+    end
+
+    thin_primary = nothing
+    exiting_int = nothing
+    entering_int = nothing
+
+    if is_thin_interface(object(primary))
+        thin_primary = primary
+    elseif dot(direction(ray), normal3d(primary)) > 0
+        exiting_int = primary
+    else
+        entering_int = primary
+    end
+
+    # Gather other intersections at the same distance to resolve cement/contact transitions
+    for obj in objects(system)
+        if obj === object(hint)
+            continue
+        end
+        temp = intersect3d(obj, ray)
+        if temp !== nothing && abs(length(temp) - t_best) <= tol
+            if is_thin_interface(object(temp))
+                thin_primary = temp
+            elseif dot(direction(ray), normal3d(temp)) > 0
+                exiting_int = temp
+            else
+                entering_int = temp
+            end
+        end
+    end
+
+    return _resolve_coincident_group(thin_primary, exiting_int, entering_int, primary)
 end
 
 """
@@ -228,25 +315,21 @@ function retrace_system!(
         end
         # Recalculate current intersection
         if isnothing(_hint)
-            # Retrace intersection
-            intersection!(ray, intersect3d(object(_intersection), ray))
+            intersection!(ray, trace_all(system, ray))
         else
-            # Retrace hint
-            intersection!(ray, intersect3d(shape(_hint), ray))
-            if !isnothing(intersection(ray))
-                object!(intersection(ray), object(_hint))
-            end
+            intersection!(ray, trace_one(system, ray, _hint))
         end
-        # Test if intersection is valid
-        if isnothing(intersection(ray))
+        # Test if intersection and object are valid
+        int = intersection(ray)
+        _obj = isnothing(int) ? nothing : object(int)
+        if isnothing(_obj)
             cleanup_children = true
             cleanup_tail = true
             reset_intersection = true
             cutoff = i
             break
         end
-        # Test if interaction is still valid
-        _interaction = interact3d(system, object(intersection(ray)), beam, ray)
+        _interaction = interact3d(system, _obj, beam, ray)
         # Catch hint
         _hint = hint(_interaction)
         if isnothing(_interaction)
@@ -258,7 +341,7 @@ function retrace_system!(
             break
         end
         if i < length(rays(beam))
-            # Modify following ray (NOT THREAD-SAFE)
+            # Mutate following ray in-place (confined to current beam instance)
             replace!(beam, _interaction, i + 1)
         else
             # Valid new interaction, drop children and add new ray
@@ -304,28 +387,26 @@ function trace_system!(
     interaction::Nullable{GaussianBeamletInteraction{T}} = nothing
     # Buffer variable
     seg_counter::Int = length(rays(gauss.chief))
+    beams = _component_beams(gauss)
     while seg_counter < r_max
-        # Trace chief ray first
-        ray = last(rays(gauss.chief))
-        tracing_step!(system, ray, hint(interaction))
-        isnothing(intersection(ray)) && break
-        _object = object(intersection(ray))
-        # Follow up with waist ray
-        ray = last(rays(gauss.waist))
-        tracing_step!(system, ray, hint(interaction))
-        # if the waist ray is no longer hitting the same object as the chief ray stop here
-        isnothing(intersection(ray)) && break
-        # Follow up with divergence ray
-        ray = last(rays(gauss.divergence))
-        tracing_step!(system, ray, hint(interaction))
-        # if the divergence ray is no longer hitting the same object as the chief ray stop here
-        isnothing(intersection(ray)) && break
-        # If beams do not hit same target stop tracing
-        if !_beams_hits_same_shape(gauss, seg_counter)
-            # Ensure that no intersection artifacts remain
-            intersection!(last(rays(gauss.chief)), nothing)
-            intersection!(last(rays(gauss.waist)), nothing)
-            intersection!(last(rays(gauss.divergence)), nothing)
+        h = hint(interaction)
+        stopped = false
+        for b in beams
+            r = last(rays(b))
+            tracing_step!(system, r, h)
+            if isnothing(intersection(r))
+                stopped = true
+                break
+            end
+        end
+        if stopped || !_beams_hits_same_shape(gauss, seg_counter)
+            for b in beams
+                intersection!(last(rays(b)), nothing)
+            end
+            break
+        end
+        _object = object(intersection(last(rays(gauss.chief))))
+        if isnothing(_object)
             break
         end
         # Calculate interaction
@@ -363,39 +444,25 @@ function retrace_system!(
     # Buffer variables
     _interaction::Nullable{GaussianBeamletInteraction{T}} = nothing
     _hint::Nullable{Hint} = nothing
+    beams = _component_beams(gauss)
     # Test if gauss beam is healthy
     n_c = length(rays(gauss.chief))
-    n_w = length(rays(gauss.waist))
-    n_d = length(rays(gauss.divergence))
-    if !(n_c == n_w == n_d)
+    if !all(b -> length(rays(b)) == n_c, beams)
         error("Gaussian beamlet is broken")
     end
     # Iterate over chief rays
     for (i, c_ray) in enumerate(rays(gauss.chief))
-        # Test if intersection is valid
-        _intersection = intersection(c_ray)
-        if isnothing(_intersection)
-            cleanup_children = true
-            cleanup_tail = true
-            reset_intersection = true
-            cutoff = i
-            break
-        end
-        # Recalculate current intersection (use shape of hint if available)
-        w_ray = rays(gauss.waist)[i]
-        d_ray = rays(gauss.divergence)[i]
+        # Recalculate current intersection
         if isnothing(_hint)
-            _object = object(_intersection)
-            _shape = shape(_intersection)
-            intersection!(c_ray, intersect3d(_object, c_ray))
-            intersection!(w_ray, intersect3d(_object, w_ray))
-            intersection!(d_ray, intersect3d(_object, d_ray))
+            for b in beams
+                r = rays(b)[i]
+                intersection!(r, trace_all(system, r))
+            end
         else
-            _object = object(_hint)
-            _shape = BeamletOptics.shape(_hint)
-            intersection!(c_ray, intersect3d(_shape, c_ray))
-            intersection!(w_ray, intersect3d(_shape, w_ray))
-            intersection!(d_ray, intersect3d(_shape, d_ray))
+            for b in beams
+                r = rays(b)[i]
+                intersection!(r, trace_one(system, r, _hint))
+            end
         end
         # Test if all beams still hit the same target
         if !_beams_hits_same_shape(gauss, i)
@@ -405,18 +472,20 @@ function retrace_system!(
             cutoff = i
             break
         end
-        # Test if valid intersection
-        if isnothing(intersection(c_ray))
+        # Test if valid intersection and object
+        c_int = intersection(c_ray)
+        _object = isnothing(c_int) ? nothing : object(c_int)
+        if isnothing(_object)
             cleanup_children = true
             cleanup_tail = true
             reset_intersection = true
             cutoff = i
             break
         end
-        # Update object field
-        object!(intersection(c_ray), _object)
-        object!(intersection(w_ray), _object)
-        object!(intersection(d_ray), _object)
+        for b in beams
+            r_int = intersection(rays(b)[i])
+            !isnothing(r_int) && object!(r_int, _object)
+        end
         # Test if interaction is still valid
         _interaction = interact3d(system, _object, gauss, i)
         # Catch hint
@@ -431,7 +500,7 @@ function retrace_system!(
         end
         # Update next beamlet section
         if i < n_c
-            # NOT THREAD-SAFE
+            # Mutate following beamlet section in-place (confined to current beamlet instance)
             replace!(gauss, _interaction, i + 1)
         else
             # Valid new interaction, drop children and add new ray
@@ -503,6 +572,9 @@ function trace_system!(
             end
             break
         end
+        if isnothing(_object)
+            break
+        end
         # Calculate interaction
         interaction = interact3d(system, _object, agb, seg_counter)
         if isnothing(interaction)
@@ -556,28 +628,16 @@ function retrace_system!(
 
     # Iterate over chief rays
     for (i, c_ray) in enumerate(rays(agb.c))
-        # Test if intersection is valid
-        _intersection = intersection(c_ray)
-        if isnothing(_intersection)
-            cleanup_children = true
-            cleanup_tail = true
-            reset_intersection = true
-            cutoff = i
-            break
-        end
-        # Recalculate current intersection (use shape of hint if available)
+        # Recalculate current intersection
         if isnothing(_hint)
-            _object = object(_intersection)
-            intersection!(c_ray, intersect3d(_object, c_ray))
+            intersection!(c_ray, trace_all(system, c_ray))
             for beam in aux
-                intersection!(rays(beam)[i], intersect3d(_object, rays(beam)[i]))
+                intersection!(rays(beam)[i], trace_all(system, rays(beam)[i]))
             end
         else
-            _object = object(_hint)
-            _shape = BeamletOptics.shape(_hint)
-            intersection!(c_ray, intersect3d(_shape, c_ray))
+            intersection!(c_ray, trace_one(system, c_ray, _hint))
             for beam in aux
-                intersection!(rays(beam)[i], intersect3d(_shape, rays(beam)[i]))
+                intersection!(rays(beam)[i], trace_one(system, rays(beam)[i], _hint))
             end
         end
         # Test if all beams still hit the same target
@@ -588,15 +648,16 @@ function retrace_system!(
             cutoff = i
             break
         end
-        # Test if valid intersection
-        if isnothing(intersection(c_ray))
+        # Test if valid intersection and object
+        c_int = intersection(c_ray)
+        _object = isnothing(c_int) ? nothing : object(c_int)
+        if isnothing(_object)
             cleanup_children = true
             cleanup_tail = true
             reset_intersection = true
             cutoff = i
             break
         end
-        # Update object field
         object!(intersection(c_ray), _object)
         for beam in aux
             r_int = intersection(rays(beam)[i])
@@ -616,7 +677,7 @@ function retrace_system!(
         end
         # Update next beamlet section
         if i < n_c
-            # NOT THREAD-SAFE
+            # Mutate following beamlet section in-place (confined to current beamlet instance)
             replace!(agb, _interaction, i + 1)
         else
             # Valid new interaction, drop children and add new ray
@@ -626,7 +687,9 @@ function retrace_system!(
 
         # Verify that the paraxial assumptions still hold for the new segment
         if check_invariant && !check_optical_invariant(agb, i + 1; threshold = threshold)
+            cleanup_children = true
             cleanup_tail = true
+            reset_intersection = true
             cutoff = i
             break
         end
@@ -674,6 +737,7 @@ A maximum number of rays per `beam` (`r_max`) can be specified in order to avoid
 - `depth_max = get_default_depth_max()`: Maximum number of branching levels explored from the root beam.
 - `check_invariant = true`: enables or disables optical invariant checks where applicable
 - `threshold = get_invariant_threshold()`: threshold for paraxial invariant checks
+- `power_cutoff = get_default_power_cutoff()`: power threshold below which sub-beams/split paths are dropped to prevent infinite branching (default: 0.0)
 """
 function solve_system!(
         system::AbstractSystem,
@@ -683,12 +747,20 @@ function solve_system!(
         retrace::Bool = true,
         depth_max::Int = get_default_depth_max(),
         check_invariant::Bool = true,
-        threshold::Real = get_invariant_threshold()
+        threshold::Real = get_invariant_threshold(),
+        power_cutoff::Real = get_default_power_cutoff()
 ) where {B <: AbstractBeam}
     queue = Tuple{B, Int}[(beam, 1)]
-    while !isempty(queue)
-        # Process beams in FIFO order.
-        current, depth = popfirst!(queue)
+    head = 1
+    while head <= length(queue)
+        # Process beams in FIFO order without O(K) array shifts.
+        current, depth = queue[head]
+        head += 1
+        # Check power cutoff before tracing the current beam.
+        if optical_power(current) < power_cutoff
+            _drop_beams!(current)
+            continue
+        end
         # Optionally retrace the current beam.
         if retrace
             retrace_system!(system, current; check_invariant, threshold)
@@ -710,9 +782,16 @@ function solve_system!(
     return nothing
 end
 
+"""
+    solve_system!(system::AbstractSystem, bg::AbstractBeamGroup; kwargs...)
+
+Solve an optical system for an entire [`AbstractBeamGroup`](@ref) in parallel across available Julia threads.
+Each beam in the group is processed independently via `Threads.@spawn`. Detector hit logging is
+safely synchronized via internal reentrant locks.
+"""
 function solve_system!(system::AbstractSystem, bg::AbstractBeamGroup; kwargs...)
-    Threads.@threads for _beam in beams(bg)
-        solve_system!(system, _beam; kwargs...)
+    @sync for _beam in beams(bg)
+        Threads.@spawn solve_system!(system, _beam; kwargs...)
     end
     return nothing
 end

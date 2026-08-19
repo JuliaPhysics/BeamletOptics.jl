@@ -55,10 +55,12 @@ const BMO = BeamletOptics
         target = [1, 0, 0]
         T = BMO.align3d(start, target)
         @test T * start ≈ target
-        # Test parallel opposite case
-        target = [-1, 0, 0]
-        T = BMO.align3d(start, target)
-        @test T * start ≈ target
+        # Test parallel opposite cases (X, Y, Z axes and arbitrary 3D direction)
+        for s_vec in ([1, 0, 0], [0, 1, 0], [0, 0, 1], normalize([1, 2, 3]))
+            T_opp = BMO.align3d(s_vec, -s_vec)
+            @test T_opp * s_vec ≈ -s_vec
+            @test det(T_opp) ≈ 1
+        end
         # Test norm and 45° rotation
         target = [1.0, 1.0, 0.0]
         T = BMO.align3d(start, target)

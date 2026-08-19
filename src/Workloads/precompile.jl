@@ -3,5 +3,6 @@ if get(ENV, "CI", "false") == "false"
     let 
         include("michelson_wl.jl")
         include("asphere_wl.jl")
+        include("coatings_wl.jl")
     end
 end

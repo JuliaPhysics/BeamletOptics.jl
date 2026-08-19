@@ -4,12 +4,13 @@
 Essentially represents the same functionality as [`Lens`](@ref).
 Refer to its documentation.
 """
-struct Prism{T, S <: AbstractShape{T}, N <: RefractiveIndex} <: AbstractRefractiveOptic{T, N}
+struct Prism{T, S <: AbstractShape{T}, N <: RefractiveIndex, C <: Tuple} <: AbstractRefractiveOptic{T, N}
     shape::S
     n::N
-    function Prism(shape::S, n::N) where {T<:Real, S<:AbstractShape{T}, N<:RefractiveIndex}
+    coatings::C
+    function Prism(shape::S, n::N, coatings::C = ()) where {T <: Real, S <: AbstractShape{T}, N <: RefractiveIndex, C <: Tuple}
         test_refractive_index_function(n)
-        return new{T, S, N}(shape, n)
+        return new{T, S, N, C}(shape, n, coatings)
     end
 end
 
