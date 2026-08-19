@@ -336,7 +336,7 @@ function _propagate_splitting_gaussian_beamlet(
     _, att_field = bulk_attenuation_factor(n_incident, λ, length(c_ray))
 
     # Spawn transmitted
-    chief_t = Beam(Ray{T}(pos, c_dir_t, nothing, λ, n_transmitted))
+    chief_t = Beam(Ray{T}(pos, c_dir_t, nothing, λ, n_transmitted, weight(c_ray)))
     waist_t = Beam(Ray{T}(
         position(w_ray) + length(w_ray) * direction(w_ray), w_dir_t, nothing, λ, n_transmitted))
     divergent_t = Beam(Ray{T}(
@@ -351,7 +351,7 @@ function _propagate_splitting_gaussian_beamlet(
     t = GaussianBeamlet(chief_t, waist_t, divergent_t, wavelength(gauss), w0_t, E0_t)
 
     # Spawn reflected
-    chief_r = Beam(Ray{T}(pos, c_dir_r, nothing, λ, n_incident))
+    chief_r = Beam(Ray{T}(pos, c_dir_r, nothing, λ, n_incident, weight(c_ray)))
     waist_r = Beam(Ray{T}(
         position(w_ray) + length(w_ray) * direction(w_ray), w_dir_r, nothing, λ, n_incident))
     divergent_r = Beam(Ray{T}(
