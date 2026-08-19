@@ -27,7 +27,7 @@ and architecture decision should be evaluated. Concretely, from
 
 **The extension promise:** a developer defines a new `AbstractObject` subtype and its
 `interact3d(system, object, beam, ray) -> AbstractInteraction` method (plus `intersect3d`
-if it needs custom geometry) — and the rest of the API (kinematics, retracing, threading,
+if it needs custom geometry) — and the rest of the API (kinematics, threading,
 coincident-boundary handling, coatings support via `_attach_coatings`, ...) works without
 further integration work. When adding infrastructure, prefer pushing complexity into the
 generic solver over asking component authors to handle it (see the `Hint`
