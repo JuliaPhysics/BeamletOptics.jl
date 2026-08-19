@@ -85,12 +85,12 @@ Returns a symbolic surface tag (e.g. `:front`, `:back`, `:side`, `:top`, `:botto
 Defaults to `:unknown` if no tag is implemented for the given SDF.
 """
 surface_tag(s::AbstractSDF, point) = surface_tag(s, _world_to_sdf(s, point), transposed_orientation(s) * normal3d(s, point))
-surface_tag(s::AbstractSDF, point, normal) = face_id(s, normal)
+surface_tag(s::AbstractSDF, point, normal) = :unknown
 
-function numeric_gradient(s::AbstractSDF{S}, pos::AbstractArray{R}) where {S, R}
+function numeric_gradient(s::AbstractSDF{S}, pos::AbstractArray{R}; h = cbrt(eps(promote_type(S, R)))) where {S, R}
     T = promote_type(S, R)
     p = Point3{T}(pos)
-    h = T(1e-6)
+    h_T = T(h)
 
     # 4-point tetrahedron technique (Inigo Quilez) - only 4 SDF evaluations, isotropic
     k1 = Point3{T}( 1, -1, -1)
@@ -98,10 +98,10 @@ function numeric_gradient(s::AbstractSDF{S}, pos::AbstractArray{R}) where {S, R}
     k3 = Point3{T}(-1,  1, -1)
     k4 = Point3{T}( 1,  1,  1)
 
-    grad = k1 * sdf(s, p + h * k1) +
-           k2 * sdf(s, p + h * k2) +
-           k3 * sdf(s, p + h * k3) +
-           k4 * sdf(s, p + h * k4)
+    grad = k1 * sdf(s, p + h_T * k1) +
+           k2 * sdf(s, p + h_T * k2) +
+           k3 * sdf(s, p + h_T * k3) +
+           k4 * sdf(s, p + h_T * k4)
 
     return normalize(grad)
 end

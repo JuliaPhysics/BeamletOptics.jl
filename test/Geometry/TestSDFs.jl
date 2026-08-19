@@ -111,6 +111,35 @@ const BMO = BeamletOptics
         # 4-point tetrahedron numeric gradient
         grad_num = BMO.numeric_gradient(sphere_origin, [0.0, 1.0, 0.0])
         @test isapprox(grad_num, [0.0, 1.0, 0.0]; atol = 1e-6)
+
+        # CylinderSDF bounding sphere and normal tests
+        cyl = BMO.CylinderSDF(1.0, 5.0)
+        c_center, c_rad = BMO.bounding_sphere(cyl)
+        @test isapprox(c_rad, sqrt(1.0^2 + 5.0^2))
+
+        # Ray parallel to z at y = 0.9 * height hitting cylinder side
+        ray_cyl_high = Ray([0.0, 0.9 * 5.0, -10.0], [0.0, 0.0, 1.0])
+        hit_cyl = BMO.intersect3d(cyl, ray_cyl_high)
+        @test hit_cyl !== nothing
+        @test isapprox(hit_cyl.t, 9.0; atol = 1e-6)
+
+        # End cap normal
+        n_top = BMO.normal3d(cyl, [0.5, 5.0, 0.0])
+        @test isapprox(n_top, [0.0, 1.0, 0.0]; atol = 1e-6)
+        n_bottom = BMO.normal3d(cyl, [0.5, -5.0, 0.0])
+        @test isapprox(n_bottom, [0.0, -1.0, 0.0]; atol = 1e-6)
+        n_side = BMO.normal3d(cyl, [1.0, 2.0, 0.0])
+        @test isapprox(n_side, [1.0, 0.0, 0.0]; atol = 1e-6)
+
+        # surface_tag tests
+        box = BMO.BoxSDF(1.0, 2.0, 3.0)
+        @test BMO.surface_tag(box, [0.0, -1.0, 0.0], [0.0, -1.0, 0.0]) == :front
+        @test BMO.surface_tag(box, [0.0, 1.0, 0.0], [0.0, 1.0, 0.0]) == :back
+        @test BMO.surface_tag(cyl, [0.0, -5.0, 0.0], [0.0, -1.0, 0.0]) == :front
+        @test BMO.surface_tag(cyl, [0.0, 5.0, 0.0], [0.0, 1.0, 0.0]) == :back
+        @test BMO.surface_tag(cyl, [1.0, 0.0, 0.0], [1.0, 0.0, 0.0]) == :side
+        test_pt = TestPointSDF(zeros(3))
+        @test BMO.surface_tag(test_pt, [0.0, 0.0, 0.0], [0.0, 1.0, 0.0]) == :unknown
     end
 end
 
