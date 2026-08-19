@@ -605,6 +605,19 @@ const BMO = BeamletOptics
         @test R≈0.01 atol=1e-6
         @test T≈0.99 atol=1e-6
         @test R + T≈1.0 atol=1e-6
+
+        # Uncoated interface (Fresnel field coefficients -> power conversion)
+        unc = Uncoated()
+        R_unc = coating_reflectance(unc, 0.0, 1064e-9, 1.0, 1.5)
+        T_unc = coating_transmittance(unc, 0.0, 1064e-9, 1.0, 1.5)
+        @test R_unc ≈ 0.04 atol=1e-6
+        @test T_unc ≈ 0.96 atol=1e-6
+        @test R_unc + T_unc ≈ 1.0 atol=1e-6
+
+        # Oblique angle (30 deg)
+        R_30 = coating_reflectance(unc, π/6, 1064e-9, 1.0, 1.5)
+        T_30 = coating_transmittance(unc, π/6, 1064e-9, 1.0, 1.5)
+        @test R_30 + T_30 ≈ 1.0 atol=1e-6
     end
 
     @testset "Analytic Normals and Surface Tags" begin
