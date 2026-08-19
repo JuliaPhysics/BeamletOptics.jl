@@ -109,6 +109,13 @@ function _last_beam_intersection(::B) where {B <: AbstractBeam}
 end
 
 """
+    optical_power(beam::AbstractBeam)
+
+Returns the optical power of the beam. Default fallback returns `1.0` (representing 100% normalized power).
+"""
+optical_power(::AbstractBeam{T, R}) where {T <: Real, R} = one(T)
+
+"""
     AbstractBeamGroup
 
 Provides a generic container type interface for bundles of [`Beam`](@ref)s.
@@ -150,10 +157,3 @@ function Base.show(io::IO, ::MIME"text/plain", bg::AbstractBeamGroup)
     println(io, "   # of beams: $(length(beams(bg)))")
     return nothing
 end
-
-"""
-    optical_power(beam::AbstractBeam)
-
-Returns the optical power of the beam. Default fallback returns `1.0` (representing 100% normalized power).
-"""
-optical_power(::AbstractBeam{T, R}) where {T <: Real, R} = one(T)
