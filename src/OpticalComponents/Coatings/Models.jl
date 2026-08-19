@@ -230,11 +230,19 @@ Compute the average power reflectance from a Jones reflection matrix for unpolar
 @inline unpolarized_reflectance(J) = 0.5 * (abs2(J[1, 1]) + abs2(J[1, 2]) + abs2(J[2, 1]) + abs2(J[2, 2]))
 
 """
-    unpolarized_transmittance(J)
+    unpolarized_transmittance(J, n1=1.0, n2=1.0, θi=0.0)
 
-Compute the average power transmittance from a Jones transmission matrix for unpolarized light.
+Compute the average power transmittance from a Jones transmission matrix `J` for unpolarized light,
+accounting for the medium admittance ratio `Re(n2*cosθt) / Re(n1*cosθi)`.
 """
-@inline unpolarized_transmittance(J) = 0.5 * (abs2(J[1, 1]) + abs2(J[1, 2]) + abs2(J[2, 1]) + abs2(J[2, 2]))
+@inline function unpolarized_transmittance(J, n1::Number = 1.0, n2::Number = 1.0, θi::Real = 0.0)
+    sinθt2 = (n1 / n2)^2 * sin(θi)^2
+    cosθt = sqrt(Complex(1.0 - sinθt2))
+    cosθi = cos(θi)
+    denom = real(n1 * cosθi)
+    factor = denom > 0 ? max(0.0, real(n2 * cosθt) / denom) : 1.0
+    return factor * 0.5 * (abs2(J[1, 1]) + abs2(J[1, 2]) + abs2(J[2, 1]) + abs2(J[2, 2]))
+end
 
 """
     coating_reflectance(coating, θi, λ, n1, n2; from_front=true, local_p=nothing)
@@ -253,7 +261,7 @@ Compute the unpolarized power transmittance T ∈ [0, 1] of a coating model at a
 """
 function coating_transmittance(c, θi, λ, n1, n2; from_front::Bool = true, local_p = nothing)
     J_t = get_jones_matrix(c, θi, λ, n1, n2, false; from_front = from_front, local_p = local_p)
-    return clamp(unpolarized_transmittance(J_t), 0.0, 1.0)
+    return clamp(unpolarized_transmittance(J_t, n1, n2, θi), 0.0, 1.0)
 end
 
 # Shared implementation for simplified constant-reflectance coating models
@@ -278,6 +286,9 @@ function get_jones_matrix(
         return SPBasis(ts, 0, 0, tp)
     end
 end
+
+coating_reflectance(c::SimpleReflectanceCoating, θi, λ, n1, n2; from_front::Bool = true, local_p = nothing) = c.R
+coating_transmittance(c::SimpleReflectanceCoating, θi, λ, n1, n2; from_front::Bool = true, local_p = nothing) = 1.0 - c.R
 
 fresnel_coefficients(c::SimpleBeamsplitterCoating, θi, λ, n1, n2) = (c.rs, c.rp, c.ts, c.tp)
 
