@@ -16,6 +16,9 @@ const BMO = BeamletOptics
     @test isdefined(BMO, :AbstractBeam)
     @test isdefined(BMO, :AbstractSystem)
     @test isdefined(BMO, :Intersection)
+    @test isdefined(BMO, :AbstractIntersection)
+    @test isdefined(BMO, :ShapeIntersection)
+    @test isdefined(BMO, :ObjectIntersection)
     @test isdefined(BMO, :Hint)
     @test isdefined(BMO, :AbstractInteraction)
 
@@ -213,6 +216,38 @@ const BMO = BeamletOptics
                 obj,
                 beam,
                 ray)===nothing
+        end
+    end
+
+    @testset "AbstractIntersection" begin
+        shape = TestShapeless()
+        object = TestObject(shape)
+        t = 2.0
+        n = [0.0, 0.0, 1.0]
+
+        @testset "ShapeIntersection" begin
+            si = BMO.ShapeIntersection(shape, t, Point3(n))
+            @test si isa BMO.AbstractIntersection{Float64}
+            @test BMO.shape(si) === shape
+            @test length(si) == t
+            @test BMO.normal3d(si) == n
+
+            # Test convenience constructor
+            si2 = BMO.ShapeIntersection(t, n, shape)
+            @test BMO.shape(si2) === shape
+            @test length(si2) == t
+            @test BMO.normal3d(si2) == n
+        end
+
+        @testset "ObjectIntersection" begin
+            si = BMO.ShapeIntersection(shape, t, Point3(n))
+            oi = BMO.ObjectIntersection(object, si)
+            @test oi isa BMO.AbstractIntersection{Float64}
+            # Test forwarding to the underlying ShapeIntersection
+            @test BMO.object(oi) === object
+            @test BMO.shape(oi) === shape
+            @test length(oi) == t
+            @test BMO.normal3d(oi) == n
         end
     end
 end

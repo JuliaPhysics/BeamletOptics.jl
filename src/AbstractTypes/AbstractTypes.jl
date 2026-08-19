@@ -9,6 +9,10 @@ Types:
         AbstractDetector
         AbstractBeamsplitter
         AbstractObjectGroup
+    AbstractIntersection
+        ShapeIntersection
+        ObjectIntersection
+        MultiIntersection
     AbstractRay
     AbstractBeam
     AbstractSystem
@@ -31,6 +35,7 @@ Core Functions:
 include("AbstractShape.jl")
 include("AbstractObject.jl")
 include("AbstractShapeTrait.jl")
+include("AbstractIntersection.jl")
 include("AbstractRay.jl")
 include("AbstractBeam.jl")
 include("AbstractGaussian.jl")

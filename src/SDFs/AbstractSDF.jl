@@ -315,7 +315,7 @@ function intersects_bounding_sphere(object::AbstractSDF, ray::AbstractRay)
 end
 
 """
-    intersect3d(sphere::AbstractSphere, ray::Ray)
+    intersect3d(object::AbstractSDF, ray::AbstractRay)
 
 Intersection algorithm for sdf based shapes.
 """
