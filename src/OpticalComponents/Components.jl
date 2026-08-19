@@ -1,10 +1,15 @@
 # Order of inclusion matters!
 
+include("FacePartition.jl")
+include("Coatings/Models.jl")
+include("Coatings/BoundaryPhysics.jl")
+include("Coatings/StandaloneCoating.jl")
 include("Mirrors.jl")
 include("Lenses.jl")
 include("Prisms.jl")
 include("SphericalLenses.jl")
 include("DoubletLenses.jl")
+include("Coatings/CoatedComponents.jl")
 include("Detectors/Detector.jl")
 include("Beamsplitters/Beamsplitters.jl")
 include("NonInteractable.jl")

@@ -141,16 +141,21 @@ end
 Calculate the optical path length of the `beam`, i.e. ``\\mathrm{OPL} = n \\cdot l``.
 """
 function optical_path_length(beam::Beam{T}) where {T}
-    p = AbstractTrees.parent(beam)
-    l0 = isnothing(p) ? zero(T) : optical_path_length(p)
-    for ray in rays(beam)
-        if isnothing(intersection(ray))
+    l0 = zero(T)
+    curr = beam
+    visited = Set{UInt}()
+    while curr !== nothing
+        id = objectid(curr)
+        if id in visited
             break
         end
-
-        l0 += optical_path_length(ray)
+        push!(visited, id)
+        for ray in rays(curr)
+            isnothing(intersection(ray)) && break
+            l0 += optical_path_length(ray)
+        end
+        curr = AbstractTrees.parent(curr)
     end
-
     return l0
 end
 
@@ -269,3 +274,21 @@ function Base.show(io::IO, ::MIME"text/plain", beam::Beam)
     end
     return nothing
 end
+
+"""
+    optical_power(beam::Beam{T, <:Ray{T}})
+
+Returns the weight of the last ray in the beam, representing its current power.
+"""
+optical_power(beam::Beam{T, <:Ray{T}}) where {T} = isempty(rays(beam)) ? zero(T) : weight(last(rays(beam)))
+
+"""
+    optical_power(beam::Beam{T, <:PolarizedRay{T}})
+
+Returns the intensity of the polarization vector of the last ray in the beam, representing its current power.
+"""
+function optical_power(beam::Beam{T, <:PolarizedRay{T}}) where {T}
+    isempty(rays(beam)) && return zero(T)
+    return abs2(norm(polarization(last(rays(beam)))))
+end
+
