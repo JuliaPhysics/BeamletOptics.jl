@@ -1,55 +1,4 @@
 """
-    Intersection{T}
-
-Stores data calculated by the [`intersect3d`](@ref) method.
-
-# Fields:
-
-- `object`: a [`Nullable`](@ref) reference to the [`AbstractObject`](@ref) that has been hit (optional but recommended)
-- `shape`: a [`Nullable`](@ref) reference to the [`AbstractShape`](@ref) of the `object` that has been hit (optional but recommended)
-- `t`: length of the ray parametrization in [m]
-- `n`: normal vector at the point of intersection
-- `coincident_object`: a [`Nullable`](@ref) reference to the adjacent/exiting [`AbstractObject`](@ref) sharing the boundary (for doublets or coatings)
-- `coincident_object_2`: a [`Nullable`](@ref) reference to the adjacent/entering [`AbstractObject`](@ref) sharing the boundary (for coatings)
-"""
-mutable struct Intersection{T <: Real}
-    object::Nullable{AbstractObject}
-    shape::Nullable{AbstractShape}
-    t::T
-    n::Point3{T}
-    coincident_object::Nullable{AbstractObject}
-    coincident_object_2::Nullable{AbstractObject}
-end
-
-function Intersection(t::T, n::AbstractArray{T}) where {T}
-    return Intersection{T}(nothing, nothing, t, Point3{T}(n), nothing, nothing)
-end
-
-function Intersection(t::T, n::AbstractArray{T}, shape::Nullable{AbstractShape}) where {T}
-    return Intersection{T}(nothing, shape, t, Point3{T}(n), nothing, nothing)
-end
-
-function Intersection(object::Nullable{AbstractObject}, shape::Nullable{AbstractShape}, t::Real, n::Point3{S}) where {S}
-    T = promote_type(typeof(t), S)
-    return Intersection{T}(object, shape, T(t), Point3{T}(n), nothing, nothing)
-end
-
-shape(i::Intersection) = i.shape
-object(i::Intersection) = i.object
-object!(i::Intersection, new::Nullable{AbstractObject}) = (i.object = new; return i)
-
-Base.length(i::Intersection) = i.t
-
-normal3d(i::Intersection) = i.n
-
-function Base.show(io::IO, ::MIME"text/plain", _intersection::Intersection)
-    println(io, "Intersected object: $(typeof(object(_intersection)))")
-    println(io, "Intersected shape: $(typeof(shape(_intersection)))")
-    println(io, "Normal vector at intersection: $(normal3d(_intersection))")
-    println(io, "Length to intersection: $(length(_intersection))")
-end
-
-"""
     AbstractRay{T<:Real}
 
 An implementation for a geometrical optics ray in R³. In general, a `AbstractRay` is described by ``\\vec{p} + t\\cdot\\vec{d}`` with ``t\\in(0,\\infty)``.
@@ -58,7 +7,7 @@ To store the result of a ray tracing solution, refer to [`AbstractBeam`](@ref).
 
 # Intersections:
 
-Since the length of a ray can not be known before solving an optical system, the [`Intersection`](@ref)-type is used.
+Since the length of a ray can not be known before solving an optical system, the [`ObjectIntersection`](@ref)-type is used.
 This [`Nullable`](@ref) type can represent the intersection with an optical element, or lack thereof.
 
 # Implementation reqs.
@@ -69,7 +18,7 @@ Subtypes of `AbstractBeam` must implement the following:
 
 - `pos`: a R³-vector that stores the current position ``\\vec{p}``
 - `dir`: a R³-vector that stores the current direction ``\\vec{d}``
-- `intersection`: a `Nullable` field that stores the current [`Intersection`] or `nothing`
+- `intersection`: a `Nullable` field that stores the current [`ObjectIntersection`](@ref) or `nothing`
 - `λ`: wavelength in [m]
 - `n`: refractive index along the ray path
 
@@ -109,7 +58,7 @@ refractive_index(ray::AbstractRay) = ray.n
 refractive_index!(ray::AbstractRay, n) = (ray.n = n)
 
 intersection(ray::AbstractRay) = ray.intersection
-function intersection!(ray::AbstractRay, _intersection::Nullable{Intersection})
+function intersection!(ray::AbstractRay, _intersection::Nullable{ObjectIntersection})
      ray.intersection = _intersection
      return nothing
 end
@@ -126,9 +75,9 @@ bounding_sphere(::Any) = nothing
 """
     intersect3d(shape::AbstractShape, ::AbstractRay)
 
-Defines the intersection between an [`AbstractShape`](@ref) and an [`AbstractRay`](@ref), must return an [`Intersection`](@ref) or `nothing`.
+Defines the intersection between an [`AbstractShape`](@ref) and an [`AbstractRay`](@ref), must return a [`ShapeIntersection`](@ref) or `nothing`.
 The default behavior for concrete `shape`s and rays is to indicate no intersection, that is `nothing`, which will inform the tracing algorithm to stop.
-Refer to the [`Intersection`](@ref) documentation for more information on the return type value.
+Refer to the [`ShapeIntersection`](@ref) documentation for more information on the return type value.
 """
 function intersect3d(shape::AbstractShape, ::AbstractRay)
     @warn lazy"No intersect3d method defined for:" typeof(shape)
@@ -145,39 +94,40 @@ intersect3d(object::AbstractObject, ray::AbstractRay) = intersect3d(shape_trait_
 
 function intersect3d(::SingleShape, object::AbstractObject, ray::AbstractRay)
     # FIXME: isinfrontof check?
-    intersection = intersect3d(shape(object), ray)
-    # Ensure that the intersection knows about the object if intersected
-    if !isnothing(intersection)
-        object!(intersection, object)
+    shape_intersection = intersect3d(shape(object), ray)
+    # return ObjectIntersection or Nothing
+    if isnothing(shape_intersection)
+        return nothing
     end
-    return intersection
+    return ObjectIntersection(object, shape_intersection)
 end
 
 function intersect3d(::MultiShape, object::AbstractObject, ray::AbstractRay{R}) where R
-    # Init return intersection
-    intersection::Nullable{Intersection{R}} = nothing
+    # Init return intersection (may be a ShapeIntersection or, if `part` is itself an
+    # AbstractObject, an ObjectIntersection tagged with that sub-object)
+    closest::Nullable{AbstractIntersection{R}} = nothing
     for part in shape(object)
         # Buffer intersection
-        temp::Nullable{Intersection{R}} = intersect3d(part, ray)
+        temp = intersect3d(part, ray)
         # Continue if miss
         if isnothing(temp)
             continue
         end
         # Catch first valid intersection
-        if isnothing(intersection)
-            intersection = temp
+        if isnothing(closest)
+            closest = temp
             continue
         end
         # Replace current with closer intersection
-        if length(temp) < length(intersection)
-            intersection = temp
+        if length(temp) < length(closest)
+            closest = temp
         end
     end
-    # Ensure that the intersection knows about the correct object if intersected
-    if !isnothing(intersection)
-        object!(intersection, object)
+    # Ensure that the intersection knows about the correct (composite) object if intersected
+    if isnothing(closest)
+        return nothing
     end
-    return intersection
+    return ObjectIntersection(object, closest)
 end
 
 """
@@ -192,7 +142,7 @@ function intersect3d(plane_position::AbstractArray,
     if isnothing(t)
         return nothing
     else
-        return Intersection(T(t), T.(plane_normal))
+        return PlaneIntersection(T(t), T.(plane_normal))
     end
 end
 
@@ -231,11 +181,11 @@ line_point_distance3d(ray::AbstractRay, point) = line_point_distance3d(position(
     point)
 
 """
-    angle3d(ray::AbstractRay, intersect::Intersection=intersection(ray))
+    angle3d(ray::AbstractRay, intersect::AbstractIntersection=intersection(ray))
 
 Calculates the angle between a `ray` and its or some other `intersection`.
 """
-function angle3d(ray::AbstractRay, intersect::Intersection = intersection(ray))
+function angle3d(ray::AbstractRay, intersect::AbstractIntersection = intersection(ray))
     return angle3d(direction(ray), normal3d(intersect))
 end
 
@@ -258,7 +208,7 @@ Tests whether the ray is entering a shape based on the orientation of the `ray` 
 If no intersection is present, default behavior is to return `false`.
 """
 isentering(r::BeamletOptics.AbstractRay) = isentering(r, BeamletOptics.intersection(r))
-isentering(r::BeamletOptics.AbstractRay, i::BeamletOptics.Intersection) = isentering(BeamletOptics.direction(r), BeamletOptics.normal3d(i))
+isentering(r::BeamletOptics.AbstractRay, i::BeamletOptics.AbstractIntersection) = isentering(BeamletOptics.direction(r), BeamletOptics.normal3d(i))
 isentering(d::AbstractArray, n::AbstractArray) = dot(d, n) < 0
 isentering(::BeamletOptics.AbstractRay, ::Nothing) = false
 

@@ -52,10 +52,10 @@ function trace_system!(::AbstractSystem, beam::B; r_max = 0) where {B <: Abstrac
 end
 
 @inline function trace_all(system::AbstractSystem, ray::AbstractRay{R}) where {R}
-    result::Union{Nothing, Intersection{R}} = nothing
+    result::Union{Nothing, ObjectIntersection{R}} = nothing
     for obj in objects(system)
         # Find shortest intersection
-        temp::Union{Nothing, Intersection{R}} = intersect3d(obj, ray)
+        temp::Union{Nothing, ObjectIntersection{R}} = intersect3d(obj, ray)
         if temp === nothing
             continue
         end
@@ -71,16 +71,14 @@ end
 @inline function trace_one(
         system::AbstractSystem, ray::AbstractRay{R}, hint::Hint) where {R}
     # Trace against hinted shape of object
-    intersection::Nullable{Intersection{R}} = intersect3d(
-        shape(hint)::AbstractShape{R}, ray)
-    if isnothing(intersection)
+    shape_intersection = intersect3d(shape(hint)::AbstractShape{R}, ray)
+    if isnothing(shape_intersection)
         # If hinted object is not intersected, trace the entire system
-        intersection = trace_all(system, ray)
+        return trace_all(system, ray)
     else
-        # If hinted object is intersected, update intersection
-        object!(intersection, object(hint))
+        # If hinted object is intersected, tag it with the hinted object
+        return ObjectIntersection(object(hint), shape_intersection)
     end
-    return intersection
 end
 
 """

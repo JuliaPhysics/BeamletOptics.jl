@@ -35,13 +35,15 @@ Calculating intersections between straight lines, i.e. rays, and surfaces is a c
 BeamletOptics.intersect3d(::BeamletOptics.AbstractShape, ::BeamletOptics.AbstractRay)
 ```
 
-Regardless of the underlying concrete implementation, each call of `intersect3d` must return `nothing` or the following type:
+Regardless of the underlying concrete implementation, each call of `intersect3d` must return `nothing` or an `AbstractIntersection`:
 
 ```@docs; canonical=false
-BeamletOptics.Intersection
+BeamletOptics.AbstractIntersection
+BeamletOptics.ShapeIntersection
+BeamletOptics.ObjectIntersection
 ```
 
-Since an optical element can consist of multiple joint shapes, the return type must store which specific part of the object was hit.
+A shape-level `intersect3d` call returns a `ShapeIntersection`; once the enclosing object is known, it is attached to form an `ObjectIntersection` — the type actually stored on an `AbstractRay`. Since an optical element can consist of multiple joint shapes, the `ObjectIntersection` type must store which specific part of the object was hit.
 
 ## Interactions
 

@@ -61,7 +61,9 @@ If `shape_trait_of(::Foo) = MultiShape()` is defined, `Foo` must implement the f
 
 ## Functions
 
-- `shape(::Foo)`: a getter function that returns a `Tuple` of all relevant shapes, e.g. `(foo.front, foo.middle, foo.back)`
+- `shape(::Foo)`: a getter function that returns a `Tuple` of all relevant parts, e.g. `(foo.front, foo.middle, foo.back)`.
+  Parts may be [`AbstractShape`](@ref)s or nested [`AbstractObject`](@ref)s (e.g. a coating modeled as its own object) —
+  `intersect3d`/kinematic functions dispatch on whichever is returned.
 
 # Additional information
 

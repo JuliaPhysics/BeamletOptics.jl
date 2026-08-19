@@ -152,31 +152,26 @@ function RoundPlateBeamsplitter(
 end
 
 function intersect3d(pbs::AbstractPlateBeamsplitter, ray::AbstractRay)
-    # this is sooooooo stupid but necessary to ensure correct intersection... 
+    # this is sooooooo stupid but necessary to ensure correct intersection...
     ic = intersect3d(coating(pbs), ray)
     is = intersect3d(substrate(pbs), ray)
     if isnothing(ic) & isnothing(is)
         return nothing
     end
     if isnothing(is)
-        object!(ic, pbs)
-        return ic
+        return ObjectIntersection(pbs, ic)
     end
     if isnothing(ic)
-        object!(is, pbs)
-        return is
+        return ObjectIntersection(pbs, is)
     end
     # if both shapes are hit, pick the coating
     if length(ic) ≈ length(is)
-        object!(ic, pbs)
-        return ic
+        return ObjectIntersection(pbs, ic)
     end
     if length(ic) < length(is)
-        object!(ic, pbs)
-        return ic
+        return ObjectIntersection(pbs, ic)
     else
-        object!(is, pbs)
-        return is
+        return ObjectIntersection(pbs, is)
     end
 end
 

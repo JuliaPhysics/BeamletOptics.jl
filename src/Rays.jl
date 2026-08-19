@@ -7,14 +7,14 @@ Mutable struct to store ray information.
 
 - `pos`: a point in R³ that describes the `Ray` origin
 - `dir`: a normalized vector in R³ that describes the `Ray` direction
-- `intersection`: refer to [`Intersection`](@ref)
+- `intersection`: refer to [`ObjectIntersection`](@ref)
 - `λ`: wavelength in [m]
 - `n`: refractive index along the beam path
 """
 mutable struct Ray{T} <: AbstractRay{T}
     pos::Point3{T}
     dir::Point3{T}
-    intersection::Nullable{Intersection{T}}
+    intersection::Nullable{ObjectIntersection{T}}
     λ::T
     n::T
 end

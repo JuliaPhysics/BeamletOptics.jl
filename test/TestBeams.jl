@@ -2,11 +2,24 @@ module TestBeams
 
 using BeamletOptics
 using Test
+using LinearAlgebra
+using GeometryBasics
 
 const BMO = BeamletOptics
 
+mutable struct TestShapeless{T} <: BMO.AbstractShape{T}
+    pos::Vector{T}
+    dir::Matrix{T}
+end
+TestShapeless() = TestShapeless{Float64}(zeros(3), Matrix{Float64}(I, 3, 3))
+
+struct TestObject{T, S <: BMO.AbstractShape{T}} <: BMO.AbstractObject{T}
+    shape::S
+end
+TestObject() = TestObject(TestShapeless())
+
 @testset "Beams" begin
-    is = BMO.Intersection(1.0, zeros(3))
+    is = BMO.ObjectIntersection(TestObject(), BMO.ShapeIntersection(TestShapeless(), 1.0, Point3(zeros(3))))
     r1 = Ray([0.0, 0, 0], [1, 0, 0])
     r2 = Ray([1.0, 0, 0], [0, 1, 0])
     r3 = Ray([1.0, 1, 0], [0, 0, 1])

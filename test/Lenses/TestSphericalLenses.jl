@@ -85,8 +85,8 @@ const mm = 1e-3
     """Test coma for rotated and translated optical system"""
     function test_coma(ray::BMO.AbstractRay, f0::AbstractArray,
             dir::AbstractArray; atol = 7e-5)
-        is = BMO.intersect3d(f0, dir, ray)
-        p0 = position(ray) + length(is) * BMO.direction(ray)
+        t = BMO.line_plane_distance3d(f0, dir, position(ray), BMO.direction(ray))
+        p0 = position(ray) + t * BMO.direction(ray)
         dz = norm(p0 - f0)
         if dz ≤ atol
             return true
@@ -135,7 +135,7 @@ const mm = 1e-3
             beam.rays[1].pos = pos + 0 * nv
             solve_system!(system, beam)
             for i in 1:(length(beam.rays) - 1)
-                @test abs(dot(beam.rays[i].intersection.n, beam.rays[i].dir)) ≈ 1
+                @test abs(dot(BMO.normal3d(beam.rays[i].intersection), beam.rays[i].dir)) ≈ 1
             end
             return true
         end

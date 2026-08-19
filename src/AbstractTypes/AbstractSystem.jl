@@ -40,7 +40,7 @@ A `Hint` can be passed as part of an [`AbstractInteraction`](@ref) and will info
 in the [`AbstractSystem`](@ref) will be hit next.
 
 !!! info 
-    The `Hint` does not need to result in a guaranteed [`Intersection`](@ref). However, if the hinted shape is intersected, it will
+    The `Hint` does not need to result in a guaranteed [`ObjectIntersection`](@ref). However, if the hinted shape is intersected, it will
     be immediatly assumed as the correct global intersection.
 
 # Fields

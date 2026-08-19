@@ -27,12 +27,14 @@ and architecture decision should be evaluated. Concretely, from
 
 **The extension promise:** a developer defines a new `AbstractObject` subtype and its
 `interact3d(system, object, beam, ray) -> AbstractInteraction` method (plus `intersect3d`
-if it needs custom geometry) — and the rest of the API (kinematics, threading,
-coincident-boundary handling, coatings support via `_attach_coatings`, ...) works without
-further integration work. When adding infrastructure, prefer pushing complexity into the
-generic solver over asking component authors to handle it (see the `Hint`
-interface/coincident-boundary resolution in [System.jl](src/System.jl) as the reference
-example of that trade-off).
+if it needs custom geometry) — and the rest of the API (kinematics, threading, the `Hint`
+mechanism, ...) works without further integration work. When adding infrastructure, prefer
+pushing complexity into the generic solver over asking component authors to handle it (see
+the `Hint` interface in [System.jl](src/System.jl) as the reference example of that
+trade-off). Note: coincident-boundary disambiguation (coatings, cemented doublets) is
+currently still handled per-component via `Hint` + shape-identity comparison, not
+centrally by the solver — `MultiIntersection` (`src/AbstractTypes/AbstractIntersection.jl`)
+is scaffolding towards changing that.
 
 **Corollary — when reviewing or writing code, be suspicious of:**
 - Any component or algorithm that assumes a specific world-space orientation, a

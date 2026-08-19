@@ -15,10 +15,11 @@ const BMO = BeamletOptics
     @test isdefined(BMO, :AbstractRay)
     @test isdefined(BMO, :AbstractBeam)
     @test isdefined(BMO, :AbstractSystem)
-    @test isdefined(BMO, :Intersection)
     @test isdefined(BMO, :AbstractIntersection)
     @test isdefined(BMO, :ShapeIntersection)
     @test isdefined(BMO, :ObjectIntersection)
+    @test isdefined(BMO, :MultiIntersection)
+    @test isdefined(BMO, :PlaneIntersection)
     @test isdefined(BMO, :Hint)
     @test isdefined(BMO, :AbstractInteraction)
 
@@ -72,6 +73,7 @@ const BMO = BeamletOptics
         is_1 = BMO.intersect3d(plane_pos, plane_nml_1, ray)
         is_2 = BMO.intersect3d(plane_pos, plane_nml_2, ray)
         is_3 = BMO.intersect3d(plane_pos, plane_nml_3, ray)
+        @test is_1 isa BMO.PlaneIntersection{Float64}
         @test length(is_1) == 2
         @test length(is_2) == 1
         @test isnothing(is_3)
@@ -248,6 +250,34 @@ const BMO = BeamletOptics
             @test BMO.shape(oi) === shape
             @test length(oi) == t
             @test BMO.normal3d(oi) == n
+
+            # Test re-tagging with a different object, same underlying hit
+            other = TestObject(shape)
+            retagged = BMO.ObjectIntersection(other, oi)
+            @test BMO.object(retagged) === other
+            @test BMO.shape(retagged) === shape
+            @test length(retagged) == t
+        end
+
+        @testset "MultiIntersection" begin
+            si = BMO.ShapeIntersection(shape, t, Point3(n))
+            hit = BMO.ObjectIntersection(object, si)
+
+            other_shape = TestShapeless()
+            other_object = TestObject(other_shape)
+            si2 = BMO.ShapeIntersection(other_shape, t + 1e-9, Point3(n))
+            exiting_hit = BMO.ObjectIntersection(other_object, si2)
+
+            mi = BMO.MultiIntersection(hit; exiting = exiting_hit)
+            @test mi isa BMO.AbstractIntersection{Float64}
+            # Test forwarding to the primary hit
+            @test BMO.object(mi) === object
+            @test BMO.shape(mi) === shape
+            @test length(mi) == t
+            @test BMO.normal3d(mi) == n
+            # Test coincident accessors
+            @test BMO.exiting(mi) === exiting_hit
+            @test isnothing(BMO.entering(mi))
         end
     end
 end

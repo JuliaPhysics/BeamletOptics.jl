@@ -284,7 +284,8 @@ function intersect3d(mesh::AbstractMesh{M},
         return nothing
     else
         normal = normal3d(mesh, fID)
-        return Intersection(t0, normalize(Point3{T}(normal)), mesh)
+        n0 = normalize(Point3{T}(normal))
+        return ShapeIntersection(t0, n0, mesh)
     end
 end
 
