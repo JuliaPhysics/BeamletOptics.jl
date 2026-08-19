@@ -69,6 +69,33 @@ function bounding_sphere(s::PlanoSurfaceSDF{T}) where {T}
     return (Point3{T}(0, s.thickness / 2, 0), r)
 end
 
+function normal3d(ps::PlanoSurfaceSDF{T}, point) where {T}
+    p = _world_to_sdf(ps, point)
+    d_front = abs(p[2])
+    d_back = abs(p[2] - ps.thickness)
+    r_xz = norm(Point2(p[1], p[3]))
+    d_side = abs(r_xz - ps.diameter / 2)
+    n_local = if d_front <= d_back && d_front <= d_side
+        Point3{T}(0, -1, 0)
+    elseif d_back <= d_front && d_back <= d_side
+        Point3{T}(0, 1, 0)
+    else
+        r_inv = r_xz > 0 ? inv(r_xz) : zero(T)
+        Point3{T}(p[1] * r_inv, 0, p[3] * r_inv)
+    end
+    return ps.dir * n_local
+end
+
+function surface_tag(ps::PlanoSurfaceSDF, p, normal)
+    if normal[2] < -0.5
+        return :front
+    elseif normal[2] > 0.5
+        return :back
+    else
+        return :side
+    end
+end
+
 """
     SphereSDF
 
