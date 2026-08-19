@@ -23,9 +23,9 @@ function render!(
     sdf_values = Float32.([BMO.sdf(sdf, [i, j, k]) for i in x, j in y, k in z])
     mc = MC(sdf_values; x = Float32.(x), y = Float32.(y), z = Float32.(z))
     march(mc)
-    vertices = transpose(reinterpret(reshape, Float32, mc.vertices))
-    faces = transpose(reinterpret(reshape, Int64, mc.triangles))
-    mesh!(ax, vertices, faces; kwargs...)
+    pts = Point3{Float32}[Point3{Float32}(v...) for v in mc.vertices]
+    fcs = [TriangleFace{Int}(t...) for t in mc.triangles]
+    mesh!(ax, pts, fcs; kwargs...)
     return nothing
 end
 

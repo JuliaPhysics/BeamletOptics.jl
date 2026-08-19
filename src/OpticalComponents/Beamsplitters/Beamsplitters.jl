@@ -30,4 +30,6 @@ abstract type AbstractBeamsplitter{T} <: AbstractObject{T} end
 include("ThinBeamsplitter.jl")
 include("PlateBeamsplitter.jl")
 include("CubeBeamsplitter.jl")
+include("PolarizingCubeBeamsplitter.jl")
+include("PolarizingBeamSplitter.jl")
 include("Compensators.jl")

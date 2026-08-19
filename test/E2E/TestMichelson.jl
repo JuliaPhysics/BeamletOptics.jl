@@ -94,10 +94,10 @@ const mm = 1e-3
             for (j, y) in enumerate(ys)
                 for (i, x) in enumerate(xs)
                     r = sqrt(x^2 + y^2)
-                    screen[i, j] += BMO.electric_field(
+                    screen[i, j] += -BMO.electric_field(
                         r, short_arm, E0, w0, λ, M2)
                     screen[i, j] += BMO.electric_field(
-                        r, long_arm, E0, w0, λ, M2) * exp(im * pi)
+                        r, long_arm, E0, w0, λ, M2)
                 end
             end
             

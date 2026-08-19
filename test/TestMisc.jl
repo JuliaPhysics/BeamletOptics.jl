@@ -20,5 +20,5 @@ end
         @eval Aqua.test_all($BMO; ambiguities = false)
     end
 end
-   
+
 end
