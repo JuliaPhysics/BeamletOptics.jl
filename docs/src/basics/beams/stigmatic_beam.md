@@ -46,6 +46,9 @@ The [`GaussianBeamlet`](@ref) implements the [`BeamletOptics.AbstractBeam`](@ref
 GaussianBeamlet
 ```
 
+!!! warning "Scalar Nature & Polarization Limitations"
+    The basic `GaussianBeamlet` is a **scalar** wave approximation. When interacting with optical coatings, it tracks scalar diagonal amplitude transmission ($J_{1,1}$). For optical setups involving polarizing optics (e.g. waveplates, polarizing beamsplitters, or rotated birefringent elements with cross-polarization $J_{1,2} \neq 0$), use [`AstigmaticGaussianBeamlet`](@ref) or [`PolarizedRay`](@ref), which provide full 3D vectorial Jones calculus tracking.
+
 A [`GaussianBeamlet`](@ref) can be constructed via:
 
 ```@docs; canonical=false

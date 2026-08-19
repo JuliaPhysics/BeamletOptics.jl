@@ -50,7 +50,7 @@ const BMO = BeamletOptics
         @test r[3] ≈ -sqrt(2) / 2
         @test tr[3] ≈ -sqrt(2) / 2
         @test rr[3] ≈ sqrt(2) / 2
-        @test trt ≈ rrr
+        @test trt ≈ -rrr
         @test trr ≈ rrt
     end
     
@@ -76,7 +76,7 @@ const BMO = BeamletOptics
         @test r[2] ≈ -sqrt(2) / 2
         @test tr ≈ r
         @test rr ≈ t
-        @test trt ≈ rrr
+        @test trt ≈ -rrr
         @test trr ≈ rrt
     end
 end

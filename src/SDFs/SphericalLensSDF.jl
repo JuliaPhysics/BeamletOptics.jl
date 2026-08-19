@@ -57,11 +57,43 @@ function PlanoSurfaceSDF(thickness::T, diameter::D) where {T, D}
     )
 end
 
-function sdf(ps::PlanoSurfaceSDF{T}, point) where T
+function sdf(ps::PlanoSurfaceSDF{T}, point) where {T}
     p = _world_to_sdf(ps, point)
-    d = abs.(Point2(norm(Point2(p[1], p[3])), p[2] - thickness(ps)/2)) -
-        Point2(diameter(ps)/2, thickness(ps)/2)
+    d = abs.(Point2(norm(Point2(p[1], p[3])), p[2] - thickness(ps) / 2)) -
+        Point2(diameter(ps) / 2, thickness(ps) / 2)
     return min(maximum(d), zero(T)) + norm(max.(d, zero(T)))
+end
+
+function bounding_sphere(s::PlanoSurfaceSDF{T}) where {T}
+    r = sqrt((s.diameter / 2)^2 + (s.thickness / 2)^2)
+    return (Point3{T}(0, s.thickness / 2, 0), r)
+end
+
+function normal3d(ps::PlanoSurfaceSDF{T}, point) where {T}
+    p = _world_to_sdf(ps, point)
+    d_front = abs(p[2])
+    d_back = abs(p[2] - ps.thickness)
+    r_xz = norm(Point2(p[1], p[3]))
+    d_side = abs(r_xz - ps.diameter / 2)
+    n_local = if d_front <= d_back && d_front <= d_side
+        Point3{T}(0, -1, 0)
+    elseif d_back <= d_front && d_back <= d_side
+        Point3{T}(0, 1, 0)
+    else
+        r_inv = r_xz > 0 ? inv(r_xz) : zero(T)
+        Point3{T}(p[1] * r_inv, 0, p[3] * r_inv)
+    end
+    return ps.dir * n_local
+end
+
+function surface_tag(ps::PlanoSurfaceSDF, p, normal)
+    if normal[2] < -0.5
+        return :front
+    elseif normal[2] > 0.5
+        return :back
+    else
+        return :side
+    end
 end
 
 """
@@ -79,13 +111,26 @@ thickness(s::SphereSDF) = 2s.radius
 
 SphereSDF(r::T) where {T} = SphereSDF{T}(zeros(T, 3), r)
 
-orientation(::SphereSDF{T}) where {T} = SArray{Tuple{3,3}, T}(I)
-transposed_orientation(::SphereSDF{T}) where {T} = SArray{Tuple{3,3}, T}(I)
+orientation(::SphereSDF{T}) where {T} = SArray{Tuple{3, 3}, T}(I)
+transposed_orientation(::SphereSDF{T}) where {T} = SArray{Tuple{3, 3}, T}(I)
 orientation!(::SphereSDF, ::Any) = nothing
 
 function sdf(sphere::SphereSDF, point)
     p = _world_to_sdf(sphere, point)
     return norm(p) - sphere.radius
+end
+
+function normal3d(sphere::SphereSDF, point)
+    p = _world_to_sdf(sphere, point)
+    return normalize(p)
+end
+
+function surface_tag(sphere::SphereSDF, p, normal)
+    return p[2] <= 0 ? :front : :back
+end
+
+function bounding_sphere(s::SphereSDF{T}) where {T}
+    return (Point3{T}(0), s.radius)
 end
 
 """
@@ -137,7 +182,7 @@ mutable struct ConcaveSphericalSurfaceSDF{T} <: AbstractSphericalSurfaceSDF{T}
     sag::T
 end
 
-thickness(::ConcaveSphericalSurfaceSDF{T}) where T = zero(T)
+thickness(::ConcaveSphericalSurfaceSDF{T}) where {T} = zero(T)
 
 """
     ConcaveSphericalSurfaceSDF(radius, diameter)
@@ -156,17 +201,22 @@ function ConcaveSphericalSurfaceSDF(radius::R, diameter::D) where {R, D}
     )
 end
 
-function sdf(css::ConcaveSphericalSurfaceSDF{T}, point) where T
+function sdf(css::ConcaveSphericalSurfaceSDF{T}, point) where {T}
     p = _world_to_sdf(css, point)
     # cylinder sdf
-    ps = p + Point3(zero(T), sag(css)/2, zero(T))
+    ps = p + Point3(zero(T), sag(css) / 2, zero(T))
     d = abs.(Point2(norm(Point2(ps[1], ps[3])), ps[2])) -
-        Point2(diameter(css)/2, sag(css)/2)
+        Point2(diameter(css) / 2, sag(css) / 2)
     sdf1 = min(maximum(d), zero(T)) + norm(max.(d, zero(T)))
     # sphere sdf
     ps = p + Point3(zero(T), radius(css), zero(T))
     sdf2 = norm(ps) - radius(css)
     return max(sdf1, -sdf2)
+end
+
+function bounding_sphere(s::ConcaveSphericalSurfaceSDF{T}) where {T}
+    r = sqrt((s.diameter / 2)^2 + (s.sag / 2)^2)
+    return (Point3{T}(0, -s.sag / 2, 0), r)
 end
 
 """
@@ -220,15 +270,22 @@ function sdf(css::ConvexSphericalSurfaceSDF, point)
     p = _world_to_sdf(css, point)
     # -p[2] to align surface with neg. y-axis
     q = Point2(norm(Point2(p[1], p[3])), -p[2] + radius(css))
-    s = max((css.height - radius(css)) * q[1]^2 + (diameter(css)/2)^2 * (css.height + radius(css) - 2 * q[2]),
-        css.height * q[1] - diameter(css)/2 * q[2])
+    s = max(
+        (css.height - radius(css)) * q[1]^2 +
+        (diameter(css) / 2)^2 * (css.height + radius(css) - 2 * q[2]),
+        css.height * q[1] - diameter(css) / 2 * q[2])
     if s < 0
         return norm(q) - radius(css)
-    elseif q[1] < diameter(css)/2
+    elseif q[1] < diameter(css) / 2
         return css.height - q[2]
     else
-        return norm(q - Point2(diameter(css)/2, css.height))
+        return norm(q - Point2(diameter(css) / 2, css.height))
     end
+end
+
+function bounding_sphere(s::ConvexSphericalSurfaceSDF{T}) where {T}
+    r = sqrt((s.diameter / 2)^2 + (s.sag / 2)^2)
+    return (Point3{T}(0, s.sag / 2, 0), r)
 end
 
 """
@@ -318,8 +375,8 @@ function BiConcaveLensSDF(r1::L, r2::M, l::N, d::O, md::MD) where {L, M, N, O, M
     shape = BiConcaveLensSDF(r1, r2, l, d)
     # add an outer ring
     l0 = l + sag(shape.sdfs[1]) + sag(shape.sdfs[3])
-    ring = RingSDF(d/2, (md - d) / 2, l0)
-    translate3d!(ring, [0, l/2, 0])
+    ring = RingSDF(d / 2, (md - d) / 2, l0)
+    translate3d!(ring, [0, l / 2, 0])
     shape += ring
     return shape
 end
@@ -374,8 +431,8 @@ function PlanoConcaveLensSDF(r::R, l::L, d::D, md::MD) where {R, L, D, MD}
     # add an outer ring
     _sag = sag(shape.sdfs[2])
     _l = l + _sag
-    ring = RingSDF(d/2, (md - d) / 2, _l)
-    translate3d!(ring, [0, _l/2, 0])
+    ring = RingSDF(d / 2, (md - d) / 2, _l)
+    translate3d!(ring, [0, _l / 2, 0])
     shape += ring
     return shape
 end
@@ -411,7 +468,7 @@ This constructor automatically sets the mechanical diameter equal to the optical
 - `diameter`: The clear (optical) diameter of the surface.
 
 """
-function SphericalSurface(radius::R, diameter::D) where {R<:Real, D<:Real}
+function SphericalSurface(radius::R, diameter::D) where {R <: Real, D <: Real}
     T = promote_type(R, D)
     return SphericalSurface{T}(T(radius), T(diameter), T(diameter))
 end
@@ -447,8 +504,12 @@ function _sdf(s::SphericalSurface, ::BackwardOrientation)
     return back
 end
 
-sdf(s::SphericalSurface, ::ForwardLeftMeniscusOrientation) = ConvexSphericalSurfaceSDF(radius(s), diameter(s))
+function sdf(s::SphericalSurface, ::ForwardLeftMeniscusOrientation)
+    ConvexSphericalSurfaceSDF(radius(s), diameter(s))
+end
 sdf(s::SphericalSurface, ::BackwardLeftMeniscusOrientation) = SphereSDF(radius(s))
 
 sdf(s::SphericalSurface, ::ForwardRightMeniscusOrientation) = SphereSDF(abs(radius(s)))
-sdf(s::SphericalSurface, ::BackwardRightMeniscusOrientation) = ConvexSphericalSurfaceSDF(abs(radius(s)), diameter(s))
+function sdf(s::SphericalSurface, ::BackwardRightMeniscusOrientation)
+    ConvexSphericalSurfaceSDF(abs(radius(s)), diameter(s))
+end

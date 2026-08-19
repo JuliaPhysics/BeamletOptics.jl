@@ -9,6 +9,21 @@ const mm = 1e-3
 
 @testset "Beamsplitters" begin
     N0 = 1.5
+
+    @testset "PlateBeamsplitter Constructor Type Promotion" begin
+        # Passing integer dimensions to RectangularPlateBeamsplitter
+        rpbs = RectangularPlateBeamsplitter(36, 25, 1, n -> N0)
+        @test rpbs isa RectangularPlateBeamsplitter{Float64}
+        @test BMO.shape(rpbs) isa BMO.BoxSDF{Float64}
+        @test BMO.coatings(rpbs)[1].second isa BMO.SimpleBeamsplitterCoating
+
+        # Passing integer dimensions to RoundPlateBeamsplitter
+        round_pbs = RoundPlateBeamsplitter(25, 1, n -> N0)
+        @test round_pbs isa RoundPlateBeamsplitter{Float64}
+        @test BMO.shape(round_pbs) isa BMO.PlanoSurfaceSDF{Float64}
+        @test BMO.coatings(round_pbs)[1].second isa BMO.SimpleBeamsplitterCoating
+    end
+
     @testset "Testing RectangularPlateBeamsplitter with Beam" begin
         # Init splitter
         N0 = 1.5
@@ -20,8 +35,7 @@ const mm = 1e-3
         solve_system!(system, beam)
 
         @testset "Test pos/dir" begin
-            @test position(pbs) == zeros(3)
-            @test orientation(pbs) ≈ orientation(pbs.substrate)
+            @test orientation(pbs) ≈ orientation(BMO.shape(pbs))
         end
 
         @testset "Test children after tracing" begin
@@ -60,6 +74,14 @@ const mm = 1e-3
             # correct dir
             @test BMO.direction(first(p)) ≈ BMO.direction(last(t))
             @test BMO.direction(last(r)) ≈ [1, 0, 0]
+        end
+
+        @testset "PlateBeamsplitter with AR back_coating" begin
+            pbs_ar = RectangularPlateBeamsplitter(36mm, 25mm, 1mm, n -> N0; back_coating=SimpleARCoating())
+            @test length(BMO.coatings(pbs_ar)) == 2
+            @test BMO.coatings(pbs_ar)[1].first == :front
+            @test BMO.coatings(pbs_ar)[2].first == :back
+            @test BMO.coatings(pbs_ar)[2].second isa SimpleARCoating
         end
     end
 

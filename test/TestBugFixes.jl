@@ -229,4 +229,82 @@ end
     @test all(==(lengths[1]), lengths)
 end
 
+@testset "Coincident refractive-reflective boundary" begin
+    # Test for coincident boundary bug where a mirror placed exactly at the lens/glass back boundary
+    # is correctly processed and reflects rays instead of letting them leak/refract straight through.
+    
+    λ = 354.84e-9
+    B1, B2, B3 = 0.6961663, 0.4079426, 0.8974794
+    C1, C2, C3 = 0.0684043^2, 0.1162414^2, 9.896161^2
+    SE = SellmeierEquation(B1, B2, B3, C1, C2, C3)
+    
+    d_glass = 17.5mm
+    L_bs = 30mm
+    
+    # Lens element (glass block)
+    glass_block = Lens(RectangularFlatSurface(L_bs), RectangularFlatSurface(L_bs), d_glass, SE)
+    translate3d!(glass_block, [0.0, L_bs/2, 0.0])
+    
+    # Mirror placed EXACTLY at the back face of the glass block (no gap, gap = 0.0)
+    mirror = SquarePlanoMirror(L_bs, 5mm)
+    translate3d!(mirror, [0.0, L_bs/2 + d_glass, 0.0])
+    
+    # Detector placed to capture the returning reflected ray
+    detector = Detector(16mm)
+    translate3d!(detector, [0.0, -10mm, 0.0])
+    
+    # Beam pointing along +y, starting at y = 10 mm
+    beam = GaussianBeamlet([0.0, 10mm, 0.0], [0.0, 1.0, 0.0], λ, 0.5mm)
+    
+    system = System([glass_block, mirror, detector])
+    
+    empty!(detector)
+    solve_system!(system, beam)
+    
+    @test detector.hits !== nothing
+    @test length(detector.hits) == 1
+end
+
+@testset "Auxiliary beamlet TIR before splitting" begin
+    struct Splitting5050Coating end
+    BMO.coating_behavior(::Splitting5050Coating, ray) = Splitting()
+    BMO.get_jones_matrix(::Splitting5050Coating, θi, λ, n1, n2, is_reflected; from_front=true) = BMO.SPBasis(1/sqrt(2), 0, 0, 1/sqrt(2))
+
+    mesh = BMO.QuadraticFlatMesh(100mm)
+    coating = Coating(mesh, Splitting5050Coating(), normal_filter=[0.0, -1.0, 0.0])
+    
+    # Ray incident from n_incident = 1.5 to n_transmitted = 1.0 (glass to air)
+    # Critical angle = asin(1/1.5) ≈ 41.8103 deg
+    # Chief ray angle = 41.7 deg (refracts, near critical angle)
+    θ = deg2rad(41.7)
+    dir_c = [sin(θ), cos(θ), 0.0]
+    
+    # Waist size 0.001mm (1 um) gives divergence angle large enough for divergence ray to exceed critical angle
+    w0 = 0.001mm
+    λ = 1000e-9
+    
+    gauss = GaussianBeamlet([0.0, -10mm, 0.0], dir_c, λ, w0)
+    
+    n_inc = 1.5
+    n_trans = 1.0
+    normal = [0.0, -1.0, 0.0]
+    
+    tir_triggered = false
+    cb = () -> (tir_triggered = true; return nothing)
+    
+    BMO._propagate_splitting_gaussian_beamlet(
+        System([coating]), coating, Splitting5050Coating(), gauss, 1, n_inc, n_trans, normal, true, cb
+    )
+    @test tir_triggered
+
+    agb = AstigmaticGaussianBeamlet([0.0, -10mm, 0.0], dir_c, λ, w0)
+    tir_triggered_agb = false
+    cb_agb = () -> (tir_triggered_agb = true; return nothing)
+    
+    BMO._propagate_splitting_astigmatic_beamlet(
+        System([coating]), coating, Splitting5050Coating(), agb, 1, n_inc, n_trans, normal, true, cb_agb
+    )
+    @test tir_triggered_agb
+end
+
 end # MODULE

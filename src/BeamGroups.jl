@@ -695,9 +695,7 @@ function WavefrontBeamletDecomposition(
     w0s_y = T(dy * overlap)
     k = 2π / λ
 
-    beams = Vector{AstigmaticGaussianBeamlet{T}}()
-    sizehint!(beams, ceil(Int, nx * ny * 0.1)) # Conservative estimate
-    beams_lock = ReentrantLock()
+    grid_beams = Matrix{Union{Nothing, AstigmaticGaussianBeamlet{T}}}(nothing, nx, ny)
     max_amp = maximum(amplitude)
 
     Threads.@threads for i in 1:nx
@@ -779,9 +777,15 @@ function WavefrontBeamletDecomposition(
             end
 
             b = AstigmaticGaussianBeamlet(pos, local_dir, λ, w0s_x, w0s_y; E0 = E0_complex, support = local_support)
-            lock(beams_lock) do
-                push!(beams, b)
-            end
+            grid_beams[i, j] = b
+        end
+    end
+
+    beams = Vector{AstigmaticGaussianBeamlet{T}}()
+    sizehint!(beams, count(!isnothing, grid_beams))
+    for item in grid_beams
+        if item !== nothing
+            push!(beams, item)
         end
     end
 

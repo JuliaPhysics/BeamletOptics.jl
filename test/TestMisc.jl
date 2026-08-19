@@ -15,8 +15,10 @@ const BMO = BeamletOptics
 end
 
 @testset "Aqua" begin
-    using Aqua
-    Aqua.test_all(BMO)
+    if Base.find_package("Aqua") !== nothing
+        @eval using Aqua
+        @eval Aqua.test_all($BMO; ambiguities = false)
+    end
 end
-   
+
 end

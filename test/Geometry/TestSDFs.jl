@@ -81,6 +81,66 @@ const BMO = BeamletOptics
         @test BMO.normal3d(point, p2 + offset) == p2
         @test BMO.normal3d(point, p3 + offset) == p3
     end
+
+    @testset "Testing raymarching enhancements" begin
+        # Sphere intersection from large distance (bounding sphere fast-forward)
+        sphere = BMO.SphereSDF(1.0)
+        translate3d!(sphere, [0.0, 50.0, 0.0])
+        ray_distant = Ray([0.0, -100.0, 0.0], [0.0, 1.0, 0.0])
+        hit_distant = BMO.intersect3d(sphere, ray_distant)
+        @test hit_distant !== nothing
+        @test isapprox(hit_distant.t, 149.0; atol = 1e-9)
+        @test isapprox(hit_distant.n, [0.0, -1.0, 0.0]; atol = 1e-7)
+
+        # Grazing incidence ray on sphere
+        # Sphere at (0, 0, 0) with radius 1.0; ray at x = 0.999 approaching along y
+        sphere_origin = BMO.SphereSDF(1.0)
+        y_hit_expected = -sqrt(1.0 - 0.999^2)
+        ray_grazing = Ray([0.999, -5.0, 0.0], [0.0, 1.0, 0.0])
+        hit_grazing = BMO.intersect3d(sphere_origin, ray_grazing)
+        @test hit_grazing !== nothing
+        @test isapprox(hit_grazing.t, 5.0 + y_hit_expected; atol = 1e-8)
+
+        # Inside raymarching through sphere
+        ray_inside = Ray([0.0, 0.0, 0.0], [0.0, 1.0, 0.0])
+        hit_inside = BMO._raymarch_inside(sphere_origin, ray_inside.pos, ray_inside.dir)
+        @test hit_inside !== nothing
+        @test isapprox(hit_inside.t, 1.0; atol = 1e-9)
+        @test isapprox(hit_inside.n, [0.0, 1.0, 0.0]; atol = 1e-7)
+
+        # 4-point tetrahedron numeric gradient
+        grad_num = BMO.numeric_gradient(sphere_origin, [0.0, 1.0, 0.0])
+        @test isapprox(grad_num, [0.0, 1.0, 0.0]; atol = 1e-6)
+
+        # CylinderSDF bounding sphere and normal tests
+        cyl = BMO.CylinderSDF(1.0, 5.0)
+        c_center, c_rad = BMO.bounding_sphere(cyl)
+        @test isapprox(c_rad, sqrt(1.0^2 + 5.0^2))
+
+        # Ray parallel to z at y = 0.9 * height hitting cylinder side
+        ray_cyl_high = Ray([0.0, 0.9 * 5.0, -10.0], [0.0, 0.0, 1.0])
+        hit_cyl = BMO.intersect3d(cyl, ray_cyl_high)
+        @test hit_cyl !== nothing
+        @test isapprox(hit_cyl.t, 9.0; atol = 1e-6)
+
+        # End cap normal
+        n_top = BMO.normal3d(cyl, [0.5, 5.0, 0.0])
+        @test isapprox(n_top, [0.0, 1.0, 0.0]; atol = 1e-6)
+        n_bottom = BMO.normal3d(cyl, [0.5, -5.0, 0.0])
+        @test isapprox(n_bottom, [0.0, -1.0, 0.0]; atol = 1e-6)
+        n_side = BMO.normal3d(cyl, [1.0, 2.0, 0.0])
+        @test isapprox(n_side, [1.0, 0.0, 0.0]; atol = 1e-6)
+
+        # surface_tag tests
+        box = BMO.BoxSDF(1.0, 2.0, 3.0)
+        @test BMO.surface_tag(box, [0.0, -1.0, 0.0], [0.0, -1.0, 0.0]) == :front
+        @test BMO.surface_tag(box, [0.0, 1.0, 0.0], [0.0, 1.0, 0.0]) == :back
+        @test BMO.surface_tag(cyl, [0.0, -5.0, 0.0], [0.0, -1.0, 0.0]) == :bottom
+        @test BMO.surface_tag(cyl, [0.0, 5.0, 0.0], [0.0, 1.0, 0.0]) == :top
+        @test BMO.surface_tag(cyl, [1.0, 0.0, 0.0], [1.0, 0.0, 0.0]) == :side
+        test_pt = TestPointSDF(zeros(3))
+        @test BMO.surface_tag(test_pt, [0.0, 0.0, 0.0], [0.0, 1.0, 0.0]) == :unknown
+    end
 end
 
 end # MODULE

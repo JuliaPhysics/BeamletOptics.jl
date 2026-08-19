@@ -158,7 +158,15 @@ function reset_rotation3d!(mesh::AbstractMesh{T}) where {T}
         return nothing
     end
     # Calculate rotation reset axis
-    axis = 1/(2*sin(θ)) * [R[3,2]-R[2,3], R[1,3]-R[3,1], R[2,1]-R[1,2]]
+    if θ > π - 1e-5
+        # Since θ ≈ π, sin(θ) ≈ 0, R is symmetric: R + I = 2 * axis * axisᵀ
+        # Find the column of R + I with the largest norm to extract the axis robustly
+        M = R + I
+        col_idx = argmax(vec(sum(abs2, M, dims=1)))
+        axis = normalize(M[:, col_idx])
+    else
+        axis = 1/(2*sin(θ)) * [R[3,2]-R[2,3], R[1,3]-R[3,1], R[2,1]-R[1,2]]
+    end
     # Reset mesh rotation
     rotate3d!(mesh, axis, -θ)
     # Reset orientation field
@@ -184,14 +192,16 @@ end
 Returns a vector with unit length that is perpendicular to the target `face`` according to
 the right-hand rule. The vertices must be listed row-wise within the face matrix.
 """
-function normal3d(mesh::AbstractMesh{T}, fID::Int) where{T}
-    @views begin
-        face = vertices(mesh)[faces(mesh)[fID, :], :]
-        n = cross(
-            (Point3{T}(face[2, :]) - Point3{T}(face[1, :])),
-            (Point3{T}(face[3, :]) - Point3{T}(face[1, :]))
-        )
-    end
+function normal3d(mesh::AbstractMesh{T}, fID::Int) where {T}
+    verts = vertices(mesh)
+    fcs = faces(mesh)
+    idx1 = fcs[fID, 1]
+    idx2 = fcs[fID, 2]
+    idx3 = fcs[fID, 3]
+    V1 = Point3{T}(verts[idx1, 1], verts[idx1, 2], verts[idx1, 3])
+    V2 = Point3{T}(verts[idx2, 1], verts[idx2, 2], verts[idx2, 3])
+    V3 = Point3{T}(verts[idx3, 1], verts[idx3, 2], verts[idx3, 3])
+    n = cross(V2 - V1, V3 - V1)
     return normalize(n)
 end
 
@@ -208,7 +218,10 @@ function MoellerTrumboreAlgorithm(face, ray::AbstractRay{T}; kϵ = 1e-9, lϵ = 1
     V1 = Point3(face[1, 1], face[1, 2], face[1, 3])
     V2 = Point3(face[2, 1], face[2, 2], face[2, 3])
     V3 = Point3(face[3, 1], face[3, 2], face[3, 3])
+    return MoellerTrumboreAlgorithm(V1, V2, V3, ray; kϵ = kϵ, lϵ = lϵ)
+end
 
+function MoellerTrumboreAlgorithm(V1, V2, V3, ray::AbstractRay{T}; kϵ = 1e-9, lϵ = 1e-9) where {T}
     E1 = V2 - V1
     E2 = V3 - V1
     Pv = cross(direction(ray), E2)
@@ -248,13 +261,19 @@ This function is a generic implementation to check if a `ray` intersects the `me
 function intersect3d(mesh::AbstractMesh{M},
         ray::AbstractRay{R}) where {M <: Real, R <: Real}
     numEl = size(faces(mesh), 1)
-    # allocate all intermediate vectors once (note that this is NOT THREAD-SAFE)
     T = promote_type(M, R)
     fID::Int = 0
     t0::T = Inf
+    verts = vertices(mesh)
+    fcs = faces(mesh)
     for i in 1:numEl
-        face = @views vertices(mesh)[faces(mesh)[i, :], :]
-        t = MoellerTrumboreAlgorithm(face, ray)
+        idx1 = fcs[i, 1]
+        idx2 = fcs[i, 2]
+        idx3 = fcs[i, 3]
+        V1 = Point3{M}(verts[idx1, 1], verts[idx1, 2], verts[idx1, 3])
+        V2 = Point3{M}(verts[idx2, 1], verts[idx2, 2], verts[idx2, 3])
+        V3 = Point3{M}(verts[idx3, 1], verts[idx3, 2], verts[idx3, 3])
+        t = MoellerTrumboreAlgorithm(V1, V2, V3, ray)
         # Return closest intersection
         if t < t0
             t0 = t
@@ -264,9 +283,8 @@ function intersect3d(mesh::AbstractMesh{M},
     if isinf(t0)
         return nothing
     else
-        face = @views vertices(mesh)[faces(mesh)[fID, :], :]
         normal = normal3d(mesh, fID)
-        return Intersection(t0, normalize(T.(normal)), mesh)
+        return Intersection(t0, normalize(Point3{T}(normal)), mesh)
     end
 end
 
