@@ -87,7 +87,7 @@ Defaults to `:unknown` if no tag is implemented for the given SDF.
 surface_tag(s::AbstractSDF, point) = surface_tag(s, _world_to_sdf(s, point), transposed_orientation(s) * normal3d(s, point))
 surface_tag(s::AbstractSDF, point, normal) = :unknown
 
-function numeric_gradient(s::AbstractSDF{S}, pos::AbstractArray{R}; h = cbrt(eps(promote_type(S, R)))) where {S, R}
+function numeric_gradient(s::AbstractSDF{S}, pos::AbstractArray{R}; h = promote_type(S, R)(1e-6)) where {S, R}
     T = promote_type(S, R)
     p = Point3{T}(pos)
     h_T = T(h)
