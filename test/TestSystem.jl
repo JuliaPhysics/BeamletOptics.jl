@@ -19,9 +19,6 @@ const BMO = BeamletOptics
         @test_logs (:warn, "Tracing for $(typeof(beam)) not implemented") BMO.trace_system!(
             system,
             beam)
-        @test_logs (:warn, "Retracing for $(typeof(beam)) not implemented") BMO.retrace_system!(
-            system,
-            beam)
     end
 
     # Setup circular multipass cell with flat mirrors
@@ -95,18 +92,6 @@ const BMO = BeamletOptics
         @test 180 - rad2deg(BMO.angle3d(first_ray_dir, last_ray_dir)) ≈ 2 * Δθ
         @test BMO.object(BMO.intersection(first_ray)) ===
               mirrors[(n_mirrors + 1) ÷ 2 + 2]
-    end
-
-    @testset "Testing system retracing" begin
-        system = System(mirrors)
-        first_ray = Ray(origin, dir)
-        beam = Beam(first_ray)
-        t1 = @timed BMO.trace_system!(system, beam, r_max = 1000000)
-        t2 = @timed BMO.retrace_system!(system, beam) # for precompilation
-        t2 = @timed BMO.retrace_system!(system, beam)
-        if t1.time < t2.time
-            @warn "Retracing took longer than tracing, something might be bugged...\n   Tracing: $(t1.time) s\n   Retracing: $(t2.time) s"
-        end
     end
 end
 

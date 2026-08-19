@@ -104,16 +104,16 @@ const BMO = BeamletOptics
         @test AbstractTrees.parent(cb1) === root
         @test AbstractTrees.parent(cb2) === root
         @test AbstractTrees.parent(cb3) === cb2
-        # Replace bottom child
+        # Adding another child to a beam that already has one must fail
         cbr = TestBeam()
-        @test_throws "_modify_beam_head not implemented for $(typeof(cb2))" BMO.children!(
+        @test_throws "Adding child to beam failed" BMO.children!(
             cb2,
             cbr)
         # Test child removal
         BMO._drop_beams!(cb2)
         @test isempty(BMO.children(cb2))
         # Stuff
-        @test_throws "_last_beam_intersection not implemented for $(typeof(cb2))" BMO._last_beam_intersection(cb2)
+        @test_throws "_reset_beam! not implemented for $(typeof(cb2))" BMO._reset_beam!(cb2)
     end
 
     mutable struct TestShapeless{T} <: BMO.AbstractShape{T}

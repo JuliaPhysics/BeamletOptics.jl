@@ -1,7 +1,7 @@
 """
     AbstractIntersection{T}
 
-Stores data calculated by the [`intersect3d`](@ref) method. This information can be reused, i.e. for retracing.
+Stores data calculated by the [`intersect3d`](@ref) method.
 
 # Required fields
 
@@ -11,8 +11,8 @@ Stores data calculated by the [`intersect3d`](@ref) method. This information can
 # Interface
 
 Subtypes must have the `t` and `n` fields above, which back the generic [`Base.length`](@ref)/[`normal3d`](@ref)
-accessors defined for `AbstractIntersection`. Where applicable, subtypes should also implement [`shape`](@ref)
-and/or [`object`](@ref), see [`ShapeIntersection`](@ref) and [`ObjectIntersection`](@ref).
+accessors defined for `AbstractIntersection`. Where applicable, subtypes should also implement `shape`
+and/or `object`, see [`ShapeIntersection`](@ref) and [`ObjectIntersection`](@ref).
 """
 abstract type AbstractIntersection{T} end
 

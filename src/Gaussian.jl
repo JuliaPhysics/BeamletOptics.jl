@@ -142,25 +142,13 @@ function Base.push!(gauss::GaussianBeamlet{T},
     return nothing
 end
 
-function Base.replace!(gauss::GaussianBeamlet{T},
-        interaction::GaussianBeamletInteraction{T},
-        index::Int) where {T}
-    replace!(gauss.chief, interaction.chief, index)
-    replace!(gauss.waist, interaction.waist, index)
-    replace!(gauss.divergence, interaction.divergence, index)
+function _reset_beam!(gauss::GaussianBeamlet)
+    _reset_beam!(gauss.chief)
+    _reset_beam!(gauss.waist)
+    _reset_beam!(gauss.divergence)
+    _drop_beams!(gauss)
     return nothing
 end
-
-function _modify_beam_head!(old::GaussianBeamlet{T},
-        new::GaussianBeamlet{T}) where {T <: Real}
-    _modify_beam_head!(old.chief, new.chief)
-    _modify_beam_head!(old.waist, new.waist)
-    _modify_beam_head!(old.divergence, new.divergence)
-    wavelength!(old, wavelength(new))
-    electric_field!(old, electric_field(new))
-end
-
-_last_beam_intersection(gauss::GaussianBeamlet) = intersection(last(rays(gauss.chief)))
 
 """
     _beams_hits_same_shape(gauss, id)

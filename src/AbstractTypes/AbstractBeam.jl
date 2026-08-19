@@ -20,8 +20,7 @@ Subtypes of `AbstractBeam` must implement the following:
 
 ## Functions:
 
-- `_modify_beam_head!`: modifies the beam path for retracing purposes
-- `_last_beam_intersection`: returns the last `Beam` intersection
+- `_reset_beam!`: resets the beam tree back to just its head ray(s), ready for a fresh trace
 """
 abstract type AbstractBeam{T <: Real, R <: AbstractRay{T}} end
 
@@ -47,18 +46,13 @@ AbstractTrees.printnode(io::IO, node::B; kw...) where {B <: AbstractBeam} = show
 Handles the inclusion of adding a single `child` to an existing `beam`. The function behaves as follows:
 
 1. If no previous children exist, add child
-2. If `beam` already has a single child, modify child beam starting ray (retracing)
-3. Else throw error
+2. Else throw error
 """
 function children!(beam::B, child::B) where {B <: AbstractBeam}
     if isempty(children(beam))
         # Link parent and add child to tree
         parent!(child, beam)
         push!(children(beam), child)
-        return nothing
-    end
-    if length(children(beam)) == 1
-        _modify_beam_head!(first(children(beam)), child)
         return nothing
     end
     return error("Adding child to beam failed")
@@ -69,12 +63,6 @@ function children!(beam::B, _children::AbstractVector{B}) where {B <: AbstractBe
         # Link parent and add children to tree
         parent!.(_children, Ref(beam))
         append!(children(beam), _children)
-        return nothing
-    end
-    if length(children(beam)) == length(_children)
-        for (i, child) in enumerate(children(beam))
-            _modify_beam_head!(child, _children[i])
-        end
         return nothing
     end
     return error("Adding children to beam failed")
@@ -89,23 +77,20 @@ function children!(beam::B, _children::Tuple{Vararg{B}}) where {B <: AbstractBea
         end
         return nothing
     end
-    if length(children(beam)) == length(_children)
-        for (i, child) in enumerate(children(beam))
-            _modify_beam_head!(child, _children[i])
-        end
-        return nothing
-    end
     return error("Adding children to beam failed")
 end
 
 _drop_beams!(b::B) where {B <: AbstractBeam} = (b.children = Vector{B}())
 
-function _modify_beam_head!(::B, ::B) where {B <: AbstractBeam}
-    throw(ArgumentError(lazy"_modify_beam_head not implemented for $B"))
-end
+"""
+    _reset_beam!(beam::AbstractBeam)
 
-function _last_beam_intersection(::B) where {B <: AbstractBeam}
-    throw(ArgumentError(lazy"_last_beam_intersection not implemented for $B"))
+Resets `beam` back to just its head ray(s) — drops all children, truncates ray vector(s)
+to the first ray, and clears that ray's intersection — so that [`solve_system!`](@ref)
+can resolve it from scratch.
+"""
+function _reset_beam!(::B) where {B <: AbstractBeam}
+    throw(ArgumentError(lazy"_reset_beam! not implemented for $B"))
 end
 
 """

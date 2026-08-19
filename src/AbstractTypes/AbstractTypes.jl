@@ -27,8 +27,6 @@ Core Functions:
     translate3d!(AbstractObject, offset)
     trace_system!(system, Beam)
     trace_system!(system, GaussianBeamlet)
-    retrace_system!(system, Beam)
-    retrace_system!(system, GaussianBeamlet)
 =#
 
 # Order of inclusion matters!
