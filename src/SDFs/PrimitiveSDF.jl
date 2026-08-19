@@ -289,10 +289,10 @@ end
 
 function surface_tag(cylinder::CylinderSDF, point, normal)
     ny = normal[2]
-    if ny < -0.5
-        return :front
-    elseif ny > 0.5
-        return :back
+    if ny > 0.5
+        return :top
+    elseif ny < -0.5
+        return :bottom
     else
         return :side
     end

@@ -135,8 +135,8 @@ const BMO = BeamletOptics
         box = BMO.BoxSDF(1.0, 2.0, 3.0)
         @test BMO.surface_tag(box, [0.0, -1.0, 0.0], [0.0, -1.0, 0.0]) == :front
         @test BMO.surface_tag(box, [0.0, 1.0, 0.0], [0.0, 1.0, 0.0]) == :back
-        @test BMO.surface_tag(cyl, [0.0, -5.0, 0.0], [0.0, -1.0, 0.0]) == :front
-        @test BMO.surface_tag(cyl, [0.0, 5.0, 0.0], [0.0, 1.0, 0.0]) == :back
+        @test BMO.surface_tag(cyl, [0.0, -5.0, 0.0], [0.0, -1.0, 0.0]) == :bottom
+        @test BMO.surface_tag(cyl, [0.0, 5.0, 0.0], [0.0, 1.0, 0.0]) == :top
         @test BMO.surface_tag(cyl, [1.0, 0.0, 0.0], [1.0, 0.0, 0.0]) == :side
         test_pt = TestPointSDF(zeros(3))
         @test BMO.surface_tag(test_pt, [0.0, 0.0, 0.0], [0.0, 1.0, 0.0]) == :unknown
