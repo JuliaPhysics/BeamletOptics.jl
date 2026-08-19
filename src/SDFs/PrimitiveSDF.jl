@@ -80,7 +80,7 @@ function sdf(cylinder::CylinderSDF{T}, point) where T
 end
 
 function bounding_sphere(s::CylinderSDF{T}) where T
-    return (Point3{T}(0), sqrt(s.radius^2 + (s.height / 2)^2))
+    return (Point3{T}(0), sqrt(s.radius^2 + s.height^2))
 end
 
 """
@@ -245,11 +245,29 @@ function normal3d(box::BoxSDF{T}, point) where {T}
     return box.dir * n_local
 end
 
+function surface_tag(box::BoxSDF, point, normal)
+    ny = normal[2]
+    if ny < -0.5
+        return :front
+    elseif ny > 0.5
+        return :back
+    elseif normal[1] > 0.5
+        return :right
+    elseif normal[1] < -0.5
+        return :left
+    elseif normal[3] > 0.5
+        return :top
+    elseif normal[3] < -0.5
+        return :bottom
+    else
+        return :unknown
+    end
+end
+
 # CylinderSDF
 function _cylinder_local_normal(cylinder::CylinderSDF{T}, p::Point3{T}) where {T}
-    half_h = cylinder.height / 2
-    d_top = abs(p[2] - half_h)
-    d_bottom = abs(p[2] + half_h)
+    d_top = abs(p[2] - cylinder.height)
+    d_bottom = abs(p[2] + cylinder.height)
     r_xz = norm(Point2(p[1], p[3]))
     d_side = abs(r_xz - cylinder.radius)
     
@@ -267,6 +285,17 @@ function normal3d(cylinder::CylinderSDF{T}, point) where {T}
     p = _world_to_sdf(cylinder, point)
     n_local = _cylinder_local_normal(cylinder, p)
     return cylinder.dir * n_local
+end
+
+function surface_tag(cylinder::CylinderSDF, point, normal)
+    ny = normal[2]
+    if ny < -0.5
+        return :front
+    elseif ny > 0.5
+        return :back
+    else
+        return :side
+    end
 end
 
 # RightAnglePrismSDF
@@ -301,4 +330,17 @@ function normal3d(prism::RightAnglePrismSDF{T}, point) where {T}
         Point3{T}(0, 0, sign(p[3]))
     end
     return prism.dir * n_local
+end
+
+function surface_tag(prism::RightAnglePrismSDF, point, normal)
+    idx = _prism_face_index(prism, Point3(point))
+    if idx == 1
+        return :hypotenuse
+    elseif idx == 2
+        return :leg1
+    elseif idx == 3
+        return :leg2
+    else
+        return :side
+    end
 end
