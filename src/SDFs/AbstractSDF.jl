@@ -56,7 +56,9 @@ function bounding_box(s::AbstractSDF)
         ymax = 1000 - sdf(s, Point3(0, 1000, 0))
         zmax = 1000 - sdf(s, Point3(0, 0, 1000))
     else
-        center, r = bounding_sphere(s)
+        c_local, r = bounding_sphere(s)
+        # Transform center from local SDF coordinates to world coordinates
+        center = orientation(s) * c_local + position(s)
         xmin = center[1] - r
         xmax = center[1] + r
         ymin = center[2] - r
@@ -75,58 +77,139 @@ Computes the normal vector of `s` at `pos`.
 """
 normal3d(s::AbstractSDF, pos) = normal_fd(s, pos)
 
-function numeric_gradient(s::AbstractSDF, pos)
-    # approximate ∇ of s at pos
-    eps = 1e-8
-    norm = Point3(sdf(s, pos + Point3(eps, 0, 0)) - sdf(s, pos - Point3(eps, 0, 0)),
-        sdf(s, pos + Point3(0, eps, 0)) - sdf(s, pos - Point3(0, eps, 0)),
-        sdf(s, pos + Point3(0, 0, eps)) - sdf(s, pos - Point3(0, 0, eps)))
-    return normalize(norm)
+"""
+    surface_tag(sdf::AbstractSDF, point)
+    surface_tag(sdf::AbstractSDF, point, normal)
+
+Returns a symbolic surface tag (e.g. `:front`, `:back`, `:side`, `:top`, `:bottom`) for a hit point on the SDF.
+Defaults to `:unknown` if no tag is implemented for the given SDF.
+"""
+surface_tag(s::AbstractSDF, point) = surface_tag(s, _world_to_sdf(s, point), transposed_orientation(s) * normal3d(s, point))
+surface_tag(s::AbstractSDF, point, normal) = face_id(s, normal)
+
+function numeric_gradient(s::AbstractSDF{S}, pos::AbstractArray{R}) where {S, R}
+    T = promote_type(S, R)
+    p = Point3{T}(pos)
+    h = T(1e-6)
+
+    # 4-point tetrahedron technique (Inigo Quilez) - only 4 SDF evaluations, isotropic
+    k1 = Point3{T}( 1, -1, -1)
+    k2 = Point3{T}(-1, -1,  1)
+    k3 = Point3{T}(-1,  1, -1)
+    k4 = Point3{T}( 1,  1,  1)
+
+    grad = k1 * sdf(s, p + h * k1) +
+           k2 * sdf(s, p + h * k2) +
+           k3 * sdf(s, p + h * k3) +
+           k4 * sdf(s, p + h * k4)
+
+    return normalize(grad)
 end
+numeric_gradient(s::AbstractSDF, pos) = numeric_gradient(s, Point3(pos))
 
 function normal_fd(s::AbstractSDF, p)
-    normal = normalize(gradient(x -> sdf(s, x), p))
-    all(!isnan, normal) && return normal
+    try
+        normal = normalize(gradient(x -> sdf(s, x), p))
+        if all(!isnan, normal) && norm(normal) > 0
+            return normal
+        end
+    catch
+    end
     # fallback
     return numeric_gradient(s, p)
 end
 
 """
-    _raymarch_outside(shape::AbstractSDF, pos, dir; num_iter=1000, eps=1e-10)
+    _refine_root_1d(shape, p0, dir, ta, tb; max_iter=6, tol=1e-13)
+
+Refines the 1D intersection distance along the ray `p(t) = p0 + t * dir` within `[ta, tb]` using the secant method.
+"""
+function _refine_root_1d(shape::AbstractSDF, p0::Point3{T}, dir::Point3{T}, ta::T, tb::T;
+        max_iter = 6, tol = Config.get_sdf_raymarch_eps()) where T
+    ga = sdf(shape, p0 + ta * dir)
+    gb = sdf(shape, p0 + tb * dir)
+
+    abs(ga) <= tol && return ta
+    abs(gb) <= tol && return tb
+
+    for _ in 1:max_iter
+        denom = gb - ga
+        abs(denom) < eps(T) && break
+
+        # Secant step
+        t_next = tb - gb * (tb - ta) / denom
+
+        # Guard against wild extrapolation outside [min(ta, tb), max(ta, tb)]
+        t_min = min(ta, tb)
+        t_max = max(ta, tb)
+        if !(t_min <= t_next <= t_max)
+            t_next = (ta + tb) / 2
+        end
+
+        g_next = sdf(shape, p0 + t_next * dir)
+        if abs(g_next) <= tol
+            return t_next
+        end
+
+        if ga * g_next <= 0
+            tb = t_next
+            gb = g_next
+        else
+            ta = tb
+            ga = gb
+            tb = t_next
+            gb = g_next
+        end
+    end
+    return tb
+end
+
+"""
+    _raymarch_outside(shape::AbstractSDF, pos, dir; num_iter=1000, eps=Config.get_sdf_raymarch_eps(), t_start=0.0)
 
 Perform the ray marching algorithm if the starting pos is outside of `shape`.
+Uses adaptive sphere tracing combined with 1D secant root refinement.
 """
 function _raymarch_outside(shape::AbstractSDF{S},
         pos::AbstractArray{R},
         dir::AbstractArray{R},
         num_iter = 1000,
-        eps = Config.get_sdf_raymarch_eps()) where {S, R}
+        eps = Config.get_sdf_raymarch_eps();
+        t_start = zero(promote_type(S, R))) where {S, R}
     T = promote_type(S, R)
-    dist = sdf(shape, pos)
-    t0 = zero(T)
+    p0 = Point3{T}(pos)
+    d = Point3{T}(dir)
 
-    # `escaped` tracks if the ray has definitively moved away from the surface
+    t0 = T(t_start)
+    current_pos = p0 + t0 * d
+    dist = sdf(shape, current_pos)
+
     escaped = dist > eps
+    prev_t = t0
+
     i = 1
     while i <= num_iter
-        # When trapped in the surface noise floor (dist < eps), we slowly accelerate the minimum step
-        # proportionally to the distance traveled (t0 * 0.01). 
-        # This logarithmic escape prevents exhausting num_iter on highly inaccurate SDFs, 
-        # while bounding the blind step to 1% of the traveled distance to prevent tunneling.
-        min_step = escaped ? eps : (eps + t0 * 0.01)
+        # When near the surface, use a small step; cap the blind escape growth to avoid tunneling
+        min_step = escaped ? T(eps) : min(T(1e-4), T(eps) + t0 * T(0.001))
         step_size = max(dist, min_step)
-        pos = pos + step_size * dir
+
+        prev_t = t0
         t0 += step_size
-        dist = sdf(shape, pos)
+        current_pos = p0 + t0 * d
+        dist = sdf(shape, current_pos)
         i += 1
 
         if dist > eps
             escaped = true
         elseif escaped
-            normal = normal3d(shape, pos)
-            # Filter out false positive hits caused by numerical noise when leaving an SDF.
-            if !(dot(dir, normal) > eps)
-                return Intersection(t0, normal, shape)
+            # Hit detected or zero-crossing; refine intersection distance with 1D secant method
+            t_hit = _refine_root_1d(shape, p0, d, prev_t, t0; tol = eps)
+            hit_pos = p0 + t_hit * d
+            normal = normal3d(shape, hit_pos)
+
+            # Filter out false positive hits caused by numerical noise when leaving an SDF
+            if !(dot(d, normal) > eps)
+                return Intersection(t_hit, normal, shape)
             end
         end
     end
@@ -134,37 +217,101 @@ function _raymarch_outside(shape::AbstractSDF{S},
 end
 
 """
-    _raymarch_inside(object::AbstractSDF, pos, dir; num_iter=1000, dl=0.1)
+    _raymarch_inside(object::AbstractSDF, pos, dir; num_iter=1000, dl=Config.get_sdf_inside_step())
 
 Perform the ray marching algorithm if the starting pos is inside of `object`.
+Marches forward along the ray direction and refines the exit boundary point.
 """
 function _raymarch_inside(object::AbstractSDF{S},
         pos::AbstractArray{R},
         dir::AbstractArray{R},
         num_iter = 1000,
         dl = Config.get_sdf_inside_step()) where {S, R}
-    # this method assumes semi-concave objects, i.e. might fail depending on the choice of dl
     T = promote_type(S, R)
-    t0::T = 0
+    p0 = Point3{T}(pos)
+    d = Point3{T}(dir)
+
+    t0 = zero(T)
+    current_pos = p0
+    dist = sdf(object, current_pos)
+    eps = Config.get_sdf_raymarch_eps()
+
+    # If starting on the surface, take a small step inside
+    if abs(dist) <= eps
+        t0 += T(eps)
+        current_pos = p0 + t0 * d
+        dist = sdf(object, current_pos)
+    end
+
+    prev_t = t0
     i = 1
-    # march the ray a fixed distance dl until position is outside of sdf, since some sdfs are not exact on the inside
     while i <= num_iter
-        pos = pos + dl * dir
-        t0 += dl
-        dist = sdf(object, pos)
-        # once outside the sdf, fall back to _raymarch_outside
-        if dist > 0
-            intersection = _raymarch_outside(object, pos, -dir)
-            if intersection === nothing
-                break
+        # For exact Euclidean SDFs, abs(dist) is the distance to boundary. dl acts as upper bound.
+        step_size = dist < 0 ? min(abs(dist), T(dl)) : T(eps)
+        step_size = max(step_size, T(eps))
+
+        prev_t = t0
+        t0 += step_size
+        current_pos = p0 + t0 * d
+        dist = sdf(object, current_pos)
+
+        # Reached or crossed the exit boundary
+        if dist > eps
+            t_hit = _refine_root_1d(object, p0, d, prev_t, t0; tol = eps)
+            hit_pos = p0 + t_hit * d
+            normal = normal3d(object, hit_pos)
+            # Ensure the ray is actually exiting the surface (not crossing an internal seam)
+            if dot(d, normal) > -eps
+                return Intersection(t_hit, normal, object)
             end
-            intersection.t = t0 - intersection.t
-            return intersection
         end
         i += 1
     end
-    # return no intersection if too many iterations or actual miss occurs
     return nothing
+end
+
+"""
+    bounding_sphere_entry(object::AbstractSDF, ray::AbstractRay)
+
+Computes if the ray intersects the bounding sphere of `object`, and if so, returns `(true, t_enter)`.
+If `object` has no bounding sphere, returns `(true, 0.0)`.
+"""
+function bounding_sphere_entry(object::AbstractSDF, ray::AbstractRay)
+    bs = bounding_sphere(object)
+    if bs === nothing
+        return (true, 0.0) # fallback: no bounding sphere
+    end
+    c_local, r = bs
+
+    # Transform ray to local SDF coordinates
+    local_pos = _world_to_sdf(object, position(ray))
+    local_dir = transposed_orientation(object) * direction(ray)
+
+    # Ray-sphere intersection
+    v = local_pos - c_local
+    b = dot(v, local_dir)
+    c = dot(v, v) - r^2
+
+    # If origin is outside (c > 0) and ray points away (b > 0), it misses
+    if c > 0 && b > 0
+        return (false, 0.0)
+    end
+
+    disc = b^2 - c
+    if disc < 0
+        return (false, 0.0)
+    end
+
+    if c > 0
+        t_enter = -b - sqrt(disc)
+        return (true, max(0.0, t_enter))
+    else
+        return (true, 0.0)
+    end
+end
+
+function intersects_bounding_sphere(object::AbstractSDF, ray::AbstractRay)
+    return bounding_sphere_entry(object, ray)[1]
 end
 
 """
@@ -173,22 +320,29 @@ end
 Intersection algorithm for sdf based shapes.
 """
 function intersect3d(object::AbstractSDF, ray::AbstractRay)
+    hit_bs, t_enter = bounding_sphere_entry(object, ray)
+    if !hit_bs
+        return nothing
+    end
+
     pos = position(ray)
     dir = direction(ray)
     d = sdf(object, pos)
+
     # Test if outside of sdf, else inside
     if d > Config.get_sdf_surface_threshold()
-        return _raymarch_outside(object, pos, dir)
+        # If ray origin is outside bounding sphere, jump empty air up to t_enter (with margin)
+        t_start = t_enter > 0 ? max(0.0, t_enter - 100 * Config.get_sdf_raymarch_eps()) : 0.0
+        return _raymarch_outside(object, pos, dir; t_start = t_start)
     end
-    # Test if normal and ray dir oppose or align to determine if ray exits object
+
+    # Test if normal and ray dir oppose or align to determine if ray enters or exits object
     n = normal3d(object, pos)
-    if dot(dir, n) ≤ 0
+    if dot(dir, n) <= 0
         return _raymarch_inside(object, pos, dir)
     else
         return _raymarch_outside(object, pos, dir)
     end
-    # Return no intersection else
-    return nothing
 end
 
 # generic SDF transformations

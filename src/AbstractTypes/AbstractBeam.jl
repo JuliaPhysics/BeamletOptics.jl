@@ -30,7 +30,12 @@ AbstractTrees.nodetype(::Type{T}) where {T <: AbstractBeam} = T
 
 AbstractTrees.ParentLinks(::Type{<:AbstractBeam}) = AbstractTrees.StoredParents()
 AbstractTrees.parent(beam::AbstractBeam) = beam.parent
-parent!(beam::B, parent::B) where {B <: AbstractBeam} = (beam.parent = parent)
+function parent!(beam::B, parent::B) where {B <: AbstractBeam}
+    if beam !== parent
+        beam.parent = parent
+    end
+    return nothing
+end
 
 AbstractTrees.children(b::AbstractBeam) = b.children
 
@@ -75,6 +80,24 @@ function children!(beam::B, _children::AbstractVector{B}) where {B <: AbstractBe
     return error("Adding children to beam failed")
 end
 
+function children!(beam::B, _children::Tuple{Vararg{B}}) where {B <: AbstractBeam}
+    if isempty(children(beam))
+        # Link parent and add children to tree
+        for child in _children
+            parent!(child, beam)
+            push!(children(beam), child)
+        end
+        return nothing
+    end
+    if length(children(beam)) == length(_children)
+        for (i, child) in enumerate(children(beam))
+            _modify_beam_head!(child, _children[i])
+        end
+        return nothing
+    end
+    return error("Adding children to beam failed")
+end
+
 _drop_beams!(b::B) where {B <: AbstractBeam} = (b.children = Vector{B}())
 
 function _modify_beam_head!(::B, ::B) where {B <: AbstractBeam}
@@ -88,7 +111,7 @@ end
 """
     AbstractBeamGroup
 
-Provides a generic container type interface for bundles of [`Beam`](@ref)s. 
+Provides a generic container type interface for bundles of [`Beam`](@ref)s.
 This interface assumes that there exists a central beam around which the bundle propagates,
 e.g. akin to an optical axis.
 
@@ -127,3 +150,10 @@ function Base.show(io::IO, ::MIME"text/plain", bg::AbstractBeamGroup)
     println(io, "   # of beams: $(length(beams(bg)))")
     return nothing
 end
+
+"""
+    optical_power(beam::AbstractBeam)
+
+Returns the optical power of the beam. Default fallback returns `1.0` (representing 100% normalized power).
+"""
+optical_power(::AbstractBeam{T, R}) where {T <: Real, R} = one(T)
