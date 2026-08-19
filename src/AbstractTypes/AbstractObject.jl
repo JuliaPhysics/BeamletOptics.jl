@@ -94,4 +94,18 @@ Subtypes of `AbstractObjectGroup` must implement the following:
 """
 abstract type AbstractObjectGroup{T} <: AbstractObject{T} end
 
-AbstractTrees.children(group::AbstractObjectGroup) = group.objects
+AbstractTrees.children(group::AbstractObjectGroup) = objects(group)
+
+"""
+    is_refractive(object::AbstractObject)
+
+Default fallback implementation checking if an object has refractive properties. Returns `false`.
+"""
+is_refractive(::AbstractObject) = false
+
+"""
+    is_thin_interface(object::AbstractObject)
+
+Fallback implementation checking if an object is a zero-thickness boundary interface (like thin beamsplitter coatings or thin film coatings). Returns `false`.
+"""
+is_thin_interface(::AbstractObject) = false

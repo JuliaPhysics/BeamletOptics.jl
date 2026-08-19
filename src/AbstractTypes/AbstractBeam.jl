@@ -75,6 +75,24 @@ function children!(beam::B, _children::AbstractVector{B}) where {B <: AbstractBe
     return error("Adding children to beam failed")
 end
 
+function children!(beam::B, _children::Tuple{Vararg{B}}) where {B <: AbstractBeam}
+    if isempty(children(beam))
+        # Link parent and add children to tree
+        for child in _children
+            parent!(child, beam)
+            push!(children(beam), child)
+        end
+        return nothing
+    end
+    if length(children(beam)) == length(_children)
+        for (i, child) in enumerate(children(beam))
+            _modify_beam_head!(child, _children[i])
+        end
+        return nothing
+    end
+    return error("Adding children to beam failed")
+end
+
 _drop_beams!(b::B) where {B <: AbstractBeam} = (b.children = Vector{B}())
 
 function _modify_beam_head!(::B, ::B) where {B <: AbstractBeam}
