@@ -32,7 +32,7 @@ Subtypes of `AbstractShape` should implement the following:
 
 ## Ray Tracing:
 
-- [`intersect3d`](@ref): returns the intersection between an `AbstractShape` and `AbstractRay`, or lack thereof. See also [`ShapeIntersection`](@ref)
+- [`intersect3d`](@ref): returns the intersection between an `AbstractShape` and `AbstractRay`, or lack thereof. See also [`Intersection`](@ref)
 
 ## Rendering (with Makie):
 

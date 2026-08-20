@@ -143,6 +143,37 @@ const mm = 1e-3
         @test test_doublet(488e-9, 143.68mm, -2.064e-4)
         @test test_doublet(707e-9, 143.68mm, 0)
         @test test_doublet(1064e-9, 143.68mm, +7.466e-4)
+
+        @testset "Polarized ray through doublet" begin
+            λ = 707e-9
+            AC254 = SphericalDoubletLens(87.9mm, -105.6mm, Inf, 6mm, 3mm, BMO.inch, NLAK22, NSF10)
+            system = System([AC254])
+            ray = PolarizedRay([0.0, -0.05, 0.0], [0.0, 1.0, 0.0], λ, [1.0, 0.0, 0.0])
+            beam = Beam(ray)
+            solve_system!(system, beam)
+            @test length(BMO.rays(beam)) == 4
+            @test BMO.refractive_index.(beam.rays) == [1.0, NLAK22(λ), NSF10(λ), 1.0]
+            @test optical_path_length(beam) > length(beam)
+        end
+
+        @testset "Gaussian and AGB beamlet through doublet" begin
+            λ = 707e-9
+            AC254 = SphericalDoubletLens(87.9mm, -105.6mm, Inf, 6mm, 3mm, BMO.inch, NLAK22, NSF10)
+            system = System([AC254])
+            
+            # Gaussian beamlet
+            gauss = GaussianBeamlet([0.0, -0.05, 0.0], [0.0, 1.0, 0.0], λ, 1.0mm)
+            solve_system!(system, gauss)
+            @test length(BMO.rays(gauss.chief)) == 4
+            @test optical_path_length(gauss) > 0.0
+
+            # Astigmatic Gaussian beamlet
+            agb = AstigmaticGaussianBeamlet([0.0, -0.05, 0.0], [0.0, 1.0, 0.0], λ, 1.0mm)
+            solve_system!(system, agb; check_invariant = true)
+            @test length(BMO.rays(agb.c)) == 4
+            @test optical_path_length(agb) > 0.0
+            @test BMO.check_optical_invariant(agb, 4)
+        end
     end
 end
 

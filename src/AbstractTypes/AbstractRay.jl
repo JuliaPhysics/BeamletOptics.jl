@@ -7,7 +7,7 @@ To store the result of a ray tracing solution, refer to [`AbstractBeam`](@ref).
 
 # Intersections:
 
-Since the length of a ray can not be known before solving an optical system, the [`ObjectIntersection`](@ref)-type is used.
+Since the length of a ray can not be known before solving an optical system, the [`AbstractIntersection`](@ref)-type is used.
 This [`Nullable`](@ref) type can represent the intersection with an optical element, or lack thereof.
 
 # Implementation reqs.
@@ -18,7 +18,7 @@ Subtypes of `AbstractBeam` must implement the following:
 
 - `pos`: a R³-vector that stores the current position ``\\vec{p}``
 - `dir`: a R³-vector that stores the current direction ``\\vec{d}``
-- `intersection`: a `Nullable` field that stores the current [`ObjectIntersection`](@ref) or `nothing`
+- `intersection`: a `Nullable` field that stores the current [`AbstractIntersection`](@ref) or `nothing`
 - `λ`: wavelength in [m]
 - `n`: refractive index along the ray path
 
