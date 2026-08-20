@@ -32,6 +32,7 @@ struct AbsorbingSurface <: AbstractSurfaceModel end
 A surface model that records incoming light (power, phase, wavefront, or electric field distribution).
 """
 struct DetectorSurface{D} <: AbstractSurfaceModel
+    # QUESTION D not restricted, intended content?
     detector_data::D
 end
 

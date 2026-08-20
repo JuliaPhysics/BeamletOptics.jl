@@ -41,8 +41,8 @@ Stores coincident intersections sharing the same boundary within tolerance.
 """
 struct MultiIntersection{T <: Real, O1, O2} <: AbstractIntersection{T}
     hit::Intersection{T}
-    exiting::O1
-    entering::O2
+    exiting::O1             # QUESTION type not restricted, Union{Nothing, <: AbstractObject} ?
+    entering::O2            # QUESTION type not restricted, Union{Nothing, <: AbstractObject} ? 
 end
 
 function MultiIntersection(hit::Intersection{T};

@@ -95,6 +95,7 @@ function interact3d(
     int::Intersection{T},
     ray::AbstractRay{T}
 ) where {T <: Real}
+    # QUESTION seperate dispatch for Gaussian and AGB?
     if d.detector_data !== nothing
         push!(d.detector_data, (position(int), ray))
     end

@@ -89,11 +89,13 @@ In general, the intersection logic between an [`AbstractObject`](@ref) and an [`
 intersect3d(object::AbstractObject, ray::AbstractRay) = intersect3d(shape_trait_of(object), object, ray)
 
 function intersect3d(::SingleShape, object::AbstractObject, ray::AbstractRay)
+    # QUESTION returns only shape information upstream, Coating handling when?
     return intersect3d(shape(object), ray)
 end
 
 function intersect3d(::MultiShape, object::AbstractObject, ray::AbstractRay{R}) where R
     closest::Nullable{Intersection{R}} = nothing
+    # QUESTION proper recursion handling (unwrapping shapes of sub-objects) tested?
     for part in shape(object)
         temp = intersect3d(part, ray)
         isnothing(temp) && continue

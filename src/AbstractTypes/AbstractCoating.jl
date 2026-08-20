@@ -19,6 +19,8 @@ end
 
 Coating(shape::AbstractShape{T}, model::AbstractSurfaceModel) where {T} = Coating{T, typeof(shape), typeof(model)}(shape, model)
 
+# QUESTION single shape trait required?
+
 shape(c::Coating) = c.shape
 surface_model(c::Coating) = c.model
 
