@@ -52,15 +52,15 @@ end
 wavelength(ray::AbstractRay) = ray.λ
 wavelength!(ray::AbstractRay, λ) = (ray.λ = λ)
 
-wavenumber(ray::AbstractRay) = 2π/wavelength(ray)
+wavenumber(ray::AbstractRay) = 2π / wavelength(ray)
 
 refractive_index(ray::AbstractRay) = ray.n
 refractive_index!(ray::AbstractRay, n) = (ray.n = n)
 
 intersection(ray::AbstractRay) = ray.intersection
 function intersection!(ray::AbstractRay, _intersection::Nullable{<:AbstractIntersection})
-     ray.intersection = _intersection
-     return nothing
+    ray.intersection = _intersection
+    return nothing
 end
 
 """
@@ -86,13 +86,14 @@ end
 
 In general, the intersection logic between an [`AbstractObject`](@ref) and an [`AbstractRay`](@ref) depends on the [`AbstractShapeTrait`](@ref).
 """
-intersect3d(object::AbstractObject, ray::AbstractRay) = intersect3d(shape_trait_of(object), object, ray)
+intersect3d(object::AbstractObject, ray::AbstractRay) = intersect3d(
+    shape_trait_of(object), object, ray)
 
 function intersect3d(::SingleShape, object::AbstractObject, ray::AbstractRay)
     return intersect3d(shape(object), ray)
 end
 
-function intersect3d(::MultiShape, object::AbstractObject, ray::AbstractRay{R}) where R
+function intersect3d(::MultiShape, object::AbstractObject, ray::AbstractRay{R}) where {R}
     closest::Nullable{Intersection{R}} = nothing
     for part in shape(object)
         temp = intersect3d(part, ray)
@@ -182,10 +183,10 @@ isinfrontof(shape::AbstractShape, ray::AbstractRay) = isinfrontof(position(shape
 Tests whether the ray is entering a shape based on the orientation of the `ray` direction and surface normal.
 If no intersection is present, default behavior is to return `false`.
 """
-isentering(r::BeamletOptics.AbstractRay) = isentering(r, BeamletOptics.intersection(r))
-isentering(r::BeamletOptics.AbstractRay, i::BeamletOptics.AbstractIntersection) = isentering(BeamletOptics.direction(r), BeamletOptics.normal3d(i))
+isentering(r::AbstractRay) = isentering(r, intersection(r))
+isentering(r::AbstractRay, i::AbstractIntersection) = isentering(direction(r), normal3d(i))
 isentering(d::AbstractArray, n::AbstractArray) = dot(d, n) < 0
-isentering(::BeamletOptics.AbstractRay, ::Nothing) = false
+isentering(::AbstractRay, ::Nothing) = false
 
 """
     refraction3d(ray, n2)
@@ -196,7 +197,7 @@ function refraction3d(ray::AbstractRay, n2)
     dir = direction(ray)
     nml = normal3d(intersection(ray))
     # if beam is leaving substrate, flip normal
-    if !isentering(ray) 
+    if !isentering(ray)
         nml *= -1
     end
     n1 = refractive_index(ray)
