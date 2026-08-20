@@ -152,27 +152,13 @@ function Base.push!(gauss::GaussianBeamlet{T},
     return nothing
 end
 
-function Base.replace!(gauss::GaussianBeamlet{T},
-        interaction::GaussianBeamletInteraction{T},
-        index::Int) where {T}
-    replace!(gauss.chief, interaction.chief, index)
-    replace!(gauss.waist, interaction.waist, index)
-    replace!(gauss.divergence, interaction.divergence, index)
+function _reset_beam!(gauss::GaussianBeamlet)
+    _reset_beam!(gauss.chief)
+    _reset_beam!(gauss.waist)
+    _reset_beam!(gauss.divergence)
+    _drop_beams!(gauss)
     return nothing
 end
-
-function _modify_beam_head!(old::GaussianBeamlet{T},
-        new::GaussianBeamlet{T}) where {T <: Real}
-    _modify_beam_head!(old.chief, new.chief)
-    _modify_beam_head!(old.waist, new.waist)
-    _modify_beam_head!(old.divergence, new.divergence)
-    wavelength!(old, wavelength(new))
-    electric_field!(old, electric_field(new))
-end
-
-_last_beam_intersection(gauss::GaussianBeamlet) = intersection(last(rays(gauss.chief)))
-
-@inline _component_beams(gauss::GaussianBeamlet) = (gauss.chief, gauss.waist, gauss.divergence)
 
 """
     _beams_hits_same_shape(gauss, id)
@@ -181,13 +167,14 @@ Tests if all rays at section `id` of `gauss` hit the same object shape.
 Returns `true` or `false`.
 """
 @inline function _beams_hits_same_shape(gauss::GaussianBeamlet, id::Int)::Bool
-    ints = map(b -> intersection(rays(b)[id]), _component_beams(gauss))
-    are_nothing = isnothing.(ints)
+    c = intersection(rays(gauss.chief)[id])
+    w = intersection(rays(gauss.waist)[id])
+    d = intersection(rays(gauss.divergence)[id])
+    are_nothing = (c === nothing, w === nothing, d === nothing)
     if any(are_nothing)
         return all(are_nothing)
     end
-    s1 = shape(ints[1])
-    return all(i -> shape(i) === s1, ints)
+    return true
 end
 
 """

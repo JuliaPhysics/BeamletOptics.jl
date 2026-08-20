@@ -15,4 +15,3 @@ function _calculate_global_E0(object::AbstractObject, ray::PolarizedRay,
 end
 
 include("PolarizationFilter.jl")
-include("Waveplate.jl")

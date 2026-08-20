@@ -7,14 +7,14 @@ Mutable struct to store ray information.
 
 - `pos`: a point in R³ that describes the `Ray` origin
 - `dir`: a normalized vector in R³ that describes the `Ray` direction
-- `intersection`: refer to [`Intersection`](@ref)
+- `intersection`: refer to [`AbstractIntersection`](@ref)
 - `λ`: wavelength in [m]
 - `n`: refractive index along the beam path
 """
 mutable struct Ray{T} <: AbstractRay{T}
     pos::Point3{T}
     dir::Point3{T}
-    intersection::Nullable{Intersection{T}}
+    intersection::Union{Nothing, Intersection{T}, MultiIntersection{T}}
     λ::T
     n::Union{T, Complex{T}}
     weight::T
@@ -45,7 +45,7 @@ Optionally, a wavelength `λ` can be specified. The start refractive index is as
 """
 function Ray(pos::AbstractArray{P},
         dir::AbstractArray{D},
-        λ::L = 1000e-9) where {P <: Real, D <: Real, L<:Real}
+        λ::L = 1000e-9) where {P <: Real, D <: Real, L <: Real}
     F = promote_type(P, D, L)
     if isapprox(norm(dir), 0, atol=1e-14)
         throw(ErrorException("Direction vector to short for normalization."))
@@ -62,12 +62,21 @@ end
 
 function Ray(pos::AbstractArray{P},
         dir::AbstractArray{D},
-        int::Nullable{Intersection},
-        λ::L,
+        intersection::Nullable{<:AbstractIntersection},
+        λ::L = 1000e-9,
         n::N = 1,
         weight::W = 1) where {P <: Real, D <: Real, L <: Real, N <: Number, W <: Real}
     F = promote_type(P, D, L, real(N), W)
-    return Ray{F}(pos, dir, int, λ, n, weight)
+    if isapprox(norm(dir), 0, atol=1e-14)
+        throw(ErrorException("Direction vector to short for normalization."))
+    end
+    return Ray{F}(
+        Point3{F}(pos),
+        normalize(Point3{F}(dir)),
+        intersection,
+        F(λ),
+        (n isa Complex ? Complex{F}(n) : F(n)),
+        F(weight))
 end
 
 weight(ray::Ray) = ray.weight

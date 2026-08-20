@@ -1,0 +1,1560 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Unified Media–Interface Architecture for BeamletOptics.jl</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark-dimmed.min.css" id="highlight-theme">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/julia.min.js"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        :root {
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --font-display: 'Outfit', var(--font-sans);
+            --font-mono: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
+            
+            /* Dark Theme Colors (Default) */
+            --bg-page: #0b0f19;
+            --bg-surface: #111827;
+            --bg-card: rgba(17, 24, 39, 0.7);
+            --bg-code: #0a0e17;
+            --border-color: rgba(255, 255, 255, 0.08);
+            --border-hover: rgba(99, 102, 241, 0.4);
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --text-muted: #6b7280;
+            --accent-primary: #6366f1;
+            --accent-secondary: #a855f7;
+            --accent-pink: #ec4899;
+            --accent-cyan: #06b6d4;
+            --accent-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
+            --accent-glow: rgba(99, 102, 241, 0.25);
+            --table-hover: rgba(99, 102, 241, 0.05);
+            --shadow-card: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+            --sidebar-width: 330px;
+        }
+
+        [data-theme="light"] {
+            --bg-page: #f8fafc;
+            --bg-surface: #ffffff;
+            --bg-card: rgba(255, 255, 255, 0.85);
+            --bg-code: #0f172a;
+            --border-color: #e2e8f0;
+            --border-hover: rgba(99, 102, 241, 0.5);
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --text-muted: #94a3b8;
+            --accent-primary: #4f46e5;
+            --accent-secondary: #9333ea;
+            --accent-pink: #db2777;
+            --accent-cyan: #0891b2;
+            --accent-gradient: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #db2777 100%);
+            --accent-glow: rgba(79, 70, 229, 0.15);
+            --table-hover: rgba(79, 70, 229, 0.04);
+            --shadow-card: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            scroll-behavior: smooth;
+            font-size: 15px;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background-color: var(--bg-page);
+            color: var(--text-primary);
+            line-height: 1.7;
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        #progress-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 3.5px;
+            background: var(--accent-gradient);
+            z-index: 10000;
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+
+        header.glass-header {
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            background: rgba(11, 15, 25, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border-color);
+            padding: 0.85rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        [data-theme="light"] header.glass-header {
+            background: rgba(248, 250, 252, 0.8);
+        }
+
+        .brand-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .brand-logo {
+            width: 32px;
+            height: 32px;
+            background: var(--accent-gradient);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-weight: 800;
+            font-family: var(--font-display);
+            font-size: 16px;
+            box-shadow: 0 0 15px var(--accent-glow);
+        }
+        .brand-title {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 1.15rem;
+            letter-spacing: -0.02em;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .brand-badge {
+            font-size: 0.72rem;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 20px;
+            background: rgba(99, 102, 241, 0.15);
+            color: var(--accent-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .theme-toggle-btn {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 7px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        .theme-toggle-btn:hover {
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 12px var(--accent-glow);
+        }
+
+        .page-container {
+            max-width: 1440px;
+            margin: 0 auto;
+            display: flex;
+            padding: 2.5rem 2rem 5rem;
+            gap: 3.5rem;
+        }
+
+        aside.sidebar {
+            width: var(--sidebar-width);
+            flex-shrink: 0;
+            position: sticky;
+            top: 5rem;
+            height: calc(100vh - 7rem);
+            overflow-y: auto;
+            padding-right: 1.5rem;
+            scrollbar-width: thin;
+        }
+        aside.sidebar::-webkit-scrollbar {
+            width: 4px;
+        }
+        aside.sidebar::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+
+        .toc-title {
+            font-family: var(--font-display);
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+        }
+        .toc-nav {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .toc-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.88rem;
+            padding: 6px 12px;
+            border-radius: 6px;
+            border-left: 2px solid transparent;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .toc-link.toc-sub {
+            padding-left: 22px;
+            font-size: 0.82rem;
+            color: var(--text-muted);
+        }
+        .toc-link:hover {
+            color: var(--text-primary);
+            background: rgba(99, 102, 241, 0.08);
+            border-left-color: var(--accent-primary);
+        }
+        .toc-link.active {
+            color: var(--accent-primary);
+            font-weight: 600;
+            background: rgba(99, 102, 241, 0.12);
+            border-left-color: var(--accent-primary);
+        }
+
+        main.content-area {
+            flex-grow: 1;
+            max-width: 900px;
+            min-width: 0;
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+            font-family: var(--font-display);
+            color: var(--text-primary);
+            font-weight: 700;
+            letter-spacing: -0.025em;
+            line-height: 1.25;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 0.6rem;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        h2 {
+            font-size: 1.65rem;
+            margin-top: 3.2rem;
+            margin-bottom: 1.2rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        h2::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 1.2em;
+            background: var(--accent-gradient);
+            border-radius: 4px;
+        }
+
+        h3 {
+            font-size: 1.25rem;
+            margin-top: 2rem;
+            margin-bottom: 0.8rem;
+            color: var(--text-primary);
+        }
+
+        p {
+            margin-bottom: 1.3rem;
+            color: var(--text-secondary);
+        }
+
+        strong {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        ul, ol {
+            margin-bottom: 1.4rem;
+            padding-left: 1.6rem;
+            color: var(--text-secondary);
+        }
+        li {
+            margin-bottom: 0.4rem;
+        }
+
+        .code-wrapper {
+            margin: 1.8rem 0;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-code);
+            overflow: hidden;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+            transition: border-color 0.2s ease;
+        }
+        .code-wrapper:hover {
+            border-color: var(--border-hover);
+        }
+
+        .code-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.03);
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+        }
+        .window-controls {
+            display: flex;
+            gap: 6px;
+        }
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+        .dot.red { background: #ef4444; }
+        .dot.yellow { background: #f59e0b; }
+        .dot.green { background: #10b981; }
+
+        .code-lang {
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            color: var(--accent-cyan);
+        }
+
+        .copy-btn {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 4px 8px;
+            border-radius: 5px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.2s ease;
+        }
+        .copy-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+
+        pre {
+            margin: 0;
+            padding: 1.2rem;
+            overflow-x: auto;
+            font-family: var(--font-mono);
+            font-size: 0.88rem;
+            line-height: 1.6;
+        }
+        pre code {
+            background: transparent !important;
+            padding: 0 !important;
+            font-family: inherit;
+        }
+
+        code:not(pre code) {
+            font-family: var(--font-mono);
+            font-size: 0.85em;
+            padding: 2px 6px;
+            border-radius: 5px;
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--accent-cyan);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: 2rem 0;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: var(--shadow-card);
+        }
+        thead {
+            background: var(--bg-surface);
+        }
+        th, td {
+            padding: 12px 18px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+        th {
+            font-family: var(--font-display);
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--text-primary);
+            letter-spacing: 0.02em;
+        }
+        td {
+            font-size: 0.88rem;
+            color: var(--text-secondary);
+        }
+        tr:last-child td {
+            border-bottom: none;
+        }
+        tr:hover td {
+            background: var(--table-hover);
+        }
+
+        blockquote {
+            margin: 1.8rem 0;
+            padding: 1.2rem 1.6rem;
+            border-left: 4px solid var(--accent-primary);
+            background: rgba(99, 102, 241, 0.05);
+            border-radius: 0 10px 10px 0;
+            color: var(--text-secondary);
+        }
+
+        .MathJax {
+            color: var(--text-primary) !important;
+            font-size: 105% !important;
+        }
+
+        @media (max-width: 1024px) {
+            aside.sidebar {
+                display: none;
+            }
+            .page-container {
+                padding: 1.5rem 1rem;
+            }
+            h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="progress-bar"></div>
+
+    <header class="glass-header">
+        <div class="brand-container">
+            <div class="brand-logo">BMO</div>
+            <div class="brand-title">BeamletOptics.jl Architecture</div>
+            <span class="brand-badge">v2.7 Master Blueprint</span>
+        </div>
+        <div class="header-actions">
+            <button class="theme-toggle-btn" id="theme-btn" onclick="toggleTheme()">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="theme-icon">
+                    <circle cx="12" cy="12" r="5"></circle>
+                    <line x1="12" y1="1" x2="12" y2="3"></line>
+                    <line x1="12" y1="21" x2="12" y2="23"></line>
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                    <line x1="1" y1="12" x2="3" y2="12"></line>
+                    <line x1="21" y1="12" x2="23" y2="12"></line>
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                </svg>
+                <span id="theme-text">Light Mode</span>
+            </button>
+        </div>
+    </header>
+
+    <div class="page-container">
+        <aside class="sidebar">
+            <div class="toc-title">Table of Contents</div>
+            <nav class="toc-nav">
+                <a href="#executive-summary-paradigm-shift" class="toc-link toc-main">1. Executive Summary &amp; Paradigm Shift</a>
+<a href="#the-foundational-insight" class="toc-link toc-sub">The Foundational Insight</a>
+<a href="#architectural-overview-the-four-decoupled-layers" class="toc-link toc-main">2. Architectural Overview: The Four Decoupled Layers</a>
+<a href="#scaling-from-lenses-to-prisms-and-dense-triangle-meshes" class="toc-link toc-sub">3.2 Scaling from Lenses to Prisms and Dense Triangle Meshes</a>
+<a href="#generic-sdf-ray-marcher-written-once-for-all-sdfs" class="toc-link toc-sub">3.3 Generic SDF Ray-Marcher (Written Once for All SDFs)</a>
+<a href="#layer-2-optical-media-surface-models" class="toc-link toc-main">4. Layer 2: Optical Media &amp; Surface Models</a>
+<a href="#layer-4-universal-physics-dispatch-pipeline" class="toc-link toc-main">6. Layer 4: Universal Physics Dispatch Pipeline</a>
+<a href="#state-aware-media-transition-resolution-entering-vs.-exiting-vs.-cemented" class="toc-link toc-sub">6.1 State-Aware Media Transition Resolution (Entering vs. Exiting vs. Cemented)</a>
+<a href="#universal-surface-interaction-methods-with-epsilon-self-intersection-prevention" class="toc-link toc-sub">6.2 Universal Surface Interaction Methods with Epsilon Self-Intersection Prevention</a>
+<a href="#robust-polarization-frame-transformation-normal-incidence-degeneracy" class="toc-link toc-sub">6.3 Robust Polarization Frame Transformation &amp; Normal Incidence Degeneracy</a>
+<a href="#the-universal-system-tracing-loop-branching-model" class="toc-link toc-main">7. The Universal System Tracing Loop &amp; Branching Model</a>
+<a href="#single-tracing-step" class="toc-link toc-sub">7.1 Single Tracing Step</a>
+<a href="#zero-allocation-ray-branching-dag-buffer-model-with-energy-cutoff" class="toc-link toc-sub">7.2 Zero-Allocation Ray Branching (DAG Buffer Model with Energy Cutoff)</a>
+<a href="#beamlet-optics-parabasal-ray-decomposition" class="toc-link toc-main">8. Beamlet Optics &amp; Parabasal Ray Decomposition</a>
+<a href="#the-answer-no" class="toc-link toc-sub">The Answer: NO!</a>
+<a href="#independent-parabasal-ray-marching-wavefront-reconstruction" class="toc-link toc-sub">8.1 Independent Parabasal Ray-Marching &amp; Wavefront Reconstruction</a>
+<a href="#gpu-acceleration-architecture" class="toc-link toc-main">9. GPU Acceleration Architecture</a>
+<a href="#critical-edge-case-drawback-analysis" class="toc-link toc-main">10. Critical Edge-Case &amp; Drawback Analysis</a>
+<a href="#immediate-low-hanging-fruits-future-proofing" class="toc-link toc-main">11. Immediate Low-Hanging Fruits &amp; Future-Proofing</a>
+<a href="#comprehensive-comparison-legacy-vs.-definitive-architecture" class="toc-link toc-main">12. Comprehensive Comparison: Legacy vs. Definitive Architecture</a>
+<a href="#contributor-faq-extension-patterns" class="toc-link toc-main">13. Contributor FAQ &amp; Extension Patterns</a>
+<a href="#q1-how-do-i-add-a-new-custom-thin-film-coating-or-surface-model" class="toc-link toc-sub">Q1: How do I add a new custom thin-film coating or surface model?</a>
+<a href="#q2-how-do-i-model-a-custom-freeform-cad-lens" class="toc-link toc-sub">Q2: How do I model a custom Freeform / CAD Lens?</a>
+<a href="#q3-how-do-i-model-birefringent-crystals-calcite-quartz-wollaston-prisms" class="toc-link toc-sub">Q3: How do I model Birefringent Crystals (Calcite, Quartz, Wollaston Prisms)?</a>
+<a href="#q4-how-do-i-model-diffraction-gratings-and-holographic-optical-elements-hoes" class="toc-link toc-sub">Q4: How do I model Diffraction Gratings and Holographic Optical Elements (HOEs)?</a>
+<a href="#q5-how-do-i-simulate-gradient-index-grin-optics-or-atmospheric-turbulence" class="toc-link toc-sub">Q5: How do I simulate Gradient-Index (GRIN) Optics or Atmospheric Turbulence?</a>
+<a href="#q6-how-do-i-model-metasurfaces-spatial-light-modulators-slms-and-phase-masks" class="toc-link toc-sub">Q6: How do I model Metasurfaces, Spatial Light Modulators (SLMs), and Phase Masks?</a>
+<a href="#q8-how-do-i-handle-submerged-systems-e.g.-water-immersion-objectives-fluidics" class="toc-link toc-sub">Q8: How do I handle Submerged Systems (e.g. Water Immersion Objectives, Fluidics)?</a>
+<a href="#q9-how-do-detectors-record-coherent-wavefronts-vs.-incoherent-intensity" class="toc-link toc-sub">Q9: How do Detectors record Coherent Wavefronts vs. Incoherent Intensity?</a>
+<a href="#q10-is-non-sequential-ray-tracing-supported" class="toc-link toc-sub">Q10: Is Non-Sequential Ray Tracing Supported?</a>
+            </nav>
+        </aside>
+
+        <main class="content-area">
+            <h1 id="the-unified-mediainterface-architecture-for-beamletoptics.jl">The Unified Media–Interface Architecture for BeamletOptics.jl</h1>
+<p><strong>A First-Principles, Zero-Allocation Foundation for Geometric and Beamlet Optics</strong></p>
+<p><strong>Document Version:</strong> 2.7 (Comprehensive Master Architectural Specification)<br />
+<strong>Target Branches:</strong> <code>feature/intersection-handling</code>, <code>master</code><br />
+<strong>Author:</strong> Optical Architecture Working Group</p>
+<hr />
+<h2 id="executive-summary-paradigm-shift">1. Executive Summary &amp; Paradigm Shift</h2>
+<p>Historically, <code>BeamletOptics.jl</code> (BMO) distributed optical physics across concrete optical components. Every component type (<code>SphericalLens</code>, <code>Mirror</code>, <code>PlateBeamsplitter</code>, <code>PolarizationFilter</code>, <code>Detector</code>) implemented its own custom <code>interact3d</code> method, duplicating Snell’s law, Fresnel equations, normal inversion, and ray creation. Furthermore, tracking multi-material interfaces (doublets, coatings, beamsplitters) relied on ad-hoc object mutation and tolerance searches (<code>MultiIntersection</code>).</p>
+<h3 id="the-foundational-insight">The Foundational Insight</h3>
+<p><strong>A lens is not an optical interaction; a lens is a geometric volume filled with a physical medium.</strong></p>
+<p>In natural optics: 1. <strong>Geometry (Space &amp; Boundaries):</strong> SDFs and Meshes partition <span class="math inline">\(\mathbb{R}^3\)</span> into spatial domains bounded by oriented manifolds <span class="math inline">\(\partial \Omega\)</span>. 2. <strong>Media (Volumetric Physics):</strong> Light propagates through bulk materials characterized by complex refractive indices <span class="math inline">\(\tilde{n}(\lambda) = n(\lambda) + i\kappa(\lambda)\)</span> or dielectric tensors <span class="math inline">\(\boldsymbol{\epsilon}(\lambda)\)</span>. 3. <strong>Interfaces (Boundary Physics):</strong> When a wavepacket encounters an oriented boundary <span class="math inline">\(\partial \Omega\)</span> between Medium 1 and Medium 2, Maxwell’s boundary conditions uniquely dictate reflection, refraction, absorption, splitting, or diffraction.</p>
+<p>By decomposing BMO into these three orthogonal layers: * <strong>Zero Component Boilerplate:</strong> Over 90% of duplicate Snell/Fresnel code across components is permanently eliminated. * <strong>Universal Higher-Order Beamlets:</strong> <code>GaussianBeamlet</code> and <code>AstigmaticGaussianBeamlet</code> broadcast across parabasal rays with continuous Optical Path Length (<span class="math inline">\(OPL\)</span>) accumulation without per-component specialization. * <strong>100% Type-Stable &amp; Register-Resident:</strong> Immutable <code>isbits</code> structs and compile-time unrolled tuple indexing eliminate GC pauses and enable native <strong>GPU acceleration</strong> and <strong>Automatic Differentiation (AD)</strong>.</p>
+<hr />
+<h2 id="architectural-overview-the-four-decoupled-layers">2. Architectural Overview: The Four Decoupled Layers</h2>
+<div class="code-wrapper">
+        <div class="code-header">
+            <div class="window-controls">
+                <span class="dot red"></span>
+                <span class="dot yellow"></span>
+                <span class="dot green"></span>
+            </div>
+            <span class="code-lang">JULIA</span>
+            <button class="copy-btn" onclick="copyCode(this)" title="Copy Code">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                <span>Copy</span>
+            </button>
+        </div>
+        <pre><code>┌──────────────────────────────────────────────────────────────────────────────┐
+│                            LAYER 1: PURE GEOMETRY                            │
+│   AbstractShape{T} (SDFs, Meshes, CSG)  ──&gt;  ShapeHit{T} (isbits, stack)     │
+└──────────────────────────────────────┬───────────────────────────────────────┘
+                                       │ (t, n̂, SurfaceID)
+                                       ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                    LAYER 2: COMPOSABLE OPTICAL OBJECTS                       │
+│   AbstractObject{T}:                                                         │
+│     ├── SingleOptic: Shape (Geometry) + Bulk Medium + Boundary Tuple         │
+│     └── CompositeOptic: MultiShape Children + Internal Interfaces            │
+└──────────────────────────────────────┬───────────────────────────────────────┘
+                                       │ Type-Stable Unrolled Dispatch &amp; Media Transition
+                                       ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                    LAYER 3: UNIVERSAL BOUNDARY PHYSICS                       │
+│   interact_surface(surface_model, transition, ray, t_hit)                    │
+│   (Fresnel, Thin-Film Stack, Ideal Mirror, Grating, Detector, Polarizer)     │
+└──────────────────────────────────────┬───────────────────────────────────────┘
+                                       │ Outgoing Ray(s) / Beamlet(s) + OPL &amp; Epsilon Advance
+                                       ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                            LAYER 4: SYSTEM TRACER                            │
+│   Universal Execution Loop with Energy Cutoff &amp; Branching DAG Buffer         │
+└──────────────────────────────────────────────────────────────────────────────┘</code></pre>
+    </div>
+<hr />
+<h2 id="layer-1-pure-geometry-type-stable-shapehitt">3. Layer 1: Pure Geometry &amp; Type-Stable <code>ShapeHit{T}</code></h2>
+<p>Geometric solvers (SDF ray-marchers, analytical shapes, BVH meshes) have zero awareness of refractive indices, wavelengths, or optical physics. They solve pure geometry and return a stack-allocated, <code>isbits</code> geometric hit token.</p>
+<h3 id="universal-surfaceid-facet-addressing">3.1 Universal <code>SurfaceID</code> Facet Addressing</h3>
+<p>To support everything from 2-sided lenses to <strong>5-sided prisms, 8-sided polyhedra, and triangle meshes with millions of facets</strong> without dynamic dispatch, <code>SurfaceID</code> is defined as a lightweight 32-bit <code>isbits</code> integer wrapper:</p>
+<div class="sourceCode" id="cb2"><div class="code-wrapper">
+        <div class="code-header">
+            <div class="window-controls">
+                <span class="dot red"></span>
+                <span class="dot yellow"></span>
+                <span class="dot green"></span>
+            </div>
+            <span class="code-lang">JULIA</span>
+            <button class="copy-btn" onclick="copyCode(this)" title="Copy Code">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                <span>Copy</span>
+            </button>
+        </div>
+        <pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="st">&quot;&quot;&quot;</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="st">    SurfaceID</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="st">A 32-bit unsigned integer identifying a geometric surface or facet.</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="st">100% isbits, zero-allocation, and GPU register resident. Supports up to 4.2 billion facets.</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="st">&quot;&quot;&quot;</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> SurfaceID</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    id<span class="op">::</span><span class="dt">UInt32</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="bu">Base</span>.<span class="dt">Integer</span>(s<span class="op">::</span>SurfaceID) <span class="op">=</span> s.id</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="bu">Base</span>.convert(<span class="op">::</span><span class="dt">Type</span>{SurfaceID}<span class="op">,</span> x<span class="op">::</span><span class="dt">Integer</span>) <span class="op">=</span> SurfaceID(<span class="dt">UInt32</span>(x))</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="co"># Semantic Aliases for Common Standard Optics</span></span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> FRONT    <span class="op">=</span> SurfaceID(<span class="fl">1</span>)</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> BACK     <span class="op">=</span> SurfaceID(<span class="fl">2</span>)</span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> SIDE     <span class="op">=</span> SurfaceID(<span class="fl">3</span>)</span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> INTERNAL <span class="op">=</span> SurfaceID(<span class="fl">4</span>)</span></code></pre>
+    </div></div>
+<div class="sourceCode" id="cb3"><div class="code-wrapper">
+        <div class="code-header">
+            <div class="window-controls">
+                <span class="dot red"></span>
+                <span class="dot yellow"></span>
+                <span class="dot green"></span>
+            </div>
+            <span class="code-lang">JULIA</span>
+            <button class="copy-btn" onclick="copyCode(this)" title="Copy Code">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                <span>Copy</span>
+            </button>
+        </div>
+        <pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="st">&quot;&quot;&quot;</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="st">    ShapeHit{T&lt;:Real}</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="st">Pure geometric intersection result. 100% immutable, zero heap allocations (isbits).</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="st">&quot;&quot;&quot;</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> ShapeHit{T <span class="op">&lt;:</span> <span class="dt">Real</span>}</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    t<span class="op">::</span>T                    <span class="co"># Distance parameter along ray (p = origin + t * dir)</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    normal<span class="op">::</span>Point3{T}       <span class="co"># Outward unit normal vector (|n̂| = 1)</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    tag<span class="op">::</span>SurfaceID          <span class="co"># 4-byte surface identifier (FRONT, BACK, Prism Face, Triangle Index)</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span></code></pre>
+    </div></div>
+<h3 id="scaling-from-lenses-to-prisms-and-dense-triangle-meshes">3.2 Scaling from Lenses to Prisms and Dense Triangle Meshes</h3>
+<ul>
+<li><strong>Lenses &amp; Mirrors (<span class="math inline">\(N=2..3\)</span> faces):</strong> <code>tag = FRONT</code>, <code>BACK</code>, or <code>SIDE</code>. Boundaries stored in <code>NTuple{3, SurfaceModel}</code>.</li>
+<li><strong>Prisms &amp; Polyhedra (<span class="math inline">\(N=4..8\)</span> faces, e.g. Pentaprism, Porro Prism):</strong> <code>tag = SurfaceID(1)</code> through <code>SurfaceID(N)</code>. Boundaries stored in an indexable <code>NTuple{N, SurfaceModel}</code>.</li>
+<li><strong>Dense Triangle Meshes (<span class="math inline">\(N &gt; 1000\)</span> triangles):</strong> Individual triangles do not require separate entries in <code>boundaries::Tuple</code>. Instead, triangle <code>SurfaceID</code> values resolve to a <strong>Material Palette ID</strong> (<span class="math inline">\(1..K\)</span>, where <span class="math inline">\(K \le 8\)</span>), indexing into a compact material palette array.</li>
+</ul>
+<h3 id="generic-sdf-ray-marcher-written-once-for-all-sdfs">3.3 Generic SDF Ray-Marcher (Written Once for All SDFs)</h3>
+<p>In BMO, all SDF volumes inherit from <code>AbstractSDF</code>. The ray-marching algorithm is implemented <strong>once</strong> in <code>src/SDFs/AbstractSDF.jl</code> and automatically powers all SDF primitives, lens shapes, and CSG unions:</p>
+<div class="sourceCode" id="cb4"><div class="code-wrapper">
+        <div class="code-header">
+            <div class="window-controls">
+                <span class="dot red"></span>
+                <span class="dot yellow"></span>
+                <span class="dot green"></span>
+            </div>
+            <span class="code-lang">JULIA</span>
+            <button class="copy-btn" onclick="copyCode(this)" title="Copy Code">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                <span>Copy</span>
+            </button>
+        </div>
+        <pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Defined ONCE in src/SDFs/AbstractSDF.jl for ALL SDF types (spheres, aspheres, cylinders, unions, etc.)</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="kw">function</span> intersect3d(shape<span class="op">::</span>AbstractSDF{T}<span class="op">,</span> ray<span class="op">::</span>AbstractRay{T}) <span class="kw">where</span> {T}</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    t_hit<span class="op">,</span> hit_found <span class="op">=</span> ray_march(shape<span class="op">,</span> position(ray)<span class="op">,</span> direction(ray))</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    <span class="op">!</span>hit_found <span class="op">&amp;&amp;</span> <span class="kw">return</span> <span class="cn">nothing</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    p_hit <span class="op">=</span> position(ray) <span class="op">+</span> t_hit <span class="op">*</span> direction(ray)</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>    normal <span class="op">=</span> normal3d(shape<span class="op">,</span> p_hit)</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Intrinsic tag queried generically from the SDF</span></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>    tag <span class="op">=</span> surface_tag(shape<span class="op">,</span> p_hit<span class="op">,</span> normal)</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>    <span class="kw">return</span> ShapeHit{T}(t_hit<span class="op">,</span> normal<span class="op">,</span> tag)</span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span></code></pre>
+    </div></div>
+<h3 id="canonical-fully-typed-intersection-bridge">3.4 Canonical, Fully-Typed <code>Intersection</code> Bridge</h3>
+<p>When a shape hit is associated with an <code>AbstractObject</code>, it is wrapped in an immutable <code>Intersection</code>:</p>
+<div class="sourceCode" id="cb5"><div class="code-wrapper">
+        <div class="code-header">
+            <div class="window-controls">
+                <span class="dot red"></span>
+                <span class="dot yellow"></span>
+                <span class="dot green"></span>
+            </div>
+            <span class="code-lang">JULIA</span>
+            <button class="copy-btn" onclick="copyCode(this)" title="Copy Code">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                <span>Copy</span>
+            </button>
+        </div>
+        <pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="st">&quot;&quot;&quot;</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="st">    Intersection{T&lt;:Real, S&lt;:AbstractShape{T}, O&lt;:AbstractObject{T}} &lt;: AbstractIntersection{T}</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="st">Fully typed, immutable token representing the ray intersection.</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="st">&quot;&quot;&quot;</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> Intersection{T <span class="op">&lt;:</span> <span class="dt">Real</span><span class="op">,</span> S <span class="op">&lt;:</span> AbstractShape{T}<span class="op">,</span> O <span class="op">&lt;:</span> AbstractObject{T}} <span class="op">&lt;:</span> AbstractIntersection{T}</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>    hit<span class="op">::</span>ShapeHit{T}</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>    shape<span class="op">::</span>S</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>    object<span class="op">::</span>O</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a><span class="pp">@inline</span> <span class="bu">Base</span>.length(i<span class="op">::</span>Intersection) <span class="op">=</span> i.hit.t</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a><span class="pp">@inline</span> normal3d(i<span class="op">::</span>Intersection)   <span class="op">=</span> i.hit.normal</span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a><span class="pp">@inline</span> surface_tag(i<span class="op">::</span>Intersection) <span class="op">=</span> i.hit.tag</span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a><span class="pp">@inline</span> shape(i<span class="op">::</span>Intersection)       <span class="op">=</span> i.shape</span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a><span class="pp">@inline</span> object(i<span class="op">::</span>Intersection)      <span class="op">=</span> i.object</span></code></pre>
+    </div></div>
+<hr />
+<h2 id="layer-2-optical-media-surface-models">4. Layer 2: Optical Media &amp; Surface Models</h2>
+<h3 id="volumetric-media-abstractmedium">4.1 Volumetric Media (<code>AbstractMedium</code>)</h3>
+<p>Bulk materials govern phase accumulation, group velocity, dispersion, and bulk absorption:</p>
+<div class="sourceCode" id="cb6"><div class="code-wrapper">
+        <div class="code-header">
+            <div class="window-controls">
+                <span class="dot red"></span>
+                <span class="dot yellow"></span>
+                <span class="dot green"></span>
+            </div>
+            <span class="code-lang">JULIA</span>
+            <button class="copy-btn" onclick="copyCode(this)" title="Copy Code">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                <span>Copy</span>
+            </button>
+        </div>
+        <pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="kw">abstract type</span> AbstractMedium <span class="kw">end</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> Ambient <span class="op">&lt;:</span> AbstractMedium <span class="kw">end</span>  <span class="co"># Wildcard resolving to System environment (e.g. Air/Vacuum)</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> IsotropicMedium{D<span class="op">,</span> A} <span class="op">&lt;:</span> AbstractMedium</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    name<span class="op">::</span><span class="dt">Symbol</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>    dispersion<span class="op">::</span>D    <span class="co"># Function λ -&gt; n(λ) (e.g. SellmeierFormula, Cauchy, Constant)</span></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>    attenuation<span class="op">::</span>A   <span class="co"># Function λ -&gt; α(λ) (bulk absorption coefficient [1/m])</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>refractive_index(<span class="op">::</span>Ambient<span class="op">,</span> λ) <span class="op">=</span> <span class="fl">1.0</span></span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>refractive_index(m<span class="op">::</span>IsotropicMedium<span class="op">,</span> λ) <span class="op">=</span> m.dispersion(λ)</span></code></pre>
+    </div></div>
+<h3 id="surface-models-abstractsurfacemodel">4.2 Surface Models (<code>AbstractSurfaceModel</code>)</h3>
+<p>Surface models govern physical behavior <em>at</em> the boundary interface:</p>
+<div class="sourceCode" id="cb7"><div class="code-wrapper">
+        <div class="code-header">
+            <div class="window-controls">
+                <span class="dot red"></span>
+                <span class="dot yellow"></span>
+                <span class="dot green"></span>
+            </div>
+            <span class="code-lang">JULIA</span>
+            <button class="copy-btn" onclick="copyCode(this)" title="Copy Code">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                <span>Copy</span>
+            </button>
+        </div>
+        <pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">abstract type</span> AbstractSurfaceModel <span class="kw">end</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> FresnelInterface <span class="op">&lt;:</span> AbstractSurfaceModel <span class="kw">end</span>     <span class="co"># Bare dielectric boundary (Snell + Fresnel)</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> IdealMirror <span class="op">&lt;:</span> AbstractSurfaceModel <span class="kw">end</span>          <span class="co"># 100% specular reflection</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> AbsorbingSurface <span class="op">&lt;:</span> AbstractSurfaceModel <span class="kw">end</span>     <span class="co"># Ray termination (apertures/baffles)</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> DetectorSurface{D} <span class="op">&lt;:</span> AbstractSurfaceModel       <span class="co"># Records power, phase, E-field</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>    detector_data<span class="op">::</span>D</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> CoatedSurface{C} <span class="op">&lt;:</span> AbstractSurfaceModel         <span class="co"># AR, HR, Beamsplitter, Thin-film stack</span></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>    coating_model<span class="op">::</span>C</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> GratingSurface{T} <span class="op">&lt;:</span> AbstractSurfaceModel        <span class="co"># Diffraction grating: d * (sinθm - sinθi) = mλ</span></span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>    groove_density<span class="op">::</span>T</span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>    order<span class="op">::</span><span class="dt">Int</span></span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span></code></pre>
+    </div></div>
+<hr />
+<h2 id="layer-3-the-abstractobject-type-hierarchy">5. Layer 3: The <code>AbstractObject</code> Type Hierarchy</h2>
+<p>All optical components in BMO are subtypes of <code>AbstractObject{T}</code>. We organize them into a clean, two-tier hierarchy:</p>
+<div class="code-wrapper">
+        <div class="code-header">
+            <div class="window-controls">
+                <span class="dot red"></span>
+                <span class="dot yellow"></span>
+                <span class="dot green"></span>
+            </div>
+            <span class="code-lang">JULIA</span>
+            <button class="copy-btn" onclick="copyCode(this)" title="Copy Code">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                <span>Copy</span>
+            </button>
+        </div>
+        <pre><code>                          AbstractObject{T}
+                                 │
+             ┌───────────────────┴───────────────────┐
+             ▼                                       ▼
+     SingleOptic{T}                        CompositeOptic{T}
+(Lens, Mirror, Detector)                (DoubletLens, CubeBeamsplitter)
+ ├── shape::AbstractShape                ├── children::Tuple of Optics
+ ├── medium::AbstractMedium              └── internal_boundaries
+ └── boundaries::NTuple</code></pre>
+    </div>
+<h3 id="single-optics-singleoptic-abstractobject">5.1 Single Optics (<code>SingleOptic &lt;: AbstractObject</code>)</h3>
+<p>A <code>SingleOptic</code> represents a single geometric volume (or 2D surface) possessing a bulk interior medium and an indexable <code>Tuple</code> of boundary surface definitions:</p>
+<div class="sourceCode" id="cb9"><div class="code-wrapper">
+        <div class="code-header">
+            <div class="window-controls">
+                <span class="dot red"></span>
+                <span class="dot yellow"></span>
+                <span class="dot green"></span>
+            </div>
+            <span class="code-lang">JULIA</span>
+            <button class="copy-btn" onclick="copyCode(this)" title="Copy Code">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                <span>Copy</span>
+            </button>
+        </div>
+        <pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="kw">abstract type</span> SingleOptic{T} <span class="op">&lt;:</span> AbstractObject{T} <span class="kw">end</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>shape_trait_of(<span class="op">::</span>SingleOptic) <span class="op">=</span> SingleShape()</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Standard generic implementation backing Lens, Mirror, Detector, etc.</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> Optic{T <span class="op">&lt;:</span> <span class="dt">Real</span><span class="op">,</span> S <span class="op">&lt;:</span> AbstractShape{T}<span class="op">,</span> M <span class="op">&lt;:</span> AbstractMedium<span class="op">,</span> B <span class="op">&lt;:</span> <span class="dt">Tuple</span>} <span class="op">&lt;:</span> SingleOptic{T}</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>    shape<span class="op">::</span>S</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>    medium<span class="op">::</span>M</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>    boundaries<span class="op">::</span>B  <span class="co"># (FrontSurface, BackSurface, SideSurface)</span></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>shape(o<span class="op">::</span>Optic) <span class="op">=</span> o.shape</span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>medium(o<span class="op">::</span>Optic) <span class="op">=</span> o.medium</span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a><span class="co"># Guaranteed Zero-Allocation, Compile-Time Unrolled Boundary Lookup:</span></span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a><span class="pp">@inline</span> <span class="kw">function</span> boundary(o<span class="op">::</span>Optic{T<span class="op">,</span> S<span class="op">,</span> M<span class="op">,</span> B}<span class="op">,</span> tag<span class="op">::</span>SurfaceID) <span class="kw">where</span> {T<span class="op">,</span> S<span class="op">,</span> M<span class="op">,</span> B <span class="op">&lt;:</span> <span class="dt">Tuple</span>}</span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a>    idx <span class="op">=</span> <span class="dt">Integer</span>(tag)</span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Statically unrolled branch-free dispatch for heterogeneous Tuples:</span></span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a>    <span class="bu">Base</span>.Cartesian.<span class="pp">@nif</span> <span class="fl">8</span> i <span class="op">-&gt;</span> (idx <span class="op">==</span> i <span class="op">&amp;&amp;</span> i <span class="op">&lt;=</span> length(o.boundaries)) i <span class="op">-&gt;</span> (<span class="pp">@inbounds</span> o.boundaries[i]) i <span class="op">-&gt;</span> o.boundaries[<span class="fl">1</span>]</span>
+<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span></code></pre>
+    </div></div>
+<h4 id="user-facing-component-constructors-idiomatic-julia">User-Facing Component Constructors (Idiomatic Julia)</h4>
+<div class="sourceCode" id="cb10"><div class="code-wrapper">
+        <div class="code-header">
+            <div class="window-controls">
+                <span class="dot red"></span>
+                <span class="dot yellow"></span>
+                <span class="dot green"></span>
+            </div>
+            <span class="code-lang">JULIA</span>
+            <button class="copy-btn" onclick="copyCode(this)" title="Copy Code">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                <span>Copy</span>
+            </button>
+        </div>
+        <pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Spherical Lens (Constructs an Optic with glass medium and front/back boundaries)</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="kw">function</span> SphericalLens(r1<span class="op">,</span> r2<span class="op">,</span> thickness<span class="op">,</span> diameter<span class="op">,</span> glass<span class="op">;</span> front<span class="op">=</span>FresnelInterface()<span class="op">,</span> back<span class="op">=</span>FresnelInterface())</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>    s <span class="op">=</span> SphericalLensSDF(r1<span class="op">,</span> r2<span class="op">,</span> thickness<span class="op">,</span> diameter)</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>    m <span class="op">=</span> IsotropicMedium(<span class="op">:</span>Glass<span class="op">,</span> glass<span class="op">,</span> <span class="cn">nothing</span>)</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>    b <span class="op">=</span> (front<span class="op">,</span> back<span class="op">,</span> AbsorbingSurface()) <span class="co"># Indexable Tuple: FRONT=1, BACK=2, SIDE=3</span></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>    <span class="kw">return</span> Optic(s<span class="op">,</span> m<span class="op">,</span> b)</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Flat Mirror (Constructs an Optic with reflective front boundary)</span></span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a><span class="kw">function</span> PlanoMirror(diameter<span class="op">,</span> thickness<span class="op">;</span> coating<span class="op">=</span>IdealMirror())</span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>    s <span class="op">=</span> CylinderSDF(diameter<span class="op">/</span><span class="fl">2</span><span class="op">,</span> thickness)</span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>    b <span class="op">=</span> (coating<span class="op">,</span> AbsorbingSurface()<span class="op">,</span> AbsorbingSurface())</span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>    <span class="kw">return</span> Optic(s<span class="op">,</span> Ambient()<span class="op">,</span> b)</span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span>
+<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a><span class="co"># Detector (Constructs an Optic with recording surface)</span></span>
+<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a><span class="kw">function</span> Detector(width<span class="op">,</span> height<span class="op">,</span> resolution)</span>
+<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a>    s <span class="op">=</span> RectangleSDF(width<span class="op">,</span> height)</span>
+<span id="cb10-19"><a href="#cb10-19" aria-hidden="true" tabindex="-1"></a>    b <span class="op">=</span> (DetectorSurface(resolution)<span class="op">,</span> AbsorbingSurface()<span class="op">,</span> AbsorbingSurface())</span>
+<span id="cb10-20"><a href="#cb10-20" aria-hidden="true" tabindex="-1"></a>    <span class="kw">return</span> Optic(s<span class="op">,</span> Ambient()<span class="op">,</span> b)</span>
+<span id="cb10-21"><a href="#cb10-21" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span></code></pre>
+    </div></div>
+<hr />
+<h3 id="composite-optics-the-multishape-integration">5.2 Composite Optics &amp; the <code>MultiShape</code> Integration</h3>
+<p>A <code>CompositeOptic</code> (e.g. <code>DoubletLens</code>, <code>CubeBeamsplitter</code>) represents an assembly of multiple touching single optics that share internal boundaries.</p>
+<div class="sourceCode" id="cb11"><div class="code-wrapper">
+        <div class="code-header">
+            <div class="window-controls">
+                <span class="dot red"></span>
+                <span class="dot yellow"></span>
+                <span class="dot green"></span>
+            </div>
+            <span class="code-lang">JULIA</span>
+            <button class="copy-btn" onclick="copyCode(this)" title="Copy Code">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                <span>Copy</span>
+            </button>
+        </div>
+        <pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="kw">abstract type</span> CompositeOptic{T} <span class="op">&lt;:</span> AbstractObject{T} <span class="kw">end</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Composite optics naturally implement the MultiShape trait</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>shape_trait_of(<span class="op">::</span>CompositeOptic) <span class="op">=</span> MultiShape()</span></code></pre>
+    </div></div>
+<h4 id="the-doubletlens-struct-constructor">The <code>DoubletLens</code> Struct &amp; Constructor</h4>
+<div class="sourceCode" id="cb12"><div class="code-wrapper">
+        <div class="code-header">
+            <div class="window-controls">
+                <span class="dot red"></span>
+                <span class="dot yellow"></span>
+                <span class="dot green"></span>
+            </div>
+            <span class="code-lang">JULIA</span>
+            <button class="copy-btn" onclick="copyCode(this)" title="Copy Code">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                <span>Copy</span>
+            </button>
+        </div>
+        <pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> DoubletLens{T<span class="op">,</span> L1 <span class="op">&lt;:</span> SingleOptic{T}<span class="op">,</span> L2 <span class="op">&lt;:</span> SingleOptic{T}<span class="op">,</span> B <span class="op">&lt;:</span> AbstractSurfaceModel} <span class="op">&lt;:</span> CompositeOptic{T}</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>    front_lens<span class="op">::</span>L1</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>    back_lens<span class="op">::</span>L2</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>    cemented_boundary<span class="op">::</span>B  <span class="co"># e.g. FresnelInterface() or CoatedSurface(CementLayer)</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a><span class="co"># MultiShape shape getter exposes constituent shapes for kinematics &amp; intersection</span></span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>shape(dl<span class="op">::</span>DoubletLens) <span class="op">=</span> (shape(dl.front_lens)<span class="op">,</span> shape(dl.back_lens))</span></code></pre>
+    </div></div>
+<h4 id="how-multishape-intersection-kinematics-work">How <code>MultiShape</code> Intersection &amp; Kinematics Work</h4>
+<ol type="1">
+<li><strong>Kinematics</strong>: All spatial transforms (<code>translate3d!</code>, <code>rotate3d!</code>, <code>align3d!</code>) on a <code>CompositeOptic</code> automatically delegate across all child shapes via existing <code>MultiShape</code> trait methods.</li>
+<li><strong>Intersection</strong>: Testing a ray against a <code>CompositeOptic</code> queries constituent shapes:</li>
+</ol>
+<div class="sourceCode" id="cb13"><div class="code-wrapper">
+        <div class="code-header">
+            <div class="window-controls">
+                <span class="dot red"></span>
+                <span class="dot yellow"></span>
+                <span class="dot green"></span>
+            </div>
+            <span class="code-lang">JULIA</span>
+            <button class="copy-btn" onclick="copyCode(this)" title="Copy Code">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                <span>Copy</span>
+            </button>
+        </div>
+        <pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="kw">function</span> intersect3d(<span class="op">::</span>MultiShape<span class="op">,</span> composite<span class="op">::</span>CompositeOptic<span class="op">,</span> ray<span class="op">::</span>AbstractRay{R}) <span class="kw">where</span> {R}</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>    closest_hit<span class="op">::</span><span class="dt">Union</span>{<span class="dt">Nothing</span><span class="op">,</span> ShapeHit{R}} <span class="op">=</span> <span class="cn">nothing</span></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>    closest_shape <span class="op">=</span> <span class="cn">nothing</span></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>    <span class="kw">for</span> child_shape <span class="kw">in</span> shape(composite)</span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>        temp_hit <span class="op">=</span> intersect3d(child_shape<span class="op">,</span> ray)</span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>        <span class="kw">if</span> temp_hit <span class="op">!==</span> <span class="cn">nothing</span></span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>            <span class="kw">if</span> closest_hit <span class="op">===</span> <span class="cn">nothing</span> <span class="op">||</span> temp_hit.t <span class="op">&lt;</span> closest_hit.t</span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>                closest_hit <span class="op">=</span> temp_hit</span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>                closest_shape <span class="op">=</span> child_shape</span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>            <span class="kw">end</span></span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>        <span class="kw">end</span></span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>    <span class="kw">end</span></span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a>    isnothing(closest_hit) <span class="op">&amp;&amp;</span> <span class="kw">return</span> <span class="cn">nothing</span></span>
+<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a>    <span class="kw">return</span> Intersection(closest_hit<span class="op">,</span> closest_shape<span class="op">,</span> composite)</span>
+<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span></code></pre>
+    </div></div>
+<hr />
+<h2 id="layer-4-universal-physics-dispatch-pipeline">6. Layer 4: Universal Physics Dispatch Pipeline</h2>
+<p>Because optical physics is decoupled from component types, <code>interact_surface</code> is implemented <strong>once per surface model</strong>, not once per optical component:</p>
+<h3 id="state-aware-media-transition-resolution-entering-vs.-exiting-vs.-cemented">6.1 State-Aware Media Transition Resolution (Entering vs. Exiting vs. Cemented)</h3>
+<p>A ray carries its active propagation medium <span class="math inline">\(M_{\text{current}}\)</span>. The transition resolver evaluates the incident and transmitted media across single and composite interfaces:</p>
+<div class="sourceCode" id="cb14"><div class="code-wrapper">
+        <div class="code-header">
+            <div class="window-controls">
+                <span class="dot red"></span>
+                <span class="dot yellow"></span>
+                <span class="dot green"></span>
+            </div>
+            <span class="code-lang">JULIA</span>
+            <button class="copy-btn" onclick="copyCode(this)" title="Copy Code">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                <span>Copy</span>
+            </button>
+        </div>
+        <pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="pp">@inline</span> <span class="kw">function</span> resolve_transition(</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>    med_inside<span class="op">::</span>AbstractMedium<span class="op">,</span></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>    med_outside<span class="op">::</span>AbstractMedium<span class="op">,</span></span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>    ray<span class="op">::</span>AbstractRay<span class="op">,</span></span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>    normal<span class="op">::</span>Point3</span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>    <span class="co"># dot(dir, normal) &lt; 0 =&gt; entering optic; dot(dir, normal) &gt; 0 =&gt; exiting optic</span></span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>    is_entering <span class="op">=</span> dot(direction(ray)<span class="op">,</span> normal) <span class="op">&lt;</span> <span class="fl">0</span></span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>    normal_eff  <span class="op">=</span> is_entering ? normal <span class="op">:</span> <span class="op">-</span>normal</span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Resolve incident and transmitted bulk media</span></span>
+<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>    med_inc   <span class="op">=</span> is_entering ? current_medium(ray) <span class="op">:</span> med_inside</span>
+<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a>    med_trans <span class="op">=</span> is_entering ? med_inside <span class="op">:</span> med_outside</span>
+<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a>    n_inc   <span class="op">=</span> refractive_index(med_inc<span class="op">,</span> wavelength(ray))</span>
+<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a>    n_trans <span class="op">=</span> refractive_index(med_trans<span class="op">,</span> wavelength(ray))</span>
+<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-18"><a href="#cb14-18" aria-hidden="true" tabindex="-1"></a>    <span class="kw">return</span> (n_inc <span class="op">=</span> n_inc<span class="op">,</span> n_trans <span class="op">=</span> n_trans<span class="op">,</span> med_trans <span class="op">=</span> med_trans<span class="op">,</span> normal_eff <span class="op">=</span> normal_eff<span class="op">,</span> entering <span class="op">=</span> is_entering)</span>
+<span id="cb14-19"><a href="#cb14-19" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span></code></pre>
+    </div></div>
+<ul>
+<li><strong>Isolated Lens Front Face (Entering):</strong> <code>med_inside = Glass</code>, <code>med_outside = Ambient</code> <span class="math inline">\(\implies n_{\text{ambient}} \to n_1\)</span>.</li>
+<li><strong>Cemented Doublet Interface (<span class="math inline">\(L_1 \to L_2\)</span>):</strong> <code>med_inside = Glass1</code>, <code>med_outside = Glass2</code> <span class="math inline">\(\implies n_1 \to n_2\)</span> (Direct Glass-to-Glass Snell refraction without false air gaps).</li>
+<li><strong>Isolated Lens Rear Face (Exiting):</strong> <code>med_inside = Glass</code>, <code>med_outside = Ambient</code> <span class="math inline">\(\implies n_1 \to n_{\text{ambient}}\)</span>.</li>
+</ul>
+<hr />
+<h3 id="universal-surface-interaction-methods-with-epsilon-self-intersection-prevention">6.2 Universal Surface Interaction Methods with Epsilon Self-Intersection Prevention</h3>
+<p>Every <code>interact_surface</code> receives the geometric distance <span class="math inline">\(t_{\text{hit}}\)</span> from <code>ShapeHit{T}</code>. Outgoing rays apply an <span class="math inline">\(\epsilon\)</span>-normal offset to prevent self-intersection (“shadow acne”) on subsequent ray-marching steps:</p>
+<div class="sourceCode" id="cb15"><div class="code-wrapper">
+        <div class="code-header">
+            <div class="window-controls">
+                <span class="dot red"></span>
+                <span class="dot yellow"></span>
+                <span class="dot green"></span>
+            </div>
+            <span class="code-lang">JULIA</span>
+            <button class="copy-btn" onclick="copyCode(this)" title="Copy Code">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                <span>Copy</span>
+            </button>
+        </div>
+        <pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Numerical epsilon offset constant for self-intersection avoidance</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> RAY_EPSILON <span class="op">=</span> <span class="fl">1e-7</span></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Dielectric Fresnel Interface</span></span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a><span class="kw">function</span> interact_surface(<span class="op">::</span>FresnelInterface<span class="op">,</span> trans<span class="op">,</span> ray<span class="op">::</span>PolarizedRay{T}<span class="op">,</span> t_hit<span class="op">::</span>T) <span class="kw">where</span> {T}</span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>    θi <span class="op">=</span> angle3d(direction(ray)<span class="op">,</span> <span class="op">-</span>trans.normal_eff)</span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>    rs<span class="op">,</span> rp<span class="op">,</span> ts<span class="op">,</span> tp <span class="op">=</span> fresnel_coefficients(θi<span class="op">,</span> trans.n_trans <span class="op">/</span> trans.n_inc)</span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>    p_hit <span class="op">=</span> position(ray) <span class="op">+</span> t_hit <span class="op">*</span> direction(ray)</span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a>    <span class="kw">if</span> is_total_internal_reflection(rs<span class="op">,</span> rp)</span>
+<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a>        new_dir <span class="op">=</span> reflection3d(direction(ray)<span class="op">,</span> trans.normal_eff)</span>
+<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a>        new_pol <span class="op">=</span> reflect_polarization(polarization(ray)<span class="op">,</span> rs<span class="op">,</span> rp<span class="op">,</span> direction(ray)<span class="op">,</span> trans.normal_eff)</span>
+<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a>        med_out <span class="op">=</span> trans.med_inc</span>
+<span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a>        new_pos <span class="op">=</span> p_hit <span class="op">+</span> (RAY_EPSILON <span class="op">*</span> sign(dot(new_dir<span class="op">,</span> trans.normal_eff))) <span class="op">*</span> trans.normal_eff</span>
+<span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a>    <span class="kw">else</span></span>
+<span id="cb15-17"><a href="#cb15-17" aria-hidden="true" tabindex="-1"></a>        new_dir<span class="op">,</span> _ <span class="op">=</span> refraction3d(direction(ray)<span class="op">,</span> trans.normal_eff<span class="op">,</span> trans.n_inc<span class="op">,</span> trans.n_trans)</span>
+<span id="cb15-18"><a href="#cb15-18" aria-hidden="true" tabindex="-1"></a>        new_pol <span class="op">=</span> refract_polarization(polarization(ray)<span class="op">,</span> ts<span class="op">,</span> tp<span class="op">,</span> direction(ray)<span class="op">,</span> trans.normal_eff<span class="op">,</span> trans.n_inc<span class="op">,</span> trans.n_trans)</span>
+<span id="cb15-19"><a href="#cb15-19" aria-hidden="true" tabindex="-1"></a>        med_out <span class="op">=</span> trans.med_trans</span>
+<span id="cb15-20"><a href="#cb15-20" aria-hidden="true" tabindex="-1"></a>        new_pos <span class="op">=</span> p_hit <span class="op">-</span> (RAY_EPSILON <span class="op">*</span> sign(dot(new_dir<span class="op">,</span> trans.normal_eff))) <span class="op">*</span> trans.normal_eff</span>
+<span id="cb15-21"><a href="#cb15-21" aria-hidden="true" tabindex="-1"></a>    <span class="kw">end</span></span>
+<span id="cb15-22"><a href="#cb15-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-23"><a href="#cb15-23" aria-hidden="true" tabindex="-1"></a>    new_opl <span class="op">=</span> optical_path_length(ray) <span class="op">+</span> t_hit <span class="op">*</span> trans.n_inc</span>
+<span id="cb15-24"><a href="#cb15-24" aria-hidden="true" tabindex="-1"></a>    <span class="kw">return</span> PolarizedRay{T}(new_pos<span class="op">,</span> new_dir<span class="op">,</span> <span class="cn">nothing</span><span class="op">,</span> wavelength(ray)<span class="op">,</span> med_out<span class="op">,</span> new_pol<span class="op">,</span> new_opl)</span>
+<span id="cb15-25"><a href="#cb15-25" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span>
+<span id="cb15-26"><a href="#cb15-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-27"><a href="#cb15-27" aria-hidden="true" tabindex="-1"></a><span class="co"># Specular Mirror Interface</span></span>
+<span id="cb15-28"><a href="#cb15-28" aria-hidden="true" tabindex="-1"></a><span class="kw">function</span> interact_surface(<span class="op">::</span>IdealMirror<span class="op">,</span> trans<span class="op">,</span> ray<span class="op">::</span>AbstractRay{T}<span class="op">,</span> t_hit<span class="op">::</span>T) <span class="kw">where</span> {T}</span>
+<span id="cb15-29"><a href="#cb15-29" aria-hidden="true" tabindex="-1"></a>    new_dir <span class="op">=</span> reflection3d(direction(ray)<span class="op">,</span> trans.normal_eff)</span>
+<span id="cb15-30"><a href="#cb15-30" aria-hidden="true" tabindex="-1"></a>    p_hit   <span class="op">=</span> position(ray) <span class="op">+</span> t_hit <span class="op">*</span> direction(ray)</span>
+<span id="cb15-31"><a href="#cb15-31" aria-hidden="true" tabindex="-1"></a>    new_pos <span class="op">=</span> p_hit <span class="op">+</span> RAY_EPSILON <span class="op">*</span> trans.normal_eff</span>
+<span id="cb15-32"><a href="#cb15-32" aria-hidden="true" tabindex="-1"></a>    new_opl <span class="op">=</span> optical_path_length(ray) <span class="op">+</span> t_hit <span class="op">*</span> trans.n_inc</span>
+<span id="cb15-33"><a href="#cb15-33" aria-hidden="true" tabindex="-1"></a>    <span class="kw">return</span> Ray{T}(new_pos<span class="op">,</span> new_dir<span class="op">,</span> <span class="cn">nothing</span><span class="op">,</span> wavelength(ray)<span class="op">,</span> current_medium(ray)<span class="op">,</span> new_opl)</span>
+<span id="cb15-34"><a href="#cb15-34" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span>
+<span id="cb15-35"><a href="#cb15-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-36"><a href="#cb15-36" aria-hidden="true" tabindex="-1"></a><span class="co"># Absorptive / Detector Interface</span></span>
+<span id="cb15-37"><a href="#cb15-37" aria-hidden="true" tabindex="-1"></a><span class="kw">function</span> interact_surface(d<span class="op">::</span>DetectorSurface<span class="op">,</span> trans<span class="op">,</span> ray<span class="op">::</span>AbstractRay{T}<span class="op">,</span> t_hit<span class="op">::</span>T) <span class="kw">where</span> {T}</span>
+<span id="cb15-38"><a href="#cb15-38" aria-hidden="true" tabindex="-1"></a>    hit_pos <span class="op">=</span> position(ray) <span class="op">+</span> t_hit <span class="op">*</span> direction(ray)</span>
+<span id="cb15-39"><a href="#cb15-39" aria-hidden="true" tabindex="-1"></a>    record_hit<span class="op">!</span>(d.detector_data<span class="op">,</span> hit_pos<span class="op">,</span> ray)</span>
+<span id="cb15-40"><a href="#cb15-40" aria-hidden="true" tabindex="-1"></a>    <span class="kw">return</span> <span class="cn">nothing</span>  <span class="co"># Cleanly terminates ray</span></span>
+<span id="cb15-41"><a href="#cb15-41" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span></code></pre>
+    </div></div>
+<h3 id="robust-polarization-frame-transformation-normal-incidence-degeneracy">6.3 Robust Polarization Frame Transformation &amp; Normal Incidence Degeneracy</h3>
+<p>When computing <code>reflect_polarization</code> and <code>refract_polarization</code>, the electric field <span class="math inline">\(\mathbf{E}_{\text{in}}\)</span> is transformed using the local <span class="math inline">\((s, p)\)</span> plane-of-incidence basis: <span class="math display">\[\hat{s} = \frac{\vec{d} \times \hat{n}}{\|\vec{d} \times \hat{n}\|}, \quad \hat{p} = \vec{d} \times \hat{s}\]</span></p>
+<h4 id="degeneracy-handling-at-normal-incidence-vecd-times-hatn-epsilon_texttol">Degeneracy Handling at Normal Incidence (<span class="math inline">\(\|\vec{d} \times \hat{n}\| &lt; \epsilon_{\text{tol}}\)</span>):</h4>
+<p>When light strikes a surface at exact or near-normal incidence (<span class="math inline">\(\theta_i \approx 0\)</span>), the cross product <span class="math inline">\(\vec{d} \times \hat{n} \approx \mathbf{0}\)</span>, producing a <span class="math inline">\(0/0\)</span> singularity. * <strong>Resolution:</strong> At normal incidence, the plane of incidence is degenerate and <span class="math inline">\(r_s = r_p = \frac{n_{\text{trans}} - n_{\text{inc}}}{n_{\text{trans}} + n_{\text{inc}}}\)</span>. The solver bypasses the cross product and applies the isotropic scalar Fresnel factor directly to the transverse <span class="math inline">\(\mathbf{E}\)</span>-field vector without rotating frames.</p>
+<hr />
+<h2 id="the-universal-system-tracing-loop-branching-model">7. The Universal System Tracing Loop &amp; Branching Model</h2>
+<h3 id="single-tracing-step">7.1 Single Tracing Step</h3>
+<p>The system tracer coordinates geometry, medium resolution, and boundary physics in three zero-allocation steps:</p>
+<div class="sourceCode" id="cb16"><div class="code-wrapper">
+        <div class="code-header">
+            <div class="window-controls">
+                <span class="dot red"></span>
+                <span class="dot yellow"></span>
+                <span class="dot green"></span>
+            </div>
+            <span class="code-lang">JULIA</span>
+            <button class="copy-btn" onclick="copyCode(this)" title="Copy Code">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                <span>Copy</span>
+            </button>
+        </div>
+        <pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="kw">function</span> trace_step<span class="op">!</span>(system<span class="op">::</span>AbstractSystem<span class="op">,</span> ray<span class="op">::</span>AbstractRay{T}) <span class="kw">where</span> {T}</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 1. Geometry phase: find closest intersection across all objects</span></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>    hit_intersection <span class="op">=</span> trace_all(system<span class="op">,</span> ray)</span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>    isnothing(hit_intersection) <span class="op">&amp;&amp;</span> <span class="kw">return</span> <span class="cn">nothing</span></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>    obj  <span class="op">=</span> object(hit_intersection)</span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>    geom <span class="op">=</span> hit_intersection.hit</span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 2. Transition phase: resolve entering/exiting bulk media</span></span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a>    ambient <span class="op">=</span> ambient_medium(system)</span>
+<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a>    trans   <span class="op">=</span> resolve_transition(medium(obj)<span class="op">,</span> ambient<span class="op">,</span> ray<span class="op">,</span> geom.normal)</span>
+<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 3. Physics phase: query boundary model via branch-free Cartesian unrolling</span></span>
+<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a>    surface_model <span class="op">=</span> boundary(obj<span class="op">,</span> geom.tag)</span>
+<span id="cb16-15"><a href="#cb16-15" aria-hidden="true" tabindex="-1"></a>    <span class="kw">return</span> interact_surface(surface_model<span class="op">,</span> trans<span class="op">,</span> ray<span class="op">,</span> geom.t)</span>
+<span id="cb16-16"><a href="#cb16-16" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span></code></pre>
+    </div></div>
+<h3 id="zero-allocation-ray-branching-dag-buffer-model-with-energy-cutoff">7.2 Zero-Allocation Ray Branching (DAG Buffer Model with Energy Cutoff)</h3>
+<p>For partially reflecting/transmitting surfaces (beamsplitters, thin-film coatings) that split light into multiple child rays, energy splitting is managed via a <strong>pre-allocated, fixed-capacity stack buffer</strong> (<code>StaticRayStack{N}</code>):</p>
+<div class="code-wrapper">
+        <div class="code-header">
+            <div class="window-controls">
+                <span class="dot red"></span>
+                <span class="dot yellow"></span>
+                <span class="dot green"></span>
+            </div>
+            <span class="code-lang">JULIA</span>
+            <button class="copy-btn" onclick="copyCode(this)" title="Copy Code">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                <span>Copy</span>
+            </button>
+        </div>
+        <pre><code>                       Root Ray
+                          │
+                  [Beamsplitter]
+                   /          \
+          Reflected Ray      Transmitted Ray
+          (Pushed to Stack)  (Traced iteratively)</code></pre>
+    </div>
+<h4 id="energy-depth-cutoff-invariants">Energy &amp; Depth Cutoff Invariants:</h4>
+<p>To prevent infinite bounce loops in resonant cavities, etalons, or TIR traps: 1. <strong>Flux Threshold Cutoff:</strong> Rays with relative power <span class="math inline">\(\text{flux} &lt; \epsilon_{\text{cutoff}}\)</span> (e.g. <span class="math inline">\(10^{-4}\)</span> or <span class="math inline">\(0.01\%\)</span>) are dropped. 2. <strong>Maximum Recursion Depth:</strong> Ray branching terminates when <span class="math inline">\(\text{depth} \ge \text{max\_depth}\)</span> (default: 50).</p>
+<hr />
+<h2 id="beamlet-optics-parabasal-ray-decomposition">8. Beamlet Optics &amp; Parabasal Ray Decomposition</h2>
+<p>A major question is: <strong>Do we have to specialize <code>interact3d</code> for <code>GaussianBeamlet</code> and <code>AstigmaticGaussianBeamlet</code>?</strong></p>
+<h3 id="the-answer-no">The Answer: NO!</h3>
+<p>In <code>BeamletOptics.jl</code>, higher-order beamlets are mathematically represented by <strong>parabasal ray bundles</strong>:</p>
+<p><span class="math display">\[\begin{aligned}
+\text{\textbf{Beam}} &amp;\implies 1 \text{ Ray} \\
+\text{\textbf{GaussianBeamlet}} &amp;\implies 3 \text{ Rays: } (\text{chief}, \text{waist}, \text{divergence}) \\
+\text{\textbf{AstigmaticGaussianBeamlet}} &amp;\implies 9 \text{ Rays: } (\text{chief}, w_{x\pm}, w_{y\pm}, d_{x\pm}, d_{y\pm})
+\end{aligned}\]</span></p>
+<div class="code-wrapper">
+        <div class="code-header">
+            <div class="window-controls">
+                <span class="dot red"></span>
+                <span class="dot yellow"></span>
+                <span class="dot green"></span>
+            </div>
+            <span class="code-lang">JULIA</span>
+            <button class="copy-btn" onclick="copyCode(this)" title="Copy Code">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                <span>Copy</span>
+            </button>
+        </div>
+        <pre><code>                AstigmaticGaussianBeamlet (9 Rays)
+                                │
+   ┌───────────┬───────────┬────┴──────┬───────────┬───────────┐
+   ▼           ▼           ▼           ▼           ▼           ▼
+Chief Ray   Waist X+    Waist X-    Div X+      Div X-      ...
+   │           │           │           │           │           │
+   └───────────┴───────────┼───────────┴───────────┴───────────┘
+                           ▼
+          Universal interact_surface(...)
+         (Snell / Fresnel / Coating Transfer Matrix)</code></pre>
+    </div>
+<h3 id="independent-parabasal-ray-marching-wavefront-reconstruction">8.1 Independent Parabasal Ray-Marching &amp; Wavefront Reconstruction</h3>
+<p>In BMO’s Arnaud/Greynolds parabasal formulation: * <strong>All 3 or 9 rays are marched independently against the numerical SDF geometry.</strong> Each ray hits the surface at its own physical intersection position and local normal <span class="math inline">\(\hat{n}\)</span>. * The complex beam curvature matrix <span class="math inline">\(\mathbf{Q} = \mathbf{Q}_r + i \mathbf{Q}_i\)</span> and wavefront phase are reconstructed directly from the differential coordinates of the auxiliary rays relative to the chief ray. * <strong>Advantage:</strong> This completely eliminates the need for analytical 2nd-order surface Hessians (<span class="math inline">\(\mathbf{C} = \nabla \hat{n}\)</span>), working seamlessly on arbitrary numerical SDFs, CSG blends, and triangle meshes!</p>
+<div class="sourceCode" id="cb19"><div class="code-wrapper">
+        <div class="code-header">
+            <div class="window-controls">
+                <span class="dot red"></span>
+                <span class="dot yellow"></span>
+                <span class="dot green"></span>
+            </div>
+            <span class="code-lang">JULIA</span>
+            <button class="copy-btn" onclick="copyCode(this)" title="Copy Code">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                <span>Copy</span>
+            </button>
+        </div>
+        <pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Defined ONCE in src/Gaussian.jl for ALL optical components</span></span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a><span class="kw">function</span> interact3d(system<span class="op">::</span>AbstractSystem<span class="op">,</span> object<span class="op">::</span>AbstractObject<span class="op">,</span> gauss<span class="op">::</span>GaussianBeamlet<span class="op">,</span> id<span class="op">::</span><span class="dt">Int</span>)</span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>    i_chief <span class="op">=</span> interact_step(system<span class="op">,</span> object<span class="op">,</span> rays(gauss.chief)[id])</span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>    i_waist <span class="op">=</span> interact_step(system<span class="op">,</span> object<span class="op">,</span> rays(gauss.waist)[id])</span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>    i_div   <span class="op">=</span> interact_step(system<span class="op">,</span> object<span class="op">,</span> rays(gauss.divergence)[id])</span>
+<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a>    <span class="kw">if</span> any(isnothing<span class="op">,</span> (i_chief<span class="op">,</span> i_waist<span class="op">,</span> i_div))</span>
+<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a>        <span class="kw">return</span> <span class="cn">nothing</span></span>
+<span id="cb19-9"><a href="#cb19-9" aria-hidden="true" tabindex="-1"></a>    <span class="kw">end</span></span>
+<span id="cb19-10"><a href="#cb19-10" aria-hidden="true" tabindex="-1"></a>    <span class="kw">return</span> GaussianBeamletInteraction(i_chief<span class="op">,</span> i_waist<span class="op">,</span> i_div)</span>
+<span id="cb19-11"><a href="#cb19-11" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span>
+<span id="cb19-12"><a href="#cb19-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-13"><a href="#cb19-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Defined ONCE in src/AstigmaticGaussian.jl for ALL optical components</span></span>
+<span id="cb19-14"><a href="#cb19-14" aria-hidden="true" tabindex="-1"></a><span class="kw">function</span> interact3d(system<span class="op">::</span>AbstractSystem<span class="op">,</span> object<span class="op">::</span>AbstractObject<span class="op">,</span> agb<span class="op">::</span>AstigmaticGaussianBeamlet<span class="op">,</span> id<span class="op">::</span><span class="dt">Int</span>)</span>
+<span id="cb19-15"><a href="#cb19-15" aria-hidden="true" tabindex="-1"></a>    interactions <span class="op">=</span> ntuple(<span class="fl">9</span>) <span class="kw">do</span> i</span>
+<span id="cb19-16"><a href="#cb19-16" aria-hidden="true" tabindex="-1"></a>        interact_step(system<span class="op">,</span> object<span class="op">,</span> rays(component_beam(agb<span class="op">,</span> i))[id])</span>
+<span id="cb19-17"><a href="#cb19-17" aria-hidden="true" tabindex="-1"></a>    <span class="kw">end</span></span>
+<span id="cb19-18"><a href="#cb19-18" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb19-19"><a href="#cb19-19" aria-hidden="true" tabindex="-1"></a>    any(isnothing<span class="op">,</span> interactions) <span class="op">&amp;&amp;</span> <span class="kw">return</span> <span class="cn">nothing</span></span>
+<span id="cb19-20"><a href="#cb19-20" aria-hidden="true" tabindex="-1"></a>    <span class="kw">return</span> AstigmaticGaussianBeamletInteraction(interactions<span class="op">...</span>)</span>
+<span id="cb19-21"><a href="#cb19-21" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span></code></pre>
+    </div></div>
+<hr />
+<h2 id="gpu-acceleration-architecture">9. GPU Acceleration Architecture</h2>
+<p>Traditional object-oriented ray tracers fail on GPUs in Julia because they rely on mutable structs, heap allocations (<code>Array</code>, <code>Vector</code>, <code>Dict</code>), and runtime dynamic dispatch.</p>
+<h3 id="why-this-mediainterface-architecture-excels-on-gpus-cuda.jl-kernelabstractions.jl-metal.jl">Why This Media–Interface Architecture Excels on GPUs (<code>CUDA.jl</code>, <code>KernelAbstractions.jl</code>, <code>Metal.jl</code>):</h3>
+<ol type="1">
+<li><strong><code>isbits</code> Register Invariant</strong>:
+<ul>
+<li><code>ShapeHit{T}</code>, <code>SurfaceID</code>, <code>Ray{T}</code>, and <code>PolarizedRay{T}</code> contain only primitive floats and bitstypes.</li>
+<li>They fit directly into <strong>GPU hardware registers</strong> with zero heap memory allocation.</li>
+</ul></li>
+<li><strong>Branchless / Direct Execution Kernel</strong>:
+<ul>
+<li>Massive ray bundles (<span class="math inline">\(10^6+\)</span> rays or Monte Carlo ray-tracing) execute in parallel on thousands of GPU cores:</li>
+</ul></li>
+</ol>
+<div class="sourceCode" id="cb20"><div class="code-wrapper">
+        <div class="code-header">
+            <div class="window-controls">
+                <span class="dot red"></span>
+                <span class="dot yellow"></span>
+                <span class="dot green"></span>
+            </div>
+            <span class="code-lang">JULIA</span>
+            <button class="copy-btn" onclick="copyCode(this)" title="Copy Code">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                <span>Copy</span>
+            </button>
+        </div>
+        <pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Runs simultaneously across thousands of GPU threads via KernelAbstractions.jl / CUDA.jl</span></span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a><span class="pp">@kernel</span> <span class="kw">function</span> trace_rays_kernel<span class="op">!</span>(rays_out<span class="op">,</span> <span class="pp">@Const</span>(rays_in)<span class="op">,</span> <span class="pp">@Const</span>(system_shapes)<span class="op">,</span> <span class="pp">@Const</span>(system_materials))</span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>    idx <span class="op">=</span> <span class="pp">@index</span>(Global)</span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>    ray <span class="op">=</span> rays_in[idx]</span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 1. SDF ray-march in GPU registers (arithmetic-heavy SIMD)</span></span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>    hit <span class="op">=</span> gpu_trace_closest(system_shapes<span class="op">,</span> ray)</span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a>    <span class="co"># 2. Evaluate boundary physics (Snell / Reflection)</span></span>
+<span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a>    <span class="kw">if</span> hit.t <span class="op">&lt;</span> <span class="cn">Inf</span></span>
+<span id="cb20-11"><a href="#cb20-11" aria-hidden="true" tabindex="-1"></a>        trans <span class="op">=</span> gpu_resolve_transition(hit<span class="op">,</span> ray<span class="op">,</span> system_materials)</span>
+<span id="cb20-12"><a href="#cb20-12" aria-hidden="true" tabindex="-1"></a>        rays_out[idx] <span class="op">=</span> gpu_interact(hit.tag<span class="op">,</span> trans<span class="op">,</span> ray<span class="op">,</span> hit.t)</span>
+<span id="cb20-13"><a href="#cb20-13" aria-hidden="true" tabindex="-1"></a>    <span class="kw">end</span></span>
+<span id="cb20-14"><a href="#cb20-14" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span></code></pre>
+    </div></div>
+<ol start="3" type="1">
+<li><strong>SDF Ray-Marching is Ideal for GPUs</strong>:
+<ul>
+<li>Mathematical SDF formulas are arithmetic-dense and memory-light—the exact workload GPUs are built to maximize.</li>
+</ul></li>
+</ol>
+<hr />
+<h2 id="critical-edge-case-drawback-analysis">10. Critical Edge-Case &amp; Drawback Analysis</h2>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Potential Drawback / Edge Case</th>
+<th style="text-align: left;">Root Cause</th>
+<th style="text-align: left;"><strong>Architectural Resolution</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>1. Ambient Medium in Submerged Systems</strong></td>
+<td style="text-align: left;">If an <code>Interface</code> hardcodes <code>outside_medium = Air</code>, submerged optics (e.g. water tanks, cryostats) would require redefining components.</td>
+<td style="text-align: left;">Components default their <code>outside_medium</code> to <code>Ambient()</code>. During tracing, <code>Ambient()</code> dynamically resolves to the enclosing <code>system.ambient_medium</code> (<span class="math inline">\(n=1.0\)</span> by default). Explicit outer media are only set for permanently cemented/encased assemblies.</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>2. Dynamic / User-Assembled Touching Shapes</strong></td>
+<td style="text-align: left;">If a user translates two separate lenses <span class="math inline">\(L_1\)</span> and <span class="math inline">\(L_2\)</span> so their flat faces touch at runtime, neither lens knows about the other at construction time.</td>
+<td style="text-align: left;">1. Composite constructors (<code>DoubletLens</code>, <code>CubeBeamsplitter</code>) bind shared interfaces automatically.<br>2. For ad-hoc user assemblies, the tracer tracks <span class="math inline">\(n_{\text{ray}}\)</span>. When exiting <span class="math inline">\(L_1\)</span>, if the forward distance to <span class="math inline">\(L_2\)</span> is <span class="math inline">\(t \le \epsilon_{\text{tol}}\)</span>, the tracer transitions <span class="math inline">\(n_1 \to n_2\)</span> directly without an artificial air step.<br>3. A fluent helper <code>cement!(L1, :back, L2, :front)</code> is provided.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>3. Tagging on Arbitrary Custom SDFs</strong></td>
+<td style="text-align: left;">User-defined mathematical SDF formulas (<span class="math inline">\(f(\mathbf{x}) \le 0\)</span>) might not have annotated face tags (<code>FRONT</code>, <code>BACK</code>).</td>
+<td style="text-align: left;">A fallback classifier assigns tags via outward normal geometry (<span class="math inline">\(\hat{n} \cdot \hat{d}_{\text{opt}}\)</span>), with optional predicate overrides <code>(p, n) -&gt; SurfaceID</code>.</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>4. 2D / Non-Volumetric Elements</strong></td>
+<td style="text-align: left;">Flat apertures, detectors, and thin polarizer sheets do not enclose a 3D volume.</td>
+<td style="text-align: left;">Marked with <code>is_thin_interface(elem) = true</code>. Both <code>inside_medium</code> and <code>outside_medium</code> match ambient space, so rays interact and propagate without index refraction.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>5. Floating-Point Coincidence Ambiguity</strong></td>
+<td style="text-align: left;">Touching surfaces report identical <span class="math inline">\(t_1 \approx t_2\)</span> within numerical precision.</td>
+<td style="text-align: left;">When propagating inside an optic <span class="math inline">\(\Omega_1\)</span>, queries are domain-restricted to <span class="math inline">\(\Omega_1\)</span>’s bounding manifolds, avoiding floating-point z-fighting at coincident faces.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="immediate-low-hanging-fruits-future-proofing">11. Immediate Low-Hanging Fruits &amp; Future-Proofing</h2>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Area</th>
+<th style="text-align: left;">Impact</th>
+<th style="text-align: left;">Detailed Benefit</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>Massive Code Deletion</strong></td>
+<td style="text-align: left;">~1,500 lines removed</td>
+<td style="text-align: left;">Deletes duplicate Snell/Fresnel/TIR code in <code>Lenses.jl</code>, <code>Mirrors.jl</code>, <code>Beamsplitters.jl</code>.</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Zero Heap Allocations</strong></td>
+<td style="text-align: left;">CPU L1 cache execution</td>
+<td style="text-align: left;">Inner loops run entirely in registers without GC pauses for <span class="math inline">\(10^5+\)</span> rays.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>5-Line Optic Constructors</strong></td>
+<td style="text-align: left;">Developer Ergonomics</td>
+<td style="text-align: left;">Creating a custom lens takes <strong>5 lines</strong> (<code>Optic(shape, medium, boundaries)</code>).</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Automatic Differentiation (AD)</strong></td>
+<td style="text-align: left;">Lens Optimization</td>
+<td style="text-align: left;">Fully immutable <code>isbits</code> structs allow <strong><code>Enzyme.jl</code></strong> and <strong><code>ForwardDiff.jl</code></strong> to differentiate through systems with native LLVM performance.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Metasurfaces &amp; Gratings</strong></td>
+<td style="text-align: left;">Extensibility</td>
+<td style="text-align: left;">Adding diffractive phase masks or metasurfaces requires only a new <code>AbstractSurfaceModel</code>.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="comprehensive-comparison-legacy-vs.-definitive-architecture">12. Comprehensive Comparison: Legacy vs. Definitive Architecture</h2>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Architectural Feature</th>
+<th style="text-align: left;">Legacy BMO (<code>master</code>)</th>
+<th style="text-align: left;">Initial PR #60 Draft</th>
+<th style="text-align: left;"><strong>Definitive Architecture (v2.7)</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong><code>Intersection</code> Representation</strong></td>
+<td style="text-align: left;">Mutable struct with coincident pointers</td>
+<td style="text-align: left;">Mutable hierarchy (<code>MultiIntersection</code>)</td>
+<td style="text-align: left;"><strong>100% Immutable <code>ShapeHit{T}</code> (<code>isbits</code>)</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Facet ID Type</strong></td>
+<td style="text-align: left;">Ad-hoc symbols</td>
+<td style="text-align: left;"><code>tag::Symbol</code> (dynamic dispatch)</td>
+<td style="text-align: left;"><strong><code>SurfaceID</code> (<code>UInt32</code> <code>isbits</code> wrapper)</strong></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Memory Allocation</strong></td>
+<td style="text-align: left;">Heap allocated per hit</td>
+<td style="text-align: left;">Dynamic boxed references</td>
+<td style="text-align: left;"><strong>Zero heap allocations (stack/register only)</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Physics Dispatch</strong></td>
+<td style="text-align: left;">Duplicated in every component type</td>
+<td style="text-align: left;">Duplicated in components + traits</td>
+<td style="text-align: left;"><strong>Universal dispatch on <code>(SurfaceModel, Medium)</code></strong></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Boundary Lookup</strong></td>
+<td style="text-align: left;">Ad-hoc getter methods</td>
+<td style="text-align: left;">Dynamic NamedTuple index</td>
+<td style="text-align: left;"><strong>Static Cartesian unrolled indexing (<code>@nif</code>)</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Ray Advance Distance</strong></td>
+<td style="text-align: left;">Undefined <span class="math inline">\(t\)</span> handling</td>
+<td style="text-align: left;">Inconsistent</td>
+<td style="text-align: left;"><strong>Explicit <span class="math inline">\(t_{\text{hit}}\)</span> parameter from <code>ShapeHit{T}</code></strong></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Self-Intersection Prevention</strong></td>
+<td style="text-align: left;">None (prone to shadow acne)</td>
+<td style="text-align: left;">None</td>
+<td style="text-align: left;"><strong><span class="math inline">\(\epsilon\)</span>-Normal offset along outgoing ray</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Medium Transition Resolution</strong></td>
+<td style="text-align: left;">Heuristic <code>isentering</code> normal checks</td>
+<td style="text-align: left;">Tolerant coincident <span class="math inline">\(t\)</span>-matching</td>
+<td style="text-align: left;"><strong>State-aware: <code>resolve_transition(med_in, med_out, ray, n̂)</code></strong></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Cemented Interfaces</strong></td>
+<td style="text-align: left;">Coincident object pointer hacks</td>
+<td style="text-align: left;">Coincident <span class="math inline">\(t\)</span>-search with tolerance</td>
+<td style="text-align: left;"><strong>Native multi-material boundary <span class="math inline">\((\text{Glass}_1 \to \text{Glass}_2)\)</span></strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Beamlet Specialization</strong></td>
+<td style="text-align: left;">Required duplicate methods for Gausslets</td>
+<td style="text-align: left;">Required duplicate methods</td>
+<td style="text-align: left;"><strong>Universal broadcast across parabasal rays</strong></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>GPU Acceleration</strong></td>
+<td style="text-align: left;">Impossible (heap + mutability)</td>
+<td style="text-align: left;">Impossible</td>
+<td style="text-align: left;"><strong>100% GPU-Ready (Register resident)</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Extensibility</strong></td>
+<td style="text-align: left;">New optic requires custom <code>interact3d</code></td>
+<td style="text-align: left;">New optic requires custom <code>interact3d</code></td>
+<td style="text-align: left;"><strong>New optic = Shape + Material + Boundary map</strong></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="contributor-faq-extension-patterns">13. Contributor FAQ &amp; Extension Patterns</h2>
+<h3 id="q1-how-do-i-add-a-new-custom-thin-film-coating-or-surface-model">Q1: How do I add a new custom thin-film coating or surface model?</h3>
+<p>Define a subtype of <code>AbstractSurfaceModel</code> and implement a single <code>interact_surface</code> method:</p>
+<div class="sourceCode" id="cb21"><div class="code-wrapper">
+        <div class="code-header">
+            <div class="window-controls">
+                <span class="dot red"></span>
+                <span class="dot yellow"></span>
+                <span class="dot green"></span>
+            </div>
+            <span class="code-lang">JULIA</span>
+            <button class="copy-btn" onclick="copyCode(this)" title="Copy Code">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                <span>Copy</span>
+            </button>
+        </div>
+        <pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> DichroicCoating{T} <span class="op">&lt;:</span> AbstractSurfaceModel</span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>    cutoff_wavelength<span class="op">::</span>T</span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a><span class="kw">function</span> interact_surface(d<span class="op">::</span>DichroicCoating<span class="op">,</span> trans<span class="op">,</span> ray<span class="op">::</span>AbstractRay{T}<span class="op">,</span> t_hit<span class="op">::</span>T) <span class="kw">where</span> {T}</span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a>    <span class="kw">if</span> wavelength(ray) <span class="op">&lt;</span> d.cutoff_wavelength</span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Reflect short wavelengths</span></span>
+<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a>        <span class="kw">return</span> interact_surface(IdealMirror()<span class="op">,</span> trans<span class="op">,</span> ray<span class="op">,</span> t_hit)</span>
+<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a>    <span class="kw">else</span></span>
+<span id="cb21-10"><a href="#cb21-10" aria-hidden="true" tabindex="-1"></a>        <span class="co"># Transmit long wavelengths</span></span>
+<span id="cb21-11"><a href="#cb21-11" aria-hidden="true" tabindex="-1"></a>        <span class="kw">return</span> interact_surface(FresnelInterface()<span class="op">,</span> trans<span class="op">,</span> ray<span class="op">,</span> t_hit)</span>
+<span id="cb21-12"><a href="#cb21-12" aria-hidden="true" tabindex="-1"></a>    <span class="kw">end</span></span>
+<span id="cb21-13"><a href="#cb21-13" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span></code></pre>
+    </div></div>
+<hr />
+<h3 id="q2-how-do-i-model-a-custom-freeform-cad-lens">Q2: How do I model a custom Freeform / CAD Lens?</h3>
+<ol type="1">
+<li>Define the geometric shape (SDF or Mesh) with <code>surface_tag(shape, p, n)</code> returning a <code>SurfaceID</code>.</li>
+<li>Construct the optic: <code>Optic(my_freeform_sdf, glass_medium, (AR_front, AR_back, Absorber_side))</code>.</li>
+<li>Tracing works immediately for standard rays, polarized rays, and Gaussian beamlets with <strong>zero extra lines of optical physics code</strong>.</li>
+</ol>
+<hr />
+<h3 id="q3-how-do-i-model-birefringent-crystals-calcite-quartz-wollaston-prisms">Q3: How do I model Birefringent Crystals (Calcite, Quartz, Wollaston Prisms)?</h3>
+<p>Birefringence is a <strong>volumetric medium property</strong>, not a component hack. 1. Define <code>AnisotropicMedium(no_dispersion, ne_dispersion, optical_axis_vector) &lt;: AbstractMedium</code>. 2. At the boundary interface, <code>interact_surface</code> evaluates the dispersion relation: <span class="math display">\[k_o = \frac{\omega}{c} n_o, \quad k_e(\theta) = \frac{\omega}{c} \left(\frac{\cos^2\theta}{n_o^2} + \frac{\sin^2\theta}{n_e^2}\right)^{-1/2}\]</span> 3. The boundary pushes the ordinary ray along <span class="math inline">\(\vec{d}_o\)</span> and the extraordinary ray along the Poynting vector <span class="math inline">\(\vec{S}_e\)</span> (accounting for the walk-off angle) onto the <code>StaticRayStack</code>.</p>
+<hr />
+<h3 id="q4-how-do-i-model-diffraction-gratings-and-holographic-optical-elements-hoes">Q4: How do I model Diffraction Gratings and Holographic Optical Elements (HOEs)?</h3>
+<ol type="1">
+<li>Define <code>GratingSurface(groove_density, blaze_angle, order_efficiencies) &lt;: AbstractSurfaceModel</code>.</li>
+<li><code>interact_surface</code> solves the grating vector equation: <span class="math display">\[\vec{k}_{\parallel, m} = \vec{k}_{\parallel, \text{inc}} + m \vec{G}\]</span> where <span class="math inline">\(\vec{G} = \frac{2\pi}{d} \hat{g}\)</span> is the grating reciprocal vector.</li>
+<li>Outgoing diffracted orders (<span class="math inline">\(m = 0, \pm 1, \dots\)</span>) are created with amplitudes scaled by the grating efficiency curve.</li>
+</ol>
+<hr />
+<h3 id="q5-how-do-i-simulate-gradient-index-grin-optics-or-atmospheric-turbulence">Q5: How do I simulate Gradient-Index (GRIN) Optics or Atmospheric Turbulence?</h3>
+<p>In a GRIN medium (e.g. Luneburg lenses, GRIN fiber collimators, thermal lensing), the refractive index varies continuously: <span class="math inline">\(n(\mathbf{r}) = n_0(1 - \frac{1}{2} A r^2)\)</span>. * <strong>Volumetric Transport:</strong> When propagating inside a <code>GRINMedium &lt;: AbstractMedium</code>, the tracer uses an adaptive 4th-order Runge-Kutta or Verlet ray-marcher solving the ray equation: <span class="math display">\[\frac{d}{ds} \left( n(\mathbf{r}) \frac{d\mathbf{r}}{ds} \right) = \nabla n(\mathbf{r})\]</span> * <strong>Boundary Transitions:</strong> When the curved ray reaches the bounding SDF manifold <span class="math inline">\(\partial \Omega\)</span>, the standard <code>interact_surface</code> pipeline executes seamlessly.</p>
+<hr />
+<h3 id="q6-how-do-i-model-metasurfaces-spatial-light-modulators-slms-and-phase-masks">Q6: How do I model Metasurfaces, Spatial Light Modulators (SLMs), and Phase Masks?</h3>
+<p>Metasurfaces impart an abrupt subwavelength phase discontinuity <span class="math inline">\(\Phi(u, v)\)</span>: 1. Define <code>PhaseMaskSurface(phase_function) &lt;: AbstractSurfaceModel</code>. 2. In <code>interact_surface</code>, Generalized Snell’s Law is evaluated directly: <span class="math display">\[\vec{d}_{\text{trans}} \times \hat{n} - \vec{d}_{\text{inc}} \times \hat{n} = \frac{\lambda_0}{2\pi n_{\text{trans}}} \nabla \Phi(u, v)\]</span> 3. The outgoing wavepacket receives the phase shift <span class="math inline">\(\Delta \phi = \Phi(u_0, v_0)\)</span> without altering bulk geometric SDFs.</p>
+<hr />
+<h3 id="q7-how-does-automatic-differentiation-ad-with-enzyme.jl-or-forwarddiff.jl-work">Q7: How does Automatic Differentiation (AD) with <code>Enzyme.jl</code> or <code>ForwardDiff.jl</code> work?</h3>
+<p>Because all data structures (<code>ShapeHit{T}</code>, <code>Intersection</code>, <code>Ray{T}</code>, <code>Optic</code>) are <strong>100% immutable and <code>isbits</code> (stack-allocated)</strong>: * There are zero heap pointers or mutable arrays in the inner loop. * You can define a merit function <span class="math inline">\(\mathcal{L}(\boldsymbol{\theta})\)</span> (e.g. RMS wavefront error or spot size on a detector) parameterized by lens curvature radii <span class="math inline">\(R_i\)</span>, glass thicknesses <span class="math inline">\(d_i\)</span>, or positions <span class="math inline">\(\mathbf{x}_i\)</span>. * Calling <code>Enzyme.autodiff(Reverse, ray_trace_loss, Active(system_params))</code> computes exact machine-precision gradients <span class="math inline">\(\nabla_{\boldsymbol{\theta}} \mathcal{L}\)</span> for gradient-based optical optimization (BFGS, Adam).</p>
+<hr />
+<h3 id="q8-how-do-i-handle-submerged-systems-e.g.-water-immersion-objectives-fluidics">Q8: How do I handle Submerged Systems (e.g. Water Immersion Objectives, Fluidics)?</h3>
+<p>Simply configure the ambient space of the system:</p>
+<div class="sourceCode" id="cb22"><div class="code-wrapper">
+        <div class="code-header">
+            <div class="window-controls">
+                <span class="dot red"></span>
+                <span class="dot yellow"></span>
+                <span class="dot green"></span>
+            </div>
+            <span class="code-lang">JULIA</span>
+            <button class="copy-btn" onclick="copyCode(this)" title="Copy Code">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                <span>Copy</span>
+            </button>
+        </div>
+        <pre class="sourceCode julia"><code class="sourceCode julia"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>system <span class="op">=</span> OpticalSystem(ambient_medium <span class="op">=</span> IsotropicMedium(<span class="op">:</span>Water<span class="op">,</span> water_sellmeier<span class="op">,</span> <span class="cn">nothing</span>))</span></code></pre>
+    </div></div>
+<p>All standard optics using <code>Ambient()</code> dynamically resolve outside transitions against water (<span class="math inline">\(n=1.33\)</span>) rather than air (<span class="math inline">\(n=1.0\)</span>) with zero component reconfiguration.</p>
+<hr />
+<h3 id="q9-how-do-detectors-record-coherent-wavefronts-vs.-incoherent-intensity">Q9: How do Detectors record Coherent Wavefronts vs. Incoherent Intensity?</h3>
+<p>In <code>interact_surface(d::DetectorSurface, trans, ray, t_hit)</code>: * <strong>Geometric Rays:</strong> Accumulate incoherent ray count and power <span class="math inline">\(I(x, y) = \sum P_i \delta(x - x_i, y - y_i)\)</span>. * <strong>Polarized Rays &amp; Beamlets:</strong> Accumulate complex electric field vectors <span class="math inline">\(\mathbf{E}(x, y) = \sum \mathbf{E}_i e^{i (k \cdot OPL_i - \omega t)}\)</span>. * The detector matrix provides direct Fourier optics post-processing for <strong>Point Spread Functions (PSF)</strong>, <strong>Modulation Transfer Functions (MTF)</strong>, and <strong>Interferograms</strong>.</p>
+<hr />
+<h3 id="q10-is-non-sequential-ray-tracing-supported">Q10: Is Non-Sequential Ray Tracing Supported?</h3>
+<p><strong>Yes.</strong> The Media–Interface architecture is inherently non-sequential: * Rays do not follow a fixed component order list. * At each step, <code>trace_all</code> finds the physically closest boundary manifold. * Light bounces freely through retroreflectors, integrating spheres, multipass absorption cells, and laser resonator cavities until terminating at detectors, absorbers, or reaching the energy flux cutoff.</p>
+<hr />
+<h2 id="direct-implementation-roadmap-for-featureintersection-handling">14. Direct Implementation Roadmap for <code>feature/intersection-handling</code></h2>
+<ol type="1">
+<li><strong>Step 1 (<code>ShapeHit</code> &amp; <code>SurfaceID</code>):</strong> Define <code>struct SurfaceID; id::UInt32; end</code> and <code>struct ShapeHit{T}</code> in <code>src/AbstractTypes/AbstractIntersection.jl</code>. Update <code>src/SDFs/AbstractSDF.jl</code> and mesh solvers to return <code>ShapeHit{T}</code>.</li>
+<li><strong>Step 2 (<code>Intersection</code>):</strong> Replace <code>ObjectIntersection</code>, <code>PlaneIntersection</code>, and <code>MultiIntersection</code> with a single canonical <code>Intersection{T, S, O}</code>.</li>
+<li><strong>Step 3 (<code>Media &amp; State Tracking</code>):</strong> Add <code>current_medium(ray)</code> and <code>resolve_transition(med_inside, med_outside, ray, normal)</code>.</li>
+<li><strong>Step 4 (Consolidate <code>interact</code>):</strong> Replace monolithic <code>interact3d</code> implementations across <code>Lenses.jl</code>, <code>Mirrors.jl</code>, and <code>Detectors.jl</code> with the universal <code>interact_surface(model, trans, ray, t_hit)</code> pipeline.</li>
+</ol>
+
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', (event) => {
+            document.querySelectorAll('pre code').forEach((el) => {
+                hljs.highlightElement(el);
+            });
+        });
+
+        function copyCode(btn) {
+            const pre = btn.closest('.code-wrapper').querySelector('pre code');
+            navigator.clipboard.writeText(pre.innerText).then(() => {
+                const span = btn.querySelector('span');
+                span.innerText = 'Copied!';
+                btn.style.borderColor = 'var(--accent-cyan)';
+                setTimeout(() => {
+                    span.innerText = 'Copy';
+                    btn.style.borderColor = 'var(--border-color)';
+                }, 2000);
+            });
+        }
+
+        function toggleTheme() {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('bmo-theme', newTheme);
+            updateThemeButton(newTheme);
+        }
+
+        function updateThemeButton(theme) {
+            const btnText = document.getElementById('theme-text');
+            btnText.innerText = theme === 'dark' ? 'Light Mode' : 'Dark Mode';
+        }
+
+        window.addEventListener('scroll', () => {
+            const winScroll = document.body.scrollTop || document.documentElement.scrollTop;
+            const height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+            const scrolled = (winScroll / height) * 100;
+            document.getElementById('progress-bar').style.width = scrolled + '%';
+
+            const headings = document.querySelectorAll('main h2, main h3');
+            let currentActive = null;
+            headings.forEach(h => {
+                const rect = h.getBoundingClientRect();
+                if (rect.top <= 140) {
+                    currentActive = h.id;
+                }
+            });
+            if (currentActive) {
+                document.querySelectorAll('.toc-link').forEach(link => {
+                    link.classList.remove('active');
+                    if (link.getAttribute('href') === '#' + currentActive) {
+                        link.classList.add('active');
+                    }
+                });
+            }
+        });
+
+        const storedTheme = localStorage.getItem('bmo-theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', storedTheme);
+        updateThemeButton(storedTheme);
+    </script>
+</body>
+</html>

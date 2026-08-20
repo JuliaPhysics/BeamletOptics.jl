@@ -12,7 +12,7 @@ but must be transformed into global coordinates using the method described in th
 
 - `pos`: a point in R³ that describes the `Ray` origin
 - `dir`: a normalized vector in R³ that describes the `Ray` direction
-- `intersection`: refer to [`Intersection`](@ref)
+- `intersection`: refer to [`AbstractIntersection`](@ref)
 - `λ`: wavelength in [m]
 - `n`: refractive index along the beam path
 - `E0`: complex-valued 3-tuple to represent the electric field in global coordinates
@@ -37,14 +37,14 @@ where r and t are the complex-valued Fresnel coefficients (see also [`fresnel_co
 mutable struct PolarizedRay{T} <: AbstractRay{T}
     pos::Point3{T}
     dir::Point3{T}
-    intersection::Nullable{Intersection{T}}
+    intersection::Union{Nothing, Intersection{T}, MultiIntersection{T}}
     λ::T
     n::Union{T, Complex{T}}
     E0::Point3{Complex{T}}
     function PolarizedRay{T}(
             pos::AbstractArray{P},
             dir::AbstractArray{D},
-            int::Nullable{Intersection},
+            int::Union{Nothing, Intersection, MultiIntersection},
             λ::L,
             n::N,
             E0::AbstractArray{<:Union{E, Complex{E}}}

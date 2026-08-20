@@ -190,7 +190,7 @@ const BMO = BeamletOptics
         end
     end
 
-    @testset "Retracing" begin
+    @testset "Re-solving after a kinematic change" begin
         s1 = BMO.CylinderSDF(BMO.inch / 2, BMO.inch)
         l1 = BMO.Lens(s1, n -> 1.5)
         BMO.translate3d!(l1, [0, 0.1, 0.0])
@@ -202,9 +202,9 @@ const BMO = BeamletOptics
 
         n_initial = length(BMO.rays(beam.c))
 
-        # Move lens slightly and retrace
+        # Move lens slightly and solve again
         BMO.translate3d!(l1, [0, 0.005, 0])
-        BMO.retrace_system!(system, beam)
+        solve_system!(system, beam)
 
         # Should still have same number of segments
         @test length(BMO.rays(beam.c)) == n_initial

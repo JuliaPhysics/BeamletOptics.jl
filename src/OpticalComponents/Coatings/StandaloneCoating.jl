@@ -48,6 +48,7 @@ end
 
 shape_trait_of(::Coating) = SingleShape()
 shape(c::Coating) = c.shape
+surface_model(c::Coating) = c.model
 
 function intersect3d(::SingleShape, coating::Coating, ray::AbstractRay)
     int = intersect3d(shape(coating), ray)

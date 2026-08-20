@@ -6,9 +6,18 @@ export position, direction, orientation
 # ray and beam type export
 export Ray, PolarizedRay, Beam, PointSource, CollimatedSource, UniformDiscSource,
        GaussianBeamlet, AstigmaticGaussianBeamlet, rayleigh_range, rays, point_on_beam,
-       normal3d
+       normal3d, optical_path_length
 export CollimatedGaussianBeamletSource, GaussianBeamletDecomposition,
        SphericalGaussianBeamletSource, EllipticalGaussianBeamletSource, WavefrontBeamletDecomposition, AstigmaticBeamGroup
+
+# media, surfaces & coatings
+export AbstractMedium, Ambient, IsotropicMedium,
+       complex_refractive_index, extinction_coefficient, absorption_coefficient
+export AbstractSurfaceModel, FresnelInterface, IdealMirror, AbsorbingSurface,
+       DetectorSurface, CoatedSurface, GratingSurface
+export AbstractCoating, Coating, surface_model
+export Transition, resolve_transition, current_medium, interact3d
+export Intersection
 
 # system
 export System, StaticSystem, solve_system!

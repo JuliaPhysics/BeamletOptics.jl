@@ -84,41 +84,12 @@ end
 
 Base.push!(b::Beam, interaction::BeamInteraction) = push!(b, interaction.ray)
 
-function Base.replace!(beam::Beam{<:Real, <:Ray}, interaction::BeamInteraction{<:Real, <:Ray}, index::Int)
-    position!(rays(beam)[index], position(interaction.ray))
-    direction!(rays(beam)[index], direction(interaction.ray))
-    wavelength!(rays(beam)[index], wavelength(interaction.ray))
-    refractive_index!(rays(beam)[index], refractive_index(interaction.ray))
-end
-
-function Base.replace!(beam::Beam{<:Real, <:PolarizedRay}, interaction::BeamInteraction{<:Real, <:PolarizedRay}, index::Int)
-    position!(rays(beam)[index], position(interaction.ray))
-    direction!(rays(beam)[index], direction(interaction.ray))
-    wavelength!(rays(beam)[index], wavelength(interaction.ray))
-    refractive_index!(rays(beam)[index], refractive_index(interaction.ray))
-    polarization!(rays(beam)[index], polarization(interaction.ray))
-end
-
-"Used mainly for retracing. Updates beam children data."
-function _modify_beam_head!(old::Beam{T, R}, new::Beam{T, R}) where {T<:Real, R<:Ray{T}}
-    position!(first(rays(old)), position(first(rays(new))))
-    direction!(first(rays(old)), direction(first(rays(new))))
-    wavelength!(first(rays(old)), wavelength(first(rays(new))))
-    refractive_index!(first(rays(old)), refractive_index(first(rays(new))))
+function _reset_beam!(beam::Beam)
+    deleteat!(rays(beam), 2:length(rays(beam)))
+    intersection!(first(rays(beam)), nothing)
+    _drop_beams!(beam)
     return nothing
 end
-
-"Used mainly for retracing. Updates beam children data."
-function _modify_beam_head!(old::Beam{T, R}, new::Beam{T, R}) where {T<:Real, R<:PolarizedRay{T}}
-    position!(first(rays(old)), position(first(rays(new))))
-    direction!(first(rays(old)), direction(first(rays(new))))
-    wavelength!(first(rays(old)), wavelength(first(rays(new))))
-    refractive_index!(first(rays(old)), refractive_index(first(rays(new))))
-    polarization!(first(rays(old)), polarization(first(rays(new))))
-    return nothing
-end
-
-_last_beam_intersection(beam::Beam) = intersection(last(rays(beam)))
 
 """
     Base.length(beam::Beam)
@@ -227,11 +198,6 @@ function isparaxial(::AbstractSystem, beam::Beam, threshold::Real = π / 4)
         if isnothing(intersection(ray))
             break
         end
-        target = object((intersection(ray)))
-        # Test if refractive element
-        if !isa(target, AbstractRefractiveOptic)
-            continue
-        end
         # Test angle between ray and its intersection
         angle = angle3d(ray)
         if angle > π / 2 # flip sector
@@ -266,7 +232,7 @@ function Base.show(io::IO, ::MIME"text/plain", beam::Beam)
             println(io, "    Pos.: $(position(ray))")
             println(io, "    Dir.: $(direction(ray))")
         else
-            println(io, "    Intersects with $(typeof(object(intersection(ray))))")
+            println(io, "    Intersection: distance=$(length(ray)), normal=$(normal3d(intersection(ray)))")
             println(io, "    Pos.: $(position(ray))")
             println(io, "    Dir.: $(direction(ray))")
             println(io, "    End.: $(position(ray) .+ length(ray) .* direction(ray))")

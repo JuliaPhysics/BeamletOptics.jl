@@ -178,5 +178,6 @@ function surface_tag(u::UnionSDF, point)
 end
 
 function surface_tag(u::UnionSDF, local_p, local_n)
+    # FIXME face_id not defined
     return face_id(u, local_n)
 end

@@ -178,12 +178,12 @@ for beam in beams
     render!(ax, beam, flen=0.12e-3, color = colors[i], show_pos=true)
     # use the 0° beams to construct all other beam sets
 
-    pos = beam.rays[1].pos + BeamletOptics.intersection(beam.rays[1]).t*beam.rays[1].dir
+    pos = beam.rays[1].pos + length(BeamletOptics.intersection(beam.rays[1]))*beam.rays[1].dir
     for angle in field_angles
         i += 1
         # tilted input beam generation
         dir = [0, cosd(angle), sind(angle)]
-        spos = pos - dir * BeamletOptics.intersection(beam.rays[1]).t
+        spos = pos - dir * length(BeamletOptics.intersection(beam.rays[1]))
         abeam = Beam(spos, dir, beam.rays[1].λ)
 
         # trace through system

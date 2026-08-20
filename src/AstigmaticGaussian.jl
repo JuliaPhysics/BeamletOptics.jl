@@ -228,7 +228,13 @@ optical_path_length(agb::AstigmaticGaussianBeamlet) = optical_path_length(agb.c)
 
 isentering(agb::AstigmaticGaussianBeamlet, id::Int) = isentering(rays(agb.c)[id])
 
-_last_beam_intersection(agb::AstigmaticGaussianBeamlet) = intersection(last(rays(agb.c)))
+function _reset_beam!(agb::AstigmaticGaussianBeamlet)
+    for beam in _component_beams(agb)
+        _reset_beam!(beam)
+    end
+    _drop_beams!(agb)
+    return nothing
+end
 
 point_on_beam(agb::AstigmaticGaussianBeamlet, t::Real) = point_on_beam(agb.c, t)
 
@@ -346,34 +352,6 @@ function Base.push!(agb::AstigmaticGaussianBeamlet{T},
     return nothing
 end
 
-function Base.replace!(agb::AstigmaticGaussianBeamlet{T},
-        interaction::AstigmaticGaussianBeamletInteraction{T},
-        index::Int) where {T}
-    replace!(agb.c, interaction.chief, index)
-    replace!(agb.wxp, interaction.wxp, index)
-    replace!(agb.wxm, interaction.wxm, index)
-    replace!(agb.wyp, interaction.wyp, index)
-    replace!(agb.wym, interaction.wym, index)
-    replace!(agb.dxp, interaction.dxp, index)
-    replace!(agb.dxm, interaction.dxm, index)
-    replace!(agb.dyp, interaction.dyp, index)
-    replace!(agb.dym, interaction.dym, index)
-    return nothing
-end
-
-function _modify_beam_head!(old::AstigmaticGaussianBeamlet{T},
-        new::AstigmaticGaussianBeamlet{T}) where {T <: Real}
-    _modify_beam_head!(old.c, new.c)
-    _modify_beam_head!(old.wxp, new.wxp)
-    _modify_beam_head!(old.wxm, new.wxm)
-    _modify_beam_head!(old.wyp, new.wyp)
-    _modify_beam_head!(old.wym, new.wym)
-    _modify_beam_head!(old.dxp, new.dxp)
-    _modify_beam_head!(old.dxm, new.dxm)
-    _modify_beam_head!(old.dyp, new.dyp)
-    _modify_beam_head!(old.dym, new.dym)
-end
-
 """
     _beams_hits_same_shape(agb, id)
 
@@ -392,10 +370,9 @@ Tests if all 9 component rays at section `id` hit the same object shape.
         isnothing(intersection(rays(agb.dym)[id])) || return false
         return true
     else
-        s0 = shape(i1)
         _check = b -> begin
             int = intersection(rays(b)[id])
-            !isnothing(int) && shape(int) === s0
+            !isnothing(int)
         end
         _check(agb.wxp) || return false
         _check(agb.wxm) || return false

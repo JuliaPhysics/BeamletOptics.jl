@@ -266,19 +266,37 @@ end
 # Get matching coating for a hit
 function get_coating_model_at_hit(obj::AbstractObject, ray::AbstractRay)
     obj_coatings = coatings(obj)
+    if isempty(obj_coatings)
+        return Uncoated()
+    end
     int = intersection(ray)
     isnothing(int) && return Uncoated()
     p_hit = position(ray) + length(ray) * direction(ray)
 
     parent_shape = shape(obj)
+    if parent_shape isa Tuple
+        for s in parent_shape
+            sh = s isa AbstractObject ? shape(s) : s
+            if sh isa AbstractShape
+                local_p = world_to_local(sh, p_hit)
+                n_world = normal3d(int)
+                local_n = transposed_orientation(sh) * n_world
+                hit_sub_sdf = active_constituent_sdf(sh, p_hit)
+                coat_list = hasproperty(hit_sub_sdf, :coatings) ? getproperty(hit_sub_sdf, :coatings) : obj_coatings
+                m = get_matching_coating(coat_list, sh, local_p, local_n)
+                if is_coated(m)
+                    return m
+                end
+            end
+        end
+        return Uncoated()
+    end
+
     local_p = world_to_local(parent_shape, p_hit)
     n_world = normal3d(int)
-    if object(int) !== obj
-        n_world = -n_world
-    end
     local_n = transposed_orientation(parent_shape) * n_world
 
-    hit_sub_sdf = isnothing(int.shape) ? active_constituent_sdf(parent_shape, p_hit) : int.shape
+    hit_sub_sdf = active_constituent_sdf(parent_shape, p_hit)
     coat_list = hasproperty(hit_sub_sdf, :coatings) ? getproperty(hit_sub_sdf, :coatings) : obj_coatings
     return get_matching_coating(coat_list, parent_shape, local_p, local_n)
 end
@@ -308,9 +326,9 @@ function resolve_coincident_coatings(::Nothing, system::AbstractSystem, ray::Abs
 end
 
 function resolve_coincident_coatings(
-        int::Intersection, system::AbstractSystem, ray::AbstractRay)
-    res1 = check_coincident_coating(int.coincident_object, ray)
-    res2 = check_coincident_coating(int.coincident_object_2, ray)
+        mi::MultiIntersection, system::AbstractSystem, ray::AbstractRay)
+    res1 = check_coincident_coating(mi.exiting, ray)
+    res2 = check_coincident_coating(mi.entering, ray)
     if res1 !== nothing && res2 !== nothing
         obj1, coat1 = res1
         obj2, coat2 = res2
@@ -321,6 +339,11 @@ function resolve_coincident_coatings(
     res1 !== nothing && return res1
     res2 !== nothing && return res2
     return nothing, Uncoated()
+end
+
+function resolve_coincident_coatings(
+        int::Intersection, system::AbstractSystem, ray::AbstractRay)
+    return (nothing, Uncoated())
 end
 
 check_coincident_coating(::Nothing, ray::AbstractRay) = nothing
