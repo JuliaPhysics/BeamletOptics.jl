@@ -150,7 +150,7 @@ const mm = 1e-3
         E0_buffer = l1.E0
         
         for (i, phi) in enumerate(phis)
-            # Iterate over relative phase shifts, use retracing
+            # Iterate over relative phase shifts, re-solving each time
             l1.E0 = E0_buffer * exp(im * phi)
             empty!(pd_1)
             empty!(pd_2)

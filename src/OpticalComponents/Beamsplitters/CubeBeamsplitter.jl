@@ -60,35 +60,46 @@ function CubeBeamsplitter(
     return CubeBeamsplitter(front, back, bs)
 end
 
+function _cbs_hit_target(cbs::CubeBeamsplitter, ray::AbstractRay)
+    int = intersection(ray)
+    isnothing(int) && return :none
+    ic = intersect3d(shape(cbs.coating), ray)
+    if !isnothing(ic) && isapprox(length(int), length(ic), atol=1e-7)
+        return :coating
+    end
+    if_hit = intersect3d(shape(cbs.front), ray)
+    if !isnothing(if_hit) && isapprox(length(int), length(if_hit), atol=1e-7)
+        return :front
+    end
+    ib = intersect3d(shape(cbs.back), ray)
+    if !isnothing(ib) && isapprox(length(int), length(ib), atol=1e-7)
+        return :back
+    end
+    return :none
+end
+
 function interact3d(
     system::AbstractSystem,
     cbs::CubeBeamsplitter,
     beam::Beam{T, R},
     ray::R) where {T <: Real, R <: AbstractRay{T}}
-    # Front prism interaction
-    if shape(intersection(ray)) === shape(cbs.front)
+    target = _cbs_hit_target(cbs, ray)
+    if target === :front
         interaction = interact3d(system, cbs.front, beam, ray)
-        # Hint towards coating
         hint!(interaction, Hint(cbs, shape(cbs.coating)))
         return interaction
-    end
-    # Splitter "coating" interaction
-    if shape(intersection(ray)) === shape(cbs.coating)
-        # Beamsplitter coating interaction
+    elseif target === :coating
         interact3d(system, cbs.coating, beam, ray)
-        # Update refractive index
         _n = refractive_index(cbs, wavelength(ray))
         refractive_index!(first(rays(beam.children[1])), _n)
         refractive_index!(first(rays(beam.children[2])), _n)
         return nothing
-    end
-    # Back prism interaction
-    if shape(intersection(ray)) === shape(cbs.back)
+    elseif target === :back
         interaction = interact3d(system, cbs.back, beam, ray)
-        # Hint towards coating
         hint!(interaction, Hint(cbs, shape(cbs.coating)))
         return interaction
     end
+    return nothing
 end
 
 function interact3d(
@@ -96,28 +107,24 @@ function interact3d(
     cbs::CubeBeamsplitter,
     gauss::GaussianBeamlet,
     id::Int)
-    _shape = shape(intersection(rays(gauss.chief)[id]))
-    # Front prism interaction
-    if _shape === shape(cbs.front)
+    chief_ray = rays(gauss.chief)[id]
+    target = _cbs_hit_target(cbs, chief_ray)
+    if target === :front
         interaction = interact3d(system, cbs.front, gauss, id)
         hint!(interaction, Hint(cbs, shape(cbs.coating)))
         return interaction
-    end
-    # Splitter "coating" interaction
-    if _shape === shape(cbs.coating)
+    elseif target === :coating
         interact3d(system, cbs.coating, gauss, id)
-        # Update refractive index
         _n = refractive_index(cbs, wavelength(gauss))
         refractive_index!(gauss.children[1], 1, _n)
         refractive_index!(gauss.children[2], 1, _n)
         return nothing
-    end
-    # Back prism interaction
-    if _shape === shape(cbs.back)
+    elseif target === :back
         interaction = interact3d(system, cbs.back, gauss, id)
         hint!(interaction, Hint(cbs, shape(cbs.coating)))
         return interaction
     end
+    return nothing
 end
 
 function interact3d(
@@ -125,26 +132,22 @@ function interact3d(
     cbs::CubeBeamsplitter,
     agb::AstigmaticGaussianBeamlet,
     id::Int)
-    _shape = shape(intersection(rays(agb.c)[id]))
-    # Front prism interaction
-    if _shape === shape(cbs.front)
+    chief_ray = rays(agb.c)[id]
+    target = _cbs_hit_target(cbs, chief_ray)
+    if target === :front
         interaction = interact3d(system, cbs.front, agb, id)
         hint!(interaction, Hint(cbs, shape(cbs.coating)))
         return interaction
-    end
-    # Splitter "coating" interaction
-    if _shape === shape(cbs.coating)
+    elseif target === :coating
         interact3d(system, cbs.coating, agb, id)
-        # Update refractive index
         _n = refractive_index(cbs, wavelength(agb))
         refractive_index!(agb.children[1], 1, _n)
         refractive_index!(agb.children[2], 1, _n)
         return nothing
-    end
-    # Back prism interaction
-    if _shape === shape(cbs.back)
+    elseif target === :back
         interaction = interact3d(system, cbs.back, agb, id)
         hint!(interaction, Hint(cbs, shape(cbs.coating)))
         return interaction
     end
+    return nothing
 end

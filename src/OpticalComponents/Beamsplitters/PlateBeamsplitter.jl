@@ -152,30 +152,17 @@ function RoundPlateBeamsplitter(
 end
 
 function intersect3d(pbs::AbstractPlateBeamsplitter, ray::AbstractRay)
-    # this is sooooooo stupid but necessary to ensure correct intersection... 
     ic = intersect3d(coating(pbs), ray)
     is = intersect3d(substrate(pbs), ray)
-    if isnothing(ic) & isnothing(is)
+    if isnothing(ic) && isnothing(is)
         return nothing
-    end
-    if isnothing(is)
-        object!(ic, pbs)
+    elseif isnothing(is)
         return ic
-    end
-    if isnothing(ic)
-        object!(is, pbs)
+    elseif isnothing(ic)
         return is
-    end
-    # if both shapes are hit, pick the coating
-    if length(ic) ≈ length(is)
-        object!(ic, pbs)
-        return ic
-    end
-    if length(ic) < length(is)
-        object!(ic, pbs)
+    elseif length(ic) <= length(is)
         return ic
     else
-        object!(is, pbs)
         return is
     end
 end
@@ -186,15 +173,17 @@ function interact3d(
     beam::Beam{T, R},
     ray::R
     ) where {T <: Real, R <: AbstractRay{T}}
+    ic = intersect3d(coating(pbs), ray)
+    hit_coating = !isnothing(ic) && isapprox(length(intersection(ray)), length(ic), atol=1e-7)
+
     # Substrate interaction
-    if shape(intersection(ray)) === shape(substrate(pbs))
+    if !hit_coating
         interaction = interact3d(system, substrate(pbs), beam, ray)
-        # Hint towards coating
         hint!(interaction, Hint(pbs, shape(coating(pbs))))
         return interaction
     end
     # Splitter "coating" interaction
-    if shape(intersection(ray)) === shape(coating(pbs))
+    if hit_coating
         # Beamsplitter coating interaction
         interact3d(system, coating(pbs), beam, ray)
         # Update refractive index and calculate refraction
@@ -227,15 +216,18 @@ function interact3d(
     gauss::GaussianBeamlet,
     id::Int
     )
-    _shape = shape(intersection(rays(gauss.chief)[id]))
+    chief_ray = rays(gauss.chief)[id]
+    ic = intersect3d(coating(pbs), chief_ray)
+    hit_coating = !isnothing(ic) && isapprox(length(intersection(chief_ray)), length(ic), atol=1e-7)
+
     # Substrate interaction
-    if _shape === shape(substrate(pbs))
+    if !hit_coating
         interaction = interact3d(system, substrate(pbs), gauss, id)
         hint!(interaction, Hint(pbs, shape(coating(pbs))))
         return interaction
     end
     # Splitter interaction
-    if _shape === shape(coating(pbs))
+    if hit_coating
         interact3d(system, coating(pbs), gauss, id)
         # Update refractive index and calculate refraction
         λ = wavelength(rays(gauss.chief)[id])
@@ -274,15 +266,18 @@ function interact3d(
     agb::AstigmaticGaussianBeamlet,
     id::Int
     )
-    _shape = shape(intersection(rays(agb.c)[id]))
+    chief_ray = rays(agb.c)[id]
+    ic = intersect3d(coating(pbs), chief_ray)
+    hit_coating = !isnothing(ic) && isapprox(length(intersection(chief_ray)), length(ic), atol=1e-7)
+
     # Substrate interaction
-    if _shape === shape(substrate(pbs))
+    if !hit_coating
         interaction = interact3d(system, substrate(pbs), agb, id)
         hint!(interaction, Hint(pbs, shape(coating(pbs))))
         return interaction
     end
     # Splitter interaction
-    if _shape === shape(coating(pbs))
+    if hit_coating
         interact3d(system, coating(pbs), agb, id)
         # Update refractive index and calculate refraction
         λ = wavelength(rays(agb.c)[id])

@@ -12,7 +12,7 @@ but must be transformed into global coordinates using the method described in th
 
 - `pos`: a point in R³ that describes the `Ray` origin
 - `dir`: a normalized vector in R³ that describes the `Ray` direction
-- `intersection`: refer to [`Intersection`](@ref)
+- `intersection`: refer to [`AbstractIntersection`](@ref)
 - `λ`: wavelength in [m]
 - `n`: refractive index along the beam path
 - `E0`: complex-valued 3-tuple to represent the electric field in global coordinates
@@ -37,19 +37,19 @@ where r and t are the complex-valued Fresnel coefficients (see also [`fresnel_co
 mutable struct PolarizedRay{T} <: AbstractRay{T}
     pos::Point3{T}
     dir::Point3{T}
-    intersection::Nullable{Intersection{T}}
+    intersection::Union{Nothing, Intersection{T}, MultiIntersection{T}}
     λ::T
-    n::T
+    n::Union{T, Complex{T}}
     E0::Point3{Complex{T}}
     function PolarizedRay{T}(
             pos::AbstractArray{P},
             dir::AbstractArray{D},
-            int::Nullable{Intersection},
+            int::Union{Nothing, Intersection, MultiIntersection},
             λ::L,
             n::N,
             E0::AbstractArray{<:Union{E, Complex{E}}}
         ) where {T, P, D, L, N, E}
-        M = promote_type(T, P, D, L, N, E)
+        M = promote_type(T, P, D, L, real(N), real(E))
         if isapprox(norm(dir), 0, atol=1e-14)
             throw(ErrorException("Direction vector to short for normalization."))
         end
@@ -62,7 +62,7 @@ mutable struct PolarizedRay{T} <: AbstractRay{T}
             normalize(Point3{M}(dir)),
             int,
             M(λ),
-            M(n),
+            (n isa Complex ? Complex{M}(n) : M(n)),
             Point3{Complex{M}}(E0)
         )
     end
@@ -152,6 +152,12 @@ XYBasis(j11::Number, j12::Number, j21::Number, j22::Number) = GlobalJonesBasis(@
 XZBasis(j11::Number, j12::Number, j21::Number, j22::Number) = GlobalJonesBasis(@SArray([j11 0 j12; 0 1 0; j21 0 j22]))
 YZBasis(j11::Number, j12::Number, j21::Number, j22::Number) = GlobalJonesBasis(@SArray([1 0 0; 0 j22 j21; 0 j12 j11]))
 
+Base.:*(val::Number, J::GlobalJonesBasis) = GlobalJonesBasis(val * static_data(J))
+Base.:*(J::GlobalJonesBasis, val::Number) = GlobalJonesBasis(static_data(J) * val)
+
+Base.:*(val::Number, J::LocalJonesBasis) = LocalJonesBasis(val * static_data(J))
+Base.:*(J::LocalJonesBasis, val::Number) = LocalJonesBasis(static_data(J) * val)
+
 """
     _calculate_global_E0(in_dir, out_dir, normal, J)
 
@@ -166,29 +172,40 @@ is chosen for the s- and p-components.
 - `J`: Jones matrix extended to 3x3, e.g. [-rₛ 0 0; 0 rₚ 0; 0 0 1] for reflection
 """
 function _calculate_global_E0(in_dir::AbstractArray, out_dir::AbstractArray, normal::AbstractArray, J::LocalJonesBasis)
-    # Choose basis vectors
-    if !isparallel3d(in_dir, out_dir)
-        v = out_dir
+    k_in = normalize(in_dir)
+    k_out = normalize(out_dir)
+    n = normalize(normal)
+
+    # Test if in-dir and normal are parallel (normal incidence)
+    if isparallel3d(k_in, n)
+        s = normal3d(k_in)
     else
-        v = normal
+        s = cross(k_in, n)
+        s = normalize(s)
     end
-    # test if in-dir and normal are parallel
-    if isparallel3d(in_dir, normal)
-        # Does this really always work for normal s-p-incidence?
-        v = normal3d(in_dir)
-    end
-    # Calculate support vector
-    s = cross(in_dir, v)
-    s = normalize(s)
+
     # Calculate transforms
-    p1 = cross(in_dir, s)
-    O_in = vcat(s', p1', in_dir')
+    p1 = cross(k_in, s)
+    O_in = @SArray [
+        s[1]       s[2]       s[3];
+        p1[1]      p1[2]      p1[3];
+        k_in[1]    k_in[2]    k_in[3]
+    ]
+
     # Fallback method as per eq. 17
-    if isparallel3d(in_dir, out_dir) && !(in_dir ≈ -out_dir)
-        O_out = hcat(s, p1, in_dir)
+    if isparallel3d(k_in, k_out) && !(k_in ≈ -k_out)
+        O_out = @SArray [
+            s[1]  p1[1]  k_in[1];
+            s[2]  p1[2]  k_in[2];
+            s[3]  p1[3]  k_in[3]
+        ]
     else
-        p2 = cross(out_dir, s)
-        O_out = hcat(s, p2, out_dir)
+        p2 = cross(k_out, s)
+        O_out = @SArray [
+            s[1]  p2[1]  k_out[1];
+            s[2]  p2[2]  k_out[2];
+            s[3]  p2[3]  k_out[3]
+        ]
     end
     # Calculate new E0
     P = O_out * J * O_in

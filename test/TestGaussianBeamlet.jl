@@ -158,6 +158,19 @@ const mm = 1e-3
             @test BMO.istilted(system, gauss) == true
             @test BMO.isparaxial(system, gauss, deg2rad(30)) == false
         end
+
+        @testset "Batch and In-place Field Evaluation" begin
+            gauss_test = GaussianBeamlet([0.0, 0, 0], [0, 1, 0], 1064e-9, 1e-3)
+            rs = LinRange(-5e-4, 5e-4, 11)
+            z_eval = 0.05
+            E_single = [BMO.electric_field(gauss_test, r, z_eval) for r in rs]
+            E_batch = BMO.electric_field(gauss_test, rs, z_eval)
+            @test E_batch ≈ E_single
+
+            E_out = zeros(ComplexF64, size(rs))
+            BMO.electric_field!(E_out, gauss_test, rs, z_eval)
+            @test E_out ≈ E_single
+        end
     end
 end
 

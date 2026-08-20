@@ -76,7 +76,7 @@ const BMO = BeamletOptics
         @testset "y-Polarization" begin
             BMO.polarization!(ray, lin_y_pol)
             translate3d!(m3, [0, 2, 0])
-            # test retracing
+            # test re-solving after a kinematic change
             solve_system!(system, beam)
             @test BMO.polarization(beam.rays[1]) ≈ lin_y_pol
             @test BMO.polarization(beam.rays[2]) ≈ [0, -I0_2, 0]

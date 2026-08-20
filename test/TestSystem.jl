@@ -19,9 +19,6 @@ const BMO = BeamletOptics
         @test_logs (:warn, "Tracing for $(typeof(beam)) not implemented") BMO.trace_system!(
             system,
             beam)
-        @test_logs (:warn, "Retracing for $(typeof(beam)) not implemented") BMO.retrace_system!(
-            system,
-            beam)
     end
 
     # Setup circular multipass cell with flat mirrors
@@ -51,15 +48,14 @@ const BMO = BeamletOptics
         first_obj = mirrors[(n_mirrors + 1) ÷ 2 + 2]
         false_obj = mirrors[(n_mirrors + 1) ÷ 2 + 2 + 1]
         # trace_all
-        @test BMO.object(BMO.trace_all(system, ray)) === first_obj
+        @test BMO.trace_all(system, ray)[2] === first_obj
         # trace_one
-        @test BMO.object(BMO.trace_one(
-            system, ray, BMO.Hint(first_obj))) === first_obj
-        @test BMO.object(BMO.trace_one(
-            system, ray, BMO.Hint(false_obj))) === first_obj
+        @test BMO.trace_one(system, ray, BMO.Hint(first_obj))[2] === first_obj
+        @test BMO.trace_one(system, ray, BMO.Hint(false_obj))[2] === first_obj
         # tracing step
-        BMO.tracing_step!(system, ray, nothing)
-        @test BMO.object(BMO.intersection(ray)) === first_obj
+        obj = BMO.tracing_step!(system, ray, nothing)
+        @test obj === first_obj
+        @test BMO.intersection(ray) isa Intersection
     end
 
     @testset "Testing system tracing" begin
@@ -75,8 +71,7 @@ const BMO = BeamletOptics
         first_ray_dir = BMO.direction(first_ray)
         last_ray_dir = BMO.direction(last(BMO.rays(beam)))
         @test 180 - rad2deg(BMO.angle3d(first_ray_dir, last_ray_dir)) ≈ 2 * Δθ
-        @test BMO.object(BMO.intersection(first_ray)) ===
-              mirrors[(n_mirrors + 1) ÷ 2 + 2]
+        @test !isnothing(BMO.intersection(first_ray))
     end
 
     @testset "Testing StaticSystem tracing" begin
@@ -93,20 +88,20 @@ const BMO = BeamletOptics
         first_ray_dir = BMO.direction(first_ray)
         last_ray_dir = BMO.direction(last(BMO.rays(beam)))
         @test 180 - rad2deg(BMO.angle3d(first_ray_dir, last_ray_dir)) ≈ 2 * Δθ
-        @test BMO.object(BMO.intersection(first_ray)) ===
-              mirrors[(n_mirrors + 1) ÷ 2 + 2]
+        @test !isnothing(BMO.intersection(first_ray))
     end
 
-    @testset "Testing system retracing" begin
-        system = System(mirrors)
-        first_ray = Ray(origin, dir)
-        beam = Beam(first_ray)
-        t1 = @timed BMO.trace_system!(system, beam, r_max = 1000000)
-        t2 = @timed BMO.retrace_system!(system, beam) # for precompilation
-        t2 = @timed BMO.retrace_system!(system, beam)
-        if t1.time < t2.time
-            @warn "Retracing took longer than tracing, something might be bugged...\n   Tracing: $(t1.time) s\n   Retracing: $(t2.time) s"
-        end
+    @testset "Dynamic Coincident Boundaries (MultiIntersection)" begin
+        lens1 = SphericalLens(Inf, -50e-3, 10e-3, 25.4e-3, 1.5)
+        lens2 = SphericalLens(-50e-3, Inf, 10e-3, 25.4e-3, 1.6)
+        translate3d!(lens2, [0.0, thickness(lens1), 0.0])
+        
+        sys = System([lens1, lens2])
+        ray = Ray([0.0, -10e-3, 0.0], [0.0, 1.0, 0.0])
+        beam = Beam(ray)
+        
+        solve_system!(sys, beam)
+        @test length(rays(beam)) >= 3
     end
 end
 

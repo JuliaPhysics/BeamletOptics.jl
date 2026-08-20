@@ -189,10 +189,10 @@ function AstigmaticGaussianBeamlet(
     div_dir_yp = normalize(direction + s2 * tan(θy))
     div_dir_ym = normalize(direction - s2 * tan(θy))
     # Corrected divergence ray positions to ensure waist is at z0_x and z0_y
-    dxp = Ray(position - z0_x * s1 * tan(θx), div_dir_xp, λ)
-    dxm = Ray(position + z0_x * s1 * tan(θx), div_dir_xm, λ)
-    dyp = Ray(position - z0_y * s2 * tan(θy), div_dir_yp, λ)
-    dym = Ray(position + z0_y * s2 * tan(θy), div_dir_ym, λ)
+    dxp = Ray(position + z0_x * direction, div_dir_xp, λ)
+    dxm = Ray(position + z0_x * direction, div_dir_xm, λ)
+    dyp = Ray(position + z0_y * direction, div_dir_yp, λ)
+    dym = Ray(position + z0_y * direction, div_dir_ym, λ)
     # Chief ray
     c = PolarizedRay(position + z0 * direction, direction, λ, E0)
     return AstigmaticGaussianBeamlet(
@@ -208,7 +208,11 @@ function AstigmaticGaussianBeamlet(
     )
 end
 
-"""Return a tuple of all 9 component beams of the [`AstigmaticGaussianBeamlet`](@ref)."""
+"""
+    _component_beams(agb::AstigmaticGaussianBeamlet)
+
+Returns a tuple of all 9 component [`Beam`](@ref)s (chief and 8 auxiliary waist/divergence beams).
+"""
 @inline _component_beams(agb::AstigmaticGaussianBeamlet) = (
     agb.c, agb.wxp, agb.wxm, agb.wyp, agb.wym, agb.dxp, agb.dxm, agb.dyp, agb.dym)
 
@@ -224,7 +228,13 @@ optical_path_length(agb::AstigmaticGaussianBeamlet) = optical_path_length(agb.c)
 
 isentering(agb::AstigmaticGaussianBeamlet, id::Int) = isentering(rays(agb.c)[id])
 
-_last_beam_intersection(agb::AstigmaticGaussianBeamlet) = intersection(last(rays(agb.c)))
+function _reset_beam!(agb::AstigmaticGaussianBeamlet)
+    for beam in _component_beams(agb)
+        _reset_beam!(beam)
+    end
+    _drop_beams!(agb)
+    return nothing
+end
 
 point_on_beam(agb::AstigmaticGaussianBeamlet, t::Real) = point_on_beam(agb.c, t)
 
@@ -313,20 +323,19 @@ function interact3d(system::AbstractSystem,
         object::AbstractObject,
         agb::AstigmaticGaussianBeamlet{R},
         ray_id::Int) where {R}
-    i_c = interact3d(system, object, agb.c, rays(agb.c)[ray_id])
-    i_wxp = interact3d(system, object, agb.wxp, rays(agb.wxp)[ray_id])
-    i_wxm = interact3d(system, object, agb.wxm, rays(agb.wxm)[ray_id])
-    i_wyp = interact3d(system, object, agb.wyp, rays(agb.wyp)[ray_id])
-    i_wym = interact3d(system, object, agb.wym, rays(agb.wym)[ray_id])
-    i_dxp = interact3d(system, object, agb.dxp, rays(agb.dxp)[ray_id])
-    i_dxm = interact3d(system, object, agb.dxm, rays(agb.dxm)[ray_id])
-    i_dyp = interact3d(system, object, agb.dyp, rays(agb.dyp)[ray_id])
-    i_dym = interact3d(system, object, agb.dym, rays(agb.dym)[ray_id])
-    if any(isnothing, (i_c, i_wxp, i_wxm, i_wyp, i_wym, i_dxp, i_dxm, i_dyp, i_dym))
-        return nothing
+    coated_obj, coating = resolve_coated_boundary(system, object, rays(agb.c)[ray_id])
+    if !(coating isa Uncoated)
+        target_obj = isnothing(coated_obj) ? object : coated_obj
+        if coating_behavior(coating, rays(agb.c)[ray_id]) isa Absorptive
+            return nothing
+        end
+        return interact3d_behavior(coating_behavior(coating, rays(agb.c)[ray_id]),
+            system, target_obj, coating, agb, ray_id)
     end
-    return AstigmaticGaussianBeamletInteraction{R}(
-        i_c, i_wxp, i_wxm, i_wyp, i_wym, i_dxp, i_dxm, i_dyp, i_dym)
+
+    ints = map(b -> interact3d(system, object, b, rays(b)[ray_id]), _component_beams(agb))
+    any(isnothing, ints) && return nothing
+    return AstigmaticGaussianBeamletInteraction{R}(ints...)
 end
 
 function Base.push!(agb::AstigmaticGaussianBeamlet{T},
@@ -341,34 +350,6 @@ function Base.push!(agb::AstigmaticGaussianBeamlet{T},
     push!(agb.dyp, interaction.dyp)
     push!(agb.dym, interaction.dym)
     return nothing
-end
-
-function Base.replace!(agb::AstigmaticGaussianBeamlet{T},
-        interaction::AstigmaticGaussianBeamletInteraction{T},
-        index::Int) where {T}
-    replace!(agb.c, interaction.chief, index)
-    replace!(agb.wxp, interaction.wxp, index)
-    replace!(agb.wxm, interaction.wxm, index)
-    replace!(agb.wyp, interaction.wyp, index)
-    replace!(agb.wym, interaction.wym, index)
-    replace!(agb.dxp, interaction.dxp, index)
-    replace!(agb.dxm, interaction.dxm, index)
-    replace!(agb.dyp, interaction.dyp, index)
-    replace!(agb.dym, interaction.dym, index)
-    return nothing
-end
-
-function _modify_beam_head!(old::AstigmaticGaussianBeamlet{T},
-        new::AstigmaticGaussianBeamlet{T}) where {T <: Real}
-    _modify_beam_head!(old.c, new.c)
-    _modify_beam_head!(old.wxp, new.wxp)
-    _modify_beam_head!(old.wxm, new.wxm)
-    _modify_beam_head!(old.wyp, new.wyp)
-    _modify_beam_head!(old.wym, new.wym)
-    _modify_beam_head!(old.dxp, new.dxp)
-    _modify_beam_head!(old.dxm, new.dxm)
-    _modify_beam_head!(old.dyp, new.dyp)
-    _modify_beam_head!(old.dym, new.dym)
 end
 
 """
@@ -389,10 +370,9 @@ Tests if all 9 component rays at section `id` hit the same object shape.
         isnothing(intersection(rays(agb.dym)[id])) || return false
         return true
     else
-        s0 = shape(i1)
         _check = b -> begin
             int = intersection(rays(b)[id])
-            !isnothing(int) && shape(int) === s0
+            !isnothing(int)
         end
         _check(agb.wxp) || return false
         _check(agb.wxm) || return false
@@ -723,6 +703,73 @@ function parabasal_field(
 end
 
 """
+    parabasal_field(agb, rs::AbstractArray{<:AbstractVector}, z; kwargs...)
+
+Batch version of [`parabasal_field`](@ref) evaluating the scalar electric field across an array of
+transverse offsets `rs` at longitudinal position `z`. Hoists chief-ray invariants (z-segment,
+parabasal parameters, reference area, OPL phase shift) for accelerated evaluation.
+"""
+function parabasal_field(
+        agb::AstigmaticGaussianBeamlet,
+        rs::AbstractArray{V},
+        z::Real;
+        E_ref_amp::Union{Nothing, Number} = nothing,
+        area_ref::Union{Nothing, Complex} = nothing,
+        z_norm::Real = 0.0
+) where {V <: AbstractArray}
+    p0, i = point_on_beam(agb, z)
+    chief = rays(agb.c)[i]
+    dir = direction(chief)
+
+    if area_ref === nothing || E_ref_amp === nothing
+        p0n, in_ = point_on_beam(agb, z_norm)
+        chiefn = rays(agb.c)[in_]
+        if area_ref === nothing
+            dirn = direction(chiefn)
+            h1n, _, h2n, _, _ = parabasal_ray_parameters(agb, p0n, in_)
+            area_ref = _pseudo_cross2d(h1n, h2n, dirn)
+        end
+        if E_ref_amp === nothing
+            E_vec = polarization(chiefn)
+            max_idx = argmax(abs.(E_vec))
+            E_ref_amp = Complex(norm(E_vec) * cis(angle(E_vec[max_idx])))
+        end
+    end
+
+    h1, u1, h2, u2, _ = parabasal_ray_parameters(agb, p0, i)
+    area = _pseudo_cross2d(h1, h2, dir)
+    if isnan(area) || abs(area) < 1e-25
+        area = Complex(1e-25, 1e-25)
+    end
+
+    p_parent = agb.parent
+    l_parent = isnothing(p_parent) ? 0.0 : length(p_parent)
+    opl_parent = isnothing(p_parent) ? 0.0 : optical_path_length(p_parent)
+
+    Δl = opl_parent - l_parent
+    z_sum = l_parent
+    for j in 1:(i - 1)
+        ray_j = rays(agb.c)[j]
+        Δl += optical_path_length(ray_j) - length(ray_j)
+        z_sum += length(ray_j)
+    end
+    Δl += (refractive_index(chief) - 1) * (z - z_sum)
+
+    k0 = 2π / wavelength(chief)
+    gouy_opl_factor = E_ref_amp * sqrt(area_ref / area) * exp(im * k0 * (z + Δl))
+
+    res = Array{ComplexF64}(undef, size(rs))
+    for idx in eachindex(rs)
+        r = rs[idx]
+        ξ1 = _pseudo_cross2d(h1, r, dir)
+        ξ2 = _pseudo_cross2d(h2, r, dir)
+        w = (ξ1 * _pseudo_dot(u2, r) - ξ2 * _pseudo_dot(u1, r)) / (2 * area)
+        res[idx] = gouy_opl_factor * exp(im * k0 * w)
+    end
+    return res
+end
+
+"""
     electric_field(agb, r, z)
 
 Convenience wrapper for [`parabasal_field`](@ref) using the beamlet's starting position (z=0)
@@ -730,6 +777,22 @@ as the reference normalization.
 """
 function electric_field(agb::AstigmaticGaussianBeamlet, r::AbstractArray, z::Real)
     return parabasal_field(agb, r, z; z_norm = 0.0)
+end
+
+"""
+    electric_field!(E_out, agb, rs, z)
+
+In-place batch evaluation of scalar electric field phasors into pre-allocated array `E_out`.
+"""
+function electric_field!(
+        E_out::AbstractArray,
+        agb::AstigmaticGaussianBeamlet,
+        rs::AbstractArray,
+        z::Real
+)
+    fields = parabasal_field(agb, rs, z; z_norm = 0.0)
+    copyto!(E_out, fields)
+    return E_out
 end
 
 """
@@ -759,14 +822,14 @@ function intensity(agb::AstigmaticGaussianBeamlet, r::AbstractArray, z::Real)
 end
 
 """
-    rayleigh_range(agb::AstigmaticGaussianBeamlet)
+    rayleigh_range(agb::AstigmaticGaussianBeamlet; M2=1)
 
 Returns the Rayleigh range for the x and y axes of the beamlet as a tuple `(z_rx, z_ry)`.
 """
-function rayleigh_range(agb::AstigmaticGaussianBeamlet)
+function rayleigh_range(agb::AstigmaticGaussianBeamlet; M2 = 1)
     λ = wavelength(agb)
     _, w1, w2 = waist_parameters(agb, 0.0)
-    return (rayleigh_range(λ, norm(w1)), rayleigh_range(λ, norm(w2)))
+    return (rayleigh_range(λ, norm(w1), M2), rayleigh_range(λ, norm(w2), M2))
 end
 
 """

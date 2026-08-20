@@ -7,17 +7,31 @@ Mutable struct to store ray information.
 
 - `pos`: a point in R³ that describes the `Ray` origin
 - `dir`: a normalized vector in R³ that describes the `Ray` direction
-- `intersection`: refer to [`Intersection`](@ref)
+- `intersection`: refer to [`AbstractIntersection`](@ref)
 - `λ`: wavelength in [m]
 - `n`: refractive index along the beam path
 """
 mutable struct Ray{T} <: AbstractRay{T}
     pos::Point3{T}
     dir::Point3{T}
-    intersection::Nullable{Intersection{T}}
+    intersection::Union{Nothing, Intersection{T}, MultiIntersection{T}}
     λ::T
-    n::T
+    n::Union{T, Complex{T}}
+    weight::T
+
+    function Ray{T}(pos::AbstractArray, dir::AbstractArray, int::Nullable{Intersection}, λ::Real, n::Number, weight::Real = one(T)) where {T}
+        return new{T}(
+            Point3{T}(pos),
+            normalize(Point3{T}(dir)),
+            int,
+            T(λ),
+            (n isa Complex ? Complex{T}(n) : T(n)),
+            T(weight)
+        )
+    end
 end
+
+Ray{T}(pos, dir, int, λ, n) where {T} = Ray{T}(pos, dir, int, λ, n, one(T))
 
 """
     Ray(pos, dir, λ=1000e-9)
@@ -31,7 +45,7 @@ Optionally, a wavelength `λ` can be specified. The start refractive index is as
 """
 function Ray(pos::AbstractArray{P},
         dir::AbstractArray{D},
-        λ::L = 1000e-9) where {P <: Real, D <: Real, L<:Real}
+        λ::L = 1000e-9) where {P <: Real, D <: Real, L <: Real}
     F = promote_type(P, D, L)
     if isapprox(norm(dir), 0, atol=1e-14)
         throw(ErrorException("Direction vector to short for normalization."))
@@ -41,5 +55,29 @@ function Ray(pos::AbstractArray{P},
         normalize(Point3{F}(dir)),
         nothing,
         F(λ),
-        F(1))
+        F(1),
+        F(1)
+    )
 end
+
+function Ray(pos::AbstractArray{P},
+        dir::AbstractArray{D},
+        intersection::Nullable{<:AbstractIntersection},
+        λ::L = 1000e-9,
+        n::N = 1,
+        weight::W = 1) where {P <: Real, D <: Real, L <: Real, N <: Number, W <: Real}
+    F = promote_type(P, D, L, real(N), W)
+    if isapprox(norm(dir), 0, atol=1e-14)
+        throw(ErrorException("Direction vector to short for normalization."))
+    end
+    return Ray{F}(
+        Point3{F}(pos),
+        normalize(Point3{F}(dir)),
+        intersection,
+        F(λ),
+        (n isa Complex ? Complex{F}(n) : F(n)),
+        F(weight))
+end
+
+weight(ray::Ray) = ray.weight
+weight!(ray::Ray, w::Real) = (ray.weight = w)

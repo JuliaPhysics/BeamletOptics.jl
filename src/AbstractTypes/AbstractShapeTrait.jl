@@ -61,7 +61,9 @@ If `shape_trait_of(::Foo) = MultiShape()` is defined, `Foo` must implement the f
 
 ## Functions
 
-- `shape(::Foo)`: a getter function that returns a `Tuple` of all relevant shapes, e.g. `(foo.front, foo.middle, foo.back)`
+- `shape(::Foo)`: a getter function that returns a `Tuple` of all relevant parts, e.g. `(foo.front, foo.middle, foo.back)`.
+  Parts may be [`AbstractShape`](@ref)s or nested [`AbstractObject`](@ref)s (e.g. a coating modeled as its own object) —
+  `intersect3d`/kinematic functions dispatch on whichever is returned.
 
 # Additional information
 
@@ -165,7 +167,15 @@ function reset_rotation3d!(::MultiShape, object::AbstractObject{T}) where T
         return nothing
     end
     # Calculate rotation reset axis
-    axis = 1/(2*sin(θ)) * [R[3,2]-R[2,3], R[1,3]-R[3,1], R[2,1]-R[1,2]]
+    if θ > π - 1e-5
+        # Since θ ≈ π, sin(θ) ≈ 0, R is symmetric: R + I = 2 * axis * axisᵀ
+        # Find the column of R + I with the largest norm to extract the axis robustly
+        M = R + I
+        col_idx = argmax(vec(sum(abs2, M, dims=1)))
+        axis = normalize(M[:, col_idx])
+    else
+        axis = 1/(2*sin(θ)) * [R[3,2]-R[2,3], R[1,3]-R[3,1], R[2,1]-R[1,2]]
+    end
     # Reset object rotation
     rotate3d!(object, axis, -θ)
     # Reset center of kinematics (removes precision artifacts)

@@ -2,11 +2,13 @@ module TestBeams
 
 using BeamletOptics
 using Test
+using LinearAlgebra
+using GeometryBasics
 
 const BMO = BeamletOptics
 
 @testset "Beams" begin
-    is = BMO.Intersection(1.0, zeros(3))
+    is = Intersection(1.0, [1.0, 0.0, 0.0], [0.0, 1.0, 0.0])
     r1 = Ray([0.0, 0, 0], [1, 0, 0])
     r2 = Ray([1.0, 0, 0], [0, 1, 0])
     r3 = Ray([1.0, 1, 0], [0, 0, 1])

@@ -18,7 +18,8 @@ Subtypes of `AbstractSystem` must implement the following:
 """
 abstract type AbstractSystem end
 
-refractive_index(::AbstractSystem, λ::Real) = 1.0
+refractive_index(::AbstractSystem, λ::Real) = one(λ)
+refractive_index(sys::AbstractSystem) = refractive_index(sys, get_default_wavelength())
 
 """
     interact3d(::AbstractSystem, object::AbstractObject, ::AbstractBeam, ::AbstractRay)
@@ -39,7 +40,7 @@ A `Hint` can be passed as part of an [`AbstractInteraction`](@ref) and will info
 in the [`AbstractSystem`](@ref) will be hit next.
 
 !!! info 
-    The `Hint` does not need to result in a guaranteed [`Intersection`](@ref). However, if the hinted shape is intersected, it will
+    The `Hint` does not need to result in a guaranteed [`AbstractIntersection`](@ref). However, if the hinted shape is intersected, it will
     be immediatly assumed as the correct global intersection.
 
 # Fields

@@ -59,6 +59,34 @@ const BMO = BeamletOptics
         @test norm(w2) ≈ w0 atol=1e-6
     end
 
+    @testset "Rayleigh range" begin
+        beam = AstigmaticGaussianBeamlet([0.0, 0, 0], [0, 1, 0], λ0, w0; E0=[0,0,1], support=[0,0,1])
+        rx, ry = BMO.rayleigh_range(beam)
+        expected_zr = π * w0^2 / λ0
+        @test rx ≈ expected_zr atol=1e-6
+        @test ry ≈ expected_zr atol=1e-6
+        
+        rx2, ry2 = BMO.rayleigh_range(beam; M2=2.0)
+        @test rx2 ≈ expected_zr / 2.0 atol=1e-6
+        @test ry2 ≈ expected_zr / 2.0 atol=1e-6
+    end
+
+    @testset "Batch and In-place Field Evaluation" begin
+        beam = AstigmaticGaussianBeamlet([0.0, 0, 0], [0, 1, 0], λ0, w0; E0=[0,0,1], support=[0,0,1])
+        dir = normalize([0, 1, 0])
+        ex = normalize(cross(dir, [0,0,1]))
+        z_eval = 0.05
+        rs = [ex * r for r in LinRange(-2e-4, 2e-4, 11)]
+
+        E_single = [BMO.parabasal_field(beam, r, z_eval) for r in rs]
+        E_batch = BMO.parabasal_field(beam, rs, z_eval)
+        @test E_batch ≈ E_single
+
+        E_out = zeros(ComplexF64, size(rs))
+        BMO.electric_field!(E_out, beam, rs, z_eval)
+        @test E_out ≈ E_single
+    end
+
     @testset "Waist parameters with offsets" begin
         z0_x = 0.05
         z0_y = 0.10
@@ -162,7 +190,7 @@ const BMO = BeamletOptics
         end
     end
 
-    @testset "Retracing" begin
+    @testset "Re-solving after a kinematic change" begin
         s1 = BMO.CylinderSDF(BMO.inch / 2, BMO.inch)
         l1 = BMO.Lens(s1, n -> 1.5)
         BMO.translate3d!(l1, [0, 0.1, 0.0])
@@ -174,9 +202,9 @@ const BMO = BeamletOptics
 
         n_initial = length(BMO.rays(beam.c))
 
-        # Move lens slightly and retrace
+        # Move lens slightly and solve again
         BMO.translate3d!(l1, [0, 0.005, 0])
-        BMO.retrace_system!(system, beam)
+        solve_system!(system, beam)
 
         # Should still have same number of segments
         @test length(BMO.rays(beam.c)) == n_initial

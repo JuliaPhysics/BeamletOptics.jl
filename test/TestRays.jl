@@ -7,6 +7,8 @@ using GeometryBasics
 
 const BMO = BeamletOptics
 
+dummy_intersection(t, n) = Intersection(t, [0.0, 0.0, 0.0], Point3(n))
+
 @testset "Rays" begin
     # Testing constructor
     pos = [0, 0, 0]
@@ -28,8 +30,8 @@ const BMO = BeamletOptics
         r1 = Ray([0, 0, 0], [0, 1, 0])
         r2 = Ray([0, 0, 0], [0, 1, 0])
         r3 = Ray([0, 0, 0], [0, 1, 0])
-        i1 = BMO.Intersection(nothing, nothing, 0.0, Point3(0, 1.0, 0))
-        i2 = BMO.Intersection(nothing, nothing, 0.0, Point3(0, -1.0, 0))
+        i1 = dummy_intersection(0.0, [0, 1.0, 0])
+        i2 = dummy_intersection(0.0, [0, -1.0, 0])
         BMO.intersection!(r1, i1)
         BMO.intersection!(r2, i2)
         @test !BMO.isentering(r1)
@@ -44,13 +46,13 @@ const BMO = BeamletOptics
         ray = Ray(zeros(3), dir)
         nml = normalize(Point3{Float64}(0, -1, 1))
         BMO.intersection!(
-            ray, BMO.Intersection(nothing, nothing, 1.0, nml))
+            ray, dummy_intersection(1.0, nml))
         @test BMO.refraction3d(dir, nml, n1, n2) ==
               BMO.refraction3d(ray, n2)
         # test for correct exit normal flip
         nml *= -1
         BMO.intersection!(
-            ray, BMO.Intersection(nothing, nothing, 1.0, nml))
+            ray, dummy_intersection(1.0, nml))
         @test BMO.refraction3d(dir, -nml, n1, n2) ==
               BMO.refraction3d(ray, n2)
     end

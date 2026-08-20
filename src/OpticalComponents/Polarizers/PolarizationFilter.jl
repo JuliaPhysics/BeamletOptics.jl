@@ -1,3 +1,5 @@
+abstract type AbstractJonesPolarizer{T} <: AbstractObject{T} end
+
 """
     PolarizationFilter <: AbstractJonesPolarizer
 

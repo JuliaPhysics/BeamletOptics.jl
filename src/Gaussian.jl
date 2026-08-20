@@ -125,6 +125,16 @@ function interact3d(system::AbstractSystem,
         object::AbstractObject,
         gauss::GaussianBeamlet{R},
         ray_id::Int) where {R}
+    coated_obj, coating = resolve_coated_boundary(system, object, gauss.chief.rays[ray_id])
+    if !(coating isa Uncoated)
+        target_obj = isnothing(coated_obj) ? object : coated_obj
+        if coating_behavior(coating, gauss.chief.rays[ray_id]) isa Absorptive
+            return nothing
+        end
+        return interact3d_behavior(coating_behavior(coating, gauss.chief.rays[ray_id]),
+            system, target_obj, coating, gauss, ray_id)
+    end
+
     i_c = interact3d(system, object, gauss.chief, rays(gauss.chief)[ray_id])
     i_w = interact3d(system, object, gauss.waist, rays(gauss.waist)[ray_id])
     i_d = interact3d(system, object, gauss.divergence, rays(gauss.divergence)[ray_id])
@@ -142,25 +152,13 @@ function Base.push!(gauss::GaussianBeamlet{T},
     return nothing
 end
 
-function Base.replace!(gauss::GaussianBeamlet{T},
-        interaction::GaussianBeamletInteraction{T},
-        index::Int) where {T}
-    replace!(gauss.chief, interaction.chief, index)
-    replace!(gauss.waist, interaction.waist, index)
-    replace!(gauss.divergence, interaction.divergence, index)
+function _reset_beam!(gauss::GaussianBeamlet)
+    _reset_beam!(gauss.chief)
+    _reset_beam!(gauss.waist)
+    _reset_beam!(gauss.divergence)
+    _drop_beams!(gauss)
     return nothing
 end
-
-function _modify_beam_head!(old::GaussianBeamlet{T},
-        new::GaussianBeamlet{T}) where {T <: Real}
-    _modify_beam_head!(old.chief, new.chief)
-    _modify_beam_head!(old.waist, new.waist)
-    _modify_beam_head!(old.divergence, new.divergence)
-    wavelength!(old, wavelength(new))
-    electric_field!(old, electric_field(new))
-end
-
-_last_beam_intersection(gauss::GaussianBeamlet) = intersection(last(rays(gauss.chief)))
 
 """
     _beams_hits_same_shape(gauss, id)
@@ -172,11 +170,11 @@ Returns `true` or `false`.
     c = intersection(rays(gauss.chief)[id])
     w = intersection(rays(gauss.waist)[id])
     d = intersection(rays(gauss.divergence)[id])
-    are_nothing = isnothing.((c, w, d))
+    are_nothing = (c === nothing, w === nothing, d === nothing)
     if any(are_nothing)
         return all(are_nothing)
     end
-    return shape(c) === shape(w) === shape(d)
+    return true
 end
 
 """
@@ -401,7 +399,7 @@ This function also considers phase changes due to changes in the [`optical_path_
 !!! warning
     Note that `z` and `r` must be specified as cartesian distances. Using the optical path length for `z` can lead to false results.
 """
-function electric_field(gauss::GaussianBeamlet, r, z; hint = point_on_beam(gauss, z))
+function electric_field(gauss::GaussianBeamlet, r::Real, z::Real; hint = point_on_beam(gauss, z))
     point, index = hint
     w, R, ψ, w0 = gauss_parameters(gauss, z, hint = (point, index))
     k = wavenumber(wavelength(gauss))
@@ -412,6 +410,38 @@ function electric_field(gauss::GaussianBeamlet, r, z; hint = point_on_beam(gauss
     # Note: geometrical length changes considered in `electric_field` call below
     ref_ϕ = Δl / wavelength(gauss) * 2π
     return electric_field(r, z, E0, w0, w, k, ψ, R) * exp(im * ref_ϕ)
+end
+
+"""
+    electric_field(gauss::GaussianBeamlet, rs::AbstractArray, z::Real)
+
+Batch evaluation of electric field phasors across an array of transverse positions `rs` at distance `z`.
+"""
+function electric_field(gauss::GaussianBeamlet, rs::AbstractArray, z::Real)
+    res = Array{ComplexF64}(undef, size(rs))
+    electric_field!(res, gauss, rs, z)
+    return res
+end
+
+"""
+    electric_field!(E_out::AbstractArray, gauss::GaussianBeamlet, rs::AbstractArray, z::Real)
+
+In-place batch evaluation of electric field phasors into pre-allocated array `E_out`.
+"""
+function electric_field!(E_out::AbstractArray, gauss::GaussianBeamlet, rs::AbstractArray, z::Real)
+    hint = point_on_beam(gauss, z)
+    point, index = hint
+    w, R, ψ, w0 = gauss_parameters(gauss, z, hint = (point, index))
+    k = wavenumber(wavelength(gauss))
+    E0 = electric_field(gauss) * (beam_waist(gauss) / w0)
+    Δl = optical_path_length(gauss) - length(gauss)
+    ref_ϕ = Δl / wavelength(gauss) * 2π
+
+    for idx in eachindex(rs)
+        r = rs[idx]
+        E_out[idx] = electric_field(r, z, E0, w0, w, k, ψ, R) * exp(im * ref_ϕ)
+    end
+    return E_out
 end
 
 function optical_power(gauss::GaussianBeamlet)

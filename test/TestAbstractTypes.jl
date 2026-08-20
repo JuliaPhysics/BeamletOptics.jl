@@ -15,7 +15,9 @@ const BMO = BeamletOptics
     @test isdefined(BMO, :AbstractRay)
     @test isdefined(BMO, :AbstractBeam)
     @test isdefined(BMO, :AbstractSystem)
+    @test isdefined(BMO, :AbstractIntersection)
     @test isdefined(BMO, :Intersection)
+    @test isdefined(BMO, :MultiIntersection)
     @test isdefined(BMO, :Hint)
     @test isdefined(BMO, :AbstractInteraction)
 
@@ -69,6 +71,7 @@ const BMO = BeamletOptics
         is_1 = BMO.intersect3d(plane_pos, plane_nml_1, ray)
         is_2 = BMO.intersect3d(plane_pos, plane_nml_2, ray)
         is_3 = BMO.intersect3d(plane_pos, plane_nml_3, ray)
+        @test is_1 isa BMO.Intersection{Float64}
         @test length(is_1) == 2
         @test length(is_2) == 1
         @test isnothing(is_3)
@@ -101,16 +104,16 @@ const BMO = BeamletOptics
         @test AbstractTrees.parent(cb1) === root
         @test AbstractTrees.parent(cb2) === root
         @test AbstractTrees.parent(cb3) === cb2
-        # Replace bottom child
+        # Adding another child to a beam that already has one must fail
         cbr = TestBeam()
-        @test_throws "_modify_beam_head not implemented for $(typeof(cb2))" BMO.children!(
+        @test_throws "Adding child to beam failed" BMO.children!(
             cb2,
             cbr)
         # Test child removal
         BMO._drop_beams!(cb2)
         @test isempty(BMO.children(cb2))
         # Stuff
-        @test_throws "_last_beam_intersection not implemented for $(typeof(cb2))" BMO._last_beam_intersection(cb2)
+        @test_throws "_reset_beam! not implemented for $(typeof(cb2))" BMO._reset_beam!(cb2)
     end
 
     mutable struct TestShapeless{T} <: BMO.AbstractShape{T}
@@ -215,6 +218,112 @@ const BMO = BeamletOptics
                 ray)===nothing
         end
     end
-end
+
+    @testset "AbstractIntersection" begin
+        shape = TestShapeless()
+        object = TestObject(shape)
+        t = 2.0
+        p = [0.0, 2.0, 0.0]
+        n = [0.0, 0.0, 1.0]
+
+        @testset "Intersection(t, p, n)" begin
+            int = Intersection(t, p, n)
+            @test int isa BMO.AbstractIntersection{Float64}
+            @test length(int) == t
+            @test position(int) == Point3(p)
+            @test normal3d(int) == Point3(n)
+        end
+
+        @testset "MultiIntersection" begin
+            hit = Intersection(t, p, n)
+            other_object = TestObject(TestShapeless())
+
+            mi = BMO.MultiIntersection(hit; exiting = other_object, entering = object)
+            @test mi isa BMO.AbstractIntersection{Float64}
+            @test length(mi) == t
+            @test position(mi) == Point3(p)
+            @test normal3d(mi) == Point3(n)
+            @test BMO.exiting(mi) === other_object
+            @test BMO.entering(mi) === object
+        end
+    end
+
+        @testset "AbstractMedium" begin
+            amb = Ambient()
+            @test BMO.refractive_index(amb, 532e-9) == 1.0
+            @test BMO.complex_refractive_index(amb, 532e-9) == 1.0 + 0.0im
+            @test BMO.extinction_coefficient(amb, 532e-9) == 0.0
+            @test BMO.absorption_coefficient(amb, 532e-9) == 0.0
+
+            glass = IsotropicMedium(:N_BK7, λ -> 1.5168)
+            @test BMO.refractive_index(glass, 532e-9) ≈ 1.5168
+            @test BMO.complex_refractive_index(glass, 532e-9) ≈ 1.5168 + 0.0im
+
+            const_medium = IsotropicMedium(:Fixed, 1.45)
+            @test BMO.refractive_index(const_medium) == 1.45
+
+            # Complex refractive index (e.g. absorbing metal or gain medium)
+            metal = IsotropicMedium(:Gold, 0.2 + 3.0im)
+            @test BMO.refractive_index(metal) == 0.2
+            @test BMO.complex_refractive_index(metal) == 0.2 + 3.0im
+            @test BMO.extinction_coefficient(metal) == 3.0
+
+            # Attenuation / linear absorption coefficient
+            abs_glass = IsotropicMedium(:AbsGlass, 1.5, 100.0) # α = 100 1/m
+            @test BMO.refractive_index(abs_glass, 500e-9) == 1.5
+            @test BMO.absorption_coefficient(abs_glass, 500e-9) ≈ 100.0
+            @test isapprox(BMO.extinction_coefficient(abs_glass, 500e-9), 100.0 * 500e-9 / (4 * π), atol=1e-10)
+
+            # Temperature and pressure dependent thermo-optic response
+            air_tp = IsotropicMedium(:AirTP, (λ; T=293.15, P=101325.0) -> 1.0 + 2.7e-4 * (P / 101325.0) * (293.15 / T))
+            @test BMO.refractive_index(air_tp, 500e-9) ≈ 1.00027
+            @test isapprox(BMO.refractive_index(air_tp, 500e-9; T=300.0), 1.0 + 2.7e-4 * (293.15 / 300.0), atol=1e-8)
+            @test isapprox(BMO.refractive_index(air_tp, 500e-9; P=202650.0), 1.0 + 2 * 2.7e-4, atol=1e-8)
+        end
+
+        @testset "AbstractSurfaceModel" begin
+            @test FresnelInterface() isa AbstractSurfaceModel
+            @test IdealMirror() isa AbstractSurfaceModel
+            @test AbsorbingSurface() isa AbstractSurfaceModel
+            @test DetectorSurface() isa AbstractSurfaceModel
+            @test CoatedSurface(:AR) isa AbstractSurfaceModel
+            @test GratingSurface(600.0, 1) isa AbstractSurfaceModel
+        end
+
+        @testset "Coating" begin
+            shape = TestShapeless()
+            c = Coating(shape, FresnelInterface())
+            @test c isa AbstractCoating
+            @test BMO.shape(c) === shape
+            @test BMO.surface_model(c) === FresnelInterface()
+        end
+
+        @testset "Transition" begin
+            trans = resolve_transition(IsotropicMedium(:Glass, 1.5), Ambient(), Ray([0.0, 0, 0], [0.0, 1, 0]), Point3(0.0, -1, 0))
+            @test trans isa Transition
+            @test trans.is_entering == true
+
+            ray = Ray([0.0, 0, 0], [0.0, 1, 0], nothing, 532e-9, 1.0)
+            int = Intersection(1.0, [0.0, 1.0, 0.0], [0.0, -1.0, 0.0])
+            out_ray = interact3d(FresnelInterface(), trans, int, ray)
+            @test out_ray isa Ray
+            @test isapprox(norm(BMO.direction(out_ray)), 1.0)
+
+            mirror_ray = interact3d(IdealMirror(), trans, int, ray)
+            @test mirror_ray isa Ray
+            @test BMO.direction(mirror_ray)[2] ≈ -1.0
+
+            absorb_ray = interact3d(AbsorbingSurface(), trans, int, ray)
+            @test isnothing(absorb_ray)
+
+            # Grating diffraction test: 600 lines/mm, grooves along z
+            g = GratingSurface(600e3, 1, Point3(0.0, 0.0, 1.0))
+            g_ray = interact3d(g, trans, int, Ray([0.0, 0, 0], [0.0, 1, 0], nothing, 500e-9, 1.0))
+            @test g_ray isa Ray
+            # sin(θm) = 500e-9 * 600e3 = 0.30 -> dx = 0.30, dy = -sqrt(1 - 0.3^2)
+            @test isapprox(BMO.direction(g_ray)[1], 0.30, atol=1e-6)
+            @test isapprox(BMO.direction(g_ray)[2], -sqrt(1 - 0.3^2), atol=1e-6)
+        end
+    end
 
 end # MODULE
