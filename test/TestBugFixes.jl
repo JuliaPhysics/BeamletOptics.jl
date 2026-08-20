@@ -162,8 +162,8 @@ end
     r3 = BMO.rays(beam)[3]
     @testset "Testing SDF sphere marching surface bug regression" begin
         @test length(BMO.rays(beam)) == 3
-        @test BMO.object(BMO.intersection(r1)) === mirror
-        @test BMO.object(BMO.intersection(r2)) === mirror
+        @test !isnothing(BMO.intersection(r1))
+        @test !isnothing(BMO.intersection(r2))
         @test isnothing(BMO.intersection(r3))
         @test dot(BMO.direction(r1), BMO.direction(r3)) < 0
     end

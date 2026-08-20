@@ -52,20 +52,50 @@ function trace_system!(::AbstractSystem, beam::B; r_max = 0) where {B <: Abstrac
 end
 
 @inline function trace_all(system::AbstractSystem, ray::AbstractRay{R}) where {R}
-    result::Union{Nothing, ObjectIntersection{R}} = nothing
+    tol = get_coincident_boundary_tolerance()
+    best_hit::Union{Nothing, Intersection{R}} = nothing
+    best_obj = nothing
+    second_hit::Union{Nothing, Intersection{R}} = nothing
+    second_obj = nothing
+    
     for obj in objects(system)
-        # Find shortest intersection
-        temp::Union{Nothing, ObjectIntersection{R}} = intersect3d(obj, ray)
+        temp = intersect3d(obj, ray)
         if temp === nothing
             continue
         end
 
-        # Catch first valid intersection and replace current with closer intersection
-        if result === nothing || length(temp) < length(result)
-            result = temp
+        # Check for coincident hits within tolerance
+        if best_hit === nothing
+            best_hit = temp
+            best_obj = obj
+        elseif abs(length(temp) - length(best_hit)) <= tol
+            second_hit = temp
+            second_obj = obj
+            if length(temp) < length(best_hit)
+                second_hit = best_hit
+                second_obj = best_obj
+                best_hit = temp
+                best_obj = obj
+            end
+        elseif length(temp) < length(best_hit) - tol
+            best_hit = temp
+            best_obj = obj
+            second_hit = nothing
+            second_obj = nothing
         end
     end
-    return result
+    
+    if best_hit === nothing
+        return nothing
+    elseif second_hit === nothing
+        return (best_hit, best_obj)
+    else
+        h1_is_exit = dot(direction(ray), normal3d(best_hit)) > 0
+        exiting_obj = h1_is_exit ? best_obj : second_obj
+        entering_obj = h1_is_exit ? second_obj : best_obj
+        mi = MultiIntersection(best_hit; exiting = exiting_obj, entering = entering_obj)
+        return (mi, best_obj)
+    end
 end
 
 @inline function trace_one(
@@ -76,54 +106,45 @@ end
         # If hinted object is not intersected, trace the entire system
         return trace_all(system, ray)
     else
-        # If hinted object is intersected, tag it with the hinted object
-        return ObjectIntersection(object(hint), shape_intersection)
+        return (shape_intersection, object(hint))
     end
 end
 
 """
     tracing_step!(system::AbstractSystem, ray::AbstractRay{R}, hint::Hint)
 
-Tests if the `ray` intersects an `object` in the optical `system`. Returns the closest intersection.
-
-# Hint
-
-An optional [`Hint`](@ref) can be provided to test against a specific object (and shape) in the `system` first.
-
-!!! warning
-    If a hint is provided and the object intersection is valid, the intersection will be returned immediately.
-    However, it is not guaranteed that this is the true closest intersection.
+Tests if the `ray` intersects an `object` in the optical `system`. Returns the hit object, or `nothing`.
 """
 @inline function tracing_step!(
         system::AbstractSystem, ray::AbstractRay{R}, hint::Hint) where {R <: Real}
-    # Test against hinted object
-    intersection!(ray, trace_one(system, ray, hint))
-    return nothing
+    res = trace_one(system, ray, hint)
+    if res === nothing
+        intersection!(ray, nothing)
+        return nothing
+    else
+        hit, obj = res
+        intersection!(ray, hit)
+        return obj
+    end
 end
 
 @inline function tracing_step!(
         system::AbstractSystem, ray::AbstractRay{R}, ::Nothing) where {R <: Real}
-    # Test against all objects in system
-    intersection!(ray, trace_all(system, ray))
-    return nothing
+    res = trace_all(system, ray)
+    if res === nothing
+        intersection!(ray, nothing)
+        return nothing
+    else
+        hit, obj = res
+        intersection!(ray, hit)
+        return obj
+    end
 end
 
 """
     trace_system!(system::AbstractSystem, beam::Beam{T}; r_max = get_default_r_max()) where {T <: Real}
 
 Trace a [`Beam`](@ref) through an optical `system`. Maximum number of tracing steps can be capped by `r_max`.
-
-# Tracing logic
-
-The intersection of the last ray of the `beam` with any objects contained within the `system` is tested.
-If an object is hit, the optical interaction is calculated. If no interaction occurs or no
-further objects are hit, the tracing procedure is stopped.
-
-# Arguments
-
-- `system:`: The optical system through which the [`Beam`](@ref) is traced.
-- `beam`: The [`Beam`](@ref) object to be traced.
-- `r_max`: Maximum number of tracing iterations.
 """
 function trace_system!(
         system::AbstractSystem,
@@ -136,19 +157,19 @@ function trace_system!(
     interaction::Nullable{BeamInteraction{T, R}} = nothing
     while length(rays(beam)) < r_max
         ray = last(rays(beam))
-        if interaction === nothing
+        obj = if interaction === nothing
             tracing_step!(system, ray, nothing)
         else
             tracing_step!(system, ray, hint(interaction))
         end
         # Test if intersection is valid
         ray_intersection = intersection(ray)
-        if isnothing(ray_intersection)
+        if isnothing(ray_intersection) || isnothing(obj)
             break
         end
-        obj = object(ray_intersection)
-        interaction = interact3d(
-            system, obj, beam, ray)::Union{Nothing, BeamInteraction{T, R}}
+        interaction = (ray_intersection isa MultiIntersection ?
+            interact3d(system, ray_intersection, beam, ray) :
+            interact3d(system, obj, beam, ray))::Union{Nothing, BeamInteraction{T, R}}
         if isnothing(interaction)
             break
         end
@@ -162,18 +183,6 @@ end
     trace_system!(system::System, gauss::GaussianBeamlet{T}; r_max = get_default_r_max()) where {T <: Real}
 
 Trace a [`GaussianBeamlet`](@ref) through an optical `system`. Maximum number of tracing steps can be capped by `r_max`.
-
-# Tracing logic
-
-The chief, waist and divergence beams are traced step-by-step through the `system`.
-For each intersection after a [`tracing_step!`](@ref), the intersections are compared.
-If all rays hit the same target, the optical interaction is analyzed, else the tracing stops.
-
-# Arguments
-
-- `system`: The optical system through which the [`GaussianBeamlet`](@ref) is traced.
-- `gauss`: The [`GaussianBeamlet`](@ref) object to be traced.
-- `r_max`: Maximum number of tracing iterations.
 """
 function trace_system!(
         system::AbstractSystem,
@@ -189,18 +198,15 @@ function trace_system!(
     while seg_counter < r_max
         # Trace chief ray first
         ray = last(rays(gauss.chief))
-        tracing_step!(system, ray, hint(interaction))
+        _object = tracing_step!(system, ray, hint(interaction))
         isnothing(intersection(ray)) && break
-        _object = object(intersection(ray))
         # Follow up with waist ray
         ray = last(rays(gauss.waist))
         tracing_step!(system, ray, hint(interaction))
-        # if the waist ray is no longer hitting the same object as the chief ray stop here
         isnothing(intersection(ray)) && break
         # Follow up with divergence ray
         ray = last(rays(gauss.divergence))
         tracing_step!(system, ray, hint(interaction))
-        # if the divergence ray is no longer hitting the same object as the chief ray stop here
         isnothing(intersection(ray)) && break
         # If beams do not hit same target stop tracing
         if !_beams_hits_same_shape(gauss, seg_counter)
@@ -229,9 +235,6 @@ end
     trace_system!(system, agb::AstigmaticGaussianBeamlet; r_max = get_default_r_max(), check_invariant = true, threshold = get_invariant_threshold())
 
 Trace an [`AstigmaticGaussianBeamlet`](@ref) through an optical `system`.
-All 9 component beams (chief + 8 parabasal) are traced in lockstep:
-the chief ray is traced first for each intersection, followed by the auxiliary rays.
-All rays must hit the same shape; otherwise tracing stops.
 """
 function trace_system!(
         system::AbstractSystem,
@@ -247,9 +250,8 @@ function trace_system!(
     while seg_counter < r_max
         # Trace chief ray first
         ray = last(rays(agb.c))
-        tracing_step!(system, ray, hint(interaction))
+        _object = tracing_step!(system, ray, hint(interaction))
         isnothing(intersection(ray)) && break
-        _object = object(intersection(ray))
         # Follow up with all auxiliary rays
         stopped = false
         for beam in aux

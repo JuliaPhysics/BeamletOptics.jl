@@ -39,11 +39,11 @@ Regardless of the underlying concrete implementation, each call of `intersect3d`
 
 ```@docs; canonical=false
 BeamletOptics.AbstractIntersection
-BeamletOptics.ShapeIntersection
-BeamletOptics.ObjectIntersection
+BeamletOptics.Intersection
+BeamletOptics.MultiIntersection
 ```
 
-A shape-level `intersect3d` call returns a `ShapeIntersection`; once the enclosing object is known, it is attached to form an `ObjectIntersection` — the type actually stored on an `AbstractRay`. Since an optical element can consist of multiple joint shapes, the `ObjectIntersection` type must store which specific part of the object was hit.
+A shape-level `intersect3d` call returns an `Intersection{T}(t, p, n)` containing hit distance, 3D point, and surface normal. When coincident boundaries occur between touching optics, a `MultiIntersection{T}` records both exiting and entering components.
 
 ## Interactions
 

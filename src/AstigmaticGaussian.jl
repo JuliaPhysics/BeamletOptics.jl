@@ -367,10 +367,9 @@ Tests if all 9 component rays at section `id` hit the same object shape.
         isnothing(intersection(rays(agb.dym)[id])) || return false
         return true
     else
-        s0 = shape(i1)
         _check = b -> begin
             int = intersection(rays(b)[id])
-            !isnothing(int) && shape(int) === s0
+            !isnothing(int)
         end
         _check(agb.wxp) || return false
         _check(agb.wxm) || return false

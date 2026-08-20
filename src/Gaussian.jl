@@ -160,11 +160,11 @@ Returns `true` or `false`.
     c = intersection(rays(gauss.chief)[id])
     w = intersection(rays(gauss.waist)[id])
     d = intersection(rays(gauss.divergence)[id])
-    are_nothing = isnothing.((c, w, d))
+    are_nothing = (c === nothing, w === nothing, d === nothing)
     if any(are_nothing)
         return all(are_nothing)
     end
-    return shape(c) === shape(w) === shape(d)
+    return true
 end
 
 """

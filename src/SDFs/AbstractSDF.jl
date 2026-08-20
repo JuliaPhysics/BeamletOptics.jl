@@ -209,7 +209,7 @@ function _raymarch_outside(shape::AbstractSDF{S},
 
             # Filter out false positive hits caused by numerical noise when leaving an SDF
             if !(dot(d, normal) > eps)
-                return ShapeIntersection(t_hit, normal, shape)
+                return Intersection(t_hit, hit_pos, normal)
             end
         end
     end
@@ -262,7 +262,7 @@ function _raymarch_inside(object::AbstractSDF{S},
             normal = normal3d(object, hit_pos)
             # Ensure the ray is actually exiting the surface (not crossing an internal seam)
             if dot(d, normal) > -eps
-                return ShapeIntersection(t_hit, normal, object)
+                return Intersection(t_hit, hit_pos, normal)
             end
         end
         i += 1

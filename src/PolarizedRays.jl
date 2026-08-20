@@ -37,14 +37,14 @@ where r and t are the complex-valued Fresnel coefficients (see also [`fresnel_co
 mutable struct PolarizedRay{T} <: AbstractRay{T}
     pos::Point3{T}
     dir::Point3{T}
-    intersection::Nullable{ObjectIntersection{T}}
+    intersection::Union{Nothing, Intersection{T}, MultiIntersection{T}}
     λ::T
     n::T
     E0::Point3{Complex{T}}
     function PolarizedRay{T}(
             pos::AbstractArray{P},
             dir::AbstractArray{D},
-            int::Nullable{ObjectIntersection},
+            int::Union{Nothing, Intersection, MultiIntersection},
             λ::L,
             n::N,
             E0::AbstractArray{<:Union{E, Complex{E}}}

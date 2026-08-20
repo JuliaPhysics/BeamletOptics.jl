@@ -7,18 +7,7 @@ using GeometryBasics
 
 const BMO = BeamletOptics
 
-mutable struct TestShapeless{T} <: BMO.AbstractShape{T}
-    pos::Vector{T}
-    dir::Matrix{T}
-end
-TestShapeless() = TestShapeless{Float64}(zeros(3), Matrix{Float64}(I, 3, 3))
-
-struct TestObject{T, S <: BMO.AbstractShape{T}} <: BMO.AbstractObject{T}
-    shape::S
-end
-TestObject() = TestObject(TestShapeless())
-
-dummy_intersection(t, n) = BMO.ObjectIntersection(TestObject(), BMO.ShapeIntersection(TestShapeless(), t, Point3(n)))
+dummy_intersection(t, n) = Intersection(t, [0.0, 0.0, 0.0], Point3(n))
 
 @testset "Rays" begin
     # Testing constructor

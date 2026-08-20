@@ -29,43 +29,27 @@ by specialized subtypes.
 """
 abstract type AbstractReflectiveOptic{T} <: AbstractObject{T} end
 
-# FIXME Require reflectivity field/function for interaction with PolarizedRay
+surface_model(::AbstractReflectiveOptic) = IdealMirror()
 
 """
-    interact3d(AbstractReflectiveOptic, Ray)
+    interact3d(system, optic::AbstractReflectiveOptic, ::Beam, ray)
 
-Implements the reflection of a [`Ray`](@ref) via the normal at the intersection point on an optical surface.
-"""
-function interact3d(::AbstractSystem,
-        ::AbstractReflectiveOptic,
-        ::Beam{T, R},
-        ray::R) where {T <: Real, R <: Ray{T}}
-    normal = normal3d(intersection(ray))
-    npos = position(ray) + length(ray) * direction(ray)
-    ndir = reflection3d(direction(ray), normal)
-    return BeamInteraction{T, R}(nothing,
-        Ray{T}(npos, ndir, nothing, wavelength(ray), refractive_index(ray)))
-end
-
-"""
-    interact3d(AbstractReflectiveOptic, PolarizedRay)
-
-Implements the ideal reflection of a [`PolarizedRay`](@ref) via the normal at the intersection point on an optical surface.
-A Jones matrix of [-1 0 0; 0 1 0] is assumed as per Peatross (2015, 2023 Ed. p. 154) and Yun et al. (see [`PolarizedRay`](@ref) for more information).
+Reflects incoming ray at a reflective optical surface using the universal boundary physics pipeline.
 """
 function interact3d(::AbstractSystem,
-        obj::AbstractReflectiveOptic,
+        optic::AbstractReflectiveOptic,
         ::Beam{T, R},
-        ray::R) where {T <: Real, R <: PolarizedRay{T}}
+        ray::R) where {T <: Real, R <: AbstractRay{T}}
     normal = normal3d(intersection(ray))
-    npos = position(ray) + length(ray) * direction(ray)
-    ndir = reflection3d(direction(ray), normal)
-    # Jones reflection matrix
-    J = SPBasis(-1, 0, 0, 1)
-    E0 = _calculate_global_E0(obj, ray, ndir, J)
-    return BeamInteraction{T, R}(nothing,
-        PolarizedRay{T}(
-            npos, ndir, nothing, wavelength(ray), refractive_index(ray), E0))
+    hit_pos = position(ray) + length(ray) * direction(ray)
+    int = Intersection(length(ray), hit_pos, normal)
+    trans = Transition(Ambient(), Ambient(), false)
+    
+    out_ray = interact3d(surface_model(optic), trans, int, ray)
+    if out_ray === nothing
+        return nothing
+    end
+    return BeamInteraction{T, R}(nothing, out_ray)
 end
 
 """

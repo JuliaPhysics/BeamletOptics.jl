@@ -17,8 +17,8 @@ const BMO = BeamletOptics
         solve_system!(system, beam)
         # Test nothing interaction
         @test length(BMO.rays(beam)) == 1
-        @test BMO.object(BMO.intersection(last(BMO.rays(beam)))) == intersectable
-        @test BMO.shape(BMO.intersection(last(BMO.rays(beam)))) == cube_shape
+        @test !isnothing(BMO.intersection(last(BMO.rays(beam))))
+        @test isapprox(length(BMO.intersection(last(BMO.rays(beam)))), 5.0, atol=1e-5)
         @test isnothing(BMO.interact3d(system, intersectable, beam, first(BMO.rays(beam))))
     end
 

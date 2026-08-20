@@ -52,11 +52,6 @@ const COINCIDENT_BOUNDARY_TOLERANCE = @load_preference("coincident_boundary_tole
     1e-7)
 const INDEX_MATCHING_TOLERANCE = @load_preference("index_matching_tolerance", 1e-5)
 
-"""
-    get_internal_reflection_threshold()
-
-Returns the global configuration threshold for total internal reflection detection.
-"""
 get_internal_reflection_threshold() = INTERNAL_REFLECTION_THRESHOLD
 
 """

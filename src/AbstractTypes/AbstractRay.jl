@@ -58,7 +58,7 @@ refractive_index(ray::AbstractRay) = ray.n
 refractive_index!(ray::AbstractRay, n) = (ray.n = n)
 
 intersection(ray::AbstractRay) = ray.intersection
-function intersection!(ray::AbstractRay, _intersection::Nullable{ObjectIntersection})
+function intersection!(ray::AbstractRay, _intersection::Nullable{<:AbstractIntersection})
      ray.intersection = _intersection
      return nothing
 end
@@ -70,14 +70,11 @@ Returns `(c_local, r)` where `c_local` is the center of the bounding sphere in l
 """
 bounding_sphere(::Any) = nothing
 
-
-
 """
     intersect3d(shape::AbstractShape, ::AbstractRay)
 
-Defines the intersection between an [`AbstractShape`](@ref) and an [`AbstractRay`](@ref), must return a [`ShapeIntersection`](@ref) or `nothing`.
+Defines the intersection between an [`AbstractShape`](@ref) and an [`AbstractRay`](@ref), must return an [`Intersection`](@ref) or `nothing`.
 The default behavior for concrete `shape`s and rays is to indicate no intersection, that is `nothing`, which will inform the tracing algorithm to stop.
-Refer to the [`ShapeIntersection`](@ref) documentation for more information on the return type value.
 """
 function intersect3d(shape::AbstractShape, ::AbstractRay)
     @warn lazy"No intersect3d method defined for:" typeof(shape)
@@ -88,46 +85,23 @@ end
     intersect3d(object::AbstractObject, ray::AbstractRay)
 
 In general, the intersection logic between an [`AbstractObject`](@ref) and an [`AbstractRay`](@ref) depends on the [`AbstractShapeTrait`](@ref).
-Refer to the respective documentation.
 """
 intersect3d(object::AbstractObject, ray::AbstractRay) = intersect3d(shape_trait_of(object), object, ray)
 
 function intersect3d(::SingleShape, object::AbstractObject, ray::AbstractRay)
-    # FIXME: isinfrontof check?
-    shape_intersection = intersect3d(shape(object), ray)
-    # return ObjectIntersection or Nothing
-    if isnothing(shape_intersection)
-        return nothing
-    end
-    return ObjectIntersection(object, shape_intersection)
+    return intersect3d(shape(object), ray)
 end
 
 function intersect3d(::MultiShape, object::AbstractObject, ray::AbstractRay{R}) where R
-    # Init return intersection (may be a ShapeIntersection or, if `part` is itself an
-    # AbstractObject, an ObjectIntersection tagged with that sub-object)
-    closest::Nullable{AbstractIntersection{R}} = nothing
+    closest::Nullable{Intersection{R}} = nothing
     for part in shape(object)
-        # Buffer intersection
         temp = intersect3d(part, ray)
-        # Continue if miss
-        if isnothing(temp)
-            continue
-        end
-        # Catch first valid intersection
-        if isnothing(closest)
-            closest = temp
-            continue
-        end
-        # Replace current with closer intersection
-        if length(temp) < length(closest)
+        isnothing(temp) && continue
+        if isnothing(closest) || length(temp) < length(closest)
             closest = temp
         end
     end
-    # Ensure that the intersection knows about the correct (composite) object if intersected
-    if isnothing(closest)
-        return nothing
-    end
-    return ObjectIntersection(object, closest)
+    return closest
 end
 
 """
@@ -142,7 +116,8 @@ function intersect3d(plane_position::AbstractArray,
     if isnothing(t)
         return nothing
     else
-        return PlaneIntersection(T(t), T.(plane_normal))
+        hit_pos = position(ray) + T(t) * direction(ray)
+        return Intersection(T(t), hit_pos, Point3{T}(plane_normal))
     end
 end
 

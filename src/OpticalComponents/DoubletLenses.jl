@@ -64,13 +64,27 @@ function SphericalDoubletLens(r1, r2, r3, l1, l2, d, n1, n2)
 end
 
 function interact3d(system::AbstractSystem, dl::DoubletLens, beam::Beam{T, R}, ray::R) where {T <: Real, R <: Ray{T}}
-    # Interaction logic: if front is hit, hint to back and vice versa
-    if shape(intersection(ray)) === shape(dl.front)
-        i = interact3d(system, dl.front, beam, ray)
-        hint = Hint(dl, dl.back.shape)
-    elseif shape(intersection(ray)) === shape(dl.back)
-        i = interact3d(system, dl.back, beam, ray)
-        hint = Hint(dl, dl.front.shape)
+    λ = wavelength(ray)
+    n1 = refractive_index(dl.front, λ)
+    n2 = refractive_index(dl.back, λ)
+    n_curr = refractive_index(ray)
+    
+    int = intersection(ray)
+    ambient = Ambient()
+
+    if isapprox(n_curr, 1.0, atol=1e-4)
+        trans = Transition(ambient, medium_from(dl.front), true)
+        out_ray = interact3d(surface_model(dl.front), trans, int, ray)
+        hint = Hint(dl, shape(dl.back))
+        return BeamInteraction(hint, out_ray)
+    elseif isapprox(n_curr, n1, atol=1e-4)
+        trans = Transition(medium_from(dl.front), medium_from(dl.back), true)
+        out_ray = interact3d(surface_model(dl.back), trans, int, ray)
+        hint = Hint(dl, shape(dl.back))
+        return BeamInteraction(hint, out_ray)
+    else
+        trans = Transition(medium_from(dl.back), ambient, false)
+        out_ray = interact3d(surface_model(dl.back), trans, int, ray)
+        return BeamInteraction(nothing, out_ray)
     end
-    return BeamInteraction(hint, i.ray)
 end
