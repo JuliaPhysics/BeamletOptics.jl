@@ -12,7 +12,7 @@ but must be transformed into global coordinates using the method described in th
 
 - `pos`: a point in R³ that describes the `Ray` origin
 - `dir`: a normalized vector in R³ that describes the `Ray` direction
-- `intersection`: refer to [`ObjectIntersection`](@ref)
+- `intersection`: refer to [`AbstractIntersection`](@ref)
 - `λ`: wavelength in [m]
 - `n`: refractive index along the beam path
 - `E0`: complex-valued 3-tuple to represent the electric field in global coordinates

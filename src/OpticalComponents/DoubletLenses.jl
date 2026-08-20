@@ -63,7 +63,7 @@ function SphericalDoubletLens(r1, r2, r3, l1, l2, d, n1, n2)
     return DoubletLens(front, back)
 end
 
-function interact3d(system::AbstractSystem, dl::DoubletLens, beam::Beam{T, R}, ray::R) where {T <: Real, R <: Ray{T}}
+function interact3d(system::AbstractSystem, dl::DoubletLens, beam::Beam{T, R}, ray::R) where {T <: Real, R <: AbstractRay{T}}
     λ = wavelength(ray)
     n1 = refractive_index(dl.front, λ)
     n2 = refractive_index(dl.back, λ)
@@ -76,15 +76,15 @@ function interact3d(system::AbstractSystem, dl::DoubletLens, beam::Beam{T, R}, r
         trans = Transition(ambient, medium_from(dl.front), true)
         out_ray = interact3d(surface_model(dl.front), trans, int, ray)
         hint = Hint(dl, shape(dl.back))
-        return BeamInteraction(hint, out_ray)
+        return BeamInteraction{T, R}(hint, out_ray)
     elseif isapprox(n_curr, n1, atol=1e-4)
         trans = Transition(medium_from(dl.front), medium_from(dl.back), true)
         out_ray = interact3d(surface_model(dl.back), trans, int, ray)
         hint = Hint(dl, shape(dl.back))
-        return BeamInteraction(hint, out_ray)
+        return BeamInteraction{T, R}(hint, out_ray)
     else
         trans = Transition(medium_from(dl.back), ambient, false)
         out_ray = interact3d(surface_model(dl.back), trans, int, ray)
-        return BeamInteraction(nothing, out_ray)
+        return BeamInteraction{T, R}(nothing, out_ray)
     end
 end

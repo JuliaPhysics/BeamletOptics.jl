@@ -45,42 +45,31 @@ IsotropicMedium(name::Symbol, dispersion) = IsotropicMedium(name, dispersion, no
 IsotropicMedium(dispersion::Number) = IsotropicMedium(dispersion isa Complex ? :ComplexConstant : :Constant, dispersion, nothing)
 IsotropicMedium(dispersion) = IsotropicMedium(:Dispersive, dispersion, nothing)
 
-# Evaluates dispersion callable or constant, handling keyword args gracefully
-@inline function _eval_dispersion(disp::Number, λ::Real; kwargs...)
-    return disp
-end
-
-@inline function _eval_dispersion(disp::Function, λ::Real; T::Real = 293.15, P::Real = 101325.0, kwargs...)
-    # Try calling with environmental kwargs, fallback to 1-arg if not accepted
-    try
-        return disp(λ; T = T, P = P, kwargs...)
-    catch e
-        if e isa MethodError
-            return disp(λ)
-        else
-            rethrow(e)
-        end
+# Evaluates dispersion callable or constant with zero overhead and full inlining
+@inline _eval_dispersion(disp::Number, λ::Real) = disp
+@inline _eval_dispersion(disp::Number, λ::Real, kwargs) = disp
+@inline _eval_dispersion(disp, λ::Real) = disp(λ)
+@inline function _eval_dispersion(disp, λ::Real, kwargs)
+    if isempty(kwargs)
+        return disp(λ)
+    else
+        return disp(λ; kwargs...)
     end
 end
 
-@inline function _eval_dispersion(disp, λ::Real; kwargs...)
-    # Generic callable functor (SellmeierEquation, DiscreteRefractiveIndex, etc.)
-    return disp(λ)
-end
-
 """
-    complex_refractive_index(m::IsotropicMedium, λ=0.0; T=293.15, P=101325.0, kwargs...) -> ComplexF64
+    complex_refractive_index(m::IsotropicMedium, λ=0.0; kwargs...) -> ComplexF64
 
 Returns the full complex refractive index ``\\tilde{n} = n + i\\kappa``.
 """
-function complex_refractive_index(m::IsotropicMedium, λ::Real = 0.0; T::Real = 293.15, P::Real = 101325.0, kwargs...)::ComplexF64
-    val = _eval_dispersion(m.dispersion, λ; T = T, P = P, kwargs...)
+@inline function complex_refractive_index(m::IsotropicMedium, λ::Real = 0.0; kwargs...)::ComplexF64
+    val = _eval_dispersion(m.dispersion, λ, kwargs)
     if val isa Complex
         return ComplexF64(val)
     else
         n_real = Float64(val)
         if m.attenuation !== nothing && λ > 0
-            α = _eval_dispersion(m.attenuation, λ; T = T, P = P, kwargs...)
+            α = _eval_dispersion(m.attenuation, λ, kwargs)
             κ = Float64(α) * λ / (4 * π)
             return ComplexF64(n_real, κ)
         else
@@ -90,12 +79,12 @@ function complex_refractive_index(m::IsotropicMedium, λ::Real = 0.0; T::Real = 
 end
 
 """
-    refractive_index(m::IsotropicMedium, λ=0.0; T=293.15, P=101325.0, kwargs...) -> Float64
+    refractive_index(m::IsotropicMedium, λ=0.0; kwargs...) -> Float64
 
 Returns the real part of the refractive index ``n = \\text{Re}(\\tilde{n})``.
 """
-function refractive_index(m::IsotropicMedium, λ::Real = 0.0; T::Real = 293.15, P::Real = 101325.0, kwargs...)::Float64
-    val = _eval_dispersion(m.dispersion, λ; T = T, P = P, kwargs...)
+@inline function refractive_index(m::IsotropicMedium, λ::Real = 0.0; kwargs...)::Float64
+    val = _eval_dispersion(m.dispersion, λ, kwargs)
     return Float64(real(val))
 end
 
@@ -104,7 +93,7 @@ end
 
 Returns the extinction coefficient ``\\kappa = \\text{Im}(\\tilde{n})`` (positive for absorption, negative for gain).
 """
-function extinction_coefficient(m::AbstractMedium, λ::Real = 0.0; kwargs...)::Float64
+@inline function extinction_coefficient(m::AbstractMedium, λ::Real = 0.0; kwargs...)::Float64
     return Float64(imag(complex_refractive_index(m, λ; kwargs...)))
 end
 
