@@ -28,9 +28,11 @@ system ambient medium, ray propagation direction, and boundary outward surface n
 )
     # Media transition for an isolated component immersed in ambient medium
     is_entering = dot(direction(ray), normal) < 0
-    med_in  = is_entering ? current_medium(ray) : component_medium
-    med_out = is_entering ? component_medium : ambient
-    return Transition(med_in, med_out, is_entering)
+    if is_entering
+        return Transition(ambient, component_medium, true)
+    else
+        return Transition(component_medium, ambient, false)
+    end
 end
 
 """

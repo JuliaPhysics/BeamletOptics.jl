@@ -18,7 +18,14 @@ Subtypes of `AbstractSystem` must implement the following:
 """
 abstract type AbstractSystem end
 
-refractive_index(::AbstractSystem, λ::Real) = one(λ)
+"""
+    ambient_medium(system::AbstractSystem) -> AbstractMedium
+
+Returns the surrounding ambient medium of the optical system (default: `Ambient()`).
+"""
+ambient_medium(::AbstractSystem) = Ambient()
+
+refractive_index(sys::AbstractSystem, λ::Real) = refractive_index(ambient_medium(sys), λ)
 refractive_index(sys::AbstractSystem) = refractive_index(sys, get_default_wavelength())
 
 """

@@ -13,7 +13,7 @@ function interact3d(
     n1 = refractive_index(trans.medium_in, λ)
     n2 = refractive_index(trans.medium_out, λ)
     
-    normal = trans.is_entering ? normal3d(int) : -normal3d(int)
+    normal = dot(normal3d(int), direction(ray)) < 0 ? normal3d(int) : -normal3d(int)
     new_dir, tir = refraction3d(direction(ray), normal, n1, n2)
     
     new_pos = position(int)
@@ -32,7 +32,7 @@ function interact3d(
     n1 = refractive_index(trans.medium_in, λ)
     n2 = refractive_index(trans.medium_out, λ)
     
-    normal = trans.is_entering ? normal3d(int) : -normal3d(int)
+    normal = dot(normal3d(int), direction(ray)) < 0 ? normal3d(int) : -normal3d(int)
     θi = angle3d(direction(ray), -normal)
     rs, rp, ts, tp = fresnel_coefficients(θi, n2 / n1)
     
@@ -117,7 +117,13 @@ function interact3d(
     int::Intersection{T},
     ray::AbstractRay{T}
 ) where {T <: Real}
-    return interact3d(FresnelInterface(), trans, int, ray)
+    if c.coating_model isa AbstractSurfaceModel
+        return interact3d(c.coating_model, trans, int, ray)
+    elseif c.coating_model isa Function
+        return c.coating_model(trans, int, ray)
+    else
+        return interact3d(FresnelInterface(), trans, int, ray)
+    end
 end
 
 function interact3d(
@@ -133,19 +139,19 @@ function interact3d(
 
     # Determine groove vector in the tangent plane
     g_vec = if g.groove_vector !== nothing
-        normalize(Point3{T}(g.groove_vector) - dot(Point3{T}(g.groove_vector), normal) * normal)
+        normalize(Point3{T}(g.groove_vector))
     else
-        ref_axis = abs(dot(normal, Point3{T}(1, 0, 0))) > 0.9 ? Point3{T}(0, 1, 0) : Point3{T}(1, 0, 0)
-        normalize(cross(normal, ref_axis))
+        # Default groove axis perpendicular to incidence plane or along local tangent
+        t_ref = isparallel3d(dir, normal) ? normal3d(dir) : cross(dir, normal)
+        normalize(Point3{T}(t_ref))
     end
-    p_vec = normalize(cross(g_vec, normal)) # Periodicity direction across rulings
+    p_vec = normalize(cross(g_vec, normal))
 
-    # Decompose incoming direction onto groove and ruling axes
+    # Grating equation projection components
     d_g = dot(dir, g_vec)
     d_p_in = dot(dir, p_vec)
-
-    # Vector grating equation momentum kick
-    d_p_out = d_p_in + (g.order * λ * g.groove_density) / n_med
+    m = g.order
+    d_p_out = d_p_in + (m * λ * g.groove_density) / n_med
 
     # Unit normalization constraint
     d_n_sq = 1 - d_g^2 - d_p_out^2
@@ -175,7 +181,7 @@ function interact3d(
     normal = normal3d(mi)
     int = mi.hit
     
-    ambient = Ambient()
+    ambient = ambient_medium(system)
     trans = resolve_transition(mi, ambient, ray)
     
     target_obj = entering(mi) !== nothing ? entering(mi) : exiting(mi)

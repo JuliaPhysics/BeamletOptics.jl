@@ -4,7 +4,7 @@ abstract type AbstractDoubletRefractiveOptic{
     B <: AbstractShape{T},
     N1 <: RefractiveIndex,
     N2 <: RefractiveIndex
-} <: AbstractRefractiveOptic{T, N1} end
+} <: AbstractObjectGroup{T} end
 
 """
     DoubletLens
@@ -31,6 +31,7 @@ end
 shape_trait_of(::DoubletLens) = MultiShape()
 
 shape(dl::DoubletLens) = (dl.front, dl.back)
+objects(dl::DoubletLens) = (dl.front, dl.back)
 
 Base.position(dl::DoubletLens) = position(dl.front)
 orientation(dl::DoubletLens) = orientation(dl.front)
@@ -52,7 +53,7 @@ For radii sign definition, refer to the [`SphericalLens`](@ref) constructor.
 - `l2`: second lens thickness
 - `d`: lens diameter
 - `n1`: first lens [`RefractiveIndex`](@ref)
-- `n1`: second lens [`RefractiveIndex`](@ref)
+- `n2`: second lens [`RefractiveIndex`](@ref)
 """
 function SphericalDoubletLens(r1, r2, r3, l1, l2, d, n1, n2)
     # Generate "cemented" front and back spherical lenses
@@ -61,30 +62,4 @@ function SphericalDoubletLens(r1, r2, r3, l1, l2, d, n1, n2)
     # Move doublet parts into position
     translate3d!(back, [0, thickness(shape(front)), 0])
     return DoubletLens(front, back)
-end
-
-function interact3d(system::AbstractSystem, dl::DoubletLens, beam::Beam{T, R}, ray::R) where {T <: Real, R <: AbstractRay{T}}
-    λ = wavelength(ray)
-    n1 = refractive_index(dl.front, λ)
-    n2 = refractive_index(dl.back, λ)
-    n_curr = refractive_index(ray)
-    
-    int = intersection(ray)
-    ambient = Ambient()
-
-    if isapprox(n_curr, 1.0, atol=1e-4)
-        trans = Transition(ambient, medium_from(dl.front), true)
-        out_ray = interact3d(surface_model(dl.front), trans, int, ray)
-        hint = Hint(dl, shape(dl.back))
-        return BeamInteraction{T, R}(hint, out_ray)
-    elseif isapprox(n_curr, n1, atol=1e-4)
-        trans = Transition(medium_from(dl.front), medium_from(dl.back), true)
-        out_ray = interact3d(surface_model(dl.back), trans, int, ray)
-        hint = Hint(dl, shape(dl.back))
-        return BeamInteraction{T, R}(hint, out_ray)
-    else
-        trans = Transition(medium_from(dl.back), ambient, false)
-        out_ray = interact3d(surface_model(dl.back), trans, int, ray)
-        return BeamInteraction{T, R}(nothing, out_ray)
-    end
 end

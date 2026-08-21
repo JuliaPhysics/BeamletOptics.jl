@@ -63,16 +63,17 @@ end
 function _cbs_hit_target(cbs::CubeBeamsplitter, ray::AbstractRay)
     int = intersection(ray)
     isnothing(int) && return :none
+    tol = Config.get_coincident_boundary_tolerance()
     ic = intersect3d(shape(cbs.coating), ray)
-    if !isnothing(ic) && isapprox(length(int), length(ic), atol=1e-7)
+    if !isnothing(ic) && isapprox(length(int), length(ic), atol = tol)
         return :coating
     end
     if_hit = intersect3d(shape(cbs.front), ray)
-    if !isnothing(if_hit) && isapprox(length(int), length(if_hit), atol=1e-7)
+    if !isnothing(if_hit) && isapprox(length(int), length(if_hit), atol = tol)
         return :front
     end
     ib = intersect3d(shape(cbs.back), ray)
-    if !isnothing(ib) && isapprox(length(int), length(ib), atol=1e-7)
+    if !isnothing(ib) && isapprox(length(int), length(ib), atol = tol)
         return :back
     end
     return :none

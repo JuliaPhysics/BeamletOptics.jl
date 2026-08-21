@@ -167,14 +167,21 @@ function intersect3d(pbs::AbstractPlateBeamsplitter, ray::AbstractRay)
     end
 end
 
+function _is_coating_hit(pbs::AbstractPlateBeamsplitter, ray::AbstractRay)
+    int = intersection(ray)
+    isnothing(int) && return false
+    ic = intersect3d(coating(pbs), ray)
+    tol = Config.get_coincident_boundary_tolerance()
+    return !isnothing(ic) && isapprox(length(int), length(ic), atol = tol)
+end
+
 function interact3d(
     system::AbstractSystem,
     pbs::AbstractPlateBeamsplitter,
     beam::Beam{T, R},
     ray::R
     ) where {T <: Real, R <: AbstractRay{T}}
-    ic = intersect3d(coating(pbs), ray)
-    hit_coating = !isnothing(ic) && isapprox(length(intersection(ray)), length(ic), atol=1e-7)
+    hit_coating = _is_coating_hit(pbs, ray)
 
     # Substrate interaction
     if !hit_coating
@@ -217,8 +224,7 @@ function interact3d(
     id::Int
     )
     chief_ray = rays(gauss.chief)[id]
-    ic = intersect3d(coating(pbs), chief_ray)
-    hit_coating = !isnothing(ic) && isapprox(length(intersection(chief_ray)), length(ic), atol=1e-7)
+    hit_coating = _is_coating_hit(pbs, chief_ray)
 
     # Substrate interaction
     if !hit_coating
@@ -267,8 +273,7 @@ function interact3d(
     id::Int
     )
     chief_ray = rays(agb.c)[id]
-    ic = intersect3d(coating(pbs), chief_ray)
-    hit_coating = !isnothing(ic) && isapprox(length(intersection(chief_ray)), length(ic), atol=1e-7)
+    hit_coating = _is_coating_hit(pbs, chief_ray)
 
     # Substrate interaction
     if !hit_coating

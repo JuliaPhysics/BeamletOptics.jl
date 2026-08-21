@@ -48,12 +48,11 @@ function interact3d(system::AbstractSystem,
         optic::AbstractRefractiveOptic,
         ::Beam{T, R},
         ray::R) where {T <: Real, R <: AbstractRay{T}}
-    normal = normal3d(intersection(ray))
-    hit_pos = position(ray) + length(ray) * direction(ray)
-    int = Intersection(length(ray), hit_pos, normal)
+    int = intersection(ray)
+    normal = normal3d(int)
     
     med = medium_from(optic)
-    ambient = Ambient()
+    ambient = ambient_medium(system)
     trans = resolve_transition(med, ambient, ray, normal)
     
     out_ray = interact3d(surface_model(optic), trans, int, ray)

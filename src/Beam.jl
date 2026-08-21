@@ -184,15 +184,31 @@ end
 """
     isparaxial(system, beam, threshold=π/4)
 
-Tests the angle between the `beam` direction and surface normal at each intersection.
+Tests if the `beam` direction angle with respect to the surface normal exceeds `threshold` at refractive interfaces.
+Reflections (e.g. at mirrors or beamsplitters) are excluded from the paraxial check.
 Mainly intended as a check for [`GaussianBeamlet`](@ref).
 """
 function isparaxial(::AbstractSystem, beam::Beam, threshold::Real = π / 4)
     # Test if refractive elements are hit with angle larger than threshold
-    for ray in beam.rays
-        if isnothing(intersection(ray))
-            break
+    rays_list = rays(beam)
+    n_rays = length(rays_list)
+    for i in 1:n_rays
+        ray = rays_list[i]
+        int = intersection(ray)
+        isnothing(int) && break
+        
+        # If there is a next ray in the beam, check if it is a refractive crossing
+        if i < n_rays
+            next_ray = rays_list[i + 1]
+            n_surf = normal3d(int)
+            # Refraction crosses the interface: dot(dir_in, n) and dot(dir_out, n) have same sign
+            is_refracted = (dot(direction(ray), n_surf) * dot(direction(next_ray), n_surf) > 0)
+            if !is_refracted
+                # Pure reflection at mirror or beamsplitter branch -> paraxial decomposition holds
+                continue
+            end
         end
+
         # Test angle between ray and its intersection
         angle = angle3d(ray)
         if angle > π / 2 # flip sector

@@ -14,7 +14,7 @@ Mutable struct to store ray information.
 mutable struct Ray{T} <: AbstractRay{T}
     pos::Point3{T}
     dir::Point3{T}
-    intersection::Union{Nothing, Intersection{T}, MultiIntersection{T}}
+    intersection::Union{Nothing, AbstractIntersection{T}}
     λ::T
     n::T
 end
@@ -42,6 +42,20 @@ function Ray(pos::AbstractArray{P},
         nothing,
         F(λ),
         F(1))
+end
+
+function Ray(pos::Point3{T},
+        dir::Point3{T},
+        intersection::Nullable{<:AbstractIntersection},
+        λ::Real = 1000e-9,
+        n::Real = 1.0) where {T <: Real}
+    F = promote_type(T, typeof(λ), typeof(n))
+    return Ray{F}(
+        Point3{F}(pos),
+        normalize(Point3{F}(dir)),
+        intersection,
+        F(λ),
+        F(n))
 end
 
 function Ray(pos::AbstractArray{P},

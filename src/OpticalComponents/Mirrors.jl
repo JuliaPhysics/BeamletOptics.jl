@@ -36,14 +36,13 @@ surface_model(::AbstractReflectiveOptic) = IdealMirror()
 
 Reflects incoming ray at a reflective optical surface using the universal boundary physics pipeline.
 """
-function interact3d(::AbstractSystem,
+function interact3d(system::AbstractSystem,
         optic::AbstractReflectiveOptic,
         ::Beam{T, R},
         ray::R) where {T <: Real, R <: AbstractRay{T}}
-    normal = normal3d(intersection(ray))
-    hit_pos = position(ray) + length(ray) * direction(ray)
-    int = Intersection(length(ray), hit_pos, normal)
-    trans = Transition(Ambient(), Ambient(), false)
+    int = intersection(ray)
+    ambient = ambient_medium(system)
+    trans = Transition(ambient, ambient, false)
     
     out_ray = interact3d(surface_model(optic), trans, int, ray)
     if out_ray === nothing

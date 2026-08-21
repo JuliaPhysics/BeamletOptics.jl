@@ -1,17 +1,27 @@
 """
-    System <: AbstractSystem
+    System{M<:AbstractMedium} <: AbstractSystem
 
-A container storing the optical elements of, i.e. a camera lens or lab setup.
+A container storing the optical elements of, i.e. a camera lens or lab setup, and the surrounding ambient medium.
 
 # Fields
 
 - `objects`: vector containing the different objects that are part of the system (subtypes of [`AbstractObject`](@ref))
+- `ambient_medium`: surrounding medium of the optical system (default: [`Ambient`](@ref))
 """
-struct System <: AbstractSystem
+struct System{M <: AbstractMedium} <: AbstractSystem
     objects::Vector{AbstractObject}
+    ambient_medium::M
 end
 
-System(object::AbstractObject) = System([object])
+System(objects::Vector{AbstractObject}) = System(objects, Ambient())
+System(objects::Vector{<:AbstractObject}) = System(Vector{AbstractObject}(objects), Ambient())
+System(object::AbstractObject) = System([object], Ambient())
+System(objects::Vector{<:AbstractObject}, ambient::AbstractMedium) = System(Vector{AbstractObject}(objects), ambient)
+System(objects::Vector{<:AbstractObject}, n::RefractiveIndex) = System(objects, medium_from(n))
+System(object::AbstractObject, ambient::AbstractMedium) = System([object], ambient)
+System(object::AbstractObject, n::RefractiveIndex) = System([object], medium_from(n))
+
+ambient_medium(system::System) = system.ambient_medium
 
 """
     objects(system::System)
@@ -21,7 +31,7 @@ Exposes all objects stored within the system. By exposing the `Leaves` of the tr
 objects(system::System) = Leaves(system.objects)
 
 """
-    StaticSystem <: AbstractSystem
+    StaticSystem{T<:Tuple, M<:AbstractMedium} <: AbstractSystem
 
 A static container storing the optical elements of, i.e. a camera lens or lab setup.
 Compared to `System` this way defining the system is less flexible, i.e. no elements
@@ -33,16 +43,25 @@ can be added or removed after construction but it allows for more performant ray
 
 # Fields
 
-- `objects`: vector containing the different objects that are part of the system (subtypes of [`AbstractObject`](@ref))
+- `objects`: tuple containing the different objects that are part of the system (subtypes of [`AbstractObject`](@ref))
+- `ambient_medium`: surrounding medium of the optical system (default: [`Ambient`](@ref))
 """
-struct StaticSystem{T <: Tuple} <: AbstractSystem
+struct StaticSystem{T <: Tuple, M <: AbstractMedium} <: AbstractSystem
     objects::T
+    ambient_medium::M
 end
-StaticSystem(object::AbstractObject) = StaticSystem((object))
-StaticSystem(object::AbstractObjectGroup) = StaticSystem([object])
+
+StaticSystem(objects::T) where {T <: Tuple} = StaticSystem(objects, Ambient())
+StaticSystem(object::AbstractObject) = StaticSystem((object,), Ambient())
+StaticSystem(object::AbstractObjectGroup) = StaticSystem(tuple(collect(Leaves([object]))...), Ambient())
 function StaticSystem(objects::AbstractArray{<:AbstractObject})
-    StaticSystem(tuple(collect(Leaves(objects))...))
+    StaticSystem(tuple(collect(Leaves(objects))...), Ambient())
 end
+function StaticSystem(objects::AbstractArray{<:AbstractObject}, ambient::AbstractMedium)
+    StaticSystem(tuple(collect(Leaves(objects))...), ambient)
+end
+
+ambient_medium(system::StaticSystem) = system.ambient_medium
 
 objects(system::StaticSystem) = system.objects
 
@@ -106,8 +125,33 @@ end
     if isnothing(shape_intersection)
         # If hinted object is not intersected, trace the entire system
         return trace_all(system, ray)
+    end
+
+    # Check if this hit is coincident with another object in system
+    tol = get_coincident_boundary_tolerance()
+    best_hit = shape_intersection
+    best_obj = object(hint)
+    second_hit = nothing
+    second_obj = nothing
+
+    for obj in objects(system)
+        obj === best_obj && continue
+        temp = intersect3d(obj, ray)
+        if temp !== nothing && abs(length(temp) - length(best_hit)) <= tol
+            second_hit = temp
+            second_obj = obj
+            break
+        end
+    end
+
+    if second_hit === nothing
+        return (best_hit, best_obj)
     else
-        return (shape_intersection, object(hint))
+        h1_is_exit = dot(direction(ray), normal3d(best_hit)) > 0
+        exiting_obj = h1_is_exit ? best_obj : second_obj
+        entering_obj = h1_is_exit ? second_obj : best_obj
+        mi = MultiIntersection(best_hit; exiting = exiting_obj, entering = entering_obj)
+        return (mi, best_obj)
     end
 end
 
@@ -199,30 +243,34 @@ function trace_system!(
     seg_counter::Int = length(rays(gauss.chief))
     while seg_counter < r_max
         # Trace chief ray first
-        ray = last(rays(gauss.chief))
-        _object = tracing_step!(system, ray, hint(interaction))
-        isnothing(intersection(ray)) && break
+        ray_c = last(rays(gauss.chief))
+        obj_c = tracing_step!(system, ray_c, hint(interaction))
         # Follow up with waist ray
-        ray = last(rays(gauss.waist))
-        tracing_step!(system, ray, hint(interaction))
-        isnothing(intersection(ray)) && break
+        ray_w = last(rays(gauss.waist))
+        obj_w = tracing_step!(system, ray_w, hint(interaction))
         # Follow up with divergence ray
-        ray = last(rays(gauss.divergence))
-        tracing_step!(system, ray, hint(interaction))
-        isnothing(intersection(ray)) && break
-        # If beams do not hit same target stop tracing
-        if !_beams_hits_same_shape(gauss, seg_counter)
+        ray_d = last(rays(gauss.divergence))
+        obj_d = tracing_step!(system, ray_d, hint(interaction))
+
+        int_c = intersection(ray_c)
+        int_w = intersection(ray_w)
+        int_d = intersection(ray_d)
+
+        # If any beam misses or beams do not hit same target stop tracing
+        if any(isnothing, (int_c, int_w, int_d)) || (obj_c !== obj_w || obj_c !== obj_d) || !_beams_hits_same_shape(gauss, seg_counter)
             # Ensure that no intersection artifacts remain
-            intersection!(last(rays(gauss.chief)), nothing)
-            intersection!(last(rays(gauss.waist)), nothing)
-            intersection!(last(rays(gauss.divergence)), nothing)
+            intersection!(ray_c, nothing)
+            intersection!(ray_w, nothing)
+            intersection!(ray_d, nothing)
             break
         end
         # Calculate interaction
-        interaction = interact3d(system,
-            _object,
-            gauss,
-            seg_counter)
+        ray_intersection = intersection(ray_c)
+        interaction = if ray_intersection isa MultiIntersection
+            interact3d(system, ray_intersection, gauss, seg_counter)
+        else
+            interact3d(system, obj_c, gauss, seg_counter)
+        end
         if isnothing(interaction)
             break
         end
@@ -251,22 +299,20 @@ function trace_system!(
     aux = _aux_beams(agb)
     while seg_counter < r_max
         # Trace chief ray first
-        ray = last(rays(agb.c))
-        _object = tracing_step!(system, ray, hint(interaction))
-        isnothing(intersection(ray)) && break
+        ray_c = last(rays(agb.c))
+        obj_c = tracing_step!(system, ray_c, hint(interaction))
+        
         # Follow up with all auxiliary rays
-        stopped = false
+        missed = isnothing(intersection(ray_c))
         for beam in aux
-            ray = last(rays(beam))
-            tracing_step!(system, ray, hint(interaction))
-            if isnothing(intersection(ray))
-                stopped = true
-                break
+            ray_aux = last(rays(beam))
+            obj_aux = tracing_step!(system, ray_aux, hint(interaction))
+            if isnothing(intersection(ray_aux)) || obj_aux !== obj_c
+                missed = true
             end
         end
-        stopped && break
-        # If beams do not hit same target stop tracing
-        if !_beams_hits_same_shape(agb, seg_counter)
+
+        if missed || !_beams_hits_same_shape(agb, seg_counter)
             # Ensure that no intersection artifacts remain
             intersection!(last(rays(agb.c)), nothing)
             for beam in aux
@@ -275,7 +321,12 @@ function trace_system!(
             break
         end
         # Calculate interaction
-        interaction = interact3d(system, _object, agb, seg_counter)
+        ray_intersection = intersection(ray_c)
+        interaction = if ray_intersection isa MultiIntersection
+            interact3d(system, ray_intersection, agb, seg_counter)
+        else
+            interact3d(system, obj_c, agb, seg_counter)
+        end
         if isnothing(interaction)
             break
         end

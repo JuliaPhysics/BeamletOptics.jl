@@ -20,7 +20,7 @@ export Transition, resolve_transition, current_medium, interact3d
 export Intersection
 
 # system
-export System, StaticSystem, solve_system!
+export System, StaticSystem, solve_system!, ambient_medium
 
 # object group
 export ObjectGroup

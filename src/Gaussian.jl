@@ -134,6 +134,19 @@ function interact3d(system::AbstractSystem,
     return GaussianBeamletInteraction{R}(i_c, i_w, i_d)
 end
 
+function interact3d(system::AbstractSystem,
+        mi::MultiIntersection,
+        gauss::GaussianBeamlet{R},
+        ray_id::Int) where {R}
+    i_c = interact3d(system, mi, gauss.chief, rays(gauss.chief)[ray_id])
+    i_w = interact3d(system, mi, gauss.waist, rays(gauss.waist)[ray_id])
+    i_d = interact3d(system, mi, gauss.divergence, rays(gauss.divergence)[ray_id])
+    if any(isnothing, (i_c, i_w, i_d))
+        return nothing
+    end
+    return GaussianBeamletInteraction{R}(i_c, i_w, i_d)
+end
+
 function Base.push!(gauss::GaussianBeamlet{T},
         interaction::GaussianBeamletInteraction{T}) where {T}
     push!(gauss.chief, interaction.chief)
@@ -164,7 +177,10 @@ Returns `true` or `false`.
     if any(are_nothing)
         return all(are_nothing)
     end
-    return true
+    nc = normal3d(c)
+    nw = normal3d(w)
+    nd = normal3d(d)
+    return (dot(nc, nw) > 0.5) && (dot(nc, nd) > 0.5)
 end
 
 """

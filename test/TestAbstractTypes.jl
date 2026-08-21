@@ -323,6 +323,28 @@ const BMO = BeamletOptics
             # sin(θm) = 500e-9 * 600e3 = 0.30 -> dx = 0.30, dy = -sqrt(1 - 0.3^2)
             @test isapprox(BMO.direction(g_ray)[1], 0.30, atol=1e-6)
             @test isapprox(BMO.direction(g_ray)[2], -sqrt(1 - 0.3^2), atol=1e-6)
+
+            # Auto groove axis grating
+            g_auto = GratingSurface(600e3, 1)
+            g_auto_ray = interact3d(g_auto, trans, int, Ray([0.0, 0, 0], [0.0, 1, 0], nothing, 500e-9, 1.0))
+            @test g_auto_ray isa Ray
+            @test isapprox(norm(BMO.direction(g_auto_ray)), 1.0)
+
+            # CoatedSurface tests
+            cs_mirror = CoatedSurface(IdealMirror())
+            @test interact3d(cs_mirror, trans, int, ray) isa Ray
+            @test BMO.direction(interact3d(cs_mirror, trans, int, ray))[2] ≈ -1.0
+
+            cs_func = CoatedSurface((t, i, r) -> Ray(BMO.position(i), Point3(1.0, 0.0, 0.0), nothing, BMO.wavelength(r), 1.0))
+            custom_ray = interact3d(cs_func, trans, int, ray)
+            @test custom_ray isa Ray
+            @test BMO.direction(custom_ray) == Point3(1.0, 0.0, 0.0)
+
+            # PolarizedRay on IdealMirror
+            pol_ray = PolarizedRay([0.0, 0, 0], [0.0, 1, 0], 532e-9, [1.0, 0.0, 0.0])
+            pol_mirror_ray = interact3d(IdealMirror(), trans, int, pol_ray)
+            @test pol_mirror_ray isa PolarizedRay
+            @test BMO.direction(pol_mirror_ray)[2] ≈ -1.0
         end
     end
 

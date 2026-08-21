@@ -174,6 +174,36 @@ const mm = 1e-3
             @test optical_path_length(agb) > 0.0
             @test BMO.check_optical_invariant(agb, 4)
         end
+
+        @testset "Reverse and index-matched doublet propagation" begin
+            λ = 707e-9
+            # Reverse propagation from +y to -y
+            AC254 = SphericalDoubletLens(87.9mm, -105.6mm, Inf, 6mm, 3mm, BMO.inch, NLAK22, NSF10)
+            sys_rev = System([AC254])
+            beam_rev = Beam([0.0, 0.05, 0.0], [0.0, -1.0, 0.0], λ)
+            solve_system!(sys_rev, beam_rev)
+            @test length(BMO.rays(beam_rev)) == 4
+            @test BMO.refractive_index.(beam_rev.rays) == [1.0, NSF10(λ), NLAK22(λ), 1.0]
+
+            # Index-matched doublet (n1 == n2)
+            AC_matched = SphericalDoubletLens(87.9mm, -105.6mm, Inf, 6mm, 3mm, BMO.inch, 1.5, 1.5)
+            sys_matched = System([AC_matched])
+            beam_matched = Beam([0.0, -0.05, 0.0], [0.0, 1.0, 0.0], λ)
+            solve_system!(sys_matched, beam_matched)
+            @test length(BMO.rays(beam_matched)) == 4
+            @test BMO.refractive_index.(beam_matched.rays) == [1.0, 1.5, 1.5, 1.0]
+
+            # Water-immersed doublet
+            water = IsotropicMedium(:Water, 1.333)
+            sys_water = System([AC254], water)
+            @test BMO.ambient_medium(sys_water) === water
+            @test BMO.refractive_index(sys_water, λ) ≈ 1.333
+            ray_water = Ray([0.0, -0.05, 0.0], [0.0, 1.0, 0.0], nothing, λ, 1.333)
+            beam_water = Beam(ray_water)
+            solve_system!(sys_water, beam_water)
+            @test length(BMO.rays(beam_water)) == 4
+            @test BMO.refractive_index.(beam_water.rays) == [1.333, NLAK22(λ), NSF10(λ), 1.333]
+        end
     end
 end
 

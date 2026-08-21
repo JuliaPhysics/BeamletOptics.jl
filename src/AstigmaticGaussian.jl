@@ -335,6 +335,26 @@ function interact3d(system::AbstractSystem,
         i_c, i_wxp, i_wxm, i_wyp, i_wym, i_dxp, i_dxm, i_dyp, i_dym)
 end
 
+function interact3d(system::AbstractSystem,
+        mi::MultiIntersection,
+        agb::AstigmaticGaussianBeamlet{R},
+        ray_id::Int) where {R}
+    i_c = interact3d(system, mi, agb.c, rays(agb.c)[ray_id])
+    i_wxp = interact3d(system, mi, agb.wxp, rays(agb.wxp)[ray_id])
+    i_wxm = interact3d(system, mi, agb.wxm, rays(agb.wxm)[ray_id])
+    i_wyp = interact3d(system, mi, agb.wyp, rays(agb.wyp)[ray_id])
+    i_wym = interact3d(system, mi, agb.wym, rays(agb.wym)[ray_id])
+    i_dxp = interact3d(system, mi, agb.dxp, rays(agb.dxp)[ray_id])
+    i_dxm = interact3d(system, mi, agb.dxm, rays(agb.dxm)[ray_id])
+    i_dyp = interact3d(system, mi, agb.dyp, rays(agb.dyp)[ray_id])
+    i_dym = interact3d(system, mi, agb.dym, rays(agb.dym)[ray_id])
+    if any(isnothing, (i_c, i_wxp, i_wxm, i_wyp, i_wym, i_dxp, i_dxm, i_dyp, i_dym))
+        return nothing
+    end
+    return AstigmaticGaussianBeamletInteraction{R}(
+        i_c, i_wxp, i_wxm, i_wyp, i_wym, i_dxp, i_dxm, i_dyp, i_dym)
+end
+
 function Base.push!(agb::AstigmaticGaussianBeamlet{T},
         interaction::AstigmaticGaussianBeamletInteraction{T}) where {T}
     push!(agb.c, interaction.chief)
@@ -357,28 +377,17 @@ Tests if all 9 component rays at section `id` hit the same object shape.
 @inline function _beams_hits_same_shape(agb::AstigmaticGaussianBeamlet, id::Int)::Bool
     i1 = intersection(rays(agb.c)[id])
     if isnothing(i1)
-        isnothing(intersection(rays(agb.wxp)[id])) || return false
-        isnothing(intersection(rays(agb.wxm)[id])) || return false
-        isnothing(intersection(rays(agb.wyp)[id])) || return false
-        isnothing(intersection(rays(agb.wym)[id])) || return false
-        isnothing(intersection(rays(agb.dxp)[id])) || return false
-        isnothing(intersection(rays(agb.dxm)[id])) || return false
-        isnothing(intersection(rays(agb.dyp)[id])) || return false
-        isnothing(intersection(rays(agb.dym)[id])) || return false
+        for b in _aux_beams(agb)
+            isnothing(intersection(rays(b)[id])) || return false
+        end
         return true
     else
-        _check = b -> begin
+        nc = normal3d(i1)
+        for b in _aux_beams(agb)
             int = intersection(rays(b)[id])
-            !isnothing(int)
+            isnothing(int) && return false
+            dot(nc, normal3d(int)) > 0.5 || return false
         end
-        _check(agb.wxp) || return false
-        _check(agb.wxm) || return false
-        _check(agb.wyp) || return false
-        _check(agb.wym) || return false
-        _check(agb.dxp) || return false
-        _check(agb.dxm) || return false
-        _check(agb.dyp) || return false
-        _check(agb.dym) || return false
         return true
     end
 end
