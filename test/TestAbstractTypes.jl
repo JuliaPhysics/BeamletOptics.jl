@@ -345,6 +345,20 @@ const BMO = BeamletOptics
             pol_mirror_ray = interact3d(IdealMirror(), trans, int, pol_ray)
             @test pol_mirror_ray isa PolarizedRay
             @test BMO.direction(pol_mirror_ray)[2] ≈ -1.0
+
+            # surface_model fallback tests
+            @test surface_model(nothing) isa FresnelInterface
+            @test surface_model(IdealMirror()) isa IdealMirror
+
+            # Standalone Coating object in a System
+            coat_shape = deepcopy(BMO.shape(BMO.ThinBeamsplitter(0.05)))
+            translate3d!(coat_shape, [0.0, 0.05, 0.0])
+            coat_obj = Coating(coat_shape, IdealMirror())
+            coat_sys = System([coat_obj])
+            coat_beam = Beam([0.0, 0.0, 0.0], [0.0, 1.0, 0.0], 532e-9)
+            solve_system!(coat_sys, coat_beam)
+            @test length(BMO.rays(coat_beam)) == 2
+            @test BMO.direction(last(BMO.rays(coat_beam)))[2] ≈ -1.0
         end
     end
 

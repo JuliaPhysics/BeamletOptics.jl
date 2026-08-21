@@ -59,3 +59,7 @@ end
 
 GratingSurface(groove_density::Real, order::Int = 1) = 
     GratingSurface(Float64(groove_density), order, nothing)
+
+surface_model(::AbstractObject) = FresnelInterface()
+surface_model(::Nothing) = FresnelInterface()
+surface_model(m::AbstractSurfaceModel) = m
