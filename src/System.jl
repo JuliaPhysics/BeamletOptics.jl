@@ -105,6 +105,10 @@ end
         end
     end
     
+    return _resolve_coincident_hit(best_hit, best_obj, second_hit, second_obj, ray)
+end
+
+@inline function _resolve_coincident_hit(best_hit, best_obj, second_hit, second_obj, ray)
     if best_hit === nothing
         return nothing
     elseif second_hit === nothing
@@ -144,38 +148,19 @@ end
         end
     end
 
-    if second_hit === nothing
-        return (best_hit, best_obj)
-    else
-        h1_is_exit = dot(direction(ray), normal3d(best_hit)) > 0
-        exiting_obj = h1_is_exit ? best_obj : second_obj
-        entering_obj = h1_is_exit ? second_obj : best_obj
-        mi = MultiIntersection(best_hit; exiting = exiting_obj, entering = entering_obj)
-        return (mi, best_obj)
-    end
+    return _resolve_coincident_hit(best_hit, best_obj, second_hit, second_obj, ray)
 end
 
+@inline trace_one(system::AbstractSystem, ray::AbstractRay, ::Nothing) = trace_all(system, ray)
+
 """
-    tracing_step!(system::AbstractSystem, ray::AbstractRay{R}, hint::Hint)
+    tracing_step!(system::AbstractSystem, ray::AbstractRay{R}, hint::Nullable{Hint})
 
 Tests if the `ray` intersects an `object` in the optical `system`. Returns the hit object, or `nothing`.
 """
 @inline function tracing_step!(
-        system::AbstractSystem, ray::AbstractRay{R}, hint::Hint) where {R <: Real}
+        system::AbstractSystem, ray::AbstractRay{R}, hint::Nullable{Hint} = nothing) where {R <: Real}
     res = trace_one(system, ray, hint)
-    if res === nothing
-        intersection!(ray, nothing)
-        return nothing
-    else
-        hit, obj = res
-        intersection!(ray, hit)
-        return obj
-    end
-end
-
-@inline function tracing_step!(
-        system::AbstractSystem, ray::AbstractRay{R}, ::Nothing) where {R <: Real}
-    res = trace_all(system, ray)
     if res === nothing
         intersection!(ray, nothing)
         return nothing
@@ -202,11 +187,7 @@ function trace_system!(
     interaction::Nullable{BeamInteraction{T, R}} = nothing
     while length(rays(beam)) < r_max
         ray = last(rays(beam))
-        obj = if interaction === nothing
-            tracing_step!(system, ray, nothing)
-        else
-            tracing_step!(system, ray, hint(interaction))
-        end
+        obj = tracing_step!(system, ray, hint(interaction))
         # Test if intersection is valid
         ray_intersection = intersection(ray)
         if isnothing(ray_intersection) || isnothing(obj)
