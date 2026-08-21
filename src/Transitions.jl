@@ -26,7 +26,7 @@ system ambient medium, ray propagation direction, and boundary outward surface n
     ray::AbstractRay,
     normal::Point3
 )
-    # QUESTION is this method intended primarily for medium -> air and vice versa?
+    # Media transition for an isolated component immersed in ambient medium
     is_entering = dot(direction(ray), normal) < 0
     med_in  = is_entering ? current_medium(ray) : component_medium
     med_out = is_entering ? component_medium : ambient
@@ -45,24 +45,22 @@ Resolves the media transition across a coincident boundary between touching opti
 )
     ex_obj = exiting(mi)
     en_obj = entering(mi)
-    # QUESTION two touching objects, entry + exit + possibly "coating" 
     if ex_obj !== nothing && en_obj !== nothing
-        # QUESTION `medium_from` called for obj with no defined medium, e.g. Mirror?
+        # Direct interface between two touching optical components (e.g. cemented doublet)
         med_in = medium_from(ex_obj)
         med_out = medium_from(en_obj)
         return Transition(med_in, med_out, true)
-    # QUESTION only exiting object + possibly "coating" 
     elseif ex_obj !== nothing
+        # Ray emerging from an optical component into ambient medium
         return Transition(medium_from(ex_obj), ambient, false)
-    # QUESTIOn only entering object + possibly "coating" 
     elseif en_obj !== nothing
+        # Ray entering an optical component from ambient medium
         return Transition(ambient, medium_from(en_obj), true)
-    # QUESTION which case is represented here?
     else
+        # Standalone virtual interface or detector plane in ambient medium
         return resolve_transition(Ambient(), ambient, ray, normal3d(mi))
     end
 end
 
-# QUESTION this is the default behavior, correct? extensions considered in the future?
-# Fallback for rays storing refractive index instead of AbstractMedium
+# Fallback for rays storing scalar refractive index instead of AbstractMedium
 current_medium(ray::AbstractRay) = IsotropicMedium(refractive_index(ray))

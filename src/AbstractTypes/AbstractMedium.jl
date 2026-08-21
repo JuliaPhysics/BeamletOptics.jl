@@ -113,8 +113,9 @@ end
 """
     medium_from(x) -> AbstractMedium
 
-Converts a medium, constant refractive index, or dispersion function into an `AbstractMedium`.
+Converts a medium, constant refractive index, dispersion function, or optical object into an `AbstractMedium`.
 """
 medium_from(m::AbstractMedium) = m
 medium_from(n::Number) = IsotropicMedium(n)
+medium_from(::AbstractObject) = Ambient()
 medium_from(f) = IsotropicMedium(f)

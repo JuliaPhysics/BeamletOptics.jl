@@ -35,20 +35,20 @@ function Base.show(io::IO, ::MIME"text/plain", i::Intersection)
 end
 
 """
-    MultiIntersection{T<:Real, O1, O2} <: AbstractIntersection{T}
+    MultiIntersection{T<:Real, O1<:Union{Nothing, AbstractObject}, O2<:Union{Nothing, AbstractObject}} <: AbstractIntersection{T}
 
 Stores coincident intersections sharing the same boundary within tolerance.
 """
-struct MultiIntersection{T <: Real, O1, O2} <: AbstractIntersection{T}
+struct MultiIntersection{T <: Real, O1 <: Union{Nothing, AbstractObject}, O2 <: Union{Nothing, AbstractObject}} <: AbstractIntersection{T}
     hit::Intersection{T}
-    exiting::O1             # QUESTION type not restricted, Union{Nothing, <: AbstractObject} ?
-    entering::O2            # QUESTION type not restricted, Union{Nothing, <: AbstractObject} ? 
+    exiting::O1
+    entering::O2
 end
 
 function MultiIntersection(hit::Intersection{T};
-        exiting = nothing,
-        entering = nothing) where {T}
-    return MultiIntersection{T, typeof(exiting), typeof(entering)}(hit, exiting, entering)
+        exiting::O1 = nothing,
+        entering::O2 = nothing) where {T, O1 <: Union{Nothing, AbstractObject}, O2 <: Union{Nothing, AbstractObject}}
+    return MultiIntersection{T, O1, O2}(hit, exiting, entering)
 end
 
 exiting(mi::MultiIntersection) = mi.exiting

@@ -89,15 +89,24 @@ function interact3d(
     return nothing
 end
 
+"""
+    record!(data, d::DetectorSurface, int::Intersection, ray)
+
+Extensible data recording interface for detector surfaces.
+"""
+function record!(data::Any, ::DetectorSurface, int::Intersection{T}, ray::AbstractRay{T}) where {T <: Real}
+    push!(data, (position(int), ray))
+    return nothing
+end
+
 function interact3d(
     d::DetectorSurface,
     trans::Transition,
     int::Intersection{T},
     ray::AbstractRay{T}
 ) where {T <: Real}
-    # QUESTION seperate dispatch for Gaussian and AGB?
     if d.detector_data !== nothing
-        push!(d.detector_data, (position(int), ray))
+        record!(d.detector_data, d, int, ray)
     end
     return nothing
 end

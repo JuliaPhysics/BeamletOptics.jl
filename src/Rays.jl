@@ -46,7 +46,7 @@ end
 
 function Ray(pos::AbstractArray{P},
         dir::AbstractArray{D},
-        intersection::Nullable{<:AbstractIntersection}, # QUESTION = nothing by default?
+        intersection::Nullable{<:AbstractIntersection},
         λ::L = 1000e-9,
         n::N = 1.0) where {P <: Real, D <: Real, L <: Real, N <: Real}
     F = promote_type(P, D, L, N)

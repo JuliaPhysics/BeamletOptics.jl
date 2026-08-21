@@ -58,7 +58,7 @@ end
     second_hit::Union{Nothing, Intersection{R}} = nothing
     second_obj = nothing
     
-    # QUESTION objects(system) will expose AbstractCoating as is, correct? filter required for correct MultiIntersection?
+    # Iterate over all optical objects/interfaces in system
     for obj in objects(system)
         temp = intersect3d(obj, ray)
         if temp === nothing
@@ -168,7 +168,7 @@ function trace_system!(
         if isnothing(ray_intersection) || isnothing(obj)
             break
         end
-        # QUESTION where does interact3d(::AbstractSystem, ::Intersection, etc) go? e.g. "SingleIntersection"
+        # Dispatch to interface interaction depending on intersection type
         interaction = (ray_intersection isa MultiIntersection ?
             interact3d(system, ray_intersection, beam, ray) :
             interact3d(system, obj, beam, ray))::Union{Nothing, BeamInteraction{T, R}}

@@ -82,19 +82,112 @@ position!(::MultiShape, object::AbstractObject, ::Any) = nothing
 orientation(::MultiShape, object::AbstractObject) = orientation(first(shape(object)))
 orientation!(::MultiShape, object::AbstractObject, ::Any) = nothing
 
+@inline _in_tuple(x, ::Tuple{}) = false
+@inline _in_tuple(x, t::Tuple) = (x === first(t)) || _in_tuple(x, Base.tail(t))
+
+"""
+    unique_shapes(object::Union{AbstractObject, AbstractShape}) -> Tuple
+
+Collects all unique underlying leaf shapes within `object` without duplicate references (stack-allocated, zero-allocation Tuple).
+"""
+@inline unique_shapes(object::Union{AbstractObject, AbstractShape}) = _collect_unique_shapes(object, ())
+
+@inline function _collect_unique_shapes(item::AbstractShape, visited::Tuple)
+    if _in_tuple(item, visited)
+        return visited
+    else
+        return (visited..., item)
+    end
+end
+
+@inline function _collect_unique_shapes(item::AbstractObject, visited::Tuple)
+    if shape_trait_of(item) isa SingleShape
+        return _collect_unique_shapes(shape(item), visited)
+    elseif shape_trait_of(item) isa MultiShape
+        return _collect_unique_shapes_tuple(shape(item), visited)
+    else
+        return visited
+    end
+end
+
+@inline _collect_unique_shapes_tuple(::Tuple{}, visited::Tuple) = visited
+@inline function _collect_unique_shapes_tuple(parts::Tuple, visited::Tuple)
+    head = first(parts)
+    tail = Base.tail(parts)
+    v_next = _collect_unique_shapes(head, visited)
+    return _collect_unique_shapes_tuple(tail, v_next)
+end
+
+@inline function _collect_unique_shapes_tuple(parts::AbstractArray, visited::Tuple)
+    v = visited
+    for part in parts
+        v = _collect_unique_shapes(part, v)
+    end
+    return v
+end
+
 """
     translate3d!(::MultiShape, object, offset)
 
-Moves all parts of the [`MultiShape`](@ref) `object` along the specified `offset` vector.
+Moves all parts of the [`MultiShape`](@ref) `object` along the specified `offset` vector (zero allocations).
 """
-function translate3d!(::MultiShape, object::AbstractObject, offset)
-    # Translate tracking vector
+@inline function translate3d!(::MultiShape, object::AbstractObject, offset)
     position!(object, position(object) .+ offset)
-    # Recursively translate all subparts
-    for subpart in shape(object)
-        translate3d!(subpart, offset)
-    end
+    _translate3d_multishape_tuple(shape(object), offset, (object,))
     return nothing
+end
+
+@inline _translate3d_multishape_tuple(::Tuple{}, offset, visited::Tuple) = visited
+@inline function _translate3d_multishape_tuple(parts::Tuple, offset, visited::Tuple)
+    head = first(parts)
+    tail = Base.tail(parts)
+    v_next = _translate3d_part!(head, offset, visited)
+    return _translate3d_multishape_tuple(tail, offset, v_next)
+end
+
+@inline function _translate3d_multishape_tuple(parts::AbstractArray, offset, visited::Tuple)
+    v = visited
+    for part in parts
+        v = _translate3d_part!(part, offset, v)
+    end
+    return v
+end
+
+@inline function _translate3d_part!(shape_part::AbstractShape, offset, visited::Tuple)
+    if !_in_tuple(shape_part, visited)
+        translate3d!(shape_part, offset)
+        return (visited..., shape_part)
+    end
+    return visited
+end
+
+@inline function _translate3d_part!(obj_part::AbstractObject, offset, visited::Tuple)
+    if shape_trait_of(obj_part) isa SingleShape
+        s = shape(obj_part)
+        if !_in_tuple(s, visited)
+            translate3d!(s, offset)
+            return (visited..., obj_part, s)
+        else
+            return (visited..., obj_part)
+        end
+    elseif shape_trait_of(obj_part) isa MultiShape
+        if !_in_tuple(obj_part, visited)
+            position!(obj_part, position(obj_part) .+ offset)
+            v1 = (visited..., obj_part)
+            return _translate3d_multishape_tuple(shape(obj_part), offset, v1)
+        end
+    else
+        translate3d!(obj_part, offset)
+    end
+    return visited
+end
+
+@inline function _translate3d_part!(part::Any, offset, visited::Tuple)
+    if !_in_tuple(part, visited)
+        translate3d!(part, offset)
+        return (visited..., part)
+    end
+    return visited
 end
 
 """
@@ -103,7 +196,7 @@ end
 Translates all parts of the [`MultiShape`](@ref) `object` in parallel to the specified `target` position.
 The `object` center point will be equal to the `target`.
 """
-function translate_to3d!(::MultiShape, object::AbstractObject, target)
+@inline function translate_to3d!(::MultiShape, object::AbstractObject, target)
     current = position(object)
     translate3d!(object, target .- current)
     return nothing
@@ -112,21 +205,73 @@ end
 """
     rotate3d!(::MultiShape, object, axis, θ)
 
-All parts of the [`MultiShape`](@ref) `object` are rotated around the pivot center via the specified angle `θ` and `axis`.
+All parts of the [`MultiShape`](@ref) `object` are rotated around the pivot center via the specified angle `θ` and `axis` (zero allocations).
 """
-function rotate3d!(::MultiShape, object::AbstractObject, axis, θ)
+@inline function rotate3d!(::MultiShape, object::AbstractObject, axis, θ)
     R = rotate3d(axis, θ)
-    # Update group orientation
+    orig_pos = position(object)
     orientation!(object, R * orientation(object))
-    # Recursively rotate all subgroups and objects
-    for subpart in shape(object)
-        rotate3d!(subpart, axis, θ)
-        v = position(subpart) .- position(object)
-        # Translate group around pivot point
-        v = (R * v) - v
-        translate3d!(subpart, v)
-    end
+    _rotate3d_multishape_tuple(shape(object), axis, θ, R, orig_pos, (object,))
     return nothing
+end
+
+@inline _rotate3d_multishape_tuple(::Tuple{}, axis, θ, R, orig_pos, visited::Tuple) = visited
+@inline function _rotate3d_multishape_tuple(parts::Tuple, axis, θ, R, orig_pos, visited::Tuple)
+    head = first(parts)
+    tail = Base.tail(parts)
+    v_next = _rotate3d_part!(head, axis, θ, R, orig_pos, visited)
+    return _rotate3d_multishape_tuple(tail, axis, θ, R, orig_pos, v_next)
+end
+
+@inline function _rotate3d_multishape_tuple(parts::AbstractArray, axis, θ, R, orig_pos, visited::Tuple)
+    v = visited
+    for part in parts
+        v = _rotate3d_part!(part, axis, θ, R, orig_pos, v)
+    end
+    return v
+end
+
+@inline function _rotate3d_part!(shape_part::AbstractShape, axis, θ, R, orig_pos, visited::Tuple)
+    if !_in_tuple(shape_part, visited)
+        rotate3d!(shape_part, axis, θ)
+        v = position(shape_part) .- orig_pos
+        v_shifted = (R * v) - v
+        translate3d!(shape_part, v_shifted)
+        return (visited..., shape_part)
+    end
+    return visited
+end
+
+@inline function _rotate3d_part!(obj_part::AbstractObject, axis, θ, R, orig_pos, visited::Tuple)
+    if shape_trait_of(obj_part) isa SingleShape
+        s = shape(obj_part)
+        if !_in_tuple(s, visited)
+            rotate3d!(obj_part, axis, θ)
+            v = position(obj_part) .- orig_pos
+            v_shifted = (R * v) - v
+            translate3d!(obj_part, v_shifted)
+            return (visited..., obj_part, s)
+        else
+            return (visited..., obj_part)
+        end
+    elseif shape_trait_of(obj_part) isa MultiShape
+        if !_in_tuple(obj_part, visited)
+            orientation!(obj_part, R * orientation(obj_part))
+            v1 = (visited..., obj_part)
+            return _rotate3d_multishape_tuple(shape(obj_part), axis, θ, R, orig_pos, v1)
+        end
+    else
+        rotate3d!(obj_part, axis, θ)
+    end
+    return visited
+end
+
+@inline function _rotate3d_part!(part::Any, axis, θ, R, orig_pos, visited::Tuple)
+    if !_in_tuple(part, visited)
+        rotate3d!(part, axis, θ)
+        return (visited..., part)
+    end
+    return visited
 end
 
 function align3d!(::MultiShape, object::AbstractObject, target_vec)
