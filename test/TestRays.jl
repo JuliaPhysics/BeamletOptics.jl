@@ -14,7 +14,7 @@ dummy_intersection(t, n) = Intersection(t, [0.0, 0.0, 0.0], Point3(n))
     pos = [0, 0, 0]
     dir = [1.0, 1, 0]
     ray = Ray(pos, dir)
-    @test ismutable(ray)
+    @test !ismutable(ray)
     @test isa(ray, Ray{Float64})
     @test isnothing(ray.intersection)
     @test isinf(length(ray))
@@ -32,11 +32,14 @@ dummy_intersection(t, n) = Intersection(t, [0.0, 0.0, 0.0], Point3(n))
         r3 = Ray([0, 0, 0], [0, 1, 0])
         i1 = dummy_intersection(0.0, [0, 1.0, 0])
         i2 = dummy_intersection(0.0, [0, -1.0, 0])
-        BMO.intersection!(r1, i1)
-        BMO.intersection!(r2, i2)
-        @test !BMO.isentering(r1)
-        @test BMO.isentering(r2)
-        @test !BMO.isentering(r3)
+        seg1 = RaySegment(r1, i1)
+        seg2 = RaySegment(r2, i2)
+        seg3 = RaySegment(r3, nothing)
+        @test !BMO.isentering(seg1)
+        @test BMO.isentering(seg2)
+        @test !BMO.isentering(seg3)
+        @test !BMO.isentering(r1, i1)
+        @test BMO.isentering(r2, i2)
     end
 
     @testset "Testing refraction3d" begin
@@ -45,16 +48,16 @@ dummy_intersection(t, n) = Intersection(t, [0.0, 0.0, 0.0], Point3(n))
         dir = normalize([0, 1, 0])
         ray = Ray(zeros(3), dir)
         nml = normalize(Point3{Float64}(0, -1, 1))
-        BMO.intersection!(
-            ray, dummy_intersection(1.0, nml))
+        int1 = dummy_intersection(1.0, nml)
+        seg1 = RaySegment(ray, int1)
         @test BMO.refraction3d(dir, nml, n1, n2) ==
-              BMO.refraction3d(ray, n2)
+              BMO.refraction3d(seg1, n2)
         # test for correct exit normal flip
         nml *= -1
-        BMO.intersection!(
-            ray, dummy_intersection(1.0, nml))
+        int2 = dummy_intersection(1.0, nml)
+        seg2 = RaySegment(ray, int2)
         @test BMO.refraction3d(dir, -nml, n1, n2) ==
-              BMO.refraction3d(ray, n2)
+              BMO.refraction3d(seg2, n2)
     end
 end
 

@@ -170,9 +170,12 @@ Tests if all rays at section `id` of `gauss` hit the same object shape.
 Returns `true` or `false`.
 """
 @inline function _beams_hits_same_shape(gauss::GaussianBeamlet, id::Int)::Bool
-    c = intersection(rays(gauss.chief)[id])
-    w = intersection(rays(gauss.waist)[id])
-    d = intersection(rays(gauss.divergence)[id])
+    if id > length(gauss.chief.segments) || id > length(gauss.waist.segments) || id > length(gauss.divergence.segments)
+        return true
+    end
+    c = gauss.chief.segments[id].intersection
+    w = gauss.waist.segments[id].intersection
+    d = gauss.divergence.segments[id].intersection
     are_nothing = (c === nothing, w === nothing, d === nothing)
     if any(are_nothing)
         return all(are_nothing)
@@ -182,6 +185,7 @@ Returns `true` or `false`.
     nd = normal3d(d)
     return (dot(nc, nw) > 0.5) && (dot(nc, nd) > 0.5)
 end
+
 
 """
     GaussianBeamlet(position, direction, λ, w0; kwargs...)
@@ -285,9 +289,10 @@ function gauss_parameters(
         hint = point_on_beam(gauss, z)
 )
     p0, index = hint
-    chief = gauss.chief.rays[index]
-    div = gauss.divergence.rays[index]
-    waist = gauss.waist.rays[index]
+    chief = rays(gauss.chief)[index]
+    div = rays(gauss.divergence)[index]
+    waist = rays(gauss.waist)[index]
+
     #=
     Divergence ray height and slope (same for waist ray)
     - find divergence ray "height" and "slope" at intersection point y0 with target plane at p0 of chief ray

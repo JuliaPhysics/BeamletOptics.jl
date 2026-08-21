@@ -19,7 +19,7 @@ function interact3d(
     new_pos = position(int)
     new_n = tir ? n1 : n2
     
-    return Ray{T}(new_pos, new_dir, nothing, λ, new_n)
+    return Ray{T}(new_pos, new_dir, λ, new_n)
 end
 
 function interact3d(
@@ -50,7 +50,7 @@ function interact3d(
     new_E0 = P * polarization(ray)
     new_pos = position(int)
     
-    return PolarizedRay{T}(new_pos, new_dir, nothing, λ, new_n, new_E0)
+    return PolarizedRay{T}(new_pos, new_dir, λ, new_n, new_E0)
 end
 
 function interact3d(
@@ -62,7 +62,7 @@ function interact3d(
     normal = normal3d(int)
     new_dir = reflection3d(direction(ray), normal)
     new_pos = position(int)
-    return Ray{T}(new_pos, new_dir, nothing, wavelength(ray), refractive_index(ray))
+    return Ray{T}(new_pos, new_dir, wavelength(ray), refractive_index(ray))
 end
 
 function interact3d(
@@ -77,7 +77,7 @@ function interact3d(
     J = SPBasis(-1, 0, 0, 1)
     P = _calculate_global_E0(direction(ray), new_dir, normal, J)
     new_E0 = P * polarization(ray)
-    return PolarizedRay{T}(new_pos, new_dir, nothing, wavelength(ray), refractive_index(ray), new_E0)
+    return PolarizedRay{T}(new_pos, new_dir, wavelength(ray), refractive_index(ray), new_E0)
 end
 
 function interact3d(
@@ -164,7 +164,7 @@ function interact3d(
     new_dir = normalize(d_g * g_vec + d_p_out * p_vec + d_n_out * normal)
     new_pos = position(int)
 
-    return Ray{T}(new_pos, new_dir, nothing, λ, refractive_index(ray))
+    return Ray{T}(new_pos, new_dir, λ, refractive_index(ray))
 end
 
 """
@@ -207,7 +207,8 @@ function interact3d(
     beam::AbstractBeam{T, R},
     ray::R
 ) where {T <: Real, R <: AbstractRay{T}}
-    int = intersection(ray)
+    int = isempty(beam.segments) ? intersect3d(shape(c), ray) : last(beam.segments).intersection
+    isnothing(int) && return nothing
     ambient = ambient_medium(system)
     trans = resolve_transition(ambient, ambient, ray, normal3d(int))
     out_ray = interact3d(surface_model(c), trans, int, ray)
@@ -216,3 +217,4 @@ function interact3d(
     end
     return BeamInteraction{T, R}(nothing, out_ray)
 end
+

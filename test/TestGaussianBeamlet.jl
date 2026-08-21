@@ -182,13 +182,13 @@ const mm = 1e-3
             # Wide beamlet shifted close to the lens edge (r = 2.5mm)
             clip_gauss = GaussianBeamlet([2.3mm, -0.05, 0.0], [0.0, 1.0, 0.0], 532e-9, 2.0mm)
             solve_system!(clip_sys, clip_gauss)
-            # Divergence ray misses the 5mm diameter lens aperture, trace should abort cleanly
             @test length(BMO.rays(clip_gauss.chief)) == 1
-            @test isnothing(BMO.intersection(last(BMO.rays(clip_gauss.chief))))
-            @test isnothing(BMO.intersection(last(BMO.rays(clip_gauss.waist))))
-            @test isnothing(BMO.intersection(last(BMO.rays(clip_gauss.divergence))))
+            @test isnothing(last(clip_gauss.chief.segments).intersection)
+            @test isnothing(last(clip_gauss.waist.segments).intersection)
+            @test isnothing(last(clip_gauss.divergence.segments).intersection)
         end
     end
+
 end
 
 end # MODULE

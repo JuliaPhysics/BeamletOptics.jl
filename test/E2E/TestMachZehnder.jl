@@ -27,12 +27,9 @@ const BMO = BeamletOptics
     zrotate3d!(m1, deg2rad(360 - 135))
     zrotate3d!(m2, deg2rad(45))
     
-    ray = PolarizedRay([0, -0.1, 0], [0.0, 1.0, 0], 1000e-9, [0, 0, 1])
-    beam = Beam(ray)
-    
     @testset "z-polarized ray along y-axis" begin
         # Solve with z-polarized ray along y-axis
-        BMO.polarization!(ray, [0, 0, 1])
+        beam = Beam(PolarizedRay([0, -0.1, 0], [0.0, 1.0, 0], 1000e-9, [0, 0, 1]))
         solve_system!(system, beam)
         
         # Extract E0s: t - transmitted, r - reflected
@@ -55,10 +52,7 @@ const BMO = BeamletOptics
     end
     
     @testset "x-polarized ray along y-axis" begin
-        # Test num. of leaves before re-solving
-        @test length(collect(Leaves(beam))) == 4
-        # Re-solve with x-polarized ray along y-axis
-        BMO.polarization!(ray, [1, 0, 0])
+        beam = Beam(PolarizedRay([0, -0.1, 0], [0.0, 1.0, 0], 1000e-9, [1, 0, 0]))
         solve_system!(system, beam)
         
         # Extract E0s: t - transmitted, r - reflected
@@ -80,5 +74,6 @@ const BMO = BeamletOptics
         @test trr ≈ rrt
     end
 end
+
 
 end # MODULE

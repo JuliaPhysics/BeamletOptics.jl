@@ -34,17 +34,15 @@ where r and t are the complex-valued Fresnel coefficients (see also [`fresnel_co
 !!! warning "Intensity"
     E0 can not be converted into an [`intensity`](@ref) value, since a single `PolarizedRay` can not directly model the change in intensity during imaging by an optical system.
 """
-mutable struct PolarizedRay{T} <: AbstractRay{T}
+struct PolarizedRay{T <: Real} <: AbstractRay{T}
     pos::Point3{T}
     dir::Point3{T}
-    intersection::Union{Nothing, AbstractIntersection{T}}
     λ::T
     n::T
     E0::Point3{Complex{T}}
     function PolarizedRay{T}(
             pos::AbstractArray{P},
             dir::AbstractArray{D},
-            int::Union{Nothing, AbstractIntersection},
             λ::L,
             n::N,
             E0::AbstractArray{<:Union{E, Complex{E}}}
@@ -60,7 +58,6 @@ mutable struct PolarizedRay{T} <: AbstractRay{T}
         return new{M}(
             Point3{M}(pos),
             normalize(Point3{M}(dir)),
-            int,
             M(λ),
             M(n),
             Point3{Complex{M}}(E0)
@@ -69,7 +66,6 @@ mutable struct PolarizedRay{T} <: AbstractRay{T}
 end
 
 polarization(ray::PolarizedRay) = ray.E0
-polarization!(ray::PolarizedRay, new) = (ray.E0 = new)
 
 islinear(ray::PolarizedRay) = islinear(polarization(ray))
 iscircular(ray::PolarizedRay) = iscircular(polarization(ray))
@@ -90,12 +86,52 @@ function PolarizedRay(
     return PolarizedRay{F}(
         Point3{F}(pos),
         normalize(Point3{F}(dir)),
-        nothing,
         F(λ),
         F(1),
         Point3{Complex{F}}(E0)
     )
 end
+
+function PolarizedRay(
+        pos::AbstractArray{P},
+        dir::AbstractArray{D},
+        λ::L,
+        n::N,
+        E0::AbstractArray{<:Union{E, Complex{E}}}
+    ) where {P <: Real, D <: Real, L <: Real, N <: Real, E <: Real}
+    F = promote_type(P, D, L, N, E)
+    return PolarizedRay{F}(
+        Point3{F}(pos),
+        normalize(Point3{F}(dir)),
+        F(λ),
+        F(n),
+        Point3{Complex{F}}(E0)
+    )
+end
+
+# 6-argument compatibility constructor for legacy call sites
+function PolarizedRay(
+        pos::AbstractArray,
+        dir::AbstractArray,
+        ::Nullable{<:AbstractIntersection},
+        λ::Real,
+        n::Real,
+        E0::AbstractArray
+    )
+    return PolarizedRay(pos, dir, λ, n, E0)
+end
+
+function PolarizedRay{T}(
+        pos::AbstractArray,
+        dir::AbstractArray,
+        ::Nullable{<:AbstractIntersection},
+        λ::Real,
+        n::Real,
+        E0::AbstractArray
+    ) where {T}
+    return PolarizedRay{T}(pos, dir, λ, n, E0)
+end
+
 
 abstract type AbstractJonesMatrix{T} <: AbstractMatrix{T} end
 
@@ -200,11 +236,12 @@ function _calculate_global_E0(in_dir::AbstractArray, out_dir::AbstractArray, nor
     _calculate_global_E0(in_dir, out_dir, normal, static_data(J))
 end
 
-function _calculate_global_E0(::AbstractObject, ray::PolarizedRay, out_dir::AbstractArray, J::LocalJonesBasis)
+function _calculate_global_E0(::AbstractObject, ray::PolarizedRay, out_dir::AbstractArray, J::LocalJonesBasis, int::Nullable{<:AbstractIntersection} = nothing)
     # Update Jones matrix according to global object orientation
     in_dir = direction(ray)
-    normal = normal3d(intersection(ray))
+    normal = isnothing(int) ? (isnothing(intersection(ray)) ? Point3(0.0, 0.0, 1.0) : normal3d(intersection(ray))) : normal3d(int)
     E0 = polarization(ray)
     P = _calculate_global_E0(in_dir, out_dir, normal, J)
     return P*E0
 end
+

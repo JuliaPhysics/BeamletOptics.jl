@@ -124,7 +124,7 @@ const mm = 1e-3
             f_z = thickness(AC254_150_AB) + bfl + δf
             f0 = position(AC254_150_AB.front.shape) + f_z * -dir
             for (i, z) in enumerate(zs)
-                beam.rays[1].pos = pos + z * nv
+                beam = Beam(pos + z * nv, -dir, λ)
                 solve_system!(system, beam)
                 @test length(BMO.rays(beam)) == 4
                 @test BMO.refractive_index.(beam.rays) ==
@@ -132,13 +132,14 @@ const mm = 1e-3
                 fs[i] = test_coma(last(BMO.rays(beam)), f0, dir, atol = 1e-6)
             end
             # Test center ray normal vectors
-            beam.rays[1].pos = pos + 0 * nv
+            beam = Beam(pos + 0 * nv, -dir, λ)
             solve_system!(system, beam)
-            for i in 1:(length(beam.rays) - 1)
-                @test abs(dot(BMO.normal3d(beam.rays[i].intersection), beam.rays[i].dir)) ≈ 1
+            for i in 1:(length(beam.segments) - 1)
+                @test abs(dot(BMO.normal3d(beam.segments[i].intersection), direction(beam.segments[i]))) ≈ 1
             end
             return true
         end
+
         # Run tests for AC254_150_AB against plot data at https://www.thorlabs.com/newgrouppage9.cfm?objectgroup_id=12767
         @test test_doublet(488e-9, 143.68mm, -2.064e-4)
         @test test_doublet(707e-9, 143.68mm, 0)

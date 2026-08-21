@@ -38,9 +38,10 @@ Reflects incoming ray at a reflective optical surface using the universal bounda
 """
 function interact3d(system::AbstractSystem,
         optic::AbstractReflectiveOptic,
-        ::Beam{T, R},
+        beam::Beam{T, R},
         ray::R) where {T <: Real, R <: AbstractRay{T}}
-    int = intersection(ray)
+    int = isempty(beam.segments) ? intersect3d(shape(optic), ray) : last(beam.segments).intersection
+    isnothing(int) && return nothing
     ambient = ambient_medium(system)
     trans = Transition(ambient, ambient, false)
     
@@ -50,6 +51,7 @@ function interact3d(system::AbstractSystem,
     end
     return BeamInteraction{T, R}(nothing, out_ray)
 end
+
 
 """
     Mirror{S <: AbstractShape} <: AbstractReflectiveOptic

@@ -19,12 +19,8 @@ const nm = 1e-9
     Δ = D / n_beams
     w0s = Δ
 
-    beams = CollimatedGaussianBeamletSource([0.0, 0.0, 0.0], [0.0, 1.0, 0.0], D, λ, w0s; n_grid=n_beams)
+    beams = CollimatedGaussianBeamletSource([0.0, 0.0, 0.0], [0.0, 1.0, 0.0], D, λ, w0s; n_grid=n_beams, E0=[0.0, 0.0, 1.0])
 
-    # Set electric field amplitude to point along z-axis to match previous test
-    for b in beams
-        BeamletOptics.polarization!(b.c.rays[1], [0.0, 0.0, 1.0])
-    end
 
     # Physical detector large enough to catch all divergence rays
     pd = Detector(3000mm)

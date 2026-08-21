@@ -82,16 +82,18 @@ end
 
 _drop_beams!(b::B) where {B <: AbstractBeam} = (b.children = Vector{B}())
 
+segments(beam::AbstractBeam) = beam.segments
+
 """
     _reset_beam!(beam::AbstractBeam)
 
-Resets `beam` back to just its head ray(s) — drops all children, truncates ray vector(s)
-to the first ray, and clears that ray's intersection — so that [`solve_system!`](@ref)
-can resolve it from scratch.
+Resets `beam` back to just its initial state — drops all children and clears all propagation segments,
+ready for a fresh trace by [`solve_system!`](@ref).
 """
 function _reset_beam!(::B) where {B <: AbstractBeam}
     throw(ArgumentError(lazy"_reset_beam! not implemented for $B"))
 end
+
 
 """
     optical_power(beam::AbstractBeam)

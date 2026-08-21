@@ -53,9 +53,9 @@ const BMO = BeamletOptics
         @test BMO.trace_one(system, ray, BMO.Hint(first_obj))[2] === first_obj
         @test BMO.trace_one(system, ray, BMO.Hint(false_obj))[2] === first_obj
         # tracing step
-        obj = BMO.tracing_step!(system, ray, nothing)
+        seg, obj = BMO.tracing_step(system, ray, nothing)
         @test obj === first_obj
-        @test BMO.intersection(ray) isa Intersection
+        @test seg.intersection isa Intersection
     end
 
     @testset "Testing system tracing" begin
@@ -71,7 +71,7 @@ const BMO = BeamletOptics
         first_ray_dir = BMO.direction(first_ray)
         last_ray_dir = BMO.direction(last(BMO.rays(beam)))
         @test 180 - rad2deg(BMO.angle3d(first_ray_dir, last_ray_dir)) ≈ 2 * Δθ
-        @test !isnothing(BMO.intersection(first_ray))
+        @test !isnothing(first(beam.segments).intersection)
     end
 
     @testset "Testing StaticSystem tracing" begin
@@ -88,8 +88,9 @@ const BMO = BeamletOptics
         first_ray_dir = BMO.direction(first_ray)
         last_ray_dir = BMO.direction(last(BMO.rays(beam)))
         @test 180 - rad2deg(BMO.angle3d(first_ray_dir, last_ray_dir)) ≈ 2 * Δθ
-        @test !isnothing(BMO.intersection(first_ray))
+        @test !isnothing(first(beam.segments).intersection)
     end
+
 
     @testset "Dynamic Coincident Boundaries (MultiIntersection)" begin
         lens1 = SphericalLens(Inf, -50e-3, 10e-3, 25.4e-3, 1.5)

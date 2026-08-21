@@ -10,22 +10,23 @@ const GLOBAL_USE_PLACEHOLDERS = true
 
 This is a function to speed up compilation time when building the docs locally.
 It checks whether the `include` call is made locally or from within the **CI environment**.
-In the former case, script evaluation is avoided and a placeholder figure is created for 
+In the former case, script evaluation is avoided and a placeholder figure is created for
 each `save` call within the script.
 
 Evaluation can be forced by setting `use_placeholder = false`. Global evaluation can be forced
 by setting `GLOBAL_USE_PLACEHOLDERS = false` in this file (does not apply for CI env.).
 """
-function conditional_include(fname::String; use_placeholder::Bool=!haskey(ENV, "CI"))
+function conditional_include(fname::String; use_placeholder::Bool = !haskey(ENV, "CI"))
     # Check for global flag if not within CI env.
     if !haskey(ENV, "CI") && !GLOBAL_USE_PLACEHOLDERS
         use_placeholder = false
     end
     # Check if to run script
-    if use_placeholder        
+    if use_placeholder
         content = read(fname, String)
         # match save("filename") but ignore comments, i.e. # save(...)
-        pattern = Regex("^[ \\t]*save\\(\\s*\"([^\"]+)\"\\s*,\\s*([a-zA-Z_][a-zA-Z0-9_]*)", "m")
+        pattern = Regex(
+            "^[ \\t]*save\\(\\s*\"([^\"]+)\"\\s*,\\s*([a-zA-Z_][a-zA-Z0-9_]*)", "m")
         for match in eachmatch(pattern, content)
             save_name = match.captures[1]
             fig_name = match.captures[2]
@@ -36,22 +37,22 @@ function conditional_include(fname::String; use_placeholder::Bool=!haskey(ENV, "
             matches = collect(eachmatch(npattern, prior_content))
             if !isempty(matches)
                 nmatch = last(matches)
-                _width =  parse(Int, nmatch.captures[1])
+                _width = parse(Int, nmatch.captures[1])
                 _height = parse(Int, nmatch.captures[2])
             else
                 @info "Using default height for $fig_name"
-                _width =  600
+                _width = 600
                 _height = 300
             end
             # save placeholder
-            fig = Figure(size=(_width, _height))
-            ax = Axis(fig[1,1], backgroundcolor=:gray)
+            fig = Figure(size = (_width, _height))
+            ax = Axis(fig[1, 1], backgroundcolor = :gray)
             hidedecorations!(ax)
             text!(ax, 0, 0;
-                text="$save_name\n($_width x $_height)",
-                align=(:center, :center),
-                color=:white,
-                fontsize=20
+                text = "$save_name\n($_width x $_height)",
+                align = (:center, :center),
+                color = :white,
+                fontsize = 20
             )
             save(save_name, fig)
             @info "Saving placeholder for $save_name (Size: $_width x $_height, fig_var_name=$fig_name)"
@@ -68,7 +69,7 @@ end
 function replace_build_with_src(path::String)
     clean_path = abspath(path)
     build_segment = joinpath("docs", "build")
-    src_segment   = joinpath("docs", "src")
+    src_segment = joinpath("docs", "src")
     src_path = replace(clean_path, build_segment => src_segment)
     return src_path
 end
@@ -79,7 +80,7 @@ end
 This function runs the build script and places the images within the docs\\src folder when run outside of the CI/CD pipeline.
 It is recommended to use this approach when the rendered image is too computationally intensive for the github runner.
 If a prerendered image already exists, it has to be **deleted manually** in order to trigger a re-run.
-    
+
 # Arguments
 
 - `fname`: points to the BMO render script
@@ -120,7 +121,7 @@ function prerender_include(fname::String, cname::String)
         save_name = match.captures[1]
         path_name = dirname(cname)
         @info "Copying $save_name from \\build to \\src"
-        cp(joinpath(path_name, save_name), joinpath(location, save_name); force=true)
+        cp(joinpath(path_name, save_name), joinpath(location, save_name); force = true)
     end
     return nothing
 end

@@ -17,8 +17,8 @@ const BMO = BeamletOptics
         solve_system!(system, beam)
         # Test nothing interaction
         @test length(BMO.rays(beam)) == 1
-        @test !isnothing(BMO.intersection(last(BMO.rays(beam))))
-        @test isapprox(length(BMO.intersection(last(BMO.rays(beam)))), 5.0, atol=1e-5)
+        @test !isnothing(last(beam.segments).intersection)
+        @test isapprox(length(last(beam.segments).intersection), 5.0, atol=1e-5)
         @test isnothing(BMO.interact3d(system, intersectable, beam, first(BMO.rays(beam))))
     end
 
@@ -29,9 +29,10 @@ const BMO = BeamletOptics
         solve_system!(system, beam)
         # Test nothing interaction and intersection
         @test length(BMO.rays(beam)) == 1
-        @test isnothing(BMO.intersection(last(BMO.rays(beam))))
+        @test isnothing(last(beam.segments).intersection)
         @test isnothing(BMO.interact3d(system, noninteract, beam, first(BMO.rays(beam))))
     end
+
 end
 
 end

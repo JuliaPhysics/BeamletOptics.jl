@@ -46,9 +46,11 @@ const mm = 1e-3
             beam = Beam(ray)
             solve_system!(system, beam, r_max = 40)
 
-            surf_errors[i] = (position(beam.rays[begin]) + length(beam.rays[begin]) .* BMO.direction(beam.rays[begin]))[2] -
+            seg = beam.segments[begin]
+            surf_errors[i] = (position(seg) + length(seg) .* BMO.direction(seg))[2] -
                              BMO.aspheric_equation(ray.pos[3], 1 / R, k, A)
         end
+
 
         # FIXME: The atol is actually derived from the raymarching epsilon. If this is puts
         # into a configurable option, this should be changed as well.

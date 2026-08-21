@@ -60,8 +60,10 @@ function CubeBeamsplitter(
     return CubeBeamsplitter(front, back, bs)
 end
 
-function _cbs_hit_target(cbs::CubeBeamsplitter, ray::AbstractRay)
-    int = intersection(ray)
+function _cbs_hit_target(cbs::CubeBeamsplitter, ray::AbstractRay, int::Nullable{<:AbstractIntersection} = nothing)
+    if isnothing(int)
+        int = intersect3d(shape(cbs), ray)
+    end
     isnothing(int) && return :none
     tol = Config.get_coincident_boundary_tolerance()
     ic = intersect3d(shape(cbs.coating), ray)
@@ -84,7 +86,8 @@ function interact3d(
     cbs::CubeBeamsplitter,
     beam::Beam{T, R},
     ray::R) where {T <: Real, R <: AbstractRay{T}}
-    target = _cbs_hit_target(cbs, ray)
+    int = isempty(beam.segments) ? intersect3d(shape(cbs), ray) : last(beam.segments).intersection
+    target = _cbs_hit_target(cbs, ray, int)
     if target === :front
         interaction = interact3d(system, cbs.front, beam, ray)
         hint!(interaction, Hint(cbs, shape(cbs.coating)))
@@ -92,8 +95,13 @@ function interact3d(
     elseif target === :coating
         interact3d(system, cbs.coating, beam, ray)
         _n = refractive_index(cbs, wavelength(ray))
-        refractive_index!(first(rays(beam.children[1])), _n)
-        refractive_index!(first(rays(beam.children[2])), _n)
+        for child in beam.children
+            if child.head_ray isa Ray
+                child.head_ray = Ray(position(child.head_ray), direction(child.head_ray), wavelength(child.head_ray), _n)
+            elseif child.head_ray isa PolarizedRay
+                child.head_ray = PolarizedRay(position(child.head_ray), direction(child.head_ray), wavelength(child.head_ray), _n, polarization(child.head_ray))
+            end
+        end
         return nothing
     elseif target === :back
         interaction = interact3d(system, cbs.back, beam, ray)
@@ -109,7 +117,8 @@ function interact3d(
     gauss::GaussianBeamlet,
     id::Int)
     chief_ray = rays(gauss.chief)[id]
-    target = _cbs_hit_target(cbs, chief_ray)
+    int = id <= length(gauss.chief.segments) ? gauss.chief.segments[id].intersection : intersect3d(shape(cbs), chief_ray)
+    target = _cbs_hit_target(cbs, chief_ray, int)
     if target === :front
         interaction = interact3d(system, cbs.front, gauss, id)
         hint!(interaction, Hint(cbs, shape(cbs.coating)))
@@ -117,8 +126,11 @@ function interact3d(
     elseif target === :coating
         interact3d(system, cbs.coating, gauss, id)
         _n = refractive_index(cbs, wavelength(gauss))
-        refractive_index!(gauss.children[1], 1, _n)
-        refractive_index!(gauss.children[2], 1, _n)
+        for child in gauss.children
+            child.chief.head_ray = Ray(position(child.chief.head_ray), direction(child.chief.head_ray), wavelength(child.chief.head_ray), _n)
+            child.waist.head_ray = Ray(position(child.waist.head_ray), direction(child.waist.head_ray), wavelength(child.waist.head_ray), _n)
+            child.divergence.head_ray = Ray(position(child.divergence.head_ray), direction(child.divergence.head_ray), wavelength(child.divergence.head_ray), _n)
+        end
         return nothing
     elseif target === :back
         interaction = interact3d(system, cbs.back, gauss, id)
@@ -134,7 +146,8 @@ function interact3d(
     agb::AstigmaticGaussianBeamlet,
     id::Int)
     chief_ray = rays(agb.c)[id]
-    target = _cbs_hit_target(cbs, chief_ray)
+    int = id <= length(agb.c.segments) ? agb.c.segments[id].intersection : intersect3d(shape(cbs), chief_ray)
+    target = _cbs_hit_target(cbs, chief_ray, int)
     if target === :front
         interaction = interact3d(system, cbs.front, agb, id)
         hint!(interaction, Hint(cbs, shape(cbs.coating)))
@@ -142,8 +155,16 @@ function interact3d(
     elseif target === :coating
         interact3d(system, cbs.coating, agb, id)
         _n = refractive_index(cbs, wavelength(agb))
-        refractive_index!(agb.children[1], 1, _n)
-        refractive_index!(agb.children[2], 1, _n)
+        for child in agb.children
+            for b in _component_beams(child)
+                if b.head_ray isa PolarizedRay
+                    b.head_ray = PolarizedRay(position(b.head_ray), direction(b.head_ray), wavelength(b.head_ray), _n, polarization(b.head_ray))
+                else
+                    b.head_ray = Ray(position(b.head_ray), direction(b.head_ray), wavelength(b.head_ray), _n)
+                end
+            end
+        end
+
         return nothing
     elseif target === :back
         interaction = interact3d(system, cbs.back, agb, id)

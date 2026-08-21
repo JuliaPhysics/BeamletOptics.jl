@@ -73,38 +73,46 @@ end
 Base.isvalid(bs::AbstractBeamsplitter) = reflectance(bs)^2 + transmittance(bs)^2 ≈ 1
 
 @inline function _beamsplitter_transmitted_beam(
-        ::AbstractBeamsplitter, ::Beam{T, R}, ray::R) where {T <: Real, R <: Ray{T}}
-    pos = position(ray) + length(ray) * direction(ray)
+        bs::AbstractBeamsplitter, beam::Beam{T, R}, ray::R) where {T <: Real, R <: Ray{T}}
+    seg = isempty(beam.segments) ? RaySegment(ray, intersect3d(shape(bs), ray)) : last(beam.segments)
+    int = seg.intersection
+    pos = isnothing(int) ? position(ray) : propagate(ray, length(int))
     dir = direction(ray)
-    return Beam(Ray(pos, dir, wavelength(ray)))
+    return Beam(Ray(pos, dir, wavelength(ray), refractive_index(ray)))
 end
 
 @inline function _beamsplitter_reflected_beam(
-        ::AbstractBeamsplitter, ::Beam{T, R}, ray::R) where {T <: Real, R <: Ray{T}}
-    normal = normal3d(intersection(ray))
-    pos = position(ray) + length(ray) * direction(ray)
+        bs::AbstractBeamsplitter, beam::Beam{T, R}, ray::R) where {T <: Real, R <: Ray{T}}
+    seg = isempty(beam.segments) ? RaySegment(ray, intersect3d(shape(bs), ray)) : last(beam.segments)
+    int = seg.intersection
+    normal = isnothing(int) ? Point3{T}(0, 0, 1) : normal3d(int)
+    pos = isnothing(int) ? position(ray) : propagate(ray, length(int))
     dir = reflection3d(direction(ray), normal)
-    return Beam(Ray(pos, dir, wavelength(ray)))
+    return Beam(Ray(pos, dir, wavelength(ray), refractive_index(ray)))
 end
 
-@inline function _beamsplitter_transmitted_beam(bs::AbstractBeamsplitter, ::Beam{T, R},
+@inline function _beamsplitter_transmitted_beam(bs::AbstractBeamsplitter, beam::Beam{T, R},
         ray::R) where {T <: Real, R <: PolarizedRay{T}}
     J = SPBasis(transmittance(bs), 0, 0, transmittance(bs))
-    pos = position(ray) + length(ray) * direction(ray)
+    seg = isempty(beam.segments) ? RaySegment(ray, intersect3d(shape(bs), ray)) : last(beam.segments)
+    int = seg.intersection
+    pos = isnothing(int) ? position(ray) : propagate(ray, length(int))
     dir = direction(ray)
-    E0 = _calculate_global_E0(bs, ray, dir, J)
-    return Beam(PolarizedRay(pos, dir, wavelength(ray), E0))
+    E0 = _calculate_global_E0(bs, ray, dir, J, int)
+    return Beam(PolarizedRay(pos, dir, wavelength(ray), refractive_index(ray), E0))
 end
 
-@inline function _beamsplitter_reflected_beam(bs::AbstractBeamsplitter, ::Beam{T, R},
+@inline function _beamsplitter_reflected_beam(bs::AbstractBeamsplitter, beam::Beam{T, R},
         ray::R) where {T <: Real, R <: PolarizedRay{T}}
     J = SPBasis(-reflectance(bs), 0, 0, reflectance(bs))
-    normal = normal3d(intersection(ray))
-    pos = position(ray) + length(ray) * direction(ray)
+    seg = isempty(beam.segments) ? RaySegment(ray, intersect3d(shape(bs), ray)) : last(beam.segments)
+    int = seg.intersection
+    normal = isnothing(int) ? Point3{T}(0, 0, 1) : normal3d(int)
+    pos = isnothing(int) ? position(ray) : propagate(ray, length(int))
     in_dir = direction(ray)
     out_dir = reflection3d(in_dir, normal)
-    E0 = _calculate_global_E0(bs, ray, out_dir, J)
-    return Beam(PolarizedRay(pos, out_dir, wavelength(ray), E0))
+    E0 = _calculate_global_E0(bs, ray, out_dir, J, int)
+    return Beam(PolarizedRay(pos, out_dir, wavelength(ray), refractive_index(ray), E0))
 end
 
 function interact3d(::AbstractSystem, bs::ThinBeamsplitter, beam::Beam{T, R},
@@ -157,8 +165,9 @@ This is intended to model the effect of the Fresnel equations without full polar
 function interact3d(
         ::AbstractSystem, bs::ThinBeamsplitter, gauss::GaussianBeamlet, ray_id::Int)
     # Phase flip
-    ray = gauss.chief.rays[ray_id]
-    df = dot(direction(ray), normal3d(intersection(ray)))
+    ray = rays(gauss.chief)[ray_id]
+    int = ray_id <= length(gauss.chief.segments) ? gauss.chief.segments[ray_id].intersection : intersect3d(shape(bs), ray)
+    df = dot(direction(ray), normal3d(int))
     if df < 0
         ϕ = π
     else
@@ -213,17 +222,19 @@ function interact3d(
         ::AbstractSystem, bs::ThinBeamsplitter, agb::AstigmaticGaussianBeamlet, ray_id::Int)
     # Phase flip
     ray = rays(agb.c)[ray_id]
-    df = dot(direction(ray), normal3d(intersection(ray)))
+    int = ray_id <= length(agb.c.segments) ? agb.c.segments[ray_id].intersection : intersect3d(shape(bs), ray)
+    df = dot(direction(ray), normal3d(int))
     ϕ = df < 0 ? π : 0
 
     t = _beamsplitter_transmitted_beam(bs, agb, ray_id)
     r = _beamsplitter_reflected_beam(bs, agb, ray_id)
 
     # Add conditional phase flip to reflected beam chief polarization
-    chief_ray = first(rays(r.c))
+    chief_ray = r.c.head_ray
     E_new = polarization(chief_ray) * exp(im * ϕ)
-    polarization!(chief_ray, E_new)
+    r.c.head_ray = PolarizedRay(position(chief_ray), direction(chief_ray), wavelength(chief_ray), refractive_index(chief_ray), E_new)
 
     children!(agb, [t, r])
     return nothing
 end
+
