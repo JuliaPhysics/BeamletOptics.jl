@@ -41,8 +41,17 @@ function rays(b::Beam{T, R}) where {T, R}
     end
 end
 
-Base.push!(b::Beam{T, R}, seg::RaySegment{T, R}) where {T, R} = push!(b.segments, seg)
-Base.push!(b::Beam{T, R}, ray::R) where {T, R} = push!(b.segments, RaySegment(ray))
+function Base.push!(b::Beam{T, R}, seg::RaySegment{T, R}) where {T, R}
+    if isempty(b.segments) || seg.accumulated_opl > optical_path_length(seg)
+        push!(b.segments, seg)
+    else
+        prev_opl = last(b.segments).accumulated_opl
+        adjusted = RaySegment(seg.ray, seg.intersection, seg.hit_object, prev_opl + optical_path_length(seg))
+        push!(b.segments, adjusted)
+    end
+end
+Base.push!(b::Beam{T, R}, ray::R) where {T, R} = push!(b, RaySegment(ray))
+
 
 function Beam(ray::R) where {T, R <: AbstractRay{T}}
     return Beam{T, R}(ray, Vector{RaySegment{T, R}}(), nothing, Vector{Beam{T, R}}())
@@ -124,14 +133,9 @@ Calculate the optical path length of the `beam`, i.e. ``\\mathrm{OPL} = \\sum n_
 function optical_path_length(beam::Beam{T}) where {T}
     p = AbstractTrees.parent(beam)
     l0 = isnothing(p) ? zero(T) : optical_path_length(p)
-    for seg in beam.segments
-        if isnothing(seg.intersection)
-            break
-        end
-        l0 += optical_path_length(seg)
-    end
-    return l0
+    return isempty(beam.segments) ? l0 : (l0 + last(beam.segments).accumulated_opl)
 end
+
 
 function length_parent(beam::Beam{T}) where {T}
     p = AbstractTrees.parent(beam)
