@@ -51,20 +51,3 @@ function Ray(pos::Point3{T},
         F(λ),
         F(n))
 end
-
-# 5-argument compatibility constructor for legacy call sites
-function Ray(pos::AbstractArray,
-        dir::AbstractArray,
-        ::Nullable{<:AbstractIntersection},
-        λ::Real = 1000e-9,
-        n::Real = 1.0)
-    return Ray(pos, dir, λ, n)
-end
-
-function Ray{T}(pos::AbstractArray,
-        dir::AbstractArray,
-        ::Nullable{<:AbstractIntersection},
-        λ::Real = 1000e-9,
-        n::Real = 1.0) where {T <: Real}
-    return Ray{T}(Point3{T}(pos), normalize(Point3{T}(dir)), T(λ), T(n))
-end

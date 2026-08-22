@@ -303,7 +303,7 @@ const BMO = BeamletOptics
             @test trans isa Transition
             @test trans.is_entering == true
 
-            ray = Ray([0.0, 0, 0], [0.0, 1, 0], nothing, 532e-9, 1.0)
+            ray = Ray([0.0, 0, 0], [0.0, 1, 0], 532e-9, 1.0)
             int = Intersection(1.0, [0.0, 1.0, 0.0], [0.0, -1.0, 0.0])
             out_ray = interact3d(FresnelInterface(), trans, int, ray)
             @test out_ray isa Ray
@@ -318,7 +318,7 @@ const BMO = BeamletOptics
 
             # Grating diffraction test: 600 lines/mm, grooves along z
             g = GratingSurface(600e3, 1, Point3(0.0, 0.0, 1.0))
-            g_ray = interact3d(g, trans, int, Ray([0.0, 0, 0], [0.0, 1, 0], nothing, 500e-9, 1.0))
+            g_ray = interact3d(g, trans, int, Ray([0.0, 0, 0], [0.0, 1, 0], 500e-9, 1.0))
             @test g_ray isa Ray
             # sin(θm) = 500e-9 * 600e3 = 0.30 -> dx = 0.30, dy = -sqrt(1 - 0.3^2)
             @test isapprox(BMO.direction(g_ray)[1], 0.30, atol=1e-6)
@@ -326,7 +326,7 @@ const BMO = BeamletOptics
 
             # Auto groove axis grating
             g_auto = GratingSurface(600e3, 1)
-            g_auto_ray = interact3d(g_auto, trans, int, Ray([0.0, 0, 0], [0.0, 1, 0], nothing, 500e-9, 1.0))
+            g_auto_ray = interact3d(g_auto, trans, int, Ray([0.0, 0, 0], [0.0, 1, 0], 500e-9, 1.0))
             @test g_auto_ray isa Ray
             @test isapprox(norm(BMO.direction(g_auto_ray)), 1.0)
 
@@ -335,7 +335,7 @@ const BMO = BeamletOptics
             @test interact3d(cs_mirror, trans, int, ray) isa Ray
             @test BMO.direction(interact3d(cs_mirror, trans, int, ray))[2] ≈ -1.0
 
-            cs_func = CoatedSurface((t, i, r) -> Ray(BMO.position(i), Point3(1.0, 0.0, 0.0), nothing, BMO.wavelength(r), 1.0))
+            cs_func = CoatedSurface((t, i, r) -> Ray(BMO.position(i), Point3(1.0, 0.0, 0.0), BMO.wavelength(r), 1.0))
             custom_ray = interact3d(cs_func, trans, int, ray)
             @test custom_ray isa Ray
             @test BMO.direction(custom_ray) == Point3(1.0, 0.0, 0.0)

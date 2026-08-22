@@ -199,7 +199,7 @@ const mm = 1e-3
             sys_water = System([AC254], water)
             @test BMO.ambient_medium(sys_water) === water
             @test BMO.refractive_index(sys_water, λ) ≈ 1.333
-            ray_water = Ray([0.0, -0.05, 0.0], [0.0, 1.0, 0.0], nothing, λ, 1.333)
+            ray_water = Ray([0.0, -0.05, 0.0], [0.0, 1.0, 0.0], λ, 1.333)
             beam_water = Beam(ray_water)
             solve_system!(sys_water, beam_water)
             @test length(BMO.rays(beam_water)) == 4

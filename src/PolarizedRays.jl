@@ -12,7 +12,6 @@ but must be transformed into global coordinates using the method described in th
 
 - `pos`: a point in R³ that describes the `Ray` origin
 - `dir`: a normalized vector in R³ that describes the `Ray` direction
-- `intersection`: refer to [`AbstractIntersection`](@ref)
 - `λ`: wavelength in [m]
 - `n`: refractive index along the beam path
 - `E0`: complex-valued 3-tuple to represent the electric field in global coordinates
@@ -109,28 +108,6 @@ function PolarizedRay(
     )
 end
 
-# 6-argument compatibility constructor for legacy call sites
-function PolarizedRay(
-        pos::AbstractArray,
-        dir::AbstractArray,
-        ::Nullable{<:AbstractIntersection},
-        λ::Real,
-        n::Real,
-        E0::AbstractArray
-    )
-    return PolarizedRay(pos, dir, λ, n, E0)
-end
-
-function PolarizedRay{T}(
-        pos::AbstractArray,
-        dir::AbstractArray,
-        ::Nullable{<:AbstractIntersection},
-        λ::Real,
-        n::Real,
-        E0::AbstractArray
-    ) where {T}
-    return PolarizedRay{T}(pos, dir, λ, n, E0)
-end
 
 
 abstract type AbstractJonesMatrix{T} <: AbstractMatrix{T} end

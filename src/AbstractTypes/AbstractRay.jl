@@ -32,17 +32,6 @@ wavenumber(ray::AbstractRay) = 2π / wavelength(ray)
 refractive_index(ray::AbstractRay) = ray.n
 refractive_index!(ray::AbstractRay, n) = (ray.n = n)
 
-intersection(::AbstractRay) = nothing
-intersection!(::AbstractRay, ::Nullable{<:AbstractIntersection}) = nothing
-
-@inline function Base.getproperty(ray::AbstractRay, s::Symbol)
-    if s === :intersection
-        return nothing
-    else
-        return getfield(ray, s)
-    end
-end
-
 
 
 """
@@ -152,31 +141,6 @@ function intersect3d(plane_position::AbstractArray,
     end
 end
 
-function geom_length(ray::AbstractRay{T}) where {T}
-    isnothing(intersection(ray)) && return T(Inf)
-    return length(intersection(ray))
-end
-
-"""
-    optical_path_length(ray::AbstractRay{T}) where {T}
-
-Calculate the optical path length of the `ray`, i.e. ``\\mathrm{OPL} = n \\cdot l``.
-"""
-function optical_path_length(ray::AbstractRay{T}) where {T}
-    isnothing(intersection(ray)) && return T(Inf)
-    return length(intersection(ray)) * real(refractive_index(ray))
-end
-
-"""
-    Base.length(ray::AbstractRay)
-
-Returns the geometric length of a `ray` between its start and intersection point. If no intersection exists, `Inf` is returned.
-
-!!! tip
-    Use [`optical_path_length`](@ref) to get the optical path length instead.
-"""
-Base.length(ray::AbstractRay{T}) where {T} = geom_length(ray)
-
 """
     line_point_distance3d(ray, point)
 
@@ -187,13 +151,13 @@ line_point_distance3d(ray::AbstractRay, point) = line_point_distance3d(position(
     point)
 
 """
-    angle3d(ray::AbstractRay, intersect::AbstractIntersection=intersection(ray))
+    angle3d(ray::AbstractRay, intersect::AbstractIntersection)
+    angle3d(seg::RaySegment)
 
-Calculates the angle between a `ray` and its or some other `intersection`.
+Calculates the angle between a `ray` and its surface `intersection`.
 """
-function angle3d(ray::AbstractRay, intersect::AbstractIntersection = intersection(ray))
-    return angle3d(direction(ray), normal3d(intersect))
-end
+angle3d(ray::AbstractRay, intersect::AbstractIntersection) = angle3d(direction(ray), normal3d(intersect))
+angle3d(seg::RaySegment) = isnothing(seg.intersection) ? nothing : angle3d(direction(seg.ray), normal3d(seg.intersection))
 
 """
     isinfrontof(shape::AbstractShape, ray::AbstractRay)
@@ -208,15 +172,15 @@ isinfrontof(shape::AbstractShape, ray::AbstractRay) = isinfrontof(position(shape
     direction(ray))
 
 """
-    isentering(ray)
+    isentering(ray, int)
+    isentering(seg::RaySegment)
 
 Tests whether the ray is entering a shape based on the orientation of the `ray` direction and surface normal.
-If no intersection is present, default behavior is to return `false`.
 """
-isentering(r::AbstractRay) = isentering(r, intersection(r))
 isentering(r::AbstractRay, i::AbstractIntersection) = isentering(direction(r), normal3d(i))
 isentering(d::AbstractArray, n::AbstractArray) = dot(d, n) < 0
 isentering(::AbstractRay, ::Nothing) = false
+
 
 """
     refraction3d(ray, int, n2)

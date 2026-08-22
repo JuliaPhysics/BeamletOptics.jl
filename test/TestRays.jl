@@ -16,9 +16,17 @@ dummy_intersection(t, n) = Intersection(t, [0.0, 0.0, 0.0], Point3(n))
     ray = Ray(pos, dir)
     @test !ismutable(ray)
     @test isa(ray, Ray{Float64})
-    @test isnothing(ray.intersection)
-    @test isinf(length(ray))
     @test isapprox(norm(ray.dir), 1)
+    @test BMO.position(ray) == pos
+    @test BMO.direction(ray) ≈ normalize(dir)
+    @test BMO.wavelength(ray) == 1000e-9
+    @test BMO.refractive_index(ray) == 1.0
+    # Test RaySegment length
+    seg_unhit = RaySegment(ray, nothing)
+    @test isinf(length(seg_unhit))
+    seg_hit = RaySegment(ray, dummy_intersection(5.0, [0, 1, 0]))
+    @test length(seg_hit) == 5.0
+    @test BMO.optical_path_length(seg_hit) == 5.0
     # Test helper functions
     @test BMO.line_point_distance3d(ray, [1, 1, 0]) == 0
     @test BMO.line_point_distance3d(ray, [-1, 1, 0]) == sqrt(2)

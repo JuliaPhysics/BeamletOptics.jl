@@ -30,21 +30,22 @@ end
 
 function interact3d(::AbstractSystem,
         polfilter::PolarizationFilter,
-        ::Beam{T, R},
+        beam::Beam{T, R},
         ray::R) where {T <: Real, R <: PolarizedRay{T}}
-    npos = position(ray) + length(ray) * direction(ray)
+    int = isempty(beam.segments) ? intersect3d(shape(polfilter), ray) : last(beam.segments).intersection
+    isnothing(int) && return nothing
+    npos = position(int)
     ndir = direction(ray)
 
     E0 = _calculate_global_E0(polfilter, ray, ndir, polfilter.JMat)
 
     # Terminate blocked rays
-    # FIXME this needs to be reworked in the future
-    if norm(E0) ≈ polfilter.cutoff
+    if norm(E0) ≈ polfilter.cutoff || norm(E0) < polfilter.cutoff
         return nothing
     end
 
     return BeamInteraction{T, R}(nothing,
-        PolarizedRay{T}(npos, ndir, nothing, wavelength(ray), refractive_index(ray), E0))
+        PolarizedRay{T}(npos, ndir, wavelength(ray), refractive_index(ray), E0))
 end
 
 function interact3d(system::AbstractSystem,
