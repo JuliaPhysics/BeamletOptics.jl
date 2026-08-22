@@ -47,7 +47,19 @@ function UnionSDF{T}(sdfs::Vararg{AbstractSDF{T}, N}) where {T, N}
         SMatrix{3,3}(one(T)*I),
         Point3{T}(zero(T)),
         sdfs
-        )
+    )
+end
+
+function UnionSDF(sdfs::Vararg{AbstractSDF{T}, N}) where {T, N}
+    return UnionSDF{T}(sdfs...)
+end
+
+function UnionSDF(sdfs::Tuple{Vararg{AbstractSDF{T}}}) where {T}
+    return UnionSDF{T}(sdfs...)
+end
+
+function UnionSDF(sdfs::AbstractVector{<:AbstractSDF{T}}) where {T}
+    return UnionSDF{T}(Tuple(sdfs)...)
 end
 
 function sdf(s::UnionSDF, pos)
@@ -172,12 +184,11 @@ function normal3d(s::UnionSDF, pos)
 end
 
 function surface_tag(u::UnionSDF, point)
-    p_local = _world_to_sdf(u, point)
-    n_local = transposed_orientation(u) * normal3d(u, point)
-    return surface_tag(u, p_local, n_local)
+    idx = argmin(sdf(_sdf, point) for _sdf in u.sdfs)
+    return surface_tag(u.sdfs[idx], point)
 end
 
 function surface_tag(u::UnionSDF, local_p, local_n)
-    # FIXME face_id not defined
-    return face_id(u, local_n)
+    idx = argmin(sdf(_sdf, local_p) for _sdf in u.sdfs)
+    return surface_tag(u.sdfs[idx], local_p, local_n)
 end

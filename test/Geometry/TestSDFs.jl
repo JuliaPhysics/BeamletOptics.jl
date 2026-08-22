@@ -140,6 +140,13 @@ const BMO = BeamletOptics
         @test BMO.surface_tag(cyl, [1.0, 0.0, 0.0], [1.0, 0.0, 0.0]) == :side
         test_pt = TestPointSDF(zeros(3))
         @test BMO.surface_tag(test_pt, [0.0, 0.0, 0.0], [0.0, 1.0, 0.0]) == :unknown
+
+        # UnionSDF surface_tag delegation
+        s1 = BMO.BoxSDF(1.0, 2.0, 3.0)
+        s2 = BMO.SphereSDF(Point3(0.0, 5.0, 0.0), 1.0)
+        u_sdf = s1 + s2
+        @test BMO.surface_tag(u_sdf, [0.0, -2.0, 0.0]) == :front
+        @test BMO.surface_tag(u_sdf, [0.0, 6.0, 0.0]) == :back
     end
 end
 
