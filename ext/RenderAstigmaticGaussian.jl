@@ -47,13 +47,9 @@ function render!(
             l = length(p)
         end
 
-        for ray in BMO.rays(child.c)
-            # Calculate local segment length
-            if isnothing(BMO.intersection(ray))
-                l_local = flen
-            else
-                l_local = length(ray)
-            end
+        segs = child.c.segments
+        if isempty(segs)
+            l_local = flen
             us = LinRange(0, l_local, z_res) .+ l
             # Precompute waist parameters at each z
             params = [BMO.waist_parameters(child, u) for u in us]
@@ -118,10 +114,79 @@ function render!(
             if show_waist
                 scatter!.(axis, pts; color, markersize)
             end
+        else
+            for seg in segs
+                hit = BMO.intersection(seg)
+                l_local = isnothing(hit) ? flen : length(hit)
+                us = LinRange(0, l_local, z_res) .+ l
+                # Precompute waist parameters at each z
+                params = [BMO.waist_parameters(child, u) for u in us]
 
-            # Bump length tracker
-            if !isnothing(BMO.intersection(ray))
-                l += length(ray)
+                # sort params b and c
+                ps = getindex.(params, 1)
+                bs = getindex.(params, 2)
+                cs = getindex.(params, 3)
+
+                # Ensure elliptical basis vectors (bs, cs) vary smoothly along the segment
+                # to prevent mesh twisting/flips, especially when passing through a focus.
+                for j in 2:length(bs)
+                    b_new = bs[j]
+                    c_new = cs[j]
+                    b_old = bs[j - 1]
+                    c_old = cs[j - 1]
+
+                    # preserve handedness (prevent inside-out mesh flips)
+                    cross_old = cross(b_old, c_old)
+                    cross_new = cross(b_new, c_new)
+                    if dot(cross_new, cross_old) < 0
+                        b_new = -b_new
+                    end
+
+                    # optimal rotation to align with previous slice (Parallel Transport)
+                    # MUST normalize to prevent magnitude-bias from twisting the mesh when major/minor axes swap!
+                    bn = normalize(b_new)
+                    cn = normalize(c_new)
+                    bo = normalize(b_old)
+                    co = normalize(c_old)
+
+                    X = dot(bn, bo) + dot(cn, co)
+                    Y = dot(cn, bo) - dot(bn, co)
+                    phi = atan(Y, X)
+
+                    cos_phi = cos(phi)
+                    sin_phi = sin(phi)
+
+                    bs[j] = b_new * cos_phi + c_new * sin_phi
+                    cs[j] = -b_new * sin_phi + c_new * cos_phi
+                end
+
+                # Build surface mesh matrices
+                pts = Matrix{Point3{T}}(undef, length(params), length(vs))
+
+                for i in eachindex(params)
+                    pts[i, :] = [BMO.ellipse(v, ps[i], bs[i], cs[i]) for v in vs]
+                end
+
+                Xt = getindex.(pts, 1)
+                Yt = getindex.(pts, 2)
+                Zt = getindex.(pts, 3)
+
+                # Render the envelope as a smooth surface
+                surface!(axis, Xt, Yt, Zt;
+                    color = fill(color, size(Xt)),
+                    transparency,
+                    kwargs...
+                )
+
+                # Optionally, plot waist ellipse
+                if show_waist
+                    scatter!.(axis, pts; color, markersize)
+                end
+
+                # Bump length tracker
+                if !isnothing(hit)
+                    l += length(hit)
+                end
             end
         end
 

@@ -28,11 +28,49 @@ function render!(
         transparency = true,
         kwargs...
     )
-    if isnothing(BMO.intersection(ray))
+    temp = position(ray) + flen * BMO.direction(ray)
+
+    lines!(axis,
+        [position(ray)[1], temp[1]],
+        [position(ray)[2], temp[2]],
+        [position(ray)[3], temp[3]];
+        color,
+        linewidth,
+        transparency,
+        kwargs...
+    )
+    
+    if show_pos
+        scatter!(axis, position(ray); color)
+    end
+
+    return nothing
+end
+
+"""
+    render!(axis, segment::RaySegment; kwargs...)
+
+Renders a `RaySegment` as a 3D line from the ray position to its intersection (or `flen` if no intersection).
+"""
+function render!(
+        axis::_RenderEnv,
+        segment::BMO.RaySegment;
+        # kwargs
+        flen = 1.0,
+        show_pos = false,
+        # Makie kwargs
+        color = :blue,
+        linewidth = 1.0,
+        transparency = true,
+        kwargs...
+    )
+    hit = BMO.intersection(segment)
+    if isnothing(hit)
         len = flen
     else
-        len = length(BMO.intersection(ray))
+        len = length(hit)
     end
+    ray = segment.ray
     temp = position(ray) + len * BMO.direction(ray)
 
     lines!(axis,
@@ -46,11 +84,8 @@ function render!(
     )
     
     if show_pos
-        # start point
-        scatter!(axis, ray.pos; color)
-
-        # end point
-        if !isnothing(BMO.intersection(ray))
+        scatter!(axis, position(ray); color)
+        if !isnothing(hit)
             scatter!(axis, temp; color)
         end
     end
@@ -73,8 +108,12 @@ function render!(
         kwargs...
     )
     for child in PreOrderDFS(beam)
-        for ray in BMO.rays(child)
-            render!(axis, ray; kwargs...)
+        if isempty(child.segments)
+            render!(axis, child.head_ray; kwargs...)
+        else
+            for seg in child.segments
+                render!(axis, seg; kwargs...)
+            end
         end
     end
     return nothing
