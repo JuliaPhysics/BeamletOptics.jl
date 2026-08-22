@@ -1,3 +1,60 @@
+function _collect_ray_segments!(
+        pts::Vector{Point3f},
+        scatter_pts::Vector{Point3f},
+        ray::BMO.AbstractRay,
+        flen::Real,
+        show_pos::Bool
+    )
+    p1 = Point3f(position(ray)...)
+    p2 = Point3f((position(ray) + flen * BMO.direction(ray))...)
+    push!(pts, p1, p2)
+    if show_pos
+        push!(scatter_pts, p1)
+    end
+    return nothing
+end
+
+function _collect_ray_segments!(
+        pts::Vector{Point3f},
+        scatter_pts::Vector{Point3f},
+        segment::BMO.RaySegment,
+        flen::Real,
+        show_pos::Bool
+    )
+    hit = BMO.intersection(segment)
+    len = isnothing(hit) ? flen : length(hit)
+    ray = segment.ray
+    p1 = Point3f(position(ray)...)
+    p2 = Point3f((position(ray) + len * BMO.direction(ray))...)
+    push!(pts, p1, p2)
+    if show_pos
+        push!(scatter_pts, p1)
+        if !isnothing(hit)
+            push!(scatter_pts, p2)
+        end
+    end
+    return nothing
+end
+
+function _collect_ray_segments!(
+        pts::Vector{Point3f},
+        scatter_pts::Vector{Point3f},
+        beam::Beam,
+        flen::Real,
+        show_pos::Bool
+    )
+    for child in PreOrderDFS(beam)
+        if isempty(child.segments)
+            _collect_ray_segments!(pts, scatter_pts, child.head_ray, flen, show_pos)
+        else
+            for seg in child.segments
+                _collect_ray_segments!(pts, scatter_pts, seg, flen, show_pos)
+            end
+        end
+    end
+    return nothing
+end
+
 """
     render!(axis, ray; kwargs...)
 
@@ -28,20 +85,19 @@ function render!(
         transparency = true,
         kwargs...
     )
-    temp = position(ray) + flen * BMO.direction(ray)
+    pts = Point3f[]
+    scatter_pts = Point3f[]
+    _collect_ray_segments!(pts, scatter_pts, ray, flen, show_pos)
 
-    lines!(axis,
-        [position(ray)[1], temp[1]],
-        [position(ray)[2], temp[2]],
-        [position(ray)[3], temp[3]];
+    linesegments!(axis, pts;
         color,
         linewidth,
         transparency,
         kwargs...
     )
-    
-    if show_pos
-        scatter!(axis, position(ray); color)
+
+    if show_pos && !isempty(scatter_pts)
+        scatter!(axis, scatter_pts; color)
     end
 
     return nothing
@@ -64,30 +120,19 @@ function render!(
         transparency = true,
         kwargs...
     )
-    hit = BMO.intersection(segment)
-    if isnothing(hit)
-        len = flen
-    else
-        len = length(hit)
-    end
-    ray = segment.ray
-    temp = position(ray) + len * BMO.direction(ray)
+    pts = Point3f[]
+    scatter_pts = Point3f[]
+    _collect_ray_segments!(pts, scatter_pts, segment, flen, show_pos)
 
-    lines!(axis,
-        [position(ray)[1], temp[1]],
-        [position(ray)[2], temp[2]],
-        [position(ray)[3], temp[3]];
+    linesegments!(axis, pts;
         color,
         linewidth,
         transparency,
         kwargs...
     )
-    
-    if show_pos
-        scatter!(axis, position(ray); color)
-        if !isnothing(hit)
-            scatter!(axis, temp; color)
-        end
+
+    if show_pos && !isempty(scatter_pts)
+        scatter!(axis, scatter_pts; color)
     end
 
     return nothing
@@ -100,22 +145,46 @@ Render the entire `beam` of rays into the specified 3D-`axis`.
 
 # Keyword args
 
-Refer to the plotting method of the `AbstractRay` for a list of keyword arguments.
+- `flen = 1.0`: plotted length of the infinite ray in case of no intersection in [m]
+- `show_pos = false`: marks the starting position (and intersections) with spheres
+
+# Makie kwargs
+
+- `color = :blue`: ray color
+- `linewidth = 1.0`: ray line width
+- `transparency = true`: ray transparency
+
+Additional kwargs can be passed into the line plot.
 """
 function render!(
         axis::_RenderEnv,
         beam::Beam;
+        # kwargs
+        flen = 1.0,
+        show_pos = false,
+        # Makie kwargs
+        color = :blue,
+        linewidth = 1.0,
+        transparency = true,
         kwargs...
     )
-    for child in PreOrderDFS(beam)
-        if isempty(child.segments)
-            render!(axis, child.head_ray; kwargs...)
-        else
-            for seg in child.segments
-                render!(axis, seg; kwargs...)
-            end
-        end
+    pts = Point3f[]
+    scatter_pts = Point3f[]
+    _collect_ray_segments!(pts, scatter_pts, beam, flen, show_pos)
+
+    if !isempty(pts)
+        linesegments!(axis, pts;
+            color,
+            linewidth,
+            transparency,
+            kwargs...
+        )
     end
+
+    if show_pos && !isempty(scatter_pts)
+        scatter!(axis, scatter_pts; color)
+    end
+
     return nothing
 end
 
@@ -127,20 +196,50 @@ Renders the [`BeamletOptics.AbstractBeamGroup`](@ref) into the specified `axis`.
 # Keywords arguments
 
 - `render_every = 5`: renders only every e.g. fifth individual beam in the group
+- `flen = 1.0`: plotted length of the infinite ray in case of no intersection in [m]
+- `show_pos = false`: marks the starting position (and intersections) with spheres
 
-Refer to the plotting method of the `AbstractRay` for further keyword arguments.
+# Makie kwargs
+
+- `color = :blue`: ray color
+- `linewidth = 1.0`: ray line width
+- `transparency = true`: ray transparency
+
+Additional kwargs can be passed into the line plot.
 """
 function render!(
         axis::_RenderEnv,
         beam_group::BMO.AbstractBeamGroup;
         # kwargs
-        render_every::Int=5,
+        render_every::Int = 5,
+        flen = 1.0,
+        show_pos = false,
         # Makie kwargs
+        color = :blue,
+        linewidth = 1.0,
+        transparency = true,
         kwargs...
     )
-    numEl = length(BMO.beams(beam_group))
+    pts = Point3f[]
+    scatter_pts = Point3f[]
+    bms = BMO.beams(beam_group)
+    numEl = length(bms)
     for i = 1:render_every:numEl
-        render!(axis, BMO.beams(beam_group)[i]; kwargs...)
+        _collect_ray_segments!(pts, scatter_pts, bms[i], flen, show_pos)
     end
+
+    if !isempty(pts)
+        linesegments!(axis, pts;
+            color,
+            linewidth,
+            transparency,
+            kwargs...
+        )
+    end
+
+    if show_pos && !isempty(scatter_pts)
+        scatter!(axis, scatter_pts; color)
+    end
+
     return nothing
 end
