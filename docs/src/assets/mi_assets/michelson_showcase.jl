@@ -11,15 +11,9 @@ const mm = 1e-3
 
 function reset_beamlet!(beam::GaussianBeamlet)
     BeamletOptics._drop_beams!(beam)
-    r_c = first(BeamletOptics.rays(beam.chief))
-    r_w = first(BeamletOptics.rays(beam.waist))
-    r_d = first(BeamletOptics.rays(beam.divergence))
-    BeamletOptics.intersection!(r_c, nothing)
-    BeamletOptics.intersection!(r_w, nothing)
-    BeamletOptics.intersection!(r_d, nothing)
-    beam.chief.rays = [r_c]
-    beam.waist.rays = [r_w]
-    beam.divergence.rays = [r_d]
+    empty!(beam.chief.segments)
+    empty!(beam.waist.segments)
+    empty!(beam.divergence.segments)
     return nothing
 end
 
