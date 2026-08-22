@@ -46,4 +46,24 @@ Exposes all objects/subgroups stored within the group.
 """
 objects(group::ObjectGroup) = group.objects
 
+"""
+    intersect3d(group::AbstractObjectGroup, ray::AbstractRay)
+
+Computes the closest intersection between `ray` and any constituent object of `group`.
+Provides a universal fallback for composite object groups outside of a `System`.
+"""
+function intersect3d(group::AbstractObjectGroup, ray::AbstractRay)
+    best_hit = nothing
+    for obj in objects(group)
+        hit = intersect3d(obj, ray)
+        if hit !== nothing
+            if best_hit === nothing || length(hit) < length(best_hit)
+                best_hit = hit
+            end
+        end
+    end
+    return best_hit
+end
+
 Base.show(::IO, ::MIME"text/plain", group::ObjectGroup) = print_tree(group)
+

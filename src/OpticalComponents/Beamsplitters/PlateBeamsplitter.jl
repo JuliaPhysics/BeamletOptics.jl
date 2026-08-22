@@ -137,19 +137,3 @@ function RoundPlateBeamsplitter(
     coating = RoundThinBeamsplitter(diameter; reflectance)
     return RoundPlateBeamsplitter(substrate, coating)
 end
-
-function intersect3d(pbs::AbstractPlateBeamsplitter, ray::AbstractRay)
-    ic = intersect3d(coating(pbs), ray)
-    is = intersect3d(substrate(pbs), ray)
-    if isnothing(ic) && isnothing(is)
-        return nothing
-    elseif isnothing(is)
-        return ic
-    elseif isnothing(ic)
-        return is
-    elseif length(ic) <= length(is)
-        return ic
-    else
-        return is
-    end
-end

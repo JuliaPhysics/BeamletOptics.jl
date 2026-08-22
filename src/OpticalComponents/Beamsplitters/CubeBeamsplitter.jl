@@ -54,10 +54,3 @@ function CubeBeamsplitter(
     set_new_origin3d!(shape(bs))
     return CubeBeamsplitter(front, back, bs)
 end
-
-function intersect3d(cbs::CubeBeamsplitter, ray::AbstractRay)
-    ihits = (intersect3d(cbs.front, ray), intersect3d(cbs.back, ray), intersect3d(cbs.coating, ray))
-    valid_hits = filter(!isnothing, ihits)
-    isempty(valid_hits) && return nothing
-    return argmin(length, valid_hits)
-end

@@ -99,6 +99,7 @@ AbstractTrees.children(group::AbstractObjectGroup) = objects(group)
 """
     is_refractive(object::AbstractObject)
 
+
 Default fallback implementation checking if an object has refractive properties. Returns `false`.
 """
 is_refractive(::AbstractObject) = false
