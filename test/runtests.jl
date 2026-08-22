@@ -1,6 +1,7 @@
 # order or inclusion matters!
 include(joinpath(@__DIR__, "TestUtils.jl"))
 include(joinpath(@__DIR__, "TestAbstractTypes.jl"))
+include(joinpath(@__DIR__, "TestAnisotropicMedia.jl"))
 
 # Test ray and beam types
 include(joinpath(@__DIR__, "TestRays.jl"))

@@ -184,6 +184,14 @@ function interact3d(
     ambient = ambient_medium(system)
     trans = resolve_transition(mi, ambient, ray)
     
+    obj_en = entering(mi)
+    obj_ex = exiting(mi)
+    c_obj = coating(mi)
+    bs_obj = c_obj isa AbstractBeamsplitter ? c_obj : (obj_en isa AbstractBeamsplitter ? obj_en : (obj_ex isa AbstractBeamsplitter ? obj_ex : nothing))
+    if bs_obj !== nothing
+        return interact3d(system, bs_obj, trans, int, beam, ray)
+    end
+    
     target_obj = entering(mi) !== nothing ? entering(mi) : exiting(mi)
     model = surface_model(target_obj)
     
@@ -217,4 +225,6 @@ function interact3d(
     end
     return BeamInteraction{T, R}(nothing, out_ray)
 end
+
+
 

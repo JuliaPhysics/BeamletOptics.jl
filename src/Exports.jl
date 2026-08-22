@@ -14,6 +14,9 @@ export CollimatedGaussianBeamletSource, GaussianBeamletDecomposition,
 
 # media, surfaces & coatings
 export AbstractMedium, Ambient, IsotropicMedium,
+       AbstractAnisotropicMedium, UniaxialMedium, BiaxialMedium,
+       refractive_index, refractive_index_o, refractive_index_e, birefringence, optic_axis,
+       is_uniaxial, is_biaxial, dielectric_tensor,
        complex_refractive_index, extinction_coefficient, absorption_coefficient
 export AbstractSurfaceModel, FresnelInterface, IdealMirror, AbsorbingSurface,
        DetectorSurface, CoatedSurface, GratingSurface
@@ -28,7 +31,9 @@ export System, StaticSystem, solve_system!, ambient_medium
 export ObjectGroup
 
 # additional
-export DiscreteRefractiveIndex, SellmeierEquation
+export DiscreteRefractiveIndex, SellmeierEquation,
+       admittance_factor, fresnel_power_coefficients, fresnel_coefficients,
+       reflection3d, refraction3d
 
 #=
 components

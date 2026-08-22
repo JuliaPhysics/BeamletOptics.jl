@@ -72,10 +72,8 @@ end
 
 @inline function trace_all(system::AbstractSystem, ray::AbstractRay{R}) where {R}
     tol = get_coincident_boundary_tolerance()
-    best_hit::Union{Nothing, Intersection{R}} = nothing
-    best_obj = nothing
-    second_hit::Union{Nothing, Intersection{R}} = nothing
-    second_obj = nothing
+    best_t = R(Inf)
+    coincident_hits = Tuple{Intersection{R}, AbstractObject}[]
     
     # Iterate over all optical objects/interfaces in system
     for obj in objects(system)
@@ -83,43 +81,66 @@ end
         if temp === nothing
             continue
         end
+        t_hit = length(temp)
 
-        # Check for coincident hits within tolerance
-        if best_hit === nothing
-            best_hit = temp
-            best_obj = obj
-        elseif abs(length(temp) - length(best_hit)) <= tol
-            second_hit = temp
-            second_obj = obj
-            if length(temp) < length(best_hit)
-                second_hit = best_hit
-                second_obj = best_obj
-                best_hit = temp
-                best_obj = obj
+        if isempty(coincident_hits)
+            best_t = t_hit
+            push!(coincident_hits, (temp, obj))
+        elseif abs(t_hit - best_t) <= tol
+            push!(coincident_hits, (temp, obj))
+            if t_hit < best_t
+                best_t = t_hit
             end
-        elseif length(temp) < length(best_hit) - tol
-            best_hit = temp
-            best_obj = obj
-            second_hit = nothing
-            second_obj = nothing
+        elseif t_hit < best_t - tol
+            best_t = t_hit
+            empty!(coincident_hits)
+            push!(coincident_hits, (temp, obj))
         end
     end
     
-    return _resolve_coincident_hit(best_hit, best_obj, second_hit, second_obj, ray)
+    return _resolve_coincident_hits(coincident_hits, ray)
 end
 
-@inline function _resolve_coincident_hit(best_hit, best_obj, second_hit, second_obj, ray)
-    if best_hit === nothing
+@inline function _resolve_coincident_hits(hits::Vector{Tuple{Intersection{R}, AbstractObject}}, ray::AbstractRay{R}) where {R}
+    if isempty(hits)
         return nothing
-    elseif second_hit === nothing
-        return (best_hit, best_obj)
-    else
-        h1_is_exit = dot(direction(ray), normal3d(best_hit)) > 0
-        exiting_obj = h1_is_exit ? best_obj : second_obj
-        entering_obj = h1_is_exit ? second_obj : best_obj
-        mi = MultiIntersection(best_hit; exiting = exiting_obj, entering = entering_obj)
-        return (mi, best_obj)
+    elseif length(hits) == 1
+        return hits[1]
     end
+
+    best_hit = hits[1][1]
+    best_obj = hits[1][2]
+
+    exiting_obj = nothing
+    entering_obj = nothing
+    coating_obj = nothing
+
+    for (hit, obj) in hits
+        if obj isa AbstractCoating || obj isa AbstractBeamsplitter
+            coating_obj = obj
+        else
+            is_exit = dot(direction(ray), normal3d(hit)) > 0
+            if is_exit
+                exiting_obj = obj
+            else
+                entering_obj = obj
+            end
+        end
+    end
+
+    # Fallback if both/all are classified or ambiguous
+    if exiting_obj === nothing && entering_obj === nothing
+        if length(hits) >= 2
+            h1, o1 = hits[1]
+            h2, o2 = hits[2]
+            h1_is_exit = dot(direction(ray), normal3d(h1)) > 0
+            exiting_obj = h1_is_exit ? o1 : o2
+            entering_obj = h1_is_exit ? o2 : o1
+        end
+    end
+
+    mi = MultiIntersection(best_hit; exiting = exiting_obj, entering = entering_obj, coating = coating_obj)
+    return (mi, best_obj)
 end
 
 @inline function trace_one(
@@ -133,25 +154,22 @@ end
 
     # Check if this hit is coincident with another object in system
     tol = get_coincident_boundary_tolerance()
-    best_hit = shape_intersection
-    best_obj = object(hint)
-    second_hit = nothing
-    second_obj = nothing
+    best_t = length(shape_intersection)
+    coincident_hits = Tuple{Intersection{R}, AbstractObject}[(shape_intersection, object(hint))]
 
     for obj in objects(system)
-        obj === best_obj && continue
+        obj === object(hint) && continue
         temp = intersect3d(obj, ray)
-        if temp !== nothing && abs(length(temp) - length(best_hit)) <= tol
-            second_hit = temp
-            second_obj = obj
-            break
+        if temp !== nothing && abs(length(temp) - best_t) <= tol
+            push!(coincident_hits, (temp, obj))
         end
     end
 
-    return _resolve_coincident_hit(best_hit, best_obj, second_hit, second_obj, ray)
+    return _resolve_coincident_hits(coincident_hits, ray)
 end
 
 @inline trace_one(system::AbstractSystem, ray::AbstractRay, ::Nothing) = trace_all(system, ray)
+
 
 """
     tracing_step(system::AbstractSystem, ray::AbstractRay{R}, hint::Nullable{Hint} = nothing, opl_accum::R = zero(R)) where {R <: Real}

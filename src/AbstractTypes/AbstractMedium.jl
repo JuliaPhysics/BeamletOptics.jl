@@ -111,6 +111,183 @@ function absorption_coefficient(m::AbstractMedium, λ::Real = 0.0; kwargs...)::F
 end
 
 """
+    AbstractAnisotropicMedium <: AbstractMedium
+
+Abstract supertype for anisotropic and birefringent optical media where refractive index and dielectric response depend on direction and polarization.
+"""
+abstract type AbstractAnisotropicMedium <: AbstractMedium end
+
+"""
+    UniaxialMedium{No, Ne, C, A} <: AbstractAnisotropicMedium
+
+A uniaxial birefringent crystal characterized by ordinary index ``n_o``, extraordinary index ``n_e``,
+and optic axis vector ``\\hat{\\mathbf{c}}``.
+
+# Fields
+- `name::Symbol`: Crystal material name (e.g. `:Calcite`, `:BBO`, `:Quartz`, `:LiNbO3`)
+- `dispersion_o::No`: Ordinary dispersion formula or constant ``n_o(\\lambda)``
+- `dispersion_e::Ne`: Extraordinary dispersion formula or constant ``n_e(\\lambda)``
+- `optic_axis::C`: Optic axis unit vector ``\\hat{\\mathbf{c}} \\in \\mathbb{R}^3``
+- `attenuation::A`: Bulk attenuation formula (or `nothing`)
+"""
+struct UniaxialMedium{No, Ne, C <: Point3, A} <: AbstractAnisotropicMedium
+    name::Symbol
+    dispersion_o::No
+    dispersion_e::Ne
+    optic_axis::C
+    attenuation::A
+end
+
+function UniaxialMedium(
+    name::Symbol,
+    no,
+    ne,
+    optic_axis::AbstractArray = Point3(0.0, 0.0, 1.0);
+    attenuation = nothing
+)
+    c_axis = normalize(Point3{Float64}(optic_axis))
+    return UniaxialMedium(name, no, ne, c_axis, attenuation)
+end
+
+function UniaxialMedium(
+    no,
+    ne,
+    optic_axis::AbstractArray = Point3(0.0, 0.0, 1.0);
+    attenuation = nothing
+)
+    return UniaxialMedium(:Uniaxial, no, ne, optic_axis; attenuation)
+end
+
+"""
+    BiaxialMedium{Nx, Ny, Nz, A} <: AbstractAnisotropicMedium
+
+A biaxial anisotropic optical crystal characterized by three principal refractive indices ``n_x, n_y, n_z``.
+"""
+struct BiaxialMedium{Nx, Ny, Nz, A} <: AbstractAnisotropicMedium
+    name::Symbol
+    dispersion_x::Nx
+    dispersion_y::Ny
+    dispersion_z::Nz
+    attenuation::A
+end
+
+function BiaxialMedium(
+    name::Symbol,
+    nx,
+    ny,
+    nz;
+    attenuation = nothing
+)
+    return BiaxialMedium(name, nx, ny, nz, attenuation)
+end
+
+function BiaxialMedium(
+    nx,
+    ny,
+    nz;
+    attenuation = nothing
+)
+    return BiaxialMedium(:Biaxial, nx, ny, nz; attenuation)
+end
+
+optic_axis(m::UniaxialMedium) = m.optic_axis
+is_uniaxial(::UniaxialMedium) = true
+is_uniaxial(::AbstractMedium) = false
+is_biaxial(::BiaxialMedium) = true
+is_biaxial(::AbstractMedium) = false
+
+"""
+    refractive_index_o(m::UniaxialMedium, λ=0.0; kwargs...) -> Float64
+
+Returns the ordinary refractive index ``n_o(\\lambda)``.
+"""
+@inline function refractive_index_o(m::UniaxialMedium, λ::Real = 0.0; kwargs...)::Float64
+    val = _eval_dispersion(m.dispersion_o, λ, kwargs)
+    return Float64(real(val))
+end
+
+"""
+    refractive_index_e(m::UniaxialMedium, λ=0.0; kwargs...) -> Float64
+
+Returns the principal extraordinary refractive index ``n_e(\\lambda)``.
+"""
+@inline function refractive_index_e(m::UniaxialMedium, λ::Real = 0.0; kwargs...)::Float64
+    val = _eval_dispersion(m.dispersion_e, λ, kwargs)
+    return Float64(real(val))
+end
+
+"""
+    birefringence(m::UniaxialMedium, λ=0.0; kwargs...) -> Float64
+
+Returns the crystal birefringence ``\\Delta n = n_e(\\lambda) - n_o(\\lambda)``.
+Positive for positive uniaxial crystals (e.g. Quartz), negative for negative uniaxial crystals (e.g. Calcite).
+"""
+@inline function birefringence(m::UniaxialMedium, λ::Real = 0.0; kwargs...)::Float64
+    return refractive_index_e(m, λ; kwargs...) - refractive_index_o(m, λ; kwargs...)
+end
+
+@inline function refractive_index(m::UniaxialMedium, λ::Real = 0.0; kwargs...)::Float64
+    return refractive_index_o(m, λ; kwargs...)
+end
+
+"""
+    refractive_index(m::UniaxialMedium, λ::Real, k_dir::AbstractArray; kwargs...) -> Float64
+
+Calculates the angle-dependent extraordinary refractive index ``n_e(\\theta)`` for propagation wavevector direction `k_dir`:
+```math
+\\frac{1}{n_e(\\theta)^2} = \\frac{\\cos^2\\theta}{n_o^2} + \\frac{\\sin^2\\theta}{n_e^2}
+```
+where ``\\cos\\theta = |\\hat{\\mathbf{k}} \\cdot \\hat{\\mathbf{c}}|``.
+"""
+function refractive_index(m::UniaxialMedium, λ::Real, k_dir::AbstractArray; kwargs...)::Float64
+    no = refractive_index_o(m, λ; kwargs...)
+    ne = refractive_index_e(m, λ; kwargs...)
+    k_unit = normalize(Point3{Float64}(k_dir))
+    c_unit = optic_axis(m)
+    cosθ = abs(dot(k_unit, c_unit))
+    sinθ2 = max(0.0, 1.0 - cosθ^2)
+    denom = ne^2 * cosθ^2 + no^2 * sinθ2
+    if denom <= 0
+        return no
+    end
+    return (no * ne) / sqrt(denom)
+end
+
+"""
+    dielectric_tensor(medium, λ=0.0; kwargs...) -> SMatrix{3, 3, Float64, 9}
+
+Returns the 3×3 relative permittivity tensor ``\\boldsymbol{\\varepsilon}_r(\\lambda)``.
+"""
+function dielectric_tensor(m::Ambient, λ::Real = 0.0; kwargs...)
+    return SMatrix{3, 3, Float64, 9}(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
+end
+
+function dielectric_tensor(m::IsotropicMedium, λ::Real = 0.0; kwargs...)
+    n2 = refractive_index(m, λ; kwargs...)^2
+    return SMatrix{3, 3, Float64, 9}(n2, 0.0, 0.0, 0.0, n2, 0.0, 0.0, 0.0, n2)
+end
+
+function dielectric_tensor(m::UniaxialMedium, λ::Real = 0.0; kwargs...)
+    no2 = refractive_index_o(m, λ; kwargs...)^2
+    ne2 = refractive_index_e(m, λ; kwargs...)^2
+    c = optic_axis(m)
+    # ε_r = ε_o * I + (ε_e - ε_o) * (c ⊗ c)
+    Δε = ne2 - no2
+    return SMatrix{3, 3, Float64, 9}(
+        no2 + Δε * c[1] * c[1], Δε * c[2] * c[1],       Δε * c[3] * c[1],
+        Δε * c[1] * c[2],       no2 + Δε * c[2] * c[2], Δε * c[3] * c[2],
+        Δε * c[1] * c[3],       Δε * c[2] * c[3],       no2 + Δε * c[3] * c[3]
+    )
+end
+
+function dielectric_tensor(m::BiaxialMedium, λ::Real = 0.0; kwargs...)
+    nx2 = Float64(real(_eval_dispersion(m.dispersion_x, λ, kwargs)))^2
+    ny2 = Float64(real(_eval_dispersion(m.dispersion_y, λ, kwargs)))^2
+    nz2 = Float64(real(_eval_dispersion(m.dispersion_z, λ, kwargs)))^2
+    return SMatrix{3, 3, Float64, 9}(nx2, 0.0, 0.0, 0.0, ny2, 0.0, 0.0, 0.0, nz2)
+end
+
+"""
     medium_from(x) -> AbstractMedium
 
 Converts a medium, constant refractive index, dispersion function, or optical object into an `AbstractMedium`.
@@ -119,3 +296,4 @@ medium_from(m::AbstractMedium) = m
 medium_from(n::Number) = IsotropicMedium(n)
 medium_from(::AbstractObject) = Ambient()
 medium_from(f) = IsotropicMedium(f)
+

@@ -72,169 +72,185 @@ end
 
 Base.isvalid(bs::AbstractBeamsplitter) = reflectance(bs)^2 + transmittance(bs)^2 ≈ 1
 
-@inline function _beamsplitter_transmitted_beam(
-        bs::AbstractBeamsplitter, beam::Beam{T, R}, ray::R) where {T <: Real, R <: Ray{T}}
-    seg = isempty(beam.segments) ? RaySegment(ray, intersect3d(shape(bs), ray)) : last(beam.segments)
-    int = seg.intersection
-    pos = isnothing(int) ? position(ray) : propagate(ray, length(int))
-    dir = direction(ray)
-    return Beam(Ray(pos, dir, wavelength(ray), refractive_index(ray)))
+@inline function _beamsplitter_transmitted_ray(
+        bs::AbstractBeamsplitter, trans::Transition, int::AbstractIntersection{T}, ray::Ray{T}) where {T <: Real}
+    λ = wavelength(ray)
+    n1 = refractive_index(trans.medium_in, λ)
+    n2 = refractive_index(trans.medium_out, λ)
+    normal = dot(normal3d(int), direction(ray)) < 0 ? normal3d(int) : -normal3d(int)
+    new_dir, _ = refraction3d(direction(ray), normal, n1, n2)
+    pos = position(int)
+    return Ray{T}(pos, new_dir, λ, n2)
 end
 
-@inline function _beamsplitter_reflected_beam(
-        bs::AbstractBeamsplitter, beam::Beam{T, R}, ray::R) where {T <: Real, R <: Ray{T}}
-    seg = isempty(beam.segments) ? RaySegment(ray, intersect3d(shape(bs), ray)) : last(beam.segments)
-    int = seg.intersection
-    normal = isnothing(int) ? Point3{T}(0, 0, 1) : normal3d(int)
-    pos = isnothing(int) ? position(ray) : propagate(ray, length(int))
-    dir = reflection3d(direction(ray), normal)
-    return Beam(Ray(pos, dir, wavelength(ray), refractive_index(ray)))
+@inline function _beamsplitter_reflected_ray(
+        bs::AbstractBeamsplitter, trans::Transition, int::AbstractIntersection{T}, ray::Ray{T}) where {T <: Real}
+    λ = wavelength(ray)
+    n1 = refractive_index(trans.medium_in, λ)
+    normal = dot(normal3d(int), direction(ray)) < 0 ? normal3d(int) : -normal3d(int)
+    new_dir = reflection3d(direction(ray), normal)
+    pos = position(int)
+    return Ray{T}(pos, new_dir, λ, n1)
 end
 
-@inline function _beamsplitter_transmitted_beam(bs::AbstractBeamsplitter, beam::Beam{T, R},
-        ray::R) where {T <: Real, R <: PolarizedRay{T}}
+@inline function _beamsplitter_transmitted_ray(
+        bs::AbstractBeamsplitter, trans::Transition, int::AbstractIntersection{T}, ray::PolarizedRay{T}) where {T <: Real}
+    λ = wavelength(ray)
+    n1 = refractive_index(trans.medium_in, λ)
+    n2 = refractive_index(trans.medium_out, λ)
+    normal = dot(normal3d(int), direction(ray)) < 0 ? normal3d(int) : -normal3d(int)
+    new_dir, _ = refraction3d(direction(ray), normal, n1, n2)
+    pos = position(int)
     J = SPBasis(transmittance(bs), 0, 0, transmittance(bs))
-    seg = isempty(beam.segments) ? RaySegment(ray, intersect3d(shape(bs), ray)) : last(beam.segments)
-    int = seg.intersection
-    pos = isnothing(int) ? position(ray) : propagate(ray, length(int))
-    dir = direction(ray)
-    E0 = _calculate_global_E0(bs, ray, dir, J, int)
-    return Beam(PolarizedRay(pos, dir, wavelength(ray), refractive_index(ray), E0))
+    P = _calculate_global_E0(direction(ray), new_dir, normal, J)
+    new_E0 = P * polarization(ray)
+    return PolarizedRay{T}(pos, new_dir, λ, n2, new_E0)
 end
 
-@inline function _beamsplitter_reflected_beam(bs::AbstractBeamsplitter, beam::Beam{T, R},
-        ray::R) where {T <: Real, R <: PolarizedRay{T}}
+@inline function _beamsplitter_reflected_ray(
+        bs::AbstractBeamsplitter, trans::Transition, int::AbstractIntersection{T}, ray::PolarizedRay{T}) where {T <: Real}
+    λ = wavelength(ray)
+    n1 = refractive_index(trans.medium_in, λ)
+    normal = dot(normal3d(int), direction(ray)) < 0 ? normal3d(int) : -normal3d(int)
+    new_dir = reflection3d(direction(ray), normal)
+    pos = position(int)
     J = SPBasis(-reflectance(bs), 0, 0, reflectance(bs))
-    seg = isempty(beam.segments) ? RaySegment(ray, intersect3d(shape(bs), ray)) : last(beam.segments)
-    int = seg.intersection
-    normal = isnothing(int) ? Point3{T}(0, 0, 1) : normal3d(int)
-    pos = isnothing(int) ? position(ray) : propagate(ray, length(int))
-    in_dir = direction(ray)
-    out_dir = reflection3d(in_dir, normal)
-    E0 = _calculate_global_E0(bs, ray, out_dir, J, int)
-    return Beam(PolarizedRay(pos, out_dir, wavelength(ray), refractive_index(ray), E0))
+    P = _calculate_global_E0(direction(ray), new_dir, normal, J)
+    new_E0 = P * polarization(ray)
+    return PolarizedRay{T}(pos, new_dir, λ, n1, new_E0)
 end
 
-function interact3d(::AbstractSystem, bs::ThinBeamsplitter, beam::Beam{T, R},
+function interact3d(
+        system::AbstractSystem,
+        bs::ThinBeamsplitter,
+        trans::Transition,
+        int::AbstractIntersection{T},
+        beam::Beam{T, R},
         ray::R) where {T <: Real, R <: AbstractRay{T}}
-    # Push transmitted and reflected beams to system
-    children!(beam,
-        [_beamsplitter_transmitted_beam(bs, beam, ray),
-            _beamsplitter_reflected_beam(bs, beam, ray)])
-    # Stop for beam spawning
+    t_ray = _beamsplitter_transmitted_ray(bs, trans, int, ray)
+    r_ray = _beamsplitter_reflected_ray(bs, trans, int, ray)
+    children!(beam, [Beam(t_ray), Beam(r_ray)])
     return nothing
 end
 
-@inline function _beamsplitter_transmitted_beam(
-        bs::AbstractBeamsplitter, gauss::GaussianBeamlet, ray_id::Int)
-    # Transmitted Gaussian (no phase flip)
-    chief = _beamsplitter_transmitted_beam(bs, gauss.chief, rays(gauss.chief)[ray_id])
-    waist = _beamsplitter_transmitted_beam(bs, gauss.waist, rays(gauss.waist)[ray_id])
-    divergence = _beamsplitter_transmitted_beam(
-        bs, gauss.divergence, rays(gauss.divergence)[ray_id])
+function interact3d(
+        system::AbstractSystem,
+        bs::ThinBeamsplitter,
+        beam::Beam{T, R},
+        ray::R) where {T <: Real, R <: AbstractRay{T}}
+    int = isempty(beam.segments) ? intersect3d(shape(bs), ray) : last(beam.segments).intersection
+    isnothing(int) && return nothing
+    ambient = ambient_medium(system)
+    trans = resolve_transition(ambient, ambient, ray, normal3d(int))
+    return interact3d(system, bs, trans, int, beam, ray)
+end
+
+function interact3d(
+        system::AbstractSystem,
+        bs::ThinBeamsplitter,
+        trans::Transition,
+        int::AbstractIntersection,
+        gauss::GaussianBeamlet{R},
+        ray_id::Int) where {R}
+    chief_ray = rays(gauss.chief)[ray_id]
+    waist_ray = rays(gauss.waist)[ray_id]
+    div_ray = rays(gauss.divergence)[ray_id]
+
+    int_c = ray_id <= length(gauss.chief.segments) ? (isnothing(gauss.chief.segments[ray_id].intersection) ? int : gauss.chief.segments[ray_id].intersection) : int
+    int_w = ray_id <= length(gauss.waist.segments) ? (isnothing(gauss.waist.segments[ray_id].intersection) ? int : gauss.waist.segments[ray_id].intersection) : int
+    int_d = ray_id <= length(gauss.divergence.segments) ? (isnothing(gauss.divergence.segments[ray_id].intersection) ? int : gauss.divergence.segments[ray_id].intersection) : int
+
+    t_c = _beamsplitter_transmitted_ray(bs, trans, int_c, chief_ray)
+    t_w = _beamsplitter_transmitted_ray(bs, trans, int_w, waist_ray)
+    t_d = _beamsplitter_transmitted_ray(bs, trans, int_d, div_ray)
+
+    r_c = _beamsplitter_reflected_ray(bs, trans, int_c, chief_ray)
+    r_w = _beamsplitter_reflected_ray(bs, trans, int_w, waist_ray)
+    r_d = _beamsplitter_reflected_ray(bs, trans, int_d, div_ray)
+
     λ = wavelength(gauss)
     w0 = gauss_parameters(gauss, length(gauss))[4]
-    E0 = transmittance(bs) * electric_field(gauss) * (beam_waist(gauss) / w0)
-    return GaussianBeamlet(chief, waist, divergence, λ, w0, E0)
-end
+    E0_t = transmittance(bs) * electric_field(gauss) * (beam_waist(gauss) / w0)
+    E0_r = reflectance(bs) * electric_field(gauss) * (beam_waist(gauss) / w0)
 
-@inline function _beamsplitter_reflected_beam(
-        bs::AbstractBeamsplitter, gauss::GaussianBeamlet, ray_id::Int)
-    # Reflected Gaussian (no phase flip)
-    chief = _beamsplitter_reflected_beam(bs, gauss.chief, rays(gauss.chief)[ray_id])
-    waist = _beamsplitter_reflected_beam(bs, gauss.waist, rays(gauss.waist)[ray_id])
-    divergence = _beamsplitter_reflected_beam(
-        bs, gauss.divergence, rays(gauss.divergence)[ray_id])
-    λ = wavelength(gauss)
-    w0 = gauss_parameters(gauss, length(gauss))[4]
-    E0 = reflectance(bs) * electric_field(gauss) * (beam_waist(gauss) / w0)
-    return GaussianBeamlet(chief, waist, divergence, λ, w0, E0)
-end
-
-"""
-    interact3d(::AbstractSystem, bs::ThinBeamsplitter, gauss::GaussianBeamlet, ray_id::Int)
-
-Models the interaction between a [`ThinBeamsplitter`](@ref) and a [`GaussianBeamlet`](@ref).
-
-# Reflection phase jump
-
-The reflection phase jump is modeled here as θᵣ = π for simplicity. This is since in practice it will have only a relative effect on the signal at the detector for interferometric setups.
-The phase jump is applied to the reflected portion of any incoming beam that faces the [`ThinBeamsplitter`](@ref) normal vector, which assumes that the splitter has an unambigous normal, i.e. a 2D mesh.
-This is intended to model the effect of the Fresnel equations without full polarization calculus.
-"""
-function interact3d(
-        ::AbstractSystem, bs::ThinBeamsplitter, gauss::GaussianBeamlet, ray_id::Int)
-    # Phase flip
-    ray = rays(gauss.chief)[ray_id]
-    int = ray_id <= length(gauss.chief.segments) ? gauss.chief.segments[ray_id].intersection : intersect3d(shape(bs), ray)
-    df = dot(direction(ray), normal3d(int))
-    if df < 0
-        ϕ = π
-    else
-        ϕ = 0
-    end
-
-    t = _beamsplitter_transmitted_beam(bs, gauss, ray_id)
-    r = _beamsplitter_reflected_beam(bs, gauss, ray_id)
-
-    # Add conditional phase flip to reflected beam
-    electric_field!(r, electric_field(r) * exp(im * ϕ))
-
-    children!(gauss, [t, r])
-    return nothing
-end
-
-@inline function _beamsplitter_transmitted_beam(
-        bs::AbstractBeamsplitter, agb::AstigmaticGaussianBeamlet, ray_id::Int)
-    c = _beamsplitter_transmitted_beam(bs, agb.c, rays(agb.c)[ray_id])
-    wxp = _beamsplitter_transmitted_beam(bs, agb.wxp, rays(agb.wxp)[ray_id])
-    wxm = _beamsplitter_transmitted_beam(bs, agb.wxm, rays(agb.wxm)[ray_id])
-    wyp = _beamsplitter_transmitted_beam(bs, agb.wyp, rays(agb.wyp)[ray_id])
-    wym = _beamsplitter_transmitted_beam(bs, agb.wym, rays(agb.wym)[ray_id])
-    dxp = _beamsplitter_transmitted_beam(bs, agb.dxp, rays(agb.dxp)[ray_id])
-    dxm = _beamsplitter_transmitted_beam(bs, agb.dxm, rays(agb.dxm)[ray_id])
-    dyp = _beamsplitter_transmitted_beam(bs, agb.dyp, rays(agb.dyp)[ray_id])
-    dym = _beamsplitter_transmitted_beam(bs, agb.dym, rays(agb.dym)[ray_id])
-    return AstigmaticGaussianBeamlet(c, wxp, wxm, wyp, wym, dxp, dxm, dyp, dym)
-end
-
-@inline function _beamsplitter_reflected_beam(
-        bs::AbstractBeamsplitter, agb::AstigmaticGaussianBeamlet, ray_id::Int)
-    c = _beamsplitter_reflected_beam(bs, agb.c, rays(agb.c)[ray_id])
-    wxp = _beamsplitter_reflected_beam(bs, agb.wxp, rays(agb.wxp)[ray_id])
-    wxm = _beamsplitter_reflected_beam(bs, agb.wxm, rays(agb.wxm)[ray_id])
-    wyp = _beamsplitter_reflected_beam(bs, agb.wyp, rays(agb.wyp)[ray_id])
-    wym = _beamsplitter_reflected_beam(bs, agb.wym, rays(agb.wym)[ray_id])
-    dxp = _beamsplitter_reflected_beam(bs, agb.dxp, rays(agb.dxp)[ray_id])
-    dxm = _beamsplitter_reflected_beam(bs, agb.dxm, rays(agb.dxm)[ray_id])
-    dyp = _beamsplitter_reflected_beam(bs, agb.dyp, rays(agb.dyp)[ray_id])
-    dym = _beamsplitter_reflected_beam(bs, agb.dym, rays(agb.dym)[ray_id])
-    return AstigmaticGaussianBeamlet(c, wxp, wxm, wyp, wym, dxp, dxm, dyp, dym)
-end
-
-"""
-    interact3d(::AbstractSystem, bs::ThinBeamsplitter, agb::AstigmaticGaussianBeamlet, ray_id::Int)
-
-Models the interaction between a [`ThinBeamsplitter`](@ref) and an [`AstigmaticGaussianBeamlet`](@ref).
-The reflection phase jump θᵣ = π is applied to the reflected child beam.
-"""
-function interact3d(
-        ::AbstractSystem, bs::ThinBeamsplitter, agb::AstigmaticGaussianBeamlet, ray_id::Int)
-    # Phase flip
-    ray = rays(agb.c)[ray_id]
-    int = ray_id <= length(agb.c.segments) ? agb.c.segments[ray_id].intersection : intersect3d(shape(bs), ray)
-    df = dot(direction(ray), normal3d(int))
+    # Reflection phase flip if facing normal
+    df = dot(direction(chief_ray), normal3d(int_c))
     ϕ = df < 0 ? π : 0
+    E0_r *= exp(im * ϕ)
 
-    t = _beamsplitter_transmitted_beam(bs, agb, ray_id)
-    r = _beamsplitter_reflected_beam(bs, agb, ray_id)
+    t_beam = GaussianBeamlet(Beam(t_c), Beam(t_w), Beam(t_d), λ, w0, E0_t)
+    r_beam = GaussianBeamlet(Beam(r_c), Beam(r_w), Beam(r_d), λ, w0, E0_r)
 
-    # Add conditional phase flip to reflected beam chief polarization
-    chief_ray = r.c.head_ray
-    E_new = polarization(chief_ray) * exp(im * ϕ)
-    r.c.head_ray = PolarizedRay(position(chief_ray), direction(chief_ray), wavelength(chief_ray), refractive_index(chief_ray), E_new)
-
-    children!(agb, [t, r])
+    children!(gauss, [t_beam, r_beam])
     return nothing
+end
+
+function interact3d(
+        system::AbstractSystem,
+        bs::ThinBeamsplitter,
+        gauss::GaussianBeamlet{R},
+        ray_id::Int) where {R}
+    chief_ray = rays(gauss.chief)[ray_id]
+    int = ray_id <= length(gauss.chief.segments) ? gauss.chief.segments[ray_id].intersection : intersect3d(shape(bs), chief_ray)
+    isnothing(int) && return nothing
+    ambient = ambient_medium(system)
+    trans = resolve_transition(ambient, ambient, chief_ray, normal3d(int))
+    return interact3d(system, bs, trans, int, gauss, ray_id)
+end
+
+function interact3d(
+        system::AbstractSystem,
+        bs::ThinBeamsplitter,
+        trans::Transition,
+        int::AbstractIntersection,
+        agb::AstigmaticGaussianBeamlet{R},
+        ray_id::Int) where {R}
+    c_ray = rays(agb.c)[ray_id]
+    int_c = ray_id <= length(agb.c.segments) ? (isnothing(agb.c.segments[ray_id].intersection) ? int : agb.c.segments[ray_id].intersection) : int
+    
+    t_c = _beamsplitter_transmitted_ray(bs, trans, int_c, c_ray)
+    r_c = _beamsplitter_reflected_ray(bs, trans, int_c, c_ray)
+    
+    df = dot(direction(c_ray), normal3d(int_c))
+    ϕ = df < 0 ? π : 0
+    if ϕ != 0
+        r_c = PolarizedRay(position(r_c), direction(r_c), wavelength(r_c), refractive_index(r_c), polarization(r_c) * exp(im * ϕ))
+    end
+    
+    t_aux = Ray{R}[]
+    r_aux = Ray{R}[]
+    for b in _aux_beams(agb)
+        ray_a = rays(b)[ray_id]
+        int_a = ray_id <= length(b.segments) ? (isnothing(b.segments[ray_id].intersection) ? int : b.segments[ray_id].intersection) : int
+        push!(t_aux, _beamsplitter_transmitted_ray(bs, trans, int_a, ray_a))
+        push!(r_aux, _beamsplitter_reflected_ray(bs, trans, int_a, ray_a))
+    end
+    
+    t_agb = AstigmaticGaussianBeamlet(
+        Beam(t_c),
+        Beam(t_aux[1]), Beam(t_aux[2]), Beam(t_aux[3]), Beam(t_aux[4]),
+        Beam(t_aux[5]), Beam(t_aux[6]), Beam(t_aux[7]), Beam(t_aux[8])
+    )
+    r_agb = AstigmaticGaussianBeamlet(
+        Beam(r_c),
+        Beam(r_aux[1]), Beam(r_aux[2]), Beam(r_aux[3]), Beam(r_aux[4]),
+        Beam(r_aux[5]), Beam(r_aux[6]), Beam(r_aux[7]), Beam(r_aux[8])
+    )
+    
+    children!(agb, [t_agb, r_agb])
+    return nothing
+end
+
+function interact3d(
+        system::AbstractSystem,
+        bs::ThinBeamsplitter,
+        agb::AstigmaticGaussianBeamlet{R},
+        ray_id::Int) where {R}
+    c_ray = rays(agb.c)[ray_id]
+    int = ray_id <= length(agb.c.segments) ? agb.c.segments[ray_id].intersection : intersect3d(shape(bs), c_ray)
+    isnothing(int) && return nothing
+    ambient = ambient_medium(system)
+    trans = resolve_transition(ambient, ambient, c_ray, normal3d(int))
+    return interact3d(system, bs, trans, int, agb, ray_id)
 end
 

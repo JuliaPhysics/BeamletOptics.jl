@@ -138,6 +138,16 @@ function interact3d(system::AbstractSystem,
         mi::MultiIntersection,
         gauss::GaussianBeamlet{R},
         ray_id::Int) where {R}
+    c_obj = coating(mi)
+    obj_en = entering(mi)
+    obj_ex = exiting(mi)
+    bs_obj = c_obj isa AbstractBeamsplitter ? c_obj : (obj_en isa AbstractBeamsplitter ? obj_en : (obj_ex isa AbstractBeamsplitter ? obj_ex : nothing))
+    if bs_obj !== nothing
+        ambient = ambient_medium(system)
+        trans = resolve_transition(mi, ambient, rays(gauss.chief)[ray_id])
+        return interact3d(system, bs_obj, trans, mi.hit, gauss, ray_id)
+    end
+
     i_c = interact3d(system, mi, gauss.chief, rays(gauss.chief)[ray_id])
     i_w = interact3d(system, mi, gauss.waist, rays(gauss.waist)[ray_id])
     i_d = interact3d(system, mi, gauss.divergence, rays(gauss.divergence)[ray_id])
