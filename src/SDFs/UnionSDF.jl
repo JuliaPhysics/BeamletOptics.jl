@@ -41,20 +41,20 @@ function thickness(u::UnionSDF{T}) where T
     return t
 end
 
-function UnionSDF{T}(sdfs::Vararg{AbstractSDF{T}, N}) where {T, N}
+function UnionSDF{T}(sdfs::AbstractSDF{T}...) where {T}
     UnionSDF{T, typeof(sdfs)}(
-        SMatrix{3,3}(one(T)*I),
-        SMatrix{3,3}(one(T)*I),
+        SMatrix{3, 3, T, 9}(one(T) * I),
+        SMatrix{3, 3, T, 9}(one(T) * I),
         Point3{T}(zero(T)),
         sdfs
     )
 end
 
-function UnionSDF(sdfs::Vararg{AbstractSDF{T}, N}) where {T, N}
-    return UnionSDF{T}(sdfs...)
+function UnionSDF(s1::AbstractSDF{T}, sdfs::AbstractSDF{T}...) where {T}
+    return UnionSDF{T}(s1, sdfs...)
 end
 
-function UnionSDF(sdfs::Tuple{Vararg{AbstractSDF{T}}}) where {T}
+function UnionSDF(sdfs::Tuple{AbstractSDF{T}, Vararg{AbstractSDF{T}}}) where {T}
     return UnionSDF{T}(sdfs...)
 end
 
