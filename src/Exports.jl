@@ -4,7 +4,7 @@ export translate3d!, translate_to3d!, rotate3d!, xrotate3d!, yrotate3d!, zrotate
 export position, direction, orientation
 
 # ray and beam type export
-export Ray, PolarizedRay, RaySegment, segments, hit_object, accumulated_opl,
+export Ray, PolarizedRay, RaySegment, segments, accumulated_opl,
        Beam, PointSource, CollimatedSource, UniformDiscSource,
        GaussianBeamlet, AstigmaticGaussianBeamlet, rayleigh_range, rays, point_on_beam,
        normal3d, optical_path_length

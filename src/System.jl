@@ -180,12 +180,12 @@ Tests if the `ray` intersects an `object` in the optical `system`. Returns `(Ray
         system::AbstractSystem, ray::AbstractRay{R}, hint::Nullable{Hint} = nothing, opl_accum::R = zero(R)) where {R <: Real}
     res = trace_one(system, ray, hint)
     if res === nothing
-        seg = RaySegment(ray, nothing, nothing, opl_accum)
+        seg = RaySegment(ray, nothing, opl_accum)
         return (seg, nothing)
     else
         hit, obj = res
         seg_opl = opl_accum + length(hit) * refractive_index(ray)
-        seg = RaySegment(ray, hit, obj, seg_opl)
+        seg = RaySegment(ray, hit, seg_opl)
         return (seg, obj)
     end
 end
@@ -280,9 +280,9 @@ function trace_system!(
 
         # If any beam misses or beams do not hit same target stop tracing
         if any(isnothing, (int_c, int_w, int_d)) || (obj_c !== obj_w || obj_c !== obj_d) || !_beams_hits_same_shape(gauss, seg_counter)
-            gauss.chief.segments[end] = RaySegment(seg_c.ray, nothing, nothing, opl_c)
-            gauss.waist.segments[end] = RaySegment(seg_w.ray, nothing, nothing, opl_w)
-            gauss.divergence.segments[end] = RaySegment(seg_d.ray, nothing, nothing, opl_d)
+            gauss.chief.segments[end] = RaySegment(seg_c.ray, nothing, opl_c)
+            gauss.waist.segments[end] = RaySegment(seg_w.ray, nothing, opl_w)
+            gauss.divergence.segments[end] = RaySegment(seg_d.ray, nothing, opl_d)
             break
         end
 
@@ -348,9 +348,9 @@ function trace_system!(
         end
 
         if missed || !_beams_hits_same_shape(agb, seg_counter)
-            agb.c.segments[end] = RaySegment(seg_c.ray, nothing, nothing, opl_c)
+            agb.c.segments[end] = RaySegment(seg_c.ray, nothing, opl_c)
             for (idx, b) in enumerate(aux)
-                b.segments[end] = RaySegment(current_aux[idx], nothing, nothing, opl_aux[idx])
+                b.segments[end] = RaySegment(current_aux[idx], nothing, opl_aux[idx])
             end
             break
         end

@@ -46,7 +46,7 @@ function Base.push!(b::Beam{T, R}, seg::RaySegment{T, R}) where {T, R}
         push!(b.segments, seg)
     else
         prev_opl = last(b.segments).accumulated_opl
-        adjusted = RaySegment(seg.ray, seg.intersection, seg.hit_object, prev_opl + optical_path_length(seg))
+        adjusted = RaySegment(seg.ray, seg.intersection, prev_opl + optical_path_length(seg))
         push!(b.segments, adjusted)
     end
 end

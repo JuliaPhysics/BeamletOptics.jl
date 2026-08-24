@@ -50,23 +50,20 @@ with an optical boundary (or escape to infinity).
 # Fields
 - `ray::R`: the ray propagating along this segment
 - `intersection::Nullable{AbstractIntersection{T}}`: the boundary intersection point, or `nothing` if unhit
-- `hit_object::Nullable{AbstractObject}`: the object hit at the end of this segment, or `nothing`
 - `accumulated_opl::T`: cumulative optical path length up to the end of this segment
 """
 struct RaySegment{T <: Real, R <: AbstractRay{T}}
     ray::R
     intersection::Nullable{AbstractIntersection{T}}
-    hit_object::Nullable{AbstractObject}
     accumulated_opl::T
 end
 
-function RaySegment(ray::R, int::Nullable{AbstractIntersection{T}} = nothing, obj::Nullable{AbstractObject} = nothing, opl::Real = 0.0) where {T <: Real, R <: AbstractRay{T}}
-    return RaySegment{T, R}(ray, int, obj, T(opl))
+function RaySegment(ray::R, int::Nullable{AbstractIntersection{T}} = nothing, opl::Real = 0.0) where {T <: Real, R <: AbstractRay{T}}
+    return RaySegment{T, R}(ray, int, T(opl))
 end
 
 ray(seg::RaySegment) = seg.ray
 intersection(seg::RaySegment) = seg.intersection
-hit_object(seg::RaySegment) = seg.hit_object
 accumulated_opl(seg::RaySegment) = seg.accumulated_opl
 
 Base.position(seg::RaySegment) = position(seg.ray)
