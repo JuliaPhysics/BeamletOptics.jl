@@ -21,10 +21,10 @@ Resolves the incident and transmitted media across a boundary given the componen
 system ambient medium, ray propagation direction, and boundary outward surface normal.
 """
 @inline function resolve_transition(
-    component_medium::AbstractMedium,
-    ambient::AbstractMedium,
-    ray::AbstractRay,
-    normal::Point3
+        component_medium::AbstractMedium,
+        ambient::AbstractMedium,
+        ray::AbstractRay,
+        normal::Point3
 )
     # Media transition for an isolated component immersed in ambient medium
     is_entering = dot(direction(ray), normal) < 0
@@ -41,9 +41,9 @@ end
 Resolves the media transition across a coincident boundary between touching optics.
 """
 @inline function resolve_transition(
-    mi::MultiIntersection,
-    ambient::AbstractMedium,
-    ray::AbstractRay
+        mi::MultiIntersection,
+        ambient::AbstractMedium,
+        ray::AbstractRay
 )
     ex_obj = exiting(mi)
     en_obj = entering(mi)

@@ -10,7 +10,7 @@ abstract type AbstractCoating{T} <: AbstractObject{T} end
 
 A container representing an optical boundary interface.
 - `shape`: The boundary geometry (e.g. partial-volume SDF, mesh patch, or NURBS face).
-- `model`: The boundary interaction physics (e.g. `ARCoating`, `FresnelInterface`, `IdealMirror`).
+- `model`: The boundary interaction physics (e.g. `ARCoating`, `FresnelSurface`, `IdealMirrorSurface`).
 """
 struct Coating{T <: Real, S <: AbstractShape{T}, M <: AbstractSurfaceModel} <: AbstractCoating{T}
     shape::S

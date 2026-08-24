@@ -4,7 +4,7 @@
 Universal boundary interaction function evaluating boundary physics on the given surface model.
 """
 function interact3d(
-    ::FresnelInterface,
+    ::FresnelSurface,
     trans::Transition,
     int::Intersection{T},
     ray::Ray{T}
@@ -23,7 +23,7 @@ function interact3d(
 end
 
 function interact3d(
-    ::FresnelInterface,
+    ::FresnelSurface,
     trans::Transition,
     int::Intersection{T},
     ray::PolarizedRay{T}
@@ -54,7 +54,7 @@ function interact3d(
 end
 
 function interact3d(
-    ::IdealMirror,
+    ::IdealMirrorSurface,
     trans::Transition,
     int::Intersection{T},
     ray::Ray{T}
@@ -66,7 +66,7 @@ function interact3d(
 end
 
 function interact3d(
-    ::IdealMirror,
+    ::IdealMirrorSurface,
     trans::Transition,
     int::Intersection{T},
     ray::PolarizedRay{T}
@@ -122,7 +122,7 @@ function interact3d(
     elseif c.coating_model isa Function
         return c.coating_model(trans, int, ray)
     else
-        return interact3d(FresnelInterface(), trans, int, ray)
+        return interact3d(FresnelSurface(), trans, int, ray)
     end
 end
 

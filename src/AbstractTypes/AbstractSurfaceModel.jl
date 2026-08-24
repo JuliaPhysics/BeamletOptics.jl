@@ -6,18 +6,18 @@ Abstract supertype governing the physical behavior at an optical boundary interf
 abstract type AbstractSurfaceModel end
 
 """
-    FresnelInterface <: AbstractSurfaceModel
+    FresnelSurface <: AbstractSurfaceModel
 
 A bare dielectric interface governed by Snell's law of refraction and Fresnel reflection equations.
 """
-struct FresnelInterface <: AbstractSurfaceModel end
+struct FresnelSurface <: AbstractSurfaceModel end
 
 """
-    IdealMirror <: AbstractSurfaceModel
+    IdealMirrorSurface <: AbstractSurfaceModel
 
 A perfect specular reflective surface with 100% reflectance across all wavelengths.
 """
-struct IdealMirror <: AbstractSurfaceModel end
+struct IdealMirrorSurface <: AbstractSurfaceModel end
 
 """
     AbsorbingSurface <: AbstractSurfaceModel
@@ -57,9 +57,10 @@ struct GratingSurface{T <: Real, G} <: AbstractSurfaceModel
     groove_vector::G
 end
 
-GratingSurface(groove_density::Real, order::Int = 1) = 
+function GratingSurface(groove_density::Real, order::Int = 1)
     GratingSurface(Float64(groove_density), order, nothing)
+end
 
-surface_model(::AbstractObject) = FresnelInterface()
-surface_model(::Nothing) = FresnelInterface()
+surface_model(::AbstractObject) = FresnelSurface()
+surface_model(::Nothing) = FresnelSurface()
 surface_model(m::AbstractSurfaceModel) = m

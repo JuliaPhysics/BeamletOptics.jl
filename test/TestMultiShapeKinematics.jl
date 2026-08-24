@@ -40,7 +40,7 @@ const BMO = BeamletOptics
     s_rear  = MutableShape(p_rear)
 
     # front_coating shares the exact same mutable shape instance s_front
-    front_coating = Coating(s_front, FresnelInterface())
+    front_coating = Coating(s_front, FresnelSurface())
 
     optic = MockCoatedOptic(
         s_front,

@@ -20,6 +20,8 @@ const BMO = BeamletOptics
     @test isdefined(BMO, :MultiIntersection)
     @test isdefined(BMO, :Hint)
     @test isdefined(BMO, :AbstractInteraction)
+    @test isdefined(BMO, :AbstractVolumeModel)
+    @test isdefined(BMO, :VolumeInteraction)
 
     # Generate test structs
     struct TestSystem <: BMO.AbstractSystem end
@@ -282,20 +284,30 @@ const BMO = BeamletOptics
         end
 
         @testset "AbstractSurfaceModel" begin
-            @test FresnelInterface() isa AbstractSurfaceModel
-            @test IdealMirror() isa AbstractSurfaceModel
+            @test FresnelSurface() isa AbstractSurfaceModel
+            @test IdealMirrorSurface() isa AbstractSurfaceModel
             @test AbsorbingSurface() isa AbstractSurfaceModel
             @test DetectorSurface() isa AbstractSurfaceModel
             @test CoatedSurface(:AR) isa AbstractSurfaceModel
             @test GratingSurface(600.0, 1) isa AbstractSurfaceModel
         end
 
+        @testset "AbstractVolumeModel" begin
+            @test VolumeInteraction() isa AbstractVolumeModel
+            struct TestVolumeModel <: AbstractVolumeModel end
+            @test TestVolumeModel() isa AbstractVolumeModel
+            vm = VolumeInteraction()
+            med = IsotropicMedium(:TestMed, 1.5)
+            r = Ray([0.0, 0, 0], [0.0, 1, 0], 532e-9, 1.0)
+            @test_throws ErrorException interact3d(vm, med, r)
+        end
+
         @testset "Coating" begin
             shape = TestShapeless()
-            c = Coating(shape, FresnelInterface())
+            c = Coating(shape, FresnelSurface())
             @test c isa AbstractCoating
             @test BMO.shape(c) === shape
-            @test BMO.surface_model(c) === FresnelInterface()
+            @test BMO.surface_model(c) === FresnelSurface()
         end
 
         @testset "Transition" begin
@@ -305,11 +317,11 @@ const BMO = BeamletOptics
 
             ray = Ray([0.0, 0, 0], [0.0, 1, 0], 532e-9, 1.0)
             int = Intersection(1.0, [0.0, 1.0, 0.0], [0.0, -1.0, 0.0])
-            out_ray = interact3d(FresnelInterface(), trans, int, ray)
+            out_ray = interact3d(FresnelSurface(), trans, int, ray)
             @test out_ray isa Ray
             @test isapprox(norm(BMO.direction(out_ray)), 1.0)
 
-            mirror_ray = interact3d(IdealMirror(), trans, int, ray)
+            mirror_ray = interact3d(IdealMirrorSurface(), trans, int, ray)
             @test mirror_ray isa Ray
             @test BMO.direction(mirror_ray)[2] ≈ -1.0
 
@@ -331,7 +343,7 @@ const BMO = BeamletOptics
             @test isapprox(norm(BMO.direction(g_auto_ray)), 1.0)
 
             # CoatedSurface tests
-            cs_mirror = CoatedSurface(IdealMirror())
+            cs_mirror = CoatedSurface(IdealMirrorSurface())
             @test interact3d(cs_mirror, trans, int, ray) isa Ray
             @test BMO.direction(interact3d(cs_mirror, trans, int, ray))[2] ≈ -1.0
 
@@ -340,20 +352,20 @@ const BMO = BeamletOptics
             @test custom_ray isa Ray
             @test BMO.direction(custom_ray) == Point3(1.0, 0.0, 0.0)
 
-            # PolarizedRay on IdealMirror
+            # PolarizedRay on IdealMirrorSurface
             pol_ray = PolarizedRay([0.0, 0, 0], [0.0, 1, 0], 532e-9, [1.0, 0.0, 0.0])
-            pol_mirror_ray = interact3d(IdealMirror(), trans, int, pol_ray)
+            pol_mirror_ray = interact3d(IdealMirrorSurface(), trans, int, pol_ray)
             @test pol_mirror_ray isa PolarizedRay
             @test BMO.direction(pol_mirror_ray)[2] ≈ -1.0
 
             # surface_model fallback tests
-            @test surface_model(nothing) isa FresnelInterface
-            @test surface_model(IdealMirror()) isa IdealMirror
+            @test surface_model(nothing) isa FresnelSurface
+            @test surface_model(IdealMirrorSurface()) isa IdealMirrorSurface
 
             # Standalone Coating object in a System
             coat_shape = deepcopy(BMO.shape(BMO.ThinBeamsplitter(0.05)))
             translate3d!(coat_shape, [0.0, 0.05, 0.0])
-            coat_obj = Coating(coat_shape, IdealMirror())
+            coat_obj = Coating(coat_shape, IdealMirrorSurface())
             coat_sys = System([coat_obj])
             coat_beam = Beam([0.0, 0.0, 0.0], [0.0, 1.0, 0.0], 532e-9)
             solve_system!(coat_sys, coat_beam)

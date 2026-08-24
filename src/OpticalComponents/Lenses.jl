@@ -36,7 +36,7 @@ abstract type AbstractRefractiveOptic{T, F} <: AbstractObject{T} end
 
 refractive_index(object::AbstractRefractiveOptic) = object.n
 refractive_index(object::AbstractRefractiveOptic, λ::Real)::Float64 = refractive_index(medium_from(object), λ)
-surface_model(::AbstractRefractiveOptic) = FresnelInterface()
+surface_model(::AbstractRefractiveOptic) = FresnelSurface()
 medium_from(optic::AbstractRefractiveOptic) = medium_from(optic.n)
 
 """

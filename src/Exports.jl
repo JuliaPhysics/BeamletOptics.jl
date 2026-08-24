@@ -18,8 +18,9 @@ export AbstractMedium, Ambient, IsotropicMedium,
        refractive_index, refractive_index_o, refractive_index_e, birefringence, optic_axis,
        is_uniaxial, is_biaxial, dielectric_tensor,
        complex_refractive_index, extinction_coefficient, absorption_coefficient
-export AbstractSurfaceModel, FresnelInterface, IdealMirror, AbsorbingSurface,
+export AbstractSurfaceModel, FresnelSurface, IdealMirrorSurface, AbsorbingSurface,
        DetectorSurface, CoatedSurface, GratingSurface
+export AbstractVolumeModel, VolumeInteraction
 export AbstractCoating, Coating, surface_model
 export Transition, resolve_transition, current_medium, interact3d
 export Intersection

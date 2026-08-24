@@ -29,7 +29,7 @@ by specialized subtypes.
 """
 abstract type AbstractReflectiveOptic{T} <: AbstractObject{T} end
 
-surface_model(::AbstractReflectiveOptic) = IdealMirror()
+surface_model(::AbstractReflectiveOptic) = IdealMirrorSurface()
 
 """
     interact3d(system, optic::AbstractReflectiveOptic, ::Beam, ray)

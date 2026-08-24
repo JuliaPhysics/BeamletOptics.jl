@@ -39,7 +39,9 @@ end
 
 Stores coincident intersections sharing the same boundary within tolerance (e.g. cemented interfaces, optical coatings).
 """
-struct MultiIntersection{T <: Real, O1 <: Union{Nothing, AbstractObject}, O2 <: Union{Nothing, AbstractObject}, O3 <: Union{Nothing, AbstractObject}} <: AbstractIntersection{T}
+struct MultiIntersection{T <: Real, O1 <: Union{Nothing, AbstractObject},
+    O2 <: Union{Nothing, AbstractObject}, O3 <: Union{Nothing, AbstractObject}} <:
+       AbstractIntersection{T}
     hit::Intersection{T}
     exiting::O1
     entering::O2
@@ -49,7 +51,8 @@ end
 function MultiIntersection(hit::Intersection{T};
         exiting::O1 = nothing,
         entering::O2 = nothing,
-        coating::O3 = nothing) where {T, O1 <: Union{Nothing, AbstractObject}, O2 <: Union{Nothing, AbstractObject}, O3 <: Union{Nothing, AbstractObject}}
+        coating::O3 = nothing) where {T, O1 <: Union{Nothing, AbstractObject},
+        O2 <: Union{Nothing, AbstractObject}, O3 <: Union{Nothing, AbstractObject}}
     return MultiIntersection{T, O1, O2, O3}(hit, exiting, entering, coating)
 end
 
@@ -64,7 +67,9 @@ function Base.show(io::IO, ::MIME"text/plain", mi::MultiIntersection)
     println(io, "Intersection distance: $(length(mi))")
     println(io, "Intersection position: $(position(mi))")
     println(io, "Exiting object: $(isnothing(exiting(mi)) ? nothing : typeof(exiting(mi)))")
-    println(io, "Entering object: $(isnothing(entering(mi)) ? nothing : typeof(entering(mi)))")
-    println(io, "Coating/Interface: $(isnothing(coating(mi)) ? nothing : typeof(coating(mi)))")
+    println(
+        io, "Entering object: $(isnothing(entering(mi)) ? nothing : typeof(entering(mi)))")
+    println(
+        io, "Coating/Interface: $(isnothing(coating(mi)) ? nothing : typeof(coating(mi)))")
     println(io, "Normal vector: $(normal3d(mi))")
 end
