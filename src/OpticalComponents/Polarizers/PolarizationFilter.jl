@@ -30,9 +30,9 @@ end
 
 function interact3d(::AbstractSystem,
         polfilter::PolarizationFilter,
-        beam::Beam{T, R},
-        ray::R) where {T <: Real, R <: PolarizedRay{T}}
-    int = isempty(beam.segments) ? intersect3d(shape(polfilter), ray) : last(beam.segments).intersection
+        beam::Beam{T},
+        ray::PolarizedRay{T}) where {T <: Real}
+    int = isempty(beam.segments) ? intersect3d(shape(polfilter), ray) : intersection(last(beam.segments))
     isnothing(int) && return nothing
     npos = position(int)
     ndir = direction(ray)
@@ -44,8 +44,14 @@ function interact3d(::AbstractSystem,
         return nothing
     end
 
-    return BeamInteraction{T, R}(nothing,
-        PolarizedRay{T}(npos, ndir, wavelength(ray), refractive_index(ray), E0))
+    return BeamInteraction(nothing,
+        PolarizedRay(
+            npos,
+            ndir,
+            wavelength(ray),
+            refractive_index(ray),
+            E0
+        ))
 end
 
 function interact3d(system::AbstractSystem,

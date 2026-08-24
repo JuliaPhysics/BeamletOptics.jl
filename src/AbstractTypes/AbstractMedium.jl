@@ -150,7 +150,7 @@ function UniaxialMedium(
 end
 
 function UniaxialMedium(
-    no,
+    no::Union{Number, Function, DiscreteRefractiveIndex, SellmeierEquation},
     ne,
     optic_axis::AbstractArray = Point3(0.0, 0.0, 1.0);
     attenuation = nothing

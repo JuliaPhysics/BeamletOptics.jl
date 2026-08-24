@@ -1,82 +1,43 @@
 """
-    AbstractRay{T<:Real}
+    AbstractRay{T<:Real, S<:AbstractSegment{T}}
 
-An implementation for a geometrical optics ray in R³. In general, an `AbstractRay` is described by
-an immutable position ``\\vec{p}``, normalized direction ``\\vec{d}``, wavelength ``\\lambda``, and refractive index ``n``.
+An implementation for a geometrical optics ray in R³. An `AbstractRay` is described by
+its optical payload (wavelength `λ`, refractive index `n`, polarization state, etc.) and
+wraps a spatial trajectory `segment::S` where `S <: AbstractSegment{T}`.
+
 `AbstractRay`s model the propagation of light between optical interactions according to the laws of geometrical optics.
-To store the solved sequence of ray propagation segments through an optical system, refer to [`AbstractBeam`](@ref) and [`RaySegment`](@ref).
+To store the solved sequence of ray propagation segments through an optical system, refer to [`AbstractBeam`](@ref).
 
-# Fields
+# Implementation requirements
 Subtypes of `AbstractRay` must implement:
-- `pos`: a point in R³ that stores the ray origin ``\\vec{p}``
-- `dir`: a unit vector in R³ that stores the propagation direction ``\\vec{d}``
+- `segment`: an [`AbstractSegment`](@ref) describing the ray's spatial trajectory
 - `λ`: wavelength in [m]
 - `n`: refractive index along the ray path
 """
-abstract type AbstractRay{T <: Real} end
+abstract type AbstractRay{T <: Real, S <: AbstractSegment{T}} end
 
-Base.position(ray::AbstractRay) = ray.pos
-position!(ray::AbstractRay, pos) = (ray.pos = pos)
+segment(ray::AbstractRay) = ray.segment
 
-direction(ray::AbstractRay) = ray.dir
-function direction!(ray::AbstractRay, dir)
-    ray.dir = normalize(dir)
-    return nothing
-end
+Base.position(ray::AbstractRay) = position(segment(ray))
+direction(ray::AbstractRay) = direction(segment(ray))
+intersection(ray::AbstractRay) = intersection(segment(ray))
+normal3d(ray::AbstractRay) = normal3d(segment(ray))
+accumulated_opl(ray::AbstractRay) = accumulated_opl(segment(ray))
+
+Base.length(ray::AbstractRay) = length(segment(ray))
+geom_length(ray::AbstractRay) = length(segment(ray))
+optical_path_length(ray::AbstractRay{T}) where {T} = isinf(length(ray)) ? T(Inf) : length(ray) * real(refractive_index(ray))
 
 wavelength(ray::AbstractRay) = ray.λ
-wavelength!(ray::AbstractRay, λ) = (ray.λ = λ)
-
 wavenumber(ray::AbstractRay) = 2π / wavelength(ray)
-
 refractive_index(ray::AbstractRay) = ray.n
-refractive_index!(ray::AbstractRay, n) = (ray.n = n)
-
-
 
 """
     propagate(ray::AbstractRay, t)
 
 Evaluates the 3D point along the ray at distance parameter `t`: ``\\vec{p}(t) = \\vec{p} + t \\cdot \\vec{d}``.
 """
-@inline propagate(ray::AbstractRay{T}, t::Real) where {T} = position(ray) + T(t) * direction(ray)
-
-"""
-    RaySegment{T<:Real, R<:AbstractRay{T}}
-
-Stores the trace state of a ray propagating through a medium until its intersection
-with an optical boundary (or escape to infinity).
-
-# Fields
-- `ray::R`: the ray propagating along this segment
-- `intersection::Nullable{AbstractIntersection{T}}`: the boundary intersection point, or `nothing` if unhit
-- `accumulated_opl::T`: cumulative optical path length up to the end of this segment
-"""
-struct RaySegment{T <: Real, R <: AbstractRay{T}}
-    ray::R
-    intersection::Nullable{AbstractIntersection{T}}
-    accumulated_opl::T
-end
-
-function RaySegment(ray::R, int::Nullable{AbstractIntersection{T}} = nothing, opl::Real = 0.0) where {T <: Real, R <: AbstractRay{T}}
-    return RaySegment{T, R}(ray, int, T(opl))
-end
-
-ray(seg::RaySegment) = seg.ray
-intersection(seg::RaySegment) = seg.intersection
-accumulated_opl(seg::RaySegment) = seg.accumulated_opl
-
-Base.position(seg::RaySegment) = position(seg.ray)
-direction(seg::RaySegment) = direction(seg.ray)
-wavelength(seg::RaySegment) = wavelength(seg.ray)
-refractive_index(seg::RaySegment) = refractive_index(seg.ray)
-normal3d(seg::RaySegment) = isnothing(seg.intersection) ? nothing : normal3d(seg.intersection)
-
-geom_length(seg::RaySegment{T}) where {T} = isnothing(seg.intersection) ? T(Inf) : length(seg.intersection)
-optical_path_length(seg::RaySegment{T}) where {T} = isnothing(seg.intersection) ? T(Inf) : length(seg.intersection) * real(refractive_index(seg.ray))
-Base.length(seg::RaySegment) = geom_length(seg)
-
-isentering(seg::RaySegment) = isnothing(seg.intersection) ? false : isentering(direction(seg.ray), normal3d(seg.intersection))
+@inline propagate(ray::AbstractRay, t::Real) = propagate(segment(ray), t)
 
 
 """
@@ -149,12 +110,12 @@ line_point_distance3d(ray::AbstractRay, point) = line_point_distance3d(position(
 
 """
     angle3d(ray::AbstractRay, intersect::AbstractIntersection)
-    angle3d(seg::RaySegment)
+    angle3d(ray::AbstractRay)
 
 Calculates the angle between a `ray` and its surface `intersection`.
 """
 angle3d(ray::AbstractRay, intersect::AbstractIntersection) = angle3d(direction(ray), normal3d(intersect))
-angle3d(seg::RaySegment) = isnothing(seg.intersection) ? nothing : angle3d(direction(seg.ray), normal3d(seg.intersection))
+angle3d(ray::AbstractRay) = isnothing(intersection(ray)) ? nothing : angle3d(direction(ray), normal3d(intersection(ray)))
 
 """
     isinfrontof(shape::AbstractShape, ray::AbstractRay)
@@ -170,32 +131,22 @@ isinfrontof(shape::AbstractShape, ray::AbstractRay) = isinfrontof(position(shape
 
 """
     isentering(ray, int)
-    isentering(seg::RaySegment)
+    isentering(ray)
 
 Tests whether the ray is entering a shape based on the orientation of the `ray` direction and surface normal.
 """
 isentering(r::AbstractRay, i::AbstractIntersection) = isentering(direction(r), normal3d(i))
 isentering(d::AbstractArray, n::AbstractArray) = dot(d, n) < 0
 isentering(::AbstractRay, ::Nothing) = false
+isentering(r::AbstractRay) = isentering(r, intersection(r))
 
 
 """
     refraction3d(ray, int, n2)
-    refraction3d(seg::RaySegment, n2)
+    refraction3d(ray, n2)
 
 Calculates the new direction of a `ray` entering into a new medium with ref. index `n2`.
 """
-function refraction3d(seg::RaySegment, n2)
-    isnothing(seg.intersection) && error("Cannot calculate refraction for segment without intersection")
-    dir = direction(seg.ray)
-    nml = normal3d(seg.intersection)
-    if !isentering(seg)
-        nml *= -1
-    end
-    n1 = refractive_index(seg.ray)
-    return refraction3d(dir, nml, n1, n2)
-end
-
 function refraction3d(ray::AbstractRay, int::AbstractIntersection, n2)
     dir = direction(ray)
     nml = normal3d(int)
@@ -211,4 +162,3 @@ function refraction3d(ray::AbstractRay, n2)
     isnothing(int) && error("Cannot calculate refraction for ray without intersection")
     return refraction3d(ray, int, n2)
 end
-

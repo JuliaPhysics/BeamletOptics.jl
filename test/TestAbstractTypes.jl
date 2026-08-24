@@ -12,6 +12,9 @@ const BMO = BeamletOptics
     @test isdefined(BMO, :AbstractShape)
     @test isdefined(BMO, :AbstractObject)
     @test isdefined(BMO, :AbstractObjectGroup)
+    @test isdefined(BMO, :AbstractSegment)
+    @test isdefined(BMO, :OpenSegment)
+    @test isdefined(BMO, :LineSegment)
     @test isdefined(BMO, :AbstractRay)
     @test isdefined(BMO, :AbstractBeam)
     @test isdefined(BMO, :AbstractSystem)
@@ -31,38 +34,24 @@ const BMO = BeamletOptics
         sys = TestSystem()
     end
 
-    mutable struct TestRay{T} <: BMO.AbstractRay{T}
-        pos::Vector{T}
-        dir::Vector{T}
+    mutable struct TestRay{T, S <: BMO.AbstractSegment{T}} <: BMO.AbstractRay{T, S}
+        segment::S
         λ::T
         n::T
     end
 
     TestRay(pos::AbstractArray{T}, dir::AbstractArray{T}) where {T} = TestRay(
-        pos, dir, T(1000e-9), T(1))
+        BMO.OpenSegment(pos, dir, zero(T)), T(1000e-9), T(1))
 
     Base.length(::TestRay) = π
 
     @testset "AbstractRay" begin
         r = TestRay([0.0, 0, 0], [1.0, 0, 0])
         # Test getters
-        @test position(r) == r.pos
-        @test BMO.direction(r) == r.dir
+        @test position(r) == [0.0, 0, 0]
+        @test BMO.direction(r) == [1.0, 0, 0]
         @test BMO.wavelength(r) == r.λ
         @test BMO.refractive_index(r) == r.n
-        # Test setters
-        n_pos = [1, 1, 1]
-        n_dir = [1.0, 1, 0]
-        n_lam = 532e-9
-        n_rfi = 1.5
-        BMO.position!(r, n_pos)
-        BMO.direction!(r, n_dir)
-        BMO.wavelength!(r, n_lam)
-        BMO.refractive_index!(r, n_rfi)
-        @test position(r) == n_pos
-        @test BMO.direction(r) ≈ n_dir .* (sqrt(2) / 2)
-        @test BMO.wavelength(r) == n_lam
-        @test BMO.refractive_index(r) == n_rfi
         @test length(r) == π
         # Test ray-plane intersection
         plane_pos = [1, 0, -1]
@@ -79,12 +68,12 @@ const BMO = BeamletOptics
         @test isnothing(is_3)
     end
 
-    mutable struct TestBeam{T} <: BMO.AbstractBeam{T, TestRay{T}}
-        parent::BMO.Nullable{TestBeam}
-        children::Vector{TestBeam}
+    mutable struct TestBeam{T, R <: BMO.AbstractRay{T}} <: BMO.AbstractBeam{T, R}
+        parent::BMO.Nullable{TestBeam{T, R}}
+        children::Vector{TestBeam{T, R}}
     end
 
-    TestBeam() = TestBeam{Float64}(nothing, Vector{TestBeam{Float64}}())
+    TestBeam() = TestBeam{Float64, TestRay{Float64, BMO.OpenSegment{Float64}}}(nothing, Vector{TestBeam{Float64, TestRay{Float64, BMO.OpenSegment{Float64}}}}())
 
     @testset "AbstractBeam" begin
         # Create beam tree
@@ -171,11 +160,11 @@ const BMO = BeamletOptics
             shape = TestShapeless([1, 0, 0], Matrix{Int}(I, 3, 3))
             ray = TestRay([0.0, 0, 0], [1.0, 0, 0])
             @test BMO.isinfrontof(shape, ray) == true
-            BMO.direction!(ray, -[1, 0, 0])
+            ray = TestRay([0.0, 0, 0], -[1.0, 0, 0])
             @test BMO.isinfrontof(shape, ray) == false
-            BMO.direction!(ray, [0, 1, 0])
+            ray = TestRay([0.0, 0, 0], [0.0, 1, 0])
             @test BMO.isinfrontof(shape, ray) == false
-            BMO.direction!(ray, [1.0, 1, 0])
+            ray = TestRay([0.0, 0, 0], [1.0, 1, 0])
             @test BMO.isinfrontof(shape, ray) == true
             @test norm(BMO.direction(ray)) ≈ 1
         end

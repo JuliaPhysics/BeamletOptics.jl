@@ -174,20 +174,13 @@ end
 """
     tracing_step(system::AbstractSystem, ray::AbstractRay{R}, hint::Nullable{Hint} = nothing, opl_accum::R = zero(R)) where {R <: Real}
 
-Tests if the `ray` intersects an `object` in the optical `system`. Returns `(RaySegment, hit_object)` or `(RaySegment, nothing)` if unhit.
+Tests if the `ray` intersects an `object` in the optical `system`. Returns `(resolved_ray, hit_intersection, hit_object)` or `(resolved_ray, nothing, nothing)` if unhit.
+Delegates volumetric propagation and segment construction to `propagate_volume`.
 """
 @inline function tracing_step(
-        system::AbstractSystem, ray::AbstractRay{R}, hint::Nullable{Hint} = nothing, opl_accum::R = zero(R)) where {R <: Real}
-    res = trace_one(system, ray, hint)
-    if res === nothing
-        seg = RaySegment(ray, nothing, opl_accum)
-        return (seg, nothing)
-    else
-        hit, obj = res
-        seg_opl = opl_accum + length(hit) * refractive_index(ray)
-        seg = RaySegment(ray, hit, seg_opl)
-        return (seg, obj)
-    end
+        system::AbstractSystem, ray::AbstractRay{T}, hint::Nullable{Hint} = nothing, opl_accum::T = zero(T)) where {T <: Real}
+    med = current_medium(system, hint)
+    return propagate_volume(system, med, ray, hint, opl_accum)
 end
 
 @inline function tracing_step!(
@@ -208,30 +201,30 @@ Trace a [`Beam`](@ref) through an optical `system`. Maximum number of tracing st
 """
 function trace_system!(
         system::AbstractSystem,
-        beam::Beam{T, R};
+        beam::Beam{T};
         # kwargs
         r_max::Int = get_default_r_max(),
         kwargs...
-) where {T <: Real, R <: AbstractRay{T}}
+) where {T <: Real}
     _reset_beam!(beam)
-    interaction::Nullable{BeamInteraction{T, R}} = nothing
-    current_ray::R = beam.head_ray
+    interaction::Nullable{BeamInteraction} = nothing
+    current_ray::AbstractRay{T} = first(beam.segments)
     current_opl::T = zero(T)
+    empty!(beam.segments)
 
     while length(beam.segments) < r_max
-        seg, obj = tracing_step(system, current_ray, hint(interaction), current_opl)
-        push!(beam, seg)
+        resolved_ray, hit, obj = tracing_step(system, current_ray, hint(interaction), current_opl)
+        push!(beam, resolved_ray)
 
-        hit = seg.intersection
         if isnothing(hit) || isnothing(obj)
             break
         end
 
-        current_opl = seg.accumulated_opl
+        current_opl = accumulated_opl(resolved_ray)
         # Dispatch to interface interaction depending on intersection type
         interaction = (hit isa MultiIntersection ?
-            interact3d(system, hit, beam, current_ray) :
-            interact3d(system, obj, beam, current_ray))::Union{Nothing, BeamInteraction{T, R}}
+            interact3d(system, hit, beam, resolved_ray) :
+            interact3d(system, obj, beam, resolved_ray))::Union{Nothing, BeamInteraction}
         if isnothing(interaction)
             break
         end
@@ -256,39 +249,42 @@ function trace_system!(
     interaction::Nullable{GaussianBeamletInteraction{T}} = nothing
     seg_counter::Int = 1
 
-    current_c::Ray{T} = gauss.chief.head_ray
-    current_w::Ray{T} = gauss.waist.head_ray
-    current_d::Ray{T} = gauss.divergence.head_ray
+    current_c::Ray{T} = first(gauss.chief.segments)
+    current_w::Ray{T} = first(gauss.waist.segments)
+    current_d::Ray{T} = first(gauss.divergence.segments)
+
+    empty!(gauss.chief.segments)
+    empty!(gauss.waist.segments)
+    empty!(gauss.divergence.segments)
 
     opl_c::T = zero(T)
     opl_w::T = zero(T)
     opl_d::T = zero(T)
 
-
     while seg_counter <= r_max
-        seg_c, obj_c = tracing_step(system, current_c, hint(interaction), opl_c)
-        seg_w, obj_w = tracing_step(system, current_w, hint(interaction), opl_w)
-        seg_d, obj_d = tracing_step(system, current_d, hint(interaction), opl_d)
+        resolved_c, hit_c, obj_c = tracing_step(system, current_c, hint(interaction), opl_c)
+        resolved_w, hit_w, obj_w = tracing_step(system, current_w, hint(interaction), opl_w)
+        resolved_d, hit_d, obj_d = tracing_step(system, current_d, hint(interaction), opl_d)
 
-        push!(gauss.chief, seg_c)
-        push!(gauss.waist, seg_w)
-        push!(gauss.divergence, seg_d)
+        push!(gauss.chief, resolved_c)
+        push!(gauss.waist, resolved_w)
+        push!(gauss.divergence, resolved_d)
 
-        int_c = seg_c.intersection
-        int_w = seg_w.intersection
-        int_d = seg_d.intersection
+        int_c = hit_c
+        int_w = hit_w
+        int_d = hit_d
 
         # If any beam misses or beams do not hit same target stop tracing
         if any(isnothing, (int_c, int_w, int_d)) || (obj_c !== obj_w || obj_c !== obj_d) || !_beams_hits_same_shape(gauss, seg_counter)
-            gauss.chief.segments[end] = RaySegment(seg_c.ray, nothing, opl_c)
-            gauss.waist.segments[end] = RaySegment(seg_w.ray, nothing, opl_w)
-            gauss.divergence.segments[end] = RaySegment(seg_d.ray, nothing, opl_d)
+            gauss.chief.segments[end] = Ray(current_c, OpenSegment(position(current_c), direction(current_c), opl_c))
+            gauss.waist.segments[end] = Ray(current_w, OpenSegment(position(current_w), direction(current_w), opl_w))
+            gauss.divergence.segments[end] = Ray(current_d, OpenSegment(position(current_d), direction(current_d), opl_d))
             break
         end
 
-        opl_c = seg_c.accumulated_opl
-        opl_w = seg_w.accumulated_opl
-        opl_d = seg_d.accumulated_opl
+        opl_c = accumulated_opl(resolved_c)
+        opl_w = accumulated_opl(resolved_w)
+        opl_d = accumulated_opl(resolved_d)
 
         # Calculate interaction
         interaction = if int_c isa MultiIntersection
@@ -326,42 +322,44 @@ function trace_system!(
     seg_counter::Int = 1
     aux = _aux_beams(agb)
 
-    current_c::PolarizedRay{T} = agb.c.head_ray
-    current_aux = Ray{T}[b.head_ray for b in aux]
+    current_c::PolarizedRay{T} = first(agb.c.segments)
+    current_aux = Ray{T}[first(b.segments) for b in aux]
 
-
+    empty!(agb.c.segments)
+    for b in aux
+        empty!(b.segments)
+    end
 
     opl_c::T = zero(T)
     opl_aux = zeros(T, length(aux))
 
     while seg_counter <= r_max
-        seg_c, obj_c = tracing_step(system, current_c, hint(interaction), opl_c)
-        push!(agb.c, seg_c)
+        resolved_c, hit_c, obj_c = tracing_step(system, current_c, hint(interaction), opl_c)
+        push!(agb.c, resolved_c)
 
-        missed = isnothing(seg_c.intersection)
+        missed = isnothing(hit_c)
         for (idx, b) in enumerate(aux)
-            seg_a, obj_a = tracing_step(system, current_aux[idx], hint(interaction), opl_aux[idx])
-            push!(b, seg_a)
-            if isnothing(seg_a.intersection) || obj_a !== obj_c
+            resolved_a, hit_a, obj_a = tracing_step(system, current_aux[idx], hint(interaction), opl_aux[idx])
+            push!(b, resolved_a)
+            if isnothing(hit_a) || obj_a !== obj_c
                 missed = true
             end
         end
 
         if missed || !_beams_hits_same_shape(agb, seg_counter)
-            agb.c.segments[end] = RaySegment(seg_c.ray, nothing, opl_c)
+            agb.c.segments[end] = PolarizedRay(current_c, OpenSegment(position(current_c), direction(current_c), opl_c))
             for (idx, b) in enumerate(aux)
-                b.segments[end] = RaySegment(current_aux[idx], nothing, opl_aux[idx])
+                b.segments[end] = Ray(current_aux[idx], OpenSegment(position(current_aux[idx]), direction(current_aux[idx]), opl_aux[idx]))
             end
             break
         end
 
-
-        opl_c = seg_c.accumulated_opl
+        opl_c = accumulated_opl(resolved_c)
         for idx in 1:length(aux)
-            opl_aux[idx] = aux[idx].segments[seg_counter].accumulated_opl
+            opl_aux[idx] = accumulated_opl(aux[idx].segments[seg_counter])
         end
 
-        int_c = seg_c.intersection
+        int_c = hit_c
         interaction = if int_c isa MultiIntersection
             interact3d(system, int_c, agb, seg_counter)
         else

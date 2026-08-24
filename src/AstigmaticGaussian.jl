@@ -30,34 +30,34 @@ and
 !!! info "Waist and field calculation"
     For a given beamlet the Gaussian beam parameters can be obtained via the [`gauss_parameters`](@ref) function.
 """
-mutable struct AstigmaticGaussianBeamlet{T} <: AbstractBeam{T, PolarizedRay{T}}
-    c::Beam{T, PolarizedRay{T}}       # chief
-    wxp::Beam{T, Ray{T}}              # waist x +
-    wxm::Beam{T, Ray{T}}              # waist x -
-    wyp::Beam{T, Ray{T}}              # waist y +
-    wym::Beam{T, Ray{T}}              # waist y -
-    dxp::Beam{T, Ray{T}}              # div. x +
-    dxm::Beam{T, Ray{T}}              # div. x -
-    dyp::Beam{T, Ray{T}}              # div. y +
-    dym::Beam{T, Ray{T}}              # div. y -
-    parent::Nullable{AstigmaticGaussianBeamlet{T}}
-    children::Vector{AstigmaticGaussianBeamlet{T}}
-end
+mutable struct AstigmaticGaussianBeamlet{T, RC <: PolarizedRay{T}, RA <: Ray{T}} <: AbstractBeam{T, RC}
+    c::Beam{T, RC}       # chief
+    wxp::Beam{T, RA}     # waist x +
+    wxm::Beam{T, RA}     # waist x -
+    wyp::Beam{T, RA}     # waist y +
+    wym::Beam{T, RA}     # waist y -
+    dxp::Beam{T, RA}     # div. x +
+    dxm::Beam{T, RA}     # div. x -
+    dyp::Beam{T, RA}     # div. y +
+    dym::Beam{T, RA}     # div. y -
+    parent::Nullable{AstigmaticGaussianBeamlet{T, RC, RA}}
+    children::Vector{AstigmaticGaussianBeamlet{T, RC, RA}}
+ end
 
 function AstigmaticGaussianBeamlet(
-        c::Beam{T, PolarizedRay{T}},
-        wxp::Beam{T, Ray{T}},
-        wxm::Beam{T, Ray{T}},
-        wyp::Beam{T, Ray{T}},
-        wym::Beam{T, Ray{T}},
-        dxp::Beam{T, Ray{T}},
-        dxm::Beam{T, Ray{T}},
-        dyp::Beam{T, Ray{T}},
-        dym::Beam{T, Ray{T}}
-) where {T <: Real}
-    return AstigmaticGaussianBeamlet{T}(c, wxp, wxm, wyp, wym, dxp, dxm, dyp, dym,
+        c::Beam{T, RC},
+        wxp::Beam{T, RA},
+        wxm::Beam{T, RA},
+        wyp::Beam{T, RA},
+        wym::Beam{T, RA},
+        dxp::Beam{T, RA},
+        dxm::Beam{T, RA},
+        dyp::Beam{T, RA},
+        dym::Beam{T, RA}
+) where {T <: Real, RC <: PolarizedRay{T}, RA <: Ray{T}}
+    return AstigmaticGaussianBeamlet{T, RC, RA}(c, wxp, wxm, wyp, wym, dxp, dxm, dyp, dym,
         nothing,
-        Vector{AstigmaticGaussianBeamlet{T}}())
+        Vector{AstigmaticGaussianBeamlet{T, RC, RA}}())
 end
 
 """
@@ -388,18 +388,18 @@ Tests if all 9 component rays at section `id` hit the same object shape.
     if id > length(agb.c.segments)
         return true
     end
-    i1 = agb.c.segments[id].intersection
+    i1 = intersection(agb.c.segments[id])
     if isnothing(i1)
         for b in _aux_beams(agb)
             id > length(b.segments) && continue
-            isnothing(b.segments[id].intersection) || return false
+            isnothing(intersection(b.segments[id])) || return false
         end
         return true
     else
         nc = normal3d(i1)
         for b in _aux_beams(agb)
             id > length(b.segments) && return false
-            int = b.segments[id].intersection
+            int = intersection(b.segments[id])
             isnothing(int) && return false
             dot(nc, normal3d(int)) > 0.5 || return false
         end

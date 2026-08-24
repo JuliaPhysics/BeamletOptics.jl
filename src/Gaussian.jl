@@ -30,32 +30,33 @@ and
     It is assumed, but not forbidden, that the optical system contains non-flat or non-parabolic beam-surface-interactions that cause the beam to obtain
     astigmatism or higher-order abberations. These can not be represented by the `GaussianBeamlet`.
 """
-mutable struct GaussianBeamlet{T} <: AbstractBeam{T, Ray{T}}
-    chief::Beam{T, Ray{T}}
-    waist::Beam{T, Ray{T}}
-    divergence::Beam{T, Ray{T}}
+mutable struct GaussianBeamlet{T, R <: Ray{T}} <: AbstractBeam{T, R}
+    chief::Beam{T, R}
+    waist::Beam{T, R}
+    divergence::Beam{T, R}
     λ::T
     w0::T
     E0::Complex{T}
-    parent::Nullable{GaussianBeamlet{T}}
-    children::Vector{GaussianBeamlet{T}}
+    parent::Nullable{GaussianBeamlet{T, R}}
+    children::Vector{GaussianBeamlet{T, R}}
 end
 
-function GaussianBeamlet(chief::Beam{T, Ray{T}},
-        waist::Beam{T, Ray{T}},
-        div::Beam{T, Ray{T}},
-        λ::T,
-        w0::T,
-        E0::Complex{T}) where {T <: Real}
-    return GaussianBeamlet{T}(
+function GaussianBeamlet(chief::Beam{T, R},
+        waist::Beam{T, R},
+        div::Beam{T, R},
+        λ::L,
+        w0::W,
+        E0::Number) where {T <: Real, R <: Ray{T}, L <: Real, W <: Real}
+    F = promote_type(T, L, W, typeof(real(E0)))
+    return GaussianBeamlet{F, R}(
         chief,
         waist,
         div,
-        λ,
-        w0,
-        E0,
+        F(λ),
+        F(w0),
+        Complex{F}(E0),
         nothing,
-        Vector{GaussianBeamlet{T}}())
+        Vector{GaussianBeamlet{F, R}}())
 end
 
 """
@@ -183,9 +184,9 @@ Returns `true` or `false`.
     if id > length(gauss.chief.segments) || id > length(gauss.waist.segments) || id > length(gauss.divergence.segments)
         return true
     end
-    c = gauss.chief.segments[id].intersection
-    w = gauss.waist.segments[id].intersection
-    d = gauss.divergence.segments[id].intersection
+    c = intersection(gauss.chief.segments[id])
+    w = intersection(gauss.waist.segments[id])
+    d = intersection(gauss.divergence.segments[id])
     are_nothing = (c === nothing, w === nothing, d === nothing)
     if any(are_nothing)
         return all(are_nothing)

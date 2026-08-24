@@ -53,9 +53,9 @@ const BMO = BeamletOptics
         @test BMO.trace_one(system, ray, BMO.Hint(first_obj))[2] === first_obj
         @test BMO.trace_one(system, ray, BMO.Hint(false_obj))[2] === first_obj
         # tracing step
-        seg, obj = BMO.tracing_step(system, ray, nothing)
+        seg, hit, obj = BMO.tracing_step(system, ray, nothing)
         @test obj === first_obj
-        @test seg.intersection isa Intersection
+        @test intersection(seg) isa Intersection
     end
 
     @testset "Testing system tracing" begin
@@ -71,7 +71,7 @@ const BMO = BeamletOptics
         first_ray_dir = BMO.direction(first_ray)
         last_ray_dir = BMO.direction(last(BMO.rays(beam)))
         @test 180 - rad2deg(BMO.angle3d(first_ray_dir, last_ray_dir)) ≈ 2 * Δθ
-        @test !isnothing(first(beam.segments).intersection)
+        @test !isnothing(intersection(first(beam.segments)))
     end
 
     @testset "Testing StaticSystem tracing" begin
@@ -88,7 +88,7 @@ const BMO = BeamletOptics
         first_ray_dir = BMO.direction(first_ray)
         last_ray_dir = BMO.direction(last(BMO.rays(beam)))
         @test 180 - rad2deg(BMO.angle3d(first_ray_dir, last_ray_dir)) ≈ 2 * Δθ
-        @test !isnothing(first(beam.segments).intersection)
+        @test !isnothing(intersection(first(beam.segments)))
     end
 
 

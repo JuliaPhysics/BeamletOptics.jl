@@ -111,26 +111,26 @@ function projection_factor(hit::AbstractRayHit)
 end
 
 "Stores a [`Ray`](@ref) hit"
-struct RayHit{T} <: AbstractRayHit{T}
-    ray::Ray{T}
+struct RayHit{T, R <: Ray{T}} <: AbstractRayHit{T}
+    ray::R
     intersection::Intersection{T}
     opl::T
 end
 
-RayHit(ray::Ray{T}, int::Intersection{T}, opl::Real) where {T} = RayHit{T}(ray, int, T(opl))
-RayHit(ray::Ray{T}, opl::Real) where {T} = RayHit{T}(ray, Intersection(zero(T), position(ray), Point3{T}(0,0,1)), T(opl))
-RayHit(seg::RaySegment{T, Ray{T}}) where {T} = RayHit{T}(seg.ray, isnothing(seg.intersection) ? Intersection(zero(T), position(seg.ray), Point3{T}(0,0,1)) : seg.intersection, seg.accumulated_opl)
+RayHit(ray::Ray{T}, int::Intersection{T}, opl::Real) where {T} = RayHit{T, typeof(ray)}(ray, int, T(opl))
+RayHit(ray::Ray{T}, opl::Real) where {T} = RayHit{T, typeof(ray)}(ray, Intersection(zero(T), position(ray), Point3{T}(0,0,1)), T(opl))
+RayHit(ray::Ray{T}) where {T} = RayHit{T, typeof(ray)}(ray, isnothing(intersection(ray)) ? Intersection(zero(T), position(ray), Point3{T}(0,0,1)) : intersection(ray), accumulated_opl(ray))
 
 "Stores a [`PolarizedRay`](@ref) hit"
-struct PolarizedRayHit{T} <: AbstractRayHit{T}
-    ray::PolarizedRay{T}
+struct PolarizedRayHit{T, R <: PolarizedRay{T}} <: AbstractRayHit{T}
+    ray::R
     intersection::Intersection{T}
     opl::T
 end
 
-PolarizedRayHit(ray::PolarizedRay{T}, int::Intersection{T}, opl::Real) where {T} = PolarizedRayHit{T}(ray, int, T(opl))
-PolarizedRayHit(ray::PolarizedRay{T}, opl::Real) where {T} = PolarizedRayHit{T}(ray, Intersection(zero(T), position(ray), Point3{T}(0,0,1)), T(opl))
-PolarizedRayHit(seg::RaySegment{T, PolarizedRay{T}}) where {T} = PolarizedRayHit{T}(seg.ray, isnothing(seg.intersection) ? Intersection(zero(T), position(seg.ray), Point3{T}(0,0,1)) : seg.intersection, seg.accumulated_opl)
+PolarizedRayHit(ray::PolarizedRay{T}, int::Intersection{T}, opl::Real) where {T} = PolarizedRayHit{T, typeof(ray)}(ray, int, T(opl))
+PolarizedRayHit(ray::PolarizedRay{T}, opl::Real) where {T} = PolarizedRayHit{T, typeof(ray)}(ray, Intersection(zero(T), position(ray), Point3{T}(0,0,1)), T(opl))
+PolarizedRayHit(ray::PolarizedRay{T}) where {T} = PolarizedRayHit{T, typeof(ray)}(ray, isnothing(intersection(ray)) ? Intersection(zero(T), position(ray), Point3{T}(0,0,1)) : intersection(ray), accumulated_opl(ray))
 
 polarization(hit::PolarizedRayHit) = polarization(hit.ray)
 
@@ -204,11 +204,11 @@ end
 
 function projection_factor(hit::GaussianBeamletHit)
     seg = hit.gauss.chief.segments[hit.id]
-    abs(dot(direction(hit), normal3d(seg.intersection)))
+    abs(dot(direction(hit), normal3d(seg)))
 end
 function projection_factor(hit::AstigmaticGaussianBeamletHit)
     seg = hit.agb.c.segments[hit.id]
-    abs(dot(direction(hit), normal3d(seg.intersection)))
+    abs(dot(direction(hit), normal3d(seg)))
 end
 
 
@@ -268,8 +268,8 @@ mutable struct Detector{T, S <: AbstractShape{T}} <: AbstractDetector{T}
     # direct reference to avoid UnionAny from AbstractDetectorHit
     hits::Union{
         Nothing,
-        Vector{RayHit{T}},
-        Vector{PolarizedRayHit{T}},
+        Vector{<:RayHit{T}},
+        Vector{<:PolarizedRayHit{T}},
         Vector{GaussianBeamletHit{T}},
         Vector{AstigmaticGaussianBeamletHit{T}}
     }
@@ -315,10 +315,9 @@ function push!(d::Detector, new::AbstractDetectorHit)
     end
 end
 
-function interact3d(::AbstractSystem, d::Detector, beam::Beam{T, R},
-        ray::R) where {T <: Real, R <: Ray{T}}
-    seg = isempty(beam.segments) ? RaySegment(ray, intersect3d(shape(d), ray)) : last(beam.segments)
-    int = isnothing(seg.intersection) ? intersect3d(shape(d), ray) : seg.intersection
+function interact3d(::AbstractSystem, d::Detector, beam::Beam{T},
+        ray::Ray{T}) where {T <: Real}
+    int = isnothing(intersection(ray)) ? intersect3d(shape(d), ray) : intersection(ray)
     opl = optical_path_length(beam)
     hit = RayHit(ray, int, opl)
     push!(d, hit)
@@ -327,9 +326,9 @@ function interact3d(::AbstractSystem, d::Detector, beam::Beam{T, R},
         return nothing
     else
         # Continue tracing with hit pos. as starting
-        return BeamInteraction{T, R}(
+        return BeamInteraction{T, typeof(ray)}(
             nothing,
-            Ray{T}(
+            Ray(
                 position(hit),
                 direction(hit),
                 wavelength(ray),
@@ -339,10 +338,9 @@ function interact3d(::AbstractSystem, d::Detector, beam::Beam{T, R},
     end
 end
 
-function interact3d(::AbstractSystem, d::Detector, beam::Beam{T, R},
-        ray::R) where {T <: Real, R <: PolarizedRay{T}}
-    seg = isempty(beam.segments) ? RaySegment(ray, intersect3d(shape(d), ray)) : last(beam.segments)
-    int = isnothing(seg.intersection) ? intersect3d(shape(d), ray) : seg.intersection
+function interact3d(::AbstractSystem, d::Detector, beam::Beam{T},
+        ray::PolarizedRay{T}) where {T <: Real}
+    int = isnothing(intersection(ray)) ? intersect3d(shape(d), ray) : intersection(ray)
     opl = optical_path_length(beam)
     hit = PolarizedRayHit(ray, int, opl)
     push!(d, hit)
@@ -351,9 +349,9 @@ function interact3d(::AbstractSystem, d::Detector, beam::Beam{T, R},
         return nothing
     else
         # Continue tracing with hit pos. as starting
-        return BeamInteraction{T, R}(
+        return BeamInteraction{T, typeof(ray)}(
             nothing,
-            PolarizedRay{T}(
+            PolarizedRay(
                 position(hit),
                 direction(hit),
                 wavelength(ray),
@@ -365,11 +363,11 @@ function interact3d(::AbstractSystem, d::Detector, beam::Beam{T, R},
 end
 
 function interact3d(::AbstractSystem, d::Detector, g::GaussianBeamlet{R}, id::Int) where {R}
-    seg = id <= length(g.chief.segments) ? g.chief.segments[id] : RaySegment(rays(g.chief)[id], intersect3d(shape(d), rays(g.chief)[id]))
+    seg = id <= length(g.chief.segments) ? g.chief.segments[id] : rays(g.chief)[id]
     l0 = length(g) - length(seg)
     p0 = position(seg)
     d0 = direction(seg)
-    nml = isnothing(seg.intersection) ? Point3{R}(0, 0, 1) : normal3d(seg.intersection)
+    nml = isnothing(intersection(seg)) ? Point3{R}(0, 0, 1) : normal3d(intersection(seg))
     sqrt_proj = sqrt(abs(dot(d0, nml)))
 
     # Calculate actual beam radius at detector for auto-limits
@@ -388,14 +386,13 @@ end
 
 function interact3d(system::AbstractSystem, d::Detector,
         agb::AstigmaticGaussianBeamlet{R}, id::Int) where {R}
-    seg = id <= length(agb.c.segments) ? agb.c.segments[id] : RaySegment(rays(agb.c)[id], intersect3d(shape(d), rays(agb.c)[id]))
-    l0 = length(agb) - length(seg)
+    chief = id <= length(agb.c.segments) ? agb.c.segments[id] : rays(agb.c)[id]
+    l0 = length(agb) - length(chief)
 
-    chief = seg.ray
-    p0 = position(seg)
-    d0 = direction(seg)
+    p0 = position(chief)
+    d0 = direction(chief)
     k0 = 2π / wavelength(chief)
-    nml = isnothing(seg.intersection) ? Point3{R}(0, 0, 1) : normal3d(seg.intersection)
+    nml = isnothing(intersection(chief)) ? Point3{R}(0, 0, 1) : normal3d(intersection(chief))
     sqrt_proj = sqrt(abs(dot(d0, nml)))
 
     # Parabasal parameters at segment start (p0)
@@ -426,8 +423,8 @@ function interact3d(system::AbstractSystem, d::Detector,
     end
     # Note: the (n-1)*z term in parabasal_field depends on (z - z_sum).
     # Propagate semi-axes to detector for w_max (auto-limits)
-    H1 = h1 + length(seg) * u1
-    H2 = h2 + length(seg) * u2
+    H1 = h1 + length(chief) * u1
+    H2 = h2 + length(chief) * u2
     w_max = max(norm(H1), norm(H2))
     n_eff = refractive_index(agb, id)
 

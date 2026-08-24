@@ -19,7 +19,7 @@ end
 """A collection of all types from BMO which might be renderable in principle."""
 const _RenderTypes = Union{
     AbstractRay,
-    RaySegment,
+    AbstractSegment,
     AbstractBeam,
     AbstractShape,
     AbstractObject,

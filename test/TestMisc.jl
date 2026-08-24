@@ -17,8 +17,8 @@ end
 @testset "Aqua" begin
     if Base.find_package("Aqua") !== nothing
         @eval using Aqua
-        @eval Aqua.test_all($BMO; ambiguities = false)
+        @eval Aqua.test_all($BMO)
     end
 end
-   
+
 end

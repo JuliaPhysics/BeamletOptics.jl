@@ -1,23 +1,22 @@
 """
     Beam{T, R <: AbstractRay{T}} <: AbstractBeam{T, R}
 
-Stores the ray propagation segments calculated from geometrical optics when propagating through an optical system.
+Stores the ray propagation sequence calculated from geometrical optics when propagating through an optical system.
 The `Beam` type is parametrically defined by the [`AbstractRay`](@ref) subtype that it stores.
 
 # Fields
-- `head_ray`: the initial spawned ray at the origin of the beam
-- `segments`: vector of [`RaySegment`](@ref)s, representing each propagation step from boundary to boundary
+- `segments`: vector of [`AbstractRay`](@ref)s, representing each propagation step from boundary to boundary
 - `parent`: reference to the parent beam, if any ([`Nullable`](@ref) to account for the root beam)
 - `children`: vector of child beams created during branching (e.g. at beamsplitters)
 """
 mutable struct Beam{T, R <: AbstractRay{T}} <: AbstractBeam{T, R}
-    head_ray::R
-    segments::Vector{RaySegment{T, R}}
+    segments::Vector{R}
     parent::Nullable{Beam{T, R}}
     children::Vector{Beam{T, R}}
 end
 
 segments(b::Beam) = b.segments
+rays(b::Beam) = b.segments
 
 @inline function Base.getproperty(b::Beam, s::Symbol)
     if s === :rays
@@ -27,34 +26,34 @@ segments(b::Beam) = b.segments
     end
 end
 
-
-"""
-    rays(beam::Beam)
-
-Returns the sequence of rays that make up the `beam`. If the beam is not yet solved, returns `[beam.head_ray]`.
-"""
-function rays(b::Beam{T, R}) where {T, R}
-    if isempty(b.segments)
-        return R[b.head_ray]
+function Base.push!(b::Beam{T, R}, ray::AbstractRay{T}) where {T, R}
+    if isempty(b.segments) || accumulated_opl(ray) > optical_path_length(ray)
+        push!(b.segments, ray)
     else
-        return R[seg.ray for seg in b.segments]
+        prev_opl = accumulated_opl(last(b.segments))
+        seg = segment(ray)
+        adjusted_seg = if seg isa LineSegment
+            LineSegment(position(seg), direction(seg), intersection(seg), prev_opl + optical_path_length(ray))
+        elseif seg isa OpenSegment
+            OpenSegment(position(seg), direction(seg), prev_opl + optical_path_length(ray))
+        else
+            seg
+        end
+        adjusted_ray = ray isa PolarizedRay ? PolarizedRay(ray, adjusted_seg) : Ray(ray, adjusted_seg)
+        push!(b.segments, adjusted_ray)
     end
 end
 
-function Base.push!(b::Beam{T, R}, seg::RaySegment{T, R}) where {T, R}
-    if isempty(b.segments) || seg.accumulated_opl > optical_path_length(seg)
-        push!(b.segments, seg)
-    else
-        prev_opl = last(b.segments).accumulated_opl
-        adjusted = RaySegment(seg.ray, seg.intersection, prev_opl + optical_path_length(seg))
-        push!(b.segments, adjusted)
-    end
+function Beam(ray::Ray{T}) where {T}
+    return Beam{T, Ray{T}}(Ray{T}[ray], nothing, Vector{Beam{T, Ray{T}}}())
 end
-Base.push!(b::Beam{T, R}, ray::R) where {T, R} = push!(b, RaySegment(ray))
 
+function Beam(ray::PolarizedRay{T}) where {T}
+    return Beam{T, PolarizedRay{T}}(PolarizedRay{T}[ray], nothing, Vector{Beam{T, PolarizedRay{T}}}())
+end
 
-function Beam(ray::R) where {T, R <: AbstractRay{T}}
-    return Beam{T, R}(ray, Vector{RaySegment{T, R}}(), nothing, Vector{Beam{T, R}}())
+function Beam{T, R}(ray::R) where {T, R <: AbstractRay{T}}
+    return Beam{T, R}(R[ray], nothing, Vector{Beam{T, R}}())
 end
 
 """
@@ -66,13 +65,13 @@ with wavelength `λ = 1000 nm`.
 function Beam(pos::AbstractArray{P}, dir::AbstractArray{D}, λ::L=1e-6) where {P,D,L}
     T = promote_type(P,D,L)
     ray = Ray(pos, dir, λ, 1.0)
-    return Beam{T, Ray{T}}(ray, Vector{RaySegment{T, Ray{T}}}(), nothing, Vector{Beam{T, Ray{T}}}())
+    return Beam{T, Ray{T}}(Ray{T}[ray], nothing, Vector{Beam{T, Ray{T}}}())
 end
 
 function Beam(pos::AbstractArray{P}, dir::AbstractArray{D}, λ::L, n::N) where {P,D,L,N<:Real}
     T = promote_type(P,D,L,N)
     ray = Ray(pos, dir, λ, n)
-    return Beam{T, Ray{T}}(ray, Vector{RaySegment{T, Ray{T}}}(), nothing, Vector{Beam{T, Ray{T}}}())
+    return Beam{T, Ray{T}}(Ray{T}[ray], nothing, Vector{Beam{T, Ray{T}}}())
 end
 
 """
@@ -84,7 +83,7 @@ with the wavelength `λ` and electric field vector `E0`.
 function Beam(pos::AbstractArray{P}, dir::AbstractArray{D}, λ::L, E0::AbstractArray) where {P,D,L}
     T = promote_type(P,D,L,eltype(E0))
     ray = PolarizedRay(pos, dir, λ, 1.0, E0)
-    return Beam{T, PolarizedRay{T}}(ray, Vector{RaySegment{T, PolarizedRay{T}}}(), nothing, Vector{Beam{T, PolarizedRay{T}}}())
+    return Beam{T, PolarizedRay{T}}(PolarizedRay{T}[ray], nothing, Vector{Beam{T, PolarizedRay{T}}}())
 end
 
 
@@ -106,7 +105,13 @@ end
 Base.push!(b::Beam, interaction::BeamInteraction) = push!(b, interaction.ray)
 
 function _reset_beam!(beam::Beam)
-    empty!(beam.segments)
+    if !isempty(beam.segments)
+        first_ray = first(beam.segments)
+        reset_seg = OpenSegment(position(first_ray), direction(first_ray), 0.0)
+        reset_ray = first_ray isa PolarizedRay ? PolarizedRay(first_ray, reset_seg) : Ray(first_ray, reset_seg)
+        empty!(beam.segments)
+        push!(beam.segments, reset_ray)
+    end
     _drop_beams!(beam)
     return nothing
 end
@@ -133,9 +138,8 @@ Calculate the optical path length of the `beam`, i.e. ``\\mathrm{OPL} = \\sum n_
 function optical_path_length(beam::Beam{T}) where {T}
     p = AbstractTrees.parent(beam)
     l0 = isnothing(p) ? zero(T) : optical_path_length(p)
-    return isempty(beam.segments) ? l0 : (l0 + last(beam.segments).accumulated_opl)
+    return isempty(beam.segments) ? l0 : (l0 + accumulated_opl(last(beam.segments)))
 end
-
 
 function length_parent(beam::Beam{T}) where {T}
     p = AbstractTrees.parent(beam)
@@ -148,11 +152,11 @@ end
 
 function length_rays(beam::Beam{T}) where {T}
     l = zero(T)
-    for seg in beam.segments
-        if isnothing(seg.intersection)
+    for ray in beam.segments
+        if isnothing(intersection(ray))
             break
         end
-        l += length(seg)
+        l += length(ray)
     end
     return l
 end
@@ -166,23 +170,23 @@ function point_on_beam(beam::B, t::Real)::Tuple{Point3{T}, Int} where {T, R <: A
     p = AbstractTrees.parent(beam)
     temp = isnothing(p) ? zero(T) : length(p)
     if isempty(beam.segments)
-        return position(beam.head_ray) + T(t) * direction(beam.head_ray), 1
+        error("Cannot query point on empty beam")
     end
     numEl = length(beam.segments)
-    for (index, seg) in enumerate(beam.segments)
-        if index == numEl || isnothing(seg.intersection)
+    for (index, ray) in enumerate(beam.segments)
+        if index == numEl || isnothing(intersection(ray))
             break
         end
-        temp += length(seg)
+        temp += length(ray)
         if t < temp
             b = temp - t
-            point = position(seg) + (length(seg) - b) * direction(seg)
+            point = position(ray) + (length(ray) - b) * direction(ray)
             return point, index
         end
     end
-    seg = last(beam.segments)
+    ray = last(beam.segments)
     b = t - temp
-    point = position(seg) + b * direction(seg)
+    point = position(ray) + b * direction(ray)
     return point, numEl
 end
 
@@ -193,23 +197,23 @@ Tests if the `beam` direction angle with respect to the surface normal exceeds `
 Reflections (e.g. at mirrors or beamsplitters) are excluded from the paraxial check.
 """
 function isparaxial(::AbstractSystem, beam::Beam, threshold::Real = π / 4)
-    segs = beam.segments
-    n_segs = length(segs)
-    for i in 1:n_segs
-        seg = segs[i]
-        int = seg.intersection
+    rays_vec = beam.segments
+    n_rays = length(rays_vec)
+    for i in 1:n_rays
+        ray = rays_vec[i]
+        int = intersection(ray)
         isnothing(int) && break
         
-        if i < n_segs
-            next_seg = segs[i + 1]
+        if i < n_rays
+            next_ray = rays_vec[i + 1]
             n_surf = normal3d(int)
-            is_refracted = (dot(direction(seg), n_surf) * dot(direction(next_seg), n_surf) > 0)
+            is_refracted = (dot(direction(ray), n_surf) * dot(direction(next_ray), n_surf) > 0)
             if !is_refracted
                 continue
             end
         end
 
-        angle = angle3d(direction(seg.ray), normal3d(int))
+        angle = angle3d(direction(ray), normal3d(int))
         if angle > π / 2
             angle = π - angle
         end
@@ -226,11 +230,8 @@ end
 Tests if the given `beam` contains the `ray` as a part of its solution.
 """
 function isparentbeam(beam::Beam, _ray::AbstractRay)
-    if beam.head_ray === _ray
-        return true
-    end
-    for seg in beam.segments
-        if seg.ray === _ray
+    for ray in beam.segments
+        if ray === _ray
             return true
         end
     end
@@ -239,24 +240,27 @@ end
 
 function Base.show(io::IO, ::MIME"text/plain", beam::Beam)
     if isempty(beam.segments)
-        println(io, "Beam (unsolved):")
-        println(io, "    Origin: $(position(beam.head_ray))")
-        println(io, "    Dir.:   $(direction(beam.head_ray))")
+        println(io, "Beam (empty)")
         return nothing
     end
-    for (i, seg) in enumerate(beam.segments)
+    if length(beam.segments) == 1 && isnothing(intersection(first(beam.segments)))
+        println(io, "Beam (unsolved):")
+        println(io, "    Origin: $(position(first(beam.segments)))")
+        println(io, "    Dir.:   $(direction(first(beam.segments)))")
+        return nothing
+    end
+    for (i, ray) in enumerate(beam.segments)
         println(io, "Segment $i:")
-        if isnothing(seg.intersection)
+        if isnothing(intersection(ray))
             println(io, "    No intersection")
-            println(io, "    Pos.: $(position(seg))")
-            println(io, "    Dir.: $(direction(seg))")
+            println(io, "    Pos.: $(position(ray))")
+            println(io, "    Dir.: $(direction(ray))")
         else
-            println(io, "    Intersection: distance=$(length(seg)), normal=$(normal3d(seg.intersection))")
-            println(io, "    Pos.: $(position(seg))")
-            println(io, "    Dir.: $(direction(seg))")
-            println(io, "    End.: $(propagate(seg.ray, length(seg)))")
+            println(io, "    Intersection: distance=$(length(ray)), normal=$(normal3d(ray))")
+            println(io, "    Pos.: $(position(ray))")
+            println(io, "    Dir.: $(direction(ray))")
+            println(io, "    End.: $(propagate(ray, length(ray)))")
         end
     end
     return nothing
 end
-

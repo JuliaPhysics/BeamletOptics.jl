@@ -103,7 +103,7 @@ const BMO = BeamletOptics
 
         # Inside raymarching through sphere
         ray_inside = Ray([0.0, 0.0, 0.0], [0.0, 1.0, 0.0])
-        hit_inside = BMO._raymarch_inside(sphere_origin, ray_inside.pos, ray_inside.dir)
+        hit_inside = BMO._raymarch_inside(sphere_origin, position(ray_inside), BMO.direction(ray_inside))
         @test hit_inside !== nothing
         @test isapprox(hit_inside.t, 1.0; atol = 1e-9)
         @test isapprox(hit_inside.n, [0.0, 1.0, 0.0]; atol = 1e-7)

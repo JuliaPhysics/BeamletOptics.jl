@@ -4,7 +4,7 @@ export translate3d!, translate_to3d!, rotate3d!, xrotate3d!, yrotate3d!, zrotate
 export position, direction, orientation
 
 # ray and beam type export
-export Ray, PolarizedRay, RaySegment, segments, accumulated_opl,
+export Ray, PolarizedRay, AbstractSegment, OpenSegment, LineSegment, segment, segments, accumulated_opl,
        Beam, PointSource, CollimatedSource, UniformDiscSource,
        GaussianBeamlet, AstigmaticGaussianBeamlet, rayleigh_range, rays, point_on_beam,
        normal3d, optical_path_length
@@ -22,8 +22,8 @@ export AbstractSurfaceModel, FresnelSurface, IdealMirrorSurface, AbsorbingSurfac
        DetectorSurface, CoatedSurface, GratingSurface
 export AbstractVolumeModel, VolumeInteraction
 export AbstractCoating, Coating, surface_model
-export Transition, resolve_transition, current_medium, interact3d
-export Intersection
+export Transition, resolve_transition, current_medium, propagate_volume, interact3d
+export Intersection, intersection
 
 # system
 export System, StaticSystem, solve_system!, ambient_medium

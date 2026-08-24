@@ -125,8 +125,8 @@ function interact3d(
         bs::ThinBeamsplitter,
         trans::Transition,
         int::AbstractIntersection{T},
-        beam::Beam{T, R},
-        ray::R) where {T <: Real, R <: AbstractRay{T}}
+        beam::Beam{T},
+        ray::AbstractRay{T}) where {T <: Real}
     t_ray = _beamsplitter_transmitted_ray(bs, trans, int, ray)
     r_ray = _beamsplitter_reflected_ray(bs, trans, int, ray)
     children!(beam, [Beam(t_ray), Beam(r_ray)])
@@ -136,9 +136,9 @@ end
 function interact3d(
         system::AbstractSystem,
         bs::ThinBeamsplitter,
-        beam::Beam{T, R},
-        ray::R) where {T <: Real, R <: AbstractRay{T}}
-    int = isempty(beam.segments) ? intersect3d(shape(bs), ray) : last(beam.segments).intersection
+        beam::Beam{T},
+        ray::AbstractRay{T}) where {T <: Real}
+    int = isempty(beam.segments) ? intersect3d(shape(bs), ray) : intersection(last(beam.segments))
     isnothing(int) && return nothing
     ambient = ambient_medium(system)
     trans = resolve_transition(ambient, ambient, ray, normal3d(int))
@@ -156,9 +156,9 @@ function interact3d(
     waist_ray = rays(gauss.waist)[ray_id]
     div_ray = rays(gauss.divergence)[ray_id]
 
-    int_c = ray_id <= length(gauss.chief.segments) ? (isnothing(gauss.chief.segments[ray_id].intersection) ? int : gauss.chief.segments[ray_id].intersection) : int
-    int_w = ray_id <= length(gauss.waist.segments) ? (isnothing(gauss.waist.segments[ray_id].intersection) ? int : gauss.waist.segments[ray_id].intersection) : int
-    int_d = ray_id <= length(gauss.divergence.segments) ? (isnothing(gauss.divergence.segments[ray_id].intersection) ? int : gauss.divergence.segments[ray_id].intersection) : int
+    int_c = ray_id <= length(gauss.chief.segments) ? (isnothing(intersection(gauss.chief.segments[ray_id])) ? int : intersection(gauss.chief.segments[ray_id])) : int
+    int_w = ray_id <= length(gauss.waist.segments) ? (isnothing(intersection(gauss.waist.segments[ray_id])) ? int : intersection(gauss.waist.segments[ray_id])) : int
+    int_d = ray_id <= length(gauss.divergence.segments) ? (isnothing(intersection(gauss.divergence.segments[ray_id])) ? int : intersection(gauss.divergence.segments[ray_id])) : int
 
     t_c = _beamsplitter_transmitted_ray(bs, trans, int_c, chief_ray)
     t_w = _beamsplitter_transmitted_ray(bs, trans, int_w, waist_ray)
@@ -191,7 +191,7 @@ function interact3d(
         gauss::GaussianBeamlet{R},
         ray_id::Int) where {R}
     chief_ray = rays(gauss.chief)[ray_id]
-    int = ray_id <= length(gauss.chief.segments) ? gauss.chief.segments[ray_id].intersection : intersect3d(shape(bs), chief_ray)
+    int = ray_id <= length(gauss.chief.segments) ? intersection(gauss.chief.segments[ray_id]) : intersect3d(shape(bs), chief_ray)
     isnothing(int) && return nothing
     ambient = ambient_medium(system)
     trans = resolve_transition(ambient, ambient, chief_ray, normal3d(int))
@@ -206,7 +206,7 @@ function interact3d(
         agb::AstigmaticGaussianBeamlet{R},
         ray_id::Int) where {R}
     c_ray = rays(agb.c)[ray_id]
-    int_c = ray_id <= length(agb.c.segments) ? (isnothing(agb.c.segments[ray_id].intersection) ? int : agb.c.segments[ray_id].intersection) : int
+    int_c = ray_id <= length(agb.c.segments) ? (isnothing(intersection(agb.c.segments[ray_id])) ? int : intersection(agb.c.segments[ray_id])) : int
     
     t_c = _beamsplitter_transmitted_ray(bs, trans, int_c, c_ray)
     r_c = _beamsplitter_reflected_ray(bs, trans, int_c, c_ray)
@@ -221,7 +221,7 @@ function interact3d(
     r_aux = Ray{R}[]
     for b in _aux_beams(agb)
         ray_a = rays(b)[ray_id]
-        int_a = ray_id <= length(b.segments) ? (isnothing(b.segments[ray_id].intersection) ? int : b.segments[ray_id].intersection) : int
+        int_a = ray_id <= length(b.segments) ? (isnothing(intersection(b.segments[ray_id])) ? int : intersection(b.segments[ray_id])) : int
         push!(t_aux, _beamsplitter_transmitted_ray(bs, trans, int_a, ray_a))
         push!(r_aux, _beamsplitter_reflected_ray(bs, trans, int_a, ray_a))
     end
@@ -247,7 +247,7 @@ function interact3d(
         agb::AstigmaticGaussianBeamlet{R},
         ray_id::Int) where {R}
     c_ray = rays(agb.c)[ray_id]
-    int = ray_id <= length(agb.c.segments) ? agb.c.segments[ray_id].intersection : intersect3d(shape(bs), c_ray)
+    int = ray_id <= length(agb.c.segments) ? intersection(agb.c.segments[ray_id]) : intersect3d(shape(bs), c_ray)
     isnothing(int) && return nothing
     ambient = ambient_medium(system)
     trans = resolve_transition(ambient, ambient, c_ray, normal3d(int))

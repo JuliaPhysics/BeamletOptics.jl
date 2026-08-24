@@ -46,9 +46,9 @@ Refracts or reflects incoming ray at an optical surface using the universal boun
 """
 function interact3d(system::AbstractSystem,
         optic::AbstractRefractiveOptic,
-        beam::Beam{T, R},
-        ray::R) where {T <: Real, R <: AbstractRay{T}}
-    int = isempty(beam.segments) ? intersect3d(shape(optic), ray) : last(beam.segments).intersection
+        beam::Beam{T},
+        ray::AbstractRay{T}) where {T <: Real}
+    int = isempty(beam.segments) ? intersect3d(shape(optic), ray) : intersection(last(beam.segments))
     isnothing(int) && return nothing
     normal = normal3d(int)
     
@@ -65,7 +65,7 @@ function interact3d(system::AbstractSystem,
     tir = (out_ray.n == refractive_index(optic, wavelength(ray)) && !entering)
     hint = (entering || tir) ? Hint(optic) : nothing
     
-    return BeamInteraction{T, R}(hint, out_ray)
+    return BeamInteraction(hint, out_ray)
 end
 
 
