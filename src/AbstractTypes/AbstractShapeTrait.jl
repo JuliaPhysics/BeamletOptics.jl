@@ -130,8 +130,8 @@ end
     translate3d!(::MultiShape, object, offset)
 
 Moves all parts of the [`MultiShape`](@ref) `object` along the specified `offset` vector (zero allocations).
-Also backs [`AbstractObjectGroup`](@ref)'s `translate3d!`, whose `shape(group) = objects(group)` (see
-[`AbstractObject.jl`](@ref)) lets it reuse this same implementation.
+Also backs [`AbstractObjectGroup`](@ref)'s `translate3d!`, whose `shape(group) = objects(group)`
+lets it reuse this same implementation.
 """
 @inline function translate3d!(::MultiShape, object::Union{AbstractObject, AbstractObjectGroup}, offset)
     position!(object, position(object) .+ offset)

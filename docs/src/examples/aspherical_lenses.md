@@ -185,7 +185,7 @@ for beam in beams
         # tilted input beam generation
         dir = [0, cosd(angle), sind(angle)]
         spos = pos - dir * l0
-        abeam = Beam(spos, dir, first_seg.ray.λ)
+        abeam = Beam(spos, dir, first_seg.λ)
 
         # trace through system
         solve_system!(system, abeam, r_max=50)

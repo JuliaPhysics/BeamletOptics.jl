@@ -62,10 +62,10 @@ struct System{M <: AbstractMedium} <: AbstractSystem
 end
 
 System(objects::Vector{_ObjectOrGroup}) = System(objects, Ambient())
-System(objects::Vector{<:_ObjectOrGroup}) = System(Vector{_ObjectOrGroup}(objects), Ambient())
+System(objects::AbstractVector) = System(Vector{_ObjectOrGroup}(objects), Ambient())
 System(object::_ObjectOrGroup) = System([object], Ambient())
-System(objects::Vector{<:_ObjectOrGroup}, ambient::AbstractMedium) = System(Vector{_ObjectOrGroup}(objects), ambient)
-System(objects::Vector{<:_ObjectOrGroup}, n::RefractiveIndex) = System(objects, medium_from(n))
+System(objects::AbstractVector, ambient::AbstractMedium) = System(Vector{_ObjectOrGroup}(objects), ambient)
+System(objects::AbstractVector, n::RefractiveIndex) = System(objects, medium_from(n))
 System(object::_ObjectOrGroup, ambient::AbstractMedium) = System([object], ambient)
 System(object::_ObjectOrGroup, n::RefractiveIndex) = System([object], medium_from(n))
 
@@ -105,10 +105,10 @@ end
 StaticSystem(objects::T) where {T <: Tuple} = StaticSystem(objects, Ambient())
 StaticSystem(object::AbstractObject) = StaticSystem((object,), Ambient())
 StaticSystem(object::AbstractObjectGroup) = StaticSystem(tuple(_flatten_system_objects(object)...), Ambient())
-function StaticSystem(objects::AbstractArray{<:_ObjectOrGroup})
+function StaticSystem(objects::AbstractArray)
     StaticSystem(tuple(_flatten_system_objects(objects)...), Ambient())
 end
-function StaticSystem(objects::AbstractArray{<:_ObjectOrGroup}, ambient::AbstractMedium)
+function StaticSystem(objects::AbstractArray, ambient::AbstractMedium)
     StaticSystem(tuple(_flatten_system_objects(objects)...), ambient)
 end
 

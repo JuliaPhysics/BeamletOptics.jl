@@ -39,7 +39,7 @@ with_segment(ray::Ray, seg::AbstractSegment) = Ray(ray, seg)
 Constructs an immutable `Ray` with an [`OpenSegment`](@ref) where:
 - `pos`: is the `Ray` origin
 - `dir`: is the `Ray` direction of propagation, normalized to unit length
-- `λ`: wavelength in [m] (default 1000 nm)
+- `λ`: wavelength in \\[m\\] (default 1000 nm)
 - `n`: refractive index (default 1.0)
 """
 function (::Type{Ray{T}})(pos::AbstractArray{P},

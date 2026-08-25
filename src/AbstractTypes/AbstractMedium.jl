@@ -33,7 +33,7 @@ An isotropic optical medium characterized by a dispersion formula (real or compl
 # Fields
 - `name::Symbol`: Material name (e.g. `:N_BK7`, `:FusedSilica`, `:Water`, `:Gold`, `:Constant`)
 - `dispersion::D`: Dispersion function `(λ; T, P, kwargs...) -> n` or `(λ) -> n` (Real or Complex), or a constant Number (`Real` or `Complex`)
-- `attenuation::A`: Bulk attenuation function `(λ; T, P, kwargs...) -> α` [1/m] (or `nothing`)
+- `attenuation::A`: Bulk attenuation function `(λ; T, P, kwargs...) -> α` \\[1/m\\] (or `nothing`)
 """
 struct IsotropicMedium{D, A} <: AbstractMedium
     name::Symbol
