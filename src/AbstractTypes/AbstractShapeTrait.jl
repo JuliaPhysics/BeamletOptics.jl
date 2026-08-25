@@ -130,8 +130,10 @@ end
     translate3d!(::MultiShape, object, offset)
 
 Moves all parts of the [`MultiShape`](@ref) `object` along the specified `offset` vector (zero allocations).
+Also backs [`AbstractObjectGroup`](@ref)'s `translate3d!`, whose `shape(group) = objects(group)` (see
+[`AbstractObject.jl`](@ref)) lets it reuse this same implementation.
 """
-@inline function translate3d!(::MultiShape, object::AbstractObject, offset)
+@inline function translate3d!(::MultiShape, object::Union{AbstractObject, AbstractObjectGroup}, offset)
     position!(object, position(object) .+ offset)
     _translate3d_multishape_tuple(shape(object), offset, (object,))
     return nothing
@@ -196,7 +198,7 @@ end
 Translates all parts of the [`MultiShape`](@ref) `object` in parallel to the specified `target` position.
 The `object` center point will be equal to the `target`.
 """
-@inline function translate_to3d!(::MultiShape, object::AbstractObject, target)
+@inline function translate_to3d!(::MultiShape, object::Union{AbstractObject, AbstractObjectGroup}, target)
     current = position(object)
     translate3d!(object, target .- current)
     return nothing
@@ -207,7 +209,7 @@ end
 
 All parts of the [`MultiShape`](@ref) `object` are rotated around the pivot center via the specified angle `θ` and `axis` (zero allocations).
 """
-@inline function rotate3d!(::MultiShape, object::AbstractObject, axis, θ)
+@inline function rotate3d!(::MultiShape, object::Union{AbstractObject, AbstractObjectGroup}, axis, θ)
     R = rotate3d(axis, θ)
     orig_pos = position(object)
     orientation!(object, R * orientation(object))
@@ -274,7 +276,7 @@ end
     return visited
 end
 
-function align3d!(::MultiShape, object::AbstractObject, target_vec)
+function align3d!(::MultiShape, object::Union{AbstractObject, AbstractObjectGroup}, target_vec)
     # FIXME
     @warn "align3d! not yet implemented for MultiShape"
     return nothing
@@ -288,7 +290,7 @@ Resets all applied translations of the `object`, i.e. moves the center back to t
 !!! info "Parts within parts"
     Sub-part relative translations are not reset!
 """
-function reset_translation3d!(::MultiShape, object::AbstractObject{T}) where T
+function reset_translation3d!(::MultiShape, object::Union{AbstractObject{T}, AbstractObjectGroup{T}}) where T
     # Reset object back to origin
     translate3d!(object, -position(object))
     # Reset center of kinematics (removes precision artifacts)
@@ -304,7 +306,7 @@ Reset all applied rotations of the `object`, i.e. resets the local coordinate sy
 !!! info "Parts within parts"
     Sub-part relative rotations are not reset!
 """
-function reset_rotation3d!(::MultiShape, object::AbstractObject{T}) where T
+function reset_rotation3d!(::MultiShape, object::Union{AbstractObject{T}, AbstractObjectGroup{T}}) where T
     # Calculate rotation reset angle (thx LLMs)
     R = orientation(object)
     θ = acos(clamp((tr(R)-1)/2, -1, 1))

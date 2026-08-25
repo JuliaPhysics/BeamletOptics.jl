@@ -1,5 +1,5 @@
 """
-    CubeBeamsplitter{T} <: AbstractObjectGroup{T}
+    CubeBeamsplitter{T} <: AbstractObject{T}
 
 A cuboid beamsplitter where the splitting interaction occurs between two [`RightAnglePrism`](@ref)s.
 For more information refer to the [`AbstractPlateBeamsplitter`](@ref) docs.
@@ -10,7 +10,7 @@ For more information refer to the [`AbstractPlateBeamsplitter`](@ref) docs.
 - `back`: the backward facing substrate, represented by a [`RightAnglePrism`](@ref)
 - `coating`: a rectangular [`ThinBeamsplitter`](@ref) that represents the splitting interface
 """
-struct CubeBeamsplitter{T} <: AbstractObjectGroup{T}
+struct CubeBeamsplitter{T} <: AbstractObject{T}
     front::Prism{T, RightAnglePrismSDF{T}}
     back::Prism{T, RightAnglePrismSDF{T}}
     coating::ThinBeamsplitter{T, Mesh{T}}
@@ -19,7 +19,6 @@ end
 shape_trait_of(::CubeBeamsplitter) = MultiShape()
 
 shape(cbs::CubeBeamsplitter) = (cbs.front, cbs.back, cbs.coating)
-objects(cbs::CubeBeamsplitter) = (cbs.front, cbs.back, cbs.coating)
 
 Base.position(cbs::CubeBeamsplitter) = position(cbs.coating)
 orientation(cbs::CubeBeamsplitter) = orientation(cbs.front)

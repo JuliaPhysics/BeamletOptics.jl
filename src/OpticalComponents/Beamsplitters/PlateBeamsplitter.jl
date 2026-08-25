@@ -1,7 +1,7 @@
 """
-    AbstractPlateBeamsplitter{T} <: AbstractObjectGroup{T}
+    AbstractPlateBeamsplitter{T} <: AbstractObject{T}
 
-A generic type to represent an [`AbstractBeamsplitter`](@ref) composite component that consists of a substrate with a 
+A generic type to represent an [`AbstractBeamsplitter`](@ref) composite component that consists of a substrate with a
 single coated face at which a beam splitting interaction occurs.
 
 # Implementation reqs.
@@ -18,7 +18,7 @@ Subtypes of `AbstractPlateBeamsplitter` should implement all supertype reqs. as 
 - `coating`: returns a [`ThinBeamsplitter`](@ref)
 - `substrate`: returns a [`Prism`](@ref)
 """
-abstract type AbstractPlateBeamsplitter{T} <: AbstractObjectGroup{T} end
+abstract type AbstractPlateBeamsplitter{T} <: AbstractObject{T} end
 
 coating(pbs::AbstractPlateBeamsplitter) = pbs.coating
 substrate(pbs::AbstractPlateBeamsplitter) = pbs.substrate
@@ -28,7 +28,6 @@ orientation(pbs::AbstractPlateBeamsplitter) = orientation(substrate(pbs))
 
 shape_trait_of(::AbstractPlateBeamsplitter) = MultiShape()
 shape(pbs::AbstractPlateBeamsplitter) = (substrate(pbs), coating(pbs))
-objects(pbs::AbstractPlateBeamsplitter) = (substrate(pbs), coating(pbs))
 
 refractive_index(pbs::AbstractPlateBeamsplitter, λ::Real) = refractive_index(substrate(pbs), λ)
 

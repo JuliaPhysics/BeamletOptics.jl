@@ -4,7 +4,7 @@ abstract type AbstractDoubletRefractiveOptic{
     B <: AbstractShape{T},
     N1 <: RefractiveIndex,
     N2 <: RefractiveIndex
-} <: AbstractObjectGroup{T} end
+} <: AbstractObject{T} end
 
 """
     DoubletLens
@@ -31,7 +31,6 @@ end
 shape_trait_of(::DoubletLens) = MultiShape()
 
 shape(dl::DoubletLens) = (dl.front, dl.back)
-objects(dl::DoubletLens) = (dl.front, dl.back)
 
 Base.position(dl::DoubletLens) = position(dl.front)
 orientation(dl::DoubletLens) = orientation(dl.front)

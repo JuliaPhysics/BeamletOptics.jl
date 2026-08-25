@@ -1,34 +1,85 @@
 """
+    _ObjectOrGroup
+
+Internal union of everything that can be passed into a [`System`](@ref)/[`StaticSystem`](@ref):
+a regular [`AbstractObject`](@ref), or an [`AbstractObjectGroup`](@ref) bundle thereof.
+"""
+const _ObjectOrGroup = Union{AbstractObject, AbstractObjectGroup}
+
+"""
+    _flatten_system_objects(objs) -> Vector{AbstractObject}
+
+Recursively expands `objs` (a single [`_ObjectOrGroup`](@ref) or a collection thereof) into
+a flat `Vector{AbstractObject}` suitable for tracing: [`AbstractObjectGroup`](@ref)s are
+expanded via `objects(group)`, and any [`MultiShape`](@ref) `AbstractObject` whose parts
+(`shape(obj)`) are themselves all `AbstractObject`/`AbstractObjectGroup` is expanded the
+same way (e.g. a [`CubeBeamsplitter`](@ref) becomes its `front`/`back`/`coating`). Any
+other object is kept as-is.
+"""
+function _flatten_system_objects(objs)
+    acc = AbstractObject[]
+    for o in objs
+        _flatten_system_objects!(acc, o)
+    end
+    return acc
+end
+_flatten_system_objects(obj::_ObjectOrGroup) = _flatten_system_objects!(AbstractObject[], obj)
+
+function _flatten_system_objects!(acc::Vector{AbstractObject}, obj::AbstractObject)
+    if shape_trait_of(obj) isa MultiShape
+        parts = shape(obj)
+        if all(p -> p isa _ObjectOrGroup, parts)
+            for p in parts
+                _flatten_system_objects!(acc, p)
+            end
+            return acc
+        end
+    end
+    push!(acc, obj)
+    return acc
+end
+function _flatten_system_objects!(acc::Vector{AbstractObject}, group::AbstractObjectGroup)
+    for o in objects(group)
+        _flatten_system_objects!(acc, o)
+    end
+    return acc
+end
+
+"""
     System{M<:AbstractMedium} <: AbstractSystem
 
 A container storing the optical elements of, i.e. a camera lens or lab setup, and the surrounding ambient medium.
 
 # Fields
 
-- `objects`: vector containing the different objects that are part of the system (subtypes of [`AbstractObject`](@ref))
+- `objects`: vector containing the objects that are part of the system — [`AbstractObject`](@ref)s
+  and/or [`AbstractObjectGroup`](@ref) bundles thereof, exactly as passed to the constructor
 - `ambient_medium`: surrounding medium of the optical system (default: [`Ambient`](@ref))
 """
 struct System{M <: AbstractMedium} <: AbstractSystem
-    objects::Vector{AbstractObject}
+    objects::Vector{_ObjectOrGroup}
     ambient_medium::M
 end
 
-System(objects::Vector{AbstractObject}) = System(objects, Ambient())
-System(objects::Vector{<:AbstractObject}) = System(Vector{AbstractObject}(objects), Ambient())
-System(object::AbstractObject) = System([object], Ambient())
-System(objects::Vector{<:AbstractObject}, ambient::AbstractMedium) = System(Vector{AbstractObject}(objects), ambient)
-System(objects::Vector{<:AbstractObject}, n::RefractiveIndex) = System(objects, medium_from(n))
-System(object::AbstractObject, ambient::AbstractMedium) = System([object], ambient)
-System(object::AbstractObject, n::RefractiveIndex) = System([object], medium_from(n))
+System(objects::Vector{_ObjectOrGroup}) = System(objects, Ambient())
+System(objects::Vector{<:_ObjectOrGroup}) = System(Vector{_ObjectOrGroup}(objects), Ambient())
+System(object::_ObjectOrGroup) = System([object], Ambient())
+System(objects::Vector{<:_ObjectOrGroup}, ambient::AbstractMedium) = System(Vector{_ObjectOrGroup}(objects), ambient)
+System(objects::Vector{<:_ObjectOrGroup}, n::RefractiveIndex) = System(objects, medium_from(n))
+System(object::_ObjectOrGroup, ambient::AbstractMedium) = System([object], ambient)
+System(object::_ObjectOrGroup, n::RefractiveIndex) = System([object], medium_from(n))
 
 ambient_medium(system::System) = system.ambient_medium
 
 """
     objects(system::System)
 
-Exposes all objects stored within the system. By exposing the `Leaves` of the tree only, it is ensured that `AbstractObjectGroup`s are flattened into a regular vector.
+Exposes all objects stored within the system as a flat, trace-ready list: any
+[`AbstractObjectGroup`](@ref) bundle or [`MultiShape`](@ref) composite (e.g. a
+[`CubeBeamsplitter`](@ref) or [`DoubletLens`](@ref)) is recursively expanded into its
+constituent [`AbstractObject`](@ref)s, see [`_flatten_system_objects`](@ref).
 """
-objects(system::System) = Leaves(system.objects)
+objects(system::System) = _flatten_system_objects(system.objects)
 
 """
     StaticSystem{T<:Tuple, M<:AbstractMedium} <: AbstractSystem
@@ -53,12 +104,12 @@ end
 
 StaticSystem(objects::T) where {T <: Tuple} = StaticSystem(objects, Ambient())
 StaticSystem(object::AbstractObject) = StaticSystem((object,), Ambient())
-StaticSystem(object::AbstractObjectGroup) = StaticSystem(tuple(collect(Leaves([object]))...), Ambient())
-function StaticSystem(objects::AbstractArray{<:AbstractObject})
-    StaticSystem(tuple(collect(Leaves(objects))...), Ambient())
+StaticSystem(object::AbstractObjectGroup) = StaticSystem(tuple(_flatten_system_objects(object)...), Ambient())
+function StaticSystem(objects::AbstractArray{<:_ObjectOrGroup})
+    StaticSystem(tuple(_flatten_system_objects(objects)...), Ambient())
 end
-function StaticSystem(objects::AbstractArray{<:AbstractObject}, ambient::AbstractMedium)
-    StaticSystem(tuple(collect(Leaves(objects))...), ambient)
+function StaticSystem(objects::AbstractArray{<:_ObjectOrGroup}, ambient::AbstractMedium)
+    StaticSystem(tuple(_flatten_system_objects(objects)...), ambient)
 end
 
 ambient_medium(system::StaticSystem) = system.ambient_medium
