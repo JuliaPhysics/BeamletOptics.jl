@@ -28,14 +28,13 @@ function propagate_volume end
     res = trace_one(system, ray, hint)
     if res === nothing
         seg = OpenSegment(position(ray), direction(ray), opl_accum)
-        resolved_ray = ray isa PolarizedRay ? PolarizedRay(ray, seg) : Ray(ray, seg)
+        resolved_ray = with_segment(ray, seg)
         return (resolved_ray, nothing, nothing)
     else
         hit, obj = res
         seg_opl = opl_accum + length(hit) * real(refractive_index(ray))
-        hit_geom = hit isa MultiIntersection ? hit.hit : hit
-        seg = LineSegment(position(ray), direction(ray), hit_geom, seg_opl)
-        resolved_ray = ray isa PolarizedRay ? PolarizedRay(ray, seg) : Ray(ray, seg)
+        seg = LineSegment(position(ray), direction(ray), geometry_intersection(hit), seg_opl)
+        resolved_ray = with_segment(ray, seg)
         return (resolved_ray, hit, obj)
     end
 end

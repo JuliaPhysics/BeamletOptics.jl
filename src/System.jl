@@ -194,6 +194,13 @@ end
     end
 end
 
+# Dispatched interaction helper for hit vs multi-intersection
+@inline interact_hit(system::AbstractSystem, obj::AbstractObject, hit::Intersection, beam, ray) = interact3d(system, obj, beam, ray)
+@inline interact_hit(system::AbstractSystem, ::AbstractObject, mi::MultiIntersection, beam, ray) = interact3d(system, mi, beam, ray)
+
+@inline interact_hit(system::AbstractSystem, obj::AbstractObject, hit::Intersection, beam, seg_counter::Int) = interact3d(system, obj, beam, seg_counter)
+@inline interact_hit(system::AbstractSystem, ::AbstractObject, mi::MultiIntersection, beam, seg_counter::Int) = interact3d(system, mi, beam, seg_counter)
+
 """
     trace_system!(system::AbstractSystem, beam::Beam{T}; r_max = get_default_r_max()) where {T <: Real}
 
@@ -222,9 +229,7 @@ function trace_system!(
 
         current_opl = accumulated_opl(resolved_ray)
         # Dispatch to interface interaction depending on intersection type
-        interaction = (hit isa MultiIntersection ?
-            interact3d(system, hit, beam, resolved_ray) :
-            interact3d(system, obj, beam, resolved_ray))::Union{Nothing, BeamInteraction}
+        interaction = interact_hit(system, obj, hit, beam, resolved_ray)::Union{Nothing, BeamInteraction}
         if isnothing(interaction)
             break
         end
@@ -253,15 +258,15 @@ function trace_system!(
     current_w::Ray{T} = first(gauss.waist.segments)
     current_d::Ray{T} = first(gauss.divergence.segments)
 
-    empty!(gauss.chief.segments)
-    empty!(gauss.waist.segments)
-    empty!(gauss.divergence.segments)
-
     opl_c::T = zero(T)
     opl_w::T = zero(T)
     opl_d::T = zero(T)
 
-    while seg_counter <= r_max
+    empty!(gauss.chief.segments)
+    empty!(gauss.waist.segments)
+    empty!(gauss.divergence.segments)
+
+    while length(gauss.chief.segments) < r_max
         resolved_c, hit_c, obj_c = tracing_step(system, current_c, hint(interaction), opl_c)
         resolved_w, hit_w, obj_w = tracing_step(system, current_w, hint(interaction), opl_w)
         resolved_d, hit_d, obj_d = tracing_step(system, current_d, hint(interaction), opl_d)
@@ -270,15 +275,13 @@ function trace_system!(
         push!(gauss.waist, resolved_w)
         push!(gauss.divergence, resolved_d)
 
-        int_c = hit_c
-        int_w = hit_w
-        int_d = hit_d
+        int_c, int_w, int_d = hit_c, hit_w, hit_d
 
-        # If any beam misses or beams do not hit same target stop tracing
         if any(isnothing, (int_c, int_w, int_d)) || (obj_c !== obj_w || obj_c !== obj_d) || !_beams_hits_same_shape(gauss, seg_counter)
-            gauss.chief.segments[end] = Ray(current_c, OpenSegment(position(current_c), direction(current_c), opl_c))
-            gauss.waist.segments[end] = Ray(current_w, OpenSegment(position(current_w), direction(current_w), opl_w))
-            gauss.divergence.segments[end] = Ray(current_d, OpenSegment(position(current_d), direction(current_d), opl_d))
+            # Finish rays as OpenSegments
+            gauss.chief.segments[end] = with_segment(current_c, OpenSegment(position(current_c), direction(current_c), opl_c))
+            gauss.waist.segments[end] = with_segment(current_w, OpenSegment(position(current_w), direction(current_w), opl_w))
+            gauss.divergence.segments[end] = with_segment(current_d, OpenSegment(position(current_d), direction(current_d), opl_d))
             break
         end
 
@@ -287,11 +290,7 @@ function trace_system!(
         opl_d = accumulated_opl(resolved_d)
 
         # Calculate interaction
-        interaction = if int_c isa MultiIntersection
-            interact3d(system, int_c, gauss, seg_counter)
-        else
-            interact3d(system, obj_c, gauss, seg_counter)
-        end
+        interaction = interact_hit(system, obj_c, int_c, gauss, seg_counter)
         if isnothing(interaction)
             break
         end
@@ -312,44 +311,48 @@ Trace an [`AstigmaticGaussianBeamlet`](@ref) through an optical `system`.
 function trace_system!(
         system::AbstractSystem,
         agb::AstigmaticGaussianBeamlet{T};
-        # kwargs
+        # kwargs...
         r_max::Int = get_default_r_max(),
         check_invariant::Bool = true,
-        threshold::Real = get_invariant_threshold()
+        threshold::Real = get_invariant_threshold(),
+        kwargs...
 ) where {T <: Real}
     _reset_beam!(agb)
     interaction::Nullable{AstigmaticGaussianBeamletInteraction{T}} = nothing
     seg_counter::Int = 1
-    aux = _aux_beams(agb)
 
     current_c::PolarizedRay{T} = first(agb.c.segments)
-    current_aux = Ray{T}[first(b.segments) for b in aux]
-
-    empty!(agb.c.segments)
-    for b in aux
-        empty!(b.segments)
+    current_aux = Vector{Ray{T}}(undef, 8)
+    aux = _aux_beams(agb)
+    for idx in 1:length(aux)
+        current_aux[idx] = first(aux[idx].segments)
     end
 
     opl_c::T = zero(T)
-    opl_aux = zeros(T, length(aux))
+    opl_aux = zeros(T, 8)
 
-    while seg_counter <= r_max
+    empty!(agb.c.segments)
+    for beam in aux
+        empty!(beam.segments)
+    end
+
+    while length(agb.c.segments) < r_max
         resolved_c, hit_c, obj_c = tracing_step(system, current_c, hint(interaction), opl_c)
         push!(agb.c, resolved_c)
 
         missed = isnothing(hit_c)
-        for (idx, b) in enumerate(aux)
-            resolved_a, hit_a, obj_a = tracing_step(system, current_aux[idx], hint(interaction), opl_aux[idx])
-            push!(b, resolved_a)
+        for idx in 1:length(aux)
+            resolved_aux, hit_a, obj_a = tracing_step(system, current_aux[idx], hint(interaction), opl_aux[idx])
+            push!(aux[idx], resolved_aux)
             if isnothing(hit_a) || obj_a !== obj_c
                 missed = true
             end
         end
 
         if missed || !_beams_hits_same_shape(agb, seg_counter)
-            agb.c.segments[end] = PolarizedRay(current_c, OpenSegment(position(current_c), direction(current_c), opl_c))
-            for (idx, b) in enumerate(aux)
-                b.segments[end] = Ray(current_aux[idx], OpenSegment(position(current_aux[idx]), direction(current_aux[idx]), opl_aux[idx]))
+            agb.c.segments[end] = with_segment(current_c, OpenSegment(position(current_c), direction(current_c), opl_c))
+            for idx in 1:length(aux)
+                aux[idx].segments[end] = with_segment(current_aux[idx], OpenSegment(position(current_aux[idx]), direction(current_aux[idx]), opl_aux[idx]))
             end
             break
         end
@@ -360,11 +363,7 @@ function trace_system!(
         end
 
         int_c = hit_c
-        interaction = if int_c isa MultiIntersection
-            interact3d(system, int_c, agb, seg_counter)
-        else
-            interact3d(system, obj_c, agb, seg_counter)
-        end
+        interaction = interact_hit(system, obj_c, int_c, agb, seg_counter)
         if isnothing(interaction)
             break
         end

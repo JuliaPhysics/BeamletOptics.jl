@@ -111,19 +111,17 @@ function interact3d(
     return nothing
 end
 
+@inline _eval_coating_model(m::AbstractSurfaceModel, trans, int, ray) = interact3d(m, trans, int, ray)
+@inline _eval_coating_model(f::Function, trans, int, ray) = f(trans, int, ray)
+@inline _eval_coating_model(::Any, trans, int, ray) = interact3d(FresnelSurface(), trans, int, ray)
+
 function interact3d(
     c::CoatedSurface,
     trans::Transition,
     int::Intersection{T},
     ray::AbstractRay{T}
 ) where {T <: Real}
-    if c.coating_model isa AbstractSurfaceModel
-        return interact3d(c.coating_model, trans, int, ray)
-    elseif c.coating_model isa Function
-        return c.coating_model(trans, int, ray)
-    else
-        return interact3d(FresnelSurface(), trans, int, ray)
-    end
+    return _eval_coating_model(c.coating_model, trans, int, ray)
 end
 
 function interact3d(
@@ -175,7 +173,7 @@ Handles coincident interface interaction across touching optical components.
 function interact3d(
     system::AbstractSystem,
     mi::MultiIntersection,
-    beam::AbstractBeam{T, R},
+    beam::AbstractBeam{T},
     ray::R
 ) where {T <: Real, R <: AbstractRay{T}}
     normal = normal3d(mi)
@@ -184,15 +182,12 @@ function interact3d(
     ambient = ambient_medium(system)
     trans = resolve_transition(mi, ambient, ray)
     
-    obj_en = entering(mi)
-    obj_ex = exiting(mi)
-    c_obj = coating(mi)
-    bs_obj = c_obj isa AbstractBeamsplitter ? c_obj : (obj_en isa AbstractBeamsplitter ? obj_en : (obj_ex isa AbstractBeamsplitter ? obj_ex : nothing))
+    bs_obj = _first_beamsplitter(coating(mi), entering(mi), exiting(mi))
     if bs_obj !== nothing
         return interact3d(system, bs_obj, trans, int, beam, ray)
     end
     
-    target_obj = entering(mi) !== nothing ? entering(mi) : exiting(mi)
+    target_obj = something(entering(mi), exiting(mi))
     model = surface_model(target_obj)
     
     out_ray = interact3d(model, trans, int, ray)

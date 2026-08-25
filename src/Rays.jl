@@ -31,6 +31,7 @@ Resolves or replaces the trajectory segment of an existing `ray` with a new `seg
 """
 Ray{T, S}(ray::Ray{T}, seg::S) where {T <: Real, S <: AbstractSegment{T}} = Ray{T, S}(seg, ray.λ, ray.n)
 Ray(ray::Ray{T}, seg::S) where {T <: Real, S <: AbstractSegment{T}} = Ray{T, S}(seg, ray.λ, ray.n)
+with_segment(ray::Ray, seg::AbstractSegment) = Ray(ray, seg)
 
 """
     Ray(pos, dir, λ=1000e-9, n=1.0)

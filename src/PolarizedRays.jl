@@ -81,6 +81,7 @@ PolarizedRay{T, S}(ray::PolarizedRay{T}, seg::S) where {T <: Real, S <: Abstract
 function PolarizedRay(ray::PolarizedRay{T}, seg::S) where {T <: Real, S <: AbstractSegment{T}}
     return PolarizedRay(seg, ray.λ, ray.n, ray.E0)
 end
+with_segment(ray::PolarizedRay, seg::AbstractSegment) = PolarizedRay(ray, seg)
 
 function (::Type{PolarizedRay{T}})(
         pos::AbstractArray{P},

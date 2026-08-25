@@ -31,15 +31,8 @@ function Base.push!(b::Beam{T, R}, ray::AbstractRay{T}) where {T, R}
         push!(b.segments, ray)
     else
         prev_opl = accumulated_opl(last(b.segments))
-        seg = segment(ray)
-        adjusted_seg = if seg isa LineSegment
-            LineSegment(position(seg), direction(seg), intersection(seg), prev_opl + optical_path_length(ray))
-        elseif seg isa OpenSegment
-            OpenSegment(position(seg), direction(seg), prev_opl + optical_path_length(ray))
-        else
-            seg
-        end
-        adjusted_ray = ray isa PolarizedRay ? PolarizedRay(ray, adjusted_seg) : Ray(ray, adjusted_seg)
+        new_opl = prev_opl + optical_path_length(ray)
+        adjusted_ray = with_accumulated_opl(ray, new_opl)
         push!(b.segments, adjusted_ray)
     end
 end
@@ -108,7 +101,7 @@ function _reset_beam!(beam::Beam)
     if !isempty(beam.segments)
         first_ray = first(beam.segments)
         reset_seg = OpenSegment(position(first_ray), direction(first_ray), 0.0)
-        reset_ray = first_ray isa PolarizedRay ? PolarizedRay(first_ray, reset_seg) : Ray(first_ray, reset_seg)
+        reset_ray = with_segment(first_ray, reset_seg)
         empty!(beam.segments)
         push!(beam.segments, reset_ray)
     end

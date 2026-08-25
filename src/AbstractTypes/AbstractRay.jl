@@ -39,6 +39,20 @@ Evaluates the 3D point along the ray at distance parameter `t`: ``\\vec{p}(t) = 
 """
 @inline propagate(ray::AbstractRay, t::Real) = propagate(segment(ray), t)
 
+"""
+    with_segment(ray::AbstractRay, seg::AbstractSegment) -> AbstractRay
+
+Replaces the trajectory segment of `ray` with `seg` while preserving optical properties.
+"""
+function with_segment end
+
+"""
+    with_accumulated_opl(ray::AbstractRay, opl::Real) -> AbstractRay
+
+Returns a copy of `ray` with updated `accumulated_opl` on its segment.
+"""
+@inline with_accumulated_opl(ray::AbstractRay, opl::Real) = with_segment(ray, with_accumulated_opl(segment(ray), opl))
+
 
 """
     bounding_sphere(obj)

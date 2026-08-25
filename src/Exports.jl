@@ -5,6 +5,7 @@ export position, direction, orientation
 
 # ray and beam type export
 export Ray, PolarizedRay, AbstractSegment, OpenSegment, LineSegment, segment, segments, accumulated_opl,
+       with_segment, with_accumulated_opl,
        Beam, PointSource, CollimatedSource, UniformDiscSource,
        GaussianBeamlet, AstigmaticGaussianBeamlet, rayleigh_range, rays, point_on_beam,
        normal3d, optical_path_length
@@ -23,7 +24,7 @@ export AbstractSurfaceModel, FresnelSurface, IdealMirrorSurface, AbsorbingSurfac
 export AbstractVolumeModel, VolumeInteraction
 export AbstractCoating, Coating, surface_model
 export Transition, resolve_transition, current_medium, propagate_volume, interact3d
-export Intersection, intersection
+export Intersection, intersection, geometry_intersection
 
 # system
 export System, StaticSystem, solve_system!, ambient_medium
@@ -59,7 +60,7 @@ export Detector, electric_field, intensity, spot_diagram, optical_power, gauss_p
        waist_parameters, Centroid, MinMax
 
 # splitters
-export ThinBeamsplitter, RoundThinBeamsplitter, RectangularPlateBeamsplitter,
+export AbstractBeamsplitter, ThinBeamsplitter, RoundThinBeamsplitter, RectangularPlateBeamsplitter,
        RoundPlateBeamsplitter, CubeBeamsplitter, RectangularCompensatorPlate
 
 # polarizing components

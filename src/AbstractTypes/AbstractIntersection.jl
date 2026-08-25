@@ -59,6 +59,14 @@ end
 exiting(mi::MultiIntersection) = mi.exiting
 entering(mi::MultiIntersection) = mi.entering
 coating(mi::MultiIntersection) = mi.coating
+
+"""
+    geometry_intersection(int::AbstractIntersection) -> Intersection
+
+Extracts the underlying geometrical `Intersection` from an `AbstractIntersection`.
+"""
+geometry_intersection(i::Intersection) = i
+geometry_intersection(mi::MultiIntersection) = mi.hit
 Base.length(mi::MultiIntersection) = length(mi.hit)
 normal3d(mi::MultiIntersection) = normal3d(mi.hit)
 Base.position(mi::MultiIntersection) = position(mi.hit)

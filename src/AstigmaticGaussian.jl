@@ -339,10 +339,7 @@ function interact3d(system::AbstractSystem,
         mi::MultiIntersection,
         agb::AstigmaticGaussianBeamlet{R},
         ray_id::Int) where {R}
-    c_obj = coating(mi)
-    obj_en = entering(mi)
-    obj_ex = exiting(mi)
-    bs_obj = c_obj isa AbstractBeamsplitter ? c_obj : (obj_en isa AbstractBeamsplitter ? obj_en : (obj_ex isa AbstractBeamsplitter ? obj_ex : nothing))
+    bs_obj = _first_beamsplitter(coating(mi), entering(mi), exiting(mi))
     if bs_obj !== nothing
         ambient = ambient_medium(system)
         trans = resolve_transition(mi, ambient, rays(agb.c)[ray_id])

@@ -100,3 +100,11 @@ normal3d(s::LineSegment) = normal3d(s.intersection)
 accumulated_opl(s::LineSegment) = s.accumulated_opl
 Base.length(s::LineSegment) = length(s.intersection)
 @inline propagate(s::LineSegment{T}, t::Real) where {T} = position(s) + T(t) * direction(s)
+
+"""
+    with_accumulated_opl(seg::AbstractSegment, opl::Real) -> AbstractSegment
+
+Returns a copy of `seg` with updated `accumulated_opl`.
+"""
+with_accumulated_opl(s::OpenSegment{T}, opl::Real) where {T} = OpenSegment{T}(s.pos, s.dir, T(opl))
+with_accumulated_opl(s::LineSegment{T}, opl::Real) where {T} = LineSegment{T}(s.p0, s.dir, s.intersection, T(opl))

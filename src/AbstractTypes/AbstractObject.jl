@@ -31,6 +31,8 @@ is dispatched.
 """
 abstract type AbstractObject{T <: Real} end
 
+abstract type AbstractBeamsplitter{T <: Real} <: AbstractObject{T} end
+
 "Default trait"
 shape_trait_of(::AbstractObject) = SingleShape()
 

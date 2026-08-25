@@ -66,3 +66,8 @@ end
 
 # Fallback for rays storing scalar refractive index instead of AbstractMedium
 current_medium(ray::AbstractRay) = IsotropicMedium(refractive_index(ray))
+
+# Helper to dispatch on beamsplitter among coincident objects
+@inline _first_beamsplitter(bs::AbstractBeamsplitter, ::Any...) = bs
+@inline _first_beamsplitter(::Any, objs...) = _first_beamsplitter(objs...)
+@inline _first_beamsplitter() = nothing
