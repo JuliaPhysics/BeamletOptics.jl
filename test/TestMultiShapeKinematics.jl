@@ -90,6 +90,14 @@ const BMO = BeamletOptics
         @test position(s_rear) ≈ initial_front_pos + expected_rear_offset atol=1e-12
     end
 
+    @testset "MultiShape align3d!" begin
+        target_axis = Point3(1.0, 0.0, 0.0)
+        align3d!(optic, target_axis)
+        @test normalize(orientation(optic)[:, 2]) ≈ target_axis atol=1e-12
+        @test normalize(orientation(s_front)[:, 2]) ≈ target_axis atol=1e-12
+        @test normalize(orientation(front_coating)[:, 2]) ≈ target_axis atol=1e-12
+    end
+
     @testset "DetectorSurface record! interface" begin
         d_hits = []
         d_surf = DetectorSurface(d_hits)

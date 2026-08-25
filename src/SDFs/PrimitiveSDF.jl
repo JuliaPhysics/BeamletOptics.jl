@@ -22,9 +22,9 @@ end
 
 Creates a [`BoxSDF`](@ref) with:
 
-- `x`: x-dir. edge length in [m]
-- `y`: y-dir. edge length in [m]
-- `z`: z-dir. edge length in [m]
+- `x`: x-dir. edge length in \\[m\\]
+- `y`: y-dir. edge length in \\[m\\]
+- `z`: z-dir. edge length in \\[m\\]
 """
 function BoxSDF(x::X, y::Y, z::Z) where {X<:Real, Y<:Real, Z<:Real}
     T = float(promote_type(X, Y, Z))
@@ -207,7 +207,7 @@ end
 """
     RightAnglePrismSDF(leg_length, height)
 
-Constructs a symmetric right angle prism with `leg_length` in x and y and `height` z in [m].
+Constructs a symmetric right angle prism with `leg_length` in x and y and `height` z in \\[m\\].
 """
 function RightAnglePrismSDF(leg_length::L, height::H) where {L, H}
     T = promote_type(L, H)

@@ -195,6 +195,8 @@ function isparaxial(::AbstractSystem, beam::Beam, threshold::Real = π / 4)
             if !is_refracted
                 continue
             end
+        else
+            continue
         end
 
         angle = angle3d(direction(ray), normal3d(int))

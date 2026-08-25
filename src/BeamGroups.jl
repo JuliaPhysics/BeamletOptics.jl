@@ -38,7 +38,7 @@ The following inputs and arguments can be used to configure the [`PointSource`](
 - `pos`: center beam starting position
 - `dir`: center beam starting direction
 - `θ`: half spread angle in rad
-- `λ = 1e-6`: wavelength in [m], default val. is 1000 nm
+- `λ = 1e-6`: wavelength in \\[m\\], default val. is 1000 nm
 
 ## Keyword Arguments
 
@@ -138,8 +138,8 @@ The following inputs and arguments can be used to configure the [`CollimatedSour
 
 - `pos`: center beam starting position
 - `dir`: center beam starting direction
-- `diameter`: outer beam bundle diameter in [m]
-- `λ = 1e-6`: wavelength in [m], default val. is 1000 nm
+- `diameter`: outer beam bundle diameter in \\[m\\]
+- `λ = 1e-6`: wavelength in \\[m\\], default val. is 1000 nm
 
 ## Keyword Arguments
 
@@ -212,8 +212,8 @@ The following inputs and arguments can be used to configure the underlying [`Col
 
 - `pos`: center beam starting position
 - `dir`: center beam starting direction
-- `diameter`: outer beam bundle diameter in [m]
-- `λ = 1e-6`: wavelength in [m]
+- `diameter`: outer beam bundle diameter in \\[m\\]
+- `λ = 1e-6`: wavelength in \\[m\\]
 
 ## Keyword Arguments
 

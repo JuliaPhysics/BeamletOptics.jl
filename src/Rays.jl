@@ -5,7 +5,7 @@ Immutable struct to store geometrical ray information and physical parameters in
 
 # Fields
 - `segment::S`: the trajectory segment of the ray (subtyping [`AbstractSegment`](@ref))
-- `λ::T`: wavelength in [m]
+- `λ::T`: wavelength in \\[m\\]
 - `n::T`: refractive index of current medium
 """
 struct Ray{T <: Real, S <: AbstractSegment{T}} <: AbstractRay{T, S}

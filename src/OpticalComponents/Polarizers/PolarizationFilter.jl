@@ -16,7 +16,7 @@ end
 """
     PolarizationFilter(edge_length; cutoff_strength)
 
-Spawns a thin, rectangular [`PolarizationFilter`](@ref). The `edge_length` has to be specified in [m].
+Spawns a thin, rectangular [`PolarizationFilter`](@ref). The `edge_length` has to be specified in \\[m\\].
 The filter is aligned with the global y-axis and transmits along the x-axis, while blocking polarization components
 along the global z-axis.
 """
@@ -37,7 +37,7 @@ function interact3d(::AbstractSystem,
     npos = position(int)
     ndir = direction(ray)
 
-    E0 = _calculate_global_E0(polfilter, ray, ndir, polfilter.JMat)
+    E0 = _calculate_global_E0(polfilter, ray, ndir, polfilter.JMat, int)
 
     # Terminate blocked rays
     if norm(E0) ≈ polfilter.cutoff || norm(E0) < polfilter.cutoff

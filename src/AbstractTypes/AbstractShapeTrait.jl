@@ -67,7 +67,7 @@ If `shape_trait_of(::Foo) = MultiShape()` is defined, `Foo` must implement the f
 
 # Additional information
 
-!!! warn "Kinematic center"
+!!! warning "Kinematic center"
     Unless specified otherwise by dispatching `position` / `position!` and `orientation` / `orientation!`
     onto custom `pos` and `dir` data fields, the **position and orientation of the first element** returned
     by `shape(object)` will be used as the **kinematic center** for e.g. `translate3d!`.
@@ -276,9 +276,26 @@ end
     return visited
 end
 
-function align3d!(::MultiShape, object::Union{AbstractObject, AbstractObjectGroup}, target_vec)
-    # FIXME
-    @warn "align3d! not yet implemented for MultiShape"
+"""
+    align3d!(::MultiShape, object, target_vec)
+
+Rotates all constituent parts of the [`MultiShape`](@ref) `object` around its kinematic origin
+such that the primary local y-axis aligns with `target_vec`.
+"""
+@inline function align3d!(::MultiShape, object::Union{AbstractObject, AbstractObjectGroup}, target_vec)
+    start_vec = normalize(orientation(object)[:, 2])
+    tgt = normalize(target_vec)
+    c = dot(start_vec, tgt)
+    if c ≈ 1
+        return nothing
+    elseif c ≈ -1
+        ax = normal3d(start_vec)
+        rotate3d!(MultiShape(), object, ax, π)
+    else
+        ax = normalize(cross(start_vec, tgt))
+        θ = acos(clamp(c, -1.0, 1.0))
+        rotate3d!(MultiShape(), object, ax, θ)
+    end
     return nothing
 end
 

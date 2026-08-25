@@ -2,12 +2,15 @@
     current_intersection(beam, obj, ray) -> Nullable{AbstractIntersection}
 
 Returns the surface intersection for the current interaction step: the intersection
-already carried by the most recently traced ray in `beam`, or a freshly computed one via
-`intersect3d` against `obj`'s shape if `beam` has not been traced this far yet (or at all,
-e.g. when `interact3d` is called directly instead of via [`trace_system!`](@ref)).
+already carried by `ray`, or by the most recently traced ray in `beam`, or a freshly computed one via
+`intersect3d` against `obj`'s shape if `ray` has not been resolved yet (e.g. when `interact3d` is called
+directly with an unresolved ray instead of via [`trace_system!`](@ref)).
 """
 function current_intersection(beam::AbstractBeam, obj, ray::AbstractRay)
-    last_int = isempty(beam.rays) ? nothing : intersection(last(beam.rays))
+    ray_int = intersection(ray)
+    !isnothing(ray_int) && return ray_int
+    r_vec = rays(beam)
+    last_int = isempty(r_vec) ? nothing : intersection(last(r_vec))
     return isnothing(last_int) ? intersect3d(shape(obj), ray) : last_int
 end
 
@@ -19,17 +22,26 @@ boundary interaction pipeline (see [`interact3d(::AbstractSystem, ::Union, ::Abs
 Subtypes of [`AbstractRefractiveOptic`](@ref), [`AbstractReflectiveOptic`](@ref) and
 [`AbstractCoating`](@ref) may specialize this to override the default per-family behavior.
 """
-transition_for(optic::AbstractRefractiveOptic, system::AbstractSystem, ray::AbstractRay, int::AbstractIntersection) =
-    resolve_transition(medium_from(optic), ambient_medium(system), ray, normal3d(int))
+transition_for(optic::AbstractRefractiveOptic, system::AbstractSystem, ray::AbstractRay, int::AbstractIntersection) = resolve_transition(
+    medium_from(optic), ambient_medium(system), ray, normal3d(int))
 
-function transition_for(::AbstractReflectiveOptic, system::AbstractSystem, ::AbstractRay, ::AbstractIntersection)
+function transition_for(::AbstractReflectiveOptic, system::AbstractSystem,
+        ::AbstractRay, ::AbstractIntersection)
     amb = ambient_medium(system)
     return Transition(amb, amb, false)
 end
 
-function transition_for(::AbstractCoating, system::AbstractSystem, ray::AbstractRay, int::AbstractIntersection)
+function transition_for(::AbstractCoating, system::AbstractSystem,
+        ray::AbstractRay, int::AbstractIntersection)
     amb = ambient_medium(system)
     return resolve_transition(amb, amb, ray, normal3d(int))
+end
+
+function transition_for(optic::AbstractObject, system::AbstractSystem,
+        ray::AbstractRay, int::AbstractIntersection)
+    is_refractive(optic) ?
+    resolve_transition(medium_from(optic), ambient_medium(system), ray, normal3d(int)) :
+    Transition(ambient_medium(system), ambient_medium(system), false)
 end
 
 """
@@ -41,9 +53,11 @@ overrides this to flag total internal reflection / re-entry ambiguities for the 
 """
 interaction_hint(::AbstractObject, ::Transition, ::AbstractRay, ::AbstractRay) = nothing
 
-function interaction_hint(optic::AbstractRefractiveOptic, trans::Transition, out_ray::AbstractRay, ray::AbstractRay)
+function interaction_hint(optic::AbstractRefractiveOptic, trans::Transition,
+        out_ray::AbstractRay, ray::AbstractRay)
     entering = trans.is_entering
-    tir = (out_ray.n == refractive_index(optic, wavelength(ray)) && !entering)
+    optic_n = refractive_index(optic, wavelength(ray))
+    tir = (!entering && isapprox(refractive_index(out_ray), optic_n; atol = 1e-10))
     return (entering || tir) ? Hint(optic) : nothing
 end
 

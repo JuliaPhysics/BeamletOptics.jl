@@ -27,7 +27,7 @@ end
 """
     AconvexCylinderSDF(radius, diameter, height)
 
-Constructs an aconvex cylinder with radius `r`, diameter `d` and height `h` in [m].
+Constructs an aconvex cylinder with radius `r`, diameter `d` and height `h` in \\[m\\].
 The acylindric shape is defined by its `conic_constant` and the `coefficients` for the
 even aspheric polynomoial.
 """
@@ -96,7 +96,7 @@ end
 """
     AconcaveCylinderSDF(radius, diameter, height)
 
-Constructs an aconcave cylinder cutout with radius `r`, diameter `d` and height `h` in [m].
+Constructs an aconcave cylinder cutout with radius `r`, diameter `d` and height `h` in \\[m\\].
 The acylindric shape is defined by its `conic_constant` and the `coefficients` for the
 even aspheric polynomoial.
 """

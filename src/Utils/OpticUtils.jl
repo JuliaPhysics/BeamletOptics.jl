@@ -110,7 +110,7 @@ intensity(E::Number, Z = Z_vacuum) = abs2(E) / (2 * Z)
 """
 fresnel_coefficients(θ, n)
 
-Calculates the complex Fresnel coefficients for reflection and transmission based on the incident angle `θ` in [rad]
+Calculates the complex Fresnel coefficients for reflection and transmission based on the incident angle `θ` in \\[rad\\]
 and the refractive index ratio `n = n₂ / n₁`. Returns rₛ, rₚ, tₛ and tₚ.
 
 # Signs
@@ -179,7 +179,7 @@ end
     fresnel_power_coefficients(θ::Real, n::Number)
 
 Calculates the power reflectance and transmittance coefficients ``R_s, R_p, T_s, T_p``
-across a dielectric boundary for incident angle `θ` in [rad] and index ratio `n = n₂ / n₁`.
+across a dielectric boundary for incident angle `θ` in \\[rad\\] and index ratio `n = n₂ / n₁`.
 Satisfies radiant flux conservation ``R_s + T_s = 1`` and ``R_p + T_p = 1``.
 """
 function fresnel_power_coefficients(θ::Real, n::Number)

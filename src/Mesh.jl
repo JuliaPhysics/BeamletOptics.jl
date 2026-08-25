@@ -46,7 +46,7 @@ vertices and faces. The mesh is initialized at the global origin. Data type of M
 type of vertex data (i.e `Float32`).
 
 !!! tip
-    Mesh vertex data is scaled by factor 1e-3, assuming [m] scale. Ensure that the export program is adjusted accordingly
+    Mesh vertex data is scaled by factor 1e-3, assuming \\[m\\] scale. Ensure that the export program is adjusted accordingly
     when scaling issues occur.
 """
 function Mesh(mesh)
@@ -300,8 +300,8 @@ Creates a 2D rectangular [`Mesh`](@ref) that is centered around the origin and a
 
 # Inputs
 
-- `width`: width along the x-axis in [m]
-- `height`: height along the z-axis in [m]
+- `width`: width along the x-axis in \\[m\\]
+- `height`: height along the z-axis in \\[m\\]
 """
 function RectangularFlatMesh(width::W, height::H) where {W<:Real, H<:Real}
     T = promote_type(W, H)
@@ -340,7 +340,7 @@ Creates a 2D rectangular [`Mesh`](@ref) that is centered around the origin and a
 
 # Inputs
 
-- `radius`: of the mesh in [m]
+- `radius`: of the mesh in \\[m\\]
 - `n`: slice discretization factor (higher equals better resolution)
 """
 function CircularFlatMesh(radius::T, n::Int=30) where T<:Real
@@ -380,7 +380,7 @@ The mesh is initialized such that one corner of the cuboid lies at the origin.
 
 # Arguments
 
-- `x, y, z`: dimensions for the cube in [m]
+- `x, y, z`: dimensions for the cube in \\[m\\]
 - `θ`: parallel tilt angle
 """
 function CuboidMesh(x::X, y::Y, z::Z, θ::Real=π/2) where {X<:Real, Y<:Real, Z<:Real}

@@ -60,14 +60,14 @@ The splitter coating is centered at the origin. See also [`RoundPlateBeamsplitte
 
 # Inputs
 
-- `width`: substrate width along the x-axis in [m]
-- `height`: substrate height along the z-axis in [m]
-- `thickness`: substrate thickness along the y-axis in [m]
+- `width`: substrate width along the x-axis in \\[m\\]
+- `height`: substrate height along the z-axis in \\[m\\]
+- `thickness`: substrate thickness along the y-axis in \\[m\\]
 - `n`: the [`RefractiveIndex`](@ref) of the substrate
 
 # Keywords
 
-- `reflectance`: defines the splitting ratio in [-], i.e. R = 0 ... 1.0
+- `reflectance`: defines the splitting ratio in \\[-\\], i.e. R = 0 ... 1.0
 """
 function RectangularPlateBeamsplitter(
         width::Real,
@@ -115,13 +115,13 @@ The coating is centered at the origin. See also [`RectangularPlateBeamsplitter`]
 
 # Inputs
 
-- `diameter`: x-z-plane substrate diameter in [m]
-- `thickness`: substrate thickness along the z-axis in [m]
+- `diameter`: x-z-plane substrate diameter in \\[m\\]
+- `thickness`: substrate thickness along the z-axis in \\[m\\]
 - `n`: the [`RefractiveIndex`](@ref) of the substrate
 
 # Keywords 
 
-- `reflectance`: defines the splitting ratio in [-], i.e. R = 0 ... 1.0
+- `reflectance`: defines the splitting ratio in \\[-\\], i.e. R = 0 ... 1.0
 """
 function RoundPlateBeamsplitter(
         diameter::Real,

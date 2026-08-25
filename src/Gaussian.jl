@@ -15,9 +15,9 @@ and
 - `chief`: a [`Beam`](@ref) of [`Ray`](@ref)s to store the chief ray
 - `waist`: a [`Beam`](@ref) of [`Ray`](@ref)s to store the waist ray
 - `divergence`: a [`Beam`](@ref) of [`Ray`](@ref)s to store the divergence ray
-- `λ`: beam wavelength in [m]
-- `w0`: local beam waist radius in [m]
-- `E0`: complex field value in [V/m]
+- `λ`: beam wavelength in \\[m\\]
+- `w0`: local beam waist radius in \\[m\\]
+- `E0`: complex field value in \\[V/m\\]
 - `parent`: reference to the parent beam, if any ([`Nullable`](@ref) to account for the root beam which has no parent)
 - `children`: vector of child beams, each child beam represents a branching or bifurcation of the original beam, i.e. beam-splitting
 
@@ -87,13 +87,6 @@ beam_waist(beam::GaussianBeamlet) = beam.w0
 electric_field(beam::GaussianBeamlet) = beam.E0
 electric_field!(beam::GaussianBeamlet{T}, new) where {T} = (beam.E0 = Complex{T}(new))
 refractive_index(beam::GaussianBeamlet, id::Int) = refractive_index(rays(beam.chief)[id])
-function refractive_index!(beam::GaussianBeamlet, id::Int, n_new::Real)
-    refractive_index!(rays(beam.chief)[id], n_new)
-    refractive_index!(rays(beam.waist)[id], n_new)
-    refractive_index!(rays(beam.divergence)[id], n_new)
-    return nothing
-end
-
 Base.length(gauss::GaussianBeamlet) = length(gauss.chief)
 optical_path_length(gauss::GaussianBeamlet) = optical_path_length(gauss.chief)
 
@@ -208,21 +201,21 @@ The following inputs and arguments can be used to configure the beamlet:
 
 - `position`: origin of the beamlet
 - `direction`: direction of the beamlet
-- `λ`: wavelength of the beamlet in [m]. Default value is 1000 nm.
-- `w0`: beam waist (radius) in [m]. Default value is 1 mm.
+- `λ`: wavelength of the beamlet in \\[m\\]. Default value is 1000 nm.
+- `w0`: beam waist (radius) in \\[m\\]. Default value is 1 mm.
 
 ## Keyword Arguments
 
 - `M2`: beam quality factor. Default is 1
-- `P0`: beam total power in [W]. Default is 1 mW
-- `z0`: beam waist offset in [m]. Default is 0 m
+- `P0`: beam total power in \\[W\\]. Default is 1 mW
+- `z0`: beam waist offset in \\[m\\]. Default is 0 m
 - `support`: [`Nullable`](@ref) support vector for the construction of the waist and div rays
 
 # Additional information
 
 !!! tip "Waist offset"
     The `z0` keyword arg. can be used in order to spawn a beam where the waist is not located at the
-    specified `position`, but rather at an offset `z0` in [m] along the chief ray axis.
+    specified `position`, but rather at an offset `z0` in \\[m\\] along the chief ray axis.
 
 !!! info "Support vector"
     In order to calculate the basis vectors required for the beamlet construction, a random orthogonal vector is chosen.

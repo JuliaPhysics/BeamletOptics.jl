@@ -59,8 +59,13 @@ A container storing the optical elements of, i.e. a camera lens or lab setup, an
 struct System{M <: AbstractMedium} <: AbstractSystem
     objects::Vector{_ObjectOrGroup}
     ambient_medium::M
+    flat_objects::Vector{AbstractObject}
 end
 
+function System(objects::Vector{_ObjectOrGroup}, ambient::M) where {M <: AbstractMedium}
+    flat = _flatten_system_objects(objects)
+    return System{M}(objects, ambient, flat)
+end
 System(objects::Vector{_ObjectOrGroup}) = System(objects, Ambient())
 System(objects::AbstractVector) = System(Vector{_ObjectOrGroup}(objects), Ambient())
 System(object::_ObjectOrGroup) = System([object], Ambient())
@@ -79,7 +84,19 @@ Exposes all objects stored within the system as a flat, trace-ready list: any
 [`CubeBeamsplitter`](@ref) or [`DoubletLens`](@ref)) is recursively expanded into its
 constituent [`AbstractObject`](@ref)s, see [`_flatten_system_objects`](@ref).
 """
-objects(system::System) = _flatten_system_objects(system.objects)
+objects(system::System) = system.flat_objects
+
+function Base.push!(system::System, obj::_ObjectOrGroup)
+    push!(system.objects, obj)
+    _flatten_system_objects!(system.flat_objects, obj)
+    return system
+end
+
+function Base.empty!(system::System)
+    empty!(system.objects)
+    empty!(system.flat_objects)
+    return system
+end
 
 """
     StaticSystem{T<:Tuple, M<:AbstractMedium} <: AbstractSystem
@@ -124,35 +141,33 @@ end
 @inline function trace_all(system::AbstractSystem, ray::AbstractRay{R}) where {R}
     tol = get_coincident_boundary_tolerance()
     best_t = R(Inf)
-    coincident_hits = Tuple{Intersection{R}, AbstractObject}[]
+    hits = ()
     
     # Iterate over all optical objects/interfaces in system
     for obj in objects(system)
         temp = intersect3d(obj, ray)
-        if temp === nothing
-            continue
-        end
+        temp === nothing && continue
         t_hit = length(temp)
 
-        if isempty(coincident_hits)
+        if isempty(hits)
             best_t = t_hit
-            push!(coincident_hits, (temp, obj))
+            hits = ((temp, obj),)
         elseif abs(t_hit - best_t) <= tol
-            push!(coincident_hits, (temp, obj))
+            length(hits) >= 3 && throw(ErrorException("Too many hits detected at interface"))
+            hits = (hits..., (temp, obj))
             if t_hit < best_t
                 best_t = t_hit
             end
         elseif t_hit < best_t - tol
             best_t = t_hit
-            empty!(coincident_hits)
-            push!(coincident_hits, (temp, obj))
+            hits = ((temp, obj),)
         end
     end
     
-    return _resolve_coincident_hits(coincident_hits, ray)
+    return _resolve_coincident_hits(hits, ray)
 end
 
-@inline function _resolve_coincident_hits(hits::Vector{Tuple{Intersection{R}, AbstractObject}}, ray::AbstractRay{R}) where {R}
+@inline function _resolve_coincident_hits(hits::Union{Tuple, AbstractVector}, ray::AbstractRay{R}) where {R}
     # no Intersection detected
     if isempty(hits)
         return nothing
@@ -172,19 +187,26 @@ end
     exiting_obj = nothing
     entering_obj = nothing
     coating_obj = nothing
+    dir = direction(ray)
+
     # determine coating, entry obj and exit obj via ray dir
     for (hit, obj) in hits
-        # FIXME can be unified once Coatings are introduced fully
         if obj isa AbstractCoating || obj isa AbstractBeamsplitter
             # Zero-thickness interface, not a solid volume: can't be "entered"/"exited"
             coating_obj = obj
         else
             # Ray exits a volume through a surface whose outward normal points the same
             # way as the ray direction (dot > 0); it enters through the opposite case
-            is_exit = dot(direction(ray), normal3d(hit)) > 0
+            is_exit = dot(dir, normal3d(hit)) > 0
             if is_exit
+                if exiting_obj !== nothing
+                    throw(ErrorException("Multiple exiting objects detected at coincident interface: $(typeof(exiting_obj)) and $(typeof(obj))"))
+                end
                 exiting_obj = obj
             else
+                if entering_obj !== nothing
+                    throw(ErrorException("Multiple entering objects detected at coincident interface: $(typeof(entering_obj)) and $(typeof(obj))"))
+                end
                 entering_obj = obj
             end
         end
@@ -197,7 +219,7 @@ end
         if length(hits) >= 2
             h1, o1 = hits[1]
             h2, o2 = hits[2]
-            h1_is_exit = dot(direction(ray), normal3d(h1)) > 0
+            h1_is_exit = dot(dir, normal3d(h1)) > 0
             exiting_obj = h1_is_exit ? o1 : o2
             entering_obj = h1_is_exit ? o2 : o1
         end
@@ -221,17 +243,18 @@ end
     # Check if this hit is coincident with another object in system
     tol = get_coincident_boundary_tolerance()
     best_t = length(shape_intersection)
-    coincident_hits = Tuple{Intersection{R}, AbstractObject}[(shape_intersection, object(hint))]
+    hits = ((shape_intersection, object(hint)),)
 
     for obj in objects(system)
         obj === object(hint) && continue
         temp = intersect3d(obj, ray)
         if temp !== nothing && abs(length(temp) - best_t) <= tol
-            push!(coincident_hits, (temp, obj))
+            length(hits) >= 3 && throw(ErrorException("Too many hits detected at interface"))
+            hits = (hits..., (temp, obj))
         end
     end
 
-    return _resolve_coincident_hits(coincident_hits, ray)
+    return _resolve_coincident_hits(hits, ray)
 end
 
 @inline trace_one(system::AbstractSystem, ray::AbstractRay, ::Nothing) = trace_all(system, ray)

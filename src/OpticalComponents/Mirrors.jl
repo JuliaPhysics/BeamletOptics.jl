@@ -51,7 +51,7 @@ The reflecting surface is normal to the y-axis.
 
 # Inputs
 
-- `edge_length`: the edge length of the square mirror in [m]
+- `edge_length`: the edge length of the square mirror in \\[m\\]
 """
 function SquarePlanoMirror2D(size::T) where {T <: Real}
     shape = QuadraticFlatMesh(size)
@@ -66,9 +66,9 @@ The front reflecting surface is normal to the y-axis and lies at the origin.
 
 # Inputs
 
-- `width`:      of the mirror in x-direction [m] 
-- `height`:     of the mirror in z-direction [m] 
-- `thickness`:  of the mirror in y-direction [m] 
+- `width`:      of the mirror in x-direction \\[m\\] 
+- `height`:     of the mirror in z-direction \\[m\\] 
+- `thickness`:  of the mirror in y-direction \\[m\\] 
 """
 function RectangularPlanoMirror(width::W, height::H, thickness::T) where {W<:Real,H<:Real,T<:Real}
     shape = CuboidMesh(width, thickness, height)
@@ -90,8 +90,8 @@ See also [`RectangularPlanoMirror`](@ref).
 
 # Inputs
 
-- `width`: the side length of the square mirror in x- and y-direction [m]
-- `thickness`: of the mirror in [m]
+- `width`: the side length of the square mirror in x- and y-direction \\[m\\]
+- `thickness`: of the mirror in \\[m\\]
 """
 function SquarePlanoMirror(width::W, thickness::T) where {W<:Real,T<:Real}
     return RectangularPlanoMirror(width, width, thickness)
@@ -118,8 +118,8 @@ Returns a cylindrical, flat [`RoundPlanoMirror`](@ref) with perfect reflectivity
 
 # Inputs
 
-- `diameter`: mirror diameter in [m]
-- `thickness`: mirror substrate thickness in [m]
+- `diameter`: mirror diameter in \\[m\\]
+- `thickness`: mirror substrate thickness in \\[m\\]
 """
 function RoundPlanoMirror(diameter::D, thickness::T) where {D<:Real,T<:Real}
     shape = PlanoSurfaceSDF(thickness, diameter)
@@ -151,9 +151,9 @@ See also [`ConcaveSphericalMirror`](@ref).
 
 # Inputs
 
-- `radius`: the spherical surface radius of curvature in [m]
-- `thickness`: substrate thickness in [m]
-- `diameter`: mirror outer diameter in [m]
+- `radius`: the spherical surface radius of curvature in \\[m\\]
+- `thickness`: substrate thickness in \\[m\\]
+- `diameter`: mirror outer diameter in \\[m\\]
 """
 function ConcaveSphericalMirror(radius::Real, thickness::Real, diameter::Real)
     cylinder = PlanoSurfaceSDF(thickness, diameter)
@@ -183,8 +183,8 @@ Constructs a right angle prism mirror. The primary surface is aligned with the p
 
 # Inputs
 
-- `leg_length`: edge length in x and y in [m] 
-- `height`: in z-axis in [m]
+- `leg_length`: mirror leg length in \\[m\\]
+- `height`: mirror height in \\[m\\]
 """
 function RightAnglePrismMirror(leg_length::Real, height::Real)
     shape = RightAnglePrismSDF(leg_length, height)

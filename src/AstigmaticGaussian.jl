@@ -73,17 +73,17 @@ In the 5-argument version, independent waists `w0_x` and `w0_y` can be specified
 
 - `position`: origin of the beamlet
 - `direction`: direction of the beamlet
-- `λ`: wavelength of the beamlet in [m]. Default value is 1000 nm.
-- `w0`: beam waist (radius) in [m]. Default value is 1 mm.
-- `w0_x`, `w0_y`: independent beam waists in [m].
+- `λ`: wavelength of the beamlet in \\[m\\]. Default value is 1000 nm.
+- `w0`: beam waist (radius) in \\[m\\]. Default value is 1 mm.
+- `w0_x`, `w0_y`: independent beam waists in \\[m\\].
 
 ## Keyword Arguments
 
 - `M2`, `M2_x`, `M2_y`: beam quality factors. Default is 1
-- `P0`: beam total power in [W]. Default is 1 mW.
-- `E0`: electric field vector in [V/m]. Default is `nothing` (aligned with support axes, scaled by `P0`).
+- `P0`: beam total power in \\[W\\]. Default is 1 mW.
+- `E0`: electric field vector in \\[V/m\\]. Default is `nothing` (aligned with support axes, scaled by `P0`).
 - `support`: optional support vector for basis construction
-- `z0`: beam waist offset in [m]. Default is 0 m
+- `z0`: beam waist offset in \\[m\\]. Default is 0 m
 
 # Additional information
 
@@ -241,19 +241,14 @@ polarization(agb::AstigmaticGaussianBeamlet) = polarization(first(rays(agb.c)))
 
 electric_field(agb::AstigmaticGaussianBeamlet) = polarization(agb)
 function electric_field!(agb::AstigmaticGaussianBeamlet, new_E0)
-    polarization!(first(rays(agb.c)), new_E0)
-end
-
-function refractive_index(agb::AstigmaticGaussianBeamlet, id::Int)
-    return refractive_index(rays(agb.c)[id])
-end
-
-function refractive_index!(agb::AstigmaticGaussianBeamlet, id::Int, n_new::Real)
-    for beam in _component_beams(agb)
-        refractive_index!(rays(beam)[id], n_new)
+    if !isempty(rays(agb.c))
+        r = first(rays(agb.c))
+        agb.c.rays[1] = PolarizedRay(segment(r), wavelength(r), refractive_index(r), new_E0)
     end
     return nothing
 end
+
+refractive_index(agb::AstigmaticGaussianBeamlet, id::Int) = refractive_index(rays(agb.c)[id])
 
 """
     parent!(child::AstigmaticGaussianBeamlet, parent::AstigmaticGaussianBeamlet)
@@ -435,8 +430,8 @@ end
 Compute the complex parabasal ray parameters (h1, u1, h2, u2) at the transverse
 plane defined by the chief ray's position `p0` and direction at segment `i`.
 
-The real parts of `h` and `u` come from the divergence rays (dxp, dyp),
-while the imaginary parts come from the waist rays (wxp, wyp).
+The real parts of `h` and `u` come from the waist rays (wxp, wyp),
+while the imaginary parts come from the divergence rays (dxp, dyp).
 """
 function parabasal_ray_parameters(agb::AstigmaticGaussianBeamlet, p0, i)
     chief = rays(agb.c)[i]
@@ -538,9 +533,9 @@ end
 Apply a global phase shift `Δϕ` to the `AstigmaticGaussianBeamlet` by rotating the chief ray's polarization.
 """
 function shift_phase!(agb::AstigmaticGaussianBeamlet, Δϕ::Real)
-    for ray in rays(agb.c)
-        E = polarization(ray)
-        polarization!(ray, E * exp(im * Δϕ))
+    for (i, ray) in enumerate(rays(agb.c))
+        E = polarization(ray) * exp(im * Δϕ)
+        agb.c.rays[i] = PolarizedRay(segment(ray), wavelength(ray), refractive_index(ray), E)
     end
     return nothing
 end

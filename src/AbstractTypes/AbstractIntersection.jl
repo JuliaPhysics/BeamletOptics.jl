@@ -13,7 +13,7 @@ Base.position(i::AbstractIntersection) = i.p
     Intersection{T<:Real} <: AbstractIntersection{T}
 
 Stores the geometric details of a hit interface:
-- `t`: distance parameter along ray parametrization in [m]
+- `t`: distance parameter along ray parametrization in \\[m\\]
 - `p`: 3D position of the hit point
 - `n`: outward unit normal vector at the point of intersection
 """

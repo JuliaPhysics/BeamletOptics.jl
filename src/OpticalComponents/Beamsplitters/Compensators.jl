@@ -7,9 +7,9 @@ The compensator is aligned with the positive y-axis. The first surface lies at t
 
 # Inputs
 
-- `width`: compensator width along the x-axis in [m]
-- `height`: compensator height along the z-axis in [m]
-- `thickness`: compensator thickness along the y-axis in [m]
+- `width`: compensator width along the x-axis in \\[m\\]
+- `height`: compensator height along the z-axis in \\[m\\]
+- `thickness`: compensator thickness along the y-axis in \\[m\\]
 - `n`: the [`RefractiveIndex`](@ref) of the substrate
 """
 function RectangularCompensatorPlate(width::W, height::H, thickness::T, n::RefractiveIndex) where {W<:Real,H<:Real,T<:Real}

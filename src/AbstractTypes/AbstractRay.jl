@@ -11,7 +11,7 @@ To store the solved sequence of ray propagation segments through an optical syst
 # Implementation requirements
 Subtypes of `AbstractRay` must implement:
 - `segment`: an [`AbstractSegment`](@ref) describing the ray's spatial trajectory
-- `λ`: wavelength in [m]
+- `λ`: wavelength in \\[m\\]
 - `n`: refractive index along the ray path
 """
 abstract type AbstractRay{T <: Real, S <: AbstractSegment{T}} end

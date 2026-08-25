@@ -9,7 +9,7 @@ Subtypes of `AbstractMedium` should implement:
 - `refractive_index(medium, λ; T=293.15, P=101325.0, kwargs...)`: Real part of the refractive index ``n(\\lambda, T, P)`` for ray tracing and Snell refraction.
 - `complex_refractive_index(medium, λ; T=293.15, P=101325.0, kwargs...)`: Full complex refractive index ``\\tilde{n} = n + i\\kappa`` for thin-film, absorption, and gain calculations.
 - `extinction_coefficient(medium, λ; kwargs...)`: Imaginary part ``\\kappa`` representing absorption (``\\kappa > 0``) or gain (``\\kappa < 0``).
-- `absorption_coefficient(medium, λ; kwargs...)`: Linear attenuation/gain coefficient ``\\alpha = \\frac{4\\pi \\kappa}{\\lambda}`` [1/m].
+- `absorption_coefficient(medium, λ; kwargs...)`: Linear attenuation/gain coefficient ``\\alpha = \\frac{4\\pi \\kappa}{\\lambda}`` \\[1/m\\].
 """
 abstract type AbstractMedium end
 
@@ -100,7 +100,7 @@ end
 """
     absorption_coefficient(m::AbstractMedium, λ=0.0; kwargs...) -> Float64
 
-Returns the linear attenuation coefficient ``\\alpha = \\frac{4\\pi \\kappa}{\\lambda}`` [1/m].
+Returns the linear attenuation coefficient ``\\alpha = \\frac{4\\pi \\kappa}{\\lambda}`` \\[1/m\\].
 """
 function absorption_coefficient(m::AbstractMedium, λ::Real = 0.0; kwargs...)::Float64
     if λ <= 0

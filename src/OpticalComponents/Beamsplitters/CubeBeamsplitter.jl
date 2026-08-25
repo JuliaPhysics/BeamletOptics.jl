@@ -33,12 +33,12 @@ coating is orientated at a 45° angle with respect to the y-axis.
 
 # Inputs
 
-- `leg_length`: the x-, y- and z-edge length in [m]
+- `leg_length`: the x-, y- and z-edge length in \\[m\\]
 - `n`: the [`RefractiveIndex`](@ref) of the front and back prism
 
 # Keywords 
 
-- `reflectance`: defines the splitting ratio in [-], i.e. R = 0 ... 1.0
+- `reflectance`: defines the splitting ratio in \\[-\\], i.e. R = 0 ... 1.0
 """
 function CubeBeamsplitter(
         leg_length::Real,

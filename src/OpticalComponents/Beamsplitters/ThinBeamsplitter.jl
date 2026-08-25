@@ -27,8 +27,8 @@ transmittance(bs::ThinBeamsplitter) = bs.transmittance
 
 Creates a zero-thickness, lossless, non-polarizing 2D rectangular [`ThinBeamsplitter`](@ref) where
 
-- `width`: is the x-dir. edge length in [m]
-- `height`: is the z-dir. edge length in [m]
+- `width`: is the x-dir. edge length in \\[m\\]
+- `height`: is the z-dir. edge length in \\[m\\]
 - `reflectance`: kw-arg that determines how much light is **reflected**, i.e. 0.7 for a 70:30 splitter
 
 # Additional information
@@ -53,7 +53,7 @@ end
 """
     RoundThinBeamsplitter(diameter; reflectance=0.5)
 
-Creates a zero-thickness, 2D round [`ThinBeamsplitter`](@ref) with the specified `diameter` in [m].
+Creates a zero-thickness, 2D round [`ThinBeamsplitter`](@ref) with the specified `diameter` in \\[m\\].
 For more information, refer to the [`ThinBeamsplitter`](@ref) constructor.
 """
 function RoundThinBeamsplitter(diameter::Real; reflectance::Real = 0.5)

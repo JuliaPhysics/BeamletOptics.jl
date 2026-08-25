@@ -10,14 +10,14 @@ but must be transformed into global coordinates using the method described in th
 
 # Fields
 - `segment::S`: the trajectory segment of the ray
-- `λ::T`: wavelength in [m]
+- `λ::T`: wavelength in \\[m\\]
 - `n::T`: refractive index along the beam path
 - `E0::Point3{Complex{T}}`: complex-valued 3-tuple to represent the electric field in global coordinates
 
 # Jones matrices
 In local coordinates the Jones matrices in the case of reflection/refraction are defined as
-- reflection: [-rₛ 0; 0 rₚ]
-- transmission: [tₛ 0; 0 tₚ]
+- reflection: `[-rₛ 0; 0 rₚ]`
+- transmission: `[tₛ 0; 0 tₚ]`
 where r and t are the complex-valued Fresnel coefficients (see also [`fresnel_coefficients`](@ref)).
 """
 struct PolarizedRay{T <: Real, S <: AbstractSegment{T}} <: AbstractRay{T, S}

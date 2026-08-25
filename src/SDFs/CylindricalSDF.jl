@@ -38,7 +38,7 @@ end
 """
     ConvexCylinderSDF(radius, diameter, height)
 
-Constructs a cut cylinder with radius `r`, diameter `d` and height `h` in [m].
+Constructs a cut cylinder with radius `r`, diameter `d` and height `h` in \\[m\\].
 """
 function ConvexCylinderSDF(radius::R, diameter::D, height::H) where {R, D, H}
     T = promote_type(R, D, H)
@@ -101,7 +101,7 @@ end
 """
     ConcaveCylinderSDF(radius, diameter, height)
 
-Constructs a concave cylinder with radius `r`, diameter `d` and height `h` in [m].
+Constructs a concave cylinder with radius `r`, diameter `d` and height `h` in \\[m\\].
 """
 function ConcaveCylinderSDF(radius::R, diameter::D, height::H) where {R, D, H}
     T = promote_type(R, D, H)
