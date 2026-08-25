@@ -153,7 +153,7 @@ end
             best_t = t_hit
             hits = ((temp, obj),)
         elseif abs(t_hit - best_t) <= tol
-            length(hits) >= 3 && throw(ErrorException("Too many hits detected at interface"))
+            length(hits) >= 3 && throw(ErrorException("Too many coincident hits detected at interface (> 3 objects)"))
             hits = (hits..., (temp, obj))
             if t_hit < best_t
                 best_t = t_hit
@@ -178,7 +178,7 @@ end
     end
     # only up to three objects allowed at interface (2x substrate, 1x coating)
     if length(hits) > 3
-        throw(ErrorException("Too many hits detected at interface"))
+        throw(ErrorException("Too many coincident hits detected at interface (> 3 objects)"))
     end
     # sort hits
     best_hit = hits[1][1]
@@ -249,7 +249,7 @@ end
         obj === object(hint) && continue
         temp = intersect3d(obj, ray)
         if temp !== nothing && abs(length(temp) - best_t) <= tol
-            length(hits) >= 3 && throw(ErrorException("Too many hits detected at interface"))
+            length(hits) >= 3 && throw(ErrorException("Too many coincident hits detected at interface (> 3 objects)"))
             hits = (hits..., (temp, obj))
         end
     end

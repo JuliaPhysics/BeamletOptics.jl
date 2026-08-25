@@ -1,5 +1,5 @@
 """
-    current_intersection(beam::AbstractBeam, obj::AbstractObject, ray::AbstractRay) -> Nullable{AbstractIntersection}
+    current_intersection(beam::AbstractBeam{T}, obj::AbstractObject, ray::AbstractRay{T}) where {T <: Real} -> Nullable{AbstractIntersection}
 
 Returns the surface intersection for the current interaction step: the intersection
 already carried by `ray`, or by the most recently traced ray in `beam`, or a freshly computed one via
@@ -12,7 +12,11 @@ directly with an unresolved ray instead of via [`trace_system!`](@ref)).
 - `obj`: The optical component being hit.
 - `ray`: The incoming ray segment.
 """
-function current_intersection(beam::AbstractBeam, obj::AbstractObject, ray::AbstractRay)
+@inline function current_intersection(
+        beam::AbstractBeam{T},
+        obj::AbstractObject,
+        ray::AbstractRay{T}
+) where {T <: Real}
     ray_int = intersection(ray)
     !isnothing(ray_int) && return ray_int
     r_vec = rays(beam)
@@ -35,29 +39,45 @@ Subtypes of [`AbstractRefractiveOptic`](@ref), [`AbstractReflectiveOptic`](@ref)
 - `ray`: The incident ray.
 - `int`: The intersection on the optic's boundary.
 """
-transition_for(optic::AbstractRefractiveOptic, system::AbstractSystem, ray::AbstractRay, int::AbstractIntersection) = resolve_transition(
-    medium_from(optic), ambient_medium(system), ray, normal3d(int))
+@inline transition_for(
+    optic::AbstractRefractiveOptic,
+    system::AbstractSystem,
+    ray::AbstractRay,
+    int::AbstractIntersection
+) = resolve_transition(medium_from(optic), ambient_medium(system), ray, normal3d(int))
 
-function transition_for(::AbstractReflectiveOptic, system::AbstractSystem,
-        ::AbstractRay, ::AbstractIntersection)
+@inline function transition_for(
+        ::AbstractReflectiveOptic,
+        system::AbstractSystem,
+        ::AbstractRay,
+        ::AbstractIntersection
+)
     amb = ambient_medium(system)
     return Transition(amb, amb, false)
 end
 
-function transition_for(::AbstractCoating, system::AbstractSystem,
-        ray::AbstractRay, int::AbstractIntersection)
+@inline function transition_for(
+        ::AbstractCoating,
+        system::AbstractSystem,
+        ray::AbstractRay,
+        int::AbstractIntersection
+)
     amb = ambient_medium(system)
     return resolve_transition(amb, amb, ray, normal3d(int))
 end
 
-function transition_for(::AbstractObject, system::AbstractSystem,
-        ::AbstractRay, ::AbstractIntersection)
+@inline function transition_for(
+        ::AbstractObject,
+        system::AbstractSystem,
+        ::AbstractRay,
+        ::AbstractIntersection
+)
     amb = ambient_medium(system)
     return Transition(amb, amb, false)
 end
 
 """
-    interaction_hint(optic::AbstractObject, trans::Transition, out_ray::AbstractRay, ray::AbstractRay) -> Nullable{Hint}
+    interaction_hint(optic::AbstractObject, trans::Transition, out_ray::AbstractRay{T}, ray::AbstractRay{T}) where {T <: Real} -> Nullable{Hint}
 
 Returns an optional [`Hint`](@ref) to attach to the [`BeamInteraction`](@ref) produced by the
 universal boundary interaction pipeline. Defaults to `nothing`; [`AbstractRefractiveOptic`](@ref)
@@ -70,10 +90,14 @@ overrides this to flag total internal reflection / re-entry ambiguities for the 
 - `out_ray`: The outgoing ray after surface interaction.
 - `ray`: The incoming ray before surface interaction.
 """
-interaction_hint(::AbstractObject, ::Transition, ::AbstractRay, ::AbstractRay) = nothing
+@inline interaction_hint(::AbstractObject, ::Transition, ::AbstractRay, ::AbstractRay) = nothing
 
-function interaction_hint(optic::AbstractRefractiveOptic, trans::Transition,
-        out_ray::AbstractRay{T}, ray::AbstractRay{T}) where {T <: Real}
+@inline function interaction_hint(
+        optic::AbstractRefractiveOptic,
+        trans::Transition,
+        out_ray::AbstractRay{T},
+        ray::AbstractRay{T}
+) where {T <: Real}
     entering = trans.is_entering
     optic_n = refractive_index(optic, wavelength(ray))
     tol = sqrt(eps(T))
@@ -82,7 +106,7 @@ function interaction_hint(optic::AbstractRefractiveOptic, trans::Transition,
 end
 
 """
-    interact3d(system::AbstractSystem, optic::Union{AbstractRefractiveOptic, AbstractReflectiveOptic, AbstractCoating}, beam::AbstractBeam{T}, ray::AbstractRay{T}) where {T <: Real}
+    interact3d(system::AbstractSystem, optic::Union{AbstractRefractiveOptic, AbstractReflectiveOptic, AbstractCoating}, beam::AbstractBeam{T}, ray::AbstractRay{T}) where {T <: Real} -> Nullable{BeamInteraction}
 
 Universal boundary interaction pipeline shared by refractive optics, reflective optics and
 coatings: resolves the current intersection and media [`Transition`](@ref) (see
@@ -96,7 +120,7 @@ coatings: resolves the current intersection and media [`Transition`](@ref) (see
 - `beam`: The beam being traced.
 - `ray`: The active ray segment.
 """
-function interact3d(
+@inline function interact3d(
         system::AbstractSystem,
         optic::Union{AbstractRefractiveOptic, AbstractReflectiveOptic, AbstractCoating},
         beam::AbstractBeam{T},
@@ -109,3 +133,4 @@ function interact3d(
     isnothing(out_ray) && return nothing
     return BeamInteraction(interaction_hint(optic, trans, out_ray, ray), out_ray)
 end
+
