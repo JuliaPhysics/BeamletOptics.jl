@@ -96,6 +96,11 @@ environment, then run `docs/make.jl`. Two things that aren't obvious from that p
   `true` for day-to-day local builds — a full render pass takes several minutes. Only
   flip it to `false` temporarily when you actually need to regenerate real figures, then
   set it back before committing.
+- **GLMakie is BMO's assumed/default Makie backend.** CairoMakie is only used where a
+  static `.png` export is specifically wanted (e.g. some doc figures). When manually
+  exercising `render!` or anything under `ext/` (`BeamletOpticsMakieExt` and its
+  constituent `Render*.jl` files) — e.g. an ad-hoc smoke test after touching rendering
+  code — load GLMakie, not CairoMakie, unless a static image is explicitly what's needed.
 - **Windows-only link bug**: Documenter treats a bare `[text]` followed by a
   parenthesized aside — e.g. `` `α` in [1/m] (Lambert-Beer: ...) `` — as a malformed
   markdown link. On Windows this fails the build with "colons not allowed in paths"
