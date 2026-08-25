@@ -47,7 +47,7 @@ const mm = 1e-3
             beam = Beam(ray)
             solve_system!(system, beam, r_max = 40)
 
-            seg = beam.segments[begin]
+            seg = beam.rays[begin]
             surf_errors[i] = (position(seg) + length(seg) .* BMO.direction(seg))[2] -
                              BMO.aspheric_equation(position(ray)[3], 1 / R, k, A)
         end

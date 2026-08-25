@@ -15,20 +15,20 @@ const BMO = BeamletOptics
     r4 = Ray([1.0, 1, 1], [1, 0, 0]) # OpenSegment
 
     beam = Beam(r1)
-    empty!(beam.segments)
+    empty!(beam.rays)
     push!(beam, r1)
     push!(beam, r2)
     push!(beam, r3)
     push!(beam, r4)
     @test length(beam) == 3
-    @test length(beam.segments) == 4
+    @test length(beam.rays) == 4
     @test length(BMO.rays(beam)) == 4
     @test BMO.point_on_beam(beam, 0) == ([0, 0, 0], 1)
     @test BMO.point_on_beam(beam, 1) == ([1, 0, 0], 2)
     @test BMO.point_on_beam(beam, 2) == ([1, 1, 0], 3)
     @test BMO.point_on_beam(beam, 3) == ([1, 1, 1], 4)
     @test BMO.isparentbeam(beam, r1) == true
-    @test BMO.isparentbeam(beam, beam.segments[2]) == true
+    @test BMO.isparentbeam(beam, beam.rays[2]) == true
 end
 
 end # MODULE

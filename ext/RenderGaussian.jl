@@ -46,7 +46,7 @@ function render!(
             l = length(p)
         end
         # Render each ray segment
-        segs = child.chief.segments
+        segs = child.chief.rays
         for seg in segs
             hit = BMO.intersection(seg)
             len = isnothing(hit) ? flen : length(hit)

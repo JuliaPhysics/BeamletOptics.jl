@@ -382,21 +382,21 @@ end
 Tests if all 9 component rays at section `id` hit the same object shape.
 """
 @inline function _beams_hits_same_shape(agb::AstigmaticGaussianBeamlet, id::Int)::Bool
-    if id > length(agb.c.segments)
+    if id > length(agb.c.rays)
         return true
     end
-    i1 = intersection(agb.c.segments[id])
+    i1 = intersection(agb.c.rays[id])
     if isnothing(i1)
         for b in _aux_beams(agb)
-            id > length(b.segments) && continue
-            isnothing(intersection(b.segments[id])) || return false
+            id > length(b.rays) && continue
+            isnothing(intersection(b.rays[id])) || return false
         end
         return true
     else
         nc = normal3d(i1)
         for b in _aux_beams(agb)
-            id > length(b.segments) && return false
-            int = intersection(b.segments[id])
+            id > length(b.rays) && return false
+            int = intersection(b.rays[id])
             isnothing(int) && return false
             dot(nc, normal3d(int)) > 0.5 || return false
         end

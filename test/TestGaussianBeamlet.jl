@@ -183,9 +183,9 @@ const mm = 1e-3
             clip_gauss = GaussianBeamlet([2.3mm, -0.05, 0.0], [0.0, 1.0, 0.0], 532e-9, 2.0mm)
             solve_system!(clip_sys, clip_gauss)
             @test length(BMO.rays(clip_gauss.chief)) == 1
-            @test isnothing(intersection(last(clip_gauss.chief.segments)))
-            @test isnothing(intersection(last(clip_gauss.waist.segments)))
-            @test isnothing(intersection(last(clip_gauss.divergence.segments)))
+            @test isnothing(intersection(last(clip_gauss.chief.rays)))
+            @test isnothing(intersection(last(clip_gauss.waist.rays)))
+            @test isnothing(intersection(last(clip_gauss.divergence.rays)))
         end
     end
 

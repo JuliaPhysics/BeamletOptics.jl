@@ -71,7 +71,7 @@ const BMO = BeamletOptics
         first_ray_dir = BMO.direction(first_ray)
         last_ray_dir = BMO.direction(last(BMO.rays(beam)))
         @test 180 - rad2deg(BMO.angle3d(first_ray_dir, last_ray_dir)) ≈ 2 * Δθ
-        @test !isnothing(intersection(first(beam.segments)))
+        @test !isnothing(intersection(first(beam.rays)))
     end
 
     @testset "Testing StaticSystem tracing" begin
@@ -88,7 +88,7 @@ const BMO = BeamletOptics
         first_ray_dir = BMO.direction(first_ray)
         last_ray_dir = BMO.direction(last(BMO.rays(beam)))
         @test 180 - rad2deg(BMO.angle3d(first_ray_dir, last_ray_dir)) ≈ 2 * Δθ
-        @test !isnothing(intersection(first(beam.segments)))
+        @test !isnothing(intersection(first(beam.rays)))
     end
 
 

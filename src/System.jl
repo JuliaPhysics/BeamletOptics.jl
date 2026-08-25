@@ -266,11 +266,11 @@ function trace_system!(
 ) where {T <: Real}
     _reset_beam!(beam)
     interaction::Nullable{BeamInteraction} = nothing
-    current_ray::AbstractRay{T} = first(beam.segments)
+    current_ray::AbstractRay{T} = first(beam.rays)
     current_opl::T = zero(T)
-    empty!(beam.segments)
+    empty!(beam.rays)
 
-    while length(beam.segments) < r_max
+    while length(beam.rays) < r_max
         resolved_ray, hit, obj = tracing_step(system, current_ray, hint(interaction), current_opl)
         push!(beam, resolved_ray)
 
@@ -305,19 +305,19 @@ function trace_system!(
     interaction::Nullable{GaussianBeamletInteraction{T}} = nothing
     seg_counter::Int = 1
 
-    current_c::Ray{T} = first(gauss.chief.segments)
-    current_w::Ray{T} = first(gauss.waist.segments)
-    current_d::Ray{T} = first(gauss.divergence.segments)
+    current_c::Ray{T} = first(gauss.chief.rays)
+    current_w::Ray{T} = first(gauss.waist.rays)
+    current_d::Ray{T} = first(gauss.divergence.rays)
 
     opl_c::T = zero(T)
     opl_w::T = zero(T)
     opl_d::T = zero(T)
 
-    empty!(gauss.chief.segments)
-    empty!(gauss.waist.segments)
-    empty!(gauss.divergence.segments)
+    empty!(gauss.chief.rays)
+    empty!(gauss.waist.rays)
+    empty!(gauss.divergence.rays)
 
-    while length(gauss.chief.segments) < r_max
+    while length(gauss.chief.rays) < r_max
         resolved_c, hit_c, obj_c = tracing_step(system, current_c, hint(interaction), opl_c)
         resolved_w, hit_w, obj_w = tracing_step(system, current_w, hint(interaction), opl_w)
         resolved_d, hit_d, obj_d = tracing_step(system, current_d, hint(interaction), opl_d)
@@ -330,9 +330,9 @@ function trace_system!(
 
         if any(isnothing, (int_c, int_w, int_d)) || (obj_c !== obj_w || obj_c !== obj_d) || !_beams_hits_same_shape(gauss, seg_counter)
             # Finish rays as OpenSegments
-            gauss.chief.segments[end] = with_segment(current_c, OpenSegment(position(current_c), direction(current_c), opl_c))
-            gauss.waist.segments[end] = with_segment(current_w, OpenSegment(position(current_w), direction(current_w), opl_w))
-            gauss.divergence.segments[end] = with_segment(current_d, OpenSegment(position(current_d), direction(current_d), opl_d))
+            gauss.chief.rays[end] = with_segment(current_c, OpenSegment(position(current_c), direction(current_c), opl_c))
+            gauss.waist.rays[end] = with_segment(current_w, OpenSegment(position(current_w), direction(current_w), opl_w))
+            gauss.divergence.rays[end] = with_segment(current_d, OpenSegment(position(current_d), direction(current_d), opl_d))
             break
         end
 
@@ -372,22 +372,22 @@ function trace_system!(
     interaction::Nullable{AstigmaticGaussianBeamletInteraction{T}} = nothing
     seg_counter::Int = 1
 
-    current_c::PolarizedRay{T} = first(agb.c.segments)
+    current_c::PolarizedRay{T} = first(agb.c.rays)
     current_aux = Vector{Ray{T}}(undef, 8)
     aux = _aux_beams(agb)
     for idx in 1:length(aux)
-        current_aux[idx] = first(aux[idx].segments)
+        current_aux[idx] = first(aux[idx].rays)
     end
 
     opl_c::T = zero(T)
     opl_aux = zeros(T, 8)
 
-    empty!(agb.c.segments)
+    empty!(agb.c.rays)
     for beam in aux
-        empty!(beam.segments)
+        empty!(beam.rays)
     end
 
-    while length(agb.c.segments) < r_max
+    while length(agb.c.rays) < r_max
         resolved_c, hit_c, obj_c = tracing_step(system, current_c, hint(interaction), opl_c)
         push!(agb.c, resolved_c)
 
@@ -401,16 +401,16 @@ function trace_system!(
         end
 
         if missed || !_beams_hits_same_shape(agb, seg_counter)
-            agb.c.segments[end] = with_segment(current_c, OpenSegment(position(current_c), direction(current_c), opl_c))
+            agb.c.rays[end] = with_segment(current_c, OpenSegment(position(current_c), direction(current_c), opl_c))
             for idx in 1:length(aux)
-                aux[idx].segments[end] = with_segment(current_aux[idx], OpenSegment(position(current_aux[idx]), direction(current_aux[idx]), opl_aux[idx]))
+                aux[idx].rays[end] = with_segment(current_aux[idx], OpenSegment(position(current_aux[idx]), direction(current_aux[idx]), opl_aux[idx]))
             end
             break
         end
 
         opl_c = accumulated_opl(resolved_c)
         for idx in 1:length(aux)
-            opl_aux[idx] = accumulated_opl(aux[idx].segments[seg_counter])
+            opl_aux[idx] = accumulated_opl(aux[idx].rays[seg_counter])
         end
 
         int_c = hit_c

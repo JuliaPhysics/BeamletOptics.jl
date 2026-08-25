@@ -7,7 +7,7 @@ already carried by the most recently traced ray in `beam`, or a freshly computed
 e.g. when `interact3d` is called directly instead of via [`trace_system!`](@ref)).
 """
 function current_intersection(beam::AbstractBeam, obj, ray::AbstractRay)
-    last_int = isempty(beam.segments) ? nothing : intersection(last(beam.segments))
+    last_int = isempty(beam.rays) ? nothing : intersection(last(beam.rays))
     return isnothing(last_int) ? intersect3d(shape(obj), ray) : last_int
 end
 

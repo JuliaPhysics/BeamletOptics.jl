@@ -134,8 +134,8 @@ const mm = 1e-3
             # Test center ray normal vectors
             beam = Beam(pos + 0 * nv, -dir, λ)
             solve_system!(system, beam)
-            for i in 1:(length(beam.segments) - 1)
-                @test abs(dot(BMO.normal3d(beam.segments[i]), direction(beam.segments[i]))) ≈ 1
+            for i in 1:(length(beam.rays) - 1)
+                @test abs(dot(BMO.normal3d(beam.rays[i]), direction(beam.rays[i]))) ≈ 1
             end
             return true
         end

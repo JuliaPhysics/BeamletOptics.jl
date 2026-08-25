@@ -27,7 +27,7 @@ function _collect_ray_segments!(
         show_pos::Bool
     )
     for child in PreOrderDFS(beam)
-        for ray in child.segments
+        for ray in child.rays
             _collect_ray_segments!(pts, scatter_pts, ray, flen, show_pos)
         end
     end

@@ -177,7 +177,7 @@ for beam in beams
     solve_system!(system, beam, r_max=50)
     render!(ax, beam, flen=0.12e-3, color = colors[i], show_pos=true)
     # use the 0° beams to construct all other beam sets
-    first_seg = first(beam.segments)
+    first_seg = first(beam.rays)
     pos = BeamletOptics.position(BeamletOptics.intersection(first_seg))
     l0 = length(BeamletOptics.intersection(first_seg))
     for angle in field_angles

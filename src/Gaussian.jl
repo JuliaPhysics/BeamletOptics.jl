@@ -178,12 +178,12 @@ Tests if all rays at section `id` of `gauss` hit the same object shape.
 Returns `true` or `false`.
 """
 @inline function _beams_hits_same_shape(gauss::GaussianBeamlet, id::Int)::Bool
-    if id > length(gauss.chief.segments) || id > length(gauss.waist.segments) || id > length(gauss.divergence.segments)
+    if id > length(gauss.chief.rays) || id > length(gauss.waist.rays) || id > length(gauss.divergence.rays)
         return true
     end
-    c = intersection(gauss.chief.segments[id])
-    w = intersection(gauss.waist.segments[id])
-    d = intersection(gauss.divergence.segments[id])
+    c = intersection(gauss.chief.rays[id])
+    w = intersection(gauss.waist.rays[id])
+    d = intersection(gauss.divergence.rays[id])
     are_nothing = (c === nothing, w === nothing, d === nothing)
     if any(are_nothing)
         return all(are_nothing)

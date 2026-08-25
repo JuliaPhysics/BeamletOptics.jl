@@ -27,7 +27,7 @@ The next sections will focus on the **Intersection** and **Interaction** steps.
 
 ## Ray and segment representation
 
-Each cycle of the loop appends a new piece to the light path. This data is split across two cooperating types: an [`BeamletOptics.AbstractRay`](@ref) (the physical state — wavelength, refractive index, polarization, ...) wraps an [`BeamletOptics.AbstractSegment`](@ref) (the purely geometrical state — origin, direction and, once a hit has been found, the resulting [`BeamletOptics.Intersection`](@ref)). A [`Beam`](@ref) stores its light path as `segments::Vector{<:AbstractRay}`; the last element is either an unresolved ray (its segment is an `OpenSegment`, no hit yet) or, after tracing, a resolved ray (its segment is a `LineSegment` carrying the `Intersection`).
+Each cycle of the loop appends a new piece to the light path. This data is split across two cooperating types: an [`BeamletOptics.AbstractRay`](@ref) (the physical state — wavelength, refractive index, polarization, ...) wraps an [`BeamletOptics.AbstractSegment`](@ref) (the purely geometrical state — origin, direction and, once a hit has been found, the resulting [`BeamletOptics.Intersection`](@ref)). A [`Beam`](@ref) stores its light path as `rays::Vector{<:AbstractRay}`; the last element is either an unresolved ray (its segment is an `OpenSegment`, no hit yet) or, after tracing, a resolved ray (its segment is a `LineSegment` carrying the `Intersection`).
 
 ![Ray/Segment architecture](ray_segment_arch.svg)
 

@@ -194,20 +194,20 @@ position(hit::AstigmaticGaussianBeamletHit) = position(rays(hit.agb.c)[hit.id])
 direction(hit::AstigmaticGaussianBeamletHit) = direction(rays(hit.agb.c)[hit.id])
 
 function hit_point(hit::GaussianBeamletHit)
-    seg = hit.gauss.chief.segments[hit.id]
+    seg = hit.gauss.chief.rays[hit.id]
     return position(seg) + length(seg) * direction(seg)
 end
 function hit_point(hit::AstigmaticGaussianBeamletHit)
-    seg = hit.agb.c.segments[hit.id]
+    seg = hit.agb.c.rays[hit.id]
     return position(seg) + length(seg) * direction(seg)
 end
 
 function projection_factor(hit::GaussianBeamletHit)
-    seg = hit.gauss.chief.segments[hit.id]
+    seg = hit.gauss.chief.rays[hit.id]
     abs(dot(direction(hit), normal3d(seg)))
 end
 function projection_factor(hit::AstigmaticGaussianBeamletHit)
-    seg = hit.agb.c.segments[hit.id]
+    seg = hit.agb.c.rays[hit.id]
     abs(dot(direction(hit), normal3d(seg)))
 end
 
@@ -363,9 +363,7 @@ function interact3d(::AbstractSystem, d::Detector, beam::Beam{T},
 end
 
 function interact3d(::AbstractSystem, d::Detector, g::GaussianBeamlet{R}, id::Int) where {R}
-    # rays(g.chief) and g.chief.segments are the same vector (a beam is never empty),
-    # so `id` is either a valid index into both or genuinely out of range.
-    seg = g.chief.segments[id]
+    seg = g.chief.rays[id]
     l0 = length(g) - length(seg)
     p0 = position(seg)
     d0 = direction(seg)
@@ -388,9 +386,7 @@ end
 
 function interact3d(system::AbstractSystem, d::Detector,
         agb::AstigmaticGaussianBeamlet{R}, id::Int) where {R}
-    # rays(agb.c) and agb.c.segments are the same vector (a beam is never empty),
-    # so `id` is either a valid index into both or genuinely out of range.
-    chief = agb.c.segments[id]
+    chief = agb.c.rays[id]
     l0 = length(agb) - length(chief)
 
     p0 = position(chief)
@@ -421,7 +417,7 @@ function interact3d(system::AbstractSystem, d::Detector,
     Δl = opl_parent - l_parent
     z_sum = l_parent
     for j in 1:(id - 1)
-        seg_j = agb.c.segments[j]
+        seg_j = agb.c.rays[j]
         Δl += optical_path_length(seg_j) - length(seg_j)
         z_sum += length(seg_j)
     end

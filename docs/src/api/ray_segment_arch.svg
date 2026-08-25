@@ -23,7 +23,7 @@
   <!-- Beam box -->
   <rect class="box" x="140" y="8" width="180" height="40" rx="3"/>
   <text class="title" x="230" y="24">Beam{T,R}</text>
-  <text class="field" x="230" y="40">segments::Vector{R}</text>
+  <text class="field" x="230" y="40">rays::Vector{R}</text>
 
   <path d="M 230 48 L 230 68" stroke="#000000" stroke-width="1" marker-end="url(#rsArrow)"/>
 

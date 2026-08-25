@@ -47,7 +47,7 @@ function render!(
             l = length(p)
         end
 
-        segs = child.c.segments
+        segs = child.c.rays
         if isempty(segs)
             l_local = flen
             us = LinRange(0, l_local, z_res) .+ l

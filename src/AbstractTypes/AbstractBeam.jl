@@ -82,8 +82,6 @@ end
 
 _drop_beams!(b::B) where {B <: AbstractBeam} = (b.children = Vector{B}())
 
-segments(beam::AbstractBeam) = beam.segments
-
 """
     _reset_beam!(beam::AbstractBeam)
 
