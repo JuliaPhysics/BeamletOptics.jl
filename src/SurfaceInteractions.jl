@@ -199,27 +199,4 @@ function interact3d(
     return BeamInteraction(hint, out_ray)
 end
 
-"""
-    interact3d(system, c::AbstractCoating, beam, ray)
-
-Handles standalone optical boundary coating interactions.
-"""
-function interact3d(
-    system::AbstractSystem,
-    c::AbstractCoating,
-    beam::AbstractBeam{T},
-    ray::AbstractRay{T}
-) where {T <: Real}
-    int = isempty(beam.segments) ? intersect3d(shape(c), ray) : intersection(last(beam.segments))
-    isnothing(int) && return nothing
-    ambient = ambient_medium(system)
-    trans = resolve_transition(ambient, ambient, ray, normal3d(int))
-    out_ray = interact3d(surface_model(c), trans, int, ray)
-    if out_ray === nothing
-        return nothing
-    end
-    return BeamInteraction(nothing, out_ray)
-end
-
-
 

@@ -138,7 +138,7 @@ function interact3d(
         bs::ThinBeamsplitter,
         beam::Beam{T},
         ray::AbstractRay{T}) where {T <: Real}
-    int = isempty(beam.segments) ? intersect3d(shape(bs), ray) : intersection(last(beam.segments))
+    int = current_intersection(beam, bs, ray)
     isnothing(int) && return nothing
     ambient = ambient_medium(system)
     trans = resolve_transition(ambient, ambient, ray, normal3d(int))

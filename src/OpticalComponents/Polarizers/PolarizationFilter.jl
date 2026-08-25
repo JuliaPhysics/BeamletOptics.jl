@@ -32,7 +32,7 @@ function interact3d(::AbstractSystem,
         polfilter::PolarizationFilter,
         beam::Beam{T},
         ray::PolarizedRay{T}) where {T <: Real}
-    int = isempty(beam.segments) ? intersect3d(shape(polfilter), ray) : intersection(last(beam.segments))
+    int = current_intersection(beam, polfilter, ray)
     isnothing(int) && return nothing
     npos = position(int)
     ndir = direction(ray)

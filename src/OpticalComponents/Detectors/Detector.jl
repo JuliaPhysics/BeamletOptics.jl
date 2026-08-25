@@ -363,7 +363,9 @@ function interact3d(::AbstractSystem, d::Detector, beam::Beam{T},
 end
 
 function interact3d(::AbstractSystem, d::Detector, g::GaussianBeamlet{R}, id::Int) where {R}
-    seg = id <= length(g.chief.segments) ? g.chief.segments[id] : rays(g.chief)[id]
+    # rays(g.chief) and g.chief.segments are the same vector (a beam is never empty),
+    # so `id` is either a valid index into both or genuinely out of range.
+    seg = g.chief.segments[id]
     l0 = length(g) - length(seg)
     p0 = position(seg)
     d0 = direction(seg)
@@ -386,7 +388,9 @@ end
 
 function interact3d(system::AbstractSystem, d::Detector,
         agb::AstigmaticGaussianBeamlet{R}, id::Int) where {R}
-    chief = id <= length(agb.c.segments) ? agb.c.segments[id] : rays(agb.c)[id]
+    # rays(agb.c) and agb.c.segments are the same vector (a beam is never empty),
+    # so `id` is either a valid index into both or genuinely out of range.
+    chief = agb.c.segments[id]
     l0 = length(agb) - length(chief)
 
     p0 = position(chief)

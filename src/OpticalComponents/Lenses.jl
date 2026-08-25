@@ -40,36 +40,6 @@ surface_model(::AbstractRefractiveOptic) = FresnelSurface()
 medium_from(optic::AbstractRefractiveOptic) = medium_from(optic.n)
 
 """
-    interact3d(system, optic::AbstractRefractiveOptic, ::Beam, ray)
-
-Refracts or reflects incoming ray at an optical surface using the universal boundary physics pipeline.
-"""
-function interact3d(system::AbstractSystem,
-        optic::AbstractRefractiveOptic,
-        beam::Beam{T},
-        ray::AbstractRay{T}) where {T <: Real}
-    int = isempty(beam.segments) ? intersect3d(shape(optic), ray) : intersection(last(beam.segments))
-    isnothing(int) && return nothing
-    normal = normal3d(int)
-    
-    med = medium_from(optic)
-    ambient = ambient_medium(system)
-    trans = resolve_transition(med, ambient, ray, normal)
-    
-    out_ray = interact3d(surface_model(optic), trans, int, ray)
-    if out_ray === nothing
-        return nothing
-    end
-    
-    entering = trans.is_entering
-    tir = (out_ray.n == refractive_index(optic, wavelength(ray)) && !entering)
-    hint = (entering || tir) ? Hint(optic) : nothing
-    
-    return BeamInteraction(hint, out_ray)
-end
-
-
-"""
     Lens{T, S <: AbstractShape{T}, N <: RefractiveIndex} <: AbstractRefractiveOptic{T, N}
 
 Represents an uncoated `Lens` with a homogeneous [`RefractiveIndex`](@ref) `n = n(λ)`.

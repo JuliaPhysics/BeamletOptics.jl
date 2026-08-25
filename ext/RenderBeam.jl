@@ -5,25 +5,8 @@ function _collect_ray_segments!(
         flen::Real,
         show_pos::Bool
     )
-    p1 = Point3f(position(ray)...)
-    p2 = Point3f((position(ray) + flen * BMO.direction(ray))...)
-    push!(pts, p1, p2)
-    if show_pos
-        push!(scatter_pts, p1)
-    end
-    return nothing
-end
-
-function _collect_ray_segments!(
-        pts::Vector{Point3f},
-        scatter_pts::Vector{Point3f},
-        segment::BMO.RaySegment,
-        flen::Real,
-        show_pos::Bool
-    )
-    hit = BMO.intersection(segment)
+    hit = BMO.intersection(ray)
     len = isnothing(hit) ? flen : length(hit)
-    ray = segment.ray
     p1 = Point3f(position(ray)...)
     p2 = Point3f((position(ray) + len * BMO.direction(ray))...)
     push!(pts, p1, p2)
@@ -44,12 +27,8 @@ function _collect_ray_segments!(
         show_pos::Bool
     )
     for child in PreOrderDFS(beam)
-        if isempty(child.segments)
-            _collect_ray_segments!(pts, scatter_pts, child.head_ray, flen, show_pos)
-        else
-            for seg in child.segments
-                _collect_ray_segments!(pts, scatter_pts, seg, flen, show_pos)
-            end
+        for ray in child.segments
+            _collect_ray_segments!(pts, scatter_pts, ray, flen, show_pos)
         end
     end
     return nothing
@@ -88,41 +67,6 @@ function render!(
     pts = Point3f[]
     scatter_pts = Point3f[]
     _collect_ray_segments!(pts, scatter_pts, ray, flen, show_pos)
-
-    linesegments!(axis, pts;
-        color,
-        linewidth,
-        transparency,
-        kwargs...
-    )
-
-    if show_pos && !isempty(scatter_pts)
-        scatter!(axis, scatter_pts; color)
-    end
-
-    return nothing
-end
-
-"""
-    render!(axis, segment::RaySegment; kwargs...)
-
-Renders a `RaySegment` as a 3D line from the ray position to its intersection (or `flen` if no intersection).
-"""
-function render!(
-        axis::_RenderEnv,
-        segment::BMO.RaySegment;
-        # kwargs
-        flen = 1.0,
-        show_pos = false,
-        # Makie kwargs
-        color = :blue,
-        linewidth = 1.0,
-        transparency = true,
-        kwargs...
-    )
-    pts = Point3f[]
-    scatter_pts = Point3f[]
-    _collect_ray_segments!(pts, scatter_pts, segment, flen, show_pos)
 
     linesegments!(axis, pts;
         color,

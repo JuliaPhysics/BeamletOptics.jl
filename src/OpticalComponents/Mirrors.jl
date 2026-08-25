@@ -32,28 +32,6 @@ abstract type AbstractReflectiveOptic{T} <: AbstractObject{T} end
 surface_model(::AbstractReflectiveOptic) = IdealMirrorSurface()
 
 """
-    interact3d(system, optic::AbstractReflectiveOptic, ::Beam, ray)
-
-Reflects incoming ray at a reflective optical surface using the universal boundary physics pipeline.
-"""
-function interact3d(system::AbstractSystem,
-        optic::AbstractReflectiveOptic,
-        beam::Beam{T},
-        ray::AbstractRay{T}) where {T <: Real}
-    int = isempty(beam.segments) ? intersect3d(shape(optic), ray) : intersection(last(beam.segments))
-    isnothing(int) && return nothing
-    ambient = ambient_medium(system)
-    trans = Transition(ambient, ambient, false)
-    
-    out_ray = interact3d(surface_model(optic), trans, int, ray)
-    if out_ray === nothing
-        return nothing
-    end
-    return BeamInteraction(nothing, out_ray)
-end
-
-
-"""
     Mirror{S <: AbstractShape} <: AbstractReflectiveOptic
 
 Concrete implementation of a perfect mirror (R = 1) with arbitrary shape.

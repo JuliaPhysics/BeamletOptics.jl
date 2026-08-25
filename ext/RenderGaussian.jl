@@ -47,37 +47,22 @@ function render!(
         end
         # Render each ray segment
         segs = child.chief.segments
-        if isempty(segs)
-            ray = child.chief.head_ray
-            u = LinRange(0, flen, z_res)
+        for seg in segs
+            hit = BMO.intersection(seg)
+            len = isnothing(hit) ? flen : length(hit)
+            u = LinRange(0, len, z_res)
             v = LinRange(0, 2π, r_res)
             w = BMO.gauss_parameters(child, u .+ l)[1]
             X = [w[i] * cos(v) for (i, u) in enumerate(u), v in v]
             Y = [u for u in u, v in v]
             Z = [w[i] * sin(v) for (i, u) in enumerate(u), v in v]
-            R = BMO.align3d([0, 1, 0], ray.dir)
-            Xt = R[1, 1] * X + R[1, 2] * Y + R[1, 3] * Z .+ position(ray)[1]
-            Yt = R[2, 1] * X + R[2, 2] * Y + R[2, 3] * Z .+ position(ray)[2]
-            Zt = R[3, 1] * X + R[3, 2] * Y + R[3, 3] * Z .+ position(ray)[3]
+            R = BMO.align3d([0, 1, 0], BMO.direction(seg))
+            Xt = R[1, 1] * X + R[1, 2] * Y + R[1, 3] * Z .+ position(seg)[1]
+            Yt = R[2, 1] * X + R[2, 2] * Y + R[2, 3] * Z .+ position(seg)[2]
+            Zt = R[3, 1] * X + R[3, 2] * Y + R[3, 3] * Z .+ position(seg)[3]
             surface!(axis, Xt, Yt, Zt; transparency, colormap = [color, color], kwargs...)
-        else
-            for seg in segs
-                hit = BMO.intersection(seg)
-                len = isnothing(hit) ? flen : length(hit)
-                u = LinRange(0, len, z_res)
-                v = LinRange(0, 2π, r_res)
-                w = BMO.gauss_parameters(child, u .+ l)[1]
-                X = [w[i] * cos(v) for (i, u) in enumerate(u), v in v]
-                Y = [u for u in u, v in v]
-                Z = [w[i] * sin(v) for (i, u) in enumerate(u), v in v]
-                R = BMO.align3d([0, 1, 0], seg.ray.dir)
-                Xt = R[1, 1] * X + R[1, 2] * Y + R[1, 3] * Z .+ position(seg.ray)[1]
-                Yt = R[2, 1] * X + R[2, 2] * Y + R[2, 3] * Z .+ position(seg.ray)[2]
-                Zt = R[3, 1] * X + R[3, 2] * Y + R[3, 3] * Z .+ position(seg.ray)[3]
-                surface!(axis, Xt, Yt, Zt; transparency, colormap = [color, color], kwargs...)
-                if !isnothing(hit)
-                    l += length(hit)
-                end
+            if !isnothing(hit)
+                l += length(hit)
             end
         end
         # Optionally, plot generating rays
