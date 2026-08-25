@@ -153,23 +153,34 @@ end
 end
 
 @inline function _resolve_coincident_hits(hits::Vector{Tuple{Intersection{R}, AbstractObject}}, ray::AbstractRay{R}) where {R}
+    # no Intersection detected
     if isempty(hits)
         return nothing
-    elseif length(hits) == 1
+    end
+    # single Intersection detected
+    if length(hits) == 1
         return hits[1]
     end
-
+    # only up to three objects allowed at interface (2x substrate, 1x coating)
+    if length(hits) > 3
+        throw(ErrorException("Too many hits detected at interface"))
+    end
+    # sort hits
     best_hit = hits[1][1]
     best_obj = hits[1][2]
-
+    # init MultiIntersection fields
     exiting_obj = nothing
     entering_obj = nothing
     coating_obj = nothing
-
+    # determine coating, entry obj and exit obj via ray dir
     for (hit, obj) in hits
+        # FIXME can be unified once Coatings are introduced fully
         if obj isa AbstractCoating || obj isa AbstractBeamsplitter
+            # Zero-thickness interface, not a solid volume: can't be "entered"/"exited"
             coating_obj = obj
         else
+            # Ray exits a volume through a surface whose outward normal points the same
+            # way as the ray direction (dot > 0); it enters through the opposite case
             is_exit = dot(direction(ray), normal3d(hit)) > 0
             if is_exit
                 exiting_obj = obj
@@ -179,7 +190,9 @@ end
         end
     end
 
-    # Fallback if both/all are classified or ambiguous
+    # Fallback: every coincident object was classified as a coating/beamsplitter (or
+    # otherwise no exiting/entering pair was found) — force a classification from just
+    # the first two hits so exiting_obj/entering_obj don't both stay `nothing`
     if exiting_obj === nothing && entering_obj === nothing
         if length(hits) >= 2
             h1, o1 = hits[1]
@@ -190,6 +203,8 @@ end
         end
     end
 
+    # Bundle the shared location with the exiting/entering/coating roles so downstream
+    # `interact3d` can pick the physically correct behavior at this shared boundary
     mi = MultiIntersection(best_hit; exiting = exiting_obj, entering = entering_obj, coating = coating_obj)
     return (mi, best_obj)
 end
