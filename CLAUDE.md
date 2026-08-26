@@ -85,6 +85,26 @@ changes. Key points:
   `src/AbstractTypes/AbstractShapeTrait.jl` (an `# AbstractObject implementation reqs.`
   section).
 
+## Code conventions
+
+- **DRY: precondition/invariant-establishing calls live in the function whose contract
+  needs them, not at every call site that happens to reach it.** If a function's contract
+  requires some setup (e.g. `_reset_beam!` establishing "always trace fresh" for
+  `trace_system!`), that call belongs inside the contract-owning function itself — not
+  duplicated by callers that merely dispatch into it. A caller one layer up should trust
+  the callee to uphold its own contract rather than re-establishing the precondition
+  itself; doing so is dead work, not useful defensive redundancy. Reference case:
+  `trace_system!` (all methods, `src/System.jl`) calls `_reset_beam!` as its first
+  statement because it is public API also called directly (tests, docs), so it must
+  guarantee a fresh trace regardless of caller. `solve_system!` used to also call
+  `_reset_beam!` right before dispatching into `trace_system!` via `solve_leaf!` — that
+  outer call was redundant (nothing ran in between to justify re-establishing the same
+  state) and was removed rather than centralized upward, since moving it to
+  `solve_system!` only and stripping it from `trace_system!` would have broken
+  `trace_system!`'s standalone contract (see `test/TestSystem.jl`, which calls
+  `trace_system!` directly twice on the same beam and expects each call to retrace
+  fresh).
+
 ## Documentation build
 
 Building the docs locally is described in

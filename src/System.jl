@@ -515,9 +515,8 @@ function solve_system!(
     while !isempty(queue)
         # Process beams in FIFO order.
         current, depth = popfirst!(queue)
-        # Reset the current beam back to its head ray(s) before (re-)tracing.
-        _reset_beam!(current)
-        # Process the current leaf beam.
+        # Process the current leaf beam. `trace_system!` resets the beam back to its
+        # head ray(s) before (re-)tracing (see `BeamletOptics._reset_beam!`).
         solve_leaf!(system, current; r_max, check_invariant, threshold)
         # Check if the maximum branching depth has been reached.
         if depth <= depth_max
