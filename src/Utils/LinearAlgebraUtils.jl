@@ -43,24 +43,29 @@ The orientation is chosen deterministically to guarantee reproducible bases.
     end
 end
 
-function normal3d(input::AbstractArray)
-    T = float(eltype(input))
-    v = normalize(SVector{3,T}(Tuple(input)))
-    n = _orthogonal_basis_vector(v)
-    # stabilize output type
-    if input isa SVector
-        return convert(typeof(input), n)
-    elseif input isa AbstractVector
-        return collect(n)
-    else
-        return convert(typeof(input), n)
-    end
+@inline function normal3d(input::SVector{3, T}) where {T}
+    v = normalize(input)
+    return _orthogonal_basis_vector(v)
 end
 
-function normal3d(input::Point3{T}) where T
-    v = normalize(SVector{3,T}(Tuple(input)))
+@inline function normal3d(input::Point3{T}) where {T}
+    v = normalize(SVector{3, T}(Tuple(input)))
     n = _orthogonal_basis_vector(v)
     return Point3(n...)
+end
+
+function normal3d(input::AbstractVector)
+    T = float(eltype(input))
+    v = normalize(SVector{3, T}(Tuple(input)))
+    n = _orthogonal_basis_vector(v)
+    return collect(n)
+end
+
+function normal3d(input::AbstractArray)
+    T = float(eltype(input))
+    v = normalize(SVector{3, T}(Tuple(input)))
+    n = _orthogonal_basis_vector(v)
+    return convert(typeof(input), n)
 end
 
 """

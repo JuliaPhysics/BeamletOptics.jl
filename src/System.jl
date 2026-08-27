@@ -26,15 +26,22 @@ end
 _flatten_system_objects(obj::_ObjectOrGroup) = _flatten_system_objects!(AbstractObject[], obj)
 
 function _flatten_system_objects!(acc::Vector{AbstractObject}, obj::AbstractObject)
-    if shape_trait_of(obj) isa MultiShape
-        parts = shape(obj)
-        if all(p -> p isa _ObjectOrGroup, parts)
-            for p in parts
-                _flatten_system_objects!(acc, p)
-            end
-            return acc
+    return _flatten_system_objects_trait!(acc, shape_trait_of(obj), obj)
+end
+
+function _flatten_system_objects_trait!(acc::Vector{AbstractObject}, ::MultiShape, obj::AbstractObject)
+    parts = shape(obj)
+    if all(p -> p isa _ObjectOrGroup, parts)
+        for p in parts
+            _flatten_system_objects!(acc, p)
         end
+        return acc
     end
+    push!(acc, obj)
+    return acc
+end
+
+function _flatten_system_objects_trait!(acc::Vector{AbstractObject}, ::AbstractShapeTrait, obj::AbstractObject)
     push!(acc, obj)
     return acc
 end
