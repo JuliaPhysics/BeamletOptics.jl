@@ -26,3 +26,5 @@ surface_model(c::Coating) = c.model
 
 Base.position(c::Coating) = position(c.shape)
 orientation(c::Coating) = orientation(c.shape)
+
+is_thin_interface(::AbstractCoating) = true

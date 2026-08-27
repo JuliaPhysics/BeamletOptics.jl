@@ -138,7 +138,30 @@ function trace_system!(::AbstractSystem, beam::B; r_max = 0) where {B <: Abstrac
     return nothing
 end
 
-@inline function trace_all(system::AbstractSystem, ray::AbstractRay{R}) where {R}
+@noinline function _throw_too_many_coincident_hits()
+    throw(ErrorException("Too many coincident hits detected at interface (> 3 objects)"))
+end
+
+@noinline function _throw_multiple_exiting_objects(o1, o2)
+    throw(ErrorException("Multiple exiting objects detected at coincident interface: $(typeof(o1)) and $(typeof(o2))"))
+end
+
+@noinline function _throw_multiple_entering_objects(o1, o2)
+    throw(ErrorException("Multiple entering objects detected at coincident interface: $(typeof(o1)) and $(typeof(o2))"))
+end
+
+"""
+    trace_all(system::AbstractSystem, ray::AbstractRay{R}) where {R<:Real}
+
+Performs non-sequential ray tracing across all objects in `system` to find the closest
+geometrical intersection. Detects and groups coincident boundaries within tolerance.
+
+# Returns
+- `(intersection, object)`: A tuple of the resolved [`Intersection`](@ref) or
+  [`MultiIntersection`](@ref) and the associated [`AbstractObject`](@ref).
+- `nothing`: If no object in the system was hit.
+"""
+@inline function trace_all(system::AbstractSystem, ray::AbstractRay{R}) where {R <: Real}
     tol = get_coincident_boundary_tolerance()
     best_t = R(Inf)
     hits = ()
@@ -153,7 +176,7 @@ end
             best_t = t_hit
             hits = ((temp, obj),)
         elseif abs(t_hit - best_t) <= tol
-            length(hits) >= 3 && throw(ErrorException("Too many coincident hits detected at interface (> 3 objects)"))
+            length(hits) >= 3 && _throw_too_many_coincident_hits()
             hits = (hits..., (temp, obj))
             if t_hit < best_t
                 best_t = t_hit
@@ -167,54 +190,58 @@ end
     return _resolve_coincident_hits(hits, ray)
 end
 
-@inline function _resolve_coincident_hits(hits::Union{Tuple, AbstractVector}, ray::AbstractRay{R}) where {R}
-    # no Intersection detected
+"""
+    _resolve_coincident_hits(hits::Union{Tuple, AbstractVector}, ray::AbstractRay{R}) where {R<:Real}
+
+Resolves multiple coincident geometric intersections into a unified [`MultiIntersection`](@ref),
+classifying entering, exiting, and coating objects via ray propagation direction and outward surface normals.
+"""
+@inline function _resolve_coincident_hits(hits::Union{Tuple, AbstractVector}, ray::AbstractRay{R}) where {R <: Real}
+    # No intersection detected
     if isempty(hits)
         return nothing
     end
-    # single Intersection detected
+    # Single intersection detected (fast path)
     if length(hits) == 1
         return hits[1]
     end
-    # only up to three objects allowed at interface (2x substrate, 1x coating)
+    # Only up to three objects allowed at coincident interface (e.g. 2x substrate, 1x coating)
     if length(hits) > 3
-        throw(ErrorException("Too many coincident hits detected at interface (> 3 objects)"))
+        _throw_too_many_coincident_hits()
     end
-    # sort hits
+
     best_hit = hits[1][1]
     best_obj = hits[1][2]
-    # init MultiIntersection fields
+
     exiting_obj = nothing
     entering_obj = nothing
     coating_obj = nothing
     dir = direction(ray)
 
-    # determine coating, entry obj and exit obj via ray dir
+    # Classify coating, entering object, and exiting object via ray direction and outward normal
     for (hit, obj) in hits
-        if obj isa AbstractCoating || obj isa AbstractBeamsplitter
-            # Zero-thickness interface, not a solid volume: can't be "entered"/"exited"
+        if is_thin_interface(obj)
+            # Zero-thickness interface, not a solid volume: cannot be entered/exited
             coating_obj = obj
         else
-            # Ray exits a volume through a surface whose outward normal points the same
-            # way as the ray direction (dot > 0); it enters through the opposite case
+            # Ray exits a volume through a surface whose outward normal points in the same
+            # direction as the ray (dot > 0); otherwise it enters
             is_exit = dot(dir, normal3d(hit)) > 0
             if is_exit
                 if exiting_obj !== nothing
-                    throw(ErrorException("Multiple exiting objects detected at coincident interface: $(typeof(exiting_obj)) and $(typeof(obj))"))
+                    _throw_multiple_exiting_objects(exiting_obj, obj)
                 end
                 exiting_obj = obj
             else
                 if entering_obj !== nothing
-                    throw(ErrorException("Multiple entering objects detected at coincident interface: $(typeof(entering_obj)) and $(typeof(obj))"))
+                    _throw_multiple_entering_objects(entering_obj, obj)
                 end
                 entering_obj = obj
             end
         end
     end
 
-    # Fallback: every coincident object was classified as a coating/beamsplitter (or
-    # otherwise no exiting/entering pair was found) — force a classification from just
-    # the first two hits so exiting_obj/entering_obj don't both stay `nothing`
+    # Fallback: All coincident objects classified as surface interfaces (or no paired exit/entry)
     if exiting_obj === nothing && entering_obj === nothing
         if length(hits) >= 2
             h1, o1 = hits[1]
@@ -225,22 +252,26 @@ end
         end
     end
 
-    # Bundle the shared location with the exiting/entering/coating roles so downstream
-    # `interact3d` can pick the physically correct behavior at this shared boundary
+    # Construct MultiIntersection bundle for downstream interact3d dispatch
     mi = MultiIntersection(best_hit; exiting = exiting_obj, entering = entering_obj, coating = coating_obj)
     return (mi, best_obj)
 end
 
+"""
+    trace_one(system::AbstractSystem, ray::AbstractRay{R}, hint::Hint) where {R<:Real}
+
+Traces `ray` using an optional [`Hint`](@ref) for fast shape-intersection. If the hinted
+object is hit, checks for coincident interfaces; otherwise falls back to [`trace_all`](@ref).
+"""
 @inline function trace_one(
-        system::AbstractSystem, ray::AbstractRay{R}, hint::Hint) where {R}
-    # Trace against hinted shape of object
+        system::AbstractSystem, ray::AbstractRay{R}, hint::Hint) where {R <: Real}
+    # Fast path: Trace against hinted shape of object
     shape_intersection = intersect3d(shape(hint)::AbstractShape{R}, ray)
     if isnothing(shape_intersection)
-        # If hinted object is not intersected, trace the entire system
         return trace_all(system, ray)
     end
 
-    # Check if this hit is coincident with another object in system
+    # Check if this hit is coincident with other objects in the system
     tol = get_coincident_boundary_tolerance()
     best_t = length(shape_intersection)
     hits = ((shape_intersection, object(hint)),)
@@ -249,7 +280,7 @@ end
         obj === object(hint) && continue
         temp = intersect3d(obj, ray)
         if temp !== nothing && abs(length(temp) - best_t) <= tol
-            length(hits) >= 3 && throw(ErrorException("Too many coincident hits detected at interface (> 3 objects)"))
+            length(hits) >= 3 && _throw_too_many_coincident_hits()
             hits = (hits..., (temp, obj))
         end
     end

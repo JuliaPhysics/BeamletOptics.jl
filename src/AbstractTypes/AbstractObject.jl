@@ -166,6 +166,7 @@ Fallback implementation checking if an object is a zero-thickness boundary inter
 """
 is_thin_interface(::AbstractObject) = false
 is_thin_interface(::Nothing) = false
+is_thin_interface(::AbstractBeamsplitter) = true
 
 """
     refractive_index(object::AbstractObject) -> Real
