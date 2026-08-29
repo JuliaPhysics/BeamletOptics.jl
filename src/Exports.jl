@@ -44,6 +44,7 @@ export Detector, electric_field, intensity, spot_diagram, optical_power, gauss_p
 # splitters
 export ThinBeamsplitter, RoundThinBeamsplitter, RectangularPlateBeamsplitter,
        RoundPlateBeamsplitter, CubeBeamsplitter, RectangularCompensatorPlate
+export PolarizingBeamSplitter, PolarizingCubeBeamsplitter, RectangularPolarizingPlateBeamsplitter, RoundPolarizingPlateBeamsplitter
 
 # polarizing components
 export PolarizationFilter
@@ -57,6 +58,9 @@ export Retroreflector, get_invariant_threshold, set_invariant_threshold!,
     get_internal_reflection_threshold, get_line_plane_intersection_threshold,
     get_orthogonality_threshold, get_default_r_max, get_default_depth_max,
     get_default_wavelength, get_default_waist, get_default_power
+
+# polarization components
+export Waveplate, HalfWaveplate, QuarterWaveplate
 
 # render
 export render!

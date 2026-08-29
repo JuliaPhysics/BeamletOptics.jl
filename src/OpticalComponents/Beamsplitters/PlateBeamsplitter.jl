@@ -1,7 +1,7 @@
 """
     AbstractPlateBeamsplitter <: AbstractBeamsplitter
 
-A generic type to represent an [`AbstractBeamsplitter`](@ref) that consists of a substrate with a 
+A generic type to represent an [`AbstractBeamsplitter`](@ref) that consists of a substrate with a
 single coated face at which a beam splitting interaction occurs.
 
 # Implementation reqs.
@@ -43,7 +43,9 @@ shape_trait_of(::AbstractPlateBeamsplitter) = MultiShape()
 
 shape(pbs::AbstractPlateBeamsplitter) = (substrate(pbs), coating(pbs))
 
-refractive_index(pbs::AbstractPlateBeamsplitter, λ::Real) = refractive_index(substrate(pbs), λ)
+function refractive_index(pbs::AbstractPlateBeamsplitter, λ::Real)
+    refractive_index(substrate(pbs), λ)
+end
 
 """
     RectangularPlateBeamsplitter <: AbstractPlateBeamsplitter
@@ -88,12 +90,12 @@ function RectangularPlateBeamsplitter(
         height::Real,
         thickness::Real,
         n::RefractiveIndex;
-        reflectance::Real=0.5
-    )
+        reflectance::Real = 0.5
+)
     # create substrate prism and move into pos
     substrate_shape = BoxSDF(width, thickness, height)
     substrate = Prism(substrate_shape, n)
-    translate3d!(substrate, [0, thickness/2, 0])
+    translate3d!(substrate, [0, thickness / 2, 0])
     # rotate splitter "coating" into pos
     coating = ThinBeamsplitter(width, height; reflectance)
     zrotate3d!(coating, π)
@@ -133,7 +135,7 @@ The coating is centered at the origin. See also [`RectangularPlateBeamsplitter`]
 - `thickness`: substrate thickness along the z-axis in [m]
 - `n`: the [`RefractiveIndex`](@ref) of the substrate
 
-# Keywords 
+# Keywords
 
 - `reflectance`: defines the splitting ratio in [-], i.e. R = 0 ... 1.0
 """
@@ -141,8 +143,8 @@ function RoundPlateBeamsplitter(
         diameter::Real,
         thickness::Real,
         n::RefractiveIndex;
-        reflectance::Real=0.5
-    )
+        reflectance::Real = 0.5
+)
     # create substrate cylinder prism
     substrate_shape = PlanoSurfaceSDF(thickness, diameter)
     substrate = Prism(substrate_shape, n)
@@ -151,8 +153,63 @@ function RoundPlateBeamsplitter(
     return RoundPlateBeamsplitter(substrate, coating)
 end
 
+"""
+    RectangularPolarizingPlateBeamsplitter <: AbstractPlateBeamsplitter
+
+A plate beamsplitter with a rectangular substrate and an ideal polarizing
+splitting coating.
+"""
+struct RectangularPolarizingPlateBeamsplitter{T} <:
+       AbstractPlateBeamsplitter{T}
+    substrate::Prism{T, BoxSDF{T}}
+    coating::PolarizingBeamSplitter{T, Mesh{T}}
+end
+
+"""
+    RectangularPolarizingPlateBeamsplitter(width, height, thickness, n)
+"""
+function RectangularPolarizingPlateBeamsplitter(
+        width::Real,
+        height::Real,
+        thickness::Real,
+        n::RefractiveIndex
+)
+    substrate_shape = BoxSDF(width, thickness, height)
+    substrate = Prism(substrate_shape, n)
+    translate3d!(substrate, [0, thickness / 2, 0])
+    coating = PolarizingBeamSplitter(width, height)
+    zrotate3d!(coating, π)
+    return RectangularPolarizingPlateBeamsplitter(substrate, coating)
+end
+
+"""
+    RoundPolarizingPlateBeamsplitter <: AbstractPlateBeamsplitter
+
+A plate beamsplitter with a cylindrical substrate and an ideal polarizing
+splitting coating.
+"""
+struct RoundPolarizingPlateBeamsplitter{T} <:
+       AbstractPlateBeamsplitter{T}
+    substrate::Prism{T, PlanoSurfaceSDF{T}}
+    coating::PolarizingBeamSplitter{T, Mesh{T}}
+end
+
+"""
+    RoundPolarizingPlateBeamsplitter(diameter, thickness, n)
+"""
+function RoundPolarizingPlateBeamsplitter(
+        diameter::Real,
+        thickness::Real,
+        n::RefractiveIndex
+)
+    substrate_shape = PlanoSurfaceSDF(thickness, diameter)
+    substrate = Prism(substrate_shape, n)
+    coating = PolarizingBeamSplitter(CircularFlatMesh(diameter / 2))
+    return RoundPolarizingPlateBeamsplitter(substrate, coating)
+end
+
 function intersect3d(pbs::AbstractPlateBeamsplitter, ray::AbstractRay)
-    # this is sooooooo stupid but necessary to ensure correct intersection... 
+    # this is sooooooo stupid but necessary to ensure correct intersection...
     ic = intersect3d(coating(pbs), ray)
     is = intersect3d(substrate(pbs), ray)
     if isnothing(ic) & isnothing(is)
@@ -181,11 +238,11 @@ function intersect3d(pbs::AbstractPlateBeamsplitter, ray::AbstractRay)
 end
 
 function interact3d(
-    system::AbstractSystem,
-    pbs::AbstractPlateBeamsplitter,
-    beam::Beam{T, R},
-    ray::R
-    ) where {T <: Real, R <: AbstractRay{T}}
+        system::AbstractSystem,
+        pbs::AbstractPlateBeamsplitter,
+        beam::Beam{T, R},
+        ray::R
+) where {T <: Real, R <: AbstractRay{T}}
     # Substrate interaction
     if shape(intersection(ray)) === shape(substrate(pbs))
         interaction = interact3d(system, substrate(pbs), beam, ray)
@@ -214,7 +271,27 @@ function interact3d(
         end
         refractive_index!(first(rays(beam.children[1])), _nt)
         refractive_index!(first(rays(beam.children[2])), _nr)
-        direction!(first(rays(beam.children[1])), n_d)
+
+        # update direction and polarization
+        child_ray = first(rays(beam.children[1]))
+        direction!(child_ray, n_d)
+        if child_ray isa PolarizedRay
+            # Use proper Yun calculus to apply Fresnel coefficients for the refraction
+            # instead of an unphysical geometric rotation placeholder.
+            in_dir = direction(ray)
+            nml = normal3d(intersection(ray))
+
+            # The normal should point against the incoming ray for accurate incidence angle
+            dot(in_dir, nml) > 0 && (nml = -nml)
+
+            θi = angle3d(in_dir, -nml)
+            rs, rp, ts, tp = fresnel_coefficients(θi, _nt / _nr)
+
+            # Use Jones matrix approach for transmission
+            J = SPBasis(ts, 0, 0, tp)
+            new_E0 = _calculate_global_E0(pbs, ray, n_d, J)
+            polarization!(child_ray, new_E0)
+        end
         return nothing
     end
     # if nothing worked, return nothing
@@ -222,11 +299,11 @@ function interact3d(
 end
 
 function interact3d(
-    system::AbstractSystem,
-    pbs::AbstractPlateBeamsplitter,
-    gauss::GaussianBeamlet,
-    id::Int
-    )
+        system::AbstractSystem,
+        pbs::AbstractPlateBeamsplitter,
+        gauss::GaussianBeamlet,
+        id::Int
+)
     _shape = shape(intersection(rays(gauss.chief)[id]))
     # Substrate interaction
     if _shape === shape(substrate(pbs))
@@ -245,16 +322,16 @@ function interact3d(
             # transmitted ray is refracted into substrate
             _nt = n_optics
             _nr = n_system
-            n_c, _ = refraction3d(rays(gauss.chief)[id], n_optics) 
-            n_w, _ = refraction3d(rays(gauss.waist)[id], n_optics) 
-            n_d, _ = refraction3d(rays(gauss.divergence)[id], n_optics) 
+            n_c, _ = refraction3d(rays(gauss.chief)[id], n_optics)
+            n_w, _ = refraction3d(rays(gauss.waist)[id], n_optics)
+            n_d, _ = refraction3d(rays(gauss.divergence)[id], n_optics)
         else
             # transmitted ray is refracted into environment
             _nt = n_system
             _nr = n_optics
-            n_c, _ = refraction3d(rays(gauss.chief)[id], n_system) 
-            n_w, _ = refraction3d(rays(gauss.waist)[id], n_system) 
-            n_d, _ = refraction3d(rays(gauss.divergence)[id], n_system) 
+            n_c, _ = refraction3d(rays(gauss.chief)[id], n_system)
+            n_w, _ = refraction3d(rays(gauss.waist)[id], n_system)
+            n_d, _ = refraction3d(rays(gauss.divergence)[id], n_system)
         end
         # Update children ref. index and dir. due to refraction
         refractive_index!(gauss.children[1], 1, _nt)

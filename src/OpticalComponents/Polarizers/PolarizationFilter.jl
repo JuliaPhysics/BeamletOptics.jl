@@ -55,10 +55,10 @@ function interact3d(system::AbstractSystem,
     i_c = interact3d(system, polfilter, agb.c, rays(agb.c)[id])
     isnothing(i_c) && return nothing
     
-    # Auxiliary rays only undergo geometric interaction with the filter shape.
+    # Auxiliary rays only undergo geometric interaction with the filter.
     # They hit at their own transverse locations, preserving beam width/divergence.
     aux_ints = map(b -> begin
-        interact3d(system, polfilter.shape, b, rays(b)[id])
+        interact3d(system, polfilter, b, rays(b)[id])
     end, _aux_beams(agb))
     
     if any(isnothing, aux_ints)

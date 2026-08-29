@@ -93,17 +93,23 @@ end
     pos = position(ray) + length(ray) * direction(ray)
     dir = direction(ray)
     E0 = _calculate_global_E0(bs, ray, dir, J)
+    # Enforce orthogonality (Gram-Schmidt)
+    E0 -= dot(dir, E0) * dir
     return Beam(PolarizedRay(pos, dir, wavelength(ray), E0))
 end
 
 @inline function _beamsplitter_reflected_beam(bs::AbstractBeamsplitter, ::Beam{T, R},
         ray::R) where {T <: Real, R <: PolarizedRay{T}}
+    # Symmetric reflection for non-polarizing BS behavior (preserve polarization state)
+    # The negative reflectance matrix correctly implements a pi phase shift on reflection.
     J = SPBasis(-reflectance(bs), 0, 0, reflectance(bs))
     normal = normal3d(intersection(ray))
     pos = position(ray) + length(ray) * direction(ray)
     in_dir = direction(ray)
     out_dir = reflection3d(in_dir, normal)
     E0 = _calculate_global_E0(bs, ray, out_dir, J)
+    # Enforce orthogonality (Gram-Schmidt)
+    E0 -= dot(out_dir, E0) * out_dir
     return Beam(PolarizedRay(pos, out_dir, wavelength(ray), E0))
 end
 
