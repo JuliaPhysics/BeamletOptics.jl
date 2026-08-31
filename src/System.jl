@@ -310,17 +310,6 @@ Delegates volumetric propagation and segment construction to `propagate_volume`.
     return propagate_volume(system, med, ray, hint, opl_accum)
 end
 
-@inline function tracing_step!(
-        system::AbstractSystem, ray::AbstractRay{R}, hint::Nullable{Hint} = nothing) where {R <: Real}
-    res = trace_one(system, ray, hint)
-    if res === nothing
-        return nothing
-    else
-        hit, obj = res
-        return obj
-    end
-end
-
 # Dispatched interaction helper for hit vs multi-intersection
 @inline interact_hit(system::AbstractSystem, obj::AbstractObject, hit::Intersection, beam, ray) = interact3d(system, obj, beam, ray)
 @inline interact_hit(system::AbstractSystem, ::AbstractObject, mi::MultiIntersection, beam, ray) = interact3d(system, mi, beam, ray)
