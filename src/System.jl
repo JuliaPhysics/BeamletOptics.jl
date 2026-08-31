@@ -297,7 +297,6 @@ end
 
 @inline trace_one(system::AbstractSystem, ray::AbstractRay, ::Nothing) = trace_all(system, ray)
 
-
 """
     tracing_step(system::AbstractSystem, ray::AbstractRay{R}, hint::Nullable{Hint} = nothing, opl_accum::R = zero(R)) where {R <: Real}
 
@@ -310,12 +309,23 @@ Delegates volumetric propagation and segment construction to `propagate_volume`.
     return propagate_volume(system, med, ray, hint, opl_accum)
 end
 
-# Dispatched interaction helper for hit vs multi-intersection
-@inline interact_hit(system::AbstractSystem, obj::AbstractObject, hit::Intersection, beam, ray) = interact3d(system, obj, beam, ray)
-@inline interact_hit(system::AbstractSystem, ::AbstractObject, mi::MultiIntersection, beam, ray) = interact3d(system, mi, beam, ray)
+"""
+    interact3d(system::AbstractSystem, object::AbstractObject, hit, beam::AbstractBeam, ray_or_id)
 
-@inline interact_hit(system::AbstractSystem, obj::AbstractObject, hit::Intersection, beam, seg_counter::Int) = interact3d(system, obj, beam, seg_counter)
-@inline interact_hit(system::AbstractSystem, ::AbstractObject, mi::MultiIntersection, beam, seg_counter::Int) = interact3d(system, mi, beam, seg_counter)
+Solver-internal dispatch used by [`trace_system!`](@ref): routes a resolved `hit` from
+[`tracing_step`](@ref) to the interaction that applies. A plain [`Intersection`](@ref)
+dispatches on the hit `object`; a [`MultiIntersection`](@ref) dispatches on the bundle
+itself (coincident-boundary handling) and `object` is ignored. `ray_or_id` — the ray
+([`Beam`](@ref)) or ray index ([`GaussianBeamlet`](@ref) /
+[`AstigmaticGaussianBeamlet`](@ref)) — is forwarded unchanged.
+"""
+@inline interact3d(system::AbstractSystem, object::AbstractObject, ::Intersection,
+    beam::AbstractBeam, ray_or_id::Union{AbstractRay, Int}) =
+    interact3d(system, object, beam, ray_or_id)
+
+@inline interact3d(system::AbstractSystem, ::AbstractObject, mi::MultiIntersection,
+    beam::AbstractBeam, ray_or_id::Union{AbstractRay, Int}) =
+    interact3d(system, mi, beam, ray_or_id)
 
 """
     trace_system!(system::AbstractSystem, beam::Beam{T}; r_max = get_default_r_max()) where {T <: Real}
@@ -345,7 +355,7 @@ function trace_system!(
 
         current_opl = accumulated_opl(resolved_ray)
         # Dispatch to interface interaction depending on intersection type
-        interaction = interact_hit(system, obj, hit, beam, resolved_ray)::Union{Nothing, BeamInteraction}
+        interaction = interact3d(system, obj, hit, beam, resolved_ray)::Union{Nothing, BeamInteraction}
         if isnothing(interaction)
             break
         end
@@ -406,7 +416,7 @@ function trace_system!(
         opl_d = accumulated_opl(resolved_d)
 
         # Calculate interaction
-        interaction = interact_hit(system, obj_c, int_c, gauss, seg_counter)
+        interaction = interact3d(system, obj_c, int_c, gauss, seg_counter)
         if isnothing(interaction)
             break
         end
@@ -479,7 +489,7 @@ function trace_system!(
         end
 
         int_c = hit_c
-        interaction = interact_hit(system, obj_c, int_c, agb, seg_counter)
+        interaction = interact3d(system, obj_c, int_c, agb, seg_counter)
         if isnothing(interaction)
             break
         end
