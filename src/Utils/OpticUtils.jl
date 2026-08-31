@@ -110,7 +110,7 @@ intensity(E::Number, Z = Z_vacuum) = abs2(E) / (2 * Z)
 """
 fresnel_coefficients(θ, n)
 
-Calculates the complex Fresnel coefficients for reflection and transmission based on the incident angle `θ` in [rad]
+Calculates the complex Fresnel coefficients for reflection and transmission based on the incident angle `θ` in \\[rad\\]
 and the refractive index ratio `n = n₂ / n₁`. Returns rₛ, rₚ, tₛ and tₚ.
 
 # Signs
@@ -145,6 +145,57 @@ function is_internally_reflected(rp::Number, rs::Number)
     isapprox(abs2(rs), 1, atol = Config.get_internal_reflection_threshold()) &&
         isapprox(abs2(rp), 1, atol = Config.get_internal_reflection_threshold())
 end
+
+"""
+    admittance_factor(θi::Real, n::Number) -> Real
+
+Calculates the optical boundary admittance factor ``\\sqrt{\\frac{n_2 \\cos\\theta_t}{n_1 \\cos\\theta_i}}``
+for refractive transmission where ``n = n_2 / n_1``.
+This factor scales electric field amplitude transmission into power-conserving flux across dielectric interfaces.
+"""
+function admittance_factor(θi::Real, n::Number)
+    cost = cos(θi)
+    if cost <= 0
+        return 0.0
+    end
+    n2s2 = real(sqrt(Complex(n^2 - sin(θi)^2)))
+    return sqrt(max(0.0, n2s2 / cost))
+end
+
+"""
+    admittance_factor(θi::Real, θt::Real, n1::Real, n2::Real) -> Real
+
+Calculates the optical boundary admittance factor ``\\sqrt{\\frac{n_2 \\cos\\theta_t}{n_1 \\cos\\theta_i}}``.
+"""
+function admittance_factor(θi::Real, θt::Real, n1::Real, n2::Real)
+    denom = n1 * cos(θi)
+    if denom <= 0
+        return 0.0
+    end
+    return sqrt(max(0.0, (n2 * cos(θt)) / denom))
+end
+
+"""
+    fresnel_power_coefficients(θ::Real, n::Number)
+
+Calculates the power reflectance and transmittance coefficients ``R_s, R_p, T_s, T_p``
+across a dielectric boundary for incident angle `θ` in \\[rad\\] and index ratio `n = n₂ / n₁`.
+Satisfies radiant flux conservation ``R_s + T_s = 1`` and ``R_p + T_p = 1``.
+"""
+function fresnel_power_coefficients(θ::Real, n::Number)
+    rs, rp, ts, tp = fresnel_coefficients(θ, n)
+    Rs = abs2(rs)
+    Rp = abs2(rp)
+    if is_internally_reflected(rp, rs)
+        return (Rs, Rp, 0.0, 0.0)
+    else
+        admittance = admittance_factor(θ, n)^2
+        Ts = admittance * abs2(ts)
+        Tp = admittance * abs2(tp)
+        return (Rs, Rp, Ts, Tp)
+    end
+end
+
 
 """
     sag(r::Real, l::Real)

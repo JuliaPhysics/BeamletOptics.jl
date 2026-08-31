@@ -51,8 +51,7 @@ poly!(ax, BMO.vertices(mesh), BMO.faces(mesh)[192, :]; color=:red, transparency=
 render!(ax, b; show_pos=true)
 arrow!(ax, pos, dir)
 
-ray.intersection = nothing
-render!(ax, ray; linestyle=:dashdot, flen=200mm, )
+render!(ax, ray; linestyle=:dashdot, flen=200mm)
 
 display(fig)
 hide_axis(ax)

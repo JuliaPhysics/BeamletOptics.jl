@@ -29,44 +29,7 @@ by specialized subtypes.
 """
 abstract type AbstractReflectiveOptic{T} <: AbstractObject{T} end
 
-# FIXME Require reflectivity field/function for interaction with PolarizedRay
-
-"""
-    interact3d(AbstractReflectiveOptic, Ray)
-
-Implements the reflection of a [`Ray`](@ref) via the normal at the intersection point on an optical surface.
-"""
-function interact3d(::AbstractSystem,
-        ::AbstractReflectiveOptic,
-        ::Beam{T, R},
-        ray::R) where {T <: Real, R <: Ray{T}}
-    normal = normal3d(intersection(ray))
-    npos = position(ray) + length(ray) * direction(ray)
-    ndir = reflection3d(direction(ray), normal)
-    return BeamInteraction{T, R}(nothing,
-        Ray{T}(npos, ndir, nothing, wavelength(ray), refractive_index(ray)))
-end
-
-"""
-    interact3d(AbstractReflectiveOptic, PolarizedRay)
-
-Implements the ideal reflection of a [`PolarizedRay`](@ref) via the normal at the intersection point on an optical surface.
-A Jones matrix of [-1 0 0; 0 1 0] is assumed as per Peatross (2015, 2023 Ed. p. 154) and Yun et al. (see [`PolarizedRay`](@ref) for more information).
-"""
-function interact3d(::AbstractSystem,
-        obj::AbstractReflectiveOptic,
-        ::Beam{T, R},
-        ray::R) where {T <: Real, R <: PolarizedRay{T}}
-    normal = normal3d(intersection(ray))
-    npos = position(ray) + length(ray) * direction(ray)
-    ndir = reflection3d(direction(ray), normal)
-    # Jones reflection matrix
-    J = SPBasis(-1, 0, 0, 1)
-    E0 = _calculate_global_E0(obj, ray, ndir, J)
-    return BeamInteraction{T, R}(nothing,
-        PolarizedRay{T}(
-            npos, ndir, nothing, wavelength(ray), refractive_index(ray), E0))
-end
+surface_model(::AbstractReflectiveOptic) = IdealMirrorSurface()
 
 """
     Mirror{S <: AbstractShape} <: AbstractReflectiveOptic
@@ -88,7 +51,7 @@ The reflecting surface is normal to the y-axis.
 
 # Inputs
 
-- `edge_length`: the edge length of the square mirror in [m]
+- `edge_length`: the edge length of the square mirror in \\[m\\]
 """
 function SquarePlanoMirror2D(size::T) where {T <: Real}
     shape = QuadraticFlatMesh(size)
@@ -103,9 +66,9 @@ The front reflecting surface is normal to the y-axis and lies at the origin.
 
 # Inputs
 
-- `width`:      of the mirror in x-direction [m] 
-- `height`:     of the mirror in z-direction [m] 
-- `thickness`:  of the mirror in y-direction [m] 
+- `width`:      of the mirror in x-direction \\[m\\] 
+- `height`:     of the mirror in z-direction \\[m\\] 
+- `thickness`:  of the mirror in y-direction \\[m\\] 
 """
 function RectangularPlanoMirror(width::W, height::H, thickness::T) where {W<:Real,H<:Real,T<:Real}
     shape = CuboidMesh(width, thickness, height)
@@ -127,8 +90,8 @@ See also [`RectangularPlanoMirror`](@ref).
 
 # Inputs
 
-- `width`: the side length of the square mirror in x- and y-direction [m]
-- `thickness`: of the mirror in [m]
+- `width`: the side length of the square mirror in x- and y-direction \\[m\\]
+- `thickness`: of the mirror in \\[m\\]
 """
 function SquarePlanoMirror(width::W, thickness::T) where {W<:Real,T<:Real}
     return RectangularPlanoMirror(width, width, thickness)
@@ -155,8 +118,8 @@ Returns a cylindrical, flat [`RoundPlanoMirror`](@ref) with perfect reflectivity
 
 # Inputs
 
-- `diameter`: mirror diameter in [m]
-- `thickness`: mirror substrate thickness in [m]
+- `diameter`: mirror diameter in \\[m\\]
+- `thickness`: mirror substrate thickness in \\[m\\]
 """
 function RoundPlanoMirror(diameter::D, thickness::T) where {D<:Real,T<:Real}
     shape = PlanoSurfaceSDF(thickness, diameter)
@@ -188,9 +151,9 @@ See also [`ConcaveSphericalMirror`](@ref).
 
 # Inputs
 
-- `radius`: the spherical surface radius of curvature in [m]
-- `thickness`: substrate thickness in [m]
-- `diameter`: mirror outer diameter in [m]
+- `radius`: the spherical surface radius of curvature in \\[m\\]
+- `thickness`: substrate thickness in \\[m\\]
+- `diameter`: mirror outer diameter in \\[m\\]
 """
 function ConcaveSphericalMirror(radius::Real, thickness::Real, diameter::Real)
     cylinder = PlanoSurfaceSDF(thickness, diameter)
@@ -220,8 +183,8 @@ Constructs a right angle prism mirror. The primary surface is aligned with the p
 
 # Inputs
 
-- `leg_length`: edge length in x and y in [m] 
-- `height`: in z-axis in [m]
+- `leg_length`: mirror leg length in \\[m\\]
+- `height`: mirror height in \\[m\\]
 """
 function RightAnglePrismMirror(leg_length::Real, height::Real)
     shape = RightAnglePrismSDF(leg_length, height)

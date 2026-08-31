@@ -38,7 +38,7 @@ end
 """
     ConvexCylinderSDF(radius, diameter, height)
 
-Constructs a cut cylinder with radius `r`, diameter `d` and height `h` in [m].
+Constructs a cut cylinder with radius `r`, diameter `d` and height `h` in \\[m\\].
 """
 function ConvexCylinderSDF(radius::R, diameter::D, height::H) where {R, D, H}
     T = promote_type(R, D, H)
@@ -84,7 +84,6 @@ function sdf_cut_disk(point::Point2, r, h)
            norm(p - Point2(w, h))
 end
 
-
 """
     ConcaveCylinderSDF <: AbstractSDF
 
@@ -102,7 +101,7 @@ end
 """
     ConcaveCylinderSDF(radius, diameter, height)
 
-Constructs a concave cylinder with radius `r`, diameter `d` and height `h` in [m].
+Constructs a concave cylinder with radius `r`, diameter `d` and height `h` in \\[m\\].
 """
 function ConcaveCylinderSDF(radius::R, diameter::D, height::H) where {R, D, H}
     T = promote_type(R, D, H)
@@ -118,7 +117,7 @@ function ConcaveCylinderSDF(radius::R, diameter::D, height::H) where {R, D, H}
     return s
 end
 
-thickness(::ConcaveCylinderSDF{T}) where T = zero(T)
+thickness(::ConcaveCylinderSDF{T}) where {T} = zero(T)
 
 function sdf(s::ConcaveCylinderSDF{T}, point) where {T}
     p = _world_to_sdf(s, point)
@@ -127,12 +126,12 @@ function sdf(s::ConcaveCylinderSDF{T}, point) where {T}
     _sag = sag(abs(s.radius), s.diameter)
     ps = p + Point3(zero(T), -s.radius, zero(T))
     d = abs.(Point2(norm(Point2(p[3], ps[2])), ps[1])) -
-        Point2(abs(s.radius), s.height/2)
+        Point2(abs(s.radius), s.height / 2)
     c = min(maximum(d), zero(T)) + norm(max.(d, zero(T)))
 
     # box
-    pp = p + Point3(0, -_sag/2*sign(s.radius), 0)
-    q = abs.(pp) - Point3(s.height/2, _sag/2, s.diameter/2)
+    pp = p + Point3(0, -_sag / 2 * sign(s.radius), 0)
+    q = abs.(pp) - Point3(s.height / 2, _sag / 2, s.diameter / 2)
     l = norm(max.(q, zero(T))) + min(max(q[1], max(q[2], q[3])), zero(T))
 
     return max(l, -c)
@@ -212,7 +211,7 @@ function _sdf(s::CylindricalSurface, ::BackwardOrientation)
 end
 
 """
-    RectangularFlatSurface{T} <: AbstracCylindricalSurface{T}
+    RectangularFlatSurface{T} <: AbstractCylindricalSurface{T}
 
 A type representing a planar rectangular surface, which is only parametrized by its `size`.
 

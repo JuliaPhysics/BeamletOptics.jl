@@ -33,6 +33,7 @@ Subtypes of `AbstractShape` should implement the following:
 ## Ray Tracing:
 
 - [`intersect3d`](@ref): returns the intersection between an `AbstractShape` and `AbstractRay`, or lack thereof. See also [`Intersection`](@ref)
+- [`normal3d`](@ref): returns a surface normal for the shape. The signature is shape-family-specific (`normal3d(mesh, faceID)`, `normal3d(sdf, point)`, ...); a concrete method is required alongside [`intersect3d`](@ref)
 
 ## Rendering (with Makie):
 
@@ -49,6 +50,18 @@ orientation(shape::AbstractShape) = shape.dir
 orientation!(shape::AbstractShape, dir) = (shape.dir = dir)
 
 """
+    normal3d(shape::AbstractShape, args...)
+
+Interface function: every concrete [`AbstractShape`](@ref) family must implement a method
+returning a surface normal. The trailing arguments are shape-family-specific — e.g. a
+face index for [`AbstractMesh`](@ref), a surface point for [`AbstractSDF`](@ref). This
+fallback errors so a missing implementation is reported clearly rather than as a bare
+`MethodError`.
+"""
+normal3d(shape::AbstractShape, args...) = throw(ArgumentError(
+    lazy"normal3d not defined for $(typeof(shape)) with trailing args ::Tuple{$(map(typeof, args)...)}"))
+
+"""
     translate3d!(shape::AbstractShape, offset)
 
 Translates the `pos`ition of `shape` by the `offset`-vector.
@@ -61,7 +74,7 @@ end
 """
     translate_to3d!(shape::AbstractShape, target)
 
-Translates the `shape` to the `target` position. 
+Translates the `shape` to the `target` position.
 """
 function translate_to3d!(shape::AbstractShape, target)
     current = position(shape)
@@ -105,10 +118,11 @@ end
 Rotates the `shape` such that its local y-axis aligns with the `target_axis`.
 """
 function align3d!(shape::AbstractShape, target_axis)
-    R = align3d(orientation(shape)[:,2], target_axis)
+    R = align3d(orientation(shape)[:, 2], target_axis)
     orientation!(shape, R * orientation(shape))
     return nothing
 end
 
 """Resets the `shape` rotation angles to zero."""
-reset_rotation3d!(shape::AbstractShape{T}) where {T} = orientation!(shape, Matrix{T}(I, 3, 3))
+reset_rotation3d!(shape::AbstractShape{T}) where {T} = orientation!(
+    shape, Matrix{T}(I, 3, 3))

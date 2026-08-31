@@ -4,20 +4,38 @@ export translate3d!, translate_to3d!, rotate3d!, xrotate3d!, yrotate3d!, zrotate
 export position, direction, orientation
 
 # ray and beam type export
-export Ray, PolarizedRay, Beam, PointSource, CollimatedSource, UniformDiscSource,
+export Ray, PolarizedRay, AbstractSegment, OpenSegment, LineSegment, segment, accumulated_opl,
+       with_segment, with_accumulated_opl,
+       Beam, PointSource, CollimatedSource, UniformDiscSource,
        GaussianBeamlet, AstigmaticGaussianBeamlet, rayleigh_range, rays, point_on_beam,
-       normal3d
+       normal3d, optical_path_length
+
 export CollimatedGaussianBeamletSource, GaussianBeamletDecomposition,
        SphericalGaussianBeamletSource, EllipticalGaussianBeamletSource, WavefrontBeamletDecomposition, AstigmaticBeamGroup
 
+# media, surfaces & coatings
+export AbstractMedium, Ambient, IsotropicMedium,
+       AbstractAnisotropicMedium, UniaxialMedium, BiaxialMedium,
+       refractive_index, refractive_index_o, refractive_index_e, birefringence, optic_axis,
+       is_uniaxial, is_biaxial, dielectric_tensor,
+       complex_refractive_index, extinction_coefficient, absorption_coefficient
+export AbstractSurfaceModel, FresnelSurface, IdealMirrorSurface, AbsorbingSurface,
+       DetectorSurface, CoatedSurface, GratingSurface
+export AbstractVolumeModel, VolumeInteraction
+export AbstractCoating, Coating, surface_model
+export Transition, resolve_transition, current_medium, propagate_volume, interact3d
+export Intersection, intersection, geometry_intersection
+
 # system
-export System, StaticSystem, solve_system!
+export System, StaticSystem, solve_system!, ambient_medium
 
 # object group
 export ObjectGroup
 
 # additional
-export DiscreteRefractiveIndex, SellmeierEquation
+export DiscreteRefractiveIndex, SellmeierEquation,
+       admittance_factor, fresnel_power_coefficients, fresnel_coefficients,
+       reflection3d, refraction3d
 
 #=
 components
@@ -42,7 +60,7 @@ export Detector, electric_field, intensity, spot_diagram, optical_power, gauss_p
        waist_parameters, Centroid, MinMax
 
 # splitters
-export ThinBeamsplitter, RoundThinBeamsplitter, RectangularPlateBeamsplitter,
+export AbstractBeamsplitter, ThinBeamsplitter, RoundThinBeamsplitter, RectangularPlateBeamsplitter,
        RoundPlateBeamsplitter, CubeBeamsplitter, RectangularCompensatorPlate
 
 # polarizing components
@@ -56,7 +74,8 @@ export Retroreflector, get_invariant_threshold, set_invariant_threshold!,
     get_sdf_surface_threshold, get_sdf_raymarch_eps, get_sdf_inside_step,
     get_internal_reflection_threshold, get_line_plane_intersection_threshold,
     get_orthogonality_threshold, get_default_r_max, get_default_depth_max,
-    get_default_wavelength, get_default_waist, get_default_power
+    get_default_wavelength, get_default_waist, get_default_power,
+    get_coincident_boundary_tolerance
 
 # render
 export render!

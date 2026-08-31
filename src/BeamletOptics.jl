@@ -24,11 +24,15 @@ using .Config: get_invariant_threshold, set_invariant_threshold!,
              get_sdf_surface_threshold, get_sdf_raymarch_eps, get_sdf_inside_step,
              get_internal_reflection_threshold, get_line_plane_intersection_threshold,
              get_orthogonality_threshold, get_default_r_max, get_default_depth_max,
-             get_default_wavelength, get_default_waist, get_default_power
+             get_default_wavelength, get_default_waist, get_default_power,
+             get_coincident_boundary_tolerance
 include("Utils/Utils.jl")
 include("AbstractTypes/AbstractTypes.jl")
 include("Rays.jl")
 include("PolarizedRays.jl")
+include("Transitions.jl")
+include("SurfaceInteractions.jl")
+include("VolumeInteractions.jl")
 include("Beam.jl")
 include("Gaussian.jl")
 include("AstigmaticGaussian.jl")

@@ -50,7 +50,6 @@ For the context of this tutorial, the following constants and helper functions h
 
 - `cm`: corresponds to 1e-2 m
 - `mm`: corresponds to 1e-3 m
-- `reset_beamlet`: a helper function that resets an already solved `GaussianBeamlet` beam path to its initial position and direction
 
 ## Building the optical system
 
@@ -133,11 +132,9 @@ Once the mirror is in place, we can run the simulation to see how the beam inter
 
 ## Placing the beamsplitter
 
-The beamsplitter splits the beam into a reference and probe beam path. In this step, a 1" [`CubeBeamsplitter`](@ref) with a splitting ratio of 50% will be placed within the system, along with the previously defined mirror. Refer to the [Cube beamsplitter](@ref) section for more information. We also reset the beam to ensure we start from its original parameters before propagation through the new configuration:
+The beamsplitter splits the beam into a reference and probe beam path. In this step, a 1" [`CubeBeamsplitter`](@ref) with a splitting ratio of 50% will be placed within the system, along with the previously defined mirror. Refer to the [Cube beamsplitter](@ref) section for more information. Note that [`solve_system!`](@ref) always resets `beam` back to its original starting ray(s) before (re-)tracing, so no manual reset step is needed here:
 
 ```julia
-reset_beamlet!(beam)
-
 # define NBK7 ref. index for λ
 NBK7 = DiscreteRefractiveIndex([632.8e-9], [1.51509])
 
@@ -182,8 +179,6 @@ The following figure shows two 1" mirrors mounted in [KC1L/M](https://www.thorla
 The final step in creating a functional interferometer simulation is to add a [`Detector`](@ref) that captures the field data of the incoming beamlets.
 
 ```julia
-reset_beamlet!(beam)
-
 # define detector with 5x5 mm active area
 pd = Detector(5e-3)
 

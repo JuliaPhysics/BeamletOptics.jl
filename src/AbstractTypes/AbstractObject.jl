@@ -31,6 +31,34 @@ is dispatched.
 """
 abstract type AbstractObject{T <: Real} end
 
+"""
+    AbstractBeamsplitter <: AbstractObject
+
+A generic type to represent an [`AbstractObject`](@ref) that splits incoming beams by reflection and transmission.
+
+# Implementation reqs.
+
+Subtypes of `AbstractBeamsplitter` should implement all supertype requirements.
+
+## Interaction logic
+
+After intersection with the [`AbstractShape`](@ref) at which the beam splitting occurs, the `interact3d` function
+should appended the transmitted and reflected sub-beams to the parent beam via the [`children!`](@ref) function.
+The `interact3d` function should then return `nothing` in order to stop the tracing of the parent beam.
+
+!!! info "Appending convention"
+    As a convention, when splitting an incoming beam, the order of `children` appended to the parent beam should be
+      1. transmitted beam
+      2. reflected beam
+
+## Functions
+
+- `interact3d`: see above
+- `_beamsplitter_transmitted_beam`: optional helper function
+- `_beamsplitter_reflected_beam`: optical helper function
+"""
+abstract type AbstractBeamsplitter{T <: Real} <: AbstractObject{T} end
+
 "Default trait"
 shape_trait_of(::AbstractObject) = SingleShape()
 
@@ -75,23 +103,25 @@ reset_translation3d!(object::AbstractObject) = reset_translation3d!(shape_trait_
 reset_rotation3d!(object::AbstractObject) = reset_rotation3d!(shape_trait_of(object), object)
 
 """
-    AbstractObjectGroup <: AbstractObject
+    is_refractive(object::AbstractObject)
 
-Container type for groups of optical elements, based on a tree-like data structure. Intended for easier kinematic handling of connected elements.
-See also [`ObjectGroup`](@ref) for a concrete implementation.
 
-# Implementation reqs.
-
-Subtypes of `AbstractObjectGroup` must implement the following:
-
-## Fields:
-
-- `objects`: stores objects or additional subgroups of objects, allows for hierarchical structures
-
-## Functions:
-
-- for the kinematic API, all corresponding functions of [`AbstractObject`](@ref) must be implemented
+Default fallback implementation checking if an object has refractive properties. Returns `false`.
 """
-abstract type AbstractObjectGroup{T} <: AbstractObject{T} end
+is_refractive(::AbstractObject) = false
 
-AbstractTrees.children(group::AbstractObjectGroup) = group.objects
+"""
+    is_thin_interface(object::AbstractObject)
+
+Fallback implementation checking if an object is a zero-thickness boundary interface (like thin beamsplitter coatings or thin film coatings). Returns `false`.
+"""
+is_thin_interface(::AbstractObject) = false
+is_thin_interface(::Nothing) = false
+is_thin_interface(::AbstractBeamsplitter) = true
+
+"""
+    refractive_index(object::AbstractObject) -> Real
+
+Default fallback returning the refractive index of `object` at the default wavelength ([`get_default_wavelength`](@ref)).
+"""
+refractive_index(object::AbstractObject) = refractive_index(object, get_default_wavelength())

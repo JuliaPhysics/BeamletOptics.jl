@@ -20,8 +20,7 @@ Subtypes of `AbstractBeam` must implement the following:
 
 ## Functions:
 
-- `_modify_beam_head!`: modifies the beam path for retracing purposes
-- `_last_beam_intersection`: returns the last `Beam` intersection
+- `_reset_beam!`: resets the beam tree back to just its head ray(s), ready for a fresh trace
 """
 abstract type AbstractBeam{T <: Real, R <: AbstractRay{T}} end
 
@@ -30,7 +29,12 @@ AbstractTrees.nodetype(::Type{T}) where {T <: AbstractBeam} = T
 
 AbstractTrees.ParentLinks(::Type{<:AbstractBeam}) = AbstractTrees.StoredParents()
 AbstractTrees.parent(beam::AbstractBeam) = beam.parent
-parent!(beam::B, parent::B) where {B <: AbstractBeam} = (beam.parent = parent)
+function parent!(beam::B, parent::B) where {B <: AbstractBeam}
+    if beam !== parent
+        beam.parent = parent
+    end
+    return nothing
+end
 
 AbstractTrees.children(b::AbstractBeam) = b.children
 
@@ -42,18 +46,13 @@ AbstractTrees.printnode(io::IO, node::B; kw...) where {B <: AbstractBeam} = show
 Handles the inclusion of adding a single `child` to an existing `beam`. The function behaves as follows:
 
 1. If no previous children exist, add child
-2. If `beam` already has a single child, modify child beam starting ray (retracing)
-3. Else throw error
+2. Else throw error
 """
 function children!(beam::B, child::B) where {B <: AbstractBeam}
     if isempty(children(beam))
         # Link parent and add child to tree
         parent!(child, beam)
         push!(children(beam), child)
-        return nothing
-    end
-    if length(children(beam)) == 1
-        _modify_beam_head!(first(children(beam)), child)
         return nothing
     end
     return error("Adding child to beam failed")
@@ -66,9 +65,15 @@ function children!(beam::B, _children::AbstractVector{B}) where {B <: AbstractBe
         append!(children(beam), _children)
         return nothing
     end
-    if length(children(beam)) == length(_children)
-        for (i, child) in enumerate(children(beam))
-            _modify_beam_head!(child, _children[i])
+    return error("Adding children to beam failed")
+end
+
+function children!(beam::B, _children::Tuple{Vararg{B}}) where {B <: AbstractBeam}
+    if isempty(children(beam))
+        # Link parent and add children to tree
+        for child in _children
+            parent!(child, beam)
+            push!(children(beam), child)
         end
         return nothing
     end
@@ -77,18 +82,28 @@ end
 
 _drop_beams!(b::B) where {B <: AbstractBeam} = (b.children = Vector{B}())
 
-function _modify_beam_head!(::B, ::B) where {B <: AbstractBeam}
-    throw(ArgumentError(lazy"_modify_beam_head not implemented for $B"))
+"""
+    _reset_beam!(beam::AbstractBeam)
+
+Resets `beam` back to just its initial state — drops all children and clears all propagation segments,
+ready for a fresh trace by [`solve_system!`](@ref).
+"""
+function _reset_beam!(::B) where {B <: AbstractBeam}
+    throw(ArgumentError(lazy"_reset_beam! not implemented for $B"))
 end
 
-function _last_beam_intersection(::B) where {B <: AbstractBeam}
-    throw(ArgumentError(lazy"_last_beam_intersection not implemented for $B"))
-end
+
+"""
+    optical_power(beam::AbstractBeam)
+
+Returns the optical power of the beam. Default fallback returns `1.0` (representing 100% normalized power).
+"""
+optical_power(::AbstractBeam{T, R}) where {T <: Real, R} = one(T)
 
 """
     AbstractBeamGroup
 
-Provides a generic container type interface for bundles of [`Beam`](@ref)s. 
+Provides a generic container type interface for bundles of [`Beam`](@ref)s.
 This interface assumes that there exists a central beam around which the bundle propagates,
 e.g. akin to an optical axis.
 

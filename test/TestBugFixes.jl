@@ -126,12 +126,12 @@ end
         @test delta ≈ 1
     end
 
-    @testset "Testing electric_field mutation during retracing" begin
+    @testset "Testing electric_field mutation across repeated solves" begin
         gb_prb = GaussianBeamlet([0, -start_offset, 0], [0, 1, 0], 1e-6, 0.5mm)
         gb_ref = GaussianBeamlet([start_offset, 0, 0], [-1, 0, 0], 1e-6, 0.5mm)
         phis = LinRange(0, 2pi, 50)
         pwr = zeros(length(phis))
-        # Vary starting phase by 0...2pi via retracing
+        # Vary starting phase by 0...2pi, re-solving the system each time
         for (i, phi) in enumerate(phis)
             empty!(detector)
             solve_system!(system, gb_prb)
@@ -162,11 +162,12 @@ end
     r3 = BMO.rays(beam)[3]
     @testset "Testing SDF sphere marching surface bug regression" begin
         @test length(BMO.rays(beam)) == 3
-        @test BMO.object(BMO.intersection(r1)) === mirror
-        @test BMO.object(BMO.intersection(r2)) === mirror
-        @test isnothing(BMO.intersection(r3))
+        @test !isnothing(intersection(beam.rays[1]))
+        @test !isnothing(intersection(beam.rays[2]))
+        @test isnothing(intersection(beam.rays[3]))
         @test dot(BMO.direction(r1), BMO.direction(r3)) < 0
     end
+
 end
 
 @testset "PlateBeamsplitter BoundsError" begin
@@ -190,43 +191,6 @@ end
 
     # Verify we have children (splitting happened)
     @test length(BMO.children(agb)) == 2
-end
-
-@testset "Retrace Tail Trimming Consistency" begin
-    # Issue: When retracing reaches the old tail (i == n_c), a new segment
-    # can be pushed and then rejected by check_optical_invariant.
-    # Stale n_c caused inconsistent trimming between chief and aux beams.
-
-    # We need a system where we can trigger an invariant violation during retrace.
-    # We'll use a very small invariant threshold to make it easy to trigger.
-    strict_threshold = 1e-15
-
-    # A simple plane surface
-    surf = RoundPlanoMirror(50mm, 5mm)
-    BMO.translate3d!(surf, [0, 50mm, 0])
-    system = System([surf])
-
-    # Initial trace: 1 segment (2 rays)
-    agb = AstigmaticGaussianBeamlet([0, 0, 0], [0, 1, 0], 1e-6, 1mm)
-
-    with_logger(NullLogger()) do
-        # Use strict threshold for this call
-        solve_system!(system, agb; threshold = strict_threshold)
-
-        n_initial = length(BMO.rays(agb.c))
-        @test n_initial == 2
-
-        # Now move the surface further away such that retracing will
-        # reach the old tail and try to push a new segment.
-        BMO.translate3d!(surf, [0, 10mm, 0])
-
-        # Also tilt it or change parameters to trigger invariant violation if possible.
-        BMO.retrace_system!(system, agb; threshold = strict_threshold)
-    end
-
-    # Verification of consistency
-    lengths = map(b -> length(BMO.rays(b)), BMO._component_beams(agb))
-    @test all(==(lengths[1]), lengths)
 end
 
 end # MODULE

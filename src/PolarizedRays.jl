@@ -1,101 +1,126 @@
 """
-    PolarizedRay{T} <: AbstractRay{T}
+    PolarizedRay{T, S} <: AbstractRay{T, S}
 
 A ray type to model the propagation of an electric field vector based on the publication:
 
 **Yun, Garam, Karlton Crabtree, and Russell A. Chipman. "Three-dimensional polarization ray-tracing calculus I: definition and diattenuation." Applied Optics 50.18 (2011): 2855-2865.**
 
-The geometrical ray description is identical to the standard [`Ray`](@ref). The polarization interaction can be described in local s-p-coordinates
+The geometrical ray trajectory is stored in `segment::S` (where `S <: AbstractSegment{T}`). The polarization interaction can be described in local s-p-coordinates
 but must be transformed into global coordinates using the method described in the publication above, see also [`_calculate_global_E0`](@ref).
 
 # Fields
-
-- `pos`: a point in R³ that describes the `Ray` origin
-- `dir`: a normalized vector in R³ that describes the `Ray` direction
-- `intersection`: refer to [`Intersection`](@ref)
-- `λ`: wavelength in [m]
-- `n`: refractive index along the beam path
-- `E0`: complex-valued 3-tuple to represent the electric field in global coordinates
+- `segment::S`: the trajectory segment of the ray
+- `λ::T`: wavelength in \\[m\\]
+- `n::T`: refractive index along the beam path
+- `E0::Point3{Complex{T}}`: complex-valued 3-tuple to represent the electric field in global coordinates
 
 # Jones matrices
-
 In local coordinates the Jones matrices in the case of reflection/refraction are defined as
-
-- reflection: [-rₛ 0; 0 rₚ]
-- transmission: [tₛ 0; 0 tₚ]
-
+- reflection: `[-rₛ 0; 0 rₚ]`
+- transmission: `[tₛ 0; 0 tₚ]`
 where r and t are the complex-valued Fresnel coefficients (see also [`fresnel_coefficients`](@ref)).
-
-# Additional information
-
-!!! warning "Field vector"
-    It is assumed that the electric field vector ``E_0`` stays orthogonal to the direction of propagation throughout the optical system.
-
-!!! warning "Intensity"
-    E0 can not be converted into an [`intensity`](@ref) value, since a single `PolarizedRay` can not directly model the change in intensity during imaging by an optical system.
 """
-mutable struct PolarizedRay{T} <: AbstractRay{T}
-    pos::Point3{T}
-    dir::Point3{T}
-    intersection::Nullable{Intersection{T}}
+struct PolarizedRay{T <: Real, S <: AbstractSegment{T}} <: AbstractRay{T, S}
+    segment::S
     λ::T
     n::T
     E0::Point3{Complex{T}}
-    function PolarizedRay{T}(
-            pos::AbstractArray{P},
-            dir::AbstractArray{D},
-            int::Nullable{Intersection},
-            λ::L,
-            n::N,
+
+    function PolarizedRay{T, S}(
+            seg::S,
+            λ::Real,
+            n::Real,
             E0::AbstractArray{<:Union{E, Complex{E}}}
-        ) where {T, P, D, L, N, E}
-        M = promote_type(T, P, D, L, N, E)
-        if isapprox(norm(dir), 0, atol=1e-14)
-            throw(ErrorException("Direction vector to short for normalization."))
+        ) where {T <: Real, S <: AbstractSegment{T}, E <: Real}
+        if !isorthogonal3d(direction(seg), E0; atol=1e-10)
+            error("Ray dir. and E0 must be orthogonal (dot product: $(dot(direction(seg), E0)))")
         end
-        # This test is very important and must be performed for each pol. ray
-        if !isorthogonal3d(dir, E0; atol=1e-10)
-            error("Ray dir. and E0 must be orthogonal (dot product: $(dot(dir, E0)))")
-        end
-        return new{M}(
-            Point3{M}(pos),
-            normalize(Point3{M}(dir)),
-            int,
-            M(λ),
-            M(n),
-            Point3{Complex{M}}(E0)
+        return new{T, S}(
+            seg,
+            T(λ),
+            T(n),
+            Point3{Complex{T}}(E0)
         )
     end
 end
 
 polarization(ray::PolarizedRay) = ray.E0
-polarization!(ray::PolarizedRay, new) = (ray.E0 = new)
 
 islinear(ray::PolarizedRay) = islinear(polarization(ray))
 iscircular(ray::PolarizedRay) = iscircular(polarization(ray))
 iselliptical(ray::PolarizedRay) = iselliptical(polarization(ray))
 
 """
-    PolarizedRay(pos, dir, λ = 1000e-9, E0 = [1, 0, 0])
+    PolarizedRay(segment, λ, n, E0)
 
-1 V/m in x-dir.
+Constructs a `PolarizedRay` from an existing `segment`.
 """
+function PolarizedRay(
+        seg::S,
+        λ::L,
+        n::N,
+        E0::AbstractArray{<:Union{E, Complex{E}}}
+    ) where {T <: Real, S <: AbstractSegment{T}, L <: Real, N <: Real, E <: Real}
+    F = promote_type(T, L, N, E)
+    if F != T
+        # Re-promote segment if needed
+        seg_promoted = S <: OpenSegment ? OpenSegment(position(seg), direction(seg), F(accumulated_opl(seg))) :
+                       LineSegment(position(seg), direction(seg), Intersection(F(length(seg.intersection)), Point3{F}(position(seg.intersection)), Point3{F}(normal3d(seg.intersection))), F(accumulated_opl(seg)))
+        return PolarizedRay{F, typeof(seg_promoted)}(seg_promoted, F(λ), F(n), Point3{Complex{F}}(E0))
+    else
+        return PolarizedRay{T, S}(seg, T(λ), T(n), Point3{Complex{T}}(E0))
+    end
+end
+
+"""
+    PolarizedRay(ray::PolarizedRay, segment)
+
+Resolves or replaces the trajectory segment of an existing `ray` with a new `segment`.
+"""
+PolarizedRay{T, S}(ray::PolarizedRay{T}, seg::S) where {T <: Real, S <: AbstractSegment{T}} = PolarizedRay{T, S}(seg, ray.λ, ray.n, ray.E0)
+function PolarizedRay(ray::PolarizedRay{T}, seg::S) where {T <: Real, S <: AbstractSegment{T}}
+    return PolarizedRay(seg, ray.λ, ray.n, ray.E0)
+end
+with_segment(ray::PolarizedRay, seg::AbstractSegment) = PolarizedRay(ray, seg)
+
+function (::Type{PolarizedRay{T}})(
+        pos::AbstractArray{P},
+        dir::AbstractArray{D},
+        λ::L = 1000e-9,
+        n::N = 1.0,
+        E0::AbstractArray = [electric_field(1), 0, 0]
+    ) where {T <: Real, P <: Real, D <: Real, L <: Real, N <: Real}
+    seg = OpenSegment(pos, dir, zero(T))
+    return PolarizedRay{T, typeof(seg)}(
+        seg,
+        T(λ),
+        T(n),
+        Point3{Complex{T}}(E0)
+    )
+end
+
 function PolarizedRay(
         pos::AbstractArray{P},
         dir::AbstractArray{D},
         λ::L = 1000e-9,
         E0::AbstractArray{<:Union{E, Complex{E}}} = [electric_field(1), 0, 0]
-    ) where {P <: Real, D <: Real, L <: Real, E<:Real}
+    ) where {P <: Real, D <: Real, L <: Real, E <: Real}
     F = promote_type(P, D, L, E)
-    return PolarizedRay{F}(
-        Point3{F}(pos),
-        normalize(Point3{F}(dir)),
-        nothing,
-        F(λ),
-        F(1),
-        Point3{Complex{F}}(E0)
-    )
+    return PolarizedRay{F}(pos, dir, F(λ), F(1), E0)
 end
+
+function PolarizedRay(
+        pos::AbstractArray{P},
+        dir::AbstractArray{D},
+        λ::L,
+        n::N,
+        E0::AbstractArray{<:Union{E, Complex{E}}}
+    ) where {P <: Real, D <: Real, L <: Real, N <: Real, E <: Real}
+    F = promote_type(P, D, L, N, E)
+    return PolarizedRay{F}(pos, dir, F(λ), F(n), E0)
+end
+
+
 
 abstract type AbstractJonesMatrix{T} <: AbstractMatrix{T} end
 
@@ -200,10 +225,10 @@ function _calculate_global_E0(in_dir::AbstractArray, out_dir::AbstractArray, nor
     _calculate_global_E0(in_dir, out_dir, normal, static_data(J))
 end
 
-function _calculate_global_E0(::AbstractObject, ray::PolarizedRay, out_dir::AbstractArray, J::LocalJonesBasis)
+function _calculate_global_E0(::AbstractObject, ray::PolarizedRay, out_dir::AbstractArray, J::LocalJonesBasis, int::Nullable{<:AbstractIntersection} = nothing)
     # Update Jones matrix according to global object orientation
     in_dir = direction(ray)
-    normal = normal3d(intersection(ray))
+    normal = isnothing(int) ? (isnothing(intersection(ray)) ? Point3(0.0, 0.0, 1.0) : normal3d(intersection(ray))) : normal3d(int)
     E0 = polarization(ray)
     P = _calculate_global_E0(in_dir, out_dir, normal, J)
     return P*E0

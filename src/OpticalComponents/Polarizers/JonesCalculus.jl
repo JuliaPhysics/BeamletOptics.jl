@@ -26,7 +26,7 @@ Refer to the [`_calculate_global_E0`](@ref) implementation for more information.
 """
 abstract type AbstractJonesPolarizer{T} <: AbstractObject{T} end
 
-function _calculate_global_E0(object::AbstractJonesPolarizer, ray::PolarizedRay, out_dir::AbstractArray, J::GlobalJonesBasis)
+function _calculate_global_E0(object::AbstractJonesPolarizer, ray::PolarizedRay, out_dir::AbstractArray, J::GlobalJonesBasis, int::Nullable{<:AbstractIntersection} = nothing)
     in_dir = direction(ray)
     E0 = polarization(ray)
     if !isparallel3d(in_dir, out_dir)

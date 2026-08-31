@@ -66,7 +66,7 @@ const mm = 1e-3
                 i_a[i] = malus_law(thetas[i]-1)
                 rotate3d!(filter, ray_dir, deg2rad(step(thetas)))
                 # test polarization state
-                @test all(BMO.islinear.(beam.rays))
+                @test all(BMO.islinear.(BMO.rays(beam)))
                 # test projected polarization direction
                 v1 = real(E1)
                 angles_n[i] = rad2deg(BMO.angle3d(v1, pol_vec))
@@ -96,9 +96,9 @@ const mm = 1e-3
             i_n_tilt = similar(i_n)
             for i in eachindex(thetas)
                 solve_system!(system, beam)
-                i_n_tilt[i] = pseudo_I(beam.rays[2].E0)
+                i_n_tilt[i] = pseudo_I(BMO.polarization(BMO.rays(beam)[2]))
                 rotate3d!(filter, ray_dir, deg2rad(step(thetas)))
-                @test all(BMO.islinear.(beam.rays))
+                @test all(BMO.islinear.(BMO.rays(beam)))
             end
             # only applicable for θ_tilt = 45°
             i_a_tilt = malus_law.(thetas .- 1) .* 0.75 .+ 0.25

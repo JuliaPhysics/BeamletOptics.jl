@@ -38,7 +38,7 @@ The following inputs and arguments can be used to configure the [`PointSource`](
 - `pos`: center beam starting position
 - `dir`: center beam starting direction
 - `θ`: half spread angle in rad
-- `λ = 1e-6`: wavelength in [m], default val. is 1000 nm
+- `λ = 1e-6`: wavelength in \\[m\\], default val. is 1000 nm
 
 ## Keyword Arguments
 
@@ -138,8 +138,8 @@ The following inputs and arguments can be used to configure the [`CollimatedSour
 
 - `pos`: center beam starting position
 - `dir`: center beam starting direction
-- `diameter`: outer beam bundle diameter in [m]
-- `λ = 1e-6`: wavelength in [m], default val. is 1000 nm
+- `diameter`: outer beam bundle diameter in \\[m\\]
+- `λ = 1e-6`: wavelength in \\[m\\], default val. is 1000 nm
 
 ## Keyword Arguments
 
@@ -212,8 +212,8 @@ The following inputs and arguments can be used to configure the underlying [`Col
 
 - `pos`: center beam starting position
 - `dir`: center beam starting direction
-- `diameter`: outer beam bundle diameter in [m]
-- `λ = 1e-6`: wavelength in [m]
+- `diameter`: outer beam bundle diameter in \\[m\\]
+- `λ = 1e-6`: wavelength in \\[m\\]
 
 ## Keyword Arguments
 
@@ -286,7 +286,8 @@ function CollimatedGaussianBeamletSource(
         n_grid::Int = 20,
         basis::Union{Nothing, Tuple{AbstractVector, AbstractVector}} = nothing,
         randomize_axes::Bool = false,
-        rng = Random.GLOBAL_RNG
+        rng = Random.GLOBAL_RNG,
+        E0 = nothing
 ) where {P <: Real, D1 <: Real, D2 <: Real, L <: Real, W <: Real}
     T = promote_type(P, D1, D2, L, W)
     dir_n = normalize(dir)
@@ -312,12 +313,13 @@ function CollimatedGaussianBeamletSource(
             else
                 local_support = nothing
             end
-            b = AstigmaticGaussianBeamlet(pos + offset, dir_n, λ, w0s; support = local_support)
+            b = AstigmaticGaussianBeamlet(pos + offset, dir_n, λ, w0s; support = local_support, E0 = E0)
             push!(beams, b)
         end
     end
     return AstigmaticBeamGroup(beams)
 end
+
 
 """
     GaussianBeamletDecomposition(pos, dir, λ, w0; n_grid=20)

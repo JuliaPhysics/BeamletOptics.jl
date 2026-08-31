@@ -21,8 +21,8 @@ julia> using BeamletOptics
 
 julia> methods(render!)
 # 1 method for generic function "render!" from BeamletOptics:
- [1] render!(::Any, ::Union{BeamletOptics.AbstractSystem, BeamletOptics.AbstractBeam, BeamletOptics.AbstractObject, BeamletOptics.AbstractObjectGroup, BeamletOptics.AbstractRay, BeamletOptics.AbstractShape}, kwargs...)
-     @ C:\Users\anon\.julia\dev\BeamletOptics\src\Render.jl:56
+ [1] render!(::Any, ::Union{BeamletOptics.AbstractBeam, BeamletOptics.AbstractObject, BeamletOptics.AbstractObjectGroup, BeamletOptics.AbstractRay, BeamletOptics.AbstractSegment, BeamletOptics.AbstractShape, BeamletOptics.AbstractSystem}, kwargs...)
+     @ C:\Users\anon\.julia\dev\BeamletOptics\src\Render.jl:57
 
 julia> axis = nothing;
 

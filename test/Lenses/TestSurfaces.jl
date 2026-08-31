@@ -14,8 +14,9 @@ const mm = 1e-3
         beam = Beam(ray)
         solve_system!(system, beam)
 
-        dist = -beam.rays[end].pos[3] / beam.rays[end].dir[3]
-        α = asind(beam.rays[end].dir[3])
+        last_ray = beam.rays[end]
+        dist = -position(last_ray)[3] / direction(last_ray)[3]
+        α = asind(direction(last_ray)[3])
         wd = cosd(α) * dist
 
         return wd

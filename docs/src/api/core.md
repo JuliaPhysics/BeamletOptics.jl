@@ -2,19 +2,17 @@
 
 The BMO package is intended to provide optical simulation capabilites with as much "out-of-the-box" comfort as possible, meaning that users should not have to worry about e.g. providing the correct optical sequence and exact alignment of objects. The following five design principles are core assumptions of the underlying API:
 
-1. Optical interactions are decoupled from the underlying geometry representation
-2. Optical elements are closed volumes or must mimic as such (exceptions apply, e.g. coatings)
-3. Elements should be easily moveable and have working interactions for most angles of incidence
-3. Without additional knowledge, tracing is performed non-sequentially
-4. With additional knowledge, tracing is performed sequentially
+1. Optical interaction is decoupled from geometry representation.
+2. Optical elements are closed volumes (or must mimic being one) — exceptions apply, e.g. coatings.
+3. Elements must be freely movable and work correctly for (almost) any angle of incidence — no paraxial shortcuts, no assumed canonical orientation.
+4. Without extra knowledge, tracing is non-sequential: the solver discovers what a ray/beam hits next by searching the scene, not by a user-declared optical path or object order.
+5. With extra knowledge (a [`BeamletOptics.Hint`](@ref)), tracing can go sequential for performance/ambiguity resolution — but this is an optimization, never a requirement placed on the user.
 
 ## Intersect-Interact-Repeat-Loop
 
 The first two principles will be elaborated upon in more detail in the [Geometry representation](@ref) section. For the latter two design decisions, the following high-level solver schematic can be used to abstract the steps that are performed when calling [`solve_system!`](@ref) with an input system and beam:
 
-```@raw html
-<img src="../iir_loop.svg" alt="my figure" style="width:100%; height:auto;"/>
-```
+![Intersect-Interact-Repeat-Loop schematic](iir_loop.svg)
 
 This scheme is loosely referred to as the **Intersect-Interact-Repeat-Loop** and consists of the following steps:
 
@@ -23,9 +21,17 @@ This scheme is loosely referred to as the **Intersect-Interact-Repeat-Loop** and
 3. Attach or overwrite the next part of the ray chain or beam tree
 4. Use the new information to repeat 1.
 
-Once this procedure has been completed, the alignment of the system or other time-dependent optical properties (e.g. the phase of a Gaussian beamlet) can be updated. When rerunning the solver, the algorithm will try to reuse information about the previously intersected objects to speed up the calculation of the next simulation step. This is described in more detail in the sections: [Tracing systems](@ref) and [Retracing systems](@ref).
+Once this procedure has been completed, the alignment of the system or other time-dependent optical properties (e.g. the phase of a Gaussian beamlet) can be updated. When rerunning the solver, the beam is reset to its starting ray(s) and traced again from scratch, described in more detail in the [Tracing systems](@ref) section.
 
 The next sections will focus on the **Intersection** and **Interaction** steps.
+
+## Ray and segment representation
+
+Each cycle of the loop appends a new piece to the light path. This data is split across two cooperating types: an [`BeamletOptics.AbstractRay`](@ref) (the physical state — wavelength, refractive index, polarization, ...) wraps an [`BeamletOptics.AbstractSegment`](@ref) (the purely geometrical state — origin, direction and, once a hit has been found, the resulting [`BeamletOptics.Intersection`](@ref)). A [`Beam`](@ref) stores its light path as `rays::Vector{<:AbstractRay}`; the last element is either an unresolved ray (its segment is an `OpenSegment`, no hit yet) or, after tracing, a resolved ray (its segment is a `LineSegment` carrying the `Intersection`).
+
+![Ray/Segment architecture](ray_segment_arch.svg)
+
+Splitting the ray this way keeps the [Intersections](@ref) step (which only ever needs position/direction) decoupled from the physical properties that only the [Interactions](@ref) step needs to consult (design principle 1).
 
 ## Intersections
 
@@ -35,13 +41,15 @@ Calculating intersections between straight lines, i.e. rays, and surfaces is a c
 BeamletOptics.intersect3d(::BeamletOptics.AbstractShape, ::BeamletOptics.AbstractRay)
 ```
 
-Regardless of the underlying concrete implementation, each call of `intersect3d` must return `nothing` or the following type:
+Regardless of the underlying concrete implementation, each call of `intersect3d` must return `nothing` or an `AbstractIntersection`:
 
 ```@docs; canonical=false
+BeamletOptics.AbstractIntersection
 BeamletOptics.Intersection
+BeamletOptics.MultiIntersection
 ```
 
-Since an optical element can consist of multiple joint shapes, the return type must store which specific part of the object was hit.
+A shape-level `intersect3d` call returns an `Intersection{T}(t, p, n)` containing hit distance, 3D point, and surface normal. When coincident boundaries occur between touching optics, a `MultiIntersection{T}` records both exiting and entering components.
 
 ## Interactions
 
@@ -72,6 +80,16 @@ The main reason for this is the intersection ambiguity encountered at interfaces
 !!! tip
     Use of the `Hint` interface is primarily intended for multishape objects with joint surfaces.
 
+## Composite optics vs. kinematic groups
+
+Design principle 2 states that an optical element should be a closed volume, or mimic being one — but many real components (a cube beamsplitter, a cemented doublet) are physically built from more than one [`BeamletOptics.AbstractShape`](@ref). BMO models this with the **shape trait** (`shape_trait_of`, see [`BeamletOptics.AbstractShapeTrait`](@ref)): a component that consists of several jointly-owned shapes implements [`BeamletOptics.MultiShape`](@ref) and is still a single [`BeamletOptics.AbstractObject`](@ref) with its own `interact3d` — e.g. [`CubeBeamsplitter`](@ref), [`DoubletLens`](@ref).
+
+This is a distinct concept from [`BeamletOptics.AbstractObjectGroup`](@ref) (e.g. [`ObjectGroup`](@ref)), which is deliberately **not** an `AbstractObject`: a group has no optical identity of its own and exists purely as a kinematic convenience for moving otherwise-unrelated components together as one rigid assembly (e.g. all elements sitting on a shared mount). Consequently a group is never a target of `intersect3d`/`interact3d`.
+
+![MultiShape composites vs. ObjectGroup kinematic wrapper](objectgroup_multishape.svg)
+
+Since the non-sequential solver (design principle 4) needs a flat list of `AbstractObject`s to test against, [`System`](@ref)/[`StaticSystem`](@ref) recursively expand both `MultiShape` composites and `AbstractObjectGroup`s down to their constituent `AbstractObject`s when tracing — this is what makes e.g. the coating of a `ThinBeamsplitter` reachable as its own intersection target, and it is also why touching composite surfaces need the `Hint` mechanism above to disambiguate.
+
 ## Tracing logic
 
 ### Tracing systems
@@ -82,18 +100,10 @@ In the initial state, is is assumed that the problem consists of `objects <: Abs
 BeamletOptics.trace_system!
 ```
 
-This non-sequential mode is comparatively safe in determining the "true" beam path, but will scale suboptimally in time-complexity with the amount of optical elements. After solving the system, the beam path is known and can be potentially reused in the future.
+This non-sequential mode is comparatively safe in determining the "true" beam path, but will scale suboptimally in time-complexity with the amount of optical elements. After solving the system, the beam path is known; calling [`solve_system!`](@ref) again on the same beam resets it back to its starting ray(s) and performs a fresh non-sequential trace, e.g. after moving an object or changing a beam property such as its phase.
 
 !!! info "Object order"
-    Unlike with classic, surface-based ray tracers, the order in which objects are listed in the [`System`](@ref) object vector/tuple is not considered for the purpose of tracing or retracing.
-
-### Retracing systems
-
-Once a system has been traced for the first time, the system and beam can be solved again. However, this time the solver will try to reuse as much information from the previous run as possible by testing if the previous beam trajectory is still valid in a sequential tracing mode. Retracing systems assumes that the kinematic changes (e.g. optomechanical aligment) between the current tracing procedure and the previous one are small. If an intersection along the beam trajectory becomes invalid, the solver will perform a non-sequential trace for all invalidated parts of the beam.
-
-```@docs; canonical=false
-BeamletOptics.retrace_system!
-```
+    Unlike with classic, surface-based ray tracers, the order in which objects are listed in the [`System`](@ref) object vector/tuple is not considered for the purpose of tracing.
 
 ## CPU and GPU support
 

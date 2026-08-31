@@ -1,6 +1,7 @@
 # order or inclusion matters!
 include(joinpath(@__DIR__, "TestUtils.jl"))
 include(joinpath(@__DIR__, "TestAbstractTypes.jl"))
+include(joinpath(@__DIR__, "TestAnisotropicMedia.jl"))
 
 # Test ray and beam types
 include(joinpath(@__DIR__, "TestRays.jl"))
@@ -19,6 +20,7 @@ include(joinpath(@__DIR__, "Geometry", "TestSDFs.jl"))
 # Test system and object containers
 include(joinpath(@__DIR__, "TestSystem.jl"))
 include(joinpath(@__DIR__, "TestObjectGroups.jl"))
+include(joinpath(@__DIR__, "TestMultiShapeKinematics.jl"))
 
 # Test lens models
 include(joinpath(@__DIR__, "Lenses", "TestSphericalLenses.jl"))

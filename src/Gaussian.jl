@@ -15,9 +15,9 @@ and
 - `chief`: a [`Beam`](@ref) of [`Ray`](@ref)s to store the chief ray
 - `waist`: a [`Beam`](@ref) of [`Ray`](@ref)s to store the waist ray
 - `divergence`: a [`Beam`](@ref) of [`Ray`](@ref)s to store the divergence ray
-- `λ`: beam wavelength in [m]
-- `w0`: local beam waist radius in [m]
-- `E0`: complex field value in [V/m]
+- `λ`: beam wavelength in \\[m\\]
+- `w0`: local beam waist radius in \\[m\\]
+- `E0`: complex field value in \\[V/m\\]
 - `parent`: reference to the parent beam, if any ([`Nullable`](@ref) to account for the root beam which has no parent)
 - `children`: vector of child beams, each child beam represents a branching or bifurcation of the original beam, i.e. beam-splitting
 
@@ -30,32 +30,33 @@ and
     It is assumed, but not forbidden, that the optical system contains non-flat or non-parabolic beam-surface-interactions that cause the beam to obtain
     astigmatism or higher-order abberations. These can not be represented by the `GaussianBeamlet`.
 """
-mutable struct GaussianBeamlet{T} <: AbstractBeam{T, Ray{T}}
-    chief::Beam{T, Ray{T}}
-    waist::Beam{T, Ray{T}}
-    divergence::Beam{T, Ray{T}}
+mutable struct GaussianBeamlet{T, R <: Ray{T}} <: AbstractBeam{T, R}
+    chief::Beam{T, R}
+    waist::Beam{T, R}
+    divergence::Beam{T, R}
     λ::T
     w0::T
     E0::Complex{T}
-    parent::Nullable{GaussianBeamlet{T}}
-    children::Vector{GaussianBeamlet{T}}
+    parent::Nullable{GaussianBeamlet{T, R}}
+    children::Vector{GaussianBeamlet{T, R}}
 end
 
-function GaussianBeamlet(chief::Beam{T, Ray{T}},
-        waist::Beam{T, Ray{T}},
-        div::Beam{T, Ray{T}},
-        λ::T,
-        w0::T,
-        E0::Complex{T}) where {T <: Real}
-    return GaussianBeamlet{T}(
+function GaussianBeamlet(chief::Beam{T, R},
+        waist::Beam{T, R},
+        div::Beam{T, R},
+        λ::L,
+        w0::W,
+        E0::Number) where {T <: Real, R <: Ray{T}, L <: Real, W <: Real}
+    F = promote_type(T, L, W, typeof(real(E0)))
+    return GaussianBeamlet{F, R}(
         chief,
         waist,
         div,
-        λ,
-        w0,
-        E0,
+        F(λ),
+        F(w0),
+        Complex{F}(E0),
         nothing,
-        Vector{GaussianBeamlet{T}}())
+        Vector{GaussianBeamlet{F, R}}())
 end
 
 """
@@ -86,13 +87,6 @@ beam_waist(beam::GaussianBeamlet) = beam.w0
 electric_field(beam::GaussianBeamlet) = beam.E0
 electric_field!(beam::GaussianBeamlet{T}, new) where {T} = (beam.E0 = Complex{T}(new))
 refractive_index(beam::GaussianBeamlet, id::Int) = refractive_index(rays(beam.chief)[id])
-function refractive_index!(beam::GaussianBeamlet, id::Int, n_new::Real)
-    refractive_index!(rays(beam.chief)[id], n_new)
-    refractive_index!(rays(beam.waist)[id], n_new)
-    refractive_index!(rays(beam.divergence)[id], n_new)
-    return nothing
-end
-
 Base.length(gauss::GaussianBeamlet) = length(gauss.chief)
 optical_path_length(gauss::GaussianBeamlet) = optical_path_length(gauss.chief)
 
@@ -134,6 +128,26 @@ function interact3d(system::AbstractSystem,
     return GaussianBeamletInteraction{R}(i_c, i_w, i_d)
 end
 
+function interact3d(system::AbstractSystem,
+        mi::MultiIntersection,
+        gauss::GaussianBeamlet{R},
+        ray_id::Int) where {R}
+    bs_obj = _first_beamsplitter(coating(mi), entering(mi), exiting(mi))
+    if bs_obj !== nothing
+        ambient = ambient_medium(system)
+        trans = resolve_transition(mi, ambient, rays(gauss.chief)[ray_id])
+        return interact3d(system, bs_obj, trans, mi.hit, gauss, ray_id)
+    end
+
+    i_c = interact3d(system, mi, gauss.chief, rays(gauss.chief)[ray_id])
+    i_w = interact3d(system, mi, gauss.waist, rays(gauss.waist)[ray_id])
+    i_d = interact3d(system, mi, gauss.divergence, rays(gauss.divergence)[ray_id])
+    if any(isnothing, (i_c, i_w, i_d))
+        return nothing
+    end
+    return GaussianBeamletInteraction{R}(i_c, i_w, i_d)
+end
+
 function Base.push!(gauss::GaussianBeamlet{T},
         interaction::GaussianBeamletInteraction{T}) where {T}
     push!(gauss.chief, interaction.chief)
@@ -142,25 +156,13 @@ function Base.push!(gauss::GaussianBeamlet{T},
     return nothing
 end
 
-function Base.replace!(gauss::GaussianBeamlet{T},
-        interaction::GaussianBeamletInteraction{T},
-        index::Int) where {T}
-    replace!(gauss.chief, interaction.chief, index)
-    replace!(gauss.waist, interaction.waist, index)
-    replace!(gauss.divergence, interaction.divergence, index)
+function _reset_beam!(gauss::GaussianBeamlet)
+    _reset_beam!(gauss.chief)
+    _reset_beam!(gauss.waist)
+    _reset_beam!(gauss.divergence)
+    _drop_beams!(gauss)
     return nothing
 end
-
-function _modify_beam_head!(old::GaussianBeamlet{T},
-        new::GaussianBeamlet{T}) where {T <: Real}
-    _modify_beam_head!(old.chief, new.chief)
-    _modify_beam_head!(old.waist, new.waist)
-    _modify_beam_head!(old.divergence, new.divergence)
-    wavelength!(old, wavelength(new))
-    electric_field!(old, electric_field(new))
-end
-
-_last_beam_intersection(gauss::GaussianBeamlet) = intersection(last(rays(gauss.chief)))
 
 """
     _beams_hits_same_shape(gauss, id)
@@ -169,15 +171,22 @@ Tests if all rays at section `id` of `gauss` hit the same object shape.
 Returns `true` or `false`.
 """
 @inline function _beams_hits_same_shape(gauss::GaussianBeamlet, id::Int)::Bool
-    c = intersection(rays(gauss.chief)[id])
-    w = intersection(rays(gauss.waist)[id])
-    d = intersection(rays(gauss.divergence)[id])
-    are_nothing = isnothing.((c, w, d))
+    if id > length(gauss.chief.rays) || id > length(gauss.waist.rays) || id > length(gauss.divergence.rays)
+        return true
+    end
+    c = intersection(gauss.chief.rays[id])
+    w = intersection(gauss.waist.rays[id])
+    d = intersection(gauss.divergence.rays[id])
+    are_nothing = (c === nothing, w === nothing, d === nothing)
     if any(are_nothing)
         return all(are_nothing)
     end
-    return shape(c) === shape(w) === shape(d)
+    nc = normal3d(c)
+    nw = normal3d(w)
+    nd = normal3d(d)
+    return (dot(nc, nw) > 0.5) && (dot(nc, nd) > 0.5)
 end
+
 
 """
     GaussianBeamlet(position, direction, λ, w0; kwargs...)
@@ -192,21 +201,21 @@ The following inputs and arguments can be used to configure the beamlet:
 
 - `position`: origin of the beamlet
 - `direction`: direction of the beamlet
-- `λ`: wavelength of the beamlet in [m]. Default value is 1000 nm.
-- `w0`: beam waist (radius) in [m]. Default value is 1 mm.
+- `λ`: wavelength of the beamlet in \\[m\\]. Default value is 1000 nm.
+- `w0`: beam waist (radius) in \\[m\\]. Default value is 1 mm.
 
 ## Keyword Arguments
 
 - `M2`: beam quality factor. Default is 1
-- `P0`: beam total power in [W]. Default is 1 mW
-- `z0`: beam waist offset in [m]. Default is 0 m
+- `P0`: beam total power in \\[W\\]. Default is 1 mW
+- `z0`: beam waist offset in \\[m\\]. Default is 0 m
 - `support`: [`Nullable`](@ref) support vector for the construction of the waist and div rays
 
 # Additional information
 
 !!! tip "Waist offset"
     The `z0` keyword arg. can be used in order to spawn a beam where the waist is not located at the
-    specified `position`, but rather at an offset `z0` in [m] along the chief ray axis.
+    specified `position`, but rather at an offset `z0` in \\[m\\] along the chief ray axis.
 
 !!! info "Support vector"
     In order to calculate the basis vectors required for the beamlet construction, a random orthogonal vector is chosen.
@@ -281,9 +290,10 @@ function gauss_parameters(
         hint = point_on_beam(gauss, z)
 )
     p0, index = hint
-    chief = gauss.chief.rays[index]
-    div = gauss.divergence.rays[index]
-    waist = gauss.waist.rays[index]
+    chief = rays(gauss.chief)[index]
+    div = rays(gauss.divergence)[index]
+    waist = rays(gauss.waist)[index]
+
     #=
     Divergence ray height and slope (same for waist ray)
     - find divergence ray "height" and "slope" at intersection point y0 with target plane at p0 of chief ray

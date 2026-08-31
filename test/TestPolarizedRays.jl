@@ -63,7 +63,7 @@ const BMO = BeamletOptics
         beam = Beam(ray)
 
         @testset "x-Polarization" begin
-            BMO.polarization!(ray, lin_x_pol)
+            beam = Beam([0.0, 0, -2], [0, 0, 1], 1000e-9, lin_x_pol)
             # test tracing
             solve_system!(system, beam)
             @test BMO.polarization(beam.rays[1]) ≈ lin_x_pol
@@ -74,9 +74,9 @@ const BMO = BeamletOptics
         end
 
         @testset "y-Polarization" begin
-            BMO.polarization!(ray, lin_y_pol)
+            beam = Beam([0.0, 0, -2], [0, 0, 1], 1000e-9, lin_y_pol)
             translate3d!(m3, [0, 2, 0])
-            # test retracing
+            # test re-solving after a kinematic change
             solve_system!(system, beam)
             @test BMO.polarization(beam.rays[1]) ≈ lin_y_pol
             @test BMO.polarization(beam.rays[2]) ≈ [0, -I0_2, 0]
@@ -85,6 +85,7 @@ const BMO = BeamletOptics
             @test length(beam) ≈ 8.0
         end
     end
+
 
     @testset "Brewster windows" begin
         brewster_angle(n) = atan(n)

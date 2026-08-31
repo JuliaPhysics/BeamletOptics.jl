@@ -157,8 +157,38 @@ const mm = 1e-3
             solve_system!(system, gauss)
             @test BMO.istilted(system, gauss) == true
             @test BMO.isparaxial(system, gauss, deg2rad(30)) == false
+
+            # 45-degree folding mirror should NOT be considered tilted / non-paraxial
+            mirror = BMO.SquarePlanoMirror(0.05, 0.01)
+            translate3d!(mirror, [0.0, 0.05, 0.0])
+            zrotate3d!(mirror, deg2rad(45))
+            mirror_sys = System([mirror])
+            mirror_beam = Beam([0.0, 0.0, 0.0], [0.0, 1.0, 0.0], 532e-9)
+            solve_system!(mirror_sys, mirror_beam)
+            @test length(BMO.rays(mirror_beam)) == 2
+            @test BMO.isparaxial(mirror_sys, mirror_beam) == true
+
+            mirror_gauss = GaussianBeamlet([0.0, 0.0, 0.0], [0.0, 1.0, 0.0], 532e-9, 1.0mm)
+            solve_system!(mirror_sys, mirror_gauss)
+            @test length(BMO.rays(mirror_gauss.chief)) == 2
+            @test BMO.istilted(mirror_sys, mirror_gauss) == false
+            @test BMO.isparaxial(mirror_sys, mirror_gauss) == true
+        end
+
+        @testset "Testing beamlet aperture clipping" begin
+            # Small lens aperture
+            small_lens = SphericalLens(25mm, -25mm, 4mm, 5mm, 1.5)
+            clip_sys = System([small_lens])
+            # Wide beamlet shifted close to the lens edge (r = 2.5mm)
+            clip_gauss = GaussianBeamlet([2.3mm, -0.05, 0.0], [0.0, 1.0, 0.0], 532e-9, 2.0mm)
+            solve_system!(clip_sys, clip_gauss)
+            @test length(BMO.rays(clip_gauss.chief)) == 1
+            @test isnothing(intersection(last(clip_gauss.chief.rays)))
+            @test isnothing(intersection(last(clip_gauss.waist.rays)))
+            @test isnothing(intersection(last(clip_gauss.divergence.rays)))
         end
     end
+
 end
 
 end # MODULE

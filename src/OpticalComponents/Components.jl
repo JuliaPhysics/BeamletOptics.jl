@@ -2,6 +2,7 @@
 
 include("Mirrors.jl")
 include("Lenses.jl")
+include("BoundaryInteraction.jl")
 include("Prisms.jl")
 include("SphericalLenses.jl")
 include("DoubletLenses.jl")

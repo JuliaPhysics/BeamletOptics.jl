@@ -1,116 +1,71 @@
 """
-    Intersection{T}
+    AbstractRay{T<:Real, S<:AbstractSegment{T}}
 
-Stores data calculated by the [`intersect3d`](@ref) method. This information can be reused, i.e. for retracing.
+An implementation for a geometrical optics ray in R³. An `AbstractRay` is described by
+its optical payload (wavelength `λ`, refractive index `n`, polarization state, etc.) and
+wraps a spatial trajectory `segment::S` where `S <: AbstractSegment{T}`.
 
-# Fields:
+`AbstractRay`s model the propagation of light between optical interactions according to the laws of geometrical optics.
+To store the solved sequence of ray propagation segments through an optical system, refer to [`AbstractBeam`](@ref).
 
-- `object`: a [`Nullable`](@ref) reference to the [`AbstractObject`](@ref) that has been hit (optional but recommended)
-- `shape`: a [`Nullable`](@ref) reference to the [`AbstractShape`](@ref) of the `object` that has been hit (optional but recommended)
-- `t`: length of the ray parametrization in [m]
-- `n`: normal vector at the point of intersection
-"""
-mutable struct Intersection{T}
-    object::Nullable{AbstractObject}
-    shape::Nullable{AbstractShape}
-    t::T
-    n::Point3{T}
-end
-
-function Intersection(t::T, n::AbstractArray{T}) where {T}
-    return Intersection(nothing, nothing, t, Point3{T}(n))
-end
-
-function Intersection(t::T, n::AbstractArray{T}, shape::Nullable{AbstractShape}) where {T}
-    return Intersection(nothing, shape, t, Point3{T}(n))
-end
-
-shape(i::Intersection) = i.shape
-object(i::Intersection) = i.object
-object!(i::Intersection, new::AbstractObject) = (i.object = new)
-
-Base.length(i::Intersection) = i.t
-
-normal3d(i::Intersection) = i.n
-
-function Base.show(io::IO, ::MIME"text/plain", _intersection::Intersection)
-    println(io, "Intersected object: $(typeof(object(_intersection)))")
-    println(io, "Intersected shape: $(typeof(shape(_intersection)))")
-    println(io, "Normal vector at intersection: $(normal3d(_intersection))")
-    println(io, "Length to intersection: $(length(_intersection))")
-end
-
-"""
-    AbstractRay{T<:Real}
-
-An implementation for a geometrical optics ray in R³. In general, a `AbstractRay` is described by ``\\vec{p} + t\\cdot\\vec{d}`` with ``t\\in(0,\\infty)``.
-`AbstractRay`s are intended to model the propagation of light between optical interactions according to the laws of geometrical optics.
-To store the result of a ray tracing solution, refer to [`AbstractBeam`](@ref).
-
-# Intersections:
-
-Since the length of a ray can not be known before solving an optical system, the [`Intersection`](@ref)-type is used.
-This [`Nullable`](@ref) type can represent the intersection with an optical element, or lack thereof.
-
-# Implementation reqs.
-
-Subtypes of `AbstractBeam` must implement the following:
-
-## Fields:
-
-- `pos`: a R³-vector that stores the current position ``\\vec{p}``
-- `dir`: a R³-vector that stores the current direction ``\\vec{d}``
-- `intersection`: a `Nullable` field that stores the current [`Intersection`] or `nothing`
-- `λ`: wavelength in [m]
+# Implementation requirements
+Subtypes of `AbstractRay` must implement:
+- `segment`: an [`AbstractSegment`](@ref) describing the ray's spatial trajectory
+- `λ`: wavelength in \\[m\\]
 - `n`: refractive index along the ray path
-
-# Additional information
-
-!!! info "Ray length"
-    Base.`length`: this function is used to return the length of the `AbstractRay` (if no intersection exists, the ray length is `Inf`).
-    The `opl` keyword can be used to obtain the optical path length instead.
-
-!!! warning "Ray direction"
-    Many functions assume that the `dir`ection vector has unit length (i.e. ``|\\vec{p}| = 1``).
-    Violating this assumption might lead to spurious results.
 """
-abstract type AbstractRay{T <: Real} end
+abstract type AbstractRay{T <: Real, S <: AbstractSegment{T}} end
 
-Base.position(ray::AbstractRay) = ray.pos
-position!(ray::AbstractRay, pos) = (ray.pos = pos)
+segment(ray::AbstractRay) = ray.segment
 
-"""
-    direction(ray::AbstractRay)
+Base.position(ray::AbstractRay) = position(segment(ray))
+direction(ray::AbstractRay) = direction(segment(ray))
+intersection(ray::AbstractRay) = intersection(segment(ray))
+normal3d(ray::AbstractRay) = normal3d(segment(ray))
+accumulated_opl(ray::AbstractRay) = accumulated_opl(segment(ray))
 
-Returns the direction vector of the `ray`.
-"""
-direction(ray::AbstractRay) = ray.dir
-
-function direction!(ray::AbstractRay, dir)
-    ray.dir = normalize(dir)
-    return nothing
-end
+Base.length(ray::AbstractRay) = length(segment(ray))
+geom_length(ray::AbstractRay) = length(segment(ray))
+optical_path_length(ray::AbstractRay{T}) where {T} = isinf(length(ray)) ? T(Inf) : length(ray) * real(refractive_index(ray))
 
 wavelength(ray::AbstractRay) = ray.λ
-wavelength!(ray::AbstractRay, λ) = (ray.λ = λ)
-
-wavenumber(ray::AbstractRay) = 2π/wavelength(ray)
-
+wavenumber(ray::AbstractRay) = 2π / wavelength(ray)
 refractive_index(ray::AbstractRay) = ray.n
-refractive_index!(ray::AbstractRay, n) = (ray.n = n)
 
-intersection(ray::AbstractRay) = ray.intersection
-function intersection!(ray::AbstractRay, _intersection::Nullable{Intersection})
-     ray.intersection = _intersection
-     return nothing
-end
+"""
+    propagate(ray::AbstractRay, t)
+
+Evaluates the 3D point along the ray at distance parameter `t`: ``\\vec{p}(t) = \\vec{p} + t \\cdot \\vec{d}``.
+"""
+@inline propagate(ray::AbstractRay, t::Real) = propagate(segment(ray), t)
+
+"""
+    with_segment(ray::AbstractRay, seg::AbstractSegment) -> AbstractRay
+
+Replaces the trajectory segment of `ray` with `seg` while preserving optical properties.
+"""
+function with_segment end
+
+"""
+    with_accumulated_opl(ray::AbstractRay, opl::Real) -> AbstractRay
+
+Returns a copy of `ray` with updated `accumulated_opl` on its segment.
+"""
+@inline with_accumulated_opl(ray::AbstractRay, opl::Real) = with_segment(ray, with_accumulated_opl(segment(ray), opl))
+
+
+"""
+    bounding_sphere(obj)
+
+Returns `(c_local, r)` where `c_local` is the center of the bounding sphere in local coordinates and `r` is its radius, or `nothing` if not implemented.
+"""
+bounding_sphere(::Any) = nothing
 
 """
     intersect3d(shape::AbstractShape, ::AbstractRay)
 
 Defines the intersection between an [`AbstractShape`](@ref) and an [`AbstractRay`](@ref), must return an [`Intersection`](@ref) or `nothing`.
 The default behavior for concrete `shape`s and rays is to indicate no intersection, that is `nothing`, which will inform the tracing algorithm to stop.
-Refer to the [`Intersection`](@ref) documentation for more information on the return type value.
 """
 function intersect3d(shape::AbstractShape, ::AbstractRay)
     @warn lazy"No intersect3d method defined for:" typeof(shape)
@@ -121,45 +76,24 @@ end
     intersect3d(object::AbstractObject, ray::AbstractRay)
 
 In general, the intersection logic between an [`AbstractObject`](@ref) and an [`AbstractRay`](@ref) depends on the [`AbstractShapeTrait`](@ref).
-Refer to the respective documentation.
 """
-intersect3d(object::AbstractObject, ray::AbstractRay) = intersect3d(shape_trait_of(object), object, ray)
+intersect3d(object::AbstractObject, ray::AbstractRay) = intersect3d(
+    shape_trait_of(object), object, ray)
 
 function intersect3d(::SingleShape, object::AbstractObject, ray::AbstractRay)
-    # FIXME: isinfrontof check?
-    intersection = intersect3d(shape(object), ray)
-    # Ensure that the intersection knows about the object if intersected
-    if !isnothing(intersection)
-        object!(intersection, object)
-    end
-    return intersection
+    return intersect3d(shape(object), ray)
 end
 
-function intersect3d(::MultiShape, object::AbstractObject, ray::AbstractRay{R}) where R
-    # Init return intersection
-    intersection::Nullable{Intersection{R}} = nothing
+function intersect3d(::MultiShape, object::AbstractObject, ray::AbstractRay{R}) where {R}
+    closest::Nullable{Intersection{R}} = nothing
     for part in shape(object)
-        # Buffer intersection
-        temp::Nullable{Intersection{R}} = intersect3d(part, ray)
-        # Continue if miss
-        if isnothing(temp)
-            continue
-        end
-        # Catch first valid intersection
-        if isnothing(intersection)
-            intersection = temp
-            continue
-        end
-        # Replace current with closer intersection
-        if length(temp) < length(intersection)
-            intersection = temp
+        temp = intersect3d(part, ray)
+        isnothing(temp) && continue
+        if isnothing(closest) || length(temp) < length(closest)
+            closest = temp
         end
     end
-    # Ensure that the intersection knows about the correct object if intersected
-    if !isnothing(intersection)
-        object!(intersection, object)
-    end
-    return intersection
+    return closest
 end
 
 """
@@ -174,34 +108,10 @@ function intersect3d(plane_position::AbstractArray,
     if isnothing(t)
         return nothing
     else
-        return Intersection(T(t), T.(plane_normal))
+        hit_pos = position(ray) + T(t) * direction(ray)
+        return Intersection(T(t), hit_pos, Point3{T}(plane_normal))
     end
 end
-
-function geom_length(ray::AbstractRay{T}) where {T}
-    isnothing(intersection(ray)) && return T(Inf)
-    return length(intersection(ray))
-end
-
-"""
-    optical_path_length(ray::AbstractRay{T}) where {T}
-
-Calculate the optical path length of the `ray`, i.e. ``\\mathrm{OPL} = n \\cdot l``.
-"""
-function optical_path_length(ray::AbstractRay{T}) where {T}
-    isnothing(intersection(ray)) && return T(Inf)
-    return length(intersection(ray)) * refractive_index(ray)
-end
-
-"""
-    Base.length(ray::AbstractRay)
-
-Returns the geometric length of a `ray` between its start and intersection point. If no intersection exists, `Inf` is returned.
-
-!!! tip
-    Use [`optical_path_length`](@ref) to get the optical path length instead.
-"""
-Base.length(ray::AbstractRay{T}) where {T} = geom_length(ray)
 
 """
     line_point_distance3d(ray, point)
@@ -213,13 +123,13 @@ line_point_distance3d(ray::AbstractRay, point) = line_point_distance3d(position(
     point)
 
 """
-    angle3d(ray::AbstractRay, intersect::Intersection=intersection(ray))
+    angle3d(ray::AbstractRay, intersect::AbstractIntersection)
+    angle3d(ray::AbstractRay)
 
-Calculates the angle between a `ray` and its or some other `intersection`.
+Calculates the angle between a `ray` and its surface `intersection`.
 """
-function angle3d(ray::AbstractRay, intersect::Intersection = intersection(ray))
-    return angle3d(direction(ray), normal3d(intersect))
-end
+angle3d(ray::AbstractRay, intersect::AbstractIntersection) = angle3d(direction(ray), normal3d(intersect))
+angle3d(ray::AbstractRay) = isnothing(intersection(ray)) ? nothing : angle3d(direction(ray), normal3d(intersection(ray)))
 
 """
     isinfrontof(shape::AbstractShape, ray::AbstractRay)
@@ -234,28 +144,35 @@ isinfrontof(shape::AbstractShape, ray::AbstractRay) = isinfrontof(position(shape
     direction(ray))
 
 """
+    isentering(ray, int)
     isentering(ray)
 
 Tests whether the ray is entering a shape based on the orientation of the `ray` direction and surface normal.
-If no intersection is present, default behavior is to return `false`.
 """
-isentering(r::BeamletOptics.AbstractRay) = isentering(r, BeamletOptics.intersection(r))
-isentering(r::BeamletOptics.AbstractRay, i::BeamletOptics.Intersection) = isentering(BeamletOptics.direction(r), BeamletOptics.normal3d(i))
+isentering(r::AbstractRay, i::AbstractIntersection) = isentering(direction(r), normal3d(i))
 isentering(d::AbstractArray, n::AbstractArray) = dot(d, n) < 0
-isentering(::BeamletOptics.AbstractRay, ::Nothing) = false
+isentering(::AbstractRay, ::Nothing) = false
+isentering(r::AbstractRay) = isentering(r, intersection(r))
+
 
 """
+    refraction3d(ray, int, n2)
     refraction3d(ray, n2)
 
 Calculates the new direction of a `ray` entering into a new medium with ref. index `n2`.
 """
-function refraction3d(ray::AbstractRay, n2)
+function refraction3d(ray::AbstractRay, int::AbstractIntersection, n2)
     dir = direction(ray)
-    nml = normal3d(intersection(ray))
-    # if beam is leaving substrate, flip normal
-    if !isentering(ray) 
+    nml = normal3d(int)
+    if !isentering(dir, nml)
         nml *= -1
     end
     n1 = refractive_index(ray)
     return refraction3d(dir, nml, n1, n2)
+end
+
+function refraction3d(ray::AbstractRay, n2)
+    int = intersection(ray)
+    isnothing(int) && error("Cannot calculate refraction for ray without intersection")
+    return refraction3d(ray, int, n2)
 end

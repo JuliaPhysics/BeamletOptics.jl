@@ -41,13 +41,25 @@ function thickness(u::UnionSDF{T}) where T
     return t
 end
 
-function UnionSDF{T}(sdfs::Vararg{AbstractSDF{T}, N}) where {T, N}
+function UnionSDF{T}(sdfs::AbstractSDF{T}...) where {T}
     UnionSDF{T, typeof(sdfs)}(
-        SMatrix{3,3}(one(T)*I),
-        SMatrix{3,3}(one(T)*I),
+        SMatrix{3, 3, T, 9}(one(T) * I),
+        SMatrix{3, 3, T, 9}(one(T) * I),
         Point3{T}(zero(T)),
         sdfs
-        )
+    )
+end
+
+function UnionSDF(s1::AbstractSDF{T}, sdfs::AbstractSDF{T}...) where {T}
+    return UnionSDF{T}(s1, sdfs...)
+end
+
+function UnionSDF(sdfs::Tuple{AbstractSDF{T}, Vararg{AbstractSDF{T}}}) where {T}
+    return UnionSDF{T}(sdfs...)
+end
+
+function UnionSDF(sdfs::AbstractVector{<:AbstractSDF{T}}) where {T}
+    return UnionSDF{T}(Tuple(sdfs)...)
 end
 
 function sdf(s::UnionSDF, pos)
@@ -55,10 +67,91 @@ function sdf(s::UnionSDF, pos)
     return minimum(sdf(_sdf, pos) for _sdf in s.sdfs)
 end
 
-Base.:+(s1::AbstractSDF{T}, s2::AbstractSDF{T}) where T = UnionSDF{T}(s1, s2)
-Base.:+(union::UnionSDF{T}, sdf::AbstractSDF{T}) where T = UnionSDF{T}(union.sdfs..., sdf)
-Base.:+(sdf::AbstractSDF{T}, union::UnionSDF{T}) where T = UnionSDF{T}(sdf, union.sdfs...)
-Base.:+(u1::UnionSDF{T}, u2::UnionSDF{T}) where T = UnionSDF{T}(u1.sdfs..., u2.sdfs...)
+function bounding_sphere(u::UnionSDF{T}) where T
+    c_merged = Point3{T}(0)
+    r_merged = zero(T)
+    initialized = false
+    for s in u.sdfs
+        bs = bounding_sphere(s)
+        if bs === nothing
+            return nothing
+        end
+        c_local, r = bs
+        c_world = orientation(s) * c_local + position(s)
+        if !initialized
+            c_merged = c_world
+            r_merged = r
+            initialized = true
+        else
+            c2, r2 = c_world, r
+            d = norm(c_merged - c2)
+            if d + r2 <= r_merged
+                continue
+            elseif d + r_merged <= r2
+                c_merged = c2
+                r_merged = r2
+            else
+                new_r = (d + r_merged + r2) / 2
+                if d > 0
+                    c_merged = c_merged + (new_r - r_merged) * ((c2 - c_merged) / d)
+                end
+                r_merged = new_r
+            end
+        end
+    end
+    if !initialized
+        return nothing
+    end
+    c_local_union = _world_to_sdf(u, c_merged)
+    return (c_local_union, r_merged)
+end
+
+# Conversion helper for fields
+convert_field(::Type{T}, x::Number) where T = T(x)
+convert_field(::Type{T}, x::Point3) where T = Point3{T}(x)
+convert_field(::Type{T}, x::Point2) where T = Point2{T}(x)
+convert_field(::Type{T}, x::SMatrix{N, M, S, L}) where {T, N, M, S, L} = SMatrix{N, M, T, L}(x)
+convert_field(::Type{T}, x::Tuple{Vararg{AbstractSDF}}) where T = map(s -> convert(AbstractSDF{T}, s), x)
+convert_field(::Type{T}, x) where T = x
+
+# Reconstruct helper for single-parameter types (default fallback)
+reconstruct_sdf(::Type{T}, ::Type{SDFType}, args...) where {T, SDFType} = (Base.typename(SDFType).wrapper){T}(args...)
+
+# Specialization for UnionSDF (multi-parameter)
+reconstruct_sdf(::Type{T}, ::Type{<:UnionSDF}, dir, transposed_dir, pos, sdfs) where T =
+    UnionSDF{T, typeof(sdfs)}(dir, transposed_dir, pos, sdfs)
+
+# Base conversion method
+function Base.convert(::Type{AbstractSDF{T}}, s::SDFType) where {T, S, SDFType <: AbstractSDF{S}}
+    if T == S
+        return s
+    end
+    new_fields = map(fieldnames(SDFType)) do name
+        convert_field(T, getfield(s, name))
+    end
+    return reconstruct_sdf(T, SDFType, new_fields...)
+end
+
+function Base.:+(s1::AbstractSDF{T1}, s2::AbstractSDF{T2}) where {T1, T2}
+    T = promote_type(T1, T2)
+    return UnionSDF{T}(convert(AbstractSDF{T}, s1), convert(AbstractSDF{T}, s2))
+end
+function Base.:+(union::UnionSDF{T1}, sdf::AbstractSDF{T2}) where {T1, T2}
+    T = promote_type(T1, T2)
+    converted_sdfs = map(s -> convert(AbstractSDF{T}, s), union.sdfs)
+    return UnionSDF{T}(converted_sdfs..., convert(AbstractSDF{T}, sdf))
+end
+function Base.:+(sdf::AbstractSDF{T1}, union::UnionSDF{T2}) where {T1, T2}
+    T = promote_type(T1, T2)
+    converted_sdfs = map(s -> convert(AbstractSDF{T}, s), union.sdfs)
+    return UnionSDF{T}(convert(AbstractSDF{T}, sdf), converted_sdfs...)
+end
+function Base.:+(u1::UnionSDF{T1}, u2::UnionSDF{T2}) where {T1, T2}
+    T = promote_type(T1, T2)
+    c1 = map(s -> convert(AbstractSDF{T}, s), u1.sdfs)
+    c2 = map(s -> convert(AbstractSDF{T}, s), u2.sdfs)
+    return UnionSDF{T}(c1..., c2...)
+end
 
 function translate3d!(u::UnionSDF, offset)
     position!(u, position(u) .+ offset)
@@ -88,4 +181,14 @@ function normal3d(s::UnionSDF, pos)
     idx = argmin(sdf(_sdf, pos) for _sdf in s.sdfs)
 
     return normal3d(s.sdfs[idx], pos)
+end
+
+function surface_tag(u::UnionSDF, point)
+    idx = argmin(sdf(_sdf, point) for _sdf in u.sdfs)
+    return surface_tag(u.sdfs[idx], point)
+end
+
+function surface_tag(u::UnionSDF, local_p, local_n)
+    idx = argmin(sdf(_sdf, local_p) for _sdf in u.sdfs)
+    return surface_tag(u.sdfs[idx], local_p, local_n)
 end

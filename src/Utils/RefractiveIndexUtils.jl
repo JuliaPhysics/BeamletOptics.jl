@@ -103,7 +103,7 @@ end
 Union type that represents valid means to pass a refractive index `n` to e.g. [`AbstractObject`](@ref)s.
 The core assumption is that:
 
-1. the refractive index is callable with a **single** `Number` argument `λ` to represent the wavelength in [m]
+1. the refractive index is callable with a **single** `Number` argument `λ` to represent the wavelength in \\[m\\]
 2. the return value is a **single** `Number` value for the refractive index
 
 Refer to e.g. [`DiscreteRefractiveIndex`](@ref).

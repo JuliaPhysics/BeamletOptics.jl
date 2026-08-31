@@ -27,25 +27,28 @@ end
 """
     AconvexCylinderSDF(radius, diameter, height)
 
-Constructs an aconvex cylinder with radius `r`, diameter `d` and height `h` in [m].
+Constructs an aconvex cylinder with radius `r`, diameter `d` and height `h` in \\[m\\].
 The acylindric shape is defined by its `conic_constant` and the `coefficients` for the
 even aspheric polynomoial.
 """
 function AconvexCylinderSDF(radius::R, diameter::D, height::H, conic_constant::CC, coefficients::AbstractVector{TT}) where {R,D,H,CC,TT}
-    T = promote_type(R, D, H, CC, TT)
-    s = AconvexCylinderSDF{T}(
-        Matrix{T}(I, 3, 3),
-        Matrix{T}(I, 3, 3),
+    T = float(promote_type(R, D, H, CC, TT))
+    coeffs_T = convert(Vector{T}, coefficients)
+    r_T = T(radius)
+    d_T = T(diameter)
+    h_T = T(height)
+    k_T = T(conic_constant)
+    return AconvexCylinderSDF{T}(
+        SMatrix{3, 3, T, 9}(one(T) * I),
+        SMatrix{3, 3, T, 9}(one(T) * I),
         Point3{T}(0),
-        radius,
-        diameter,
-        height,
-        conic_constant,
-        coefficients,
-        Point2(max_aspheric_value(1 / radius, conic_constant, coefficients, diameter))
+        r_T,
+        d_T,
+        h_T,
+        k_T,
+        coeffs_T,
+        Point2{T}(max_aspheric_value(1 / r_T, k_T, coeffs_T, d_T))
     )
-
-    return s
 end
 
 function thickness(s::AconvexCylinderSDF)
@@ -93,25 +96,28 @@ end
 """
     AconcaveCylinderSDF(radius, diameter, height)
 
-Constructs an aconcave cylinder cutout with radius `r`, diameter `d` and height `h` in [m].
+Constructs an aconcave cylinder cutout with radius `r`, diameter `d` and height `h` in \\[m\\].
 The acylindric shape is defined by its `conic_constant` and the `coefficients` for the
 even aspheric polynomoial.
 """
 function AconcaveCylinderSDF(radius::R, diameter::D, height::H, conic_constant::CC, coefficients::AbstractVector{TT}) where {R,D,H,CC,TT}
-    T = promote_type(R, D, H, CC, TT)
-    s = AconcaveCylinderSDF{T}(
-        Matrix{T}(I, 3, 3),
-        Matrix{T}(I, 3, 3),
+    T = float(promote_type(R, D, H, CC, TT))
+    coeffs_T = convert(Vector{T}, coefficients)
+    r_T = T(radius)
+    d_T = T(diameter)
+    h_T = T(height)
+    k_T = T(conic_constant)
+    return AconcaveCylinderSDF{T}(
+        SMatrix{3, 3, T, 9}(one(T) * I),
+        SMatrix{3, 3, T, 9}(one(T) * I),
         Point3{T}(0),
-        radius,
-        diameter,
-        height,
-        conic_constant,
-        coefficients,
-        Point2(max_aspheric_value(1 / radius, conic_constant, coefficients, diameter))
+        r_T,
+        d_T,
+        h_T,
+        k_T,
+        coeffs_T,
+        Point2{T}(max_aspheric_value(1 / r_T, k_T, coeffs_T, d_T))
     )
-
-    return s
 end
 
 function thickness(s::AconcaveCylinderSDF{T}) where {T}
@@ -187,10 +193,10 @@ This constructor automatically sets the mechanical diameter equal to the optical
 - `coefficients::Vector{T}` : The coefficients of the even aspherical equation for the curved surface.
 """
 function AcylindricalSurface(radius::T1, diameter::T2, height::T3, conic_constant::T4, coefficients::AbstractVector{T5}) where {T1,T2,T3,T4,T5}
-    T = promote_type(T1, T2, T3, T4, T5)
+    T = float(promote_type(T1, T2, T3, T4, T5))
 
     return AcylindricalSurface{T}(
-        radius, diameter, height, conic_constant, coefficients, diameter)
+        T(radius), T(diameter), T(height), T(conic_constant), convert(Vector{T}, coefficients), T(diameter))
 end
 
 function edge_sag(s::AcylindricalSurface{T}, ::AbstractAcylindricalSurfaceSDF) where T
@@ -231,10 +237,10 @@ function _sdf(s::AcylindricalSurface, ::BackwardOrientation)
 end
 
 function bounding_sphere(s::AbstractAcylindricalSurfaceSDF{T}) where T
-    y = aspheric_equation(diameter(s) / 2, s)
+    t = thickness(s)
     z = diameter(s) / 2
     x = height(s) / 2
-    r = max(x, y, z)
-    center = Point3{T}(zero(T))
+    r = sqrt(x^2 + z^2 + (t / 2)^2)
+    center = Point3{T}(0, t / 2, 0)
     return (center, r)
 end

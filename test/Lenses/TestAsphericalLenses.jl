@@ -3,6 +3,7 @@ module TestAsphericalLenses
 using BeamletOptics
 using Test
 using GeometryBasics
+import BeamletOptics: direction
 
 const BMO = BeamletOptics
 
@@ -46,9 +47,11 @@ const mm = 1e-3
             beam = Beam(ray)
             solve_system!(system, beam, r_max = 40)
 
-            surf_errors[i] = (position(beam.rays[begin]) + length(beam.rays[begin]) .* BMO.direction(beam.rays[begin]))[2] -
-                             BMO.aspheric_equation(ray.pos[3], 1 / R, k, A)
+            seg = beam.rays[begin]
+            surf_errors[i] = (position(seg) + length(seg) .* BMO.direction(seg))[2] -
+                             BMO.aspheric_equation(position(ray)[3], 1 / R, k, A)
         end
+
 
         # FIXME: The atol is actually derived from the raymarching epsilon. If this is puts
         # into a configurable option, this should be changed as well.
@@ -59,8 +62,9 @@ const mm = 1e-3
         beam = Beam(ray)
         solve_system!(system, beam, r_max = 40)
 
-        dist = -beam.rays[end].pos[3] / beam.rays[end].dir[3]
-        α = asind(beam.rays[end].dir[3])
+        last_ray = beam.rays[end]
+        dist = -position(last_ray)[3] / direction(last_ray)[3]
+        α = asind(direction(last_ray)[3])
         wd = cosd(α) * dist
 
         @test wd≈93.2mm atol=1e-4
@@ -170,7 +174,8 @@ const mm = 1e-3
         ]
         for beam in beams
             solve_system!(system, beam, r_max = 50)
-            f_pos = last(beam.rays).pos + 0.12mm * last(beam.rays).dir
+            last_ray = last(beam.rays)
+            f_pos = position(last_ray) + 0.12mm * direction(last_ray)
 
             # test if the beam is correctly focussed
             @test length(BMO.rays(beam)) == 11

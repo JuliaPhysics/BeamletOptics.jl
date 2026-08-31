@@ -22,8 +22,8 @@ Creates a right angle symmetric [`Prism`](@ref). The prism is *not aligned* with
 
 # Inputs
 
-- `leg_length`: dimension in x- and y-direction in [m]
-- `height`: in [m]
+- `leg_length`: dimension in x- and y-direction in \\[m\\]
+- `height`: in \\[m\\]
 - `n`: [`RefractiveIndex`](@ref) of the prism
 """
 function RightAnglePrism(leg_length::Real, height::Real, n::RefractiveIndex)

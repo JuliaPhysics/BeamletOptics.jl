@@ -46,30 +46,23 @@ function render!(
             l = length(p)
         end
         # Render each ray segment
-        for ray in BMO.rays(child.chief)
-            # Generate local u, v coords
-            if isnothing(BMO.intersection(ray))
-                u = LinRange(0, flen, z_res)
-            else
-                u = LinRange(0, length(ray), z_res)
-            end
+        segs = child.chief.rays
+        for seg in segs
+            hit = BMO.intersection(seg)
+            len = isnothing(hit) ? flen : length(hit)
+            u = LinRange(0, len, z_res)
             v = LinRange(0, 2π, r_res)
-            # Calculate beam surface at origin along y-axis
             w = BMO.gauss_parameters(child, u .+ l)[1]
             X = [w[i] * cos(v) for (i, u) in enumerate(u), v in v]
             Y = [u for u in u, v in v]
             Z = [w[i] * sin(v) for (i, u) in enumerate(u), v in v]
-            # Transform into world coords
-            R = BMO.align3d([0, 1, 0], ray.dir)
-            Xt = R[1, 1] * X + R[1, 2] * Y + R[1, 3] * Z .+ position(ray)[1]
-            Yt = R[2, 1] * X + R[2, 2] * Y + R[2, 3] * Z .+ position(ray)[2]
-            Zt = R[3, 1] * X + R[3, 2] * Y + R[3, 3] * Z .+ position(ray)[3]
-
+            R = BMO.align3d([0, 1, 0], BMO.direction(seg))
+            Xt = R[1, 1] * X + R[1, 2] * Y + R[1, 3] * Z .+ position(seg)[1]
+            Yt = R[2, 1] * X + R[2, 2] * Y + R[2, 3] * Z .+ position(seg)[2]
+            Zt = R[3, 1] * X + R[3, 2] * Y + R[3, 3] * Z .+ position(seg)[3]
             surface!(axis, Xt, Yt, Zt; transparency, colormap = [color, color], kwargs...)
-
-            # Bump length tracker
-            if !isnothing(BMO.intersection(ray))
-                l += length(ray)
+            if !isnothing(hit)
+                l += length(hit)
             end
         end
         # Optionally, plot generating rays

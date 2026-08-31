@@ -47,3 +47,15 @@ function render!(ax::_RenderEnv, sys::BMO.AbstractSystem; kwargs...)
     end
     return nothing
 end
+
+"""
+    render!(ax::_RenderEnv, group::AbstractObjectGroup; kwargs...)
+
+Render all objects/subgroups contained in the `group`.
+"""
+function render!(ax::_RenderEnv, group::BMO.AbstractObjectGroup; kwargs...)
+    for _obj in BMO.objects(group)
+        render!(ax, _obj; kwargs...)
+    end
+    return nothing
+end

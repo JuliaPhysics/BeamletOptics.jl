@@ -85,8 +85,8 @@ const mm = 1e-3
     """Test coma for rotated and translated optical system"""
     function test_coma(ray::BMO.AbstractRay, f0::AbstractArray,
             dir::AbstractArray; atol = 7e-5)
-        is = BMO.intersect3d(f0, dir, ray)
-        p0 = position(ray) + length(is) * BMO.direction(ray)
+        t = BMO.line_plane_distance3d(f0, dir, position(ray), BMO.direction(ray))
+        p0 = position(ray) + t * BMO.direction(ray)
         dz = norm(p0 - f0)
         if dz ≤ atol
             return true
@@ -124,7 +124,7 @@ const mm = 1e-3
             f_z = thickness(AC254_150_AB) + bfl + δf
             f0 = position(AC254_150_AB.front.shape) + f_z * -dir
             for (i, z) in enumerate(zs)
-                beam.rays[1].pos = pos + z * nv
+                beam = Beam(pos + z * nv, -dir, λ)
                 solve_system!(system, beam)
                 @test length(BMO.rays(beam)) == 4
                 @test BMO.refractive_index.(beam.rays) ==
@@ -132,17 +132,79 @@ const mm = 1e-3
                 fs[i] = test_coma(last(BMO.rays(beam)), f0, dir, atol = 1e-6)
             end
             # Test center ray normal vectors
-            beam.rays[1].pos = pos + 0 * nv
+            beam = Beam(pos + 0 * nv, -dir, λ)
             solve_system!(system, beam)
             for i in 1:(length(beam.rays) - 1)
-                @test abs(dot(beam.rays[i].intersection.n, beam.rays[i].dir)) ≈ 1
+                @test abs(dot(BMO.normal3d(beam.rays[i]), direction(beam.rays[i]))) ≈ 1
             end
             return true
         end
+
         # Run tests for AC254_150_AB against plot data at https://www.thorlabs.com/newgrouppage9.cfm?objectgroup_id=12767
         @test test_doublet(488e-9, 143.68mm, -2.064e-4)
         @test test_doublet(707e-9, 143.68mm, 0)
         @test test_doublet(1064e-9, 143.68mm, +7.466e-4)
+
+        @testset "Polarized ray through doublet" begin
+            λ = 707e-9
+            AC254 = SphericalDoubletLens(87.9mm, -105.6mm, Inf, 6mm, 3mm, BMO.inch, NLAK22, NSF10)
+            system = System([AC254])
+            ray = PolarizedRay([0.0, -0.05, 0.0], [0.0, 1.0, 0.0], λ, [1.0, 0.0, 0.0])
+            beam = Beam(ray)
+            solve_system!(system, beam)
+            @test length(BMO.rays(beam)) == 4
+            @test BMO.refractive_index.(beam.rays) == [1.0, NLAK22(λ), NSF10(λ), 1.0]
+            @test optical_path_length(beam) > length(beam)
+        end
+
+        @testset "Gaussian and AGB beamlet through doublet" begin
+            λ = 707e-9
+            AC254 = SphericalDoubletLens(87.9mm, -105.6mm, Inf, 6mm, 3mm, BMO.inch, NLAK22, NSF10)
+            system = System([AC254])
+            
+            # Gaussian beamlet
+            gauss = GaussianBeamlet([0.0, -0.05, 0.0], [0.0, 1.0, 0.0], λ, 1.0mm)
+            solve_system!(system, gauss)
+            @test length(BMO.rays(gauss.chief)) == 4
+            @test optical_path_length(gauss) > 0.0
+
+            # Astigmatic Gaussian beamlet
+            agb = AstigmaticGaussianBeamlet([0.0, -0.05, 0.0], [0.0, 1.0, 0.0], λ, 1.0mm)
+            solve_system!(system, agb; check_invariant = true)
+            @test length(BMO.rays(agb.c)) == 4
+            @test optical_path_length(agb) > 0.0
+            @test BMO.check_optical_invariant(agb, 4)
+        end
+
+        @testset "Reverse and index-matched doublet propagation" begin
+            λ = 707e-9
+            # Reverse propagation from +y to -y
+            AC254 = SphericalDoubletLens(87.9mm, -105.6mm, Inf, 6mm, 3mm, BMO.inch, NLAK22, NSF10)
+            sys_rev = System([AC254])
+            beam_rev = Beam([0.0, 0.05, 0.0], [0.0, -1.0, 0.0], λ)
+            solve_system!(sys_rev, beam_rev)
+            @test length(BMO.rays(beam_rev)) == 4
+            @test BMO.refractive_index.(beam_rev.rays) == [1.0, NSF10(λ), NLAK22(λ), 1.0]
+
+            # Index-matched doublet (n1 == n2)
+            AC_matched = SphericalDoubletLens(87.9mm, -105.6mm, Inf, 6mm, 3mm, BMO.inch, 1.5, 1.5)
+            sys_matched = System([AC_matched])
+            beam_matched = Beam([0.0, -0.05, 0.0], [0.0, 1.0, 0.0], λ)
+            solve_system!(sys_matched, beam_matched)
+            @test length(BMO.rays(beam_matched)) == 4
+            @test BMO.refractive_index.(beam_matched.rays) == [1.0, 1.5, 1.5, 1.0]
+
+            # Water-immersed doublet
+            water = IsotropicMedium(:Water, 1.333)
+            sys_water = System([AC254], water)
+            @test BMO.ambient_medium(sys_water) === water
+            @test BMO.refractive_index(sys_water, λ) ≈ 1.333
+            ray_water = Ray([0.0, -0.05, 0.0], [0.0, 1.0, 0.0], λ, 1.333)
+            beam_water = Beam(ray_water)
+            solve_system!(sys_water, beam_water)
+            @test length(BMO.rays(beam_water)) == 4
+            @test BMO.refractive_index.(beam_water.rays) == [1.333, NLAK22(λ), NSF10(λ), 1.333]
+        end
     end
 end
 

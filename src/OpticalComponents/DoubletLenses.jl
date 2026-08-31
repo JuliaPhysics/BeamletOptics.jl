@@ -4,7 +4,7 @@ abstract type AbstractDoubletRefractiveOptic{
     B <: AbstractShape{T},
     N1 <: RefractiveIndex,
     N2 <: RefractiveIndex
-} <: AbstractRefractiveOptic{T, N1} end
+} <: AbstractObject{T} end
 
 """
     DoubletLens
@@ -52,7 +52,7 @@ For radii sign definition, refer to the [`SphericalLens`](@ref) constructor.
 - `l2`: second lens thickness
 - `d`: lens diameter
 - `n1`: first lens [`RefractiveIndex`](@ref)
-- `n1`: second lens [`RefractiveIndex`](@ref)
+- `n2`: second lens [`RefractiveIndex`](@ref)
 """
 function SphericalDoubletLens(r1, r2, r3, l1, l2, d, n1, n2)
     # Generate "cemented" front and back spherical lenses
@@ -61,16 +61,4 @@ function SphericalDoubletLens(r1, r2, r3, l1, l2, d, n1, n2)
     # Move doublet parts into position
     translate3d!(back, [0, thickness(shape(front)), 0])
     return DoubletLens(front, back)
-end
-
-function interact3d(system::AbstractSystem, dl::DoubletLens, beam::Beam{T, R}, ray::R) where {T <: Real, R <: Ray{T}}
-    # Interaction logic: if front is hit, hint to back and vice versa
-    if shape(intersection(ray)) === shape(dl.front)
-        i = interact3d(system, dl.front, beam, ray)
-        hint = Hint(dl, dl.back.shape)
-    elseif shape(intersection(ray)) === shape(dl.back)
-        i = interact3d(system, dl.back, beam, ray)
-        hint = Hint(dl, dl.front.shape)
-    end
-    return BeamInteraction(hint, i.ray)
 end

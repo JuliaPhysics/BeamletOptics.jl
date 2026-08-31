@@ -30,34 +30,34 @@ and
 !!! info "Waist and field calculation"
     For a given beamlet the Gaussian beam parameters can be obtained via the [`gauss_parameters`](@ref) function.
 """
-mutable struct AstigmaticGaussianBeamlet{T} <: AbstractBeam{T, PolarizedRay{T}}
-    c::Beam{T, PolarizedRay{T}}       # chief
-    wxp::Beam{T, Ray{T}}              # waist x +
-    wxm::Beam{T, Ray{T}}              # waist x -
-    wyp::Beam{T, Ray{T}}              # waist y +
-    wym::Beam{T, Ray{T}}              # waist y -
-    dxp::Beam{T, Ray{T}}              # div. x +
-    dxm::Beam{T, Ray{T}}              # div. x -
-    dyp::Beam{T, Ray{T}}              # div. y +
-    dym::Beam{T, Ray{T}}              # div. y -
-    parent::Nullable{AstigmaticGaussianBeamlet{T}}
-    children::Vector{AstigmaticGaussianBeamlet{T}}
-end
+mutable struct AstigmaticGaussianBeamlet{T, RC <: PolarizedRay{T}, RA <: Ray{T}} <: AbstractBeam{T, RC}
+    c::Beam{T, RC}       # chief
+    wxp::Beam{T, RA}     # waist x +
+    wxm::Beam{T, RA}     # waist x -
+    wyp::Beam{T, RA}     # waist y +
+    wym::Beam{T, RA}     # waist y -
+    dxp::Beam{T, RA}     # div. x +
+    dxm::Beam{T, RA}     # div. x -
+    dyp::Beam{T, RA}     # div. y +
+    dym::Beam{T, RA}     # div. y -
+    parent::Nullable{AstigmaticGaussianBeamlet{T, RC, RA}}
+    children::Vector{AstigmaticGaussianBeamlet{T, RC, RA}}
+ end
 
 function AstigmaticGaussianBeamlet(
-        c::Beam{T, PolarizedRay{T}},
-        wxp::Beam{T, Ray{T}},
-        wxm::Beam{T, Ray{T}},
-        wyp::Beam{T, Ray{T}},
-        wym::Beam{T, Ray{T}},
-        dxp::Beam{T, Ray{T}},
-        dxm::Beam{T, Ray{T}},
-        dyp::Beam{T, Ray{T}},
-        dym::Beam{T, Ray{T}}
-) where {T <: Real}
-    return AstigmaticGaussianBeamlet{T}(c, wxp, wxm, wyp, wym, dxp, dxm, dyp, dym,
+        c::Beam{T, RC},
+        wxp::Beam{T, RA},
+        wxm::Beam{T, RA},
+        wyp::Beam{T, RA},
+        wym::Beam{T, RA},
+        dxp::Beam{T, RA},
+        dxm::Beam{T, RA},
+        dyp::Beam{T, RA},
+        dym::Beam{T, RA}
+) where {T <: Real, RC <: PolarizedRay{T}, RA <: Ray{T}}
+    return AstigmaticGaussianBeamlet{T, RC, RA}(c, wxp, wxm, wyp, wym, dxp, dxm, dyp, dym,
         nothing,
-        Vector{AstigmaticGaussianBeamlet{T}}())
+        Vector{AstigmaticGaussianBeamlet{T, RC, RA}}())
 end
 
 """
@@ -73,17 +73,17 @@ In the 5-argument version, independent waists `w0_x` and `w0_y` can be specified
 
 - `position`: origin of the beamlet
 - `direction`: direction of the beamlet
-- `λ`: wavelength of the beamlet in [m]. Default value is 1000 nm.
-- `w0`: beam waist (radius) in [m]. Default value is 1 mm.
-- `w0_x`, `w0_y`: independent beam waists in [m].
+- `λ`: wavelength of the beamlet in \\[m\\]. Default value is 1000 nm.
+- `w0`: beam waist (radius) in \\[m\\]. Default value is 1 mm.
+- `w0_x`, `w0_y`: independent beam waists in \\[m\\].
 
 ## Keyword Arguments
 
 - `M2`, `M2_x`, `M2_y`: beam quality factors. Default is 1
-- `P0`: beam total power in [W]. Default is 1 mW.
-- `E0`: electric field vector in [V/m]. Default is `nothing` (aligned with support axes, scaled by `P0`).
+- `P0`: beam total power in \\[W\\]. Default is 1 mW.
+- `E0`: electric field vector in \\[V/m\\]. Default is `nothing` (aligned with support axes, scaled by `P0`).
 - `support`: optional support vector for basis construction
-- `z0`: beam waist offset in [m]. Default is 0 m
+- `z0`: beam waist offset in \\[m\\]. Default is 0 m
 
 # Additional information
 
@@ -224,7 +224,13 @@ optical_path_length(agb::AstigmaticGaussianBeamlet) = optical_path_length(agb.c)
 
 isentering(agb::AstigmaticGaussianBeamlet, id::Int) = isentering(rays(agb.c)[id])
 
-_last_beam_intersection(agb::AstigmaticGaussianBeamlet) = intersection(last(rays(agb.c)))
+function _reset_beam!(agb::AstigmaticGaussianBeamlet)
+    for beam in _component_beams(agb)
+        _reset_beam!(beam)
+    end
+    _drop_beams!(agb)
+    return nothing
+end
 
 point_on_beam(agb::AstigmaticGaussianBeamlet, t::Real) = point_on_beam(agb.c, t)
 
@@ -235,19 +241,14 @@ polarization(agb::AstigmaticGaussianBeamlet) = polarization(first(rays(agb.c)))
 
 electric_field(agb::AstigmaticGaussianBeamlet) = polarization(agb)
 function electric_field!(agb::AstigmaticGaussianBeamlet, new_E0)
-    polarization!(first(rays(agb.c)), new_E0)
-end
-
-function refractive_index(agb::AstigmaticGaussianBeamlet, id::Int)
-    return refractive_index(rays(agb.c)[id])
-end
-
-function refractive_index!(agb::AstigmaticGaussianBeamlet, id::Int, n_new::Real)
-    for beam in _component_beams(agb)
-        refractive_index!(rays(beam)[id], n_new)
+    if !isempty(rays(agb.c))
+        r = first(rays(agb.c))
+        agb.c.rays[1] = PolarizedRay(segment(r), wavelength(r), refractive_index(r), new_E0)
     end
     return nothing
 end
+
+refractive_index(agb::AstigmaticGaussianBeamlet, id::Int) = refractive_index(rays(agb.c)[id])
 
 """
     parent!(child::AstigmaticGaussianBeamlet, parent::AstigmaticGaussianBeamlet)
@@ -329,6 +330,33 @@ function interact3d(system::AbstractSystem,
         i_c, i_wxp, i_wxm, i_wyp, i_wym, i_dxp, i_dxm, i_dyp, i_dym)
 end
 
+function interact3d(system::AbstractSystem,
+        mi::MultiIntersection,
+        agb::AstigmaticGaussianBeamlet{R},
+        ray_id::Int) where {R}
+    bs_obj = _first_beamsplitter(coating(mi), entering(mi), exiting(mi))
+    if bs_obj !== nothing
+        ambient = ambient_medium(system)
+        trans = resolve_transition(mi, ambient, rays(agb.c)[ray_id])
+        return interact3d(system, bs_obj, trans, mi.hit, agb, ray_id)
+    end
+
+    i_c = interact3d(system, mi, agb.c, rays(agb.c)[ray_id])
+    i_wxp = interact3d(system, mi, agb.wxp, rays(agb.wxp)[ray_id])
+    i_wxm = interact3d(system, mi, agb.wxm, rays(agb.wxm)[ray_id])
+    i_wyp = interact3d(system, mi, agb.wyp, rays(agb.wyp)[ray_id])
+    i_wym = interact3d(system, mi, agb.wym, rays(agb.wym)[ray_id])
+    i_dxp = interact3d(system, mi, agb.dxp, rays(agb.dxp)[ray_id])
+    i_dxm = interact3d(system, mi, agb.dxm, rays(agb.dxm)[ray_id])
+    i_dyp = interact3d(system, mi, agb.dyp, rays(agb.dyp)[ray_id])
+    i_dym = interact3d(system, mi, agb.dym, rays(agb.dym)[ray_id])
+    if any(isnothing, (i_c, i_wxp, i_wxm, i_wyp, i_wym, i_dxp, i_dxm, i_dyp, i_dym))
+        return nothing
+    end
+    return AstigmaticGaussianBeamletInteraction{R}(
+        i_c, i_wxp, i_wxm, i_wyp, i_wym, i_dxp, i_dxm, i_dyp, i_dym)
+end
+
 function Base.push!(agb::AstigmaticGaussianBeamlet{T},
         interaction::AstigmaticGaussianBeamletInteraction{T}) where {T}
     push!(agb.c, interaction.chief)
@@ -343,68 +371,34 @@ function Base.push!(agb::AstigmaticGaussianBeamlet{T},
     return nothing
 end
 
-function Base.replace!(agb::AstigmaticGaussianBeamlet{T},
-        interaction::AstigmaticGaussianBeamletInteraction{T},
-        index::Int) where {T}
-    replace!(agb.c, interaction.chief, index)
-    replace!(agb.wxp, interaction.wxp, index)
-    replace!(agb.wxm, interaction.wxm, index)
-    replace!(agb.wyp, interaction.wyp, index)
-    replace!(agb.wym, interaction.wym, index)
-    replace!(agb.dxp, interaction.dxp, index)
-    replace!(agb.dxm, interaction.dxm, index)
-    replace!(agb.dyp, interaction.dyp, index)
-    replace!(agb.dym, interaction.dym, index)
-    return nothing
-end
-
-function _modify_beam_head!(old::AstigmaticGaussianBeamlet{T},
-        new::AstigmaticGaussianBeamlet{T}) where {T <: Real}
-    _modify_beam_head!(old.c, new.c)
-    _modify_beam_head!(old.wxp, new.wxp)
-    _modify_beam_head!(old.wxm, new.wxm)
-    _modify_beam_head!(old.wyp, new.wyp)
-    _modify_beam_head!(old.wym, new.wym)
-    _modify_beam_head!(old.dxp, new.dxp)
-    _modify_beam_head!(old.dxm, new.dxm)
-    _modify_beam_head!(old.dyp, new.dyp)
-    _modify_beam_head!(old.dym, new.dym)
-end
-
 """
     _beams_hits_same_shape(agb, id)
 
 Tests if all 9 component rays at section `id` hit the same object shape.
 """
 @inline function _beams_hits_same_shape(agb::AstigmaticGaussianBeamlet, id::Int)::Bool
-    i1 = intersection(rays(agb.c)[id])
+    if id > length(agb.c.rays)
+        return true
+    end
+    i1 = intersection(agb.c.rays[id])
     if isnothing(i1)
-        isnothing(intersection(rays(agb.wxp)[id])) || return false
-        isnothing(intersection(rays(agb.wxm)[id])) || return false
-        isnothing(intersection(rays(agb.wyp)[id])) || return false
-        isnothing(intersection(rays(agb.wym)[id])) || return false
-        isnothing(intersection(rays(agb.dxp)[id])) || return false
-        isnothing(intersection(rays(agb.dxm)[id])) || return false
-        isnothing(intersection(rays(agb.dyp)[id])) || return false
-        isnothing(intersection(rays(agb.dym)[id])) || return false
+        for b in _aux_beams(agb)
+            id > length(b.rays) && continue
+            isnothing(intersection(b.rays[id])) || return false
+        end
         return true
     else
-        s0 = shape(i1)
-        _check = b -> begin
-            int = intersection(rays(b)[id])
-            !isnothing(int) && shape(int) === s0
+        nc = normal3d(i1)
+        for b in _aux_beams(agb)
+            id > length(b.rays) && return false
+            int = intersection(b.rays[id])
+            isnothing(int) && return false
+            dot(nc, normal3d(int)) > 0.5 || return false
         end
-        _check(agb.wxp) || return false
-        _check(agb.wxm) || return false
-        _check(agb.wyp) || return false
-        _check(agb.wym) || return false
-        _check(agb.dxp) || return false
-        _check(agb.dxm) || return false
-        _check(agb.dyp) || return false
-        _check(agb.dym) || return false
         return true
     end
 end
+
 
 function isparentbeam(beam::AstigmaticGaussianBeamlet, ray::AbstractRay)
     for b in _component_beams(beam)
@@ -436,8 +430,8 @@ end
 Compute the complex parabasal ray parameters (h1, u1, h2, u2) at the transverse
 plane defined by the chief ray's position `p0` and direction at segment `i`.
 
-The real parts of `h` and `u` come from the divergence rays (dxp, dyp),
-while the imaginary parts come from the waist rays (wxp, wyp).
+The real parts of `h` and `u` come from the waist rays (wxp, wyp),
+while the imaginary parts come from the divergence rays (dxp, dyp).
 """
 function parabasal_ray_parameters(agb::AstigmaticGaussianBeamlet, p0, i)
     chief = rays(agb.c)[i]
@@ -539,9 +533,9 @@ end
 Apply a global phase shift `Δϕ` to the `AstigmaticGaussianBeamlet` by rotating the chief ray's polarization.
 """
 function shift_phase!(agb::AstigmaticGaussianBeamlet, Δϕ::Real)
-    for ray in rays(agb.c)
-        E = polarization(ray)
-        polarization!(ray, E * exp(im * Δϕ))
+    for (i, ray) in enumerate(rays(agb.c))
+        E = polarization(ray) * exp(im * Δϕ)
+        agb.c.rays[i] = PolarizedRay(segment(ray), wavelength(ray), refractive_index(ray), E)
     end
     return nothing
 end
