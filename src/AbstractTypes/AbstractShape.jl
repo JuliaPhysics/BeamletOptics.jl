@@ -33,6 +33,7 @@ Subtypes of `AbstractShape` should implement the following:
 ## Ray Tracing:
 
 - [`intersect3d`](@ref): returns the intersection between an `AbstractShape` and `AbstractRay`, or lack thereof. See also [`Intersection`](@ref)
+- [`normal3d`](@ref): returns a surface normal for the shape. The signature is shape-family-specific (`normal3d(mesh, faceID)`, `normal3d(sdf, point)`, ...); a concrete method is required alongside [`intersect3d`](@ref)
 
 ## Rendering (with Makie):
 
@@ -47,6 +48,18 @@ position!(shape::AbstractShape, pos) = (shape.pos = pos)
 "Enforces that `shape` has to have the field `dir` or implement `orientation()`."
 orientation(shape::AbstractShape) = shape.dir
 orientation!(shape::AbstractShape, dir) = (shape.dir = dir)
+
+"""
+    normal3d(shape::AbstractShape, args...)
+
+Interface function: every concrete [`AbstractShape`](@ref) family must implement a method
+returning a surface normal. The trailing arguments are shape-family-specific — e.g. a
+face index for [`AbstractMesh`](@ref), a surface point for [`AbstractSDF`](@ref). This
+fallback errors so a missing implementation is reported clearly rather than as a bare
+`MethodError`.
+"""
+normal3d(shape::AbstractShape, args...) = throw(ArgumentError(
+    lazy"normal3d not defined for $(typeof(shape)) with trailing args ::Tuple{$(map(typeof, args)...)}"))
 
 """
     translate3d!(shape::AbstractShape, offset)

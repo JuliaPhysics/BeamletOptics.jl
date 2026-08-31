@@ -155,6 +155,9 @@ const BMO = BeamletOptics
         @test_logs (:warn, "No intersect3d method defined for:") BMO.intersect3d(
             shape,
             ray)
+        # normal3d has no generic AbstractShape implementation
+        @test_throws "normal3d not defined for" BMO.normal3d(shape)
+        @test_throws "normal3d not defined for" BMO.normal3d(shape, 1)
 
         @testset "Testing AbstractRay - AbstractShape" begin
             shape = TestShapeless([1, 0, 0], Matrix{Int}(I, 3, 3))
