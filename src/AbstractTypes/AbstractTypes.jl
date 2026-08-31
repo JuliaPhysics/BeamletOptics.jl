@@ -1,6 +1,7 @@
 # Order of inclusion matters!
 include("AbstractShape.jl")
 include("AbstractObject.jl")
+include("AbstractObjectGroup.jl")
 include("AbstractMedium.jl")
 include("AbstractSurfaceModel.jl")
 include("AbstractVolumeModel.jl")
