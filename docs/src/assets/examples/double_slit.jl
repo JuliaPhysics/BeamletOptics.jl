@@ -22,14 +22,20 @@ a = 10e-6           # Slit width (10 µm)
 d = 100e-6          # Slit separation (100 µm)
 L = 0.2             # Propagation distance (0.2 m)
 W = 0.5e-3          # calculation window (0.5 mm)
-nx = 251            # resolution
+# Beamlet sampling. The sub-waist is w0 = overlap * grid spacing, and a Gaussian
+# of waist w0 cannot radiate beyond its own divergence lambda/(pi*w0). To recover
+# the full sinc envelope of the slit, that divergence must exceed the diffraction
+# angle of the aperture itself, i.e. pi*w0 << a.
+overlap = 1.2       # sub-waist scaling (default: smooth overlap at lowest cost)
+nx = 751            # x resolution: dx = 0.67 um -> w0x = 0.8 um << a = 10 um
+nz = 101            # z resolution: field is uniform along z, so sample it coarsely
 
 # Define the Aperture Mask (Double Slit)
 x = LinRange(-W / 2, W / 2, nx)
-z = LinRange(-W / 2, W / 2, nx)
-amplitude = zeros(nx, nx)
+z = LinRange(-W / 2, W / 2, nz)
+amplitude = zeros(nx, nz)
 
-for i in 1:nx, j in 1:nx
+for i in 1:nx, j in 1:nz
     # Slits are long along z, narrow along x
     in_slit1 = abs(x[i] - d / 2) < a / 2
     in_slit2 = abs(x[i] + d / 2) < a / 2
@@ -39,7 +45,7 @@ for i in 1:nx, j in 1:nx
     end
 end
 
-phase = zeros(nx, nx)
+phase = zeros(nx, nz)
 dir = [0.0, 1.0, 0.0] # Propagation along Y
 ##
 # Decompose into Astigmatic Beamlets
@@ -48,12 +54,15 @@ dir = [0.0, 1.0, 0.0] # Propagation along Y
 e1 = [1.0, 0.0, 0.0]
 e2 = [0.0, 0.0, 1.0]
 beams = WavefrontBeamletDecomposition(x, z, amplitude, phase, dir, λ;
-    threshold = 1e-3, overlap = 3.0, basis = (e1, e2))
+    threshold = 1e-3, overlap = overlap, basis = (e1, e2))
 
 @info "Number of beamlets generated: $(length(beams))"
 
 # Define the System and Propagate
-target_pd = Detector(30e-3)
+# The screen must be wide enough to catch each beamlet's divergence rays, which
+# reach lambda*L/(pi*w0x) ~ 50 mm off-axis here; beamlets that miss it register
+# no hit at all. Only the +-15 mm evaluation window below is actually plotted.
+target_pd = Detector(150e-3)
 translate_to3d!(target_pd, [0.0, L, 0.0])
 system = System([target_pd])
 
@@ -93,10 +102,11 @@ plt_res = surface!(ax3d, X_res, Y_res, Z_res,
     shading = NoShading,
     depth_shift = -1e-3) # Subtle shift to win Z-fighting without clipping
 
-# Render a few representative beamlets
-step = max(1, length(beams) ÷ 15)
+# Render a few representative beamlets. These now fan out strongly along x
+# (w0x = 0.8 um diverges at ~14 deg), so keep them faint and few.
+step = max(1, length(beams) ÷ 6)
 for i in 1:step:length(beams)
-    render!(ax3d, beams[i], color = (:cyan, 0.05), show_beams = false, flen = 0.0)
+    render!(ax3d, beams[i], color = (:cyan, 0.02), show_beams = false, flen = 0.0)
 end
 
 # Render the system components (Detector frame)
@@ -115,7 +125,19 @@ ax1d = Axis(fig[2, 2],
     title = "Interference Fringes (x-slice)",
     xlabel = "x Position [mm]", ylabel = "Intensity",
     yticksvisible = false, yticklabelsvisible = false)
-lines!(ax1d, xs_eval .* 1000, I[:, size(I, 2) ÷ 2], color = :red, linewidth = 2)
+I_slice = I[:, size(I, 2) ÷ 2]
+lines!(ax1d, xs_eval .* 1000, I_slice, color = :red, linewidth = 2,
+    label = "Beamlets")
+
+# Analytical Fraunhofer pattern of the double slit for reference
+sinθ = xs_eval ./ sqrt.(xs_eval .^ 2 .+ L^2)
+β = π * a .* sinθ ./ λ  # half-phase across a single slit (envelope)
+γ = π * d .* sinθ ./ λ  # half-phase between the two slits (fringes)
+I_ana = sinc.(β ./ π) .^ 2 .* cos.(γ) .^ 2
+I_ana .*= maximum(I_slice) / maximum(I_ana)
+lines!(ax1d, xs_eval .* 1000, I_ana, color = :blue, linewidth = 2,
+    linestyle = :dashdot, label = "Fraunhofer")
+axislegend(ax1d, position = :rt, framevisible = false, labelsize = 14)
 
 # This makes the 1.2m distance look shorter so we can zoom in on X/Z details
 scale!(ax3d.scene, 1.0, 0.15, 1.0)
