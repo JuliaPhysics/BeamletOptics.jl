@@ -775,7 +775,12 @@ function WavefrontBeamletDecomposition(
                 phi = 2π * rand(rng)
                 local_support = base_s * cos(phi) + ortho_s * sin(phi)
             else
-                local_support = nothing
+                # Align the principal axes with the sampling basis so that
+                # w0s_x/w0s_y belong to the e1_v/e2_v grid axes as intended.
+                # Without this the constructor falls back to normal3d(local_dir),
+                # which is unrelated to `basis` and transposes the two waists.
+                s1 = cross(local_dir, e2_v)
+                local_support = norm(s1) < 1e-6 ? nothing : normalize(s1)
             end
 
             b = AstigmaticGaussianBeamlet(pos, local_dir, λ, w0s_x, w0s_y; E0 = E0_complex, support = local_support)
