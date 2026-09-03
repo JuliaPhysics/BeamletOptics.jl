@@ -298,9 +298,24 @@ ys = LinRange(0, n*Δy, n+1)
 power_fig = Figure(size=(600, 250))
 power_ax = Axis(power_fig[1, 1], xlabel="Δy [nm]", ylabel="P [mW]",)
 
-lines!(power_ax, ys*1e9, P*1e3, color=:red)
-vlines!(power_ax, λ*1e9, color=:red, linestyle=:dashdot)
+lines!(power_ax, ys*1e9, P*1e3, color=:red, label="Simulated")
 
+# Analytical fringe curve at ideal interferometric contrast V = 1. A mirror shift
+# Δy lengthens the arm twice over, so the phase is φ = 4π·Δy/λ and the power
+# follows cos²(φ/2) -- two periods per wavelength of travel. With V = 1 the curve
+# swings over the full laser power, from 0 to P_in.
+P_in = get_default_power()          # 1 mW, the default power of `beam`
+φ = 4π .* ys ./ λ
+# Only the static offset is taken from the simulation (arm length difference);
+# period and contrast are purely analytical.
+φ0 = angle(sum(P .* cis.(-φ)))
+P_ideal = P_in .* cos.((φ .+ φ0) ./ 2) .^ 2
+
+lines!(power_ax, ys*1e9, P_ideal*1e3, color=:blue, linestyle=:dashdot,
+    linewidth=2, label="Analytical")
+axislegend(power_ax, position=:cb, framevisible=false, labelsize=10)
+
+xlims!(power_ax, 0, λ*1e9)
 ylims!(power_ax, 0, 1)
 
 save("mi_powerplot.png", power_fig, px_per_unit=4)
