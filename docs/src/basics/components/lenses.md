@@ -186,7 +186,7 @@ fig # hide
 
 ```
 
-An acylindrical lens can easily be constructed using the [AcylindricalSurface](@ref) surface type:
+An acylindrical lens can easily be constructed using the [`AcylindricalSurface`](@ref) surface type:
 
 ```@example
 using CairoMakie, BeamletOptics # hide

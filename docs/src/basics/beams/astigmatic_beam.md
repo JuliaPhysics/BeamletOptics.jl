@@ -44,7 +44,7 @@ While the above beam closely matches the example Gaussian given in the previous 
 
 ![Astigmatic ray tracing III](agbtest3.png)
 
-The phase factor due to the optical path length of the central ray ($e^{i k (z + \Delta L)}$) is added to the reduced field $\psi$ during the final field calculation for each beamlet. More information on the mathemathics behind this formalism can be found below in [The Curvature Matrix $\mathbf{Q}$](@ref) section.
+The phase factor due to the optical path length of the central ray ($e^{i k (z + \Delta L)}$) is added to the reduced field $\psi$ during the final field calculation for each beamlet. More information on the mathemathics behind this formalism can be found below in [The Curvature Matrix $\mathbf{Q}$](@ref curvature-matrix-Q) section.
 
 !!! info "Optical invariant"
     In order to ensure the correctness of the traced beamlet, the complex ray vectors must satisfy the **vanishing complex optical invariant**:
@@ -83,7 +83,7 @@ beams = WavefrontBeamletDecomposition(x, z, amplitude, phase, dir, λ)
 solve_system!(system, beams)
 ```
 
-## The Curvature Matrix $\mathbf{Q}$
+## [The Curvature Matrix $\mathbf{Q}$](@id curvature-matrix-Q)
 
 The relationship between the auxiliary rays and the complex curvature of the beam is defined by the matrix equation $\mathbf{Q} = \mathbf{U}\mathbf{H}^{-1}$. By arranging the transverse components of the complex rays into $2 \times 2$ matrices $\mathbf{H} = [\mathbf{h}_1, \mathbf{h}_2]$ and $\mathbf{U} = [\mathbf{u}_1, \mathbf{u}_2]$, we can solve for the individual components of $\mathbf{Q}$:
 
