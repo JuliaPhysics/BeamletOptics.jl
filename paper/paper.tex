@@ -393,8 +393,12 @@ curvature $R(z)$ and Gouy phase $\psi(z)$ are reconstructed from the ray
 heights and slopes using the relations of Herloski \cite{Herloski1983}
 and DeJager \cite{DeJager1992}. The complex field of the mode is then
 \begin{equation}
-E(r,z) = E_0\,\frac{w_0}{w(z)}\, e^{-r^2/w(z)^2}\, e^{\,i\left[kz +
-\psi(z) + kr^2/2R(z)\right]},
+  \begin{split}
+    E(r,z) = {}& E_0\,\frac{w_0}{w(z)}
+      \exp\!\left(-\frac{r^2}{w(z)^2}\right) \\
+      &\cdot \exp\!\left(i\left[kz + \psi(z)
+        + \frac{k r^2}{2 R(z)}\right]\right),
+  \end{split}
   \label{eq:gaussfield}
 \end{equation}
 with $k = 2\pi/\lambda$. In addition, the optical path length of the
@@ -421,48 +425,115 @@ DeJager \cite{DeJager1992}.}
 
 \subsection{Astigmatic polarized Gaussian beamlets}
 
-For off-axis, tilted or otherwise non-symmetric systems the stigmatic
-model breaks down \cite{Kochkina:2013}. Here BMO offers the
-\texttt{AstigmaticGaussianBeamlet}, an implementation of the
-generally-astigmatic beamlet formalism of Greynolds
-\cite{Greynolds:1986_1, Greynolds:1986_2} in the vectorial,
-polarization-aware form of Worku and Gross \cite{Worku:2017}. The mode
-is carried by nine rays, see Fig.~\ref{fig:agbeamlet}: a polarized chief
-ray plus four ``waist'' and four ``divergence'' rays sampling two
-orthogonal transverse axes. Together they track the complex $2\times2$
-curvature matrix $\mathbf{Q}(z) = \mathbf{U}\mathbf{H}^{-1}$, formed
-from the transverse components of the complex ray heights
-$\mathbf{H} = [\mathbf{h}_1, \mathbf{h}_2]$ and angles
-$\mathbf{U} = [\mathbf{u}_1, \mathbf{u}_2]$. The diagonal of
-$\mathbf{Q}$ gives the width and phase curvature along the principal
-axes; the off-diagonal terms encode general astigmatism (wavefront
-twist). Physical validity requires the \emph{complex optical invariant}
-to vanish,
+For off-axis or non-symmetric optical systems, a stigmatic beam
+model is generally insufficient \cite{Kochkina:2013}.
+BMO therefore provides the \texttt{AstigmaticGaussianBeamlet}, based on the generally
+astigmatic formalism of Greynolds \cite{Greynolds:1986_1, Greynolds:1986_2}
+and its polarization-aware formulation by Worku and Gross \cite{Worku:2017}.
+Each beamlet is comprised of a polarized chief ray and eight auxiliary
+rays: two positive and negative waist pairs and two divergence ray pairs along two
+orthogonal transverse directions. Refer to Fig.~\ref{fig:agbeamlet} for a visual breakdown.
+The following mathematical description for the field reconstruction from a traced set of rays 
+assumes a fundamental Gaussian mode with $M^2=1$.
+
+At each evaluation plane perpendicular to the chief-ray direction
+$\hat{\mathbf d}$, the auxiliary rays define two complex height
+vectors $\mathbf h_1,\mathbf h_2$ and two complex direction
+vectors $\mathbf u_1,\mathbf u_2$.
+BMO constructs their real parts from the waist-ray pairs and
+their imaginary parts from the divergence-ray pairs, using half
+the difference between the positive and negative rays.
+
+Expressed in a common orthonormal transverse basis, these vectors
+form the matrices
+\[
+    H = [\mathbf h_1,\mathbf h_2],
+    \qquad
+    U = [\mathbf u_1,\mathbf u_2],
+    \qquad
+    Q = UH^{-1}.
+\]
+The complex curvature matrix $Q$ determines the transverse
+quadratic phase and Gaussian amplitude profile.
+For invertible $H$, its symmetry is equivalent to the vanishing
+of the bilinear coupling invariant,
 \begin{equation}
-\mathbf{h}_1 \times \mathbf{u}_2 - \mathbf{h}_2 \times \mathbf{u}_1 = 0,
-  \label{eq:invariant}
+    \mathbf h_1^{T}\mathbf u_2
+    -
+    \mathbf h_2^{T}\mathbf u_1
+    = 0.
+    \label{eq:beamlet-coupling-invariant}
 \end{equation}
-which BMO checks after every interaction and which guarantees that
-$\mathbf{Q}$ stays symmetric \cite{KochkinaAO:2013}. The reduced complex
-amplitude of a single beamlet is
+Here, $T$ denotes transposition without complex conjugation.
+BMO evaluates this condition numerically as part of its
+optical-invariant checks.
+
+For a coordinate-independent field expression, we define the
+oriented transverse area product
+\[
+    [\mathbf a,\mathbf b]_{\hat{\mathbf d}}
+    \equiv
+    (\mathbf a \times \mathbf b)\cdot\hat{\mathbf d},
+\]
+where all products are bilinear and involve no complex
+conjugation.
+For transverse vectors, this scalar equals the two-dimensional
+determinant in a right-handed basis oriented along
+$\hat{\mathbf d}$.
+
+Writing $D=[\mathbf h_1,\mathbf h_2]_{\hat{\mathbf d}}$,
+the reduced complex scalar field of a beamlet is
 \begin{equation}
-\psi(\mathbf{r}) = \frac{E_0}{\sqrt{\mathbf{h}_1 \times \mathbf{h}_2}}\,
-\exp\!\left(\! ik\,
-\frac{(\mathbf{h}_1\!\times\!\mathbf{r})(\mathbf{u}_2\!\cdot\!\mathbf{r})
--(\mathbf{h}_2\!\times\!\mathbf{r})(\mathbf{u}_1\!\cdot\!\mathbf{r})}
-{2\,\mathbf{h}_1 \times \mathbf{h}_2} \right)\!,
-  \label{eq:agbfield}
+    \begin{aligned}
+        \psi(\mathbf r)
+        &= \frac{A}{\sqrt{D}}
+        \exp\!\Biggl\{
+            \frac{ik}{2D}
+            \Bigl[
+                [\mathbf h_1,\mathbf r]_{\hat{\mathbf d}}\,
+                \mathbf u_2^{T}\mathbf r
+        \\[-0.2em]
+        &\hspace{5.5em}
+                -
+                [\mathbf h_2,\mathbf r]_{\hat{\mathbf d}}\,
+                \mathbf u_1^{T}\mathbf r
+            \Bigr]
+        \Biggr\}.
+    \end{aligned}
+    \label{eq:astigmatic-beamlet-field}
 \end{equation}
-evaluated with the analytic (non-conjugated) bilinear form to preserve
-continuity in the complex domain \cite{Greynolds:2014, Wilhelm:2001}.
-The physical $1/e^2$ intensity ellipse is recovered from the
-eigendecomposition of the spot matrix
-$\mathbf{S} = \operatorname{Re}(\mathbf{h}_1\mathbf{h}_1^\dagger + \mathbf{h}_2\mathbf{h}_2^\dagger)$
-\cite{KochkinaAO:2013}. Related methods underpin e.g. the commercial
-codes FRED and CODE~V and the open-source \texttt{poke}
-\cite{Ashcraft:2022, Ashcraft:2024} and IfoCAD \cite{Wanner:2017}.
-Table~\ref{tab:models} summarizes the difference in capability between
-both beamlet models.
+Here, $\mathbf r$ is a transverse displacement relative to the chief ray, $k$ is the
+wavenumber in the propagation medium, and $A$ sets the reference
+normalization.
+The exponent is equivalently
+$ik\mathbf r_{\perp}^{T}Q\mathbf r_{\perp}/2$,
+where $\mathbf r_{\perp}$ contains the components of $\mathbf r$
+in the chosen transverse basis.
+Equation~\ref{eq:astigmatic-beamlet-field} omits the longitudinal
+optical-path phase and the chief-ray polarization vector.
+A continuous choice of the square-root branch is required to
+preserve the Gouy phase along propagation.
+
+With this phase convention, a spatially decaying Gaussian
+requires $\operatorname{Im}(Q)$ to be positive definite.
+Its eigenvectors determine the intensity-ellipse axes; if its
+eigenvalues are $\mu_1,\mu_2$, the corresponding $1/e^2$ intensity
+radii are
+\[
+    w_j = \sqrt{\frac{2}{k\mu_j}},
+    \qquad j=1,2.
+\]
+The wavefront curvature is determined separately by
+$\operatorname{Re}(Q)$; its principal axes need not coincide with
+those of the intensity ellipse \cite{KochkinaAO:2013}.
+The model describes each beamlet within a local paraxial, quadratic-field approximation.
+Although the auxiliary rays are traced geometrically through
+the optical system, this does not make an individual beamlet
+an exact representation of higher-order aberrations.
+Related methods underpin the commercial codes FRED and CODE V,
+as well as the open-source tools poke \cite{Ashcraft:2022, Ashcraft:2024}
+and IfoCAD \cite{Wanner:2017}. Table~\ref{tab:models} summarizes the 
+differences in capability between both Gaussian beamlet models.
 
 Beyond single modes, the astigmatic beamlet is also the building block
 that makes \emph{beamlet decomposition} possible. Each beamlet stays a
@@ -600,7 +671,7 @@ laser datasheet provides (Code~\ref{lst:hene}).
 
 \begin{lstlisting}[
   language = Julia,
-  numbers = right,
+  numbers = left,
   label = {lst:hene},
   caption = {Defining a HeNe source as a Gaussian beamlet with a 
   beam-quality factor.} 
