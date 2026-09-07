@@ -30,9 +30,9 @@ be quickly investigated. Optical elements are modeled as closed volumes
 described by meshes or signed distance functions. The underlying solver
 calculates beam paths non-sequentially. Every component is freely
 movable through a robust kinematic API. We describe the package
-architecture, the ray and beamlet models it implements, and validate the
-implementation against the analytical Fraunhofer diffraction pattern of
-a double slit.
+architecture, the ray and beamlet models it implements, showcase a 
+Michelson interferometer example and validate the implementation against 
+the analytical Fraunhofer diffraction pattern of a double slit.
 \end{abstract}
 
 \section{Introduction}
@@ -48,7 +48,7 @@ are costly and closed source. An open-source alternative is therefore
 attractive, and the Julia programming language \cite{bezanson2017julia}
 offers a variety of in-built features, such as performance, automatic
 differentiation (AD) and easy access to multi-threading, that allow for
-elegant and rapid iteration of algorithms.
+rapid iteration of algorithms.
 
 BMO is being developed at the Institute of Technical Physics (DLR), where one
 of the motivating applications is the design of heterodyne laser
@@ -76,7 +76,7 @@ scalar diffraction propagation of sampled fields. What has been missing
 is a lightweight tool aimed specifically at \emph{prototyping}
 three-dimensional breadboard setups with laser sources: one that
 does not assume a fixed optical axis or surface order, lets the user
-move components interactively, and still returns the physical-optics
+move components interactively, and provides the physical-optics
 quantities (waist, curvature, phase, interference) that matter for a
 coherent source.
 
@@ -128,7 +128,7 @@ in the future.
 
 Code~\ref{lst:expander} builds a Keplerian beam expander from two stock
 spherical lenses and traces a bundle of collimated rays through it. It
-shows the three ingredients of every BMO simulation: constructing
+shows the three steps of every BMO simulation: constructing
 components, placing them with the kinematic API, and calling
 \texttt{solve\_system!}. The result is illustrated in
 Fig.~\ref{fig:expander}. The paraxial rays emerge collimated and
@@ -142,7 +142,7 @@ exact, non-paraxial surface trace, with no aberration model added.
   float = h,
   label = {lst:expander},
   caption = {A two-lens Keplerian beam expander. Visualization becomes
-available once a Makie backend is loaded.}
+available once a Makie backend is loaded, examples can be found in the BMO documentation.}
 ]
   using BeamletOptics
   # two thin spherical lenses, n = 1.5 for all λ
@@ -253,7 +253,7 @@ radiative transfer in curved geometries \cite{McMillan:2022}. Their use
 as the primary geometry backend of an optical ray tracer is, to our
 knowledge, new. For flat surfaces and imported CAD geometry BMO also
 provides a mesh backend using the M\"oller--Trumbore intersection
-algorithm \cite{Moeller:2005}, but with a per-face constant normal it is
+algorithm \cite{Moeller:2005}, but with a constant normal vector for each face it is
 unsuitable for curved optical surfaces and intended mainly for
 visualization and placeholder optomechanics.
 
@@ -313,7 +313,7 @@ special-case code. Handing the solver a hint is how BMO resolves this
 currently. The hint travels back to the solver as part of the
 interaction returned by \texttt{interact3d}, so supplying a correct one
 is the responsibility of whoever implements such a composite element.
-Systems without mutable elements can be marked \texttt{StaticSystem} for
+Systems without mutable elements can be marked as \texttt{StaticSystem} for
 more aggressive compiler specialization, and independent rays are traced
 in parallel on the CPU.
 
@@ -321,7 +321,7 @@ in parallel on the CPU.
 
 Every object exposes a \texttt{position} (an $\mathbb{R}^3$ centroid)
 and an \texttt{orientation} (an orthonormal $3\times3$ matrix). Relative
-moves are made with \texttt{translate3d!}, \texttt{rotate3d!} and the
+moves are made with \texttt{translate3d!}, \texttt{rotate3d!} and 
 axis-specific helpers, e.g. \texttt{zrotate3d!}. Components can be
 locked together in an \texttt{ObjectGroup} that moves rigidly, which is
 how multi-element lens assemblies and zoom groups are built. All
@@ -369,17 +369,15 @@ system.}
 
 \subsection{Stigmatic Gaussian beamlets}
 
-Geometrical rays can not by themselves describe the $\mathrm{TEM}_{00}$
-Gaussian mode of a laser, whose radius, wavefront curvature and Gouy
-phase evolve according to wave optics \cite{Saleh2019}. The standard
-method already implemented as a Julia package is the $ABCD$
+Geometrical rays can not by themselves describe the Gaussian mode of a laser, 
+whose radius, wavefront curvature and Gouy phase evolve according to wave optics \cite{Saleh2019}.
+One method for Gaussian propagation already implemented as a Julia package is the $ABCD$
 $q$-parameter method \cite{ABCDMatrixOptics}, which requires a paraxial
-system matrix. BMO instead uses the \emph{complex ray} (or
-ray-equivalent) method introduced by Arnaud \cite{Arnaud1968}: a
-fundamental Gaussian can be represented by a small number of ordinary
-geometrical rays traced through the optical system.
+system matrix. BMO instead uses the \emph{complex ray} method introduced 
+by Arnaud \cite{Arnaud1968}: a fundamental Gaussian can be represented by 
+a small number of ordinary geometrical rays traced through the optical system.
 
-The \texttt{GaussianBeamlet} represents the mode with three coplanar
+The \texttt{GaussianBeamlet} represents the $\mathrm{TEM}_{00}$ mode with three coplanar
 rays (Fig.~\ref{fig:beamlet}). A \emph{chief} ray along the axis, a
 \emph{waist} ray offset by $w_0$, and a \emph{divergence} ray tilted by
 the far-field half-angle
@@ -387,10 +385,10 @@ the far-field half-angle
 \theta = \frac{M^2 \lambda}{\pi w_0},
   \label{eq:divergence}
 \end{equation}
-where $M^2 \geq 1$ is the beam quality factor. After tracing all three
+where $M^2 \geq 1$ is the beam quality factor and $\lambda$ the wavelength. After tracing all three
 rays through the system, the local beam radius $w(z)$, radius of
-curvature $R(z)$ and Gouy phase $\psi(z)$ are reconstructed from the ray
-heights and slopes using the relations of Herloski \cite{Herloski1983}
+curvature $R(z)$ and Gouy phase $\psi(z)$ are reconstructed in cylinder coordinates $(r,z)$ 
+from the ray heights and slopes using the relations of Herloski \cite{Herloski1983}
 and DeJager \cite{DeJager1992}. The complex field of the mode is then
 \begin{equation}
   \begin{split}
@@ -401,7 +399,7 @@ and DeJager \cite{DeJager1992}. The complex field of the mode is then
   \end{split}
   \label{eq:gaussfield}
 \end{equation}
-with $k = 2\pi/\lambda$. In addition, the optical path length of the
+with $k = 2\pi/\lambda$ being the wavenumber. In addition, the optical path length of the
 chief ray is tracked so that the absolute phase of interfering beams is
 correct. This model is exact for a mode that stays on axis and meets
 only locally parabolic or flat surfaces; it does not capture
@@ -414,7 +412,7 @@ it can not.
 
 \begin{figure}[h]
 \centerline{\includegraphics[width=\columnwidth]{figures/gaussian_showcase.png}}
-\caption{A \texttt{GaussianBeamlet} focused by a single lens. The mode
+\caption{A \texttt{GaussianBeamlet} focused by a single lens. The $\mathrm{TEM}_{00}$ mode
 is carried by three geometrical rays: chief (red), waist (blue) and
 divergence (green). From their heights and slopes the $1/e^2$ envelope
 shown in red, together with $w(z)$, $R(z)$ and $\psi(z)$, is
@@ -535,9 +533,9 @@ as well as the open-source tools poke \cite{Ashcraft:2022, Ashcraft:2024}
 and IfoCAD \cite{Wanner:2017}. Table~\ref{tab:models} summarizes the 
 differences in capability between both Gaussian beamlet models.
 
-Beyond single modes, the astigmatic beamlet is also the building block
+Beyond single modes, the astigmatic beamlet model is also the foundation
 that makes \emph{beamlet decomposition} possible. Each beamlet stays a
-valid, narrow solution under arbitrary tilt, astigmatism and off-axis
+valid solution under arbitrary tilt, astigmatism and off-axis
 propagation, so an arbitrary wavefront can be expanded into a set of
 them and propagated by ordinary ray tracing. This is the basis of the field
 decompositions of Section~\ref{sec:beamgroups}.
@@ -726,7 +724,7 @@ dash-dotted line. The blue dash-dotted curve is the analytical
 prediction of Eq.~\ref{eq:mipower} at ideal fringe contrast $V = 1$;
 only its phase offset is taken from the simulation, while period and
 contrast are purely analytical. The two periods per $\lambda$ follow
-from the path difference changing by $2\,\Delta y$; the finite minimum
+from the path difference changing by $2\,\Delta y$; the non-zero minimum
 and sub-unity maximum of the simulated curve reflect the slight
 arm-length imbalance.}
 \label{fig:mipower}
@@ -771,14 +769,14 @@ Eq.~\ref{eq:fraunhofer} (blue, dashed).}
 \subsection{Performance notes}
 
 The computational cost of tracing a system is dominated by the
-intersection tests, which scale as $\mathcal{O}(n)$ in the number $n$ of
+intersection tests, which currently scale by $\mathcal{O}(n)$ with the number $n$ of
 intersectable objects. We have not yet benchmarked BMO against
 comparable software, since we still see room for improvement through
 more sophisticated tracing methods, e.g. sphere-of-influence testing.
 Further, the current implementations of \texttt{solve\_system!} for the
 geometrical beams and Gaussian beamlets rely on branching logic, which
 makes GPU adaptation difficult; as of version 0.13, all tracing
-algorithms run on the CPU. Tracing a \texttt{System} is deliberately
+algorithms run on the CPU. Tracing a system is deliberately
 separated from the evaluation of field data, so that the computationally
 expensive calculation of field distributions can be triggered outside of
 the solver loop, at a point of the user's choosing.
