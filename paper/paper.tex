@@ -30,7 +30,7 @@ be quickly investigated. Optical elements are modeled as closed volumes
 described by meshes or signed distance functions. The underlying solver
 calculates beam paths non-sequentially. Every component is freely
 movable through a robust kinematic API. We describe the package
-architecture, the ray and beamlet models it implements, showcase a 
+architecture and the ray and beamlet models it implements, showcase a 
 Michelson interferometer example and validate the implementation against 
 the analytical Fraunhofer diffraction pattern of a double slit.
 \end{abstract}
@@ -44,7 +44,7 @@ to a focus, and how large is the waist there? What happens to the fringe
 contrast of an interferometer when a mirror is tilted by a milliradian
 or a mount drifts by a micron? Commercial optical design suites such as
 Zemax OpticStudio, CODE~V or FRED can answer these questions, but they
-are costly and closed source. An open-source alternative is therefore
+are costly and closed-source. An open-source alternative is therefore
 attractive, and the Julia programming language \cite{bezanson2017julia}
 offers a variety of in-built features, such as performance, automatic
 differentiation (AD) and easy access to multi-threading, that allow for
@@ -60,7 +60,7 @@ or perturbed, in the spirit of the mission-grade simulators built for
 space gravitational-wave detectors \cite{Wanner:2017}, but lightweight
 enough to iterate on rapidly \cite{Manny:2024}. Since many of these
 experiments use laser beams in the fundamental transverse
-electromagnetic ($\mathrm{TEM}_{00}$) mode, utilizing the Gaussian
+electromagnetic ($\mathrm{TEM}_{00}$) mode, utilization of the Gaussian
 beamlet formalism offers a performant tool for the design and analysis
 of optical setups. This method builds upon geometrical optics and ray
 tracing, which are established techniques.
@@ -93,7 +93,7 @@ width=\columnwidth]{figures/openraman.png}}
 \caption{OpenRAMAN spectrometer BMO model. The excitation light
 (green) is folded through the
 instrument, and the returning signal is traced at several wavelengths
-(coloured) through the collection optics onto the sensor plane (blue).
+(colored) through the collection optics onto the sensor plane (blue).
 The housing and opto-mechanical mounts are imported as meshes and
 included as non-interacting geometry so that beam clearance can be
 inspected in the same scene as the optical path.}
@@ -142,7 +142,7 @@ exact, non-paraxial surface trace, with no aberration model added.
   float = h,
   label = {lst:expander},
   caption = {A two-lens Keplerian beam expander. Visualization becomes
-available once a Makie backend is loaded, examples can be found in the BMO documentation.}
+available once a Makie backend is loaded; examples can be found in the BMO documentation.}
 ]
   using BeamletOptics
   # two thin spherical lenses, n = 1.5 for all λ
@@ -239,7 +239,7 @@ maintenance burden.
 \caption{Sphere tracing through a scene of SDF primitives. At each
 iteration the SDF gives the distance to the nearest surface, drawn here
 as a translucent sphere: the ray may advance by that radius without
-tunnelling through geometry. Steps are large in open space and shrink as
+tunneling through geometry. Steps are large in open space and shrink as
 the ray approaches a surface.}
 \label{fig:spheretracing}
 \end{figure}
@@ -247,7 +247,7 @@ Lens volumes are composed from Quilez's analytic primitives
 \cite{Quilez_sdf}, e.g. cut spheres or cylinders, and joined by a
 boolean union (\texttt{UnionSDF}), which stays exact under addition. On
 top of these, iterative root-finding routines extend the marcher to
-rotationally-symmetric even aspheres (ISO~10110) and (a)cylindrical
+rotationally symmetric even aspheres (ISO~10110) and (a)cylindrical
 lenses. SDFs are established in computer graphics and have been used for
 radiative transfer in curved geometries \cite{McMillan:2022}. Their use
 as the primary geometry backend of an optical ray tracer is, to our
@@ -299,7 +299,7 @@ added to the \texttt{System} is irrelevant. Nothing about the beam path
 needs to be declared in advance, which is what allows components to be
 moved freely and systems to be assembled without specifying a surface
 sequence. The price is that the intersection search scales linearly with
-the element count, as in $\mathcal{O}(n)$.
+the element count, i.e. $\mathcal{O}(n)$.
 
 Where knowledge about the next relevant object is available, it can be
 handed to the solver through the \texttt{Hint} interface, which
@@ -369,7 +369,7 @@ system.}
 
 \subsection{Stigmatic Gaussian beamlets}
 
-Geometrical rays can not by themselves describe the Gaussian mode of a laser, 
+Geometrical rays cannot by themselves describe the Gaussian mode of a laser, 
 whose radius, wavefront curvature and Gouy phase evolve according to wave optics \cite{Saleh2019}.
 One method for Gaussian propagation already implemented as a Julia package is the $ABCD$
 $q$-parameter method \cite{ABCDMatrixOptics}, which requires a paraxial
@@ -385,7 +385,7 @@ the far-field half-angle
 \theta = \frac{M^2 \lambda}{\pi w_0},
   \label{eq:divergence}
 \end{equation}
-where $M^2 \geq 1$ is the beam quality factor and $\lambda$ the wavelength. After tracing all three
+where $M^2 \geq 1$ is the beam-quality factor and $\lambda$ the wavelength. After tracing all three
 rays through the system, the local beam radius $w(z)$, radius of
 curvature $R(z)$ and Gouy phase $\psi(z)$ are reconstructed in cylinder coordinates $(r,z)$ 
 from the ray heights and slopes using the relations of Herloski \cite{Herloski1983}
@@ -399,16 +399,16 @@ and DeJager \cite{DeJager1992}. The complex field of the mode is then
   \end{split}
   \label{eq:gaussfield}
 \end{equation}
-with $k = 2\pi/\lambda$ being the wavenumber. In addition, the optical path length of the
+with $k = 2\pi/\lambda$ being the wavenumber. In addition, the optical-path length of the
 chief ray is tracked so that the absolute phase of interfering beams is
 correct. This model is exact for a mode that stays on axis and meets
 only locally parabolic or flat surfaces; it does not capture
 astigmatism, spherical aberration or polarization aberration, and the
-beam can not be clipped by hard apertures. Within
+beam cannot be clipped by hard apertures. Within
 these limits it is cheap, i.e. three rays per beam, and yields $w$, $R$
 and $\psi$ directly, which makes it a good default for first-order
 layout work; the astigmatic model of the next section covers the cases
-it can not.
+it cannot handle.
 
 \begin{figure}[h]
 \centerline{\includegraphics[width=\columnwidth]{figures/gaussian_showcase.png}}
@@ -428,10 +428,10 @@ model is generally insufficient \cite{Kochkina:2013}.
 BMO therefore provides the \texttt{AstigmaticGaussianBeamlet}, based on the generally
 astigmatic formalism of Greynolds \cite{Greynolds:1986_1, Greynolds:1986_2}
 and its polarization-aware formulation by Worku and Gross \cite{Worku:2017}.
-Each beamlet is comprised of a polarized chief ray and eight auxiliary
-rays: two positive and negative waist pairs and two divergence ray pairs along two
+Each beamlet consists of a polarized chief ray and eight auxiliary
+rays: two positive and negative waist pairs and two divergence-ray pairs along two
 orthogonal transverse directions. Refer to Fig.~\ref{fig:agbeamlet} for a visual breakdown.
-The following mathematical description for the field reconstruction from a traced set of rays 
+The following mathematical description of the field reconstruction from a traced set of rays 
 assumes a fundamental Gaussian mode with $M^2=1$.
 
 At each evaluation plane perpendicular to the chief-ray direction
@@ -507,7 +507,7 @@ The exponent is equivalently
 $ik\mathbf r_{\perp}^{T}Q\mathbf r_{\perp}/2$,
 where $\mathbf r_{\perp}$ contains the components of $\mathbf r$
 in the chosen transverse basis.
-Equation~\ref{eq:astigmatic-beamlet-field} omits the longitudinal
+Eq.~\ref{eq:astigmatic-beamlet-field} omits the longitudinal
 optical-path phase and the chief-ray polarization vector.
 A continuous choice of the square-root branch is required to
 preserve the Gouy phase along propagation.
@@ -531,7 +531,7 @@ an exact representation of higher-order aberrations.
 Related methods underpin the commercial codes FRED and CODE V,
 as well as the open-source tools poke \cite{Ashcraft:2022, Ashcraft:2024}
 and IfoCAD \cite{Wanner:2017}. Table~\ref{tab:models} summarizes the 
-differences in capability between both Gaussian beamlet models.
+differences in capability between the two Gaussian beamlet models.
 
 Beyond single modes, the astigmatic beamlet model is also the foundation
 that makes \emph{beamlet decomposition} possible. Each beamlet stays a
@@ -546,7 +546,7 @@ decompositions of Section~\ref{sec:beamgroups}.
 cylindrical lens. Nine rays sample two orthogonal transverse axes:
 polarized chief (red), four waist (blue) and four divergence (green).
 The reconstructed envelope is elliptical and the beam acquires the
-astigmatism that the three-ray model of Fig.~\ref{fig:beamlet} can not
+astigmatism that the three-ray model of Fig.~\ref{fig:beamlet} cannot
 represent.}
 \label{fig:agbeamlet}
 \end{figure}
@@ -576,7 +576,7 @@ Sources that are not a single mode are built as \emph{beam groups}. For
 geometrical ray tracing, the \texttt{CollimatedSource} and
 \texttt{PointSource} are initialized as bundles with an equal-area
 Fibonacci-sampled spread for correct energy weighting. For beamlet
-tracing, decompositions of an arbitrary field into smaller beamlets is
+tracing, decomposition of an arbitrary field into smaller beamlets is
 used. The \texttt{GaussianBeamletDecomposition} tiles a larger
 $\mathrm{TEM}_{00}$ Gaussian with smaller beamlets for aberration
 capture. The \texttt{WavefrontBeamletDecomposition} imports a complex
@@ -584,7 +584,7 @@ E-field, e.g. a phase screen or an aperture mask, and maps the local
 phase gradient onto a propagation direction per beamlet through the
 Eikonal approximation. Because each beamlet is propagated by an exact
 ray trace and coherently summed at the detector, this reproduces
-diffraction from complex apertures \cite{Greynolds:2014, Ashcraft:2024}.
+diffraction from complex apertures \cite{Ashcraft:2024, Greynolds:2014}.
 
 \section{Available components}
 
@@ -640,7 +640,7 @@ IR filter and cover glass) modeled from a patent prescription
 
 A representative application assembles a Michelson interferometer from
 stock catalog parts. A \texttt{RightAnglePrismMirror} folds the beam of
-a HeNe laser into a 1" \texttt{CubeBeamsplitter}; two
+a HeNe laser into a 1-inch \texttt{CubeBeamsplitter}; two
 \texttt{RoundPlanoMirror}s return the probe and reference arms, and a
 $5\times5$~mm \texttt{Detector} records the recombined field
 (Fig.~\ref{fig:michelson}). Cage rods, lens tubes and kinematic mounts
@@ -769,7 +769,7 @@ Eq.~\ref{eq:fraunhofer} (blue, dashed).}
 \subsection{Performance notes}
 
 The computational cost of tracing a system is dominated by the
-intersection tests, which currently scale by $\mathcal{O}(n)$ with the number $n$ of
+intersection tests, which currently scale as $\mathcal{O}(n)$ with the number $n$ of
 intersectable objects. We have not yet benchmarked BMO against
 comparable software, since we still see room for improvement through
 more sophisticated tracing methods, e.g. sphere-of-influence testing.
@@ -813,13 +813,13 @@ ray paths.
 
 We thank the JuliaPhysics organization for hosting the package and
 Brian Guenter for valuable technical discussions. We thank Thorsten \"Osterle
-for proof-reading the manuscript. BeamletOptics.jl builds on the Julia language
+for proofreading the manuscript. BeamletOptics.jl builds on the Julia language
 \cite{bezanson2017julia} and the Makie visualization ecosystem
 \cite{Danisch2021}.
 
 \section*{Disclosures}
 
-During the preparation of this manuscript, the authors used \mbox{Opus 5
+During the preparation of this manuscript, the authors used \mbox{Claude Opus 5
 (Anthropic)} for grammar and spelling correction, formatting support,
 and consistency checks of notation, terminology, and cross-references.
 No results, figures or arguments were generated by AI. The authors
