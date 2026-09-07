@@ -23,8 +23,8 @@ model of classical lens design software.
 
 \textbf{BeamletOptics.jl} (BMO) is an open-source Julia package that
 aims to fill this gap. It couples a 3D geometrical ray tracer with the
-complex-ray (\emph{Gaussian beamlet}) formalism of Arnaud and Greynolds,
-so that the propagation of e.g. a laser beam through an arbitrarily
+Complex ray and Gaussian beamlet formalisms,
+so that the propagation of a laser beam through an arbitrarily
 aligned arrangement of lenses, mirrors, beamsplitters and detectors can
 be quickly investigated. Optical elements are modeled as closed volumes
 described by meshes or signed distance functions. The underlying solver
@@ -46,11 +46,11 @@ or a mount drifts by a micron? Commercial optical design suites such as
 Zemax OpticStudio, CODE~V or FRED can answer these questions, but they
 are costly and closed source. An open-source alternative is therefore
 attractive, and the Julia programming language \cite{bezanson2017julia}
-offers a variety of in-built features, such as speed, automatic
+offers a variety of in-built features, such as performance, automatic
 differentiation (AD) and easy access to multi-threading, that allow for
 elegant and rapid iteration of algorithms.
 
-BMO is developed at the Institute of Technical Physics (DLR), where one
+BMO is being developed at the Institute of Technical Physics (DLR), where one
 of the motivating applications is the design of heterodyne laser
 interferometers for two-color pressure measurement
 \cite{Uittenbosch2023}. In that context a \emph{digital twin} of the
@@ -74,14 +74,14 @@ built on constructive solid geometry. \texttt{ABCDMatrixOptics.jl}
 \texttt{WaveOpticsPropagation.jl} \cite{WaveOpticsPropagation} performs
 scalar diffraction propagation of sampled fields. What has been missing
 is a lightweight tool aimed specifically at \emph{prototyping}
-three-dimensional breadboard setups with e.g. laser sources: one that
+three-dimensional breadboard setups with laser sources: one that
 does not assume a fixed optical axis or surface order, lets the user
 move components interactively, and still returns the physical-optics
 quantities (waist, curvature, phase, interference) that matter for a
 coherent source.
 
-In Fig.~\ref{fig:openraman} the kind of setup is displayed that BMO
-targets. The OpenRAMAN spectrometer \cite{OpenRAMAN} is traced using a
+In Fig.~\ref{fig:openraman} the kind of setup that BMO targets is displayed. 
+The OpenRAMAN spectrometer \cite{OpenRAMAN} is traced using a
 laser beam model for the excitation path and geometrical ray tracing for
 the Raman scattering path.
 
@@ -280,8 +280,8 @@ without modifying the solver.
 
 \begin{figure}[t]
 \centerline{\includegraphics[width=\columnwidth]{figures/iir_loop.pdf}}
-\caption{The Intersect--Interact--Repeat loop. The inner black loop is
-the per-ray trace; the outer red loop is the time-domain solution, in
+\caption{The Intersect--Interact--Repeat loop. The inner black loop represents
+the static ray trace; the outer red loop is the time-domain solution, in
 which component alignment is updated between successive
 \texttt{solve\_system!} calls. Blue and green annotations mark the two
 extension points: the geometry backend supplying intersections and
@@ -312,7 +312,7 @@ local geometry alone is possible, but tends to require a good deal of
 special-case code. Handing the solver a hint is how BMO resolves this
 currently. The hint travels back to the solver as part of the
 interaction returned by \texttt{interact3d}, so supplying a correct one
-is a responsibility of whoever implements such a composite element.
+is the responsibility of whoever implements such a composite element.
 Systems without mutable elements can be marked \texttt{StaticSystem} for
 more aggressive compiler specialization, and independent rays are traced
 in parallel on the CPU.
@@ -468,7 +468,7 @@ Beyond single modes, the astigmatic beamlet is also the building block
 that makes \emph{beamlet decomposition} possible. Each beamlet stays a
 valid, narrow solution under arbitrary tilt, astigmatism and off-axis
 propagation, so an arbitrary wavefront can be expanded into a set of
-them and propagated by ordinary ray tracing. This the basis of the field
+them and propagated by ordinary ray tracing. This is the basis of the field
 decompositions of Section~\ref{sec:beamgroups}.
 
 \begin{figure}[h]
@@ -523,7 +523,7 @@ BMO ships a tested library of breadboard components:
 
 \begin{enumerate}
   \item \emph{Mirrors.} Plano mirrors with square, rectangular or round
-apertures, plus concave spherical, right-angle-prism and retroreflector
+apertures, plus concave spherical and retroreflector
 variants.
   \item \emph{Refractive optics.} Spherical and even-aspheric singlets
 through the \texttt{SphericalLens} and \texttt{Lens} constructors,
@@ -743,8 +743,8 @@ ray paths.
 \section*{Acknowledgements}
 
 We thank the JuliaPhysics organization for hosting the package and
-Brian Guenter for valuable technical discussions.
-BeamletOptics.jl builds on the Julia language
+Brian Guenter for valuable technical discussions. We thank Thorsten \"Osterle
+for proof-reading the manuscript. BeamletOptics.jl builds on the Julia language
 \cite{bezanson2017julia} and the Makie visualization ecosystem
 \cite{Danisch2021}.
 
