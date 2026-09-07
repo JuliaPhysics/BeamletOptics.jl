@@ -40,6 +40,7 @@ snoop_compile/
 !paper/**/*.png
 !paper/**/*.gif
 !paper/**/*.svg
+!paper/juliagraphs.png
 
 # figures/iir_loop.pdf and logojuliacon.pdf are build INPUTS, not output,
 # and must stay tracked -- so never add a blanket paper/*.pdf rule here.
