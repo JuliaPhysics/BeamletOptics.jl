@@ -144,6 +144,54 @@ const mm = 1e-3
         @test test_doublet(707e-9, 143.68mm, 0)
         @test test_doublet(1064e-9, 143.68mm, +7.466e-4)
     end
+
+    @testset "Testing doublet lenses ray and beam type compats." begin
+        # Every ray/beam type the solver can produce must trace through a DoubletLens.
+        # Regression: the chief ray of an AstigmaticGaussianBeamlet is a PolarizedRay,
+        # which is not a subtype of Ray, so the doublet interact3d must accept AbstractRay.
+        n1 = λ -> 1.5
+        n2 = λ -> 1.7
+        λ = 1e-6
+        w0 = 1mm
+        pos = [0.0, 0, 0]
+        dir = [0.0, 1, 0]
+        support = [1.0, 0, 0]
+        n_seq = [1, n1(λ), n2(λ), 1]
+
+        function doublet_system()
+            dl = SphericalDoubletLens(33.3mm, -22.3mm, -291.1mm, 9mm, 2.5mm, 25.4mm, n1, n2)
+            translate3d!(dl, [0, 50mm, 0])
+            return System([dl])
+        end
+
+        @testset "Beam{Ray}" begin
+            beam = Beam(pos, dir, λ)
+            solve_system!(doublet_system(), beam)
+            @test length(rays(beam)) == 4
+            @test BMO.refractive_index.(rays(beam)) == n_seq
+        end
+
+        @testset "Beam{PolarizedRay}" begin
+            beam = Beam(pos, dir, λ, [1.0, 0, 0])
+            solve_system!(doublet_system(), beam)
+            @test length(rays(beam)) == 4
+            @test BMO.refractive_index.(rays(beam)) == n_seq
+        end
+
+        @testset "GaussianBeamlet" begin
+            gauss = GaussianBeamlet(pos, dir, λ, w0; support)
+            solve_system!(doublet_system(), gauss)
+            @test length(rays(gauss.chief)) == 4
+            @test BMO.refractive_index.(rays(gauss.chief)) == n_seq
+        end
+
+        @testset "AstigmaticGaussianBeamlet" begin
+            agb = AstigmaticGaussianBeamlet(pos, dir, λ, w0; support)
+            solve_system!(doublet_system(), agb)
+            @test length(rays(agb.c)) == 4
+            @test BMO.refractive_index.(rays(agb.c)) == n_seq
+        end
+    end
 end
 
 end # MODULE
