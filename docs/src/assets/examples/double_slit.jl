@@ -1,21 +1,5 @@
 using BeamletOptics, GLMakie
 
-function get_view(ls::LScene)
-    cam = ls.scene.camera_controls
-    eye = cam.eyeposition[]
-    lookat = cam.lookat[]
-    up = cam.upvector[]
-    return eye, lookat, up
-end
-
-function set_view(ls::LScene, eye, lookat, up)
-    cam = ls.scene.camera_controls
-    cam.eyeposition[] = Vec3f(eye...)
-    cam.lookat[] = Vec3f(lookat...)
-    cam.upvector[] = Vec3f(up...)
-    update_cam!(ls.scene, cam)
-end
-
 # Parameters
 λ = 633e-9          # 633 nm (HeNe Laser)
 a = 10e-6           # Slit width (10 µm)

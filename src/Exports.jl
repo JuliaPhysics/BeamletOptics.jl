@@ -59,4 +59,4 @@ export Retroreflector, get_invariant_threshold, set_invariant_threshold!,
     get_default_wavelength, get_default_waist, get_default_power
 
 # render
-export render!
+export render!, get_view, set_view, hide_axis, set_orthographic, arrow!, render_lcs!, look_at!
