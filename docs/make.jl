@@ -35,6 +35,7 @@ makedocs(;
                 "Beam expander"             => joinpath("tutorials", "expander.md"),
                 "Miniature microscope"      => joinpath("tutorials", "microscope.md"),
                 "Michelson interferometer"  => joinpath("tutorials", "michelson.md"),
+                "Raman spectroscopy"        => joinpath("tutorials", "openraman.md"),
             ],
             "Examples" => Any[
                 "Spherical lenses"          => joinpath("examples", "spherical_lenses.md"),
