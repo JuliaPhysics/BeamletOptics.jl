@@ -4,8 +4,6 @@ GLMakie.activate!(; ssao=true)
 
 const BMO = BeamletOptics
 
-include(joinpath(@__DIR__, "..", "render_utils.jl"))
-
 distance = 20e-2
 factor = 1.2
 RoC = distance/2 * factor

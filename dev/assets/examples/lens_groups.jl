@@ -6,8 +6,6 @@ const BMO = BeamletOptics
 const mm = 1e-3
 const cm = 10mm
 
-include(joinpath(@__DIR__, "..", "render_utils.jl"))
-
 ## focus group
 l1 = SphericalDoubletLens(103.4371e-3, 61.14925e-3, -603.2959e-3, 1.5e-3, 10.03975e-3, 55e-3, 1.963000, 1.603112)
 l2 = SphericalLens(49.97282e-3, 168.2416e-3, 8.622723e-3, 52e-3, 1.603001)

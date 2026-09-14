@@ -5,8 +5,6 @@ GLMakie.activate!(; ssao=true)
 const BMO = BeamletOptics
 const mm = 1e-3
 
-include(joinpath(@__DIR__, "..", "render_utils.jl"))
-
 ##
 # define spherical lenses
 l1 = SphericalLens(48.88e-3, 182.96e-3, 8.89e-3, 52.3e-3, λ -> 1.62286)
