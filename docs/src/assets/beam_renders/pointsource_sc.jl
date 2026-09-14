@@ -4,8 +4,6 @@ GLMakie.activate!(; ssao=true)
 
 const BMO = BeamletOptics
 
-include(joinpath(@__DIR__, "..", "render_utils.jl"))
-
 ## point source
 ps = PointSource([0,0,0], [0,1,0], deg2rad(10); num_rings=3, num_rays=200)
 

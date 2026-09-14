@@ -82,9 +82,41 @@ const BMO = BeamletOptics
             @test length(unique(directions)) == length(directions)
         end
 
+        @testset "Testing basis kwarg" begin
+            dir_n = normalize(dir)
+            # a basis is only defined up to its component normal to dir
+            b0 = BMO.normal3d(dir_n)
+            rotated = PointSource(pos, dir, alpha, lambda; num_rays, num_rings,
+                basis = BMO.rotate3d(dir_n, deg2rad(30)) * b0)
+
+            dirs_default = BMO.direction.(first.(BMO.rays.(BMO.beams(source))))
+            dirs_rotated = BMO.direction.(first.(BMO.rays.(BMO.beams(rotated))))
+
+            # rotating the basis spins the fan about its own axis: the polar angle
+            # distribution is invariant, the individual ray directions are not
+            angles_default = sort(round.(BMO.angle3d.(Ref(dir), dirs_default), digits=11))
+            angles_rotated = sort(round.(BMO.angle3d.(Ref(dir), dirs_rotated), digits=11))
+            @test angles_default ≈ angles_rotated
+            @test !all(dirs_default .≈ dirs_rotated)
+
+            # the default is reproducible, and passing the default basis reproduces it
+            @test all(dirs_default .≈ BMO.direction.(first.(BMO.rays.(BMO.beams(
+                PointSource(pos, dir, alpha, lambda; num_rays, num_rings))))))
+            @test all(dirs_default .≈ BMO.direction.(first.(BMO.rays.(BMO.beams(
+                PointSource(pos, dir, alpha, lambda; num_rays, num_rings, basis = b0))))))
+
+            # a basis component along dir is projected out, so it changes nothing
+            @test all(dirs_default .≈ BMO.direction.(first.(BMO.rays.(BMO.beams(
+                PointSource(pos, dir, alpha, lambda; num_rays, num_rings,
+                    basis = b0 + 5 * dir_n))))))
+        end
+
         @testset "Testing throw errors" begin
             @test_throws ErrorException PointSource(pos, dir, 1.1*π, lambda; num_rays, num_rings)
             @test_throws ErrorException PointSource(pos, dir, alpha, lambda; num_rays=100, num_rings=10)
+            # basis parallel to dir has no component in the sampling plane
+            @test_throws ErrorException PointSource(pos, dir, alpha, lambda; num_rays, num_rings,
+                basis = dir)
         end
     end
 
@@ -131,8 +163,87 @@ const BMO = BeamletOptics
             @test length(unique(positions)) == length(positions)
         end
 
+        @testset "Testing basis kwarg" begin
+            b0 = BMO.normal3d(dir)
+            rotated = CollimatedSource(pos, dir, diameter; num_rays, num_rings,
+                basis = BMO.rotate3d(dir, deg2rad(30)) * b0)
+
+            pos_default = position.(first.(BMO.rays.(BMO.beams(source))))
+            pos_rotated = position.(first.(BMO.rays.(BMO.beams(rotated))))
+
+            # rotating the basis spins the pupil pattern about its own axis: the radial
+            # distribution is invariant, the individual ray positions are not
+            radii_default = sort(round.(norm.(pos_default .- Ref(pos)), digits=11))
+            radii_rotated = sort(round.(norm.(pos_rotated .- Ref(pos)), digits=11))
+            @test radii_default ≈ radii_rotated
+            @test !all(pos_default .≈ pos_rotated)
+
+            # the default is reproducible, and passing the default basis reproduces it
+            @test all(pos_default .≈ position.(first.(BMO.rays.(BMO.beams(
+                CollimatedSource(pos, dir, diameter; num_rays, num_rings))))))
+            @test all(pos_default .≈ position.(first.(BMO.rays.(BMO.beams(
+                CollimatedSource(pos, dir, diameter; num_rays, num_rings, basis = b0))))))
+
+            # a basis component along dir is projected out, so it changes nothing
+            @test all(pos_default .≈ position.(first.(BMO.rays.(BMO.beams(
+                CollimatedSource(pos, dir, diameter; num_rays, num_rings,
+                    basis = b0 + 5 * dir))))))
+        end
+
+        @testset "Testing non-unit dir" begin
+            # `rotate3d` is only a rotation for a unit-length axis, so a non-unit `dir`
+            # used to scale `helper` on every step and smear the rings into a spiral
+            scaled = CollimatedSource(pos, 3dir, diameter; num_rays, num_rings)
+            radii = norm.(position.(first.(BMO.rays.(BMO.beams(scaled)))) .- Ref(pos))
+            @test maximum(radii) ≈ diameter / 2
+            @test length(unique(round.(radii, digits=11))) == num_rings
+            @test BMO.direction(scaled) ≈ normalize(dir)
+        end
+
         @testset "Testing throw errors" begin
             @test_throws ErrorException CollimatedSource(pos, dir, diameter; num_rays=100, num_rings=10)
+            # basis parallel to dir has no component in the pupil plane
+            @test_throws ErrorException CollimatedSource(pos, dir, diameter; num_rays, num_rings,
+                basis = dir)
+        end
+    end
+
+    @testset "Uniform disc source" begin
+        # define parameters
+        lambda = 486.0e-9
+        pos = [0, -0.5, 0]
+        dir = [0, 1, 1]
+        diameter = 2BMO.inch
+        num_rays = 500
+
+        source = UniformDiscSource(pos, dir, diameter, lambda; num_rays)
+
+        @testset "Testing basis kwarg" begin
+            dir_n = normalize(dir)
+            b0 = BMO.normal3d(dir_n)
+            rotated = UniformDiscSource(pos, dir, diameter, lambda; num_rays,
+                basis = BMO.rotate3d(dir_n, deg2rad(30)) * b0)
+
+            pos_default = position.(first.(BMO.rays.(BMO.beams(source))))
+            pos_rotated = position.(first.(BMO.rays.(BMO.beams(rotated))))
+
+            # rotating the basis spins the sunflower pattern about its own axis: the
+            # equal-area radial distribution is invariant, the ray positions are not
+            radii_default = sort(round.(norm.(pos_default .- Ref(pos)), digits=11))
+            radii_rotated = sort(round.(norm.(pos_rotated .- Ref(pos)), digits=11))
+            @test radii_default ≈ radii_rotated
+            @test !all(pos_default .≈ pos_rotated)
+            # the rotated pattern stays in the pupil plane
+            @test all(isapprox.(dot.(pos_rotated .- Ref(pos), Ref(dir_n)), 0, atol = 1e-12))
+
+            # the default is reproducible, and passing the default basis reproduces it
+            @test all(pos_default .≈ position.(first.(BMO.rays.(BMO.beams(
+                UniformDiscSource(pos, dir, diameter, lambda; num_rays, basis = b0))))))
+        end
+
+        @testset "Testing throw errors" begin
+            @test_throws ErrorException UniformDiscSource(pos, dir, diameter, lambda;
+                num_rays, basis = dir)
         end
     end
 end

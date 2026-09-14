@@ -6,8 +6,6 @@ const BMO = BeamletOptics
 const mm = 1e-3
 const cm = 10mm
 
-include(joinpath(@__DIR__, "..", "render_utils.jl"))
-
 ##
 λs = [488e-9, 707e-9, 1064e-9]
 

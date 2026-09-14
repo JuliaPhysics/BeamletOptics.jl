@@ -1,11 +1,3 @@
-abstract type AbstractDoubletRefractiveOptic{
-    T,
-    F <: AbstractShape{T},
-    B <: AbstractShape{T},
-    N1 <: RefractiveIndex,
-    N2 <: RefractiveIndex
-} <: AbstractRefractiveOptic{T, N1} end
-
 """
     DoubletLens
 
@@ -23,7 +15,7 @@ See also [`SphericalDoubletLens`](@ref).
     This component type strongly assumes that both lenses are mounted fully flush with respect to each other. 
     Gaps between the components might lead to incorrect results.
 """
-struct DoubletLens{T, F<:AbstractShape{T}, B<:AbstractShape{T}, N1<:RefractiveIndex, N2<:RefractiveIndex} <: AbstractDoubletRefractiveOptic{T, F, B, N1, N2}
+struct DoubletLens{T, F<:AbstractShape{T}, B<:AbstractShape{T}, N1<:RefractiveIndex, N2<:RefractiveIndex} <: AbstractObject{T}
     front::Lens{T, F, N1}
     back::Lens{T, B, N2}
 end
@@ -63,7 +55,7 @@ function SphericalDoubletLens(r1, r2, r3, l1, l2, d, n1, n2)
     return DoubletLens(front, back)
 end
 
-function interact3d(system::AbstractSystem, dl::DoubletLens, beam::Beam{T, R}, ray::R) where {T <: Real, R <: Ray{T}}
+function interact3d(system::AbstractSystem, dl::DoubletLens, beam::Beam{T, R}, ray::R) where {T <: Real, R <: AbstractRay{T}}
     # Interaction logic: if front is hit, hint to back and vice versa
     if shape(intersection(ray)) === shape(dl.front)
         i = interact3d(system, dl.front, beam, ray)

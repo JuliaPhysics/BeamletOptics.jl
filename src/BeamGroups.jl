@@ -1,4 +1,29 @@
 """
+    _sampling_basis(dir, basis, T)
+
+Returns the unit-length reference vector that seeds the azimuthal sampling of a beam group.
+`dir` must already be normalized.
+
+If `basis` is `nothing`, a vector normal to `dir` is picked deterministically via
+[`normal3d`](@ref). Otherwise `basis` is projected into the plane normal to `dir`, which
+lets a caller rotate the sampling pattern of a source about its own axis.
+
+Throws if `basis` has no significant component in that plane, i.e. if it is zero or
+parallel to `dir`. The test is relative to `norm(basis)` because projecting an
+unnormalized vector leaves a residual that scales with its length; an absolute
+tolerance would let a parallel `basis` through and yield `NaN` sampling.
+"""
+_sampling_basis(dir::AbstractVector, ::Nothing, ::Type{<:Real}) = normal3d(dir)
+
+function _sampling_basis(dir::AbstractVector, basis::AbstractVector, ::Type{T}) where {T <: Real}
+    b1 = basis - dot(basis, dir) * dir
+    if norm(b1) ≤ sqrt(eps(T)) * norm(basis)
+        throw(ErrorException("Source `basis` must not be zero or parallel to `dir`"))
+    end
+    return normalize(b1)
+end
+
+"""
     PointSource <: AbstractBeamGroup
 
 Represents a cone of [`Beam`](@ref)s being emitted from a single point in space.
@@ -20,7 +45,7 @@ end
 numerical_aperture(ps::PointSource) = ps.NA
 
 """
-    PointSource(pos, dir, θ, λ; num_rings, num_rays)
+    PointSource(pos, dir, θ, λ; num_rings, num_rays, basis)
 
 Spawns a point source of [`Beam`](@ref)s at the specified `pos`ition and `dir`ection.
 The point source is modelled as a collection of concentric beam fans centered around the center beam.
@@ -44,9 +69,13 @@ The following inputs and arguments can be used to configure the [`PointSource`](
 
 - `num_rings`: number of concentric beam rings, default is 10
 - `num_rays`: total number of rays in the source, default is 100x num_rings
+- `basis`: Optional reference vector (e.g. `[1,0,0]`) to define the starting azimuthal angle for the source rings.
 
-!!! warning
-    The orthogonal basis vectors for the beam generation are generated randomly.
+!!! info "Reproducible sampling"
+    If no `basis` is passed, the orthogonal basis vectors are derived from `dir` deterministically,
+    so two sources sharing the same `dir`, `θ`, `num_rings` and `num_rays` sample exactly the same
+    ray directions. Pass a `basis` to rotate the azimuthal sampling of a source about its own axis,
+    e.g. to interleave several otherwise identical sources.
 """
 function PointSource(
         pos::AbstractArray{P},
@@ -54,7 +83,8 @@ function PointSource(
         θ::H,
         λ::L = 1e-6;
         num_rings::Int = 10,
-        num_rays::Int = 100 * num_rings
+        num_rays::Int = 100 * num_rings,
+        basis::Union{Nothing, AbstractVector} = nothing
 ) where {P <: Real, D <: Real, H <: Real, L <: Real}
     T = promote_type(P, D, H, L)
     if num_rays < num_rings * 20
@@ -65,7 +95,7 @@ function PointSource(
     end
     # define basis vectors
     dir = normalize(dir)
-    b1 = normal3d(dir) # random seed
+    b1 = _sampling_basis(dir, basis, T)
     b2 = normal3d(dir, b1)
     θ_NA = LinRange(0, θ, num_rings)
     # define buffer
@@ -121,7 +151,7 @@ end
 diameter(cs::CollimatedSource) = cs.diameter
 
 """
-    CollimatedSource(pos, dir, diameter, λ; num_rings, num_rays)
+    CollimatedSource(pos, dir, diameter, λ; num_rings, num_rays, basis)
 
 Spawns a bundle of collimated [`Beam`](@ref)s at the specified `pos`ition and `dir`ection.
 The source is modelled as a ring of concentric beam rings around the center beam.
@@ -145,9 +175,14 @@ The following inputs and arguments can be used to configure the [`CollimatedSour
 
 - `num_rings`: number of concentric beam rings, default is 10
 - `num_rays`: total number of rays in the source, default is 100x num_rings
+- `basis`: Optional reference vector (e.g. `[1,0,0]`) to define the starting azimuthal angle for the beam rings.
 
-!!! warning
-    The orthogonal basis vectors for the beam generation are generated randomly.
+!!! info "Reproducible sampling"
+    If no `basis` is passed, the orthogonal basis vectors spanning the pupil plane are derived
+    from `dir` deterministically, so two sources sharing the same `dir`, `diameter`,
+    `num_rings` and `num_rays` sample exactly the same ray positions. Pass a `basis` to rotate
+    the azimuthal sampling of a source about its own axis, e.g. to interleave several
+    otherwise identical sources.
 """
 function CollimatedSource(
         pos::AbstractArray{P},
@@ -155,18 +190,21 @@ function CollimatedSource(
         diameter::D2,
         λ::L = 1e-6;
         num_rings::Int = 10,
-        num_rays::Int = 100 * num_rings
+        num_rays::Int = 100 * num_rings,
+        basis::Union{Nothing, AbstractVector} = nothing
 ) where {P <: Real, D1 <: Real, D2 <: Real, L <: Real}
     T = promote_type(P, D1, D2, L)
     if num_rays < num_rings * 20
         throw(ErrorException("No. of rays should be atleast 20x no. of rings (passed: $num_rays, req: $(num_rings*20))"))
     end
+    # ensure normalization
+    dir = normalize(dir)
     # define buffer
     beams = Vector{Beam{T, Ray{T}}}()
     push!(beams, Beam(Ray(pos, dir, λ)))
     num_rays -= 1
     # setup concentric beam ring radii
-    b1 = normal3d(dir) # random seed
+    b1 = _sampling_basis(dir, basis, T)
     r_max = diameter / 2
     radii = LinRange(0, r_max, num_rings)[2:end]
     # calculate total accumulated circumference of all rings
@@ -195,7 +233,7 @@ function CollimatedSource(
 end
 
 """
-    UniformDiscSource(pos, dir, diameter, λ; num_rays=1_000)
+    UniformDiscSource(pos, dir, diameter, λ; num_rays=1_000, basis)
 
 Generates a ray fan with *equal area per ray* across a circular pupil
 using the deterministic sunflower (Fibonacci) pattern.
@@ -218,6 +256,13 @@ The following inputs and arguments can be used to configure the underlying [`Col
 ## Keyword Arguments
 
 - `num_rays=1000`: total number of rays in the source
+- `basis`: Optional reference vector (e.g. `[1,0,0]`) to define the starting azimuthal angle of the sunflower pattern.
+
+!!! info "Reproducible sampling"
+    If no `basis` is passed, the orthogonal basis vectors spanning the pupil plane are derived
+    from `dir` deterministically, so two sources sharing the same `dir`, `diameter` and
+    `num_rays` sample exactly the same ray positions. Pass a `basis` to rotate the sunflower
+    pattern about its own axis, e.g. to interleave several otherwise identical sources.
 """
 function UniformDiscSource(
         pos::AbstractArray{P},
@@ -225,15 +270,17 @@ function UniformDiscSource(
         diameter::D2,
         λ::L = 1e-6;
         # kwargs
-        num_rays::Int = 1_000
+        num_rays::Int = 1_000,
+        basis::Union{Nothing, AbstractVector} = nothing
 ) where {P <: Real, D1 <: Real, D2 <: Real, L <: Real}
     T = promote_type(P, D1, D2, L)
     R = diameter / 2
     φ0 = 2π / (1 + √5)         # golden angle
     beams = Vector{Beam{T, Ray{T}}}(undef, num_rays)
+    dir = normalize(dir)
     # orthogonal basis in the pupil plane
-    e1 = normal3d(dir)
-    e2 = normalize(cross(dir, e1))
+    e1 = _sampling_basis(dir, basis, T)
+    e2 = normal3d(dir, e1)
     for k in 0:(num_rays - 1)
         ρ = √((k + 0.5) / num_rays)     # equal-area radius
         φ = k * φ0
@@ -435,6 +482,12 @@ adjacent beamlets in the grid.
 - `rng`: Random number generator to use for `randomize_axes`.
 - `P0`: Total power of the spherical source in [W].
 - `E0`: Optional Jones vector defining the polarization and phase of the spherical wave.
+
+!!! info "Reproducible sampling"
+    If no `basis` is passed, the orthogonal basis vectors are derived from `dir` deterministically,
+    so two sources sharing the same arguments sample exactly the same beamlet directions. Pass a
+    `basis` to rotate the azimuthal sampling of a source about its own axis. A `basis` that is
+    zero or parallel to `dir` throws.
 """
 function SphericalGaussianBeamletSource(
         pos::AbstractArray{P},
@@ -465,7 +518,7 @@ function SphericalGaussianBeamletSource(
     w0s = λ / (π * overlap * Δθ)
 
     dir_n = normalize(dir)
-    b1 = isnothing(basis) ? normal3d(dir_n) : normalize(basis - dot(basis, dir_n) * dir_n)
+    b1 = _sampling_basis(dir_n, basis, T)
     b2 = normalize(cross(dir_n, b1))
     θ_NA = LinRange(0, θ, num_rings)
 
@@ -536,6 +589,12 @@ such as tapered amplifiers or edge-emitting laser diodes.
 - `rng`: Random number generator to use for `randomize_axes`.
 - `P0`: Total power of the source in [W].
 - `E0`: Optional Jones vector defining the polarization and phase of the wave.
+
+!!! info "Reproducible sampling"
+    If no `basis` is passed, the orthogonal basis vectors are derived from `dir` deterministically,
+    so two sources sharing the same arguments sample exactly the same beamlet directions. Pass a
+    `basis` to rotate the azimuthal sampling of a source about its own axis. A `basis` that is
+    zero or parallel to `dir` throws.
 """
 function EllipticalGaussianBeamletSource(
         pos::AbstractArray{P},
@@ -567,7 +626,7 @@ function EllipticalGaussianBeamletSource(
     w0s = λ / (π * overlap * Δθ)
 
     dir_n = normalize(dir)
-    b1 = isnothing(basis) ? normal3d(dir_n) : normalize(basis - dot(basis, dir_n) * dir_n)
+    b1 = _sampling_basis(dir_n, basis, T)
     b2 = normalize(cross(dir_n, b1))
     
     # We use tangent space to define the elliptical rings
@@ -775,7 +834,12 @@ function WavefrontBeamletDecomposition(
                 phi = 2π * rand(rng)
                 local_support = base_s * cos(phi) + ortho_s * sin(phi)
             else
-                local_support = nothing
+                # Align the principal axes with the sampling basis so that
+                # w0s_x/w0s_y belong to the e1_v/e2_v grid axes as intended.
+                # Without this the constructor falls back to normal3d(local_dir),
+                # which is unrelated to `basis` and transposes the two waists.
+                s1 = cross(local_dir, e2_v)
+                local_support = norm(s1) < 1e-6 ? nothing : normalize(s1)
             end
 
             b = AstigmaticGaussianBeamlet(pos, local_dir, λ, w0s_x, w0s_y; E0 = E0_complex, support = local_support)

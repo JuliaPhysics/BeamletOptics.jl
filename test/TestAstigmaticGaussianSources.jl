@@ -55,6 +55,26 @@ const nm = 1e-9
         @test length(bg) == 500
         # Check they all originate from pos
         @test all(BMO.position(b) ≈ pos for b in bg)
+
+        @testset "basis kwarg" begin
+            dir_n = normalize(dir)
+            b0 = BMO.normal3d(dir_n)
+            rotated = SphericalGaussianBeamletSource(pos, dir, θ, λ; num_rings = 5,
+                num_rays = 500, basis = BMO.rotate3d(dir_n, deg2rad(30)) * b0)
+
+            dirs = [BMO.direction(b) for b in bg]
+            dirs_rot = [BMO.direction(b) for b in rotated]
+            # spinning the basis about dir leaves the polar angle distribution intact
+            @test sort(round.(BMO.angle3d.(Ref(dir_n), dirs), digits = 11)) ≈
+                  sort(round.(BMO.angle3d.(Ref(dir_n), dirs_rot), digits = 11))
+            @test !all(dirs .≈ dirs_rot)
+            # passing the default basis reproduces the default
+            @test all(dirs .≈ [BMO.direction(b) for b in SphericalGaussianBeamletSource(
+                pos, dir, θ, λ; num_rings = 5, num_rays = 500, basis = b0)])
+            # a degenerate basis would silently yield NaN directions, so it throws
+            @test_throws ErrorException SphericalGaussianBeamletSource(pos, dir, θ, λ;
+                num_rings = 5, num_rays = 500, basis = dir)
+        end
     end
 
     @testset "EllipticalGaussianBeamletSource" begin
@@ -78,6 +98,23 @@ const nm = 1e-9
             u = dot(d, b1) / dot(d, dir_n)
             v = dot(d, b2) / dot(d, dir_n)
             @test (u / tan(θ_x))^2 + (v / tan(θ_y))^2 <= 1.05
+        end
+
+        @testset "basis kwarg" begin
+            b0 = BMO.normal3d(dir_n)
+            # the elliptical cone is not rotationally symmetric, so a rotated basis
+            # genuinely reorients the pattern rather than just relabelling it
+            rotated = EllipticalGaussianBeamletSource(pos, dir, θ_x, θ_y, λ; num_rings = 5,
+                num_rays = 500, basis = BMO.rotate3d(dir_n, deg2rad(30)) * b0)
+            dirs = [BMO.direction(b) for b in bg]
+            dirs_rot = [BMO.direction(b) for b in rotated]
+            @test !all(dirs .≈ dirs_rot)
+            # passing the default basis reproduces the default
+            @test all(dirs .≈ [BMO.direction(b) for b in EllipticalGaussianBeamletSource(
+                pos, dir, θ_x, θ_y, λ; num_rings = 5, num_rays = 500, basis = b0)])
+            # a degenerate basis would silently yield NaN directions, so it throws
+            @test_throws ErrorException EllipticalGaussianBeamletSource(pos, dir, θ_x, θ_y, λ;
+                num_rings = 5, num_rays = 500, basis = dir)
         end
     end
 

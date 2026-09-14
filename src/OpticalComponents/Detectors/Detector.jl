@@ -268,8 +268,8 @@ Spawns a quadratic [`Detector`](@ref) surface that is aligned with the neg. y-ax
 The detector edge length can be configured via `edge_length`.
 Additionally, continued tracing can be configured via the `stop` flag where
 
-- `true` indicates continued tracing
-- `false` stops the incoming beams as with any hard target
+- `false` indicates continued tracing
+- `true` stops the incoming beams as with any hard target
 """
 function Detector(edge_length::Real, stop::Bool = true)
     shape = QuadraticFlatMesh(edge_length)
@@ -310,11 +310,11 @@ function interact3d(::AbstractSystem, d::Detector, beam::Beam{T, R},
         # Stop solver (hard target)
         return nothing
     else
-        # Continue tracing with hit pos. as starting
+        # Continue tracing with hit point as starting position
         return BeamInteraction{T, R}(
             nothing,
             Ray{T}(
-                position(hit),
+                hit_point(hit),
                 direction(hit),
                 nothing,
                 wavelength(ray),
@@ -335,11 +335,11 @@ function interact3d(::AbstractSystem, d::Detector, beam::Beam{T, R},
         # Stop solver (hard target)
         return nothing
     else
-        # Continue tracing with hit pos. as starting
+        # Continue tracing with hit point as starting position
         return BeamInteraction{T, R}(
             nothing,
             PolarizedRay{T}(
-                position(hit),
+                hit_point(hit),
                 direction(hit),
                 nothing,
                 wavelength(ray),

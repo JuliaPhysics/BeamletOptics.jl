@@ -1,7 +1,7 @@
 """
     RetroMesh(scale::Real; T = Float64)
 
-Creates an open tetrahedral [Mesh](@ref) with edges derived from the vertices of a unit cube.
+Creates an open tetrahedral [`Mesh`](@ref) with edges derived from the vertices of a unit cube.
 Can be scaled with a `scale` factor. The data type for the vertices and internal computations
 can be adjusted using `T` (default: Float64).
 """

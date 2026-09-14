@@ -33,8 +33,31 @@ const mm = 1e-3
     @test minimum(zs)*1000 ≈ 0.09707    atol = 1e-3
     @test maximum(zs)*1000 ≈ 3.55978    atol = 1e-3
     # test empty! fct.
-    empty!(pd)    
+    empty!(pd)
     @test isnothing(BMO.hits(pd))
+end
+
+@testset "Testing continued tracing (stop = false)" begin
+    # Regression test: interact3d used to resume the next segment at the
+    # incoming ray's origin instead of the actual hit point, which made
+    # `stop = false` re-hit the same detector forever (bounded only by r_max).
+    d1 = Detector(20mm, false)
+    d2 = Detector(20mm, true)
+    translate_to3d!(d1, [0.0, 0.10, 0.0])
+    translate_to3d!(d2, [0.0, 0.20, 0.0])
+    system = System([d1, d2])
+
+    beam = Beam(Ray([0.0, 0.0, 0.0], [0.0, 1.0, 0.0]))
+    solve_system!(system, beam)
+
+    @test length(BMO.hits(d1)) == 1
+    @test length(BMO.hits(d2)) == 1
+    @test length(rays(beam)) == 2
+
+    hit = BMO.hits(d1)[1]
+    @test BMO.hit_point(hit) ≈ [0.0, 0.10, 0.0]
+    # the continued segment must start at the hit point, not the incoming ray's origin
+    @test position(rays(beam)[2]) ≈ [0.0, 0.10, 0.0]
 end
 
 @testset "Testing point spread function" begin

@@ -6,8 +6,6 @@ const BMO = BeamletOptics
 
 const mm = 1e-3
 
-include(joinpath(@__DIR__, "..", "render_utils.jl"))
-
 ##
 c_view = [
   0.605459    0.783477  -0.139944  -0.0298959

@@ -1,12 +1,14 @@
 module BeamletOpticsMakieExt
 
 using BeamletOptics
-import BeamletOptics: render!, RenderException, _RenderTypes, get_view, set_view, hide_axis
+import BeamletOptics: render!, RenderException, _RenderTypes, get_view, set_view, hide_axis,
+                       set_orthographic, arrow!, render_lcs!, look_at!
 
 const BMO = BeamletOptics
 
-using Makie: Axis3, LScene, mesh!, surface!, lines!, RGBf, RGBAf, scatter!
-using GeometryBasics: Point2, Point3
+using Makie: Axis3, LScene, mesh!, surface!, lines!, RGBf, RGBAf, scatter!, text!,
+             update_cam!, cameracontrols, arrows3d!
+using GeometryBasics: Point2, Point3, Vec3f
 using AbstractTrees: PreOrderDFS
 using MarchingCubes: MC, march
 using LinearAlgebra: dot, cross, normalize
@@ -53,37 +55,6 @@ include("RenderObjects.jl")
 include("RenderLenses.jl")
 include("RenderCylinderLenses.jl")
 include("RenderPresets.jl")
-
-"""
-    get_view(ls::LScene)
-
-Returns the current `eyeposition`, `lookat` and `upvector` of the scene `ls`.
-"""
-function get_view(ls::LScene)
-    cam = ls.scene.camera_controls
-    eye = cam.eyeposition[]
-    lookat = cam.lookat[]
-    up = cam.upvector[]
-    return eye, lookat, up
-end
-
-"""
-    set_view(ls::LScene, eye, lookat, up)
-
-Sets the current `eyeposition`, `lookat` and `upvector` of the scene `ls`.
-"""
-function set_view(ls::LScene, eye, lookat, up)
-    cam = ls.scene.camera_controls
-    cam.eyeposition[] = eye
-    cam.lookat[] = lookat
-    cam.upvector[] = up
-end
-
-"""
-    hide_axis(ls::LScene, hide::Bool=true)
-
-Hides the axis markers in the `LScene`. Can be toggled via `hide`.
-"""
-hide_axis(ls::LScene, hide::Bool = true) = (ls.show_axis[] = !hide)
+include("RenderCamera.jl")
 
 end

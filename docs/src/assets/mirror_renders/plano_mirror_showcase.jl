@@ -4,8 +4,6 @@ GLMakie.activate!(; ssao=true)
 
 const BMO = BeamletOptics
 
-include(joinpath(@__DIR__, "..", "render_utils.jl"))
-
 function spawn_mirror_mount()
     m1 = RoundPlanoMirror(1BeamletOptics.inch, 6e-3)
     holder = MeshDummy(joinpath(@__DIR__, "Mirror_Post.stl"))
