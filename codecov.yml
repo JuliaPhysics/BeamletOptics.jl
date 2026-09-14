@@ -1,0 +1,3 @@
+# The Makie extension is not to be tested as part of BMO main, future work...
+ignore:
+  - "ext/**"

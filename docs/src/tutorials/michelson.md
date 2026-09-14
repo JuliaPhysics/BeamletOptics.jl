@@ -287,11 +287,11 @@ power_fig = Figure(size=(600, 250))
 power_ax = Axis(power_fig[1, 1], xlabel="Δy [nm]", ylabel="P [mW]",)
 
 lines!(power_ax, ys*1e9, P*1e3, color=:red, label="Simulated")
-vlines!(power_ax, λ*1e9, color=:red, linestyle=:dashdot)
 
 # Analytical fringe curve at ideal interferometric contrast V = 1. A mirror shift
 # Δy lengthens the arm twice over, so the phase is φ = 4π·Δy/λ and the power
-# follows cos²(φ/2) -- two periods per wavelength of travel.
+# follows cos²(φ/2) -- two periods per wavelength of travel. With V = 1 the curve
+# swings over the full laser power, from 0 to P_in.
 P_in = get_default_power()          # 1 mW, the default power of `beam`
 φ = 4π .* ys ./ λ
 # Only the static offset is taken from the simulation (arm length difference);
@@ -300,13 +300,14 @@ P_in = get_default_power()          # 1 mW, the default power of `beam`
 P_ideal = P_in .* cos.((φ .+ φ0) ./ 2) .^ 2
 
 lines!(power_ax, ys*1e9, P_ideal*1e3, color=:blue, linestyle=:dashdot,
-    linewidth=2, label="Ideal (V = 1)")
-axislegend(power_ax, position=:rb, framevisible=false, labelsize=10)
+    linewidth=2, label="Analytical")
+axislegend(power_ax, position=:cb, framevisible=false, labelsize=10)
 
+xlims!(power_ax, 0, λ*1e9)
 ylims!(power_ax, 0, 1)
 ```
 
-Below is the resulting figure, illustrating the power oscillation as the mirror translates from its starting position to Δy = λ, marked by the dashed red line. The blue dash-dotted curve is the analytical fringe pattern ``P = P_{in} \cos^2(\varphi/2)`` for an ideal interferometric contrast of ``V = 1``, where only the static phase offset is taken from the simulation. It can be observed that the optical power does not reach 0 mW or the full 1 mW of the input laser power: the simulated curve peaks at 0.985 mW and dips to 0.012 mW, i.e. a contrast of ``V = 0.975``. This is because of the slight difference in arm length between the probe and reference beams. Also, the resulting power curve features two periods whereas the translation only corresponds to a movement of one wavelength. This is because the mirror movement by a single Δy step will cause a total increase of 2 ⋅ Δy in path length difference, which is exactly the factor of two that appears in the analytical phase ``\varphi = 4\pi\,\Delta y/\lambda``.
+Below is the resulting figure, illustrating the power oscillation as the mirror translates from its starting position to Δy = λ, which marks the right edge of the plot. The blue dash-dotted curve is the analytical fringe pattern ``P = P_{in} \cos^2(\varphi/2)`` for an ideal interferometric contrast of ``V = 1``, where only the static phase offset is taken from the simulation. It can be observed that the optical power does not reach 0 mW or the full 1 mW of the input laser power: the simulated curve peaks at 0.985 mW and dips to 0.012 mW, i.e. a contrast of ``V = 0.975``. This is because of the slight difference in arm length between the probe and reference beams. Also, the resulting power curve features two periods whereas the translation only corresponds to a movement of one wavelength. This is because the mirror movement by a single Δy step will cause a total increase of 2 ⋅ Δy in path length difference, which is exactly the factor of two that appears in the analytical phase ``\varphi = 4\pi\,\Delta y/\lambda``.
 
 ![Detector power curve](mi_powerplot.png)
 

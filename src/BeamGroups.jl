@@ -197,9 +197,7 @@ function CollimatedSource(
     if num_rays < num_rings * 20
         throw(ErrorException("No. of rays should be atleast 20x no. of rings (passed: $num_rays, req: $(num_rings*20))"))
     end
-    # `rotate3d` implements Rodrigues' formula, which is only a rotation for a unit-length
-    # axis. A non-unit `dir` would otherwise scale `helper` on every step and smear the
-    # rings into a spiral.
+    # ensure normalization
     dir = normalize(dir)
     # define buffer
     beams = Vector{Beam{T, Ray{T}}}()
