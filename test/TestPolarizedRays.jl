@@ -159,6 +159,185 @@ const BMO = BeamletOptics
         @test phi ≈ π / 2
         @test abs(last(Ey)) < 2e-14
     end
+
+    @testset "Detector electric_field (coherent vector sum)" begin
+        # Two plane waves crossing at the origin at ±θ from the y-axis. The OPL is chosen
+        # so that each ray's phasor at the crossing point is 1+0im. Along the detector x-axis
+        # they form fringes of period Λ whose contrast equals |E₊⋅E₋| / (|E₊||E₋|), which
+        # a scalar sum cannot reproduce.
+        λ = 1e-6
+        θ = deg2rad(30)
+        Λ = λ / (2 * sin(θ))
+        d_plus = [sin(θ), cos(θ), 0]
+        d_minus = [-sin(θ), cos(θ), 0]
+        s_pol = [0, 0, 1.0]
+        p_plus = [cos(θ), -sin(θ), 0]
+        p_minus = [cos(θ), sin(θ), 0]
+
+        function manual_hit(dir, E0; focus = zeros(3))
+            L = λ   # k*L = 2π -> cis(k*opl) = 1 at the focus
+            ray = PolarizedRay(focus .- L .* dir, dir, λ, E0)
+            BMO.intersection!(ray, BMO.Intersection(L, BMO.Point3(-dir)))
+            return BMO.PolarizedRayHit(ray, BMO.optical_path_length(ray))
+        end
+
+        function two_ray_detector(E_plus, E_minus)
+            pd = Detector(1.0)
+            push!(pd, manual_hit(d_plus, E_plus))
+            push!(pd, manual_hit(d_minus, E_minus))
+            return pd
+        end
+
+        # index 101 is x = 0 (crossing point), index 51 is x = -Λ/2 (half a fringe away)
+        x_scan(pd) = electric_field(pd; n = 201, x_min = -Λ, x_max = Λ, z_min = 0.0, z_max = 0.0)
+        visibility(I) = (maximum(I) - minimum(I)) / (maximum(I) + minimum(I))
+
+        @testset "s-polarization: full-contrast fringes" begin
+            xs, zs, E = x_scan(two_ray_detector(s_pol, s_pol))
+            @test eltype(E) <: BMO.Point3{<:Complex}
+            I = intensity.(E[:, 1])
+
+            @test sum(abs2, E[101, 1]) ≈ 4
+            @test I[51] / I[101] < 1e-12
+            @test visibility(I) ≈ 1
+        end
+
+        @testset "p-polarization: fringe contrast |cos 2θ|" begin
+            xs, zs, E = x_scan(two_ray_detector(p_plus, p_minus))
+            E_focus = E[101, 1]
+            I = intensity.(E[:, 1])
+
+            # in-plane (y) components cancel by symmetry
+            @test abs(E_focus[2]) < 1e-12
+            @test sum(abs2, E_focus) ≈ 4 * cos(θ)^2
+            @test intensity(E_focus) ≈ sum(abs2, E_focus) / (2 * BMO.Z_vacuum)
+            @test I[51] / I[101] ≈ (1 - cos(2θ)) / (1 + cos(2θ))
+            @test visibility(I) ≈ abs(cos(2θ))
+        end
+
+        @testset "orthogonal polarizations do not interfere" begin
+            pd = two_ray_detector(s_pol, p_minus)
+            xs, zs, I = intensity(pd; n = 101, x_min = -Λ, x_max = Λ, z_min = -Λ, z_max = Λ)
+
+            @test maximum(I) - minimum(I) < 1e-12 * maximum(I)
+            @test 2 * BMO.Z_vacuum * maximum(I) ≈ 2
+        end
+
+        @testset "tilted detector: no projection factor" begin
+            # Documents that, unlike RayHit, the vector field is not weighted by the incidence angle
+            tilt = deg2rad(40)
+            probe(pd) = intensity(pd; n = 1, x_min = 0.0, x_max = 0.0, z_min = 0.0, z_max = 0.0)[3][1, 1]
+
+            pd_pol = Detector(1.0)
+            zrotate3d!(pd_pol, tilt)
+            solve_system!(StaticSystem([pd_pol]), Beam([0, -1.0, 0], [0, 1.0, 0], λ, s_pol))
+
+            pd_ray = Detector(1.0)
+            zrotate3d!(pd_ray, tilt)
+            solve_system!(StaticSystem([pd_ray]), Beam([0, -1.0, 0], [0, 1.0, 0], λ))
+
+            @test 2 * BMO.Z_vacuum * probe(pd_pol) ≈ 1
+            @test 2 * BMO.Z_vacuum * probe(pd_ray) ≈ cos(tilt)^2
+        end
+
+        @testset "aplanatic high-NA focus: vectorial PSF" begin
+            # Converging x-polarized ray fan on a sphere around the focus (optical axis +y)
+            # with the Richards–Wolf field and apodization of an aplanatic lens.
+            function aplanatic_detector(NA; N = 60, pol = [1.0, 0, 0])
+                pd = Detector(1.0)
+                for i in 1:N, j in 1:(4N)
+                    α = asin(NA) * (i - 0.5) / N
+                    φ = 2π * (j - 0.5) / (4N)
+                    dir = [sin(α) * cos(φ), cos(α), sin(α) * sin(φ)]
+                    e_r = [cos(φ), 0, sin(φ)]
+                    e_φ = [-sin(φ), 0, cos(φ)]
+                    e_ρ = [cos(α) * cos(φ), -sin(α), cos(α) * sin(φ)]
+                    E0 = sqrt(cos(α)) * sin(α) .* (dot(pol, e_r) .* e_ρ .+ dot(pol, e_φ) .* e_φ)
+                    push!(pd, manual_hit(dir, E0))
+                end
+                return pd
+            end
+
+            function vector_psf(NA; n = 151)
+                R = 1.5λ / NA
+                xs, zs, E = electric_field(aplanatic_detector(NA); n, x_min = -R, x_max = R, z_min = -R, z_max = R)
+                c = (n + 1) ÷ 2
+                I = intensity.(E)
+                Ex2 = map(e -> abs2(e[1]), E)
+                Ey2 = map(e -> abs2(e[2]), E)
+                fwhm_count(v) = count(>(maximum(v) / 2), v)
+                return (
+                    peak = argmax(I) == CartesianIndex(c, c),
+                    fwhm_ratio = fwhm_count(I[:, c]) / fwhm_count(I[c, :]),
+                    Ey_center = Ey2[c, c] / maximum(Ey2),
+                    Ey_ratio = maximum(Ey2) / maximum(Ex2),
+                    Ey_lobe_row = argmax(Ey2)[2] == c
+                )
+            end
+
+            low = vector_psf(0.1)
+            @test low.peak
+            @test low.fwhm_ratio ≈ 1 atol = 0.1
+            @test low.Ey_ratio < 0.01
+
+            high = vector_psf(0.9)
+            @test high.peak
+            # PSF is stretched along the input polarization (x)
+            @test high.fwhm_ratio > 1.2
+            # longitudinal component vanishes on axis, but forms strong lobes along x
+            @test high.Ey_center < 1e-12
+            @test high.Ey_ratio > 0.1
+            @test high.Ey_lobe_row
+        end
+    end
+
+    @testset "Polarized point spread function (vector coherent sum)" begin
+        # Same optical setup as the scalar Airy-disc test (see TestDetector.jl),
+        # but tracing a linearly polarized ray fan built from the same
+        # deterministic UniformDiscSource sampling, so the geometry matches exactly.
+        mm = 1e-3
+        R1 = 100mm
+        R2 = Inf
+        l = 1mm
+        d = 25.4mm
+        n = 1.5
+        λ = 1e-6
+        D = 15mm
+        num_rays = 1000
+
+        lens = SphericalLens(R1, R2, l, d, x -> n)
+
+        x_shift = y_shift = -2mm
+        psfd = Detector(10e-3)
+        translate3d!(psfd, [x_shift, 200e-3 + 0.13e-3, y_shift])
+
+        cs = UniformDiscSource([0, -10e-3, 0], [0, 1, 0], D, λ; num_rays)
+        E0 = [1.0, 0, 0]
+        pol_beams = [Beam(position(first(rays(b))), direction(first(rays(b))), λ, E0)
+                     for b in BMO.beams(cs)]
+        pcs = BMO.CollimatedSource(pol_beams, D)
+
+        sys = System([lens, psfd])
+        solve_system!(sys, pcs)
+
+        x, y, I_num = intensity(psfd; n = 500, crop_factor = 5, center = MinMax())
+
+        # walk from the peak to the first local minimum through the centre column
+        ix_ctr, jx_ctr = Tuple(argmax(I_num))
+        col = I_num[:, jx_ctr]
+        i_min = ix_ctr
+        while i_min < length(col) && col[i_min + 1] < col[i_min]
+            i_min += 1
+        end
+
+        # compare relative to the peak, since the absolute offset (x_shift) dwarfs the Airy radius
+        airy_radius = 1.22 * λ * 200e-3 / D
+        @test x[i_min] - x[ix_ctr] ≈ airy_radius rtol = 2e-2
+
+        # vector field result feeds the scalar intensity/power pipeline
+        @test eltype(electric_field(psfd; n = 2)[3]) <: BMO.Point3{<:Complex}
+        @test BMO.optical_power(psfd; n = 100, crop_factor = 5, center = MinMax()) > 0
+    end
 end
 
 end # MODULE
