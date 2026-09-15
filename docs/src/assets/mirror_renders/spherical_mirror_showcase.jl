@@ -15,6 +15,7 @@ translate3d!(m2, [0, distance, 0])
 
 system = StaticSystem([m1, m2])
 
+##
 fig = Figure(size=(600,240))
 dr = 0.03
 y1 = -0.02
@@ -30,8 +31,9 @@ beam = Beam(Ray([0, distance/2, 7e-3], [0.17, 1, 0]))
 
 solve_system!(system, beam, r_max=100)
 
-render!(ax, beam, flen=0.1)
-render!(ax, m1)
-render!(ax, m2)
+render!(ax, beam, flen=0.1, alpha=0.25)
+render!(ax, m1; transparency=true, alpha=0.75)
+render!(ax, m2; transparency=true, alpha=0.75)
 
+##
 save("spherical_mirror_showcase.png", fig; px_per_unit=8)
