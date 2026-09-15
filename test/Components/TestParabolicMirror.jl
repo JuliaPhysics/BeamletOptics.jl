@@ -1,4 +1,4 @@
-module TestOffAxisParabolicMirror
+module TestParabolicMirror
 
 using BeamletOptics
 using Test
