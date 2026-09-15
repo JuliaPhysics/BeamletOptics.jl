@@ -3,6 +3,7 @@ mirror_showcase_dir = joinpath(@__DIR__, "..", "..", "assets", "mirror_renders")
 
 Main.DocUtils.conditional_include(joinpath(mirror_showcase_dir, "plano_mirror_showcase.jl"))
 Main.DocUtils.conditional_include(joinpath(mirror_showcase_dir, "spherical_mirror_showcase.jl"))
+Main.DocUtils.conditional_include(joinpath(mirror_showcase_dir, "parabolic_mirror_showcase.jl"))
 Main.DocUtils.conditional_include(joinpath(mirror_showcase_dir, "oap_mirror_showcase.jl"))
 ```
 
@@ -44,6 +45,18 @@ The following constructor allows the spawning of concave spherical mirrors.
 
 ```@docs; canonical=false
 ConcaveSphericalMirror(::Real, ::Real, ::Real)
+```
+
+## Parabolic Mirrors
+
+The [`ParabolicMirror`](@ref) represents an on-axis parabolic mirror. In contrast to the [`ConcaveSphericalMirror`](@ref), a paraboloid focuses a collimated beam that is parallel to its optical axis into a single point without spherical aberration. Its surface $y = -\frac{x^2 + z^2}{4f}$ is the special case $x_{\text{off}} = 0$ of the [`OffAxisParaboloidSDF`](@ref) (see below), such that the focus lies at $(0, -f, 0)$.
+
+![Parabolic mirror showcase](parabolic_mirror_showcase.png)
+
+The following constructor allows the spawning of on-axis parabolic mirrors.
+
+```@docs; canonical=false
+ParabolicMirror(::Real, ::Real)
 ```
 
 ## Off-Axis Parabolic Mirrors

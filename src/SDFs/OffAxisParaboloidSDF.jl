@@ -4,6 +4,7 @@
 Signed distance function representation of an Off-Axis Parabolic (OAP) mirror substrate.
 The front concave surface represents a paraboloid of revolution with parent focal length `f`
 offset by distance `x_off` along the parent x-axis.
+Setting `x_off = 0` yields an on-axis paraboloid, see [`ParabolicMirror`](@ref).
 
 # Fields
 

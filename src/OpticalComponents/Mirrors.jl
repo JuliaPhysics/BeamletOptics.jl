@@ -261,3 +261,27 @@ function OffAxisParabolicMirror(
     oap_sdf = OffAxisParaboloidSDF(f, x_off, T(diameter), t)
     return Mirror(oap_sdf)
 end
+
+"""
+    ParabolicMirror(f, diameter; thickness=nothing)
+
+Constructs an on-axis parabolic [`Mirror`](@ref) with focal length `f`.
+The vertex of the concave reflecting surface lies at the origin, the mirror opens towards the negative y-axis
+and its focus lies at `(0, -f, 0)`. The shape is an [`OffAxisParaboloidSDF`](@ref) without off-axis offset.
+
+# Inputs
+
+- `f`:          Focal length [m]
+- `diameter`:   Mirror aperture diameter [m]
+- `thickness`:  Substrate thickness in [m] (default: rim sag + 10 mm)
+"""
+function ParabolicMirror(
+        f::Real,
+        diameter::Real;
+        thickness::Union{Real, Nothing} = nothing
+    )
+    T = float(promote_type(typeof(f), typeof(diameter), typeof(thickness === nothing ? 0.0 : thickness)))
+    sag_max = T(diameter / 2)^2 / (4 * T(f))
+    t = thickness === nothing ? sag_max + T(10e-3) : T(thickness)
+    return Mirror(OffAxisParaboloidSDF(T(f), zero(T), T(diameter), t))
+end

@@ -93,6 +93,36 @@ const nm = 1e-9
         max_spot_radius = maximum(norm.(spots))
         @test max_spot_radius < 1e-9
     end
+
+    @testset "On-Axis Parabolic Mirror" begin
+        f = 100mm
+        d = 60mm
+        m = ParabolicMirror(f, d)
+        sdf = BMO.shape(m)
+
+        @test sdf.f ≈ f
+        @test sdf.x_off == 0
+        @test sdf.thickness ≈ 2.25mm + 10mm
+        @test BMO.shape(ParabolicMirror(1, 1)).f isa Float64
+
+        # Rays parallel to the optical axis must pass through the focus after reflection
+        F = [0, -f, 0]
+        for (hx, hz) in [(0, 0), (5mm, 0), (0, 20mm), (18mm, -18mm), (29mm, 0)]
+            beam = Beam(Ray([hx, -50mm, hz], [0, 1, 0]))
+            solve_system!(StaticSystem([m]), beam)
+            @test length(BMO.rays(beam)) == 2
+            r = BMO.rays(beam)[end]
+            p = position(r)
+            dir = BMO.direction(r)
+            @test norm(cross(F - p, dir)) < 1e-9
+            @test dot(F - p, dir) > 0
+        end
+
+        # Rays outside of the aperture miss the mirror
+        beam = Beam(Ray([35mm, -50mm, 0], [0, 1, 0]))
+        solve_system!(StaticSystem([m]), beam)
+        @test length(BMO.rays(beam)) == 1
+    end
 end
 
 end # module
