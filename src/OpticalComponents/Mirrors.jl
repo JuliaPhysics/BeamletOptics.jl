@@ -163,28 +163,28 @@ function RoundPlanoMirror(diameter::D, thickness::T) where {D<:Real,T<:Real}
     return RoundPlanoMirror(shape)
 end
 
-"""[`ConcaveSphericalMirror`](@ref) shape type based on a [`UnionSDF`](@ref)"""
-const ConcaveSphericalMirrorShape{T} = UnionSDF{T, Tuple{ConcaveSphericalSurfaceSDF{T}, PlanoSurfaceSDF{T}}}
+"""[`SphericalMirror`](@ref) shape type based on a [`UnionSDF`](@ref)"""
+const SphericalMirrorShape{T} = UnionSDF{T, Tuple{ConcaveSphericalSurfaceSDF{T}, PlanoSurfaceSDF{T}}}
 
 """
-    ConcaveSphericalMirror <: AbstractReflectiveOptic
+    SphericalMirror <: AbstractReflectiveOptic
 
 An ideal concave mirror with spherical reflecting surface, e.g. R = 1.
 See also [`RoundPlanoMirror`](@ref).
 
 # Fields
 
-- `shape`: a [`ConcaveSphericalMirrorShape`](@ref) that represents the substrate
+- `shape`: a [`SphericalMirrorShape`](@ref) that represents the substrate
 """
-struct ConcaveSphericalMirror{T} <: AbstractReflectiveOptic{T}
-    shape::ConcaveSphericalMirrorShape{T}
+struct SphericalMirror{T} <: AbstractReflectiveOptic{T}
+    shape::SphericalMirrorShape{T}
 end
 
 """
-    ConcaveSphericalMirror(radius, thickness, diameter)
+    SphericalMirror(radius, thickness, diameter)
 
 Constructor for a spherical mirror with a concave reflecting surface. The component is aligned with the positive y-axis.
-See also [`ConcaveSphericalMirror`](@ref). 
+See also [`SphericalMirror`](@ref).
 
 # Inputs
 
@@ -192,12 +192,15 @@ See also [`ConcaveSphericalMirror`](@ref).
 - `thickness`: substrate thickness in [m]
 - `diameter`: mirror outer diameter in [m]
 """
-function ConcaveSphericalMirror(radius::Real, thickness::Real, diameter::Real)
+function SphericalMirror(radius::Real, thickness::Real, diameter::Real)
     cylinder = PlanoSurfaceSDF(thickness, diameter)
     concave = ConcaveSphericalSurfaceSDF(abs(radius), diameter)
     shape = concave + cylinder
-    return ConcaveSphericalMirror(shape)
+    return SphericalMirror(shape)
 end
+
+# Former name, kept for backwards compatibility
+Base.@deprecate_binding ConcaveSphericalMirror SphericalMirror
 
 """
     RightAnglePrismMirror <: AbstractReflectiveOptic

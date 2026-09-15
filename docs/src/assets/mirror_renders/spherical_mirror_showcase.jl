@@ -7,8 +7,8 @@ const BMO = BeamletOptics
 distance = 20e-2
 factor = 1.2
 RoC = distance/2 * factor
-m1 = ConcaveSphericalMirror(RoC, 5e-3, 2BeamletOptics.inch)
-m2 = ConcaveSphericalMirror(RoC, 5e-3, 2BeamletOptics.inch)
+m1 = SphericalMirror(RoC, 5e-3, 2BeamletOptics.inch)
+m2 = SphericalMirror(RoC, 5e-3, 2BeamletOptics.inch)
 
 zrotate3d!(m1, deg2rad(180))
 translate3d!(m2, [0, distance, 0])
@@ -34,4 +34,4 @@ render!(ax, beam, flen=0.1)
 render!(ax, m1)
 render!(ax, m2)
 
-save("concave_mirror_showcase.png", fig; px_per_unit=8)
+save("spherical_mirror_showcase.png", fig; px_per_unit=8)

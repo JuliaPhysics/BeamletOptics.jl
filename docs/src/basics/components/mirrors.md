@@ -35,21 +35,21 @@ Below, a trivial example of a beam path propagating through a system of Ø1"-mir
 
 ![Plano mirror showcase](plano_mirror_showcase.png)
 
-## Concave Mirrors
+## Spherical Mirrors
 
-The [`ConcaveSphericalMirror`](@ref) represents an ideal optical element with a spherical concave reflective surface, commonly used for non-dispersive focusing applications. Its geometry is modeled using a combination of a concave spherical surface and a plano substrate, represented internally by a [`BeamletOptics.UnionSDF`](@ref) (refer also to the [SDF-based spherical lenses](@ref) section).
+The [`SphericalMirror`](@ref) represents an ideal optical element with a spherical concave reflective surface, commonly used for non-dispersive focusing applications. Its geometry is modeled using a combination of a concave spherical surface and a plano substrate, represented internally by a [`BeamletOptics.UnionSDF`](@ref) (refer also to the [SDF-based spherical lenses](@ref) section).
 
-![Concave mirror multipass showcase](concave_mirror_showcase.png)
+![Spherical mirror multipass showcase](spherical_mirror_showcase.png)
 
-The following constructor allows the spawning of concave spherical mirrors.
+The following constructor allows the spawning of spherical mirrors.
 
 ```@docs; canonical=false
-ConcaveSphericalMirror(::Real, ::Real, ::Real)
+SphericalMirror(::Real, ::Real, ::Real)
 ```
 
 ## Parabolic Mirrors
 
-The [`ParabolicMirror`](@ref) represents an on-axis parabolic mirror. In contrast to the [`ConcaveSphericalMirror`](@ref), a paraboloid focuses a collimated beam that is parallel to its optical axis into a single point without spherical aberration. Its surface $y = -\frac{x^2 + z^2}{4f}$ is the special case $x_{\text{off}} = 0$ of the [`OffAxisParaboloidSDF`](@ref) (see below), such that the focus lies at $(0, -f, 0)$.
+The [`ParabolicMirror`](@ref) represents an on-axis parabolic mirror. In contrast to the [`SphericalMirror`](@ref), a paraboloid focuses a collimated beam that is parallel to its optical axis into a single point without spherical aberration. Its surface $y = -\frac{x^2 + z^2}{4f}$ is the special case $x_{\text{off}} = 0$ of the [`BeamletOptics.OffAxisParaboloidSDF`](@ref), such that the focus lies at $(0, -f, 0)$.
 
 ![Parabolic mirror showcase](parabolic_mirror_showcase.png)
 
@@ -69,7 +69,7 @@ $$f = RFL \cdot \cos^2\left(\frac{\theta_d}{2}\right), \quad x_{\text{off}} = RF
 
 ![Off-Axis Parabolic mirror showcase](oap_mirror_showcase.png)
 
-The following constructors allow the spawning of off-axis parabolic mirrors and their signed distance functions.
+The following constructor allows the spawning of off-axis parabolic mirrors.
 
 ```@docs; canonical=false
 OffAxisParabolicMirror(::Real, ::Real)
