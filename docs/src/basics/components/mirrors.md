@@ -3,8 +3,8 @@ mirror_showcase_dir = joinpath(@__DIR__, "..", "..", "assets", "mirror_renders")
 
 Main.DocUtils.conditional_include(joinpath(mirror_showcase_dir, "plano_mirror_showcase.jl"))
 Main.DocUtils.conditional_include(joinpath(mirror_showcase_dir, "spherical_mirror_showcase.jl"))
-Main.DocUtils.conditional_include(joinpath(mirror_showcase_dir, "parabolic_mirror_showcase.jl"))
-Main.DocUtils.conditional_include(joinpath(mirror_showcase_dir, "oap_mirror_showcase.jl"))
+Main.DocUtils.conditional_include(joinpath(mirror_showcase_dir, "parabolic_mirror_showcase.jl"), use_placeholder=false)
+Main.DocUtils.conditional_include(joinpath(mirror_showcase_dir, "oap_mirror_showcase.jl"), use_placeholder=false)
 ```
 
 # Mirrors
@@ -73,5 +73,4 @@ The following constructors allow the spawning of off-axis parabolic mirrors and 
 
 ```@docs; canonical=false
 OffAxisParabolicMirror(::Real, ::Real)
-OffAxisParaboloidSDF
 ```

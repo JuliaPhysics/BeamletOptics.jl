@@ -239,7 +239,7 @@ Constructs an Off-Axis Parabolic (OAP) [`Mirror`](@ref) from:
 - `rfl`:        Reflected Focal Length (distance from aperture center to focus) [m]
 - `diameter`:   Mirror aperture diameter [m]
 - `angle`:      Deflection angle in degrees (default: 90°)
-- `thickness`:  Substrate thickness in [m] (default: calculated automatically to ensure solid backing)
+- `thickness`:  Substrate thickness [m], calculated automatically to ensure solid backing if `nothing` (default)
 """
 function OffAxisParabolicMirror(
         rfl::Real,
@@ -273,7 +273,7 @@ and its focus lies at `(0, -f, 0)`. The shape is an [`OffAxisParaboloidSDF`](@re
 
 - `f`:          Focal length [m]
 - `diameter`:   Mirror aperture diameter [m]
-- `thickness`:  Substrate thickness in [m] (default: rim sag + 10 mm)
+- `thickness`:  Substrate thickness [m], rim sag + 10 mm if `nothing` (default)
 """
 function ParabolicMirror(
         f::Real,

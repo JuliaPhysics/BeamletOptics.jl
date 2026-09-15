@@ -2,23 +2,35 @@ using GLMakie, BeamletOptics
 
 GLMakie.activate!(; ssao = true)
 
-f_val = 100e-3
+const BMO = BeamletOptics
+const mm = 1e-3
+const nm = 1e-9
 
-parabolic_mirror_obj = ParabolicMirror(f_val, 2BeamletOptics.inch)
+##
+f_val = 100mm
 
-beam_obj = CollimatedSource(
-    [0, -150e-3, 0], [0, 1, 0], 20e-3, 1550e-9; num_rings = 4, num_rays = 80)
+pm = ParabolicMirror(f_val, 2BeamletOptics.inch)
 
-system_obj = StaticSystem([parabolic_mirror_obj])
-solve_system!(system_obj, beam_obj)
+beam = CollimatedSource([0, -200mm, 0], [0, 1, 0], 45mm, 1550nm; num_rings = 4, num_rays = 200)
 
-fig_pm_sc = Figure(size = (600, 350))
-ax_pm_sc = LScene(fig_pm_sc[1, 1], show_axis = false)
+system = StaticSystem([pm])
+solve_system!(system, beam)
 
-render!(ax_pm_sc, system_obj)
-render!(ax_pm_sc, beam_obj; flen = 2f_val)
+##
+cview = [
+  0.780432   0.625241  8.32667e-17   0.0589337
+ -0.247203   0.308562  0.918521      0.0245199
+  0.574297  -0.716843  0.395373     -0.133852
+  0.0        0.0       0.0           1.0
+]
 
-cam3d!(ax_pm_sc.scene; eyeposition = Point3f(0.05, -0.09, 0.2),
-    lookat = Point3f(0, -0.09, 0), upvector = Vec3f(1, 0, 0))
+fig = Figure(size = (600, 350))
+display(fig)
+ax = LScene(fig[1, 1], show_axis = false)
 
-save("parabolic_mirror_showcase.png", fig_pm_sc; px_per_unit = 8, update = false)
+render!(ax, pm; transparency=true, alpha=0.5)
+render!(ax, beam; flen = 2f_val, color=RGBAf(0,0,1,0.5), show_pos=false)
+
+set_view(ax, cview)
+
+save("parabolic_mirror_showcase.png", fig; px_per_unit = 8, update = false)
