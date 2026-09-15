@@ -153,7 +153,7 @@ end
 
 @testset "Issue#51" begin
     # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/51
-    mirror = BeamletOptics.ConcaveSphericalMirror(0.1, 0.01, 0.2)
+    mirror = BeamletOptics.SphericalMirror(0.1, 0.01, 0.2)
     system = StaticSystem([mirror])
     beam = Beam([0, -0.19, 0.07], [0.0, 1, 0])
     solve_system!(system, beam)

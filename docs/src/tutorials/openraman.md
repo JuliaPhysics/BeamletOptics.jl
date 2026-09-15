@@ -8,7 +8,7 @@ raman_dir = joinpath(@__DIR__, "..", "assets", "raman_assets")
 isdefined(@__MODULE__, :OpenRaman) || include(joinpath(raman_dir, "OpenRaman", "OpenRaman.jl"))
 using .OpenRaman
 
-Main.DocUtils.conditional_include(joinpath(raman_dir, "openraman_showcase.jl"), use_placeholder=false)
+Main.DocUtils.conditional_include(joinpath(raman_dir, "openraman_showcase.jl"))
 ```
 
 # Raman spectroscopy
