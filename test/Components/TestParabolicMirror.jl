@@ -123,6 +123,26 @@ const nm = 1e-9
         solve_system!(StaticSystem([m]), beam)
         @test length(BMO.rays(beam)) == 1
     end
+
+    @testset "Bounding Sphere" begin
+        f = 100mm
+        r_max = 30mm
+        thickness = 20mm
+        sag_max = r_max^2 / (4f)
+
+        sdf = BMO.OffAxisParaboloidSDF(f, 0.0, 2r_max, thickness)
+        center, r = BMO.bounding_sphere(sdf)
+
+        @test center ≈ BMO.Point3(0, (thickness - sag_max) / 2, 0)
+        @test r ≈ sqrt(r_max^2 + ((thickness + sag_max) / 2)^2) + 0.05
+
+        # bounding_box must transform the sphere into a symmetric, aperture-covering box
+        xmin, xmax, ymin, ymax, zmin, zmax = BMO.bounding_box(sdf)
+        @test xmin ≈ -xmax
+        @test zmin ≈ -zmax
+        @test xmax ≈ zmax # rotationally symmetric about the y-axis since x_off = 0
+        @test xmax >= r_max
+    end
 end
 
 end # module
