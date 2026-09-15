@@ -3,8 +3,6 @@ using LinearAlgebra
 
 GLMakie.activate!(; ssao = true)
 
-include(joinpath(@__DIR__, "..", "render_utils.jl"))
-
 rfl_val = 200e-3
 d_val = 60e-3
 angle_val = 90
