@@ -54,6 +54,7 @@ include("RenderMesh.jl")
 include("RenderObjects.jl")
 include("RenderLenses.jl")
 include("RenderCylinderLenses.jl")
+include("RenderMirrors.jl")
 include("RenderPresets.jl")
 include("RenderCamera.jl")
 

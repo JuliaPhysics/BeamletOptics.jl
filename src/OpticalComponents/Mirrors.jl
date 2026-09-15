@@ -163,28 +163,28 @@ function RoundPlanoMirror(diameter::D, thickness::T) where {D<:Real,T<:Real}
     return RoundPlanoMirror(shape)
 end
 
-"""[`ConcaveSphericalMirror`](@ref) shape type based on a [`UnionSDF`](@ref)"""
-const ConcaveSphericalMirrorShape{T} = UnionSDF{T, Tuple{ConcaveSphericalSurfaceSDF{T}, PlanoSurfaceSDF{T}}}
+"""[`SphericalMirror`](@ref) shape type based on a [`UnionSDF`](@ref)"""
+const SphericalMirrorShape{T} = UnionSDF{T, Tuple{ConcaveSphericalSurfaceSDF{T}, PlanoSurfaceSDF{T}}}
 
 """
-    ConcaveSphericalMirror <: AbstractReflectiveOptic
+    SphericalMirror <: AbstractReflectiveOptic
 
 An ideal concave mirror with spherical reflecting surface, e.g. R = 1.
 See also [`RoundPlanoMirror`](@ref).
 
 # Fields
 
-- `shape`: a [`ConcaveSphericalMirrorShape`](@ref) that represents the substrate
+- `shape`: a [`SphericalMirrorShape`](@ref) that represents the substrate
 """
-struct ConcaveSphericalMirror{T} <: AbstractReflectiveOptic{T}
-    shape::ConcaveSphericalMirrorShape{T}
+struct SphericalMirror{T} <: AbstractReflectiveOptic{T}
+    shape::SphericalMirrorShape{T}
 end
 
 """
-    ConcaveSphericalMirror(radius, thickness, diameter)
+    SphericalMirror(radius, thickness, diameter)
 
 Constructor for a spherical mirror with a concave reflecting surface. The component is aligned with the positive y-axis.
-See also [`ConcaveSphericalMirror`](@ref). 
+See also [`SphericalMirror`](@ref).
 
 # Inputs
 
@@ -192,12 +192,15 @@ See also [`ConcaveSphericalMirror`](@ref).
 - `thickness`: substrate thickness in [m]
 - `diameter`: mirror outer diameter in [m]
 """
-function ConcaveSphericalMirror(radius::Real, thickness::Real, diameter::Real)
+function SphericalMirror(radius::Real, thickness::Real, diameter::Real)
     cylinder = PlanoSurfaceSDF(thickness, diameter)
     concave = ConcaveSphericalSurfaceSDF(abs(radius), diameter)
     shape = concave + cylinder
-    return ConcaveSphericalMirror(shape)
+    return SphericalMirror(shape)
 end
+
+# Former name, kept for backwards compatibility
+Base.@deprecate_binding ConcaveSphericalMirror SphericalMirror
 
 """
     RightAnglePrismMirror <: AbstractReflectiveOptic
@@ -227,4 +230,61 @@ function RightAnglePrismMirror(leg_length::Real, height::Real)
     shape = RightAnglePrismSDF(leg_length, height)
     zrotate3d!(shape, deg2rad(45+180))
     return RightAnglePrismMirror(shape)
+end
+
+"""
+    OffAxisParabolicMirror(rfl, diameter; angle=90, thickness=nothing)
+
+Constructs an Off-Axis Parabolic (OAP) [`Mirror`](@ref) from:
+
+# Inputs
+
+- `rfl`:        Reflected Focal Length (distance from aperture center to focus) [m]
+- `diameter`:   Mirror aperture diameter [m]
+- `angle`:      Deflection angle in degrees (default: 90°)
+- `thickness`:  Substrate thickness [m], calculated automatically to ensure solid backing if `nothing` (default)
+"""
+function OffAxisParabolicMirror(
+        rfl::Real,
+        diameter::Real;
+        angle::Real = 90,
+        thickness::Union{Real, Nothing} = nothing
+    )
+    T = float(promote_type(typeof(rfl), typeof(diameter), typeof(angle), typeof(thickness === nothing ? 0.0 : thickness)))
+    angle_rad = deg2rad(angle)
+
+    f = T(rfl * (cos(angle_rad / 2)^2))
+    x_off = T(rfl * sin(angle_rad))
+
+    r_max = T(diameter / 2)
+    sag_max = abs(-(((r_max + x_off)^2 - x_off^2) / (4 * f)))
+
+    t = thickness === nothing ? max(T(diameter / 2), sag_max + T(10e-3)) : T(thickness)
+
+    oap_sdf = OffAxisParaboloidSDF(f, x_off, T(diameter), t)
+    return Mirror(oap_sdf)
+end
+
+"""
+    ParabolicMirror(f, diameter; thickness=nothing)
+
+Constructs an on-axis parabolic [`Mirror`](@ref) with focal length `f`.
+The vertex of the concave reflecting surface lies at the origin, the mirror opens towards the negative y-axis
+and its focus lies at `(0, -f, 0)`. The shape is an [`OffAxisParaboloidSDF`](@ref) without off-axis offset.
+
+# Inputs
+
+- `f`:          Focal length [m]
+- `diameter`:   Mirror aperture diameter [m]
+- `thickness`:  Substrate thickness [m], rim sag + 10 mm if `nothing` (default)
+"""
+function ParabolicMirror(
+        f::Real,
+        diameter::Real;
+        thickness::Union{Real, Nothing} = nothing
+    )
+    T = float(promote_type(typeof(f), typeof(diameter), typeof(thickness === nothing ? 0.0 : thickness)))
+    sag_max = T(diameter / 2)^2 / (4 * T(f))
+    t = thickness === nothing ? sag_max + T(10e-3) : T(thickness)
+    return Mirror(OffAxisParaboloidSDF(T(f), zero(T), T(diameter), t))
 end
