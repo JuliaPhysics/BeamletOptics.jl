@@ -7,10 +7,10 @@ This section of the documentation is intended for users that want to dive deeper
 ```@contents
 Pages = [
     "rays.md",
-    joinpath("beams", "beams.md"),
-    joinpath("beams", "stigmatic_beam.md"),
-    joinpath("beams", "astigmatic_beam.md"),
-    joinpath("components", "components.md"),
+    "beams/beams.md",
+    "beams/stigmatic_beam.md",
+    "beams/astigmatic_beam.md",
+    "components/components.md",
     "systems.md",
     "render.md",
 ]

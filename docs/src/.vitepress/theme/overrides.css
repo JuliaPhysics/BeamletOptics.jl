@@ -1,0 +1,73 @@
+/* Override default DocumenterVitepress styles here.
+   This file is loaded after style.css, so rules here take precedence. */
+
+/* Hero logo sizing.
+
+   Two things kept the logo small. The SVG carries an intrinsic size
+   (50.9mm x 26.6mm, i.e. ~192x101px) and VitePress only caps the hero image via
+   max-width (192/256/320px per breakpoint) without ever scaling it up. On top of
+   that, the hero image box is square (320x320px), which suits a square logo but
+   not a 1.9:1 wide one -- it can never use the available height.
+
+   So: widen the box and let the logo fill it. The image stays absolutely centred
+   the way the theme positions it, which also keeps the blurred background blob
+   centred. `!important` is needed because the theme's scoped `:deep(.image-src)`
+   rules are more specific than anything we can write from here. */
+.VPHero .image-container {
+  width: min(460px, 100%);
+}
+
+.VPHero .image-src {
+  width: 100%;
+  height: auto;
+  max-width: 100% !important;
+  max-height: none !important;
+}
+
+/* Reference links from Julia code to docstrings, see julia-ref-transformer.ts.
+
+   The link wraps the Shiki token span, which keeps its own syntax colour. The
+   link itself must not restyle the code the way `.vp-doc a` styles prose links. */
+.vp-doc a.jl-ref {
+  color: inherit;
+  font-weight: inherit;
+  text-decoration: none;
+  border-bottom: 1px dotted var(--vp-c-text-3);
+}
+
+.vp-doc a.jl-ref:hover {
+  border-bottom: 1px solid var(--vp-c-brand-1);
+}
+
+.jl-tip {
+  position: fixed;
+  z-index: 100;
+  max-width: min(560px, calc(100vw - 16px));
+  padding: 8px 12px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  background: var(--vp-c-bg-elv);
+  box-shadow: var(--vp-shadow-3);
+  font-size: 13px;
+  line-height: 1.5;
+  pointer-events: none;
+}
+
+.jl-tip pre {
+  margin: 0;
+  font-family: var(--vp-font-family-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  color: var(--vp-c-text-1);
+}
+
+.jl-tip p {
+  margin: 0;
+  color: var(--vp-c-text-2);
+}
+
+.jl-tip pre + p {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--vp-c-divider);
+}
