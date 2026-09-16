@@ -39,7 +39,7 @@ hide_axis(ax)
 
 render!(ax, system)
 
-λ = 486.0 # nm
+λ = 486e-9 # m
 zs = LinRange(-0.02, 0.02, 10)
 for (i, z) in enumerate(zs)
     beam = Beam(Ray([0, -0.05, z], [0, 1, 0], λ))
@@ -68,7 +68,7 @@ hidezdecorations!(ax)
 
 render!(ax, tl_system)
 
-λ = 486.0 # nm
+λ = 486e-9 # m
 zs = LinRange(-0.02, 0.02, 10)
 for (i, z) in enumerate(zs)
     beam = Beam(Ray([0, -0.05, z], [0, 1, 0], λ))
