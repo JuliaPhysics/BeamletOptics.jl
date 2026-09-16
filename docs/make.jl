@@ -114,7 +114,10 @@ makedocs(;
 # On Windows DocumenterVitepress only runs `npm install` and tells the user to install
 # Node.js system-wide instead of building the site. Do the build here with the JLL's Node.
 if Sys.iswindows()
-    cd(@__DIR__) do
+    # The drive letter must be upper case: VS Code starts Julia in `c:\...`, and with a
+    # lower case drive letter the VitePress SSR build fails with ERR_MODULE_NOT_FOUND
+    # for chunks in `.vitepress/.temp`.
+    cd(uppercasefirst(@__DIR__)) do
         run(`$(NodeJS_20_jll.node()) node_modules/vitepress/bin/vitepress.js build build/.documenter`)
     end
 end
