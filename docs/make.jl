@@ -126,5 +126,5 @@ DocumenterVitepress.deploydocs(;
     repo="github.com/JuliaPhysics/BeamletOptics.jl.git",
     target=joinpath(@__DIR__, "build"),
     devbranch="master",
-    push_preview=false,
+    push_preview=true,
 )
