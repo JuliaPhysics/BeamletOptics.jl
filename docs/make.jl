@@ -43,6 +43,7 @@ makedocs(;
                 "Double Gauss lens"         => joinpath("examples", "double_gauss.md"),
                 "Lens groups"               => joinpath("examples", "lens_groups.md"),
                 "Double slit"               => joinpath("examples", "double_slit.md"),
+                "Point spread functions"    => joinpath("examples", "psf.md"),
             ],
         ],
         "Basics" => Any[
