@@ -29,7 +29,8 @@ export Mirror, SquarePlanoMirror2D, RectangularPlanoMirror, SquarePlanoMirror,
        OffAxisParabolicMirror, ParabolicMirror
 
 # lenses
-export Lens, DoubletLens, ThinLens, SphericalLens, SphericalDoubletLens, thickness
+export Lens, DoubletLens, ThinLens, SphericalLens, SphericalDoubletLens, thickness,
+       TripletLens, SphericalTripletLens
 
 # surfaces
 export CircularFlatSurface, RectangularFlatSurface, SphericalSurface, EvenAsphericalSurface,
