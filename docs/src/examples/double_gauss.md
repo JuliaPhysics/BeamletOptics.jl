@@ -45,7 +45,7 @@ render!(ax, system)
 For interactive viewing it is recommended that a `LScene` is used instead of the `Axis3` with the [GLMakie](https://docs.makie.org/stable/) backend. At this point the `system` can be solved. A [`Beam`](@ref) consisting of [`Ray`](@ref)s with the wavelength mentioned above will be used for tracing.
 
 ```julia
-λ = 486.0 # nm
+λ = 486e-9 # m
 zs = LinRange(-0.02, 0.02, 10)
 for (i, z) in enumerate(zs)
     beam = Beam(Ray([0, -0.05, z], [0, 1, 0], λ))
@@ -76,7 +76,7 @@ hidezdecorations!(ax)
 
 render!(ax, tl_system)
 
-λ = 486.0 # nm
+λ = 486e-9 # m
 zs = LinRange(-0.02, 0.02, 10)
 for (i, z) in enumerate(zs)
     beam = Beam(Ray([0, -0.05, z], [0, 1, 0], λ))
