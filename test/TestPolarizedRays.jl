@@ -240,54 +240,66 @@ const BMO = BeamletOptics
             @test 2 * BMO.Z_vacuum * probe(pd_ray) ≈ cos(tilt)^2
         end
 
-        @testset "aplanatic high-NA focus: vectorial PSF" begin
-            # Converging x-polarized ray fan on a sphere around the focus (optical axis +y)
-            # with the Richards–Wolf field and apodization of an aplanatic lens.
-            function aplanatic_detector(NA; N = 60, pol = [1.0, 0, 0])
-                pd = Detector(1.0)
-                for i in 1:N, j in 1:(4N)
-                    α = asin(NA) * (i - 0.5) / N
-                    φ = 2π * (j - 0.5) / (4N)
-                    dir = [sin(α) * cos(φ), cos(α), sin(α) * sin(φ)]
-                    e_r = [cos(φ), 0, sin(φ)]
-                    e_φ = [-sin(φ), 0, cos(φ)]
-                    e_ρ = [cos(α) * cos(φ), -sin(α), cos(α) * sin(φ)]
-                    E0 = sqrt(cos(α)) * sin(α) .* (dot(pol, e_r) .* e_ρ .+ dot(pol, e_φ) .* e_φ)
-                    push!(pd, manual_hit(dir, E0))
-                end
-                return pd
+        @testset "parabolic mirror: real high-NA trace" begin
+            # x-polarized plane wave focused by an on-axis paraboloid (NA ≈ 0.88), compared with an
+            # analytic fan from the ideal-mirror laws d' = d - 2(d⋅n)n, E' = -E + 2(E⋅n)n and the
+            # pupil mapping h = 2f⋅tan(α/2). The fan uses the weight h⋅dh/dα of an equal-area ray sum;
+            # the energy-conserving Debye weight √(sinα⋅h⋅dh/dα) deviates by ≈2 % and is not tested.
+            mm = 1e-3
+            f = 5mm
+            D = 12mm
+            N = 5000
+            pol = [1.0, 0, 0]
+
+            mirror = ParabolicMirror(f, 12.5mm)
+            src = UniformDiscSource([0, -f / 2, 0], [0, 1, 0], D, λ; num_rays = N)
+            pol_src = BMO.CollimatedSource(
+                [Beam(position(first(rays(b))), direction(first(rays(b))), λ, pol) for b in BMO.beams(src)], D)
+            # source sits between focus and mirror, so the incoming rays never cross the detector
+            pd = Detector(1mm)
+            translate3d!(pd, [0, -f, 0])
+            solve_system!(System([mirror, pd]), pol_src)
+
+            hs = BMO.hits(pd)
+            @test length(hs) == N
+            @test maximum(h -> hypot(BMO.hit_point(h)[1], BMO.hit_point(h)[3]), hs) < 1e-9
+            @test all(h -> norm(BMO.polarization(h)) ≈ 1, hs)
+
+            NA = maximum(h -> sqrt(1 - BMO.direction(h)[2]^2), hs)
+            @test NA ≈ sin(2 * atan(D / (4f))) rtol = 1e-3
+
+            analytic = Detector(1.0)
+            Nα = 60
+            for i in 1:Nα, j in 1:(4Nα)
+                α = asin(NA) * (i - 0.5) / Nα
+                φ = 2π * (j - 0.5) / (4Nα)
+                h = 2f * tan(α / 2)
+                nrm = normalize([h * cos(φ) / (2f), 1, h * sin(φ) / (2f)])
+                dir = [0, 1.0, 0] .- 2 * nrm[2] .* nrm
+                E0 = -pol .+ 2 * dot(pol, nrm) .* nrm
+                weight = tan(α / 2) / cos(α / 2)^2   # ∝ h⋅dh/dα
+                push!(analytic, manual_hit(dir, weight .* E0))
             end
 
-            function vector_psf(NA; n = 151)
-                R = 1.5λ / NA
-                xs, zs, E = electric_field(aplanatic_detector(NA); n, x_min = -R, x_max = R, z_min = -R, z_max = R)
-                c = (n + 1) ÷ 2
+            W = 1.5λ / NA
+            function normalized_psf(detector)
+                E = electric_field(detector; n = 101, x_min = -W, x_max = W, z_min = -W, z_max = W)[3]
                 I = intensity.(E)
                 Ex2 = map(e -> abs2(e[1]), E)
                 Ey2 = map(e -> abs2(e[2]), E)
-                fwhm_count(v) = count(>(maximum(v) / 2), v)
-                return (
-                    peak = argmax(I) == CartesianIndex(c, c),
-                    fwhm_ratio = fwhm_count(I[:, c]) / fwhm_count(I[c, :]),
-                    Ey_center = Ey2[c, c] / maximum(Ey2),
-                    Ey_ratio = maximum(Ey2) / maximum(Ex2),
-                    Ey_lobe_row = argmax(Ey2)[2] == c
-                )
+                return I ./ maximum(I), maximum(Ey2) / maximum(Ex2)
             end
+            I_real, Ey_real = normalized_psf(pd)
+            I_ref, Ey_ref = normalized_psf(analytic)
+            c = 51
+            half_max_count(v) = count(>(0.5), v)
 
-            low = vector_psf(0.1)
-            @test low.peak
-            @test low.fwhm_ratio ≈ 1 atol = 0.1
-            @test low.Ey_ratio < 0.01
-
-            high = vector_psf(0.9)
-            @test high.peak
-            # PSF is stretched along the input polarization (x)
-            @test high.fwhm_ratio > 1.2
-            # longitudinal component vanishes on axis, but forms strong lobes along x
-            @test high.Ey_center < 1e-12
-            @test high.Ey_ratio > 0.1
-            @test high.Ey_lobe_row
+            @test argmax(I_real) == CartesianIndex(c, c)
+            @test maximum(abs, I_real - I_ref) < 1e-2
+            @test Ey_real ≈ Ey_ref rtol = 1e-2
+            # vectorial signatures survive the real trace
+            @test half_max_count(I_real[:, c]) / half_max_count(I_real[c, :]) > 1.2
+            @test Ey_real > 0.1
         end
     end
 
@@ -335,8 +347,18 @@ const BMO = BeamletOptics
         @test x[i_min] - x[ix_ctr] ≈ airy_radius rtol = 2e-2
 
         # vector field result feeds the scalar intensity/power pipeline
-        @test eltype(electric_field(psfd; n = 2)[3]) <: BMO.Point3{<:Complex}
+        E_map = electric_field(psfd; n = 200, crop_factor = 5, center = MinMax())[3]
+        @test eltype(E_map) <: BMO.Point3{<:Complex}
         @test BMO.optical_power(psfd; n = 100, crop_factor = 5, center = MinMax()) > 0
+
+        # at this NA the PSF stays isotropic and the vector effects vanish
+        row = I_num[ix_ctr, :]
+        j_min = jx_ctr
+        while j_min < length(row) && row[j_min + 1] < row[j_min]
+            j_min += 1
+        end
+        @test (x[i_min] - x[ix_ctr]) / (y[j_min] - y[jx_ctr]) ≈ 1 atol = 0.01
+        @test maximum(e -> abs2(e[2]), E_map) / maximum(e -> abs2(e[1]), E_map) < 1e-3
     end
 end
 
