@@ -43,4 +43,18 @@ A polarisation filter or linear polarizer is the simplest practical polarizer an
 
 ```@docs; canonical=false
 PolarizationFilter(::Real)
+RoundPolarizationFilter
+transmission_axis(::PolarizationFilter)
+```
+
+The transmission axis of a filter can be queried via [`transmission_axis`](@ref). When rendered, both the [`PolarizationFilter`](@ref) and the [`LinearPolarizer`](@ref) show this axis as a line across the film; the [`LinearPolarizer`](@ref) additionally shows rim marks akin to the engraved line of real components. This can be disabled via `render!(ax, filter; show_transmission_axis=false)`, and styled with `axis_color` and `axis_linewidth`.
+
+## Linear polarizer
+
+The [`LinearPolarizer`](@ref) models a real film polarizer (e.g. Thorlabs [LPNIRE100-B](https://www.thorlabs.com/item/LPNIRE100-B?aID=af1e1f34f538197c483fc7db11fa2b22&aC=1)): a 2D [`PolarizationFilter`](@ref) cemented between two flush glass plates. The film acts at the inner glass interface, the uncoated outer surfaces cause Fresnel losses, and the film thickness itself is not modeled. An example is shown in the [Polarized rays](@ref) section.
+
+```@docs; canonical=false
+LinearPolarizer
+RoundLinearPolarizer
+transmission_axis(::LinearPolarizer)
 ```

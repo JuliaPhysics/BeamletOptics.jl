@@ -57,6 +57,7 @@ include("RenderLenses.jl")
 include("RenderCylinderLenses.jl")
 include("RenderMirrors.jl")
 include("RenderPresets.jl")
+include("RenderPolarizers.jl")
 include("RenderCamera.jl")
 
 end
