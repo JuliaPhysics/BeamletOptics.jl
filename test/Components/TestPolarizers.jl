@@ -105,6 +105,43 @@ const mm = 1e-3
             @test i_n_tilt ≈ i_a_tilt
         end
     end
+
+    @testset "Polarizing filter - astigmatic Gaussian beamlet" begin
+        # Default filter at origin: transmits along global x, blocks global z
+        filter = PolarizationFilter(5mm)
+        system = System([filter])
+        λ = 633e-9
+        w0 = 0.5mm
+        pos = [0, -10mm, 0]
+        dir = [0, 1, 0]
+
+        @testset "Transmitted polarization" begin
+            ref = AstigmaticGaussianBeamlet(pos, dir, λ, w0; E0 = [1, 0, 0], support = [1, 0, 0])
+            agb = AstigmaticGaussianBeamlet(pos, dir, λ, w0; E0 = [1, 0, 0], support = [1, 0, 0])
+            @test_nowarn solve_system!(system, agb)
+            # All component beams pass the filter in sync
+            lengths = map(b -> length(BMO.rays(b)), BMO._component_beams(agb))
+            @test all(==(2), lengths)
+            # Beam radii behind the ideal filter match free-space propagation
+            z = 25mm
+            w1, w2 = BMO.gauss_parameters(agb, z)
+            w1_ref, w2_ref = BMO.gauss_parameters(ref, z)
+            @test w1 ≈ w1_ref
+            @test w2 ≈ w2_ref
+            # Chief polarization is unchanged
+            @test BMO.polarization(BMO.rays(agb.c)[2]) ≈ BMO.polarization(BMO.rays(agb.c)[1])
+        end
+
+        @testset "Blocked polarization" begin
+            agb = AstigmaticGaussianBeamlet(pos, dir, λ, w0; E0 = [0, 0, 1], support = [1, 0, 0])
+            @test_nowarn solve_system!(system, agb)
+            # Auxiliary beams stay in sync with the chief beam
+            lengths = map(b -> length(BMO.rays(b)), BMO._component_beams(agb))
+            @test all(==(lengths[1]), lengths)
+            # Field behind the filter is extinguished
+            @test norm(BMO.polarization(last(BMO.rays(agb.c)))) ≈ 0 atol = 1e-12
+        end
+    end
 end
 
 end # MODULE
