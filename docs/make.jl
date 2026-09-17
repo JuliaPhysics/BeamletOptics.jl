@@ -3,8 +3,36 @@ using GLMakie
 using BeamletOptics
 using Documenter
 using DocumenterCitations
+using DocumenterVitepress
+import NodeJS_20_jll
 
 include(joinpath(@__DIR__, "DocUtils.jl"))
+
+# DocumenterVitepress runs `npm install` through NodeJS_20_jll, but JLLWrappers does not
+# put the artifact's `bin` directory on PATH. npm postinstall scripts that spawn `node`
+# themselves (esbuild) then fail, so put it there ourselves.
+if Sys.iswindows()
+    ENV["PATH"] = string(dirname(NodeJS_20_jll.node_path), ";", ENV["PATH"])
+end
+
+# DocumenterCitations 1.5 wraps every in-text citation in a `CitationSiteNode`, an HTML
+# anchor the bibliography backlinks point at. DocumenterVitepress only handles the
+# `BibliographyNode`, so without this method the node itself ends up in the markdown as
+# `DocumenterCitations.CitationSiteNode("...")`. Emit the anchor, then the citation link,
+# mirroring what the LaTeX writer of DocumenterCitations does.
+function DocumenterVitepress.render(
+    io::IO,
+    mime::MIME"text/plain",
+    node::Documenter.MarkdownAST.Node,
+    citation_site::DocumenterCitations.CitationSiteNode,
+    page,
+    doc;
+    kwargs...
+)
+    print(io, "<a id=\"", citation_site.id, "\"></a>")
+    DocumenterVitepress.render(io, mime, node, node.children, page, doc; kwargs...)
+    return nothing
+end
 
 DocMeta.setdocmeta!(
     BeamletOptics,
@@ -19,13 +47,10 @@ makedocs(;
     modules=[BeamletOptics],
     authors="Hugo Uittenbosch <hugo.uittenbosch@dlr.de>, Oliver Kliebisch <oliver.kliebisch@dlr.de> and contributors",
     sitename="BeamletOptics.jl",
-    format=Documenter.HTML(;
-        prettyurls=get(ENV, "CI", "false") == "true",
-        canonical="https://JuliaPhysics.github.io/BeamletOptics.jl",
-        edit_link="master",
-        assets=String[],
-        size_threshold_ignore=["reference.md"],
-        sidebar_sitename = false,
+    format=DocumenterVitepress.MarkdownVitepress(;
+        repo="github.com/JuliaPhysics/BeamletOptics.jl",
+        devbranch="master",
+        devurl="dev",
     ),
     pagesonly=true,
     pages=[
@@ -87,8 +112,20 @@ makedocs(;
     plugins=[bib],
 )
 
-deploydocs(;
+# On Windows DocumenterVitepress only runs `npm install` and tells the user to install
+# Node.js system-wide instead of building the site. Do the build here with the JLL's Node.
+if Sys.iswindows()
+    # The drive letter must be upper case: VS Code starts Julia in `c:\...`, and with a
+    # lower case drive letter the VitePress SSR build fails with ERR_MODULE_NOT_FOUND
+    # for chunks in `.vitepress/.temp`.
+    cd(uppercasefirst(@__DIR__)) do
+        run(`$(NodeJS_20_jll.node()) node_modules/vitepress/bin/vitepress.js build build/.documenter`)
+    end
+end
+
+DocumenterVitepress.deploydocs(;
     repo="github.com/JuliaPhysics/BeamletOptics.jl.git",
+    target=joinpath(@__DIR__, "build"),
     devbranch="master",
     push_preview=false,
 )

@@ -10,7 +10,38 @@ If you want to edit the package documentation locally, follow these steps:
     1. This step is **important**, otherwise an incompatible version of `BeamletOptics` might be used to generate the docs
 4. Run the `make.jl` file
 
-Changes you have made will then be saved into the `build` folder. You can host the website locally by opening the `index.html` starting page.
+The generated site is written to `docs/build/1`. DocumenterVitepress builds one site per
+deployment base, and a local build always ends up in the first (and only) one.
+
+To preview it, serve `docs/build/1` as the server root -- VitePress uses absolute paths, so
+opening `index.html` from the file system does **not** work.
+
+With the
+[Live Server](https://marketplace.visualstudio.com/items?itemName=ritwickdey.LiveServer)
+extension for VS Code, point the server root at the build folder. The `.vscode` folder is
+not tracked by git, so create `.vscode/settings.json` in your local clone yourself:
+
+```json
+{
+    "liveServer.settings.root": "/docs/build/1",
+    "liveServer.settings.port": 5501
+}
+```
+
+The path is relative to the workspace root, which has to be the repository root for this to
+work. The port is optional and only needed if the default (5500) is already taken. With that
+in place, *Go Live* serves the docs. Alternatively, from the `docs` environment:
+
+```julia
+using LiveServer
+LiveServer.serve(dir = "build/1")
+```
+
+!!! note
+    On Windows, `make.jl` runs the VitePress build itself, because DocumenterVitepress
+    skips that step there. Node comes from `NodeJS_20_jll`, so no system-wide Node.js
+    installation is required. The first build downloads the npm packages into
+    `docs/node_modules` and therefore takes noticeably longer.
 
 ## Section titles
 
@@ -35,4 +66,4 @@ In general, you can generate and include figures into your documentation section
 Examples for this pattern can be found at the top of most .md files of the documentation, e.g. `beamsplitters.md`.
 
 !!! tip
-    Usage of placeholders can be disabled for each script via the `use_placeholder=false` keyword argument. It can also be deactivated globally by setting `GLOBAL_USE_PLACEHOLDERS=false` in the `cond_save.jl` file.
+    Usage of placeholders can be disabled for each script via the `use_placeholder=false` keyword argument. It can also be deactivated globally by setting `GLOBAL_USE_PLACEHOLDERS=false` in the `DocUtils.jl` file.
