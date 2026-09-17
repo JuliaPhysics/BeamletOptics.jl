@@ -62,18 +62,13 @@ jobs:
       - name: Install OpenGL dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            xvfb \
-            mesa-utils \
-            libgl1-mesa-dri \
-            libgl1-mesa-glx \
-            libegl1 \
-            libxrandr2 \
-            libxinerama1 \
-            libxcursor1 \
-            libxi6
+          sudo apt-get install -y xvfb mesa-utils
+      # Precompilation is skipped here: GLMakie needs a display to initialize, which only
+      # exists inside xvfb-run below.
       - name: Configure doc environment
         shell: julia --project=docs --color=yes {0}
+        env:
+          JULIA_PKG_PRECOMPILE_AUTO: "0"
         run: |
           using Pkg
           Pkg.develop(PackageSpec(path=pwd()))
@@ -85,7 +80,6 @@ jobs:
           xvfb-run --auto-servernum --server-args="-screen 0 1280x1024x24" \
             julia --project=docs --color=yes -e 'using Documenter; include("docs/make.jl")'
         env:
-          DISPLAY: ":99"
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
       # Run doctests in xvfb environment.
@@ -98,5 +92,3 @@ jobs:
               DocMeta.setdocmeta!(BeamletOptics, :DocTestSetup, :(using BeamletOptics); recursive=true);
               doctest(BeamletOptics)
             '
-        env:
-          DISPLAY: ":99"
