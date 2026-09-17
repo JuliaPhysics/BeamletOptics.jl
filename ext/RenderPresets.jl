@@ -10,3 +10,10 @@ render!(ax::_RenderEnv, bs::ThinBeamsplitter; kwargs...) = _render!(ax, bs; tran
 render!(ax::_RenderEnv, nino::BMO.NonInteractableObject; kwargs...) = _render!(ax, nino; transparency=false, color=:grey, kwargs...)
 
 render!(ax::_RenderEnv, nino::BMO.IntersectableObject; kwargs...) = _render!(ax, nino; transparency=true, color=:grey, kwargs...)
+
+function render!(ax::_RenderEnv, lipo::LinearPolarizer; kwargs...)
+    render!(ax, lipo.front; kwargs...)
+    render!(ax, lipo.back; kwargs...)
+    render!(ax, lipo.filter; transparency=true, alpha=0.75, color=:green)
+    return nothing
+end

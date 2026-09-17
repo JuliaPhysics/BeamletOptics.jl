@@ -138,8 +138,191 @@ const mm = 1e-3
             # Auxiliary beams stay in sync with the chief beam
             lengths = map(b -> length(BMO.rays(b)), BMO._component_beams(agb))
             @test all(==(lengths[1]), lengths)
-            # Field behind the filter is extinguished
-            @test norm(BMO.polarization(last(BMO.rays(agb.c)))) ≈ 0 atol = 1e-12
+            # Beamlet is terminated at the filter
+            @test all(==(1), lengths)
+            @test BMO.object(BMO.intersection(last(BMO.rays(agb.c)))) === filter
+        end
+    end
+
+    @testset "Round polarization filter" begin
+        filter = RoundPolarizationFilter(10mm)
+        system = System([filter])
+
+        @testset "Hit" begin
+            beam = Beam([4mm, -10mm, 0], [0, 1, 0], 1e-6, [1.0, 0, 0])
+            solve_system!(system, beam)
+            @test length(BMO.rays(beam)) == 2
+            @test BMO.polarization(BMO.rays(beam)[2]) ≈ BMO.polarization(BMO.rays(beam)[1])
+        end
+
+        @testset "Miss" begin
+            beam = Beam([6mm, -10mm, 0], [0, 1, 0], 1e-6, [1.0, 0, 0])
+            solve_system!(system, beam)
+            @test length(BMO.rays(beam)) == 1
+        end
+    end
+
+    @testset "Linear polarizer - geometry and kinematics" begin
+        n = λ -> 1.5
+        tf = 1.6mm
+        tb = 1.0mm
+
+        lp = RoundLinearPolarizer(25.4mm, tf, tb, n)
+        @test position(lp) ≈ zeros(3)
+        @test position(lp.front) ≈ [0, -tf, 0]
+        @test position(lp.back) ≈ [0, 0, 0]
+        @test thickness(lp) ≈ tf + tb
+
+        v = [1mm, 2mm, 3mm]
+        translate3d!(lp, v)
+        rotate3d!(lp, [0, 0, 1], π / 4)
+        yp = orientation(lp)[:, 2]
+        @test position(lp) ≈ v
+        @test thickness(lp) ≈ tf + tb
+        @test position(lp.front) ≈ v - tf * yp
+        @test position(lp.back) ≈ v
+    end
+
+    @testset "Linear polarizer - Malus law (forward and reverse)" begin
+        n = λ -> 1.5
+        tf = 1.6mm
+        tb = 1.0mm
+        D = 25.4mm
+        λ = 1e-6
+
+        # Reference system: single plate of thickness tf + tb, no film in between
+        ref = Prism(BMO.PlanoSurfaceSDF(tf + tb, D), n)
+        translate3d!(ref, [0, -tf, 0])
+        system_ref = System([ref])
+
+        thetas = 0:10:80
+
+        @testset "Forward" begin
+            for θ in thetas
+                lp = RoundLinearPolarizer(D, tf, tb, n)
+                rotate3d!(lp, [0, 1, 0], deg2rad(θ))
+                system = System([lp])
+
+                beam = Beam([0, -10mm, 0], [0, 1, 0], λ, [1.0, 0, 0])
+                solve_system!(system, beam)
+                beam_ref = Beam([0, -10mm, 0], [0, 1, 0], λ, [1.0, 0, 0])
+                solve_system!(system_ref, beam_ref)
+
+                E = BMO.polarization(last(BMO.rays(beam)))
+                Eref = BMO.polarization(last(BMO.rays(beam_ref)))
+                ratio = norm(E)^2 / norm(Eref)^2
+                @test ratio ≈ cosd(θ)^2 rtol = 1e-9
+                @test length(BMO.rays(beam)) == 4
+            end
+        end
+
+        @testset "Reverse" begin
+            for θ in thetas
+                lp = RoundLinearPolarizer(D, tf, tb, n)
+                rotate3d!(lp, [0, 1, 0], deg2rad(θ))
+                system = System([lp])
+
+                beam = Beam([0, 10mm, 0], [0, -1, 0], λ, [1.0, 0, 0])
+                solve_system!(system, beam)
+                beam_ref = Beam([0, 10mm, 0], [0, -1, 0], λ, [1.0, 0, 0])
+                solve_system!(system_ref, beam_ref)
+
+                E = BMO.polarization(last(BMO.rays(beam)))
+                Eref = BMO.polarization(last(BMO.rays(beam_ref)))
+                ratio = norm(E)^2 / norm(Eref)^2
+                @test ratio ≈ cosd(θ)^2 rtol = 1e-9
+                @test length(BMO.rays(beam)) == 4
+            end
+        end
+
+        @testset "Blocked orientation (θ = 90°)" begin
+            @testset "Forward" begin
+                lp = RoundLinearPolarizer(D, tf, tb, n)
+                rotate3d!(lp, [0, 1, 0], deg2rad(90))
+                system = System([lp])
+                beam = Beam([0, -10mm, 0], [0, 1, 0], λ, [1.0, 0, 0])
+                @test_nowarn solve_system!(system, beam)
+                # The film blocks the beam at the cemented interface: start -> front prism, then terminated
+                @test length(BMO.rays(beam)) == 2
+                @test BMO.shape(BMO.intersection(last(BMO.rays(beam)))) === BMO.shape(lp.front)
+            end
+
+            @testset "Reverse" begin
+                lp = RoundLinearPolarizer(D, tf, tb, n)
+                rotate3d!(lp, [0, 1, 0], deg2rad(90))
+                system = System([lp])
+                beam = Beam([0, 10mm, 0], [0, -1, 0], λ, [1.0, 0, 0])
+                @test_nowarn solve_system!(system, beam)
+                # The film blocks the beam at the cemented interface: start -> back prism, then terminated
+                @test length(BMO.rays(beam)) == 2
+                @test BMO.shape(BMO.intersection(last(BMO.rays(beam)))) === BMO.shape(lp.back)
+            end
+        end
+    end
+
+    @testset "Linear polarizer - tilted plate offset" begin
+        n = λ -> 1.5
+        tf = 1.6mm
+        tb = 1.0mm
+        D = 25.4mm
+        λ = 1e-6
+
+        lp = RoundLinearPolarizer(D, tf, tb, n)
+        xrotate3d!(lp, deg2rad(30))
+        system = System([lp])
+
+        p1 = [0.0, -10mm, 0.0]
+        d1 = [0.0, 1.0, 0.0]
+        beam = Beam(p1, d1, λ, [1.0, 0, 0])
+        solve_system!(system, beam)
+
+        lastray = last(BMO.rays(beam))
+        dir_out = BMO.direction(lastray)
+        pos_out = BMO.position(lastray)
+
+        @test dir_out ≈ d1 atol = 1e-12
+
+        # perpendicular distance between the incoming line (p1, d1) and the outgoing line
+        delta = pos_out .- p1
+        perp = delta .- dot(delta, d1) .* d1
+        offset = norm(perp)
+
+        θi = deg2rad(30)
+        expected_offset = (tf + tb) * sin(θi) * (1 - cos(θi) / sqrt(1.5^2 - sin(θi)^2))
+        @test offset ≈ expected_offset atol = 1e-9
+    end
+
+    @testset "Linear polarizer - beamlets" begin
+        n = λ -> 1.5
+        tf = 1.6mm
+        tb = 1.0mm
+        D = 25.4mm
+        λ = 633e-9
+        w0 = 0.5mm
+        pos = [0, -10mm, 0]
+        dir = [0, 1, 0]
+
+        lp = RoundLinearPolarizer(D, tf, tb, n)
+        system = System([lp])
+
+        @testset "GaussianBeamlet" begin
+            gauss = GaussianBeamlet(pos, dir, λ, w0)
+            @test_nowarn solve_system!(system, gauss)
+        end
+
+        @testset "AstigmaticGaussianBeamlet - transmitted" begin
+            agb = AstigmaticGaussianBeamlet(pos, dir, λ, w0; E0 = [1, 0, 0], support = [1, 0, 0])
+            @test_nowarn solve_system!(system, agb)
+            lengths = map(b -> length(BMO.rays(b)), BMO._component_beams(agb))
+            @test all(==(4), lengths)
+        end
+
+        @testset "AstigmaticGaussianBeamlet - blocked" begin
+            agb = AstigmaticGaussianBeamlet(pos, dir, λ, w0; E0 = [0, 0, 1], support = [1, 0, 0])
+            @test_nowarn solve_system!(system, agb)
+            lengths = map(b -> length(BMO.rays(b)), BMO._component_beams(agb))
+            @test all(==(2), lengths)
+            @test BMO.shape(BMO.intersection(last(BMO.rays(agb.c)))) === BMO.shape(lp.front)
         end
     end
 end

@@ -45,3 +45,4 @@ function _calculate_global_E0(object::AbstractJonesPolarizer, ray::PolarizedRay,
 end
 
 include("PolarizationFilter.jl")
+include("LinearPolarizer.jl")

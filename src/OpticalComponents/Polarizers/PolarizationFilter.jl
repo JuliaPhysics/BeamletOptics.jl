@@ -28,6 +28,18 @@ function PolarizationFilter(edge_length::Real; cutoff_strength=eps())
     return PolarizationFilter(shape, XZBasis(1, 0, 0, 0), cutoff_strength)
 end
 
+"""
+    RoundPolarizationFilter(diameter; cutoff_strength)
+
+Spawns a thin, round [`PolarizationFilter`](@ref) with the given `diameter` in [m].
+The filter is centered at the origin, aligned with the global y-axis and transmits along the x-axis,
+while blocking polarization components along the global z-axis.
+"""
+function RoundPolarizationFilter(diameter::Real; cutoff_strength=eps())
+    shape = CircularFlatMesh(diameter / 2)
+    return PolarizationFilter(shape, XZBasis(1, 0, 0, 0), cutoff_strength)
+end
+
 function interact3d(::AbstractSystem,
         polfilter::PolarizationFilter,
         ::Beam{T, R},
@@ -38,8 +50,7 @@ function interact3d(::AbstractSystem,
     E0 = _calculate_global_E0(polfilter, ray, ndir, polfilter.JMat)
 
     # Terminate blocked rays
-    # FIXME this needs to be reworked in the future
-    if norm(E0) ≈ polfilter.cutoff
+    if norm(E0) ≤ polfilter.cutoff
         return nothing
     end
 

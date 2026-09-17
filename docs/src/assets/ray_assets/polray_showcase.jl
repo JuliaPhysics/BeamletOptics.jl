@@ -8,6 +8,15 @@ const nm = 1e-9
 
 PSF10_03_P01() = RoundPlanoMirror(25.4mm, 6mm)
 
+N_BK7 = SellmeierEquation(
+    1.03961212,      # B1
+    0.231792344,     # B2
+    1.01046945,      # B3
+    0.00600069867,   # C1 (μm²)
+    0.0200179144,    # C2 (μm²)
+    103.560653       # C3 (μm²)
+)
+
 ##
 periscope = MeshDummy(joinpath(@__DIR__, "periscope.stl"))
 
@@ -27,12 +36,12 @@ translate_to3d!(m3, position(m2) + [0, 127.856mm, 0])
 zrotate3d!(m3, deg2rad(-45))
 
 ##
-flt = PolarizationFilter(20mm)
-translate_to3d!(flt, position(m2) + [0, 70mm, 0])
-yrotate3d!(flt, deg2rad(0))
+LPNIRE100 = RoundLinearPolarizer(25.4mm, 1.6mm, 1.7mm, N_BK7)
+translate_to3d!(LPNIRE100, position(m2) + [0, 61.31mm + 1.6mm, 0])
+yrotate3d!(LPNIRE100, deg2rad(0))
 
 ##
-system = System([m1, m2, m3, flt])
+system = System([m1, m2, m3, LPNIRE100])
 
 E_circ = [0, 1im, 1] / sqrt(2)
 E_lin = [0,1,0]
@@ -64,7 +73,7 @@ render!(ax, m1; color=:gold)
 render!(ax, m2; color=:gold)
 render!(ax, m3; color=:gold)
 
-render!(ax, flt)
+render!(ax, LPNIRE100)
 # render_lcs!(ax, flt; scale=3)
 
 render!(ax, beam; flen=200mm, color=RGBAf(1,0,0,0.25), show_polarization=true, pol_λ=5mm, pol_color=:red)

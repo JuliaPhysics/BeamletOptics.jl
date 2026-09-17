@@ -48,7 +48,7 @@ export ThinBeamsplitter, RoundThinBeamsplitter, RectangularPlateBeamsplitter,
        RoundPlateBeamsplitter, CubeBeamsplitter, RectangularCompensatorPlate
 
 # polarizing components
-export PolarizationFilter
+export PolarizationFilter, RoundPolarizationFilter, LinearPolarizer, RoundLinearPolarizer
 
 # dummies
 export NonInteractableObject, MeshDummy, IntersectableObject
