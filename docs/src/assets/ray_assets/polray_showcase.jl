@@ -27,23 +27,35 @@ translate_to3d!(m3, position(m2) + [0, 127.856mm, 0])
 zrotate3d!(m3, deg2rad(-45))
 
 ##
-filter = PolarizationFilter(20mm)
-translate_to3d!(filter, position(m2) + [0, 70mm, 0])
-yrotate3d!(filter, deg2rad(0))
+flt = PolarizationFilter(20mm)
+translate_to3d!(flt, position(m2) + [0, 70mm, 0])
+yrotate3d!(flt, deg2rad(0))
 
 ##
-system = System([m1, m2, m3, filter])
+system = System([m1, m2, m3, flt])
 
-E_circ = [0, 2im, -1] / sqrt(2)
+E_circ = [0, 1im, 1] / sqrt(2)
 E_lin = [0,1,0]
 
-ray = PolarizedRay(position(m1) + [80mm, 0, 0], [-1, 0, 0], 1000nm, E_lin)
+start_pos = position(m1) + [150mm, 0, 0]
+
+ray = PolarizedRay(start_pos, [-1, 0, 0], 1000nm, E_lin)
 beam = Beam(ray)
+
+beam = AstigmaticGaussianBeamlet(start_pos, [-1, 0, 0], 1000nm, 4mm, E0=E_circ)
 
 solve_system!(system, beam)
 
 ##
-fig = Figure()#size=(600,300))
+cview = [
+ -0.59507    0.803674  9.15934e-16  -0.0651614
+ -0.548087  -0.405824  0.731373     -0.02743
+  0.587786   0.435218  0.681977     -0.384558
+  0.0        0.0       0.0           1.0
+]
+
+fig = Figure(size=(600,450))
+display(fig)
 ax = LScene(fig[1,1], show_axis=false)
 
 render!(ax, periscope; transparency=true, alpha=0.05)
@@ -52,9 +64,11 @@ render!(ax, m1; color=:gold)
 render!(ax, m2; color=:gold)
 render!(ax, m3; color=:gold)
 
-render!(ax, filter)
-# render_lcs!(ax, filter; scale=3)
+render!(ax, flt)
+# render_lcs!(ax, flt; scale=3)
 
-render!(ax, beam; flen=80mm, color=:blue, show_polarization=true, pol_λ=5mm, pol_color=:blue, pol_amplitude=10mm)
+render!(ax, beam; flen=200mm, color=RGBAf(1,0,0,0.25), show_polarization=true, pol_λ=5mm, pol_color=:red)
 
-fig
+set_view(ax, cview)
+
+save("polray_showcase.png", fig; px_per_unit=4, update = false)
