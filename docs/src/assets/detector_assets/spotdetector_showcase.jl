@@ -28,7 +28,7 @@ translate3d!(l567, [0, l_567, 0])
 
 # spot detector in the paraxial image plane, back focal length is 44.902 mm
 pd = Detector(50mm)
-translate3d!(pd, [0, l_567 + thickness(l567) + 44.902mm, 0])
+translate3d!(pd, [0, l_567 + thickness(l567) + 44.6mm, 0])
 
 sonnar = ObjectGroup([l1, l234, l567])
 
@@ -43,8 +43,9 @@ fields = [
 ]
 
 dir_theta(θ) = [0, cosd(θ), sind(θ)]
-b1 = CollimatedSource([0, -50mm, fields[1].z0], dir_theta(fields[1].θ), 50mm, λ; num_rays=500)
-b2 = CollimatedSource([0, -50mm, fields[2].z0], dir_theta(fields[2].θ), 40mm, λ; num_rays=500)
+b1 = CollimatedSource([0, -50mm, fields[1].z0], dir_theta(fields[1].θ), 50mm, λ; num_rings=6, num_rays=500)
+b2 = CollimatedSource([0, -50mm, fields[2].z0], dir_theta(fields[2].θ), 40mm, λ; num_rings=6, num_rays=500)
+b3 = UniformDiscSource([0, -50mm, fields[1].z0], dir_theta(fields[1].θ), 50mm, λ; num_rays=1000)
 
 solve_system!(system, b1)
 b1_spots = spot_diagram(pd)
@@ -52,6 +53,10 @@ empty!(pd)
 
 solve_system!(system, b2)
 b2_spots = spot_diagram(pd)
+empty!(pd)
+
+solve_system!(system, b3)
+x, z, I = intensity(pd; n=300, crop_factor=1)
 empty!(pd)
 
 ##
@@ -66,8 +71,6 @@ fig = Figure(size=(600, 600))
 ax = LScene(fig[1,1:2], show_axis=false)
 
 render!(ax, sonnar; transparency=true, alpha=0.1)
-# render!(ax, stop)
-# render!(ax, s7)
 render!(ax, pd)
 
 render!(ax, b1; alpha=0.15, render_every=5, color=:red)
@@ -97,3 +100,16 @@ display(fig)
 set_view(ax, cview)
 
 save("sonnar_spot_diagram.png", fig, px_per_unit=4, update=false)
+
+## point spread function of the oblique beam
+psf_fig = Figure(size=(600, 360))
+psf_ax = Axis(
+    psf_fig[1,1],
+    aspect=DataAspect(),
+    xlabel="x [µm]",
+    ylabel="z [µm]",
+)
+hm = heatmap!(psf_ax, x*1e6, z*1e6, I / maximum(I), colormap=:viridis, interpolate=true)
+Colorbar(psf_fig[1,2], hm, label="I / Iₘₐₓ", height=Relative(0.6))
+
+save("sonnar_psf_showcase.png", psf_fig, px_per_unit=4)

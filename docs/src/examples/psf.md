@@ -1,19 +1,13 @@
 ```@setup psf
 dir = joinpath(@__DIR__, "..", "assets", "examples")
 
-Main.DocUtils.conditional_include(joinpath(dir, "psfdetector_showcase.jl"))
-Main.DocUtils.conditional_include(joinpath(dir, "polarized_psf_showcase.jl"))
+Main.DocUtils.conditional_include(joinpath(dir, "psfdetector_showcase.jl"), use_placeholder=false)
+Main.DocUtils.conditional_include(joinpath(dir, "polarized_psf_showcase.jl"), use_placeholder=false)
 ```
 
 # Point spread functions
 
 A [`Detector`](@ref) placed in the focal plane of an imaging system yields an estimate of its point spread function (PSF), see the [Point spread function estimation](@ref) section for the general idea. The examples below cover the diffraction limited case, an aberrated system and the vectorial focus at high NA.
-
-!!! warning "Experimental feature"
-    The point spread function estimation is a highly experimental feature. It does not use
-    pupils (yet) but merely uses superposition of the ray-attached plane-waves. While this
-    gives qualitatively sound results, it requires good sampling of the problem to obtain
-    quantitatively good results. Currently no Strehl-ratio is calculated due to that.
 
 !!! warning "Collimated input"
     When dealing with a collimated source as the input to your optical system, where you want to calculate the PSF, **DO NOT** use the [`CollimatedSource`](@ref) beam group directly but instead use the [`UniformDiscSource`](@ref) constructor. This function returns a `CollimatedSource` with an equal-area sampling, which correctly weights the outer beams in relation to the inner beams. Otherwise the results might be wrong.
@@ -138,9 +132,6 @@ Ey = map(e -> abs2(e[2]), E)      # longitudinal component
 The field `E` is a matrix of complex 3D vectors, so individual components can be evaluated separately. The cuts through the focus show a full width at half maximum of about 720 nm along ``x`` and 510 nm along ``z``, i.e. the PSF is roughly 1.4 times wider along the polarization. The longitudinal component reaches about 18 % of the peak of the transverse component.
 
 ![Vectorial PSF of a parabolic mirror at NA 0.88](psf_vector_showcase.png)
-
-!!! note "Unpolarized light"
-    Orthogonal field vectors do not interfere. To obtain the PSF of unpolarized light, trace the system once with an ``x``-polarized (`[1, 0, 0]`) and once with a ``z``-polarized (`[0, 0, 1]`) source and add the resulting intensities.
 
 !!! warning "Ray amplitudes at high NA"
     The field vector `E0` of a [`PolarizedRay`](@ref) carries the Fresnel/Jones amplitude coefficients, but neither the change of the ray-tube cross-section nor the refractive intensity factor ``\sqrt{n_2\cos\theta_t/(n_1\cos\theta_i)}``. A real trace therefore weights the marginal rays differently than an energy-conserving (Debye) calculation. Geometry, phases and field directions are unaffected, but the PSF shape deviates quantitatively at high NA:

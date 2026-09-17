@@ -3,7 +3,6 @@ detector_showcase_dir = joinpath(@__DIR__, "..", "..", "assets", "detector_asset
 
 Main.DocUtils.conditional_include(joinpath(detector_showcase_dir, "spotdetector_showcase.jl"), use_placeholder=false)
 Main.DocUtils.conditional_include(joinpath(detector_showcase_dir, "photodetector_showcase.jl"), use_placeholder=false)
-Main.DocUtils.conditional_include(joinpath(@__DIR__, "..", "..", "assets", "examples", "psfdetector_showcase.jl"), use_placeholder=false)
 ```
 
 # Detectors
@@ -67,14 +66,14 @@ The figure below demonstrates an example intensity distribution captured by the 
 
 ### Point spread function estimation
 
-If a [`Detector`](@ref) is placed in the focal plane of an imaging system, the coherent addition of the ray-attached plane waves yields an estimate of its point spread function (PSF). The call is the same as above, only the detector position changes. A singlet imaging a collimated 15 mm beam yields the expected Airy pattern:
-
-![Airy disc PSF](psf_airy_showcase.png)
-
-For [`PolarizedRay`](@ref)s the field is added as 3D vectors, so [`electric_field`](@ref) returns a matrix of complex vectors and each component of the focal field can be analyzed separately. This becomes relevant at high NA, where the field vectors tilt towards the optical axis.
+If a [`Detector`](@ref) is placed in the focal plane of an imaging system, the coherent addition of the ray-attached plane waves yields an estimate of its point spread function (PSF). For the Sonnar example from the [Spot diagrams](@ref) section the following distribution was calculated for the on-axis beam bundle. 
 
 !!! warning "Experimental feature"
     The PSF estimation does not use pupils (yet) but merely superimposes the ray-attached plane waves. It gives qualitatively sound results, but requires good sampling of the problem to be quantitatively meaningful. No Strehl ratio is calculated.
+
+![Sonnar Airy disc PSF](sonnar_psf_showcase.png)
+
+For [`PolarizedRay`](@ref)s the field is added as 3D vectors, so [`electric_field`](@ref) returns a matrix of complex vectors and each component of the focal field can be analyzed separately. This becomes relevant at high NA, where the field vectors tilt towards the optical axis.
 
 !!! tip "PSF examples"
     The [Point spread functions](@ref) example page covers the Airy disc, an aberrated asphere and the vectorial focus of a parabolic mirror at NA 0.88, including the caveats on collimated sources and ray amplitudes.
