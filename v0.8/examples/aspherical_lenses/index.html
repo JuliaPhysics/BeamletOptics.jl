@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Aspherical lenses · BeamletOptics.jl</title><meta name="title" content="Aspherical lenses · BeamletOptics.jl"/><meta property="og:title" content="Aspherical lenses · BeamletOptics.jl"/><meta property="twitter:title" content="Aspherical lenses · BeamletOptics.jl"/><meta name="description" content="Documentation for BeamletOptics.jl."/><meta property="og:description" content="Documentation for BeamletOptics.jl."/><meta property="twitter:description" content="Documentation for BeamletOptics.jl."/><meta property="og:url" content="https://StackEnjoyer.github.io/BeamletOptics.jl/examples/aspherical_lenses/"/><meta property="twitter:url" content="https://StackEnjoyer.github.io/BeamletOptics.jl/examples/aspherical_lenses/"/><link rel="canonical" href="https://StackEnjoyer.github.io/BeamletOptics.jl/examples/aspherical_lenses/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img class="docs-light-only" src="../../assets/logo.svg" alt="BeamletOptics.jl logo"/><img class="docs-dark-only" src="../../assets/logo-dark.svg" alt="BeamletOptics.jl logo"/></a><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><span class="tocitem">Tutorials</span><ul><li><a class="tocitem" href="../../tutorials/expander/">Beam expander</a></li><li><a class="tocitem" href="../../tutorials/michelson/">Michelson interferometer</a></li></ul></li><li><span class="tocitem">Examples</span><ul><li><a class="tocitem" href="../spherical_lenses/">Spherical lenses</a></li><li class="is-active"><a class="tocitem" href>Aspherical lenses</a><ul class="internal"><li class="toplevel"><a class="tocitem" href="#Complex-aspherical-lens-example"><span>Complex aspherical lens example</span></a></li></ul></li><li><a class="tocitem" href="../double_gauss/">Double Gauss lens</a></li><li><a class="tocitem" href="../lens_groups/">Lens groups</a></li></ul></li><li><span class="tocitem">Basics</span><ul><li><a class="tocitem" href="../../basics/intro/">Introduction</a></li><li><a class="tocitem" href="../../basics/rays/">Rays</a></li><li><a class="tocitem" href="../../basics/beams/">Beams</a></li><li><a class="tocitem" href="../../basics/elements/">Optical elements</a></li><li><a class="tocitem" href="../../basics/systems/">Optical systems</a></li></ul></li><li><span class="tocitem">Components</span><ul><li><a class="tocitem" href="../../components/components/">Overview</a></li><li><a class="tocitem" href="../../components/mirrors/">Mirrors</a></li><li><a class="tocitem" href="../../components/lenses/">Lenses</a></li><li><a class="tocitem" href="../../components/beamsplitters/">Beamsplitters</a></li><li><a class="tocitem" href="../../components/detectors/">Detectors</a></li></ul></li><li><span class="tocitem">Developer Documentation</span><ul><li><a class="tocitem" href="../../guide/">Dev. guide</a></li><li><a class="tocitem" href="../../design/">API design</a></li></ul></li><li><a class="tocitem" href="../../reference/">Reference</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href>Aspherical lenses</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Aspherical lenses</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/StackEnjoyer/BeamletOptics.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/StackEnjoyer/BeamletOptics.jl/blob/master/docs/src/examples/aspherical_lenses.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Simple-aspherical-lens-example"><a class="docs-heading-anchor" href="#Simple-aspherical-lens-example">Simple aspherical lens example</a><a id="Simple-aspherical-lens-example-1"></a><a class="docs-heading-anchor-permalink" href="#Simple-aspherical-lens-example" title="Permalink"></a></h1><p>The package has a basic support for ISO 10110 even aspheres. It is planned to extend this support in the future to include extended aspheres and maybe Q-aspheres. The following example shows the most simple usage of the plano-aspheric asphere constructor based on the <a href="https://www.thorlabs.com/thorproduct.cfm?partnumber=AL50100J">Thorlabs AL50100J</a> aspheric lens:</p><pre><code class="language-julia hljs">using CairoMakie, BeamletOptics
+
+# radius
+R = 50.3583e-3
+# conic constant
+k = -0.789119
+# even aspheric coefficients up to 8th order
+A = [0, 2.10405e-7*(1e3)^3, 1.76468e-11*(1e3)^5, 1.02641e-15*(1e3)^7]
+# center thickness
+ct = 10.2e-3
+# diameter
+d = 50e-3
+# refractive index of BK-7 @ 1310 nm (design wavelength)
+n = 1.5036
+
+lens = Lens(
+        EvenAsphericalSurface(R, d, k, A),
+        SphericalSurface(Inf, d),
+        ct,
+        x -&gt; n
+    )
+
+system = System(lens)
+
+fig = Figure(size=(640,480))
+
+ax = fig[1,1] = Axis3(fig, aspect=:data, azimuth=0., elevation=1e-3)
+
+hidexdecorations!(ax)
+hidezdecorations!(ax)
+
+for z in -0.02:0.001:0.02
+    pos = [0.0, -0.05, z]
+    dir = [0.0, 1.0, 0]
+    ray = Ray(pos, dir)
+    beam = Beam(ray)
+    solve_system!(system, beam, r_max=40)
+
+    render_beam!(ax, beam, flen=0.1)
+end
+render_object!(ax, lens)</code></pre><p><img src="../aspherical_lens_showcase.png" alt="Aspherical lens showcase"/></p><h1 id="Complex-aspherical-lens-example"><a class="docs-heading-anchor" href="#Complex-aspherical-lens-example">Complex aspherical lens example</a><a id="Complex-aspherical-lens-example-1"></a><a class="docs-heading-anchor-permalink" href="#Complex-aspherical-lens-example" title="Permalink"></a></h1><p>This example shows how a complex optical system for a mobile device can be modeled and traced using this package. This example is taken from <a href="https://www.pencilofrays.com/zemax/bonus.html#mobile">Pencil of Rays</a>.</p><p>The whole system consists of three complex-shaped aspherical lenses, a filter and a cover glass in front of a sensor plane. All five components can be easily modeled using the <code>Lens</code> constructor and shifted in space using the kinematic API. The field has to be modeled manually.</p><pre><code class="language-julia hljs">using CairoMakie, BeamletOptics
+
+## mobile-kyocera-3P_USP8558939.zmx
+
+# construct the first lens
+L1 = Lens(
+        EvenAsphericalSurface(
+            1.054e-3, # r
+            1.333024e-3, # d
+            -0.14294, # conic
+             [0,0.038162*(1e3)^3, 0.06317*(1e3)^5, -0.020792*(1e3)^7, 0.18432*(1e3)^9,
+             -0.04827*(1e3)^11, 0.094529*(1e3)^13] # coeffs
+        ),
+        EvenAsphericalSurface(
+            2.027e-3, # r
+            1.216472e-3, # d
+            8.0226, # conic
+            [0,0.0074974*(1e3)^3, 0.064686*(1e3)^5, 0.19354*(1e3)^7, -0.50703*(1e3)^9,
+            -0.34529*(1e3)^11, 5.9938*(1e3)^13] # coeffs
+        ),
+        0.72e-3, # center thickness
+        n -&gt; 1.580200
+    )
+
+# construct the second lens
+L2 = Lens(
+        EvenAsphericalSurface(
+            -3.116e-3, # r
+            1.4e-3, # d
+            -49.984, # conic
+            [0,-0.31608*(1e3)^3, 0.34755*(1e3)^5, -0.17102*(1e3)^7, -0.41506*(1e3)^9,
+            -1.342*(1e3)^11, 5.0594*(1e3)^13, -2.7483*(1e3)^15] # coeffs
+        ),
+        EvenAsphericalSurface(
+            -4.835e-3, # r
+            1.9e-3, # d
+            1.6674, # conic
+            [0,-0.079727*(1e3)^3, 0.13899*(1e3)^5, -0.044057*(1e3)^7,
+            -0.019369*(1e3)^9, 0.016993*(1e3)^11, 0.093716*(1e3)^13,
+            -0.080329*(1e3)^15] # coeffs
+        ),
+        0.55e-3, # center_thickness
+        n -&gt; 1.804700
+    )
+
+# shift the second lens to its position, assuming L1 is at the origin (0,0,0)
+translate3d!(L2, [0, BeamletOptics.thickness(L1) + 0.39e-3,0])
+
+# construct the third lens
+L3 = Lens(
+        EvenAsphericalSurface(
+            3.618e-3, # r
+            3.04e-3, # d
+            -44.874, # conic
+            [0,-0.14756*(1e3)^3, 0.035194*(1e3)^5, -0.0032262*(1e3)^7,
+            0.0018592*(1e3)^9, 0.00036658*(1e3)^11, -0.00016039*(1e3)^13,
+            -3.1846e-5*(1e3)^15] # coeffs
+        ),
+        EvenAsphericalSurface(
+            2.161e-3, # r
+            3.7e-3, # d
+            -10.719, # conic
+            [0,-0.096568*(1e3)^3, 0.026771*(1e3)^5, -0.011261*(1e3)^7,
+            0.0019879*(1e3)^9, 0.00015579*(1e3)^11, -0.00012433*(1e3)^13,
+            1.5264e-5*(1e3)^15] # coeffs
+        ),
+        0.7e-3, # center_thickness
+        n -&gt; 1.580200
+    )
+
+# first translate the lens to the L2 position, then shift it by the relative offset with respect to L2
+translate_to3d!(L3, BeamletOptics.position(L2))
+translate3d!(L3, [0, BeamletOptics.thickness(L2) + 0.63e-3,0])
+
+# construct the filter by setting the radius to Inf for front/back, resulting in a parallel plate
+Filt = Lens(
+        SphericalSurface(Inf, 4.2e-3),
+        SphericalSurface(Inf, 4.2e-3),
+        0.15e-3,
+        n -&gt; 1.516800
+    )
+
+# same principle as for L3
+translate_to3d!(Filt, BeamletOptics.position(L3))
+translate3d!(Filt, [0, BeamletOptics.thickness(L3) + 0.19e-3,0])
+
+# Construct the cover glass and shift into position
+Cover = Lens(
+        SphericalSurface(Inf, 4.9e-3),
+        SphericalSurface(Inf, 4.9e-3),
+        0.5e-3,
+        n -&gt; 1.469200
+    )
+translate_to3d!(Cover, BeamletOptics.position(Filt))
+translate3d!(Cover, [0, BeamletOptics.thickness(Filt) + 0.18e-3,0])
+
+system = System([L1, L2, L3, Filt, Cover])
+
+fig = Figure()
+ax = Axis3(fig[1,1], aspect=:data, azimuth=0.0, elevation=.0)
+hidedecorations!(ax)
+hidespines!(ax)
+
+render_system!(ax, system)
+
+# 0° beams
+beams = [
+    Beam([0, -0.5e-3, -1.3e-3/2], [0, 1, 0], 0.5876e-6),
+    Beam([0, -0.5e-3, 0], [0, 1, 0], 0.5876e-6),
+    Beam([0, -0.5e-3, 1.3e-3/2], [0, 1, 0], 0.5876e-6)
+]
+field_angles = 6:6:30
+colors = [:blue, :green, :red, :yellow, :magenta, :cyan]
+for beam in beams
+    i = 1
+    solve_system!(system, beam, r_max=50)
+    render_beam!(ax, beam, flen=0.12e-3, color = colors[i], show_pos=true)
+    # use the 0° beams to construct all other beam sets
+
+    pos = beam.rays[1].pos + BeamletOptics.intersection(beam.rays[1]).t*beam.rays[1].dir
+    for angle in field_angles
+        i += 1
+        # tilted input beam generation
+        dir = [0, cosd(angle), sind(angle)]
+        spos = pos - dir * BeamletOptics.intersection(beam.rays[1]).t
+        abeam = Beam(spos, dir, beam.rays[1].λ)
+
+        # trace through system
+        solve_system!(system, abeam, r_max=50)
+        render_beam!(ax, abeam, flen=0.12e-3*(1+sind(angle)), color = colors[i], show_pos=true)
+    end
+end</code></pre><p><img src="../aspherical_lens_mobile.png" alt="Mobile lens with comples aspheres"/></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../spherical_lenses/">« Spherical lenses</a><a class="docs-footer-nextpage" href="../double_gauss/">Double Gauss lens »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.10.1 on <span class="colophon-date" title="Wednesday 9 April 2025 17:33">Wednesday 9 April 2025</span>. Using Julia version 1.11.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
