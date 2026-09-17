@@ -1,4 +1,34 @@
-# BeamletOptics
+```@raw html
+---
+# https://vitepress.dev/reference/default-theme-home-page
+layout: home
+
+hero:
+  name: BeamletOptics.jl
+  text: A digital optics laboratory
+  tagline: 3D ray tracing and Gaussian beamlet propagation for optical setups in Julia
+  image:
+    light: /logo.svg
+    dark: /logo-dark.svg
+    alt: BeamletOptics
+  actions:
+    - theme: brand
+      text: Get started
+      link: /tutorials/expander
+    - theme: alt
+      text: Basics
+      link: /basics/intro
+    - theme: alt
+      text: View on Github
+      link: https://github.com/JuliaPhysics/BeamletOptics.jl
+---
+```
+
+```@raw html
+<p style="margin-bottom:2cm"></p>
+
+<div class="vp-doc" style="width:80%; margin:auto">
+```
 
 Building optical setups in a laboratory environment -- for instance a laser interferometer -- is a common task for optical engineers and physicists. This package is intended to provide a simulation environment in which the user can quickly analyze and layout simple optical components like lenses or beamsplitters before committing to a breadboard setup.  
 
@@ -83,3 +113,7 @@ In order to warrant a 1.0.0 release tag, the following features will need to be 
 - 🔳 Visualization
     - 🔳 automatic Makie plot updates (e.g. some form of "interactive" mode)
     - 🔳 Better Lens surface plots based on multiple dispatch
+
+```@raw html
+</div>
+```
