@@ -1,4 +1,4 @@
-using GLMakie, CairoMakie, BeamletOptics
+using GLMakie, BeamletOptics
 
 GLMakie.activate!(; ssao=true)
 
@@ -24,11 +24,11 @@ translate3d!(l6, [0, l_6, 0])
 
 system = StaticSystem([l1, l23, l45, l6])
 
-# generate render
+# generate render, same view for both lenses
 cview = [
-    0.484123   0.875     -1.11022e-16  -0.0272104
+    0.484123   0.875     -1.11022e-16  -0.0322104
     -0.260453   0.144104   0.954672     -0.00137587
-     0.835338  -0.462179   0.29766      -0.0651289
+     0.835338  -0.462179   0.29766      -0.0951289
      0.0        0.0        0.0           1.0
 ]
 
@@ -50,30 +50,42 @@ end
 set_view(ax, cview)
 save("double_gauss.png", fig; px_per_unit=8, update = false)
 
-## thin lens comparison
-CairoMakie.activate!()
+## Sonnar comparison
+s1 = SphericalLens(69.21e-3, 433.84e-3, 9.33e-3, 70e-3, λ -> 1.671)
+# front triplet: last surface only has a clear aperture of 40 mm -> assembled from individual lenses
+s2 = SphericalLens(35.86e-3, 85.87e-3, 11.81e-3, 60e-3, λ -> 1.671)
+s3 = SphericalLens(85.87e-3, -646.31e-3, 7.05e-3, 60e-3, λ -> 1.4892)
+s4 = Lens(SphericalSurface(-646.31e-3, 60e-3), SphericalSurface(23.51e-3, 40e-3), 1.9e-3, λ -> 1.7394)
+translate3d!(s3, [0, thickness(s2), 0])
+translate3d!(s4, [0, thickness(s2) + thickness(s3), 0])
+s234 = TripletLens(s2, s3, s4)
+s567 = SphericalTripletLens(Inf, 51.09e-3, -22.12e-3, -103.13e-3, 2.48e-3, 19.81e-3, 4.57e-3, 42e-3,
+                            λ -> 1.5232, λ -> 1.6578, λ -> 1.5894)
 
-thin_lens = SphericalLens(100e-3, 100e-3, 0, 52.3e-3, λ -> 1.5)
+# Calculate translation distances
+s_234 = thickness(s1) + 0.38e-3
+s_567 = s_234 + thickness(s234) + 13.0e-3 + 2.24e-3
 
-tl_system = StaticSystem([thin_lens])
+# move elements into position
+translate3d!(s234, [0, s_234, 0])
+translate3d!(s567, [0, s_567, 0])
+
+sonnar = StaticSystem([s1, s234, s567])
 
 fig = Figure(size=(600,380))
-aspect = (1,2,1)
-limits = (-0.05, 0.05, -0.05, 0.15, -0.05, 0.05)
-ax = Axis3(fig[1,1]; aspect, limits, azimuth=0, elevation=1e-3)
+display(fig)
+ax = LScene(fig[1,1])
+hide_axis(ax)
 
-# hide decorations for vis. purposes
-hidexdecorations!(ax)
-hidezdecorations!(ax)
+render!(ax, sonnar)
 
-render!(ax, tl_system)
-
-λ = 486e-9 # m
-zs = LinRange(-0.02, 0.02, 10)
+# same relative filling of the aperture as above: F/1.5 instead of F/2
+zs = LinRange(-0.0267, 0.0267, 10)
 for (i, z) in enumerate(zs)
     beam = Beam(Ray([0, -0.05, z], [0, 1, 0], λ))
-    solve_system!(tl_system, beam)
-    render!(ax, beam, flen=0.2)
+    solve_system!(sonnar, beam)
+    render!(ax, beam, flen=0.045, show_pos=true)
 end
 
-save("thin_lens_f100.png", fig, px_per_unit=4)
+set_view(ax, cview)
+save("sonnar.png", fig; px_per_unit=8, update = false)
