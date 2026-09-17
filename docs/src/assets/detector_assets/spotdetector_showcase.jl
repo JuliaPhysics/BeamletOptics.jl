@@ -2,56 +2,98 @@ using GLMakie, BeamletOptics
 
 GLMakie.activate!(; ssao=true)
 
+const BMO = BeamletOptics
 const mm = 1e-3
 
 ##
-lens = ThinLens(50mm, 50mm, BeamletOptics.inch, 1.5)
+# define spherical lenses
+l1 = SphericalLens(69.21e-3, 433.84e-3, 9.33e-3, 70e-3, λ -> 1.671)
+# front triplet: last surface only 40 mm clear aperture -> assembled from individual lenses
+l2 = SphericalLens(35.86e-3, 85.87e-3, 11.81e-3, 60e-3, λ -> 1.671)
+l3 = SphericalLens(85.87e-3, -646.31e-3, 7.05e-3, 60e-3, λ -> 1.4892)
+l4 = Lens(SphericalSurface(-646.31e-3, 60e-3), SphericalSurface(23.51e-3, 40e-3), 1.9e-3, λ -> 1.7394)
+translate3d!(l3, [0, thickness(l2), 0])
+translate3d!(l4, [0, thickness(l2) + thickness(l3), 0])
+l234 = TripletLens(l2, l3, l4)
+l567 = SphericalTripletLens(Inf, 51.09e-3, -22.12e-3, -103.13e-3, 2.48e-3, 19.81e-3, 4.57e-3, 42e-3,
+                            λ -> 1.5232, λ -> 1.6578, λ -> 1.5894)
 
-sd = Detector(10e-3)
-translate3d!(sd, [0, 50mm, 0])
+# Calculate translation distances
+l_234 = thickness(l1) + 0.38e-3
+l_567 = l_234 + thickness(l234) + 13.0e-3 + 2.24e-3
 
-system = System([lens, sd])
+# move elements into position
+translate3d!(l234, [0, l_234, 0])
+translate3d!(l567, [0, l_567, 0])
 
-## render system
-system_fig = Figure(size=(600,300))
-limits = (-0.02, 0.02, -0.025, 0.05, -0.015, 0.015)
-aspect = (1,1.875,0.75)
-system_ax = Axis3(system_fig[1,1], aspect=aspect, limits=limits, azimuth=-1, elevation=0.)
+# spot detector in the paraxial image plane, back focal length is 44.902 mm
+pd = Detector(50mm)
+translate3d!(pd, [0, l_567 + thickness(l567) + 44.902mm, 0])
 
-hidedecorations!(system_ax)
-hidespines!(system_ax)
+sonnar = ObjectGroup([l1, l234, l567])
 
-render!(system_ax, system)
+system = StaticSystem([sonnar, pd])
 
-beam = Beam([0,-50mm,0], [0,1,0], 1e-6)
+##
+λ = 587.6e-9 # m
+fields = [
+    (h = 0.0,    θ = 0.0,     z0 = 0.0,       color = :blue),
+    (h = 21.6mm, θ = 12.0619, z0 = -25.319mm, color = :green),
+    (h = 43.2mm, θ = 23.3057, z0 = -54.766mm, color = :red),
+]
 
-aperture = BeamletOptics.inch*0.8
-num_rings = 20
-num_rays = 5000
+dir_theta(θ) = [0, cosd(θ), sind(θ)]
+b1 = CollimatedSource([0, -50mm, fields[1].z0], dir_theta(fields[1].θ), 50mm, λ; num_rays=500)
+b2 = CollimatedSource([0, -50mm, fields[2].z0], dir_theta(fields[2].θ), 40mm, λ; num_rays=500)
 
-cs = CollimatedSource([0,-50mm,0], [0,1,0], aperture, 1e-6; num_rings, num_rays)
+solve_system!(system, b1)
+b1_spots = spot_diagram(pd)
+empty!(pd)
 
-t1 = @timed solve_system!(system, cs)
+solve_system!(system, b2)
+b2_spots = spot_diagram(pd)
+empty!(pd)
 
-spots = spot_diagram(sd)
+##
+cview = [
+  0.35614    0.934433   -2.08167e-17  -0.0304396
+ -0.167338   0.0637774   0.983835      0.00380212
+  0.919327  -0.350382    0.17908      -0.10951
+  0.0        0.0         0.0           1.0
+]
 
-render!(system_ax, cs, color=:blue, show_pos=false, render_every=50)
+fig = Figure(size=(600, 600))
+ax = LScene(fig[1,1:2], show_axis=false)
 
-save("spot_diagram_system.png", system_fig, px_per_unit=4)
+render!(ax, sonnar; transparency=true, alpha=0.1)
+# render!(ax, stop)
+# render!(ax, s7)
+render!(ax, pd)
 
-## render diagram
-spot_fig = Figure(size=(600,400))
-spot_ax = Axis(spot_fig[1,1], aspect=1, xlabel="x [mm]", ylabel="y [mm]")
-sc = scatter!(spot_ax, spots, markersize=3, color=:blue)
+render!(ax, b1; alpha=0.15, render_every=5, color=:red)
+render!(ax, b2; alpha=0.15, render_every=5, color=:green)
 
-extime = trunc(t1.time*1e3, digits=2)
+spot_ax1 = Axis(
+    fig[2,1],
+    aspect=1,
+    xlabel="x [µm]",
+    ylabel="z [µm]",
+    yaxisposition = :left,
+    title = "h = $(round(fields[1].h / mm, digits=1)) mm, θ = $(fields[1].θ)°",
+)
+scatter!(spot_ax1, b1_spots*1e6, markersize=4, color=:red)
 
-leg_string = "
-   # of traces: $num_rays \n
-   # of rings: $num_rings \n
-   Ex. Time: $extime ms \n
-"
+spot_ax2 = Axis(
+    fig[2,2],
+    aspect=1,
+    xlabel="x [µm]",
+    ylabel="z [µm]",
+    yaxisposition = :right,
+    title = "h = $(round(fields[2].h / mm, digits=1)) mm, θ = $(round(fields[2].θ, digits=2))°",
+)
+scatter!(spot_ax2, b2_spots*1e6, markersize=4, color=:green)
 
-Legend(spot_fig[1,2], [sc], [leg_string], "Quick stats.")
+display(fig)
+set_view(ax, cview)
 
-save("spot_diagram_showcase.png", spot_fig, px_per_unit=4)
+save("sonnar_spot_diagram.png", fig, px_per_unit=4, update=false)

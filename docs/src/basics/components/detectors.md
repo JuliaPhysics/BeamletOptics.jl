@@ -34,13 +34,9 @@ The `spot_diagram` method provides a straight forward way to generate spot diagr
 spot_diagram
 ```
 
-Below an optical system consisting of a collection of collimated [`Beam`](@ref)s passing through a [`ThinLens`](@ref) is shown. A [`Detector`](@ref) is positioned at the approximate focal plane to capture the resulting spot diagram.
+The following image shows the spot diagram of a Sonnar lens. Two [`CollimatedSource`](@ref)s are traced through the system at different angles. A [`Detector`](@ref) is positioned at the focal plane to capture the resulting spot diagrams, which are visualized using the method explained above.
 
-![Thin lens setup](spot_diagram_system.png)
-
-The beam bundle used to generate the spot diagram was created via the [`CollimatedSource`](@ref) constructor. The resulting spot diagram of the lens shown above is visualized below.
-
-![Spot diagram showcase](spot_diagram_showcase.png)
+![Sonnar spot diagram showcase](sonnar_spot_diagram.png)
 
 ## Field distributions
 
