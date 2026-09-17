@@ -40,6 +40,24 @@ function RoundPolarizationFilter(diameter::Real; cutoff_strength=eps())
     return PolarizationFilter(shape, XZBasis(1, 0, 0, 0), cutoff_strength)
 end
 
+"""
+    transmission_axis(pf::PolarizationFilter)
+
+Returns the unit vector (in global coordinates) along which [`PolarizationFilter`](@ref) `pf` transmits
+polarization, derived from its Jones matrix so that it stays correct for any filter orientation or custom
+`GlobalJonesBasis`. The sign of the returned vector is arbitrary, since it represents an axis rather than
+a direction.
+"""
+function transmission_axis(pf::PolarizationFilter)
+    R = orientation(pf)
+    n = R[:, 2]
+    Q = I - n * n'
+    J = static_data(pf.JMat)
+    M = Q * R * J * R' * Q
+    F = svd(M)
+    return normalize(real(F.V[:, 1]))
+end
+
 function interact3d(::AbstractSystem,
         polfilter::PolarizationFilter,
         ::Beam{T, R},

@@ -39,6 +39,14 @@ refractive_index(lp::LinearPolarizer, λ::Real) = refractive_index(lp.front, λ)
 thickness(lp::LinearPolarizer) = dot(position(lp.back) - position(lp.front), orientation(lp)[:, 2]) + thickness(lp.back)
 
 """
+    transmission_axis(lp::LinearPolarizer)
+
+Returns the unit vector (in global coordinates) along which [`LinearPolarizer`](@ref) `lp` transmits
+polarization. Refer to [`transmission_axis(::PolarizationFilter)`](@ref) for details.
+"""
+transmission_axis(lp::LinearPolarizer) = transmission_axis(lp.filter)
+
+"""
     RoundLinearPolarizer(diameter, front_thickness, back_thickness, n; cutoff_strength=eps())
 
 Creates a [`LinearPolarizer`](@ref): a round polarizing film cemented between two round glass plates

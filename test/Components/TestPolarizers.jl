@@ -162,6 +162,67 @@ const mm = 1e-3
         end
     end
 
+    @testset "Transmission axis" begin
+        @testset "PolarizationFilter" begin
+            pf = PolarizationFilter(5mm)
+            t = transmission_axis(pf)
+            @test norm(t) ≈ 1
+            @test abs(dot(t, [1, 0, 0])) ≈ 1 atol = 1e-12
+
+            for θ in 0:15:180
+                pf2 = PolarizationFilter(5mm)
+                rotate3d!(pf2, [0, 1, 0], deg2rad(θ))
+                t2 = transmission_axis(pf2)
+                expected = [cosd(θ), 0, -sind(θ)]
+                @test norm(t2) ≈ 1
+                @test abs(dot(t2, expected)) ≈ 1 atol = 1e-12
+            end
+
+            pf3 = PolarizationFilter(5mm)
+            xrotate3d!(pf3, deg2rad(30))
+            t3 = transmission_axis(pf3)
+            n3 = orientation(pf3)[:, 2]
+            @test norm(t3) ≈ 1
+            @test abs(dot(t3, n3)) ≈ 0 atol = 1e-12
+            @test abs(dot(t3, [1, 0, 0])) ≈ 1 atol = 1e-12
+        end
+
+        @testset "LinearPolarizer" begin
+            n = λ -> 1.5
+            lp = RoundLinearPolarizer(25.4mm, 1.6mm, 1.6mm, n)
+            t = transmission_axis(lp)
+            @test norm(t) ≈ 1
+            @test abs(dot(t, [1, 0, 0])) ≈ 1 atol = 1e-12
+
+            for θ in 0:15:180
+                lp2 = RoundLinearPolarizer(25.4mm, 1.6mm, 1.6mm, n)
+                rotate3d!(lp2, [0, 1, 0], deg2rad(θ))
+                t2 = transmission_axis(lp2)
+                expected = [cosd(θ), 0, -sind(θ)]
+                @test norm(t2) ≈ 1
+                @test abs(dot(t2, expected)) ≈ 1 atol = 1e-12
+            end
+
+            lp3 = RoundLinearPolarizer(25.4mm, 1.6mm, 1.6mm, n)
+            xrotate3d!(lp3, deg2rad(30))
+            t3 = transmission_axis(lp3)
+            n3 = orientation(lp3)[:, 2]
+            @test norm(t3) ≈ 1
+            @test abs(dot(t3, n3)) ≈ 0 atol = 1e-12
+            @test abs(dot(t3, [1, 0, 0])) ≈ 1 atol = 1e-12
+        end
+
+        @testset "Malus consistency" begin
+            filter = PolarizationFilter(5mm)
+            t = transmission_axis(filter)
+            system = System([filter])
+            beam = Beam([0, -10mm, 0], [0, 1, 0], 1e-6, t)
+            solve_system!(system, beam)
+            E = BMO.polarization(last(BMO.rays(beam)))
+            @test norm(E) ≈ 1 atol = 1e-9
+        end
+    end
+
     @testset "Linear polarizer - geometry and kinematics" begin
         n = λ -> 1.5
         tf = 1.6mm
