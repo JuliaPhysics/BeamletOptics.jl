@@ -150,15 +150,25 @@ function _polarization_points(beam::BMO.Beam; flen, λ_vis = nothing, amplitude 
 end
 
 """
-    _polarization_points(agb::BMO.AstigmaticGaussianBeamlet; flen, λ_vis = nothing, scale = 1.0, ppl = 32)
+    _polarization_points(agb::BMO.AstigmaticGaussianBeamlet; flen, λ_vis = nothing, scale = 1.0,
+                         focus_exponent = 1.0, ppl = 32)
 
 Field-vector curve sample points along the chief ray of an
-`AstigmaticGaussianBeamlet` tree. The curve amplitude at each sample is the
-local mean 1/e² beam radius, `scale * (‖b‖ + ‖c‖)/2 / Emax`, where `(_, b, c)
-= waist_parameters(child, z)`. Gouy phase and phase-front curvature are
-ignored; the curve is a qualitative visualization only.
+`AstigmaticGaussianBeamlet` tree. The curve amplitude follows the on-axis field
+amplitude of the beamlet,
+
+    a(z) = scale * r_ref * (A_ref / A(z))^(focus_exponent / 2) / Emax,
+
+with `A = ‖b‖·‖c‖` the product of the 1/e² semi-axes from
+`(_, b, c) = waist_parameters(child, z)`, and `r_ref`, `A_ref` the mean radius
+and semi-axis product at the start of the root beamlet. For `focus_exponent = 1`
+this is the physical scaling `E ∝ √(w0x·w0y / (wx·wy))`, so the curve is raised
+where the beam is compressed (focus) and flattened where it expands;
+`focus_exponent = 0` gives a constant amplitude. Gouy phase and phase-front
+curvature are ignored; the curve is a qualitative visualization only.
 """
-function _polarization_points(agb::BMO.AstigmaticGaussianBeamlet; flen, λ_vis = nothing, scale = 1.0, ppl = 32)
+function _polarization_points(agb::BMO.AstigmaticGaussianBeamlet; flen, λ_vis = nothing, scale = 1.0,
+        focus_exponent = 1.0, ppl = 32)
     # Pass 1: Emax (over chief rays) and total plotted length.
     Emax = 0.0
     L_tot = 0.0
@@ -178,6 +188,13 @@ function _polarization_points(agb::BMO.AstigmaticGaussianBeamlet; flen, λ_vis =
     λ_vis = something(λ_vis, L_tot / 20)
     k_vis = 2π / λ_vis
 
+    # Reference beam size at the start of the root beamlet
+    (_, b_ref, c_ref) = BMO.waist_parameters(agb, 0.0)
+    r_ref = (norm(b_ref) + norm(c_ref)) / 2
+    A_ref = norm(b_ref) * norm(c_ref)
+    # Floor for the local cross-section to avoid a singular gain at caustics
+    A_min = A_ref * 1e-12
+
     pts = Point3f[]
     for child in PreOrderDFS(agb)
         parent_agb = child.parent
@@ -196,7 +213,8 @@ function _polarization_points(agb::BMO.AstigmaticGaussianBeamlet; flen, λ_vis =
             l0 = l
             amp = function (t)
                 (_, b, c) = BMO.waist_parameters(child, l0 + t)
-                return scale * (norm(b) + norm(c)) / 2 / Emax
+                A = max(norm(b) * norm(c), A_min)
+                return scale * r_ref * (A_ref / A)^(focus_exponent / 2) / Emax
             end
 
             S = _field_segment!(pts, p, d, E⊥, S, n, L, amp, k_vis, λ_vis, ppl)

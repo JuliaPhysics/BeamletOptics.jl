@@ -24,8 +24,12 @@ With `show_beams = true` the generating rays are overlayed into the axis as foll
   `t = 0` snapshot `Re{E⊥·exp(i·k·s)}` along the accumulated optical path `s`. Gouy
   phase and phase-front curvature are ignored; the curve is a qualitative
   visualization only.
-- `pol_scale = 1.0`: curve amplitude as a multiple of the local mean 1/e² beam radius
-  at the maximum |E⊥|
+- `pol_scale = 1.0`: curve amplitude as a multiple of the mean 1/e² beam radius at the
+  start of the beamlet (at the maximum |E⊥|)
+- `pol_focus_exponent = 1.0`: the amplitude follows the on-axis field amplitude,
+  `(A_ref / A(z))^(pol_focus_exponent/2)` with `A = wx·wy`. `1` is the physical scaling
+  `E ∝ √(w0x·w0y / (wx·wy))`, which raises the curve in the focus; values in `(0, 1)`
+  compress the gain for tight foci, `0` gives a constant amplitude.
 - `pol_ppl = 32`: sample points per `pol_λ` along the curve
 - `pol_color = :crimson`: field curve color
 - `pol_linewidth = 2.0`: field curve line width
@@ -49,6 +53,7 @@ function render!(
         show_polarization = false,
         pol_λ = nothing,
         pol_scale = 1.0,
+        pol_focus_exponent = 1.0,
         pol_ppl = 32,
         pol_color = :crimson,
         pol_linewidth = 2.0,
@@ -161,7 +166,8 @@ function render!(
     end
 
     if show_polarization
-        pts = _polarization_points(agb; flen, λ_vis = pol_λ, scale = pol_scale, ppl = pol_ppl)
+        pts = _polarization_points(agb; flen, λ_vis = pol_λ, scale = pol_scale,
+            focus_exponent = pol_focus_exponent, ppl = pol_ppl)
         _render_field_curve!(axis, pts; color = pol_color, linewidth = pol_linewidth)
     end
 
