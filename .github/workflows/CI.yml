@@ -58,11 +58,20 @@ jobs:
         with:
           version: '1'
       - uses: julia-actions/cache@v3
-      # Install OpenGL dependencies for headless rendering
+      # Install OpenGL dependencies for headless rendering.
       - name: Install OpenGL dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y xvfb mesa-utils
+          sudo apt-get install -y \
+            xvfb \
+            mesa-utils \
+            libgl1-mesa-dri \
+            libgl1-mesa-glx \
+            libegl1 \
+            libxrandr2 \
+            libxinerama1 \
+            libxcursor1 \
+            libxi6
       - name: Configure doc environment
         shell: julia --project=docs --color=yes {0}
         run: |
@@ -70,19 +79,24 @@ jobs:
           Pkg.develop(PackageSpec(path=pwd()))
           Pkg.instantiate()
       - uses: julia-actions/julia-buildpkg@v1
-      # Run docs in xvfb environment
+      # Run docs in xvfb environment.
       - name: Deploy documentation with xvfb
         run: |
-          xvfb-run julia --project=docs --color=yes -e 'using Documenter; include("docs/make.jl")'
+          xvfb-run --auto-servernum --server-args="-screen 0 1280x1024x24" \
+            julia --project=docs --color=yes -e 'using Documenter; include("docs/make.jl")'
         env:
+          DISPLAY: ":99"
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
-      # Run doctests in xvfb environment
+      # Run doctests in xvfb environment.
       - name: Run doctests with xvfb
         run: |
-          xvfb-run julia --project=docs --color=yes -e '
-            using Documenter: DocMeta, doctest;
-            using BeamletOptics;
-            DocMeta.setdocmeta!(BeamletOptics, :DocTestSetup, :(using BeamletOptics); recursive=true);
-            doctest(BeamletOptics)
-          '
+          xvfb-run --auto-servernum --server-args="-screen 0 1280x1024x24" \
+            julia --project=docs --color=yes -e '
+              using Documenter: DocMeta, doctest;
+              using BeamletOptics;
+              DocMeta.setdocmeta!(BeamletOptics, :DocTestSetup, :(using BeamletOptics); recursive=true);
+              doctest(BeamletOptics)
+            '
+        env:
+          DISPLAY: ":99"
