@@ -2,6 +2,7 @@
 ray_showcase_dir = joinpath(@__DIR__, "..", "assets", "ray_assets")
 
 Main.DocUtils.conditional_include(joinpath(ray_showcase_dir, "ray_showcase.jl"))
+Main.DocUtils.conditional_include(joinpath(ray_showcase_dir, "polray_showcase.jl"), use_placeholder=false)
 Main.DocUtils.conditional_include(joinpath(ray_showcase_dir, "fresnel_coeffs.jl"))
 ```
 
@@ -34,6 +35,10 @@ In order to model the effect of polarizing elements, the polarization ray tracin
 ```@docs; canonical=false
 PolarizedRay
 ```
+
+The next figure shows a circularly polarized [`AstigmaticGaussianBeamlet`](@ref) passing through a periscope made of three 45° plano mirrors, with the mechanical [KCB1/M](https://www.thorlabs.com/item/KCB1_M) mount shown transparently for context. The helix along the beam traces the electric field vector of the chief ray, which stays circularly polarized through the mirror reflections. A [`PolarizationFilter`](@ref) between the second and third mirror passes only one linear component, so after the filter the field oscillates in a single plane. The `PolarizedRay` is fundamental to track the on-axis polarization state of the beamlet.
+
+![Polarized ray plot](polray_showcase.png)
 
 ### Fresnel coefficients
 

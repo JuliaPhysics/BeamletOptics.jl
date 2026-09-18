@@ -28,6 +28,36 @@ function PolarizationFilter(edge_length::Real; cutoff_strength=eps())
     return PolarizationFilter(shape, XZBasis(1, 0, 0, 0), cutoff_strength)
 end
 
+"""
+    RoundPolarizationFilter(diameter; cutoff_strength)
+
+Spawns a thin, round [`PolarizationFilter`](@ref) with the given `diameter` in [m].
+The filter is centered at the origin, aligned with the global y-axis and transmits along the x-axis,
+while blocking polarization components along the global z-axis.
+"""
+function RoundPolarizationFilter(diameter::Real; cutoff_strength=eps())
+    shape = CircularFlatMesh(diameter / 2)
+    return PolarizationFilter(shape, XZBasis(1, 0, 0, 0), cutoff_strength)
+end
+
+"""
+    transmission_axis(pf::PolarizationFilter)
+
+Returns the unit vector (in global coordinates) along which [`PolarizationFilter`](@ref) `pf` transmits
+polarization, derived from its Jones matrix so that it stays correct for any filter orientation or custom
+`GlobalJonesBasis`. The sign of the returned vector is arbitrary, since it represents an axis rather than
+a direction.
+"""
+function transmission_axis(pf::PolarizationFilter)
+    R = orientation(pf)
+    n = R[:, 2]
+    Q = I - n * n'
+    J = static_data(pf.JMat)
+    M = Q * R * J * R' * Q
+    F = svd(M)
+    return normalize(real(F.V[:, 1]))
+end
+
 function interact3d(::AbstractSystem,
         polfilter::PolarizationFilter,
         ::Beam{T, R},
@@ -38,8 +68,7 @@ function interact3d(::AbstractSystem,
     E0 = _calculate_global_E0(polfilter, ray, ndir, polfilter.JMat)
 
     # Terminate blocked rays
-    # FIXME this needs to be reworked in the future
-    if norm(E0) ≈ polfilter.cutoff
+    if norm(E0) ≤ polfilter.cutoff
         return nothing
     end
 
@@ -47,23 +76,15 @@ function interact3d(::AbstractSystem,
         PolarizedRay{T}(npos, ndir, nothing, wavelength(ray), refractive_index(ray), E0))
 end
 
-function interact3d(system::AbstractSystem,
-        polfilter::PolarizationFilter,
-        agb::AstigmaticGaussianBeamlet{T},
-        id::Int) where {T <: Real}
-    # Chief ray interaction (handles polarization change)
-    i_c = interact3d(system, polfilter, agb.c, rays(agb.c)[id])
-    isnothing(i_c) && return nothing
-    
-    # Auxiliary rays only undergo geometric interaction with the filter shape.
-    # They hit at their own transverse locations, preserving beam width/divergence.
-    aux_ints = map(b -> begin
-        interact3d(system, polfilter.shape, b, rays(b)[id])
-    end, _aux_beams(agb))
-    
-    if any(isnothing, aux_ints)
-        return nothing
-    end
-    
-    return AstigmaticGaussianBeamletInteraction{T}(i_c, aux_ints...)
+function interact3d(
+        ::AbstractSystem,
+        ::PolarizationFilter,
+        ::Beam{T, R},
+        ray::R
+    ) where {T <: Real, R <: Ray{T}}
+    # unpolarized rays (e.g. beamlet auxiliary rays) pass through the ideal filter unchanged
+    npos = position(ray) + length(ray) * direction(ray)
+    ndir = direction(ray)
+    return BeamInteraction{T, R}(nothing,
+        Ray{T}(npos, ndir, nothing, wavelength(ray), refractive_index(ray)))
 end

@@ -46,7 +46,22 @@ The following generic kwargs can be used for all hit types:
 A tuple `(xs, zs, E)` where
 - `xs::LinRange{T}` and `zs::LinRange{T}` are the sampled coordinates
   in the detector's local x and z axes,
-- `E::Matrix{Complex{T}}` is the corresponding raw/unscaled intensity map
+- `E::Matrix{Complex{T}}` is the corresponding raw/unscaled intensity map,
+  except for [`PolarizedRayHit`](@ref)s, see below.
+
+# [`PolarizedRayHit`](@ref) hits
+
+For [`PolarizedRay`](@ref)s, the per-ray `E0` field vectors are added **coherently as 3D vectors**
+in global coordinates (not projected onto the detector plane), so `E::Matrix{Point3{Complex{T}}}`.
+No obliquity/projection factor is applied: unlike the scalar ray case, the relative projection between
+rays is already encoded in their vector directions. As with the scalar case, the result is raw/unscaled
+(`E0` carries Fresnel/Jones amplitude factors but not ray-tube area or pupil-sampling density).
+
+!!! note "Unpolarized light"
+    Since polarization states with orthogonal `E0` do not interfere, an unpolarized PSF is **not**
+    obtained from a single coherent trace. Instead, trace twice with orthogonal input polarizations
+    (e.g. `E0 = [1,0,0]` and `E0 = [0,0,1]`) and incoherently add the resulting intensities,
+    i.e. `I_total = intensity(E_x) .+ intensity(E_z)`.
 """
 electric_field(d::Detector; kwargs...) = electric_field(d, hits(d); kwargs...)
 
@@ -246,6 +261,69 @@ function electric_field(
             for (p_hit, dir, proj, k, opl) in hit_data
                 l = dot(p - p_hit, dir)
                 acc += proj * cis(k * (opl + l))
+            end
+            field[i, j] = acc
+        end
+    end
+
+    return xs, zs, field
+end
+
+function electric_field(
+        pd::Detector,
+        hits::Vector{PolarizedRayHit{R}};
+        # kwargs
+        n::Int = 100,
+        crop_factor::Real = 1,
+        center::AbstractCenterAlgorithm = Centroid(),
+        x_min = Inf,
+        x_max = Inf,
+        z_min = Inf,
+        z_max = Inf,
+        x0_shift::Real = 0,
+        z0_shift::Real = 0,
+        kwargs...
+) where {R}
+    # automatically calculate limits
+    _x_min, _x_max, _z_min, _z_max = calc_local_lims(pd; crop_factor, center)
+    if x_min != Inf && x_max != Inf
+        _x_min = x_min
+        _x_max = x_max
+    end
+    if z_min != Inf && z_max != Inf
+        _z_min = z_min
+        _z_max = z_max
+    end
+    xs = LinRange(_x_min, _x_max, n) .+ x0_shift
+    zs = LinRange(_z_min, _z_max, n) .+ z0_shift
+    # Buffer field (global E-field vector per grid point)
+    field = fill(zero(Point3{Complex{R}}), n, n)
+
+    # PD local coordinate axis
+    orient = orientation(pd)
+    @views e1, e2 = Point3(-orient[:, 1]), Point3(orient[:, 3])
+    origin_pd = position(pd)
+
+    hit_data = map(hits) do hit
+        dir = direction(hit)
+        p_hit = position(hit) + length(hit) * dir
+        E0 = polarization(hit)
+        k = wavenumber(hit)
+        opl = optical_path_length(hit)
+        (p_hit, dir, E0, k, opl)
+    end
+
+    Threads.@threads for j in eachindex(zs)
+        z = zs[j]
+        @inbounds for i in eachindex(xs)
+            x = xs[i]
+            # Global detector surface point coordinate
+            p = origin_pd + x * e1 + z * e2
+            # Coherently add all vector field contributions
+            acc = zero(Point3{Complex{R}})
+            for (p_hit, dir, E0, k, opl) in hit_data
+                l = dot(p - p_hit, dir)
+                acc += E0 * cis(k * (opl + l))
             end
             field[i, j] = acc
         end

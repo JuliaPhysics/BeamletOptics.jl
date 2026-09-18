@@ -29,7 +29,8 @@ export Mirror, SquarePlanoMirror2D, RectangularPlanoMirror, SquarePlanoMirror,
        OffAxisParabolicMirror, ParabolicMirror
 
 # lenses
-export Lens, DoubletLens, ThinLens, SphericalLens, SphericalDoubletLens, thickness
+export Lens, DoubletLens, ThinLens, SphericalLens, SphericalDoubletLens, thickness,
+       TripletLens, SphericalTripletLens
 
 # surfaces
 export CircularFlatSurface, RectangularFlatSurface, SphericalSurface, EvenAsphericalSurface,
@@ -47,7 +48,8 @@ export ThinBeamsplitter, RoundThinBeamsplitter, RectangularPlateBeamsplitter,
        RoundPlateBeamsplitter, CubeBeamsplitter, RectangularCompensatorPlate
 
 # polarizing components
-export PolarizationFilter
+export PolarizationFilter, RoundPolarizationFilter, LinearPolarizer, RoundLinearPolarizer,
+       transmission_axis
 
 # dummies
 export NonInteractableObject, MeshDummy, IntersectableObject

@@ -8,10 +8,10 @@ const BMO = BeamletOptics
 
 using Makie: Axis3, LScene, mesh!, surface!, lines!, RGBf, RGBAf, scatter!, text!,
              update_cam!, cameracontrols, arrows3d!
-using GeometryBasics: Point2, Point3, Vec3f
+using GeometryBasics: Point2, Point3, Point3f, Vec3f
 using AbstractTrees: PreOrderDFS
 using MarchingCubes: MC, march
-using LinearAlgebra: dot, cross, normalize
+using LinearAlgebra: dot, cross, normalize, norm
 
 const _RenderEnv = Union{
     Axis3,
@@ -47,6 +47,7 @@ end
 
 # include order dependant!
 include("RenderBeam.jl")
+include("RenderPolarization.jl")
 include("RenderGaussian.jl")
 include("RenderAstigmaticGaussian.jl")
 include("RenderSDF.jl")
@@ -56,6 +57,7 @@ include("RenderLenses.jl")
 include("RenderCylinderLenses.jl")
 include("RenderMirrors.jl")
 include("RenderPresets.jl")
+include("RenderPolarizers.jl")
 include("RenderCamera.jl")
 
 end

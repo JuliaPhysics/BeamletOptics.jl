@@ -16,6 +16,28 @@ With `show_beams = true` the generating rays are overlayed into the axis as foll
 - `z_res::Int = 100`: longitudinal resolution
 - `r_res::Int = 64`: radial (angular) resolution
 
+# Polarization kwargs
+
+- `show_polarization = false`: overlay the E-field curve along the chief ray
+- `pol_λ = nothing`: visualization wavelength [m], default = total plotted length / 20.
+  This is a plotting parameter, not the physical ray wavelength; the curve shows the
+  `t = 0` snapshot `Re{E⊥·exp(i·k·s)}` along the accumulated optical path `s`. Gouy
+  phase and phase-front curvature are ignored; the curve is a qualitative
+  visualization only. Values finer than `plotted length / 2000` are clamped with a
+  warning.
+- `pol_scale = 1.0`: curve amplitude as a multiple of the mean 1/e² beam radius at the
+  start of the beamlet (at the maximum |E⊥|)
+- `pol_focus_exponent = 1.0`: the amplitude follows the on-axis field amplitude,
+  `(A_ref / A(z))^(pol_focus_exponent/2)` with `A = wx·wy`. `1` is the physical scaling
+  `E ∝ √(w0x·w0y / (wx·wy))`, which raises the curve in the focus; values in `(0, 1)`
+  compress the gain for tight foci, `0` gives a constant amplitude.
+- `pol_gain_max = 10.0`: upper bound on the focus gain, in multiples of the reference
+  amplitude at the start of the beamlet. The curve saturates at this value rather than
+  leaving the scene when the beam focuses tighter downstream than its input waist.
+- `pol_ppl = 32`: sample points per `pol_λ` along the curve
+- `pol_color = :crimson`: field curve color
+- `pol_linewidth = 2.0`: field curve line width
+
 # Makie kwargs
 
 - `color = :red`
@@ -31,6 +53,15 @@ function render!(
         z_res = 100,
         flen = 0.1,
         show_waist = false,
+        # Polarization kwargs
+        show_polarization = false,
+        pol_λ = nothing,
+        pol_scale = 1.0,
+        pol_focus_exponent = 1.0,
+        pol_gain_max = 10.0,
+        pol_ppl = 32,
+        pol_color = :crimson,
+        pol_linewidth = 2.0,
         # Makie kwargs
         color = :red,
         transparency = true,
@@ -138,5 +169,12 @@ function render!(
             render!(axis, child.wym; show_pos, flen, color = :blue)
         end
     end
+
+    if show_polarization
+        pts = _polarization_points(agb; flen, λ_vis = pol_λ, scale = pol_scale,
+            focus_exponent = pol_focus_exponent, gain_max = pol_gain_max, ppl = pol_ppl)
+        _render_field_curve!(axis, pts; color = pol_color, linewidth = pol_linewidth)
+    end
+
     return axis
 end
