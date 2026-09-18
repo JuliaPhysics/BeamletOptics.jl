@@ -34,6 +34,41 @@ function DocumenterVitepress.render(
     return nothing
 end
 
+# On Windows, `@contents` listings of pages in subfolders are broken twice. Documenter
+# matches `Pages` against `relpath`s with backslashes, so pages must be given as
+# `joinpath("beams", "beams.md")` (see `basics/intro.md`) rather than "beams/beams.md".
+# DocumenterVitepress then writes that relpath into the link, and VitePress rejects
+# `beams\beams` as a dead link. This is DocumenterVitepress' method with the path
+# separators normalised to `/`.
+if Sys.iswindows()
+    function DocumenterVitepress.render(
+        io::IO,
+        ::MIME"text/plain",
+        node::Documenter.MarkdownAST.Node,
+        contents::Documenter.ContentsNode,
+        page,
+        doc;
+        kwargs...
+    )
+        current_path = nothing
+        for (count, path, anchor) in contents.elements
+            path = replace(DocumenterVitepress.mdext(path), '\\' => '/')
+            header = anchor.object
+            anchor_frag = DocumenterVitepress.vitepress_anchor(Documenter.anchor_fragment(anchor))
+            url = replace(string(path, anchor_frag), " " => "%20")
+            link = DocumenterVitepress.Markdown.Link(replace(anchor.id, "-" => " "), url)
+            level = header.level
+            if path != current_path
+                level = 1
+                current_path = path
+            end
+            print(io, "    "^(level - 1), "- ")
+            println(io, replace(DocumenterVitepress.Markdown.plaininline(link), ".md#" => "#"))
+        end
+        return println(io)
+    end
+end
+
 DocMeta.setdocmeta!(
     BeamletOptics,
     :DocTestSetup,
