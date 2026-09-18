@@ -71,3 +71,225 @@
   padding-top: 6px;
   border-top: 1px solid var(--vp-c-divider);
 }
+
+/* Julia logo colours for custom blocks and badges (D3 b).
+
+   VitePress' default `tip`/`note` colour is an alias of the brand colour
+   (`--vp-c-tip-1: var(--vp-c-brand-1)` etc. in VitePress' own vars.css), so
+   without this it would follow the blue brand colour below. Map each
+   semantic colour to a Julia colour instead: tip -> green, warning ->
+   purple, danger -> red, note/important -> blue. `-1..3` are text/border shades
+   (lighter in `.dark` for contrast on a dark background), `-soft` is a
+   translucent background. */
+:root {
+  --vp-c-tip-1: var(--julia-green);
+  --vp-c-tip-2: var(--julia-green);
+  --vp-c-tip-3: var(--julia-green);
+  --vp-c-tip-soft: rgba(56, 152, 38, 0.14);
+
+  --vp-c-note-1: var(--julia-blue);
+  --vp-c-note-2: var(--julia-blue);
+  --vp-c-note-3: var(--julia-blue);
+  --vp-c-note-soft: rgba(64, 99, 216, 0.14);
+
+  --vp-c-important-1: var(--julia-blue);
+  --vp-c-important-2: var(--julia-blue);
+  --vp-c-important-3: var(--julia-blue);
+  --vp-c-important-soft: rgba(64, 99, 216, 0.14);
+
+  --vp-c-warning-1: var(--julia-purple);
+  --vp-c-warning-2: var(--julia-purple);
+  --vp-c-warning-3: var(--julia-purple);
+  --vp-c-warning-soft: rgba(149, 88, 178, 0.14);
+
+  --vp-c-danger-1: var(--julia-red);
+  --vp-c-danger-2: var(--julia-red);
+  --vp-c-danger-3: var(--julia-red);
+  --vp-c-danger-soft: rgba(203, 60, 51, 0.14);
+
+  /* DocumenterVitepress' style.css sets these directly (not via
+     `--vp-c-tip-*`), so they must be overridden separately or the tip block
+     border/background would stay brand-coloured. */
+  --vp-custom-block-tip-border: var(--julia-green);
+  --vp-custom-block-tip-bg: rgba(56, 152, 38, 0.14);
+}
+
+/* `.dark` matches DocumenterVitepress' own dark overrides above (same
+   specificity, source order decides), but `--vp-custom-block-tip-*` are set
+   by DV under the more specific `:root.dark`, so that selector is repeated
+   here too. */
+.dark,
+:root.dark {
+  --vp-c-tip-1: #5fb84f;
+  --vp-c-tip-2: #74c464;
+  --vp-c-tip-3: #8ed17e;
+  --vp-c-tip-soft: rgba(56, 152, 38, 0.16);
+
+  --vp-c-note-1: #6b8af0;
+  --vp-c-note-2: #8aa3f5;
+  --vp-c-note-3: #a3b8f7;
+  --vp-c-note-soft: rgba(64, 99, 216, 0.16);
+
+  --vp-c-important-1: #6b8af0;
+  --vp-c-important-2: #8aa3f5;
+  --vp-c-important-3: #a3b8f7;
+  --vp-c-important-soft: rgba(64, 99, 216, 0.16);
+
+  --vp-c-warning-1: #b48ecb;
+  --vp-c-warning-2: #c3a4d6;
+  --vp-c-warning-3: #d1bae1;
+  --vp-c-warning-soft: rgba(149, 88, 178, 0.16);
+
+  --vp-c-danger-1: #e2776e;
+  --vp-c-danger-2: #ea9a93;
+  --vp-c-danger-3: #f0b5b0;
+  --vp-c-danger-soft: rgba(203, 60, 51, 0.16);
+
+  --vp-custom-block-tip-border: #5fb84f;
+  --vp-custom-block-tip-text: var(--vp-dark-subtext);
+  --vp-custom-block-tip-bg: rgba(56, 152, 38, 0.16);
+}
+
+/* Brand colour: Julia blue everywhere (D3 b), overriding DocumenterVitepress'
+   default teal-blue. Inline code deliberately keeps `--vp-code-color:
+   var(--vp-c-text-1)` (set in DocumenterVitepress' style.css to avoid making
+   code look like a link, see DV issue #377) and is not touched here. */
+:root {
+  --vp-c-brand: var(--julia-blue);
+  --vp-c-brand-1: var(--julia-blue);
+  --vp-c-brand-2: var(--julia-blue);
+  --vp-c-brand-3: var(--julia-blue);
+  --vp-button-brand-bg: var(--julia-blue);
+  --vp-button-brand-hover-bg: #6b8af0;
+}
+
+/* DV sets a green brand (incl. the button border) under `.dark`. */
+.dark {
+  --vp-c-brand: #6b8af0;
+  --vp-button-brand-border: #8aa3f5;
+  --vp-c-brand-1: #6b8af0;
+  --vp-c-brand-2: #8aa3f5;
+  --vp-c-brand-3: #a3b8f7;
+  --vp-button-brand-bg: #6b8af0;
+  --vp-button-brand-hover-bg: #8aa3f5;
+}
+
+/* Hero name gradient: red -> purple -> blue, the Julia logo colours (D3 b),
+   the same in light and dark mode. DocumenterVitepress' style.css sets its
+   own (different) gradient under `:root.dark`, which is more specific than
+   plain `:root` and would otherwise win in dark mode regardless of source
+   order, so it must be overridden with the same selector here. */
+:root,
+:root.dark {
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: linear-gradient(
+    120deg,
+    var(--julia-red) 10%,
+    var(--julia-purple) 50%,
+    var(--julia-blue)
+  );
+}
+
+/* Hero image blob, following the VitePress docs' own breakpoints for blur.
+   Same `:root.dark` specificity note as above applies to the background
+   image; the filter (blur radius) is not overridden by DV in dark mode, so
+   a plain `:root` rule is enough for that one, but it is kept in the same
+   selector for clarity. */
+:root,
+:root.dark {
+  --vp-home-hero-image-background-image: linear-gradient(
+    -45deg,
+    var(--julia-purple) 50%,
+    var(--julia-blue) 50%
+  );
+  --vp-home-hero-image-filter: blur(56px);
+}
+
+@media (min-width: 640px) {
+  :root {
+    --vp-home-hero-image-filter: blur(68px);
+  }
+}
+
+@media (min-width: 960px) {
+  :root {
+    --vp-home-hero-image-filter: blur(80px);
+  }
+}
+
+/* Gallery grid (tutorials/index.md, index.md showcase strip). */
+.bmo-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.bmo-tile {
+  position: relative;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 12px;
+  background: var(--vp-c-bg-soft);
+  overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+
+.bmo-tile:hover {
+  border-color: var(--vp-c-brand-1);
+  box-shadow: var(--vp-shadow-3);
+  transform: translateY(-2px);
+}
+
+.bmo-tile img {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  display: block;
+  margin: 0;
+  background: #fff;
+}
+
+.bmo-tile p {
+  margin: 0;
+  padding: 0 16px;
+}
+
+/* Stretched link: the whole tile is clickable via the title link, which must
+   be the only link inside the tile (otherwise the overlay swallows clicks on
+   the others). */
+.bmo-tile a {
+  color: var(--vp-c-text-1);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.bmo-tile a::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.bmo-tile .VPBadge {
+  margin: 8px 16px 0;
+}
+
+.bmo-teaser {
+  font-size: 14px;
+  color: var(--vp-c-text-2);
+}
+
+.bmo-tags {
+  font-size: 12px;
+  color: var(--vp-c-text-3);
+  padding-bottom: 12px;
+}
+
+/* Tutorial header card (S3): level badge + "You will learn how to" list. */
+.bmo-card {
+  border: 1px solid var(--vp-c-divider);
+  border-left: 4px solid var(--vp-c-brand-1);
+  border-radius: 8px;
+  padding: 12px 20px;
+  background: var(--vp-c-bg-soft);
+  margin: 16px 0;
+}

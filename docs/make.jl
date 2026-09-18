@@ -120,6 +120,7 @@ makedocs(;
     pages=[
         "Home" => "index.md",
         "Getting started" => Any[
+            "Overview" => joinpath("tutorials", "index.md"),
             "Tutorials" => Any[
                 "Laser alignment"           => joinpath("tutorials", "laser_alignment.md"),
                 "Miniature microscope"      => joinpath("tutorials", "microscope.md"),
@@ -169,6 +170,7 @@ makedocs(;
                     "SDFs"                      => joinpath("api", "sdfs.md"),
                 ],
             ],
+            "Roadmap" => "roadmap.md",
         ],
         "Reference" => "reference.md"
     ],
