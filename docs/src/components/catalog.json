@@ -1,0 +1,177 @@
+[
+  {
+    "name": "Mirror",
+    "category": "Mirrors",
+    "image": "plano_mirror_showcase.png",
+    "href": "/reference#BeamletOptics.Mirror",
+    "teaser": "Generic perfect mirror built from any closed shape."
+  },
+  {
+    "name": "SquarePlanoMirror2D",
+    "category": "Mirrors",
+    "image": "flat_mirror_family_showcase.png",
+    "href": "/reference#BeamletOptics.SquarePlanoMirror2D-Tuple{T}%20where%20T<:Real",
+    "teaser": "Flat square mirror for 2D ray tracing."
+  },
+  {
+    "name": "SquarePlanoMirror",
+    "category": "Mirrors",
+    "image": "flat_mirror_family_showcase.png",
+    "href": "/reference#BeamletOptics.SquarePlanoMirror-Union{Tuple{T},%20Tuple{W},%20Tuple{W,%20T}}%20where%20{W<:Real,%20T<:Real}",
+    "teaser": "Flat square mirror with a substrate thickness."
+  },
+  {
+    "name": "RectangularPlanoMirror",
+    "category": "Mirrors",
+    "image": "flat_mirror_family_showcase.png",
+    "href": "/reference#BeamletOptics.RectangularPlanoMirror-Union{Tuple{T},%20Tuple{H},%20Tuple{W},%20Tuple{W,%20H,%20T}}%20where%20{W<:Real,%20H<:Real,%20T<:Real}",
+    "teaser": "Flat rectangular mirror with a substrate thickness."
+  },
+  {
+    "name": "RoundPlanoMirror",
+    "category": "Mirrors",
+    "image": "plano_mirror_showcase.png",
+    "href": "/reference#BeamletOptics.RoundPlanoMirror",
+    "teaser": "Round flat mirror with a substrate thickness."
+  },
+  {
+    "name": "SphericalMirror",
+    "category": "Mirrors",
+    "image": "spherical_mirror_showcase.png",
+    "href": "/reference#BeamletOptics.SphericalMirror",
+    "teaser": "Concave spherical mirror for non-dispersive focusing."
+  },
+  {
+    "name": "RightAnglePrismMirror",
+    "category": "Mirrors",
+    "image": "right_angle_prism_mirror_showcase.png",
+    "href": "/reference#BeamletOptics.RightAnglePrismMirror-Tuple{Real,%20Real}",
+    "teaser": "90 degree beam-turning prism mirror."
+  },
+  {
+    "name": "ParabolicMirror",
+    "category": "Mirrors",
+    "image": "parabolic_mirror_showcase.png",
+    "href": "/reference#BeamletOptics.ParabolicMirror-Tuple{Real,%20Real}",
+    "teaser": "On-axis parabolic mirror, free of spherical aberration."
+  },
+  {
+    "name": "OffAxisParabolicMirror",
+    "category": "Mirrors",
+    "image": "oap_mirror_showcase.png",
+    "href": "/reference#BeamletOptics.OffAxisParabolicMirror-Tuple{Real,%20Real}",
+    "teaser": "Off-axis parabolic mirror for achromatic focusing."
+  },
+  {
+    "name": "Retroreflector",
+    "category": "Mirrors",
+    "image": "retroreflector_showcase.png",
+    "href": "/reference#BeamletOptics.Retroreflector-Tuple{Real}",
+    "teaser": "Corner-cube reflector that returns rays toward their source."
+  },
+  {
+    "name": "Lens",
+    "category": "Lenses",
+    "image": "lens_constructor.png",
+    "href": "/reference#BeamletOptics.Lens",
+    "teaser": "Generic refractive lens built from any pair of surfaces."
+  },
+  {
+    "name": "DoubletLens",
+    "category": "Lenses",
+    "image": "doublet_showcase.png",
+    "href": "/reference#BeamletOptics.DoubletLens",
+    "teaser": "Cemented two-element lens for reduced chromatic aberration."
+  },
+  {
+    "name": "ThinLens",
+    "category": "Lenses",
+    "image": "spot_diagram_system.png",
+    "href": "/reference#BeamletOptics.ThinLens-Tuple{Real,%20Real,%20Real,%20Union{Function,%20DiscreteRefractiveIndex,%20SellmeierEquation}}",
+    "teaser": "Idealized thin spherical lens."
+  },
+  {
+    "name": "SphericalLens",
+    "category": "Lenses",
+    "image": "spherical_lens_showcase.png",
+    "href": "/reference#BeamletOptics.SphericalLens",
+    "teaser": "Spherical singlet lens built from manufacturer data."
+  },
+  {
+    "name": "SphericalDoubletLens",
+    "category": "Lenses",
+    "image": "doublet_showcase.png",
+    "href": "/reference#BeamletOptics.SphericalDoubletLens-NTuple{8,%20Any}",
+    "teaser": "Convenience constructor for spherical doublet lenses."
+  },
+  {
+    "name": "Prism",
+    "category": "Prisms",
+    "image": "prism_showcase.png",
+    "href": "/reference#BeamletOptics.Prism",
+    "teaser": "Generic refractive prism built from any closed shape."
+  },
+  {
+    "name": "RightAnglePrism",
+    "category": "Prisms",
+    "image": "prism_showcase.png",
+    "href": "/reference#BeamletOptics.RightAnglePrism-Tuple{Real,%20Real,%20Union{Function,%20DiscreteRefractiveIndex,%20SellmeierEquation}}",
+    "teaser": "Right-angle symmetric prism, e.g. for cube beamsplitters."
+  },
+  {
+    "name": "ThinBeamsplitter",
+    "category": "Beamsplitters",
+    "image": "thin_beamsplitter_showcase.png",
+    "href": "/reference#BeamletOptics.ThinBeamsplitter-Tuple{Real,%20Real}",
+    "teaser": "Zero-thickness rectangular splitting coating."
+  },
+  {
+    "name": "RoundThinBeamsplitter",
+    "category": "Beamsplitters",
+    "image": "thin_beamsplitter_showcase.png",
+    "href": "/reference#BeamletOptics.RoundThinBeamsplitter-Tuple{Real}",
+    "teaser": "Zero-thickness round splitting coating."
+  },
+  {
+    "name": "RectangularPlateBeamsplitter",
+    "category": "Beamsplitters",
+    "image": "pbs_showcase.png",
+    "href": "/reference#BeamletOptics.RectangularPlateBeamsplitter-Tuple{Real,%20Real,%20Real,%20Union{Function,%20DiscreteRefractiveIndex,%20SellmeierEquation}}",
+    "teaser": "Rectangular plate beamsplitter with a finite substrate."
+  },
+  {
+    "name": "RoundPlateBeamsplitter",
+    "category": "Beamsplitters",
+    "image": "pbs_showcase.png",
+    "href": "/reference#BeamletOptics.RoundPlateBeamsplitter-Tuple{Real,%20Real,%20Union{Function,%20DiscreteRefractiveIndex,%20SellmeierEquation}}",
+    "teaser": "Round plate beamsplitter with a finite substrate."
+  },
+  {
+    "name": "CubeBeamsplitter",
+    "category": "Beamsplitters",
+    "image": "cbs_showcase.png",
+    "href": "/reference#BeamletOptics.CubeBeamsplitter-Tuple{Real,%20Union{Function,%20DiscreteRefractiveIndex,%20SellmeierEquation}}",
+    "teaser": "Two cemented right-angle prisms forming a cube splitter."
+  },
+  {
+    "name": "RectangularCompensatorPlate",
+    "category": "Beamsplitters",
+    "image": "compensator_plate_showcase.png",
+    "href": "/reference#BeamletOptics.RectangularCompensatorPlate-Union{Tuple{T},%20Tuple{H},%20Tuple{W},%20Tuple{W,%20H,%20T,%20Union{Function,%20DiscreteRefractiveIndex,%20SellmeierEquation}}}%20where%20{W<:Real,%20H<:Real,%20T<:Real}",
+    "teaser": "Corrects the parallel beam offset of a plate beamsplitter."
+  },
+  {
+    "name": "Detector",
+    "category": "Detectors",
+    "image": "pd_showcase.png",
+    "href": "/reference#BeamletOptics.Detector",
+    "teaser": "Detection screen for field, spot and power analysis."
+  },
+  {
+    "name": "PolarizationFilter",
+    "category": "Polarizers",
+    "image": "polarization_filter_showcase.png",
+    "href": "/reference#BeamletOptics.PolarizationFilter-Tuple{Real}",
+    "teaser": "Ideal zero-thickness linear polarization filter."
+  }
+]

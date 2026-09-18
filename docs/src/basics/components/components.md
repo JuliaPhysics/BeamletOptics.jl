@@ -1,12 +1,17 @@
+```@setup components
+catalog_showcase_dir = joinpath(@__DIR__, "..", "..", "assets", "catalog_assets")
+
+Main.DocUtils.conditional_include(joinpath(catalog_showcase_dir, "catalog_showcase.jl"))
+```
+
 # Optical components
 
-Optical elements serve as the building blocks for optical systems in the context of this package, representing components such as mirrors, lenses, filters and so on. A collection of basic optical elements is provided with this package as is. They are tested for the correctness of their optical interactions and are verified to work with reasonable fidelity. For detailed documentation, refer to the following table of contents. 
+Optical elements serve as the building blocks for optical systems in the context of this package, representing components such as mirrors, lenses, filters and so on. A collection of basic optical elements is provided with this package as is. They are tested for the correctness of their optical interactions and are verified to work with reasonable fidelity. Browse the catalog below, or refer to the [Mirrors](@ref), [Lenses](@ref), [Beamsplitters](@ref), [Detectors](@ref) and [Polarizers](@ref) pages for detailed documentation.
 
 ## Component overview
 
-```@contents
-Pages = ["mirrors.md", "lenses.md", "beamsplitters.md", "detectors.md", "polarizers.md"]
-Depth = 2
+```@raw html
+<ComponentCatalog />
 ```
 
 ## Moving optical elements

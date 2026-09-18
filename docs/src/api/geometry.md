@@ -4,6 +4,29 @@ In BMO, the distinction between an *object* and its geometric representation (*s
 
 ## Separation of geometry and optical interactions
 
+```mermaid
+classDiagram
+    class AbstractShape
+    class AbstractShapeTrait
+    class SingleShape
+    class MultiShape
+    class AbstractObject
+    class AbstractObjectGroup
+    class AbstractSystem
+    class AbstractRay
+    class AbstractBeam
+    class AbstractBeamGroup
+
+    AbstractShapeTrait <|-- SingleShape
+    AbstractShapeTrait <|-- MultiShape
+    AbstractObject <|-- AbstractObjectGroup
+    AbstractObject --> AbstractShape : geometry
+    AbstractObject --> AbstractShapeTrait : shape_trait_of
+    AbstractSystem --> AbstractObject : objects
+    AbstractBeam --> AbstractRay : rays
+    AbstractBeamGroup --> AbstractBeam : beams
+```
+
 The geometry, represented by a concrete subtype of the [`BeamletOptics.AbstractShape`](@ref), defines the physical boundaries of the element. Shapes can be represented in various forms, such as [Meshes](@ref) or [Signed Distance Functions (SDFs)](@ref). The main goal for this design choice is to allow for the possibility to switch out geometry representations for more advanced methods in the future, e.g. [NURBS.jl](https://github.com/HoBeZwe/NURBS.jl).
 
 ```@docs; canonical=false

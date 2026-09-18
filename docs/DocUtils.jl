@@ -2,6 +2,7 @@ module DocUtils
 
 using GLMakie: Figure, Axis, hidedecorations!, text!, save
 using Dates: now
+import Documenter, DocumenterVitepress
 
 const GLOBAL_USE_PLACEHOLDERS = true
 
@@ -124,5 +125,16 @@ function prerender_include(fname::String, cname::String)
     end
     return nothing
 end
+
+"""Plugin that injects the catalog Vue component and the Mermaid npm deps into the
+DocumenterVitepress build (see `DocumenterVitepress/src/extension_hooks.jl`)."""
+struct BMODocsExtras <: Documenter.Plugin end
+
+DocumenterVitepress.vitepress_components(::BMODocsExtras) = [
+    (name = "ComponentCatalog", import_path = "@/ComponentCatalog.vue"),
+]
+
+DocumenterVitepress.vitepress_dependencies(::BMODocsExtras) =
+    Dict("mermaid" => "^11.4.1", "vitepress-plugin-mermaid" => "^2.0.17")
 
 end

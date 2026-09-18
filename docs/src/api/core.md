@@ -12,7 +12,16 @@ The BMO package is intended to provide optical simulation capabilites with as mu
 
 The first two principles will be elaborated upon in more detail in the [Geometry representation](@ref) section. For the latter two design decisions, the following high-level solver schematic can be used to abstract the steps that are performed when calling [`solve_system!`](@ref) with an input system and beam:
 
-![Intersect-Interact-Repeat loop](iir_loop.svg)
+```mermaid
+flowchart TD
+    A[Intersect: test ray/beam against the system] --> B{Intersection found?}
+    B -- "No / r_max exceeded" --> Z([Exit])
+    B -- Yes --> C[Interact: compute AbstractInteraction]
+    C --> D[Attach / overwrite next ray or beam segment]
+    D --> E{Hint attached?}
+    E -- "Yes: test the hinted shape first" --> A
+    E -- "No: brute-force intersection test" --> A
+```
 
 This scheme is loosely referred to as the **Intersect-Interact-Repeat-Loop** and consists of the following steps:
 
@@ -88,6 +97,18 @@ This non-sequential mode is comparatively safe in determining the "true" beam pa
 ### Retracing systems
 
 Once a system has been traced for the first time, the system and beam can be solved again. However, this time the solver will try to reuse as much information from the previous run as possible by testing if the previous beam trajectory is still valid in a sequential tracing mode. Retracing systems assumes that the kinematic changes (e.g. optomechanical aligment) between the current tracing procedure and the previous one are small. If an intersection along the beam trajectory becomes invalid, the solver will perform a non-sequential trace for all invalidated parts of the beam.
+
+```mermaid
+flowchart TD
+    A[retrace_system!] --> B{Beam path already known?}
+    B -- "No, first trace" --> C[Brute-force trace_system!]
+    B -- "Yes, reuse hints" --> D[Sequential retrace along known path]
+    D --> E{Previous intersections still valid?}
+    E -- Yes --> F([Done])
+    E -- "No, invalidated" --> G[Brute-force trace of invalidated segments]
+    G --> F
+    C --> F
+```
 
 ```@docs; canonical=false
 BeamletOptics.retrace_system!
