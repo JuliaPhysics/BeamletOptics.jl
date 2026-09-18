@@ -41,8 +41,14 @@ include(joinpath(@__DIR__, "E2E", "TestMichelson.jl"))
 include(joinpath(@__DIR__, "E2E", "TestMachZehnder.jl"))
 include(joinpath(@__DIR__, "E2E", "TestFraunhofer.jl"))
 
+# Test rendering
+# MUST stay first: TestRenderErrors.jl needs to run before anything loads the BMO Makie ext.
+include(joinpath(@__DIR__, "Rendering", "TestRenderErrors.jl"))
+include(joinpath(@__DIR__, "Rendering", "TestRenderPolarization.jl"))
+
 # Test regressions
 include(joinpath(@__DIR__, "TestBugFixes.jl"))
 
 # Test misc.
 include(joinpath(@__DIR__, "TestMisc.jl"))
+

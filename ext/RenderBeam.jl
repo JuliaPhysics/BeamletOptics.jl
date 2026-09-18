@@ -14,7 +14,8 @@ Renders a `ray` as a 3D line into the specified `axis`.
   `ArgumentError` for a non-polarized ray)
 - `pol_λ = nothing`: visualization wavelength [m], default = total plotted length / 20.
   This is a plotting parameter, not the physical ray wavelength; the curve shows the
-  `t = 0` snapshot `Re{E⊥·exp(i·k·s)}` along the accumulated optical path `s`.
+  `t = 0` snapshot `Re{E⊥·exp(i·k·s)}` along the accumulated optical path `s`. Values
+  finer than `plotted length / 2000` are clamped with a warning.
 - `pol_amplitude = nothing`: curve amplitude [m] at the maximum |E⊥|, default `pol_λ/4`
 - `pol_ppl = 32`: sample points per `pol_λ` along the curve
 - `pol_color = :crimson`: field curve color
@@ -100,7 +101,8 @@ Refer to the plotting method of the `AbstractRay` for a list of keyword argument
   for the whole beam tree, not per ray, to preserve phase continuity.
 - `pol_λ = nothing`: visualization wavelength [m], default = total plotted length / 20.
   This is a plotting parameter, not the physical ray wavelength; the curve shows the
-  `t = 0` snapshot `Re{E⊥·exp(i·k·s)}` along the accumulated optical path `s`.
+  `t = 0` snapshot `Re{E⊥·exp(i·k·s)}` along the accumulated optical path `s`. Values
+  finer than `plotted length / 2000` are clamped with a warning.
 - `pol_amplitude = nothing`: curve amplitude [m] at the maximum |E⊥|, default `pol_λ/4`
 - `pol_ppl = 32`: sample points per `pol_λ` along the curve
 - `pol_color = :crimson`: field curve color

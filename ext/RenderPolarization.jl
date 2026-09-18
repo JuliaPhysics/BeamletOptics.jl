@@ -25,6 +25,26 @@ geometric length.
 """
 _plotted_length(ray, flen) = isnothing(BMO.intersection(ray)) ? flen : length(ray)
 
+const _MAX_PERIODS = 2000
+
+"""
+    _resolve_λ_vis(λ_vis, L_plot)
+
+Resolve the visualization wavelength: `λ_vis` if given, else `L_plot / 20`.
+Clamped from below to `L_plot / _MAX_PERIODS` so that a `pol_λ` mistakenly
+set to the physical ray wavelength cannot generate millions of points.
+"""
+function _resolve_λ_vis(λ_vis, L_plot)
+    λ = something(λ_vis, L_plot / 20)
+    λ_min = L_plot / _MAX_PERIODS
+    if λ < λ_min
+        @warn "pol_λ is too fine for the plotted path; clamping. pol_λ is a \
+               visualization wavelength, not the physical ray wavelength." λ λ_min maxlog=1
+        λ = λ_min
+    end
+    return λ
+end
+
 """
     _field_segment!(pts, p, d, E⊥, S, n, L, amp, k_vis, λ_vis, ppl)
 
@@ -87,7 +107,7 @@ function _polarization_points(ray::BMO.PolarizedRay; flen, λ_vis = nothing, amp
     if L <= 0
         return Point3f[]
     end
-    λ_vis = something(λ_vis, L / 20)
+    λ_vis = _resolve_λ_vis(λ_vis, L)
     σ = something(amplitude, λ_vis / 4)
     k_vis = 2π / λ_vis
 
@@ -102,29 +122,27 @@ function _polarization_points(ray::BMO.PolarizedRay; flen, λ_vis = nothing, amp
 end
 
 """
-    _polarization_points(beam::BMO.Beam; flen, λ_vis = nothing, amplitude = nothing, ppl = 32)
+    _polarization_points(beam::BMO.Beam{<:Any, <:BMO.PolarizedRay}; flen, λ_vis = nothing, amplitude = nothing, ppl = 32)
 
 Field-vector curve sample points for a whole `Beam` tree (chief + child
 beams), with phase continuity across segments.
 """
-function _polarization_points(beam::BMO.Beam; flen, λ_vis = nothing, amplitude = nothing, ppl = 32)
-    # Pass 1: Emax and total plotted length, over the same segments as pass 2.
+function _polarization_points(beam::BMO.Beam{<:Any, <:BMO.PolarizedRay}; flen, λ_vis = nothing, amplitude = nothing, ppl = 32)
+    # Pass 1: Emax and the max plotted length over any branch, over the same segments as pass 2.
     Emax = 0.0
-    L_tot = 0.0
+    L_max = 0.0
     for b in PreOrderDFS(beam)
         for r in BMO.rays(b)
             Emax = max(Emax, norm(_transverse(BMO.polarization(r), BMO.direction(r))))
-            is_last = isnothing(BMO.intersection(r))
-            L = is_last ? flen : length(r)
-            L_tot += L
-            is_last && break
+            isnothing(BMO.intersection(r)) && break
         end
+        L_max = max(L_max, length(b) + flen)
     end
-    if L_tot <= 0
+    if L_max <= 0
         return Point3f[]
     end
     Emax = max(Emax, eps())
-    λ_vis = something(λ_vis, L_tot / 20)
+    λ_vis = _resolve_λ_vis(λ_vis, L_max)
     σ = something(amplitude, λ_vis / 4)
     k_vis = 2π / λ_vis
 
@@ -151,49 +169,47 @@ end
 
 """
     _polarization_points(agb::BMO.AstigmaticGaussianBeamlet; flen, λ_vis = nothing, scale = 1.0,
-                         focus_exponent = 1.0, ppl = 32)
+                         focus_exponent = 1.0, gain_max = 10.0, ppl = 32)
 
 Field-vector curve sample points along the chief ray of an
 `AstigmaticGaussianBeamlet` tree. The curve amplitude follows the on-axis field
-amplitude of the beamlet,
+amplitude of the beamlet, clamped to a maximum gain relative to the reference
+amplitude,
 
-    a(z) = scale * r_ref * (A_ref / A(z))^(focus_exponent / 2) / Emax,
+    a(z) = scale * r_ref * min((A_ref / A(z))^(focus_exponent / 2), gain_max) / Emax,
 
 with `A = ‖b‖·‖c‖` the product of the 1/e² semi-axes from
 `(_, b, c) = waist_parameters(child, z)`, and `r_ref`, `A_ref` the mean radius
 and semi-axis product at the start of the root beamlet. For `focus_exponent = 1`
 this is the physical scaling `E ∝ √(w0x·w0y / (wx·wy))`, so the curve is raised
-where the beam is compressed (focus) and flattened where it expands;
+where the beam is compressed (focus) and flattened where it expands, saturating
+at `gain_max` so the curve stays on-screen through a tight focus;
 `focus_exponent = 0` gives a constant amplitude. Gouy phase and phase-front
 curvature are ignored; the curve is a qualitative visualization only.
 """
 function _polarization_points(agb::BMO.AstigmaticGaussianBeamlet; flen, λ_vis = nothing, scale = 1.0,
-        focus_exponent = 1.0, ppl = 32)
-    # Pass 1: Emax (over chief rays) and total plotted length.
+        focus_exponent = 1.0, gain_max = 10.0, ppl = 32)
+    # Pass 1: Emax (over chief rays) and the max plotted length over any branch.
     Emax = 0.0
-    L_tot = 0.0
+    L_max = 0.0
     for child in PreOrderDFS(agb)
         for ray in BMO.rays(child.c)
             Emax = max(Emax, norm(_transverse(BMO.polarization(ray), BMO.direction(ray))))
-            is_last = isnothing(BMO.intersection(ray))
-            L = is_last ? flen : length(ray)
-            L_tot += L
-            is_last && break
+            isnothing(BMO.intersection(ray)) && break
         end
+        L_max = max(L_max, length(child) + flen)
     end
-    if L_tot <= 0
+    if L_max <= 0
         return Point3f[]
     end
     Emax = max(Emax, eps())
-    λ_vis = something(λ_vis, L_tot / 20)
+    λ_vis = _resolve_λ_vis(λ_vis, L_max)
     k_vis = 2π / λ_vis
 
     # Reference beam size at the start of the root beamlet
     (_, b_ref, c_ref) = BMO.waist_parameters(agb, 0.0)
     r_ref = (norm(b_ref) + norm(c_ref)) / 2
     A_ref = norm(b_ref) * norm(c_ref)
-    # Floor for the local cross-section to avoid a singular gain at caustics
-    A_min = A_ref * 1e-12
 
     pts = Point3f[]
     for child in PreOrderDFS(agb)
@@ -213,8 +229,15 @@ function _polarization_points(agb::BMO.AstigmaticGaussianBeamlet; flen, λ_vis =
             l0 = l
             amp = function (t)
                 (_, b, c) = BMO.waist_parameters(child, l0 + t)
-                A = max(norm(b) * norm(c), A_min)
-                return scale * r_ref * (A_ref / A)^(focus_exponent / 2) / Emax
+                A = norm(b) * norm(c)
+                gain = if A_ref <= 0
+                    one(A_ref)          # degenerate source: no focus scaling
+                elseif A <= 0
+                    gain_max            # exact caustic: saturate, never divide by zero
+                else
+                    (A_ref / A)^(focus_exponent / 2)
+                end
+                return scale * r_ref * min(gain, gain_max) / Emax
             end
 
             S = _field_segment!(pts, p, d, E⊥, S, n, L, amp, k_vis, λ_vis, ppl)
