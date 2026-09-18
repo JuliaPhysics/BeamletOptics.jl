@@ -126,12 +126,13 @@ function prerender_include(fname::String, cname::String)
     return nothing
 end
 
-"""Plugin that injects the catalog Vue component and the Mermaid npm deps into the
-DocumenterVitepress build (see `DocumenterVitepress/src/extension_hooks.jl`)."""
+"""Plugin that injects the catalog and roadmap Vue components and the Mermaid npm deps into
+the DocumenterVitepress build (see `DocumenterVitepress/src/extension_hooks.jl`)."""
 struct BMODocsExtras <: Documenter.Plugin end
 
 DocumenterVitepress.vitepress_components(::BMODocsExtras) = [
     (name = "ComponentCatalog", import_path = "@/ComponentCatalog.vue"),
+    (name = "RoadmapBoard", import_path = "@/RoadmapBoard.vue"),
 ]
 
 DocumenterVitepress.vitepress_dependencies(::BMODocsExtras) =
