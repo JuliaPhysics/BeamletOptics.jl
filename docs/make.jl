@@ -4,9 +4,23 @@ using BeamletOptics
 using Documenter
 using DocumenterCitations
 using DocumenterVitepress
+using Literate
 import NodeJS_20_jll
 
 include(joinpath(@__DIR__, "DocUtils.jl"))
+
+# Literate-based tutorials: the source of truth is the `.jl` file in `docs/literate`.
+# `Literate.markdown` regenerates the corresponding page in `docs/src/tutorials` (see
+# `.gitignore`), and `Literate.script`/`Literate.notebook` produce the downloadable
+# `.jl`/`.ipynb` files served via the `vitepress_assets` hook in `DocUtils.jl`.
+let
+    lit_src = joinpath(@__DIR__, "literate", "laser_alignment.jl")
+    out_md  = joinpath(@__DIR__, "src", "tutorials")
+    out_dl  = joinpath(@__DIR__, "src", "assets", "downloads")
+    Literate.markdown(lit_src, out_md; documenter=true, credit=false)
+    Literate.script(lit_src, out_dl; credit=false)
+    Literate.notebook(lit_src, out_dl; execute=false, credit=false)
+end
 
 # DocumenterVitepress runs `npm install` through NodeJS_20_jll, but JLLWrappers does not
 # put the artifact's `bin` directory on PATH. npm postinstall scripts that spawn `node`
@@ -107,7 +121,7 @@ makedocs(;
         "Home" => "index.md",
         "Getting started" => Any[
             "Tutorials" => Any[
-                "Beam expander"             => joinpath("tutorials", "expander.md"),
+                "Laser alignment"           => joinpath("tutorials", "laser_alignment.md"),
                 "Miniature microscope"      => joinpath("tutorials", "microscope.md"),
                 "Michelson interferometer"  => joinpath("tutorials", "michelson.md"),
                 "Raman spectroscopy"        => joinpath("tutorials", "openraman.md"),

@@ -137,4 +137,12 @@ DocumenterVitepress.vitepress_components(::BMODocsExtras) = [
 DocumenterVitepress.vitepress_dependencies(::BMODocsExtras) =
     Dict("mermaid" => "^11.4.1", "vitepress-plugin-mermaid" => "^2.0.17")
 
+# `docs/src/assets` is copied verbatim into `build/.documenter/assets` by Documenter, but
+# that directory is not served at a stable URL by VitePress. The `vitepress_assets` hook
+# copies the *contents* of its argument directory into `build/.documenter/public` (i.e.
+# `public/<filename>`, flattening the `downloads` folder itself away), which VitePress does
+# serve as-is, so the Literate downloads end up reachable at the site root as `/<file>`.
+DocumenterVitepress.vitepress_assets(::BMODocsExtras) =
+    [joinpath(@__DIR__, "src", "assets", "downloads")]
+
 end
