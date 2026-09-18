@@ -48,9 +48,6 @@ E_lin = [0,1,0]
 
 start_pos = position(m1) + [150mm, 0, 0]
 
-ray = PolarizedRay(start_pos, [-1, 0, 0], 1000nm, E_lin)
-beam = Beam(ray)
-
 beam = AstigmaticGaussianBeamlet(start_pos, [-1, 0, 0], 1000nm, 4mm, E0=E_circ)
 
 solve_system!(system, beam)

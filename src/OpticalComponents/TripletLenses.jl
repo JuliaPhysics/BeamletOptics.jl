@@ -88,10 +88,12 @@ function interact3d(system::AbstractSystem, tl::TripletLens, beam::Beam{T, R}, r
         next = tl.middle
     elseif hit === shape(tl.middle)
         i = interact3d(system, tl.middle, beam, ray)
+        isnothing(i) && return nothing
         s = dot(direction(i.ray), orientation(tl)[:, 2])
         next = s ≥ 0 ? tl.back : tl.front
     else
         error("TripletLens: intersected shape is not part of this lens")
     end
+    isnothing(i) && return nothing
     return BeamInteraction(Hint(tl, shape(next)), i.ray)
 end
