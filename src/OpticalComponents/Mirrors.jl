@@ -261,7 +261,7 @@ function OffAxisParabolicMirror(
 
     t = thickness === nothing ? max(T(diameter / 2), sag_max + T(10e-3)) : T(thickness)
 
-    oap_sdf = OffAxisParaboloidSDF(f, x_off, T(diameter), t)
+    oap_sdf = ConicSDF(2f, -one(T), x_off, T(diameter), t)
     return Mirror(oap_sdf)
 end
 
@@ -294,7 +294,7 @@ function ParabolicMirror(
     T = float(promote_type(typeof(f), typeof(diameter), typeof(thickness === nothing ? 0.0 : thickness)))
     sag_max = T(diameter / 2)^2 / (4 * T(f))
     t = thickness === nothing ? sag_max + T(10e-3) : T(thickness)
-    substrate = OffAxisParaboloidSDF(T(f), zero(T), T(diameter), t)
+    substrate = ConicSDF(2 * T(f), -one(T), zero(T), T(diameter), t)
     if hole_diameter === nothing
         return Mirror(substrate)
     end
@@ -310,4 +310,205 @@ function ParabolicMirror(
     bore = CylinderSDF(hd / 2, half_height)
     translate3d!(bore, [zero(T), y_center, zero(T)])
     return Mirror(substrate - bore)
+end
+
+function _conic_from_conjugates(s, s′)
+    iszero(s + s′) && throw(ArgumentError("s + s′ must be non-zero (s = $s, s′ = $s′)"))
+    R = 2 * s * s′ / (s + s′)
+    k = -((s′ - s) / (s′ + s))^2
+    return R, k
+end
+
+function _conic_auto_thickness(R, k, x_off, diameter, ::Type{T}) where {T}
+    # extrema of y_surf over the aperture disc; Z is monotone in r
+    r_hi = abs(x_off) + diameter / 2
+    r_lo = max(zero(T), abs(x_off) - diameter / 2)
+    Z_off = _conic_sag(x_off, R, k)
+    y_a = -(_conic_sag(r_lo, R, k) - Z_off)
+    y_b = -(_conic_sag(r_hi, R, k) - Z_off)
+    return abs(y_a - y_b) + T(10e-3)
+end
+
+"""
+    OffAxisConicMirror(R, k, x_off, diameter; thickness=nothing)
+
+Constructs an off-axis segment of a general conic-of-revolution [`Mirror`](@ref) (sphere,
+paraboloid, ellipsoid or hyperboloid), offset by `x_off` from the parent vertex. See
+[`ConicSDF`](@ref) for the frame convention (origin, parent axis, opening direction, vertex
+location).
+
+# Inputs
+
+- `R`:          Radius of curvature at the parent vertex \\[m\\]; `R > 0` is concave (opens
+                towards `-y`), `R < 0` is convex (opens towards `+y`). Must be non-zero.
+- `k`:          Conic constant. `k = -1` is a paraboloid, `k = 0` a sphere, `-1 < k <= 0` a
+                prolate ellipsoid, `k > 0` an oblate ellipsoid, `k < -1` a hyperboloid.
+- `x_off`:      Off-axis distance from the parent vertex to the aperture center \\[m\\]
+- `diameter`:   Mirror aperture diameter \\[m\\]
+- `thickness`:  Substrate thickness \\[m\\], calculated automatically to ensure solid backing
+                if `nothing` (default)
+
+For `k > -1` the aperture must stay within the domain of the parent conic
+(`abs(x_off) + diameter/2 < abs(R)/sqrt(1+k)`), otherwise an `ArgumentError` is thrown; for
+`k <= -1` there is no such limit. See also [`ConicMirror`](@ref) for the on-axis case.
+"""
+function OffAxisConicMirror(
+        R::Real,
+        k::Real,
+        x_off::Real,
+        diameter::Real;
+        thickness::Union{Real, Nothing} = nothing
+    )
+    T = float(promote_type(typeof(R), typeof(k), typeof(x_off), typeof(diameter),
+        typeof(thickness === nothing ? 0.0 : thickness)))
+    Rt, kt, x_offt, dt = T(R), T(k), T(x_off), T(diameter)
+    if thickness === nothing
+        # Validate (R, k, x_off, diameter) via the SDF constructor itself first: computing
+        # the auto thickness below evaluates the sag function outside its domain if the
+        # aperture is invalid, which would raise a DomainError instead of an ArgumentError.
+        ConicSDF(Rt, kt, x_offt, dt, one(T))
+        t = _conic_auto_thickness(Rt, kt, x_offt, dt, T)
+    else
+        t = T(thickness)
+    end
+    return Mirror(ConicSDF(Rt, kt, x_offt, dt, t))
+end
+
+"""
+    ConicMirror(R, k, diameter; thickness=nothing)
+
+Constructs an on-axis segment of a general conic-of-revolution [`Mirror`](@ref) (sphere,
+paraboloid, ellipsoid or hyperboloid). The vertex lies at the origin and the mirror opens
+towards the negative y-axis for `R > 0`. See [`OffAxisConicMirror`](@ref) for the off-axis
+case and the full sign/domain conventions.
+
+# Inputs
+
+- `R`:          Radius of curvature at the vertex \\[m\\]; `R > 0` concave, `R < 0` convex
+- `k`:          Conic constant; `k = -1` is a paraboloid (see [`ParabolicMirror`](@ref)),
+                `k = 0` a sphere (see [`SphericalMirror`](@ref))
+- `diameter`:   Mirror aperture diameter \\[m\\]
+- `thickness`:  Substrate thickness \\[m\\], calculated automatically to ensure solid backing
+                if `nothing` (default)
+"""
+function ConicMirror(R::Real, k::Real, diameter::Real; thickness::Union{Real, Nothing} = nothing)
+    return OffAxisConicMirror(R, k, 0, diameter; thickness)
+end
+
+"""
+    OffAxisEllipsoidalMirror(s, s′, x_off, diameter; thickness=nothing)
+
+Constructs an off-axis segment of an ellipsoidal [`Mirror`](@ref) whose two real conjugate
+foci lie at object/image distances `s`, `s′` from the parent vertex, offset by `x_off`. Both
+foci lie on the same side (the `-y`, i.e. reflecting, side) of the parent vertex for positive
+`s`, `s′`.
+
+# Inputs
+
+- `s`, `s′`:    Conjugate object/image distances from the parent vertex \\[m\\], measured
+                positive towards `-y` (in front of the mirror). Must have the same sign.
+- `x_off`:      Off-axis distance from the parent vertex to the aperture center \\[m\\]
+- `diameter`:   Mirror aperture diameter \\[m\\]
+- `thickness`:  Substrate thickness \\[m\\], calculated automatically to ensure solid backing
+                if `nothing` (default)
+
+The vertex radius of curvature and conic constant are derived via
+`R = 2ss′/(s+s′)`, `k = -((s′-s)/(s′+s))^2`. See also [`EllipsoidalMirror`](@ref) for the
+on-axis case.
+"""
+function OffAxisEllipsoidalMirror(
+        s::Real,
+        s′::Real,
+        x_off::Real,
+        diameter::Real;
+        thickness::Union{Real, Nothing} = nothing
+    )
+    R, k = _conic_from_conjugates(s, s′)
+    if !(-1 < k <= 0)
+        throw(ArgumentError(
+            "s and s′ must have the same sign for an ellipsoid (got s = $s, s′ = $s′ ⇒ k = $k); " *
+            "use OffAxisHyperbolicMirror for a virtual focus or ParabolicMirror for s′ → ∞"))
+    end
+    return OffAxisConicMirror(R, k, x_off, diameter; thickness)
+end
+
+"""
+    EllipsoidalMirror(s, s′, diameter; thickness=nothing)
+
+Constructs an on-axis segment of an ellipsoidal [`Mirror`](@ref) whose two real conjugate
+foci lie at `(0, -s, 0)` and `(0, -s′, 0)`; the vertex lies at the origin. See
+[`OffAxisEllipsoidalMirror`](@ref) for the off-axis case and the sign convention for `s`, `s′`.
+
+# Inputs
+
+- `s`, `s′`:    Conjugate object/image distances from the vertex \\[m\\], same sign
+- `diameter`:   Mirror aperture diameter \\[m\\]
+- `thickness`:  Substrate thickness \\[m\\], calculated automatically to ensure solid backing
+                if `nothing` (default)
+"""
+function EllipsoidalMirror(s::Real, s′::Real, diameter::Real; thickness::Union{Real, Nothing} = nothing)
+    return OffAxisEllipsoidalMirror(s, s′, 0, diameter; thickness)
+end
+
+"""
+    OffAxisHyperbolicMirror(s, s′, x_off, diameter; thickness=nothing)
+
+Constructs an off-axis segment of a hyperboloidal [`Mirror`](@ref) whose conjugate foci lie at
+object/image distances `s`, `s′` from the parent vertex, offset by `x_off`. Exactly one focus
+is virtual, i.e. `s` and `s′` have opposite signs.
+
+# Inputs
+
+- `s`, `s′`:    Conjugate object/image distances from the parent vertex \\[m\\], measured
+                positive towards `-y` (real focus, in front of the mirror) and negative
+                towards `+y` (virtual focus, behind the mirror). Must have opposite signs.
+- `x_off`:      Off-axis distance from the parent vertex to the aperture center \\[m\\]
+- `diameter`:   Mirror aperture diameter \\[m\\]
+- `thickness`:  Substrate thickness \\[m\\], calculated automatically to ensure solid backing
+                if `nothing` (default)
+
+!!! note "Cassegrain secondary"
+    The secondary of a Cassegrain/Gregory telescope sees the prime focus behind itself, so
+    pass it as a negative `s`.
+
+The vertex radius of curvature and conic constant are derived via
+`R = 2ss′/(s+s′)`, `k = -((s′-s)/(s′+s))^2`. See also [`HyperbolicMirror`](@ref) for the
+on-axis case.
+"""
+function OffAxisHyperbolicMirror(
+        s::Real,
+        s′::Real,
+        x_off::Real,
+        diameter::Real;
+        thickness::Union{Real, Nothing} = nothing
+    )
+    R, k = _conic_from_conjugates(s, s′)
+    if !(k < -1)
+        throw(ArgumentError(
+            "s and s′ must have opposite signs for a hyperboloid (got s = $s, s′ = $s′ ⇒ k = $k); " *
+            "use OffAxisEllipsoidalMirror"))
+    end
+    return OffAxisConicMirror(R, k, x_off, diameter; thickness)
+end
+
+"""
+    HyperbolicMirror(s, s′, diameter; thickness=nothing)
+
+Constructs an on-axis segment of a hyperboloidal [`Mirror`](@ref) (e.g. a Cassegrain/Gregory
+secondary) whose conjugate foci lie at `(0, -s, 0)` and `(0, -s′, 0)`; the vertex lies at the
+origin. See [`OffAxisHyperbolicMirror`](@ref) for the off-axis case and the sign convention.
+
+!!! note "Cassegrain secondary"
+    The secondary of a Cassegrain/Gregory telescope sees the prime focus behind itself, so
+    pass it as a negative `s`.
+
+# Inputs
+
+- `s`, `s′`:    Conjugate object/image distances from the vertex \\[m\\], opposite signs
+- `diameter`:   Mirror aperture diameter \\[m\\]
+- `thickness`:  Substrate thickness \\[m\\], calculated automatically to ensure solid backing
+                if `nothing` (default)
+"""
+function HyperbolicMirror(s::Real, s′::Real, diameter::Real; thickness::Union{Real, Nothing} = nothing)
+    return OffAxisHyperbolicMirror(s, s′, 0, diameter; thickness)
 end

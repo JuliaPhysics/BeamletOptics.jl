@@ -121,6 +121,13 @@ function _raymarch_outside(shape::AbstractSDF{S},
         dist = sdf(shape, pos)
         i += 1
 
+        # A ray escaping the scene makes `dist` track the true remaining distance, so `t0`
+        # grows geometrically and overflows to `Inf` well inside `num_iter`. `sdf` then
+        # returns `NaN`, which fails `dist > eps` below and would be misread as re-entering
+        # the surface, returning a bogus `Intersection(Inf, ...)`. A non-finite probe is a
+        # miss, not a hit.
+        (isfinite(dist) && isfinite(t0)) || return nothing
+
         if dist > eps
             escaped = true
         elseif escaped

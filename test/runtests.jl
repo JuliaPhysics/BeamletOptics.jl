@@ -33,6 +33,7 @@ include(joinpath(@__DIR__, "Components", "TestDetector.jl"))
 include(joinpath(@__DIR__, "Components", "TestBeamsplitters.jl"))
 include(joinpath(@__DIR__, "Components", "TestPolarizers.jl"))
 include(joinpath(@__DIR__, "Components", "TestParabolicMirror.jl"))
+include(joinpath(@__DIR__, "Components", "TestConicMirror.jl"))
 
 # Test end-to-end models
 include(joinpath(@__DIR__, "E2E", "TestDoubleGaussLens.jl"))

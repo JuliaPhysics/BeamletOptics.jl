@@ -1,13 +1,13 @@
 """
-    render!(ax, s::OffAxisParaboloidSDF; color=:silver, kwargs...)
+    render!(ax, s::ConicSDF; color=:silver, kwargs...)
 
-Analytical surface renderer for an [`OffAxisParaboloidSDF`](@ref).
-Renders the concave parabolic front reflective face, the cylindrical substrate side wall,
+Analytical surface renderer for a [`ConicSDF`](@ref).
+Renders the concave/convex conic front reflective face, the cylindrical substrate side wall,
 and the flat rear substrate base into `ax`.
 """
 function render!(
         ax::_RenderEnv,
-        s::BMO.OffAxisParaboloidSDF;
+        s::BMO.ConicSDF;
         color = :silver,
         kwargs...
 )
@@ -21,6 +21,10 @@ function render!(
     R_rot = BMO.orientation(s)
     P_pos = BMO.position(s)
 
+    R = 2 * s.f
+    Z_off = BMO._conic_sag(s.x_off, R, s.k)
+    y_surf(xl, zl) = -(BMO._conic_sag(sqrt((xl + s.x_off)^2 + zl^2), R, s.k) - Z_off)
+
     function draw_surface!(X_loc, Y_loc, Z_loc; surf_color = color)
         Xt = Float32.(R_rot[1, 1] .* X_loc .+ R_rot[1, 2] .* Y_loc .+
                       R_rot[1, 3] .* Z_loc .+ P_pos[1])
@@ -31,20 +35,17 @@ function render!(
         surface!(ax, Xt, Yt, Zt; colormap = [surf_color, surf_color], kwargs...)
     end
 
-    # Front Parabolic Concave Surface
+    # Front Conic Surface
     X_front = [r * cos(t) for r in r_grid, t in theta_grid]
     Z_front = [r * sin(t) for r in r_grid, t in theta_grid]
-    Y_front = [min(s.thickness,
-                   -(((r * cos(t) + s.x_off)^2 + (r * sin(t))^2 - s.x_off^2) / (4 * s.f)))
+    Y_front = [min(s.thickness, y_surf(r * cos(t), r * sin(t)))
                for r in r_grid, t in theta_grid]
     draw_surface!(X_front, Y_front, Z_front; surf_color = color)
 
     # Substrate Cylindrical Side Wall
     X_wall = [r_max * cos(t) for u in u_grid, t in theta_grid]
     Z_wall = [r_max * sin(t) for u in u_grid, t in theta_grid]
-    Y_rim = [min(s.thickness,
-                 -(((r_max * cos(t) + s.x_off)^2 + (r_max * sin(t))^2 - s.x_off^2) /
-                   (4 * s.f))) for t in theta_grid]
+    Y_rim = [min(s.thickness, y_surf(r_max * cos(t), r_max * sin(t))) for t in theta_grid]
     Y_wall = [(1 - u) * Y_rim[j] + u * s.thickness
               for (i, u) in enumerate(u_grid), (j, t) in enumerate(theta_grid)]
     draw_surface!(X_wall, Y_wall, Z_wall; surf_color = :grey)
