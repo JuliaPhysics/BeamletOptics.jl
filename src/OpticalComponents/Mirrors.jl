@@ -266,25 +266,48 @@ function OffAxisParabolicMirror(
 end
 
 """
-    ParabolicMirror(f, diameter; thickness=nothing)
+    ParabolicMirror(f, diameter; thickness=nothing, hole_diameter=nothing)
 
 Constructs an on-axis parabolic [`Mirror`](@ref) with focal length `f`.
 The vertex of the concave reflecting surface lies at the origin, the mirror opens towards the negative y-axis
 and its focus lies at `(0, -f, 0)`. The shape is an [`OffAxisParaboloidSDF`](@ref) without off-axis offset.
 
+If `hole_diameter` is given, a cylindrical bore centred on the optical axis (the local
++y-axis) is subtracted from the substrate, piercing it completely (a Cassegrain primary).
+
+!!! warning "Reflective bore wall"
+    Rays that graze into the hole will reflect off its wall rather than being absorbed.
+
 # Inputs
 
-- `f`:          Focal length [m]
-- `diameter`:   Mirror aperture diameter [m]
-- `thickness`:  Substrate thickness [m], rim sag + 10 mm if `nothing` (default)
+- `f`:              Focal length \\[m\\]
+- `diameter`:       Mirror aperture diameter \\[m\\]
+- `thickness`:      Substrate thickness \\[m\\], rim sag + 10 mm if `nothing` (default)
+- `hole_diameter`:  Diameter of the central through-hole \\[m\\], no hole if `nothing` (default). Must satisfy `0 < hole_diameter < diameter`.
 """
 function ParabolicMirror(
         f::Real,
         diameter::Real;
-        thickness::Union{Real, Nothing} = nothing
+        thickness::Union{Real, Nothing} = nothing,
+        hole_diameter::Union{Real, Nothing} = nothing
     )
     T = float(promote_type(typeof(f), typeof(diameter), typeof(thickness === nothing ? 0.0 : thickness)))
     sag_max = T(diameter / 2)^2 / (4 * T(f))
     t = thickness === nothing ? sag_max + T(10e-3) : T(thickness)
-    return Mirror(OffAxisParaboloidSDF(T(f), zero(T), T(diameter), t))
+    substrate = OffAxisParaboloidSDF(T(f), zero(T), T(diameter), t)
+    if hole_diameter === nothing
+        return Mirror(substrate)
+    end
+    hd = T(hole_diameter)
+    if !(0 < hd < T(diameter))
+        throw(ArgumentError("hole_diameter must satisfy 0 < hole_diameter < diameter"))
+    end
+    # Substrate spans roughly y ∈ [-sag_max, t]; oversize the bore so it pierces
+    # completely, and center it on that span.
+    margin = T(10e-3)
+    half_height = (t + sag_max) / 2 + margin
+    y_center = (t - sag_max) / 2
+    bore = CylinderSDF(hd / 2, half_height)
+    translate3d!(bore, [zero(T), y_center, zero(T)])
+    return Mirror(substrate - bore)
 end

@@ -8,7 +8,9 @@ Generate a hierarchy of all AbstractSDFs via:
 # Order of inclusion matters!
 include("AbstractSDF.jl")
 include("AbstractSurface.jl")
+include("AbstractCompositeSDF.jl")
 include("UnionSDF.jl")
+include("DifferenceSDF.jl")
 include("PrimitiveSDF.jl")
 include("SphericalLensSDF.jl")
 include("MeniscusLensSDF.jl")

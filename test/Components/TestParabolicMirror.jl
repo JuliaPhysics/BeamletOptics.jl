@@ -124,6 +124,35 @@ const nm = 1e-9
         @test length(BMO.rays(beam)) == 1
     end
 
+    @testset "On-Axis Parabolic Mirror with bore (Cassegrain primary)" begin
+        f = 100mm
+        d = 60mm
+        hd = 10mm
+        m = ParabolicMirror(f, d; hole_diameter = hd)
+        sdf = BMO.shape(m)
+
+        @test sdf isa BMO.DifferenceSDF
+
+        # A ray down the bore axis misses (passes straight through the hole).
+        beam = Beam(Ray([0, -50mm, 0], [0, 1, 0]))
+        solve_system!(StaticSystem([m]), beam)
+        @test length(BMO.rays(beam)) == 1
+
+        # A ray just outside the bore radius hits, with t matching the analytic sag.
+        r_hit = hd / 2 + 1mm
+        beam2 = Beam(Ray([r_hit, -50mm, 0], [0, 1, 0]))
+        solve_system!(StaticSystem([m]), beam2)
+        @test length(BMO.rays(beam2)) == 2
+        r = BMO.rays(beam2)[1]
+        sag = r_hit^2 / (4f)
+        @test length(r) ≈ 50mm - sag atol=1e-9
+
+        # Invalid hole sizes are rejected
+        @test_throws ArgumentError ParabolicMirror(f, d; hole_diameter = 0)
+        @test_throws ArgumentError ParabolicMirror(f, d; hole_diameter = d)
+        @test_throws ArgumentError ParabolicMirror(f, d; hole_diameter = 2d)
+    end
+
     @testset "Bounding Sphere" begin
         f = 100mm
         r_max = 30mm
