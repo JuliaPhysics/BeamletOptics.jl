@@ -107,6 +107,9 @@ electric_field(I::Real, Z = Z_vacuum, ϕ = 0) = sqrt(2 * I * Z) * exp(im * ϕ)
 "Calculates the intensity in [W/m²] for a given complex electric field phasor `E`. Vacuum wave impedance is assumed."
 intensity(E::Number, Z = Z_vacuum) = abs2(E) / (2 * Z)
 
+"Calculates the intensity in [W/m²] for a given complex electric field vector `E` (e.g. a [`PolarizedRay`](@ref) field). Vacuum wave impedance is assumed."
+intensity(E::AbstractVector{<:Number}, Z = Z_vacuum) = sum(abs2, E) / (2 * Z)
+
 """
 fresnel_coefficients(θ, n)
 

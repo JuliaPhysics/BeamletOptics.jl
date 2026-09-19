@@ -40,7 +40,7 @@ fig = Figure(size=(600,300))
 display(fig)
 ax = LScene(fig[1,1])
 hide_axis(ax)
-render!(ax, agb; flen=0.1-0.03, show_beams=true, show_pos=true, color=RGBAf(1,0,0,0.1))
+render!(ax, agb; flen=0.1-0.03, show_beams=true, show_pos=true, color=RGBAf(1,0,0,0.1), show_polarization=true)
 render!(ax, l; color=RGBAf(1, 1, 1, .1))
 
 c_view = [

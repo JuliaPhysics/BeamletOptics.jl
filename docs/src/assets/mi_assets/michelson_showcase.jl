@@ -251,7 +251,7 @@ heat2 = Axis(fringes_fig[1, 2], xlabel="x [mm]", ylabel="y [mm]", title="After r
 hidedecorations!(heat1)
 hidedecorations!(heat2)
 
-hm = heatmap!(heat1, x*1e3, y*1e3, I, colormap=:viridis)
+hm = heatmap!(heat1, x*1e3, y*1e3, I, colormap=:viridis, interpolate=true)
 scatter!(heat1, spots*1e3; color=:red, markersize=2)
 
 zrotate3d!(m1, 1e-3)
@@ -268,7 +268,7 @@ x, y, I = intensity(
 )
 spots = spot_diagram(pd)
 
-hm = heatmap!(heat2, x*1e3, y*1e3, I, colormap=:viridis)
+hm = heatmap!(heat2, x*1e3, y*1e3, I, colormap=:viridis, interpolate=true)
 scatter!(heat2, spots*1e3; color=:red, markersize=2)
 
 save("mi_fringes.png", fringes_fig, px_per_unit=4)

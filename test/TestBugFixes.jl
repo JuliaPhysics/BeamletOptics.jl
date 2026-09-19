@@ -169,6 +169,22 @@ end
     end
 end
 
+@testset "Meniscus lens on-axis normal" begin
+    # Issue: AD normal of MeniscusLensSDF flipped on the optical axis, on-axis rays missed the lens.
+    for (r1, r2) in ((69.21mm, 433.84mm), (-433.84mm, -69.21mm))
+        lens = SphericalLens(r1, r2, 9.33mm, 70mm, λ -> 1.671)
+        @test BMO.shape(lens) isa BMO.MeniscusLensSDF
+        # rotate to test transformation of the normal
+        zrotate3d!(lens, deg2rad(30))
+        dir = orientation(lens)[:, 2]
+        beam = Beam(Ray(position(lens) - 0.05 * dir, dir))
+        solve_system!(System([lens]), beam)
+        @test length(BMO.rays(beam)) == 3
+        @test BMO.refractive_index.(BMO.rays(beam)) == [1, 1.671, 1]
+        @test abs(dot(BMO.direction(last(BMO.rays(beam))), dir)) ≈ 1
+    end
+end
+
 @testset "PlateBeamsplitter BoundsError" begin
     # Issue: Newborn child beams only contain one ray. Indexing rays(beam)[id]
     # where id > 1 throws a BoundsError in interact3d for AstigmaticGaussianBeamlet.

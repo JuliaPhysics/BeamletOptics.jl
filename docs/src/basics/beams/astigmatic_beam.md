@@ -37,6 +37,7 @@ As with the [`GaussianBeamlet`](@ref), tracing these rays through a system allow
 \psi(\mathbf{r}) = \frac{E_0}{\sqrt{\mathbf{h}_1 \times \mathbf{h}_2}} \cdot \exp \left( i k \frac{(\mathbf{h}_1 \times \mathbf{r})(\mathbf{u}_2 \cdot \mathbf{r}) - (\mathbf{h}_2 \times \mathbf{r})(\mathbf{u}_1 \cdot \mathbf{r})}{2 \mathbf{h}_1 \times \mathbf{h}_2} \right) \,,
 ```
 where $\mathbf{h}_{1,2}$ and $\mathbf{u}_{1,2}$ are the two-dimensional complex ray height and angle vectors on the plane perpendicular to the chief ray [Greynolds:1986_1, Wilhelm:2001, Greynolds:2014](@cite). By also tracing a 3D-field vector along the chief ray based on the formalism introduced in the [Polarized rays](@ref) section, polarization effects can be considered when calculating $\psi$ [Worku:2017](@cite). For a simple lens setup, the resulting waist is illustrated in the image below.
+The linear polarization state is visualized by an oscillating red line and is proportional to the on-axis peak field strength.
 
 ![Astigmatic ray tracing II](agbtest2.png)
 
