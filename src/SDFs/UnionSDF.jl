@@ -8,7 +8,7 @@ are exact.
 The intended way to construct these is not explicitely but by just adding two `AbstractSDFs`
 using the regular `+` operator.
 
-```@example
+```julia
 s1 = SphereSDF(1.0)
 translate3d!(s1, Point3(0, 1.0, 0.0))
 

@@ -8,14 +8,13 @@ i.e. `base \\ (tool_1 ∪ tool_2 ∪ …)`. Unlike [`UnionSDF`](@ref), the const
 The intended way to construct these is not explicitly but by subtracting `AbstractSDF`s
 using the regular `-` operator:
 
-```@example
+```julia
 s1 = SphereSDF(1.0)
 s2 = SphereSDF(0.5)
 translate3d!(s2, Point3(0.5, 0.0, 0.0))
 
 # will result in a sphere with a smaller, off-center sphere carved out of it
 s_diff = s1 - s2
-nothing # hide
 ```
 
 # Non-commutativity and evaluation order

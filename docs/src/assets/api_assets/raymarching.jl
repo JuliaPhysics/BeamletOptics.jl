@@ -5,7 +5,7 @@ GLMakie.activate!(; ssao=true)
 const BMO = BeamletOptics
 const mm = 1e-3
 
-include(joinpath(@__DIR__, "render_utils.jl"))
+include(joinpath(@__DIR__, "..", "render_utils.jl"))
 
 ##
 box_dim = 8mm
