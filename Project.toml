@@ -26,13 +26,11 @@ BeamletOpticsMakieExt = "Makie"
 
 [compat]
 AbstractTrees = "0.4"
-Aqua = "0.8"
 FileIO = "1"
 ForwardDiff = "0.10, 1.0.1"
 GeometryBasics = "0.5"
 InteractiveUtils = "1"
 LinearAlgebra = "1"
-Logging = "1"
 Makie = "0.22, 0.23, 0.24"
 MarchingCubes = "0.1"
 MeshIO = "0.5"
@@ -40,15 +38,8 @@ PrecompileTools = "1"
 Preferences = "1.5.2"
 Random = "1"
 StaticArrays = "1"
-Test = "1"
 Trapz = "2"
-julia = "1.10"
+julia = "1.12"
 
-[extras]
-Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
-Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
-Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
-Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
-
-[targets]
-test = ["Aqua", "Test", "Logging", "Makie"]
+[workspace]
+projects = ["test", "docs"]

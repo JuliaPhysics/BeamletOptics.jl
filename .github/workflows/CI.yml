@@ -24,7 +24,7 @@ jobs:
       matrix:
         version:
           - '1.12'
-          - '1.10'
+          - '1'
           - 'pre'
         os:
           - ubuntu-latest
@@ -71,7 +71,6 @@ jobs:
           JULIA_PKG_PRECOMPILE_AUTO: "0"
         run: |
           using Pkg
-          Pkg.develop(PackageSpec(path=pwd()))
           Pkg.instantiate()
       - uses: julia-actions/julia-buildpkg@v1
       # Run docs in xvfb environment.
