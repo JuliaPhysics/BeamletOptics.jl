@@ -6,8 +6,8 @@ If you want to edit the package documentation locally, follow these steps:
 2. Switch into the `docs` environment, e.g. `] activate .` inside of the `docs` folder
     1. Inside of [VS Code](https://code.visualstudio.com/) you can activate the local environment by right-clicking the `make.jl` file
     2. If you have the Julia plugin installed, you will be able to select `Julia: Activate This Environment`
-3. Inside of the `docs` environment switch the dependency onto your local `BeamletOptics` dev folder via `] dev BeamletOptics`
-    1. This step is **important**, otherwise an incompatible version of `BeamletOptics` might be used to generate the docs
+3. Inside of the `docs` environment run `] instantiate` 
+    1. `docs` is part of the package's workspace and declares `[sources] BeamletOptics = {path = ".."}`, so the local checkout is used automatically
 4. Run the `make.jl` file
 
 The generated site is written to `docs/build/1`. DocumenterVitepress builds one site per
