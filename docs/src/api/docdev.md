@@ -47,6 +47,27 @@ LiveServer.serve(dir = "build/1")
 
 When creating a custom section in the documentation, you should avoid naming the section the same way as your type, e.g. for `MyCustomType` you should not create a section that is called `# MyCustomType`. The reason for this is that the `@ref` macro will confuse the docstring of your type with the section header, leading to undefined behavior for any links pointing to the embedded docstring via `[`MyCustomType`](@ref)`.
 
+## Tables
+
+Documenter parses pages with Julia's Markdown parser, which does not pass inline HTML such as `<center>` through. To center a table and give it the docs' framed table style, wrap it in two `@raw html` blocks that open and close a `bmo-table` container (styled in `docs/src/.vitepress/theme/overrides.css`):
+
+````markdown
+```@raw html
+<div class="bmo-table">
+```
+
+| $k$ | surface family |
+| :---: | --- |
+| $k = -1$ | paraboloid |
+| $k = 0$ | sphere |
+
+```@raw html
+</div>
+```
+````
+
+Keep the blank lines around the table, otherwise it is not parsed as Markdown. Column alignment uses the usual `:---`, `:---:` and `---:` markers.
+
 ## Creating figures
 
 In general, you can generate and include figures into your documentation section any way you see fit. We strongly urge you to use the existing `CairoMakie` or `GLMakie` backend. However, with the increasing amount of plots and corresponding scripts the build time for the docs in a local environment has become unsustainable. Therefore, for the BMO docs we recommend that you adhere to the following design pattern:
