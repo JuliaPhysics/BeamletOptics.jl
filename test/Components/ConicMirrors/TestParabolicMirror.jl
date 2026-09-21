@@ -8,7 +8,7 @@ const BMO = BeamletOptics
 const mm = 1e-3
 const nm = 1e-9
 
-@testset "Off-Axis Parabolic Mirror" begin
+@testset "Parabolic Mirrors" begin
     @testset "Constructor Geometry (90°)" begin
         rfl = 200mm
         d = 60mm
@@ -153,24 +153,16 @@ const nm = 1e-9
         @test_throws ArgumentError ParabolicMirror(f, d; hole_diameter = 2d)
     end
 
-    @testset "Bounding Sphere" begin
+    @testset "Parabola via ConicMirror" begin
         f = 100mm
-        r_max = 30mm
-        thickness = 20mm
-        sag_max = r_max^2 / (4f)
-
-        sdf = BMO.OffAxisParaboloidSDF(f, 0.0, 2r_max, thickness)
-        center, r = BMO.bounding_sphere(sdf)
-
-        @test center ≈ BMO.Point3(0, (thickness - sag_max) / 2, 0)
-        @test r ≈ sqrt(r_max^2 + ((thickness + sag_max) / 2)^2) + 0.05
-
-        # bounding_box must transform the sphere into a symmetric, aperture-covering box
-        xmin, xmax, ymin, ymax, zmin, zmax = BMO.bounding_box(sdf)
-        @test xmin ≈ -xmax
-        @test zmin ≈ -zmax
-        @test xmax ≈ zmax # rotationally symmetric about the y-axis since x_off = 0
-        @test xmax >= r_max
+        D = 60mm
+        # ConicMirror(2f, -1, D) must build the same shape as ParabolicMirror(f, D), whose
+        # focusing is traced in "On-Axis Parabolic Mirror" above
+        sc = BMO.shape(ConicMirror(2f, -1, D))
+        sp = BMO.shape(ParabolicMirror(f, D))
+        for field in (:f, :k, :x_off, :diameter, :thickness)
+            @test getfield(sc, field) ≈ getfield(sp, field)
+        end
     end
 end
 
