@@ -57,7 +57,7 @@ For this purpose, the package implements a traditional ray tracing solver. This 
 ## Installation
 
 !!! warning
-    This package requires Julia ≥ 1.10
+    This package requires Julia ≥ 1.12
 
 You can add this package to your project by entering the package manager (press `]` in the REPL) and typing `add BeamletOptics`. It is also recommended that you `add GLMakie`. You can include this package into your current scope via `using BeamletOptics`. If a Makie version is loaded before or after the inclusion of this package, the extension provided as part of this package will enable additional visualization functions. 
 
