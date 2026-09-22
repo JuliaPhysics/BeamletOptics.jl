@@ -12,6 +12,7 @@ path = ".."
 
 [compat]
 BeamletOptics = "0.13"
+CairoMakie = "0.15"
 Documenter = "1.11"
 DocumenterCitations = "1.4"
 DocumenterVitepress = "0.3.6"
