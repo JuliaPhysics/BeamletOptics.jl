@@ -70,14 +70,23 @@ function translate_to3d!(shape::AbstractShape, target)
 end
 
 """
+    rotate3d!(shape::AbstractShape, R::AbstractMatrix)
+
+Rotates the `dir`-matrix of `shape` by the rotation matrix `R`.
+"""
+function rotate3d!(shape::AbstractShape, R::AbstractMatrix)
+    orientation!(shape, R * orientation(shape))
+    return nothing
+end
+
+"""
     rotate3d!(shape::AbstractShape, axis, θ)
 
 Rotates the `dir`-matrix of `shape` around the reference-`axis` by an angle of `θ`.
 """
 function rotate3d!(shape::AbstractShape, axis, θ)
     R = rotate3d(axis, θ)
-    orientation!(shape, R * orientation(shape))
-    return nothing
+    return rotate3d!(shape, R)
 end
 
 """Rotates the `dir`-matrix of `shape` around the global x-axis by an angle of `θ`."""
@@ -106,7 +115,7 @@ Rotates the `shape` such that its local y-axis aligns with the `target_axis`.
 """
 function align3d!(shape::AbstractShape, target_axis)
     R = align3d(orientation(shape)[:,2], target_axis)
-    orientation!(shape, R * orientation(shape))
+    rotate3d!(shape, R)
     return nothing
 end
 

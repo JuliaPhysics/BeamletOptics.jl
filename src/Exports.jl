@@ -26,7 +26,10 @@ components
 # mirrors
 export Mirror, SquarePlanoMirror2D, RectangularPlanoMirror, SquarePlanoMirror,
        RoundPlanoMirror, SphericalMirror, RightAnglePrismMirror,
-       OffAxisParabolicMirror, ParabolicMirror
+       ConicMirror, OffAxisConicMirror,
+       ParabolicMirror, OffAxisParabolicMirror,
+       EllipsoidalMirror, OffAxisEllipsoidalMirror,
+       HyperbolicMirror, OffAxisHyperbolicMirror
 
 # lenses
 export Lens, DoubletLens, ThinLens, SphericalLens, SphericalDoubletLens, thickness,

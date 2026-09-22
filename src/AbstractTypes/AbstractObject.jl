@@ -62,6 +62,8 @@ translate3d!(object::AbstractObject, offset) = translate3d!(shape_trait_of(objec
 
 translate_to3d!(object::AbstractObject, target) = translate_to3d!(shape_trait_of(object), object, target)
 
+rotate3d!(object::AbstractObject, R::AbstractMatrix) = rotate3d!(shape_trait_of(object), object, R)
+
 rotate3d!(object::AbstractObject, axis, θ) = rotate3d!(shape_trait_of(object), object, axis, θ)
 
 xrotate3d!(object::AbstractObject, θ) = rotate3d!(object, Point3(1, 0, 0), θ)

@@ -1,7 +1,8 @@
 ```@setup rays
 dir = joinpath(@__DIR__, "..", "assets")
 
-Main.DocUtils.conditional_include(joinpath(dir, "raymarching.jl"))
+Main.DocUtils.conditional_include(joinpath(dir, "api_assets", "raymarching.jl"))
+Main.DocUtils.conditional_include(joinpath(dir, "api_assets", "sdf_showcase.jl"))
 ```
 
 # Signed Distance Functions (SDFs)
@@ -38,13 +39,31 @@ The algorithm works by iteratively propagating a ray from the point of origin th
 
 Surface normals can be estimated numerically by sampling the SDF gradient around the hit point or by generating the automatic derivative of the SDF for exact descriptions. BMO uses both procedures, depending on the SDF type.
 
-## Union SDFs
+## Composite SDFs
 
-In order to make use of the dispatch capability of Julia, the `UnionSDF` allows users to easily combine SDFs.
+In order to make use of the dispatch capability of Julia, boolean composite SDFs allow users to easily combine SDFs using the `+` and `-` operators. Both share a common field layout and pivot-aware kinematics, defined by the `AbstractCompositeSDF` interface:
+
+```@docs; canonical=false
+BeamletOptics.AbstractCompositeSDF
+```
+
+![SDF composition examples](composite_sdf.png)
+
+### Union
 
 ```@docs; canonical=false
 BeamletOptics.UnionSDF
 ```
 
-!!! info 
-    Since two exact SDFs will only yield an exact union during boolean addition, only the `+` operator is defined. Introducing the `-` operator is still under consideration.
+### Difference
+
+```@docs; canonical=false
+BeamletOptics.DifferenceSDF
+```
+
+!!! info "Exactness"
+    Boolean addition of non-overlapping, exact SDFs stays exact. Boolean subtraction, by
+    contrast, only yields a *bound*: `max(-a, b)` under-estimates the true distance near
+    the seam between operands. This under-estimate is the *safe* direction for sphere
+    tracing — it never causes tunneling, only a few extra ray marching iterations near
+    concave creases. For information refer to the website of [I. Quilez](https://iquilezles.org/articles/distfunctions/)

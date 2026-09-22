@@ -1,8 +1,8 @@
 ```@setup psf
 dir = joinpath(@__DIR__, "..", "assets", "examples")
 
-Main.DocUtils.conditional_include(joinpath(dir, "psfdetector_showcase.jl"), use_placeholder=false)
-Main.DocUtils.conditional_include(joinpath(dir, "polarized_psf_showcase.jl"), use_placeholder=false)
+Main.DocUtils.conditional_include(joinpath(dir, "psfdetector_showcase.jl"))
+Main.DocUtils.conditional_include(joinpath(dir, "polarized_psf_showcase.jl"))
 ```
 
 # Point spread functions

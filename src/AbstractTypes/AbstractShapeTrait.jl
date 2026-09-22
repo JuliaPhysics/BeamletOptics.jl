@@ -42,6 +42,8 @@ translate3d!(::SingleShape, object::AbstractObject, offset) = translate3d!(shape
 
 translate_to3d!(::SingleShape, object::AbstractObject, target) = translate_to3d!(shape(object), target)
 
+rotate3d!(::SingleShape, object::AbstractObject, R::AbstractMatrix) = rotate3d!(shape(object), R)
+
 rotate3d!(::SingleShape, object::AbstractObject, axis, θ) = rotate3d!(shape(object), axis, θ)
 
 align3d!(::SingleShape, object::AbstractObject, axis) = align3d!(shape(object), axis)
@@ -108,17 +110,16 @@ function translate_to3d!(::MultiShape, object::AbstractObject, target)
 end
 
 """
-    rotate3d!(::MultiShape, object, axis, θ)
+    rotate3d!(::MultiShape, object, R::AbstractMatrix)
 
-All parts of the [`MultiShape`](@ref) `object` are rotated around the pivot center via the specified angle `θ` and `axis`.
+All parts of the [`MultiShape`](@ref) `object` are rotated around the pivot center via the rotation matrix `R`.
 """
-function rotate3d!(::MultiShape, object::AbstractObject, axis, θ)
-    R = rotate3d(axis, θ)
+function rotate3d!(::MultiShape, object::AbstractObject, R::AbstractMatrix)
     # Update group orientation
     orientation!(object, R * orientation(object))
     # Recursively rotate all subgroups and objects
     for subpart in shape(object)
-        rotate3d!(subpart, axis, θ)
+        rotate3d!(subpart, R)
         v = position(subpart) .- position(object)
         # Translate group around pivot point
         v = (R * v) - v
@@ -127,9 +128,19 @@ function rotate3d!(::MultiShape, object::AbstractObject, axis, θ)
     return nothing
 end
 
+"""
+    rotate3d!(::MultiShape, object, axis, θ)
+
+All parts of the [`MultiShape`](@ref) `object` are rotated around the pivot center via the specified angle `θ` and `axis`.
+"""
+function rotate3d!(::MultiShape, object::AbstractObject, axis, θ)
+    R = rotate3d(axis, θ)
+    return rotate3d!(MultiShape(), object, R)
+end
+
 function align3d!(::MultiShape, object::AbstractObject, target_vec)
-    # FIXME
-    @warn "align3d! not yet implemented for MultiShape"
+    R = align3d(orientation(object)[:, 2], target_vec)
+    rotate3d!(object, R)
     return nothing
 end
 

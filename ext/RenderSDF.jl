@@ -26,9 +26,13 @@ function render!(
     if isempty(mc.vertices)
         return nothing
     end
-    vertices = transpose(reinterpret(reshape, Float32, mc.vertices))
-    faces = transpose(reinterpret(reshape, Int64, mc.triangles))
-    mesh!(ax, vertices, faces; kwargs...)
+    pts = [Point3f(v...) for v in mc.vertices]
+    fcs = [GLTriangleFace(t...) for t in mc.triangles]
+    normals = [let n = BMO.normal3d(sdf, Point3(p...))
+                   any(isnan, n) ? Vec3f(0, 1, 0) : Vec3f(n...)
+               end for p in pts]
+    gb_mesh = Mesh(pts, fcs; normal = normals)
+    mesh!(ax, gb_mesh; kwargs...)
     return nothing
 end
 
