@@ -7,10 +7,11 @@ DocumenterVitepress = "4710194d-e776-4893-9690-8d956a29c365"
 GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
 NodeJS_20_jll = "c7aee132-11e1-519c-8219-0a43005e73c2"
 
-[sources]
-BeamletOptics = {path = ".."}
+[sources.BeamletOptics]
+path = ".."
 
 [compat]
+BeamletOptics = "0.13"
 Documenter = "1.11"
 DocumenterCitations = "1.4"
 DocumenterVitepress = "0.3.6"
