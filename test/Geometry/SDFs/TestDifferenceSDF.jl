@@ -298,8 +298,7 @@ const BMO = BeamletOptics
         @test isapprox(orientation(diff.base)[:, 2], target_axis; atol = 1e-12)
         @test isapprox(orientation(diff.tools[1])[:, 2], target_axis; atol = 1e-12)
         # Operand position should rotate around composite pivot
-        @test isapprox(position(diff.tools[1]) - position(diff), Point3(0.0, 0.0, -0.5); atol = 1e-12) ||
-              isapprox(norm(position(diff.tools[1]) - position(diff)), 0.5; atol = 1e-12)
+        @test isapprox(position(diff.tools[1]) - position(diff), Point3(0.5, 0.0, 0.0); atol = 1e-12)
 
         # 2. reset_translation3d!
         translate3d!(diff, [2.0, 3.0, -1.0])

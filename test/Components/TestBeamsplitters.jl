@@ -129,13 +129,26 @@ const mm = 1e-3
         translate3d!(beamsplitter, [0, 50mm, 0])
         system = System([beamsplitter])
 
+        # depth_max = 0: the root beam's freshly generated children are dropped -> warns
         beam = Beam([0, 0, 0], [0, 1, 0], 1e-6)
-        solve_system!(system, beam; depth_max=0)
+        @test_logs (:warn, r"branching depth") solve_system!(system, beam; depth_max=0)
         @test isempty(beam.children)
 
+        # depth_max = 1: the depth-2 children have no further children to drop -> no warning
         beam = Beam([0, 0, 0], [0, 1, 0], 1e-6)
-        solve_system!(system, beam; depth_max=1)
+        @test_logs solve_system!(system, beam; depth_max=1)
         @test length(beam.children) == 2
+    end
+
+    @testset "depth_max warning" begin
+        beamsplitter = CubeBeamsplitter(25e-3, n -> N0)
+        translate3d!(beamsplitter, [0, 50mm, 0])
+        system = System([beamsplitter])
+        beam = Beam([0, 0, 0], [0, 1, 0], 1e-6)
+
+        @test_logs (:warn, r"branching depth") match_mode=:any solve_system!(system, beam; depth_max = 0)
+        @test_logs solve_system!(system, beam)
+        @test BMO.get_default_depth_max() == 100
     end
 end
 

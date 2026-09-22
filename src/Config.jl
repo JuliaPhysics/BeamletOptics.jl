@@ -73,7 +73,7 @@ get_orthogonality_threshold() = ORTHOGONALITY_THRESHOLD
 
 # --- Tracing Defaults ---
 const DEFAULT_R_MAX = @load_preference("default_r_max", 100)
-const DEFAULT_DEPTH_MAX = @load_preference("default_depth_max", typemax(Int))
+const DEFAULT_DEPTH_MAX = @load_preference("default_depth_max", 100)
 
 """
     get_default_r_max()
@@ -86,6 +86,7 @@ get_default_r_max() = DEFAULT_R_MAX
     get_default_depth_max()
 
 Returns the default maximum depth for recursive ray tracing (e.g., reflections/refractions).
+Defaults to 100 (configurable via the `default_depth_max` preference).
 """
 get_default_depth_max() = DEFAULT_DEPTH_MAX
 
