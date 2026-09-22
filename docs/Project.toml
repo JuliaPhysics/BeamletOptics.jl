@@ -11,6 +11,7 @@ NodeJS_20_jll = "c7aee132-11e1-519c-8219-0a43005e73c2"
 path = ".."
 
 [compat]
+BeamletOptics = "0.13"
 CairoMakie = "0.15"
 Documenter = "1.11"
 DocumenterCitations = "1.4"
