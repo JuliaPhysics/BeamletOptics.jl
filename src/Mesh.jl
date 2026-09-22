@@ -91,8 +91,15 @@ end
 Mutating function that rotates the `mesh` around the specified rotation `axis` by the angle `θ`.
 """
 function rotate3d!(mesh::AbstractMesh, axis, θ)
-    # Calculate rotation matrix
-    R = rotate3d(axis, θ)
+    return rotate3d!(mesh, rotate3d(axis, θ))
+end
+
+"""
+    rotate3d!(mesh, R::AbstractMatrix)
+
+Rotate the mesh vertices and orientation around its current position using `R`.
+"""
+function rotate3d!(mesh::AbstractMesh, R::AbstractMatrix)
     # Translate mesh to origin, rotate (counter-clockwise), retranslate
     vertices!(mesh, (vertices(mesh) .- position(mesh)') * R' .+ position(mesh)')
     orientation!(mesh, R * orientation(mesh))

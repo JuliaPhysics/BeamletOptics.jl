@@ -43,6 +43,22 @@ const BMO = BeamletOptics
     end
 
     @testset "Testing x/y/zrotate3d!" begin
+        @testset "Matrix rotation updates geometry about the mesh position" begin
+            mesh = BMO.CubeMesh(1)
+            translate3d!(mesh, [2, 3, 4])
+            pivot = copy(position(mesh))
+            vertex = copy(BMO.vertices(mesh)[1, :])
+            normal = BMO.normal3d(mesh, 1)
+            R = BMO.rotate3d([0, 1, 0], π / 3)
+
+            rotate3d!(mesh, R)
+
+            @test position(mesh) == pivot
+            @test BMO.vertices(mesh)[1, :] ≈ pivot + R * (vertex - pivot)
+            @test BMO.normal3d(mesh, 1) ≈ R * normal
+            @test orientation(mesh) ≈ R
+        end
+
         @testset "Testing rotate3d!" begin
             rotate3d!(foo, [1, 0, 0], π / 4)
             @test isapprox(minimum(BMO.vertices(foo)[:, 1]), -0.5)

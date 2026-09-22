@@ -191,18 +191,32 @@ const nm = 1e-9
         solve_system!(StaticSystem([oap_coll]), beam_coll_hit)
         @test length(BMO.rays(beam_coll_hit)) == 2
 
-        # 2. Focused through-hole
-        oap_foc = OffAxisParabolicMirror(rfl, d; hole_diameter = hd, hole_axis = :focused)
-        @test BMO.shape(oap_foc) isa BMO.DifferenceSDF
+        # 2. Focused through-hole, including a non-right-angle segment.
+        @testset "Focused bore ($(angle)°)" for angle in (90, 60)
+            oap_foc = OffAxisParabolicMirror(rfl, d; angle,
+                hole_diameter = hd, hole_axis = :focused)
+            @test BMO.shape(oap_foc) isa BMO.DifferenceSDF
 
-        # Parent paraboloid: x_off = rfl * sin(90°) = 100mm, f = rfl * cos²(45°) = 50mm
-        # Focus is at (-x_off, -f, 0) = (-100mm, -50mm, 0)
-        # Direction from focus through aperture center (0, 0, 0) is normalize([100mm, 50mm, 0])
-        f_dir = normalize([100mm, 50mm, 0.0])
-        # A ray coming from behind the mirror towards focus along -f_dir passes through the bore
-        beam_foc = Beam(Ray(f_dir * 100mm, -f_dir))
-        solve_system!(StaticSystem([oap_foc]), beam_foc)
-        @test length(BMO.rays(beam_foc)) == 1
+            solid = OffAxisParabolicMirror(rfl, d; angle)
+            parent = BMO.shape(solid)
+            # The segment origin is on the surface, not at the parent vertex.
+            # Its parent vertex is (-x_off, sag_off, 0), so the focus is
+            # (-x_off, sag_off - f, 0); at 90° this is (-rfl, 0, 0).
+            sag_off = parent.x_off^2 / (4 * parent.f)
+            focus = [-parent.x_off, sag_off - parent.f, 0.0]
+            @test norm(focus) ≈ rfl
+            f_dir = normalize(focus)
+
+            # Rays along the bore pass in both directions. The solid mirror
+            # must intercept them, so this cannot pass merely by missing it.
+            for side in (-1, 1)
+                ray = Ray(side * rfl * f_dir, -side * f_dir)
+                @test !isnothing(BMO.intersect3d(solid, ray))
+                beam_foc = Beam(ray)
+                solve_system!(StaticSystem([oap_foc]), beam_foc)
+                @test length(BMO.rays(beam_foc)) == 1
+            end
+        end
 
         # Error handling
         @test_throws ArgumentError OffAxisParabolicMirror(rfl, d; hole_diameter = 0)

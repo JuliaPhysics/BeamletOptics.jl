@@ -272,7 +272,7 @@ Constructs an Off-Axis Parabolic (OAP) [`Mirror`](@ref) from:
 - `hole_diameter`:  Diameter of the through-hole [m], no hole if `nothing` (default). Must satisfy `0 < hole_diameter < diameter`.
 - `hole_axis`:      Orientation of the through-hole. Options:
                     - `:collimated` (default): parallel to the collimated beam (local y-axis / substrate normal), centered at the aperture center `(0, 0, 0)`.
-                    - `:focused`: angled towards the parent paraboloid focus `(-x_off, -f, 0)`, passing through the aperture center `(0, 0, 0)` (e.g. for collinear pump-probe beams).
+                    - `:focused`: angled towards the parent paraboloid focus `(-x_off, x_off^2/(4f) - f, 0)` in the segment frame, equivalently `(-rfl*sind(angle), -rfl*cosd(angle), 0)` with `angle` in degrees, passing through the aperture center `(0, 0, 0)` (e.g. for collinear pump-probe beams).
 """
 function OffAxisParabolicMirror(
         rfl::Real,

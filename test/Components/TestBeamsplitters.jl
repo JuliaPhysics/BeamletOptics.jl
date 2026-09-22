@@ -17,7 +17,8 @@ const mm = 1e-3
         beam = Beam([0, -50mm, 0], [0, 1, 0], 1e-6)
         # Trace normally
         zrotate3d!(pbs, deg2rad(45))
-        solve_system!(system, beam)
+        # Keep geometry regressions from growing an unbounded beam tree in CI.
+        solve_system!(system, beam; depth_max=4)
 
         @testset "Test pos/dir" begin
             @test position(pbs) == zeros(3)
@@ -43,7 +44,7 @@ const mm = 1e-3
 
         # Retrace backside
         zrotate3d!(pbs, π)
-        solve_system!(system, beam)
+        solve_system!(system, beam; depth_max=4)
 
         @testset "Test children after retracing" begin
             p = beam.rays
