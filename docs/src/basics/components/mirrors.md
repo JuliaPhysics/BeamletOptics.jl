@@ -28,7 +28,7 @@ The following constructors can be used to generate flat reflecting shapes. Addit
 
 ## Plano Mirrors
 
-A category of mirrors with a flat reflecting surface. A round version of this mirror can be easily generated using the [`RoundPlanoMirror`](@ref) or [`RightAnglePrismMirror`](@ref) types. An optional central through-hole can be added to [`RoundPlanoMirror`](@ref) via the `hole_diameter` keyword argument:
+A category of mirrors with a flat reflecting surface. A round version of this mirror can be easily generated using the [`RoundPlanoMirror`](@ref) or [`RightAnglePrismMirror`](@ref) constructors, which return a [`Mirror`](@ref). An optional central through-hole can be added to [`RoundPlanoMirror`](@ref) via the `hole_diameter` keyword argument:
 
 ```@docs; canonical=false
 RoundPlanoMirror(::Real, ::Real)
@@ -84,7 +84,7 @@ $$R = \frac{2ss'}{s+s'}, \qquad k = -\left(\frac{s'-s}{s'+s}\right)^2$$
 
 Same-sign $s, s'$ give a real second focus (ellipsoid, $-1 < k \le 0$); opposite signs give a virtual second focus (hyperboloid, $k < -1$).
 
-The following constructors allow the spawning of on-axis and off-axis conic, ellipsoidal and hyperbolic mirrors. All on-axis constructors accept an optional `hole_diameter` keyword argument to subtract an axial cylindrical through-hole from the substrate (e.g. for Cassegrain, Gregorian, Ritchey-Chrétien, or Dall-Kirkham telescope primaries). Parabolic mirrors are covered in the [Parabolic Mirrors](@ref) section below.
+The following constructors allow the spawning of on-axis and off-axis conic, ellipsoidal and hyperbolic mirrors. All conic-family constructors (on- and off-axis) accept an optional `hole_diameter` keyword argument to subtract an axial cylindrical through-hole from the substrate (e.g. for Cassegrain, Gregorian, Ritchey-Chrétien, or Dall-Kirkham telescope primaries). Additionally, [`OffAxisParabolicMirror`](@ref) accepts the `hole_axis` keyword to specify bore orientation. Parabolic mirrors are covered in the [Parabolic Mirrors](@ref) section below.
 
 ```@docs; canonical=false
 ConicMirror(::Real, ::Real, ::Real)

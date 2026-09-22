@@ -264,6 +264,30 @@ const nm = 1e-9
         @test length(BMO.rays(b_plano)) == 1
     end
 
+    @testset "Mirror constructors return Mirror" begin
+        d = 25mm
+        t = 5mm
+        hd = 5mm
+
+        m_plano = RoundPlanoMirror(d, t)
+        @test m_plano isa Mirror
+        @test BMO.shape(m_plano) isa BMO.PlanoSurfaceSDF
+
+        m_plano_hole = RoundPlanoMirror(d, t; hole_diameter = hd)
+        @test m_plano_hole isa Mirror
+
+        m_sph = SphericalMirror(0.2, t, d)
+        @test m_sph isa Mirror
+        @test BMO.shape(m_sph) isa BMO.UnionSDF
+
+        m_sph_hole = SphericalMirror(0.2, t, d; hole_diameter = hd)
+        @test m_sph_hole isa Mirror
+
+        m_rap = RightAnglePrismMirror(d, d)
+        @test m_rap isa Mirror
+        @test BMO.shape(m_rap) isa BMO.RightAnglePrismSDF
+    end
+
     @testset "Parabola via ConicMirror" begin
         f = 100mm
         D = 60mm

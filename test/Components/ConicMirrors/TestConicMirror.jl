@@ -52,6 +52,37 @@ const mm = 1e-3
         @test BMO.shape(OffAxisConicMirror(36, -1, 8, 8)).f isa Float64
         @test BMO.shape(ConicMirror(1, 0, 1)).f isa Float64
     end
+
+    @testset "Off-axis Conic mirror with through-hole" begin
+        # Concave, valid off-axis mirror (same parameterization as the "Kinematics" testset
+        # above, offset like the off-axis testset in TestEllipsoidalMirror.jl).
+        s1 = 300mm
+        s2 = 150mm
+        D = 30mm
+        x_off = 60mm
+        R = 2 * s1 * s2 / (s1 + s2)
+        k = -((s2 - s1) / (s2 + s1))^2
+        hd = 6mm
+
+        m = OffAxisConicMirror(R, k, x_off, D; hole_diameter = hd)
+        m0 = OffAxisConicMirror(R, k, x_off, D)
+        @test BMO.shape(m) isa BMO.DifferenceSDF
+
+        beam = Beam(Ray([0, -50mm, 0], [0, 1.0, 0]))
+        solve_system!(StaticSystem([m]), beam)
+        @test length(BMO.rays(beam)) == 1
+
+        beam0 = Beam(Ray([0, -50mm, 0], [0, 1.0, 0]))
+        solve_system!(StaticSystem([m0]), beam0)
+        @test length(BMO.rays(beam0)) == 2
+
+        beam_off = Beam(Ray([hd / 2 + 2mm, -50mm, 0], [0, 1.0, 0]))
+        solve_system!(StaticSystem([m]), beam_off)
+        @test length(BMO.rays(beam_off)) == 2
+
+        @test_throws ArgumentError OffAxisConicMirror(R, k, x_off, D; hole_diameter = 0)
+        @test_throws ArgumentError OffAxisConicMirror(R, k, x_off, D; hole_diameter = D)
+    end
 end
 
 end # module

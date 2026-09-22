@@ -83,6 +83,33 @@ const mm = 1e-3
 
         @test BMO.shape(OffAxisHyperbolicMirror(-1, 3, 1, 1)).f isa Float64
     end
+
+    @testset "Off-axis Hyperbolic mirror with through-hole" begin
+        b = 40mm
+        a = 200mm
+        x_off = 20mm
+        D = 20mm
+        hd = 4mm
+
+        m = OffAxisHyperbolicMirror(-b, a, x_off, D; hole_diameter = hd)
+        m0 = OffAxisHyperbolicMirror(-b, a, x_off, D)
+        @test BMO.shape(m) isa BMO.DifferenceSDF
+
+        beam = Beam(Ray([0, -50mm, 0], [0, 1.0, 0]))
+        solve_system!(StaticSystem([m]), beam)
+        @test length(BMO.rays(beam)) == 1
+
+        beam0 = Beam(Ray([0, -50mm, 0], [0, 1.0, 0]))
+        solve_system!(StaticSystem([m0]), beam0)
+        @test length(BMO.rays(beam0)) == 2
+
+        beam_off = Beam(Ray([hd / 2 + 2mm, -50mm, 0], [0, 1.0, 0]))
+        solve_system!(StaticSystem([m]), beam_off)
+        @test length(BMO.rays(beam_off)) == 2
+
+        @test_throws ArgumentError OffAxisHyperbolicMirror(-b, a, x_off, D; hole_diameter = 0)
+        @test_throws ArgumentError OffAxisHyperbolicMirror(-b, a, x_off, D; hole_diameter = D)
+    end
 end
 
 end # module

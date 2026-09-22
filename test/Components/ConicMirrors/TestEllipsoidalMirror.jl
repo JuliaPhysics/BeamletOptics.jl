@@ -74,6 +74,33 @@ const mm = 1e-3
 
         @test BMO.shape(EllipsoidalMirror(2, 3, 1)).f isa Float64
     end
+
+    @testset "Off-axis Ellipsoidal mirror with through-hole" begin
+        s1 = 300mm
+        s2 = 150mm
+        x_off = 60mm
+        D = 30mm
+        hd = 6mm
+
+        m = OffAxisEllipsoidalMirror(s1, s2, x_off, D; hole_diameter = hd)
+        m0 = OffAxisEllipsoidalMirror(s1, s2, x_off, D)
+        @test BMO.shape(m) isa BMO.DifferenceSDF
+
+        beam = Beam(Ray([0, -50mm, 0], [0, 1.0, 0]))
+        solve_system!(StaticSystem([m]), beam)
+        @test length(BMO.rays(beam)) == 1
+
+        beam0 = Beam(Ray([0, -50mm, 0], [0, 1.0, 0]))
+        solve_system!(StaticSystem([m0]), beam0)
+        @test length(BMO.rays(beam0)) == 2
+
+        beam_off = Beam(Ray([hd / 2 + 2mm, -50mm, 0], [0, 1.0, 0]))
+        solve_system!(StaticSystem([m]), beam_off)
+        @test length(BMO.rays(beam_off)) == 2
+
+        @test_throws ArgumentError OffAxisEllipsoidalMirror(s1, s2, x_off, D; hole_diameter = 0)
+        @test_throws ArgumentError OffAxisEllipsoidalMirror(s1, s2, x_off, D; hole_diameter = D)
+    end
 end
 
 end # module
