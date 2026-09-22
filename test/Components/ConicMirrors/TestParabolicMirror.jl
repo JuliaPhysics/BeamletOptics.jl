@@ -147,10 +147,107 @@ const nm = 1e-9
         sag = r_hit^2 / (4f)
         @test length(r) ≈ 50mm - sag atol=1e-9
 
+        # Transformation of pierced mirror (testing AbstractCompositeSDF align3d! and reset_*)
+        m_trans = ParabolicMirror(f, d; hole_diameter = hd)
+        align3d!(m_trans, [1.0, 0.0, 0.0])
+        # Ray along the aligned local y-axis ([1, 0, 0]) must miss
+        beam_align = Beam(Ray([-50mm, 0, 0], [1.0, 0, 0]))
+        solve_system!(StaticSystem([m_trans]), beam_align)
+        @test length(BMO.rays(beam_align)) == 1
+
+        # Ray just outside bore radius in aligned orientation must hit
+        beam_align_hit = Beam(Ray([-50mm, 0, r_hit], [1.0, 0, 0]))
+        solve_system!(StaticSystem([m_trans]), beam_align_hit)
+        @test length(BMO.rays(beam_align_hit)) == 2
+
+        # Reset rotation restores original alignment
+        reset_rotation3d!(m_trans)
+        beam_reset = Beam(Ray([0, -50mm, 0], [0, 1.0, 0]))
+        solve_system!(StaticSystem([m_trans]), beam_reset)
+        @test length(BMO.rays(beam_reset)) == 1
+
         # Invalid hole sizes are rejected
         @test_throws ArgumentError ParabolicMirror(f, d; hole_diameter = 0)
         @test_throws ArgumentError ParabolicMirror(f, d; hole_diameter = d)
         @test_throws ArgumentError ParabolicMirror(f, d; hole_diameter = 2d)
+    end
+
+    @testset "Off-Axis Parabolic Mirror with through-hole (Thorlabs OAP)" begin
+        rfl = 100mm
+        d = 50mm
+        hd = 10mm
+
+        # 1. Collimated through-hole
+        oap_coll = OffAxisParabolicMirror(rfl, d; hole_diameter = hd, hole_axis = :collimated)
+        @test BMO.shape(oap_coll) isa BMO.DifferenceSDF
+
+        # Ray along local +y through aperture center passes straight through hole
+        beam_coll = Beam(Ray([0, -50mm, 0], [0, 1.0, 0]))
+        solve_system!(StaticSystem([oap_coll]), beam_coll)
+        @test length(BMO.rays(beam_coll)) == 1
+
+        # Ray outside bore hits the mirror
+        beam_coll_hit = Beam(Ray([hd / 2 + 2mm, -50mm, 0], [0, 1.0, 0]))
+        solve_system!(StaticSystem([oap_coll]), beam_coll_hit)
+        @test length(BMO.rays(beam_coll_hit)) == 2
+
+        # 2. Focused through-hole
+        oap_foc = OffAxisParabolicMirror(rfl, d; hole_diameter = hd, hole_axis = :focused)
+        @test BMO.shape(oap_foc) isa BMO.DifferenceSDF
+
+        # Parent paraboloid: x_off = rfl * sin(90°) = 100mm, f = rfl * cos²(45°) = 50mm
+        # Focus is at (-x_off, -f, 0) = (-100mm, -50mm, 0)
+        # Direction from focus through aperture center (0, 0, 0) is normalize([100mm, 50mm, 0])
+        f_dir = normalize([100mm, 50mm, 0.0])
+        # A ray coming from behind the mirror towards focus along -f_dir passes through the bore
+        beam_foc = Beam(Ray(f_dir * 100mm, -f_dir))
+        solve_system!(StaticSystem([oap_foc]), beam_foc)
+        @test length(BMO.rays(beam_foc)) == 1
+
+        # Error handling
+        @test_throws ArgumentError OffAxisParabolicMirror(rfl, d; hole_diameter = 0)
+        @test_throws ArgumentError OffAxisParabolicMirror(rfl, d; hole_diameter = d)
+        @test_throws ArgumentError OffAxisParabolicMirror(rfl, d; hole_diameter = hd, hole_axis = :invalid)
+    end
+
+    @testset "Cassegrain and other mirrors with through-holes" begin
+        d = 60mm
+        hd = 15mm
+
+        # ConicMirror with hole
+        m_conic = ConicMirror(200mm, -1.0, d; hole_diameter = hd)
+        @test BMO.shape(m_conic) isa BMO.DifferenceSDF
+        b_conic = Beam(Ray([0, -50mm, 0], [0, 1.0, 0]))
+        solve_system!(StaticSystem([m_conic]), b_conic)
+        @test length(BMO.rays(b_conic)) == 1
+
+        # HyperbolicMirror (Ritchey-Chrétien primary with hole)
+        m_hyp = HyperbolicMirror(100mm, -200mm, d; hole_diameter = hd)
+        @test BMO.shape(m_hyp) isa BMO.DifferenceSDF
+        b_hyp = Beam(Ray([0, -50mm, 0], [0, 1.0, 0]))
+        solve_system!(StaticSystem([m_hyp]), b_hyp)
+        @test length(BMO.rays(b_hyp)) == 1
+
+        # EllipsoidalMirror (Dall-Kirkham primary with hole)
+        m_ell = EllipsoidalMirror(100mm, 200mm, d; hole_diameter = hd)
+        @test BMO.shape(m_ell) isa BMO.DifferenceSDF
+        b_ell = Beam(Ray([0, -50mm, 0], [0, 1.0, 0]))
+        solve_system!(StaticSystem([m_ell]), b_ell)
+        @test length(BMO.rays(b_ell)) == 1
+
+        # SphericalMirror with hole
+        m_sph = SphericalMirror(200mm, 10mm, d; hole_diameter = hd)
+        @test BMO.shape(m_sph) isa BMO.DifferenceSDF
+        b_sph = Beam(Ray([0, -50mm, 0], [0, 1.0, 0]))
+        solve_system!(StaticSystem([m_sph]), b_sph)
+        @test length(BMO.rays(b_sph)) == 1
+
+        # RoundPlanoMirror with hole
+        m_plano = RoundPlanoMirror(d, 10mm; hole_diameter = hd)
+        @test BMO.shape(m_plano) isa BMO.DifferenceSDF
+        b_plano = Beam(Ray([0, -50mm, 0], [0, 1.0, 0]))
+        solve_system!(StaticSystem([m_plano]), b_plano)
+        @test length(BMO.rays(b_plano)) == 1
     end
 
     @testset "Parabola via ConicMirror" begin

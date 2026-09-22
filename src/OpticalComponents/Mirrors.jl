@@ -134,6 +134,19 @@ function SquarePlanoMirror(width::W, thickness::T) where {W<:Real,T<:Real}
     return RectangularPlanoMirror(width, width, thickness)
 end
 
+function _pierce_substrate(substrate, diameter, t::T, sag_max::T, hole_diameter) where {T}
+    hd = T(hole_diameter)
+    if !(0 < hd < T(diameter))
+        throw(ArgumentError("hole_diameter must satisfy 0 < hole_diameter < diameter (got $hole_diameter, diameter $diameter)"))
+    end
+    margin = T(10e-3)
+    half_height = (t + sag_max) / 2 + margin
+    y_center = (t - sag_max) / 2
+    bore = CylinderSDF(hd / 2, half_height)
+    translate3d!(bore, [zero(T), y_center, zero(T)])
+    return Mirror(substrate - bore)
+end
+
 """
     RoundPlanoMirror <: AbstractReflectiveOptic
 
@@ -149,18 +162,23 @@ struct RoundPlanoMirror{T} <: AbstractReflectiveOptic{T}
 end
 
 """
-    RoundPlanoMirror(diameter, thickness)
+    RoundPlanoMirror(diameter, thickness; hole_diameter=nothing)
 
-Returns a cylindrical, flat [`RoundPlanoMirror`](@ref) with perfect reflectivity based on:
+Returns a cylindrical, flat [`RoundPlanoMirror`](@ref) (or pierced [`Mirror`](@ref)) with perfect reflectivity based on:
 
 # Inputs
 
 - `diameter`: mirror diameter in [m]
 - `thickness`: mirror substrate thickness in [m]
+- `hole_diameter`: diameter of the central through-hole in [m], no hole if `nothing` (default)
 """
-function RoundPlanoMirror(diameter::D, thickness::T) where {D<:Real,T<:Real}
+function RoundPlanoMirror(diameter::D, thickness::T; hole_diameter::Union{Real, Nothing} = nothing) where {D<:Real,T<:Real}
     shape = PlanoSurfaceSDF(thickness, diameter)
-    return RoundPlanoMirror(shape)
+    if hole_diameter === nothing
+        return RoundPlanoMirror(shape)
+    end
+    T_res = typeof(float(thickness))
+    return _pierce_substrate(shape, diameter, T_res(thickness), zero(T_res), hole_diameter)
 end
 
 """[`SphericalMirror`](@ref) shape type based on a [`UnionSDF`](@ref)"""
@@ -181,7 +199,7 @@ struct SphericalMirror{T} <: AbstractReflectiveOptic{T}
 end
 
 """
-    SphericalMirror(radius, thickness, diameter)
+    SphericalMirror(radius, thickness, diameter; hole_diameter=nothing)
 
 Constructor for a spherical mirror with a concave reflecting surface. The component is aligned with the positive y-axis.
 See also [`SphericalMirror`](@ref).
@@ -191,12 +209,20 @@ See also [`SphericalMirror`](@ref).
 - `radius`: the spherical surface radius of curvature in [m]
 - `thickness`: substrate thickness in [m]
 - `diameter`: mirror outer diameter in [m]
+- `hole_diameter`: diameter of the central through-hole in [m], no hole if `nothing` (default)
 """
-function SphericalMirror(radius::Real, thickness::Real, diameter::Real)
+function SphericalMirror(radius::Real, thickness::Real, diameter::Real; hole_diameter::Union{Real, Nothing} = nothing)
     cylinder = PlanoSurfaceSDF(thickness, diameter)
     concave = ConcaveSphericalSurfaceSDF(abs(radius), diameter)
     shape = concave + cylinder
-    return SphericalMirror(shape)
+    if hole_diameter === nothing
+        return SphericalMirror(shape)
+    end
+    T = float(promote_type(typeof(radius), typeof(thickness), typeof(diameter)))
+    r_sph = T(abs(radius))
+    d_half = T(diameter) / 2
+    sag_max = r_sph >= d_half ? r_sph - sqrt(r_sph^2 - d_half^2) : d_half
+    return _pierce_substrate(shape, diameter, T(thickness), sag_max, hole_diameter)
 end
 
 # Former name, kept for backwards compatibility
@@ -233,22 +259,28 @@ function RightAnglePrismMirror(leg_length::Real, height::Real)
 end
 
 """
-    OffAxisParabolicMirror(rfl, diameter; angle=90, thickness=nothing)
+    OffAxisParabolicMirror(rfl, diameter; angle=90, thickness=nothing, hole_diameter=nothing, hole_axis=:collimated)
 
 Constructs an Off-Axis Parabolic (OAP) [`Mirror`](@ref) from:
 
 # Inputs
 
-- `rfl`:        Reflected Focal Length (distance from aperture center to focus) [m]
-- `diameter`:   Mirror aperture diameter [m]
-- `angle`:      Deflection angle in degrees (default: 90°)
-- `thickness`:  Substrate thickness [m], calculated automatically to ensure solid backing if `nothing` (default)
+- `rfl`:            Reflected Focal Length (distance from aperture center to focus) [m]
+- `diameter`:       Mirror aperture diameter [m]
+- `angle`:          Deflection angle in degrees (default: 90°)
+- `thickness`:      Substrate thickness [m], calculated automatically to ensure solid backing if `nothing` (default)
+- `hole_diameter`:  Diameter of the through-hole [m], no hole if `nothing` (default). Must satisfy `0 < hole_diameter < diameter`.
+- `hole_axis`:      Orientation of the through-hole. Options:
+                    - `:collimated` (default): parallel to the collimated beam (local y-axis / substrate normal), centered at the aperture center `(0, 0, 0)`.
+                    - `:focused`: angled towards the parent paraboloid focus `(-x_off, -f, 0)`, passing through the aperture center `(0, 0, 0)` (e.g. for collinear pump-probe beams).
 """
 function OffAxisParabolicMirror(
         rfl::Real,
         diameter::Real;
         angle::Real = 90,
-        thickness::Union{Real, Nothing} = nothing
+        thickness::Union{Real, Nothing} = nothing,
+        hole_diameter::Union{Real, Nothing} = nothing,
+        hole_axis::Symbol = :collimated
     )
     T = float(promote_type(typeof(rfl), typeof(diameter), typeof(angle), typeof(thickness === nothing ? 0.0 : thickness)))
     angle_rad = deg2rad(angle)
@@ -262,7 +294,28 @@ function OffAxisParabolicMirror(
     t = thickness === nothing ? max(T(diameter / 2), sag_max + T(10e-3)) : T(thickness)
 
     oap_sdf = ConicSDF(2f, -one(T), x_off, T(diameter), t)
-    return Mirror(oap_sdf)
+    if hole_diameter === nothing
+        return Mirror(oap_sdf)
+    end
+
+    hd = T(hole_diameter)
+    if !(0 < hd < T(diameter))
+        throw(ArgumentError("hole_diameter must satisfy 0 < hole_diameter < diameter (got $hole_diameter, diameter $diameter)"))
+    end
+
+    if hole_axis === :collimated
+        return _pierce_substrate(oap_sdf, diameter, t, sag_max, hole_diameter)
+    elseif hole_axis === :focused
+        focus_vec = Point3(-x_off, -T(rfl * cos(angle_rad)), zero(T))
+        u_dir = normalize(focus_vec)
+        margin = T(10e-3)
+        span = max(T(diameter), t + sag_max) + 2margin
+        bore = CylinderSDF(hd / 2, span)
+        align3d!(bore, u_dir)
+        return Mirror(oap_sdf - bore)
+    else
+        throw(ArgumentError("hole_axis must be :collimated or :focused, got :$hole_axis"))
+    end
 end
 
 """
@@ -298,18 +351,7 @@ function ParabolicMirror(
     if hole_diameter === nothing
         return Mirror(substrate)
     end
-    hd = T(hole_diameter)
-    if !(0 < hd < T(diameter))
-        throw(ArgumentError("hole_diameter must satisfy 0 < hole_diameter < diameter"))
-    end
-    # Substrate spans roughly y ∈ [-sag_max, t]; oversize the bore so it pierces
-    # completely, and center it on that span.
-    margin = T(10e-3)
-    half_height = (t + sag_max) / 2 + margin
-    y_center = (t - sag_max) / 2
-    bore = CylinderSDF(hd / 2, half_height)
-    translate3d!(bore, [zero(T), y_center, zero(T)])
-    return Mirror(substrate - bore)
+    return _pierce_substrate(substrate, diameter, t, sag_max, hole_diameter)
 end
 
 function _conic_from_conjugates(s, s′)
@@ -375,24 +417,42 @@ function OffAxisConicMirror(
 end
 
 """
-    ConicMirror(R, k, diameter; thickness=nothing)
+    ConicMirror(R, k, diameter; thickness=nothing, hole_diameter=nothing)
 
 Constructs an on-axis segment of a general conic-of-revolution [`Mirror`](@ref) (sphere,
 paraboloid, ellipsoid or hyperboloid). The vertex lies at the origin and the mirror opens
 towards the negative y-axis for `R > 0`. See [`OffAxisConicMirror`](@ref) for the off-axis
 case and the full sign/domain conventions.
 
+If `hole_diameter` is given, a cylindrical bore centred on the optical axis (the local
++y-axis) is subtracted from the substrate, piercing it completely (e.g. Cassegrain,
+Ritchey-Chrétien, or Dall-Kirkham primary).
+
 # Inputs
 
-- `R`:          Radius of curvature at the vertex \\[m\\]; `R > 0` concave, `R < 0` convex
-- `k`:          Conic constant; `k = -1` is a paraboloid (see [`ParabolicMirror`](@ref)),
-                `k = 0` a sphere (see [`SphericalMirror`](@ref))
-- `diameter`:   Mirror aperture diameter \\[m\\]
-- `thickness`:  Substrate thickness \\[m\\], calculated automatically to ensure solid backing
-                if `nothing` (default)
+- `R`:              Radius of curvature at the vertex \\[m\\]; `R > 0` concave, `R < 0` convex
+- `k`:              Conic constant; `k = -1` is a paraboloid (see [`ParabolicMirror`](@ref)),
+                    `k = 0` a sphere (see [`SphericalMirror`](@ref))
+- `diameter`:       Mirror aperture diameter \\[m\\]
+- `thickness`:      Substrate thickness \\[m\\], calculated automatically to ensure solid backing
+                    if `nothing` (default)
+- `hole_diameter`:  Diameter of the central through-hole \\[m\\], no hole if `nothing` (default). Must satisfy `0 < hole_diameter < diameter`.
 """
-function ConicMirror(R::Real, k::Real, diameter::Real; thickness::Union{Real, Nothing} = nothing)
-    return OffAxisConicMirror(R, k, 0, diameter; thickness)
+function ConicMirror(
+        R::Real,
+        k::Real,
+        diameter::Real;
+        thickness::Union{Real, Nothing} = nothing,
+        hole_diameter::Union{Real, Nothing} = nothing
+    )
+    m = OffAxisConicMirror(R, k, 0, diameter; thickness)
+    if hole_diameter === nothing
+        return m
+    end
+    t = shape(m).thickness
+    T = typeof(t)
+    sag_max = abs(_conic_sag(T(diameter / 2), T(R), T(k)))
+    return _pierce_substrate(shape(m), diameter, t, sag_max, hole_diameter)
 end
 
 """
@@ -433,21 +493,37 @@ function OffAxisEllipsoidalMirror(
 end
 
 """
-    EllipsoidalMirror(s, s′, diameter; thickness=nothing)
+    EllipsoidalMirror(s, s′, diameter; thickness=nothing, hole_diameter=nothing)
 
 Constructs an on-axis segment of an ellipsoidal [`Mirror`](@ref) whose two real conjugate
 foci lie at `(0, -s, 0)` and `(0, -s′, 0)`; the vertex lies at the origin. See
 [`OffAxisEllipsoidalMirror`](@ref) for the off-axis case and the sign convention for `s`, `s′`.
 
+If `hole_diameter` is given, a cylindrical bore centred on the optical axis (the local
++y-axis) is subtracted from the substrate, piercing it completely (e.g. Dall-Kirkham primary).
+
 # Inputs
 
-- `s`, `s′`:    Conjugate object/image distances from the vertex \\[m\\], same sign
-- `diameter`:   Mirror aperture diameter \\[m\\]
-- `thickness`:  Substrate thickness \\[m\\], calculated automatically to ensure solid backing
-                if `nothing` (default)
+- `s`, `s′`:        Conjugate object/image distances from the vertex \\[m\\], same sign
+- `diameter`:       Mirror aperture diameter \\[m\\]
+- `thickness`:      Substrate thickness \\[m\\], calculated automatically to ensure solid backing
+                    if `nothing` (default)
+- `hole_diameter`:  Diameter of the central through-hole \\[m\\], no hole if `nothing` (default). Must satisfy `0 < hole_diameter < diameter`.
 """
-function EllipsoidalMirror(s::Real, s′::Real, diameter::Real; thickness::Union{Real, Nothing} = nothing)
-    return OffAxisEllipsoidalMirror(s, s′, 0, diameter; thickness)
+function EllipsoidalMirror(
+        s::Real,
+        s′::Real,
+        diameter::Real;
+        thickness::Union{Real, Nothing} = nothing,
+        hole_diameter::Union{Real, Nothing} = nothing
+    )
+    R, k = _conic_from_conjugates(s, s′)
+    if !(-1 < k <= 0)
+        throw(ArgumentError(
+            "s and s′ must have the same sign for an ellipsoid (got s = $s, s′ = $s′ ⇒ k = $k); " *
+            "use HyperbolicMirror for a virtual focus or ParabolicMirror for s′ → ∞"))
+    end
+    return ConicMirror(R, k, diameter; thickness, hole_diameter)
 end
 
 """
@@ -492,11 +568,14 @@ function OffAxisHyperbolicMirror(
 end
 
 """
-    HyperbolicMirror(s, s′, diameter; thickness=nothing)
+    HyperbolicMirror(s, s′, diameter; thickness=nothing, hole_diameter=nothing)
 
 Constructs an on-axis segment of a hyperboloidal [`Mirror`](@ref) (e.g. a Cassegrain/Gregory
-secondary) whose conjugate foci lie at `(0, -s, 0)` and `(0, -s′, 0)`; the vertex lies at the
+secondary, or a Ritchey-Chrétien primary) whose conjugate foci lie at `(0, -s, 0)` and `(0, -s′, 0)`; the vertex lies at the
 origin. See [`OffAxisHyperbolicMirror`](@ref) for the off-axis case and the sign convention.
+
+If `hole_diameter` is given, a cylindrical bore centred on the optical axis (the local
++y-axis) is subtracted from the substrate, piercing it completely (e.g. Ritchey-Chrétien primary).
 
 !!! note "Cassegrain secondary"
     The secondary of a Cassegrain/Gregory telescope sees the prime focus behind itself, so
@@ -504,11 +583,24 @@ origin. See [`OffAxisHyperbolicMirror`](@ref) for the off-axis case and the sign
 
 # Inputs
 
-- `s`, `s′`:    Conjugate object/image distances from the vertex \\[m\\], opposite signs
-- `diameter`:   Mirror aperture diameter \\[m\\]
-- `thickness`:  Substrate thickness \\[m\\], calculated automatically to ensure solid backing
-                if `nothing` (default)
+- `s`, `s′`:        Conjugate object/image distances from the vertex \\[m\\], opposite signs
+- `diameter`:       Mirror aperture diameter \\[m\\]
+- `thickness`:      Substrate thickness \\[m\\], calculated automatically to ensure solid backing
+                    if `nothing` (default)
+- `hole_diameter`:  Diameter of the central through-hole \\[m\\], no hole if `nothing` (default). Must satisfy `0 < hole_diameter < diameter`.
 """
-function HyperbolicMirror(s::Real, s′::Real, diameter::Real; thickness::Union{Real, Nothing} = nothing)
-    return OffAxisHyperbolicMirror(s, s′, 0, diameter; thickness)
+function HyperbolicMirror(
+        s::Real,
+        s′::Real,
+        diameter::Real;
+        thickness::Union{Real, Nothing} = nothing,
+        hole_diameter::Union{Real, Nothing} = nothing
+    )
+    R, k = _conic_from_conjugates(s, s′)
+    if !(k < -1)
+        throw(ArgumentError(
+            "s and s′ must have opposite signs for a hyperboloid (got s = $s, s′ = $s′ ⇒ k = $k); " *
+            "use EllipsoidalMirror"))
+    end
+    return ConicMirror(R, k, diameter; thickness, hole_diameter)
 end

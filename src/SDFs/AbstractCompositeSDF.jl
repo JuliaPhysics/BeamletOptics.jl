@@ -36,8 +36,6 @@ and must not be relied upon to identify an operand's role in the boolean express
 """
 function operands end
 
-# FIXME pos/dir propagation bug in align3d!, reset_rotation3d! and reset_translation3d!
-
 """
     translate3d!(c::AbstractCompositeSDF, offset)
 
@@ -52,6 +50,26 @@ function translate3d!(c::AbstractCompositeSDF, offset)
 end
 
 """
+    rotate3d!(c::AbstractCompositeSDF, R::AbstractMatrix)
+
+Rotates `c` and all of its [`operands`](@ref) around `c`'s own origin (pivot), by the
+rotation matrix `R`.
+"""
+function rotate3d!(c::AbstractCompositeSDF, R::AbstractMatrix)
+    # Update group orientation
+    orientation!(c, R * orientation(c))
+    # Rotate all operands around the composite center
+    for s in operands(c)
+        rotate3d!(s, R)
+        v = position(s) - position(c)
+        # Translate group around pivot point
+        v = (R * v) - v
+        translate3d!(s, v)
+    end
+    return nothing
+end
+
+"""
     rotate3d!(c::AbstractCompositeSDF, axis, θ)
 
 Rotates `c` and all of its [`operands`](@ref) around `c`'s own origin (pivot), by an
@@ -59,15 +77,42 @@ angle `θ` around `axis`.
 """
 function rotate3d!(c::AbstractCompositeSDF, axis, θ)
     R = rotate3d(axis, θ)
-    # Update group orientation
-    orientation!(c, R * orientation(c))
-    # Rotate all operands around the composite center
-    for s in operands(c)
-        rotate3d!(s, axis, θ)
-        v = position(s) - position(c)
-        # Translate group around pivot point
-        v = (R * v) - v
-        translate3d!(s, v)
-    end
+    return rotate3d!(c, R)
+end
+
+"""
+    align3d!(c::AbstractCompositeSDF, target_axis)
+
+Rotates `c` and all of its [`operands`](@ref) around `c`'s own origin (pivot) such that
+its local y-axis aligns with `target_axis`.
+"""
+function align3d!(c::AbstractCompositeSDF, target_axis)
+    R = align3d(orientation(c)[:, 2], target_axis)
+    rotate3d!(c, R)
+    return nothing
+end
+
+"""
+    reset_translation3d!(c::AbstractCompositeSDF)
+
+Resets the translation of `c` and all of its [`operands`](@ref), returning the composite
+origin to `(0, 0, 0)` while preserving relative operand positions.
+"""
+function reset_translation3d!(c::AbstractCompositeSDF{T}) where {T}
+    translate3d!(c, -position(c))
+    position!(c, Point3{T}(0))
+    return nothing
+end
+
+"""
+    reset_rotation3d!(c::AbstractCompositeSDF)
+
+Resets the orientation of `c` and all of its [`operands`](@ref) back to the standard basis,
+preserving relative operand positions and orientations.
+"""
+function reset_rotation3d!(c::AbstractCompositeSDF{T}) where {T}
+    R = orientation(c)'
+    rotate3d!(c, R)
+    orientation!(c, Matrix{T}(I, 3, 3))
     return nothing
 end

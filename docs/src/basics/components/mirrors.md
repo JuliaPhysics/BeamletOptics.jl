@@ -28,7 +28,7 @@ The following constructors can be used to generate flat reflecting shapes. Addit
 
 ## Plano Mirrors
 
-A category of mirrors with a flat reflecting surface. A round version of this mirror can be easily generated using the [`RoundPlanoMirror`](@ref) or [`RightAnglePrismMirror`](@ref) types:
+A category of mirrors with a flat reflecting surface. A round version of this mirror can be easily generated using the [`RoundPlanoMirror`](@ref) or [`RightAnglePrismMirror`](@ref) types. An optional central through-hole can be added to [`RoundPlanoMirror`](@ref) via the `hole_diameter` keyword argument:
 
 ```@docs; canonical=false
 RoundPlanoMirror(::Real, ::Real)
@@ -40,7 +40,7 @@ Below, a trivial example of a beam path propagating through a system of Ø1"-mir
 
 ## Spherical Mirrors
 
-The [`SphericalMirror`](@ref) represents an ideal optical element with a spherical concave reflective surface, commonly used for non-dispersive focusing applications. Its geometry is modeled using a combination of a concave spherical surface and a plano substrate, represented internally by a [`BeamletOptics.UnionSDF`](@ref) (refer also to the [SDF-based spherical lenses](@ref) section).
+The [`SphericalMirror`](@ref) represents an ideal optical element with a spherical concave reflective surface, commonly used for non-dispersive focusing applications. Its geometry is modeled using a combination of a concave spherical surface and a plano substrate, represented internally by a [`BeamletOptics.UnionSDF`](@ref) (refer also to the [SDF-based spherical lenses](@ref) section). An optional central through-hole can be added via the `hole_diameter` keyword argument.
 
 ![Spherical mirror multipass showcase](spherical_mirror_showcase.png)
 
@@ -84,7 +84,7 @@ $$R = \frac{2ss'}{s+s'}, \qquad k = -\left(\frac{s'-s}{s'+s}\right)^2$$
 
 Same-sign $s, s'$ give a real second focus (ellipsoid, $-1 < k \le 0$); opposite signs give a virtual second focus (hyperboloid, $k < -1$).
 
-The following constructors allow the spawning of on-axis and off-axis conic, ellipsoidal and hyperbolic mirrors. Parabolic mirrors are covered in the [Parabolic Mirrors](@ref) section below.
+The following constructors allow the spawning of on-axis and off-axis conic, ellipsoidal and hyperbolic mirrors. All on-axis constructors accept an optional `hole_diameter` keyword argument to subtract an axial cylindrical through-hole from the substrate (e.g. for Cassegrain, Gregorian, Ritchey-Chrétien, or Dall-Kirkham telescope primaries). Parabolic mirrors are covered in the [Parabolic Mirrors](@ref) section below.
 
 ```@docs; canonical=false
 ConicMirror(::Real, ::Real, ::Real)
@@ -97,7 +97,7 @@ Parabolic mirrors are the $k = -1$ special case of the conic mirrors above, with
 
 #### On-axis parabolic mirrors
 
-The [`ParabolicMirror`](@ref) represents an on-axis parabolic mirror. Its surface $y = -\frac{x^2 + z^2}{4f}$ opens towards $-y$, such that the focus lies at $(0, -f, 0)$. Optionally, a central through-hole can be added, e.g. to model a Cassegrain primary.
+The [`ParabolicMirror`](@ref) represents an on-axis parabolic mirror. Its surface $y = -\frac{x^2 + z^2}{4f}$ opens towards $-y$, such that the focus lies at $(0, -f, 0)$. Optionally, a central through-hole can be added via `hole_diameter`, e.g. to model a Cassegrain primary.
 
 ![Parabolic mirror showcase](parabolic_mirror_showcase.png)
 
@@ -112,6 +112,12 @@ The [`OffAxisParabolicMirror`](@ref) represents an off-axis parabolic (OAP) mirr
 Its geometry is constructed from a parent paraboloid with focal length $f$ and off-axis distance $x_{\text{off}}$, parameterized by the Reflected Focal Length ($RFL$) and deflection angle $\theta_d$ (default 90°):
 
 $$f = RFL \cdot \cos^2\left(\frac{\theta_d}{2}\right), \quad x_{\text{off}} = RFL \cdot \sin(\theta_d)$$
+
+##### Through-holes (Thorlabs POH style)
+
+An optional through-hole can be specified via the `hole_diameter` keyword argument. The orientation of the bore is controlled by `hole_axis`:
+- `:collimated` (default): A cylindrical bore parallel to the incident collimated beam (local $y$-axis / substrate normal).
+- `:focused`: A cylindrical bore oriented towards the focal point $(-x_{\text{off}}, -RFL\cos\theta_d, 0)$, enabling collinear pump-probe or THz transmission through the mirror substrate directly onto the focus.
 
 ![Off-Axis Parabolic mirror showcase](oap_mirror_showcase.png)
 

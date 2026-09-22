@@ -284,6 +284,37 @@ const BMO = BeamletOptics
             @test orientation(u_ops[i]) ≈ orientation(diff_ops[i])
         end
     end
+
+    @testset "align3d!, reset_rotation3d! and reset_translation3d! propagation" begin
+        c1 = BMO.CylinderSDF(1.0, 2.0)
+        c2 = BMO.CylinderSDF(0.3, 1.0)
+        translate3d!(c2, [0.0, 0.5, 0.0])
+        diff = c1 - c2
+
+        # 1. align3d!
+        target_axis = [1.0, 0.0, 0.0]
+        align3d!(diff, target_axis)
+        @test isapprox(orientation(diff)[:, 2], target_axis; atol = 1e-12)
+        @test isapprox(orientation(diff.base)[:, 2], target_axis; atol = 1e-12)
+        @test isapprox(orientation(diff.tools[1])[:, 2], target_axis; atol = 1e-12)
+        # Operand position should rotate around composite pivot
+        @test isapprox(position(diff.tools[1]) - position(diff), Point3(0.0, 0.0, -0.5); atol = 1e-12) ||
+              isapprox(norm(position(diff.tools[1]) - position(diff)), 0.5; atol = 1e-12)
+
+        # 2. reset_translation3d!
+        translate3d!(diff, [2.0, 3.0, -1.0])
+        @test position(diff) ≈ Point3(2.0, 3.0, -1.0)
+        reset_translation3d!(diff)
+        @test position(diff) == Point3(0.0, 0.0, 0.0)
+
+        # 3. reset_rotation3d!
+        reset_rotation3d!(diff)
+        @test isapprox(orientation(diff), Matrix(1.0I, 3, 3); atol = 1e-12)
+        @test isapprox(orientation(diff.base), Matrix(1.0I, 3, 3); atol = 1e-12)
+        @test isapprox(orientation(diff.tools[1]), Matrix(1.0I, 3, 3); atol = 1e-12)
+        # Initial relative offset was along local y: [0, 0.5, 0]
+        @test isapprox(position(diff.tools[1]), Point3(0.0, 0.5, 0.0); atol = 1e-12)
+    end
 end
 
 end # MODULE
