@@ -13,7 +13,10 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 path = ".."
 
 [compat]
+AbstractTrees = "0.4"
 Aqua = "0.8"
 BeamletOptics = "0.13"
+GeometryBasics = "0.5"
 Logging = "1"
+Makie = "0.24"
 Test = "1"
