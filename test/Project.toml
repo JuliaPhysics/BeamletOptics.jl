@@ -9,10 +9,11 @@ Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
-[sources]
-BeamletOptics = {path = ".."}
+[sources.BeamletOptics]
+path = ".."
 
 [compat]
 Aqua = "0.8"
+GeometryBasics = "0.5"
 Logging = "1"
 Test = "1"
