@@ -1,6 +1,6 @@
 # kinematic export
 export translate3d!, translate_to3d!, rotate3d!, xrotate3d!, yrotate3d!, zrotate3d!,
-       align3d!, reset_translation3d!, reset_rotation3d!
+       align3d!, reset_translation3d!, reset_rotation3d!, set_pivot3d!
 export position, direction, orientation
 
 # ray and beam type export

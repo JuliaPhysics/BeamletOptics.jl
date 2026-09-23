@@ -36,7 +36,7 @@ For elements that implement the [`BeamletOptics.AbstractObject`](@ref) interface
 
 ## Groups of optical elements
 
-For the easier representation of a group of [`BeamletOptics.AbstractObject`](@ref)s that moves as one, the [`ObjectGroup`](@ref) can be used. Refer to the [Lens groups](@ref) example for more information.
+For the easier representation of a group of [`BeamletOptics.AbstractObject`](@ref)s that moves as one, the [`ObjectGroup`](@ref) can be used. Refer to the [Lens groups](@ref) example for more information. The group's pivot (its `center`) can be moved without moving its members via [`set_pivot3d!`](@ref).
 
 ```@docs; canonical=false
 ObjectGroup
