@@ -152,4 +152,32 @@ const BMO = BeamletOptics
     end
 end
 
+@testset "rotate3d! about an arbitrary pivot" begin
+    # rotate3d!(x, R, pivot) and rotate3d!(x, axis, θ, pivot) for all shape and object types
+    axis = [1.0, -2.0, 0.5]
+    θ = 0.8
+    pivot = [0.3, -0.7, 1.1]
+    Rp = BMO.rotate3d(axis, θ)
+    subjects = Any[
+        BMO.CylinderSDF(1e-3, 2e-3),                                # shape
+        BMO.CylinderSDF(1e-3, 2e-3) + BMO.CylinderSDF(2e-3, 1e-3),  # composite SDF
+        BMO.CubeMesh(1e-3),                                         # mesh
+        RoundPlanoMirror(10e-3, 2e-3),                              # object (SingleShape)
+        CubeBeamsplitter(5e-3, λ -> 1.5),                           # object (MultiShape)
+        ObjectGroup([RoundPlanoMirror(10e-3, 2e-3), CubeBeamsplitter(5e-3, λ -> 1.5)]),
+    ]
+    for x in subjects
+        translate3d!(x, [1e-3, 2e-3, 3e-3])
+        p0, O0 = position(x), orientation(x)
+        a = deepcopy(x)
+        b = deepcopy(x)
+        @test rotate3d!(a, Rp, pivot) === nothing
+        @test rotate3d!(b, 3.7 * axis, θ, Point3(pivot...)) === nothing
+        @test position(a) ≈ pivot + Rp * (p0 - pivot) atol = 1e-12
+        @test orientation(a) ≈ Rp * O0 atol = 1e-12
+        @test position(b) ≈ position(a) atol = 1e-12
+        @test orientation(b) ≈ orientation(a) atol = 1e-12
+    end
+end
+
 end # MODULE

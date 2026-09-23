@@ -18,7 +18,7 @@ mirror = ParabolicMirror(f, 12.5mm, thickness=1mm)
 # spawn the beam between detector (y = -f) and mirror rim (y ≈ -1.95 mm), so the detector does not clip it
 src = UniformDiscSource([0, -f / 1.1, 0], [0, 1, 0], D, λ; num_rays = 5000)
 beam = CollimatedSource(
-    [Beam(position(first(rays(b))), direction(first(rays(b))), λ, [1.0, 0, 0]) for b in BMO.beams(src)], D)
+    [Beam(position(first(rays(b))), direction(first(rays(b))), λ, [1.0, 0, 0]) for b in BMO.beams(src)], D, [0, -f / 1.1, 0], [0, 1, 0])
 
 pd = Detector(1mm)
 translate_to3d!(pd, [0, -f, 0])

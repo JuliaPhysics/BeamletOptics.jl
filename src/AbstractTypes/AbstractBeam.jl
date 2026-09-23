@@ -23,8 +23,29 @@ Subtypes of `AbstractBeam` must implement the following:
 - `_modify_beam_head!`: modifies the beam path for retracing purposes
 - `_last_beam_intersection`: returns the last `Beam` intersection
 - `empty!`: resets the beam to its unsolved state
+- `first_ray`: returns the start ray on the optical axis of the beam; for beamlets the first chief ray.
+  Defines the generic `position`/`direction` of the beam (the pivot for rotations)
+
+The tree functions `parent`, `children` and `isroot` (from `AbstractTrees`) work via the `parent`/`children` fields.
+
+## Kinematic API:
+
+`AbstractBeam`s are [`BeamletOptics.Movable`](@ref) with a [`BeamletOptics.Directed`](@ref) frame, see
+[`BeamletOptics.AbstractKinematicTrait`](@ref). Only root beams can be moved.
+Every move resets the beam to its untraced start state via `empty!`; moving a child beam throws an `ArgumentError`.
+Rotations are applied about the `position` of the beam, i.e. the start of `first_ray`.
+[`reset_rotation3d!`](@ref) throws an `ArgumentError`, since a beam has no orientation.
+
+To support the kinematic API, a subtype additionally implements one of the following:
+
+- `_component_beams`: for beams made up of component [`Beam`](@ref)s (e.g. [`GaussianBeamlet`](@ref)),
+  returns a tuple of these beams. The generic `translate3d!`/`rotate3d!` then delegate to them.
+- `translate3d!(::Movable, beam, offset)` and `rotate3d!(::Movable, beam, R::AbstractMatrix)`: for beams that
+  store rays directly (e.g. [`Beam`](@ref)), move the start ray(s) via the ray verbs.
 """
 abstract type AbstractBeam{T <: Real, R <: AbstractRay{T}} end
+
+kinematic_trait_of(::AbstractBeam) = Movable(Directed())
 
 AbstractTrees.NodeType(::Type{T}) where {T <: AbstractBeam} = HasNodeType()
 AbstractTrees.nodetype(::Type{T}) where {T <: AbstractBeam} = T
@@ -32,6 +53,7 @@ AbstractTrees.nodetype(::Type{T}) where {T <: AbstractBeam} = T
 AbstractTrees.ParentLinks(::Type{<:AbstractBeam}) = AbstractTrees.StoredParents()
 AbstractTrees.parent(beam::AbstractBeam) = beam.parent
 parent!(beam::B, parent::B) where {B <: AbstractBeam} = (beam.parent = parent)
+# `isroot(beam)` is provided by AbstractTrees via `parent`, i.e. `isnothing(parent(beam))`
 
 AbstractTrees.children(b::AbstractBeam) = b.children
 
@@ -91,44 +113,52 @@ function Base.empty!(::B) where {B <: AbstractBeam}
 end
 
 """
-    AbstractBeamGroup
+    first_ray(beam::AbstractBeam)
 
-Provides a generic container type interface for bundles of [`Beam`](@ref)s. 
-This interface assumes that there exists a central beam around which the bundle propagates,
-e.g. akin to an optical axis.
-
-# Implementation reqs.
-
-Subtypes of `AbstractBeamGroup` must implement the following:
-
-## Fields:
-
-- `beams`: a vector or tuple of [`Beam`](@ref)s
-
-## Functions:
-
-If the `beams` field does not exist, the following getters must be dispatched:
-
-- `beams`: getter for the `beams` field or equivalent return type
-- `position`: getter for the starting position of the central [`Beam`](@ref)
-- `direction`: getter for the starting direction of the central [`Beam`](@ref)
-- `wavelength`: getter for the common wavelength of the beam bundle
+Returns the start ray on the optical axis of the `beam`; for beamlets the first chief ray.
+Defines the generic `position` and `direction` of the `beam`, which are used as the pivot for rotations.
 """
-abstract type AbstractBeamGroup{T <: Real, R <: AbstractRay{T}} end
+function first_ray(::B) where {B <: AbstractBeam}
+    throw(ArgumentError(lazy"first_ray not implemented for $B"))
+end
 
-beams(bg::AbstractBeamGroup) = bg.beams
+Base.position(b::AbstractBeam) = position(first_ray(b))
+direction(b::AbstractBeam) = direction(first_ray(b))
 
-Base.length(bg::AbstractBeamGroup) = length(beams(bg))
-Base.iterate(bg::AbstractBeamGroup, state...) = iterate(beams(bg), state...)
-Base.getindex(bg::AbstractBeamGroup, i::Int) = getindex(beams(bg), i)
+"""
+    _component_beams(beam::AbstractBeam)
 
-Base.position(bg::AbstractBeamGroup) = position(first(rays(first(beams(bg)))))
-direction(bg::AbstractBeamGroup) = direction(first(rays(first(beams(bg)))))
+Returns a tuple of the component [`Beam`](@ref)s of a composite `beam` (e.g. a [`GaussianBeamlet`](@ref)),
+chief beam first. Required for the kinematic API of composite beams.
+"""
+function _component_beams(::B) where {B <: AbstractBeam}
+    throw(ArgumentError(lazy"_component_beams not implemented for $B"))
+end
 
-wavelength(bg::AbstractBeamGroup) = wavelength(first(rays(first(beams(bg)))))
+"""
+    translate3d!(::Movable, beam::AbstractBeam, offset)
 
-function Base.show(io::IO, ::MIME"text/plain", bg::AbstractBeamGroup)
-    println(io, "Subtype of AbstractBeamGroup")
-    println(io, "   # of beams: $(length(beams(bg)))")
+Resets the root `beam` to its untraced start state and moves it by `offset`.
+Composite beams delegate to their component beams. Throws an `ArgumentError` for child beams.
+"""
+function translate3d!(::Movable, b::AbstractBeam, offset)
+    isroot(b) || throw(ArgumentError("cannot move a child beam; move its root beam instead"))
+    empty!(b)
+    foreach(c -> translate3d!(c, offset), _component_beams(b))
+    return nothing
+end
+
+"""
+    rotate3d!(::Movable, beam::AbstractBeam, R::AbstractMatrix)
+
+Resets the root `beam` to its untraced start state and rotates it by `R` about its `position`
+(the chief ray start for beamlets). Composite beams delegate to their component beams.
+Throws an `ArgumentError` for child beams.
+"""
+function rotate3d!(::Movable, b::AbstractBeam, R::AbstractMatrix)
+    isroot(b) || throw(ArgumentError("cannot move a child beam; move its root beam instead"))
+    empty!(b)
+    p = position(b)
+    foreach(c -> rotate3d!(c, R, p), _component_beams(b))
     return nothing
 end

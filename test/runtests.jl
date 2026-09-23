@@ -11,6 +11,8 @@ include(joinpath(@__DIR__, "TestGaussianBeamlet.jl"))
 include(joinpath(@__DIR__, "TestAstigmaticGaussianBeamlet.jl"))
 include(joinpath(@__DIR__, "TestAstigmaticGaussianPhysical.jl"))
 include(joinpath(@__DIR__, "TestAstigmaticGaussianSources.jl"))
+include(joinpath(@__DIR__, "TestSourceKinematics.jl"))
+include(joinpath(@__DIR__, "TestKinematicTrait.jl"))
 
 # Test geometry representation
 include(joinpath(@__DIR__, "Geometry", "TestMesh.jl"))

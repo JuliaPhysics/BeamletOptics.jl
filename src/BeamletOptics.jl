@@ -6,7 +6,7 @@ using Trapz: trapz
 using PrecompileTools: @setup_workload, @compile_workload
 using StaticArrays: @SArray, @SVector, SMatrix, SArray, SVector
 using GeometryBasics: Point3, Point2, Mat
-using AbstractTrees: AbstractTrees, parent, children, NodeType, nodetype, nodevalue,
+using AbstractTrees: AbstractTrees, parent, children, isroot, NodeType, nodetype, nodevalue,
                      print_tree, HasNodeType, Leaves, StatelessBFS, PostOrderDFS,
                      PreOrderDFS, TreeIterator
 using InteractiveUtils: subtypes
@@ -32,7 +32,7 @@ include("PolarizedRays.jl")
 include("Beam.jl")
 include("Gaussian.jl")
 include("AstigmaticGaussian.jl")
-include("BeamGroups.jl")
+include("BeamGroups/BeamGroups.jl")
 include("Mesh.jl")
 include("SDFs/SDF.jl")
 include("System.jl")

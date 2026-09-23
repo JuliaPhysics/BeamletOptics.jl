@@ -28,11 +28,13 @@ Core Functions:
 =#
 
 # Order of inclusion matters!
+include("AbstractKinematicTrait.jl")
 include("AbstractShape.jl")
 include("AbstractObject.jl")
 include("AbstractShapeTrait.jl")
 include("AbstractRay.jl")
 include("AbstractBeam.jl")
+include("AbstractBeamGroup.jl")
 include("AbstractGaussian.jl")
 include("AbstractSystem.jl")
 include("AbstractUtils.jl")

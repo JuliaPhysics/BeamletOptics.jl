@@ -18,6 +18,9 @@ A `ObjectGroup` implements the kinematic functions of [`AbstractObject`](@ref). 
 - [`translate_to3d!`](@ref): all objects are moved in parallel such that the group `center` is equal to the target position
 - [`rotate3d!`](@ref): all objects are rotated around the `center` point with respect to their relative position
 - [`set_pivot3d!`](@ref): moves the group `center` (the pivot used above) without moving any of its `objects`
+
+The `objects` must be either all static or all movable, otherwise the constructor throws an `ArgumentError`.
+The group takes that kinematic class, see [`BeamletOptics.AbstractKinematicTrait`](@ref).
 """
 mutable struct ObjectGroup{T, O <: Tuple{Vararg{AbstractObject}}} <: AbstractObjectGroup{T}
     dir::SMatrix{3, 3, T, 9}
@@ -26,6 +29,8 @@ mutable struct ObjectGroup{T, O <: Tuple{Vararg{AbstractObject}}} <: AbstractObj
 end
 
 shape_trait_of(::ObjectGroup) = MultiShape()
+
+kinematic_trait_of(g::ObjectGroup) = _container_trait(objects(g))
 
 shape(o::ObjectGroup) = o.objects
 
@@ -60,6 +65,7 @@ end
 
 ObjectGroup(v::AbstractArray, T = Float64) = ObjectGroup(tuple(v...), T)
 function ObjectGroup(v::V, T = Float64) where {V <: Tuple}
+    _check_kinematic_members(v)
     ObjectGroup{T, V}(SMatrix{3,3}(one(T)*I), Point3{T}(0), v)
 end
 

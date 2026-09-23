@@ -26,6 +26,35 @@ rays(b::Beam) = b.rays
 
 Base.push!(b::Beam, ray::AbstractRay) = push!(b.rays, ray)
 
+"""
+    empty!(beam::Beam)
+
+Resets the `beam` to its untraced start state: all rays but the first are removed, the
+intersection of the start ray is cleared and all child beams are dropped.
+"""
+function Base.empty!(b::Beam)
+    deleteat!(rays(b), 2:length(rays(b)))
+    empty!(first(rays(b)))
+    _drop_beams!(b)
+    return b
+end
+
+first_ray(b::Beam) = first(rays(b))
+
+function translate3d!(::Movable, b::Beam, offset)
+    isroot(b) || throw(ArgumentError("cannot move a child beam; move its root beam instead"))
+    empty!(b)
+    translate3d!(first_ray(b), offset)
+    return nothing
+end
+
+function rotate3d!(::Movable, b::Beam, R::AbstractMatrix)
+    isroot(b) || throw(ArgumentError("cannot move a child beam; move its root beam instead"))
+    empty!(b)
+    rotate3d!(first_ray(b), R)
+    return nothing
+end
+
 function Beam(ray::R) where {T, R <: AbstractRay{T}}
     Beam{T, R}([ray], nothing, Vector{Beam{T, R}}())
 end

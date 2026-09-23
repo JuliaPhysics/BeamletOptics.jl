@@ -25,6 +25,13 @@ the kinematic interface and tracing methods for objects consisting of one or mor
 All kinematic functions defined for the [`AbstractShape`](@ref) can also be called for a `AbstractObject`. In this case, the shape trait will define how the specific movement function
 is dispatched.
 
+## Kinematic
+
+`AbstractObject`s are [`BeamletOptics.Movable`](@ref) with an [`BeamletOptics.Oriented`](@ref) frame, see
+[`BeamletOptics.AbstractKinematicTrait`](@ref). The primitives `translate3d!(::Movable, object, offset)` and
+`rotate3d!(::Movable, object, R::AbstractMatrix)` forward to the shape trait. A subtype can opt out of the
+kinematic API via `BeamletOptics.kinematic_trait_of(::Foo) = BeamletOptics.Static()`.
+
 ## Functions:
 
 - [`interact3d`](@ref): defines the optical interaction, the return type must be `Nothing` or an [`AbstractInteraction`](@ref)
@@ -33,6 +40,8 @@ abstract type AbstractObject{T <: Real} end
 
 "Default trait"
 shape_trait_of(::AbstractObject) = SingleShape()
+
+kinematic_trait_of(::AbstractObject) = Movable(Oriented())
 
 """
     shape(::AbstractObject)
@@ -70,23 +79,9 @@ In general, `orientation(object)` returns `orientation(shape(object))` unless sp
 orientation(object::AbstractObject) = orientation(shape_trait_of(object), object)
 orientation!(object::AbstractObject, dir) = orientation!(shape_trait_of(object), object, dir)
 
-translate3d!(object::AbstractObject, offset) = translate3d!(shape_trait_of(object), object, offset)
+translate3d!(::Movable, object::AbstractObject, offset) = translate3d!(shape_trait_of(object), object, offset)
 
-translate_to3d!(object::AbstractObject, target) = translate_to3d!(shape_trait_of(object), object, target)
-
-rotate3d!(object::AbstractObject, R::AbstractMatrix) = rotate3d!(shape_trait_of(object), object, R)
-
-rotate3d!(object::AbstractObject, axis, θ) = rotate3d!(shape_trait_of(object), object, axis, θ)
-
-xrotate3d!(object::AbstractObject{T}, θ) where T = rotate3d!(object, Point3{T}(one(T), 0, 0), θ)
-yrotate3d!(object::AbstractObject{T}, θ) where T = rotate3d!(object, Point3{T}(0, one(T), 0), θ)
-zrotate3d!(object::AbstractObject{T}, θ) where T = rotate3d!(object, Point3{T}(0, 0, one(T)), θ)
-
-align3d!(object::AbstractObject, axis) = align3d!(shape_trait_of(object), object, axis)
-
-reset_translation3d!(object::AbstractObject) = reset_translation3d!(shape_trait_of(object), object)
-
-reset_rotation3d!(object::AbstractObject) = reset_rotation3d!(shape_trait_of(object), object)
+rotate3d!(::Movable, object::AbstractObject, R::AbstractMatrix) = rotate3d!(shape_trait_of(object), object, R)
 
 """
     AbstractObjectGroup <: AbstractObject

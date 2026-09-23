@@ -54,7 +54,7 @@ This [`Nullable`](@ref) type can represent the intersection with an optical elem
 
 # Implementation reqs.
 
-Subtypes of `AbstractBeam` must implement the following:
+Subtypes of `AbstractRay` must implement the following:
 
 ## Fields:
 
@@ -68,6 +68,14 @@ Subtypes of `AbstractBeam` must implement the following:
 
 - `empty!`: resets the ray to its initial, unsolved state
 - `intersect3d`: calculates the [`Intersection`](@ref) between a ray and a shape
+- `rotate3d!(::Movable, ray, R::AbstractMatrix)`: only required for subtypes carrying direction-dependent data (e.g. field vectors); must rotate this data together with the ray direction and clear the intersection
+
+## Kinematic API:
+
+`AbstractRay`s are [`BeamletOptics.Movable`](@ref) with a [`BeamletOptics.Directed`](@ref) frame, see
+[`BeamletOptics.AbstractKinematicTrait`](@ref). Every verb clears the ray [`Intersection`](@ref), i.e. resets
+the ray to its unsolved state. Rotations are applied about the ray start position.
+[`reset_rotation3d!`](@ref) throws an `ArgumentError`, since a ray has no orientation.
 
 # Additional information
 
@@ -76,10 +84,12 @@ Subtypes of `AbstractBeam` must implement the following:
     The `opl` keyword can be used to obtain the optical path length instead.
 
 !!! warning "Ray direction"
-    Many functions assume that the `dir`ection vector has unit length (i.e. ``|\\vec{p}| = 1``).
+    Many functions assume that the `dir`ection vector has unit length (i.e. ``|\\vec{d}| = 1``).
     Violating this assumption might lead to spurious results.
 """
 abstract type AbstractRay{T <: Real} end
+
+kinematic_trait_of(::AbstractRay) = Movable(Directed())
 
 Base.position(ray::AbstractRay) = ray.pos
 position!(ray::AbstractRay, pos) = (ray.pos = pos)
@@ -111,6 +121,30 @@ function intersection!(ray::AbstractRay, _intersection::Nullable{Intersection})
 end
 
 Base.empty!(ray::AbstractRay) = intersection!(ray, nothing)
+
+"""
+    translate3d!(::Movable, ray::AbstractRay, offset)
+
+Moves the start position of the `ray` by `offset` and clears its intersection.
+"""
+function translate3d!(::Movable, ray::AbstractRay{T}, offset) where {T}
+    position!(ray, Point3{T}(position(ray) .+ offset))
+    empty!(ray)
+    return nothing
+end
+
+"""
+    rotate3d!(::Movable, ray::AbstractRay, R::AbstractMatrix)
+
+Rotates the direction of the `ray` by `R` about its own start position and clears its intersection.
+Subtypes carrying direction-dependent data (e.g. the field vector of a [`PolarizedRay`](@ref))
+dispatch their own method that also rotates this data.
+"""
+function rotate3d!(::Movable, ray::AbstractRay{T}, R::AbstractMatrix) where {T}
+    direction!(ray, Point3{T}(R * direction(ray)))
+    empty!(ray)
+    return nothing
+end
 
 """
     intersect3d(shape::AbstractShape, ::AbstractRay)
