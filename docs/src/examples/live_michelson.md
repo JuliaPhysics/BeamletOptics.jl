@@ -109,19 +109,21 @@ display(fig)
 
 [`kinematic_controls!`](@ref) enables the following controls:
 
-| Input                              | Effect                                                     |
-|:-----------------------------------|:-----------------------------------------------------------|
-| Left-drag on a component           | Move it in the horizontal plane                            |
-| Shift + left-drag on a component   | Rotate it around the vertical axis                         |
-| `↑` / `↓`                          | Move it along its normal by 10 nm                          |
-| `←` / `→`                          | Rotate it around the vertical axis by 10 µrad              |
-| `Page Up` / `Page Down`            | Tilt it around its local x-axis by 10 µrad                 |
-| Shift + key                        | Ten times the step size                                    |
-| `r`                                | Reset the component to its initial pose                    |
-| `Esc` / click on empty space       | Deselect the component                                     |
-| `h`                                | Show or hide an overlay of all controls                    |
+| Input                          | Move mode                    | Rotate mode                  |
+|:-------------------------------|:-----------------------------|:-----------------------------|
+| Left-drag on a component       | Move in the horizontal plane | Rotate around the blue axis  |
+| `↑` / `↓`                      | Move along the green arrow   | Rotate around the red ring   |
+| `→` / `←`                      | Move along the red arrow     | Rotate around the blue ring  |
+| `Page Up` / `Page Down`        | Move along the blue arrow    | Rotate around the green ring |
 
-The selected component is marked by a box and three arrows, which show the direction of `↑` (green), the tilt axis of `Page Up` (red) and the rotation axis of `←` (blue). 
+Further controls: `m` switches between the move and the rotate mode, pressing shift multiplies
+the step size by 10, `r` resets the selected component to its initial pose, `Esc` or a click on
+empty space deselects it and `h` shows or hides an overlay of all controls.
+
+The selected component is marked by a box and three axes above it: its local y-axis (green), its
+local x-axis (red) and the vertical rotation axis (blue). In the move mode the axes are shown as
+arrows, in the rotate mode as rings. The first key of each pair moves the component in the
+direction of the arrow, or rotates it in the direction of the ring.
 
 Since the interferometer is sensitive to changes in the order of the wavelength, the keyboard controls are best suited for alignment. Rotating the mirror `m1` by 1 mrad generates the fringes shown above. Moving the mirror `m2` by ``\lambda/2`` changes the optical path length by ``\lambda``, which corresponds to one period of the optical power:
 

@@ -58,33 +58,81 @@ function _bbox_wireframe(bb)
     return pts
 end
 
+
 _shift_pressed(scene) = Keyboard.left_shift in events(scene).keyboardstate ||
                         Keyboard.right_shift in events(scene).keyboardstate
 
 _px(scene) = Tuple(Float64.(mouseposition_px(scene)))
 
-const _HELP_HINT = "h: show controls"
+_other_mode(mode::Symbol) = mode == :move ? :rotate : :move
 
-function _help_text(fine_step, fine_angle)
-    step = round(fine_step * 1e9, sigdigits = 3)
-    angle = round(fine_angle * 1e6, sigdigits = 3)
+_help_hint(mode::Symbol) = "$mode mode, m: switch mode, h: show controls"
+
+function _help_text(mode::Symbol, fine_step, fine_angle)
+    if mode == :move
+        verb, step = "move along", "$(round(fine_step * 1e9, sigdigits = 3)) nm"
+        up, left, page, drag = "green arrow", "red arrow", "blue arrow", "move in plane"
+    else
+        verb, step = "rotate around", "$(round(fine_angle * 1e6, sigdigits = 3)) µrad"
+        up, left, page, drag = "red ring", "blue ring", "green ring", "rotate around blue ring"
+    end
     return """
-    left-drag: move
-    shift + left-drag: rotate
-    ↑/↓: move along green arrow by $step nm
-    ←/→: rotate around blue arrow by $angle µrad
-    page up/down: tilt around red arrow by $angle µrad
-    shift + key: 10× step
-    r: reset
-    esc: deselect
+    $mode mode, m: switch to $(_other_mode(mode)) mode
+    left-drag: $drag
+    ↑/↓: $verb $up
+    ←/→: $verb $left
+    page up/down: $verb $page
+    step: $step, shift: 10× step
+    r: reset, esc: deselect
     h: hide controls"""
+end
+
+# Green, red and blue axes of the controls: local y-axis, local x-axis and rotation axis
+const _AXES_COLORS = [:green, :red, :blue]
+const _RING_RES = 32
+
+"""
+    _gizmo(mode, origin, axes, l)
+
+Returns the arrows, labels and rings that visualize the controls `axes` at the `origin`. In the
+move mode, the arrows of length `l` point along the `axes`. In the rotate mode, the arrows mark the
+positive direction of rotation on rings with radius `l` around the `axes`.
+"""
+function _gizmo(mode::Symbol, origin, axes, l)
+    r = l
+    arrow_pos = Point3f[]
+    arrow_dir = Vec3f[]
+    label_pos = Point3f[]
+    ring_pts = Point3f[]
+    for a in axes
+        e1 = normalize(cross(a, abs(a[1]) < 0.9 ? [1, 0, 0] : [0, 1, 0]))
+        e2 = cross(a, e1)
+        ts = LinRange(0, 1.5π, _RING_RES + 1)
+        for i in 1:_RING_RES
+            push!(ring_pts, Point3f(origin + r * (cos(ts[i]) * e1 + sin(ts[i]) * e2)))
+            push!(ring_pts, Point3f(origin + r * (cos(ts[i + 1]) * e1 + sin(ts[i + 1]) * e2)))
+        end
+        if mode == :move
+            push!(arrow_pos, Point3f(origin))
+            push!(arrow_dir, Vec3f(l * a))
+            push!(label_pos, Point3f(origin + 1.2 * l * a))
+        else
+            # Arrow tip at the end of the ring, label on the axis of the ring
+            t = last(ts)
+            push!(arrow_pos, Point3f(origin + r * (cos(t) * e1 + sin(t) * e2)))
+            push!(arrow_dir, Vec3f(0.35 * r * (-sin(t) * e1 + cos(t) * e2)))
+            push!(label_pos, Point3f(origin + 1.3 * r * a))
+        end
+    end
+    return arrow_pos, arrow_dir, label_pos, ring_pts
 end
 
 """
     KinematicController
 
 Returned by [`kinematic_controls!`](@ref). The currently selected object is stored in the
-`selected` `Observable`. Use `close` to remove the controls.
+`selected` `Observable`, the current mode (`:move` or `:rotate`) in the `mode` `Observable`. Use
+`close` to remove the controls.
 """
 mutable struct KinematicController{H <: SystemRenderHandle}
     ax::_RenderEnv
@@ -92,6 +140,7 @@ mutable struct KinematicController{H <: SystemRenderHandle}
     movable::Vector{BMO.AbstractObject}
     init_poses::IdDict{BMO.AbstractObject, Tuple{Point3{Float64}, Matrix{Float64}}}
     selected::Observable{Union{Nothing, BMO.AbstractObject}}
+    mode::Observable{Symbol}
     on_change::Function
     plane_normal::Vector{Float64}
     rotation_axis::Vector{Float64}
@@ -102,18 +151,21 @@ mutable struct KinematicController{H <: SystemRenderHandle}
     # interaction state
     dirty::Bool
     dragging::Bool
-    rotating::Bool
     plane_point::Vector{Float64}
     grab_offset::Vector{Float64}
     last_mouse::NTuple{2, Float64}
     bg_press_pos::Union{Nothing, NTuple{2, Float64}}
-    # selection box and axes of the keyboard controls
+    # selection box and gizmo of the keyboard controls
     box_obs::Observable{Vector{Point3f}}
-    axes_pos::Observable{Vector{Point3f}}
-    axes_dir::Observable{Vector{Vec3f}}
-    axes_visible::Observable{Bool}
+    arrow_pos::Observable{Vector{Point3f}}
+    arrow_dir::Observable{Vector{Vec3f}}
+    label_pos::Observable{Vector{Point3f}}
+    ring_pts::Observable{Vector{Point3f}}
+    gizmo_size::Observable{Float64}
+    gizmo_visible::Observable{Bool}
     # controls overlay, toggled via h
     help_obs::Observable{String}
+    help_shown::Bool
     plots::Vector{AbstractPlot}
     listeners::Vector{Any}
     # last error of on_change, logged only once
@@ -123,7 +175,8 @@ end
 function Base.show(io::IO, ctrl::KinematicController)
     obj = ctrl.selected[]
     sel = isnothing(obj) ? "none" : string(nameof(typeof(obj)))
-    print(io, "KinematicController(", length(ctrl.movable), " movable, selected = ", sel, ")")
+    print(io, "KinematicController(", length(ctrl.movable), " movable, selected = ", sel,
+        ", mode = ", ctrl.mode[], ")")
 end
 
 _is_movable(ctrl::KinematicController, obj) = any(o -> o === obj, ctrl.movable)
@@ -133,22 +186,42 @@ function _object_plots(h::SystemRenderHandle, obj)
     return isnothing(i) ? AbstractPlot[] : h.handles[i].plots
 end
 
+"""Axes of the keyboard controls: local y-axis, local x-axis and rotation axis of the `obj`."""
+function _control_axes(ctrl::KinematicController, obj)
+    R = orientation(obj)
+    return (Vector{Float64}(R[:, 2]), Vector{Float64}(R[:, 1]), ctrl.rotation_axis)
+end
+
+function _update_help!(ctrl::KinematicController)
+    ctrl.help_obs[] = ctrl.help_shown ? _help_text(ctrl.mode[], ctrl.fine_step, ctrl.fine_angle) :
+                      _help_hint(ctrl.mode[])
+    return nothing
+end
+
 function _update_selection_box!(ctrl::KinematicController)
     obj = ctrl.selected[]
     plots = isnothing(obj) ? AbstractPlot[] : _object_plots(ctrl.h, obj)
     if isempty(plots)
         isempty(ctrl.box_obs[]) || (empty!(ctrl.box_obs[]); notify(ctrl.box_obs))
-        ctrl.axes_visible[] && (ctrl.axes_visible[] = false)
+        ctrl.gizmo_visible[] && (ctrl.gizmo_visible[] = false)
         return nothing
     end
     bb = mapreduce(Makie.boundingbox, GeometryBasics.union, plots)
     ctrl.box_obs[] = _bbox_wireframe(bb)
-    # Move direction, tilt axis and rotation axis of the keyboard controls
-    l = 1.5 * maximum(GeometryBasics.widths(bb))
-    R = orientation(obj)
-    ctrl.axes_pos[] = fill(Point3f(position(obj)), 3)
-    ctrl.axes_dir[] = [Vec3f(l * R[:, 2]), Vec3f(l * R[:, 1]), Vec3f(l * ctrl.rotation_axis)]
-    ctrl.axes_visible[] || (ctrl.axes_visible[] = true)
+    # Place the gizmo above the object, where it is not covered by beams through the object
+    w = GeometryBasics.widths(bb)
+    l = (ctrl.mode[] == :move ? 1.2 : 0.8) * maximum(w)
+    v = ctrl.rotation_axis
+    offset = ctrl.mode[] == :move ? 0.3 * l : 1.4 * l
+    origin = Vector{Float64}(position(obj)) + (dot(abs.(v), w) / 2 + offset) * v
+    arrow_pos, arrow_dir, label_pos, ring_pts = _gizmo(ctrl.mode[], origin, _control_axes(ctrl, obj), l)
+    ctrl.arrow_pos.val = arrow_pos
+    ctrl.arrow_dir.val = arrow_dir
+    ctrl.label_pos.val = label_pos
+    ctrl.ring_pts.val = ring_pts
+    ctrl.gizmo_size.val = l
+    foreach(notify, (ctrl.gizmo_size, ctrl.arrow_pos, ctrl.arrow_dir, ctrl.label_pos, ctrl.ring_pts))
+    ctrl.gizmo_visible[] || (ctrl.gizmo_visible[] = true)
     return nothing
 end
 
@@ -189,6 +262,33 @@ function _reset_pose!(ctrl::KinematicController, obj)
     return nothing
 end
 
+"""
+    _key_step!(ctrl, obj, key, factor)
+
+Moves or rotates the `obj` depending on the mode of the `ctrl`. Returns `false` if the `key` is
+not a control key.
+"""
+function _key_step!(ctrl::KinematicController, obj, key, factor)
+    y, x, v = _control_axes(ctrl, obj)
+    # Axis and sign of the step for each key, see _help_text
+    axis, sign = if ctrl.mode[] == :move
+        key == Keyboard.up ? (y, 1) : key == Keyboard.down ? (y, -1) :
+        key == Keyboard.right ? (x, 1) : key == Keyboard.left ? (x, -1) :
+        key == Keyboard.page_up ? (v, 1) : key == Keyboard.page_down ? (v, -1) : (nothing, 0)
+    else
+        key == Keyboard.up ? (x, 1) : key == Keyboard.down ? (x, -1) :
+        key == Keyboard.left ? (v, 1) : key == Keyboard.right ? (v, -1) :
+        key == Keyboard.page_up ? (y, 1) : key == Keyboard.page_down ? (y, -1) : (nothing, 0)
+    end
+    isnothing(axis) && return false
+    if ctrl.mode[] == :move
+        translate3d!(obj, (sign * factor * ctrl.fine_step) .* axis)
+    else
+        rotate3d!(obj, axis, sign * factor * ctrl.fine_angle)
+    end
+    return true
+end
+
 """Returns the drag plane intersection of the ray through the mouse position."""
 function _mouse_plane_hit(scene, ctrl::KinematicController)
     ray = Makie.ray_at_cursor(scene)
@@ -206,35 +306,40 @@ Enables mouse and keyboard controls for the objects of the live-rendered system 
 [`update_render!`](@ref) of `h` and the `on_change` callback are called after each change. The camera
 can be used as usual as long as no object is grabbed. Returns a `KinematicController`.
 
+The controls have a move and a rotate mode, which are switched with the key `m`. The selected object
+is marked by a box and three axes above the object: its local y-axis (green), its local x-axis
+(red) and the `rotation_axis` (blue). In the move mode the axes are shown as arrows, in the rotate
+mode as rings. The key `h` shows or hides an overlay of all controls.
+
 # Mouse controls
 
-- left-drag on an object: moves the object within the plane through its position (`plane_normal`)
-- shift + left-drag on an object: rotates the object around the `rotation_axis`
+- left-drag on an object: moves the object within the plane through its position (`plane_normal`),
+  or rotates it around the `rotation_axis` in the rotate mode
 - left-click on empty space: deselects the current object
 
 # Keyboard controls
 
 The following keys apply to the selected object, pressing shift multiplies the step size by 10:
 
-- `↑`/`↓`: moves the object along its local y-axis by `fine_step`
-- `←`/`→`: rotates the object around the `rotation_axis` by `fine_angle`
-- `page up`/`page down`: tilts the object around its local x-axis by `fine_angle`
-- `r`: resets the object to its initial pose
-- `esc`: deselects the object
+| key                   | move mode (`fine_step`) | rotate mode (`fine_angle`) |
+|:----------------------|:------------------------|:---------------------------|
+| `↑`/`↓`               | along the green arrow   | around the red ring        |
+| `→`/`←`               | along the red arrow     | around the blue ring       |
+| `page up`/`page down` | along the blue arrow    | around the green ring      |
 
-The selected object is marked by a box and three arrows: the direction of `↑` (green), the tilt
-axis of `page up` (red) and the `rotation_axis` of `←` (blue). The key `h` shows or hides an overlay
-of all controls.
+The first key moves the object in the direction of the arrow, or rotates it in the direction of
+the ring. In addition, `r` resets the object to its initial pose and `esc` deselects it.
 
 # Keyword args
 
 - `objects = nothing`: the movable objects, all objects of `h` by default
 - `on_change = obj -> nothing`: called with the moved object after each change, e.g. to solve the system
 - `plane_normal = [0, 0, 1]`: normal of the plane for mouse translation
-- `rotation_axis = [0, 0, 1]`: rotation axis for mouse and keyboard rotation
+- `rotation_axis = [0, 0, 1]`: rotation axis for mouse rotation, blue axis of the keyboard controls
 - `rotate_speed = deg2rad(0.5)`: mouse rotation angle per pixel [rad]
 - `fine_step = 10e-9`: keyboard translation step [m]
 - `fine_angle = 10e-6`: keyboard rotation step [rad]
+- `mode = :move`: initial mode, `:move` or `:rotate`
 - `throttle = true`: limits updates to one per frame
 - `show_help = false`: shows the controls overlay initially, otherwise only a hint
 - `pick = ax -> Makie.pick(Makie.get_scene(ax))`: picking function
@@ -249,38 +354,50 @@ function kinematic_controls!(
         rotate_speed = deg2rad(0.5),
         fine_step = 10e-9,
         fine_angle = 10e-6,
+        mode::Symbol = :move,
         throttle::Bool = true,
         show_help::Bool = false,
         pick = _default_pick
     )
+    mode in (:move, :rotate) || throw(ArgumentError("mode must be :move or :rotate, got :$mode"))
     scene = Makie.get_scene(ax)
     movable = isnothing(objects) ? BMO.AbstractObject[oh.obj for oh in h.handles] :
               collect(BMO.AbstractObject, objects)
     init_poses = IdDict{BMO.AbstractObject, Tuple{Point3{Float64}, Matrix{Float64}}}(
         obj => _pose(obj) for obj in movable)
+
+    # Selection box and gizmo, updated via Observables
     box_obs = Observable(Point3f[])
-    box_plot = linesegments!(ax, box_obs; color = :yellow, linewidth = 2)
-    axes_pos = Observable(fill(Point3f(0), 3))
-    axes_dir = Observable(fill(Vec3f(0, 0, 1), 3))
-    axes_visible = Observable(false)
-    axes_colors = [:green, :red, :blue]
-    axes_plot = arrows3d!(ax, axes_pos, axes_dir; color = axes_colors, visible = axes_visible,
-        shaftradius = 0.015, tipradius = 0.04, tiplength = 0.12, overdraw = true)
-    labels_plot = text!(ax, Makie.lift((p, d) -> p .+ 1.15 .* d, axes_pos, axes_dir);
-        text = ["↑", "page up", "←"], color = axes_colors, visible = axes_visible,
-        fontsize = 16, align = (:center, :center), overdraw = true)
-    help = _help_text(fine_step, fine_angle)
-    help_obs = Observable(show_help ? help : _HELP_HINT)
-    help_plot = text!(ax, Point2f(0.01, 0.99); text = help_obs, space = :relative,
-        align = (:left, :top), fontsize = 14, color = :gray40)
+    arrow_pos, arrow_dir, label_pos, ring_pts = _gizmo(mode, zeros(3), ([0, 1, 0], [1, 0, 0], [0, 0, 1]), 1.0)
+    arrow_pos, arrow_dir = Observable(arrow_pos), Observable(arrow_dir)
+    label_pos, ring_pts = Observable(label_pos), Observable(ring_pts)
+    gizmo_size = Observable(1.0)
+    gizmo_visible = Observable(false)
+    mode_obs = Observable(mode)
+    ring_colors = repeat(_AXES_COLORS; inner = 2 * _RING_RES)
+    labels = Makie.lift(m -> m == :move ? ["↑", "→", "page up"] : ["page up", "↑", "←"], mode_obs)
+    plots = AbstractPlot[
+        linesegments!(ax, box_obs; color = :yellow, linewidth = 2),
+        # Arrow dimensions relative to the gizmo size, such that ring arrows are mostly tip
+        arrows3d!(ax, arrow_pos, arrow_dir; color = _AXES_COLORS, visible = gizmo_visible,
+            markerscale = gizmo_size, shaftradius = 0.025, tipradius = 0.1, tiplength = 0.3,
+            overdraw = true),
+        linesegments!(ax, ring_pts; color = ring_colors, linewidth = 3, overdraw = true,
+            visible = Makie.lift((v, m) -> v && m == :rotate, gizmo_visible, mode_obs)),
+        text!(ax, label_pos; text = labels, color = _AXES_COLORS, visible = gizmo_visible,
+            fontsize = 20, align = (:center, :center), overdraw = true)
+    ]
+    help_obs = Observable(show_help ? _help_text(mode, fine_step, fine_angle) : _help_hint(mode))
+    push!(plots, text!(ax, Point2f(0.01, 0.99); text = help_obs, space = :relative,
+        align = (:left, :top), fontsize = 14, color = :gray40))
 
     ctrl = KinematicController(
         ax, h, movable, init_poses, Observable{Union{Nothing, BMO.AbstractObject}}(nothing),
-        on_change, normalize(Float64.(plane_normal)), normalize(Float64.(rotation_axis)),
+        mode_obs, on_change, normalize(Float64.(plane_normal)), normalize(Float64.(rotation_axis)),
         Float64(rotate_speed), Float64(fine_step), Float64(fine_angle), throttle,
-        false, false, false, zeros(3), zeros(3), (0.0, 0.0), nothing,
-        box_obs, axes_pos, axes_dir, axes_visible, help_obs,
-        AbstractPlot[box_plot, axes_plot, labels_plot, help_plot], Any[], nothing
+        false, false, zeros(3), zeros(3), (0.0, 0.0), nothing,
+        box_obs, arrow_pos, arrow_dir, label_pos, ring_pts, gizmo_size, gizmo_visible,
+        help_obs, show_help, plots, Any[], nothing
     )
 
     # High priority, so that the camera does not receive events while an object is grabbed
@@ -294,21 +411,17 @@ function kinematic_controls!(
                 return Consume(false)
             end
             ctrl.selected[] = obj
-            if _shift_pressed(scene)
-                ctrl.rotating = true
-                ctrl.last_mouse = _px(scene)
-            else
-                # Keep the offset between object and mouse to avoid a jump at the start
-                ctrl.dragging = true
-                ctrl.plane_point = Vector{Float64}(position(obj))
-                hit = _mouse_plane_hit(scene, ctrl)
-                ctrl.grab_offset = isnothing(hit) ? zeros(3) : ctrl.plane_point .- hit
-            end
+            ctrl.dragging = true
+            ctrl.last_mouse = _px(scene)
+            # Keep the offset between object and mouse to avoid a jump at the start
+            ctrl.plane_point = Vector{Float64}(position(obj))
+            hit = _mouse_plane_hit(scene, ctrl)
+            ctrl.grab_offset = isnothing(hit) ? zeros(3) : ctrl.plane_point .- hit
             _update_selection_box!(ctrl)
             return Consume(true)
         elseif event.action == Mouse.release
-            if ctrl.dragging || ctrl.rotating
-                ctrl.dragging = ctrl.rotating = false
+            if ctrl.dragging
+                ctrl.dragging = false
                 return Consume(true)
             end
             # Deselect on click, but not after rotating the camera
@@ -327,15 +440,14 @@ function kinematic_controls!(
 
     l2 = on(events(scene).mouseposition, priority = 200) do _
         obj = ctrl.selected[]
-        isnothing(obj) && return Consume(false)
-        if ctrl.dragging
+        (isnothing(obj) || !ctrl.dragging) && return Consume(false)
+        if ctrl.mode[] == :move
             hit = _mouse_plane_hit(scene, ctrl)
             if !isnothing(hit)
                 translate_to3d!(obj, hit .+ ctrl.grab_offset)
                 _request_update!(ctrl)
             end
-            return Consume(true)
-        elseif ctrl.rotating
+        else
             mp = _px(scene)
             dx = mp[1] - ctrl.last_mouse[1]
             ctrl.last_mouse = mp
@@ -343,15 +455,20 @@ function kinematic_controls!(
                 rotate3d!(obj, ctrl.rotation_axis, ctrl.rotate_speed * dx)
                 _request_update!(ctrl)
             end
-            return Consume(true)
         end
-        return Consume(false)
+        return Consume(true)
     end
 
     l3 = on(events(scene).keyboardbutton, priority = 200) do event
         event.action in (Keyboard.press, Keyboard.repeat) || return Consume(false)
-        if event.key == Keyboard.h && event.action == Keyboard.press
-            help_obs[] = help_obs[] == _HELP_HINT ? help : _HELP_HINT
+        if event.action == Keyboard.press && event.key in (Keyboard.h, Keyboard.m)
+            if event.key == Keyboard.h
+                ctrl.help_shown = !ctrl.help_shown
+            else
+                ctrl.mode[] = _other_mode(ctrl.mode[])
+                _update_selection_box!(ctrl)
+            end
+            _update_help!(ctrl)
             return Consume(true)
         end
         obj = ctrl.selected[]
@@ -359,28 +476,14 @@ function kinematic_controls!(
         if event.key == Keyboard.escape
             ctrl.selected[] = nothing
             _update_selection_box!(ctrl)
-            return Consume(true)
-        end
-        step = ctrl.fine_step * (_shift_pressed(scene) ? 10 : 1)
-        angle = ctrl.fine_angle * (_shift_pressed(scene) ? 10 : 1)
-        if event.key == Keyboard.up
-            translate3d!(obj, step .* orientation(obj)[:, 2])
-        elseif event.key == Keyboard.down
-            translate3d!(obj, -step .* orientation(obj)[:, 2])
-        elseif event.key == Keyboard.left
-            rotate3d!(obj, ctrl.rotation_axis, angle)
-        elseif event.key == Keyboard.right
-            rotate3d!(obj, ctrl.rotation_axis, -angle)
-        elseif event.key == Keyboard.page_up
-            rotate3d!(obj, orientation(obj)[:, 1], angle)
-        elseif event.key == Keyboard.page_down
-            rotate3d!(obj, orientation(obj)[:, 1], -angle)
         elseif event.key == Keyboard.r
             _reset_pose!(ctrl, obj)
+            _request_update!(ctrl)
+        elseif _key_step!(ctrl, obj, event.key, _shift_pressed(scene) ? 10 : 1)
+            _request_update!(ctrl)
         else
             return Consume(false)
         end
-        _request_update!(ctrl)
         return Consume(true)
     end
     push!(ctrl.listeners, l1, l2, l3)

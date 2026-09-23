@@ -160,10 +160,23 @@ const BMO = BeamletOptics
         P2 = collect(Float64.(BMO.position(m1)))
         @test isapprox(P2, P0; atol = 1e-9)
 
+        # move mode: ← moves along -x, page up along the rotation axis
         R0 = Matrix{Float64}(BMO.orientation(m1))
         events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.left, Keyboard.press)
-        R1 = Matrix{Float64}(BMO.orientation(m1))
-        @test !isapprox(R1, R0; atol = 1e-9)
+        @test collect(Float64.(BMO.position(m1))) ≈ P0 .- 1e-3 .* R0[:, 1]
+        events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.page_up, Keyboard.press)
+        @test collect(Float64.(BMO.position(m1))) ≈ P0 .- 1e-3 .* R0[:, 1] .+ [0, 0, 1e-3]
+        @test Matrix{Float64}(BMO.orientation(m1)) ≈ R0
+
+        # rotate mode: ← rotates positively around the rotation axis, position is kept
+        events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.m, Keyboard.press)
+        @test ctrl.mode[] == :rotate
+        P1 = collect(Float64.(BMO.position(m1)))
+        events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.left, Keyboard.press)
+        @test Matrix{Float64}(BMO.orientation(m1)) ≈ BMO.rotate3d([0, 0, 1], 1e-3) * R0
+        @test collect(Float64.(BMO.position(m1))) ≈ P1
+        events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.m, Keyboard.press)
+        @test ctrl.mode[] == :move
 
         # shift multiplies the step by 10
         push!(events(scene).keyboardstate, Keyboard.left_shift)
@@ -233,19 +246,39 @@ const BMO = BeamletOptics
         close(ctrl)
     end
 
+    @testset "left-drag rotates in the rotate mode" begin
+        fig, ax, h, m1, m2 = _fixture()
+        scene = ax.scene
+        pick_m1 = ax2 -> (h.handles[1].plots[1], 0)
+        ctrl = Ext.kinematic_controls!(ax, h; throttle = false, pick = pick_m1, mode = :rotate,
+            rotate_speed = 1e-2)
+        P0 = collect(Float64.(BMO.position(m1)))
+        R0 = Matrix{Float64}(BMO.orientation(m1))
+        events(scene).mouseposition[] = (100.0, 100.0)
+        events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+        events(scene).mouseposition[] = (110.0, 100.0)
+        events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
+        @test Matrix{Float64}(BMO.orientation(m1)) ≈ BMO.rotate3d([0, 0, 1], 0.1) * R0
+        @test collect(Float64.(BMO.position(m1))) ≈ P0
+        # rings are shown instead of arrows
+        @test ctrl.plots[3].visible[]
+        close(ctrl)
+        @test_throws ArgumentError Ext.kinematic_controls!(ax, h; mode = :fly)
+    end
+
     @testset "h toggles the controls overlay" begin
         fig, ax, h, m1, m2 = _fixture()
         scene = ax.scene
         ctrl = Ext.kinematic_controls!(ax, h; throttle = false, fine_step = 20e-9)
-        @test ctrl.help_obs[] == Ext._HELP_HINT
+        @test ctrl.help_obs[] == Ext._help_hint(:move)
         # works without a selected object
         events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.h, Keyboard.press)
         @test occursin("20.0 nm", ctrl.help_obs[])
         events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.h, Keyboard.press)
-        @test ctrl.help_obs[] == Ext._HELP_HINT
+        @test ctrl.help_obs[] == Ext._help_hint(:move)
         close(ctrl)
         ctrl = Ext.kinematic_controls!(ax, h; show_help = true)
-        @test ctrl.help_obs[] != Ext._HELP_HINT
+        @test ctrl.help_obs[] != Ext._help_hint(:move)
         close(ctrl)
     end
 
@@ -255,7 +288,7 @@ const BMO = BeamletOptics
         pick_m1 = ax2 -> (h.handles[1].plots[1], 0)
         n0 = length(ax.scene.plots)
         ctrl = Ext.kinematic_controls!(ax, h; throttle = false, pick = pick_m1)
-        @test length(ax.scene.plots) == n0 + 4 # selection box, axes, labels and controls overlay
+        @test length(ax.scene.plots) == n0 + 5 # selection box, gizmo and controls overlay
 
         close(ctrl)
         @test isempty(ctrl.listeners)

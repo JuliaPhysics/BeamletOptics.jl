@@ -117,19 +117,23 @@ ctrl = kinematic_controls!(ax, hsys; on_change = obj -> begin
 end)
 ```
 
-| Input                              | Effect                                                     |
-|:-----------------------------------|:-----------------------------------------------------------|
-| Left-drag on a component           | Move it in the horizontal plane (`plane_normal`)           |
-| Shift + left-drag on a component   | Rotate it about the vertical axis (`rotation_axis`)        |
-| `↑` / `↓`                          | Fine translation along the component normal (`fine_step`)  |
-| `←` / `→`                          | Fine rotation about `rotation_axis` (`fine_angle`)         |
-| `Page Up` / `Page Down`            | Fine tilt about the component's local x-axis               |
-| Shift + key                        | ×10 step size                                              |
-| `r`                                | Reset the selected component to its initial pose           |
-| `Esc` / click on empty space       | Deselect                                                   |
-| `h`                                | Show or hide an overlay of all controls                    |
+| Input                          | Move mode                    | Rotate mode                  |
+|:-------------------------------|:-----------------------------|:-----------------------------|
+| Left-drag on a component       | Move in the horizontal plane | Rotate around the blue axis  |
+| `↑` / `↓`                      | Move along the green arrow   | Rotate around the red ring   |
+| `→` / `←`                      | Move along the red arrow     | Rotate around the blue ring  |
+| `Page Up` / `Page Down`        | Move along the blue arrow    | Rotate around the green ring |
 
-The selected component is marked by a box and three arrows, which show the direction of `↑` (green), the tilt axis of `Page Up` (red) and the rotation axis of `←` (blue). The camera works as usual as long as no component is grabbed. Call `close(ctrl)` to remove the
+Further controls: `m` switches between the move and the rotate mode, pressing shift multiplies
+the step size by 10, `r` resets the selected component to its initial pose, `Esc` or a click on
+empty space deselects it and `h` shows or hides an overlay of all controls.
+
+The selected component is marked by a box and three axes above it: its local y-axis (green), its
+local x-axis (red) and the vertical rotation axis (blue). In the move mode the axes are shown as
+arrows, in the rotate mode as rings. The first key of each pair moves the component in the
+direction of the arrow, or rotates it in the direction of the ring.
+
+The camera works as usual as long as no component is grabbed. Call `close(ctrl)` to remove the
 controls.
 
 A complete example can be found in the [Interactive Michelson interferometer](@ref) example.
