@@ -63,6 +63,34 @@
     "teaser": "Off-axis parabolic mirror for achromatic focusing."
   },
   {
+    "name": "EllipsoidalMirror",
+    "category": "Mirrors",
+    "image": "ellipsoidal_mirror_showcase.png",
+    "href": "/reference#BeamletOptics.EllipsoidalMirror-Tuple{Real,%20Real,%20Real}",
+    "teaser": "Concave ellipsoid that images one focus into the other."
+  },
+  {
+    "name": "OffAxisEllipsoidalMirror",
+    "category": "Mirrors",
+    "image": "ellipsoidal_mirror_showcase.png",
+    "href": "/reference#BeamletOptics.OffAxisEllipsoidalMirror-NTuple{4,%20Real}",
+    "teaser": "Off-axis ellipsoid segment separating in- and outgoing beam."
+  },
+  {
+    "name": "HyperbolicMirror",
+    "category": "Mirrors",
+    "image": "hyperbolic_mirror_showcase.png",
+    "href": "/reference#BeamletOptics.HyperbolicMirror-Tuple{Real,%20Real,%20Real}",
+    "teaser": "Convex hyperboloid, e.g. the secondary of a Cassegrain telescope."
+  },
+  {
+    "name": "OffAxisHyperbolicMirror",
+    "category": "Mirrors",
+    "image": "hyperbolic_mirror_showcase.png",
+    "href": "/reference#BeamletOptics.OffAxisHyperbolicMirror-NTuple{4,%20Real}",
+    "teaser": "Off-axis hyperboloid segment for folded two-mirror systems."
+  },
+  {
     "name": "Retroreflector",
     "category": "Mirrors",
     "image": "retroreflector_showcase.png",
