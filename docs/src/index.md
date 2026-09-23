@@ -139,7 +139,7 @@ save("quickstart.png", fig, px_per_unit=3); nothing # hide
 ![Miniature microscope](tutorials/ucla_intro_fig.png)
 
 ```@raw html
-<p><Badge type="tip" text="Beginner" /></p>
+<p><Badge type="warning" text="Intermediate" /></p>
 ```
 
 [Miniature microscope](@ref)

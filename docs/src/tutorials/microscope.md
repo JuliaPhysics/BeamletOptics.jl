@@ -6,11 +6,11 @@ Main.DocUtils.conditional_include(joinpath(tutorial_dir, "miniscope_showcase.jl"
 
 # Miniature microscope
 
-The UCLA Miniscope is a lightweight microscope that utilizes 2-photon fluorescence imaging to record neural activity in awake, freely moving mice [Madruga:2024](@cite). This beginner tutorial aims to reproduce the optical path of the imaging system from the data provided in the [UCLA 2P Miniscope repository](https://github.com/golshanilab/UCLA_2P_Miniscope).
+The UCLA Miniscope is a lightweight microscope that utilizes 2-photon fluorescence imaging to record neural activity in awake, freely moving mice [Madruga:2024](@cite). This tutorial aims to reproduce the optical path of the imaging system from the data provided in the [UCLA 2P Miniscope repository](https://github.com/golshanilab/UCLA_2P_Miniscope).
 
 ```@raw html
 <div class="bmo-card">
-<p><Badge type="tip" text="Beginner" /></p>
+<p><Badge type="warning" text="Intermediate" /></p>
 ```
 
 You will learn how to:

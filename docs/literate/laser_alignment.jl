@@ -29,6 +29,13 @@
 # !!! info "Units"
 #     Unless stated otherwise, this package assumes SI units for input parameters. We define `const mm = 1e-3` below and use `mm` throughout to make lengths easier to read, e.g. `50mm` is 50 millimeters expressed in meters.
 #
+# !!! tip "Before you start"
+#     This tutorial assumes basic familiarity with Julia. If you are new to the language, the [Getting started](https://docs.julialang.org/en/v1/manual/getting-started/) section of the Julia manual and the [Julia learning resources](https://julialang.org/learning/) are good starting points; [Modern Julia Workflows](https://modernjuliaworkflows.org/) covers package environments and editor setup.
+#
+#     We also assume that you run the code in [VS Code](https://code.visualstudio.com/) with the [Julia extension](https://www.julia-vscode.org/docs/stable/gettingstarted/) installed. Execute the code blocks one after another in the integrated Julia REPL, e.g. by selecting them and pressing `Shift+Enter`. You need to install the packages once beforehand: press `]` in the REPL and type `add BeamletOptics CairoMakie`.
+#
+#     Figures are only shown when the figure object is returned or displayed. On this page, the plots appear as images below the code blocks. When running the code yourself, end each plotting block with the figure variable (e.g. `fig`) or call `display(fig)`; VS Code then opens the figure in its plot pane.
+#
 # ## Building the periscope
 #
 # We start by defining the two mirrors of the periscope, a [`RoundPlanoMirror`](@ref) with an outer diameter of one inch and a thickness of 6 mm each.
@@ -58,7 +65,8 @@ ax = Axis3(fig[1,1], aspect=:data, azimuth=0.3π, elevation=0.15π)
 hidedecorations!(ax)
 render!(ax, system)
 render!(ax, beam, color=:red, flen=0.3)
-save("periscope.png", fig, px_per_unit=4); nothing # hide
+save("periscope.png", fig, px_per_unit=4); nothing #hide #md
+fig #!md
 
 # ![Aligned periscope lifting the beam from 50 mm to 150 mm](periscope.png)
 #
@@ -92,7 +100,8 @@ scatter!(spot_ax, [0.0], [0.0], color=:black, marker=:xcross, markersize=16)
 pts = spot_diagram(card)
 scatter!(spot_ax, [p[1]/mm for p in pts], [p[2]/mm for p in pts], color=:red)
 
-save("card_misaligned.png", fig2, px_per_unit=4); nothing # hide
+save("card_misaligned.png", fig2, px_per_unit=4); nothing #hide #md
+fig2 #!md
 
 # ![Misaligned beam missing the target on the alignment card](card_misaligned.png)
 #
@@ -149,7 +158,8 @@ println("waist: ", round(w[i] * 1e6, digits=1), " µm at z = ", round(zs[i] / mm
 fig3 = Figure(size=(600, 300))
 ax3 = Axis(fig3[1,1], xlabel="optical path [mm]", ylabel="beam radius w [µm]")
 lines!(ax3, zs ./ mm, w .* 1e6)
-save("waist.png", fig3, px_per_unit=4); nothing # hide
+save("waist.png", fig3, px_per_unit=4); nothing #hide #md
+fig3 #!md
 
 # ![Beam radius as a function of optical path length, focused by the lens](waist.png)
 #
@@ -175,7 +185,8 @@ fig4 = Figure(size=(500, 400))
 ax4 = Axis(fig4[1,1], aspect=1, xlabel="x [µm]", ylabel="z [µm]")
 hm = heatmap!(ax4, x .* 1e6, z .* 1e6, I)
 Colorbar(fig4[1,2], hm)
-save("camera.png", fig4, px_per_unit=4); nothing # hide
+save("camera.png", fig4, px_per_unit=4); nothing #hide #md
+fig4 #!md
 
 # ![Focused intensity distribution on the camera sensor](camera.png)
 #
@@ -187,7 +198,8 @@ axo = Axis3(figo[1,1], aspect=:data, azimuth=0.3π, elevation=0.15π)
 hidedecorations!(axo)
 render!(axo, system_full)
 render!(axo, laser, color=:red)
-save("laser_alignment.png", figo, px_per_unit=4); nothing # hide
+save("laser_alignment.png", figo, px_per_unit=4); nothing #hide #md
+figo #!md
 
 # ## Next steps
 #

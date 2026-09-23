@@ -27,7 +27,7 @@ Browse the step-by-step tutorials and standalone examples below to see what you 
 ![Miniature microscope](ucla_intro_fig.png)
 
 ```@raw html
-<p><Badge type="tip" text="Beginner" /></p>
+<p><Badge type="warning" text="Intermediate" /></p>
 ```
 
 [Miniature microscope](@ref)
@@ -116,6 +116,17 @@ Browse the step-by-step tutorials and standalone examples below to see what you 
 ```@raw html
 <p class="bmo-teaser">Move groups of lenses in a zoom objective.</p>
 <p class="bmo-tags">ObjectGroup · Kinematic API</p>
+</div>
+<div class="bmo-tile">
+```
+
+![Point spread functions](../examples/psf_airy_showcase.png)
+
+[Point spread functions](@ref)
+
+```@raw html
+<p class="bmo-teaser">Airy disc, aberrated spots and the vectorial focus at high NA.</p>
+<p class="bmo-tags">Detectors · Polarization</p>
 </div>
 <div class="bmo-tile">
 ```
