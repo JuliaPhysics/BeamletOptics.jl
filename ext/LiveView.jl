@@ -1,5 +1,5 @@
 using Makie: Figure, Axis, Label, SliderGrid, GridLayout, DataAspect, Relative, colsize!,
-             heatmap!, autolimits!
+             heatmap!, autolimits!, Button, Toggle
 
 """
     DetectorPanel
@@ -32,6 +32,10 @@ Base.show(io::IO, p::DetectorPanel) = print(io, "DetectorPanel(", p.name, ", mod
 Interactive window returned by [`live_view`](@ref). The `Figure` is stored in `fig`, the `LScene`
 of the 3D view in `ax` and the `KinematicController` in `controls`. Use `display` to show the
 window and `close` to remove the controls.
+
+The systems are solved after each change if `auto_trace[]` is `true`, otherwise only via the
+`trace_button`, the key `t` or by switching the `auto_trace_toggle` on. `stale` is `true` if the
+beams and detector panels do not match the current poses of the objects.
 """
 mutable struct LiveView
     fig::Figure
@@ -45,6 +49,13 @@ mutable struct LiveView
     sliders::Union{Nothing, SliderGrid}
     on_change::Function
     last_error::Union{Nothing, String}
+    # manual tracing, auto_trace is the `active` observable of the toggle
+    auto_trace::Observable{Bool}
+    stale::Bool
+    trace_button::Button
+    auto_trace_toggle::Toggle
+    # alpha of the beam plots before dimming, restored after tracing
+    beam_alphas::IdDict{Any, Any}
 end
 
 Base.display(gui::LiveView) = display(gui.fig)
@@ -234,11 +245,91 @@ function _resolve!(gui::LiveView, obj)
     return nothing
 end
 
+const _STALE_ALPHA = 0.3
+
+_beam_plots(h::BeamRenderHandle) = AbstractPlot[h.plot]
+_beam_plots(h::GaussianRenderHandle) = AbstractPlot[h.mesh_plot; h.beam_plots]
+_beam_plots(h) = AbstractPlot[]
+
+"""Dims all beam plots of the `gui` to indicate outdated beams, stores the original `alpha`."""
+function _dim_beams!(gui::LiveView)
+    for h in gui.beam_handles, plot in _beam_plots(h)
+        haskey(plot, :alpha) || continue
+        haskey(gui.beam_alphas, plot) || (gui.beam_alphas[plot] = plot.alpha[])
+        plot.alpha[] = _STALE_ALPHA
+    end
+    return nothing
+end
+
+"""Restores the `alpha` of all beam plots of the `gui` after dimming."""
+function _restore_beams!(gui::LiveView)
+    for (plot, alpha) in gui.beam_alphas
+        plot.alpha[] = alpha
+    end
+    empty!(gui.beam_alphas)
+    return nothing
+end
+
+"""Marks the beams and detector panels of the `gui` as outdated after `obj` (or a slider) changed."""
+function _mark_stale!(gui::LiveView, obj)
+    gui.stale || _dim_beams!(gui)
+    gui.stale = true
+    msg = "outdated, press t to trace"
+    gui.status.text[] = isnothing(obj) ? msg :
+                        "$(nameof(typeof(obj))) at $(_position_string(obj)) — $msg"
+    return nothing
+end
+
+"""Called by the controls after each change of `obj`: solves the systems or marks them as outdated."""
+function _on_change!(gui::LiveView, obj)
+    if gui.auto_trace[]
+        _resolve!(gui, obj)
+    else
+        _mark_stale!(gui, obj)
+    end
+    return nothing
+end
+
+"""
+    _trace!(gui::LiveView)
+
+Solves all systems of the `gui` with the currently selected object, see [`_resolve!`](@ref), and
+restores the appearance of the beams.
+"""
+function _trace!(gui::LiveView)
+    obj = gui.controls.selected[]
+    try
+        _resolve!(gui, obj)
+    catch e
+        gui.last_error = _log_once(e, gui.last_error, "solving the systems")
+    end
+    _restore_beams!(gui)
+    gui.stale = false
+    isnothing(obj) && (gui.status.text[] = "traced")
+    return nothing
+end
+
+"""Connects the trace button, the key `t` and the auto trace toggle of the `gui`."""
+function _connect_trace!(gui::LiveView)
+    listeners = gui.controls.listeners
+    push!(listeners, on(_ -> _trace!(gui), gui.trace_button.clicks))
+    push!(listeners, on(events(gui.ax.scene).keyboardbutton, priority = 200) do event
+        (event.action == Keyboard.press && event.key == Keyboard.t) || return Consume(false)
+        _trace!(gui)
+        return Consume(true)
+    end)
+    push!(listeners, on(gui.auto_trace) do active
+        active && gui.stale && _trace!(gui)
+        return nothing
+    end)
+    return nothing
+end
+
 """
     _connect_sliders!(gui, callbacks)
 
-Calls the slider `callbacks` after a value change, then updates all systems and solves again. The
-updates are throttled to one per frame. The listeners are added to the controls of the `gui`, such
+Calls the slider `callbacks` after a value change, then updates all systems and solves again, or
+marks them as outdated if auto tracing is off. The updates are throttled to one per frame. The listeners are added to the controls of the `gui`, such
 that `close(gui)` removes them.
 """
 function _connect_sliders!(gui::LiveView, callbacks)
@@ -262,10 +353,14 @@ function _connect_sliders!(gui::LiveView, callbacks)
         empty!(pending)
         # The callbacks may have moved objects
         foreach(update_render!, gui.system_handles)
-        try
-            _resolve!(gui, nothing)
-        catch e
-            gui.last_error = _log_once(e, gui.last_error, "solving the systems")
+        if gui.auto_trace[]
+            try
+                _resolve!(gui, nothing)
+            catch e
+                gui.last_error = _log_once(e, gui.last_error, "solving the systems")
+            end
+        else
+            _mark_stale!(gui, nothing)
         end
         return nothing
     end
@@ -296,6 +391,15 @@ window and `close(gui)` to remove the controls.
 
 Additional context, e.g. a static optomechanical assembly, can be added via `render!(gui.ax, ...)`.
 
+# Manual tracing
+
+With `auto_trace = false`, the systems are not solved after each change, which is useful for
+systems that take long to solve. Objects and sliders still update the 3D view, while the beams are
+dimmed and the status line shows that they are outdated. The systems are solved by the
+`Trace (t)` button below the 3D view or the key `t`. The toggle next to the button switches auto
+tracing on or off, switching it on solves the systems if they are outdated. The initial solve
+always runs.
+
 # Detector panels
 
 By default, one panel per `Detector` of all systems is shown next to the 3D view. The panel shows
@@ -306,6 +410,8 @@ automatically around the beam, unless `x_min`, `x_max`, `z_min` and `z_max` are 
 # Keyword args
 
 - `size = (1400, 800)`: size of the figure
+- `auto_trace = true`: solves the systems after each change, otherwise only on request, see
+  "Manual tracing"
 - `detectors = :auto`: all `Detector`s of all systems. Alternatively a vector of `pd`,
   `pd => mode` or `pd => (mode, kwargs)`, where `mode` is `:auto`, `:spot` or `:intensity` and
   `kwargs` are passed to `intensity`, e.g. `(; n = 200, x_min = -1e-3, x_max = 1e-3, ...)`. An empty
@@ -323,6 +429,7 @@ automatically around the beam, unless `x_min`, `x_max`, `z_min` and `z_max` are 
 function live_view(
         pairs::Pair{<:BMO.AbstractSystem}...;
         size = (1400, 800),
+        auto_trace::Bool = true,
         detectors = :auto,
         on_change = (gui, obj) -> nothing,
         sliders = [],
@@ -356,7 +463,12 @@ function live_view(
     else
         SliderGrid(fig[2, 1:ncols], first.(slider_specs)...)
     end
-    status = Label(fig[isnothing(slider_grid) ? 2 : 3, 1:ncols],
+    # Status row: trace button, auto trace toggle and status line
+    status_row = GridLayout(fig[isnothing(slider_grid) ? 2 : 3, 1:ncols])
+    trace_button = Button(status_row[1, 1]; label = "Trace (t)")
+    auto_trace_toggle = Toggle(status_row[1, 2]; active = auto_trace)
+    Label(status_row[1, 3], "auto trace")
+    status = Label(status_row[1, 4],
         "Click on a component to select it, press h to show the controls"; tellwidth = false)
 
     system_handles = SystemRenderHandle[live_render!(ax, sys; system_kwargs...) for sys in systems]
@@ -369,17 +481,22 @@ function live_view(
     # A single controller for all systems, otherwise several controllers would compete for events
     handles = reduce(vcat, [h.handles for h in system_handles]; init = ObjectRenderHandle[])
     plot2obj = IdDict{Any, BMO.AbstractObject}()
-    for h in system_handles, (plot, obj) in h.plot2obj
-        plot2obj[plot] = obj
+    parent = IdDict{BMO.AbstractObject, BMO.AbstractObject}()
+    for h in system_handles
+        merge!(plot2obj, h.plot2obj)
+        merge!(parent, h.parent)
     end
-    combined = SystemRenderHandle(ax, first(systems), handles, plot2obj)
+    combined = SystemRenderHandle(ax, first(systems), handles, plot2obj, parent)
     gui_ref = Ref{LiveView}()
-    controls = kinematic_controls!(ax, combined; on_change = obj -> _resolve!(gui_ref[], obj), kwargs...)
+    controls = kinematic_controls!(ax, combined; on_change = obj -> _on_change!(gui_ref[], obj),
+        kwargs...)
 
     gui = LiveView(fig, ax, ps, system_handles, beam_handles, controls, panels, status, slider_grid,
-        on_change, nothing)
+        on_change, nothing, auto_trace_toggle.active, false, trace_button, auto_trace_toggle,
+        IdDict{Any, Any}())
     gui_ref[] = gui
     isnothing(slider_grid) || _connect_sliders!(gui, last.(slider_specs))
+    _connect_trace!(gui)
     _resolve!(gui, nothing)
     return gui
 end

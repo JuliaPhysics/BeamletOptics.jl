@@ -209,6 +209,147 @@ const BMO = BeamletOptics
         close(gui)
     end
 
+    @testset "manual trace" begin
+        _spot(pd) = sort(collect(BMO.spot_diagram(pd)); by = p -> (p[1], p[2]))
+
+        # beam points and spot of a fresh solve of the system
+        function _fresh(sys, pd)
+            b = Beam([0.0, 0, 0], [0.0, 1, 0])
+            empty!(pd)
+            solve_system!(sys, b)
+            pts = Point3f[]
+            Ext._collect_segments!(pts, b; flen = 1.0, render_every = 5)
+            return pts, length(BMO.hits(pd)), _spot(pd)
+        end
+
+        @testset "key steps, t, trace button" begin
+            m, pd = _fixture()
+            sys = System([m, pd])
+            beam = Beam([0.0, 0, 0], [0.0, 1, 0])
+            n_calls = Ref(0)
+            gui = live_view(sys, beam; auto_trace = false, throttle = false, mode = :rotate,
+                fine_angle = 1e-2, on_change = (g, obj) -> (n_calls[] += 1))
+            @test !gui.auto_trace[]
+            @test !gui.auto_trace_toggle.active[]
+            @test gui.trace_button isa Makie.Button
+            # the initial solve runs anyway
+            @test n_calls[] == 1
+            @test length(BMO.hits(pd)) == 1
+            @test !gui.stale
+            bh = gui.beam_handles[1]
+
+            gui.controls.selected[] = m
+            R0 = Matrix{Float64}(BMO.orientation(m))
+            n_hits = length(BMO.hits(pd))
+            pts0 = copy(bh.points[])
+            xy0 = copy(gui.panels[1].xy[])
+            _key!(gui, Keyboard.left)
+            # the object moves, but nothing is solved
+            @test Matrix{Float64}(BMO.orientation(m)) ≈ BMO.rotate3d([0, 0, 1], 1e-2) * R0
+            @test gui.system_handles[1].handles[1].R ≈ Matrix{Float64}(BMO.orientation(m))
+            @test n_calls[] == 1
+            @test length(BMO.hits(pd)) == n_hits
+            @test bh.points[] == pts0
+            @test gui.panels[1].xy[] == xy0
+            @test gui.stale
+            @test occursin("outdated, press t to trace", gui.status.text[])
+            @test startswith(gui.status.text[], "RoundPlanoMirror at (")
+            @test bh.plot.alpha[] ≈ 0.3
+
+            # t solves the system
+            _key!(gui, Keyboard.t)
+            @test n_calls[] == 2
+            @test !gui.stale
+            @test bh.plot.alpha[] ≈ 1.0
+            pts_gui, n_gui, xy_gui = copy(bh.points[]), length(BMO.hits(pd)), copy(gui.panels[1].xy[])
+            spot_gui = _spot(pd)
+            @test xy_gui != xy0
+            pts, n, spot = _fresh(sys, pd)
+            @test n_gui == n
+            @test pts_gui ≈ pts
+            @test spot_gui ≈ spot
+
+            # the trace button solves the system as well, rotate back to keep the spot on the detector
+            _key!(gui, Keyboard.right)
+            @test gui.stale
+            @test n_calls[] == 2
+            notify(gui.trace_button.clicks)
+            @test n_calls[] == 3
+            @test !gui.stale
+            pts_gui, xy_gui2 = copy(bh.points[]), copy(gui.panels[1].xy[])
+            @test xy_gui2 != xy_gui
+            pts, n, spot = _fresh(sys, pd)
+            @test n == 1
+            @test pts_gui ≈ pts
+
+            # switching auto trace on without changes does not solve
+            gui.auto_trace_toggle.active[] = true
+            @test n_calls[] == 3
+            gui.auto_trace_toggle.active[] = false
+
+            close(gui)
+            _key!(gui, Keyboard.t)
+            @test n_calls[] == 3
+        end
+
+        @testset "sliders and auto trace toggle" begin
+            m, pd = _fixture()
+            sys = System([m, pd])
+            beam = Beam([0.0, 0, 0], [0.0, 1, 0])
+            n_calls = Ref(0)
+            called = Float64[]
+            callback = v -> (push!(called, v); translate_to3d!(pd, [0.1, 0.1, v * 1e-3]))
+            gui = live_view(sys, beam; auto_trace = false, throttle = false,
+                sliders = ["detector z [mm]" => (0:0.1:2, callback)],
+                on_change = (g, obj) -> (n_calls[] += 1))
+            @test n_calls[] == 1
+            xy0 = copy(gui.panels[1].xy[])
+            gui.sliders.sliders[1].value[] = 1.0
+            notify(events(gui.ax.scene).tick)
+            # the callback and update_render! run, but no solve
+            @test called == [1.0]
+            @test gui.system_handles[1].handles[2].P ≈ BMO.position(pd)
+            @test n_calls[] == 1
+            @test gui.panels[1].xy[] == xy0
+            @test gui.stale
+            @test gui.status.text[] == "outdated, press t to trace"
+
+            # switching auto trace on solves once, since the state is outdated
+            gui.auto_trace_toggle.active[] = true
+            @test gui.auto_trace[]
+            @test n_calls[] == 2
+            @test !gui.stale
+            @test gui.panels[1].xy[] != xy0
+
+            # auto tracing resumes
+            gui.controls.selected[] = m
+            _key!(gui, Keyboard.up)
+            @test n_calls[] == 3
+            @test !gui.stale
+            gui.sliders.sliders[1].value[] = 0.5
+            notify(events(gui.ax.scene).tick)
+            @test n_calls[] == 4
+            @test !gui.stale
+            close(gui)
+        end
+
+        @testset "auto trace by default, t traces as well" begin
+            m, pd = _fixture()
+            n_calls = Ref(0)
+            gui = live_view(System([m, pd]), Beam([0.0, 0, 0], [0.0, 1, 0]); throttle = false,
+                on_change = (g, obj) -> (n_calls[] += 1))
+            @test gui.auto_trace[]
+            @test gui.auto_trace_toggle.active[]
+            gui.controls.selected[] = m
+            _key!(gui, Keyboard.up)
+            @test n_calls[] == 2
+            @test !gui.stale
+            _key!(gui, Keyboard.t)
+            @test n_calls[] == 3
+            close(gui)
+        end
+    end
+
     @testset "failing on_change is logged once" begin
         m, pd = _fixture()
         sys = System([m, pd])

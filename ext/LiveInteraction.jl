@@ -101,6 +101,7 @@ function _help_text(mode::Symbol, fine_step, fine_angle)
     step: $step, shift: 10× step
     +/-: change step
     r: reset, esc: deselect
+    click again: select part of a group, esc: up one level
     h: hide controls"""
 end
 
@@ -219,11 +220,61 @@ function Base.show(io::IO, ctrl::KinematicController)
         ", mode = ", ctrl.mode[], ")")
 end
 
-_is_movable(ctrl::KinematicController, obj) = any(o -> o === obj, ctrl.movable)
+"""Returns the objects of the group `obj`, or an empty vector if `obj` is not a group."""
+_children(obj) = obj isa BMO.AbstractObjectGroup ? collect(BMO.AbstractObject, BMO.shape(obj)) :
+                 BMO.AbstractObject[]
+
+"""Returns all objects of the group `obj` that are not groups themselves (recursively), or `[obj]`."""
+function _leaves(obj)
+    obj isa BMO.AbstractObjectGroup || return BMO.AbstractObject[obj]
+    return reduce(vcat, (_leaves(c) for c in BMO.shape(obj)); init = BMO.AbstractObject[])
+end
+
+"""Returns the `obj` and all its nested objects and subgroups (recursively)."""
+function _descendants(obj)
+    out = BMO.AbstractObject[obj]
+    for c in _children(obj)
+        append!(out, _descendants(c))
+    end
+    return out
+end
+
+"""Returns the chain `[leaf, parent of leaf, …, top-level object]` of the hierarchy of `ctrl.h`."""
+function _chain(ctrl, leaf)
+    chain = BMO.AbstractObject[leaf]
+    while haskey(ctrl.h.parent, last(chain))
+        push!(chain, ctrl.h.parent[last(chain)])
+    end
+    return chain
+end
+
+"""An object is movable if its top-level object is one of the movable objects of the `ctrl`."""
+function _is_movable(ctrl::KinematicController, obj)
+    top = _top_level(ctrl.h, obj)
+    return any(o -> o === top, ctrl.movable)
+end
 
 function _object_plots(h::SystemRenderHandle, obj)
-    i = findfirst(oh -> oh.obj === obj, h.handles)
-    return isnothing(i) ? AbstractPlot[] : h.handles[i].plots
+    plots = AbstractPlot[]
+    for leaf in _leaves(obj)
+        i = findfirst(oh -> oh.obj === leaf, h.handles)
+        isnothing(i) || append!(plots, h.handles[i].plots)
+    end
+    return plots
+end
+
+"""
+    _drill_select(ctrl, leaf)
+
+Returns the new selection after a click on the `leaf`: the top-level object of the `leaf` on the
+first click, then one level further down the hierarchy towards the `leaf` on each further click.
+"""
+function _drill_select(ctrl::KinematicController, leaf)
+    chain = _chain(ctrl, leaf)
+    sel = ctrl.selected[]
+    i = isnothing(sel) ? nothing : findfirst(o -> o === sel, chain)
+    isnothing(i) && return last(chain)
+    return chain[max(i - 1, 1)]
 end
 
 """Axes of the keyboard controls: local y-axis, local x-axis and rotation axis of the `obj`."""
@@ -379,12 +430,14 @@ end
 """
     _ray_pick(ctrl::KinematicController, scene)
 
-Returns the movable object of `ctrl` hit by the camera ray at the current cursor position of
-`scene`, see [`_ray_pick(objects, origin, dir)`](@ref).
+Returns the object hit by the camera ray at the current cursor position of `scene` among all
+objects of the movable objects of `ctrl`, i.e. objects of groups are returned instead of the
+groups, see [`_ray_pick(objects, origin, dir)`](@ref).
 """
 function _ray_pick(ctrl::KinematicController, scene)
     r = Makie.ray_at_cursor(scene)
-    return _ray_pick(ctrl.movable, r.origin, r.direction)
+    leaves = reduce(vcat, (_leaves(o) for o in ctrl.movable); init = BMO.AbstractObject[])
+    return _ray_pick(leaves, r.origin, r.direction)
 end
 
 """
@@ -406,6 +459,11 @@ mode as rings. The key `h` shows or hides an overlay of all controls.
   or rotates it around the `rotation_axis` in the rotate mode
 - left-click on empty space: deselects the current object
 
+Object groups (e.g. `ObjectGroup`) are selected as a whole by the first click. Each further click on
+the selected group selects the next level of the hierarchy towards the object under the cursor,
+i.e. a subgroup or a single object, which is then moved on its own. A group is moved and rotated
+around its `position`, the group center.
+
 # Keyboard controls
 
 The following keys apply to the selected object, pressing shift multiplies the step size by 10:
@@ -417,7 +475,8 @@ The following keys apply to the selected object, pressing shift multiplies the s
 | `page up`/`page down` | along the blue arrow    | around the green ring      |
 
 The first key moves the object in the direction of the arrow, or rotates it in the direction of
-the ring. In addition, `r` resets the object to its initial pose and `esc` deselects it.
+the ring. In addition, `r` resets the object to its initial pose and `esc` deselects it. If the
+object is part of a group, `esc` selects the enclosing group instead.
 
 The keys `+` and `-` increase or decrease the step size of the current mode (`fine_step` or
 `fine_angle`) along the 1-2-5 sequence, e.g. 10 nm → 20 nm → 50 nm → 100 nm. They also work
@@ -425,7 +484,8 @@ without a selected object. The current step size is shown in the hint line.
 
 # Keyword args
 
-- `objects = nothing`: the movable objects, all objects of `h` by default
+- `objects = nothing`: the movable top-level objects, all top-level objects of `h` by default. The
+  objects of a movable group are movable as well.
 - `on_change = obj -> nothing`: called with the moved object after each change, e.g. to solve the system
 - `plane_normal = [0, 0, 1]`: normal of the plane for mouse translation
 - `rotation_axis = [0, 0, 1]`: rotation axis for mouse rotation, blue axis of the keyboard controls
@@ -456,10 +516,19 @@ function kinematic_controls!(
     )
     mode in (:move, :rotate) || throw(ArgumentError("mode must be :move or :rotate, got :$mode"))
     scene = Makie.get_scene(ax)
-    movable = isnothing(objects) ? BMO.AbstractObject[oh.obj for oh in h.handles] :
-              collect(BMO.AbstractObject, objects)
+    movable = BMO.AbstractObject[]
+    if isnothing(objects)
+        # Top-level objects, since the handles of groups belong to the objects of the group
+        for oh in h.handles
+            top = _top_level(h, oh.obj)
+            any(o -> o === top, movable) || push!(movable, top)
+        end
+    else
+        append!(movable, objects)
+    end
+    # Initial poses of all levels, such that each object and subgroup can be reset
     init_poses = IdDict{BMO.AbstractObject, Tuple{Point3{Float64}, Matrix{Float64}}}(
-        obj => _pose(obj) for obj in movable)
+        obj => _pose(obj) for top in movable for obj in _descendants(top))
 
     # Selection box and gizmo, updated via Observables
     box_obs = Observable(Point3f[])
@@ -501,19 +570,21 @@ function kinematic_controls!(
         event.button == Mouse.left || return Consume(false)
         if event.action == Mouse.press
             if pick === nothing
-                obj = _ray_pick(ctrl, scene)
-                if isnothing(obj)
+                leaf = _ray_pick(ctrl, scene)
+                if isnothing(leaf)
                     plot, _ = _default_pick(ax)
-                    obj = isnothing(plot) ? nothing : pick_object(h, plot)
+                    leaf = isnothing(plot) ? nothing : _pick_leaf(h, plot)
                 end
             else
                 plot, _ = pick(ax)
-                obj = isnothing(plot) ? nothing : pick_object(h, plot)
+                leaf = isnothing(plot) ? nothing : _pick_leaf(h, plot)
             end
-            if isnothing(obj) || !_is_movable(ctrl, obj)
+            if isnothing(leaf) || !_is_movable(ctrl, leaf)
                 ctrl.bg_press_pos = _px(scene)
                 return Consume(false)
             end
+            # Clicking again on a group selects the next level towards the clicked object
+            obj = _drill_select(ctrl, leaf)
             ctrl.selected[] = obj
             ctrl.dragging = true
             ctrl.last_mouse = _px(scene)
@@ -578,7 +649,8 @@ function kinematic_controls!(
         obj = ctrl.selected[]
         isnothing(obj) && return Consume(false)
         if event.key == Keyboard.escape
-            ctrl.selected[] = nothing
+            # One level up in the hierarchy of groups, deselect at the top level
+            ctrl.selected[] = get(ctrl.h.parent, obj, nothing)
             _update_selection_box!(ctrl)
         elseif event.key == Keyboard.r
             _reset_pose!(ctrl, obj)

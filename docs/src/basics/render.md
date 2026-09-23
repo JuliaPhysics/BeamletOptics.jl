@@ -136,4 +136,129 @@ direction of the arrow, or rotates it in the direction of the ring.
 The camera works as usual as long as no component is grabbed. Call `close(ctrl)` to remove the
 controls.
 
-A complete example can be found in the [Interactive Michelson interferometer](@ref) example.
+## Interactive live view
+
+[`live_view`](@ref) combines [`live_render!`](@ref), [`kinematic_controls!`](@ref), detector
+panels and optional sliders into a single ready-to-use window. It is the fastest way to explore
+the sensitivity of a system in the REPL: grab a mirror, watch the beam path and the detector
+panels update live.
+
+```julia
+using GLMakie, BeamletOptics
+
+gui = live_view(system, beam)
+display(gui)
+```
+
+More than one `system => beam` pair can be shown in the same 3D view, e.g. the transmitter and
+receiver path of a lidar, which are solved with different sources:
+
+```julia
+gui = live_view(system_tx => beam_tx, system_rx => source_rx)
+```
+
+### Static context
+
+Additional context that is not part of any `system`, e.g. a housing or an optical table, can be
+added directly to `gui.ax` via `render!`:
+
+```julia
+render!(gui.ax, housing_mesh; transparency = true, color = (:gray, 0.3))
+```
+
+Such geometry is not selectable and does not block clicking on the optics behind it: objects are
+picked by intersecting the camera ray with the movable objects of the system, not with everything
+drawn in the scene, so a housing mesh in front of a component never gets in the way.
+
+### Detector panels
+
+By default (`detectors = :auto`), one panel is shown for every `Detector` of every system,
+deduplicated by identity. Each panel shows the spot diagram (`:spot`) for ray-based hits or the
+intensity (`:intensity`) for Gaussian beamlet hits, chosen automatically (`:auto`). Pass a vector
+to select detectors and modes explicitly, or `[]` to disable the panels:
+
+```julia
+gui = live_view(system, beam; detectors = [pd1, pd2 => :spot, pd3 => (:intensity, (; n = 200))])
+```
+
+The `kwargs` of the `pd => (mode, kwargs)` form are passed to [`intensity`](@ref); most useful is
+a fixed extent via `x_min`, `x_max`, `z_min` and `z_max` (in meters, like the rest of this
+package), instead of the automatic crop around the beam.
+
+### Sliders
+
+`sliders` adds custom parameters below the 3D view. Each entry is `"label" => (range, callback)`
+(or `(range, callback, startvalue)`); `callback` is called with the current slider value and is
+expected to move objects or otherwise change the system:
+
+```julia
+gui = live_view(system, beam;
+    sliders = ["focus [mm]" => (-1:0.01:4, v -> set_focus(cl, v * 1e-3))])
+```
+
+Since this package uses SI units throughout, a slider that is labeled and ranged in millimeters
+for convenience must convert its value before applying it, as in `v * 1e-3` above.
+
+### Custom updates
+
+`on_change = (gui, obj) -> ...` is called after every solve, with the moved object or `nothing`
+(initial solve, or after a slider change). Use it to plot additional derived quantities into
+`gui.fig`. Since `on_change` already runs for the initial solve inside `live_view`, the callback
+should only update an `Observable`; the axis and the plot are created once afterwards:
+
+```julia
+power = Observable(Point2f[])
+
+function record_power!(gui, obj)
+    P = optical_power(pd)
+    push!(power[], Point2f(length(power[]) + 1, 1e3 * P))
+    notify(power)
+    return nothing
+end
+
+gui = live_view(system, beam; on_change = record_power!)
+# Below a single detector panel, the panels are placed in a grid in gui.fig[1, 2]
+power_ax = Axis(gui.fig[1, 2][2, 1]; xlabel = "Update", ylabel = "P [mW]")
+lines!(power_ax, power)
+on(_ -> autolimits!(power_ax), power)
+```
+
+Errors raised inside `on_change` are logged once and do not interrupt the interaction. See the
+[Interactive Michelson interferometer](@ref) example for a full callback that tracks the optical
+power over time.
+
+### Manual tracing
+
+Solving a large system on every mouse-drag event can be too slow for smooth interaction. With
+`auto_trace = false`, `live_view` still updates the 3D view and the sliders immediately, but only
+solves the systems (and updates the beams and detector panels) on request: the `Trace (t)` button
+below the 3D view, the key `t`, or switching the "auto trace" toggle back on (which solves once if
+the state is outdated). While outdated, the beam plots are dimmed and the status line shows a
+hint. The initial solve always runs, regardless of `auto_trace`.
+
+### Groups
+
+Clicking a component inside an `ObjectGroup` selects the outermost group first. Clicking the same
+component again descends one level into the hierarchy (a subgroup, then the individual object),
+so that the group can still be moved as a whole, or a single part can be moved on its own. `Esc`
+goes back up one level, and deselects once the top level is reached.
+
+### Controls
+
+| Input                                     | Action                                                     |
+|:-------------------------------------------|:-------------------------------------------------------------|
+| Left-click on a component                  | Select it (first click selects the outermost group)          |
+| Left-click again on the same component     | Select one level deeper into the group                       |
+| Left-click on empty space                  | Deselect                                                      |
+| Left-drag on the selected component        | Move within the plane, or rotate around the rotation axis    |
+| `↑`/`↓`, `→`/`←`, `Page Up`/`Page Down`     | Move along / rotate around the green, red, blue axis         |
+| Shift (held)                               | ×10 step size                                                 |
+| `+` / `-`                                  | Increase / decrease the step size (1-2-5 sequence)            |
+| `m`                                        | Switch between move and rotate mode                           |
+| `r`                                        | Reset the selected component to its initial pose              |
+| `Esc`                                      | Deselect, or select the enclosing group if inside one         |
+| `h`                                        | Show or hide the controls overlay                              |
+| `t`                                        | Solve the systems now (manual tracing)                        |
+
+A complete example, including a custom `on_change` callback, can be found in the
+[Interactive Michelson interferometer](@ref) example.

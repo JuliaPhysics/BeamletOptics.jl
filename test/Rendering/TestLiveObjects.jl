@@ -213,6 +213,61 @@ end
         @test all(isempty(oh.plots) for oh in hs.handles)
     end
 
+    @testset "System with nested groups renders per leaf" begin
+        m1 = RoundPlanoMirror(0.02, 0.004)
+        m2 = RoundPlanoMirror(0.02, 0.004)
+        m3 = RoundPlanoMirror(0.02, 0.004)
+        translate3d!(m2, [0, 0.05, 0])
+        translate3d!(m3, [0, 0.1, 0])
+        inner = ObjectGroup([m2, m3])
+        outer = ObjectGroup([m1, inner])
+        sys = System([outer])
+        h = live_render!(ax, sys)
+
+        # one handle per leaf, hierarchy in parent
+        @test length(h.handles) == 3
+        @test [oh.obj for oh in h.handles] == [m1, m2, m3]
+        @test all(oh -> oh isa Ext.ObjectRenderHandle, h.handles)
+        @test h.parent[m1] === outer
+        @test h.parent[m2] === inner
+        @test h.parent[m3] === inner
+        @test h.parent[inner] === outer
+        @test !haskey(h.parent, outer)
+        @test Ext._top_level(h, m2) === outer
+        @test Ext._top_level(h, outer) === outer
+
+        # pick_object returns the top-level object, _pick_leaf the rendered object
+        plot_m3 = h.handles[3].plots[1]
+        @test pick_object(h, plot_m3) === outer
+        @test Ext._pick_leaf(h, plot_m3) === m3
+        @test pick_object(h, nothing) === nothing
+
+        # moving the outer group applies the transform to all leaf plots without re-rendering
+        ids_before = [objectid.(oh.plots) for oh in h.handles]
+        translate3d!(outer, [0.02, -0.01, 0.005])
+        zrotate3d!(outer, deg2rad(15))
+        update_render!(h)
+        @test [objectid.(oh.plots) for oh in h.handles] == ids_before
+        for oh in h.handles
+            P, R = BMO.position(oh.obj), BMO.orientation(oh.obj)
+            for plot in oh.plots
+                _check_reference_points(plot, oh.P0, oh.R0, P, R)
+            end
+        end
+
+        # moving a sub-object moves only its plots
+        model_m1 = Makie.transformation(h.handles[1].plots[1]).model[]
+        translate3d!(m2, [0, 0, 0.01])
+        update_render!(h)
+        @test [objectid.(oh.plots) for oh in h.handles] == ids_before
+        @test Makie.transformation(h.handles[1].plots[1]).model[] == model_m1
+        oh2 = h.handles[2]
+        _check_reference_points(oh2.plots[1], oh2.P0, oh2.R0, BMO.position(m2), BMO.orientation(m2))
+
+        remove_render!(h)
+        @test all(isempty(oh.plots) for oh in h.handles)
+    end
+
     @testset "show" begin
         lens = SphericalLens(0.05, -0.05, 0.01, 0.02)
         h = live_render!(ax, lens)

@@ -425,6 +425,191 @@ const BMO = BeamletOptics
         @test ctrl.fine_step ≈ 20e-9
     end
 
+    # Nested groups G ⊃ H ⊃ lens and a second top-level group M ⊃ m. The lens is at the origin,
+    # which the default camera looks at, all other objects are away from the camera ray.
+    function _group_fixture()
+        lens = RoundPlanoMirror(0.025, 0.005)
+        h1 = RoundPlanoMirror(0.025, 0.005)
+        g1 = RoundPlanoMirror(0.025, 0.005)
+        m = RoundPlanoMirror(0.025, 0.005)
+        translate3d!(h1, [0.3, 0, 0])
+        translate3d!(g1, [0, 0.3, 0])
+        translate3d!(m, [0, 0, -0.3])
+        H = ObjectGroup([lens, h1])
+        G = ObjectGroup([g1, H])
+        M = ObjectGroup([m])
+        sys = System([G, M])
+        fig = Figure()
+        ax = LScene(fig[1, 1])
+        h = live_render!(ax, sys)
+        return (; fig, ax, h, lens, h1, g1, m, H, G, M)
+    end
+
+    _click!(scene) = (events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press);
+                      events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release))
+    _pos(obj) = collect(Float64.(BMO.position(obj)))
+
+    @testset "group drill-down" begin
+        @testset "_drill_select reproduces the trace table" begin
+            f = _group_fixture()
+            ctrl = Ext.kinematic_controls!(f.ax, f.h; throttle = false)
+            @test length(ctrl.movable) == 2
+            @test ctrl.movable[1] === f.G && ctrl.movable[2] === f.M
+            @test Ext._chain(ctrl, f.lens) == [f.lens, f.H, f.G]
+            @test Ext._drill_select(ctrl, f.lens) === f.G
+            ctrl.selected[] = f.G
+            @test Ext._drill_select(ctrl, f.lens) === f.H
+            ctrl.selected[] = f.H
+            @test Ext._drill_select(ctrl, f.lens) === f.lens
+            ctrl.selected[] = f.lens
+            @test Ext._drill_select(ctrl, f.lens) === f.lens
+            @test Ext._drill_select(ctrl, f.m) === f.M
+            # clicking on a sibling of the selected sub-object selects the top level again
+            @test Ext._drill_select(ctrl, f.h1) === f.G
+            @test Ext._is_movable(ctrl, f.lens)
+            close(ctrl)
+        end
+
+        @testset "trace table via clicks and esc" begin
+            f = _group_fixture()
+            scene = f.ax.scene
+            target = Ref{Any}(f.lens)
+            plot_of(obj) = only(oh for oh in f.h.handles if oh.obj === obj).plots[1]
+            ctrl = Ext.kinematic_controls!(f.ax, f.h; throttle = false,
+                pick = ax2 -> (plot_of(target[]), 0))
+            selections = Any[]
+            for _ in 1:4
+                _click!(scene)
+                push!(selections, ctrl.selected[])
+            end
+            @test selections[1] === f.G
+            @test selections[2] === f.H
+            @test selections[3] === f.lens
+            @test selections[4] === f.lens
+            target[] = f.m
+            _click!(scene)
+            @test ctrl.selected[] === f.M
+
+            # esc goes up one level, deselects at the top level
+            ctrl.selected[] = f.lens
+            events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.escape, Keyboard.press)
+            @test ctrl.selected[] === f.H
+            events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.escape, Keyboard.press)
+            @test ctrl.selected[] === f.G
+            events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.escape, Keyboard.press)
+            @test ctrl.selected[] === nothing
+            close(ctrl)
+        end
+
+        @testset "drill-down via ray picking" begin
+            f = _group_fixture()
+            scene = f.ax.scene
+            vp = scene.viewport[]
+            cx, cy = vp.origin[1] + vp.widths[1] / 2, vp.origin[2] + vp.widths[2] / 2
+            ctrl = Ext.kinematic_controls!(f.ax, f.h; throttle = false)
+            events(scene).mouseposition[] = (cx, cy)
+            # the ray pick returns the leaf, the click logic decides the level
+            @test Ext._ray_pick(ctrl, scene) === f.lens
+            _click!(scene)
+            @test ctrl.selected[] === f.G
+            _click!(scene)
+            @test ctrl.selected[] === f.H
+            _click!(scene)
+            @test ctrl.selected[] === f.lens
+            close(ctrl)
+        end
+
+        @testset "key steps and reset per level" begin
+            f = _group_fixture()
+            scene = f.ax.scene
+            # handles in render order: g1, lens, h1, m
+            @test [oh.obj for oh in f.h.handles] == [f.g1, f.lens, f.h1, f.m]
+            ctrl = Ext.kinematic_controls!(f.ax, f.h; throttle = false, fine_step = 1e-3,
+                pick = ax2 -> (f.h.handles[2].plots[1], 0))
+            key!(k) = (events(scene).keyboardbutton[] = Makie.KeyEvent(k, Keyboard.press))
+            init = Dict(n => _pos(getfield(f, n)) for n in (:lens, :h1, :g1, :m, :H, :G, :M))
+            siblings = (:h1, :g1, :m, :H, :G, :M)
+
+            # init_poses of all levels
+            for n in keys(init)
+                @test haskey(ctrl.init_poses, getfield(f, n))
+            end
+
+            # sub-object: only the lens moves
+            foreach(_ -> _click!(scene), 1:3)
+            @test ctrl.selected[] === f.lens
+            key!(Keyboard.up)
+            @test isapprox(norm(_pos(f.lens) - init[:lens]), 1e-3; atol = 1e-12)
+            for n in siblings
+                @test isapprox(_pos(getfield(f, n)), init[n]; atol = 1e-12)
+            end
+            # the plots of the lens follow, the others do not
+            @test f.h.handles[2].P == BMO.position(f.lens)
+            @test f.h.handles[3].P == BMO.position(f.h1)
+
+            # r resets the sub-object only
+            key!(Keyboard.r)
+            @test isapprox(_pos(f.lens), init[:lens]; atol = 1e-12)
+
+            # esc: subgroup H, moving H moves lens and h1, but not g1
+            key!(Keyboard.escape)
+            @test ctrl.selected[] === f.H
+            key!(Keyboard.up)
+            d = _pos(f.H) - init[:H]
+            @test isapprox(norm(d), 1e-3; atol = 1e-12)
+            @test isapprox(_pos(f.lens), init[:lens] + d; atol = 1e-12)
+            @test isapprox(_pos(f.h1), init[:h1] + d; atol = 1e-12)
+            @test isapprox(_pos(f.g1), init[:g1]; atol = 1e-12)
+
+            # move the lens within the moved H, r on the lens keeps h1 moved
+            _click!(scene)
+            @test ctrl.selected[] === f.lens
+            key!(Keyboard.up)
+            key!(Keyboard.r)
+            @test isapprox(_pos(f.lens), init[:lens]; atol = 1e-12)
+            @test isapprox(_pos(f.h1), init[:h1] + d; atol = 1e-12)
+
+            # r on the group resets the group
+            key!(Keyboard.escape)
+            @test ctrl.selected[] === f.H
+            key!(Keyboard.r)
+            @test isapprox(_pos(f.H), init[:H]; atol = 1e-12)
+            @test isapprox(_pos(f.h1), init[:h1]; atol = 1e-12)
+            @test isapprox(_pos(f.g1), init[:g1]; atol = 1e-12)
+            close(ctrl)
+        end
+
+        @testset "selection box of a group spans all leaves" begin
+            f = _group_fixture()
+            ctrl = Ext.kinematic_controls!(f.ax, f.h; throttle = false)
+            leaf_plots(objs) = reduce(vcat, [oh.plots for oh in f.h.handles if any(o -> o === oh.obj, objs)])
+            function check_box(objs)
+                bb = mapreduce(Makie.boundingbox, GeometryBasics.union, leaf_plots(objs))
+                pts = ctrl.box_obs[]
+                @test length(pts) == 24
+                lo = [minimum(p[i] for p in pts) for i in 1:3]
+                hi = [maximum(p[i] for p in pts) for i in 1:3]
+                @test isapprox(lo, collect(minimum(bb)); atol = 1e-5)
+                @test isapprox(hi, collect(maximum(bb)); atol = 1e-5)
+            end
+            ctrl.selected[] = f.G
+            Ext._update_selection_box!(ctrl)
+            check_box((f.lens, f.h1, f.g1))
+            ctrl.selected[] = f.H
+            Ext._update_selection_box!(ctrl)
+            check_box((f.lens, f.h1))
+            ctrl.selected[] = f.lens
+            Ext._update_selection_box!(ctrl)
+            check_box((f.lens,))
+            close(ctrl)
+        end
+
+        @testset "help text" begin
+            @test occursin("click again: select part of a group, esc: up one level",
+                Ext._help_text(:move, 10e-9, 10e-6))
+        end
+    end
+
     @testset "close disconnects listeners and removes the selection box" begin
         fig, ax, h, m1, m2 = _fixture()
         scene = ax.scene

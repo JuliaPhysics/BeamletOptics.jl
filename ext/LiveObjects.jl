@@ -171,12 +171,15 @@ end
     SystemRenderHandle <: AbstractRenderHandle
 
 Live rendering handle of an `AbstractSystem`, which holds one `ObjectRenderHandle` per object.
+Object groups are rendered per object, their hierarchy is stored in `parent`, which maps each
+object of a group to the enclosing group. Top-level objects have no entry.
 """
 mutable struct SystemRenderHandle{S <: BMO.AbstractSystem} <: AbstractRenderHandle
     ax::_RenderEnv
     sys::S
     handles::Vector{ObjectRenderHandle}
     plot2obj::IdDict{Any, BMO.AbstractObject}
+    parent::IdDict{BMO.AbstractObject, BMO.AbstractObject}
 end
 
 function Base.show(io::IO, h::SystemRenderHandle)
@@ -187,21 +190,40 @@ end
 """
     live_render!(ax, sys::AbstractSystem; kwargs...)
 
-Live-renders all objects of the `sys`tem, see [`live_render!`](@ref). Object groups are handled as a
-single rigid object.
+Live-renders all objects of the `sys`tem, see [`live_render!`](@ref). Object groups are rendered per
+object, such that each object of a group can be moved on its own without rendering the group again.
+[`pick_object`](@ref) returns the top-level object of the system, i.e. the outermost group.
 """
 function live_render!(ax::_RenderEnv, sys::BMO.AbstractSystem; kwargs...)
     handles = ObjectRenderHandle[]
     plot2obj = IdDict{Any, BMO.AbstractObject}()
-    # Avoid use of objects(sys)
-    for obj in sys.objects
+    parent = IdDict{BMO.AbstractObject, BMO.AbstractObject}()
+    function render_obj!(obj)
+        if obj isa BMO.AbstractObjectGroup
+            for child in BMO.shape(obj)
+                parent[child] = obj
+                render_obj!(child)
+            end
+            return nothing
+        end
         h = live_render!(ax, obj; kwargs...)
         push!(handles, h)
         for p in h.plots
             plot2obj[p] = obj
         end
+        return nothing
     end
-    return SystemRenderHandle(ax, sys, handles, plot2obj)
+    # Avoid use of objects(sys), which flattens the groups
+    foreach(render_obj!, sys.objects)
+    return SystemRenderHandle(ax, sys, handles, plot2obj, parent)
+end
+
+"""Returns the top-level object of `obj` in the hierarchy of `h`, i.e. the outermost group."""
+function _top_level(h::SystemRenderHandle, obj)
+    while haskey(h.parent, obj)
+        obj = h.parent[obj]
+    end
+    return obj
 end
 
 function update_render!(h::SystemRenderHandle)
@@ -215,7 +237,13 @@ function remove_render!(h::SystemRenderHandle)
     return nothing
 end
 
-function pick_object(h::SystemRenderHandle, plot)
+"""Returns the rendered (leaf) object of `plot`, i.e. an object of a group, or `nothing`."""
+function _pick_leaf(h::SystemRenderHandle, plot)
     owner = _walk_to_owner(p -> haskey(h.plot2obj, p), plot)
     return isnothing(owner) ? nothing : h.plot2obj[owner]
+end
+
+function pick_object(h::SystemRenderHandle, plot)
+    leaf = _pick_leaf(h, plot)
+    return isnothing(leaf) ? nothing : _top_level(h, leaf)
 end
