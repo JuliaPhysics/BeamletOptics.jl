@@ -147,6 +147,12 @@ end
         @test h.P0 == BMO.position(cbs)
         @test h.R0 == BMO.orientation(cbs)
 
+        # moving another part than the first does not change the pose of the object
+        old_ids = objectid.(h.plots)
+        translate3d!(cbs.back, [0.0, 0.0, 0.01])
+        update_render!(h)
+        @test objectid.(h.plots) != old_ids
+
         remove_render!(h)
         @test isempty(h.plots)
     end
@@ -266,6 +272,17 @@ end
 
         remove_render!(h)
         @test all(isempty(oh.plots) for oh in h.handles)
+    end
+
+    @testset "pick_object after a fallback rerender" begin
+        cbs = CubeBeamsplitter(0.02, λ -> 1.5)
+        h = live_render!(ax, System([cbs]))
+        old_plots = copy(h.handles[1].plots)
+        translate3d!(cbs.front, [0.0, 0.0, 0.01])
+        update_render!(h)
+        @test all(p -> !any(q -> q === p, old_plots), h.handles[1].plots)
+        @test all(p -> pick_object(h, p) === cbs, h.handles[1].plots)
+        remove_render!(h)
     end
 
     @testset "show" begin

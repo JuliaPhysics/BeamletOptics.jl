@@ -129,9 +129,10 @@ Applies the current pose of the object to its plots. If the subparts of a `Multi
 not been moved rigidly, the object is rendered again.
 """
 function update_render!(h::ObjectRenderHandle)
+    # The pose of a MultiShape object is the pose of its first part, hence check the other parts first
+    _is_rigid(h) || return _rerender!(h)
     P, R = _pose(h.obj)
     (P == h.P && R == h.R) && return h
-    _is_rigid(h) || return _rerender!(h)
     # Makie model matrix: x ↦ Rd * x + t, since scale and origin are not used
     Rd = R * h.R0'
     t = P - Rd * h.P0
@@ -178,7 +179,6 @@ mutable struct SystemRenderHandle{S <: BMO.AbstractSystem} <: AbstractRenderHand
     ax::_RenderEnv
     sys::S
     handles::Vector{ObjectRenderHandle}
-    plot2obj::IdDict{Any, BMO.AbstractObject}
     parent::IdDict{BMO.AbstractObject, BMO.AbstractObject}
 end
 
@@ -196,7 +196,6 @@ object, such that each object of a group can be moved on its own without renderi
 """
 function live_render!(ax::_RenderEnv, sys::BMO.AbstractSystem; kwargs...)
     handles = ObjectRenderHandle[]
-    plot2obj = IdDict{Any, BMO.AbstractObject}()
     parent = IdDict{BMO.AbstractObject, BMO.AbstractObject}()
     function render_obj!(obj)
         if obj isa BMO.AbstractObjectGroup
@@ -206,16 +205,12 @@ function live_render!(ax::_RenderEnv, sys::BMO.AbstractSystem; kwargs...)
             end
             return nothing
         end
-        h = live_render!(ax, obj; kwargs...)
-        push!(handles, h)
-        for p in h.plots
-            plot2obj[p] = obj
-        end
+        push!(handles, live_render!(ax, obj; kwargs...))
         return nothing
     end
     # Avoid use of objects(sys), which flattens the groups
     foreach(render_obj!, sys.objects)
-    return SystemRenderHandle(ax, sys, handles, plot2obj, parent)
+    return SystemRenderHandle(ax, sys, handles, parent)
 end
 
 """Returns the top-level object of `obj` in the hierarchy of `h`, i.e. the outermost group."""
@@ -233,14 +228,24 @@ end
 
 function remove_render!(h::SystemRenderHandle)
     foreach(remove_render!, h.handles)
-    empty!(h.plot2obj)
     return nothing
 end
 
-"""Returns the rendered (leaf) object of `plot`, i.e. an object of a group, or `nothing`."""
+"""
+    _pick_leaf(h::SystemRenderHandle, plot)
+
+Returns the rendered (leaf) object of `plot`, i.e. an object of a group, or `nothing`. The owner is
+looked up in the handles, since a fallback rerender replaces the plots of a handle.
+"""
 function _pick_leaf(h::SystemRenderHandle, plot)
-    owner = _walk_to_owner(p -> haskey(h.plot2obj, p), plot)
-    return isnothing(owner) ? nothing : h.plot2obj[owner]
+    p = plot
+    while p isa AbstractPlot
+        for oh in h.handles
+            any(q -> q === p, oh.plots) && return oh.obj
+        end
+        p = p.parent
+    end
+    return nothing
 end
 
 function pick_object(h::SystemRenderHandle, plot)

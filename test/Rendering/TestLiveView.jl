@@ -210,6 +210,29 @@ const BMO = BeamletOptics
         close(gui)
     end
 
+    @testset "panel power matches optical_power" begin
+        m, pd = _fixture()
+        # small area and coarse grid, such that the edges contribute to the integral
+        area = (; n = 5, x_min = -0.3e-3, x_max = 0.3e-3, z_min = -0.3e-3, z_max = 0.3e-3)
+        gui = live_view(System([m, pd]), _gauss(); detectors = [pd => (:intensity, area)])
+        P = optical_power(pd; area...)
+        @test gui.panels[1].ax.title[] == "Detector 1: P = $(Ext._fmt3(1e3 * P)) mW"
+        close(gui)
+    end
+
+    @testset "failed solve keeps the beams outdated" begin
+        m, pd = _fixture()
+        gui = live_view(System([m, pd]), Beam([0.0, 0, 0], [0.0, 1, 0]); auto_trace = false,
+            throttle = false)
+        @test !gui.stale
+        # solve_system! fails for this beam
+        gui.pairs[1] = gui.pairs[1].first => nothing
+        @test_logs (:error, r"solving the systems") Ext._trace!(gui)
+        @test gui.stale
+        @test occursin("failed", gui.status.text[])
+        close(gui)
+    end
+
     @testset "manual trace" begin
         _spot(pd) = sort(collect(BMO.spot_diagram(pd)); by = p -> (p[1], p[2]))
 

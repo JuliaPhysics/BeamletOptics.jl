@@ -173,8 +173,8 @@ function _update_intensity!(p::DetectorPanel, h)
     p.scatter_plot.visible[] && (p.scatter_plot.visible[] = false)
     p.heat_plot.visible[] || (p.heat_plot.visible[] = true)
     if h isa AbstractVector{<:BMO.GaussianBeamletHit}
-        # Optical power from the computed intensity, avoids a second field evaluation
-        P = sum(I) * step(x) * step(z)
+        # Optical power from the computed intensity like optical_power, avoids a second field evaluation
+        P = BMO.trapz((x, z), I)
         p.ax.title[] = "$(p.name): P = $(_fmt3(1e3 * P)) mW"
     else
         p.ax.title[] = _hits_title(p, h)
@@ -280,32 +280,41 @@ function _mark_stale!(gui::LiveView, obj)
     return nothing
 end
 
+"""
+    _solve!(gui::LiveView, obj)
+
+Solves all systems of the `gui` via `_resolve!` and restores the appearance of the beams. If solving
+fails, the beams and detector panels are kept marked as outdated. Returns `true` on success.
+"""
+function _solve!(gui::LiveView, obj)
+    try
+        _resolve!(gui, obj)
+    catch e
+        gui.last_error = _log_once(e, gui.last_error, "solving the systems")
+        gui.stale || _dim_beams!(gui)
+        gui.stale = true
+        gui.status.text[] = "solving the systems failed, see the log"
+        return false
+    end
+    _restore_beams!(gui)
+    gui.stale = false
+    return true
+end
+
 """Called by the controls after each change of `obj`: solves the systems or marks them as outdated."""
 function _on_change!(gui::LiveView, obj)
     if gui.auto_trace[]
-        _resolve!(gui, obj)
+        _solve!(gui, obj)
     else
         _mark_stale!(gui, obj)
     end
     return nothing
 end
 
-"""
-    _trace!(gui::LiveView)
-
-Solves all systems of the `gui` with the currently selected object, see [`_resolve!`](@ref), and
-restores the appearance of the beams.
-"""
+"""Solves all systems of the `gui` on request, with the currently selected object."""
 function _trace!(gui::LiveView)
     obj = gui.controls.selected[]
-    try
-        _resolve!(gui, obj)
-    catch e
-        gui.last_error = _log_once(e, gui.last_error, "solving the systems")
-    end
-    _restore_beams!(gui)
-    gui.stale = false
-    isnothing(obj) && (gui.status.text[] = "traced")
+    _solve!(gui, obj) && isnothing(obj) && (gui.status.text[] = "traced")
     return nothing
 end
 
@@ -354,11 +363,7 @@ function _connect_sliders!(gui::LiveView, callbacks)
         # The callbacks may have moved objects
         foreach(update_render!, gui.system_handles)
         if gui.auto_trace[]
-            try
-                _resolve!(gui, nothing)
-            catch e
-                gui.last_error = _log_once(e, gui.last_error, "solving the systems")
-            end
+            _solve!(gui, nothing)
         else
             _mark_stale!(gui, nothing)
         end
@@ -480,13 +485,9 @@ function live_view(
 
     # A single controller for all systems, otherwise several controllers would compete for events
     handles = reduce(vcat, [h.handles for h in system_handles]; init = ObjectRenderHandle[])
-    plot2obj = IdDict{Any, BMO.AbstractObject}()
     parent = IdDict{BMO.AbstractObject, BMO.AbstractObject}()
-    for h in system_handles
-        merge!(plot2obj, h.plot2obj)
-        merge!(parent, h.parent)
-    end
-    combined = SystemRenderHandle(ax, first(systems), handles, plot2obj, parent)
+    foreach(h -> merge!(parent, h.parent), system_handles)
+    combined = SystemRenderHandle(ax, first(systems), handles, parent)
     gui_ref = Ref{LiveView}()
     controls = kinematic_controls!(ax, combined; on_change = obj -> _on_change!(gui_ref[], obj),
         kwargs...)
