@@ -8,6 +8,12 @@ using LinearAlgebra
 
 const BMO = BeamletOptics
 
+# Object that can not be moved, see `kinematic_trait_of`
+struct FixedMirror{T, S <: BMO.AbstractShape{T}} <: BMO.AbstractObject{T}
+    shape::S
+end
+BMO.kinematic_trait_of(::FixedMirror) = BMO.Static()
+
 @testset "Kinematic controls" begin
     Ext = Base.get_extension(BeamletOptics, :BeamletOpticsMakieExt)
     @test !isnothing(Ext)
@@ -366,6 +372,60 @@ const BMO = BeamletOptics
         close(ctrl)
     end
 
+    @testset "spectator mode" begin
+        fig, ax, h, m1, m2 = _fixture()
+        scene = ax.scene
+        pick_m1 = ax2 -> (h.handles[1].plots[1], 0)
+        ctrl = Ext.kinematic_controls!(ax, h; throttle = false, pick = pick_m1)
+        events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+        events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
+        @test ctrl.selected[] === m1
+
+        # v clears the selection, clicks and keys no longer select or move anything
+        events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.v, Keyboard.press)
+        @test ctrl.spectator[]
+        @test ctrl.selected[] === nothing
+        @test ctrl.help_obs[] == Ext._SPECTATOR_HINT
+        P0 = collect(Float64.(BMO.position(m1)))
+        events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+        events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
+        @test ctrl.selected[] === nothing
+        events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.m, Keyboard.press)
+        @test ctrl.mode[] == :move
+        events(scene).unicode_input[] = '+'
+        @test ctrl.fine_step ≈ 10e-9
+        events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.h, Keyboard.press)
+        @test ctrl.help_obs[] == Ext._SPECTATOR_HELP
+        events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.h, Keyboard.press)
+
+        # v again switches back to the edit mode
+        events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.v, Keyboard.press)
+        @test !ctrl.spectator[]
+        events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+        events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
+        @test ctrl.selected[] === m1
+        @test collect(Float64.(BMO.position(m1))) == P0
+        close(ctrl)
+
+        ctrl = Ext.kinematic_controls!(ax, h; spectator = true)
+        @test ctrl.spectator[]
+        @test ctrl.help_obs[] == Ext._SPECTATOR_HINT
+        close(ctrl)
+    end
+
+    @testset "static objects are not movable" begin
+        m1 = RoundPlanoMirror(0.025, 0.005)
+        fixed = FixedMirror(BMO.shape(RoundPlanoMirror(0.025, 0.005)))
+        translate3d!(m1, [0.1, 0, 0])
+        fig = Figure()
+        ax = LScene(fig[1, 1])
+        h = live_render!(ax, System([m1, fixed]))
+        @test length(h.handles) == 2
+        ctrl = Ext.kinematic_controls!(ax, h)
+        @test ctrl.movable == [m1]
+        close(ctrl)
+    end
+
     @testset "step size keys" begin
         @test Ext._next_step(3e-8, 1) ≈ 5e-8
         @test Ext._next_step(3e-8, -1) ≈ 2e-8
@@ -377,7 +437,7 @@ const BMO = BeamletOptics
         fig, ax, h, m1, m2 = _fixture()
         scene = ax.scene
         ctrl = Ext.kinematic_controls!(ax, h; throttle = false, fine_step = 10e-9, fine_angle = 10e-6)
-        @test ctrl.help_obs[] == "move mode, step 10 nm, +/-: step, m: switch mode, h: show controls"
+        @test ctrl.help_obs[] == "move mode, step 10 nm, +/-: step, m: switch mode, v: spectator, h: show controls"
 
         # move mode, no object selected: 1-2-5 sequence on fine_step only
         @test isnothing(ctrl.selected[])
@@ -388,7 +448,7 @@ const BMO = BeamletOptics
         end
         @test steps ≈ [20e-9, 50e-9, 100e-9, 50e-9]
         @test ctrl.fine_angle == 10e-6
-        @test ctrl.help_obs[] == "move mode, step 50 nm, +/-: step, m: switch mode, h: show controls"
+        @test ctrl.help_obs[] == "move mode, step 50 nm, +/-: step, m: switch mode, v: spectator, h: show controls"
 
         # help overlay shows the new step as well
         events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.h, Keyboard.press)

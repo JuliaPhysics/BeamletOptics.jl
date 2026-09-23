@@ -89,8 +89,8 @@ const BMO = BeamletOptics
         gui = live_view(sys1 => b1, sys2 => b2; throttle = false, mode = :rotate, fine_angle = 1e-3)
         @test length(gui.panels) == 1 # deduplicated
         @test sprint(show, gui) == "LiveView(2 systems, 1 detector panels)"
-        # both systems are handled by one controller
-        @test length(gui.controls.h.handles) == 3
+        # both systems and the markers of both sources are handled by one controller
+        @test length(gui.controls.h.handles) == 5
         @test length(BMO.hits(pd)) == 2
         gui.controls.selected[] = m
         _key!(gui, Keyboard.left)
@@ -189,7 +189,8 @@ const BMO = BeamletOptics
         # Mirror at the origin, which the default camera looks at
         m = RoundPlanoMirror(0.025, 0.005)
         sys = System([m])
-        beam = Beam([1.0, 1.0, 1.0], [1.0, 0, 0]) # unrelated to the mirror, live_view needs a beam
+        # unrelated to the mirror, live_view needs a beam; its marker is not on the camera ray
+        beam = Beam([1.0, -1.0, 0.0], [1.0, 0, 0])
         gui = live_view(sys, beam; detectors = [])
 
         # A MeshDummy-like housing in front of the mirror along the camera ray, not part of the
@@ -207,6 +208,62 @@ const BMO = BeamletOptics
         events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
         events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
         @test gui.controls.selected[] === m # the occluding housing does not block the selection
+        close(gui)
+    end
+
+    @testset "movable sources" begin
+        _marker(gui, src) = gui.controls.h.handles[findfirst(oh -> oh.obj === src, gui.controls.h.handles)]
+
+        # Beam: select the marker, move the source along its direction
+        m, pd = _fixture()
+        beam = Beam([0.0, 0, 0], [0.0, 1, 0])
+        gui_ref = Ref{Any}(nothing)
+        gui = live_view(System([m, pd]), beam; throttle = false, fine_step = 1e-3,
+            pick = ax -> (_marker(gui_ref[], beam).plots[1], 0))
+        gui_ref[] = gui
+        marker = _marker(gui, beam)
+        @test beam in gui.controls.movable
+        _select!(gui)
+        @test gui.controls.selected[] === beam
+        _key!(gui, Keyboard.up)
+        @test collect(BMO.position(beam)) ≈ [0, 1e-3, 0]
+        @test marker.P ≈ [0, 1e-3, 0]
+        # solved again from the new start point
+        @test length(BMO.hits(pd)) == 1
+        @test gui.beam_handles[1].points[][1] ≈ Point3f(0, 1e-3, 0)
+        @test startswith(gui.status.text[], "Beam at (")
+        # rotate the source, the spot moves on the detector
+        x0 = _mean_x(gui.panels[1].xy[])
+        _key!(gui, Keyboard.m)
+        _key!(gui, Keyboard.page_up)
+        _key!(gui, Keyboard.m)
+        _key!(gui, Keyboard.backspace)
+        @test collect(BMO.position(beam)) ≈ [0, 0, 0]
+        @test collect(BMO.direction(beam)) ≈ [0, 1, 0]
+        close(gui)
+
+        # beam group: the whole source is moved
+        m, pd = _fixture()
+        cs = CollimatedSource([0.0, 0, 0], [0.0, 1, 0], 2e-3, 1e-6; num_rings = 2, num_rays = 40)
+        gui_ref = Ref{Any}(nothing)
+        gui = live_view(System([m, pd]) => cs; throttle = false, fine_step = 1e-3,
+            pick = ax -> (_marker(gui_ref[], cs).plots[1], 0))
+        gui_ref[] = gui
+        _select!(gui)
+        @test gui.controls.selected[] === cs
+        z0 = sum(p -> p[2], gui.panels[1].xy[]) / 40
+        _key!(gui, Keyboard.page_up) # along the vertical axis
+        @test collect(BMO.position(cs)) ≈ [0, 0, 1e-3]
+        @test length(BMO.hits(pd)) == 40
+        @test sum(p -> p[2], gui.panels[1].xy[]) / 40 ≈ z0 + 1 atol = 1e-3 # [mm]
+        close(gui)
+
+        # no markers
+        m, pd = _fixture()
+        beam = Beam([0.0, 0, 0], [0.0, 1, 0])
+        gui = live_view(System([m, pd]), beam; movable_sources = false)
+        @test !any(oh -> oh.obj === beam, gui.controls.h.handles)
+        @test !(beam in gui.controls.movable)
         close(gui)
     end
 

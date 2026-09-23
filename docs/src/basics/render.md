@@ -139,7 +139,12 @@ mode, which is switched with `m`:
 | `Backspace`                  | Reset the selected component to its initial pose                |
 | `Esc`                        | Select the enclosing group, or deselect at the top level        |
 | Left-click on empty space    | Deselect                                                        |
+| `v`                          | Switch the spectator mode on or off                             |
 | `h`                          | Show or hide an overlay of all controls                         |
+
+In the spectator mode, the selection is cleared and all mouse and keyboard input goes to the
+camera, such that the system can be viewed without moving a component by accident. Components
+whose kinematic trait is `Static` can not be selected.
 
 The selected component is marked by a box and three axes above it: its local y-axis (green), its
 local x-axis (red) and the vertical rotation axis (blue). In the move mode the axes are shown as
@@ -172,6 +177,13 @@ receiver path of a lidar, which are solved with different sources:
 ```julia
 gui = live_view(system_tx => beam_tx, system_rx => source_rx)
 ```
+
+### Movable sources in the live view
+
+Each source, i.e. the beam or beam group of each `system => beam` pair, is shown with an orange
+marker at its position, which points along its direction. A source is selected and moved via its
+marker like any component, after which the systems are solved again. For a beam, which only has a
+direction, the green axis is its direction. Pass `movable_sources = false` to hide the markers.
 
 ### Static context
 

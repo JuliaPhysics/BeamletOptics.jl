@@ -87,10 +87,18 @@ function _step_string(mode::Symbol, fine_step, fine_angle)
            "$(_fmt_sigdigits(fine_angle * 1e6)) µrad"
 end
 
+const _SPECTATOR_HINT = "spectator mode, v: edit, h: show controls"
+
 function _help_hint(mode::Symbol, fine_step, fine_angle)
     step = _step_string(mode, fine_step, fine_angle)
-    return "$mode mode, step $step, +/-: step, m: switch mode, h: show controls"
+    return "$mode mode, step $step, +/-: step, m: switch mode, v: spectator, h: show controls"
 end
+
+const _SPECTATOR_HELP = """
+    spectator mode, v: switch to edit mode
+    all clicks and drags: camera
+    components can not be selected or moved
+    h: hide controls"""
 
 function _help_text(mode::Symbol, fine_step, fine_angle, select_modifier = nothing)
     step = _step_string(mode, fine_step, fine_angle)
@@ -111,7 +119,7 @@ function _help_text(mode::Symbol, fine_step, fine_angle, select_modifier = nothi
     page up/down: $verb $page
     step: $step, +/-: change step, shift: 10× step
     backspace: reset, esc: enclosing group or deselect
-    h: hide controls"""
+    v: spectator mode, h: hide controls"""
 end
 
 const _STEP_MANTISSAS = (1.0, 2.0, 5.0)
@@ -187,9 +195,9 @@ Returned by [`kinematic_controls!`](@ref). The currently selected object is stor
 mutable struct KinematicController{H <: SystemRenderHandle}
     ax::_RenderEnv
     h::H
-    movable::Vector{BMO.AbstractObject}
-    init_poses::IdDict{BMO.AbstractObject, Tuple{Point3{Float64}, Matrix{Float64}}}
-    selected::Observable{Union{Nothing, BMO.AbstractObject}}
+    movable::Vector{_LiveMovable}
+    init_poses::IdDict{_LiveMovable, Tuple{Point3{Float64}, Matrix{Float64}}}
+    selected::Observable{Union{Nothing, _LiveMovable}}
     mode::Observable{Symbol}
     on_change::Function
     plane_normal::Vector{Float64}
@@ -198,6 +206,8 @@ mutable struct KinematicController{H <: SystemRenderHandle}
     fine_step::Float64
     fine_angle::Float64
     throttle::Bool
+    # all input goes to the camera, toggled via v
+    spectator::Observable{Bool}
     select_modifier::Any
     drag_threshold::Float64
     # interaction state
@@ -207,7 +217,7 @@ mutable struct KinematicController{H <: SystemRenderHandle}
     grab_offset::Vector{Float64}
     last_mouse::NTuple{2, Float64}
     press_pos::Union{Nothing, NTuple{2, Float64}}
-    press_leaf::Union{Nothing, BMO.AbstractObject}
+    press_leaf::Union{Nothing, _LiveMovable}
     press_kind::Symbol
     # selection box and gizmo of the keyboard controls
     box_obs::Observable{Vector{Point3f}}
@@ -234,18 +244,18 @@ function Base.show(io::IO, ctrl::KinematicController)
 end
 
 """Returns the objects of the group `obj`, or an empty vector if `obj` is not a group."""
-_children(obj) = obj isa BMO.AbstractObjectGroup ? collect(BMO.AbstractObject, BMO.shape(obj)) :
-                 BMO.AbstractObject[]
+_children(obj) = obj isa BMO.AbstractObjectGroup ? collect(_LiveMovable, BMO.shape(obj)) :
+                 _LiveMovable[]
 
 """Returns all objects of the group `obj` that are not groups themselves (recursively), or `[obj]`."""
 function _leaves(obj)
-    obj isa BMO.AbstractObjectGroup || return BMO.AbstractObject[obj]
-    return reduce(vcat, (_leaves(c) for c in BMO.shape(obj)); init = BMO.AbstractObject[])
+    obj isa BMO.AbstractObjectGroup || return _LiveMovable[obj]
+    return reduce(vcat, (_leaves(c) for c in BMO.shape(obj)); init = _LiveMovable[])
 end
 
 """Returns the `obj` and all its nested objects and subgroups (recursively)."""
 function _descendants(obj)
-    out = BMO.AbstractObject[obj]
+    out = _LiveMovable[obj]
     for c in _children(obj)
         append!(out, _descendants(c))
     end
@@ -254,7 +264,7 @@ end
 
 """Returns the chain `[leaf, parent of leaf, …, top-level object]` of the hierarchy of `ctrl.h`."""
 function _chain(ctrl, leaf)
-    chain = BMO.AbstractObject[leaf]
+    chain = _LiveMovable[leaf]
     while haskey(ctrl.h.parent, last(chain))
         push!(chain, ctrl.h.parent[last(chain)])
     end
@@ -292,11 +302,15 @@ end
 
 """Axes of the keyboard controls: local y-axis, local x-axis and rotation axis of the `obj`."""
 function _control_axes(ctrl::KinematicController, obj)
-    R = orientation(obj)
+    R = _pose(obj)[2]
     return (Vector{Float64}(R[:, 2]), Vector{Float64}(R[:, 1]), ctrl.rotation_axis)
 end
 
 function _update_help!(ctrl::KinematicController)
+    if ctrl.spectator[]
+        ctrl.help_obs[] = ctrl.help_shown ? _SPECTATOR_HELP : _SPECTATOR_HINT
+        return nothing
+    end
     ctrl.help_obs[] = ctrl.help_shown ?
                       _help_text(ctrl.mode[], ctrl.fine_step, ctrl.fine_angle, ctrl.select_modifier) :
                       _help_hint(ctrl.mode[], ctrl.fine_step, ctrl.fine_angle)
@@ -372,7 +386,7 @@ end
 
 function _reset_pose!(ctrl::KinematicController, obj)
     P0, R0 = ctrl.init_poses[obj]
-    axis, angle = _axis_angle_from_rotmatrix(R0 * orientation(obj)')
+    axis, angle = _axis_angle_from_rotmatrix(R0 * _pose(obj)[2]')
     angle > 1e-12 && rotate3d!(obj, axis, angle)
     translate_to3d!(obj, P0)
     return nothing
@@ -405,6 +419,24 @@ function _key_step!(ctrl::KinematicController, obj, key, factor)
     return true
 end
 
+"""
+    _set_spectator!(ctrl, on::Bool)
+
+Switches the spectator mode of the `ctrl` on or off. In the spectator mode, the selection is
+cleared and all mouse and keyboard input goes to the camera.
+"""
+function _set_spectator!(ctrl::KinematicController, on::Bool)
+    ctrl.spectator[] = on
+    if on
+        ctrl.dragging = false
+        ctrl.press_kind = :none
+        ctrl.selected[] = nothing
+        _update_selection_box!(ctrl)
+    end
+    _update_help!(ctrl)
+    return nothing
+end
+
 """Returns the drag plane intersection of the ray through the mouse position."""
 function _mouse_plane_hit(scene, ctrl::KinematicController)
     ray = Makie.ray_at_cursor(scene)
@@ -415,27 +447,53 @@ end
 _default_pick(ax) = Makie.pick(Makie.get_scene(ax))
 
 """
-    _ray_pick(objects, origin, dir)
+    _ray_box(origin, dir, bb)
 
-Returns the object among `objects` with the nearest `BMO.intersect3d` hit of the ray from `origin`
-along `dir`, or `nothing` if the ray misses all `objects`. `ObjectGroup`s and `MultiShape` objects
-are picked as a whole through `intersect3d`. Objects for which `intersect3d` errors (e.g. custom
-objects without a geometry implementation) or returns `nothing` (e.g. `NonInteractableObject`) are
-skipped.
+Returns the distance along the ray from `origin` along `dir` to the box `bb`, `0` if `origin` is
+inside of the box, or `nothing` if the ray misses the box.
 """
-function _ray_pick(objects, origin, dir)
+function _ray_box(origin, dir, bb)
+    lo, hi = minimum(bb), maximum(bb)
+    tmin, tmax = -Inf, Inf
+    for i in 1:3
+        if abs(dir[i]) < 1e-12
+            lo[i] <= origin[i] <= hi[i] || return nothing
+        else
+            t1, t2 = (lo[i] - origin[i]) / dir[i], (hi[i] - origin[i]) / dir[i]
+            tmin, tmax = max(tmin, min(t1, t2)), min(tmax, max(t1, t2))
+        end
+    end
+    return tmax < max(tmin, 0) ? nothing : max(tmin, 0)
+end
+
+"""
+    _ray_pick(objects, origin, dir, box = obj -> nothing)
+
+Returns the object among `objects` with the nearest hit of the ray from `origin` along `dir`, or
+`nothing` if the ray misses all `objects`. Objects are hit via `BMO.intersect3d`, i.e.
+`ObjectGroup`s and `MultiShape` objects are picked as a whole. Objects for which `intersect3d`
+errors (e.g. custom objects without a geometry implementation) or returns `nothing` (e.g.
+`NonInteractableObject`) are skipped. Sources, which have no geometry, are hit via the bounding
+box returned by `box`.
+"""
+function _ray_pick(objects, origin, dir, box = obj -> nothing)
     ray = BMO.Ray(Vector{Float64}(origin), Vector{Float64}(dir))
     best, tmin = nothing, Inf
     for obj in objects
-        isect = try
-            BMO.intersect3d(obj, ray)
-        catch e
-            e isa InterruptException && rethrow()
-            nothing
+        t = if obj isa BMO.AbstractObject
+            isect = try
+                BMO.intersect3d(obj, ray)
+            catch e
+                e isa InterruptException && rethrow()
+                nothing
+            end
+            isnothing(isect) ? nothing : BMO.length(isect)
+        else
+            bb = box(obj)
+            isnothing(bb) ? nothing : _ray_box(origin, dir, bb)
         end
-        isnothing(isect) && continue
-        t = BMO.length(isect)
-        if 0 < t < tmin
+        isnothing(t) && continue
+        if 0 <= t < tmin
             best, tmin = obj, t
         end
     end
@@ -447,12 +505,16 @@ end
 
 Returns the object hit by the camera ray at the current cursor position of `scene` among all
 objects of the movable objects of `ctrl`, i.e. objects of groups are returned instead of the
-groups, see [`_ray_pick(objects, origin, dir)`](@ref).
+groups. Sources are hit via the bounding box of their marker.
 """
 function _ray_pick(ctrl::KinematicController, scene)
     r = Makie.ray_at_cursor(scene)
-    leaves = reduce(vcat, (_leaves(o) for o in ctrl.movable); init = BMO.AbstractObject[])
-    return _ray_pick(leaves, r.origin, r.direction)
+    leaves = reduce(vcat, (_leaves(o) for o in ctrl.movable); init = _LiveMovable[])
+    box = function (obj)
+        plots = _object_plots(ctrl.h, obj)
+        return isempty(plots) ? nothing : mapreduce(Makie.boundingbox, GeometryBasics.union, plots)
+    end
+    return _ray_pick(leaves, r.origin, r.direction, box)
 end
 
 """
@@ -467,6 +529,12 @@ The controls have a move and a rotate mode, which are switched with the key `m`.
 is marked by a box and three axes above the object: its local y-axis (green), its local x-axis
 (red) and the `rotation_axis` (blue). In the move mode the axes are shown as arrows, in the rotate
 mode as rings. The key `h` shows or hides an overlay of all controls.
+
+The key `v` switches the spectator mode on or off, in which the selection is cleared and all
+mouse and keyboard input goes to the camera, such that nothing can be moved by accident.
+
+Objects with a `Static` kinematic trait, see `BeamletOptics.kinematic_trait_of`, can not be
+selected. Sources can be moved via their marker, see [`live_view`](@ref).
 
 # Mouse controls
 
@@ -524,6 +592,7 @@ without a selected object. The current step size is shown in the hint line.
   `Camera3D` reset).
 - `drag_threshold = 3`: [px] mouse movement between press and release that turns a click into a
   drag
+- `spectator = false`: starts in the spectator mode
 """
 function kinematic_controls!(
         ax::_RenderEnv,
@@ -540,22 +609,24 @@ function kinematic_controls!(
         show_help::Bool = false,
         pick = nothing,
         select_modifier = nothing,
-        drag_threshold = 3
+        drag_threshold = 3,
+        spectator::Bool = false
     )
     mode in (:move, :rotate) || throw(ArgumentError("mode must be :move or :rotate, got :$mode"))
     scene = Makie.get_scene(ax)
-    movable = BMO.AbstractObject[]
+    movable = _LiveMovable[]
     if isnothing(objects)
         # Top-level objects, since the handles of groups belong to the objects of the group
         for oh in h.handles
             top = _top_level(h, oh.obj)
+            BMO._is_static(top) && continue
             any(o -> o === top, movable) || push!(movable, top)
         end
     else
         append!(movable, objects)
     end
     # Initial poses of all levels, such that each object and subgroup can be reset
-    init_poses = IdDict{BMO.AbstractObject, Tuple{Point3{Float64}, Matrix{Float64}}}(
+    init_poses = IdDict{_LiveMovable, Tuple{Point3{Float64}, Matrix{Float64}}}(
         obj => _pose(obj) for top in movable for obj in _descendants(top))
 
     # Selection box and gizmo, updated via Observables. The hidden gizmo is placed in the center of
@@ -585,18 +656,17 @@ function kinematic_controls!(
         text!(ax, label_pos; text = labels, color = _AXES_COLORS, visible = gizmo_visible,
             fontsize = 20, align = (:center, :center), overdraw = true)
     ]
-    help_obs = Observable(show_help ? _help_text(mode, fine_step, fine_angle, select_modifier) :
-                      _help_hint(mode, fine_step, fine_angle))
+    help_obs = Observable("")
     # Drawn in the 2D scene of the axis, such that it does not count towards the limits of the scene
     help_pos = Makie.lift(vp -> Point2f(minimum(vp)[1] + 10, maximum(vp)[2] - 10), ax.scene.viewport)
     push!(plots, text!(ax.blockscene, help_pos; text = help_obs, space = :pixel,
         align = (:left, :top), fontsize = 14, color = :gray40))
 
     ctrl = KinematicController(
-        ax, h, movable, init_poses, Observable{Union{Nothing, BMO.AbstractObject}}(nothing),
+        ax, h, movable, init_poses, Observable{Union{Nothing, _LiveMovable}}(nothing),
         mode_obs, on_change, normalize(Float64.(plane_normal)), normalize(Float64.(rotation_axis)),
         Float64(rotate_speed), Float64(fine_step), Float64(fine_angle), throttle,
-        select_modifier, Float64(drag_threshold),
+        Observable(spectator), select_modifier, Float64(drag_threshold),
         false, false, zeros(3), zeros(3), (0.0, 0.0), nothing, nothing, :none,
         box_obs, arrow_pos, arrow_dir, label_pos, ring_pts, gizmo_size, gizmo_visible,
         help_obs, show_help, plots, Any[], nothing
@@ -604,7 +674,7 @@ function kinematic_controls!(
 
     # High priority, so that the camera does not receive events while an object is dragged
     l1 = on(events(scene).mousebutton, priority = 200) do event
-        event.button == Mouse.left || return Consume(false)
+        (event.button == Mouse.left && !ctrl.spectator[]) || return Consume(false)
         if event.action == Mouse.press
             if !isnothing(ctrl.select_modifier) && !_modifier_held(scene, ctrl.select_modifier)
                 # Modifier not held: every click and drag goes to the camera, no state change
@@ -705,6 +775,12 @@ function kinematic_controls!(
 
     l3 = on(events(scene).keyboardbutton, priority = 200) do event
         event.action in (Keyboard.press, Keyboard.repeat) || return Consume(false)
+        if event.action == Keyboard.press && event.key == Keyboard.v
+            _set_spectator!(ctrl, !ctrl.spectator[])
+            return Consume(true)
+        end
+        # Only the overlay can be toggled in the spectator mode
+        ctrl.spectator[] && event.key != Keyboard.h && return Consume(false)
         if event.action == Keyboard.press && event.key in (Keyboard.h, Keyboard.m)
             if event.key == Keyboard.h
                 ctrl.help_shown = !ctrl.help_shown
@@ -733,11 +809,12 @@ function kinematic_controls!(
     end
     # Typed characters instead of keys, since + and - depend on the keyboard layout
     l4 = on(events(scene).unicode_input, priority = 200) do char
-        char in ('+', '-') || return Consume(false)
+        (char in ('+', '-') && !ctrl.spectator[]) || return Consume(false)
         _change_step!(ctrl, char == '+' ? 1 : -1)
         return Consume(true)
     end
     push!(ctrl.listeners, l1, l2, l3, l4)
+    _update_help!(ctrl)
 
     if throttle
         push!(ctrl.listeners, on(_ -> ctrl.dirty && _apply_update!(ctrl), events(scene).tick))

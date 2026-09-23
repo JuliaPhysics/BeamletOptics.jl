@@ -360,8 +360,8 @@ function _connect_sliders!(gui::LiveView, callbacks)
             end
         end
         empty!(pending)
-        # The callbacks may have moved objects
-        foreach(update_render!, gui.system_handles)
+        # The callbacks may have moved objects or sources
+        update_render!(gui.controls.h)
         if gui.auto_trace[]
             _solve!(gui, nothing)
         else
@@ -428,6 +428,8 @@ automatically around the beam, unless `x_min`, `x_max`, `z_min` and `z_max` are 
 - `system_kwargs = (;)`: passed to `live_render!` of each system
 - `beam_kwargs = Dict()`: `beam => kwargs` passed to `live_render!` of the beam, by default
   `(; render_every = 5)` for beam groups
+- `movable_sources = true`: shows an orange marker at each source, i.e. the beam or beam group of
+  each pair, with which the source can be selected and moved like the components
 - all other kwargs are passed to [`kinematic_controls!`](@ref), e.g. `fine_step`, `plane_normal`
   or `rotation_axis`
 """
@@ -440,6 +442,7 @@ function live_view(
         sliders = [],
         system_kwargs = (;),
         beam_kwargs = Dict(),
+        movable_sources = true,
         kwargs...
     )
     isempty(pairs) && throw(ArgumentError("live_view requires at least one system => beam pair"))
@@ -485,6 +488,15 @@ function live_view(
 
     # A single controller for all systems, otherwise several controllers would compete for events
     handles = reduce(vcat, [h.handles for h in system_handles]; init = ObjectRenderHandle[])
+    if movable_sources
+        # Markers of the sources, scaled to the size of the systems
+        plots = reduce(vcat, (oh.plots for oh in handles); init = AbstractPlot[])
+        marker_size = isempty(plots) ? 1e-2 :
+                      0.08 * maximum(GeometryBasics.widths(mapreduce(Makie.boundingbox, GeometryBasics.union, plots)))
+        for src in unique(objectid, last.(ps))
+            BMO._is_static(src) || push!(handles, _live_render_source!(ax, src; size = marker_size))
+        end
+    end
     parent = IdDict{BMO.AbstractObject, BMO.AbstractObject}()
     foreach(h -> merge!(parent, h.parent), system_handles)
     combined = SystemRenderHandle(ax, first(systems), handles, parent)

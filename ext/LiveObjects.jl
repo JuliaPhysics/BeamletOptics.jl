@@ -1,19 +1,24 @@
 using Makie: translate!, rotate!, Quaternion, AbstractPlot
 
+"""Values that can be live-rendered and moved by the controls: objects and sources."""
+const _LiveMovable = Union{BMO.AbstractObject, BMO.AbstractBeam, BMO.AbstractBeamGroup}
+
 """
     ObjectRenderHandle <: AbstractRenderHandle
 
-Live rendering handle of an `AbstractObject`, see [`live_render!`](@ref).
+Live rendering handle of an `AbstractObject`, see [`live_render!`](@ref), or of the marker of a
+source, see `_live_render_source!`.
 
-The plots are generated once by [`render!`](@ref) in the reference pose `P0`, `R0` of the object.
+The plots are generated once by the `draw` function in the reference pose `P0`, `R0` of the object.
 Afterwards, the rigid transformation from the reference pose to the current pose is applied as the
 model matrix of the plots, i.e. `x ↦ R * R0' * (x - P0) + P`.
 """
-mutable struct ObjectRenderHandle{O <: BMO.AbstractObject} <: AbstractRenderHandle
+mutable struct ObjectRenderHandle{O <: _LiveMovable} <: AbstractRenderHandle
     ax::_RenderEnv
     obj::O
     plots::Vector{AbstractPlot}
-    kwargs::Dict{Symbol, Any}
+    # renders the object in its current pose
+    draw::Function
     # reference pose
     P0::Point3{Float64}
     R0::Matrix{Float64}
@@ -29,10 +34,21 @@ function Base.show(io::IO, h::ObjectRenderHandle)
     print(io, "ObjectRenderHandle(", nameof(typeof(h.obj)), ", ", length(h.plots), " plots)")
 end
 
-_pose(x) = (Point3{Float64}(position(x)), Matrix{Float64}(orientation(x)))
+_pose(x) = _pose(BMO.kinematic_trait_of(x), x)
+_pose(::Any, x) = (Point3{Float64}(position(x)), Matrix{Float64}(orientation(x)))
+# Beams only have a direction, which is the local y-axis of the frame
+_pose(::BMO.Movable{BMO.Directed}, x) = (Point3{Float64}(position(x)), _direction_frame(BMO.direction(x)))
 
-function _subposes(obj::BMO.AbstractObject)
-    BMO.shape_trait_of(obj) isa BMO.SingleShape && return Point3{Float64}[], Matrix{Float64}[]
+"""Returns a right-handed orthonormal frame with the local y-axis along `d`."""
+function _direction_frame(d)
+    y = normalize(Vector{Float64}(d))
+    x = normalize(cross(y, abs(y[3]) < 0.9 ? [0.0, 0, 1] : [1.0, 0, 0]))
+    return hcat(x, y, cross(x, y))
+end
+
+function _subposes(obj)
+    (obj isa BMO.AbstractObject && BMO.shape_trait_of(obj) isa BMO.MultiShape) ||
+        return Point3{Float64}[], Matrix{Float64}[]
     parts = BMO.shape(obj)
     return [_pose(p)[1] for p in parts], [_pose(p)[2] for p in parts]
 end
@@ -51,10 +67,30 @@ Renders the `obj` via [`render!`](@ref) and returns an `ObjectRenderHandle`. Kin
 `obj` are applied to the plots via [`update_render!`](@ref) without regenerating the geometry.
 """
 function live_render!(ax::_RenderEnv, obj::BMO.AbstractObject; kwargs...)
-    plots = _capture_new_plots(() -> render!(ax, obj; kwargs...), ax)
+    return _live_render_movable!(ax, obj, () -> render!(ax, obj; kwargs...))
+end
+
+function _live_render_movable!(ax::_RenderEnv, obj, draw)
+    plots = _capture_new_plots(draw, ax)
     P0, R0 = _pose(obj)
     subP0, subR0 = _subposes(obj)
-    return ObjectRenderHandle(ax, obj, plots, Dict{Symbol, Any}(kwargs), P0, R0, subP0, subR0, P0, R0)
+    return ObjectRenderHandle(ax, obj, plots, draw, P0, R0, subP0, subR0, P0, R0)
+end
+
+"""
+    _live_render_source!(ax, src; size, color = :orange)
+
+Renders a marker of the source `src` (a beam or beam group), i.e. an arrow of length `size` along
+its direction and a sphere at its position, and returns an `ObjectRenderHandle`. The marker allows
+selecting and moving the source with the [`kinematic_controls!`](@ref).
+"""
+function _live_render_source!(ax::_RenderEnv, src; size::Real, color = :orange)
+    draw = function ()
+        p, d = Point3f(position(src)), Vec3f(size * normalize(BMO.direction(src)))
+        arrows3d!(ax, [p], [d]; color, shaftradius = 0.05, tipradius = 0.15, tiplength = 0.35)
+        mesh!(ax, GeometryBasics.Sphere(p, Float32(size / 5)); color)
+    end
+    return _live_render_movable!(ax, src, draw)
 end
 
 """
@@ -115,7 +151,7 @@ function _rerender!(h::ObjectRenderHandle)
     for plot in h.plots
         delete!(h.ax, plot)
     end
-    h.plots = _capture_new_plots(() -> render!(h.ax, h.obj; h.kwargs...), h.ax)
+    h.plots = _capture_new_plots(h.draw, h.ax)
     h.P0, h.R0 = _pose(h.obj)
     h.P, h.R = h.P0, h.R0
     h.subP0, h.subR0 = _subposes(h.obj)
