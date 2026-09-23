@@ -13,11 +13,66 @@ Thumbs.db
 *.jl.mem
 .vscode
 
+# ignore image formats
 *.png
+*.gif
+*.svg
+
+# allow pre-rendered images within docs folder
+!docs/src/**/*.png
+!docs/src/**/*.gif
+!docs/src/**/*.svg
+
 snoop_compile/
 
 /Manifest.toml
 /docs/Manifest.toml
 /docs/build/
 
+# DocumenterVitepress runs npm inside docs/ and leaves these behind
+/docs/node_modules/
+/docs/package.json
+/docs/package-lock.json
+
 /scripts
+
+# ---------------------------------------------------------------------
+# JuliaCon Proceedings submission (paper/)
+# ---------------------------------------------------------------------
+# Everything Editorialbot needs to compile the manuscript is tracked.
+# The blanket image rules above would otherwise swallow paper/figures/,
+# so re-include them here.
+!paper/**/*.png
+!paper/**/*.gif
+!paper/**/*.svg
+!paper/juliagraphs.png
+
+# figures/iir_loop.pdf and logojuliacon.pdf are build INPUTS, not output,
+# and must stay tracked -- so never add a blanket paper/*.pdf rule here.
+
+# Artifacts the LaTeX toolchain regenerates on every build
+paper/*.aux
+paper/*.bbl
+paper/*.bcf
+paper/*.blg
+paper/*.brf
+paper/*.dvi
+paper/*.fdb_latexmk
+paper/*.fls
+paper/*.idx
+paper/*.ilg
+paper/*.ind
+paper/*.lof
+paper/*.log
+paper/*.lot
+paper/*.nav
+paper/*.out
+paper/*.run.xml
+paper/*.snm
+paper/*.spl
+paper/*.synctex.gz
+paper/*.toc
+paper/*.vrb
+
+# Compiled manuscript (rebuild with the pdflatex/bibtex recipe)
+paper/paper.pdf

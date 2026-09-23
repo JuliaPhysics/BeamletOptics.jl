@@ -1,10 +1,8 @@
 ```@setup beamsplitters
-include(joinpath(@__DIR__, "..", "..", "assets", "cond_save.jl"))
-
 bs_showcase_dir = joinpath(@__DIR__, "..", "..", "assets", "bs_assets")
 
-conditional_include(joinpath(bs_showcase_dir, "pbs_showcase.jl"))
-conditional_include(joinpath(bs_showcase_dir, "cbs_showcase.jl"))
+Main.DocUtils.conditional_include(joinpath(bs_showcase_dir, "pbs_showcase.jl"))
+Main.DocUtils.conditional_include(joinpath(bs_showcase_dir, "cbs_showcase.jl"))
 ``` 
 
 # Beamsplitters

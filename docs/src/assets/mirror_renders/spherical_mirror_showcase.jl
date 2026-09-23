@@ -4,19 +4,18 @@ GLMakie.activate!(; ssao=true)
 
 const BMO = BeamletOptics
 
-include(joinpath(@__DIR__, "..", "render_utils.jl"))
-
 distance = 20e-2
 factor = 1.2
 RoC = distance/2 * factor
-m1 = ConcaveSphericalMirror(RoC, 5e-3, 2BeamletOptics.inch)
-m2 = ConcaveSphericalMirror(RoC, 5e-3, 2BeamletOptics.inch)
+m1 = SphericalMirror(RoC, 5e-3, 2BeamletOptics.inch)
+m2 = SphericalMirror(RoC, 5e-3, 2BeamletOptics.inch)
 
 zrotate3d!(m1, deg2rad(180))
 translate3d!(m2, [0, distance, 0])
 
 system = StaticSystem([m1, m2])
 
+##
 fig = Figure(size=(600,240))
 dr = 0.03
 y1 = -0.02
@@ -32,8 +31,9 @@ beam = Beam(Ray([0, distance/2, 7e-3], [0.17, 1, 0]))
 
 solve_system!(system, beam, r_max=100)
 
-render!(ax, beam, flen=0.1)
-render!(ax, m1)
-render!(ax, m2)
+render!(ax, beam, flen=0.1, alpha=0.25)
+render!(ax, m1; transparency=true, alpha=0.75)
+render!(ax, m2; transparency=true, alpha=0.75)
 
-save("concave_mirror_showcase.png", fig; px_per_unit=8)
+##
+save("spherical_mirror_showcase.png", fig; px_per_unit=8)

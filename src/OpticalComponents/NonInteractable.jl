@@ -19,4 +19,10 @@ set_new_origin3d!(d::NonInteractableObject) = set_new_origin3d!(d.shape)
 intersect3d(::NonInteractableObject, ::AbstractRay) = nothing
 interact3d(::AbstractSystem, ::NonInteractableObject, ::AbstractBeam, ::AbstractRay) = nothing
 
+"""
+    MeshDummy(loadpath::String)
+
+Creates a [`NonInteractableObject`](@ref) with a [`Mesh`](@ref) loaded from the specified file path.
+Useful for rendering background objects or geometry that does not interact with rays.
+"""
 MeshDummy(loadpath::String) = NonInteractableObject(Mesh(load(loadpath)))

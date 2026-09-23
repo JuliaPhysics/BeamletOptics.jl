@@ -1,9 +1,7 @@
 ```@setup rays
-include(joinpath(@__DIR__, "..", "assets", "cond_save.jl"))
-
 dir = joinpath(@__DIR__, "..", "assets")
 
-conditional_include(joinpath(dir, "meshes.jl"))
+Main.DocUtils.conditional_include(joinpath(dir, "meshes.jl"))
 ```
 
 # Meshes

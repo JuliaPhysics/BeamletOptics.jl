@@ -107,6 +107,9 @@ electric_field(I::Real, Z = Z_vacuum, ϕ = 0) = sqrt(2 * I * Z) * exp(im * ϕ)
 "Calculates the intensity in [W/m²] for a given complex electric field phasor `E`. Vacuum wave impedance is assumed."
 intensity(E::Number, Z = Z_vacuum) = abs2(E) / (2 * Z)
 
+"Calculates the intensity in [W/m²] for a given complex electric field vector `E` (e.g. a [`PolarizedRay`](@ref) field). Vacuum wave impedance is assumed."
+intensity(E::AbstractVector{<:Number}, Z = Z_vacuum) = sum(abs2, E) / (2 * Z)
+
 """
 fresnel_coefficients(θ, n)
 
@@ -142,7 +145,8 @@ function fresnel_coefficients(θ::AbstractArray{T}, n::Number) where {T}
 end
 
 function is_internally_reflected(rp::Number, rs::Number)
-    isapprox(abs2(rs), 1, atol = 1e-6) && isapprox(abs2(rp), 1, atol = 1e-6)
+    isapprox(abs2(rs), 1, atol = Config.get_internal_reflection_threshold()) &&
+        isapprox(abs2(rp), 1, atol = Config.get_internal_reflection_threshold())
 end
 
 """
@@ -174,7 +178,7 @@ numerical_aperture(θ::Real, n::Real = 1.0) = n * sin(θ)
 Calculates e.g. the interferometric contrast from a series of optical power measurements.
 For more information go [here](https://en.wikipedia.org/wiki/Interferometric_visibility).
 """
-visibility(I_min::Real, I_max::Real) = (I_max - I_min) / (I_max + I_min) 
+visibility(I_min::Real, I_max::Real) = (I_max - I_min) / (I_max + I_min)
 function visibility(opt_pwr::AbstractArray)
     I_max = maximum(opt_pwr)
     I_min = minimum(opt_pwr)

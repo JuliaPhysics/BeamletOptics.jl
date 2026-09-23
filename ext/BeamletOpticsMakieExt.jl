@@ -1,18 +1,21 @@
 module BeamletOpticsMakieExt
 
 using BeamletOptics
-import BeamletOptics: render!, RenderException, _RenderTypes, get_view, set_view, hide_axis
+import BeamletOptics: render!, RenderException, _RenderTypes, get_view, set_view, hide_axis,
+                       set_orthographic, arrow!, render_lcs!, look_at!
 
 const BMO = BeamletOptics
 
-using Makie: Axis3, LScene, mesh!, surface!, lines!, RGBf, RGBAf, scatter!
-using GeometryBasics: Point2, Point3
+using Makie: Axis3, LScene, mesh!, surface!, lines!, RGBf, RGBAf, scatter!, text!,
+             update_cam!, cameracontrols, arrows3d!
+using GeometryBasics: Point2, Point3, Point3f, Vec3f, GLTriangleFace, Mesh
 using AbstractTrees: PreOrderDFS
 using MarchingCubes: MC, march
+using LinearAlgebra: dot, cross, normalize, norm
 
 const _RenderEnv = Union{
     Axis3,
-    LScene,
+    LScene
 }
 
 struct InvalidAxisError <: RenderException
@@ -28,7 +31,7 @@ struct RenderNotImplementedError <: RenderException
     msg::String
     t::Type
     function RenderNotImplementedError(t::Type)
-        if !(t<:_RenderTypes)
+        if !(t <: _RenderTypes)
             throw(ErrorException("Type $t not supported"))
         end
         msg = "Render function not implemented for type $t"
@@ -36,50 +39,25 @@ struct RenderNotImplementedError <: RenderException
     end
 end
 
-render!(::A, ::_RenderTypes; kwargs...) where A<:Any = throw(InvalidAxisError(A))
+render!(::A, ::_RenderTypes; kwargs...) where {A <: Any} = throw(InvalidAxisError(A))
 
-render!(::_RenderEnv, ::T; kwargs...) where T<:_RenderTypes = throw(RenderNotImplementedError(T))
+function render!(::_RenderEnv, ::T; kwargs...) where {T <: _RenderTypes}
+    throw(RenderNotImplementedError(T))
+end
 
 # include order dependant!
 include("RenderBeam.jl")
+include("RenderPolarization.jl")
 include("RenderGaussian.jl")
+include("RenderAstigmaticGaussian.jl")
 include("RenderSDF.jl")
 include("RenderMesh.jl")
 include("RenderObjects.jl")
 include("RenderLenses.jl")
 include("RenderCylinderLenses.jl")
+include("RenderMirrors.jl")
 include("RenderPresets.jl")
-
-"""
-    get_view(ls::LScene)
-
-Returns the current `eyeposition`, `lookat` and `upvector` of the scene `ls`.
-"""
-function get_view(ls::LScene)
-    cam = ls.scene.camera_controls
-    eye = cam.eyeposition[]
-    lookat = cam.lookat[]
-    up = cam.upvector[]
-    return eye, lookat, up
-end
-
-"""
-    set_view(ls::LScene, eye, lookat, up)
-
-Sets the current `eyeposition`, `lookat` and `upvector` of the scene `ls`.
-"""
-function set_view(ls::LScene, eye, lookat, up)
-    cam = ls.scene.camera_controls
-    cam.eyeposition[] = eye
-    cam.lookat[] = lookat
-    cam.upvector[] = up
-end
-
-"""
-    hide_axis(ls::LScene, hide::Bool=true)
-
-Hides the axis markers in the `LScene`. Can be toggled via `hide`.
-"""
-hide_axis(ls::LScene, hide::Bool=true) = (ls.show_axis[] = !hide)
+include("RenderPolarizers.jl")
+include("RenderCamera.jl")
 
 end

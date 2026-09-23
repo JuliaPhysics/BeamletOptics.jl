@@ -173,6 +173,7 @@ const mm = 1e-3
             f_pos = last(beam.rays).pos + 0.12mm * last(beam.rays).dir
 
             # test if the beam is correctly focussed
+            @test length(BMO.rays(beam)) == 11
             @test f_pos[3]≈0 atol=1e-7
         end
 

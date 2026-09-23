@@ -1,9 +1,7 @@
 ```@setup miniscope
-include(joinpath(@__DIR__, "..", "assets", "cond_save.jl"))
-
 tutorial_dir = joinpath(@__DIR__, "..", "assets", "ms_assets")
 
-conditional_include(joinpath(tutorial_dir, "miniscope_showcase.jl"))
+Main.DocUtils.conditional_include(joinpath(tutorial_dir, "miniscope_showcase.jl"))
 ```
 
 # Miniature microscope

@@ -4,7 +4,7 @@
 Ray representation of the **stigmatic** Gaussian beam as per J. Arnaud (1985). The beam quality `M2` is fully considered via the divergence angle.
 The formalism for the beam parameter calculation is based on the following publications:
 
-**Jacques Arnaud, "Representation of Gaussian beams by complex rays," Appl. Opt. 24, 538-543 (1985)**
+**Jacques Arnaud, "Representation of Gaussian beams by complex rays." Appl. Opt. 24, 538-543 (1985)**
 
 and
 
@@ -84,7 +84,7 @@ wavelength(beam::GaussianBeamlet) = beam.λ
 wavelength!(beam::GaussianBeamlet, new) = (beam.λ = new)
 beam_waist(beam::GaussianBeamlet) = beam.w0
 electric_field(beam::GaussianBeamlet) = beam.E0
-electric_field!(beam::GaussianBeamlet{T}, new) where T = (beam.E0 = Complex{T}(new))
+electric_field!(beam::GaussianBeamlet{T}, new) where {T} = (beam.E0 = Complex{T}(new))
 refractive_index(beam::GaussianBeamlet, id::Int) = refractive_index(rays(beam.chief)[id])
 function refractive_index!(beam::GaussianBeamlet, id::Int, n_new::Real)
     refractive_index!(rays(beam.chief)[id], n_new)
@@ -213,15 +213,15 @@ The following inputs and arguments can be used to configure the beamlet:
     If results fluctuate due to the randomness of this vector, make sure to specify a fixed orthogonal `support` vector.
 """
 function GaussianBeamlet(
-    position::AbstractArray{P},
-    direction::AbstractArray{D}, 
-    λ::L = 1e-6,
-    w0::Real = 1e-3;
-    M2::Real = 1,
-    P0::Real = 1e-3,
-    z0::Real = 0,
-    support::Nullable{AbstractArray} = nothing
-    ) where {P<:Real, D<:Real, L<:Real}
+        position::AbstractArray{P},
+        direction::AbstractArray{D},
+        λ::L = get_default_wavelength(),
+        w0::Real = get_default_waist();
+        M2::Real = 1,
+        P0::Real = get_default_power(),
+        z0::Real = 0,
+        support::Nullable{AbstractArray} = nothing
+) where {P <: Real, D <: Real, L <: Real}
     # T = promote_type(P, D, L)
     dir = normalize(direction)
     # Create orthogonal vector for construction purposes (right-handed)
@@ -255,26 +255,6 @@ function GaussianBeamlet(
     )
 end
 
-global gb_constructor_warn = true
-
-#FIXME remove deprecated constructor until end of 2025
-function GaussianBeamlet(chief::Ray{T}, λ=1e-6, w0=1e-3; M2=1, P0=1e-3, support = [0,0,1]) where T
-    if gb_constructor_warn
-        @warn "The GaussianBeamlet(::Ray, ...) constructor will be deprecated in the future"
-        global gb_constructor_warn = false
-    end
-    s1 = normal3d(direction(chief), support)
-    return GaussianBeamlet(
-        position(chief),
-        direction(chief),
-        λ,
-        w0;
-        M2,
-        P0,
-        support = s1
-    )
-end
-
 point_on_beam(gauss::GaussianBeamlet, t::Real) = point_on_beam(gauss.chief, t)
 
 """
@@ -299,7 +279,7 @@ function gauss_parameters(
         gauss::GaussianBeamlet,
         z::Real;
         hint = point_on_beam(gauss, z)
-    )
+)
     p0, index = hint
     chief = gauss.chief.rays[index]
     div = gauss.divergence.rays[index]
@@ -333,7 +313,7 @@ function gauss_parameters(
     H = abs(n * (y_w * m_d - y_d * m_w))
     # Test optical invariant
     λ = wavelength(gauss)
-    if !isapprox(H, λ / π, atol = 1e-6)
+    if !isapprox(H, λ / π, atol = Config.get_invariant_threshold())
         H = λ / π
         # println("H not fulfilled at z=$z")
     end
@@ -349,7 +329,50 @@ function gauss_parameters(
     isnan(ψ) && (ψ = zero(ψ))
     isnan(w0) && (w0 = w)
     R < 0 && (ψ = -ψ)
-    return w, R, ψ, w0
+    return (w, R, ψ, w0)
+end
+
+"""
+    waist_parameters(gb, z)
+
+Compute the position and cross-section axes at distance `z` along the beam.
+For a stigmatic `GaussianBeamlet`, the cross-section is circular, and the axes are
+determined by the orientation of the auxiliary waist ray.
+Returns the vectors `(p0, w1, w2)` and scalar waist radii `(w0, w0)`.
+"""
+function waist_parameters(gb::GaussianBeamlet, z::Real)
+    p0, i = point_on_beam(gb, z)
+    w, _, _, _ = gauss_parameters(gb, z, hint = (p0, i))
+    chief = rays(gb.chief)[i]
+    waist = rays(gb.waist)[i]
+    dir = direction(chief)
+    # Recover the basis vector from the auxiliary waist ray
+    # p_waist = p_chief + w * s1
+    vec = position(waist) - p0
+    # Project to transverse plane to be sure
+    vec = vec - dot(vec, dir) * dir
+    if norm(vec) < 1e-12
+        s1 = normal3d(dir)
+    else
+        s1 = normalize(vec)
+    end
+    s2 = cross(dir, s1)
+    # Get waist size for unification
+    _, _, _, w0 = gauss_parameters(gb, z)
+    return p0, w * s1, w * s2, w0, w0
+end
+
+function waist_parameters(gauss::GaussianBeamlet{G}, zs::AbstractArray) where {G}
+    n = length(zs)
+    p0 = Vector{Point3{G}}(undef, n)
+    w1 = Vector{Point3{G}}(undef, n)
+    w2 = Vector{Point3{G}}(undef, n)
+    w01 = Vector{G}(undef, n)
+    w02 = Vector{G}(undef, n)
+    @inbounds for i in 1:n
+        p0[i], w1[i], w2[i], w01[i], w02[i] = waist_parameters(gauss, zs[i])
+    end
+    return (p0, w1, w2, w01, w02)
 end
 
 """
@@ -378,20 +401,22 @@ This function also considers phase changes due to changes in the [`optical_path_
 !!! warning
     Note that `z` and `r` must be specified as cartesian distances. Using the optical path length for `z` can lead to false results.
 """
-function electric_field(gauss::GaussianBeamlet, r, z)
-    point, index = point_on_beam(gauss, z)
+function electric_field(gauss::GaussianBeamlet, r, z; hint = point_on_beam(gauss, z))
+    point, index = hint
     w, R, ψ, w0 = gauss_parameters(gauss, z, hint = (point, index))
     k = wavenumber(wavelength(gauss))
     # Calculate new local field strength based on E0*w0 = const.
     E0 = electric_field(gauss) * (beam_waist(gauss) / w0)
     # Calculate phase change due to optical path length
     Δl = optical_path_length(gauss) - length(gauss)
-    # Note: geometrical length changes considered in `electric_field` call below 
+    # Note: geometrical length changes considered in `electric_field` call below
     ref_ϕ = Δl / wavelength(gauss) * 2π
-    return electric_field(r, z, E0, w0, w, k, ψ, R) * exp(im*ref_ϕ)
+    return electric_field(r, z, E0, w0, w, k, ψ, R) * exp(im * ref_ϕ)
 end
 
-optical_power(gauss::GaussianBeamlet) = intensity(electric_field(gauss)) / 2 * π * beam_waist(gauss)^2
+function optical_power(gauss::GaussianBeamlet)
+    intensity(electric_field(gauss)) / 2 * π * beam_waist(gauss)^2
+end
 
 """
     isparaxial(system, gb::GaussianBeamlet, threshold=π/4)

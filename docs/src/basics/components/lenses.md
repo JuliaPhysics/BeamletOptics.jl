@@ -1,12 +1,11 @@
 ```@setup lenses
-include(joinpath(@__DIR__, "..", "..", "assets", "cond_save.jl"))
-
 lens_showcase_dir = joinpath(@__DIR__, "..", "..", "assets", "lens_assets")
 
-conditional_include(joinpath(lens_showcase_dir, "lens_constructor_showcase.jl"))
-conditional_include(joinpath(lens_showcase_dir, "spherical_lens_showcase.jl"))
-conditional_include(joinpath(lens_showcase_dir, "aspherical_lens_showcase.jl"))
-conditional_include(joinpath(lens_showcase_dir, "spherical_doublet_showcase.jl"))
+Main.DocUtils.conditional_include(joinpath(lens_showcase_dir, "lens_constructor_showcase.jl"))
+Main.DocUtils.conditional_include(joinpath(lens_showcase_dir, "spherical_lens_showcase.jl"))
+Main.DocUtils.conditional_include(joinpath(lens_showcase_dir, "aspherical_lens_showcase.jl"))
+Main.DocUtils.conditional_include(joinpath(lens_showcase_dir, "spherical_doublet_showcase.jl"))
+Main.DocUtils.conditional_include(joinpath(lens_showcase_dir, "cylindrical_lens_showcase.jl"))
 ``` 
 
 # Lenses
@@ -162,37 +161,23 @@ Thus, they focus or collimate light only in one dimension. This package currentl
 
 A plano-convex cylindrical lens can be constructed in the following way. Note that for this lens type a plano-surface can be constructed by passing a [`RectangularFlatSurface`](@ref) to the lens constructor:
 
-```@example
-using CairoMakie, BeamletOptics # hide
-
+```julia
 r = 5.2e-3  # radius
 d = 10e-3   # diameter/width of the cylindric portion
 h = 20e-3   # height/length of the cylinder
 ct = 5.9e-3 # center thickness
 lens = Lens(
-    CylindricalSurface(r, d, h),    
+    CylindricalSurface(r, d, h),
     ct,
     n -> 1.517
 )
-
-fig = Figure() # hide
-
-ax = Axis3(fig[1,1], aspect=:data, azimuth=-pi/4, elevation=deg2rad(30)) # hide
-
-hidedecorations!(ax) # hide
-hidespines!(ax) # hide
-
-render!(ax,lens) # hide
-
-fig # hide
-
 ```
 
-An acylindrical lens can easily be constructed using the [AcylindricalSurface](@ref) surface type:
+![Cylindrical lens showcase](cylindrical_lens_showcase.png)
 
-```@example
-using CairoMakie, BeamletOptics # hide
+An acylindrical lens can easily be constructed using the [`AcylindricalSurface`](@ref) surface type:
 
+```julia
 radius = -15.538e-3
 diameter = 25e-3
 height = 50e-3
@@ -209,18 +194,9 @@ lens = Lens(
         7.5e-3,
         n -> 1.777
     )
-
-fig = Figure() # hide
-
-ax = Axis3(fig[1,1], aspect=:data, azimuth=-pi/4, elevation=deg2rad(30)) # hide
-
-hidedecorations!(ax) # hide
-hidespines!(ax) # hide
-
-render!(ax,lens) # hide
-
-fig # hide
 ```
+
+![Acylindrical lens showcase](acylindrical_lens_showcase.png)
 
 ## Doublet lenses
 

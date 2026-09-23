@@ -15,5 +15,5 @@ Depth = 5
 # Index
 
 ```@autodocs
-Modules = [BeamletOptics]
+Modules = [BeamletOptics, BeamletOptics.Config]
 ```

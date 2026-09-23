@@ -6,8 +6,6 @@ const BMO = BeamletOptics
 const mm = 1e-3
 const inch = BMO.inch
 
-include(joinpath(@__DIR__, "..", "render_utils.jl"))
-
 ##
 r1 = 34.9e-3
 r2 = -34.9e-3

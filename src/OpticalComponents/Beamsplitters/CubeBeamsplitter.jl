@@ -119,3 +119,32 @@ function interact3d(
         return interaction
     end
 end
+
+function interact3d(
+    system::AbstractSystem,
+    cbs::CubeBeamsplitter,
+    agb::AstigmaticGaussianBeamlet,
+    id::Int)
+    _shape = shape(intersection(rays(agb.c)[id]))
+    # Front prism interaction
+    if _shape === shape(cbs.front)
+        interaction = interact3d(system, cbs.front, agb, id)
+        hint!(interaction, Hint(cbs, shape(cbs.coating)))
+        return interaction
+    end
+    # Splitter "coating" interaction
+    if _shape === shape(cbs.coating)
+        interact3d(system, cbs.coating, agb, id)
+        # Update refractive index
+        _n = refractive_index(cbs, wavelength(agb))
+        refractive_index!(agb.children[1], 1, _n)
+        refractive_index!(agb.children[2], 1, _n)
+        return nothing
+    end
+    # Back prism interaction
+    if _shape === shape(cbs.back)
+        interaction = interact3d(system, cbs.back, agb, id)
+        hint!(interaction, Hint(cbs, shape(cbs.coating)))
+        return interaction
+    end
+end

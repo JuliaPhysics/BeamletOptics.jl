@@ -6,15 +6,67 @@ If you want to edit the package documentation locally, follow these steps:
 2. Switch into the `docs` environment, e.g. `] activate .` inside of the `docs` folder
     1. Inside of [VS Code](https://code.visualstudio.com/) you can activate the local environment by right-clicking the `make.jl` file
     2. If you have the Julia plugin installed, you will be able to select `Julia: Activate This Environment`
-3. Inside of the `docs` environment switch the dependency onto your local `BeamletOptics` dev folder via `] dev BeamletOptics`
-    1. This step is **important**, otherwise an incompatible version of `BeamletOptics` might be used to generate the docs
+3. Inside of the `docs` environment run `] instantiate` 
+    1. `docs` is part of the package's workspace and declares `[sources] BeamletOptics = {path = ".."}`, so the local checkout is used automatically
 4. Run the `make.jl` file
 
-Changes you have made will then be saved into the `build` folder. You can host the website locally by opening the `index.html` starting page.
+The generated site is written to `docs/build/1`. DocumenterVitepress builds one site per
+deployment base, and a local build always ends up in the first (and only) one.
+
+To preview it, serve `docs/build/1` as the server root -- VitePress uses absolute paths, so
+opening `index.html` from the file system does **not** work.
+
+With the
+[Live Server](https://marketplace.visualstudio.com/items?itemName=ritwickdey.LiveServer)
+extension for VS Code, point the server root at the build folder. The `.vscode` folder is
+not tracked by git, so create `.vscode/settings.json` in your local clone yourself:
+
+```json
+{
+    "liveServer.settings.root": "/docs/build/1",
+    "liveServer.settings.port": 5501
+}
+```
+
+The path is relative to the workspace root, which has to be the repository root for this to
+work. The port is optional and only needed if the default (5500) is already taken. With that
+in place, *Go Live* serves the docs. Alternatively, from the `docs` environment:
+
+```julia
+using LiveServer
+LiveServer.serve(dir = "build/1")
+```
+
+!!! note
+    On Windows, `make.jl` runs the VitePress build itself, because DocumenterVitepress
+    skips that step there. Node comes from `NodeJS_20_jll`, so no system-wide Node.js
+    installation is required. The first build downloads the npm packages into
+    `docs/node_modules` and therefore takes noticeably longer.
 
 ## Section titles
 
 When creating a custom section in the documentation, you should avoid naming the section the same way as your type, e.g. for `MyCustomType` you should not create a section that is called `# MyCustomType`. The reason for this is that the `@ref` macro will confuse the docstring of your type with the section header, leading to undefined behavior for any links pointing to the embedded docstring via `[`MyCustomType`](@ref)`.
+
+## Tables
+
+Documenter parses pages with Julia's Markdown parser, which does not pass inline HTML such as `<center>` through. To center a table and give it the docs' framed table style, wrap it in two `@raw html` blocks that open and close a `bmo-table` container (styled in `docs/src/.vitepress/theme/overrides.css`):
+
+````markdown
+```@raw html
+<div class="bmo-table">
+```
+
+| $k$ | surface family |
+| :---: | --- |
+| $k = -1$ | paraboloid |
+| $k = 0$ | sphere |
+
+```@raw html
+</div>
+```
+````
+
+Keep the blank lines around the table, otherwise it is not parsed as Markdown. Column alignment uses the usual `:---`, `:---:` and `---:` markers.
 
 ## Creating figures
 
@@ -27,13 +79,12 @@ In general, you can generate and include figures into your documentation section
     - files will be saved with respect to the calling environment
 3. In the markdown file that contains your documentation and should load your images, do the following:
     1. create a `@setup` code block
-    2. include the `conditional_include` via e.g. `include(joinpath(@__DIR__, "..", "assets", "cond_save.jl"))`
-        - ensure that the relative file path is correct
-    3. load your script during build via `conditional_include`
-        - more info on this function is provided in the `cond_save.jl` file
+    2. load your script during build via `Main.DocUtils.conditional_include`
+        - more info on this function is provided in the `DocUtils.jl` file
+    3. Or, alternatively use `Main.DocUtils.prerender_include` to generate the image locally
 4. Load the image within your markdown file via `![My figure](my_fig.png)`
 
 Examples for this pattern can be found at the top of most .md files of the documentation, e.g. `beamsplitters.md`.
 
 !!! tip
-    Usage of placeholders can be disabled for each script via the `use_placeholder=false` keyword argument. It can also be deactivated globally by setting `GLOBAL_USE_PLACEHOLDERS=false` in the `cond_save.jl` file.
+    Usage of placeholders can be disabled for each script via the `use_placeholder=false` keyword argument. It can also be deactivated globally by setting `GLOBAL_USE_PLACEHOLDERS=false` in the `DocUtils.jl` file.

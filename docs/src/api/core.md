@@ -12,9 +12,7 @@ The BMO package is intended to provide optical simulation capabilites with as mu
 
 The first two principles will be elaborated upon in more detail in the [Geometry representation](@ref) section. For the latter two design decisions, the following high-level solver schematic can be used to abstract the steps that are performed when calling [`solve_system!`](@ref) with an input system and beam:
 
-```@raw html
-<img src="../iir_loop.svg" alt="my figure" style="width:100%; height:auto;"/>
-```
+![Intersect-Interact-Repeat loop](iir_loop.svg)
 
 This scheme is loosely referred to as the **Intersect-Interact-Repeat-Loop** and consists of the following steps:
 

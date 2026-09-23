@@ -1,9 +1,7 @@
 ```@setup double_gauss
-include(joinpath(@__DIR__, "..", "assets", "cond_save.jl"))
-
 dir = joinpath(@__DIR__, "..", "assets", "examples")
 
-conditional_include(joinpath(dir, "lens_groups.jl"))
+Main.DocUtils.conditional_include(joinpath(dir, "lens_groups.jl"))
 ``` 
 
 # Lens groups

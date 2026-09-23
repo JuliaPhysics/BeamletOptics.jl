@@ -1,4 +1,34 @@
-# BeamletOptics
+```@raw html
+---
+# https://vitepress.dev/reference/default-theme-home-page
+layout: home
+
+hero:
+  name: BeamletOptics.jl
+  text: A digital optics laboratory
+  tagline: 3D ray tracing and Gaussian beamlet propagation for optical setups in Julia
+  image:
+    light: /logo.svg
+    dark: /logo-dark.svg
+    alt: BeamletOptics
+  actions:
+    - theme: brand
+      text: Get started
+      link: /tutorials/expander
+    - theme: alt
+      text: Basics
+      link: /basics/intro
+    - theme: alt
+      text: View on Github
+      link: https://github.com/JuliaPhysics/BeamletOptics.jl
+---
+```
+
+```@raw html
+<p style="margin-bottom:2cm"></p>
+
+<div class="vp-doc" style="width:80%; margin:auto">
+```
 
 Building optical setups in a laboratory environment -- for instance a laser interferometer -- is a common task for optical engineers and physicists. This package is intended to provide a simulation environment in which the user can quickly analyze and layout simple optical components like lenses or beamsplitters before committing to a breadboard setup.  
 
@@ -27,7 +57,7 @@ For this purpose, the package implements a traditional ray tracing solver. This 
 ## Installation
 
 !!! warning
-    This package requires Julia ≥ 1.9.4
+    This package requires Julia ≥ 1.12
 
 You can add this package to your project by entering the package manager (press `]` in the REPL) and typing `add BeamletOptics`. It is also recommended that you `add GLMakie`. You can include this package into your current scope via `using BeamletOptics`. If a Makie version is loaded before or after the inclusion of this package, the extension provided as part of this package will enable additional visualization functions. 
 
@@ -44,6 +74,7 @@ The BeamletOptics package is made available under the MIT license. If you use th
 A variety of packages and tools exist that implement similar approaches or offer optics modeling capabilities. Within the Julia ecosystem, the following packages need to be mentioned:
 
 - [OpticSim.jl](https://github.com/brianguenter/OpticSim.jl)
+- [FluxOptics.jl](https://github.com/anscoil/FluxOptics.jl)
 - [ABCDMatrixOptics.jl](https://github.com/JuliaPhysics/ABCDMatrixOptics.jl)
 - [WaveOpticsPropagation.jl](https://github.com/JuliaPhysics/WaveOpticsPropagation.jl)
 
@@ -65,9 +96,9 @@ In order to warrant a 1.0.0 release tag, the following features will need to be 
 ### Additional features
 
 - 🔳 Beamlet tracing
-    - 🟩 Implementation of the full polarized astigmatic Gaussian beamlet formalism
+    - ✅ Implementation of the full polarized astigmatic Gaussian beamlet formalism
         - refer to Worku et al. (2017/2020), Greynolds (1985)
-    - 🔳 Support for (trivial) forms of 2D-field decomposition, e.g. tophat
+    - ✅ Support for (trivial) forms of 2D-field decomposition, e.g. tophat
     - 🔳 Modeling of the coherence length and contrast influence
 - 🔳 Components
     - 🟩 Polarizing optics (based on Jones formalism)
@@ -82,3 +113,7 @@ In order to warrant a 1.0.0 release tag, the following features will need to be 
 - 🔳 Visualization
     - 🔳 automatic Makie plot updates (e.g. some form of "interactive" mode)
     - 🔳 Better Lens surface plots based on multiple dispatch
+
+```@raw html
+</div>
+```

@@ -1,10 +1,11 @@
 # Order of inclusion matters!
 
-include("Mirrors.jl")
+include("Mirrors/Mirrors.jl")
 include("Lenses.jl")
 include("Prisms.jl")
 include("SphericalLenses.jl")
 include("DoubletLenses.jl")
+include("TripletLenses.jl")
 include("Detectors/Detector.jl")
 include("Beamsplitters/Beamsplitters.jl")
 include("NonInteractable.jl")

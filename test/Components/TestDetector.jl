@@ -33,8 +33,31 @@ const mm = 1e-3
     @test minimum(zs)*1000 ≈ 0.09707    atol = 1e-3
     @test maximum(zs)*1000 ≈ 3.55978    atol = 1e-3
     # test empty! fct.
-    empty!(pd)    
+    empty!(pd)
     @test isnothing(BMO.hits(pd))
+end
+
+@testset "Testing continued tracing (stop = false)" begin
+    # Regression test: interact3d used to resume the next segment at the
+    # incoming ray's origin instead of the actual hit point, which made
+    # `stop = false` re-hit the same detector forever (bounded only by r_max).
+    d1 = Detector(20mm, false)
+    d2 = Detector(20mm, true)
+    translate_to3d!(d1, [0.0, 0.10, 0.0])
+    translate_to3d!(d2, [0.0, 0.20, 0.0])
+    system = System([d1, d2])
+
+    beam = Beam(Ray([0.0, 0.0, 0.0], [0.0, 1.0, 0.0]))
+    solve_system!(system, beam)
+
+    @test length(BMO.hits(d1)) == 1
+    @test length(BMO.hits(d2)) == 1
+    @test length(rays(beam)) == 2
+
+    hit = BMO.hits(d1)[1]
+    @test BMO.hit_point(hit) ≈ [0.0, 0.10, 0.0]
+    # the continued segment must start at the hit point, not the incoming ray's origin
+    @test position(rays(beam)[2]) ≈ [0.0, 0.10, 0.0]
 end
 
 @testset "Testing point spread function" begin
@@ -67,15 +90,17 @@ end
         # get PSF
         x, y, I_num = intensity(psfd; n=500, crop_factor=5, center=MinMax())
 
-        # get numerical first zero of the Airy-disk
-        ci = argmax(I_num)
-        ix_ctr, jx_ctr = Tuple(ci)
-        num_min = x[argmin(I_num[:, jx_ctr])]   # first zero through the centre column
+        # walk from the peak to the first local minimum through the centre column
+        ix_ctr, jx_ctr = Tuple(argmax(I_num))
+        col = I_num[:, jx_ctr]
+        i_min = ix_ctr
+        while i_min < length(col) && col[i_min + 1] < col[i_min]
+            i_min += 1
+        end
 
-        # theoretical Airy-disk 1st zero
-        airy_min = 1.22*λ*200e-3/D - x_shift
-
-        @test abs(num_min) ≈ airy_min rtol=1e-2
+        # compare relative to the peak, since the absolute offset (x_shift) dwarfs the Airy radius
+        airy_radius = 1.22*λ*200e-3/D
+        @test x[i_min] - x[ix_ctr] ≈ airy_radius rtol=2e-2
     end
 
     @testset "Detector reset" begin

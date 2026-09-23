@@ -5,8 +5,6 @@ GLMakie.activate!(; ssao=true)
 const BMO = BeamletOptics
 const mm = 1e-3
 
-include(joinpath(@__DIR__, "..", "render_utils.jl"))
-
 ##
 n = 1.5
 

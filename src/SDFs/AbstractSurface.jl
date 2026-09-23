@@ -101,4 +101,7 @@ struct CircularFlatSurface{T} <: AbstractRotationallySymmetricSurface{T}
     diameter::T
 end
 
+radius(::CircularFlatSurface{T}) where {T} = T(Inf)
+edge_sag(::CircularFlatSurface{T}, ::AbstractSDF) where {T} = zero(T)
+
 sdf(::CircularFlatSurface, ::AbstractOrientationType) = nothing

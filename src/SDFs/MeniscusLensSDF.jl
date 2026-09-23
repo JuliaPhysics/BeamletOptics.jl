@@ -45,6 +45,21 @@ function sdf(ml::MeniscusLensSDF, pos)
     return max(min(sdf(ml.convex, p), sdf(ml.cylinder, p)), -sdf(ml.concave, p))
 end
 
+# AD through the composite sdf picks the wrong sub-shape on the optical axis (NaN value of
+# the radial norm breaks max/min), hence select the active sub-sdf as for the UnionSDF.
+function normal3d(ml::MeniscusLensSDF, pos)
+    p = _world_to_sdf(ml, pos)
+    d_convex = sdf(ml.convex, p)
+    d_cylinder = sdf(ml.cylinder, p)
+    d_concave = -sdf(ml.concave, p)
+    if min(d_convex, d_cylinder) ≥ d_concave
+        n = d_convex ≤ d_cylinder ? normal3d(ml.convex, p) : normal3d(ml.cylinder, p)
+    else
+        n = -normal3d(ml.concave, p)
+    end
+    return orientation(ml) * n
+end
+
 function MeniscusLensSDF(r1::R1, r2::R2, l::L, d::D = 1inch) where {R1, R2, L, D}
     T = promote_type(R1, R2, L, D)
     # check input radius of curv. signs
@@ -138,8 +153,13 @@ function meniscus_lens_sdf(front_surface::AbstractSurface{T1}, front::AbstractSD
 
     # Compute sag values at the clear aperture:
     # Use d1 for the front and d2 for the back.
-    convex_sag = edge_sag(front_surface, front)
-    concave_sag = edge_sag(back_surface, back)
+    if orientation == :left_facing
+        convex_sag = edge_sag(front_surface, front)
+        concave_sag = edge_sag(back_surface, back)
+    else
+        convex_sag = edge_sag(back_surface, back)
+        concave_sag = edge_sag(front_surface, front)
+    end
 
     cylinder_l = center_thickness - convex_sag + concave_sag
     if cylinder_l ≤ 0
@@ -166,10 +186,10 @@ function meniscus_lens_sdf(front_surface::AbstractSurface{T1}, front::AbstractSD
         convex_shape = front
         concave_shape = back
     else
-        translate3d!(back, [0, -abs(radius(front_surface)), 0])
+        translate3d!(front, [0, -abs(radius(front_surface)), 0])
         translate3d!(cylinder, [0, -concave_sag, 0])
-        zrotate3d!(front, π)
-        translate3d!(front, [0, thickness(cylinder) - concave_sag + convex_sag, 0])
+        zrotate3d!(back, π)
+        translate3d!(back, [0, thickness(cylinder) - concave_sag + convex_sag, 0])
         convex_shape = back
         concave_shape = front
     end

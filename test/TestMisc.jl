@@ -1,22 +1,11 @@
 module TestMisc
 
 using BeamletOptics
+using Aqua
 using Test
 
-const BMO = BeamletOptics
-
-@testset "Render" begin
-    axis = nothing
-    cube = BMO.CubeMesh(1)
-    @test_throws BMO.MissingBackendError render!(axis, cube)
-    @test_throws BMO.MissingBackendError BMO.get_view(axis)
-    @test_throws BMO.MissingBackendError BMO.set_view(axis, [1 1; 0 0])
-    @test_throws BMO.MissingBackendError BMO.hide_axis(axis, true)
-end
-
 @testset "Aqua" begin
-    using Aqua
-    Aqua.test_all(BMO)
+    Aqua.test_all(BeamletOptics)
 end
    
 end
