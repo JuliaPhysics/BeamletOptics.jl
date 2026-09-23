@@ -71,3 +71,64 @@
   padding-top: 6px;
   border-top: 1px solid var(--vp-c-divider);
 }
+
+/* Centered, framed tables.
+
+   Documenter parses pages with Julia's Markdown parser, so inline HTML such as
+   `<center>` around a table is not passed through. Instead, wrap the table in two
+   `@raw html` blocks, which DocumenterVitepress emits verbatim:
+
+       ```@raw html
+       <div class="bmo-table">
+       ```
+
+       | a | b |
+       | --- | --- |
+       | 1 | 2 |
+
+       ```@raw html
+       </div>
+       ```
+
+   VitePress renders tables as `display: block` with `overflow-x: auto` (so wide
+   tables scroll on phones). That is kept; `width: fit-content` plus auto margins
+   centres the block, and the clipping gives the rounded frame for free. */
+.vp-doc .bmo-table table {
+  width: fit-content;
+  max-width: 100%;
+  margin: 24px auto;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.vp-doc .bmo-table th,
+.vp-doc .bmo-table td {
+  border: none;
+  border-bottom: 1px solid var(--vp-c-divider);
+  padding: 8px 20px;
+}
+
+.vp-doc .bmo-table th + th,
+.vp-doc .bmo-table td + td {
+  border-left: 1px solid var(--vp-c-divider);
+}
+
+.vp-doc .bmo-table tr {
+  border-top: none;
+}
+
+.vp-doc .bmo-table tr:last-child td {
+  border-bottom: none;
+}
+
+.vp-doc .bmo-table th {
+  background-color: var(--vp-c-brand-soft);
+  color: var(--vp-c-text-1);
+  font-weight: 600;
+}
+
+.vp-doc .bmo-table tbody tr:hover {
+  background-color: var(--vp-c-default-soft);
+}

@@ -1,10 +1,10 @@
 # kinematic export
 export translate3d!, translate_to3d!, rotate3d!, xrotate3d!, yrotate3d!, zrotate3d!,
-       align3d!, reset_translation3d!, reset_rotation3d!
+       align3d!, reset_translation3d!, reset_rotation3d!, set_pivot3d!
 export position, direction, orientation
 
 # ray and beam type export
-export Ray, PolarizedRay, Beam, PointSource, CollimatedSource, UniformDiscSource,
+export Ray, PolarizedRay, Beam, PointSource, CollimatedSource, UniformDiscSource, UniformPointSource,
        GaussianBeamlet, AstigmaticGaussianBeamlet, rayleigh_range, rays, point_on_beam,
        normal3d
 export CollimatedGaussianBeamletSource, GaussianBeamletDecomposition,
@@ -26,7 +26,10 @@ components
 # mirrors
 export Mirror, SquarePlanoMirror2D, RectangularPlanoMirror, SquarePlanoMirror,
        RoundPlanoMirror, SphericalMirror, RightAnglePrismMirror,
-       OffAxisParabolicMirror, ParabolicMirror
+       ConicMirror, OffAxisConicMirror,
+       ParabolicMirror, OffAxisParabolicMirror,
+       EllipsoidalMirror, OffAxisEllipsoidalMirror,
+       HyperbolicMirror, OffAxisHyperbolicMirror
 
 # lenses
 export Lens, DoubletLens, ThinLens, SphericalLens, SphericalDoubletLens, thickness,

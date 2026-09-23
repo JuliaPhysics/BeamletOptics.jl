@@ -1,4 +1,4 @@
-module TestSDFs
+module TestAbstractSDF
 
 using BeamletOptics
 using Test
@@ -7,37 +7,37 @@ using GeometryBasics
 
 const BMO = BeamletOptics
 
-@testset "SDFs" begin
+# Orientation-less test point sdf
+mutable struct TestPointSDF{T} <: BMO.AbstractSDF{T}
+    position::Point3{T}
+    orientation::Matrix{T}
+end
+
+TestPointSDF(p::AbstractArray{T}) where {T} = TestPointSDF{T}(
+    Point3{T}(p), Matrix{T}(I, 3, 3))
+TestPointSDF(T = Float64) = TestPointSDF{T}(Point3{T}(0), Matrix{T}(I, 3, 3))
+
+BMO.position(tps::TestPointSDF) = tps.position
+BMO.position!(tps::TestPointSDF{T}, new::Point3{T}) where {T} = (tps.position = new)
+
+BMO.orientation(tps::TestPointSDF) = tps.orientation
+BMO.orientation!(tps::TestPointSDF{T}, new::Matrix{T}) where {T} = (tps.orientation = new)
+
+BMO.transposed_orientation(tps::TestPointSDF) = transpose(tps.orientation)
+BMO.transposed_orientation!(::TestPointSDF, ::Any) = nothing
+
+function BMO.sdf(tps::TestPointSDF, point)
+    p = BMO._world_to_sdf(tps, point)
+    return norm(p)
+end
+
+@testset "Abstract SDF" begin
     @testset "Testing type definitions" begin
         @test isdefined(BMO, :AbstractSDF)
         @test isdefined(BMO, :SphereSDF)
         @test isdefined(BMO, :CylinderSDF)
         @test isdefined(BMO, :CutSphereSDF)
         @test isdefined(BMO, :ThinLensSDF)
-    end
-
-    # Orientation-less test point sdf
-    mutable struct TestPointSDF{T} <: BMO.AbstractSDF{T}
-        position::Point3{T}
-        orientation::Matrix{T}
-    end
-
-    TestPointSDF(p::AbstractArray{T}) where {T} = TestPointSDF{T}(
-        Point3{T}(p), Matrix{T}(I, 3, 3))
-    TestPointSDF(T = Float64) = TestPointSDF{T}(Point3{T}(0), Matrix{T}(I, 3, 3))
-
-    BMO.position(tps::TestPointSDF) = tps.position
-    BMO.position!(tps::TestPointSDF{T}, new::Point3{T}) where {T} = (tps.position = new)
-
-    BMO.orientation(tps::TestPointSDF) = tps.orientation
-    BMO.orientation!(tps::TestPointSDF{T}, new::Matrix{T}) where {T} = (tps.orientation = new)
-
-    BMO.transposed_orientation(tps::TestPointSDF) = transpose(tps.orientation)
-    BMO.transposed_orientation!(::TestPointSDF, ::Any) = nothing
-
-    function BMO.sdf(tps::TestPointSDF, point)
-        p = BMO._world_to_sdf(tps, point)
-        return norm(p)
     end
 
     @testset "Testing kinematics and transforms" begin

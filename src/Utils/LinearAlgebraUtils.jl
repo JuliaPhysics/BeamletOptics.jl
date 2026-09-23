@@ -68,14 +68,18 @@ end
 
 Returns the rotation matrix that will rotate a vector around the reference axis at an angle
 θ in radians. Vector length is maintained. Counter-clockwise rotation in a right-hand coord. system.
+The `reference` axis is normalized internally, i.e. it can have any non-zero length.
 """
 function rotate3d(reference::AbstractVector, θ)
     if isnan(θ) || isinf(θ)
         throw(ArgumentError("θ must be real and not Inf or NaN"))
     end
+    if iszero(norm(reference))
+        throw(ArgumentError("Rotation axis must not be a zero vector"))
+    end
     cost = cos(θ)
     sint = sin(θ)
-    ux, uy, uz = reference
+    ux, uy, uz = normalize(reference)
     R = @SArray [
         cost+ux^2*(1-cost) ux*uy*(1-cost)-uz*sint ux*uz*(1-cost)+uy*sint
         uy*ux*(1-cost)+uz*sint cost+uy^2*(1-cost) uy*uz*(1-cost)-ux*sint

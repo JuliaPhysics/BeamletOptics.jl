@@ -20,15 +20,10 @@ Subtypes of `AbstractShape` should implement the following:
 
 ## Kinematic:
 
-- [`translate3d!`](@ref): the object is moved by a translation vector relative to its current position
-- [`translate_to3d!`](@ref): the object is moved towards the target position
-- [`rotate3d!`](@ref): the object is rotated by an angle around a reference vector
-- [`xrotate3d!`](@ref): rotation around the x-axis
-- [`yrotate3d!`](@ref): rotation around the y-axis
-- [`zrotate3d!`](@ref): rotation around the z-axis
-- [`align3d!`](@ref): align local shape y-axis with target vector
-- [`reset_translation3d!`](@ref): return the `object` to the global origin
-- [`reset_rotation3d!`](@ref): rotate the `object` back into its original state
+`AbstractShape`s are [`BeamletOptics.Movable`](@ref) with an [`BeamletOptics.Oriented`](@ref) frame,
+see [`BeamletOptics.AbstractKinematicTrait`](@ref). The default primitives
+`translate3d!(::Movable, shape, offset)` and `rotate3d!(::Movable, shape, R::AbstractMatrix)` act on
+`position`/`orientation`; subtypes with additional geometry data (e.g. mesh vertices) dispatch their own.
 
 ## Ray Tracing:
 
@@ -40,6 +35,8 @@ Refer to the [`render!`](@ref) documentation.
 """
 abstract type AbstractShape{T <: Real} end
 
+kinematic_trait_of(::AbstractShape) = Movable(Oriented())
+
 "Enforces that `shape` has to have the field `pos` or implement `position()`."
 Base.position(shape::AbstractShape) = shape.pos
 position!(shape::AbstractShape, pos) = (shape.pos = pos)
@@ -49,66 +46,21 @@ orientation(shape::AbstractShape) = shape.dir
 orientation!(shape::AbstractShape, dir) = (shape.dir = dir)
 
 """
-    translate3d!(shape::AbstractShape, offset)
+    translate3d!(::Movable, shape::AbstractShape, offset)
 
 Translates the `pos`ition of `shape` by the `offset`-vector.
 """
-function translate3d!(shape::AbstractShape, offset)
+function translate3d!(::Movable, shape::AbstractShape, offset)
     position!(shape, position(shape) + offset)
     return nothing
 end
 
 """
-    translate_to3d!(shape::AbstractShape, target)
+    rotate3d!(::Movable, shape::AbstractShape, R::AbstractMatrix)
 
-Translates the `shape` to the `target` position. 
+Rotates the `dir`-matrix of `shape` by the rotation matrix `R`.
 """
-function translate_to3d!(shape::AbstractShape, target)
-    current = position(shape)
-    translate3d!(shape, target - current)
-    return nothing
-end
-
-"""
-    rotate3d!(shape::AbstractShape, axis, θ)
-
-Rotates the `dir`-matrix of `shape` around the reference-`axis` by an angle of `θ`.
-"""
-function rotate3d!(shape::AbstractShape, axis, θ)
-    R = rotate3d(axis, θ)
+function rotate3d!(::Movable, shape::AbstractShape, R::AbstractMatrix)
     orientation!(shape, R * orientation(shape))
     return nothing
 end
-
-"""Rotates the `dir`-matrix of `shape` around the global x-axis by an angle of `θ`."""
-function xrotate3d!(shape::AbstractShape{T}, θ) where {T}
-    rotate3d!(shape, Point3(one(T), zero(T), zero(T)), θ)
-end
-"""Rotates the `dir`-matrix of `shape` around the global y-axis by an angle of `θ`."""
-function yrotate3d!(shape::AbstractShape{T}, θ) where {T}
-    rotate3d!(shape, Point3(zero(T), one(T), zero(T)), θ)
-end
-"""Rotates the `dir`-matrix of `shape` around the global z-axis by an angle of `θ`."""
-function zrotate3d!(shape::AbstractShape{T}, θ) where {T}
-    rotate3d!(shape, Point3(zero(T), zero(T), one(T)), θ)
-end
-
-"""Returns the `shape` to the global origin."""
-function reset_translation3d!(shape::AbstractShape{T}) where {T}
-    position!(shape, Point3(zero(T)))
-    return nothing
-end
-
-"""
-    align3d!(shape, target_axis)
-
-Rotates the `shape` such that its local y-axis aligns with the `target_axis`.
-"""
-function align3d!(shape::AbstractShape, target_axis)
-    R = align3d(orientation(shape)[:,2], target_axis)
-    orientation!(shape, R * orientation(shape))
-    return nothing
-end
-
-"""Resets the `shape` rotation angles to zero."""
-reset_rotation3d!(shape::AbstractShape{T}) where {T} = orientation!(shape, Matrix{T}(I, 3, 3))

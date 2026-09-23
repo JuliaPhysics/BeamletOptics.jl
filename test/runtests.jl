@@ -11,10 +11,15 @@ include(joinpath(@__DIR__, "TestGaussianBeamlet.jl"))
 include(joinpath(@__DIR__, "TestAstigmaticGaussianBeamlet.jl"))
 include(joinpath(@__DIR__, "TestAstigmaticGaussianPhysical.jl"))
 include(joinpath(@__DIR__, "TestAstigmaticGaussianSources.jl"))
+include(joinpath(@__DIR__, "TestSourceKinematics.jl"))
+include(joinpath(@__DIR__, "TestKinematicTrait.jl"))
 
 # Test geometry representation
 include(joinpath(@__DIR__, "Geometry", "TestMesh.jl"))
-include(joinpath(@__DIR__, "Geometry", "TestSDFs.jl"))
+include(joinpath(@__DIR__, "Geometry", "SDFs", "TestAbstractSDF.jl"))
+include(joinpath(@__DIR__, "Geometry", "SDFs", "TestUnionSDF.jl"))
+include(joinpath(@__DIR__, "Geometry", "SDFs", "TestDifferenceSDF.jl"))
+include(joinpath(@__DIR__, "Geometry", "SDFs", "TestConicSDF.jl"))
 
 # Test system and object containers
 include(joinpath(@__DIR__, "TestSystem.jl"))
@@ -32,7 +37,10 @@ include(joinpath(@__DIR__, "Components", "TestDetectorUtils.jl"))
 include(joinpath(@__DIR__, "Components", "TestDetector.jl"))
 include(joinpath(@__DIR__, "Components", "TestBeamsplitters.jl"))
 include(joinpath(@__DIR__, "Components", "TestPolarizers.jl"))
-include(joinpath(@__DIR__, "Components", "TestParabolicMirror.jl"))
+include(joinpath(@__DIR__, "Components", "ConicMirrors", "TestConicMirror.jl"))
+include(joinpath(@__DIR__, "Components", "ConicMirrors", "TestParabolicMirror.jl"))
+include(joinpath(@__DIR__, "Components", "ConicMirrors", "TestEllipsoidalMirror.jl"))
+include(joinpath(@__DIR__, "Components", "ConicMirrors", "TestHyperbolicMirror.jl"))
 
 # Test end-to-end models
 include(joinpath(@__DIR__, "E2E", "TestDoubleGaussLens.jl"))

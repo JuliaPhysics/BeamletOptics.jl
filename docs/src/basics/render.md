@@ -31,7 +31,7 @@ julia> mirror = RoundPlanoMirror(25e-3, 5e-3);
 julia> render!(axis, mirror)
 ERROR: It appears no suitable Makie backend is loaded in this session.
 Stacktrace:
- [1] render!(::Nothing, ::RoundPlanoMirror{Float64})
+ [1] render!(::Nothing, ::Mirror{Float64, BeamletOptics.PlanoSurfaceSDF{Float64}})
    @ BeamletOptics c:\Users\anon\.julia\dev\BeamletOptics\src\Render.jl:46
  [2] top-level scope
    @ REPL[5]:1

@@ -6,8 +6,8 @@ If you want to edit the package documentation locally, follow these steps:
 2. Switch into the `docs` environment, e.g. `] activate .` inside of the `docs` folder
     1. Inside of [VS Code](https://code.visualstudio.com/) you can activate the local environment by right-clicking the `make.jl` file
     2. If you have the Julia plugin installed, you will be able to select `Julia: Activate This Environment`
-3. Inside of the `docs` environment switch the dependency onto your local `BeamletOptics` dev folder via `] dev BeamletOptics`
-    1. This step is **important**, otherwise an incompatible version of `BeamletOptics` might be used to generate the docs
+3. Inside of the `docs` environment run `] instantiate` 
+    1. `docs` is part of the package's workspace and declares `[sources] BeamletOptics = {path = ".."}`, so the local checkout is used automatically
 4. Run the `make.jl` file
 
 The generated site is written to `docs/build/1`. DocumenterVitepress builds one site per
@@ -46,6 +46,27 @@ LiveServer.serve(dir = "build/1")
 ## Section titles
 
 When creating a custom section in the documentation, you should avoid naming the section the same way as your type, e.g. for `MyCustomType` you should not create a section that is called `# MyCustomType`. The reason for this is that the `@ref` macro will confuse the docstring of your type with the section header, leading to undefined behavior for any links pointing to the embedded docstring via `[`MyCustomType`](@ref)`.
+
+## Tables
+
+Documenter parses pages with Julia's Markdown parser, which does not pass inline HTML such as `<center>` through. To center a table and give it the docs' framed table style, wrap it in two `@raw html` blocks that open and close a `bmo-table` container (styled in `docs/src/.vitepress/theme/overrides.css`):
+
+````markdown
+```@raw html
+<div class="bmo-table">
+```
+
+| $k$ | surface family |
+| :---: | --- |
+| $k = -1$ | paraboloid |
+| $k = 0$ | sphere |
+
+```@raw html
+</div>
+```
+````
+
+Keep the blank lines around the table, otherwise it is not parsed as Markdown. Column alignment uses the usual `:---`, `:---:` and `---:` markers.
 
 ## Creating figures
 

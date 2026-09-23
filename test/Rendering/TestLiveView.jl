@@ -127,7 +127,7 @@ const BMO = BeamletOptics
         @test length(BMO.hits(pd)) == 1
         x1 = _mean_x(gui.panels[1].xy[])
         @test abs(x1 - x0) > 1 # [mm], 20 mrad deflection over 100 mm
-        @test startswith(gui.status.text[], "RoundPlanoMirror at (")
+        @test startswith(gui.status.text[], "$(nameof(typeof(m))) at (")
 
         # move the mirror out of the beam
         _key!(gui, Keyboard.m)
@@ -277,7 +277,7 @@ const BMO = BeamletOptics
             @test gui.panels[1].xy[] == xy0
             @test gui.stale
             @test occursin("outdated, press t to trace", gui.status.text[])
-            @test startswith(gui.status.text[], "RoundPlanoMirror at (")
+            @test startswith(gui.status.text[], "$(nameof(typeof(m))) at (")
             @test bh.plot.alpha[] ≈ 0.3
 
             # t solves the system

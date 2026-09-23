@@ -74,52 +74,26 @@ function Mesh(mesh)
 end
 
 """
-    translate3d!(mesh::AbstractMesh, offset)
+    translate3d!(::Movable, mesh::AbstractMesh, offset)
 
 Mutating function that translates the vertices of an mesh in relation to the offset vector.
 In addition, the mesh position vector is overwritten to reflect the new "center of gravity".
 """
-function translate3d!(mesh::AbstractMesh, offset)
+function translate3d!(::Movable, mesh::AbstractMesh, offset)
     position!(mesh, position(mesh) .+ offset)
     vertices!(mesh, vertices(mesh) .+ offset')
     return nothing
 end
 
 """
-    rotate3d!(mesh, axis, θ)
+    rotate3d!(::Movable, mesh::AbstractMesh, R::AbstractMatrix)
 
-Mutating function that rotates the `mesh` around the specified rotation `axis` by the angle `θ`.
+Rotate the mesh vertices and orientation around its current position using `R`.
 """
-function rotate3d!(mesh::AbstractMesh, axis, θ)
-    # Calculate rotation matrix
-    R = rotate3d(axis, θ)
+function rotate3d!(::Movable, mesh::AbstractMesh, R::AbstractMatrix)
     # Translate mesh to origin, rotate (counter-clockwise), retranslate
     vertices!(mesh, (vertices(mesh) .- position(mesh)') * R' .+ position(mesh)')
     orientation!(mesh, R * orientation(mesh))
-    return nothing
-end
-
-function xrotate3d!(mesh::AbstractMesh{T}, θ) where {T}
-    rotate3d!(mesh, @SArray(T[one(T), zero(T), zero(T)]), θ)
-end
-function yrotate3d!(mesh::AbstractMesh{T}, θ) where {T}
-    rotate3d!(mesh, @SArray(T[zero(T), one(T), zero(T)]), θ)
-end
-function zrotate3d!(mesh::AbstractMesh{T}, θ) where {T}
-    rotate3d!(mesh, @SArray(T[zero(T), zero(T), one(T)]), θ)
-end
-
-"""
-    align3d!(mesh, target_axis)
-
-Aligns the local `mesh` y-axis onto the `target_axis`.
-"""
-function align3d!(mesh::AbstractMesh, target_axis)
-    # Calculate rotation matrix
-    R = align3d(orientation(mesh)[:,2], target_axis)
-    # Translate mesh to origin, rotate (counter-clockwise), retranslate
-    vertices!(mesh, (vertices(mesh) .- position(mesh)') * R' .+ position(mesh)')
-    orientation!(mesh, orientation(mesh) * R)
     return nothing
 end
 
@@ -132,37 +106,6 @@ function scale3d!(mesh::AbstractMesh, scale)
     # Translate mesh to origin, scale, return to orig. pos.
     vertices!(mesh, (vertices(mesh) .- position(mesh)') .* scale .+ position(mesh)')
     scale!(mesh, scale)
-    return nothing
-end
-
-"""
-    reset_translation3d!(mesh::AbstractMesh)
-
-Resets all previous translations and returns the mesh back to the global origin.
-"""
-function reset_translation3d!(mesh::AbstractMesh{T}) where {T}
-    translate3d!(mesh, -position(mesh))
-    return nothing
-end
-
-"""
-    reset_rotation3d!(mesh::AbstractMesh)
-
-Resets all previous rotations around the current offset.
-"""
-function reset_rotation3d!(mesh::AbstractMesh{T}) where {T}
-    # Calculate rotation reset angle (thx LLMs)
-    R = orientation(mesh)
-    θ = acos(clamp((tr(R)-1)/2, -1, 1))
-    if iszero(θ)
-        return nothing
-    end
-    # Calculate rotation reset axis
-    axis = 1/(2*sin(θ)) * [R[3,2]-R[2,3], R[1,3]-R[3,1], R[2,1]-R[1,2]]
-    # Reset mesh rotation
-    rotate3d!(mesh, axis, -θ)
-    # Reset orientation field
-    orientation!(mesh, Matrix{T}(I, 3, 3))
     return nothing
 end
 

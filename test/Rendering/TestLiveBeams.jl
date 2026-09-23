@@ -121,7 +121,7 @@ end
 
     @testset "Beam group of non-Beams errors clearly" begin
         b1 = AstigmaticGaussianBeamlet([0, 0, 0], [0, 1, 0], 1000e-9, 1e-3)
-        bg = AstigmaticBeamGroup([b1])
+        bg = AstigmaticBeamGroup([b1], [0, 0, 0], [0, 1, 0])
         fig = Figure()
         ax = LScene(fig[1, 1])
         @test_throws ArgumentError Ext.live_render!(ax, bg)

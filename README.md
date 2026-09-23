@@ -40,6 +40,8 @@ To install this package in your current project environment, enter the Pkg REPL-
 using Pkg; Pkg.add("BeamletOptics")
 ```
 
+BMO requires **Julia 1.12 or newer**. On older Julia versions, Pkg will automatically fall back to the latest release that still supports them.
+
 # Examples
 
 For a variety of illustrated examples and tutorials, refer to the **Tutorials** and **Examples** in the **Getting started** sections of the documentation linked to above.

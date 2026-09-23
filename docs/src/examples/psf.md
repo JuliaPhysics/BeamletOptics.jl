@@ -1,8 +1,8 @@
 ```@setup psf
 dir = joinpath(@__DIR__, "..", "assets", "examples")
 
-Main.DocUtils.conditional_include(joinpath(dir, "psfdetector_showcase.jl"), use_placeholder=false)
-Main.DocUtils.conditional_include(joinpath(dir, "polarized_psf_showcase.jl"), use_placeholder=false)
+Main.DocUtils.conditional_include(joinpath(dir, "psfdetector_showcase.jl"))
+Main.DocUtils.conditional_include(joinpath(dir, "polarized_psf_showcase.jl"))
 ```
 
 # Point spread functions
@@ -114,7 +114,7 @@ mirror = ParabolicMirror(f, 12.5e-3)
 # spawn the beam behind the detector (y = -f) and in front of the mirror rim (y ≈ -1.95 mm)
 src = UniformDiscSource([0, -f / 2, 0], [0, 1, 0], D, λ; num_rays = 5000)
 pol_src = CollimatedSource(
-    [Beam(position(first(rays(b))), direction(first(rays(b))), λ, [1.0, 0, 0]) for b in BMO.beams(src)], D)
+    [Beam(position(first(rays(b))), direction(first(rays(b))), λ, [1.0, 0, 0]) for b in BMO.beams(src)], D, [0, -f / 2, 0], [0, 1, 0])
 
 pd = Detector(1e-3)
 translate3d!(pd, [0, -f, 0])

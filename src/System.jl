@@ -656,11 +656,11 @@ function retrace_system!(
 end
 
 """
-    solve_system!(system::System, beam::AbstractBeam; r_max=100, retrace=true, depth_max=typemax(Int))
+    solve_system!(system::System, beam::AbstractBeam; r_max=get_default_r_max(), retrace=true, depth_max=get_default_depth_max(), check_invariant=true, threshold=get_invariant_threshold())
 
 Manage the tracing of an `AbstractBeam` through an optical `system`. The function retraces the `beam` if possible and then proceeds to trace each leaf of the beam tree through the system.
 The condition to stop ray tracing is that the last `beam` intersection is `nothing` or the beam interaction is `nothing`. Then, the system is considered to be solved.
-A maximum number of rays per `beam` (`r_max`) can be specified in order to avoid infinite calculations under resonant conditions, i.e. two facing mirrors. Likewise, `depth_max` limits how many branching levels are explored when new sub-beams are generated (for example, by beamsplitters) so that the tree cannot grow without bound.
+A maximum number of rays per `beam` (`r_max`) can be specified in order to avoid infinite calculations under resonant conditions, i.e. two facing mirrors. Likewise, `depth_max` limits how many branching levels are explored when new sub-beams are generated (for example, by beamsplitters) so that the tree cannot grow without bound. Sub-beams beyond the depth limit are dropped from the tree.
 
 # Arguments
 
@@ -671,7 +671,7 @@ A maximum number of rays per `beam` (`r_max`) can be specified in order to avoid
 
 - `r_max = get_default_r_max()`: Maximum number of tracing iterations for each leaf.
 - `retrace = true`: Flag to indicate if the system should be retraced. Default is true.
-- `depth_max = get_default_depth_max()`: Maximum number of branching levels explored from the root beam.
+- `depth_max = get_default_depth_max()`: Maximum number of branching levels explored from the root beam
 - `check_invariant = true`: enables or disables optical invariant checks where applicable
 - `threshold = get_invariant_threshold()`: threshold for paraxial invariant checks
 """
@@ -704,7 +704,6 @@ function solve_system!(
         else
             # Maximum braching depth is reached. Remove childrens of the current beam because they will not be solved.
             _drop_beams!(current)
-            @debug lazy"Maximum branching depth of $depth_max levels reached."
         end
     end
     return nothing

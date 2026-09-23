@@ -43,6 +43,22 @@ const BMO = BeamletOptics
     end
 
     @testset "Testing x/y/zrotate3d!" begin
+        @testset "Matrix rotation updates geometry about the mesh position" begin
+            mesh = BMO.CubeMesh(1)
+            translate3d!(mesh, [2, 3, 4])
+            pivot = copy(position(mesh))
+            vertex = copy(BMO.vertices(mesh)[1, :])
+            normal = BMO.normal3d(mesh, 1)
+            R = BMO.rotate3d([0, 1, 0], π / 3)
+
+            rotate3d!(mesh, R)
+
+            @test position(mesh) == pivot
+            @test BMO.vertices(mesh)[1, :] ≈ pivot + R * (vertex - pivot)
+            @test BMO.normal3d(mesh, 1) ≈ R * normal
+            @test orientation(mesh) ≈ R
+        end
+
         @testset "Testing rotate3d!" begin
             rotate3d!(foo, [1, 0, 0], π / 4)
             @test isapprox(minimum(BMO.vertices(foo)[:, 1]), -0.5)
@@ -102,6 +118,19 @@ const BMO = BeamletOptics
         @test BMO.vertices(foo) ≈ BMO.vertices(bar)
     end
 
+    @testset "reset_rotation3d! at and near θ = π" begin
+        for θ in (π, π - 1e-9, π / 2)
+            m = BMO.CubeMesh(1)
+            ref = BMO.vertices(BMO.CubeMesh(1))
+            translate3d!(m, [1, 2, 3])
+            rotate3d!(m, [1, 1, 0], θ)
+            reset_rotation3d!(m)
+            @test orientation(m) == I
+            @test position(m) ≈ [1, 2, 3]
+            @test BMO.vertices(m) ≈ ref .+ [1 2 3] atol = 1e-12
+        end
+    end
+
     @testset "Testing align3d!" begin
         align3d!(foo, normalize([0, 1, 1]))
         @test position(foo) == zeros(3)
@@ -109,6 +138,22 @@ const BMO = BeamletOptics
         @test orientation(foo)[:, 2] ≈ [0, √2 / 2, √2 / 2]
         @test orientation(foo)[:, 3] ≈ [0, -√2 / 2, √2 / 2]
         reset_rotation3d!(foo)
+    end
+
+    @testset "align3d! from rotated start orientation" begin
+        m = BMO.CubeMesh(1)
+        translate3d!(m, [1, 2, 3])
+        xrotate3d!(m, π / 5)
+        V0 = copy(BMO.vertices(m))
+        O0 = orientation(m)
+        p0 = copy(position(m))
+        t = [1.0, 0, 0]
+        R = BMO.align3d(O0[:, 2], t)
+        align3d!(m, t)
+        @test orientation(m)[:, 2] ≈ t
+        @test orientation(m) ≈ R * O0
+        @test BMO.vertices(m) ≈ (V0 .- p0') * R' .+ p0'
+        @test position(m) == p0
     end
 
     @testset "Testing normal" begin
@@ -222,6 +267,47 @@ const BMO = BeamletOptics
             @test BMO.normal3d(cm, i) ≈ [0, -1, 0]
         end
     end
+end
+
+@testset "ObjectGroup of meshes" begin
+    # Part 1: rotate3d! propagates to member mesh vertices/orientation about the group center
+    m1 = SquarePlanoMirror(0.0254, 0.005)
+    m2 = SquarePlanoMirror(0.0254, 0.005)
+    translate3d!(m1, [0.05, 0, 0])
+    translate3d!(m2, [0, 0, 0.05])
+    g = ObjectGroup([m1, m2])
+    members = (m1, m2)
+    pg = copy(position(g))
+    V0 = [copy(BMO.vertices(BMO.shape(mi))) for mi in members]
+    O0 = [orientation(BMO.shape(mi)) for mi in members]
+
+    rotate3d!(g, [0, 0, 1], π / 3)
+    R = BMO.rotate3d([0, 0, 1], π / 3)
+    for (i, mi) in enumerate(members)
+        @test BMO.vertices(BMO.shape(mi)) ≈ (V0[i] .- pg') * R' .+ pg'
+        @test orientation(BMO.shape(mi)) ≈ R * O0[i]
+    end
+
+    # Part 2: align3d! propagates the same way and sets the group's local y-axis
+    m1b = SquarePlanoMirror(0.0254, 0.005)
+    m2b = SquarePlanoMirror(0.0254, 0.005)
+    translate3d!(m1b, [0.05, 0, 0])
+    translate3d!(m2b, [0, 0, 0.05])
+    gb = ObjectGroup([m1b, m2b])
+    membersb = (m1b, m2b)
+    pgb = copy(position(gb))
+    V0b = [copy(BMO.vertices(BMO.shape(mi))) for mi in membersb]
+    O0b = [orientation(BMO.shape(mi)) for mi in membersb]
+
+    Og0 = orientation(gb)
+    target = normalize([1.0, 1.0, 0.0])
+    Rb = BMO.align3d(Og0[:, 2], target)
+    align3d!(gb, target)
+    for (i, mi) in enumerate(membersb)
+        @test BMO.vertices(BMO.shape(mi)) ≈ (V0b[i] .- pgb') * Rb' .+ pgb'
+        @test orientation(BMO.shape(mi)) ≈ Rb * O0b[i]
+    end
+    @test orientation(gb)[:, 2] ≈ target
 end
 
 end # MODULE
