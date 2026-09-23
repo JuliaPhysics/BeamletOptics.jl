@@ -66,14 +66,30 @@ _px(scene) = Tuple(Float64.(mouseposition_px(scene)))
 
 _other_mode(mode::Symbol) = mode == :move ? :rotate : :move
 
-_help_hint(mode::Symbol) = "$mode mode, m: switch mode, h: show controls"
+"""Formats `x` with 3 significant digits, without a trailing `.0` for integer values."""
+function _fmt_sigdigits(x)
+    v = round(x, sigdigits = 3)
+    return isinteger(v) && abs(v) < 1e15 ? string(Int(v)) : string(v)
+end
+
+"""Returns the current keyboard step of the `mode`, in nm for the move and µrad for the rotate mode."""
+function _step_string(mode::Symbol, fine_step, fine_angle)
+    return mode == :move ? "$(_fmt_sigdigits(fine_step * 1e9)) nm" :
+           "$(_fmt_sigdigits(fine_angle * 1e6)) µrad"
+end
+
+function _help_hint(mode::Symbol, fine_step, fine_angle)
+    step = _step_string(mode, fine_step, fine_angle)
+    return "$mode mode, step $step, +/-: step, m: switch mode, h: show controls"
+end
 
 function _help_text(mode::Symbol, fine_step, fine_angle)
+    step = _step_string(mode, fine_step, fine_angle)
     if mode == :move
-        verb, step = "move along", "$(round(fine_step * 1e9, sigdigits = 3)) nm"
+        verb = "move along"
         up, left, page, drag = "green arrow", "red arrow", "blue arrow", "move in plane"
     else
-        verb, step = "rotate around", "$(round(fine_angle * 1e6, sigdigits = 3)) µrad"
+        verb = "rotate around"
         up, left, page, drag = "red ring", "blue ring", "green ring", "rotate around blue ring"
     end
     return """
@@ -83,8 +99,32 @@ function _help_text(mode::Symbol, fine_step, fine_angle)
     ←/→: $verb $left
     page up/down: $verb $page
     step: $step, shift: 10× step
+    +/-: change step
     r: reset, esc: deselect
     h: hide controls"""
+end
+
+const _STEP_MANTISSAS = (1.0, 2.0, 5.0)
+# Bounds of the keyboard steps, changed via + and -
+const _FINE_STEP_LIMITS = (1e-12, 1.0)
+const _FINE_ANGLE_LIMITS = (1e-9, π / 4)
+
+"""
+    _next_step(x, dir::Int)
+
+Returns the next value after `x > 0` in the 1-2-5 sequence (…, 1, 2, 5, 10, 20, …) in the direction
+`dir` (`1`: up, `-1`: down). If `x` is not a value of the sequence, the next value of the sequence
+in the direction `dir` is returned.
+"""
+function _next_step(x::Real, dir::Int)
+    x > 0 || throw(ArgumentError("step must be positive, got $x"))
+    dir in (-1, 1) || throw(ArgumentError("dir must be -1 or 1, got $dir"))
+    e = floor(log10(x))
+    # Adjacent decades as well, in case of rounding errors of log10
+    grid = [k * 10.0^d for d in (e - 1):(e + 2) for k in _STEP_MANTISSAS]
+    i = findfirst(g -> isapprox(x, g; rtol = 1e-6), grid)
+    isnothing(i) || return grid[i + dir]
+    return dir > 0 ? grid[findfirst(>(x), grid)] : grid[findlast(<(x), grid)]
 end
 
 # Green, red and blue axes of the controls: local y-axis, local x-axis and rotation axis
@@ -194,7 +234,18 @@ end
 
 function _update_help!(ctrl::KinematicController)
     ctrl.help_obs[] = ctrl.help_shown ? _help_text(ctrl.mode[], ctrl.fine_step, ctrl.fine_angle) :
-                      _help_hint(ctrl.mode[])
+                      _help_hint(ctrl.mode[], ctrl.fine_step, ctrl.fine_angle)
+    return nothing
+end
+
+"""Changes the keyboard step of the current mode of the `ctrl` by one value of the 1-2-5 sequence."""
+function _change_step!(ctrl::KinematicController, dir::Int)
+    if ctrl.mode[] == :move
+        ctrl.fine_step = clamp(_next_step(ctrl.fine_step, dir), _FINE_STEP_LIMITS...)
+    else
+        ctrl.fine_angle = clamp(_next_step(ctrl.fine_angle, dir), _FINE_ANGLE_LIMITS...)
+    end
+    _update_help!(ctrl)
     return nothing
 end
 
@@ -299,6 +350,44 @@ end
 _default_pick(ax) = Makie.pick(Makie.get_scene(ax))
 
 """
+    _ray_pick(objects, origin, dir)
+
+Returns the object among `objects` with the nearest `BMO.intersect3d` hit of the ray from `origin`
+along `dir`, or `nothing` if the ray misses all `objects`. `ObjectGroup`s and `MultiShape` objects
+are picked as a whole through `intersect3d`. Objects for which `intersect3d` errors (e.g. custom
+objects without a geometry implementation) or returns `nothing` (e.g. `NonInteractableObject`) are
+skipped.
+"""
+function _ray_pick(objects, origin, dir)
+    ray = BMO.Ray(Vector{Float64}(origin), Vector{Float64}(dir))
+    best, tmin = nothing, Inf
+    for obj in objects
+        isect = try
+            BMO.intersect3d(obj, ray)
+        catch
+            nothing
+        end
+        isnothing(isect) && continue
+        t = BMO.length(isect)
+        if 0 < t < tmin
+            best, tmin = obj, t
+        end
+    end
+    return best
+end
+
+"""
+    _ray_pick(ctrl::KinematicController, scene)
+
+Returns the movable object of `ctrl` hit by the camera ray at the current cursor position of
+`scene`, see [`_ray_pick(objects, origin, dir)`](@ref).
+"""
+function _ray_pick(ctrl::KinematicController, scene)
+    r = Makie.ray_at_cursor(scene)
+    return _ray_pick(ctrl.movable, r.origin, r.direction)
+end
+
+"""
     kinematic_controls!(ax, h::SystemRenderHandle; kwargs...)
 
 Enables mouse and keyboard controls for the objects of the live-rendered system `h`, see
@@ -330,6 +419,10 @@ The following keys apply to the selected object, pressing shift multiplies the s
 The first key moves the object in the direction of the arrow, or rotates it in the direction of
 the ring. In addition, `r` resets the object to its initial pose and `esc` deselects it.
 
+The keys `+` and `-` increase or decrease the step size of the current mode (`fine_step` or
+`fine_angle`) along the 1-2-5 sequence, e.g. 10 nm → 20 nm → 50 nm → 100 nm. They also work
+without a selected object. The current step size is shown in the hint line.
+
 # Keyword args
 
 - `objects = nothing`: the movable objects, all objects of `h` by default
@@ -342,7 +435,9 @@ the ring. In addition, `r` resets the object to its initial pose and `esc` desel
 - `mode = :move`: initial mode, `:move` or `:rotate`
 - `throttle = true`: limits updates to one per frame
 - `show_help = false`: shows the controls overlay initially, otherwise only a hint
-- `pick = ax -> Makie.pick(Makie.get_scene(ax))`: picking function
+- `pick = nothing`: objects are selected by intersecting the camera ray with the movable objects, so
+  meshes that are not part of the system (e.g. housings) do not block the selection; otherwise a
+  function `ax -> (plot, index)`
 """
 function kinematic_controls!(
         ax::_RenderEnv,
@@ -357,7 +452,7 @@ function kinematic_controls!(
         mode::Symbol = :move,
         throttle::Bool = true,
         show_help::Bool = false,
-        pick = _default_pick
+        pick = nothing
     )
     mode in (:move, :rotate) || throw(ArgumentError("mode must be :move or :rotate, got :$mode"))
     scene = Makie.get_scene(ax)
@@ -387,7 +482,8 @@ function kinematic_controls!(
         text!(ax, label_pos; text = labels, color = _AXES_COLORS, visible = gizmo_visible,
             fontsize = 20, align = (:center, :center), overdraw = true)
     ]
-    help_obs = Observable(show_help ? _help_text(mode, fine_step, fine_angle) : _help_hint(mode))
+    help_obs = Observable(show_help ? _help_text(mode, fine_step, fine_angle) :
+                      _help_hint(mode, fine_step, fine_angle))
     push!(plots, text!(ax, Point2f(0.01, 0.99); text = help_obs, space = :relative,
         align = (:left, :top), fontsize = 14, color = :gray40))
 
@@ -404,8 +500,16 @@ function kinematic_controls!(
     l1 = on(events(scene).mousebutton, priority = 200) do event
         event.button == Mouse.left || return Consume(false)
         if event.action == Mouse.press
-            plot, _ = pick(ax)
-            obj = isnothing(plot) ? nothing : pick_object(h, plot)
+            if pick === nothing
+                obj = _ray_pick(ctrl, scene)
+                if isnothing(obj)
+                    plot, _ = _default_pick(ax)
+                    obj = isnothing(plot) ? nothing : pick_object(h, plot)
+                end
+            else
+                plot, _ = pick(ax)
+                obj = isnothing(plot) ? nothing : pick_object(h, plot)
+            end
             if isnothing(obj) || !_is_movable(ctrl, obj)
                 ctrl.bg_press_pos = _px(scene)
                 return Consume(false)
@@ -486,7 +590,13 @@ function kinematic_controls!(
         end
         return Consume(true)
     end
-    push!(ctrl.listeners, l1, l2, l3)
+    # Typed characters instead of keys, since + and - depend on the keyboard layout
+    l4 = on(events(scene).unicode_input, priority = 200) do char
+        char in ('+', '-') || return Consume(false)
+        _change_step!(ctrl, char == '+' ? 1 : -1)
+        return Consume(true)
+    end
+    push!(ctrl.listeners, l1, l2, l3, l4)
 
     if throttle
         push!(ctrl.listeners, on(_ -> ctrl.dirty && _apply_update!(ctrl), events(scene).tick))

@@ -71,6 +71,41 @@ const BMO = BeamletOptics
         @test isapprox(maximum(xs), 1.0; atol = 1e-6)
     end
 
+    @testset "_ray_pick pure helper" begin
+        origin = [0.0, -1.0, 0.0]
+        dir = [0.0, 1.0, 0.0]
+
+        @testset "occluder in front is skipped, mirror behind is picked" begin
+            cube = BMO.CubeMesh(1)
+            translate3d!(cube, -[0.5, 0.5, 0.5])
+            translate3d!(cube, [0.0, -0.5, 0.0]) # in front of the mirror, on the ray
+            occluder = NonInteractableObject(cube) # not part of any system
+            mir = RoundPlanoMirror(0.025, 0.005) # at the origin, behind the occluder
+            @test Ext._ray_pick([occluder, mir], origin, dir) === mir
+        end
+
+        @testset "nearest of two movables on the ray is picked" begin
+            near = RoundPlanoMirror(0.025, 0.005)
+            far = RoundPlanoMirror(0.025, 0.005)
+            translate3d!(far, [0.0, 2.0, 0.0])
+            @test Ext._ray_pick([far, near], origin, dir) === near
+            @test Ext._ray_pick([near, far], origin, dir) === near
+        end
+
+        @testset "ray misses all movables" begin
+            m1 = RoundPlanoMirror(0.025, 0.005)
+            m2 = RoundPlanoMirror(0.025, 0.005)
+            translate3d!(m2, [0.0, 2.0, 0.0])
+            @test isnothing(Ext._ray_pick([m1, m2], [0.1, -1.0, 0.0], dir))
+        end
+
+        @testset "objects whose intersect3d errors are skipped, not rethrown" begin
+            struct _BrokenRayPickObject <: BMO.AbstractObject{Float64} end
+            mir = RoundPlanoMirror(0.025, 0.005)
+            @test Ext._ray_pick([_BrokenRayPickObject(), mir], origin, dir) === mir
+        end
+    end
+
     # Event handling, picking requires a screen and is replaced
     function _fixture()
         m1 = RoundPlanoMirror(0.025, 0.005)
@@ -81,6 +116,33 @@ const BMO = BeamletOptics
         ax = LScene(fig[1, 1])
         h = live_render!(ax, sys)
         return fig, ax, h, m1, m2
+    end
+
+    @testset "default pick (nothing) selects via ray casting" begin
+        fig, ax, h, m1, m2 = _fixture()
+        scene = ax.scene
+        # Default camera looks at [0,0,0] (m1's position) from the center of the viewport
+        vp = scene.viewport[]
+        cx, cy = vp.origin[1] + vp.widths[1] / 2, vp.origin[2] + vp.widths[2] / 2
+        ctrl = Ext.kinematic_controls!(ax, h; throttle = false) # no pick kwarg: ray picking
+        events(scene).mouseposition[] = (cx, cy)
+        events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+        @test ctrl.selected[] === m1
+        close(ctrl)
+    end
+
+    @testset "ray miss falls back to Makie.pick" begin
+        fig, ax, h, m1, m2 = _fixture()
+        scene = ax.scene
+        ctrl = Ext.kinematic_controls!(ax, h; throttle = false)
+        # Mouse position at the corner: the ray misses both mirrors, the fallback finds no plot
+        # without a backend
+        events(scene).mouseposition[] = (1.0, 1.0)
+        @test isnothing(Ext._ray_pick(ctrl, scene))
+        @test_logs events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+        @test ctrl.selected[] === nothing
+        @test !ctrl.dragging
+        close(ctrl)
     end
 
     @testset "grab, drag-translate, release" begin
@@ -270,16 +332,97 @@ const BMO = BeamletOptics
         fig, ax, h, m1, m2 = _fixture()
         scene = ax.scene
         ctrl = Ext.kinematic_controls!(ax, h; throttle = false, fine_step = 20e-9)
-        @test ctrl.help_obs[] == Ext._help_hint(:move)
+        hint = Ext._help_hint(:move, 20e-9, 10e-6)
+        @test ctrl.help_obs[] == hint
         # works without a selected object
         events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.h, Keyboard.press)
-        @test occursin("20.0 nm", ctrl.help_obs[])
+        @test occursin("step: 20 nm", ctrl.help_obs[])
+        @test occursin("+/-: change step", ctrl.help_obs[])
         events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.h, Keyboard.press)
-        @test ctrl.help_obs[] == Ext._help_hint(:move)
+        @test ctrl.help_obs[] == hint
         close(ctrl)
         ctrl = Ext.kinematic_controls!(ax, h; show_help = true)
-        @test ctrl.help_obs[] != Ext._help_hint(:move)
+        @test ctrl.help_obs[] != Ext._help_hint(:move, 10e-9, 10e-6)
         close(ctrl)
+    end
+
+    @testset "step size keys" begin
+        @test Ext._next_step(3e-8, 1) ≈ 5e-8
+        @test Ext._next_step(3e-8, -1) ≈ 2e-8
+        @test Ext._next_step(1e-8, 1) ≈ 2e-8
+        @test Ext._next_step(5e-8, 1) ≈ 1e-7
+        @test Ext._next_step(1e-7, -1) ≈ 5e-8
+        @test Ext._next_step(1.0, -1) ≈ 0.5
+
+        fig, ax, h, m1, m2 = _fixture()
+        scene = ax.scene
+        ctrl = Ext.kinematic_controls!(ax, h; throttle = false, fine_step = 10e-9, fine_angle = 10e-6)
+        @test ctrl.help_obs[] == "move mode, step 10 nm, +/-: step, m: switch mode, h: show controls"
+
+        # move mode, no object selected: 1-2-5 sequence on fine_step only
+        @test isnothing(ctrl.selected[])
+        steps = Float64[]
+        for c in ('+', '+', '+', '-')
+            events(scene).unicode_input[] = c
+            push!(steps, ctrl.fine_step)
+        end
+        @test steps ≈ [20e-9, 50e-9, 100e-9, 50e-9]
+        @test ctrl.fine_angle == 10e-6
+        @test ctrl.help_obs[] == "move mode, step 50 nm, +/-: step, m: switch mode, h: show controls"
+
+        # help overlay shows the new step as well
+        events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.h, Keyboard.press)
+        @test occursin("step: 50 nm", ctrl.help_obs[])
+        events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.h, Keyboard.press)
+
+        # rotate mode: fine_angle only
+        events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.m, Keyboard.press)
+        steps = Float64[]
+        for c in ('+', '+', '+', '-')
+            events(scene).unicode_input[] = c
+            push!(steps, ctrl.fine_angle)
+        end
+        @test steps ≈ [20e-6, 50e-6, 100e-6, 50e-6]
+        @test ctrl.fine_step ≈ 50e-9
+        @test occursin("rotate mode, step 50 µrad", ctrl.help_obs[])
+
+        # clamping at the bounds
+        ctrl.fine_angle = π / 4
+        events(scene).unicode_input[] = '+'
+        @test ctrl.fine_angle ≈ π / 4
+        events(scene).unicode_input[] = '-'
+        @test ctrl.fine_angle ≈ 0.5
+        ctrl.fine_angle = 1e-9
+        events(scene).unicode_input[] = '-'
+        @test ctrl.fine_angle ≈ 1e-9
+        events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.m, Keyboard.press)
+        ctrl.fine_step = 1.0
+        events(scene).unicode_input[] = '+'
+        @test ctrl.fine_step ≈ 1.0
+        ctrl.fine_step = 1e-12
+        events(scene).unicode_input[] = '-'
+        @test ctrl.fine_step ≈ 1e-12
+
+        # + and - are consumed, other characters are passed on
+        probe = Char[]
+        on(events(scene).unicode_input, priority = -1000) do c
+            push!(probe, c)
+            return Consume(false)
+        end
+        events(scene).unicode_input[] = '+'
+        events(scene).unicode_input[] = 'x'
+        @test probe == ['x']
+
+        # also with a selected object
+        ctrl.selected[] = m1
+        ctrl.fine_step = 10e-9
+        events(scene).unicode_input[] = '+'
+        @test ctrl.fine_step ≈ 20e-9
+
+        # the listener is removed by close
+        close(ctrl)
+        events(scene).unicode_input[] = '+'
+        @test ctrl.fine_step ≈ 20e-9
     end
 
     @testset "close disconnects listeners and removes the selection box" begin

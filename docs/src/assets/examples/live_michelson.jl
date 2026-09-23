@@ -32,51 +32,46 @@ pd = Detector(pd_size)
 translate_to3d!(pd, [18.81cm, 9.595cm, 0])
 
 system = System([rpm, cbs, m1, m2, pd])
-solve_system!(system, beam)
 
-## Figure with the 3D view, the detector intensity and the optical power
-fig = Figure(size = (1200, 700))
-ax = LScene(fig[1:2, 1]; show_axis = false)
-heat_ax = Axis(fig[1, 2]; title = "Detector intensity", xlabel = "x [mm]", ylabel = "y [mm]", aspect = 1)
-power_ax = Axis(fig[2, 2]; title = "Optical power", xlabel = "Update", ylabel = "P [mW]")
-status = Label(fig[3, 1:2], "Click on a component to select it, press h to show the controls"; tellwidth = false)
-colsize!(fig.layout, 1, Relative(0.6))
+## Optical power over the updates, plotted into an additional axis below the detector panel
+power = Observable(Point2f[])
+power_ax = nothing
 
-system_handle = live_render!(ax, system)
-beam_handle = live_render!(ax, beam)
+"""Returns the optical power [W] from the intensity of a detector panel of the `live_view`."""
+function panel_power(panel)
+    isnothing(BMO.hits(panel.pd)) && return 0.0
+    x, z, I = panel.heat_x[], panel.heat_y[], panel.heat_I[] # [mm], [mm], [W/m²]
+    return sum(I) * (x[2] - x[1]) * (z[2] - z[1]) * mm^2
+end
 
-# Evaluate the detector on a fixed grid, the color range is set by the aligned interferometer
-n = 100
-detector_intensity() = intensity(pd; n, x_min = -pd_size / 2, x_max = pd_size / 2, z_min = -pd_size / 2, z_max = pd_size / 2)
-x, y, I = detector_intensity()
-dA = step(x) * step(y)
-I_obs = Observable(I)
-heatmap!(heat_ax, x / mm, y / mm, I_obs; colorrange = (0, maximum(I)))
-
-power = Observable([Point2f(1, 1e3 * sum(I) * dA)])
-lines!(power_ax, power; color = :red)
-
-## Solve the system and update all plots after a component has been moved
-function on_change(obj)
-    empty!(pd)
-    solve_system!(system, beam)
-    update_render!(beam_handle)
-    # No light hits the detector if e.g. the beamsplitter is moved out of the beam
-    I_obs[] = isnothing(BMO.hits(pd)) ? zero(I_obs[]) : detector_intensity()[3]
-    P = sum(I_obs[]) * dA
-    push!(power[], Point2f(last(power[])[1] + 1, 1e3 * P))
+function record_power!(gui, obj)
+    global power_ax
+    # Called for the first time after the window has been set up
+    if isnothing(power_ax)
+        power_ax = Axis(gui.fig[1, 2][2, 1]; title = "Optical power", xlabel = "Update", ylabel = "P [mW]")
+        lines!(power_ax, power; color = :red)
+    end
+    n = isempty(power[]) ? 1 : last(power[])[1] + 1
+    push!(power[], Point2f(n, 1e3 * panel_power(gui.panels[1])))
     length(power[]) > 300 && popfirst!(power[])
     notify(power)
     autolimits!(power_ax)
-    status.text[] = "$(nameof(typeof(obj))) at $(round.(BMO.position(obj) / mm, digits = 6)) mm, P = $(round(1e3 * P, digits = 4)) mW"
     return nothing
 end
 
-controls = kinematic_controls!(ax, system_handle; on_change)
+## Interactive window, the detector intensity is evaluated on the full detector area
+full_area = (; x_min = -pd_size / 2, x_max = pd_size / 2, z_min = -pd_size / 2, z_max = pd_size / 2)
+gui = live_view(system, beam; size = (1200, 700), detectors = [pd => (:intensity, full_area)],
+    on_change = record_power!)
+fig = gui.fig
+controls = gui.controls
+
+# Solves the system again after moving a component from code, as the controls do after each change
+on_change(obj) = controls.on_change(obj)
 
 # Open the interactive window when used from the REPL or run as a script
 if isinteractive()
-    display(fig)
+    display(gui)
 elseif abspath(PROGRAM_FILE) == @__FILE__
-    wait(display(fig))
+    wait(display(gui))
 end

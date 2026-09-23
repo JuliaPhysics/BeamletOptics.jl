@@ -197,3 +197,23 @@ Enables mouse and keyboard controls for moving and rotating the objects of a liv
 If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
 """
 kinematic_controls!(::Any, ::Any; kwargs...) = throw(MissingBackendError())
+
+"""
+    live_view(system => beam, ...; kwargs...)
+    live_view(system, beam; kwargs...)
+
+Opens a complete interactive window for one or several pairs of `system` and `beam`: a 3D view in
+which all components can be moved via [`kinematic_controls!`](@ref), one panel per `Detector`
+(spot diagram or intensity), a status line and optional sliders. After each change, all detectors
+are emptied, all systems are solved again and the beams and panels are updated. Returns a
+`LiveView`, which can be shown via `display`.
+
+Main keyword arguments: `detectors` (`:auto`, a vector of `pd`, `pd => mode` or
+`pd => (mode, kwargs)`, or `[]`), `on_change = (gui, obj) -> nothing`,
+`sliders = ["label" => (range, callback)]`, `system_kwargs`, `beam_kwargs` and `size`. All other
+keyword arguments are passed to [`kinematic_controls!`](@ref). Refer to the method of the `Makie`
+extension for details.
+
+If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
+"""
+live_view(::Any...; kwargs...) = throw(MissingBackendError())

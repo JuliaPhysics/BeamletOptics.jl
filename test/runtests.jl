@@ -48,6 +48,7 @@ include(joinpath(@__DIR__, "Rendering", "TestRenderPolarization.jl"))
 include(joinpath(@__DIR__, "Rendering", "TestLiveObjects.jl"))
 include(joinpath(@__DIR__, "Rendering", "TestLiveBeams.jl"))
 include(joinpath(@__DIR__, "Rendering", "TestLiveInteraction.jl"))
+include(joinpath(@__DIR__, "Rendering", "TestLiveView.jl"))
 
 # Test regressions
 include(joinpath(@__DIR__, "TestBugFixes.jl"))

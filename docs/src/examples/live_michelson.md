@@ -6,7 +6,7 @@ Main.DocUtils.conditional_include(joinpath(dir, "live_michelson_showcase.jl"))
 
 # Interactive Michelson interferometer
 
-This example shows how to build an interactive application with the [live rendering](@ref "Live rendering") functions of this package. The Michelson interferometer of the [Michelson interferometer](@ref) tutorial is rendered into a `GLMakie` window, in which the components can be moved and rotated with the mouse and keyboard. After each change, the system is solved again and the beam path, the fringe pattern on the detector and the optical power are updated live.
+This example shows how to build an interactive application with [`live_view`](@ref), which is based on the [live rendering](@ref "Live rendering") functions of this package. The Michelson interferometer of the [Michelson interferometer](@ref) tutorial is rendered into a `GLMakie` window, in which the components can be moved and rotated with the mouse and keyboard. After each change, the system is solved again and the beam path, the fringe pattern on the detector and the optical power are updated live.
 
 ![Interactive Michelson interferometer](live_michelson_fringes.png)
 
@@ -50,64 +50,56 @@ pd = Detector(pd_size)
 translate_to3d!(pd, [18.81cm, 9.595cm, 0])
 
 system = System([rpm, cbs, m1, m2, pd])
-solve_system!(system, beam)
 ```
 
-## Rendering the system
+## Opening the interactive window
 
-The figure consists of a `LScene` for the system and two axes for the detector intensity and the optical power. Instead of [`render!`](@ref), the system and the beam are rendered with [`live_render!`](@ref), which returns handles that can be updated later on.
+A single call of [`live_view`](@ref) opens a complete interactive window for the system and the beam: the 3D view, one panel per [`Detector`](@ref) and a status line. The detector panel shows the intensity for Gaussian beamlets and the spot diagram for rays, together with the optical power or the number of rays in its title. By default, the intensity is cropped around the beam. Here, the full detector area is evaluated instead, which makes the movement of the fringes visible. The `record_power!` callback is defined in the [next section](@ref "Custom updates").
 
 ```julia
-fig = Figure(size = (1200, 700))
-ax = LScene(fig[1:2, 1]; show_axis = false)
-heat_ax = Axis(fig[1, 2]; title = "Detector intensity", xlabel = "x [mm]", ylabel = "y [mm]", aspect = 1)
-power_ax = Axis(fig[2, 2]; title = "Optical power", xlabel = "Update", ylabel = "P [mW]")
-status = Label(fig[3, 1:2], "Click on a component to select it, press h to show the controls"; tellwidth = false)
-colsize!(fig.layout, 1, Relative(0.6))
-
-system_handle = live_render!(ax, system)
-beam_handle = live_render!(ax, beam)
+full_area = (; x_min = -pd_size / 2, x_max = pd_size / 2, z_min = -pd_size / 2, z_max = pd_size / 2)
+gui = live_view(system, beam; size = (1200, 700), detectors = [pd => (:intensity, full_area)],
+    on_change = record_power!)
+display(gui)
 ```
 
-The detector intensity is evaluated on a fixed grid and stored in an `Observable`, such that the heatmap follows its changes. The color range is set by the aligned interferometer, which makes changes of the optical power visible.
+After each change, `live_view` empties all detectors, solves the system again and updates the beam and the detector panels. There is no need to call [`solve_system!`](@ref) or [`update_render!`](@ref) manually. The figure, the 3D view and the controls are available as `gui.fig`, `gui.ax` and `gui.controls`, e.g. to add static context via `render!(gui.ax, ...)`. Several systems can be shown in the same view via `live_view(system1 => beam1, system2 => beam2)`, and sliders for custom parameters can be added via the `sliders` keyword argument.
+
+## Custom updates
+
+The `on_change` callback is called after each solve with the moved component, or `nothing` for the initial solve. Here, it records the optical power on the detector, which is calculated from the intensity of the detector panel, and plots it into an additional axis below the panel:
 
 ```julia
-n = 100
-detector_intensity() = intensity(pd; n, x_min = -pd_size / 2, x_max = pd_size / 2, z_min = -pd_size / 2, z_max = pd_size / 2)
-x, y, I = detector_intensity()
-dA = step(x) * step(y)
-I_obs = Observable(I)
-heatmap!(heat_ax, x / mm, y / mm, I_obs; colorrange = (0, maximum(I)))
+power = Observable(Point2f[])
+power_ax = nothing
 
-power = Observable([Point2f(1, 1e3 * sum(I) * dA)])
-lines!(power_ax, power; color = :red)
-```
+function panel_power(panel)
+    isnothing(BMO.hits(panel.pd)) && return 0.0
+    x, z, I = panel.heat_x[], panel.heat_y[], panel.heat_I[] # [mm], [mm], [W/m²]
+    return sum(I) * (x[2] - x[1]) * (z[2] - z[1]) * mm^2
+end
 
-## Interaction
-
-The `on_change` function is called after a component has been moved. It solves the system again, updates the beam via [`update_render!`](@ref) and evaluates the detector. The rendering of the moved component itself is updated automatically. Note that the detector has to be reset via `empty!` before solving the system.
-
-```julia
-function on_change(obj)
-    empty!(pd)
-    solve_system!(system, beam)
-    update_render!(beam_handle)
-    # No light hits the detector if e.g. the beamsplitter is moved out of the beam
-    I_obs[] = isnothing(BMO.hits(pd)) ? zero(I_obs[]) : detector_intensity()[3]
-    P = sum(I_obs[]) * dA
-    push!(power[], Point2f(last(power[])[1] + 1, 1e3 * P))
+function record_power!(gui, obj)
+    global power_ax
+    # Called for the first time after the window has been set up
+    if isnothing(power_ax)
+        power_ax = Axis(gui.fig[1, 2][2, 1]; title = "Optical power", xlabel = "Update", ylabel = "P [mW]")
+        lines!(power_ax, power; color = :red)
+    end
+    n = isempty(power[]) ? 1 : last(power[])[1] + 1
+    push!(power[], Point2f(n, 1e3 * panel_power(gui.panels[1])))
     length(power[]) > 300 && popfirst!(power[])
     notify(power)
     autolimits!(power_ax)
-    status.text[] = "$(nameof(typeof(obj))) at $(round.(BMO.position(obj) / mm, digits = 6)) mm, P = $(round(1e3 * P, digits = 4)) mW"
     return nothing
 end
-
-controls = kinematic_controls!(ax, system_handle; on_change)
-display(fig)
 ```
 
-[`kinematic_controls!`](@ref) enables the following controls:
+Errors in the callback are logged once and do not interrupt the interaction.
+
+## Controls
+
+The components are moved via [`kinematic_controls!`](@ref), which enables the following controls:
 
 | Input                          | Move mode                    | Rotate mode                  |
 |:-------------------------------|:-----------------------------|:-----------------------------|
@@ -115,10 +107,15 @@ display(fig)
 | `↑` / `↓`                      | Move along the green arrow   | Rotate around the red ring   |
 | `→` / `←`                      | Move along the red arrow     | Rotate around the blue ring  |
 | `Page Up` / `Page Down`        | Move along the blue arrow    | Rotate around the green ring |
+| `+` / `-`                      | Increase / decrease the step | Increase / decrease the step |
 
 Further controls: `m` switches between the move and the rotate mode, pressing shift multiplies
 the step size by 10, `r` resets the selected component to its initial pose, `Esc` or a click on
-empty space deselects it and `h` shows or hides an overlay of all controls.
+empty space deselects it and `h` shows or hides an overlay of all controls. The keys `+` and `-`
+change the step size of the current mode along the 1-2-5 sequence, e.g. 10 nm → 20 nm → 50 nm →
+100 nm, also without a selected component. The current step size is shown in the hint line at the
+top of the 3D view. Keyword arguments such as the initial `fine_step` or the `rotation_axis` are
+passed from `live_view` to [`kinematic_controls!`](@ref).
 
 The selected component is marked by a box and three axes above it: its local y-axis (green), its
 local x-axis (red) and the vertical rotation axis (blue). In the move mode the axes are shown as
