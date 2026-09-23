@@ -71,6 +71,10 @@ them), e.g. `"left_shift"`."""
 _modifier_name(btn::Keyboard.Button) = string(btn)
 _modifier_name(btns) = join(string.(btns), "/")
 
+# Ctrl (Windows/Linux) or Cmd (macOS) held, used for the undo/redo shortcuts
+const _CTRL_OR_CMD_KEYS = (Keyboard.left_control, Keyboard.right_control,
+    Keyboard.left_super, Keyboard.right_super)
+
 _px(scene) = Tuple(Float64.(mouseposition_px(scene)))
 
 _other_mode(mode::Symbol) = mode == :move ? :rotate : :move
@@ -119,6 +123,7 @@ function _help_text(mode::Symbol, fine_step, fine_angle, select_modifier = nothi
     page up/down: $verb $page
     step: $step, +/-: change step, shift: 10× step
     backspace: reset, esc: enclosing group or deselect
+    ctrl/cmd+z: undo, ctrl/cmd+y or ctrl/cmd+shift+z: redo
     v: spectator mode, h: hide controls"""
 end
 
@@ -147,6 +152,10 @@ end
 
 # Green, red and blue axes of the controls: local y-axis, local x-axis and rotation axis
 const _AXES_COLORS = [:green, :red, :blue]
+# Symbols of the gizmo axes in the same order as _AXES_COLORS, and as accepted by `constraints`
+const _AXES_SYMS = (:y, :x, :v)
+const _GIZMO_AXES = (:x, :y, :v)
+const _GIZMO_FADE_ALPHA = 0.15
 const _RING_RES = 32
 
 """
@@ -185,6 +194,19 @@ function _gizmo(mode::Symbol, origin, axes, l)
     return arrow_pos, arrow_dir, label_pos, ring_pts
 end
 
+"""One entry of the undo history of [`kinematic_controls!`](@ref): the pose of `obj` before and
+after one gesture (a mouse drag, a reset or one or several merged keyboard steps)."""
+struct _HistoryEntry
+    obj::_LiveMovable
+    P0::Point3{Float64}
+    R0::Matrix{Float64}
+    P1::Point3{Float64}
+    R1::Matrix{Float64}
+end
+
+# Last key step, see `_record_key_step!`
+const _KeyStepInfo = NamedTuple{(:obj, :key, :time), Tuple{_LiveMovable, Keyboard.Button, Float64}}
+
 """
     KinematicController
 
@@ -210,6 +232,12 @@ mutable struct KinematicController{H <: SystemRenderHandle}
     spectator::Observable{Bool}
     select_modifier::Any
     drag_threshold::Float64
+    # locked move/rotate axes per object, see the `constraints` kwarg
+    constraints::IdDict{Any, NamedTuple}
+    # screen-space pick radius of sources [px]
+    source_pick_radius::Float64
+    # disables all keyboard handling while true, e.g. a focused text field elsewhere in the figure
+    ignore_keys::Function
     # interaction state
     dirty::Bool
     dragging::Bool
@@ -219,12 +247,21 @@ mutable struct KinematicController{H <: SystemRenderHandle}
     press_pos::Union{Nothing, NTuple{2, Float64}}
     press_leaf::Union{Nothing, _LiveMovable}
     press_kind::Symbol
+    # pose of the selected object at the start of the current drag, for the undo history
+    drag_start::Union{Nothing, Tuple{Point3{Float64}, Matrix{Float64}}}
+    # undo/redo history, one entry per gesture, see `_push_history!` / `_record_key_step!`
+    undo_stack::Vector{_HistoryEntry}
+    redo_stack::Vector{_HistoryEntry}
+    last_key_step::Union{Nothing, _KeyStepInfo}
     # selection box and gizmo of the keyboard controls
     box_obs::Observable{Vector{Point3f}}
     arrow_pos::Observable{Vector{Point3f}}
     arrow_dir::Observable{Vector{Vec3f}}
     label_pos::Observable{Vector{Point3f}}
     ring_pts::Observable{Vector{Point3f}}
+    arrow_color::Observable{Vector{Makie.RGBAf}}
+    label_color::Observable{Vector{Makie.RGBAf}}
+    ring_color::Observable{Vector{Makie.RGBAf}}
     gizmo_size::Observable{Float64}
     gizmo_visible::Observable{Bool}
     # controls overlay, toggled via h
@@ -306,6 +343,53 @@ function _control_axes(ctrl::KinematicController, obj)
     return (Vector{Float64}(R[:, 2]), Vector{Float64}(R[:, 1]), ctrl.rotation_axis)
 end
 
+"""Returns the vectors of the gizmo axes `syms` (a subset of `:x`, `:y`, `:v`) of `obj`."""
+function _axis_vectors(ctrl::KinematicController, obj, syms)
+    y, x, v = _control_axes(ctrl, obj)
+    lookup = (y = y, x = x, v = v)
+    return [lookup[s] for s in syms]
+end
+
+"""Returns the constraints `NamedTuple` of `obj` (`(; move, rotate)`, either field possibly
+missing), or `(;)` if `obj` has no entry in `ctrl.constraints`."""
+_constraints_of(ctrl::KinematicController, obj) = get(ctrl.constraints, obj, (;))
+
+"""Returns the allowed axes (a tuple of `:x`, `:y`, `:v`) of `obj` for `kind` (`:move` or
+`:rotate`), all axes by default."""
+function _allowed_axes(ctrl::KinematicController, obj, kind::Symbol)
+    return get(_constraints_of(ctrl, obj), kind, _GIZMO_AXES)
+end
+
+"""Validates the `constraints` kwarg of [`kinematic_controls!`](@ref)."""
+function _validate_constraints(constraints)
+    for (obj, c) in constraints
+        for k in keys(c)
+            k in (:move, :rotate) ||
+                throw(ArgumentError("invalid constraints field :$k, use :move or :rotate"))
+        end
+        for kind in (:move, :rotate)
+            haskey(c, kind) || continue
+            for a in c[kind]
+                a in _GIZMO_AXES ||
+                    throw(ArgumentError("invalid constraint axis :$a for :$kind, use :x, :y or :v"))
+            end
+        end
+    end
+    return nothing
+end
+
+"""Returns the colors of the gizmo axes `[y, x, v]` (green, red, blue) of `obj`'s `kind` controls
+(`:move` or `:rotate`), faded to indicate axes locked by the `constraints`."""
+function _gizmo_colors(ctrl::KinematicController, obj, kind::Symbol)
+    allowed = _allowed_axes(ctrl, obj, kind)
+    colors = Makie.RGBAf[]
+    for (sym, c) in zip(_AXES_SYMS, _AXES_COLORS)
+        rgba = Makie.RGBAf(Makie.to_color(c))
+        push!(colors, sym in allowed ? rgba : Makie.RGBAf(rgba.r, rgba.g, rgba.b, _GIZMO_FADE_ALPHA))
+    end
+    return colors
+end
+
 function _update_help!(ctrl::KinematicController)
     if ctrl.spectator[]
         ctrl.help_obs[] = ctrl.help_shown ? _SPECTATOR_HELP : _SPECTATOR_HINT
@@ -350,7 +434,12 @@ function _update_selection_box!(ctrl::KinematicController)
     ctrl.label_pos.val = label_pos
     ctrl.ring_pts.val = ring_pts
     ctrl.gizmo_size.val = l
-    foreach(notify, (ctrl.gizmo_size, ctrl.arrow_pos, ctrl.arrow_dir, ctrl.label_pos, ctrl.ring_pts))
+    colors = _gizmo_colors(ctrl, obj, ctrl.mode[])
+    ctrl.arrow_color.val = colors
+    ctrl.label_color.val = colors
+    ctrl.ring_color.val = repeat(colors; inner = 2 * _RING_RES)
+    foreach(notify, (ctrl.gizmo_size, ctrl.arrow_pos, ctrl.arrow_dir, ctrl.label_pos, ctrl.ring_pts,
+        ctrl.arrow_color, ctrl.label_color, ctrl.ring_color))
     ctrl.gizmo_visible[] || (ctrl.gizmo_visible[] = true)
     return nothing
 end
@@ -384,33 +473,123 @@ function _apply_update!(ctrl::KinematicController)
     return nothing
 end
 
+"""
+    _set_pose!(obj, P, R)
+
+Sets the pose of `obj` to position `P` and orientation `R`, by rotating around the axis-angle of
+`R * orientation(obj)'` and then translating to `P`.
+"""
+function _set_pose!(obj, P, R)
+    axis, angle = _axis_angle_from_rotmatrix(R * _pose(obj)[2]')
+    angle > 1e-12 && rotate3d!(obj, axis, angle)
+    translate_to3d!(obj, P)
+    return nothing
+end
+
 function _reset_pose!(ctrl::KinematicController, obj)
     P0, R0 = ctrl.init_poses[obj]
-    axis, angle = _axis_angle_from_rotmatrix(R0 * _pose(obj)[2]')
-    angle > 1e-12 && rotate3d!(obj, axis, angle)
-    translate_to3d!(obj, P0)
+    _set_pose!(obj, P0, R0)
     return nothing
+end
+
+const _HISTORY_LIMIT = 100
+
+"""
+    _push_history!(ctrl, obj, P0, R0, P1, R1)
+
+Pushes a new undo entry moving `obj` from the pose `(P0, R0)` to `(P1, R1)`, unless nothing
+changed. Starts a new gesture: clears the redo stack and drops the oldest entry once the history
+exceeds `_HISTORY_LIMIT`.
+"""
+function _push_history!(ctrl::KinematicController, obj, P0, R0, P1, R1)
+    (P0 == P1 && R0 == R1) && return nothing
+    push!(ctrl.undo_stack, _HistoryEntry(obj, P0, R0, P1, R1))
+    length(ctrl.undo_stack) > _HISTORY_LIMIT && popfirst!(ctrl.undo_stack)
+    empty!(ctrl.redo_stack)
+    return nothing
+end
+
+"""
+    _record_key_step!(ctrl, obj, key, P0, R0, P1, R1)
+
+Records a keyboard step of `obj` from `(P0, R0)` to `(P1, R1)` in the undo history. A step of the
+same `key` on the same `obj` as the previous one, no more than 1 s apart, is merged into the same
+entry instead of pushing a new one.
+"""
+function _record_key_step!(ctrl::KinematicController, obj, key, P0, R0, P1, R1)
+    (P0 == P1 && R0 == R1) && return nothing
+    now = time()
+    m = ctrl.last_key_step
+    if !isnothing(m) && m.obj === obj && m.key === key && (now - m.time) <= 1.0 &&
+       !isempty(ctrl.undo_stack)
+        e = pop!(ctrl.undo_stack)
+        push!(ctrl.undo_stack, _HistoryEntry(obj, e.P0, e.R0, P1, R1))
+    else
+        _push_history!(ctrl, obj, P0, R0, P1, R1)
+    end
+    ctrl.last_key_step = (obj = obj, key = key, time = now)
+    return nothing
+end
+
+"""
+    _undo!(ctrl::KinematicController)
+
+Undoes the last recorded gesture (a mouse drag, a reset or one or several merged keyboard steps),
+if any, and selects its object. Returns whether an entry was undone.
+"""
+function _undo!(ctrl::KinematicController)
+    isempty(ctrl.undo_stack) && return false
+    e = pop!(ctrl.undo_stack)
+    push!(ctrl.redo_stack, e)
+    ctrl.last_key_step = nothing
+    _set_pose!(e.obj, e.P0, e.R0)
+    ctrl.selected[] === e.obj || (ctrl.selected[] = e.obj)
+    _update_selection_box!(ctrl)
+    _request_update!(ctrl)
+    return true
+end
+
+"""
+    _redo!(ctrl::KinematicController)
+
+Redoes the last undone gesture, if any, and selects its object. Returns whether an entry was
+redone.
+"""
+function _redo!(ctrl::KinematicController)
+    isempty(ctrl.redo_stack) && return false
+    e = pop!(ctrl.redo_stack)
+    push!(ctrl.undo_stack, e)
+    ctrl.last_key_step = nothing
+    _set_pose!(e.obj, e.P1, e.R1)
+    ctrl.selected[] === e.obj || (ctrl.selected[] = e.obj)
+    _update_selection_box!(ctrl)
+    _request_update!(ctrl)
+    return true
 end
 
 """
     _key_step!(ctrl, obj, key, factor)
 
 Moves or rotates the `obj` depending on the mode of the `ctrl`. Returns `false` if the `key` is
-not a control key.
+not a control key. If the corresponding axis is locked by the `constraints` of `obj`, the key is
+still consumed (returns `true`) but nothing moves.
 """
 function _key_step!(ctrl::KinematicController, obj, key, factor)
     y, x, v = _control_axes(ctrl, obj)
     # Axis and sign of the step for each key, see _help_text
-    axis, sign = if ctrl.mode[] == :move
-        key == Keyboard.up ? (y, 1) : key == Keyboard.down ? (y, -1) :
-        key == Keyboard.right ? (x, 1) : key == Keyboard.left ? (x, -1) :
-        key == Keyboard.page_up ? (v, 1) : key == Keyboard.page_down ? (v, -1) : (nothing, 0)
+    axis_sym, axis, sign = if ctrl.mode[] == :move
+        key == Keyboard.up ? (:y, y, 1) : key == Keyboard.down ? (:y, y, -1) :
+        key == Keyboard.right ? (:x, x, 1) : key == Keyboard.left ? (:x, x, -1) :
+        key == Keyboard.page_up ? (:v, v, 1) : key == Keyboard.page_down ? (:v, v, -1) :
+        (nothing, nothing, 0)
     else
-        key == Keyboard.up ? (x, 1) : key == Keyboard.down ? (x, -1) :
-        key == Keyboard.left ? (v, 1) : key == Keyboard.right ? (v, -1) :
-        key == Keyboard.page_up ? (y, 1) : key == Keyboard.page_down ? (y, -1) : (nothing, 0)
+        key == Keyboard.up ? (:x, x, 1) : key == Keyboard.down ? (:x, x, -1) :
+        key == Keyboard.left ? (:v, v, 1) : key == Keyboard.right ? (:v, v, -1) :
+        key == Keyboard.page_up ? (:y, y, 1) : key == Keyboard.page_down ? (:y, y, -1) :
+        (nothing, nothing, 0)
     end
     isnothing(axis) && return false
+    axis_sym in _allowed_axes(ctrl, obj, ctrl.mode[]) || return true # locked: consumed, no motion
     if ctrl.mode[] == :move
         translate3d!(obj, (sign * factor * ctrl.fine_step) .* axis)
     else
@@ -430,6 +609,8 @@ function _set_spectator!(ctrl::KinematicController, on::Bool)
     if on
         ctrl.dragging = false
         ctrl.press_kind = :none
+        ctrl.drag_start = nothing
+        ctrl.last_key_step = nothing
         ctrl.selected[] = nothing
         _update_selection_box!(ctrl)
     end
@@ -469,12 +650,12 @@ end
 """
     _ray_pick(objects, origin, dir, box = obj -> nothing)
 
-Returns the object among `objects` with the nearest hit of the ray from `origin` along `dir`, or
-`nothing` if the ray misses all `objects`. Objects are hit via `BMO.intersect3d`, i.e.
-`ObjectGroup`s and `MultiShape` objects are picked as a whole. Objects for which `intersect3d`
-errors (e.g. custom objects without a geometry implementation) or returns `nothing` (e.g.
-`NonInteractableObject`) are skipped. Sources, which have no geometry, are hit via the bounding
-box returned by `box`.
+Returns `(obj, t)`: the object among `objects` with the nearest hit of the ray from `origin` along
+`dir`, and the hit distance `t`, or `(nothing, nothing)` if the ray misses all `objects`. Objects
+are hit via `BMO.intersect3d`, i.e. `ObjectGroup`s and `MultiShape` objects are picked as a whole.
+Objects for which `intersect3d` errors (e.g. custom objects without a geometry implementation) or
+returns `nothing` (e.g. `NonInteractableObject`) are skipped. Sources, which have no geometry, are
+hit via the bounding box returned by `box`.
 """
 function _ray_pick(objects, origin, dir, box = obj -> nothing)
     ray = BMO.Ray(Vector{Float64}(origin), Vector{Float64}(dir))
@@ -497,24 +678,42 @@ function _ray_pick(objects, origin, dir, box = obj -> nothing)
             best, tmin = obj, t
         end
     end
-    return best
+    return best, isnothing(best) ? nothing : tmin
 end
 
 """
     _ray_pick(ctrl::KinematicController, scene)
 
-Returns the object hit by the camera ray at the current cursor position of `scene` among all
-objects of the movable objects of `ctrl`, i.e. objects of groups are returned instead of the
-groups. Sources are hit via the bounding box of their marker.
+Returns `(obj, t)`: the object hit by the camera ray at the current cursor position of `scene`
+among all objects of the movable objects of `ctrl`, i.e. objects of groups are returned instead of
+the groups, and the hit distance `t`; or `(nothing, nothing)` if the ray misses everything. Sources
+(non-`AbstractObject` leaves, i.e. beams and beam groups) are hit via the bounding box of their
+marker as usual, and additionally whenever the screen-space projection of their `position` is
+within `ctrl.source_pick_radius` pixels of the cursor, using as `t` the distance along the ray to
+the point of the ray closest to the source position (so that the nearest candidate still wins).
 """
 function _ray_pick(ctrl::KinematicController, scene)
     r = Makie.ray_at_cursor(scene)
+    origin, dir = Vector{Float64}(r.origin), Vector{Float64}(r.direction)
     leaves = reduce(vcat, (_leaves(o) for o in ctrl.movable); init = _LiveMovable[])
     box = function (obj)
         plots = _object_plots(ctrl.h, obj)
         return isempty(plots) ? nothing : mapreduce(Makie.boundingbox, GeometryBasics.union, plots)
     end
-    return _ray_pick(leaves, r.origin, r.direction, box)
+    best, tmin = _ray_pick(leaves, origin, dir, box)
+    tmin = isnothing(tmin) ? Inf : tmin
+    cursor = _px(scene)
+    for obj in leaves
+        obj isa BMO.AbstractObject && continue # sources only, already covered by the bbox hit above
+        p = Vector{Float64}(position(obj))
+        px = Makie.project(scene, :data, :pixel, Point3(p))
+        hypot(px[1] - cursor[1], px[2] - cursor[2]) <= ctrl.source_pick_radius || continue
+        t = dot(p .- origin, dir)
+        if 0 <= t < tmin
+            best, tmin = obj, t
+        end
+    end
+    return best, isnothing(best) ? nothing : tmin
 end
 
 """
@@ -542,8 +741,11 @@ A click selects, a drag moves only what is already selected, every other drag ro
 
 - left-click on an object: selects it, so that a camera drag never moves or rotates a component by
   accident
-- left-drag on the selected object: moves it within the plane through its position
-  (`plane_normal`), or rotates it around the `rotation_axis` in the rotate mode
+- left-drag on the selected object: moves it within the plane through the grabbed point
+  (`plane_normal`), such that the point under the cursor at the start of the drag stays under the
+  cursor; or rotates it around the `rotation_axis` in the rotate mode. If the exact point under the
+  cursor is not known (a custom `pick` function, or the `Makie.pick` fallback), the object's
+  `position` is used instead
 - left-drag elsewhere (background or an unselected object): rotates the camera as usual
 - left-click on empty space: deselects the current object
 
@@ -551,6 +753,10 @@ Object groups (e.g. `ObjectGroup`) are selected as a whole by the first click. E
 the selected group selects the next level of the hierarchy towards the object under the cursor,
 i.e. a subgroup or a single object, which is then moved on its own. A group is moved and rotated
 around its `position`, the group center.
+
+Sources (beams and beam groups) are additionally picked when their `position`, projected to pixel
+space, is within `source_pick_radius` of the cursor, in addition to the bounding box of their
+marker, see [`live_view`](@ref).
 
 # Keyboard controls
 
@@ -570,6 +776,21 @@ The keys `+` and `-` increase or decrease the step size of the current mode (`fi
 `fine_angle`) along the 1-2-5 sequence, e.g. 10 nm → 20 nm → 50 nm → 100 nm. They also work
 without a selected object. The current step size is shown in the hint line.
 
+# Undo/redo
+
+`Ctrl`+`Z` (`Cmd`+`Z` on macOS) undoes the last gesture, `Ctrl`+`Y` or `Ctrl`+`Shift`+`Z`
+(`Cmd`+`Y`/`Cmd`+`Shift`+`Z`) redoes it. A gesture is a mouse drag, a reset (`Backspace`) or a run
+of keyboard steps of the same key on the same object less than 1 s apart, each recorded as a single
+history entry (up to 100 entries). Undoing or redoing selects the affected object and re-triggers
+`on_change`. A new gesture clears the redo history. Not available in the spectator mode.
+
+# Constraints
+
+`constraints` locks the move and/or rotate axes of specific objects, e.g. a mirror in a kinematic
+mount that may only tilt. A locked axis does not move via the mouse or the keyboard (the key is
+still consumed) and is shown faded on the gizmo. For an object inside a group, the constraints of
+the object (or subgroup) that is currently selected apply.
+
 # Keyword args
 
 - `objects = nothing`: the movable top-level objects, all top-level objects of `h` by default. The
@@ -585,7 +806,8 @@ without a selected object. The current step size is shown in the hint line.
 - `show_help = false`: shows the controls overlay initially, otherwise only a hint
 - `pick = nothing`: objects are selected by intersecting the camera ray with the movable objects, so
   meshes that are not part of the system (e.g. housings) do not block the selection; otherwise a
-  function `ax -> (plot, index)`
+  function `ax -> (plot, index)`. The grab point of a drag falls back to the object's `position`
+  when a custom `pick` is used, since it does not provide a hit point.
 - `select_modifier = nothing`: if set to a `Keyboard.Button` (or a tuple/vector of them, meaning
   "any of"), clicks and drags only react on objects while the modifier is held; otherwise they
   always go to the camera. Suggested: `Keyboard.left_shift` (`Ctrl`+click is taken by Makie's
@@ -593,6 +815,14 @@ without a selected object. The current step size is shown in the hint line.
 - `drag_threshold = 3`: [px] mouse movement between press and release that turns a click into a
   drag
 - `spectator = false`: starts in the spectator mode
+- `constraints = Dict()`: maps an object to a `NamedTuple` `(; move = axes, rotate = axes)`, where
+  `axes` is a tuple of the allowed gizmo axes `:x` (red, local x), `:y` (green, local y) and `:v`
+  (blue, `rotation_axis`); a missing field means all axes are allowed, `()` means none, see
+  "Constraints"
+- `source_pick_radius = 15`: [px] screen-space pick radius of source markers, see "Mouse controls"
+- `ignore_keys = () -> false`: predicate checked before any keyboard handling (including `v`, `h`,
+  `m` and undo/redo); while `true`, keys are not handled and passed on, e.g. while a text field
+  elsewhere in the figure is focused
 """
 function kinematic_controls!(
         ax::_RenderEnv,
@@ -610,9 +840,15 @@ function kinematic_controls!(
         pick = nothing,
         select_modifier = nothing,
         drag_threshold = 3,
-        spectator::Bool = false
+        spectator::Bool = false,
+        constraints = Dict(),
+        source_pick_radius = 15,
+        ignore_keys = () -> false
     )
     mode in (:move, :rotate) || throw(ArgumentError("mode must be :move or :rotate, got :$mode"))
+    # Objects are compared by identity
+    constraints_dict = IdDict{Any, NamedTuple}(constraints)
+    _validate_constraints(constraints_dict)
     scene = Makie.get_scene(ax)
     movable = _LiveMovable[]
     if isnothing(objects)
@@ -640,20 +876,23 @@ function kinematic_controls!(
         ([0, 1, 0], [1, 0, 0], [0, 0, 1]), 1e-3 * maximum(GeometryBasics.widths(bb)))
     arrow_pos, arrow_dir = Observable(arrow_pos), Observable(arrow_dir)
     label_pos, ring_pts = Observable(label_pos), Observable(ring_pts)
+    default_colors = Makie.RGBAf[Makie.RGBAf(Makie.to_color(c)) for c in _AXES_COLORS]
+    arrow_color = Observable(default_colors)
+    label_color = Observable(default_colors)
+    ring_color = Observable(repeat(default_colors; inner = 2 * _RING_RES))
     gizmo_size = Observable(1.0)
     gizmo_visible = Observable(false)
     mode_obs = Observable(mode)
-    ring_colors = repeat(_AXES_COLORS; inner = 2 * _RING_RES)
     labels = Makie.lift(m -> m == :move ? ["↑", "→", "page up"] : ["page up", "↑", "←"], mode_obs)
     plots = AbstractPlot[
         linesegments!(ax, box_obs; color = :yellow, linewidth = 2),
         # Arrow dimensions relative to the gizmo size, such that ring arrows are mostly tip
-        arrows3d!(ax, arrow_pos, arrow_dir; color = _AXES_COLORS, visible = gizmo_visible,
+        arrows3d!(ax, arrow_pos, arrow_dir; color = arrow_color, visible = gizmo_visible,
             markerscale = gizmo_size, shaftradius = 0.025, tipradius = 0.1, tiplength = 0.3,
             overdraw = true),
-        linesegments!(ax, ring_pts; color = ring_colors, linewidth = 3, overdraw = true,
+        linesegments!(ax, ring_pts; color = ring_color, linewidth = 3, overdraw = true,
             visible = Makie.lift((v, m) -> v && m == :rotate, gizmo_visible, mode_obs)),
-        text!(ax, label_pos; text = labels, color = _AXES_COLORS, visible = gizmo_visible,
+        text!(ax, label_pos; text = labels, color = label_color, visible = gizmo_visible,
             fontsize = 20, align = (:center, :center), overdraw = true)
     ]
     help_obs = Observable("")
@@ -667,9 +906,11 @@ function kinematic_controls!(
         mode_obs, on_change, normalize(Float64.(plane_normal)), normalize(Float64.(rotation_axis)),
         Float64(rotate_speed), Float64(fine_step), Float64(fine_angle), throttle,
         Observable(spectator), select_modifier, Float64(drag_threshold),
+        constraints_dict, Float64(source_pick_radius), ignore_keys,
         false, false, zeros(3), zeros(3), (0.0, 0.0), nothing, nothing, :none,
-        box_obs, arrow_pos, arrow_dir, label_pos, ring_pts, gizmo_size, gizmo_visible,
-        help_obs, show_help, plots, Any[], nothing
+        nothing, _HistoryEntry[], _HistoryEntry[], nothing,
+        box_obs, arrow_pos, arrow_dir, label_pos, ring_pts, arrow_color, label_color, ring_color,
+        gizmo_size, gizmo_visible, help_obs, show_help, plots, Any[], nothing
     )
 
     # High priority, so that the camera does not receive events while an object is dragged
@@ -680,15 +921,18 @@ function kinematic_controls!(
                 # Modifier not held: every click and drag goes to the camera, no state change
                 return Consume(false)
             end
+            local t
             if pick === nothing
-                leaf = _ray_pick(ctrl, scene)
+                leaf, t = _ray_pick(ctrl, scene)
                 if isnothing(leaf)
                     plot, _ = _default_pick(ax)
                     leaf = isnothing(plot) ? nothing : _pick_leaf(h, plot)
+                    t = nothing
                 end
             else
                 plot, _ = pick(ax)
                 leaf = isnothing(plot) ? nothing : _pick_leaf(h, plot)
+                t = nothing
             end
             ctrl.press_pos = _px(scene)
             if isnothing(leaf) || !_is_movable(ctrl, leaf)
@@ -703,8 +947,20 @@ function kinematic_controls!(
                 ctrl.press_kind = :pending_drag
                 ctrl.last_mouse = ctrl.press_pos
                 ctrl.plane_point = Vector{Float64}(position(sel))
-                hit = _mouse_plane_hit(scene, ctrl)
-                ctrl.grab_offset = isnothing(hit) ? zeros(3) : ctrl.plane_point .- hit
+                # Grab at the exact point under the cursor, so that point stays under the cursor
+                # during the drag; falls back to the pivot if the hit point is not known
+                hit_point = nothing
+                if !isnothing(t)
+                    r = Makie.ray_at_cursor(scene)
+                    hit_point = Vector{Float64}(r.origin) .+ t .* Vector{Float64}(r.direction)
+                    ctrl.plane_point = hit_point
+                end
+                if !isnothing(hit_point)
+                    ctrl.grab_offset = Vector{Float64}(position(sel)) .- hit_point
+                else
+                    hit = _mouse_plane_hit(scene, ctrl)
+                    ctrl.grab_offset = isnothing(hit) ? zeros(3) : ctrl.plane_point .- hit
+                end
                 return Consume(true)
             else
                 # A press on an unselected object might turn into a camera drag: let it through
@@ -719,6 +975,14 @@ function kinematic_controls!(
             if ctrl.dragging
                 ctrl.dragging = false
                 consume = true
+                if !isnothing(ctrl.drag_start)
+                    obj = ctrl.selected[]
+                    P0, R0 = ctrl.drag_start
+                    P1, R1 = _pose(obj)
+                    ctrl.drag_start = nothing
+                    ctrl.last_key_step = nothing
+                    _push_history!(ctrl, obj, P0, R0, P1, R1)
+                end
             elseif kind == :pending_drag
                 # Released before crossing the threshold: a click, not a drag
                 if moved < ctrl.drag_threshold
@@ -753,19 +1017,26 @@ function kinematic_controls!(
             moved = hypot((cur .- ctrl.press_pos)...)
             moved >= ctrl.drag_threshold || return Consume(true)
             ctrl.dragging = true
+            ctrl.drag_start = _pose(ctrl.selected[])
         end
         obj = ctrl.selected[]
         if ctrl.mode[] == :move
             hit = _mouse_plane_hit(scene, ctrl)
             if !isnothing(hit)
-                translate_to3d!(obj, hit .+ ctrl.grab_offset)
-                _request_update!(ctrl)
+                target = hit .+ ctrl.grab_offset
+                allowed = _allowed_axes(ctrl, obj, :move)
+                if !isempty(allowed)
+                    Δ = target .- Vector{Float64}(position(obj))
+                    A = hcat(_axis_vectors(ctrl, obj, allowed)...)
+                    translate3d!(obj, A * (A \ Δ))
+                    _request_update!(ctrl)
+                end
             end
         else
             mp = _px(scene)
             dx = mp[1] - ctrl.last_mouse[1]
             ctrl.last_mouse = mp
-            if dx != 0
+            if dx != 0 && :v in _allowed_axes(ctrl, obj, :rotate)
                 rotate3d!(obj, ctrl.rotation_axis, ctrl.rotate_speed * dx)
                 _request_update!(ctrl)
             end
@@ -774,6 +1045,7 @@ function kinematic_controls!(
     end
 
     l3 = on(events(scene).keyboardbutton, priority = 200) do event
+        ctrl.ignore_keys() && return Consume(false)
         event.action in (Keyboard.press, Keyboard.repeat) || return Consume(false)
         if event.action == Keyboard.press && event.key == Keyboard.v
             _set_spectator!(ctrl, !ctrl.spectator[])
@@ -791,6 +1063,14 @@ function kinematic_controls!(
             _update_help!(ctrl)
             return Consume(true)
         end
+        if event.key in (Keyboard.z, Keyboard.y) && _modifier_held(scene, _CTRL_OR_CMD_KEYS)
+            if event.key == Keyboard.y || _shift_pressed(scene)
+                _redo!(ctrl)
+            else
+                _undo!(ctrl)
+            end
+            return Consume(true)
+        end
         obj = ctrl.selected[]
         isnothing(obj) && return Consume(false)
         if event.key == Keyboard.escape
@@ -798,17 +1078,27 @@ function kinematic_controls!(
             ctrl.selected[] = get(ctrl.h.parent, obj, nothing)
             _update_selection_box!(ctrl)
         elseif event.key == Keyboard.backspace
+            P0, R0 = _pose(obj)
             _reset_pose!(ctrl, obj)
-            _request_update!(ctrl)
-        elseif _key_step!(ctrl, obj, event.key, _shift_pressed(scene) ? 10 : 1)
+            P1, R1 = _pose(obj)
+            ctrl.last_key_step = nothing
+            _push_history!(ctrl, obj, P0, R0, P1, R1)
             _request_update!(ctrl)
         else
-            return Consume(false)
+            P0, R0 = _pose(obj)
+            if _key_step!(ctrl, obj, event.key, _shift_pressed(scene) ? 10 : 1)
+                P1, R1 = _pose(obj)
+                _record_key_step!(ctrl, obj, event.key, P0, R0, P1, R1)
+                _request_update!(ctrl)
+            else
+                return Consume(false)
+            end
         end
         return Consume(true)
     end
     # Typed characters instead of keys, since + and - depend on the keyboard layout
     l4 = on(events(scene).unicode_input, priority = 200) do char
+        ctrl.ignore_keys() && return Consume(false)
         (char in ('+', '-') && !ctrl.spectator[]) || return Consume(false)
         _change_step!(ctrl, char == '+' ? 1 : -1)
         return Consume(true)

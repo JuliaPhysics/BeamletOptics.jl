@@ -10,6 +10,7 @@ const BMO = BeamletOptics
 
 using Makie: Axis3, LScene, mesh!, surface!, lines!, RGBf, RGBAf, scatter!, text!,
              update_cam!, cameracontrols, arrows3d!
+using PrecompileTools: @setup_workload, @compile_workload
 using GeometryBasics: Point2, Point3, Point3f, Vec3f, GLTriangleFace, Mesh
 using AbstractTrees: PreOrderDFS
 using MarchingCubes: MC, march
@@ -66,5 +67,7 @@ include("LiveObjects.jl")
 include("LiveBeams.jl")
 include("LiveInteraction.jl")
 include("LiveView.jl")
+# precompiles the live rendering/interaction call paths, must come last
+include("LivePrecompile.jl")
 
 end

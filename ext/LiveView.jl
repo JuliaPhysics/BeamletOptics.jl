@@ -1,5 +1,5 @@
 using Makie: Figure, Axis, Label, SliderGrid, GridLayout, DataAspect, Relative, colsize!,
-             heatmap!, autolimits!, Button, Toggle
+             heatmap!, autolimits!, Button, Toggle, Textbox
 
 """
     DetectorPanel
@@ -35,7 +35,8 @@ window and `close` to remove the controls.
 
 The systems are solved after each change if `auto_trace[]` is `true`, otherwise only via the
 `trace_button`, the key `t` or by switching the `auto_trace_toggle` on. `stale` is `true` if the
-beams and detector panels do not match the current poses of the objects.
+beams and detector panels do not match the current poses of the objects. If solving takes longer
+than `trace_budget` [s], the systems are solved once the movement pauses for `idle_delay` [s].
 """
 mutable struct LiveView
     fig::Figure
@@ -56,6 +57,19 @@ mutable struct LiveView
     auto_trace_toggle::Toggle
     # alpha of the beam plots before dimming, restored after tracing
     beam_alphas::IdDict{Any, Any}
+    # adaptive tracing, durations of the last solve and panel update [s]
+    trace_budget::Float64
+    idle_delay::Float64
+    solve_time::Float64
+    panel_time::Float64
+    # a solve is deferred until the movement pauses
+    pending::Bool
+    pending_obj::Any
+    last_change::Float64
+    # the panels show a preview on a coarse grid
+    coarse::Bool
+    labels::IdDict{Any, String}
+    step_box::Textbox
 end
 
 Base.display(gui::LiveView) = display(gui.fig)
@@ -162,9 +176,15 @@ function _update_spot!(p::DetectorPanel, h)
     return nothing
 end
 
-function _update_intensity!(p::DetectorPanel, h)
-    x, z, I = BMO.intensity(p.pd; merge((; n = 100), p.kwargs)...)
-    # Grid size is constant, hence each intermediate state of the observables is valid
+"""Grid size of the intensity of the panel `p`, reduced to a preview while moving objects."""
+function _panel_n(p::DetectorPanel, coarse::Bool)
+    n = get(p.kwargs, :n, 100)
+    return coarse ? max(16, n ÷ 4) : n
+end
+
+function _update_intensity!(p::DetectorPanel, h; coarse = false)
+    x, z, I = BMO.intensity(p.pd; merge(p.kwargs, (; n = _panel_n(p, coarse)))...)
+    # The plot is updated lazily, hence the grid size may change
     p.heat_x[] = Float32.(1e3 .* x)
     p.heat_y[] = Float32.(1e3 .* z)
     p.heat_I[] = Float32.(I)
@@ -179,12 +199,13 @@ function _update_intensity!(p::DetectorPanel, h)
     else
         p.ax.title[] = _hits_title(p, h)
     end
+    coarse && (p.ax.title[] *= " (preview)")
     autolimits!(p.ax)
     return nothing
 end
 
 """Updates the plots and the title of the panel `p` after the systems have been solved."""
-function _update_panel!(p::DetectorPanel)
+function _update_panel!(p::DetectorPanel; coarse = false)
     try
         h = BMO.hits(p.pd)
         if isnothing(h)
@@ -195,12 +216,12 @@ function _update_panel!(p::DetectorPanel)
             if mode == :intensity && p.mode == :auto && h isa AbstractVector{<:BMO.AstigmaticGaussianBeamletHit}
                 # Fall back to the spot diagram if the field of the hits can not be evaluated
                 try
-                    _update_intensity!(p, h)
+                    _update_intensity!(p, h; coarse)
                 catch
                     _update_spot!(p, h)
                 end
             elseif mode == :intensity
-                _update_intensity!(p, h)
+                _update_intensity!(p, h; coarse)
             else
                 _update_spot!(p, h)
             end
@@ -220,28 +241,59 @@ function _position_string(obj)
 end
 
 """
+    _unit_string(x, units)
+
+Formats `x` with 3 significant digits in the first of the `units` (`factor => unit`, from small to
+large) in which it is below 1000, e.g. 1000 µm as 1 mm.
+"""
+function _unit_string(x, units)
+    for (i, (factor, unit)) in enumerate(units)
+        v = round(x / factor, sigdigits = 3)
+        (v < 1000 || i == length(units)) && return "$(_fmt_sigdigits(v)) $unit"
+    end
+end
+
+_length_string(x) = _unit_string(x, (1e-9 => "nm", 1e-6 => "µm", 1e-3 => "mm"))
+_angle_string(x) = _unit_string(x, (1e-6 => "µrad", 1e-3 => "mrad", deg2rad(1) => "°"))
+
+_label(gui, obj) = get(gui.labels, obj, string(nameof(typeof(obj))))
+
+"""Describes the pose of `obj`, including the change since the controls were enabled."""
+function _pose_string(gui, obj)
+    s = "$(_label(gui, obj)) at $(_position_string(obj))"
+    haskey(gui.controls.init_poses, obj) || return s
+    P0, R0 = gui.controls.init_poses[obj]
+    P, R = _pose(obj)
+    _, angle = _axis_angle_from_rotmatrix(R * R0')
+    return s * ", moved by $(_length_string(norm(P - P0))), rotated by $(_angle_string(angle))"
+end
+
+"""
     _resolve!(gui::LiveView, obj)
 
 Empties all `Detector`s, solves all systems and updates the beams, detector panels and the status
 line of the `gui`. The user `on_change` is called with the moved `obj`, or `nothing`.
 """
-function _resolve!(gui::LiveView, obj)
+function _resolve!(gui::LiveView, obj; coarse = false)
     # A detector can be part of several systems, hence empty all before solving
+    t0 = time()
     foreach(empty!, _find_detectors(first.(gui.pairs)))
     for (i, (sys, beam)) in enumerate(gui.pairs)
         solve_system!(sys, beam)
         update_render!(gui.beam_handles[i])
     end
-    foreach(_update_panel!, gui.panels)
+    t1 = time()
+    foreach(p -> _update_panel!(p; coarse), gui.panels)
+    gui.solve_time = t1 - t0
+    coarse || (gui.panel_time = time() - t1)
+    gui.coarse = coarse
     try
         gui.on_change(gui, obj)
         gui.last_error = nothing
     catch e
         gui.last_error = _log_once(e, gui.last_error, "`on_change` callback")
     end
-    if !isnothing(obj)
-        gui.status.text[] = "$(nameof(typeof(obj))) at $(_position_string(obj))"
-    end
+    isnothing(obj) || (gui.status.text[] = _pose_string(gui, obj))
     return nothing
 end
 
@@ -249,6 +301,7 @@ const _STALE_ALPHA = 0.3
 
 _beam_plots(h::BeamRenderHandle) = AbstractPlot[h.plot]
 _beam_plots(h::GaussianRenderHandle) = AbstractPlot[h.mesh_plot; h.beam_plots]
+_beam_plots(h::AstigmaticGroupRenderHandle) = AbstractPlot[h.mesh_plot]
 _beam_plots(h) = AbstractPlot[]
 
 """Dims all beam plots of the `gui` to indicate outdated beams, stores the original `alpha`."""
@@ -271,12 +324,10 @@ function _restore_beams!(gui::LiveView)
 end
 
 """Marks the beams and detector panels of the `gui` as outdated after `obj` (or a slider) changed."""
-function _mark_stale!(gui::LiveView, obj)
+function _mark_stale!(gui::LiveView, obj; msg = "outdated, press t to trace")
     gui.stale || _dim_beams!(gui)
     gui.stale = true
-    msg = "outdated, press t to trace"
-    gui.status.text[] = isnothing(obj) ? msg :
-                        "$(nameof(typeof(obj))) at $(_position_string(obj)) — $msg"
+    gui.status.text[] = isnothing(obj) ? msg : "$(_pose_string(gui, obj)) — $msg"
     return nothing
 end
 
@@ -286,9 +337,10 @@ end
 Solves all systems of the `gui` via `_resolve!` and restores the appearance of the beams. If solving
 fails, the beams and detector panels are kept marked as outdated. Returns `true` on success.
 """
-function _solve!(gui::LiveView, obj)
+function _solve!(gui::LiveView, obj; coarse = false)
+    gui.pending = false
     try
-        _resolve!(gui, obj)
+        _resolve!(gui, obj; coarse)
     catch e
         gui.last_error = _log_once(e, gui.last_error, "solving the systems")
         gui.stale || _dim_beams!(gui)
@@ -301,12 +353,35 @@ function _solve!(gui::LiveView, obj)
     return true
 end
 
-"""Called by the controls after each change of `obj`: solves the systems or marks them as outdated."""
+"""
+    _on_change!(gui::LiveView, obj)
+
+Called after each change of `obj` (or a slider, then `obj` is `nothing`). Solves the systems, with
+a coarse preview of slow detector panels, or marks them as outdated. If solving is slower than the
+`trace_budget`, the solve is deferred until the movement pauses, see `_on_idle!`.
+"""
 function _on_change!(gui::LiveView, obj)
-    if gui.auto_trace[]
-        _solve!(gui, obj)
-    else
+    gui.last_change = time()
+    if !gui.auto_trace[]
         _mark_stale!(gui, obj)
+    elseif gui.solve_time <= gui.trace_budget
+        _solve!(gui, obj; coarse = gui.panel_time > gui.trace_budget)
+    else
+        _mark_stale!(gui, obj; msg = "tracing when the movement pauses")
+        gui.pending = true
+        gui.pending_obj = obj
+    end
+    return nothing
+end
+
+"""Solves deferred changes and refines the preview of the detector panels once the movement pauses."""
+function _on_idle!(gui::LiveView)
+    time() - gui.last_change > gui.idle_delay || return nothing
+    if gui.pending && gui.auto_trace[]
+        _solve!(gui, gui.pending_obj)
+    elseif gui.coarse
+        foreach(_update_panel!, gui.panels)
+        gui.coarse = false
     end
     return nothing
 end
@@ -324,6 +399,7 @@ function _connect_trace!(gui::LiveView)
     push!(listeners, on(_ -> _trace!(gui), gui.trace_button.clicks))
     push!(listeners, on(events(gui.ax.scene).keyboardbutton, priority = 200) do event
         (event.action == Keyboard.press && event.key == Keyboard.t) || return Consume(false)
+        gui.step_box.focused[] && return Consume(false)
         _trace!(gui)
         return Consume(true)
     end)
@@ -331,6 +407,47 @@ function _connect_trace!(gui::LiveView)
         active && gui.stale && _trace!(gui)
         return nothing
     end)
+    push!(listeners, on(_ -> _on_idle!(gui), events(gui.ax.scene).tick))
+    return nothing
+end
+
+"""
+    _parse_step(s)
+
+Parses a step such as `"250 nm"`, `"0.1 mm"`, `"50 µrad"` or `"1 deg"` into `(:move, step [m])` or
+`(:rotate, step [rad])`. Returns `nothing` if `s` is invalid.
+"""
+function _parse_step(s::AbstractString)
+    m = match(r"^\s*([0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?)\s*(\S+)\s*$", s)
+    isnothing(m) && return nothing
+    x = parse(Float64, m.captures[1])
+    x > 0 || return nothing
+    unit = replace(m.captures[2], "u" => "µ", "μ" => "µ")
+    units = Dict("nm" => (:move, 1e-9), "µm" => (:move, 1e-6), "mm" => (:move, 1e-3),
+        "cm" => (:move, 1e-2), "m" => (:move, 1.0), "µrad" => (:rotate, 1e-6),
+        "mrad" => (:rotate, 1e-3), "rad" => (:rotate, 1.0), "deg" => (:rotate, deg2rad(1)),
+        "°" => (:rotate, deg2rad(1)))
+    haskey(units, unit) || return nothing
+    mode, factor = units[unit]
+    return mode, x * factor
+end
+
+"""Sets the keyboard step and the mode of the controls from the text `s` of the step textbox."""
+function _set_step!(gui::LiveView, s)
+    step = isnothing(s) ? nothing : _parse_step(s)
+    if isnothing(step)
+        gui.status.text[] = "invalid step \"$s\", use e.g. 250 nm or 50 µrad"
+        return nothing
+    end
+    ctrl = gui.controls
+    mode, x = step
+    mode == :move ? (ctrl.fine_step = x) : (ctrl.fine_angle = x)
+    if ctrl.mode[] != mode
+        ctrl.mode[] = mode
+        _update_selection_box!(ctrl)
+    end
+    _update_help!(ctrl)
+    gui.status.text[] = "$mode step: $(_step_string(mode, ctrl.fine_step, ctrl.fine_angle))"
     return nothing
 end
 
@@ -362,11 +479,7 @@ function _connect_sliders!(gui::LiveView, callbacks)
         empty!(pending)
         # The callbacks may have moved objects or sources
         update_render!(gui.controls.h)
-        if gui.auto_trace[]
-            _solve!(gui, nothing)
-        else
-            _mark_stale!(gui, nothing)
-        end
+        _on_change!(gui, nothing)
         return nothing
     end
     push!(listeners, tick)
@@ -395,6 +508,16 @@ fields `fig`, `ax`, `controls`, `panels`, `status` and `sliders`. Use `display(g
 window and `close(gui)` to remove the controls.
 
 Additional context, e.g. a static optomechanical assembly, can be added via `render!(gui.ax, ...)`.
+The status line shows the pose of the moved object and its change since the window was opened.
+The keyboard step can be typed into the textbox below the 3D view, e.g. `250 nm` or `50 µrad`,
+where the unit selects the move or rotate mode.
+
+# Adaptive tracing
+
+If solving the systems takes longer than `trace_budget`, the objects still follow the mouse and the
+keys immediately, while the beams are dimmed. The systems are solved once the movement pauses for
+`idle_delay`. Likewise, detector panels that take longer than `trace_budget` show a preview on a
+coarse grid while objects are moved, which is refined once the movement pauses.
 
 # Manual tracing
 
@@ -430,6 +553,10 @@ automatically around the beam, unless `x_min`, `x_max`, `z_min` and `z_max` are 
   `(; render_every = 5)` for beam groups
 - `movable_sources = true`: shows an orange marker at each source, i.e. the beam or beam group of
   each pair, with which the source can be selected and moved like the components
+- `labels = Dict()`: `obj => "name"` for the status line and the titles of the detector panels
+- `trace_budget = 0.03`: [s] duration of a solve or panel update, above which tracing is deferred
+  or the panels show a preview, see "Adaptive tracing"
+- `idle_delay = 0.2`: [s] pause of the movement after which deferred tracing runs
 - all other kwargs are passed to [`kinematic_controls!`](@ref), e.g. `fine_step`, `plane_normal`
   or `rotation_axis`
 """
@@ -443,6 +570,9 @@ function live_view(
         system_kwargs = (;),
         beam_kwargs = Dict(),
         movable_sources = true,
+        labels = Dict(),
+        trace_budget = 0.03,
+        idle_delay = 0.2,
         kwargs...
     )
     isempty(pairs) && throw(ArgumentError("live_view requires at least one system => beam pair"))
@@ -462,7 +592,7 @@ function live_view(
         nc = ceil(Int, sqrt(length(specs)))
         for (i, (pd, mode, kw)) in enumerate(specs)
             parent = grid[(i - 1) ÷ nc + 1, (i - 1) % nc + 1]
-            push!(panels, DetectorPanel(parent, pd, "Detector $i", mode, kw))
+            push!(panels, DetectorPanel(parent, pd, get(labels, pd, "Detector $i"), mode, kw))
         end
         colsize!(fig.layout, 1, Relative(0.6))
     end
@@ -476,7 +606,8 @@ function live_view(
     trace_button = Button(status_row[1, 1]; label = "Trace (t)")
     auto_trace_toggle = Toggle(status_row[1, 2]; active = auto_trace)
     Label(status_row[1, 3], "auto trace")
-    status = Label(status_row[1, 4],
+    step_box = Textbox(status_row[1, 4]; placeholder = "step, e.g. 250 nm", width = 150)
+    status = Label(status_row[1, 5],
         "Click on a component to select it, press h to show the controls"; tellwidth = false)
 
     system_handles = SystemRenderHandle[live_render!(ax, sys; system_kwargs...) for sys in systems]
@@ -501,15 +632,18 @@ function live_view(
     foreach(h -> merge!(parent, h.parent), system_handles)
     combined = SystemRenderHandle(ax, first(systems), handles, parent)
     gui_ref = Ref{LiveView}()
+    # Typing into the step textbox must not trigger the controls
     controls = kinematic_controls!(ax, combined; on_change = obj -> _on_change!(gui_ref[], obj),
-        kwargs...)
+        ignore_keys = () -> step_box.focused[], kwargs...)
 
     gui = LiveView(fig, ax, ps, system_handles, beam_handles, controls, panels, status, slider_grid,
         on_change, nothing, auto_trace_toggle.active, false, trace_button, auto_trace_toggle,
-        IdDict{Any, Any}())
+        IdDict{Any, Any}(), Float64(trace_budget), Float64(idle_delay), 0.0, 0.0, false, nothing,
+        0.0, false, IdDict{Any, String}(labels), step_box)
     gui_ref[] = gui
     isnothing(slider_grid) || _connect_sliders!(gui, last.(slider_specs))
     _connect_trace!(gui)
+    push!(controls.listeners, on(s -> _set_step!(gui, s), step_box.stored_string))
     _resolve!(gui, nothing)
     return gui
 end

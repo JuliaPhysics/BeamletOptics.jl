@@ -267,6 +267,105 @@ const BMO = BeamletOptics
         close(gui)
     end
 
+    @testset "labels, pose and step textbox" begin
+        m, pd = _fixture()
+        gui_ref = Ref{Any}(nothing)
+        gui = live_view(System([m, pd]), Beam([0.0, 0, 0], [0.0, 1, 0]); throttle = false,
+            fine_step = 1e-3, labels = Dict(m => "Mirror 1", pd => "PD"),
+            pick = ax -> (gui_ref[].controls.h.handles[1].plots[1], 0))
+        gui_ref[] = gui
+        @test startswith(gui.panels[1].ax.title[], "PD: ")
+        _select!(gui)
+        _key!(gui, Keyboard.up)
+        @test startswith(gui.status.text[], "Mirror 1 at (")
+        @test occursin("moved by 1 mm, rotated by 0 µrad", gui.status.text[])
+
+        gui.step_box.stored_string[] = "250 nm"
+        @test gui.controls.fine_step ≈ 250e-9
+        @test gui.controls.mode[] == :move
+        gui.step_box.stored_string[] = "50 µrad"
+        @test gui.controls.fine_angle ≈ 50e-6
+        @test gui.controls.mode[] == :rotate
+        gui.step_box.stored_string[] = "fast"
+        @test occursin("invalid step", gui.status.text[])
+        @test gui.controls.fine_angle ≈ 50e-6
+
+        # typing into the textbox does not trigger the controls
+        R0 = Matrix{Float64}(BMO.orientation(m))
+        gui.step_box.focused[] = true
+        _key!(gui, Keyboard.left)
+        _key!(gui, Keyboard.m)
+        @test Matrix{Float64}(BMO.orientation(m)) == R0
+        @test gui.controls.mode[] == :rotate
+        gui.step_box.focused[] = false
+        _key!(gui, Keyboard.left)
+        @test Matrix{Float64}(BMO.orientation(m)) ≈ BMO.rotate3d([0, 0, 1], 50e-6) * R0
+        close(gui)
+
+        @test Ext._length_string(0.9999999e-3) == "1 mm"
+        @test Ext._length_string(2.5e-7) == "250 nm"
+        @test Ext._length_string(12.0) == "12000 mm"
+        @test Ext._angle_string(5e-5) == "50 µrad"
+        @test Ext._angle_string(0.1) == "100 mrad"
+        @test Ext._angle_string(deg2rad(90)) == "90 °"
+        @test Ext._parse_step("250 nm")[1] == :move
+        @test Ext._parse_step("250 nm")[2] ≈ 250e-9
+        @test Ext._parse_step("0.5um")[2] ≈ 0.5e-6
+        @test Ext._parse_step("1e-3 m")[2] ≈ 1e-3
+        @test Ext._parse_step("2 deg")[2] ≈ deg2rad(2)
+        @test Ext._parse_step("3 mrad")[1] == :rotate
+        @test isnothing(Ext._parse_step("10"))
+        @test isnothing(Ext._parse_step("-1 nm"))
+        @test isnothing(Ext._parse_step("1 inch"))
+    end
+
+    @testset "adaptive tracing" begin
+        # slow systems: the solve is deferred until the movement pauses
+        m, pd = _fixture()
+        gui_ref = Ref{Any}(nothing)
+        gui = live_view(System([m, pd]), Beam([0.0, 0, 0], [0.0, 1, 0]); throttle = false,
+            mode = :rotate, fine_angle = 1e-2, trace_budget = 0.0, idle_delay = 0.1,
+            pick = ax -> (gui_ref[].controls.h.handles[1].plots[1], 0))
+        gui_ref[] = gui
+        _select!(gui)
+        pts0 = copy(gui.beam_handles[1].points[])
+        _key!(gui, Keyboard.left)
+        @test gui.pending
+        @test gui.stale
+        @test gui.beam_handles[1].points[] == pts0
+        @test occursin("tracing when the movement pauses", gui.status.text[])
+        # still moving
+        notify(events(gui.ax.scene).tick)
+        @test gui.pending
+        gui.last_change -= 1
+        notify(events(gui.ax.scene).tick)
+        @test !gui.pending
+        @test !gui.stale
+        @test gui.beam_handles[1].points[] != pts0
+        close(gui)
+
+        # slow panels: a coarse preview while moving, refined once the movement pauses
+        m, pd = _fixture()
+        gui_ref = Ref{Any}(nothing)
+        gui = live_view(System([m, pd]), _gauss(); throttle = false, mode = :rotate,
+            fine_angle = 1e-4, idle_delay = 0.1, detectors = [pd => (:intensity, (; n = 40))],
+            pick = ax -> (gui_ref[].controls.h.handles[1].plots[1], 0))
+        gui_ref[] = gui
+        @test size(gui.panels[1].heat_I[]) == (40, 40)
+        gui.panel_time = 1.0 # pretend that the panels are slow
+        _select!(gui)
+        _key!(gui, Keyboard.left)
+        @test gui.coarse
+        @test size(gui.panels[1].heat_I[]) == (16, 16)
+        @test endswith(gui.panels[1].ax.title[], "(preview)")
+        gui.last_change -= 1
+        notify(events(gui.ax.scene).tick)
+        @test !gui.coarse
+        @test size(gui.panels[1].heat_I[]) == (40, 40)
+        @test !endswith(gui.panels[1].ax.title[], "(preview)")
+        close(gui)
+    end
+
     @testset "panel power matches optical_power" begin
         m, pd = _fixture()
         # small area and coarse grid, such that the edges contribute to the integral

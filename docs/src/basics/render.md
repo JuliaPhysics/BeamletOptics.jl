@@ -98,8 +98,9 @@ update_render!(hbeam)             # beam path: point buffer is replaced in place
 - **Rays, beams and beam groups**: all segments are drawn by a single `linesegments` plot, so the
   number of plots does not grow with the number of rays. The number of segments may change
   between updates, e.g. when a component is moved out of the beam path.
-- **Gaussian beamlets**: the 1/e² envelope of all segments is merged into a single mesh.
-  `AstigmaticGaussianBeamlet`s are not supported yet.
+- **Gaussian beamlets**: the 1/e² envelope of all segments is merged into a single mesh. This
+  applies to `GaussianBeamlet`s, `AstigmaticGaussianBeamlet`s and groups of astigmatic beamlets,
+  of which every `render_every`-th beamlet is rendered.
 
 Use [`remove_render!`](@ref) to delete the plots of a handle.
 
@@ -137,6 +138,8 @@ mode, which is switched with `m`:
 | Shift (held)                 | Ten times the step size                                         |
 | `+` / `-`                    | Increase / decrease the step size along the 1-2-5 sequence      |
 | `Backspace`                  | Reset the selected component to its initial pose                |
+| `Ctrl`/`Cmd` + `Z`           | Undo the last change                                            |
+| `Ctrl`/`Cmd` + `Y`           | Redo, also `Ctrl`/`Cmd` + `Shift` + `Z`                         |
 | `Esc`                        | Select the enclosing group, or deselect at the top level        |
 | Left-click on empty space    | Deselect                                                        |
 | `v`                          | Switch the spectator mode on or off                             |
@@ -155,7 +158,21 @@ size are shown in the hint line at the top of the 3D view.
 Clicking a component inside an `ObjectGroup` selects the outermost group first. Clicking the same
 component again descends one level into the hierarchy (a subgroup, then the individual object),
 so that the group can still be moved as a whole, or a single part can be moved on its own. `Esc`
-goes back up one level. Call `close(ctrl)` to remove the controls.
+goes back up one level.
+
+A drag grabs the point under the cursor, which stays under the cursor during the drag. Each drag,
+reset and series of steps with the same key (less than 1 s apart) is one entry of the undo history,
+which undoes up to 100 changes.
+
+The `constraints` lock axes of individual components, e.g. a mirror in a kinematic mount that can
+only be tilted. The axes are named after the gizmo: `:x` (red), `:y` (green) and `:v` (blue, the
+`rotation_axis`). Missing fields allow all axes, locked axes are shown faded:
+
+```julia
+ctrl = kinematic_controls!(ax, hsys; constraints = Dict(mirror => (; move = (), rotate = (:x, :v))))
+```
+
+Call `close(ctrl)` to remove the controls.
 
 ## Interactive live view
 
@@ -264,11 +281,25 @@ below the 3D view, the key `t`, or switching the "auto trace" toggle back on (wh
 the state is outdated). While outdated, the beam plots are dimmed and the status line shows a
 hint. The initial solve always runs, regardless of `auto_trace`.
 
+With `auto_trace = true`, `live_view` adapts to slow systems as well: if solving takes longer than
+`trace_budget` (30 ms by default), the components still follow the mouse immediately, while the
+systems are solved once the movement pauses for `idle_delay` (0.2 s). Likewise, detector panels
+that take longer than `trace_budget` show a coarse preview while moving, which is refined once the
+movement pauses.
+
 ### Controls
 
 The 3D view uses the controls of [`kinematic_controls!`](@ref), see
 [Interactive kinematics](@ref). In addition, the key `t` solves the systems immediately, see
-[Manual tracing](@ref).
+[Manual tracing](@ref). The keyboard step can be typed into the textbox below the 3D view, e.g.
+`250 nm` or `50 µrad`, where the unit selects the move or rotate mode. The status line shows the
+pose of the moved component and its change since the window was opened. Names for the status line
+and the detector panels are passed via `labels`:
+
+```julia
+gui = live_view(system, beam; labels = Dict(m1 => "Mirror 1", pd => "Photodiode"),
+    constraints = Dict(m1 => (; move = ())))
+```
 
 A complete example, including a custom `on_change` callback, can be found in the
 [Interactive Michelson interferometer](@ref) example.

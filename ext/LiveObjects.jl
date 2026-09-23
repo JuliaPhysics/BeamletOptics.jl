@@ -89,6 +89,8 @@ function _live_render_source!(ax::_RenderEnv, src; size::Real, color = :orange)
         p, d = Point3f(position(src)), Vec3f(size * normalize(BMO.direction(src)))
         arrows3d!(ax, [p], [d]; color, shaftradius = 0.05, tipradius = 0.15, tiplength = 0.35)
         mesh!(ax, GeometryBasics.Sphere(p, Float32(size / 5)); color)
+        # Constant size on the screen, such that the source is visible in the overview as well
+        scatter!(ax, [p]; color, markersize = 12, strokecolor = :black, strokewidth = 1)
     end
     return _live_render_movable!(ax, src, draw)
 end

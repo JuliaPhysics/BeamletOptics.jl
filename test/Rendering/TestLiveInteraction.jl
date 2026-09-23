@@ -87,28 +87,28 @@ BMO.kinematic_trait_of(::FixedMirror) = BMO.Static()
             translate3d!(cube, [0.0, -0.5, 0.0]) # in front of the mirror, on the ray
             occluder = NonInteractableObject(cube) # not part of any system
             mir = RoundPlanoMirror(0.025, 0.005) # at the origin, behind the occluder
-            @test Ext._ray_pick([occluder, mir], origin, dir) === mir
+            @test Ext._ray_pick([occluder, mir], origin, dir)[1] === mir
         end
 
         @testset "nearest of two movables on the ray is picked" begin
             near = RoundPlanoMirror(0.025, 0.005)
             far = RoundPlanoMirror(0.025, 0.005)
             translate3d!(far, [0.0, 2.0, 0.0])
-            @test Ext._ray_pick([far, near], origin, dir) === near
-            @test Ext._ray_pick([near, far], origin, dir) === near
+            @test Ext._ray_pick([far, near], origin, dir)[1] === near
+            @test Ext._ray_pick([near, far], origin, dir)[1] === near
         end
 
         @testset "ray misses all movables" begin
             m1 = RoundPlanoMirror(0.025, 0.005)
             m2 = RoundPlanoMirror(0.025, 0.005)
             translate3d!(m2, [0.0, 2.0, 0.0])
-            @test isnothing(Ext._ray_pick([m1, m2], [0.1, -1.0, 0.0], dir))
+            @test isnothing(Ext._ray_pick([m1, m2], [0.1, -1.0, 0.0], dir)[1])
         end
 
         @testset "objects whose intersect3d errors are skipped, not rethrown" begin
             struct _BrokenRayPickObject <: BMO.AbstractObject{Float64} end
             mir = RoundPlanoMirror(0.025, 0.005)
-            @test Ext._ray_pick([_BrokenRayPickObject(), mir], origin, dir) === mir
+            @test Ext._ray_pick([_BrokenRayPickObject(), mir], origin, dir)[1] === mir
         end
     end
 
@@ -145,7 +145,7 @@ BMO.kinematic_trait_of(::FixedMirror) = BMO.Static()
         # Mouse position at the corner: the ray misses both mirrors, the fallback finds no plot
         # without a backend
         events(scene).mouseposition[] = (1.0, 1.0)
-        @test isnothing(Ext._ray_pick(ctrl, scene))
+        @test isnothing(Ext._ray_pick(ctrl, scene)[1])
         @test_logs events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
         @test ctrl.selected[] === nothing
         @test !ctrl.dragging
@@ -589,7 +589,7 @@ BMO.kinematic_trait_of(::FixedMirror) = BMO.Static()
             ctrl = Ext.kinematic_controls!(f.ax, f.h; throttle = false)
             events(scene).mouseposition[] = (cx, cy)
             # the ray pick returns the leaf, the click logic decides the level
-            @test Ext._ray_pick(ctrl, scene) === f.lens
+            @test Ext._ray_pick(ctrl, scene)[1] === f.lens
             _click!(scene)
             @test ctrl.selected[] === f.G
             _click!(scene)
@@ -927,6 +927,354 @@ BMO.kinematic_trait_of(::FixedMirror) = BMO.Static()
             Keyboard.page_up, Keyboard.page_down, Keyboard.left_shift, Keyboard.right_shift
         ])
         @test isempty(intersect(handled_keys, camera_keys))
+    end
+
+    @testset "undo/redo" begin
+        _ctrl_z!(scene) = (push!(events(scene).keyboardstate, Keyboard.left_control);
+                            events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.z, Keyboard.press);
+                            delete!(events(scene).keyboardstate, Keyboard.left_control))
+        _ctrl_y!(scene) = (push!(events(scene).keyboardstate, Keyboard.left_control);
+                            events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.y, Keyboard.press);
+                            delete!(events(scene).keyboardstate, Keyboard.left_control))
+
+        @testset "undo/redo of a drag" begin
+            fig, ax, h, m1, m2 = _fixture()
+            scene = ax.scene
+            pick_m1 = ax2 -> (h.handles[1].plots[1], 0)
+            ctrl = Ext.kinematic_controls!(ax, h; throttle = false, pick = pick_m1)
+            events(scene).mouseposition[] = (100.0, 100.0)
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
+            @test ctrl.selected[] === m1
+            P0 = collect(Float64.(BMO.position(m1)))
+
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+            events(scene).mouseposition[] = (140.0, 160.0)
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
+            P1 = collect(Float64.(BMO.position(m1)))
+            @test P1 != P0
+            @test length(ctrl.undo_stack) == 1
+            @test isempty(ctrl.redo_stack)
+
+            _ctrl_z!(scene)
+            @test isapprox(collect(Float64.(BMO.position(m1))), P0; atol = 1e-9)
+            @test isempty(ctrl.undo_stack)
+            @test length(ctrl.redo_stack) == 1
+            @test ctrl.selected[] === m1
+
+            _ctrl_y!(scene)
+            @test isapprox(collect(Float64.(BMO.position(m1))), P1; atol = 1e-9)
+            @test length(ctrl.undo_stack) == 1
+            @test isempty(ctrl.redo_stack)
+            close(ctrl)
+        end
+
+        @testset "consecutive key steps merge into one entry" begin
+            fig, ax, h, m1, m2 = _fixture()
+            scene = ax.scene
+            pick_m1 = ax2 -> (h.handles[1].plots[1], 0)
+            ctrl = Ext.kinematic_controls!(ax, h; throttle = false, pick = pick_m1, fine_step = 1e-3)
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
+            @test ctrl.selected[] === m1
+            P0 = collect(Float64.(BMO.position(m1)))
+            for _ in 1:5
+                events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.up, Keyboard.press)
+            end
+            P1 = collect(Float64.(BMO.position(m1)))
+            @test isapprox(norm(P1 .- P0), 5e-3; atol = 1e-9)
+            @test length(ctrl.undo_stack) == 1 # 5 steps merged into 1 entry
+
+            _ctrl_z!(scene)
+            @test isapprox(collect(Float64.(BMO.position(m1))), P0; atol = 1e-9)
+            @test isempty(ctrl.undo_stack)
+        end
+
+        @testset "key steps more than 1 s apart do not merge" begin
+            fig, ax, h, m1, m2 = _fixture()
+            scene = ax.scene
+            pick_m1 = ax2 -> (h.handles[1].plots[1], 0)
+            ctrl = Ext.kinematic_controls!(ax, h; throttle = false, pick = pick_m1, fine_step = 1e-3)
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
+            events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.up, Keyboard.press)
+            @test length(ctrl.undo_stack) == 1
+            # pretend the previous step happened more than 1 s ago
+            ctrl.last_key_step = (obj = m1, key = Keyboard.up, time = ctrl.last_key_step.time - 2.0)
+            events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.up, Keyboard.press)
+            @test length(ctrl.undo_stack) == 2 # not merged: a separate entry
+            close(ctrl)
+            close(ctrl)
+        end
+
+        @testset "undo/redo of a reset" begin
+            fig, ax, h, m1, m2 = _fixture()
+            scene = ax.scene
+            pick_m1 = ax2 -> (h.handles[1].plots[1], 0)
+            ctrl = Ext.kinematic_controls!(ax, h; throttle = false, pick = pick_m1, fine_step = 1e-3)
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
+            P0 = collect(Float64.(BMO.position(m1)))
+            events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.up, Keyboard.press)
+            events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.backspace, Keyboard.press)
+            @test isapprox(collect(Float64.(BMO.position(m1))), P0; atol = 1e-9)
+            @test length(ctrl.undo_stack) == 2 # the key step, then the reset
+
+            _ctrl_z!(scene) # undo the reset
+            @test !isapprox(collect(Float64.(BMO.position(m1))), P0; atol = 1e-9)
+            _ctrl_z!(scene) # undo the key step
+            @test isapprox(collect(Float64.(BMO.position(m1))), P0; atol = 1e-9)
+            @test isempty(ctrl.undo_stack)
+            close(ctrl)
+        end
+
+        @testset "a new gesture clears the redo stack" begin
+            fig, ax, h, m1, m2 = _fixture()
+            scene = ax.scene
+            pick_m1 = ax2 -> (h.handles[1].plots[1], 0)
+            ctrl = Ext.kinematic_controls!(ax, h; throttle = false, pick = pick_m1, fine_step = 1e-3)
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
+            events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.up, Keyboard.press)
+            _ctrl_z!(scene)
+            @test length(ctrl.redo_stack) == 1
+            events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.up, Keyboard.press)
+            @test isempty(ctrl.redo_stack)
+            close(ctrl)
+        end
+
+        @testset "spectator mode ignores undo" begin
+            fig, ax, h, m1, m2 = _fixture()
+            scene = ax.scene
+            pick_m1 = ax2 -> (h.handles[1].plots[1], 0)
+            ctrl = Ext.kinematic_controls!(ax, h; throttle = false, pick = pick_m1, fine_step = 1e-3)
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
+            events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.up, Keyboard.press)
+            P1 = collect(Float64.(BMO.position(m1)))
+            @test length(ctrl.undo_stack) == 1
+            events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.v, Keyboard.press) # spectator on
+            @test ctrl.spectator[]
+            _ctrl_z!(scene)
+            @test collect(Float64.(BMO.position(m1))) == P1 # unaffected
+            @test length(ctrl.undo_stack) == 1 # nothing popped
+            close(ctrl)
+        end
+
+        @testset "_undo!/_redo! return whether something happened" begin
+            fig, ax, h, m1, m2 = _fixture()
+            ctrl = Ext.kinematic_controls!(ax, h; throttle = false)
+            @test Ext._undo!(ctrl) == false
+            @test Ext._redo!(ctrl) == false
+            close(ctrl)
+        end
+    end
+
+    @testset "constraints" begin
+        @testset "validates axis and field names" begin
+            fig, ax, h, m1, m2 = _fixture()
+            @test_throws ArgumentError Ext.kinematic_controls!(
+                ax, h; constraints = Dict(m1 => (; move = (:q,))))
+            @test_throws ArgumentError Ext.kinematic_controls!(
+                ax, h; constraints = Dict(m1 => (; spin = (:x,))))
+            close(Ext.kinematic_controls!(ax, h; constraints = Dict(m1 => (; move = (:x, :y)))))
+        end
+
+        @testset "locked keys are consumed without moving" begin
+            fig, ax, h, m1, m2 = _fixture()
+            scene = ax.scene
+            pick_m1 = ax2 -> (h.handles[1].plots[1], 0)
+            ctrl = Ext.kinematic_controls!(ax, h; throttle = false, pick = pick_m1, fine_step = 1e-3,
+                constraints = Dict(m1 => (; move = (:x,))))
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
+            @test ctrl.selected[] === m1
+            P0 = collect(Float64.(BMO.position(m1)))
+            # up moves along the (locked) y-axis
+            events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.up, Keyboard.press)
+            @test collect(Float64.(BMO.position(m1))) == P0
+            @test isempty(ctrl.undo_stack)
+            # right moves along the (allowed) x-axis
+            events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.right, Keyboard.press)
+            @test collect(Float64.(BMO.position(m1))) != P0
+            close(ctrl)
+        end
+
+        @testset "mouse drag projects onto the allowed move axis" begin
+            fig, ax, h, m1, m2 = _fixture()
+            scene = ax.scene
+            pick_m1 = ax2 -> (h.handles[1].plots[1], 0)
+            ctrl = Ext.kinematic_controls!(ax, h; throttle = false, pick = pick_m1,
+                constraints = Dict(m1 => (; move = (:x,))))
+            events(scene).mouseposition[] = (100.0, 100.0)
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
+            @test ctrl.selected[] === m1
+            P0 = collect(Float64.(BMO.position(m1)))
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+            events(scene).mouseposition[] = (140.0, 160.0) # diagonal drag
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
+            d = collect(Float64.(BMO.position(m1))) .- P0
+            # motion is only along local x = [1, 0, 0] (mirror is unrotated)
+            @test isapprox(d[2], 0.0; atol = 1e-9)
+            @test isapprox(d[3], 0.0; atol = 1e-9)
+            close(ctrl)
+        end
+
+        @testset "no allowed move axis: drag does not move the object" begin
+            fig, ax, h, m1, m2 = _fixture()
+            scene = ax.scene
+            pick_m1 = ax2 -> (h.handles[1].plots[1], 0)
+            ctrl = Ext.kinematic_controls!(ax, h; throttle = false, pick = pick_m1,
+                constraints = Dict(m1 => (; move = ())))
+            events(scene).mouseposition[] = (100.0, 100.0)
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
+            P0 = collect(Float64.(BMO.position(m1)))
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+            events(scene).mouseposition[] = (140.0, 160.0)
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
+            @test collect(Float64.(BMO.position(m1))) == P0
+            close(ctrl)
+        end
+
+        @testset "rotate drag is blocked when :v is locked" begin
+            fig, ax, h, m1, m2 = _fixture()
+            scene = ax.scene
+            pick_m1 = ax2 -> (h.handles[1].plots[1], 0)
+            ctrl = Ext.kinematic_controls!(ax, h; throttle = false, pick = pick_m1, mode = :rotate,
+                rotate_speed = 1e-2, constraints = Dict(m1 => (; rotate = (:x,))))
+            R0 = Matrix{Float64}(BMO.orientation(m1))
+            events(scene).mouseposition[] = (100.0, 100.0)
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
+            @test ctrl.selected[] === m1
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+            events(scene).mouseposition[] = (110.0, 100.0)
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
+            @test Matrix{Float64}(BMO.orientation(m1)) ≈ R0 # :v (rotation_axis) is locked
+            close(ctrl)
+        end
+
+        @testset "gizmo colors fade for locked axes" begin
+            fig, ax, h, m1, m2 = _fixture()
+            scene = ax.scene
+            pick_m1 = ax2 -> (h.handles[1].plots[1], 0)
+            ctrl = Ext.kinematic_controls!(ax, h; throttle = false, pick = pick_m1,
+                constraints = Dict(m1 => (; move = (:x,))))
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
+            # order is [y, x, v]: y locked, x allowed, v locked
+            @test ctrl.arrow_color[][1].alpha ≈ Ext._GIZMO_FADE_ALPHA
+            @test ctrl.arrow_color[][2].alpha ≈ 1.0
+            @test ctrl.arrow_color[][3].alpha ≈ Ext._GIZMO_FADE_ALPHA
+            close(ctrl)
+        end
+    end
+
+    @testset "grab point" begin
+        @testset "drag keeps the grabbed point under the cursor" begin
+            fig, ax, h, m1, m2 = _fixture()
+            scene = ax.scene
+            vp = scene.viewport[]
+            cx, cy = vp.origin[1] + vp.widths[1] / 2, vp.origin[2] + vp.widths[2] / 2
+            ctrl = Ext.kinematic_controls!(ax, h; throttle = false) # default ray picking: t is known
+            events(scene).mouseposition[] = (cx, cy)
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
+            @test ctrl.selected[] === m1
+
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+            leaf, t = Ext._ray_pick(ctrl, scene)
+            @test leaf === m1
+            @test !isnothing(t)
+            r0 = Makie.ray_at_cursor(scene)
+            hit0 = Vector{Float64}(r0.origin) .+ t .* Vector{Float64}(r0.direction)
+            @test isapprox(ctrl.plane_point, hit0; atol = 1e-9) # plane through the hit, not the pivot
+            grab_offset = copy(ctrl.grab_offset)
+            @test isapprox(collect(Float64.(BMO.position(m1))) .- grab_offset, hit0; atol = 1e-9)
+
+            events(scene).mouseposition[] = (cx + 30, cy + 15)
+            r1 = Makie.ray_at_cursor(scene)
+            hit1 = Ext._ray_plane_intersect(Vector{Float64}(r1.origin), Vector{Float64}(r1.direction),
+                ctrl.plane_point, ctrl.plane_normal)
+            # the grabbed point (position - grab_offset) is still exactly the new plane hit
+            @test isapprox(collect(Float64.(BMO.position(m1))) .- grab_offset, hit1; atol = 1e-9)
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
+            close(ctrl)
+        end
+
+        @testset "custom pick falls back to the pivot" begin
+            fig, ax, h, m1, m2 = _fixture()
+            scene = ax.scene
+            pick_m1 = ax2 -> (h.handles[1].plots[1], 0)
+            ctrl = Ext.kinematic_controls!(ax, h; throttle = false, pick = pick_m1)
+            events(scene).mouseposition[] = (100.0, 100.0)
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+            @test isapprox(ctrl.plane_point, collect(Float64.(BMO.position(m1))); atol = 1e-9)
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
+            close(ctrl)
+        end
+    end
+
+    @testset "screen-space picking of sources" begin
+        fig, ax, h, m1, m2 = _fixture()
+        scene = ax.scene
+        beam = Beam([0.0, -1.0, 2.0], [0.0, 1.0, 0.0]) # away from m1/m2
+        src_handle = Ext._live_render_source!(ax, beam; size = 1e-3) # tiny marker
+        push!(h.handles, src_handle)
+        ctrl = Ext.kinematic_controls!(ax, h; throttle = false)
+        @test any(o -> o === beam, ctrl.movable)
+
+        p = Vector{Float64}(BMO.position(beam))
+        px = Makie.project(scene, :data, :pixel, Point3(p))
+        vp = scene.viewport[]
+
+        # a few pixels off the tiny marker: within source_pick_radius, but outside its 3D bbox
+        events(scene).mouseposition[] = (px[1] + vp.origin[1] + 10, px[2] + vp.origin[2] + 10)
+        leaf, t = Ext._ray_pick(ctrl, scene)
+        @test leaf === beam
+        @test !isnothing(t)
+
+        # far outside source_pick_radius: no longer picked
+        events(scene).mouseposition[] = (px[1] + vp.origin[1] + 100, px[2] + vp.origin[2] + 100)
+        leaf2, _ = Ext._ray_pick(ctrl, scene)
+        @test leaf2 !== beam
+        close(ctrl)
+    end
+
+    @testset "ignore_keys disables all key handling" begin
+        fig, ax, h, m1, m2 = _fixture()
+        scene = ax.scene
+        pick_m1 = ax2 -> (h.handles[1].plots[1], 0)
+        ignore = Ref(false)
+        ctrl = Ext.kinematic_controls!(ax, h; throttle = false, pick = pick_m1, fine_step = 1e-3,
+            ignore_keys = () -> ignore[])
+        events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+        events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
+        @test ctrl.selected[] === m1
+
+        ignore[] = true
+        probe = Any[]
+        on(events(scene).keyboardbutton, priority = -1000) do event
+            push!(probe, event.key)
+            return Consume(false)
+        end
+        P0 = collect(Float64.(BMO.position(m1)))
+        events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.up, Keyboard.press)
+        @test collect(Float64.(BMO.position(m1))) == P0 # not moved
+        @test probe == [Keyboard.up] # passed through to lower-priority listeners
+        events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.v, Keyboard.press)
+        @test !ctrl.spectator[] # v not handled either
+        events(scene).unicode_input[] = '+'
+        @test ctrl.fine_step == 1e-3 # not changed
+
+        ignore[] = false
+        events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.up, Keyboard.press)
+        @test collect(Float64.(BMO.position(m1))) != P0 # works again
+        close(ctrl)
     end
 end
 
