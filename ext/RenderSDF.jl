@@ -5,7 +5,15 @@ Render the surface of the `sdf` based on the marching cubes algorithm into the s
 
 Additional kwargs can be passed into the mesh plot.
 """
-function render!(
+render!(ax::_RenderEnv, sdf::BMO.AbstractSDF; kwargs...) = _render_marching_cubes!(ax, sdf; kwargs...)
+
+"""
+    _render_marching_cubes!(ax, sdf; x_resolution=100, y_resolution=100, z_resolution=100, kwargs...)
+
+Generic marching cubes renderer behind `render!(ax, ::AbstractSDF)`. Specialized `render!`
+methods call it directly when they need to fall back to the generic surface.
+"""
+function _render_marching_cubes!(
         ax::_RenderEnv,
         sdf::BMO.AbstractSDF;
         # kwargs

@@ -127,5 +127,5 @@ function render!(
         return _render_conic!(ax, d.base, r_hole; color, kwargs...)
     end
 
-    return invoke(render!, Tuple{_RenderEnv, BMO.AbstractSDF}, ax, d; color = color, kwargs...)
+    return _render_marching_cubes!(ax, d; color, kwargs...)
 end
