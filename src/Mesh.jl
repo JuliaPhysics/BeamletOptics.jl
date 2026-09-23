@@ -156,16 +156,8 @@ end
 Resets all previous rotations around the current offset.
 """
 function reset_rotation3d!(mesh::AbstractMesh{T}) where {T}
-    # Calculate rotation reset angle (thx LLMs)
-    R = orientation(mesh)
-    θ = acos(clamp((tr(R)-1)/2, -1, 1))
-    if iszero(θ)
-        return nothing
-    end
-    # Calculate rotation reset axis
-    axis = 1/(2*sin(θ)) * [R[3,2]-R[2,3], R[1,3]-R[3,1], R[2,1]-R[1,2]]
-    # Reset mesh rotation
-    rotate3d!(mesh, axis, -θ)
+    # The inverse of the orthonormal orientation is its transpose (robust for all angles incl. π)
+    rotate3d!(mesh, transpose(orientation(mesh)))
     # Reset orientation field
     orientation!(mesh, Matrix{T}(I, 3, 3))
     return nothing

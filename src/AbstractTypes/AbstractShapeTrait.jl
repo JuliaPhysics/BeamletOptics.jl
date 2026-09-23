@@ -169,16 +169,8 @@ Reset all applied rotations of the `object`, i.e. resets the local coordinate sy
     Sub-part relative rotations are not reset!
 """
 function reset_rotation3d!(::MultiShape, object::AbstractObject{T}) where T
-    # Calculate rotation reset angle (thx LLMs)
-    R = orientation(object)
-    θ = acos(clamp((tr(R)-1)/2, -1, 1))
-    if iszero(θ)
-        return nothing
-    end
-    # Calculate rotation reset axis
-    axis = 1/(2*sin(θ)) * [R[3,2]-R[2,3], R[1,3]-R[3,1], R[2,1]-R[1,2]]
-    # Reset object rotation
-    rotate3d!(object, axis, -θ)
+    # The inverse of the orthonormal orientation is its transpose (robust for all angles incl. π)
+    rotate3d!(object, transpose(orientation(object)))
     # Reset center of kinematics (removes precision artifacts)
     orientation!(object, Matrix{T}(I, 3, 3))
     return nothing

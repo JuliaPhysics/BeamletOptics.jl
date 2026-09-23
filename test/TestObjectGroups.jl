@@ -85,6 +85,20 @@ const BMO = BeamletOptics
         end
     end
 
+    @testset "reset_rotation3d! at and near θ = π" begin
+        for θ in (π, π - 1e-9, π / 2)
+            rotate3d!(objects, [0, 1, 1], θ)
+            reset_rotation3d!(objects)
+            @test orientation(objects) == Matrix{Float64}(I, 3, 3)
+            # center is a Float32 object
+            @test orientation(center) ≈ I atol = sqrt(eps(Float32))
+            for (i, obj) in enumerate(Leaves(BMO.objects(circle)))
+                @test position(obj) ≈ [xs[i], ys[i], 0] atol = 1e-12
+                @test orientation(obj) ≈ I atol = 1e-12
+            end
+        end
+    end
+
     @testset "System compatibility" begin
         # Test if objects in ObjectGroup are exposed correctly when iterating
         system = System(objects)

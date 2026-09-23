@@ -118,6 +118,19 @@ const BMO = BeamletOptics
         @test BMO.vertices(foo) ≈ BMO.vertices(bar)
     end
 
+    @testset "reset_rotation3d! at and near θ = π" begin
+        for θ in (π, π - 1e-9, π / 2)
+            m = BMO.CubeMesh(1)
+            ref = BMO.vertices(BMO.CubeMesh(1))
+            translate3d!(m, [1, 2, 3])
+            rotate3d!(m, [1, 1, 0], θ)
+            reset_rotation3d!(m)
+            @test orientation(m) == I
+            @test position(m) ≈ [1, 2, 3]
+            @test BMO.vertices(m) ≈ ref .+ [1 2 3] atol = 1e-12
+        end
+    end
+
     @testset "Testing align3d!" begin
         align3d!(foo, normalize([0, 1, 1]))
         @test position(foo) == zeros(3)
