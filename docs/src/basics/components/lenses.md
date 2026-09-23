@@ -212,3 +212,13 @@ The following image shows the [AC254-150-AB](https://www.thorlabs.com/thorproduc
 
 !!! tip "Spherical lens example"
     For a complex showcase featuring spherical singlet and doublet lenses, refer to the [Double Gauss lens](@ref) example page.
+
+## Triplet lenses
+
+The [`TripletLens`](@ref) extends the doublet to three cemented elements, which share two
+common surfaces. For spherical triplet lenses the following constructor can be used.
+
+```@docs; canonical=false
+TripletLens
+SphericalTripletLens(::Any, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any)
+```

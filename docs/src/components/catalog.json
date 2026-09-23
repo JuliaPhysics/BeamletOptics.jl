@@ -105,6 +105,20 @@
     "teaser": "Convenience constructor for spherical doublet lenses."
   },
   {
+    "name": "TripletLens",
+    "category": "Lenses",
+    "image": "triplet_lens_showcase.png",
+    "href": "/reference#BeamletOptics.TripletLens",
+    "teaser": "Three cemented elements sharing two common surfaces."
+  },
+  {
+    "name": "SphericalTripletLens",
+    "category": "Lenses",
+    "image": "triplet_lens_showcase.png",
+    "href": "/reference#BeamletOptics.SphericalTripletLens-NTuple{11,%20Any}",
+    "teaser": "Cemented triplet from four radii and one diameter."
+  },
+  {
     "name": "Prism",
     "category": "Prisms",
     "image": "prism_showcase.png",
@@ -170,8 +184,29 @@
   {
     "name": "PolarizationFilter",
     "category": "Polarizers",
-    "image": "polarization_filter_showcase.png",
+    "image": "polarizer_family_showcase.png",
     "href": "/reference#BeamletOptics.PolarizationFilter-Tuple{Real}",
     "teaser": "Ideal zero-thickness linear polarization filter."
+  },
+  {
+    "name": "RoundPolarizationFilter",
+    "category": "Polarizers",
+    "image": "polarizer_family_showcase.png",
+    "href": "/reference#BeamletOptics.RoundPolarizationFilter-Tuple{Real}",
+    "teaser": "Round zero-thickness linear polarization filter."
+  },
+  {
+    "name": "LinearPolarizer",
+    "category": "Polarizers",
+    "image": "polarizer_family_showcase.png",
+    "href": "/reference#BeamletOptics.LinearPolarizer",
+    "teaser": "Polarizing film laminated between two glass plates."
+  },
+  {
+    "name": "RoundLinearPolarizer",
+    "category": "Polarizers",
+    "image": "polarizer_family_showcase.png",
+    "href": "/reference#BeamletOptics.RoundLinearPolarizer-Tuple{Real,%20Real,%20Real,%20Union{Function,%20DiscreteRefractiveIndex,%20SellmeierEquation}}",
+    "teaser": "Builds a round film polarizer with glass substrates."
   }
 ]

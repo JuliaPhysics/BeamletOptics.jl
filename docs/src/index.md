@@ -4,8 +4,7 @@
 layout: home
 
 hero:
-  name: BeamletOptics.jl
-  text: A digital optics laboratory
+  name: A digital optics laboratory
   tagline: 3D ray tracing and Gaussian beamlet propagation for optical setups in Julia
   image:
     light: /logo.svg

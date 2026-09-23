@@ -10,7 +10,9 @@ n_generic = λ -> 1.5
 
 # Catalog tiles share one camera/figure style so that they read as a set (see
 # `docs/src/basics/components/components.md`): Figure(size=(400, 300)), an Axis3 with
-# aspect=:data and decorations/spines hidden, at the same azimuth/elevation.
+# aspect=:data and decorations/spines hidden, at the same azimuth/elevation. The
+# `TripletLens` tile below is the one exception: a thick lens in this 3/4 view shows only
+# its aperture and rim, so it is viewed side-on with traced rays instead.
 
 ## Flat-mirror family: SquarePlanoMirror2D, SquarePlanoMirror, RectangularPlanoMirror
 ## (the generic `Mirror` type reuses this render too, see catalog.json).
@@ -90,14 +92,54 @@ render!(cmp_ax, cmp)
 autolimits!(cmp_ax)
 save("compensator_plate_showcase.png", cmp_fig; px_per_unit=4, update=false)
 
-## PolarizationFilter
+## Polarizer family: PolarizationFilter, RoundPolarizationFilter, LinearPolarizer
+## (`RoundLinearPolarizer` builds the last one, see catalog.json).
+# +x renders toward the upper right, so the square filter goes to +x and the laminated
+# polarizer to -x, giving a square -> round -> laminated reading order left to right.
 pf = PolarizationFilter(15e-3)
+translate3d!(pf, [20e-3, 0, 0])
 
-pf_fig = Figure(size=(400, 300))
-pf_ax = Axis3(pf_fig[1, 1], aspect=:data, azimuth=0.3π, elevation=0.25π)
-hidedecorations!(pf_ax)
-hidespines!(pf_ax)
-render!(pf_ax, pf)
-# Same zero-thickness case as `RoundThinBeamsplitter` above.
-limits!(pf_ax, -0.008, 0.008, -0.008, 0.008, -0.008, 0.008)
-save("polarization_filter_showcase.png", pf_fig; px_per_unit=4, update=false)
+rpf = RoundPolarizationFilter(15e-3)
+
+lp = RoundLinearPolarizer(15e-3, 2e-3, 2e-3, n_generic)
+translate3d!(lp, [-20e-3, 0, 0])
+
+pol_fig = Figure(size=(400, 300))
+pol_ax = Axis3(pol_fig[1, 1], aspect=:data, azimuth=0.3π, elevation=0.25π)
+hidedecorations!(pol_ax)
+hidespines!(pol_ax)
+render!(pol_ax, pf)
+render!(pol_ax, rpf)
+render!(pol_ax, lp)
+# Unlike the single-filter tile this replaces, `autolimits!` is fine here: the laminated
+# polarizer gives the group a non-zero y-extent.
+autolimits!(pol_ax)
+save("polarizer_family_showcase.png", pol_fig; px_per_unit=4, update=false)
+
+## TripletLens / SphericalTripletLens
+# Unlike the tiles above, this one is viewed side-on with rays: a thick lens seen in the
+# shared 3/4 camera shows only its aperture and rim and reads as a featureless puck. This
+# also matches the other Lenses tiles, which come from `lens_assets/`.
+# Crown-flint-crown cemented triplet. The outer elements are biconvex, so their radii and
+# thicknesses must satisfy sag(r1) + sag(r2) < l, otherwise the `Lens` constructor
+# rejects them with "cylinder section length of ≤ 0".
+n_flint = λ -> 1.65
+triplet = SphericalTripletLens(30e-3, -25e-3, 25e-3, -30e-3, 8e-3, 3e-3, 8e-3,
+                               25.4e-3, n_generic, n_flint, n_generic)
+
+triplet_fig = Figure(size=(400, 300))
+triplet_ax = Axis3(triplet_fig[1, 1], aspect=:data, azimuth=0.04π, elevation=0.07π)
+hidedecorations!(triplet_ax)
+hidespines!(triplet_ax)
+render!(triplet_ax, triplet.front; alpha=0.35)
+render!(triplet_ax, triplet.middle; alpha=0.35)
+render!(triplet_ax, triplet.back; alpha=0.35)
+
+triplet_system = System([triplet])
+for z in LinRange(-0.010, 0.010, 9)
+    local beam = Beam([0, -0.018, z], [0.0, 1.0, 0.0], 532e-9)
+    solve_system!(triplet_system, beam)
+    render!(triplet_ax, beam; flen=0.022, show_pos=false)
+end
+autolimits!(triplet_ax)
+save("triplet_lens_showcase.png", triplet_fig; px_per_unit=4, update=false)

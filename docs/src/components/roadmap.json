@@ -46,14 +46,11 @@
       "id": "visualization",
       "title": "Visualization",
       "items": [
-        {
-          "title": "Automatic Makie plot updates (e.g. some form of \"interactive\" mode)",
-          "status": "todo"
-        },
-        {
-          "title": "Better lens surface plots based on multiple dispatch",
-          "status": "todo"
-        }
+        { "title": "Performance updates", "status": "todo" },
+        { "title": "Automatic render updates of changed BMO objects", "status": "todo" },
+        { "title": "Interactive viewing in GLMakie (e.g. tooltips)", "status": "todo" },
+        { "title": "Rudimentary interaction (e.g. dragging/moving objects)", "status": "todo" },
+        { "title": "Starshot: GUI prototype", "status": "todo" }
       ]
     }
   ]
