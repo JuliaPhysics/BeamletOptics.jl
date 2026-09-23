@@ -77,7 +77,7 @@ For this purpose, the package implements a traditional ray tracing solver. This 
 White light through a dense flint prism -- dispersion comes for free with a Sellmeier glass model.
 
 ```@example quickstart
-using CairoMakie, BeamletOptics
+using GLMakie, BeamletOptics
 
 # dense flint glass N-SF11, Sellmeier coefficients in µm²
 SF11 = SellmeierEquation(1.73759695, 0.313747346, 1.89878101, 0.013188707, 0.0623068142, 155.23629)
