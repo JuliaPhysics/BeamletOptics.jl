@@ -1,8 +1,8 @@
 ```@setup detectors
 detector_showcase_dir = joinpath(@__DIR__, "..", "..", "assets", "detector_assets")
 
-Main.DocUtils.conditional_include(joinpath(detector_showcase_dir, "spotdetector_showcase.jl"), use_placeholder=false)
-Main.DocUtils.conditional_include(joinpath(detector_showcase_dir, "photodetector_showcase.jl"), use_placeholder=false)
+Main.DocUtils.conditional_include(joinpath(detector_showcase_dir, "spotdetector_showcase.jl"))
+Main.DocUtils.conditional_include(joinpath(detector_showcase_dir, "photodetector_showcase.jl"))
 ```
 
 # Detectors

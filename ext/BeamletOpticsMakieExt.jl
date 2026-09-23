@@ -8,7 +8,7 @@ const BMO = BeamletOptics
 
 using Makie: Axis3, LScene, mesh!, surface!, lines!, RGBf, RGBAf, scatter!, text!,
              update_cam!, cameracontrols, arrows3d!
-using GeometryBasics: Point2, Point3, Point3f, Vec3f
+using GeometryBasics: Point2, Point3, Point3f, Vec3f, GLTriangleFace, Mesh
 using AbstractTrees: PreOrderDFS
 using MarchingCubes: MC, march
 using LinearAlgebra: dot, cross, normalize, norm

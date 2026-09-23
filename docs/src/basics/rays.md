@@ -2,7 +2,7 @@
 ray_showcase_dir = joinpath(@__DIR__, "..", "assets", "ray_assets")
 
 Main.DocUtils.conditional_include(joinpath(ray_showcase_dir, "ray_showcase.jl"))
-Main.DocUtils.conditional_include(joinpath(ray_showcase_dir, "polray_showcase.jl"), use_placeholder=false)
+Main.DocUtils.conditional_include(joinpath(ray_showcase_dir, "polray_showcase.jl"))
 Main.DocUtils.conditional_include(joinpath(ray_showcase_dir, "fresnel_coeffs.jl"))
 ```
 
