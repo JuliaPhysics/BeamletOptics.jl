@@ -119,28 +119,38 @@ end)
 
 A click selects a component, a drag on the selected component moves or rotates it, and every
 other drag rotates the camera as usual, so that rotating the camera never selects or moves a
-component by accident.
+component by accident. The keyboard controls apply to the selected component and depend on the
+mode, which is switched with `m`:
 
-| Input                          | Move mode                    | Rotate mode                  |
-|:-------------------------------|:-----------------------------|:-----------------------------|
-| Left-click on a component      | Select it                    | Select it                    |
-| Left-drag on the selection     | Move in the horizontal plane | Rotate around the blue axis  |
-| Left-drag elsewhere            | Rotate the camera            | Rotate the camera            |
-| `↑` / `↓`                      | Move along the green arrow   | Rotate around the red ring   |
-| `→` / `←`                      | Move along the red arrow     | Rotate around the blue ring  |
-| `Page Up` / `Page Down`        | Move along the blue arrow    | Rotate around the green ring |
+| Input                                   | Move mode                     | Rotate mode                   |
+|:----------------------------------------|:------------------------------|:------------------------------|
+| Left-click on a component               | Select it                     | Select it                     |
+| Left-drag on the selected component     | Move in the horizontal plane  | Rotate around the blue axis   |
+| Left-drag elsewhere                     | Rotate the camera             | Rotate the camera             |
+| `↑` / `↓`                               | Move along the green arrow    | Rotate around the red ring    |
+| `→` / `←`                               | Move along the red arrow      | Rotate around the blue ring   |
+| `Page Up` / `Page Down`                 | Move along the blue arrow     | Rotate around the green ring  |
 
-Further controls: `m` switches between the move and the rotate mode, pressing shift multiplies
-the step size by 10, `Backspace` resets the selected component to its initial pose, `Esc` or a
-click on empty space deselects it and `h` shows or hides an overlay of all controls.
+| Input                        | Action                                                          |
+|:-----------------------------|:----------------------------------------------------------------|
+| `m`                          | Switch between the move and the rotate mode                     |
+| Shift (held)                 | Ten times the step size                                         |
+| `+` / `-`                    | Increase / decrease the step size along the 1-2-5 sequence      |
+| `Backspace`                  | Reset the selected component to its initial pose                |
+| `Esc`                        | Select the enclosing group, or deselect at the top level        |
+| Left-click on empty space    | Deselect                                                        |
+| `h`                          | Show or hide an overlay of all controls                         |
 
 The selected component is marked by a box and three axes above it: its local y-axis (green), its
 local x-axis (red) and the vertical rotation axis (blue). In the move mode the axes are shown as
 arrows, in the rotate mode as rings. The first key of each pair moves the component in the
-direction of the arrow, or rotates it in the direction of the ring.
+direction of the arrow, or rotates it in the direction of the ring. The current mode and step
+size are shown in the hint line at the top of the 3D view.
 
-The camera works as usual as long as no component is grabbed. Call `close(ctrl)` to remove the
-controls.
+Clicking a component inside an `ObjectGroup` selects the outermost group first. Clicking the same
+component again descends one level into the hierarchy (a subgroup, then the individual object),
+so that the group can still be moved as a whole, or a single part can be moved on its own. `Esc`
+goes back up one level. Call `close(ctrl)` to remove the controls.
 
 ## Interactive live view
 
@@ -242,30 +252,11 @@ below the 3D view, the key `t`, or switching the "auto trace" toggle back on (wh
 the state is outdated). While outdated, the beam plots are dimmed and the status line shows a
 hint. The initial solve always runs, regardless of `auto_trace`.
 
-### Groups
-
-Clicking a component inside an `ObjectGroup` selects the outermost group first. Clicking the same
-component again descends one level into the hierarchy (a subgroup, then the individual object),
-so that the group can still be moved as a whole, or a single part can be moved on its own. `Esc`
-goes back up one level, and deselects once the top level is reached.
-
 ### Controls
 
-| Input                                     | Action                                                     |
-|:-------------------------------------------|:-------------------------------------------------------------|
-| Left-click on a component                  | Select it (first click selects the outermost group)          |
-| Left-click again on the same component     | Select one level deeper into the group                       |
-| Left-click on empty space                  | Deselect                                                      |
-| Left-drag on the selected component        | Move within the plane, or rotate around the rotation axis    |
-| Left-drag elsewhere                        | Rotate the camera                                              |
-| `↑`/`↓`, `→`/`←`, `Page Up`/`Page Down`     | Move along / rotate around the green, red, blue axis         |
-| Shift (held)                               | ×10 step size                                                 |
-| `+` / `-`                                  | Increase / decrease the step size (1-2-5 sequence)            |
-| `m`                                        | Switch between move and rotate mode                           |
-| `Backspace`                                | Reset the selected component to its initial pose              |
-| `Esc`                                      | Deselect, or select the enclosing group if inside one         |
-| `h`                                        | Show or hide the controls overlay                              |
-| `t`                                        | Solve the systems now (manual tracing)                        |
+The 3D view uses the controls of [`kinematic_controls!`](@ref), see
+[Interactive kinematics](@ref). In addition, the key `t` solves the systems immediately, see
+[Manual tracing](@ref).
 
 A complete example, including a custom `on_change` callback, can be found in the
 [Interactive Michelson interferometer](@ref) example.

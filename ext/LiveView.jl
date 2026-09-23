@@ -329,8 +329,8 @@ end
     _connect_sliders!(gui, callbacks)
 
 Calls the slider `callbacks` after a value change, then updates all systems and solves again, or
-marks them as outdated if auto tracing is off. The updates are throttled to one per frame. The listeners are added to the controls of the `gui`, such
-that `close(gui)` removes them.
+marks them as outdated if auto tracing is off. The updates are throttled to one per frame. The
+listeners are added to the controls of the `gui`, such that `close(gui)` removes them.
 """
 function _connect_sliders!(gui::LiveView, callbacks)
     pending = Dict{Int, Any}()

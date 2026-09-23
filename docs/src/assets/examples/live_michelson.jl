@@ -33,36 +33,25 @@ translate_to3d!(pd, [18.81cm, 9.595cm, 0])
 
 system = System([rpm, cbs, m1, m2, pd])
 
-## Optical power over the updates, plotted into an additional axis below the detector panel
+## Optical power over the updates, the detector intensity is evaluated on the full detector area
+full_area = (; x_min = -pd_size / 2, x_max = pd_size / 2, z_min = -pd_size / 2, z_max = pd_size / 2)
 power = Observable(Point2f[])
-power_ax = nothing
-
-"""Returns the optical power [W] from the intensity of a detector panel of the `live_view`."""
-function panel_power(panel)
-    isnothing(BMO.hits(panel.pd)) && return 0.0
-    x, z, I = panel.heat_x[], panel.heat_y[], panel.heat_I[] # [mm], [mm], [W/m²]
-    return sum(I) * (x[2] - x[1]) * (z[2] - z[1]) * mm^2
-end
 
 function record_power!(gui, obj)
-    global power_ax
-    # Called for the first time after the window has been set up
-    if isnothing(power_ax)
-        power_ax = Axis(gui.fig[1, 2][2, 1]; title = "Optical power", xlabel = "Update", ylabel = "P [mW]")
-        lines!(power_ax, power; color = :red)
-    end
+    P = isnothing(BMO.hits(pd)) ? 0.0 : optical_power(pd; n = 100, full_area...)
     n = isempty(power[]) ? 1 : last(power[])[1] + 1
-    push!(power[], Point2f(n, 1e3 * panel_power(gui.panels[1])))
+    push!(power[], Point2f(n, 1e3 * P))
     length(power[]) > 300 && popfirst!(power[])
     notify(power)
-    autolimits!(power_ax)
     return nothing
 end
 
-## Interactive window, the detector intensity is evaluated on the full detector area
-full_area = (; x_min = -pd_size / 2, x_max = pd_size / 2, z_min = -pd_size / 2, z_max = pd_size / 2)
+## Interactive window, with an additional axis for the optical power below the detector panel
 gui = live_view(system, beam; size = (1200, 700), detectors = [pd => (:intensity, full_area)],
     on_change = record_power!)
+power_ax = Axis(gui.fig[1, 2][2, 1]; title = "Optical power", xlabel = "Update", ylabel = "P [mW]")
+lines!(power_ax, power; color = :red)
+on(_ -> autolimits!(power_ax), power)
 fig = gui.fig
 controls = gui.controls
 

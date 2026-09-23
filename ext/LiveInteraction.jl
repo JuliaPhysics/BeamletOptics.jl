@@ -58,7 +58,6 @@ function _bbox_wireframe(bb)
     return pts
 end
 
-
 _shift_pressed(scene) = Keyboard.left_shift in events(scene).keyboardstate ||
                         Keyboard.right_shift in events(scene).keyboardstate
 
@@ -105,15 +104,13 @@ function _help_text(mode::Symbol, fine_step, fine_angle, select_modifier = nothi
     click = isnothing(select_modifier) ? "click" : "$(_modifier_name(select_modifier))+click"
     return """
     $mode mode, m: switch to $(_other_mode(mode)) mode
-    $click: select (again: part of group), drag selection: $drag
-    other drags: camera
+    $click: select, again: part of a group
+    drag selection: $drag, other drags: camera
     ↑/↓: $verb $up
     ←/→: $verb $left
     page up/down: $verb $page
-    step: $step, shift: 10× step
-    +/-: change step
-    backspace: reset, esc: up/deselect
-    click again: select part of a group, esc: up one level
+    step: $step, +/-: change step, shift: 10× step
+    backspace: reset, esc: enclosing group or deselect
     h: hide controls"""
 end
 
@@ -432,7 +429,8 @@ function _ray_pick(objects, origin, dir)
     for obj in objects
         isect = try
             BMO.intersect3d(obj, ray)
-        catch
+        catch e
+            e isa InterruptException && rethrow()
             nothing
         end
         isnothing(isect) && continue
@@ -560,9 +558,15 @@ function kinematic_controls!(
     init_poses = IdDict{BMO.AbstractObject, Tuple{Point3{Float64}, Matrix{Float64}}}(
         obj => _pose(obj) for top in movable for obj in _descendants(top))
 
-    # Selection box and gizmo, updated via Observables
+    # Selection box and gizmo, updated via Observables. The hidden gizmo is placed in the center of
+    # the system with a negligible size, since it counts towards the limits of the scene.
     box_obs = Observable(Point3f[])
-    arrow_pos, arrow_dir, label_pos, ring_pts = _gizmo(mode, zeros(3), ([0, 1, 0], [1, 0, 0], [0, 0, 1]), 1.0)
+    obj_plots = reduce(vcat, (oh.plots for oh in h.handles); init = AbstractPlot[])
+    bb = isempty(obj_plots) ? GeometryBasics.Rect3d(zeros(3), ones(3)) :
+         mapreduce(Makie.boundingbox, GeometryBasics.union, obj_plots)
+    center = Vector{Float64}(minimum(bb) + GeometryBasics.widths(bb) / 2)
+    arrow_pos, arrow_dir, label_pos, ring_pts = _gizmo(mode, center,
+        ([0, 1, 0], [1, 0, 0], [0, 0, 1]), 1e-3 * maximum(GeometryBasics.widths(bb)))
     arrow_pos, arrow_dir = Observable(arrow_pos), Observable(arrow_dir)
     label_pos, ring_pts = Observable(label_pos), Observable(ring_pts)
     gizmo_size = Observable(1.0)
@@ -583,7 +587,9 @@ function kinematic_controls!(
     ]
     help_obs = Observable(show_help ? _help_text(mode, fine_step, fine_angle, select_modifier) :
                       _help_hint(mode, fine_step, fine_angle))
-    push!(plots, text!(ax, Point2f(0.01, 0.99); text = help_obs, space = :relative,
+    # Drawn in the 2D scene of the axis, such that it does not count towards the limits of the scene
+    help_pos = Makie.lift(vp -> Point2f(minimum(vp)[1] + 10, maximum(vp)[2] - 10), ax.scene.viewport)
+    push!(plots, text!(ax.blockscene, help_pos; text = help_obs, space = :pixel,
         align = (:left, :top), fontsize = 14, color = :gray40))
 
     ctrl = KinematicController(
@@ -742,7 +748,7 @@ end
 function Base.close(ctrl::KinematicController)
     foreach(off, ctrl.listeners)
     empty!(ctrl.listeners)
-    foreach(p -> delete!(ctrl.ax, p), ctrl.plots)
+    foreach(p -> delete!(p.parent, p), ctrl.plots)
     empty!(ctrl.plots)
     return nothing
 end

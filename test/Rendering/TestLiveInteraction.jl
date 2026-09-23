@@ -625,8 +625,9 @@ const BMO = BeamletOptics
         end
 
         @testset "help text" begin
-            @test occursin("click again: select part of a group, esc: up one level",
-                Ext._help_text(:move, 10e-9, 10e-6))
+            help = Ext._help_text(:move, 10e-9, 10e-6)
+            @test occursin("again: part of a group", help)
+            @test occursin("esc: enclosing group or deselect", help)
         end
     end
 
@@ -635,12 +636,18 @@ const BMO = BeamletOptics
         scene = ax.scene
         pick_m1 = ax2 -> (h.handles[1].plots[1], 0)
         n0 = length(ax.scene.plots)
+        nb = length(ax.blockscene.plots)
+        limits = Makie.data_limits(ax.scene)
         ctrl = Ext.kinematic_controls!(ax, h; throttle = false, pick = pick_m1)
-        @test length(ax.scene.plots) == n0 + 5 # selection box, gizmo and controls overlay
+        @test length(ax.scene.plots) == n0 + 4 # selection box and gizmo
+        @test length(ax.blockscene.plots) == nb + 1 # controls overlay
+        # the hidden gizmo and the overlay must not change the limits of the scene
+        @test Makie.data_limits(ax.scene) ≈ limits
 
         close(ctrl)
         @test isempty(ctrl.listeners)
         @test length(ax.scene.plots) == n0
+        @test length(ax.blockscene.plots) == nb
 
         # listeners are gone: this must not error and must not select anything
         events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
