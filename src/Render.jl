@@ -131,3 +131,69 @@ backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
 render_lcs!(::Any, ::AbstractArray = zeros(3), ::AbstractMatrix = Matrix{Float64}(I, 3, 3); kwargs...) =
     throw(MissingBackendError())
 render_lcs!(::Any, ::AbstractObject; kwargs...) = throw(MissingBackendError())
+
+"""
+    AbstractRenderHandle
+
+Supertype of all handles returned by [`live_render!`](@ref). A handle references the rendered
+object or beam and its plots, which can be re-synchronized via [`update_render!`](@ref).
+Concrete handles are implemented by the `Makie` extension.
+"""
+abstract type AbstractRenderHandle end
+
+"""
+    live_render!(axis, thing; kwargs...)
+
+Renders `thing` into the `axis` like [`render!`](@ref), but returns an [`AbstractRenderHandle`](@ref)
+that can be updated in place via [`update_render!`](@ref). Intended for animations and interactive
+applications, e.g. moving components that require the system to be solved repeatedly.
+
+- objects and systems: the geometry is generated once, kinematic changes are applied as a model
+  transformation of the existing plots
+- rays, beams and beam groups: all segments are bundled into a single plot
+- `GaussianBeamlet`: the envelope of all segments is bundled into a single mesh
+
+Keyword arguments are passed on as for [`render!`](@ref).
+
+If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
+"""
+live_render!(::Any, ::_RenderTypes; kwargs...) = throw(MissingBackendError())
+
+"""
+    update_render!(handle)
+
+Re-synchronizes the plots of the `handle` with the current state of the rendered object or beam,
+e.g. after moving components or calling [`solve_system!`](@ref).
+
+If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
+"""
+update_render!(::Any; kwargs...) = throw(MissingBackendError())
+
+"""
+    remove_render!(handle)
+
+Deletes all plots of the `handle` from its axis.
+
+If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
+"""
+remove_render!(::Any) = throw(MissingBackendError())
+
+"""
+    pick_object(handle, plot)
+
+Returns the object of a live-rendered object or system `handle` that is visualized by the `plot`,
+or `nothing` if the `plot` does not belong to the `handle`.
+
+If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
+"""
+pick_object(::Any, ::Any) = throw(MissingBackendError())
+
+"""
+    kinematic_controls!(axis, handle; kwargs...)
+
+Enables mouse and keyboard controls for moving and rotating the objects of a live-rendered system
+`handle` within the `axis`. Returns a controller that can be removed via `close`.
+
+If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
+"""
+kinematic_controls!(::Any, ::Any; kwargs...) = throw(MissingBackendError())

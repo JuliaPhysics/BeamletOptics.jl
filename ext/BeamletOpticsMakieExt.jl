@@ -2,7 +2,9 @@ module BeamletOpticsMakieExt
 
 using BeamletOptics
 import BeamletOptics: render!, RenderException, _RenderTypes, get_view, set_view, hide_axis,
-                       set_orthographic, arrow!, render_lcs!, look_at!
+                       set_orthographic, arrow!, render_lcs!, look_at!,
+                       AbstractRenderHandle, live_render!, update_render!, remove_render!,
+                       pick_object, kinematic_controls!
 
 const BMO = BeamletOptics
 
@@ -59,5 +61,9 @@ include("RenderMirrors.jl")
 include("RenderPresets.jl")
 include("RenderPolarizers.jl")
 include("RenderCamera.jl")
+# live rendering, must come after all static renderers
+include("LiveObjects.jl")
+include("LiveBeams.jl")
+include("LiveInteraction.jl")
 
 end
