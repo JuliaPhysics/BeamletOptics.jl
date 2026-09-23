@@ -47,6 +47,25 @@ function flattenNavGroups(items: any[], depth = 0): any[] {
   })
 }
 
+const sidebarTemp = {
+  sidebar: 'REPLACE_ME_DOCUMENTER_VITEPRESS',
+}
+
+// DocumenterVitepress marks every sidebar group as `collapsed: false`, i.e. the whole
+// tree starts expanded. Only the top-level groups start expanded; nested groups (e.g.
+// "Tutorials" in "Getting started") start collapsed. VitePress still expands the group
+// that contains the current page.
+function limitSidebarCollapse(items: any[], depth = 0): any[] {
+  return items.map((item) => {
+    if (!item.items) return item
+    return {
+      ...item,
+      collapsed: depth > 0,
+      items: limitSidebarCollapse(item.items, depth + 1),
+    }
+  })
+}
+
 const nav = [
   ...flattenNavGroups(navTemp.nav as any),
   {
@@ -121,7 +140,7 @@ export default withMermaid(defineConfig({
       }
     },
     nav,
-    sidebar: 'REPLACE_ME_DOCUMENTER_VITEPRESS',
+    sidebar: limitSidebarCollapse(sidebarTemp.sidebar as any),
     sidebarDrawer: 'REPLACE_ME_DOCUMENTER_VITEPRESS_SIDEBAR_DRAWER',
     editLink: 'REPLACE_ME_DOCUMENTER_VITEPRESS',
     socialLinks: [
