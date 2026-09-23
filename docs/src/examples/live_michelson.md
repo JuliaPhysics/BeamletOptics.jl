@@ -99,19 +99,24 @@ Errors in the callback are logged once and do not interrupt the interaction.
 
 ## Controls
 
-The components are moved via [`kinematic_controls!`](@ref), which enables the following controls:
+The components are moved via [`kinematic_controls!`](@ref), which enables the following controls.
+A click selects a component, a drag on the selected component moves or rotates it, and every
+other drag rotates the camera as usual, so rotating the camera never selects or moves a component
+by accident:
 
 | Input                          | Move mode                    | Rotate mode                  |
 |:-------------------------------|:-----------------------------|:-----------------------------|
-| Left-drag on a component       | Move in the horizontal plane | Rotate around the blue axis  |
+| Left-click on a component      | Select it                    | Select it                    |
+| Left-drag on the selection     | Move in the horizontal plane | Rotate around the blue axis  |
+| Left-drag elsewhere            | Rotate the camera            | Rotate the camera            |
 | `↑` / `↓`                      | Move along the green arrow   | Rotate around the red ring   |
 | `→` / `←`                      | Move along the red arrow     | Rotate around the blue ring  |
 | `Page Up` / `Page Down`        | Move along the blue arrow    | Rotate around the green ring |
 | `+` / `-`                      | Increase / decrease the step | Increase / decrease the step |
 
 Further controls: `m` switches between the move and the rotate mode, pressing shift multiplies
-the step size by 10, `r` resets the selected component to its initial pose, `Esc` or a click on
-empty space deselects it and `h` shows or hides an overlay of all controls. The keys `+` and `-`
+the step size by 10, `Backspace` resets the selected component to its initial pose, `Esc` or a
+click on empty space deselects it and `h` shows or hides an overlay of all controls. The keys `+` and `-`
 change the step size of the current mode along the 1-2-5 sequence, e.g. 10 nm → 20 nm → 50 nm →
 100 nm, also without a selected component. The current step size is shown in the hint line at the
 top of the 3D view. Keyword arguments such as the initial `fine_step` or the `rotation_axis` are

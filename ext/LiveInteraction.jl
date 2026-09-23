@@ -62,6 +62,16 @@ end
 _shift_pressed(scene) = Keyboard.left_shift in events(scene).keyboardstate ||
                         Keyboard.right_shift in events(scene).keyboardstate
 
+"""Returns whether the `modifier` (a `Keyboard.Button`, or a tuple/vector of them meaning "any of")
+is currently held in the `scene`."""
+_modifier_held(scene, modifier::Keyboard.Button) = modifier in events(scene).keyboardstate
+_modifier_held(scene, modifiers) = any(m -> m in events(scene).keyboardstate, modifiers)
+
+"""Returns a short display name for a `select_modifier` (a `Keyboard.Button`, or a tuple/vector of
+them), e.g. `"left_shift"`."""
+_modifier_name(btn::Keyboard.Button) = string(btn)
+_modifier_name(btns) = join(string.(btns), "/")
+
 _px(scene) = Tuple(Float64.(mouseposition_px(scene)))
 
 _other_mode(mode::Symbol) = mode == :move ? :rotate : :move
@@ -83,7 +93,7 @@ function _help_hint(mode::Symbol, fine_step, fine_angle)
     return "$mode mode, step $step, +/-: step, m: switch mode, h: show controls"
 end
 
-function _help_text(mode::Symbol, fine_step, fine_angle)
+function _help_text(mode::Symbol, fine_step, fine_angle, select_modifier = nothing)
     step = _step_string(mode, fine_step, fine_angle)
     if mode == :move
         verb = "move along"
@@ -92,15 +102,17 @@ function _help_text(mode::Symbol, fine_step, fine_angle)
         verb = "rotate around"
         up, left, page, drag = "red ring", "blue ring", "green ring", "rotate around blue ring"
     end
+    click = isnothing(select_modifier) ? "click" : "$(_modifier_name(select_modifier))+click"
     return """
     $mode mode, m: switch to $(_other_mode(mode)) mode
-    left-drag: $drag
+    $click: select (again: part of group), drag selection: $drag
+    other drags: camera
     ↑/↓: $verb $up
     ←/→: $verb $left
     page up/down: $verb $page
     step: $step, shift: 10× step
     +/-: change step
-    r: reset, esc: deselect
+    backspace: reset, esc: up/deselect
     click again: select part of a group, esc: up one level
     h: hide controls"""
 end
@@ -189,13 +201,17 @@ mutable struct KinematicController{H <: SystemRenderHandle}
     fine_step::Float64
     fine_angle::Float64
     throttle::Bool
+    select_modifier::Any
+    drag_threshold::Float64
     # interaction state
     dirty::Bool
     dragging::Bool
     plane_point::Vector{Float64}
     grab_offset::Vector{Float64}
     last_mouse::NTuple{2, Float64}
-    bg_press_pos::Union{Nothing, NTuple{2, Float64}}
+    press_pos::Union{Nothing, NTuple{2, Float64}}
+    press_leaf::Union{Nothing, BMO.AbstractObject}
+    press_kind::Symbol
     # selection box and gizmo of the keyboard controls
     box_obs::Observable{Vector{Point3f}}
     arrow_pos::Observable{Vector{Point3f}}
@@ -284,7 +300,8 @@ function _control_axes(ctrl::KinematicController, obj)
 end
 
 function _update_help!(ctrl::KinematicController)
-    ctrl.help_obs[] = ctrl.help_shown ? _help_text(ctrl.mode[], ctrl.fine_step, ctrl.fine_angle) :
+    ctrl.help_obs[] = ctrl.help_shown ?
+                      _help_text(ctrl.mode[], ctrl.fine_step, ctrl.fine_angle, ctrl.select_modifier) :
                       _help_hint(ctrl.mode[], ctrl.fine_step, ctrl.fine_angle)
     return nothing
 end
@@ -455,8 +472,13 @@ mode as rings. The key `h` shows or hides an overlay of all controls.
 
 # Mouse controls
 
-- left-drag on an object: moves the object within the plane through its position (`plane_normal`),
-  or rotates it around the `rotation_axis` in the rotate mode
+A click selects, a drag moves only what is already selected, every other drag rotates the camera:
+
+- left-click on an object: selects it, so that a camera drag never moves or rotates a component by
+  accident
+- left-drag on the selected object: moves it within the plane through its position
+  (`plane_normal`), or rotates it around the `rotation_axis` in the rotate mode
+- left-drag elsewhere (background or an unselected object): rotates the camera as usual
 - left-click on empty space: deselects the current object
 
 Object groups (e.g. `ObjectGroup`) are selected as a whole by the first click. Each further click on
@@ -475,8 +497,8 @@ The following keys apply to the selected object, pressing shift multiplies the s
 | `page up`/`page down` | along the blue arrow    | around the green ring      |
 
 The first key moves the object in the direction of the arrow, or rotates it in the direction of
-the ring. In addition, `r` resets the object to its initial pose and `esc` deselects it. If the
-object is part of a group, `esc` selects the enclosing group instead.
+the ring. In addition, `Backspace` resets the object to its initial pose and `esc` deselects it. If
+the object is part of a group, `esc` selects the enclosing group instead.
 
 The keys `+` and `-` increase or decrease the step size of the current mode (`fine_step` or
 `fine_angle`) along the 1-2-5 sequence, e.g. 10 nm → 20 nm → 50 nm → 100 nm. They also work
@@ -498,6 +520,12 @@ without a selected object. The current step size is shown in the hint line.
 - `pick = nothing`: objects are selected by intersecting the camera ray with the movable objects, so
   meshes that are not part of the system (e.g. housings) do not block the selection; otherwise a
   function `ax -> (plot, index)`
+- `select_modifier = nothing`: if set to a `Keyboard.Button` (or a tuple/vector of them, meaning
+  "any of"), clicks and drags only react on objects while the modifier is held; otherwise they
+  always go to the camera. Suggested: `Keyboard.left_shift` (`Ctrl`+click is taken by Makie's
+  `Camera3D` reset).
+- `drag_threshold = 3`: [px] mouse movement between press and release that turns a click into a
+  drag
 """
 function kinematic_controls!(
         ax::_RenderEnv,
@@ -512,7 +540,9 @@ function kinematic_controls!(
         mode::Symbol = :move,
         throttle::Bool = true,
         show_help::Bool = false,
-        pick = nothing
+        pick = nothing,
+        select_modifier = nothing,
+        drag_threshold = 3
     )
     mode in (:move, :rotate) || throw(ArgumentError("mode must be :move or :rotate, got :$mode"))
     scene = Makie.get_scene(ax)
@@ -551,7 +581,7 @@ function kinematic_controls!(
         text!(ax, label_pos; text = labels, color = _AXES_COLORS, visible = gizmo_visible,
             fontsize = 20, align = (:center, :center), overdraw = true)
     ]
-    help_obs = Observable(show_help ? _help_text(mode, fine_step, fine_angle) :
+    help_obs = Observable(show_help ? _help_text(mode, fine_step, fine_angle, select_modifier) :
                       _help_hint(mode, fine_step, fine_angle))
     push!(plots, text!(ax, Point2f(0.01, 0.99); text = help_obs, space = :relative,
         align = (:left, :top), fontsize = 14, color = :gray40))
@@ -560,15 +590,20 @@ function kinematic_controls!(
         ax, h, movable, init_poses, Observable{Union{Nothing, BMO.AbstractObject}}(nothing),
         mode_obs, on_change, normalize(Float64.(plane_normal)), normalize(Float64.(rotation_axis)),
         Float64(rotate_speed), Float64(fine_step), Float64(fine_angle), throttle,
-        false, false, zeros(3), zeros(3), (0.0, 0.0), nothing,
+        select_modifier, Float64(drag_threshold),
+        false, false, zeros(3), zeros(3), (0.0, 0.0), nothing, nothing, :none,
         box_obs, arrow_pos, arrow_dir, label_pos, ring_pts, gizmo_size, gizmo_visible,
         help_obs, show_help, plots, Any[], nothing
     )
 
-    # High priority, so that the camera does not receive events while an object is grabbed
+    # High priority, so that the camera does not receive events while an object is dragged
     l1 = on(events(scene).mousebutton, priority = 200) do event
         event.button == Mouse.left || return Consume(false)
         if event.action == Mouse.press
+            if !isnothing(ctrl.select_modifier) && !_modifier_held(scene, ctrl.select_modifier)
+                # Modifier not held: every click and drag goes to the camera, no state change
+                return Consume(false)
+            end
             if pick === nothing
                 leaf = _ray_pick(ctrl, scene)
                 if isnothing(leaf)
@@ -579,43 +614,71 @@ function kinematic_controls!(
                 plot, _ = pick(ax)
                 leaf = isnothing(plot) ? nothing : _pick_leaf(h, plot)
             end
+            ctrl.press_pos = _px(scene)
             if isnothing(leaf) || !_is_movable(ctrl, leaf)
-                ctrl.bg_press_pos = _px(scene)
+                ctrl.press_leaf = nothing
+                ctrl.press_kind = :background
                 return Consume(false)
             end
-            # Clicking again on a group selects the next level towards the clicked object
-            obj = _drill_select(ctrl, leaf)
-            ctrl.selected[] = obj
-            ctrl.dragging = true
-            ctrl.last_mouse = _px(scene)
-            # Keep the offset between object and mouse to avoid a jump at the start
-            ctrl.plane_point = Vector{Float64}(position(obj))
-            hit = _mouse_plane_hit(scene, ctrl)
-            ctrl.grab_offset = isnothing(hit) ? zeros(3) : ctrl.plane_point .- hit
-            _update_selection_box!(ctrl)
-            return Consume(true)
+            ctrl.press_leaf = leaf
+            sel = ctrl.selected[]
+            if !isnothing(sel) && any(o -> o === sel, _chain(ctrl, leaf))
+                # Dragging the already selected object: block the camera immediately
+                ctrl.press_kind = :pending_drag
+                ctrl.last_mouse = ctrl.press_pos
+                ctrl.plane_point = Vector{Float64}(position(sel))
+                hit = _mouse_plane_hit(scene, ctrl)
+                ctrl.grab_offset = isnothing(hit) ? zeros(3) : ctrl.plane_point .- hit
+                return Consume(true)
+            else
+                # A press on an unselected object might turn into a camera drag: let it through
+                ctrl.press_kind = :pending_select
+                return Consume(false)
+            end
         elseif event.action == Mouse.release
+            cur = _px(scene)
+            moved = isnothing(ctrl.press_pos) ? Inf : hypot((cur .- ctrl.press_pos)...)
+            kind = ctrl.press_kind
+            consume = false
             if ctrl.dragging
                 ctrl.dragging = false
-                return Consume(true)
-            end
-            # Deselect on click, but not after rotating the camera
-            if !isnothing(ctrl.bg_press_pos)
-                cur = _px(scene)
-                moved = hypot((cur .- ctrl.bg_press_pos)...)
-                ctrl.bg_press_pos = nothing
-                if moved < 3
+                consume = true
+            elseif kind == :pending_drag
+                # Released before crossing the threshold: a click, not a drag
+                if moved < ctrl.drag_threshold
+                    ctrl.selected[] = _drill_select(ctrl, ctrl.press_leaf)
+                    _update_selection_box!(ctrl)
+                end
+                consume = true
+            elseif kind == :pending_select
+                # Only select if this was a click, not a camera rotation
+                if moved < ctrl.drag_threshold
+                    ctrl.selected[] = _drill_select(ctrl, ctrl.press_leaf)
+                    _update_selection_box!(ctrl)
+                end
+            elseif kind == :background
+                if moved < ctrl.drag_threshold
                     ctrl.selected[] = nothing
                     _update_selection_box!(ctrl)
                 end
             end
+            ctrl.press_kind = :none
+            ctrl.press_leaf = nothing
+            ctrl.press_pos = nothing
+            return Consume(consume)
         end
         return Consume(false)
     end
 
     l2 = on(events(scene).mouseposition, priority = 200) do _
+        if !ctrl.dragging
+            ctrl.press_kind == :pending_drag || return Consume(false)
+            cur = _px(scene)
+            moved = hypot((cur .- ctrl.press_pos)...)
+            moved >= ctrl.drag_threshold || return Consume(true)
+            ctrl.dragging = true
+        end
         obj = ctrl.selected[]
-        (isnothing(obj) || !ctrl.dragging) && return Consume(false)
         if ctrl.mode[] == :move
             hit = _mouse_plane_hit(scene, ctrl)
             if !isnothing(hit)
@@ -652,7 +715,7 @@ function kinematic_controls!(
             # One level up in the hierarchy of groups, deselect at the top level
             ctrl.selected[] = get(ctrl.h.parent, obj, nothing)
             _update_selection_box!(ctrl)
-        elseif event.key == Keyboard.r
+        elseif event.key == Keyboard.backspace
             _reset_pose!(ctrl, obj)
             _request_update!(ctrl)
         elseif _key_step!(ctrl, obj, event.key, _shift_pressed(scene) ? 10 : 1)

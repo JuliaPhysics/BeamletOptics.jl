@@ -117,16 +117,22 @@ ctrl = kinematic_controls!(ax, hsys; on_change = obj -> begin
 end)
 ```
 
+A click selects a component, a drag on the selected component moves or rotates it, and every
+other drag rotates the camera as usual, so that rotating the camera never selects or moves a
+component by accident.
+
 | Input                          | Move mode                    | Rotate mode                  |
 |:-------------------------------|:-----------------------------|:-----------------------------|
-| Left-drag on a component       | Move in the horizontal plane | Rotate around the blue axis  |
+| Left-click on a component      | Select it                    | Select it                    |
+| Left-drag on the selection     | Move in the horizontal plane | Rotate around the blue axis  |
+| Left-drag elsewhere            | Rotate the camera            | Rotate the camera            |
 | `↑` / `↓`                      | Move along the green arrow   | Rotate around the red ring   |
 | `→` / `←`                      | Move along the red arrow     | Rotate around the blue ring  |
 | `Page Up` / `Page Down`        | Move along the blue arrow    | Rotate around the green ring |
 
 Further controls: `m` switches between the move and the rotate mode, pressing shift multiplies
-the step size by 10, `r` resets the selected component to its initial pose, `Esc` or a click on
-empty space deselects it and `h` shows or hides an overlay of all controls.
+the step size by 10, `Backspace` resets the selected component to its initial pose, `Esc` or a
+click on empty space deselects it and `h` shows or hides an overlay of all controls.
 
 The selected component is marked by a box and three axes above it: its local y-axis (green), its
 local x-axis (red) and the vertical rotation axis (blue). In the move mode the axes are shown as
@@ -251,11 +257,12 @@ goes back up one level, and deselects once the top level is reached.
 | Left-click again on the same component     | Select one level deeper into the group                       |
 | Left-click on empty space                  | Deselect                                                      |
 | Left-drag on the selected component        | Move within the plane, or rotate around the rotation axis    |
+| Left-drag elsewhere                        | Rotate the camera                                              |
 | `↑`/`↓`, `→`/`←`, `Page Up`/`Page Down`     | Move along / rotate around the green, red, blue axis         |
 | Shift (held)                               | ×10 step size                                                 |
 | `+` / `-`                                  | Increase / decrease the step size (1-2-5 sequence)            |
 | `m`                                        | Switch between move and rotate mode                           |
-| `r`                                        | Reset the selected component to its initial pose              |
+| `Backspace`                                | Reset the selected component to its initial pose              |
 | `Esc`                                      | Deselect, or select the enclosing group if inside one         |
 | `h`                                        | Show or hide the controls overlay                              |
 | `t`                                        | Solve the systems now (manual tracing)                        |

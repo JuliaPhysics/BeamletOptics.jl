@@ -205,6 +205,7 @@ const BMO = BeamletOptics
         cx, cy = vp.origin[1] + vp.widths[1] / 2, vp.origin[2] + vp.widths[2] / 2
         events(scene).mouseposition[] = (cx, cy)
         events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+        events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
         @test gui.controls.selected[] === m # the occluding housing does not block the selection
         close(gui)
     end

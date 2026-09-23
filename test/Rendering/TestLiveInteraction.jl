@@ -127,6 +127,7 @@ const BMO = BeamletOptics
         ctrl = Ext.kinematic_controls!(ax, h; throttle = false) # no pick kwarg: ray picking
         events(scene).mouseposition[] = (cx, cy)
         events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+        events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
         @test ctrl.selected[] === m1
         close(ctrl)
     end
@@ -154,12 +155,17 @@ const BMO = BeamletOptics
         ctrl = Ext.kinematic_controls!(ax, h; throttle = false, pick = pick_m1)
         @test ctrl isa Ext.KinematicController
 
+        # a click selects, but does not move the object
         events(scene).mouseposition[] = (100.0, 100.0)
         events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+        events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
         @test ctrl.selected[] === m1
-        @test ctrl.dragging
+        @test !ctrl.dragging
 
+        # dragging the now-selected object moves it
+        events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
         events(scene).mouseposition[] = (140.0, 160.0)
+        @test ctrl.dragging
         @test collect(Float64.(BMO.position(m1))) != P0 # object followed the drag
         @test length(h.handles[1].plots) > 0 # no plot churn
 
@@ -170,7 +176,7 @@ const BMO = BeamletOptics
         close(ctrl)
     end
 
-    @testset "grab consumes the press (camera does not see it)" begin
+    @testset "grab consumes the press once the object is selected" begin
         fig, ax, h, m1, m2 = _fixture()
         scene = ax.scene
         pick_m1 = ax2 -> (h.handles[1].plots[1], 0)
@@ -182,8 +188,16 @@ const BMO = BeamletOptics
             return Consume(false)
         end
 
+        # first click: the object is not yet selected, so press and release are not consumed
         events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
-        @test probe[] == 0 # low-priority listener never reached: event was consumed
+        @test probe[] == 1
+        events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
+        @test probe[] == 2
+        @test ctrl.selected[] === m1
+
+        # pressing again on the now-selected object is consumed (camera blocked)
+        events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+        @test probe[] == 2 # low-priority listener not reached this time
 
         close(ctrl)
     end
@@ -249,7 +263,7 @@ const BMO = BeamletOptics
         delete!(events(scene).keyboardstate, Keyboard.left_shift)
 
         # reset
-        events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.r, Keyboard.press)
+        events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.backspace, Keyboard.press)
         @test isapprox(collect(Float64.(BMO.position(m1))), P0; atol = 1e-9)
         @test isapprox(Matrix{Float64}(BMO.orientation(m1)), R0; atol = 1e-6)
 
@@ -269,6 +283,7 @@ const BMO = BeamletOptics
             ax, h; throttle = false, pick = pick_m1, on_change = o -> (changed[] = o)
         )
         events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+        events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
         events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.up, Keyboard.press)
         @test changed[] === m1
         close(ctrl)
@@ -282,6 +297,7 @@ const BMO = BeamletOptics
             ax, h; throttle = false, pick = pick_m1, on_change = o -> error("no hits")
         )
         events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+        events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
         @test_logs (:error, r"on_change") events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.up, Keyboard.press)
         # the same error again is not logged a second time
         @test_logs events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.up, Keyboard.press)
@@ -297,6 +313,7 @@ const BMO = BeamletOptics
             ax, h; throttle = true, pick = pick_m1, on_change = o -> (n_updates[] += 1)
         )
         events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+        events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
         for _ in 1:5
             events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.up, Keyboard.press)
         end
@@ -317,6 +334,9 @@ const BMO = BeamletOptics
         P0 = collect(Float64.(BMO.position(m1)))
         R0 = Matrix{Float64}(BMO.orientation(m1))
         events(scene).mouseposition[] = (100.0, 100.0)
+        events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+        events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
+        @test ctrl.selected[] === m1
         events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
         events(scene).mouseposition[] = (110.0, 100.0)
         events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
@@ -547,8 +567,8 @@ const BMO = BeamletOptics
             @test f.h.handles[2].P == BMO.position(f.lens)
             @test f.h.handles[3].P == BMO.position(f.h1)
 
-            # r resets the sub-object only
-            key!(Keyboard.r)
+            # backspace resets the sub-object only
+            key!(Keyboard.backspace)
             @test isapprox(_pos(f.lens), init[:lens]; atol = 1e-12)
 
             # esc: subgroup H, moving H moves lens and h1, but not g1
@@ -561,18 +581,18 @@ const BMO = BeamletOptics
             @test isapprox(_pos(f.h1), init[:h1] + d; atol = 1e-12)
             @test isapprox(_pos(f.g1), init[:g1]; atol = 1e-12)
 
-            # move the lens within the moved H, r on the lens keeps h1 moved
+            # move the lens within the moved H, backspace on the lens keeps h1 moved
             _click!(scene)
             @test ctrl.selected[] === f.lens
             key!(Keyboard.up)
-            key!(Keyboard.r)
+            key!(Keyboard.backspace)
             @test isapprox(_pos(f.lens), init[:lens]; atol = 1e-12)
             @test isapprox(_pos(f.h1), init[:h1] + d; atol = 1e-12)
 
-            # r on the group resets the group
+            # backspace on the group resets the group
             key!(Keyboard.escape)
             @test ctrl.selected[] === f.H
-            key!(Keyboard.r)
+            key!(Keyboard.backspace)
             @test isapprox(_pos(f.H), init[:H]; atol = 1e-12)
             @test isapprox(_pos(f.h1), init[:h1]; atol = 1e-12)
             @test isapprox(_pos(f.g1), init[:g1]; atol = 1e-12)
@@ -625,6 +645,221 @@ const BMO = BeamletOptics
         # listeners are gone: this must not error and must not select anything
         events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
         @test ctrl.selected[] === nothing
+    end
+
+    @testset "click vs drag" begin
+        # Simplified group hierarchy matching the trace table of the plan: G ⊃ lens, M separate
+        function _cvd_fixture()
+            lens = RoundPlanoMirror(0.025, 0.005)
+            m = RoundPlanoMirror(0.025, 0.005)
+            translate3d!(m, [0, 0, -0.3])
+            G = ObjectGroup([lens])
+            M = ObjectGroup([m])
+            sys = System([G, M])
+            fig = Figure()
+            ax = LScene(fig[1, 1])
+            h = live_render!(ax, sys)
+            return (; fig, ax, h, lens, m, G, M)
+        end
+        _plot_of(f, obj) = only(oh for oh in f.h.handles if oh.obj === obj).plots[1]
+
+        _press!(scene, pos) = (events(scene).mouseposition[] = pos;
+                                events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press))
+        _move!(scene, pos) = (events(scene).mouseposition[] = pos)
+        _release!(scene) = (events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release))
+        _drag!(scene, from, to) = (_press!(scene, from); _move!(scene, to); _release!(scene))
+        _click_at!(scene, pos) = (_press!(scene, pos); _release!(scene))
+
+        @testset "trace table" begin
+            f = _cvd_fixture()
+            scene = f.ax.scene
+            target = Ref{Any}(f.lens)
+            ctrl = Ext.kinematic_controls!(f.ax, f.h; throttle = false,
+                pick = ax2 -> (isnothing(target[]) ? nothing : _plot_of(f, target[]), 0))
+
+            # drag starting on lens, 50 px; nothing selected before -> camera rotates, nothing selected
+            _drag!(scene, (100.0, 100.0), (150.0, 100.0))
+            @test ctrl.selected[] === nothing
+
+            # click on lens; nothing selected before -> G selected
+            _click_at!(scene, (100.0, 100.0))
+            @test ctrl.selected[] === f.G
+
+            # drag starting on lens, 50 px; G selected -> G moves, camera still
+            P0 = collect(Float64.(BMO.position(f.G)))
+            _drag!(scene, (100.0, 100.0), (150.0, 100.0))
+            @test collect(Float64.(BMO.position(f.G))) != P0
+            @test ctrl.selected[] === f.G
+
+            # click on lens; G selected -> lens selected
+            _click_at!(scene, (100.0, 100.0))
+            @test ctrl.selected[] === f.lens
+
+            # drag starting on M, 50 px; lens selected -> camera rotates, lens stays selected
+            target[] = f.m
+            _drag!(scene, (100.0, 100.0), (150.0, 100.0))
+            @test ctrl.selected[] === f.lens
+
+            # click on empty space; lens selected -> nothing selected
+            target[] = nothing
+            _click_at!(scene, (400.0, 400.0))
+            @test ctrl.selected[] === nothing
+
+            close(ctrl)
+        end
+
+        @testset "drag on an unselected object does not block the camera" begin
+            fig, ax, h, m1, m2 = _fixture()
+            scene = ax.scene
+            pick_m1 = ax2 -> (h.handles[1].plots[1], 0)
+            ctrl = Ext.kinematic_controls!(ax, h; throttle = false, pick = pick_m1)
+            P0 = collect(Float64.(BMO.position(m1)))
+
+            probe = Ref(0)
+            on(events(scene).mousebutton, priority = -1000) do event
+                probe[] += 1
+                return Consume(false)
+            end
+
+            # No mouseposition is set before the press, so Makie's own Camera3D mouse controls
+            # (which only react while the mouse is inside the viewport) do not compete for the
+            # event either; this isolates whether `kinematic_controls!` itself consumes it.
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+            @test probe[] == 1 # camera not blocked
+            _move!(scene, (150.0, 100.0))
+            _release!(scene)
+            @test collect(Float64.(BMO.position(m1))) == P0 # no pose change
+            @test ctrl.selected[] === nothing # it was a drag, not a click
+            close(ctrl)
+        end
+
+        @testset "drag on the selected object blocks the camera and moves it" begin
+            fig, ax, h, m1, m2 = _fixture()
+            scene = ax.scene
+            pick_m1 = ax2 -> (h.handles[1].plots[1], 0)
+            ctrl = Ext.kinematic_controls!(ax, h; throttle = false, pick = pick_m1)
+            _click_at!(scene, (100.0, 100.0))
+            @test ctrl.selected[] === m1
+
+            probe = Ref(0)
+            on(events(scene).mousebutton, priority = -1000) do event
+                probe[] += 1
+                return Consume(false)
+            end
+
+            P0 = collect(Float64.(BMO.position(m1)))
+            _press!(scene, (100.0, 100.0))
+            @test probe[] == 0 # probe receives nothing
+            _move!(scene, (140.0, 100.0))
+            @test collect(Float64.(BMO.position(m1))) != P0 # the object moves
+            _release!(scene)
+            close(ctrl)
+        end
+
+        @testset "press+release with 2 px movement does not change the pose" begin
+            fig, ax, h, m1, m2 = _fixture()
+            scene = ax.scene
+            pick_m1 = ax2 -> (h.handles[1].plots[1], 0)
+            ctrl = Ext.kinematic_controls!(ax, h; throttle = false, pick = pick_m1)
+            _click_at!(scene, (100.0, 100.0))
+            @test ctrl.selected[] === m1
+
+            P0 = collect(Float64.(BMO.position(m1)))
+            _press!(scene, (100.0, 100.0))
+            _move!(scene, (102.0, 100.0)) # 2 px, below the default threshold of 3
+            _release!(scene)
+            @test collect(Float64.(BMO.position(m1))) == P0
+            @test !ctrl.dragging
+            close(ctrl)
+        end
+
+        @testset "select_modifier gates clicks and drags" begin
+            fig, ax, h, m1, m2 = _fixture()
+            scene = ax.scene
+            pick_m1 = ax2 -> (h.handles[1].plots[1], 0)
+            ctrl = Ext.kinematic_controls!(ax, h; throttle = false, pick = pick_m1,
+                select_modifier = Keyboard.left_shift)
+
+            probe = Ref(0)
+            on(events(scene).mousebutton, priority = -1000) do event
+                probe[] += 1
+                return Consume(false)
+            end
+
+            # without shift: the click does not select, the probe gets the event (no mouseposition
+            # is set, so Camera3D's own mouse controls do not compete for the event either)
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+            @test probe[] == 1
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
+            @test ctrl.selected[] === nothing
+
+            # with shift held: the click selects
+            push!(events(scene).keyboardstate, Keyboard.left_shift)
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
+            @test ctrl.selected[] === m1
+            delete!(events(scene).keyboardstate, Keyboard.left_shift)
+            close(ctrl)
+        end
+    end
+
+    @testset "keyboard controls unchanged except backspace reset" begin
+        fig, ax, h, m1, m2 = _fixture()
+        scene = ax.scene
+        pick_m1 = ax2 -> (h.handles[1].plots[1], 0)
+        ctrl = Ext.kinematic_controls!(ax, h; throttle = false, pick = pick_m1, fine_step = 1e-3)
+        events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+        events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
+        @test ctrl.selected[] === m1
+
+        P0 = collect(Float64.(BMO.position(m1)))
+        events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.up, Keyboard.press)
+        @test isapprox(norm(collect(Float64.(BMO.position(m1))) .- P0), 1e-3; atol = 1e-9)
+
+        events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.backspace, Keyboard.press)
+        @test isapprox(collect(Float64.(BMO.position(m1))), P0; atol = 1e-9)
+
+        events(scene).unicode_input[] = '+'
+        @test ctrl.fine_step ≈ 2e-3
+
+        # r is no longer bound to reset: not consumed, the probe receives it, pose unchanged
+        keys_probe = Any[]
+        on(events(scene).keyboardbutton, priority = -1000) do event
+            push!(keys_probe, event.key)
+            return Consume(false)
+        end
+        P1 = collect(Float64.(BMO.position(m1)))
+        events(scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.r, Keyboard.press)
+        @test keys_probe == [Keyboard.r]
+        @test collect(Float64.(BMO.position(m1))) == P1
+        close(ctrl)
+    end
+
+    @testset "no key collides with Camera3D" begin
+        _collect_keys!(out, x::Keyboard.Button) = push!(out, x)
+        _collect_keys!(out, ::Mouse.Button) = out
+        _collect_keys!(out, ::Bool) = out
+        _collect_keys!(out, x::Makie.And) = (_collect_keys!(out, x.left); _collect_keys!(out, x.right))
+        _collect_keys!(out, x::Makie.Or) = (_collect_keys!(out, x.left); _collect_keys!(out, x.right))
+        _collect_keys!(out, x::Makie.Not) = _collect_keys!(out, x.x)
+        _collect_keys!(out, x::Makie.Exclusively) = (foreach(b -> _collect_keys!(out, b), x.x); out)
+        _collect_keys!(out, x) = out
+
+        fig = Figure()
+        ax = LScene(fig[1, 1])
+        cam = Makie.cameracontrols(ax.scene)
+        camera_keys = Set{Keyboard.Button}()
+        for (_, obs) in cam.controls.attributes
+            _collect_keys!(camera_keys, obs[])
+        end
+        @test !isempty(camera_keys) # sanity: the extraction actually found keys
+
+        handled_keys = Set([
+            Keyboard.h, Keyboard.m, Keyboard.t, Keyboard.escape, Keyboard.backspace,
+            Keyboard.up, Keyboard.down, Keyboard.left, Keyboard.right,
+            Keyboard.page_up, Keyboard.page_down, Keyboard.left_shift, Keyboard.right_shift
+        ])
+        @test isempty(intersect(handled_keys, camera_keys))
     end
 end
 
