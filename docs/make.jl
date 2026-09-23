@@ -108,7 +108,7 @@ DocMeta.setdocmeta!(
 bib = CitationBibliography(joinpath(@__DIR__, "src", "refs.bib"))
 
 makedocs(;
-    modules=[BeamletOptics],
+    modules=[BeamletOptics, Base.get_extension(BeamletOptics, :BeamletOpticsMakieExt)],
     authors="Hugo Uittenbosch <hugo.uittenbosch@dlr.de>, Oliver Kliebisch <oliver.kliebisch@dlr.de> and contributors",
     sitename="BeamletOptics.jl",
     format=DocumenterVitepress.MarkdownVitepress(;
@@ -117,6 +117,7 @@ makedocs(;
         devurl="dev",
     ),
     pagesonly=true,
+    warnonly=[:missing_docs],
     pages=[
         "Home" => "index.md",
         "Getting started" => Any[
@@ -154,7 +155,13 @@ makedocs(;
                 "Polarizing components"     => joinpath("basics", "components", "polarizers.md"),
             ],
             "Optical systems"               => joinpath("basics", "systems.md"),
-            "Visualization"                 => joinpath("basics", "render.md"),
+            "Visualization" => Any[
+                "Overview"                  => joinpath("basics", "visualization", "overview.md"),
+                "Rays and beams"            => joinpath("basics", "visualization", "beams.md"),
+                "Gaussian beamlets"         => joinpath("basics", "visualization", "gaussian.md"),
+                "Components and systems"    => joinpath("basics", "visualization", "components.md"),
+                "Scene and camera"          => joinpath("basics", "visualization", "camera.md"),
+            ],
         ],
         "Developer Documentation" => Any[
             "Developer guide" => Any[

@@ -45,7 +45,7 @@ features:
   - icon: "📊"
     title: Makie visualization
     details: Render setups and beams in 2D and 3D with CairoMakie or GLMakie.
-    link: /basics/render
+    link: /basics/visualization/overview
     linkText: Learn more
   - icon: "🧩"
     title: Extensible

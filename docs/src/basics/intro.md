@@ -12,7 +12,7 @@ Pages = [
     joinpath("beams", "astigmatic_beam.md"),
     joinpath("components", "components.md"),
     "systems.md",
-    "render.md",
+    joinpath("visualization", "overview.md"),
 ]
 Depth = 2
 ```
