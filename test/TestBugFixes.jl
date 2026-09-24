@@ -9,6 +9,62 @@ const BMO = BeamletOptics
 
 const mm = 1e-3
 
+@testset "Issue#11" begin
+    # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/11
+    # A very narrow point source produced a scattered spot diagram behind a lens system that had
+    # been moved and rotated before (suspected rounding errors of `_world_to_sdf`).
+    @testset "Narrow point source through a double Gauss lens" begin
+        # Based on https://www.pencilofrays.com/double-gauss-sonnar-comparison/
+        l1 = SphericalLens(48.88mm, 182.96mm, 8.89mm, 52.3mm, λ -> 1.62286)
+        l23 = SphericalDoubletLens(36.92mm, Inf, 23.06mm, 15.11mm, 2.31mm,
+            45.11mm, λ -> 1.58565, λ -> 1.67764)
+        l45 = SphericalDoubletLens(-23.91mm, Inf, -36.92mm, 1.92mm, 7.77mm,
+            40.01mm, λ -> 1.57046, λ -> 1.64128)
+        l6 = SphericalLens(1063.24mm, -48.88mm, 6.73mm, 45.11mm, λ -> 1.62286)
+        l_23 = thickness(l1) + 0.38mm
+        l_45 = l_23 + thickness(l23) + 9.14mm + 13.36mm
+        l_6 = l_45 + thickness(l45) + 0.38mm
+        translate3d!(l23, [0, l_23, 0])
+        translate3d!(l45, [0, l_45, 0])
+        translate3d!(l6, [0, l_6, 0])
+        detector = Detector(5mm)
+        test_setup = ObjectGroup([ObjectGroup([l1, l23, l45, l6]), detector])
+        # Move, rotate and reset the setup before tracing, as in the issue
+        translate3d!(test_setup, [0.05, 0.05, 0.05])
+        xrotate3d!(test_setup, deg2rad(60))
+        zrotate3d!(test_setup, deg2rad(45))
+        reset_rotation3d!(test_setup)
+        reset_translation3d!(test_setup)
+        translate_to3d!(detector, [0, 0.147, 0])
+        source = PointSource([0, -0.5, 0], [0, 1, 0], 5e-5, 486.0e-9, num_rays = 1000,
+            num_rings = 10)
+        solve_system!(System([test_setup]), source)
+        @test all(hit -> norm(hit) < 2e-7, spot_diagram(detector))
+    end
+
+    @testset "Narrow point source through a tilted concave asphere" begin
+        # The numeric normal of aspheres, introduced for this issue, kicked near-axis rays out of
+        # their meridional plane at concave aspheres, see Issue#80. A point source on the axis of
+        # a rotationally symmetric lens: every ray must stay in its meridional plane.
+        n = 1.458
+        lens = Lens(CircularFlatSurface(30mm),
+            EvenAsphericalSurface((n - 1) * 50mm, 30mm, -n^2, [0.0]), 4mm, x -> n)
+        xrotate3d!(lens, deg2rad(0.5))
+        zrotate3d!(lens, deg2rad(0.2))
+        axis = BMO.orientation(lens)[:, 2]
+        source = PointSource(Vector(position(lens) .- 0.1 .* axis), Vector(axis), 5e-5, 486.0e-9;
+            num_rays = 1000, num_rings = 10)
+        solve_system!(System(lens), source)
+        # out-of-plane component of each outgoing ray, the on-axis ray has no meridional plane
+        kicks = map(BMO.beams(source)) do beam
+            m = cross(axis, BMO.direction(first(beam.rays)))
+            norm(m) < 1e-15 ? 0.0 : abs(dot(BMO.direction(last(beam.rays)), normalize(m)))
+        end
+        @test length(kicks) == 1000
+        @test maximum(kicks) < 1e-12
+    end
+end
+
 @testset "Issue#14" begin
     pd_res = 1000
     pd_size = 10mm
@@ -182,6 +238,45 @@ end
         @test length(BMO.rays(beam)) == 3
         @test BMO.refractive_index.(BMO.rays(beam)) == [1, 1.671, 1]
         @test abs(dot(BMO.direction(last(BMO.rays(beam))), dir)) ≈ 1
+    end
+end
+
+@testset "Issue#80" begin
+    # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/80
+    # Near-axis rays through hyperbolic plano-concave and plano-convex lenses.
+    # A plano-conic lens with k = -n² images a collimated beam that enters through the plane
+    # face exactly onto a point: every outgoing ray passes through the (real or virtual)
+    # focus at `f` from the conic vertex. Near the vertex the concave SDF is a sliver thinner
+    # than the finite-difference step of `numeric_gradient`, which used to give wrong normals
+    # for |h| ≲ 10 µm.
+    n = 1.458
+    f = 50mm
+    ct = 4mm
+    d = 30mm
+    concave = Lens(CircularFlatSurface(d),
+        EvenAsphericalSurface((n - 1) * f, d, -n^2, [0.0]), ct, x -> n)
+    convex = Lens(CircularFlatSurface(d),
+        EvenAsphericalSurface(-(n - 1) * f, d, -n^2, [0.0]), 2ct, x -> n)
+    # The conic vertex lies on the back face, `thickness` along the lens axis
+    for (lens, thickness, f_signed) in ((concave, ct, -f), (convex, 2ct, f)),
+        tilt in (0.0, deg2rad(0.5))
+
+        xrotate3d!(lens, tilt)
+        system = System(lens)
+        e_x, axis = BMO.orientation(lens)[:, 1], BMO.orientation(lens)[:, 2]
+        focus = position(lens) .+ (thickness + f_signed) .* axis
+        # Below h ≈ 0.1 µm the sag (h²/2R ≈ 1e-13 m) is smaller than the ray-marching
+        # tolerance, the plane face is hit instead; the angle error stays below h / f.
+        for h in (1e-6, 1e-5, 1e-4, 1e-3, 5mm)
+            beam = Beam(Ray(position(lens) .- 0.1 .* axis .+ h .* e_x, Vector(axis)))
+            solve_system!(system, beam)
+            p, out = position(last(beam.rays)), BMO.direction(last(beam.rays))
+            # lateral miss of the focus by the (extended) outgoing ray, relative to h
+            t = dot(focus .- p, axis) / dot(out, axis)
+            miss = dot(p .+ t .* out .- focus, e_x)
+            @test abs(miss) < 1e-6 * h
+        end
+        xrotate3d!(lens, -tilt)
     end
 end
 
