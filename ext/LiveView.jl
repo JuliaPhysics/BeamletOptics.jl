@@ -276,16 +276,17 @@ line of the `gui`. The user `on_change` is called with the moved `obj`, or `noth
 """
 function _resolve!(gui::LiveView, obj; coarse = false)
     # A detector can be part of several systems, hence empty all before solving
-    t0 = time()
+    # Monotonic clock with ns resolution, time() is too coarse on Windows for fast solves
+    t0 = time_ns()
     foreach(empty!, _find_detectors(first.(gui.pairs)))
     for (i, (sys, beam)) in enumerate(gui.pairs)
         solve_system!(sys, beam)
         update_render!(gui.beam_handles[i])
     end
-    t1 = time()
+    t1 = time_ns()
     foreach(p -> _update_panel!(p; coarse), gui.panels)
-    gui.solve_time = t1 - t0
-    coarse || (gui.panel_time = time() - t1)
+    gui.solve_time = 1e-9 * (t1 - t0)
+    coarse || (gui.panel_time = 1e-9 * (time_ns() - t1))
     gui.coarse = coarse
     try
         gui.on_change(gui, obj)

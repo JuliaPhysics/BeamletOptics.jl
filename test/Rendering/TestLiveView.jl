@@ -35,11 +35,16 @@ const BMO = BeamletOptics
 
     _gauss() = GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], 1e-6, 0.5e-3)
 
+    # The tests expect each change to be solved immediately. Adaptive tracing depends on the
+    # measured solve time, which exceeds the default `trace_budget` on slow runners (e.g. CI with
+    # coverage), hence it is disabled unless a test sets `trace_budget` itself.
+    _live_view(args...; kwargs...) = live_view(args...; merge((; trace_budget = Inf), kwargs)...)
+
     @testset "construction and panels" begin
         m, pd = _fixture()
         sys = System([m, pd])
         gauss = _gauss()
-        gui = live_view(sys, gauss)
+        gui = _live_view(sys, gauss)
         @test gui isa Ext.LiveView
         @test length(gui.panels) == 1
         @test occursin("Detector 1: P =", gui.panels[1].ax.title[])
@@ -52,7 +57,7 @@ const BMO = BeamletOptics
 
         m, pd = _fixture()
         cs = CollimatedSource([0.0, 0, 0], [0.0, 1, 0], 2e-3, 1e-6; num_rings = 2, num_rays = 40)
-        gui = live_view(System([m, pd]) => cs)
+        gui = _live_view(System([m, pd]) => cs)
         @test occursin("40 rays", gui.panels[1].ax.title[])
         @test gui.panels[1].scatter_plot.visible[]
         @test length(gui.panels[1].xy[]) == 40
@@ -60,24 +65,24 @@ const BMO = BeamletOptics
 
         # explicit modes and kwargs, a solved beam can not be reused for new objects
         m, pd = _fixture()
-        gui = live_view(System([m, pd]), _gauss();
+        gui = _live_view(System([m, pd]), _gauss();
             detectors = [pd => (:intensity, (; n = 20, x_min = -2.5e-3, x_max = 2.5e-3,
                 z_min = -2.5e-3, z_max = 2.5e-3))])
         @test size(gui.panels[1].heat_I[]) == (20, 20)
         @test gui.panels[1].heat_x[] ≈ collect(LinRange(-2.5f0, 2.5f0, 20))
         close(gui)
-        gui = live_view(System([m, pd]), _gauss(); detectors = [pd => :spot])
+        gui = _live_view(System([m, pd]), _gauss(); detectors = [pd => :spot])
         @test gui.panels[1].scatter_plot.visible[]
         close(gui)
 
         # no panels
-        gui = live_view(System([m, pd]), _gauss(); detectors = [])
+        gui = _live_view(System([m, pd]), _gauss(); detectors = [])
         @test isempty(gui.panels)
         close(gui)
 
-        @test_throws ArgumentError live_view()
-        @test_throws ArgumentError live_view(System([m, pd]), gauss; detectors = [pd => :fancy])
-        @test_throws ArgumentError live_view(System([m, pd]), gauss; detectors = :none)
+        @test_throws ArgumentError _live_view()
+        @test_throws ArgumentError _live_view(System([m, pd]), gauss; detectors = [pd => :fancy])
+        @test_throws ArgumentError _live_view(System([m, pd]), gauss; detectors = :none)
     end
 
     @testset "shared detector is emptied once per solve" begin
@@ -86,7 +91,7 @@ const BMO = BeamletOptics
         sys2 = System([pd])
         b1 = Beam([0.0, 0, 0], [0.0, 1, 0])
         b2 = Beam([0.05, 0.1, 0.001], [1.0, 0, 0])
-        gui = live_view(sys1 => b1, sys2 => b2; throttle = false, mode = :rotate, fine_angle = 1e-3)
+        gui = _live_view(sys1 => b1, sys2 => b2; throttle = false, mode = :rotate, fine_angle = 1e-3)
         @test length(gui.panels) == 1 # deduplicated
         @test sprint(show, gui) == "LiveView(2 systems, 1 detector panels)"
         # both systems and the markers of both sources are handled by one controller
@@ -114,7 +119,7 @@ const BMO = BeamletOptics
         beam = Beam([0.0, 0, 0], [0.0, 1, 0])
         n_calls = Ref(0)
         gui_ref = Ref{Any}(nothing)
-        gui = live_view(sys, beam; throttle = false, mode = :rotate, fine_angle = 1e-2,
+        gui = _live_view(sys, beam; throttle = false, mode = :rotate, fine_angle = 1e-2,
             on_change = (g, obj) -> (n_calls[] += 1), pick = ax -> (gui_ref[].controls.h.handles[1].plots[1], 0))
         gui_ref[] = gui
         @test gui.controls.h.handles[1].obj === m
@@ -154,7 +159,7 @@ const BMO = BeamletOptics
         called = Float64[]
         n_calls = Ref(0)
         callback = v -> (push!(called, v); translate_to3d!(pd, [0.1, 0.1, v * 1e-3]))
-        gui = live_view(sys, beam; sliders = ["detector z [mm]" => (0:0.1:2, callback)],
+        gui = _live_view(sys, beam; sliders = ["detector z [mm]" => (0:0.1:2, callback)],
             on_change = (g, obj) -> (obj === nothing && (n_calls[] += 1)))
         @test isempty(called) # not called at construction
         @test length(gui.sliders.sliders) == 1
@@ -174,7 +179,7 @@ const BMO = BeamletOptics
         # errors of the callback are logged once
         close(gui)
         m, pd = _fixture()
-        gui = live_view(System([m, pd]), Beam([0.0, 0, 0], [0.0, 1, 0]); sliders = ["x" => (0:0.1:1, v -> error("slider"), 0.5)])
+        gui = _live_view(System([m, pd]), Beam([0.0, 0, 0], [0.0, 1, 0]); sliders = ["x" => (0:0.1:1, v -> error("slider"), 0.5)])
         @test gui.sliders.sliders[1].value[] == 0.5
         gui.sliders.sliders[1].value[] = 0.1
         @test_logs (:error, r"slider callback") notify(events(gui.ax.scene).tick)
@@ -191,7 +196,7 @@ const BMO = BeamletOptics
         sys = System([m])
         # unrelated to the mirror, live_view needs a beam; its marker is not on the camera ray
         beam = Beam([1.0, -1.0, 0.0], [1.0, 0, 0])
-        gui = live_view(sys, beam; detectors = [])
+        gui = _live_view(sys, beam; detectors = [])
 
         # A MeshDummy-like housing in front of the mirror along the camera ray, not part of the
         # system: added directly to the axis, as described for `render!(gui.ax, ...)`
@@ -218,7 +223,7 @@ const BMO = BeamletOptics
         m, pd = _fixture()
         beam = Beam([0.0, 0, 0], [0.0, 1, 0])
         gui_ref = Ref{Any}(nothing)
-        gui = live_view(System([m, pd]), beam; throttle = false, fine_step = 1e-3,
+        gui = _live_view(System([m, pd]), beam; throttle = false, fine_step = 1e-3,
             pick = ax -> (_marker(gui_ref[], beam).plots[1], 0))
         gui_ref[] = gui
         marker = _marker(gui, beam)
@@ -246,7 +251,7 @@ const BMO = BeamletOptics
         m, pd = _fixture()
         cs = CollimatedSource([0.0, 0, 0], [0.0, 1, 0], 2e-3, 1e-6; num_rings = 2, num_rays = 40)
         gui_ref = Ref{Any}(nothing)
-        gui = live_view(System([m, pd]) => cs; throttle = false, fine_step = 1e-3,
+        gui = _live_view(System([m, pd]) => cs; throttle = false, fine_step = 1e-3,
             pick = ax -> (_marker(gui_ref[], cs).plots[1], 0))
         gui_ref[] = gui
         _select!(gui)
@@ -261,7 +266,7 @@ const BMO = BeamletOptics
         # no markers
         m, pd = _fixture()
         beam = Beam([0.0, 0, 0], [0.0, 1, 0])
-        gui = live_view(System([m, pd]), beam; movable_sources = false)
+        gui = _live_view(System([m, pd]), beam; movable_sources = false)
         @test !any(oh -> oh.obj === beam, gui.controls.h.handles)
         @test !(beam in gui.controls.movable)
         close(gui)
@@ -270,7 +275,7 @@ const BMO = BeamletOptics
     @testset "labels, pose and step textbox" begin
         m, pd = _fixture()
         gui_ref = Ref{Any}(nothing)
-        gui = live_view(System([m, pd]), Beam([0.0, 0, 0], [0.0, 1, 0]); throttle = false,
+        gui = _live_view(System([m, pd]), Beam([0.0, 0, 0], [0.0, 1, 0]); throttle = false,
             fine_step = 1e-3, labels = Dict(m => "Mirror 1", pd => "PD"),
             pick = ax -> (gui_ref[].controls.h.handles[1].plots[1], 0))
         gui_ref[] = gui
@@ -323,10 +328,11 @@ const BMO = BeamletOptics
         # slow systems: the solve is deferred until the movement pauses
         m, pd = _fixture()
         gui_ref = Ref{Any}(nothing)
-        gui = live_view(System([m, pd]), Beam([0.0, 0, 0], [0.0, 1, 0]); throttle = false,
+        gui = _live_view(System([m, pd]), Beam([0.0, 0, 0], [0.0, 1, 0]); throttle = false,
             mode = :rotate, fine_angle = 1e-2, trace_budget = 0.0, idle_delay = 0.1,
             pick = ax -> (gui_ref[].controls.h.handles[1].plots[1], 0))
         gui_ref[] = gui
+        gui.solve_time = 1.0 # pretend that the solve is slow, independent of the machine
         _select!(gui)
         pts0 = copy(gui.beam_handles[1].points[])
         _key!(gui, Keyboard.left)
@@ -347,12 +353,14 @@ const BMO = BeamletOptics
         # slow panels: a coarse preview while moving, refined once the movement pauses
         m, pd = _fixture()
         gui_ref = Ref{Any}(nothing)
-        gui = live_view(System([m, pd]), _gauss(); throttle = false, mode = :rotate,
+        gui = _live_view(System([m, pd]), _gauss(); throttle = false, mode = :rotate,
             fine_angle = 1e-4, idle_delay = 0.1, detectors = [pd => (:intensity, (; n = 40))],
-            pick = ax -> (gui_ref[].controls.h.handles[1].plots[1], 0))
+            trace_budget = 0.5, pick = ax -> (gui_ref[].controls.h.handles[1].plots[1], 0))
         gui_ref[] = gui
         @test size(gui.panels[1].heat_I[]) == (40, 40)
-        gui.panel_time = 1.0 # pretend that the panels are slow
+        # pretend that the solve is fast and the panels are slow, independent of the machine
+        gui.solve_time = 0.0
+        gui.panel_time = 1.0
         _select!(gui)
         _key!(gui, Keyboard.left)
         @test gui.coarse
@@ -370,7 +378,7 @@ const BMO = BeamletOptics
         m, pd = _fixture()
         # small area and coarse grid, such that the edges contribute to the integral
         area = (; n = 5, x_min = -0.3e-3, x_max = 0.3e-3, z_min = -0.3e-3, z_max = 0.3e-3)
-        gui = live_view(System([m, pd]), _gauss(); detectors = [pd => (:intensity, area)])
+        gui = _live_view(System([m, pd]), _gauss(); detectors = [pd => (:intensity, area)])
         P = optical_power(pd; area...)
         @test gui.panels[1].ax.title[] == "Detector 1: P = $(Ext._fmt3(1e3 * P)) mW"
         close(gui)
@@ -378,7 +386,7 @@ const BMO = BeamletOptics
 
     @testset "failed solve keeps the beams outdated" begin
         m, pd = _fixture()
-        gui = live_view(System([m, pd]), Beam([0.0, 0, 0], [0.0, 1, 0]); auto_trace = false,
+        gui = _live_view(System([m, pd]), Beam([0.0, 0, 0], [0.0, 1, 0]); auto_trace = false,
             throttle = false)
         @test !gui.stale
         # solve_system! fails for this beam
@@ -407,7 +415,7 @@ const BMO = BeamletOptics
             sys = System([m, pd])
             beam = Beam([0.0, 0, 0], [0.0, 1, 0])
             n_calls = Ref(0)
-            gui = live_view(sys, beam; auto_trace = false, throttle = false, mode = :rotate,
+            gui = _live_view(sys, beam; auto_trace = false, throttle = false, mode = :rotate,
                 fine_angle = 1e-2, on_change = (g, obj) -> (n_calls[] += 1))
             @test !gui.auto_trace[]
             @test !gui.auto_trace_toggle.active[]
@@ -479,7 +487,7 @@ const BMO = BeamletOptics
             n_calls = Ref(0)
             called = Float64[]
             callback = v -> (push!(called, v); translate_to3d!(pd, [0.1, 0.1, v * 1e-3]))
-            gui = live_view(sys, beam; auto_trace = false, throttle = false,
+            gui = _live_view(sys, beam; auto_trace = false, throttle = false,
                 sliders = ["detector z [mm]" => (0:0.1:2, callback)],
                 on_change = (g, obj) -> (n_calls[] += 1))
             @test n_calls[] == 1
@@ -516,7 +524,7 @@ const BMO = BeamletOptics
         @testset "auto trace by default, t traces as well" begin
             m, pd = _fixture()
             n_calls = Ref(0)
-            gui = live_view(System([m, pd]), Beam([0.0, 0, 0], [0.0, 1, 0]); throttle = false,
+            gui = _live_view(System([m, pd]), Beam([0.0, 0, 0], [0.0, 1, 0]); throttle = false,
                 on_change = (g, obj) -> (n_calls[] += 1))
             @test gui.auto_trace[]
             @test gui.auto_trace_toggle.active[]
@@ -536,7 +544,7 @@ const BMO = BeamletOptics
         beam = Beam([0.0, 0, 0], [0.0, 1, 0])
         gui_ref = Ref{Any}(nothing)
         @test_logs (:error, r"on_change") begin
-            gui_ref[] = live_view(sys, beam; throttle = false, on_change = (g, obj) -> error("boom"),
+            gui_ref[] = _live_view(sys, beam; throttle = false, on_change = (g, obj) -> error("boom"),
                 pick = ax -> (gui_ref[].controls.h.handles[1].plots[1], 0))
             gui = gui_ref[]
             _select!(gui)
