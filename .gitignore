@@ -76,3 +76,5 @@ paper/*.vrb
 
 # Compiled manuscript (rebuild with the pdflatex/bibtex recipe)
 paper/paper.pdf
+# implementation plans (local only)
+/plans/
