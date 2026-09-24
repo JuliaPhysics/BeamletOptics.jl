@@ -44,6 +44,7 @@ function thickness(u::UnionSDF{T}) where T
 end
 
 function UnionSDF{T}(sdfs::Vararg{AbstractSDF{T}, N}) where {T, N}
+    _check_kinematic_members(sdfs)
     UnionSDF{T, typeof(sdfs)}(
         SMatrix{3,3}(one(T)*I),
         SMatrix{3,3}(one(T)*I),

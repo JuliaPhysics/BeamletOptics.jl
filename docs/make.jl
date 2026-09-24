@@ -34,6 +34,35 @@ function DocumenterVitepress.render(
     return nothing
 end
 
+# Documenter matches the `Pages` of an `@contents` block against `relpath`, which uses `\`
+# on Windows, so pages in subdirectories (e.g. "beams/beams.md") are silently dropped, and
+# with `joinpath` entries DocumenterVitepress emits `\` links that VitePress rejects as dead.
+# Copy of `Documenter.populate!(::ContentsNode, ::Document)` (Documenter 1.x) with the page
+# path normalized to `/`.
+if Sys.iswindows()
+    function Documenter.populate!(contents::Documenter.ContentsNode, document::Documenter.Document)
+        for (_, filedict) in document.internal.anchors.map
+            for (_, anchors) in filedict
+                for anchor in anchors
+                    page = replace(relpath(anchor.file, dirname(contents.build)), '\\' => '/')
+                    if Documenter._isvalid(page, contents.pages) &&
+                            anchor.object isa Documenter.MarkdownAST.Heading &&
+                            anchor.object.level ≤ contents.depth
+                        push!(contents.elements, (anchor.order, page, anchor))
+                    end
+                end
+            end
+        end
+        pagesmap = Documenter.precedence(contents.pages)
+        comparison = function (a, b)
+            (x = Documenter._compare(pagesmap, 2, a, b)) == 0 || return x < 0
+            return a[1] < b[1]
+        end
+        sort!(contents.elements, lt = comparison)
+        return contents
+    end
+end
+
 DocMeta.setdocmeta!(
     BeamletOptics,
     :DocTestSetup,
@@ -75,7 +104,8 @@ makedocs(;
             "Introduction"                  => joinpath("basics", "intro.md"),
             "Rays"                          => joinpath("basics", "rays.md"),
             "Beams" => Any[
-                "Basic beam"                => joinpath("basics", "beams", "beams.md"),
+                "Overview"                  => joinpath("basics", "beams", "overview.md"),
+                "Basic beam"               => joinpath("basics", "beams", "beams.md"),
                 "Stigmatic Gaussian"        => joinpath("basics", "beams", "stigmatic_beam.md"),
                 "Astigmatic Gaussian"       => joinpath("basics", "beams", "astigmatic_beam.md"),
                 "Beam groups"               => joinpath("basics", "beams", "beam_groups.md"),
@@ -89,6 +119,11 @@ makedocs(;
                 "Polarizing components"     => joinpath("basics", "components", "polarizers.md"),
             ],
             "Optical systems"               => joinpath("basics", "systems.md"),
+            "Kinematics" => Any[
+                "Overview"                  => joinpath("basics", "kinematics", "kinematics.md"),
+                "Optical elements"          => joinpath("basics", "kinematics", "objects.md"),
+                "Sources"                   => joinpath("basics", "kinematics", "sources.md"),
+            ],
             "Visualization"                 => joinpath("basics", "render.md"),
         ],
         "Developer Documentation" => Any[

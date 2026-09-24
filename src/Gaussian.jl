@@ -93,6 +93,23 @@ function refractive_index!(beam::GaussianBeamlet, id::Int, n_new::Real)
     return nothing
 end
 
+"""
+    empty!(gauss::GaussianBeamlet)
+
+Resets the beamlet to its untraced start state, i.e. resets the `chief`, `waist` and
+`divergence` beams and drops all child beamlets.
+"""
+function Base.empty!(g::GaussianBeamlet)
+    foreach(empty!, _component_beams(g))
+    _drop_beams!(g)
+    return g
+end
+
+"""Return a tuple of the `chief`, `waist` and `divergence` beams of the [`GaussianBeamlet`](@ref)."""
+_component_beams(g::GaussianBeamlet) = (g.chief, g.waist, g.divergence)
+
+first_ray(g::GaussianBeamlet) = first_ray(g.chief)
+
 Base.length(gauss::GaussianBeamlet) = length(gauss.chief)
 optical_path_length(gauss::GaussianBeamlet) = optical_path_length(gauss.chief)
 
