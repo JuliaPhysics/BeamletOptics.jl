@@ -11,8 +11,10 @@ const BMO = BeamletOptics
     @testset "AbstractBeamGroup definitions" begin
         @test isdefined(BMO, :AbstractBeamGroup)
 
-        struct BeamTestGroup{T} <: BMO.AbstractBeamGroup{T, Ray{T}}
+        mutable struct BeamTestGroup{T} <: BMO.AbstractBeamGroup{T, Ray{T}}
             central_beam::BMO.Beam{T, Ray{T}}
+            center::Point3{T}
+            orientation::BMO.SMatrix{3, 3, T, 9}
         end
 
         struct BeamTestSystem <: BMO.AbstractSystem end
@@ -26,10 +28,11 @@ const BMO = BeamletOptics
         dir = [0,1,0]
         lambda = 1064e-9
 
-        tg = BeamTestGroup(BMO.Beam(pos, dir, lambda))
+        tg = BeamTestGroup{Float64}(BMO.Beam(pos, dir, lambda), pos, BMO.SMatrix{3, 3, Float64, 9}(I))
 
         @test position(tg) == pos
         @test BMO.direction(tg) == dir
+        @test orientation(tg) == I
         @test BMO.wavelength(tg) == lambda
 
         ts = BeamTestSystem()
@@ -244,6 +247,77 @@ const BMO = BeamletOptics
         @testset "Testing throw errors" begin
             @test_throws ErrorException UniformDiscSource(pos, dir, diameter, lambda;
                 num_rays, basis = dir)
+        end
+    end
+
+    @testset "Uniform point source" begin
+        # define parameters
+        lambda = 486.0e-9
+        pos = [0, -0.5, 0]
+        dir = [0, 1, 1]
+        dir_n = normalize(dir)
+        θ = deg2rad(20)
+        num_rays = 500
+
+        source = UniformPointSource(pos, dir, θ, lambda; num_rays)
+        start_dirs(s) = BMO.direction.(first.(BMO.rays.(BMO.beams(s))))
+
+        @testset "Testing getters and sampling bounds" begin
+            @test source isa PointSource
+            @test length(source) == num_rays
+            @test BMO.numerical_aperture(source) == sin(θ)
+            @test position(source) == pos
+            @test BMO.direction(source) ≈ dir_n
+            @test BMO.wavelength(source) == lambda
+            @test all(position(b) == pos for b in BMO.beams(source))
+            @test all(BMO.angle3d(dir_n, d) ≤ θ + 1e-12 for d in start_dirs(source))
+            # default wavelength and number of rays
+            @test length(UniformPointSource(pos, dir, θ)) == 1000
+            # single ray
+            @test length(UniformPointSource(pos, dir, θ; num_rays = 1)) == 1
+        end
+
+        @testset "Testing equal solid angle" begin
+            N = 2000
+            us = UniformPointSource(pos, dir, θ; num_rays = N)
+            ϑs = BMO.angle3d.(Ref(dir_n), start_dirs(us))
+            frac = count(≤(θ / 2), ϑs) / N
+            @test abs(frac - (1 - cos(θ / 2)) / (1 - cos(θ))) ≤ 1 / N
+        end
+
+        @testset "Testing basis kwarg" begin
+            b0 = BMO.normal3d(dir_n)
+            α = deg2rad(30)
+            Rα = BMO.rotate3d(dir_n, α)
+            rotated = UniformPointSource(pos, dir, θ, lambda; num_rays, basis = Rα * b0)
+
+            dirs_default = start_dirs(source)
+            dirs_rotated = start_dirs(rotated)
+            # rotating the basis spins the sunflower pattern about its own axis
+            @test all(norm(Rα * d0 - d1) < 1e-12 for (d0, d1) in zip(dirs_default, dirs_rotated))
+            @test !all(dirs_default .≈ dirs_rotated)
+
+            # the default is reproducible, and passing the default basis reproduces it
+            @test all(dirs_default .== start_dirs(UniformPointSource(pos, dir, θ, lambda; num_rays)))
+            @test all(dirs_default .≈ start_dirs(UniformPointSource(pos, dir, θ, lambda; num_rays, basis = b0)))
+
+            # orientation: local x is the projected basis, local y is dir
+            b = [1.0, 2.0, 0.5]
+            ob = UniformPointSource(pos, dir, θ; num_rays = 10, basis = b)
+            O = orientation(ob)
+            @test norm(O[:, 1] - normalize(b - dot(b, dir_n) * dir_n)) < 1e-12
+            @test BMO.direction(ob) == O[:, 2]
+            @test norm(O' * O - I) < 1e-12
+            @test abs(det(O) - 1) < 1e-12
+        end
+
+        @testset "Testing throw errors" begin
+            @test_throws ErrorException UniformPointSource(pos, dir, 1.1 * π, lambda; num_rays)
+            @test_throws ErrorException UniformPointSource(pos, dir, π, lambda; num_rays)
+            @test_throws ErrorException UniformPointSource(pos, dir, θ, lambda; num_rays = 0)
+            # basis parallel to dir has no component in the sampling plane
+            @test_throws ErrorException UniformPointSource(pos, dir, θ, lambda; num_rays, basis = dir)
+            @test_throws ErrorException UniformPointSource(pos, dir, θ, lambda; num_rays, basis = [0, 0, 0])
         end
     end
 end

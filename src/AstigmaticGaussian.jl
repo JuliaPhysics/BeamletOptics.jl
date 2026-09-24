@@ -219,6 +219,20 @@ end
 # Implementation of AbstractBeam interface
 rays(agb::AstigmaticGaussianBeamlet) = rays(agb.c)
 
+"""
+    empty!(agb::AstigmaticGaussianBeamlet)
+
+Resets the beamlet to its untraced start state, i.e. resets all 9 component beams and
+drops all child beamlets.
+"""
+function Base.empty!(agb::AstigmaticGaussianBeamlet)
+    foreach(empty!, _component_beams(agb))
+    _drop_beams!(agb)
+    return agb
+end
+
+first_ray(agb::AstigmaticGaussianBeamlet) = first_ray(agb.c)
+
 Base.length(agb::AstigmaticGaussianBeamlet) = length(agb.c)
 optical_path_length(agb::AstigmaticGaussianBeamlet) = optical_path_length(agb.c)
 
@@ -229,8 +243,6 @@ _last_beam_intersection(agb::AstigmaticGaussianBeamlet) = intersection(last(rays
 point_on_beam(agb::AstigmaticGaussianBeamlet, t::Real) = point_on_beam(agb.c, t)
 
 wavelength(agb::AstigmaticGaussianBeamlet) = wavelength(first(rays(agb.c)))
-direction(agb::AstigmaticGaussianBeamlet) = direction(first(rays(agb.c)))
-position(agb::AstigmaticGaussianBeamlet) = position(first(rays(agb.c)))
 polarization(agb::AstigmaticGaussianBeamlet) = polarization(first(rays(agb.c)))
 
 electric_field(agb::AstigmaticGaussianBeamlet) = polarization(agb)

@@ -1,6 +1,6 @@
 # Rendering rays and beams
 
-Rays and beams are drawn as 3D lines. A ray without an intersection is drawn with the finite length `flen`, since its actual length is infinite. Example renderings can be found in the [Basic rays](@ref), [Basic beam](@ref) and [Beam groups](@ref) sections.
+Rays and beams are drawn as 3D lines. A ray without an intersection is drawn with the finite length `flen`, since its actual length is infinite. Example renderings can be found in the [Basic rays](@ref), [Basic beam](@ref) and [Beam groups](../beams/beam_groups.md) sections.
 
 ## Single rays
 

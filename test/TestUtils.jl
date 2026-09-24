@@ -46,6 +46,12 @@ const BMO = BeamletOptics
         @test isapprox(Rot * [1, 0, 0], [0, 1, 0])
         @test_throws ArgumentError BMO.rotate3d([0, 0, 1], Inf)
         @test_throws ArgumentError BMO.rotate3d([0, 0, 1], NaN)
+        # non-unit axes are normalized
+        @test BMO.rotate3d([0, 0, 5], π / 2) ≈ Rot
+        R = BMO.rotate3d([1, 1, 0], 1.1)
+        @test R' * R ≈ BMO.I
+        @test R * [1, 1, 0] ≈ [1, 1, 0]
+        @test_throws ArgumentError BMO.rotate3d([0, 0, 0], π / 2)
     end
 
     @testset "Testing align3d for rotation and conservation of length" begin

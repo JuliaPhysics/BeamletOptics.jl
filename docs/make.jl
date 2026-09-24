@@ -141,7 +141,8 @@ makedocs(;
             "Introduction"                  => joinpath("basics", "intro.md"),
             "Rays"                          => joinpath("basics", "rays.md"),
             "Beams" => Any[
-                "Basic beam"                => joinpath("basics", "beams", "beams.md"),
+                "Overview"                  => joinpath("basics", "beams", "overview.md"),
+                "Basic beam"               => joinpath("basics", "beams", "beams.md"),
                 "Stigmatic Gaussian"        => joinpath("basics", "beams", "stigmatic_beam.md"),
                 "Astigmatic Gaussian"       => joinpath("basics", "beams", "astigmatic_beam.md"),
                 "Beam groups"               => joinpath("basics", "beams", "beam_groups.md"),
@@ -155,6 +156,11 @@ makedocs(;
                 "Polarizing components"     => joinpath("basics", "components", "polarizers.md"),
             ],
             "Optical systems"               => joinpath("basics", "systems.md"),
+            "Kinematics" => Any[
+                "Overview"                  => joinpath("basics", "kinematics", "kinematics.md"),
+                "Optical elements"          => joinpath("basics", "kinematics", "objects.md"),
+                "Sources"                   => joinpath("basics", "kinematics", "sources.md"),
+            ],
             "Visualization" => Any[
                 "Overview"                  => joinpath("basics", "visualization", "overview.md"),
                 "Rays and beams"            => joinpath("basics", "visualization", "beams.md"),

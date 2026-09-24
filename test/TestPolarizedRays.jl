@@ -254,7 +254,7 @@ const BMO = BeamletOptics
             mirror = ParabolicMirror(f, 12.5mm)
             src = UniformDiscSource([0, -f / 2, 0], [0, 1, 0], D, λ; num_rays = N)
             pol_src = BMO.CollimatedSource(
-                [Beam(position(first(rays(b))), direction(first(rays(b))), λ, pol) for b in BMO.beams(src)], D)
+                [Beam(position(first(rays(b))), direction(first(rays(b))), λ, pol) for b in BMO.beams(src)], D, [0, -f / 2, 0], [0, 1, 0])
             # source sits between focus and mirror, so the incoming rays never cross the detector
             pd = Detector(1mm)
             translate3d!(pd, [0, -f, 0])
@@ -327,7 +327,7 @@ const BMO = BeamletOptics
         E0 = [1.0, 0, 0]
         pol_beams = [Beam(position(first(rays(b))), direction(first(rays(b))), λ, E0)
                      for b in BMO.beams(cs)]
-        pcs = BMO.CollimatedSource(pol_beams, D)
+        pcs = BMO.CollimatedSource(pol_beams, D, [0, -10e-3, 0], [0, 1, 0])
 
         sys = System([lens, psfd])
         solve_system!(sys, pcs)

@@ -71,6 +71,20 @@ end
 polarization(ray::PolarizedRay) = ray.E0
 polarization!(ray::PolarizedRay, new) = (ray.E0 = new)
 
+"""
+    rotate3d!(::Movable, ray::PolarizedRay, R::AbstractMatrix)
+
+Rotates the direction and the field vector `E0` of the `ray` by `R` about its start position
+and clears its intersection. `E0` stays orthogonal to the direction and is not renormalized,
+i.e. its amplitude is kept.
+"""
+function rotate3d!(::Movable, ray::PolarizedRay{T}, R::AbstractMatrix) where {T}
+    direction!(ray, Point3{T}(R * direction(ray)))
+    polarization!(ray, Point3{Complex{T}}(R * polarization(ray)))
+    empty!(ray)
+    return nothing
+end
+
 islinear(ray::PolarizedRay) = islinear(polarization(ray))
 iscircular(ray::PolarizedRay) = iscircular(polarization(ray))
 iselliptical(ray::PolarizedRay) = iselliptical(polarization(ray))
