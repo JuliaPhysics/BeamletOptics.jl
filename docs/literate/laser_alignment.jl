@@ -1,6 +1,6 @@
 # # Laser alignment
 #
-# This tutorial walks through a small lab-style task: lifting a HeNe laser beam onto a table with a periscope, discovering and correcting a mirror mounting error with an alignment card, and finally focusing the beam onto a camera sensor.
+# This tutorial walks through a small lab-style task: steering a HeNe laser beam onto the optical axis of a setup with two mirrors, discovering and correcting a mirror mounting error with an alignment card, and finally focusing the beam onto a camera sensor.
 #
 # ```@raw html
 # <div class="bmo-card">
@@ -24,7 +24,7 @@
 # </div>
 # ```
 #
-# Our HeNe laser sits at a beam height of 50 mm, while the rest of the optical table works at 150 mm. A periscope built from two mirrors lifts the beam onto the table height. The first mirror, `M1`, turns out to have a small mounting error; we will find it with an alignment card and correct it. Finally, a lens focuses the beam onto a camera.
+# Our HeNe laser sits on an optical table, but its beam runs 100 mm to the side of the optical axis of the setup we want to feed. Two mirrors in a Z-shaped arrangement shift the beam sideways onto that axis, the standard way to steer a laser beam in the lab. The first mirror, `M1`, turns out to have a small mounting error; we will find it with an alignment card and correct it. Finally, a lens focuses the beam onto a camera.
 #
 # !!! info "Units"
 #     Unless stated otherwise, this package assumes SI units for input parameters. We define `const mm = 1e-3` below and use `mm` throughout to make lengths easier to read, e.g. `50mm` is 50 millimeters expressed in meters.
@@ -36,51 +36,65 @@
 #
 #     Figures appear only when the figure object is returned or displayed. On this page, the plots are shown as images below the code blocks. When running the code yourself, end each plotting block with the figure variable (e.g. `fig`) or call `display(fig)`. With GLMakie, `display(fig)` opens an interactive window where the 3D scene can be rotated and zoomed. GLMakie handles the 2D plots in this tutorial as well.
 #
-# ## Building the periscope
+# ## Setting up the mirrors
 #
-# We start by defining the two mirrors of the periscope, a [`RoundPlanoMirror`](@ref) with an outer diameter of one inch and a thickness of 6 mm each.
+# Each mirror is a Ø1" [`RoundPlanoMirror`](@ref) with a thickness of 6 mm (e.g. [PF10-03-P01](https://www.thorlabs.com/thorproduct.cfm?partnumber=PF10-03-P01)), held by a [KM100CP/M](https://www.thorlabs.com/thorproduct.cfm?partnumber=KM100CP/M) kinematic mount on a post. The mount model ships with the package: `BMO.KM100CPMount()` returns it as a [`MeshDummy`](@ref), which is rendered but ignored by the ray tracer. Its origin lies at the center of the mirror, so grouping mount and mirror into an [`ObjectGroup`](@ref) lets us move and rotate both together.
 
 using GLMakie, BeamletOptics
 const BMO = BeamletOptics
 const mm = 1e-3
 
-h1, h2 = 50mm, 150mm     # beam height of the laser and of the table optics
 λ = 632.8e-9             # HeNe wavelength
+Δx = 100mm               # lateral offset between laser and optical axis
 
-m1 = RoundPlanoMirror(BMO.inch, 6mm)
-m2 = RoundPlanoMirror(BMO.inch, 6mm)
-xrotate3d!(m1, deg2rad(-45)); translate3d!(m1, [0, 100mm, h1])
-xrotate3d!(m2, deg2rad(135)); translate3d!(m2, [0, 100mm, h2])
+function mounted_mirror()
+    mirror = RoundPlanoMirror(BMO.inch, 6mm)
+    return ObjectGroup([BMO.KM100CPMount(), mirror])
+end
 
-# Every component spawns at the global origin facing the +y-axis, which is the direction of the optical axis in this tutorial. Rotating `M1` by −45° around the x-axis tilts its face so that the incoming horizontal beam is sent straight up. `M2` is rotated by 135° rather than −45°, so that its **front** face points back down at the beam coming up from `M1`. With −45° the beam would instead hit the *back* of the 6 mm thick mirror substrate and leave the periscope roughly 10 mm too low, missing the rest of the setup entirely.
+m1 = mounted_mirror()
+m2 = mounted_mirror()
+zrotate3d!(m1, deg2rad(45));   translate3d!(m1, [0, 100mm, 0])
+zrotate3d!(m2, deg2rad(-135)); translate3d!(m2, [Δx, 100mm, 0])
+
+# Every component spawns at the global origin facing the +y-axis, which is the direction of the laser beam. The beam runs at the height of the mirror centers, which we take as `z = 0`. Rotating `M1` by 45° around the vertical z-axis sends the beam sideways along +x. `M2` is rotated by −135° so that its **front** face points back at `M1`, which sends the beam along +y again, now shifted by `Δx`.
 #
-# We can now trace a single [`Beam`](@ref) through the periscope and render the result. `System`s bundle all components that take part in a simulation, and [`solve_system!`](@ref) performs the actual ray tracing.
+# For the figures, we also draw the optical table: a plate with an M6 hole grid on a 25 mm pitch, whose surface lies 81.8 mm below the beam, at the foot of the mount posts. It is plain Makie and not part of the simulation.
+
+function optical_table!(ax; xs=(-75mm, 175mm), ys=(-50mm, 500mm), z_top=-81.8mm, pitch=25mm)
+    mesh!(ax, Rect3f(Vec3f(xs[1], ys[1], z_top - 12mm), Vec3f(xs[2] - xs[1], ys[2] - ys[1], 12mm)), color=:grey85)
+    holes = [Point3f(x, y, z_top + 0.2mm) for x in xs[1]+pitch/2:pitch:xs[2], y in ys[1]+pitch/2:pitch:ys[2]]
+    scatter!(ax, vec(holes), color=:grey45, markersize=2.5)
+end
+
+# We can now trace a single [`Beam`](@ref) through the two mirrors and render the result. `System`s bundle all components that take part in a simulation, and [`solve_system!`](@ref) performs the actual ray tracing.
 
 system = System([m1, m2])
-beam = Beam(Ray([0, 0, h1], [0, 1.0, 0], λ))
+beam = Beam(Ray([0, 0, 0], [0, 1.0, 0], λ))
 solve_system!(system, beam)
 
 fig = Figure(size=(600, 400))
-ax = Axis3(fig[1,1], aspect=:data, azimuth=0.3π, elevation=0.15π)
-hidedecorations!(ax)
+ax = Axis3(fig[1,1], aspect=:data, azimuth=-0.35π, elevation=0.18π, protrusions=0)
+hidedecorations!(ax); hidespines!(ax)
+optical_table!(ax)
 render!(ax, system)
 render!(ax, beam, color=:red, flen=0.3)
-save("periscope.png", fig, px_per_unit=4); nothing #hide #md
+save("mirrors.png", fig, px_per_unit=4); nothing #hide #md
 fig #!md
 
-# ![Aligned periscope lifting the beam from 50 mm to 150 mm](periscope.png)
+# ![Two mounted mirrors shifting the beam sideways onto the optical axis](mirrors.png)
 #
 # ## Finding the misalignment
 #
-# In practice, mirror mounts are never perfectly aligned. We simulate a small mounting error on `M1` and place an alignment card 300 mm downstream of it (200 mm past `M2`) to see where the beam actually lands.
+# In practice, mirror mounts are never perfectly aligned. We simulate a small mounting error on `M1` and place an alignment card on the optical axis, 200 mm past `M2`, to see where the beam actually lands.
 
-xrotate3d!(m1, deg2rad(0.5))           # M1 was mounted 0.5° off
+zrotate3d!(m1, deg2rad(0.5))           # M1 was mounted 0.5° off
 
 card = Detector(BMO.inch, false)       # alignment card: records hits, lets the beam pass
-translate3d!(card, [0, 300mm, h2])
+translate3d!(card, [Δx, 300mm, 0])
 
 system = System([m1, m2, card])
-beam = Beam(Ray([0, 0, h1], [0, 1.0, 0], λ))
+beam = Beam(Ray([0, 0, 0], [0, 1.0, 0], λ))
 empty!(card)
 solve_system!(system, beam)
 offset = spot_diagram(card)[1]         # [x, z] on the card
@@ -89,8 +103,9 @@ println("offset on card: ", round.(offset ./ mm, digits=2), " mm")
 # A [`Detector`](@ref) with `stop = false` behaves like a real alignment card: it records where the beam hits, but lets the beam continue propagating through the rest of the system rather than absorbing it. Detectors accumulate hits over successive calls to `solve_system!`, so we call [`empty!`](@ref) beforehand to discard any previous data.
 
 fig2 = Figure(size=(750, 400))
-ax2 = Axis3(fig2[1,1], aspect=:data, azimuth=0.3π, elevation=0.15π)
-hidedecorations!(ax2)
+ax2 = Axis3(fig2[1,1], aspect=:data, azimuth=-0.35π, elevation=0.18π, protrusions=0)
+hidedecorations!(ax2); hidespines!(ax2)
+optical_table!(ax2)
 render!(ax2, system)
 render!(ax2, beam, color=:red, flen=0.3)
 
@@ -109,21 +124,21 @@ fig2 #!md
 #
 # ## Correcting the mirror
 #
-# Tilting a mirror by a small angle ``\delta`` deflects the reflected beam by ``2\delta``. Since the card sits a path length ``L`` behind `M1` (up to `M2`, then across to the card), the resulting offset on the card is approximately
+# Tilting a mirror by a small angle ``\delta`` deflects the reflected beam by ``2\delta``. Since the card sits a path length ``L`` behind `M1` (across to `M2`, then along the axis to the card), the resulting offset on the card is approximately
 #
 # ```math
 # \text{offset} = 2\delta L
 # ```
 #
-# We can invert this relation to compute the correction angle from the measured offset and apply it to `M1`.
+# We can invert this relation to compute the correction angle from the measured offset. The tilt moved the spot towards +x, so we rotate `M1` back by −δ, just as you would turn the adjustment screw of the mount.
 
-L = (h2 - h1) + (300mm - 100mm)        # M1 → M2 → card
-δ = offset[2] / (2L)
+L = Δx + (300mm - 100mm)             # M1 → M2 → card
+δ = offset[1] / (2L)
 println("correction: ", round(rad2deg(δ), digits=3), "°")
-xrotate3d!(m1, δ)
+zrotate3d!(m1, -δ)
 
 empty!(card)
-beam = Beam(Ray([0, 0, h1], [0, 1.0, 0], λ))
+beam = Beam(Ray([0, 0, 0], [0, 1.0, 0], λ))
 solve_system!(system, beam)
 println("offset after correction: ", round.(spot_diagram(card)[1] ./ 1e-6, digits=2), " µm")
 
@@ -136,15 +151,15 @@ println("offset after correction: ", round.(spot_diagram(card)[1] ./ 1e-6, digit
 NBK7 = SellmeierEquation(1.03961212, 0.231792344, 1.01046945,
                          0.00600069867, 0.0200179144, 103.560653)
 lens = SphericalLens(51.5mm, Inf, 3.6mm, BMO.inch, NBK7)   # plano-convex, like a stock f = 100 mm lens
-translate3d!(lens, [0, 350mm, h2])
+translate3d!(lens, [Δx, 350mm, 0])
 f = BMO.lensmakers_eq(51.5mm, Inf, NBK7(λ))               # ≈ 99.98 mm
 
-# The first radius of curvature (51.5 mm) describes the curved front surface, which faces the collimated beam coming from the periscope; the second surface is flat (`Inf`).
+# The first radius of curvature (51.5 mm) describes the curved front surface, which faces the collimated beam coming from the mirrors; the second surface is flat (`Inf`).
 #
 # To model the coherent laser beam itself rather than a single ray, we use a [`GaussianBeamlet`](@ref) with a 0.5 mm waist radius. The `support` keyword pins the local reference frame of the beamlet to a fixed vector, which keeps the simulation reproducible instead of relying on an arbitrary default that could change from run to run.
 
 w0 = 0.5mm
-laser = GaussianBeamlet([0, 0, h1], [0, 1.0, 0], λ, w0; support=[1.0, 0, 0])
+laser = GaussianBeamlet([0, 0, 0], [0, 1.0, 0], λ, w0; support=[1.0, 0, 0])
 system = System([m1, m2, lens])
 solve_system!(system, laser)
 
@@ -168,12 +183,12 @@ fig3 #!md
 w_lens, _, _, _ = gauss_parameters(laser, 450mm)
 println("paraxial waist estimate: ", round(λ * f / (π * w_lens) * 1e6, digits=1), " µm")
 
-# The two values agree to within a few percent. Now we place a camera right at the waist location found above. The periscope path after `M2` runs along +y starting at `y = 100mm` (optical path 200 mm), so the camera's y-position follows from the path length at the waist.
+# The two values agree to within a few percent. Now we place a camera right at the waist location found above. The beam path after `M2` runs along +y starting at `y = 100mm` (optical path 200 mm), so the camera's y-position follows from the path length at the waist.
 
 camera = Detector(1mm)
-translate3d!(camera, [0, 100mm + (zs[i] - 200mm), h2])
+translate3d!(camera, [Δx, 100mm + (zs[i] - 200mm), 0])
 system = System([m1, m2, lens, camera])
-laser = GaussianBeamlet([0, 0, h1], [0, 1.0, 0], λ, w0; support=[1.0, 0, 0])
+laser = GaussianBeamlet([0, 0, 0], [0, 1.0, 0], λ, w0; support=[1.0, 0, 0])
 empty!(camera)
 solve_system!(system, laser)
 x, z, I = intensity(camera; n=100)
@@ -194,8 +209,9 @@ fig4 #!md
 
 system_full = System([m1, m2, lens, camera])
 figo = Figure(size=(600, 400))
-axo = Axis3(figo[1,1], aspect=:data, azimuth=0.3π, elevation=0.15π)
-hidedecorations!(axo)
+axo = Axis3(figo[1,1], aspect=:data, azimuth=-0.35π, elevation=0.18π, protrusions=0)
+hidedecorations!(axo); hidespines!(axo)
+optical_table!(axo)
 render!(axo, system_full)
 render!(axo, laser, color=:red)
 save("laser_alignment.png", figo, px_per_unit=4); nothing #hide #md
