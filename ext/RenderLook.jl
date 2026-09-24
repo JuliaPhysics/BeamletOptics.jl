@@ -27,7 +27,7 @@ plot of an object, explicit kwargs of `render!` (e.g. `color`) override them.
 | `:interface`  | cemented interfaces of doublets, triplets |
 """
 const _MATERIALS = Dict{Symbol, _Material}(
-    :refractive => _preset(RGBf(0.72, 0.85, 0.92), 0.35, true, 0.6, 0.8, 96),
+    :refractive => _preset(RGBf(0.45, 0.72, 0.88), 0.5, true, 0.6, 1.0, 96),
     :reflective => _preset(RGBf(0.82, 0.83, 0.85), 1, false, 0.5, 1.0, 128),
     :coating => _preset(RGBf(0.85, 0.55, 0.85), 0.5, true, 0.6, 0.6, 64),
     :polarizer => _preset(RGBf(0.15, 0.30, 0.35), 0.8, true, 0.7, 0.4, 32),
@@ -65,8 +65,29 @@ Feature edges
 """Minimum angle between the normals of adjacent faces of a feature edge, see `_feature_edges`."""
 const _EDGE_ANGLE = deg2rad(30)
 
-"""Color of the feature edge lines."""
+"""Color of the feature edge lines of an opaque object, see `_edge_color`."""
 const _EDGE_COLOR = RGBAf(0.1, 0.1, 0.12, 0.8)
+
+"""
+    _edge_color(color, alpha = 1)
+
+Returns the color of the feature edges of an object with the plot attributes `color` and `alpha`.
+The opacity of the edges follows the opacity `a` of the object, i.e. the product of `alpha` and
+the alpha channel of `color`: it is `min(1, 2a)` times the opacity of `_EDGE_COLOR`, such that
+the edges of glass (`a = 0.5`) are fully visible, while the edges of a nearly transparent object,
+e.g. a housing with `a = 0.05`, fade out with it. Per-vertex colors count as opaque.
+"""
+function _edge_color(color, alpha = 1)
+    a = color isa AbstractVector || isnothing(color) ? 1.0f0 : Float32(Makie.to_color(color).alpha)
+    return RGBAf(_EDGE_COLOR.r, _EDGE_COLOR.g, _EDGE_COLOR.b,
+        _EDGE_COLOR.alpha * min(1.0f0, 2 * Float32(alpha) * a))
+end
+
+"""Returns `_edge_color` of the `color` and `alpha`, an `Observable` if one of them is."""
+function _edge_color_obs(color, alpha)
+    (color isa Observable || alpha isa Observable) || return _edge_color(color, alpha)
+    return Makie.lift(_edge_color, Makie.convert(Observable, color), Makie.convert(Observable, alpha))
+end
 
 """Plot attributes of the object that are passed on to its feature edge lines."""
 const _EDGE_KWARGS = (:visible, :clip_planes)
@@ -202,9 +223,10 @@ end
 
 Plots the feature edges of all `meshes` (see `_feature_edges`) as a single `lines!` plot, see
 `_polylines`. Of the `kwargs`, i.e. the plot attributes of the object, only `_EDGE_KWARGS` and
-`transparency` are used.
+`transparency` are used; `color` and `alpha` set the opacity of the edges, see `_edge_color`.
 """
-function _plot_edges!(ax::_RenderEnv, meshes; transparency::Bool = false, kwargs...)
+function _plot_edges!(ax::_RenderEnv, meshes; transparency = false, color = nothing,
+        alpha = 1, kwargs...)
     pts = Point3f[]
     for m in meshes
         append!(pts, _feature_edges(m))
@@ -215,7 +237,7 @@ function _plot_edges!(ax::_RenderEnv, meshes; transparency::Bool = false, kwargs
     # The depth shift keeps the lines in front of the faces they bound. The lines of transparent
     # objects are transparent as well, otherwise the faces along the silhouette cover them
     # partially (GLMakie, order independent transparency)
-    lines!(ax, _polylines(pts); color = _EDGE_COLOR, linewidth = 1, transparency,
+    lines!(ax, _polylines(pts); color = _edge_color_obs(color, alpha), linewidth = 1, transparency,
         inspectable = false, depth_shift = -1.0f-5, kw...)
     return nothing
 end

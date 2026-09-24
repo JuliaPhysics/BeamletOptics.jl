@@ -723,7 +723,7 @@ function _render_mesh!(ax::_RenderEnv, s; color = _default_color(s), edges::Bool
     parts = _MESH_COLLECTOR[]
     if isnothing(parts)
         _plot_mesh!(ax, m; color, kwargs...)
-        edges && _plot_edges!(ax, (m,); kwargs...)
+        edges && _plot_edges!(ax, (m,); color, kwargs...)
     else
         push!(parts, (m, s isa BMO.AbstractSDF ? s : nothing, (; color, kwargs...), cemented))
     end

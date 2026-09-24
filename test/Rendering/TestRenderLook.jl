@@ -68,8 +68,8 @@ end
 
     @testset "materials" begin
         # values of the table of the plan
-        @test mats[:refractive].color == RGBf(0.72, 0.85, 0.92)
-        @test mats[:refractive].alpha ≈ 0.35
+        @test mats[:refractive].color == RGBf(0.45, 0.72, 0.88)
+        @test mats[:refractive].alpha ≈ 0.5
         @test mats[:refractive].shininess ≈ 96
         @test Set(keys(mats)) == Set([:refractive, :reflective, :coating, :polarizer, :detector,
             :mechanics, :interface])
@@ -150,6 +150,18 @@ end
         @test count(p -> any(isnan, p), pts) == 1
         k = findfirst(p -> any(isnan, p), pts)
         @test pts[1] == pts[k - 1] && pts[k + 1] == pts[end]
+
+        # the opacity of the edges follows the opacity of the object
+        @test Ext._edge_color(RGBf(0.5, 0.5, 0.5), 1).alpha ≈ Ext._EDGE_COLOR.alpha
+        @test Ext._edge_color(mats[:refractive].color, mats[:refractive].alpha).alpha ≈ Ext._EDGE_COLOR.alpha
+        @test Ext._edge_color(RGBAf(0.5, 0.5, 0.5, 0.05)).alpha ≈ Ext._EDGE_COLOR.alpha * 0.1
+        @test Ext._edge_color(:grey, 0.2).alpha ≈ Ext._EDGE_COLOR.alpha * 0.4
+        # e.g. a housing with an Observable color, as `lift(a -> alphacolor(c, a), alpha_obs)`
+        housing_color = Observable(RGBAf(0.7, 0.7, 0.7, 0.05))
+        edges = only(edge_plots(rendered_plots(cyl; color = housing_color, transparency = true)))
+        @test edges.color[].alpha ≈ Ext._EDGE_COLOR.alpha * 0.1
+        housing_color[] = RGBAf(0.7, 0.7, 0.7, 1.0)
+        @test edges.color[].alpha ≈ Ext._EDGE_COLOR.alpha
 
         # zero thickness: boundary edges
         @test length(segments(only(edge_plots(rendered_plots(Detector(10e-3)))))) == 4

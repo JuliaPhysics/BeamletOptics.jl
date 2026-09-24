@@ -62,7 +62,7 @@ the feature edges, and visible cemented interfaces of doublet and triplet lenses
 
 | material      | components                                 | color        | alpha |
 |:--------------|:-------------------------------------------|:-------------|:------|
-| `:refractive` | lenses, prisms, plates, windows            | pale blue    | 0.35  |
+| `:refractive` | lenses, prisms, plates, windows            | light blue   | 0.5   |
 | `:reflective` | mirrors, retroreflector                    | silver       | 1     |
 | `:coating`    | beamsplitter coatings                      | pale magenta | 0.5   |
 | `:polarizer`  | polarization filters                       | dark teal    | 0.8   |
@@ -81,10 +81,13 @@ keyword arguments of `render!` change the look of an object:
   for all parts of the object. The cemented interfaces keep their amber look.
 - `edges = true`: draws the feature edges, i.e. the edges where the faces of an object meet at
   an angle of more than 30°, and the boundary of open surfaces such as a `Detector`. `edges =
-  false` switches them off. Shapes rendered via the marching cubes fallback have no edges.
+  false` switches them off. Shapes rendered via the marching cubes fallback have no edges. The
+  opacity of the edges follows the opacity of the object, e.g. a nearly transparent housing
+  (`color = (:gray70, 0.05)`) gets correspondingly faint edges, while the edges of glass stay fully
+  visible.
 
 ```julia
-render!(ax, lens)                       # pale blue glass with edges
+render!(ax, lens)                       # light blue glass with edges
 render!(ax, lens; color = :red)         # red glass, same transparency
 render!(ax, mount; material = :mechanics, edges = false)
 ```
