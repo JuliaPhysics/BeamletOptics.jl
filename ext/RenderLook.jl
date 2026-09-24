@@ -29,7 +29,7 @@ plot of an object, explicit kwargs of `render!` (e.g. `color`) override them.
 const _MATERIALS = Dict{Symbol, _Material}(
     :refractive => _preset(RGBf(0.45, 0.72, 0.88), 0.5, true, 0.6, 1.0, 96),
     :reflective => _preset(RGBf(0.82, 0.83, 0.85), 1, false, 0.5, 1.0, 128),
-    :coating => _preset(RGBf(0.85, 0.55, 0.85), 0.5, true, 0.6, 0.6, 64),
+    :coating => _preset(RGBf(0.95, 0.40, 0.90), 0.6, true, 0.7, 0.6, 64),
     :polarizer => _preset(RGBf(0.15, 0.30, 0.35), 0.8, true, 0.7, 0.4, 32),
     :detector => _preset(RGBf(0.12, 0.22, 0.35), 1, false, 0.8, 0.2, 16),
     :mechanics => _preset(RGBf(0.55, 0.56, 0.58), 1, false, 0.9, 0.15, 16),
@@ -261,8 +261,8 @@ only.
 function _studio_lights(multi::Bool)
     light(c, dir) = Makie.DirectionalLight(RGBf(c, c, c), dir, true)
     multi || return RGBf(0.45, 0.45, 0.45), [light(0.75, _KEY_DIRECTION)]
-    return RGBf(0.35, 0.35, 0.35),
-        [light(0.8, _KEY_DIRECTION), light(0.35, _FILL_DIRECTION), light(0.3, _RIM_DIRECTION)]
+    return RGBf(0.3, 0.3, 0.3),
+        [light(0.75, _KEY_DIRECTION), light(0.2, _FILL_DIRECTION), light(0.15, _RIM_DIRECTION)]
 end
 
 """Returns `true` if the active Makie backend supports several lights, i.e. `MultiLightShading`."""

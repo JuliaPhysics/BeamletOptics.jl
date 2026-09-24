@@ -137,7 +137,19 @@ end
 
         # two circles, no edges along the smooth side wall
         s = BMO.CylinderSDF(5e-3, 2e-3)
-        cyl = NonInteractableObject(s)
+        cyl = Prism(s, λ -> 1.5)
+
+        # mechanics: no edges by default, a mesh (e.g. a MeshDummy) keeps its smooth shading
+        mech = NonInteractableObject(BMO.CylinderSDF(5e-3, 2e-3))
+        @test isempty(edge_plots(rendered_plots(mech)))
+        @test length(edge_plots(rendered_plots(mech; edges = true))) == 1
+        cube = BMO.CubeMesh(10e-3)
+        plots = rendered_plots(NonInteractableObject(cube))
+        @test only(plots) isa Makie.Mesh
+        @test length(GeometryBasics.coordinates(only(plots)[1][])) == size(BMO.vertices(cube), 1)
+        @test only(plots).backlight[] == 0
+        # an explicit optical material draws the edges
+        @test length(edge_plots(rendered_plots(mech; material = :refractive))) == 1
         edges = only(edge_plots(rendered_plots(cyl)))
         segs = segments(edges)
         @test length(segs) == 2 * Ext._N_THETA
@@ -158,7 +170,7 @@ end
         @test Ext._edge_color(:grey, 0.2).alpha ≈ Ext._EDGE_COLOR.alpha * 0.4
         # e.g. a housing with an Observable color, as `lift(a -> alphacolor(c, a), alpha_obs)`
         housing_color = Observable(RGBAf(0.7, 0.7, 0.7, 0.05))
-        edges = only(edge_plots(rendered_plots(cyl; color = housing_color, transparency = true)))
+        edges = only(edge_plots(rendered_plots(mech; color = housing_color, transparency = true, edges = true)))
         @test edges.color[].alpha ≈ Ext._EDGE_COLOR.alpha * 0.1
         housing_color[] = RGBAf(0.7, 0.7, 0.7, 1.0)
         @test edges.color[].alpha ≈ Ext._EDGE_COLOR.alpha
@@ -272,8 +284,8 @@ end
         lights = Makie.get_lights(ax.scene)
         @test length(lights) == 3
         @test all(l -> l isa Makie.DirectionalLight && l.camera_relative, lights)
-        @test [l.color.r for l in lights] ≈ [0.8, 0.35, 0.3]
-        @test ax.scene.compute[:ambient_color][] ≈ RGBf(0.35, 0.35, 0.35)
+        @test [l.color.r for l in lights] ≈ [0.75, 0.2, 0.15]
+        @test ax.scene.compute[:ambient_color][] ≈ RGBf(0.3, 0.3, 0.3)
         @test ax.scene.compute[:lighting_mode][] == Makie.MultiLightShading
 
         # :none leaves the lights untouched

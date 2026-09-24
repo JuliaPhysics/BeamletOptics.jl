@@ -64,7 +64,7 @@ the feature edges, and visible cemented interfaces of doublet and triplet lenses
 |:--------------|:-------------------------------------------|:-------------|:------|
 | `:refractive` | lenses, prisms, plates, windows            | light blue   | 0.5   |
 | `:reflective` | mirrors, retroreflector                    | silver       | 1     |
-| `:coating`    | beamsplitter coatings                      | pale magenta | 0.5   |
+| `:coating`    | beamsplitter coatings                      | magenta      | 0.6   |
 | `:polarizer`  | polarization filters                       | dark teal    | 0.8   |
 | `:detector`   | detectors                                  | dark blue    | 1     |
 | `:mechanics`  | mechanics, dummies and other objects       | mid grey     | 1     |
@@ -79,7 +79,8 @@ keyword arguments of `render!` change the look of an object:
   of the object
 - `color`, `alpha`, `transparency`, ...: override the corresponding attribute of the material,
   for all parts of the object. The cemented interfaces keep their amber look.
-- `edges = true`: draws the feature edges, i.e. the edges where the faces of an object meet at
+- `edges`: draws the feature edges (by default for all materials except `:mechanics`, whose
+  detailed meshes, e.g. a housing from an STL file, would cover the optics), i.e. the edges where the faces of an object meet at
   an angle of more than 30°, and the boundary of open surfaces such as a `Detector`. `edges =
   false` switches them off. Shapes rendered via the marching cubes fallback have no edges. The
   opacity of the edges follows the opacity of the object, e.g. a nearly transparent housing

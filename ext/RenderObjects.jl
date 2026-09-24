@@ -39,18 +39,26 @@ render!(ax::_RenderEnv, object::BMO.AbstractObject; kwargs...) = _render!(ax, ob
 _render!(ax::_RenderEnv, obj::BMO.AbstractObject; kwargs...) = render!(ax, BMO.shape_trait_of(obj), obj; kwargs...)
 
 """
-    render!(ax, ::SingleShape, obj; material = nothing, edges = true, kwargs...)
+    render!(ax, ::SingleShape, obj; material = nothing, edges = nothing, kwargs...)
 
 Renders the shape of `obj` as one mesh if it has an analytic tessellation (see `_has_mesh`),
 otherwise via the `render!` method of the shape. The mesh plot gets the attributes of the
 `material` (see `_material`), the `kwargs` override them. The feature `edges` are drawn for
-analytic meshes only. The `show_normals` kwargs of `render!(ax, ::AbstractMesh)` also select the
+analytic meshes only, by default for all materials except `:mechanics`. Mechanics given as a mesh
+(e.g. a `MeshDummy`) keep the smooth shading of their mesh. The `show_normals` kwargs of `render!(ax, ::AbstractMesh)` also select the
 `render!` method of the shape.
 """
-function render!(ax::_RenderEnv, ::BMO.SingleShape, obj; material = nothing, edges::Bool = true, kwargs...)
+function render!(ax::_RenderEnv, ::BMO.SingleShape, obj; material = nothing,
+        edges::Union{Nothing, Bool} = nothing, kwargs...)
     s = BMO.shape(obj)
     kw = (; _material(obj, material)..., kwargs...)
-    if _has_mesh(s) && !haskey(kwargs, :show_normals) && !haskey(kwargs, :show_normals_length)
+    # Mechanics (e.g. a housing from an STL file) have no feature edges by default, since the many
+    # edges of a detailed mesh cover the optics, and keep the smooth shading of their mesh
+    mechanics = (isnothing(material) ? _material_class(obj) : material) === :mechanics
+    edges = something(edges, !mechanics)
+    if mechanics && s isa BMO.AbstractMesh
+        render!(ax, s; kw...)
+    elseif _has_mesh(s) && !haskey(kwargs, :show_normals) && !haskey(kwargs, :show_normals_length)
         _render_mesh!(ax, s; edges, cemented = obj isa BMO.Lens, kw...)
     else
         render!(ax, s; kw...)
