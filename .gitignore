@@ -78,3 +78,6 @@ paper/*.vrb
 paper/paper.pdf
 # implementation plans (local only)
 /plans/
+
+# render gallery output
+/gallery/output/
