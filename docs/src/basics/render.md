@@ -70,7 +70,7 @@ set_render_look(:cad)
 
 | material      | components                                 | `:modern`            | `:cad`             |
 |:--------------|:-------------------------------------------|:---------------------|:-------------------|
-| `:refractive` | lenses, prisms, plates, windows            | clear glass, 0.38    | light blue, 0.5    |
+| `:refractive` | lenses, prisms, plates, windows            | clear glass, 0.3     | light blue, 0.5    |
 | `:reflective` | mirrors, retroreflector                    | metallic silver      | silver             |
 | `:coating`    | beamsplitter coatings                      | light violet, 0.4    | magenta, 0.6       |
 | `:polarizer`  | polarization filters                       | dark slate, 0.75     | dark teal, 0.8     |
