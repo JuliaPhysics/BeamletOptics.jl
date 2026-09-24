@@ -226,7 +226,15 @@ display(gui)
 ```
 
 A [view cube](@ref "View cube") in the top right corner of the 3D view switches to the standard
-views with a click, clicks on the cube never select or deselect a component.
+views with a click, clicks on the cube never select or deselect a component. The live view starts
+in the isometric view from the corner between `Top`, `Front` and `Right`, i.e. from `(1, -1, 1)`,
+such that the labels of the cube read correctly. The "orthographic" toggle below the 3D view,
+next to "auto trace" and "clip beams", switches between perspective and orthographic projection,
+`orthographic = true` starts with the latter:
+
+```julia
+gui = live_view(system, beam; orthographic = true)
+```
 
 More than one `system => beam` pair can be shown in the same 3D view, e.g. the transmitter and
 receiver path of a lidar, which are solved with different sources:

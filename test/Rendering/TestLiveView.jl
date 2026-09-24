@@ -2,6 +2,7 @@ module TestLiveView
 
 using BeamletOptics
 using Makie
+using LinearAlgebra: normalize, dot
 using Test
 
 const BMO = BeamletOptics
@@ -197,6 +198,8 @@ const BMO = BeamletOptics
         # unrelated to the mirror, live_view needs a beam; its marker is not on the camera ray
         beam = Beam([1.0, -1.0, 0.0], [1.0, 0, 0])
         gui = _live_view(sys, beam; detectors = [])
+        # Makie's default camera instead of the initial Front-Right-Top view of `live_view`
+        set_view(gui.ax, [3.0, 3, 3], [0.0, 0, 0], [0.0, 0, 1])
 
         # A MeshDummy-like housing in front of the mirror along the camera ray, not part of the
         # system: added directly to the axis, as described for `render!(gui.ax, ...)`
@@ -805,6 +808,69 @@ const BMO = BeamletOptics
             @test n_calls[] == n0
             close(gui)
         end
+    end
+
+    @testset "orthographic toggle" begin
+        m, pd = _fixture()
+        gui = _live_view(System([m, pd]), Beam([0.0, 0, 0], [0.0, 1, 0]))
+        settings = cameracontrols(gui.ax.scene).settings
+        @test !gui.orthographic_toggle.active[]
+        @test settings.projectiontype[] == Makie.Perspective
+        gui.orthographic_toggle.active[] = true
+        @test settings.projectiontype[] == Makie.Orthographic
+        gui.orthographic_toggle.active[] = false
+        @test settings.projectiontype[] == Makie.Perspective
+        close(gui)
+
+        m, pd = _fixture()
+        gui = _live_view(System([m, pd]), Beam([0.0, 0, 0], [0.0, 1, 0]); orthographic = true)
+        @test gui.orthographic_toggle.active[]
+        @test cameracontrols(gui.ax.scene).settings.projectiontype[] == Makie.Orthographic
+        close(gui)
+    end
+
+    @testset "spot panel limits" begin
+        # A single ray gives a zero-width spot diagram, which must not collapse the limits
+        m, pd = _fixture()
+        gui = _live_view(System([m, pd]), Beam([0.0, 0, 0], [0.0, 1, 0]))
+        p = gui.panels[1]
+        @test length(p.xy[]) == 1
+        for lims in (p.ax.targetlimits[], p.ax.finallimits[])
+            @test all(isfinite, lims.origin) && all(isfinite, lims.widths)
+            @test all(lims.widths .>= 2e-3 * (1 - 1e-6))
+        end
+        close(gui)
+
+        # Many spots keep the limits of `autolimits!`
+        m, pd = _fixture()
+        cs = CollimatedSource([0.0, 0, 0], [0.0, 1, 0], 2e-3, 1e-6; num_rings = 2, num_rays = 40)
+        gui = _live_view(System([m, pd]) => cs)
+        p = gui.panels[1]
+        lims = p.ax.targetlimits[]
+        autolimits!(p.ax)
+        @test p.ax.targetlimits[] == lims
+        close(gui)
+
+        # Only the degenerate axis is padded, by half the extent of the other axis
+        ax = Axis(Figure()[1, 1])
+        Ext._pad_degenerate_limits!(ax, [Point2f(1, 0), Point2f(1, 2)])
+        lims = ax.targetlimits[]
+        @test lims.origin ≈ [0.0, 1 - 1.05] && lims.widths ≈ [2.0, 2 * 1.05]
+    end
+
+    @testset "initial view from the Front-Right-Top corner" begin
+        m, pd = _fixture()
+        gui = _live_view(System([m, pd]), Beam([0.0, 0, 0], [0.0, 1, 0]); throttle = false)
+        cam = cameracontrols(gui.ax.scene)
+        dir = normalize(Vector{Float64}(cam.eyeposition[] .- cam.lookat[]))
+        @test isapprox(dir, normalize([1.0, -1, 1]); atol = 1e-6)
+        @test abs(dot(Vector{Float64}(cam.upvector[]), dir)) < 1e-6
+        # A later view of the user is kept, also after tracing
+        set_view(gui.ax, [0.0, 0, 1], [0.0, 0, 0], [0.0, 1, 0])
+        _key!(gui, Keyboard.t)
+        @test cam.eyeposition[] ≈ Vec3f(0, 0, 1)
+        @test cam.upvector[] ≈ Vec3f(0, 1, 0)
+        close(gui)
     end
 
     @testset "failing on_change is logged once" begin

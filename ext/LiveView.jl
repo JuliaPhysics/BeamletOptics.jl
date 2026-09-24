@@ -1,5 +1,5 @@
 using Makie: Figure, Axis, Label, SliderGrid, GridLayout, DataAspect, Relative, colsize!,
-             heatmap!, autolimits!, Button, Toggle, Textbox
+             heatmap!, autolimits!, limits!, Button, Toggle, Textbox
 
 """
     DetectorPanel
@@ -39,7 +39,8 @@ The systems are solved after each change if `auto_trace[]` is `true`, otherwise 
 beams and detector panels do not match the current poses of the objects. If solving takes longer
 than `trace_budget` [s], the systems are solved once the movement pauses for `idle_delay` [s].
 The clip planes of the 3D view are stored in `clip_planes`, which are applied if `clipping` is
-`true`.
+`true`. The `orthographic_toggle` switches the 3D view between perspective and orthographic
+projection.
 """
 mutable struct LiveView
     fig::Figure
@@ -84,6 +85,8 @@ mutable struct LiveView
     clip_beams_toggle::Toggle
     # view cube in the corner of the 3D view, see `view_cube!`
     view_cube::Union{Nothing, ViewCube}
+    # orthographic projection of the 3D view, switched via the toggle
+    orthographic_toggle::Toggle
 end
 
 Base.display(gui::LiveView) = display(gui.fig)
@@ -191,6 +194,30 @@ function _update_spot!(p::DetectorPanel, h)
     p.scatter_plot.visible[] || (p.scatter_plot.visible[] = true)
     p.ax.title[] = _hits_title(p, h)
     autolimits!(p.ax)
+    _pad_degenerate_limits!(p.ax, p.xy[])
+    return nothing
+end
+
+"""
+    _pad_degenerate_limits!(ax, xy; ε = 1e-6)
+
+Sets the limits of the spot diagram `ax` if the x or z extent of the spots `xy` [mm] is below `ε`,
+e.g. for a single ray, since `DataAspect` gives degenerate limits for a zero-width data range. A
+degenerate axis gets half the extent of the other axis around its center, or 1 µm if both are
+degenerate. Otherwise the limits of `autolimits!` are kept.
+"""
+function _pad_degenerate_limits!(ax::Axis, xy; ε = 1e-6)
+    isempty(xy) && return nothing
+    xmin, xmax = extrema(q -> Float64(q[1]), xy)
+    zmin, zmax = extrema(q -> Float64(q[2]), xy)
+    Δx, Δz = xmax - xmin, zmax - zmin
+    (Δx < ε || Δz < ε) || return nothing
+    h = max(Δx, Δz) / 2
+    h = h < ε ? 1e-3 : h
+    hx = Δx < ε ? h : Δx / 2 * 1.05
+    hz = Δz < ε ? h : Δz / 2 * 1.05
+    cx, cz = (xmin + xmax) / 2, (zmin + zmax) / 2
+    limits!(ax, cx - hx, cx + hx, cz - hz, cz + hz)
     return nothing
 end
 
@@ -787,6 +814,8 @@ view. The selection box of a partly clipped component only covers its visible pa
 - `clip_beams = false`: clips the beams as well, can be switched with the "clip beams" toggle
 - `view_cube = true`: shows a view cube in the top right corner of the 3D view, a click on a
   face, edge or corner switches to the corresponding standard view, see [`view_cube!`](@ref)
+- `orthographic = false`: starts the 3D view with orthographic instead of perspective projection,
+  can be switched with the "orthographic" toggle below the 3D view
 - all other kwargs are passed to [`kinematic_controls!`](@ref), e.g. `fine_step`, `plane_normal`
   or `rotation_axis`
 """
@@ -806,6 +835,7 @@ function live_view(
         clip_planes = [],
         clip_beams::Bool = false,
         view_cube::Bool = true,
+        orthographic::Bool = false,
         kwargs...
     )
     isempty(pairs) && throw(ArgumentError("live_view requires at least one system => beam pair"))
@@ -844,8 +874,10 @@ function live_view(
     Label(status_row[1, 3], "auto trace")
     clip_beams_toggle = Toggle(status_row[1, 4]; active = clip_beams)
     Label(status_row[1, 5], "clip beams")
-    step_box = Textbox(status_row[1, 6]; placeholder = "step, e.g. 250 nm", width = 150)
-    status = Label(status_row[1, 7],
+    orthographic_toggle = Toggle(status_row[1, 6]; active = orthographic)
+    Label(status_row[1, 7], "orthographic")
+    step_box = Textbox(status_row[1, 8]; placeholder = "step, e.g. 250 nm", width = 150)
+    status = Label(status_row[1, 9],
         "Click on a component to select it, press h to show the controls"; tellwidth = false)
 
     system_handles = SystemRenderHandle[live_render!(ax, sys; system_kwargs...) for sys in systems]
@@ -884,7 +916,7 @@ function live_view(
         on_change, nothing, auto_trace_toggle.active, false, trace_button, auto_trace_toggle,
         IdDict{Any, Any}(), Float64(trace_budget), Float64(idle_delay), 0.0, 0.0, false, nothing,
         0.0, false, IdDict{Any, String}(labels), step_box, LiveClipPlane[], true, 1.2 * extent,
-        clip_beams, clip_beams_toggle, cube)
+        clip_beams, clip_beams_toggle, cube, orthographic_toggle)
     gui_ref[] = gui
     for (point, normal) in clip_specs
         _add_clip_plane!(gui, point, normal; select = false)
@@ -894,8 +926,24 @@ function live_view(
     _connect_clip_planes!(gui)
     push!(controls.listeners, on(v -> v == gui.clip_beams || _set_clip_beams!(gui, v), clip_beams_toggle.active))
     push!(controls.listeners, on(s -> _set_step!(gui, s), step_box.stored_string))
+    push!(controls.listeners, on(v -> _set_orthographic!(gui, v), orthographic_toggle.active))
+    _set_orthographic!(gui, orthographic)
     _resolve!(gui, nothing)
+    # Initial view from the Front-Right-Top corner, in which the labels of the view cube read
+    # correctly. Only set once, later changes of the view, e.g. via `set_view`, are kept.
+    cam = cameracontrols(ax.scene)
+    lookat = Vector{Float64}(cam.lookat[])
+    dist = norm(Vector{Float64}(cam.eyeposition[]) .- lookat)
+    o, up = _region_view((1, -1, 1))
+    set_view(ax, lookat .+ dist .* o, lookat, up)
     return gui
 end
 
 live_view(system::BMO.AbstractSystem, beam; kwargs...) = live_view(system => beam; kwargs...)
+
+"""Switches the 3D view of the `gui` to orthographic (`true`) or perspective (`false`) projection."""
+function _set_orthographic!(gui::LiveView, orthographic::Bool)
+    settings = cameracontrols(gui.ax.scene).settings
+    settings.projectiontype[] = orthographic ? Makie.Orthographic : Makie.Perspective
+    return nothing
+end
