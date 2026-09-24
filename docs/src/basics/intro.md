@@ -7,11 +7,16 @@ This section of the documentation is intended for users that want to dive deeper
 ```@contents
 Pages = [
     "rays.md",
+    "beams/overview.md",
     "beams/beams.md",
     "beams/stigmatic_beam.md",
     "beams/astigmatic_beam.md",
+    "beams/beam_groups.md",
     "components/components.md",
     "systems.md",
+    "kinematics/kinematics.md",
+    "kinematics/objects.md",
+    "kinematics/sources.md",
     "render.md",
 ]
 Depth = 2
