@@ -641,11 +641,27 @@ function _set_spectator!(ctrl::KinematicController, on::Bool)
     return nothing
 end
 
+"""
+    _cursor_ray(scene)
+
+Returns the `origin` and the `direction` of the camera ray through the mouse position. For an
+orthographic `Camera3D`, `Makie.ray_at_cursor` (Makie 0.24) returns the origin relative to the
+world origin instead of the eye position, which is corrected here.
+"""
+function _cursor_ray(scene)
+    r = Makie.ray_at_cursor(scene)
+    origin, dir = Vector{Float64}(r.origin), Vector{Float64}(r.direction)
+    cam = Makie.cameracontrols(scene)
+    if cam isa Makie.Camera3D && cam.settings.projectiontype[] != Makie.Perspective
+        origin .+= Vector{Float64}(cam.eyeposition[])
+    end
+    return origin, dir
+end
+
 """Returns the drag plane intersection of the ray through the mouse position."""
 function _mouse_plane_hit(scene, ctrl::KinematicController)
-    ray = Makie.ray_at_cursor(scene)
-    return _ray_plane_intersect(Vector{Float64}(ray.origin), Vector{Float64}(ray.direction),
-        ctrl.plane_point, ctrl.plane_normal)
+    origin, dir = _cursor_ray(scene)
+    return _ray_plane_intersect(origin, dir, ctrl.plane_point, ctrl.plane_normal)
 end
 
 _default_pick(ax) = Makie.pick(Makie.get_scene(ax))
@@ -716,9 +732,8 @@ within `ctrl.source_pick_radius` pixels of the cursor, using as `t` the distance
 the point of the ray closest to the source position (so that the nearest candidate still wins).
 """
 function _ray_pick(ctrl::KinematicController, scene)
-    r = Makie.ray_at_cursor(scene)
-    origin, dir = Vector{Float64}(r.origin), Vector{Float64}(r.direction)
-    leaves = reduce(vcat, (_leaves(o) for o in ctrl.movable); init = _LiveMovable[])
+    origin, dir = _cursor_ray(scene)
+    leaves =reduce(vcat, (_leaves(o) for o in ctrl.movable); init = _LiveMovable[])
     box = function (obj)
         plots = _object_plots(ctrl.h, obj)
         return isempty(plots) ? nothing : mapreduce(Makie.boundingbox, GeometryBasics.union, plots)
@@ -975,8 +990,8 @@ function kinematic_controls!(
                 # during the drag; falls back to the pivot if the hit point is not known
                 hit_point = nothing
                 if !isnothing(t)
-                    r = Makie.ray_at_cursor(scene)
-                    hit_point = Vector{Float64}(r.origin) .+ t .* Vector{Float64}(r.direction)
+                    origin, dir = _cursor_ray(scene)
+                    hit_point = origin .+ t .* dir
                     ctrl.plane_point = hit_point
                 end
                 if !isnothing(hit_point)

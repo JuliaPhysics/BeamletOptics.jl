@@ -219,6 +219,29 @@ const BMO = BeamletOptics
         close(gui)
     end
 
+    @testset "ray picking with the orthographic projection" begin
+        # Mirror away from the origin, the camera looks at it, as after zooming to a component
+        m = RoundPlanoMirror(0.025, 0.005)
+        translate3d!(m, [0.2, 0.3, 0.1])
+        gui = _live_view(System([m]), Beam([1.0, -1.0, 0.0], [1.0, 0, 0]); detectors = [],
+            orthographic = true)
+        c = collect(BMO.position(m))
+        set_view(gui.ax, c .+ 0.5 .* [1.0, -1, 1], c, [0.0, 0, 1])
+        scene = gui.ax.scene
+        cam = Makie.cameracontrols(scene)
+        @test cam.settings.projectiontype[] == Makie.Orthographic
+        vp = scene.viewport[]
+        events(scene).mouseposition[] = (vp.origin[1] + vp.widths[1] / 2, vp.origin[2] + vp.widths[2] / 2)
+        # the ray through the center starts at the eye and points to lookat
+        origin, dir = Ext._cursor_ray(scene)
+        @test isapprox(origin, collect(cam.eyeposition[]); atol = 1e-6)
+        @test isapprox(dir, normalize(collect(cam.lookat[] - cam.eyeposition[])); atol = 1e-6)
+        events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+        events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
+        @test gui.controls.selected[] === m
+        close(gui)
+    end
+
     @testset "movable sources" begin
         _marker(gui, src) = gui.controls.h.handles[findfirst(oh -> oh.obj === src, gui.controls.h.handles)]
 
