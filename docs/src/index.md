@@ -74,32 +74,47 @@ For this purpose, the package implements a traditional ray tracing solver. This 
 
 ## BMO in 30 seconds
 
-White light through a dense flint prism -- dispersion comes for free with a Sellmeier glass model.
+A circularly polarized Gaussian laser beam through a Keplerian beam expander -- beam radius, focus and polarization are traced along with the rays.
 
 ```@example quickstart
 using GLMakie, BeamletOptics
 
-# dense flint glass N-SF11, Sellmeier coefficients in µm²
-SF11 = SellmeierEquation(1.73759695, 0.313747346, 1.89878101, 0.013188707, 0.0623068142, 155.23629)
-prism = RightAnglePrism(40e-3, 20e-3, SF11)
-system = System([prism])
+const mm = 1e-3
 
-fig = Figure(size=(800, 400))
-ax = Axis3(fig[1,1], aspect=:data, azimuth=-π/2, elevation=π/2, limits=(-0.1, 0.2, -0.06, 0.06, -0.02, 0.02))
-hidedecorations!(ax); hidespines!(ax)
+# Keplerian beam expander: f₁ = 15 mm, f₂ = 45 mm → 3× magnification
+lens1 = ThinLens(15mm, 15mm, 12mm, 1.5)      # biconvex, f = R for n = 1.5
+lens2 = ThinLens(45mm, 45mm, 25mm, 1.5)
+translate3d!(lens1, [0, 20mm, 0])
+translate3d!(lens2, [0, 80mm, 0])              # spacing f₁ + f₂
+system = System([lens1, lens2])
+
+# 532 nm laser, 1.5 mm waist radius, circularly polarized
+laser = AstigmaticGaussianBeamlet([0, 0, 0], [0, 1, 0], 532e-9, 1.5mm; E0=[1, 0, im]/√2)
+solve_system!(system, laser)
+
+# plot lenses and beam
+fig = Figure(size=(800, 300))
+ax = LScene(fig[1, 1], show_axis=false)
 render!(ax, system)
+render!(ax, laser; color=RGBAf(0.1, 0.8, 0.1, 0.25), flen=0.04,
+        show_polarization=true, pol_λ=4mm, pol_gain_max=4, pol_scale=1.5)
+render_lcs!(ax, [-5mm, 50mm, -25mm]; scale=3, show_labels=true)
+set_orthographic(ax)
 
-θ = deg2rad(45)                                     # angle of incidence
-for (λ, c) in zip(420e-9:40e-9:660e-9, cgrad(:rainbow, 7, categorical=true))
-    beam = Beam([-0.1, -0.088, 0], [cos(θ), sin(θ), 0], λ)
-    solve_system!(system, beam)
-    render!(ax, beam, color=c, flen=0.25)
-    render!(ax, first(rays(beam)), color=:black)    # incoming white light
-end
-save("quickstart.png", fig, px_per_unit=3); nothing # hide
+cview = [                                               # hide
+ -0.558947    0.829203   -5.72459e-17  -0.0528982       # hide
+ -0.0248834  -0.0167734   0.99955       0.00802568      # hide
+  0.82883     0.558696    0.0300089    -2.26736         # hide
+  0.0         0.0         0.0           1.0             # hide     
+]                                                       # hide
+set_view(ax, cview) # hide
+save("quickstart.png", fig, px_per_unit=3, update=false) # hide
+
+# beam radius behind the expander relative to the input beam
+gauss_parameters(laser, 0.12)[1] / gauss_parameters(laser, 0.0)[1]
 ```
 
-![Prism dispersion](quickstart.png)
+![Circularly polarized beam in a Keplerian beam expander](quickstart.png)
 
 ## Showcase
 
