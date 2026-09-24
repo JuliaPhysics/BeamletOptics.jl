@@ -1,6 +1,6 @@
 # # Laser alignment
 #
-# This tutorial walks through a small lab-style task: steering a HeNe laser beam onto the optical axis of a setup with two mirrors, discovering and correcting a mirror mounting error with an alignment card, and finally focusing the beam onto a camera sensor.
+# This tutorial walks through a small lab-style task: steering a HeNe laser beam onto the optical axis of a setup with two mirrors, then discovering and correcting a mirror mounting error with an alignment card.
 #
 # ```@raw html
 # <div class="bmo-card">
@@ -12,7 +12,6 @@
 # 1. Place components with the kinematic API
 # 2. Trace a [`Beam`](@ref) and read out a [`Detector`](@ref)
 # 3. Find and correct a misaligned mirror
-# 4. Focus a [`GaussianBeamlet`](@ref) and measure its waist
 #
 # ```@raw html
 # </div>
@@ -24,7 +23,7 @@
 # </div>
 # ```
 #
-# Our HeNe laser sits on an optical table, but its beam runs 100 mm to the side of the optical axis of the setup we want to feed. Two mirrors in a Z-shaped arrangement shift the beam sideways onto that axis, the standard way to steer a laser beam in the lab. The first mirror, `M1`, turns out to have a small mounting error; we will find it with an alignment card and correct it. Finally, a lens focuses the beam onto a camera.
+# Our HeNe laser sits on an optical table, but its beam runs 100 mm to the side of the optical axis of the setup we want to feed. Two mirrors in a Z-shaped arrangement shift the beam sideways onto that axis, the standard way to steer a laser beam in the lab. The first mirror, `M1`, turns out to have a small mounting error; we will find it with an alignment card, and you will correct it yourself.
 #
 # !!! info "Units"
 #     Unless stated otherwise, this package assumes SI units for input parameters. We define `const mm = 1e-3` below and use `mm` throughout to make lengths easier to read, e.g. `50mm` is 50 millimeters expressed in meters.
@@ -41,6 +40,7 @@
 # Each mirror is a Ø1" [`RoundPlanoMirror`](@ref) with a thickness of 6 mm (e.g. [PF10-03-P01](https://www.thorlabs.com/thorproduct.cfm?partnumber=PF10-03-P01)), held by a [KM100CP/M](https://www.thorlabs.com/thorproduct.cfm?partnumber=KM100CP/M) kinematic mount on a post. The mount model ships with the package: `BMO.KM100CPMount()` returns it as a [`MeshDummy`](@ref), which is rendered but ignored by the ray tracer. Its origin lies at the center of the mirror, so grouping mount and mirror into an [`ObjectGroup`](@ref) lets us move and rotate both together.
 
 using GLMakie, BeamletOptics
+GLMakie.activate!(; ssao=true) #hide
 const BMO = BeamletOptics
 const mm = 1e-3
 
@@ -64,7 +64,7 @@ zrotate3d!(m2, deg2rad(-135)); translate3d!(m2, [Δx, 100mm, 0])
 function optical_table!(ax; xs=(-75mm, 175mm), ys=(-50mm, 500mm), z_top=-81.8mm, pitch=25mm)
     mesh!(ax, Rect3f(Vec3f(xs[1], ys[1], z_top - 12mm), Vec3f(xs[2] - xs[1], ys[2] - ys[1], 12mm)), color=:grey85)
     holes = [Point3f(x, y, z_top + 0.2mm) for x in xs[1]+pitch/2:pitch:xs[2], y in ys[1]+pitch/2:pitch:ys[2]]
-    scatter!(ax, vec(holes), color=:grey45, markersize=2.5)
+    meshscatter!(ax, vec(holes), markersize=Vec3f(3mm, 3mm, 0.1mm), color=:grey45)   # flattened spheres: Ø6 mm holes
 end
 
 # We can now trace a single [`Beam`](@ref) through the two mirrors and render the result. `System`s bundle all components that take part in a simulation, and [`solve_system!`](@ref) performs the actual ray tracing.
@@ -74,149 +74,117 @@ beam = Beam(Ray([0, 0, 0], [0, 1.0, 0], λ))
 solve_system!(system, beam)
 
 fig = Figure(size=(600, 400))
-ax = Axis3(fig[1,1], aspect=:data, azimuth=-0.35π, elevation=0.18π, protrusions=0)
-hidedecorations!(ax); hidespines!(ax)
+ax = LScene(fig[1,1], show_axis=false)
 optical_table!(ax)
 render!(ax, system)
-render!(ax, beam, color=:red, flen=0.3)
-save("mirrors.png", fig, px_per_unit=4); nothing #hide #md
+render!(ax, beam, color=:red, flen=0.3, show_pos=true)
+render_lcs!(ax; scale=8, show_labels=true)
+set_view(ax, [212mm, -106mm, 138mm], [42mm, 87mm, -46mm], [0, 0, 1]) #hide
+save("mirrors.png", fig, px_per_unit=4, update=false); nothing #hide #md
 fig #!md
 
 # ![Two mounted mirrors shifting the beam sideways onto the optical axis](mirrors.png)
 #
 # ## Finding the misalignment
 #
-# In practice, mirror mounts are never perfectly aligned. We simulate a small mounting error on `M1` and place an alignment card on the optical axis, 200 mm past `M2`, to see where the beam actually lands.
+# In practice, mirror mounts are never perfectly aligned, and `M1` has been knocked slightly out of place. We place an alignment card on the optical axis, 200 mm past `M2`, to see where the beam actually lands.
 
-zrotate3d!(m1, deg2rad(0.5))           # M1 was mounted 0.5° off
+xrotate3d!(m1, deg2rad(-0.23)); zrotate3d!(m1, deg2rad(0.37)) #hide #md
+using Base64 #!md
+## The mounting error of M1 is encoded on purpose. Try the exercise below before decoding it! #!md
+θx, θz = deg2rad.(parse.(Float64, split(String(base64decode("LTAuMjMgMC4zNw=="))))) #!md
+xrotate3d!(m1, θx); zrotate3d!(m1, θz) #!md
 
 card = Detector(BMO.inch, false)       # alignment card: records hits, lets the beam pass
 translate3d!(card, [Δx, 300mm, 0])
-
 system = System([m1, m2, card])
-beam = Beam(Ray([0, 0, 0], [0, 1.0, 0], λ))
-empty!(card)
-solve_system!(system, beam)
-offset = spot_diagram(card)[1]         # [x, z] on the card
-println("offset on card: ", round.(offset ./ mm, digits=2), " mm")
 
-# A [`Detector`](@ref) with `stop = false` behaves like a real alignment card: it records where the beam hits, but lets the beam continue propagating through the rest of the system rather than absorbing it. Detectors accumulate hits over successive calls to `solve_system!`, so we call [`empty!`](@ref) beforehand to discard any previous data.
+function check_alignment()
+    empty!(card)
+    solve_system!(system, Beam(Ray([0, 0, 0], [0, 1.0, 0], λ)))
+    offset = spot_diagram(card)[1]     # [x, z] on the card
+    println("offset on card: x = ", round(offset[1] / mm, digits=4) + 0, " mm, z = ", round(offset[2] / mm, digits=4) + 0, " mm")
+    return offset
+end
 
-fig2 = Figure(size=(750, 400))
-ax2 = Axis3(fig2[1,1], aspect=:data, azimuth=-0.35π, elevation=0.18π, protrusions=0)
-hidedecorations!(ax2); hidespines!(ax2)
-optical_table!(ax2)
-render!(ax2, system)
-render!(ax2, beam, color=:red, flen=0.3)
+offset = check_alignment()
 
-spot_ax = Axis(fig2[1,2], aspect=1, xlabel="x [mm]", ylabel="z [mm]",
-    limits=(-12.7, 12.7, -12.7, 12.7), title="Card")
-scatter!(spot_ax, [0.0], [0.0], color=:black, marker=:xcross, markersize=16)
-pts = spot_diagram(card)
-scatter!(spot_ax, [p[1]/mm for p in pts], [p[2]/mm for p in pts], color=:red)
+# A [`Detector`](@ref) with `stop = false` behaves like a real alignment card: it records where the beam hits, but lets the beam continue propagating through the rest of the system rather than absorbing it. Detectors accumulate hits over successive calls to `solve_system!`, so `check_alignment` calls [`empty!`](@ref) first to discard any previous data. We will reuse it below to check our corrections.
+#
+# To see the result, we plot the setup next to the card:
 
-save("card_misaligned.png", fig2, px_per_unit=4); nothing #hide #md
+function plot_alignment()
+    beam = Beam(Ray([0, 0, 0], [0, 1.0, 0], λ))
+    solve_system!(system, beam)
+    fig = Figure(size=(600, 400))
+    ax = LScene(fig[1,1], show_axis=false)
+    optical_table!(ax)
+    render!(ax, system)
+    render!(ax, beam, color=:red, flen=0.3, show_pos=true)
+    spot_ax = Axis(fig[1,2], aspect=1, xlabel="x [mm]", ylabel="z [mm]",
+        limits=(-12.7, 12.7, -12.7, 12.7), title="Card")
+    scatter!(spot_ax, [0.0], [0.0], color=:black, marker=:xcross, markersize=16)
+    pts = spot_diagram(card)
+    scatter!(spot_ax, [p[1]/mm for p in pts], [p[2]/mm for p in pts], color=:red)
+    set_view(ax, [157mm, 465mm, 106mm], [77mm, 208mm, -64mm], [0, 0, 1]) #hide
+    return fig
+end
+
+fig2 = plot_alignment()
+save("card_misaligned.png", fig2, px_per_unit=4, update=false); nothing #hide #md
 fig2 #!md
 
 # ![Misaligned beam missing the target on the alignment card](card_misaligned.png)
 #
-# The black cross marks the intended target at the center of the card, while the red dot shows where the beam actually lands, offset by roughly 5 mm.
+# The black cross marks the intended target at the center of the card. The red dot shows where the beam actually lands: about 3.9 mm to the side and 1.2 mm up.
 #
 # ## Correcting the mirror
 #
-# Tilting a mirror by a small angle ``\delta`` deflects the reflected beam by ``2\delta``. Since the card sits a path length ``L`` behind `M1` (across to `M2`, then along the axis to the card), the resulting offset on the card is approximately
+# Now it is your turn: bring the spot back to the center of the card by rotating `M1` with [`zrotate3d!`](@ref) and [`xrotate3d!`](@ref), just as you would turn the two adjustment screws of the mount. Two small-angle rules help to estimate the angles from the offset on the card, which sits a path length ``L = 300`` mm behind `M1` (across to `M2`, then along the axis to the card):
+#
+# - Rotating `M1` by ``\delta_z`` about the vertical z-axis turns the reflected beam by ``2\delta_z`` within the table plane.
+# - Rotating `M1` by ``\delta_x`` about the global x-axis tilts it out of the plane of incidence. Because `M1` sits at 45°, only part of this tilt acts on the beam, which is deflected vertically by just ``\delta_x``, not ``2\delta_x``. A positive rotation moves the spot down.
+#
+# Together, this gives
 #
 # ```math
-# \text{offset} = 2\delta L
+# \Delta x \approx 2\,\delta_z L, \qquad \Delta z \approx -\delta_x L
 # ```
 #
-# We can invert this relation to compute the correction angle from the measured offset. The tilt moved the spot towards +x, so we rotate `M1` back by −δ, just as you would turn the adjustment screw of the mount.
+# Solve these for the angles, rotate `M1` back by them and call `check_alignment()` again. Since the rules are only approximate, a second iteration brings you closer still.
 
-L = Δx + (300mm - 100mm)             # M1 → M2 → card
-δ = offset[1] / (2L)
-println("correction: ", round(rad2deg(δ), digits=3), "°")
-zrotate3d!(m1, -δ)
+L = 300mm                              # M1 → M2 → card
+## Your turn, e.g.:
+## zrotate3d!(m1, ...)
+## xrotate3d!(m1, ...)
+## check_alignment()
 
-empty!(card)
-beam = Beam(Ray([0, 0, 0], [0, 1.0, 0], λ))
-solve_system!(system, beam)
-println("offset after correction: ", round.(spot_diagram(card)[1] ./ 1e-6, digits=2), " µm")
+#md # ```@raw html
+#md # <details class="details custom-block">
+#md # <summary>Show solution</summary>
+#md # ```
+#md #
+#md # `M1` was first rotated by −0.23° about the x-axis and then by +0.37° about the z-axis. Rotations do not commute, so we undo them in reverse order:
 
-# The correction angle exactly cancels the 0.5° mounting error we introduced above, and the residual offset on the card drops from several millimeters to well under a micrometer.
+## SPOILER: solution below. Try the exercise first! #!md
+zrotate3d!(m1, deg2rad(-0.37))
+xrotate3d!(m1, deg2rad(0.23))
+check_alignment()
+
+#md # The residual offset is far below a micrometer. Estimating the angles with the rules above gets you within about 10 µm on the first try.
+#md #
+#md # ```@raw html
+#md # </details>
+#md # ```
 #
-# ## Focusing onto a camera
-#
-# With `M1` corrected, we add a plano-convex lens to focus the beam and place a camera at the resulting waist. The lens is modeled with a [`SellmeierEquation`](@ref) dispersion model for N-BK7 glass and built with the [`SphericalLens`](@ref) convenience constructor.
+# With `M1` corrected, the beam hits the center of the card and runs along the optical axis of the setup:
 
-NBK7 = SellmeierEquation(1.03961212, 0.231792344, 1.01046945,
-                         0.00600069867, 0.0200179144, 103.560653)
-lens = SphericalLens(51.5mm, Inf, 3.6mm, BMO.inch, NBK7)   # plano-convex, like a stock f = 100 mm lens
-translate3d!(lens, [Δx, 350mm, 0])
-f = BMO.lensmakers_eq(51.5mm, Inf, NBK7(λ))               # ≈ 99.98 mm
-
-# The first radius of curvature (51.5 mm) describes the curved front surface, which faces the collimated beam coming from the mirrors; the second surface is flat (`Inf`).
-#
-# To model the coherent laser beam itself rather than a single ray, we use a [`GaussianBeamlet`](@ref) with a 0.5 mm waist radius. The `support` keyword pins the local reference frame of the beamlet to a fixed vector, which keeps the simulation reproducible instead of relying on an arbitrary default that could change from run to run.
-
-w0 = 0.5mm
-laser = GaussianBeamlet([0, 0, 0], [0, 1.0, 0], λ, w0; support=[1.0, 0, 0])
-system = System([m1, m2, lens])
-solve_system!(system, laser)
-
-zs = range(500mm, 600mm, length=2001)      # optical path length from the laser
-w, _, _, _ = gauss_parameters(laser, zs)
-i = argmin(w)
-println("waist: ", round(w[i] * 1e6, digits=1), " µm at z = ", round(zs[i] / mm, digits=1), " mm")
-
-#-
-
-fig3 = Figure(size=(600, 300))
-ax3 = Axis(fig3[1,1], xlabel="optical path [mm]", ylabel="beam radius w [µm]")
-lines!(ax3, zs ./ mm, w .* 1e6)
-save("waist.png", fig3, px_per_unit=4); nothing #hide #md
+fig3 = plot_alignment()
+save("laser_alignment.png", fig3, px_per_unit=4, update=false); nothing #hide #md
 fig3 #!md
 
-# ![Beam radius as a function of optical path length, focused by the lens](waist.png)
+# ![Aligned beam hitting the center of the alignment card](laser_alignment.png)
 #
-# As a sanity check, we can compare this to the paraxial estimate ``\lambda f / (\pi w_{lens})``, using the beam radius at the lens (path length 450 mm). The beam has diverged considerably over that distance -- its Rayleigh range is only about 1.24 m -- so using the beam radius at the lens rather than the initial waist gives a more meaningful estimate here.
-
-w_lens, _, _, _ = gauss_parameters(laser, 450mm)
-println("paraxial waist estimate: ", round(λ * f / (π * w_lens) * 1e6, digits=1), " µm")
-
-# The two values agree to within a few percent. Now we place a camera right at the waist location found above. The beam path after `M2` runs along +y starting at `y = 100mm` (optical path 200 mm), so the camera's y-position follows from the path length at the waist.
-
-camera = Detector(1mm)
-translate3d!(camera, [Δx, 100mm + (zs[i] - 200mm), 0])
-system = System([m1, m2, lens, camera])
-laser = GaussianBeamlet([0, 0, 0], [0, 1.0, 0], λ, w0; support=[1.0, 0, 0])
-empty!(camera)
-solve_system!(system, laser)
-x, z, I = intensity(camera; n=100)
-println("power on camera: ", round(optical_power(camera) * 1e3, digits=3), " mW")
-
-#-
-
-fig4 = Figure(size=(500, 400))
-ax4 = Axis(fig4[1,1], aspect=1, xlabel="x [µm]", ylabel="z [µm]")
-hm = heatmap!(ax4, x .* 1e6, z .* 1e6, I)
-Colorbar(fig4[1,2], hm)
-save("camera.png", fig4, px_per_unit=4); nothing #hide #md
-fig4 #!md
-
-# ![Focused intensity distribution on the camera sensor](camera.png)
-#
-# Nearly all of the input power reaches the camera, and the focused spot matches the waist size computed above.
-
-system_full = System([m1, m2, lens, camera])
-figo = Figure(size=(600, 400))
-axo = Axis3(figo[1,1], aspect=:data, azimuth=-0.35π, elevation=0.18π, protrusions=0)
-hidedecorations!(axo); hidespines!(axo)
-optical_table!(axo)
-render!(axo, system_full)
-render!(axo, laser, color=:red)
-save("laser_alignment.png", figo, px_per_unit=4); nothing #hide #md
-figo #!md
-
 # ## Next steps
 #
 # From here, you could continue with the [Michelson interferometer](@ref) tutorial to see how a similar beam is split and recombined, the [Miniature microscope](@ref) tutorial for a more complex multi-lens system, or browse the [Optical components](@ref) and [Visualization](@ref) sections for more details on the building blocks used here.

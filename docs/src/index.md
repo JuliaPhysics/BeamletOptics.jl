@@ -116,7 +116,7 @@ gauss_parameters(laser, 0.12)[1] / gauss_parameters(laser, 0.0)[1]
 
 ![Circularly polarized beam in a Keplerian beam expander](quickstart.png)
 
-## Showcase
+## Resources to get you started
 
 ```@raw html
 <div class="bmo-gallery">
