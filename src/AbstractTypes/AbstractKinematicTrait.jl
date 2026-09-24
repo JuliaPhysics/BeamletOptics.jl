@@ -1,42 +1,40 @@
 """
     AbstractKinematicTrait
 
-The kinematic trait defines whether a value can be moved by the kinematic API
+The kinematic trait defines whether an entity can be moved by the kinematic API
 ([`translate3d!`](@ref), [`rotate3d!`](@ref), ...). It is returned by
-[`kinematic_trait_of`](@ref BeamletOptics.kinematic_trait_of) and follows the same dispatch
-pattern as [`AbstractShapeTrait`](@ref): every public verb `verb(x, args...)` forwards to
-`verb(kinematic_trait_of(x), x, args...)`.
+[`kinematic_trait_of`](@ref) and follows the same dispatch
+pattern as [`AbstractShapeTrait`](@ref): every public function e.g. `translate3d!(x, args...)` forwards to
+`translate3d!(kinematic_trait_of(x), x, args...)`.
 
 Two traits are defined:
 
-1. [`Static`](@ref BeamletOptics.Static): `x` cannot be moved, every verb throws an `ArgumentError`
-2. [`Movable`](@ref BeamletOptics.Movable): `x` can be moved; its frame
-   ([`Oriented`](@ref BeamletOptics.Oriented) or [`Directed`](@ref BeamletOptics.Directed))
+1. [`Static`](@ref): `x` cannot be moved, every kin. function throws an `ArgumentError`
+2. [`Movable`](@ref): `x` can be moved; its frame
+   ([`Oriented`](@ref) or [`Directed`](@ref))
    selects orientation- or direction-based behaviour
 
 A subtype of a movable abstract type can opt out of the kinematic API by declaring its own
 `kinematic_trait_of` method, e.g.
 
 ```julia
-struct FixedMirror{T, S <: BeamletOptics.AbstractShape{T}} <: BeamletOptics.AbstractObject{T}
+struct FixedMirror{T, S <: AbstractShape{T}} <: AbstractObject{T}
     shape::S
 end
 
-BeamletOptics.kinematic_trait_of(::FixedMirror) = BeamletOptics.Static()
+kinematic_trait_of(::FixedMirror) = Static()
 ```
 
-Every kinematic verb on a `FixedMirror` now throws an `ArgumentError`; its getters
+Every kinematic function on a `FixedMirror` now throws an `ArgumentError`; its getters
 (`position`, `orientation`, ...) stay available.
 
 # Containers
 
-All members of a container ([`ObjectGroup`](@ref), [`UnionSDF`](@ref BeamletOptics.UnionSDF)/[`DifferenceSDF`](@ref BeamletOptics.DifferenceSDF),
-[`BeamletOptics.AbstractBeamGroup`](@ref)) must be either all `Static` or all `Movable`
-(their frames, [`Oriented`](@ref BeamletOptics.Oriented)/[`Directed`](@ref BeamletOptics.Directed),
-may still mix). This is checked in the respective constructors, which throw an `ArgumentError`
-if the members are mixed; nesting is covered because a nested container already has a uniform
+All members of a container ([`ObjectGroup`](@ref), [`UnionSDF`](@ref)/[`DifferenceSDF`](@ref),
+[`AbstractBeamGroup`](@ref)) must be either all `Static` or all `Movable`. Frames can still be mixed.
+**This must be checked in the respective constructors**; nesting is then covered because a nested container already has a uniform
 class from its own constructor. The container then takes that class: `Static` if all members
-are `Static`, else `Movable(`[`Oriented`](@ref BeamletOptics.Oriented)`())`. All shapes returned
+are `Static`, else `Movable(`[`Oriented`](@ref)`())`. All shapes returned
 by `shape(object)` of a [`MultiShape`](@ref) object must be movable, since `MultiShape` objects
 (e.g. a `CubeBeamsplitter`) have no shared constructor to enforce this.
 """
@@ -45,24 +43,23 @@ abstract type AbstractKinematicTrait end
 """
     Static <: AbstractKinematicTrait
 
-Represents a value that cannot be moved. Every kinematic verb throws an `ArgumentError`; the
+Represents a value that cannot be moved. Every kinematic function throws an `ArgumentError`; the
 getters (e.g. `position`, [`orientation`](@ref)) stay available.
-This is the fallback of [`kinematic_trait_of`](@ref BeamletOptics.kinematic_trait_of).
+This is the fallback of [`kinematic_trait_of`](@ref).
 """
 struct Static <: AbstractKinematicTrait end
 
 """
     AbstractKinematicFrame
 
-Frame of a [`Movable`](@ref BeamletOptics.Movable) value, either
-[`Oriented`](@ref BeamletOptics.Oriented) or [`Directed`](@ref BeamletOptics.Directed).
+Reference frame of a [`Movable`](@ref) value, either [`Oriented`](@ref) or [`Directed`](@ref).
 """
 abstract type AbstractKinematicFrame end
 
 """
     Oriented <: AbstractKinematicFrame
 
-Frame of a movable value with a full local coordinate system, e.g. shapes, objects and beam
+Reference frame of a movable value with a full local coordinate system, e.g. shapes, objects and beam
 groups.
 
 # Implementation reqs.
@@ -79,7 +76,7 @@ struct Oriented <: AbstractKinematicFrame end
 """
     Directed <: AbstractKinematicFrame
 
-Frame of a movable value that only has a direction but no orientation, e.g. rays and beams.
+Reference frame of a movable value that only has a direction but no orientation, e.g. rays and beams.
 
 # Implementation reqs.
 
@@ -93,14 +90,14 @@ struct Directed <: AbstractKinematicFrame end
 """
     Movable{F <: AbstractKinematicFrame} <: AbstractKinematicTrait
 
-Represents a value that can be moved by the kinematic API. The `frame` field
-([`Oriented`](@ref BeamletOptics.Oriented) or [`Directed`](@ref BeamletOptics.Directed))
-selects orientation- or direction-based behaviour of the derived verbs.
+Represents a value that can be moved by the kinematic API.
+The `frame` field ([`Oriented`](@ref) or [`Directed`](@ref))
+selects orientation- or direction-based behaviour of the derived functions.
 
 Rotations are applied about the own `position` of the value unless a `pivot` is passed
 explicitly. A rotation `axis` can have any non-zero length (it is normalized internally).
 
-# Verbs
+# Kinematic functions
 
 - [`translate3d!`](@ref): moves `x` by an `offset` vector (primitive, implemented per type)
 - [`rotate3d!`](@ref): rotates `x` by a rotation matrix `R` about `position(x)`, or about a
@@ -113,16 +110,16 @@ explicitly. A rotation `axis` can have any non-zero length (it is normalized int
   aligned with a target vector
 - [`reset_translation3d!`](@ref): moves `x` so that `position(x)` is the global origin;
   available for every `Movable`, including rays, beams and beam groups
-- [`reset_rotation3d!`](@ref): only available for [`Oriented`](@ref BeamletOptics.Oriented)
+- [`reset_rotation3d!`](@ref): only available for [`Oriented`](@ref)
   values, where it rotates `x` back to identity `orientation`; for
-  [`Directed`](@ref BeamletOptics.Directed) values (rays, beams) it throws an
+  [`Directed`](@ref) values (rays, beams) it throws an
   `ArgumentError`, use [`align3d!`](@ref) instead
-- [`direction`](@ref): for [`Oriented`](@ref BeamletOptics.Oriented) values this is the local
-  y-axis, `orientation(x)[:, 2]`; [`Directed`](@ref BeamletOptics.Directed) values provide
+- [`direction`](@ref): for [`Oriented`](@ref) values this is the local
+  y-axis, `orientation(x)[:, 2]`; [`Directed`](@ref) values provide
   their own getter
 
 Sources (rays, beams and beam groups) are additionally reset to their untraced start state by
-every one of the verbs above: a moved but already-traced source would otherwise keep rays or
+every one of the functions above: a moved but already-traced source would otherwise keep rays or
 child beams belonging to the old, now geometrically wrong, light path. Moving a beam that is
 not the root of its beam tree (e.g. one created by a beamsplitter interaction) throws an
 `ArgumentError`; move its root beam instead.
@@ -135,7 +132,7 @@ If `kinematic_trait_of(::Foo) = Movable(...)` is declared, `Foo` must implement 
 - `translate3d!(::Movable, x::Foo, offset)`: moves `x` by `offset`
 - `rotate3d!(::Movable, x::Foo, R::AbstractMatrix)`: rotates `x` by `R` about `position(x)`
 
-All other verbs listed above are derived from these two primitives.
+All other kin. functions listed above are derived from these two primitives.
 """
 struct Movable{F <: AbstractKinematicFrame} <: AbstractKinematicTrait
     frame::F
@@ -144,26 +141,23 @@ end
 """
     kinematic_trait_of(x) -> AbstractKinematicTrait
 
-Returns the [`AbstractKinematicTrait`](@ref BeamletOptics.AbstractKinematicTrait) of `x`.
-Defaults to [`Static`](@ref BeamletOptics.Static)`()`; movable types declare
-[`Movable`](@ref BeamletOptics.Movable)`(`[`Oriented`](@ref BeamletOptics.Oriented)`())` or
-`Movable(`[`Directed`](@ref BeamletOptics.Directed)`())`.
+Returns the [`AbstractKinematicTrait`](@ref) of `x`. Defaults to [`Static`](@ref)`()`.
+Movable types declare [`Movable`](@ref)`(`[`Oriented`](@ref)`())` or `Movable(`[`Directed`](@ref)`())`.
 """
 kinematic_trait_of(x) = Static()
 
 """
     _is_static(x)
 
-Returns `true` if the [`kinematic_trait_of`](@ref BeamletOptics.kinematic_trait_of) `x` is
-[`Static`](@ref BeamletOptics.Static).
+Returns `true` if the [`kinematic_trait_of`](@ref) `x` is [`Static`](@ref).
 """
 _is_static(x) = kinematic_trait_of(x) isa Static
 
 """
     _check_kinematic_members(members)
 
-Throws an `ArgumentError` if some `members` of a container are [`Static`](@ref BeamletOptics.Static)
-and some are [`Movable`](@ref BeamletOptics.Movable). Empty collections pass.
+Throws an `ArgumentError` if some `members` of a container are [`Static`](@ref)
+and some are [`Movable`](@ref). Empty collections pass.
 """
 function _check_kinematic_members(members)
     has_static = false
@@ -192,11 +186,7 @@ _container_trait(members) = (!isempty(members) && _is_static(first(members))) ? 
 
 _static_error(x) = throw(ArgumentError(lazy"$(typeof(x)) is static and cannot be moved, see `kinematic_trait_of`"))
 
-#=
-Public entry points: each verb forwards to its trait-first method. The trailing argument types
-must be kept as they are, since they keep the entry points and the trait-first methods of the
-same arity disjoint (ambiguity freedom).
-=#
+# entry point functions below
 
 """
     translate3d!(x, offset)
@@ -283,7 +273,7 @@ y-axis, i.e. `orientation(x)[:, 2]`; rays and beams return their own direction.
 """
 direction(x) = direction(kinematic_trait_of(x), x)
 
-# Static branch: every verb throws
+# Static branch: every kinematic functions throws
 
 translate3d!(::Static, x, offset) = _static_error(x)
 rotate3d!(::Static, x, R::AbstractMatrix) = _static_error(x)

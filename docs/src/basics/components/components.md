@@ -9,40 +9,9 @@ Pages = ["mirrors.md", "lenses.md", "beamsplitters.md", "detectors.md", "polariz
 Depth = 2
 ```
 
-## Moving optical elements
+## Moving components
 
-Optical elements can move around freely in three-dimensional space, which enables the modeling of kinematics within optical setups. When objects are manipulated, they are translated and rotated around their self-defined center of gravity, which is represented as a ``\mathbb{R}^3``-vector and will be referred to as its [`position`](@ref). Additionally, the [`orientation`](@ref) of an object, defined as its local fixed coordinate system, is represented by an orthonormal matrix in ``\mathbb{R}^3``. If the object is rotated, this matrix can be used to calculate the inverse transform into global coordinates. [`direction(object)`](@ref) returns the local y-axis of the object, i.e. its optical axis, as `orientation(object)[:, 2]`.
-
-!!! important "Optical system kinematics"
-    Elements can be moved freely between each call of [`solve_system!`](@ref). However, during tracing it is assumed that all elements remain static.
-
-For elements that implement the [`BeamletOptics.AbstractObject`](@ref) interface, the following movement commands are provided:
-
-- Translation
-    - [`translate3d!`](@ref)
-    - [`translate_to3d!`](@ref)
-- Rotation
-    - [`rotate3d!`](@ref)
-    - [`xrotate3d!`](@ref)
-    - [`yrotate3d!`](@ref)
-    - [`zrotate3d!`](@ref)
-    - [`align3d!`](@ref)
-- Reset commands
-    - [`reset_translation3d!`](@ref)
-    - [`reset_rotation3d!`](@ref)
-
-!!! important "Relative motion"
-    Unless specified otherwise, the translation and rotation commands result in relative motions to the current position and orientation. This must be taken into account when trying to model a specific set of movements.
-
-The same commands can be used to move light sources, see [Moving sources](@ref).
-
-## Groups of optical elements
-
-For the easier representation of a group of [`BeamletOptics.AbstractObject`](@ref)s that moves as one, the [`ObjectGroup`](@ref) can be used. Refer to the [Lens groups](@ref) example for more information. The group's pivot (its `center`) can be moved without moving its members via [`set_pivot3d!`](@ref).
-
-```@docs; canonical=false
-ObjectGroup
-```
+Optical elements can be moved freely in 3D space and combined into groups that move as one, see [Moving optical elements](@ref) in the [Kinematics](@ref) section.
 
 ## Listing available components
 

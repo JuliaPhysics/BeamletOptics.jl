@@ -1,9 +1,5 @@
 abstract type AbstractAsphericalSurfaceSDF{T} <: AbstractLensSDF{T} end
 
-# Fall back to the numeric gradient for aspheres, as AD-gradients seem
-# instable/wrong in edge cases at the moment. See https://github.com/JuliaPhysics/BeamletOptics.jl/issues/11
-normal3d(s::AbstractAsphericalSurfaceSDF, pos) = numeric_gradient(s, pos)
-
 """
     ConvexAsphericalSurfaceSDF
 
