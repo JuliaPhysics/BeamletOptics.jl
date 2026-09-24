@@ -70,14 +70,7 @@ const mm = 1e-3
         solve_system!(system, source)
         @test test_coma(detector, atol=6e-5)
     end
-
-    @testset "Test with point source (narrow)" begin
-        # Tests regression for https://github.com/JuliaPhysics/BeamletOptics.jl/issues/11
-        source = PointSource([0, -0.5, 0], [0, 1 ,0], 5e-5, 486.0e-9, num_rays=1000, num_rings=10)
-        empty!(detector)
-        solve_system!(system, source)
-        @test test_coma(detector, atol=2e-7)
-    end
+    # The narrow point source (Issue#11) is tested in TestBugFixes.jl
 end
 
 end # MODULE

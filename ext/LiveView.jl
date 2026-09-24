@@ -846,7 +846,8 @@ function live_view(
     )
     isempty(pairs) && throw(ArgumentError("live_view requires at least one system => beam pair"))
     ps = Pair{BMO.AbstractSystem, Any}[p for p in pairs]
-    systems = first.(ps)
+    # several beams may share a system, which is rendered once
+    systems = unique(objectid, first.(ps))
     specs = _panel_specs(detectors, systems)
     slider_specs = [_slider_spec(s) for s in sliders]
     clip_specs = _clip_plane_specs(clip_planes)
