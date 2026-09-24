@@ -4,6 +4,7 @@ using BeamletOptics
 using LinearAlgebra
 using Test
 using Logging
+using Random
 
 const BMO = BeamletOptics
 
@@ -278,6 +279,28 @@ end
         end
         xrotate3d!(lens, -tilt)
     end
+end
+
+@testset "Issue#82" begin
+    # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/82
+    # Issue: the on-axis ray leaves the concave face exactly at its vertex, where the plano and
+    # the concave part of the lens SDF touch. Away from the origin, floating-point noise of the
+    # world coordinates made the gradient at the exit point belong to the concave part, which
+    # points into the lens. `intersect3d` then took the ray as entering the lens again and
+    # returned a second, degenerate hit at t ≈ -1e-10 (≈ 0.5 % of random poses).
+    rng = MersenneTwister(1)
+    n = 1.458
+    spurious = 0
+    for _ in 1:2000
+        lens = Lens(CircularFlatSurface(30mm), SphericalSurface(31.85mm, 30mm), 4mm, λ -> n)
+        rotate3d!(lens, BMO.rotate3d(normalize(randn(rng, 3)), 2π * rand(rng)))
+        translate3d!(lens, 12 .* randn(rng, 3))
+        dir = orientation(lens)[:, 2]
+        beam = Beam(position(lens) - 0.1 * dir, dir, 589e-9)
+        solve_system!(System([lens]), beam)
+        spurious += BMO.refractive_index.(BMO.rays(beam)) != [1, n, 1]
+    end
+    @test spurious == 0
 end
 
 @testset "PlateBeamsplitter BoundsError" begin
