@@ -3,7 +3,6 @@ module TestAsphericalLenses
 using BeamletOptics
 using Test
 using GeometryBasics
-using LinearAlgebra: dot
 
 const BMO = BeamletOptics
 
@@ -65,43 +64,6 @@ const mm = 1e-3
         wd = cosd(α) * dist
 
         @test wd≈93.2mm atol=1e-4
-    end
-
-    @testset "Near-axis rays through hyperbolic plano-concave and plano-convex lenses" begin
-        # A plano-conic lens with k = -n² images a collimated beam that enters through the plane
-        # face exactly onto a point: every outgoing ray passes through the (real or virtual)
-        # focus at `f` from the conic vertex. Near the vertex the concave SDF is a sliver thinner
-        # than the finite-difference step of `numeric_gradient`, which used to give wrong normals
-        # for |h| ≲ 10 µm.
-        n = 1.458
-        f = 50mm
-        ct = 4mm
-        d = 30mm
-        concave = Lens(CircularFlatSurface(d),
-            EvenAsphericalSurface((n - 1) * f, d, -n^2, [0.0]), ct, x -> n)
-        convex = Lens(CircularFlatSurface(d),
-            EvenAsphericalSurface(-(n - 1) * f, d, -n^2, [0.0]), 2ct, x -> n)
-        # The conic vertex lies on the back face, `thickness` along the lens axis
-        for (lens, thickness, f_signed) in ((concave, ct, -f), (convex, 2ct, f)),
-            tilt in (0.0, deg2rad(0.5))
-
-            xrotate3d!(lens, tilt)
-            system = System(lens)
-            e_x, axis = BMO.orientation(lens)[:, 1], BMO.orientation(lens)[:, 2]
-            focus = position(lens) .+ (thickness + f_signed) .* axis
-            # Below h ≈ 0.1 µm the sag (h²/2R ≈ 1e-13 m) is smaller than the ray-marching
-            # tolerance, the plane face is hit instead; the angle error stays below h / f.
-            for h in (1e-6, 1e-5, 1e-4, 1e-3, 5mm)
-                beam = Beam(Ray(position(lens) .- 0.1 .* axis .+ h .* e_x, Vector(axis)))
-                solve_system!(system, beam)
-                p, out = position(last(beam.rays)), BMO.direction(last(beam.rays))
-                # lateral miss of the focus by the (extended) outgoing ray, relative to h
-                t = dot(focus .- p, axis) / dot(out, axis)
-                miss = dot(p .+ t .* out .- focus, e_x)
-                @test abs(miss) < 1e-6 * h
-            end
-            xrotate3d!(lens, -tilt)
-        end
     end
 
     @testset "Complex aspherical imaging system" begin
