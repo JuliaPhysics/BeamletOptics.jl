@@ -4,7 +4,8 @@ using BeamletOptics
 import BeamletOptics: render!, RenderException, _RenderTypes, get_view, set_view, hide_axis,
                        set_orthographic, arrow!, render_lcs!, look_at!,
                        AbstractRenderHandle, live_render!, update_render!, remove_render!,
-                       pick_object, kinematic_controls!, live_view, view_cube!, studio_lighting!
+                       pick_object, kinematic_controls!, live_view, view_cube!, studio_lighting!,
+                       set_render_look
 
 const BMO = BeamletOptics
 

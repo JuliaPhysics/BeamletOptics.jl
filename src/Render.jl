@@ -211,7 +211,7 @@ are emptied, all systems are solved again and the beams and panels are updated. 
 Main keyword arguments: `detectors` (`:auto`, a vector of `pd`, `pd => mode` or
 `pd => (mode, kwargs)`, or `[]`), `on_change = (gui, obj) -> nothing`,
 `sliders = ["label" => (range, callback)]`, `system_kwargs`, `beam_kwargs`, `lighting = :studio`
-(see [`studio_lighting!`](@ref)), `edges = true` and `size`. All other
+(see [`studio_lighting!`](@ref)), `edges` and `size`. All other
 keyword arguments are passed to [`kinematic_controls!`](@ref). Refer to the method of the `Makie`
 extension for details.
 
@@ -265,3 +265,15 @@ explicitly.
 If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
 """
 studio_lighting!(::Any; kwargs...) = throw(MissingBackendError())
+
+"""
+    set_render_look(look::Symbol)
+
+Sets the look of all subsequently rendered objects, `:modern` (default) or `:cad`. The `:modern`
+look renders clear glass, metallic mirrors and neutral mechanics without edge lines, the `:cad`
+look saturated materials with feature edge lines. Explicit kwargs of [`render!`](@ref), e.g.
+`color`, `material` or `edges`, override the look.
+
+If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
+"""
+set_render_look(::Any) = throw(MissingBackendError())

@@ -64,7 +64,26 @@ end
 
 @testset "Render look" begin
     @test !isnothing(Ext)
-    mats = Ext._MATERIALS
+
+    @testset "looks" begin
+        @test Ext._LOOK[] == :modern
+        @test Ext._materials() === Ext._MODERN_MATERIALS
+        @test !Ext._default_edges()
+        # modern: clear glass and no edges by default
+        lens = SphericalLens(0.05, -0.05, 5e-3, 25.4e-3)
+        fig = Figure(); ax = LScene(fig[1, 1])
+        render!(ax, lens)
+        @test !any(p -> p isa Lines, ax.scene.plots)
+        @test set_render_look(:cad) == :cad
+        @test Ext._materials() === Ext._CAD_MATERIALS
+        @test Ext._default_edges()
+        @test_throws ArgumentError set_render_look(:toy)
+        @test set_render_look(:modern) == :modern
+    end
+
+    # The following tests check the materials and edges of the `:cad` look
+    set_render_look(:cad)
+    mats = Ext._materials()
 
     @testset "materials" begin
         # values of the table of the plan
@@ -308,6 +327,7 @@ end
         @test isempty(edge_plots(only(gui.system_handles[1].handles).plots))
         close(gui)
     end
+    set_render_look(:modern)
 end
 
 end # module

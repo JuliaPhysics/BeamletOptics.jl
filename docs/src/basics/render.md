@@ -57,18 +57,28 @@ julia> methods(render!)
 
 ## Look
 
-Rendered objects have a CAD-like look: a material per component class, thin dark lines along
-the feature edges, and visible cemented interfaces of doublet and triplet lenses.
+Rendered objects get a material per component class and visible cemented interfaces of doublet
+and triplet lenses. Two looks are available, which are selected via [`set_render_look`](@ref):
 
-| material      | components                                 | color        | alpha |
-|:--------------|:-------------------------------------------|:-------------|:------|
-| `:refractive` | lenses, prisms, plates, windows            | light blue   | 0.5   |
-| `:reflective` | mirrors, retroreflector                    | silver       | 1     |
-| `:coating`    | beamsplitter coatings                      | magenta      | 0.6   |
-| `:polarizer`  | polarization filters                       | dark teal    | 0.8   |
-| `:detector`   | detectors                                  | dark blue    | 1     |
-| `:mechanics`  | mechanics, dummies and other objects       | mid grey     | 1     |
-| `:interface`  | cemented interfaces of doublets, triplets  | amber        | 0.25  |
+- `:modern` (default): a restrained palette of clear, slightly tinted glass with highlights,
+  metallic mirrors and neutral mechanics, without edge lines
+- `:cad`: saturated materials with thin dark lines along the feature edges, like a CAD program
+
+```julia
+set_render_look(:cad)
+```
+
+| material      | components                                 | `:modern`            | `:cad`             |
+|:--------------|:-------------------------------------------|:---------------------|:-------------------|
+| `:refractive` | lenses, prisms, plates, windows            | clear glass, 0.38    | light blue, 0.5    |
+| `:reflective` | mirrors, retroreflector                    | metallic silver      | silver             |
+| `:coating`    | beamsplitter coatings                      | light violet, 0.4    | magenta, 0.6       |
+| `:polarizer`  | polarization filters                       | dark slate, 0.75     | dark teal, 0.8     |
+| `:detector`   | detectors                                  | graphite             | dark blue          |
+| `:mechanics`  | mechanics, dummies and other objects       | neutral grey         | mid grey           |
+| `:interface`  | cemented interfaces of doublets, triplets  | pale amber, 0.15     | amber, 0.25        |
+
+The numbers are the opacity `alpha` of transparent materials.
 
 Besides the color and the opacity, each material sets the `transparency`, `diffuse`, `specular`
 and `shininess` attributes of the mesh plot. The parts of composite objects are rendered with
@@ -79,8 +89,9 @@ keyword arguments of `render!` change the look of an object:
   of the object
 - `color`, `alpha`, `transparency`, ...: override the corresponding attribute of the material,
   for all parts of the object. The cemented interfaces keep their amber look.
-- `edges`: draws the feature edges (by default for all materials except `:mechanics`, whose
-  detailed meshes, e.g. a housing from an STL file, would cover the optics), i.e. the edges where the faces of an object meet at
+- `edges`: draws the feature edges (by default in the `:cad` look for all materials except
+  `:mechanics`, whose detailed meshes, e.g. a housing from an STL file, would cover the optics),
+  i.e. the edges where the faces of an object meet at
   an angle of more than 30°, and the boundary of open surfaces such as a `Detector`. `edges =
   false` switches them off. Shapes rendered via the marching cubes fallback have no edges. The
   opacity of the edges follows the opacity of the object, e.g. a nearly transparent housing
@@ -88,7 +99,8 @@ keyword arguments of `render!` change the look of an object:
   visible.
 
 ```julia
-render!(ax, lens)                       # light blue glass with edges
+render!(ax, lens)                       # glass of the active look
+render!(ax, lens; edges = true)         # with feature edges
 render!(ax, lens; color = :red)         # red glass, same transparency
 render!(ax, mount; material = :mechanics, edges = false)
 ```
@@ -105,8 +117,8 @@ studio_lighting!(ax)
 render!(ax, system)
 ```
 
-The [`live_view`](@ref) applies the rig and draws the edges by default, `lighting = :none` keeps
-the default lights of Makie and `edges = false` switches the edges off.
+The [`live_view`](@ref) applies the rig, `lighting = :none` keeps the default lights of Makie and
+`edges = true` or `false` overrides the edges of the look.
 
 ## Camera and scene helpers
 

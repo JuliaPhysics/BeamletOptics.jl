@@ -1,9 +1,10 @@
 #=
-CAD-like look of the rendered objects: material presets per component class, feature edge lines
-and the studio lighting rig. The component classes are assigned in `RenderPresets.jl`.
+Look of the rendered objects: material presets per component class, feature edge lines and the
+studio lighting rig. Two looks are available, see `set_render_look`. The component classes are
+assigned in `RenderPresets.jl`.
 =#
 
-"""Plot attributes of a material preset, see `_MATERIALS`."""
+"""Plot attributes of a material preset, see `_materials`."""
 const _Material = @NamedTuple{color::RGBf, alpha::Float32, transparency::Bool, diffuse::Float32,
     specular::Float32, shininess::Float32}
 
@@ -11,10 +12,10 @@ _preset(color, alpha, transparency, diffuse, specular, shininess) =
     _Material((color, alpha, transparency, diffuse, specular, shininess))
 
 """
-    _MATERIALS
+    _CAD_MATERIALS
 
-Material presets per component class, see `_material_class`. The attributes are passed to the mesh
-plot of an object, explicit kwargs of `render!` (e.g. `color`) override them.
+Material presets per component class of the `:cad` look, see `_material_class`. The attributes are
+passed to the mesh plot of an object, explicit kwargs of `render!` (e.g. `color`) override them.
 
 | class         | components                                |
 |:--------------|:------------------------------------------|
@@ -26,7 +27,7 @@ plot of an object, explicit kwargs of `render!` (e.g. `color`) override them.
 | `:mechanics`  | mechanics, dummies and other objects      |
 | `:interface`  | cemented interfaces of doublets, triplets |
 """
-const _MATERIALS = Dict{Symbol, _Material}(
+const _CAD_MATERIALS = Dict{Symbol, _Material}(
     :refractive => _preset(RGBf(0.45, 0.72, 0.88), 0.5, true, 0.6, 1.0, 96),
     :reflective => _preset(RGBf(0.82, 0.83, 0.85), 1, false, 0.5, 1.0, 128),
     :coating => _preset(RGBf(0.95, 0.40, 0.90), 0.6, true, 0.7, 0.6, 64),
@@ -37,9 +38,42 @@ const _MATERIALS = Dict{Symbol, _Material}(
 )
 
 """
+    _MODERN_MATERIALS
+
+Material presets of the `:modern` look, see `_CAD_MATERIALS`. A restrained palette: clear glass with
+highlights, bright metallic mirrors, neutral mechanics, and a subtle coating of beamsplitters.
+"""
+const _MODERN_MATERIALS = Dict{Symbol, _Material}(
+    :refractive => _preset(RGBf(0.72, 0.86, 0.93), 0.38, true, 0.55, 1.6, 250),
+    :reflective => _preset(RGBf(0.80, 0.81, 0.84), 1, false, 0.6, 1.6, 300),
+    :coating => _preset(RGBf(0.82, 0.50, 0.85), 0.4, true, 0.6, 1.0, 128),
+    :polarizer => _preset(RGBf(0.22, 0.28, 0.32), 0.75, true, 0.7, 0.8, 64),
+    :detector => _preset(RGBf(0.16, 0.18, 0.22), 1, false, 0.8, 0.6, 64),
+    :mechanics => _preset(RGBf(0.60, 0.61, 0.63), 1, false, 0.9, 0.3, 32),
+    :interface => _preset(RGBf(0.90, 0.85, 0.70), 0.15, true, 0.6, 0.6, 64),
+)
+
+"""The active look, see `set_render_look`."""
+const _LOOK = Ref(:modern)
+
+const _LOOKS = (:modern, :cad)
+
+function set_render_look(look::Symbol)
+    look in _LOOKS || throw(ArgumentError("unknown look :$look, must be one of $_LOOKS"))
+    _LOOK[] = look
+    return look
+end
+
+"""Returns the material presets of the active look."""
+_materials() = _LOOK[] === :cad ? _CAD_MATERIALS : _MODERN_MATERIALS
+
+"""Returns `true` if the active look draws feature edges by default."""
+_default_edges() = _LOOK[] === :cad
+
+"""
     _material_class(obj)
 
-Returns the material class of the object `obj`, i.e. a key of `_MATERIALS`. Defaults to
+Returns the material class of the object `obj`, i.e. a key of `_materials()`. Defaults to
 `:mechanics`, the component classes are assigned in `RenderPresets.jl`.
 """
 _material_class(::Any) = :mechanics
@@ -47,15 +81,16 @@ _material_class(::Any) = :mechanics
 """
     _material(obj, material = nothing)
 
-Returns the plot attributes of the `material` (a key of `_MATERIALS`), or of the material class of
+Returns the plot attributes of the `material` (a key of `_materials()`), or of the material class of
 `obj` if `material` is `nothing`.
 """
 function _material(obj, material = nothing)
     class = isnothing(material) ? _material_class(obj) : material
-    if !(class isa Symbol && haskey(_MATERIALS, class))
-        throw(ArgumentError("unknown material $(repr(class)), must be one of $(sort!(collect(keys(_MATERIALS))))"))
+    materials = _materials()
+    if !(class isa Symbol && haskey(materials, class))
+        throw(ArgumentError("unknown material $(repr(class)), must be one of $(sort!(collect(keys(materials))))"))
     end
-    return _MATERIALS[class]
+    return materials[class]
 end
 
 #=
@@ -260,9 +295,11 @@ only.
 """
 function _studio_lights(multi::Bool)
     light(c, dir) = Makie.DirectionalLight(RGBf(c, c, c), dir, true)
-    multi || return RGBf(0.45, 0.45, 0.45), [light(0.75, _KEY_DIRECTION)]
-    return RGBf(0.3, 0.3, 0.3),
-        [light(0.75, _KEY_DIRECTION), light(0.2, _FILL_DIRECTION), light(0.15, _RIM_DIRECTION)]
+    # The modern look is lit more softly, i.e. with more ambient light
+    a, k = _LOOK[] === :cad ? (0.3, 0.75) : (0.45, 0.6)
+    multi || return RGBf(a + 0.15, a + 0.15, a + 0.15), [light(k, _KEY_DIRECTION)]
+    return RGBf(a, a, a),
+        [light(k, _KEY_DIRECTION), light(0.2, _FILL_DIRECTION), light(0.15, _RIM_DIRECTION)]
 end
 
 """Returns `true` if the active Makie backend supports several lights, i.e. `MultiLightShading`."""

@@ -1,5 +1,5 @@
 #=
-Material classes of the components, see `_MATERIALS`. The parts of MultiShape objects (e.g. the
+Material classes of the components, see `_materials`. The parts of MultiShape objects (e.g. the
 prisms and the coating of a `CubeBeamsplitter`) are rendered with the class of each part.
 =#
 

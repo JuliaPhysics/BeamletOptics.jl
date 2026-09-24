@@ -763,7 +763,7 @@ function _plot_collected!(ax::_RenderEnv, parts; edges::Bool = false)
         isnothing(interface) || isempty(interface.faces) || push!(interfaces, (interface, key[1]))
     end
     for (interface, kw) in interfaces
-        _plot_mesh!(ax, interface; kw..., _MATERIALS[:interface]...)
+        _plot_mesh!(ax, interface; kw..., _materials()[:interface]...)
     end
     edges && !isempty(keys) && _plot_edges!(ax, meshes; first(keys)[1]...)
     return nothing
