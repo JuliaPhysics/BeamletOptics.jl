@@ -184,13 +184,13 @@ function intersect3d(object::AbstractSDF, ray::AbstractRay)
     pos = position(ray)
     dir = direction(ray)
     d = sdf(object, pos)
+    h = Config.get_sdf_surface_threshold()
     # Test if outside of sdf, else inside
-    if d > Config.get_sdf_surface_threshold()
+    if d > h
         return _raymarch_outside(object, pos, dir)
     end
-    # Test if normal and ray dir oppose or align to determine if ray exits object
-    n = normal3d(object, pos)
-    if dot(dir, n) ≤ 0
+    # The one-sided difference along the ray is used to determine inside/outside instead of the normal
+    if sdf(object, pos + h * dir) ≤ d
         return _raymarch_inside(object, pos, dir)
     else
         return _raymarch_outside(object, pos, dir)
