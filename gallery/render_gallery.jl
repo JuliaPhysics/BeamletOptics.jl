@@ -341,7 +341,13 @@ function render_view(entry, view::Symbol, path::String)
         nf += pf
     end
     c, d = plots_bbox(new_plots)
-    set_view(ax, c .+ d .* VIEWS[view], c, [0, 0, 1])
+    # distance at which the bounding sphere (diameter d) fits into the field of view, the
+    # vertical one is the smaller for the landscape figure. The automatic centering on display
+    # would reset the distance to d, which cuts off compact objects like cubes.
+    cam = ax.scene.camera_controls
+    cam.settings[:center] = false
+    fov = cam.fov[]
+    set_view(ax, c .+ (d / 2) / sind(fov / 2) .* VIEWS[view], c, [0, 0, 1])
     save(path, fig)
     return (time = t, plots = length(new_plots), vertices = nv, faces = nf,
         fallback = uses_fallback(obj))

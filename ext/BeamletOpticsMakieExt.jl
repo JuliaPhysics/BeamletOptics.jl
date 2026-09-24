@@ -11,7 +11,9 @@ const BMO = BeamletOptics
 using Makie: Axis3, LScene, mesh!, surface!, lines!, RGBf, RGBAf, scatter!, text!,
              update_cam!, cameracontrols, arrows3d!
 using PrecompileTools: @setup_workload, @compile_workload
-using GeometryBasics: Point2, Point3, Point3f, Vec3f, GLTriangleFace, Mesh
+using GeometryBasics: Point2, Point3, Point3f, Point3d, Vec3f, Vec3d, GLTriangleFace, Mesh
+using StaticArrays: SMatrix
+using Base.ScopedValues: ScopedValue, with
 using AbstractTrees: PreOrderDFS
 using MarchingCubes: MC, march
 using LinearAlgebra: dot, cross, normalize, norm
@@ -53,6 +55,7 @@ include("RenderBeam.jl")
 include("RenderPolarization.jl")
 include("RenderGaussian.jl")
 include("RenderAstigmaticGaussian.jl")
+include("RenderTessellation.jl")
 include("RenderSDF.jl")
 include("RenderMesh.jl")
 include("RenderObjects.jl")

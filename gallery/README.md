@@ -27,7 +27,7 @@ Before rendering, the script compares the catalogue with the component construct
 - `output/index.md`: one table per category
 - `output/overview.png`: all isometric images in a grid (saved with CairoMakie, since GLMakie clips figures larger than the screen)
 
-Both views use the automatic framing of `save`, only the viewing direction is set by the script.
+Both views are framed by the script: the automatic recentering of the `LScene` camera is switched off and the eye is placed such that the bounding sphere of the object fits into the field of view.
 
 ## Columns of `index.md`
 

@@ -125,7 +125,7 @@ end
         cbs = CubeBeamsplitter(0.02, λ -> 1.5)
         h = live_render!(ax, cbs)
         n = length(h.plots)
-        @test n >= 3 # front, back, coating
+        @test n == 2 # merged front and back, coating
 
         translate3d!(cbs, [0.01, 0.02, -0.01])
         zrotate3d!(cbs, deg2rad(35))
@@ -183,7 +183,7 @@ end
         h = live_render!(ax, group)
         @test h isa Ext.ObjectRenderHandle
         n = length(h.plots)
-        @test n == 2
+        @test n == 1 # one merged mesh
 
         translate3d!(group, [0.02, 0, 0])
         zrotate3d!(group, deg2rad(10))
