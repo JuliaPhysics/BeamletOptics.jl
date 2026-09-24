@@ -188,11 +188,7 @@ function intersect3d(object::AbstractSDF, ray::AbstractRay)
     if d > Config.get_sdf_surface_threshold()
         return _raymarch_outside(object, pos, dir)
     end
-    # The ray starts on the surface: it enters the object if the SDF decreases along the ray.
-    # The one-sided difference along the ray is used instead of the normal, since at a kink of
-    # the SDF the gradient can belong to the other side. E.g. at the vertex of a concave lens face
-    # the plano and the concave part touch, and floating-point noise of the world coordinates
-    # decides which part the gradient comes from, see Issue#82 in test/TestBugFixes.jl.
+    # The one-sided difference along the ray is used to determine inside/outside instead of the normal
     h = Config.get_sdf_surface_threshold()
     if sdf(object, pos + h * dir) ≤ d
         return _raymarch_inside(object, pos, dir)

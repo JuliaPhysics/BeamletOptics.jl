@@ -283,11 +283,6 @@ end
 
 @testset "Issue#82" begin
     # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/82
-    # Issue: the on-axis ray leaves the concave face exactly at its vertex, where the plano and
-    # the concave part of the lens SDF touch. Away from the origin, floating-point noise of the
-    # world coordinates made the gradient at the exit point belong to the concave part, which
-    # points into the lens. `intersect3d` then took the ray as entering the lens again and
-    # returned a second, degenerate hit at t ≈ -1e-10 (≈ 0.5 % of random poses).
     rng = MersenneTwister(1)
     n = 1.458
     spurious = 0
