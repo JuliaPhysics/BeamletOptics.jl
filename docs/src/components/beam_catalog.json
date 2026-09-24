@@ -1,0 +1,107 @@
+[
+  {
+    "name": "Ray",
+    "category": "Rays",
+    "image": "catalog_Ray.png",
+    "href": "/reference#BeamletOptics.Ray",
+    "teaser": "Monochromatic geometrical ray with position and direction."
+  },
+  {
+    "name": "PolarizedRay",
+    "category": "Rays",
+    "image": "catalog_PolarizedRay.png",
+    "href": "/reference#BeamletOptics.PolarizedRay",
+    "teaser": "Ray that carries a complex electric field vector."
+  },
+  {
+    "name": "Beam",
+    "category": "Beams",
+    "image": "catalog_Beam.png",
+    "href": "/reference#BeamletOptics.Beam",
+    "teaser": "Tree of rays that stores a light path, including split beams."
+  },
+  {
+    "name": "GaussianBeamlet",
+    "category": "Beamlets",
+    "image": "catalog_GaussianBeamlet.png",
+    "href": "/reference#BeamletOptics.GaussianBeamlet",
+    "teaser": "Stigmatic Gaussian beam traced via chief, waist and divergence rays."
+  },
+  {
+    "name": "AstigmaticGaussianBeamlet",
+    "category": "Beamlets",
+    "image": "catalog_AstigmaticGaussianBeamlet.png",
+    "href": "/reference#BeamletOptics.AstigmaticGaussianBeamlet",
+    "teaser": "Polarized Gaussian beam with independent waists in two axes."
+  },
+  {
+    "name": "CollimatedSource",
+    "category": "Beam groups",
+    "image": "catalog_CollimatedSource.png",
+    "href": "/reference#BeamletOptics.CollimatedSource",
+    "teaser": "Parallel beams on concentric rings, i.e. a plane wavefront."
+  },
+  {
+    "name": "UniformDiscSource",
+    "category": "Beam groups",
+    "image": "catalog_UniformDiscSource.png",
+    "href": "/reference#BeamletOptics.UniformDiscSource-Union{Tuple{L},%20Tuple{D2},%20Tuple{D1},%20Tuple{P},%20Tuple{AbstractArray{P},%20AbstractArray{D1},%20D2},%20Tuple{AbstractArray{P},%20AbstractArray{D1},%20D2,%20L}}%20where%20{P<:Real,%20D1<:Real,%20D2<:Real,%20L<:Real}",
+    "teaser": "Collimated source with equal-area Fibonacci sampling."
+  },
+  {
+    "name": "PointSource",
+    "category": "Beam groups",
+    "image": "catalog_PointSource.png",
+    "href": "/reference#BeamletOptics.PointSource",
+    "teaser": "Cone of beams from a single point, i.e. a spherical wavefront."
+  },
+  {
+    "name": "UniformPointSource",
+    "category": "Beam groups",
+    "image": "catalog_UniformPointSource.png",
+    "href": "/reference#BeamletOptics.UniformPointSource-Union{Tuple{L},%20Tuple{H},%20Tuple{D},%20Tuple{P},%20Tuple{AbstractArray{P},%20AbstractArray{D},%20H},%20Tuple{AbstractArray{P},%20AbstractArray{D},%20H,%20L}}%20where%20{P<:Real,%20D<:Real,%20H<:Real,%20L<:Real}",
+    "teaser": "Point source with an equal solid angle per ray."
+  },
+  {
+    "name": "AstigmaticBeamGroup",
+    "category": "Beam groups",
+    "image": "catalog_AstigmaticBeamGroup.png",
+    "href": "/reference#BeamletOptics.AstigmaticBeamGroup",
+    "teaser": "Container for a coherent group of astigmatic Gaussian beamlets."
+  },
+  {
+    "name": "CollimatedGaussianBeamletSource",
+    "category": "Beam groups",
+    "image": "catalog_CollimatedGaussianBeamletSource.png",
+    "href": "/reference#BeamletOptics.CollimatedGaussianBeamletSource-Union{Tuple{W},%20Tuple{L},%20Tuple{D2},%20Tuple{D1},%20Tuple{P},%20Tuple{AbstractArray{P},%20AbstractArray{D1},%20D2,%20L,%20W}}%20where%20{P<:Real,%20D1<:Real,%20D2<:Real,%20L<:Real,%20W<:Real}",
+    "teaser": "Square grid of beamlets forming a flat-top plane wave."
+  },
+  {
+    "name": "GaussianBeamletDecomposition",
+    "category": "Beam groups",
+    "image": "catalog_GaussianBeamletDecomposition.png",
+    "href": "/reference#BeamletOptics.GaussianBeamletDecomposition-Union{Tuple{L},%20Tuple{W},%20Tuple{D1},%20Tuple{P},%20Tuple{AbstractArray{P},%20AbstractArray{D1},%20L,%20W}}%20where%20{P<:Real,%20D1<:Real,%20W<:Real,%20L<:Real}",
+    "teaser": "Large Gaussian beam decomposed into a grid of beamlets."
+  },
+  {
+    "name": "SphericalGaussianBeamletSource",
+    "category": "Beam groups",
+    "image": "catalog_SphericalGaussianBeamletSource.png",
+    "href": "/reference#BeamletOptics.SphericalGaussianBeamletSource-Union{Tuple{L},%20Tuple{H},%20Tuple{D},%20Tuple{P},%20Tuple{AbstractArray{P},%20AbstractArray{D},%20H,%20L}}%20where%20{P<:Real,%20D<:Real,%20H<:Real,%20L<:Real}",
+    "teaser": "Spherical wave decomposed into a cone of beamlets."
+  },
+  {
+    "name": "EllipticalGaussianBeamletSource",
+    "category": "Beam groups",
+    "image": "catalog_EllipticalGaussianBeamletSource.png",
+    "href": "/reference#BeamletOptics.EllipticalGaussianBeamletSource-Union{Tuple{L},%20Tuple{H2},%20Tuple{H1},%20Tuple{D},%20Tuple{P},%20Tuple{AbstractArray{P},%20AbstractArray{D},%20H1,%20H2,%20L}}%20where%20{P<:Real,%20D<:Real,%20H1<:Real,%20H2<:Real,%20L<:Real}",
+    "teaser": "Beamlets on an elliptical cap, e.g. for laser diodes."
+  },
+  {
+    "name": "WavefrontBeamletDecomposition",
+    "category": "Beam groups",
+    "image": "catalog_WavefrontBeamletDecomposition.png",
+    "href": "/reference#BeamletOptics.WavefrontBeamletDecomposition-Union{Tuple{L},%20Tuple{D},%20Tuple{Ph},%20Tuple{A},%20Tuple{P2},%20Tuple{P1},%20Tuple{AbstractVector{P1},%20AbstractVector{P2},%20AbstractMatrix{A},%20AbstractMatrix{Ph},%20AbstractArray{D},%20L}}%20where%20{P1<:Real,%20P2<:Real,%20A<:Real,%20Ph<:Real,%20D<:Real,%20L<:Real}",
+    "teaser": "Measured or custom complex field decomposed into beamlets."
+  }
+]

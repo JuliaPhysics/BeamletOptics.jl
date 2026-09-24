@@ -1,16 +1,34 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { withBase } from 'vitepress'
-import entries from './catalog.json'
+import componentEntries from './catalog.json'
+import beamEntries from './beam_catalog.json'
 
-// Eagerly import every rendered component PNG so a plain filename in catalog.json can be
-// resolved to the URL Vite actually serves it at. Entries whose image is missing (e.g. a
-// typo, or a render that has not been produced yet) fall back to no image instead of
-// breaking the build.
-const imgs = import.meta.glob('../basics/components/*.png', { eager: true, import: 'default' })
+// `catalog` selects the entries and the page folder the tile images are rendered into
+// (`catalog_showcase.jl` and `beam_catalog_showcase.jl`).
+const props = defineProps({
+  catalog: { type: String, default: 'components' },
+})
+
+const catalogs = {
+  components: { entries: componentEntries, folder: '/basics/components/' },
+  beams: { entries: beamEntries, folder: '/basics/beams/' },
+}
+
+const entries = catalogs[props.catalog].entries
+
+// Eagerly import every rendered tile PNG so a plain filename in the JSON can be resolved to
+// the URL Vite actually serves it at. Entries whose image is missing (e.g. a typo, or a
+// placeholder build that skips rendering) fall back to no image instead of breaking the
+// build.
+const imgs = import.meta.glob(['../basics/components/catalog_*.png', '../basics/beams/catalog_*.png'], {
+  eager: true,
+  import: 'default',
+})
 
 function imageSrc(name) {
-  const match = Object.entries(imgs).find(([path]) => path.endsWith('/' + name))
+  const suffix = catalogs[props.catalog].folder + name
+  const match = Object.entries(imgs).find(([path]) => path.endsWith(suffix))
   return match ? match[1] : null
 }
 

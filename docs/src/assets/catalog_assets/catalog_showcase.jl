@@ -1,145 +1,141 @@
-using GLMakie, BeamletOptics
+#=
+Tiles of the component catalog on `docs/src/basics/components/components.md`, one per entry of
+`docs/src/components/catalog.json`. Wrapped in a module since all showcase scripts are included
+into the same namespace.
+=#
+module ComponentCatalogTiles
 
-GLMakie.activate!(; ssao=true)
+include(joinpath(@__DIR__, "catalog_render.jl"))
 
-const BMO = BeamletOptics
+const mm = 1e-3
+const inch = BMO.inch
 
-# Shared refractive index used for the dielectric parts below; the exact value does not
-# matter for a catalog thumbnail.
-n_generic = λ -> 1.5
+# refractive indices, the exact values do not matter for a catalog tile
+const n_crown = λ -> 1.5168
+const n_flint = λ -> 1.7
 
-# Catalog tiles share one camera/figure style so that they read as a set (see
-# `docs/src/basics/components/components.md`): Figure(size=(400, 300)), an Axis3 with
-# aspect=:data and decorations/spines hidden, at the same azimuth/elevation. The
-# `TripletLens` tile below is the one exception: a thick lens in this 3/4 view shows only
-# its aperture and rim, so it is viewed side-on with traced rays instead.
-
-## Flat-mirror family: SquarePlanoMirror2D, SquarePlanoMirror, RectangularPlanoMirror
-## (the generic `Mirror` type reuses this render too, see catalog.json).
-sq2d = SquarePlanoMirror2D(15e-3)
-translate3d!(sq2d, [-25e-3, 0, 0])
-
-sq = SquarePlanoMirror(15e-3, 4e-3)
-
-rect = RectangularPlanoMirror(20e-3, 12e-3, 4e-3)
-translate3d!(rect, [25e-3, 0, 0])
-
-flat_mirror_fig = Figure(size=(400, 300))
-flat_mirror_ax = Axis3(flat_mirror_fig[1, 1], aspect=:data, azimuth=0.3π, elevation=0.25π)
-hidedecorations!(flat_mirror_ax)
-hidespines!(flat_mirror_ax)
-render!(flat_mirror_ax, sq2d)
-render!(flat_mirror_ax, sq)
-render!(flat_mirror_ax, rect)
-autolimits!(flat_mirror_ax)
-save("flat_mirror_family_showcase.png", flat_mirror_fig; px_per_unit=4, update=false)
-
-## RightAnglePrismMirror
-rapm = RightAnglePrismMirror(15e-3, 20e-3)
-
-rapm_fig = Figure(size=(400, 300))
-rapm_ax = Axis3(rapm_fig[1, 1], aspect=:data, azimuth=0.3π, elevation=0.25π)
-hidedecorations!(rapm_ax)
-hidespines!(rapm_ax)
-render!(rapm_ax, rapm)
-autolimits!(rapm_ax)
-save("right_angle_prism_mirror_showcase.png", rapm_fig; px_per_unit=4, update=false)
-
-## Retroreflector
-rr = Retroreflector(15e-3)
-
-rr_fig = Figure(size=(400, 300))
-rr_ax = Axis3(rr_fig[1, 1], aspect=:data, azimuth=0.3π, elevation=0.25π)
-hidedecorations!(rr_ax)
-hidespines!(rr_ax)
-render!(rr_ax, rr)
-autolimits!(rr_ax)
-save("retroreflector_showcase.png", rr_fig; px_per_unit=4, update=false)
-
-## Prism / RightAnglePrism (the generic `Prism` type is built the same way)
-prism = RightAnglePrism(15e-3, 20e-3, n_generic)
-
-prism_fig = Figure(size=(400, 300))
-prism_ax = Axis3(prism_fig[1, 1], aspect=:data, azimuth=0.3π, elevation=0.25π)
-hidedecorations!(prism_ax)
-hidespines!(prism_ax)
-render!(prism_ax, prism)
-autolimits!(prism_ax)
-save("prism_showcase.png", prism_fig; px_per_unit=4, update=false)
-
-## ThinBeamsplitter / RoundThinBeamsplitter
-tbs = RoundThinBeamsplitter(20e-3)
-
-tbs_fig = Figure(size=(400, 300))
-tbs_ax = Axis3(tbs_fig[1, 1], aspect=:data, azimuth=0.3π, elevation=0.25π)
-hidedecorations!(tbs_ax)
-hidespines!(tbs_ax)
-render!(tbs_ax, tbs)
-# `RoundThinBeamsplitter` is a zero-thickness disc: the y-extent of its mesh is exactly
-# zero, so `autolimits!` falls back to a large default span along that axis. Pad the
-# limits manually instead so the disc reads at the same scale as the other tiles.
-limits!(tbs_ax, -0.011, 0.011, -0.011, 0.011, -0.011, 0.011)
-save("thin_beamsplitter_showcase.png", tbs_fig; px_per_unit=4, update=false)
-
-## RectangularCompensatorPlate
-cmp = RectangularCompensatorPlate(20e-3, 15e-3, 4e-3, n_generic)
-
-cmp_fig = Figure(size=(400, 300))
-cmp_ax = Axis3(cmp_fig[1, 1], aspect=:data, azimuth=0.3π, elevation=0.25π)
-hidedecorations!(cmp_ax)
-hidespines!(cmp_ax)
-render!(cmp_ax, cmp)
-autolimits!(cmp_ax)
-save("compensator_plate_showcase.png", cmp_fig; px_per_unit=4, update=false)
-
-## Polarizer family: PolarizationFilter, RoundPolarizationFilter, LinearPolarizer
-## (`RoundLinearPolarizer` builds the last one, see catalog.json).
-# +x renders toward the upper right, so the square filter goes to +x and the laminated
-# polarizer to -x, giving a square -> round -> laminated reading order left to right.
-pf = PolarizationFilter(15e-3)
-translate3d!(pf, [20e-3, 0, 0])
-
-rpf = RoundPolarizationFilter(15e-3)
-
-lp = RoundLinearPolarizer(15e-3, 2e-3, 2e-3, n_generic)
-translate3d!(lp, [-20e-3, 0, 0])
-
-pol_fig = Figure(size=(400, 300))
-pol_ax = Axis3(pol_fig[1, 1], aspect=:data, azimuth=0.3π, elevation=0.25π)
-hidedecorations!(pol_ax)
-hidespines!(pol_ax)
-render!(pol_ax, pf)
-render!(pol_ax, rpf)
-render!(pol_ax, lp)
-# Unlike the single-filter tile this replaces, `autolimits!` is fine here: the laminated
-# polarizer gives the group a non-zero y-extent.
-autolimits!(pol_ax)
-save("polarizer_family_showcase.png", pol_fig; px_per_unit=4, update=false)
-
-## TripletLens / SphericalTripletLens
-# Unlike the tiles above, this one is viewed side-on with rays: a thick lens seen in the
-# shared 3/4 camera shows only its aperture and rim and reads as a featureless puck. This
-# also matches the other Lenses tiles, which come from `lens_assets/`.
-# Crown-flint-crown cemented triplet. The outer elements are biconvex, so their radii and
-# thicknesses must satisfy sag(r1) + sag(r2) < l, otherwise the `Lens` constructor
-# rejects them with "cylinder section length of ≤ 0".
-n_flint = λ -> 1.65
-triplet = SphericalTripletLens(30e-3, -25e-3, 25e-3, -30e-3, 8e-3, 3e-3, 8e-3,
-                               25.4e-3, n_generic, n_flint, n_generic)
-
-triplet_fig = Figure(size=(400, 300))
-triplet_ax = Axis3(triplet_fig[1, 1], aspect=:data, azimuth=0.04π, elevation=0.07π)
-hidedecorations!(triplet_ax)
-hidespines!(triplet_ax)
-render!(triplet_ax, triplet.front; alpha=0.35)
-render!(triplet_ax, triplet.middle; alpha=0.35)
-render!(triplet_ax, triplet.back; alpha=0.35)
-
-triplet_system = System([triplet])
-for z in LinRange(-0.010, 0.010, 9)
-    local beam = Beam([0, -0.018, z], [0.0, 1.0, 0.0], 532e-9)
-    solve_system!(triplet_system, beam)
-    render!(triplet_ax, beam; flen=0.022, show_pos=false)
+"Two cemented spherical lenses (AC254-100-like), assembled via the `DoubletLens` type directly."
+function manual_doublet()
+    front = SphericalLens(62.8mm, -45.7mm, 4mm, inch, n_crown)
+    back = SphericalLens(-45.7mm, -128.2mm, 2.5mm, inch, n_flint)
+    translate3d!(back, [0, thickness(BMO.shape(front)), 0])
+    return DoubletLens(front, back)
 end
-autolimits!(triplet_ax)
-save("triplet_lens_showcase.png", triplet_fig; px_per_unit=4, update=false)
+
+"Three cemented lenses built from surfaces, assembled via the `TripletLens` type directly."
+function manual_triplet()
+    front = Lens(SphericalSurface(60mm, inch), SphericalSurface(25mm, inch), 3mm, n_flint)
+    middle = Lens(SphericalSurface(25mm, inch), SphericalSurface(-25mm, inch), 8mm, n_crown)
+    back = Lens(SphericalSurface(-25mm, inch), SphericalSurface(-60mm, inch), 3mm, n_flint)
+    translate3d!(middle, [0, thickness(BMO.shape(front)), 0])
+    translate3d!(back, [0, thickness(BMO.shape(front)) + thickness(BMO.shape(middle)), 0])
+    return TripletLens(front, middle, back)
+end
+
+"Tile that renders the object returned by `build`."
+object_tile(build; kwargs...) = ax -> render!(ax, build(); kwargs...)
+
+"Rotates `obj` by 180° about `z`, so that the tile shows the reflective face of off-axis mirrors
+and the facets of the retroreflector."
+flipped(obj) = (zrotate3d!(obj, π); obj)
+
+const TILES = [
+    # mirrors
+    "Mirror" => object_tile(() -> Mirror(BMO.CylinderSDF(inch / 2, 6mm))),
+    "SquarePlanoMirror2D" => object_tile(() -> SquarePlanoMirror2D(inch)),
+    "SquarePlanoMirror" => object_tile(() -> SquarePlanoMirror(inch, 6mm)),
+    "RectangularPlanoMirror" => object_tile(() -> RectangularPlanoMirror(50mm, 25mm, 6mm)),
+    "RoundPlanoMirror" => object_tile(() -> RoundPlanoMirror(inch, 6mm)),
+    "SphericalMirror" => object_tile(() -> SphericalMirror(200mm, 6mm, inch)),
+    "RightAnglePrismMirror" => object_tile(() -> RightAnglePrismMirror(inch, inch)),
+    "ConicMirror" => object_tile(() -> ConicMirror(200mm, -0.5, 50mm; thickness = 6mm)),
+    "OffAxisConicMirror" => object_tile(() -> flipped(OffAxisConicMirror(200mm, -0.5, 40mm, inch))),
+    "ParabolicMirror" => object_tile(() -> ParabolicMirror(200mm, 100mm; hole_diameter = 10mm, thickness = 5mm)),
+    "OffAxisParabolicMirror" => object_tile(() -> flipped(OffAxisParabolicMirror(2inch, inch))),
+    "EllipsoidalMirror" => object_tile(() -> EllipsoidalMirror(40mm, 160mm, 100mm; thickness = 5mm)),
+    "OffAxisEllipsoidalMirror" => object_tile(() -> flipped(OffAxisEllipsoidalMirror(100mm, 300mm, 30mm, inch))),
+    "HyperbolicMirror" => object_tile(() -> HyperbolicMirror(-50mm, 200mm, 30mm; thickness = 5mm)),
+    "OffAxisHyperbolicMirror" => object_tile(() -> flipped(OffAxisHyperbolicMirror(-50mm, 200mm, 20mm, inch))),
+    "Retroreflector" => object_tile(() -> flipped(Retroreflector(inch))),
+    # lenses
+    "Lens" => object_tile(() -> Lens(SphericalSurface(25.8mm, inch), CircularFlatSurface(inch), 5.3mm, n_crown)),
+    "SphericalLens" => object_tile(() -> SphericalLens(34.9mm, -34.9mm, 6.8mm, inch, n_crown)),
+    "ThinLens" => object_tile(() -> ThinLens(34.9mm, -34.9mm, inch, 1.5)),
+    "DoubletLens" => object_tile(manual_doublet),
+    "SphericalDoubletLens" => object_tile(() -> SphericalDoubletLens(87.9mm, -105.6mm, -1000, 6mm, 3mm, inch, n_crown, n_flint)),
+    "TripletLens" => object_tile(manual_triplet),
+    "SphericalTripletLens" => object_tile(() -> SphericalTripletLens(60mm, 25mm, -25mm, -60mm, 3mm, 8mm, 3mm, inch,
+        n_flint, n_crown, n_flint)),
+    # prisms
+    "Prism" => object_tile(() -> Prism(BMO.BoxSDF(20mm, 20mm, 20mm), n_crown)),
+    "RightAnglePrism" => object_tile(() -> RightAnglePrism(inch, inch, n_crown)),
+    # beamsplitters
+    "ThinBeamsplitter" => object_tile(() -> ThinBeamsplitter(inch)),
+    "RoundThinBeamsplitter" => object_tile(() -> RoundThinBeamsplitter(inch)),
+    "RectangularPlateBeamsplitter" => object_tile(() -> RectangularPlateBeamsplitter(36mm, 25mm, 5mm, n_crown)),
+    "RoundPlateBeamsplitter" => object_tile(() -> RoundPlateBeamsplitter(inch, 3mm, n_crown)),
+    "CubeBeamsplitter" => object_tile(() -> CubeBeamsplitter(inch, n_crown)),
+    "RectangularCompensatorPlate" => object_tile(() -> RectangularCompensatorPlate(36mm, 25mm, 5mm, n_crown)),
+    # detectors
+    "Detector" => object_tile(() -> Detector(inch)),
+    # polarizers
+    "PolarizationFilter" => object_tile(() -> PolarizationFilter(inch)),
+    "RoundPolarizationFilter" => object_tile(() -> RoundPolarizationFilter(inch)),
+    "LinearPolarizer" => object_tile(() -> RoundLinearPolarizer(inch, 1mm, 1mm, n_crown)),
+    "RoundLinearPolarizer" => object_tile(() -> RoundLinearPolarizer(inch, 1mm, 1mm, n_crown)),
+    # dummies
+    "MeshDummy" => object_tile(() -> MeshDummy(joinpath(@__DIR__, "..", "detector_assets", "FDS010.stl"))),
+    "NonInteractableObject" => object_tile(() -> NonInteractableObject(BMO.CylinderSDF(6mm, 50mm))),
+    "IntersectableObject" => object_tile(() -> IntersectableObject(BMO.BoxSDF(20mm, 10mm, 20mm))),
+]
+
+#=
+Coverage check: every exported component constructor must have a catalog entry
+=#
+
+const COVERAGE_SECTIONS = ("mirrors", "lenses", "prisms", "detectors", "splitters",
+    "polarizing components", "dummies")
+
+"Returns true if `name` is an exported component constructor (type or constructor function)."
+function is_component_constructor(name::Symbol)
+    isdefined(BMO, name) || return false
+    isuppercase(first(string(name))) || return false
+    f = getfield(BMO, name)
+    f isa Type && return f <: BMO.AbstractObject
+    return f isa Function
+end
+
+"Exported component constructors of the relevant sections of `src/Exports.jl`."
+function exported_components()
+    names = String[]
+    section = ""
+    for line in eachline(joinpath(pkgdir(BeamletOptics), "src", "Exports.jl"))
+        stripped = strip(line)
+        m = match(r"^#\s*(.*)$", stripped)
+        if !isnothing(m)
+            section = strip(m.captures[1])
+            continue
+        end
+        isempty(stripped) && continue
+        for id in eachmatch(r"[A-Za-z_][A-Za-z0-9_!]*", replace(stripped, r"^export\s+" => ""))
+            name = Symbol(id.match)
+            if section in COVERAGE_SECTIONS || (section == "misc" && name == :Retroreflector)
+                is_component_constructor(name) && push!(names, id.match)
+            end
+        end
+    end
+    return unique(names)
+end
+
+const CATALOG_JSON = joinpath(@__DIR__, "..", "..", "components", "catalog.json")
+
+let names = first.(TILES)
+    check_tiles(CATALOG_JSON, names)
+    not_listed = setdiff(exported_components(), catalog_names(CATALOG_JSON))
+    isempty(not_listed) || @warn "Exported components missing from catalog.json" not_listed
+    for (name, draw!) in TILES
+        save_tile(name, draw!)
+    end
+end
+
+end # module
