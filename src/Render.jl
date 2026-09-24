@@ -217,3 +217,36 @@ extension for details.
 If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
 """
 live_view(::Any...; kwargs...) = throw(MissingBackendError())
+
+"""
+    view_cube!(ls::LScene; size = 110, corner = :top_right, duration = 0.3)
+
+Adds a CAD-style view cube to a corner of the 3D view `ls`. The cube rotates with the camera, and a
+left click on a face, an edge or a corner of the cube moves the camera to the corresponding
+standard view, keeping the `lookat` point and the distance of the camera. Returns a `ViewCube`,
+which can be removed via `close`. The view cube is shown by default in [`live_view`](@ref).
+
+The camera looks at the clicked side of the system, i.e. it is placed on the side of the clicked
+face:
+
+| face     | camera at | up   |
+|:---------|:----------|:-----|
+| `Top`    | `+z`      | `+y` |
+| `Bottom` | `-z`      | `+y` |
+| `Front`  | `-y`      | `+z` |
+| `Back`   | `+y`      | `+z` |
+| `Right`  | `+x`      | `+z` |
+| `Left`   | `-x`      | `+z` |
+
+Edges and corners give the diagonal views between the adjacent faces, with `+z` as the up
+direction. The region under the cursor is highlighted.
+
+# Keyword args
+
+- `size = 110`: [px] edge length of the square viewport of the cube
+- `corner = :top_right`: one of `:top_right`, `:top_left`, `:bottom_right` and `:bottom_left`
+- `duration = 0.3`: [s] duration of the animated transition, `0` switches the view instantly
+
+If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
+"""
+view_cube!(::Any; kwargs...) = throw(MissingBackendError())

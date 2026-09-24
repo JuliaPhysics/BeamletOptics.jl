@@ -30,13 +30,16 @@ Base.show(io::IO, p::DetectorPanel) = print(io, "DetectorPanel(", p.name, ", mod
     LiveView
 
 Interactive window returned by [`live_view`](@ref). The `Figure` is stored in `fig`, the `LScene`
-of the 3D view in `ax` and the `KinematicController` in `controls`. Use `display` to show the
-window and `close` to remove the controls.
+of the 3D view in `ax`, the `KinematicController` in `controls` and the view cube in `view_cube`
+(or `nothing`). Use `display` to show the window and `close` to remove the controls and the view
+cube.
 
 The systems are solved after each change if `auto_trace[]` is `true`, otherwise only via the
 `trace_button`, the key `t` or by switching the `auto_trace_toggle` on. `stale` is `true` if the
 beams and detector panels do not match the current poses of the objects. If solving takes longer
 than `trace_budget` [s], the systems are solved once the movement pauses for `idle_delay` [s].
+The clip planes of the 3D view are stored in `clip_planes`, which are applied if `clipping` is
+`true`.
 """
 mutable struct LiveView
     fig::Figure
@@ -70,6 +73,17 @@ mutable struct LiveView
     coarse::Bool
     labels::IdDict{Any, String}
     step_box::Textbox
+    # clip planes, switched on and off via `clipping`
+    clip_planes::Vector{LiveClipPlane}
+    clipping::Bool
+    # edge length of the outline of new clip planes, fixed at construction, since the bounding
+    # boxes of clipped plots only cover their visible part
+    clip_size::Float64
+    # the beams are clipped as well, switched via the toggle
+    clip_beams::Bool
+    clip_beams_toggle::Toggle
+    # view cube in the corner of the 3D view, see `view_cube!`
+    view_cube::Union{Nothing, ViewCube}
 end
 
 Base.display(gui::LiveView) = display(gui.fig)
@@ -78,7 +92,11 @@ function Base.show(io::IO, gui::LiveView)
     print(io, "LiveView(", length(gui.pairs), " systems, ", length(gui.panels), " detector panels)")
 end
 
-Base.close(gui::LiveView) = close(gui.controls)
+function Base.close(gui::LiveView)
+    close(gui.controls)
+    isnothing(gui.view_cube) || close(gui.view_cube)
+    return nothing
+end
 
 """Logs the error `e` of the `source` once per distinct message, returns the new last message."""
 function _log_once(e, last_error, source::String)
@@ -390,6 +408,8 @@ end
 """Solves all systems of the `gui` on request, with the currently selected object."""
 function _trace!(gui::LiveView)
     obj = gui.controls.selected[]
+    # A clip plane is not part of the systems
+    obj isa LiveClipPlane && (obj = nothing)
     _solve!(gui, obj) && isnothing(obj) && (gui.status.text[] = "traced")
     return nothing
 end
@@ -497,6 +517,191 @@ function _slider_spec(s::Pair)
 end
 _slider_spec(s) = throw(ArgumentError("invalid slider $s, use \"label\" => (range, callback[, startvalue])"))
 
+# Makie ignores all clip planes of a plot beyond the 8th
+const _MAX_CLIP_PLANES = 8
+
+const _CLIP_HELP = "p: add clip plane, del: remove, c: clipping on/off, shift+c: flip"
+
+"""Validates the `clip_planes` kwarg of `live_view` and returns a vector of `point => normal`."""
+function _clip_plane_specs(clip_planes)
+    specs = collect(clip_planes)
+    length(specs) > _MAX_CLIP_PLANES &&
+        throw(ArgumentError("at most $_MAX_CLIP_PLANES clip planes are supported by Makie"))
+    for s in specs
+        s isa Pair || throw(ArgumentError("invalid clip plane $s, use point => normal"))
+        norm(s.second) < 1e-12 && throw(ArgumentError("the normal of a clip plane must not be zero, got $(s.second)"))
+    end
+    return specs
+end
+
+"""
+    _apply_clip_planes!(gui::LiveView)
+
+Applies the clip planes of the `gui` (none if `clipping` is off) to the scene and to all its plots
+that did not set `clip_planes` explicitly, i.e. except the markers and the controls. The beams are
+clipped only if `clip_beams` is set, which can be switched at runtime. Nothing is written as long
+as there are no planes to apply or reset.
+"""
+function _apply_clip_planes!(gui::LiveView)
+    scene = gui.ax.scene
+    planes = gui.clipping ? Plane3f[_plane3f(p) for p in gui.clip_planes] : Plane3f[]
+    # Plots added later inherit the planes of the scene when they are created
+    isempty(planes) && isempty(scene.theme.clip_planes[]) && return nothing
+    scene.theme.clip_planes[] = planes
+    beam_plots = Base.IdSet{Any}(p for h in gui.beam_handles for p in _beam_plots(h))
+    for plot in scene.plots
+        (haskey(plot.kw, :clip_planes) || plot in beam_plots) && continue
+        # Nested plots inherit the planes of their parent
+        plot.clip_planes[] == planes || (plot.clip_planes = planes)
+    end
+    # The beams are created with explicit `clip_planes`, hence they are set here in both cases
+    beam_planes = gui.clip_beams ? planes : Plane3f[]
+    for plot in beam_plots
+        plot.clip_planes[] == beam_planes || (plot.clip_planes = beam_planes)
+    end
+    return nothing
+end
+
+"""Switches the clipping of the beams of the `gui` on or off, see `clip_beams`."""
+function _set_clip_beams!(gui::LiveView, on::Bool)
+    gui.clip_beams = on
+    gui.clip_beams_toggle.active[] == on || (gui.clip_beams_toggle.active[] = on)
+    _apply_clip_planes!(gui)
+    return nothing
+end
+
+"""Re-applies the clip planes after the clip `plane` has been moved, without solving the systems."""
+function _on_clip_change!(gui::LiveView, plane::LiveClipPlane)
+    _apply_clip_planes!(gui)
+    gui.status.text[] = _pose_string(gui, plane)
+    return nothing
+end
+
+"""
+    _add_clip_plane!(gui, point, normal; select = true)
+
+Adds a clip plane through `point` with the `normal` to the `gui`: renders its marker, registers
+it as a movable object of the controls and applies the planes. Selects the plane if `select`.
+"""
+function _add_clip_plane!(gui::LiveView, point, normal; select::Bool = true)
+    ctrl = gui.controls
+    plane = LiveClipPlane(point, normal, gui.clip_size)
+    push!(ctrl.h.handles, _live_render_clip_plane!(gui.ax, plane))
+    push!(ctrl.movable, plane)
+    ctrl.init_poses[plane] = _pose(plane)
+    push!(gui.clip_planes, plane)
+    haskey(gui.labels, plane) || (gui.labels[plane] = "Clip plane")
+    _apply_clip_planes!(gui)
+    if select
+        ctrl.selected[] = plane
+        _update_selection_box!(ctrl)
+        gui.status.text[] = _pose_string(gui, plane)
+    end
+    return plane
+end
+
+"""
+    _remove_clip_plane!(gui, plane)
+
+Removes the clip `plane` from the `gui`: deletes its marker, forgets it in the controls, including
+its entries of the undo history, deselects it and applies the remaining planes.
+"""
+function _remove_clip_plane!(gui::LiveView, plane::LiveClipPlane)
+    ctrl = gui.controls
+    i = findfirst(oh -> oh.obj === plane, ctrl.h.handles)
+    if !isnothing(i)
+        remove_render!(ctrl.h.handles[i])
+        deleteat!(ctrl.h.handles, i)
+    end
+    filter!(o -> o !== plane, ctrl.movable)
+    delete!(ctrl.init_poses, plane)
+    delete!(ctrl.constraints, plane)
+    filter!(e -> e.obj !== plane, ctrl.undo_stack)
+    filter!(e -> e.obj !== plane, ctrl.redo_stack)
+    !isnothing(ctrl.last_key_step) && ctrl.last_key_step.obj === plane && (ctrl.last_key_step = nothing)
+    if ctrl.selected[] === plane
+        ctrl.dragging = false
+        ctrl.drag_start = nothing
+        ctrl.press_kind = :none
+        ctrl.press_leaf = nothing
+        ctrl.selected[] = nothing
+        _update_selection_box!(ctrl)
+    end
+    filter!(p -> p !== plane, gui.clip_planes)
+    delete!(gui.labels, plane)
+    _apply_clip_planes!(gui)
+    gui.status.text[] = "clip plane removed"
+    return nothing
+end
+
+"""Rotates the clip `plane` by π about its local x-axis, such that the other side is visible."""
+function _flip_clip_plane!(gui::LiveView, plane::LiveClipPlane)
+    ctrl = gui.controls
+    P0, R0 = _pose(plane)
+    rotate3d!(plane, plane.dir[:, 1], π)
+    P1, R1 = _pose(plane)
+    ctrl.last_key_step = nothing
+    _push_history!(ctrl, plane, P0, R0, P1, R1)
+    update_render!(ctrl.h)
+    _update_selection_box!(ctrl)
+    _on_clip_change!(gui, plane)
+    return nothing
+end
+
+"""
+    _clip_key!(gui::LiveView, key)
+
+Handles the clip plane keys of the `gui`: `p` adds a plane through the selected object (or the
+camera `lookat`) along the view direction, `Delete` removes the selected plane, `c` switches
+clipping on and off and `Shift+c` flips the selected plane. Returns whether the key was handled.
+"""
+function _clip_key!(gui::LiveView, key)
+    ctrl = gui.controls
+    scene = gui.ax.scene
+    sel = ctrl.selected[]
+    if key == Keyboard.c
+        if _shift_pressed(scene)
+            sel isa LiveClipPlane || return false
+            _flip_clip_plane!(gui, sel)
+            return true
+        end
+        isempty(gui.clip_planes) && return false
+        gui.clipping = !gui.clipping
+        _apply_clip_planes!(gui)
+        gui.status.text[] = gui.clipping ? "clipping on" : "clipping off"
+        return true
+    elseif key == Keyboard.p
+        # Nothing can be selected in the spectator mode
+        ctrl.spectator[] && return false
+        if length(gui.clip_planes) >= _MAX_CLIP_PLANES
+            gui.status.text[] = "at most $_MAX_CLIP_PLANES clip planes"
+            return true
+        end
+        cam = cameracontrols(scene)
+        lookat, eye = Vector{Float64}(cam.lookat[]), Vector{Float64}(cam.eyeposition[])
+        point = isnothing(sel) ? lookat : Vector{Float64}(position(sel))
+        _add_clip_plane!(gui, point, lookat - eye)
+        return true
+    elseif key == Keyboard.delete
+        sel isa LiveClipPlane || return false
+        _remove_clip_plane!(gui, sel)
+        return true
+    end
+    return false
+end
+
+"""Connects the clip plane keys of the `gui`, see `_clip_key!`."""
+function _connect_clip_planes!(gui::LiveView)
+    push!(gui.controls.listeners, on(events(gui.ax.scene).keyboardbutton, priority = 200) do event
+        event.action == Keyboard.press || return Consume(false)
+        gui.controls.ignore_keys() && return Consume(false)
+        return Consume(_clip_key!(gui, event.key))
+    end)
+    gui.controls.help_extra = _CLIP_HELP
+    _update_help!(gui.controls)
+    return nothing
+end
+
 """
     live_view(system => beam, ...; kwargs...)
     live_view(system, beam; kwargs...)
@@ -536,6 +741,25 @@ the intensity (`:intensity`) for Gaussian beamlet hits and the spot diagram (`:s
 together with the optical power or the number of hits in its title. The intensity is cropped
 automatically around the beam, unless `x_min`, `x_max`, `z_min` and `z_max` are given.
 
+# Clip planes
+
+Clip planes cut the 3D view open, e.g. to look into a housing. Only the side of a plane its normal
+points to stays visible. The key `p` adds a plane through the selected object, or through the
+`lookat` point of the camera if nothing is selected, with its normal along the view direction.
+A plane is selected via the purple handle at its center and moved and rotated like a component,
+its normal is the green axis. Moving a plane does not solve the systems. The keys apply as follows:
+
+| key       | action                                   |
+|:----------|:-----------------------------------------|
+| `p`       | add a clip plane and select it           |
+| `Delete`  | remove the selected clip plane           |
+| `c`       | switch clipping on or off (all planes)   |
+| `Shift+c` | flip the selected clip plane             |
+
+Makie supports at most 8 clip planes. The markers of the sources and planes and the controls are
+never clipped, the beams only with `clip_beams = true` or the "clip beams" toggle below the 3D
+view. The selection box of a partly clipped component only covers its visible part.
+
 # Keyword args
 
 - `size = (1400, 800)`: size of the figure
@@ -558,6 +782,11 @@ automatically around the beam, unless `x_min`, `x_max`, `z_min` and `z_max` are 
 - `trace_budget = 0.03`: [s] duration of a solve or panel update, above which tracing is deferred
   or the panels show a preview, see "Adaptive tracing"
 - `idle_delay = 0.2`: [s] pause of the movement after which deferred tracing runs
+- `clip_planes = []`: initial clip planes, a vector of `point => normal`, e.g.
+  `[[0, 0.1, 0] => [0, 1, 0]]`, see "Clip planes"
+- `clip_beams = false`: clips the beams as well, can be switched with the "clip beams" toggle
+- `view_cube = true`: shows a view cube in the top right corner of the 3D view, a click on a
+  face, edge or corner switches to the corresponding standard view, see [`view_cube!`](@ref)
 - all other kwargs are passed to [`kinematic_controls!`](@ref), e.g. `fine_step`, `plane_normal`
   or `rotation_axis`
 """
@@ -574,6 +803,9 @@ function live_view(
         labels = Dict(),
         trace_budget = 0.03,
         idle_delay = 0.2,
+        clip_planes = [],
+        clip_beams::Bool = false,
+        view_cube::Bool = true,
         kwargs...
     )
     isempty(pairs) && throw(ArgumentError("live_view requires at least one system => beam pair"))
@@ -581,9 +813,12 @@ function live_view(
     systems = first.(ps)
     specs = _panel_specs(detectors, systems)
     slider_specs = [_slider_spec(s) for s in sliders]
+    clip_specs = _clip_plane_specs(clip_planes)
 
     fig = Figure(; size)
     ax = LScene(fig[1, 1]; show_axis = false)
+    # Its click listener runs before the controls, hence clicks on the cube never select objects
+    cube = view_cube ? view_cube!(ax) : nothing
     ncols = isempty(specs) ? 1 : 2
 
     # Detector panels in a near-square grid next to the 3D view
@@ -607,24 +842,30 @@ function live_view(
     trace_button = Button(status_row[1, 1]; label = "Trace (t)")
     auto_trace_toggle = Toggle(status_row[1, 2]; active = auto_trace)
     Label(status_row[1, 3], "auto trace")
-    step_box = Textbox(status_row[1, 4]; placeholder = "step, e.g. 250 nm", width = 150)
-    status = Label(status_row[1, 5],
+    clip_beams_toggle = Toggle(status_row[1, 4]; active = clip_beams)
+    Label(status_row[1, 5], "clip beams")
+    step_box = Textbox(status_row[1, 6]; placeholder = "step, e.g. 250 nm", width = 150)
+    status = Label(status_row[1, 7],
         "Click on a component to select it, press h to show the controls"; tellwidth = false)
 
     system_handles = SystemRenderHandle[live_render!(ax, sys; system_kwargs...) for sys in systems]
     beam_handles = AbstractRenderHandle[]
     for beam in last.(ps)
         default = beam isa BMO.AbstractBeamGroup ? (; render_every = 5) : (;)
-        push!(beam_handles, live_render!(ax, beam; get(beam_kwargs, beam, default)...))
+        kw = get(beam_kwargs, beam, default)
+        # The planes of the beams are set explicitly by `_apply_clip_planes!`, see `clip_beams`
+        push!(beam_handles, live_render!(ax, beam; kw..., clip_planes = Plane3f[]))
     end
 
     # A single controller for all systems, otherwise several controllers would compete for events
     handles = reduce(vcat, [h.handles for h in system_handles]; init = ObjectRenderHandle[])
+    # Size of the systems, before any clip plane shrinks the bounding boxes
+    plots = reduce(vcat, (oh.plots for oh in handles); init = AbstractPlot[])
+    extent = isempty(plots) ? 0.125 :
+             maximum(GeometryBasics.widths(mapreduce(Makie.boundingbox, GeometryBasics.union, plots)))
     if movable_sources
         # Markers of the sources, scaled to the size of the systems
-        plots = reduce(vcat, (oh.plots for oh in handles); init = AbstractPlot[])
-        marker_size = isempty(plots) ? 1e-2 :
-                      0.08 * maximum(GeometryBasics.widths(mapreduce(Makie.boundingbox, GeometryBasics.union, plots)))
+        marker_size = 0.08 * extent
         for src in unique(objectid, last.(ps))
             BMO._is_static(src) || push!(handles, _live_render_source!(ax, src; size = marker_size))
         end
@@ -634,16 +875,24 @@ function live_view(
     combined = SystemRenderHandle(ax, first(systems), handles, parent)
     gui_ref = Ref{LiveView}()
     # Typing into the step textbox must not trigger the controls
-    controls = kinematic_controls!(ax, combined; on_change = obj -> _on_change!(gui_ref[], obj),
+    # Moving a clip plane only re-applies the planes, the systems are not solved
+    change = obj -> obj isa LiveClipPlane ? _on_clip_change!(gui_ref[], obj) : _on_change!(gui_ref[], obj)
+    controls = kinematic_controls!(ax, combined; on_change = change,
         ignore_keys = () -> step_box.focused[], kwargs...)
 
     gui = LiveView(fig, ax, ps, system_handles, beam_handles, controls, panels, status, slider_grid,
         on_change, nothing, auto_trace_toggle.active, false, trace_button, auto_trace_toggle,
         IdDict{Any, Any}(), Float64(trace_budget), Float64(idle_delay), 0.0, 0.0, false, nothing,
-        0.0, false, IdDict{Any, String}(labels), step_box)
+        0.0, false, IdDict{Any, String}(labels), step_box, LiveClipPlane[], true, 1.2 * extent,
+        clip_beams, clip_beams_toggle, cube)
     gui_ref[] = gui
+    for (point, normal) in clip_specs
+        _add_clip_plane!(gui, point, normal; select = false)
+    end
     isnothing(slider_grid) || _connect_sliders!(gui, last.(slider_specs))
     _connect_trace!(gui)
+    _connect_clip_planes!(gui)
+    push!(controls.listeners, on(v -> v == gui.clip_beams || _set_clip_beams!(gui, v), clip_beams_toggle.active))
     push!(controls.listeners, on(s -> _set_step!(gui, s), step_box.stored_string))
     _resolve!(gui, nothing)
     return gui

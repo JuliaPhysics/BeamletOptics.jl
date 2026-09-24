@@ -538,6 +538,275 @@ const BMO = BeamletOptics
         end
     end
 
+    @testset "clip planes" begin
+        _handle(gui, obj) = gui.controls.h.handles[findfirst(oh -> oh.obj === obj, gui.controls.h.handles)]
+        # all plots of the system objects, including the nested plots of recipes
+        _nested(p) = AbstractPlot[p; reduce(vcat, _nested.(p.plots); init = AbstractPlot[])]
+        _optics_plots(gui) = reduce(vcat, (_nested(p) for h in gui.system_handles for oh in h.handles
+                                           for p in oh.plots); init = AbstractPlot[])
+        # markers of the sources and clip planes
+        _marker_plots(gui) = reduce(vcat, (_nested(p) for oh in gui.controls.h.handles
+                                           if !(oh.obj isa BMO.AbstractObject) for p in oh.plots); init = AbstractPlot[])
+        _beam_plots(gui) = reduce(vcat, (_nested(p) for h in gui.beam_handles for p in Ext._beam_plots(h)))
+        _control_plots(gui) = reduce(vcat, (_nested(p) for p in gui.controls.plots[1:4]))
+        _planes(gui) = only(unique(p.clip_planes[] for p in _optics_plots(gui)))
+        _shift_key!(gui, key) = (push!(events(gui.ax.scene).keyboardstate, Keyboard.left_shift);
+                                 _key!(gui, key);
+                                 delete!(events(gui.ax.scene).keyboardstate, Keyboard.left_shift))
+        _beam() = Beam([0.0, 0, 0], [0.0, 1, 0])
+        P1 = [Plane3f(Point3f(0, 0.1, 0), Vec3f(0, 1, 0))]
+
+        @testset "kwarg, markers and beams are not clipped" begin
+            m, pd = _fixture()
+            n_calls = Ref(0)
+            pick_plot = Ref{Any}(nothing)
+            gui = _live_view(System([m, pd]), _beam(); throttle = false, fine_step = 1e-3,
+                clip_planes = [[0, 0.1, 0] => [0, 1, 0]], on_change = (g, obj) -> (n_calls[] += 1),
+                pick = ax -> (pick_plot[], 0))
+            @test length(gui.clip_planes) == 1
+            plane = gui.clip_planes[1]
+            @test isnothing(gui.controls.selected[])
+            @test gui.clipping
+            @test plane in gui.controls.movable
+            @test gui.ax.scene.theme.clip_planes[] == P1
+            @test !isempty(_optics_plots(gui))
+            @test all(p -> p.clip_planes[] == P1, _optics_plots(gui))
+            for plots in (_marker_plots(gui), _beam_plots(gui), _control_plots(gui))
+                @test !isempty(plots)
+                @test all(p -> p.clip_planes[] == Plane3f[], plots)
+            end
+
+            # a plot added later gets the planes, also after a move
+            added = Ext._capture_new_plots(gui.ax) do
+                cube = BMO.CubeMesh(0.01)
+                render!(gui.ax, NonInteractableObject(cube))
+            end
+            @test !isempty(added)
+            @test all(p -> p.clip_planes[] == P1, reduce(vcat, _nested.(added)))
+
+            # the outline does not select the plane, the handle does
+            marker = _handle(gui, plane)
+            pick_plot[] = marker.plots[1]
+            @test marker.plots[1] isa Makie.Lines
+            _select!(gui)
+            @test isnothing(gui.controls.selected[])
+            pick_plot[] = marker.plots[2]
+            _select!(gui)
+            @test gui.controls.selected[] === plane
+            @test all(isfinite, reduce(vcat, collect.(gui.controls.box_obs[])))
+
+            # a key step along the normal moves the plane, without solving the systems
+            n0, spot0 = n_calls[], copy(BMO.spot_diagram(pd))
+            stale0 = gui.stale
+            _key!(gui, Keyboard.up)
+            @test collect(position(plane)) ≈ [0, 0.101, 0]
+            @test abs(_planes(gui)[1].distance - P1[1].distance - 1e-3) < 1e-6
+            @test _planes(gui) == [Ext._plane3f(plane)]
+            @test all(p -> p.clip_planes[] == _planes(gui), reduce(vcat, _nested.(added)))
+            @test marker.P ≈ position(plane)
+            @test n_calls[] == n0
+            @test BMO.spot_diagram(pd) == spot0
+            @test gui.stale == stale0
+            @test startswith(gui.status.text[], "Clip plane at (")
+
+            # shift+c flips the selected plane, c switches clipping off and on
+            _shift_key!(gui, Keyboard.c)
+            @test Ext._normal(plane) ≈ [0, -1, 0]
+            @test _planes(gui)[1].normal ≈ Vec3f(0, -1, 0)
+            @test collect(position(plane)) ≈ [0, 0.101, 0]
+            @test gui.clipping
+            flipped = _planes(gui)
+            _key!(gui, Keyboard.c)
+            @test !gui.clipping
+            @test _planes(gui) == Plane3f[]
+            @test all(p -> p.clip_planes[] == Plane3f[], reduce(vcat, _nested.(added)))
+            _key!(gui, Keyboard.c)
+            @test gui.clipping
+            @test _planes(gui) == flipped
+            @test n_calls[] == n0
+
+            # reset of the plane
+            _key!(gui, Keyboard.backspace)
+            @test collect(position(plane)) ≈ [0, 0.1, 0]
+            @test _planes(gui)[1].normal ≈ P1[1].normal
+            @test _planes(gui)[1].distance ≈ P1[1].distance
+            @test n_calls[] == n0
+
+            # `v` still toggles the spectator mode with a clip plane selected
+            @test gui.controls.selected[] === plane
+            _key!(gui, Keyboard.v)
+            @test gui.controls.spectator[]
+            @test isnothing(gui.controls.selected[])
+            _key!(gui, Keyboard.v)
+            @test !gui.controls.spectator[]
+            close(gui)
+
+            # clip_beams
+            m, pd = _fixture()
+            gui = _live_view(System([m, pd]), _gauss(); clip_planes = [[0, 0.1, 0] => [0, 1, 0]],
+                clip_beams = true, beam_kwargs = Dict())
+            @test !isempty(_beam_plots(gui))
+            @test all(p -> p.clip_planes[] == P1, _beam_plots(gui))
+            @test all(p -> p.clip_planes[] == Plane3f[], _marker_plots(gui))
+            @test gui.clip_beams_toggle.active[]
+            # switched off and on again at runtime via the toggle
+            gui.clip_beams_toggle.active[] = false
+            @test !gui.clip_beams
+            @test all(p -> p.clip_planes[] == Plane3f[], _beam_plots(gui))
+            gui.clip_beams_toggle.active[] = true
+            @test all(p -> p.clip_planes[] == P1, _beam_plots(gui))
+            # clipping off: the beams follow as well
+            _key!(gui, Keyboard.c)
+            @test all(p -> p.clip_planes[] == Plane3f[], _beam_plots(gui))
+            close(gui)
+
+            # default: the beams are not clipped until the toggle is switched on
+            m, pd = _fixture()
+            gui = _live_view(System([m, pd]), _gauss(); clip_planes = [[0, 0.1, 0] => [0, 1, 0]],
+                beam_kwargs = Dict())
+            @test !gui.clip_beams_toggle.active[]
+            @test all(p -> p.clip_planes[] == Plane3f[], _beam_plots(gui))
+            gui.clip_beams_toggle.active[] = true
+            @test all(p -> p.clip_planes[] == P1, _beam_plots(gui))
+            close(gui)
+
+            # invalid planes
+            m, pd = _fixture()
+            @test_throws ArgumentError _live_view(System([m, pd]), _beam();
+                clip_planes = [[0, 0, i] => [0, 0, 1] for i in 1:9])
+            @test_throws ArgumentError _live_view(System([m, pd]), _beam(); clip_planes = [[0, 0, 0] => [0, 0, 0]])
+            @test_throws ArgumentError Ext.LiveClipPlane([0, 0, 0], [0, 0, 0], 1.0)
+        end
+
+        @testset "drag of a plane with its normal along the rotation axis" begin
+            # the normal (local y-axis) is parallel to the rotation axis z, e.g. for a plane added
+            # in the top view, hence the allowed axes of the drag are linearly dependent
+            m, pd = _fixture()
+            pick_plot = Ref{Any}(nothing)
+            gui = _live_view(System([m, pd]), _beam(); throttle = false,
+                clip_planes = [[0, 0.1, 0] => [0, 0, 1]], pick = ax -> (pick_plot[], 0))
+            plane = gui.clip_planes[1]
+            pick_plot[] = _handle(gui, plane).plots[2]
+            scene = gui.ax.scene
+            events(scene).mouseposition[] = (100.0, 100.0)
+            _select!(gui)
+            @test gui.controls.selected[] === plane
+            P0 = collect(Float64.(BMO.position(plane)))
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+            events(scene).mouseposition[] = (140.0, 160.0)
+            @test gui.controls.dragging
+            P1 = collect(Float64.(BMO.position(plane)))
+            @test all(isfinite, P1)
+            @test P1 != P0
+            events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
+            close(gui)
+        end
+
+        @testset "fully clipped selection" begin
+            m, pd = _fixture()
+            # everything below y = 0.5 is clipped, i.e. all objects
+            gui = _live_view(System([m, pd]), _beam(); throttle = false,
+                clip_planes = [[0, 0.5, 0] => [0, 1, 0]])
+            @test Makie.boundingbox(gui.system_handles[1].handles[1].plots[1]) == Makie.Rect3d()
+            gui.controls.selected[] = m
+            Ext._update_selection_box!(gui.controls)
+            pts = gui.controls.box_obs[]
+            @test !isempty(pts)
+            @test all(p -> all(isfinite, p), pts)
+            @test all(p -> all(isfinite, p), gui.controls.arrow_pos[])
+            close(gui)
+        end
+
+        @testset "add and remove at runtime" begin
+            m, pd = _fixture()
+            n_calls = Ref(0)
+            gui = _live_view(System([m, pd]), _beam(); throttle = false, fine_step = 1e-3,
+                fine_angle = 1e-2, on_change = (g, obj) -> (n_calls[] += 1))
+            @test isempty(gui.clip_planes)
+            # no clip planes: nothing is written
+            @test all(p -> p.clip_planes[] == Plane3f[], _optics_plots(gui))
+            @test occursin("p: add clip plane", Ext._help_text(:move, 1e-9, 1e-6) * "\n" * gui.controls.help_extra)
+            gui.controls.help_shown = true
+            Ext._update_help!(gui.controls)
+            @test occursin("shift+c: flip", gui.controls.help_obs[])
+            n0 = n_calls[]
+
+            # nothing selected: through the lookat point of the camera, along the view direction
+            cam = Makie.cameracontrols(gui.ax.scene)
+            cam.eyeposition[] = Vec3f(0.3, -0.2, 0.25)
+            cam.lookat[] = Vec3f(0.05, 0.1, 0.0)
+            lookat, eye = Vector{Float64}(cam.lookat[]), Vector{Float64}(cam.eyeposition[])
+            view_dir = (lookat - eye) / sqrt(sum(abs2, lookat - eye))
+            _key!(gui, Keyboard.p)
+            @test length(gui.clip_planes) == 1
+            plane = gui.clip_planes[1]
+            @test gui.controls.selected[] === plane
+            @test collect(position(plane)) ≈ lookat
+            @test maximum(abs.(Ext._normal(plane) - view_dir)) < 1e-6
+            @test all(p -> p.clip_planes[] == [Ext._plane3f(plane)], _optics_plots(gui))
+            @test all(p -> p.clip_planes[] == Plane3f[], _marker_plots(gui))
+
+            # moved and rotated with keys like a component
+            _key!(gui, Keyboard.up)
+            @test collect(position(plane)) ≈ lookat + 1e-3 * view_dir
+            x_axis = plane.dir[:, 1]
+            _key!(gui, Keyboard.m)
+            _key!(gui, Keyboard.up)
+            @test Ext._normal(plane) ≈ BMO.rotate3d(x_axis, 1e-2) * view_dir
+            @test all(p -> p.clip_planes[] == [Ext._plane3f(plane)], _optics_plots(gui))
+            _key!(gui, Keyboard.m)
+            @test n_calls[] == n0
+
+            # a selected component: through its position
+            gui.controls.selected[] = m
+            _key!(gui, Keyboard.p)
+            @test length(gui.clip_planes) == 2
+            plane2 = gui.clip_planes[2]
+            @test gui.controls.selected[] === plane2
+            @test collect(position(plane2)) ≈ collect(position(m))
+            @test maximum(abs.(Ext._normal(plane2) - view_dir)) < 1e-6
+            @test _planes(gui) == Ext._plane3f.([plane, plane2])
+
+            # Delete with a component selected does nothing
+            gui.controls.selected[] = m
+            _key!(gui, Keyboard.delete)
+            @test length(gui.clip_planes) == 2
+            @test gui.controls.selected[] === m
+
+            # Delete removes the marker and the plane
+            marker_plots = copy(_handle(gui, plane2).plots)
+            gui.controls.selected[] = plane2
+            _key!(gui, Keyboard.delete)
+            @test gui.clip_planes == [plane]
+            @test isnothing(gui.controls.selected[])
+            @test !(plane2 in gui.controls.movable)
+            @test !haskey(gui.controls.init_poses, plane2)
+            @test !any(oh -> oh.obj === plane2, gui.controls.h.handles)
+            @test !any(p -> any(q -> q === p, gui.ax.scene.plots), marker_plots)
+            @test _planes(gui) == [Ext._plane3f(plane)]
+            # the undo history of the removed plane is dropped, undo still works
+            @test all(e -> e.obj !== plane2, gui.controls.undo_stack)
+            gui.controls.selected[] = plane
+            _key!(gui, Keyboard.delete)
+            @test isempty(gui.clip_planes)
+            @test all(p -> p.clip_planes[] == Plane3f[], _optics_plots(gui))
+            @test gui.ax.scene.theme.clip_planes[] == Plane3f[]
+            @test n_calls[] == n0
+
+            # at most 8 planes
+            for _ in 1:8
+                _key!(gui, Keyboard.p)
+            end
+            @test length(gui.clip_planes) == 8
+            @test_logs _key!(gui, Keyboard.p)
+            @test length(gui.clip_planes) == 8
+            @test gui.status.text[] == "at most 8 clip planes"
+            @test length(_planes(gui)) == 8
+            @test n_calls[] == n0
+            close(gui)
+        end
+    end
+
     @testset "failing on_change is logged once" begin
         m, pd = _fixture()
         sys = System([m, pd])

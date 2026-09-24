@@ -1,7 +1,51 @@
-using Makie: translate!, rotate!, Quaternion, AbstractPlot
+using Makie: translate!, rotate!, Quaternion, AbstractPlot, Plane3f
 
-"""Values that can be live-rendered and moved by the controls: objects and sources."""
-const _LiveMovable = Union{BMO.AbstractObject, BMO.AbstractBeam, BMO.AbstractBeamGroup}
+"""
+    LiveClipPlane
+
+Clip plane of a `LiveView`, see [`live_view`](@ref). The plane passes through `pos`, its normal is
+the local y-axis of the right-handed orthonormal frame `dir`, i.e. `dir[:, 2]`. Only the side the
+normal points to stays visible. `size` is the edge length of its outline. The plane is moved like a
+component via its marker, see `_live_render_clip_plane!`.
+"""
+mutable struct LiveClipPlane
+    pos::Point3{Float64}
+    dir::Matrix{Float64}
+    size::Float64
+end
+
+function LiveClipPlane(point, normal, size::Real)
+    n = Vector{Float64}(collect(normal))
+    norm(n) < 1e-12 && throw(ArgumentError("the normal of a clip plane must not be zero, got $normal"))
+    return LiveClipPlane(Point3{Float64}(collect(point)), _direction_frame(n), Float64(size))
+end
+
+function Base.show(io::IO, p::LiveClipPlane)
+    print(io, "LiveClipPlane(", collect(p.pos), ", normal = ", _normal(p), ")")
+end
+
+BMO.kinematic_trait_of(::LiveClipPlane) = BMO.Movable(BMO.Oriented())
+Base.position(p::LiveClipPlane) = p.pos
+BMO.orientation(p::LiveClipPlane) = p.dir
+
+function BMO.translate3d!(::BMO.Movable, p::LiveClipPlane, offset)
+    p.pos = p.pos + Point3{Float64}(collect(offset))
+    return nothing
+end
+
+function BMO.rotate3d!(::BMO.Movable, p::LiveClipPlane, R::AbstractMatrix)
+    p.dir = Matrix{Float64}(R * p.dir)
+    return nothing
+end
+
+"""Returns the unit normal of the clip plane `p`, i.e. its local y-axis."""
+_normal(p::LiveClipPlane) = p.dir[:, 2]
+
+"""Returns the `Makie.Plane3f` of the clip plane `p`, as applied to the plots."""
+_plane3f(p::LiveClipPlane) = Plane3f(Point3f(p.pos), Vec3f(_normal(p)))
+
+"""Values that can be live-rendered and moved by the controls: objects, sources and clip planes."""
+const _LiveMovable = Union{BMO.AbstractObject, BMO.AbstractBeam, BMO.AbstractBeamGroup, LiveClipPlane}
 
 """
     ObjectRenderHandle <: AbstractRenderHandle
@@ -87,12 +131,45 @@ selecting and moving the source with the [`kinematic_controls!`](@ref).
 function _live_render_source!(ax::_RenderEnv, src; size::Real, color = :orange)
     draw = function ()
         p, d = Point3f(position(src)), Vec3f(size * normalize(BMO.direction(src)))
-        arrows3d!(ax, [p], [d]; color, shaftradius = 0.05, tipradius = 0.15, tiplength = 0.35)
-        mesh!(ax, GeometryBasics.Sphere(p, Float32(size / 5)); color)
+        # Markers are never clipped, see the clip planes of `live_view`
+        arrows3d!(ax, [p], [d]; color, shaftradius = 0.05, tipradius = 0.15, tiplength = 0.35,
+            clip_planes = Plane3f[])
+        mesh!(ax, GeometryBasics.Sphere(p, Float32(size / 5)); color, clip_planes = Plane3f[])
         # Constant size on the screen, such that the source is visible in the overview as well
-        scatter!(ax, [p]; color, markersize = 12, strokecolor = :black, strokewidth = 1)
+        scatter!(ax, [p]; color, markersize = 12, strokecolor = :black, strokewidth = 1,
+            clip_planes = Plane3f[])
     end
     return _live_render_movable!(ax, src, draw)
+end
+
+"""
+    _live_render_clip_plane!(ax, plane::LiveClipPlane; color = :purple)
+
+Renders the marker of the clip `plane`, i.e. its outline of edge length `plane.size` and a handle
+(sphere and scatter) at its position, and returns an `ObjectRenderHandle`. The marker is never
+clipped. Only the handle selects the plane, see `_pickable_plots`.
+"""
+function _live_render_clip_plane!(ax::_RenderEnv, plane::LiveClipPlane; color = :purple)
+    draw = function ()
+        p = Vector{Float64}(plane.pos)
+        # Outline along the local x- and z-axes, i.e. within the plane
+        x, z = plane.dir[:, 1], plane.dir[:, 3]
+        s = plane.size / 2
+        corners = [Point3f(p + s * (a * x + b * z)) for (a, b) in ((-1, -1), (1, -1), (1, 1), (-1, 1), (-1, -1))]
+        lines!(ax, corners; color, linewidth = 2, clip_planes = Plane3f[])
+        # About the size of the sphere of a source marker, see `live_view`
+        mesh!(ax, GeometryBasics.Sphere(Point3f(p), Float32(plane.size / 75)); color,
+            clip_planes = Plane3f[])
+        scatter!(ax, [Point3f(p)]; color, markersize = 12, strokecolor = :black, strokewidth = 1,
+            clip_planes = Plane3f[])
+    end
+    return _live_render_movable!(ax, plane, draw)
+end
+
+"""Returns the plots of `oh` that select its object, i.e. all but the outline of a clip plane."""
+function _pickable_plots(oh::ObjectRenderHandle)
+    oh.obj isa LiveClipPlane || return oh.plots
+    return AbstractPlot[p for p in oh.plots if !(p isa Makie.Lines)]
 end
 
 """
@@ -279,7 +356,7 @@ function _pick_leaf(h::SystemRenderHandle, plot)
     p = plot
     while p isa AbstractPlot
         for oh in h.handles
-            any(q -> q === p, oh.plots) && return oh.obj
+            any(q -> q === p, _pickable_plots(oh)) && return oh.obj
         end
         p = p.parent
     end

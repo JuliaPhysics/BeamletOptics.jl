@@ -26,6 +26,7 @@ const BMO = BeamletOptics
     @test_throws BMO.MissingBackendError pick_object(nothing, nothing)
     @test_throws BMO.MissingBackendError kinematic_controls!(axis, nothing)
     @test_throws BMO.MissingBackendError live_view(System([Detector(1e-3)]), Beam([0.0,0,0],[0.0,1,0],1e-6))
+    @test_throws BMO.MissingBackendError view_cube!(axis)
 end
 
 end

@@ -182,6 +182,29 @@ BMO.kinematic_trait_of(::FixedMirror) = BMO.Static()
         close(ctrl)
     end
 
+    @testset "drag with a local axis parallel to the rotation axis" begin
+        # the local x-axis of m1 points along -z, i.e. along the rotation axis, hence the allowed
+        # axes of the drag are linearly dependent
+        fig, ax, h, m1, m2 = _fixture()
+        BMO.yrotate3d!(m1, π / 2)
+        Ext.update_render!(h)
+        scene = ax.scene
+        P0 = collect(Float64.(BMO.position(m1)))
+        ctrl = Ext.kinematic_controls!(ax, h; throttle = false, pick = ax2 -> (h.handles[1].plots[1], 0))
+        events(scene).mouseposition[] = (100.0, 100.0)
+        events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+        events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
+        @test ctrl.selected[] === m1
+        events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+        events(scene).mouseposition[] = (140.0, 160.0)
+        @test ctrl.dragging
+        P1 = collect(Float64.(BMO.position(m1)))
+        @test P1 != P0
+        @test all(isfinite, P1)
+        events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
+        close(ctrl)
+    end
+
     @testset "grab consumes the press once the object is selected" begin
         fig, ax, h, m1, m2 = _fixture()
         scene = ax.scene
@@ -922,11 +945,27 @@ BMO.kinematic_trait_of(::FixedMirror) = BMO.Static()
         @test !isempty(camera_keys) # sanity: the extraction actually found keys
 
         handled_keys = Set([
-            Keyboard.h, Keyboard.m, Keyboard.t, Keyboard.escape, Keyboard.backspace,
+            Keyboard.h, Keyboard.m, Keyboard.t, Keyboard.v, Keyboard.escape, Keyboard.backspace,
             Keyboard.up, Keyboard.down, Keyboard.left, Keyboard.right,
-            Keyboard.page_up, Keyboard.page_down, Keyboard.left_shift, Keyboard.right_shift
+            Keyboard.page_up, Keyboard.page_down, Keyboard.left_shift, Keyboard.right_shift,
+            Keyboard.p, Keyboard.c, Keyboard.delete
         ])
         @test isempty(intersect(handled_keys, camera_keys))
+
+        # Key combinations with a modifier: the key itself must not be a camera key either, except
+        # for the deliberate exceptions below. The modifiers alone are no conflict, Camera3D only
+        # uses ctrl and alt together with a left click (reset, reposition).
+        combo_keys = Set([
+            Keyboard.z, # ctrl/cmd+z: undo, ctrl/cmd+shift+z: redo
+            Keyboard.y, # ctrl/cmd+y: redo
+            Keyboard.c  # shift+c: flip the selected clip plane
+        ])
+        # Camera3D fixes the camera to the z/y axis only while z/y is held during a camera drag,
+        # which does not happen for the standard undo/redo shortcuts, hence they are kept
+        exceptions = Set([Keyboard.z, Keyboard.y])
+        @test isempty(intersect(setdiff(combo_keys, exceptions), camera_keys))
+        # the exceptions are still needed, otherwise they can be removed
+        @test exceptions ⊆ camera_keys
     end
 
     @testset "undo/redo" begin

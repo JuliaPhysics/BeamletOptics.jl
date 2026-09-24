@@ -4,7 +4,7 @@ using BeamletOptics
 import BeamletOptics: render!, RenderException, _RenderTypes, get_view, set_view, hide_axis,
                        set_orthographic, arrow!, render_lcs!, look_at!,
                        AbstractRenderHandle, live_render!, update_render!, remove_render!,
-                       pick_object, kinematic_controls!, live_view
+                       pick_object, kinematic_controls!, live_view, view_cube!
 
 const BMO = BeamletOptics
 
@@ -66,6 +66,7 @@ include("RenderCamera.jl")
 include("LiveObjects.jl")
 include("LiveBeams.jl")
 include("LiveInteraction.jl")
+include("ViewCube.jl")
 include("LiveView.jl")
 # precompiles the live rendering/interaction call paths, must come last
 include("LivePrecompile.jl")

@@ -1,6 +1,6 @@
 import Makie
 using Makie: events, on, off, Consume, Mouse, Keyboard, mouseposition_px, Point2f, Vec3f
-using LinearAlgebra: tr, diag, I
+using LinearAlgebra: tr, diag, I, pinv
 
 """
     _ray_plane_intersect(origin, dir, plane_point, normal)
@@ -267,6 +267,8 @@ mutable struct KinematicController{H <: SystemRenderHandle}
     # controls overlay, toggled via h
     help_obs::Observable{String}
     help_shown::Bool
+    # additional lines of the overlay, e.g. the keys of `live_view`
+    help_extra::String
     plots::Vector{AbstractPlot}
     listeners::Vector{Any}
     # last error of on_change, logged only once
@@ -318,7 +320,7 @@ function _object_plots(h::SystemRenderHandle, obj)
     plots = AbstractPlot[]
     for leaf in _leaves(obj)
         i = findfirst(oh -> oh.obj === leaf, h.handles)
-        isnothing(i) || append!(plots, h.handles[i].plots)
+        isnothing(i) || append!(plots, _pickable_plots(h.handles[i]))
     end
     return plots
 end
@@ -395,8 +397,9 @@ function _update_help!(ctrl::KinematicController)
         ctrl.help_obs[] = ctrl.help_shown ? _SPECTATOR_HELP : _SPECTATOR_HINT
         return nothing
     end
-    ctrl.help_obs[] = ctrl.help_shown ?
-                      _help_text(ctrl.mode[], ctrl.fine_step, ctrl.fine_angle, ctrl.select_modifier) :
+    help = _help_text(ctrl.mode[], ctrl.fine_step, ctrl.fine_angle, ctrl.select_modifier)
+    isempty(ctrl.help_extra) || (help *= "\n" * ctrl.help_extra)
+    ctrl.help_obs[] = ctrl.help_shown ? help :
                       _help_hint(ctrl.mode[], ctrl.fine_step, ctrl.fine_angle)
     return nothing
 end
@@ -412,6 +415,26 @@ function _change_step!(ctrl::KinematicController, dir::Int)
     return nothing
 end
 
+_is_finite_box(bb) = all(isfinite, minimum(bb)) && all(isfinite, maximum(bb))
+
+"""
+    _selection_bbox(ctrl, obj, plots)
+
+Returns the bounding box of the `plots` of the selected `obj`. With clip planes, see
+[`live_view`](@ref), the bounding box of a plot only covers its visible part and is empty if the
+plot is clipped entirely. Such plots are skipped; if all are clipped, a box around the `position`
+of `obj` is returned, with the edge length of a source marker (8 % of the visible scene, or 1 cm).
+"""
+function _selection_bbox(ctrl::KinematicController, obj, plots)
+    bbs = filter(_is_finite_box, [Makie.boundingbox(p) for p in plots])
+    isempty(bbs) || return reduce(GeometryBasics.union, bbs)
+    all_plots = reduce(vcat, (oh.plots for oh in ctrl.h.handles); init = AbstractPlot[])
+    scene_bbs = filter(_is_finite_box, [Makie.boundingbox(p) for p in all_plots])
+    w = isempty(scene_bbs) ? 1e-2 :
+        0.08 * maximum(GeometryBasics.widths(reduce(GeometryBasics.union, scene_bbs)))
+    return GeometryBasics.Rect3d(Vector{Float64}(position(obj)) .- w / 2, fill(w, 3))
+end
+
 function _update_selection_box!(ctrl::KinematicController)
     obj = ctrl.selected[]
     plots = isnothing(obj) ? AbstractPlot[] : _object_plots(ctrl.h, obj)
@@ -420,7 +443,7 @@ function _update_selection_box!(ctrl::KinematicController)
         ctrl.gizmo_visible[] && (ctrl.gizmo_visible[] = false)
         return nothing
     end
-    bb = mapreduce(Makie.boundingbox, GeometryBasics.union, plots)
+    bb = _selection_bbox(ctrl, obj, plots)
     ctrl.box_obs[] = _bbox_wireframe(bb)
     # Place the gizmo above the object, where it is not covered by beams through the object
     w = GeometryBasics.widths(bb)
@@ -885,15 +908,16 @@ function kinematic_controls!(
     mode_obs = Observable(mode)
     labels = Makie.lift(m -> m == :move ? ["↑", "→", "page up"] : ["page up", "↑", "←"], mode_obs)
     plots = AbstractPlot[
-        linesegments!(ax, box_obs; color = :yellow, linewidth = 2),
+        linesegments!(ax, box_obs; color = :yellow, linewidth = 2, clip_planes = Plane3f[]),
         # Arrow dimensions relative to the gizmo size, such that ring arrows are mostly tip
         arrows3d!(ax, arrow_pos, arrow_dir; color = arrow_color, visible = gizmo_visible,
             markerscale = gizmo_size, shaftradius = 0.025, tipradius = 0.1, tiplength = 0.3,
-            overdraw = true),
+            overdraw = true, clip_planes = Plane3f[]),
         linesegments!(ax, ring_pts; color = ring_color, linewidth = 3, overdraw = true,
-            visible = Makie.lift((v, m) -> v && m == :rotate, gizmo_visible, mode_obs)),
+            visible = Makie.lift((v, m) -> v && m == :rotate, gizmo_visible, mode_obs),
+            clip_planes = Plane3f[]),
         text!(ax, label_pos; text = labels, color = label_color, visible = gizmo_visible,
-            fontsize = 20, align = (:center, :center), overdraw = true)
+            fontsize = 20, align = (:center, :center), overdraw = true, clip_planes = Plane3f[])
     ]
     help_obs = Observable("")
     # Drawn in the 2D scene of the axis, such that it does not count towards the limits of the scene
@@ -910,7 +934,7 @@ function kinematic_controls!(
         false, false, zeros(3), zeros(3), (0.0, 0.0), nothing, nothing, :none,
         nothing, _HistoryEntry[], _HistoryEntry[], nothing,
         box_obs, arrow_pos, arrow_dir, label_pos, ring_pts, arrow_color, label_color, ring_color,
-        gizmo_size, gizmo_visible, help_obs, show_help, plots, Any[], nothing
+        gizmo_size, gizmo_visible, help_obs, show_help, "", plots, Any[], nothing
     )
 
     # High priority, so that the camera does not receive events while an object is dragged
@@ -1028,7 +1052,9 @@ function kinematic_controls!(
                 if !isempty(allowed)
                     Δ = target .- Vector{Float64}(position(obj))
                     A = hcat(_axis_vectors(ctrl, obj, allowed)...)
-                    translate3d!(obj, A * (A \ Δ))
+                    # Projection onto the allowed axes, which may be linearly dependent, e.g. if
+                    # a local axis is parallel to the rotation axis
+                    translate3d!(obj, A * (pinv(A) * Δ))
                     _request_update!(ctrl)
                 end
             end

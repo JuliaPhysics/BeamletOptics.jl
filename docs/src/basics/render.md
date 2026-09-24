@@ -70,6 +70,43 @@ literal passed to `set_view`. This is the pattern used throughout this package's
 tutorials to freeze a camera position found interactively. The `set_view(ls, eye, lookat,
 up)` and `look_at!` forms are the reproducible alternative, useful when the viewpoint
 should be derived from the scene's own geometry instead of copy-pasted.
+
+## View cube
+
+[`view_cube!`](@ref) adds a small CAD-style cube to a corner of an `LScene`. The cube rotates
+with the camera and shows the current orientation of the scene. A left click on a face, an edge or
+a corner of the cube moves the camera to the corresponding standard view in a short animation,
+while the point the camera looks at and its distance are kept. The region under the cursor is
+highlighted.
+
+```julia
+using GLMakie, BeamletOptics
+
+fig = Figure()
+ax = LScene(fig[1, 1])
+render!(ax, system)
+cube = view_cube!(ax; size = 110, corner = :top_right)
+display(fig)
+```
+
+The camera is placed on the side of the clicked face and looks at the system from there:
+
+| Face     | Camera at | Up   |
+|:---------|:----------|:-----|
+| `Top`    | `+z`      | `+y` |
+| `Bottom` | `-z`      | `+y` |
+| `Front`  | `-y`      | `+z` |
+| `Back`   | `+y`      | `+z` |
+| `Right`  | `+x`      | `+z` |
+| `Left`   | `-x`      | `+z` |
+
+The 12 edges and 8 corners give the diagonal views between the adjacent faces, e.g. the corner
+between `Top`, `Front` and `Right` looks from `(1, -1, 1)`, with `+z` as the up direction. The
+transition takes `duration = 0.3` s, `duration = 0` switches the view instantly. The cube is not
+affected by zooming or by clip planes. Call `close(cube)` to remove it. The
+[live view](@ref "Interactive live view") shows a view cube by default, which is disabled via
+`live_view(system, beam; view_cube = false)`.
+
 ## Live rendering
 
 `render!` generates new plots on every call. For animations and interactive applications, where
@@ -188,6 +225,9 @@ gui = live_view(system, beam)
 display(gui)
 ```
 
+A [view cube](@ref "View cube") in the top right corner of the 3D view switches to the standard
+views with a click, clicks on the cube never select or deselect a component.
+
 More than one `system => beam` pair can be shown in the same 3D view, e.g. the transmitter and
 receiver path of a lidar, which are solved with different sources:
 
@@ -214,6 +254,32 @@ render!(gui.ax, housing_mesh; transparency = true, color = (:gray, 0.3))
 Such geometry is not selectable and does not block clicking on the optics behind it: objects are
 picked by intersecting the camera ray with the movable objects of the system, not with everything
 drawn in the scene, so a housing mesh in front of a component never gets in the way.
+
+### Clip planes
+
+Clip planes cut the 3D view open, e.g. to look into a housing or behind a component. Only the side
+of a plane its normal points to stays visible. `p` adds a plane through the selected component, or
+through the point the camera looks at if nothing is selected, with its normal along the view
+direction. A plane is selected via the purple handle at its center and moved and rotated like a
+component, its normal is the green axis. Moving a plane does not solve the systems.
+
+| Input      | Action                                                  |
+|:-----------|:--------------------------------------------------------|
+| `p`        | Add a clip plane and select it                          |
+| `Delete`   | Remove the selected clip plane                          |
+| `c`        | Switch clipping on or off (all planes)                  |
+| `Shift+c`  | Flip the selected clip plane, i.e. show the other side  |
+
+Planes can also be given at construction as `point => normal`. The beams are not clipped unless
+`clip_beams = true` or the "clip beams" toggle below the 3D view is switched on, the markers of
+the sources and planes are never clipped:
+
+```julia
+gui = live_view(system, beam; clip_planes = [[0, 0.1, 0] => [0, 1, 0]], clip_beams = true)
+```
+
+Makie supports at most 8 clip planes. The selection box of a partly clipped component only covers
+its visible part.
 
 ### Detector panels
 
@@ -291,7 +357,8 @@ movement pauses.
 
 The 3D view uses the controls of [`kinematic_controls!`](@ref), see
 [Interactive kinematics](@ref). In addition, the key `t` solves the systems immediately, see
-[Manual tracing](@ref). The keyboard step can be typed into the textbox below the 3D view, e.g.
+[Manual tracing](@ref), and `p`, `Delete`, `c` and `Shift+c` control the clip planes, see
+[Clip planes](@ref). The keyboard step can be typed into the textbox below the 3D view, e.g.
 `250 nm` or `50 µrad`, where the unit selects the move or rotate mode. The status line shows the
 pose of the moved component and its change since the window was opened. Names for the status line
 and the detector panels are passed via `labels`:
