@@ -4,6 +4,7 @@ using BeamletOptics
 using LinearAlgebra
 using Test
 using Logging
+using Random
 
 const BMO = BeamletOptics
 
@@ -278,6 +279,23 @@ end
         end
         xrotate3d!(lens, -tilt)
     end
+end
+
+@testset "Issue#82" begin
+    # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/82
+    rng = MersenneTwister(1)
+    n = 1.458
+    spurious = 0
+    for _ in 1:2000
+        lens = Lens(CircularFlatSurface(30mm), SphericalSurface(31.85mm, 30mm), 4mm, λ -> n)
+        rotate3d!(lens, BMO.rotate3d(normalize(randn(rng, 3)), 2π * rand(rng)))
+        translate3d!(lens, 12 .* randn(rng, 3))
+        dir = orientation(lens)[:, 2]
+        beam = Beam(position(lens) - 0.1 * dir, dir, 589e-9)
+        solve_system!(System([lens]), beam)
+        spurious += BMO.refractive_index.(BMO.rays(beam)) != [1, n, 1]
+    end
+    @test spurious == 0
 end
 
 @testset "PlateBeamsplitter BoundsError" begin
