@@ -4,11 +4,11 @@ using BeamletOptics
 import BeamletOptics: render!, RenderException, _RenderTypes, get_view, set_view, hide_axis,
                        set_orthographic, arrow!, render_lcs!, look_at!,
                        AbstractRenderHandle, live_render!, update_render!, remove_render!,
-                       pick_object, kinematic_controls!, live_view, view_cube!
+                       pick_object, kinematic_controls!, live_view, view_cube!, studio_lighting!
 
 const BMO = BeamletOptics
 
-using Makie: Axis3, LScene, mesh!, surface!, lines!, RGBf, RGBAf, scatter!, text!,
+using Makie: Axis3, LScene, mesh!, surface!, lines!, linesegments!, RGBf, RGBAf, scatter!, text!,
              update_cam!, cameracontrols, arrows3d!
 using PrecompileTools: @setup_workload, @compile_workload
 using GeometryBasics: Point2, Point3, Point3f, Point3d, Vec3f, Vec3d, GLTriangleFace, Mesh
@@ -56,6 +56,7 @@ include("RenderPolarization.jl")
 include("RenderGaussian.jl")
 include("RenderAstigmaticGaussian.jl")
 include("RenderTessellation.jl")
+include("RenderLook.jl")
 include("RenderSDF.jl")
 include("RenderMesh.jl")
 include("RenderObjects.jl")

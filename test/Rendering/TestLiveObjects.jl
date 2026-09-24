@@ -70,7 +70,8 @@ end
     @testset "SingleShape (RoundPlanoMirror, SDF marching-cubes mesh)" begin
         mir = RoundPlanoMirror(0.025, 0.005)
         h = live_render!(ax, mir)
-        @test length(h.plots) == 1
+        @test length(h.plots) == 2 # mesh and feature edges
+        @test h.plots[1] isa Makie.Mesh
 
         translate3d!(mir, [0.0, 0.02, 0.0])
         yrotate3d!(mir, deg2rad(30))
@@ -99,7 +100,7 @@ end
     @testset "Mesh-based object (RightAnglePrismMirror): full vertex check" begin
         # Compare with the rigid transformation, since a new render! would re-mesh the object
         prism = RightAnglePrismMirror(0.02, 0.01)
-        h = live_render!(ax, prism)
+        h = live_render!(ax, prism; edges = false)
         @test length(h.plots) == 1
         plot = h.plots[1]
 
@@ -125,7 +126,8 @@ end
         cbs = CubeBeamsplitter(0.02, λ -> 1.5)
         h = live_render!(ax, cbs)
         n = length(h.plots)
-        @test n == 2 # merged front and back, coating
+        @test count(p -> p isa Makie.Mesh, h.plots) == 2 # merged front and back, coating
+        @test n == 3 # and the feature edges
 
         translate3d!(cbs, [0.01, 0.02, -0.01])
         zrotate3d!(cbs, deg2rad(35))
@@ -183,7 +185,8 @@ end
         h = live_render!(ax, group)
         @test h isa Ext.ObjectRenderHandle
         n = length(h.plots)
-        @test n == 1 # one merged mesh
+        @test count(p -> p isa Makie.Mesh, h.plots) == 1 # one merged mesh
+        @test n == 2 # and the feature edges
 
         translate3d!(group, [0.02, 0, 0])
         zrotate3d!(group, deg2rad(10))

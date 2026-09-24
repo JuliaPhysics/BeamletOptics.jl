@@ -377,15 +377,18 @@ function _crossing(g, pa, pb, fa, fb)
 end
 
 """
-    _clip(m, g, own, τ)
+    _clip(m, g, own, τ; on = nothing, interface = nothing)
 
 Returns the part of `m` where `g > τ`, e.g. outside of the other parts of a union. Triangles with
 all vertices on the boundary (`|g| ≤ τ`, i.e. coincident faces) are kept if `g > τ` holds at their
 centroid, which is projected onto the surface of `own` (the SDF of `m`, or `nothing`) first, since
 the centroids of curved triangles lie inside the true surface. Triangles with vertices on both
 sides are cut along `g = 0`.
+
+Removed coincident triangles whose projected centroid also lies on the surface of `on`
+(`|on| ≤ τ`) are added to the [`_TriMesh`](@ref) `interface`, e.g. the cemented faces of a lens.
 """
-function _clip(m::_TriMesh, g, own, τ)
+function _clip(m::_TriMesh, g, own, τ; on = nothing, interface::Union{Nothing, _TriMesh} = nothing)
     n = length(m.points)
     f = [g(p) for p in m.points]
     cls = [v > τ ? 1 : (v < -τ ? -1 : 0) for v in f]
@@ -405,6 +408,7 @@ function _clip(m::_TriMesh, g, own, τ)
         end
     end
     kept = NTuple{3, Int}[]
+    coincident = NTuple{3, Int}[]
     poly = Int[]
     for tri in m.faces
         c = map(i -> cls[i], tri)
@@ -423,7 +427,11 @@ function _clip(m::_TriMesh, g, own, τ)
                     ctr = ctr - d * nc
                 end
             end
-            g(ctr) > τ && push!(kept, tri)
+            if g(ctr) > τ
+                push!(kept, tri)
+            elseif !isnothing(on) && abs(on(ctr)) ≤ τ
+                push!(coincident, tri)
+            end
         else
             # Sutherland-Hodgman clipping of the triangle against g > 0
             empty!(poly)
@@ -452,6 +460,16 @@ function _clip(m::_TriMesh, g, own, τ)
     sizehint!(out.faces, length(kept))
     for tri in kept
         push!(out.faces, map(vertex, tri))
+    end
+    if !isnothing(interface) && !isempty(coincident)
+        # the coincident triangles are not cut, i.e. consist of vertices of m only
+        used = unique(Iterators.flatten(coincident))
+        offset = length(interface.points)
+        new_ids = Dict(k => offset + i for (i, k) in enumerate(used))
+        append!(interface.points, m.points[used])
+        append!(interface.normals, m.normals[used])
+        append!(interface.tags, m.tags[used])
+        append!(interface.faces, (map(k -> new_ids[k], tri) for tri in coincident))
     end
     return out
 end
@@ -547,13 +565,16 @@ end
 (o::_Outside)(p) = -BMO.sdf(o.s, p)
 
 """
-    _union(parts)
+    _union(parts; interface = nothing, cemented = nothing)
 
 Returns the merged mesh of the union of `parts`, a vector of `(mesh, sdf)`. Triangles of a part
 that lie inside or on the surface of another part are removed, see `_clip`. Parts with
 `sdf = nothing` are neither filtered nor used for filtering.
+
+If a [`_TriMesh`](@ref) `interface` is given, the faces where two `cemented` parts (one `Bool` per
+part) touch are added to it once, i.e. the copy of the first of both parts.
 """
-function _union(parts)
+function _union(parts; interface::Union{Nothing, _TriMesh} = nothing, cemented = nothing)
     length(parts) == 1 && return first(first(parts))
     lo, hi = _bbox((m for (m, _) in parts)...)
     τ = _TAU * maximum(hi - lo)
@@ -565,9 +586,14 @@ function _union(parts)
         others = Tuple(bounded[j] for j in eachindex(parts) if j != i && !isnothing(bounded[j]))
         if isnothing(s) || isempty(others)
             push!(meshes, m)
-        else
-            push!(meshes, _clip(m, _MinOf(others), s, τ))
+            continue
         end
+        on = nothing
+        if !isnothing(interface) && cemented[i]
+            later = Tuple(bounded[j] for j in (i + 1):length(parts) if cemented[j] && !isnothing(bounded[j]))
+            isempty(later) || (on = _MinOf(later))
+        end
+        push!(meshes, _clip(m, _MinOf(others), s, τ; on, interface))
     end
     return _merge(meshes)
 end
@@ -685,32 +711,38 @@ function _plot_mesh!(ax::_RenderEnv, m::_TriMesh; color = nothing, kwargs...)
 end
 
 """
-    _render_mesh!(ax, s; color = _default_color(s), kwargs...)
+    _render_mesh!(ax, s; color = _default_color(s), edges = false, cemented = false, kwargs...)
 
-Renders the analytic mesh of the shape `s`. Inside of a `MultiShape` object the mesh is collected
-instead, see `_MESH_COLLECTOR`.
+Renders the analytic mesh of the shape `s` and, if `edges`, its feature edges, see `_plot_edges!`.
+Inside of a `MultiShape` object the mesh is collected instead, see `_MESH_COLLECTOR`. `cemented`
+marks the parts whose contact faces are cemented interfaces, see `_plot_collected!`.
 """
-function _render_mesh!(ax::_RenderEnv, s; color = _default_color(s), kwargs...)
+function _render_mesh!(ax::_RenderEnv, s; color = _default_color(s), edges::Bool = false,
+        cemented::Bool = false, kwargs...)
     m = _tessellate(s)
     parts = _MESH_COLLECTOR[]
     if isnothing(parts)
         _plot_mesh!(ax, m; color, kwargs...)
+        edges && _plot_edges!(ax, (m,); kwargs...)
     else
-        push!(parts, (m, s isa BMO.AbstractSDF ? s : nothing, (; color, kwargs...)))
+        push!(parts, (m, s isa BMO.AbstractSDF ? s : nothing, (; color, kwargs...), cemented))
     end
     return nothing
 end
 
 """
-    _plot_collected!(ax, parts)
+    _plot_collected!(ax, parts; edges = false)
 
 Plots the collected `parts` (see `_MESH_COLLECTOR`), one mesh per set of plot attributes. The parts
-of a mesh are merged via `_union`, i.e. coincident interior faces are removed.
+of a mesh are merged via `_union`, i.e. coincident interior faces are removed. The faces where two
+`cemented` parts touch (e.g. the lenses of a doublet) are plotted once as separate interface meshes
+with the `:interface` material, which overrides the look attributes of the parts. Finally, the
+feature `edges` of all meshes are plotted as a single plot, see `_plot_edges!`.
 """
-function _plot_collected!(ax::_RenderEnv, parts)
+function _plot_collected!(ax::_RenderEnv, parts; edges::Bool = false)
     keys = Any[]
     groups = Vector{Any}[]
-    for (m, s, kw) in parts
+    for (m, s, kw, cemented) in parts
         key = (kw, m.two_sided)
         i = findfirst(k -> isequal(k, key), keys)
         if isnothing(i)
@@ -718,10 +750,21 @@ function _plot_collected!(ax::_RenderEnv, parts)
             push!(groups, Any[])
             i = length(keys)
         end
-        push!(groups[i], (m, s))
+        push!(groups[i], (m, s, cemented))
     end
+    meshes = _TriMesh[]
+    interfaces = Any[]
     for (key, group) in zip(keys, groups)
-        _plot_mesh!(ax, _union(group); key[1]...)
+        cemented = Bool[c for (_, _, c) in group]
+        interface = count(cemented) > 1 ? _TriMesh(; two_sided = true) : nothing
+        m = _union([(m, s) for (m, s, _) in group]; interface, cemented)
+        _plot_mesh!(ax, m; key[1]...)
+        push!(meshes, m)
+        isnothing(interface) || isempty(interface.faces) || push!(interfaces, (interface, key[1]))
     end
+    for (interface, kw) in interfaces
+        _plot_mesh!(ax, interface; kw..., _MATERIALS[:interface]...)
+    end
+    edges && !isempty(keys) && _plot_edges!(ax, meshes; first(keys)[1]...)
     return nothing
 end

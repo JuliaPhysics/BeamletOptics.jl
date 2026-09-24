@@ -1,12 +1,11 @@
-render!(ax::_RenderEnv, refr::BMO.AbstractRefractiveOptic; kwargs...) = _render!(ax, refr; transparency=true, color=:white, kwargs...)
-render!(ax::_RenderEnv, refl::BMO.AbstractReflectiveOptic; kwargs...) = _render!(ax, refl; transparency=false, color=:silver, kwargs...)
+#=
+Material classes of the components, see `_MATERIALS`. The parts of MultiShape objects (e.g. the
+prisms and the coating of a `CubeBeamsplitter`) are rendered with the class of each part.
+=#
 
-render!(ax::_RenderEnv, lens::Lens; kwargs...) = _render!(ax, lens; transparency=true, color=RGBf(0.678, 0.847, 0.902), alpha=0.5, kwargs...)
-render!(ax::_RenderEnv, lens::DoubletLens; kwargs...) = _render!(ax, lens; transparency=true, color=RGBf(0.678, 0.847, 0.902), alpha=0.5, kwargs...)
-render!(ax::_RenderEnv, lens::TripletLens; kwargs...) = _render!(ax, lens; transparency=true, color=RGBf(0.678, 0.847, 0.902), alpha=0.5, kwargs...)
-
-render!(ax::_RenderEnv, bs::ThinBeamsplitter; kwargs...) = _render!(ax, bs; transparency=true, color=:magenta, kwargs...)
-
-render!(ax::_RenderEnv, nino::BMO.NonInteractableObject; kwargs...) = _render!(ax, nino; transparency=false, color=:grey, kwargs...)
-
-render!(ax::_RenderEnv, nino::BMO.IntersectableObject; kwargs...) = _render!(ax, nino; transparency=true, color=:grey, kwargs...)
+_material_class(::BMO.AbstractObject) = :mechanics
+_material_class(::BMO.AbstractRefractiveOptic) = :refractive
+_material_class(::BMO.AbstractReflectiveOptic) = :reflective
+_material_class(::ThinBeamsplitter) = :coating
+_material_class(::BMO.AbstractJonesPolarizer) = :polarizer
+_material_class(::BMO.AbstractDetector) = :detector

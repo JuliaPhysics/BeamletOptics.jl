@@ -43,7 +43,8 @@ function render!(ax::_RenderEnv, lipo::LinearPolarizer; show_transmission_axis::
         axis_color=:black, axis_linewidth=2, kwargs...)
     render!(ax, lipo.front; kwargs...)
     render!(ax, lipo.back; kwargs...)
-    _render!(ax, lipo.filter; transparency=true, alpha=0.75, color=:green)
+    # The film uses the polarizer material, explicit kwargs (e.g. `material`, `edges`) apply to all parts
+    _render!(ax, lipo.filter; kwargs...)
     if show_transmission_axis
         t_f = thickness(lipo.front)
         t_b = thickness(lipo.back)

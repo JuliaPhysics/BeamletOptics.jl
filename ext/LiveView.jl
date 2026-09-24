@@ -816,6 +816,10 @@ view. The selection box of a partly clipped component only covers its visible pa
   face, edge or corner switches to the corresponding standard view, see [`view_cube!`](@ref)
 - `orthographic = false`: starts the 3D view with orthographic instead of perspective projection,
   can be switched with the "orthographic" toggle below the 3D view
+- `lighting = :studio`: lighting rig of the 3D view, see [`studio_lighting!`](@ref), `:none`
+  keeps the default lights of Makie
+- `edges = true`: draws the feature edges of the components, see [`render!`](@ref). An `edges`
+  entry of `system_kwargs` takes precedence.
 - all other kwargs are passed to [`kinematic_controls!`](@ref), e.g. `fine_step`, `plane_normal`
   or `rotation_axis`
 """
@@ -836,6 +840,8 @@ function live_view(
         clip_beams::Bool = false,
         view_cube::Bool = true,
         orthographic::Bool = false,
+        lighting::Symbol = :studio,
+        edges::Bool = true,
         kwargs...
     )
     isempty(pairs) && throw(ArgumentError("live_view requires at least one system => beam pair"))
@@ -847,6 +853,7 @@ function live_view(
 
     fig = Figure(; size)
     ax = LScene(fig[1, 1]; show_axis = false)
+    studio_lighting!(ax; preset = lighting)
     # Its click listener runs before the controls, hence clicks on the cube never select objects
     cube = view_cube ? view_cube!(ax) : nothing
     ncols = isempty(specs) ? 1 : 2
@@ -880,7 +887,10 @@ function live_view(
     status = Label(status_row[1, 9],
         "Click on a component to select it, press h to show the controls"; tellwidth = false)
 
-    system_handles = SystemRenderHandle[live_render!(ax, sys; system_kwargs...) for sys in systems]
+    # `edges` is only passed if it differs from the default of `render!`, i.e. custom `render!`
+    # methods of user objects do not need to accept it
+    sys_kw = edges ? system_kwargs : (; edges, system_kwargs...)
+    system_handles = SystemRenderHandle[live_render!(ax, sys; sys_kw...) for sys in systems]
     beam_handles = AbstractRenderHandle[]
     for beam in last.(ps)
         default = beam isa BMO.AbstractBeamGroup ? (; render_every = 5) : (;)

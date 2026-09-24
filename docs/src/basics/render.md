@@ -55,6 +55,55 @@ julia> methods(render!)
   [5] etc...
 ```
 
+## Look
+
+Rendered objects have a CAD-like look: a material per component class, thin dark lines along
+the feature edges, and visible cemented interfaces of doublet and triplet lenses.
+
+| material      | components                                 | color        | alpha |
+|:--------------|:-------------------------------------------|:-------------|:------|
+| `:refractive` | lenses, prisms, plates, windows            | pale blue    | 0.35  |
+| `:reflective` | mirrors, retroreflector                    | silver       | 1     |
+| `:coating`    | beamsplitter coatings                      | pale magenta | 0.5   |
+| `:polarizer`  | polarization filters                       | dark teal    | 0.8   |
+| `:detector`   | detectors                                  | dark blue    | 1     |
+| `:mechanics`  | mechanics, dummies and other objects       | mid grey     | 1     |
+| `:interface`  | cemented interfaces of doublets, triplets  | amber        | 0.25  |
+
+Besides the color and the opacity, each material sets the `transparency`, `diffuse`, `specular`
+and `shininess` attributes of the mesh plot. The parts of composite objects are rendered with
+their own class, e.g. the prisms and the coating of a [`CubeBeamsplitter`](@ref). The following
+keyword arguments of `render!` change the look of an object:
+
+- `material = nothing`: one of the materials above, overrides the component class for all parts
+  of the object
+- `color`, `alpha`, `transparency`, ...: override the corresponding attribute of the material,
+  for all parts of the object. The cemented interfaces keep their amber look.
+- `edges = true`: draws the feature edges, i.e. the edges where the faces of an object meet at
+  an angle of more than 30°, and the boundary of open surfaces such as a `Detector`. `edges =
+  false` switches them off. Shapes rendered via the marching cubes fallback have no edges.
+
+```julia
+render!(ax, lens)                       # pale blue glass with edges
+render!(ax, lens; color = :red)         # red glass, same transparency
+render!(ax, mount; material = :mechanics, edges = false)
+```
+
+The lighting of the scene is set via [`studio_lighting!`](@ref): an ambient light plus a key
+light from the upper right front, a fill light from the left and a rim light from behind, all
+relative to the camera. Backends with a single directional light (e.g. CairoMakie) get the
+ambient and the key light only.
+
+```julia
+fig = Figure()
+ax = LScene(fig[1, 1])
+studio_lighting!(ax)
+render!(ax, system)
+```
+
+The [`live_view`](@ref) applies the rig and draws the edges by default, `lighting = :none` keeps
+the default lights of Makie and `edges = false` switches the edges off.
+
 ## Camera and scene helpers
 
 Alongside `render!`, a small set of `LScene`-specific helpers is provided for framing and

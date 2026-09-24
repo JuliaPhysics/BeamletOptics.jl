@@ -132,11 +132,11 @@ function posed!(s)
     return s
 end
 
-"""Returns the new plots of `render!(ax, x)`."""
-function rendered_plots(x)
+"""Returns the new plots of `render!(ax, x; kwargs...)`."""
+function rendered_plots(x; kwargs...)
     ax = LScene(Figure()[1, 1])
     n0 = length(ax.scene.plots)
-    render!(ax, x)
+    render!(ax, x; kwargs...)
     return ax.scene.plots[(n0 + 1):end]
 end
 
@@ -188,7 +188,7 @@ BMO.sdf(s::BlobSDF, p) = norm(BMO._world_to_sdf(s, p)) - 5e-3
         for (name, lens) in lenses
             @testset "$name" begin
                 posed!(lens)
-                plots = rendered_plots(lens)
+                plots = rendered_plots(lens; edges = false)
                 @test length(plots) == 1
                 @test plots[1] isa Makie.Mesh
                 check_solid(mesh_data(plots[1][1][])..., solid(BMO.shape(lens)))
@@ -200,10 +200,10 @@ BMO.sdf(s::BlobSDF, p) = norm(BMO._world_to_sdf(s, p)) - 5e-3
         @testset "doublet" begin
             dl = SphericalDoubletLens(87.9e-3, -105.6e-3, -1000, 6e-3, 3e-3, 25.4e-3, 1.5, 1.6)
             posed!(dl)
-            plots = rendered_plots(dl)
-            @test length(plots) == 1
+            plots = rendered_plots(dl; edges = false)
+            @test length(plots) == 2 # outer mesh and cemented interface, see TestRenderLook.jl
             s1, s2 = BMO.shape(dl.front), BMO.shape(dl.back)
-            # the cemented interface is interior and removed
+            # the cemented interface is interior and removed from the outer mesh
             check_solid(mesh_data(plots[1][1][])..., p -> min(BMO.sdf(s1, p), BMO.sdf(s2, p)))
         end
     end
@@ -225,7 +225,7 @@ BMO.sdf(s::BlobSDF, p) = norm(BMO._world_to_sdf(s, p)) - 5e-3
         end
         # conic mirror: front face in the given color, substrate grey
         cm = ConicMirror(200e-3, -0.5, 50e-3; thickness = 6e-3)
-        plots = rendered_plots(cm)
+        plots = rendered_plots(cm; edges = false)
         @test length(plots) == 1
         m = plots[1][1][]
         colors = plots[1].color[]
@@ -246,7 +246,7 @@ BMO.sdf(s::BlobSDF, p) = norm(BMO._world_to_sdf(s, p)) - 5e-3
     @testset "objects" begin
         # one mesh plot per color: prisms merged, coating separate
         cbs = CubeBeamsplitter(20e-3, λ -> 1.5)
-        plots = rendered_plots(cbs)
+        plots = rendered_plots(cbs; edges = false)
         @test length(plots) == 2
         @test all(p -> p isa Makie.Mesh, plots)
         prisms = argmax(p -> length(GeometryBasics.faces(p[1][])), plots)
@@ -255,7 +255,7 @@ BMO.sdf(s::BlobSDF, p) = norm(BMO._world_to_sdf(s, p)) - 5e-3
         @test is_closed(pts, fcs, 1e-9)
         # mesh shapes are flat shaded and lit from both sides
         rr = Retroreflector(25e-3)
-        plots = rendered_plots(rr)
+        plots = rendered_plots(rr; edges = false)
         @test length(plots) == 1
         @test plots[1].backlight[] == 1
         pts, nrm, fcs = mesh_data(plots[1][1][])
