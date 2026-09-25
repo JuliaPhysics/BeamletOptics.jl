@@ -112,7 +112,8 @@ end
 """
     set_new_origin3d!(mesh::AbstractMesh)
 
-Resets the mesh `dir`ectional matrix and `pos`ition vector to their initial values.\\
+Resets the mesh `dir`ectional matrix and `pos`ition vector to their initial values.
+
 **Warning: this operation is non-reversible!**
 """
 function set_new_origin3d!(mesh::AbstractMesh{T}) where {T}
@@ -186,7 +187,7 @@ end
 """
     intersect3d(mesh::Mesh, ray::Ray)
 
-This function is a generic implementation to check if a `ray` intersects the `mesh`.\\
+This function is a generic implementation to check if a `ray` intersects the `mesh`.
 """
 function intersect3d(mesh::AbstractMesh{M},
         ray::AbstractRay{R}) where {M <: Real, R <: Real}
