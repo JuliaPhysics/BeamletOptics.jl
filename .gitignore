@@ -34,9 +34,11 @@ snoop_compile/
 /docs/src/tutorials/laser_alignment.md
 /docs/src/assets/downloads/
 
-# DocumenterVitepress runs npm inside docs/ and leaves these behind
+# DocumenterVitepress runs npm inside docs/ and leaves these behind.
+# docs/package.json must stay tracked: without it DocumenterVitepress copies its
+# read-only template from ~/.julia/packages and then fails to write plugin deps
+# into it (Permission denied on CI).
 /docs/node_modules/
-/docs/package.json
 /docs/package-lock.json
 
 /scripts

@@ -183,6 +183,7 @@ makedocs(;
                     "Meshes"                    => joinpath("api", "meshes.md"),
                     "SDFs"                      => joinpath("api", "sdfs.md"),
                 ],
+                "Kinematics"                => joinpath("api", "kinematics_api.md"),
             ],
             "Roadmap" => "roadmap.md",
         ],
