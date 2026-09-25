@@ -86,20 +86,26 @@ end
         @test length(plots) == 2
         @test only(mesh_plots(plots)) === plots[1]
         edges = only(edge_plots(plots))
-        @test edges.linewidth[] == 1
-        # 0.6 × the opacity of the edges of the `:cad` look for the same object alpha
+        @test edges.linewidth[] == Ext._MODERN_EDGE_WIDTH
+        # a darker shade of the glass, not dark outlines
+        f, t = Ext._MODERN_EDGE_FACTOR, Ext._MODERN_EDGE_TINT
+        @test edges.color[].r ≈ t * mat.color.r
+        @test edges.color[].b ≈ t * mat.color.b
+        # the factor × the opacity of the edges of the `:cad` look for the same object alpha
         set_render_look(:cad)
         cad_edges = only(edge_plots(rendered_plots(lens; color = mat.color, alpha = mat.alpha)))
+        @test cad_edges.color[].r ≈ Ext._EDGE_COLOR.r
         set_render_look(:modern)
-        @test edges.color[].alpha ≈ 0.6 * cad_edges.color[].alpha
-        @test edges.color[].alpha ≈ 0.6 * Ext._edge_color(mat.color, mat.alpha).alpha
-        # the factor is taken when plotting, an Observable color keeps it
+        @test edges.color[].alpha ≈ f * cad_edges.color[].alpha
+        @test edges.color[].alpha ≈ f * Ext._edge_color(mat.color, mat.alpha).alpha
+        # the style is taken when plotting, an Observable color keeps it
         c = Observable(RGBAf(0.5, 0.5, 0.5, 1.0))
         edges = only(edge_plots(rendered_plots(lens; color = c, alpha = 1)))
-        @test edges.color[].alpha ≈ 0.6 * Ext._EDGE_COLOR.alpha
+        @test edges.color[].alpha ≈ f * Ext._EDGE_COLOR.alpha
+        @test edges.color[].r ≈ t * 0.5
         set_render_look(:cad)
         c[] = RGBAf(0.5, 0.5, 0.5, 1.0)
-        @test edges.color[].alpha ≈ 0.6 * Ext._EDGE_COLOR.alpha
+        @test edges.color[].alpha ≈ f * Ext._EDGE_COLOR.alpha
         set_render_look(:modern)
 
         # no edges of mirrors, detectors and mechanics, unless explicit
