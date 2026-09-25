@@ -1,5 +1,12 @@
 # # Laser alignment
 #
+# !!! tip "Before you start"
+#     This tutorial assumes basic familiarity with Julia. If you are new to the language, the [Getting started](https://docs.julialang.org/en/v1/manual/getting-started/) section of the Julia manual and the [Julia learning resources](https://julialang.org/learning/) are good starting points; [Modern Julia Workflows](https://modernjuliaworkflows.org/) covers package environments and editor setup.
+#
+#     We also assume that you run the code in [VS Code](https://code.visualstudio.com/) with the [Julia extension](https://www.julia-vscode.org/docs/stable/gettingstarted/) installed. Execute the code blocks one after another in the integrated Julia REPL, e.g. by selecting them and pressing `Shift+Enter`. You need to install the packages once beforehand: press `]` in the REPL and type `add BeamletOptics, GLMakie`.
+#
+#     Figures appear only when the figure object is returned or displayed. On this page, the plots are shown as images below the code blocks. When running the code yourself, end each plotting block with the figure variable (e.g. `fig`) or call `display(fig)`. With GLMakie, `display(fig)` opens an interactive window where the 3D scene can be rotated and zoomed. GLMakie handles the 2D plots in this tutorial as well.
+#
 # This tutorial walks through a small lab-style task: steering a HeNe laser beam onto the optical axis of a setup with two mirrors, then discovering and correcting a mirror mounting error with an alignment card.
 #
 # ```@raw html
@@ -27,13 +34,6 @@
 #
 # !!! info "Units"
 #     Unless stated otherwise, this package assumes SI units for input parameters. We define `const mm = 1e-3` below and use `mm` throughout to make lengths easier to read, e.g. `50mm` is 50 millimeters expressed in meters.
-#
-# !!! tip "Before you start"
-#     This tutorial assumes basic familiarity with Julia. If you are new to the language, the [Getting started](https://docs.julialang.org/en/v1/manual/getting-started/) section of the Julia manual and the [Julia learning resources](https://julialang.org/learning/) are good starting points; [Modern Julia Workflows](https://modernjuliaworkflows.org/) covers package environments and editor setup.
-#
-#     We also assume that you run the code in [VS Code](https://code.visualstudio.com/) with the [Julia extension](https://www.julia-vscode.org/docs/stable/gettingstarted/) installed. Execute the code blocks one after another in the integrated Julia REPL, e.g. by selecting them and pressing `Shift+Enter`. You need to install the packages once beforehand: press `]` in the REPL and type `add BeamletOptics GLMakie`.
-#
-#     Figures appear only when the figure object is returned or displayed. On this page, the plots are shown as images below the code blocks. When running the code yourself, end each plotting block with the figure variable (e.g. `fig`) or call `display(fig)`. With GLMakie, `display(fig)` opens an interactive window where the 3D scene can be rotated and zoomed. GLMakie handles the 2D plots in this tutorial as well.
 #
 # ## Setting up the mirrors
 #
