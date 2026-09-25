@@ -2,7 +2,7 @@ module TestLiveView
 
 using BeamletOptics
 using Makie
-using LinearAlgebra: normalize, dot
+using LinearAlgebra: normalize, dot, norm
 using Test
 
 const BMO = BeamletOptics
@@ -273,11 +273,11 @@ const BMO = BeamletOptics
         @test collect(BMO.direction(beam)) ≈ [0, 1, 0]
         close(gui)
 
-        # beam group: the whole source is moved
+        # beam group: the whole source is moved, all beams are solved without preview tracing
         m, pd = _fixture()
         cs = CollimatedSource([0.0, 0, 0], [0.0, 1, 0], 2e-3, 1e-6; num_rings = 2, num_rays = 40)
         gui_ref = Ref{Any}(nothing)
-        gui = _live_view(System([m, pd]) => cs; throttle = false, fine_step = 1e-3,
+        gui = _live_view(System([m, pd]) => cs; throttle = false, fine_step = 1e-3, preview = false,
             pick = ax -> (_marker(gui_ref[], cs).plots[1], 0))
         gui_ref[] = gui
         _select!(gui)
@@ -1206,6 +1206,375 @@ const BMO = BeamletOptics
         @test all(p -> p.visible[], leaf_plots)
         @test first(Ext._ray_pick(gui.controls, scene)) === m
         close(gui)
+    end
+
+    _tick!(gui, dt = 1.0) = (events(gui.ax.scene).tick[] = Makie.Tick(Makie.RegularRenderTick, 0, 0.0, dt))
+    _source() = CollimatedSource([0.0, 0, 0], [0.0, 1, 0], 2e-3, 1e-6; num_rings = 2, num_rays = 40)
+    _traced(b) = !isnothing(BMO.intersection(first(BMO.rays(b))))
+
+    @testset "preview tracing" begin
+        m, pd = _fixture()
+        cs = _source()
+        n_calls = Ref(0)
+        gui = _live_view(System([m, pd]) => cs; throttle = false, fine_step = 1e-4, idle_delay = 10.0,
+            on_change = (g, obj) -> (n_calls[] += 1))
+        @test gui.preview_enabled
+        @test length(BMO.hits(pd)) == 40
+        @test !endswith(gui.panels[1].ax.title[], "(preview)")
+        n0 = n_calls[]
+        gui.controls.selected[] = m
+        _key!(gui, Keyboard.up)
+        # only the rendered beams are traced, the others are reset
+        @test gui.preview
+        @test findall(_traced, BMO.beams(cs)) == collect(1:5:40)
+        @test length(BMO.hits(pd)) == 8
+        @test endswith(gui.panels[1].ax.title[], "8 rays (preview)")
+        @test n_calls[] == n0
+        pts = copy(gui.beam_handles[1].points[])
+        # still moving
+        _tick!(gui)
+        @test gui.preview
+        # the full solve once the movement pauses
+        gui.last_change -= 100
+        _tick!(gui)
+        @test !gui.preview
+        @test all(_traced, BMO.beams(cs))
+        @test length(BMO.hits(pd)) == 40
+        @test gui.panels[1].ax.title[] == "Detector 1: 40 rays"
+        @test n_calls[] == n0 + 1
+        # the beam plot shows the same rendered subset
+        @test gui.beam_handles[1].points[] == pts
+        # t solves fully as well
+        _key!(gui, Keyboard.up)
+        @test gui.preview
+        _key!(gui, Keyboard.t)
+        @test !gui.preview
+        @test length(BMO.hits(pd)) == 40
+        close(gui)
+
+        # the budget applies to the preview solve while moving
+        m, pd = _fixture()
+        gui = _live_view(System([m, pd]) => _source(); throttle = false, fine_step = 1e-4,
+            trace_budget = 0.5)
+        gui.solve_time = 1.0 # pretend that the full solve is slow
+        gui.controls.selected[] = m
+        _key!(gui, Keyboard.up)
+        @test !gui.pending
+        @test gui.preview
+        @test gui.preview_time < 0.5
+        close(gui)
+
+        # without preview tracing, all beams are traced immediately
+        m, pd = _fixture()
+        cs = _source()
+        gui = _live_view(System([m, pd]) => cs; throttle = false, fine_step = 1e-4, preview = false)
+        gui.controls.selected[] = m
+        _key!(gui, Keyboard.up)
+        @test !gui.preview
+        @test all(_traced, BMO.beams(cs))
+        @test length(BMO.hits(pd)) == 40
+        close(gui)
+
+        # a group rendered completely, single beams and Gaussian beamlets are not affected
+        for beam in (_source(), Beam([0.0, 0, 0], [0.0, 1, 0]), _gauss())
+            m, pd = _fixture()
+            gui = _live_view(System([m, pd]) => beam; throttle = false, fine_step = 1e-4,
+                beam_kwargs = beam isa BMO.AbstractBeamGroup ? Dict(beam => (; render_every = 1)) : Dict())
+            gui.controls.selected[] = m
+            _key!(gui, Keyboard.up)
+            @test !gui.preview
+            @test !endswith(gui.panels[1].ax.title[], "(preview)")
+            close(gui)
+        end
+    end
+
+    @testset "detector metrics" begin
+        # synthetic spot
+        c = (0.3e-3, -0.2e-3)
+        pts = [Point2(c[1] + dx, c[2] + dz) for (dx, dz) in ((1e-3, 0), (-1e-3, 0), (0, 2e-3), (0, -2e-3))]
+        mt = Ext._spot_metrics(pts)
+        @test mt.n == 4
+        @test abs(mt.cx - c[1]) < 1e-9 && abs(mt.cz - c[2]) < 1e-9
+        @test abs(mt.rms - sqrt(2.5) * 1e-3) < 1e-9
+        @test abs(mt.rmax - 2e-3) < 1e-9
+
+        # ray hits of a panel
+        m, pd = _fixture()
+        gui = _live_view(System([m, pd]) => _source())
+        p = gui.panels[1]
+        spots = BMO.spot_diagram(pd)
+        cx, cz = sum(q -> q[1], spots) / 40, sum(q -> q[2], spots) / 40
+        @test abs(p.metrics.cx - cx) < 1e-9 && abs(p.metrics.cz - cz) < 1e-9
+        @test abs(p.metrics.rms - sqrt(sum(q -> (q[1] - cx)^2 + (q[2] - cz)^2, spots) / 40)) < 1e-9
+        @test p.metrics.n == 40
+        @test p.centroid[] ≈ [Point2f(1e3 * cx, 1e3 * cz)]
+        @test startswith(p.ax.subtitle[], "N = 40, c = (")
+        @test occursin("rms ", p.ax.subtitle[])
+        @test isnothing(p.profiles_ax) && isempty(p.history_axes)
+        close(gui)
+
+        # Gaussian beamlet: power and 1/e² radius
+        m, pd = _fixture()
+        gui = _live_view(System([m, pd]), _gauss())
+        p = gui.panels[1]
+        @test isapprox(p.metrics.P, optical_power(pd); rtol = 1e-3)
+        # waist 0.5 mm at the source, 200 mm to the detector
+        zR = π * 0.5e-3^2 / 1e-6
+        w = 0.5e-3 * sqrt(1 + (0.2 / zR)^2)
+        @test isapprox(p.metrics.wx, w; rtol = 0.02)
+        @test isapprox(p.metrics.wz, w; rtol = 0.02)
+        @test abs(p.metrics.cx) < 1e-6 && abs(p.metrics.cz) < 1e-6
+        @test p.metrics.peak ≈ maximum(BMO.intensity(pd)[3])
+        @test startswith(p.ax.subtitle[], "P = ")
+        close(gui)
+
+        # logarithmic color scale with a floor, fixed color range
+        m, pd = _fixture()
+        # an area of ±5 w, where the floor applies
+        area = (; n = 20, x_min = -2.5e-3, x_max = 2.5e-3, z_min = -2.5e-3, z_max = 2.5e-3)
+        gui = _live_view(System([m, pd]), _gauss(); detectors = [pd => (:intensity, (; area..., colorscale = :log))])
+        p = gui.panels[1]
+        _, _, I = BMO.intensity(pd; area...)
+        Imax = maximum(I)
+        @test p.heat_I[] ≈ Float32.(log10.(max.(I, 1e-4 * Imax)))
+        @test minimum(p.heat_I[]) ≈ log10(1e-4 * Imax) rtol = 1e-5
+        @test collect(p.heat_plot.colorrange[]) ≈ [log10(1e-4 * Imax), log10(Imax)]
+        close(gui)
+        m, pd = _fixture()
+        gui = _live_view(System([m, pd]), _gauss(); detectors = [pd => (:intensity, (; n = 20, colorrange = (0, 5)))])
+        @test collect(gui.panels[1].heat_plot.colorrange[]) == [0, 5]
+        @test size(gui.panels[1].heat_I[]) == (20, 20)
+        close(gui)
+        @test_throws ArgumentError _live_view(System([m, pd]), _gauss(); detectors = [pd => (:intensity, (; colorscale = :sqrt))])
+
+        # history: one point per solve, at most 300
+        m, pd = _fixture()
+        gui = _live_view(System([m, pd]), Beam([0.0, 0, 0], [0.0, 1, 0]); throttle = false,
+            fine_step = 1e-4, detectors = [pd => (:spot, (; history = true))])
+        p = gui.panels[1]
+        @test length(p.history_axes) == 2
+        @test length(p.history_value[]) == 1
+        gui.controls.selected[] = m
+        _key!(gui, Keyboard.up)
+        _key!(gui, Keyboard.up)
+        @test length(p.history_value[]) == 3
+        @test last(p.history_value[]) == Point2f(3, 1)
+        @test last(p.history_cx[]) ≈ Point2f(3, 1e3 * p.metrics.cx)
+        @test p.history_axes[1].ylabel[] == "N"
+        for _ in 1:310
+            Ext._resolve!(gui, nothing)
+        end
+        @test length(p.history_value[]) == 300
+        @test length(p.history_cz[]) == 300
+        @test first(p.history_value[])[1] == 14 && last(p.history_value[])[1] == 313
+        close(gui)
+
+        # profiles through the centroid
+        m, pd = _fixture()
+        gui = _live_view(System([m, pd]), _gauss(); detectors = [pd => (:intensity, (; n = 30, profiles = true, history = true))])
+        p = gui.panels[1]
+        @test !isnothing(p.profiles_ax)
+        @test length(p.profiles_ax.scene.plots) == 2
+        x, z, I = BMO.intensity(pd; n = 30)
+        i, j = argmin(abs.(x .- p.metrics.cx)), argmin(abs.(z .- p.metrics.cz))
+        @test p.profile_x[] ≈ [Point2f(1e3 * x[k], I[k, j]) for k in 1:30]
+        @test p.profile_z[] ≈ [Point2f(1e3 * z[k], I[i, k]) for k in 1:30]
+        @test p.history_axes[1].ylabel[] == "P [mW]"
+        @test last(p.history_value[])[2] ≈ 1e3 * p.metrics.P
+        close(gui)
+    end
+
+    # Moves the cursor onto the projection of the point `p` [m] in the 3D view
+    function _cursor_to!(gui, p)
+        scene = gui.ax.scene
+        px = Makie.project(scene, :data, :pixel, Point3(p))
+        vp = scene.viewport[]
+        events(scene).mouseposition[] = (vp.origin[1] + px[1], vp.origin[2] + px[2])
+        return nothing
+    end
+
+    @testset "beam inspection" begin
+        # lens in front of the mirror, such that the refractive index matters
+        m, pd = _fixture()
+        lens = SphericalLens(0.05, -0.05, 5e-3, 25.4e-3)
+        translate3d!(lens, [0, 0.05, 0])
+        beam = Beam([0.0, 0, 0], [0.0, 1, 0])
+        gui = _live_view(System([lens, m, pd]), beam; throttle = false)
+        rays = collect(BMO.rays(beam))
+        @test length(rays) >= 4
+        # the segment behind the lens, viewed from above, and the segment towards the detector
+        for (k, eye) in ((3, [0.1, 0.06, 0.25]), (4, [0.05, 0.0, 0.25]))
+            r = rays[k]
+            mid = collect(BMO.position(r)) .+ 0.5 * length(r) .* collect(BMO.direction(r))
+            set_view(gui.ax, eye, mid, [0.0, 1, 0])
+            _cursor_to!(gui, mid)
+            _select!(gui)
+            info = gui.inspection
+            @test !isnothing(info)
+            @test maximum(abs.(info.point .- mid)) < 1e-6
+            @test info.direction ≈ collect(BMO.direction(r))
+            L = sum(length, rays[1:(k - 1)]) + 0.5 * length(r)
+            opl = sum(q -> length(q) * BMO.refractive_index(q), rays[1:(k - 1)]) +
+                  0.5 * length(r) * BMO.refractive_index(r)
+            @test abs(info.length - L) < 1e-6
+            @test abs(info.opl - opl) < 1e-6
+            @test info.opl > info.length + 1e-3 # through the lens
+            @test isnothing(info.w) && isnothing(info.R)
+            @test startswith(gui.status.text[], "beam at (")
+            @test occursin("OPL", gui.status.text[])
+            @test !isnothing(gui.inspection_plot)
+            @test isnothing(gui.controls.selected[])
+        end
+        # esc removes the marker
+        plot = gui.inspection_plot
+        _key!(gui, Keyboard.escape)
+        @test isnothing(gui.inspection) && isnothing(gui.inspection_plot)
+        @test !any(q -> q === plot, gui.ax.scene.plots)
+        # a click elsewhere removes it as well
+        r = rays[4]
+        mid = collect(BMO.position(r)) .+ 0.5 * length(r) .* collect(BMO.direction(r))
+        _cursor_to!(gui, mid)
+        _select!(gui)
+        @test !isnothing(gui.inspection)
+        _cursor_to!(gui, mid .+ [0.0, 0.03, 0])
+        _select!(gui)
+        @test isnothing(gui.inspection) && isnothing(gui.inspection_plot)
+
+        # components win over beams: the beam passes the center of the mirror
+        set_view(gui.ax, [0.1, 0.0, 0.25], collect(BMO.position(m)), [0.0, 1, 0])
+        _cursor_to!(gui, collect(BMO.position(m)))
+        _select!(gui)
+        @test gui.controls.selected[] === m
+        @test isnothing(gui.inspection)
+        close(gui)
+
+        # Gaussian beamlet: w and R of gauss_parameters
+        m, pd = _fixture()
+        gauss = _gauss()
+        gui = _live_view(System([m, pd]), gauss; throttle = false)
+        r = BMO.rays(gauss.chief)[1]
+        mid = collect(BMO.position(r)) .+ 0.4 * length(r) .* collect(BMO.direction(r))
+        set_view(gui.ax, [0.1, 0.04, 0.2], mid, [0.0, 1, 0])
+        _cursor_to!(gui, mid)
+        _select!(gui)
+        info = gui.inspection
+        @test maximum(abs.(info.point .- mid)) < 1e-6
+        @test abs(info.length - 0.4 * length(r)) < 1e-6
+        w, R = BMO.gauss_parameters(gauss, info.length)
+        @test info.w == w && info.R == R
+        @test occursin("w = ", gui.status.text[]) && occursin("R = ", gui.status.text[])
+        close(gui)
+    end
+
+    @testset "measuring" begin
+        m1 = RoundPlanoMirror(25e-3, 5e-3)
+        zrotate3d!(m1, deg2rad(45))
+        translate3d!(m1, [0, 0.1, 0])
+        m2 = RoundPlanoMirror(25e-3, 5e-3)
+        zrotate3d!(m2, deg2rad(-30))
+        xrotate3d!(m2, 0.1)
+        translate3d!(m2, [0.2, 0.1, 0.05])
+        pick_plot = Ref{Any}(nothing)
+        gui = _live_view(System([m1, m2]), Beam([0.0, 0, 0], [0.0, 1, 0]); throttle = false,
+            labels = Dict(m1 => "M1", m2 => "M2"), pick = ax -> (pick_plot[], 0))
+        _plot(obj) = gui.controls.h.handles[findfirst(oh -> oh.obj === obj, gui.controls.h.handles)].plots[1]
+        gui.measure_toggle.active[] = true
+        @test startswith(gui.status.text[], "measure:")
+        pick_plot[] = _plot(m1)
+        _select!(gui)
+        @test length(gui.measure_points) == 1
+        @test occursin("click the second point", gui.status.text[])
+        pick_plot[] = _plot(m2)
+        _select!(gui)
+        d = gui.measurement
+        @test abs(d.distance - norm(collect(BMO.position(m2)) - collect(BMO.position(m1)))) < 1e-9
+        n1, n2 = BMO.orientation(m1)[:, 2], BMO.orientation(m2)[:, 2]
+        @test d.angle ≈ acos(dot(n1, n2))
+        @test occursin("M1 to M2: distance", gui.status.text[])
+        @test occursin("angle", gui.status.text[])
+        @test length(gui.measure_plots) == 2
+        @test gui.measure_plots[1] isa Makie.Lines
+        # a third point starts a new measurement, the toggle clears it
+        _select!(gui)
+        @test length(gui.measure_points) == 1 && isnothing(gui.measurement)
+        gui.measure_toggle.active[] = false
+        @test isempty(gui.measure_points) && isempty(gui.measure_plots)
+        close(gui)
+    end
+
+    @testset "camera tools" begin
+        m, pd = _fixture()
+        lens = SphericalLens(0.05, -0.05, 5e-3, 25.4e-3)
+        translate3d!(lens, [0, 0.05, 0])
+        views = ["top" => ([0.0, 0.05, 0.5], [0.0, 0.05, 0.0], [0.0, 1.0, 0.0])]
+        gui = _live_view(System([lens, m, pd]), Beam([0.0, 0, 0], [0.0, 1, 0]); throttle = false, views)
+        cam = cameracontrols(gui.ax.scene)
+        _view() = Ext._current_view(gui)
+        # the home view is taken at the first tick, e.g. after `set_view` before `display`
+        set_view(gui.ax, [0.3, -0.2, 0.25], [0.0, 0.05, 0.0], [0.0, 0.0, 1.0])
+        _tick!(gui)
+        home = _view()
+        @test gui.home_set
+
+        # g: zoom to the selected lens, the view direction is kept
+        eye0, lookat0, _ = _view()
+        o0 = normalize(eye0 - lookat0)
+        gui.controls.selected[] = lens
+        _key!(gui, Keyboard.g)
+        _tick!(gui)
+        bb = Ext._selection_bbox(gui.controls, lens, Ext._object_plots(gui.controls.h, lens))
+        center = collect(minimum(bb) .+ Makie.widths(bb) ./ 2)
+        d = norm(collect(Makie.widths(bb)))
+        eye, lookat, _ = _view()
+        @test lookat ≈ center atol = 1e-6
+        @test normalize(eye - lookat) ≈ o0 atol = 1e-5
+        @test norm(eye - lookat) ≈ (d / 2) / sind(cam.fov[] / 2) rtol = 1e-5
+        # animated
+        gui.controls.selected[] = nothing
+        _key!(gui, Keyboard.g)
+        _tick!(gui, 0.05)
+        @test !isnothing(gui.camera_animation)
+        _tick!(gui)
+        @test isnothing(gui.camera_animation)
+        eye, lookat, _ = _view()
+        bbs = [Makie.boundingbox(p) for h in gui.system_handles for oh in h.handles for p in oh.plots]
+        bb = reduce(Ext.GeometryBasics.union, bbs)
+        @test lookat ≈ collect(minimum(bb) .+ Makie.widths(bb) ./ 2) atol = 1e-6
+
+        # home
+        notify(gui.home_button.clicks)
+        _tick!(gui)
+        for (a, b) in zip(_view(), home)
+            @test a ≈ b atol = 1e-6
+        end
+
+        # views menu
+        @test first.(gui.views_menu.options[]) == ["top"]
+        gui.views_menu.i_selected[] = 1
+        _tick!(gui)
+        for (a, b) in zip(_view(), views[1].second)
+            @test a ≈ b atol = 1e-6
+        end
+        # save view: appended and printed as Julia code
+        set_view(gui.ax, [0.1, 0.2, 0.3], [0.0, 0.01, 0.02], [0.0, 0.0, 1.0])
+        out = mktemp() do path, io
+            redirect_stdout(io) do
+                notify(gui.save_view_button.clicks)
+            end
+            flush(io)
+            read(path, String)
+        end
+        @test startswith(out, "\"view 2\" => ([")
+        entry = eval(Meta.parse(out))
+        @test entry.first == "view 2"
+        for (a, b) in zip(entry.second, _view())
+            @test a == b
+        end
+        @test first.(gui.views_menu.options[]) == ["top", "view 2"]
+        @test gui.views[2] == entry
+        close(gui)
+
+        @test_throws ArgumentError _live_view(System([lens]), Beam([0.0, 0, 0], [0.0, 1, 0]); views = ["a" => [1, 2, 3]])
     end
 end
 

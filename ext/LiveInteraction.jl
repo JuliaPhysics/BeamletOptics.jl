@@ -273,6 +273,9 @@ mutable struct KinematicController{H <: SystemRenderHandle}
     listeners::Vector{Any}
     # last error of on_change, logged only once
     last_error::Union{Nothing, String}
+    # called after each click (not a drag) with the selected object, or `nothing` for a click on the
+    # background; if it returns `true` for the background, the selection is kept, see `live_view`
+    on_click::Function
 end
 
 function Base.show(io::IO, ctrl::KinematicController)
@@ -958,7 +961,7 @@ function kinematic_controls!(
         false, false, zeros(3), zeros(3), (0.0, 0.0), nothing, nothing, :none,
         nothing, _HistoryEntry[], _HistoryEntry[], nothing,
         box_obs, arrow_pos, arrow_dir, label_pos, ring_pts, arrow_color, label_color, ring_color,
-        gizmo_size, gizmo_visible, help_obs, show_help, "", plots, Any[], nothing
+        gizmo_size, gizmo_visible, help_obs, show_help, "", plots, Any[], nothing, obj -> false
     )
 
     # High priority, so that the camera does not receive events while an object is dragged
@@ -1037,6 +1040,7 @@ function kinematic_controls!(
                 if moved < ctrl.drag_threshold
                     ctrl.selected[] = _drill_select(ctrl, ctrl.press_leaf)
                     _update_selection_box!(ctrl)
+                    ctrl.on_click(ctrl.selected[])
                 end
                 consume = true
             elseif kind == :pending_select
@@ -1044,9 +1048,10 @@ function kinematic_controls!(
                 if moved < ctrl.drag_threshold
                     ctrl.selected[] = _drill_select(ctrl, ctrl.press_leaf)
                     _update_selection_box!(ctrl)
+                    ctrl.on_click(ctrl.selected[])
                 end
             elseif kind == :background
-                if moved < ctrl.drag_threshold
+                if moved < ctrl.drag_threshold && !ctrl.on_click(nothing)
                     ctrl.selected[] = nothing
                     _update_selection_box!(ctrl)
                 end

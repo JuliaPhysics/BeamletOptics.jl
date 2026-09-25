@@ -378,6 +378,26 @@ The `kwargs` of the `pd => (mode, kwargs)` form are passed to [`intensity`](@ref
 a fixed extent via `x_min`, `x_max`, `z_min` and `z_max` (in meters, like the rest of this
 package), instead of the automatic crop around the beam.
 
+The subtitle of each panel shows its metrics for alignment, the centroid is marked by a red cross:
+
+- spot diagram: the number of hits `N`, the centroid `c`, the RMS radius `sqrt(mean(|p - c|²))`
+  and the geometric radius, i.e. the largest distance from the centroid
+- intensity: the power `P`, the peak intensity, the centroid `c` and the 1/e² radii `w` along x
+  and z, i.e. twice the standard deviation of the intensity along each axis
+
+The following panel options are not passed to [`intensity`](@ref):
+
+| Option                  | Effect                                                               |
+|:------------------------|:---------------------------------------------------------------------|
+| `colorscale = :log`     | shows `log10` of the intensity, with a floor of 1e-4 times the maximum |
+| `colorrange = (lo, hi)` | fixed color range of the intensity (in `log10` units for `:log`)     |
+| `history = true`        | adds an axis with the power (or `N`) and the centroid over the last 300 full solves |
+| `profiles = true`       | adds an axis with the intensity along x and z through the centroid   |
+
+```julia
+gui = live_view(system, beam; detectors = [pd => (:intensity, (; colorscale = :log, history = true, profiles = true))])
+```
+
 ### Sliders
 
 `sliders` adds custom parameters below the 3D view. Each entry is `"label" => (range, callback)`
@@ -394,8 +414,9 @@ for convenience must convert its value before applying it, as in `v * 1e-3` abov
 
 ### Custom updates
 
-`on_change = (gui, obj) -> ...` is called after every solve, with the moved object or `nothing`
-(initial solve, or after a slider change). Use it to plot additional derived quantities into
+`on_change = (gui, obj) -> ...` is called after every full solve, with the moved object or
+`nothing` (initial solve, or after a slider change). It is not called after the preview solves of
+beam groups while moving, see [Manual tracing](@ref), but once the full solve follows. Use it to plot additional derived quantities into
 `gui.fig`. Since `on_change` already runs for the initial solve inside `live_view`, the callback
 should only update an `Observable`; the axis and the plot are created once afterwards:
 
@@ -435,6 +456,17 @@ systems are solved once the movement pauses for `idle_delay` (0.2 s). Likewise, 
 that take longer than `trace_budget` show a coarse preview while moving, which is refined once the
 movement pauses.
 
+Beam groups, e.g. a source with thousands of rays, are rendered with `render_every = 5` by
+default, i.e. only every fifth beam is drawn. While a component is moved, such groups are only
+solved for the rendered beams (preview tracing), the other beams are reset and do not hit the
+detectors; the titles of the detector panels end with "(preview)". Once the movement pauses for
+`idle_delay`, the full group is solved. The `trace_budget` applies to the preview solve while
+moving, such that large groups stay interactive. `preview = false` always solves the full groups:
+
+```julia
+gui = live_view(system, source; beam_kwargs = Dict(source => (; render_every = 50)), preview = false)
+```
+
 ### Component menu and pose inspector
 
 The row below the status line holds a component menu, two buttons to hide components and the pose
@@ -454,6 +486,37 @@ inspector:
   like the arrow keys in the rotate mode, e.g. `rv = 1` equals one key step with a step of 1 mrad.
   Each input is a step of the undo history, the constraints of the component apply. While a box is
   focused, the keys of the 3D view are ignored.
+
+### Beam inspection and measuring
+
+A click on a beam, within 6 px of a rendered segment, marks the point on the beam and shows in the
+status line its position [mm], the direction of the beam, the geometric path length and the
+optical path length (Σ n·L) from the source [mm] and, for Gaussian beamlets, the radius `w` and
+the radius of curvature `R` at this point (see `BeamletOptics.gauss_parameters`). Components take
+precedence over beams, i.e. a click on a component still selects it. `esc` or a click elsewhere
+removes the marker.
+
+The "measure" toggle in the row of the component menu switches measuring on: two clicks on
+components or beams show the distance between the positions of the components or the points of
+the beams [mm], and the angle between the optical axes (local y-axes) of two components, with a
+dashed line between the points. A third click starts a new measurement, switching the toggle off
+clears it.
+
+### Camera tools
+
+| Input       | Action                                                                     |
+|:------------|:---------------------------------------------------------------------------|
+| `g`         | Zoom to the selected component, or to all systems, keeping the view direction |
+| "home"      | Restore the view when the window was shown                                 |
+| "views"     | Set one of the saved views                                                 |
+| "save view" | Save the current view as `"view n"` and print it as code for `views`       |
+
+Saved views can be passed to the next session via `views`:
+
+```julia
+gui = live_view(system, beam;
+    views = ["top" => ([0.0, 0.05, 0.5], [0.0, 0.05, 0.0], [0.0, 1.0, 0.0])])
+```
 
 ### Exporting the changes
 
@@ -485,8 +548,8 @@ Labels that are valid variable names are used as names, other objects are called
 
 The 3D view uses the controls of [`kinematic_controls!`](@ref), see
 [Interactive kinematics](@ref). In addition, the key `t` solves the systems immediately, see
-[Manual tracing](@ref), and `p`, `Delete`, `c` and `Shift+c` control the clip planes, see
-[Clip planes](@ref). The keyboard step can be typed into the textbox below the 3D view, e.g.
+[Manual tracing](@ref), `p`, `Delete`, `c` and `Shift+c` control the clip planes, see
+[Clip planes](@ref), and `g` zooms to the selection, see [Camera tools](@ref). The keyboard step can be typed into the textbox below the 3D view, e.g.
 `250 nm` or `50 µrad`, where the unit selects the move or rotate mode, see also
 [Component menu and pose inspector](@ref). The status line shows the
 pose of the moved component and its change since the window was opened. Names for the status line
