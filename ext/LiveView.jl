@@ -1,5 +1,6 @@
-using Makie: Figure, Axis, Label, SliderGrid, GridLayout, DataAspect, Relative, colsize!,
-             heatmap!, autolimits!, limits!, Button, Toggle, Textbox
+using Makie: Figure, Axis, Label, SliderGrid, GridLayout, DataAspect, Relative, colsize!, colgap!,
+             heatmap!, autolimits!, limits!, Button, Toggle, Textbox, Menu
+import InteractiveUtils
 
 """
     DetectorPanel
@@ -41,6 +42,12 @@ than `trace_budget` [s], the systems are solved once the movement pauses for `id
 The clip planes of the 3D view are stored in `clip_planes`, which are applied if `clipping` is
 `true`. The `orthographic_toggle` switches the 3D view between perspective and orthographic
 projection.
+
+The `export_button` prints the changed poses as Julia code, see [`export_changes`](@ref), and
+copies them to the clipboard if `export_clipboard` is `true`. The component `menu` lists the
+movable objects `menu_objects`, the objects hidden via the `hide_button` are stored in `hidden`.
+The `pose_boxes` of the pose inspector show and set the position `x`, `y`, `z` [mm] of the
+selected object and rotate it about the red, green and blue axes of the controls [mrad].
 """
 mutable struct LiveView
     fig::Figure
@@ -87,6 +94,18 @@ mutable struct LiveView
     view_cube::Union{Nothing, ViewCube}
     # orthographic projection of the 3D view, switched via the toggle
     orthographic_toggle::Toggle
+    # export of the changed poses, see `export_changes`
+    export_button::Button
+    export_clipboard::Bool
+    # component menu, the option `i` selects `menu_objects[i]`
+    menu::Menu
+    menu_objects::Vector{Any}
+    # hidden objects, i.e. rendered objects (leaves of groups) whose plots are invisible
+    hide_button::Button
+    show_all_button::Button
+    hidden::Base.IdSet{Any}
+    # pose inspector: x, y, z [mm] and the rotations rx, ry, rv [mrad], see `_POSE_FIELDS`
+    pose_boxes::Vector{Textbox}
 end
 
 Base.display(gui::LiveView) = display(gui.fig)
@@ -447,7 +466,7 @@ function _connect_trace!(gui::LiveView)
     push!(listeners, on(_ -> _trace!(gui), gui.trace_button.clicks))
     push!(listeners, on(events(gui.ax.scene).keyboardbutton, priority = 200) do event
         (event.action == Keyboard.press && event.key == Keyboard.t) || return Consume(false)
-        gui.step_box.focused[] && return Consume(false)
+        gui.controls.ignore_keys() && return Consume(false)
         _trace!(gui)
         return Consume(true)
     end)
@@ -729,6 +748,407 @@ function _connect_clip_planes!(gui::LiveView)
     return nothing
 end
 
+#=
+Export of the changed poses
+=#
+
+"""
+    _rotation_axis_angle(R)
+
+Returns the `axis` and `angle` of the rotation matrix `R` such that `rotate3d(axis, angle) ≈ R`.
+Unlike `_axis_angle_from_rotmatrix`, which is based on the trace of `R`, it is accurate to the
+precision of `Float64` for all angles, including small ones.
+"""
+function _rotation_axis_angle(R::AbstractMatrix)
+    # sin(angle) * axis
+    v = [R[3, 2] - R[2, 3], R[1, 3] - R[3, 1], R[2, 1] - R[1, 2]] ./ 2
+    s, c = norm(v), (tr(R) - 1) / 2
+    angle = atan(s, c)
+    iszero(s) && c > 0 && return [0.0, 0.0, 1.0], 0.0
+    c > -0.5 && return v ./ s, angle
+    # Close to π, where sin(angle) is inaccurate: (R + R') / 2 = c I + (1 - c) axis axis'
+    B = (R + R') ./ 2 - c * I
+    axis = normalize(B[:, argmax(diag(B))])
+    dot(axis, v) < 0 && (axis = -axis)
+    return axis, angle
+end
+
+"""Sets the pose of `obj` like `_set_pose!`, but with the accurate `_rotation_axis_angle`."""
+function _set_pose_exact!(obj, P, R)
+    axis, angle = _rotation_axis_angle(R * _pose(obj)[2]')
+    angle > 0 && rotate3d!(obj, axis, angle)
+    translate_to3d!(obj, P)
+    return nothing
+end
+
+"""
+    _menu_entries(ctrl)
+
+Returns `(obj, depth)` of all movable objects of the controls `ctrl` in the order of the component
+menu: the top-level objects in the order of the handles, the objects of a group after the group,
+with the nesting `depth` of the group. Clip planes are not listed.
+"""
+function _menu_entries(ctrl::KinematicController)
+    entries = Tuple{Any, Int}[]
+    function add!(obj, depth)
+        push!(entries, (obj, depth))
+        foreach(c -> add!(c, depth + 1), _children(obj))
+        return nothing
+    end
+    for obj in ctrl.movable
+        obj isa LiveClipPlane || add!(obj, 0)
+    end
+    return entries
+end
+
+"""Returns `true` if `s` can be used as the name of a variable."""
+_is_variable_name(s) = Base.isidentifier(s) && try
+    Meta.parse(s) isa Symbol
+catch
+    false
+end
+
+"""
+    _export_names(gui, objects)
+
+Returns the variable names of the `objects` in the code of `export_changes`: the label of an
+object if it is a valid, unique variable name, otherwise `obj1`, `obj2`, … by the position `k`
+of the object in `objects`, i.e. in the component menu.
+"""
+function _export_names(gui::LiveView, objects)
+    names = IdDict{Any, String}()
+    used = Set{String}()
+    for (k, obj) in enumerate(objects)
+        label = get(gui.labels, obj, "")
+        name = _is_variable_name(label) && !(label in used) ? label : "obj$k"
+        while name in used
+            name *= "_"
+        end
+        push!(used, name)
+        names[obj] = name
+    end
+    return names
+end
+
+"""Formats the vector `v` as Julia code with full precision."""
+_vector_code(v) = "[" * join((repr(Float64(x)) for x in v), ", ") * "]"
+
+"""
+    _initial_copy(ctrl, group)
+
+Returns a copy of the `group` in which the group and all its objects are reset to their initial
+poses of the controls `ctrl`, from the outside in.
+"""
+function _initial_copy(ctrl::KinematicController, group)
+    copy = deepcopy(group)
+    for (obj, c) in zip(_descendants(group), _descendants(copy))
+        haskey(ctrl.init_poses, obj) && _set_pose_exact!(c, ctrl.init_poses[obj]...)
+    end
+    return copy
+end
+
+"""
+    _export_code(gui) -> (code, n)
+
+Returns the Julia code of `export_changes` and the number `n` of changed objects. The objects are
+listed in the order of the component menu. Since moving a group moves its objects as well, the
+changes of a group and its objects are replayed on an `_initial_copy` of the group, such that the
+change of each object of the group is relative to its pose after the preceding lines.
+"""
+function _export_code(gui::LiveView)
+    ctrl = gui.controls
+    entries = _menu_entries(ctrl)
+    names = _export_names(gui, first.(entries))
+    lines = String[
+        "# Changed poses of the live view, apply to the objects in their initial poses.",
+        "# Each rotation is about the position of the object, groups are moved before their objects."]
+    n = 0
+    for top in ctrl.movable
+        top isa LiveClipPlane && continue
+        objs = _descendants(top)
+        copies = top isa BMO.AbstractObjectGroup ? _descendants(_initial_copy(ctrl, top)) : nothing
+        for (i, obj) in enumerate(objs)
+            haskey(ctrl.init_poses, obj) || continue
+            P, R = _pose(obj)
+            P0, R0 = isnothing(copies) ? ctrl.init_poses[obj] : _pose(copies[i])
+            (norm(P - P0) > 1e-15 || norm(R - R0) > 1e-15) || continue
+            axis, angle = _rotation_axis_angle(R * R0')
+            name = names[obj]
+            type = string(nameof(typeof(obj)))
+            label = get(gui.labels, obj, nothing)
+            push!(lines, "", isnothing(label) ? "# $type" : "# $label ($type)")
+            angle > 0 && push!(lines, "rotate3d!($name, $(_vector_code(axis)), $(repr(angle)))")
+            push!(lines, "translate_to3d!($name, $(_vector_code(P)))")
+            isnothing(copies) || _set_pose_exact!(copies[i], P, R)
+            n += 1
+        end
+    end
+    n == 0 && push!(lines, "", "# no changes")
+    return join(lines, "\n") * "\n", n
+end
+
+"""Copies `code` to the clipboard, returns `false` if there is no clipboard, e.g. headless."""
+function _copy_to_clipboard(code::String)
+    try
+        InteractiveUtils.clipboard(code)
+        return true
+    catch e
+        e isa InterruptException && rethrow()
+        return false
+    end
+end
+
+"""
+    export_changes(gui::LiveView; io = stdout, clipboard = false) -> String
+
+Returns the changes of the poses in the `gui` as Julia code, which is printed to `io` and copied to
+the clipboard if `clipboard` is `true` and a clipboard is available. The "Export" button of the
+`gui` prints the code and copies it to the clipboard.
+
+For each object whose pose differs from its initial pose, i.e. its pose when the window was
+opened, the code contains a `rotate3d!` about the position of the object (skipped if the object
+was only moved) followed by a `translate_to3d!` to its absolute position [m], with the full
+precision of `Float64`. Applied to the objects in their initial poses, e.g. in the script that
+created the system, the code reproduces the current poses. The objects of a group are listed after
+the group, their changes are relative to the pose after moving the group. Clip planes are not
+exported.
+
+The variables are named after the `labels` of [`live_view`](@ref) if they are valid variable names,
+otherwise `obj1`, `obj2`, … by the position of the object in the component menu. A comment above
+each change names the label and the type of the object.
+
+```julia
+gui = live_view(system, beam; labels = Dict(m1 => "m1", lens => "lens"))
+# move the objects, then
+code = export_changes(gui)
+```
+"""
+function export_changes(gui::LiveView; io::IO = stdout, clipboard::Bool = false)
+    code, _ = _export_code(gui)
+    print(io, code)
+    clipboard && _copy_to_clipboard(code)
+    return code
+end
+
+"""Prints the changed poses to `stdout` and copies them to the clipboard, see `export_changes`."""
+function _export!(gui::LiveView)
+    code, n = _export_code(gui)
+    print(stdout, code)
+    copied = gui.export_clipboard && _copy_to_clipboard(code)
+    gui.status.text[] = "exported $n change$(n == 1 ? "" : "s")" * (copied ? " (copied)" : "")
+    return nothing
+end
+
+#=
+Component menu, hide and show
+=#
+
+"""Returns the options of the component menu of the `entries`, see `_menu_entries`."""
+function _menu_options(labels, entries)
+    isempty(entries) && return [("no components", 0)]
+    return [("  "^depth * get(labels, obj, string(nameof(typeof(obj)))), i)
+            for (i, (obj, depth)) in enumerate(entries)]
+end
+
+"""
+    _on_menu_select!(gui, i)
+
+Selects the object of the option `i` of the component menu, like a click in the 3D view. The
+option `0`, i.e. no selection, is set by `_on_select!` and ignored.
+"""
+function _on_menu_select!(gui::LiveView, i)
+    1 <= i <= length(gui.menu_objects) || return nothing
+    ctrl = gui.controls
+    obj = gui.menu_objects[i]
+    ctrl.selected[] === obj && return nothing
+    if ctrl.spectator[]
+        gui.status.text[] = "spectator mode, press v to select components"
+        gui.menu.i_selected[] = 0
+        return nothing
+    end
+    ctrl.selected[] = obj
+    _update_selection_box!(ctrl)
+    gui.status.text[] = _pose_string(gui, obj)
+    return nothing
+end
+
+"""Shows the selected object of the controls in the component menu and in the pose inspector."""
+function _on_select!(gui::LiveView)
+    obj = gui.controls.selected[]
+    i = isnothing(obj) ? nothing : findfirst(o -> o === obj, gui.menu_objects)
+    i = something(i, 0)
+    gui.menu.i_selected[] == i || (gui.menu.i_selected[] = i)
+    _update_inspector!(gui)
+    return nothing
+end
+
+"""Sets the `visible` attribute of all plots of the rendered objects (leaves) of `obj`."""
+function _set_hidden!(gui::LiveView, obj, hide::Bool)
+    for leaf in _leaves(obj)
+        hide ? push!(gui.hidden, leaf) : delete!(gui.hidden, leaf)
+        i = findfirst(oh -> oh.obj === leaf, gui.controls.h.handles)
+        isnothing(i) && continue
+        for plot in gui.controls.h.handles[i].plots
+            plot.visible[] == !hide || (plot.visible[] = !hide)
+        end
+    end
+    return nothing
+end
+
+"""
+    _toggle_hidden!(gui)
+
+Hides the selected object of the `gui`, i.e. makes its plots invisible and clears the selection,
+or shows it again if it is hidden. A hidden object can not be selected in the 3D view, but it
+stays in the systems.
+"""
+function _toggle_hidden!(gui::LiveView)
+    ctrl = gui.controls
+    obj = ctrl.selected[]
+    if isnothing(obj)
+        gui.status.text[] = "select a component to hide it"
+        return nothing
+    elseif obj isa LiveClipPlane
+        gui.status.text[] = "clip planes can not be hidden, press c to switch clipping off"
+        return nothing
+    end
+    hide = !all(leaf -> leaf in gui.hidden, _leaves(obj))
+    _set_hidden!(gui, obj, hide)
+    if hide
+        ctrl.selected[] = nothing
+        _update_selection_box!(ctrl)
+        gui.status.text[] = "$(_label(gui, obj)) hidden, select it in the menu to show it again"
+    else
+        gui.status.text[] = "$(_label(gui, obj)) shown"
+    end
+    return nothing
+end
+
+"""Shows all hidden objects of the `gui`."""
+function _show_all!(gui::LiveView)
+    foreach(leaf -> _set_hidden!(gui, leaf, false), collect(gui.hidden))
+    gui.status.text[] = "all components shown"
+    return nothing
+end
+
+#=
+Pose inspector
+=#
+
+"""Labels of the boxes of the pose inspector: position [mm] and rotations about the axes [mrad]."""
+const _POSE_FIELDS = ("x [mm]", "y [mm]", "z [mm]", "rx [mrad]", "ry [mrad]", "rv [mrad]")
+
+"""Gizmo axes (see `_axis_vectors`) of the rotation boxes of the pose inspector."""
+const _POSE_AXES = (:x, :y, :v)
+
+"""Label colors of the pose inspector: the colors of the gizmo axes for the rotations."""
+const _POSE_COLORS = (:black, :black, :black, :red, :green, :blue)
+
+"""Returns `true` if a textbox or the component menu of the `gui` takes keyboard input."""
+function _typing(gui::LiveView)
+    gui.step_box.focused[] && return true
+    any(tb -> tb.focused[], gui.pose_boxes) && return true
+    return gui.menu.is_open[]
+end
+
+"""Shows `s` in the textbox `tb` without triggering its listeners, `""` shows the placeholder."""
+function _set_box!(tb::Textbox, s::String)
+    tb.stored_string.val = isempty(s) ? nothing : s
+    tb.displayed_string[] == s || (tb.displayed_string[] = s)
+    return nothing
+end
+
+"""
+    _update_inspector!(gui; force = false)
+
+Shows the position [mm] of the selected object of the `gui` in the position boxes of the pose
+inspector and clears the rotation boxes, or clears all boxes if nothing is selected. Focused boxes
+are skipped, unless `force`.
+"""
+function _update_inspector!(gui::LiveView; force::Bool = false)
+    obj = gui.controls.selected[]
+    p = isnothing(obj) ? nothing : 1e3 .* Vector{Float64}(position(obj))
+    for (k, tb) in enumerate(gui.pose_boxes)
+        tb.focused[] && !force && continue
+        _set_box!(tb, isnothing(p) || k > 3 ? "" : string(round(p[k], digits = 6)))
+    end
+    return nothing
+end
+
+"""Returns `true` if the constraints of `obj` allow a move by `Δ`, see `kinematic_controls!`."""
+function _move_allowed(ctrl::KinematicController, obj, Δ)
+    haskey(_constraints_of(ctrl, obj), :move) || return true
+    allowed = _allowed_axes(ctrl, obj, :move)
+    isempty(allowed) && return iszero(Δ)
+    A = hcat(_axis_vectors(ctrl, obj, allowed)...)
+    return norm(Δ - A * (pinv(A) * Δ)) <= 1e-12 + 1e-9 * norm(Δ)
+end
+
+"""
+    _apply_pose_input!(gui, k, s)
+
+Applies the input `s` of the box `k` of the pose inspector (see `_POSE_FIELDS`) to the selected
+object of the `gui`: for `k ≤ 3`, moves it to the absolute position x, y or z [mm], otherwise
+rotates it about the red, green or blue axis of the controls [mrad], like a key step in the rotate
+mode. The change is recorded in the undo history and solved like a key step. An invalid input
+only shows a message in the status line.
+"""
+function _apply_pose_input!(gui::LiveView, k::Int, s)
+    ctrl = gui.controls
+    obj = ctrl.selected[]
+    if isnothing(obj)
+        _update_inspector!(gui; force = true)
+        return nothing
+    end
+    x = isnothing(s) ? nothing : tryparse(Float64, strip(s))
+    if isnothing(x) || !isfinite(x)
+        gui.status.text[] = "invalid input \"$(something(s, ""))\" for $(_POSE_FIELDS[k]), enter a number"
+        return nothing
+    end
+    P0, R0 = _pose(obj)
+    if k <= 3
+        P = Vector{Float64}(P0)
+        P[k] = x / 1e3
+        if !_move_allowed(ctrl, obj, P - P0)
+            gui.status.text[] = "$(_label(gui, obj)) can not move along $(_POSE_FIELDS[k][1]), see the constraints"
+            _update_inspector!(gui; force = true)
+            return nothing
+        end
+        translate_to3d!(obj, P)
+        # `translate_to3d!` moves by `P - position`, which may round
+        r = P - Vector{Float64}(position(obj))
+        iszero(r) || translate3d!(obj, r)
+    else
+        sym = _POSE_AXES[k - 3]
+        if !(sym in _allowed_axes(ctrl, obj, :rotate))
+            gui.status.text[] = "$(_label(gui, obj)) can not rotate about this axis, see the constraints"
+            _update_inspector!(gui; force = true)
+            return nothing
+        end
+        iszero(x) || rotate3d!(obj, only(_axis_vectors(ctrl, obj, (sym,))), x / 1e3)
+    end
+    P1, R1 = _pose(obj)
+    ctrl.last_key_step = nothing
+    _push_history!(ctrl, obj, P0, R0, P1, R1)
+    _request_update!(ctrl)
+    _update_inspector!(gui; force = true)
+    return nothing
+end
+
+"""Connects the export button, the component menu, the hide buttons and the pose inspector."""
+function _connect_tools!(gui::LiveView)
+    listeners = gui.controls.listeners
+    push!(listeners, on(_ -> _export!(gui), gui.export_button.clicks))
+    push!(listeners, on(i -> _on_menu_select!(gui, i), gui.menu.i_selected))
+    push!(listeners, on(_ -> _on_select!(gui), gui.controls.selected))
+    push!(listeners, on(_ -> _toggle_hidden!(gui), gui.hide_button.clicks))
+    push!(listeners, on(_ -> _show_all!(gui), gui.show_all_button.clicks))
+    for (k, tb) in enumerate(gui.pose_boxes)
+        push!(listeners, on(s -> _apply_pose_input!(gui, k, s), tb.stored_string))
+    end
+    return nothing
+end
+
 """
     live_view(system => beam, ...; kwargs...)
     live_view(system, beam; kwargs...)
@@ -744,6 +1164,22 @@ Additional context, e.g. a static optomechanical assembly, can be added via `ren
 The status line shows the pose of the moved object and its change since the window was opened.
 The keyboard step can be typed into the textbox below the 3D view, e.g. `250 nm` or `50 µrad`,
 where the unit selects the move or rotate mode.
+
+# Component menu, pose inspector and export
+
+The row below the status line holds a menu of all movable objects (the objects of a group
+indented after the group, without clip planes), which selects an object like a click in the 3D
+view. "hide" makes the plots of the selected object invisible and clears the selection, "hide"
+on a hidden object selected in the menu shows it again, "show all" shows all objects. Hidden
+objects can not be selected in the 3D view, but are still traced.
+
+The pose inspector shows the position `x`, `y`, `z` [mm] of the selected object, `Enter` in a box
+moves the object to the typed absolute coordinate. `rx`, `ry` and `rv` [mrad] rotate the object
+about the red, green and blue axis of the controls, like the keys in the rotate mode. Each input is
+recorded in the undo history, invalid inputs are reported in the status line.
+
+The "Export" button prints the changed poses as Julia code to `stdout` and copies it to the
+clipboard, see [`export_changes`](@ref).
 
 # Adaptive tracing
 
@@ -805,7 +1241,8 @@ view. The selection box of a partly clipped component only covers its visible pa
   `(; render_every = 5)` for beam groups
 - `movable_sources = true`: shows an orange marker at each source, i.e. the beam or beam group of
   each pair, with which the source can be selected and moved like the components
-- `labels = Dict()`: `obj => "name"` for the status line and the titles of the detector panels
+- `labels = Dict()`: `obj => "name"` for the status line, the titles of the detector panels, the
+  component menu and the variable names of [`export_changes`](@ref)
 - `trace_budget = 0.03`: [s] duration of a solve or panel update, above which tracing is deferred
   or the panels show a preview, see "Adaptive tracing"
 - `idle_delay = 0.2`: [s] pause of the movement after which deferred tracing runs
@@ -886,8 +1323,23 @@ function live_view(
     orthographic_toggle = Toggle(status_row[1, 6]; active = orthographic)
     Label(status_row[1, 7], "orthographic")
     step_box = Textbox(status_row[1, 8]; placeholder = "step, e.g. 250 nm", width = 150)
-    status = Label(status_row[1, 9],
+    export_button = Button(status_row[1, 9]; label = "Export")
+    status = Label(status_row[1, 10],
         "Click on a component to select it, press h to show the controls"; tellwidth = false)
+    # Tool row: component menu (added below, once the movable objects are known), hide buttons and
+    # pose inspector
+    tool_row = GridLayout(fig[isnothing(slider_grid) ? 3 : 4, 1:ncols])
+    hide_button = Button(tool_row[1, 2]; label = "hide")
+    show_all_button = Button(tool_row[1, 3]; label = "show all")
+    pose_boxes = Textbox[]
+    for (k, (field, color)) in enumerate(zip(_POSE_FIELDS, _POSE_COLORS))
+        Label(tool_row[1, 2k + 2], field; color)
+        push!(pose_boxes, Textbox(tool_row[1, 2k + 3]; placeholder = k <= 3 ? " " : "0", width = 72))
+    end
+    # Keeps the tool row left-aligned
+    # Keeps the tool row left-aligned and compact enough for narrow windows
+    Label(tool_row[1, 16], ""; tellwidth = false)
+    colgap!(tool_row, 6)
 
     # `edges` is only passed if given, i.e. custom `render!` methods of user objects do not need to
     # accept it
@@ -918,17 +1370,27 @@ function live_view(
     foreach(h -> merge!(parent, h.parent), system_handles)
     combined = SystemRenderHandle(ax, first(systems), handles, parent)
     gui_ref = Ref{LiveView}()
-    # Typing into the step textbox must not trigger the controls
     # Moving a clip plane only re-applies the planes, the systems are not solved
-    change = obj -> obj isa LiveClipPlane ? _on_clip_change!(gui_ref[], obj) : _on_change!(gui_ref[], obj)
+    change = function (obj)
+        gui = gui_ref[]
+        obj isa LiveClipPlane ? _on_clip_change!(gui, obj) : _on_change!(gui, obj)
+        _update_inspector!(gui)
+        return nothing
+    end
+    # Typing into a textbox or the search of the component menu must not trigger the controls
     controls = kinematic_controls!(ax, combined; on_change = change,
-        ignore_keys = () -> step_box.focused[], kwargs...)
+        ignore_keys = () -> isassigned(gui_ref) && _typing(gui_ref[]), kwargs...)
 
+    labels_dict = IdDict{Any, String}(labels)
+    entries = _menu_entries(controls)
+    menu = Menu(tool_row[1, 1]; options = _menu_options(labels_dict, entries), default = nothing,
+        prompt = "select component", width = 170)
     gui = LiveView(fig, ax, ps, system_handles, beam_handles, controls, panels, status, slider_grid,
         on_change, nothing, auto_trace_toggle.active, false, trace_button, auto_trace_toggle,
         IdDict{Any, Any}(), Float64(trace_budget), Float64(idle_delay), 0.0, 0.0, false, nothing,
-        0.0, false, IdDict{Any, String}(labels), step_box, LiveClipPlane[], true, 1.2 * extent,
-        clip_beams, clip_beams_toggle, cube, orthographic_toggle)
+        0.0, false, labels_dict, step_box, LiveClipPlane[], true, 1.2 * extent,
+        clip_beams, clip_beams_toggle, cube, orthographic_toggle, export_button, true, menu,
+        Any[first.(entries)...], hide_button, show_all_button, Base.IdSet{Any}(), pose_boxes)
     gui_ref[] = gui
     for (point, normal) in clip_specs
         _add_clip_plane!(gui, point, normal; select = false)
@@ -936,6 +1398,7 @@ function live_view(
     isnothing(slider_grid) || _connect_sliders!(gui, last.(slider_specs))
     _connect_trace!(gui)
     _connect_clip_planes!(gui)
+    _connect_tools!(gui)
     push!(controls.listeners, on(v -> v == gui.clip_beams || _set_clip_beams!(gui, v), clip_beams_toggle.active))
     push!(controls.listeners, on(s -> _set_step!(gui, s), step_box.stored_string))
     push!(controls.listeners, on(v -> _set_orthographic!(gui, v), orthographic_toggle.active))

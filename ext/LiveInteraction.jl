@@ -325,6 +325,13 @@ function _object_plots(h::SystemRenderHandle, obj)
     return plots
 end
 
+"""Returns `true` if all plots of the rendered object `leaf` are invisible, e.g. hidden via the
+component menu of `live_view`. Such objects can not be selected in the 3D view."""
+function _is_hidden(ctrl::KinematicController, leaf)
+    plots = _object_plots(ctrl.h, leaf)
+    return !isempty(plots) && all(p -> !p.visible[], plots)
+end
+
 """
     _drill_select(ctrl, leaf)
 
@@ -725,7 +732,8 @@ end
 
 Returns `(obj, t)`: the object hit by the camera ray at the current cursor position of `scene`
 among all objects of the movable objects of `ctrl`, i.e. objects of groups are returned instead of
-the groups, and the hit distance `t`; or `(nothing, nothing)` if the ray misses everything. Sources
+the groups, and the hit distance `t`; or `(nothing, nothing)` if the ray misses everything. Hidden
+objects are skipped, see `_is_hidden`. Sources
 (non-`AbstractObject` leaves, i.e. beams and beam groups) are hit via the bounding box of their
 marker as usual, and additionally whenever the screen-space projection of their `position` is
 within `ctrl.source_pick_radius` pixels of the cursor, using as `t` the distance along the ray to
@@ -733,7 +741,8 @@ the point of the ray closest to the source position (so that the nearest candida
 """
 function _ray_pick(ctrl::KinematicController, scene)
     origin, dir = _cursor_ray(scene)
-    leaves =reduce(vcat, (_leaves(o) for o in ctrl.movable); init = _LiveMovable[])
+    leaves = reduce(vcat, (_leaves(o) for o in ctrl.movable); init = _LiveMovable[])
+    filter!(leaf -> !_is_hidden(ctrl, leaf), leaves)
     box = function (obj)
         plots = _object_plots(ctrl.h, obj)
         return isempty(plots) ? nothing : mapreduce(Makie.boundingbox, GeometryBasics.union, plots)
@@ -973,6 +982,7 @@ function kinematic_controls!(
                 leaf = isnothing(plot) ? nothing : _pick_leaf(h, plot)
                 t = nothing
             end
+            !isnothing(leaf) && _is_hidden(ctrl, leaf) && (leaf = nothing)
             ctrl.press_pos = _px(scene)
             if isnothing(leaf) || !_is_movable(ctrl, leaf)
                 ctrl.press_leaf = nothing

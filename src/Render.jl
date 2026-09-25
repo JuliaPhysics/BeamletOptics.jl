@@ -220,6 +220,18 @@ If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown
 live_view(::Any...; kwargs...) = throw(MissingBackendError())
 
 """
+    export_changes(gui; io = stdout, clipboard = false)
+
+Returns the changes of the poses in the `live_view` window `gui` as Julia code, i.e. one
+`rotate3d!` about the position of the object and one `translate_to3d!` per moved object, relative
+to its initial pose. The code is printed to `io` and copied to the clipboard if `clipboard` is
+`true`. Refer to the method of the `Makie` extension for details.
+
+If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
+"""
+export_changes(::Any; kwargs...) = throw(MissingBackendError())
+
+"""
     view_cube!(ls::LScene; size = 110, corner = :top_right, duration = 0.3)
 
 Adds a CAD-style view cube to a corner of the 3D view `ls`. The cube rotates with the camera, and a
@@ -270,8 +282,8 @@ studio_lighting!(::Any; kwargs...) = throw(MissingBackendError())
     set_render_look(look::Symbol)
 
 Sets the look of all subsequently rendered objects, `:modern` (default) or `:cad`. The `:modern`
-look renders clear glass, metallic mirrors and neutral mechanics without edge lines, the `:cad`
-look saturated materials with feature edge lines. Explicit kwargs of [`render!`](@ref), e.g.
+look renders clear glass with faint silhouettes, metallic mirrors and neutral mechanics without
+edge lines, the `:cad` look saturated materials with feature edge lines. Explicit kwargs of [`render!`](@ref), e.g.
 `color`, `material` or `edges`, override the look.
 
 If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.

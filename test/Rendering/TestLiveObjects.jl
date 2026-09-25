@@ -70,7 +70,7 @@ end
     @testset "SingleShape (RoundPlanoMirror, SDF marching-cubes mesh)" begin
         mir = RoundPlanoMirror(0.025, 0.005)
         h = live_render!(ax, mir)
-        @test length(h.plots) == 1 + Ext._default_edges() # mesh and the feature edges of the look
+        @test length(h.plots) == 1 + Ext._default_edges(:reflective) # mesh and the feature edges of the look
         @test h.plots[1] isa Makie.Mesh
 
         translate3d!(mir, [0.0, 0.02, 0.0])
@@ -127,7 +127,7 @@ end
         h = live_render!(ax, cbs)
         n = length(h.plots)
         @test count(p -> p isa Makie.Mesh, h.plots) == 2 # merged front and back, coating
-        @test n == 2 + Ext._default_edges() # and the feature edges of the look
+        @test n == 2 + Ext._default_edges(:refractive) # and the feature edges of the look
 
         translate3d!(cbs, [0.01, 0.02, -0.01])
         zrotate3d!(cbs, deg2rad(35))
@@ -186,7 +186,7 @@ end
         @test h isa Ext.ObjectRenderHandle
         n = length(h.plots)
         @test count(p -> p isa Makie.Mesh, h.plots) == 1 # one merged mesh
-        @test n == 1 + Ext._default_edges() # and the feature edges of the look
+        @test n == 1 + Ext._default_edges(:reflective) # and the feature edges of the look
 
         translate3d!(group, [0.02, 0, 0])
         zrotate3d!(group, deg2rad(10))

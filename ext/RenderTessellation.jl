@@ -714,8 +714,9 @@ end
     _render_mesh!(ax, s; color = _default_color(s), edges = false, cemented = false, kwargs...)
 
 Renders the analytic mesh of the shape `s` and, if `edges`, its feature edges, see `_plot_edges!`.
-Inside of a `MultiShape` object the mesh is collected instead, see `_MESH_COLLECTOR`. `cemented`
-marks the parts whose contact faces are cemented interfaces, see `_plot_collected!`.
+Inside of a `MultiShape` object the mesh is collected instead, see `_MESH_COLLECTOR`, together with
+`edges`, i.e. whether the part contributes feature edges. `cemented` marks the parts whose contact
+faces are cemented interfaces, see `_plot_collected!`.
 """
 function _render_mesh!(ax::_RenderEnv, s; color = _default_color(s), edges::Bool = false,
         cemented::Bool = false, kwargs...)
@@ -725,25 +726,27 @@ function _render_mesh!(ax::_RenderEnv, s; color = _default_color(s), edges::Bool
         _plot_mesh!(ax, m; color, kwargs...)
         edges && _plot_edges!(ax, (m,); color, kwargs...)
     else
-        push!(parts, (m, s isa BMO.AbstractSDF ? s : nothing, (; color, kwargs...), cemented))
+        push!(parts, (m, s isa BMO.AbstractSDF ? s : nothing, (; color, kwargs...), cemented, edges))
     end
     return nothing
 end
 
 """
-    _plot_collected!(ax, parts; edges = false)
+    _plot_collected!(ax, parts)
 
 Plots the collected `parts` (see `_MESH_COLLECTOR`), one mesh per set of plot attributes. The parts
 of a mesh are merged via `_union`, i.e. coincident interior faces are removed. The faces where two
 `cemented` parts touch (e.g. the lenses of a doublet) are plotted once as separate interface meshes
 with the `:interface` material, which overrides the look attributes of the parts. Finally, the
-feature `edges` of all meshes are plotted as a single plot, see `_plot_edges!`.
+feature edges of all meshes of the parts with `edges` are plotted as a single plot, see
+`_plot_edges!`.
 """
-function _plot_collected!(ax::_RenderEnv, parts; edges::Bool = false)
+function _plot_collected!(ax::_RenderEnv, parts)
     keys = Any[]
     groups = Vector{Any}[]
-    for (m, s, kw, cemented) in parts
-        key = (kw, m.two_sided)
+    for (m, s, kw, cemented, edges) in parts
+        # Parts with and without edges are merged separately
+        key = (kw, m.two_sided, edges)
         i = findfirst(k -> isequal(k, key), keys)
         if isnothing(i)
             push!(keys, key)
@@ -754,17 +757,21 @@ function _plot_collected!(ax::_RenderEnv, parts; edges::Bool = false)
     end
     meshes = _TriMesh[]
     interfaces = Any[]
+    edge_kw = nothing
     for (key, group) in zip(keys, groups)
         cemented = Bool[c for (_, _, c) in group]
         interface = count(cemented) > 1 ? _TriMesh(; two_sided = true) : nothing
         m = _union([(m, s) for (m, s, _) in group]; interface, cemented)
         _plot_mesh!(ax, m; key[1]...)
-        push!(meshes, m)
+        if key[3]
+            push!(meshes, m)
+            isnothing(edge_kw) && (edge_kw = key[1])
+        end
         isnothing(interface) || isempty(interface.faces) || push!(interfaces, (interface, key[1]))
     end
     for (interface, kw) in interfaces
         _plot_mesh!(ax, interface; kw..., _materials()[:interface]...)
     end
-    edges && !isempty(keys) && _plot_edges!(ax, meshes; first(keys)[1]...)
+    isempty(meshes) || _plot_edges!(ax, meshes; edge_kw...)
     return nothing
 end

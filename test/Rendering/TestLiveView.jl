@@ -911,6 +911,302 @@ const BMO = BeamletOptics
         @test gui_ref[].last_error !== nothing
         close(gui_ref[])
     end
+
+    _ctrl_z!(gui) = (push!(events(gui.ax.scene).keyboardstate, Keyboard.left_control);
+                     _key!(gui, Keyboard.z);
+                     delete!(events(gui.ax.scene).keyboardstate, Keyboard.left_control))
+
+    # Angle between the rotation matrices R1 and R2
+    _angle(R1, R2) = Ext._rotation_axis_angle(R1 * R2')[2]
+
+    @testset "export changes" begin
+        m, pd = _fixture()
+        m2 = RoundPlanoMirror(0.02, 0.004)
+        translate3d!(m2, [0.2, 0, 0])
+        g = ObjectGroup([RoundPlanoMirror(0.02, 0.004), RoundPlanoMirror(0.02, 0.004)])
+        translate3d!(g.objects[2], [0, 0.05, 0])
+        translate3d!(g, [0.3, 0, 0])
+        lens = SphericalLens(0.05, -0.05, 5e-3, 25.4e-3)
+        translate3d!(lens, [0, 0.05, 0])
+        beam = Beam([0.0, 0, 0], [0.0, 1, 0])
+        cs = CollimatedSource([0.0, 0, 0], [0.0, 1, 0], 2e-3, 1e-6; num_rings = 2, num_rays = 40)
+        # all objects of the menu and their fresh copies in the initial poses
+        objs = Any[m, pd, m2, g, g.objects[1], g.objects[2], lens, beam, cs]
+        fresh = deepcopy(objs)
+        sys = System([m, pd, m2, g, lens])
+        gui = _live_view(sys => beam, sys => cs; throttle = false, detectors = [],
+            labels = Dict(m => "m1", lens => "the lens", g => "end", pd => "PD"))
+        gui.export_clipboard = false
+        entries = Ext._menu_entries(gui.controls)
+        @test all(first.(entries) .=== objs)
+        @test last.(entries) == [0, 0, 0, 0, 1, 1, 0, 0, 0]
+
+        code = export_changes(gui; io = devnull)
+        @test occursin("# no changes", code)
+        @test !occursin("translate_to3d!", code)
+
+        # mirror: selected via the menu, moved and rotated via keys
+        gui.menu.i_selected[] = 1
+        @test gui.controls.selected[] === m
+        _key!(gui, Keyboard.up)
+        _key!(gui, Keyboard.m)
+        _key!(gui, Keyboard.left)
+        _key!(gui, Keyboard.page_up)
+        # group and one of its objects, lens, sources
+        translate3d!(g, [0.01, 0.002, -0.001])
+        zrotate3d!(g, 0.1)
+        xrotate3d!(g, 0.02)
+        xrotate3d!(g.objects[1], 2e-9)
+        translate3d!(g.objects[1], [0, 0, 1e-3])
+        translate3d!(lens, [1e-3, 0, 0])
+        translate3d!(beam, [1e-3, 0, 0])
+        rotate3d!(beam, [0.0, 0, 1], 0.01)
+        translate3d!(cs, [0, 0, 2e-3])
+        rotate3d!(cs, [1.0, 0, 0], 0.02)
+        # clip planes are not exported
+        plane = Ext._add_clip_plane!(gui, [0, 0.05, 0], [0, 1, 0])
+        translate3d!(plane, [0, 0.01, 0])
+
+        buf = IOBuffer()
+        code = export_changes(gui; io = buf)
+        @test String(take!(buf)) == code
+        names = Ext._export_names(gui, objs)
+        @test names[m] == "m1"
+        @test names[lens] == "obj7" && names[g] == "obj4" && names[pd] == "PD" && names[m2] == "obj3"
+        @test occursin("# m1 (Mirror)\nrotate3d!(m1, [", code)
+        @test occursin("# the lens (Lens)\ntranslate_to3d!(obj7, [", code)
+        @test occursin("# end (ObjectGroup)", code)
+        @test occursin("\n# Beam\n", code)
+        # unmoved objects, including the object of the moved group, and the clip plane
+        for obj in (pd, m2, g.objects[2])
+            @test !occursin("($(names[obj]),", code)
+        end
+        @test !occursin("Clip", code)
+        @test count("translate_to3d!(", code) == 6
+
+        # the code reproduces the poses on the fresh copies
+        mod = Module()
+        Core.eval(mod, :(using BeamletOptics))
+        for (obj, f) in zip(objs, fresh)
+            Core.eval(mod, :($(Symbol(names[obj])) = $f))
+        end
+        include_string(mod, code)
+        for (obj, f) in zip(objs, fresh)
+            P, R = Ext._pose(obj)
+            Pf, Rf = Ext._pose(f)
+            @test maximum(abs, P - Pf) < 1e-12
+            @test _angle(R, Rf) < 1e-12
+        end
+
+        # the export button prints the same code
+        out = mktemp() do path, io
+            redirect_stdout(io) do
+                notify(gui.export_button.clicks)
+            end
+            flush(io)
+            read(path, String)
+        end
+        @test out == code
+        @test gui.status.text[] == "exported 6 changes"
+        close(gui)
+
+        # accurate axis and angle, also for small angles and close to π
+        for (axis, angle) in (([1.0, 2, 3], 1e-9), ([0.0, 0, 1], 0.3), ([1.0, -1, 0.5], π - 1e-9),
+                ([0.3, 0.2, -1], 2.5), ([0.0, 1, 0], π))
+            R = BMO.rotate3d(axis, angle)
+            a, θ = Ext._rotation_axis_angle(R)
+            @test θ ≈ angle rtol = 1e-12
+            @test maximum(abs, BMO.rotate3d(a, θ) - R) < 1e-14
+        end
+        @test Ext._rotation_axis_angle([1.0 0 0; 0 1 0; 0 0 1])[2] == 0
+    end
+
+    @testset "pose inspector" begin
+        m, pd = _fixture()
+        lens = SphericalLens(0.05, -0.05, 5e-3, 25.4e-3)
+        translate3d!(lens, [0.01, 0.05, 0.002])
+        gui_ref = Ref{Any}(nothing)
+        gui = _live_view(System([lens, m, pd]), Beam([0.0, 0, 0], [0.0, 1, 0]); throttle = false,
+            fine_angle = 1e-3, fine_step = 1e-3, pick = ax -> (gui_ref[].controls.h.handles[2].plots[1], 0))
+        gui_ref[] = gui
+        boxes = gui.pose_boxes
+        texts() = [tb.displayed_string[] for tb in boxes]
+        @test texts() == fill("", 6)
+
+        # nothing selected: input is ignored
+        boxes[1].stored_string[] = "5"
+        @test collect(BMO.position(lens)) == [0.01, 0.05, 0.002]
+        @test texts() == fill("", 6)
+
+        # the boxes follow the selection
+        gui.menu.i_selected[] = 1
+        @test gui.controls.selected[] === lens
+        @test texts() == ["10.0", "50.0", "2.0", "", "", ""]
+        _select!(gui)
+        @test gui.controls.selected[] === m
+        @test texts() == ["0.0", "100.0", "0.0", "", "", ""]
+        gui.menu.i_selected[] = 1
+
+        # absolute position [mm]
+        P0 = collect(BMO.position(lens))
+        R0 = Matrix(BMO.orientation(lens))
+        boxes[1].stored_string[] = "12.5"
+        P = collect(BMO.position(lens))
+        @test P[1] == 0.0125
+        @test P[2:3] == P0[2:3]
+        @test BMO.orientation(lens) == R0
+        @test texts() == ["12.5", "50.0", "2.0", "", "", ""]
+        @test occursin("at (12.5, 50.0, 2.0) mm", gui.status.text[])
+
+        # a rotation of 1 mrad about the blue axis equals one key step
+        ref = deepcopy(lens)
+        _key!(gui, Keyboard.m)
+        @test gui.controls.mode[] == :rotate
+        @test Ext._key_step!(gui.controls, ref, Keyboard.left, 1)
+        boxes[6].stored_string[] = "1"
+        @test BMO.orientation(lens) == BMO.orientation(ref)
+        @test collect(BMO.position(lens)) == P
+        @test texts() == ["12.5", "50.0", "2.0", "", "", ""]
+        # red and green axes, like the keys up and page up
+        for (k, key) in ((4, Keyboard.up), (5, Keyboard.page_up))
+            Ext._key_step!(gui.controls, ref, key, 1)
+            boxes[k].stored_string[] = "1"
+            @test BMO.orientation(lens) ≈ BMO.orientation(ref) atol = 1e-15
+        end
+
+        # undo
+        for _ in 1:3
+            _ctrl_z!(gui)
+        end
+        @test _angle(Matrix(BMO.orientation(lens)), R0) < 1e-12
+        _ctrl_z!(gui)
+        @test collect(BMO.position(lens)) ≈ P0 atol = 1e-15
+        @test texts()[1] == "10.0"
+
+        # invalid input changes nothing
+        for s in ("abc", "1 mm", "NaN")
+            boxes[2].stored_string[] = s
+            @test startswith(gui.status.text[], "invalid input \"$s\"")
+            @test collect(BMO.position(lens)) ≈ P0 atol = 1e-15
+        end
+
+        # keys are ignored while a box is focused, the focused box is not overwritten
+        _key!(gui, Keyboard.m)
+        @test gui.controls.mode[] == :move
+        boxes[1].focused[] = true
+        boxes[1].displayed_string[] = "3"
+        _key!(gui, Keyboard.up)
+        _key!(gui, Keyboard.m)
+        @test gui.controls.mode[] == :move
+        @test collect(BMO.position(lens)) ≈ P0 atol = 1e-15
+        translate3d!(lens, [0, 0, 1e-3])
+        Ext._request_update!(gui.controls)
+        @test texts()[1:3] == ["3", "50.0", "3.0"]
+        boxes[1].focused[] = false
+        # the boxes follow key steps
+        _key!(gui, Keyboard.up)
+        @test texts()[1:3] == ["10.0", "51.0", "3.0"]
+
+        # deselect
+        _key!(gui, Keyboard.escape)
+        @test isnothing(gui.controls.selected[])
+        @test texts() == fill("", 6)
+        close(gui)
+
+        # constraints are respected
+        m, pd = _fixture()
+        gui = _live_view(System([m, pd]), Beam([0.0, 0, 0], [0.0, 1, 0]); throttle = false,
+            constraints = Dict(m => (; move = (:v,), rotate = ())))
+        gui.menu.i_selected[] = 1
+        P0, R0 = collect(BMO.position(m)), Matrix(BMO.orientation(m))
+        gui.pose_boxes[1].stored_string[] = "5"
+        gui.pose_boxes[6].stored_string[] = "5"
+        @test collect(BMO.position(m)) == P0
+        @test BMO.orientation(m) == R0
+        gui.pose_boxes[3].stored_string[] = "5"
+        @test collect(BMO.position(m)) ≈ [0, 0.1, 0.005]
+        close(gui)
+    end
+
+    @testset "component menu, hide and show" begin
+        m, pd = _fixture()
+        g = ObjectGroup([RoundPlanoMirror(0.02, 0.004), RoundPlanoMirror(0.02, 0.004)])
+        translate3d!(g.objects[2], [0, 0.05, 0])
+        translate3d!(g, [0.3, 0, 0])
+        beam = Beam([0.0, 0, 0], [0.0, 1, 0])
+        gui_ref = Ref{Any}(nothing)
+        gui = _live_view(System([m, pd, g]), beam; throttle = false,
+            labels = Dict(m => "M1", g.objects[1] => "G1"),
+            pick = ax -> (gui_ref[].controls.h.handles[1].plots[1], 0))
+        gui_ref[] = gui
+        # every movable object once, the objects of the group after the group, indented
+        @test first.(gui.menu.options[]) == ["M1", "Detector", "ObjectGroup", "  G1", "  Mirror", "Beam"]
+        @test all(gui.menu_objects .=== Any[m, pd, g, g.objects[1], g.objects[2], beam])
+        @test gui.menu.i_selected[] == 0
+
+        # the menu selects, the selection in the 3D view updates the menu
+        gui.menu.i_selected[] = 4
+        @test gui.controls.selected[] === g.objects[1]
+        @test !isempty(gui.controls.box_obs[])
+        @test startswith(gui.status.text[], "G1 at (")
+        _select!(gui)
+        @test gui.controls.selected[] === m
+        @test gui.menu.i_selected[] == 1
+        _key!(gui, Keyboard.escape)
+        @test gui.menu.i_selected[] == 0
+
+        # keys are ignored while the menu is open, e.g. for its search
+        gui.menu.is_open[] = true
+        _key!(gui, Keyboard.m)
+        @test gui.controls.mode[] == :move
+        gui.menu.is_open[] = false
+
+        # ray picking of the mirror in the center of the view
+        set_view(gui.ax, [0.3, -0.2, 0.3], [0.0, 0.1, 0.0], [0.0, 0, 1])
+        scene = gui.ax.scene
+        vp = scene.viewport[]
+        events(scene).mouseposition[] = (vp.origin[1] + vp.widths[1] / 2, vp.origin[2] + vp.widths[2] / 2)
+        @test first(Ext._ray_pick(gui.controls, scene)) === m
+
+        # hide
+        notify(gui.hide_button.clicks)
+        @test startswith(gui.status.text[], "select a component")
+        gui.menu.i_selected[] = 1
+        notify(gui.hide_button.clicks)
+        @test isnothing(gui.controls.selected[])
+        @test gui.menu.i_selected[] == 0
+        @test m in gui.hidden
+        @test all(p -> !p.visible[], gui.controls.h.handles[1].plots)
+        @test isnothing(first(Ext._ray_pick(gui.controls, scene)))
+        # also not via the `pick` function
+        _select!(gui)
+        @test isnothing(gui.controls.selected[])
+        # still traced
+        Ext._trace!(gui)
+        @test length(BMO.hits(pd)) == 1
+
+        # a hidden object can be selected in the menu and shown again
+        gui.menu.i_selected[] = 1
+        @test gui.controls.selected[] === m
+        notify(gui.hide_button.clicks)
+        @test !(m in gui.hidden)
+        @test all(p -> p.visible[], gui.controls.h.handles[1].plots)
+        @test gui.controls.selected[] === m
+
+        # groups: all objects, show all
+        gui.menu.i_selected[] = 3
+        notify(gui.hide_button.clicks)
+        gui.menu.i_selected[] = 1
+        notify(gui.hide_button.clicks)
+        @test length(gui.hidden) == 3
+        leaf_plots = [p for oh in gui.controls.h.handles if oh.obj in (m, g.objects...) for p in oh.plots]
+        @test all(p -> !p.visible[], leaf_plots)
+        notify(gui.show_all_button.clicks)
+        @test isempty(gui.hidden)
+        @test all(p -> p.visible[], leaf_plots)
+        @test first(Ext._ray_pick(gui.controls, scene)) === m
+        close(gui)
+    end
 end
 
 end # module

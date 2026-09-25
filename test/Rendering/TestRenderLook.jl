@@ -68,17 +68,65 @@ end
     @testset "looks" begin
         @test Ext._LOOK[] == :modern
         @test Ext._materials() === Ext._MODERN_MATERIALS
-        @test !Ext._default_edges()
-        # modern: clear glass and no edges by default
-        lens = SphericalLens(0.05, -0.05, 5e-3, 25.4e-3)
-        fig = Figure(); ax = LScene(fig[1, 1])
-        render!(ax, lens)
-        @test !any(p -> p isa Lines, ax.scene.plots)
+        # modern: edges of the glass only
+        @test Ext._default_edges(:refractive) && Ext._default_edges(:coating) && Ext._default_edges(:interface)
+        @test !any(Ext._default_edges, (:reflective, :polarizer, :detector, :mechanics))
         @test set_render_look(:cad) == :cad
         @test Ext._materials() === Ext._CAD_MATERIALS
-        @test Ext._default_edges()
+        @test all(Ext._default_edges, (:refractive, :reflective, :coating, :polarizer, :detector, :interface))
+        @test !Ext._default_edges(:mechanics)
         @test_throws ArgumentError set_render_look(:toy)
         @test set_render_look(:modern) == :modern
+    end
+
+    @testset "modern silhouettes" begin
+        mat = Ext._materials()[:refractive]
+        lens = SphericalLens(0.05, -0.05, 5e-3, 25.4e-3)
+        plots = rendered_plots(lens)
+        @test length(plots) == 2
+        @test only(mesh_plots(plots)) === plots[1]
+        edges = only(edge_plots(plots))
+        @test edges.linewidth[] == 1
+        # 0.6 × the opacity of the edges of the `:cad` look for the same object alpha
+        set_render_look(:cad)
+        cad_edges = only(edge_plots(rendered_plots(lens; color = mat.color, alpha = mat.alpha)))
+        set_render_look(:modern)
+        @test edges.color[].alpha ≈ 0.6 * cad_edges.color[].alpha
+        @test edges.color[].alpha ≈ 0.6 * Ext._edge_color(mat.color, mat.alpha).alpha
+        # the factor is taken when plotting, an Observable color keeps it
+        c = Observable(RGBAf(0.5, 0.5, 0.5, 1.0))
+        edges = only(edge_plots(rendered_plots(lens; color = c, alpha = 1)))
+        @test edges.color[].alpha ≈ 0.6 * Ext._EDGE_COLOR.alpha
+        set_render_look(:cad)
+        c[] = RGBAf(0.5, 0.5, 0.5, 1.0)
+        @test edges.color[].alpha ≈ 0.6 * Ext._EDGE_COLOR.alpha
+        set_render_look(:modern)
+
+        # no edges of mirrors, detectors and mechanics, unless explicit
+        for obj in (RoundPlanoMirror(25e-3, 5e-3), Detector(10e-3),
+                NonInteractableObject(BMO.CylinderSDF(5e-3, 2e-3)))
+            @test isempty(edge_plots(rendered_plots(obj)))
+        end
+        @test length(edge_plots(rendered_plots(RoundPlanoMirror(25e-3, 5e-3); edges = true))) == 1
+        @test isempty(edge_plots(rendered_plots(lens; edges = false)))
+        # coating and prisms of a beamsplitter
+        @test length(edge_plots(rendered_plots(CubeBeamsplitter(20e-3, λ -> 1.5)))) == 1
+        @test length(edge_plots(rendered_plots(ThinBeamsplitter(10e-3, 10e-3)))) == 1
+
+        # MultiShape: only the parts with edges contribute, mechanics parts never by default
+        for look in (:modern, :cad)
+            set_render_look(look)
+            mech = NonInteractableObject(BMO.CylinderSDF(5e-3, 2e-3))
+            translate3d!(mech, [0.1, 0, 0])
+            group = ObjectGroup([SphericalLens(0.05, -0.05, 5e-3, 25.4e-3), mech])
+            edges = only(edge_plots(rendered_plots(group)))
+            @test all(p -> any(isnan, p) || abs(p[1]) < 0.02, edges[1][])
+            # explicit edges apply to all parts
+            edges = only(edge_plots(rendered_plots(group; edges = true)))
+            @test any(p -> !any(isnan, p) && p[1] > 0.05, edges[1][])
+            @test isempty(edge_plots(rendered_plots(group; edges = false)))
+        end
+        set_render_look(:modern)
     end
 
     # The following tests check the materials and edges of the `:cad` look

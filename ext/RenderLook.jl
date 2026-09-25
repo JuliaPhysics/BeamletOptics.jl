@@ -67,8 +67,26 @@ end
 """Returns the material presets of the active look."""
 _materials() = _LOOK[] === :cad ? _CAD_MATERIALS : _MODERN_MATERIALS
 
-"""Returns `true` if the active look draws feature edges by default."""
-_default_edges() = _LOOK[] === :cad
+"""Material classes with feature edges in the `:modern` look, i.e. faint silhouettes of the glass."""
+const _MODERN_EDGE_CLASSES = (:refractive, :coating, :interface)
+
+"""Factor of the opacity of the feature edges in the `:modern` look, see `_edge_factor`."""
+const _MODERN_EDGE_FACTOR = 0.6f0
+
+"""
+    _default_edges(class::Symbol)
+
+Returns `true` if the active look draws the feature edges of the material `class` by default: the
+`:cad` look for all classes except `:mechanics`, the `:modern` look only for glass, i.e. the
+classes of `_MODERN_EDGE_CLASSES`.
+"""
+function _default_edges(class::Symbol)
+    _LOOK[] === :cad && return class !== :mechanics
+    return class in _MODERN_EDGE_CLASSES
+end
+
+"""Returns the factor of the opacity of the feature edges of the active look, see `_edge_color`."""
+_edge_factor() = _LOOK[] === :cad ? 1.0f0 : _MODERN_EDGE_FACTOR
 
 """
     _material_class(obj)
@@ -104,24 +122,26 @@ const _EDGE_ANGLE = deg2rad(30)
 const _EDGE_COLOR = RGBAf(0.1, 0.1, 0.12, 0.8)
 
 """
-    _edge_color(color, alpha = 1)
+    _edge_color(color, alpha = 1, factor = 1)
 
 Returns the color of the feature edges of an object with the plot attributes `color` and `alpha`.
 The opacity of the edges follows the opacity `a` of the object, i.e. the product of `alpha` and
 the alpha channel of `color`: it is `min(1, 2a)` times the opacity of `_EDGE_COLOR`, such that
 the edges of glass (`a = 0.5`) are fully visible, while the edges of a nearly transparent object,
-e.g. a housing with `a = 0.05`, fade out with it. Per-vertex colors count as opaque.
+e.g. a housing with `a = 0.05`, fade out with it. Per-vertex colors count as opaque. Finally, the
+opacity is multiplied by the `factor` of the look, see `_edge_factor`.
 """
-function _edge_color(color, alpha = 1)
+function _edge_color(color, alpha = 1, factor = 1)
     a = color isa AbstractVector || isnothing(color) ? 1.0f0 : Float32(Makie.to_color(color).alpha)
     return RGBAf(_EDGE_COLOR.r, _EDGE_COLOR.g, _EDGE_COLOR.b,
-        _EDGE_COLOR.alpha * min(1.0f0, 2 * Float32(alpha) * a))
+        _EDGE_COLOR.alpha * min(1.0f0, 2 * Float32(alpha) * a) * Float32(factor))
 end
 
-"""Returns `_edge_color` of the `color` and `alpha`, an `Observable` if one of them is."""
-function _edge_color_obs(color, alpha)
-    (color isa Observable || alpha isa Observable) || return _edge_color(color, alpha)
-    return Makie.lift(_edge_color, Makie.convert(Observable, color), Makie.convert(Observable, alpha))
+"""Returns `_edge_color` of the `color`, `alpha` and `factor`, an `Observable` if one of them is."""
+function _edge_color_obs(color, alpha, factor = 1)
+    (color isa Observable || alpha isa Observable) || return _edge_color(color, alpha, factor)
+    return Makie.lift((c, a) -> _edge_color(c, a, factor), Makie.convert(Observable, color),
+        Makie.convert(Observable, alpha))
 end
 
 """Plot attributes of the object that are passed on to its feature edge lines."""
@@ -258,7 +278,8 @@ end
 
 Plots the feature edges of all `meshes` (see `_feature_edges`) as a single `lines!` plot, see
 `_polylines`. Of the `kwargs`, i.e. the plot attributes of the object, only `_EDGE_KWARGS` and
-`transparency` are used; `color` and `alpha` set the opacity of the edges, see `_edge_color`.
+`transparency` are used; `color` and `alpha` set the opacity of the edges, see `_edge_color`. The
+factor of the active look is taken when the edges are plotted, see `_edge_factor`.
 """
 function _plot_edges!(ax::_RenderEnv, meshes; transparency = false, color = nothing,
         alpha = 1, kwargs...)
@@ -272,7 +293,8 @@ function _plot_edges!(ax::_RenderEnv, meshes; transparency = false, color = noth
     # The depth shift keeps the lines in front of the faces they bound. The lines of transparent
     # objects are transparent as well, otherwise the faces along the silhouette cover them
     # partially (GLMakie, order independent transparency)
-    lines!(ax, _polylines(pts); color = _edge_color_obs(color, alpha), linewidth = 1, transparency,
+    lines!(ax, _polylines(pts); color = _edge_color_obs(color, alpha, _edge_factor()), linewidth = 1,
+        transparency,
         inspectable = false, depth_shift = -1.0f-5, kw...)
     return nothing
 end

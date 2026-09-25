@@ -61,7 +61,9 @@ Rendered objects get a material per component class and visible cemented interfa
 and triplet lenses. Two looks are available, which are selected via [`set_render_look`](@ref):
 
 - `:modern` (default): a restrained palette of clear, slightly tinted glass with highlights,
-  metallic mirrors and neutral mechanics, without edge lines
+  metallic mirrors and neutral mechanics. Only the glass (`:refractive`, `:coating` and
+  `:interface`) gets faint silhouettes, i.e. its feature edges at 60 % of the opacity of the
+  `:cad` look, such that lenses stay readable in front of a housing
 - `:cad`: saturated materials with thin dark lines along the feature edges, like a CAD program
 
 ```julia
@@ -89,18 +91,19 @@ keyword arguments of `render!` change the look of an object:
   of the object
 - `color`, `alpha`, `transparency`, ...: override the corresponding attribute of the material,
   for all parts of the object. The cemented interfaces keep their amber look.
-- `edges`: draws the feature edges (by default in the `:cad` look for all materials except
-  `:mechanics`, whose detailed meshes, e.g. a housing from an STL file, would cover the optics),
-  i.e. the edges where the faces of an object meet at
-  an angle of more than 30°, and the boundary of open surfaces such as a `Detector`. `edges =
-  false` switches them off. Shapes rendered via the marching cubes fallback have no edges. The
-  opacity of the edges follows the opacity of the object, e.g. a nearly transparent housing
-  (`color = (:gray70, 0.05)`) gets correspondingly faint edges, while the edges of glass stay fully
-  visible.
+- `edges`: draws the feature edges, i.e. the edges where the faces of an object meet at an angle
+  of more than 30°, and the boundary of open surfaces such as a `Detector`. By default, the `:cad`
+  look draws them for all materials except `:mechanics`, whose detailed meshes, e.g. a housing from
+  an STL file, would cover the optics, the `:modern` look for the glass only. The parts of
+  composite objects contribute edges according to their own class. `edges = true` or `false`
+  overrides the look, for all parts of the object. Shapes rendered via the marching cubes fallback
+  have no edges. The opacity of the edges follows the opacity of the object, e.g. a nearly
+  transparent housing (`color = (:gray70, 0.05)`) gets correspondingly faint edges, while the
+  edges of glass stay visible.
 
 ```julia
 render!(ax, lens)                       # glass of the active look
-render!(ax, lens; edges = true)         # with feature edges
+render!(ax, mirror; edges = true)       # with feature edges in the :modern look
 render!(ax, lens; color = :red)         # red glass, same transparency
 render!(ax, mount; material = :mechanics, edges = false)
 ```
@@ -426,13 +429,60 @@ systems are solved once the movement pauses for `idle_delay` (0.2 s). Likewise, 
 that take longer than `trace_budget` show a coarse preview while moving, which is refined once the
 movement pauses.
 
+### Component menu and pose inspector
+
+The row below the status line holds a component menu, two buttons to hide components and the pose
+inspector:
+
+- The menu lists all movable components and sources by their `labels` (or type), the objects of a
+  group indented after the group. Selecting an entry selects the component like a click in the 3D
+  view, a click in the 3D view shows the selected component in the menu. The menu can be searched
+  by typing while it is open. Clip planes are not listed.
+- "hide" hides the selected component, e.g. a mirror in front of the component of interest, and
+  clears the selection. A hidden component can not be selected in the 3D view, but stays in the
+  systems, i.e. it is still traced. Selecting it in the menu and pressing "hide" again shows it,
+  "show all" shows all hidden components.
+- The pose inspector shows the position `x`, `y`, `z` [mm] of the selected component. Typing a
+  value and pressing `Enter` moves the component to this absolute coordinate. The boxes `rx`, `ry`
+  and `rv` [mrad] rotate it by the typed angle about the red, green and blue axis of the controls,
+  like the arrow keys in the rotate mode, e.g. `rv = 1` equals one key step with a step of 1 mrad.
+  Each input is a step of the undo history, the constraints of the component apply. While a box is
+  focused, the keys of the 3D view are ignored.
+
+### Exporting the changes
+
+The "Export" button next to the status line prints the changed poses as Julia code and copies it
+to the clipboard, such that an alignment found interactively can be pasted into the script that
+builds the system. [`export_changes`](@ref) returns the same code:
+
+```julia
+gui = live_view(system, beam; labels = Dict(m1 => "m1", lens => "lens"))
+# move the components, then
+code = export_changes(gui)
+```
+
+```julia
+# Changed poses of the live view, apply to the objects in their initial poses.
+# Each rotation is about the position of the object, groups are moved before their objects.
+
+# m1 (Mirror)
+rotate3d!(m1, [0.0, 0.0, 1.0], 0.0005)
+translate_to3d!(m1, [0.0, 0.1000012, 0.0])
+```
+
+Each moved object gets a `rotate3d!` about its own position (only if it was rotated) and a
+`translate_to3d!` to its absolute position [m], relative to its pose when the window was opened.
+Labels that are valid variable names are used as names, other objects are called `obj1`, `obj2`,
+… by their position in the component menu. Clip planes are not exported.
+
 ### Controls
 
 The 3D view uses the controls of [`kinematic_controls!`](@ref), see
 [Interactive kinematics](@ref). In addition, the key `t` solves the systems immediately, see
 [Manual tracing](@ref), and `p`, `Delete`, `c` and `Shift+c` control the clip planes, see
 [Clip planes](@ref). The keyboard step can be typed into the textbox below the 3D view, e.g.
-`250 nm` or `50 µrad`, where the unit selects the move or rotate mode. The status line shows the
+`250 nm` or `50 µrad`, where the unit selects the move or rotate mode, see also
+[Component menu and pose inspector](@ref). The status line shows the
 pose of the moved component and its change since the window was opened. Names for the status line
 and the detector panels are passed via `labels`:
 
