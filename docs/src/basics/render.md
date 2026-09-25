@@ -293,6 +293,12 @@ gui = live_view(system, beam)
 display(gui)
 ```
 
+With GLMakie, `display(gui)` opens the window without SSAO and with up to 60 fps, since SSAO (e.g.
+enabled globally via `GLMakie.activate!(ssao = true)`) multiplies the frame time with large meshes
+such as a housing, and GLMakie's default of 30 fps makes rotating the view sluggish. Screen settings
+passed to `display(gui; ...)` override these defaults. For static renders with SSAO, pass it to the
+display of that figure only, e.g. `display(fig; ssao = true)`.
+
 A [view cube](@ref "View cube") in the top right corner of the 3D view switches to the standard
 views with a click, clicks on the cube never select or deselect a component. The live view starts
 in the isometric view from the corner between `Top`, `Front` and `Right`, i.e. from `(1, -1, 1)`,
