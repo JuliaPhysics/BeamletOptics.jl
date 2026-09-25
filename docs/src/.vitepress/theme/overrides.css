@@ -370,3 +370,37 @@
   background: var(--vp-c-bg-soft);
   margin: 16px 0;
 }
+
+/* Mermaid edge labels: Mermaid's dark theme draws them on an opaque grey box,
+   which looks like a stray button on the VitePress background. Use the page
+   background instead, so labels just read as text on the edge. */
+.mermaid .edgeLabel,
+.mermaid .edgeLabel p,
+.mermaid .labelBkg {
+  background-color: var(--vp-c-bg) !important;
+}
+.mermaid .edgeLabel rect {
+  fill: var(--vp-c-bg) !important;
+}
+
+/* Mermaid measures node/edge labels off-page, where `p` inherits the body
+   line-height (24px), but renders them inside `.vp-doc`, whose `p` has
+   line-height 28px and a 16px margin. The extra height clips the last line of
+   multi-line labels, so restore the measured metrics inside diagrams. */
+.vp-doc .mermaid p {
+  line-height: 24px;
+  margin: 0;
+}
+
+/* Separator rule in Mermaid type cards (`<hr/>` in a node label, see "Type
+   diagrams" in docs/src/api/docdev.md). `.vp-doc hr` adds 16px margins that
+   Mermaid does not see while measuring the label, which clips the card
+   content. `foreignObject hr` matches both the off-page measurement and the
+   rendered diagram, so the rule is sized identically in both places. */
+foreignObject hr {
+  margin: 6px 0 !important;
+  border: 0 !important;
+  border-top: 1px solid currentColor !important;
+  height: 0 !important;
+  opacity: 0.4;
+}

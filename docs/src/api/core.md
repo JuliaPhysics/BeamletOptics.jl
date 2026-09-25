@@ -13,14 +13,21 @@ The BMO package is intended to provide optical simulation capabilites with as mu
 The first two principles will be elaborated upon in more detail in the [Geometry representation](@ref) section. For the latter two design decisions, the following high-level solver schematic can be used to abstract the steps that are performed when calling [`solve_system!`](@ref) with an input system and beam:
 
 ```mermaid
-flowchart TD
-    A[Intersect: test ray/beam against the system] --> B{Intersection found?}
-    B -- "No / r_max exceeded" --> Z([Exit])
-    B -- Yes --> C[Interact: compute AbstractInteraction]
-    C --> D[Attach / overwrite next ray or beam segment]
-    D --> E{Hint attached?}
-    E -- "Yes: test the hinted shape first" --> A
-    E -- "No: brute-force intersection test" --> A
+flowchart TB
+    S(["<b>solve_system!</b><br/>system + beam"]) --> I
+    I["<b>1. Intersect</b><br/>hinted shape first,<br/>else all objects"] -- hit --> X["<b>2. Interact</b><br/>compute<br/>AbstractInteraction"]
+    X --> R["<b>3. Repeat</b><br/>attach / overwrite next<br/>ray or beam segment"]
+    R -- "optional Hint" --> I
+    I -- "no hit or r_max" --> E([done])
+
+    classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
+    classDef green fill:#38982626,stroke:#389826,stroke-width:2px
+    classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
+    classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
+    class I blue
+    class X green
+    class R purple
+    class S,E terminal
 ```
 
 This scheme is loosely referred to as the **Intersect-Interact-Repeat-Loop** and consists of the following steps:
@@ -99,15 +106,22 @@ This non-sequential mode is comparatively safe in determining the "true" beam pa
 Once a system has been traced for the first time, the system and beam can be solved again. However, this time the solver will try to reuse as much information from the previous run as possible by testing if the previous beam trajectory is still valid in a sequential tracing mode. Retracing systems assumes that the kinematic changes (e.g. optomechanical aligment) between the current tracing procedure and the previous one are small. If an intersection along the beam trajectory becomes invalid, the solver will perform a non-sequential trace for all invalidated parts of the beam.
 
 ```mermaid
-flowchart TD
-    A[retrace_system!] --> B{Beam path already known?}
-    B -- "No, first trace" --> C[Brute-force trace_system!]
-    B -- "Yes, reuse hints" --> D[Sequential retrace along known path]
-    D --> E{Previous intersections still valid?}
-    E -- Yes --> F([Done])
-    E -- "No, invalidated" --> G[Brute-force trace of invalidated segments]
+flowchart TB
+    A(["<b>retrace_system!</b>"]) --> B{"Beam path<br/>known?"}
+    B -- "no, first trace" --> C["<b>Brute-force</b><br/>trace_system!"]
+    B -- "yes, reuse hints" --> D["<b>Sequential retrace</b><br/>along known path"]
+    D --> E{"Previous<br/>intersections<br/>still valid?"}
+    E -- "no" --> G["<b>Brute-force</b><br/>trace of invalidated<br/>segments"]
+    E -- "yes" --> F([done])
     G --> F
     C --> F
+
+    classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
+    classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
+    classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
+    class C,G blue
+    class D purple
+    class A,F terminal
 ```
 
 ```@docs; canonical=false

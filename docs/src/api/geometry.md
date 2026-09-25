@@ -4,27 +4,46 @@ In BMO, the distinction between an *object* and its geometric representation (*s
 
 ## Separation of geometry and optical interactions
 
-```mermaid
-classDiagram
-    class AbstractShape
-    class AbstractShapeTrait
-    class SingleShape
-    class MultiShape
-    class AbstractObject
-    class AbstractObjectGroup
-    class AbstractSystem
-    class AbstractRay
-    class AbstractBeam
-    class AbstractBeamGroup
+Each card lists the fields and functions that a subtype must provide. Solid arrows point from a field to the type it stores, dotted arrows point to subtypes.
 
-    AbstractShapeTrait <|-- SingleShape
-    AbstractShapeTrait <|-- MultiShape
-    AbstractObject <|-- AbstractObjectGroup
-    AbstractObject --> AbstractShape : geometry
-    AbstractObject --> AbstractShapeTrait : shape_trait_of
-    AbstractSystem --> AbstractObject : objects
-    AbstractBeam --> AbstractRay : rays
-    AbstractBeamGroup --> AbstractBeam : beams
+```mermaid
+flowchart TB
+    SYS["<b>AbstractSystem</b><br/><i>abstract type</i><hr/>objects, n<br/>refractive_index(system, λ)"]
+    GRP["<b>AbstractObjectGroup</b><br/><i>abstract type #lt;: AbstractObject</i><hr/>objects"]
+    OBJ["<b>AbstractObject</b><br/><i>abstract type</i><hr/>interact3d(system, object, beam, ray)<br/>shape_trait_of(object)"]
+    TRT["<b>AbstractShapeTrait</b><br/><i>trait</i>"]
+    SGL["<b>SingleShape</b><br/><i>trait</i><hr/>object.shape"]
+    MLT["<b>MultiShape</b><br/><i>trait</i><hr/>shape(object)"]
+    SHP["<b>AbstractShape</b><br/><i>abstract type</i><hr/>pos, dir<br/>intersect3d(shape, ray)"]
+
+    SYS -- objects --> OBJ
+    GRP -- objects --> OBJ
+    OBJ -- shape_trait_of --> TRT
+    TRT -.-> SGL
+    TRT -.-> MLT
+    OBJ -- geometry --> SHP
+
+    classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
+    classDef green fill:#38982626,stroke:#389826,stroke-width:2px
+    classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
+    class SHP blue
+    class SYS,OBJ,GRP green
+    class TRT,SGL,MLT purple
+```
+
+Light sources are structured analogously, but carry no shape:
+
+```mermaid
+flowchart TB
+    BG["<b>AbstractBeamGroup</b><br/><i>abstract type</i><hr/>beams, center, orientation<br/>wavelength(group)"]
+    BM["<b>AbstractBeam</b><br/><i>abstract type</i><hr/>parent, children<br/>first_ray(beam)<br/>empty!(beam)<br/>_modify_beam_head!<br/>_last_beam_intersection"]
+    RY["<b>AbstractRay</b><br/><i>abstract type</i><hr/>pos, dir, intersection, λ, n<br/>empty!(ray)"]
+
+    BG -- beams --> BM
+    BM -- rays --> RY
+
+    classDef green fill:#38982626,stroke:#389826,stroke-width:2px
+    class BG,BM,RY green
 ```
 
 The geometry, represented by a concrete subtype of the [`BeamletOptics.AbstractShape`](@ref), defines the physical boundaries of the element. Shapes can be represented in various forms, such as [Meshes](@ref) or [Signed Distance Functions (SDFs)](@ref). The main goal for this design choice is to allow for the possibility to switch out geometry representations for more advanced methods in the future, e.g. [NURBS.jl](https://github.com/HoBeZwe/NURBS.jl).

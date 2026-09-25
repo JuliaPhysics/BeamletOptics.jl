@@ -4,22 +4,27 @@ This page explains how the kinematic API described in the [Kinematics](@ref) sec
 
 ## Kinematic traits
 
-Analogous to the [`BeamletOptics.AbstractShapeTrait`](@ref) of the [Geometry representation](@ref), the kinematic API is built on a trait that is dispatched on via multiple dispatch. Every public kinematic function, e.g. `translate3d!(x, offset)`, forwards to a trait-specific method `translate3d!(kinematic_trait_of(x), x, offset)`.
+Analogous to the [`BeamletOptics.AbstractShapeTrait`](@ref) of the [Geometry representation](@ref), the kinematic API is built on a trait that is dispatched on via multiple dispatch. Every public kinematic function, e.g. `translate3d!(x, offset)`, forwards to a trait-specific method `translate3d!(kinematic_trait_of(x), x, offset)`. As on the [Geometry representation](@ref) page, each card lists what a subtype must provide, solid arrows point from a field to the type it stores and dotted arrows point to subtypes.
 
 ```mermaid
-classDiagram
-    class AbstractKinematicTrait
-    class Static
-    class Movable
-    class AbstractKinematicFrame
-    class Oriented
-    class Directed
+flowchart TB
+    TR["<b>AbstractKinematicTrait</b><br/><i>trait</i><hr/>kinematic_trait_of(x)"]
+    ST["<b>Static</b><br/><i>trait</i>"]
+    MV["<b>Movable</b><br/><i>trait</i><hr/>frame<br/>translate3d!(x, offset)<br/>rotate3d!(x, R)"]
+    FR["<b>AbstractKinematicFrame</b><br/><i>frame</i>"]
+    OR["<b>Oriented</b><br/><i>frame</i><hr/>position(x)<br/>orientation(x)"]
+    DI["<b>Directed</b><br/><i>frame</i><hr/>position(x)<br/>direction(x)"]
 
-    AbstractKinematicTrait <|-- Static
-    AbstractKinematicTrait <|-- Movable
-    AbstractKinematicFrame <|-- Oriented
-    AbstractKinematicFrame <|-- Directed
-    Movable --> AbstractKinematicFrame : frame
+    TR -.-> ST
+    TR -.-> MV
+    MV -- frame --> FR
+    FR -.-> OR
+    FR -.-> DI
+
+    classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
+    classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
+    class TR,ST,MV purple
+    class FR,OR,DI blue
 ```
 
 ```@docs; canonical=false

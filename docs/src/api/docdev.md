@@ -68,6 +68,58 @@ Documenter parses pages with Julia's Markdown parser, which does not pass inline
 
 Keep the blank lines around the table, otherwise it is not parsed as Markdown. Column alignment uses the usual `:---`, `:---:` and `---:` markers.
 
+## Diagrams
+
+Diagrams are written as [Mermaid](https://mermaid.js.org/) code blocks with the `mermaid` language tag, which VitePress renders in the browser. Font size and box padding are set once for the whole site in the `mermaid` entry of `docs/src/.vitepress/config.mts`, so a diagram needs no `%%{init: ...}%%` line of its own.
+
+Label text is set to the size of the body text, but a diagram that is wider than the page is scaled down to fit, and its text shrinks with it. Since the page is narrow but can be arbitrarily long, lay diagrams out **vertically**:
+
+- use `flowchart TB`, not `LR`, and let loops return along the side of the chain
+- keep side exits (e.g. a *done* terminal) to a single extra column
+- break long labels with `<br/>` and put the key word in `<b>...</b>`, e.g. `I["<b>1. Intersect</b><br/>hinted shape first"]`
+- split unrelated clusters of a diagram into separate diagrams instead of placing them side by side
+
+To color nodes, copy the following class definitions into the diagram and assign them with `class <nodes> <name>`. The colors are the Julia logo colors with a translucent fill, so they work in light and dark mode:
+
+````markdown
+```mermaid
+flowchart TB
+    S(["<b>start</b>"]) --> A["<b>Step</b>"] --> E([done])
+
+    classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
+    classDef green fill:#38982626,stroke:#389826,stroke-width:2px
+    classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
+    classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
+    class A blue
+    class S,E terminal
+```
+````
+
+Use `terminal` for entry and exit points, and one color per role within a diagram, e.g. the [Intersect-Interact-Repeat-Loop](@ref) uses blue for intersecting, green for interacting and purple for the hint/retrace path.
+
+### Type diagrams
+
+Relations between types are also drawn as flowcharts, not as Mermaid `classDiagram`s: class diagrams ignore `classDef` colors, always draw both member compartments (leaving empty boxes), and use a different font size. Each type is a card that shows its name, its kind and, below a rule, the fields (comma-separated on one line) and functions (one per line) from the `# Implementation reqs.` section of its docstring. Solid arrows point from a field to the type it stores and carry the field name, dotted arrows point to subtypes. By convention, blue marks geometry, green optical elements and light, and purple traits:
+
+````markdown
+```mermaid
+flowchart TB
+    OBJ["<b>AbstractObject</b><br/><i>abstract type</i><hr/>interact3d(system, object, beam, ray)"]
+    SHP["<b>AbstractShape</b><br/><i>abstract type</i><hr/>pos, dir<br/>intersect3d(shape, ray)"]
+    OBJ -- geometry --> SHP
+
+    classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
+    classDef green fill:#38982626,stroke:#389826,stroke-width:2px
+    class SHP blue
+    class OBJ green
+```
+````
+
+Write `<` as `#lt;` inside a label, e.g. `abstract type #lt;: AbstractObject`. Type diagrams tend to grow sideways, so check that they stay narrower than the page: an edge that skips a row needs a column of its own, and a label on such an edge widens that column further.
+
+!!! warning "Label line height"
+    Mermaid measures the size of a label outside of the page, but VitePress renders it with the page styles, e.g. a larger line height for `p` and larger margins for `hr`, which clips the last line of a label. Two rules in `docs/src/.vitepress/theme/overrides.css` (`.vp-doc .mermaid p` and `foreignObject hr`) keep the rendered size equal to the measured one; do not remove them. If a new HTML tag in a label causes clipping, it needs a rule of the same kind.
+
 ## Creating figures
 
 In general, you can generate and include figures into your documentation section any way you see fit. We strongly urge you to use the existing `CairoMakie` or `GLMakie` backend. However, with the increasing amount of plots and corresponding scripts the build time for the docs in a local environment has become unsustainable. Therefore, for the BMO docs we recommend that you adhere to the following design pattern:

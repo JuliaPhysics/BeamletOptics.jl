@@ -130,6 +130,13 @@ export default withMermaid(defineConfig({
       ], 
     },
   },
+  // Site-wide Mermaid defaults, see "Diagrams" in docs/src/api/docdev.md.
+  // Label text matches the body text (16px) as long as a diagram is not wider
+  // than the page, since wider diagrams are scaled down to fit.
+  mermaid: {
+    themeVariables: { fontSize: '16px' },
+    flowchart: { padding: 16, nodeSpacing: 40, rankSpacing: 40 },
+  },
   themeConfig: {
     outline: 'deep',
     logo: { light: '/logo.svg', dark: '/logo-dark.svg' },
