@@ -208,12 +208,20 @@ which all components can be moved via [`kinematic_controls!`](@ref), one panel p
 are emptied, all systems are solved again and the beams and panels are updated. Returns a
 `LiveView`, which can be shown via `display`.
 
+The detector panels show metrics (centroid, RMS or 1/e² radius, power), optionally on a
+logarithmic color scale with a history and profiles. A click on a beam shows its position, path
+length and, for Gaussian beamlets, its radius and curvature, the "measure" toggle measures
+distances and angles between components and beams. The key `g` zooms to the selection, "home",
+the "views" menu and "save view" set and store camera views. While moving, beam groups are solved
+only for their rendered beams (`preview = true`), the full group once the movement pauses.
+
 Main keyword arguments: `detectors` (`:auto`, a vector of `pd`, `pd => mode` or
-`pd => (mode, kwargs)`, or `[]`), `on_change = (gui, obj) -> nothing`,
-`sliders = ["label" => (range, callback)]`, `system_kwargs`, `beam_kwargs`, `lighting = :studio`
-(see [`studio_lighting!`](@ref)), `edges` and `size`. All other
-keyword arguments are passed to [`kinematic_controls!`](@ref). Refer to the method of the `Makie`
-extension for details.
+`pd => (mode, kwargs)`, or `[]`, with the panel options `colorscale`, `colorrange`, `history`
+and `profiles`), `on_change = (gui, obj) -> nothing` (called after full solves),
+`sliders = ["label" => (range, callback)]`, `system_kwargs`, `beam_kwargs`, `preview = true`,
+`views = ["name" => (eye, lookat, up)]`, `lighting = :studio` (see [`studio_lighting!`](@ref)),
+`edges` and `size`. All other keyword arguments are passed to [`kinematic_controls!`](@ref). Refer
+to the method of the `Makie` extension for details.
 
 If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
 """

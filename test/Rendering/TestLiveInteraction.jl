@@ -948,7 +948,7 @@ BMO.kinematic_trait_of(::FixedMirror) = BMO.Static()
             Keyboard.h, Keyboard.m, Keyboard.t, Keyboard.v, Keyboard.escape, Keyboard.backspace,
             Keyboard.up, Keyboard.down, Keyboard.left, Keyboard.right,
             Keyboard.page_up, Keyboard.page_down, Keyboard.left_shift, Keyboard.right_shift,
-            Keyboard.p, Keyboard.c, Keyboard.delete
+            Keyboard.p, Keyboard.c, Keyboard.delete, Keyboard.g
         ])
         @test isempty(intersect(handled_keys, camera_keys))
 

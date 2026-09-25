@@ -1,19 +1,33 @@
 using Makie: Figure, Axis, Label, SliderGrid, GridLayout, DataAspect, Relative, colsize!, colgap!,
-             heatmap!, autolimits!, limits!, Button, Toggle, Textbox, Menu
+             heatmap!, autolimits!, limits!, Button, Toggle, Textbox, Menu, rowgap!, linkxaxes!,
+             hidexdecorations!, hidespines!
 import InteractiveUtils
+
+# Number of updates shown in the history of a detector panel
+const _HISTORY_LENGTH = 300
+
+# Floor of the logarithmic intensity scale, relative to the maximum
+const _LOG_FLOOR = 1e-4
 
 """
     DetectorPanel
 
 Detector panel of a `LiveView`, which shows the spot diagram or the intensity of a
-`Detector` in a 2D `Axis`, see `live_view`.
+`Detector` in a 2D `Axis`, see `live_view`. The metrics of the last update are shown in the
+subtitle of the axis and stored in `metrics`, the centroid is marked by a cross. Optionally, a
+`history` axis shows the power (or number of hits) and the centroid over the last updates, and a
+`profiles` axis the intensity along x and z through the centroid.
 """
 mutable struct DetectorPanel
     pd::BMO.Detector
     name::String
     # :auto, :spot or :intensity
     mode::Symbol
+    # kwargs of `intensity`, i.e. without the panel options below
     kwargs::NamedTuple
+    # :linear or :log, fixed color range or `nothing`
+    colorscale::Symbol
+    colorrange::Any
     ax::Axis
     xy::Observable{Vector{Point2f}}
     heat_x::Observable{Vector{Float32}}
@@ -21,6 +35,21 @@ mutable struct DetectorPanel
     heat_I::Observable{Matrix{Float32}}
     scatter_plot::AbstractPlot
     heat_plot::AbstractPlot
+    # metrics of the last update and centroid cross [mm]
+    metrics::Any
+    centroid::Observable{Vector{Point2f}}
+    centroid_plot::AbstractPlot
+    # history of the power (or number of hits) and of the centroid [mm] over the update index, in
+    # two axes with a common x-axis, empty without history
+    history_axes::Vector{Axis}
+    history_count::Int
+    history_value::Observable{Vector{Point2f}}
+    history_cx::Observable{Vector{Point2f}}
+    history_cz::Observable{Vector{Point2f}}
+    # intensity profiles along x and z through the centroid [mm]
+    profiles_ax::Union{Nothing, Axis}
+    profile_x::Observable{Vector{Point2f}}
+    profile_z::Observable{Vector{Point2f}}
     # last error of the update, logged only once
     last_error::Union{Nothing, String}
 end
@@ -48,6 +77,12 @@ copies them to the clipboard if `export_clipboard` is `true`. The component `men
 movable objects `menu_objects`, the objects hidden via the `hide_button` are stored in `hidden`.
 The `pose_boxes` of the pose inspector show and set the position `x`, `y`, `z` [mm] of the
 selected object and rotate it about the red, green and blue axes of the controls [mrad].
+
+While moving, beam groups are solved only for their rendered beams if `preview_enabled`, `preview`
+is `true` until the full solve. A click on a beam stores the inspected point in `inspection`, the
+`measure_toggle` switches measuring on, the result is stored in `measurement`. The `home_button`
+restores the `home` view, the `views_menu` sets one of the saved `views`, which the
+`save_view_button` extends.
 """
 mutable struct LiveView
     fig::Figure
@@ -106,6 +141,30 @@ mutable struct LiveView
     hidden::Base.IdSet{Any}
     # pose inspector: x, y, z [mm] and the rotations rx, ry, rv [mrad], see `_POSE_FIELDS`
     pose_boxes::Vector{Textbox}
+    # preview tracing: while moving, beam groups are solved only for their rendered beams, see
+    # `_resolve!`; `preview` is set after such a solve, until the full solve once the movement pauses
+    preview_enabled::Bool
+    preview::Bool
+    preview_obj::Any
+    # duration of the last preview solve [s]
+    preview_time::Float64
+    # beam inspection: the inspected point of a beam (see `_inspect_beam`) and its marker
+    inspection::Any
+    inspection_plot::Union{Nothing, AbstractPlot}
+    # measuring: up to two points `(; point, obj)`, the result `(; distance, angle)` and its plots
+    measure_toggle::Toggle
+    measure_points::Vector{Any}
+    measurement::Any
+    measure_plots::Vector{AbstractPlot}
+    # camera tools: home view (eye, lookat, up), taken at the first tick, the saved views, the
+    # animated camera transition
+    home_button::Button
+    home::NTuple{3, Vector{Float64}}
+    home_set::Bool
+    views::Vector{Pair{String, NTuple{3, Vector{Float64}}}}
+    views_menu::Menu
+    save_view_button::Button
+    camera_animation::Any
 end
 
 """
@@ -188,9 +247,33 @@ function _panel_specs(detectors, systems)
     return specs
 end
 
+# Options of a detector panel, which are not passed to `intensity`
+const _PANEL_OPTIONS = (:colorscale, :colorrange, :history, :profiles)
+
+"""
+    _panel_options(kwargs)
+
+Splits the `kwargs` of a detector panel into the panel options `(; colorscale, colorrange,
+history, profiles)` and the remaining kwargs, which are passed to `intensity`.
+"""
+function _panel_options(kwargs::NamedTuple)
+    colorscale = get(kwargs, :colorscale, :linear)
+    colorscale in (:linear, :log) ||
+        throw(ArgumentError("colorscale of a detector panel must be :linear or :log, got $(repr(colorscale))"))
+    colorrange = get(kwargs, :colorrange, nothing)
+    opts = (; colorscale, colorrange, history = Bool(get(kwargs, :history, false)),
+        profiles = Bool(get(kwargs, :profiles, false)))
+    rest = NamedTuple(k => v for (k, v) in pairs(kwargs) if !(k in _PANEL_OPTIONS))
+    return opts, rest
+end
+
 function DetectorPanel(parent, pd::BMO.Detector, name::String, mode::Symbol, kwargs::NamedTuple)
-    ax = Axis(parent; title = "$name: no hits", xlabel = "x [mm]", ylabel = "z [mm]",
-        aspect = DataAspect())
+    opts, kwargs = _panel_options(kwargs)
+    grid = GridLayout(parent)
+    # The metrics are shown in the subtitle, right above the axis, since the axis does not fill its
+    # cell with `DataAspect`
+    ax = Axis(grid[1, 1]; title = "$name: no hits", xlabel = "x [mm]", ylabel = "z [mm]",
+        aspect = DataAspect(), subtitlesize = 11, subtitlecolor = :gray25)
     n = get(kwargs, :n, 100)
     xy = Observable(Point2f[])
     heat_x = Observable(zeros(Float32, n))
@@ -198,8 +281,41 @@ function DetectorPanel(parent, pd::BMO.Detector, name::String, mode::Symbol, kwa
     heat_I = Observable(zeros(Float32, n, n))
     heat_plot = heatmap!(ax, heat_x, heat_y, heat_I; colorrange = (0.0f0, 1.0f0), visible = false)
     scatter_plot = scatter!(ax, xy; markersize = 3, color = :black, visible = false)
-    return DetectorPanel(pd, name, mode, kwargs, ax, xy, heat_x, heat_y, heat_I, scatter_plot,
-        heat_plot, nothing)
+    centroid = Observable(Point2f[])
+    centroid_plot = scatter!(ax, centroid; marker = :cross, markersize = 12, color = :red)
+    history_value, history_cx, history_cz = Observable(Point2f[]), Observable(Point2f[]), Observable(Point2f[])
+    history_axes = Axis[]
+    row = 2
+    if opts.history
+        value_ax = Axis(grid[row, 1]; height = 80, xlabel = "update", ylabel = "",
+            xlabelsize = 11, ylabelsize = 11, xticklabelsize = 10, yticklabelsize = 10)
+        # Centroid on a second y-axis on the right, i.e. a twin axis
+        centroid_ax = Axis(grid[row, 1]; height = 80, yaxisposition = :right, ylabel = "c [mm]",
+            ylabelsize = 11, yticklabelsize = 10, backgroundcolor = :transparent)
+        hidexdecorations!(centroid_ax)
+        hidespines!(centroid_ax)
+        linkxaxes!(value_ax, centroid_ax)
+        lines!(value_ax, history_value; color = :black)
+        lines!(centroid_ax, history_cx; color = :red, linewidth = 1)
+        lines!(centroid_ax, history_cz; color = :blue, linewidth = 1)
+        push!(history_axes, value_ax, centroid_ax)
+        row += 1
+    end
+    profile_x, profile_z = Observable(Point2f[]), Observable(Point2f[])
+    profiles_ax = nothing
+    if opts.profiles
+        # x profile red, z profile blue, like the centroid of the history
+        profiles_ax = Axis(grid[row, 1]; height = 80, xlabel = "x (red), z (blue) [mm]",
+            ylabel = "I [W/m²]", xlabelsize = 11, ylabelsize = 11, xticklabelsize = 10,
+            yticklabelsize = 10)
+        lines!(profiles_ax, profile_x; color = :red)
+        lines!(profiles_ax, profile_z; color = :blue)
+    end
+    rowgap!(grid, 4)
+    return DetectorPanel(pd, name, mode, kwargs, opts.colorscale, opts.colorrange, ax, xy, heat_x,
+        heat_y, heat_I, scatter_plot, heat_plot, nothing, centroid, centroid_plot,
+        history_axes, 0, history_value, history_cx, history_cz, profiles_ax, profile_x, profile_z,
+        nothing)
 end
 
 """Formats `x` with 3 decimal places."""
@@ -222,6 +338,16 @@ function _clear_panel!(p::DetectorPanel)
     p.scatter_plot.visible[] && (p.scatter_plot.visible[] = false)
     p.heat_plot.visible[] && (p.heat_plot.visible[] = false)
     isempty(p.xy[]) || (p.xy[] = Point2f[])
+    isempty(p.centroid[]) || (p.centroid[] = Point2f[])
+    _clear_profiles!(p)
+    p.metrics = nothing
+    p.ax.subtitle[] = ""
+    return nothing
+end
+
+function _clear_profiles!(p::DetectorPanel)
+    isempty(p.profile_x[]) || (p.profile_x[] = Point2f[])
+    isempty(p.profile_z[]) || (p.profile_z[] = Point2f[])
     return nothing
 end
 
@@ -230,12 +356,94 @@ function _hits_title(p::DetectorPanel, h)
     return _is_beamlet_hits(h) ? "$(p.name): $n beamlets" : "$(p.name): $n rays"
 end
 
-function _update_spot!(p::DetectorPanel, h)
+"""
+    _spot_metrics(pts)
+
+Returns the metrics `(; n, cx, cz, rms, rmax)` of the spot diagram `pts` (local x/z [m]): the
+number of hits, the centroid, the RMS radius `sqrt(mean(|p - c|²))` and the geometric radius, i.e.
+the largest distance from the centroid [m].
+"""
+function _spot_metrics(pts)
+    n = length(pts)
+    cx = sum(q -> Float64(q[1]), pts) / n
+    cz = sum(q -> Float64(q[2]), pts) / n
+    r2 = [(Float64(q[1]) - cx)^2 + (Float64(q[2]) - cz)^2 for q in pts]
+    return (; n, cx, cz, rms = sqrt(sum(r2) / n), rmax = sqrt(maximum(r2)))
+end
+
+"""
+    _intensity_metrics(x, z, I)
+
+Returns the metrics `(; P, cx, cz, wx, wz, peak)` of the intensity `I[i, j]` at `x[i]`, `z[j]`
+[m]: the power (integrated like `optical_power`), the centroid, the 1/e² radii `2σ` from the second
+moments along x and z and the peak intensity. The centroid and the radii are `NaN` without
+intensity.
+"""
+function _intensity_metrics(x, z, I)
+    P = BMO.trapz((x, z), I)
+    peak = maximum(I)
+    S = sum(I)
+    S > 0 || return (; P, cx = NaN, cz = NaN, wx = NaN, wz = NaN, peak)
+    # Marginal distributions along x and z, the uniform cell area cancels
+    Ix, Iz = vec(sum(I; dims = 2)), vec(sum(I; dims = 1))
+    cx, cz = dot(Ix, x) / S, dot(Iz, z) / S
+    σx2 = sum(Ix .* (x .- cx) .^ 2) / S
+    σz2 = sum(Iz .* (z .- cz) .^ 2) / S
+    return (; P, cx, cz, wx = 2 * sqrt(σx2), wz = 2 * sqrt(σz2), peak)
+end
+
+"""Formats the length `x` like `_length_string` with its sign, below 1 pm as `0 nm`."""
+function _signed_length_string(x)
+    abs(x) < 1e-12 && return "0 nm"
+    return x < 0 ? "-" * _length_string(-x) : _length_string(x)
+end
+
+"""Formats the metrics `m` of a panel, see `_spot_metrics` and `_intensity_metrics`, in two lines."""
+function _metrics_string(m)
+    if haskey(m, :rms)
+        return "N = $(m.n), c = ($(_signed_length_string(m.cx)), $(_signed_length_string(m.cz)))\n" *
+               "rms $(_length_string(m.rms)), max $(_length_string(m.rmax))"
+    end
+    s = "P = $(_fmt3(1e3 * m.P)) mW, peak $(_fmt_sigdigits(m.peak)) W/m²"
+    isfinite(m.cx) || return s * "\nno intensity"
+    return s * "\nc = ($(_signed_length_string(m.cx)), $(_signed_length_string(m.cz))), " *
+           "w = ($(_length_string(m.wx)), $(_length_string(m.wz)))"
+end
+
+"""
+    _set_metrics!(p, m; record = true)
+
+Shows the metrics `m` of the panel `p` in the subtitle of its axis and marks the centroid. With
+`record`, the power (or the number of hits) and the centroid are added to the history of the
+panel, if any.
+"""
+function _set_metrics!(p::DetectorPanel, m; record::Bool = true)
+    p.metrics = m
+    p.ax.subtitle[] = _metrics_string(m)
+    c = isfinite(m.cx) ? [Point2f(1e3 * m.cx, 1e3 * m.cz)] : Point2f[]
+    p.centroid[] == c || (p.centroid[] = c)
+    (record && !isempty(p.history_axes)) || return nothing
+    p.history_count += 1
+    k = p.history_count
+    value, label = haskey(m, :P) ? (1e3 * m.P, "P [mW]") : (m.n, "N")
+    for (obs, v) in ((p.history_value, value), (p.history_cx, 1e3 * m.cx), (p.history_cz, 1e3 * m.cz))
+        push!(obs[], Point2f(k, v))
+        length(obs[]) > _HISTORY_LENGTH && popfirst!(obs[])
+        notify(obs)
+    end
+    p.history_axes[1].ylabel[] == label || (p.history_axes[1].ylabel[] = label)
+    foreach(autolimits!, p.history_axes)
+    return nothing
+end
+
+function _update_spot!(p::DetectorPanel, h; preview = false, record = true)
     pts = BMO.spot_diagram(p.pd)
     p.xy[] = [Point2f(1e3 * q[1], 1e3 * q[2]) for q in pts]
     p.heat_plot.visible[] && (p.heat_plot.visible[] = false)
     p.scatter_plot.visible[] || (p.scatter_plot.visible[] = true)
-    p.ax.title[] = _hits_title(p, h)
+    p.ax.title[] = _hits_title(p, h) * (preview ? " (preview)" : "")
+    _set_metrics!(p, _spot_metrics(pts); record)
+    _clear_profiles!(p)
     autolimits!(p.ax)
     _pad_degenerate_limits!(p.ax, p.xy[])
     return nothing
@@ -270,48 +478,83 @@ function _panel_n(p::DetectorPanel, coarse::Bool)
     return coarse ? max(16, n ÷ 4) : n
 end
 
-function _update_intensity!(p::DetectorPanel, h; coarse = false)
+"""
+    _display_intensity(I, colorscale) -> (values, colorrange)
+
+Returns the values of the heatmap of the intensity `I` and their color range: `I` for the linear
+scale, `log10(I)` with a floor of `_LOG_FLOOR` times the maximum for the logarithmic scale.
+"""
+function _display_intensity(I, colorscale::Symbol)
+    Imax = Float64(maximum(I))
+    colorscale == :linear && return I, (0.0, Imax > 0 ? Imax : 1.0)
+    floor = Imax > 0 ? _LOG_FLOOR * Imax : _LOG_FLOOR
+    return log10.(max.(I, floor)), (log10(floor), log10(floor / _LOG_FLOOR))
+end
+
+"""Shows the intensity `I` along x and z through the centroid of the metrics `m` of the panel `p`."""
+function _update_profiles!(p::DetectorPanel, x, z, I, m)
+    isnothing(p.profiles_ax) && return nothing
+    if !isfinite(m.cx)
+        _clear_profiles!(p)
+        return nothing
+    end
+    i, j = argmin(abs.(x .- m.cx)), argmin(abs.(z .- m.cz))
+    p.profile_x[] = [Point2f(1e3 * x[k], I[k, j]) for k in eachindex(x)]
+    p.profile_z[] = [Point2f(1e3 * z[k], I[i, k]) for k in eachindex(z)]
+    autolimits!(p.profiles_ax)
+    return nothing
+end
+
+function _update_intensity!(p::DetectorPanel, h; coarse = false, preview = false, record = true)
     x, z, I = BMO.intensity(p.pd; merge(p.kwargs, (; n = _panel_n(p, coarse)))...)
     # The plot is updated lazily, hence the grid size may change
     p.heat_x[] = Float32.(1e3 .* x)
     p.heat_y[] = Float32.(1e3 .* z)
-    p.heat_I[] = Float32.(I)
-    Imax = Float32(maximum(I))
-    p.heat_plot.colorrange[] = (0.0f0, Imax > 0 ? Imax : 1.0f0)
+    values, range = _display_intensity(I, p.colorscale)
+    p.heat_I[] = Float32.(values)
+    p.heat_plot.colorrange[] = Float32.(something(p.colorrange, range))
     p.scatter_plot.visible[] && (p.scatter_plot.visible[] = false)
     p.heat_plot.visible[] || (p.heat_plot.visible[] = true)
+    # Optical power from the computed intensity like optical_power, avoids a second field evaluation
+    m = _intensity_metrics(x, z, I)
     if h isa AbstractVector{<:BMO.GaussianBeamletHit}
-        # Optical power from the computed intensity like optical_power, avoids a second field evaluation
-        P = BMO.trapz((x, z), I)
-        p.ax.title[] = "$(p.name): P = $(_fmt3(1e3 * P)) mW"
+        p.ax.title[] = "$(p.name): P = $(_fmt3(1e3 * m.P)) mW"
     else
         p.ax.title[] = _hits_title(p, h)
     end
-    coarse && (p.ax.title[] *= " (preview)")
+    (coarse || preview) && (p.ax.title[] *= " (preview)")
+    _set_metrics!(p, m; record)
+    _update_profiles!(p, x, z, I, m)
     autolimits!(p.ax)
     return nothing
 end
 
-"""Updates the plots and the title of the panel `p` after the systems have been solved."""
-function _update_panel!(p::DetectorPanel; coarse = false)
+"""
+    _update_panel!(p; coarse = false, preview = false, record = true)
+
+Updates the plots, the title and the metrics of the panel `p` after the systems have been solved.
+`coarse` computes the intensity on a coarse grid, `preview` marks the title after a preview solve,
+see `_resolve!`. `record` adds the metrics to the history of the panel.
+"""
+function _update_panel!(p::DetectorPanel; coarse = false, preview = false, record = true)
     try
         h = BMO.hits(p.pd)
         if isnothing(h)
             _clear_panel!(p)
-            p.ax.title[] = "$(p.name): no hits"
+            p.ax.title[] = "$(p.name): no hits" * (preview ? " (preview)" : "")
         else
             mode = _resolve_mode(p.mode, h)
             if mode == :intensity && p.mode == :auto && h isa AbstractVector{<:BMO.AstigmaticGaussianBeamletHit}
                 # Fall back to the spot diagram if the field of the hits can not be evaluated
                 try
-                    _update_intensity!(p, h; coarse)
+                    _update_intensity!(p, h; coarse, preview, record)
                 catch
-                    _update_spot!(p, h)
+                    _update_spot!(p, h; preview, record)
                 end
             elseif mode == :intensity
-                _update_intensity!(p, h; coarse)
+                _update_intensity!(p, h; coarse, preview, record)
             else
-                _update_spot!(p, h)
+                _update_spot!(p, h; preview, record)
             end
         end
         p.last_error = nothing
@@ -356,31 +599,82 @@ function _pose_string(gui, obj)
     return s * ", moved by $(_length_string(norm(P - P0))), rotated by $(_angle_string(angle))"
 end
 
+_render_every(h::BeamRenderHandle) = h.render_every
+_render_every(h::AstigmaticGroupRenderHandle) = h.render_every
+_render_every(_) = 1
+
+"""Returns `true` if the `beam` with the render handle `h` is solved as a preview while moving."""
+_previewable(beam, h) = beam isa BMO.AbstractBeamGroup && _render_every(h) > 1
+
+"""Returns `true` if the `gui` solves any of its beams as a preview while moving, see `_resolve!`."""
+_has_preview(gui::LiveView) = gui.preview_enabled &&
+                              any(i -> _previewable(gui.pairs[i].second, gui.beam_handles[i]), eachindex(gui.pairs))
+
 """
-    _resolve!(gui::LiveView, obj)
+    _solve_preview!(system, bg, k)
+
+Solves only the rendered beams `beams(bg)[1:k:end]` of the beam group `bg` and resets all other
+beams to their untraced start state, such that no outdated paths are rendered or hit a detector.
+"""
+function _solve_preview!(system, bg::BMO.AbstractBeamGroup, k::Int)
+    bms = BMO.beams(bg)
+    idx = 1:k:length(bms)
+    # Like `solve_system!` of a beam group
+    Threads.@threads for i in idx
+        solve_system!(system, bms[i])
+    end
+    for i in eachindex(bms)
+        (i - 1) % k == 0 || empty!(bms[i])
+    end
+    return nothing
+end
+
+"""
+    _resolve!(gui::LiveView, obj; coarse = false, preview = false)
 
 Empties all `Detector`s, solves all systems and updates the beams, detector panels and the status
 line of the `gui`. The user `on_change` is called with the moved `obj`, or `nothing`.
+
+With `preview`, beam groups rendered with `render_every > 1` are solved only for their rendered
+beams, see `_solve_preview!`, the titles of the detector panels are marked with "(preview)" and
+`gui.preview` is set, such that the full solve follows once the movement pauses, see `_on_idle!`.
+`on_change` is only called after full solves, the metrics of a preview are not recorded in the
+history of the panels.
 """
-function _resolve!(gui::LiveView, obj; coarse = false)
+function _resolve!(gui::LiveView, obj; coarse = false, preview = false)
     # A detector can be part of several systems, hence empty all before solving
     # Monotonic clock with ns resolution, time() is too coarse on Windows for fast solves
     t0 = time_ns()
     foreach(empty!, _find_detectors(first.(gui.pairs)))
+    previewed = false
     for (i, (sys, beam)) in enumerate(gui.pairs)
-        solve_system!(sys, beam)
-        update_render!(gui.beam_handles[i])
+        h = gui.beam_handles[i]
+        if preview && _previewable(beam, h)
+            _solve_preview!(sys, beam, _render_every(h))
+            previewed = true
+        else
+            solve_system!(sys, beam)
+        end
+        update_render!(h)
     end
     t1 = time_ns()
-    foreach(p -> _update_panel!(p; coarse), gui.panels)
-    gui.solve_time = 1e-9 * (t1 - t0)
-    coarse || (gui.panel_time = 1e-9 * (time_ns() - t1))
+    foreach(p -> _update_panel!(p; coarse, preview = previewed, record = !previewed), gui.panels)
+    if previewed
+        gui.preview_time = 1e-9 * (t1 - t0)
+    else
+        gui.solve_time = 1e-9 * (t1 - t0)
+        coarse || (gui.panel_time = 1e-9 * (time_ns() - t1))
+    end
     gui.coarse = coarse
-    try
-        gui.on_change(gui, obj)
-        gui.last_error = nothing
-    catch e
-        gui.last_error = _log_once(e, gui.last_error, "`on_change` callback")
+    gui.preview = previewed
+    gui.preview_obj = obj
+    if !previewed
+        try
+            gui.on_change(gui, obj)
+            gui.last_error = nothing
+        catch e
+            gui.last_error = _log_once(e, gui.last_error, "`on_change` callback")
+        end
     end
     isnothing(obj) || (gui.status.text[] = _pose_string(gui, obj))
     return nothing
@@ -426,10 +720,10 @@ end
 Solves all systems of the `gui` via `_resolve!` and restores the appearance of the beams. If solving
 fails, the beams and detector panels are kept marked as outdated. Returns `true` on success.
 """
-function _solve!(gui::LiveView, obj; coarse = false)
+function _solve!(gui::LiveView, obj; coarse = false, preview = false)
     gui.pending = false
     try
-        _resolve!(gui, obj; coarse)
+        _resolve!(gui, obj; coarse, preview)
     catch e
         gui.last_error = _log_once(e, gui.last_error, "solving the systems")
         gui.stale || _dim_beams!(gui)
@@ -446,15 +740,17 @@ end
     _on_change!(gui::LiveView, obj)
 
 Called after each change of `obj` (or a slider, then `obj` is `nothing`). Solves the systems, with
-a coarse preview of slow detector panels, or marks them as outdated. If solving is slower than the
-`trace_budget`, the solve is deferred until the movement pauses, see `_on_idle!`.
+a preview of beam groups (see `_resolve!`) and a coarse preview of slow detector panels, or marks
+them as outdated. If solving (the preview solve, if any) is slower than the `trace_budget`, the
+solve is deferred until the movement pauses, see `_on_idle!`.
 """
 function _on_change!(gui::LiveView, obj)
     gui.last_change = time()
+    preview = _has_preview(gui)
     if !gui.auto_trace[]
         _mark_stale!(gui, obj)
-    elseif gui.solve_time <= gui.trace_budget
-        _solve!(gui, obj; coarse = gui.panel_time > gui.trace_budget)
+    elseif (preview ? gui.preview_time : gui.solve_time) <= gui.trace_budget
+        _solve!(gui, obj; coarse = gui.panel_time > gui.trace_budget, preview)
     else
         _mark_stale!(gui, obj; msg = "tracing when the movement pauses")
         gui.pending = true
@@ -463,13 +759,19 @@ function _on_change!(gui::LiveView, obj)
     return nothing
 end
 
-"""Solves deferred changes and refines the preview of the detector panels once the movement pauses."""
+"""
+Solves deferred changes, completes a preview solve with a full solve and refines the preview of
+the detector panels once the movement pauses.
+"""
 function _on_idle!(gui::LiveView)
     time() - gui.last_change > gui.idle_delay || return nothing
     if gui.pending && gui.auto_trace[]
         _solve!(gui, gui.pending_obj)
+    elseif gui.preview
+        # Also if auto tracing was switched off in the meantime, since the preview is incomplete
+        _solve!(gui, gui.preview_obj)
     elseif gui.coarse
-        foreach(_update_panel!, gui.panels)
+        foreach(p -> _update_panel!(p; record = false), gui.panels)
         gui.coarse = false
     end
     return nothing
@@ -1068,11 +1370,11 @@ const _POSE_AXES = (:x, :y, :v)
 """Label colors of the pose inspector: the colors of the gizmo axes for the rotations."""
 const _POSE_COLORS = (:black, :black, :black, :red, :green, :blue)
 
-"""Returns `true` if a textbox or the component menu of the `gui` takes keyboard input."""
+"""Returns `true` if a textbox or a menu of the `gui` takes keyboard input."""
 function _typing(gui::LiveView)
     gui.step_box.focused[] && return true
     any(tb -> tb.focused[], gui.pose_boxes) && return true
-    return gui.menu.is_open[]
+    return gui.menu.is_open[] || gui.views_menu.is_open[]
 end
 
 """Shows `s` in the textbox `tb` without triggering its listeners, `""` shows the placeholder."""
@@ -1173,6 +1475,534 @@ function _connect_tools!(gui::LiveView)
     return nothing
 end
 
+#=
+Beam inspection and measuring
+=#
+
+# Screen-space pick radius of the beams [px]
+const _BEAM_PICK_RADIUS = 6.0
+
+"""
+    _BeamSegment
+
+Rendered segment of a beam from `a` to `b` [m] along the `ray`. `l0` and `opl0` are the geometric
+and optical path length from the source to `a` [m]. `beamlet` is the Gaussian beamlet whose chief
+ray the segment belongs to, or `nothing`.
+"""
+struct _BeamSegment
+    a::Vector{Float64}
+    b::Vector{Float64}
+    ray::BMO.AbstractRay
+    l0::Float64
+    opl0::Float64
+    beamlet::Any
+end
+
+"""
+    _push_beam_segments!(segs, rays, l0, opl0, flen; beamlet = nothing)
+
+Appends the segments of the consecutive `rays` of one beam, starting at the path lengths `l0` and
+`opl0` [m], like `_push_ray_segment!`: a ray without intersection has the length `flen`.
+"""
+function _push_beam_segments!(segs, rays, l0, opl0, flen; beamlet = nothing)
+    l, opl = Float64(l0), Float64(opl0)
+    for ray in rays
+        isect = BMO.intersection(ray)
+        len = isnothing(isect) ? Float64(flen) : Float64(length(isect))
+        a = Vector{Float64}(position(ray))
+        push!(segs, _BeamSegment(a, a .+ len .* Vector{Float64}(BMO.direction(ray)), ray, l, opl, beamlet))
+        l += len
+        opl += len * BMO.refractive_index(ray)
+    end
+    return segs
+end
+
+_parent_lengths(::Nothing) = (0.0, 0.0)
+_parent_lengths(p) = (Float64(length(p)), Float64(BMO.optical_path_length(p)))
+
+function _beam_segments!(segs, ray::BMO.AbstractRay; flen)
+    return _push_beam_segments!(segs, (ray,), 0.0, 0.0, flen)
+end
+
+function _beam_segments!(segs, beam::Beam; flen)
+    for child in PreOrderDFS(beam)
+        _push_beam_segments!(segs, BMO.rays(child), _parent_lengths(child.parent)..., flen)
+    end
+    return segs
+end
+
+function _beam_segments!(segs, gauss::BMO.GaussianBeamlet; flen)
+    # Along the chief ray, `gauss_parameters` of a child beamlet expects the length from the source
+    for child in PreOrderDFS(gauss)
+        _push_beam_segments!(segs, BMO.rays(child.chief), _parent_lengths(child.parent)..., flen;
+            beamlet = child)
+    end
+    return segs
+end
+
+function _beam_segments!(segs, agb::BMO.AstigmaticGaussianBeamlet; flen)
+    for child in PreOrderDFS(agb)
+        _push_beam_segments!(segs, BMO.rays(child.c), _parent_lengths(child.parent)..., flen)
+    end
+    return segs
+end
+
+function _beam_segments!(segs, bg::BMO.AbstractBeamGroup; flen, render_every = 1)
+    bms = BMO.beams(bg)
+    for i in 1:render_every:length(bms)
+        _beam_segments!(segs, bms[i]; flen)
+    end
+    return segs
+end
+
+"""Returns the rendered segments of the beam of the render handle `h`, see `_BeamSegment`."""
+function _beam_segments(h::BeamRenderHandle)
+    segs = _BeamSegment[]
+    if h.thing isa BMO.AbstractBeamGroup
+        return _beam_segments!(segs, h.thing; flen = h.flen, render_every = h.render_every)
+    end
+    return _beam_segments!(segs, h.thing; flen = h.flen)
+end
+_beam_segments(h::GaussianRenderHandle) = _beam_segments!(_BeamSegment[], h.thing; flen = h.flen)
+function _beam_segments(h::AstigmaticGroupRenderHandle)
+    return _beam_segments!(_BeamSegment[], h.thing; flen = h.flen, render_every = h.render_every)
+end
+_beam_segments(_) = _BeamSegment[]
+
+"""Returns the distance of the point `p` from the segment `a`-`b` in 2D."""
+function _point_segment_distance(p, a, b)
+    ab = (b[1] - a[1], b[2] - a[2])
+    L2 = ab[1]^2 + ab[2]^2
+    t = L2 > 0 ? clamp(((p[1] - a[1]) * ab[1] + (p[2] - a[2]) * ab[2]) / L2, 0, 1) : 0.0
+    return hypot(p[1] - a[1] - t * ab[1], p[2] - a[2] - t * ab[2])
+end
+
+"""
+    _closest_on_segment(a, b, origin, dir)
+
+Returns the parameter `s ∈ [0, 1]` of the point `a + s (b - a)` of the segment that is closest to
+the line `origin + t dir`.
+"""
+function _closest_on_segment(a, b, origin, dir)
+    u, w = b .- a, a .- origin
+    A, B, C = dot(u, u), dot(u, dir), dot(dir, dir)
+    D, E = dot(u, w), dot(dir, w)
+    den = A * C - B^2
+    s = den > 1e-12 * A * C ? (B * E - C * D) / den : 0.0
+    return clamp(s, 0.0, 1.0)
+end
+
+"""
+    _inspect_beam(gui)
+
+Returns the point of the rendered beams of the `gui` under the cursor, i.e. on the segment whose
+projection is closest to the cursor within `_BEAM_PICK_RADIUS` pixels, or `nothing`. The result is
+`(; point, direction, length, opl, w, R)`: the point closest to the camera ray through the cursor
+and the direction of its segment, the geometric and optical path length (Σ n·L) from the source
+[m], and for Gaussian beamlets the radius `w` and the curvature `R` of `gauss_parameters` at the
+point, otherwise `nothing`.
+"""
+function _inspect_beam(gui::LiveView)
+    scene = gui.ax.scene
+    cursor = _px(scene)
+    origin, dir = _cursor_ray(scene)
+    best, dmin = nothing, _BEAM_PICK_RADIUS
+    for h in gui.beam_handles, seg in _beam_segments(h)
+        # Segments behind the camera are not visible
+        (dot(seg.a .- origin, dir) > 0 || dot(seg.b .- origin, dir) > 0) || continue
+        pa = Makie.project(scene, :data, :pixel, Point3(seg.a))
+        pb = Makie.project(scene, :data, :pixel, Point3(seg.b))
+        d = _point_segment_distance(cursor, pa, pb)
+        if d <= dmin
+            best, dmin = seg, d
+        end
+    end
+    isnothing(best) && return nothing
+    s = _closest_on_segment(best.a, best.b, origin, dir)
+    point = best.a .+ s .* (best.b .- best.a)
+    L = norm(point .- best.a)
+    len = best.l0 + L
+    opl = best.opl0 + L * BMO.refractive_index(best.ray)
+    w, R = if isnothing(best.beamlet)
+        nothing, nothing
+    else
+        BMO.gauss_parameters(best.beamlet, len)[1:2]
+    end
+    return (; point, direction = Vector{Float64}(BMO.direction(best.ray)), length = len, opl, w, R)
+end
+
+"""Formats a vector with 4 decimal places."""
+_direction_string(v) = "(" * join((string(round(x, digits = 4)) for x in v), ", ") * ")"
+
+"""Formats the point `p` [m] in mm with 3 decimal places."""
+_point_string(p) = "(" * join((_fmt3(1e3 * x) for x in p), ", ") * ") mm"
+
+"""Describes the inspected point `info` of a beam, see `_inspect_beam`."""
+function _inspection_string(info)
+    s = "beam at $(_point_string(info.point)), direction $(_direction_string(info.direction)), " *
+        "path $(_fmt3(1e3 * info.length)) mm, OPL $(_fmt3(1e3 * info.opl)) mm"
+    isnothing(info.w) && return s
+    # `R` is the curvature, shown as the radius of curvature
+    r = iszero(info.R) ? "∞" : _signed_length_string(1 / info.R)
+    return s * ", w = $(_length_string(info.w)), R = $r"
+end
+
+"""Returns a marker of the points `pts` in the 3D view of the `gui`, which is never clipped."""
+function _point_marker!(gui::LiveView, pts; color = :magenta)
+    return scatter!(gui.ax, pts; color, markersize = 10, strokecolor = :black, strokewidth = 1,
+        overdraw = true, clip_planes = Plane3f[])
+end
+
+"""Removes the marker and the result of the beam inspection of the `gui`, if any."""
+function _clear_inspection!(gui::LiveView)
+    gui.inspection = nothing
+    isnothing(gui.inspection_plot) && return nothing
+    delete!(gui.ax, gui.inspection_plot)
+    gui.inspection_plot = nothing
+    return nothing
+end
+
+"""Shows the inspected point `info` of a beam with a marker and in the status line of the `gui`."""
+function _show_inspection!(gui::LiveView, info)
+    _clear_inspection!(gui)
+    gui.inspection = info
+    gui.inspection_plot = _point_marker!(gui, [Point3f(info.point)])
+    gui.status.text[] = _inspection_string(info)
+    return nothing
+end
+
+"""Removes the points, the result and the plots of the measurement of the `gui`."""
+function _clear_measurement!(gui::LiveView)
+    empty!(gui.measure_points)
+    gui.measurement = nothing
+    foreach(p -> delete!(gui.ax, p), gui.measure_plots)
+    empty!(gui.measure_plots)
+    return nothing
+end
+
+"""
+    _measure(a, b)
+
+Returns `(; distance, angle)` between the measured points `a` and `b` (`(; point, obj)`): the
+distance [m] and the angle between the optical axes (local y-axes) of the objects [rad], or
+`nothing` unless both are components.
+"""
+function _measure(a, b)
+    distance = norm(b.point .- a.point)
+    angle = nothing
+    if a.obj isa BMO.AbstractObject && b.obj isa BMO.AbstractObject
+        na, nb = _pose(a.obj)[2][:, 2], _pose(b.obj)[2][:, 2]
+        angle = acos(clamp(dot(na, nb) / (norm(na) * norm(nb)), -1, 1))
+    end
+    return (; distance, angle)
+end
+
+"""
+    _add_measure_point!(gui, point, obj)
+
+Adds the `point` [m] of the component `obj` (or `nothing` for a point of a beam) to the measurement
+of the `gui`. The second point shows the distance, and the angle between two components, in the
+status line with a dashed line between the points; a third point starts a new measurement.
+"""
+function _add_measure_point!(gui::LiveView, point, obj)
+    length(gui.measure_points) >= 2 && _clear_measurement!(gui)
+    foreach(p -> delete!(gui.ax, p), gui.measure_plots)
+    empty!(gui.measure_plots)
+    push!(gui.measure_points, (; point = Vector{Float64}(point), obj))
+    pts = [Point3f(m.point) for m in gui.measure_points]
+    name(m) = isnothing(m.obj) ? "beam" : _label(gui, m.obj)
+    if length(pts) == 1
+        gui.status.text[] = "measure: $(name(gui.measure_points[1])) at $(_point_string(point)), " *
+                            "click the second point"
+    else
+        a, b = gui.measure_points
+        gui.measurement = _measure(a, b)
+        s = "measure: $(name(a)) to $(name(b)): distance $(round(1e3 * gui.measurement.distance, digits = 6)) mm"
+        isnothing(gui.measurement.angle) || (s *= ", angle $(_angle_string(gui.measurement.angle))")
+        gui.status.text[] = s
+        push!(gui.measure_plots, lines!(gui.ax, pts; color = :magenta, linestyle = :dash,
+            linewidth = 2, overdraw = true, clip_planes = Plane3f[]))
+    end
+    push!(gui.measure_plots, _point_marker!(gui, pts))
+    return nothing
+end
+
+"""Switches measuring of the `gui` on or off, which clears the measurement."""
+function _set_measuring!(gui::LiveView, on::Bool)
+    _clear_measurement!(gui)
+    _clear_inspection!(gui)
+    gui.status.text[] = on ? "measure: click two components or beams" : "measuring off"
+    return nothing
+end
+
+"""
+    _on_click!(gui, obj)
+
+Called after a click in the 3D view with the selected object `obj`, or `nothing` for a click on no
+component. While measuring, the position of the component or the point of the beam under the
+cursor is added to the measurement. Otherwise a click on a beam inspects it, see `_inspect_beam`,
+and a click elsewhere removes the inspection. Returns `true` if a beam was clicked, then the
+selection is kept.
+"""
+function _on_click!(gui::LiveView, obj)
+    obj isa LiveClipPlane && (obj = nothing)
+    info = isnothing(obj) ? _inspect_beam(gui) : nothing
+    if gui.measure_toggle.active[]
+        if !isnothing(obj)
+            _add_measure_point!(gui, position(obj), obj)
+        elseif !isnothing(info)
+            _add_measure_point!(gui, info.point, nothing)
+        end
+    elseif isnothing(info)
+        _clear_inspection!(gui)
+    else
+        _show_inspection!(gui, info)
+    end
+    return !isnothing(info)
+end
+
+#=
+Camera tools
+=#
+
+const _CAMERA_HELP = "g: zoom to selection, click on a beam: inspect it"
+
+"""
+    _CameraAnimation
+
+State of the animated transition of the camera of a `LiveView` to a new view, see
+`_animate_camera!`. Like `_CubeAnimation`, the direction from `lookat` to the eye is rotated by
+`angle` about `axis` and the up vector is rolled by `roll`, while `lookat` and the distance `dist`
+of the eye are interpolated linearly.
+"""
+mutable struct _CameraAnimation
+    lookat0::Vector{Float64}
+    dist0::Float64
+    o0::Vector{Float64}
+    u0::Vector{Float64}
+    # target view, applied as given at the end
+    eye1::Vector{Float64}
+    lookat1::Vector{Float64}
+    up1::Vector{Float64}
+    dist1::Float64
+    axis::Vector{Float64}
+    angle::Float64
+    roll::Float64
+    duration::Float64
+    elapsed::Float64
+end
+
+"""Returns the current view `(eye, lookat, up)` of the 3D view of the `gui`."""
+function _current_view(gui::LiveView)
+    cam = cameracontrols(gui.ax.scene)
+    return (Vector{Float64}(cam.eyeposition[]), Vector{Float64}(cam.lookat[]),
+        Vector{Float64}(cam.upvector[]))
+end
+
+"""Applies the frame at the fraction `t` of the animation `a` to the camera of the `gui`."""
+function _apply_camera_frame!(gui::LiveView, a::_CameraAnimation, t)
+    if t >= 1
+        set_view(gui.ax, a.eye1, a.lookat1, a.up1)
+        return nothing
+    end
+    # Smooth start and stop
+    τ = t^2 * (3 - 2t)
+    o = normalize(_rotate(a.o0, a.axis, τ * a.angle))
+    up = normalize(_rotate(_rotate(a.u0, a.axis, τ * a.angle), o, τ * a.roll))
+    lookat = a.lookat0 .+ τ .* (a.lookat1 .- a.lookat0)
+    dist = a.dist0 + τ * (a.dist1 - a.dist0)
+    set_view(gui.ax, lookat .+ dist .* o, lookat, up)
+    return nothing
+end
+
+"""Advances the camera animation of the `gui` by `dt` [s]. A new animation of the view cube wins."""
+function _step_camera!(gui::LiveView, dt)
+    a = gui.camera_animation
+    isnothing(a) && return nothing
+    if !isnothing(gui.view_cube) && !isnothing(gui.view_cube.anim)
+        gui.camera_animation = nothing
+        return nothing
+    end
+    a.elapsed += dt
+    t = a.duration > 0 ? min(a.elapsed / a.duration, 1.0) : 1.0
+    t >= 1 && (gui.camera_animation = nothing)
+    _apply_camera_frame!(gui, a, t)
+    return nothing
+end
+
+"""
+    _animate_camera!(gui, eye, lookat, up)
+
+Moves the camera of the `gui` to the view `eye`, `lookat`, `up`, animated over the duration of the
+view cube (0.3 s without a view cube), driven by `tick` events.
+"""
+function _animate_camera!(gui::LiveView, eye, lookat, up)
+    eye0, lookat0, up0 = _current_view(gui)
+    d0, d1 = eye0 .- lookat0, Vector{Float64}(eye) .- Vector{Float64}(lookat)
+    dist0, dist1 = norm(d0), norm(d1)
+    o0 = dist0 > 0 ? d0 ./ dist0 : [0.0, 0.0, 1.0]
+    o1 = dist1 > 0 ? d1 ./ dist1 : o0
+    u0 = something(_orthogonalize(up0, o0), _perp(o0))
+    u1 = something(_orthogonalize(Vector{Float64}(up), o1), _perp(o1))
+    axis, angle = _rotation_between(o0, o1, cross(o0, u0))
+    ur = _rotate(u0, axis, angle)
+    roll = atan(dot(cross(ur, u1), o1), dot(ur, u1))
+    duration = isnothing(gui.view_cube) ? 0.3 : gui.view_cube.duration
+    isnothing(gui.view_cube) || (gui.view_cube.anim = nothing)
+    gui.camera_animation = _CameraAnimation(lookat0, dist0, o0, u0, Vector{Float64}(eye),
+        Vector{Float64}(lookat), Vector{Float64}(up), dist1, axis, angle, roll, duration, 0.0)
+    duration > 0 || _step_camera!(gui, 0.0)
+    return nothing
+end
+
+"""
+    _zoom_box(gui)
+
+Returns the bounding box of the plots of the selected object of the `gui`, or of all systems if
+nothing is selected, or `nothing` if there are no visible plots.
+"""
+function _zoom_box(gui::LiveView)
+    ctrl = gui.controls
+    obj = ctrl.selected[]
+    isnothing(obj) || return _selection_bbox(ctrl, obj, _object_plots(ctrl.h, obj))
+    plots = [p for h in gui.system_handles for oh in h.handles for p in oh.plots if p.visible[]]
+    bbs = filter(_is_finite_box, [Makie.boundingbox(p) for p in plots])
+    return isempty(bbs) ? nothing : reduce(GeometryBasics.union, bbs)
+end
+
+"""
+    _zoom_to_selection!(gui)
+
+Moves the camera of the `gui` such that the bounding sphere of the selected object, or of all
+systems if nothing is selected, fills the view: `lookat` is set to the center of the bounding box,
+the eye to the distance `(d/2) / sin(fov/2)` along the current view direction, where `d` is the
+diagonal of the box.
+"""
+function _zoom_to_selection!(gui::LiveView)
+    bb = _zoom_box(gui)
+    if isnothing(bb)
+        gui.status.text[] = "nothing to zoom to"
+        return nothing
+    end
+    center = Vector{Float64}(minimum(bb) .+ GeometryBasics.widths(bb) ./ 2)
+    d = max(norm(Vector{Float64}(GeometryBasics.widths(bb))), 1e-6)
+    cam = cameracontrols(gui.ax.scene)
+    dist = (d / 2) / sind(cam.fov[] / 2)
+    eye, lookat, up = _current_view(gui)
+    o = norm(eye .- lookat) > 0 ? normalize(eye .- lookat) : [0.0, 0.0, 1.0]
+    _animate_camera!(gui, center .+ dist .* o, center, up)
+    return nothing
+end
+
+"""Validates the `views` kwarg of `live_view` and returns a vector of `name => (eye, lookat, up)`."""
+function _view_specs(views)
+    specs = Pair{String, NTuple{3, Vector{Float64}}}[]
+    for v in views
+        ok = v isa Pair && v.second isa Tuple && length(v.second) == 3 &&
+             all(x -> x isa AbstractVector{<:Real} && length(x) == 3, v.second)
+        ok || throw(ArgumentError("invalid view $v, use \"name\" => (eye, lookat, up)"))
+        push!(specs, string(v.first) => Tuple(Vector{Float64}.(v.second)))
+    end
+    return specs
+end
+
+"""Returns the options of the views menu, the option `i` sets `views[i]`."""
+function _views_options(views)
+    isempty(views) && return [("no views", 0)]
+    return [(name, i) for (i, (name, _)) in enumerate(views)]
+end
+
+"""Sets the camera of the `gui` to the saved view `i`, see `views`."""
+function _set_saved_view!(gui::LiveView, i)
+    1 <= i <= length(gui.views) || return nothing
+    name, (eye, lookat, up) = gui.views[i]
+    _animate_camera!(gui, eye, lookat, up)
+    gui.status.text[] = "view \"$name\""
+    return nothing
+end
+
+"""
+    _save_view!(gui; io = stdout)
+
+Appends the current view of the `gui` as `"view n"` to the saved views and prints it as the Julia
+code of an entry of the `views` kwarg of `live_view` to `io`. Returns the code.
+"""
+function _save_view!(gui::LiveView; io::IO = stdout)
+    n = length(gui.views) + 1
+    names = Set(first.(gui.views))
+    while "view $n" in names
+        n += 1
+    end
+    name = "view $n"
+    view = _current_view(gui)
+    push!(gui.views, name => view)
+    gui.views_menu.options[] = _views_options(gui.views)
+    code = "$(repr(name)) => ($(join(_vector_code.(view), ", ")))"
+    println(io, code)
+    gui.status.text[] = "saved $(repr(name)), printed as code"
+    return code
+end
+
+"""Restores the home view of the `gui`, i.e. the view when the window was shown."""
+function _go_home!(gui::LiveView)
+    _animate_camera!(gui, gui.home...)
+    gui.status.text[] = "home view"
+    return nothing
+end
+
+"""
+Connects the camera tools of the `gui`: the key `g` (zoom to the selection), the home button, the
+views menu and the save view button, and the animation and the home view via `tick`.
+"""
+function _connect_camera!(gui::LiveView)
+    listeners = gui.controls.listeners
+    scene = gui.ax.scene
+    push!(listeners, on(events(scene).keyboardbutton, priority = 200) do event
+        (event.action == Keyboard.press && event.key == Keyboard.g) || return Consume(false)
+        gui.controls.ignore_keys() && return Consume(false)
+        _zoom_to_selection!(gui)
+        return Consume(true)
+    end)
+    push!(listeners, on(events(scene).tick) do tick
+        # The home view is the view when the window is shown, e.g. after `set_view`
+        if !gui.home_set
+            gui.home = _current_view(gui)
+            gui.home_set = true
+        end
+        _step_camera!(gui, tick.delta_time)
+        return nothing
+    end)
+    push!(listeners, on(_ -> _go_home!(gui), gui.home_button.clicks))
+    push!(listeners, on(i -> _set_saved_view!(gui, something(i, 0)), gui.views_menu.i_selected))
+    push!(listeners, on(_ -> _save_view!(gui), gui.save_view_button.clicks))
+    gui.controls.help_extra *= "\n" * _CAMERA_HELP
+    _update_help!(gui.controls)
+    return nothing
+end
+
+"""Connects the beam inspection, esc and the measure toggle of the `gui`."""
+function _connect_inspection!(gui::LiveView)
+    listeners = gui.controls.listeners
+    gui.controls.on_click = function (obj)
+        try
+            return _on_click!(gui, obj)
+        catch e
+            gui.last_error = _log_once(e, gui.last_error, "beam inspection")
+            return false
+        end
+    end
+    # Before the controls, which consume esc to deselect, the key is passed on
+    push!(listeners, on(events(gui.ax.scene).keyboardbutton, priority = 201) do event
+        (event.action == Keyboard.press && event.key == Keyboard.escape) || return Consume(false)
+        gui.controls.ignore_keys() && return Consume(false)
+        _clear_inspection!(gui)
+        _clear_measurement!(gui)
+        return Consume(false)
+    end)
+    push!(listeners, on(v -> _set_measuring!(gui, v), gui.measure_toggle.active))
+    return nothing
+end
+
 """
     live_view(system => beam, ...; kwargs...)
     live_view(system, beam; kwargs...)
@@ -1205,12 +2035,38 @@ recorded in the undo history, invalid inputs are reported in the status line.
 The "Export" button prints the changed poses as Julia code to `stdout` and copies it to the
 clipboard, see [`export_changes`](@ref).
 
+# Beam inspection and measuring
+
+A click on a rendered beam (within 6 px) that does not hit a component marks the point on the beam
+and shows its position [mm], the direction of the beam, the geometric and optical path length
+(Σ n·L) from the source [mm] and, for Gaussian beamlets, the radius `w` and the radius of curvature
+`R` in the status line. Components take precedence over beams. `esc` or a click elsewhere removes
+the marker.
+
+With the "measure" toggle on, two clicks on components or beams show the distance between the
+positions of the components or the points of the beams [mm], and the angle between the optical
+axes (local y-axes) of two components, with a dashed line between the points. A third click starts
+a new measurement, switching the toggle off clears it.
+
+# Camera tools
+
+The key `g` zooms to the selected object, or to all systems if nothing is selected, while the view
+direction is kept. "home" restores the view when the window was shown. The "views" menu sets one
+of the `views`, "save view" adds the current view as `"view n"` and prints it as an entry of the
+`views` kwarg, e.g. `"view 1" => ([0.1, -0.2, 0.3], [0.0, 0.0, 0.0], [0.0, 0.0, 1.0])`.
+
 # Adaptive tracing
 
 If solving the systems takes longer than `trace_budget`, the objects still follow the mouse and the
 keys immediately, while the beams are dimmed. The systems are solved once the movement pauses for
 `idle_delay`. Likewise, detector panels that take longer than `trace_budget` show a preview on a
 coarse grid while objects are moved, which is refined once the movement pauses.
+
+With `preview = true`, beam groups rendered with `render_every > 1` are solved only for their
+rendered beams while objects are moved, and the titles of the detector panels end with
+"(preview)". The full beam group is solved once the movement pauses for `idle_delay`. The
+`trace_budget` applies to the preview solve while moving. `on_change` is only called after full
+solves.
 
 # Manual tracing
 
@@ -1227,6 +2083,19 @@ By default, one panel per `Detector` of all systems is shown next to the 3D view
 the intensity (`:intensity`) for Gaussian beamlet hits and the spot diagram (`:spot`) otherwise,
 together with the optical power or the number of hits in its title. The intensity is cropped
 automatically around the beam, unless `x_min`, `x_max`, `z_min` and `z_max` are given.
+
+The subtitle of each panel shows its metrics, the centroid is marked by a red cross: the number of
+hits, the centroid, the RMS radius and the geometric radius of a spot diagram, or the power, the
+centroid, the 1/e² radii along x and z from the second moments and the peak of the intensity. The
+following options of the panel kwargs are not passed to `intensity`:
+
+- `colorscale = :linear`: `:log` shows `log10` of the intensity, with a floor of 1e-4 times the
+  maximum
+- `colorrange = nothing`: fixed color range of the intensity, in `log10` units for `:log`
+- `history = false`: adds an axis below the panel with the power (or the number of hits, black)
+  and the centroid x (red) and z (blue) over the last 300 full solves
+- `profiles = false`: adds an axis below the panel with the intensity along x (red) and z (blue)
+  through the centroid
 
 # Clip planes
 
@@ -1247,6 +2116,8 @@ Makie supports at most 8 clip planes. The markers of the sources and planes and 
 never clipped, the beams only with `clip_beams = true` or the "clip beams" toggle below the 3D
 view. The selection box of a partly clipped component only covers its visible part.
 
+The key `g` zooms to the selection, see "Camera tools".
+
 # Keyword args
 
 - `size = (1400, 800)`: size of the figure
@@ -1254,10 +2125,11 @@ view. The selection box of a partly clipped component only covers its visible pa
   "Manual tracing"
 - `detectors = :auto`: all `Detector`s of all systems. Alternatively a vector of `pd`,
   `pd => mode` or `pd => (mode, kwargs)`, where `mode` is `:auto`, `:spot` or `:intensity` and
-  `kwargs` are passed to `intensity`, e.g. `(; n = 200, x_min = -1e-3, x_max = 1e-3, ...)`. An empty
-  vector disables the panels.
-- `on_change = (gui, obj) -> nothing`: called after each solve with the moved object, or
-  `nothing` after a slider change
+  `kwargs` are passed to `intensity`, e.g. `(; n = 200, x_min = -1e-3, x_max = 1e-3, ...)`,
+  except the panel options, e.g. `(; colorscale = :log, history = true)`, see "Detector panels".
+  An empty vector disables the panels.
+- `on_change = (gui, obj) -> nothing`: called after each full solve with the moved object, or
+  `nothing` after a slider change, i.e. not after preview solves, see "Adaptive tracing"
 - `sliders = []`: vector of `"label" => (range, callback)` or `"label" => (range, callback, startvalue)`.
   The `callback` is called with the new value, then the systems are solved again.
 - `system_kwargs = (;)`: passed to `live_render!` of each system
@@ -1282,6 +2154,10 @@ view. The selection box of a partly clipped component only covers its visible pa
 - `edges = nothing`: draws the feature edges of the components, by default depending on the look,
   see [`set_render_look`](@ref) and [`render!`](@ref). An `edges` entry of `system_kwargs` takes
   precedence.
+- `preview = true`: solves beam groups only for their rendered beams while moving, see
+  "Adaptive tracing"
+- `views = []`: saved views of the "views" menu, a vector of `"name" => (eye, lookat, up)`, see
+  "Camera tools"
 - all other kwargs are passed to [`kinematic_controls!`](@ref), e.g. `fine_step`, `plane_normal`
   or `rotation_axis`
 """
@@ -1304,6 +2180,8 @@ function live_view(
         orthographic::Bool = false,
         lighting::Symbol = :studio,
         edges::Union{Nothing, Bool} = nothing,
+        preview::Bool = true,
+        views = [],
         kwargs...
     )
     isempty(pairs) && throw(ArgumentError("live_view requires at least one system => beam pair"))
@@ -1313,6 +2191,7 @@ function live_view(
     specs = _panel_specs(detectors, systems)
     slider_specs = [_slider_spec(s) for s in sliders]
     clip_specs = _clip_plane_specs(clip_planes)
+    view_specs = _view_specs(views)
 
     fig = Figure(; size)
     ax = LScene(fig[1, 1]; show_axis = false)
@@ -1358,11 +2237,15 @@ function live_view(
     pose_boxes = Textbox[]
     for (k, (field, color)) in enumerate(zip(_POSE_FIELDS, _POSE_COLORS))
         Label(tool_row[1, 2k + 2], field; color)
-        push!(pose_boxes, Textbox(tool_row[1, 2k + 3]; placeholder = k <= 3 ? " " : "0", width = 72))
+        push!(pose_boxes, Textbox(tool_row[1, 2k + 3]; placeholder = k <= 3 ? " " : "0", width = 60))
     end
-    # Keeps the tool row left-aligned
+    # Measuring and camera tools, the views menu is added below with the component menu
+    measure_toggle = Toggle(tool_row[1, 16]; active = false)
+    Label(tool_row[1, 17], "measure")
+    home_button = Button(tool_row[1, 18]; label = "home")
+    save_view_button = Button(tool_row[1, 20]; label = "save view")
     # Keeps the tool row left-aligned and compact enough for narrow windows
-    Label(tool_row[1, 16], ""; tellwidth = false)
+    Label(tool_row[1, 21], ""; tellwidth = false)
     colgap!(tool_row, 6)
 
     # `edges` is only passed if given, i.e. custom `render!` methods of user objects do not need to
@@ -1408,13 +2291,18 @@ function live_view(
     labels_dict = IdDict{Any, String}(labels)
     entries = _menu_entries(controls)
     menu = Menu(tool_row[1, 1]; options = _menu_options(labels_dict, entries), default = nothing,
-        prompt = "select component", width = 170)
+        prompt = "select component", width = 150)
+    views_menu = Menu(tool_row[1, 19]; options = _views_options(view_specs), default = nothing,
+        prompt = "views", width = 90)
     gui = LiveView(fig, ax, ps, system_handles, beam_handles, controls, panels, status, slider_grid,
         on_change, nothing, auto_trace_toggle.active, false, trace_button, auto_trace_toggle,
         IdDict{Any, Any}(), Float64(trace_budget), Float64(idle_delay), 0.0, 0.0, false, nothing,
         0.0, false, labels_dict, step_box, LiveClipPlane[], true, 1.2 * extent,
         clip_beams, clip_beams_toggle, cube, orthographic_toggle, export_button, true, menu,
-        Any[first.(entries)...], hide_button, show_all_button, Base.IdSet{Any}(), pose_boxes)
+        Any[first.(entries)...], hide_button, show_all_button, Base.IdSet{Any}(), pose_boxes,
+        preview, false, nothing, 0.0, nothing, nothing, measure_toggle, Any[], nothing,
+        AbstractPlot[], home_button, (zeros(3), zeros(3), zeros(3)), false, view_specs,
+        views_menu, save_view_button, nothing)
     gui_ref[] = gui
     for (point, normal) in clip_specs
         _add_clip_plane!(gui, point, normal; select = false)
@@ -1423,6 +2311,8 @@ function live_view(
     _connect_trace!(gui)
     _connect_clip_planes!(gui)
     _connect_tools!(gui)
+    _connect_inspection!(gui)
+    _connect_camera!(gui)
     push!(controls.listeners, on(v -> v == gui.clip_beams || _set_clip_beams!(gui, v), clip_beams_toggle.active))
     push!(controls.listeners, on(s -> _set_step!(gui, s), step_box.stored_string))
     push!(controls.listeners, on(v -> _set_orthographic!(gui, v), orthographic_toggle.active))
@@ -1435,6 +2325,8 @@ function live_view(
     dist = norm(Vector{Float64}(cam.eyeposition[]) .- lookat)
     o, up = _region_view((1, -1, 1))
     set_view(ax, lookat .+ dist .* o, lookat, up)
+    # Replaced by the view at the first tick, i.e. when the window is shown
+    gui.home = _current_view(gui)
     return gui
 end
 
