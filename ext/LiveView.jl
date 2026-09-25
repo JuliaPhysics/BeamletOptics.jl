@@ -111,14 +111,25 @@ end
 """
     display(gui::LiveView; screen_config...)
 
-Displays the window of the `gui`. With GLMakie, the window is rendered without SSAO and with up to
-60 fps: SSAO (e.g. enabled globally via `GLMakie.activate!(ssao = true)`) multiplies the frame time
-of a live view with large meshes, and GLMakie's default of 30 fps makes rotating the view sluggish.
-The `screen_config` kwargs of the backend override these defaults.
+Displays the window of the `gui`. With GLMakie, the live view gets its own window, rendered without
+SSAO and with up to 60 fps: SSAO (e.g. enabled globally via `GLMakie.activate!(ssao = true)`)
+multiplies the frame time of a live view with large meshes, and GLMakie's default of 30 fps makes
+rotating the view sluggish. The `screen_config` kwargs of the backend override these defaults.
+
+A new window is used instead of reusing the current one, since GLMakie fails to reuse a window
+whose screen configuration (e.g. `ssao`) and size both change ("Binding freed Texture").
 """
 function Base.display(gui::LiveView; screen_config...)
     if _multi_light_backend() # i.e. GLMakie
-        return display(gui.fig; ssao = false, framerate = 60.0, screen_config...)
+        # A figure can only be shown in one screen: an open window of the gui is reused, unless new
+        # screen settings are given
+        old = Makie.getscreen(gui.fig.scene)
+        if !isnothing(old) && isopen(old)
+            isempty(screen_config) && return old
+            close(old)
+        end
+        screen = Makie.current_backend().Screen(; ssao = false, framerate = 60.0, screen_config...)
+        return display(screen, gui.fig)
     end
     return display(gui.fig; screen_config...)
 end
