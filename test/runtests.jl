@@ -41,6 +41,13 @@ include(joinpath(@__DIR__, "E2E", "TestMichelson.jl"))
 include(joinpath(@__DIR__, "E2E", "TestMachZehnder.jl"))
 include(joinpath(@__DIR__, "E2E", "TestFraunhofer.jl"))
 
+# Test storage of setups
+include(joinpath(@__DIR__, "Storage", "TestStorageCore.jl"))
+include(joinpath(@__DIR__, "Storage", "TestStorageShapes.jl"))
+include(joinpath(@__DIR__, "Storage", "TestStorageObjects.jl"))
+include(joinpath(@__DIR__, "Storage", "TestStorageSources.jl"))
+include(joinpath(@__DIR__, "Storage", "TestStorageE2E.jl"))
+
 # Test rendering
 # MUST stay first: TestRenderErrors.jl needs to run before anything loads the BMO Makie ext.
 include(joinpath(@__DIR__, "Rendering", "TestRenderErrors.jl"))

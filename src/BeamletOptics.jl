@@ -14,6 +14,9 @@ using FileIO: load
 using MeshIO
 using ForwardDiff: gradient
 using Random
+using TOML: TOML
+using SHA: sha256
+using ZipArchives: ZipReader, ZipWriter, zip_writefile, zip_readentry, zip_findlast_entry, zip_names
 
 import Base: length, push!, empty!, position
 
@@ -38,6 +41,12 @@ include("SDFs/SDF.jl")
 include("System.jl")
 include("OpticalComponents/Components.jl")
 include("ObjectGroups.jl")
+include("Storage/Archive.jl")
+include("Storage/Core.jl")
+include("Storage/Shapes.jl")
+include("Storage/Materials.jl")
+include("Storage/Objects.jl")
+include("Storage/Sources.jl")
 include("Render.jl")
 include("Exports.jl")
 

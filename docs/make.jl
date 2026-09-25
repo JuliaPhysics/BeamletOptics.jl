@@ -89,6 +89,7 @@ makedocs(;
                 "Polarizing components"     => joinpath("basics", "components", "polarizers.md"),
             ],
             "Optical systems"               => joinpath("basics", "systems.md"),
+            "Saving and loading setups"     => joinpath("basics", "storage.md"),
             "Visualization"                 => joinpath("basics", "render.md"),
         ],
         "Developer Documentation" => Any[

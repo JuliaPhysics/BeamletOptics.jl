@@ -23,4 +23,4 @@ function RectangularCompensatorPlate(width::W, height::H, thickness::T, n::Refra
     return Prism(shape, n)
 end
 
-RectangularCompensatorPlate(w::Real, h::Real, t::Real, n::Real) = RectangularCompensatorPlate(w, h, t, λ->n)
+RectangularCompensatorPlate(w::Real, h::Real, t::Real, n::Real) = RectangularCompensatorPlate(w, h, t, ConstantRefractiveIndex(n))

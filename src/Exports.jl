@@ -17,7 +17,10 @@ export System, StaticSystem, solve_system!
 export ObjectGroup
 
 # additional
-export DiscreteRefractiveIndex, SellmeierEquation
+export DiscreteRefractiveIndex, SellmeierEquation, ConstantRefractiveIndex, register_material!
+
+# storage
+export save_setup, load_setup
 
 #=
 components

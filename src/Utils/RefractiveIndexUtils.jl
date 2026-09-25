@@ -98,6 +98,27 @@ function (SE::SellmeierEquation)(λ)
 end
 
 """
+    ConstantRefractiveIndex{T}
+
+Represents a wavelength-independent refractive index, i.e. a material without dispersion.
+Can be called like a function `n = n(λ)` and returns the same `n` for every wavelength `λ`.
+Unlike an anonymous function such as `λ -> 1.5`, it can be stored with [`save_setup`](@ref).
+Refer to [`RefractiveIndex`](@ref) for more information.
+
+# Fields
+
+- `n`: the refractive index in [-]
+"""
+struct ConstantRefractiveIndex{T <: Real}
+    n::T
+end
+
+(cri::ConstantRefractiveIndex)(λ) = cri.n
+
+"[`ConstantRefractiveIndex`](@ref) passes test by default"
+test_refractive_index_function(::ConstantRefractiveIndex) = nothing
+
+"""
     RefractiveIndex
 
 Union type that represents valid means to pass a refractive index `n` to e.g. [`AbstractObject`](@ref)s.
@@ -106,6 +127,6 @@ The core assumption is that:
 1. the refractive index is callable with a **single** `Number` argument `λ` to represent the wavelength in [m]
 2. the return value is a **single** `Number` value for the refractive index
 
-Refer to e.g. [`DiscreteRefractiveIndex`](@ref).
+Refer to e.g. [`ConstantRefractiveIndex`](@ref), [`SellmeierEquation`](@ref) or [`DiscreteRefractiveIndex`](@ref).
 """
-const RefractiveIndex = Union{Function, DiscreteRefractiveIndex, SellmeierEquation}
+const RefractiveIndex = Union{Function, DiscreteRefractiveIndex, SellmeierEquation, ConstantRefractiveIndex}

@@ -1,5 +1,5 @@
 """
-    SphericalLens(r1, r2, l, d=1inch, n=λ->1.5)
+    SphericalLens(r1, r2, l, d=1inch, n=ConstantRefractiveIndex(1.5))
 
 Creates a spherical [`Lens`](@ref) based on:
 
@@ -7,7 +7,7 @@ Creates a spherical [`Lens`](@ref) based on:
 - `r2`: back radius
 - `l`: lens thickness
 - `d`: lens diameter, default is one inch
-- `n`: [`RefractiveIndex`](@ref) as a function of λ, i.e. `n = n(λ)`
+- `n`: [`RefractiveIndex`](@ref) as a function of λ, i.e. `n = n(λ)`. A `Real` value is wrapped in a [`ConstantRefractiveIndex`](@ref).
 
 # Notes
 
@@ -17,7 +17,7 @@ Creates a spherical [`Lens`](@ref) based on:
 !!! info "Thin lenses"
     If `l` is set to zero, a [`ThinLens`](@ref) will be created. However, note that the actual lens thickness will be different from zero.
 """
-function SphericalLens(r1::Real, r2::Real, l::Real, d::Real = 1inch, n::RefractiveIndex = λ -> 1.5)
+function SphericalLens(r1::Real, r2::Real, l::Real, d::Real = 1inch, n::RefractiveIndex = ConstantRefractiveIndex(1.5))
     # Test for thin lens
     if iszero(l)
         return ThinLens(r1, r2, d, n)
@@ -31,7 +31,7 @@ function SphericalLens(r1::Real, r2::Real, l::Real, d::Real = 1inch, n::Refracti
     )
 end
 
-SphericalLens(r1, r2, l, d, n::Real) = SphericalLens(r1, r2, l, d, λ -> n)
+SphericalLens(r1, r2, l, d, n::Real) = SphericalLens(r1, r2, l, d, ConstantRefractiveIndex(n))
 
 """
     ThinLens(R1::Real, R2::Real, d::Real, n::Function)
@@ -43,4 +43,4 @@ function ThinLens(R1::Real, R2::Real, d::Real, n::RefractiveIndex)
     shape = ThinLensSDF(R1, R2, d)
     return Lens(shape, n)
 end
-ThinLens(R1::Real, R2::Real, d::Real, n::Real) = ThinLens(R1, R2, d, x -> n)
+ThinLens(R1::Real, R2::Real, d::Real, n::Real) = ThinLens(R1, R2, d, ConstantRefractiveIndex(n))
