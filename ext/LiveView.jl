@@ -108,7 +108,20 @@ mutable struct LiveView
     pose_boxes::Vector{Textbox}
 end
 
-Base.display(gui::LiveView) = display(gui.fig)
+"""
+    display(gui::LiveView; screen_config...)
+
+Displays the window of the `gui`. With GLMakie, the window is rendered without SSAO and with up to
+60 fps: SSAO (e.g. enabled globally via `GLMakie.activate!(ssao = true)`) multiplies the frame time
+of a live view with large meshes, and GLMakie's default of 30 fps makes rotating the view sluggish.
+The `screen_config` kwargs of the backend override these defaults.
+"""
+function Base.display(gui::LiveView; screen_config...)
+    if _multi_light_backend() # i.e. GLMakie
+        return display(gui.fig; ssao = false, framerate = 60.0, screen_config...)
+    end
+    return display(gui.fig; screen_config...)
+end
 
 function Base.show(io::IO, gui::LiveView)
     print(io, "LiveView(", length(gui.pairs), " systems, ", length(gui.panels), " detector panels)")
