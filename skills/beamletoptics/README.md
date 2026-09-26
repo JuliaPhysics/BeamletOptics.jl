@@ -28,13 +28,22 @@ The canonical entry point is `SKILL.md`.
 The files in `templates/` are small, complete scripts. Templates 01 to 06 run headless with only
 BeamletOptics installed. `07_render_system.jl` additionally needs `CairoMakie`.
 
+Paths below are relative to this skill directory; `<env>` is a Julia project that has BeamletOptics
+(and `CairoMakie` for `--render`) installed:
+
 ```sh
-julia --project=<env with BeamletOptics> templates/03_psf_airy.jl
-julia --project=<env with BeamletOptics> scripts/run_templates.jl            # smoke-test 01-06
-julia --project=<env with BeamletOptics + CairoMakie> scripts/run_templates.jl --render
+julia --project=<env> templates/03_psf_airy.jl
+julia --project=<env> scripts/run_templates.jl            # smoke-test 01-06
+julia --project=<env> scripts/run_templates.jl --render   # all templates, needs CairoMakie
 ```
 
-Inside this repository, `--project=.` (package env) runs 01 to 06 and `--project=docs` runs all of them.
+From the root of the BeamletOptics repository, use the package env (templates 01 to 06) or the docs
+env (all templates):
+
+```sh
+julia --project=. skills/beamletoptics/scripts/run_templates.jl
+julia --project=docs skills/beamletoptics/scripts/run_templates.jl --render
+```
 
 ## Helper scripts
 

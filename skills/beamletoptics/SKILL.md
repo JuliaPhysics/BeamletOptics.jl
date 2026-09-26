@@ -10,7 +10,8 @@ non-sequential 3D ray tracing and Gaussian beamlet propagation, with a Makie ext
 When this Skill is active:
 
 - Use only documented BeamletOptics API. **Do not invent constructors, keyword arguments or
-  functions.** If unsure, look it up before writing code:
+  functions.** If unsure, look it up before writing code (script paths are relative to this skill's
+  directory; `<env>` is a Julia project with BeamletOptics installed):
   - `julia --project=<env> scripts/api_lookup.jl <Name> [<Name>...]` prints docstrings and method signatures.
   - `julia --project=<env> scripts/api_lookup.jl --exports` lists every exported name.
   - Read `src/` of the installed package (`julia -e 'using BeamletOptics; println(pkgdir(BeamletOptics))'`).

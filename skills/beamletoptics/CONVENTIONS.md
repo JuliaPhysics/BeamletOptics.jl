@@ -74,7 +74,7 @@ moved, not children created by splitters.
 - **Gaussian beam**: `w0` is the waist *radius* (1/e² intensity); `gauss_parameters` returns
   curvature `R` as 1/r (not a radius) and Gouy phase ψ = −atan(z/z_R).
 - **Beamsplitter** `reflectance` keyword is the reflected **power** fraction (0.7 → 70:30, default 0.5 → 50:50);
-  internally the amplitudes are `r = √reflectance`, `t = √(1 − r²)`. The reflected beam gets a π phase
-  jump. Children are ordered `[transmitted, reflected]`.
+  internally the amplitudes are `r = √reflectance`, `t = √(1 − r²)`. The reflection phase depends on the
+  beam type and the incidence side (see `components/beamsplitters.md`). Children are ordered `[transmitted, reflected]`.
 - **Detector local coordinates** `(x, z)` form a left-handed frame with the detector normal (the normal
   points against the incoming beam, initially −y).
