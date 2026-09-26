@@ -165,6 +165,8 @@ mutable struct LiveView
     views_menu::Menu
     save_view_button::Button
     camera_animation::Any
+    # markers of the movable sources, shown or hidden via the toggle or the key `s`
+    sources_toggle::Toggle
 end
 
 """
@@ -892,7 +894,7 @@ _slider_spec(s) = throw(ArgumentError("invalid slider $s, use \"label\" => (rang
 # Makie ignores all clip planes of a plot beyond the 8th
 const _MAX_CLIP_PLANES = 8
 
-const _CLIP_HELP = "p: add clip plane, del: remove, c: clipping on/off, shift+c: flip"
+const _LIVE_VIEW_HELP = "p: add clip plane, del: remove, c: clipping on/off, shift+c: flip\ns: show/hide sources"
 
 """Validates the `clip_planes` kwarg of `live_view` and returns a vector of `point => normal`."""
 function _clip_plane_specs(clip_planes)
@@ -1069,7 +1071,7 @@ function _connect_clip_planes!(gui::LiveView)
         gui.controls.ignore_keys() && return Consume(false)
         return Consume(_clip_key!(gui, event.key))
     end)
-    gui.controls.help_extra = _CLIP_HELP
+    gui.controls.help_extra = _LIVE_VIEW_HELP
     _update_help!(gui.controls)
     return nothing
 end
@@ -1314,10 +1316,51 @@ function _set_hidden!(gui::LiveView, obj, hide::Bool)
         hide ? push!(gui.hidden, leaf) : delete!(gui.hidden, leaf)
         i = findfirst(oh -> oh.obj === leaf, gui.controls.h.handles)
         isnothing(i) && continue
+        visible = !hide && (gui.sources_toggle.active[] || !_is_source(leaf))
         for plot in gui.controls.h.handles[i].plots
-            plot.visible[] == !hide || (plot.visible[] = !hide)
+            plot.visible[] == visible || (plot.visible[] = visible)
         end
     end
+    return nothing
+end
+
+_is_source(obj) = obj isa Union{BMO.AbstractBeam, BMO.AbstractBeamGroup}
+
+"""
+    _set_show_sources!(gui, show)
+
+Shows or hides the markers of all movable sources of the `gui`, e.g. if a marker covers small
+components. Hidden markers can not be selected in the 3D view, a selected source is deselected.
+Sources hidden via the "hide" button stay hidden.
+"""
+function _set_show_sources!(gui::LiveView, show::Bool)
+    ctrl = gui.controls
+    for oh in ctrl.h.handles
+        _is_source(oh.obj) || continue
+        visible = show && !(oh.obj in gui.hidden)
+        for plot in oh.plots
+            plot.visible[] == visible || (plot.visible[] = visible)
+        end
+    end
+    if !show && _is_source(ctrl.selected[])
+        ctrl.selected[] = nothing
+        _update_selection_box!(ctrl)
+    end
+    gui.status.text[] = show ? "sources shown" : "sources hidden, press s to show them"
+    return nothing
+end
+
+"""Connects the "sources" toggle and the key `s` of the `gui`, see `_set_show_sources!`."""
+function _connect_sources!(gui::LiveView)
+    listeners = gui.controls.listeners
+    push!(listeners, on(v -> _set_show_sources!(gui, v), gui.sources_toggle.active))
+    push!(listeners, on(events(gui.ax.scene).keyboardbutton, priority = 200) do event
+        (event.action == Keyboard.press && event.key == Keyboard.s) || return Consume(false)
+        gui.controls.ignore_keys() && return Consume(false)
+        gui.sources_toggle.active[] = !gui.sources_toggle.active[]
+        return Consume(true)
+    end)
+    gui.sources_toggle.active[] || _set_show_sources!(gui, false)
     return nothing
 end
 
@@ -2137,6 +2180,8 @@ The key `g` zooms to the selection, see "Camera tools".
   `(; render_every = 5)` for beam groups
 - `movable_sources = true`: shows an orange marker at each source, i.e. the beam or beam group of
   each pair, with which the source can be selected and moved like the components
+- `show_sources = true`: initial visibility of the source markers, which can be switched with the
+  "sources" toggle below the 3D view or the key `s`
 - `labels = Dict()`: `obj => "name"` for the status line, the titles of the detector panels, the
   component menu and the variable names of [`export_changes`](@ref)
 - `trace_budget = 0.03`: [s] duration of a solve or panel update, above which tracing is deferred
@@ -2171,6 +2216,7 @@ function live_view(
         system_kwargs = (;),
         beam_kwargs = Dict(),
         movable_sources = true,
+        show_sources::Bool = true,
         labels = Dict(),
         trace_budget = 0.03,
         idle_delay = 0.2,
@@ -2225,9 +2271,11 @@ function live_view(
     Label(status_row[1, 5], "clip beams")
     orthographic_toggle = Toggle(status_row[1, 6]; active = orthographic)
     Label(status_row[1, 7], "orthographic")
-    step_box = Textbox(status_row[1, 8]; placeholder = "step, e.g. 250 nm", width = 150)
-    export_button = Button(status_row[1, 9]; label = "Export")
-    status = Label(status_row[1, 10],
+    sources_toggle = Toggle(status_row[1, 8]; active = show_sources)
+    Label(status_row[1, 9], "sources (s)")
+    step_box = Textbox(status_row[1, 10]; placeholder = "step, e.g. 250 nm", width = 150)
+    export_button = Button(status_row[1, 11]; label = "Export")
+    status = Label(status_row[1, 12],
         "Click on a component to select it, press h to show the controls"; tellwidth = false)
     # Tool row: component menu (added below, once the movable objects are known), hide buttons and
     # pose inspector
@@ -2302,7 +2350,7 @@ function live_view(
         Any[first.(entries)...], hide_button, show_all_button, Base.IdSet{Any}(), pose_boxes,
         preview, false, nothing, 0.0, nothing, nothing, measure_toggle, Any[], nothing,
         AbstractPlot[], home_button, (zeros(3), zeros(3), zeros(3)), false, view_specs,
-        views_menu, save_view_button, nothing)
+        views_menu, save_view_button, nothing, sources_toggle)
     gui_ref[] = gui
     for (point, normal) in clip_specs
         _add_clip_plane!(gui, point, normal; select = false)
@@ -2317,6 +2365,7 @@ function live_view(
     push!(controls.listeners, on(s -> _set_step!(gui, s), step_box.stored_string))
     push!(controls.listeners, on(v -> _set_orthographic!(gui, v), orthographic_toggle.active))
     _set_orthographic!(gui, orthographic)
+    _connect_sources!(gui)
     _resolve!(gui, nothing)
     # Initial view from the Front-Right-Top corner, in which the labels of the view cube read
     # correctly. Only set once, later changes of the view, e.g. via `set_view`, are kept.

@@ -322,7 +322,9 @@ gui = live_view(system_tx => beam_tx, system_rx => source_rx)
 Each source, i.e. the beam or beam group of each `system => beam` pair, is shown with an orange
 marker at its position, which points along its direction. A source is selected and moved via its
 marker like any component, after which the systems are solved again. For a beam, which only has a
-direction, the green axis is its direction. Pass `movable_sources = false` to hide the markers.
+direction, the green axis is its direction. If a marker covers small components, the "sources"
+toggle below the 3D view or the key `s` hides all markers and shows them again, `show_sources =
+false` starts with hidden markers. Pass `movable_sources = false` to omit the markers altogether.
 
 ### Static context
 
@@ -549,7 +551,8 @@ Labels that are valid variable names are used as names, other objects are called
 The 3D view uses the controls of [`kinematic_controls!`](@ref), see
 [Interactive kinematics](@ref). In addition, the key `t` solves the systems immediately, see
 [Manual tracing](@ref), `p`, `Delete`, `c` and `Shift+c` control the clip planes, see
-[Clip planes](@ref), and `g` zooms to the selection, see [Camera tools](@ref). The keyboard step can be typed into the textbox below the 3D view, e.g.
+[Clip planes](@ref), `s` shows or hides the source markers, see
+[Movable sources in the live view](@ref), and `g` zooms to the selection, see [Camera tools](@ref). The keyboard step can be typed into the textbox below the 3D view, e.g.
 `250 nm` or `50 µrad`, where the unit selects the move or rotate mode, see also
 [Component menu and pose inspector](@ref). The status line shows the
 pose of the moved component and its change since the window was opened. Names for the status line
