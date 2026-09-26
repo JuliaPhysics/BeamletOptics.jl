@@ -358,7 +358,8 @@ end
     @test all(==(lengths[1]), lengths)
 end
 
-@testset "Polarized ray numerics" begin
+@testset "Issue#87" begin
+    # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/87
     # Oblique unit vector (a ray direction from a pulse shaper), for which
     # dot(normalize(d), normalize(d)) - 1 = 4.4e-16 > eps()
     d = [-0.9999762904273509, 0.006881465035232346, -0.0002530259335731185]
