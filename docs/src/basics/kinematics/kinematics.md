@@ -52,9 +52,4 @@ reset_rotation3d!(::Any)
 
 ## Static and movable entities
 
-Whether an entity can be moved at all, and whether it is moved based on its orientation or only on its direction, is defined by its kinematic trait. This is mostly of interest when implementing new optical elements or beam types, e.g. to fix an element in place.
-
-```@docs; canonical=false
-BeamletOptics.AbstractKinematicTrait
-BeamletOptics.Movable
-```
+All optical elements, rays, beams and beam groups provided by BMO can be moved. A custom type can also be declared static, in which case every movement command throws an `ArgumentError`. How the kinematic API is implemented, and how a new element or beam type opts in or out of it, is explained in the [Kinematic system](@ref) section of the developer documentation.

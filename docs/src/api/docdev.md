@@ -68,6 +68,57 @@ Documenter parses pages with Julia's Markdown parser, which does not pass inline
 
 Keep the blank lines around the table, otherwise it is not parsed as Markdown. Column alignment uses the usual `:---`, `:---:` and `---:` markers.
 
+## Diagrams
+
+Diagrams are written as [Mermaid](https://mermaid.js.org/) code blocks with the `mermaid` language tag, which VitePress renders in the browser. Font size and box padding are set once for the whole site in the `mermaid` entry of `docs/src/.vitepress/config.mts`, so a diagram needs no `%%{init: ...}%%` line of its own. Diagrams narrower than the body text are centered by a rule in `docs/src/.vitepress/theme/overrides.css`.
+
+Label text is set to the size of the body text, but a diagram that is wider than the page is scaled down to fit, and its text shrinks with it. Since the page is narrow but can be arbitrarily long, top-to-bottom layouts (`flowchart TB`) usually stay more readable than left-to-right ones.
+
+To color nodes, the following class definitions can be copied into a diagram and assigned with `class <nodes> <name>`. The colors are the Julia logo colors with a translucent fill, so they work in light and dark mode:
+
+````markdown
+```mermaid
+flowchart TB
+    S(["<b>start</b>"]) --> A["<b>Step</b>"] --> E([done])
+
+    classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
+    classDef green fill:#38982626,stroke:#389826,stroke-width:2px
+    classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
+    classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
+    class A blue
+    class S,E terminal
+```
+````
+
+For example, the [Intersect-Interact-Repeat-Loop](@ref) uses `terminal` for its entry and exit points and one color per step.
+
+### Type diagrams
+
+Relations between types are drawn as flowcharts as well, since Mermaid `classDiagram`s ignore `classDef` colors, always draw both member compartments (leaving empty boxes), and use a different font size. The type diagrams on the [Geometry representation](@ref) and [Kinematic system](@ref) pages can serve as a starting point, e.g.:
+
+````markdown
+```mermaid
+flowchart TB
+    OBJ["<b>AbstractObject</b><br/><i>abstract type</i>"]
+    SGL["<b>SingleShape</b><br/><i>shape trait</i>"]
+    SHP["<b>AbstractShape</b><br/><i>abstract type</i>"]
+    OBJ -- shape_trait_of --> SGL
+    SGL -- object.shape --> SHP
+
+    classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
+    classDef green fill:#38982626,stroke:#389826,stroke-width:2px
+    classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
+    class SHP blue
+    class OBJ green
+    class SGL purple
+```
+````
+
+Inside a label, `<` has to be written as `#lt;`, e.g. `abstract type #lt;: AbstractObject`. Type diagrams tend to grow sideways: an edge that skips a row needs a column of its own, and a label on such an edge widens that column further.
+
+!!! warning "Label line height"
+    Mermaid measures the size of a label outside of the page, but VitePress renders it with the page styles, e.g. a larger line height for `p`, which clips the last line of a label. The rule `.vp-doc .mermaid p` in `docs/src/.vitepress/theme/overrides.css` keeps the rendered size equal to the measured one; do not remove it. If a new HTML tag in a label causes clipping, it needs a rule of the same kind.
+
 ## Creating figures
 
 In general, you can generate and include figures into your documentation section any way you see fit. We strongly urge you to use the existing `CairoMakie` or `GLMakie` backend. However, with the increasing amount of plots and corresponding scripts the build time for the docs in a local environment has become unsustainable. Therefore, for the BMO docs we recommend that you adhere to the following design pattern:

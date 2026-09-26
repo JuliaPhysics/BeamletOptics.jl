@@ -32,6 +32,19 @@ function _render_transmission_axis!(ax::_RenderEnv, pf::BMO.PolarizationFilter; 
     return nothing
 end
 
+"""
+    render!(ax, pf::PolarizationFilter; kwargs...)
+
+Renders the [`PolarizationFilter`](@ref) `pf` into the specified `ax`, optionally with its transmission axis.
+
+# Keyword args
+
+- `show_transmission_axis = true`: draws the [`transmission_axis`](@ref) as a line on the filter
+- `axis_color = :black`: color of the transmission axis line
+- `axis_linewidth = 2`: line width of the transmission axis line
+
+Remaining kwargs are passed on to the Makie mesh plot.
+"""
 function render!(ax::_RenderEnv, pf::PolarizationFilter; show_transmission_axis::Bool=true,
         axis_color=:black, axis_linewidth=2, kwargs...)
     _render!(ax, pf; kwargs...)
@@ -39,6 +52,20 @@ function render!(ax::_RenderEnv, pf::PolarizationFilter; show_transmission_axis:
     return nothing
 end
 
+"""
+    render!(ax, lipo::LinearPolarizer; kwargs...)
+
+Renders the [`LinearPolarizer`](@ref) `lipo` into the specified `ax`, optionally with its transmission axis.
+The two substrate halves render like refractive optics, and the filter film is drawn in translucent green.
+
+# Keyword args
+
+- `show_transmission_axis = true`: draws the [`transmission_axis`](@ref) as a line on the filter
+- `axis_color = :black`: color of the transmission axis line
+- `axis_linewidth = 2`: line width of the transmission axis line
+
+Remaining kwargs are passed on to the Makie mesh plots of the substrate halves.
+"""
 function render!(ax::_RenderEnv, lipo::LinearPolarizer; show_transmission_axis::Bool=true,
         axis_color=:black, axis_linewidth=2, kwargs...)
     render!(ax, lipo.front; kwargs...)

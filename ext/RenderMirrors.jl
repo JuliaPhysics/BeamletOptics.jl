@@ -1,7 +1,7 @@
 """
     _render_conic!(ax, s::ConicSDF, r_hole; color=:silver, kwargs...)
 
-Shared analytical surface renderer for a [`ConicSDF`](@ref) substrate, optionally pierced by
+Shared analytical surface renderer for a [`BeamletOptics.ConicSDF`](@ref) substrate, optionally pierced by
 an axial cylindrical bore of radius `r_hole` (`r_hole = 0` for the unpierced case). Renders
 the concave/convex conic front reflective face (annular if `r_hole > 0`), the cylindrical
 substrate side wall, the flat rear substrate base, and, if `r_hole > 0`, the inner bore wall
@@ -75,7 +75,7 @@ end
 """
     render!(ax, s::ConicSDF; color=:silver, kwargs...)
 
-Analytical surface renderer for a [`ConicSDF`](@ref).
+Analytical surface renderer for a [`BeamletOptics.ConicSDF`](@ref).
 Renders the concave/convex conic front reflective face, the cylindrical substrate side wall,
 and the flat rear substrate base into `ax`.
 """
@@ -91,8 +91,8 @@ end
 """
     _axial_bore_radius(d::DifferenceSDF{T, <:ConicSDF})
 
-Returns the radius of `d`'s tool if it is a single [`CylinderSDF`](@ref) coaxial with the
-[`ConicSDF`](@ref) base and centered on its axis, or `nothing` otherwise.
+Returns the radius of `d`'s tool if it is a single [`BeamletOptics.CylinderSDF`](@ref) coaxial with the
+[`BeamletOptics.ConicSDF`](@ref) base and centered on its axis, or `nothing` otherwise.
 """
 function _axial_bore_radius(d::BMO.DifferenceSDF{T, <:BMO.ConicSDF}) where {T}
     s = d.base
@@ -112,7 +112,7 @@ end
 """
     render!(ax, d::DifferenceSDF{T, <:ConicSDF}; color=:silver, kwargs...)
 
-Analytical surface renderer for a [`ConicSDF`](@ref) with an axial cylindrical bore
+Analytical surface renderer for a [`BeamletOptics.ConicSDF`](@ref) with an axial cylindrical bore
 (e.g. Cassegrain, Ritchey-Chrétien, or OAP with `:collimated` through-hole).
 If the bore is non-axial, falls back to the general SDF MarchingCubes renderer.
 """
@@ -127,5 +127,5 @@ function render!(
         return _render_conic!(ax, d.base, r_hole; color, kwargs...)
     end
 
-    return invoke(render!, Tuple{_RenderEnv, BMO.AbstractSDF}, ax, d; color = color, kwargs...)
+    return _render_marching_cubes!(ax, d; color, kwargs...)
 end

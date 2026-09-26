@@ -7,17 +7,17 @@ This section of the documentation is intended for users that want to dive deeper
 ```@contents
 Pages = [
     "rays.md",
-    "beams/overview.md",
-    "beams/beams.md",
-    "beams/stigmatic_beam.md",
-    "beams/astigmatic_beam.md",
-    "beams/beam_groups.md",
-    "components/components.md",
+    joinpath("beams", "overview.md"),
+    joinpath("beams", "beams.md"),
+    joinpath("beams", "stigmatic_beam.md"),
+    joinpath("beams", "astigmatic_beam.md"),
+    joinpath("beams", "beam_groups.md"),
+    joinpath("components", "components.md"),
     "systems.md",
-    "kinematics/kinematics.md",
-    "kinematics/objects.md",
-    "kinematics/sources.md",
-    "render.md",
+    joinpath("kinematics", "kinematics.md"),
+    joinpath("kinematics", "objects.md"),
+    joinpath("kinematics", "sources.md"),
+    joinpath("visualization", "overview.md"),
 ]
 Depth = 2
 ```

@@ -1,8 +1,22 @@
+```@setup beam_catalog
+beam_catalog_dir = joinpath(@__DIR__, "..", "..", "assets", "beam_renders")
+
+Main.DocUtils.conditional_include(joinpath(beam_catalog_dir, "beam_catalog_showcase.jl"))
+```
+
 # Beams
 
 As mentioned in the [Rays](@ref) section, a beam within the context of this package serves as a data structure for storing collections of rays, forming the backbone of the simulation framework. Beams are intended to be designed as [AbstractTrees](https://github.com/JuliaCollections/AbstractTrees.jl) to allow for ray bifurcations, e.g. in the case of optical elements such as beamsplitters. The [`solve_system!`](@ref) function relies on this data structure to perform ray tracing computations within optical systems. 
 
-To ensure compatibility and extensibility, beam types must adhere to the [`BeamletOptics.AbstractBeam`](@ref) interface. Refer to its documentation for more information. For detailed documentation of the provided beam types and sources, refer to the following table of contents.
+To ensure compatibility and extensibility, beam types must adhere to the [`BeamletOptics.AbstractBeam`](@ref) interface. Refer to its documentation for more information. Browse the catalog below, or refer to the table of contents for detailed documentation of the provided beam types and sources.
+
+## Beam catalog
+
+Beams, beamlets and beam groups are traced through a bi-convex lens onto a detector near its focus.
+
+```@raw html
+<ComponentCatalog catalog="beams" />
+```
 
 ## Beam overview
 

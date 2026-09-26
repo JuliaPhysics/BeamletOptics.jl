@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitepress'
+import { withMermaid } from 'vitepress-plugin-mermaid'
 import { tabsMarkdownPlugin } from 'vitepress-plugin-tabs'
 import { mathjaxPlugin } from './mathjax-plugin'
 import { juliaReplTransformer } from './julia-repl-transformer'
@@ -46,6 +47,25 @@ function flattenNavGroups(items: any[], depth = 0): any[] {
   })
 }
 
+const sidebarTemp = {
+  sidebar: 'REPLACE_ME_DOCUMENTER_VITEPRESS',
+}
+
+// DocumenterVitepress marks every sidebar group as `collapsed: false`, i.e. the whole
+// tree starts expanded. Only the top-level groups start expanded; nested groups (e.g.
+// "Tutorials" in "Getting started") start collapsed. VitePress still expands the group
+// that contains the current page.
+function limitSidebarCollapse(items: any[], depth = 0): any[] {
+  return items.map((item) => {
+    if (!item.items) return item
+    return {
+      ...item,
+      collapsed: depth > 0,
+      items: limitSidebarCollapse(item.items, depth + 1),
+    }
+  })
+}
+
 const nav = [
   ...flattenNavGroups(navTemp.nav as any),
   {
@@ -54,7 +74,7 @@ const nav = [
 ]
 
 // https://vitepress.dev/reference/site-config
-export default defineConfig({
+export default withMermaid(defineConfig({
   base: 'REPLACE_ME_DOCUMENTER_VITEPRESS',// TODO: replace this in makedocs!
   title: 'REPLACE_ME_DOCUMENTER_VITEPRESS',
   description: 'REPLACE_ME_DOCUMENTER_VITEPRESS',
@@ -110,6 +130,13 @@ export default defineConfig({
       ], 
     },
   },
+  // Site-wide Mermaid defaults, see "Diagrams" in docs/src/api/docdev.md.
+  // Label text matches the body text (16px) as long as a diagram is not wider
+  // than the page, since wider diagrams are scaled down to fit.
+  mermaid: {
+    themeVariables: { fontSize: '16px' },
+    flowchart: { padding: 16, nodeSpacing: 40, rankSpacing: 40 },
+  },
   themeConfig: {
     outline: 'deep',
     logo: { light: '/logo.svg', dark: '/logo-dark.svg' },
@@ -120,7 +147,7 @@ export default defineConfig({
       }
     },
     nav,
-    sidebar: 'REPLACE_ME_DOCUMENTER_VITEPRESS',
+    sidebar: limitSidebarCollapse(sidebarTemp.sidebar as any),
     sidebarDrawer: 'REPLACE_ME_DOCUMENTER_VITEPRESS_SIDEBAR_DRAWER',
     editLink: 'REPLACE_ME_DOCUMENTER_VITEPRESS',
     socialLinks: [
@@ -131,4 +158,4 @@ export default defineConfig({
       copyright: `© Copyright ${new Date().getUTCFullYear()}.`
     }
   }
-})
+}))

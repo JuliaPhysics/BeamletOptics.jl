@@ -1,8 +1,8 @@
 """
     AbstractShape{T<:Real}
 
-A generic type for a shape that exists in 3D-space. Must have a `pos`ition and orientation.\\
-Types used to describe the geometry of a shape should be subtypes of `Real`.\\
+A generic type for a shape that exists in 3D-space. Must have a `pos`ition and orientation.
+Types used to describe the geometry of a shape should be subtypes of `Real`.
 
 # Implementation reqs.
 

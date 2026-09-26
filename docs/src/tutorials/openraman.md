@@ -17,13 +17,24 @@ Main.DocUtils.conditional_include(joinpath(raman_dir, "openraman_showcase.jl"))
 Luc Boussemaere [Boussemaere:2026](@cite). A 532 nm laser is focused into a sample, the tiny
 fraction of light that comes back [Raman-shifted](https://www.edmundoptics.de/knowledge-center/application-notes/lasers/basic-principles-of-raman-scattering-and-spectroscopy/) is separated from the excitation light by a
 dichroic mirror, and a reflective diffraction grating spreads it across a camera sensor.
-In this advanced tutorial the instrument is rebuilt in BMO. You will learn how to:
+In this advanced tutorial the instrument is rebuilt in BMO.
+
+```@raw html
+<div class="bmo-card">
+<p><Badge type="danger" text="Advanced" /></p>
+```
+
+You will learn how to:
 
 1. Write your own optical component by implementing [`BeamletOptics.interact3d`](@ref)
 2. Build a component out of several shapes using the [`BeamletOptics.MultiShape`](@ref) trait
 3. Give a component its own [`render!`](@ref) method
 4. Trace a [`GaussianBeamlet`](@ref) and geometrical [`PointSource`](@ref) ray bundles through the system
 5. Extract a spectral calibration from the [`Detector`](@ref) and check it against theory
+
+```@raw html
+</div>
+```
 
 ![OpenRAMAN introduction figure](or_intro_fig.png)
 
