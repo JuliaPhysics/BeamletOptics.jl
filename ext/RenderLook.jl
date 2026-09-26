@@ -44,9 +44,9 @@ Material presets of the `:modern` look, see `_CAD_MATERIALS`. A restrained palet
 highlights, bright metallic mirrors, neutral mechanics, and a subtle coating of beamsplitters.
 """
 const _MODERN_MATERIALS = Dict{Symbol, _Material}(
-    :refractive => _preset(RGBf(0.68, 0.85, 0.94), 0.3, true, 0.85, 1.5, 250),
-    :reflective => _preset(RGBf(0.80, 0.81, 0.84), 1, false, 0.6, 1.6, 300),
-    :coating => _preset(RGBf(0.82, 0.50, 0.85), 0.4, true, 0.6, 1.0, 128),
+    :refractive => _preset(RGBf(0.68, 0.85, 0.94), 0.3, true, 0.85, 0.8, 64),
+    :reflective => _preset(RGBf(0.82, 0.83, 0.86), 1, false, 0.8, 0.9, 64),
+    :coating => _preset(RGBf(0.82, 0.70, 0.90), 0.28, true, 0.6, 0.6, 64),
     :polarizer => _preset(RGBf(0.22, 0.28, 0.32), 0.75, true, 0.7, 0.8, 64),
     :detector => _preset(RGBf(0.16, 0.18, 0.22), 1, false, 0.8, 0.6, 64),
     :mechanics => _preset(RGBf(0.60, 0.61, 0.63), 1, false, 0.9, 0.3, 32),
@@ -338,11 +338,11 @@ only.
 """
 function _studio_lights(multi::Bool)
     light(c, dir) = Makie.DirectionalLight(RGBf(c, c, c), dir, true)
-    # The modern look is lit more softly, i.e. with more ambient light
-    a, k = _LOOK[] === :cad ? (0.3, 0.75) : (0.45, 0.6)
+    # The modern look is lit more softly, i.e. with more ambient and fill light
+    a, k, f = _LOOK[] === :cad ? (0.3, 0.75, 0.2) : (0.5, 0.55, 0.35)
     multi || return RGBf(a + 0.15, a + 0.15, a + 0.15), [light(k, _KEY_DIRECTION)]
     return RGBf(a, a, a),
-        [light(k, _KEY_DIRECTION), light(0.2, _FILL_DIRECTION), light(0.15, _RIM_DIRECTION)]
+        [light(k, _KEY_DIRECTION), light(f, _FILL_DIRECTION), light(0.15, _RIM_DIRECTION)]
 end
 
 """Returns `true` if the active Makie backend supports several lights, i.e. `MultiLightShading`."""

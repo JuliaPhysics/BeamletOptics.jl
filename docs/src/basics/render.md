@@ -74,7 +74,7 @@ set_render_look(:cad)
 |:--------------|:-------------------------------------------|:---------------------|:-------------------|
 | `:refractive` | lenses, prisms, plates, windows            | clear glass, 0.3     | light blue, 0.5    |
 | `:reflective` | mirrors, retroreflector                    | metallic silver      | silver             |
-| `:coating`    | beamsplitter coatings                      | light violet, 0.4    | magenta, 0.6       |
+| `:coating`    | beamsplitter coatings                      | pale violet, 0.28    | magenta, 0.6       |
 | `:polarizer`  | polarization filters                       | dark slate, 0.75     | dark teal, 0.8     |
 | `:detector`   | detectors                                  | graphite             | dark blue          |
 | `:mechanics`  | mechanics, dummies and other objects       | neutral grey         | mid grey           |
