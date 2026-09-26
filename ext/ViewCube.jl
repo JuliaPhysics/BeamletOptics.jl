@@ -330,11 +330,14 @@ function view_cube!(
     vp = Observable(_corner_rect(main.viewport[], size, corner); ignore_equal_values = true)
     push!(listeners, on(v -> (vp[] = _corner_rect(v, size, corner)), main.viewport))
     scene = Scene(main; viewport = vp, clear = false)
+    # Soft light, such that the light faces of the cube stay light
+    Makie.set_ambient_light!(scene, RGBf(0.7, 0.7, 0.7))
+    Makie.set_lights!(scene, [Makie.DirectionalLight(RGBf(0.35, 0.35, 0.35), Vec3f(-0.46, -0.63, -0.63), true)])
 
     # Cube with labels on the faces and a colored axis triad at the corner (-1, -1, -1)
     edge_pts = Point3f[]
     edge_colors = RGBAf[]
-    dark = RGBAf(0.25, 0.25, 0.25, 1)
+    dark = RGBAf(0.55, 0.55, 0.57, 1)
     for i in 1:3, a in (-1, 1), b in (-1, 1)
         j, k = mod1(i + 1, 3), mod1(i + 2, 3)
         p, q = zeros(3), zeros(3)
@@ -355,12 +358,12 @@ function view_cube!(
     end
     # The cube is never clipped by the clip planes of the main scene
     faces = AbstractPlot[
-        mesh!(scene, Rect3f(Point3f(-1), Vec3f(2)); color = RGBf(0.88, 0.88, 0.88),
+        mesh!(scene, Rect3f(Point3f(-1), Vec3f(2)); color = RGBf(0.92, 0.92, 0.93), specular = 0.1,
             clip_planes = Plane3f[]),
-        linesegments!(scene, edge_pts; color = edge_colors, linewidth = 2, depth_shift = -1f-4,
+        linesegments!(scene, edge_pts; color = edge_colors, linewidth = 1.5, depth_shift = -1f-4,
             clip_planes = Plane3f[]),
         text!(scene, label_pos; text = names, rotation = collect(label_rot), markerspace = :data,
-            fontsize = 0.42, align = (:center, :center), color = :black, clip_planes = Plane3f[])
+            fontsize = 0.42, align = (:center, :center), color = :gray30, clip_planes = Plane3f[])
     ]
     highlight_mesh = Observable(_region_mesh((0, 0, 1)))
     highlight = mesh!(scene, highlight_mesh; color = RGBAf(0.2, 0.5, 1.0, 0.6), transparency = true,
