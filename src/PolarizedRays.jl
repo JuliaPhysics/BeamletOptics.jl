@@ -53,8 +53,9 @@ mutable struct PolarizedRay{T} <: AbstractRay{T}
         if isapprox(norm(dir), 0, atol=1e-14)
             throw(ErrorException("Direction vector to short for normalization."))
         end
-        # This test is very important and must be performed for each pol. ray
-        if !isorthogonal3d(dir, E0; atol=1e-10)
+        # This test is very important and must be performed for each pol. ray, the tolerance is
+        # relative to the field amplitude
+        if !isorthogonal3d(normalize(dir), E0; atol = 1e-10 * norm(E0))
             error("Ray dir. and E0 must be orthogonal (dot product: $(dot(dir, E0)))")
         end
         return new{M}(
@@ -220,5 +221,14 @@ function _calculate_global_E0(::AbstractObject, ray::PolarizedRay, out_dir::Abst
     normal = normal3d(intersection(ray))
     E0 = polarization(ray)
     P = _calculate_global_E0(in_dir, out_dir, normal, J)
-    return P*E0
+    return _transverse(P * E0, out_dir)
 end
+
+"""
+    _transverse(E0, dir)
+
+Removes the component of the field `E0` along `dir`. For nearly parallel in- and out-directions,
+the s-p basis of [`_calculate_global_E0`](@ref) is ill-conditioned and `E0` would otherwise keep a
+small component along the direction of propagation.
+"""
+_transverse(E0, dir) = E0 - (dot(dir, E0) / dot(dir, dir)) * dir

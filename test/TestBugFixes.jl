@@ -358,4 +358,61 @@ end
     @test all(==(lengths[1]), lengths)
 end
 
+@testset "Polarized ray numerics" begin
+    # Oblique unit vector (a ray direction from a pulse shaper), for which
+    # dot(normalize(d), normalize(d)) - 1 = 4.4e-16 > eps()
+    d = [-0.9999762904273509, 0.006881465035232346, -0.0002530259335731185]
+    _is_transverse(r) = abs(dot(BMO.direction(r), BMO.polarization(r))) ≤
+                        1e-10 * norm(BMO.polarization(r))
+    _all_rays(b) = [r for bb in BMO.PreOrderDFS(b) for r in BMO.rays(bb)]
+
+    @testset "isparallel3d for oblique directions" begin
+        @test BMO.isparallel3d(d, d)
+        @test all(v -> BMO.isparallel3d(v, v), (normalize(randn(MersenneTwister(k), 3)) for k in 1:1000))
+        @test BMO.isparallel3d(d, 3 .* d)
+        @test BMO.isparallel3d(d, -d)
+        @test !BMO.isparallel3d(d, normalize(d + [0, 1e-6, 0]))
+    end
+
+    @testset "Transmission through an oblique thin beamsplitter" begin
+        P = BMO._calculate_global_E0(d, d, normalize([1.0, 1, 0]), BMO.SPBasis(0.9, 0, 0, 0.9))
+        @test !any(isnan, P)
+        bs = ThinBeamsplitter(40mm, 25mm; reflectance = 0.1)
+        zrotate3d!(bs, deg2rad(45))
+        E0 = normalize(cross(d, [0, 0, 1.0]))
+        beam = Beam(PolarizedRay(-20mm .* d, d, 780e-9, E0))
+        solve_system!(System([bs]), beam)
+        @test length(beam.children) == 2
+        @test all(_is_transverse, _all_rays(beam))
+    end
+
+    @testset "Plate beamsplitter under 45°" begin
+        pbs = RoundPlateBeamsplitter(25mm, 3mm, λ -> 1.5; reflectance = 0.1)
+        zrotate3d!(pbs, deg2rad(45))
+        for E0 in ([0, 0, 1.0], [1.0, 0, 0])
+            beam = Beam(PolarizedRay([0, -20mm, 0], [0, 1.0, 0], 780e-9, E0))
+            solve_system!(System([pbs]), beam)
+            rs = _all_rays(beam)
+            @test all(_is_transverse, rs)
+            # The transmitted beam leaves the plate parallel to the incident beam
+            t = last(BMO.rays(last(collect(BMO.PreOrderDFS(beam.children[1])))))
+            @test BMO.direction(t) ≈ [0, 1, 0]
+        end
+    end
+
+    @testset "Orthogonality test relative to the field amplitude" begin
+        @test_nowarn PolarizedRay(zeros(3), [0, 1, 0], 1e-6, [1e3, 1e-8, 0])
+        @test_throws ErrorException PolarizedRay(zeros(3), [0, 1, 0], 1e-6, [1e3, 1, 0])
+        # Oblique rays with large field amplitudes through a lens
+        lens = SphericalLens(8mm, Inf, 3mm, 12mm, λ -> 1.51)
+        for h in (0.2mm, 1mm, 3mm), θ in (0.0, 5.0, 15.0)
+            dir = [sind(θ), cosd(θ), 0]
+            E0 = 1e4 .* [0, 0, 1.0]
+            beam = Beam(PolarizedRay([h, -10mm, 0.5mm], dir, 780e-9, E0))
+            solve_system!(System([lens]), beam)
+            @test all(_is_transverse, _all_rays(beam))
+        end
+    end
+end
+
 end # MODULE
