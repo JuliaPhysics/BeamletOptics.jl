@@ -98,6 +98,7 @@ makedocs(;
                 "Lens groups"               => joinpath("examples", "lens_groups.md"),
                 "Double slit"               => joinpath("examples", "double_slit.md"),
                 "Point spread functions"    => joinpath("examples", "psf.md"),
+                "Interactive Michelson"     => joinpath("examples", "live_michelson.md"),
             ],
         ],
         "Basics" => Any[

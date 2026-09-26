@@ -9,6 +9,34 @@ const BMO = BeamletOptics
 const mm = 1e-3
 
 @testset "Spherical Lenses" begin
+    @testset "Mechanical ring spans the lens edge" begin
+        # Edge sagitta of R = 40 mm over a clear aperture of 20 mm
+        R, d, md = 40mm, 20mm, 25.4mm
+        s = R - sqrt(R^2 - (d / 2)^2)
+        function ring_extent(lens)
+            rings = [p for p in BMO.shape(lens).sdfs if p isa BMO.RingSDF]
+            @test length(rings) == 1
+            r = only(rings)
+            return BMO.position(r)[2] - r.hthickness, BMO.position(r)[2] + r.hthickness
+        end
+        n = λ -> 1.5
+        # biconvex: edge from s to T - s
+        lens = Lens(SphericalSurface(R, d, md), SphericalSurface(-R, d), 5mm, n)
+        lo, hi = ring_extent(lens)
+        @test lo ≈ s atol = 1e-9
+        @test hi ≈ 5mm - s atol = 1e-9
+        # biconcave: edge from -s to T + s
+        lens = Lens(SphericalSurface(-R, d, md), SphericalSurface(R, d), 2mm, n)
+        lo, hi = ring_extent(lens)
+        @test lo ≈ -s atol = 1e-9
+        @test hi ≈ 2mm + s atol = 1e-9
+        # convex-plano: edge from 0 to T - s
+        lens = Lens(SphericalSurface(Inf, d, md), SphericalSurface(-R, d), 5mm, n)
+        lo, hi = ring_extent(lens)
+        @test lo ≈ 0 atol = 1e-9
+        @test hi ≈ 5mm - s atol = 1e-9
+    end
+
     @testset "Testing type definitions" begin
         @test isdefined(BMO, :AbstractSDF)
         @test isdefined(BMO, :SphereSDF)

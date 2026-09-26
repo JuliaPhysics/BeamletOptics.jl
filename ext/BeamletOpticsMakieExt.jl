@@ -2,13 +2,19 @@ module BeamletOpticsMakieExt
 
 using BeamletOptics
 import BeamletOptics: render!, RenderException, _RenderTypes, get_view, set_view, hide_axis,
-                       set_orthographic, arrow!, render_lcs!, look_at!
+                       set_orthographic, arrow!, render_lcs!, look_at!,
+                       AbstractRenderHandle, live_render!, update_render!, remove_render!,
+                       pick_object, kinematic_controls!, live_view, view_cube!, studio_lighting!,
+                       set_render_look, export_changes
 
 const BMO = BeamletOptics
 
-using Makie: Axis3, LScene, mesh!, surface!, lines!, RGBf, RGBAf, scatter!, text!,
+using Makie: Axis3, LScene, mesh!, surface!, lines!, linesegments!, RGBf, RGBAf, scatter!, text!,
              update_cam!, cameracontrols, arrows3d!
-using GeometryBasics: Point2, Point3, Point3f, Vec3f, GLTriangleFace, Mesh
+using PrecompileTools: @setup_workload, @compile_workload
+using GeometryBasics: Point2, Point3, Point3f, Point3d, Vec3f, Vec3d, GLTriangleFace, Mesh
+using StaticArrays: SMatrix
+using Base.ScopedValues: ScopedValue, with
 using AbstractTrees: PreOrderDFS
 using MarchingCubes: MC, march
 using LinearAlgebra: dot, cross, normalize, norm
@@ -50,6 +56,8 @@ include("RenderBeam.jl")
 include("RenderPolarization.jl")
 include("RenderGaussian.jl")
 include("RenderAstigmaticGaussian.jl")
+include("RenderTessellation.jl")
+include("RenderLook.jl")
 include("RenderSDF.jl")
 include("RenderMesh.jl")
 include("RenderObjects.jl")
@@ -59,5 +67,13 @@ include("RenderMirrors.jl")
 include("RenderPresets.jl")
 include("RenderPolarizers.jl")
 include("RenderCamera.jl")
+# live rendering, must come after all static renderers
+include("LiveObjects.jl")
+include("LiveBeams.jl")
+include("LiveInteraction.jl")
+include("ViewCube.jl")
+include("LiveView.jl")
+# precompiles the live rendering/interaction call paths, must come last
+include("LivePrecompile.jl")
 
 end

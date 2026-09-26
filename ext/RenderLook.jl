@@ -1,0 +1,389 @@
+#=
+Look of the rendered objects: material presets per component class, feature edge lines and the
+studio lighting rig. Two looks are available, see `set_render_look`. The component classes are
+assigned in `RenderPresets.jl`.
+=#
+
+"""Plot attributes of a material preset, see `_materials`."""
+const _Material = @NamedTuple{color::RGBf, alpha::Float32, transparency::Bool, diffuse::Float32,
+    specular::Float32, shininess::Float32}
+
+_preset(color, alpha, transparency, diffuse, specular, shininess) =
+    _Material((color, alpha, transparency, diffuse, specular, shininess))
+
+"""
+    _CAD_MATERIALS
+
+Material presets per component class of the `:cad` look, see `_material_class`. The attributes are
+passed to the mesh plot of an object, explicit kwargs of `render!` (e.g. `color`) override them.
+
+| class         | components                                |
+|:--------------|:------------------------------------------|
+| `:refractive` | lenses, prisms, plates, windows           |
+| `:reflective` | mirrors, retroreflector                   |
+| `:coating`    | beamsplitter coatings                     |
+| `:polarizer`  | polarization filters                      |
+| `:detector`   | detectors                                 |
+| `:mechanics`  | mechanics, dummies and other objects      |
+| `:interface`  | cemented interfaces of doublets, triplets |
+"""
+const _CAD_MATERIALS = Dict{Symbol, _Material}(
+    :refractive => _preset(RGBf(0.45, 0.72, 0.88), 0.5, true, 0.6, 1.0, 96),
+    :reflective => _preset(RGBf(0.82, 0.83, 0.85), 1, false, 0.5, 1.0, 128),
+    :coating => _preset(RGBf(0.95, 0.40, 0.90), 0.6, true, 0.7, 0.6, 64),
+    :polarizer => _preset(RGBf(0.15, 0.30, 0.35), 0.8, true, 0.7, 0.4, 32),
+    :detector => _preset(RGBf(0.12, 0.22, 0.35), 1, false, 0.8, 0.2, 16),
+    :mechanics => _preset(RGBf(0.55, 0.56, 0.58), 1, false, 0.9, 0.15, 16),
+    :interface => _preset(RGBf(0.95, 0.80, 0.45), 0.25, true, 0.6, 0.3, 32),
+)
+
+"""
+    _MODERN_MATERIALS
+
+Material presets of the `:modern` look, see `_CAD_MATERIALS`. A restrained palette: clear glass with
+highlights, bright metallic mirrors, neutral mechanics, and a subtle coating of beamsplitters.
+"""
+const _MODERN_MATERIALS = Dict{Symbol, _Material}(
+    :refractive => _preset(RGBf(0.68, 0.85, 0.94), 0.3, true, 0.85, 0.8, 64),
+    :reflective => _preset(RGBf(0.82, 0.83, 0.86), 1, false, 0.8, 0.9, 64),
+    :coating => _preset(RGBf(0.82, 0.70, 0.90), 0.28, true, 0.6, 0.6, 64),
+    :polarizer => _preset(RGBf(0.22, 0.28, 0.32), 0.75, true, 0.7, 0.8, 64),
+    :detector => _preset(RGBf(0.16, 0.18, 0.22), 1, false, 0.8, 0.6, 64),
+    :mechanics => _preset(RGBf(0.60, 0.61, 0.63), 1, false, 0.9, 0.3, 32),
+    :interface => _preset(RGBf(0.90, 0.85, 0.70), 0.15, true, 0.6, 0.6, 64),
+)
+
+"""The active look, see `set_render_look`."""
+const _LOOK = Ref(:modern)
+
+const _LOOKS = (:modern, :cad)
+
+function set_render_look(look::Symbol)
+    look in _LOOKS || throw(ArgumentError("unknown look :$look, must be one of $_LOOKS"))
+    _LOOK[] = look
+    return look
+end
+
+"""Returns the material presets of the active look."""
+_materials() = _LOOK[] === :cad ? _CAD_MATERIALS : _MODERN_MATERIALS
+
+"""Material classes with feature edges in the `:modern` look, i.e. faint silhouettes of the glass."""
+const _MODERN_EDGE_CLASSES = (:refractive, :coating, :interface)
+
+"""Factor of the opacity of the feature edges in the `:modern` look, see `_edge_style`."""
+const _MODERN_EDGE_FACTOR = 0.5f0
+
+"""
+Brightness of the feature edges in the `:modern` look relative to the color of the object, i.e. the
+edges are a darker shade of the glass instead of dark outlines, see `_edge_color`.
+"""
+const _MODERN_EDGE_TINT = 0.55f0
+
+"""Line width of the feature edges in the `:modern` look."""
+const _MODERN_EDGE_WIDTH = 0.8f0
+
+"""
+    _default_edges(class::Symbol)
+
+Returns `true` if the active look draws the feature edges of the material `class` by default: the
+`:cad` look for all classes except `:mechanics`, the `:modern` look only for glass, i.e. the
+classes of `_MODERN_EDGE_CLASSES`.
+"""
+function _default_edges(class::Symbol)
+    _LOOK[] === :cad && return class !== :mechanics
+    return class in _MODERN_EDGE_CLASSES
+end
+
+"""
+    _edge_style()
+
+Returns the opacity `factor`, the `tint` (see `_edge_color`) and the `linewidth` of the feature edges
+of the active look: dark outlines in the `:cad` look, a faint darker shade of the object color in the
+`:modern` look.
+"""
+_edge_style() = _LOOK[] === :cad ? (1.0f0, nothing, 1.0f0) :
+                (_MODERN_EDGE_FACTOR, _MODERN_EDGE_TINT, _MODERN_EDGE_WIDTH)
+
+"""
+    _material_class(obj)
+
+Returns the material class of the object `obj`, i.e. a key of `_materials()`. Defaults to
+`:mechanics`, the component classes are assigned in `RenderPresets.jl`.
+"""
+_material_class(::Any) = :mechanics
+
+"""
+    _material(obj, material = nothing)
+
+Returns the plot attributes of the `material` (a key of `_materials()`), or of the material class of
+`obj` if `material` is `nothing`.
+"""
+function _material(obj, material = nothing)
+    class = isnothing(material) ? _material_class(obj) : material
+    materials = _materials()
+    if !(class isa Symbol && haskey(materials, class))
+        throw(ArgumentError("unknown material $(repr(class)), must be one of $(sort!(collect(keys(materials))))"))
+    end
+    return materials[class]
+end
+
+#=
+Feature edges
+=#
+
+"""Minimum angle between the normals of adjacent faces of a feature edge, see `_feature_edges`."""
+const _EDGE_ANGLE = deg2rad(30)
+
+"""Color of the feature edge lines of an opaque object, see `_edge_color`."""
+const _EDGE_COLOR = RGBAf(0.1, 0.1, 0.12, 0.8)
+
+"""
+    _edge_color(color, alpha = 1, factor = 1, tint = nothing)
+
+Returns the color of the feature edges of an object with the plot attributes `color` and `alpha`.
+The opacity of the edges follows the opacity `a` of the object, i.e. the product of `alpha` and
+the alpha channel of `color`: it is `min(1, 2a)` times the opacity of `_EDGE_COLOR`, such that
+the edges of glass (`a = 0.5`) are fully visible, while the edges of a nearly transparent object,
+e.g. a housing with `a = 0.05`, fade out with it. Per-vertex colors count as opaque. Finally, the
+opacity is multiplied by the `factor` of the look. With a `tint`, the edges are the color of the
+object scaled by `tint` instead of the dark `_EDGE_COLOR`, see `_edge_style`.
+"""
+function _edge_color(color, alpha = 1, factor = 1, tint = nothing)
+    single = !(color isa AbstractVector || isnothing(color))
+    a = single ? Float32(Makie.to_color(color).alpha) : 1.0f0
+    base = isnothing(tint) || !single ? _EDGE_COLOR : Makie.to_color(color)
+    s = isnothing(tint) || !single ? 1.0f0 : Float32(tint)
+    return RGBAf(s * base.r, s * base.g, s * base.b,
+        _EDGE_COLOR.alpha * min(1.0f0, 2 * Float32(alpha) * a) * Float32(factor))
+end
+
+"""Returns `_edge_color` of the `color`, `alpha` and `factor`, an `Observable` if one of them is."""
+function _edge_color_obs(color, alpha, factor = 1, tint = nothing)
+    (color isa Observable || alpha isa Observable) || return _edge_color(color, alpha, factor, tint)
+    return Makie.lift((c, a) -> _edge_color(c, a, factor, tint), Makie.convert(Observable, color),
+        Makie.convert(Observable, alpha))
+end
+
+"""Plot attributes of the object that are passed on to its feature edge lines."""
+const _EDGE_KWARGS = (:visible, :clip_planes)
+
+"""
+    _weld(points, tol)
+
+Welds the `points` by position within about `tol`, returns the representative index of each point.
+"""
+function _weld(points, tol)
+    cell(p) = (floor(Int, p[1] / tol), floor(Int, p[2] / tol), floor(Int, p[3] / tol))
+    grid = Dict{NTuple{3, Int}, Int}()
+    sizehint!(grid, length(points))
+    ids = zeros(Int, length(points))
+    for (i, p) in enumerate(points)
+        c = cell(p)
+        rep = get(grid, c, 0)
+        if rep == 0
+            # points within tol may lie in a neighboring cell
+            for d in Iterators.product(-1:1, -1:1, -1:1)
+                j = get(grid, c .+ d, 0)
+                if j != 0 && norm(points[j] - p) ≤ tol
+                    rep = j
+                    break
+                end
+            end
+            rep == 0 && (rep = i)
+            grid[c] = rep
+        end
+        ids[i] = rep
+    end
+    return ids
+end
+
+"""
+    _feature_edges(m::_TriMesh; angle = 30°)
+
+Returns the feature edges of `m` as pairs of points, see `_polylines`. The vertices are welded by
+position first (tolerance `1e-9` of the mesh size). An edge is a feature edge if the normals of its
+two adjacent faces differ by more than `angle`, or if it is a boundary edge (one adjacent face).
+Non-manifold edges (more than two faces) are feature edges if not all faces are parallel, i.e.
+the edges of coincident flat faces are skipped. The orientation of the faces of open
+(`two_sided`) meshes is ignored.
+"""
+function _feature_edges(m::_TriMesh; angle = _EDGE_ANGLE)
+    pts = Point3f[]
+    isempty(m.faces) && return pts
+    lo, hi = _bbox(m)
+    tol = 1e-9 * max(maximum(hi - lo), floatmin(Float64))
+    ids = _weld(m.points, tol)
+    normals = Vector{Vec3d}(undef, length(m.faces))
+    cmin = cos(angle)
+    # edge => (number of faces, first face, second face, any face not parallel to the first face)
+    edges = Dict{Tuple{Int, Int}, Tuple{Int, Int, Int, Bool}}()
+    sizehint!(edges, 2 * length(m.faces))
+    for (k, f) in enumerate(m.faces)
+        a, b, c = ids[f[1]], ids[f[2]], ids[f[3]]
+        (a == b || b == c || a == c) && continue
+        g = cross(m.points[b] - m.points[a], m.points[c] - m.points[a])
+        normals[k] = norm(g) > 0 ? g / norm(g) : Vec3d(0)
+        for (i, j) in ((a, b), (b, c), (c, a))
+            key = minmax(i, j)
+            n, f1, f2, bent = get(edges, key, (0, 0, 0, false))
+            if n == 0
+                edges[key] = (1, k, 0, false)
+            else
+                bent |= abs(dot(normals[f1], normals[k])) < cmin
+                edges[key] = (n + 1, f1, n == 1 ? k : f2, bent)
+            end
+        end
+    end
+    for ((i, j), (n, f1, f2, bent)) in edges
+        if n == 2
+            d = dot(normals[f1], normals[f2])
+            (m.two_sided ? abs(d) : d) ≥ cmin && continue
+        elseif n > 2
+            # e.g. the coincident faces of touching parts, which are not removed within `_TAU`
+            bent || continue
+        end
+        push!(pts, Point3f(m.points[i]), Point3f(m.points[j]))
+    end
+    return pts
+end
+
+"""
+    _polylines(segments)
+
+Chains the `segments` (pairs of points, see `_feature_edges`) into polylines, which are separated
+by `NaN` points. Segments are joined at points that are shared by exactly two segments, e.g. the
+segments of a circle are joined into a closed loop.
+"""
+function _polylines(segments::Vector{Point3f})
+    ids = Dict{Point3f, Int}()
+    vertex(p) = get!(ids, p, length(ids) + 1)
+    edges = [(vertex(segments[k]), vertex(segments[k + 1])) for k in 1:2:length(segments)]
+    points = Vector{Point3f}(undef, length(ids))
+    for (p, i) in ids
+        points[i] = p
+    end
+    adjacent = [Int[] for _ in points]
+    for (e, (a, b)) in enumerate(edges)
+        push!(adjacent[a], e)
+        push!(adjacent[b], e)
+    end
+    used = falses(length(edges))
+    # follows the chain from vertex `v` via edge `e`, appends the vertices to `chain`
+    function walk!(chain, v, e)
+        while true
+            a, b = edges[e]
+            v = a == v ? b : a
+            push!(chain, v)
+            length(adjacent[v]) == 2 || return chain
+            e = adjacent[v][1] == e ? adjacent[v][2] : adjacent[v][1]
+            used[e] && return chain
+            used[e] = true
+        end
+    end
+    out = Point3f[]
+    for e in eachindex(edges)
+        used[e] && continue
+        used[e] = true
+        a, b = edges[e]
+        forward = walk!([a], a, e)
+        backward = forward[end] == a ? Int[] : walk!(Int[], b, e)
+        isempty(out) || push!(out, Point3f(NaN))
+        append!(out, points[i] for i in Iterators.flatten((reverse(backward)[1:(end - 1)], forward)))
+    end
+    return out
+end
+
+"""
+    _plot_edges!(ax, meshes; kwargs...)
+
+Plots the feature edges of all `meshes` (see `_feature_edges`) as a single `lines!` plot, see
+`_polylines`. Of the `kwargs`, i.e. the plot attributes of the object, only `_EDGE_KWARGS` and
+`transparency` are used; `color` and `alpha` set the opacity of the edges, see `_edge_color`. The
+style of the active look is taken when the edges are plotted, see `_edge_style`.
+"""
+function _plot_edges!(ax::_RenderEnv, meshes; transparency = false, color = nothing,
+        alpha = 1, kwargs...)
+    pts = Point3f[]
+    for m in meshes
+        append!(pts, _feature_edges(m))
+    end
+    isempty(pts) && return nothing
+    kw = (; (k => v for (k, v) in pairs(kwargs) if k in _EDGE_KWARGS)...)
+    # Polylines instead of line segments, since short segments of thin lines look frayed (GLMakie).
+    # The depth shift keeps the lines in front of the faces they bound. The lines of transparent
+    # objects are transparent as well, otherwise the faces along the silhouette cover them
+    # partially (GLMakie, order independent transparency)
+    factor, tint, linewidth = _edge_style()
+    lines!(ax, _polylines(pts); color = _edge_color_obs(color, alpha, factor, tint), linewidth,
+        transparency,
+        inspectable = false, depth_shift = -1.0f-5, kw...)
+    return nothing
+end
+
+#=
+Lighting
+=#
+
+# Directions along which the light travels, relative to the camera: x right, y up, z towards the viewer
+const _KEY_DIRECTION = Vec3f(-0.46, -0.63, -0.63)   # from the upper right front
+const _FILL_DIRECTION = Vec3f(1.0, -0.2, -0.5)      # from the left
+const _RIM_DIRECTION = Vec3f(0.0, -0.4, 1.0)        # from behind
+
+"""
+    _studio_lights(multi::Bool)
+
+Returns the ambient light color and the directional lights of the `:studio` rig. With `multi = true`
+(backends with `MultiLightShading`, i.e. GLMakie) a key, fill and rim light, otherwise the key light
+only.
+"""
+function _studio_lights(multi::Bool)
+    light(c, dir) = Makie.DirectionalLight(RGBf(c, c, c), dir, true)
+    # The modern look is lit more softly, i.e. with more ambient and fill light
+    a, k, f = _LOOK[] === :cad ? (0.3, 0.75, 0.2) : (0.5, 0.55, 0.35)
+    multi || return RGBf(a + 0.15, a + 0.15, a + 0.15), [light(k, _KEY_DIRECTION)]
+    return RGBf(a, a, a),
+        [light(k, _KEY_DIRECTION), light(f, _FILL_DIRECTION), light(0.15, _RIM_DIRECTION)]
+end
+
+"""Returns `true` if the active Makie backend supports several lights, i.e. `MultiLightShading`."""
+function _multi_light_backend()
+    backend = Makie.current_backend()
+    return !ismissing(backend) && nameof(backend) === :GLMakie
+end
+
+"""
+    _apply_lighting!(scene, preset::Symbol, multi::Bool)
+
+Sets the lights of the `preset` (`:studio` or `:none`) in the `scene`, see `_studio_lights`.
+"""
+function _apply_lighting!(scene, preset::Symbol, multi::Bool)
+    preset in (:studio, :none) ||
+        throw(ArgumentError("unknown lighting preset :$preset, must be :studio or :none"))
+    preset === :none && return nothing
+    ambient, lights = _studio_lights(multi)
+    Makie.set_ambient_light!(scene, ambient)
+    Makie.set_lights!(scene, lights)
+    return nothing
+end
+
+"""
+    studio_lighting!(ls::LScene; preset = :studio)
+
+Sets up the lighting of the 3D view `ls`. The `:studio` rig consists of an ambient light, a key
+light from the upper right front, a fill light from the left and a rim light from behind, all
+relative to the camera. Backends that support a single directional light only (e.g. CairoMakie)
+get the ambient and the key light. `preset = :none` leaves the lights unchanged.
+
+[`live_view`](@ref) applies the rig by default. Call it for scenes created via `render!`, e.g.
+
+```julia
+fig = Figure()
+ax = LScene(fig[1, 1])
+studio_lighting!(ax)
+render!(ax, system)
+```
+"""
+function studio_lighting!(ls::LScene; preset::Symbol = :studio)
+    _apply_lighting!(ls.scene, preset, _multi_light_backend())
+    return nothing
+end

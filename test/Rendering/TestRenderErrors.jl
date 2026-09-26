@@ -20,6 +20,16 @@ const BMO = BeamletOptics
     @test_throws BMO.MissingBackendError BMO.render_lcs!(axis, [0,0,0], Matrix{Float64}(I, 3, 3))
     @test_throws BMO.MissingBackendError BMO.render_lcs!(axis, RoundPlanoMirror(25e-3, 5e-3))
     @test_throws BMO.MissingBackendError BMO.look_at!(axis, [0,0,0], [1,0,0])
+    @test_throws BMO.MissingBackendError live_render!(axis, cube)
+    @test_throws BMO.MissingBackendError update_render!(nothing)
+    @test_throws BMO.MissingBackendError remove_render!(nothing)
+    @test_throws BMO.MissingBackendError pick_object(nothing, nothing)
+    @test_throws BMO.MissingBackendError kinematic_controls!(axis, nothing)
+    @test_throws BMO.MissingBackendError set_render_look(:cad)
+    @test_throws BMO.MissingBackendError live_view(System([Detector(1e-3)]), Beam([0.0,0,0],[0.0,1,0],1e-6))
+    @test_throws BMO.MissingBackendError export_changes(nothing)
+    @test_throws BMO.MissingBackendError view_cube!(axis)
+    @test_throws BMO.MissingBackendError studio_lighting!(axis)
 end
 
 end

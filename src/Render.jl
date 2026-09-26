@@ -131,3 +131,169 @@ backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
 render_lcs!(::Any, ::AbstractArray = zeros(3), ::AbstractMatrix = Matrix{Float64}(I, 3, 3); kwargs...) =
     throw(MissingBackendError())
 render_lcs!(::Any, ::AbstractObject; kwargs...) = throw(MissingBackendError())
+
+"""
+    AbstractRenderHandle
+
+Supertype of all handles returned by [`live_render!`](@ref). A handle references the rendered
+object or beam and its plots, which can be re-synchronized via [`update_render!`](@ref).
+Concrete handles are implemented by the `Makie` extension.
+"""
+abstract type AbstractRenderHandle end
+
+"""
+    live_render!(axis, thing; kwargs...)
+
+Renders `thing` into the `axis` like [`render!`](@ref), but returns an [`AbstractRenderHandle`](@ref)
+that can be updated in place via [`update_render!`](@ref). Intended for animations and interactive
+applications, e.g. moving components that require the system to be solved repeatedly.
+
+- objects and systems: the geometry is generated once, kinematic changes are applied as a model
+  transformation of the existing plots
+- rays, beams and beam groups: all segments are bundled into a single plot
+- `GaussianBeamlet`: the envelope of all segments is bundled into a single mesh
+
+Keyword arguments are passed on as for [`render!`](@ref).
+
+If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
+"""
+live_render!(::Any, ::_RenderTypes; kwargs...) = throw(MissingBackendError())
+
+"""
+    update_render!(handle)
+
+Re-synchronizes the plots of the `handle` with the current state of the rendered object or beam,
+e.g. after moving components or calling [`solve_system!`](@ref).
+
+If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
+"""
+update_render!(::Any; kwargs...) = throw(MissingBackendError())
+
+"""
+    remove_render!(handle)
+
+Deletes all plots of the `handle` from its axis.
+
+If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
+"""
+remove_render!(::Any) = throw(MissingBackendError())
+
+"""
+    pick_object(handle, plot)
+
+Returns the object of a live-rendered object or system `handle` that is visualized by the `plot`,
+or `nothing` if the `plot` does not belong to the `handle`.
+
+If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
+"""
+pick_object(::Any, ::Any) = throw(MissingBackendError())
+
+"""
+    kinematic_controls!(axis, handle; kwargs...)
+
+Enables mouse and keyboard controls for moving and rotating the objects of a live-rendered system
+`handle` within the `axis`. Returns a controller that can be removed via `close`.
+
+If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
+"""
+kinematic_controls!(::Any, ::Any; kwargs...) = throw(MissingBackendError())
+
+"""
+    live_view(system => beam, ...; kwargs...)
+    live_view(system, beam; kwargs...)
+
+Opens a complete interactive window for one or several pairs of `system` and `beam`: a 3D view in
+which all components can be moved via [`kinematic_controls!`](@ref), one panel per `Detector`
+(spot diagram or intensity), a status line and optional sliders. After each change, all detectors
+are emptied, all systems are solved again and the beams and panels are updated. Returns a
+`LiveView`, which can be shown via `display`.
+
+The detector panels show metrics (centroid, RMS or 1/e² radius, power), optionally on a
+logarithmic color scale with a history and profiles. A click on a beam shows its position, path
+length and, for Gaussian beamlets, its radius and curvature, the "measure" toggle measures
+distances and angles between components and beams. The key `g` zooms to the selection, "home",
+the "views" menu and "save view" set and store camera views. While moving, beam groups are solved
+only for their rendered beams (`preview = true`), the full group once the movement pauses.
+
+Main keyword arguments: `detectors` (`:auto`, a vector of `pd`, `pd => mode` or
+`pd => (mode, kwargs)`, or `[]`, with the panel options `colorscale`, `colorrange`, `history`
+and `profiles`), `on_change = (gui, obj) -> nothing` (called after full solves),
+`sliders = ["label" => (range, callback)]`, `system_kwargs`, `beam_kwargs`, `preview = true`,
+`views = ["name" => (eye, lookat, up)]`, `lighting = :studio` (see [`studio_lighting!`](@ref)),
+`edges` and `size`. All other keyword arguments are passed to [`kinematic_controls!`](@ref). Refer
+to the method of the `Makie` extension for details.
+
+If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
+"""
+live_view(::Any...; kwargs...) = throw(MissingBackendError())
+
+"""
+    export_changes(gui; io = stdout, clipboard = false)
+
+Returns the changes of the poses in the `live_view` window `gui` as Julia code, i.e. one
+`rotate3d!` about the position of the object and one `translate_to3d!` per moved object, relative
+to its initial pose. The code is printed to `io` and copied to the clipboard if `clipboard` is
+`true`. Refer to the method of the `Makie` extension for details.
+
+If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
+"""
+export_changes(::Any; kwargs...) = throw(MissingBackendError())
+
+"""
+    view_cube!(ls::LScene; size = 110, corner = :top_right, duration = 0.3)
+
+Adds a CAD-style view cube to a corner of the 3D view `ls`. The cube rotates with the camera, and a
+left click on a face, an edge or a corner of the cube moves the camera to the corresponding
+standard view, keeping the `lookat` point and the distance of the camera. Returns a `ViewCube`,
+which can be removed via `close`. The view cube is shown by default in [`live_view`](@ref).
+
+The camera looks at the clicked side of the system, i.e. it is placed on the side of the clicked
+face:
+
+| face     | camera at | up   |
+|:---------|:----------|:-----|
+| `Top`    | `+z`      | `+y` |
+| `Bottom` | `-z`      | `+y` |
+| `Front`  | `-y`      | `+z` |
+| `Back`   | `+y`      | `+z` |
+| `Right`  | `+x`      | `+z` |
+| `Left`   | `-x`      | `+z` |
+
+Edges and corners give the diagonal views between the adjacent faces, with `+z` as the up
+direction. The region under the cursor is highlighted.
+
+# Keyword args
+
+- `size = 110`: [px] edge length of the square viewport of the cube
+- `corner = :top_right`: one of `:top_right`, `:top_left`, `:bottom_right` and `:bottom_left`
+- `duration = 0.3`: [s] duration of the animated transition, `0` switches the view instantly
+
+If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
+"""
+view_cube!(::Any; kwargs...) = throw(MissingBackendError())
+
+"""
+    studio_lighting!(ls::LScene; preset = :studio)
+
+Sets up a CAD-like lighting rig in the 3D view `ls`, if a suitable backend is loaded: an ambient
+light, a key light from the upper right front, a fill light from the left and a rim light from
+behind, all relative to the camera. Backends with a single directional light (e.g. CairoMakie)
+get the ambient and the key light only. `preset = :none` leaves the lights unchanged.
+[`live_view`](@ref) applies the rig by default, scenes created via [`render!`](@ref) call it
+explicitly.
+
+If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
+"""
+studio_lighting!(::Any; kwargs...) = throw(MissingBackendError())
+
+"""
+    set_render_look(look::Symbol)
+
+Sets the look of all subsequently rendered objects, `:modern` (default) or `:cad`. The `:modern`
+look renders clear glass with faint silhouettes, metallic mirrors and neutral mechanics without
+edge lines, the `:cad` look saturated materials with feature edge lines. Explicit kwargs of [`render!`](@ref), e.g.
+`color`, `material` or `edges`, override the look.
+
+If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
+"""
+set_render_look(::Any) = throw(MissingBackendError())
