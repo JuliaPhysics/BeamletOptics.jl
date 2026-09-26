@@ -4,10 +4,67 @@ using BeamletOptics
 using LinearAlgebra
 using Test
 using Logging
+using Random
 
 const BMO = BeamletOptics
 
 const mm = 1e-3
+
+@testset "Issue#11" begin
+    # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/11
+    # A very narrow point source produced a scattered spot diagram behind a lens system that had
+    # been moved and rotated before (suspected rounding errors of `_world_to_sdf`).
+    @testset "Narrow point source through a double Gauss lens" begin
+        # Based on https://www.pencilofrays.com/double-gauss-sonnar-comparison/
+        l1 = SphericalLens(48.88mm, 182.96mm, 8.89mm, 52.3mm, λ -> 1.62286)
+        l23 = SphericalDoubletLens(36.92mm, Inf, 23.06mm, 15.11mm, 2.31mm,
+            45.11mm, λ -> 1.58565, λ -> 1.67764)
+        l45 = SphericalDoubletLens(-23.91mm, Inf, -36.92mm, 1.92mm, 7.77mm,
+            40.01mm, λ -> 1.57046, λ -> 1.64128)
+        l6 = SphericalLens(1063.24mm, -48.88mm, 6.73mm, 45.11mm, λ -> 1.62286)
+        l_23 = thickness(l1) + 0.38mm
+        l_45 = l_23 + thickness(l23) + 9.14mm + 13.36mm
+        l_6 = l_45 + thickness(l45) + 0.38mm
+        translate3d!(l23, [0, l_23, 0])
+        translate3d!(l45, [0, l_45, 0])
+        translate3d!(l6, [0, l_6, 0])
+        detector = Detector(5mm)
+        test_setup = ObjectGroup([ObjectGroup([l1, l23, l45, l6]), detector])
+        # Move, rotate and reset the setup before tracing, as in the issue
+        translate3d!(test_setup, [0.05, 0.05, 0.05])
+        xrotate3d!(test_setup, deg2rad(60))
+        zrotate3d!(test_setup, deg2rad(45))
+        reset_rotation3d!(test_setup)
+        reset_translation3d!(test_setup)
+        translate_to3d!(detector, [0, 0.147, 0])
+        source = PointSource([0, -0.5, 0], [0, 1, 0], 5e-5, 486.0e-9, num_rays = 1000,
+            num_rings = 10)
+        solve_system!(System([test_setup]), source)
+        @test all(hit -> norm(hit) < 2e-7, spot_diagram(detector))
+    end
+
+    @testset "Narrow point source through a tilted concave asphere" begin
+        # The numeric normal of aspheres, introduced for this issue, kicked near-axis rays out of
+        # their meridional plane at concave aspheres, see Issue#80. A point source on the axis of
+        # a rotationally symmetric lens: every ray must stay in its meridional plane.
+        n = 1.458
+        lens = Lens(CircularFlatSurface(30mm),
+            EvenAsphericalSurface((n - 1) * 50mm, 30mm, -n^2, [0.0]), 4mm, x -> n)
+        xrotate3d!(lens, deg2rad(0.5))
+        zrotate3d!(lens, deg2rad(0.2))
+        axis = BMO.orientation(lens)[:, 2]
+        source = PointSource(Vector(position(lens) .- 0.1 .* axis), Vector(axis), 5e-5, 486.0e-9;
+            num_rays = 1000, num_rings = 10)
+        solve_system!(System(lens), source)
+        # out-of-plane component of each outgoing ray, the on-axis ray has no meridional plane
+        kicks = map(BMO.beams(source)) do beam
+            m = cross(axis, BMO.direction(first(beam.rays)))
+            norm(m) < 1e-15 ? 0.0 : abs(dot(BMO.direction(last(beam.rays)), normalize(m)))
+        end
+        @test length(kicks) == 1000
+        @test maximum(kicks) < 1e-12
+    end
+end
 
 @testset "Issue#14" begin
     pd_res = 1000
@@ -185,6 +242,62 @@ end
     end
 end
 
+@testset "Issue#80" begin
+    # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/80
+    # Near-axis rays through hyperbolic plano-concave and plano-convex lenses.
+    # A plano-conic lens with k = -n² images a collimated beam that enters through the plane
+    # face exactly onto a point: every outgoing ray passes through the (real or virtual)
+    # focus at `f` from the conic vertex. Near the vertex the concave SDF is a sliver thinner
+    # than the finite-difference step of `numeric_gradient`, which used to give wrong normals
+    # for |h| ≲ 10 µm.
+    n = 1.458
+    f = 50mm
+    ct = 4mm
+    d = 30mm
+    concave = Lens(CircularFlatSurface(d),
+        EvenAsphericalSurface((n - 1) * f, d, -n^2, [0.0]), ct, x -> n)
+    convex = Lens(CircularFlatSurface(d),
+        EvenAsphericalSurface(-(n - 1) * f, d, -n^2, [0.0]), 2ct, x -> n)
+    # The conic vertex lies on the back face, `thickness` along the lens axis
+    for (lens, thickness, f_signed) in ((concave, ct, -f), (convex, 2ct, f)),
+        tilt in (0.0, deg2rad(0.5))
+
+        xrotate3d!(lens, tilt)
+        system = System(lens)
+        e_x, axis = BMO.orientation(lens)[:, 1], BMO.orientation(lens)[:, 2]
+        focus = position(lens) .+ (thickness + f_signed) .* axis
+        # Below h ≈ 0.1 µm the sag (h²/2R ≈ 1e-13 m) is smaller than the ray-marching
+        # tolerance, the plane face is hit instead; the angle error stays below h / f.
+        for h in (1e-6, 1e-5, 1e-4, 1e-3, 5mm)
+            beam = Beam(Ray(position(lens) .- 0.1 .* axis .+ h .* e_x, Vector(axis)))
+            solve_system!(system, beam)
+            p, out = position(last(beam.rays)), BMO.direction(last(beam.rays))
+            # lateral miss of the focus by the (extended) outgoing ray, relative to h
+            t = dot(focus .- p, axis) / dot(out, axis)
+            miss = dot(p .+ t .* out .- focus, e_x)
+            @test abs(miss) < 1e-6 * h
+        end
+        xrotate3d!(lens, -tilt)
+    end
+end
+
+@testset "Issue#82" begin
+    # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/82
+    rng = MersenneTwister(1)
+    n = 1.458
+    spurious = 0
+    for _ in 1:2000
+        lens = Lens(CircularFlatSurface(30mm), SphericalSurface(31.85mm, 30mm), 4mm, λ -> n)
+        rotate3d!(lens, BMO.rotate3d(normalize(randn(rng, 3)), 2π * rand(rng)))
+        translate3d!(lens, 12 .* randn(rng, 3))
+        dir = orientation(lens)[:, 2]
+        beam = Beam(position(lens) - 0.1 * dir, dir, 589e-9)
+        solve_system!(System([lens]), beam)
+        spurious += BMO.refractive_index.(BMO.rays(beam)) != [1, n, 1]
+    end
+    @test spurious == 0
+end
+
 @testset "PlateBeamsplitter BoundsError" begin
     # Issue: Newborn child beams only contain one ray. Indexing rays(beam)[id]
     # where id > 1 throws a BoundsError in interact3d for AstigmaticGaussianBeamlet.
@@ -243,6 +356,64 @@ end
     # Verification of consistency
     lengths = map(b -> length(BMO.rays(b)), BMO._component_beams(agb))
     @test all(==(lengths[1]), lengths)
+end
+
+@testset "Issue#87" begin
+    # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/87
+    # Oblique unit vector (a ray direction from a pulse shaper), for which
+    # dot(normalize(d), normalize(d)) - 1 = 4.4e-16 > eps()
+    d = [-0.9999762904273509, 0.006881465035232346, -0.0002530259335731185]
+    _is_transverse(r) = abs(dot(BMO.direction(r), BMO.polarization(r))) ≤
+                        1e-10 * norm(BMO.polarization(r))
+    _all_rays(b) = [r for bb in BMO.PreOrderDFS(b) for r in BMO.rays(bb)]
+
+    @testset "isparallel3d for oblique directions" begin
+        @test BMO.isparallel3d(d, d)
+        @test all(v -> BMO.isparallel3d(v, v), (normalize(randn(MersenneTwister(k), 3)) for k in 1:1000))
+        @test BMO.isparallel3d(d, 3 .* d)
+        @test BMO.isparallel3d(d, -d)
+        @test !BMO.isparallel3d(d, normalize(d + [0, 1e-6, 0]))
+    end
+
+    @testset "Transmission through an oblique thin beamsplitter" begin
+        P = BMO._calculate_global_E0(d, d, normalize([1.0, 1, 0]), BMO.SPBasis(0.9, 0, 0, 0.9))
+        @test !any(isnan, P)
+        bs = ThinBeamsplitter(40mm, 25mm; reflectance = 0.1)
+        zrotate3d!(bs, deg2rad(45))
+        E0 = normalize(cross(d, [0, 0, 1.0]))
+        beam = Beam(PolarizedRay(-20mm .* d, d, 780e-9, E0))
+        solve_system!(System([bs]), beam)
+        @test length(beam.children) == 2
+        @test all(_is_transverse, _all_rays(beam))
+    end
+
+    @testset "Plate beamsplitter under 45°" begin
+        pbs = RoundPlateBeamsplitter(25mm, 3mm, λ -> 1.5; reflectance = 0.1)
+        zrotate3d!(pbs, deg2rad(45))
+        for E0 in ([0, 0, 1.0], [1.0, 0, 0])
+            beam = Beam(PolarizedRay([0, -20mm, 0], [0, 1.0, 0], 780e-9, E0))
+            solve_system!(System([pbs]), beam)
+            rs = _all_rays(beam)
+            @test all(_is_transverse, rs)
+            # The transmitted beam leaves the plate parallel to the incident beam
+            t = last(BMO.rays(last(collect(BMO.PreOrderDFS(beam.children[1])))))
+            @test BMO.direction(t) ≈ [0, 1, 0]
+        end
+    end
+
+    @testset "Orthogonality test relative to the field amplitude" begin
+        @test_nowarn PolarizedRay(zeros(3), [0, 1, 0], 1e-6, [1e3, 1e-8, 0])
+        @test_throws ErrorException PolarizedRay(zeros(3), [0, 1, 0], 1e-6, [1e3, 1, 0])
+        # Oblique rays with large field amplitudes through a lens
+        lens = SphericalLens(8mm, Inf, 3mm, 12mm, λ -> 1.51)
+        for h in (0.2mm, 1mm, 3mm), θ in (0.0, 5.0, 15.0)
+            dir = [sind(θ), cosd(θ), 0]
+            E0 = 1e4 .* [0, 0, 1.0]
+            beam = Beam(PolarizedRay([h, -10mm, 0.5mm], dir, 780e-9, E0))
+            solve_system!(System([lens]), beam)
+            @test all(_is_transverse, _all_rays(beam))
+        end
+    end
 end
 
 end # MODULE
