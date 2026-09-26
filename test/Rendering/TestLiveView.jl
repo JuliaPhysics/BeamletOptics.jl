@@ -289,6 +289,36 @@ const BMO = BeamletOptics
         @test sum(p -> p[2], gui.panels[1].xy[]) / 40 ≈ z0 + 1 atol = 1e-3 # [mm]
         close(gui)
 
+        # hide and show the markers via the toggle and the key `s`, a selected source is deselected
+        m, pd = _fixture()
+        beam = Beam([0.0, 0, 0], [0.0, 1, 0])
+        gui_ref = Ref{Any}(nothing)
+        gui = _live_view(System([m, pd]), beam; throttle = false,
+            pick = ax -> (_marker(gui_ref[], beam).plots[1], 0))
+        gui_ref[] = gui
+        marker = _marker(gui, beam)
+        @test gui.sources_toggle.active[]
+        @test all(p -> p.visible[], marker.plots)
+        _select!(gui)
+        @test gui.controls.selected[] === beam
+        _key!(gui, Keyboard.s)
+        @test !gui.sources_toggle.active[]
+        @test !any(p -> p.visible[], marker.plots)
+        @test isnothing(gui.controls.selected[])
+        @test startswith(gui.status.text[], "sources hidden")
+        # "show all" keeps the markers hidden, the mirror stays visible
+        Ext._show_all!(gui)
+        @test !any(p -> p.visible[], marker.plots)
+        gui.sources_toggle.active[] = true
+        @test all(p -> p.visible[], marker.plots)
+        close(gui)
+        # initially hidden
+        m, pd = _fixture()
+        beam = Beam([0.0, 0, 0], [0.0, 1, 0])
+        gui = _live_view(System([m, pd]), beam; show_sources = false)
+        @test !any(p -> p.visible[], _marker(gui, beam).plots)
+        close(gui)
+
         # no markers
         m, pd = _fixture()
         beam = Beam([0.0, 0, 0], [0.0, 1, 0])
