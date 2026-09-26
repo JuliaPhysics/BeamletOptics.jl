@@ -52,6 +52,22 @@
         { "title": "Rudimentary interaction (e.g. dragging/moving objects)", "status": "todo" },
         { "title": "Starshot: GUI prototype", "status": "todo" }
       ]
+    },
+    {
+      "id": "documentation",
+      "title": "Documentation",
+      "items": [
+        {
+          "title": "More beginner tutorials",
+          "children": [
+            {
+              "title": "Beam expander",
+              "status": "todo",
+              "note": "replaced by the laser alignment tutorial, to be reworked as a beginner tutorial with Literate.jl (like docs/literate/laser_alignment.jl); the previous version is docs/src/tutorials/expander.md in the git history"
+            }
+          ]
+        }
+      ]
     }
   ]
 }

@@ -25,7 +25,7 @@ features:
   - icon: "🔦"
     title: 3D ray tracing
     details: Hybrid sequential and non-sequential ray tracing without paraxial approximation.
-    link: /basics/rays
+    link: /basics/beams/overview#Beam-catalog
     linkText: Learn more
   - icon: "🌊"
     title: Gaussian beamlets
@@ -40,7 +40,7 @@ features:
   - icon: "🎛️"
     title: Kinematic API
     details: Translate, rotate and group elements to model moving or vibrating setups.
-    link: /basics/components/components#Moving-optical-elements
+    link: /basics/kinematics/kinematics
     linkText: Learn more
   - icon: "📊"
     title: Makie visualization
