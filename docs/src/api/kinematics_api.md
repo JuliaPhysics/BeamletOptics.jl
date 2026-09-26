@@ -4,16 +4,16 @@ This page explains how the kinematic API described in the [Kinematics](@ref) sec
 
 ## Kinematic traits
 
-Analogous to the [`BeamletOptics.AbstractShapeTrait`](@ref) of the [Geometry representation](@ref), the kinematic API is built on a trait that is dispatched on via multiple dispatch. Every public kinematic function, e.g. `translate3d!(x, offset)`, forwards to a trait-specific method `translate3d!(kinematic_trait_of(x), x, offset)`. As on the [Geometry representation](@ref) page, each card lists what a subtype must provide, solid arrows point from a field to the type it stores and dotted arrows point to subtypes.
+Analogous to the [`BeamletOptics.AbstractShapeTrait`](@ref) of the [Geometry representation](@ref), the kinematic API is built on a trait that is dispatched on via multiple dispatch. Every public kinematic function, e.g. `translate3d!(x, offset)`, forwards to a trait-specific method `translate3d!(kinematic_trait_of(x), x, offset)`. As on the [Geometry representation](@ref) page, solid arrows are labeled with the field that leads from one type to the next, dotted arrows point to subtypes.
 
 ```mermaid
 flowchart TB
-    TR["<b>AbstractKinematicTrait</b><br/><i>trait</i><hr/>kinematic_trait_of(x)"]
-    ST["<b>Static</b><br/><i>trait</i>"]
-    MV["<b>Movable</b><br/><i>trait</i><hr/>frame<br/>translate3d!(x, offset)<br/>rotate3d!(x, R)"]
+    TR["<b>AbstractKinematicTrait</b><br/><i>kinematic trait</i>"]
+    ST["<b>Static</b><br/><i>kinematic trait</i>"]
+    MV["<b>Movable</b><br/><i>kinematic trait</i>"]
     FR["<b>AbstractKinematicFrame</b><br/><i>frame</i>"]
-    OR["<b>Oriented</b><br/><i>frame</i><hr/>position(x)<br/>orientation(x)"]
-    DI["<b>Directed</b><br/><i>frame</i><hr/>position(x)<br/>direction(x)"]
+    OR["<b>Oriented</b><br/><i>frame</i>"]
+    DI["<b>Directed</b><br/><i>frame</i>"]
 
     TR -.-> ST
     TR -.-> MV

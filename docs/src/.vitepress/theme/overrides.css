@@ -392,15 +392,10 @@
   margin: 0;
 }
 
-/* Separator rule in Mermaid type cards (`<hr/>` in a node label, see "Type
-   diagrams" in docs/src/api/docdev.md). `.vp-doc hr` adds 16px margins that
-   Mermaid does not see while measuring the label, which clips the card
-   content. `foreignObject hr` matches both the off-page measurement and the
-   rendered diagram, so the rule is sized identically in both places. */
-foreignObject hr {
-  margin: 6px 0 !important;
-  border: 0 !important;
-  border-top: 1px solid currentColor !important;
-  height: 0 !important;
-  opacity: 0.4;
+/* Mermaid renders a diagram as an inline SVG with `max-width` set to its
+   natural width, so diagrams narrower than the text column sit at its left
+   edge. Center them within the body text instead. */
+.vp-doc .mermaid svg {
+  display: block;
+  margin: 0 auto;
 }

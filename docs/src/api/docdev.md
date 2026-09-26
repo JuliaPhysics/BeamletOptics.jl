@@ -70,16 +70,11 @@ Keep the blank lines around the table, otherwise it is not parsed as Markdown. C
 
 ## Diagrams
 
-Diagrams are written as [Mermaid](https://mermaid.js.org/) code blocks with the `mermaid` language tag, which VitePress renders in the browser. Font size and box padding are set once for the whole site in the `mermaid` entry of `docs/src/.vitepress/config.mts`, so a diagram needs no `%%{init: ...}%%` line of its own.
+Diagrams are written as [Mermaid](https://mermaid.js.org/) code blocks with the `mermaid` language tag, which VitePress renders in the browser. Font size and box padding are set once for the whole site in the `mermaid` entry of `docs/src/.vitepress/config.mts`, so a diagram needs no `%%{init: ...}%%` line of its own. Diagrams narrower than the body text are centered by a rule in `docs/src/.vitepress/theme/overrides.css`.
 
-Label text is set to the size of the body text, but a diagram that is wider than the page is scaled down to fit, and its text shrinks with it. Since the page is narrow but can be arbitrarily long, lay diagrams out **vertically**:
+Label text is set to the size of the body text, but a diagram that is wider than the page is scaled down to fit, and its text shrinks with it. Since the page is narrow but can be arbitrarily long, top-to-bottom layouts (`flowchart TB`) usually stay more readable than left-to-right ones.
 
-- use `flowchart TB`, not `LR`, and let loops return along the side of the chain
-- keep side exits (e.g. a *done* terminal) to a single extra column
-- break long labels with `<br/>` and put the key word in `<b>...</b>`, e.g. `I["<b>1. Intersect</b><br/>hinted shape first"]`
-- split unrelated clusters of a diagram into separate diagrams instead of placing them side by side
-
-To color nodes, copy the following class definitions into the diagram and assign them with `class <nodes> <name>`. The colors are the Julia logo colors with a translucent fill, so they work in light and dark mode:
+To color nodes, the following class definitions can be copied into a diagram and assigned with `class <nodes> <name>`. The colors are the Julia logo colors with a translucent fill, so they work in light and dark mode:
 
 ````markdown
 ```mermaid
@@ -95,30 +90,34 @@ flowchart TB
 ```
 ````
 
-Use `terminal` for entry and exit points, and one color per role within a diagram, e.g. the [Intersect-Interact-Repeat-Loop](@ref) uses blue for intersecting, green for interacting and purple for the hint/retrace path.
+For example, the [Intersect-Interact-Repeat-Loop](@ref) uses `terminal` for its entry and exit points and one color per step.
 
 ### Type diagrams
 
-Relations between types are also drawn as flowcharts, not as Mermaid `classDiagram`s: class diagrams ignore `classDef` colors, always draw both member compartments (leaving empty boxes), and use a different font size. Each type is a card that shows its name, its kind and, below a rule, the fields (comma-separated on one line) and functions (one per line) from the `# Implementation reqs.` section of its docstring. Solid arrows point from a field to the type it stores and carry the field name, dotted arrows point to subtypes. By convention, blue marks geometry, green optical elements and light, and purple traits:
+Relations between types are drawn as flowcharts as well, since Mermaid `classDiagram`s ignore `classDef` colors, always draw both member compartments (leaving empty boxes), and use a different font size. The type diagrams on the [Geometry representation](@ref) and [Kinematic system](@ref) pages can serve as a starting point, e.g.:
 
 ````markdown
 ```mermaid
 flowchart TB
-    OBJ["<b>AbstractObject</b><br/><i>abstract type</i><hr/>interact3d(system, object, beam, ray)"]
-    SHP["<b>AbstractShape</b><br/><i>abstract type</i><hr/>pos, dir<br/>intersect3d(shape, ray)"]
-    OBJ -- geometry --> SHP
+    OBJ["<b>AbstractObject</b><br/><i>abstract type</i>"]
+    SGL["<b>SingleShape</b><br/><i>shape trait</i>"]
+    SHP["<b>AbstractShape</b><br/><i>abstract type</i>"]
+    OBJ -- shape_trait_of --> SGL
+    SGL -- object.shape --> SHP
 
     classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
     classDef green fill:#38982626,stroke:#389826,stroke-width:2px
+    classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
     class SHP blue
     class OBJ green
+    class SGL purple
 ```
 ````
 
-Write `<` as `#lt;` inside a label, e.g. `abstract type #lt;: AbstractObject`. Type diagrams tend to grow sideways, so check that they stay narrower than the page: an edge that skips a row needs a column of its own, and a label on such an edge widens that column further.
+Inside a label, `<` has to be written as `#lt;`, e.g. `abstract type #lt;: AbstractObject`. Type diagrams tend to grow sideways: an edge that skips a row needs a column of its own, and a label on such an edge widens that column further.
 
 !!! warning "Label line height"
-    Mermaid measures the size of a label outside of the page, but VitePress renders it with the page styles, e.g. a larger line height for `p` and larger margins for `hr`, which clips the last line of a label. Two rules in `docs/src/.vitepress/theme/overrides.css` (`.vp-doc .mermaid p` and `foreignObject hr`) keep the rendered size equal to the measured one; do not remove them. If a new HTML tag in a label causes clipping, it needs a rule of the same kind.
+    Mermaid measures the size of a label outside of the page, but VitePress renders it with the page styles, e.g. a larger line height for `p`, which clips the last line of a label. The rule `.vp-doc .mermaid p` in `docs/src/.vitepress/theme/overrides.css` keeps the rendered size equal to the measured one; do not remove it. If a new HTML tag in a label causes clipping, it needs a rule of the same kind.
 
 ## Creating figures
 
