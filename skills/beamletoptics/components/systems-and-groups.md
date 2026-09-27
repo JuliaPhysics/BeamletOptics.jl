@@ -17,6 +17,9 @@ solve_system!(system, beam_or_source; r_max = 100, retrace = true, depth_max = 1
               check_invariant = true, threshold = get_invariant_threshold())
 ```
 
+Sources and other beam groups also take `progress = true`: a progress bar in the terminal once
+tracing has run for `get_progress_threshold()` s (default 5 s).
+
 ## ObjectGroup
 
 ```julia

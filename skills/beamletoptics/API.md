@@ -45,7 +45,7 @@ Use `scripts/api_lookup.jl NAME` to print the docstring and signatures of any na
 | Polarizers    | `PolarizationFilter`, `RoundPolarizationFilter`, `LinearPolarizer`, `RoundLinearPolarizer`, `transmission_axis` |
 | Detectors     | `Detector`, `spot_diagram`, `intensity`, `electric_field`, `optical_power`, `gauss_parameters`, `waist_parameters`, `Centroid`, `MinMax` |
 | Dummies       | `MeshDummy`, `NonInteractableObject`, `IntersectableObject` |
-| Config        | `get_default_wavelength`, `get_default_waist`, `get_default_power`, `get_default_r_max`, `get_default_depth_max`, `get_invariant_threshold`, `set_invariant_threshold!`, `get_internal_reflection_threshold`, `get_line_plane_intersection_threshold`, `get_orthogonality_threshold`, `get_sdf_surface_threshold`, `get_sdf_raymarch_eps`, `get_sdf_inside_step` |
+| Config        | `get_default_wavelength`, `get_default_waist`, `get_default_power`, `get_default_r_max`, `get_default_depth_max`, `get_invariant_threshold`, `set_invariant_threshold!`, `get_internal_reflection_threshold`, `get_line_plane_intersection_threshold`, `get_orthogonality_threshold`, `get_sdf_surface_threshold`, `get_sdf_raymarch_eps`, `get_sdf_inside_step`, `get_progress_threshold`, `set_progress_threshold!` |
 | Render (Makie)| `render!`, `get_view`, `set_view`, `hide_axis`, `set_orthographic`, `look_at!`, `arrow!`, `render_lcs!` |
 
 Useful non-exported helpers: `BeamletOptics.inch`, `lensmakers_eq(R1, R2, n)` (returns f),
@@ -58,7 +58,7 @@ Useful non-exported helpers: `BeamletOptics.inch`, `lensmakers_eq(R1, R2, n)` (r
 ```julia
 solve_system!(system, beam; r_max = 100, retrace = true, depth_max = 100,
               check_invariant = true, threshold = get_invariant_threshold())
-solve_system!(system, beam_group; kwargs...)   # multithreaded over member beams
+solve_system!(system, beam_group; progress = true, kwargs...)   # multithreaded over member beams
 ```
 
 - `r_max`: max. rays per beam leaf (raise it for resonators, e.g. facing mirrors)
@@ -67,6 +67,9 @@ solve_system!(system, beam_group; kwargs...)   # multithreaded over member beams
   full non-sequential solve where it breaks. Pass `retrace = false` if an element was moved *into*
   the existing beam path (e.g. a chopper), which otherwise fails silently.
 - Julia threads (`julia -t auto`) speed up solving of sources with many beams.
+- `progress`: beam groups and detector readout show a progress bar once they have run for
+  `get_progress_threshold()` s (default 5 s, `set_progress_threshold!(Inf)` disables it). It is
+  only drawn if `stderr` is a terminal, so scripts with piped output see nothing.
 
 ## Beam queries
 
@@ -101,7 +104,7 @@ P          = optical_power(det)               # W
 
 Grid keywords for `electric_field`/`intensity`/`optical_power`: `n`, `crop_factor`, `x_min`, `x_max`,
 `z_min`, `z_max`, `x0_shift`, `z0_shift`, `center = Centroid() | MinMax()`, and for beamlets `num_spots`.
-See `components/detectors.md`.
+They also take `progress = true` (see Solving). See `components/detectors.md`.
 
 ## Makie rendering
 
