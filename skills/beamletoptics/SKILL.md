@@ -2,6 +2,8 @@
 name: beamletoptics
 description: Build, modify, and debug optical simulations with BeamletOptics.jl (Julia, "BMO"). Use when writing Julia code that uses BeamletOptics, or when the user asks to simulate or ray-trace lenses, mirrors, beamsplitters, polarizers, detectors, Gaussian beams/beamlets, interferometers, PSFs, spot diagrams, or to render an optical setup with Makie.
 allowed-tools: Read, Write, Edit, Grep, Glob, Bash
+metadata:
+  beamletoptics-version: "0.13"
 ---
 
 You are helping the user build optical simulations with **BeamletOptics.jl**: a Julia package for
@@ -9,6 +11,10 @@ non-sequential 3D ray tracing and Gaussian beamlet propagation, with a Makie ext
 
 When this Skill is active:
 
+- This skill describes BeamletOptics **0.13** (`beamletoptics-version` above). Check the installed version
+  with `julia --project=<env> -e 'using BeamletOptics; println(pkgversion(BeamletOptics))'`. If its
+  major or minor version differs, treat signatures in these files as possibly outdated and confirm every
+  constructor, keyword and function with `scripts/api_lookup.jl` before using it.
 - Use only documented BeamletOptics API. **Do not invent constructors, keyword arguments or
   functions.** If unsure, look it up before writing code (script paths are relative to this skill's
   directory; `<env>` is a Julia project with BeamletOptics installed):

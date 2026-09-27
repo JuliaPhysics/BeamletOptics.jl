@@ -57,6 +57,9 @@ include(joinpath(@__DIR__, "Rendering", "TestRenderPolarization.jl"))
 # Test regressions
 include(joinpath(@__DIR__, "TestBugFixes.jl"))
 
+# Test agent skill docs against the public API
+include(joinpath(@__DIR__, "TestAgentSkill.jl"))
+
 # Test misc.
 include(joinpath(@__DIR__, "TestMisc.jl"))
 

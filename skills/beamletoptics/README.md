@@ -54,3 +54,10 @@ julia --project=docs skills/beamletoptics/scripts/run_templates.jl --render
 
 When the public API changes (`src/Exports.jl`, constructor signatures), update the matching file in
 `components/` and rerun `scripts/run_templates.jl --render`.
+
+`test/TestAgentSkill.jl` guards two things in the package test suite:
+
+- the exported-names table in `API.md` must match `names(BeamletOptics)` in both directions;
+- `metadata.beamletoptics-version` in `SKILL.md` must match the major.minor version in `Project.toml`.
+  When bumping the minor version, review the skill and update this field (and the version named in
+  the `SKILL.md` body).

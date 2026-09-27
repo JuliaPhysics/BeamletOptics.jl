@@ -45,7 +45,7 @@ Use `scripts/api_lookup.jl NAME` to print the docstring and signatures of any na
 | Polarizers    | `PolarizationFilter`, `RoundPolarizationFilter`, `LinearPolarizer`, `RoundLinearPolarizer`, `transmission_axis` |
 | Detectors     | `Detector`, `spot_diagram`, `intensity`, `electric_field`, `optical_power`, `gauss_parameters`, `waist_parameters`, `Centroid`, `MinMax` |
 | Dummies       | `MeshDummy`, `NonInteractableObject`, `IntersectableObject` |
-| Config        | `get_default_wavelength`, `get_default_waist`, `get_default_power`, `get_default_r_max`, `get_default_depth_max`, `get_invariant_threshold`, `set_invariant_threshold!`, … |
+| Config        | `get_default_wavelength`, `get_default_waist`, `get_default_power`, `get_default_r_max`, `get_default_depth_max`, `get_invariant_threshold`, `set_invariant_threshold!`, `get_internal_reflection_threshold`, `get_line_plane_intersection_threshold`, `get_orthogonality_threshold`, `get_sdf_surface_threshold`, `get_sdf_raymarch_eps`, `get_sdf_inside_step` |
 | Render (Makie)| `render!`, `get_view`, `set_view`, `hide_axis`, `set_orthographic`, `look_at!`, `arrow!`, `render_lcs!` |
 
 Useful non-exported helpers: `BeamletOptics.inch`, `lensmakers_eq(R1, R2, n)` (returns f),
