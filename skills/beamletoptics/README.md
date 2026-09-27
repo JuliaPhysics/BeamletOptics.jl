@@ -4,10 +4,15 @@ This folder is an [Agent Skill](https://docs.claude.com/en/docs/agents-and-tools
 that teaches coding agents how to write simulations with
 [BeamletOptics.jl](https://github.com/JuliaPhysics/BeamletOptics.jl).
 
-Install it as:
+Install it in one of these ways:
 
-- `npx skills add JuliaPhysics/BeamletOptics.jl` (the CLI discovers `skills/beamletoptics/SKILL.md`), or
-- copy this folder to `~/.claude/skills/beamletoptics/` (personal) or `<project>/.claude/skills/beamletoptics/` (project).
+- **Recommended:** copy the version that matches your installed package from Julia:
+  `using BeamletOptics; BeamletOptics.install_agent_skill()` installs to `./.claude/skills/beamletoptics`.
+  Pass `joinpath(homedir(), ".claude", "skills")` for a personal installation. Rerun after `Pkg.update`.
+- `npx skills add JuliaPhysics/BeamletOptics.jl` (the CLI discovers `skills/beamletoptics/SKILL.md`).
+  This copy follows the development branch and may be newer than your installed release.
+- Copy this folder manually to `~/.claude/skills/beamletoptics/` (personal) or
+  `<project>/.claude/skills/beamletoptics/` (project).
 
 The canonical entry point is `SKILL.md`.
 

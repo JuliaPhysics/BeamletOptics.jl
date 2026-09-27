@@ -88,11 +88,16 @@ documentation and is maintained with the code:
 - When the public API changes (`src/Exports.jl`, constructor signatures, keyword arguments,
   conventions), update the matching file in `skills/beamletoptics/components/` or the
   top-level skill files, and run the templates: `julia --project=. skills/beamletoptics/scripts/run_templates.jl`
-  (headless templates), `julia --project=docs skills/beamletoptics/scripts/run_templates.jl --render` (all).- [test/TestAgentSkill.jl](test/TestAgentSkill.jl) fails if the export table in
+  (headless templates), `julia --project=docs skills/beamletoptics/scripts/run_templates.jl --render` (all).
+- [test/TestAgentSkill.jl](test/TestAgentSkill.jl) fails if the export table in
   `skills/beamletoptics/API.md` differs from `names(BeamletOptics)`, or if
   `metadata.beamletoptics-version` in `SKILL.md` differs from the major.minor version in
   `Project.toml`. On a minor version bump, review the skill and update both the field and the
   version named in the `SKILL.md` body.
+- Users install the version-matched copy with `BeamletOptics.install_agent_skill()`
+  ([src/AgentSkill.jl](src/AgentSkill.jl)), which copies `skills/beamletoptics/` out of the
+  installed package. Keep the folder at that path, or update the function and
+  [docs/src/tutorials/ai_assistants.md](docs/src/tutorials/ai_assistants.md) with it.
 
 ## Docstrings
 

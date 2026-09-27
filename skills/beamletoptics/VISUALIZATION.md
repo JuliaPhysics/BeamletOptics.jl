@@ -9,6 +9,16 @@ using GLMakie, BeamletOptics      # Axis3 and LScene, camera helpers, save to PN
 Without a Makie backend, `render!` throws a `MissingBackendError`. GLMakie needs OpenGL: on a
 headless Linux machine, run scripts under a virtual display, e.g. `xvfb-run -a julia --project=. script.jl`.
 
+**Fallback without OpenGL or display** (CI containers, cloud sandboxes, no `xvfb`): CairoMakie also
+activates the extension and saves PNG/PDF/SVG files. It supports `Axis3` only: no `LScene` and none
+of the `LScene` camera helpers below. Swap the import and keep the rest of the script:
+
+```julia
+using CairoMakie, BeamletOptics   # Axis3 only; save("setup.png", fig)
+```
+
+Use GLMakie when it works and CairoMakie only when GLMakie cannot open a context.
+
 ## Minimal example
 
 ```julia

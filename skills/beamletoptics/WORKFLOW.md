@@ -86,5 +86,6 @@ and look at the image before trusting numbers. Axis-aligned top view: `Axis3(...
 - Gaussian beamlet stops: all 3 (9) rays must hit the same surfaces; the beamlet may be clipped or the
   optical invariant check failed (`check_invariant = false` to diagnose, not to "fix").
 - `KeyError` from `DiscreteRefractiveIndex`: wavelength not in the table.
-- `MissingBackendError` on `render!`: load `GLMakie`.
+- `MissingBackendError` on `render!`: load `GLMakie` (or `CairoMakie` without OpenGL, see `VISUALIZATION.md`).
+- GLMakie fails to create a window/context on a headless machine: use `xvfb-run -a`, or switch to CairoMakie with `Axis3`.
 - Detector error "No hits available": nothing reached it; check position/orientation (normal −y by default).

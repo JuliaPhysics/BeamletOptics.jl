@@ -1,3 +1,15 @@
+"""
+    BeamletOptics
+
+Non-sequential 3D ray and Gaussian beamlet tracing for optical setups ("BMO").
+Documentation: https://juliaphysics.github.io/BeamletOptics.jl/stable/
+
+# AI coding assistants
+
+The package ships an agent skill that teaches assistants such as Claude Code how to use BMO.
+Install the copy matching this package version into a project with
+[`BeamletOptics.install_agent_skill`](@ref).
+"""
 module BeamletOptics
 
 using LinearAlgebra: norm, normalize, normalize!, dot, cross, I, eigen, Symmetric, svd
@@ -39,6 +51,7 @@ include("System.jl")
 include("OpticalComponents/Components.jl")
 include("ObjectGroups.jl")
 include("Render.jl")
+include("AgentSkill.jl")
 include("Exports.jl")
 
 include("Workloads/precompile.jl")
