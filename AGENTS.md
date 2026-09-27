@@ -125,5 +125,35 @@ output in `docs/build/1`, served with LiveServer) and the figure pattern (script
 - **Preconditions belong to the function whose contract needs them**, not to every call site
   that reaches it. If a public function must establish some state (e.g. a fresh trace), it
   does so itself, and callers one layer up trust it instead of repeating the setup.
+- **Extend verbs by dispatch, not by `_helper` functions.** Before writing an unexported
+  `_helper`, check whether the subtask is one of the following, each of which has a dispatch
+  answer:
+  - *Normalizing an argument* (point or object, axis and angle or matrix, with or without
+    pivot): add a method of the same verb that converts the argument and calls the verb
+    again, e.g. `rotate3d!(x, axis, θ)` → `rotate3d!(x, R)`.
+  - *Branching on a type or trait* (`isa`, `isnothing(kw)` selecting a code path): dispatch
+    on the type or on a trait (`kinematic_trait_of`, `shape_trait_of`). An optional argument
+    that changes behavior is a positional method, not a `kw = nothing` keyword.
+  - *Repeating an existing operation* (rotating about a pivot, aligning a direction): call
+    the existing public verb. Derived methods call public entry points only, so type-specific
+    methods of those verbs apply automatically.
+  - *Checking a precondition a trait already encodes* (static, directed vs. oriented): let
+    the trait branch handle it.
+
+  New verbs follow the pattern of [AbstractKinematicTrait.jl](src/AbstractTypes/AbstractKinematicTrait.jl):
+  public entry point → trait method → derived methods built from existing verbs →
+  per-type primitives only where no existing verb suffices. `rotate3d!` has four public
+  signatures but only one per-type primitive, `rotate3d!(x, R)`:
+
+  ```julia
+  point_at3d!(x, target) = point_at3d!(kinematic_trait_of(x), x, target)
+  point_at3d!(::Static, x, target) = _static_error(x)
+  point_at3d!(t::Movable, x, target) = point_at3d!(t, x, position(target))   # any positioned target
+  point_at3d!(::Movable, x, target::AbstractVector) = align3d!(x, target - position(x))
+  ```
+
+  A `_helper` is fine for type-independent work that has no natural verb: error
+  constructors (`_static_error`), numeric kernels, internal data plumbing. It must not
+  branch on argument types.
 - New or changed functionality comes with tests, docstrings, and docs or examples where
   relevant ([docs/src/api/contribute.md](docs/src/api/contribute.md)).
