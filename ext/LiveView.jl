@@ -165,7 +165,7 @@ mutable struct LiveView
     views_menu::Menu
     save_view_button::Button
     camera_animation::Any
-    # markers of the movable sources, shown or hidden via the toggle or the key `s`
+    # markers of the movable sources, shown or hidden via the toggle or the key `1`
     sources_toggle::Toggle
 end
 
@@ -1346,16 +1346,19 @@ function _set_show_sources!(gui::LiveView, show::Bool)
         ctrl.selected[] = nothing
         _update_selection_box!(ctrl)
     end
-    gui.status.text[] = show ? "sources shown" : "sources hidden, press s to show them"
+    gui.status.text[] = show ? "sources shown" : "sources hidden, press 1 to show them"
     return nothing
 end
 
-"""Connects the "sources" toggle and the key `s` of the `gui`, see `_set_show_sources!`."""
+"""
+Connects the "sources" toggle and the key `1` of the `gui`, see `_set_show_sources!`. Not `s`,
+which moves the camera backwards (WASD keys of Makie's `Camera3D`).
+"""
 function _connect_sources!(gui::LiveView)
     listeners = gui.controls.listeners
     push!(listeners, on(v -> _set_show_sources!(gui, v), gui.sources_toggle.active))
     push!(listeners, on(events(gui.ax.scene).keyboardbutton, priority = 200) do event
-        (event.action == Keyboard.press && event.key == Keyboard.s) || return Consume(false)
+        (event.action == Keyboard.press && event.key == Keyboard._1) || return Consume(false)
         gui.controls.ignore_keys() && return Consume(false)
         gui.sources_toggle.active[] = !gui.sources_toggle.active[]
         return Consume(true)
@@ -2181,7 +2184,7 @@ The key `g` zooms to the selection, see "Camera tools".
 - `movable_sources = true`: shows an orange marker at each source, i.e. the beam or beam group of
   each pair, with which the source can be selected and moved like the components
 - `show_sources = true`: initial visibility of the source markers, which can be switched with the
-  "sources" toggle below the 3D view or the key `s`
+  "sources" toggle below the 3D view or the key `1`
 - `labels = Dict()`: `obj => "name"` for the status line, the titles of the detector panels, the
   component menu and the variable names of [`export_changes`](@ref)
 - `trace_budget = 0.03`: [s] duration of a solve or panel update, above which tracing is deferred
@@ -2272,7 +2275,7 @@ function live_view(
     orthographic_toggle = Toggle(status_row[1, 6]; active = orthographic)
     Label(status_row[1, 7], "orthographic")
     sources_toggle = Toggle(status_row[1, 8]; active = show_sources)
-    Label(status_row[1, 9], "sources (s)")
+    Label(status_row[1, 9], "sources (1)")
     step_box = Textbox(status_row[1, 10]; placeholder = "step, e.g. 250 nm", width = 150)
     export_button = Button(status_row[1, 11]; label = "Export")
     status = Label(status_row[1, 12],

@@ -289,7 +289,8 @@ const BMO = BeamletOptics
         @test sum(p -> p[2], gui.panels[1].xy[]) / 40 ≈ z0 + 1 atol = 1e-3 # [mm]
         close(gui)
 
-        # hide and show the markers via the toggle and the key `s`, a selected source is deselected
+        # hide and show the markers via the toggle and the key `1`, a selected source is deselected.
+        # `s` stays with the camera (WASD).
         m, pd = _fixture()
         beam = Beam([0.0, 0, 0], [0.0, 1, 0])
         gui_ref = Ref{Any}(nothing)
@@ -302,6 +303,8 @@ const BMO = BeamletOptics
         _select!(gui)
         @test gui.controls.selected[] === beam
         _key!(gui, Keyboard.s)
+        @test gui.sources_toggle.active[]
+        _key!(gui, Keyboard._1)
         @test !gui.sources_toggle.active[]
         @test !any(p -> p.visible[], marker.plots)
         @test isnothing(gui.controls.selected[])

@@ -323,7 +323,7 @@ Each source, i.e. the beam or beam group of each `system => beam` pair, is shown
 marker at its position, which points along its direction. A source is selected and moved via its
 marker like any component, after which the systems are solved again. For a beam, which only has a
 direction, the green axis is its direction. If a marker covers small components, the "sources"
-toggle below the 3D view or the key `s` hides all markers and shows them again, `show_sources =
+toggle below the 3D view or the key `1` hides all markers and shows them again, `show_sources =
 false` starts with hidden markers. Pass `movable_sources = false` to omit the markers altogether.
 
 ### Static context
