@@ -58,13 +58,15 @@ julia --project=docs skills/beamletoptics/scripts/run_templates.jl --render
 
 ## Maintenance
 
-When the public API changes (`src/Exports.jl`, constructor signatures, keyword arguments,
-conventions), update the matching file in `components/` and rerun the templates (see above).
-Developer instructions for the package itself are in `AGENTS.md` at the repository root.
+The skill must match the release it ships with. A patch that changes public behavior (exports,
+signatures, keyword arguments, conventions) updates the affected skill files in the same patch;
+the patch author is responsible for this. See "Agent skill" in `AGENTS.md` at the repository root.
 
-`test/TestAgentSkill.jl` guards two things in the package test suite:
+`test/TestAgentSkill.jl` catches mechanical drift in the package test suite:
 
 - the exported-names table in `API.md` must match `names(BeamletOptics)` in both directions;
-- `metadata.beamletoptics-version` in `SKILL.md` must match the major.minor version in `Project.toml`.
-  When bumping the minor version, review the skill and update this field (and the version named in
-  the `SKILL.md` body).
+- `metadata.beamletoptics-version` in `SKILL.md` must match the major.minor version in `Project.toml`;
+- `install_agent_skill` must copy the skill;
+- the headless templates 01 to 06 must run without error.
+
+It does not catch changed semantics, e.g. a flipped sign convention that still runs.

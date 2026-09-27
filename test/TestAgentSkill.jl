@@ -49,6 +49,21 @@ const SKILL_DIR = joinpath(@__DIR__, "..", "skills", "beamletoptics")
             @test uperm(skill_md) & 0x02 != 0   # writable again
         end
     end
+
+    # Catches removed names and changed signatures or keywords, not changed semantics.
+    # Rendering templates need a Makie backend and are skipped.
+    @testset "Headless templates run" begin
+        template_dir = joinpath(SKILL_DIR, "templates")
+        templates = filter(f -> endswith(f, ".jl") && !occursin("render", f), readdir(template_dir))
+        @testset "$f" for f in sort(templates)
+            # own module per template; the printed results are discarded
+            ran = redirect_stdout(devnull) do
+                Base.include(Module(), joinpath(template_dir, f))
+                return true
+            end
+            @test ran
+        end
+    end
 end
 
 end

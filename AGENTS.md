@@ -82,18 +82,27 @@ From [docs/src/api/contribute.md](docs/src/api/contribute.md):
 
 ## Agent skill
 
-[skills/beamletoptics/](skills/beamletoptics/) teaches coding agents to *use* BMO. It is
-documentation and is maintained with the code:
+[skills/beamletoptics/](skills/beamletoptics/) teaches coding agents to *use* BMO. It ships
+with every release, so it must describe exactly that release.
 
-- When the public API changes (`src/Exports.jl`, constructor signatures, keyword arguments,
-  conventions), update the matching file in `skills/beamletoptics/components/` or the
-  top-level skill files, and run the templates: `julia --project=. skills/beamletoptics/scripts/run_templates.jl`
-  (headless templates), `julia --project=docs skills/beamletoptics/scripts/run_templates.jl --render` (all).
-- [test/TestAgentSkill.jl](test/TestAgentSkill.jl) fails if the export table in
-  `skills/beamletoptics/API.md` differs from `names(BeamletOptics)`, or if
+- **The author of a patch (usually a coding agent) is responsible for keeping the skill correct
+  for the release the patch lands in.** A patch that changes public behavior (exports,
+  constructor signatures, keyword arguments or their defaults, units, sign or orientation
+  conventions, the validity limits of a beam model) reviews the affected skill files
+  (`SKILL.md`, `API.md`, `CONVENTIONS.md`, `CHECKLIST.md`, `components/`, `templates/`) and
+  updates them in the same patch. State in the PR description which skill files were updated,
+  or that none were affected.
+- [test/TestAgentSkill.jl](test/TestAgentSkill.jl) catches mechanical drift only. It fails if
+  the export table in `API.md` differs from `names(BeamletOptics)`, if
   `metadata.beamletoptics-version` in `SKILL.md` differs from the major.minor version in
-  `Project.toml`. On a minor version bump, review the skill and update both the field and the
+  `Project.toml`, if `install_agent_skill` breaks, or if a headless template (01–06) throws.
+  Passing tests do not show that the skill is correct: a changed meaning, e.g. a flipped sign
+  convention, still runs. Checking that is the author's job (above).
+- On a minor version bump, review the whole skill and update both the version field and the
   version named in the `SKILL.md` body.
+- `templates/07_render_system.jl` needs GLMakie and is not part of the test suite. After
+  rendering changes, run all templates with
+  `julia --project=docs skills/beamletoptics/scripts/run_templates.jl --render`.
 - Users install the version-matched copy with `BeamletOptics.install_agent_skill()`
   ([src/AgentSkill.jl](src/AgentSkill.jl)), which copies `skills/beamletoptics/` out of the
   installed package. Keep the folder at that path, or update the function and
