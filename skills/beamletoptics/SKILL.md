@@ -73,6 +73,20 @@ When this Skill is active:
   point out model limits when they matter for the user's question.
 - Do not modify the BeamletOptics package source unless the user asks for it; write user scripts instead.
 
+## Switching to package development (bug fix, feature)
+
+If a result looks like a BeamletOptics bug, first reduce it to a minimal script that reproduces it
+with the installed version, and show it to the user before changing any package code. When the user
+wants the bug fixed or a feature added in BeamletOptics itself:
+
+- **Never edit the installed package** under `~/.julia/packages`: it is read-only and shared.
+  Work in a development checkout instead (`] dev BeamletOptics`, cloned to `~/.julia/dev/BeamletOptics`),
+  or in the user's clone of the repository.
+- **Read `AGENTS.md` at the root of that checkout before changing code.** It holds the developer
+  instructions: design philosophy, code conventions (dispatch over helper functions), docstring
+  rules and test commands. This skill describes usage only and does not replace it.
+- Turn the minimal reproducer into a test, and run the affected test modules as `AGENTS.md` describes.
+
 ## Local references bundled with this Skill
 
 - API primer: `API.md`
