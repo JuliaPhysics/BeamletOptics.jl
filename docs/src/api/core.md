@@ -5,8 +5,8 @@ The BMO package is intended to provide optical simulation capabilites with as mu
 1. Optical interactions are decoupled from the underlying geometry representation
 2. Optical elements are closed volumes or must mimic as such (exceptions apply, e.g. coatings)
 3. Elements should be easily moveable and have working interactions for most angles of incidence
-3. Without additional knowledge, tracing is performed non-sequentially
-4. With additional knowledge, tracing is performed sequentially
+4. Without additional knowledge, tracing is performed non-sequentially
+5. With additional knowledge, tracing is performed sequentially
 
 ## Intersect-Interact-Repeat-Loop
 
