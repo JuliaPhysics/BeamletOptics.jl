@@ -43,6 +43,33 @@ LiveServer.serve(dir = "build/1")
     installation is required. The first build downloads the npm packages into
     `docs/node_modules` and therefore takes noticeably longer.
 
+## Documentation philosophy
+
+The documentation lives off docstrings and figures, not off prose that repeats them. A page embeds docstrings via `@docs` blocks and Makie-rendered figures instead of re-explaining in free text what a docstring or figure should already cover. If a page needs to explain something that a docstring is missing, extend the docstring instead.
+
+## Docstring conventions
+
+A docstring starts with an indented signature line and a blank line, followed by a prose description that cross-references other names via `@ref` links. An optional `# Fields` (structs) or `# Arguments` (functions) list comes last, one bullet per name:
+
+```julia
+"""
+    MyMirror(diameter, thickness; hole_diameter = nothing)
+
+A round plano mirror with its reflecting face at the origin and its normal along the y-axis,
+see [`RoundPlanoMirror`](@ref) for the orientation convention.
+
+# Arguments
+
+- `diameter`: outer diameter in m
+- `thickness`: substrate thickness in m, extending towards +y
+"""
+```
+
+Additional `# <Section>` headers, e.g. `# Sign convention`, are fine if none of the standard ones fits. Do not repeat the prose as bullets.
+
+- **Constructor docstrings must be self-sufficient in the REPL.** `?MyComponent` is often the only information a user reads, so it must cover units, sign and orientation conventions, physical assumptions and limitations, not only the argument types.
+- **Type and abstract type docstrings state the interface** they define or fulfill: which functions a subtype has to implement, or which trait a concrete type participates in. See [`BeamletOptics.SingleShape`](@ref) and [`BeamletOptics.MultiShape`](@ref) (section `AbstractObject implementation reqs.`) for the reference pattern.
+
 ## Section titles
 
 When creating a custom section in the documentation, you should avoid naming the section the same way as your type, e.g. for `MyCustomType` you should not create a section that is called `# MyCustomType`. The reason for this is that the `@ref` macro will confuse the docstring of your type with the section header, leading to undefined behavior for any links pointing to the embedded docstring via `[`MyCustomType`](@ref)`.

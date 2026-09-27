@@ -136,6 +136,7 @@ makedocs(;
                 "Double slit"               => joinpath("examples", "double_slit.md"),
                 "Point spread functions"    => joinpath("examples", "psf.md"),
             ],
+            "AI assistants"                 => joinpath("tutorials", "ai_assistants.md"),
         ],
         "Basics" => Any[
             "Introduction"                  => joinpath("basics", "intro.md"),
