@@ -105,6 +105,6 @@ See `components/detectors.md`.
 
 ## Makie rendering
 
-`using CairoMakie` (or `GLMakie`) before or after `using BeamletOptics` activates the extension.
+`using GLMakie` before or after `using BeamletOptics` activates the extension.
 One generic function draws everything: `render!(ax, system)`, `render!(ax, beam)`,
 `render!(ax, source)`, `render!(ax, object)`. See `VISUALIZATION.md`.

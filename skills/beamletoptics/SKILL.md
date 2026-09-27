@@ -64,14 +64,15 @@ When this Skill is active:
 - Sanity-check numbers against a paraxial estimate (`BeamletOptics.lensmakers_eq`, Airy radius, Malus, …).
 
 6) Visualize (optional, needs a Makie backend) → `VISUALIZATION.md`
-- `render!(ax, system)`, `render!(ax, beam)`; CairoMakie for headless PNGs, GLMakie for interactive 3D.
+- `using GLMakie`, then `render!(ax, system)`, `render!(ax, beam)`; `save` a PNG or `display` an interactive window.
 
 ## Safety and non-goals
 
 - BeamletOptics does not model coatings, scattering or stray light from refractive surfaces (polarized
   refraction traces only the refracted ray). Results are simulations, not certified optical designs;
   point out model limits when they matter for the user's question.
-- Do not modify the BeamletOptics package source unless the user asks for it; write user scripts instead.
+- Do not modify the BeamletOptics package source unless the user asks for it (then see the next
+  section); write user scripts instead.
 
 ## Switching to package development (bug fix, feature)
 

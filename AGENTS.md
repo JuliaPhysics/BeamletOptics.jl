@@ -63,7 +63,8 @@ doublets) is handled per component by returning a `Hint`
 
 - BMO requires Julia ≥ 1.12 (`Project.toml`). Use the newest Julia installed on the machine,
   not merely the minimum a Manifest allows. Machine-specific paths (e.g. the location of
-  `julia.exe` when there is no `juliaup`) belong in an untracked `CLAUDE.local.md`, not here.
+  `julia.exe` when there is no `juliaup`) belong in an untracked local file such as
+  `CLAUDE.local.md` (git-ignored), not here.
 - The repository is a Pkg workspace: `test` and `docs` are subprojects that pick up the local
   checkout automatically.
 
@@ -86,8 +87,8 @@ documentation and is maintained with the code:
 
 - When the public API changes (`src/Exports.jl`, constructor signatures, keyword arguments,
   conventions), update the matching file in `skills/beamletoptics/components/` or the
-  top-level skill files, and run `julia --project=. skills/beamletoptics/scripts/run_templates.jl`.
-- [test/TestAgentSkill.jl](test/TestAgentSkill.jl) fails if the export table in
+  top-level skill files, and run the templates: `julia --project=. skills/beamletoptics/scripts/run_templates.jl`
+  (headless templates), `julia --project=docs skills/beamletoptics/scripts/run_templates.jl --render` (all).- [test/TestAgentSkill.jl](test/TestAgentSkill.jl) fails if the export table in
   `skills/beamletoptics/API.md` differs from `names(BeamletOptics)`, or if
   `metadata.beamletoptics-version` in `SKILL.md` differs from the major.minor version in
   `Project.toml`. On a minor version bump, review the skill and update both the field and the
@@ -110,8 +111,8 @@ output in `docs/build/1`, served with LiveServer) and the figure pattern (script
 - `GLOBAL_USE_PLACEHOLDERS` at the top of [docs/DocUtils.jl](docs/DocUtils.jl) switches
   local builds between real figures and fast placeholders. Keep it `true`; set it to `false`
   only to regenerate figures, and set it back before committing. CI always renders.
-- **GLMakie is the default Makie backend.** Use CairoMakie only where a static image is the
-  point. For ad-hoc checks of `render!` or anything under `ext/`, load GLMakie.
+- **GLMakie is the Makie backend.** Use it for figures, ad-hoc checks of `render!` and anything
+  under `ext/`. On headless Linux, run it under `xvfb-run -a` (CI does the same).
 - **Windows link bug:** Documenter reads `[text]` followed by a parenthesized aside, e.g.
   `` `α` in [1/m] (Lambert-Beer: ...) ``, as a link and fails with "colons not allowed in
   paths". Escape literal brackets as `\[1/m\]`.

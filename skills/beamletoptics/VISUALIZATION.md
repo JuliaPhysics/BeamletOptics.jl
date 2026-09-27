@@ -1,23 +1,22 @@
 # Visualization (Makie extension)
 
-Rendering lives in the `BeamletOpticsMakieExt` extension. It activates once a Makie backend is loaded:
+Rendering lives in the `BeamletOpticsMakieExt` extension and uses **GLMakie**:
 
 ```julia
-using CairoMakie, BeamletOptics   # headless PNG/PDF/SVG; only Axis3
-# or
-using GLMakie, BeamletOptics      # interactive window; LScene + Axis3, camera helpers
+using GLMakie, BeamletOptics      # Axis3 and LScene, camera helpers, save to PNG
 ```
 
-Without a backend, `render!` throws a `MissingBackendError`.
+Without a Makie backend, `render!` throws a `MissingBackendError`. GLMakie needs OpenGL: on a
+headless Linux machine, run scripts under a virtual display, e.g. `xvfb-run -a julia --project=. script.jl`.
 
 ## Minimal example
 
 ```julia
 fig = Figure()
-ax = Axis3(fig[1, 1], aspect = :data)   # or LScene(fig[1, 1]) with GLMakie
+ax = Axis3(fig[1, 1], aspect = :data)   # or LScene(fig[1, 1])
 render!(ax, system)                     # all objects of the system
 render!(ax, beam)                       # a solved Beam (and its children)
-save("setup.png", fig)                  # CairoMakie; display(fig) with GLMakie
+save("setup.png", fig)                  # or display(fig) for an interactive window
 ```
 
 ## `render!` methods
@@ -42,7 +41,7 @@ usually dwarfs a millimeter-scale setup.
 - Use `aspect = :data` so optics are not distorted; or give explicit `aspect` and `limits`.
 - Remove decorations for figures: `hidedecorations!(ax); hidespines!(ax)`.
 
-GLMakie `LScene` helpers:
+`LScene` helpers:
 
 - `hide_axis(ls)`, `set_orthographic(ls)`
 - `get_view(ls)`: rotate the scene by hand, call it, paste the printed matrix into the script

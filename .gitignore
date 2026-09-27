@@ -83,3 +83,6 @@ paper/*.vrb
 
 # Compiled manuscript (rebuild with the pdflatex/bibtex recipe)
 paper/paper.pdf
+
+# Local, machine-specific agent instructions
+CLAUDE.local.md

@@ -1,6 +1,6 @@
-# Render a system, a ray fan and a Gaussian beamlet with Makie.
-# Needs a Makie backend in the environment: CairoMakie (headless, Axis3 only) or GLMakie (LScene + camera helpers).
-using CairoMakie, BeamletOptics
+# Render a system, a ray fan and a Gaussian beamlet with GLMakie and save it as a PNG.
+# Needs GLMakie in the environment; on headless Linux run it under `xvfb-run -a`.
+using GLMakie, BeamletOptics
 
 const mm = 1e-3
 

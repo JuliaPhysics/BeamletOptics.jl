@@ -3,7 +3,7 @@
 ## Environment
 
 - BeamletOptics requires Julia ≥ 1.12. Work in a project environment:
-  `julia --project=. -e 'using Pkg; Pkg.add("BeamletOptics")'` (add `CairoMakie`/`GLMakie` for plots).
+  `julia --project=. -e 'using Pkg; Pkg.add("BeamletOptics")'` (add `GLMakie` for plots).
 - Run scripts non-interactively with `julia --project=. script.jl`. First runs precompile and can take
   a minute; don't mistake that for a hang.
 - Use `julia -t auto` when tracing sources with many beams (solving a beam group is multithreaded).
@@ -86,5 +86,5 @@ and look at the image before trusting numbers. Axis-aligned top view: `Axis3(...
 - Gaussian beamlet stops: all 3 (9) rays must hit the same surfaces; the beamlet may be clipped or the
   optical invariant check failed (`check_invariant = false` to diagnose, not to "fix").
 - `KeyError` from `DiscreteRefractiveIndex`: wavelength not in the table.
-- `MissingBackendError` on `render!`: load `CairoMakie` or `GLMakie`.
+- `MissingBackendError` on `render!`: load `GLMakie`.
 - Detector error "No hits available": nothing reached it; check position/orientation (normal −y by default).
