@@ -62,6 +62,7 @@ include(joinpath(@__DIR__, "Rendering", "TestLiveObjects.jl"))
 include(joinpath(@__DIR__, "Rendering", "TestLiveBeams.jl"))
 include(joinpath(@__DIR__, "Rendering", "TestLiveProgress.jl"))
 include(joinpath(@__DIR__, "Rendering", "TestLiveInteraction.jl"))
+include(joinpath(@__DIR__, "Rendering", "TestLiveTree.jl"))
 include(joinpath(@__DIR__, "Rendering", "TestLiveView.jl"))
 include(joinpath(@__DIR__, "Rendering", "TestViewCube.jl"))
 
