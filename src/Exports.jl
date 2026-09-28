@@ -6,7 +6,7 @@ export position, direction, orientation
 # ray and beam type export
 export Ray, PolarizedRay, Beam, PointSource, CollimatedSource, UniformDiscSource, UniformPointSource,
        GaussianBeamlet, AstigmaticGaussianBeamlet, rayleigh_range, rays, point_on_beam,
-       normal3d
+       normal3d, transverse_polarization, wavelength, refractive_index, wavenumber
 export CollimatedGaussianBeamletSource, GaussianBeamletDecomposition,
        SphericalGaussianBeamletSource, EllipticalGaussianBeamletSource, WavefrontBeamletDecomposition, AstigmaticBeamGroup
 
@@ -43,8 +43,12 @@ export CircularFlatSurface, RectangularFlatSurface, SphericalSurface, EvenAspher
 export Prism, RightAnglePrism
 
 # detectors
-export Detector, electric_field, intensity, spot_diagram, optical_power, gauss_parameters,
-       waist_parameters, Centroid, MinMax
+export Detector, AbstractFourierDetector, FourierBeamletPropagator,
+       FourierKPoint, SpatialGrid, DetectorObservables,
+       calculate_observables, calculate_observables!, synthesize_field,
+       electric_field, intensity, spot_diagram, optical_power,
+       gauss_parameters, waist_parameters, Centroid, MinMax,
+       hits, hits!
 
 # splitters
 export ThinBeamsplitter, RoundThinBeamsplitter, RectangularPlateBeamsplitter,
@@ -62,8 +66,7 @@ export Retroreflector, get_invariant_threshold, set_invariant_threshold!,
     get_sdf_surface_threshold, get_sdf_raymarch_eps, get_sdf_inside_step,
     get_internal_reflection_threshold, get_line_plane_intersection_threshold,
     get_orthogonality_threshold, get_default_r_max, get_default_depth_max,
-    get_default_wavelength, get_default_waist, get_default_power,
-    get_progress_threshold, set_progress_threshold!
+    get_default_wavelength, get_default_waist, get_default_power
 
 # render
 export render!, get_view, set_view, hide_axis, set_orthographic, arrow!, render_lcs!, look_at!

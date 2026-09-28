@@ -135,6 +135,7 @@ makedocs(;
                 "Lens groups"               => joinpath("examples", "lens_groups.md"),
                 "Double slit"               => joinpath("examples", "double_slit.md"),
                 "Point spread functions"    => joinpath("examples", "psf.md"),
+                "Fourier detector"          => joinpath("examples", "fourier_detector.md"),
             ],
             "AI assistants"                 => joinpath("tutorials", "ai_assistants.md"),
         ],
