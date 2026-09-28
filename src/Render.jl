@@ -222,8 +222,8 @@ and `profiles`), `on_change = (gui, obj) -> nothing` (called after full solves),
 `views = ["name" => (eye, lookat, up)]`, `lighting = :studio` (see [`studio_lighting!`](@ref)),
 `edges` and `size`. `layout = :app` arranges the window like an application, with a toolbar,
 collapsible sidebars (object tree with selection and visibility, sliders, properties of the
-selection), an analysis dock with
-the detector panels and a status bar, in the colors of `theme = :light` or `:dark`; the default
+selection), an analysis dock with a tab per detector panel (only the panel of the active tab is
+computed after a solve) and a status bar, in the colors of `theme = :light` or `:dark`; the default
 `layout = :compact` places the panels next to the 3D view and the tools below it. All other keyword arguments are passed to [`kinematic_controls!`](@ref). Refer
 to the method of the `Makie` extension for details.
 

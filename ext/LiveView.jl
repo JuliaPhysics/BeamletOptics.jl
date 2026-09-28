@@ -128,6 +128,10 @@ and optionally, with defaults for any layout,
   `_on_selected!(gui)` after the selection changed, `_on_clipping!(gui)` after clipping was
   switched, `_on_clip_planes_changed!(gui)` after a clip plane was added or removed and
   `_on_hidden!(gui)` after objects were hidden or shown
+- which detector panels are computed and how their results are shown, for layouts that show only
+  some of them: `_computed_panels(gui, preview)`, `_shown_panels(gui)` and
+  `_apply_panel!(gui, p, field; coarse, preview)` (all panels by default), with the hooks
+  `_on_solve_started!(gui)` and `_on_applied!(gui)` around a solve, see `LiveDock.jl`
 - `_clip_plane_label(gui)`: the label of a new clip plane (`"Clip plane"`), and
   `_show_hint(gui)`: how a hidden object is shown again, for the status line
 - slots for additional parts: `_add_toolbar_entry!(gui, group)`, `_add_sidebar_section!(gui,
@@ -535,15 +539,38 @@ function _set_metrics!(p::DetectorPanel, m; record::Bool = true)
     p.ax.subtitle[] = _metrics_string(m)
     c = isfinite(m.cx) ? [Point2f(1e3 * m.cx, 1e3 * m.cz)] : Point2f[]
     p.centroid[] == c || (p.centroid[] = c)
-    (record && !isempty(p.history_axes)) || return nothing
+    record && _record_history!(p, m)
+    return nothing
+end
+
+"""
+    _record_history!(p, m; draw = true)
+
+Adds the power (or the number of hits) and the centroid of the metrics `m` to the history of the
+panel `p`, if it has one. Without `draw`, only the data is extended and the plots are not updated,
+e.g. for a panel that is not shown, see `_draw_history!`.
+"""
+function _record_history!(p::DetectorPanel, m; draw::Bool = true)
+    isempty(p.history_axes) && return nothing
     p.history_count += 1
     k = p.history_count
-    value, label = haskey(m, :P) ? (1e3 * m.P, "P [mW]") : (m.n, "N")
+    value = haskey(m, :P) ? 1e3 * m.P : m.n
     for (obs, v) in ((p.history_value, value), (p.history_cx, 1e3 * m.cx), (p.history_cz, 1e3 * m.cz))
         push!(obs[], Point2f(k, v))
         length(obs[]) > _HISTORY_LENGTH && popfirst!(obs[])
-        notify(obs)
     end
+    draw && _draw_history!(p, m)
+    return nothing
+end
+
+"""
+Updates the plots of the history of the panel `p` from its data (see `_record_history!`), the
+label of the power or number of hits from the metrics `m` of the last record.
+"""
+function _draw_history!(p::DetectorPanel, m = p.metrics)
+    isempty(p.history_axes) && return nothing
+    foreach(notify, (p.history_value, p.history_cx, p.history_cz))
+    label = (isnothing(m) || haskey(m, :P)) ? "P [mW]" : "N"
     p.history_axes[1].ylabel[] == label || (p.history_axes[1].ylabel[] = label)
     foreach(autolimits!, p.history_axes)
     return nothing
@@ -787,8 +814,8 @@ Each source is traced, and each field computed, with its progress output `sinks[
 `BMO._PROGRESS_SINK`, `nothing` for the terminal): first one per pair, then one per panel.
 
 With `preview`, beam groups rendered with `render_every > 1` are solved only for their rendered
-beams, see `_solve_preview!`. Returns `(; previewed, fields, solve_time, field_time)`: whether a
-beam group was solved as a preview, the fields of the panels and the durations [s].
+beams, see `_solve_preview!`. Returns `(; previewed, panels, fields, solve_time, field_time)`:
+whether a beam group was solved as a preview, the `panels` and their fields and the durations [s].
 """
 function _compute(pairs, handles, panels, sinks; coarse = false, preview = false)
     # Monotonic clock with ns resolution, time() is too coarse on Windows for fast solves
@@ -810,8 +837,45 @@ function _compute(pairs, handles, panels, sinks; coarse = false, preview = false
     n = length(pairs)
     fields = Any[Base.ScopedValues.with(() -> _panel_field(p, coarse), BMO._PROGRESS_SINK => sinks[n + k])
                  for (k, p) in enumerate(panels)]
-    return (; previewed, fields, solve_time = 1e-9 * (t1 - t0), field_time = 1e-9 * (time_ns() - t1))
+    return (; previewed, panels, fields, solve_time = 1e-9 * (t1 - t0),
+        field_time = 1e-9 * (time_ns() - t1))
 end
+
+#=
+Panels shown by the layout: the compact layout shows, and thus computes, all panels after each
+solve; the app layout only the panel of its active tab, see `LiveDock.jl`
+=#
+
+"""
+    _computed_panels(gui, preview::Bool) -> Vector
+
+The detector panels of the `gui` whose fields are computed after a solve (a preview solve if
+`preview`), see `_compute`: all panels, unless the layout shows only some of them. Their results
+are shown by `_apply_panel!`.
+"""
+_computed_panels(gui::LiveView, ::Bool) = gui.panels
+
+"""
+    _shown_panels(gui) -> Vector
+
+The detector panels of the `gui` that are shown, i.e. refined after a coarse preview, see
+`_on_idle!`: all panels, unless the layout shows only some of them.
+"""
+_shown_panels(gui::LiveView) = gui.panels
+
+"""
+    _apply_panel!(gui, p, field; coarse, preview)
+
+Shows the `field` of the panel `p` (see `_panel_field`) after a solve of the `gui`, the metrics of a
+full solve are recorded in its history, see `_update_panel!`.
+"""
+_apply_panel!(::LiveView, p::DetectorPanel, field; coarse, preview) =
+    _update_panel!(p, field; coarse, preview, record = !preview)
+
+# Hooks of the layout around a solve: before a solve empties the detectors, and after its result
+# was shown, see `_start_job` and `_apply!`
+_on_solve_started!(::LiveView) = nothing
+_on_applied!(::LiveView) = nothing
 
 """
     _apply!(gui, r, obj; coarse = false)
@@ -830,8 +894,8 @@ function _apply!(gui::LiveView, r, obj; coarse = false)
     foreach(update_render!, gui.beam_handles)
     t1 = time_ns()
     previewed = r.previewed
-    for (p, field) in zip(gui.panels, r.fields)
-        _update_panel!(p, field; coarse, preview = previewed, record = !previewed)
+    for (p, field) in zip(r.panels, r.fields)
+        _apply_panel!(gui, p, field; coarse, preview = previewed)
     end
     solve_time = r.solve_time + 1e-9 * (t1 - t0)
     if previewed
@@ -853,6 +917,7 @@ function _apply!(gui::LiveView, r, obj; coarse = false)
     end
     isnothing(obj) || (gui.status.text[] = _pose_string(gui, obj))
     _on_solved!(gui)
+    _on_applied!(gui)
     return nothing
 end
 
@@ -866,23 +931,30 @@ task; a solve of the `gui` in the background is cancelled first.
 """
 function _resolve!(gui::LiveView, obj; coarse = false, preview = false)
     _cancel_solve!(gui)
-    sinks = fill(nothing, length(gui.pairs) + length(gui.panels))
-    r = _compute(gui.pairs, gui.beam_handles, gui.panels, sinks; coarse, preview)
+    panels = _computed_panels(gui, preview)
+    sinks = fill(nothing, length(gui.pairs) + length(panels))
+    _on_solve_started!(gui)
+    r = _compute(gui.pairs, gui.beam_handles, panels, sinks; coarse, preview)
     _apply!(gui, r, obj; coarse)
     return nothing
 end
 
 """
-    _start_job(gui, apply, obj, pairs, handles; coarse = false, preview = false, timing) -> _SolveJob
+    _start_job(gui, apply, obj, pairs, handles[, panels]; coarse = false, preview = false, timing) -> _SolveJob
 
-Starts `_compute` for the `pairs` (with the beam render `handles`) and the detector panels of the
-`gui` in a background task, with a progress sink per source and panel, see `_SolveJob`. `apply`
-shows the result, `timing` is the duration field that a cancelled job updates.
+Starts `_compute` for the `pairs` (with the beam render `handles`) and the detector `panels` (by
+default `_computed_panels`) of the `gui` in a background task, with a progress sink per source and
+panel, see `_SolveJob`. `apply` shows the result, `timing` is the duration field that a cancelled
+job updates, `:panel_time` for a job that only computes panels, i.e. without `pairs`.
 """
-function _start_job(gui::LiveView, apply, obj, pairs, handles; coarse = false, preview = false,
-        timing::Symbol)
+_start_job(gui::LiveView, apply, obj, pairs, handles; preview = false, kwargs...) =
+    _start_job(gui, apply, obj, pairs, handles, _computed_panels(gui, preview); preview, kwargs...)
+
+function _start_job(gui::LiveView, apply, obj, pairs, handles, panels; coarse = false,
+        preview = false, timing::Symbol)
+    isempty(pairs) || _on_solve_started!(gui)
     # The task works on its own copies of the lists, the objects are protected by `_change!`
-    pairs, handles, panels = copy(pairs), copy(handles), copy(gui.panels)
+    pairs, handles, panels = copy(pairs), copy(handles), copy(panels)
     sinks = [BMO._ProgressSink() for _ in 1:(length(pairs) + length(panels))]
     anchors = Point3f[_progress_anchor.(last.(pairs)); _progress_anchor.(getfield.(panels, :pd))]
     done = Base.Event()
@@ -969,7 +1041,8 @@ const _CANCELLED = "trace cancelled, press t to trace"
     _finish!(gui, job)
 
 Shows the result of the finished `job` in the `gui` via `job.apply`, and restores the appearance
-of the beams. If solving failed, the error is logged and the beams and detector panels are kept
+of the beams after a solve (a job that only computed detector panels leaves them as they are, see
+`_solves`). If solving failed, the error is logged and the beams and detector panels are kept
 marked as outdated. Returns `true` on success.
 """
 function _finish!(gui::LiveView, job::_SolveJob)
@@ -981,10 +1054,15 @@ function _finish!(gui::LiveView, job::_SolveJob)
         _fail!(gui, e)
         return false
     end
-    _restore_beams!(gui)
-    gui.stale = false
+    if _solves(job)
+        _restore_beams!(gui)
+        gui.stale = false
+    end
     return true
 end
+
+"""Whether the `job` solves the systems, i.e. does not only compute detector panels."""
+_solves(job::_SolveJob) = job.timing !== :panel_time
 
 """Marks the beams and detector panels of the `gui` as outdated after the solve failed with `e`."""
 function _fail!(gui::LiveView, e)
@@ -1123,9 +1201,9 @@ function _solve!(gui::LiveView, obj; coarse = false, preview = false)
     return done
 end
 
-"""Shows the fields `r.fields` of the detector panels of the `gui`, which refine a coarse preview."""
+"""Shows the fields `r.fields` of the detector panels `r.panels`, which refine a coarse preview."""
 function _refine!(gui::LiveView, r)
-    for (p, field) in zip(gui.panels, r.fields)
+    for (p, field) in zip(r.panels, r.fields)
         _update_panel!(p, field; record = false)
     end
     gui.coarse = false
@@ -1169,7 +1247,7 @@ function _on_idle!(gui::LiveView)
         _solve!(gui, gui.preview_obj)
     elseif gui.coarse
         job = _start_job(gui, r -> _refine!(gui, r), gui.preview_obj, empty(gui.pairs),
-            empty(gui.beam_handles); timing = :panel_time)
+            empty(gui.beam_handles), _shown_panels(gui); timing = :panel_time)
         _run!(gui, job, "computing the detector fields, Esc cancels")
     end
     return nothing
@@ -2685,7 +2763,10 @@ actions in the 3D view are unchanged:
   `labels` entry are named by their type and a running index, e.g. "Lens 2", also in the status
   line.
 - right sidebar ("Properties"): the selected object, the pose boxes, the step box and the mode
-- analysis dock below the 3D view: the detector panels
+- analysis dock below the 3D view: a tab per detector panel, a click on a tab shows its panel.
+  Only the panel of the active tab is computed after a solve, the other panels are computed when
+  their tab is opened; a collapsed dock computes none. Panels with `history = true` still record
+  every full solve. The history and profiles axes are shown beside the panel.
 - status bar: the status line and the duration of the last solve, the number of rays and the
   projection
 

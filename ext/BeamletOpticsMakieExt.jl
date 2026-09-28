@@ -77,6 +77,7 @@ include("LiveIcons.jl")
 include("ViewCube.jl")
 include("LiveView.jl")
 include("LiveApp.jl")
+include("LiveDock.jl")
 # precompiles the live rendering/interaction call paths, must come last
 include("LivePrecompile.jl")
 

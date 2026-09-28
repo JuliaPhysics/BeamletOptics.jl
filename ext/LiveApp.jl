@@ -90,7 +90,8 @@ Layout of `live_view(...; layout = :app)`, an application window around the 3D v
 - the left sidebar, a stack of titled sections ("OBJECTS" with the object tree, see `_tree_rows`,
   "PARAMETERS" with the sliders), and the right sidebar ("PROPERTIES": selection, pose boxes,
   step, mode), see `_add_sidebar_section!`
-- the analysis dock below the 3D view with the detector panels, see `_add_dock_panel!`
+- the analysis dock below the 3D view, a tab per detector panel (or other panel, see
+  `_add_dock_panel!`), of which only the active one is shown and computed, see `_DockTabs`
 - the status bar with the status line and an info label (last trace, number of rays, projection)
 
 The sidebars and the dock are collapsed via toggles in the toolbar, then the 3D view takes their
@@ -110,7 +111,9 @@ mutable struct AppLayout <: AbstractLiveLayout
     # the stack of a sidebar grows its sections marked `grow`, otherwise the filler at the end
     fillers::Dict{Symbol, Label}
     growing::Dict{Symbol, Bool}
+    # the panels `title => content` of the dock and its tabs, a `_DockTabs`
     dock_panels::Vector{Pair{String, GridLayout}}
+    tabs::Any
     # toolbar entries without a field of `LiveView`
     collapse::@NamedTuple{left::_IconToggle, right::_IconToggle, dock::_IconToggle}
     clip_toggle::_IconToggle
@@ -198,22 +201,7 @@ end
 _add_sidebar_section!(gui::AppView, side::Symbol, title::AbstractString; kwargs...) =
     _add_sidebar_section!(gui.layout, side, title; kwargs...)
 
-"""
-    _add_dock_panel!(layout::AppLayout, title) -> GridLayout
-
-Appends a panel with the `title` to the analysis dock and returns its layout. The first panel
-switches the dock on, later panels keep it collapsed if it is. The panels are placed in a row (tabs
-follow in S4b). Requires the toolbar, see `_build_toolbar`.
-"""
-function _add_dock_panel!(layout::AppLayout, title::AbstractString)
-    grid = GridLayout(layout.dock.grid[1, length(layout.dock_panels) + 1])
-    push!(layout.dock_panels, String(title) => grid)
-    active = layout.collapse.dock.active
-    length(layout.dock_panels) == 1 && !active[] && (active[] = true)
-    _update_dock!(layout)
-    return grid
-end
-_add_dock_panel!(gui::AppView, title::AbstractString) = _add_dock_panel!(gui.layout, title)
+# `_add_dock_panel!` is defined with the tabs of the dock in `LiveDock.jl`
 
 #=
 Collapsing
@@ -415,12 +403,11 @@ function _build_layout(layout::AppLayout, fig, spec)
     layout.left = _app_part(main, (1, 1), s -> colsize!(main, 1, s), Fixed(240), t.sidebar)
     layout.right = _app_part(main, (1, 3), s -> colsize!(main, 3, s), Fixed(260), t.sidebar)
     layout.dock = _app_part(root, (3, 1), s -> rowsize!(root, 3, s),
-        Relative(0.3), t.sidebar; padding = 8)
+        Relative(0.36), t.sidebar; padding = 8)
     layout.sections = Dict(:left => Pair{String, GridLayout}[], :right => Pair{String, GridLayout}[])
     layout.fillers = Dict(s => Label(getfield(layout, s).grid[1, 1], ""; tellwidth = false,
         tellheight = false) for s in (:left, :right))
     layout.growing = Dict(:left => false, :right => false)
-    layout.dock_panels = Pair{String, GridLayout}[]
     rowsize!(root, 2, Auto(false))
     # Toolbar
     Box(root[1, 1]; color = t.background, cornerradius = 0)
@@ -444,15 +431,7 @@ function _build_layout(layout::AppLayout, fig, spec)
     end
     inspector = _build_inspector!(layout)
     # Analysis dock
-    panels = Any[]
-    for (i, (pd, mode, kw)) in enumerate(spec.specs)
-        name = get(spec.labels, pd, "Detector $i")
-        p = DetectorPanel(_add_dock_panel!(layout, name)[1, 1], pd, name, mode, kw)
-        # Colors of the panel that do not follow the theme
-        p.ax.subtitlecolor[] = t.muted
-        p.scatter_plot.color[] = t.text
-        push!(panels, p)
-    end
+    panels = _build_dock!(layout, spec)
     _update_dock!(layout)
     # Status bar
     Box(root[4, 1]; color = t.background, cornerradius = 0)
@@ -545,6 +524,7 @@ function _connect_layout!(gui::AppView)
     push!(listeners, on(v -> _set_shown!(layout.left, v), layout.collapse.left.active))
     push!(listeners, on(v -> _set_shown!(layout.right, v), layout.collapse.right.active))
     push!(listeners, on(_ -> _update_dock!(layout), layout.collapse.dock.active))
+    _connect_dock!(gui)
     push!(listeners, on(m -> _set_text!(layout.mode_label, _mode_string(m)), ctrl.mode; update = true))
     push!(listeners, on(_ -> _on_solved!(gui), gui.orthographic_toggle.active))
     # Object tree

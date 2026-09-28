@@ -192,9 +192,11 @@ end
 """
 Durations [ms] of full re-solves after moving the first lens by ±10 µm along x: the lens is moved
 like the keyboard controls do (`_change!` + `update_render!` of the controls), then `_resolve!`
-solves the systems and updates the beams and all detector panels synchronously, as the deferred
-full solve does once a movement pauses. `solve` and `panel` are the `solve_time` and `panel_time`
-the live view measures itself (see `_apply!`), `total` the wall time of `_resolve!`.
+solves the systems and updates the beams and the detector panels synchronously, as the deferred
+full solve does once a movement pauses: all panels in the compact layout, only the panel of the
+active tab (and panels with a history) in the app layout, see `_computed_panels`. `solve` and
+`panel` are the `solve_time` and `panel_time` the live view measures itself (see `_apply!`), i.e.
+`panel` is the panel work done after the solve, `total` the wall time of `_resolve!`.
 """
 function solve_times(gui, lens; n = N_SOLVES, warmup = N_WARMUP_SOLVES)
     ctrl = gui.controls
