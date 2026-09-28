@@ -1921,7 +1921,7 @@ end
 
 Moves the camera of the `gui` such that the bounding sphere of the selected object, or of all
 systems if nothing is selected, fills the view: `lookat` is set to the center of the bounding box,
-the eye to the distance `(d/2) / sin(fov/2)` along the current view direction, where `d` is the
+the eye to the distance `(d/2) / sin(fov/2)` (orthographic: `d/2`) along the current view direction, where `d` is the
 diagonal of the box.
 """
 function _zoom_to_selection!(gui::LiveView)
@@ -1933,7 +1933,8 @@ function _zoom_to_selection!(gui::LiveView)
     center = Vector{Float64}(minimum(bb) .+ GeometryBasics.widths(bb) ./ 2)
     d = max(norm(Vector{Float64}(GeometryBasics.widths(bb))), 1e-6)
     cam = cameracontrols(gui.ax.scene)
-    dist = (d / 2) / sind(cam.fov[] / 2)
+    # The orthographic view is scaled by the distance of the eye, which is its half height
+    dist = cam.settings.projectiontype[] == Makie.Perspective ? (d / 2) / sind(cam.fov[] / 2) : d / 2
     eye, lookat, up = _current_view(gui)
     o = norm(eye .- lookat) > 0 ? normalize(eye .- lookat) : [0.0, 0.0, 1.0]
     _animate_camera!(gui, center .+ dist .* o, center, up)
@@ -2366,8 +2367,7 @@ function live_view(
     _connect_camera!(gui)
     push!(controls.listeners, on(v -> v == gui.clip_beams || _set_clip_beams!(gui, v), clip_beams_toggle.active))
     push!(controls.listeners, on(s -> _set_step!(gui, s), step_box.stored_string))
-    push!(controls.listeners, on(v -> _set_orthographic!(gui, v), orthographic_toggle.active))
-    _set_orthographic!(gui, orthographic)
+    _connect_projection!(gui, orthographic)
     _connect_sources!(gui)
     _resolve!(gui, nothing)
     # Initial view from the Front-Right-Top corner, in which the labels of the view cube read
@@ -2384,9 +2384,60 @@ end
 
 live_view(system::BMO.AbstractSystem, beam; kwargs...) = live_view(system => beam; kwargs...)
 
-"""Switches the 3D view of the `gui` to orthographic (`true`) or perspective (`false`) projection."""
-function _set_orthographic!(gui::LiveView, orthographic::Bool)
-    settings = cameracontrols(gui.ax.scene).settings
-    settings.projectiontype[] = orthographic ? Makie.Orthographic : Makie.Perspective
+"""
+    _connect_projection!(gui, orthographic)
+
+Connects the orthographic toggle of the `gui` and sets the initial projection.
+
+The orthographic `Camera3D` scales the view with the distance between eye and `lookat` and clips
+the scene at `near`/`far` in front of the eye. Zooming in, or moving along the view direction, then
+moves the eye into the scene: the near plane cuts through it like a clip plane, while the view
+itself stays the same. In orthographic mode the depth range is therefore static and reaches from
+behind the eye (negative `near`) past the far side of the scene, updated whenever the eye moves.
+The scene bounds are taken when switching to orthographic, with a margin of one radius for later
+moves of objects.
+"""
+function _connect_projection!(gui::LiveView, orthographic::Bool)
+    cam = cameracontrols(gui.ax.scene)
+    settings = cam.settings
+    perspective_depth = (settings.clipping_mode[], cam.near[], cam.far[])
+    bounds = Ref((zeros(3), 1.0))
+    # Silent updates: every camera move calls `update_cam!` after setting the eye position
+    function set_depth!()
+        center, radius = bounds[]
+        d = norm(Vector{Float64}(cam.eyeposition[]) .- center) + 2 * radius
+        cam.near.val = -d
+        cam.far.val = d
+        return nothing
+    end
+    function set_projection!(ortho::Bool)
+        if ortho
+            bounds[] = _scene_bounds(gui)
+            settings.clipping_mode.val = :static
+            set_depth!()
+        else
+            mode, near, far = perspective_depth
+            settings.clipping_mode.val = mode
+            cam.near.val = near
+            cam.far.val = far
+        end
+        settings.projectiontype[] = ortho ? Makie.Orthographic : Makie.Perspective
+        return nothing
+    end
+    listeners = gui.controls.listeners
+    push!(listeners, on(set_projection!, gui.orthographic_toggle.active))
+    push!(listeners, on(cam.eyeposition) do _
+        settings.projectiontype[] == Makie.Perspective || set_depth!()
+        return nothing
+    end)
+    set_projection!(orthographic)
     return nothing
+end
+
+"""Returns the center and radius of the bounding sphere of the plots of the 3D view of the `gui`."""
+function _scene_bounds(gui::LiveView)
+    bb = Makie.data_limits(gui.ax.scene)
+    _is_finite_box(bb) || return (zeros(3), 1.0)
+    w = Vector{Float64}(GeometryBasics.widths(bb))
+    return Vector{Float64}(minimum(bb)) .+ w ./ 2, max(norm(w) / 2, 1e-6)
 end

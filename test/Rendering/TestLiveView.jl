@@ -232,12 +232,20 @@ const BMO = BeamletOptics
         @test cam.settings.projectiontype[] == Makie.Orthographic
         vp = scene.viewport[]
         events(scene).mouseposition[] = (vp.origin[1] + vp.widths[1] / 2, vp.origin[2] + vp.widths[2] / 2)
-        # the ray through the center starts at the eye and points to lookat
+        # the ray through the center passes the eye, starts at the near plane behind it and
+        # points to lookat
         origin, dir = Ext._cursor_ray(scene)
-        @test isapprox(origin, collect(cam.eyeposition[]); atol = 1e-6)
-        @test isapprox(dir, normalize(collect(cam.lookat[] - cam.eyeposition[])); atol = 1e-6)
-        events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
-        events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
+        eye = collect(cam.eyeposition[])
+        @test isapprox(dir, normalize(collect(cam.lookat[]) .- eye); atol = 1e-6)
+        @test isapprox(origin, eye .+ cam.near[] .* dir; atol = 1e-6)
+        @test cam.near[] < 0
+        _select!(gui)
+        @test gui.controls.selected[] === m
+        # the eye zoomed past the mirror: the mirror behind the eye is visible and can be picked
+        gui.controls.selected[] = nothing
+        u = normalize([1.0, -1, 1])
+        set_view(gui.ax, c .- 0.1 .* u, c .- 0.2 .* u, [0.0, 0, 1])
+        _select!(gui)
         @test gui.controls.selected[] === m
         close(gui)
     end
@@ -872,10 +880,27 @@ const BMO = BeamletOptics
         settings = cameracontrols(gui.ax.scene).settings
         @test !gui.orthographic_toggle.active[]
         @test settings.projectiontype[] == Makie.Perspective
+        cam = cameracontrols(gui.ax.scene)
+        perspective_depth = (settings.clipping_mode[], cam.near[], cam.far[])
         gui.orthographic_toggle.active[] = true
         @test settings.projectiontype[] == Makie.Orthographic
+        # Eye inside the scene, e.g. after zooming in: the depth range covers the whole scene on
+        # both sides of the eye, so that the near plane does not cut it
+        bb = Makie.data_limits(gui.ax.scene)
+        corners = [collect(Float64, p) for p in Makie.GeometryBasics.coordinates(bb)]
+        center = sum(corners) ./ length(corners)
+        for (eye, lookat) in ((center, center .+ [0.0, 1, 0]), (center .+ [0.0, -0.01, 0], center),
+                              (center .+ [0.0, -10, 0], center))
+            set_view(gui.ax, eye, lookat, [0.0, 0, 1])
+            @test cam.near[] < 0 < cam.far[]
+            v = normalize(lookat .- eye)
+            @test all(cam.near[] < dot(p .- eye, v) < cam.far[] for p in corners)
+            # the projection uses the updated range
+            @test gui.ax.scene.camera.projection[][3, 3] ≈ -2 / (cam.far[] - cam.near[]) rtol = 1e-4
+        end
         gui.orthographic_toggle.active[] = false
         @test settings.projectiontype[] == Makie.Perspective
+        @test (settings.clipping_mode[], cam.near[], cam.far[]) == perspective_depth
         close(gui)
 
         m, pd = _fixture()

@@ -656,14 +656,15 @@ end
 
 Returns the `origin` and the `direction` of the camera ray through the mouse position. For an
 orthographic `Camera3D`, `Makie.ray_at_cursor` (Makie 0.24) returns the origin relative to the
-world origin instead of the eye position, which is corrected here.
+world origin instead of the eye position, which is corrected here. The origin is also moved back to
+a negative `near` plane, i.e. the start of the visible depth range behind the eye.
 """
 function _cursor_ray(scene)
     r = Makie.ray_at_cursor(scene)
     origin, dir = Vector{Float64}(r.origin), Vector{Float64}(r.direction)
     cam = Makie.cameracontrols(scene)
     if cam isa Makie.Camera3D && cam.settings.projectiontype[] != Makie.Perspective
-        origin .+= Vector{Float64}(cam.eyeposition[])
+        origin .+= Vector{Float64}(cam.eyeposition[]) .+ min(cam.near[], 0.0) .* dir
     end
     return origin, dir
 end
