@@ -494,9 +494,17 @@ view, off the view cube and the other cards:
 - "pin" keeps the card with its component when the selection changes, e.g. to watch or type the
   poses of several components; the widgets of a pinned card act on its component. "unpin" closes
   it.
-- Sources whose rays can be regenerated (`CollimatedSource`, `PointSource` and their uniform
-  variants, see [`set_num_rays!`](@ref)) add the slider "rays" for their number of rays, which
-  solves again.
+- Below the pose, rows of the component type, refreshed after each solve and move:
+
+  | Component | Rows |
+  |:----------|:-----|
+  | optical components | `beam`: the rays hitting it in the last solve and the angle of incidence of the first one (e.g. the center ray of a ring source) with the range of all, or "not hit" |
+  | lenses, prisms | `n` at the wavelength of the hitting beam, `d` the center thickness (`Lens`) |
+  | beamsplitters | `split`: R and T (power) of the coating |
+  | polarizers | `axis`: the transmission axis about the optical axis, from the horizontal |
+  | detectors | `panel`: the power (intensity panel) or the number of rays (spot panel) |
+  | ray sources | `λ` and the diameter or NA; sources whose rays can be regenerated (`CollimatedSource`, `PointSource` and their uniform variants, see [`set_num_rays!`](@ref)) add the slider "rays" for their number of rays, which solves again |
+  | Gaussian beamlets | `λ`, the waist `w0` and the Rayleigh range `zR` |
 
 The rows and the buttons in the head are declared per type by multiple dispatch, see
 [`card_rows`](@ref) and [`card_actions`](@ref): each row is a [`CardRow`](@ref) of texts and

@@ -78,7 +78,7 @@ BMO.card_actions(::CardTestObject) = ()
         @test !any(b -> b isa Textbox, gui.fig.content)
         @test !any(b -> b isa Button && b.label[] == "hide", gui.fig.content)
         # drawn after the 3D scene
-        @test c.scene.transformation.translation[][3] == Ext._CARD_Z
+        @test c.scene.transformation.translation[][3] == Ext._card_z(1)
         # hidden without a selection, without widgets and with all parts away
         @test !c.scene.visible[] && isempty(c.widgets)
         @test all(_away, (c.head, c.rows, c.step, c.actions, c.background))
@@ -275,7 +275,8 @@ BMO.card_actions(::CardTestObject) = ()
     @testset "pinned cards" begin
         m, pd = _fixture()
         beam = _gauss()
-        gui = _live_view(System([m, pd]), beam; labels = Dict(m => "M1", pd => "PD"))
+        # a window large enough for three cards next to each other
+        gui = _live_view(System([m, pd]), beam; labels = Dict(m => "M1", pd => "PD"), size = (1800, 1100))
         ctrl = gui.controls
         c1 = gui.card
         # nothing to pin without a selection
@@ -357,8 +358,10 @@ BMO.card_actions(::CardTestObject) = ()
         m, pd = _fixture()
         t = CardTestObject(BMO.shape(RoundPlanoMirror(0.01, 0.002)))
         translate3d!(t, [-0.05, 0.05, 0.0])
+        m2 = RoundPlanoMirror(25e-3, 5e-3)
+        translate3d!(m2, [0.05, 0.3, 0.0])
         solves = Ref(0)
-        gui = _live_view(System([m, pd, t]), _gauss(); on_change = (gui, obj) -> (solves[] += 1))
+        gui = _live_view(System([m, pd, t, m2]), _gauss(); on_change = (gui, obj) -> (solves[] += 1))
         c, ctrl = gui.card, gui.controls
         _select!(gui, t)
         # the pose rows, then its own rows; no actions
@@ -388,11 +391,11 @@ BMO.card_actions(::CardTestObject) = ()
         _select!(gui, m)
         @test isnothing(_w(c, :lift)) && _w(c, :hide) isa Button
         @test all(b -> b.parent === nothing, filter(b -> !any(x -> x === b, c.blocks), old))
-        # an object with the same declarations keeps the widgets and shows its values
+        # an object with the same declarations (another mirror) keeps the widgets and shows its values
         kept = copy(c.blocks)
-        _select!(gui, pd)
+        _select!(gui, m2)
         @test length(c.blocks) == length(kept) && all(c.blocks .=== kept)
-        @test _pose(c, 1).displayed_string[] == "100.0"
+        @test _pose(c, 2).displayed_string[] == "300.0"
         close(gui)
     end
 

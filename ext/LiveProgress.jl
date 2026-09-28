@@ -10,8 +10,8 @@ const _PROGRESS_PANEL = Vec2f(220, 46)
 const _PROGRESS_MARGIN = 8.0f0
 # z translation of the plots: GLMakie draws the plots in the order of this value, the window comes
 # after the 3D scene, and its depth (≈ 0.01) lies in front of it, including transparent plots, which
-# are drawn over plots with `overdraw`. Within the clip range ±10000 of the pixel camera and below
-# the component card, see `_CARD_Z`
+# are drawn over plots with `overdraw`. Within the clip range ±10000 of the pixel camera, among the
+# levels of the component cards, see `_CARD_Z`
 const _PROGRESS_Z = 9800.0f0
 const _PROGRESS_PADDING = 10.0f0
 const _PROGRESS_TRACK = Vec2f(_PROGRESS_PANEL[1] - 2 * _PROGRESS_PADDING, 6)

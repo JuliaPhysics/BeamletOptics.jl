@@ -4,10 +4,16 @@ using Makie: Figure, Observable, Point2f, Vec2f, Rect2f, GridLayout, Textbox, Bu
 # Component cards of the live view: the controls of an object, next to it in the 3D view
 
 # z translation of the scene of a card: GLMakie draws the plots in the order of this value, the
-# card comes after the 3D scene and the progress window (`_PROGRESS_Z`), and its depth (≈ 0.005)
-# lies in front of them. Plus the offsets of the widgets, it stays within the clip range ±10000 of
-# the pixel camera
+# card comes after the 3D scene, and its depth (≈ 0.005–0.02) lies in front of it. Each card gets
+# its own value, `_CARD_Z0` for the first, `_CARD_DZ` more for each further one up to `_CARD_Z`,
+# such that a newer card is drawn over an older one as a whole. Plus the offsets of the widgets,
+# it stays within the clip range ±10000 of the pixel camera
 const _CARD_Z = 9900.0f0
+const _CARD_Z0 = 9600.0f0
+const _CARD_DZ = 10.0f0
+
+"""The z translation of the `k`-th card (from 1), see `_CARD_Z`."""
+_card_z(k::Int) = min(_CARD_Z, _CARD_Z0 + (k - 1) * _CARD_DZ)
 # Distance of the card from the bounding box of its object [px]
 const _CARD_GAP = 12.0f0
 # Minimum distance of the card from the edges of the 3D view and from the view cube [px]
@@ -21,6 +27,8 @@ const _CARD_AWAY = Rect2f(-1.0f5, -1.0f5, 0, 0)
 const _CARD_BACKGROUND = RGBAf(0.1, 0.1, 0.12, 1)
 # Line from the card to its object and the dot at the object
 const _CARD_LINK_COLOR = RGBAf(0.95, 0.95, 0.95, 0.85)
+# Font size of the cards, smaller than the theme, such that several cards fit into the view
+const _CARD_FONTSIZE = 14
 
 """
     _ComponentCard(fig::Figure)
@@ -52,8 +60,8 @@ the pose `key = (obj, P, R)` when it was pinned; they move with the object, see 
 `pose` is the object and its pose that the widgets show.
 
 Parts that are not shown are moved far outside of the figure (`_CARD_AWAY`), since hidden widgets
-still take clicks within their bounding box. `scene` is translated to `_CARD_Z`, so that GLMakie
-draws the card over the 3D scene, including plots added later and transparent plots.
+still take clicks within their bounding box. `scene` is translated to `z` (see `_card_z`), so that
+GLMakie draws the card over the 3D scene, including plots added later and transparent plots.
 """
 mutable struct _ComponentCard
     scene::Scene
@@ -74,6 +82,7 @@ mutable struct _ComponentCard
     content_key::Any
     refreshing::Bool
     collapsed::Bool
+    auto_collapsed::Bool
     pinned::Bool
     obj::Any
     corners::Vector{Point3f}
@@ -89,9 +98,9 @@ function _card_part(scene::Scene)
     return layout
 end
 
-function _ComponentCard(fig::Figure)
+function _ComponentCard(fig::Figure, z::Real = _CARD_Z)
     scene = Scene(fig.scene; camera = Makie.campixel!, clear = false)
-    translate!(scene, 0, 0, _CARD_Z)
+    translate!(scene, 0, 0, z)
     # The line first, then the background, then the widgets: each covers the one before
     link = Observable(Point2f[])
     lines!(scene, link; color = _CARD_LINK_COLOR, linewidth = 1.5, inspectable = false)
@@ -100,16 +109,17 @@ function _ComponentCard(fig::Figure)
     background = Box(scene; bbox = _CARD_AWAY, color = _CARD_BACKGROUND, strokevisible = false,
         cornerradius = _PROGRESS_CORNER)
     head, step = _card_part(scene), _card_part(scene)
-    collapse_button = Button(head[1, 1]; label = "–", width = 24, height = 22, padding = (0, 0, 0, 0))
-    pin_button = Button(head[1, 2]; label = "pin", height = 22, padding = (6, 6, 0, 0))
-    title = Label(head[1, 3], ""; font = :bold, halign = :left, color = _PROGRESS_TEXT_COLOR)
-    Label(step[1, 1], "step"; halign = :right, color = _PROGRESS_TEXT_COLOR)
+    collapse_button = Button(head[1, 1]; label = "–", width = 22, height = 20, padding = (0, 0, 0, 0),
+        fontsize = _CARD_FONTSIZE)
+    pin_button = Button(head[1, 2]; label = "pin", height = 20, padding = (6, 6, 0, 0), fontsize = _CARD_FONTSIZE)
+    title = Label(head[1, 3], ""; font = :bold, halign = :left, _card_style(Label)...)
+    Label(step[1, 1], "step"; halign = :right, _card_style(Label)...)
     step_box = Textbox(step[1, 2]; placeholder = "e.g. 250 nm", width = 110, _card_style(Textbox)...)
-    _fix_caret!(step_box)
+    _fix_caret!(step_box, z)
     scene.visible[] = false
     return _ComponentCard(scene, background, head, _card_part(scene), _card_part(scene), step, title,
         collapse_button, pin_button, step_box, link, Tuple{Any, CardWidget}[], Any[], Textbox[], Any[],
-        nothing, false, false, false, nothing, Point3f[], nothing, nothing)
+        nothing, false, false, false, false, nothing, Point3f[], nothing, nothing)
 end
 
 """Returns the textboxes of the card `c`: the step box and the declared ones."""
@@ -126,18 +136,24 @@ Widgets of the declarations, by the type of the block
 =#
 
 # Colors of the card, which is dark, for the blocks of the declarations
-_card_style(::Type{Label}) = (; color = _PROGRESS_TEXT_COLOR)
-_card_style(::Type{Textbox}) = (; textcolor = _PROGRESS_TEXT_COLOR)
+_card_style(::Type{Label}) = (; color = _PROGRESS_TEXT_COLOR, fontsize = _CARD_FONTSIZE)
+_card_style(::Type{Textbox}) = (; textcolor = _PROGRESS_TEXT_COLOR, fontsize = _CARD_FONTSIZE, height = 26,
+    textpadding = (6, 6, 4, 4))
+_card_style(::Type{Button}) = (; fontsize = _CARD_FONTSIZE, height = 24, padding = (8, 8, 2, 2))
 _card_style(::Type) = (;)
 
-# The caret and the selection of a textbox are drawn without the translation of the scene of the card
-function _fix_caret!(tb::Textbox)
+# The caret and the selection of a textbox are drawn without the translation of the scene of the
+# card, which is at `z`
+function _fix_caret!(tb::Textbox, z::Real)
     for p in tb.editor.plots
-        p isa Makie.Text || translate!(p, 0, 0, _CARD_Z + 5)
+        p isa Makie.Text || translate!(p, 0, 0, z + 5)
     end
     return nothing
 end
-_fix_caret!(_) = nothing
+_fix_caret!(_, ::Real) = nothing
+
+# The z translation of the scene of the card `c`
+_scene_z(c::_ComponentCard) = c.scene.transformation.translation[][3]
 
 # The observable of a block that carries its inputs, see `CardWidget`
 _widget_input(b::Slider) = b.value
@@ -191,7 +207,7 @@ end
 
 """Returns the parts of the card `c` below its head that are shown, see `_ComponentCard`."""
 function _lower_parts(c::_ComponentCard)
-    c.collapsed && return GridLayout[]
+    (c.collapsed || c.auto_collapsed) && return GridLayout[]
     rows = isempty(c.rows.content) ? GridLayout[] : [c.rows]
     return c.pinned ? rows : [rows..., c.step]
 end
@@ -343,6 +359,8 @@ end
 # Rectangle of a card with the top left corner `p` and the `size`
 _card_rect(p::Point2f, size::Vec2f) = Rect2f(p[1], p[2] - size[2], size...)
 _overlaps(a::Rect2f, b::Rect2f) = all(minimum(a) .< maximum(b)) && all(minimum(b) .< maximum(a))
+# The card with the top left corner `p` and the `size` overlaps one of the `obstacles`
+_covers(p::Point2f, size::Vec2f, obstacles) = any(o -> _overlaps(_card_rect(p, size), o), obstacles)
 
 """Returns the screen rectangles [figure px] that the cards keep off: the view cube, if any."""
 _obstacles(::Nothing) = Rect2f[]
@@ -353,20 +371,25 @@ _obstacles(cube::ViewCube) = [Rect2f(Makie.viewport(cube.scene)[])]
 
 Moves the top left corner `p` of a card of the `size` off the `obstacles`, i.e. the view cube and
 the cards placed before (see `_update_cards!`), which would otherwise take its clicks or the other
-way round: to the nearest position below, above, left or right of an obstacle that lies inside the
-`view` with the margin `_CARD_MARGIN` and overlaps no obstacle. Keeps `p` if there is none.
+way round: to the nearest position that lies inside the `view` with the margin `_CARD_MARGIN` and
+overlaps no obstacle. The candidates combine the coordinates of `p`, of the edges of the view and of
+the positions next to each obstacle (left or right of it, below or above it). Keeps `p` if none is
+free, i.e. if the view is too full.
 """
 function _avoid(p::Point2f, size::Vec2f, view::Rect2f, obstacles)
-    free(q) = !any(o -> _overlaps(_card_rect(q, size), o), obstacles)
+    free(q) = !_covers(q, size, obstacles)
     free(p) && return p
     lo, hi = minimum(view) .+ _CARD_MARGIN, maximum(view) .- _CARD_MARGIN
     m = _CARD_MARGIN
-    candidates = Point2f[]
+    # Left edges and top edges of the card
+    xs, ys = Float32[p[1], lo[1], hi[1] - size[1]], Float32[p[2], hi[2], lo[2] + size[2]]
     for o in obstacles
-        push!(candidates, Point2f(p[1], minimum(o)[2] - m), Point2f(p[1], maximum(o)[2] + m + size[2]),
-            Point2f(minimum(o)[1] - m - size[1], p[2]), Point2f(maximum(o)[1] + m, p[2]))
+        push!(xs, minimum(o)[1] - m - size[1], maximum(o)[1] + m)
+        push!(ys, minimum(o)[2] - m, maximum(o)[2] + m + size[2])
     end
-    inside(q) = q[1] >= lo[1] && q[1] + size[1] <= hi[1] && q[2] - size[2] >= lo[2] && q[2] <= hi[2]
+    inside(q) = q[1] >= lo[1] - 1.0f-3 && q[1] + size[1] <= hi[1] + 1.0f-3 &&
+                q[2] - size[2] >= lo[2] - 1.0f-3 && q[2] <= hi[2] + 1.0f-3
+    candidates = [Point2f(x, y) for x in xs for y in ys]
     filter!(q -> inside(q) && free(q), candidates)
     isempty(candidates) && return p
     return argmin(q -> norm(q - p), candidates)

@@ -86,7 +86,10 @@ after each change and detector panels update live. `export_changes(gui)` prints 
 as Julia code. Needs an interactive display; not for headless scripts. A selected component opens a
 card next to it in the 3D view: exact position `x`, `y`, `z` [mm], rotations `rx`, `ry`, `rv`
 [mrad] about the gizmo axes, the keyboard step (e.g. `250 nm`) and "hide". "pin" keeps a card with
-its component, so several components can be edited side by side.
+its component, so several components can be edited side by side. Below the pose, rows of the type:
+rays hitting it and their angle of incidence (last solve), `n` of lenses, R/T of beamsplitters, the
+polarizer axis, detector power, the ray count slider of sources (`set_num_rays!`). Own types add
+rows with a `card_rows` method (`CardRow`, `CardWidget`).
 
 Solves longer than `progress_delay` (kwarg, default 0.5 s) run in the background: the window stays
 usable and a small progress window appears next to the source being traced or the detector whose

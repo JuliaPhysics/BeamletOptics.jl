@@ -76,6 +76,7 @@ include("LiveProgress.jl")
 include("ViewCube.jl")
 include("LiveCard.jl")
 include("LiveView.jl")
+include("LiveCardRows.jl")
 # precompiles the live rendering/interaction call paths, must come last
 include("LivePrecompile.jl")
 
