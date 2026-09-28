@@ -298,27 +298,82 @@ const BMO = BeamletOptics
         insp, ctrl = gui.layout.inspector, gui.controls
         n = length(gui.cards)
         ctrl.selected[] = o.m
-        # the pin in the header pins a floating card to the selected object
+        # the pin in the header docks a card of the selected object below the inspector, no
+        # floating card
         insp.pin.active[] = true
-        c = only(filter(c -> c.pinned, gui.cards))
-        @test c.obj === o.m && c !== gui.card && length(gui.cards) == n + 1
-        events(gui.ax.scene).tick[] = Makie.Tick(Makie.RegularRenderTick, 0, 0.0, 1.0)
-        @test c.scene.visible[] && Ext._card_widget(c, :hide) isa Button
-        # it stays when the selection changes, the pin follows the selection
+        c = only(insp.pinned)
+        @test c.pinned && c.obj === o.m && Ext._is_pinned(gui, o.m) && length(gui.cards) == n
+        _tick!(gui)
+        @test !any(c -> c.scene.visible[], gui.cards)
+        @test Ext._card_widget(c, :hide) isa Button && Ext._card_widget(c, :x) isa Textbox
+        @test c.head.title.text[] == "Mirror 1" && c.head.icon[] === Ext._icon(:mirror)
+        @test c.head.pin.active[]
+        # it stays when the selection changes, the pin of the inspector follows the selection
         ctrl.selected[] = o.pd
-        @test !insp.pin.active[] && c.scene.visible[]
-        ctrl.selected[] = o.m
-        @test insp.pin.active[]
-        # "unpin" on the floating card unpins it, the pin of the inspector follows
-        c.pin_button.active[] = !c.pin_button.active[]
-        @test !c.pinned && !c.scene.visible[] && !insp.pin.active[]
-        # pin and unpin from the inspector
+        @test !insp.pin.active[] && only(insp.pinned) === c
+        # a second pinned card below the first
         insp.pin.active[] = true
-        @test Ext._is_pinned(gui, o.m)
+        c2 = insp.pinned[2]
+        @test c2.obj === o.pd && Ext._card_widget(c2, :panel_mode) isa Button
+        @test maximum(_rect(c2.parent))[2] <= minimum(_rect(c.parent))[2]
+        # the first card may have collapsed to make room, see `_fit_pinned!`; expanded again
+        c.collapsed && notify(c.head.collapse.clicks)
+        @test !c.collapsed
+        # the widgets of a pinned card act on its object, not on the selection
+        ctrl.selected[] = o.l1
+        Ext._card_widget(c, :z).stored_string[] = "5"
+        @test BMO.position(o.m)[3] ≈ 5e-3
+        @test Ext._card_widget(c, :z).displayed_string[] == "5.0"
+        # and take the keyboard
+        Ext._card_widget(c, :y).focused[] = true
+        @test Ext._typing(gui)
+        Ext._card_widget(c, :y).focused[] = false
+        # collapsed to the head and the actions, expanded again
+        notify(c.head.collapse.clicks)
+        @test c.collapsed && isempty(c.rows.content) && Ext._card_widget(c, :hide) isa Button
+        @test c.head.collapse.icon[] === Ext._icon(:expand)
+        notify(c.head.collapse.clicks)
+        @test !c.collapsed && Ext._card_widget(c, :x) isa Textbox
+        # the pin of a pinned card unpins it, the next card moves up
+        c.head.pin.active[] = false
+        @test only(insp.pinned) === c2 && !Ext._is_pinned(gui, o.m)
+        @test isempty(c.widgets) && c.head.title.parent === nothing
+        # pin and unpin from the inspector
+        ctrl.selected[] = o.m
+        insp.pin.active[] = true
+        @test Ext._is_pinned(gui, o.m) && length(insp.pinned) == 2
         insp.pin.active[] = false
-        @test !Ext._is_pinned(gui, o.m)
+        @test !Ext._is_pinned(gui, o.m) && only(insp.pinned) === c2
         # the keyboard step stays in the inspector
         @test gui.step_box !== gui.card.step_box
+        close(gui)
+    end
+
+    @testset "pinned cards fit into the sidebar" begin
+        gui, o = _fixture()
+        insp, ctrl = gui.layout.inspector, gui.controls
+        ctrl.selected[] = o.m
+        # more pinned cards than fit: the older ones collapse, the newest stays expanded
+        for obj in (o.m, o.pd, o.bs, o.pd2, o.l1)
+            Ext._toggle_pin!(gui, obj)
+            # the older cards collapse, then the property list is shortened; only beyond that
+            # room, the sidebar overflows
+            @test !Ext._overflows(gui) ||
+                  (all(c -> c.collapsed, insp.pinned[1:(end - 1)]) && isempty(insp.list.rows))
+            @test length(insp.list.rows) <= length(Ext._inspector_rows(gui, ctrl.selected[]))
+            @test !insp.pinned[end].collapsed
+        end
+        @test count(c -> c.collapsed, insp.pinned) >= 1
+        # an expanded card stays expanded, others collapse instead
+        c = first(insp.pinned)
+        @test c.collapsed
+        notify(c.head.collapse.clicks)
+        @test !c.collapsed && Ext._card_widget(c, :x) isa Textbox
+        @test !Ext._overflows(gui) || all(d -> d.collapsed, filter(d -> d !== c, insp.pinned))
+        # a collapsed card is not expanded automatically, e.g. after a solve
+        collapsed = [d.collapsed for d in insp.pinned]
+        Ext._update_inspector!(gui; force = true)
+        @test [d.collapsed for d in insp.pinned] == collapsed
         close(gui)
     end
 
@@ -331,15 +386,15 @@ const BMO = BeamletOptics
         ctrl.selected[] = o.m
         _tick!(gui)
         _click!(gui, _center(_rect(insp.pin.box)))
-        # the selection and its docked card stay, the pin is active, a floating card is pinned
+        # the selection and its docked card stay, the pin is active, a card is pinned below
         @test ctrl.selected[] === o.m
         @test insp.shown === o.m && insp.name.text[] == "Mirror 1"
         @test _w(gui, :x) isa Textbox && !isempty(insp.card.rows.content)
         @test insp.pin.active[] && Ext._is_pinned(gui, o.m)
         @test gui.layout.right.shown
         _tick!(gui)
-        c = only(filter(c -> c.pinned, gui.cards))
-        @test c.obj === o.m && c.scene.visible[]
+        c = only(insp.pinned)
+        @test c.obj === o.m && !any(c -> c.scene.visible[], gui.cards)
         # a click on a widget of the docked card keeps the selection, too
         _click!(gui, _center(_rect(_w(gui, :y))))
         @test ctrl.selected[] === o.m && _w(gui, :y).focused[]
@@ -348,14 +403,16 @@ const BMO = BeamletOptics
         _click!(gui, _center(_rect(insp.pin.box)))
         @test !Ext._is_pinned(gui, o.m) && !insp.pin.active[]
         @test ctrl.selected[] === o.m && insp.name.text[] == "Mirror 1" && _w(gui, :x) isa Textbox
-        _tick!(gui)
-        @test !c.scene.visible[]
-        # pinned again, then unpinned via "unpin" on the floating card
+        @test isempty(insp.pinned)
+        # pinned again, then unpinned via the pin of the pinned card; a click on its widgets keeps
+        # the selection
         _click!(gui, _center(_rect(insp.pin.box)))
-        _tick!(gui)
-        c = only(filter(c -> c.pinned, gui.cards))
-        _click!(gui, _center(_rect(c.pin_button.box)))
-        @test !c.pinned && !insp.pin.active[]
+        c = only(insp.pinned)
+        _click!(gui, _center(_rect(Ext._card_widget(c, :y))))
+        @test ctrl.selected[] === o.m && Ext._card_widget(c, :y).focused[]
+        Ext._card_widget(c, :y).focused[] = false
+        _click!(gui, _center(_rect(c.head.pin.box)))
+        @test isempty(insp.pinned) && !insp.pin.active[]
         @test ctrl.selected[] === o.m && insp.name.text[] == "Mirror 1" && _w(gui, :x) isa Textbox
         # a click on the background of the 3D view still clears the selection
         vp = gui.ax.scene.viewport[]

@@ -145,17 +145,14 @@ function _ComponentCard(fig::Figure, theme::NamedTuple, z::Real = _CARD_Z)
     background = Box(scene; bbox = _CARD_AWAY, color = t.sidebar, strokecolor = t.border,
         strokewidth = 1, cornerradius = _CARD_CORNER)
     head, tools, step = _card_part(scene), _card_part(scene), _card_part(scene)
-    icon, icon_color = _kind_icon!(head[1, 1])
-    title = Label(head[1, 2], ""; font = :bold, halign = :left, _card_style(t, Label)...,
-        fontsize = _CARD_TITLE_FONTSIZE)
-    icons = (; _icon_theme(t)..., icon_color = t.muted, size = _CARD_TOOL, icon_size = _CARD_TOOL_ICON)
-    pin_button = _IconToggle(tools[1, 1]; icon = :pinned, icon_off = :pin,
-        tooltip = "Pin the card to the object", icons...)
-    collapse_button = _IconButton(tools[1, 2]; icon = :collapse, tooltip = "Collapse the card", icons...)
+    icon, icon_color = _card_icon!(head[1, 1])
+    title = _card_title!(head[1, 2], t)
+    pin_button = _card_pin!(tools[1, 1], t)
+    collapse_button = _card_collapse!(tools[1, 2], t)
     Makie.colgap!(tools, 2)
     foreach(_fix_tooltip!, (pin_button, collapse_button))
     Label(step[1, 1], "step"; halign = :right, _card_style(t, Label)..., color = t.muted)
-    step_box = Textbox(step[1, 2]; placeholder = "e.g. 250 nm", width = 110, _card_style(t, Textbox)...)
+    step_box = _step_box!(step[1, 2], t; width = 110)
     _fix_caret!(step_box, z)
     scene.visible[] = false
     return _ComponentCard(scene, t, background, head, _card_part(scene), tools, _card_part(scene), step,
@@ -163,44 +160,91 @@ function _ComponentCard(fig::Figure, theme::NamedTuple, z::Real = _CARD_Z)
         Any[], Textbox[], Any[], nothing, false, false, false, false, nothing, Point3f[], nothing, nothing)
 end
 
-"""
-    _kind_icon!(pos) -> (icon, color)
+#=
+Parts of the head of a card, shared by its hosts: the floating `_ComponentCard`, the card of the
+selection in the inspector of the app layout and the pinned cards docked below it (`_DockedCard`)
+=#
 
-Adds the icon of the kind of an object (see `_tree_kind`) at the grid position `pos` of a card,
-like the header of the inspector of the app layout. Returns the observables of its marker and its
-color, see `_show_kind!`.
 """
-function _kind_icon!(pos)
-    box = Box(pos; width = _CARD_ICON, height = _CARD_ICON, visible = false)
+    _card_icon!(pos; size = _CARD_ICON, box = size) -> (icon, color)
+
+Adds the icon of the kind of an object (see `_tree_kind`) at the grid position `pos` of the head of
+a card, `size` pixels large in a square of `box` pixels. Returns the observables of its marker and
+its color, see `_show_kind!`.
+"""
+function _card_icon!(pos; size::Real = _CARD_ICON, box::Real = size)
+    b = Box(pos; width = box, height = box, visible = false)
     icon = Observable(_icon(:object))
     color = Observable(RGBAf(0, 0, 0, 1))
-    center = Makie.lift(r -> Point2f(Makie.origin(r) .+ Makie.widths(r) ./ 2), box.blockscene,
-        box.layoutobservables.computedbbox)
-    scatter!(box.blockscene, center; marker = icon, markersize = _CARD_ICON, color,
+    center = Makie.lift(r -> Point2f(Makie.origin(r) .+ Makie.widths(r) ./ 2), b.blockscene,
+        b.layoutobservables.computedbbox)
+    scatter!(b.blockscene, center; marker = icon, markersize = size, color,
         markerspace = :pixel, inspectable = false)
     return icon, color
 end
 
-"""Shows the icon of the kind of `obj` in its color on the card `c`, see `_tree_kind`."""
-function _show_kind!(c::_ComponentCard, obj)
+"""Adds the title of a card, the bold label of its object, at the grid position `pos`."""
+_card_title!(pos, t::NamedTuple; fontsize::Real = _CARD_TITLE_FONTSIZE, kwargs...) =
+    Label(pos, ""; font = :bold, halign = :left, _card_style(t, Label)..., fontsize, kwargs...)
+
+# The icon buttons of the head, in the colors of the tokens `t`
+_card_icons(t::NamedTuple; size::Real = _CARD_TOOL, icon_size::Real = _CARD_TOOL_ICON) =
+    (; _icon_theme(t)..., icon_color = t.muted, size, icon_size)
+
+"""The pin of a card at the grid position `pos`, an `_IconToggle` that is active while pinned."""
+_card_pin!(pos, t::NamedTuple; kwargs...) = _IconToggle(pos; icon = :pinned, icon_off = :pin,
+    tooltip = "Pin the card to the object", _card_icons(t)..., kwargs...)
+
+"""The chevron of a card at the grid position `pos` that collapses it, see `_show_head!`."""
+_card_collapse!(pos, t::NamedTuple; kwargs...) =
+    _IconButton(pos; icon = :collapse, tooltip = "Collapse the card", _card_icons(t)..., kwargs...)
+
+"""The textbox of the keyboard step of a card at the grid position `pos`, see `_set_step!`."""
+_step_box!(pos, t::NamedTuple; kwargs...) =
+    Textbox(pos; placeholder = "e.g. 250 nm", _card_style(t, Textbox)..., kwargs...)
+
+"""
+    _show_kind!(icon, color, t, obj)
+
+Shows the icon of the kind of `obj` (see `_tree_kind`) in its color of the tokens `t`, the icon of
+a system in the muted color for `nothing`.
+"""
+function _show_kind!(icon::Observable, color::Observable, t::NamedTuple, obj)
     kind = _tree_kind(obj)
-    _update!(c.icon, _icon(kind))
-    _update!(c.icon_color, RGBAf(Makie.to_color(_tree_marker_color(c.theme, kind))))
+    _update!(icon, _icon(kind))
+    _update!(color, RGBAf(Makie.to_color(_tree_marker_color(t, kind))))
     return nothing
 end
+function _show_kind!(icon::Observable, color::Observable, t::NamedTuple, ::Nothing)
+    _update!(icon, _icon(:system))
+    _update!(color, RGBAf(Makie.to_color(t.muted)))
+    return nothing
+end
+_show_kind!(c::_ComponentCard, obj) = _show_kind!(c.icon, c.icon_color, c.theme, obj)
+
+"""
+    _show_head!(pin, collapse, pinned, collapsed)
+
+Shows whether a card is `pinned` and `collapsed` on its `pin` and its `collapse` chevron (or
+`nothing` for a card that does not collapse).
+"""
+function _show_head!(pin::_IconToggle, collapse, pinned::Bool, collapsed::Bool)
+    _update!(pin.active, pinned)
+    _update!(pin.tooltip, pinned ? "Unpin the card" : "Pin the card to the object")
+    _show_collapsed!(collapse, collapsed)
+    return nothing
+end
+_show_collapsed!(::Nothing, _) = nothing
+function _show_collapsed!(b::_IconButton, collapsed::Bool)
+    _update!(b.icon, _icon(collapsed ? :expand : :collapse))
+    _update!(b.tooltip, collapsed ? "Expand the card" : "Collapse the card")
+    return nothing
+end
+_show_head!(c::_ComponentCard) = _show_head!(c.pin_button, c.collapse_button, c.pinned, c.collapsed)
 
 # The tooltip of an icon button of a card, relative to the translation of the card, see
 # `_CARD_TOOLTIP_DZ`
 _fix_tooltip!(b::Union{_IconButton, _IconToggle}) = translate!(last(b.plots), 0, 0, _CARD_TOOLTIP_DZ)
-
-"""Shows whether the card `c` is pinned and collapsed on its icon buttons."""
-function _show_head!(c::_ComponentCard)
-    _update!(c.pin_button.active, c.pinned)
-    _update!(c.pin_button.tooltip, c.pinned ? "Unpin the card" : "Pin the card to the object")
-    _update!(c.collapse_button.icon, _icon(c.collapsed ? :expand : :collapse))
-    _update!(c.collapse_button.tooltip, c.collapsed ? "Expand the card" : "Collapse the card")
-    return nothing
-end
 
 """Returns the textboxes of the card `c`: the step box and the declared ones."""
 _card_boxes(c::_ComponentCard) = (c.step_box, c.textboxes...)

@@ -434,21 +434,29 @@ BMO.card_actions(::CardTestObject) = ()
             gui = _live_view(System([m, pd]), _gauss(); layout, theme, labels = Dict(m => "M1"))
             t = Ext._app_theme(theme)
             @test gui.layout.theme === t
-            # a pinned card, in both layouts (the app layout docks the card of the selection)
+            # a pinned card: floating in the compact layout, docked below the inspector in the app
+            # layout, whose floating cards keep the colors of the theme
             Ext._toggle_pin!(gui, m)
-            c = only(filter(c -> c.pinned, gui.cards))
-            @test c.theme === t && c.scene.visible[]
-            @test _rgba(c.background.color[]) == _rgba(t.sidebar)
-            @test _rgba(c.background.strokecolor[]) == _rgba(t.border)
-            @test _rgba(c.title.color[]) == _rgba(t.text) && c.title.text[] == "M1"
-            @test c.pin_button.active[] && c.icon[] === Ext._icon(:mirror)
+            @test _rgba(gui.card.background.color[]) == _rgba(t.sidebar)
+            @test _rgba(gui.card.background.strokecolor[]) == _rgba(t.border)
+            if layout === :app
+                c = only(gui.layout.inspector.pinned)
+                @test c.theme === t && !any(c -> c.scene.visible[], gui.cards)
+                @test _rgba(c.head.title.color[]) == _rgba(t.text) && c.head.title.text[] == "M1"
+                @test c.head.pin.active[] && c.head.icon[] === Ext._icon(:mirror)
+            else
+                c = only(filter(c -> c.pinned, gui.cards))
+                @test c.theme === t && c.scene.visible[]
+                @test _rgba(c.title.color[]) == _rgba(t.text) && c.title.text[] == "M1"
+                @test c.pin_button.active[] && c.icon[] === Ext._icon(:mirror)
+                # the line to the object
+                @test _rgba(c.scene.plots[1].color[]) == _rgba(t.accent)
+            end
             # the widgets in the style of the app layout, the rotations in the gizmo colors
             @test _rgba(_pose(c, 1).boxcolor[]) == _rgba(t.field)
             @test _rgba(_pose(c, 1).textcolor[]) == _rgba(t.text)
             @test _rgba(_label(c, "x").color[]) == _rgba(t.text)
             @test [_rgba(_label(c, k).color[]) for k in ("rx", "ry", "rv")] == _rgba.(collect(t.gizmo))
-            # the line to the object
-            @test _rgba(c.scene.plots[1].color[]) == _rgba(t.accent)
             # the progress window: panel and text from the theme, the bar orange
             panel, track, bar, text = gui.progress.plots
             @test _rgba(panel.color[]) == _rgba(t.sidebar) && _rgba(text.color[]) == _rgba(t.text)

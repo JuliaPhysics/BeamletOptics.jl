@@ -132,7 +132,9 @@ and optionally, with defaults for any layout,
   its inspector (`_DockedCard`), returns `false` from `_selection_card_shown(gui)` and refreshes
   them in `_refresh_inspector!(gui; force)`, called with the cards (see `_update_inspector!`);
   `_step_box(layout, w, card)` returns its `Textbox` of the keyboard step, `_layout_boxes(gui)`
-  the textboxes that take the keyboard (see `_typing`). Pinned cards float in all layouts.
+  the textboxes that take the keyboard (see `_typing`). Pinned cards float by default; a layout
+  that shows them elsewhere, e.g. the app layout below its inspector, implements `_pin!(gui, obj)`,
+  `_unpin!(gui, obj)` and `_is_pinned(gui, obj)`, see `_toggle_pin!`.
 - `_outside_view(gui)`: `true` while the mouse is over a part of the layout whose clicks must not
   reach the controls of the 3D view, e.g. the sidebars of the app layout (none by default)
 - hooks called by the shared logic: `_on_solved!(gui)` after a solve is shown,
@@ -2472,19 +2474,25 @@ _is_pinned(gui::LiveView, obj) = any(c -> c.pinned && c.obj === obj, gui.cards)
 """
     _toggle_pin!(gui, obj)
 
-Pins a floating card to `obj` (a spare card, see `_spare_card!`), independent of the card of the
-selection, e.g. from the docked card of the app layout; or unpins the cards pinned to `obj`.
+Pins a card to `obj`, independent of the card of the selection, or unpins the cards pinned to
+`obj`. Where a pinned card is shown depends on the layout (see `_pin!`, `_unpin!` and
+`_is_pinned`): floating next to its object by default, docked below the inspector in the app layout.
 """
 function _toggle_pin!(gui::LiveView, obj)
-    _is_pinned(gui, obj) && return _unpin!(gui, obj)
-    c = _spare_card!(gui)
-    c.pinned, c.obj, c.key, c.pose = true, obj, nothing, nothing
-    _show_head!(c)
-    _update_cards!(gui)
+    _is_pinned(gui, obj) ? _unpin!(gui, obj) : _pin!(gui, obj)
     _on_pinned!(gui)
     return nothing
 end
 _toggle_pin!(::LiveView, ::Nothing) = nothing
+
+"""Pins a floating card to `obj`, a spare card (see `_spare_card!`), see `_toggle_pin!`."""
+function _pin!(gui::LiveView, obj)
+    c = _spare_card!(gui)
+    c.pinned, c.obj, c.key, c.pose = true, obj, nothing, nothing
+    _show_head!(c)
+    _update_cards!(gui)
+    return nothing
+end
 
 # Called after a card was pinned or unpinned, see `AbstractLiveLayout`
 _on_pinned!(::LiveView) = nothing

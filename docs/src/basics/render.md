@@ -598,9 +598,14 @@ BeamletOptics.card_rows(l::MyLens) = (pose_card_rows(l)...,
 
 where `solve = true` solves the systems again after an input, like a move.
 
-With `live_view(...; layout = :app)`, the card of the selection is docked in the "Properties"
-sidebar instead of floating next to the component: it shows the same rows and actions, and its pin
-pins a floating card to the component in the 3D view, as above.
+With `live_view(...; layout = :app)`, the cards are docked in the "Properties" sidebar instead of
+floating next to the components: the card of the selection at the top, with the same rows and
+actions, and below it the pinned cards, one below the other, each with its own head (icon, label,
+actions, pin and chevron). The pin of the selection pins a card, the pin of a pinned card unpins
+it. The sidebar does not scroll: if the cards do not fit, the older pinned cards collapse to their
+heads (the one pinned or expanded last stays open) and the property list of the selection is
+shortened; a collapsed card is only expanded again by its chevron. The floating cards and the
+docked cards are built by the same code from the same declarations.
 
 The row below the status line holds the component menu and "show all". The menu lists all movable
 components and sources by their `labels` (or type), the objects of a group indented after the

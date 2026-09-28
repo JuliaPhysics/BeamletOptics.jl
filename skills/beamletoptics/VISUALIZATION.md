@@ -91,7 +91,8 @@ type: rays hitting it and their angle of incidence (last solve), `n` of lenses, 
 beamsplitters, the polarizer axis, detector power, the ray count slider of sources
 (`set_num_rays!`). Own types add rows with a `card_rows` method (`CardRow`, `CardWidget`).
 `theme = :light` (default) or `:dark` colors the cards and the progress window; `layout = :app`
-arranges the whole window like an application in these colors.
+arranges the whole window like an application in these colors, with the cards (selection and
+pinned) docked in the "Properties" sidebar instead of floating.
 
 Mechanics that should be visible but not traced (e.g. a housing STL) go into
 `extras = [housing => (; color = :lightblue), ...]` (`obj` or `obj => render_kwargs`), not into
