@@ -278,6 +278,9 @@ mutable struct KinematicController{H <: SystemRenderHandle}
     on_click::Function
     # called before each change of an object, see `_change!`
     before_change::Function
+    # presses are left to other listeners while true, e.g. over the widgets of the component card of
+    # `live_view`; releases are handled, such that a drag that started elsewhere ends
+    ignore_mouse::Function
 end
 
 function Base.show(io::IO, ctrl::KinematicController)
@@ -983,12 +986,13 @@ function kinematic_controls!(
         nothing, _HistoryEntry[], _HistoryEntry[], nothing,
         box_obs, arrow_pos, arrow_dir, label_pos, ring_pts, arrow_color, label_color, ring_color,
         gizmo_size, gizmo_visible, help_obs, show_help, "", plots, Any[], nothing, obj -> false,
-        () -> nothing
+        () -> nothing, () -> false
     )
 
     # High priority, so that the camera does not receive events while an object is dragged
     l1 = on(events(scene).mousebutton, priority = 200) do event
         (event.button == Mouse.left && !ctrl.spectator[]) || return Consume(false)
+        event.action == Mouse.press && ctrl.ignore_mouse() && return Consume(false)
         if event.action == Mouse.press
             if !isnothing(ctrl.select_modifier) && !_modifier_held(scene, ctrl.select_modifier)
                 # Modifier not held: every click and drag goes to the camera, no state change

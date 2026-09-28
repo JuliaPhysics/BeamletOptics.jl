@@ -107,8 +107,10 @@ projection.
 The `export_button` prints the changed poses as Julia code, see [`export_changes`](@ref), and
 copies them to the clipboard if `export_clipboard` is `true`. The component `menu` lists the
 movable objects `menu_objects`, the objects hidden via the `hide_button` are stored in `hidden`.
-The `pose_boxes` of the pose inspector show and set the position `x`, `y`, `z` [mm] of the
-selected object and rotate it about the red, green and blue axes of the controls [mrad].
+The `card` next to the selected object holds the `hide_button`, the `pose_boxes`, which show and
+set the position `x`, `y`, `z` [mm] of the object and rotate it about the red, green and blue axes
+of the controls [mrad], and the `step_box` of the keyboard step. `cards` holds all cards, including
+the pinned ones.
 
 While moving, beam groups are solved only for their rendered beams if `preview_enabled`, `preview`
 is `true` until the full solve. A solve that takes longer than `trace_budget` continues in the
@@ -205,6 +207,12 @@ mutable struct LiveView
     job::Union{Nothing, _SolveJob}
     progress::_ProgressOverlay
     progress_delay::Float64
+    # card with the controls of the selected object next to it in the 3D view, which holds
+    # `step_box`, `hide_button` and `pose_boxes`; all cards, including the pinned ones; the
+    # listeners that keep the camera from the cards, see `_shield_cards!`
+    card::_ComponentCard
+    cards::Vector{_ComponentCard}
+    card_shield::Vector{Any}
 end
 
 """
@@ -241,6 +249,7 @@ function Base.close(gui::LiveView)
     _cancel_solve!(gui)
     close(gui.controls)
     isnothing(gui.view_cube) || close(gui.view_cube)
+    foreach(_hide_card!, gui.cards)
     return nothing
 end
 
@@ -1347,9 +1356,14 @@ function _remove_clip_plane!(gui::LiveView, plane::LiveClipPlane)
     filter!(p -> p !== plane, gui.clip_planes)
     delete!(gui.labels, plane)
     _apply_clip_planes!(gui)
+    _unpin!(gui, plane)
     gui.status.text[] = "clip plane removed"
     return nothing
 end
+
+# Other selected objects, e.g. after a click on a button of the card that is being hidden
+_remove_clip_plane!(::LiveView, _) = nothing
+_flip_clip_plane!(::LiveView, _) = nothing
 
 """Rotates the clip `plane` by π about its local x-axis, such that the other side is visible."""
 function _flip_clip_plane!(gui::LiveView, plane::LiveClipPlane)
@@ -1643,13 +1657,14 @@ function _on_menu_select!(gui::LiveView, i)
     return nothing
 end
 
-"""Shows the selected object of the controls in the component menu and in the pose inspector."""
+"""Shows the selected object of the controls in the component menu and in the component card."""
 function _on_select!(gui::LiveView)
     obj = gui.controls.selected[]
     i = isnothing(obj) ? nothing : findfirst(o -> o === obj, gui.menu_objects)
     i = something(i, 0)
     gui.menu.i_selected[] == i || (gui.menu.i_selected[] = i)
     _update_inspector!(gui)
+    _update_cards!(gui)
     return nothing
 end
 
@@ -1711,38 +1726,42 @@ function _connect_sources!(gui::LiveView)
 end
 
 """
-    _toggle_hidden!(gui)
+    _toggle_hidden!(gui, obj)
 
-Hides the selected object of the `gui`, i.e. makes its plots invisible and clears the selection,
-or shows it again if it is hidden. A hidden object can not be selected in the 3D view, but it
-stays in the systems.
+Hides the object `obj` of a card of the `gui`, i.e. makes its plots invisible and clears the
+selection if it is selected, or shows it again if it is hidden. A hidden object can not be
+selected in the 3D view, but it stays in the systems.
 """
-function _toggle_hidden!(gui::LiveView)
+function _toggle_hidden!(gui::LiveView, obj)
     ctrl = gui.controls
-    obj = ctrl.selected[]
-    if isnothing(obj)
-        gui.status.text[] = "select a component to hide it"
-        return nothing
-    elseif obj isa LiveClipPlane
-        gui.status.text[] = "clip planes can not be hidden, press c to switch clipping off"
-        return nothing
-    end
-    hide = !all(leaf -> leaf in gui.hidden, _leaves(obj))
+    hide = !_all_hidden(gui, obj)
     _set_hidden!(gui, obj, hide)
     if hide
-        ctrl.selected[] = nothing
-        _update_selection_box!(ctrl)
+        if ctrl.selected[] === obj
+            ctrl.selected[] = nothing
+            _update_selection_box!(ctrl)
+        end
         gui.status.text[] = "$(_label(gui, obj)) hidden, select it in the menu to show it again"
     else
         gui.status.text[] = "$(_label(gui, obj)) shown"
     end
+    _update_cards!(gui)
     return nothing
 end
+_toggle_hidden!(gui::LiveView, ::Nothing) = (gui.status.text[] = "select a component to hide it"; nothing)
+function _toggle_hidden!(gui::LiveView, ::LiveClipPlane)
+    gui.status.text[] = "clip planes can not be hidden, press c to switch clipping off"
+    return nothing
+end
+
+"""Returns `true` if all rendered objects (leaves) of `obj` are hidden in the `gui`."""
+_all_hidden(gui::LiveView, obj) = all(leaf -> leaf in gui.hidden, _leaves(obj))
 
 """Shows all hidden objects of the `gui`."""
 function _show_all!(gui::LiveView)
     foreach(leaf -> _set_hidden!(gui, leaf, false), collect(gui.hidden))
     gui.status.text[] = "all components shown"
+    _update_cards!(gui)
     return nothing
 end
 
@@ -1761,8 +1780,7 @@ const _POSE_COLORS = (:black, :black, :black, :red, :green, :blue)
 
 """Returns `true` if a textbox or a menu of the `gui` takes keyboard input."""
 function _typing(gui::LiveView)
-    gui.step_box.focused[] && return true
-    any(tb -> tb.focused[], gui.pose_boxes) && return true
+    any(c -> any(tb -> tb.focused[], _card_boxes(c)), gui.cards) && return true
     return gui.menu.is_open[] || gui.views_menu.is_open[]
 end
 
@@ -1776,14 +1794,23 @@ end
 """
     _update_inspector!(gui; force = false)
 
-Shows the position [mm] of the selected object of the `gui` in the position boxes of the pose
-inspector and clears the rotation boxes, or clears all boxes if nothing is selected. Focused boxes
-are skipped, unless `force`.
+Shows the position [mm] of the object of each card of the `gui` (see `_card_object`) in its pose
+boxes, see `_update_boxes!`.
 """
 function _update_inspector!(gui::LiveView; force::Bool = false)
-    obj = gui.controls.selected[]
+    foreach(c -> _update_boxes!(c, _card_object(gui, c); force), gui.cards)
+    return nothing
+end
+
+"""
+    _update_boxes!(c::_ComponentCard, obj; force = false)
+
+Shows the position [mm] of `obj` in the position boxes of the card `c` and clears the rotation
+boxes, or clears all boxes for `nothing`. Focused boxes are skipped, unless `force`.
+"""
+function _update_boxes!(c::_ComponentCard, obj; force::Bool = false)
     p = isnothing(obj) ? nothing : 1e3 .* Vector{Float64}(position(obj))
-    for (k, tb) in enumerate(gui.pose_boxes)
+    for (k, tb) in enumerate(c.pose_boxes)
         tb.focused[] && !force && continue
         _set_box!(tb, isnothing(p) || k > 3 ? "" : string(round(p[k], digits = 6)))
     end
@@ -1800,21 +1827,17 @@ function _move_allowed(ctrl::KinematicController, obj, Δ)
 end
 
 """
-    _apply_pose_input!(gui, k, s)
+    _apply_pose_input!(gui, obj, k, s)
 
-Applies the input `s` of the box `k` of the pose inspector (see `_POSE_FIELDS`) to the selected
-object of the `gui`: for `k ≤ 3`, moves it to the absolute position x, y or z [mm], otherwise
-rotates it about the red, green or blue axis of the controls [mrad], like a key step in the rotate
-mode. The change is recorded in the undo history and solved like a key step. An invalid input
-only shows a message in the status line.
+Applies the input `s` of the pose box `k` of a card (see `_POSE_FIELDS`) to its object `obj`: for
+`k ≤ 3`, moves it to the absolute position x, y or z [mm], otherwise rotates it about the red,
+green or blue axis of the controls [mrad], like a key step in the rotate mode. The change is
+recorded in the undo history and solved like a key step. An invalid input only shows a message in
+the status line.
 """
-function _apply_pose_input!(gui::LiveView, k::Int, s)
+_apply_pose_input!(gui::LiveView, ::Nothing, ::Int, _) = _update_inspector!(gui; force = true)
+function _apply_pose_input!(gui::LiveView, obj, k::Int, s)
     ctrl = gui.controls
-    obj = ctrl.selected[]
-    if isnothing(obj)
-        _update_inspector!(gui; force = true)
-        return nothing
-    end
     x = isnothing(s) ? nothing : tryparse(Float64, strip(s))
     if isnothing(x) || !isfinite(x)
         gui.status.text[] = "invalid input \"$(something(s, ""))\" for $(_POSE_FIELDS[k]), enter a number"
@@ -1853,17 +1876,247 @@ function _apply_pose_input!(gui::LiveView, k::Int, s)
     return nothing
 end
 
-"""Connects the export button, the component menu, the hide buttons and the pose inspector."""
+"""
+Camera3D takes the keyboard (WASD etc.) only after a click on the background of the 3D view, which
+a click on a widget, e.g. the orthographic toggle, undoes. Here the keyboard stays with the camera
+of the `gui` unless a textbox or a menu takes the input, see `_typing`.
+"""
+function _keep_keyboard!(gui::LiveView)
+    cam = cameracontrols(gui.ax.scene)
+    selected = !_typing(gui)
+    cam.selected[] == selected || (cam.selected[] = selected)
+    return nothing
+end
+
+"""Connects the export button, the component menu and "show all"; the cards connect their widgets."""
 function _connect_tools!(gui::LiveView)
     listeners = gui.controls.listeners
     push!(listeners, on(_ -> _export!(gui), gui.export_button.clicks))
     push!(listeners, on(i -> _on_menu_select!(gui, i), gui.menu.i_selected))
     push!(listeners, on(_ -> _on_select!(gui), gui.controls.selected))
-    push!(listeners, on(_ -> _toggle_hidden!(gui), gui.hide_button.clicks))
     push!(listeners, on(_ -> _show_all!(gui), gui.show_all_button.clicks))
-    for (k, tb) in enumerate(gui.pose_boxes)
-        push!(listeners, on(s -> _apply_pose_input!(gui, k, s), tb.stored_string))
+    return nothing
+end
+
+#=
+Component card
+=#
+
+"""Returns `true` if the component menu or the views menu of the `gui` is open."""
+_menu_open(gui::LiveView) = gui.menu.is_open[] || gui.views_menu.is_open[]
+
+"""
+Returns the object of the card `c` of the `gui`: the pinned object, the selected object for the card
+of the selection (`gui.card`), `nothing` for a spare card.
+"""
+function _card_object(gui::LiveView, c::_ComponentCard)
+    c.pinned && return c.obj
+    return c === gui.card ? gui.controls.selected[] : nothing
+end
+
+"""
+    _update_cards!(gui)
+
+Shows the pinned cards of the `gui` next to their objects and the card of the selection
+(`gui.card`) next to the selected object, unless it has a pinned card; see `_update_card!`. The
+cards are placed in this order, each off the view cube and the cards before, so that none covers
+another. All cards are hidden while a menu is open, whose options they would cover. Called every
+frame, which moves the cards with the camera and the objects.
+"""
+function _update_cards!(gui::LiveView)
+    menu = _menu_open(gui)
+    sel = gui.controls.selected[]
+    obstacles = _obstacles(gui.view_cube)
+    for c in gui.cards
+        c === gui.card && continue
+        _update_card!(gui, c, c.pinned && !menu ? c.obj : nothing, obstacles)
     end
+    shown = menu || any(c -> c.pinned && c.obj === sel, gui.cards) ? nothing : sel
+    _update_card!(gui, gui.card, shown, obstacles)
+    return nothing
+end
+
+"""
+    _update_card!(gui, c, obj, obstacles)
+
+Shows the card `c` for `obj` (or hides it for `nothing`): its label, its actions and the pose of
+`obj` if it changed, then moves it next to the bounding box of `obj` (see `_card_position`), off the
+`obstacles` (see `_avoid`), to which it adds its rectangle, and connects it to `obj` by a line.
+Only changed values update the layout.
+"""
+_update_card!(::LiveView, c::_ComponentCard, ::Nothing, ::Vector{Rect2f}) = _hide_card!(c)
+function _update_card!(gui::LiveView, c::_ComponentCard, obj, obstacles::Vector{Rect2f})
+    # The pose boxes show another object or a new pose, e.g. after a move by a program
+    pose = _pose(obj)
+    if c.pose === nothing || c.pose[1] !== obj || c.pose[2] != pose
+        c.pose = (obj, pose)
+        _update_boxes!(c, obj)
+    end
+    corners = _card_corners(gui, c, obj)
+    _update!(c.title.text, _label(gui, obj))
+    _update_actions!(gui, c, obj)
+    actions = _card_actions(c, obj)
+    scene = gui.ax.scene
+    view = Rect2f(Makie.viewport(scene)[])
+    size = _card_size(c, actions)
+    p = _avoid(_card_position(_screen_rect(scene, corners, obj), size, view), size, view, obstacles)
+    _arrange_card!(c, actions, p)
+    rect = _card_rect(p, size)
+    push!(obstacles, rect)
+    _update!(c.link, [_link_anchor(scene, corners, obj), Point2f(minimum(rect) .+ size ./ 2)])
+    _update!(c.scene.visible, true)
+    return nothing
+end
+
+"""
+    _card_corners(gui, c, obj)
+
+Returns the corners of the bounding box of the object `obj` of the card `c` of the `gui`: of the
+selection box for the card of the selection, which the controls keep up to date. A pinned card takes
+the bounding box of the plots of `obj` once and moves it with the pose of `obj` (see `key`), since
+the plots follow a move only after they are rendered again.
+"""
+function _card_corners(gui::LiveView, c::_ComponentCard, obj)
+    ctrl = gui.controls
+    c.pinned || return ctrl.box_obs[]
+    if c.key === nothing || c.key[1] !== obj
+        P, R = _pose(obj)
+        c.corners = _box_corners(_selection_bbox(ctrl, obj, _object_plots(ctrl.h, obj)))
+        c.key = (obj, Vector{Float64}(P), Matrix{Float64}(R))
+    end
+    _, P0, R0 = c.key
+    P, R = _pose(obj)
+    T = Matrix{Float64}(R) * R0'
+    return [Point3f(Vector{Float64}(P) + T * (Vector{Float64}(q) - P0)) for q in c.corners]
+end
+
+"""Shows "show" on the hide button of the card `c` if its object `obj` is hidden, otherwise "hide"."""
+_update_actions!(gui::LiveView, c::_ComponentCard, obj) =
+    _update!(c.hide_button.label, _all_hidden(gui, obj) ? "show" : "hide")
+_update_actions!(::LiveView, ::_ComponentCard, ::LiveClipPlane) = nothing
+
+"""Collapses the card `c` of the `gui` to its head, or expands it again."""
+function _toggle_collapsed!(gui::LiveView, c::_ComponentCard)
+    c.collapsed = !c.collapsed
+    c.collapse_button.label[] = c.collapsed ? "+" : "–"
+    _update_cards!(gui)
+    return nothing
+end
+
+"""
+    _toggle_pinned!(gui, c)
+
+Pins the card `c` of the selection to the selected object, which keeps the card next to the object
+independent of the selection; the selection gets another card. Unpins a pinned card, which hides
+it.
+"""
+function _toggle_pinned!(gui::LiveView, c::_ComponentCard)
+    if c.pinned
+        c.pinned, c.obj = false, nothing
+        c.pin_button.label[] = "pin"
+        _hide_card!(c)
+    elseif c === gui.card && !isnothing(gui.controls.selected[])
+        c.pinned, c.obj, c.key = true, gui.controls.selected[], nothing
+        c.pin_button.label[] = "unpin"
+        _use_card!(gui, _spare_card!(gui))
+    end
+    _update_cards!(gui)
+    return nothing
+end
+
+"""Unpins the cards of the `gui` that are pinned to `obj`, e.g. a removed clip plane."""
+function _unpin!(gui::LiveView, obj)
+    for c in gui.cards
+        c.pinned && c.obj === obj && _toggle_pinned!(gui, c)
+    end
+    return nothing
+end
+
+"""Returns a card of the `gui` that is neither pinned nor the card of the selection, or a new one."""
+function _spare_card!(gui::LiveView)
+    i = findfirst(c -> !c.pinned && c !== gui.card, gui.cards)
+    isnothing(i) || return gui.cards[i]
+    c = _ComponentCard(gui.fig)
+    push!(gui.cards, c)
+    _connect_card!(gui, c)
+    # The listeners of the new widgets come after the mouse shield of the cards, which must come last
+    _shield_cards!(gui)
+    return c
+end
+
+"""Makes `c` the card of the selection of the `gui`, which holds `step_box`, `hide_button` and `pose_boxes`."""
+function _use_card!(gui::LiveView, c::_ComponentCard)
+    gui.card = c
+    gui.step_box, gui.hide_button, gui.pose_boxes = c.step_box, c.hide_button, c.pose_boxes
+    c.key, c.pose = nothing, nothing
+    return nothing
+end
+
+"""
+    _connect_card!(gui, c)
+
+Connects the widgets of the card `c` of the `gui`, which act on its object (see `_card_object`), and
+its textboxes to the keyboard handling of the camera, see `_keep_keyboard!`.
+"""
+function _connect_card!(gui::LiveView, c::_ComponentCard)
+    listeners = gui.controls.listeners
+    obj() = _card_object(gui, c)
+    push!(listeners, on(_ -> _toggle_collapsed!(gui, c), c.collapse_button.clicks))
+    push!(listeners, on(_ -> _toggle_pinned!(gui, c), c.pin_button.clicks))
+    push!(listeners, on(_ -> _toggle_hidden!(gui, obj()), c.hide_button.clicks))
+    push!(listeners, on(_ -> _flip_clip_plane!(gui, obj()), c.flip_button.clicks))
+    push!(listeners, on(_ -> _remove_clip_plane!(gui, obj()), c.remove_button.clicks))
+    for (k, tb) in enumerate(c.pose_boxes)
+        push!(listeners, on(s -> _apply_pose_input!(gui, obj(), k, s), tb.stored_string))
+    end
+    push!(listeners, on(s -> _set_step!(gui, s), c.step_box.stored_string))
+    for tb in _card_boxes(c)
+        push!(listeners, on(_ -> _keep_keyboard!(gui), tb.focused))
+    end
+    return nothing
+end
+
+"""
+    _shield_cards!(gui)
+
+(Re)adds the listeners that keep the presses and the scrolling over the cards of the `gui` from the
+camera: after the widgets of all cards (Textbox 70, Button 1), whose presses they would take
+otherwise, and before the camera (0).
+"""
+function _shield_cards!(gui::LiveView)
+    ev = events(gui.ax.scene)
+    listeners = gui.controls.listeners
+    foreach(off, gui.card_shield)
+    filter!(l -> !any(s -> s === l, gui.card_shield), listeners)
+    over = () -> any(c -> _over_card(c, ev), gui.cards)
+    gui.card_shield = Any[on(event -> Consume(event.action == Mouse.press && over()), ev.mousebutton; priority = 1),
+        on(_ -> Consume(over()), ev.scroll; priority = 1)]
+    append!(listeners, gui.card_shield)
+    return nothing
+end
+
+"""
+    _connect_cards!(gui)
+
+Connects the cards of the `gui`: their widgets, their update every frame and the mouse. Presses on
+a card reach its widgets only: the controls ignore them (`ignore_mouse`) and the camera does not
+get them, see `_shield_cards!`. A press elsewhere ends the input into the textboxes of the cards,
+also if the controls consume it.
+"""
+function _connect_cards!(gui::LiveView)
+    ctrl = gui.controls
+    ev = events(gui.ax.scene)
+    over = () -> any(c -> _over_card(c, ev), gui.cards)
+    ctrl.ignore_mouse = over
+    foreach(c -> _connect_card!(gui, c), gui.cards)
+    push!(ctrl.listeners, on(_ -> _update_cards!(gui), ev.tick))
+    # Before the controls (200)
+    push!(ctrl.listeners, on(ev.mousebutton, priority = 250) do event
+        event.action == Mouse.press && !over() && foreach(_defocus_card!, gui.cards)
+        return Consume(false)
+    end)
+    _shield_cards!(gui)
+    _update_cards!(gui)
     return nothing
 end
 
@@ -2368,20 +2621,11 @@ function _connect_camera!(gui::LiveView)
         _step_camera!(gui, tick.delta_time)
         return nothing
     end)
-    # Camera3D takes the keyboard (WASD etc.) only after a click on the background of the 3D
-    # view, which a click on a widget, e.g. the orthographic toggle, undoes. Here the keyboard
-    # stays with the camera unless a textbox or a menu takes the input.
-    cam = cameracontrols(scene)
-    function keep_keyboard!(_...)
-        selected = !_typing(gui)
-        cam.selected[] == selected || (cam.selected[] = selected)
-        return nothing
+    # The textboxes of the cards are connected with their cards, see `_connect_card!`
+    for obs in (cameracontrols(scene).selected, gui.menu.is_open, gui.views_menu.is_open)
+        push!(listeners, on(_ -> _keep_keyboard!(gui), obs))
     end
-    for obs in (cam.selected, gui.step_box.focused, gui.menu.is_open, gui.views_menu.is_open,
-                (tb.focused for tb in gui.pose_boxes)...)
-        push!(listeners, on(keep_keyboard!, obs))
-    end
-    keep_keyboard!()
+    _keep_keyboard!(gui)
     push!(listeners, on(_ -> _go_home!(gui), gui.home_button.clicks))
     push!(listeners, on(i -> _set_saved_view!(gui, something(i, 0)), gui.views_menu.i_selected))
     push!(listeners, on(_ -> _save_view!(gui), gui.save_view_button.clicks))
@@ -2426,21 +2670,35 @@ window and `close(gui)` to remove the controls.
 
 Additional context, e.g. a static optomechanical assembly, can be added via `render!(gui.ax, ...)`.
 The status line shows the pose of the moved object and its change since the window was opened.
-The keyboard step can be typed into the textbox below the 3D view, e.g. `250 nm` or `50 µrad`,
-where the unit selects the move or rotate mode.
 
-# Component menu, pose inspector and export
+# Component card, component menu and export
+
+The selected object opens a card next to its bounding box in the 3D view, connected to it by a
+line, which follows the camera and the object: right of the box, or left of, below or above it if
+there is no room, always inside the view and never over the view cube or another card. It is
+hidden without a selection and while a menu is open. "pin" in its head keeps the card with its
+object, independent of the selection, e.g. to watch or type the poses of several objects; the
+selection then gets a new card. "unpin" closes a pinned card. The head shows the label of the
+object and its actions:
+
+- "hide" makes the plots of the object invisible and clears the selection. On a hidden object
+  selected in the menu, the button reads "show" and shows it again. Hidden objects can not be
+  selected in the 3D view, but are still traced.
+- For a clip plane, "flip" and "remove" instead, like `Shift+c` and `Delete`.
+
+Below, `x`, `y`, `z` [mm] show the position of the object, `Enter` in a box moves the object to the
+typed absolute coordinate. `rx`, `ry` and `rv` [mrad] rotate the object about the red, green and
+blue axis of the controls, like the keys in the rotate mode. Each input is recorded in the undo
+history, invalid inputs are reported in the status line. The widgets of a pinned card act on its
+object, also if another object is selected. `step`, only on the card of the selection, sets the
+keyboard step, e.g. `250 nm` or `50 µrad`, where the unit selects the move or rotate mode. "–" in
+the head collapses the card to its head, "+" expands it again. Clicks and drags on the card neither select objects
+nor move the camera, and while a box of the card has the focus, the keys of the 3D view are
+ignored.
 
 The row below the status line holds a menu of all movable objects (the objects of a group
 indented after the group, without clip planes), which selects an object like a click in the 3D
-view. "hide" makes the plots of the selected object invisible and clears the selection, "hide"
-on a hidden object selected in the menu shows it again, "show all" shows all objects. Hidden
-objects can not be selected in the 3D view, but are still traced.
-
-The pose inspector shows the position `x`, `y`, `z` [mm] of the selected object, `Enter` in a box
-moves the object to the typed absolute coordinate. `rx`, `ry` and `rv` [mrad] rotate the object
-about the red, green and blue axis of the controls, like the keys in the rotate mode. Each input is
-recorded in the undo history, invalid inputs are reported in the status line.
+view, and "show all", which shows all hidden objects.
 
 The "Export" button prints the changed poses as Julia code to `stdout` and copies it to the
 clipboard, see [`export_changes`](@ref).
@@ -2653,28 +2911,22 @@ function live_view(
     Label(status_row[1, 7], "orthographic")
     sources_toggle = Toggle(status_row[1, 8]; active = show_sources)
     Label(status_row[1, 9], "sources (1)")
-    step_box = Textbox(status_row[1, 10]; placeholder = "step, e.g. 250 nm", width = 150)
-    export_button = Button(status_row[1, 11]; label = "Export")
-    status = Label(status_row[1, 12],
+    export_button = Button(status_row[1, 10]; label = "Export")
+    status = Label(status_row[1, 11],
         "Click on a component to select it, press h to show the controls"; tellwidth = false)
-    # Tool row: component menu (added below, once the movable objects are known), hide buttons and
-    # pose inspector
+    # Tool row: component menu (added below, once the movable objects are known) and "show all"
     tool_row = GridLayout(fig[isnothing(slider_grid) ? 3 : 4, 1:ncols])
-    hide_button = Button(tool_row[1, 2]; label = "hide")
-    show_all_button = Button(tool_row[1, 3]; label = "show all")
-    pose_boxes = Textbox[]
-    for (k, (field, color)) in enumerate(zip(_POSE_FIELDS, _POSE_COLORS))
-        Label(tool_row[1, 2k + 2], field; color)
-        push!(pose_boxes, Textbox(tool_row[1, 2k + 3]; placeholder = k <= 3 ? " " : "0", width = 60))
-    end
+    show_all_button = Button(tool_row[1, 2]; label = "show all")
     # Measuring and camera tools, the views menu is added below with the component menu
-    measure_toggle = Toggle(tool_row[1, 16]; active = false)
-    Label(tool_row[1, 17], "measure")
-    home_button = Button(tool_row[1, 18]; label = "home")
-    save_view_button = Button(tool_row[1, 20]; label = "save view")
+    measure_toggle = Toggle(tool_row[1, 3]; active = false)
+    Label(tool_row[1, 4], "measure")
+    home_button = Button(tool_row[1, 5]; label = "home")
+    save_view_button = Button(tool_row[1, 7]; label = "save view")
     # Keeps the tool row left-aligned and compact enough for narrow windows
-    Label(tool_row[1, 21], ""; tellwidth = false)
+    Label(tool_row[1, 8], ""; tellwidth = false)
     colgap!(tool_row, 6)
+    # Pose, keyboard step and hide button of the selected object, next to it in the 3D view
+    card = _ComponentCard(fig)
 
     # `edges` is only passed if given, i.e. custom `render!` methods of user objects do not need to
     # accept it
@@ -2720,18 +2972,18 @@ function live_view(
     entries = _menu_entries(controls)
     menu = Menu(tool_row[1, 1]; options = _menu_options(labels_dict, entries), default = nothing,
         prompt = "select component", width = 150)
-    views_menu = Menu(tool_row[1, 19]; options = _views_options(view_specs), default = nothing,
+    views_menu = Menu(tool_row[1, 6]; options = _views_options(view_specs), default = nothing,
         prompt = "views", width = 90)
     gui = LiveView(fig, ax, ps, system_handles, beam_handles, controls, panels, status, slider_grid,
         on_change, nothing, auto_trace_toggle.active, false, trace_button, auto_trace_toggle,
         IdDict{Any, Any}(), Float64(trace_budget), Float64(idle_delay), 0.0, 0.0, false, nothing,
-        0.0, false, labels_dict, step_box, LiveClipPlane[], true, 1.2 * extent,
+        0.0, false, labels_dict, card.step_box, LiveClipPlane[], true, 1.2 * extent,
         clip_beams, clip_beams_toggle, cube, orthographic_toggle, export_button, true, menu,
-        Any[first.(entries)...], hide_button, show_all_button, Base.IdSet{Any}(), pose_boxes,
+        Any[first.(entries)...], card.hide_button, show_all_button, Base.IdSet{Any}(), card.pose_boxes,
         preview, false, nothing, 0.0, nothing, nothing, measure_toggle, Any[], nothing,
         AbstractPlot[], home_button, (zeros(3), zeros(3), zeros(3)), false, view_specs,
         views_menu, save_view_button, nothing, sources_toggle, nothing, _ProgressOverlay(ax),
-        Float64(progress_delay))
+        Float64(progress_delay), card, [card], Any[])
     gui_ref[] = gui
     # Objects must not change while a solve in the background traces them
     controls.before_change = () -> _cancel_solve!(gui)
@@ -2744,8 +2996,8 @@ function live_view(
     _connect_tools!(gui)
     _connect_inspection!(gui)
     _connect_camera!(gui)
+    _connect_cards!(gui)
     push!(controls.listeners, on(v -> v == gui.clip_beams || _set_clip_beams!(gui, v), clip_beams_toggle.active))
-    push!(controls.listeners, on(s -> _set_step!(gui, s), step_box.stored_string))
     _connect_projection!(gui, orthographic)
     _connect_sources!(gui)
     _resolve!(gui, nothing)

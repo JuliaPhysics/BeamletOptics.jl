@@ -473,25 +473,33 @@ gui = live_view(system, source; beam_kwargs = Dict(source => (; render_every = 5
 Solves longer than `progress_delay` run in the background with a progress window next to the
 source or detector, see "Long solves" in the docstring of [`live_view`](@ref).
 
-### Component menu and pose inspector
+### Component card and component menu
 
-The row below the status line holds a component menu, two buttons to hide components and the pose
-inspector:
+Selecting a component, source or clip plane opens a card next to its bounding box in the 3D view,
+connected to it by a line. The card follows the camera and the component and stays inside the
+view, off the view cube and the other cards:
 
-- The menu lists all movable components and sources by their `labels` (or type), the objects of a
-  group indented after the group. Selecting an entry selects the component like a click in the 3D
-  view, a click in the 3D view shows the selected component in the menu. The menu can be searched
-  by typing while it is open. Clip planes are not listed.
-- "hide" hides the selected component, e.g. a mirror in front of the component of interest, and
-  clears the selection. A hidden component can not be selected in the 3D view, but stays in the
-  systems, i.e. it is still traced. Selecting it in the menu and pressing "hide" again shows it,
-  "show all" shows all hidden components.
-- The pose inspector shows the position `x`, `y`, `z` [mm] of the selected component. Typing a
-  value and pressing `Enter` moves the component to this absolute coordinate. The boxes `rx`, `ry`
-  and `rv` [mrad] rotate it by the typed angle about the red, green and blue axis of the controls,
-  like the arrow keys in the rotate mode, e.g. `rv = 1` equals one key step with a step of 1 mrad.
-  Each input is a step of the undo history, the constraints of the component apply. While a box is
-  focused, the keys of the 3D view are ignored.
+- The head shows the label of the component and "hide", which hides it, e.g. a mirror in front of
+  the component of interest, and clears the selection. A hidden component can not be selected in
+  the 3D view, but stays in the systems, i.e. it is still traced. Selected in the menu, its card
+  reads "show", which shows it again. For a clip plane, the head holds "flip" and "remove".
+- `x`, `y`, `z` [mm] show the position of the component. Typing a value and pressing `Enter`
+  moves the component to this absolute coordinate. The boxes `rx`, `ry` and `rv` [mrad] rotate it
+  by the typed angle about the red, green and blue axis of the controls, like the arrow keys in the
+  rotate mode, e.g. `rv = 1` equals one key step with a step of 1 mrad. Each input is a step of the
+  undo history, the constraints of the component apply. While a box is focused, the keys of the 3D
+  view are ignored.
+- `step` sets the keyboard step, see below.
+- "–" collapses the card to its head, "+" expands it again.
+- "pin" keeps the card with its component when the selection changes, e.g. to watch or type the
+  poses of several components; the widgets of a pinned card act on its component. "unpin" closes
+  it.
+
+The row below the status line holds the component menu and "show all". The menu lists all movable
+components and sources by their `labels` (or type), the objects of a group indented after the
+group. Selecting an entry selects the component like a click in the 3D view, a click in the 3D view
+shows the selected component in the menu. The menu can be searched by typing while it is open.
+Clip planes are not listed. "show all" shows all hidden components.
 
 ### Beam inspection and measuring
 
@@ -556,9 +564,9 @@ The 3D view uses the controls of [`kinematic_controls!`](@ref), see
 [Interactive kinematics](@ref). In addition, the key `t` solves the systems immediately, see
 [Manual tracing](@ref), `p`, `Delete`, `c` and `Shift+c` control the clip planes, see
 [Clip planes](@ref), `s` shows or hides the source markers, see
-[Movable sources in the live view](@ref), and `g` zooms to the selection, see [Camera tools](@ref). The keyboard step can be typed into the textbox below the 3D view, e.g.
-`250 nm` or `50 µrad`, where the unit selects the move or rotate mode, see also
-[Component menu and pose inspector](@ref). The status line shows the
+[Movable sources in the live view](@ref), and `g` zooms to the selection, see [Camera tools](@ref). The keyboard step can be typed into the box `step` of the component card, e.g.
+`250 nm` or `50 µrad`, where the unit selects the move or rotate mode, see
+[Component card and component menu](@ref). The status line shows the
 pose of the moved component and its change since the window was opened. Names for the status line
 and the detector panels are passed via `labels`:
 

@@ -21,10 +21,12 @@ const BMO = BeamletOptics
         # In a child scene, drawn after all plots of the 3D scene
         @test length(ax.scene.plots) == n0
         @test o.hud in ax.scene.children && length(o.hud.plots) == length(o.plots) == 4
-        # GLMakie sorts the plots by the z translation before drawing
+        # GLMakie sorts the plots by the z translation before drawing, which also puts them in front
+        # of the 3D scene; `overdraw` would put transparent plots over them
         @test all(p -> Makie.transformationmatrix(p)[][3, 4] > Ext._PROGRESS_Z, o.plots)
+        @test all(p -> Makie.transformationmatrix(p)[][3, 4] < Ext._CARD_Z, o.plots)
         @test all(p -> !p.visible[], o.plots)
-        @test all(p -> p.overdraw[], o.plots)
+        @test all(p -> !p.overdraw[], o.plots)
         @test all(p -> !p.inspectable[], o.plots)
         @test all(p -> !p.transparency[], o.plots)
         @test all(p -> isempty(p.clip_planes[]), o.plots)
