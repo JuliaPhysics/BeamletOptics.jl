@@ -220,7 +220,10 @@ Main keyword arguments: `detectors` (`:auto`, a vector of `pd`, `pd => mode` or
 and `profiles`), `on_change = (gui, obj) -> nothing` (called after full solves),
 `sliders = ["label" => (range, callback)]`, `system_kwargs`, `beam_kwargs`, `preview = true`,
 `views = ["name" => (eye, lookat, up)]`, `lighting = :studio` (see [`studio_lighting!`](@ref)),
-`edges` and `size`. All other keyword arguments are passed to [`kinematic_controls!`](@ref). Refer
+`edges` and `size`. `layout = :app` arranges the window like an application, with a toolbar,
+collapsible sidebars (objects and sliders, properties of the selection), an analysis dock with
+the detector panels and a status bar, in the colors of `theme = :light` or `:dark`; the default
+`layout = :compact` places the panels next to the 3D view and the tools below it. All other keyword arguments are passed to [`kinematic_controls!`](@ref). Refer
 to the method of the `Makie` extension for details.
 
 If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.

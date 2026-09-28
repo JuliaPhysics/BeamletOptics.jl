@@ -89,6 +89,62 @@ mutable struct _SolveJob
 end
 
 """
+    AbstractLiveLayout
+
+Layout of a [`LiveView`](@ref), i.e. where its widgets are placed in the figure, see the
+`layout` kwarg of [`live_view`](@ref). The logic of the live view (tracing, clipping, measuring,
+camera, inspection) is shared by all layouts: it works on the observables of the widgets, e.g.
+`clicks` of a button, `active` of a toggle and `stored_string` of a textbox, never on their type
+or position. A layout `L` holds its own state (e.g. the slots of its sidebars) and is stored in
+`gui.layout` of the `LiveView{L}`.
+
+# Interface
+
+A subtype `L <: AbstractLiveLayout` implements
+
+- `_build_layout(layout::L, fig, spec) -> NamedTuple`: creates the widgets in the `Figure` `fig`,
+  which `_figure(layout, size)` created. `spec` holds the inputs of `live_view`: `specs` (detector
+  panels, see `_panel_specs`), `slider_specs`, `labels`, `lighting`, `view_cube`, `auto_trace`,
+  `clip_beams`, `orthographic`, `show_sources` and `view_specs`. The result has the fields
+  - `ax`: the `LScene` of the 3D view, with `studio_lighting!` applied, and `cube`: its view cube
+    or `nothing`
+  - `panels`: the `DetectorPanel`s of `spec.specs`, `sliders`: a `SliderGrid` of
+    `spec.slider_specs` or `nothing`, `status`: the `Label` of the status line
+  - `trace_button`, `export_button`, `home_button`, `save_view_button`, `hide_button`,
+    `show_all_button`: anything with `clicks::Observable{Int}`, or `nothing` for the last two
+  - `auto_trace_toggle`, `clip_beams_toggle`, `orthographic_toggle`, `sources_toggle`,
+    `measure_toggle`: anything with `active::Observable{Bool}`, initialized from `spec`
+  - `step_box` and the 6 `pose_boxes` (see `_POSE_FIELDS`): `Textbox`es
+- `_build_menus(layout::L, w, options, views_options) -> (; menu, views_menu)`: called with the
+  result `w` of `_build_layout` once the movable objects are known; the component `menu` (a `Menu`
+  with the `options`, or `nothing`) and the `views_menu` (a `Menu` with the `views_options`)
+
+and optionally, with defaults for any layout,
+
+- `_figure(layout::L, size)`: the `Figure`, and `_default_size(layout::L)`: its size unless given
+- `_connect_layout!(gui::LiveView{L})`: connects the widgets that only the layout has, e.g.
+  collapsing; its listeners belong in `gui.controls.listeners`
+- hooks called by the shared logic: `_on_solved!(gui)` after a solve is shown,
+  `_on_selected!(gui)` after the selection changed, `_on_clipping!(gui)` after clipping was
+  switched
+- slots for additional parts: `_add_toolbar_entry!(gui, group)`, `_add_sidebar_section!(gui,
+  side, title)` and `_add_dock_panel!(gui, title)`, which return the `GridPosition` or
+  `GridLayout` to place widgets in, see `AppLayout`
+
+The layouts of `live_view` are `CompactLayout` and `AppLayout`.
+"""
+abstract type AbstractLiveLayout end
+
+"""
+    CompactLayout
+
+Layout of `live_view(...; layout = :compact)`: the 3D view with the detector panels on its right,
+the sliders, the status row and the tool row below. The positions in `gui.fig` are fixed, e.g. the
+panels are placed in `gui.fig[1, 2]`, where users may add their own axes.
+"""
+struct CompactLayout <: AbstractLiveLayout end
+
+"""
     LiveView
 
 Interactive window returned by [`live_view`](@ref). The `Figure` is stored in `fig`, the `LScene`
@@ -116,8 +172,11 @@ background as `job`, the `progress` window shows its loops after `progress_delay
 `measure_toggle` switches measuring on, the result is stored in `measurement`. The `home_button`
 restores the `home` view, the `views_menu` sets one of the saved `views`, which the
 `save_view_button` extends.
+
+The type parameter `L` is the type of the `layout`, see `AbstractLiveLayout`: `CompactView` and
+`AppView` are the `LiveView`s of `live_view(...; layout = :compact)` and `layout = :app`.
 """
-mutable struct LiveView
+mutable struct LiveView{L <: AbstractLiveLayout}
     fig::Figure
     ax::LScene
     pairs::Vector{Pair{BMO.AbstractSystem, Any}}
@@ -132,8 +191,10 @@ mutable struct LiveView
     # manual tracing, auto_trace is the `active` observable of the toggle
     auto_trace::Observable{Bool}
     stale::Bool
-    trace_button::Button
-    auto_trace_toggle::Toggle
+    # The widgets are typed by what the logic uses, since the layouts use different widgets:
+    # buttons have `clicks::Observable{Int}`, toggles `active::Observable{Bool}`
+    trace_button::Any
+    auto_trace_toggle::Any
     # alpha of the beam plots before dimming, restored after tracing
     beam_alphas::IdDict{Any, Any}
     # adaptive tracing, durations of the last solve and panel update [s]
@@ -157,20 +218,20 @@ mutable struct LiveView
     clip_size::Float64
     # the beams are clipped as well, switched via the toggle
     clip_beams::Bool
-    clip_beams_toggle::Toggle
+    clip_beams_toggle::Any
     # view cube in the corner of the 3D view, see `view_cube!`
     view_cube::Union{Nothing, ViewCube}
     # orthographic projection of the 3D view, switched via the toggle
-    orthographic_toggle::Toggle
+    orthographic_toggle::Any
     # export of the changed poses, see `export_changes`
-    export_button::Button
+    export_button::Any
     export_clipboard::Bool
-    # component menu, the option `i` selects `menu_objects[i]`
-    menu::Menu
+    # component menu, the option `i` selects `menu_objects[i]`, `nothing` in layouts without it
+    menu::Union{Nothing, Menu}
     menu_objects::Vector{Any}
     # hidden objects, i.e. rendered objects (leaves of groups) whose plots are invisible
-    hide_button::Button
-    show_all_button::Button
+    hide_button::Any
+    show_all_button::Any
     hidden::Base.IdSet{Any}
     # pose inspector: x, y, z [mm] and the rotations rx, ry, rv [mrad], see `_POSE_FIELDS`
     pose_boxes::Vector{Textbox}
@@ -185,27 +246,35 @@ mutable struct LiveView
     inspection::Any
     inspection_plot::Union{Nothing, AbstractPlot}
     # measuring: up to two points `(; point, obj)`, the result `(; distance, angle)` and its plots
-    measure_toggle::Toggle
+    measure_toggle::Any
     measure_points::Vector{Any}
     measurement::Any
     measure_plots::Vector{AbstractPlot}
     # camera tools: home view (eye, lookat, up), taken at the first tick, the saved views, the
     # animated camera transition
-    home_button::Button
+    home_button::Any
     home::NTuple{3, Vector{Float64}}
     home_set::Bool
     views::Vector{Pair{String, NTuple{3, Vector{Float64}}}}
     views_menu::Menu
-    save_view_button::Button
+    save_view_button::Any
     camera_animation::Any
     # markers of the movable sources, shown or hidden via the toggle or the key `1`
-    sources_toggle::Toggle
+    sources_toggle::Any
     # solve in a background task, see `_solve!`, its progress window and the delay [s] after which
     # the window of a loop appears
     job::Union{Nothing, _SolveJob}
     progress::_ProgressOverlay
     progress_delay::Float64
+    # state of the layout, e.g. the slots of the app layout, see `AbstractLiveLayout`
+    layout::L
 end
+
+# Converts the fields like the constructor of a non-parametric type, the layout is the last field
+LiveView(fields...) = LiveView{typeof(last(fields))}(fields...)
+
+"""`LiveView` with the compact layout, i.e. `live_view(...; layout = :compact)`."""
+const CompactView = LiveView{CompactLayout}
 
 """
     display(gui::LiveView; screen_config...)
@@ -780,6 +849,7 @@ function _apply!(gui::LiveView, r, obj; coarse = false)
         end
     end
     isnothing(obj) || (gui.status.text[] = _pose_string(gui, obj))
+    _on_solved!(gui)
     return nothing
 end
 
@@ -1287,6 +1357,15 @@ function _set_clip_beams!(gui::LiveView, on::Bool)
     return nothing
 end
 
+"""Switches the clip planes of the `gui` on or off, see `clipping`."""
+function _set_clipping!(gui::LiveView, on::Bool)
+    gui.clipping = on
+    _apply_clip_planes!(gui)
+    gui.status.text[] = on ? "clipping on" : "clipping off"
+    _on_clipping!(gui)
+    return nothing
+end
+
 """Re-applies the clip planes after the clip `plane` has been moved, without solving the systems."""
 function _on_clip_change!(gui::LiveView, plane::LiveClipPlane)
     _apply_clip_planes!(gui)
@@ -1383,9 +1462,7 @@ function _clip_key!(gui::LiveView, key)
             return true
         end
         isempty(gui.clip_planes) && return false
-        gui.clipping = !gui.clipping
-        _apply_clip_planes!(gui)
-        gui.status.text[] = gui.clipping ? "clipping on" : "clipping off"
+        _set_clipping!(gui, !gui.clipping)
         return true
     elseif key == Keyboard.p
         # Nothing can be selected in the spectator mode
@@ -1647,9 +1724,36 @@ end
 function _on_select!(gui::LiveView)
     obj = gui.controls.selected[]
     i = isnothing(obj) ? nothing : findfirst(o -> o === obj, gui.menu_objects)
-    i = something(i, 0)
-    gui.menu.i_selected[] == i || (gui.menu.i_selected[] = i)
+    _show_menu_selection!(gui.menu, something(i, 0))
     _update_inspector!(gui)
+    _on_selected!(gui)
+    return nothing
+end
+
+_show_menu_selection!(::Nothing, _) = nothing
+function _show_menu_selection!(menu::Menu, i)
+    menu.i_selected[] == i || (menu.i_selected[] = i)
+    return nothing
+end
+
+#=
+Optional widgets: a layout may leave out the component menu and the hide buttons (`nothing`), their
+observables are then `nothing` and not listened to
+=#
+
+_clicks(::Nothing) = nothing
+_clicks(button) = button.clicks
+_menu_selection(::Nothing) = nothing
+_menu_selection(menu::Menu) = menu.i_selected
+_menu_open(::Nothing) = nothing
+_menu_open(menu::Menu) = menu.is_open
+_is_open(::Nothing) = false
+_is_open(menu::Menu) = menu.is_open[]
+
+"""Adds a listener `f` of the observable `obs` to the `listeners`, unless `obs` is `nothing`."""
+_listen!(_, _, ::Nothing) = nothing
+function _listen!(listeners, f, obs::Observable)
+    push!(listeners, on(f, obs))
     return nothing
 end
 
@@ -1763,7 +1867,7 @@ const _POSE_COLORS = (:black, :black, :black, :red, :green, :blue)
 function _typing(gui::LiveView)
     gui.step_box.focused[] && return true
     any(tb -> tb.focused[], gui.pose_boxes) && return true
-    return gui.menu.is_open[] || gui.views_menu.is_open[]
+    return _is_open(gui.menu) || gui.views_menu.is_open[]
 end
 
 """Shows `s` in the textbox `tb` without triggering its listeners, `""` shows the placeholder."""
@@ -1857,10 +1961,10 @@ end
 function _connect_tools!(gui::LiveView)
     listeners = gui.controls.listeners
     push!(listeners, on(_ -> _export!(gui), gui.export_button.clicks))
-    push!(listeners, on(i -> _on_menu_select!(gui, i), gui.menu.i_selected))
+    _listen!(listeners, i -> _on_menu_select!(gui, i), _menu_selection(gui.menu))
     push!(listeners, on(_ -> _on_select!(gui), gui.controls.selected))
-    push!(listeners, on(_ -> _toggle_hidden!(gui), gui.hide_button.clicks))
-    push!(listeners, on(_ -> _show_all!(gui), gui.show_all_button.clicks))
+    _listen!(listeners, _ -> _toggle_hidden!(gui), _clicks(gui.hide_button))
+    _listen!(listeners, _ -> _show_all!(gui), _clicks(gui.show_all_button))
     for (k, tb) in enumerate(gui.pose_boxes)
         push!(listeners, on(s -> _apply_pose_input!(gui, k, s), tb.stored_string))
     end
@@ -2377,9 +2481,9 @@ function _connect_camera!(gui::LiveView)
         cam.selected[] == selected || (cam.selected[] = selected)
         return nothing
     end
-    for obs in (cam.selected, gui.step_box.focused, gui.menu.is_open, gui.views_menu.is_open,
+    for obs in (cam.selected, gui.step_box.focused, _menu_open(gui.menu), gui.views_menu.is_open,
                 (tb.focused for tb in gui.pose_boxes)...)
-        push!(listeners, on(keep_keyboard!, obs))
+        _listen!(listeners, keep_keyboard!, obs)
     end
     keep_keyboard!()
     push!(listeners, on(_ -> _go_home!(gui), gui.home_button.clicks))
@@ -2538,9 +2642,30 @@ view. The selection box of a partly clipped component only covers its visible pa
 
 The key `g` zooms to the selection, see "Camera tools".
 
+# App layout
+
+With `layout = :app`, the same live view is arranged as an application window, all keys and mouse
+actions in the 3D view are unchanged:
+
+- toolbar: trace and auto trace, home, fit (`g`), views, save view, orthographic, clipping (`c`),
+  clip beams, sources (`1`), measure, export, the toggles of the sidebars and the dock, help (`h`)
+- left sidebar: the objects and, below them, the sliders ("Parameters")
+- right sidebar ("Properties"): the selected object, the pose boxes, the step box, the mode and
+  the hide buttons
+- analysis dock below the 3D view: the detector panels
+- status bar: the status line and the duration of the last solve, the number of rays and the
+  projection
+
+The sidebars and the dock can be collapsed via the toolbar, the 3D view then takes their space.
+The component menu of the compact layout is not shown. In the compact layout, the widgets are at
+fixed positions of `gui.fig`, e.g. the detector panels in `gui.fig[1, 2]`, next to which users
+may add their own axes.
+
 # Keyword args
 
-- `size = (1400, 800)`: size of the figure
+- `layout = :compact`: arrangement of the widgets, `:compact` or `:app`, see "App layout"
+- `theme = :light`: colors of the app layout, `:light` or `:dark` (ignored by `:compact`)
+- `size`: size of the figure, by default `(1400, 800)` for `:compact` and `(1600, 950)` for `:app`
 - `auto_trace = true`: solves the systems after each change, otherwise only on request, see
   "Manual tracing"
 - `detectors = :auto`: all `Detector`s of all systems. Alternatively a vector of `pd`,
@@ -2587,7 +2712,9 @@ The key `g` zooms to the selection, see "Camera tools".
 """
 function live_view(
         pairs::Pair{<:BMO.AbstractSystem}...;
-        size = (1400, 800),
+        size = nothing,
+        layout::Symbol = :compact,
+        theme::Symbol = :light,
         auto_trace::Bool = true,
         detectors = :auto,
         on_change = (gui, obj) -> nothing,
@@ -2619,62 +2746,11 @@ function live_view(
     clip_specs = _clip_plane_specs(clip_planes)
     view_specs = _view_specs(views)
 
-    fig = Figure(; size)
-    ax = LScene(fig[1, 1]; show_axis = false)
-    studio_lighting!(ax; preset = lighting)
-    # Its click listener runs before the controls, hence clicks on the cube never select objects
-    cube = view_cube ? view_cube!(ax) : nothing
-    ncols = isempty(specs) ? 1 : 2
-
-    # Detector panels in a near-square grid next to the 3D view
-    panels = Any[]
-    if !isempty(specs)
-        grid = GridLayout(fig[1, 2])
-        nc = ceil(Int, sqrt(length(specs)))
-        for (i, (pd, mode, kw)) in enumerate(specs)
-            parent = grid[(i - 1) ÷ nc + 1, (i - 1) % nc + 1]
-            push!(panels, DetectorPanel(parent, pd, get(labels, pd, "Detector $i"), mode, kw))
-        end
-        colsize!(fig.layout, 1, Relative(0.6))
-    end
-    slider_grid = if isempty(slider_specs)
-        nothing
-    else
-        SliderGrid(fig[2, 1:ncols], first.(slider_specs)...)
-    end
-    # Status row: trace button, auto trace toggle and status line
-    status_row = GridLayout(fig[isnothing(slider_grid) ? 2 : 3, 1:ncols])
-    trace_button = Button(status_row[1, 1]; label = "Trace (t)")
-    auto_trace_toggle = Toggle(status_row[1, 2]; active = auto_trace)
-    Label(status_row[1, 3], "auto trace")
-    clip_beams_toggle = Toggle(status_row[1, 4]; active = clip_beams)
-    Label(status_row[1, 5], "clip beams")
-    orthographic_toggle = Toggle(status_row[1, 6]; active = orthographic)
-    Label(status_row[1, 7], "orthographic")
-    sources_toggle = Toggle(status_row[1, 8]; active = show_sources)
-    Label(status_row[1, 9], "sources (1)")
-    step_box = Textbox(status_row[1, 10]; placeholder = "step, e.g. 250 nm", width = 150)
-    export_button = Button(status_row[1, 11]; label = "Export")
-    status = Label(status_row[1, 12],
-        "Click on a component to select it, press h to show the controls"; tellwidth = false)
-    # Tool row: component menu (added below, once the movable objects are known), hide buttons and
-    # pose inspector
-    tool_row = GridLayout(fig[isnothing(slider_grid) ? 3 : 4, 1:ncols])
-    hide_button = Button(tool_row[1, 2]; label = "hide")
-    show_all_button = Button(tool_row[1, 3]; label = "show all")
-    pose_boxes = Textbox[]
-    for (k, (field, color)) in enumerate(zip(_POSE_FIELDS, _POSE_COLORS))
-        Label(tool_row[1, 2k + 2], field; color)
-        push!(pose_boxes, Textbox(tool_row[1, 2k + 3]; placeholder = k <= 3 ? " " : "0", width = 60))
-    end
-    # Measuring and camera tools, the views menu is added below with the component menu
-    measure_toggle = Toggle(tool_row[1, 16]; active = false)
-    Label(tool_row[1, 17], "measure")
-    home_button = Button(tool_row[1, 18]; label = "home")
-    save_view_button = Button(tool_row[1, 20]; label = "save view")
-    # Keeps the tool row left-aligned and compact enough for narrow windows
-    Label(tool_row[1, 21], ""; tellwidth = false)
-    colgap!(tool_row, 6)
+    lay = _live_layout(layout, theme)
+    fig = _figure(lay, something(size, _default_size(lay)))
+    w = _build_layout(lay, fig, (; specs, slider_specs, labels, lighting, view_cube, auto_trace,
+        clip_beams, orthographic, show_sources, view_specs))
+    ax = w.ax
 
     # `edges` is only passed if given, i.e. custom `render!` methods of user objects do not need to
     # accept it
@@ -2718,36 +2794,35 @@ function live_view(
 
     labels_dict = IdDict{Any, String}(labels)
     entries = _menu_entries(controls)
-    menu = Menu(tool_row[1, 1]; options = _menu_options(labels_dict, entries), default = nothing,
-        prompt = "select component", width = 150)
-    views_menu = Menu(tool_row[1, 19]; options = _views_options(view_specs), default = nothing,
-        prompt = "views", width = 90)
-    gui = LiveView(fig, ax, ps, system_handles, beam_handles, controls, panels, status, slider_grid,
-        on_change, nothing, auto_trace_toggle.active, false, trace_button, auto_trace_toggle,
-        IdDict{Any, Any}(), Float64(trace_budget), Float64(idle_delay), 0.0, 0.0, false, nothing,
-        0.0, false, labels_dict, step_box, LiveClipPlane[], true, 1.2 * extent,
-        clip_beams, clip_beams_toggle, cube, orthographic_toggle, export_button, true, menu,
-        Any[first.(entries)...], hide_button, show_all_button, Base.IdSet{Any}(), pose_boxes,
-        preview, false, nothing, 0.0, nothing, nothing, measure_toggle, Any[], nothing,
-        AbstractPlot[], home_button, (zeros(3), zeros(3), zeros(3)), false, view_specs,
-        views_menu, save_view_button, nothing, sources_toggle, nothing, _ProgressOverlay(ax),
-        Float64(progress_delay))
+    menus = _build_menus(lay, w, _menu_options(labels_dict, entries), _views_options(view_specs))
+    gui = LiveView(fig, ax, ps, system_handles, beam_handles, controls, w.panels, w.status,
+        w.sliders, on_change, nothing, w.auto_trace_toggle.active, false, w.trace_button,
+        w.auto_trace_toggle, IdDict{Any, Any}(), Float64(trace_budget), Float64(idle_delay), 0.0,
+        0.0, false, nothing, 0.0, false, labels_dict, w.step_box, LiveClipPlane[], true,
+        1.2 * extent, clip_beams, w.clip_beams_toggle, w.cube, w.orthographic_toggle,
+        w.export_button, true, menus.menu, Any[first.(entries)...], w.hide_button,
+        w.show_all_button, Base.IdSet{Any}(), w.pose_boxes, preview, false, nothing, 0.0, nothing,
+        nothing, w.measure_toggle, Any[], nothing, AbstractPlot[], w.home_button,
+        (zeros(3), zeros(3), zeros(3)), false, view_specs, menus.views_menu, w.save_view_button,
+        nothing, w.sources_toggle, nothing, _ProgressOverlay(ax), Float64(progress_delay), lay)
     gui_ref[] = gui
     # Objects must not change while a solve in the background traces them
     controls.before_change = () -> _cancel_solve!(gui)
     for (point, normal) in clip_specs
         _add_clip_plane!(gui, point, normal; select = false)
     end
-    isnothing(slider_grid) || _connect_sliders!(gui, last.(slider_specs))
+    isnothing(gui.sliders) || _connect_sliders!(gui, last.(slider_specs))
     _connect_trace!(gui)
     _connect_clip_planes!(gui)
     _connect_tools!(gui)
     _connect_inspection!(gui)
     _connect_camera!(gui)
-    push!(controls.listeners, on(v -> v == gui.clip_beams || _set_clip_beams!(gui, v), clip_beams_toggle.active))
-    push!(controls.listeners, on(s -> _set_step!(gui, s), step_box.stored_string))
+    push!(controls.listeners, on(v -> v == gui.clip_beams || _set_clip_beams!(gui, v),
+        gui.clip_beams_toggle.active))
+    push!(controls.listeners, on(s -> _set_step!(gui, s), gui.step_box.stored_string))
     _connect_projection!(gui, orthographic)
     _connect_sources!(gui)
+    _connect_layout!(gui)
     _resolve!(gui, nothing)
     # Initial view from the Front-Right-Top corner, in which the labels of the view cube read
     # correctly. Only set once, later changes of the view, e.g. via `set_view`, are kept.
@@ -2762,6 +2837,111 @@ function live_view(
 end
 
 live_view(system::BMO.AbstractSystem, beam; kwargs...) = live_view(system => beam; kwargs...)
+
+#=
+Layouts, see `AbstractLiveLayout`
+=#
+
+"""
+    _live_layout(layout::Symbol, theme::Symbol) -> AbstractLiveLayout
+
+Returns the layout of the `layout` and `theme` kwargs of `live_view`, the only place where the
+names are mapped to the layout types. The `theme` is validated for all layouts, but only used by
+the app layout.
+"""
+function _live_layout(layout::Symbol, theme::Symbol)
+    tokens = _app_theme(theme)
+    layout == :compact && return CompactLayout()
+    layout == :app && return AppLayout(tokens)
+    throw(ArgumentError("layout must be :compact or :app, got :$layout"))
+end
+
+_default_size(::AbstractLiveLayout) = (1400, 800)
+_figure(::AbstractLiveLayout, size) = Figure(; size)
+
+# Optional parts of the layout interface, see `AbstractLiveLayout`
+_connect_layout!(::LiveView) = nothing
+_on_solved!(::LiveView) = nothing
+_on_selected!(::LiveView) = nothing
+_on_clipping!(::LiveView) = nothing
+
+function _slot_error(gui::LiveView, what)
+    throw(ArgumentError("the $(nameof(typeof(gui.layout))) of this live view has no $what"))
+end
+_add_toolbar_entry!(gui::LiveView, _) = _slot_error(gui, "toolbar")
+_add_sidebar_section!(gui::LiveView, _, _) = _slot_error(gui, "sidebars")
+_add_dock_panel!(gui::LiveView, _) = _slot_error(gui, "dock")
+
+function _build_layout(::CompactLayout, fig, spec)
+    (; specs, slider_specs, labels, lighting, view_cube, auto_trace, clip_beams, orthographic,
+        show_sources) = spec
+    ax = LScene(fig[1, 1]; show_axis = false)
+    studio_lighting!(ax; preset = lighting)
+    # Its click listener runs before the controls, hence clicks on the cube never select objects
+    cube = view_cube ? view_cube!(ax) : nothing
+    ncols = isempty(specs) ? 1 : 2
+
+    # Detector panels in a near-square grid next to the 3D view
+    panels = Any[]
+    if !isempty(specs)
+        grid = GridLayout(fig[1, 2])
+        nc = ceil(Int, sqrt(length(specs)))
+        for (i, (pd, mode, kw)) in enumerate(specs)
+            parent = grid[(i - 1) ÷ nc + 1, (i - 1) % nc + 1]
+            push!(panels, DetectorPanel(parent, pd, get(labels, pd, "Detector $i"), mode, kw))
+        end
+        colsize!(fig.layout, 1, Relative(0.6))
+    end
+    sliders = if isempty(slider_specs)
+        nothing
+    else
+        SliderGrid(fig[2, 1:ncols], first.(slider_specs)...)
+    end
+    # Status row: trace button, auto trace toggle and status line
+    status_row = GridLayout(fig[isnothing(sliders) ? 2 : 3, 1:ncols])
+    trace_button = Button(status_row[1, 1]; label = "Trace (t)")
+    auto_trace_toggle = Toggle(status_row[1, 2]; active = auto_trace)
+    Label(status_row[1, 3], "auto trace")
+    clip_beams_toggle = Toggle(status_row[1, 4]; active = clip_beams)
+    Label(status_row[1, 5], "clip beams")
+    orthographic_toggle = Toggle(status_row[1, 6]; active = orthographic)
+    Label(status_row[1, 7], "orthographic")
+    sources_toggle = Toggle(status_row[1, 8]; active = show_sources)
+    Label(status_row[1, 9], "sources (1)")
+    step_box = Textbox(status_row[1, 10]; placeholder = "step, e.g. 250 nm", width = 150)
+    export_button = Button(status_row[1, 11]; label = "Export")
+    status = Label(status_row[1, 12],
+        "Click on a component to select it, press h to show the controls"; tellwidth = false)
+    # Tool row: component menu (added by `_build_menus`, once the movable objects are known), hide
+    # buttons and pose inspector
+    tool_row = GridLayout(fig[isnothing(sliders) ? 3 : 4, 1:ncols])
+    hide_button = Button(tool_row[1, 2]; label = "hide")
+    show_all_button = Button(tool_row[1, 3]; label = "show all")
+    pose_boxes = Textbox[]
+    for (k, (field, color)) in enumerate(zip(_POSE_FIELDS, _POSE_COLORS))
+        Label(tool_row[1, 2k + 2], field; color)
+        push!(pose_boxes, Textbox(tool_row[1, 2k + 3]; placeholder = k <= 3 ? " " : "0", width = 60))
+    end
+    # Measuring and camera tools, the views menu is added with the component menu
+    measure_toggle = Toggle(tool_row[1, 16]; active = false)
+    Label(tool_row[1, 17], "measure")
+    home_button = Button(tool_row[1, 18]; label = "home")
+    save_view_button = Button(tool_row[1, 20]; label = "save view")
+    # Keeps the tool row left-aligned and compact enough for narrow windows
+    Label(tool_row[1, 21], ""; tellwidth = false)
+    colgap!(tool_row, 6)
+    return (; ax, cube, panels, sliders, status, trace_button, auto_trace_toggle, clip_beams_toggle,
+        orthographic_toggle, sources_toggle, step_box, export_button, hide_button, show_all_button,
+        pose_boxes, measure_toggle, home_button, save_view_button, tool_row)
+end
+
+function _build_menus(::CompactLayout, w, options, views_options)
+    menu = Menu(w.tool_row[1, 1]; options, default = nothing, prompt = "select component",
+        width = 150)
+    views_menu = Menu(w.tool_row[1, 19]; options = views_options, default = nothing,
+        prompt = "views", width = 90)
+    return (; menu, views_menu)
+end
 
 """
     _connect_projection!(gui, orthographic)
