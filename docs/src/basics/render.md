@@ -431,30 +431,90 @@ for convenience must convert its value before applying it, as in `v * 1e-3` abov
 
 `on_change = (gui, obj) -> ...` is called after every full solve, with the moved object or
 `nothing` (initial solve, or after a slider change). It is not called after the preview solves of
-beam groups while moving, see [Manual tracing](@ref), but once the full solve follows. Use it to plot additional derived quantities into
-`gui.fig`. Since `on_change` already runs for the initial solve inside `live_view`, the callback
-should only update an `Observable`; the axis and the plot are created once afterwards:
+beam groups while moving, see [Manual tracing](@ref), but once the full solve follows. Use it to
+record derived quantities, e.g. the optical power on a detector over time, which an own panel
+plots, see [Own panels, controls and tools](@ref):
 
 ```julia
-power = Observable(Point2f[])
+power = Point2f[]
 
 function record_power!(gui, obj)
-    P = optical_power(pd)
-    push!(power[], Point2f(length(power[]) + 1, 1e3 * P))
-    notify(power)
+    push!(power, Point2f(length(power) + 1, 1e3 * optical_power(pd)))
     return nothing
 end
 
 gui = live_view(system, beam; on_change = record_power!)
-# Below a single detector panel, the panels are placed in a grid in gui.fig[1, 2]
-power_ax = Axis(gui.fig[1, 2][2, 1]; xlabel = "Update", ylabel = "P [mW]")
-lines!(power_ax, power)
-on(_ -> autolimits!(power_ax), power)
 ```
 
 Errors raised inside `on_change` are logged once and do not interrupt the interaction. See the
 [Interactive Michelson interferometer](@ref) example for a full callback that tracks the optical
 power over time.
+
+### Own panels, controls and tools
+
+Own parts are added to a `gui = live_view(...)` by three functions, which work with both layouts;
+the layout decides where the parts go:
+
+| function | `layout = :compact` | `layout = :app` |
+|:--|:--|:--|
+| [`add_panel!`](@ref) | below the detector panels, right of the 3D view | a tab of the analysis dock |
+| [`add_controls!`](@ref) | a row above the status row | a section of the left sidebar, below "Parameters" |
+| [`add_tool!`](@ref) | a button (or toggle) in the row below the status line | an icon button (or toggle) in the toolbar, before "Help" |
+
+`add_panel!(f, gui, title)` calls `f(layout)` with the `GridLayout` of the new panel, into which it
+builds e.g. an `Axis` with plots. The function returned by `f` is called with the `gui` after each
+full solve, like `on_change`, and once right away. In the app layout, only the panel of the shown
+tab is updated, hidden panels when their tab is opened, i.e. hidden panels cost nothing. The new tab
+stays in the background unless `select = true`:
+
+```julia
+add_panel!(gui, "Optical power") do layout
+    ax = Axis(layout[1, 1]; xlabel = "Update", ylabel = "P [mW]")
+    pts = Observable(copy(power))
+    lines!(ax, pts)
+    return gui -> (pts[] = copy(power); autolimits!(ax))
+end
+```
+
+Data that must be recorded after every solve, also while the panel is hidden, is recorded by
+`on_change`, as above, and only plotted by the panel. In the compact layout, the panels are placed
+in a grid in `gui.fig[1, 2]`; an axis at `gui.fig[1, 2][2, 1]`, below a single detector panel,
+works as well, but only `add_panel!` works with both layouts.
+
+`add_controls!(f, gui, title)` calls `f(layout)` to build widgets, e.g. buttons, menus and
+textboxes. While a textbox of the controls is focused or a menu is open, the keys of the 3D view and
+the camera are ignored, as for the boxes of the live view. A change of the optics from such a
+widget calls [`retrace!`](@ref), which solves the systems again like after a slider of the
+`sliders` kwarg (or marks the beams as outdated with `auto_trace = false`); the change itself goes
+into its first argument, since objects must not change while a solve runs in the background:
+
+```julia
+add_controls!(gui, "Mirror") do layout
+    box = Textbox(layout[1, 1]; placeholder = "tilt [mrad]", width = 100)
+    on(box.stored_string) do s
+        θ = tryparse(Float64, s)
+        isnothing(θ) || retrace!(() -> zrotate3d!(m1, 1e-3 * θ), gui)
+    end
+end
+```
+
+`add_tool!(f, gui, name)` adds a button that calls `f(gui)`, with `toggle = true` a toggle that
+calls `f(gui, active)`. In the app layout, it is an icon of the toolbar (`icon`, e.g. `:measure`,
+`:export` or `:chart`, an unknown name lists the valid ones) with a `tooltip`. `key` binds a key of
+the 3D view to the tool; keys that the live view, the kinematic controls or the camera use (all
+letters) throw an `ArgumentError` naming the binding, e.g. the digits `2`–`9` or the function keys
+are free:
+
+```julia
+add_tool!(gui, "Center m1"; icon = :fit, key = Keyboard._2) do gui
+    retrace!(() -> translate_to3d!(m1, [0, 0.1, 0]), gui)
+end
+# Shows or hides a reference line along the optical axis
+ref = lines!(gui.ax, [Point3f(0, 0, 0), Point3f(0, 0.3, 0)]; color = :gray, visible = false)
+add_tool!(gui, "Optical axis"; toggle = true, key = Keyboard._3) do gui, active
+    ref.visible[] = active
+end
+```
 
 ### Manual tracing
 

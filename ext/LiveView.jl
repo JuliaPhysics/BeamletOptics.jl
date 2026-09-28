@@ -145,6 +145,12 @@ and optionally, with defaults for any layout,
 - slots for additional parts: `_add_toolbar_entry!(gui, group)`, `_add_sidebar_section!(gui,
   side, title)` and `_add_dock_panel!(gui, title)`, which return the `GridPosition` or
   `GridLayout` to place widgets in, see `AppLayout`
+- the places of the public customization API (see `LiveCustom.jl`), without which it throws for
+  the layout: `_add_user_panel!(f, gui, title, select)` for [`add_panel!`](@ref),
+  `_controls_slot!(gui, title)` for [`add_controls!`](@ref) and
+  `_tool_widget(gui, toggle::Val, name, icon, tooltip)` for [`add_tool!`](@ref). A layout that
+  hides panels implements `_panel_shown(gui, p)` and `_mark_panel_stale!(gui, p)` and updates a
+  stale panel once it is shown, see `_UserPanel`
 
 The layouts of `live_view` are `CompactLayout` and `AppLayout`.
 """
@@ -155,9 +161,49 @@ abstract type AbstractLiveLayout end
 
 Layout of `live_view(...; layout = :compact)`: the 3D view with the detector panels on its right,
 the sliders, the status row and the tool row below. The positions in `gui.fig` are fixed, e.g. the
-panels are placed in `gui.fig[1, 2]`, where users may add their own axes.
+panels are placed in `gui.fig[1, 2]`, where users may add their own axes (see
+[`add_panel!`](@ref)).
 """
-struct CompactLayout <: AbstractLiveLayout end
+mutable struct CompactLayout <: AbstractLiveLayout
+    # the grid of the detector panels in `fig[1, 2]` (`nothing` without panels), the status row
+    # and the tool row, the places of the customization API, see `LiveCustom.jl`
+    panels::Union{Nothing, GridLayout}
+    status_row::GridLayout
+    tool_row::GridLayout
+    CompactLayout() = new(nothing)
+end
+
+"""
+    _UserPanel
+
+A panel added via [`add_panel!`](@ref): its `title`, the `layout` of its content and the
+`update(gui)` returned by the builder (or `nothing`), which runs after each full solve while the
+panel is shown, see `_update_user_panels!`. A layout that hides panels (the tabs of the app layout)
+marks a hidden panel stale instead and updates it once it is shown, see `_mark_panel_stale!`.
+"""
+mutable struct _UserPanel
+    const title::String
+    const layout::GridLayout
+    const update::Union{Nothing, Function}
+    last_error::Union{Nothing, String}
+end
+
+"""
+    _UserParts()
+
+The parts of a live view added via the customization API (see `LiveCustom.jl`): the `panels`
+(`_UserPanel`s), the `boxes` (`Textbox`es) and `menus` of added controls and panels, which take
+the keyboard like those of the layout (see `_typing`), and the `keys` of added tools with their
+names, see [`add_tool!`](@ref).
+"""
+struct _UserParts
+    panels::Vector{_UserPanel}
+    boxes::Vector{Textbox}
+    menus::Vector{Menu}
+    keys::Dict{Keyboard.Button, String}
+end
+
+_UserParts() = _UserParts(_UserPanel[], Textbox[], Menu[], Dict{Keyboard.Button, String}())
 
 """
     LiveView
@@ -290,6 +336,8 @@ mutable struct LiveView{L <: AbstractLiveLayout}
     # see `_live_render_extras!`; the opacity of objects set via their card, see `_set_opacity!`
     extras::SystemRenderHandle
     opacity::IdDict{Any, Any}
+    # panels, widgets and tool keys added via the customization API, see `LiveCustom.jl`
+    custom::_UserParts
     # state of the layout, e.g. the slots of the app layout, see `AbstractLiveLayout`; the last
     # field, see the constructor below
     layout::L
@@ -933,6 +981,8 @@ function _apply!(gui::LiveView, r, obj; coarse = false)
         catch e
             gui.last_error = _log_once(e, gui.last_error, "`on_change` callback")
         end
+        # After `on_change`, which may record what the panels of `add_panel!` show
+        _update_user_panels!(gui)
     end
     isnothing(obj) || (gui.status.text[] = _pose_string(gui, obj))
     _on_solved!(gui)
@@ -2004,6 +2054,8 @@ const _POSE_COLORS = (:black, :black, :black, :red, :green, :blue)
 function _typing(gui::LiveView)
     any(c -> any(tb -> tb.focused[], _card_boxes(c)), gui.cards) && return true
     any(tb -> tb.focused[], _layout_boxes(gui)) && return true
+    # the widgets of `add_controls!` and `add_panel!`, see `_register_widgets!`
+    _custom_typing(gui.custom) && return true
     return _menu_open(gui)
 end
 
@@ -3304,6 +3356,13 @@ The component menu of the compact layout is replaced by the tree. In the compact
 fixed positions of `gui.fig`, e.g. the detector panels in `gui.fig[1, 2]`, next to which users
 may add their own axes.
 
+# Own panels, controls and tools
+
+[`add_panel!`](@ref) adds an own panel (below the detector panels, or a tab of the dock of the app
+layout), [`add_controls!`](@ref) own widgets (a row above the status row, or a section of the left
+sidebar) and [`add_tool!`](@ref) a button or toggle, optionally with a key (in the tool row, or the
+toolbar). [`retrace!`](@ref) solves again after a change from code, e.g. from such a widget.
+
 # Keyword args
 
 - `layout = :compact`: arrangement of the widgets, `:compact` or `:app`, see "App layout"
@@ -3458,7 +3517,7 @@ function live_view(
         nothing, AbstractPlot[], w.home_button, (zeros(3), zeros(3), zeros(3)), false, view_specs,
         menus.views_menu, w.save_view_button, nothing, w.sources_toggle, nothing,
         _ProgressOverlay(ax), Float64(progress_delay), card, [card], Any[], extras_handle,
-        IdDict{Any, Any}(), lay)
+        IdDict{Any, Any}(), _UserParts(), lay)
     gui_ref[] = gui
     # Objects must not change while a solve in the background traces them
     controls.before_change = () -> _cancel_solve!(gui)
@@ -3529,7 +3588,7 @@ _add_toolbar_entry!(gui::LiveView, _) = _slot_error(gui, "toolbar")
 _add_sidebar_section!(gui::LiveView, _, _) = _slot_error(gui, "sidebars")
 _add_dock_panel!(gui::LiveView, _) = _slot_error(gui, "dock")
 
-function _build_layout(::CompactLayout, fig, spec)
+function _build_layout(layout::CompactLayout, fig, spec)
     (; specs, slider_specs, labels, lighting, view_cube, auto_trace, clip_beams, orthographic,
         show_sources) = spec
     ax = LScene(fig[1, 1]; show_axis = false)
@@ -3548,6 +3607,7 @@ function _build_layout(::CompactLayout, fig, spec)
             push!(panels, DetectorPanel(parent, pd, get(labels, pd, "Detector $i"), mode, kw))
         end
         colsize!(fig.layout, 1, Relative(0.6))
+        layout.panels = grid
     end
     sliders = if isempty(slider_specs)
         nothing
@@ -3580,6 +3640,8 @@ function _build_layout(::CompactLayout, fig, spec)
     # Keeps the tool row left-aligned and compact enough for narrow windows
     Label(tool_row[1, 8], ""; tellwidth = false)
     colgap!(tool_row, 6)
+    layout.status_row = status_row
+    layout.tool_row = tool_row
     return (; ax, cube, panels, sliders, status, trace_button, auto_trace_toggle, clip_beams_toggle,
         orthographic_toggle, sources_toggle, export_button, show_all_button, measure_toggle,
         home_button, save_view_button, tool_row)

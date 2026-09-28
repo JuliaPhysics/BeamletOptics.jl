@@ -226,7 +226,9 @@ selected, moved and hidden like the components, but never traced, e.g. a housing
 collapsible sidebars (object tree with selection and visibility, sliders, properties of the
 selection), an analysis dock with a tab per detector panel (only the panel of the active tab is
 computed after a solve) and a status bar, in the colors of `theme = :light` or `:dark`; the default
-`layout = :compact` places the panels next to the 3D view and the tools below it. All other keyword arguments are passed to [`kinematic_controls!`](@ref). Refer
+`layout = :compact` places the panels next to the 3D view and the tools below it. Own panels,
+widgets and tools are added to either layout via [`add_panel!`](@ref), [`add_controls!`](@ref)
+and [`add_tool!`](@ref). All other keyword arguments are passed to [`kinematic_controls!`](@ref). Refer
 to the method of the `Makie` extension for details.
 
 If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
@@ -244,6 +246,101 @@ to its initial pose. The code is printed to `io` and copied to the clipboard if 
 If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
 """
 export_changes(::Any; kwargs...) = throw(MissingBackendError())
+
+"""
+    add_panel!(f, gui, title::AbstractString; select = false) -> GridLayout
+
+Adds an own analysis panel named `title` to the [`live_view`](@ref) window `gui`, placed by its
+layout: with `layout = :compact` below the detector panels next to the 3D view (in a new column if
+there are none), with the title above it; with `layout = :app` as a new tab of the analysis dock,
+behind the tabs that exist (the active tab stays active unless `select = true`).
+
+`f(layout)` builds the content into the given `GridLayout`, e.g. an `Axis` with plots, and may
+return a function `update(gui)`, which is called after each full solve (not after the preview
+solves while moving), like the `on_change` of `live_view`, and once right away. In the app layout,
+`update` only runs while the tab is shown; a hidden panel is updated when its tab is opened or the
+dock is expanded. Any other return value of `f`, e.g. the last plot of a `do` block, means no
+`update`. Errors in `update` are logged once and do not interrupt the interaction. Returns the
+layout.
+
+```julia
+gui = live_view(system, beam)
+add_panel!(gui, "Power") do layout
+    ax = Axis(layout[1, 1]; xlabel = "Update", ylabel = "P [mW]")
+    pts = Observable(Point2f[])
+    lines!(ax, pts)
+    return gui -> (push!(pts[], Point2f(length(pts[]) + 1, 1e3 * optical_power(pd))); notify(pts))
+end
+```
+
+If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
+"""
+add_panel!(::Any, ::Any, ::AbstractString; kwargs...) = throw(MissingBackendError())
+
+"""
+    add_controls!(f, gui, title::AbstractString) -> GridLayout
+
+Adds own widgets to the [`live_view`](@ref) window `gui`, placed by its layout: with
+`layout = :compact` in a row named `title` above the status row, spanning the width of the window;
+with `layout = :app` as a section `title` of the left sidebar, below "Parameters". `f(layout)`
+builds the widgets (e.g. `Button`, `Toggle`, `Menu`, `Textbox`) into the given `GridLayout` and
+connects them. Returns the layout.
+
+`Textbox`es and `Menu`s in the layout take the keyboard like those of the live view: while a box
+is focused or a menu is open, the keys of the 3D view and the camera are ignored. They are
+collected once `f` returns, widgets added later are not. An input that changes the optics solves
+the systems again via [`retrace!`](@ref):
+
+```julia
+add_controls!(gui, "Laser") do layout
+    box = Textbox(layout[1, 1]; placeholder = "power [mW]", width = 100)
+    on(box.stored_string) do s
+        retrace!(() -> set_power!(laser, 1e-3 * parse(Float64, s)), gui)
+    end
+end
+```
+
+If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
+"""
+add_controls!(::Any, ::Any, ::AbstractString) = throw(MissingBackendError())
+
+"""
+    add_tool!(f, gui, name::AbstractString; icon = :object, key = nothing, toggle = false, tooltip = name)
+
+Adds a tool to the [`live_view`](@ref) window `gui`: a button that calls `f(gui)`, or with
+`toggle = true` a toggle that calls `f(gui, active::Bool)` whenever it is switched. With
+`layout = :app`, an icon button (or toggle) in the toolbar, before "Help", with the `icon` (a name
+of the icon set of the app layout, e.g. `:measure`, `:export` or `:chart`; an unknown name throws
+an `ArgumentError` that lists the valid ones) and the `tooltip`; with `layout = :compact`, a
+button (or a toggle with a label) named `name` in the row below the status line.
+
+`key`, a free `Makie.Keyboard.Button` such as `Keyboard._2` or `Keyboard.f5`, presses the button
+(or switches the toggle) from the 3D view; it is shown in the tooltip or label. Keys taken by the
+live view, the kinematic controls, Makie's `Camera3D` (which binds almost all letters) or another
+tool throw an `ArgumentError` that names the existing binding. The key is ignored while a textbox of the window is focused. Errors in
+`f` are logged once. Returns the widget, with `clicks` (button) or `active` (toggle).
+
+If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
+"""
+add_tool!(::Any, ::Any, ::AbstractString; kwargs...) = throw(MissingBackendError())
+
+"""
+    retrace!(gui)
+    retrace!(f, gui)
+
+Solves the systems of the [`live_view`](@ref) window `gui` again after a change from code, e.g. a
+widget of [`add_controls!`](@ref) or a tool of [`add_tool!`](@ref), like after a slider of the
+`sliders` kwarg: the render of the objects is updated, then the systems are solved (with preview
+tracing and deferred solves of slow systems, as while moving), or the beams are marked as
+outdated if auto tracing is off. `on_change` and the `update` of the panels of
+[`add_panel!`](@ref) run after the full solve.
+
+With `f`, `f()` makes the change first, after a solve running in the background is cancelled:
+objects must not change while they are traced, hence changes of objects belong into `f`.
+
+If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
+"""
+retrace!(::Any...) = throw(MissingBackendError())
 
 """
     view_cube!(ls::LScene; size = 110, corner = :top_right, duration = 0.3)

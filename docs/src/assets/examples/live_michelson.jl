@@ -35,23 +35,29 @@ system = System([rpm, cbs, m1, m2, pd])
 
 ## Optical power over the updates, the detector intensity is evaluated on the full detector area
 full_area = (; x_min = -pd_size / 2, x_max = pd_size / 2, z_min = -pd_size / 2, z_max = pd_size / 2)
-power = Observable(Point2f[])
+power = Point2f[]
 
+# Called after each full solve, also while the power panel is hidden (a tab of the app layout)
 function record_power!(gui, obj)
     P = isnothing(BMO.hits(pd)) ? 0.0 : optical_power(pd; n = 100, full_area...)
-    n = isempty(power[]) ? 1 : last(power[])[1] + 1
-    push!(power[], Point2f(n, 1e3 * P))
-    length(power[]) > 300 && popfirst!(power[])
-    notify(power)
+    n = isempty(power) ? 1 : last(power)[1] + 1
+    push!(power, Point2f(n, 1e3 * P))
+    length(power) > 300 && popfirst!(power)
     return nothing
 end
 
-## Interactive window, with an additional axis for the optical power below the detector panel
+## Interactive window, `layout = :app` opens it as an application window
 gui = live_view(system, beam; size = (1200, 700), detectors = [pd => (:intensity, full_area)],
-    on_change = record_power!)
-power_ax = Axis(gui.fig[1, 2][2, 1]; title = "Optical power", xlabel = "Update", ylabel = "P [mW]")
-lines!(power_ax, power; color = :red)
-on(_ -> autolimits!(power_ax), power)
+    on_change = record_power!, layout = :compact)
+
+# The optical power as an own panel: below the detector panel, or a tab in the app layout
+add_panel!(gui, "Optical power") do layout
+    ax = Axis(layout[1, 1]; xlabel = "Update", ylabel = "P [mW]")
+    pts = Observable(copy(power))
+    lines!(ax, pts; color = :red)
+    # Called after each full solve while the panel is shown
+    return gui -> (pts[] = copy(power); autolimits!(ax))
+end
 fig = gui.fig
 controls = gui.controls
 

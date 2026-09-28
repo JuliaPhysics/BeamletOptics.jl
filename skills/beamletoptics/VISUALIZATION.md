@@ -95,6 +95,37 @@ selected, moved, hidden and exported like components. An extra must not also be 
 system (`ArgumentError`). The card of a `NonInteractableObject`/`MeshDummy` or
 `IntersectableObject` has an "opacity" slider (0-100 %, 0 % hides it).
 
+Own GUI parts go into a `gui = live_view(...)` via three functions that work with both
+`layout = :compact` and `layout = :app` (the layout places them); do not place blocks at fixed
+`gui.fig[...]` positions, those only exist in the compact layout:
+
+```julia
+power = Point2f[]   # recorded by on_change = (gui, obj) -> push!(power, ...), runs after every full solve
+add_panel!(gui, "Power") do layout            # compact: below the detector panels; app: a dock tab
+    ax = Axis(layout[1, 1]; xlabel = "Update", ylabel = "P [mW]")
+    pts = Observable(copy(power)); lines!(ax, pts)
+    return gui -> (pts[] = copy(power); autolimits!(ax))   # update(gui): after full solves, only while shown
+end
+add_controls!(gui, "Mirror") do layout        # compact: row above the status row; app: left sidebar
+    b = Button(layout[1, 1]; label = "tilt +1 mrad")
+    on(_ -> retrace!(() -> zrotate3d!(m1, 1e-3), gui), b.clicks)   # change inside retrace!, then re-solve
+end
+add_tool!(gui, "Reset m1"; icon = :home, key = Keyboard._2) do gui   # toggle = true: f(gui, active)
+    retrace!(() -> translate_to3d!(m1, [0, 0.1, 0]), gui)
+end
+```
+
+- `f` of `add_panel!` returns `update(gui)` or anything else (= no update); in the app, hidden tabs
+  are updated when opened (`select = true` shows the new tab). Record data in `on_change`, not in
+  `update`, if it must be recorded while the panel is hidden.
+- `retrace!(gui)` / `retrace!(f, gui)` re-solves like a `sliders` entry (marks stale with
+  `auto_trace = false`); make object changes inside `f` (a background solve is cancelled first).
+- Textboxes/menus built in `add_controls!`/`add_panel!` block the 3D keys while focused/open.
+- `key` must be free: all letters, arrows, `1`, `Esc`, `Delete`, `Backspace`, Shift/Ctrl/Alt,
+  `+`/`-` are taken (live view, kinematic controls, Makie `Camera3D`) → `ArgumentError`. Use
+  digits `2`-`9` or `f1`-`f12`. `icon` must be an icon name of the app (e.g. `:measure`,
+  `:export`, `:chart`, `:object`), else `ArgumentError` listing them (also in compact).
+
 Solves longer than `progress_delay` (kwarg, default 0.5 s) run in the background: the window stays
 usable and a small progress window appears next to the source being traced or the detector whose
 field is computed. Moving a component or pressing `Esc` cancels the solve.

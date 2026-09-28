@@ -153,7 +153,8 @@ Slots
     _add_toolbar_entry!(layout::AppLayout, group::Symbol) -> GridPosition
 
 Returns the position of a new entry at the end of the toolbar `group`, e.g. for a `Button`. A new
-group is appended to the toolbar, after a separator.
+group is appended to the toolbar, after a separator, but before the group `:help`, which stays
+last.
 """
 function _add_toolbar_entry!(layout::AppLayout, group::Symbol)
     i = findfirst(g -> g.first == group, layout.groups)
@@ -163,8 +164,11 @@ function _add_toolbar_entry!(layout::AppLayout, group::Symbol)
             Box(layout.toolbar[1, 2k]; width = 1, height = 22, color = layout.theme.border,
                 strokewidth = 0)
         end
-        g = GridLayout(layout.toolbar[1, 2k + 1]; default_colgap = 4)
-        push!(layout.groups, group => g)
+        # The group `:help` moves one place to the right, the new group takes its place
+        j = k > 0 && layout.groups[k].first == :help ? k : k + 1
+        j == k && (layout.toolbar[1, 2k + 1] = layout.groups[k].second)
+        g = GridLayout(layout.toolbar[1, 2j - 1]; default_colgap = 4)
+        insert!(layout.groups, j, group => g)
         g
     else
         layout.groups[i].second

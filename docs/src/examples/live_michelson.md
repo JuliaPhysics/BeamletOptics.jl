@@ -54,18 +54,17 @@ system = System([rpm, cbs, m1, m2, pd])
 
 ## Custom updates
 
-The `on_change` callback is called after each solve with the moved component, or `nothing` for the initial solve. Here, it records the optical power on the detector. Since the callback already runs for the initial solve inside [`live_view`](@ref), it only updates an `Observable`, which is plotted after the window has been created. The intensity is evaluated on the full detector area, which makes the movement of the fringes visible:
+The `on_change` callback is called after each full solve with the moved component, or `nothing` for the initial solve. Here, it records the optical power on the detector into a vector, which is plotted by an own panel below. The intensity is evaluated on the full detector area, which makes the movement of the fringes visible:
 
 ```julia
 full_area = (; x_min = -pd_size / 2, x_max = pd_size / 2, z_min = -pd_size / 2, z_max = pd_size / 2)
-power = Observable(Point2f[])
+power = Point2f[]
 
 function record_power!(gui, obj)
     P = isnothing(BMO.hits(pd)) ? 0.0 : optical_power(pd; n = 100, full_area...)
-    n = isempty(power[]) ? 1 : last(power[])[1] + 1
-    push!(power[], Point2f(n, 1e3 * P))
-    length(power[]) > 300 && popfirst!(power[])
-    notify(power)
+    n = isempty(power) ? 1 : last(power)[1] + 1
+    push!(power, Point2f(n, 1e3 * P))
+    length(power) > 300 && popfirst!(power)
     return nothing
 end
 ```
@@ -74,16 +73,24 @@ Errors in the callback are logged once and do not interrupt the interaction.
 
 ## Opening the interactive window
 
-A single call of [`live_view`](@ref) opens a complete interactive window for the system and the beam: the 3D view, one panel per [`Detector`](@ref) and a status line. The detector panel shows the intensity for Gaussian beamlets and the spot diagram for rays, together with the optical power or the number of rays in its title. By default, the intensity is cropped around the beam, here the full detector area is evaluated instead. The optical power is plotted into an additional axis below the detector panel:
+A single call of [`live_view`](@ref) opens a complete interactive window for the system and the beam: the 3D view, one panel per [`Detector`](@ref) and a status line. The detector panel shows the intensity for Gaussian beamlets and the spot diagram for rays, together with the optical power or the number of rays in its title. By default, the intensity is cropped around the beam, here the full detector area is evaluated instead. The optical power is plotted by an own panel, added via [`add_panel!`](@ref): the `do` block builds an axis into the layout of the panel and returns the function that updates the plot after each full solve:
 
 ```julia
 gui = live_view(system, beam; size = (1200, 700), detectors = [pd => (:intensity, full_area)],
-    on_change = record_power!)
-power_ax = Axis(gui.fig[1, 2][2, 1]; title = "Optical power", xlabel = "Update", ylabel = "P [mW]")
-lines!(power_ax, power; color = :red)
-on(_ -> autolimits!(power_ax), power)
+    on_change = record_power!, layout = :compact)
+add_panel!(gui, "Optical power") do layout
+    ax = Axis(layout[1, 1]; xlabel = "Update", ylabel = "P [mW]")
+    pts = Observable(copy(power))
+    lines!(ax, pts; color = :red)
+    return gui -> (pts[] = copy(power); autolimits!(ax))
+end
 display(gui)
 ```
+
+The panel is placed by the layout of the window: below the detector panel in the default
+`layout = :compact`, as a tab of the analysis dock with `layout = :app`. There, the panel is only
+updated while its tab is shown, which is why the power is recorded by `on_change`, which runs after
+every full solve.
 
 After each change, `live_view` empties all detectors, solves the system again and updates the beam and the detector panels. There is no need to call [`solve_system!`](@ref) or [`update_render!`](@ref) manually. The figure, the 3D view and the controls are available as `gui.fig`, `gui.ax` and `gui.controls`, e.g. to add static context via `render!(gui.ax, ...)`. Several systems can be shown in the same view via `live_view(system1 => beam1, system2 => beam2)`, and sliders for custom parameters can be added via the `sliders` keyword argument.
 

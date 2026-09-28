@@ -71,6 +71,7 @@ include(joinpath(@__DIR__, "Rendering", "TestLiveApp.jl"))
 include(joinpath(@__DIR__, "Rendering", "TestLiveDock.jl"))
 include(joinpath(@__DIR__, "Rendering", "TestLiveInspector.jl"))
 include(joinpath(@__DIR__, "Rendering", "TestLiveExtras.jl"))
+include(joinpath(@__DIR__, "Rendering", "TestLiveCustom.jl"))
 include(joinpath(@__DIR__, "Rendering", "TestViewCube.jl"))
 
 # Test regressions

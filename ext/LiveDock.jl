@@ -485,6 +485,18 @@ function _refresh_dock!(gui::AppView)
     tabs = gui.layout.tabs
     p = _active_panel(tabs)
     (gui.layout.dock.shown && !isnothing(p) && p in tabs.stale) || return nothing
+    _refresh_tab!(gui, p)
+    return nothing
+end
+
+"""
+    _refresh_tab!(gui::AppView, p)
+
+Updates the stale panel `p` of the shown active tab, see `_refresh_dock!`: a `DetectorPanel` is
+computed, the `update` of a `_UserPanel` of [`add_panel!`](@ref) is called, see `LiveCustom.jl`.
+"""
+function _refresh_tab!(gui::AppView, p::DetectorPanel)
+    tabs = gui.layout.tabs
     if haskey(tabs.fields, p)
         _show_panel!(gui, p, pop!(tabs.fields, p))
         return nothing

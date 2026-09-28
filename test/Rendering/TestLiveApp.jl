@@ -367,10 +367,13 @@ const BMO = BeamletOptics
     @testset "slots" begin
         m, pd = _fixture()
         gui = _live_app(System([m, pd]), Beam([0.0, 0, 0], [0.0, 1, 0]); detectors = [])
-        # a new toolbar group after the built-in ones
+        # a new toolbar group after the built-in ones, but before "Help", which stays last
         b = Button(Ext._add_toolbar_entry!(gui, :custom); label = "Mine")
-        @test first(gui.layout.groups[end]) == :custom
-        @test b in contents(gui.layout.groups[end].second)
+        @test first.(gui.layout.groups[(end - 1):end]) == [:custom, :help]
+        @test b in contents(gui.layout.groups[end - 1].second)
+        # the groups and separators alternate in the columns of the toolbar
+        cols(x) = Makie.GridLayoutBase.gridcontent(x).span.cols
+        @test [cols(g.second) for g in gui.layout.groups] == [1:1, 3:3, 5:5, 7:7, 9:9, 11:11, 13:13]
         # a sidebar section below the built-in ones
         g = Ext._add_sidebar_section!(gui, :right, "Extra")
         @test g isa GridLayout

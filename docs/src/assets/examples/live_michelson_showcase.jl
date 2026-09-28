@@ -1,6 +1,8 @@
 include(joinpath(@__DIR__, "live_michelson.jl"))
 
 GLMakie.activate!(; visible = false)
+# Solves every step: a script shows no frames, in which deferred solves would run
+gui.trace_budget = Inf
 
 ## Tilt mirror 1 by 1 mrad, which generates fringes on the detector
 controls.selected[] = m1
