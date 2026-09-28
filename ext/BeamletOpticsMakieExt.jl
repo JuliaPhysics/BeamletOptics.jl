@@ -5,7 +5,8 @@ import BeamletOptics: render!, RenderException, _RenderTypes, get_view, set_view
                        set_orthographic, arrow!, render_lcs!, look_at!,
                        AbstractRenderHandle, live_render!, update_render!, remove_render!,
                        pick_object, kinematic_controls!, live_view, view_cube!, studio_lighting!,
-                       set_render_look, export_changes
+                       set_render_look, export_changes, card_rows, pose_card_rows, card_actions,
+                       set_num_rays!
 
 const BMO = BeamletOptics
 

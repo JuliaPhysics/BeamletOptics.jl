@@ -106,11 +106,10 @@ projection.
 
 The `export_button` prints the changed poses as Julia code, see [`export_changes`](@ref), and
 copies them to the clipboard if `export_clipboard` is `true`. The component `menu` lists the
-movable objects `menu_objects`, the objects hidden via the `hide_button` are stored in `hidden`.
-The `card` next to the selected object holds the `hide_button`, the `pose_boxes`, which show and
-set the position `x`, `y`, `z` [mm] of the object and rotate it about the red, green and blue axes
-of the controls [mrad], and the `step_box` of the keyboard step. `cards` holds all cards, including
-the pinned ones.
+movable objects `menu_objects`, the objects hidden via "hide" are stored in `hidden`. The `card`
+next to the selected object shows the rows and actions declared for it (see [`card_rows`](@ref),
+e.g. its pose) and the `step_box` of the keyboard step. `cards` holds all cards, including the
+pinned ones.
 
 While moving, beam groups are solved only for their rendered beams if `preview_enabled`, `preview`
 is `true` until the full solve. A solve that takes longer than `trace_budget` continues in the
@@ -170,12 +169,10 @@ mutable struct LiveView
     # component menu, the option `i` selects `menu_objects[i]`
     menu::Menu
     menu_objects::Vector{Any}
-    # hidden objects, i.e. rendered objects (leaves of groups) whose plots are invisible
-    hide_button::Button
+    # hidden objects, i.e. rendered objects (leaves of groups) whose plots are invisible, see the
+    # action "hide" of the cards
     show_all_button::Button
     hidden::Base.IdSet{Any}
-    # pose inspector: x, y, z [mm] and the rotations rx, ry, rv [mrad], see `_POSE_FIELDS`
-    pose_boxes::Vector{Textbox}
     # preview tracing: while moving, beam groups are solved only for their rendered beams, see
     # `_resolve!`; `preview` is set after such a solve, until the full solve once the movement pauses
     preview_enabled::Bool
@@ -208,8 +205,8 @@ mutable struct LiveView
     progress::_ProgressOverlay
     progress_delay::Float64
     # card with the controls of the selected object next to it in the 3D view, which holds
-    # `step_box`, `hide_button` and `pose_boxes`; all cards, including the pinned ones; the
-    # listeners that keep the camera from the cards, see `_shield_cards!`
+    # `step_box`; all cards, including the pinned ones; the listeners that keep the camera from
+    # the cards, see `_shield_cards!`
     card::_ComponentCard
     cards::Vector{_ComponentCard}
     card_shield::Vector{Any}
@@ -789,6 +786,8 @@ function _apply!(gui::LiveView, r, obj; coarse = false)
         end
     end
     isnothing(obj) || (gui.status.text[] = _pose_string(gui, obj))
+    # e.g. values of the last solve on the cards
+    _update_inspector!(gui)
     return nothing
 end
 
@@ -1745,6 +1744,7 @@ function _toggle_hidden!(gui::LiveView, obj)
     else
         gui.status.text[] = "$(_label(gui, obj)) shown"
     end
+    _update_inspector!(gui)
     _update_cards!(gui)
     return nothing
 end
@@ -1761,6 +1761,7 @@ _all_hidden(gui::LiveView, obj) = all(leaf -> leaf in gui.hidden, _leaves(obj))
 function _show_all!(gui::LiveView)
     foreach(leaf -> _set_hidden!(gui, leaf, false), collect(gui.hidden))
     gui.status.text[] = "all components shown"
+    _update_inspector!(gui)
     _update_cards!(gui)
     return nothing
 end
@@ -1794,26 +1795,12 @@ end
 """
     _update_inspector!(gui; force = false)
 
-Shows the position [mm] of the object of each card of the `gui` (see `_card_object`) in its pose
-boxes, see `_update_boxes!`.
+Shows the values of the objects of all cards of the `gui` in their widgets, e.g. the position of
+an object in its pose boxes, see `_refresh_card!`. Focused textboxes keep the typed text, unless
+`force`.
 """
 function _update_inspector!(gui::LiveView; force::Bool = false)
-    foreach(c -> _update_boxes!(c, _card_object(gui, c); force), gui.cards)
-    return nothing
-end
-
-"""
-    _update_boxes!(c::_ComponentCard, obj; force = false)
-
-Shows the position [mm] of `obj` in the position boxes of the card `c` and clears the rotation
-boxes, or clears all boxes for `nothing`. Focused boxes are skipped, unless `force`.
-"""
-function _update_boxes!(c::_ComponentCard, obj; force::Bool = false)
-    p = isnothing(obj) ? nothing : 1e3 .* Vector{Float64}(position(obj))
-    for (k, tb) in enumerate(c.pose_boxes)
-        tb.focused[] && !force && continue
-        _set_box!(tb, isnothing(p) || k > 3 ? "" : string(round(p[k], digits = 6)))
-    end
+    foreach(c -> _refresh_card!(gui, c; force), gui.cards)
     return nothing
 end
 
@@ -1939,34 +1926,155 @@ end
 """
     _update_card!(gui, c, obj, obstacles)
 
-Shows the card `c` for `obj` (or hides it for `nothing`): its label, its actions and the pose of
-`obj` if it changed, then moves it next to the bounding box of `obj` (see `_card_position`), off the
-`obstacles` (see `_avoid`), to which it adds its rectangle, and connects it to `obj` by a line.
-Only changed values update the layout.
+Shows the card `c` for `obj` (or hides it for `nothing`): builds its declared widgets when it gets
+another object (see `_build_content!`) and shows the values of `obj` when it or its pose changes,
+then moves the card next to the bounding box of `obj` (see `_card_position`), off the `obstacles`
+(see `_avoid`), to which it adds its rectangle, and connects it to `obj` by a line. Only changed
+values update the layout.
 """
 _update_card!(::LiveView, c::_ComponentCard, ::Nothing, ::Vector{Rect2f}) = _hide_card!(c)
 function _update_card!(gui::LiveView, c::_ComponentCard, obj, obstacles::Vector{Rect2f})
-    # The pose boxes show another object or a new pose, e.g. after a move by a program
     pose = _pose(obj)
+    if c.pose === nothing || c.pose[1] !== obj
+        _build_content!(gui, c, obj)
+    end
+    # Another object or a new pose, e.g. after a move by a program
     if c.pose === nothing || c.pose[1] !== obj || c.pose[2] != pose
         c.pose = (obj, pose)
-        _update_boxes!(c, obj)
+        _refresh_card!(gui, c)
     end
     corners = _card_corners(gui, c, obj)
     _update!(c.title.text, _label(gui, obj))
-    _update_actions!(gui, c, obj)
-    actions = _card_actions(c, obj)
     scene = gui.ax.scene
     view = Rect2f(Makie.viewport(scene)[])
-    size = _card_size(c, actions)
+    size = _card_size(c)
     p = _avoid(_card_position(_screen_rect(scene, corners, obj), size, view), size, view, obstacles)
-    _arrange_card!(c, actions, p)
+    _arrange_card!(c, p)
     rect = _card_rect(p, size)
     push!(obstacles, rect)
     _update!(c.link, [_link_anchor(scene, corners, obj), Point2f(minimum(rect) .+ size ./ 2)])
     _update!(c.scene.visible, true)
     return nothing
 end
+
+"""
+    _build_content!(gui, c, obj)
+
+Builds the widgets of the card `c` of the `gui` for its new object `obj` from the declarations
+[`card_actions`](@ref) (in `c.actions`) and [`card_rows`](@ref) (one layout per row in `c.rows`),
+see `_add_cell!`. If the declarations have the same layout as those of the widgets on the card,
+e.g. for another mirror, the widgets are kept and only take the new declarations. New widgets come
+before the mouse shield of the cards, see `_shield_cards!`.
+"""
+function _build_content!(gui::LiveView, c::_ComponentCard, obj)
+    actions, rows = card_actions(obj), card_rows(obj)
+    key = (_layout_key(actions), _layout_key(rows))
+    declared = CardWidget[_declared_widgets(actions)..., _declared_widgets(rows)...]
+    if key == c.content_key
+        c.widgets = [(b, w) for ((b, _), w) in zip(c.widgets, declared)]
+        return nothing
+    end
+    _clear_content!(c)
+    for (j, w) in enumerate(actions)
+        _add_cell!(gui, c, c.actions[1, j], w)
+    end
+    for (i, row) in enumerate(rows)
+        layout = GridLayout(c.rows[i, 1]; halign = :left, default_colgap = 6)
+        for (j, cell) in enumerate(row.cells)
+            _add_cell!(gui, c, layout[1, j], cell)
+        end
+    end
+    c.content_key = key
+    _shield_cards!(gui)
+    return nothing
+end
+
+"""
+    _add_cell!(gui, c, pos, cell)
+
+Adds a cell of a declaration to the card `c` of the `gui` at the grid position `pos`: a text as a
+`Label`, a [`CardWidget`](@ref) as a block of its type with the colors of the card. The inputs of
+the block call `on` of the declaration (see `_on_input!`), and a textbox takes the keyboard like
+the others of the card.
+"""
+function _add_cell!(::LiveView, c::_ComponentCard, pos, text::String)
+    push!(c.blocks, Label(pos, text; halign = :left, _card_style(Label)...))
+    return nothing
+end
+function _add_cell!(gui::LiveView, c::_ComponentCard, pos, w::CardWidget)
+    b = w.type(pos; _card_style(w.type)..., w.attributes...)
+    push!(c.blocks, b)
+    push!(c.widgets, (b, w))
+    i = length(c.widgets)
+    _fix_caret!(b)
+    _track_textbox!(gui, c, b)
+    _listen_input!(gui, c, i, _widget_input(b))
+    return nothing
+end
+
+function _track_textbox!(gui::LiveView, c::_ComponentCard, tb::Textbox)
+    push!(c.textboxes, tb)
+    push!(c.listeners, on(_ -> _keep_keyboard!(gui), tb.focused))
+    return nothing
+end
+_track_textbox!(::LiveView, ::_ComponentCard, _) = nothing
+
+_listen_input!(::LiveView, ::_ComponentCard, ::Int, ::Nothing) = nothing
+function _listen_input!(gui::LiveView, c::_ComponentCard, i::Int, obs::Observable)
+    push!(c.listeners, on(v -> _on_input!(gui, c, i, v), obs))
+    return nothing
+end
+
+"""
+    _on_input!(gui, c, i, v)
+
+Applies the input `v` of the declared widget `i` of the card `c` to the object of the card (see
+`_card_object`) with `on` of its declaration (and solves again for `solve = true`), then shows the
+new values on all cards. Ignored while the card shows new values (`refreshing`).
+"""
+function _on_input!(gui::LiveView, c::_ComponentCard, i::Int, v)
+    c.refreshing && return nothing
+    w = c.widgets[i][2]
+    _apply_input!(gui, w.on, _card_object(gui, c), v, w.solve)
+    _update_inspector!(gui)
+    _update_cards!(gui)
+    return nothing
+end
+_apply_input!(gui::LiveView, on, obj, v, solve::Bool) = _apply_on!(gui, on, obj, v, Val(solve))
+_apply_input!(::LiveView, ::Nothing, _, _, ::Bool) = nothing
+_apply_input!(::LiveView, _, ::Nothing, _, ::Bool) = nothing
+_apply_input!(::LiveView, ::Nothing, ::Nothing, _, ::Bool) = nothing
+_apply_on!(gui::LiveView, on, obj, v, ::Val{false}) = (on(gui, obj, v); nothing)
+# The input changes the optics, see `solve` of `CardWidget`: like a move, via the `on_change` of
+# the controls, which callers of the live view may extend
+function _apply_on!(gui::LiveView, on, obj, v, ::Val{true})
+    _change!(() -> on(gui, obj, v), gui.controls, obj)
+    gui.controls.on_change(obj)
+    return nothing
+end
+
+"""
+    _refresh_card!(gui, c; force = false)
+
+Shows the values of the object of the card `c` (see `_card_object`) in its declared widgets, see
+`value` of [`CardWidget`](@ref); a focused textbox keeps the typed text, unless `force`. Only if
+the widgets were built for this object, see `_update_card!`.
+"""
+function _refresh_card!(gui::LiveView, c::_ComponentCard; force::Bool = false)
+    obj = _card_object(gui, c)
+    (isnothing(obj) || c.pose === nothing || c.pose[1] !== obj) && return nothing
+    c.refreshing = true
+    try
+        for (b, w) in c.widgets
+            _refresh_widget!(b, w.value, gui, obj; force)
+        end
+    finally
+        c.refreshing = false
+    end
+    return nothing
+end
+_refresh_widget!(b, value, gui::LiveView, obj; force::Bool = false) = _show!(b, value(gui, obj); force)
+_refresh_widget!(_, ::Nothing, ::LiveView, _; force::Bool = false) = nothing
 
 """
     _card_corners(gui, c, obj)
@@ -1989,11 +2097,6 @@ function _card_corners(gui::LiveView, c::_ComponentCard, obj)
     T = Matrix{Float64}(R) * R0'
     return [Point3f(Vector{Float64}(P) + T * (Vector{Float64}(q) - P0)) for q in c.corners]
 end
-
-"""Shows "show" on the hide button of the card `c` if its object `obj` is hidden, otherwise "hide"."""
-_update_actions!(gui::LiveView, c::_ComponentCard, obj) =
-    _update!(c.hide_button.label, _all_hidden(gui, obj) ? "show" : "hide")
-_update_actions!(::LiveView, ::_ComponentCard, ::LiveClipPlane) = nothing
 
 """Collapses the card `c` of the `gui` to its head, or expands it again."""
 function _toggle_collapsed!(gui::LiveView, c::_ComponentCard)
@@ -2044,10 +2147,10 @@ function _spare_card!(gui::LiveView)
     return c
 end
 
-"""Makes `c` the card of the selection of the `gui`, which holds `step_box`, `hide_button` and `pose_boxes`."""
+"""Makes `c` the card of the selection of the `gui`, whose `step_box` sets the keyboard step."""
 function _use_card!(gui::LiveView, c::_ComponentCard)
     gui.card = c
-    gui.step_box, gui.hide_button, gui.pose_boxes = c.step_box, c.hide_button, c.pose_boxes
+    gui.step_box = c.step_box
     c.key, c.pose = nothing, nothing
     return nothing
 end
@@ -2055,24 +2158,86 @@ end
 """
     _connect_card!(gui, c)
 
-Connects the widgets of the card `c` of the `gui`, which act on its object (see `_card_object`), and
-its textboxes to the keyboard handling of the camera, see `_keep_keyboard!`.
+Connects the head and the step box of the card `c` of the `gui`; the declared widgets are connected
+when they are built, see `_build_content!`.
 """
 function _connect_card!(gui::LiveView, c::_ComponentCard)
     listeners = gui.controls.listeners
-    obj() = _card_object(gui, c)
     push!(listeners, on(_ -> _toggle_collapsed!(gui, c), c.collapse_button.clicks))
     push!(listeners, on(_ -> _toggle_pinned!(gui, c), c.pin_button.clicks))
-    push!(listeners, on(_ -> _toggle_hidden!(gui, obj()), c.hide_button.clicks))
-    push!(listeners, on(_ -> _flip_clip_plane!(gui, obj()), c.flip_button.clicks))
-    push!(listeners, on(_ -> _remove_clip_plane!(gui, obj()), c.remove_button.clicks))
-    for (k, tb) in enumerate(c.pose_boxes)
-        push!(listeners, on(s -> _apply_pose_input!(gui, obj(), k, s), tb.stored_string))
-    end
     push!(listeners, on(s -> _set_step!(gui, s), c.step_box.stored_string))
-    for tb in _card_boxes(c)
-        push!(listeners, on(_ -> _keep_keyboard!(gui), tb.focused))
-    end
+    push!(listeners, on(_ -> _keep_keyboard!(gui), c.step_box.focused))
+    return nothing
+end
+
+#=
+Declarations of the cards, see `card_rows` and `card_actions`
+=#
+
+# Labels of the pose rows, see `_POSE_FIELDS`, the units are given at the end of the rows, and the
+# names of their boxes
+const _CARD_POSE_LABELS = ("x", "y", "z", "rx", "ry", "rv")
+const _CARD_POSE_NAMES = (:x, :y, :z, :rx, :ry, :rv)
+# Colors of the rotation labels: red, green and blue like the gizmo axes, lighter on the dark card
+const _CARD_AXIS_COLORS = (RGBAf(1, 0.45, 0.45, 1), RGBAf(0.45, 0.85, 0.45, 1), RGBAf(0.55, 0.7, 1, 1))
+
+# Label of the pose box `k`, of the same width in both rows, such that the boxes line up
+_pose_label(k::Int) = CardWidget(Label; text = _CARD_POSE_LABELS[k], width = 18, halign = :right,
+    color = k <= 3 ? _PROGRESS_TEXT_COLOR : _CARD_AXIS_COLORS[k - 3])
+
+# Pose box `k`: the position [mm] (wide enough for e.g. -6869.709 of a telescope, longer values
+# scroll while typing) or an empty rotation box, see `_apply_pose_input!`
+_pose_box(k::Int) = CardWidget(Textbox; name = _CARD_POSE_NAMES[k], placeholder = k <= 3 ? " " : "0",
+    width = 80, value = (gui, obj) -> k <= 3 ? string(round(1e3 * position(obj)[k], digits = 6)) : "",
+    on = (gui, obj, s) -> _apply_pose_input!(gui, obj, k, s))
+
+function pose_card_rows(obj)
+    cells(ks, unit) = (Iterators.flatten((_pose_label(k), _pose_box(k)) for k in ks)..., unit)
+    return (CardRow(cells(1:3, "mm")...), CardRow(cells(4:6, "mrad")...))
+end
+
+card_rows(obj) = pose_card_rows(obj)
+
+card_actions(obj) = (CardWidget(Button; name = :hide, label = "hide",
+    value = (gui, o) -> _all_hidden(gui, o) ? "show" : "hide", on = (gui, o, _) -> _toggle_hidden!(gui, o)),)
+
+card_actions(::LiveClipPlane) = (
+    CardWidget(Button; name = :flip, label = "flip", on = (gui, p, _) -> _flip_clip_plane!(gui, p)),
+    CardWidget(Button; name = :remove, label = "remove", on = (gui, p, _) -> _remove_clip_plane!(gui, p)))
+
+# Sources whose rays can be regenerated: the pose and a slider for the number of rays
+card_rows(src::Union{BMO.CollimatedSource, BMO.PointSource}) =
+    (pose_card_rows(src)..., _ray_rows(src.sampling, length(src))...)
+
+_ray_rows(::BMO._NoSampling, ::Int) = ()
+_ray_rows(s::BMO._AbstractSampling, n::Int) = (CardRow(
+    CardWidget(Label; name = :ray_count, width = 80, halign = :left, value = (gui, src) -> "$(length(src)) rays"),
+    CardWidget(Slider; name = :rays, range = _ray_steps(_min_rays(s), n), width = 200,
+        value = (gui, src) -> length(src), on = (gui, src, n) -> _set_num_rays!(gui, src, n))),)
+
+# Fewest rays of a sampling, see `set_num_rays!`
+_min_rays(s::Union{BMO._DiscRings, BMO._ConeRings}) = 20 * s.num_rings
+_min_rays(::BMO._AbstractSampling) = 10
+
+"""Values of the ray slider: the steps 1-2-5 from `lo` up to 20 000, `lo` itself and the current count `n`."""
+function _ray_steps(lo::Int, n::Int)
+    steps = [m * 10^e for e in 1:4 for m in (1, 2, 5)]
+    return sort!(unique!([lo; n; filter(s -> lo < s <= 20_000, steps)]))
+end
+
+"""
+    _set_num_rays!(gui, src, n)
+
+Regenerates the rays of the source `src` of the `gui` with `n` rays (see [`set_num_rays!`](@ref)),
+a change of the source (a running solve is cancelled first, see `_change!`), and solves again or
+marks the beams as outdated like after a move, via the `on_change` of the controls. The slider
+snaps to its steps, hence `n` may be the current count.
+"""
+function _set_num_rays!(gui::LiveView, src, n)
+    n = round(Int, n)
+    length(src) == n && return nothing
+    _change!(() -> set_num_rays!(src, n), gui.controls, src)
+    gui.controls.on_change(src)
     return nothing
 end
 
@@ -2979,7 +3144,7 @@ function live_view(
         IdDict{Any, Any}(), Float64(trace_budget), Float64(idle_delay), 0.0, 0.0, false, nothing,
         0.0, false, labels_dict, card.step_box, LiveClipPlane[], true, 1.2 * extent,
         clip_beams, clip_beams_toggle, cube, orthographic_toggle, export_button, true, menu,
-        Any[first.(entries)...], card.hide_button, show_all_button, Base.IdSet{Any}(), card.pose_boxes,
+        Any[first.(entries)...], show_all_button, Base.IdSet{Any}(),
         preview, false, nothing, 0.0, nothing, nothing, measure_toggle, Any[], nothing,
         AbstractPlot[], home_button, (zeros(3), zeros(3), zeros(3)), false, view_specs,
         views_menu, save_view_button, nothing, sources_toggle, nothing, _ProgressOverlay(ax),

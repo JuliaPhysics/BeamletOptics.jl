@@ -1,4 +1,5 @@
-using Makie: Figure, Observable, Point2f, Vec2f, Rect2f, GridLayout, Textbox, Button, Label, Box
+using Makie: Figure, Observable, Point2f, Vec2f, Rect2f, GridLayout, Textbox, Button, Label, Box, Slider,
+             Toggle, Menu
 
 # Component cards of the live view: the controls of an object, next to it in the 3D view
 
@@ -16,12 +17,8 @@ const _CARD_PADDING = 8.0f0
 # Suggested bounding box of the parts that are not shown: hidden widgets still take clicks within
 # their bounding box, hence they are moved far outside of the figure
 const _CARD_AWAY = Rect2f(-1.0f5, -1.0f5, 0, 0)
-# Labels of the pose boxes, see `_POSE_FIELDS`, the units are given at the end of the rows
-const _CARD_POSE_LABELS = ("x", "y", "z", "rx", "ry", "rv")
 # Opaque, unlike the progress window, such that objects behind the widgets do not shine through
 const _CARD_BACKGROUND = RGBAf(0.1, 0.1, 0.12, 1)
-# Colors of the rotation labels: red, green and blue like the gizmo axes, lighter on the dark card
-const _CARD_AXIS_COLORS = (RGBAf(1, 0.45, 0.45, 1), RGBAf(0.45, 0.85, 0.45, 1), RGBAf(0.55, 0.7, 1, 1))
 # Line from the card to its object and the dot at the object
 const _CARD_LINK_COLOR = RGBAf(0.95, 0.95, 0.95, 0.85)
 
@@ -37,47 +34,59 @@ with light text. It consists of free layouts (a `GridLayout` with a suggested bo
 
 - `head`: the `collapse_button` ("–" or "+"), the `pin_button` ("pin" or "unpin") and the `title`,
   i.e. the label of the object
-- the actions of the object, right of the head, see `_card_actions`: `object_actions` holds the
-  `hide_button` for components and sources, `plane_actions` the `flip_button` and the
-  `remove_button` for clip planes
-- `body`, below the head unless `collapsed`: the `pose_boxes` x, y, z [mm] and rx, ry, rv [mrad]
-- `step`, below the body, only on the card of the selection (the keyboard steps move the selected
+- `actions`, right of the head: the buttons of [`card_actions`](@ref) for the object
+- `rows`, below the head unless `collapsed`: the rows of [`card_rows`](@ref) for the object, each in
+  its own layout
+- `step`, below the rows, only on the card of the selection (the keyboard steps move the selected
   object): the `step_box` of the keyboard step
+
+The widgets of the actions and the rows are built from their declarations when the card gets an
+object with other declarations, see `_build_content!`: `widgets` holds each widget with its
+[`CardWidget`](@ref), `blocks` all blocks (including the texts), `textboxes` the textboxes,
+`listeners` their listeners and `content_key` the layout of the declarations. While `refreshing`,
+the widgets show new values and their inputs are ignored.
 
 The `link` holds the ends of the line, the object first; its plots, like all plots of the card, are
 not inspectable. For a pinned card, `corners` are the corners of the bounding box of its object in
 the pose `key = (obj, P, R)` when it was pinned; they move with the object, see `_card_corners`.
-`pose` is the pose of the object that the pose boxes show.
+`pose` is the object and its pose that the widgets show.
 
-The constructor adds all widgets, hidden; afterwards the card is only moved, see
-`_arrange_card!`. Parts that are not shown are moved far outside of the figure (`_CARD_AWAY`),
-since hidden widgets still take clicks within their bounding box. `scene` is translated to
-`_CARD_Z`, so that GLMakie draws the card over the 3D scene, including plots added later and
-transparent plots.
+Parts that are not shown are moved far outside of the figure (`_CARD_AWAY`), since hidden widgets
+still take clicks within their bounding box. `scene` is translated to `_CARD_Z`, so that GLMakie
+draws the card over the 3D scene, including plots added later and transparent plots.
 """
 mutable struct _ComponentCard
     scene::Scene
     background::Box
     head::GridLayout
-    body::GridLayout
+    actions::GridLayout
+    rows::GridLayout
     step::GridLayout
-    object_actions::GridLayout
-    plane_actions::GridLayout
     title::Label
     collapse_button::Button
     pin_button::Button
-    pose_boxes::Vector{Textbox}
     step_box::Textbox
-    hide_button::Button
-    flip_button::Button
-    remove_button::Button
     link::Observable{Vector{Point2f}}
+    widgets::Vector{Tuple{Any, CardWidget}}
+    blocks::Vector{Any}
+    textboxes::Vector{Textbox}
+    listeners::Vector{Any}
+    content_key::Any
+    refreshing::Bool
     collapsed::Bool
     pinned::Bool
     obj::Any
     corners::Vector{Point3f}
     key::Any
     pose::Any
+end
+
+# Content of a layout of the card `scene`, aligned at the top left corner of its suggested bounding box
+function _card_part(scene::Scene)
+    layout = GridLayout(; bbox = _CARD_AWAY, halign = :left, valign = :top, default_colgap = 6,
+        default_rowgap = 6)
+    layout.parent = scene
+    return layout
 end
 
 function _ComponentCard(fig::Figure)
@@ -90,53 +99,102 @@ function _ComponentCard(fig::Figure)
         strokecolor = :black, strokewidth = 1, inspectable = false)
     background = Box(scene; bbox = _CARD_AWAY, color = _CARD_BACKGROUND, strokevisible = false,
         cornerradius = _PROGRESS_CORNER)
-    # Content of the layout, aligned at the top left corner of its suggested bounding box
-    function part()
-        layout = GridLayout(; bbox = _CARD_AWAY, halign = :left, valign = :top, default_colgap = 6,
-            default_rowgap = 6)
-        layout.parent = scene
-        return layout
-    end
-    head, body, step, object_actions, plane_actions = part(), part(), part(), part(), part()
-    text = (; color = _PROGRESS_TEXT_COLOR)
+    head, step = _card_part(scene), _card_part(scene)
     collapse_button = Button(head[1, 1]; label = "–", width = 24, height = 22, padding = (0, 0, 0, 0))
     pin_button = Button(head[1, 2]; label = "pin", height = 22, padding = (6, 6, 0, 0))
-    title = Label(head[1, 3], ""; font = :bold, halign = :left, text...)
-    pose_boxes = Textbox[]
-    for (k, name) in enumerate(_CARD_POSE_LABELS)
-        row, col = divrem(k - 1, 3)
-        color = k <= 3 ? _PROGRESS_TEXT_COLOR : _CARD_AXIS_COLORS[k - 3]
-        Label(body[row + 1, 2col + 1], name; color, halign = :right)
-        # Wide enough for e.g. -6869.709 (mm of a telescope), longer values scroll while typing
-        push!(pose_boxes, Textbox(body[row + 1, 2col + 2]; placeholder = k <= 3 ? " " : "0", width = 80,
-            textcolor = _PROGRESS_TEXT_COLOR))
-    end
-    Label(body[1, 7], "mm"; halign = :left, text...)
-    Label(body[2, 7], "mrad"; halign = :left, text...)
-    Label(step[1, 1], "step"; halign = :right, text...)
-    step_box = Textbox(step[1, 2]; placeholder = "e.g. 250 nm", width = 110, textcolor = _PROGRESS_TEXT_COLOR)
-    hide_button = Button(object_actions[1, 1]; label = "hide")
-    flip_button = Button(plane_actions[1, 1]; label = "flip")
-    remove_button = Button(plane_actions[1, 2]; label = "remove")
-    # The caret and the selection of a textbox are drawn without the translation of the scene
-    for tb in (pose_boxes..., step_box), p in tb.editor.plots
-        p isa Makie.Text || translate!(p, 0, 0, _CARD_Z + 5)
-    end
+    title = Label(head[1, 3], ""; font = :bold, halign = :left, color = _PROGRESS_TEXT_COLOR)
+    Label(step[1, 1], "step"; halign = :right, color = _PROGRESS_TEXT_COLOR)
+    step_box = Textbox(step[1, 2]; placeholder = "e.g. 250 nm", width = 110, _card_style(Textbox)...)
+    _fix_caret!(step_box)
     scene.visible[] = false
-    return _ComponentCard(scene, background, head, body, step, object_actions, plane_actions, title,
-        collapse_button, pin_button, pose_boxes, step_box, hide_button, flip_button, remove_button,
-        link, false, false, nothing, Point3f[], nothing, nothing)
+    return _ComponentCard(scene, background, head, _card_part(scene), _card_part(scene), step, title,
+        collapse_button, pin_button, step_box, link, Tuple{Any, CardWidget}[], Any[], Textbox[], Any[],
+        nothing, false, false, false, nothing, Point3f[], nothing, nothing)
 end
 
-"""Returns the actions of the card `c` for its object `obj`, see `_ComponentCard`."""
-_card_actions(c::_ComponentCard, ::LiveClipPlane) = c.plane_actions
-_card_actions(c::_ComponentCard, _) = c.object_actions
+"""Returns the textboxes of the card `c`: the step box and the declared ones."""
+_card_boxes(c::_ComponentCard) = (c.step_box, c.textboxes...)
 
-"""Returns the textboxes of the card `c`."""
-_card_boxes(c::_ComponentCard) = (c.pose_boxes..., c.step_box)
+"""Returns the declared widget with the `name` on the card `c` (see [`CardWidget`](@ref)), or `nothing`."""
+function _card_widget(c::_ComponentCard, name::Symbol)
+    i = findfirst(((_, w),) -> w.name === name, c.widgets)
+    return isnothing(i) ? nothing : first(c.widgets[i])
+end
+
+#=
+Widgets of the declarations, by the type of the block
+=#
+
+# Colors of the card, which is dark, for the blocks of the declarations
+_card_style(::Type{Label}) = (; color = _PROGRESS_TEXT_COLOR)
+_card_style(::Type{Textbox}) = (; textcolor = _PROGRESS_TEXT_COLOR)
+_card_style(::Type) = (;)
+
+# The caret and the selection of a textbox are drawn without the translation of the scene of the card
+function _fix_caret!(tb::Textbox)
+    for p in tb.editor.plots
+        p isa Makie.Text || translate!(p, 0, 0, _CARD_Z + 5)
+    end
+    return nothing
+end
+_fix_caret!(_) = nothing
+
+# The observable of a block that carries its inputs, see `CardWidget`
+_widget_input(b::Slider) = b.value
+_widget_input(b::Toggle) = b.active
+_widget_input(b::Textbox) = b.stored_string
+_widget_input(b::Button) = b.clicks
+_widget_input(b::Menu) = b.selection
+_widget_input(_) = nothing
+
+"""
+    _show!(block, v; force = false)
+
+Shows the value `v` of a declared widget (see [`CardWidget`](@ref)) in its `block`. A focused
+textbox keeps the typed text, unless `force`.
+"""
+_show!(b::Label, v; force = false) = _update!(b.text, string(v))
+_show!(b::Button, v; force = false) = _update!(b.label, string(v))
+_show!(b::Textbox, v; force = false) = ((b.focused[] && !force) || _set_box!(b, string(v)); nothing)
+_show!(b::Slider, v; force = false) = (b.value[] == v || Makie.set_close_to!(b, v); nothing)
+_show!(b::Toggle, v; force = false) = _update!(b.active, Bool(v))
+_show!(_, _; force = false) = nothing
+
+# The layout of declarations, independent of the functions `value` and `on`, see `_build_content!`
+_layout_key(rows) = map(_layout_key, rows)
+_layout_key(r::CardRow) = map(_layout_key, r.cells)
+_layout_key(s::String) = s
+_layout_key(w::CardWidget) = (w.type, w.attributes, w.name)
+
+# The declared widgets of rows or actions, in the order of their blocks
+_declared_widgets(rows) = CardWidget[w for r in rows for w in _declared_widgets(r)]
+_declared_widgets(r::CardRow) = CardWidget[w for c in r.cells for w in _declared_widgets(c)]
+_declared_widgets(w::CardWidget) = (w,)
+_declared_widgets(::String) = ()
+
+"""Moves the parts of the card `c` away, see `_CARD_AWAY`."""
+_park_card!(c::_ComponentCard) = foreach(_park!, (c.head, c.actions, c.rows, c.step, c.background))
+
+"""Removes the declared widgets of the card `c`, with their listeners and layouts."""
+function _clear_content!(c::_ComponentCard)
+    foreach(off, c.listeners)
+    foreach(delete!, c.blocks)
+    empty!(c.listeners)
+    empty!(c.blocks)
+    empty!(c.widgets)
+    empty!(c.textboxes)
+    # New layouts instead of the empty rows and columns of the old ones
+    c.actions, c.rows = _card_part(c.scene), _card_part(c.scene)
+    c.content_key = nothing
+    return nothing
+end
 
 """Returns the parts of the card `c` below its head that are shown, see `_ComponentCard`."""
-_lower_parts(c::_ComponentCard) = c.collapsed ? GridLayout[] : c.pinned ? [c.body] : [c.body, c.step]
+function _lower_parts(c::_ComponentCard)
+    c.collapsed && return GridLayout[]
+    rows = isempty(c.rows.content) ? GridLayout[] : [c.rows]
+    return c.pinned ? rows : [rows..., c.step]
+end
 
 # Size of a layout or block [px], which does not depend on its position
 _card_size(x) = Vec2f(Makie.widths(x.layoutobservables.computedbbox[]))
@@ -144,14 +202,17 @@ _card_size(x) = Vec2f(Makie.widths(x.layoutobservables.computedbbox[]))
 _place!(x, p::Point2f) = _update!(x.layoutobservables.suggestedbbox, Rect2f(p[1], p[2], 0, 0))
 _park!(x) = _update!(x.layoutobservables.suggestedbbox, _CARD_AWAY)
 
-"""
-    _card_size(c::_ComponentCard, actions) -> Vec2f
+# Size of the actions, empty without actions
+_actions_size(c::_ComponentCard) = isempty(c.actions.content) ? Vec2f(-_CARD_PADDING, 0) : _card_size(c.actions)
 
-Size of the card `c` [px] with the `actions` right of the head and the parts below it (see
+"""
+    _card_size(c::_ComponentCard) -> Vec2f
+
+Size of the card `c` [px] with its actions right of the head and the parts below it (see
 `_lower_parts`), including the padding of the background.
 """
-function _card_size(c::_ComponentCard, actions::GridLayout)
-    h, a = _card_size(c.head), _card_size(actions)
+function _card_size(c::_ComponentCard)
+    h, a = _card_size(c.head), _actions_size(c)
     w, height = h[1] + _CARD_PADDING + a[1], max(h[2], a[2])
     for part in _lower_parts(c)
         s = _card_size(part)
@@ -161,26 +222,22 @@ function _card_size(c::_ComponentCard, actions::GridLayout)
 end
 
 """
-    _arrange_card!(c::_ComponentCard, actions, p::Point2f)
+    _arrange_card!(c::_ComponentCard, p::Point2f)
 
-Moves the card `c` with the `actions` such that its top left corner is at the figure pixel `p`,
-the other actions and the parts that are not shown (see `_lower_parts`) away. Only changed
-positions update the layout.
+Moves the card `c` such that its top left corner is at the figure pixel `p`, the parts that are not
+shown (see `_lower_parts`) away. Only changed positions update the layout.
 """
-function _arrange_card!(c::_ComponentCard, actions::GridLayout, p::Point2f)
-    size = _card_size(c, actions)
+function _arrange_card!(c::_ComponentCard, p::Point2f)
+    size = _card_size(c)
     x, y = p[1] + _CARD_PADDING, p[2] - _CARD_PADDING
-    h, a = _card_size(c.head), _card_size(actions)
+    h, a = _card_size(c.head), _actions_size(c)
     line = max(h[2], a[2])
     # The head and the actions are centered vertically in the first line
     _place!(c.head, Point2f(x, y - (line - h[2]) / 2))
-    _place!(actions, Point2f(x + h[1] + _CARD_PADDING, y - (line - a[2]) / 2))
-    for other in (c.object_actions, c.plane_actions)
-        other === actions || _park!(other)
-    end
+    _place!(c.actions, Point2f(x + h[1] + _CARD_PADDING, y - (line - a[2]) / 2))
     y -= line
     lower = _lower_parts(c)
-    for part in (c.body, c.step)
+    for part in (c.rows, c.step)
         if any(l -> l === part, lower)
             y -= _CARD_PADDING
             _place!(part, Point2f(x, y))
@@ -205,7 +262,7 @@ end
 function _hide_card!(c::_ComponentCard)
     c.scene.visible[] || return nothing
     _defocus_card!(c)
-    foreach(_park!, (c.head, c.body, c.step, c.object_actions, c.plane_actions, c.background))
+    _park_card!(c)
     _update!(c.link, Point2f[])
     c.scene.visible[] = false
     return nothing

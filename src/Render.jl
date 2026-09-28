@@ -297,3 +297,87 @@ edge lines, the `:cad` look saturated materials with feature edge lines. Explici
 If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
 """
 set_render_look(::Any) = throw(MissingBackendError())
+
+"""
+    CardWidget(T; name = nothing, value = nothing, on = nothing, solve = false, attributes...)
+
+A widget on a card of [`live_view`](@ref), see [`card_rows`](@ref): a `Makie` block of the type
+`T`, e.g. `Label`, `Slider`, `Toggle`, `Textbox`, `Button` or `Menu`, created with the
+`attributes`, e.g. the `range` of a `Slider` or the `width`. The card places the widget, hides it
+with the card and keeps clicks on it from the 3D view, and its textboxes take the keyboard.
+
+- `value(gui, obj)`: the value the widget shows for the object `obj` of the card: the text of a
+  `Label` or `Button`, the value of a `Slider`, `Toggle` or `Textbox`. Refreshed when the card
+  gets its object, after moves, solves and inputs.
+- `on(gui, obj, v)`: applies an input `v` of the widget to `obj`: the value of a `Slider`, the
+  state of a `Toggle`, the entered text of a `Textbox`, the click count of a `Button` or the
+  selection of a `Menu`. Inputs of a widget without `on` are ignored.
+- `solve = true`: the input changes the optics, e.g. a parameter of `obj`: a running solve is
+  cancelled before `on`, and the systems are solved again afterwards (or the beams are marked as
+  outdated without auto tracing), like after a move, via the `on_change` of the controls.
+- `name`: finds the widget on a card, e.g. in tests.
+
+`gui` is the `LiveView`, e.g. for the beams of the last solve or the status line.
+"""
+struct CardWidget
+    type::Type
+    attributes::NamedTuple
+    value::Any
+    on::Any
+    solve::Bool
+    name::Union{Nothing, Symbol}
+end
+
+CardWidget(type::Type; name = nothing, value = nothing, on = nothing, solve::Bool = false, attributes...) =
+    CardWidget(type, NamedTuple(attributes), value, on, solve, name)
+
+"""
+    CardRow(cells...)
+
+A line of a card of [`live_view`](@ref), see [`card_rows`](@ref): its `cells` from left to right,
+each a text or a [`CardWidget`](@ref).
+"""
+struct CardRow
+    cells::Vector{Union{String, CardWidget}}
+end
+
+CardRow(cells::Union{AbstractString, CardWidget}...) = CardRow(Union{String, CardWidget}[_card_cell(c) for c in cells])
+_card_cell(s::AbstractString) = String(s)
+_card_cell(w::CardWidget) = w
+
+"""
+    card_rows(obj)
+
+Rows of the card of `obj` in [`live_view`](@ref), a tuple of [`CardRow`](@ref)s, chosen by multiple
+dispatch. By default, the rows of the pose, see [`pose_card_rows`](@ref); a source whose rays can
+be regenerated (see [`set_num_rays!`](@ref)) adds a slider for the number of rays. Add a method for
+an own type to show its properties or controls on its card, e.g.
+
+```julia
+BeamletOptics.card_rows(l::MyLens) = (pose_card_rows(l)...,
+    CardRow("f", CardWidget(Label; value = (gui, l) -> "\$(1e3 * focal_length(l)) mm")))
+```
+
+The methods for the types of BeamletOptics come with the `Makie` extension.
+"""
+function card_rows end
+
+"""
+    pose_card_rows(obj)
+
+The rows of the pose of `obj` on its card in [`live_view`](@ref), see [`card_rows`](@ref): the
+position `x`, `y`, `z` [mm], where `Enter` moves `obj` to the typed coordinate, and the rotations
+`rx`, `ry`, `rv` [mrad] about the red, green and blue axis of the controls. Comes with the `Makie`
+extension.
+"""
+function pose_card_rows end
+
+"""
+    card_actions(obj)
+
+Buttons in the head of the card of `obj` in [`live_view`](@ref), a tuple of
+[`CardWidget`](@ref)s, chosen by multiple dispatch like [`card_rows`](@ref): by default "hide"
+(or "show" for a hidden object), for clip planes "flip" and "remove". Comes with the `Makie`
+extension.
+"""
+function card_actions end

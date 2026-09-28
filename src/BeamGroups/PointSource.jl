@@ -9,16 +9,19 @@ Represents a cone of [`Beam`](@ref)s being emitted from a single point in space.
 - `NA`: the [`numerical_aperture`](@ref) of the point source spread angle
 - `center`: source position, pivot for rotations
 - `orientation`: right-handed orthonormal matrix, columns are the sampling reference vector, the central source direction and their cross product, see [`AbstractBeamGroup`](@ref)
+- `sampling`: how the rays were sampled (rings, sunflower, or given beams), see [`set_num_rays!`](@ref)
 
 # Functions
 
 - `numerical_aperture`: returns the NA of the source
+- [`set_num_rays!`](@ref): regenerates the rays with another number of rays
 """
 mutable struct PointSource{T, R <: AbstractRay{T}} <: AbstractBeamGroup{T, R}
     beams::Vector{Beam{T, R}}
     NA::T
     center::Point3{T}
     orientation::SMatrix{3, 3, T, 9}
+    sampling::_AbstractSampling
 end
 
 """
@@ -29,20 +32,29 @@ Wraps existing `beams` into a [`PointSource`](@ref) with the numerical aperture 
 source position `pos`. The group orientation is either derived from the central direction
 `dir` (the sampling reference vector is then picked deterministically via [`normal3d`](@ref)),
 or passed explicitly as a right-handed orthonormal 3x3 `orientation` matrix whose second column
-is the central direction. An invalid `orientation` throws an `ArgumentError`.
+is the central direction. An invalid `orientation` throws an `ArgumentError`. The rays of such a
+source can not be regenerated with [`set_num_rays!`](@ref).
 """
 function PointSource(beams::Vector{Beam{T, R}}, NA, pos, dir::AbstractVector) where {T, R <: AbstractRay{T}}
     d = normalize(dir)
-    M = _group_orientation(d, _sampling_basis(d, nothing, T), T)
-    _check_kinematic_members(beams)
-    return PointSource{T, R}(beams, T(NA), Point3{T}(pos), M)
+    return PointSource(beams, NA, pos, _group_orientation(d, _sampling_basis(d, nothing, T), T))
 end
 
-function PointSource(beams::Vector{Beam{T, R}}, NA, pos, orientation::AbstractMatrix) where {T, R <: AbstractRay{T}}
+PointSource(beams::Vector{<:Beam}, NA, pos, orientation::AbstractMatrix) =
+    PointSource(beams, NA, pos, orientation, _NoSampling())
+
+function PointSource(beams::Vector{Beam{T, R}}, NA, pos, orientation::AbstractMatrix,
+        sampling::_AbstractSampling) where {T, R <: AbstractRay{T}}
     _check_kinematic_members(beams)
-    return PointSource{T, R}(beams, T(NA), Point3{T}(pos), _check_orientation(orientation, T))
+    return PointSource{T, R}(beams, T(NA), Point3{T}(pos), _check_orientation(orientation, T), sampling)
 end
 numerical_aperture(ps::PointSource) = ps.NA
+
+function set_num_rays!(ps::PointSource{T}, n::Integer) where {T}
+    M = ps.orientation
+    ps.beams = _source_beams(ps.sampling, ps.center, M[:, 2], M[:, 1], _source_wavelength(ps), Int(n), T)
+    return ps
+end
 
 """
     PointSource(pos, dir, θ, λ; num_rings, num_rays, basis)
@@ -87,15 +99,29 @@ function PointSource(
         basis::Union{Nothing, AbstractVector} = nothing
 ) where {P <: Real, D <: Real, H <: Real, L <: Real}
     T = promote_type(P, D, H, L)
-    if num_rays < num_rings * 20
-        throw(ErrorException("No. of rays should be atleast 20x no. of rings (passed: $num_rays, req: $(num_rings*20))"))
-    end
     if θ ≥ pi
         throw(ErrorException("Point source opening half-angle θ must be < π"))
     end
-    # define basis vectors
     dir = normalize(dir)
     b1 = _sampling_basis(dir, basis, T)
+    sampling = _ConeRings(num_rings, θ)
+    beams = _source_beams(sampling, pos, dir, b1, λ, num_rays, T)
+    return PointSource(beams, numerical_aperture(θ), pos, _group_orientation(dir, b1, T), sampling)
+end
+
+"""
+    _source_beams(sampling, pos, dir, b1, λ, num_rays, T)
+
+Beams of a [`PointSource`](@ref) at `pos` around the unit vector `dir` with the wavelength `λ`,
+sampled by `sampling` (which holds the half spread angle) with `num_rays` rays. `b1` is the unit
+sampling reference vector normal to `dir`, see `_sampling_basis`.
+"""
+function _source_beams(s::_ConeRings, pos, dir, b1, λ, num_rays::Int, ::Type{T}) where {T}
+    num_rings, θ = s.num_rings, s.θ
+    if num_rays < num_rings * 20
+        throw(ErrorException("No. of rays should be atleast 20x no. of rings (passed: $num_rays, req: $(num_rings*20))"))
+    end
+    # define basis vectors
     b2 = normal3d(dir, b1)
     θ_NA = LinRange(0, θ, num_rings)
     # define buffer
@@ -125,8 +151,7 @@ function PointSource(
             cdir = RotMat * cdir
         end
     end
-    NA = numerical_aperture(θ)
-    return PointSource(beams, NA, pos, _group_orientation(dir, b1, T))
+    return beams
 end
 
 """
@@ -177,15 +202,21 @@ function UniformPointSource(
     if θ ≥ pi
         throw(ErrorException("Point source opening half-angle θ must be < π"))
     end
+    dir = normalize(dir)
+    e1 = _sampling_basis(dir, basis, T)
+    sampling = _ConeSunflower(θ)
+    beams = _source_beams(sampling, pos, dir, e1, λ, num_rays, T)
+    return PointSource(beams, numerical_aperture(θ), pos, _group_orientation(dir, e1, T), sampling)
+end
+
+function _source_beams(s::_ConeSunflower, pos, dir, e1, λ, num_rays::Int, ::Type{T}) where {T}
     if num_rays < 1
         throw(ErrorException("No. of rays must be at least 1 (passed: $num_rays)"))
     end
     beams = Vector{Beam{T, Ray{T}}}(undef, num_rays)
-    dir = normalize(dir)
     # orthogonal basis normal to the cone axis
-    e1 = _sampling_basis(dir, basis, T)
     e2 = normal3d(dir, e1)
-    one_minus_cosθ = 1 - cos(θ)
+    one_minus_cosθ = 1 - cos(s.θ)
     for k in 0:(num_rays - 1)
         cosϑ = 1 - (k + 0.5) / num_rays * one_minus_cosθ    # equal solid angle
         sinϑ = sqrt(max(0, (1 - cosϑ) * (1 + cosϑ)))
@@ -193,6 +224,5 @@ function UniformPointSource(
         cdir = cosϑ * dir + sinϑ * (cos(φ) * e1 + sin(φ) * e2)
         beams[k + 1] = Beam(pos, cdir, λ)
     end
-    NA = numerical_aperture(θ)
-    return PointSource(beams, NA, pos, _group_orientation(dir, e1, T))
+    return beams
 end

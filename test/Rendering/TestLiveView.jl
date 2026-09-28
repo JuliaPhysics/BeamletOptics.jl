@@ -1246,14 +1246,14 @@ const BMO = BeamletOptics
         gui = _live_view(System([lens, m, pd]), Beam([0.0, 0, 0], [0.0, 1, 0]); throttle = false,
             fine_angle = 1e-3, fine_step = 1e-3, pick = ax -> (gui_ref[].controls.h.handles[2].plots[1], 0))
         gui_ref[] = gui
-        boxes = gui.pose_boxes
-        texts() = [tb.displayed_string[] for tb in boxes]
+        box(k) = Ext._card_widget(gui.card, (:x, :y, :z, :rx, :ry, :rv)[k])
+        texts() = [isnothing(box(k)) ? "" : box(k).displayed_string[] for k in 1:6]
         @test texts() == fill("", 6)
 
-        # nothing selected: input is ignored
-        boxes[1].stored_string[] = "5"
+        # nothing selected: the card has no widgets yet, `_apply_pose_input!` ignores the input
+        @test isnothing(box(1))
+        Ext._apply_pose_input!(gui, nothing, 1, "5")
         @test collect(BMO.position(lens)) == [0.01, 0.05, 0.002]
-        @test texts() == fill("", 6)
 
         # the boxes follow the selection
         gui.menu.i_selected[] = 1
@@ -1267,7 +1267,7 @@ const BMO = BeamletOptics
         # absolute position [mm]
         P0 = collect(BMO.position(lens))
         R0 = Matrix(BMO.orientation(lens))
-        boxes[1].stored_string[] = "12.5"
+        box(1).stored_string[] = "12.5"
         P = collect(BMO.position(lens))
         @test P[1] == 0.0125
         @test P[2:3] == P0[2:3]
@@ -1280,14 +1280,14 @@ const BMO = BeamletOptics
         _key!(gui, Keyboard.m)
         @test gui.controls.mode[] == :rotate
         @test Ext._key_step!(gui.controls, ref, Keyboard.left, 1)
-        boxes[6].stored_string[] = "1"
+        box(6).stored_string[] = "1"
         @test BMO.orientation(lens) == BMO.orientation(ref)
         @test collect(BMO.position(lens)) == P
         @test texts() == ["12.5", "50.0", "2.0", "", "", ""]
         # red and green axes, like the keys up and page up
         for (k, key) in ((4, Keyboard.up), (5, Keyboard.page_up))
             Ext._key_step!(gui.controls, ref, key, 1)
-            boxes[k].stored_string[] = "1"
+            box(k).stored_string[] = "1"
             @test BMO.orientation(lens) ≈ BMO.orientation(ref) atol = 1e-15
         end
 
@@ -1302,7 +1302,7 @@ const BMO = BeamletOptics
 
         # invalid input changes nothing
         for s in ("abc", "1 mm", "NaN")
-            boxes[2].stored_string[] = s
+            box(2).stored_string[] = s
             @test startswith(gui.status.text[], "invalid input \"$s\"")
             @test collect(BMO.position(lens)) ≈ P0 atol = 1e-15
         end
@@ -1310,8 +1310,8 @@ const BMO = BeamletOptics
         # keys are ignored while a box is focused, the focused box is not overwritten
         _key!(gui, Keyboard.m)
         @test gui.controls.mode[] == :move
-        boxes[1].focused[] = true
-        boxes[1].displayed_string[] = "3"
+        box(1).focused[] = true
+        box(1).displayed_string[] = "3"
         _key!(gui, Keyboard.up)
         _key!(gui, Keyboard.m)
         @test gui.controls.mode[] == :move
@@ -1319,7 +1319,7 @@ const BMO = BeamletOptics
         translate3d!(lens, [0, 0, 1e-3])
         Ext._request_update!(gui.controls)
         @test texts()[1:3] == ["3", "50.0", "3.0"]
-        boxes[1].focused[] = false
+        box(1).focused[] = false
         # the boxes follow key steps
         _key!(gui, Keyboard.up)
         @test texts()[1:3] == ["10.0", "51.0", "3.0"]
@@ -1327,7 +1327,7 @@ const BMO = BeamletOptics
         # deselect
         _key!(gui, Keyboard.escape)
         @test isnothing(gui.controls.selected[])
-        @test texts() == fill("", 6)
+        @test !gui.card.scene.visible[]
         close(gui)
 
         # constraints are respected
@@ -1336,11 +1336,11 @@ const BMO = BeamletOptics
             constraints = Dict(m => (; move = (:v,), rotate = ())))
         gui.menu.i_selected[] = 1
         P0, R0 = collect(BMO.position(m)), Matrix(BMO.orientation(m))
-        gui.pose_boxes[1].stored_string[] = "5"
-        gui.pose_boxes[6].stored_string[] = "5"
+        Ext._card_widget(gui.card, (:x, :y, :z, :rx, :ry, :rv)[1]).stored_string[] = "5"
+        Ext._card_widget(gui.card, (:x, :y, :z, :rx, :ry, :rv)[6]).stored_string[] = "5"
         @test collect(BMO.position(m)) == P0
         @test BMO.orientation(m) == R0
-        gui.pose_boxes[3].stored_string[] = "5"
+        Ext._card_widget(gui.card, (:x, :y, :z, :rx, :ry, :rv)[3]).stored_string[] = "5"
         @test collect(BMO.position(m)) ≈ [0, 0.1, 0.005]
         close(gui)
     end
@@ -1386,10 +1386,10 @@ const BMO = BeamletOptics
         @test first(Ext._ray_pick(gui.controls, scene)) === m
 
         # hide
-        notify(gui.hide_button.clicks)
+        Ext._toggle_hidden!(gui, nothing)
         @test startswith(gui.status.text[], "select a component")
         gui.menu.i_selected[] = 1
-        notify(gui.hide_button.clicks)
+        notify(Ext._card_widget(gui.card, :hide).clicks)
         @test isnothing(gui.controls.selected[])
         @test gui.menu.i_selected[] == 0
         @test m in gui.hidden
@@ -1405,16 +1405,16 @@ const BMO = BeamletOptics
         # a hidden object can be selected in the menu and shown again
         gui.menu.i_selected[] = 1
         @test gui.controls.selected[] === m
-        notify(gui.hide_button.clicks)
+        notify(Ext._card_widget(gui.card, :hide).clicks)
         @test !(m in gui.hidden)
         @test all(p -> p.visible[], gui.controls.h.handles[1].plots)
         @test gui.controls.selected[] === m
 
         # groups: all objects, show all
         gui.menu.i_selected[] = 3
-        notify(gui.hide_button.clicks)
+        notify(Ext._card_widget(gui.card, :hide).clicks)
         gui.menu.i_selected[] = 1
-        notify(gui.hide_button.clicks)
+        notify(Ext._card_widget(gui.card, :hide).clicks)
         @test length(gui.hidden) == 3
         leaf_plots = [p for oh in gui.controls.h.handles if oh.obj in (m, g.objects...) for p in oh.plots]
         @test all(p -> !p.visible[], leaf_plots)

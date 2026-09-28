@@ -494,6 +494,24 @@ view, off the view cube and the other cards:
 - "pin" keeps the card with its component when the selection changes, e.g. to watch or type the
   poses of several components; the widgets of a pinned card act on its component. "unpin" closes
   it.
+- Sources whose rays can be regenerated (`CollimatedSource`, `PointSource` and their uniform
+  variants, see [`set_num_rays!`](@ref)) add the slider "rays" for their number of rays, which
+  solves again.
+
+The rows and the buttons in the head are declared per type by multiple dispatch, see
+[`card_rows`](@ref) and [`card_actions`](@ref): each row is a [`CardRow`](@ref) of texts and
+[`CardWidget`](@ref)s, i.e. any `Makie` widget with a function for the value it shows and one for
+its input. The card places the widgets, hides them and keeps their clicks and keys from the 3D
+view. An own component adds its rows to the pose rows, e.g.
+
+```julia
+BeamletOptics.card_rows(l::MyLens) = (pose_card_rows(l)...,
+    CardRow("f", CardWidget(Label; value = (gui, l) -> "$(round(1e3 * focal_length(l); digits = 2)) mm")),
+    CardRow("n", CardWidget(Slider; range = 1.4:0.01:1.9, solve = true,
+        value = (gui, l) -> refractive_index(l), on = (gui, l, n) -> set_index!(l, n))))
+```
+
+where `solve = true` solves the systems again after an input, like a move.
 
 The row below the status line holds the component menu and "show all". The menu lists all movable
 components and sources by their `labels` (or type), the objects of a group indented after the

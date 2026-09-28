@@ -65,6 +65,59 @@ function _check_orientation(M::AbstractMatrix, ::Type{T}) where {T <: Real}
     return S
 end
 
+"""
+    _AbstractSampling
+
+How a [`CollimatedSource`](@ref) or [`PointSource`](@ref) sampled its rays: stored in the source,
+such that [`set_num_rays!`](@ref) can regenerate them with another number of rays. The methods of
+`_source_beams` generate the beams of each sampling, the constructors use them as well.
+"""
+abstract type _AbstractSampling end
+
+"""The beams were given to the constructor, they can not be regenerated."""
+struct _NoSampling <: _AbstractSampling end
+
+"""Concentric rings of rays around a center ray on a disc, see [`CollimatedSource`](@ref)."""
+struct _DiscRings <: _AbstractSampling
+    num_rings::Int
+end
+
+"""Sunflower (Fibonacci) sampling of a disc, see [`UniformDiscSource`](@ref)."""
+struct _DiscSunflower <: _AbstractSampling end
+
+"""Concentric cones of rays with the half spread angle `θ`, see [`PointSource`](@ref)."""
+struct _ConeRings <: _AbstractSampling
+    num_rings::Int
+    θ::Float64
+end
+
+"""Sunflower (Fibonacci) sampling of the cap with the half spread angle `θ`, see [`UniformPointSource`](@ref)."""
+struct _ConeSunflower <: _AbstractSampling
+    θ::Float64
+end
+
+_source_beams(::_NoSampling, args...) =
+    throw(ArgumentError("the rays of a source that wraps given beams can not be regenerated"))
+
+"""
+    set_num_rays!(group, n)
+
+Regenerates the rays of the source `group` with `n` rays: a [`CollimatedSource`](@ref) or
+[`PointSource`](@ref), including [`UniformDiscSource`](@ref) and [`UniformPointSource`](@ref). The
+rays are sampled as by the constructor of the source (concentric rings with the same `num_rings`,
+or the sunflower pattern), in the current pose of the source and at its wavelength, i.e. the
+source equals a new one with `num_rays = n` at its position and orientation. The previous beams,
+including their traced rays, are replaced: solve the system again afterwards.
+
+Ring sources need `n ≥ 20 num_rings` and throw an `ErrorException` otherwise, like their
+constructors. A source built from given beams, e.g. `CollimatedSource(beams, diameter, pos, dir)`,
+can not be regenerated and throws an `ArgumentError`.
+"""
+function set_num_rays! end
+
+# Wavelength of the source, i.e. of its first ray
+_source_wavelength(bg::AbstractBeamGroup) = wavelength(first(rays(first(beams(bg)))))
+
 include("PointSource.jl")
 include("CollimatedSource.jl")
 include("AstigmaticBeamGroup.jl")

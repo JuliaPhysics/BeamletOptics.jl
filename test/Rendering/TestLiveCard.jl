@@ -6,6 +6,20 @@ using Test
 
 const BMO = BeamletOptics
 
+# A component with its own card rows, see `card_rows`: its height as a text and a slider that lifts
+# it, which changes the optics (`solve = true`); no actions in the head
+struct CardTestObject{T, S <: BMO.AbstractShape{T}} <: BMO.AbstractObject{T}
+    shape::S
+end
+BMO.intersect3d(::CardTestObject, ::BMO.AbstractRay) = nothing
+BMO.interact3d(::BMO.AbstractSystem, ::CardTestObject, ::BMO.AbstractBeam, ::BMO.AbstractRay) = nothing
+_height(o) = round(Int, 1e3 * BMO.position(o)[3])
+BMO.card_rows(o::CardTestObject) = (pose_card_rows(o)...,
+    CardRow("height", CardWidget(Label; name = :height, value = (gui, o) -> "$(_height(o)) mm")),
+    CardRow("lift", CardWidget(Slider; name = :lift, range = 0:5, width = 120, solve = true,
+        value = (gui, o) -> _height(o), on = (gui, o, v) -> translate3d!(o, [0, 0, 1e-3 * (v - _height(o))]))))
+BMO.card_actions(::CardTestObject) = ()
+
 @testset "Live component card" begin
     Ext = Base.get_extension(BeamletOptics, :BeamletOpticsMakieExt)
     @test !isnothing(Ext)
@@ -51,34 +65,39 @@ const BMO = BeamletOptics
         Ext._update_selection_box!(gui.controls)
         return nothing
     end
+    # Declared widgets by name, the pose boxes by their index
+    _w(c, name) = Ext._card_widget(c, name)
+    _pose(c, k) = _w(c, (:x, :y, :z, :rx, :ry, :rv)[k])
 
     @testset "widgets in the card" begin
         m, pd = _fixture()
         gui = _live_view(System([m, pd]), _gauss(); labels = Dict(m => "M1"))
         c = gui.card
-        @test gui.pose_boxes === c.pose_boxes
         @test gui.step_box === c.step_box
-        @test gui.hide_button === c.hide_button
         # no textboxes and no hide button below the 3D view
         @test !any(b -> b isa Textbox, gui.fig.content)
-        @test !any(b -> b === c.hide_button, gui.fig.content)
+        @test !any(b -> b isa Button && b.label[] == "hide", gui.fig.content)
         # drawn after the 3D scene
         @test c.scene.transformation.translation[][3] == Ext._CARD_Z
-        # hidden without a selection, with all parts away
-        @test !c.scene.visible[]
-        @test all(_away, (c.head, c.body, c.step, c.object_actions, c.plane_actions, c.background))
+        # hidden without a selection, without widgets and with all parts away
+        @test !c.scene.visible[] && isempty(c.widgets)
+        @test all(_away, (c.head, c.rows, c.step, c.actions, c.background))
 
         _select!(gui, m)
         @test c.scene.visible[]
         @test c.title.text[] == "M1"
-        @test c.hide_button.label[] == "hide"
-        @test !_away(c.body) && !_away(c.object_actions) && _away(c.plane_actions)
+        # the default declarations: "hide" and the pose rows
+        @test _w(c, :hide).label[] == "hide"
+        @test all(k -> _pose(c, k) isa Textbox, 1:6)
+        @test !_away(c.rows) && !_away(c.actions) && !_away(c.step)
         @test _inside(gui)
-        # the head and the actions in the first line, the body below
-        @test minimum(_rect(c.object_actions))[1] > maximum(_rect(c.head))[1]
-        @test maximum(_rect(c.body))[2] < minimum(_rect(c.head))[2]
-        # the pose of the object in the boxes
-        @test c.pose_boxes[2].displayed_string[] == "100.0"
+        # the head and the actions in the first line, the rows below, the step below them
+        @test minimum(_rect(c.actions))[1] > maximum(_rect(c.head))[1]
+        @test maximum(_rect(c.rows))[2] < minimum(_rect(c.head))[2]
+        @test maximum(_rect(c.step))[2] < minimum(_rect(c.rows))[2]
+        # the pose of the object in the boxes, the boxes of both rows line up
+        @test _pose(c, 2).displayed_string[] == "100.0"
+        @test minimum(_rect(_pose(c, 1)))[1] ≈ minimum(_rect(_pose(c, 4)))[1]
         # at the bounding box of the object (not at the gizmo), at one of its sides, see "placement"
         set_view(gui.ax, [0.3, -0.2, 0.3], [0.0, 0.1, 0.0], [0.0, 0, 1])
         _tick!(gui)
@@ -116,16 +135,16 @@ const BMO = BeamletOptics
         h0 = Makie.widths(_rect(c.background))[2]
         notify(c.collapse_button.clicks)
         @test c.collapsed && c.collapse_button.label[] == "+"
-        @test _away(c.body) && !_away(c.object_actions)
+        @test _away(c.rows) && _away(c.step) && !_away(c.actions)
         @test Makie.widths(_rect(c.background))[2] < h0 / 2
         notify(c.collapse_button.clicks)
         @test !c.collapsed && c.collapse_button.label[] == "–"
-        @test !_away(c.body)
+        @test !_away(c.rows)
 
         # deselected: hidden
         _select!(gui, nothing)
         @test !c.scene.visible[]
-        @test all(_away, (c.head, c.body, c.step, c.object_actions, c.background))
+        @test all(_away, (c.head, c.rows, c.step, c.actions, c.background))
         _select!(gui, m)
         close(gui)
         @test !c.scene.visible[]
@@ -198,25 +217,24 @@ const BMO = BeamletOptics
         @test !(_eye(gui) ≈ eye)
         _tick!(gui)
 
-        # the widgets of the card get the clicks
-        n = c.hide_button.clicks[]
-        xy = _center(_rect(c.hide_button))
+        # the declared widgets get the clicks
+        hide = _w(c, :hide)
+        xy = _center(_rect(hide))
         _click!(gui, xy)
-        @test c.hide_button.clicks[] == n + 1
+        @test hide.clicks[] == 1
         @test m in gui.hidden && isnothing(ctrl.selected[])
         @test !c.scene.visible[]
         # hidden widgets are away and take no clicks at their former position
         _click!(gui, xy)
-        @test c.hide_button.clicks[] == n + 1
-        @test all(b -> b.clicks[] == 0, (c.collapse_button, c.flip_button, c.remove_button))
-        # selected in the menu, the hidden object shows "show"
+        @test hide.clicks[] == 1 && c.collapse_button.clicks[] == 0
+        # selected in the menu, the hidden object shows "show"; the same declarations keep the widgets
         gui.menu.i_selected[] = findfirst(o -> o === m, gui.menu_objects)
-        @test ctrl.selected[] === m && c.hide_button.label[] == "show"
-        notify(c.hide_button.clicks)
-        @test !(m in gui.hidden) && c.hide_button.label[] == "hide"
+        @test ctrl.selected[] === m && _w(c, :hide) === hide && hide.label[] == "show"
+        notify(hide.clicks)
+        @test !(m in gui.hidden) && hide.label[] == "hide"
 
         # a textbox gets the keyboard, a press elsewhere ends the input
-        box = c.pose_boxes[1]
+        box = _pose(c, 1)
         _click!(gui, _center(_rect(box)))
         @test box.focused[] && Ext._typing(gui)
         P0 = Vector{Float64}(BMO.position(m))
@@ -234,26 +252,22 @@ const BMO = BeamletOptics
         plane = Ext._add_clip_plane!(gui, [0, 0.05, 0], [0, 1, 0])
         @test ctrl.selected[] === plane
         @test c.title.text[] == "Clip plane"
-        @test _away(c.object_actions) && !_away(c.plane_actions)
+        @test isnothing(_w(c, :hide)) && !isnothing(_w(c, :flip))
         n = plane.dir[:, 2]
-        notify(c.flip_button.clicks)
+        notify(_w(c, :flip).clicks)
         @test plane.dir[:, 2] ≈ -n
-        notify(c.remove_button.clicks)
+        notify(_w(c, :remove).clicks)
         @test !(plane in gui.clip_planes)
         @test isnothing(ctrl.selected[]) && !c.scene.visible[]
-        # the buttons do nothing for other objects
+        # another object gets its own actions
         _select!(gui, m)
-        R0 = Matrix{Float64}(BMO.orientation(m))
-        notify(c.flip_button.clicks)
-        notify(c.remove_button.clicks)
-        @test Matrix{Float64}(BMO.orientation(m)) == R0
-        @test ctrl.selected[] === m
+        @test isnothing(_w(c, :flip)) && !isnothing(_w(c, :hide))
         # a pinned plane is unpinned when it is removed
         plane = Ext._add_clip_plane!(gui, [0, 0.05, 0], [0, 1, 0])
         pinned = gui.card
         notify(pinned.pin_button.clicks)
         @test pinned.pinned && pinned.obj === plane
-        notify(pinned.remove_button.clicks)
+        notify(_w(pinned, :remove).clicks)
         @test !pinned.pinned && !pinned.scene.visible[]
         close(gui)
     end
@@ -272,11 +286,10 @@ const BMO = BeamletOptics
         notify(c1.pin_button.clicks)
         @test c1.pinned && c1.obj === m && c1.pin_button.label[] == "unpin"
         # the selection gets another card
-        @test gui.card !== c1 && length(gui.cards) == 2
-        @test gui.pose_boxes === gui.card.pose_boxes && gui.hide_button === gui.card.hide_button
+        @test gui.card !== c1 && length(gui.cards) == 2 && gui.step_box === gui.card.step_box
         # the pinned object shows its pinned card only, without the keyboard step
         @test c1.scene.visible[] && !gui.card.scene.visible[]
-        @test _away(c1.step) && !_away(c1.body)
+        @test _away(c1.step) && !_away(c1.rows)
         @test length(c1.link[]) == 2
 
         # the pinned card stays when the selection changes
@@ -292,21 +305,21 @@ const BMO = BeamletOptics
         translate3d!(m, [0.0, 0.0, 0.02])
         _tick!(gui)
         @test _rect(c1.background) != r0
-        @test c1.pose_boxes[3].displayed_string[] == "20.0"
+        @test _pose(c1, 3).displayed_string[] == "20.0"
 
         # its widgets act on its object, not on the selection
         _select!(gui, pd)
-        c1.pose_boxes[3].stored_string[] = "5"
+        _pose(c1, 3).stored_string[] = "5"
         @test BMO.position(m)[3] ≈ 5e-3
         @test BMO.position(pd)[3] ≈ 0 atol = 1e-12
-        notify(c1.hide_button.clicks)
+        notify(_w(c1, :hide).clicks)
         @test m in gui.hidden && ctrl.selected[] === pd
-        @test c1.scene.visible[] && c1.hide_button.label[] == "show"
-        notify(c1.hide_button.clicks)
-        @test !(m in gui.hidden) && c1.hide_button.label[] == "hide"
-        c1.pose_boxes[1].focused[] = true
+        @test c1.scene.visible[] && _w(c1, :hide).label[] == "show"
+        notify(_w(c1, :hide).clicks)
+        @test !(m in gui.hidden) && _w(c1, :hide).label[] == "hide"
+        _pose(c1, 1).focused[] = true
         @test Ext._typing(gui)
-        c1.pose_boxes[1].focused[] = false
+        _pose(c1, 1).focused[] = false
         @test !Ext._typing(gui)
 
         # a second pinned card; the widgets of the newest card take the clicks
@@ -338,6 +351,73 @@ const BMO = BeamletOptics
         @test gui.card === c1 && length(gui.cards) == 3
         close(gui)
         @test !any(c -> c.scene.visible[], gui.cards)
+    end
+
+    @testset "declared rows" begin
+        m, pd = _fixture()
+        t = CardTestObject(BMO.shape(RoundPlanoMirror(0.01, 0.002)))
+        translate3d!(t, [-0.05, 0.05, 0.0])
+        solves = Ref(0)
+        gui = _live_view(System([m, pd, t]), _gauss(); on_change = (gui, obj) -> (solves[] += 1))
+        c, ctrl = gui.card, gui.controls
+        _select!(gui, t)
+        # the pose rows, then its own rows; no actions
+        @test _pose(c, 1) isa Textbox && _w(c, :height).text[] == "0 mm"
+        @test isnothing(_w(c, :hide)) && isempty(c.actions.content)
+        lift = _w(c, :lift)
+        @test lift isa Slider && lift.value[] == 0
+        # an input calls `on`, solves again (`solve = true`) and shows the new values on the card
+        n = solves[]
+        Makie.set_close_to!(lift, 3)
+        @test BMO.position(t)[3] ≈ 3e-3
+        @test _w(c, :height).text[] == "3 mm" && _pose(c, 3).displayed_string[] == "3.0"
+        @test solves[] > n
+
+        # the declared widgets take the clicks like the others: a click at the right end of the
+        # slider sets its last value, and neither deselects nor moves the camera
+        set_view(gui.ax, [0.3, -0.2, 0.3], [0.0, 0.1, 0.0], [0.0, 0, 1])
+        _tick!(gui)
+        eye = _eye(gui)
+        r = _rect(lift)
+        _click!(gui, Point2f(maximum(r)[1] - 2, _center(r)[2]))
+        @test lift.value[] == 5 && BMO.position(t)[3] ≈ 5e-3
+        @test ctrl.selected[] === t && _eye(gui) ≈ eye
+
+        # another object with other declarations: new widgets, the old ones are removed
+        old = copy(c.blocks)
+        _select!(gui, m)
+        @test isnothing(_w(c, :lift)) && _w(c, :hide) isa Button
+        @test all(b -> b.parent === nothing, filter(b -> !any(x -> x === b, c.blocks), old))
+        # an object with the same declarations keeps the widgets and shows its values
+        kept = copy(c.blocks)
+        _select!(gui, pd)
+        @test length(c.blocks) == length(kept) && all(c.blocks .=== kept)
+        @test _pose(c, 1).displayed_string[] == "100.0"
+        close(gui)
+    end
+
+    @testset "ray slider of sources" begin
+        m, pd = _fixture()
+        src = CollimatedSource([0.0, 0, 0], [0.0, 1, 0], 2e-3, 1e-6; num_rings = 2, num_rays = 40)
+        # without the preview solve of the rendered rays only, see `preview` of `live_view`
+        gui = _live_view(System([m, pd]), src; preview = false)
+        c = gui.card
+        _select!(gui, src)
+        rays = _w(c, :rays)
+        @test rays.value[] == 40 && _w(c, :ray_count).text[] == "40 rays"
+        # steps 1-2-5 from the minimum of the rings, 20 × 2, up to 20 000
+        @test first(rays.range[]) == 40 && last(rays.range[]) == 20_000 && 200 in rays.range[]
+        Makie.set_close_to!(rays, 200)
+        @test length(src) == 200 && _w(c, :ray_count).text[] == "200 rays"
+        # solved again: the new rays reach the detector
+        @test length(BMO.hits(pd)) == 200
+        close(gui)
+        # a source that wraps given beams has no slider
+        wrapped = CollimatedSource(BMO.beams(src), 2e-3, [0.0, 0, 0], [0.0, 1, 0])
+        gui = _live_view(System([m, pd]), wrapped)
+        _select!(gui, wrapped)
+        @test isnothing(_w(gui.card, :rays)) && _pose(gui.card, 1) isa Textbox
+        close(gui)
     end
 end
 
