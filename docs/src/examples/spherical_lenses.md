@@ -12,7 +12,7 @@ This example recreates the figure shown in the [Spherical lenses](@ref) section 
 First a function is defined that returns the refractive index ``n(\lambda)`` for the relevent wavelengths. 
 
 ```@example spherical_lens_showcase
-using CairoMakie, BeamletOptics
+using GLMakie, BeamletOptics
 
 NBK7 = DiscreteRefractiveIndex([532e-9, 1064e-9], [1.5195, 1.5066])
 

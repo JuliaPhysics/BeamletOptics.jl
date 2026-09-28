@@ -1,4 +1,4 @@
-using GLMakie, CairoMakie, BeamletOptics
+using GLMakie, BeamletOptics
 
 GLMakie.activate!(; ssao=true)
 

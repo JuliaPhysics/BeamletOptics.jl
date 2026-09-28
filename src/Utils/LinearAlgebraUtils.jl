@@ -1,10 +1,12 @@
 """
-    isparallel3d(v1, v2)
+    isparallel3d(v1, v2; atol = √eps)
 
-Tests if `v1` is parallel to `v2`.
+Tests if `v1` is parallel (or anti-parallel) to `v2`, i.e. if the sine of the angle between both
+vectors, `norm(cross(v1, v2))` of the normalized vectors, is at most `atol`.
 """
-function isparallel3d(v1::AbstractArray, v2::AbstractArray)
-    return isapprox(abs(dot(normalize(v1), normalize(v2))), 1, atol=eps())
+function isparallel3d(v1::AbstractArray, v2::AbstractArray;
+        atol = sqrt(eps(float(promote_type(eltype(v1), eltype(v2))))))
+    return norm(cross(normalize(v1), normalize(v2))) ≤ atol
 end
 
 """

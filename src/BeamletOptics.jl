@@ -1,3 +1,15 @@
+"""
+    BeamletOptics
+
+Non-sequential 3D ray and Gaussian beamlet tracing for optical setups ("BMO").
+Documentation: https://juliaphysics.github.io/BeamletOptics.jl/stable/
+
+# AI coding assistants
+
+The package ships an agent skill that teaches assistants such as Claude Code how to use BMO.
+Install the copy matching this package version into a project with
+[`BeamletOptics.install_agent_skill`](@ref).
+"""
 module BeamletOptics
 
 using LinearAlgebra: norm, normalize, normalize!, dot, cross, I, eigen, Symmetric, svd
@@ -14,6 +26,7 @@ using FileIO: load
 using MeshIO
 using ForwardDiff: gradient
 using Random
+using ProgressMeter: Progress, update!, finish!, cancel
 
 import Base: length, push!, empty!, position
 
@@ -24,7 +37,8 @@ using .Config: get_invariant_threshold, set_invariant_threshold!,
              get_sdf_surface_threshold, get_sdf_raymarch_eps, get_sdf_inside_step,
              get_internal_reflection_threshold, get_line_plane_intersection_threshold,
              get_orthogonality_threshold, get_default_r_max, get_default_depth_max,
-             get_default_wavelength, get_default_waist, get_default_power
+             get_default_wavelength, get_default_waist, get_default_power,
+             get_progress_threshold, set_progress_threshold!
 include("Utils/Utils.jl")
 include("AbstractTypes/AbstractTypes.jl")
 include("Rays.jl")
@@ -39,6 +53,7 @@ include("System.jl")
 include("OpticalComponents/Components.jl")
 include("ObjectGroups.jl")
 include("Render.jl")
+include("AgentSkill.jl")
 include("Exports.jl")
 
 include("Workloads/precompile.jl")

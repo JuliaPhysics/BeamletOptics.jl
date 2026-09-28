@@ -2,6 +2,7 @@ module DocUtils
 
 using GLMakie: Figure, Axis, hidedecorations!, text!, save
 using Dates: now
+import Documenter, DocumenterVitepress
 
 const GLOBAL_USE_PLACEHOLDERS = true
 
@@ -124,5 +125,25 @@ function prerender_include(fname::String, cname::String)
     end
     return nothing
 end
+
+"""Plugin that injects the catalog and roadmap Vue components and the Mermaid npm deps into
+the DocumenterVitepress build (see `DocumenterVitepress/src/extension_hooks.jl`)."""
+struct BMODocsExtras <: Documenter.Plugin end
+
+DocumenterVitepress.vitepress_components(::BMODocsExtras) = [
+    (name = "ComponentCatalog", import_path = "@/ComponentCatalog.vue"),
+    (name = "RoadmapBoard", import_path = "@/RoadmapBoard.vue"),
+]
+
+DocumenterVitepress.vitepress_dependencies(::BMODocsExtras) =
+    Dict("mermaid" => "^11.4.1", "vitepress-plugin-mermaid" => "^2.0.17")
+
+# `docs/src/assets` is copied verbatim into `build/.documenter/assets` by Documenter, but
+# that directory is not served at a stable URL by VitePress. The `vitepress_assets` hook
+# copies the *contents* of its argument directory into `build/.documenter/public` (i.e.
+# `public/<filename>`, flattening the `downloads` folder itself away), which VitePress does
+# serve as-is, so the Literate downloads end up reachable at the site root as `/<file>`.
+DocumenterVitepress.vitepress_assets(::BMODocsExtras) =
+    [joinpath(@__DIR__, "src", "assets", "downloads")]
 
 end

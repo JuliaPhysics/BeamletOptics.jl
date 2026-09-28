@@ -180,6 +180,21 @@ function intersect3d(pbs::AbstractPlateBeamsplitter, ray::AbstractRay)
     end
 end
 
+"""
+    _refract_transmitted!(child, ray, dir)
+
+Sets the direction of the transmitted `child` ray of the coating to the refracted direction `dir`.
+For a [`PolarizedRay`](@ref), the field is transformed into the new direction as well.
+"""
+_refract_transmitted!(child::AbstractRay, ::AbstractRay, dir) = direction!(child, dir)
+
+function _refract_transmitted!(child::PolarizedRay, ray::PolarizedRay, dir)
+    P = _calculate_global_E0(direction(ray), dir, normal3d(intersection(ray)), SPBasis(1, 0, 0, 1))
+    polarization!(child, _transverse(P * polarization(child), dir))
+    direction!(child, dir)
+    return nothing
+end
+
 function interact3d(
     system::AbstractSystem,
     pbs::AbstractPlateBeamsplitter,
@@ -214,7 +229,7 @@ function interact3d(
         end
         refractive_index!(first(rays(beam.children[1])), _nt)
         refractive_index!(first(rays(beam.children[2])), _nr)
-        direction!(first(rays(beam.children[1])), n_d)
+        _refract_transmitted!(first(rays(beam.children[1])), ray, n_d)
         return nothing
     end
     # if nothing worked, return nothing

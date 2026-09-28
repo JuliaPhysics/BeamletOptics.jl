@@ -42,6 +42,9 @@ include(joinpath(@__DIR__, "Components", "ConicMirrors", "TestParabolicMirror.jl
 include(joinpath(@__DIR__, "Components", "ConicMirrors", "TestEllipsoidalMirror.jl"))
 include(joinpath(@__DIR__, "Components", "ConicMirrors", "TestHyperbolicMirror.jl"))
 
+# Test progress bars of long-running calls
+include(joinpath(@__DIR__, "TestProgress.jl"))
+
 # Test end-to-end models
 include(joinpath(@__DIR__, "E2E", "TestDoubleGaussLens.jl"))
 include(joinpath(@__DIR__, "E2E", "TestSonnarLens.jl"))
@@ -63,6 +66,9 @@ include(joinpath(@__DIR__, "Rendering", "TestViewCube.jl"))
 
 # Test regressions
 include(joinpath(@__DIR__, "TestBugFixes.jl"))
+
+# Test agent skill docs against the public API
+include(joinpath(@__DIR__, "TestAgentSkill.jl"))
 
 # Test misc.
 include(joinpath(@__DIR__, "TestMisc.jl"))

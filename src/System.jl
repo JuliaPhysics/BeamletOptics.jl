@@ -709,9 +709,25 @@ function solve_system!(
     return nothing
 end
 
-function solve_system!(system::AbstractSystem, bg::AbstractBeamGroup; kwargs...)
-    Threads.@threads for _beam in beams(bg)
-        solve_system!(system, _beam; kwargs...)
+"""
+    solve_system!(system::AbstractSystem, bg::AbstractBeamGroup; progress=true, kwargs...)
+
+Trace every beam of the beam group `bg` through the `system`, multithreaded over the member
+beams. All other `kwargs` are passed on to [`solve_system!`](@ref) for each beam.
+
+## Keyword Arguments
+
+- `progress = true`: show a progress bar once tracing has run for `get_progress_threshold()`
+  seconds (default 5 s). It is only drawn if `stderr` is a terminal, so documentation builds,
+  CI logs and piped output stay clean.
+"""
+function solve_system!(
+        system::AbstractSystem, bg::AbstractBeamGroup; progress::Bool = true, kwargs...)
+    _with_progress(progress, length(bg), "Tracing beams: ") do prog
+        Threads.@threads for _beam in beams(bg)
+            solve_system!(system, _beam; kwargs...)
+            _tick!(prog)
+        end
     end
     return nothing
 end

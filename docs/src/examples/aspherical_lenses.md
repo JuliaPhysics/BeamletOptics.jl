@@ -3,7 +3,7 @@
 The package has a basic support for ISO 10110 even aspheres. It is planned to extend this support in the future to include extended aspheres and maybe Q-aspheres. The following example shows the most simple usage of the plano-aspheric asphere constructor based on the [Thorlabs AL50100J](https://www.thorlabs.com/thorproduct.cfm?partnumber=AL50100J) aspheric lens:
 
 ```@example aspheric_lens
-using CairoMakie, BeamletOptics
+using GLMakie, BeamletOptics
 
 # radius
 R = 50.3583e-3
@@ -59,7 +59,7 @@ and traced using this package. This example is taken from [Pencil of Rays](https
 The whole system consists of three complex-shaped aspherical lenses, a filter and a cover glass in front of a sensor plane. All five components can be easily modeled using the `Lens` constructor and shifted in space using the kinematic API. The field has to be modeled manually.
 
 ```@example mobile_lens
-using CairoMakie, BeamletOptics
+using GLMakie, BeamletOptics
 
 ## mobile-kyocera-3P_USP8558939.zmx
 

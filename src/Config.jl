@@ -118,6 +118,20 @@ Returns the default beam total power in Watts.
 get_default_power() = DEFAULT_POWER
 
 
+# --- Progress Bars ---
+const PROGRESS_THRESHOLD = @load_preference("progress_threshold", 5.0)
+
+"""
+    get_progress_threshold()
+
+Returns the runtime in seconds after which long-running calls (`solve_system!` on a beam group,
+`electric_field`, `intensity` and `optical_power` on a detector) show a progress bar in the terminal.
+Defaults to 5 s (configurable via the `progress_threshold` preference, see
+[`set_progress_threshold!`](@ref)). `Inf` disables all progress bars.
+"""
+get_progress_threshold() = PROGRESS_THRESHOLD
+
+
 """
     set_preference!(key::String, val; persistent=true)
 
@@ -136,6 +150,15 @@ Sets the global configuration threshold for the paraxial optical invariant check
 This preference is persistent. Please restart Julia for this to take effect.
 """
 set_invariant_threshold!(val::Real) = set_preference!("invariant_threshold", Float64(val))
+
+"""
+    set_progress_threshold!(val::Real)
+
+Sets the runtime in seconds after which long-running calls show a progress bar, see
+[`get_progress_threshold`](@ref). Use `Inf` to disable progress bars globally.
+This preference is persistent. Please restart Julia for this to take effect.
+"""
+set_progress_threshold!(val::Real) = set_preference!("progress_threshold", Float64(val))
 
 
 end # module

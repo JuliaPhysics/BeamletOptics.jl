@@ -32,6 +32,16 @@ const BMO = BeamletOptics
         @test isnothing(BMO.intersection(last(BMO.rays(beam))))
         @test isnothing(BMO.interact3d(system, noninteract, beam, first(BMO.rays(beam))))
     end
+
+    @testset "KM100CPMount" begin
+        mount = BMO.KM100CPMount()
+        @test mount isa NonInteractableObject
+        @test BMO.position(mount) == zeros(3)
+        # post base 81.8 mm below the mirror center
+        zmin, zmax = extrema(BMO.vertices(BMO.shape(mount))[:, 3])
+        @test zmin ≈ -0.0818 atol=1e-4
+        @test zmax ≈ 0.0264 atol=1e-4
+    end
 end
 
 end

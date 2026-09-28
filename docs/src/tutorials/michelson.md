@@ -8,12 +8,23 @@ Main.DocUtils.conditional_include(joinpath(michelson_dir, "michelson_showcase.jl
 
 # Michelson interferometer
 
-In this tutorial, a simple [Michelson Interferometer](https://www.rp-photonics.com/michelson_interferometers.html) will be built step by step, using some core functions and components of this package. You will learn how to:
+In this tutorial, a simple [Michelson Interferometer](https://www.rp-photonics.com/michelson_interferometers.html) will be built step by step, using some core functions and components of this package.
+
+```@raw html
+<div class="bmo-card">
+<p><Badge type="warning" text="Intermediate" /></p>
+```
+
+You will learn how to:
 
 1. Define a simple laser source representation (i.e. a [`GaussianBeamlet`](@ref)).
 2. Create and position optical elements (splitter, mirrors).
 3. Add a [`Detector`](@ref) to capture interference patterns.
 4. Run a simple simulation featuring moving components
+
+```@raw html
+</div>
+```
 
 ![Intro figure](mi_intro_fig.png)
 

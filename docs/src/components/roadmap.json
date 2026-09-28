@@ -1,0 +1,73 @@
+{
+  "phases": [
+    {
+      "id": "beamlet-tracing",
+      "title": "Beamlet tracing",
+      "items": [
+        {
+          "title": "Implementation of the full polarized astigmatic Gaussian beamlet formalism",
+          "status": "done",
+          "note": "refer to Worku et al. (2017/2020), Greynolds (1985)"
+        },
+        {
+          "title": "Support for (trivial) forms of 2D-field decomposition, e.g. tophat",
+          "status": "done"
+        },
+        {
+          "title": "Modeling of the coherence length and contrast influence",
+          "status": "todo"
+        }
+      ]
+    },
+    {
+      "id": "components",
+      "title": "Components",
+      "items": [
+        {
+          "title": "Polarizing optics (based on Jones formalism)",
+          "children": [
+            { "title": "Wave plates (λ/2 and λ/4)", "status": "todo" },
+            { "title": "Retarders", "status": "todo" },
+            { "title": "Faraday rotators", "status": "todo" },
+            { "title": "Polarizing thin-film filters", "status": "done" }
+          ]
+        },
+        { "title": "Isolators", "status": "todo" },
+        {
+          "title": "Modulators",
+          "children": [
+            { "title": "AOM", "status": "todo" },
+            { "title": "EOM", "status": "todo" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "visualization",
+      "title": "Visualization",
+      "items": [
+        { "title": "Performance updates", "status": "todo" },
+        { "title": "Automatic render updates of changed BMO objects", "status": "todo" },
+        { "title": "Interactive viewing in GLMakie (e.g. tooltips)", "status": "todo" },
+        { "title": "Rudimentary interaction (e.g. dragging/moving objects)", "status": "todo" },
+        { "title": "Starshot: GUI prototype", "status": "todo" }
+      ]
+    },
+    {
+      "id": "documentation",
+      "title": "Documentation",
+      "items": [
+        {
+          "title": "More beginner tutorials",
+          "children": [
+            {
+              "title": "Beam expander",
+              "status": "todo",
+              "note": "replaced by the laser alignment tutorial, to be reworked as a beginner tutorial with Literate.jl (like docs/literate/laser_alignment.jl); the previous version is docs/src/tutorials/expander.md in the git history"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

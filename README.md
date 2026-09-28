@@ -42,6 +42,16 @@ using Pkg; Pkg.add("BeamletOptics")
 
 BMO requires **Julia 1.12 or newer**. On older Julia versions, Pkg will automatically fall back to the latest release that still supports them.
 
+## Agent skill
+
+An [Agent Skill](skills/beamletoptics/SKILL.md) for AI coding assistants is included in `skills/beamletoptics/`. Copy the version that matches your installed package into your project with:
+
+```julia
+using BeamletOptics; BeamletOptics.install_agent_skill()   # -> ./.claude/skills/beamletoptics
+```
+
+Alternatively, `npx skills add JuliaPhysics/BeamletOptics.jl` installs the skill from the development branch.
+
 # Examples
 
 For a variety of illustrated examples and tutorials, refer to the **Tutorials** and **Examples** in the **Getting started** sections of the documentation linked to above.
