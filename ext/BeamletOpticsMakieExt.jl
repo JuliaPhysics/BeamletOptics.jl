@@ -6,7 +6,7 @@ import BeamletOptics: render!, RenderException, _RenderTypes, get_view, set_view
                        AbstractRenderHandle, live_render!, update_render!, remove_render!,
                        pick_object, kinematic_controls!, live_view, view_cube!, studio_lighting!,
                        set_render_look, export_changes, card_rows, pose_card_rows, card_actions,
-                       set_num_rays!
+                       set_num_rays!, add_panel!, add_controls!, add_tool!, retrace!
 
 const BMO = BeamletOptics
 
@@ -83,6 +83,7 @@ include("LiveExtras.jl")
 include("LiveApp.jl")
 include("LiveDock.jl")
 include("LiveInspector.jl")
+include("LiveCustom.jl")
 # precompiles the live rendering/interaction call paths, must come last
 include("LivePrecompile.jl")
 

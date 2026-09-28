@@ -68,6 +68,12 @@ prop(props, name) = (i = findfirst(p -> p.first == name, props); isnothing(i) ? 
         glass = DiscreteRefractiveIndex([1e-6, 2e-6], [1.5, 1.4])
         @test prop(properties(SphericalLens(50e-3, -50e-3, 5e-3, 25.4e-3, glass)), "Index model") ==
               "DiscreteRefractiveIndex"
+        # Only defined at its wavelengths, which need not include λ₀
+        glass = DiscreteRefractiveIndex([633e-9, 532e-9], [1.515, 1.519])
+        props = properties(SphericalLens(50e-3, -50e-3, 5e-3, 25.4e-3, glass))
+        @test prop(props, "Wavelengths [m]") == [532e-9, 633e-9]
+        @test prop(props, "Indices") == [1.519, 1.515]
+        @test !any(p -> first(p) == "n(λ₀)", props)
 
         mirror = RoundPlanoMirror(25e-3, 5e-3)
         @test prop(properties(mirror), "Diameter [m]") ≈ 25e-3

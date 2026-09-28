@@ -47,8 +47,10 @@ card_rows(bs::BMO.AbstractBeamsplitter) = (pose_card_rows(bs)..., _beam_row(),
 # Polarizers: the transmission axis
 card_rows(p::Union{BMO.LinearPolarizer, BMO.PolarizationFilter}) =
     (pose_card_rows(p)..., _beam_row(), _text_row("axis", :axis, _axis_text))
-# Detectors: the hits of the last solve and the power, or the number of rays, of the detector panel
-card_rows(pd::BMO.Detector) = (pose_card_rows(pd)..., _beam_row(), _text_row("signal", :signal, _panel_text))
+# Detectors: the hits of the last solve, the power, or the number of rays, of the detector panel and
+# the options of the panel, see `_panel_row`
+card_rows(pd::BMO.Detector) = (pose_card_rows(pd)..., _beam_row(), _text_row("signal", :signal, _panel_text),
+    _panel_row())
 # Sources whose rays can be regenerated: wavelength, size and a slider for the number of rays
 card_rows(src::Union{BMO.CollimatedSource, BMO.PointSource}) = (pose_card_rows(src)...,
     _text_row("λ", :source, _source_text), _ray_rows(src.sampling, length(src))...)

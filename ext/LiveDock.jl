@@ -300,12 +300,7 @@ function _build_dock!(layout::AppLayout, spec)
     for (i, (pd, mode, kw)) in enumerate(spec.specs)
         name = get(spec.labels, pd, "Detector $i")
         p = DetectorPanel(_add_dock_panel!(layout, name; icon = :detector)[1, 1], pd, name, mode, kw)
-        # Colors of the panel that do not follow the theme
-        p.ax.subtitlecolor[] = t.muted
-        p.scatter_plot.color[] = t.text
-        # the power (or number of hits) of the history, black otherwise
-        isempty(p.history_axes) ||
-            (first(filter(x -> x isa Makie.Lines, p.history_axes[1].scene.plots)).color[] = t.text)
+        _theme_panel!(p, t)
         _arrange_panel!(p)
         layout.tabs.panels[end] = p
         push!(layout.tabs.stale, p)
@@ -313,6 +308,32 @@ function _build_dock!(layout::AppLayout, spec)
     end
     isempty(panels) || _select_tab!(layout, 1)
     return panels
+end
+
+"""
+Sets the colors of the detector panel `p` that do not follow the theme of the figure to the
+tokens `t` (see `_APP_THEMES`): the subtitle, the spot diagram and the power (or number of hits)
+of the history in the text colors, and the x (red) and z (blue) lines of the centroid history
+and of the profiles in the red and blue of `t.gizmo`.
+"""
+function _theme_panel!(p::DetectorPanel, t)
+    p.ax.subtitlecolor[] = t.muted
+    p.scatter_plot.color[] = t.text
+    lines(ax) = filter(x -> x isa Makie.Lines, ax.scene.plots)
+    x_color, z_color = t.gizmo[1], t.gizmo[3]
+    if !isempty(p.history_axes)
+        value_ax, centroid_ax = p.history_axes
+        foreach(l -> l.color[] = t.text, lines(value_ax))
+        cx, cz = lines(centroid_ax)
+        cx.color[] = x_color
+        cz.color[] = z_color
+    end
+    if !isnothing(p.profiles_ax)
+        px, pz = lines(p.profiles_ax)
+        px.color[] = x_color
+        pz.color[] = z_color
+    end
+    return nothing
 end
 
 """
@@ -485,6 +506,18 @@ function _refresh_dock!(gui::AppView)
     tabs = gui.layout.tabs
     p = _active_panel(tabs)
     (gui.layout.dock.shown && !isnothing(p) && p in tabs.stale) || return nothing
+    _refresh_tab!(gui, p)
+    return nothing
+end
+
+"""
+    _refresh_tab!(gui::AppView, p)
+
+Updates the stale panel `p` of the shown active tab, see `_refresh_dock!`: a `DetectorPanel` is
+computed, the `update` of a `_UserPanel` of [`add_panel!`](@ref) is called, see `LiveCustom.jl`.
+"""
+function _refresh_tab!(gui::AppView, p::DetectorPanel)
+    tabs = gui.layout.tabs
     if haskey(tabs.fields, p)
         _show_panel!(gui, p, pop!(tabs.fields, p))
         return nothing

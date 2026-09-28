@@ -127,6 +127,12 @@ function _index_properties(n)
     λ0 = get_default_wavelength()
     return Pair{String, Any}["Index model" => _index_model(n), "n(λ₀)" => n(λ0), "λ₀ [m]" => λ0]
 end
+# Only defined at its wavelengths, which are listed instead of a value at λ₀
+function _index_properties(n::DiscreteRefractiveIndex)
+    λs = sort!(collect(keys(n.data)))
+    return Pair{String, Any}["Index model" => _index_model(n), "Wavelengths [m]" => λs,
+        "Indices" => [n.data[λ] for λ in λs]]
+end
 _index_model(::Function) = "function of λ"
 _index_model(n) = _type_name(n)
 

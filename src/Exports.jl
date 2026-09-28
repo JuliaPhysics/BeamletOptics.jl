@@ -72,4 +72,4 @@ export Retroreflector, get_invariant_threshold, set_invariant_threshold!,
 export render!, get_view, set_view, hide_axis, set_orthographic, arrow!, render_lcs!, look_at!
 export live_render!, update_render!, remove_render!, pick_object, kinematic_controls!, live_view,
        view_cube!, studio_lighting!, set_render_look, export_changes, card_rows, pose_card_rows,
-       card_actions, CardRow, CardWidget
+       card_actions, CardRow, CardWidget, add_panel!, add_controls!, add_tool!, retrace!

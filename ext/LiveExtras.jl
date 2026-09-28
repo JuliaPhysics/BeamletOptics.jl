@@ -171,6 +171,18 @@ function _set_transparency!(p::AbstractPlot, transparency::Bool)
     return nothing
 end
 
+"""
+Opacity below which a click in the 3D view does not select mechanics (see `_Mechanics`): a click
+into the empty space inside or over a transparent housing is meant for what lies behind it, see
+`_pickable`. They stay selectable via the object tree and the component menu.
+"""
+const _MIN_PICK_OPACITY = 0.5
+
+# Mechanics that are (almost) see-through are not selected by a click, see `_MIN_PICK_OPACITY`. The
+# opacity is that of the plots, i.e. as rendered or as set via `_set_opacity!`
+_pickable(::KinematicController, ::_Mechanics, plots) =
+    !_is_hidden(plots) && _rendered_opacity(plots) >= _MIN_PICK_OPACITY
+
 """Gives an object of the `gui` shown again at opacity 0 its initial opacity, see `_set_hidden!`."""
 _restore_opacity!(::LiveView, _, ::Nothing) = nothing
 function _restore_opacity!(gui::LiveView, leaf, o::_Opacity)

@@ -12,7 +12,7 @@ using Test
         names = (:trace, :auto_trace, :home, :fit, :views, :save_view, :orthographic, :clip,
             :clip_beams, :sources, :measure, :export, :panel_left, :panel_right, :panel_bottom,
             :help, :eye, :eye_off, :expand, :collapse, :lens, :mirror, :detector, :source, :group,
-            :clip_plane, :mesh, :object, :system, :beamsplitter, :polarizer, :pin, :pinned)
+            :clip_plane, :mesh, :object, :system, :beamsplitter, :polarizer, :pin, :pinned, :chart)
         @test Set(keys(Ext._ICONS)) == Set(names)
         for name in names
             icon = Ext._icon(name)

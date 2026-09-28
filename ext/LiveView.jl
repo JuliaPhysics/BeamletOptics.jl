@@ -133,6 +133,8 @@ and optionally, with defaults for any layout,
   them in `_refresh_inspector!(gui; force)`, called with the cards (see `_update_inspector!`);
   `_step_box(layout, w, card)` returns its `Textbox` of the keyboard step, `_layout_boxes(gui)`
   the textboxes that take the keyboard (see `_typing`). Pinned cards float in all layouts.
+- `_outside_view(gui)`: `true` while the mouse is over a part of the layout whose clicks must not
+  reach the controls of the 3D view, e.g. the sidebars of the app layout (none by default)
 - hooks called by the shared logic: `_on_solved!(gui)` after a solve is shown,
   `_on_selected!(gui)` after the selection changed, `_on_clipping!(gui)` after clipping was
   switched, `_on_clip_planes_changed!(gui)` after a clip plane was added or removed,
@@ -144,9 +146,19 @@ and optionally, with defaults for any layout,
   `_on_solve_started!(gui)` and `_on_applied!(gui)` around a solve, see `LiveDock.jl`
 - `_clip_plane_label(gui)`: the label of a new clip plane (`"Clip plane"`), and
   `_show_hint(gui)`: how a hidden object is shown again, for the status line
+- colors of the 3D view, e.g. for a dark background: `_clip_plane_color(layout)` (`:purple`),
+  `_marker_stroke(layout)` (`:black`, the outline of the handles of sources, clip planes and
+  measured points), `_beam_style(layout, beam)` (default kwargs of `live_render!` of a source,
+  none by default) and `_theme_render!(layout, h)` for the rendered objects (see `AppLayout`)
 - slots for additional parts: `_add_toolbar_entry!(gui, group)`, `_add_sidebar_section!(gui,
   side, title)` and `_add_dock_panel!(gui, title)`, which return the `GridPosition` or
   `GridLayout` to place widgets in, see `AppLayout`
+- the places of the public customization API (see `LiveCustom.jl`), without which it throws for
+  the layout: `_add_user_panel!(f, gui, title, select)` for [`add_panel!`](@ref),
+  `_controls_slot!(gui, title)` for [`add_controls!`](@ref) and
+  `_tool_widget(gui, toggle::Val, name, icon, tooltip)` for [`add_tool!`](@ref). A layout that
+  hides panels implements `_panel_shown(gui, p)` and `_mark_panel_stale!(gui, p)` and updates a
+  stale panel once it is shown, see `_UserPanel`
 
 The layouts of `live_view` are `CompactLayout` and `AppLayout`.
 """
@@ -157,12 +169,52 @@ abstract type AbstractLiveLayout end
 
 Layout of `live_view(...; layout = :compact)`: the 3D view with the detector panels on its right,
 the sliders, the status row and the tool row below. The positions in `gui.fig` are fixed, e.g. the
-panels are placed in `gui.fig[1, 2]`, where users may add their own axes. The widgets have Makie's
-look, the floating cards and the progress window the colors of the `theme` tokens.
+panels are placed in `gui.fig[1, 2]`, where users may add their own axes (see
+[`add_panel!`](@ref)). The widgets have Makie's look, the floating cards and the progress window
+the colors of the `theme` tokens.
 """
-struct CompactLayout <: AbstractLiveLayout
-    theme::NamedTuple
+mutable struct CompactLayout <: AbstractLiveLayout
+    # the color tokens of the `theme` kwarg, see `_APP_THEMES`
+    const theme::NamedTuple
+    # the grid of the detector panels in `fig[1, 2]` (`nothing` without panels), the status row
+    # and the tool row, the places of the customization API, see `LiveCustom.jl`
+    panels::Union{Nothing, GridLayout}
+    status_row::GridLayout
+    tool_row::GridLayout
+    CompactLayout(theme::NamedTuple) = new(theme, nothing)
 end
+
+"""
+    _UserPanel
+
+A panel added via [`add_panel!`](@ref): its `title`, the `layout` of its content and the
+`update(gui)` returned by the builder (or `nothing`), which runs after each full solve while the
+panel is shown, see `_update_user_panels!`. A layout that hides panels (the tabs of the app layout)
+marks a hidden panel stale instead and updates it once it is shown, see `_mark_panel_stale!`.
+"""
+mutable struct _UserPanel
+    const title::String
+    const layout::GridLayout
+    const update::Union{Nothing, Function}
+    last_error::Union{Nothing, String}
+end
+
+"""
+    _UserParts()
+
+The parts of a live view added via the customization API (see `LiveCustom.jl`): the `panels`
+(`_UserPanel`s), the `boxes` (`Textbox`es) and `menus` of added controls and panels, which take
+the keyboard like those of the layout (see `_typing`), and the `keys` of added tools with their
+names, see [`add_tool!`](@ref).
+"""
+struct _UserParts
+    panels::Vector{_UserPanel}
+    boxes::Vector{Textbox}
+    menus::Vector{Menu}
+    keys::Dict{Keyboard.Button, String}
+end
+
+_UserParts() = _UserParts(_UserPanel[], Textbox[], Menu[], Dict{Keyboard.Button, String}())
 
 """
     LiveView
@@ -295,6 +347,8 @@ mutable struct LiveView{L <: AbstractLiveLayout}
     # see `_live_render_extras!`; the opacity of objects set via their card, see `_set_opacity!`
     extras::SystemRenderHandle
     opacity::IdDict{Any, Any}
+    # panels, widgets and tool keys added via the customization API, see `LiveCustom.jl`
+    custom::_UserParts
     # state of the layout, e.g. the slots of the app layout, see `AbstractLiveLayout`; the last
     # field, see the constructor below
     layout::L
@@ -938,6 +992,8 @@ function _apply!(gui::LiveView, r, obj; coarse = false)
         catch e
             gui.last_error = _log_once(e, gui.last_error, "`on_change` callback")
         end
+        # After `on_change`, which may record what the panels of `add_panel!` show
+        _update_user_panels!(gui)
     end
     isnothing(obj) || (gui.status.text[] = _pose_string(gui, obj))
     _on_solved!(gui)
@@ -1414,7 +1470,7 @@ _slider_spec(s) = throw(ArgumentError("invalid slider $s, use \"label\" => (rang
 # Makie ignores all clip planes of a plot beyond the 8th
 const _MAX_CLIP_PLANES = 8
 
-const _LIVE_VIEW_HELP = "p: add clip plane, del: remove, c: clipping on/off, shift+c: flip\ns: show/hide sources"
+const _LIVE_VIEW_HELP = "p: add clip plane, del: remove, c: clipping on/off, shift+c: flip\n1: show/hide sources"
 
 """Validates the `clip_planes` kwarg of `live_view` and returns a vector of `point => normal`."""
 function _clip_plane_specs(clip_planes)
@@ -1489,7 +1545,8 @@ it as a movable object of the controls and applies the planes. Selects the plane
 function _add_clip_plane!(gui::LiveView, point, normal; select::Bool = true)
     ctrl = gui.controls
     plane = LiveClipPlane(point, normal, gui.clip_size)
-    push!(ctrl.h.handles, _live_render_clip_plane!(gui.ax, plane))
+    push!(ctrl.h.handles, _live_render_clip_plane!(gui.ax, plane;
+        color = _clip_plane_color(gui.layout), strokecolor = _marker_stroke(gui.layout)))
     push!(ctrl.movable, plane)
     ctrl.init_poses[plane] = _pose(plane)
     push!(gui.clip_planes, plane)
@@ -2009,6 +2066,8 @@ const _POSE_COLORS = (:black, :black, :black, :red, :green, :blue)
 function _typing(gui::LiveView)
     any(c -> any(tb -> tb.focused[], _card_boxes(c)), gui.cards) && return true
     any(tb -> tb.focused[], _layout_boxes(gui)) && return true
+    # the widgets of `add_controls!` and `add_panel!`, see `_register_widgets!`
+    _custom_typing(gui.custom) && return true
     return _menu_open(gui)
 end
 
@@ -2466,6 +2525,72 @@ function _connect_card!(gui::LiveView, c::_ComponentCard)
     return nothing
 end
 
+#=
+Detectors: the options of their panel, see `_set_panel_options!`, on their cards (`_panel_row`,
+see `card_rows` in LiveCardRows.jl)
+=#
+
+"""
+The row of the options of the panel of a detector on its card: a button that cycles the mode (see
+`_PANEL_MODES`) and shows the current one, and a toggle of the logarithmic color scale. The row is
+the same for all detectors; for a detector without a panel (see the `detectors` kwarg of
+`live_view`), the button reads "no panel" and the inputs only show a message.
+"""
+_panel_row() = CardRow("panel",
+    CardWidget(Button; name = :panel_mode, label = "auto",
+        value = (gui, pd) -> _panel_mode_label(_panel_of(gui, pd)),
+        on = (gui, pd, _) -> _cycle_panel_mode!(gui, _panel_of(gui, pd))),
+    CardWidget(Toggle; name = :panel_log, value = (gui, pd) -> _is_log(_panel_of(gui, pd)),
+        on = (gui, pd, v) -> _set_panel_log!(gui, _panel_of(gui, pd), v)),
+    "log")
+
+# The modes of a detector panel, in the order of the button of `_panel_row`
+const _PANEL_MODES = (:auto, :spot, :intensity)
+
+_panel_mode_label(::Nothing) = "no panel"
+_panel_mode_label(p::DetectorPanel) = string(p.mode)
+_is_log(::Nothing) = false
+_is_log(p::DetectorPanel) = p.colorscale == :log
+
+function _cycle_panel_mode!(gui::LiveView, p::DetectorPanel)
+    i = something(findfirst(==(p.mode), _PANEL_MODES), 0)
+    _set_panel_options!(gui, p; mode = _PANEL_MODES[mod1(i + 1, length(_PANEL_MODES))])
+    gui.status.text[] = "panel $(p.name): $(p.mode)"
+    return nothing
+end
+_cycle_panel_mode!(gui::LiveView, ::Nothing) = _no_panel(gui)
+
+_set_panel_log!(gui::LiveView, p::DetectorPanel, log::Bool) =
+    _set_panel_options!(gui, p; colorscale = log ? :log : :linear)
+_set_panel_log!(gui::LiveView, ::Nothing, _) = _no_panel(gui)
+
+_no_panel(gui::LiveView) = (gui.status.text[] = "this detector has no panel, see the detectors kwarg"; nothing)
+
+"""Returns the first detector panel of `pd` in the `gui`, or `nothing`."""
+_panel_of(gui::LiveView, pd) = (i = findfirst(p -> p.pd === pd, gui.panels);
+    isnothing(i) ? nothing : gui.panels[i])
+
+"""
+    _set_panel_options!(gui, p; mode = p.mode, colorscale = p.colorscale)
+
+Sets the mode (`:auto`, `:spot` or `:intensity`) and the color scale (`:linear` or `:log`) of the
+detector panel `p` of the `gui` and shows its current hits again, see `_refresh_panel!`.
+"""
+function _set_panel_options!(gui::LiveView, p::DetectorPanel; mode::Symbol = p.mode,
+        colorscale::Symbol = p.colorscale)
+    (p.mode == mode && p.colorscale == colorscale) && return nothing
+    p.mode = mode
+    p.colorscale = colorscale
+    _refresh_panel!(gui, p)
+    return nothing
+end
+
+"""
+Shows the current hits of the detector panel `p` again, e.g. after its options changed, without
+solving and without recording its history.
+"""
+_refresh_panel!(::LiveView, p::DetectorPanel) = _update_panel!(p; coarse = false, record = false)
+
 """
     _shield_cards!(gui)
 
@@ -2486,6 +2611,15 @@ function _shield_cards!(gui::LiveView)
 end
 
 """
+    _outside_view(gui) -> Bool
+
+Returns `true` if the mouse is over a part of the layout of the `gui` whose presses are not clicks
+into the 3D view, see `ignore_mouse` of the controls: the controls neither select nor deselect on
+them. By default none, see `AbstractLiveLayout`.
+"""
+_outside_view(::LiveView) = false
+
+"""
     _connect_cards!(gui)
 
 Connects the cards of the `gui`: their widgets, their update every frame and the mouse. Presses on
@@ -2497,7 +2631,7 @@ function _connect_cards!(gui::LiveView)
     ctrl = gui.controls
     ev = events(gui.ax.scene)
     over = () -> any(c -> _over_card(c, ev), gui.cards)
-    ctrl.ignore_mouse = over
+    ctrl.ignore_mouse = () -> over() || _outside_view(gui)
     foreach(c -> _connect_card!(gui, c), gui.cards)
     push!(ctrl.listeners, on(_ -> _update_cards!(gui), ev.tick))
     # Before the controls (200)
@@ -2687,8 +2821,8 @@ end
 
 """Returns a marker of the points `pts` in the 3D view of the `gui`, which is never clipped."""
 function _point_marker!(gui::LiveView, pts; color = :magenta)
-    return scatter!(gui.ax, pts; color, markersize = 10, strokecolor = :black, strokewidth = 1,
-        overdraw = true, clip_planes = Plane3f[])
+    return scatter!(gui.ax, pts; color, markersize = 10, strokecolor = _marker_stroke(gui.layout),
+        strokewidth = 1, overdraw = true, clip_planes = Plane3f[])
 end
 
 """Removes the marker and the result of the beam inspection of the `gui`, if any."""
@@ -2896,25 +3030,44 @@ end
 """
     _zoom_box(gui)
 
-Returns the bounding box of the plots of the selected object of the `gui`, or of all systems if
-nothing is selected, or `nothing` if there are no visible plots.
+Returns the bounding box of the plots of the selected object of the `gui`, or of all systems and
+the visible extras if nothing is selected, or `nothing` if there are no visible plots.
 """
 function _zoom_box(gui::LiveView)
     ctrl = gui.controls
     obj = ctrl.selected[]
     isnothing(obj) || return _selection_bbox(ctrl, obj, _object_plots(ctrl.h, obj))
-    plots = [p for h in gui.system_handles for oh in h.handles for p in oh.plots if p.visible[]]
-    bbs = filter(_is_finite_box, [Makie.boundingbox(p) for p in plots])
+    return _visible_bbox((gui.system_handles..., gui.extras))
+end
+
+"""
+    _visible_bbox(handles) -> Union{Rect3d, Nothing}
+
+Returns the bounding box of the visible plots of the objects of the `handles` (`SystemRenderHandle`s,
+e.g. of the systems and the extras of a live view), or `nothing` if there are none.
+"""
+function _visible_bbox(handles)
+    bbs = [Makie.boundingbox(p) for h in handles for oh in h.handles for p in oh.plots if p.visible[]]
+    filter!(_is_finite_box, bbs)
     return isempty(bbs) ? nothing : reduce(GeometryBasics.union, bbs)
+end
+
+"""
+Size of the scene of the `handles` (see `_visible_bbox`): the largest edge of its bounding box, or
+0.125 m for an empty scene. Sets the size of the source markers and of new clip planes.
+"""
+function _scene_extent(handles)
+    bb = _visible_bbox(handles)
+    return isnothing(bb) ? 0.125 : Float64(maximum(GeometryBasics.widths(bb)))
 end
 
 """
     _zoom_to_selection!(gui)
 
 Moves the camera of the `gui` such that the bounding sphere of the selected object, or of all
-systems if nothing is selected, fills the view: `lookat` is set to the center of the bounding box,
-the eye to the distance `(d/2) / sin(fov/2)` (orthographic: `d/2`) along the current view direction, where `d` is the
-diagonal of the box.
+systems and the visible extras if nothing is selected (see `_zoom_box`), fills the view: `lookat`
+is set to the center of the bounding box, the eye to the distance `(d/2) / sin(fov/2)`
+(orthographic: `d/2`) along the current view direction, where `d` is the diagonal of the box.
 """
 function _zoom_to_selection!(gui::LiveView)
     bb = _zoom_box(gui)
@@ -3088,7 +3241,9 @@ object, also if another object is selected. `step`, only on the card of the sele
 keyboard step, e.g. `250 nm` or `50 µrad`, where the unit selects the move or rotate mode. "–" in
 the head collapses the card to its head, "+" expands it again. Clicks and drags on the card neither select objects
 nor move the camera, and while a box of the card has the focus, the keys of the 3D view are
-ignored.
+ignored. Further rows by type, see [`card_rows`](@ref): the number of rays of a source, the mode
+(`auto`, `spot`, `intensity`) and the log color scale of the panel of a `Detector` ("no panel"
+without one) and the opacity of mechanics.
 
 The row below the status line holds a menu of all movable objects (the objects of a group
 indented after the group, without clip planes), which selects an object like a click in the 3D
@@ -3118,6 +3273,11 @@ it, which is cheaper and keeps the correct depth; switching rebuilds the render 
 object once (a few ms for a mesh with 1 M triangles). At 0 % the object is hidden like via "hide",
 a larger opacity shows it again. The opacity is kept while the object is hidden; showing an object
 hidden at 0 % restores its initial opacity.
+
+Mechanics below 50 % opacity (as rendered or set via the slider) are not selected by a click in
+the 3D view: a click into the empty space inside or over a transparent housing selects what lies
+behind it, e.g. a component, or clears the selection. Select them via the object tree or the
+component menu instead. From 50 % on, a click selects them like any component.
 
 # Beam inspection and measuring
 
@@ -3230,8 +3390,8 @@ actions in the 3D view are unchanged:
 - right sidebar ("Properties"): the card of the selected object, docked instead of floating next
   to it: its name and type, the actions of the card (e.g. "hide", or "flip" and "remove" for a
   clip plane) and a pin, which pins a floating card to the object in the 3D view; below, the rows
-  of the card (see [`card_rows`](@ref), e.g. the pose and the ray slider of a source) and, for a
-  detector, the mode and the color scale of its panel; then the step box, the mode and the
+  of the card (see [`card_rows`](@ref), e.g. the pose, the ray slider of a source or the panel
+  options of a detector); then the step box, the mode and the
   properties of the object (see [`properties`](@ref)). Pinned cards float in the 3D view as in
   the compact layout.
 - analysis dock below the 3D view: a tab per detector panel, a click on a tab shows its panel.
@@ -3246,11 +3406,20 @@ The component menu of the compact layout is replaced by the tree. In the compact
 fixed positions of `gui.fig`, e.g. the detector panels in `gui.fig[1, 2]`, next to which users
 may add their own axes.
 
+# Own panels, controls and tools
+
+[`add_panel!`](@ref) adds an own panel (below the detector panels, or a tab of the dock of the app
+layout), [`add_controls!`](@ref) own widgets (a row above the status row, or a section of the left
+sidebar) and [`add_tool!`](@ref) a button or toggle, optionally with a key (in the tool row, or the
+toolbar). [`retrace!`](@ref) solves again after a change from code, e.g. from such a widget.
+
 # Keyword args
 
 - `layout = :compact`: arrangement of the widgets, `:compact` or `:app`, see "App layout"
 - `theme = :light`: colors, `:light` or `:dark`, of the component cards and the progress window
-  of all layouts and of the whole window of `:app`
+  of all layouts and of the whole window of `:app`. For contrast on its dark 3D view, `:dark`
+  draws the rays, the markers and the dark materials of the render look (detectors, polarizers) of
+  `:app` in lighter colors; `:light` keeps the colors of `:compact`.
 - `size`: size of the figure, by default `(1400, 800)` for `:compact` and `(1600, 950)` for `:app`
 - `auto_trace = true`: solves the systems after each change, otherwise only on request, see
   "Manual tracing"
@@ -3354,28 +3523,31 @@ function live_view(
         default = beam isa BMO.AbstractBeamGroup ? (; render_every = 5) : (;)
         kw = get(beam_kwargs, beam, default)
         # The planes of the beams are set explicitly by `_apply_clip_planes!`, see `clip_beams`
-        push!(beam_handles, live_render!(ax, beam; kw..., clip_planes = Plane3f[]))
+        push!(beam_handles, live_render!(ax, beam; _beam_style(lay, beam)..., kw...,
+            clip_planes = Plane3f[]))
     end
 
     # A single controller for all systems, otherwise several controllers would compete for events
     handles = reduce(vcat, [h.handles for h in system_handles]; init = ObjectRenderHandle[])
-    # Size of the systems, before any clip plane shrinks the bounding boxes
-    plots = reduce(vcat, (oh.plots for oh in handles); init = AbstractPlot[])
-    extent = isempty(plots) ? 0.125 :
-             maximum(GeometryBasics.widths(mapreduce(Makie.boundingbox, GeometryBasics.union, plots)))
+    # The extras are moved and selected like the objects of the systems, but never traced
+    extras_handle = _live_render_extras!(ax, extra_specs)
+    # Size of the scene (the systems and the visible extras), before any clip plane shrinks the
+    # bounding boxes
+    extent = _scene_extent((system_handles..., extras_handle))
     if movable_sources
         # Markers of the sources, scaled to the size of the systems
         marker_size = 0.08 * extent
         for src in unique(objectid, last.(ps))
-            BMO._is_static(src) || push!(handles, _live_render_source!(ax, src; size = marker_size))
+            BMO._is_static(src) || push!(handles,
+                _live_render_source!(ax, src; size = marker_size, strokecolor = _marker_stroke(lay)))
         end
     end
-    # The extras are moved and selected like the objects of the systems, but never traced
-    extras_handle = _live_render_extras!(ax, extra_specs)
     append!(handles, extras_handle.handles)
     parent = IdDict{BMO.AbstractObject, BMO.AbstractObject}()
     foreach(h -> merge!(parent, h.parent), (system_handles..., extras_handle))
     combined = SystemRenderHandle(ax, first(systems), handles, parent)
+    # Colors of the render look that the theme of the layout replaces, e.g. of dark detectors
+    _theme_render!(lay, combined)
     gui_ref = Ref{LiveView}()
     # Moving a clip plane or an extra does not solve the systems, see `_on_moved!`
     change = function (obj)
@@ -3401,7 +3573,7 @@ function live_view(
         nothing, AbstractPlot[], w.home_button, (zeros(3), zeros(3), zeros(3)), false, view_specs,
         menus.views_menu, w.save_view_button, nothing, w.sources_toggle, nothing,
         _ProgressOverlay(ax, lay.theme), Float64(progress_delay), card, [card], Any[], extras_handle,
-        IdDict{Any, Any}(), lay)
+        IdDict{Any, Any}(), _UserParts(), lay)
     gui_ref[] = gui
     # Objects must not change while a solve in the background traces them
     controls.before_change = () -> _cancel_solve!(gui)
@@ -3463,6 +3635,14 @@ _on_selected!(::LiveView) = nothing
 _on_clipping!(::LiveView) = nothing
 _on_clip_planes_changed!(::LiveView) = nothing
 _on_hidden!(::LiveView) = nothing
+
+# Colors of the 3D view, which a layout may adapt to its theme, see `_APP_THEMES`
+_clip_plane_color(::AbstractLiveLayout) = :purple
+_marker_stroke(::AbstractLiveLayout) = :black
+"""Default kwargs of `live_render!` of the source `beam` in the `layout`, e.g. the color of rays."""
+_beam_style(::AbstractLiveLayout, _) = (;)
+"""Styles the floating card `c` (see `_ComponentCard`) for the `layout`, e.g. with an outline."""
+_theme_render!(::AbstractLiveLayout, _) = nothing
 _clip_plane_label(::LiveView) = "Clip plane"
 
 function _slot_error(gui::LiveView, what)
@@ -3472,7 +3652,7 @@ _add_toolbar_entry!(gui::LiveView, _) = _slot_error(gui, "toolbar")
 _add_sidebar_section!(gui::LiveView, _, _) = _slot_error(gui, "sidebars")
 _add_dock_panel!(gui::LiveView, _) = _slot_error(gui, "dock")
 
-function _build_layout(::CompactLayout, fig, spec)
+function _build_layout(layout::CompactLayout, fig, spec)
     (; specs, slider_specs, labels, lighting, view_cube, auto_trace, clip_beams, orthographic,
         show_sources) = spec
     ax = LScene(fig[1, 1]; show_axis = false)
@@ -3491,6 +3671,7 @@ function _build_layout(::CompactLayout, fig, spec)
             push!(panels, DetectorPanel(parent, pd, get(labels, pd, "Detector $i"), mode, kw))
         end
         colsize!(fig.layout, 1, Relative(0.6))
+        layout.panels = grid
     end
     sliders = if isempty(slider_specs)
         nothing
@@ -3523,6 +3704,8 @@ function _build_layout(::CompactLayout, fig, spec)
     # Keeps the tool row left-aligned and compact enough for narrow windows
     Label(tool_row[1, 8], ""; tellwidth = false)
     colgap!(tool_row, 6)
+    layout.status_row = status_row
+    layout.tool_row = tool_row
     return (; ax, cube, panels, sliders, status, trace_button, auto_trace_toggle, clip_beams_toggle,
         orthographic_toggle, sources_toggle, export_button, show_all_button, measure_toggle,
         home_button, save_view_button, tool_row)
