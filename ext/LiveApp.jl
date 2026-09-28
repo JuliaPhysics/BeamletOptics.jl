@@ -582,6 +582,8 @@ function _name_objects!(gui::AppView)
         haskey(layout.names, h) || (layout.names[h] = get(gui.labels, h.sys, "System $i"))
         foreach(top -> foreach(name!, _descendants(top)), _top_levels(h))
     end
+    haskey(layout.names, gui.extras) || (layout.names[gui.extras] = "Extras")
+    foreach(top -> foreach(name!, _descendants(top)), _top_levels(gui.extras))
     foreach(name!, _sources(gui))
     return nothing
 end
@@ -613,21 +615,28 @@ end
 Returns the rows of the object tree of the `gui`: per system a row (key: its `SystemRenderHandle`)
 followed by its objects in the hierarchy of the kinematic controls (groups with their objects,
 including static objects such as housings, which can be hidden, but not selected), then the
-sources and the clip planes. The keys of all other rows are the objects. Systems are expanded, and
-groups collapsed, by default. Objects whose plots are all hidden (see `gui.hidden`) are muted.
+extras (see the `extras` kwarg of `live_view`) in the same way under a row "Extras" (key:
+`gui.extras`, only if there are extras), the sources and the clip planes. The keys of all other
+rows are the objects. Systems and the extras are expanded, and groups collapsed, by default.
+Objects whose plots are all hidden (see `gui.hidden`) are muted.
 """
 function _tree_rows(gui::AppView)
     rendered = Base.IdSet{Any}(oh.obj for oh in gui.controls.h.handles)
     rows = _TreeRow[]
-    for h in gui.system_handles
-        tops = _top_levels(h)
-        expanded = get(gui.layout.expanded, h, true)
-        push!(rows, _TreeRow(h, _label(gui, h), 0, :system, !isempty(tops), expanded,
-            _tree_visible(gui, rendered, h)))
-        expanded && foreach(top -> _push_tree_rows!(rows, gui, rendered, top, 1), tops)
-    end
+    foreach(h -> _push_system_rows!(rows, gui, rendered, h, :system), gui.system_handles)
+    isempty(gui.extras.handles) || _push_system_rows!(rows, gui, rendered, gui.extras, :group)
     foreach(src -> _push_tree_rows!(rows, gui, rendered, src, 0), _sources(gui))
     foreach(plane -> _push_tree_rows!(rows, gui, rendered, plane, 0), gui.clip_planes)
+    return rows
+end
+
+# The row of the system (or the extras) of `h` with the icon of the `kind`, then its objects
+function _push_system_rows!(rows, gui::AppView, rendered, h::SystemRenderHandle, kind::Symbol)
+    tops = _top_levels(h)
+    expanded = get(gui.layout.expanded, h, true)
+    push!(rows, _TreeRow(h, _label(gui, h), 0, kind, !isempty(tops), expanded,
+        _tree_visible(gui, rendered, h)))
+    expanded && foreach(top -> _push_tree_rows!(rows, gui, rendered, top, 1), tops)
     return rows
 end
 
@@ -679,7 +688,7 @@ function _reveal!(gui::AppView, obj)
         expanded[group] = changed = true
     end
     top = last(chain)
-    for h in gui.system_handles
+    for h in (gui.system_handles..., gui.extras)
         any(oh -> _top_level(h, oh.obj) === top, h.handles) || continue
         get(expanded, h, true) && break
         expanded[h] = changed = true

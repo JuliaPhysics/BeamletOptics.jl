@@ -286,6 +286,10 @@ mutable struct LiveView{L <: AbstractLiveLayout}
     card::_ComponentCard
     cards::Vector{_ComponentCard}
     card_shield::Vector{Any}
+    # objects of the `extras` kwarg: rendered, selectable and movable, but not part of any system,
+    # see `_live_render_extras!`; the opacity of objects set via their card, see `_set_opacity!`
+    extras::SystemRenderHandle
+    opacity::IdDict{Any, Any}
     # state of the layout, e.g. the slots of the app layout, see `AbstractLiveLayout`; the last
     # field, see the constructor below
     layout::L
@@ -1873,7 +1877,10 @@ function _listen!(listeners, f, obs::Observable)
     return nothing
 end
 
-"""Sets the `visible` attribute of all plots of the rendered objects (leaves) of `obj`."""
+"""
+Sets the `visible` attribute of all plots of the rendered objects (leaves) of `obj`. A leaf shown
+again whose opacity was set to 0 gets its initial opacity back, see `_set_opacity!`.
+"""
 function _set_hidden!(gui::LiveView, obj, hide::Bool)
     for leaf in _leaves(obj)
         hide ? push!(gui.hidden, leaf) : delete!(gui.hidden, leaf)
@@ -1883,6 +1890,7 @@ function _set_hidden!(gui::LiveView, obj, hide::Bool)
         for plot in gui.controls.h.handles[i].plots
             plot.visible[] == visible || (plot.visible[] = visible)
         end
+        hide || _restore_opacity!(gui, leaf, get(gui.opacity, leaf, nothing))
     end
     return nothing
 end
@@ -3109,8 +3117,11 @@ are solved again and the beams and detector panels are updated. Returns a `LiveV
 fields `fig`, `ax`, `controls`, `panels`, `status` and `sliders`. Use `display(gui)` to show the
 window and `close(gui)` to remove the controls.
 
-Additional context, e.g. a static optomechanical assembly, can be added via `render!(gui.ax, ...)`.
-The status line shows the pose of the moved object and its change since the window was opened.
+Additional context, e.g. an optomechanical assembly from a CAD file, is passed via `extras`: these
+objects are rendered, selected, moved, hidden and exported like the components, but they are not
+part of any system, i.e. never traced and without cost in the solves; see "Extras and opacity".
+Plots added via `render!(gui.ax, ...)` are only drawn. The status line shows the pose of the moved
+object and its change since the window was opened.
 
 # Component card, component menu and export
 
@@ -3143,6 +3154,28 @@ view, and "show all", which shows all hidden objects.
 
 The "Export" button prints the changed poses as Julia code to `stdout` and copies it to the
 clipboard, see [`export_changes`](@ref).
+
+# Extras and opacity
+
+`extras = [housing => (; color = :lightblue), mount]` adds objects without optical function, e.g.
+a `MeshDummy` of an STL file, each an `AbstractObject` (or a group of them) with optional kwargs
+of its [`render!`](@ref) call. They are not part of any system: never traced, moving them does not
+solve the systems. Otherwise they act like the components: a click in the 3D view (where they do
+not cover the components behind them, which are picked first) or in the component menu or object
+tree selects them, they are moved with the controls if their kinematic trait allows it (static
+ones are only rendered and hidden), hidden via "hide" or the eye of the tree, in which they are
+listed under "Extras", and their moves are exported by [`export_changes`](@ref). An extra must not
+be an object of a system.
+
+The card of mechanics, i.e. a `NonInteractableObject` (e.g. `MeshDummy`) or an
+`IntersectableObject`, in a system or among the extras, has an "opacity" slider (0-100 %,
+initially the opacity as rendered, e.g. 5 % for a color with alpha 0.05). It scales the alpha of
+the plots of the object, including its feature edges, and does not change the optics. Objects below
+100 % are drawn with order independent transparency (`transparency = true`), opaque ones without
+it, which is cheaper and keeps the correct depth; switching rebuilds the render objects of the
+object once (a few ms for a mesh with 1 M triangles). At 0 % the object is hidden like via "hide",
+a larger opacity shows it again. The opacity is kept while the object is hidden; showing an object
+hidden at 0 % restores its initial opacity.
 
 # Beam inspection and measuring
 
@@ -3246,8 +3279,8 @@ actions in the 3D view are unchanged:
   orthographic, clipping (`c`), clip beams, sources (`1`), measure, export, the toggles of the
   sidebars and the dock, help (`h`)
 - left sidebar: the object tree and, below it, the sliders ("Parameters"). The tree lists each
-  system with its objects (groups with their objects, collapsed by default), then the sources and
-  the clip planes. A click on a name selects the object like a click in the 3D view, and a
+  system with its objects (groups with their objects, collapsed by default), then the `extras`
+  under "Extras", the sources and the clip planes. A click on a name selects the object like a click in the 3D view, and a
   selection in the 3D view highlights its row. The eye hides or shows an object, a group or a
   whole system, the eye in the title of the tree shows all objects again. Objects without a
   `labels` entry are named by their type and a running index, e.g. "Lens 2", also in the status
@@ -3288,6 +3321,9 @@ may add their own axes.
 - `sliders = []`: vector of `"label" => (range, callback)` or `"label" => (range, callback, startvalue)`.
   The `callback` is called with the new value, then the systems are solved again.
 - `system_kwargs = (;)`: passed to `live_render!` of each system
+- `extras = []`: objects that are rendered and can be moved and hidden, but are not traced, a
+  vector of `obj` or `obj => render_kwargs`, e.g. `[housing => (; transparency = true, color =
+  RGBAf(0.7, 0.8, 0.9, 0.05))]`, see "Extras and opacity"
 - `beam_kwargs = Dict()`: `beam => kwargs` passed to `live_render!` of the beam, by default
   `(; render_every = 5)` for beam groups
 - `movable_sources = true`: shows an orange marker at each source, i.e. the beam or beam group of
@@ -3345,12 +3381,14 @@ function live_view(
         preview::Bool = true,
         views = [],
         progress_delay::Real = 0.5,
+        extras = [],
         kwargs...
     )
     isempty(pairs) && throw(ArgumentError("live_view requires at least one system => beam pair"))
     ps = Pair{BMO.AbstractSystem, Any}[p for p in pairs]
     # several beams may share a system, which is rendered once
     systems = unique(objectid, first.(ps))
+    extra_specs = _extra_specs(extras, systems)
     specs = _panel_specs(detectors, systems)
     slider_specs = [_slider_spec(s) for s in sliders]
     clip_specs = _clip_plane_specs(clip_planes)
@@ -3389,14 +3427,17 @@ function live_view(
             BMO._is_static(src) || push!(handles, _live_render_source!(ax, src; size = marker_size))
         end
     end
+    # The extras are moved and selected like the objects of the systems, but never traced
+    extras_handle = _live_render_extras!(ax, extra_specs)
+    append!(handles, extras_handle.handles)
     parent = IdDict{BMO.AbstractObject, BMO.AbstractObject}()
-    foreach(h -> merge!(parent, h.parent), system_handles)
+    foreach(h -> merge!(parent, h.parent), (system_handles..., extras_handle))
     combined = SystemRenderHandle(ax, first(systems), handles, parent)
     gui_ref = Ref{LiveView}()
-    # Moving a clip plane only re-applies the planes, the systems are not solved
+    # Moving a clip plane or an extra does not solve the systems, see `_on_moved!`
     change = function (obj)
         gui = gui_ref[]
-        obj isa LiveClipPlane ? _on_clip_change!(gui, obj) : _on_change!(gui, obj)
+        _on_moved!(gui, obj)
         _update_inspector!(gui)
         return nothing
     end
@@ -3416,7 +3457,8 @@ function live_view(
         Base.IdSet{Any}(), preview, false, nothing, 0.0, nothing, nothing, w.measure_toggle, Any[],
         nothing, AbstractPlot[], w.home_button, (zeros(3), zeros(3), zeros(3)), false, view_specs,
         menus.views_menu, w.save_view_button, nothing, w.sources_toggle, nothing,
-        _ProgressOverlay(ax), Float64(progress_delay), card, [card], Any[], lay)
+        _ProgressOverlay(ax), Float64(progress_delay), card, [card], Any[], extras_handle,
+        IdDict{Any, Any}(), lay)
     gui_ref[] = gui
     # Objects must not change while a solve in the background traces them
     controls.before_change = () -> _cancel_solve!(gui)

@@ -327,18 +327,30 @@ direction, the green axis is its direction. If a marker covers small components,
 toggle below the 3D view or the key `1` hides all markers and shows them again, `show_sources =
 false` starts with hidden markers. Pass `movable_sources = false` to omit the markers altogether.
 
-### Static context
+### Extras and static context
 
-Additional context that is not part of any `system`, e.g. a housing or an optical table, can be
-added directly to `gui.ax` via `render!`:
+Objects that are not part of any `system`, e.g. a housing from a CAD file, are passed as `extras`,
+each optionally with the kwargs of its `render!` call:
+
+```julia
+housing = MeshDummy("housing.stl")
+gui = live_view(system => beam; extras = [housing => (; transparency = true, color = (:gray, 0.3))])
+```
+
+Extras are never traced, so they cost nothing in the solves, and moving them does not solve the
+systems. Otherwise they act like components: they are selected with a click, in the component menu
+or in the object tree (under "Extras"), moved, hidden and exported. They do not block clicking on
+the optics behind them: objects are picked by intersecting the camera ray with the optical
+components first, which a `NonInteractableObject` never intersects. The card of a
+`NonInteractableObject` (e.g. a `MeshDummy`) or an `IntersectableObject` has an "opacity" slider,
+which makes it transparent without changing the optics; 0 % hides it.
+
+Plots added directly to `gui.ax` via `render!` are only drawn, i.e. they are neither selectable nor
+hideable:
 
 ```julia
 render!(gui.ax, housing_mesh; transparency = true, color = (:gray, 0.3))
 ```
-
-Such geometry is not selectable and does not block clicking on the optics behind it: objects are
-picked by intersecting the camera ray with the movable objects of the system, not with everything
-drawn in the scene, so a housing mesh in front of a component never gets in the way.
 
 ### Clip planes
 

@@ -213,6 +213,35 @@ function solve_times(gui, lens; n = N_SOLVES, warmup = N_WARMUP_SOLVES)
     return rows[(warmup + 1):end]
 end
 
+"""
+Opacity of the 1 M triangle mesh (see `_set_opacity!`), with the render loop stopped: median [ms]
+of `switch`, 100 % ↔ 50 %, which switches the transparency and rebuilds the render object of the
+mesh, and of `change`, 50 % ↔ 40 %, which only sets `alpha`, each plus one frame; the median
+`frame` time of the camera rotation with the mesh at 50 % (order independent transparency); and
+the `idle` redraws in 2 s with the mesh at 50 %. Afterwards the mesh is opaque again. `-1` on
+versions without `_set_opacity!`.
+"""
+function opacity_times(gui, screen, housing; n = 6)
+    isdefined(BME, :_set_opacity!) || return (; switch = -1.0, change = -1.0, frame = -1.0, idle = -1)
+    GLMakie.stop_renderloop!(screen; close_after_renderloop = false)
+    timed(o) = (t0 = time_ns(); BME._set_opacity!(gui, housing, o); frame!(screen); 1e-6 * (time_ns() - t0))
+    switch, change = try
+        timed(0.5); timed(1.0)   # warm-up, compiles the transparent shader
+        switch = [timed(isodd(k) ? 0.5 : 1.0) for k in 1:(2n)]
+        timed(0.5)
+        change = [timed(isodd(k) ? 0.4 : 0.5) for k in 1:(2n)]
+        timed(0.5)
+        median(switch), median(change)
+    finally
+        GLMakie.start_renderloop!(screen)
+    end
+    ft = median(frame_times(gui, screen))
+    sleep(0.5)
+    idle = count_redraws(gui).rendered
+    BME._set_opacity!(gui, housing, 1.0)
+    return (; switch, change, frame = ft, idle)
+end
+
 #=
 Main
 =#
@@ -248,6 +277,7 @@ function main(args)
         sleep(0.5)
         count_redraws(gui)
     end : (; rendered = -1)
+    op = opacity_times(gui, screen, scene.housing)
 
     r = (; layout = String(layout), julia = string(VERSION), threads = Threads.nthreads(),
         window = collect(WINDOW_SIZE), framebuffer = collect(size(screen)),
@@ -260,7 +290,9 @@ function main(args)
         solve_median_ms = median(getfield.(st, :solve)),
         panel_median_ms = median(getfield.(st, :panel)),
         solve_panel_median_ms = median(getfield.(st, :solve) .+ getfield.(st, :panel)),
-        resolve_wall_median_ms = median(getfield.(st, :total)))
+        resolve_wall_median_ms = median(getfield.(st, :total)),
+        opacity_switch_median_ms = op.switch, opacity_change_median_ms = op.change,
+        frame_transparent_median_ms = op.frame, idle_redraws_transparent = op.idle)
 
     println()
     @printf "live_view benchmark, layout = %s, Julia %s, %d threads\n" r.layout r.julia r.threads
@@ -277,6 +309,10 @@ function main(args)
     @printf "  %-38s %10.2f ms\n" "panel time, median" r.panel_median_ms
     @printf "  %-38s %10.2f ms\n" "solve + panel time, median" r.solve_panel_median_ms
     @printf "  %-38s %10.2f ms\n" "_resolve! wall time, median" r.resolve_wall_median_ms
+    @printf "  %-38s %10.2f ms\n" "opacity 100 ↔ 50 % (+ frame), median" r.opacity_switch_median_ms
+    @printf "  %-38s %10.2f ms\n" "opacity 50 ↔ 40 % (+ frame), median" r.opacity_change_median_ms
+    @printf "  %-38s %10.2f ms\n" "frame time, mesh at 50 %, median" r.frame_transparent_median_ms
+    @printf "  %-38s %10d\n" "idle redraws, mesh at 50 %" r.idle_redraws_transparent
     r.control_redraws > 0 || @warn "the redraw counter saw no frames in the control run"
 
     isnothing(out) || write_toml(out, r)
