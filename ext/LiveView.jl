@@ -1464,7 +1464,7 @@ _slider_spec(s) = throw(ArgumentError("invalid slider $s, use \"label\" => (rang
 # Makie ignores all clip planes of a plot beyond the 8th
 const _MAX_CLIP_PLANES = 8
 
-const _LIVE_VIEW_HELP = "p: add clip plane, del: remove, c: clipping on/off, shift+c: flip\ns: show/hide sources"
+const _LIVE_VIEW_HELP = "p: add clip plane, del: remove, c: clipping on/off, shift+c: flip\n1: show/hide sources"
 
 """Validates the `clip_planes` kwarg of `live_view` and returns a vector of `point => normal`."""
 function _clip_plane_specs(clip_planes)
