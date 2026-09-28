@@ -12,7 +12,7 @@ using Test
         names = (:trace, :auto_trace, :home, :fit, :views, :save_view, :orthographic, :clip,
             :clip_beams, :sources, :measure, :export, :panel_left, :panel_right, :panel_bottom,
             :help, :eye, :eye_off, :expand, :collapse, :lens, :mirror, :detector, :source, :group,
-            :clip_plane, :mesh, :object)
+            :clip_plane, :mesh, :object, :system)
         @test Set(keys(Ext._ICONS)) == Set(names)
         for name in names
             icon = Ext._icon(name)
@@ -44,6 +44,11 @@ using Test
         q = Ext._svg_path("M0-480Q240-960 480-480T960-480")
         @test q.commands[3].c1[2] < 0 # second arc bends downwards
         @test_throws ArgumentError Ext._svg_path("M0 0A10 10 0 0 1 20 20")
+        # A subpath closed by Z ends with an explicit line to its start, such that Makie's
+        # bounding box, which scales the marker, includes the start (e.g. the tip of an arrow)
+        t = Ext._svg_path("M0-960L480-960L480-480ZM960-480L720-240L720-720Z")
+        @test t.commands[end - 1] == Makie.LineTo(Point2d(0.5, 0.0))
+        @test maximum(Makie.bbox(t))[1] ≈ 0.5
     end
 
     fig = Figure(size = (400, 200))

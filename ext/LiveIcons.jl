@@ -55,18 +55,22 @@ const _ICON_SVG = Dict{Symbol, String}(
     :mesh => "M440-183v-274L200-596v274l240 139Zm80 0 240-139v-274L520-457v274Zm-40-343 237-137-237-137-237 137 237 137ZM160-252q-19-11-29.5-29T120-321v-318q0-22 10.5-40t29.5-29l280-161q19-11 40-11t40 11l280 161q19 11 29.5 29t10.5 40v318q0 22-10.5 40T800-252L520-91q-19 11-40 11t-40-11L160-252Zm320-228Z",
     # category
     :object => "m260-520 220-360 220 360H260ZM700-80q-75 0-127.5-52.5T520-260q0-75 52.5-127.5T700-440q75 0 127.5 52.5T880-260q0 75-52.5 127.5T700-80Zm-580-20v-320h320v320H120Zm580-60q42 0 71-29t29-71q0-42-29-71t-71-29q-42 0-71 29t-29 71q0 42 29 71t71 29Zm-500-20h160v-160H200v160Zm202-420h156l-78-126-78 126Zm78 0ZM360-340Zm340 80Z",
-    # own design: plane that cuts a beam, the cut part dashed
-    :clip_beams => "M600-800h80v640h-80v-640ZM80-520h480v80H80v-80Zm640 0h60v80h-60v-80Zm100 0h60v80h-60v-80Z",
-    # own design: biconvex lens on the optical axis
-    :lens => "M480-880Q800-480 480-80Q160-480 480-880Zm0 110Q330-480 480-190Q630-480 480-770ZM80-510h800v60H80v-60Z",
-    # own design: mirror with hatched back side
-    :mirror => "M340-880h80v800h-80v-800Zm80 730 200-200v70L420-80v-70Zm0-170 200-200v70L420-250v-70Zm0-170 200-200v70L420-420v-70Zm0-170 200-200v70L420-590v-70Z",
-    # own design: photodiode (D shape)
-    :detector => "M300-820C499-820 660-668 660-480C660-292 499-140 300-140V-820Zm80 80V-220C490-220 580-336 580-480C580-624 490-740 380-740Z",
-    # own design: laser head with an emitted beam
-    :source => "M80-680h440v400H80v-400Zm80 80v240h280v-240H160Zm360 80h360v80H520v-80Z",
-    # own design: plane in perspective
-    :clip_plane => "M280-760h600L680-200H80l200-560Zm56 80L194-280h430l142-400H336Z",
+    # Own designs, in the outlined style of Material Symbols: strokes of 80 units (2 px at 24 px),
+    # solid parts clockwise, holes counterclockwise (nonzero fill rule of FreeType)
+    # own design: a ray that ends at a plane in perspective, dashed behind it
+    :clip_beams => "M500-720L640-880L640-240L500-80ZM80-520L500-520L500-440L80-440ZM700-520L780-520L780-440L700-440ZM820-520L880-520L880-440L820-440Z",
+    # own design: biconvex lens with flat edges, the optical axis on both sides
+    :lens => "M400-880H560Q840-480 560-80H400Q120-480 400-880ZM440-800Q160-480 440-160H520Q720-480 520-800ZM80-520L200-520L200-440L80-440ZM760-520L880-520L880-440L760-440Z",
+    # own design: thick mirror with a ray reflected on it
+    :mirror => "M80-240L880-240L880-120L80-120ZM182.7-853L480-429.6L668.1-697.5L733.6-651.5L480-290.4L117.3-807ZM810-830L784.2-567.1L571.4-716.5Z",
+    # own design: sensor with 2 × 2 pixels
+    :detector => "M120-840L840-840L840-120L120-120ZM200-200L760-200L760-760L200-760ZM280-680L440-680L440-520L280-520ZM520-680L680-680L680-520L520-520ZM280-440L440-440L440-280L280-280ZM520-440L680-440L680-280L520-280Z",
+    # own design: laser head emitting a beam
+    :source => "M80-700L500-700L500-260L80-260ZM160-340L420-340L420-620L160-620ZM500-520L720-520L720-440L500-440ZM880-480L680-310L680-650Z",
+    # own design: plane in perspective with its normal
+    :clip_plane => "M80-120L300-400L880-400L660-120ZM625-180L745-340L335-340L215-180ZM440-670L520-670L520-260L440-260ZM480-880L630-650L330-650Z",
+    # own design: breadboard with mounting holes, i.e. an optical system
+    :system => "M80-760H880V-200H80ZM160-680V-280H800V-680ZM355-560C355-529.6 330.4-505 300-505C269.6-505 245-529.6 245-560C245-590.4 269.6-615 300-615C330.4-615 355-590.4 355-560ZM535-560C535-529.6 510.4-505 480-505C449.6-505 425-529.6 425-560C425-590.4 449.6-615 480-615C510.4-615 535-590.4 535-560ZM715-560C715-529.6 690.4-505 660-505C629.6-505 605-529.6 605-560C605-590.4 629.6-615 660-615C690.4-615 715-590.4 715-560ZM355-400C355-369.6 330.4-345 300-345C269.6-345 245-369.6 245-400C245-430.4 269.6-455 300-455C330.4-455 355-430.4 355-400ZM535-400C535-369.6 510.4-345 480-345C449.6-345 425-369.6 425-400C425-430.4 449.6-455 480-455C510.4-455 535-430.4 535-400ZM715-400C715-369.6 690.4-345 660-345C629.6-345 605-369.6 605-400C605-430.4 629.6-455 660-455C690.4-455 715-430.4 715-400Z",
 )
 
 const _SVG_TOKEN = r"[A-Za-z]|[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?"
@@ -133,6 +137,10 @@ function _svg_path(d::AbstractString; grid::Real = 960)
             if last(commands) isa MoveTo
                 pop!(commands)
             else
+                # An explicit line back to the start: Makie's bounding box of a path, which
+                # scales the marker, misses the start of a subpath that is only reached by
+                # `ClosePath`, e.g. the tip of an arrow head drawn from its tip
+                cur == start || push!(commands, LineTo(tf(start)))
                 push!(commands, ClosePath())
             end
             cur = start
