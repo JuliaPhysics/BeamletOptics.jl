@@ -47,5 +47,20 @@
         gui = live_view(System([RoundPlanoMirror(25e-3, 5e-3), Detector(5e-3)]),
             GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], 1e-6, 0.5e-3))
         close(gui)
+
+        # The app layout: toolbar, object tree (selection, eye, expander), slider and dock
+        pd = Detector(5e-3)
+        zrotate3d!(pd, -π / 2)
+        translate3d!(pd, [0.1, 0.1, 0])
+        gui = live_view(System([ObjectGroup([RoundPlanoMirror(25e-3, 5e-3)]), pd]),
+            Beam([0.0, 0, 0], [0.0, 1, 0]); layout = :app, trace_budget = Inf,
+            sliders = ["a" => (0:0.5:1, v -> nothing)], clip_planes = [[0, 0.1, 0] => [0, 0, 1]])
+        tree = gui.layout.tree
+        tree.clicked[] = pd
+        tree.eye_clicked[] = pd
+        tree.expand_clicked[] = first(gui.controls.movable)
+        gui.show_all_button.clicks[] += 1
+        gui.orthographic_toggle.active[] = true
+        close(gui)
     end
 end

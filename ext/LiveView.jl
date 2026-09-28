@@ -126,7 +126,10 @@ and optionally, with defaults for any layout,
   collapsing; its listeners belong in `gui.controls.listeners`
 - hooks called by the shared logic: `_on_solved!(gui)` after a solve is shown,
   `_on_selected!(gui)` after the selection changed, `_on_clipping!(gui)` after clipping was
-  switched
+  switched, `_on_clip_planes_changed!(gui)` after a clip plane was added or removed and
+  `_on_hidden!(gui)` after objects were hidden or shown
+- `_clip_plane_label(gui)`: the label of a new clip plane (`"Clip plane"`), and
+  `_show_hint(gui)`: how a hidden object is shown again, for the status line
 - slots for additional parts: `_add_toolbar_entry!(gui, group)`, `_add_sidebar_section!(gui,
   side, title)` and `_add_dock_panel!(gui, title)`, which return the `GridPosition` or
   `GridLayout` to place widgets in, see `AppLayout`
@@ -1386,8 +1389,9 @@ function _add_clip_plane!(gui::LiveView, point, normal; select::Bool = true)
     push!(ctrl.movable, plane)
     ctrl.init_poses[plane] = _pose(plane)
     push!(gui.clip_planes, plane)
-    haskey(gui.labels, plane) || (gui.labels[plane] = "Clip plane")
+    haskey(gui.labels, plane) || (gui.labels[plane] = _clip_plane_label(gui))
     _apply_clip_planes!(gui)
+    _on_clip_planes_changed!(gui)
     if select
         ctrl.selected[] = plane
         _update_selection_box!(ctrl)
@@ -1427,6 +1431,7 @@ function _remove_clip_plane!(gui::LiveView, plane::LiveClipPlane)
     delete!(gui.labels, plane)
     _apply_clip_planes!(gui)
     gui.status.text[] = "clip plane removed"
+    _on_clip_planes_changed!(gui)
     return nothing
 end
 
@@ -1706,12 +1711,22 @@ option `0`, i.e. no selection, is set by `_on_select!` and ignored.
 """
 function _on_menu_select!(gui::LiveView, i)
     1 <= i <= length(gui.menu_objects) || return nothing
+    _select!(gui, gui.menu_objects[i])
+    return nothing
+end
+
+"""
+    _select!(gui, obj)
+
+Selects the movable `obj` like a click in the 3D view, e.g. from the component menu or the object
+tree, and shows its pose in the status line. Nothing is selected in the spectator mode.
+"""
+function _select!(gui::LiveView, obj)
     ctrl = gui.controls
-    obj = gui.menu_objects[i]
     ctrl.selected[] === obj && return nothing
     if ctrl.spectator[]
         gui.status.text[] = "spectator mode, press v to select components"
-        gui.menu.i_selected[] = 0
+        _show_menu_selection!(gui.menu, 0)
         return nothing
     end
     ctrl.selected[] = obj
@@ -1815,38 +1830,50 @@ function _connect_sources!(gui::LiveView)
 end
 
 """
-    _toggle_hidden!(gui)
+    _toggle_hidden!(gui[, obj])
 
-Hides the selected object of the `gui`, i.e. makes its plots invisible and clears the selection,
-or shows it again if it is hidden. A hidden object can not be selected in the 3D view, but it
-stays in the systems.
+Hides `obj` (by default the selected object of the `gui`), i.e. makes the plots of its rendered
+objects invisible, or shows it again if all of them are hidden. A hidden selection is cleared. A
+hidden object can not be selected in the 3D view, but it stays in the systems.
 """
-function _toggle_hidden!(gui::LiveView)
+_toggle_hidden!(gui::LiveView) = _toggle_hidden!(gui, gui.controls.selected[])
+
+function _toggle_hidden!(gui::LiveView, ::Nothing)
+    gui.status.text[] = "select a component to hide it"
+    return nothing
+end
+
+function _toggle_hidden!(gui::LiveView, ::LiveClipPlane)
+    gui.status.text[] = "clip planes can not be hidden, press c to switch clipping off"
+    return nothing
+end
+
+function _toggle_hidden!(gui::LiveView, obj)
     ctrl = gui.controls
-    obj = ctrl.selected[]
-    if isnothing(obj)
-        gui.status.text[] = "select a component to hide it"
-        return nothing
-    elseif obj isa LiveClipPlane
-        gui.status.text[] = "clip planes can not be hidden, press c to switch clipping off"
-        return nothing
-    end
     hide = !all(leaf -> leaf in gui.hidden, _leaves(obj))
     _set_hidden!(gui, obj, hide)
     if hide
-        ctrl.selected[] = nothing
-        _update_selection_box!(ctrl)
-        gui.status.text[] = "$(_label(gui, obj)) hidden, select it in the menu to show it again"
+        sel = ctrl.selected[]
+        if !isnothing(sel) && all(leaf -> leaf in gui.hidden, _leaves(sel))
+            ctrl.selected[] = nothing
+            _update_selection_box!(ctrl)
+        end
+        gui.status.text[] = "$(_label(gui, obj)) hidden, $(_show_hint(gui))"
     else
         gui.status.text[] = "$(_label(gui, obj)) shown"
     end
+    _on_hidden!(gui)
     return nothing
 end
+
+"""Returns how a hidden object of the `gui` is shown again, for the status line."""
+_show_hint(::LiveView) = "select it in the menu to show it again"
 
 """Shows all hidden objects of the `gui`."""
 function _show_all!(gui::LiveView)
     foreach(leaf -> _set_hidden!(gui, leaf, false), collect(gui.hidden))
     gui.status.text[] = "all components shown"
+    _on_hidden!(gui)
     return nothing
 end
 
@@ -2647,17 +2674,23 @@ The key `g` zooms to the selection, see "Camera tools".
 With `layout = :app`, the same live view is arranged as an application window, all keys and mouse
 actions in the 3D view are unchanged:
 
-- toolbar: trace and auto trace, home, fit (`g`), views, save view, orthographic, clipping (`c`),
-  clip beams, sources (`1`), measure, export, the toggles of the sidebars and the dock, help (`h`)
-- left sidebar: the objects and, below them, the sliders ("Parameters")
-- right sidebar ("Properties"): the selected object, the pose boxes, the step box, the mode and
-  the hide buttons
+- toolbar (icons with tooltips): trace and auto trace, home, fit (`g`), views, save view,
+  orthographic, clipping (`c`), clip beams, sources (`1`), measure, export, the toggles of the
+  sidebars and the dock, help (`h`)
+- left sidebar: the object tree and, below it, the sliders ("Parameters"). The tree lists each
+  system with its objects (groups with their objects, collapsed by default), then the sources and
+  the clip planes. A click on a name selects the object like a click in the 3D view, and a
+  selection in the 3D view highlights its row. The eye hides or shows an object, a group or a
+  whole system, the eye in the title of the tree shows all objects again. Objects without a
+  `labels` entry are named by their type and a running index, e.g. "Lens 2", also in the status
+  line.
+- right sidebar ("Properties"): the selected object, the pose boxes, the step box and the mode
 - analysis dock below the 3D view: the detector panels
 - status bar: the status line and the duration of the last solve, the number of rays and the
   projection
 
 The sidebars and the dock can be collapsed via the toolbar, the 3D view then takes their space.
-The component menu of the compact layout is not shown. In the compact layout, the widgets are at
+The component menu and the hide buttons of the compact layout are replaced by the tree. In the compact layout, the widgets are at
 fixed positions of `gui.fig`, e.g. the detector panels in `gui.fig[1, 2]`, next to which users
 may add their own axes.
 
@@ -2864,6 +2897,9 @@ _connect_layout!(::LiveView) = nothing
 _on_solved!(::LiveView) = nothing
 _on_selected!(::LiveView) = nothing
 _on_clipping!(::LiveView) = nothing
+_on_clip_planes_changed!(::LiveView) = nothing
+_on_hidden!(::LiveView) = nothing
+_clip_plane_label(::LiveView) = "Clip plane"
 
 function _slot_error(gui::LiveView, what)
     throw(ArgumentError("the $(nameof(typeof(gui.layout))) of this live view has no $what"))
