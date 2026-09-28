@@ -441,6 +441,123 @@ const BMO = BeamletOptics
         close(gui)
     end
 
+    @testset "long solves in the background" begin
+        m, pd = _fixture()
+        src = CollimatedSource([0.0, 0, 0], [0.0, 1, 0], 2e-3, 1e-6; num_rings = 2, num_rays = 40)
+        gui_ref = Ref{Any}(nothing)
+        gui = _live_view(System([m, pd]), src; throttle = false, mode = :move,
+            progress_delay = 0.2, pick = ax -> (gui_ref[].controls.h.handles[1].plots[1], 0))
+        gui_ref[] = gui
+        scene = gui.ax.scene
+        tick!() = notify(events(scene).tick)
+        waitfor(f) = timedwait(f, 10.0; pollint = 0.005) === :ok
+        # A job with one loop of `n` items, each released by the test via `gate`; a cancelled job
+        # reaches its next tick without waiting
+        gate = Channel{Nothing}(100)
+        applied = Ref(0)
+        anchor = Point3f(0.1, 0.2, 0.3)
+        function slow_job(n = 10)
+            sink = BMO._ProgressSink()
+            done = Base.Event()
+            task = Threads.@spawn try
+                Base.ScopedValues.with(BMO._PROGRESS_SINK => sink) do
+                    BMO._with_progress(true, n, "Tracing beams: ") do p
+                        for _ in 1:n
+                            while !isready(gate) && !sink.cancel[]
+                                sleep(0.001)
+                            end
+                            isready(gate) && take!(gate)
+                            BMO._tick!(p)
+                        end
+                    end
+                end
+            finally
+                notify(done)
+            end
+            return Ext._SolveJob(task, done, [sink], [anchor], r -> (applied[] += 1), nothing,
+                :solve_time, time(), (; k = 0, t0 = NaN, t = NaN, count = 0))
+        end
+        items(job) = something(BMO._progress_state(job.sinks[1]), (; count = -1)).count
+
+        job = slow_job()
+        # no window while the loop has run shorter than `progress_delay`
+        @test waitfor(() -> items(job) == 0)
+        Ext._poll!(gui, job)
+        @test !gui.progress.visible[]
+        # A solve longer than `progress_delay` continues in the background, where its loop, which
+        # has run that long, shows its window at once
+        @test !Ext._run!(gui, job, "tracing, Esc cancels")
+        @test gui.job === job
+        @test gui.status.text[] == "tracing, Esc cancels"
+        tick!()
+        @test gui.progress.visible[]
+        @test gui.progress.anchor[] == Ext._screen_anchor(scene, anchor)
+        @test gui.progress.label[] == "Tracing beams 0 %"
+        # the remaining time follows from the rate since the window appeared
+        foreach(_ -> put!(gate, nothing), 1:3)
+        @test waitfor(() -> items(job) == 3)
+        tick!()
+        @test startswith(gui.progress.label[], "Tracing beams 30 % · ")
+        foreach(_ -> put!(gate, nothing), 1:7)
+        @test waitfor(() -> istaskdone(job.task))
+        tick!()
+        @test applied[] == 1
+        @test isnothing(gui.job)
+        @test !gui.progress.visible[]
+        @test gui.status.text[] == "traced"
+
+        # `t` starts no second solve, Esc cancels after the current item
+        job = slow_job()
+        @test !Ext._run!(gui, job, "tracing, Esc cancels")
+        _key!(gui, Keyboard.t)
+        @test gui.job === job
+        _key!(gui, Keyboard.escape)
+        @test isnothing(gui.job)
+        @test istaskfailed(job.task)
+        @test BMO._is_cancelled(TaskFailedException(job.task))
+        @test applied[] == 1
+        @test gui.stale
+        @test startswith(gui.status.text[], "trace cancelled")
+        # the elapsed time counts as the duration of the solve
+        @test gui.solve_time >= 0.15
+
+        # a change of an object cancels the solve before the object moves
+        _select!(gui)
+        @test gui.controls.selected[] === m
+        job = slow_job()
+        @test !Ext._run!(gui, job, "tracing, Esc cancels")
+        hook = gui.controls.before_change
+        done_before_change = Ref(false)
+        gui.controls.before_change = () -> (hook(); done_before_change[] = istaskdone(job.task))
+        P0 = Vector(position(m))
+        _key!(gui, Keyboard.up)
+        @test done_before_change[]
+        @test Vector(position(m)) != P0
+        @test gui.job !== job
+        gui.controls.before_change = hook
+        @test waitfor(() -> (tick!(); !Ext._running(gui)))
+
+        # a real solve: the sinks trace the source, then compute the field of the panel, and the
+        # result is shown once the job is done (at once or in the background)
+        job = Ext._start_job(gui, r -> nothing, nothing, gui.pairs, gui.beam_handles;
+            timing = :solve_time)
+        r = fetch(job.task)
+        @test job.anchors == [Point3f(position(src)), Point3f(position(pd))]
+        @test length(r.fields) == 1
+        gui.progress_delay = 0.0
+        Ext._trace!(gui)
+        @test waitfor(() -> (tick!(); !Ext._running(gui)))
+        @test !gui.stale
+        @test occursin("Detector 1", gui.panels[1].ax.title[])
+        close(gui)
+
+        @test Ext._progress_label((; desc = "Tracing beams", count = 42, n = 100, t0 = 0.0),
+            (; k = 1, t0 = 0.0, t = 1.0, count = 0), 2.0) == "Tracing beams 42 % · 1 s"
+        @test Ext._progress_label((; desc = "Detector field", count = 0, n = 10, t0 = 0.0),
+            (; k = 1, t0 = 0.0, t = 1.0, count = 0), 2.0) == "Detector field 0 %"
+        @test Ext._duration_string(125) == "2:05"
+    end
+
     @testset "panel power matches optical_power" begin
         m, pd = _fixture()
         # small area and coarse grid, such that the edges contribute to the integral

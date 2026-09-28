@@ -85,6 +85,10 @@ the mouse and keyboard (`kinematic_controls!`, `h` shows all controls), the syst
 after each change and detector panels update live. `export_changes(gui)` prints the changed poses
 as Julia code. Needs an interactive display; not for headless scripts.
 
+Solves longer than `progress_delay` (kwarg, default 0.5 s) run in the background: the window stays
+usable and a small progress window appears next to the source being traced or the detector whose
+field is computed. Moving a component or pressing `Esc` cancels the solve.
+
 ## Detector data plots
 
 ```julia

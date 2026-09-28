@@ -470,6 +470,9 @@ moving, such that large groups stay interactive. `preview = false` always solves
 gui = live_view(system, source; beam_kwargs = Dict(source => (; render_every = 50)), preview = false)
 ```
 
+Solves longer than `progress_delay` run in the background with a progress window next to the
+source or detector, see "Long solves" in the docstring of [`live_view`](@ref).
+
 ### Component menu and pose inspector
 
 The row below the status line holds a component menu, two buttons to hide components and the pose

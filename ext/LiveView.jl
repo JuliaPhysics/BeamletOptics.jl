@@ -57,6 +57,38 @@ end
 Base.show(io::IO, p::DetectorPanel) = print(io, "DetectorPanel(", p.name, ", mode = ", p.mode, ")")
 
 """
+    _SolveJob
+
+A solve of the systems (or a computation of the detector fields) of a `LiveView` in a background
+task, see `_solve!` and `_run!`.
+
+# Fields
+
+- `task`: runs `_compute` and returns its result
+- `done`: notified when `task` ends (or the wait of `_run!` times out)
+- `sinks`: the progress outputs of `task`, see `BMO._ProgressSink`: one per source, then one per
+  detector panel
+- `anchors`: the position of the progress window of each sink, i.e. of its source or detector
+- `apply`: shows the result of `task` in the live view, called on the render task
+- `obj`: the moved object, or `nothing`
+- `timing`: the duration field of the live view (e.g. `:solve_time`) that a cancelled job updates
+- `t0`: `time()` at the start
+- `shown`: the loop whose progress window is shown, `(; k, t0, t, count)`: the index of its sink,
+  its start and the time and count when its window appeared (`k = 0` before the first window)
+"""
+mutable struct _SolveJob
+    task::Task
+    done::Base.Event
+    sinks::Vector{BMO._ProgressSink}
+    anchors::Vector{Point3f}
+    apply::Function
+    obj::Any
+    timing::Symbol
+    t0::Float64
+    shown::@NamedTuple{k::Int, t0::Float64, t::Float64, count::Int}
+end
+
+"""
     LiveView
 
 Interactive window returned by [`live_view`](@ref). The `Figure` is stored in `fig`, the `LScene`
@@ -79,7 +111,8 @@ The `pose_boxes` of the pose inspector show and set the position `x`, `y`, `z` [
 selected object and rotate it about the red, green and blue axes of the controls [mrad].
 
 While moving, beam groups are solved only for their rendered beams if `preview_enabled`, `preview`
-is `true` until the full solve. A click on a beam stores the inspected point in `inspection`, the
+is `true` until the full solve. A solve that takes longer than `trace_budget` continues in the
+background as `job`, the `progress` window shows its loops after `progress_delay` [s]. A click on a beam stores the inspected point in `inspection`, the
 `measure_toggle` switches measuring on, the result is stored in `measurement`. The `home_button`
 restores the `home` view, the `views_menu` sets one of the saved `views`, which the
 `save_view_button` extends.
@@ -167,6 +200,11 @@ mutable struct LiveView
     camera_animation::Any
     # markers of the movable sources, shown or hidden via the toggle or the key `1`
     sources_toggle::Toggle
+    # solve in a background task, see `_solve!`, its progress window and the delay [s] after which
+    # the window of a loop appears
+    job::Union{Nothing, _SolveJob}
+    progress::_ProgressOverlay
+    progress_delay::Float64
 end
 
 """
@@ -200,6 +238,7 @@ function Base.show(io::IO, gui::LiveView)
 end
 
 function Base.close(gui::LiveView)
+    _cancel_solve!(gui)
     close(gui.controls)
     isnothing(gui.view_cube) || close(gui.view_cube)
     return nothing
@@ -507,8 +546,46 @@ function _update_profiles!(p::DetectorPanel, x, z, I, m)
     return nothing
 end
 
-function _update_intensity!(p::DetectorPanel, h; coarse = false, preview = false, record = true)
-    x, z, I = BMO.intensity(p.pd; merge(p.kwargs, (; n = _panel_n(p, coarse)))...)
+"""Marks a panel whose hits are shown as a spot diagram, see `_panel_field`."""
+struct _SpotField end
+
+"""
+    _panel_field(p::DetectorPanel, coarse::Bool)
+
+Computes what the panel `p` shows after a solve, without changing any plot, such that it can run
+in a background task (see `_solve!`): `nothing` without hits, `_SpotField()` for a spot diagram,
+the intensity `(x, z, I)` on the grid of the panel (coarse: see `_panel_n`), or the exception of a
+failed computation, which `_update_panel!` reports. A cancelled solve is rethrown, see
+`BMO._is_cancelled`.
+"""
+function _panel_field(p::DetectorPanel, coarse::Bool)
+    try
+        h = BMO.hits(p.pd)
+        isnothing(h) && return nothing
+        _resolve_mode(p.mode, h) == :intensity || return _SpotField()
+        return _intensity_field(p, h, coarse)
+    catch e
+        BMO._is_cancelled(e) && rethrow()
+        return e
+    end
+end
+
+_intensity_field(p::DetectorPanel, _, coarse::Bool) =
+    BMO.intensity(p.pd; merge(p.kwargs, (; n = _panel_n(p, coarse)))...)
+
+# In the auto mode, the spot diagram is shown if the field of the hits can not be evaluated
+function _intensity_field(p::DetectorPanel, h::AbstractVector{<:BMO.AstigmaticGaussianBeamletHit},
+        coarse::Bool)
+    try
+        return invoke(_intensity_field, Tuple{DetectorPanel, Any, Bool}, p, h, coarse)
+    catch e
+        (BMO._is_cancelled(e) || p.mode != :auto) && rethrow()
+        return _SpotField()
+    end
+end
+
+function _update_intensity!(p::DetectorPanel, h, (x, z, I); coarse = false, preview = false,
+        record = true)
     # The plot is updated lazily, hence the grid size may change
     p.heat_x[] = Float32.(1e3 .* x)
     p.heat_y[] = Float32.(1e3 .* z)
@@ -532,33 +609,16 @@ function _update_intensity!(p::DetectorPanel, h; coarse = false, preview = false
 end
 
 """
-    _update_panel!(p; coarse = false, preview = false, record = true)
+    _update_panel!(p[, field]; coarse = false, preview = false, record = true)
 
-Updates the plots, the title and the metrics of the panel `p` after the systems have been solved.
-`coarse` computes the intensity on a coarse grid, `preview` marks the title after a preview solve,
-see `_resolve!`. `record` adds the metrics to the history of the panel.
+Updates the plots, the title and the metrics of the panel `p` after the systems have been solved,
+with the `field` computed by `_panel_field` (computed here if not given). `coarse` computes the
+intensity on a coarse grid, `preview` marks the title after a preview solve, see `_resolve!`.
+`record` adds the metrics to the history of the panel.
 """
-function _update_panel!(p::DetectorPanel; coarse = false, preview = false, record = true)
+function _update_panel!(p::DetectorPanel, field; coarse = false, preview = false, record = true)
     try
-        h = BMO.hits(p.pd)
-        if isnothing(h)
-            _clear_panel!(p)
-            p.ax.title[] = "$(p.name): no hits" * (preview ? " (preview)" : "")
-        else
-            mode = _resolve_mode(p.mode, h)
-            if mode == :intensity && p.mode == :auto && h isa AbstractVector{<:BMO.AstigmaticGaussianBeamletHit}
-                # Fall back to the spot diagram if the field of the hits can not be evaluated
-                try
-                    _update_intensity!(p, h; coarse, preview, record)
-                catch
-                    _update_spot!(p, h; preview, record)
-                end
-            elseif mode == :intensity
-                _update_intensity!(p, h; coarse, preview, record)
-            else
-                _update_spot!(p, h; preview, record)
-            end
-        end
+        _show_field!(p, field, BMO.hits(p.pd); coarse, preview, record)
         p.last_error = nothing
     catch e
         p.last_error = _log_once(e, p.last_error, "update of the panel \"$(p.name)\"")
@@ -566,6 +626,20 @@ function _update_panel!(p::DetectorPanel; coarse = false, preview = false, recor
     end
     return nothing
 end
+
+_update_panel!(p::DetectorPanel; coarse = false, kwargs...) =
+    _update_panel!(p, _panel_field(p, coarse); coarse, kwargs...)
+
+function _show_field!(p::DetectorPanel, ::Nothing, _; preview, _...)
+    _clear_panel!(p)
+    p.ax.title[] = "$(p.name): no hits" * (preview ? " (preview)" : "")
+    return nothing
+end
+
+_show_field!(p::DetectorPanel, ::_SpotField, h; preview, record, _...) =
+    _update_spot!(p, h; preview, record)
+_show_field!(p::DetectorPanel, field::Tuple, h; kwargs...) = _update_intensity!(p, h, field; kwargs...)
+_show_field!(::DetectorPanel, e::Exception, _; _...) = throw(e)
 
 """Formats the position of `obj` in mm."""
 function _position_string(obj)
@@ -632,40 +706,67 @@ function _solve_preview!(system, bg::BMO.AbstractBeamGroup, k::Int)
 end
 
 """
-    _resolve!(gui::LiveView, obj; coarse = false, preview = false)
+    _compute(pairs, handles, panels, sinks; coarse = false, preview = false)
 
-Empties all `Detector`s, solves all systems and updates the beams, detector panels and the status
-line of the `gui`. The user `on_change` is called with the moved `obj`, or `nothing`.
+Empties all `Detector`s of the systems of the `pairs`, solves the systems and computes the fields
+of the detector `panels` (see `_panel_field`), without changing any plot, such that it can run in
+a background task, see `_solve!`. `handles` are the render handles of the beams of the `pairs`.
+Each source is traced, and each field computed, with its progress output `sinks[k]` (see
+`BMO._PROGRESS_SINK`, `nothing` for the terminal): first one per pair, then one per panel.
 
 With `preview`, beam groups rendered with `render_every > 1` are solved only for their rendered
-beams, see `_solve_preview!`, the titles of the detector panels are marked with "(preview)" and
-`gui.preview` is set, such that the full solve follows once the movement pauses, see `_on_idle!`.
-`on_change` is only called after full solves, the metrics of a preview are not recorded in the
-history of the panels.
+beams, see `_solve_preview!`. Returns `(; previewed, fields, solve_time, field_time)`: whether a
+beam group was solved as a preview, the fields of the panels and the durations [s].
 """
-function _resolve!(gui::LiveView, obj; coarse = false, preview = false)
-    # A detector can be part of several systems, hence empty all before solving
+function _compute(pairs, handles, panels, sinks; coarse = false, preview = false)
     # Monotonic clock with ns resolution, time() is too coarse on Windows for fast solves
     t0 = time_ns()
-    foreach(empty!, _find_detectors(first.(gui.pairs)))
-    previewed = false
-    for (i, (sys, beam)) in enumerate(gui.pairs)
-        h = gui.beam_handles[i]
-        if preview && _previewable(beam, h)
-            _solve_preview!(sys, beam, _render_every(h))
-            previewed = true
-        else
-            solve_system!(sys, beam)
+    # A detector can be part of several systems, hence empty all before solving
+    foreach(empty!, _find_detectors(first.(pairs)))
+    previewed = preview && any(i -> _previewable(pairs[i].second, handles[i]), eachindex(pairs))
+    for (i, (sys, beam)) in enumerate(pairs)
+        h = handles[i]
+        Base.ScopedValues.with(BMO._PROGRESS_SINK => sinks[i]) do
+            if preview && _previewable(beam, h)
+                _solve_preview!(sys, beam, _render_every(h))
+            else
+                solve_system!(sys, beam)
+            end
         end
-        update_render!(h)
     end
     t1 = time_ns()
-    foreach(p -> _update_panel!(p; coarse, preview = previewed, record = !previewed), gui.panels)
+    n = length(pairs)
+    fields = Any[Base.ScopedValues.with(() -> _panel_field(p, coarse), BMO._PROGRESS_SINK => sinks[n + k])
+                 for (k, p) in enumerate(panels)]
+    return (; previewed, fields, solve_time = 1e-9 * (t1 - t0), field_time = 1e-9 * (time_ns() - t1))
+end
+
+"""
+    _apply!(gui, r, obj; coarse = false)
+
+Shows the result `r` of `_compute` in the `gui`: updates the beams, the detector panels, the
+durations of the adaptive tracing and the status line, and calls the user `on_change` with the
+moved `obj` (or `nothing`) after a full solve.
+
+After a preview (see `_compute`), the titles of the detector panels are marked with "(preview)"
+and `gui.preview` is set, such that the full solve follows once the movement pauses, see
+`_on_idle!`. `on_change` is only called after full solves, the metrics of a preview are not
+recorded in the history of the panels.
+"""
+function _apply!(gui::LiveView, r, obj; coarse = false)
+    t0 = time_ns()
+    foreach(update_render!, gui.beam_handles)
+    t1 = time_ns()
+    previewed = r.previewed
+    for (p, field) in zip(gui.panels, r.fields)
+        _update_panel!(p, field; coarse, preview = previewed, record = !previewed)
+    end
+    solve_time = r.solve_time + 1e-9 * (t1 - t0)
     if previewed
-        gui.preview_time = 1e-9 * (t1 - t0)
+        gui.preview_time = solve_time
     else
-        gui.solve_time = 1e-9 * (t1 - t0)
-        coarse || (gui.panel_time = 1e-9 * (time_ns() - t1))
+        gui.solve_time = solve_time
+        coarse || (gui.panel_time = r.field_time + 1e-9 * (time_ns() - t1))
     end
     gui.coarse = coarse
     gui.preview = previewed
@@ -680,6 +781,215 @@ function _resolve!(gui::LiveView, obj; coarse = false, preview = false)
     end
     isnothing(obj) || (gui.status.text[] = _pose_string(gui, obj))
     return nothing
+end
+
+"""
+    _resolve!(gui::LiveView, obj; coarse = false, preview = false)
+
+Empties all `Detector`s, solves all systems and updates the beams, detector panels and the status
+line of the `gui`, see `_compute` and `_apply!`. The user `on_change` is called with the moved
+`obj`, or `nothing`. Unlike `_solve!`, it returns only after the solve, which runs on the calling
+task; a solve of the `gui` in the background is cancelled first.
+"""
+function _resolve!(gui::LiveView, obj; coarse = false, preview = false)
+    _cancel_solve!(gui)
+    sinks = fill(nothing, length(gui.pairs) + length(gui.panels))
+    r = _compute(gui.pairs, gui.beam_handles, gui.panels, sinks; coarse, preview)
+    _apply!(gui, r, obj; coarse)
+    return nothing
+end
+
+"""
+    _start_job(gui, apply, obj, pairs, handles; coarse = false, preview = false, timing) -> _SolveJob
+
+Starts `_compute` for the `pairs` (with the beam render `handles`) and the detector panels of the
+`gui` in a background task, with a progress sink per source and panel, see `_SolveJob`. `apply`
+shows the result, `timing` is the duration field that a cancelled job updates.
+"""
+function _start_job(gui::LiveView, apply, obj, pairs, handles; coarse = false, preview = false,
+        timing::Symbol)
+    # The task works on its own copies of the lists, the objects are protected by `_change!`
+    pairs, handles, panels = copy(pairs), copy(handles), copy(gui.panels)
+    sinks = [BMO._ProgressSink() for _ in 1:(length(pairs) + length(panels))]
+    anchors = Point3f[_progress_anchor.(last.(pairs)); _progress_anchor.(getfield.(panels, :pd))]
+    done = Base.Event()
+    task = Threads.@spawn try
+        _compute(pairs, handles, panels, sinks; coarse, preview)
+    finally
+        notify(done)
+    end
+    return _SolveJob(task, done, sinks, anchors, apply, obj, timing, time(),
+        (; k = 0, t0 = NaN, t = NaN, count = 0))
+end
+
+"""
+    _progress_anchor(x)
+
+Position of the progress window of the source or detector `x`, see `_SolveJob`. `NaN` for other
+types, e.g. custom sources without a position, whose window is shown at the bottom edge of the
+view, see `_screen_anchor`.
+"""
+_progress_anchor(x::Union{BMO.AbstractBeam, BMO.AbstractBeamGroup, BMO.AbstractObject}) =
+    Point3f(position(x))
+_progress_anchor(_) = Point3f(NaN)
+
+"""
+    _run!(gui, job, msg)
+
+Waits for the `job` at most `gui.progress_delay`: if it is done by then, its result is shown at
+once, see `_finish!`, and `true` is returned on success. Otherwise the job continues in the
+background as `gui.job` (shown once it is done, see `_poll_job!`), the status line shows `msg`
+and `false` is returned. Solves up to `progress_delay` thus behave as if they ran on the render
+task, only longer ones keep the window responsive and show their progress.
+"""
+function _run!(gui::LiveView, job::_SolveJob, msg::AbstractString)
+    _wait(job.done, gui.progress_delay)
+    istaskdone(job.task) && return _finish!(gui, job)
+    gui.job = job
+    gui.status.text[] = msg
+    return false
+end
+
+"""Waits for the event `done`, at most `timeout` [s]."""
+function _wait(done::Base.Event, timeout::Real)
+    isfinite(timeout) || return wait(done)
+    timer = Timer(_ -> notify(done), max(timeout, 0.0))
+    wait(done)
+    close(timer)
+    return nothing
+end
+
+_running(gui::LiveView) = _running(gui.job)
+_running(::Nothing) = false
+_running(::_SolveJob) = true
+
+"""
+    _cancel_solve!(gui::LiveView)
+
+Cancels the solve of the `gui` that runs in the background, if any: its loops stop after their
+current item, see `BMO._ProgressSink`. Waits for the task, discards its result, marks the beams and
+detector panels as outdated and counts the elapsed time as the duration of the solve, such that
+further changes defer the solve until the movement pauses, see `_on_change!`. A deferred solve,
+preview or coarse panel is not completed afterwards, the next change or `t` solves again.
+"""
+_cancel_solve!(gui::LiveView) = _cancel!(gui, gui.job)
+_cancel!(::LiveView, ::Nothing) = nothing
+
+function _cancel!(gui::LiveView, job::_SolveJob)
+    foreach(s -> s.cancel[] = true, job.sinks)
+    try
+        wait(job.task)
+    catch
+        # cancelled or failed, the result is discarded either way
+    end
+    gui.job = nothing
+    _hide_progress!(gui.progress)
+    setproperty!(gui, job.timing, max(getproperty(gui, job.timing), time() - job.t0))
+    gui.pending = gui.preview = gui.coarse = false
+    _mark_stale!(gui, nothing; msg = _CANCELLED)
+    return nothing
+end
+
+const _CANCELLED = "trace cancelled, press t to trace"
+
+"""
+    _finish!(gui, job)
+
+Shows the result of the finished `job` in the `gui` via `job.apply`, and restores the appearance
+of the beams. If solving failed, the error is logged and the beams and detector panels are kept
+marked as outdated. Returns `true` on success.
+"""
+function _finish!(gui::LiveView, job::_SolveJob)
+    gui.job === job && (gui.job = nothing)
+    _hide_progress!(gui.progress)
+    try
+        job.apply(fetch(job.task))
+    catch e
+        _fail!(gui, e)
+        return false
+    end
+    _restore_beams!(gui)
+    gui.stale = false
+    return true
+end
+
+"""Marks the beams and detector panels of the `gui` as outdated after the solve failed with `e`."""
+function _fail!(gui::LiveView, e)
+    if BMO._is_cancelled(e)
+        _mark_stale!(gui, nothing; msg = _CANCELLED)
+        return nothing
+    end
+    gui.last_error = _log_once(_task_error(e), gui.last_error, "solving the systems")
+    gui.stale || _dim_beams!(gui)
+    gui.stale = true
+    gui.status.text[] = "solving the systems failed, see the log"
+    return nothing
+end
+
+_task_error(e::TaskFailedException) = _task_error(e.task.result)
+_task_error(e) = e
+
+"""
+    _poll_job!(gui::LiveView)
+
+Called every frame: shows the result of the solve of the `gui` in the background once it is done,
+see `_finish!`, and until then the progress window of its running loop, see `_show_loop!`.
+"""
+_poll_job!(gui::LiveView) = _poll!(gui, gui.job)
+_poll!(::LiveView, ::Nothing) = nothing
+
+function _poll!(gui::LiveView, job::_SolveJob)
+    if istaskdone(job.task)
+        _finish!(gui, job) && isnothing(job.obj) && (gui.status.text[] = "traced")
+        return nothing
+    end
+    shown = any(k -> _show_loop!(gui, job, k, BMO._progress_state(job.sinks[k])),
+        eachindex(job.sinks))
+    shown || _hide_progress!(gui.progress)
+    return nothing
+end
+
+"""
+    _show_loop!(gui, job, k, state)
+
+Shows the progress window of the loop of the sink `k` of the `job` with the `state` of
+`BMO._progress_state`, at the position of its source or detector, once the loop has run for
+`gui.progress_delay`, like the terminal bars after `get_progress_threshold()`. Returns `true` if
+the window is shown.
+"""
+_show_loop!(::LiveView, ::_SolveJob, ::Int, ::Nothing) = false
+
+function _show_loop!(gui::LiveView, job::_SolveJob, k::Int, state::NamedTuple)
+    t = time()
+    t - state.t0 >= gui.progress_delay || return false
+    s = job.shown
+    (s.k == k && s.t0 == state.t0) || (job.shown = s = (; k, state.t0, t, state.count))
+    _show_progress!(gui.progress, job.anchors[k], state.count / max(state.n, 1),
+        _progress_label(state, s, t))
+    return true
+end
+
+"""
+    _progress_label(state, shown, t)
+
+Label of the progress window of a loop with the `state` of `BMO._progress_state`, e.g.
+"Tracing beams 42 % · 3 s" with the remaining time. It uses the rate since the window appeared
+(`shown`, see `_SolveJob`), like the terminal bars, and is left out until that rate is known.
+"""
+function _progress_label(state, shown, t)
+    pct = floor(Int, 100 * state.count / max(state.n, 1))
+    label = "$(state.desc) $pct %"
+    done = state.count - shown.count
+    (done > 0 && t > shown.t) || return label
+    left = (state.n - state.count) * (t - shown.t) / done
+    return "$label · $(_duration_string(left))"
+end
+
+"""Formats the duration `s` [s] as e.g. `3 s` or `2:05` (minutes and seconds)."""
+function _duration_string(s::Real)
+    s < 59.5 && return "$(round(Int, s)) s"
+    m, r = divrem(round(Int, s), 60)
+    return "$m:$(lpad(r, 2, '0'))"
 end
 
 const _STALE_ALPHA = 0.3
@@ -717,25 +1027,36 @@ function _mark_stale!(gui::LiveView, obj; msg = "outdated, press t to trace")
 end
 
 """
-    _solve!(gui::LiveView, obj)
+    _solve!(gui::LiveView, obj; coarse = false, preview = false)
 
-Solves all systems of the `gui` via `_resolve!` and restores the appearance of the beams. If solving
-fails, the beams and detector panels are kept marked as outdated. Returns `true` on success.
+Solves all systems of the `gui` like `_resolve!`, but in a background task: a solve that takes
+longer than `progress_delay` continues in the background, with progress windows at the sources and
+detectors, while the window stays responsive, see `_run!`. A running solve is cancelled first.
+Afterwards the appearance of the beams is restored; if solving fails, the beams and detector
+panels are kept marked as outdated. Returns `true` if the solve succeeded without continuing in
+the background.
 """
 function _solve!(gui::LiveView, obj; coarse = false, preview = false)
+    _cancel_solve!(gui)
     gui.pending = false
-    try
-        _resolve!(gui, obj; coarse, preview)
-    catch e
-        gui.last_error = _log_once(e, gui.last_error, "solving the systems")
+    job = _start_job(gui, r -> _apply!(gui, r, obj; coarse), obj, gui.pairs, gui.beam_handles;
+        coarse, preview, timing = preview ? :preview_time : :solve_time)
+    done = _run!(gui, job, "tracing, Esc cancels")
+    if _running(gui)
+        # Outdated until the solve in the background is shown, see `_finish!`
         gui.stale || _dim_beams!(gui)
         gui.stale = true
-        gui.status.text[] = "solving the systems failed, see the log"
-        return false
     end
-    _restore_beams!(gui)
-    gui.stale = false
-    return true
+    return done
+end
+
+"""Shows the fields `r.fields` of the detector panels of the `gui`, which refine a coarse preview."""
+function _refine!(gui::LiveView, r)
+    for (p, field) in zip(gui.panels, r.fields)
+        _update_panel!(p, field; record = false)
+    end
+    gui.coarse = false
+    return nothing
 end
 
 """
@@ -763,24 +1084,30 @@ end
 
 """
 Solves deferred changes, completes a preview solve with a full solve and refines the preview of
-the detector panels once the movement pauses.
+the detector panels once the movement pauses and no solve runs in the background.
 """
 function _on_idle!(gui::LiveView)
     time() - gui.last_change > gui.idle_delay || return nothing
+    _running(gui) && return nothing
     if gui.pending && gui.auto_trace[]
         _solve!(gui, gui.pending_obj)
     elseif gui.preview
         # Also if auto tracing was switched off in the meantime, since the preview is incomplete
         _solve!(gui, gui.preview_obj)
     elseif gui.coarse
-        foreach(p -> _update_panel!(p; record = false), gui.panels)
-        gui.coarse = false
+        job = _start_job(gui, r -> _refine!(gui, r), gui.preview_obj, empty(gui.pairs),
+            empty(gui.beam_handles); timing = :panel_time)
+        _run!(gui, job, "computing the detector fields, Esc cancels")
     end
     return nothing
 end
 
-"""Solves all systems of the `gui` on request, with the currently selected object."""
+"""
+Solves all systems of the `gui` on request, with the currently selected object. Ignored while a
+solve runs in the background.
+"""
 function _trace!(gui::LiveView)
+    _running(gui) && return nothing
     obj = gui.controls.selected[]
     # A clip plane is not part of the systems
     obj isa LiveClipPlane && (obj = nothing)
@@ -788,21 +1115,36 @@ function _trace!(gui::LiveView)
     return nothing
 end
 
-"""Connects the trace button, the key `t` and the auto trace toggle of the `gui`."""
+"""
+Connects the trace button, the key `t`, the auto trace toggle and the key `Esc`, which cancels a
+solve in the background, of the `gui`.
+"""
 function _connect_trace!(gui::LiveView)
     listeners = gui.controls.listeners
+    scene = gui.ax.scene
     push!(listeners, on(_ -> _trace!(gui), gui.trace_button.clicks))
-    push!(listeners, on(events(gui.ax.scene).keyboardbutton, priority = 200) do event
+    push!(listeners, on(events(scene).keyboardbutton, priority = 200) do event
         (event.action == Keyboard.press && event.key == Keyboard.t) || return Consume(false)
         gui.controls.ignore_keys() && return Consume(false)
         _trace!(gui)
+        return Consume(true)
+    end)
+    # Before the beam inspection and the controls, which use Esc as well
+    push!(listeners, on(events(scene).keyboardbutton, priority = 202) do event
+        (event.action == Keyboard.press && event.key == Keyboard.escape) || return Consume(false)
+        (_running(gui) && !gui.controls.ignore_keys()) || return Consume(false)
+        _cancel_solve!(gui)
         return Consume(true)
     end)
     push!(listeners, on(gui.auto_trace) do active
         active && gui.stale && _trace!(gui)
         return nothing
     end)
-    push!(listeners, on(_ -> _on_idle!(gui), events(gui.ax.scene).tick))
+    push!(listeners, on(events(scene).tick) do _
+        _poll_job!(gui)
+        _on_idle!(gui)
+        return nothing
+    end)
     return nothing
 end
 
@@ -865,7 +1207,8 @@ function _connect_sliders!(gui::LiveView, callbacks)
         for i in sort!(collect(keys(pending)))
             v = pending[i]
             try
-                callbacks[i](v)
+                # The callbacks may change any object
+                _change!(() -> callbacks[i](v), gui.controls, nothing)
                 errors[i] = nothing
             catch e
                 errors[i] = _log_once(e, errors[i], "slider callback")
@@ -1012,7 +1355,7 @@ end
 function _flip_clip_plane!(gui::LiveView, plane::LiveClipPlane)
     ctrl = gui.controls
     P0, R0 = _pose(plane)
-    rotate3d!(plane, plane.dir[:, 1], π)
+    _change!(() -> rotate3d!(plane, plane.dir[:, 1], π), ctrl, plane)
     P1, R1 = _pose(plane)
     ctrl.last_key_step = nothing
     _push_history!(ctrl, plane, P0, R0, P1, R1)
@@ -1486,10 +1829,12 @@ function _apply_pose_input!(gui::LiveView, k::Int, s)
             _update_inspector!(gui; force = true)
             return nothing
         end
-        translate_to3d!(obj, P)
-        # `translate_to3d!` moves by `P - position`, which may round
-        r = P - Vector{Float64}(position(obj))
-        iszero(r) || translate3d!(obj, r)
+        _change!(ctrl, obj) do
+            translate_to3d!(obj, P)
+            # `translate_to3d!` moves by `P - position`, which may round
+            r = P - Vector{Float64}(position(obj))
+            iszero(r) || translate3d!(obj, r)
+        end
     else
         sym = _POSE_AXES[k - 3]
         if !(sym in _allowed_axes(ctrl, obj, :rotate))
@@ -1497,7 +1842,8 @@ function _apply_pose_input!(gui::LiveView, k::Int, s)
             _update_inspector!(gui; force = true)
             return nothing
         end
-        iszero(x) || rotate3d!(obj, only(_axis_vectors(ctrl, obj, (sym,))), x / 1e3)
+        iszero(x) || _change!(() -> rotate3d!(obj, only(_axis_vectors(ctrl, obj, (sym,))), x / 1e3),
+            ctrl, obj)
     end
     P1, R1 = _pose(obj)
     ctrl.last_key_step = nothing
@@ -1646,9 +1992,12 @@ projection is closest to the cursor within `_BEAM_PICK_RADIUS` pixels, or `nothi
 `(; point, direction, length, opl, w, R)`: the point closest to the camera ray through the cursor
 and the direction of its segment, the geometric and optical path length (Σ n·L) from the source
 [m], and for Gaussian beamlets the radius `w` and the curvature `R` of `gauss_parameters` at the
-point, otherwise `nothing`.
+point, otherwise `nothing`. While a solve runs in the background, which changes the beams, nothing
+is inspected.
 """
 function _inspect_beam(gui::LiveView)
+    # The beams are being traced by a solve in the background
+    _running(gui) && return nothing
     scene = gui.ax.scene
     cursor = _px(scene)
     origin, dir = _cursor_ray(scene)
@@ -1811,7 +2160,7 @@ end
 Camera tools
 =#
 
-const _CAMERA_HELP = "g: zoom to selection, click on a beam: inspect it"
+const _CAMERA_HELP = "g: zoom to selection, click on a beam: inspect it, esc: cancel a long trace"
 
 """
     _CameraAnimation
@@ -2129,6 +2478,16 @@ rendered beams while objects are moved, and the titles of the detector panels en
 `trace_budget` applies to the preview solve while moving. `on_change` is only called after full
 solves.
 
+# Long solves
+
+A solve, or the computation of the detector panels, that takes longer than `progress_delay` runs
+in the background: the camera can still be moved, the beams are dimmed and the status line shows
+"tracing". The loops that show a progress bar in the terminal, i.e. the tracing of a beam group
+and the field of a detector panel, show a small progress window in the 3D view next to their source
+or detector once they have run for `progress_delay`, with the remaining time; the terminal bar is
+not drawn meanwhile. Moving a component or a source, a slider and `Esc` cancel the solve after the
+current beam, `t` is ignored until it is done.
+
 # Manual tracing
 
 With `auto_trace = false`, the systems are not solved after each change, which is useful for
@@ -2221,6 +2580,8 @@ The key `g` zooms to the selection, see "Camera tools".
   "Adaptive tracing"
 - `views = []`: saved views of the "views" menu, a vector of `"name" => (eye, lookat, up)`, see
   "Camera tools"
+- `progress_delay = 0.5`: [s] duration after which a solve continues in the background and a loop
+  shows its progress window, see "Long solves"
 - all other kwargs are passed to [`kinematic_controls!`](@ref), e.g. `fine_step`, `plane_normal`
   or `rotation_axis`
 """
@@ -2246,6 +2607,7 @@ function live_view(
         edges::Union{Nothing, Bool} = nothing,
         preview::Bool = true,
         views = [],
+        progress_delay::Real = 0.5,
         kwargs...
     )
     isempty(pairs) && throw(ArgumentError("live_view requires at least one system => beam pair"))
@@ -2368,8 +2730,11 @@ function live_view(
         Any[first.(entries)...], hide_button, show_all_button, Base.IdSet{Any}(), pose_boxes,
         preview, false, nothing, 0.0, nothing, nothing, measure_toggle, Any[], nothing,
         AbstractPlot[], home_button, (zeros(3), zeros(3), zeros(3)), false, view_specs,
-        views_menu, save_view_button, nothing, sources_toggle)
+        views_menu, save_view_button, nothing, sources_toggle, nothing, _ProgressOverlay(ax),
+        Float64(progress_delay))
     gui_ref[] = gui
+    # Objects must not change while a solve in the background traces them
+    controls.before_change = () -> _cancel_solve!(gui)
     for (point, normal) in clip_specs
         _add_clip_plane!(gui, point, normal; select = false)
     end

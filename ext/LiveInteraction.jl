@@ -276,6 +276,8 @@ mutable struct KinematicController{H <: SystemRenderHandle}
     # called after each click (not a drag) with the selected object, or `nothing` for a click on the
     # background; if it returns `true` for the background, the selection is kept, see `live_view`
     on_click::Function
+    # called before each change of an object, see `_change!`
+    before_change::Function
 end
 
 function Base.show(io::IO, ctrl::KinematicController)
@@ -507,6 +509,22 @@ function _apply_update!(ctrl::KinematicController)
 end
 
 """
+    _change!(f, ctrl::KinematicController, obj)
+
+Changes `obj` by calling `f()` after the `before_change` hook of the `ctrl`, which e.g. stops a
+solve of the [`live_view`](@ref) that traces the objects in a background task. All changes of
+objects by the controls and the live view go through here, the callers do not stop solves
+themselves. Clip planes are not traced and change without the hook.
+"""
+function _change!(f, ctrl::KinematicController, obj)
+    ctrl.before_change()
+    f()
+    return nothing
+end
+
+_change!(f, ::KinematicController, ::LiveClipPlane) = (f(); nothing)
+
+"""
     _set_pose!(obj, P, R)
 
 Sets the pose of `obj` to position `P` and orientation `R`, by rotating around the axis-angle of
@@ -521,7 +539,7 @@ end
 
 function _reset_pose!(ctrl::KinematicController, obj)
     P0, R0 = ctrl.init_poses[obj]
-    _set_pose!(obj, P0, R0)
+    _change!(() -> _set_pose!(obj, P0, R0), ctrl, obj)
     return nothing
 end
 
@@ -575,7 +593,7 @@ function _undo!(ctrl::KinematicController)
     e = pop!(ctrl.undo_stack)
     push!(ctrl.redo_stack, e)
     ctrl.last_key_step = nothing
-    _set_pose!(e.obj, e.P0, e.R0)
+    _change!(() -> _set_pose!(e.obj, e.P0, e.R0), ctrl, e.obj)
     ctrl.selected[] === e.obj || (ctrl.selected[] = e.obj)
     _update_selection_box!(ctrl)
     _request_update!(ctrl)
@@ -593,7 +611,7 @@ function _redo!(ctrl::KinematicController)
     e = pop!(ctrl.redo_stack)
     push!(ctrl.undo_stack, e)
     ctrl.last_key_step = nothing
-    _set_pose!(e.obj, e.P1, e.R1)
+    _change!(() -> _set_pose!(e.obj, e.P1, e.R1), ctrl, e.obj)
     ctrl.selected[] === e.obj || (ctrl.selected[] = e.obj)
     _update_selection_box!(ctrl)
     _request_update!(ctrl)
@@ -623,10 +641,12 @@ function _key_step!(ctrl::KinematicController, obj, key, factor)
     end
     isnothing(axis) && return false
     axis_sym in _allowed_axes(ctrl, obj, ctrl.mode[]) || return true # locked: consumed, no motion
-    if ctrl.mode[] == :move
-        translate3d!(obj, (sign * factor * ctrl.fine_step) .* axis)
-    else
-        rotate3d!(obj, axis, sign * factor * ctrl.fine_angle)
+    _change!(ctrl, obj) do
+        if ctrl.mode[] == :move
+            translate3d!(obj, (sign * factor * ctrl.fine_step) .* axis)
+        else
+            rotate3d!(obj, axis, sign * factor * ctrl.fine_angle)
+        end
     end
     return true
 end
@@ -962,7 +982,8 @@ function kinematic_controls!(
         false, false, zeros(3), zeros(3), (0.0, 0.0), nothing, nothing, :none,
         nothing, _HistoryEntry[], _HistoryEntry[], nothing,
         box_obs, arrow_pos, arrow_dir, label_pos, ring_pts, arrow_color, label_color, ring_color,
-        gizmo_size, gizmo_visible, help_obs, show_help, "", plots, Any[], nothing, obj -> false
+        gizmo_size, gizmo_visible, help_obs, show_help, "", plots, Any[], nothing, obj -> false,
+        () -> nothing
     )
 
     # High priority, so that the camera does not receive events while an object is dragged
@@ -1085,7 +1106,7 @@ function kinematic_controls!(
                     A = hcat(_axis_vectors(ctrl, obj, allowed)...)
                     # Projection onto the allowed axes, which may be linearly dependent, e.g. if
                     # a local axis is parallel to the rotation axis
-                    translate3d!(obj, A * (pinv(A) * Δ))
+                    _change!(() -> translate3d!(obj, A * (pinv(A) * Δ)), ctrl, obj)
                     _request_update!(ctrl)
                 end
             end
@@ -1094,7 +1115,7 @@ function kinematic_controls!(
             dx = mp[1] - ctrl.last_mouse[1]
             ctrl.last_mouse = mp
             if dx != 0 && :v in _allowed_axes(ctrl, obj, :rotate)
-                rotate3d!(obj, ctrl.rotation_axis, ctrl.rotate_speed * dx)
+                _change!(() -> rotate3d!(obj, ctrl.rotation_axis, ctrl.rotate_speed * dx), ctrl, obj)
                 _request_update!(ctrl)
             end
         end

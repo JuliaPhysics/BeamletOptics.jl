@@ -1,34 +1,44 @@
+using Base.ScopedValues: ScopedValue
+
 """
-    _LazyProgress
+    _LazyProgress{O}
 
-Thread-safe progress counter for long loops. It draws a `ProgressMeter.Progress` bar only
-once the loop has run for `threshold` seconds, see [`get_progress_threshold`](@ref).
+Thread-safe progress counter for long loops. Where the progress goes depends on the output
+type `O`, see `_report!`:
 
-[`_tick!`](@ref) costs one atomic increment and one `time()` call per item. The bar is created
-lazily and redrawn at most every `dt` seconds by one thread at a time (`trylock`), so an
-invisible bar never contends for a lock. Use it through [`_with_progress`](@ref), which
-finishes the bar, or cancels it if the loop throws.
+- an `IO`: a `ProgressMeter.Progress` bar is drawn only once the loop has run for `threshold`
+  seconds, see [`get_progress_threshold`](@ref),
+- a `_ProgressSink`: nothing is drawn, the sink exposes the running loop to another task (e.g.
+  the live view) and can cancel it.
+
+[`_tick!`](@ref) costs one atomic increment plus the report of the output: one `time()` call
+for an `IO`, one atomic load of the cancel flag for a sink. The terminal bar is created lazily
+and redrawn at most every `dt` seconds by one thread at a time (`trylock`), so an invisible bar
+never contends for a lock. Use it through [`_with_progress`](@ref), which finishes the bar, or
+cancels it if the loop throws.
 
 # Fields
 
 - `n`: total number of items
 - `desc`: description printed in front of the bar
 - `enabled`: if `false`, [`_tick!`](@ref) returns after a single branch
-- `output`: stream the bar is drawn to
+- `output`: stream the bar is drawn to, or the `_ProgressSink` the loop reports to
 - `count`: number of finished items
 - `tnext`: earliest `time()` at which the bar is created or redrawn, `Inf` stops drawing
 - `dt`: minimum interval in s between redraws
+- `t0`: `time()` at which the counter was created, i.e. the loop started
 - `lock`: serializes creating, redrawing and stopping the bar
 - `bar`: the ProgressMeter bar, `nothing` until it is first drawn
 """
-mutable struct _LazyProgress
+mutable struct _LazyProgress{O}
     const n::Int
     const desc::String
     const enabled::Bool
-    const output::IO
+    const output::O
     const count::Threads.Atomic{Int}
     const tnext::Threads.Atomic{Float64}
     const dt::Float64
+    const t0::Float64
     const lock::Threads.SpinLock
     bar::Nullable{Progress}
 end
@@ -36,35 +46,99 @@ end
 """
     _LazyProgress(n, desc; enabled = true, output = stderr, threshold = get_progress_threshold(), dt = 0.2)
 
-Progress counter for `n` items that draws to `output` once `threshold` seconds have passed.
+Progress counter for `n` items that reports to `output`, an `IO` or a `_ProgressSink`. An `IO`
+is drawn to once `threshold` seconds have passed; a sink ignores `threshold` and `dt`.
 """
 function _LazyProgress(n::Integer, desc::AbstractString; enabled::Bool = true,
-        output::IO = stderr, threshold::Real = get_progress_threshold(), dt::Real = 0.2)
+        output = stderr, threshold::Real = get_progress_threshold(), dt::Real = 0.2)
+    t0 = time()
     return _LazyProgress(n, desc, enabled, output, Threads.Atomic{Int}(0),
-        Threads.Atomic{Float64}(time() + threshold), dt, Threads.SpinLock(), nothing)
+        Threads.Atomic{Float64}(t0 + threshold), Float64(dt), t0, Threads.SpinLock(), nothing)
 end
+
+"""
+    _ProgressCancelled()
+
+Thrown by [`_tick!`](@ref) inside a loop whose `_ProgressSink` was cancelled. Check caught
+exceptions with `_is_cancelled`, which also sees through the wrappers of `Threads.@threads`.
+"""
+struct _ProgressCancelled <: Exception end
+
+"""
+    _ProgressSink()
+
+Receiver of the progress of all [`_with_progress`](@ref) loops that run inside
+`with(_PROGRESS_SINK => sink) do … end`, including the tasks of `Threads.@threads` started
+there. Such loops draw no terminal bar. Another task reads the running loop with
+`_progress_state(sink)`, and cancels the loops by setting `sink.cancel[] = true`: the next
+[`_tick!`](@ref) then throws `_ProgressCancelled`, i.e. a loop stops after its current item.
+
+# Fields
+
+- `current`: the innermost running loop, `nothing` between loops (atomic)
+- `cancel`: cancel request, checked by every tick
+"""
+mutable struct _ProgressSink
+    @atomic current::Union{Nothing, _LazyProgress}
+    const cancel::Threads.Atomic{Bool}
+    _ProgressSink() = new(nothing, Threads.Atomic{Bool}(false))
+end
+
+"""
+    _PROGRESS_SINK
+
+Scoped `_ProgressSink` of the running code, `nothing` (terminal bars) by default. Set it with
+`Base.ScopedValues.with(_PROGRESS_SINK => sink) do … end`.
+"""
+const _PROGRESS_SINK = ScopedValue{Union{Nothing, _ProgressSink}}(nothing)
 
 """
     _LazyProgress(progress::Bool, n, desc)
 
-Progress counter for the `progress` keyword of a public function. It is enabled only if
-`progress` is `true` and `stderr` is a terminal (`Base.TTY`), so documentation builds, CI logs
-and piped output stay clean.
+Progress counter for the `progress` keyword of a public function. It reports to the scoped
+`_PROGRESS_SINK` if one is set, otherwise to `stderr`. It is enabled only if `progress` is
+`true` and the output can show it: a sink always, `stderr` only if it is a terminal
+(`Base.TTY`), so documentation builds, CI logs and piped output stay clean.
 """
 function _LazyProgress(progress::Bool, n::Integer, desc::AbstractString)
-    return _LazyProgress(n, desc; enabled = progress && stderr isa Base.TTY)
+    output = _progress_output(_PROGRESS_SINK[])
+    return _LazyProgress(n, desc; enabled = progress && _can_draw(output), output)
 end
+
+_progress_output(::Nothing) = stderr
+_progress_output(s::_ProgressSink) = s
+
+_can_draw(::Base.TTY) = true
+_can_draw(::IO) = false
+_can_draw(::_ProgressSink) = true
 
 """
     _tick!(p::_LazyProgress)
 
-Count one finished item. Safe to call from any thread.
+Count one finished item and report it to the output of `p`, see `_report!`. Safe to call from
+any thread. Throws `_ProgressCancelled` if `p` reports to a cancelled `_ProgressSink`.
 """
 @inline function _tick!(p::_LazyProgress)
     p.enabled || return nothing
     Threads.atomic_add!(p.count, 1)
+    return _report!(p.output, p)
+end
+
+"""
+    _report!(output::IO, p::_LazyProgress)
+    _report!(s::_ProgressSink, p::_LazyProgress)
+
+Report a tick of `p`. To an `IO`, the bar is drawn lazily (threshold and redraw interval of
+`p`). To a sink nothing is drawn; if the sink is cancelled, `_ProgressCancelled` is thrown.
+"""
+@inline function _report!(::IO, p::_LazyProgress)
     time() < p.tnext[] && return nothing
     return _draw!(p)
+end
+
+@inline function _report!(s::_ProgressSink, ::_LazyProgress)
+    s.cancel[] && throw(_ProgressCancelled())
+    return nothing
 end
 
 @noinline function _draw!(p::_LazyProgress)
@@ -95,13 +169,20 @@ Run `f(p)`, which calls [`_tick!`](@ref)`(p)` once per finished item, and return
 Afterwards the bar is completed. If `f` throws, e.g. an `InterruptException` from Ctrl-C, the
 bar is cancelled before the exception is rethrown, so no half-drawn bar is left behind. In both
 cases later ticks draw nothing.
+
+If `p` reports to a `_ProgressSink`, `p` is the sink's `current` loop while `f` runs; the
+previous loop is restored afterwards, also if `f` throws, so nested loops show the inner loop
+while it runs.
 """
 function _with_progress(f, p::_LazyProgress)
+    previous = _enter!(p.output, p)
     result = try
         f(p)
     catch
         _stop!(p, cancel)
         rethrow()
+    finally
+        _leave!(p.output, previous)
     end
     _stop!(p, finish!)
     return result
@@ -111,6 +192,21 @@ function _with_progress(f, progress::Bool, n::Integer, desc::AbstractString)
     return _with_progress(f, _LazyProgress(progress, n, desc))
 end
 
+# Register `p` as the running loop of its output, return what `_leave!` restores.
+_enter!(::IO, ::_LazyProgress) = nothing
+_leave!(::IO, _) = nothing
+
+function _enter!(s::_ProgressSink, p::_LazyProgress)
+    # a disabled loop (`progress = false`) reports nothing
+    p.enabled || return @atomic s.current
+    return @atomicswap s.current = p
+end
+
+function _leave!(s::_ProgressSink, previous)
+    @atomic s.current = previous
+    return nothing
+end
+
 function _stop!(p::_LazyProgress, stop)
     lock(p.lock) do
         p.tnext[] = Inf
@@ -118,3 +214,28 @@ function _stop!(p::_LazyProgress, stop)
     end
     return nothing
 end
+
+"""
+    _progress_state(s::_ProgressSink)
+
+State of the loop that currently reports to `s`: `nothing` between loops, otherwise
+`(; desc, count, n, t0)` with `desc` the description without its trailing `": "` (e.g.
+`"Tracing beams"`), `count` finished of `n` items and `t0` the `time()` at which the loop
+started. Safe to call from any task while the loop runs.
+"""
+_progress_state(s::_ProgressSink) = _progress_state(@atomic s.current)
+_progress_state(::Nothing) = nothing
+function _progress_state(p::_LazyProgress)
+    return (; desc = String(chopsuffix(p.desc, ": ")), count = p.count[], n = p.n, t0 = p.t0)
+end
+
+"""
+    _is_cancelled(e)
+
+`true` if the exception `e` stems from a cancelled `_ProgressSink`, also if it is wrapped in a
+`TaskFailedException` or a `CompositeException` (as thrown by `Threads.@threads`).
+"""
+_is_cancelled(e) = false
+_is_cancelled(::_ProgressCancelled) = true
+_is_cancelled(e::TaskFailedException) = _is_cancelled(e.task.result)
+_is_cancelled(e::CompositeException) = any(_is_cancelled, e.exceptions)

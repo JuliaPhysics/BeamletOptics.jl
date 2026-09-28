@@ -310,7 +310,8 @@ const BMO = BeamletOptics
         gui = live_view(System([m, pd]), GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], 1e-6, 0.5e-3);
             view_cube = false)
         @test isnothing(gui.view_cube)
-        @test isempty(gui.ax.scene.children)
+        # the only child scene is the one of the progress window
+        @test gui.ax.scene.children == [gui.progress.hud]
         close(gui)
     end
 end
