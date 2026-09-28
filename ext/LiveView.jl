@@ -100,7 +100,9 @@ or position. A layout `L` holds its own state (e.g. the slots of its sidebars) a
 
 # Interface
 
-A subtype `L <: AbstractLiveLayout` implements
+A subtype `L <: AbstractLiveLayout` has the field `theme`, the color tokens of the `theme` kwarg
+(see `_APP_THEMES`), in which the floating cards and the progress window are drawn in all layouts,
+and implements
 
 - `_build_layout(layout::L, fig, spec) -> NamedTuple`: creates the widgets in the `Figure` `fig`,
   which `_figure(layout, size)` created. `spec` holds the inputs of `live_view`: `specs` (detector
@@ -155,9 +157,12 @@ abstract type AbstractLiveLayout end
 
 Layout of `live_view(...; layout = :compact)`: the 3D view with the detector panels on its right,
 the sliders, the status row and the tool row below. The positions in `gui.fig` are fixed, e.g. the
-panels are placed in `gui.fig[1, 2]`, where users may add their own axes.
+panels are placed in `gui.fig[1, 2]`, where users may add their own axes. The widgets have Makie's
+look, the floating cards and the progress window the colors of the `theme` tokens.
 """
-struct CompactLayout <: AbstractLiveLayout end
+struct CompactLayout <: AbstractLiveLayout
+    theme::NamedTuple
+end
 
 """
     LiveView
@@ -2190,6 +2195,7 @@ function _update_card!(gui::LiveView, c::_ComponentCard, obj, obstacles::Vector{
     end
     corners = _card_corners(gui, c, obj)
     _update!(c.title.text, _label(gui, obj))
+    _show_kind!(c, obj)
     scene = gui.ax.scene
     view = Rect2f(Makie.viewport(scene)[])
     sel = _screen_rect(scene, corners, obj)
@@ -2366,7 +2372,7 @@ end
 """Collapses the card `c` of the `gui` to its head, or expands it again."""
 function _toggle_collapsed!(gui::LiveView, c::_ComponentCard)
     c.collapsed = !c.collapsed
-    c.collapse_button.label[] = c.collapsed ? "+" : "–"
+    _show_head!(c)
     _update_cards!(gui)
     return nothing
 end
@@ -2381,13 +2387,13 @@ it.
 function _toggle_pinned!(gui::LiveView, c::_ComponentCard)
     if c.pinned
         c.pinned, c.obj = false, nothing
-        c.pin_button.label[] = "pin"
         _hide_card!(c)
     elseif c === gui.card && !isnothing(gui.controls.selected[])
         c.pinned, c.obj, c.key = true, gui.controls.selected[], nothing
-        c.pin_button.label[] = "unpin"
         _use_card!(gui, _spare_card!(gui))
     end
+    # Also resets the pin toggle of a card that cannot be pinned
+    _show_head!(c)
     _update_cards!(gui)
     _on_pinned!(gui)
     return nothing
@@ -2414,7 +2420,7 @@ function _toggle_pin!(gui::LiveView, obj)
     _is_pinned(gui, obj) && return _unpin!(gui, obj)
     c = _spare_card!(gui)
     c.pinned, c.obj, c.key, c.pose = true, obj, nothing, nothing
-    c.pin_button.label[] = "unpin"
+    _show_head!(c)
     _update_cards!(gui)
     _on_pinned!(gui)
     return nothing
@@ -2428,7 +2434,7 @@ _on_pinned!(::LiveView) = nothing
 function _spare_card!(gui::LiveView)
     i = findfirst(c -> !c.pinned && c !== gui.card, gui.cards)
     isnothing(i) || return gui.cards[i]
-    c = _ComponentCard(gui.fig, _card_z(length(gui.cards) + 1))
+    c = _ComponentCard(gui.fig, gui.layout.theme, _card_z(length(gui.cards) + 1))
     push!(gui.cards, c)
     _connect_card!(gui, c)
     # The listeners of the new widgets come after the mouse shield of the cards, which must come last
@@ -2453,7 +2459,8 @@ when they are built, see `_build_content!`.
 function _connect_card!(gui::LiveView, c::_ComponentCard)
     listeners = gui.controls.listeners
     push!(listeners, on(_ -> _toggle_collapsed!(gui, c), c.collapse_button.clicks))
-    push!(listeners, on(_ -> _toggle_pinned!(gui, c), c.pin_button.clicks))
+    # The toggle switches itself, `_toggle_pinned!` sets it to the state of the card
+    push!(listeners, on(v -> v == c.pinned || _toggle_pinned!(gui, c), c.pin_button.active))
     push!(listeners, on(s -> _set_step!(gui, s), c.step_box.stored_string))
     push!(listeners, on(_ -> _keep_keyboard!(gui), c.step_box.focused))
     return nothing
@@ -3242,7 +3249,8 @@ may add their own axes.
 # Keyword args
 
 - `layout = :compact`: arrangement of the widgets, `:compact` or `:app`, see "App layout"
-- `theme = :light`: colors of the app layout, `:light` or `:dark` (ignored by `:compact`)
+- `theme = :light`: colors, `:light` or `:dark`, of the component cards and the progress window
+  of all layouts and of the whole window of `:app`
 - `size`: size of the figure, by default `(1400, 800)` for `:compact` and `(1600, 950)` for `:app`
 - `auto_trace = true`: solves the systems after each change, otherwise only on request, see
   "Manual tracing"
@@ -3335,7 +3343,7 @@ function live_view(
         clip_beams, orthographic, show_sources, view_specs))
     ax = w.ax
     # Pose, keyboard step and hide button of the selected object, next to it in the 3D view
-    card = _ComponentCard(fig, _card_z(1))
+    card = _ComponentCard(fig, lay.theme, _card_z(1))
 
     # `edges` is only passed if given, i.e. custom `render!` methods of user objects do not need to
     # accept it
@@ -3392,7 +3400,7 @@ function live_view(
         Base.IdSet{Any}(), preview, false, nothing, 0.0, nothing, nothing, w.measure_toggle, Any[],
         nothing, AbstractPlot[], w.home_button, (zeros(3), zeros(3), zeros(3)), false, view_specs,
         menus.views_menu, w.save_view_button, nothing, w.sources_toggle, nothing,
-        _ProgressOverlay(ax), Float64(progress_delay), card, [card], Any[], extras_handle,
+        _ProgressOverlay(ax, lay.theme), Float64(progress_delay), card, [card], Any[], extras_handle,
         IdDict{Any, Any}(), lay)
     gui_ref[] = gui
     # Objects must not change while a solve in the background traces them
@@ -3435,12 +3443,12 @@ Layouts, see `AbstractLiveLayout`
     _live_layout(layout::Symbol, theme::Symbol) -> AbstractLiveLayout
 
 Returns the layout of the `layout` and `theme` kwargs of `live_view`, the only place where the
-names are mapped to the layout types. The `theme` is validated for all layouts, but only used by
-the app layout.
+names are mapped to the layout types. The tokens of the `theme` color the floating cards and the
+progress window of all layouts, and the whole window of the app layout.
 """
 function _live_layout(layout::Symbol, theme::Symbol)
     tokens = _app_theme(theme)
-    layout == :compact && return CompactLayout()
+    layout == :compact && return CompactLayout(tokens)
     layout == :app && return AppLayout(tokens)
     throw(ArgumentError("layout must be :compact or :app, got :$layout"))
 end

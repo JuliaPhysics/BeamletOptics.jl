@@ -489,9 +489,10 @@ source or detector, see "Long solves" in the docstring of [`live_view`](@ref).
 
 Selecting a component, source or clip plane opens a card next to its bounding box in the 3D view,
 connected to it by a line. The card follows the camera and the component and stays inside the
-view, off the view cube and the other cards:
+view, off the view cube and the other cards. It has the colors of `theme = :light` (default) or
+`:dark`, like the app layout, also in the compact layout:
 
-- The head shows the label of the component and "hide", which hides it, e.g. a mirror in front of
+- The head shows the icon of the kind of the component, its label and "hide", which hides it, e.g. a mirror in front of
   the component of interest, and clears the selection. A hidden component can not be selected in
   the 3D view, but stays in the systems, i.e. it is still traced. Selected in the menu, its card
   reads "show", which shows it again. For a clip plane, the head holds "flip" and "remove".
@@ -502,10 +503,10 @@ view, off the view cube and the other cards:
   undo history, the constraints of the component apply. While a box is focused, the keys of the 3D
   view are ignored.
 - `step` sets the keyboard step, see below.
-- "–" collapses the card to its head, "+" expands it again.
-- "pin" keeps the card with its component when the selection changes, e.g. to watch or type the
-  poses of several components; the widgets of a pinned card act on its component. "unpin" closes
-  it.
+- The chevron at the right end of the head collapses the card to its head and expands it again.
+- The pin keeps the card with its component when the selection changes, e.g. to watch or type the
+  poses of several components; the widgets of a pinned card act on its component. Clicking the
+  pin again closes it.
 - Below the pose, rows of the component type, refreshed after each solve and move:
 
   | Component | Rows |

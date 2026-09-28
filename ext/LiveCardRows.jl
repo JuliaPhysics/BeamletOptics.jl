@@ -6,8 +6,6 @@ Declarations of the cards, see `card_rows` and `card_actions`
 # names of their boxes
 const _CARD_POSE_LABELS = ("x", "y", "z", "rx", "ry", "rv")
 const _CARD_POSE_NAMES = (:x, :y, :z, :rx, :ry, :rv)
-# Colors of the rotation labels: red, green and blue like the gizmo axes, lighter on the dark card
-const _CARD_AXIS_COLORS = (RGBAf(1, 0.45, 0.45, 1), RGBAf(0.45, 0.85, 0.45, 1), RGBAf(0.55, 0.7, 1, 1))
 
 # Label of the pose box `k`, of the same width in both rows, such that the boxes line up
 # (the positions in the text color of the card, the rotations in the colors of the axes, see

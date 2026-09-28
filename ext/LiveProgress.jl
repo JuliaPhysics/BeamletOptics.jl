@@ -16,10 +16,8 @@ const _PROGRESS_Z = 9800.0f0
 const _PROGRESS_PADDING = 10.0f0
 const _PROGRESS_TRACK = Vec2f(_PROGRESS_PANEL[1] - 2 * _PROGRESS_PADDING, 6)
 const _PROGRESS_CORNER = 6.0f0
-const _PROGRESS_BACKGROUND = RGBAf(0.1, 0.1, 0.12, 0.85)
-const _PROGRESS_TRACK_COLOR = RGBAf(0.35, 0.35, 0.38, 1)
-const _PROGRESS_TEXT_COLOR = RGBAf(0.95, 0.95, 0.95, 1)
-# Orange of the source markers, see `_live_render_source!`
+# Orange of the source markers, see `_live_render_source!`; the other colors come from the tokens
+# of the theme of the live view, like those of the component cards
 const _PROGRESS_FILL_COLOR = RGBAf(Makie.to_color(:orange))
 
 # Left edge of the bar and vertical centers of the bar and the label
@@ -53,10 +51,13 @@ function _rounded_rect_marker(w::Real, h::Real, r::Real)
 end
 
 """
-    _ProgressOverlay(ax::LScene)
+    _ProgressOverlay(ax::LScene, theme::NamedTuple = _app_theme(:light))
 
-A small progress window of the live view in the 3D scene of `ax`: a dark panel with a label and a
-progress bar next to an anchor point, e.g. the marker of the source that is being traced. The
+A small progress window of the live view in the 3D scene of `ax`: a panel with a label and a
+progress bar next to an anchor point, e.g. the marker of the source that is being traced, in the
+color tokens `theme` of the live view (see `_APP_THEMES`) like the component cards: the panel in
+the color of the sidebars with a border, the text, the track of the bar in the color of the
+borders and the bar in the orange of the source markers. The
 panel has a fixed size on the screen (about 220 × 46 px, above and to the right of the anchor)
 and is drawn on top of the scene. It is drawn in a child scene of the 3D scene with a pixel
 camera, at the projection of the anchor, which [`_show_progress!`](@ref) updates, e.g. every frame
@@ -90,7 +91,8 @@ struct _ProgressOverlay
     plots::Vector{Makie.AbstractPlot}
 end
 
-function _ProgressOverlay(ax::LScene)
+function _ProgressOverlay(ax::LScene, theme::NamedTuple = _app_theme(:light))
+    t = theme
     # Pixel coordinates of the viewport of the 3D scene, see `_screen_anchor`
     hud = Makie.campixel(ax.scene)
     anchor = Observable(Point2f(NaN))
@@ -103,14 +105,15 @@ function _ProgressOverlay(ax::LScene)
     w, h = _PROGRESS_PANEL
     panel = scatter!(hud, anchor; common...,
         marker = _rounded_rect_marker(1, h / w, _PROGRESS_CORNER / w), markersize = w,
-        color = _PROGRESS_BACKGROUND, marker_offset = Vec2f(_PROGRESS_GAP) + _PROGRESS_PANEL / 2)
+        color = t.sidebar, strokecolor = t.border, strokewidth = 1,
+        marker_offset = Vec2f(_PROGRESS_GAP) + _PROGRESS_PANEL / 2)
     track = scatter!(hud, anchor; common..., marker = Rect, markersize = _PROGRESS_TRACK,
-        color = _PROGRESS_TRACK_COLOR,
+        color = t.border,
         marker_offset = Vec2f(_PROGRESS_BAR_X + _PROGRESS_TRACK[1] / 2, _PROGRESS_BAR_Y))
     bar = scatter!(hud, anchor; common..., marker = Rect, markersize = fill_size,
         color = _PROGRESS_FILL_COLOR, marker_offset = fill_offset)
     # Font size of the theme, like the status line of the live view
-    text = text!(hud, anchor; common..., text = label, color = _PROGRESS_TEXT_COLOR,
+    text = text!(hud, anchor; common..., text = label, color = t.text,
         align = (:left, :center), offset = Vec2f(_PROGRESS_BAR_X, _PROGRESS_LABEL_Y))
     plots = Makie.AbstractPlot[panel, track, bar, text]
     # In this order, after all other plots

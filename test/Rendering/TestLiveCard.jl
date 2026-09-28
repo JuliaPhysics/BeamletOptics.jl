@@ -37,6 +37,8 @@ BMO.card_actions(::CardTestObject) = ()
     _gauss() = GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], 1e-6, 0.5e-3)
     _live_view(args...; kwargs...) = live_view(args...; merge((; trace_budget = Inf), kwargs)...)
     _tick!(gui) = (events(gui.ax.scene).tick[] = Makie.Tick(Makie.RegularRenderTick, 0, 0.0, 1.0))
+    # a click on the pin toggle of the card `c`
+    _pin!(c) = (c.pin_button.active[] = !c.pin_button.active[])
 
     _rect(x) = x.layoutobservables.computedbbox[]
     _center(r) = Point2f(minimum(r) .+ Makie.widths(r) ./ 2)
@@ -134,11 +136,11 @@ BMO.card_actions(::CardTestObject) = ()
         # collapsed to the head and the actions
         h0 = Makie.widths(_rect(c.background))[2]
         notify(c.collapse_button.clicks)
-        @test c.collapsed && c.collapse_button.label[] == "+"
+        @test c.collapsed && c.collapse_button.icon[] === Ext._icon(:expand)
         @test _away(c.rows) && _away(c.step) && !_away(c.actions)
         @test Makie.widths(_rect(c.background))[2] < h0 / 2
         notify(c.collapse_button.clicks)
-        @test !c.collapsed && c.collapse_button.label[] == "–"
+        @test !c.collapsed && c.collapse_button.icon[] === Ext._icon(:collapse)
         @test !_away(c.rows)
 
         # deselected: hidden
@@ -265,7 +267,7 @@ BMO.card_actions(::CardTestObject) = ()
         # a pinned plane is unpinned when it is removed
         plane = Ext._add_clip_plane!(gui, [0, 0.05, 0], [0, 1, 0])
         pinned = gui.card
-        notify(pinned.pin_button.clicks)
+        _pin!(pinned)
         @test pinned.pinned && pinned.obj === plane
         notify(_w(pinned, :remove).clicks)
         @test !pinned.pinned && !pinned.scene.visible[]
@@ -280,12 +282,12 @@ BMO.card_actions(::CardTestObject) = ()
         ctrl = gui.controls
         c1 = gui.card
         # nothing to pin without a selection
-        notify(c1.pin_button.clicks)
-        @test !c1.pinned
+        _pin!(c1)
+        @test !c1.pinned && !c1.pin_button.active[]
 
         _select!(gui, m)
-        notify(c1.pin_button.clicks)
-        @test c1.pinned && c1.obj === m && c1.pin_button.label[] == "unpin"
+        _pin!(c1)
+        @test c1.pinned && c1.obj === m && c1.pin_button.active[]
         # the selection gets another card
         @test gui.card !== c1 && length(gui.cards) == 2 && gui.step_box === gui.card.step_box
         # the pinned object shows its pinned card only, without the keyboard step
@@ -324,7 +326,7 @@ BMO.card_actions(::CardTestObject) = ()
         @test !Ext._typing(gui)
 
         # a second pinned card; the widgets of the newest card take the clicks
-        notify(gui.card.pin_button.clicks)
+        _pin!(gui.card)
         @test length(gui.cards) == 3 && count(c -> c.pinned, gui.cards) == 2
         _select!(gui, beam)
         c3 = gui.card
@@ -332,10 +334,10 @@ BMO.card_actions(::CardTestObject) = ()
         # no card covers another
         rects = [_rect(c.background) for c in gui.cards]
         @test !any(Ext._overlaps(rects[i], rects[j]) for i in 1:3 for j in (i + 1):3)
-        _click!(gui, _center(_rect(c3.collapse_button)))
+        _click!(gui, _center(_rect(c3.collapse_button.box)))
         @test c3.collapsed
         sleep(0.3)  # later than a double click
-        _click!(gui, _center(_rect(c3.collapse_button)))
+        _click!(gui, _center(_rect(c3.collapse_button.box)))
         @test !c3.collapsed
         # the menu hides all cards
         gui.menu.is_open[] = true
@@ -346,9 +348,9 @@ BMO.card_actions(::CardTestObject) = ()
         @test count(c -> c.scene.visible[], gui.cards) == 3
 
         # unpinned: hidden, and reused for the next pin
-        notify(c1.pin_button.clicks)
-        @test !c1.pinned && !c1.scene.visible[] && c1.pin_button.label[] == "pin"
-        notify(c3.pin_button.clicks)
+        _pin!(c1)
+        @test !c1.pinned && !c1.scene.visible[] && !c1.pin_button.active[]
+        _pin!(c3)
         @test gui.card === c1 && length(gui.cards) == 3
         close(gui)
         @test !any(c -> c.scene.visible[], gui.cards)
@@ -420,6 +422,50 @@ BMO.card_actions(::CardTestObject) = ()
         gui = _live_view(System([m, pd]), wrapped)
         _select!(gui, wrapped)
         @test isnothing(_w(gui.card, :rays)) && _pose(gui.card, 1) isa Textbox
+        close(gui)
+    end
+
+    @testset "colors of the theme" begin
+        _rgba(x) = RGBAf(Makie.to_color(x))
+        _label(c, text) = only(b for b in c.blocks if b isa Label && b.text[] == text)
+        for layout in (:compact, :app), theme in (:light, :dark)
+            m, pd = _fixture()
+            gui = _live_view(System([m, pd]), _gauss(); layout, theme, labels = Dict(m => "M1"))
+            t = Ext._app_theme(theme)
+            @test gui.layout.theme === t
+            # a pinned card, in both layouts (the app layout docks the card of the selection)
+            Ext._toggle_pin!(gui, m)
+            c = only(filter(c -> c.pinned, gui.cards))
+            @test c.theme === t && c.scene.visible[]
+            @test _rgba(c.background.color[]) == _rgba(t.sidebar)
+            @test _rgba(c.background.strokecolor[]) == _rgba(t.border)
+            @test _rgba(c.title.color[]) == _rgba(t.text) && c.title.text[] == "M1"
+            @test c.pin_button.active[] && c.icon[] === Ext._icon(:mirror)
+            # the widgets in the style of the app layout, the rotations in the gizmo colors
+            @test _rgba(_pose(c, 1).boxcolor[]) == _rgba(t.field)
+            @test _rgba(_pose(c, 1).textcolor[]) == _rgba(t.text)
+            @test _rgba(_label(c, "x").color[]) == _rgba(t.text)
+            @test [_rgba(_label(c, k).color[]) for k in ("rx", "ry", "rv")] == _rgba.(collect(t.gizmo))
+            # the line to the object
+            @test _rgba(c.scene.plots[1].color[]) == _rgba(t.accent)
+            # the progress window: panel and text from the theme, the bar orange
+            panel, track, bar, text = gui.progress.plots
+            @test _rgba(panel.color[]) == _rgba(t.sidebar) && _rgba(text.color[]) == _rgba(t.text)
+            @test _rgba(track.color[]) == _rgba(t.border) && bar.color[] == Ext._PROGRESS_FILL_COLOR
+            close(gui)
+        end
+        # the icon toggle pins the card of the selection with a click
+        m, pd = _fixture()
+        gui = _live_view(System([m, pd]), _gauss())
+        _select!(gui, m)
+        _tick!(gui)
+        c = gui.card
+        _click!(gui, _center(_rect(c.pin_button.box)))
+        @test c.pinned && c.pin_button.active[] && gui.card !== c
+        sleep(0.3)  # later than a double click
+        _click!(gui, _center(_rect(c.pin_button.box)))
+        @test !c.pinned && !c.pin_button.active[]
+        @test_throws ArgumentError _live_view(System([m, pd]), _gauss(); theme = :blue)
         close(gui)
     end
 end

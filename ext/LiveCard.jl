@@ -1,5 +1,5 @@
 using Makie: Figure, Observable, Point2f, Vec2f, Rect2f, GridLayout, Textbox, Button, Label, Box, Slider,
-             Toggle, Menu
+             Toggle, Menu, BezierPath
 
 # Component cards of the live view: the controls of an object, next to it in the 3D view
 
@@ -23,12 +23,19 @@ const _CARD_PADDING = 8.0f0
 # Suggested bounding box of the parts that are not shown: hidden widgets still take clicks within
 # their bounding box, hence they are moved far outside of the figure
 const _CARD_AWAY = Rect2f(-1.0f5, -1.0f5, 0, 0)
-# Opaque, unlike the progress window, such that objects behind the widgets do not shine through
-const _CARD_BACKGROUND = RGBAf(0.1, 0.1, 0.12, 1)
-# Line from the card to its object and the dot at the object
-const _CARD_LINK_COLOR = RGBAf(0.95, 0.95, 0.95, 0.85)
-# Font size of the cards, smaller than the theme, such that several cards fit into the view
-const _CARD_FONTSIZE = 14
+# Font sizes of the cards, like the docked card of the app layout, such that several cards fit
+# into the view, and of the title
+const _CARD_FONTSIZE = 12
+const _CARD_TITLE_FONTSIZE = 13
+# Radius of the corners of the background [px]
+const _CARD_CORNER = 6
+# Sizes of the icon of the kind of the object and of the icon buttons in the head [px]
+const _CARD_ICON = 18
+const _CARD_TOOL = 22
+const _CARD_TOOL_ICON = 16
+# z translation of the tooltips of the icon buttons relative to the card, instead of
+# `_TOOLTIP_Z`, which would put them beyond the clip range of the pixel camera
+const _CARD_TOOLTIP_DZ = 60.0f0
 
 """
     _AbstractCard
@@ -43,7 +50,7 @@ e.g. `_DockedCard` in the inspector of the app layout. A host has the fields
   `refreshing` and `pose`, see `_ComponentCard`
 
 and implements `_new_parts!(c)`, `_card_object(gui, c)`, `_card_boxes(c)` and the style of its
-blocks, `_card_style(c, T)` (e.g. the colors of the dark card or of the theme of the app).
+blocks, `_card_style(c, T)` (the colors of the `theme` of the live view and the sizes of the host).
 Optionally, by dispatch on the host: `_card_value(c, v)` (e.g. of an `_AxisColor`),
 `_host_attributes(c, T, attributes)`, `_row_attributes(c)`, `_declarations(c, obj)`,
 `_fix_caret!(c, block)` and `_on_content_built!(gui, c)`.
@@ -51,18 +58,22 @@ Optionally, by dispatch on the host: `_card_value(c, v)` (e.g. of an `_AxisColor
 abstract type _AbstractCard end
 
 """
-    _ComponentCard(fig::Figure)
+    _ComponentCard(fig::Figure, theme::NamedTuple, z = _CARD_Z)
 
 Card of the live view with the controls of an object, shown over the 3D view next to the bounding
 box of the object and connected to it by a line, see `_update_card!`. The card of the selected
 object follows the selection; a `pinned` card stays with its object `obj`, independent of the
-selection. Like the progress window (`_ProgressOverlay`), it has a dark (but opaque) `background`
-with light text. It consists of free layouts (a `GridLayout` with a suggested bounding box) in
-`scene`, a scene with a pixel camera over the whole figure:
+selection. It looks like the docked card in the inspector of the app layout, in the color tokens
+`theme` of the live view (see `_APP_THEMES`): an opaque `background` in the color of the sidebars
+with a border, the widgets in the style of the app (see `_card_style`), the line and its dot in the
+accent color. It consists of free layouts (a `GridLayout` with a suggested bounding box) in `scene`,
+a scene with a pixel camera over the whole figure:
 
-- `head`: the `collapse_button` ("–" or "+"), the `pin_button` ("pin" or "unpin") and the `title`,
-  i.e. the label of the object
+- `head`: the `icon` of the kind of the object (see `_tree_kind`) in its `icon_color` and the
+  `title`, i.e. the label of the object
 - `actions`, right of the head: the buttons of [`card_actions`](@ref) for the object
+- `tools`, at the right end of the first line: the `pin_button` (an `_IconToggle`, active while
+  pinned) and the `collapse_button` (an `_IconButton`, a chevron down, or right while collapsed)
 - `rows`, below the head unless `collapsed`: the rows of [`card_rows`](@ref) for the object, each in
   its own layout
 - `step`, below the rows, only on the card of the selection (the keyboard steps move the selected
@@ -85,14 +96,18 @@ GLMakie draws the card over the 3D scene, including plots added later and transp
 """
 mutable struct _ComponentCard <: _AbstractCard
     scene::Scene
+    theme::NamedTuple
     background::Box
     head::GridLayout
     actions::GridLayout
+    tools::GridLayout
     rows::GridLayout
     step::GridLayout
+    icon::Observable{BezierPath}
+    icon_color::Observable{RGBAf}
     title::Label
-    collapse_button::Button
-    pin_button::Button
+    collapse_button::_IconButton
+    pin_button::_IconToggle
     step_box::Textbox
     link::Observable{Vector{Point2f}}
     widgets::Vector{Tuple{Any, CardWidget}}
@@ -118,28 +133,73 @@ function _card_part(scene::Scene)
     return layout
 end
 
-function _ComponentCard(fig::Figure, z::Real = _CARD_Z)
+function _ComponentCard(fig::Figure, theme::NamedTuple, z::Real = _CARD_Z)
+    t = theme
     scene = Scene(fig.scene; camera = Makie.campixel!, clear = false)
     translate!(scene, 0, 0, z)
     # The line first, then the background, then the widgets: each covers the one before
     link = Observable(Point2f[])
-    lines!(scene, link; color = _CARD_LINK_COLOR, linewidth = 1.5, inspectable = false)
-    scatter!(scene, Makie.lift(l -> l[1:min(1, end)], link); color = _CARD_LINK_COLOR, markersize = 7,
-        strokecolor = :black, strokewidth = 1, inspectable = false)
-    background = Box(scene; bbox = _CARD_AWAY, color = _CARD_BACKGROUND, strokevisible = false,
-        cornerradius = _PROGRESS_CORNER)
-    head, step = _card_part(scene), _card_part(scene)
-    collapse_button = Button(head[1, 1]; label = "–", width = 22, height = 20, padding = (0, 0, 0, 0),
-        fontsize = _CARD_FONTSIZE)
-    pin_button = Button(head[1, 2]; label = "pin", height = 20, padding = (6, 6, 0, 0), fontsize = _CARD_FONTSIZE)
-    title = Label(head[1, 3], ""; font = :bold, halign = :left, _card_style(Label)...)
-    Label(step[1, 1], "step"; halign = :right, _card_style(Label)...)
-    step_box = Textbox(step[1, 2]; placeholder = "e.g. 250 nm", width = 110, _card_style(Textbox)...)
+    lines!(scene, link; color = t.accent, linewidth = 1.5, inspectable = false)
+    scatter!(scene, Makie.lift(l -> l[1:min(1, end)], link); color = t.accent, markersize = 7,
+        strokecolor = t.view, strokewidth = 1.5, inspectable = false)
+    background = Box(scene; bbox = _CARD_AWAY, color = t.sidebar, strokecolor = t.border,
+        strokewidth = 1, cornerradius = _CARD_CORNER)
+    head, tools, step = _card_part(scene), _card_part(scene), _card_part(scene)
+    icon, icon_color = _kind_icon!(head[1, 1])
+    title = Label(head[1, 2], ""; font = :bold, halign = :left, _card_style(t, Label)...,
+        fontsize = _CARD_TITLE_FONTSIZE)
+    icons = (; _icon_theme(t)..., icon_color = t.muted, size = _CARD_TOOL, icon_size = _CARD_TOOL_ICON)
+    pin_button = _IconToggle(tools[1, 1]; icon = :pinned, icon_off = :pin,
+        tooltip = "Pin the card to the object", icons...)
+    collapse_button = _IconButton(tools[1, 2]; icon = :collapse, tooltip = "Collapse the card", icons...)
+    Makie.colgap!(tools, 2)
+    foreach(_fix_tooltip!, (pin_button, collapse_button))
+    Label(step[1, 1], "step"; halign = :right, _card_style(t, Label)..., color = t.muted)
+    step_box = Textbox(step[1, 2]; placeholder = "e.g. 250 nm", width = 110, _card_style(t, Textbox)...)
     _fix_caret!(step_box, z)
     scene.visible[] = false
-    return _ComponentCard(scene, background, head, _card_part(scene), _card_part(scene), step, title,
-        collapse_button, pin_button, step_box, link, Tuple{Any, CardWidget}[], Any[], Textbox[], Any[],
-        nothing, false, false, false, false, nothing, Point3f[], nothing, nothing)
+    return _ComponentCard(scene, t, background, head, _card_part(scene), tools, _card_part(scene), step,
+        icon, icon_color, title, collapse_button, pin_button, step_box, link, Tuple{Any, CardWidget}[],
+        Any[], Textbox[], Any[], nothing, false, false, false, false, nothing, Point3f[], nothing, nothing)
+end
+
+"""
+    _kind_icon!(pos) -> (icon, color)
+
+Adds the icon of the kind of an object (see `_tree_kind`) at the grid position `pos` of a card,
+like the header of the inspector of the app layout. Returns the observables of its marker and its
+color, see `_show_kind!`.
+"""
+function _kind_icon!(pos)
+    box = Box(pos; width = _CARD_ICON, height = _CARD_ICON, visible = false)
+    icon = Observable(_icon(:object))
+    color = Observable(RGBAf(0, 0, 0, 1))
+    center = Makie.lift(r -> Point2f(Makie.origin(r) .+ Makie.widths(r) ./ 2), box.blockscene,
+        box.layoutobservables.computedbbox)
+    scatter!(box.blockscene, center; marker = icon, markersize = _CARD_ICON, color,
+        markerspace = :pixel, inspectable = false)
+    return icon, color
+end
+
+"""Shows the icon of the kind of `obj` in its color on the card `c`, see `_tree_kind`."""
+function _show_kind!(c::_ComponentCard, obj)
+    kind = _tree_kind(obj)
+    _update!(c.icon, _icon(kind))
+    _update!(c.icon_color, RGBAf(Makie.to_color(_tree_marker_color(c.theme, kind))))
+    return nothing
+end
+
+# The tooltip of an icon button of a card, relative to the translation of the card, see
+# `_CARD_TOOLTIP_DZ`
+_fix_tooltip!(b::Union{_IconButton, _IconToggle}) = translate!(last(b.plots), 0, 0, _CARD_TOOLTIP_DZ)
+
+"""Shows whether the card `c` is pinned and collapsed on its icon buttons."""
+function _show_head!(c::_ComponentCard)
+    _update!(c.pin_button.active, c.pinned)
+    _update!(c.pin_button.tooltip, c.pinned ? "Unpin the card" : "Pin the card to the object")
+    _update!(c.collapse_button.icon, _icon(c.collapsed ? :expand : :collapse))
+    _update!(c.collapse_button.tooltip, c.collapsed ? "Expand the card" : "Collapse the card")
+    return nothing
 end
 
 """Returns the textboxes of the card `c`: the step box and the declared ones."""
@@ -155,24 +215,29 @@ end
 Widgets of the declarations, by the type of the block
 =#
 
-# Colors and sizes of the card, which is dark and compact, for the blocks of the declarations. The
-# box and border colors of the textboxes are Makie's defaults, which a theme of the figure (e.g. of
-# the app layout, with light boxes) must not change
-_card_style(::Type{Label}) = (; color = _PROGRESS_TEXT_COLOR, fontsize = _CARD_FONTSIZE)
-_card_style(::Type{Textbox}) = (; textcolor = _PROGRESS_TEXT_COLOR, boxcolor = :transparent,
-    boxcolor_hover = :transparent, boxcolor_focused = :transparent,
-    bordercolor = RGBAf(0.8, 0.8, 0.8, 1), fontsize = _CARD_FONTSIZE, height = 26,
-    textpadding = (6, 6, 4, 4))
-_card_style(::Type{Button}) = (; fontsize = _CARD_FONTSIZE, height = 24, padding = (8, 8, 2, 2))
-_card_style(::Type) = (;)
-_card_style(::_ComponentCard, T::Type) = _card_style(T)
+"""
+    _card_style(theme::NamedTuple, T::Type) -> NamedTuple
+
+Attributes of a block of the type `T` on a floating card in the color tokens `theme`: the style of
+the widgets of the app layout (see `_makie_theme`), which the card sets itself, since the figure of
+the compact layout has Makie's theme, in the compact sizes of the cards (see `_card_sizes`).
+"""
+_card_style(t::NamedTuple, ::Type{T}) where {T} = (; get(_makie_theme(t), nameof(T), (;))..., _card_sizes(T)...)
+_card_style(c::_ComponentCard, T::Type) = _card_style(c.theme, T)
+
+# Sizes of the blocks of the floating cards, like those of the docked card of the app layout
+_card_sizes(::Type{Label}) = (; fontsize = _CARD_FONTSIZE)
+_card_sizes(::Type{Textbox}) = (; fontsize = _CARD_FONTSIZE, height = 24, textpadding = (5, 5, 4, 4))
+_card_sizes(::Type{Button}) = (; fontsize = _CARD_FONTSIZE, height = 22, padding = (7, 7, 3, 3))
+_card_sizes(::Type{Menu}) = (; fontsize = _CARD_FONTSIZE)
+_card_sizes(::Type) = (;)
 
 """
     _AxisColor(k)
 
 Color of the gizmo axis `k` (1: red, 2: green, 3: blue) in a declaration, e.g. of the labels of the
 rotation boxes (see `pose_card_rows`), which each host of the card resolves to its own shade, see
-`_card_value`: lighter on the dark floating card, the axis colors of the theme when docked.
+`_card_value`: the `gizmo` colors of the theme of the live view (lighter in the dark theme).
 """
 struct _AxisColor
     k::Int
@@ -180,7 +245,7 @@ end
 
 # Values of the attributes of a declaration on the card `c`, see `_AxisColor`
 _card_value(::_AbstractCard, v) = v
-_card_value(::_ComponentCard, a::_AxisColor) = _CARD_AXIS_COLORS[a.k]
+_card_value(c::_ComponentCard, a::_AxisColor) = c.theme.gizmo[a.k]
 
 """
     _cell_attributes(c, w::CardWidget) -> NamedTuple
@@ -247,7 +312,7 @@ _declared_widgets(w::CardWidget) = (w,)
 _declared_widgets(::String) = ()
 
 """Moves the parts of the card `c` away, see `_CARD_AWAY`."""
-_park_card!(c::_ComponentCard) = foreach(_park!, (c.head, c.actions, c.rows, c.step, c.background))
+_park_card!(c::_ComponentCard) = foreach(_park!, (c.head, c.actions, c.tools, c.rows, c.step, c.background))
 
 """Removes the declared widgets of the card `c`, with their listeners and layouts."""
 function _clear_content!(c::_AbstractCard)
@@ -288,12 +353,12 @@ _actions_size(c::_ComponentCard) = isempty(c.actions.content) ? Vec2f(-_CARD_PAD
 """
     _card_size(c::_ComponentCard) -> Vec2f
 
-Size of the card `c` [px] with its actions right of the head and the parts below it (see
+Size of the card `c` [px] with its actions and tools right of the head and the parts below it (see
 `_lower_parts`), including the padding of the background.
 """
 function _card_size(c::_ComponentCard)
-    h, a = _card_size(c.head), _actions_size(c)
-    w, height = h[1] + _CARD_PADDING + a[1], max(h[2], a[2])
+    h, a, t = _card_size(c.head), _actions_size(c), _card_size(c.tools)
+    w, height = h[1] + _CARD_PADDING + a[1] + _CARD_PADDING + t[1], max(h[2], a[2], t[2])
     for part in _lower_parts(c)
         s = _card_size(part)
         w, height = max(w, s[1]), height + _CARD_PADDING + s[2]
@@ -310,11 +375,12 @@ shown (see `_lower_parts`) away. Only changed positions update the layout.
 function _arrange_card!(c::_ComponentCard, p::Point2f)
     size = _card_size(c)
     x, y = p[1] + _CARD_PADDING, p[2] - _CARD_PADDING
-    h, a = _card_size(c.head), _actions_size(c)
-    line = max(h[2], a[2])
-    # The head and the actions are centered vertically in the first line
+    h, a, t = _card_size(c.head), _actions_size(c), _card_size(c.tools)
+    line = max(h[2], a[2], t[2])
+    # The head, the actions and the tools (at the right end) are centered vertically in the first line
     _place!(c.head, Point2f(x, y - (line - h[2]) / 2))
     _place!(c.actions, Point2f(x + h[1] + _CARD_PADDING, y - (line - a[2]) / 2))
+    _place!(c.tools, Point2f(p[1] + size[1] - _CARD_PADDING - t[1], y - (line - t[2]) / 2))
     y -= line
     lower = _lower_parts(c)
     for part in (c.rows, c.step)

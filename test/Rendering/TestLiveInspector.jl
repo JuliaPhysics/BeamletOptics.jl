@@ -299,7 +299,7 @@ const BMO = BeamletOptics
         ctrl.selected[] = o.m
         @test insp.pin.active[]
         # "unpin" on the floating card unpins it, the pin of the inspector follows
-        notify(c.pin_button.clicks)
+        c.pin_button.active[] = !c.pin_button.active[]
         @test !c.pinned && !c.scene.visible[] && !insp.pin.active[]
         # pin and unpin from the inspector
         insp.pin.active[] = true

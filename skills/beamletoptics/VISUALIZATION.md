@@ -85,11 +85,13 @@ the mouse and keyboard (`kinematic_controls!`, `h` shows all controls), the syst
 after each change and detector panels update live. `export_changes(gui)` prints the changed poses
 as Julia code. Needs an interactive display; not for headless scripts. A selected component opens a
 card next to it in the 3D view: exact position `x`, `y`, `z` [mm], rotations `rx`, `ry`, `rv`
-[mrad] about the gizmo axes, the keyboard step (e.g. `250 nm`) and "hide". "pin" keeps a card with
-its component, so several components can be edited side by side. Below the pose, rows of the type:
-rays hitting it and their angle of incidence (last solve), `n` of lenses, R/T of beamsplitters, the
-polarizer axis, detector power, the ray count slider of sources (`set_num_rays!`). Own types add
-rows with a `card_rows` method (`CardRow`, `CardWidget`).
+[mrad] about the gizmo axes, the keyboard step (e.g. `250 nm`) and "hide". The pin keeps a card
+with its component, so several components can be edited side by side. Below the pose, rows of the
+type: rays hitting it and their angle of incidence (last solve), `n` of lenses, R/T of
+beamsplitters, the polarizer axis, detector power, the ray count slider of sources
+(`set_num_rays!`). Own types add rows with a `card_rows` method (`CardRow`, `CardWidget`).
+`theme = :light` (default) or `:dark` colors the cards and the progress window; `layout = :app`
+arranges the whole window like an application in these colors.
 
 Mechanics that should be visible but not traced (e.g. a housing STL) go into
 `extras = [housing => (; color = :lightblue), ...]` (`obj` or `obj => render_kwargs`), not into
