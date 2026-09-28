@@ -8,10 +8,23 @@ using Makie: Box, Fixed, Auto, Outside, Rect2f, Point2f, rowsize!
 const _GLB = Makie.GridLayoutBase
 
 """
-Color tokens of the app layout by `theme`: `background` (toolbar, status bar), `sidebar`, `view`
-(background of the 3D view and the detector panels), `border`, `text`, `muted` (secondary text),
-`accent` and `accent_soft` (active toggles), `field` (buttons and textboxes), `hover` and
-`gizmo` (labels of the rotations about the red, green and blue axes of the controls).
+Color tokens of the app layout by `theme`:
+
+- chrome: `background` (toolbar, status bar), `sidebar`, `view` (background of the 3D view and the
+  detector panels), `border`, `text`, `muted` (secondary text), `accent` and `accent_soft` (active
+  toggles), `field` (buttons and textboxes), `hover`, `tooltip` and `tooltip_text`
+- `gizmo`: the red, green and blue axes of the controls, e.g. the labels of the rotations in the
+  inspector, and the x (red) and z (blue) lines of the profiles and the centroid history of the
+  detector panels
+- 3D view: `help` (text of the controls), `rays` (rays and beams, see `_beam_style`),
+  `clip_plane` (marker of a clip plane) and `clip_plane_icon` (its icon in the object tree),
+  `marker_stroke` (outline of the handles of sources, clip planes and measured points),
+  `gizmo_outline` (outline of the labels of the gizmo, `nothing` for none),
+  `card_border` (outline of the floating cards, `nothing` for none, see `_style_card!`) and
+  `materials`, the colors of material classes that replace the colors of the render look, e.g.
+  of detectors, which are too dark on a dark background, see `_theme_render!`
+
+The light theme keeps the colors of the compact layout in the 3D view.
 """
 const _APP_THEMES = Dict{Symbol, NamedTuple}(
     :light => (;
@@ -20,14 +33,26 @@ const _APP_THEMES = Dict{Symbol, NamedTuple}(
         text = Makie.to_color("#1f2328"), muted = Makie.to_color("#69727d"),
         accent = Makie.to_color("#2f6fdb"), accent_soft = Makie.to_color("#d7e4fa"),
         field = Makie.to_color("#ffffff"), hover = Makie.to_color("#e2e6eb"),
-        gizmo = Makie.to_color.((:red, :green, :blue))),
+        tooltip = _TOOLTIP_COLOR, tooltip_text = _TOOLTIP_TEXT_COLOR,
+        gizmo = Makie.to_color.((:red, :green, :blue)),
+        help = Makie.to_color(:gray40), rays = Makie.to_color(:blue),
+        clip_plane = Makie.to_color(:purple), clip_plane_icon = Makie.to_color("#9b40c9"),
+        marker_stroke = Makie.to_color(:black), gizmo_outline = nothing, card_border = nothing,
+        materials = Dict{Symbol, RGBf}()),
     :dark => (;
         background = Makie.to_color("#1e2023"), sidebar = Makie.to_color("#25282c"),
         view = Makie.to_color("#34373b"), border = Makie.to_color("#3d4147"),
         text = Makie.to_color("#e3e5e8"), muted = Makie.to_color("#9aa1a9"),
         accent = Makie.to_color("#6ea4ff"), accent_soft = Makie.to_color("#2b4166"),
         field = Makie.to_color("#1a1c1f"), hover = Makie.to_color("#33373c"),
-        gizmo = Makie.to_color.(("#ff6b6b", "#5ccf5c", "#6ea4ff"))))
+        tooltip = Makie.to_color("#e3e5e8"), tooltip_text = Makie.to_color("#1f2328"),
+        gizmo = Makie.to_color.(("#ff6b6b", "#5ccf5c", "#6ea4ff")),
+        help = Makie.to_color("#a4abb3"), rays = Makie.to_color("#5b9bff"),
+        clip_plane = Makie.to_color("#b48ef0"), clip_plane_icon = Makie.to_color("#b48ef0"),
+        marker_stroke = Makie.to_color("#d5d9de"), gizmo_outline = Makie.to_color("#e3e5e8"),
+        card_border = Makie.to_color("#5b6168"),
+        materials = Dict{Symbol, RGBf}(:detector => Makie.to_color("#5d6673"),
+            :polarizer => Makie.to_color("#56707d"))))
 
 """Returns the color tokens of the `theme`, see `_APP_THEMES`."""
 function _app_theme(theme::Symbol)
@@ -281,7 +306,7 @@ const _TOOLBAR_ICON = 20
 
 """Keyword arguments of the icon buttons and toggles with the color tokens `t` of the theme."""
 _icon_theme(t) = (; icon_color = t.text, hover_color = t.hover, active_color = t.accent_soft,
-    active_icon_color = t.accent)
+    active_icon_color = t.accent, tooltip_color = t.tooltip, tooltip_text_color = t.tooltip_text)
 
 """
     _build_toolbar(layout::AppLayout, spec) -> NamedTuple
@@ -363,7 +388,80 @@ end
 _tree_marker_color(t::NamedTuple, kind::Symbol) = _tree_marker_color(t, Val(kind))
 _tree_marker_color(t::NamedTuple, ::Val) = t.muted
 _tree_marker_color(::NamedTuple, ::Val{:source}) = Makie.to_color("#e8890c")
-_tree_marker_color(::NamedTuple, ::Val{:clip_plane}) = Makie.to_color("#9b40c9")
+_tree_marker_color(t::NamedTuple, ::Val{:clip_plane}) = t.clip_plane_icon
+
+#=
+Colors of the 3D view by the theme, see `_APP_THEMES`
+=#
+
+_clip_plane_color(layout::AppLayout) = layout.theme.clip_plane
+_marker_stroke(layout::AppLayout) = layout.theme.marker_stroke
+
+# The rays of sources that are drawn as lines, not the envelopes of Gaussian beamlets
+_beam_style(layout::AppLayout, ::Union{BMO.AbstractRay, Beam, BMO.AbstractBeamGroup}) =
+    (; color = layout.theme.rays)
+_beam_style(::AppLayout, ::BMO.AstigmaticBeamGroup) = (;)
+
+_style_card!(layout::AppLayout, c::_ComponentCard) = _style_card!(c, layout.theme.card_border)
+_style_card!(::_ComponentCard, ::Nothing) = nothing
+function _style_card!(c::_ComponentCard, border)
+    c.background.strokecolor[] = border
+    c.background.strokewidth[] = 1
+    c.background.strokevisible[] = true
+    return nothing
+end
+
+"""
+    _theme_render!(layout::AppLayout, h::SystemRenderHandle)
+
+Replaces the colors of the material classes of the render look by the `materials` of the theme
+(see `_APP_THEMES`) in the plots of all objects of `h`, e.g. the dark detectors of the `:modern`
+look on a dark background. Only plots in the color of the look are changed, i.e. not the colors
+given by the user via `system_kwargs`.
+"""
+function _theme_render!(layout::AppLayout, h::SystemRenderHandle)
+    materials = layout.theme.materials
+    isempty(materials) && return nothing
+    look = _materials()
+    replace = Dict{RGBf, RGBf}(look[class].color => c for (class, c) in materials)
+    for oh in h.handles, p in oh.plots
+        haskey(p.attributes, :color) && _replace_color!(p, p.color[], replace)
+    end
+    return nothing
+end
+
+# Replaces a single color `c` of the plot `p` by its entry in `replace`, keeping its alpha;
+# per-vertex colors, colormaps and the like are kept
+function _replace_color!(p, c::Makie.Colors.Colorant, replace)
+    new = get(replace, RGBf(c), nothing)
+    isnothing(new) || (p.color[] = RGBAf(new, Makie.Colors.alpha(c)))
+    return nothing
+end
+_replace_color!(_, _, _) = nothing
+
+"""
+Sets the colors of the overlays of the controls in the 3D view of the `gui` (see
+`kinematic_controls!`): the help text, drawn in the block scene of the 3D view, and the outline
+of the labels of the gizmo, whose colors are the fixed colors of its axes.
+"""
+function _theme_controls!(gui::AppView)
+    foreach(p -> _theme_control!(gui, p), gui.controls.plots)
+    return nothing
+end
+
+_theme_control!(::AppView, _) = nothing
+function _theme_control!(gui::AppView, p::Makie.Text)
+    t = gui.layout.theme
+    p.parent === gui.ax.blockscene ? (p.color[] = t.help) : _outline_text!(p, t.gizmo_outline)
+    return nothing
+end
+
+_outline_text!(_, ::Nothing) = nothing
+function _outline_text!(p, color)
+    p.strokecolor[] = color
+    p.strokewidth[] = 1
+    return nothing
+end
 
 function _build_layout(layout::AppLayout, fig, spec)
     t = layout.theme
@@ -519,6 +617,7 @@ function _connect_layout!(gui::AppView)
     _update_tree!(gui)
     _on_clipping!(gui)
     _connect_inspector!(gui)
+    _theme_controls!(gui)
     return nothing
 end
 

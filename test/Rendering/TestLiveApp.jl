@@ -87,6 +87,37 @@ const BMO = BeamletOptics
         @test gui.ax.scene.backgroundcolor[] == t.view
         @test gui.status.color[] == t.text
         close(gui)
+
+        # the colors of the 3D view and of the panels follow the theme
+        _rgb(c) = RGBf(Makie.to_color(c))
+        _plots(gui, obj) = only(oh for oh in gui.controls.h.handles if oh.obj === obj).plots
+        _detector_color(gui, pd) = _rgb(first(p for p in _plots(gui, pd) if p isa Makie.Mesh).color[])
+        m, pd = _fixture()
+        beam = Beam([0.0, 0, 0], [0.0, 1, 0])
+        dark = _live_app(System([m, pd]), beam; theme = :dark,
+            clip_planes = [[0, 0.05, 0] => [0, 1, 0]], detectors = [pd => (:intensity, (; profiles = true))])
+        @test dark.beam_handles[1].plot.color[] == t.rays
+        @test _detector_color(dark, pd) == t.materials[:detector]
+        # the mirror keeps the color of the look
+        @test _rgb(first(_plots(dark, m)).color[]) == Ext._materials()[:reflective].color
+        plane = only(dark.clip_planes)
+        @test only(p for p in _plots(dark, plane) if p isa Makie.Lines).color[] == t.clip_plane
+        @test all(p -> p.strokecolor[] == t.marker_stroke,
+            filter(p -> p isa Makie.Scatter, [_plots(dark, plane); _plots(dark, beam)]))
+        help = only(p for p in dark.controls.plots if p isa Makie.Text && p.parent === dark.ax.blockscene)
+        @test help.color[] == t.help
+        @test dark.card.background.strokevisible[] && dark.card.background.strokecolor[] == t.card_border
+        @test dark.trace_button.plots[3].backgroundcolor[] == t.tooltip
+        px, pz = filter(p -> p isa Makie.Lines, only(dark.panels).profiles_ax.scene.plots)
+        @test (px.color[], pz.color[]) == (t.gizmo[1], t.gizmo[3])
+        close(dark)
+        # the light theme keeps the colors of the compact layout
+        m, pd = _fixture()
+        light = _live_app(System([m, pd]), beam)
+        @test _detector_color(light, pd) == Ext._materials()[:detector].color
+        @test _rgb(light.beam_handles[1].plot.color[]) == _rgb(:blue)
+        @test !light.card.background.strokevisible[]
+        close(light)
     end
 
     @testset "toolbar drives the shared logic" begin

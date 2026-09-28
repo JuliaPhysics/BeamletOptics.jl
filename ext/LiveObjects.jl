@@ -122,13 +122,13 @@ function _live_render_movable!(ax::_RenderEnv, obj, draw)
 end
 
 """
-    _live_render_source!(ax, src; size, color = :orange)
+    _live_render_source!(ax, src; size, color = :orange, strokecolor = :black)
 
 Renders a marker of the source `src` (a beam or beam group), i.e. an arrow of length `size` along
 its direction and a sphere at its position, and returns an `ObjectRenderHandle`. The marker allows
 selecting and moving the source with the [`kinematic_controls!`](@ref).
 """
-function _live_render_source!(ax::_RenderEnv, src; size::Real, color = :orange)
+function _live_render_source!(ax::_RenderEnv, src; size::Real, color = :orange, strokecolor = :black)
     draw = function ()
         p, d = Point3f(position(src)), Vec3f(size * normalize(BMO.direction(src)))
         # Markers are never clipped, see the clip planes of `live_view`
@@ -136,20 +136,21 @@ function _live_render_source!(ax::_RenderEnv, src; size::Real, color = :orange)
             clip_planes = Plane3f[])
         mesh!(ax, GeometryBasics.Sphere(p, Float32(size / 5)); color, clip_planes = Plane3f[])
         # Constant size on the screen, such that the source is visible in the overview as well
-        scatter!(ax, [p]; color, markersize = 12, strokecolor = :black, strokewidth = 1,
+        scatter!(ax, [p]; color, markersize = 12, strokecolor, strokewidth = 1,
             clip_planes = Plane3f[])
     end
     return _live_render_movable!(ax, src, draw)
 end
 
 """
-    _live_render_clip_plane!(ax, plane::LiveClipPlane; color = :purple)
+    _live_render_clip_plane!(ax, plane::LiveClipPlane; color = :purple, strokecolor = :black)
 
 Renders the marker of the clip `plane`, i.e. its outline of edge length `plane.size` and a handle
 (sphere and scatter) at its position, and returns an `ObjectRenderHandle`. The marker is never
 clipped. Only the handle selects the plane, see `_pickable_plots`.
 """
-function _live_render_clip_plane!(ax::_RenderEnv, plane::LiveClipPlane; color = :purple)
+function _live_render_clip_plane!(ax::_RenderEnv, plane::LiveClipPlane; color = :purple,
+        strokecolor = :black)
     draw = function ()
         p = Vector{Float64}(plane.pos)
         # Outline along the local x- and z-axes, i.e. within the plane
@@ -160,7 +161,7 @@ function _live_render_clip_plane!(ax::_RenderEnv, plane::LiveClipPlane; color = 
         # About the size of the sphere of a source marker, see `live_view`
         mesh!(ax, GeometryBasics.Sphere(Point3f(p), Float32(plane.size / 75)); color,
             clip_planes = Plane3f[])
-        scatter!(ax, [Point3f(p)]; color, markersize = 12, strokecolor = :black, strokewidth = 1,
+        scatter!(ax, [Point3f(p)]; color, markersize = 12, strokecolor, strokewidth = 1,
             clip_planes = Plane3f[])
     end
     return _live_render_movable!(ax, plane, draw)

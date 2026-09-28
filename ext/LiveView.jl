@@ -142,6 +142,11 @@ and optionally, with defaults for any layout,
   `_on_solve_started!(gui)` and `_on_applied!(gui)` around a solve, see `LiveDock.jl`
 - `_clip_plane_label(gui)`: the label of a new clip plane (`"Clip plane"`), and
   `_show_hint(gui)`: how a hidden object is shown again, for the status line
+- colors of the 3D view, e.g. for a dark background: `_clip_plane_color(layout)` (`:purple`),
+  `_marker_stroke(layout)` (`:black`, the outline of the handles of sources, clip planes and
+  measured points), `_beam_style(layout, beam)` (default kwargs of `live_render!` of a source,
+  none by default), `_style_card!(layout, card)` for each floating card and
+  `_theme_render!(layout, h)` for the rendered objects (see `AppLayout`)
 - slots for additional parts: `_add_toolbar_entry!(gui, group)`, `_add_sidebar_section!(gui,
   side, title)` and `_add_dock_panel!(gui, title)`, which return the `GridPosition` or
   `GridLayout` to place widgets in, see `AppLayout`
@@ -1534,7 +1539,8 @@ it as a movable object of the controls and applies the planes. Selects the plane
 function _add_clip_plane!(gui::LiveView, point, normal; select::Bool = true)
     ctrl = gui.controls
     plane = LiveClipPlane(point, normal, gui.clip_size)
-    push!(ctrl.h.handles, _live_render_clip_plane!(gui.ax, plane))
+    push!(ctrl.h.handles, _live_render_clip_plane!(gui.ax, plane;
+        color = _clip_plane_color(gui.layout), strokecolor = _marker_stroke(gui.layout)))
     push!(ctrl.movable, plane)
     ctrl.init_poses[plane] = _pose(plane)
     push!(gui.clip_planes, plane)
@@ -2472,6 +2478,7 @@ function _spare_card!(gui::LiveView)
     i = findfirst(c -> !c.pinned && c !== gui.card, gui.cards)
     isnothing(i) || return gui.cards[i]
     c = _ComponentCard(gui.fig)
+    _style_card!(gui.layout, c)
     push!(gui.cards, c)
     _connect_card!(gui, c)
     # The listeners of the new widgets come after the mouse shield of the cards, which must come last
@@ -2797,8 +2804,8 @@ end
 
 """Returns a marker of the points `pts` in the 3D view of the `gui`, which is never clipped."""
 function _point_marker!(gui::LiveView, pts; color = :magenta)
-    return scatter!(gui.ax, pts; color, markersize = 10, strokecolor = :black, strokewidth = 1,
-        overdraw = true, clip_planes = Plane3f[])
+    return scatter!(gui.ax, pts; color, markersize = 10, strokecolor = _marker_stroke(gui.layout),
+        strokewidth = 1, overdraw = true, clip_planes = Plane3f[])
 end
 
 """Removes the marker and the result of the beam inspection of the `gui`, if any."""
@@ -3366,7 +3373,9 @@ toolbar). [`retrace!`](@ref) solves again after a change from code, e.g. from su
 # Keyword args
 
 - `layout = :compact`: arrangement of the widgets, `:compact` or `:app`, see "App layout"
-- `theme = :light`: colors of the app layout, `:light` or `:dark` (ignored by `:compact`)
+- `theme = :light`: colors of the app layout, `:light` or `:dark` (ignored by `:compact`). For
+  contrast on its dark 3D view, `:dark` draws the rays, the markers and the dark materials of the
+  render look (detectors, polarizers) in lighter colors; `:light` keeps the colors of `:compact`.
 - `size`: size of the figure, by default `(1400, 800)` for `:compact` and `(1600, 950)` for `:app`
 - `auto_trace = true`: solves the systems after each change, otherwise only on request, see
   "Manual tracing"
@@ -3460,6 +3469,7 @@ function live_view(
     ax = w.ax
     # Pose, keyboard step and hide button of the selected object, next to it in the 3D view
     card = _ComponentCard(fig)
+    _style_card!(lay, card)
 
     # `edges` is only passed if given, i.e. custom `render!` methods of user objects do not need to
     # accept it
@@ -3470,7 +3480,8 @@ function live_view(
         default = beam isa BMO.AbstractBeamGroup ? (; render_every = 5) : (;)
         kw = get(beam_kwargs, beam, default)
         # The planes of the beams are set explicitly by `_apply_clip_planes!`, see `clip_beams`
-        push!(beam_handles, live_render!(ax, beam; kw..., clip_planes = Plane3f[]))
+        push!(beam_handles, live_render!(ax, beam; _beam_style(lay, beam)..., kw...,
+            clip_planes = Plane3f[]))
     end
 
     # A single controller for all systems, otherwise several controllers would compete for events
@@ -3483,7 +3494,8 @@ function live_view(
         # Markers of the sources, scaled to the size of the systems
         marker_size = 0.08 * extent
         for src in unique(objectid, last.(ps))
-            BMO._is_static(src) || push!(handles, _live_render_source!(ax, src; size = marker_size))
+            BMO._is_static(src) || push!(handles,
+                _live_render_source!(ax, src; size = marker_size, strokecolor = _marker_stroke(lay)))
         end
     end
     # The extras are moved and selected like the objects of the systems, but never traced
@@ -3492,6 +3504,8 @@ function live_view(
     parent = IdDict{BMO.AbstractObject, BMO.AbstractObject}()
     foreach(h -> merge!(parent, h.parent), (system_handles..., extras_handle))
     combined = SystemRenderHandle(ax, first(systems), handles, parent)
+    # Colors of the render look that the theme of the layout replaces, e.g. of dark detectors
+    _theme_render!(lay, combined)
     gui_ref = Ref{LiveView}()
     # Moving a clip plane or an extra does not solve the systems, see `_on_moved!`
     change = function (obj)
@@ -3579,6 +3593,15 @@ _on_selected!(::LiveView) = nothing
 _on_clipping!(::LiveView) = nothing
 _on_clip_planes_changed!(::LiveView) = nothing
 _on_hidden!(::LiveView) = nothing
+
+# Colors of the 3D view, which a layout may adapt to its theme, see `_APP_THEMES`
+_clip_plane_color(::AbstractLiveLayout) = :purple
+_marker_stroke(::AbstractLiveLayout) = :black
+"""Default kwargs of `live_render!` of the source `beam` in the `layout`, e.g. the color of rays."""
+_beam_style(::AbstractLiveLayout, _) = (;)
+"""Styles the floating card `c` (see `_ComponentCard`) for the `layout`, e.g. with an outline."""
+_style_card!(::AbstractLiveLayout, _) = nothing
+_theme_render!(::AbstractLiveLayout, _) = nothing
 _clip_plane_label(::LiveView) = "Clip plane"
 
 function _slot_error(gui::LiveView, what)
