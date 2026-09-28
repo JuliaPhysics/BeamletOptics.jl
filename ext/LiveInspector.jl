@@ -218,9 +218,9 @@ Docked card: the card of the selection in the inspector, see `_AbstractCard`
 
 The card of the selected object docked in the inspector of the app layout: the widgets declared by
 [`card_actions`](@ref) (in `actions`, in the header of the inspector) and [`card_rows`](@ref) (in
-`rows`, below the header), plus the app-only rows of `_docked_rows`, built by the same code as the
-floating cards (see `_build_content!`), but in the colors of the `theme` of the app and with the
-textboxes and sliders filling the width of the sidebar (see `_cell_attributes`). The fields
+`rows`, below the header), built by the same code as the floating cards (see `_build_content!`),
+but in the colors of the `theme` of the app and with the textboxes and sliders filling the width
+of the sidebar (see `_cell_attributes`). The fields
 `widgets` to `pose` are those of `_ComponentCard`; `header` and `parent` hold the layouts of the
 actions and the rows.
 """
@@ -272,47 +272,6 @@ _host_attributes(::_DockedCard, T::Type, attributes::NamedTuple) = _fill_width(T
 _fill_width(::Type{<:Union{Textbox, Slider}}, attributes) =
     merge(attributes, (; width = Relative(1), tellwidth = false))
 _fill_width(::Type, attributes) = attributes
-
-# The rows of the card and the app-only rows, e.g. the panel options of a detector
-_declarations(::_DockedCard, obj) = (card_actions(obj), (card_rows(obj)..., _docked_rows(obj)...))
-
-"""
-    _docked_rows(obj)
-
-Rows of the docked card of `obj` in the app layout below its [`card_rows`](@ref), i.e. only in the
-inspector, chosen by dispatch: settings of the live view rather than of the object, e.g. the mode
-and the color scale of the panel of a `Detector` (see `_set_panel_options!`). None by default.
-"""
-_docked_rows(_) = ()
-_docked_rows(::BMO.Detector) = (CardRow("panel",
-        CardWidget(Button; name = :panel_mode, label = "auto",
-            value = (gui, pd) -> _panel_mode_label(_panel_of(gui, pd)),
-            on = (gui, pd, _) -> _cycle_panel_mode!(gui, _panel_of(gui, pd))),
-        CardWidget(Toggle; name = :panel_log, value = (gui, pd) -> _is_log(_panel_of(gui, pd)),
-            on = (gui, pd, v) -> _set_panel_log!(gui, _panel_of(gui, pd), v)),
-        "log"),)
-
-# The modes of a detector panel, in the order of the button of `_docked_rows`
-const _PANEL_MODES = (:auto, :spot, :intensity)
-
-_panel_mode_label(::Nothing) = "no panel"
-_panel_mode_label(p::DetectorPanel) = string(p.mode)
-_is_log(::Nothing) = false
-_is_log(p::DetectorPanel) = p.colorscale == :log
-
-function _cycle_panel_mode!(gui::LiveView, p::DetectorPanel)
-    i = something(findfirst(==(p.mode), _PANEL_MODES), 0)
-    _set_panel_options!(gui, p; mode = _PANEL_MODES[mod1(i + 1, length(_PANEL_MODES))])
-    gui.status.text[] = "panel $(p.name): $(p.mode)"
-    return nothing
-end
-_cycle_panel_mode!(gui::LiveView, ::Nothing) = _no_panel(gui)
-
-_set_panel_log!(gui::LiveView, p::DetectorPanel, log::Bool) =
-    _set_panel_options!(gui, p; colorscale = log ? :log : :linear)
-_set_panel_log!(gui::LiveView, ::Nothing, _) = _no_panel(gui)
-
-_no_panel(gui::LiveView) = (gui.status.text[] = "this detector has no panel, see the detectors kwarg"; nothing)
 
 #=
 Inspector
@@ -551,34 +510,10 @@ _layout_boxes(gui::AppView) = (gui.step_box, _card_boxes(gui.layout.inspector.ca
 # The card of the selection is docked in the inspector, only pinned cards float in the 3D view
 _selection_card_shown(::AppView) = false
 
-#=
-Detector panel options, see `_docked_rows`
-=#
-
-"""Returns the first detector panel of `pd` in the `gui`, or `nothing`."""
-_panel_of(gui::LiveView, pd) = (i = findfirst(p -> p.pd === pd, gui.panels);
-    isnothing(i) ? nothing : gui.panels[i])
-
-"""
-    _set_panel_options!(gui, p; mode = p.mode, colorscale = p.colorscale)
-
-Sets the mode (`:auto`, `:spot` or `:intensity`) and the color scale (`:linear` or `:log`) of the
-detector panel `p` of the `gui` and shows its current hits again, see `_refresh_panel!`.
-"""
-function _set_panel_options!(gui::LiveView, p::DetectorPanel; mode::Symbol = p.mode,
-        colorscale::Symbol = p.colorscale)
-    (p.mode == mode && p.colorscale == colorscale) && return nothing
-    p.mode = mode
-    p.colorscale = colorscale
-    _refresh_panel!(gui, p)
-    return nothing
-end
-
-"""
-Shows the current hits of the detector panel `p` again, e.g. after its options changed, without
-solving and without recording its history.
-"""
-_refresh_panel!(::LiveView, p::DetectorPanel) = _update_panel!(p; coarse = false, record = false)
+# The toolbar, the sidebars, the dock and the status bar surround the 3D view: a click on their
+# widgets, e.g. the pin of the inspector, neither selects nor deselects (the release of the press
+# would clear the selection, and with it the inspector)
+_outside_view(gui::AppView) = !Makie.is_mouseinside(gui.ax.scene)
 
 #=
 Properties of the objects of the live view

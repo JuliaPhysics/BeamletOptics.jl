@@ -279,7 +279,8 @@ mutable struct KinematicController{H <: SystemRenderHandle}
     # called before each change of an object, see `_change!`
     before_change::Function
     # presses are left to other listeners while true, e.g. over the widgets of the component card of
-    # `live_view`; releases are handled, such that a drag that started elsewhere ends
+    # `live_view` or its sidebars; releases are handled, such that a drag that started elsewhere
+    # ends, but the release of an ignored press neither selects nor deselects
     ignore_mouse::Function
 end
 
@@ -335,10 +336,20 @@ end
 
 """Returns `true` if all plots of the rendered object `leaf` are invisible, e.g. hidden via the
 component menu of `live_view`. Such objects can not be selected in the 3D view."""
-function _is_hidden(ctrl::KinematicController, leaf)
-    plots = _object_plots(ctrl.h, leaf)
-    return !isempty(plots) && all(p -> !p.visible[], plots)
-end
+_is_hidden(ctrl::KinematicController, leaf) = _is_hidden(_object_plots(ctrl.h, leaf))
+_is_hidden(plots::AbstractVector) = !isempty(plots) && all(p -> !p.visible[], plots)
+
+"""
+    _pickable(ctrl, leaf) -> Bool
+
+Returns `true` if a click in the 3D view can select the rendered object `leaf` of the `ctrl`, i.e.
+the ray pick and the pick of the plot under the cursor consider it. Decided by the type of `leaf`
+and its plots, see `_pickable(ctrl, leaf, plots)`: by default, objects that are not hidden (see
+`_is_hidden`). Objects that are not pickable can still be selected otherwise, e.g. via the component
+menu or the object tree of `live_view`.
+"""
+_pickable(ctrl::KinematicController, leaf) = _pickable(ctrl, leaf, _object_plots(ctrl.h, leaf))
+_pickable(::KinematicController, _, plots) = !_is_hidden(plots)
 
 """
     _drill_select(ctrl, leaf)
@@ -450,6 +461,32 @@ function _selection_bbox(ctrl::KinematicController, obj, plots)
     return GeometryBasics.Rect3d(Vector{Float64}(position(obj)) .- w / 2, fill(w, 3))
 end
 
+# Largest object size that scales the gizmo, relative to the typical object, see `_gizmo_cap`
+const _GIZMO_MAX_TYPICAL = 3.0
+
+"""
+    _gizmo_cap(ctrl) -> Float64
+
+Largest size of an object that the gizmo scales with: `_GIZMO_MAX_TYPICAL` times the size of a
+typical object of the `ctrl`, i.e. the median of the largest edge of the bounding boxes of the
+visible plots of the rendered objects; `Inf` without visible objects. The gizmo is scaled with the
+selected object (see `_update_selection_box!`), which gives a huge gizmo for a large object, e.g. a
+housing around the optics; with the cap, it stays in proportion to the components. Objects of the
+typical size are not affected, nor are the objects of a scene with one or two objects.
+"""
+function _gizmo_cap(ctrl::KinematicController)
+    sizes = Float64[]
+    for oh in ctrl.h.handles
+        bbs = filter(_is_finite_box, [Makie.boundingbox(p) for p in oh.plots if p.visible[]])
+        isempty(bbs) || push!(sizes, maximum(GeometryBasics.widths(reduce(GeometryBasics.union, bbs))))
+    end
+    isempty(sizes) && return Inf
+    sort!(sizes)
+    n = length(sizes)
+    typical = isodd(n) ? sizes[(n + 1) ÷ 2] : (sizes[n ÷ 2] + sizes[n ÷ 2 + 1]) / 2
+    return _GIZMO_MAX_TYPICAL * typical
+end
+
 function _update_selection_box!(ctrl::KinematicController)
     obj = ctrl.selected[]
     plots = isnothing(obj) ? AbstractPlot[] : _object_plots(ctrl.h, obj)
@@ -462,7 +499,7 @@ function _update_selection_box!(ctrl::KinematicController)
     ctrl.box_obs[] = _bbox_wireframe(bb)
     # Place the gizmo above the object, where it is not covered by beams through the object
     w = GeometryBasics.widths(bb)
-    l = (ctrl.mode[] == :move ? 1.2 : 0.8) * maximum(w)
+    l = (ctrl.mode[] == :move ? 1.2 : 0.8) * min(maximum(w), _gizmo_cap(ctrl))
     v = ctrl.rotation_axis
     offset = ctrl.mode[] == :move ? 0.3 * l : 1.4 * l
     origin = Vector{Float64}(position(obj)) + (dot(abs.(v), w) / 2 + offset) * v
@@ -759,8 +796,8 @@ end
 
 Returns `(obj, t)`: the object hit by the camera ray at the current cursor position of `scene`
 among all objects of the movable objects of `ctrl`, i.e. objects of groups are returned instead of
-the groups, and the hit distance `t`; or `(nothing, nothing)` if the ray misses everything. Hidden
-objects are skipped, see `_is_hidden`. Sources
+the groups, and the hit distance `t`; or `(nothing, nothing)` if the ray misses everything. Objects
+that a click can not select, e.g. hidden ones, are skipped, see `_pickable`. Sources
 (non-`AbstractObject` leaves, i.e. beams and beam groups) are hit via the bounding box of their
 marker as usual, and additionally whenever the screen-space projection of their `position` is
 within `ctrl.source_pick_radius` pixels of the cursor, using as `t` the distance along the ray to
@@ -769,7 +806,7 @@ the point of the ray closest to the source position (so that the nearest candida
 function _ray_pick(ctrl::KinematicController, scene)
     origin, dir = _cursor_ray(scene)
     leaves = reduce(vcat, (_leaves(o) for o in ctrl.movable); init = _LiveMovable[])
-    filter!(leaf -> !_is_hidden(ctrl, leaf), leaves)
+    filter!(leaf -> _pickable(ctrl, leaf), leaves)
     box = function (obj)
         plots = _object_plots(ctrl.h, obj)
         return isempty(plots) ? nothing : mapreduce(Makie.boundingbox, GeometryBasics.union, plots)
@@ -992,7 +1029,11 @@ function kinematic_controls!(
     # High priority, so that the camera does not receive events while an object is dragged
     l1 = on(events(scene).mousebutton, priority = 200) do event
         (event.button == Mouse.left && !ctrl.spectator[]) || return Consume(false)
-        event.action == Mouse.press && ctrl.ignore_mouse() && return Consume(false)
+        if event.action == Mouse.press && ctrl.ignore_mouse()
+            # Neither a selection nor a deselection by the release of this press
+            ctrl.press_kind, ctrl.press_leaf, ctrl.press_pos = :none, nothing, nothing
+            return Consume(false)
+        end
         if event.action == Mouse.press
             if !isnothing(ctrl.select_modifier) && !_modifier_held(scene, ctrl.select_modifier)
                 # Modifier not held: every click and drag goes to the camera, no state change
@@ -1011,7 +1052,7 @@ function kinematic_controls!(
                 leaf = isnothing(plot) ? nothing : _pick_leaf(h, plot)
                 t = nothing
             end
-            !isnothing(leaf) && _is_hidden(ctrl, leaf) && (leaf = nothing)
+            !isnothing(leaf) && !_pickable(ctrl, leaf) && (leaf = nothing)
             ctrl.press_pos = _px(scene)
             if isnothing(leaf) || !_is_movable(ctrl, leaf)
                 ctrl.press_leaf = nothing

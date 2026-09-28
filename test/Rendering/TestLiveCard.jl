@@ -275,7 +275,8 @@ BMO.card_actions(::CardTestObject) = ()
     @testset "pinned cards" begin
         m, pd = _fixture()
         beam = _gauss()
-        gui = _live_view(System([m, pd]), beam; labels = Dict(m => "M1", pd => "PD"))
+        # room for three cards, one of them with the panel row of the detector
+        gui = _live_view(System([m, pd]), beam; labels = Dict(m => "M1", pd => "PD"), size = (1400, 900))
         ctrl = gui.controls
         c1 = gui.card
         # nothing to pin without a selection
@@ -357,8 +358,11 @@ BMO.card_actions(::CardTestObject) = ()
         m, pd = _fixture()
         t = CardTestObject(BMO.shape(RoundPlanoMirror(0.01, 0.002)))
         translate3d!(t, [-0.05, 0.05, 0.0])
+        # a second mirror off the beam path, with the same declarations as `m`
+        m2 = RoundPlanoMirror(25e-3, 5e-3)
+        translate3d!(m2, [0.1, 0.25, 0])
         solves = Ref(0)
-        gui = _live_view(System([m, pd, t]), _gauss(); on_change = (gui, obj) -> (solves[] += 1))
+        gui = _live_view(System([m, pd, t, m2]), _gauss(); on_change = (gui, obj) -> (solves[] += 1))
         c, ctrl = gui.card, gui.controls
         _select!(gui, t)
         # the pose rows, then its own rows; no actions
@@ -390,7 +394,7 @@ BMO.card_actions(::CardTestObject) = ()
         @test all(b -> b.parent === nothing, filter(b -> !any(x -> x === b, c.blocks), old))
         # an object with the same declarations keeps the widgets and shows its values
         kept = copy(c.blocks)
-        _select!(gui, pd)
+        _select!(gui, m2)
         @test length(c.blocks) == length(kept) && all(c.blocks .=== kept)
         @test _pose(c, 1).displayed_string[] == "100.0"
         close(gui)
@@ -417,6 +421,35 @@ BMO.card_actions(::CardTestObject) = ()
         gui = _live_view(System([m, pd]), wrapped)
         _select!(gui, wrapped)
         @test isnothing(_w(gui.card, :rays)) && _pose(gui.card, 1) isa Textbox
+        close(gui)
+    end
+
+    @testset "panel rows of detectors" begin
+        m, pd = _fixture()
+        pd2 = Detector(5e-3)
+        translate3d!(pd2, [0, 0.3, 0.2])
+        gui = _live_view(System([m, pd, pd2]), _gauss(); detectors = [pd])
+        c = gui.card
+        p = only(gui.panels)
+        # the pose rows, then the mode and the color scale of the panel
+        @test length(card_rows(pd)) == length(pose_card_rows(pd)) + 1
+        _select!(gui, pd)
+        _tick!(gui)
+        mode, log = _w(c, :panel_mode), _w(c, :panel_log)
+        @test _pose(c, 1) isa Textbox && mode isa Button && log isa Toggle
+        @test mode.label[] == "auto" && !log.active[]
+        # a click on the button cycles the mode, the toggle switches the color scale
+        _click!(gui, _center(_rect(mode)))
+        @test p.mode == :spot && mode.label[] == "spot"
+        @test gui.controls.selected[] === pd
+        log.active[] = true
+        @test p.colorscale == :log
+        # a detector without a panel: the same widgets, the inputs only show a message
+        _select!(gui, pd2)
+        _tick!(gui)
+        @test _w(c, :panel_mode) === mode && mode.label[] == "no panel" && !log.active[]
+        notify(mode.clicks)
+        @test occursin("no panel", gui.status.text[]) && p.mode == :spot
         close(gui)
     end
 end

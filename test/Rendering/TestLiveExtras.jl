@@ -185,6 +185,96 @@ const BMO = BeamletOptics
         close(gui)
     end
 
+    @testset "clicks into transparent mechanics" begin
+        m, pd = _fixture()
+        housing = _housing()
+        lens = SphericalLens(0.1, -0.1, 4e-3, 25.4e-3)
+        translate3d!(lens, [0, 0.05, 0])
+        gui = _live_view(System([m, pd, lens]), Beam([0.0, 0, 0], [0.0, 1, 0]); extras = [housing])
+        ctrl = gui.controls
+        # opaque mechanics are selected by a click like the components
+        @test Ext._pickable(ctrl, housing) && Ext._pickable(ctrl, m)
+        # below 50 %, a click passes through them; they stay selectable via the menu
+        Ext._set_opacity!(gui, housing, 0.4)
+        @test !Ext._pickable(ctrl, housing)
+        @test any(o -> o === housing, gui.menu_objects)
+        Ext._set_opacity!(gui, housing, 0.5)
+        @test Ext._pickable(ctrl, housing)
+        Ext._set_opacity!(gui, housing, 0)
+        @test !Ext._pickable(ctrl, housing)
+        Ext._set_opacity!(gui, housing, 1)
+        # the threshold applies to mechanics only, e.g. not to a lens rendered transparent
+        for p in _handle(gui, lens).plots
+            p.alpha[] = 0.2
+        end
+        @test Ext._pickable(ctrl, lens)
+        close(gui)
+        # rendered transparent, e.g. via the render kwargs of an extra
+        gui = _live_view(System([m, pd]), Beam([0.0, 0, 0], [0.0, 1, 0]);
+            extras = [housing => (; transparency = true, color = RGBAf(0.7, 0.8, 0.9, 0.3))])
+        @test !Ext._pickable(gui.controls, housing)
+        close(gui)
+
+        # the click itself, with the plot under the cursor given (picking requires a screen)
+        function clicked(alpha)
+            h_obj = _housing()
+            fig = Figure()
+            ax = LScene(fig[1, 1])
+            h = live_render!(ax, System([h_obj]))
+            foreach(p -> p.alpha[] = alpha, h.handles[1].plots)
+            ctrl = Ext.kinematic_controls!(ax, h; throttle = false, pick = _ -> (h.handles[1].plots[1], 0))
+            scene = ax.scene
+            events(scene).mouseposition[] = Tuple(Float64.(minimum(scene.viewport[]) .+ 50))
+            for action in (Mouse.press, Mouse.release)
+                events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, action)
+            end
+            sel = ctrl.selected[]
+            close(ctrl)
+            return sel === h_obj
+        end
+        @test clicked(1.0f0)
+        @test clicked(0.6f0)
+        @test !clicked(0.4f0)
+    end
+
+    @testset "extras in the scene extent" begin
+        m, pd = _fixture()
+        beam = Beam([0.0, 0, 0], [0.0, 1, 0])
+        _size(bb) = maximum(Makie.widths(bb))
+        marker(gui) = _size(Ext._selection_bbox(gui.controls, beam, Ext._object_plots(gui.controls.h, beam)))
+        gui = _live_view(System([m, pd]), beam)
+        clip0, marker0 = gui.clip_size, marker(gui)
+        close(gui)
+        # a housing of 0.5 m around the optics: larger source markers and clip planes
+        housing = NonInteractableObject(BMO.CubeMesh(0.5))
+        bb_housing = let fig = Figure(), ax = LScene(fig[1, 1])
+            h = live_render!(ax, System([housing]))
+            reduce(Makie.GeometryBasics.union, Makie.boundingbox.(h.handles[1].plots))
+        end
+        gui = _live_view(System([m, pd]), beam; extras = [housing])
+        ctrl = gui.controls
+        @test gui.clip_size > clip0 && gui.clip_size >= 1.2 * _size(bb_housing) - 1e-9
+        @test marker(gui) > marker0
+        plane = Ext._add_clip_plane!(gui, [0, 0.1, 0], [0, 1, 0])
+        @test plane.size ≈ gui.clip_size
+        Ext._remove_clip_plane!(gui, plane)
+        # `g` and fit all: the systems and the visible extras
+        ctrl.selected[] = nothing
+        @test _size(Ext._zoom_box(gui)) >= _size(bb_housing) - 1e-9
+        Ext._toggle_hidden!(gui, housing)
+        @test _size(Ext._zoom_box(gui)) < 0.3
+        Ext._toggle_hidden!(gui, housing)
+        # the gizmo of the large housing is capped, that of a component is unchanged
+        ctrl.selected[] = m
+        Ext._update_selection_box!(ctrl)
+        @test ctrl.gizmo_size[] ≈ 1.2 * _size(Ext._selection_bbox(ctrl, m, Ext._object_plots(ctrl.h, m)))
+        ctrl.selected[] = housing
+        Ext._update_selection_box!(ctrl)
+        @test ctrl.gizmo_size[] ≈ 1.2 * Ext._gizmo_cap(ctrl)
+        @test ctrl.gizmo_size[] < 0.3 * 1.2 * _size(bb_housing)   # uncapped: 1.2 × the housing
+        close(gui)
+    end
+
     @testset "extras in the app layout" begin
         m, pd = _fixture()
         housing = _housing()

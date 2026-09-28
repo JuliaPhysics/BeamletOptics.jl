@@ -131,6 +131,8 @@ and optionally, with defaults for any layout,
   them in `_refresh_inspector!(gui; force)`, called with the cards (see `_update_inspector!`);
   `_step_box(layout, w, card)` returns its `Textbox` of the keyboard step, `_layout_boxes(gui)`
   the textboxes that take the keyboard (see `_typing`). Pinned cards float in all layouts.
+- `_outside_view(gui)`: `true` while the mouse is over a part of the layout whose clicks must not
+  reach the controls of the 3D view, e.g. the sidebars of the app layout (none by default)
 - hooks called by the shared logic: `_on_solved!(gui)` after a solve is shown,
   `_on_selected!(gui)` after the selection changed, `_on_clipping!(gui)` after clipping was
   switched, `_on_clip_planes_changed!(gui)` after a clip plane was added or removed,
@@ -2583,6 +2585,74 @@ function _set_num_rays!(gui::LiveView, src, n)
     return nothing
 end
 
+#=
+Detectors: the options of their panel, see `_set_panel_options!`
+=#
+
+# A detector: the pose and the options of its panel in the live view
+card_rows(pd::BMO.Detector) = (pose_card_rows(pd)..., _panel_row())
+
+"""
+The row of the options of the panel of a detector on its card: a button that cycles the mode (see
+`_PANEL_MODES`) and shows the current one, and a toggle of the logarithmic color scale. The row is
+the same for all detectors; for a detector without a panel (see the `detectors` kwarg of
+`live_view`), the button reads "no panel" and the inputs only show a message.
+"""
+_panel_row() = CardRow("panel",
+    CardWidget(Button; name = :panel_mode, label = "auto",
+        value = (gui, pd) -> _panel_mode_label(_panel_of(gui, pd)),
+        on = (gui, pd, _) -> _cycle_panel_mode!(gui, _panel_of(gui, pd))),
+    CardWidget(Toggle; name = :panel_log, value = (gui, pd) -> _is_log(_panel_of(gui, pd)),
+        on = (gui, pd, v) -> _set_panel_log!(gui, _panel_of(gui, pd), v)),
+    "log")
+
+# The modes of a detector panel, in the order of the button of `_panel_row`
+const _PANEL_MODES = (:auto, :spot, :intensity)
+
+_panel_mode_label(::Nothing) = "no panel"
+_panel_mode_label(p::DetectorPanel) = string(p.mode)
+_is_log(::Nothing) = false
+_is_log(p::DetectorPanel) = p.colorscale == :log
+
+function _cycle_panel_mode!(gui::LiveView, p::DetectorPanel)
+    i = something(findfirst(==(p.mode), _PANEL_MODES), 0)
+    _set_panel_options!(gui, p; mode = _PANEL_MODES[mod1(i + 1, length(_PANEL_MODES))])
+    gui.status.text[] = "panel $(p.name): $(p.mode)"
+    return nothing
+end
+_cycle_panel_mode!(gui::LiveView, ::Nothing) = _no_panel(gui)
+
+_set_panel_log!(gui::LiveView, p::DetectorPanel, log::Bool) =
+    _set_panel_options!(gui, p; colorscale = log ? :log : :linear)
+_set_panel_log!(gui::LiveView, ::Nothing, _) = _no_panel(gui)
+
+_no_panel(gui::LiveView) = (gui.status.text[] = "this detector has no panel, see the detectors kwarg"; nothing)
+
+"""Returns the first detector panel of `pd` in the `gui`, or `nothing`."""
+_panel_of(gui::LiveView, pd) = (i = findfirst(p -> p.pd === pd, gui.panels);
+    isnothing(i) ? nothing : gui.panels[i])
+
+"""
+    _set_panel_options!(gui, p; mode = p.mode, colorscale = p.colorscale)
+
+Sets the mode (`:auto`, `:spot` or `:intensity`) and the color scale (`:linear` or `:log`) of the
+detector panel `p` of the `gui` and shows its current hits again, see `_refresh_panel!`.
+"""
+function _set_panel_options!(gui::LiveView, p::DetectorPanel; mode::Symbol = p.mode,
+        colorscale::Symbol = p.colorscale)
+    (p.mode == mode && p.colorscale == colorscale) && return nothing
+    p.mode = mode
+    p.colorscale = colorscale
+    _refresh_panel!(gui, p)
+    return nothing
+end
+
+"""
+Shows the current hits of the detector panel `p` again, e.g. after its options changed, without
+solving and without recording its history.
+"""
+_refresh_panel!(::LiveView, p::DetectorPanel) = _update_panel!(p; coarse = false, record = false)
+
 """
     _shield_cards!(gui)
 
@@ -2603,6 +2673,15 @@ function _shield_cards!(gui::LiveView)
 end
 
 """
+    _outside_view(gui) -> Bool
+
+Returns `true` if the mouse is over a part of the layout of the `gui` whose presses are not clicks
+into the 3D view, see `ignore_mouse` of the controls: the controls neither select nor deselect on
+them. By default none, see `AbstractLiveLayout`.
+"""
+_outside_view(::LiveView) = false
+
+"""
     _connect_cards!(gui)
 
 Connects the cards of the `gui`: their widgets, their update every frame and the mouse. Presses on
@@ -2614,7 +2693,7 @@ function _connect_cards!(gui::LiveView)
     ctrl = gui.controls
     ev = events(gui.ax.scene)
     over = () -> any(c -> _over_card(c, ev), gui.cards)
-    ctrl.ignore_mouse = over
+    ctrl.ignore_mouse = () -> over() || _outside_view(gui)
     foreach(c -> _connect_card!(gui, c), gui.cards)
     push!(ctrl.listeners, on(_ -> _update_cards!(gui), ev.tick))
     # Before the controls (200)
@@ -3013,25 +3092,44 @@ end
 """
     _zoom_box(gui)
 
-Returns the bounding box of the plots of the selected object of the `gui`, or of all systems if
-nothing is selected, or `nothing` if there are no visible plots.
+Returns the bounding box of the plots of the selected object of the `gui`, or of all systems and
+the visible extras if nothing is selected, or `nothing` if there are no visible plots.
 """
 function _zoom_box(gui::LiveView)
     ctrl = gui.controls
     obj = ctrl.selected[]
     isnothing(obj) || return _selection_bbox(ctrl, obj, _object_plots(ctrl.h, obj))
-    plots = [p for h in gui.system_handles for oh in h.handles for p in oh.plots if p.visible[]]
-    bbs = filter(_is_finite_box, [Makie.boundingbox(p) for p in plots])
+    return _visible_bbox((gui.system_handles..., gui.extras))
+end
+
+"""
+    _visible_bbox(handles) -> Union{Rect3d, Nothing}
+
+Returns the bounding box of the visible plots of the objects of the `handles` (`SystemRenderHandle`s,
+e.g. of the systems and the extras of a live view), or `nothing` if there are none.
+"""
+function _visible_bbox(handles)
+    bbs = [Makie.boundingbox(p) for h in handles for oh in h.handles for p in oh.plots if p.visible[]]
+    filter!(_is_finite_box, bbs)
     return isempty(bbs) ? nothing : reduce(GeometryBasics.union, bbs)
+end
+
+"""
+Size of the scene of the `handles` (see `_visible_bbox`): the largest edge of its bounding box, or
+0.125 m for an empty scene. Sets the size of the source markers and of new clip planes.
+"""
+function _scene_extent(handles)
+    bb = _visible_bbox(handles)
+    return isnothing(bb) ? 0.125 : Float64(maximum(GeometryBasics.widths(bb)))
 end
 
 """
     _zoom_to_selection!(gui)
 
 Moves the camera of the `gui` such that the bounding sphere of the selected object, or of all
-systems if nothing is selected, fills the view: `lookat` is set to the center of the bounding box,
-the eye to the distance `(d/2) / sin(fov/2)` (orthographic: `d/2`) along the current view direction, where `d` is the
-diagonal of the box.
+systems and the visible extras if nothing is selected (see `_zoom_box`), fills the view: `lookat`
+is set to the center of the bounding box, the eye to the distance `(d/2) / sin(fov/2)`
+(orthographic: `d/2`) along the current view direction, where `d` is the diagonal of the box.
 """
 function _zoom_to_selection!(gui::LiveView)
     bb = _zoom_box(gui)
@@ -3205,7 +3303,9 @@ object, also if another object is selected. `step`, only on the card of the sele
 keyboard step, e.g. `250 nm` or `50 µrad`, where the unit selects the move or rotate mode. "–" in
 the head collapses the card to its head, "+" expands it again. Clicks and drags on the card neither select objects
 nor move the camera, and while a box of the card has the focus, the keys of the 3D view are
-ignored.
+ignored. Further rows by type, see [`card_rows`](@ref): the number of rays of a source, the mode
+(`auto`, `spot`, `intensity`) and the log color scale of the panel of a `Detector` ("no panel"
+without one) and the opacity of mechanics.
 
 The row below the status line holds a menu of all movable objects (the objects of a group
 indented after the group, without clip planes), which selects an object like a click in the 3D
@@ -3235,6 +3335,11 @@ it, which is cheaper and keeps the correct depth; switching rebuilds the render 
 object once (a few ms for a mesh with 1 M triangles). At 0 % the object is hidden like via "hide",
 a larger opacity shows it again. The opacity is kept while the object is hidden; showing an object
 hidden at 0 % restores its initial opacity.
+
+Mechanics below 50 % opacity (as rendered or set via the slider) are not selected by a click in
+the 3D view: a click into the empty space inside or over a transparent housing selects what lies
+behind it, e.g. a component, or clears the selection. Select them via the object tree or the
+component menu instead. From 50 % on, a click selects them like any component.
 
 # Beam inspection and measuring
 
@@ -3347,8 +3452,8 @@ actions in the 3D view are unchanged:
 - right sidebar ("Properties"): the card of the selected object, docked instead of floating next
   to it: its name and type, the actions of the card (e.g. "hide", or "flip" and "remove" for a
   clip plane) and a pin, which pins a floating card to the object in the 3D view; below, the rows
-  of the card (see [`card_rows`](@ref), e.g. the pose and the ray slider of a source) and, for a
-  detector, the mode and the color scale of its panel; then the step box, the mode and the
+  of the card (see [`card_rows`](@ref), e.g. the pose, the ray slider of a source or the panel
+  options of a detector); then the step box, the mode and the
   properties of the object (see [`properties`](@ref)). Pinned cards float in the 3D view as in
   the compact layout.
 - analysis dock below the 3D view: a tab per detector panel, a click on a tab shows its panel.
@@ -3486,10 +3591,11 @@ function live_view(
 
     # A single controller for all systems, otherwise several controllers would compete for events
     handles = reduce(vcat, [h.handles for h in system_handles]; init = ObjectRenderHandle[])
-    # Size of the systems, before any clip plane shrinks the bounding boxes
-    plots = reduce(vcat, (oh.plots for oh in handles); init = AbstractPlot[])
-    extent = isempty(plots) ? 0.125 :
-             maximum(GeometryBasics.widths(mapreduce(Makie.boundingbox, GeometryBasics.union, plots)))
+    # The extras are moved and selected like the objects of the systems, but never traced
+    extras_handle = _live_render_extras!(ax, extra_specs)
+    # Size of the scene (the systems and the visible extras), before any clip plane shrinks the
+    # bounding boxes
+    extent = _scene_extent((system_handles..., extras_handle))
     if movable_sources
         # Markers of the sources, scaled to the size of the systems
         marker_size = 0.08 * extent
@@ -3498,8 +3604,6 @@ function live_view(
                 _live_render_source!(ax, src; size = marker_size, strokecolor = _marker_stroke(lay)))
         end
     end
-    # The extras are moved and selected like the objects of the systems, but never traced
-    extras_handle = _live_render_extras!(ax, extra_specs)
     append!(handles, extras_handle.handles)
     parent = IdDict{BMO.AbstractObject, BMO.AbstractObject}()
     foreach(h -> merge!(parent, h.parent), (system_handles..., extras_handle))

@@ -40,6 +40,17 @@ const BMO = BeamletOptics
     # Declared widgets of the docked card by name, see `card_rows`
     _w(gui, name) = Ext._card_widget(gui.layout.inspector.card, name)
     _rect(x) = x.layoutobservables.computedbbox[]
+    _center(r) = Point2f(minimum(r) .+ Makie.widths(r) ./ 2)
+    _tick!(gui) = (events(gui.ax.scene).tick[] = Makie.Tick(Makie.RegularRenderTick, 0, 0.0, 1.0))
+    # A left click at the figure pixel `xy`: mouse events like those of a window
+    function _click!(gui, xy)
+        ev = events(gui.fig.scene)
+        ev.mouseposition[] = (Float64(xy[1]), Float64(xy[2]))
+        for action in (Mouse.press, Mouse.release)
+            ev.mousebutton[] = Makie.MouseButtonEvent(Mouse.left, action)
+        end
+        return nothing
+    end
 
     @testset "formatting" begin
         @test Ext._property_row("Diameter [m]", 25.4e-3) == ("Diameter", "25.4 mm")
@@ -227,10 +238,10 @@ const BMO = BeamletOptics
         ctrl.selected[] = o.pd2
         notify(_w(gui, :panel_mode).clicks)
         @test occursin("no panel", gui.status.text[])
-        # only in the inspector: the floating cards show the rows of `card_rows`
-        @test isempty(Ext._docked_rows(o.m))
-        @test length(Ext._declarations(gui.card, o.pd)[2]) == 2
+        # the rows of `card_rows`, the same as on the floating cards
+        key(c) = map(Ext._layout_key, Ext._declarations(c, o.pd))
         @test length(Ext._declarations(gui.layout.inspector.card, o.pd)[2]) == 3
+        @test key(gui.layout.inspector.card) == key(gui.card)
         close(gui)
     end
 
@@ -308,6 +319,48 @@ const BMO = BeamletOptics
         @test !Ext._is_pinned(gui, o.m)
         # the keyboard step stays in the inspector
         @test gui.step_box !== gui.card.step_box
+        close(gui)
+    end
+
+    @testset "pin and unpin by clicks" begin
+        # Regression: the press and release of a click on a widget of the sidebar reached the
+        # controls of the 3D view, whose release on the "background" cleared the selection, which
+        # emptied the inspector before the pin could act
+        gui, o = _fixture()
+        insp, ctrl = gui.layout.inspector, gui.controls
+        ctrl.selected[] = o.m
+        _tick!(gui)
+        _click!(gui, _center(_rect(insp.pin.box)))
+        # the selection and its docked card stay, the pin is active, a floating card is pinned
+        @test ctrl.selected[] === o.m
+        @test insp.shown === o.m && insp.name.text[] == "Mirror 1"
+        @test _w(gui, :x) isa Textbox && !isempty(insp.card.rows.content)
+        @test insp.pin.active[] && Ext._is_pinned(gui, o.m)
+        @test gui.layout.right.shown
+        _tick!(gui)
+        c = only(filter(c -> c.pinned, gui.cards))
+        @test c.obj === o.m && c.scene.visible[]
+        # a click on a widget of the docked card keeps the selection, too
+        _click!(gui, _center(_rect(_w(gui, :y))))
+        @test ctrl.selected[] === o.m && _w(gui, :y).focused[]
+        _w(gui, :y).focused[] = false
+        # unpinned via the pin of the inspector: the inspector stays
+        _click!(gui, _center(_rect(insp.pin.box)))
+        @test !Ext._is_pinned(gui, o.m) && !insp.pin.active[]
+        @test ctrl.selected[] === o.m && insp.name.text[] == "Mirror 1" && _w(gui, :x) isa Textbox
+        _tick!(gui)
+        @test !c.scene.visible[]
+        # pinned again, then unpinned via "unpin" on the floating card
+        _click!(gui, _center(_rect(insp.pin.box)))
+        _tick!(gui)
+        c = only(filter(c -> c.pinned, gui.cards))
+        _click!(gui, _center(_rect(c.pin_button)))
+        @test !c.pinned && !insp.pin.active[]
+        @test ctrl.selected[] === o.m && insp.name.text[] == "Mirror 1" && _w(gui, :x) isa Textbox
+        # a click on the background of the 3D view still clears the selection
+        vp = gui.ax.scene.viewport[]
+        _click!(gui, Point2f(minimum(vp) .+ (5, 5)))
+        @test isnothing(ctrl.selected[]) && insp.name.text[] == "No selection"
         close(gui)
     end
 

@@ -93,7 +93,9 @@ Mechanics that should be visible but not traced (e.g. a housing STL) go into
 the system and not via `render!(gui.ax, ...)`: extras cost nothing in the solves, but can be
 selected, moved, hidden and exported like components. An extra must not also be an object of a
 system (`ArgumentError`). The card of a `NonInteractableObject`/`MeshDummy` or
-`IntersectableObject` has an "opacity" slider (0-100 %, 0 % hides it).
+`IntersectableObject` has an "opacity" slider (0-100 %, 0 % hides it); below 50 % a click in the
+3D view passes through it (select it in the tree or the component menu). The card of a `Detector`
+has the mode and log color scale of its detector panel.
 
 Own GUI parts go into a `gui = live_view(...)` via three functions that work with both
 `layout = :compact` and `layout = :app` (the layout places them); do not place blocks at fixed

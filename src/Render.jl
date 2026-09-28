@@ -453,10 +453,10 @@ _card_cell(w::CardWidget) = w
 
 Rows of the card of `obj` in [`live_view`](@ref), a tuple of [`CardRow`](@ref)s, chosen by multiple
 dispatch. By default, the rows of the pose, see [`pose_card_rows`](@ref); a source whose rays can
-be regenerated (see [`set_num_rays!`](@ref)) adds a slider for the number of rays, mechanics
-(`NonInteractableObject`, e.g. a `MeshDummy`, and `IntersectableObject`) a slider for their
-opacity. Add a method for
-an own type to show its properties or controls on its card, e.g.
+be regenerated (see [`set_num_rays!`](@ref)) adds a slider for the number of rays, a `Detector`
+the mode and the color scale of its detector panel, mechanics (`NonInteractableObject`, e.g. a
+`MeshDummy`, and `IntersectableObject`) a slider for their opacity. Add a method for an own type
+to show its properties or controls on its card, e.g.
 
 ```julia
 BeamletOptics.card_rows(l::MyLens) = (pose_card_rows(l)...,

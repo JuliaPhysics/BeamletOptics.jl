@@ -343,7 +343,11 @@ or in the object tree (under "Extras"), moved, hidden and exported. They do not 
 the optics behind them: objects are picked by intersecting the camera ray with the optical
 components first, which a `NonInteractableObject` never intersects. The card of a
 `NonInteractableObject` (e.g. a `MeshDummy`) or an `IntersectableObject` has an "opacity" slider,
-which makes it transparent without changing the optics; 0 % hides it.
+which makes it transparent without changing the optics; 0 % hides it. Below 50 % opacity, a click
+in the 3D view passes through such an object, i.e. a click into the empty space inside a
+transparent housing does not select the housing; select it in the object tree or the component
+menu instead. Visible extras count towards the size of the scene, which sets the size of the
+source markers and of new clip planes and the view of "fit all" (`g` without a selection).
 
 Plots added directly to `gui.ax` via `render!` are only drawn, i.e. they are neither selectable nor
 hideable:
@@ -569,6 +573,9 @@ view, off the view cube and the other cards:
 - Sources whose rays can be regenerated (`CollimatedSource`, `PointSource` and their uniform
   variants, see [`set_num_rays!`](@ref)) add the slider "rays" for their number of rays, which
   solves again.
+- A `Detector` adds the row "panel": a button that cycles the mode of its detector panel
+  (`auto`, `spot`, `intensity`) and a toggle of the logarithmic color scale. For a detector
+  without a panel (see "Detector panels"), the button reads "no panel".
 
 The rows and the buttons in the head are declared per type by multiple dispatch, see
 [`card_rows`](@ref) and [`card_actions`](@ref): each row is a [`CardRow`](@ref) of texts and
