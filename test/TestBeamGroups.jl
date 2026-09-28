@@ -320,6 +320,50 @@ const BMO = BeamletOptics
             @test_throws ErrorException UniformPointSource(pos, dir, θ, lambda; num_rays, basis = [0, 0, 0])
         end
     end
+
+    @testset "set_num_rays!" begin
+        pos, dir, λ = [0.1, -0.2, 0.3], normalize([0.2, 1.0, -0.1]), 633e-9
+        start(b) = Vector(BMO.position(first(rays(b))))
+        heading(b) = Vector(BMO.direction(first(rays(b))))
+        # A regenerated source equals a new one in its current pose
+        function same(a, b)
+            length(a) == length(b) || return false
+            return all(zip(BMO.beams(a), BMO.beams(b))) do (x, y)
+                isapprox(start(x), start(y); atol = 1e-12) && isapprox(heading(x), heading(y); atol = 1e-12)
+            end
+        end
+        # position, direction, number of rays, sampling basis
+        sources = [
+            (p, d, n, b) -> CollimatedSource(p, d, 5e-3, λ; num_rings = 4, num_rays = n, basis = b),
+            (p, d, n, b) -> UniformDiscSource(p, d, 5e-3, λ; num_rays = n, basis = b),
+            (p, d, n, b) -> PointSource(p, d, deg2rad(100), λ; num_rings = 4, num_rays = n, basis = b),
+            (p, d, n, b) -> UniformPointSource(p, d, 0.3, λ; num_rays = n, basis = b)
+        ]
+        for make in sources
+            src = make(pos, dir, 200, nothing)
+            # moved and rotated, i.e. not in the pose of the constructor
+            translate3d!(src, [0.01, 0.02, -0.03])
+            rotate3d!(src, normalize([1.0, 0.3, 0.2]), 0.4)
+            @test set_num_rays!(src, 500) === src
+            M = src.orientation
+            fresh = make(Vector(position(src)), Vector(M[:, 2]), 500, Vector(M[:, 1]))
+            @test same(src, fresh)
+            @test length(src) == 500
+            @test all(b -> BMO.wavelength(first(rays(b))) == λ, BMO.beams(src))
+        end
+        # a point source wider than 90°, whose NA does not tell its half angle
+        ps = PointSource(pos, dir, deg2rad(100), λ; num_rings = 4, num_rays = 200)
+        set_num_rays!(ps, 100)
+        @test maximum(b -> acosd(clamp(dot(heading(b), dir), -1, 1)), BMO.beams(ps)) ≈ 100
+        # too few rays for the rings, like the constructor
+        cs = CollimatedSource(pos, dir, 5e-3, λ; num_rings = 4, num_rays = 200)
+        @test_throws ErrorException set_num_rays!(cs, 79)
+        @test length(cs) == 200
+        # given beams can not be regenerated
+        wrapped = CollimatedSource(BMO.beams(cs), 5e-3, pos, dir)
+        @test_throws ArgumentError set_num_rays!(wrapped, 100)
+        @test_throws ArgumentError set_num_rays!(PointSource(BMO.beams(ps), 0.5, pos, dir), 100)
+    end
 end
 
 end # MODULE

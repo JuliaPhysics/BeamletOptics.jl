@@ -280,19 +280,10 @@ function _build_inspector!(layout::AppLayout)
     rowgap!(header, 0)
     # Pose boxes, step and mode
     pose = GridLayout(g[2, 1]; default_colgap = 6, default_rowgap = 2, tellwidth = false)
-    pose_boxes = Textbox[]
-    for (k, field) in enumerate(_POSE_FIELDS)
-        r, c = 2 * ((k - 1) ÷ 3) + 1, (k - 1) % 3 + 1
-        Label(pose[r, c], field; halign = :left, fontsize = 11,
-            color = k <= 3 ? t.muted : t.gizmo[k - 3], tellwidth = false)
-        push!(pose_boxes, Textbox(pose[r + 1, c]; placeholder = k <= 3 ? " " : "0", width = 72,
-            halign = :left))
-    end
-    Label(pose[5, 1], "step"; halign = :left, fontsize = 11, color = t.muted, tellwidth = false)
-    Label(pose[5, 2:3], "mode"; halign = :left, fontsize = 11, color = t.muted, tellwidth = false)
-    step_box = Textbox(pose[6, 1]; placeholder = "250 nm", width = 72, halign = :left)
-    mode = _Segmented(pose[6, 2:3], [:move => "Move", :rotate => "Rotate"]; theme = t)
-    rowgap!(pose, 4, 8)
+    Label(pose[1, 1], "step"; halign = :left, fontsize = 11, color = t.muted, tellwidth = false)
+    Label(pose[1, 2:3], "mode"; halign = :left, fontsize = 11, color = t.muted, tellwidth = false)
+    step_box = Textbox(pose[2, 1]; placeholder = "250 nm", width = 72, halign = :left)
+    mode = _Segmented(pose[2, 2:3], [:move => "Move", :rotate => "Rotate"]; theme = t)
     # Properties and type-dependent sections
     Box(g[3, 1]; height = 1, color = t.border, strokewidth = 0)
     list = _PropertyList(g[4, 1]; label_color = t.muted, value_color = t.text,
@@ -304,7 +295,7 @@ function _build_inspector!(layout::AppLayout)
     layout.inspector = _Inspector(g, icon, icon_color, name, type, mode, list, context,
         Pair{Type, Function}[], Function[], nothing, true, (Dict{String, Float32}(), Dict{String, Float32}()))
     layout.inspectors = Pair{Type, Function}[BMO.Detector => _detector_section]
-    return (; pose_boxes, step_box)
+    return (; step_box)
 end
 
 """
@@ -357,7 +348,7 @@ properties and type-dependent sections, which are rebuilt only if the object nee
 called per frame, but after the selection changed, a move and a solve. A collapsed inspector is not
 updated, it is refreshed when it is shown again.
 """
-function _refresh_inspector!(gui::AppView)
+function _refresh_inspector!(gui::AppView; force::Bool = false)
     layout = gui.layout
     layout.right.shown || return nothing
     insp = layout.inspector
@@ -436,13 +427,14 @@ function _connect_inspector!(gui::AppView)
     push!(listeners, on(m -> _set_mode!(gui, m), sel))
     push!(listeners, on(m -> (sel[] == m || (sel[] = m)), ctrl.mode; update = true))
     push!(listeners, on(v -> v && _refresh_inspector!(gui), layout.collapse.right.active))
+    push!(listeners, on(s -> _set_step!(gui, s), gui.step_box.stored_string))
+    push!(listeners, on(_ -> _keep_keyboard!(gui), gui.step_box.focused))
     _refresh_inspector!(gui)
     return nothing
 end
 
-# The pose boxes and, in the app layout, the rest of the inspector
-_update_inspector!(gui::AppView; force::Bool = false) =
-    (_update_pose_boxes!(gui; force); _refresh_inspector!(gui))
+# The step box of the inspector takes the keyboard like the boxes of the cards, see `_typing`
+_layout_boxes(gui::AppView) = (gui.step_box,)
 
 #=
 Type-dependent sections

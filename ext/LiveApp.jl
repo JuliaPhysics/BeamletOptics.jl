@@ -416,11 +416,14 @@ function _build_layout(layout::AppLayout, fig, spec)
     layout.info = Label(sb[1, 2], ""; halign = :right, color = t.muted)
     return (; ax, cube, panels, sliders, status, tb.trace_button, tb.auto_trace_toggle,
         tb.clip_beams_toggle, tb.orthographic_toggle, tb.sources_toggle, inspector.step_box,
-        tb.export_button, hide_button = nothing, objects.show_all_button, inspector.pose_boxes,
-        tb.measure_toggle, tb.home_button, tb.save_view_button, tb.views_menu)
+        tb.export_button, objects.show_all_button, tb.measure_toggle, tb.home_button,
+        tb.save_view_button, tb.views_menu)
 end
 
 _build_menus(::AppLayout, w, _, _) = (; menu = nothing, views_menu = w.views_menu)
+
+# The keyboard step is set in the inspector, not on a card, see `_Inspector`
+_step_box(::AppLayout, w, _) = w.step_box
 
 #=
 Connections and status
@@ -448,9 +451,8 @@ function _set_text!(label::Label, s::String)
 end
 
 function _on_solved!(gui::AppView)
+    # The inspector shows e.g. the hits of a detector after `_update_inspector!` of `_apply!`
     _set_text!(gui.layout.info, _status_info(gui))
-    # e.g. the hits of a detector
-    _refresh_inspector!(gui)
     return nothing
 end
 

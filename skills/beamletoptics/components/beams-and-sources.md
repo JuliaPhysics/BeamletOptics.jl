@@ -59,5 +59,9 @@ Kinematics act on the whole group; `set_pivot3d!` moves its pivot.
 | `WavefrontBeamletDecomposition(x, y, amplitude, phase, dir, λ; threshold, overlap, basis, randomize_axes, rng, E0)` | arbitrary sampled wavefront; the grid is centered at the origin, move it with `translate3d!` |
 | `AstigmaticBeamGroup(beams, pos, dir_or_orientation)` | wrap your own astigmatic beamlets |
 
+`set_num_rays!(src, n)` regenerates the rays of the first four sources above with `n` rays, same
+sampling, in the current pose (e.g. a coarse trace first, a fine one later); solve again afterwards.
+Wrapped beams can not be regenerated (`ArgumentError`).
+
 Trace beamlet groups onto a `Detector` and read them out with `intensity`/`electric_field`, which sum
 the beamlets coherently.

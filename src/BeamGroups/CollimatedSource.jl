@@ -9,16 +9,19 @@ Represents a parallel bundle of [`Beam`](@ref)s being emitted from a disk in spa
 - `diameter`: the diameter of the outermost beam ring
 - `center`: source position, pivot for rotations
 - `orientation`: right-handed orthonormal matrix, columns are the sampling reference vector, the central source direction and their cross product, see [`AbstractBeamGroup`](@ref)
+- `sampling`: how the rays were sampled (rings, sunflower, or given beams), see [`set_num_rays!`](@ref)
 
 # Functions
 
 - `diameter`: returns the diameter of the source
+- [`set_num_rays!`](@ref): regenerates the rays with another number of rays
 """
 mutable struct CollimatedSource{T, R <: AbstractRay{T}} <: AbstractBeamGroup{T, R}
     beams::Vector{Beam{T, R}}
     diameter::T
     center::Point3{T}
     orientation::SMatrix{3, 3, T, 9}
+    sampling::_AbstractSampling
 end
 
 """
@@ -29,20 +32,29 @@ Wraps existing `beams` into a [`CollimatedSource`](@ref) with the given `diamete
 source position `pos`. The group orientation is either derived from the central direction
 `dir` (the sampling reference vector is then picked deterministically via [`normal3d`](@ref)),
 or passed explicitly as a right-handed orthonormal 3x3 `orientation` matrix whose second column
-is the central direction. An invalid `orientation` throws an `ArgumentError`.
+is the central direction. An invalid `orientation` throws an `ArgumentError`. The rays of such a
+source can not be regenerated with [`set_num_rays!`](@ref).
 """
 function CollimatedSource(beams::Vector{Beam{T, R}}, diameter, pos, dir::AbstractVector) where {T, R <: AbstractRay{T}}
     d = normalize(dir)
-    M = _group_orientation(d, _sampling_basis(d, nothing, T), T)
-    _check_kinematic_members(beams)
-    return CollimatedSource{T, R}(beams, T(diameter), Point3{T}(pos), M)
+    return CollimatedSource(beams, diameter, pos, _group_orientation(d, _sampling_basis(d, nothing, T), T))
 end
 
-function CollimatedSource(beams::Vector{Beam{T, R}}, diameter, pos, orientation::AbstractMatrix) where {T, R <: AbstractRay{T}}
+CollimatedSource(beams::Vector{<:Beam}, diameter, pos, orientation::AbstractMatrix) =
+    CollimatedSource(beams, diameter, pos, orientation, _NoSampling())
+
+function CollimatedSource(beams::Vector{Beam{T, R}}, diameter, pos, orientation::AbstractMatrix,
+        sampling::_AbstractSampling) where {T, R <: AbstractRay{T}}
     _check_kinematic_members(beams)
-    return CollimatedSource{T, R}(beams, T(diameter), Point3{T}(pos), _check_orientation(orientation, T))
+    return CollimatedSource{T, R}(beams, T(diameter), Point3{T}(pos), _check_orientation(orientation, T), sampling)
 end
 diameter(cs::CollimatedSource) = cs.diameter
+
+function set_num_rays!(cs::CollimatedSource{T}, n::Integer) where {T}
+    M = cs.orientation
+    cs.beams = _source_beams(cs.sampling, cs.center, M[:, 2], M[:, 1], cs.diameter, _source_wavelength(cs), Int(n), T)
+    return cs
+end
 
 """
     CollimatedSource(pos, dir, diameter, λ; num_rings, num_rays, basis)
@@ -88,17 +100,31 @@ function CollimatedSource(
         basis::Union{Nothing, AbstractVector} = nothing
 ) where {P <: Real, D1 <: Real, D2 <: Real, L <: Real}
     T = promote_type(P, D1, D2, L)
+    # ensure normalization
+    dir = normalize(dir)
+    b1 = _sampling_basis(dir, basis, T)
+    sampling = _DiscRings(num_rings)
+    beams = _source_beams(sampling, pos, dir, b1, diameter, λ, num_rays, T)
+    return CollimatedSource(beams, diameter, pos, _group_orientation(dir, b1, T), sampling)
+end
+
+"""
+    _source_beams(sampling, pos, dir, b1, diameter, λ, num_rays, T)
+
+Beams of a [`CollimatedSource`](@ref) at `pos` along the unit vector `dir` with the `diameter`
+and the wavelength `λ`, sampled by `sampling` with `num_rays` rays. `b1` is the unit sampling
+reference vector normal to `dir`, see `_sampling_basis`.
+"""
+function _source_beams(s::_DiscRings, pos, dir, b1, diameter, λ, num_rays::Int, ::Type{T}) where {T}
+    num_rings = s.num_rings
     if num_rays < num_rings * 20
         throw(ErrorException("No. of rays should be atleast 20x no. of rings (passed: $num_rays, req: $(num_rings*20))"))
     end
-    # ensure normalization
-    dir = normalize(dir)
     # define buffer
     beams = Vector{Beam{T, Ray{T}}}()
     push!(beams, Beam(Ray(pos, dir, λ)))
     num_rays -= 1
     # setup concentric beam ring radii
-    b1 = _sampling_basis(dir, basis, T)
     r_max = diameter / 2
     radii = LinRange(0, r_max, num_rings)[2:end]
     # calculate total accumulated circumference of all rings
@@ -123,7 +149,7 @@ function CollimatedSource(
             helper = RotMat * helper
         end
     end
-    return CollimatedSource(beams, diameter, pos, _group_orientation(dir, b1, T))
+    return beams
 end
 
 """
@@ -172,11 +198,16 @@ function UniformDiscSource(
         basis::Union{Nothing, AbstractVector} = nothing
 ) where {P <: Real, D1 <: Real, D2 <: Real, L <: Real}
     T = promote_type(P, D1, D2, L)
+    dir = normalize(dir)
+    e1 = _sampling_basis(dir, basis, T)
+    beams = _source_beams(_DiscSunflower(), pos, dir, e1, diameter, λ, num_rays, T)
+    return CollimatedSource(beams, diameter, pos, _group_orientation(dir, e1, T), _DiscSunflower())
+end
+
+function _source_beams(::_DiscSunflower, pos, dir, e1, diameter, λ, num_rays::Int, ::Type{T}) where {T}
     R = diameter / 2
     beams = Vector{Beam{T, Ray{T}}}(undef, num_rays)
-    dir = normalize(dir)
     # orthogonal basis in the pupil plane
-    e1 = _sampling_basis(dir, basis, T)
     e2 = normal3d(dir, e1)
     for k in 0:(num_rays - 1)
         ρ = √((k + 0.5) / num_rays)     # equal-area radius
@@ -185,5 +216,5 @@ function UniformDiscSource(
         x = r * cos(φ) * e1 + r * sin(φ) * e2
         beams[k + 1] = Beam(pos + x, dir, λ)
     end
-    return CollimatedSource(beams, diameter, pos, _group_orientation(dir, e1, T))
+    return beams
 end

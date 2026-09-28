@@ -9,8 +9,10 @@ const _PROGRESS_PANEL = Vec2f(220, 46)
 # Minimum distance of the panel from the edges of the view
 const _PROGRESS_MARGIN = 8.0f0
 # z translation of the plots: GLMakie draws the plots in the order of this value, the window comes
-# last (within the clip range ±10000 of the pixel camera)
-const _PROGRESS_Z = 5000.0f0
+# after the 3D scene, and its depth (≈ 0.01) lies in front of it, including transparent plots, which
+# are drawn over plots with `overdraw`. Within the clip range ±10000 of the pixel camera and below
+# the component card, see `_CARD_Z`
+const _PROGRESS_Z = 9800.0f0
 const _PROGRESS_PADDING = 10.0f0
 const _PROGRESS_TRACK = Vec2f(_PROGRESS_PANEL[1] - 2 * _PROGRESS_PADDING, 6)
 const _PROGRESS_CORNER = 6.0f0
@@ -59,9 +61,9 @@ panel has a fixed size on the screen (about 220 × 46 px, above and to the right
 and is drawn on top of the scene. It is drawn in a child scene of the 3D scene with a pixel
 camera, at the projection of the anchor, which [`_show_progress!`](@ref) updates, e.g. every frame
 while the camera moves; an anchor outside of the view puts the panel at the edge towards it, see
-`_screen_anchor`. Its plots come last in the drawing order of GLMakie (`_PROGRESS_Z`) and ignore
-the depth (`overdraw`), so that plots added to the 3D scene later, e.g. a sky, do not cover it. As
-plots of a child scene, they do not enter the limits of the 3D scene.
+`_screen_anchor`. Its plots come last in the drawing order of GLMakie and in front of the 3D scene
+(`_PROGRESS_Z`), so that neither plots added to the 3D scene later, e.g. a sky, nor transparent
+plots cover it. As plots of a child scene, they do not enter the limits of the 3D scene.
 
 The constructor adds all plots at once, hidden, [`_show_progress!`](@ref) and
 [`_hide_progress!`](@ref) only update observables. The plots are not inspectable and not clipped.
@@ -96,7 +98,7 @@ function _ProgressOverlay(ax::LScene)
     fill_offset = Observable(Vec2f(_PROGRESS_BAR_X, _PROGRESS_BAR_Y))
     label = Observable("")
     visible = Observable(false)
-    common = (; markerspace = :pixel, visible, overdraw = true, inspectable = false,
+    common = (; markerspace = :pixel, visible, inspectable = false,
         transparency = false, clip_planes = Makie.Plane3f[])
     w, h = _PROGRESS_PANEL
     panel = scatter!(hud, anchor; common...,
@@ -133,10 +135,7 @@ function _screen_anchor(scene::Makie.Scene, p)
     q = Makie.project(scene, :data, :pixel, Point3f(p))
     x = Vec2f(q[1], q[2])
     c = Vec2f(w / 2, h / 2)
-    cam = Makie.camera(scene)
-    behind = dot(Vec3f(p) - cam.eyeposition[], cam.view_direction[]) <= 0 &&
-             Makie.cameracontrols(scene).settings.projectiontype[] == Makie.Perspective
-    if behind || !all(isfinite, x)
+    if _behind(scene, p) || !all(isfinite, x)
         d = c - x
         d = all(isfinite, d) && norm(d) > 0 ? d : Vec2f(0, -1)
         x = c + d * Float32(w + h) / norm(d)
@@ -144,6 +143,17 @@ function _screen_anchor(scene::Makie.Scene, p)
     lo = Vec2f(_PROGRESS_MARGIN - _PROGRESS_GAP)
     hi = max.(lo, Vec2f(w, h) - _PROGRESS_PANEL .- (_PROGRESS_GAP + _PROGRESS_MARGIN))
     return Point2f(clamp.(x, lo, hi))
+end
+
+"""
+Returns `true` if the 3D point `p` lies behind the camera of the `scene` with the perspective
+projection, whose projection is mirrored at the center of the view. Always `false` with the
+orthographic projection.
+"""
+function _behind(scene::Makie.Scene, p)
+    cam = Makie.camera(scene)
+    return dot(Vec3f(p) - cam.eyeposition[], cam.view_direction[]) <= 0 &&
+           Makie.cameracontrols(scene).settings.projectiontype[] == Makie.Perspective
 end
 
 # Called every frame: notify an observable only if its value changes

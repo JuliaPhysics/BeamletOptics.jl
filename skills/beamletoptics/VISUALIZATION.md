@@ -83,7 +83,10 @@ update_render!(hsys); update_render!(hbeam)   # remove_render!(h) deletes the pl
 `gui = live_view(system, beam); display(gui)` opens a window in which components are moved with
 the mouse and keyboard (`kinematic_controls!`, `h` shows all controls), the system is re-solved
 after each change and detector panels update live. `export_changes(gui)` prints the changed poses
-as Julia code. Needs an interactive display; not for headless scripts.
+as Julia code. Needs an interactive display; not for headless scripts. A selected component opens a
+card next to it in the 3D view: exact position `x`, `y`, `z` [mm], rotations `rx`, `ry`, `rv`
+[mrad] about the gizmo axes, the keyboard step (e.g. `250 nm`) and "hide". "pin" keeps a card with
+its component, so several components can be edited side by side.
 
 Solves longer than `progress_delay` (kwarg, default 0.5 s) run in the background: the window stays
 usable and a small progress window appears next to the source being traced or the detector whose
