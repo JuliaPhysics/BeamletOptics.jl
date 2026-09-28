@@ -2019,6 +2019,20 @@ function _connect_camera!(gui::LiveView)
         _step_camera!(gui, tick.delta_time)
         return nothing
     end)
+    # Camera3D takes the keyboard (WASD etc.) only after a click on the background of the 3D
+    # view, which a click on a widget, e.g. the orthographic toggle, undoes. Here the keyboard
+    # stays with the camera unless a textbox or a menu takes the input.
+    cam = cameracontrols(scene)
+    function keep_keyboard!(_...)
+        selected = !_typing(gui)
+        cam.selected[] == selected || (cam.selected[] = selected)
+        return nothing
+    end
+    for obs in (cam.selected, gui.step_box.focused, gui.menu.is_open, gui.views_menu.is_open,
+                (tb.focused for tb in gui.pose_boxes)...)
+        push!(listeners, on(keep_keyboard!, obs))
+    end
+    keep_keyboard!()
     push!(listeners, on(_ -> _go_home!(gui), gui.home_button.clicks))
     push!(listeners, on(i -> _set_saved_view!(gui, something(i, 0)), gui.views_menu.i_selected))
     push!(listeners, on(_ -> _save_view!(gui), gui.save_view_button.clicks))

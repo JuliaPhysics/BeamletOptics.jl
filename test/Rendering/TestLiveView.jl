@@ -910,6 +910,26 @@ const BMO = BeamletOptics
         close(gui)
     end
 
+    @testset "keyboard stays with the camera" begin
+        m, pd = _fixture()
+        gui = _live_view(System([m, pd]), Beam([0.0, 0, 0], [0.0, 1, 0]))
+        scene = gui.ax.scene
+        cam = cameracontrols(scene)
+        @test cam.selected[]
+        # A click outside of the 3D view, e.g. on the orthographic toggle, deselects the Camera3D
+        vp = scene.viewport[]
+        events(scene).mouseposition[] = (vp.origin[1] + vp.widths[1] + 10, vp.origin[2] + 10)
+        events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.press)
+        events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
+        @test cam.selected[]
+        # Typing in a textbox does not move the camera
+        gui.step_box.focused[] = true
+        @test !cam.selected[]
+        gui.step_box.focused[] = false
+        @test cam.selected[]
+        close(gui)
+    end
+
     @testset "spot panel limits" begin
         # A single ray gives a zero-width spot diagram, which must not collapse the limits
         m, pd = _fixture()
