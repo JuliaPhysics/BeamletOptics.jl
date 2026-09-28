@@ -89,6 +89,77 @@ mutable struct _SolveJob
 end
 
 """
+    AbstractLiveLayout
+
+Layout of a [`LiveView`](@ref), i.e. where its widgets are placed in the figure, see the
+`layout` kwarg of [`live_view`](@ref). The logic of the live view (tracing, clipping, measuring,
+camera, inspection) is shared by all layouts: it works on the observables of the widgets, e.g.
+`clicks` of a button, `active` of a toggle and `stored_string` of a textbox, never on their type
+or position. A layout `L` holds its own state (e.g. the slots of its sidebars) and is stored in
+`gui.layout` of the `LiveView{L}`.
+
+# Interface
+
+A subtype `L <: AbstractLiveLayout` implements
+
+- `_build_layout(layout::L, fig, spec) -> NamedTuple`: creates the widgets in the `Figure` `fig`,
+  which `_figure(layout, size)` created. `spec` holds the inputs of `live_view`: `specs` (detector
+  panels, see `_panel_specs`), `slider_specs`, `labels`, `lighting`, `view_cube`, `auto_trace`,
+  `clip_beams`, `orthographic`, `show_sources` and `view_specs`. The result has the fields
+  - `ax`: the `LScene` of the 3D view, with `studio_lighting!` applied, and `cube`: its view cube
+    or `nothing`
+  - `panels`: the `DetectorPanel`s of `spec.specs`, `sliders`: a `SliderGrid` of
+    `spec.slider_specs` or `nothing`, `status`: the `Label` of the status line
+  - `trace_button`, `export_button`, `home_button`, `save_view_button`, `show_all_button`:
+    anything with `clicks::Observable{Int}`, or `nothing` for the last one
+  - `auto_trace_toggle`, `clip_beams_toggle`, `orthographic_toggle`, `sources_toggle`,
+    `measure_toggle`: anything with `active::Observable{Bool}`, initialized from `spec`
+- `_build_menus(layout::L, w, options, views_options) -> (; menu, views_menu)`: called with the
+  result `w` of `_build_layout` once the movable objects are known; the component `menu` (a `Menu`
+  with the `options`, or `nothing`) and the `views_menu` (a `Menu` with the `views_options`)
+
+and optionally, with defaults for any layout,
+
+- `_figure(layout::L, size)`: the `Figure`, and `_default_size(layout::L)`: its size unless given
+- `_connect_layout!(gui::LiveView{L})`: connects the widgets that only the layout has, e.g.
+  collapsing; its listeners belong in `gui.controls.listeners`
+- where the controls of the selected object are shown, i.e. the widgets that
+  [`card_actions`](@ref) and [`card_rows`](@ref) declare, built by the same code for any host (see
+  `_AbstractCard`): by default on the floating card next to the object (`_ComponentCard`), which
+  holds the step box. A layout that shows them elsewhere, e.g. the app layout on a card docked in
+  its inspector (`_DockedCard`), returns `false` from `_selection_card_shown(gui)` and refreshes
+  them in `_refresh_inspector!(gui; force)`, called with the cards (see `_update_inspector!`);
+  `_step_box(layout, w, card)` returns its `Textbox` of the keyboard step, `_layout_boxes(gui)`
+  the textboxes that take the keyboard (see `_typing`). Pinned cards float in all layouts.
+- hooks called by the shared logic: `_on_solved!(gui)` after a solve is shown,
+  `_on_selected!(gui)` after the selection changed, `_on_clipping!(gui)` after clipping was
+  switched, `_on_clip_planes_changed!(gui)` after a clip plane was added or removed,
+  `_on_hidden!(gui)` after objects were hidden or shown and `_on_pinned!(gui)` after a card was
+  pinned or unpinned
+- which detector panels are computed and how their results are shown, for layouts that show only
+  some of them: `_computed_panels(gui, preview)`, `_shown_panels(gui)` and
+  `_apply_panel!(gui, p, field; coarse, preview)` (all panels by default), with the hooks
+  `_on_solve_started!(gui)` and `_on_applied!(gui)` around a solve, see `LiveDock.jl`
+- `_clip_plane_label(gui)`: the label of a new clip plane (`"Clip plane"`), and
+  `_show_hint(gui)`: how a hidden object is shown again, for the status line
+- slots for additional parts: `_add_toolbar_entry!(gui, group)`, `_add_sidebar_section!(gui,
+  side, title)` and `_add_dock_panel!(gui, title)`, which return the `GridPosition` or
+  `GridLayout` to place widgets in, see `AppLayout`
+
+The layouts of `live_view` are `CompactLayout` and `AppLayout`.
+"""
+abstract type AbstractLiveLayout end
+
+"""
+    CompactLayout
+
+Layout of `live_view(...; layout = :compact)`: the 3D view with the detector panels on its right,
+the sliders, the status row and the tool row below. The positions in `gui.fig` are fixed, e.g. the
+panels are placed in `gui.fig[1, 2]`, where users may add their own axes.
+"""
+struct CompactLayout <: AbstractLiveLayout end
+
+"""
     LiveView
 
 Interactive window returned by [`live_view`](@ref). The `Figure` is stored in `fig`, the `LScene`
@@ -117,8 +188,11 @@ background as `job`, the `progress` window shows its loops after `progress_delay
 `measure_toggle` switches measuring on, the result is stored in `measurement`. The `home_button`
 restores the `home` view, the `views_menu` sets one of the saved `views`, which the
 `save_view_button` extends.
+
+The type parameter `L` is the type of the `layout`, see `AbstractLiveLayout`: `CompactView` and
+`AppView` are the `LiveView`s of `live_view(...; layout = :compact)` and `layout = :app`.
 """
-mutable struct LiveView
+mutable struct LiveView{L <: AbstractLiveLayout}
     fig::Figure
     ax::LScene
     pairs::Vector{Pair{BMO.AbstractSystem, Any}}
@@ -133,8 +207,10 @@ mutable struct LiveView
     # manual tracing, auto_trace is the `active` observable of the toggle
     auto_trace::Observable{Bool}
     stale::Bool
-    trace_button::Button
-    auto_trace_toggle::Toggle
+    # The widgets are typed by what the logic uses, since the layouts use different widgets:
+    # buttons have `clicks::Observable{Int}`, toggles `active::Observable{Bool}`
+    trace_button::Any
+    auto_trace_toggle::Any
     # alpha of the beam plots before dimming, restored after tracing
     beam_alphas::IdDict{Any, Any}
     # adaptive tracing, durations of the last solve and panel update [s]
@@ -158,20 +234,20 @@ mutable struct LiveView
     clip_size::Float64
     # the beams are clipped as well, switched via the toggle
     clip_beams::Bool
-    clip_beams_toggle::Toggle
+    clip_beams_toggle::Any
     # view cube in the corner of the 3D view, see `view_cube!`
     view_cube::Union{Nothing, ViewCube}
     # orthographic projection of the 3D view, switched via the toggle
-    orthographic_toggle::Toggle
+    orthographic_toggle::Any
     # export of the changed poses, see `export_changes`
-    export_button::Button
+    export_button::Any
     export_clipboard::Bool
-    # component menu, the option `i` selects `menu_objects[i]`
-    menu::Menu
+    # component menu, the option `i` selects `menu_objects[i]`, `nothing` in layouts without it
+    menu::Union{Nothing, Menu}
     menu_objects::Vector{Any}
     # hidden objects, i.e. rendered objects (leaves of groups) whose plots are invisible, see the
-    # action "hide" of the cards
-    show_all_button::Button
+    # action "hide" of the cards; "show all" shows them again (anything with `clicks`)
+    show_all_button::Any
     hidden::Base.IdSet{Any}
     # preview tracing: while moving, beam groups are solved only for their rendered beams, see
     # `_resolve!`; `preview` is set after such a solve, until the full solve once the movement pauses
@@ -184,33 +260,46 @@ mutable struct LiveView
     inspection::Any
     inspection_plot::Union{Nothing, AbstractPlot}
     # measuring: up to two points `(; point, obj)`, the result `(; distance, angle)` and its plots
-    measure_toggle::Toggle
+    measure_toggle::Any
     measure_points::Vector{Any}
     measurement::Any
     measure_plots::Vector{AbstractPlot}
     # camera tools: home view (eye, lookat, up), taken at the first tick, the saved views, the
     # animated camera transition
-    home_button::Button
+    home_button::Any
     home::NTuple{3, Vector{Float64}}
     home_set::Bool
     views::Vector{Pair{String, NTuple{3, Vector{Float64}}}}
     views_menu::Menu
-    save_view_button::Button
+    save_view_button::Any
     camera_animation::Any
     # markers of the movable sources, shown or hidden via the toggle or the key `1`
-    sources_toggle::Toggle
+    sources_toggle::Any
     # solve in a background task, see `_solve!`, its progress window and the delay [s] after which
     # the window of a loop appears
     job::Union{Nothing, _SolveJob}
     progress::_ProgressOverlay
     progress_delay::Float64
     # card with the controls of the selected object next to it in the 3D view, which holds
-    # `step_box`; all cards, including the pinned ones; the listeners that keep the camera from
-    # the cards, see `_shield_cards!`
+    # `step_box` in the compact layout; all cards, including the pinned ones; the listeners that
+    # keep the camera from the cards, see `_shield_cards!`
     card::_ComponentCard
     cards::Vector{_ComponentCard}
     card_shield::Vector{Any}
+    # objects of the `extras` kwarg: rendered, selectable and movable, but not part of any system,
+    # see `_live_render_extras!`; the opacity of objects set via their card, see `_set_opacity!`
+    extras::SystemRenderHandle
+    opacity::IdDict{Any, Any}
+    # state of the layout, e.g. the slots of the app layout, see `AbstractLiveLayout`; the last
+    # field, see the constructor below
+    layout::L
 end
+
+# Converts the fields like the constructor of a non-parametric type, the layout is the last field
+LiveView(fields...) = LiveView{typeof(last(fields))}(fields...)
+
+"""`LiveView` with the compact layout, i.e. `live_view(...; layout = :compact)`."""
+const CompactView = LiveView{CompactLayout}
 
 """
     display(gui::LiveView; screen_config...)
@@ -469,15 +558,38 @@ function _set_metrics!(p::DetectorPanel, m; record::Bool = true)
     p.ax.subtitle[] = _metrics_string(m)
     c = isfinite(m.cx) ? [Point2f(1e3 * m.cx, 1e3 * m.cz)] : Point2f[]
     p.centroid[] == c || (p.centroid[] = c)
-    (record && !isempty(p.history_axes)) || return nothing
+    record && _record_history!(p, m)
+    return nothing
+end
+
+"""
+    _record_history!(p, m; draw = true)
+
+Adds the power (or the number of hits) and the centroid of the metrics `m` to the history of the
+panel `p`, if it has one. Without `draw`, only the data is extended and the plots are not updated,
+e.g. for a panel that is not shown, see `_draw_history!`.
+"""
+function _record_history!(p::DetectorPanel, m; draw::Bool = true)
+    isempty(p.history_axes) && return nothing
     p.history_count += 1
     k = p.history_count
-    value, label = haskey(m, :P) ? (1e3 * m.P, "P [mW]") : (m.n, "N")
+    value = haskey(m, :P) ? 1e3 * m.P : m.n
     for (obs, v) in ((p.history_value, value), (p.history_cx, 1e3 * m.cx), (p.history_cz, 1e3 * m.cz))
         push!(obs[], Point2f(k, v))
         length(obs[]) > _HISTORY_LENGTH && popfirst!(obs[])
-        notify(obs)
     end
+    draw && _draw_history!(p, m)
+    return nothing
+end
+
+"""
+Updates the plots of the history of the panel `p` from its data (see `_record_history!`), the
+label of the power or number of hits from the metrics `m` of the last record.
+"""
+function _draw_history!(p::DetectorPanel, m = p.metrics)
+    isempty(p.history_axes) && return nothing
+    foreach(notify, (p.history_value, p.history_cx, p.history_cz))
+    label = (isnothing(m) || haskey(m, :P)) ? "P [mW]" : "N"
     p.history_axes[1].ylabel[] == label || (p.history_axes[1].ylabel[] = label)
     foreach(autolimits!, p.history_axes)
     return nothing
@@ -721,8 +833,8 @@ Each source is traced, and each field computed, with its progress output `sinks[
 `BMO._PROGRESS_SINK`, `nothing` for the terminal): first one per pair, then one per panel.
 
 With `preview`, beam groups rendered with `render_every > 1` are solved only for their rendered
-beams, see `_solve_preview!`. Returns `(; previewed, fields, solve_time, field_time)`: whether a
-beam group was solved as a preview, the fields of the panels and the durations [s].
+beams, see `_solve_preview!`. Returns `(; previewed, panels, fields, solve_time, field_time)`:
+whether a beam group was solved as a preview, the `panels` and their fields and the durations [s].
 """
 function _compute(pairs, handles, panels, sinks; coarse = false, preview = false)
     # Monotonic clock with ns resolution, time() is too coarse on Windows for fast solves
@@ -744,8 +856,45 @@ function _compute(pairs, handles, panels, sinks; coarse = false, preview = false
     n = length(pairs)
     fields = Any[Base.ScopedValues.with(() -> _panel_field(p, coarse), BMO._PROGRESS_SINK => sinks[n + k])
                  for (k, p) in enumerate(panels)]
-    return (; previewed, fields, solve_time = 1e-9 * (t1 - t0), field_time = 1e-9 * (time_ns() - t1))
+    return (; previewed, panels, fields, solve_time = 1e-9 * (t1 - t0),
+        field_time = 1e-9 * (time_ns() - t1))
 end
+
+#=
+Panels shown by the layout: the compact layout shows, and thus computes, all panels after each
+solve; the app layout only the panel of its active tab, see `LiveDock.jl`
+=#
+
+"""
+    _computed_panels(gui, preview::Bool) -> Vector
+
+The detector panels of the `gui` whose fields are computed after a solve (a preview solve if
+`preview`), see `_compute`: all panels, unless the layout shows only some of them. Their results
+are shown by `_apply_panel!`.
+"""
+_computed_panels(gui::LiveView, ::Bool) = gui.panels
+
+"""
+    _shown_panels(gui) -> Vector
+
+The detector panels of the `gui` that are shown, i.e. refined after a coarse preview, see
+`_on_idle!`: all panels, unless the layout shows only some of them.
+"""
+_shown_panels(gui::LiveView) = gui.panels
+
+"""
+    _apply_panel!(gui, p, field; coarse, preview)
+
+Shows the `field` of the panel `p` (see `_panel_field`) after a solve of the `gui`, the metrics of a
+full solve are recorded in its history, see `_update_panel!`.
+"""
+_apply_panel!(::LiveView, p::DetectorPanel, field; coarse, preview) =
+    _update_panel!(p, field; coarse, preview, record = !preview)
+
+# Hooks of the layout around a solve: before a solve empties the detectors, and after its result
+# was shown, see `_start_job` and `_apply!`
+_on_solve_started!(::LiveView) = nothing
+_on_applied!(::LiveView) = nothing
 
 """
     _apply!(gui, r, obj; coarse = false)
@@ -764,8 +913,8 @@ function _apply!(gui::LiveView, r, obj; coarse = false)
     foreach(update_render!, gui.beam_handles)
     t1 = time_ns()
     previewed = r.previewed
-    for (p, field) in zip(gui.panels, r.fields)
-        _update_panel!(p, field; coarse, preview = previewed, record = !previewed)
+    for (p, field) in zip(r.panels, r.fields)
+        _apply_panel!(gui, p, field; coarse, preview = previewed)
     end
     solve_time = r.solve_time + 1e-9 * (t1 - t0)
     if previewed
@@ -786,6 +935,8 @@ function _apply!(gui::LiveView, r, obj; coarse = false)
         end
     end
     isnothing(obj) || (gui.status.text[] = _pose_string(gui, obj))
+    _on_solved!(gui)
+    _on_applied!(gui)
     # e.g. values of the last solve on the cards
     _update_inspector!(gui)
     return nothing
@@ -801,23 +952,30 @@ task; a solve of the `gui` in the background is cancelled first.
 """
 function _resolve!(gui::LiveView, obj; coarse = false, preview = false)
     _cancel_solve!(gui)
-    sinks = fill(nothing, length(gui.pairs) + length(gui.panels))
-    r = _compute(gui.pairs, gui.beam_handles, gui.panels, sinks; coarse, preview)
+    panels = _computed_panels(gui, preview)
+    sinks = fill(nothing, length(gui.pairs) + length(panels))
+    _on_solve_started!(gui)
+    r = _compute(gui.pairs, gui.beam_handles, panels, sinks; coarse, preview)
     _apply!(gui, r, obj; coarse)
     return nothing
 end
 
 """
-    _start_job(gui, apply, obj, pairs, handles; coarse = false, preview = false, timing) -> _SolveJob
+    _start_job(gui, apply, obj, pairs, handles[, panels]; coarse = false, preview = false, timing) -> _SolveJob
 
-Starts `_compute` for the `pairs` (with the beam render `handles`) and the detector panels of the
-`gui` in a background task, with a progress sink per source and panel, see `_SolveJob`. `apply`
-shows the result, `timing` is the duration field that a cancelled job updates.
+Starts `_compute` for the `pairs` (with the beam render `handles`) and the detector `panels` (by
+default `_computed_panels`) of the `gui` in a background task, with a progress sink per source and
+panel, see `_SolveJob`. `apply` shows the result, `timing` is the duration field that a cancelled
+job updates, `:panel_time` for a job that only computes panels, i.e. without `pairs`.
 """
-function _start_job(gui::LiveView, apply, obj, pairs, handles; coarse = false, preview = false,
-        timing::Symbol)
+_start_job(gui::LiveView, apply, obj, pairs, handles; preview = false, kwargs...) =
+    _start_job(gui, apply, obj, pairs, handles, _computed_panels(gui, preview); preview, kwargs...)
+
+function _start_job(gui::LiveView, apply, obj, pairs, handles, panels; coarse = false,
+        preview = false, timing::Symbol)
+    isempty(pairs) || _on_solve_started!(gui)
     # The task works on its own copies of the lists, the objects are protected by `_change!`
-    pairs, handles, panels = copy(pairs), copy(handles), copy(gui.panels)
+    pairs, handles, panels = copy(pairs), copy(handles), copy(panels)
     sinks = [BMO._ProgressSink() for _ in 1:(length(pairs) + length(panels))]
     anchors = Point3f[_progress_anchor.(last.(pairs)); _progress_anchor.(getfield.(panels, :pd))]
     done = Base.Event()
@@ -904,7 +1062,8 @@ const _CANCELLED = "trace cancelled, press t to trace"
     _finish!(gui, job)
 
 Shows the result of the finished `job` in the `gui` via `job.apply`, and restores the appearance
-of the beams. If solving failed, the error is logged and the beams and detector panels are kept
+of the beams after a solve (a job that only computed detector panels leaves them as they are, see
+`_solves`). If solving failed, the error is logged and the beams and detector panels are kept
 marked as outdated. Returns `true` on success.
 """
 function _finish!(gui::LiveView, job::_SolveJob)
@@ -916,10 +1075,15 @@ function _finish!(gui::LiveView, job::_SolveJob)
         _fail!(gui, e)
         return false
     end
-    _restore_beams!(gui)
-    gui.stale = false
+    if _solves(job)
+        _restore_beams!(gui)
+        gui.stale = false
+    end
     return true
 end
+
+"""Whether the `job` solves the systems, i.e. does not only compute detector panels."""
+_solves(job::_SolveJob) = job.timing !== :panel_time
 
 """Marks the beams and detector panels of the `gui` as outdated after the solve failed with `e`."""
 function _fail!(gui::LiveView, e)
@@ -1058,9 +1222,9 @@ function _solve!(gui::LiveView, obj; coarse = false, preview = false)
     return done
 end
 
-"""Shows the fields `r.fields` of the detector panels of the `gui`, which refine a coarse preview."""
+"""Shows the fields `r.fields` of the detector panels `r.panels`, which refine a coarse preview."""
 function _refine!(gui::LiveView, r)
-    for (p, field) in zip(gui.panels, r.fields)
+    for (p, field) in zip(r.panels, r.fields)
         _update_panel!(p, field; record = false)
     end
     gui.coarse = false
@@ -1104,7 +1268,7 @@ function _on_idle!(gui::LiveView)
         _solve!(gui, gui.preview_obj)
     elseif gui.coarse
         job = _start_job(gui, r -> _refine!(gui, r), gui.preview_obj, empty(gui.pairs),
-            empty(gui.beam_handles); timing = :panel_time)
+            empty(gui.beam_handles), _shown_panels(gui); timing = :panel_time)
         _run!(gui, job, "computing the detector fields, Esc cancels")
     end
     return nothing
@@ -1295,6 +1459,15 @@ function _set_clip_beams!(gui::LiveView, on::Bool)
     return nothing
 end
 
+"""Switches the clip planes of the `gui` on or off, see `clipping`."""
+function _set_clipping!(gui::LiveView, on::Bool)
+    gui.clipping = on
+    _apply_clip_planes!(gui)
+    gui.status.text[] = on ? "clipping on" : "clipping off"
+    _on_clipping!(gui)
+    return nothing
+end
+
 """Re-applies the clip planes after the clip `plane` has been moved, without solving the systems."""
 function _on_clip_change!(gui::LiveView, plane::LiveClipPlane)
     _apply_clip_planes!(gui)
@@ -1315,8 +1488,9 @@ function _add_clip_plane!(gui::LiveView, point, normal; select::Bool = true)
     push!(ctrl.movable, plane)
     ctrl.init_poses[plane] = _pose(plane)
     push!(gui.clip_planes, plane)
-    haskey(gui.labels, plane) || (gui.labels[plane] = "Clip plane")
+    haskey(gui.labels, plane) || (gui.labels[plane] = _clip_plane_label(gui))
     _apply_clip_planes!(gui)
+    _on_clip_planes_changed!(gui)
     if select
         ctrl.selected[] = plane
         _update_selection_box!(ctrl)
@@ -1357,6 +1531,7 @@ function _remove_clip_plane!(gui::LiveView, plane::LiveClipPlane)
     _apply_clip_planes!(gui)
     _unpin!(gui, plane)
     gui.status.text[] = "clip plane removed"
+    _on_clip_planes_changed!(gui)
     return nothing
 end
 
@@ -1396,9 +1571,7 @@ function _clip_key!(gui::LiveView, key)
             return true
         end
         isempty(gui.clip_planes) && return false
-        gui.clipping = !gui.clipping
-        _apply_clip_planes!(gui)
-        gui.status.text[] = gui.clipping ? "clipping on" : "clipping off"
+        _set_clipping!(gui, !gui.clipping)
         return true
     elseif key == Keyboard.p
         # Nothing can be selected in the spectator mode
@@ -1642,12 +1815,22 @@ option `0`, i.e. no selection, is set by `_on_select!` and ignored.
 """
 function _on_menu_select!(gui::LiveView, i)
     1 <= i <= length(gui.menu_objects) || return nothing
+    _select!(gui, gui.menu_objects[i])
+    return nothing
+end
+
+"""
+    _select!(gui, obj)
+
+Selects the movable `obj` like a click in the 3D view, e.g. from the component menu or the object
+tree, and shows its pose in the status line. Nothing is selected in the spectator mode.
+"""
+function _select!(gui::LiveView, obj)
     ctrl = gui.controls
-    obj = gui.menu_objects[i]
     ctrl.selected[] === obj && return nothing
     if ctrl.spectator[]
         gui.status.text[] = "spectator mode, press v to select components"
-        gui.menu.i_selected[] = 0
+        _show_menu_selection!(gui.menu, 0)
         return nothing
     end
     ctrl.selected[] = obj
@@ -1660,14 +1843,44 @@ end
 function _on_select!(gui::LiveView)
     obj = gui.controls.selected[]
     i = isnothing(obj) ? nothing : findfirst(o -> o === obj, gui.menu_objects)
-    i = something(i, 0)
-    gui.menu.i_selected[] == i || (gui.menu.i_selected[] = i)
+    _show_menu_selection!(gui.menu, something(i, 0))
     _update_inspector!(gui)
     _update_cards!(gui)
+    _on_selected!(gui)
     return nothing
 end
 
-"""Sets the `visible` attribute of all plots of the rendered objects (leaves) of `obj`."""
+_show_menu_selection!(::Nothing, _) = nothing
+function _show_menu_selection!(menu::Menu, i)
+    menu.i_selected[] == i || (menu.i_selected[] = i)
+    return nothing
+end
+
+#=
+Optional widgets: a layout may leave out the component menu and the hide buttons (`nothing`), their
+observables are then `nothing` and not listened to
+=#
+
+_clicks(::Nothing) = nothing
+_clicks(button) = button.clicks
+_menu_selection(::Nothing) = nothing
+_menu_selection(menu::Menu) = menu.i_selected
+_open_observable(::Nothing) = nothing
+_open_observable(menu::Menu) = menu.is_open
+_is_open(::Nothing) = false
+_is_open(menu::Menu) = menu.is_open[]
+
+"""Adds a listener `f` of the observable `obs` to the `listeners`, unless `obs` is `nothing`."""
+_listen!(_, _, ::Nothing) = nothing
+function _listen!(listeners, f, obs::Observable)
+    push!(listeners, on(f, obs))
+    return nothing
+end
+
+"""
+Sets the `visible` attribute of all plots of the rendered objects (leaves) of `obj`. A leaf shown
+again whose opacity was set to 0 gets its initial opacity back, see `_set_opacity!`.
+"""
 function _set_hidden!(gui::LiveView, obj, hide::Bool)
     for leaf in _leaves(obj)
         hide ? push!(gui.hidden, leaf) : delete!(gui.hidden, leaf)
@@ -1677,6 +1890,7 @@ function _set_hidden!(gui::LiveView, obj, hide::Bool)
         for plot in gui.controls.h.handles[i].plots
             plot.visible[] == visible || (plot.visible[] = visible)
         end
+        hide || _restore_opacity!(gui, leaf, get(gui.opacity, leaf, nothing))
     end
     return nothing
 end
@@ -1727,25 +1941,28 @@ end
 """
     _toggle_hidden!(gui, obj)
 
-Hides the object `obj` of a card of the `gui`, i.e. makes its plots invisible and clears the
-selection if it is selected, or shows it again if it is hidden. A hidden object can not be
-selected in the 3D view, but it stays in the systems.
+Hides the object `obj` of the `gui` (of a card or a row of the object tree), i.e. makes the plots
+of its rendered objects invisible and clears the selection if it is hidden now, e.g. `obj` or an
+object of a hidden group or system, or shows it again if all of them are hidden. A hidden object
+can not be selected in the 3D view, but it stays in the systems.
 """
 function _toggle_hidden!(gui::LiveView, obj)
     ctrl = gui.controls
     hide = !_all_hidden(gui, obj)
     _set_hidden!(gui, obj, hide)
     if hide
-        if ctrl.selected[] === obj
+        sel = ctrl.selected[]
+        if sel === obj || (!isnothing(sel) && _all_hidden(gui, sel))
             ctrl.selected[] = nothing
             _update_selection_box!(ctrl)
         end
-        gui.status.text[] = "$(_label(gui, obj)) hidden, select it in the menu to show it again"
+        gui.status.text[] = "$(_label(gui, obj)) hidden, $(_show_hint(gui))"
     else
         gui.status.text[] = "$(_label(gui, obj)) shown"
     end
     _update_inspector!(gui)
     _update_cards!(gui)
+    _on_hidden!(gui)
     return nothing
 end
 _toggle_hidden!(gui::LiveView, ::Nothing) = (gui.status.text[] = "select a component to hide it"; nothing)
@@ -1757,12 +1974,16 @@ end
 """Returns `true` if all rendered objects (leaves) of `obj` are hidden in the `gui`."""
 _all_hidden(gui::LiveView, obj) = all(leaf -> leaf in gui.hidden, _leaves(obj))
 
+"""Returns how a hidden object of the `gui` is shown again, for the status line."""
+_show_hint(::LiveView) = "select it in the menu to show it again"
+
 """Shows all hidden objects of the `gui`."""
 function _show_all!(gui::LiveView)
     foreach(leaf -> _set_hidden!(gui, leaf, false), collect(gui.hidden))
     gui.status.text[] = "all components shown"
     _update_inspector!(gui)
     _update_cards!(gui)
+    _on_hidden!(gui)
     return nothing
 end
 
@@ -1782,8 +2003,15 @@ const _POSE_COLORS = (:black, :black, :black, :red, :green, :blue)
 """Returns `true` if a textbox or a menu of the `gui` takes keyboard input."""
 function _typing(gui::LiveView)
     any(c -> any(tb -> tb.focused[], _card_boxes(c)), gui.cards) && return true
-    return gui.menu.is_open[] || gui.views_menu.is_open[]
+    any(tb -> tb.focused[], _layout_boxes(gui)) && return true
+    return _menu_open(gui)
 end
+
+"""
+Returns the textboxes of the `gui` outside of the cards, e.g. of the inspector of the app layout,
+which take the keyboard like those of the cards, see `_typing`. None by default.
+"""
+_layout_boxes(::LiveView) = ()
 
 """Shows `s` in the textbox `tb` without triggering its listeners, `""` shows the placeholder."""
 function _set_box!(tb::Textbox, s::String)
@@ -1796,13 +2024,20 @@ end
     _update_inspector!(gui; force = false)
 
 Shows the values of the objects of all cards of the `gui` in their widgets, e.g. the position of
-an object in its pose boxes, see `_refresh_card!`. Focused textboxes keep the typed text, unless
-`force`.
+an object in its pose boxes, see `_refresh_card!`, and, in layouts with an inspector, refreshes it,
+see `_refresh_inspector!`. Focused textboxes keep the typed text, unless `force`.
 """
 function _update_inspector!(gui::LiveView; force::Bool = false)
     foreach(c -> _refresh_card!(gui, c; force), gui.cards)
+    _refresh_inspector!(gui; force)
     return nothing
 end
+
+"""
+Refreshes the parts of the layout of the `gui` that show the selected object besides the cards,
+e.g. the inspector of the app layout; nothing by default.
+"""
+_refresh_inspector!(::LiveView; force::Bool = false) = nothing
 
 """Returns `true` if the constraints of `obj` allow a move by `Δ`, see `kinematic_controls!`."""
 function _move_allowed(ctrl::KinematicController, obj, Δ)
@@ -1879,9 +2114,9 @@ end
 function _connect_tools!(gui::LiveView)
     listeners = gui.controls.listeners
     push!(listeners, on(_ -> _export!(gui), gui.export_button.clicks))
-    push!(listeners, on(i -> _on_menu_select!(gui, i), gui.menu.i_selected))
+    _listen!(listeners, i -> _on_menu_select!(gui, i), _menu_selection(gui.menu))
     push!(listeners, on(_ -> _on_select!(gui), gui.controls.selected))
-    push!(listeners, on(_ -> _show_all!(gui), gui.show_all_button.clicks))
+    _listen!(listeners, _ -> _show_all!(gui), _clicks(gui.show_all_button))
     return nothing
 end
 
@@ -1889,8 +2124,8 @@ end
 Component card
 =#
 
-"""Returns `true` if the component menu or the views menu of the `gui` is open."""
-_menu_open(gui::LiveView) = gui.menu.is_open[] || gui.views_menu.is_open[]
+"""Returns `true` if the component menu (if any) or the views menu of the `gui` is open."""
+_menu_open(gui::LiveView) = _is_open(gui.menu) || _is_open(gui.views_menu)
 
 """
 Returns the object of the card `c` of the `gui`: the pinned object, the selected object for the card
@@ -1915,7 +2150,8 @@ function _update_cards!(gui::LiveView)
     menu = _menu_open(gui)
     sel = gui.controls.selected[]
     obstacles = _obstacles(gui.view_cube)
-    shown = menu || any(c -> c.pinned && c.obj === sel, gui.cards) ? nothing : sel
+    shown = menu || !_selection_card_shown(gui) || any(c -> c.pinned && c.obj === sel, gui.cards) ?
+        nothing : sel
     _update_card!(gui, gui.card, shown, obstacles)
     for c in gui.cards
         c === gui.card && continue
@@ -1923,6 +2159,13 @@ function _update_cards!(gui::LiveView)
     end
     return nothing
 end
+
+"""
+Returns `true` if the layout of the `gui` shows the card of the selection (`gui.card`) next to the
+selected object; layouts that show the card elsewhere, e.g. docked in the inspector of the app
+layout, return `false`. Pinned cards are shown in all layouts.
+"""
+_selection_card_shown(::LiveView) = true
 
 """
     _update_card!(gui, c, obj, obstacles)
@@ -1972,11 +2215,12 @@ end
 Builds the widgets of the card `c` of the `gui` for its new object `obj` from the declarations
 [`card_actions`](@ref) (in `c.actions`) and [`card_rows`](@ref) (one layout per row in `c.rows`),
 see `_add_cell!`. If the declarations have the same layout as those of the widgets on the card,
-e.g. for another mirror, the widgets are kept and only take the new declarations. New widgets come
-before the mouse shield of the cards, see `_shield_cards!`.
+e.g. for another mirror, the widgets are kept and only take the new declarations. The card is any
+host of the declarations, see `_AbstractCard`, e.g. the floating card, whose new widgets come
+before the mouse shield of the cards (see `_on_content_built!`), or the docked card of the app.
 """
-function _build_content!(gui::LiveView, c::_ComponentCard, obj)
-    actions, rows = card_actions(obj), card_rows(obj)
+function _build_content!(gui::LiveView, c::_AbstractCard, obj)
+    actions, rows = _declarations(c, obj)
     key = (_layout_key(actions), _layout_key(rows))
     declared = CardWidget[_declared_widgets(actions)..., _declared_widgets(rows)...]
     if key == c.content_key
@@ -1988,48 +2232,60 @@ function _build_content!(gui::LiveView, c::_ComponentCard, obj)
         _add_cell!(gui, c, c.actions[1, j], w)
     end
     for (i, row) in enumerate(rows)
-        layout = GridLayout(c.rows[i, 1]; halign = :left, default_colgap = 6)
+        layout = GridLayout(c.rows[i, 1]; _row_attributes(c)...)
         for (j, cell) in enumerate(row.cells)
             _add_cell!(gui, c, layout[1, j], cell)
         end
     end
     c.content_key = key
-    _shield_cards!(gui)
+    _on_content_built!(gui, c)
     return nothing
 end
+
+"""
+    _declarations(c, obj) -> (actions, rows)
+
+The declarations of the widgets of `obj` on the card `c`: [`card_actions`](@ref) and
+[`card_rows`](@ref), which a host may extend, e.g. the docked card of the app layout.
+"""
+_declarations(::_AbstractCard, obj) = (card_actions(obj), card_rows(obj))
+
+# The new widgets of a floating card come before the mouse shield of the cards
+_on_content_built!(gui::LiveView, ::_ComponentCard) = _shield_cards!(gui)
+_on_content_built!(::LiveView, ::_AbstractCard) = nothing
 
 """
     _add_cell!(gui, c, pos, cell)
 
 Adds a cell of a declaration to the card `c` of the `gui` at the grid position `pos`: a text as a
-`Label`, a [`CardWidget`](@ref) as a block of its type with the colors of the card. The inputs of
-the block call `on` of the declaration (see `_on_input!`), and a textbox takes the keyboard like
-the others of the card.
+`Label`, a [`CardWidget`](@ref) as a block of its type with the attributes of the card, see
+`_cell_attributes`. The inputs of the block call `on` of the declaration (see `_on_input!`), and a
+textbox takes the keyboard like the others of the card.
 """
-function _add_cell!(::LiveView, c::_ComponentCard, pos, text::String)
-    push!(c.blocks, Label(pos, text; halign = :left, _card_style(Label)...))
+function _add_cell!(::LiveView, c::_AbstractCard, pos, text::String)
+    push!(c.blocks, Label(pos, text; halign = :left, _card_style(c, Label)...))
     return nothing
 end
-function _add_cell!(gui::LiveView, c::_ComponentCard, pos, w::CardWidget)
-    b = w.type(pos; _card_style(w.type)..., w.attributes...)
+function _add_cell!(gui::LiveView, c::_AbstractCard, pos, w::CardWidget)
+    b = w.type(pos; _cell_attributes(c, w)...)
     push!(c.blocks, b)
     push!(c.widgets, (b, w))
     i = length(c.widgets)
-    _fix_caret!(b, _scene_z(c))
+    _fix_caret!(c, b)
     _track_textbox!(gui, c, b)
     _listen_input!(gui, c, i, _widget_input(b))
     return nothing
 end
 
-function _track_textbox!(gui::LiveView, c::_ComponentCard, tb::Textbox)
+function _track_textbox!(gui::LiveView, c::_AbstractCard, tb::Textbox)
     push!(c.textboxes, tb)
     push!(c.listeners, on(_ -> _keep_keyboard!(gui), tb.focused))
     return nothing
 end
-_track_textbox!(::LiveView, ::_ComponentCard, _) = nothing
+_track_textbox!(::LiveView, ::_AbstractCard, _) = nothing
 
-_listen_input!(::LiveView, ::_ComponentCard, ::Int, ::Nothing) = nothing
-function _listen_input!(gui::LiveView, c::_ComponentCard, i::Int, obs::Observable)
+_listen_input!(::LiveView, ::_AbstractCard, ::Int, ::Nothing) = nothing
+function _listen_input!(gui::LiveView, c::_AbstractCard, i::Int, obs::Observable)
     push!(c.listeners, on(v -> _on_input!(gui, c, i, v), obs))
     return nothing
 end
@@ -2041,7 +2297,7 @@ Applies the input `v` of the declared widget `i` of the card `c` to the object o
 `_card_object`) with `on` of its declaration (and solves again for `solve = true`), then shows the
 new values on all cards. Ignored while the card shows new values (`refreshing`).
 """
-function _on_input!(gui::LiveView, c::_ComponentCard, i::Int, v)
+function _on_input!(gui::LiveView, c::_AbstractCard, i::Int, v)
     c.refreshing && return nothing
     w = c.widgets[i][2]
     _apply_input!(gui, w.on, _card_object(gui, c), v, w.solve)
@@ -2067,9 +2323,9 @@ end
 
 Shows the values of the object of the card `c` (see `_card_object`) in its declared widgets, see
 `value` of [`CardWidget`](@ref); a focused textbox keeps the typed text, unless `force`. Only if
-the widgets were built for this object, see `_update_card!`.
+the widgets were built for this object (`c.pose`), see `_update_card!`.
 """
-function _refresh_card!(gui::LiveView, c::_ComponentCard; force::Bool = false)
+function _refresh_card!(gui::LiveView, c::_AbstractCard; force::Bool = false)
     obj = _card_object(gui, c)
     (isnothing(obj) || c.pose === nothing || c.pose[1] !== obj) && return nothing
     c.refreshing = true
@@ -2133,6 +2389,7 @@ function _toggle_pinned!(gui::LiveView, c::_ComponentCard)
         _use_card!(gui, _spare_card!(gui))
     end
     _update_cards!(gui)
+    _on_pinned!(gui)
     return nothing
 end
 
@@ -2143,6 +2400,29 @@ function _unpin!(gui::LiveView, obj)
     end
     return nothing
 end
+
+"""Returns `true` if a card of the `gui` is pinned to `obj`."""
+_is_pinned(gui::LiveView, obj) = any(c -> c.pinned && c.obj === obj, gui.cards)
+
+"""
+    _toggle_pin!(gui, obj)
+
+Pins a floating card to `obj` (a spare card, see `_spare_card!`), independent of the card of the
+selection, e.g. from the docked card of the app layout; or unpins the cards pinned to `obj`.
+"""
+function _toggle_pin!(gui::LiveView, obj)
+    _is_pinned(gui, obj) && return _unpin!(gui, obj)
+    c = _spare_card!(gui)
+    c.pinned, c.obj, c.key, c.pose = true, obj, nothing, nothing
+    c.pin_button.label[] = "unpin"
+    _update_cards!(gui)
+    _on_pinned!(gui)
+    return nothing
+end
+_toggle_pin!(::LiveView, ::Nothing) = nothing
+
+# Called after a card was pinned or unpinned, see `AbstractLiveLayout`
+_on_pinned!(::LiveView) = nothing
 
 """Returns a card of the `gui` that is neither pinned nor the card of the selection, or a new one."""
 function _spare_card!(gui::LiveView)
@@ -2724,9 +3004,10 @@ function _connect_camera!(gui::LiveView)
         _step_camera!(gui, tick.delta_time)
         return nothing
     end)
-    # The textboxes of the cards are connected with their cards, see `_connect_card!`
-    for obs in (cameracontrols(scene).selected, gui.menu.is_open, gui.views_menu.is_open)
-        push!(listeners, on(_ -> _keep_keyboard!(gui), obs))
+    # The textboxes of the cards are connected with their cards, see `_connect_card!`, those of the
+    # layout (see `_layout_boxes`) by the layout
+    for obs in (cameracontrols(scene).selected, _open_observable(gui.menu), gui.views_menu.is_open)
+        _listen!(listeners, _ -> _keep_keyboard!(gui), obs)
     end
     _keep_keyboard!(gui)
     push!(listeners, on(_ -> _go_home!(gui), gui.home_button.clicks))
@@ -2771,8 +3052,11 @@ are solved again and the beams and detector panels are updated. Returns a `LiveV
 fields `fig`, `ax`, `controls`, `panels`, `status` and `sliders`. Use `display(gui)` to show the
 window and `close(gui)` to remove the controls.
 
-Additional context, e.g. a static optomechanical assembly, can be added via `render!(gui.ax, ...)`.
-The status line shows the pose of the moved object and its change since the window was opened.
+Additional context, e.g. an optomechanical assembly from a CAD file, is passed via `extras`: these
+objects are rendered, selected, moved, hidden and exported like the components, but they are not
+part of any system, i.e. never traced and without cost in the solves; see "Extras and opacity".
+Plots added via `render!(gui.ax, ...)` are only drawn. The status line shows the pose of the moved
+object and its change since the window was opened.
 
 # Component card, component menu and export
 
@@ -2805,6 +3089,28 @@ view, and "show all", which shows all hidden objects.
 
 The "Export" button prints the changed poses as Julia code to `stdout` and copies it to the
 clipboard, see [`export_changes`](@ref).
+
+# Extras and opacity
+
+`extras = [housing => (; color = :lightblue), mount]` adds objects without optical function, e.g.
+a `MeshDummy` of an STL file, each an `AbstractObject` (or a group of them) with optional kwargs
+of its [`render!`](@ref) call. They are not part of any system: never traced, moving them does not
+solve the systems. Otherwise they act like the components: a click in the 3D view (where they do
+not cover the components behind them, which are picked first) or in the component menu or object
+tree selects them, they are moved with the controls if their kinematic trait allows it (static
+ones are only rendered and hidden), hidden via "hide" or the eye of the tree, in which they are
+listed under "Extras", and their moves are exported by [`export_changes`](@ref). An extra must not
+be an object of a system.
+
+The card of mechanics, i.e. a `NonInteractableObject` (e.g. `MeshDummy`) or an
+`IntersectableObject`, in a system or among the extras, has an "opacity" slider (0-100 %,
+initially the opacity as rendered, e.g. 5 % for a color with alpha 0.05). It scales the alpha of
+the plots of the object, including its feature edges, and does not change the optics. Objects below
+100 % are drawn with order independent transparency (`transparency = true`), opaque ones without
+it, which is cheaper and keeps the correct depth; switching rebuilds the render objects of the
+object once (a few ms for a mesh with 1 M triangles). At 0 % the object is hidden like via "hide",
+a larger opacity shows it again. The opacity is kept while the object is hidden; showing an object
+hidden at 0 % restores its initial opacity.
 
 # Beam inspection and measuring
 
@@ -2899,9 +3205,45 @@ view. The selection box of a partly clipped component only covers its visible pa
 
 The key `g` zooms to the selection, see "Camera tools".
 
+# App layout
+
+With `layout = :app`, the same live view is arranged as an application window, all keys and mouse
+actions in the 3D view are unchanged:
+
+- toolbar (icons with tooltips): trace and auto trace, home, fit (`g`), views, save view,
+  orthographic, clipping (`c`), clip beams, sources (`1`), measure, export, the toggles of the
+  sidebars and the dock, help (`h`)
+- left sidebar: the object tree and, below it, the sliders ("Parameters"). The tree lists each
+  system with its objects (groups with their objects, collapsed by default), then the `extras`
+  under "Extras", the sources and the clip planes. A click on a name selects the object like a click in the 3D view, and a
+  selection in the 3D view highlights its row. The eye hides or shows an object, a group or a
+  whole system, the eye in the title of the tree shows all objects again. Objects without a
+  `labels` entry are named by their type and a running index, e.g. "Lens 2", also in the status
+  line.
+- right sidebar ("Properties"): the card of the selected object, docked instead of floating next
+  to it: its name and type, the actions of the card (e.g. "hide", or "flip" and "remove" for a
+  clip plane) and a pin, which pins a floating card to the object in the 3D view; below, the rows
+  of the card (see [`card_rows`](@ref), e.g. the pose and the ray slider of a source) and, for a
+  detector, the mode and the color scale of its panel; then the step box, the mode and the
+  properties of the object (see [`properties`](@ref)). Pinned cards float in the 3D view as in
+  the compact layout.
+- analysis dock below the 3D view: a tab per detector panel, a click on a tab shows its panel.
+  Only the panel of the active tab is computed after a solve, the other panels are computed when
+  their tab is opened; a collapsed dock computes none. Panels with `history = true` still record
+  every full solve. The history and profiles axes are shown beside the panel.
+- status bar: the status line and the duration of the last solve, the number of rays and the
+  projection
+
+The sidebars and the dock can be collapsed via the toolbar, the 3D view then takes their space.
+The component menu of the compact layout is replaced by the tree. In the compact layout, the widgets are at
+fixed positions of `gui.fig`, e.g. the detector panels in `gui.fig[1, 2]`, next to which users
+may add their own axes.
+
 # Keyword args
 
-- `size = (1400, 800)`: size of the figure
+- `layout = :compact`: arrangement of the widgets, `:compact` or `:app`, see "App layout"
+- `theme = :light`: colors of the app layout, `:light` or `:dark` (ignored by `:compact`)
+- `size`: size of the figure, by default `(1400, 800)` for `:compact` and `(1600, 950)` for `:app`
 - `auto_trace = true`: solves the systems after each change, otherwise only on request, see
   "Manual tracing"
 - `detectors = :auto`: all `Detector`s of all systems. Alternatively a vector of `pd`,
@@ -2914,6 +3256,9 @@ The key `g` zooms to the selection, see "Camera tools".
 - `sliders = []`: vector of `"label" => (range, callback)` or `"label" => (range, callback, startvalue)`.
   The `callback` is called with the new value, then the systems are solved again.
 - `system_kwargs = (;)`: passed to `live_render!` of each system
+- `extras = []`: objects that are rendered and can be moved and hidden, but are not traced, a
+  vector of `obj` or `obj => render_kwargs`, e.g. `[housing => (; transparency = true, color =
+  RGBAf(0.7, 0.8, 0.9, 0.05))]`, see "Extras and opacity"
 - `beam_kwargs = Dict()`: `beam => kwargs` passed to `live_render!` of the beam, by default
   `(; render_every = 5)` for beam groups
 - `movable_sources = true`: shows an orange marker at each source, i.e. the beam or beam group of
@@ -2948,7 +3293,9 @@ The key `g` zooms to the selection, see "Camera tools".
 """
 function live_view(
         pairs::Pair{<:BMO.AbstractSystem}...;
-        size = (1400, 800),
+        size = nothing,
+        layout::Symbol = :compact,
+        theme::Symbol = :light,
         auto_trace::Bool = true,
         detectors = :auto,
         on_change = (gui, obj) -> nothing,
@@ -2969,65 +3316,24 @@ function live_view(
         preview::Bool = true,
         views = [],
         progress_delay::Real = 0.5,
+        extras = [],
         kwargs...
     )
     isempty(pairs) && throw(ArgumentError("live_view requires at least one system => beam pair"))
     ps = Pair{BMO.AbstractSystem, Any}[p for p in pairs]
     # several beams may share a system, which is rendered once
     systems = unique(objectid, first.(ps))
+    extra_specs = _extra_specs(extras, systems)
     specs = _panel_specs(detectors, systems)
     slider_specs = [_slider_spec(s) for s in sliders]
     clip_specs = _clip_plane_specs(clip_planes)
     view_specs = _view_specs(views)
 
-    fig = Figure(; size)
-    ax = LScene(fig[1, 1]; show_axis = false)
-    studio_lighting!(ax; preset = lighting)
-    # Its click listener runs before the controls, hence clicks on the cube never select objects
-    cube = view_cube ? view_cube!(ax) : nothing
-    ncols = isempty(specs) ? 1 : 2
-
-    # Detector panels in a near-square grid next to the 3D view
-    panels = Any[]
-    if !isempty(specs)
-        grid = GridLayout(fig[1, 2])
-        nc = ceil(Int, sqrt(length(specs)))
-        for (i, (pd, mode, kw)) in enumerate(specs)
-            parent = grid[(i - 1) ÷ nc + 1, (i - 1) % nc + 1]
-            push!(panels, DetectorPanel(parent, pd, get(labels, pd, "Detector $i"), mode, kw))
-        end
-        colsize!(fig.layout, 1, Relative(0.6))
-    end
-    slider_grid = if isempty(slider_specs)
-        nothing
-    else
-        SliderGrid(fig[2, 1:ncols], first.(slider_specs)...)
-    end
-    # Status row: trace button, auto trace toggle and status line
-    status_row = GridLayout(fig[isnothing(slider_grid) ? 2 : 3, 1:ncols])
-    trace_button = Button(status_row[1, 1]; label = "Trace (t)")
-    auto_trace_toggle = Toggle(status_row[1, 2]; active = auto_trace)
-    Label(status_row[1, 3], "auto trace")
-    clip_beams_toggle = Toggle(status_row[1, 4]; active = clip_beams)
-    Label(status_row[1, 5], "clip beams")
-    orthographic_toggle = Toggle(status_row[1, 6]; active = orthographic)
-    Label(status_row[1, 7], "orthographic")
-    sources_toggle = Toggle(status_row[1, 8]; active = show_sources)
-    Label(status_row[1, 9], "sources (1)")
-    export_button = Button(status_row[1, 10]; label = "Export")
-    status = Label(status_row[1, 11],
-        "Click on a component to select it, press h to show the controls"; tellwidth = false)
-    # Tool row: component menu (added below, once the movable objects are known) and "show all"
-    tool_row = GridLayout(fig[isnothing(slider_grid) ? 3 : 4, 1:ncols])
-    show_all_button = Button(tool_row[1, 2]; label = "show all")
-    # Measuring and camera tools, the views menu is added below with the component menu
-    measure_toggle = Toggle(tool_row[1, 3]; active = false)
-    Label(tool_row[1, 4], "measure")
-    home_button = Button(tool_row[1, 5]; label = "home")
-    save_view_button = Button(tool_row[1, 7]; label = "save view")
-    # Keeps the tool row left-aligned and compact enough for narrow windows
-    Label(tool_row[1, 8], ""; tellwidth = false)
-    colgap!(tool_row, 6)
+    lay = _live_layout(layout, theme)
+    fig = _figure(lay, something(size, _default_size(lay)))
+    w = _build_layout(lay, fig, (; specs, slider_specs, labels, lighting, view_cube, auto_trace,
+        clip_beams, orthographic, show_sources, view_specs))
+    ax = w.ax
     # Pose, keyboard step and hide button of the selected object, next to it in the 3D view
     card = _ComponentCard(fig, _card_z(1))
 
@@ -3056,14 +3362,17 @@ function live_view(
             BMO._is_static(src) || push!(handles, _live_render_source!(ax, src; size = marker_size))
         end
     end
+    # The extras are moved and selected like the objects of the systems, but never traced
+    extras_handle = _live_render_extras!(ax, extra_specs)
+    append!(handles, extras_handle.handles)
     parent = IdDict{BMO.AbstractObject, BMO.AbstractObject}()
-    foreach(h -> merge!(parent, h.parent), system_handles)
+    foreach(h -> merge!(parent, h.parent), (system_handles..., extras_handle))
     combined = SystemRenderHandle(ax, first(systems), handles, parent)
     gui_ref = Ref{LiveView}()
-    # Moving a clip plane only re-applies the planes, the systems are not solved
+    # Moving a clip plane or an extra does not solve the systems, see `_on_moved!`
     change = function (obj)
         gui = gui_ref[]
-        obj isa LiveClipPlane ? _on_clip_change!(gui, obj) : _on_change!(gui, obj)
+        _on_moved!(gui, obj)
         _update_inspector!(gui)
         return nothing
     end
@@ -3073,36 +3382,36 @@ function live_view(
 
     labels_dict = IdDict{Any, String}(labels)
     entries = _menu_entries(controls)
-    menu = Menu(tool_row[1, 1]; options = _menu_options(labels_dict, entries), default = nothing,
-        prompt = "select component", width = 150)
-    views_menu = Menu(tool_row[1, 6]; options = _views_options(view_specs), default = nothing,
-        prompt = "views", width = 90)
-    gui = LiveView(fig, ax, ps, system_handles, beam_handles, controls, panels, status, slider_grid,
-        on_change, nothing, auto_trace_toggle.active, false, trace_button, auto_trace_toggle,
-        IdDict{Any, Any}(), Float64(trace_budget), Float64(idle_delay), 0.0, 0.0, false, nothing,
-        0.0, false, labels_dict, card.step_box, LiveClipPlane[], true, 1.2 * extent,
-        clip_beams, clip_beams_toggle, cube, orthographic_toggle, export_button, true, menu,
-        Any[first.(entries)...], show_all_button, Base.IdSet{Any}(),
-        preview, false, nothing, 0.0, nothing, nothing, measure_toggle, Any[], nothing,
-        AbstractPlot[], home_button, (zeros(3), zeros(3), zeros(3)), false, view_specs,
-        views_menu, save_view_button, nothing, sources_toggle, nothing, _ProgressOverlay(ax),
-        Float64(progress_delay), card, [card], Any[])
+    menus = _build_menus(lay, w, _menu_options(labels_dict, entries), _views_options(view_specs))
+    gui = LiveView(fig, ax, ps, system_handles, beam_handles, controls, w.panels, w.status,
+        w.sliders, on_change, nothing, w.auto_trace_toggle.active, false, w.trace_button,
+        w.auto_trace_toggle, IdDict{Any, Any}(), Float64(trace_budget), Float64(idle_delay), 0.0,
+        0.0, false, nothing, 0.0, false, labels_dict, _step_box(lay, w, card), LiveClipPlane[], true,
+        1.2 * extent, clip_beams, w.clip_beams_toggle, w.cube, w.orthographic_toggle,
+        w.export_button, true, menus.menu, Any[first.(entries)...], w.show_all_button,
+        Base.IdSet{Any}(), preview, false, nothing, 0.0, nothing, nothing, w.measure_toggle, Any[],
+        nothing, AbstractPlot[], w.home_button, (zeros(3), zeros(3), zeros(3)), false, view_specs,
+        menus.views_menu, w.save_view_button, nothing, w.sources_toggle, nothing,
+        _ProgressOverlay(ax), Float64(progress_delay), card, [card], Any[], extras_handle,
+        IdDict{Any, Any}(), lay)
     gui_ref[] = gui
     # Objects must not change while a solve in the background traces them
     controls.before_change = () -> _cancel_solve!(gui)
     for (point, normal) in clip_specs
         _add_clip_plane!(gui, point, normal; select = false)
     end
-    isnothing(slider_grid) || _connect_sliders!(gui, last.(slider_specs))
+    isnothing(gui.sliders) || _connect_sliders!(gui, last.(slider_specs))
     _connect_trace!(gui)
     _connect_clip_planes!(gui)
     _connect_tools!(gui)
     _connect_inspection!(gui)
     _connect_camera!(gui)
     _connect_cards!(gui)
-    push!(controls.listeners, on(v -> v == gui.clip_beams || _set_clip_beams!(gui, v), clip_beams_toggle.active))
+    push!(controls.listeners, on(v -> v == gui.clip_beams || _set_clip_beams!(gui, v),
+        gui.clip_beams_toggle.active))
     _connect_projection!(gui, orthographic)
     _connect_sources!(gui)
+    _connect_layout!(gui)
     _resolve!(gui, nothing)
     # Initial view from the Front-Right-Top corner, in which the labels of the view cube read
     # correctly. Only set once, later changes of the view, e.g. via `set_view`, are kept.
@@ -3117,6 +3426,115 @@ function live_view(
 end
 
 live_view(system::BMO.AbstractSystem, beam; kwargs...) = live_view(system => beam; kwargs...)
+
+#=
+Layouts, see `AbstractLiveLayout`
+=#
+
+"""
+    _live_layout(layout::Symbol, theme::Symbol) -> AbstractLiveLayout
+
+Returns the layout of the `layout` and `theme` kwargs of `live_view`, the only place where the
+names are mapped to the layout types. The `theme` is validated for all layouts, but only used by
+the app layout.
+"""
+function _live_layout(layout::Symbol, theme::Symbol)
+    tokens = _app_theme(theme)
+    layout == :compact && return CompactLayout()
+    layout == :app && return AppLayout(tokens)
+    throw(ArgumentError("layout must be :compact or :app, got :$layout"))
+end
+
+_default_size(::AbstractLiveLayout) = (1400, 800)
+_figure(::AbstractLiveLayout, size) = Figure(; size)
+
+# Optional parts of the layout interface, see `AbstractLiveLayout`
+_connect_layout!(::LiveView) = nothing
+_on_solved!(::LiveView) = nothing
+_on_selected!(::LiveView) = nothing
+_on_clipping!(::LiveView) = nothing
+_on_clip_planes_changed!(::LiveView) = nothing
+_on_hidden!(::LiveView) = nothing
+_clip_plane_label(::LiveView) = "Clip plane"
+
+function _slot_error(gui::LiveView, what)
+    throw(ArgumentError("the $(nameof(typeof(gui.layout))) of this live view has no $what"))
+end
+_add_toolbar_entry!(gui::LiveView, _) = _slot_error(gui, "toolbar")
+_add_sidebar_section!(gui::LiveView, _, _) = _slot_error(gui, "sidebars")
+_add_dock_panel!(gui::LiveView, _) = _slot_error(gui, "dock")
+
+function _build_layout(::CompactLayout, fig, spec)
+    (; specs, slider_specs, labels, lighting, view_cube, auto_trace, clip_beams, orthographic,
+        show_sources) = spec
+    ax = LScene(fig[1, 1]; show_axis = false)
+    studio_lighting!(ax; preset = lighting)
+    # Its click listener runs before the controls, hence clicks on the cube never select objects
+    cube = view_cube ? view_cube!(ax) : nothing
+    ncols = isempty(specs) ? 1 : 2
+
+    # Detector panels in a near-square grid next to the 3D view
+    panels = Any[]
+    if !isempty(specs)
+        grid = GridLayout(fig[1, 2])
+        nc = ceil(Int, sqrt(length(specs)))
+        for (i, (pd, mode, kw)) in enumerate(specs)
+            parent = grid[(i - 1) ÷ nc + 1, (i - 1) % nc + 1]
+            push!(panels, DetectorPanel(parent, pd, get(labels, pd, "Detector $i"), mode, kw))
+        end
+        colsize!(fig.layout, 1, Relative(0.6))
+    end
+    sliders = if isempty(slider_specs)
+        nothing
+    else
+        SliderGrid(fig[2, 1:ncols], first.(slider_specs)...)
+    end
+    # Status row: trace button, auto trace toggle and status line
+    status_row = GridLayout(fig[isnothing(sliders) ? 2 : 3, 1:ncols])
+    trace_button = Button(status_row[1, 1]; label = "Trace (t)")
+    auto_trace_toggle = Toggle(status_row[1, 2]; active = auto_trace)
+    Label(status_row[1, 3], "auto trace")
+    clip_beams_toggle = Toggle(status_row[1, 4]; active = clip_beams)
+    Label(status_row[1, 5], "clip beams")
+    orthographic_toggle = Toggle(status_row[1, 6]; active = orthographic)
+    Label(status_row[1, 7], "orthographic")
+    sources_toggle = Toggle(status_row[1, 8]; active = show_sources)
+    Label(status_row[1, 9], "sources (1)")
+    export_button = Button(status_row[1, 10]; label = "Export")
+    status = Label(status_row[1, 11],
+        "Click on a component to select it, press h to show the controls"; tellwidth = false)
+    # Tool row: component menu (added by `_build_menus`, once the movable objects are known) and
+    # "show all"
+    tool_row = GridLayout(fig[isnothing(sliders) ? 3 : 4, 1:ncols])
+    show_all_button = Button(tool_row[1, 2]; label = "show all")
+    # Measuring and camera tools, the views menu is added with the component menu
+    measure_toggle = Toggle(tool_row[1, 3]; active = false)
+    Label(tool_row[1, 4], "measure")
+    home_button = Button(tool_row[1, 5]; label = "home")
+    save_view_button = Button(tool_row[1, 7]; label = "save view")
+    # Keeps the tool row left-aligned and compact enough for narrow windows
+    Label(tool_row[1, 8], ""; tellwidth = false)
+    colgap!(tool_row, 6)
+    return (; ax, cube, panels, sliders, status, trace_button, auto_trace_toggle, clip_beams_toggle,
+        orthographic_toggle, sources_toggle, export_button, show_all_button, measure_toggle,
+        home_button, save_view_button, tool_row)
+end
+
+function _build_menus(::CompactLayout, w, options, views_options)
+    menu = Menu(w.tool_row[1, 1]; options, default = nothing, prompt = "select component",
+        width = 150)
+    views_menu = Menu(w.tool_row[1, 6]; options = views_options, default = nothing,
+        prompt = "views", width = 90)
+    return (; menu, views_menu)
+end
+
+"""
+    _step_box(layout, w, card) -> Textbox
+
+The box of the keyboard step of the `layout` with the widgets `w` (see `_build_layout`): the step
+box of the `card` of the selection by default, see `_ComponentCard`.
+"""
+_step_box(::AbstractLiveLayout, _, card) = card.step_box
 
 """
     _connect_projection!(gui, orthographic)

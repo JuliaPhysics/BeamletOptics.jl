@@ -91,6 +91,13 @@ rays hitting it and their angle of incidence (last solve), `n` of lenses, R/T of
 polarizer axis, detector power, the ray count slider of sources (`set_num_rays!`). Own types add
 rows with a `card_rows` method (`CardRow`, `CardWidget`).
 
+Mechanics that should be visible but not traced (e.g. a housing STL) go into
+`extras = [housing => (; color = :lightblue), ...]` (`obj` or `obj => render_kwargs`), not into
+the system and not via `render!(gui.ax, ...)`: extras cost nothing in the solves, but can be
+selected, moved, hidden and exported like components. An extra must not also be an object of a
+system (`ArgumentError`). The card of a `NonInteractableObject`/`MeshDummy` or
+`IntersectableObject` has an "opacity" slider (0-100 %, 0 % hides it).
+
 Solves longer than `progress_delay` (kwarg, default 0.5 s) run in the background: the window stays
 usable and a small progress window appears next to the source being traced or the detector whose
 field is computed. Moving a component or pressing `Esc` cancels the solve.

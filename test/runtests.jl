@@ -24,6 +24,7 @@ include(joinpath(@__DIR__, "Geometry", "SDFs", "TestConicSDF.jl"))
 # Test system and object containers
 include(joinpath(@__DIR__, "TestSystem.jl"))
 include(joinpath(@__DIR__, "TestObjectGroups.jl"))
+include(joinpath(@__DIR__, "TestProperties.jl"))
 
 # Test lens models
 include(joinpath(@__DIR__, "Lenses", "TestSphericalLenses.jl"))
@@ -61,10 +62,16 @@ include(joinpath(@__DIR__, "Rendering", "TestRenderLook.jl"))
 include(joinpath(@__DIR__, "Rendering", "TestLiveObjects.jl"))
 include(joinpath(@__DIR__, "Rendering", "TestLiveBeams.jl"))
 include(joinpath(@__DIR__, "Rendering", "TestLiveProgress.jl"))
+include(joinpath(@__DIR__, "Rendering", "TestLiveIcons.jl"))
 include(joinpath(@__DIR__, "Rendering", "TestLiveCard.jl"))
 include(joinpath(@__DIR__, "Rendering", "TestLiveCardRows.jl"))
 include(joinpath(@__DIR__, "Rendering", "TestLiveInteraction.jl"))
+include(joinpath(@__DIR__, "Rendering", "TestLiveTree.jl"))
 include(joinpath(@__DIR__, "Rendering", "TestLiveView.jl"))
+include(joinpath(@__DIR__, "Rendering", "TestLiveApp.jl"))
+include(joinpath(@__DIR__, "Rendering", "TestLiveDock.jl"))
+include(joinpath(@__DIR__, "Rendering", "TestLiveInspector.jl"))
+include(joinpath(@__DIR__, "Rendering", "TestLiveExtras.jl"))
 include(joinpath(@__DIR__, "Rendering", "TestViewCube.jl"))
 
 # Test regressions

@@ -327,18 +327,30 @@ direction, the green axis is its direction. If a marker covers small components,
 toggle below the 3D view or the key `1` hides all markers and shows them again, `show_sources =
 false` starts with hidden markers. Pass `movable_sources = false` to omit the markers altogether.
 
-### Static context
+### Extras and static context
 
-Additional context that is not part of any `system`, e.g. a housing or an optical table, can be
-added directly to `gui.ax` via `render!`:
+Objects that are not part of any `system`, e.g. a housing from a CAD file, are passed as `extras`,
+each optionally with the kwargs of its `render!` call:
+
+```julia
+housing = MeshDummy("housing.stl")
+gui = live_view(system => beam; extras = [housing => (; transparency = true, color = (:gray, 0.3))])
+```
+
+Extras are never traced, so they cost nothing in the solves, and moving them does not solve the
+systems. Otherwise they act like components: they are selected with a click, in the component menu
+or in the object tree (under "Extras"), moved, hidden and exported. They do not block clicking on
+the optics behind them: objects are picked by intersecting the camera ray with the optical
+components first, which a `NonInteractableObject` never intersects. The card of a
+`NonInteractableObject` (e.g. a `MeshDummy`) or an `IntersectableObject` has an "opacity" slider,
+which makes it transparent without changing the optics; 0 % hides it.
+
+Plots added directly to `gui.ax` via `render!` are only drawn, i.e. they are neither selectable nor
+hideable:
 
 ```julia
 render!(gui.ax, housing_mesh; transparency = true, color = (:gray, 0.3))
 ```
-
-Such geometry is not selectable and does not block clicking on the optics behind it: objects are
-picked by intersecting the camera ray with the movable objects of the system, not with everything
-drawn in the scene, so a housing mesh in front of a component never gets in the way.
 
 ### Clip planes
 
@@ -502,7 +514,7 @@ view, off the view cube and the other cards:
   | lenses, prisms | `n` at the wavelength of the hitting beam, `d` the center thickness (`Lens`) |
   | beamsplitters | `split`: R and T (power) of the coating |
   | polarizers | `axis`: the transmission axis about the optical axis, from the horizontal |
-  | detectors | `panel`: the power (intensity panel) or the number of rays (spot panel) |
+  | detectors | `signal`: the power (intensity panel) or the number of rays (spot panel) |
   | ray sources | `λ` and the diameter or NA; sources whose rays can be regenerated (`CollimatedSource`, `PointSource` and their uniform variants, see [`set_num_rays!`](@ref)) add the slider "rays" for their number of rays, which solves again |
   | Gaussian beamlets | `λ`, the waist `w0` and the Rayleigh range `zR` |
 
@@ -520,6 +532,10 @@ BeamletOptics.card_rows(l::MyLens) = (pose_card_rows(l)...,
 ```
 
 where `solve = true` solves the systems again after an input, like a move.
+
+With `live_view(...; layout = :app)`, the card of the selection is docked in the "Properties"
+sidebar instead of floating next to the component: it shows the same rows and actions, and its pin
+pins a floating card to the component in the 3D view, as above.
 
 The row below the status line holds the component menu and "show all". The menu lists all movable
 components and sources by their `labels` (or type), the objects of a group indented after the

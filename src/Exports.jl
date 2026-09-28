@@ -16,6 +16,9 @@ export System, StaticSystem, solve_system!
 # object group
 export ObjectGroup
 
+# display
+export properties, default_properties
+
 # additional
 export DiscreteRefractiveIndex, SellmeierEquation
 

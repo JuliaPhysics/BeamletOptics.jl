@@ -36,6 +36,7 @@ Use `scripts/api_lookup.jl NAME` to print the docstring and signatures of any na
 | Rays & beams  | `Ray`, `PolarizedRay`, `Beam`, `GaussianBeamlet`, `AstigmaticGaussianBeamlet`, `rays`, `point_on_beam`, `rayleigh_range`, `normal3d` |
 | Sources       | `CollimatedSource`, `UniformDiscSource`, `PointSource`, `UniformPointSource`, `set_num_rays!`, `CollimatedGaussianBeamletSource`, `SphericalGaussianBeamletSource`, `EllipticalGaussianBeamletSource`, `GaussianBeamletDecomposition`, `WavefrontBeamletDecomposition`, `AstigmaticBeamGroup` |
 | System        | `System`, `StaticSystem`, `solve_system!`, `ObjectGroup` |
+| Inspection    | `properties`, `default_properties` |
 | Materials     | `DiscreteRefractiveIndex`, `SellmeierEquation` |
 | Lenses        | `Lens`, `ThinLens`, `SphericalLens`, `DoubletLens`, `SphericalDoubletLens`, `TripletLens`, `SphericalTripletLens`, `thickness` |
 | Surfaces      | `SphericalSurface`, `CircularFlatSurface`, `RectangularFlatSurface`, `EvenAsphericalSurface`, `CylindricalSurface`, `AcylindricalSurface` |
@@ -53,6 +54,22 @@ Useful non-exported helpers: `BeamletOptics.inch`, `lensmakers_eq(R1, R2, n)` (r
 `divergence_angle(λ, w0, M2)`, `numerical_aperture(θ, n=1)`, `optical_path_length(beam)`,
 `isparaxial(system, beam, θ=π/4)`, `fresnel_coefficients`, `beams(group)`, `objects(system)`,
 `list_subtypes(T)`, constants `Z_vacuum`, `c_vacuum`.
+
+## Properties of objects
+
+`properties(x)` lists what an object, shape, beam or source stores as `name => value` pairs, e.g.
+`"Thickness [m]" => 0.005`, `"Reflectance" => 0.3` (power ratio), `"Hits" => 12`. Values are SI
+numbers; the unit is in brackets at the end of the name, names without brackets are dimensionless.
+The live view's app layout shows this list in its inspector. It lists only stored values: e.g. the
+radii and diameter of a `Lens` are not stored and not listed.
+
+A custom `AbstractObject` subtype gets the default list (type, position, optical axis, shape). To
+show its own parameters, extend it:
+
+```julia
+BeamletOptics.properties(x::MyFilter) =
+    [default_properties(x); "Optical density" => x.od; "Center wavelength [m]" => x.λc]
+```
 
 ## Solving
 

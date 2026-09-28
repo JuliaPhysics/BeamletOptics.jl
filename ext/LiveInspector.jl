@@ -1,0 +1,589 @@
+#=
+Property inspector of the app layout of the live view (`live_view(...; layout = :app)`): the
+"PROPERTIES" section of the right sidebar, see `_Inspector`
+=#
+
+using Makie: Button, Box, Label, Textbox, GridLayout, Observable, Point2f, RGBAf, BezierPath,
+             scatter!, text!, linesegments!, lift, on, rowgap!, colgap!, rowsize!, Fixed, Auto
+
+#=
+Property list
+=#
+
+# Geometry of the property list in pixels
+const _PROPERTY_ROW = 20.0f0       # row height
+const _PROPERTY_FONTSIZE = 12.0f0
+const _PROPERTY_MAX_ROWS = 14      # longer lists end with a row "… n more"
+const _PROPERTY_GAP = 12.0f0       # minimal gap between a label and its value
+
+"""
+    _PropertyList(parent; label_color, value_color, line_color)
+
+A list of `label  value` rows at the grid position `parent`, the label left in `label_color`, the
+value right-aligned in `value_color`, rows separated by thin lines. Drawn with a constant number of
+plots (one `text!` for all labels, one for all values, one `linesegments!` for the lines) in the
+scene of an invisible `Box` that holds the place in the layout; the box is as high as the rows.
+Values that do not fit are ellipsized, lists with more than `_PROPERTY_MAX_ROWS` rows end with
+a row "… n more". Updated only by [`_set_rows!`](@ref) and on layout changes.
+"""
+mutable struct _PropertyList
+    const box::Box
+    const labels::Makie.AbstractPlot
+    const values::Makie.AbstractPlot
+    const lines::Makie.AbstractPlot
+    rows::Vector{Tuple{String, String}}
+    const font::Any
+    # widths of texts in pixels, see `_text_width`
+    const widths::Dict{String, Float32}
+end
+
+function _PropertyList(parent; label_color, value_color, line_color)
+    box = Box(parent; visible = false, height = 0, tellwidth = false)
+    scene = box.blockscene
+    common = (; space = :pixel, inspectable = false, fontsize = _PROPERTY_FONTSIZE,
+        markerspace = :pixel)
+    labels = text!(scene, Point2f[]; common..., text = String[], color = label_color,
+        align = (:left, :center))
+    values = text!(scene, Point2f[]; common..., text = String[], color = value_color,
+        align = (:right, :center))
+    lines = linesegments!(scene, Point2f[]; space = :pixel, inspectable = false,
+        color = line_color, linewidth = 1)
+    list = _PropertyList(box, labels, values, lines, Tuple{String, String}[],
+        _tree_font(scene, :regular), Dict{String, Float32}())
+    on(_ -> _redraw!(list), scene, box.layoutobservables.computedbbox)
+    return list
+end
+
+"""
+    _set_rows!(list::_PropertyList, rows)
+
+Shows the `rows` (`(label, value)` tuples of `String`s) in the `list`. The height of the list
+changes only if the number of rows does, i.e. the layout is only updated then.
+"""
+function _set_rows!(list::_PropertyList, rows::Vector{Tuple{String, String}})
+    if length(rows) > _PROPERTY_MAX_ROWS
+        n = length(rows) - _PROPERTY_MAX_ROWS + 1
+        rows = [rows[1:(_PROPERTY_MAX_ROWS - 1)]; ("… $n more", "")]
+    end
+    list.rows = rows
+    height = length(rows) * _PROPERTY_ROW
+    if list.box.height[] != height
+        # the layout calls `_redraw!` via the new bounding box
+        list.box.height[] = height
+    else
+        _redraw!(list)
+    end
+    return list
+end
+
+function _redraw!(list::_PropertyList)
+    bb = list.box.layoutobservables.computedbbox[]
+    (x0, y0), (w, h) = Makie.origin(bb), Makie.widths(bb)
+    n = length(list.rows)
+    label_pos, value_pos = Vector{Point2f}(undef, n), Vector{Point2f}(undef, n)
+    label_text, value_text = Vector{String}(undef, n), Vector{String}(undef, n)
+    lines = Point2f[]
+    fs = _PROPERTY_FONTSIZE
+    for (i, (label, value)) in enumerate(list.rows)
+        y = y0 + h - (i - 0.5f0) * _PROPERTY_ROW
+        # labels are short, they may take up to half the width
+        label_text[i] = _fit_text(list.widths, list.font, fs, label, w / 2)
+        room = w - _text_width(list.widths, list.font, fs, label_text[i]) - _PROPERTY_GAP
+        value_text[i] = _fit_text(list.widths, list.font, fs, value, room)
+        label_pos[i] = Point2f(x0, y)
+        value_pos[i] = Point2f(x0 + w, y)
+        # a line below each row but the last, on a pixel center
+        if i < n
+            yl = round(y - _PROPERTY_ROW / 2) + 0.5f0
+            push!(lines, Point2f(x0, yl), Point2f(x0 + w, yl))
+        end
+    end
+    Makie.update!(list.labels; arg1 = label_pos, text = label_text)
+    Makie.update!(list.values; arg1 = value_pos, text = value_text)
+    Makie.update!(list.lines; arg1 = lines)
+    return nothing
+end
+
+#=
+Formatting of `properties`: the unit in brackets at the end of a name selects the formatting of
+its value, see `BMO.properties`
+=#
+
+"""
+    _property_row(name, value) -> (label, text)
+
+Returns the label (the `name` without its unit) and the formatted `value` of a property, see
+`BeamletOptics.properties`: lengths `[m]` in nm, µm, mm or m, angles `[rad]` in µrad, mrad or °,
+vectors in parentheses, other numbers with 4 significant digits, `Bool`s as yes or no.
+"""
+function _property_row(name::AbstractString, value)
+    m = match(r"^(.*\S)\s*\[([^\]]+)\]$", name)
+    isnothing(m) && return (String(name), _format_value(value, Val(nothing)))
+    label, unit = m.captures
+    return (String(label), _format_value(value, Val(Symbol(unit))))
+end
+
+# By the type of the value, then numbers and vectors by the unit
+_format_value(x, ::Val) = string(x)
+_format_value(s::AbstractString, ::Val) = String(s)
+_format_value(x::Bool, ::Val) = x ? "yes" : "no"
+_format_value(x::Real, unit::Val) = _format_number(x, unit)
+_format_value(v::AbstractVector{<:Real}, unit::Val) = _format_vector(v, unit)
+
+_format_number(x::Integer, ::Val{nothing}) = string(x)
+_format_number(x, ::Val{nothing}) = _fmt_digits(x)
+_format_number(x, ::Val{U}) where {U} = "$(_fmt_digits(x)) $U"
+_format_number(x, ::Val{:m}) = _signed(x, _length_units)
+_format_number(x, ::Val{:rad}) = _signed(x, _angle_units)
+
+_vector_string(v, f) = "(" * join((f(x) for x in v), ", ") * ")"
+# directions and other dimensionless vectors with 3 decimals
+_format_vector(v, ::Val{nothing}) = _vector_string(v, x -> _fmt_digits(round(x, digits = 3)))
+_format_vector(v, ::Val{U}) where {U} = _vector_string(v, _fmt_digits) * " $U"
+function _format_vector(v, ::Val{:m})
+    # a common unit, chosen by the largest component
+    m = maximum(abs, v; init = 0.0)
+    i = findfirst(((f, _),) -> round(m / f, sigdigits = 3) < 1000, _length_units)
+    factor, unit = _length_units[something(i, length(_length_units))]
+    return _vector_string(v, x -> _fmt_digits(x / factor, 3)) * " $unit"
+end
+
+const _length_units = (1e-9 => "nm", 1e-6 => "µm", 1e-3 => "mm", 1.0 => "m")
+const _angle_units = (1e-6 => "µrad", 1e-3 => "mrad", deg2rad(1) => "°")
+
+"""Formats `x` like `_unit_string` with its sign, `0` without a unit."""
+function _signed(x::Real, units)
+    iszero(x) && return "0"
+    s = _unit_string(abs(x), units)
+    return x < 0 ? "-" * s : s
+end
+
+"""Formats `x` with `digits` significant digits, integers without `.0`, `-0` as `0`."""
+function _fmt_digits(x::Real, digits::Int = 4)
+    v = round(Float64(x), sigdigits = digits)
+    iszero(v) && return "0"
+    return isinteger(v) && abs(v) < 1e15 ? string(Int(v)) : string(v)
+end
+
+#=
+Segmented control
+=#
+
+"""
+    _Segmented(parent, options; theme)
+
+A segmented control at the grid position `parent`: a row of text buttons, one per option
+`key => label`, of which the one of `selected[]` (a key) is highlighted with the accent colors of
+the `theme` tokens. A click sets `selected`, which can also be set from code.
+"""
+struct _Segmented
+    grid::GridLayout
+    buttons::Vector{Button}
+    keys::Vector{Symbol}
+    selected::Observable{Symbol}
+end
+
+function _Segmented(parent, options::Vector{Pair{Symbol, String}}; theme, selected::Symbol = first(options).first)
+    t = theme
+    grid = GridLayout(parent; default_colgap = 2, halign = :left, tellwidth = false)
+    sel = Observable(selected)
+    ks = first.(options)
+    buttons = [Button(grid[1, i]; label, fontsize = 12, padding = (7, 7, 4, 4), cornerradius = 4)
+               for (i, (_, label)) in enumerate(options)]
+    function look!(k)
+        for (key, b) in zip(ks, buttons)
+            on_ = key == k
+            bg, fg = on_ ? (t.accent_soft, t.accent) : (t.field, t.text)
+            b.buttoncolor[] == bg || (b.buttoncolor[] = bg)
+            b.labelcolor[] == fg || (b.labelcolor[] = fg)
+            b.labelcolor_hover[] = fg
+            b.labelcolor_active[] = fg
+            b.strokecolor[] = on_ ? t.accent : t.border
+        end
+        return nothing
+    end
+    on(look!, sel; update = true)
+    for (key, b) in zip(ks, buttons)
+        on(_ -> (sel[] == key || (sel[] = key)), b.clicks)
+    end
+    return _Segmented(grid, buttons, ks, sel)
+end
+
+#=
+Docked card: the card of the selection in the inspector, see `_AbstractCard`
+=#
+
+"""
+    _DockedCard
+
+The card of the selected object docked in the inspector of the app layout: the widgets declared by
+[`card_actions`](@ref) (in `actions`, in the header of the inspector) and [`card_rows`](@ref) (in
+`rows`, below the header), plus the app-only rows of `_docked_rows`, built by the same code as the
+floating cards (see `_build_content!`), but in the colors of the `theme` of the app and with the
+textboxes and sliders filling the width of the sidebar (see `_cell_attributes`). The fields
+`widgets` to `pose` are those of `_ComponentCard`; `header` and `parent` hold the layouts of the
+actions and the rows.
+"""
+mutable struct _DockedCard <: _AbstractCard
+    const header::GridLayout
+    const parent::GridLayout
+    const theme::NamedTuple
+    actions::GridLayout
+    rows::GridLayout
+    widgets::Vector{Tuple{Any, CardWidget}}
+    blocks::Vector{Any}
+    textboxes::Vector{Textbox}
+    listeners::Vector{Any}
+    content_key::Any
+    refreshing::Bool
+    pose::Any
+end
+
+# Positions of the actions in the header of the inspector and of the rows in its section
+_docked_actions(header::GridLayout) = GridLayout(header[1:2, 3]; default_colgap = 4)
+_docked_rows_layout(parent::GridLayout) = GridLayout(parent[2, 1]; default_rowgap = 4, tellwidth = false)
+
+function _DockedCard(header::GridLayout, parent::GridLayout, theme::NamedTuple)
+    return _DockedCard(header, parent, theme, _docked_actions(header), _docked_rows_layout(parent),
+        Tuple{Any, CardWidget}[], Any[], Textbox[], Any[], nothing, false, nothing)
+end
+
+function _new_parts!(c::_DockedCard)
+    for part in (c.actions, c.rows)
+        _GLB.remove_from_gridlayout!(_GLB.gridcontent(part))
+    end
+    c.actions, c.rows = _docked_actions(c.header), _docked_rows_layout(c.parent)
+    return nothing
+end
+
+_card_object(gui::LiveView, ::_DockedCard) = gui.controls.selected[]
+_card_boxes(c::_DockedCard) = c.textboxes
+
+# The widgets take the theme of the figure, texts and axis colors from the tokens of the app
+_card_style(c::_DockedCard, ::Type{Label}) = (; color = c.theme.text, fontsize = 12)
+_card_style(::_DockedCard, ::Type{Textbox}) = (; fontsize = 12, textpadding = (5, 5, 4, 4))
+_card_style(::_DockedCard, ::Type{Button}) = (; fontsize = 12, padding = (7, 7, 4, 4))
+_card_style(::_DockedCard, ::Type) = (;)
+_card_value(c::_DockedCard, a::_AxisColor) = c.theme.gizmo[a.k]
+_row_attributes(::_DockedCard) = (; default_colgap = 6, tellwidth = false, halign = :left)
+
+# Textboxes and sliders fill the width of the sidebar instead of the width declared for the card
+_host_attributes(::_DockedCard, T::Type, attributes::NamedTuple) = _fill_width(T, attributes)
+_fill_width(::Type{<:Union{Textbox, Slider}}, attributes) =
+    merge(attributes, (; width = Relative(1), tellwidth = false))
+_fill_width(::Type, attributes) = attributes
+
+# The rows of the card and the app-only rows, e.g. the panel options of a detector
+_declarations(::_DockedCard, obj) = (card_actions(obj), (card_rows(obj)..., _docked_rows(obj)...))
+
+"""
+    _docked_rows(obj)
+
+Rows of the docked card of `obj` in the app layout below its [`card_rows`](@ref), i.e. only in the
+inspector, chosen by dispatch: settings of the live view rather than of the object, e.g. the mode
+and the color scale of the panel of a `Detector` (see `_set_panel_options!`). None by default.
+"""
+_docked_rows(_) = ()
+_docked_rows(::BMO.Detector) = (CardRow("panel",
+        CardWidget(Button; name = :panel_mode, label = "auto",
+            value = (gui, pd) -> _panel_mode_label(_panel_of(gui, pd)),
+            on = (gui, pd, _) -> _cycle_panel_mode!(gui, _panel_of(gui, pd))),
+        CardWidget(Toggle; name = :panel_log, value = (gui, pd) -> _is_log(_panel_of(gui, pd)),
+            on = (gui, pd, v) -> _set_panel_log!(gui, _panel_of(gui, pd), v)),
+        "log"),)
+
+# The modes of a detector panel, in the order of the button of `_docked_rows`
+const _PANEL_MODES = (:auto, :spot, :intensity)
+
+_panel_mode_label(::Nothing) = "no panel"
+_panel_mode_label(p::DetectorPanel) = string(p.mode)
+_is_log(::Nothing) = false
+_is_log(p::DetectorPanel) = p.colorscale == :log
+
+function _cycle_panel_mode!(gui::LiveView, p::DetectorPanel)
+    i = something(findfirst(==(p.mode), _PANEL_MODES), 0)
+    _set_panel_options!(gui, p; mode = _PANEL_MODES[mod1(i + 1, length(_PANEL_MODES))])
+    gui.status.text[] = "panel $(p.name): $(p.mode)"
+    return nothing
+end
+_cycle_panel_mode!(gui::LiveView, ::Nothing) = _no_panel(gui)
+
+_set_panel_log!(gui::LiveView, p::DetectorPanel, log::Bool) =
+    _set_panel_options!(gui, p; colorscale = log ? :log : :linear)
+_set_panel_log!(gui::LiveView, ::Nothing, _) = _no_panel(gui)
+
+_no_panel(gui::LiveView) = (gui.status.text[] = "this detector has no panel, see the detectors kwarg"; nothing)
+
+#=
+Inspector
+=#
+
+"""
+    _Inspector
+
+The property inspector of the app layout, the "PROPERTIES" section of the right sidebar, from top
+to bottom:
+
+- the header: the icon of the kind of the selected object (see `_tree_kind`), its name (see
+  `_label`) and its type, the actions of its card (e.g. hide) and the `pin` toggle, which pins a
+  floating card to the object in the 3D view (see `_toggle_pin!`)
+- the docked `card` of the selected object: the rows of [`card_rows`](@ref), e.g. the pose, see
+  `_DockedCard`
+- the step box and the mode as a segmented control (`mode`), bound to the `mode` of the controls
+- the properties of the object, see `BeamletOptics.properties` and `_PropertyList`; without a
+  selection, a summary of the live view
+
+The inspector is updated on events only (see `_refresh_inspector!`): the selection, moves, solves
+and inputs. The widgets of the card are only rebuilt if the selected object declares others, e.g.
+when a source follows a lens; otherwise they show the values of the new object.
+"""
+mutable struct _Inspector
+    const grid::GridLayout
+    const icon::Observable{BezierPath}
+    const icon_color::Observable{RGBAf}
+    const name::Label
+    const type::Label
+    const pin::_IconToggle
+    const card::_DockedCard
+    const mode::_Segmented
+    const list::_PropertyList
+    # the object shown (`nothing`: the summary), a flag that nothing was shown yet
+    shown::Any
+    fresh::Bool
+    # widths of the texts of the header in pixels, per label, see `_text_width`
+    const widths::NTuple{2, Dict{String, Float32}}
+end
+
+# Names of `properties` that the inspector shows elsewhere: in the header and the pose rows
+const _INSPECTOR_SKIPPED = ("Type", "Position [m]")
+
+"""
+    _build_inspector!(layout::AppLayout) -> (; step_box)
+
+Creates the "PROPERTIES" section of the right sidebar, see `_Inspector`. Returns the widgets that
+are fields of `LiveView`.
+"""
+function _build_inspector!(layout::AppLayout)
+    t = layout.theme
+    g = _add_sidebar_section!(layout, :right, "Properties")
+    # Header: icon, name and type, the actions of the card and the pin
+    header = GridLayout(g[1, 1]; default_colgap = 6, tellwidth = false)
+    icon_box = Box(header[1:2, 1]; width = 24, height = 24, visible = false)
+    icon = Observable(_icon(:system))
+    icon_color = Observable(RGBAf(Makie.to_color(t.muted)))
+    center = lift(r -> Point2f(Makie.origin(r) .+ Makie.widths(r) ./ 2), icon_box.blockscene,
+        icon_box.layoutobservables.computedbbox)
+    scatter!(icon_box.blockscene, center; marker = icon, markersize = 22, color = icon_color,
+        markerspace = :pixel, inspectable = false)
+    name = Label(header[1, 2], "No selection"; halign = :left, font = :bold, fontsize = 14,
+        tellwidth = false)
+    type = Label(header[2, 2], " "; halign = :left, color = t.muted, fontsize = 12,
+        tellwidth = false)
+    pin = _IconToggle(header[1:2, 4]; icon = :pinned, icon_off = :pin, _icon_theme(t)...,
+        icon_color = t.muted, size = 24, icon_size = 18, tooltip = "Pin a card in the 3D view",
+        tooltip_placement = :left)
+    rowgap!(header, 0)
+    colsize!(header, 2, Auto(false))
+    card = _DockedCard(header, g, t)
+    # Step and mode
+    pose = GridLayout(g[3, 1]; default_colgap = 6, default_rowgap = 2, tellwidth = false)
+    Label(pose[1, 1], "step"; halign = :left, fontsize = 11, color = t.muted, tellwidth = false)
+    Label(pose[1, 2:3], "mode"; halign = :left, fontsize = 11, color = t.muted, tellwidth = false)
+    step_box = Textbox(pose[2, 1]; placeholder = "250 nm", width = 80, halign = :left,
+        fontsize = 12, textpadding = (5, 5, 4, 4))
+    mode = _Segmented(pose[2, 2:3], [:move => "Move", :rotate => "Rotate"]; theme = t)
+    # Properties
+    Box(g[4, 1]; height = 1, color = t.border, strokewidth = 0)
+    list = _PropertyList(g[5, 1]; label_color = t.muted, value_color = t.text,
+        line_color = RGBAf(Makie.to_color(t.border)))
+    # the rows of the card are empty without a selection, see `_refresh_inspector!`
+    rowsize!(g, 2, Fixed(0))
+    rowgap!(g, 10)
+    layout.inspector = _Inspector(g, icon, icon_color, name, type, pin, card, mode, list, nothing,
+        true, (Dict{String, Float32}(), Dict{String, Float32}()))
+    return (; step_box)
+end
+
+"""
+    _refresh_inspector!(gui::AppView; force = false)
+
+Shows the selected object of the `gui` in the inspector (or the summary of the live view): header,
+docked card and properties. The widgets of the card are rebuilt only if the object declares others,
+see `_build_content!`; a focused textbox of the card keeps the typed text, unless `force`. Not
+called per frame, but after the selection changed, a move, a solve and an input. A collapsed
+inspector is not updated, it is refreshed when it is shown again.
+"""
+function _refresh_inspector!(gui::AppView; force::Bool = false)
+    layout = gui.layout
+    layout.right.shown || return nothing
+    insp = layout.inspector
+    obj = gui.controls.selected[]
+    if insp.fresh || obj !== insp.shown
+        insp.fresh = false
+        insp.shown = obj
+        _dock_card!(gui, insp.card, obj)
+        _show_header!(gui, obj)
+    end
+    _refresh_card!(gui, insp.card; force)
+    _show_pin!(gui)
+    _set_rows!(insp.list, _inspector_rows(gui, obj))
+    return nothing
+end
+
+"""
+    _dock_card!(gui::AppView, c::_DockedCard, obj)
+
+Builds the widgets of the docked card `c` for `obj`, see `_build_content!`, or removes them without
+a selection. The row of the card in the inspector has no height without rows.
+"""
+function _dock_card!(::AppView, c::_DockedCard, ::Nothing)
+    _clear_content!(c)
+    c.pose = nothing
+    rowsize!(c.parent, 2, Fixed(0))
+    return nothing
+end
+function _dock_card!(gui::AppView, c::_DockedCard, obj)
+    # A focused box of the old object would take the keyboard, and its input the new object
+    foreach(tb -> tb.focused[] && Makie.defocus!(tb), c.textboxes)
+    _build_content!(gui, c, obj)
+    c.pose = (obj, nothing)
+    rowsize!(c.parent, 2, isempty(c.rows.content) ? Fixed(0) : Auto())
+    return nothing
+end
+
+"""Sets the pin of the inspector of the `gui` to whether a card is pinned to the selected object."""
+function _show_pin!(gui::AppView)
+    pin = gui.layout.inspector.pin
+    obj = gui.controls.selected[]
+    pinned = !isnothing(obj) && _is_pinned(gui, obj)
+    pin.active[] == pinned || (pin.active[] = pinned)
+    visible = !isnothing(obj)
+    pin.box.visible[] == visible || (pin.box.visible[] = visible)
+    return nothing
+end
+
+_on_pinned!(gui::AppView) = _show_pin!(gui)
+
+"""Sets the icon, name and type of the header of the inspector for `obj` (`nothing`: no selection)."""
+function _show_header!(gui::AppView, obj)
+    insp, t = gui.layout.inspector, gui.layout.theme
+    kind = isnothing(obj) ? :system : _tree_kind(obj)
+    insp.icon[] = _icon(kind)
+    insp.icon_color[] = RGBAf(Makie.to_color(isnothing(obj) ? t.muted : _tree_marker_color(t, kind)))
+    name = isnothing(obj) ? "No selection" : _label(gui, obj)
+    type = isnothing(obj) ? "click an object to inspect it" : string(nameof(typeof(obj)))
+    # Labels do not ellipsize: the room for the texts is the column of the name, between the icon
+    # and the actions of the card
+    w = Makie.widths(insp.grid.layoutobservables.computedbbox[])[1] - 32 - 30 -
+        _actions_width(insp.card)
+    font(label) = _tree_font(label.blockscene, label.font[])
+    _set_text!(insp.name, _fit_text(insp.widths[1], font(insp.name), 14, name, w))
+    _set_text!(insp.type, _fit_text(insp.widths[2], font(insp.type), 12, type, w))
+    return nothing
+end
+
+# Width of the actions of the docked card `c` [px], with their gap
+_actions_width(c::_DockedCard) =
+    isempty(c.actions.content) ? 0.0f0 : Makie.widths(c.actions.layoutobservables.computedbbox[])[1] + 6
+
+"""Returns the rows of the property list for `obj`, see `BeamletOptics.properties`."""
+function _inspector_rows(::AppView, obj)
+    props = try
+        BMO.properties(obj)
+    catch e
+        # a failing `properties` method of a user type must not break the live view
+        Pair{String, Any}["Error" => sprint(showerror, e)]
+    end
+    return [_property_row(name, value) for (name, value) in props if !(name in _INSPECTOR_SKIPPED)]
+end
+
+"""Summary of the live view, shown without a selection."""
+function _inspector_rows(gui::AppView, ::Nothing)
+    objects = sum(h -> length(h.handles), gui.system_handles; init = 0)
+    rows = Tuple{String, String}[
+        ("Systems", string(length(gui.system_handles))), ("Objects", string(objects)),
+        ("Sources", string(length(_sources(gui)))), ("Detector panels", string(length(gui.panels))),
+        ("Clip planes", string(length(gui.clip_planes))),
+        ("Last trace", gui.solve_time > 0 ? _ms_string(gui.solve_time) : "–")]
+    return rows
+end
+
+"""Sets the mode of the controls of the `gui`, like the key `m`."""
+function _set_mode!(gui::LiveView, mode::Symbol)
+    ctrl = gui.controls
+    ctrl.mode[] == mode && return nothing
+    ctrl.mode[] = mode
+    _update_selection_box!(ctrl)
+    _update_help!(ctrl)
+    gui.status.text[] = "$mode mode, step: $(_step_string(mode, ctrl.fine_step, ctrl.fine_angle))"
+    return nothing
+end
+
+"""
+Connects the inspector of the `gui`: the mode control in both directions with the `mode` of the
+controls, the pin, the step box, and a refresh when the right sidebar is shown again. The widgets of
+the docked card are connected when they are built, see `_build_content!`.
+"""
+function _connect_inspector!(gui::AppView)
+    layout = gui.layout
+    insp = layout.inspector
+    ctrl = gui.controls
+    listeners = ctrl.listeners
+    sel = insp.mode.selected
+    push!(listeners, on(m -> _set_mode!(gui, m), sel))
+    push!(listeners, on(m -> (sel[] == m || (sel[] = m)), ctrl.mode; update = true))
+    push!(listeners, on(insp.pin.active) do v
+        obj = ctrl.selected[]
+        (isnothing(obj) || v == _is_pinned(gui, obj)) || _toggle_pin!(gui, obj)
+        return nothing
+    end)
+    push!(listeners, on(v -> v && _refresh_inspector!(gui), layout.collapse.right.active))
+    push!(listeners, on(s -> _set_step!(gui, s), gui.step_box.stored_string))
+    push!(listeners, on(_ -> _keep_keyboard!(gui), gui.step_box.focused))
+    _refresh_inspector!(gui)
+    return nothing
+end
+
+# The step box and the textboxes of the docked card take the keyboard like those of the floating
+# cards, see `_typing`
+_layout_boxes(gui::AppView) = (gui.step_box, _card_boxes(gui.layout.inspector.card)...)
+
+# The card of the selection is docked in the inspector, only pinned cards float in the 3D view
+_selection_card_shown(::AppView) = false
+
+#=
+Detector panel options, see `_docked_rows`
+=#
+
+"""Returns the first detector panel of `pd` in the `gui`, or `nothing`."""
+_panel_of(gui::LiveView, pd) = (i = findfirst(p -> p.pd === pd, gui.panels);
+    isnothing(i) ? nothing : gui.panels[i])
+
+"""
+    _set_panel_options!(gui, p; mode = p.mode, colorscale = p.colorscale)
+
+Sets the mode (`:auto`, `:spot` or `:intensity`) and the color scale (`:linear` or `:log`) of the
+detector panel `p` of the `gui` and shows its current hits again, see `_refresh_panel!`.
+"""
+function _set_panel_options!(gui::LiveView, p::DetectorPanel; mode::Symbol = p.mode,
+        colorscale::Symbol = p.colorscale)
+    (p.mode == mode && p.colorscale == colorscale) && return nothing
+    p.mode = mode
+    p.colorscale = colorscale
+    _refresh_panel!(gui, p)
+    return nothing
+end
+
+"""
+Shows the current hits of the detector panel `p` again, e.g. after its options changed, without
+solving and without recording its history.
+"""
+_refresh_panel!(::LiveView, p::DetectorPanel) = _update_panel!(p; coarse = false, record = false)
+
+#=
+Properties of the objects of the live view
+=#
+
+BMO.properties(p::LiveClipPlane) = Pair{String, Any}["Type" => "Clip plane",
+    "Position [m]" => collect(Float64, p.pos), "Normal" => collect(Float64, _normal(p)),
+    "Size [m]" => p.size]

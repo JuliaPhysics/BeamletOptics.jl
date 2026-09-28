@@ -10,8 +10,11 @@ const _CARD_POSE_NAMES = (:x, :y, :z, :rx, :ry, :rv)
 const _CARD_AXIS_COLORS = (RGBAf(1, 0.45, 0.45, 1), RGBAf(0.45, 0.85, 0.45, 1), RGBAf(0.55, 0.7, 1, 1))
 
 # Label of the pose box `k`, of the same width in both rows, such that the boxes line up
+# (the positions in the text color of the card, the rotations in the colors of the axes, see
+# `_AxisColor`)
 _pose_label(k::Int) = CardWidget(Label; text = _CARD_POSE_LABELS[k], width = 18, halign = :right,
-    color = k <= 3 ? _PROGRESS_TEXT_COLOR : _CARD_AXIS_COLORS[k - 3])
+    _pose_label_color(k)...)
+_pose_label_color(k::Int) = k <= 3 ? (;) : (; color = _AxisColor(k - 3))
 
 # Pose box `k`: the position [mm] (wide enough for e.g. -6869.709 of a telescope, longer values
 # scroll while typing) or an empty rotation box, see `_apply_pose_input!`
@@ -47,7 +50,7 @@ card_rows(bs::BMO.AbstractBeamsplitter) = (pose_card_rows(bs)..., _beam_row(),
 card_rows(p::Union{BMO.LinearPolarizer, BMO.PolarizationFilter}) =
     (pose_card_rows(p)..., _beam_row(), _text_row("axis", :axis, _axis_text))
 # Detectors: the hits of the last solve and the power, or the number of rays, of the detector panel
-card_rows(pd::BMO.Detector) = (pose_card_rows(pd)..., _beam_row(), _text_row("panel", :panel, _panel_text))
+card_rows(pd::BMO.Detector) = (pose_card_rows(pd)..., _beam_row(), _text_row("signal", :signal, _panel_text))
 # Sources whose rays can be regenerated: wavelength, size and a slider for the number of rays
 card_rows(src::Union{BMO.CollimatedSource, BMO.PointSource}) = (pose_card_rows(src)...,
     _text_row("λ", :source, _source_text), _ray_rows(src.sampling, length(src))...)
@@ -182,7 +185,7 @@ end
 """The power (intensity panels) or the number of rays (spot panels) of the detector panel of `pd`."""
 function _panel_text(gui::LiveView, pd)
     i = findfirst(p -> p.pd === pd, gui.panels)
-    isnothing(i) && return "no panel, $(length(BMO.hits(pd))) hits"
+    isnothing(i) && return "no panel, $(BMO._hit_count(pd)) hits"
     return _metrics_text(gui.panels[i].metrics)
 end
 _metrics_text(m::NamedTuple) = haskey(m, :P) ? "P = $(_fmt3(1e3 * m.P)) mW" : "N = $(get(m, :n, 0))"

@@ -43,7 +43,7 @@ const BMO = BeamletOptics
         _select!(gui, pd)
         @test _text(gui, :beam) == "1 ray, AOI 0.0°"
         # the number of rays of the spot panel
-        @test _text(gui, :panel) == "N = 1"
+        @test _text(gui, :signal) == "N = 1"
         # refreshed after the solve of a change: the mirror rotated by 1° about z
         _select!(gui, m)
         Ext._card_widget(gui.card, :rv).stored_string[] = string(1e3 * deg2rad(1))
@@ -91,7 +91,7 @@ const BMO = BeamletOptics
         @test _text(gui, :gauss) == "1000 nm, w0 500 µm, zR $(Ext._length_string(rayleigh_range(g)))"
         # the power of the intensity panel of the detector
         _select!(gui, pd)
-        @test startswith(_text(gui, :panel), "P = ") && endswith(_text(gui, :panel), " mW")
+        @test startswith(_text(gui, :signal), "P = ") && endswith(_text(gui, :signal), " mW")
         close(gui)
 
         src = CollimatedSource([0.0, 0, 0], [0.0, 1, 0], 4e-3, 633e-9; num_rings = 2, num_rays = 40)
