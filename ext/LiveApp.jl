@@ -88,8 +88,8 @@ Layout of `live_view(...; layout = :app)`, an application window around the 3D v
 
 - a toolbar at the top, an ordered list of groups of entries, see `_add_toolbar_entry!`
 - the left sidebar, a stack of titled sections ("OBJECTS" with the object tree, see `_tree_rows`,
-  "PARAMETERS" with the sliders), and the right sidebar ("PROPERTIES": selection, pose boxes,
-  step, mode), see `_add_sidebar_section!`
+  "PARAMETERS" with the sliders), and the right sidebar ("PROPERTIES": the inspector, see
+  `_Inspector`), see `_add_sidebar_section!`
 - the analysis dock below the 3D view, a tab per detector panel (or other panel, see
   `_add_dock_panel!`), of which only the active one is shown and computed, see `_DockTabs`
 - the status bar with the status line and an info label (last trace, number of rays, projection)
@@ -127,10 +127,11 @@ mutable struct AppLayout <: AbstractLiveLayout
     expanded::IdDict{Any, Bool}
     names::IdDict{Any, String}
     counters::Dict{String, Int}
-    # inspector labels and the info label of the status bar
-    selection_label::Label
-    type_label::Label
-    mode_label::Label
+    # the inspector (an `_Inspector`, see LiveInspector.jl) and the registry of its type-dependent
+    # sections, see `_inspector_sections`
+    inspector::Any
+    inspectors::Vector{Pair{Type, Function}}
+    # the info label of the status bar
     info::Label
     AppLayout(theme::NamedTuple) = new(theme)
 end
@@ -318,32 +319,6 @@ function _build_toolbar(layout::AppLayout, spec)
         measure_toggle, export_button, collapse, help_button)
 end
 
-"""Creates the "PROPERTIES" section of the right sidebar: selection, pose boxes, step and mode."""
-function _build_inspector!(layout::AppLayout)
-    t = layout.theme
-    g = _add_sidebar_section!(layout, :right, "Properties")
-    layout.selection_label = Label(g[1, 1:3], "No selection"; halign = :left, font = :bold,
-        fontsize = 14, tellwidth = false)
-    layout.type_label = Label(g[2, 1:3], " "; halign = :left, color = t.muted, fontsize = 12,
-        tellwidth = false)
-    pose_boxes = Textbox[]
-    for (k, field) in enumerate(_POSE_FIELDS)
-        r, c = 2 * ((k - 1) ÷ 3) + 3, (k - 1) % 3 + 1
-        Label(g[r, c], field; halign = :left, fontsize = 11,
-            color = k <= 3 ? t.text : t.gizmo[k - 3], tellwidth = false)
-        push!(pose_boxes, Textbox(g[r + 1, c]; placeholder = k <= 3 ? " " : "0", width = 72,
-            halign = :left))
-    end
-    Label(g[7, 1], "step"; halign = :left, fontsize = 11)
-    step_box = Textbox(g[8, 1:3]; placeholder = "step, e.g. 250 nm", width = 150,
-        halign = :left)
-    layout.mode_label = Label(g[9, 1:3], "mode: translate"; halign = :left, color = t.muted,
-        fontsize = 12, tellwidth = false)
-    rowgap!(g, 4)
-    colgap!(g, 6)
-    return (; pose_boxes, step_box)
-end
-
 """
 Returns the position of the title row of the section `title` of the `side`bar, e.g. for a button
 at the right of the title.
@@ -472,12 +447,16 @@ function _set_text!(label::Label, s::String)
     return nothing
 end
 
-_on_solved!(gui::AppView) = _set_text!(gui.layout.info, _status_info(gui))
+function _on_solved!(gui::AppView)
+    _set_text!(gui.layout.info, _status_info(gui))
+    # e.g. the hits of a detector
+    _refresh_inspector!(gui)
+    return nothing
+end
 
+# The inspector follows the selection via `_update_inspector!`, called right before
 function _on_selected!(gui::AppView)
     obj = gui.controls.selected[]
-    _set_text!(gui.layout.selection_label, isnothing(obj) ? "No selection" : _label(gui, obj))
-    _set_text!(gui.layout.type_label, isnothing(obj) ? " " : string(nameof(typeof(obj))))
     _reveal!(gui, obj)
     _set_selected!(gui.layout.tree, obj)
     return nothing
@@ -504,11 +483,10 @@ function _on_clipping!(gui::AppView)
     return nothing
 end
 
-_mode_string(mode::Symbol) = mode == :rotate ? "mode: rotate" : "mode: translate"
-
 """
 Connects the entries of the app layout that are not fields of `LiveView`: the clip toggle, fit,
-help, the collapse toggles, and the mode and info labels. All updates are driven by events.
+help, the collapse toggles, the info label, the object tree and the inspector. All updates are
+driven by events.
 """
 function _connect_layout!(gui::AppView)
     layout = gui.layout
@@ -525,7 +503,6 @@ function _connect_layout!(gui::AppView)
     push!(listeners, on(v -> _set_shown!(layout.right, v), layout.collapse.right.active))
     push!(listeners, on(_ -> _update_dock!(layout), layout.collapse.dock.active))
     _connect_dock!(gui)
-    push!(listeners, on(m -> _set_text!(layout.mode_label, _mode_string(m)), ctrl.mode; update = true))
     push!(listeners, on(_ -> _on_solved!(gui), gui.orthographic_toggle.active))
     # Object tree
     tree = layout.tree
@@ -535,6 +512,7 @@ function _connect_layout!(gui::AppView)
     _name_objects!(gui)
     _update_tree!(gui)
     _on_clipping!(gui)
+    _connect_inspector!(gui)
     return nothing
 end
 
@@ -546,13 +524,16 @@ Object tree
     _tree_kind(obj) -> Symbol
 
 The kind of the row of `obj` in the object tree, which selects its icon, see `_icon`: `:lens`,
-`:mirror`, `:detector`, `:group`, `:mesh` (objects without optical function, e.g. housings),
-`:source`, `:clip_plane`, `:system` or `:object` for all other objects. Add a method for a new
-type of component to give it a matching icon.
+`:mirror`, `:beamsplitter`, `:polarizer`, `:detector`, `:group`, `:mesh` (objects without optical
+function, e.g. housings), `:source`, `:clip_plane`, `:system` or `:object` for all other objects.
+The inspector shows the same icon. Add a method for a new type of component to give it a matching
+icon.
 """
 _tree_kind(_) = :object
 _tree_kind(::Union{BMO.Lens, BMO.DoubletLens, BMO.TripletLens}) = :lens
 _tree_kind(::BMO.AbstractReflectiveOptic) = :mirror
+_tree_kind(::BMO.AbstractBeamsplitter) = :beamsplitter
+_tree_kind(::Union{BMO.AbstractJonesPolarizer, BMO.LinearPolarizer}) = :polarizer
 _tree_kind(::BMO.AbstractDetector) = :detector
 _tree_kind(::BMO.AbstractObjectGroup) = :group
 _tree_kind(::Union{BMO.NonInteractableObject, BMO.IntersectableObject}) = :mesh

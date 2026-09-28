@@ -322,25 +322,43 @@ end
 
 Returns the width of the label `s` in pixels. The widths are cached, a label is measured once.
 """
-function _label_width(tree::_ObjectTree, s::String)
-    return get!(tree.label_widths, s) do
-        Float32(Makie.widths(Makie.text_bb(s, tree.font, tree.fontsize))[1])
-    end
-end
+_label_width(tree::_ObjectTree, s::String) = _text_width(tree.label_widths, tree.font, tree.fontsize, s)
 
 """
     _fit_label(tree, s, width)
 
 Returns `s`, or its longest prefix followed by "…" if `s` is wider than `width` pixels.
 """
-function _fit_label(tree::_ObjectTree, s::String, width::Real)
-    _label_width(tree, s) <= width && return s
+_fit_label(tree::_ObjectTree, s::String, width::Real) =
+    _fit_text(tree.label_widths, tree.font, tree.fontsize, s, width)
+
+"""
+    _text_width(cache, font, fontsize, s)
+
+Returns the width of the text `s` in pixels, measured once and then taken from the `cache` (a
+`Dict{String, Float32}` per font and size).
+"""
+function _text_width(cache::Dict{String, Float32}, font, fontsize, s::AbstractString)
+    return get!(cache, s) do
+        Float32(Makie.widths(Makie.text_bb(s, font, fontsize))[1])
+    end
+end
+
+"""
+    _fit_text(cache, font, fontsize, s, width)
+
+Returns `s`, or its longest prefix followed by "…" if `s` is wider than `width` pixels, see
+`_text_width`.
+"""
+function _fit_text(cache::Dict{String, Float32}, font, fontsize, s::AbstractString, width::Real)
+    s = String(s)
+    _text_width(cache, font, fontsize, s) <= width && return s
     n = length(s)
     lo, hi = 0, n - 1
     # Longest prefix with an ellipsis that fits, found by bisection
     while lo < hi
         m = (lo + hi + 1) ÷ 2
-        if _label_width(tree, first(s, m) * "…") <= width
+        if _text_width(cache, font, fontsize, first(s, m) * "…") <= width
             lo = m
         else
             hi = m - 1

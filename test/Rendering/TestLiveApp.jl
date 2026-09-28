@@ -172,16 +172,16 @@ const BMO = BeamletOptics
         m, pd = _fixture()
         gui = _live_app(System([m, pd]), Beam([0.0, 0, 0], [0.0, 1, 0]); throttle = false,
             labels = Dict(m => "M1"))
-        @test gui.layout.selection_label.text[] == "No selection"
+        @test gui.layout.inspector.name.text[] == "No selection"
         gui.controls.selected[] = m
-        @test gui.layout.selection_label.text[] == "M1"
-        @test gui.layout.type_label.text[] == string(nameof(typeof(m)))
+        @test gui.layout.inspector.name.text[] == "M1"
+        @test gui.layout.inspector.type.text[] == string(nameof(typeof(m)))
         @test gui.pose_boxes[2].displayed_string[] == "100.0"
         gui.pose_boxes[1].stored_string[] = "5"
         @test BMO.position(m)[1] ≈ 5e-3
-        @test gui.layout.mode_label.text[] == "mode: translate"
+        @test gui.layout.inspector.mode.selected[] == :move
         gui.step_box.stored_string[] = "1 mrad"
-        @test gui.layout.mode_label.text[] == "mode: rotate"
+        @test gui.layout.inspector.mode.selected[] == :rotate
         # no hide buttons, the eyes of the tree and "show all" in its title replace them
         @test isnothing(gui.hide_button)
         @test gui.show_all_button isa Ext._IconButton
@@ -230,7 +230,7 @@ const BMO = BeamletOptics
         @test Ext._tree_kind(o.l1) == :lens
         @test Ext._tree_kind(o.pd) == :detector
         @test Ext._tree_kind(gui.system_handles[1]) == :system
-        @test Ext._tree_kind(RoundThinBeamsplitter(0.01)) == :object
+        @test Ext._tree_kind(RoundThinBeamsplitter(0.01)) == :beamsplitter
         # one plot per part, independent of the number of rows
         @test length(tree.scene.plots) == 7
         # the compact layout has no tree and its hooks do nothing
@@ -251,7 +251,7 @@ const BMO = BeamletOptics
         tree.clicked[] = o.m
         @test ctrl.selected[] === o.m
         @test tree.selected === o.m
-        @test gui.layout.selection_label.text[] == "Mirror 1"
+        @test gui.layout.inspector.name.text[] == "Mirror 1"
         @test startswith(gui.status.text[], "Mirror 1")
         # objects that are not movable (e.g. static ones, or not among the `objects` kwarg of the
         # controls) can not be selected, but they are listed and can be hidden
@@ -315,7 +315,7 @@ const BMO = BeamletOptics
         plane = gui.clip_planes[end]
         @test _labels(gui)[end] == "Clip plane 2"
         @test tree.selected === plane
-        @test gui.layout.selection_label.text[] == "Clip plane 2"
+        @test gui.layout.inspector.name.text[] == "Clip plane 2"
         # `Delete` removes it, the numbers are not reused
         _key!(gui, Keyboard.delete)
         @test _labels(gui)[end] == "Clip plane 1"

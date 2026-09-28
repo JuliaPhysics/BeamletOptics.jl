@@ -1985,11 +1985,20 @@ end
 """
     _update_inspector!(gui; force = false)
 
+Updates the inspector of the `gui` after the selection changed or the selected object moved: the
+pose boxes (see `_update_pose_boxes!`) and, in layouts with more, the rest of the inspector, e.g.
+`_refresh_inspector!` of the app layout.
+"""
+_update_inspector!(gui::LiveView; force::Bool = false) = _update_pose_boxes!(gui; force)
+
+"""
+    _update_pose_boxes!(gui; force = false)
+
 Shows the position [mm] of the selected object of the `gui` in the position boxes of the pose
 inspector and clears the rotation boxes, or clears all boxes if nothing is selected. Focused boxes
 are skipped, unless `force`.
 """
-function _update_inspector!(gui::LiveView; force::Bool = false)
+function _update_pose_boxes!(gui::LiveView; force::Bool = false)
     obj = gui.controls.selected[]
     p = isnothing(obj) ? nothing : 1e3 .* Vector{Float64}(position(obj))
     for (k, tb) in enumerate(gui.pose_boxes)

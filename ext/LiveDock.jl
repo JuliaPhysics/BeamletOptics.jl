@@ -499,6 +499,18 @@ function _refresh_dock!(gui::AppView)
     return nothing
 end
 
+"""
+Marks the detector panel `p` stale after its options changed, see `_set_panel_options!`: a kept field
+was computed with the old options and is dropped. The panel is computed once it is shown.
+"""
+function _refresh_panel!(gui::AppView, p::DetectorPanel)
+    tabs = gui.layout.tabs
+    delete!(tabs.fields, p)
+    push!(tabs.stale, p)
+    _refresh_dock!(gui)
+    return nothing
+end
+
 """Shows the `field` of the panel `p`, which the last solve left stale, see `_refresh_dock!`."""
 function _show_panel!(gui::AppView, p::DetectorPanel, field)
     _update_panel!(p, field; coarse = gui.coarse, preview = gui.preview, record = false)
