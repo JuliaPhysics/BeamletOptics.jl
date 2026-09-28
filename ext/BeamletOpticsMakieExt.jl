@@ -73,6 +73,7 @@ include("LiveBeams.jl")
 include("LiveInteraction.jl")
 include("LiveTree.jl")
 include("LiveProgress.jl")
+include("LiveIcons.jl")
 include("ViewCube.jl")
 include("LiveView.jl")
 # precompiles the live rendering/interaction call paths, must come last
