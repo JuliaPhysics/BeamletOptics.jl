@@ -23,6 +23,9 @@ The following generic kwargs can be used for all hit types:
 - `x0_shift::Real=0, z0_shift::Real=0`
   Applies a constant offset to the entire x or z coordinate arrays,
   useful for recentring or testing alignment.
+- `progress::Bool=true`
+  Shows a progress bar once the calculation has run for `get_progress_threshold()`
+  seconds (default 5 s). It is only drawn if `stderr` is a terminal.
 
 ## Ray specific keyword arguments
 
@@ -82,6 +85,7 @@ function electric_field(
         z_max = Inf,
         x0_shift::Real = 0,
         z0_shift::Real = 0,
+        progress::Bool = true,
         kwargs...
 ) where {G}
     # Calculate autolims
@@ -103,30 +107,33 @@ function electric_field(
     local_z = Point3(orientation(pd)[:, 3])
     origin = position(pd)
     # Calculate field superposition
-    Threads.@threads for j in eachindex(zs)
-        z_grid = zs[j]
-        # Hoist z-grid math out of inner loop
-        p_row = origin + z_grid * local_z
+    _with_progress(progress, length(zs), "Detector field: ") do prog
+        Threads.@threads for j in eachindex(zs)
+            z_grid = zs[j]
+            # Hoist z-grid math out of inner loop
+            p_row = origin + z_grid * local_z
 
-        @inbounds for i in eachindex(xs)
-            x_grid = xs[i]
-            p1 = p_row + x_grid * local_x
+            @inbounds for i in eachindex(xs)
+                x_grid = xs[i]
+                p1 = p_row + x_grid * local_x
 
-            acc = Complex{G}(0.0)
-            for hit in hits
-                v = p1 - hit.p0
-                l1 = _pseudo_dot(v, hit.d0)
+                acc = Complex{G}(0.0)
+                for hit in hits
+                    v = p1 - hit.p0
+                    l1 = _pseudo_dot(v, hit.d0)
 
-                # Transverse distance r
-                r_vec = v - l1 * hit.d0
-                r = norm(r_vec)
+                    # Transverse distance r
+                    r_vec = v - l1 * hit.d0
+                    r = norm(r_vec)
 
-                # Distance along beam
-                z = hit.l0 + l1
+                    # Distance along beam
+                    z = hit.l0 + l1
 
-                acc += electric_field(hit.gauss, r, z; hint = (hit.p0 + l1 * hit.d0, hit.id)) * hit.sqrt_proj
+                    acc += electric_field(hit.gauss, r, z; hint = (hit.p0 + l1 * hit.d0, hit.id)) * hit.sqrt_proj
+                end
+                field[i, j] = acc
             end
-            field[i, j] = acc
+            _tick!(prog)
         end
     end
     return xs, zs, field
@@ -145,6 +152,7 @@ function electric_field(
         z_max = Inf,
         x0_shift::Real = 0,
         z0_shift::Real = 0,
+        progress::Bool = true,
         kwargs...
 ) where {G}
     # Calculate autolims
@@ -166,41 +174,44 @@ function electric_field(
     local_z = Point3(orientation(pd)[:, 3])
     origin = position(pd)
     # Calculate field superposition
-    Threads.@threads for j in eachindex(zs)
-        z_grid = zs[j]
-        # Hoist z-grid math out of inner loop
-        p_row = origin + z_grid * local_z
+    _with_progress(progress, length(zs), "Detector field: ") do prog
+        Threads.@threads for j in eachindex(zs)
+            z_grid = zs[j]
+            # Hoist z-grid math out of inner loop
+            p_row = origin + z_grid * local_z
 
-        @inbounds for i in eachindex(xs)
-            x_grid = xs[i]
-            p1 = p_row + x_grid * local_x
+            @inbounds for i in eachindex(xs)
+                x_grid = xs[i]
+                p1 = p_row + x_grid * local_x
 
-            acc = Complex{G}(0.0)
-            for hit in hits
-                v = p1 - hit.p0
-                l1 = _pseudo_dot(v, hit.d0)
-                r_vec = v - l1 * hit.d0
+                acc = Complex{G}(0.0)
+                for hit in hits
+                    v = p1 - hit.p0
+                    l1 = _pseudo_dot(v, hit.d0)
+                    r_vec = v - l1 * hit.d0
 
-                h1_z = hit.h1 + l1 * hit.u1
-                h2_z = hit.h2 + l1 * hit.u2
-                area_z = _pseudo_cross2d(h1_z, h2_z, hit.d0)
-                if abs(area_z) < 1e-25
-                    area_z = Complex{G}(1e-25, 1e-25)
+                    h1_z = hit.h1 + l1 * hit.u1
+                    h2_z = hit.h2 + l1 * hit.u2
+                    area_z = _pseudo_cross2d(h1_z, h2_z, hit.d0)
+                    if abs(area_z) < 1e-25
+                        area_z = Complex{G}(1e-25, 1e-25)
+                    end
+
+                    ξ1 = _pseudo_cross2d(h1_z, r_vec, hit.d0)
+                    ξ2 = _pseudo_cross2d(h2_z, r_vec, hit.d0)
+                    w = (ξ1 * _pseudo_dot(hit.u2, r_vec) -
+                         ξ2 * _pseudo_dot(hit.u1, r_vec)) / (2 * area_z)
+
+                    phase_corr = (hit.n_eff - 1) * l1
+                    z_total = hit.l0 + l1
+                    ψ = sqrt(hit.area_ref / area_z) *
+                        cis(hit.k0 * (z_total + w + hit.Δl + phase_corr))
+
+                    acc += (hit.E_ref_amp * ψ) * hit.sqrt_proj
                 end
-
-                ξ1 = _pseudo_cross2d(h1_z, r_vec, hit.d0)
-                ξ2 = _pseudo_cross2d(h2_z, r_vec, hit.d0)
-                w = (ξ1 * _pseudo_dot(hit.u2, r_vec) -
-                     ξ2 * _pseudo_dot(hit.u1, r_vec)) / (2 * area_z)
-
-                phase_corr = (hit.n_eff - 1) * l1
-                z_total = hit.l0 + l1
-                ψ = sqrt(hit.area_ref / area_z) *
-                    cis(hit.k0 * (z_total + w + hit.Δl + phase_corr))
-
-                acc += (hit.E_ref_amp * ψ) * hit.sqrt_proj
+                field[i, j] = acc
             end
-            field[i, j] = acc
+            _tick!(prog)
         end
     end
     return xs, zs, field
@@ -219,6 +230,7 @@ function electric_field(
         z_max = Inf,
         x0_shift::Real = 0,
         z0_shift::Real = 0,
+        progress::Bool = true,
         kwargs...
 ) where {R}
     # automatically calculate limits
@@ -250,19 +262,22 @@ function electric_field(
         (p_hit, dir, proj, k, opl)
     end
 
-    Threads.@threads for j in eachindex(zs)
-        z = zs[j]
-        @inbounds for i in eachindex(xs)
-            x = xs[i]
-            # Global detector surface point coordinate
-            p = origin_pd + x * e1 + z * e2
-            # Add all field contributions
-            acc = zero(complex(R))
-            for (p_hit, dir, proj, k, opl) in hit_data
-                l = dot(p - p_hit, dir)
-                acc += proj * cis(k * (opl + l))
+    _with_progress(progress, length(zs), "Detector field: ") do prog
+        Threads.@threads for j in eachindex(zs)
+            z = zs[j]
+            @inbounds for i in eachindex(xs)
+                x = xs[i]
+                # Global detector surface point coordinate
+                p = origin_pd + x * e1 + z * e2
+                # Add all field contributions
+                acc = zero(complex(R))
+                for (p_hit, dir, proj, k, opl) in hit_data
+                    l = dot(p - p_hit, dir)
+                    acc += proj * cis(k * (opl + l))
+                end
+                field[i, j] = acc
             end
-            field[i, j] = acc
+            _tick!(prog)
         end
     end
 
@@ -282,6 +297,7 @@ function electric_field(
         z_max = Inf,
         x0_shift::Real = 0,
         z0_shift::Real = 0,
+        progress::Bool = true,
         kwargs...
 ) where {R}
     # automatically calculate limits
@@ -313,19 +329,22 @@ function electric_field(
         (p_hit, dir, E0, k, opl)
     end
 
-    Threads.@threads for j in eachindex(zs)
-        z = zs[j]
-        @inbounds for i in eachindex(xs)
-            x = xs[i]
-            # Global detector surface point coordinate
-            p = origin_pd + x * e1 + z * e2
-            # Coherently add all vector field contributions
-            acc = zero(Point3{Complex{R}})
-            for (p_hit, dir, E0, k, opl) in hit_data
-                l = dot(p - p_hit, dir)
-                acc += E0 * cis(k * (opl + l))
+    _with_progress(progress, length(zs), "Detector field: ") do prog
+        Threads.@threads for j in eachindex(zs)
+            z = zs[j]
+            @inbounds for i in eachindex(xs)
+                x = xs[i]
+                # Global detector surface point coordinate
+                p = origin_pd + x * e1 + z * e2
+                # Coherently add all vector field contributions
+                acc = zero(Point3{Complex{R}})
+                for (p_hit, dir, E0, k, opl) in hit_data
+                    l = dot(p - p_hit, dir)
+                    acc += E0 * cis(k * (opl + l))
+                end
+                field[i, j] = acc
             end
-            field[i, j] = acc
+            _tick!(prog)
         end
     end
 

@@ -30,6 +30,9 @@ Grid keywords:
 - `x0_shift, z0_shift`: shift the window
 - `num_spots`: beamlet contour resolution used for the automatic limits
 
+`progress = true` shows a progress bar in the terminal once the readout has run for
+`get_progress_threshold()` s (default 5 s).
+
 Local `(x, z)` form a left-handed frame with the normal, as seen by the incoming beam.
 For polarized hits, `I = intensity.(E)` converts a matrix of field vectors to intensity.
 Ray-based PSFs are not normalized: compare shapes and positions, not absolute Strehl values.
