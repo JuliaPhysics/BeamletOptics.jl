@@ -898,9 +898,31 @@ const BMO = BeamletOptics
             # the projection uses the updated range
             @test gui.ax.scene.camera.projection[][3, 3] ≈ -2 / (cam.far[] - cam.near[]) rtol = 1e-4
         end
+        # `center!`, e.g. via `reset_limits!` after adding a plot, keeps the depth range
+        Makie.center!(gui.ax.scene)
+        @test cam.near[] < 0 < cam.far[]
+        @test gui.ax.scene.camera.projection[][3, 3] ≈ -2 / (cam.far[] - cam.near[]) rtol = 1e-4
+        # W/S zoom the orthographic view instead of moving along the view direction
+        scene = gui.ax.scene
+        _dist() = norm(cam.eyeposition[] .- cam.lookat[])
+        function _walk(key)
+            lookat, d = cam.lookat[], _dist()
+            events(scene).keyboardbutton[] = Makie.KeyEvent(key, Keyboard.press)
+            Makie.on_pulse(scene, cam, 0.1)
+            events(scene).keyboardbutton[] = Makie.KeyEvent(key, Keyboard.release)
+            return cam.lookat[] - lookat, _dist() / d
+        end
+        shift, scale = _walk(Keyboard.w)
+        @test iszero(shift) && scale < 0.95
+        shift, scale = _walk(Keyboard.s)
+        @test iszero(shift) && scale > 1.05
         gui.orthographic_toggle.active[] = false
         @test settings.projectiontype[] == Makie.Perspective
         @test (settings.clipping_mode[], cam.near[], cam.far[]) == perspective_depth
+        shift, scale = _walk(Keyboard.w)
+        @test norm(shift) > 0 && scale ≈ 1
+        @test cam.controls.forward_key[] == Keyboard.w
+        @test cam.controls.zoom_in_key[] == Keyboard.u
         close(gui)
 
         m, pd = _fixture()

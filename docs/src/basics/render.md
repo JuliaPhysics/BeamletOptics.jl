@@ -304,7 +304,8 @@ views with a click, clicks on the cube never select or deselect a component. The
 in the isometric view from the corner between `Top`, `Front` and `Right`, i.e. from `(1, -1, 1)`,
 such that the labels of the cube read correctly. The "orthographic" toggle below the 3D view,
 next to "auto trace" and "clip beams", switches between perspective and orthographic projection,
-`orthographic = true` starts with the latter:
+`orthographic = true` starts with the latter. Moving along the view direction does not change an
+orthographic view, there `W`/`S` zoom like `U`/`O`:
 
 ```julia
 gui = live_view(system, beam; orthographic = true)

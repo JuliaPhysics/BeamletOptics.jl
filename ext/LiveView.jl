@@ -2409,19 +2409,36 @@ moves the eye into the scene: the near plane cuts through it like a clip plane, 
 itself stays the same. In orthographic mode the depth range is therefore static and reaches from
 behind the eye (negative `near`) past the far side of the scene, updated whenever the eye moves.
 The scene bounds are taken when switching to orthographic, with a margin of one radius for later
-moves of objects.
+moves of objects. Makie's `center!`, called e.g. by `reset_limits!` when a plot is added to the
+open window or by `save` without `update = false`, replaces the depth range with a positive one;
+it is restored, with new scene bounds, before the camera applies it.
+
+Moving along the view direction does not change an orthographic view at all, so the keys for it
+(`W`/`S` of `Camera3D`) zoom there, like the zoom keys (`U`/`O`).
 """
 function _connect_projection!(gui::LiveView, orthographic::Bool)
     cam = cameracontrols(gui.ax.scene)
-    settings = cam.settings
+    settings, controls = cam.settings, cam.controls
     perspective_depth = (settings.clipping_mode[], cam.near[], cam.far[])
+    walk_keys = (controls.forward_key[], controls.backward_key[], controls.zoom_in_key[],
+        controls.zoom_out_key[])
     bounds = Ref((zeros(3), 1.0))
+    is_ortho() = settings.projectiontype[] != Makie.Perspective
     # Silent updates: every camera move calls `update_cam!` after setting the eye position
     function set_depth!()
         center, radius = bounds[]
         d = norm(Vector{Float64}(cam.eyeposition[]) .- center) + 2 * radius
         cam.near.val = -d
         cam.far.val = d
+        return nothing
+    end
+    # `false` is a key binding that is never pressed
+    function set_keys!(ortho::Bool)
+        forward, backward, zoom_in, zoom_out = walk_keys
+        controls.forward_key[] = ortho ? false : forward
+        controls.backward_key[] = ortho ? false : backward
+        controls.zoom_in_key[] = ortho ? zoom_in | forward : zoom_in
+        controls.zoom_out_key[] = ortho ? zoom_out | backward : zoom_out
         return nothing
     end
     function set_projection!(ortho::Bool)
@@ -2435,15 +2452,26 @@ function _connect_projection!(gui::LiveView, orthographic::Bool)
             cam.near.val = near
             cam.far.val = far
         end
+        set_keys!(ortho)
         settings.projectiontype[] = ortho ? Makie.Orthographic : Makie.Perspective
         return nothing
     end
     listeners = gui.controls.listeners
     push!(listeners, on(set_projection!, gui.orthographic_toggle.active))
     push!(listeners, on(cam.eyeposition) do _
-        settings.projectiontype[] == Makie.Perspective || set_depth!()
+        is_ortho() && set_depth!()
         return nothing
     end)
+    # Before the listener of the camera, which applies `near` and `far`
+    for depth in (cam.near, cam.far)
+        push!(listeners, on(depth; priority = 1) do _
+            if is_ortho()
+                bounds[] = _scene_bounds(gui)
+                set_depth!()
+            end
+            return nothing
+        end)
+    end
     set_projection!(orthographic)
     return nothing
 end
