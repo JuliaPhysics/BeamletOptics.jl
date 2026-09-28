@@ -118,23 +118,24 @@ A subtype `L <: AbstractLiveLayout` implements
   result `w` of `_build_layout` once the movable objects are known; the component `menu` (a `Menu`
   with the `options`, or `nothing`) and the `views_menu` (a `Menu` with the `views_options`)
 
-The controls of the selected object (pose, actions, the rows declared by [`card_rows`](@ref)) are
-on the component cards, see `_ComponentCard`, which all layouts share.
-
 and optionally, with defaults for any layout,
 
 - `_figure(layout::L, size)`: the `Figure`, and `_default_size(layout::L)`: its size unless given
 - `_connect_layout!(gui::LiveView{L})`: connects the widgets that only the layout has, e.g.
   collapsing; its listeners belong in `gui.controls.listeners`
-- where the selected object is shown: `_selection_card_shown(gui)` (`true`: its card floats next
-  to it in the 3D view), `_refresh_inspector!(gui; force)` for a layout that shows it elsewhere,
-  e.g. docked in an inspector, called with the cards (see `_update_inspector!`), `_step_box(layout,
-  w, card)`: the `Textbox` of the keyboard step (by default on the `card` of the selection), and
-  `_layout_boxes(gui)`: the textboxes of the layout that take the keyboard, see `_typing`
+- where the controls of the selected object are shown, i.e. the widgets that
+  [`card_actions`](@ref) and [`card_rows`](@ref) declare, built by the same code for any host (see
+  `_AbstractCard`): by default on the floating card next to the object (`_ComponentCard`), which
+  holds the step box. A layout that shows them elsewhere, e.g. the app layout on a card docked in
+  its inspector (`_DockedCard`), returns `false` from `_selection_card_shown(gui)` and refreshes
+  them in `_refresh_inspector!(gui; force)`, called with the cards (see `_update_inspector!`);
+  `_step_box(layout, w, card)` returns its `Textbox` of the keyboard step, `_layout_boxes(gui)`
+  the textboxes that take the keyboard (see `_typing`). Pinned cards float in all layouts.
 - hooks called by the shared logic: `_on_solved!(gui)` after a solve is shown,
   `_on_selected!(gui)` after the selection changed, `_on_clipping!(gui)` after clipping was
-  switched, `_on_clip_planes_changed!(gui)` after a clip plane was added or removed and
-  `_on_hidden!(gui)` after objects were hidden or shown
+  switched, `_on_clip_planes_changed!(gui)` after a clip plane was added or removed,
+  `_on_hidden!(gui)` after objects were hidden or shown and `_on_pinned!(gui)` after a card was
+  pinned or unpinned
 - which detector panels are computed and how their results are shown, for layouts that show only
   some of them: `_computed_panels(gui, preview)`, `_shown_panels(gui)` and
   `_apply_panel!(gui, p, field; coarse, preview)` (all panels by default), with the hooks
@@ -2197,11 +2198,12 @@ end
 Builds the widgets of the card `c` of the `gui` for its new object `obj` from the declarations
 [`card_actions`](@ref) (in `c.actions`) and [`card_rows`](@ref) (one layout per row in `c.rows`),
 see `_add_cell!`. If the declarations have the same layout as those of the widgets on the card,
-e.g. for another mirror, the widgets are kept and only take the new declarations. New widgets come
-before the mouse shield of the cards, see `_shield_cards!`.
+e.g. for another mirror, the widgets are kept and only take the new declarations. The card is any
+host of the declarations, see `_AbstractCard`, e.g. the floating card, whose new widgets come
+before the mouse shield of the cards (see `_on_content_built!`), or the docked card of the app.
 """
-function _build_content!(gui::LiveView, c::_ComponentCard, obj)
-    actions, rows = card_actions(obj), card_rows(obj)
+function _build_content!(gui::LiveView, c::_AbstractCard, obj)
+    actions, rows = _declarations(c, obj)
     key = (_layout_key(actions), _layout_key(rows))
     declared = CardWidget[_declared_widgets(actions)..., _declared_widgets(rows)...]
     if key == c.content_key
@@ -2213,48 +2215,60 @@ function _build_content!(gui::LiveView, c::_ComponentCard, obj)
         _add_cell!(gui, c, c.actions[1, j], w)
     end
     for (i, row) in enumerate(rows)
-        layout = GridLayout(c.rows[i, 1]; halign = :left, default_colgap = 6)
+        layout = GridLayout(c.rows[i, 1]; _row_attributes(c)...)
         for (j, cell) in enumerate(row.cells)
             _add_cell!(gui, c, layout[1, j], cell)
         end
     end
     c.content_key = key
-    _shield_cards!(gui)
+    _on_content_built!(gui, c)
     return nothing
 end
+
+"""
+    _declarations(c, obj) -> (actions, rows)
+
+The declarations of the widgets of `obj` on the card `c`: [`card_actions`](@ref) and
+[`card_rows`](@ref), which a host may extend, e.g. the docked card of the app layout.
+"""
+_declarations(::_AbstractCard, obj) = (card_actions(obj), card_rows(obj))
+
+# The new widgets of a floating card come before the mouse shield of the cards
+_on_content_built!(gui::LiveView, ::_ComponentCard) = _shield_cards!(gui)
+_on_content_built!(::LiveView, ::_AbstractCard) = nothing
 
 """
     _add_cell!(gui, c, pos, cell)
 
 Adds a cell of a declaration to the card `c` of the `gui` at the grid position `pos`: a text as a
-`Label`, a [`CardWidget`](@ref) as a block of its type with the colors of the card. The inputs of
-the block call `on` of the declaration (see `_on_input!`), and a textbox takes the keyboard like
-the others of the card.
+`Label`, a [`CardWidget`](@ref) as a block of its type with the attributes of the card, see
+`_cell_attributes`. The inputs of the block call `on` of the declaration (see `_on_input!`), and a
+textbox takes the keyboard like the others of the card.
 """
-function _add_cell!(::LiveView, c::_ComponentCard, pos, text::String)
-    push!(c.blocks, Label(pos, text; halign = :left, _card_style(Label)...))
+function _add_cell!(::LiveView, c::_AbstractCard, pos, text::String)
+    push!(c.blocks, Label(pos, text; halign = :left, _card_style(c, Label)...))
     return nothing
 end
-function _add_cell!(gui::LiveView, c::_ComponentCard, pos, w::CardWidget)
-    b = w.type(pos; _card_style(w.type)..., w.attributes...)
+function _add_cell!(gui::LiveView, c::_AbstractCard, pos, w::CardWidget)
+    b = w.type(pos; _cell_attributes(c, w)...)
     push!(c.blocks, b)
     push!(c.widgets, (b, w))
     i = length(c.widgets)
-    _fix_caret!(b)
+    _fix_caret!(c, b)
     _track_textbox!(gui, c, b)
     _listen_input!(gui, c, i, _widget_input(b))
     return nothing
 end
 
-function _track_textbox!(gui::LiveView, c::_ComponentCard, tb::Textbox)
+function _track_textbox!(gui::LiveView, c::_AbstractCard, tb::Textbox)
     push!(c.textboxes, tb)
     push!(c.listeners, on(_ -> _keep_keyboard!(gui), tb.focused))
     return nothing
 end
-_track_textbox!(::LiveView, ::_ComponentCard, _) = nothing
+_track_textbox!(::LiveView, ::_AbstractCard, _) = nothing
 
-_listen_input!(::LiveView, ::_ComponentCard, ::Int, ::Nothing) = nothing
-function _listen_input!(gui::LiveView, c::_ComponentCard, i::Int, obs::Observable)
+_listen_input!(::LiveView, ::_AbstractCard, ::Int, ::Nothing) = nothing
+function _listen_input!(gui::LiveView, c::_AbstractCard, i::Int, obs::Observable)
     push!(c.listeners, on(v -> _on_input!(gui, c, i, v), obs))
     return nothing
 end
@@ -2266,7 +2280,7 @@ Applies the input `v` of the declared widget `i` of the card `c` to the object o
 `_card_object`) with `on` of its declaration (and solves again for `solve = true`), then shows the
 new values on all cards. Ignored while the card shows new values (`refreshing`).
 """
-function _on_input!(gui::LiveView, c::_ComponentCard, i::Int, v)
+function _on_input!(gui::LiveView, c::_AbstractCard, i::Int, v)
     c.refreshing && return nothing
     w = c.widgets[i][2]
     _apply_input!(gui, w.on, _card_object(gui, c), v, w.solve)
@@ -2292,9 +2306,9 @@ end
 
 Shows the values of the object of the card `c` (see `_card_object`) in its declared widgets, see
 `value` of [`CardWidget`](@ref); a focused textbox keeps the typed text, unless `force`. Only if
-the widgets were built for this object, see `_update_card!`.
+the widgets were built for this object (`c.pose`), see `_update_card!`.
 """
-function _refresh_card!(gui::LiveView, c::_ComponentCard; force::Bool = false)
+function _refresh_card!(gui::LiveView, c::_AbstractCard; force::Bool = false)
     obj = _card_object(gui, c)
     (isnothing(obj) || c.pose === nothing || c.pose[1] !== obj) && return nothing
     c.refreshing = true
@@ -2358,6 +2372,7 @@ function _toggle_pinned!(gui::LiveView, c::_ComponentCard)
         _use_card!(gui, _spare_card!(gui))
     end
     _update_cards!(gui)
+    _on_pinned!(gui)
     return nothing
 end
 
@@ -2368,6 +2383,29 @@ function _unpin!(gui::LiveView, obj)
     end
     return nothing
 end
+
+"""Returns `true` if a card of the `gui` is pinned to `obj`."""
+_is_pinned(gui::LiveView, obj) = any(c -> c.pinned && c.obj === obj, gui.cards)
+
+"""
+    _toggle_pin!(gui, obj)
+
+Pins a floating card to `obj` (a spare card, see `_spare_card!`), independent of the card of the
+selection, e.g. from the docked card of the app layout; or unpins the cards pinned to `obj`.
+"""
+function _toggle_pin!(gui::LiveView, obj)
+    _is_pinned(gui, obj) && return _unpin!(gui, obj)
+    c = _spare_card!(gui)
+    c.pinned, c.obj, c.key, c.pose = true, obj, nothing, nothing
+    c.pin_button.label[] = "unpin"
+    _update_cards!(gui)
+    _on_pinned!(gui)
+    return nothing
+end
+_toggle_pin!(::LiveView, ::Nothing) = nothing
+
+# Called after a card was pinned or unpinned, see `AbstractLiveLayout`
+_on_pinned!(::LiveView) = nothing
 
 """Returns a card of the `gui` that is neither pinned nor the card of the selection, or a new one."""
 function _spare_card!(gui::LiveView)
@@ -2416,8 +2454,11 @@ const _CARD_POSE_NAMES = (:x, :y, :z, :rx, :ry, :rv)
 const _CARD_AXIS_COLORS = (RGBAf(1, 0.45, 0.45, 1), RGBAf(0.45, 0.85, 0.45, 1), RGBAf(0.55, 0.7, 1, 1))
 
 # Label of the pose box `k`, of the same width in both rows, such that the boxes line up
+# (the positions in the text color of the card, the rotations in the colors of the axes, see
+# `_AxisColor`)
 _pose_label(k::Int) = CardWidget(Label; text = _CARD_POSE_LABELS[k], width = 18, halign = :right,
-    color = k <= 3 ? _PROGRESS_TEXT_COLOR : _CARD_AXIS_COLORS[k - 3])
+    _pose_label_color(k)...)
+_pose_label_color(k::Int) = k <= 3 ? (;) : (; color = _AxisColor(k - 3))
 
 # Pose box `k`: the position [mm] (wide enough for e.g. -6869.709 of a telescope, longer values
 # scroll while typing) or an empty rotation box, see `_apply_pose_input!`
@@ -3211,7 +3252,13 @@ actions in the 3D view are unchanged:
   whole system, the eye in the title of the tree shows all objects again. Objects without a
   `labels` entry are named by their type and a running index, e.g. "Lens 2", also in the status
   line.
-- right sidebar ("Properties"): the selected object, the pose boxes, the step box and the mode
+- right sidebar ("Properties"): the card of the selected object, docked instead of floating next
+  to it: its name and type, the actions of the card (e.g. "hide", or "flip" and "remove" for a
+  clip plane) and a pin, which pins a floating card to the object in the 3D view; below, the rows
+  of the card (see [`card_rows`](@ref), e.g. the pose and the ray slider of a source) and, for a
+  detector, the mode and the color scale of its panel; then the step box, the mode and the
+  properties of the object (see [`properties`](@ref)). Pinned cards float in the 3D view as in
+  the compact layout.
 - analysis dock below the 3D view: a tab per detector panel, a click on a tab shows its panel.
   Only the panel of the active tab is computed after a solve, the other panels are computed when
   their tab is opened; a collapsed dock computes none. Panels with `history = true` still record
@@ -3220,7 +3267,7 @@ actions in the 3D view are unchanged:
   projection
 
 The sidebars and the dock can be collapsed via the toolbar, the 3D view then takes their space.
-The component menu and the hide buttons of the compact layout are replaced by the tree. In the compact layout, the widgets are at
+The component menu of the compact layout is replaced by the tree. In the compact layout, the widgets are at
 fixed positions of `gui.fig`, e.g. the detector panels in `gui.fig[1, 2]`, next to which users
 may add their own axes.
 

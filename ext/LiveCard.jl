@@ -34,9 +34,11 @@ e.g. `_DockedCard` in the inspector of the app layout. A host has the fields
 - `widgets` (each block with its `CardWidget`), `blocks`, `textboxes`, `listeners`, `content_key`,
   `refreshing` and `pose`, see `_ComponentCard`
 
-and implements `_new_parts!(c)`, `_card_object(gui, c)` and `_card_boxes(c)`. Optionally, by
-dispatch on the host: the attributes of the blocks (`_cell_attributes`, e.g. the colors of the
-dark card or of the theme of the app), `_fix_caret!(c, block)` and `_on_content_built!(gui, c)`.
+and implements `_new_parts!(c)`, `_card_object(gui, c)`, `_card_boxes(c)` and the style of its
+blocks, `_card_style(c, T)` (e.g. the colors of the dark card or of the theme of the app).
+Optionally, by dispatch on the host: `_card_value(c, v)` (e.g. of an `_AxisColor`),
+`_host_attributes(c, T, attributes)`, `_row_attributes(c)`, `_declarations(c, obj)`,
+`_fix_caret!(c, block)` and `_on_content_built!(gui, c)`.
 """
 abstract type _AbstractCard end
 
@@ -134,7 +136,7 @@ end
 _card_boxes(c::_ComponentCard) = (c.step_box, c.textboxes...)
 
 """Returns the declared widget with the `name` on the card `c` (see [`CardWidget`](@ref)), or `nothing`."""
-function _card_widget(c::_ComponentCard, name::Symbol)
+function _card_widget(c::_AbstractCard, name::Symbol)
     i = findfirst(((_, w),) -> w.name === name, c.widgets)
     return isnothing(i) ? nothing : first(c.widgets[i])
 end
@@ -143,10 +145,46 @@ end
 Widgets of the declarations, by the type of the block
 =#
 
-# Colors of the card, which is dark, for the blocks of the declarations
+# Colors of the card, which is dark, for the blocks of the declarations. The box and border colors
+# of the textboxes are Makie's defaults, which a theme of the figure (e.g. of the app layout, with
+# light boxes) must not change
 _card_style(::Type{Label}) = (; color = _PROGRESS_TEXT_COLOR)
-_card_style(::Type{Textbox}) = (; textcolor = _PROGRESS_TEXT_COLOR)
+_card_style(::Type{Textbox}) = (; textcolor = _PROGRESS_TEXT_COLOR, boxcolor = :transparent,
+    boxcolor_hover = :transparent, boxcolor_focused = :transparent,
+    bordercolor = RGBAf(0.8, 0.8, 0.8, 1))
 _card_style(::Type) = (;)
+_card_style(::_ComponentCard, T::Type) = _card_style(T)
+
+"""
+    _AxisColor(k)
+
+Color of the gizmo axis `k` (1: red, 2: green, 3: blue) in a declaration, e.g. of the labels of the
+rotation boxes (see `pose_card_rows`), which each host of the card resolves to its own shade, see
+`_card_value`: lighter on the dark floating card, the axis colors of the theme when docked.
+"""
+struct _AxisColor
+    k::Int
+end
+
+# Values of the attributes of a declaration on the card `c`, see `_AxisColor`
+_card_value(::_AbstractCard, v) = v
+_card_value(::_ComponentCard, a::_AxisColor) = _CARD_AXIS_COLORS[a.k]
+
+"""
+    _cell_attributes(c, w::CardWidget) -> NamedTuple
+
+Attributes of the block of the declared widget `w` on the card `c`: the style of the card for the
+type of the block (see `_card_style`), then the attributes of `w` with their values on the card
+(see `_card_value`), which the host may adapt, see `_host_attributes`.
+"""
+_cell_attributes(c::_AbstractCard, w::CardWidget) = _host_attributes(c, w.type,
+    (; _card_style(c, w.type)..., map(v -> _card_value(c, v), w.attributes)...))
+
+# The attributes of a block of the type `T` on the card, as declared by default
+_host_attributes(::_AbstractCard, T::Type, attributes::NamedTuple) = attributes
+
+# Layout of a declared row of the card, see `_build_content!`
+_row_attributes(::_ComponentCard) = (; halign = :left, default_colgap = 6)
 
 # The caret and the selection of a textbox are drawn without the translation of the scene of the card
 function _fix_caret!(tb::Textbox)
@@ -156,6 +194,8 @@ function _fix_caret!(tb::Textbox)
     return nothing
 end
 _fix_caret!(_) = nothing
+_fix_caret!(::_ComponentCard, b) = _fix_caret!(b)
+_fix_caret!(::_AbstractCard, _) = nothing
 
 # The observable of a block that carries its inputs, see `CardWidget`
 _widget_input(b::Slider) = b.value
@@ -194,7 +234,7 @@ _declared_widgets(::String) = ()
 _park_card!(c::_ComponentCard) = foreach(_park!, (c.head, c.actions, c.rows, c.step, c.background))
 
 """Removes the declared widgets of the card `c`, with their listeners and layouts."""
-function _clear_content!(c::_ComponentCard)
+function _clear_content!(c::_AbstractCard)
     foreach(off, c.listeners)
     foreach(delete!, c.blocks)
     empty!(c.listeners)
@@ -202,8 +242,14 @@ function _clear_content!(c::_ComponentCard)
     empty!(c.widgets)
     empty!(c.textboxes)
     # New layouts instead of the empty rows and columns of the old ones
-    c.actions, c.rows = _card_part(c.scene), _card_part(c.scene)
+    _new_parts!(c)
     c.content_key = nothing
+    return nothing
+end
+
+"""Replaces the layouts of the actions and the rows of the card `c` by new ones, see `_clear_content!`."""
+function _new_parts!(c::_ComponentCard)
+    c.actions, c.rows = _card_part(c.scene), _card_part(c.scene)
     return nothing
 end
 

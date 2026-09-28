@@ -56,6 +56,8 @@ function _makie_theme(t)
             textpadding = (8, 8, 5, 5)),
         Slider = (; color_inactive = t.border, color_active = t.accent,
             color_active_dimmed = t.accent_soft, linewidth = 6),
+        Toggle = (; framecolor_inactive = t.muted, framecolor_active = t.accent,
+            buttoncolor = :white),
         Axis = (; backgroundcolor = t.view, titlecolor = t.text, subtitlecolor = t.muted,
             xlabelcolor = t.text, ylabelcolor = t.text, xticklabelcolor = t.muted,
             yticklabelcolor = t.muted, xtickcolor = t.border, ytickcolor = t.border,
@@ -127,10 +129,8 @@ mutable struct AppLayout <: AbstractLiveLayout
     expanded::IdDict{Any, Bool}
     names::IdDict{Any, String}
     counters::Dict{String, Int}
-    # the inspector (an `_Inspector`, see LiveInspector.jl) and the registry of its type-dependent
-    # sections, see `_inspector_sections`
+    # the inspector with the docked card of the selection, an `_Inspector`, see LiveInspector.jl
     inspector::Any
-    inspectors::Vector{Pair{Type, Function}}
     # the info label of the status bar
     info::Label
     AppLayout(theme::NamedTuple) = new(theme)
@@ -376,7 +376,7 @@ function _build_layout(layout::AppLayout, fig, spec)
     cube = spec.view_cube ? view_cube!(ax) : nothing
     # Sidebars and dock
     layout.left = _app_part(main, (1, 1), s -> colsize!(main, 1, s), Fixed(240), t.sidebar)
-    layout.right = _app_part(main, (1, 3), s -> colsize!(main, 3, s), Fixed(260), t.sidebar)
+    layout.right = _app_part(main, (1, 3), s -> colsize!(main, 3, s), Fixed(300), t.sidebar)
     layout.dock = _app_part(root, (3, 1), s -> rowsize!(root, 3, s),
         Relative(0.36), t.sidebar; padding = 8)
     layout.sections = Dict(:left => Pair{String, GridLayout}[], :right => Pair{String, GridLayout}[])

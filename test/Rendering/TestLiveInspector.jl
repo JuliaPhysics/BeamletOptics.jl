@@ -37,6 +37,9 @@ const BMO = BeamletOptics
     _rows(gui) = gui.layout.inspector.list.rows
     _value(gui, label) = (i = findfirst(r -> r[1] == label, _rows(gui));
         isnothing(i) ? nothing : _rows(gui)[i][2])
+    # Declared widgets of the docked card by name, see `card_rows`
+    _w(gui, name) = Ext._card_widget(gui.layout.inspector.card, name)
+    _rect(x) = x.layoutobservables.computedbbox[]
 
     @testset "formatting" begin
         @test Ext._property_row("Diameter [m]", 25.4e-3) == ("Diameter", "25.4 mm")
@@ -65,17 +68,31 @@ const BMO = BeamletOptics
         @test _value(gui, "Detector panels") == "1"
         @test _value(gui, "Clip planes") == "1"
         @test endswith(_value(gui, "Last trace"), "ms")
-        # a lens: header, pose and properties, no type-dependent sections
+        # without a selection, the docked card is empty and has no height
+        @test isempty(insp.card.widgets) && isempty(insp.card.rows.content)
+        @test !insp.pin.box.visible[]
+        # a lens: header, the rows of its card (the pose) and its properties below them
         ctrl.selected[] = o.l1
         @test insp.name.text[] == "Lens 1"
         @test insp.type.text[] == "Lens"
         @test insp.icon[] === Ext._icon(:lens)
-        @test gui.pose_boxes[2].displayed_string[] == "40.0"
+        @test _w(gui, :y).displayed_string[] == "40.0"
+        @test _w(gui, :hide) isa Button && _w(gui, :hide).label[] == "hide"
+        @test all(k -> _w(gui, k) isa Textbox, (:x, :y, :z, :rx, :ry, :rv))
+        @test isnothing(_w(gui, :panel_mode))
+        @test insp.pin.box.visible[] && !insp.pin.active[]
         @test _value(gui, "Thickness") == "4 mm"
         @test _value(gui, "n(λ₀)") == "1.5"
-        @test isnothing(_value(gui, "Position"))   # in the pose boxes
+        @test isnothing(_value(gui, "Position"))   # in the pose rows
         @test isnothing(_value(gui, "Type"))       # in the header
-        @test isempty(insp.sections)
+        # the actions in the header, the rows below it, the properties below the rows
+        @test minimum(_rect(insp.card.actions))[1] > maximum(_rect(insp.name))[1] - 1
+        @test maximum(_rect(insp.card.rows))[2] < minimum(_rect(insp.type))[2]
+        @test maximum(_rect(insp.list.box))[2] < minimum(_rect(insp.card.rows))[2]
+        # the boxes fill the width of the sidebar, inside of it
+        sidebar = _rect(gui.layout.right.box)
+        @test maximum(_rect(_w(gui, :z)))[1] <= maximum(sidebar)[1]
+        @test minimum(_rect(_w(gui, :x)))[1] >= minimum(sidebar)[1]
         # a group
         ctrl.selected[] = o.group
         @test insp.name.text[] == "ObjectGroup 1"
@@ -98,17 +115,19 @@ const BMO = BeamletOptics
         @test insp.name.text[] == "Clip plane 1"
         @test insp.icon[] === Ext._icon(:clip_plane)
         @test _value(gui, "Normal") == "(0, 0, 1)"
-        # the detector: hits and the panel section
+        @test isnothing(_w(gui, :hide)) && _w(gui, :flip) isa Button && _w(gui, :remove) isa Button
+        # the detector: hits and the options of its panel
         ctrl.selected[] = o.pd
         @test insp.name.text[] == "PD1"
         @test _value(gui, "Hits") == "1"
         @test _value(gui, "Size") == "(5, 5) mm"
-        @test first.(insp.sections) == [BMO.Detector]
-        # deselected: the summary again, the sections are removed
+        @test _w(gui, :panel_mode).label[] == "auto" && !_w(gui, :panel_log).active[]
+        # deselected: the summary again, the widgets of the card are removed
+        blocks = copy(insp.card.blocks)
         ctrl.selected[] = nothing
         @test insp.name.text[] == "No selection"
-        @test isempty(insp.sections)
-        @test isempty(Ext._blocks!(Any[], insp.context))
+        @test isempty(insp.card.blocks) && isempty(insp.card.widgets)
+        @test all(b -> b.parent === nothing, blocks)
         close(gui)
     end
 
@@ -118,19 +137,25 @@ const BMO = BeamletOptics
         plots = (insp.list.labels, insp.list.values, insp.list.lines)
         n = length(gui.fig.scene.children)
         ctrl.selected[] = o.pd
-        blocks = Ext._blocks!(Any[], insp.context)
+        blocks = copy(insp.card.blocks)
         @test !isempty(blocks)
-        # a move updates the values, the sections and plots stay
-        gui.pose_boxes[3].stored_string[] = "10"
+        # a move updates the values, the widgets and plots stay
+        _w(gui, :z).stored_string[] = "10"
         @test _value(gui, "Hits") == "0"
-        @test Ext._blocks!(Any[], insp.context) == blocks
+        @test _w(gui, :z).displayed_string[] == "10.0"
+        @test insp.card.blocks == blocks
         @test (insp.list.labels, insp.list.values, insp.list.lines) === plots
-        gui.pose_boxes[3].stored_string[] = "0"
+        _w(gui, :z).stored_string[] = "0"
         @test _value(gui, "Hits") == "1"
-        # another detector keeps the sections, too
+        # a move in the 3D view, too
+        translate3d!(o.pd, [0, 0, 0.002])
+        Ext._update_inspector!(gui)
+        @test _w(gui, :z).displayed_string[] == "2.0"
+        translate3d!(o.pd, [0, 0, -0.002])
+        # another detector keeps the widgets, too
         ctrl.selected[] = o.pd2
-        @test Ext._blocks!(Any[], insp.context) == blocks
-        @test occursin("no panel", insp.context.content[1].content.content[2].content.text[])
+        @test insp.card.blocks == blocks
+        @test _w(gui, :panel_mode).label[] == "no panel"
         # the list has a constant number of plots
         ctrl.selected[] = o.l1
         @test (insp.list.labels, insp.list.values, insp.list.lines) === plots
@@ -175,57 +200,142 @@ const BMO = BeamletOptics
         close(gui)
     end
 
-    @testset "detector section" begin
+    @testset "detector panel rows" begin
         gui, o = _fixture()
-        insp, ctrl = gui.layout.inspector, gui.controls
+        ctrl = gui.controls
         p = only(gui.panels)
         ctrl.selected[] = o.pd
-        section = insp.context.content[1].content
-        segmented(i) = only(c.content for c in section.content
-                            if c.content isa GridLayout && c.span.rows == i:i)
-        mode_buttons = [c.content for c in segmented(3).content]
-        scale_buttons = [c.content for c in segmented(4).content]
-        @test p.mode == :auto
-        # the panel mode and the color scale are set in place
-        mode_buttons[2].clicks[] += 1
-        @test p.mode == :spot
+        mode, log = _w(gui, :panel_mode), _w(gui, :panel_log)
+        @test p.mode == :auto && mode.label[] == "auto"
+        # the panel mode cycles, the color scale is switched, both in place
+        notify(mode.clicks)
+        @test p.mode == :spot && mode.label[] == "spot"
         @test p.scatter_plot.visible[]
-        mode_buttons[3].clicks[] += 1
-        @test p.mode == :intensity
+        notify(mode.clicks)
+        @test p.mode == :intensity && mode.label[] == "intensity"
         @test p.heat_plot.visible[]
-        scale_buttons[2].clicks[] += 1
+        log.active[] = true
         @test p.colorscale == :log
-        # the section shows the state of the panel when selected again
+        notify(mode.clicks)
+        @test p.mode == :auto
+        # the rows show the state of the panel when selected again
         ctrl.selected[] = nothing
         p.colorscale = :linear
         ctrl.selected[] = o.pd
-        section = insp.context.content[1].content
-        @test [c.content for c in segmented(4).content][1].buttoncolor[] ==
-              gui.layout.theme.accent_soft
+        @test !_w(gui, :panel_log).active[]
+        # a detector without a panel: the inputs only show a message
+        ctrl.selected[] = o.pd2
+        notify(_w(gui, :panel_mode).clicks)
+        @test occursin("no panel", gui.status.text[])
+        # only in the inspector: the floating cards show the rows of `card_rows`
+        @test isempty(Ext._docked_rows(o.m))
+        @test length(Ext._declarations(gui.card, o.pd)[2]) == 2
+        @test length(Ext._declarations(gui.layout.inspector.card, o.pd)[2]) == 3
         close(gui)
     end
 
-    @testset "registry" begin
+    @testset "docked card" begin
         gui, o = _fixture()
         insp, ctrl = gui.layout.inspector, gui.controls
-        built = Ref(0)
-        updated = Any[]
-        Ext._add_inspector!(gui, BMO.AbstractReflectiveOptic, function (gui, grid)
-            built[] += 1
-            Label(grid[1, 1], "Mine")
-            return obj -> push!(updated, obj)
-        end)
+        # no floating card for the selection, its card is docked in the inspector
         ctrl.selected[] = o.m
-        @test built[] == 1
-        @test updated == [o.m]
-        @test first.(insp.sections) == [BMO.AbstractReflectiveOptic]
-        # other types, other sections
-        ctrl.selected[] = o.pd
-        @test first.(insp.sections) == [BMO.Detector]
+        events(gui.ax.scene).tick[] = Makie.Tick(Makie.RegularRenderTick, 0, 0.0, 1.0)
+        @test !Ext._selection_card_shown(gui)
+        @test !any(c -> c.scene.visible[], gui.cards)
+        @test insp.name.text[] == "Mirror 1"
+        # the actions of the card: hide shows the hint of the tree and clears the selection
+        notify(_w(gui, :hide).clicks)
+        @test o.m in gui.hidden && isnothing(ctrl.selected[])
+        @test occursin("eye", gui.status.text[])
+        Ext._toggle_hidden!(gui, o.m)
+        @test !(o.m in gui.hidden)
+        # a clip plane: flip and remove
+        plane = gui.clip_planes[1]
+        ctrl.selected[] = plane
+        n = plane.dir[:, 2]
+        notify(_w(gui, :flip).clicks)
+        @test plane.dir[:, 2] ≈ -n
+        notify(_w(gui, :remove).clicks)
+        @test isempty(gui.clip_planes) && isnothing(ctrl.selected[])
+        @test isempty(insp.card.widgets)
         close(gui)
-        # the compact layout has no inspector sections
-        gui = live_view(System([o.m]), o.beam; trace_budget = Inf)
-        @test_throws ArgumentError Ext._add_inspector!(gui, BMO.Mirror, (g, grid) -> identity)
+    end
+
+    @testset "ray slider of sources" begin
+        m = RoundPlanoMirror(25e-3, 5e-3)
+        zrotate3d!(m, deg2rad(45))
+        translate3d!(m, [0, 0.1, 0])
+        pd = Detector(5e-3)
+        zrotate3d!(pd, -π / 2)
+        translate3d!(pd, [0.1, 0.1, 0])
+        src = CollimatedSource([0.0, 0, 0], [0.0, 1, 0], 2e-3, 1e-6; num_rings = 2, num_rays = 40)
+        gui = live_view(System([m, pd]), src; trace_budget = Inf, layout = :app, preview = false)
+        gui.controls.selected[] = src
+        rays = _w(gui, :rays)
+        @test rays isa Slider && rays.value[] == 40
+        @test _w(gui, :ray_count).text[] == "40 rays"
+        # the slider fills the sidebar
+        @test maximum(_rect(rays))[1] <= maximum(_rect(gui.layout.right.box))[1]
+        Makie.set_close_to!(rays, 200)
+        @test length(src) == 200 && _w(gui, :ray_count).text[] == "200 rays"
+        @test length(BMO.hits(pd)) == 200
+        close(gui)
+    end
+
+    @testset "pin" begin
+        gui, o = _fixture()
+        insp, ctrl = gui.layout.inspector, gui.controls
+        n = length(gui.cards)
+        ctrl.selected[] = o.m
+        # the pin in the header pins a floating card to the selected object
+        insp.pin.active[] = true
+        c = only(filter(c -> c.pinned, gui.cards))
+        @test c.obj === o.m && c !== gui.card && length(gui.cards) == n + 1
+        events(gui.ax.scene).tick[] = Makie.Tick(Makie.RegularRenderTick, 0, 0.0, 1.0)
+        @test c.scene.visible[] && Ext._card_widget(c, :hide) isa Button
+        # it stays when the selection changes, the pin follows the selection
+        ctrl.selected[] = o.pd
+        @test !insp.pin.active[] && c.scene.visible[]
+        ctrl.selected[] = o.m
+        @test insp.pin.active[]
+        # "unpin" on the floating card unpins it, the pin of the inspector follows
+        notify(c.pin_button.clicks)
+        @test !c.pinned && !c.scene.visible[] && !insp.pin.active[]
+        # pin and unpin from the inspector
+        insp.pin.active[] = true
+        @test Ext._is_pinned(gui, o.m)
+        insp.pin.active[] = false
+        @test !Ext._is_pinned(gui, o.m)
+        # the keyboard step stays in the inspector
+        @test gui.step_box !== gui.card.step_box
+        close(gui)
+    end
+
+    @testset "keyboard" begin
+        gui, o = _fixture()
+        ctrl = gui.controls
+        ev = events(gui.ax.scene)
+        cam = cameracontrols(gui.ax.scene)
+        ctrl.selected[] = o.m
+        # a box of the docked card takes the keyboard: the camera and the controls ignore the keys
+        box = _w(gui, :x)
+        box.focused[] = true
+        @test Ext._typing(gui) && !cam.selected[]
+        P0 = Vector{Float64}(BMO.position(o.m))
+        ev.keyboardbutton[] = Makie.KeyEvent(Keyboard.left, Keyboard.press)
+        @test Vector{Float64}(BMO.position(o.m)) == P0
+        box.focused[] = false
+        @test !Ext._typing(gui) && cam.selected[]
+        # the step box as well
+        gui.step_box.focused[] = true
+        @test Ext._typing(gui) && !cam.selected[]
+        gui.step_box.focused[] = false
+        @test !Ext._typing(gui)
+        # another selection ends the input into the old box
+        box = _w(gui, :x)
+        box.focused[] = true
+        ctrl.selected[] = o.pd
+        @test !box.focused[] && !Ext._typing(gui)
         close(gui)
     end
 

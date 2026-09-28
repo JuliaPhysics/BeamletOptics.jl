@@ -210,6 +210,111 @@ function _Segmented(parent, options::Vector{Pair{Symbol, String}}; theme, select
 end
 
 #=
+Docked card: the card of the selection in the inspector, see `_AbstractCard`
+=#
+
+"""
+    _DockedCard
+
+The card of the selected object docked in the inspector of the app layout: the widgets declared by
+[`card_actions`](@ref) (in `actions`, in the header of the inspector) and [`card_rows`](@ref) (in
+`rows`, below the header), plus the app-only rows of `_docked_rows`, built by the same code as the
+floating cards (see `_build_content!`), but in the colors of the `theme` of the app and with the
+textboxes and sliders filling the width of the sidebar (see `_cell_attributes`). The fields
+`widgets` to `pose` are those of `_ComponentCard`; `header` and `parent` hold the layouts of the
+actions and the rows.
+"""
+mutable struct _DockedCard <: _AbstractCard
+    const header::GridLayout
+    const parent::GridLayout
+    const theme::NamedTuple
+    actions::GridLayout
+    rows::GridLayout
+    widgets::Vector{Tuple{Any, CardWidget}}
+    blocks::Vector{Any}
+    textboxes::Vector{Textbox}
+    listeners::Vector{Any}
+    content_key::Any
+    refreshing::Bool
+    pose::Any
+end
+
+# Positions of the actions in the header of the inspector and of the rows in its section
+_docked_actions(header::GridLayout) = GridLayout(header[1:2, 3]; default_colgap = 4)
+_docked_rows_layout(parent::GridLayout) = GridLayout(parent[2, 1]; default_rowgap = 4, tellwidth = false)
+
+function _DockedCard(header::GridLayout, parent::GridLayout, theme::NamedTuple)
+    return _DockedCard(header, parent, theme, _docked_actions(header), _docked_rows_layout(parent),
+        Tuple{Any, CardWidget}[], Any[], Textbox[], Any[], nothing, false, nothing)
+end
+
+function _new_parts!(c::_DockedCard)
+    for part in (c.actions, c.rows)
+        _GLB.remove_from_gridlayout!(_GLB.gridcontent(part))
+    end
+    c.actions, c.rows = _docked_actions(c.header), _docked_rows_layout(c.parent)
+    return nothing
+end
+
+_card_object(gui::LiveView, ::_DockedCard) = gui.controls.selected[]
+_card_boxes(c::_DockedCard) = c.textboxes
+
+# The widgets take the theme of the figure, texts and axis colors from the tokens of the app
+_card_style(c::_DockedCard, ::Type{Label}) = (; color = c.theme.text, fontsize = 12)
+_card_style(::_DockedCard, ::Type{Textbox}) = (; fontsize = 12, textpadding = (5, 5, 4, 4))
+_card_style(::_DockedCard, ::Type{Button}) = (; fontsize = 12, padding = (7, 7, 4, 4))
+_card_style(::_DockedCard, ::Type) = (;)
+_card_value(c::_DockedCard, a::_AxisColor) = c.theme.gizmo[a.k]
+_row_attributes(::_DockedCard) = (; default_colgap = 6, tellwidth = false, halign = :left)
+
+# Textboxes and sliders fill the width of the sidebar instead of the width declared for the card
+_host_attributes(::_DockedCard, T::Type, attributes::NamedTuple) = _fill_width(T, attributes)
+_fill_width(::Type{<:Union{Textbox, Slider}}, attributes) =
+    merge(attributes, (; width = Relative(1), tellwidth = false))
+_fill_width(::Type, attributes) = attributes
+
+# The rows of the card and the app-only rows, e.g. the panel options of a detector
+_declarations(::_DockedCard, obj) = (card_actions(obj), (card_rows(obj)..., _docked_rows(obj)...))
+
+"""
+    _docked_rows(obj)
+
+Rows of the docked card of `obj` in the app layout below its [`card_rows`](@ref), i.e. only in the
+inspector, chosen by dispatch: settings of the live view rather than of the object, e.g. the mode
+and the color scale of the panel of a `Detector` (see `_set_panel_options!`). None by default.
+"""
+_docked_rows(_) = ()
+_docked_rows(::BMO.Detector) = (CardRow("panel",
+        CardWidget(Button; name = :panel_mode, label = "auto",
+            value = (gui, pd) -> _panel_mode_label(_panel_of(gui, pd)),
+            on = (gui, pd, _) -> _cycle_panel_mode!(gui, _panel_of(gui, pd))),
+        CardWidget(Toggle; name = :panel_log, value = (gui, pd) -> _is_log(_panel_of(gui, pd)),
+            on = (gui, pd, v) -> _set_panel_log!(gui, _panel_of(gui, pd), v)),
+        "log"),)
+
+# The modes of a detector panel, in the order of the button of `_docked_rows`
+const _PANEL_MODES = (:auto, :spot, :intensity)
+
+_panel_mode_label(::Nothing) = "no panel"
+_panel_mode_label(p::DetectorPanel) = string(p.mode)
+_is_log(::Nothing) = false
+_is_log(p::DetectorPanel) = p.colorscale == :log
+
+function _cycle_panel_mode!(gui::LiveView, p::DetectorPanel)
+    i = something(findfirst(==(p.mode), _PANEL_MODES), 0)
+    _set_panel_options!(gui, p; mode = _PANEL_MODES[mod1(i + 1, length(_PANEL_MODES))])
+    gui.status.text[] = "panel $(p.name): $(p.mode)"
+    return nothing
+end
+_cycle_panel_mode!(gui::LiveView, ::Nothing) = _no_panel(gui)
+
+_set_panel_log!(gui::LiveView, p::DetectorPanel, log::Bool) =
+    _set_panel_options!(gui, p; colorscale = log ? :log : :linear)
+_set_panel_log!(gui::LiveView, ::Nothing, _) = _no_panel(gui)
+
+_no_panel(gui::LiveView) = (gui.status.text[] = "this detector has no panel, see the detectors kwarg"; nothing)
+
+#=
 Inspector
 =#
 
@@ -220,16 +325,17 @@ The property inspector of the app layout, the "PROPERTIES" section of the right 
 to bottom:
 
 - the header: the icon of the kind of the selected object (see `_tree_kind`), its name (see
-  `_label`) and its type
-- the pose: the pose boxes (see `_update_pose_boxes!`), the step box and the mode as a segmented
-  control (`mode`), bound to the `mode` of the controls
+  `_label`) and its type, the actions of its card (e.g. hide) and the `pin` toggle, which pins a
+  floating card to the object in the 3D view (see `_toggle_pin!`)
+- the docked `card` of the selected object: the rows of [`card_rows`](@ref), e.g. the pose, see
+  `_DockedCard`
+- the step box and the mode as a segmented control (`mode`), bound to the `mode` of the controls
 - the properties of the object, see `BeamletOptics.properties` and `_PropertyList`; without a
   selection, a summary of the live view
-- the type-dependent sections in `context`, see `_inspector_sections`
 
-The inspector is updated on events only (see `_refresh_inspector!`): the selection, moves and
-solves. The type-dependent sections are only rebuilt if the selected object needs other sections,
-e.g. when a detector follows a lens; otherwise their values are updated in place.
+The inspector is updated on events only (see `_refresh_inspector!`): the selection, moves, solves
+and inputs. The widgets of the card are only rebuilt if the selected object declares others, e.g.
+when a source follows a lens; otherwise they show the values of the new object.
 """
 mutable struct _Inspector
     const grid::GridLayout
@@ -237,13 +343,10 @@ mutable struct _Inspector
     const icon_color::Observable{RGBAf}
     const name::Label
     const type::Label
+    const pin::_IconToggle
+    const card::_DockedCard
     const mode::_Segmented
     const list::_PropertyList
-    # type-dependent sections: the registry entries they were built from, their layout and their
-    # update functions `update!(obj)`
-    context::GridLayout
-    sections::Vector{Pair{Type, Function}}
-    updates::Vector{Function}
     # the object shown (`nothing`: the summary), a flag that nothing was shown yet
     shown::Any
     fresh::Bool
@@ -251,21 +354,20 @@ mutable struct _Inspector
     const widths::NTuple{2, Dict{String, Float32}}
 end
 
-# Names of `properties` that the inspector shows elsewhere: in the header and the pose boxes
+# Names of `properties` that the inspector shows elsewhere: in the header and the pose rows
 const _INSPECTOR_SKIPPED = ("Type", "Position [m]")
 
 """
-    _build_inspector!(layout::AppLayout) -> (; pose_boxes, step_box)
+    _build_inspector!(layout::AppLayout) -> (; step_box)
 
-Creates the "PROPERTIES" section of the right sidebar, see `_Inspector`, and registers the
-built-in type-dependent sections, see `_inspector_sections`. Returns the widgets that are fields of
-`LiveView`.
+Creates the "PROPERTIES" section of the right sidebar, see `_Inspector`. Returns the widgets that
+are fields of `LiveView`.
 """
 function _build_inspector!(layout::AppLayout)
     t = layout.theme
     g = _add_sidebar_section!(layout, :right, "Properties")
-    # Header: icon, name and type
-    header = GridLayout(g[1, 1]; default_colgap = 8, tellwidth = false)
+    # Header: icon, name and type, the actions of the card and the pin
+    header = GridLayout(g[1, 1]; default_colgap = 6, tellwidth = false)
     icon_box = Box(header[1:2, 1]; width = 24, height = 24, visible = false)
     icon = Observable(_icon(:system))
     icon_color = Observable(RGBAf(Makie.to_color(t.muted)))
@@ -277,76 +379,39 @@ function _build_inspector!(layout::AppLayout)
         tellwidth = false)
     type = Label(header[2, 2], " "; halign = :left, color = t.muted, fontsize = 12,
         tellwidth = false)
+    pin = _IconToggle(header[1:2, 4]; icon = :pinned, icon_off = :pin, _icon_theme(t)...,
+        icon_color = t.muted, size = 24, icon_size = 18, tooltip = "Pin a card in the 3D view",
+        tooltip_placement = :left)
     rowgap!(header, 0)
-    # Pose boxes, step and mode
-    pose = GridLayout(g[2, 1]; default_colgap = 6, default_rowgap = 2, tellwidth = false)
+    colsize!(header, 2, Auto(false))
+    card = _DockedCard(header, g, t)
+    # Step and mode
+    pose = GridLayout(g[3, 1]; default_colgap = 6, default_rowgap = 2, tellwidth = false)
     Label(pose[1, 1], "step"; halign = :left, fontsize = 11, color = t.muted, tellwidth = false)
     Label(pose[1, 2:3], "mode"; halign = :left, fontsize = 11, color = t.muted, tellwidth = false)
-    step_box = Textbox(pose[2, 1]; placeholder = "250 nm", width = 72, halign = :left)
+    step_box = Textbox(pose[2, 1]; placeholder = "250 nm", width = 80, halign = :left,
+        fontsize = 12, textpadding = (5, 5, 4, 4))
     mode = _Segmented(pose[2, 2:3], [:move => "Move", :rotate => "Rotate"]; theme = t)
-    # Properties and type-dependent sections
-    Box(g[3, 1]; height = 1, color = t.border, strokewidth = 0)
-    list = _PropertyList(g[4, 1]; label_color = t.muted, value_color = t.text,
+    # Properties
+    Box(g[4, 1]; height = 1, color = t.border, strokewidth = 0)
+    list = _PropertyList(g[5, 1]; label_color = t.muted, value_color = t.text,
         line_color = RGBAf(Makie.to_color(t.border)))
-    context = GridLayout(g[5, 1]; tellwidth = false)
-    # an empty layout has no size, which would let the sidebar squeeze the inspector
-    rowsize!(g, 5, Fixed(0))
+    # the rows of the card are empty without a selection, see `_refresh_inspector!`
+    rowsize!(g, 2, Fixed(0))
     rowgap!(g, 10)
-    layout.inspector = _Inspector(g, icon, icon_color, name, type, mode, list, context,
-        Pair{Type, Function}[], Function[], nothing, true, (Dict{String, Float32}(), Dict{String, Float32}()))
-    layout.inspectors = Pair{Type, Function}[BMO.Detector => _detector_section]
+    layout.inspector = _Inspector(g, icon, icon_color, name, type, pin, card, mode, list, nothing,
+        true, (Dict{String, Float32}(), Dict{String, Float32}()))
     return (; step_box)
 end
 
 """
-    _inspector_sections(gui::AppView, obj) -> Vector{Pair{Type, Function}}
-
-Returns the entries `T => build` of the registry `gui.layout.inspectors` that apply to `obj`, in
-the order of the registry. `build(gui, grid)` creates a type-dependent section of the inspector in
-the `GridLayout` `grid` and returns its update function `update!(obj)`, which sets the values of
-the section for the selected `obj`; it is called after each selection, move and solve.
-
-The entries are matched with `obj isa T` in a loop instead of by dispatch, since entries are added
-at runtime, e.g. for types of the user, see `_add_inspector!`; the built-in sections (detector
-panel settings) are registered the same way, in `_build_inspector!`. Listeners of a section must
-only observe the widgets in its `grid`, which are deleted when the inspector shows other sections.
-"""
-_inspector_sections(gui::AppView, obj) = filter(e -> obj isa e.first, gui.layout.inspectors)
-_inspector_sections(::AppView, ::Nothing) = Pair{Type, Function}[]
-
-"""
-    _add_inspector!(gui::AppView, T::Type, build)
-
-Registers a type-dependent section of the inspector for objects of type `T`, see
-`_inspector_sections`. Shown from the next selection of such an object.
-"""
-function _add_inspector!(gui::AppView, T::Type, build)
-    push!(gui.layout.inspectors, T => build)
-    return nothing
-end
-_add_inspector!(gui::LiveView, _, _) = _slot_error(gui, "inspector")
-
-"""Deletes the type-dependent sections of the `inspector` and builds the `sections` in their place."""
-function _rebuild_sections!(gui::AppView, sections)
-    insp = gui.layout.inspector
-    old = insp.context
-    foreach(delete!, _blocks!(Any[], old))
-    _GLB.remove_from_gridlayout!(_GLB.gridcontent(old))
-    insp.context = GridLayout(insp.grid[5, 1]; tellwidth = false, default_rowgap = 6)
-    insp.sections = sections
-    insp.updates = Function[build(gui, GridLayout(insp.context[i, 1]; tellwidth = false))
-                            for (i, (_, build)) in enumerate(sections)]
-    rowsize!(insp.grid, 5, isempty(sections) ? Fixed(0) : Auto())
-    return nothing
-end
-
-"""
-    _refresh_inspector!(gui::AppView)
+    _refresh_inspector!(gui::AppView; force = false)
 
 Shows the selected object of the `gui` in the inspector (or the summary of the live view): header,
-properties and type-dependent sections, which are rebuilt only if the object needs other ones. Not
-called per frame, but after the selection changed, a move and a solve. A collapsed inspector is not
-updated, it is refreshed when it is shown again.
+docked card and properties. The widgets of the card are rebuilt only if the object declares others,
+see `_build_content!`; a focused textbox of the card keeps the typed text, unless `force`. Not
+called per frame, but after the selection changed, a move, a solve and an input. A collapsed
+inspector is not updated, it is refreshed when it is shown again.
 """
 function _refresh_inspector!(gui::AppView; force::Bool = false)
     layout = gui.layout
@@ -356,14 +421,48 @@ function _refresh_inspector!(gui::AppView; force::Bool = false)
     if insp.fresh || obj !== insp.shown
         insp.fresh = false
         insp.shown = obj
+        _dock_card!(gui, insp.card, obj)
         _show_header!(gui, obj)
-        sections = _inspector_sections(gui, obj)
-        sections == insp.sections || _rebuild_sections!(gui, sections)
     end
+    _refresh_card!(gui, insp.card; force)
+    _show_pin!(gui)
     _set_rows!(insp.list, _inspector_rows(gui, obj))
-    foreach(update! -> update!(obj), insp.updates)
     return nothing
 end
+
+"""
+    _dock_card!(gui::AppView, c::_DockedCard, obj)
+
+Builds the widgets of the docked card `c` for `obj`, see `_build_content!`, or removes them without
+a selection. The row of the card in the inspector has no height without rows.
+"""
+function _dock_card!(::AppView, c::_DockedCard, ::Nothing)
+    _clear_content!(c)
+    c.pose = nothing
+    rowsize!(c.parent, 2, Fixed(0))
+    return nothing
+end
+function _dock_card!(gui::AppView, c::_DockedCard, obj)
+    # A focused box of the old object would take the keyboard, and its input the new object
+    foreach(tb -> tb.focused[] && Makie.defocus!(tb), c.textboxes)
+    _build_content!(gui, c, obj)
+    c.pose = (obj, nothing)
+    rowsize!(c.parent, 2, isempty(c.rows.content) ? Fixed(0) : Auto())
+    return nothing
+end
+
+"""Sets the pin of the inspector of the `gui` to whether a card is pinned to the selected object."""
+function _show_pin!(gui::AppView)
+    pin = gui.layout.inspector.pin
+    obj = gui.controls.selected[]
+    pinned = !isnothing(obj) && _is_pinned(gui, obj)
+    pin.active[] == pinned || (pin.active[] = pinned)
+    visible = !isnothing(obj)
+    pin.box.visible[] == visible || (pin.box.visible[] = visible)
+    return nothing
+end
+
+_on_pinned!(gui::AppView) = _show_pin!(gui)
 
 """Sets the icon, name and type of the header of the inspector for `obj` (`nothing`: no selection)."""
 function _show_header!(gui::AppView, obj)
@@ -373,13 +472,19 @@ function _show_header!(gui::AppView, obj)
     insp.icon_color[] = RGBAf(Makie.to_color(isnothing(obj) ? t.muted : _tree_marker_color(t, kind)))
     name = isnothing(obj) ? "No selection" : _label(gui, obj)
     type = isnothing(obj) ? "click an object to inspect it" : string(nameof(typeof(obj)))
-    # Labels do not ellipsize, the header is as wide as the sidebar minus the icon
-    w = Makie.widths(insp.grid.layoutobservables.computedbbox[])[1] - 32
+    # Labels do not ellipsize: the room for the texts is the column of the name, between the icon
+    # and the actions of the card
+    w = Makie.widths(insp.grid.layoutobservables.computedbbox[])[1] - 32 - 30 -
+        _actions_width(insp.card)
     font(label) = _tree_font(label.blockscene, label.font[])
     _set_text!(insp.name, _fit_text(insp.widths[1], font(insp.name), 14, name, w))
     _set_text!(insp.type, _fit_text(insp.widths[2], font(insp.type), 12, type, w))
     return nothing
 end
+
+# Width of the actions of the docked card `c` [px], with their gap
+_actions_width(c::_DockedCard) =
+    isempty(c.actions.content) ? 0.0f0 : Makie.widths(c.actions.layoutobservables.computedbbox[])[1] + 6
 
 """Returns the rows of the property list for `obj`, see `BeamletOptics.properties`."""
 function _inspector_rows(::AppView, obj)
@@ -416,7 +521,8 @@ end
 
 """
 Connects the inspector of the `gui`: the mode control in both directions with the `mode` of the
-controls, and a refresh when the right sidebar is shown again.
+controls, the pin, the step box, and a refresh when the right sidebar is shown again. The widgets of
+the docked card are connected when they are built, see `_build_content!`.
 """
 function _connect_inspector!(gui::AppView)
     layout = gui.layout
@@ -426,6 +532,11 @@ function _connect_inspector!(gui::AppView)
     sel = insp.mode.selected
     push!(listeners, on(m -> _set_mode!(gui, m), sel))
     push!(listeners, on(m -> (sel[] == m || (sel[] = m)), ctrl.mode; update = true))
+    push!(listeners, on(insp.pin.active) do v
+        obj = ctrl.selected[]
+        (isnothing(obj) || v == _is_pinned(gui, obj)) || _toggle_pin!(gui, obj)
+        return nothing
+    end)
     push!(listeners, on(v -> v && _refresh_inspector!(gui), layout.collapse.right.active))
     push!(listeners, on(s -> _set_step!(gui, s), gui.step_box.stored_string))
     push!(listeners, on(_ -> _keep_keyboard!(gui), gui.step_box.focused))
@@ -433,11 +544,15 @@ function _connect_inspector!(gui::AppView)
     return nothing
 end
 
-# The step box of the inspector takes the keyboard like the boxes of the cards, see `_typing`
-_layout_boxes(gui::AppView) = (gui.step_box,)
+# The step box and the textboxes of the docked card take the keyboard like those of the floating
+# cards, see `_typing`
+_layout_boxes(gui::AppView) = (gui.step_box, _card_boxes(gui.layout.inspector.card)...)
+
+# The card of the selection is docked in the inspector, only pinned cards float in the 3D view
+_selection_card_shown(::AppView) = false
 
 #=
-Type-dependent sections
+Detector panel options, see `_docked_rows`
 =#
 
 """Returns the first detector panel of `pd` in the `gui`, or `nothing`."""
@@ -464,36 +579,6 @@ Shows the current hits of the detector panel `p` again, e.g. after its options c
 solving and without recording its history.
 """
 _refresh_panel!(::LiveView, p::DetectorPanel) = _update_panel!(p; coarse = false, record = false)
-
-"""
-The section "Detector panel" of a `Detector`: the mode and the color scale of its panel, see
-`_set_panel_options!`. A note names the panel; without a panel, the controls have no effect.
-"""
-function _detector_section(gui::AppView, grid::GridLayout)
-    t = gui.layout.theme
-    Label(grid[1, 1:2], "Detector panel"; halign = :left, font = :bold, fontsize = 12,
-        tellwidth = false)
-    note = Label(grid[2, 1:2], "no panel, see the detectors kwarg"; halign = :left,
-        color = t.muted, fontsize = 12, tellwidth = false)
-    Label(grid[3, 1], "mode"; halign = :left, fontsize = 11, color = t.muted)
-    mode = _Segmented(grid[3, 2], [:auto => "Auto", :spot => "Spot", :intensity => "Intensity"];
-        theme = t)
-    Label(grid[4, 1], "scale"; halign = :left, fontsize = 11, color = t.muted)
-    scale = _Segmented(grid[4, 2], [:linear => "Linear", :log => "Log"]; theme = t)
-    rowgap!(grid, 4)
-    colgap!(grid, 8)
-    panel = Ref{Any}(nothing)
-    on(m -> isnothing(panel[]) || _set_panel_options!(gui, panel[]; mode = m), mode.selected)
-    on(s -> isnothing(panel[]) || _set_panel_options!(gui, panel[]; colorscale = s), scale.selected)
-    return function (pd)
-        p = panel[] = _panel_of(gui, pd)
-        _set_text!(note, isnothing(p) ? "no panel, see the detectors kwarg" : "shown as \"$(p.name)\"")
-        isnothing(p) && return nothing
-        mode.selected[] == p.mode || (mode.selected[] = p.mode)
-        scale.selected[] == p.colorscale || (scale.selected[] = p.colorscale)
-        return nothing
-    end
-end
 
 #=
 Properties of the objects of the live view

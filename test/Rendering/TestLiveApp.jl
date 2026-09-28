@@ -176,14 +176,17 @@ const BMO = BeamletOptics
         gui.controls.selected[] = m
         @test gui.layout.inspector.name.text[] == "M1"
         @test gui.layout.inspector.type.text[] == string(nameof(typeof(m)))
-        @test gui.pose_boxes[2].displayed_string[] == "100.0"
-        gui.pose_boxes[1].stored_string[] = "5"
+        # the pose rows of the card, docked in the inspector
+        card = gui.layout.inspector.card
+        @test Ext._card_widget(card, :y).displayed_string[] == "100.0"
+        Ext._card_widget(card, :x).stored_string[] = "5"
         @test BMO.position(m)[1] ≈ 5e-3
         @test gui.layout.inspector.mode.selected[] == :move
         gui.step_box.stored_string[] = "1 mrad"
         @test gui.layout.inspector.mode.selected[] == :rotate
-        # no hide buttons, the eyes of the tree and "show all" in its title replace them
-        @test isnothing(gui.hide_button)
+        # the step box is in the inspector, not on a card
+        @test gui.step_box !== gui.card.step_box
+        # no component menu, the eyes of the tree and "show all" in its title replace it
         @test gui.show_all_button isa Ext._IconButton
         close(gui)
     end
@@ -336,15 +339,15 @@ const BMO = BeamletOptics
             sliders = ["a" => (0:0.1:1, v -> nothing)])
         layout = gui.layout
         w0, h0 = _width(gui.ax), _height(gui.ax)
-        box = gui.pose_boxes[1]
+        box = gui.step_box
         layout.collapse.right.active[] = false
         @test !layout.right.shown
-        @test _width(gui.ax) ≈ w0 + 260
+        @test _width(gui.ax) ≈ w0 + 300
         # hidden and laid out off-screen, where it can not take clicks
         @test !box.blockscene.visible[]
         @test maximum(box.layoutobservables.computedbbox[])[1] < 0
         layout.collapse.left.active[] = false
-        @test _width(gui.ax) ≈ w0 + 500
+        @test _width(gui.ax) ≈ w0 + 540
         @test !gui.sliders.blockscene.visible[]
         layout.collapse.dock.active[] = false
         @test !layout.dock.shown

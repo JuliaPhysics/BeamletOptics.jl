@@ -6,7 +6,8 @@
 #
 # - frame time: 60 camera rotation steps (6° about the up axis each), see `frame!` for what one
 #   frame includes;
-# - idle redraws: frames actually rendered during 2 s without input, see `count_redraws`;
+# - idle redraws: frames actually rendered during 2 s without input, see `count_redraws`, also
+#   with a selected lens and a card pinned to another one;
 # - solve + panel time: full re-solve incl. the detector panels after moving one lens, see
 #   `solve_times`.
 #
@@ -239,6 +240,14 @@ function main(args)
     st = solve_times(gui, first(scene.lenses))
     sleep(0.5)
     idle_after = count_redraws(gui)
+    # With a selection (its card floats in the compact layout, is docked in the app layout) and a
+    # pinned card of another lens, which are placed every frame, see `_update_cards!`
+    selected = isdefined(BME, :_toggle_pin!) ? let
+        BME._select!(gui, scene.lenses[2])
+        BME._toggle_pin!(gui, scene.lenses[3])
+        sleep(0.5)
+        count_redraws(gui)
+    end : (; rendered = -1)
 
     r = (; layout = String(layout), julia = string(VERSION), threads = Threads.nthreads(),
         window = collect(WINDOW_SIZE), framebuffer = collect(size(screen)),
@@ -246,7 +255,7 @@ function main(args)
         frame_mean_ms = mean(ft), frame_median_ms = median(ft), frame_min_ms = minimum(ft),
         frame_max_ms = maximum(ft),
         idle_redraws = idle.rendered, idle_ticks = idle.ticks,
-        idle_redraws_after_solve = idle_after.rendered,
+        idle_redraws_after_solve = idle_after.rendered, idle_redraws_selected = selected.rendered,
         control_redraws = control.rendered, control_changes = control.changes,
         solve_median_ms = median(getfield.(st, :solve)),
         panel_median_ms = median(getfield.(st, :panel)),
@@ -262,6 +271,7 @@ function main(args)
     @printf "  %-38s %6.2f - %.2f ms\n" "frame time, min - max" r.frame_min_ms r.frame_max_ms
     @printf "  %-38s %10d   (of %d ticks)\n" "idle redraws in $(IDLE_SECONDS) s" r.idle_redraws r.idle_ticks
     @printf "  %-38s %10d\n" "idle redraws in $(IDLE_SECONDS) s after solves" r.idle_redraws_after_solve
+    @printf "  %-38s %10d\n" "idle redraws, selection + pinned card" r.idle_redraws_selected
     @printf "  %-38s %10d   (%d changes, counter check)\n" "control: redraws, label every 100 ms" r.control_redraws r.control_changes
     @printf "  %-38s %10.2f ms\n" "solve time, median ($N_SOLVES)" r.solve_median_ms
     @printf "  %-38s %10.2f ms\n" "panel time, median" r.panel_median_ms
