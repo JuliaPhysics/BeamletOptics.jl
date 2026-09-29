@@ -292,6 +292,11 @@ _widget(gui, name) = Ext._card_widget(_card(gui), name)
         notify(s.minus.clicks)
         @test position(block)[3] ≈ 0.015
         @test stepper.value[] ≈ 15
+        # back into the beam, which the solve detects: it traces from the start of the beam
+        notify(s.minus.clicks)
+        @test position(block)[3] ≈ 0 atol = 1e-12
+        @test stepper.value[] ≈ 0 atol = 1e-9
+        @test _hits(pd) == 0
         # the card is rebuilt for another object: the blocks of the stepper are deleted with it
         @test !isempty(s.blockscene.children)
         gui.controls.selected[] = mirror
