@@ -64,9 +64,9 @@ doublets) is handled per component by returning a `Hint`
   protocol of `src/Render.jl`.
 - The interactive GUI (`live_view`, cards, kinematic controls, view cube) is the separate package
   [BeamletOpticsGUI](https://github.com/StackEnjoyer/BeamletOpticsGUI.jl). It uses only exported
-  names, the render handle protocol and the `public` developer API (`src/Exports.jl`,
-  [docs/src/api/developer_api.md](docs/src/api/developer_api.md)): renaming or changing any of
-  these breaks the GUI, so treat them like exported API.
+  names, the render handle protocol and the names declared `public` in `src/Exports.jl` (see
+  "Public API for dependent packages" in [docs/src/api/api.md](docs/src/api/api.md)): renaming or
+  changing any of these breaks the GUI, so treat them like exported API.
 - `skills/beamletoptics/`: the user-facing agent skill.
 
 ## Running Julia
