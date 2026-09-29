@@ -152,6 +152,61 @@ BMO.card_actions(::CardTestObject) = ()
         @test !c.scene.visible[]
     end
 
+    @testset "part of the selection: step, mode and properties" begin
+        m, pd = _fixture()
+        gui = _live_view(System([m, pd]), _gauss(); labels = Dict(m => "M1"), size = (1600, 1000))
+        ctrl = gui.controls
+        c = gui.cards.selection
+        _select!(gui, m)
+        _tick!(gui)
+        # step and mode below the rows, the properties collapsed by default
+        @test c.mode.selected[] == :move && c.mode.keys == [:move, :rotate]
+        @test !_away(c.step) && !c.properties_shown && _away(c.properties)
+        @test c.properties_button.icon[] === Ext._icon(:expand)
+        h0 = Makie.widths(_rect(c.background))[2]
+        # expanded: the rows of the inspector below the step, the card grows
+        notify(c.properties_button.clicks)
+        @test c.properties_shown && !_away(c.properties) && c.properties_button.icon[] === Ext._icon(:collapse)
+        @test c.list.rows == Ext._inspector_rows(gui, m) && !isempty(c.list.rows)
+        @test maximum(_rect(c.list.box))[2] < minimum(_rect(c.step))[2]
+        @test Makie.widths(_rect(c.background))[2] > h0
+        # the list fills the card, which contains it
+        @test all(minimum(_rect(c.list.box)) .>= minimum(_rect(c.background)))
+        @test all(maximum(_rect(c.list.box)) .<= maximum(_rect(c.background)))
+        @test _inside(gui)
+        # the state stays with the card when another object is selected
+        _select!(gui, pd)
+        _tick!(gui)
+        @test gui.cards.selection === c && c.properties_shown
+        @test c.list.rows == Ext._inspector_rows(gui, pd)
+        # a click on "Rotate" sets the mode of the controls, the key `m` sets it back
+        _click!(gui, _center(_rect(c.mode.buttons[2])))
+        @test ctrl.mode[] == :rotate && c.mode.selected[] == :rotate
+        @test ctrl.selected[] === pd
+        events(gui.ax.scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.m, Keyboard.press)
+        @test ctrl.mode[] == :move && c.mode.selected[] == :move
+        # a step in an angle unit switches to the rotate mode
+        c.step_box.stored_string[] = "1 mrad"
+        @test ctrl.mode[] == :rotate && c.mode.selected[] == :rotate
+        # collapsed again
+        notify(c.properties_button.clicks)
+        @test !c.properties_shown && _away(c.properties) && !_away(c.step)
+
+        # a pinned card shows neither step, mode nor properties, also if they were expanded
+        notify(c.properties_button.clicks)
+        _pin!(c)
+        @test c.pinned && c.scene.visible[]
+        @test _away(c.step) && _away(c.properties) && !_away(c.rows)
+        # the new card of the selection has its own state, collapsed
+        _select!(gui, m)
+        _tick!(gui)
+        c2 = gui.cards.selection
+        @test c2 !== c && !c2.properties_shown && !_away(c2.step) && _away(c2.properties)
+        @test c2.mode.selected[] == ctrl.mode[]
+        @test _away(c.step) && _away(c.properties)
+        close(gui)
+    end
+
     @testset "placement" begin
         view = Rect2f(0, 0, 800, 600)
         size = Vec2f(300, 150)

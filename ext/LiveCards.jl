@@ -201,6 +201,7 @@ function _update_card!(gui::LiveView, c::_ComponentCard, obj, obstacles::Vector{
     view = Rect2f(Makie.viewport(scene)[])
     sel = _screen_rect(scene, corners, obj)
     c.auto_collapsed = false
+    _fit_properties!(c)
     size = _card_size(c)
     p = isnothing(c.spot) ? _avoid(_card_position(sel, size, view), size, view, obstacles) :
         _spot_position(c.spot, size, view)
@@ -330,8 +331,9 @@ end
     _refresh_card!(gui, c; force = false)
 
 Shows the values of the object of the card `c` (see `_card_object`) in its declared widgets, see
-`value` of [`CardWidget`](@ref); a focused textbox keeps the typed text, unless `force`. Only if
-the widgets were built for this object (`c.pose`), see `_update_card!`.
+`value` of [`CardWidget`](@ref), and in the part of the selection of a floating card, see
+`_refresh_selection_part!`; a focused textbox keeps the typed text, unless `force`. Only if the
+widgets were built for this object (`c.pose`), see `_update_card!`.
 """
 function _refresh_card!(gui::LiveView, c::_AbstractCard; force::Bool = false)
     obj = _card_object(gui, c)
@@ -344,6 +346,7 @@ function _refresh_card!(gui::LiveView, c::_AbstractCard; force::Bool = false)
     finally
         c.refreshing = false
     end
+    _refresh_selection_part!(gui, c, obj)
     return nothing
 end
 _refresh_widget!(b, value, gui::LiveView, obj; force::Bool = false) = _show!(b, value(gui, obj); force)
@@ -501,7 +504,8 @@ end
 """
     _connect_card!(gui, c)
 
-Connects the head and the step box of the card `c` of the `gui`; the declared widgets are connected
+Connects the head and the part of the selection (step, mode and the disclosure of the properties,
+see `_connect_selection_part!`) of the card `c` of the `gui`; the declared widgets are connected
 when they are built, see `_build_content!`.
 """
 function _connect_card!(gui::LiveView, c::_ComponentCard)
@@ -509,9 +513,118 @@ function _connect_card!(gui::LiveView, c::_ComponentCard)
     push!(listeners, on(_ -> _toggle_collapsed!(gui, c), c.collapse_button.clicks))
     # The toggle switches itself, `_toggle_pinned!` sets it to the state of the card
     push!(listeners, on(v -> v == _pin_state(c) || _toggle_pinned!(gui, c), c.pin_button.active))
-    push!(listeners, on(s -> _set_step!(gui, s), c.step_box.stored_string))
-    push!(listeners, on(_ -> _keep_keyboard!(gui), c.step_box.focused))
+    push!(listeners, on(_ -> _toggle_properties!(gui, c), c.properties_button.clicks))
+    _connect_selection_part!(gui, c)
     _connect_dock_button!(gui, c, c.dock_button)
+    return nothing
+end
+
+#=
+Part of the selection, see `_selection_part!`: shared by the floating card of the selection and
+the inspector of the app layout, which both have the fields `step_box`, `mode` and `list`
+=#
+
+"""
+    _connect_selection_part!(gui, part)
+
+Connects the part of the selection `part` (the floating card of the selection or the inspector of
+the app layout, see `_selection_part!`) to the `gui`: its step box sets the keyboard step (see
+`_set_step!`) and takes the keyboard while focused, its mode control follows the mode of the
+controls in both directions, see `_bind_mode!`.
+"""
+function _connect_selection_part!(gui::LiveView, part)
+    listeners = gui.controls.listeners
+    push!(listeners, on(s -> _set_step!(gui, s), part.step_box.stored_string))
+    push!(listeners, on(_ -> _keep_keyboard!(gui), part.step_box.focused))
+    _bind_mode!(gui, part.mode)
+    return nothing
+end
+
+"""
+    _bind_mode!(gui, mode::_Segmented)
+
+Binds the Move/Rotate control `mode` to the mode of the controls of the `gui` in both directions: a
+click sets the mode like the key `m` (see `_set_mode!`), the key `m` and a step in another unit (see
+`_set_step!`) select the other option.
+"""
+function _bind_mode!(gui::LiveView, mode::_Segmented)
+    ctrl = gui.controls
+    sel = mode.selected
+    push!(ctrl.listeners, on(m -> _set_mode!(gui, m), sel))
+    push!(ctrl.listeners, on(m -> (sel[] == m || (sel[] = m)), ctrl.mode; update = true))
+    return nothing
+end
+
+"""Sets the mode of the controls of the `gui`, like the key `m`."""
+function _set_mode!(gui::LiveView, mode::Symbol)
+    ctrl = gui.controls
+    ctrl.mode[] == mode && return nothing
+    ctrl.mode[] = mode
+    _update_selection_box!(ctrl)
+    _update_help!(ctrl)
+    gui.status.text[] = "$mode mode, step: $(_step_string(mode, ctrl.fine_step, ctrl.fine_angle))"
+    return nothing
+end
+
+# Names of `properties` that the part of the selection does not list: the header of the card and
+# its pose rows show them
+const _INSPECTOR_SKIPPED = ("Type", "Position [m]")
+
+"""
+    _show_properties!(gui, part, obj)
+
+Shows the properties of `obj` (see `_inspector_rows`) in the property list of the part of the
+selection `part`, see `_selection_part!`.
+"""
+_show_properties!(gui::LiveView, part, obj) = (_set_rows!(part.list, _inspector_rows(gui, obj)); nothing)
+
+"""Returns the rows of the property list for `obj`, see `BeamletOptics.properties`."""
+function _inspector_rows(::LiveView, obj)
+    props = try
+        BMO.properties(obj)
+    catch e
+        # a failing `properties` method of a user type must not break the live view
+        Pair{String, Any}["Error" => sprint(showerror, e)]
+    end
+    return [_property_row(name, value) for (name, value) in props if !(name in _INSPECTOR_SKIPPED)]
+end
+
+"""Summary of the live view, shown without a selection, e.g. in the inspector of the app layout."""
+function _inspector_rows(gui::LiveView, ::Nothing)
+    objects = sum(h -> length(h.handles), gui.system_handles; init = 0)
+    rows = Tuple{String, String}[
+        ("Systems", string(length(gui.system_handles))), ("Objects", string(objects)),
+        ("Sources", string(length(_sources(gui)))), ("Detector panels", string(length(gui.panels))),
+        ("Clip planes", string(length(gui.clip.planes))),
+        ("Last trace", gui.trace.solve_time > 0 ? _ms_string(gui.trace.solve_time) : "–")]
+    return rows
+end
+
+"""
+    _refresh_selection_part!(gui, c, obj)
+
+Shows the properties of `obj` on the floating card `c` of the selection while they are expanded,
+see `_toggle_properties!`; pinned cards have no part of the selection. Nothing for other hosts, e.g.
+the inspector of the app layout refreshes its part itself, see `_refresh_inspector!`.
+"""
+_refresh_selection_part!(::LiveView, ::_AbstractCard, _) = nothing
+function _refresh_selection_part!(gui::LiveView, c::_ComponentCard, obj)
+    (c.pinned || !c.properties_shown) && return nothing
+    _show_properties!(gui, c, obj)
+    return nothing
+end
+_refresh_selection_part!(::LiveView, ::_ComponentCard, ::Nothing) = nothing
+
+"""
+Expands the properties of the floating card `c` of the selection of the `gui` below its disclosure
+row, or collapses them again, see `_ComponentCard`. The state stays with the card when another
+object is selected.
+"""
+function _toggle_properties!(gui::LiveView, c::_ComponentCard)
+    c.properties_shown = !c.properties_shown
+    _show_properties_state!(c.properties_button, c.properties_shown)
+    _refresh_selection_part!(gui, c, _card_object(gui, c))
+    _update_cards!(gui)
     return nothing
 end
 

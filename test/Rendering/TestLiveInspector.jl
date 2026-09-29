@@ -211,6 +211,27 @@ const BMO = BeamletOptics
         close(gui)
     end
 
+    @testset "part of the selection shared with the floating card" begin
+        gui, o = _fixture()
+        insp = gui.layout.inspector
+        # the step box of the inspector is the keyboard step
+        @test gui.widgets.step_box === insp.step_box
+        gui.controls.selected[] = o.m
+        Ext._refresh_inspector!(gui)
+        rows = _rows(gui)
+        @test rows == Ext._inspector_rows(gui, o.m) && !isempty(rows)
+        close(gui)
+        # the floating card of the compact layout shows the same rows for the same object
+        gui, o = _fixture(layout = :compact)
+        c = gui.cards.selection
+        gui.controls.selected[] = o.m
+        Ext._update_selection_box!(gui.controls)
+        notify(c.properties_button.clicks)
+        _tick!(gui)
+        @test c.list.rows == rows
+        close(gui)
+    end
+
     @testset "detector panel rows" begin
         gui, o = _fixture()
         ctrl = gui.controls
