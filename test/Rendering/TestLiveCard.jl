@@ -356,6 +356,27 @@ BMO.card_actions(::CardTestObject) = ()
         @test !any(c -> c.scene.visible[], gui.cards)
     end
 
+    @testset "no dock toggle in the compact layout" begin
+        # the compact layout has no sidebar: its pinned cards always float, without a dock button
+        m, pd = _fixture()
+        gui = _live_view(System([m, pd]), _gauss())
+        _select!(gui, m)
+        c = gui.card
+        _pin!(c)
+        _tick!(gui)
+        @test c.pinned && c.scene.visible[] && isnothing(c.dock_button)
+        @test all(c -> isnothing(c.dock_button), gui.cards)
+        @test Ext._is_floating(gui, m) && Ext._is_pinned(gui, m)
+        # the head holds the pin and the chevron only
+        @test length(c.tools.content) == 2
+        # floating and docking do nothing
+        Ext._dock!(gui, m)
+        Ext._float!(gui, m)
+        _tick!(gui)
+        @test c.pinned && c.obj === m && c.scene.visible[] && count(c -> c.pinned, gui.cards) == 1
+        close(gui)
+    end
+
     @testset "declared rows" begin
         m, pd = _fixture()
         t = CardTestObject(BMO.shape(RoundPlanoMirror(0.01, 0.002)))

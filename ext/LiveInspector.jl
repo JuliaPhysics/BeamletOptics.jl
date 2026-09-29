@@ -226,8 +226,9 @@ the textboxes and sliders filling the width of the sidebar (see `_cell_attribute
 - the card of the selection (`pinned = false`), whose head is the header of the inspector, see
   `_Inspector`, or
 - a card `pinned` to the object `obj`, stacked below the inspector with its own `head` (icon,
-  title, pin and collapse chevron, built by the shared parts of `LiveCard.jl`), see
-  `_dock_pinned!`; a `collapsed` card shows only its head and its actions.
+  title, float button, pin and collapse chevron, built by the shared parts of `LiveCard.jl`), see
+  `_dock_pinned!`; a `collapsed` card shows only its head and its actions. The float button moves
+  it into the 3D view as a floating `_ComponentCard`, see `_float!`.
 
 `header` and `parent` hold the layouts of the head and of the card: the actions are placed in the
 rows `actions_rows` of column 3 of the `header`, the rows in the row `rows_row` of the `parent`.
@@ -316,8 +317,9 @@ to bottom:
 - the properties of the object, see `BeamletOptics.properties` and `_PropertyList`; without a
   selection, a summary of the live view
 - the `pinned` cards in the layout `pinned_grid`, one below the other in the order of pinning,
-  each with its own head, see `_dock_pinned!`. The app layout shows no floating cards: the
-  "Properties" section is formed by the card of the selection and the pinned cards.
+  each with its own head, see `_dock_pinned!`. The "Properties" section is formed by the card of
+  the selection and the docked pinned cards; a pinned card can float next to its object in the 3D
+  view instead, see `_float!` and `_dock!`.
 
 The inspector is updated on events only (see `_refresh_inspector!`): the selection, moves, solves
 and inputs. The widgets of the card are only rebuilt if the selected object declares others, e.g.
@@ -399,10 +401,11 @@ Pinned cards of the app layout, docked below the inspector
     _dock_pinned!(gui::AppView, obj) -> _DockedCard
 
 Pins a card to `obj` in the app layout: a `_DockedCard` at the end of the pinned cards of the
-inspector, below a line, with its own head (icon, title, actions, pin and collapse chevron, see the
-shared parts `_card_icon!`, `_card_title!`, `_card_pin!` and `_card_collapse!`) and the rows of
-`obj`. The pin unpins it, see `_unpin!`; the chevron collapses it to its head. Its widgets are built
-by `_refresh_inspector!`.
+inspector, below a line, with its own head (icon, title, actions, float button, pin and collapse
+chevron, see the shared parts `_card_icon!`, `_card_title!`, `_card_float!`, `_card_pin!` and
+`_card_collapse!`) and the rows of `obj`. The float button moves it into the 3D view, see `_float!`;
+the pin unpins it, see `_unpin!`; the chevron collapses it to its head. Its widgets are built by
+`_refresh_inspector!`.
 """
 function _dock_pinned!(gui::AppView, obj)
     insp, t = gui.layout.inspector, gui.layout.theme
@@ -411,16 +414,20 @@ function _dock_pinned!(gui::AppView, obj)
     header = GridLayout(g[2, 1]; default_colgap = 6, tellwidth = false)
     icon, icon_color = _card_icon!(header[1, 1])
     title = _card_title!(header[1, 2], t; tellwidth = false)
-    pin = _card_pin!(header[1, 4], t; active = true, tooltip_placement = :left)
-    collapse = _card_collapse!(header[1, 5], t; tooltip_placement = :left)
+    float = _card_float!(header[1, 4], t; tooltip_placement = :left)
+    pin = _card_pin!(header[1, 5], t; active = true, tooltip_placement = :left)
+    collapse = _card_collapse!(header[1, 6], t; tooltip_placement = :left)
     colgap!(header, 4, 2)
+    colgap!(header, 5, 2)
     colsize!(header, 2, Auto(false))
     c = _DockedCard(header, g, t; actions_rows = 1:1, rows_row = 3)
     c.pinned, c.obj = true, obj
     listeners = Any[
+        on(_ -> _float!(gui, obj), float.clicks),
         on(v -> v || _unpin!(gui, obj), pin.active),
         on(_ -> _toggle_collapsed!(gui, c), collapse.clicks)]
-    c.head = (; icon, icon_color, title, pin, collapse, line, listeners, widths = Dict{String, Float32}())
+    c.head = (; icon, icon_color, title, float, pin, collapse, line, listeners,
+        widths = Dict{String, Float32}())
     _show_kind!(icon, icon_color, t, obj)
     _show_head!(pin, collapse, true, false)
     push!(insp.pinned, c)
@@ -534,7 +541,7 @@ function _refresh_pinned!(gui::AppView, c::_DockedCard; force::Bool = false)
     end
     title = c.head.title
     w = Makie.widths(gui.layout.inspector.grid.layoutobservables.computedbbox[])[1] -
-        _CARD_ICON - 2 * _CARD_TOOL - 20 - _actions_width(c)
+        _CARD_ICON - 3 * _CARD_TOOL - 22 - _actions_width(c)
     _set_text!(title, _fit_text(c.head.widths, _tree_font(title.blockscene, title.font[]),
         _CARD_TITLE_FONTSIZE, _label(gui, c.obj), w))
     _refresh_card!(gui, c; force)
@@ -546,11 +553,63 @@ function _pin!(gui::AppView, obj)
     _refresh_inspector!(gui; force = true)
     return nothing
 end
-_is_pinned(gui::AppView, obj) = any(c -> c.obj === obj, gui.layout.inspector.pinned)
+_is_pinned(gui::AppView, obj) = _is_docked(gui, obj) || _is_floating(gui, obj)
 function _unpin!(gui::AppView, obj)
-    foreach(c -> _remove_pinned!(gui, c), filter(c -> c.obj === obj, gui.layout.inspector.pinned))
+    foreach(c -> _remove_pinned!(gui, c), _docked_cards(gui, obj))
+    foreach(c -> _toggle_pinned!(gui, c), _floating_cards(gui, obj))
     _on_pinned!(gui)
     return nothing
+end
+
+"""Returns the pinned cards of the app layout of the `gui` that are docked for `obj`."""
+_docked_cards(gui::AppView, obj) = filter(c -> c.obj === obj, gui.layout.inspector.pinned)
+_is_docked(gui::AppView, obj) = any(c -> c.obj === obj, gui.layout.inspector.pinned)
+
+"""
+    _float!(gui::AppView, obj)
+
+Moves the card pinned to `obj` from the sidebar of the app layout into the 3D view: the docked card
+is removed, a floating card (see `_ComponentCard`) is pinned to `obj` like in the compact layout,
+collapsed if the docked card was, with the button that docks it again, see `_dock!`. The other
+docked cards keep their state; they are not expanded into the room that becomes free.
+"""
+function _float!(gui::AppView, obj)
+    docked = _docked_cards(gui, obj)
+    isempty(docked) && return nothing
+    collapsed = first(docked).collapsed
+    foreach(c -> _remove_pinned!(gui, c), docked)
+    c = _spare_card!(gui)
+    c.collapsed = collapsed
+    _pin!(gui, c, obj)
+    _on_pinned!(gui)
+    return nothing
+end
+
+"""
+    _dock!(gui::AppView, obj)
+
+Moves the floating card pinned to `obj` back into the sidebar of the app layout, at the end of the
+pinned cards, collapsed if the floating card was (by its chevron); an expanded card stays expanded
+while the older ones collapse to make room, like a newly pinned card, see `_fit_pinned!`.
+"""
+function _dock!(gui::AppView, obj)
+    floating = _floating_cards(gui, obj)
+    isempty(floating) && return nothing
+    d = _dock_pinned!(gui, obj)
+    _set_collapsed!(d, first(floating).collapsed)
+    d.collapsed || (gui.layout.inspector.keep = d)
+    foreach(c -> _toggle_pinned!(gui, c), floating)
+    _refresh_inspector!(gui; force = true)
+    return nothing
+end
+
+# The floating cards of the app layout are pinned cards, whose head has the button that docks them
+function _card_tools!(layout::AppLayout, c::_ComponentCard)
+    b = _card_dock!(c.tools[1, 0], layout.theme)
+    colgap!(c.tools, 2)
+    _fix_tooltip!(b)
+    c.dock_button = b
+    return c
 end
 
 """

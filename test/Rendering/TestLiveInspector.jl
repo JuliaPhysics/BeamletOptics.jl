@@ -421,6 +421,167 @@ const BMO = BeamletOptics
         close(gui)
     end
 
+    @testset "float and dock pinned cards" begin
+        gui, o = _fixture()
+        insp, ctrl = gui.layout.inspector, gui.controls
+        _floating(obj) = Ext._floating_cards(gui, obj)
+        _inside(r, v) = all(minimum(r) .>= minimum(v) .- 1.0f-3) && all(maximum(r) .<= maximum(v) .+ 1.0f-3)
+        ctrl.selected[] = o.m
+        # pinned: docked by default, with the float button in its head
+        Ext._toggle_pin!(gui, o.m)
+        d = only(insp.pinned)
+        @test Ext._is_pinned(gui, o.m) && !Ext._is_floating(gui, o.m) && isempty(_floating(o.m))
+        @test d.head.float.icon[] === Ext._icon(:float) && d.head.float.tooltip[] == "Float in the 3D view"
+        # floated: out of the sidebar, a floating card next to the object with the dock button
+        notify(d.head.float.clicks)
+        _tick!(gui)
+        @test isempty(insp.pinned) && Ext._is_pinned(gui, o.m) && Ext._is_floating(gui, o.m)
+        @test insp.pin.active[] && isempty(d.widgets) && d.head.title.parent === nothing
+        c = only(_floating(o.m))
+        @test c !== gui.card && c.scene.visible[] && c.title.text[] == "Mirror 1"
+        @test c.icon[] === Ext._icon(:mirror) && Ext._card_widget(c, :x) isa Textbox
+        @test c.dock_button.icon[] === Ext._icon(:dock) && c.dock_button.tooltip[] == "Dock in the sidebar"
+        # the card of the selection stays docked in the inspector, whose header has no float button
+        @test insp.name.text[] == "Mirror 1" && _w(gui, :x) isa Textbox && !gui.card.scene.visible[]
+        _icons(g) = [p.marker[] for gc in g.content if gc.content isa Box
+                     for p in gc.content.blockscene.plots if p isa Scatter]
+        @test Ext._icon(:pin) in _icons(insp.card.header) || Ext._icon(:pinned) in _icons(insp.card.header)
+        @test !(Ext._icon(:float) in _icons(insp.card.header))        # in the 3D view, linked to its object, the dock button in its head
+        bg = _rect(c.background)
+        @test _inside(bg, Rect2f(gui.ax.scene.viewport[])) && length(c.link[]) == 2
+        @test _inside(_rect(c.dock_button.box), bg) && _inside(_rect(c.pin_button.box), bg)
+        # in the colors of the theme, like the floating cards of the compact layout
+        @test RGBAf(Makie.to_color(c.background.color[])) == RGBAf(Makie.to_color(gui.layout.theme.sidebar))
+        # it stays with its object when the selection changes, its widgets act on its object
+        ctrl.selected[] = o.pd
+        _tick!(gui)
+        @test c.scene.visible[] && c.obj === o.m && !insp.pin.active[]
+        Ext._card_widget(c, :z).stored_string[] = "3"
+        @test BMO.position(o.m)[3] ≈ 3e-3
+        @test BMO.position(o.pd)[3] ≈ 0 atol = 1e-12
+        # typing into its textbox blocks the keys of the 3D view
+        box = Ext._card_widget(c, :y)
+        box.focused[] = true
+        @test Ext._typing(gui)
+        P0 = Vector{Float64}(BMO.position(o.pd))
+        events(gui.ax.scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.left, Keyboard.press)
+        @test Vector{Float64}(BMO.position(o.pd)) == P0
+        box.focused[] = false
+        @test !Ext._typing(gui)
+        # hidden and shown again: the card stays floating, like in the compact layout
+        notify(Ext._card_widget(c, :hide).clicks)
+        _tick!(gui)
+        @test o.m in gui.hidden && Ext._is_floating(gui, o.m) && c.scene.visible[]
+        notify(Ext._card_widget(c, :hide).clicks)
+        @test !(o.m in gui.hidden) && only(_floating(o.m)) === c
+        # docked again: at the end of the pinned cards, in its collapsed state
+        Ext._toggle_pin!(gui, o.pd)
+        notify(c.collapse_button.clicks)
+        @test c.collapsed
+        notify(c.dock_button.clicks)
+        _tick!(gui)
+        @test !Ext._is_floating(gui, o.m) && !c.pinned && !c.scene.visible[]
+        @test [d.obj for d in insp.pinned] == [o.pd, o.m] && insp.pinned[2].collapsed
+        @test insp.pinned[2].head.collapse.icon[] === Ext._icon(:expand)
+        # floated again, still collapsed; unpinned by the pin of the floating card
+        notify(insp.pinned[2].head.float.clicks)
+        _tick!(gui)
+        c = only(_floating(o.m))
+        @test c.collapsed && c.scene.visible[] && [d.obj for d in insp.pinned] == [o.pd]
+        c.pin_button.active[] = false
+        _tick!(gui)
+        @test !Ext._is_pinned(gui, o.m) && isempty(_floating(o.m)) && !c.scene.visible[]
+        # pinned again: docked
+        Ext._toggle_pin!(gui, o.m)
+        @test Ext._is_pinned(gui, o.m) && !Ext._is_floating(gui, o.m)
+        @test [d.obj for d in insp.pinned] == [o.pd, o.m]
+        # a floating card is unpinned by the pin of the inspector, too
+        Ext._float!(gui, o.m)
+        c = only(_floating(o.m))
+        ctrl.selected[] = o.m
+        @test insp.pin.active[]
+        insp.pin.active[] = false
+        _tick!(gui)
+        @test !Ext._is_pinned(gui, o.m) && !c.pinned && !c.scene.visible[]
+        @test [d.obj for d in insp.pinned] == [o.pd]
+        # nothing to float or dock without a pinned card
+        Ext._float!(gui, o.m)
+        Ext._dock!(gui, o.pd)
+        @test !Ext._is_pinned(gui, o.m) && [d.obj for d in insp.pinned] == [o.pd]
+        close(gui)
+    end
+
+    @testset "floating cards do not count for the sidebar" begin
+        gui, o = _fixture()
+        insp, ctrl = gui.layout.inspector, gui.controls
+        ctrl.selected[] = o.m
+        # an expanded floating card, then more docked cards than fit into the sidebar
+        Ext._toggle_pin!(gui, o.m)
+        Ext._float!(gui, o.m)
+        c = only(Ext._floating_cards(gui, o.m))
+        for obj in (o.pd, o.bs, o.pd2, o.l1)
+            Ext._toggle_pin!(gui, obj)
+            @test !Ext._overflows(gui) ||
+                  (all(d -> d.collapsed, insp.pinned[1:(end - 1)]) && isempty(insp.list.rows))
+            @test !insp.pinned[end].collapsed
+        end
+        # the floating card is neither in the stack nor collapsed by the fitting
+        @test all(d -> d.obj !== o.m, insp.pinned) && length(insp.pinned) == 4
+        @test !c.collapsed && c.pinned
+        # floating the docked cards makes room: no docked card is collapsed for them
+        for obj in (o.pd, o.bs, o.pd2)
+            Ext._float!(gui, obj)
+        end
+        @test only(insp.pinned).obj === o.l1 && !Ext._overflows(gui)
+        @test count(c -> c.pinned, gui.cards) == 4
+        _tick!(gui)
+        # the floating cards cover neither each other nor the view cube
+        rects = [_rect(c.background) for c in gui.cards if c.scene.visible[]]
+        @test length(rects) == 4
+        @test !any(Ext._overlaps(rects[i], rects[j]) for i in eachindex(rects) for j in (i + 1):length(rects))
+        close(gui)
+    end
+
+    @testset "float and dock by clicks" begin
+        # The clicks on the float button of a docked card and on the dock button of a floating
+        # card keep the selection, like those on the pins
+        gui, o = _fixture()
+        insp, ctrl = gui.layout.inspector, gui.controls
+        ctrl.selected[] = o.m
+        _tick!(gui)
+        _click!(gui, _center(_rect(insp.pin.box)))
+        d = only(insp.pinned)
+        _tick!(gui)
+        sleep(0.3)  # later than a double click
+        _click!(gui, _center(_rect(d.head.float.box)))
+        @test ctrl.selected[] === o.m && insp.name.text[] == "Mirror 1" && _w(gui, :x) isa Textbox
+        @test isempty(insp.pinned) && Ext._is_floating(gui, o.m) && insp.pin.active[]
+        _tick!(gui)
+        c = only(Ext._floating_cards(gui, o.m))
+        @test c.scene.visible[]
+        # a click on a widget of the floating card keeps the selection, too
+        sleep(0.3)
+        _click!(gui, _center(_rect(Ext._card_widget(c, :y))))
+        @test ctrl.selected[] === o.m && Ext._card_widget(c, :y).focused[] && Ext._typing(gui)
+        Ext._card_widget(c, :y).focused[] = false
+        sleep(0.3)
+        _click!(gui, _center(_rect(c.dock_button.box)))
+        @test ctrl.selected[] === o.m && insp.name.text[] == "Mirror 1"
+        @test !Ext._is_floating(gui, o.m) && only(insp.pinned).obj === o.m
+        _tick!(gui)
+        @test !c.scene.visible[]
+        # floated again and unpinned by a click on the pin of the floating card
+        sleep(0.3)
+        _click!(gui, _center(_rect(only(insp.pinned).head.float.box)))
+        _tick!(gui)
+        c = only(Ext._floating_cards(gui, o.m))
+        sleep(0.3)
+        _click!(gui, _center(_rect(c.pin_button.box)))
+        @test ctrl.selected[] === o.m && !Ext._is_pinned(gui, o.m) && !insp.pin.active[]
+        @test isempty(insp.pinned) && _w(gui, :x) isa Textbox
+        close(gui)
+    end
+
     @testset "keyboard" begin
         gui, o = _fixture()
         ctrl = gui.controls

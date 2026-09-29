@@ -604,8 +604,11 @@ actions, and below it the pinned cards, one below the other, each with its own h
 actions, pin and chevron). The pin of the selection pins a card, the pin of a pinned card unpins
 it. The sidebar does not scroll: if the cards do not fit, the older pinned cards collapse to their
 heads (the one pinned or expanded last stays open) and the property list of the selection is
-shortened; a collapsed card is only expanded again by its chevron. The floating cards and the
-docked cards are built by the same code from the same declarations.
+shortened; a collapsed card is only expanded again by its chevron. The float button in the head of
+a pinned card moves it out of the sidebar into the 3D view, where it floats next to its component
+as in the compact layout; the dock button in its head moves it back. Only the docked cards take
+room in the sidebar. The floating cards and the docked cards are built by the same code from the
+same declarations.
 
 The row below the status line holds the component menu and "show all". The menu lists all movable
 components and sources by their `labels` (or type), the objects of a group indented after the

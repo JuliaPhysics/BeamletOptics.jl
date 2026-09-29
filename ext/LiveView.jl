@@ -134,7 +134,9 @@ and optionally, with defaults for any layout,
   `_step_box(layout, w, card)` returns its `Textbox` of the keyboard step, `_layout_boxes(gui)`
   the textboxes that take the keyboard (see `_typing`). Pinned cards float by default; a layout
   that shows them elsewhere, e.g. the app layout below its inspector, implements `_pin!(gui, obj)`,
-  `_unpin!(gui, obj)` and `_is_pinned(gui, obj)`, see `_toggle_pin!`.
+  `_unpin!(gui, obj)` and `_is_pinned(gui, obj)`, see `_toggle_pin!`; if it also lets a pinned
+  card float, `_float!(gui, obj)` and `_dock!(gui, obj)`, whose floating cards get the button that
+  docks them (`_card_tools!(layout, c)`).
 - `_outside_view(gui)`: `true` while the mouse is over a part of the layout whose clicks must not
   reach the controls of the 3D view, e.g. the sidebars of the app layout (none by default)
 - hooks called by the shared logic: `_on_solved!(gui)` after a solve is shown,
@@ -2461,15 +2463,27 @@ function _toggle_pinned!(gui::LiveView, c::_ComponentCard)
 end
 
 """Unpins the cards of the `gui` that are pinned to `obj`, e.g. a removed clip plane."""
-function _unpin!(gui::LiveView, obj)
-    for c in gui.cards
-        c.pinned && c.obj === obj && _toggle_pinned!(gui, c)
-    end
-    return nothing
-end
+_unpin!(gui::LiveView, obj) = foreach(c -> _toggle_pinned!(gui, c), _floating_cards(gui, obj))
 
-"""Returns `true` if a card of the `gui` is pinned to `obj`."""
-_is_pinned(gui::LiveView, obj) = any(c -> c.pinned && c.obj === obj, gui.cards)
+"""Returns `true` if a card of the `gui` is pinned to `obj`: the pinned cards float by default."""
+_is_pinned(gui::LiveView, obj) = _is_floating(gui, obj)
+
+"""Returns the pinned cards of the `gui` that float next to `obj` in the 3D view."""
+_floating_cards(gui::LiveView, obj) = filter(c -> c.pinned && c.obj === obj, gui.cards)
+
+"""Returns `true` if a pinned card of the `gui` floats next to `obj` in the 3D view."""
+_is_floating(gui::LiveView, obj) = any(c -> c.pinned && c.obj === obj, gui.cards)
+
+"""
+    _float!(gui, obj)
+    _dock!(gui, obj)
+
+Moves the card pinned to `obj` from the sidebar into the 3D view, next to `obj`, or back. Only a
+layout that docks the pinned cards, e.g. the app layout, implements them; by default, e.g. in the
+compact layout, which has no sidebar, the pinned cards always float and these do nothing.
+"""
+_float!(::LiveView, _) = nothing
+_dock!(::LiveView, _) = nothing
 
 """
     _toggle_pin!(gui, obj)
@@ -2485,9 +2499,15 @@ function _toggle_pin!(gui::LiveView, obj)
 end
 _toggle_pin!(::LiveView, ::Nothing) = nothing
 
-"""Pins a floating card to `obj`, a spare card (see `_spare_card!`), see `_toggle_pin!`."""
-function _pin!(gui::LiveView, obj)
-    c = _spare_card!(gui)
+"""
+    _pin!(gui, obj)
+    _pin!(gui, c::_ComponentCard, obj)
+
+Pins a floating card to `obj`: the card `c`, by default a spare card (see `_spare_card!`), see
+`_toggle_pin!`.
+"""
+_pin!(gui::LiveView, obj) = _pin!(gui, _spare_card!(gui), obj)
+function _pin!(gui::LiveView, c::_ComponentCard, obj)
     c.pinned, c.obj, c.key, c.pose = true, obj, nothing, nothing
     _show_head!(c)
     _update_cards!(gui)
@@ -2501,13 +2521,29 @@ _on_pinned!(::LiveView) = nothing
 function _spare_card!(gui::LiveView)
     i = findfirst(c -> !c.pinned && c !== gui.card, gui.cards)
     isnothing(i) || return gui.cards[i]
-    c = _ComponentCard(gui.fig, gui.layout.theme, _card_z(length(gui.cards) + 1))
+    c = _ComponentCard(gui.fig, gui.layout, _card_z(length(gui.cards) + 1))
     push!(gui.cards, c)
     _connect_card!(gui, c)
     # The listeners of the new widgets come after the mouse shield of the cards, which must come last
     _shield_cards!(gui)
     return c
 end
+
+"""
+    _ComponentCard(fig, layout::AbstractLiveLayout, z = _CARD_Z)
+
+A floating card in the theme of the `layout`, with the tools of the `layout`, see `_card_tools!`.
+"""
+_ComponentCard(fig::Figure, layout::AbstractLiveLayout, z::Real = _CARD_Z) =
+    _card_tools!(layout, _ComponentCard(fig, layout.theme, z))
+
+"""
+    _card_tools!(layout, c::_ComponentCard) -> c
+
+Adds the tools of the `layout` to the head of the floating card `c`: none by default, the
+`dock_button` in a layout that docks pinned cards (see `_dock!`).
+"""
+_card_tools!(::AbstractLiveLayout, c::_ComponentCard) = c
 
 """Makes `c` the card of the selection of the `gui`, whose `step_box` sets the keyboard step."""
 function _use_card!(gui::LiveView, c::_ComponentCard)
@@ -2530,8 +2566,14 @@ function _connect_card!(gui::LiveView, c::_ComponentCard)
     push!(listeners, on(v -> v == c.pinned || _toggle_pinned!(gui, c), c.pin_button.active))
     push!(listeners, on(s -> _set_step!(gui, s), c.step_box.stored_string))
     push!(listeners, on(_ -> _keep_keyboard!(gui), c.step_box.focused))
+    _connect_dock_button!(gui, c, c.dock_button)
     return nothing
 end
+
+# The button that docks the pinned card `c` in the sidebar, if the layout has one, see `_card_tools!`
+_connect_dock_button!(::LiveView, ::_ComponentCard, ::Nothing) = nothing
+_connect_dock_button!(gui::LiveView, c::_ComponentCard, b::_IconButton) =
+    (push!(gui.controls.listeners, on(_ -> _dock!(gui, c.obj), b.clicks)); nothing)
 
 #=
 Detectors: the options of their panel, see `_set_panel_options!`, on their cards (`_panel_row`,
@@ -3397,11 +3439,16 @@ actions in the 3D view are unchanged:
   line.
 - right sidebar ("Properties"): the card of the selected object, docked instead of floating next
   to it: its name and type, the actions of the card (e.g. "hide", or "flip" and "remove" for a
-  clip plane) and a pin, which pins a floating card to the object in the 3D view; below, the rows
-  of the card (see [`card_rows`](@ref), e.g. the pose, the ray slider of a source or the panel
-  options of a detector); then the step box, the mode and the
-  properties of the object (see [`properties`](@ref)). Pinned cards float in the 3D view as in
-  the compact layout.
+  clip plane) and a pin, which pins a card to the object; below, the rows of the card (see
+  [`card_rows`](@ref), e.g. the pose, the ray slider of a source or the panel options of a
+  detector); then the step box, the mode and the properties of the object (see
+  [`properties`](@ref)). The pinned cards are docked below, one below the other, each with its own
+  head (icon, label, actions, float button, pin and chevron). The sidebar does not scroll: if the
+  docked cards do not fit, the older ones collapse to their heads. The float button of a docked
+  card moves it into the 3D view, where it floats next to its object like a pinned card of the
+  compact layout; the dock button in its head moves it back to the end of the docked cards. A
+  card keeps its collapsed state when it moves; pinned again after it was unpinned, it starts
+  docked.
 - analysis dock below the 3D view: a tab per detector panel, a click on a tab shows its panel.
   Only the panel of the active tab is computed after a solve, the other panels are computed when
   their tab is opened; a collapsed dock computes none. Panels with `history = true` still record
@@ -3520,7 +3567,7 @@ function live_view(
         clip_beams, orthographic, show_sources, view_specs))
     ax = w.ax
     # Pose, keyboard step and hide button of the selected object, next to it in the 3D view
-    card = _ComponentCard(fig, lay.theme, _card_z(1))
+    card = _ComponentCard(fig, lay, _card_z(1))
 
     # `edges` is only passed if given, i.e. custom `render!` methods of user objects do not need to
     # accept it

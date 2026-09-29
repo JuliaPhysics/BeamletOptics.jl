@@ -73,7 +73,10 @@ a scene with a pixel camera over the whole figure:
   `title`, i.e. the label of the object
 - `actions`, right of the head: the buttons of [`card_actions`](@ref) for the object
 - `tools`, at the right end of the first line: the `pin_button` (an `_IconToggle`, active while
-  pinned) and the `collapse_button` (an `_IconButton`, a chevron down, or right while collapsed)
+  pinned) and the `collapse_button` (an `_IconButton`, a chevron down, or right while collapsed);
+  in a layout that docks pinned cards, e.g. the app layout, before them the `dock_button`, which
+  docks the card in the sidebar again (see `_dock!`), otherwise `dock_button = nothing`, see
+  `_card_tools!`
 - `rows`, below the head unless `collapsed`: the rows of [`card_rows`](@ref) for the object, each in
   its own layout
 - `step`, below the rows, only on the card of the selection (the keyboard steps move the selected
@@ -123,6 +126,7 @@ mutable struct _ComponentCard <: _AbstractCard
     corners::Vector{Point3f}
     key::Any
     pose::Any
+    dock_button::Union{Nothing, _IconButton}
 end
 
 # Content of a layout of the card `scene`, aligned at the top left corner of its suggested bounding box
@@ -157,7 +161,8 @@ function _ComponentCard(fig::Figure, theme::NamedTuple, z::Real = _CARD_Z)
     scene.visible[] = false
     return _ComponentCard(scene, t, background, head, _card_part(scene), tools, _card_part(scene), step,
         icon, icon_color, title, collapse_button, pin_button, step_box, link, Tuple{Any, CardWidget}[],
-        Any[], Textbox[], Any[], nothing, false, false, false, false, nothing, Point3f[], nothing, nothing)
+        Any[], Textbox[], Any[], nothing, false, false, false, false, nothing, Point3f[], nothing, nothing,
+        nothing)
 end
 
 #=
@@ -194,6 +199,20 @@ _card_icons(t::NamedTuple; size::Real = _CARD_TOOL, icon_size::Real = _CARD_TOOL
 """The pin of a card at the grid position `pos`, an `_IconToggle` that is active while pinned."""
 _card_pin!(pos, t::NamedTuple; kwargs...) = _IconToggle(pos; icon = :pinned, icon_off = :pin,
     tooltip = "Pin the card to the object", _card_icons(t)..., kwargs...)
+
+"""
+The button of a pinned card docked in the sidebar at the grid position `pos`, which floats the card
+next to its object in the 3D view, see `_float!`.
+"""
+_card_float!(pos, t::NamedTuple; kwargs...) =
+    _IconButton(pos; icon = :float, tooltip = "Float in the 3D view", _card_icons(t)..., kwargs...)
+
+"""
+The button of a floating pinned card at the grid position `pos`, which docks the card in the
+sidebar again, see `_dock!`.
+"""
+_card_dock!(pos, t::NamedTuple; kwargs...) =
+    _IconButton(pos; icon = :dock, tooltip = "Dock in the sidebar", _card_icons(t)..., kwargs...)
 
 """The chevron of a card at the grid position `pos` that collapses it, see `_show_head!`."""
 _card_collapse!(pos, t::NamedTuple; kwargs...) =
