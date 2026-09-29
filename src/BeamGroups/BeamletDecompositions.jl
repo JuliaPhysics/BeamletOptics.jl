@@ -88,7 +88,7 @@ function GaussianBeamletDecomposition(
         end
     end
     # group orientation from the first grid axis, orthogonalized w.r.t. dir (sampling unchanged)
-    e1_o = isnothing(basis) ? e1 : _sampling_basis(dir_n, basis[1], T)
+    e1_o = isnothing(basis) ? e1 : sampling_basis(dir_n, basis[1], T)
     return AstigmaticBeamGroup(beams, pos, _group_orientation(dir_n, e1_o, T))
 end
 
@@ -250,6 +250,6 @@ function WavefrontBeamletDecomposition(
     end
 
     # grid coordinates `x`, `y` are given relative to the global origin
-    e1_o = isnothing(basis) ? e1_v : _sampling_basis(dir_n, basis[1], T)
+    e1_o = isnothing(basis) ? e1_v : sampling_basis(dir_n, basis[1], T)
     return AstigmaticBeamGroup(beams, zeros(T, 3), _group_orientation(dir_n, e1_o, T))
 end

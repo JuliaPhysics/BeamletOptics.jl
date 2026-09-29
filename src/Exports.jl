@@ -78,3 +78,5 @@ public AbstractRenderHandle, AbstractObjectRenderHandle, AbstractSystemRenderHan
        render_settings, pickable_plots, look_colors
 public is_static, hit_count, source_wavelength, min_num_rays, ProgressSink, PROGRESS_SINK,
        progress_state, is_cancelled
+public AbstractSampling, NoSampling, DiscRings, DiscSunflower, ConeRings, ConeSunflower,
+       source_beams, sampling_basis
