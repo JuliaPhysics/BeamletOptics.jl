@@ -24,7 +24,14 @@ end
 _length_string(x) = _unit_string(x, (1e-9 => "nm", 1e-6 => "µm", 1e-3 => "mm"))
 _angle_string(x) = _unit_string(x, (1e-6 => "µrad", 1e-3 => "mrad", deg2rad(1) => "°"))
 
-_label(gui, obj) = get(gui.labels, obj, string(nameof(typeof(obj))))
+"""
+    _label(gui, obj)
+
+The name of `obj` in the `gui`: its entry in `labels`, else its automatic name, e.g. "Lens 2", see
+`_name_objects!`, else the name of its type. The same in all layouts.
+"""
+_label(gui::LiveView, obj) = get(() -> get(gui.objects.names, obj, string(nameof(typeof(obj)))),
+    gui.labels, obj)
 
 """Describes the pose of `obj`, including the change since the controls were enabled."""
 function _pose_string(gui, obj)
@@ -60,11 +67,29 @@ end
 Component menu, hide and show
 =#
 
-"""Returns the options of the component menu of the `entries`, see `_menu_entries`."""
+"""
+    _menu_options(labels, entries)
+    _menu_options(gui, entries)
+
+Returns the options of the component menu of the `entries`, see `_menu_entries`, named after the
+`labels` (before the `gui` exists) or after `_label` of the `gui`.
+"""
 function _menu_options(labels, entries)
     isempty(entries) && return [("no components", 0)]
     return [("  "^depth * get(labels, obj, string(nameof(typeof(obj)))), i)
             for (i, (obj, depth)) in enumerate(entries)]
+end
+function _menu_options(gui::LiveView, entries)
+    isempty(entries) && return [("no components", 0)]
+    return [("  "^depth * _label(gui, obj), i) for (i, (obj, depth)) in enumerate(entries)]
+end
+
+"""Shows the automatic names of `_label` in the component menu of the `gui`, if it has one."""
+_refresh_menu_options!(::LiveView, ::Nothing) = nothing
+function _refresh_menu_options!(gui::LiveView, menu::Menu)
+    options = _menu_options(gui, _menu_entries(gui.controls))
+    menu.options[] == options || (menu.options[] = options)
+    return nothing
 end
 
 """
@@ -261,24 +286,9 @@ end
 """Returns `true` if the component menu (if any) or the views menu of the `gui` is open."""
 _menu_open(gui::LiveView) = _is_open(gui.widgets.menu) || _is_open(gui.widgets.views_menu)
 
-_clip_plane_label(::LiveView) = "Clip plane"
-
-"""
-    _name_objects!(gui)
-
-Names the objects of the `gui` without an entry in `labels` in `gui.objects.names`, see `_label`:
-none by default.
-"""
-_name_objects!(::LiveView) = nothing
-
-"""Clip planes of the app layout are numbered, e.g. "Clip plane 2", see `_clip_plane_label`."""
-function _clip_plane_label(gui::AppView)
+"""Clip planes are numbered, e.g. "Clip plane 2", see `_label`."""
+function _clip_plane_label(gui::LiveView)
     n = get(gui.objects.counters, "Clip plane", 0) + 1
     gui.objects.counters["Clip plane"] = n
     return "Clip plane $n"
 end
-
-"""The label of `obj` in the app layout: its entry of `labels`, else its name in the tree."""
-_label(gui::AppView, obj) = get(() -> get(gui.objects.names, obj, string(nameof(typeof(obj)))),
-    gui.labels, obj)
-

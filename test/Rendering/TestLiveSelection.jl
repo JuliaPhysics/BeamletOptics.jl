@@ -46,7 +46,7 @@ const BMO = BeamletOptics
             pick = ax -> (gui_ref[].controls.h.handles[1].plots[1], 0))
         gui_ref[] = gui
         # every movable object once, the objects of the group after the group, indented
-        @test first.(gui.widgets.menu.options[]) == ["M1", "Detector", "ObjectGroup", "  G1", "  Mirror", "Beam"]
+        @test first.(gui.widgets.menu.options[]) == ["M1", "Detector 1", "ObjectGroup 1", "  G1", "  Mirror 1", "Beam 1"]
         @test all(gui.objects.menu .=== Any[m, pd, g, g.objects[1], g.objects[2], beam])
         @test gui.widgets.menu.i_selected[] == 0
 
@@ -111,6 +111,39 @@ const BMO = BeamletOptics
         @test isempty(gui.objects.hidden)
         @test all(p -> p.visible[], leaf_plots)
         @test first(Ext._ray_pick(gui.controls, scene)) === m
+        close(gui)
+    end
+
+    @testset "automatic names and clip planes" begin
+        m1, pd = _fixture()
+        m2 = RoundPlanoMirror(25e-3, 5e-3)
+        translate3d!(m2, [0.2, 0.1, 0])
+        beam = Beam([0.0, 0, 0], [0.0, 1, 0])
+        gui = _live_view(System([m1, m2, pd]), beam; throttle = false,
+            labels = Dict(m2 => "Own name"), detectors = [])
+        gui.export_clipboard = false
+        # objects without a label get "Type i" like in the tree of the app, labelled ones keep it
+        @test Ext._label(gui, m1) == "Mirror 1"
+        @test Ext._label(gui, m2) == "Own name"
+        @test first.(gui.widgets.menu.options[]) == ["Mirror 1", "Own name", "Detector 1", "Beam 1"]
+        app = _live_view(System([m1, m2, pd]), beam; throttle = false, layout = :app,
+            labels = Dict(m2 => "Own name"), detectors = [])
+        @test [Ext._label(app, o) for o in (m1, m2, pd, beam)] == ["Mirror 1", "Own name", "Detector 1", "Beam 1"]
+        close(app)
+
+        # clip planes are numbered
+        p1 = Ext._add_clip_plane!(gui, [0, 0.05, 0], [0, 1, 0])
+        p2 = Ext._add_clip_plane!(gui, [0, 0.06, 0], [0, 1, 0])
+        @test Ext._label(gui, p1) == "Clip plane 1"
+        @test Ext._label(gui, p2) == "Clip plane 2"
+
+        # automatic names are no variable names in the export
+        translate3d!(m1, [0, 1e-3, 0])
+        names = Ext._export_names(gui, Any[m1, m2])
+        @test names[m1] == "obj1" && names[m2] == "obj2"
+        code = export_changes(gui; io = devnull)
+        @test occursin("# Mirror\n", code) || occursin("(Mirror)", code)
+        @test !occursin("Mirror 1", code)
         close(gui)
     end
 

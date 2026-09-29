@@ -43,13 +43,13 @@ end
 _sources(gui::LiveView) = unique(objectid, last.(gui.pairs))
 
 """
-    _name_objects!(gui::AppView)
+    _name_objects!(gui::LiveView)
 
 Names the systems ("System i") and all objects and sources without an entry in `labels` by their
 type and a running index per type, e.g. "Lens 2", in the order of the tree. Names, once given, are
-kept, see `_label`.
+kept, see `_label`. The component menu, if any, shows the names.
 """
-function _name_objects!(gui::AppView)
+function _name_objects!(gui::LiveView)
     layout = gui.objects
     function name!(obj)
         (haskey(gui.labels, obj) || haskey(layout.names, obj)) && return nothing
@@ -65,6 +65,7 @@ function _name_objects!(gui::AppView)
     haskey(layout.names, gui.extras) || (layout.names[gui.extras] = "Extras")
     foreach(top -> foreach(name!, _descendants(top)), _top_levels(gui.extras))
     foreach(name!, _sources(gui))
+    _refresh_menu_options!(gui, gui.widgets.menu)
     return nothing
 end
 
