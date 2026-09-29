@@ -30,7 +30,7 @@
     - Detectors
 - Surface-like modeling of rotationally symmetrical lens systems
 - Extendable API design for the implementation of custom optical interactions
-- Easy visualization via the [Makie](https://github.com/MakieOrg/Makie.jl) package
+- Easy visualization via the [Makie](https://github.com/MakieOrg/Makie.jl) package, and an interactive GUI via [BeamletOpticsGUI](https://github.com/StackEnjoyer/BeamletOpticsGUI.jl)
 
 # Installation
 

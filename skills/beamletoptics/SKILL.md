@@ -65,7 +65,7 @@ When this Skill is active:
 - Sanity-check numbers against a paraxial estimate (`BeamletOptics.lensmakers_eq`, Airy radius, Malus, …).
 
 6) Visualize (optional, needs a Makie backend) → `VISUALIZATION.md`
-- `using GLMakie`, then `render!(ax, system)`, `render!(ax, beam)`; `save` a PNG or `display` an interactive window.
+- `using GLMakie`, then `render!(ax, system)`, `render!(ax, beam)`; `save` a PNG or `display` a figure. For an interactive window with movable components use the package BeamletOpticsGUI (https://github.com/StackEnjoyer/BeamletOpticsGUI.jl), which has its own skill, installed via `BeamletOpticsGUI.install_agent_skill()`.
 
 ## Safety and non-goals
 

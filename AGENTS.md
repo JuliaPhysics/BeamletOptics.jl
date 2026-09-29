@@ -28,8 +28,11 @@ Evaluate every API and architecture decision against this. The core principles, 
 **The extension promise:** a developer defines a new `AbstractObject` subtype and its
 `interact3d(system, object, beam, ray)` method (plus `intersect3d` if it needs custom
 geometry), and the rest of the API (kinematics, threading, retracing) works without further
-integration. When adding infrastructure, prefer pushing complexity into the
-generic solver over asking component authors to handle it.
+integration. A component may also add a `card_rows` method (and `card_actions`) to show its own rows
+on its card in the interactive GUI, which lives in the separate package
+[BeamletOpticsGUI](https://github.com/StackEnjoyer/BeamletOpticsGUI.jl) (recipe and developer
+instructions there). When adding infrastructure,
+prefer pushing complexity into the generic solver over asking component authors to handle it.
 
 Current exception: coincident-boundary disambiguation (plate beamsplitters, cemented
 doublets) is handled per component by returning a `Hint`
@@ -56,7 +59,17 @@ doublets) is handled per component by returning a `Hint`
 - `src/OpticalComponents/`: components, one family per folder or file.
 - `src/SDFs/`, `src/Mesh.jl`: geometry backends.
 - `src/Exports.jl`: the public API. Changing it affects the agent skill (below).
-- `ext/`: `BeamletOpticsMakieExt` and its `Render*.jl` files.
+- `ext/`: `BeamletOpticsMakieExt` and its `Render*.jl` files: `render!` and the live rendering
+  (`RenderLive.jl` for objects and systems, the beam files for beams) behind the render handle
+  protocol of `src/Render.jl`.
+- The interactive GUI (`live_view`, cards, kinematic controls, view cube) is the separate package
+  [BeamletOpticsGUI](https://github.com/StackEnjoyer/BeamletOpticsGUI.jl). It uses the exported
+  names, the render handle protocol and the names declared `public` in `src/Exports.jl` (see
+  "Public API for dependent packages" in [docs/src/api/api.md](docs/src/api/api.md)): renaming or
+  changing any of these breaks the GUI, so treat them like exported API. It also uses some
+  internal names (e.g. the abstract types, the kinematic and shape traits, `intersection`,
+  `hits`, `objects`), which stay internal and may change: before renaming or changing an
+  internal name, search the GUI for it and update the GUI in step.
 - `skills/beamletoptics/`: the user-facing agent skill.
 
 ## Running Julia
@@ -124,7 +137,9 @@ output in `docs/build/1`, served with LiveServer) and the figure pattern (script
 
 - `GLOBAL_USE_PLACEHOLDERS` at the top of [docs/DocUtils.jl](docs/DocUtils.jl) switches
   local builds between real figures and fast placeholders. Keep it `true`; set it to `false`
-  only to regenerate figures, and set it back before committing. CI always renders.
+  only to regenerate figures, and set it back before committing. CI always renders. Such a run
+  fills `docs/figure_cache` (untracked), which later placeholder builds use instead of
+  placeholders; delete a cached figure after changing its script.
 - **GLMakie is the Makie backend.** Use it for figures, ad-hoc checks of `render!` and anything
   under `ext/`. On headless Linux, run it under `xvfb-run -a` (CI does the same).
 - **Windows link bug:** Documenter reads `[text]` followed by a parenthesized aside, e.g.

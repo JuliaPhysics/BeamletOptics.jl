@@ -4,7 +4,7 @@ export translate3d!, translate_to3d!, rotate3d!, xrotate3d!, yrotate3d!, zrotate
 export position, direction, orientation
 
 # ray and beam type export
-export Ray, PolarizedRay, Beam, PointSource, CollimatedSource, UniformDiscSource, UniformPointSource,
+export Ray, PolarizedRay, Beam, PointSource, CollimatedSource, UniformDiscSource, UniformPointSource, set_num_rays!,
        GaussianBeamlet, AstigmaticGaussianBeamlet, rayleigh_range, rays, point_on_beam,
        normal3d
 export CollimatedGaussianBeamletSource, GaussianBeamletDecomposition,
@@ -15,6 +15,9 @@ export System, StaticSystem, solve_system!
 
 # object group
 export ObjectGroup
+
+# display
+export properties, default_properties
 
 # additional
 export DiscreteRefractiveIndex, SellmeierEquation
@@ -67,3 +70,13 @@ export Retroreflector, get_invariant_threshold, set_invariant_threshold!,
 
 # render
 export render!, get_view, set_view, hide_axis, set_orthographic, arrow!, render_lcs!, look_at!
+export live_render!, update_render!, remove_render!, pick_object, studio_lighting!, set_render_look
+
+# render handle protocol and developer API for packages built on BeamletOptics: public, not exported
+public AbstractRenderHandle, AbstractObjectRenderHandle, AbstractSystemRenderHandle,
+       AbstractBeamRenderHandle, rendered, render_plots, render_children, render_parent,
+       render_settings, pickable_plots, look_colors
+public is_static, hit_count, wavelength, min_num_rays, ProgressSink, PROGRESS_SINK,
+       progress_state, is_cancelled
+public AbstractSampling, NoSampling, DiscRings, DiscSunflower, ConeRings, ConeSunflower,
+       source_beams, sampling_basis

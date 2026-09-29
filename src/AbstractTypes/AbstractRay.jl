@@ -106,6 +106,13 @@ function direction!(ray::AbstractRay, dir)
     return nothing
 end
 
+"""
+    wavelength(x)
+
+The wavelength [m] of the ray `x`, of a [`Beam`](@ref) (its first ray), of a
+[`GaussianBeamlet`](@ref), an [`AstigmaticGaussianBeamlet`](@ref) or of a beam group (its first
+beam).
+"""
 wavelength(ray::AbstractRay) = ray.λ
 wavelength!(ray::AbstractRay, λ) = (ray.λ = λ)
 

@@ -23,6 +23,8 @@ Returns the vector of rays that make up the `beam`.
 """
 rays(b::Beam) = b.rays
 
+wavelength(b::Beam) = wavelength(first(rays(b)))
+
 
 Base.push!(b::Beam, ray::AbstractRay) = push!(b.rays, ray)
 

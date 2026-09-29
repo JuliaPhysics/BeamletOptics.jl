@@ -9,3 +9,7 @@ This part of the documentation is intended for users that want to change the int
 Pages = ["conventions.md", "core.md", "geometry.md", "meshes.md", "sdfs.md", "kinematics_api.md"]
 Depth = 2
 ```
+
+## Public API for dependent packages
+
+Besides the exported names, a few names are declared `public` in `src/Exports.jl` without being exported, e.g. `BeamletOptics.is_static`, `BeamletOptics.hit_count`, the progress interface `BeamletOptics.ProgressSink` or the sampling of the sources `BeamletOptics.AbstractSampling`. Packages built on BMO, such as [BeamletOpticsGUI](https://github.com/StackEnjoyer/BeamletOpticsGUI.jl), may rely on them like on the exported API; other unexported names are internal and may change in any release. Whether a name is public can be checked with `Base.ispublic(BeamletOptics, name)`. Their docstrings are listed in the [Reference](@ref), the render handle protocol is described on the [Live rendering](@ref "Render handle protocol") page. A new `AbstractObject` subtype can add a method of [`properties`](@ref) to list its own parameters, see [Inspecting components](@ref).

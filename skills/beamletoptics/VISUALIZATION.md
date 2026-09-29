@@ -34,7 +34,7 @@ save("setup.png", fig)                  # or display(fig) for an interactive win
 | Target                        | Useful keywords (defaults) |
 |-------------------------------|----------------------------|
 | `System`                      | forwarded to each object |
-| optical object                | `color`, `transparency`, `alpha` |
+| optical object                | `material` (e.g. `:refractive`, `:mechanics`), `edges`, `color`, `alpha`, `transparency` (override the material of the look) |
 | `Beam` / `Ray`                | `color = :blue`, `linewidth = 1`, `flen = 1.0` (length drawn for an open-ended last ray), `show_pos = false`, `show_polarization = false` |
 | beam group (source)           | `render_every = 5` (draw every n-th beam), plus beam keywords |
 | `GaussianBeamlet`             | `color = :red`, `flen = 0.1`, `show_beams = false` (show chief/waist/divergence rays), `r_res`, `z_res`, `transparency = true` |
@@ -43,6 +43,15 @@ save("setup.png", fig)                  # or display(fig) for an interactive win
 
 **Always set `flen`** for beams whose last ray does not end on a surface; the default 1 m for rays
 usually dwarfs a millimeter-scale setup.
+
+## Look and lighting
+
+- `set_render_look(:modern)` (default: clear glass, metallic mirrors, neutral mechanics) or
+  `set_render_look(:cad)` (saturated materials with feature edges); applies to later `render!` calls.
+- Each component class has a material (`:refractive`, `:reflective`, `:coating`, `:polarizer`,
+  `:detector`, `:mechanics`); `render!(ax, obj; material = :mechanics, edges = false)` overrides it.
+- `studio_lighting!(ax)`: key, fill and rim light relative to the camera, for an `LScene` or
+  an `Axis3`.
 
 ## Views
 
@@ -58,6 +67,25 @@ usually dwarfs a millimeter-scale setup.
 - `set_view(ls, M)` or `set_view(ls, eye, lookat, up)`
 - `look_at!(ls, target, offset; up = [0, 0, 1])`
 - `arrow!(ax, pos, dir; scale)`, `render_lcs!(ax, obj; scale, show_labels)` (draw local frames)
+
+## Live rendering (GLMakie)
+
+`render!` creates new plots on every call. For animations or parameter sweeps, render once and update:
+
+```julia
+hsys = live_render!(ax, system)   # geometry generated once
+hbeam = live_render!(ax, beam)    # all ray segments in one plot
+zrotate3d!(mirror, 1e-3)
+solve_system!(system, beam)
+update_render!(hsys); update_render!(hbeam)   # remove_render!(h) deletes the plots
+```
+
+## Interactive GUI
+
+The interactive window (moving components with mouse and keyboard, cards, detector panels, view cube) is
+not part of BeamletOptics. It is the package BeamletOpticsGUI
+(https://github.com/StackEnjoyer/BeamletOpticsGUI.jl) with its own agent skill, installed via
+`BeamletOpticsGUI.install_agent_skill()`.
 
 ## Detector data plots
 

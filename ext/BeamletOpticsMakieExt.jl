@@ -2,13 +2,21 @@ module BeamletOpticsMakieExt
 
 using BeamletOptics
 import BeamletOptics: render!, RenderException, _RenderTypes, get_view, set_view, hide_axis,
-                       set_orthographic, arrow!, render_lcs!, look_at!
+                       set_orthographic, arrow!, render_lcs!, look_at!, live_render!, update_render!,
+                       remove_render!, pick_object, studio_lighting!, set_render_look, look_colors,
+                       rendered, render_plots, render_children, render_parent, render_settings,
+                       pickable_plots, AbstractRenderHandle, AbstractObjectRenderHandle,
+                       AbstractSystemRenderHandle, AbstractBeamRenderHandle
 
 const BMO = BeamletOptics
 
-using Makie: Axis3, LScene, mesh!, surface!, lines!, RGBf, RGBAf, scatter!, text!,
+import Makie
+using Makie: Figure, Axis3, LScene, mesh!, surface!, lines!, linesegments!, RGBf, RGBAf, scatter!, text!,
              update_cam!, cameracontrols, arrows3d!
-using GeometryBasics: Point2, Point3, Point3f, Vec3f, GLTriangleFace, Mesh
+using PrecompileTools: @setup_workload, @compile_workload
+using GeometryBasics: Point2, Point3, Point3f, Point3d, Vec3f, Vec3d, GLTriangleFace, Mesh
+using StaticArrays: SMatrix
+using Base.ScopedValues: ScopedValue, with
 using AbstractTrees: PreOrderDFS
 using MarchingCubes: MC, march
 using LinearAlgebra: dot, cross, normalize, norm
@@ -50,6 +58,8 @@ include("RenderBeam.jl")
 include("RenderPolarization.jl")
 include("RenderGaussian.jl")
 include("RenderAstigmaticGaussian.jl")
+include("RenderTessellation.jl")
+include("RenderLook.jl")
 include("RenderSDF.jl")
 include("RenderMesh.jl")
 include("RenderObjects.jl")
@@ -59,5 +69,9 @@ include("RenderMirrors.jl")
 include("RenderPresets.jl")
 include("RenderPolarizers.jl")
 include("RenderCamera.jl")
+# live rendering, must come after all static renderers
+include("RenderLive.jl")
+# precompiles the static and live rendering, must come last
+include("RenderPrecompile.jl")
 
 end

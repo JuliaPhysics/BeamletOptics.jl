@@ -34,8 +34,9 @@ Use `scripts/api_lookup.jl NAME` to print the docstring and signatures of any na
 |---------------|-------|
 | Kinematics    | `translate3d!`, `translate_to3d!`, `rotate3d!`, `xrotate3d!`, `yrotate3d!`, `zrotate3d!`, `align3d!`, `reset_translation3d!`, `reset_rotation3d!`, `set_pivot3d!`, `position`, `direction`, `orientation` |
 | Rays & beams  | `Ray`, `PolarizedRay`, `Beam`, `GaussianBeamlet`, `AstigmaticGaussianBeamlet`, `rays`, `point_on_beam`, `rayleigh_range`, `normal3d` |
-| Sources       | `CollimatedSource`, `UniformDiscSource`, `PointSource`, `UniformPointSource`, `CollimatedGaussianBeamletSource`, `SphericalGaussianBeamletSource`, `EllipticalGaussianBeamletSource`, `GaussianBeamletDecomposition`, `WavefrontBeamletDecomposition`, `AstigmaticBeamGroup` |
+| Sources       | `CollimatedSource`, `UniformDiscSource`, `PointSource`, `UniformPointSource`, `set_num_rays!`, `CollimatedGaussianBeamletSource`, `SphericalGaussianBeamletSource`, `EllipticalGaussianBeamletSource`, `GaussianBeamletDecomposition`, `WavefrontBeamletDecomposition`, `AstigmaticBeamGroup` |
 | System        | `System`, `StaticSystem`, `solve_system!`, `ObjectGroup` |
+| Inspection    | `properties`, `default_properties` |
 | Materials     | `DiscreteRefractiveIndex`, `SellmeierEquation` |
 | Lenses        | `Lens`, `ThinLens`, `SphericalLens`, `DoubletLens`, `SphericalDoubletLens`, `TripletLens`, `SphericalTripletLens`, `thickness` |
 | Surfaces      | `SphericalSurface`, `CircularFlatSurface`, `RectangularFlatSurface`, `EvenAsphericalSurface`, `CylindricalSurface`, `AcylindricalSurface` |
@@ -46,12 +47,29 @@ Use `scripts/api_lookup.jl NAME` to print the docstring and signatures of any na
 | Detectors     | `Detector`, `spot_diagram`, `intensity`, `electric_field`, `optical_power`, `gauss_parameters`, `waist_parameters`, `Centroid`, `MinMax` |
 | Dummies       | `MeshDummy`, `NonInteractableObject`, `IntersectableObject` |
 | Config        | `get_default_wavelength`, `get_default_waist`, `get_default_power`, `get_default_r_max`, `get_default_depth_max`, `get_invariant_threshold`, `set_invariant_threshold!`, `get_internal_reflection_threshold`, `get_line_plane_intersection_threshold`, `get_orthogonality_threshold`, `get_sdf_surface_threshold`, `get_sdf_raymarch_eps`, `get_sdf_inside_step`, `get_progress_threshold`, `set_progress_threshold!` |
-| Render (Makie)| `render!`, `get_view`, `set_view`, `hide_axis`, `set_orthographic`, `look_at!`, `arrow!`, `render_lcs!` |
+| Render (Makie)| `render!`, `get_view`, `set_view`, `hide_axis`, `set_orthographic`, `look_at!`, `arrow!`, `render_lcs!`, `set_render_look`, `studio_lighting!` |
+| Live (Makie)  | `live_render!`, `update_render!`, `remove_render!`, `pick_object` |
 
 Useful non-exported helpers: `BeamletOptics.inch`, `lensmakers_eq(R1, R2, n)` (returns f),
 `divergence_angle(λ, w0, M2)`, `numerical_aperture(θ, n=1)`, `optical_path_length(beam)`,
 `isparaxial(system, beam, θ=π/4)`, `fresnel_coefficients`, `beams(group)`, `objects(system)`,
 `list_subtypes(T)`, constants `Z_vacuum`, `c_vacuum`.
+
+## Properties of objects
+
+`properties(x)` lists what an object, shape, beam or source stores as `name => value` pairs, e.g.
+`"Thickness [m]" => 0.005`, `"Reflectance" => 0.3` (power ratio), `"Hits" => 12`. Values are SI
+numbers; the unit is in brackets at the end of the name, names without brackets are dimensionless.
+It lists only stored values: e.g. the
+radii and diameter of a `Lens` are not stored and not listed.
+
+A custom `AbstractObject` subtype gets the default list (type, position, optical axis, shape). To
+show its own parameters, extend it:
+
+```julia
+BeamletOptics.properties(x::MyFilter) =
+    [default_properties(x); "Optical density" => x.od; "Center wavelength [m]" => x.λc]
+```
 
 ## Solving
 
@@ -69,7 +87,8 @@ solve_system!(system, beam_group; progress = true, kwargs...)   # multithreaded 
 - Julia threads (`julia -t auto`) speed up solving of sources with many beams.
 - `progress`: beam groups and detector readout show a progress bar once they have run for
   `get_progress_threshold()` s (default 5 s, `set_progress_threshold!(Inf)` disables it). It is
-  only drawn if `stderr` is a terminal, so scripts with piped output see nothing.
+  only drawn if `stderr` is a terminal, so scripts with piped output see nothing. In the live
+  view of BeamletOpticsGUI, the same loops show a progress window in the 3D view instead.
 
 ## Beam queries
 
@@ -110,4 +129,5 @@ They also take `progress = true` (see Solving). See `components/detectors.md`.
 
 `using GLMakie` before or after `using BeamletOptics` activates the extension.
 One generic function draws everything: `render!(ax, system)`, `render!(ax, beam)`,
-`render!(ax, source)`, `render!(ax, object)`. See `VISUALIZATION.md`.
+`render!(ax, source)`, `render!(ax, object)`. `live_render!` updates the plots
+of moved components and re-solved beams in place. See `VISUALIZATION.md`.

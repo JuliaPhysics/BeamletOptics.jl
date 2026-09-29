@@ -24,6 +24,7 @@ include(joinpath(@__DIR__, "Geometry", "SDFs", "TestConicSDF.jl"))
 # Test system and object containers
 include(joinpath(@__DIR__, "TestSystem.jl"))
 include(joinpath(@__DIR__, "TestObjectGroups.jl"))
+include(joinpath(@__DIR__, "TestProperties.jl"))
 
 # Test lens models
 include(joinpath(@__DIR__, "Lenses", "TestSphericalLenses.jl"))
@@ -56,6 +57,10 @@ include(joinpath(@__DIR__, "E2E", "TestFraunhofer.jl"))
 # MUST stay first: TestRenderErrors.jl needs to run before anything loads the BMO Makie ext.
 include(joinpath(@__DIR__, "Rendering", "TestRenderErrors.jl"))
 include(joinpath(@__DIR__, "Rendering", "TestRenderPolarization.jl"))
+include(joinpath(@__DIR__, "Rendering", "TestTessellation.jl"))
+include(joinpath(@__DIR__, "Rendering", "TestRenderLook.jl"))
+include(joinpath(@__DIR__, "Rendering", "TestRenderLive.jl"))
+include(joinpath(@__DIR__, "Rendering", "TestLiveBeams.jl"))
 
 # Test regressions
 include(joinpath(@__DIR__, "TestBugFixes.jl"))

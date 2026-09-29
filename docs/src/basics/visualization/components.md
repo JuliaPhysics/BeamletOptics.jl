@@ -10,20 +10,13 @@ The generic method below covers every [`BeamletOptics.AbstractObject`](@ref), in
 render!(::Union{GLMakie.Axis3, GLMakie.LScene}, ::BeamletOptics.AbstractObject)
 ```
 
-### Default colours
+### Materials
 
-Several component types are rendered with a preset colour and transparency:
-
-| Type | `color` | `transparency` | `alpha` |
-|---|---|---|---|
-| `AbstractRefractiveOptic` | `:white` | `true` | – |
-| `AbstractReflectiveOptic` | `:silver` | `false` | – |
-| `Lens`, `DoubletLens`, `TripletLens` | light blue `RGBf(0.678, 0.847, 0.902)` | `true` | `0.5` |
-| `ThinBeamsplitter` | `:magenta` | `true` | – |
-| `NonInteractableObject` | `:grey` | `false` | – |
-| `IntersectableObject` | `:grey` | `true` | – |
-
-Each default can be overridden with the corresponding keyword argument, e.g. `render!(ax, lens; color=:orange)` or `render!(ax, mirror; transparency=true)`.
+The color, opacity and shading of a component follow its material class, e.g. clear glass for
+lenses or metallic silver for mirrors, in the active look (`:modern` or `:cad`). The materials,
+feature edges and lighting are described on the [Look](@ref) page. Each default can be overridden
+with the corresponding keyword argument, e.g. `render!(ax, lens; color=:orange)`,
+`render!(ax, mirror; transparency=true)` or `render!(ax, mount; material=:mechanics)`.
 
 ### Polarizing filters
 
@@ -40,7 +33,7 @@ render!(::Union{GLMakie.Axis3, GLMakie.LScene}, ::BeamletOptics.AbstractSystem)
 
 ## Shapes (advanced)
 
-The following methods render the shapes that components are built from. They are mainly of interest when writing custom components, see the [Signed Distance Functions (SDFs)](@ref) and [Meshes](@ref) pages of the API documentation. A [`BeamletOptics.UnionSDF`](@ref) is rendered by drawing each of its SDFs. The spherical, aspherical and acylindrical lens surfaces have dedicated analytical renderers that are used automatically when a lens is rendered.
+The following methods render the shapes that components are built from. They are mainly of interest when writing custom components, see the [Signed Distance Functions (SDFs)](@ref) and [Meshes](@ref) pages of the API documentation. A [`BeamletOptics.UnionSDF`](@ref) or [`BeamletOptics.DifferenceSDF`](@ref) is rendered as one mesh, which is merged from the analytical meshes of its SDFs if all of them have one, and otherwise sampled via marching cubes. The spherical, aspherical and acylindrical lens surfaces have dedicated analytical renderers that are used automatically when a lens is rendered.
 
 ```@docs
 render!(::Union{GLMakie.Axis3, GLMakie.LScene}, ::BeamletOptics.AbstractSDF)

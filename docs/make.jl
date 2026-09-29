@@ -167,7 +167,9 @@ makedocs(;
                 "Rays and beams"            => joinpath("basics", "visualization", "beams.md"),
                 "Gaussian beamlets"         => joinpath("basics", "visualization", "gaussian.md"),
                 "Components and systems"    => joinpath("basics", "visualization", "components.md"),
+                "Look"                      => joinpath("basics", "visualization", "look.md"),
                 "Scene and camera"          => joinpath("basics", "visualization", "camera.md"),
+                "Live rendering"            => joinpath("basics", "visualization", "live_rendering.md"),
             ],
         ],
         "Developer Documentation" => Any[

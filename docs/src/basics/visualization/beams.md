@@ -1,6 +1,6 @@
 # Rendering rays and beams
 
-Rays and beams are drawn as 3D lines. A ray without an intersection is drawn with the finite length `flen`, since its actual length is infinite. Example renderings can be found in the [Basic rays](@ref), [Basic beam](@ref) and [Beam groups](../beams/beam_groups.md) sections.
+Rays and beams are drawn as 3D lines: all ray segments of a ray, a beam (including its child beams) or a beam group are drawn by a single `linesegments` plot. A ray without an intersection is drawn with the finite length `flen`, since its actual length is infinite. [`live_render!`](@ref) draws the same plot and updates it after a solve, see [Live rendering](@ref). Example renderings can be found in the [Basic rays](@ref), [Basic beam](@ref) and [Beam groups](../beams/beam_groups.md) sections.
 
 ## Single rays
 
@@ -10,7 +10,7 @@ render!(::Union{GLMakie.Axis3, GLMakie.LScene}, ::BeamletOptics.AbstractRay)
 
 ## Beams of rays
 
-A [`Beam`](@ref) is rendered by drawing every ray of the beam tree, including all child beams created at beamsplitters. Keyword arguments such as `color` or `linewidth` are passed on to each ray.
+A [`Beam`](@ref) is rendered by drawing every ray of the beam tree, including all child beams created at beamsplitters. Keyword arguments such as `color` or `linewidth` are passed on to the plot of the segments.
 
 ```@docs
 render!(::Union{GLMakie.Axis3, GLMakie.LScene}, ::Beam)

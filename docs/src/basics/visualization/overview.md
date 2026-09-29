@@ -1,13 +1,49 @@
 # Visualization
 
-As mentioned in other sections of this documentation, the [Makie](https://docs.makie.org) backend can be used in order to generate 2D/3D renderings of optical systems and results generated with this package. Refer to the extensive `Makie` documentation and the **Examples** and the **Tutorials** sections of this package for a variety of showcases on how to visualize your simulation.
+There are two ways to look at a simulation: the interactive GUI of the package BeamletOpticsGUI,
+in which the components are moved with the mouse and the beams and detector signals follow live,
+and the render functions of BeamletOptics itself, which draw systems and beams into any
+[Makie](https://docs.makie.org) scene, e.g. for figures. The GUI draws with the same render
+functions.
 
-This section documents the [`render!`](@ref) function sorted by the type of the object being rendered:
+## Interactive GUI
+
+[BeamletOpticsGUI](https://github.com/StackEnjoyer/BeamletOpticsGUI.jl) opens a setup in an
+interactive window: select and move components with the mouse, keyboard or the card of a
+component, and the systems are solved again after each change. Detector panels show spot diagrams
+or intensities with metrics, clip planes cut into the setup, beams and distances can be measured,
+and the changed poses are exported as Julia code. Own components get their own cards, and own
+panels, controls and tools can be added.
+
+```julia
+using GLMakie, BeamletOptics, BeamletOpticsGUI
+
+gui = live_view(system, beam; layout = :app)
+display(gui)
+```
+
+![Live view of a Michelson interferometer](../../assets/gui/live_view_michelson.png)
+
+The GUI is a separate package, since it depends on Makie and changes independently of the optics.
+It builds on the [Live rendering](@ref) of BeamletOptics and its
+[render handle protocol](@ref "Render handle protocol"). Installation, the features and the API
+are documented in the [BeamletOpticsGUI repository](https://github.com/StackEnjoyer/BeamletOpticsGUI.jl).
+
+## Rendering with Makie
+
+The following pages document the [`render!`](@ref) function sorted by the type of the object
+being rendered, and the tools around it. Refer to the extensive `Makie` documentation and the
+**Examples** and the **Tutorials** sections of this package for a variety of showcases on how to
+visualize your simulation.
 
 - [Rays and beams](beams.md): single rays, beams of rays and beam groups
 - [Gaussian beamlets](gaussian.md): stigmatic and astigmatic Gaussian beamlets
-- [Components and systems](components.md): optical components, their default colours, polarizers, systems and the underlying shapes
+- [Components and systems](components.md): optical components, polarizers, systems and the
+  underlying shapes
+- [Look](look.md): materials, feature edges and lighting of the rendered objects
 - [Scene and camera](camera.md): helpers for framing and annotating a 3D scene
+- [Live rendering](live_rendering.md): plots that follow moving components and changing beams,
+  e.g. for animations, and the render handle protocol for packages built on BeamletOptics
 
 ## Backends
 
@@ -81,11 +117,11 @@ julia> using GLMakie
 
 julia> methods(render!)
 # ... methods for generic function "render!" from BeamletOptics:
-  [1] render!(axis::Union{Axis3, LScene}, gauss::GaussianBeamlet{T}; show_beams, show_pos, r_res, z_res, flen, color, transparency, kwargs...) where T
-     @ BeamletOpticsMakieExt C:\Users\anon\.julia\dev\BeamletOptics\ext\RenderGaussian.jl:26
-  [2] render!(axis::Union{Axis3, LScene}, beam_group::BeamletOptics.AbstractBeamGroup; render_every, kwargs...)
-     @ BeamletOpticsMakieExt C:\Users\anon\.julia\dev\BeamletOptics\ext\RenderBeam.jl:152
-  [3] render!(axis::Union{Axis3, LScene}, beam::Beam; flen, show_polarization, pol_λ, pol_amplitude, pol_ppl, pol_color, pol_linewidth, kwargs...)
-     @ BeamletOpticsMakieExt C:\Users\anon\.julia\dev\BeamletOptics\ext\RenderBeam.jl:111
+  [1] render!(axis::Union{Axis3, LScene}, gauss::GaussianBeamlet; r_res, z_res, kwargs...)
+     @ BeamletOpticsMakieExt C:\Users\anon\.julia\dev\BeamletOptics\ext\RenderGaussian.jl:207
+  [2] render!(axis::Union{Axis3, LScene}, bg::AstigmaticBeamGroup; r_res, z_res, kwargs...)
+     @ BeamletOpticsMakieExt C:\Users\anon\.julia\dev\BeamletOptics\ext\RenderAstigmaticGaussian.jl:237
+  [3] render!(axis::Union{Axis3, LScene}, beam::Beam; kwargs...)
+     @ BeamletOpticsMakieExt C:\Users\anon\.julia\dev\BeamletOptics\ext\RenderBeam.jl:279
   ⋮
 ```

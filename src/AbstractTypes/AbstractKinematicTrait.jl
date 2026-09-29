@@ -147,11 +147,11 @@ Movable types declare [`Movable`](@ref)`(`[`Oriented`](@ref)`())` or `Movable(`[
 kinematic_trait_of(x) = Static()
 
 """
-    _is_static(x)
+    is_static(x)
 
 Returns `true` if the [`kinematic_trait_of`](@ref) `x` is [`Static`](@ref).
 """
-_is_static(x) = kinematic_trait_of(x) isa Static
+is_static(x) = kinematic_trait_of(x) isa Static
 
 """
     _check_kinematic_members(members)
@@ -163,7 +163,7 @@ function _check_kinematic_members(members)
     has_static = false
     has_movable = false
     for m in members
-        if _is_static(m)
+        if is_static(m)
             has_static = true
         else
             has_movable = true
@@ -182,7 +182,7 @@ Returns the kinematic trait of a container with homogeneous `members` (see
 `_check_kinematic_members`): `Static()` if the
 members are static, else `Movable(Oriented())`.
 """
-_container_trait(members) = (!isempty(members) && _is_static(first(members))) ? Static() : Movable(Oriented())
+_container_trait(members) = (!isempty(members) && is_static(first(members))) ? Static() : Movable(Oriented())
 
 _static_error(x) = throw(ArgumentError(lazy"$(typeof(x)) is static and cannot be moved, see `kinematic_trait_of`"))
 

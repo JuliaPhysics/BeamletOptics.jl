@@ -69,24 +69,10 @@ function _field_segment!(pts, p, d, E⊥, S, n, L, amp, k_vis, λ_vis, ppl)
 end
 
 """
-    _render_field_curve!(axis, pts; color, linewidth)
-
-Draws the NaN-separated point vector `pts` as a single `lines!` call. Does
-nothing if `pts` is empty.
-"""
-function _render_field_curve!(axis, pts; color, linewidth)
-    if isempty(pts)
-        return nothing
-    end
-    lines!(axis, getindex.(pts, 1), getindex.(pts, 2), getindex.(pts, 3); color, linewidth)
-    return nothing
-end
-
-"""
     _check_polarized(x)
 
-Throws an `ArgumentError` unless `x` is a `BMO.PolarizedRay`, or a `BMO.Beam`
-whose ray type is a `BMO.PolarizedRay`.
+Throws an `ArgumentError` unless `x` is a `BMO.PolarizedRay`, a `BMO.Beam`
+whose ray type is a `BMO.PolarizedRay`, or a beam group of such beams.
 """
 function _check_polarized(x)
     ok = x isa BMO.Beam ? x isa BMO.Beam{<:Any, <:BMO.PolarizedRay} : x isa BMO.PolarizedRay
@@ -94,6 +80,26 @@ function _check_polarized(x)
         throw(ArgumentError("show_polarization = true requires PolarizedRays, got $(typeof(x))"))
     end
     return nothing
+end
+
+_check_polarized(bg::BMO.AbstractBeamGroup) = foreach(_check_polarized, BMO.beams(bg))
+
+"""
+    _field_curve(thing; flen, render_every = 1, λ_vis = nothing, amplitude = nothing, ppl = 32)
+
+Field-vector curve of a polarized ray or beam, see [`_polarization_points`](@ref), drawn by a
+single `lines` plot. Of a beam group, the NaN-separated curves of every `render_every`-th beam,
+each with its own default `λ_vis`.
+"""
+_field_curve(thing; flen, render_every = 1, kwargs...) = _polarization_points(thing; flen, kwargs...)
+
+function _field_curve(bg::BMO.AbstractBeamGroup; flen, render_every = 1, kwargs...)
+    bms = BMO.beams(bg)
+    pts = Point3f[]
+    for i in 1:render_every:length(bms)
+        append!(pts, _polarization_points(bms[i]; flen, kwargs...))
+    end
+    return pts
 end
 
 """

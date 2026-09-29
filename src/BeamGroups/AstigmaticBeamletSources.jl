@@ -58,7 +58,7 @@ function CollimatedGaussianBeamletSource(
         end
     end
     # group orientation from the first grid axis, orthogonalized w.r.t. dir (sampling unchanged)
-    e1_o = isnothing(basis) ? e1 : _sampling_basis(dir_n, basis[1], T)
+    e1_o = isnothing(basis) ? e1 : sampling_basis(dir_n, basis[1], T)
     return AstigmaticBeamGroup(beams, pos, _group_orientation(dir_n, e1_o, T))
 end
 
@@ -122,7 +122,7 @@ function SphericalGaussianBeamletSource(
     w0s = λ / (π * overlap * Δθ)
 
     dir_n = normalize(dir)
-    b1 = _sampling_basis(dir_n, basis, T)
+    b1 = sampling_basis(dir_n, basis, T)
     b2 = normalize(cross(dir_n, b1))
     θ_NA = LinRange(0, θ, num_rings)
 
@@ -230,7 +230,7 @@ function EllipticalGaussianBeamletSource(
     w0s = λ / (π * overlap * Δθ)
 
     dir_n = normalize(dir)
-    b1 = _sampling_basis(dir_n, basis, T)
+    b1 = sampling_basis(dir_n, basis, T)
     b2 = normalize(cross(dir_n, b1))
     
     # We use tangent space to define the elliptical rings

@@ -156,6 +156,18 @@ end
 thickness(l::Lens) = thickness(shape(l))
 
 """
+    _signed_edge_sag(surface, sd)
+
+Returns the edge sagitta of the `surface` with sign, such that the edge of a front surface lies at
+`y = s` and the edge of a back surface at `y = center_thickness + s`. [`edge_sag`](@ref) returns
+the unsigned sagitta for spherical and cylindrical surfaces, hence the sign of the radius is
+applied; the sagitta of aspherical and acylindrical surfaces is already signed.
+"""
+_signed_edge_sag(s::AbstractSurface, sd) = edge_sag(s, sd)
+_signed_edge_sag(s::SphericalSurface, sd) = sign(radius(s)) * edge_sag(s, sd)
+_signed_edge_sag(s::CylindricalSurface, sd) = sign(radius(s)) * edge_sag(s, sd)
+
+"""
      Lens(front_surface::AbstractRotationallySymmetricSurface, back_surface::AbstractRotationallySymmetricSurface, center_thickness::Real, n::RefractiveIndex)
 
 Constructs a new [`Lens`](@ref) object using the surface specifications `front_surface` and
@@ -232,7 +244,7 @@ function Lens(
                     # Step exists on the front side: level front to match back.
                     leveling_thickness = l0
                     if front !== nothing
-                        s_front = edge_sag(front_surface, front)
+                        s_front = _signed_edge_sag(front_surface, front)
                         if s_front < 0
                             # edge curves towards negative so it is a concave type shape,
                             # which has to be covered by the ring
@@ -241,13 +253,13 @@ function Lens(
                     end
 
                     ring = RingSDF(d_front / 2, (d_back - d_front) / 2, leveling_thickness)
-                    translate3d!(ring, [0, edge_sag(front_surface, front) + leveling_thickness / 2, 0])
+                    translate3d!(ring, [0, _signed_edge_sag(front_surface, front) + leveling_thickness / 2, 0])
                     shape += ring
                 else  # d_front > d_back
                     # Step exists on the back side: level back to match front.
                     leveling_thickness = l0
                     if back !== nothing
-                        s_back = edge_sag(back_surface, back)
+                        s_back = _signed_edge_sag(back_surface, back)
                         if (s_back - thickness(back)) > 0
                             # edge curves towards positive so it is a concave type shape,
                             # which has to be covered by the ring
@@ -255,7 +267,7 @@ function Lens(
                         end
                     end
                     leveling_center = position(mid)[2] +
-                                      (l0/2 + (back !== nothing ? edge_sag(back_surface, back) : 0))
+                                      (l0/2 + (back !== nothing ? _signed_edge_sag(back_surface, back) : 0))
                     if back !== nothing
                         leveling_center += s_back / 2
                     end
@@ -270,12 +282,12 @@ function Lens(
                 outer_thickness = thickness(mid)
                 outer_center = position(mid)[2] + outer_thickness / 2
                 if front !== nothing
-                    s_front = edge_sag(front_surface, front)
+                    s_front = _signed_edge_sag(front_surface, front)
                     outer_thickness -= s_front
                     outer_center += s_front / 2
                 end
                 if back !== nothing
-                    s_back = edge_sag(back_surface, back)
+                    s_back = _signed_edge_sag(back_surface, back)
                     outer_thickness += s_back
                     outer_center += s_back / 2
                 end
@@ -368,12 +380,12 @@ function Lens(
             ring_thickness = thickness(mid)
             ring_center = position(mid)[2] + ring_thickness / 2
             if front !== nothing
-                s = edge_sag(front_surface, front)
+                s = _signed_edge_sag(front_surface, front)
                 ring_thickness -= s
                 ring_center += s / 2
             end
             if back !== nothing
-                s = edge_sag(back_surface, back)
+                s = _signed_edge_sag(back_surface, back)
                 ring_thickness += s
                 ring_center += s / 2
             end
