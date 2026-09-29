@@ -2448,9 +2448,15 @@ independent of the selection; the selection gets another card. Unpins a pinned c
 it.
 """
 function _toggle_pinned!(gui::LiveView, c::_ComponentCard)
+    # The card of an inspected point or a measurement stays, see `_keep_info!`
+    c.transient && return _keep_info!(gui, c)
     if c.pinned
+        obj = c.obj
         c.pinned, c.obj = false, nothing
         _hide_card!(c)
+        # the plots of an inspected point or a measurement, unless it is still pinned elsewhere,
+        # e.g. after it was docked, see `_forget!`
+        _is_pinned(gui, obj) || _forget!(gui, obj)
     elseif c === gui.card && !isnothing(gui.controls.selected[])
         c.pinned, c.obj, c.key = true, gui.controls.selected[], nothing
         _use_card!(gui, _spare_card!(gui))
@@ -2563,7 +2569,7 @@ function _connect_card!(gui::LiveView, c::_ComponentCard)
     listeners = gui.controls.listeners
     push!(listeners, on(_ -> _toggle_collapsed!(gui, c), c.collapse_button.clicks))
     # The toggle switches itself, `_toggle_pinned!` sets it to the state of the card
-    push!(listeners, on(v -> v == c.pinned || _toggle_pinned!(gui, c), c.pin_button.active))
+    push!(listeners, on(v -> v == _pin_state(c) || _toggle_pinned!(gui, c), c.pin_button.active))
     push!(listeners, on(s -> _set_step!(gui, s), c.step_box.stored_string))
     push!(listeners, on(_ -> _keep_keyboard!(gui), c.step_box.focused))
     _connect_dock_button!(gui, c, c.dock_button)
@@ -2878,25 +2884,31 @@ end
 """Removes the marker and the result of the beam inspection of the `gui`, if any."""
 function _clear_inspection!(gui::LiveView)
     gui.inspection = nothing
+    _release_info!(gui, _BeamPoint)
     isnothing(gui.inspection_plot) && return nothing
     delete!(gui.ax, gui.inspection_plot)
     gui.inspection_plot = nothing
     return nothing
 end
 
-"""Shows the inspected point `info` of a beam with a marker and in the status line of the `gui`."""
+"""
+Shows the inspected point `info` of a beam with a marker, in the status line and on a card at the
+point in the 3D view (see `_show_info!`) of the `gui`.
+"""
 function _show_inspection!(gui::LiveView, info)
     _clear_inspection!(gui)
     gui.inspection = info
     gui.inspection_plot = _point_marker!(gui, [Point3f(info.point)])
     gui.status.text[] = _inspection_string(info)
+    _show_info!(gui, _BeamPoint(info))
     return nothing
 end
 
-"""Removes the points, the result and the plots of the measurement of the `gui`."""
+"""Removes the points, the result, the plots and the card of the measurement of the `gui`."""
 function _clear_measurement!(gui::LiveView)
     empty!(gui.measure_points)
     gui.measurement = nothing
+    _release_info!(gui, _Measurement)
     foreach(p -> delete!(gui.ax, p), gui.measure_plots)
     empty!(gui.measure_plots)
     return nothing
@@ -2946,6 +2958,8 @@ function _add_measure_point!(gui::LiveView, point, obj)
             linewidth = 2, overdraw = true, clip_planes = Plane3f[]))
     end
     push!(gui.measure_plots, _point_marker!(gui, pts))
+    _show_info!(gui, _Measurement(copy(gui.measure_points), gui.measurement,
+        [name(m) for m in gui.measure_points]))
     return nothing
 end
 

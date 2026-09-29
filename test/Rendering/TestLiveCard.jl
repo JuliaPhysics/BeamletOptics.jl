@@ -527,6 +527,100 @@ BMO.card_actions(::CardTestObject) = ()
         @test occursin("no panel", gui.status.text[]) && p.mode == :spot
         close(gui)
     end
+
+    @testset "info cards of the inspection and the measurement" begin
+        _info(y; w = nothing, R = nothing) = (; point = [0.0, y, 0.0], direction = [0.0, 1.0, 0.0],
+            length = y, opl = y, w, R)
+        _text(c, name) = _w(c, name).text[]
+        m, pd = _fixture()
+        gui = _live_view(System([m, pd]), _gauss(); labels = Dict(m => "M1", pd => "PD"))
+        # an inspected point: a transient card at the point, its pin off, no step box
+        Ext._show_inspection!(gui, _info(0.05))
+        c = Ext._info_card(gui)
+        @test c.transient && c.obj isa Ext._BeamPoint && c.scene.visible[] && !c.pin_button.active[]
+        @test c.title.text[] == "Beam" && c.icon[] === Ext._icon(:trace)
+        @test _text(c, :at) == "(0.000, 50.000, 0.000) mm" && _text(c, :path) == "50.000 mm"
+        @test isnothing(_w(c, :w)) && isnothing(_w(c, :hide)) && _away(c.step)
+        @test length(c.link[]) == 2
+        # the next inspection replaces it, with the rows of a Gaussian beamlet
+        Ext._show_inspection!(gui, _info(0.06; w = 1e-3, R = 0.0))
+        @test Ext._info_card(gui) === c && _text(c, :at) == "(0.000, 60.000, 0.000) mm"
+        @test _text(c, :w) == "1 mm" && _text(c, :R) == "∞"
+        # its pin keeps it, the next inspection gets another card
+        c.pin_button.active[] = true
+        @test !c.transient && c.pinned && isnothing(Ext._info_card(gui))
+        # the card keeps the marker of the point, which the next inspection does not remove
+        marker = only(c.obj.plots)
+        @test isnothing(gui.inspection_plot) && marker in gui.ax.scene.plots
+        Ext._show_inspection!(gui, _info(0.07))
+        c2 = Ext._info_card(gui)
+        @test c2 !== c && c.scene.visible[] && c2.scene.visible[]
+        # clearing the inspection (a click elsewhere, Esc) removes the transient card only
+        Ext._clear_inspection!(gui)
+        @test isnothing(Ext._info_card(gui)) && !c2.scene.visible[] && c.scene.visible[]
+        # unpinned: removed
+        c.pin_button.active[] = false
+        @test !c.pinned && !c.scene.visible[]
+        @test !(marker in gui.ax.scene.plots)
+
+        # a measurement: the first point, then the distance, its components and the angle
+        gui.measure_toggle.active[] = true
+        Ext._add_measure_point!(gui, BMO.position(m), m)
+        c = Ext._info_card(gui)
+        @test c.obj isa Ext._Measurement && c.title.text[] == "Measurement"
+        @test _text(c, :at) == "M1, (0.000, 100.000, 0.000) mm"
+        Ext._add_measure_point!(gui, BMO.position(pd), pd)
+        @test Ext._info_card(gui) === c
+        @test _text(c, :from) == "M1" && _text(c, :to) == "PD"
+        @test _text(c, :distance) == "100.0 mm" && _text(c, :delta) == "(100.000, 0.000, 0.000) mm"
+        @test _text(c, :angle) == "785 mrad"
+        # its pin keeps the card with the line and the markers; switching measuring off removes
+        # only the transient card of a new measurement
+        c.pin_button.active[] = true
+        kept = copy(c.obj.plots)
+        @test length(kept) == 2 && isempty(gui.measure_plots)
+        Ext._add_measure_point!(gui, BMO.position(m), m)
+        c3 = Ext._info_card(gui)
+        @test c3 !== c && all(p -> p in gui.ax.scene.plots, kept)
+        # unpinned: its plots are removed
+        c.pin_button.active[] = false
+        @test !c.pinned && !any(p -> p in gui.ax.scene.plots, kept)
+        c = c3
+        gui.measure_toggle.active[] = false
+        @test isnothing(Ext._info_card(gui)) && !c.scene.visible[]
+        close(gui)
+
+        # app layout: the transient card floats at the point, its pin docks the item below the
+        # inspector
+        m, pd = _fixture()
+        gui = _live_view(System([m, pd]), _gauss(); layout = :app)
+        Ext._show_inspection!(gui, _info(0.05))
+        c = Ext._info_card(gui)
+        @test c.scene.visible[]
+        c.pin_button.active[] = true
+        d = only(gui.layout.inspector.pinned)
+        @test d.obj isa Ext._BeamPoint && d.head.title.text[] == "Beam"
+        @test Ext._card_widget(d, :at).text[] == "(0.000, 50.000, 0.000) mm"
+        @test isnothing(Ext._info_card(gui)) && !c.scene.visible[]
+        # the kept marker moves with the card between the sidebar and the 3D view
+        x = d.obj
+        marker = only(x.plots)
+        Ext._float!(gui, x)
+        f = only(Ext._floating_cards(gui, x))
+        @test !f.transient && isempty(gui.layout.inspector.pinned) && marker in gui.ax.scene.plots
+        Ext._dock!(gui, x)
+        @test Ext._is_docked(gui, x) && isempty(Ext._floating_cards(gui, x))
+        @test marker in gui.ax.scene.plots
+        # the dock button of a transient card keeps it, docked once
+        Ext._show_inspection!(gui, _info(0.06))
+        c = Ext._info_card(gui)
+        notify(c.dock_button.clicks)
+        @test length(gui.layout.inspector.pinned) == 2 && isnothing(Ext._info_card(gui))
+        # unpinned: its marker is removed
+        Ext._unpin!(gui, x)
+        @test !Ext._is_pinned(gui, x) && !(marker in gui.ax.scene.plots)
+        close(gui)
+    end
 end
 
 end

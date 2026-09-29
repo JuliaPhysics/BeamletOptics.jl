@@ -127,6 +127,9 @@ mutable struct _ComponentCard <: _AbstractCard
     key::Any
     pose::Any
     dock_button::Union{Nothing, _IconButton}
+    # a card of an inspected point or a measurement that is replaced by the next one unless it is
+    # pinned, see `_show_info!`
+    transient::Bool
 end
 
 # Content of a layout of the card `scene`, aligned at the top left corner of its suggested bounding box
@@ -162,7 +165,7 @@ function _ComponentCard(fig::Figure, theme::NamedTuple, z::Real = _CARD_Z)
     return _ComponentCard(scene, t, background, head, _card_part(scene), tools, _card_part(scene), step,
         icon, icon_color, title, collapse_button, pin_button, step_box, link, Tuple{Any, CardWidget}[],
         Any[], Textbox[], Any[], nothing, false, false, false, false, nothing, Point3f[], nothing, nothing,
-        nothing)
+        nothing, false)
 end
 
 #=
@@ -259,7 +262,9 @@ function _show_collapsed!(b::_IconButton, collapsed::Bool)
     _update!(b.tooltip, collapsed ? "Expand the card" : "Collapse the card")
     return nothing
 end
-_show_head!(c::_ComponentCard) = _show_head!(c.pin_button, c.collapse_button, c.pinned, c.collapsed)
+_show_head!(c::_ComponentCard) = _show_head!(c.pin_button, c.collapse_button, _pin_state(c), c.collapsed)
+# A transient card is shown like a pinned one, but its pin is off, see `_show_info!`
+_pin_state(c::_ComponentCard) = c.pinned && !c.transient
 
 # The tooltip of an icon button of a card, relative to the translation of the card, see
 # `_CARD_TOOLTIP_DZ`

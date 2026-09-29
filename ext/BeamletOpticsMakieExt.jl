@@ -83,6 +83,7 @@ include("LiveExtras.jl")
 include("LiveApp.jl")
 include("LiveDock.jl")
 include("LiveInspector.jl")
+include("LiveInfo.jl")
 include("LiveCustom.jl")
 # precompiles the live rendering/interaction call paths, must come last
 include("LivePrecompile.jl")

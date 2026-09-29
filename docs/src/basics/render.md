@@ -627,9 +627,16 @@ removes the marker.
 
 The "measure" toggle in the row of the component menu switches measuring on: two clicks on
 components or beams show the distance between the positions of the components or the points of
-the beams [mm], and the angle between the optical axes (local y-axes) of two components, with a
-dashed line between the points. A third click starts a new measurement, switching the toggle off
-clears it.
+the beams [mm], its components Δ, and the angle between the optical axes (local y-axes) of two
+components, with a dashed line between the points. A third click starts a new measurement,
+switching the toggle off clears it.
+
+Both results are also shown on a card at their points in the 3D view, in the style of the
+component cards: "Beam" with the rows `at`, `dir`, `path`, `OPL` (and `w`, `R`) and
+"Measurement" with `from`, `to`, `d`, `Δ` (and `angle`). The card is replaced by the next
+inspection or measurement and removed with it, unless its pin is clicked: a pinned card stays with
+its marker or its line until it is unpinned, so several points and distances can be compared. In
+the app layout, a pinned result is docked below the inspector like a pinned component.
 
 ### Camera tools
 

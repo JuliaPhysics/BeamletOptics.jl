@@ -557,6 +557,7 @@ _is_pinned(gui::AppView, obj) = _is_docked(gui, obj) || _is_floating(gui, obj)
 function _unpin!(gui::AppView, obj)
     foreach(c -> _remove_pinned!(gui, c), _docked_cards(gui, obj))
     foreach(c -> _toggle_pinned!(gui, c), _floating_cards(gui, obj))
+    _forget!(gui, obj)
     _on_pinned!(gui)
     return nothing
 end
