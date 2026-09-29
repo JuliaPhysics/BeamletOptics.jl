@@ -114,13 +114,16 @@ end
 struct RayHit{T} <: AbstractRayHit{T}
     ray::Ray{T}
     opl::T
+    power::T
 end
+RayHit(ray::Ray{T}, opl::Real, p::Real = 1.0; power::Real = p) where {T} = RayHit{T}(ray, T(opl), T(power))
 
 "Stores a [`PolarizedRay`](@ref) hit"
 struct PolarizedRayHit{T} <: AbstractRayHit{T}
     ray::PolarizedRay{T}
     opl::T
 end
+PolarizedRayHit(ray::PolarizedRay{T}, opl::Real, p::Real = 1.0; optical_path_length::Real = opl) where {T} = PolarizedRayHit{T}(ray, T(optical_path_length))
 
 polarization(hit::PolarizedRayHit) = polarization(hit.ray)
 
@@ -433,4 +436,6 @@ end
 # include eval and helper functions
 include("DetectorUtils.jl")
 include("SpotDiagram.jl")
+include("FourierBeamletPropagator.jl")
+include("FourierBeamletPropagatorUtils.jl")
 include("FieldCalculation.jl")
