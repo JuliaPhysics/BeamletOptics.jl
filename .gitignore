@@ -86,8 +86,5 @@ paper/paper.pdf
 # implementation plans (local only)
 /plans/
 
-# render gallery output
-/gallery/output*/
-
 # Local, machine-specific agent instructions
 CLAUDE.local.md
