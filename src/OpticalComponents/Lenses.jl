@@ -135,6 +135,7 @@ Refer to the [`Lens`](@ref) and [`SphericalLens`](@ref) constructors for more in
 
 - `shape`: geometry of the lens, refer to [`AbstractShape`](@ref) for more information
 - `n`: [`RefractiveIndex`](@ref) function that returns n(λ)
+- `label`: optional name of the lens
 
 # Additional information
 
@@ -146,14 +147,17 @@ Refer to the [`Lens`](@ref) and [`SphericalLens`](@ref) constructors for more in
 struct Lens{T, S <: AbstractShape{T}, N <: RefractiveIndex} <: AbstractRefractiveOptic{T, N}
     shape::S
     n::N
+    label::Union{Nothing, String}
     function Lens(
-            shape::S, n::N) where {T <: Real, S <: AbstractShape{T}, N <: RefractiveIndex}
+            shape::S, n::N; label::Union{Nothing, String} = nothing
+        ) where {T <: Real, S <: AbstractShape{T}, N <: RefractiveIndex}
         test_refractive_index_function(n)
-        return new{T, S, N}(shape, n)
+        return new{T, S, N}(shape, n, label)
     end
 end
 
 thickness(l::Lens) = thickness(shape(l))
+label(l::Lens) = l.label
 
 """
      Lens(front_surface::AbstractRotationallySymmetricSurface, back_surface::AbstractRotationallySymmetricSurface, center_thickness::Real, n::RefractiveIndex)
@@ -176,7 +180,8 @@ function Lens(
         front_surface::AbstractRotationallySymmetricSurface,
         back_surface::AbstractRotationallySymmetricSurface,
         center_thickness::Real,
-        n::RefractiveIndex)
+        n::RefractiveIndex;
+        label::Union{Nothing, String} = nothing)
     # Define effective (optical and mechanical) diameters:
     d_mid = min(diameter(front_surface), diameter(back_surface))
     md_mid = max(mechanical_diameter(front_surface), mechanical_diameter(back_surface))
@@ -286,26 +291,30 @@ function Lens(
         end
     end
 
-    return Lens(shape, n)
+    return Lens(shape, n; label)
 end
 
 function Lens(front_surface::AbstractRotationallySymmetricSurface,
-        center_thickness::Real, n::RefractiveIndex)
+        center_thickness::Real, n::RefractiveIndex;
+        label::Union{Nothing, String} = nothing)
     Lens(
         front_surface,
         CircularFlatSurface(diameter(front_surface)),
         center_thickness,
-        n
+        n;
+        label
     )
 end
 
 function Lens(front_surface::CircularFlatSurface, back_surface::CircularFlatSurface,
-        center_thickness::Real, n::RefractiveIndex)
+        center_thickness::Real, n::RefractiveIndex;
+        label::Union{Nothing, String} = nothing)
     d_mid = min(diameter(front_surface), diameter(back_surface))
 
     return Lens(
         PlanoSurfaceSDF(center_thickness, d_mid),
-        n
+        n;
+        label
     )
 end
 
@@ -331,7 +340,8 @@ function Lens(
         front_surface::AbstractCylindricalSurface,
         back_surface::AbstractCylindricalSurface,
         center_thickness::Real,
-        n::RefractiveIndex)
+        n::RefractiveIndex;
+        label::Union{Nothing, String} = nothing)
     # Initialize remaining box section length.
     l0 = center_thickness
 
@@ -385,16 +395,18 @@ function Lens(
         end
     end
 
-    return Lens(shape, n)
+    return Lens(shape, n; label)
 end
 
 function Lens(front_surface::AbstractCylindricalSurface,
-        center_thickness::Real, n::RefractiveIndex)
+        center_thickness::Real, n::RefractiveIndex;
+        label::Union{Nothing, String} = nothing)
     Lens(
         front_surface,
         RectangularFlatSurface(diameter(front_surface)),
         center_thickness,
-        n
+        n;
+        label
     )
 end
 
@@ -433,13 +445,15 @@ function cylindric_lens_outer_parameters(
 end
 
 function Lens(front_surface::RectangularFlatSurface, back_surface::RectangularFlatSurface,
-        center_thickness::Real, n::RefractiveIndex)
+    center_thickness::Real, n::RefractiveIndex;
+    label::Union{Nothing, String} = nothing)
     d_mid = min(diameter(front_surface), diameter(back_surface))
     mid = BoxSDF(d_mid, center_thickness, d_mid)
     translate3d!(mid, [0, center_thickness / 2, 0])
 
     return Lens(
         mid,
-        n
+        n;
+        label
     )
 end

@@ -184,6 +184,7 @@ const BMO = BeamletOptics
 
     @testset "AbstractObject" begin
         object = TestObject()
+        @test BMO.label(object) === nothing
         @test isa(BMO.shape(object), TestShapeless)
         # Test forwarding of kin. API to object shape
         @test position(object) ==

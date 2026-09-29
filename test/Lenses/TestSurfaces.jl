@@ -22,6 +22,21 @@ const mm = 1e-3
     end
 
     @testset "Lens construction from surfaces" begin
+        unlabeled_lens = Lens(
+            SphericalSurface(16.1mm, 25.4mm),
+            8.2mm,
+            n -> 1.458
+        )
+        @test BMO.label(unlabeled_lens) === nothing
+
+        labeled_lens = Lens(
+            SphericalSurface(16.1mm, 25.4mm),
+            8.2mm,
+            n -> 1.458;
+            label = "Test Lens"
+        )
+        @test BMO.label(labeled_lens) == "Test Lens"
+
         ## Thorlabs LA4052, plano-convex
         r1 = 16.1mm
         r2 = Inf

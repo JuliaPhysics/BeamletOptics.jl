@@ -43,6 +43,8 @@ shape_trait_of(::AbstractObject) = SingleShape()
 
 kinematic_trait_of(::AbstractObject) = Movable(Oriented())
 
+label(::AbstractObject) = nothing
+
 """
     shape(::AbstractObject)
 
