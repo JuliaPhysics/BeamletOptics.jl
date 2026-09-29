@@ -65,7 +65,7 @@ When this Skill is active:
 - Sanity-check numbers against a paraxial estimate (`BeamletOptics.lensmakers_eq`, Airy radius, Malus, …).
 
 6) Visualize (optional, needs a Makie backend) → `VISUALIZATION.md`
-- `using GLMakie`, then `render!(ax, system)`, `render!(ax, beam)`; `save` a PNG or `display` an interactive window.
+- `using GLMakie`, then `render!(ax, system)`, `render!(ax, beam)`; `save` a PNG or `display` a figure. For an interactive window with movable components use the package BeamletOpticsGUI (https://github.com/StackEnjoyer/BeamletOpticsGUI.jl), which has its own skill, installed via `BeamletOpticsGUI.install_agent_skill()`.
 
 ## Safety and non-goals
 
@@ -95,7 +95,6 @@ wants the bug fixed or a feature added in BeamletOptics itself:
 - Units, coordinates, sign conventions: `CONVENTIONS.md`
 - Workflow patterns (scans, focus search, interferometers, groups): `WORKFLOW.md`
 - Rendering with Makie: `VISUALIZATION.md`
-- Own cards, widgets and controls in the live view (`live_view`): `WIDGETS.md`
 - Pre-delivery checklist and common pitfalls: `CHECKLIST.md`
 - Runnable reference scripts: `templates/`
 - Helper scripts: `scripts/` (`api_lookup.jl`, `run_templates.jl`)

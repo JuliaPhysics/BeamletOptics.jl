@@ -47,8 +47,8 @@ Use `scripts/api_lookup.jl NAME` to print the docstring and signatures of any na
 | Detectors     | `Detector`, `spot_diagram`, `intensity`, `electric_field`, `optical_power`, `gauss_parameters`, `waist_parameters`, `Centroid`, `MinMax` |
 | Dummies       | `MeshDummy`, `NonInteractableObject`, `IntersectableObject` |
 | Config        | `get_default_wavelength`, `get_default_waist`, `get_default_power`, `get_default_r_max`, `get_default_depth_max`, `get_invariant_threshold`, `set_invariant_threshold!`, `get_internal_reflection_threshold`, `get_line_plane_intersection_threshold`, `get_orthogonality_threshold`, `get_sdf_surface_threshold`, `get_sdf_raymarch_eps`, `get_sdf_inside_step`, `get_progress_threshold`, `set_progress_threshold!` |
-| Render (Makie)| `render!`, `get_view`, `set_view`, `hide_axis`, `set_orthographic`, `look_at!`, `arrow!`, `render_lcs!`, `set_render_look`, `studio_lighting!`, `view_cube!` |
-| Live (Makie)  | `live_render!`, `update_render!`, `remove_render!`, `pick_object`, `kinematic_controls!`, `live_view`, `export_changes`, `card_rows`, `pose_card_rows`, `card_actions`, `CardRow`, `CardWidget`, `card_input`, `card_show!`, `add_panel!`, `add_controls!`, `add_tool!`, `retrace!` |
+| Render (Makie)| `render!`, `get_view`, `set_view`, `hide_axis`, `set_orthographic`, `look_at!`, `arrow!`, `render_lcs!`, `set_render_look`, `studio_lighting!` |
+| Live (Makie)  | `live_render!`, `update_render!`, `remove_render!`, `pick_object` |
 
 Useful non-exported helpers: `BeamletOptics.inch`, `lensmakers_eq(R1, R2, n)` (returns f),
 `divergence_angle(λ, w0, M2)`, `numerical_aperture(θ, n=1)`, `optical_path_length(beam)`,
@@ -60,7 +60,7 @@ Useful non-exported helpers: `BeamletOptics.inch`, `lensmakers_eq(R1, R2, n)` (r
 `properties(x)` lists what an object, shape, beam or source stores as `name => value` pairs, e.g.
 `"Thickness [m]" => 0.005`, `"Reflectance" => 0.3` (power ratio), `"Hits" => 12`. Values are SI
 numbers; the unit is in brackets at the end of the name, names without brackets are dimensionless.
-The live view's app layout shows this list in its inspector. It lists only stored values: e.g. the
+It lists only stored values: e.g. the
 radii and diameter of a `Lens` are not stored and not listed.
 
 A custom `AbstractObject` subtype gets the default list (type, position, optical axis, shape). To
@@ -88,7 +88,6 @@ solve_system!(system, beam_group; progress = true, kwargs...)   # multithreaded 
 - `progress`: beam groups and detector readout show a progress bar once they have run for
   `get_progress_threshold()` s (default 5 s, `set_progress_threshold!(Inf)` disables it). It is
   only drawn if `stderr` is a terminal, so scripts with piped output see nothing. In a
-  `live_view`, the same loops show a progress window in the 3D view instead (see `VISUALIZATION.md`).
 
 ## Beam queries
 
@@ -129,5 +128,5 @@ They also take `progress = true` (see Solving). See `components/detectors.md`.
 
 `using GLMakie` before or after `using BeamletOptics` activates the extension.
 One generic function draws everything: `render!(ax, system)`, `render!(ax, beam)`,
-`render!(ax, source)`, `render!(ax, object)`. `live_render!` and `live_view` update the plots
+`render!(ax, source)`, `render!(ax, object)`. `live_render!` updates the plots
 of moved components and re-solved beams in place. See `VISUALIZATION.md`.
