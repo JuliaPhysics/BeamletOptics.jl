@@ -54,7 +54,7 @@ BeamletOptics.MultiShape
 
 ## Displayed properties
 
-Tools such as the inspector of [`live_view`](@ref) show what an object stores via [`properties`](@ref). A new `AbstractObject` subtype gets the [`default_properties`](@ref) (type, pose and shape) without further work; a method of `properties` for the subtype adds its own parameters.
+Tools such as the inspector of the [BeamletOpticsGUI](https://github.com/StackEnjoyer/BeamletOpticsGUI.jl) live view show what an object stores via [`properties`](@ref). A new `AbstractObject` subtype gets the [`default_properties`](@ref) (type, pose and shape) without further work; a method of `properties` for the subtype adds its own parameters.
 
 ```@docs; canonical=false
 properties
