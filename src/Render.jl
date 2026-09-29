@@ -237,6 +237,23 @@ The object group of the system of `h` that holds `obj` (an object or a group), o
 function render_parent end
 
 """
+    push!(h::AbstractSystemRenderHandle, oh::AbstractObjectRenderHandle) -> h
+
+Adds the object handle `oh` at the top level of the system handle `h`, e.g. of an object added to
+the scene after [`live_render!`](@ref), such that [`update_render!`](@ref) and
+[`pick_object`](@ref) of `h` include it.
+"""
+Base.push!(::AbstractSystemRenderHandle, ::AbstractObjectRenderHandle)
+
+"""
+    delete!(h::AbstractSystemRenderHandle, oh::AbstractObjectRenderHandle) -> h
+
+Removes the object handle `oh` from the system handle `h`. Its plots stay in the axis, delete
+them via [`remove_render!`](@ref)`(oh)`.
+"""
+Base.delete!(::AbstractSystemRenderHandle, ::AbstractObjectRenderHandle)
+
+"""
     render_settings(h::AbstractBeamRenderHandle) -> NamedTuple
 
 The settings with which the beam handle `h` draws its beam, at least `flen` (length of a final
@@ -256,7 +273,6 @@ pickable_plots(x, plots) = plots
 
 """
     live_render!(axis, thing; kwargs...)
-    live_render!(draw, axis, x) -> AbstractObjectRenderHandle
 
 Renders `thing` into the `axis` like [`render!`](@ref), but returns an
 [`AbstractRenderHandle`](@ref) that can be updated in place via [`update_render!`](@ref). Intended
@@ -270,10 +286,18 @@ solved repeatedly.
 
 Keyword arguments are passed on as for [`render!`](@ref).
 
-With a function `draw`, `draw()` plots `x` in its current pose into the `axis`, and the handle moves
-these plots with `x` like those of an object, e.g. a marker of a thing that `render!` does not
-draw. `x` has a `position` and an `orientation` (or a `direction`), e.g. a source or an own movable
-type (see [`kinematic_trait_of`](@ref)):
+If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
+"""
+live_render!(::Any, ::_RenderTypes; kwargs...) = throw(MissingBackendError())
+
+"""
+    live_render!(draw, axis, x) -> AbstractObjectRenderHandle
+
+Live-renders `x` via the function `draw`: `draw()` plots `x` in its current pose into the `axis`,
+and the returned handle moves these plots with `x` like those of an object, see
+[`live_render!`](@ref), e.g. a marker of a thing that `render!` does not draw. `x` has a `position`
+and an `orientation` (or a `direction`), e.g. a source or an own movable type (see
+[`kinematic_trait_of`](@ref)):
 
 ```julia
 h = live_render!(ax, src) do
@@ -283,7 +307,6 @@ end
 
 If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
 """
-live_render!(::Any, ::_RenderTypes; kwargs...) = throw(MissingBackendError())
 live_render!(::Function, ::Any, ::Any) = throw(MissingBackendError())
 
 """
