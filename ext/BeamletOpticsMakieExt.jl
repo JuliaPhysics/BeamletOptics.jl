@@ -71,7 +71,6 @@ include("RenderPolarizers.jl")
 include("RenderCamera.jl")
 # live rendering, must come after all static renderers
 include("RenderLive.jl")
-include("LiveBeams.jl")
 # precompiles the static and live rendering, must come last
 include("RenderPrecompile.jl")
 

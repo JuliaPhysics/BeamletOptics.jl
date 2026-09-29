@@ -60,7 +60,8 @@ doublets) is handled per component by returning a `Hint`
 - `src/SDFs/`, `src/Mesh.jl`: geometry backends.
 - `src/Exports.jl`: the public API. Changing it affects the agent skill (below).
 - `ext/`: `BeamletOpticsMakieExt` and its `Render*.jl` files: `render!` and the live rendering
-  (`RenderLive.jl`, `LiveBeams.jl`) behind the render handle protocol of `src/Render.jl`.
+  (`RenderLive.jl` for objects and systems, the beam files for beams) behind the render handle
+  protocol of `src/Render.jl`.
 - The interactive GUI (`live_view`, cards, kinematic controls, view cube) is the separate package
   [BeamletOpticsGUI](https://github.com/StackEnjoyer/BeamletOpticsGUI.jl). It uses only exported
   names, the render handle protocol and the `public` developer API (`src/Exports.jl`,
