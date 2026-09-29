@@ -162,7 +162,15 @@ makedocs(;
                 "Optical elements"          => joinpath("basics", "kinematics", "objects.md"),
                 "Sources"                   => joinpath("basics", "kinematics", "sources.md"),
             ],
-            "Visualization"                 => joinpath("basics", "render.md"),
+            "Visualization" => Any[
+                "Overview"                  => joinpath("basics", "visualization", "overview.md"),
+                "Rays and beams"            => joinpath("basics", "visualization", "beams.md"),
+                "Gaussian beamlets"         => joinpath("basics", "visualization", "gaussian.md"),
+                "Components and systems"    => joinpath("basics", "visualization", "components.md"),
+                "Look"                      => joinpath("basics", "visualization", "look.md"),
+                "Scene and camera"          => joinpath("basics", "visualization", "camera.md"),
+                "Live rendering"            => joinpath("basics", "visualization", "live_rendering.md"),
+            ],
         ],
         "Developer Documentation" => Any[
             "Developer guide" => Any[

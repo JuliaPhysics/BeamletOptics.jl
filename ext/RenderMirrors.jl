@@ -1,7 +1,7 @@
 """
     _tessellate_conic(s::ConicSDF, r_hole)
 
-Analytic mesh of a [`ConicSDF`](@ref) substrate, optionally pierced by an axial cylindrical bore
+Analytic mesh of a [`BeamletOptics.ConicSDF`](@ref) substrate, optionally pierced by an axial cylindrical bore
 of radius `r_hole` (`r_hole = 0` for the unpierced case). Consists of the concave/convex conic
 front reflective face (annular if `r_hole > 0`), the cylindrical substrate side wall, the flat
 rear substrate base, and, if `r_hole > 0`, the inner bore wall. All faces but the front face are
@@ -56,7 +56,7 @@ _default_color(::BMO.ConicSDF) = :silver
 """
     render!(ax, s::ConicSDF; color=:silver, kwargs...)
 
-Analytical mesh renderer for a [`ConicSDF`](@ref).
+Analytical mesh renderer for a [`BeamletOptics.ConicSDF`](@ref).
 Renders the concave/convex conic front reflective face in `color`, the cylindrical substrate side
 wall and the flat rear substrate base in grey into `ax`.
 """
@@ -73,7 +73,7 @@ end
     _axial_bore_radius(d::DifferenceSDF{T, <:ConicSDF})
 
 Returns the radius of `d`'s tool if it is a single [`CylinderSDF`](@ref) coaxial with the
-[`ConicSDF`](@ref) base and centered on its axis, or `nothing` otherwise.
+[`BeamletOptics.ConicSDF`](@ref) base and centered on its axis, or `nothing` otherwise.
 """
 function _axial_bore_radius(d::BMO.DifferenceSDF{T, <:BMO.ConicSDF}) where {T}
     s = d.base
@@ -102,9 +102,9 @@ _default_color(::BMO.DifferenceSDF{T, <:BMO.ConicSDF}) where {T} = :silver
 """
     render!(ax, d::DifferenceSDF{T, <:ConicSDF}; color=:silver, kwargs...)
 
-Analytical mesh renderer for a [`ConicSDF`](@ref) with an axial cylindrical bore
+Analytical mesh renderer for a [`BeamletOptics.ConicSDF`](@ref) with an axial cylindrical bore
 (e.g. Cassegrain, Ritchey-Chrétien, or OAP with `:collimated` through-hole).
-Other tools are cut from the mesh of the [`ConicSDF`](@ref), see `_difference`.
+Other tools are cut from the mesh of the [`BeamletOptics.ConicSDF`](@ref), see `_difference`.
 """
 function render!(
         ax::_RenderEnv,
