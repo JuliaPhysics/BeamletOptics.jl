@@ -455,17 +455,36 @@ Below, `x`, `y`, `z` [mm] show the position of the object, `Enter` in a box move
 typed absolute coordinate. `rx`, `ry` and `rv` [mrad] rotate the object about the red, green and
 blue axis of the controls, like the keys in the rotate mode. Each input is recorded in the undo
 history, invalid inputs are reported in the status line. The widgets of a pinned card act on its
-object, also if another object is selected. `step`, only on the card of the selection, sets the
-keyboard step, e.g. `250 nm` or `50 µrad`, where the unit selects the move or rotate mode. "–" in
-the head collapses the card to its head, "+" expands it again. Clicks and drags on the card neither select objects
-nor move the camera, and while a box of the card has the focus, the keys of the 3D view are
-ignored. Further rows by type, see [`card_rows`](@ref): the number of rays of a source, the mode
-(`auto`, `spot`, `intensity`) and the log color scale of the panel of a `Detector` ("no panel"
-without one) and the opacity of mechanics.
+object, also if another object is selected. Only the card of the selection has, below its rows,
+the `step` box of the keyboard step, e.g. `250 nm` or `50 µrad`, where the unit selects the move
+or rotate mode, the "Move"/"Rotate" control, which shows and sets the mode of the controls (it
+follows the key `m` and vice versa), and a "Properties" part, collapsed by default, which lists
+the properties of the object (see [`properties`](@ref)), the same rows as in the inspector of the
+app layout. The state of "Properties" is kept while the card follows the selection. "–" in the
+head collapses the card to its head, "+" expands it again. Clicks and drags on the card neither
+select objects nor move the camera, and while a box of the card has the focus, the keys of the 3D
+view are ignored. Further rows by type, see [`card_rows`](@ref): the number of rays of a source,
+the mode (`auto`, `spot`, `intensity`) and the log color scale of the panel of a `Detector` ("no
+panel" without one) and the opacity of mechanics. The card, the menus and the buttons take the
+colors of the `theme`.
 
-The row below the status line holds a menu of all movable objects (the objects of a group
-indented after the group, without clip planes), which selects an object like a click in the 3D
-view, and "show all", which shows all hidden objects.
+Objects without a `labels` entry are named by their type and a running index, e.g. "Mirror 1" or
+"Clip plane 2", in the card, the status line and the menus, like in the object tree of the app
+layout. The rows of an own type are added by a method of [`card_rows`](@ref), see the page "Live
+view widgets" of the documentation.
+
+Beside the component cards, the card of a system shows the number of its objects, the number of
+rays and the duration of the last solve. It is shown, without a gizmo and without a selection
+(`controls.selected[]` stays `nothing`), by selecting the system entry ("System 1", ...) in the
+component menu. An object that is not movable is shown on its card in the same way instead of
+being selected, and its pose boxes reject inputs with a message in the status line. `Esc`, a click
+on empty space or the selection of an object closes such a card.
+
+The row below the status line holds a menu of the systems and all movable objects (each system
+entry followed by its objects, the objects of a group indented after the group, without clip
+planes), which selects an object like a click in the 3D view, and "show all", which shows all
+hidden objects. The last cell of the status row is the info label: the duration of the last solve
+(or of the preview), the number of rays and the projection.
 
 The "Export" button prints the changed poses as Julia code to `stdout` and copies it to the
 clipboard, see [`export_changes`](@ref).
@@ -602,9 +621,11 @@ actions in the 3D view are unchanged:
   system with its objects (groups with their objects, collapsed by default), then the `extras`
   under "Extras", the sources and the clip planes. A click on a name selects the object like a click in the 3D view, and a
   selection in the 3D view highlights its row. The eye hides or shows an object, a group or a
-  whole system, the eye in the title of the tree shows all objects again. Objects without a
-  `labels` entry are named by their type and a running index, e.g. "Lens 2", also in the status
-  line.
+  whole system, the eye in the title of the tree shows all objects again. A click on the name of
+  a system row shows the card of the system in the inspector, without selecting anything (the
+  expander still folds the row); a click on an object that is not movable shows its card in the
+  same way. Objects without a `labels` entry are named by their type and a running index, e.g.
+  "Lens 2", also in the status line.
 - right sidebar ("Properties"): the card of the selected object, docked instead of floating next
   to it: its name and type, the actions of the card (e.g. "hide", or "flip" and "remove" for a
   clip plane) and a pin, which pins a card to the object; below, the rows of the card (see
@@ -635,14 +656,16 @@ may add their own axes.
 layout), [`add_controls!`](@ref) own widgets (a row above the status row, or a section of the left
 sidebar) and [`add_tool!`](@ref) a button or toggle, optionally with a key (in the tool row, or the
 toolbar). [`retrace!`](@ref) solves again after a change from code, e.g. from such a widget.
+Widgets of a thing in the scene belong on its card, see [`card_rows`](@ref), own widget types on
+cards and in controls use [`card_input`](@ref) and [`card_show!`](@ref).
 
 # Keyword args
 
 - `layout = :compact`: arrangement of the widgets, `:compact` or `:app`, see "App layout"
-- `theme = :light`: colors, `:light` or `:dark`, of the component cards and the progress window
-  of all layouts and of the whole window of `:app`. For contrast on its dark 3D view, `:dark`
-  draws the rays, the markers and the dark materials of the render look (detectors, polarizers) of
-  `:app` in lighter colors; `:light` keeps the colors of `:compact`.
+- `theme = :light`: colors, `:light` or `:dark`, of the whole window (background, cards, buttons,
+  menus, status row and progress window) in both layouts. For contrast on a dark 3D view, `:dark`
+  draws the rays, the markers and the dark materials of the render look (detectors, polarizers) in
+  lighter colors; `:light` keeps the colors of the default look.
 - `size`: size of the figure, by default `(1400, 800)` for `:compact` and `(1600, 950)` for `:app`
 - `auto_trace = true`: solves the systems after each change, otherwise only on request, see
   "Manual tracing"

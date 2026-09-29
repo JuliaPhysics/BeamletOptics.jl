@@ -180,6 +180,7 @@ makedocs(;
                     "SDFs"                      => joinpath("api", "sdfs.md"),
                 ],
                 "Kinematics"                => joinpath("api", "kinematics_api.md"),
+                "Live view widgets"         => joinpath("api", "live_widgets.md"),
             ],
             "Roadmap" => "roadmap.md",
         ],

@@ -95,6 +95,7 @@ wants the bug fixed or a feature added in BeamletOptics itself:
 - Units, coordinates, sign conventions: `CONVENTIONS.md`
 - Workflow patterns (scans, focus search, interferometers, groups): `WORKFLOW.md`
 - Rendering with Makie: `VISUALIZATION.md`
+- Own cards, widgets and controls in the live view (`live_view`): `WIDGETS.md`
 - Pre-delivery checklist and common pitfalls: `CHECKLIST.md`
 - Runnable reference scripts: `templates/`
 - Helper scripts: `scripts/` (`api_lookup.jl`, `run_templates.jl`)

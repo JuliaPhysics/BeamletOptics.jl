@@ -163,8 +163,8 @@ end
 
 # --- Recipe: controls without a scene object ---
 
-# A tilt of the fold mirror about z, a parameter of the alignment (not of an object): its value
-# [rad] and whether it is applied
+# A misalignment scenario of the setup, not a property of an object: it tilts the fold mirror about z;
+# the tilt [rad] and whether it is applied
 const tilt = Ref(0.0)
 const tilted = Ref(false)
 

@@ -28,8 +28,11 @@ Evaluate every API and architecture decision against this. The core principles, 
 **The extension promise:** a developer defines a new `AbstractObject` subtype and its
 `interact3d(system, object, beam, ray)` method (plus `intersect3d` if it needs custom
 geometry), and the rest of the API (kinematics, threading, retracing) works without further
-integration. When adding infrastructure, prefer pushing complexity into the
-generic solver over asking component authors to handle it.
+integration. A component may also add a `card_rows` method (and `card_actions`) to show its own rows
+on its card in the live view; the recipe for cards and controls is
+[docs/src/api/live_widgets.md](docs/src/api/live_widgets.md) (for agents:
+[skills/beamletoptics/WIDGETS.md](skills/beamletoptics/WIDGETS.md)). When adding infrastructure,
+prefer pushing complexity into the generic solver over asking component authors to handle it.
 
 Current exception: coincident-boundary disambiguation (plate beamsplitters, cemented
 doublets) is handled per component by returning a `Hint`

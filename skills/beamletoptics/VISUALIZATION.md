@@ -85,15 +85,23 @@ the mouse and keyboard (`kinematic_controls!`, `h` shows all controls), the syst
 after each change and detector panels update live. `export_changes(gui)` prints the changed poses
 as Julia code. Needs an interactive display; not for headless scripts. A selected component opens a
 card next to it in the 3D view: exact position `x`, `y`, `z` [mm], rotations `rx`, `ry`, `rv`
-[mrad] about the gizmo axes, the keyboard step (e.g. `250 nm`) and "hide". The pin keeps a card
+[mrad] about the gizmo axes and "hide". The pin keeps a card
 with its component, so several components can be edited side by side. Dragging the head of a card
 moves it to a fixed place in the view (kept when pinned; double click on the head: back next to
 its component). Below the pose, rows of the
 type: rays hitting it and their angle of incidence (last solve), `n` of lenses, R/T of
 beamsplitters, the polarizer axis, detector power, the ray count slider of sources
-(`set_num_rays!`). Own types add rows with a `card_rows` method (`CardRow`, `CardWidget`).
-`theme = :light` (default) or `:dark` colors the cards and the progress window; `layout = :app`
-arranges the whole window like an application in these colors, with the cards (selection and
+(`set_num_rays!`). Only the card of the selection also has the keyboard step (e.g. `250 nm`), a
+"Move"/"Rotate" control (in sync with the key `m`) and a "Properties" part (collapsed by default,
+the same rows as the inspector of the app), pinned cards do not. Objects without a `labels` entry
+get automatic names ("Mirror 1", "Clip plane 2") in the cards, menus and tree. The card of a system
+(number of objects, rays, solve time) opens from its entry in the component menu (compact) or its
+row in the tree (app), without a selection; non-movable objects are shown the same way (pose
+inputs are rejected). Own types add rows with a `card_rows` method (`CardRow`, `CardWidget`), see
+`WIDGETS.md`.
+`theme = :light` (default) or `:dark` colors the whole window (both layouts); the info label at
+the end of the status row shows the last solve time, the number of rays and the projection.
+`layout = :app` arranges the window like an application, with the cards (selection and
 pinned) docked in the "Properties" sidebar instead of floating; the float button of a pinned card
 moves it into the 3D view next to its component, its dock button moves it back.
 
@@ -131,11 +139,15 @@ end
   `update`, if it must be recorded while the panel is hidden.
 - `retrace!(gui)` / `retrace!(f, gui)` re-solves like a `sliders` entry (marks stale with
   `auto_trace = false`); make object changes inside `f` (a background solve is cancelled first).
+- `f` of `add_controls!` may return `update(gui)` as well (after each full solve and once right
+  away, must not change objects). Controls are for parameters without a scene object; widgets of
+  an object belong on its card (`card_rows`). See `WIDGETS.md` for both recipes.
 - Textboxes/menus built in `add_controls!`/`add_panel!` block the 3D keys while focused/open.
 - `key` must be free: all letters, arrows, `1`, `Esc`, `Delete`, `Backspace`, Shift/Ctrl/Alt,
   `+`/`-` are taken (live view, kinematic controls, Makie `Camera3D`) → `ArgumentError`. Use
   digits `2`-`9` or `f1`-`f12`. `icon` must be an icon name of the app (e.g. `:measure`,
-  `:export`, `:chart`, `:object`), else `ArgumentError` listing them (also in compact).
+  `:export`, `:chart`, `:object`) or a `Makie.BezierPath`, else `ArgumentError` listing them (also
+  in compact).
 
 Solves longer than `progress_delay` (kwarg, default 0.5 s) run in the background: the window stays
 usable and a small progress window appears next to the source being traced or the detector whose

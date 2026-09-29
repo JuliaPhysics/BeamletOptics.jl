@@ -490,7 +490,11 @@ textboxes. While a textbox of the controls is focused or a menu is open, the key
 the camera are ignored, as for the boxes of the live view. A change of the optics from such a
 widget calls [`retrace!`](@ref), which solves the systems again like after a slider of the
 `sliders` kwarg (or marks the beams as outdated with `auto_trace = false`); the change itself goes
-into its first argument, since objects must not change while a solve runs in the background:
+into its first argument, since objects must not change while a solve runs in the background. Like
+the builder of `add_panel!`, `f` may return a function `update(gui)`, which is called after each
+full solve and once right away, e.g. to show the current value of a parameter. Controls are meant
+for parameters without a scene object; the widgets of an object belong on its card, see
+[Live view widgets](@ref):
 
 ```julia
 add_controls!(gui, "Mirror") do layout
@@ -504,7 +508,8 @@ end
 
 `add_tool!(f, gui, name)` adds a button that calls `f(gui)`, with `toggle = true` a toggle that
 calls `f(gui, active)`. In the app layout, it is an icon of the toolbar (`icon`, e.g. `:measure`,
-`:export` or `:chart`, an unknown name lists the valid ones) with a `tooltip`. `key` binds a key of
+`:export` or `:chart`, an unknown name lists the valid ones, or an own `Makie.BezierPath`) with a
+`tooltip`. `key` binds a key of
 the 3D view to the tool; keys that the live view, the kinematic controls or the camera use (all
 letters) throw an `ArgumentError` naming the binding, e.g. the digits `2`–`9` or the function keys
 are free:
@@ -553,8 +558,11 @@ source or detector, see "Long solves" in the docstring of [`live_view`](@ref).
 
 Selecting a component, source or clip plane opens a card next to its bounding box in the 3D view,
 connected to it by a line. The card follows the camera and the component and stays inside the
-view, off the view cube and the other cards. It has the colors of `theme = :light` (default) or
-`:dark`, like the app layout, also in the compact layout:
+view, off the view cube and the other cards. With `theme = :light` (default) or `:dark`, the whole
+window has the colors of the theme, i.e. the cards, the menus, the buttons and the status row, in
+the compact layout as well as in the app layout. Objects without an entry in `labels` are named by
+their type and a running index, e.g. "Mirror 1" or "Clip plane 2", in the card, the status line and
+the menus, like in the object tree of the app layout:
 
 - The head shows the icon of the kind of the component, its label and "hide", which hides it, e.g. a mirror in front of
   the component of interest, and clears the selection. A hidden component can not be selected in
@@ -566,7 +574,12 @@ view, off the view cube and the other cards. It has the colors of `theme = :ligh
   rotate mode, e.g. `rv = 1` equals one key step with a step of 1 mrad. Each input is a step of the
   undo history, the constraints of the component apply. While a box is focused, the keys of the 3D
   view are ignored.
-- `step` sets the keyboard step, see below.
+- Only the card of the selection has, below its rows, the `step` box of the keyboard step, see
+  below, the "Move"/"Rotate" control and a "Properties" part. The control shows the mode of the
+  controls and sets it, and follows the key `m` and vice versa. "Properties", collapsed by default,
+  is expanded by its chevron and lists the properties of the object (see [`properties`](@ref)),
+  the same rows as the inspector of the app layout; it stays expanded or collapsed while the card
+  follows the selection. Pinned cards have neither the step, the mode nor the properties.
 - The chevron at the right end of the head collapses the card to its head and expands it again.
 - The pin keeps the card with its component when the selection changes, e.g. to watch or type the
   poses of several components; the widgets of a pinned card act on its component. Clicking the
@@ -602,7 +615,16 @@ BeamletOptics.card_rows(l::MyLens) = (pose_card_rows(l)...,
         value = (gui, l) -> refractive_index(l), on = (gui, l, n) -> set_index!(l, n))))
 ```
 
-where `solve = true` solves the systems again after an input, like a move.
+where `solve = true` solves the systems again after an input, like a move. The recipes for the card of
+an own component or system type, for own widget types and for controls without a scene object are
+on the page [Live view widgets](@ref).
+
+The card of a system shows the number of its objects, the number of rays and the duration of the last
+solve. A system is shown by its entry ("System 1", ...) in the component menu (compact layout) or by
+a click on its row in the object tree (app layout), without a selection and without a gizmo, i.e.
+`gui.controls.selected[]` stays `nothing`. An object that is not movable is shown in the same way
+instead of being selected; its pose boxes reject inputs with a message in the status line. `Esc`, a
+click on empty space or the selection of an object closes such a card.
 
 With `live_view(...; layout = :app)`, the cards are docked in the "Properties" sidebar instead of
 floating next to the components: the card of the selection at the top, with the same rows and
@@ -616,11 +638,14 @@ as in the compact layout; the dock button in its head moves it back. Only the do
 room in the sidebar. The floating cards and the docked cards are built by the same code from the
 same declarations.
 
-The row below the status line holds the component menu and "show all". The menu lists all movable
-components and sources by their `labels` (or type), the objects of a group indented after the
-group. Selecting an entry selects the component like a click in the 3D view, a click in the 3D view
-shows the selected component in the menu. The menu can be searched by typing while it is open.
-Clip planes are not listed. "show all" shows all hidden components.
+The row below the status line holds the component menu and "show all". The menu lists the systems,
+each entry followed by its movable components and sources, by their `labels` (or automatic names),
+the objects of a group indented after the group. Selecting an entry selects the component like a
+click in the 3D view, a click in the 3D view shows the selected component in the menu; a system
+entry shows the card of the system, see above. The menu can be searched by typing while it is open.
+Clip planes are not listed. "show all" shows all hidden components. The last cell of the status row
+is the info label with the duration of the last solve (or of the preview), the number of rays and
+the projection; in the app layout, it is in the status bar.
 
 ### Beam inspection and measuring
 

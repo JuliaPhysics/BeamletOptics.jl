@@ -23,6 +23,7 @@ The canonical entry point is `SKILL.md`.
 - `CONVENTIONS.md`: units, coordinate system, sign conventions
 - `WORKFLOW.md`: recommended patterns (scans, focus search, interferometers, groups)
 - `VISUALIZATION.md`: rendering with the Makie extension
+- `WIDGETS.md`: own cards, widget types and controls of the live view
 - `CHECKLIST.md`: pre-delivery checklist and common pitfalls
 - `components/`: per-component reference (constructors, orientation, caveats)
 - `templates/`: runnable example scripts
