@@ -291,11 +291,11 @@ const BMO = BeamletOptics
         @test gui.layout.inspector.name.text[] == "Mirror 1"
         @test startswith(gui.status.text[], "Mirror 1")
         # objects that are not movable (e.g. static ones, or not among the `objects` kwarg of the
-        # controls) can not be selected, but they are listed and can be hidden
+        # controls) are inspected instead of selected, they are listed and can be hidden
         filter!(x -> x !== o.housing, ctrl.movable)
         tree.clicked[] = o.housing
-        @test ctrl.selected[] === o.m
-        @test occursin("not movable", gui.status.text[])
+        @test isnothing(ctrl.selected[]) && gui.objects.inspected === o.housing
+        @test gui.layout.inspector.name.text[] == "NonInteractableObject 1"
         # a selection in the 3D view (here: of an object in a collapsed group) expands the group
         # and highlights the row
         ctrl.selected[] = o.l2
@@ -309,7 +309,7 @@ const BMO = BeamletOptics
         tree.expand_clicked[] = o.group
         @test !_row(gui, o.group).expanded
         @test !("Lens 1" in _labels(gui))
-        tree.clicked[] = gui.system_handles[1]
+        tree.expand_clicked[] = gui.system_handles[1]
         @test _labels(gui) == ["System 1", "Beam 1", "Clip plane 1"]
         tree.expand_clicked[] = gui.system_handles[1]
         @test length(_rows(gui)) == 7

@@ -1163,7 +1163,7 @@ const BMO = BeamletOptics
         @test !occursin("translate_to3d!", code)
 
         # mirror: selected via the menu, moved and rotated via keys
-        gui.widgets.menu.i_selected[] = 1
+        gui.widgets.menu.i_selected[] = findfirst(o -> o === m, gui.objects.menu)
         @test gui.controls.selected[] === m
         _key!(gui, Keyboard.up)
         _key!(gui, Keyboard.m)
@@ -1256,13 +1256,13 @@ const BMO = BeamletOptics
         @test collect(BMO.position(lens)) == [0.01, 0.05, 0.002]
 
         # the boxes follow the selection
-        gui.widgets.menu.i_selected[] = 1
+        gui.widgets.menu.i_selected[] = findfirst(o -> o === lens, gui.objects.menu)
         @test gui.controls.selected[] === lens
         @test texts() == ["10.0", "50.0", "2.0", "", "", ""]
         _select!(gui)
         @test gui.controls.selected[] === m
         @test texts() == ["0.0", "100.0", "0.0", "", "", ""]
-        gui.widgets.menu.i_selected[] = 1
+        gui.widgets.menu.i_selected[] = findfirst(o -> o === lens, gui.objects.menu)
 
         # absolute position [mm]
         P0 = collect(BMO.position(lens))
@@ -1334,7 +1334,7 @@ const BMO = BeamletOptics
         m, pd = _fixture()
         gui = _live_view(System([m, pd]), Beam([0.0, 0, 0], [0.0, 1, 0]); throttle = false,
             constraints = Dict(m => (; move = (:v,), rotate = ())))
-        gui.widgets.menu.i_selected[] = 1
+        gui.widgets.menu.i_selected[] = findfirst(o -> o === m, gui.objects.menu)
         P0, R0 = collect(BMO.position(m)), Matrix(BMO.orientation(m))
         Ext._card_widget(gui.cards.selection, (:x, :y, :z, :rx, :ry, :rv)[1]).stored_string[] = "5"
         Ext._card_widget(gui.cards.selection, (:x, :y, :z, :rx, :ry, :rv)[6]).stored_string[] = "5"
