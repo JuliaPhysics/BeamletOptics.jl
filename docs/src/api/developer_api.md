@@ -7,7 +7,7 @@ access them as `BeamletOptics.name`. They are stable within a minor version like
 The names of the render handle protocol are documented in
 [Render handle protocol](@ref "Render handle protocol").
 
-## Kinematics
+## Kinematic queries
 
 Whether an object can be moved is decided by its kinematic trait; `is_static` is the query used by
 tools that offer to move objects.
