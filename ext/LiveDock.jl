@@ -321,7 +321,7 @@ end
 Sets the colors of the detector panel `p` that do not follow the theme of the figure to the
 tokens `t` (see `_APP_THEMES`): the subtitle, the spot diagram and the power (or number of hits)
 of the history in the text colors, and the x (red) and z (blue) lines of the centroid history
-and of the profiles in the red and blue of `t.gizmo`.
+and of the profiles in the red and blue of `t.gizmo`. Used for the detector panels of all layouts.
 """
 function _theme_panel!(p::DetectorPanel, t)
     p.ax.subtitlecolor[] = t.muted
@@ -376,7 +376,7 @@ end
 
 Appends a tab with the `title` (and the `icon`, see `_icon`) to the analysis dock and returns the
 layout of its content. The new tab becomes the active one. The first panel switches the dock on,
-later panels keep it collapsed if it is. Requires the toolbar, see `_build_toolbar`.
+later panels keep it collapsed if it is. Requires the toggle of the dock, see `_build_tools`.
 """
 function _add_dock_panel!(layout::AppLayout, title::AbstractString; icon::Symbol = :panel_bottom)
     tabs = layout.tabs

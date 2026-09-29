@@ -1639,6 +1639,92 @@ const BMO = BeamletOptics
         close(gui)
     end
 
+    @testset "theme and info label" begin
+        _rgb(c) = RGBf(Makie.to_color(c))
+        _plots(gui, obj) = only(oh for oh in gui.controls.h.handles if oh.obj === obj).plots
+        _detector_color(gui, pd) = _rgb(first(p for p in _plots(gui, pd) if p isa Makie.Mesh).color[])
+        _help(gui) = only(p for p in gui.controls.plots if p isa Makie.Text && p.parent === gui.ax.blockscene)
+        _strokes(gui, objs...) = [_rgb(p.strokecolor[]) for o in objs for p in _plots(gui, o) if p isa Makie.Scatter]
+        _plane_color(gui, plane) = _rgb(only(p for p in _plots(gui, plane) if p isa Makie.Lines).color[])
+        planes = [[0, 0.05, 0] => [0, 1, 0]]
+
+        # the light theme keeps the colors of the 3D view as before the themes: the default color
+        # of the rays of `live_render!`, purple clip planes, black outlines of the handles, the
+        # colors of the render look and the gray help text
+        m, pd = _fixture()
+        beam = Beam([0.0, 0, 0], [0.0, 1, 0])
+        gui = _live_view(System([m, pd]), beam; clip_planes = planes)
+        t = Ext._APP_THEMES[:light]
+        @test gui.layout isa Ext.CompactLayout
+        @test gui.fig.scene.backgroundcolor[] == t.background
+        @test gui.ax.scene.backgroundcolor[] == t.view
+        @test _rgb(gui.beam_handles[1].plot.color[]) == _rgb(:blue)
+        plane = only(gui.clip.planes)
+        @test _plane_color(gui, plane) == _rgb(:purple)
+        @test all(==(_rgb(:black)), _strokes(gui, plane, beam))
+        @test length(_strokes(gui, plane, beam)) >= 2
+        @test _detector_color(gui, pd) == Ext._materials()[:detector].color
+        @test _rgb(_help(gui).color[]) == _rgb(:gray40)
+        # the info label at the right of the status line: last solve, rays, projection
+        info = gui.widgets.info
+        @test info isa Makie.Label
+        @test startswith(info.text[], "traced in ")
+        @test occursin("1 ray ", info.text[])
+        @test endswith(info.text[], "perspective")
+        gui.widgets.orthographic_toggle.active[] = true
+        @test endswith(info.text[], "orthographic")
+        gui.widgets.orthographic_toggle.active[] = false
+        @test Makie.GridLayoutBase.gridcontent(info).parent === gui.layout.status_row
+        close(gui)
+
+        # the dark theme colors the whole window and the 3D view
+        m, pd = _fixture()
+        beam = Beam([0.0, 0, 0], [0.0, 1, 0])
+        dark = _live_view(System([m, pd]), beam; theme = :dark, clip_planes = planes)
+        t = Ext._APP_THEMES[:dark]
+        @test dark.fig.scene.backgroundcolor[] == t.background
+        @test dark.ax.scene.backgroundcolor[] == t.view
+        @test dark.status.color[] == t.text
+        @test _rgb(dark.widgets.auto_trace_toggle.framecolor_active[]) == _rgb(t.accent)
+        @test _rgb(dark.widgets.measure_toggle.framecolor_inactive[]) == _rgb(t.muted)
+        @test _rgb(dark.widgets.trace_button.buttoncolor[]) == _rgb(t.field)
+        @test _rgb(dark.panels[1].ax.backgroundcolor[]) == _rgb(t.view)
+        @test dark.beam_handles[1].plot.color[] == t.rays
+        @test _plane_color(dark, only(dark.clip.planes)) == _rgb(t.clip_plane)
+        @test all(==(_rgb(t.marker_stroke)), _strokes(dark, only(dark.clip.planes), beam))
+        @test _detector_color(dark, pd) == t.materials[:detector]
+        @test _help(dark).color[] == t.help
+        @test startswith(dark.widgets.info.text[], "traced in ")
+        close(dark)
+    end
+
+    @testset "built-in tools" begin
+        m, pd = _fixture()
+        gui = _live_view(System([m, pd]), Beam([0.0, 0, 0], [0.0, 1, 0]); auto_trace = false,
+            clip_beams = true, orthographic = true, show_sources = false)
+        w = gui.widgets
+        # the tools of the shared logic, text buttons and toggles initialized from the kwargs
+        @test [s.role for s in Ext._tools(gui.layout)] == [:trace_button, :auto_trace_toggle,
+            :show_all_button, :home_button, :save_view_button, :orthographic_toggle,
+            :clip_beams_toggle, :sources_toggle, :measure_toggle, :export_button]
+        @test w.trace_button isa Makie.Button && w.trace_button.label[] == "Trace (t)"
+        @test w.export_button isa Makie.Button && w.export_button.label[] == "Export"
+        @test (w.auto_trace_toggle.active[], w.clip_beams_toggle.active[],
+            w.orthographic_toggle.active[], w.sources_toggle.active[], w.measure_toggle.active[]) ==
+              (false, true, true, false, false)
+        # tracing and display in the status row, the menus and the other tools in the tool row
+        grid(x) = Makie.GridLayoutBase.gridcontent(x).parent
+        @test grid(grid(w.auto_trace_toggle)) === gui.layout.status_tools
+        @test grid(w.trace_button) === gui.layout.status_tools
+        @test all(x -> grid(x) === gui.layout.tools, (w.menu, w.views_menu, w.home_button,
+            w.save_view_button, w.show_all_button, w.export_button))
+        col(x) = Makie.GridLayoutBase.gridcontent(x).span.cols.start
+        @test col(w.menu) == 1
+        @test col(w.views_menu) == col(w.home_button) + 1
+        @test col(w.save_view_button) == col(w.views_menu) + 1
+        close(gui)
+    end
+
     @testset "camera tools" begin
         m, pd = _fixture()
         lens = SphericalLens(0.05, -0.05, 5e-3, 25.4e-3)

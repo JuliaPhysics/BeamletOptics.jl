@@ -160,20 +160,13 @@ function add_tool!(f, gui::LiveView, name::AbstractString; icon::Symbol = :objec
     # An unknown icon throws in all layouts, such that code works with any layout
     _icon(icon)
     _check_key(gui, key, name)
-    w = _tool_widget(gui, Val(toggle), _key_label(name, key), icon, _key_label(tooltip, key))
+    # Built like the built-in tools, in the group `:user`, see `_BUILTIN_TOOLS`
+    w = _tool_widget(gui.layout, :user, Val(toggle), _key_label(name, key), icon,
+        _key_label(tooltip, key), false)
     _connect_tool!(gui, f, w, Val(toggle), String(name))
     _connect_tool_key!(gui, w, key, Val(toggle), String(name))
     return w
 end
-
-"""
-    _tool_widget(gui, toggle::Val, label, icon, tooltip)
-
-The slot of [`add_tool!`](@ref) in the layout of the `gui`: creates a button (`Val(false)`, with
-`clicks`) or a toggle (`Val(true)`, with `active`, initially off), shown with the `label` or the
-`icon` and the `tooltip`, which name the key of the tool, if any.
-"""
-_tool_widget(gui::LiveView, ::Val, _, _, _) = _slot_error(gui, "place for tools")
 
 _key_label(s::AbstractString, ::Nothing) = String(s)
 _key_label(s::AbstractString, key::Keyboard.Button) = "$s ($(_key_name(key)))"
