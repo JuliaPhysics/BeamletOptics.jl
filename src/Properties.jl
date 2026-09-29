@@ -1,13 +1,13 @@
 #=
 Human-readable properties of objects, shapes and beams for display, e.g. in the inspector of
-`live_view(...; layout = :app)`
+the app layout of the GUI package BeamletOpticsGUI
 =#
 
 """
     properties(x) -> Vector{Pair{String, Any}}
 
 Returns the properties of `x` (an [`AbstractObject`](@ref), shape, beam or source) as a list of
-`name => value` pairs for display, e.g. in the inspector of [`live_view`](@ref). Only stored or
+`name => value` pairs for display, e.g. in the inspector of the GUI package BeamletOpticsGUI. Only stored or
 cheaply derived values are listed, e.g. the reflectance of a beamsplitter (the power ratio R, as
 passed to its constructor) or the number of hits of a [`Detector`](@ref), no design parameters
 that the object does not store. The list is computed on each call, i.e. it shows the current pose
@@ -160,9 +160,14 @@ properties(lp::LinearPolarizer) = [default_properties(lp);
     "Transmission axis" => _vector(transmission_axis(lp)); "Thickness [m]" => thickness(lp);
     _index_properties(lp.front.n)]
 
-_hit_count(d::Detector) = isnothing(hits(d)) ? 0 : length(hits(d))
+"""
+    hit_count(d::Detector) -> Int
 
-properties(d::Detector) = [default_properties(d); _flat_size(shape(d)); "Hits" => _hit_count(d);
+The number of hits stored in the detector `d`, `0` before the first solve.
+"""
+hit_count(d::Detector) = isnothing(hits(d)) ? 0 : length(hits(d))
+
+properties(d::Detector) = [default_properties(d); _flat_size(shape(d)); "Hits" => hit_count(d);
     "Stops beams" => stop(d)]
 
 #=

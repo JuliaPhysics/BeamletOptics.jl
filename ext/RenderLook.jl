@@ -67,6 +67,8 @@ end
 """Returns the material presets of the active look."""
 _materials() = _LOOK[] === :cad ? _CAD_MATERIALS : _MODERN_MATERIALS
 
+look_colors() = Dict{Symbol, RGBf}(class => m.color for (class, m) in _materials())
+
 """Material classes with feature edges in the `:modern` look, i.e. faint silhouettes of the glass."""
 const _MODERN_EDGE_CLASSES = (:refractive, :coating, :interface)
 
@@ -374,7 +376,7 @@ light from the upper right front, a fill light from the left and a rim light fro
 relative to the camera. Backends that support a single directional light only (e.g. CairoMakie)
 get the ambient and the key light. `preset = :none` leaves the lights unchanged.
 
-[`live_view`](@ref) applies the rig by default. Call it for scenes created via `render!`, e.g.
+The GUI package BeamletOpticsGUI applies the rig by default. Call it for scenes created via `render!`, e.g.
 
 ```julia
 fig = Figure()

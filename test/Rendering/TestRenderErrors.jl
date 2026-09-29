@@ -24,19 +24,10 @@ const BMO = BeamletOptics
     @test_throws BMO.MissingBackendError update_render!(nothing)
     @test_throws BMO.MissingBackendError remove_render!(nothing)
     @test_throws BMO.MissingBackendError pick_object(nothing, nothing)
-    @test_throws BMO.MissingBackendError kinematic_controls!(axis, nothing)
     @test_throws BMO.MissingBackendError set_render_look(:cad)
-    @test_throws BMO.MissingBackendError live_view(System([Detector(1e-3)]), Beam([0.0,0,0],[0.0,1,0],1e-6))
-    @test_throws BMO.MissingBackendError export_changes(nothing)
-    @test_throws BMO.MissingBackendError add_panel!(identity, nothing, "panel")
-    @test_throws BMO.MissingBackendError add_panel!(identity, nothing, "panel"; select = true)
-    @test_throws BMO.MissingBackendError add_controls!(identity, nothing, "controls")
-    @test_throws BMO.MissingBackendError add_tool!(identity, nothing, "tool")
-    @test_throws BMO.MissingBackendError add_tool!(identity, nothing, "tool"; toggle = true)
-    @test_throws BMO.MissingBackendError retrace!(nothing)
-    @test_throws BMO.MissingBackendError retrace!(() -> nothing, nothing)
-    @test_throws BMO.MissingBackendError view_cube!(axis)
     @test_throws BMO.MissingBackendError studio_lighting!(axis)
+    @test_throws BMO.MissingBackendError live_render!(() -> nothing, axis, cube)
+    @test_throws MethodError BMO.look_colors()
 end
 
 end

@@ -2,15 +2,16 @@ module BeamletOpticsMakieExt
 
 using BeamletOptics
 import BeamletOptics: render!, RenderException, _RenderTypes, get_view, set_view, hide_axis,
-                       set_orthographic, arrow!, render_lcs!, look_at!,
-                       AbstractRenderHandle, live_render!, update_render!, remove_render!,
-                       pick_object, kinematic_controls!, live_view, view_cube!, studio_lighting!,
-                       set_render_look, export_changes, card_rows, pose_card_rows, card_actions,
-                       set_num_rays!, add_panel!, add_controls!, add_tool!, retrace!
+                       set_orthographic, arrow!, render_lcs!, look_at!, live_render!, update_render!,
+                       remove_render!, pick_object, studio_lighting!, set_render_look, look_colors,
+                       rendered, render_plots, render_children, render_parent, render_settings,
+                       pickable_plots, AbstractRenderHandle, AbstractObjectRenderHandle,
+                       AbstractSystemRenderHandle, AbstractBeamRenderHandle
 
 const BMO = BeamletOptics
 
-using Makie: Axis3, LScene, mesh!, surface!, lines!, linesegments!, RGBf, RGBAf, scatter!, text!,
+import Makie
+using Makie: Figure, Axis3, LScene, mesh!, surface!, lines!, linesegments!, RGBf, RGBAf, scatter!, text!,
              update_cam!, cameracontrols, arrows3d!
 using PrecompileTools: @setup_workload, @compile_workload
 using GeometryBasics: Point2, Point3, Point3f, Point3d, Vec3f, Vec3d, GLTriangleFace, Mesh
@@ -69,35 +70,9 @@ include("RenderPresets.jl")
 include("RenderPolarizers.jl")
 include("RenderCamera.jl")
 # live rendering, must come after all static renderers
-include("LiveObjects.jl")
+include("RenderLive.jl")
 include("LiveBeams.jl")
-include("LiveInteraction.jl")
-include("LiveTree.jl")
-include("LiveProgress.jl")
-include("LiveIcons.jl")
-include("ViewCube.jl")
-include("LiveWidgets.jl")
-include("LiveCard.jl")
-include("LiveView.jl")
-include("LiveLayout.jl")
-include("LivePanels.jl")
-include("LiveTrace.jl")
-include("LiveClip.jl")
-include("LiveExport.jl")
-include("LiveCards.jl")
-include("LiveMeasure.jl")
-include("LiveCamera.jl")
-include("LiveCompact.jl")
-include("LiveCardRows.jl")
-include("LiveExtras.jl")
-include("LiveApp.jl")
-include("LiveSelection.jl")
-include("LiveAppTree.jl")
-include("LiveDock.jl")
-include("LiveInspector.jl")
-include("LiveInfo.jl")
-include("LiveCustom.jl")
-# precompiles the live rendering/interaction call paths, must come last
-include("LivePrecompile.jl")
+# precompiles the static and live rendering, must come last
+include("RenderPrecompile.jl")
 
 end

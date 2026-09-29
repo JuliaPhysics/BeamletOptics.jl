@@ -115,11 +115,28 @@ can not be regenerated and throws an `ArgumentError`.
 """
 function set_num_rays! end
 
-# Wavelength of the source, i.e. of its first ray
-_source_wavelength(bg::AbstractBeamGroup) = wavelength(first(rays(first(beams(bg)))))
+"""
+    source_wavelength(bg::AbstractBeamGroup)
+
+The wavelength of the source `bg` [m], i.e. of its first ray.
+"""
+source_wavelength(bg::AbstractBeamGroup) = wavelength(first(rays(first(beams(bg)))))
 
 include("PointSource.jl")
 include("CollimatedSource.jl")
+
+"""
+    min_num_rays(src) -> Union{Nothing, Int}
+
+The fewest rays with which [`set_num_rays!`](@ref) regenerates the source `src`: `20 num_rings`
+for ring sources, `1` for sunflower sources, and `nothing` if the rays of `src` can not be
+regenerated, e.g. a source built from given beams or any other beam or beam group.
+"""
+min_num_rays(src) = nothing
+min_num_rays(src::Union{CollimatedSource, PointSource}) = min_num_rays(src.sampling)
+min_num_rays(::_NoSampling) = nothing
+min_num_rays(s::Union{_DiscRings, _ConeRings}) = 20 * s.num_rings
+min_num_rays(::_AbstractSampling) = 1
 include("AstigmaticBeamGroup.jl")
 include("AstigmaticBeamletSources.jl")
 include("BeamletDecompositions.jl")

@@ -70,7 +70,11 @@ export Retroreflector, get_invariant_threshold, set_invariant_threshold!,
 
 # render
 export render!, get_view, set_view, hide_axis, set_orthographic, arrow!, render_lcs!, look_at!
-export live_render!, update_render!, remove_render!, pick_object, kinematic_controls!, live_view,
-       view_cube!, studio_lighting!, set_render_look, export_changes, card_rows, pose_card_rows,
-       card_actions, CardRow, CardWidget, card_input, card_show!, add_panel!, add_controls!,
-       add_tool!, retrace!
+export live_render!, update_render!, remove_render!, pick_object, studio_lighting!, set_render_look
+
+# render handle protocol and developer API for packages built on BeamletOptics: public, not exported
+public AbstractRenderHandle, AbstractObjectRenderHandle, AbstractSystemRenderHandle,
+       AbstractBeamRenderHandle, rendered, render_plots, render_children, render_parent,
+       render_settings, pickable_plots, look_colors
+public is_static, hit_count, source_wavelength, min_num_rays, ProgressSink, PROGRESS_SINK,
+       progress_state, is_cancelled

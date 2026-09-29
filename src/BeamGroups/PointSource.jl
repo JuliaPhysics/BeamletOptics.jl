@@ -52,7 +52,7 @@ numerical_aperture(ps::PointSource) = ps.NA
 
 function set_num_rays!(ps::PointSource{T}, n::Integer) where {T}
     M = ps.orientation
-    ps.beams = _source_beams(ps.sampling, ps.center, M[:, 2], M[:, 1], _source_wavelength(ps), Int(n), T)
+    ps.beams = _source_beams(ps.sampling, ps.center, M[:, 2], M[:, 1], source_wavelength(ps), Int(n), T)
     return ps
 end
 

@@ -52,7 +52,7 @@ diameter(cs::CollimatedSource) = cs.diameter
 
 function set_num_rays!(cs::CollimatedSource{T}, n::Integer) where {T}
     M = cs.orientation
-    cs.beams = _source_beams(cs.sampling, cs.center, M[:, 2], M[:, 1], cs.diameter, _source_wavelength(cs), Int(n), T)
+    cs.beams = _source_beams(cs.sampling, cs.center, M[:, 2], M[:, 1], cs.diameter, source_wavelength(cs), Int(n), T)
     return cs
 end
 

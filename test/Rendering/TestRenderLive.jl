@@ -1,4 +1,4 @@
-module TestLiveObjects
+module TestRenderLive
 
 using BeamletOptics
 using Makie
@@ -27,6 +27,25 @@ function _check_reference_points(plot, P0, R0, P, R; atol = 1e-4)
         @test isapprox(collect(got), collect(want); atol)
     end
 end
+
+# A movable marker whose outline does not select it, see `pickable_plots`
+struct _Marker
+    pos::Vector{Float64}
+end
+Base.position(x::_Marker) = x.pos
+BMO.orientation(::_Marker) = Matrix{Float64}(I, 3, 3)
+BMO.kinematic_trait_of(::_Marker) = BMO.Movable(BMO.Oriented())
+# clicks on the outline reach what lies behind it
+BMO.pickable_plots(::_Marker, plots) = filter(p -> !(p isa Makie.Lines), plots)
+
+# An own system handle on the protocol, e.g. of a GUI that combines the handles of several systems
+struct _Combined <: BMO.AbstractSystemRenderHandle
+    sys::System
+    children::Vector{BMO.AbstractObjectRenderHandle}
+end
+BMO.rendered(h::_Combined) = h.sys
+BMO.render_children(h::_Combined) = h.children
+BMO.render_parent(::_Combined, _) = nothing
 
 @testset "Live rendering: objects & systems" begin
     Ext = Base.get_extension(BeamletOptics, :BeamletOpticsMakieExt)
@@ -242,13 +261,14 @@ end
         @test h.parent[m3] === inner
         @test h.parent[inner] === outer
         @test !haskey(h.parent, outer)
-        @test Ext._top_level(h, m2) === outer
-        @test Ext._top_level(h, outer) === outer
+        @test BMO.render_parent(h, m2) === inner
+        @test BMO.render_parent(h, inner) === outer
+        @test BMO.render_parent(h, outer) === nothing
 
-        # pick_object returns the top-level object, _pick_leaf the rendered object
+        # pick_object of the system returns the top-level object, of the child the rendered object
         plot_m3 = h.handles[3].plots[1]
         @test pick_object(h, plot_m3) === outer
-        @test Ext._pick_leaf(h, plot_m3) === m3
+        @test pick_object(h.handles[3], plot_m3) === m3
         @test pick_object(h, nothing) === nothing
 
         # moving the outer group applies the transform to all leaf plots without re-rendering
@@ -286,6 +306,91 @@ end
         @test all(p -> !any(q -> q === p, old_plots), h.handles[1].plots)
         @test all(p -> pick_object(h, p) === cbs, h.handles[1].plots)
         remove_render!(h)
+    end
+
+    @testset "Render handle protocol" begin
+        m = RoundPlanoMirror(0.025, 0.005)
+        lens = SphericalLens(0.05, -0.05, 0.01, 0.02)
+        g = ObjectGroup([lens])
+        sys = System([m, g])
+        h = live_render!(ax, sys)
+        @test h isa BMO.AbstractSystemRenderHandle
+        @test BMO.rendered(h) === sys
+        children = BMO.render_children(h)
+        @test all(c -> c isa BMO.AbstractObjectRenderHandle, children)
+        @test [BMO.rendered(c) for c in children] == [m, lens]
+        @test BMO.render_parent(h, lens) === g
+        @test BMO.render_parent(h, m) === nothing
+        @test length(BMO.render_plots(h)) == sum(c -> length(BMO.render_plots(c)), children)
+
+        # a thing drawn by a function follows its pose
+        src = CollimatedSource([0.0, 0, 0], [0.0, 1, 0], 2e-3, 1e-6; num_rings = 2, num_rays = 40)
+        hm = live_render!(ax, src) do
+            scatter!(ax, [Makie.Point3f(position(src))]; color = :orange)
+            lines!(ax, [Makie.Point3f(0, 0, 0), Makie.Point3f(0, 0.01, 0)])
+        end
+        @test hm isa BMO.AbstractObjectRenderHandle
+        @test BMO.rendered(hm) === src
+        @test length(BMO.render_plots(hm)) == 2
+        translate3d!(src, [0.01, 0, 0])
+        update_render!(hm)
+        P, R = hm.P, hm.R
+        @test P ≈ position(src)
+        _check_reference_points(BMO.render_plots(hm)[1], hm.P0, hm.R0, P, R)
+
+        # adding and removing a child handle after live_render!
+        push!(h, hm)
+        @test BMO.render_children(h)[end] === hm
+        @test pick_object(h, BMO.render_plots(hm)[1]) === src
+        delete!(h, hm)
+        @test !any(c -> c === hm, BMO.render_children(h))
+        @test pick_object(h, BMO.render_plots(hm)[1]) === nothing
+        @test !isempty(BMO.render_plots(hm)) # delete! keeps the plots
+        remove_render!(hm)
+        remove_render!(h)
+    end
+
+    @testset "pickable_plots" begin
+        x = _Marker([0.0, 0, 0])
+        h = live_render!(ax, x) do
+            scatter!(ax, [Makie.Point3f(0, 0, 0)])
+            lines!(ax, [Makie.Point3f(0, 0, 0), Makie.Point3f(1, 0, 0)])
+        end
+        s, l = BMO.render_plots(h)
+        @test pick_object(h, s) === x
+        @test pick_object(h, l) === nothing
+        remove_render!(h)
+    end
+
+    @testset "own system handle on the protocol" begin
+        s1, s2 = System([RoundPlanoMirror(0.025, 0.005)]), System([RoundPlanoMirror(0.025, 0.005)])
+        h1, h2 = live_render!(ax, s1), live_render!(ax, s2)
+        c = _Combined(s1, [BMO.render_children(h1); BMO.render_children(h2)])
+        m2 = only(s2.objects)
+        translate3d!(m2, [0.01, 0, 0])
+        update_render!(c)
+        oh = only(BMO.render_children(h2))
+        _check_reference_points(BMO.render_plots(oh)[1], oh.P0, oh.R0, position(m2), BMO.orientation(m2))
+        @test pick_object(c, BMO.render_plots(oh)[1]) === m2
+        remove_render!(c)
+        @test isempty(BMO.render_plots(c))
+    end
+
+    @testset "render! of a system, a component and a beam into an LScene" begin
+        fig2 = Figure()
+        ax2 = LScene(fig2[1, 1])
+        m = RoundPlanoMirror(0.025, 0.005)
+        zrotate3d!(m, deg2rad(45))
+        translate3d!(m, [0, 0.1, 0])
+        sys = System([m])
+        beam = Beam([0.0, 0, 0], [0.0, 1, 0], 1e-6)
+        solve_system!(sys, beam)
+        lens = SphericalLens(0.05, -0.05, 0.01, 0.02)
+        n = length(ax2.scene.plots)
+        render!(ax2, sys)
+        render!(ax2, lens)
+        render!(ax2, beam; color = :red, flen = 0.05)
+        @test length(ax2.scene.plots) > n + 2
     end
 
     @testset "show" begin

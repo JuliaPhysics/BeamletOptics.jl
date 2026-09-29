@@ -3,12 +3,12 @@ import GeometryBasics
 using GeometryBasics: GLTriangleFace
 
 """
-    BeamRenderHandle{B} <: AbstractRenderHandle
+    BeamRenderHandle{B} <: AbstractBeamRenderHandle
 
 Live rendering handle of an `AbstractRay`, a [`Beam`](@ref) or an [`BeamletOptics.AbstractBeamGroup`](@ref).
 All ray segments are drawn by a single `linesegments` plot.
 """
-mutable struct BeamRenderHandle{B} <: AbstractRenderHandle
+mutable struct BeamRenderHandle{B} <: AbstractBeamRenderHandle
     thing::B
     axis::_RenderEnv
     plot::AbstractPlot
@@ -99,12 +99,12 @@ end
 remove_render!(h::BeamRenderHandle) = (delete!(h.axis, h.plot); return nothing)
 
 """
-    GaussianRenderHandle{G} <: AbstractRenderHandle
+    GaussianRenderHandle{G} <: AbstractBeamRenderHandle
 
 Live rendering handle of a [`GaussianBeamlet`](@ref). The 1/e² envelope of all segments is drawn by
 a single `mesh` plot. The generating rays can optionally be shown as three additional plots.
 """
-mutable struct GaussianRenderHandle{G} <: AbstractRenderHandle
+mutable struct GaussianRenderHandle{G} <: AbstractBeamRenderHandle
     thing::G
     axis::_RenderEnv
     mesh_plot::AbstractPlot
@@ -395,12 +395,12 @@ function live_render!(
 end
 
 """
-    AstigmaticGroupRenderHandle{G} <: AbstractRenderHandle
+    AstigmaticGroupRenderHandle{G} <: AbstractBeamRenderHandle
 
 Live rendering handle of an [`BMO.AstigmaticBeamGroup`](@ref). The 1/e² envelopes of every
 `render_every`-th beamlet are merged into a single `mesh` plot.
 """
-mutable struct AstigmaticGroupRenderHandle{G} <: AbstractRenderHandle
+mutable struct AstigmaticGroupRenderHandle{G} <: AbstractBeamRenderHandle
     thing::G
     axis::_RenderEnv
     mesh_plot::AbstractPlot
@@ -472,3 +472,17 @@ function update_render!(h::AstigmaticGroupRenderHandle)
 end
 
 remove_render!(h::AstigmaticGroupRenderHandle) = (delete!(h.axis, h.mesh_plot); return nothing)
+
+#=
+Render handle protocol of the beam handles, see `AbstractBeamRenderHandle`
+=#
+
+rendered(h::Union{BeamRenderHandle, GaussianRenderHandle, AstigmaticGroupRenderHandle}) = h.thing
+
+render_plots(h::BeamRenderHandle) = AbstractPlot[h.plot]
+render_plots(h::GaussianRenderHandle) = AbstractPlot[h.mesh_plot; h.beam_plots]
+render_plots(h::AstigmaticGroupRenderHandle) = AbstractPlot[h.mesh_plot]
+
+render_settings(h::BeamRenderHandle) = (; h.flen, h.render_every)
+render_settings(h::GaussianRenderHandle) = (; h.flen, render_every = 1, h.r_res, h.z_res)
+render_settings(h::AstigmaticGroupRenderHandle) = (; h.flen, h.render_every, h.r_res, h.z_res)

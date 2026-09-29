@@ -365,21 +365,6 @@ end
         ax = LScene(Figure()[1, 1])
         studio_lighting!(ax; preset = :none)
         @test Makie.get_lights(ax.scene) == default_lights
-
-        # live_view
-        m = RoundPlanoMirror(25e-3, 5e-3)
-        beam = Beam([0.0, 0, 0], [0.0, 1, 0], 1e-6)
-        gui = live_view(System([m]), beam; detectors = [], lighting = :none)
-        @test Makie.get_lights(gui.ax.scene) == default_lights
-        close(gui)
-        gui = live_view(System([m]), beam; detectors = [])
-        @test only(Makie.get_lights(gui.ax.scene)).color ≈ RGBf(0.75, 0.75, 0.75)
-        # edges on by default, off via `edges = false`
-        @test length(edge_plots(only(gui.system_handles[1].handles).plots)) == 1
-        close(gui)
-        gui = live_view(System([m]), beam; detectors = [], edges = false)
-        @test isempty(edge_plots(only(gui.system_handles[1].handles).plots))
-        close(gui)
     end
     set_render_look(:modern)
 end
