@@ -142,21 +142,37 @@ mutable struct _UserPanel
 end
 
 """
+    _UserControls
+
+Controls added via [`add_controls!`](@ref): their `title`, the `layout` of their widgets and the
+`update(gui)` returned by the builder (or `nothing`), which runs once when they are added and after
+each full solve, like the `update` of a `_UserPanel`, but never stale, since controls are always
+shown.
+"""
+mutable struct _UserControls
+    const title::String
+    const layout::GridLayout
+    const update::Union{Nothing, Function}
+    last_error::Union{Nothing, String}
+end
+
+"""
     _UserParts()
 
 The parts of a live view added via the customization API (see `LiveCustom.jl`): the `panels`
-(`_UserPanel`s), the `boxes` (`Textbox`es) and `menus` of added controls and panels, which take
-the keyboard like those of the layout (see `_typing`), and the `keys` of added tools with their
-names, see [`add_tool!`](@ref).
+(`_UserPanel`s), the `controls` (`_UserControls`), the `boxes` (`Textbox`es) and `menus` of added
+controls and panels, which take the keyboard like those of the layout (see `_typing`), and the
+`keys` of added tools with their names, see [`add_tool!`](@ref).
 """
 struct _UserParts
     panels::Vector{_UserPanel}
+    controls::Vector{_UserControls}
     boxes::Vector{Textbox}
     menus::Vector{Menu}
     keys::Dict{Keyboard.Button, String}
 end
 
-_UserParts() = _UserParts(_UserPanel[], Textbox[], Menu[], Dict{Keyboard.Button, String}())
+_UserParts() = _UserParts(_UserPanel[], _UserControls[], Textbox[], Menu[], Dict{Keyboard.Button, String}())
 
 """
     _TraceState
@@ -258,7 +274,9 @@ The objects of a `LiveView` as the selection shows them: the movable objects of 
 `menu` (the option `i` selects `menu[i]`), the `hidden` objects (rendered objects, i.e. leaves of
 groups, whose plots are invisible, see the action "hide" of the cards), the `opacity` of objects
 set via their card (see `_set_opacity!`), and the automatic `names` of objects without a label
-with the `counters` of their running indices per type, see `_name_objects!`.
+with the `counters` of their running indices per type, see `_name_objects!`. `inspected` is shown
+on the card of the selection, but not selected for moving: a system or an object that is not
+movable, see `_inspect!`; it and `controls.selected[]` exclude each other.
 """
 Base.@kwdef mutable struct _ObjectState
     menu::Vector{Any} = Any[]
@@ -266,6 +284,7 @@ Base.@kwdef mutable struct _ObjectState
     opacity::IdDict{Any, Any} = IdDict{Any, Any}()
     names::IdDict{Any, String} = IdDict{Any, String}()
     counters::Dict{String, Int} = Dict{String, Int}()
+    inspected::Any = nothing
 end
 
 """

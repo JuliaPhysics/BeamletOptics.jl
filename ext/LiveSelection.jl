@@ -63,6 +63,35 @@ function _menu_entries(ctrl::KinematicController)
     return entries
 end
 
+"""
+    _menu_entries(gui)
+
+Returns `(key, depth)` of the entries of the component menu of the `gui`: per system its
+`SystemRenderHandle` (depth 0), which inspects the system (see `_inspect!`), followed by its movable
+objects (see `_menu_entries(ctrl)`) one level deeper, then the other movable objects, e.g. the
+sources and the extras.
+"""
+function _menu_entries(gui::LiveView)
+    entries = _menu_entries(gui.controls)
+    out = Tuple{Any, Int}[]
+    placed = falses(length(entries))
+    for h in gui.system_handles
+        push!(out, (h, 0))
+        tops = Base.IdSet{Any}(_top_levels(h))
+        inside = false
+        for (i, (obj, depth)) in enumerate(entries)
+            # the objects of a group follow the group
+            depth == 0 && (inside = obj in tops)
+            if inside && !placed[i]
+                push!(out, (obj, depth + 1))
+                placed[i] = true
+            end
+        end
+    end
+    append!(out, (e for (i, e) in enumerate(entries) if !placed[i]))
+    return out
+end
+
 #=
 Component menu, hide and show
 =#
@@ -84,10 +113,15 @@ function _menu_options(gui::LiveView, entries)
     return [("  "^depth * _label(gui, obj), i) for (i, (obj, depth)) in enumerate(entries)]
 end
 
-"""Shows the automatic names of `_label` in the component menu of the `gui`, if it has one."""
+"""
+Shows the entries of `_menu_entries(gui)` with the automatic names of `_label` in the component
+menu of the `gui`, if it has one: the systems and their objects, see `gui.objects.menu`.
+"""
 _refresh_menu_options!(::LiveView, ::Nothing) = nothing
 function _refresh_menu_options!(gui::LiveView, menu::Menu)
-    options = _menu_options(gui, _menu_entries(gui.controls))
+    entries = _menu_entries(gui)
+    gui.objects.menu = Any[first.(entries)...]
+    options = _menu_options(gui, entries)
     menu.options[] == options || (menu.options[] = options)
     return nothing
 end
@@ -95,8 +129,9 @@ end
 """
     _on_menu_select!(gui, i)
 
-Selects the object of the option `i` of the component menu, like a click in the 3D view. The
-option `0`, i.e. no selection, is set by `_on_select!` and ignored.
+Selects the object of the option `i` of the component menu, like a click in the 3D view, or
+inspects the system of the option, see `_select!`. The option `0`, i.e. no selection, is set by
+`_on_select!` and ignored.
 """
 function _on_menu_select!(gui::LiveView, i)
     1 <= i <= length(gui.objects.menu) || return nothing
@@ -106,10 +141,13 @@ end
 
 """
     _select!(gui, obj)
+    _select!(gui, h::SystemRenderHandle)
 
 Selects the movable `obj` like a click in the 3D view, e.g. from the component menu or the object
-tree, and shows its pose in the status line. Nothing is selected in the spectator mode.
+tree, and shows its pose in the status line. Nothing is selected in the spectator mode. The entry
+`h` of a system inspects the system instead, see `_inspect!`.
 """
+_select!(gui::LiveView, h::SystemRenderHandle) = _inspect!(gui, h)
 function _select!(gui::LiveView, obj)
     ctrl = gui.controls
     ctrl.selected[] === obj && return nothing
@@ -124,16 +162,104 @@ function _select!(gui::LiveView, obj)
     return nothing
 end
 
-"""Shows the selected object of the controls in the component menu and in the component card."""
+"""
+Shows the selected object of the controls in the component menu and in the component card. Any
+change of the selection ends the inspection, see `_inspect!`.
+"""
 function _on_select!(gui::LiveView)
-    obj = gui.controls.selected[]
-    i = isnothing(obj) ? nothing : findfirst(o -> o === obj, gui.objects.menu)
+    gui.objects.inspected = nothing
+    _on_shown!(gui)
+    return nothing
+end
+
+"""
+    _on_shown!(gui)
+
+Shows the object of the card of the selection (see `_shown_object`) in the component menu, on the
+cards, in the inspector and in the object tree, after the selection or the inspection changed.
+"""
+function _on_shown!(gui::LiveView)
+    obj = _shown_object(gui)
+    key = _row_key(gui, obj)
+    i = isnothing(obj) ? nothing : findfirst(o -> o === key, gui.objects.menu)
     _show_menu_selection!(gui.widgets.menu, something(i, 0))
     _update_inspector!(gui)
     _update_cards!(gui)
     _on_selected!(gui)
+    _show_inspected!(gui, gui.objects.inspected)
     return nothing
 end
+
+#=
+Inspection: an object that is shown on the card of the selection without being selected for moving
+=#
+
+"""
+    _shown_object(gui)
+
+The object that the card of the selection of the `gui` shows: the selected object of the controls,
+else the inspected one (see `_inspect!`), else `nothing`.
+"""
+function _shown_object(gui::LiveView)
+    sel = gui.controls.selected[]
+    return isnothing(sel) ? gui.objects.inspected : sel
+end
+
+"""
+    _inspect!(gui, obj)
+    _inspect!(gui, h::SystemRenderHandle)
+
+Shows `obj` on the card of the selection of the `gui` (floating next to it, or in the inspector of
+the app layout) without selecting it for moving, i.e. without gizmo and selection box: a system
+(also given by its handle `h`, e.g. from the component menu or the object tree) or an object that
+is not movable. The selection of the controls is cleared, since `gui.objects.inspected` and
+`controls.selected[]` exclude each other. The inspection ends with Esc, a click on the empty space
+of the 3D view or a new selection, see `_end_inspection!` and `_on_select!`. The pose boxes of an
+inspected object that is not movable reject inputs, see `_apply_pose_input!`.
+"""
+_inspect!(gui::LiveView, h::SystemRenderHandle) = _inspect!(gui, h.sys)
+function _inspect!(gui::LiveView, obj)
+    gui.objects.inspected === obj && return nothing
+    ctrl = gui.controls
+    if !isnothing(ctrl.selected[])
+        ctrl.selected[] = nothing
+        _update_selection_box!(ctrl)
+    end
+    gui.objects.inspected = obj
+    # the bounding box of the new object, see `_card_corners`
+    gui.cards.selection.key = nothing
+    gui.status.text[] = "$(_label(gui, obj)) inspected, not selected for moving, Esc closes its card"
+    _on_shown!(gui)
+    return nothing
+end
+
+"""Ends the inspection of the `gui`, see `_inspect!`; nothing without one."""
+function _end_inspection!(gui::LiveView)
+    isnothing(gui.objects.inspected) && return nothing
+    gui.objects.inspected = nothing
+    _on_shown!(gui)
+    return nothing
+end
+
+"""
+    _row_key(gui, obj)
+
+The key of `obj` in the component menu and in the object tree: the object itself, the
+`SystemRenderHandle` of a system (or of the extras).
+"""
+_row_key(::LiveView, obj) = obj
+function _row_key(gui::LiveView, sys::BMO.AbstractSystem)
+    for h in (gui.system_handles..., gui.extras)
+        h.sys === sys && return h
+    end
+    return sys
+end
+
+"""
+Shows the inspected object of the `gui` besides the cards, e.g. its row in the object tree of the app
+layout; nothing by default.
+"""
+_show_inspected!(::LiveView, _) = nothing
 
 _show_menu_selection!(::Nothing, _) = nothing
 function _show_menu_selection!(menu::Menu, i)
@@ -273,13 +399,22 @@ function _show_all!(gui::LiveView)
 end
 
 
-"""Connects the export button, the component menu and "show all"; the cards connect their widgets."""
+"""
+Connects the export button, the component menu, "show all" and Esc, which ends the inspection (see
+`_inspect!`); the cards connect their widgets.
+"""
 function _connect_tools!(gui::LiveView)
     listeners = gui.controls.listeners
     push!(listeners, on(_ -> _export!(gui), gui.widgets.export_button.clicks))
     _listen!(listeners, i -> _on_menu_select!(gui, i), _menu_selection(gui.widgets.menu))
     push!(listeners, on(_ -> _on_select!(gui), gui.controls.selected))
     _listen!(listeners, _ -> _show_all!(gui), _clicks(gui.widgets.show_all_button))
+    # Before the controls, which consume Esc to deselect; passed on
+    push!(listeners, on(events(gui.ax.scene).keyboardbutton, priority = 201) do event
+        (event.action == Keyboard.press && event.key == Keyboard.escape) || return Consume(false)
+        gui.controls.ignore_keys() || _end_inspection!(gui)
+        return Consume(false)
+    end)
     return nothing
 end
 

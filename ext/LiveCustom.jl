@@ -30,13 +30,15 @@ _add_user_panel!(_, gui::LiveView, ::String, ::Bool) = _slot_error(gui, "place f
 """
 Returns the `_UserPanel` named `title` with the content `layout`, built by `f(layout)`: its result
 is the `update` of the panel if it is a `Function`, otherwise the panel has no update, e.g. for the
-last plot of a `do` block.
+last plot or the last listener (`on`) of a `do` block.
 """
 _user_panel(f, title::String, layout::GridLayout) =
     _UserPanel(title, layout, _update_function(f(layout)), nothing)
 
 _update_function(update::Function) = update
 _update_function(_) = nothing
+# The listener of an `on` at the end of a `do` block, which is a `Function`, too
+_update_function(::Observables.ObserverFunction) = nothing
 
 """
     _panel_shown(gui, p) -> Bool
@@ -63,13 +65,16 @@ _results_valid(gui::LiveView) = !_running(gui) && !gui.trace.preview
 """
     _update_user_panels!(gui)
 
-Calls the `update` of all panels of [`add_panel!`](@ref) that are shown, after a full solve (see
-`_apply!`); hidden panels are marked stale instead. Nothing is done without such panels.
+Calls the `update` of all panels of [`add_panel!`](@ref) that are shown and of all controls of
+[`add_controls!`](@ref), after a full solve (see `_apply!`); hidden panels are marked stale
+instead. Nothing is done without such panels and controls.
 """
 function _update_user_panels!(gui::LiveView)
     for p in gui.custom.panels
         _panel_shown(gui, p) ? _update_user_panel!(gui, p) : _mark_panel_stale!(gui, p)
     end
+    # Controls are always shown
+    foreach(c -> _run_update!(gui, c, c.update), gui.custom.controls)
     return nothing
 end
 
@@ -85,16 +90,25 @@ end
 
 """Calls the `update` of the panel `p`, errors are logged once per distinct message."""
 _update_user_panel!(gui::LiveView, p::_UserPanel) = _run_update!(gui, p, p.update)
-_run_update!(::LiveView, ::_UserPanel, ::Nothing) = nothing
-function _run_update!(gui::LiveView, p::_UserPanel, update::Function)
+
+"""
+    _run_update!(gui, p, update)
+
+Calls `update(gui)` of the panel or the controls `p` (a `_UserPanel` or `_UserControls`), nothing
+without an `update`. Errors are logged once per distinct message, see `_log_once`.
+"""
+_run_update!(::LiveView, _, ::Nothing) = nothing
+function _run_update!(gui::LiveView, p::Union{_UserPanel, _UserControls}, update::Function)
     try
         update(gui)
         p.last_error = nothing
     catch e
-        p.last_error = _log_once(e, p.last_error, "update of the panel \"$(p.title)\"")
+        p.last_error = _log_once(e, p.last_error, "update of $(_update_source(p))")
     end
     return nothing
 end
+_update_source(p::_UserPanel) = "the panel \"$(p.title)\""
+_update_source(c::_UserControls) = "the controls \"$(c.title)\""
 
 #=
 Controls
@@ -102,9 +116,13 @@ Controls
 
 function add_controls!(f, gui::LiveView, title::AbstractString)
     layout = _controls_slot!(gui, String(title))
-    f(layout)
+    # Like the builder of a panel, `f` may return an `update`, see `_user_panel`
+    c = _UserControls(String(title), layout, _update_function(f(layout)), nothing)
+    push!(gui.custom.controls, c)
     _on_controls_added!(gui)
     _register_widgets!(gui, layout)
+    # The controls show the current state right away; they are always shown, i.e. never stale
+    _run_update!(gui, c, c.update)
     return layout
 end
 
@@ -154,7 +172,7 @@ _custom_typing(parts::_UserParts) =
 Tools
 =#
 
-function add_tool!(f, gui::LiveView, name::AbstractString; icon::Symbol = :object,
+function add_tool!(f, gui::LiveView, name::AbstractString; icon::Union{Symbol, BezierPath} = :object,
         key::Union{Nothing, Keyboard.Button} = nothing, toggle::Bool = false,
         tooltip::AbstractString = name)
     # An unknown icon throws in all layouts, such that code works with any layout

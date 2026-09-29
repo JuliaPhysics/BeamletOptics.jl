@@ -27,6 +27,15 @@ using Test
             @test Ext._icon(name) === icon
         end
         @test_throws ArgumentError Ext._icon(:no_such_icon)
+        # an own icon is used as it is, e.g. on an icon button
+        path = Makie.BezierPath("M -0.3 -0.3 L 0.3 -0.3 L 0 0.3 Z")
+        @test Ext._icon(path) === path
+        fig = Figure()
+        @test Ext._IconButton(fig[1, 1]; icon = path).icon[] === path
+        t = Ext._IconToggle(fig[1, 2]; icon = path, icon_off = :eye_off)
+        @test t.icon[] === Ext._icon(:eye_off)
+        t.active[] = true
+        @test t.icon[] === path
     end
 
     @testset "SVG path parser" begin

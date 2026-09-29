@@ -75,7 +75,7 @@ function _new_parts!(c::_DockedCard)
     return nothing
 end
 
-_card_object(gui::LiveView, c::_DockedCard) = c.pinned ? c.obj : gui.controls.selected[]
+_card_object(gui::LiveView, c::_DockedCard) = c.pinned ? c.obj : _shown_object(gui)
 _card_boxes(c::_DockedCard) = c.textboxes
 # A collapsed card shows only its actions
 _declarations(c::_DockedCard, obj) = (card_actions(obj), c.collapsed ? () : card_rows(obj))
@@ -418,7 +418,7 @@ function _refresh_inspector!(gui::AppView; force::Bool = false)
     layout = gui.layout
     layout.right.shown || return nothing
     insp = layout.inspector
-    obj = gui.controls.selected[]
+    obj = _shown_object(gui)
     if insp.fresh || obj !== insp.shown
         insp.fresh = false
         insp.shown = obj
@@ -457,7 +457,7 @@ end
 """Sets the pin of the inspector of the `gui` to whether a card is pinned to the selected object."""
 function _show_pin!(gui::AppView)
     pin = gui.layout.inspector.pin
-    obj = gui.controls.selected[]
+    obj = _shown_object(gui)
     pinned = !isnothing(obj) && _is_pinned(gui, obj)
     pin.active[] == pinned || (pin.active[] = pinned)
     visible = !isnothing(obj)
@@ -500,7 +500,7 @@ function _connect_inspector!(gui::AppView)
     listeners = ctrl.listeners
     _connect_selection_part!(gui, insp)
     push!(listeners, on(insp.pin.active) do v
-        obj = ctrl.selected[]
+        obj = _shown_object(gui)
         (isnothing(obj) || v == _is_pinned(gui, obj)) || _toggle_pin!(gui, obj)
         return nothing
     end)

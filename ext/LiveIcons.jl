@@ -173,16 +173,19 @@ const _ICONS = Dict{Symbol, BezierPath}(name => _svg_path(d) for (name, d) in _I
 
 """
     _icon(name::Symbol)
+    _icon(path::BezierPath)
 
 Returns the icon `name` as a `BezierPath` in the unit square centered at the origin, for use as a
 `scatter` marker (`markersize` = size of the icon in pixels, with the usual padding of Material
 Symbols). See `keys(_ICONS)` for the available names; `:object` is the generic icon of objects
-without an own one.
+without an own one. An own `path`, e.g. the icon of a tool of [`add_tool!`](@ref), is returned
+as it is.
 """
 function _icon(name::Symbol)
     haskey(_ICONS, name) && return _ICONS[name]
     throw(ArgumentError("Unknown icon :$name, available: $(join(sort!(collect(keys(_ICONS))), ", "))"))
 end
+_icon(path::BezierPath) = path
 
 # Colors of the icon buttons for a light theme; the app layout passes the tokens of its theme
 const _ICON_COLOR = RGBAf(0.23, 0.25, 0.29, 1)
@@ -197,7 +200,7 @@ const _TRANSPARENT = RGBAf(0, 0, 0, 0)
 const _TOOLTIP_Z = 9000.0f0
 
 """
-    _IconButton(parent; icon::Symbol, tooltip::String = "", size = 28, kwargs...)
+    _IconButton(parent; icon::Union{Symbol, BezierPath}, tooltip::String = "", size = 28, kwargs...)
 
 A flat icon button of the app layout of the live view at the grid position `parent`, e.g.
 `fig[1, 2]`: the icon [`_icon(icon)`](@ref _icon) on a transparent square of `size` pixels, which
@@ -238,7 +241,7 @@ struct _IconButton
 end
 
 """
-    _IconToggle(parent; icon::Symbol, icon_off::Symbol = icon, tooltip::String = "",
+    _IconToggle(parent; icon::Union{Symbol, BezierPath}, icon_off = icon, tooltip::String = "",
                 active = false, size = 28, kwargs...)
 
 A flat icon toggle of the app layout of the live view, see [`_IconButton`](@ref) for the look and
@@ -262,7 +265,7 @@ struct _IconToggle
     plots::Vector{Makie.AbstractPlot}
 end
 
-function _IconButton(parent; icon::Symbol, tooltip::String = "", kwargs...)
+function _IconButton(parent; icon::Union{Symbol, BezierPath}, tooltip::String = "", kwargs...)
     clicks = Observable(0)
     w = _icon_widget(parent, Observable(_icon(icon)), Observable(false), tooltip,
         () -> (clicks[] += 1); kwargs...)
@@ -270,8 +273,8 @@ function _IconButton(parent; icon::Symbol, tooltip::String = "", kwargs...)
         w.plots)
 end
 
-function _IconToggle(parent; icon::Symbol, icon_off::Symbol = icon, tooltip::String = "",
-        active = false, kwargs...)
+function _IconToggle(parent; icon::Union{Symbol, BezierPath}, icon_off::Union{Symbol, BezierPath} = icon,
+        tooltip::String = "", active = false, kwargs...)
     active = convert(Observable{Bool}, active)
     on_icon, off_icon = _icon(icon), _icon(icon_off)
     marker = lift(a -> a ? on_icon : off_icon, active)

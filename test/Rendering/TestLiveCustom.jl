@@ -200,6 +200,36 @@ const BMO = BeamletOptics
         close(gui)
     end
 
+    @testset "update of controls ($layout)" for layout in (:compact, :app)
+        gui, m, _ = _fixture(; layout)
+        n = Ref(0)
+        add_controls!(gui, "Counted") do l
+            Label(l[1, 1], "x")
+            return g -> (n[] += 1)
+        end
+        @test only(gui.custom.controls).title == "Counted"
+        # called right away, then after full solves only, like the update of a panel
+        @test n[] == 1
+        _move!(gui, m)
+        @test n[] == 1
+        _pause!(gui)
+        @test n[] == 2
+        _key!(gui, Keyboard.t)
+        @test n[] == 3
+        # a `do` block that ends with a listener has no update
+        add_controls!(gui, "Listener") do l
+            b = Button(l[1, 1]; label = "go")
+            on(_ -> nothing, b.clicks)
+        end
+        @test isnothing(gui.custom.controls[2].update)
+        # errors in `update` are logged once
+        @test_logs (:error, r"controls \"Broken\"") add_controls!(_ -> (_ -> error("broken controls")), gui, "Broken")
+        @test gui.custom.controls[3].last_error == "broken controls"
+        @test_logs _key!(gui, Keyboard.t)
+        @test n[] == 4
+        close(gui)
+    end
+
     @testset "tools ($layout)" for layout in (:compact, :app)
         gui, _, _ = _fixture(; layout)
         calls = Any[]
@@ -238,6 +268,10 @@ const BMO = BeamletOptics
         @test occursin("key steps", err(() -> add_tool!(identity, gui, "x"; key = Keyboard.left)))
         @test occursin("the tool \"Tool\"", err(() -> add_tool!(identity, gui, "x"; key = Keyboard._2)))
         @test occursin("measure", err(() -> add_tool!(identity, gui, "x"; icon = :nonsense)))
+        # an own icon
+        path = BezierPath("M -0.3 -0.3 L 0.3 -0.3 L 0 0.3 Z")
+        own = add_tool!(identity, gui, "Own"; icon = path)
+        own_toggle = add_tool!((g, a) -> nothing, gui, "Own toggle"; icon = path, toggle = true)
         # errors of `f` are logged
         bad = add_tool!(_ -> error("broken tool"), gui, "Bad")
         @test_logs (:error, r"tool \"Bad\"") (bad.clicks[] += 1)
@@ -249,12 +283,19 @@ const BMO = BeamletOptics
             row = gui.layout.tool_row
             filler = only(GLB.contents(row[1, GLB.ncols(row)]))
             @test filler isa Label && filler.text[] == ""
+            # the compact layout shows the name, not the icon
+            @test own isa Button && own.label[] == "Own"
         else
             # icon buttons in the toolbar group `:user` before "Help"
             @test b isa Ext._IconButton
             @test b.tooltip[] == "My tool (2)"
             @test t isa Ext._IconToggle
             @test first.(gui.layout.groups)[(end - 1):end] == [:user, :help]
+            # the own icon in the toolbar, also on a toggle, on and off
+            @test own.icon[] === path
+            @test own_toggle.icon[] === path
+            own_toggle.active[] = true
+            @test own_toggle.icon[] === path
         end
         close(gui)
     end

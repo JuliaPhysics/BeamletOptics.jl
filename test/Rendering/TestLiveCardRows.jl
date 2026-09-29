@@ -110,6 +110,22 @@ const BMO = BeamletOptics
         close(gui)
     end
 
+    @testset "systems" begin
+        m, pd = _fixture()
+        src = CollimatedSource([0.0, 0, 0], [0.0, 1, 0], 4e-3, 633e-9; num_rings = 2, num_rays = 40)
+        sys = System([m, pd])
+        gui = _live_view(sys => src, sys => Beam([0.0, 0, 0], [0.0, 1, 0]); preview = false)
+        # no pose rows, the number of objects, the rays of both sources and the last solve
+        rows = BMO.card_rows(sys)
+        @test length(rows) == 3
+        Ext._inspect!(gui, sys)
+        @test _text(gui, :objects) == "2"
+        @test _text(gui, :rays) == "41"
+        @test _text(gui, :solve) == Ext._ms_string(gui.trace.solve_time)
+        @test isnothing(Ext._card_widget(gui.cards.selection, :x))
+        close(gui)
+    end
+
     @testset "refresh of 1000 rays" begin
         m, pd = _fixture()
         src = UniformDiscSource([0.0, 0, 0], [0.0, 1, 0], 4e-3, 633e-9; num_rays = 1000)

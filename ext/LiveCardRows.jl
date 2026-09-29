@@ -25,9 +25,10 @@ function pose_card_rows(obj)
     return (CardRow(cells(1:3, "mm")...), CardRow(cells(4:6, "mrad")...))
 end
 
-# A row of a label `label` and a text of the object, `text(gui, obj)`, refreshed after moves and solves
-_text_row(label::String, name::Symbol, text) =
-    CardRow(CardWidget(Label; text = label, width = 40, halign = :left),
+# A row of a label `label` (`width` pixels wide) and a text of the object, `text(gui, obj)`,
+# refreshed after moves and solves
+_text_row(label::String, name::Symbol, text; width::Real = 40) =
+    CardRow(CardWidget(Label; text = label, width, halign = :left),
         CardWidget(Label; name, halign = :left, value = text))
 
 #=
@@ -56,6 +57,10 @@ card_rows(src::Union{BMO.CollimatedSource, BMO.PointSource}) = (pose_card_rows(s
     _text_row("λ", :source, _source_text), _ray_rows(src.sampling, length(src))...)
 # Gaussian beamlets: wavelength, waist and Rayleigh range
 card_rows(g::BMO.GaussianBeamlet) = (pose_card_rows(g)..., _text_row("λ", :gauss, _gauss_text))
+# Systems (inspected, see `_inspect!`): no pose, the number of objects, the rays of their sources and
+# the duration of the last solve
+card_rows(::BMO.AbstractSystem) = (_text_row("objects", :objects, _objects_text; width = 48),
+    _text_row("rays", :rays, _rays_text; width = 48), _text_row("solve", :solve, _solve_text; width = 48))
 
 card_actions(obj) = (CardWidget(Button; name = :hide, label = "hide",
     value = (gui, o) -> _all_hidden(gui, o) ? "show" : "hide", on = (gui, o, _) -> _toggle_hidden!(gui, o)),)
@@ -195,7 +200,14 @@ _source_text(gui::LiveView, src) = "$(_wavelength_string(BMO._source_wavelength(
 _size_text(cs::BMO.CollimatedSource) = "⌀ $(_length_string(cs.diameter))"
 _size_text(ps::BMO.PointSource) = "NA $(round(BMO.numerical_aperture(ps); digits = 3))"
 
-_gauss_text(gui::LiveView, g) = "$(_wavelength_string(BMO.wavelength(_first_ray(g)))), w0 " *
+# The rendered objects of a system, see `_leaves`
+_objects_text(::LiveView, sys) = string(length(_leaves(sys)))
+# The rays of the sources of a system (or beams of a beam group), as in the info label, see `_ray_count`
+_rays_text(gui::LiveView, sys) = string(sum(p -> _ray_count(p.second), filter(p -> p.first === sys, gui.pairs); init = 0))
+# The duration of the last full solve of all systems
+_solve_text(gui::LiveView, _) = gui.trace.solve_time > 0 ? _ms_string(gui.trace.solve_time) : "–"
+
+_gauss_text(gui::LiveView, g) ="$(_wavelength_string(BMO.wavelength(_first_ray(g)))), w0 " *
     "$(_length_string(BMO.beam_waist(g))), zR $(_length_string(BMO.rayleigh_range(g)))"
 
 #=

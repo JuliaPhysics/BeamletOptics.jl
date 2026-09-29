@@ -73,11 +73,17 @@ Applies the input `s` of the pose box `k` of a card (see `_POSE_FIELDS`) to its 
 `k ≤ 3`, moves it to the absolute position x, y or z [mm], otherwise rotates it about the red,
 green or blue axis of the controls [mrad], like a key step in the rotate mode. The change is
 recorded in the undo history and solved like a key step. An invalid input only shows a message in
-the status line.
+the status line, and so does an input for an object that is not movable, e.g. an inspected one (see
+`_inspect!`).
 """
 _apply_pose_input!(gui::LiveView, ::Nothing, ::Int, _) = _update_inspector!(gui; force = true)
 function _apply_pose_input!(gui::LiveView, obj, k::Int, s)
     ctrl = gui.controls
+    if !_is_movable(ctrl, obj)
+        gui.status.text[] = "$(_label(gui, obj)) is not movable, its pose can not be changed"
+        _update_inspector!(gui; force = true)
+        return nothing
+    end
     x = isnothing(s) ? nothing : tryparse(Float64, strip(s))
     if isnothing(x) || !isfinite(x)
         gui.status.text[] = "invalid input \"$(something(s, ""))\" for $(_POSE_FIELDS[k]), enter a number"
@@ -132,19 +138,20 @@ Component card
 =#
 
 """
-Returns the object of the card `c` of the `gui`: the pinned object, the selected object for the card
-of the selection (`gui.cards.selection`), `nothing` for a spare card.
+Returns the object of the card `c` of the `gui`: the pinned object, the selected (or inspected, see
+`_shown_object`) object for the card of the selection (`gui.cards.selection`), `nothing` for a
+spare card.
 """
 function _card_object(gui::LiveView, c::_ComponentCard)
     c.pinned && return c.obj
-    return c === gui.cards.selection ? gui.controls.selected[] : nothing
+    return c === gui.cards.selection ? _shown_object(gui) : nothing
 end
 
 """
     _update_cards!(gui)
 
-Shows the card of the selection (`gui.cards.selection`) next to the selected object, unless it has a pinned
-card, and the pinned cards of the `gui` next to their objects; see `_update_card!`. The cards are
+Shows the card of the selection (`gui.cards.selection`) next to the selected (or inspected, see
+`_inspect!`) object, unless it has a pinned card, and the pinned cards of the `gui` next to their objects; see `_update_card!`. The cards are
 placed in this order, each off the view cube and the cards before, so that none covers another:
 the cards that the mouse moved to their `spot` first, where they stay (see `_drag_cards!`), then
 the card of the selection, at its object; a pinned card without room is collapsed to its head. All
@@ -153,7 +160,7 @@ moves the cards with the camera and the objects.
 """
 function _update_cards!(gui::LiveView)
     menu = _menu_open(gui)
-    sel = gui.controls.selected[]
+    sel = _shown_object(gui)
     obstacles = _obstacles(gui.widgets.view_cube)
     shown = menu || !_selection_card_shown(gui) || any(c -> c.pinned && c.obj === sel, gui.cards.all) ?
         nothing : sel
@@ -185,7 +192,7 @@ the layout.
 """
 _update_card!(::LiveView, c::_ComponentCard, ::Nothing, ::Vector{Rect2f}) = _hide_card!(c)
 function _update_card!(gui::LiveView, c::_ComponentCard, obj, obstacles::Vector{Rect2f})
-    pose = _pose(obj)
+    pose = _card_pose(obj)
     if c.pose === nothing || c.pose[1] !== obj
         _build_content!(gui, c, obj)
     end
@@ -282,7 +289,7 @@ function _add_cell!(gui::LiveView, c::_AbstractCard, pos, w::CardWidget)
     i = length(c.widgets)
     _fix_caret!(c, b)
     _track_textbox!(gui, c, b)
-    _listen_input!(gui, c, i, _widget_input(b))
+    _listen_input!(gui, c, i, BMO.card_input(b))
     return nothing
 end
 
@@ -349,29 +356,60 @@ function _refresh_card!(gui::LiveView, c::_AbstractCard; force::Bool = false)
     _refresh_selection_part!(gui, c, obj)
     return nothing
 end
-_refresh_widget!(b, value, gui::LiveView, obj; force::Bool = false) = _show!(b, value(gui, obj); force)
+_refresh_widget!(b, value, gui::LiveView, obj; force::Bool = false) = _show_value!(b, value(gui, obj), force)
 _refresh_widget!(_, ::Nothing, ::LiveView, _; force::Bool = false) = nothing
 
 """
     _card_corners(gui, c, obj)
 
 Returns the corners of the bounding box of the object `obj` of the card `c` of the `gui`: of the
-selection box for the card of the selection, which the controls keep up to date. A pinned card takes
-the bounding box of the plots of `obj` once and moves it with the pose of `obj` (see `key`), since
-the plots follow a move only after they are rendered again.
+selection box for the card of the selected object, which the controls keep up to date. A pinned
+card and the card of an inspected object (see `_inspect!`) take the bounding box of the plots of
+`obj` once (see `_card_bbox`) and move it with the pose of `obj` (see `key` and `_card_pose`),
+since the plots follow a move only after they are rendered again.
 """
 function _card_corners(gui::LiveView, c::_ComponentCard, obj)
     ctrl = gui.controls
-    c.pinned || return ctrl.box_obs[]
+    (c.pinned || obj !== ctrl.selected[]) || return ctrl.box_obs[]
     if c.key === nothing || c.key[1] !== obj
-        P, R = _pose(obj)
-        c.corners = _box_corners(_selection_bbox(ctrl, obj, _object_plots(ctrl.h, obj)))
-        c.key = (obj, Vector{Float64}(P), Matrix{Float64}(R))
+        c.corners = _box_corners(_card_bbox(ctrl, obj))
+        c.key = (obj, _card_pose(obj))
     end
-    _, P0, R0 = c.key
-    P, R = _pose(obj)
-    T = Matrix{Float64}(R) * R0'
-    return [Point3f(Vector{Float64}(P) + T * (Vector{Float64}(q) - P0)) for q in c.corners]
+    return _moved_corners(c.corners, c.key[2], _card_pose(obj))
+end
+
+"""
+    _card_pose(obj)
+
+The pose of the object `obj` of a card (see `_pose`), by which the card notices a move; `nothing`
+for a system, whose card is refreshed after the moves of its objects like any card, see
+`_update_inspector!`.
+"""
+_card_pose(obj) = _pose(obj)
+_card_pose(::BMO.AbstractSystem) = nothing
+
+"""
+Returns the `corners` of a bounding box taken in the pose `(P0, R0)`, moved to the pose `(P, R)`;
+unchanged for an object without a pose, see `_card_pose`.
+"""
+function _moved_corners(corners, (P0, R0), (P, R))
+    T = Matrix{Float64}(R) * Matrix{Float64}(R0)'
+    return [Point3f(Vector{Float64}(P) + T * (Vector{Float64}(q) - Vector{Float64}(P0))) for q in corners]
+end
+_moved_corners(corners, ::Nothing, ::Nothing) = corners
+
+"""
+    _card_bbox(ctrl, obj)
+
+The bounding box of the plots of `obj` in the controls `ctrl`, see `_selection_bbox`; for a system,
+the union of the boxes of its rendered objects (see `_leaves`), or a box around its first object if
+all of them are clipped.
+"""
+_card_bbox(ctrl::KinematicController, obj) = _selection_bbox(ctrl, obj, _object_plots(ctrl.h, obj))
+function _card_bbox(ctrl::KinematicController, sys::BMO.AbstractSystem)
+    leaves = _leaves(sys)
+    isempty(leaves) && return GeometryBasics.Rect3d(fill(-5e-3, 3), fill(1e-2, 3))
+    return _selection_bbox(ctrl, first(leaves), _object_plots(ctrl.h, sys))
 end
 
 """Collapses the card `c` of the `gui` to its head, or expands it again."""
@@ -399,8 +437,8 @@ function _toggle_pinned!(gui::LiveView, c::_ComponentCard)
         # the plots of an inspected point or a measurement, unless it is still pinned elsewhere,
         # e.g. after it was docked, see `_forget!`
         _is_pinned(gui, obj) || _forget!(gui, obj)
-    elseif c === gui.cards.selection && !isnothing(gui.controls.selected[])
-        c.pinned, c.obj, c.key = true, gui.controls.selected[], nothing
+    elseif c === gui.cards.selection && !isnothing(_shown_object(gui))
+        c.pinned, c.obj, c.key = true, _shown_object(gui), nothing
         _use_card!(gui, _spare_card!(gui))
     end
     # Also resets the pin toggle of a card that cannot be pinned
@@ -587,6 +625,16 @@ function _inspector_rows(::LiveView, obj)
         Pair{String, Any}["Error" => sprint(showerror, e)]
     end
     return [_property_row(name, value) for (name, value) in props if !(name in _INSPECTOR_SKIPPED)]
+end
+
+"""
+The rows of the property list of an inspected system (see `_inspect!`): its properties (see
+`BeamletOptics.properties`), then the number of its objects and of its sources.
+"""
+function _inspector_rows(gui::LiveView, sys::BMO.AbstractSystem)
+    rows = invoke(_inspector_rows, Tuple{LiveView, Any}, gui, sys)
+    sources = count(p -> p.first === sys, gui.pairs)
+    return Tuple{String, String}[rows; ("Objects", string(length(_leaves(sys)))); ("Sources", string(sources))]
 end
 
 """Summary of the live view, shown without a selection, e.g. in the inspector of the app layout."""

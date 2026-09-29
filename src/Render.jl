@@ -284,13 +284,23 @@ add_panel!(::Any, ::Any, ::AbstractString; kwargs...) = throw(MissingBackendErro
 Adds own widgets to the [`live_view`](@ref) window `gui`, placed by its layout: with
 `layout = :compact` in a row named `title` above the status row, spanning the width of the window;
 with `layout = :app` as a section `title` of the left sidebar, below "Parameters". `f(layout)`
-builds the widgets (e.g. `Button`, `Toggle`, `Menu`, `Textbox`) into the given `GridLayout` and
-connects them. Returns the layout.
+builds the widgets (e.g. `Button`, `Toggle`, `Menu`, `Textbox`, or an own widget type, see
+[`card_input`](@ref)) into the given `GridLayout` and connects them. Returns the layout.
+
+Controls are meant for parameters without an object in the scene, e.g. a setting of the whole
+setup; the widgets of an object belong on its card, see [`card_rows`](@ref).
 
 `Textbox`es and `Menu`s in the layout take the keyboard like those of the live view: while a box
 is focused or a menu is open, the keys of the 3D view and the camera are ignored. They are
 collected once `f` returns, widgets added later are not. An input that changes the optics solves
-the systems again via [`retrace!`](@ref):
+the systems again via [`retrace!`](@ref), which makes the change after a running solve is
+cancelled.
+
+Like the builder of [`add_panel!`](@ref), `f` may return a function `update(gui)`, which is called
+once right away and after each full solve (not after the preview solves while moving), e.g. to
+show the current value of a parameter after an undo; `update` must not change objects. Any other
+return value of `f`, e.g. the last listener of a `do` block, means no `update`. Errors in `update`
+are logged once and do not interrupt the interaction.
 
 ```julia
 add_controls!(gui, "Laser") do layout
@@ -298,6 +308,7 @@ add_controls!(gui, "Laser") do layout
     on(box.stored_string) do s
         retrace!(() -> set_power!(laser, 1e-3 * parse(Float64, s)), gui)
     end
+    return gui -> card_show!(box, 1e3 * power(laser))
 end
 ```
 
@@ -310,10 +321,14 @@ add_controls!(::Any, ::Any, ::AbstractString) = throw(MissingBackendError())
 
 Adds a tool to the [`live_view`](@ref) window `gui`: a button that calls `f(gui)`, or with
 `toggle = true` a toggle that calls `f(gui, active::Bool)` whenever it is switched. With
-`layout = :app`, an icon button (or toggle) in the toolbar, before "Help", with the `icon` (a name
-of the icon set of the app layout, e.g. `:measure`, `:export` or `:chart`; an unknown name throws
-an `ArgumentError` that lists the valid ones) and the `tooltip`; with `layout = :compact`, a
-button (or a toggle with a label) named `name` in the row below the status line.
+`layout = :app`, an icon button (or toggle) in the toolbar, before "Help", with the `icon` and the
+`tooltip`; with `layout = :compact`, a button (or a toggle with a label) named `name` in the row
+below the status line.
+
+`icon` is a name of the icon set of the app layout, e.g. `:measure`, `:export` or `:chart` (an
+unknown name throws an `ArgumentError` that lists the valid ones, in any layout), or an own
+`Makie.BezierPath`, drawn like a `scatter` marker: in the unit square centered at the origin, e.g.
+`BezierPath("M -0.3 -0.3 L 0.3 -0.3 L 0 0.3 Z")` for a triangle.
 
 `key`, a free `Makie.Keyboard.Button` such as `Keyboard._2` or `Keyboard.f5`, presses the button
 (or switches the toggle) from the 3D view; it is shown in the tooltip or label. Keys taken by the
@@ -406,16 +421,19 @@ set_render_look(::Any) = throw(MissingBackendError())
     CardWidget(T; name = nothing, value = nothing, on = nothing, solve = false, attributes...)
 
 A widget on a card of [`live_view`](@ref), see [`card_rows`](@ref): a `Makie` block of the type
-`T`, e.g. `Label`, `Slider`, `Toggle`, `Textbox`, `Button` or `Menu`, created with the
-`attributes`, e.g. the `range` of a `Slider` or the `width`. The card places the widget, hides it
-with the card and keeps clicks on it from the 3D view, and its textboxes take the keyboard.
+`T`, e.g. `Label`, `Slider`, `Toggle`, `Textbox`, `Button` or `Menu`, created as
+`T(position; attributes...)` with the `attributes`, e.g. the `range` of a `Slider` or the `width`.
+The card places the widget, hides it with the card and keeps clicks on it from the 3D view, and its
+textboxes take the keyboard. `T` may be an own widget type with methods of [`card_input`](@ref) and
+[`card_show!`](@ref), e.g. a `Makie.@Block`.
 
-- `value(gui, obj)`: the value the widget shows for the object `obj` of the card: the text of a
-  `Label` or `Button`, the value of a `Slider`, `Toggle` or `Textbox`. Refreshed when the card
-  gets its object, after moves, solves and inputs.
-- `on(gui, obj, v)`: applies an input `v` of the widget to `obj`: the value of a `Slider`, the
-  state of a `Toggle`, the entered text of a `Textbox`, the click count of a `Button` or the
-  selection of a `Menu`. Inputs of a widget without `on` are ignored.
+- `value(gui, obj)`: the value the widget shows for the object `obj` of the card, passed to
+  [`card_show!`](@ref): the text of a `Label` or `Button`, the value of a `Slider`, `Toggle` or
+  `Textbox`. Refreshed when the card gets its object, after moves, solves and inputs.
+- `on(gui, obj, v)`: applies an input `v` of the widget to `obj`, a new value of its
+  [`card_input`](@ref): the value of a `Slider`, the state of a `Toggle`, the entered text of a
+  `Textbox`, the click count of a `Button` or the selection of a `Menu`. Inputs of a widget without
+  `on` are ignored.
 - `solve = true`: the input changes the optics, e.g. a parameter of `obj`: a running solve is
   cancelled before `on`, and the systems are solved again afterwards (or the beams are marked as
   outdated without auto tracing), like after a move, via the `on_change` of the controls.
@@ -456,13 +474,22 @@ Rows of the card of `obj` in [`live_view`](@ref), a tuple of [`CardRow`](@ref)s,
 dispatch. By default, the rows of the pose, see [`pose_card_rows`](@ref); a source whose rays can
 be regenerated (see [`set_num_rays!`](@ref)) adds a slider for the number of rays, a `Detector`
 the mode and the color scale of its detector panel, mechanics (`NonInteractableObject`, e.g. a
-`MeshDummy`, and `IntersectableObject`) a slider for their opacity. Add a method for an own type
-to show its properties or controls on its card, e.g.
+`MeshDummy`, and `IntersectableObject`) a slider for their opacity. The card of a system
+(`AbstractSystem`, shown after a click on its entry in the component menu or the object tree)
+shows the number of its objects, the number of rays of its sources and the duration of the last
+solve. Add a method for an own type to show its properties or controls on its card, e.g.
 
 ```julia
 BeamletOptics.card_rows(l::MyLens) = (pose_card_rows(l)...,
     CardRow("f", CardWidget(Label; value = (gui, l) -> "\$(1e3 * focal_length(l)) mm")))
 ```
+
+A card exists only for things in the scene (objects, groups, sources, systems, clip planes); a
+parameter without an object belongs into [`add_controls!`](@ref). The card may be rebuilt at any
+time and shows other objects of the same declarations, hence the widgets keep no state: `value`
+and `on` get the `gui` and the object. `value` runs after every move, solve and input and must be
+cheap. The rows of a system type extend the default ones via
+`invoke(BeamletOptics.card_rows, Tuple{BeamletOptics.AbstractSystem}, sys)`.
 
 The methods for the types of BeamletOptics come with the `Makie` extension.
 """
@@ -487,3 +514,40 @@ Buttons in the head of the card of `obj` in [`live_view`](@ref), a tuple of
 extension.
 """
 function card_actions end
+
+"""
+    card_input(w) -> Union{Observable, Nothing}
+
+The input of the widget `w` on a card of [`live_view`](@ref) (see [`CardWidget`](@ref)): an
+`Observable` whose updates are the inputs of the user, each passed as `v` to the `on(gui, obj, v)`
+of the declaration. `nothing` means that the widget takes no input, e.g. a `Label`, and is the
+default for any type. The `Makie` extension has methods for the blocks of `Makie`: the `value` of a
+`Slider`, `active` of a `Toggle`, `stored_string` of a `Textbox`, `clicks` of a `Button` and
+`selection` of a `Menu`.
+
+An own widget type, e.g. a `Makie.@Block` or any type constructed as `T(position; attributes...)`
+that places itself at a `GridPosition`, adds a method of `card_input` and of [`card_show!`](@ref)
+and can then be declared as `CardWidget(T; ...)` on a card. Widgets built in
+[`add_controls!`](@ref) may use both functions as well, the controls do not call them. An own type
+that consists of several blocks deletes them in `Base.delete!`, which the card calls when it
+rebuilds its widgets (a `Makie.@Block` with `@forwarded_layout` does so by itself).
+"""
+function card_input end
+
+"""
+    card_show!(w, v)
+
+Shows the value `v` in the widget `w` on a card of [`live_view`](@ref), where `v` is the result of
+the `value(gui, obj)` of its [`CardWidget`](@ref). The card calls it when it gets its object and
+after moves, solves and inputs. The `Makie` extension has methods for the blocks of `Makie`: the
+text of a `Label` or the label of a `Button` (`string(v)`), the text of a `Textbox`, the value of
+a `Slider` (the closest step of its range) and the state of a `Toggle`. The default for any other
+type shows nothing.
+
+Showing a value is not an input: the card ignores the updates of [`card_input`](@ref) while it
+shows values, and a method should not change the observable of `card_input` if it can avoid it,
+since outside of a card, e.g. in [`add_controls!`](@ref), nothing ignores them. A method should
+also keep what the user is typing: the method for a `Textbox` does not change a focused box,
+unless it is called with `force = true`, which the card does after an input was applied.
+"""
+function card_show! end

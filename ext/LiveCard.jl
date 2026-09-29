@@ -95,8 +95,9 @@ object with other declarations, see `_build_content!`: `widgets` holds each widg
 the widgets show new values and their inputs are ignored.
 
 The `link` holds the ends of the line, the object first; its plots, like all plots of the card, are
-not inspectable. For a pinned card, `corners` are the corners of the bounding box of its object in
-the pose `key = (obj, P, R)` when it was pinned; they move with the object, see `_card_corners`.
+not inspectable. For a pinned card and the card of an inspected object (see `_inspect!`), `corners`
+are the corners of the bounding box of its object in the pose `key = (obj, pose)` when it was
+pinned or inspected; they move with the object, see `_card_corners`.
 `pose` is the object and its pose that the widgets show.
 
 A drag at the head of the card (outside its buttons) moves it to a `spot` in the 3D view, where it
@@ -417,26 +418,33 @@ _fix_caret!(::_AbstractCard, _) = nothing
 # The z translation of the scene of the card `c`
 _scene_z(c::_ComponentCard) = c.scene.transformation.translation[][3]
 
-# The observable of a block that carries its inputs, see `CardWidget`
-_widget_input(b::Slider) = b.value
-_widget_input(b::Toggle) = b.active
-_widget_input(b::Textbox) = b.stored_string
-_widget_input(b::Button) = b.clicks
-_widget_input(b::Menu) = b.selection
-_widget_input(_) = nothing
+#=
+Widget protocol of the cards (see `card_input` and `card_show!`) for the blocks of Makie; a type
+without methods takes no input and shows nothing
+=#
+
+BMO.card_input(_) = nothing
+BMO.card_input(b::Slider) = b.value
+BMO.card_input(b::Toggle) = b.active
+BMO.card_input(b::Textbox) = b.stored_string
+BMO.card_input(b::Button) = b.clicks
+BMO.card_input(b::Menu) = b.selection
+
+BMO.card_show!(_, _) = nothing
+BMO.card_show!(b::Label, v) = (_update!(b.text, string(v)); nothing)
+BMO.card_show!(b::Button, v) = (_update!(b.label, string(v)); nothing)
+BMO.card_show!(b::Textbox, v; force::Bool = false) = ((b.focused[] && !force) || _set_box!(b, string(v)); nothing)
+BMO.card_show!(b::Slider, v) = (b.value[] == v || Makie.set_close_to!(b, v); nothing)
+BMO.card_show!(b::Toggle, v) = (_update!(b.active, Bool(v)); nothing)
 
 """
-    _show!(block, v; force = false)
+    _show_value!(block, v, force::Bool)
 
-Shows the value `v` of a declared widget (see [`CardWidget`](@ref)) in its `block`. A focused
-textbox keeps the typed text, unless `force`.
+Shows the value `v` of a declared widget in its `block` via [`card_show!`](@ref); `force` also
+overwrites a focused `Textbox`, see `_refresh_card!`.
 """
-_show!(b::Label, v; force = false) = _update!(b.text, string(v))
-_show!(b::Button, v; force = false) = _update!(b.label, string(v))
-_show!(b::Textbox, v; force = false) = ((b.focused[] && !force) || _set_box!(b, string(v)); nothing)
-_show!(b::Slider, v; force = false) = (b.value[] == v || Makie.set_close_to!(b, v); nothing)
-_show!(b::Toggle, v; force = false) = _update!(b.active, Bool(v))
-_show!(_, _; force = false) = nothing
+_show_value!(b, v, ::Bool) = BMO.card_show!(b, v)
+_show_value!(b::Textbox, v, force::Bool) = BMO.card_show!(b, v; force)
 
 # The layout of declarations, independent of the functions `value` and `on`, see `_build_content!`
 _layout_key(rows) = map(_layout_key, rows)
@@ -593,7 +601,7 @@ end
 Rectangle [figure px] around the projections of the 3D points `pts` (e.g. the corners of the
 bounding box of the object `obj`) in the 3D `scene`. Points behind the camera are skipped. If no
 point remains, e.g. for an object behind the camera, the rectangle is the point at the edge of the
-view towards `obj`, see `_screen_anchor`.
+view towards `obj` (see `_card_anchor`), see `_screen_anchor`.
 """
 function _screen_rect(scene::Scene, pts, obj)
     o = Point2f(minimum(Makie.viewport(scene)[]))
@@ -603,11 +611,16 @@ function _screen_rect(scene::Scene, pts, obj)
         q = Makie.project(scene, :data, :pixel, Point3f(p))
         all(isfinite, q) && push!(qs, o + Point2f(q[1], q[2]))
     end
-    isempty(qs) && push!(qs, o + _screen_anchor(scene, position(obj)))
+    isempty(qs) && push!(qs, o + _screen_anchor(scene, _card_anchor(obj, pts)))
     lo = reduce((a, b) -> min.(a, b), qs)
     hi = reduce((a, b) -> max.(a, b), qs)
     return Rect2f(lo, hi - lo)
 end
+
+# The point of `obj` towards which a card points if the corners `pts` of its bounding box are behind
+# the camera: its position, the center of the box for a system, which has no position
+_card_anchor(obj, _) = position(obj)
+_card_anchor(::BMO.AbstractSystem, pts) = (reduce((a, b) -> min.(a, b), pts) + reduce((a, b) -> max.(a, b), pts)) / 2
 
 """
     _link_anchor(scene, pts, obj) -> Point2f

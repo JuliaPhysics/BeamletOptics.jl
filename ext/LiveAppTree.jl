@@ -21,10 +21,16 @@ _tree_kind(::BMO.AbstractObjectGroup) = :group
 _tree_kind(::Union{BMO.NonInteractableObject, BMO.IntersectableObject}) = :mesh
 _tree_kind(::Union{BMO.AbstractBeam, BMO.AbstractBeamGroup}) = :source
 _tree_kind(::LiveClipPlane) = :clip_plane
-_tree_kind(::SystemRenderHandle) = :system
+_tree_kind(::Union{SystemRenderHandle, BMO.AbstractSystem}) = :system
 
 """The rendered objects of the system of `h`, i.e. the leaves of its groups, see `_set_hidden!`."""
 _leaves(h::SystemRenderHandle) = _LiveMovable[oh.obj for oh in h.handles]
+
+"""
+The objects of the system `sys` as they are rendered, i.e. the leaves of its groups (see
+`live_render!`), e.g. for the card of an inspected system, see `_inspect!`.
+"""
+_leaves(sys::BMO.AbstractSystem) = reduce(vcat, (_leaves(obj) for obj in sys.objects); init = _LiveMovable[])
 
 """Returns the top-level objects (outermost groups) of the system of `h`, in the order of `h`."""
 function _top_levels(h::SystemRenderHandle)
@@ -46,8 +52,10 @@ _sources(gui::LiveView) = unique(objectid, last.(gui.pairs))
     _name_objects!(gui::LiveView)
 
 Names the systems ("System i") and all objects and sources without an entry in `labels` by their
-type and a running index per type, e.g. "Lens 2", in the order of the tree. Names, once given, are
-kept, see `_label`. The component menu, if any, shows the names.
+type and a running index per type, e.g. "Lens 2", in the order of the tree. A system has its name
+twice, as its `SystemRenderHandle` (the key of its row and menu entry) and as the system itself,
+which its card shows (see `_inspect!`). Names, once given, are kept, see `_label`. The component
+menu, if any, shows the names.
 """
 function _name_objects!(gui::LiveView)
     layout = gui.objects
@@ -60,9 +68,11 @@ function _name_objects!(gui::LiveView)
     end
     for (i, h) in enumerate(gui.system_handles)
         haskey(layout.names, h) || (layout.names[h] = get(gui.labels, h.sys, "System $i"))
+        haskey(layout.names, h.sys) || (layout.names[h.sys] = layout.names[h])
         foreach(top -> foreach(name!, _descendants(top)), _top_levels(h))
     end
     haskey(layout.names, gui.extras) || (layout.names[gui.extras] = "Extras")
+    haskey(layout.names, gui.extras.sys) || (layout.names[gui.extras.sys] = "Extras")
     foreach(top -> foreach(name!, _descendants(top)), _top_levels(gui.extras))
     foreach(name!, _sources(gui))
     _refresh_menu_options!(gui, gui.widgets.menu)
@@ -139,17 +149,22 @@ end
     _tree_click!(gui, key)
 
 Handles a click on the label of a row of the object tree: selects the object like a click in the
-3D view (see `_select!`), a click on a system expands or collapses it. Objects that are not
-movable can not be selected.
+3D view (see `_select!`). A click on a system (or the extras) and on an object that is not movable
+inspects it instead, i.e. shows its card in the inspector without selecting it, see `_inspect!`;
+the expander of a system expands or collapses it.
 """
-_tree_click!(gui::AppView, h::SystemRenderHandle) = _toggle_expanded!(gui, h)
+_tree_click!(gui::AppView, h::SystemRenderHandle) = _inspect!(gui, h)
 
 function _tree_click!(gui::AppView, obj)
-    if !_is_movable(gui.controls, obj)
-        gui.status.text[] = "$(_label(gui, obj)) is not movable, it can not be selected"
-        return nothing
-    end
-    _select!(gui, obj)
+    _is_movable(gui.controls, obj) ? _select!(gui, obj) : _inspect!(gui, obj)
+    return nothing
+end
+
+# The row of the inspected object is highlighted like the selected one, see `_on_selected!`
+_show_inspected!(::AppView, ::Nothing) = nothing
+function _show_inspected!(gui::AppView, obj)
+    _reveal!(gui, obj)
+    _set_selected!(gui.layout.tree, _row_key(gui, obj))
     return nothing
 end
 
@@ -158,6 +173,8 @@ Expands the system and the groups that contain `obj`, such that its row is shown
 tree. The rows are only set again if a row was expanded.
 """
 _reveal!(::AppView, ::Nothing) = nothing
+# The rows of the systems are always shown
+_reveal!(::AppView, ::BMO.AbstractSystem) = nothing
 
 function _reveal!(gui::AppView, obj)
     ctrl = gui.controls

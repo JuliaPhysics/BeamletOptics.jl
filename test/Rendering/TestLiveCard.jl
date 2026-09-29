@@ -760,6 +760,48 @@ BMO.card_actions(::CardTestObject) = ()
         @test !Ext._is_pinned(gui, x) && !(marker in gui.ax.scene.plots)
         close(gui)
     end
+
+    @testset "widget protocol of the blocks of Makie" begin
+        # the cards use the public verbs only, see `card_input` and `card_show!`
+        @test !isdefined(Ext, :_widget_input) && !isdefined(Ext, :_show!)
+        fig = Figure()
+        slider = Slider(fig[1, 1]; range = 0:10)
+        toggle = Toggle(fig[2, 1])
+        box = Textbox(fig[3, 1])
+        button = Button(fig[4, 1])
+        menu = Menu(fig[5, 1]; options = ["a", "b"])
+        label = Label(fig[6, 1], "")
+        @test BMO.card_input(slider) === slider.value
+        @test BMO.card_input(toggle) === toggle.active
+        @test BMO.card_input(box) === box.stored_string
+        @test BMO.card_input(button) === button.clicks
+        @test BMO.card_input(menu) === menu.selection
+        # no input: labels and any other type
+        @test isnothing(BMO.card_input(label))
+        @test isnothing(BMO.card_input(42))
+        BMO.card_show!(slider, 7)
+        @test slider.value[] == 7
+        BMO.card_show!(toggle, true)
+        @test toggle.active[]
+        BMO.card_show!(button, "hide")
+        @test button.label[] == "hide"
+        BMO.card_show!(label, 1.5)
+        @test label.text[] == "1.5"
+        # a textbox shows the value without an input, but keeps what is typed, unless `force`
+        n = Ref(0)
+        on(_ -> (n[] += 1), box.stored_string)
+        BMO.card_show!(box, 12)
+        @test box.displayed_string[] == "12" && box.stored_string[] == "12"
+        box.focused[] = true
+        BMO.card_show!(box, 13)
+        @test box.displayed_string[] == "12"
+        BMO.card_show!(box, 13; force = true)
+        @test box.displayed_string[] == "13"
+        @test n[] == 0
+        # shows nothing for any other type
+        @test isnothing(BMO.card_show!(menu, "b"))
+        @test isnothing(BMO.card_show!(42, 1))
+    end
 end
 
 end
