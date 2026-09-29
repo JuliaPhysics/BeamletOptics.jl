@@ -306,21 +306,21 @@ const BMO = BeamletOptics
             pick = ax -> (_marker(gui_ref[], beam).plots[1], 0))
         gui_ref[] = gui
         marker = _marker(gui, beam)
-        @test gui.sources_toggle.active[]
+        @test gui.widgets.sources_toggle.active[]
         @test all(p -> p.visible[], marker.plots)
         _select!(gui)
         @test gui.controls.selected[] === beam
         _key!(gui, Keyboard.s)
-        @test gui.sources_toggle.active[]
+        @test gui.widgets.sources_toggle.active[]
         _key!(gui, Keyboard._1)
-        @test !gui.sources_toggle.active[]
+        @test !gui.widgets.sources_toggle.active[]
         @test !any(p -> p.visible[], marker.plots)
         @test isnothing(gui.controls.selected[])
         @test startswith(gui.status.text[], "sources hidden")
         # "show all" keeps the markers hidden, the mirror stays visible
         Ext._show_all!(gui)
         @test !any(p -> p.visible[], marker.plots)
-        gui.sources_toggle.active[] = true
+        gui.widgets.sources_toggle.active[] = true
         @test all(p -> p.visible[], marker.plots)
         close(gui)
         # initially hidden
@@ -352,24 +352,24 @@ const BMO = BeamletOptics
         @test startswith(gui.status.text[], "Mirror 1 at (")
         @test occursin("moved by 1 mm, rotated by 0 µrad", gui.status.text[])
 
-        gui.step_box.stored_string[] = "250 nm"
+        gui.widgets.step_box.stored_string[] = "250 nm"
         @test gui.controls.fine_step ≈ 250e-9
         @test gui.controls.mode[] == :move
-        gui.step_box.stored_string[] = "50 µrad"
+        gui.widgets.step_box.stored_string[] = "50 µrad"
         @test gui.controls.fine_angle ≈ 50e-6
         @test gui.controls.mode[] == :rotate
-        gui.step_box.stored_string[] = "fast"
+        gui.widgets.step_box.stored_string[] = "fast"
         @test occursin("invalid step", gui.status.text[])
         @test gui.controls.fine_angle ≈ 50e-6
 
         # typing into the textbox does not trigger the controls
         R0 = Matrix{Float64}(BMO.orientation(m))
-        gui.step_box.focused[] = true
+        gui.widgets.step_box.focused[] = true
         _key!(gui, Keyboard.left)
         _key!(gui, Keyboard.m)
         @test Matrix{Float64}(BMO.orientation(m)) == R0
         @test gui.controls.mode[] == :rotate
-        gui.step_box.focused[] = false
+        gui.widgets.step_box.focused[] = false
         _key!(gui, Keyboard.left)
         @test Matrix{Float64}(BMO.orientation(m)) ≈ BMO.rotate3d([0, 0, 1], 50e-6) * R0
         close(gui)
@@ -399,21 +399,21 @@ const BMO = BeamletOptics
             mode = :rotate, fine_angle = 1e-2, trace_budget = 0.0, idle_delay = 0.1,
             pick = ax -> (gui_ref[].controls.h.handles[1].plots[1], 0))
         gui_ref[] = gui
-        gui.solve_time = 1.0 # pretend that the solve is slow, independent of the machine
+        gui.trace.solve_time = 1.0 # pretend that the solve is slow, independent of the machine
         _select!(gui)
         pts0 = copy(gui.beam_handles[1].points[])
         _key!(gui, Keyboard.left)
-        @test gui.pending
-        @test gui.stale
+        @test gui.trace.pending
+        @test gui.trace.stale
         @test gui.beam_handles[1].points[] == pts0
         @test occursin("tracing when the movement pauses", gui.status.text[])
         # still moving
         notify(events(gui.ax.scene).tick)
-        @test gui.pending
-        gui.last_change -= 1
+        @test gui.trace.pending
+        gui.trace.last_change -= 1
         notify(events(gui.ax.scene).tick)
-        @test !gui.pending
-        @test !gui.stale
+        @test !gui.trace.pending
+        @test !gui.trace.stale
         @test gui.beam_handles[1].points[] != pts0
         close(gui)
 
@@ -426,16 +426,16 @@ const BMO = BeamletOptics
         gui_ref[] = gui
         @test size(gui.panels[1].heat_I[]) == (40, 40)
         # pretend that the solve is fast and the panels are slow, independent of the machine
-        gui.solve_time = 0.0
-        gui.panel_time = 1.0
+        gui.trace.solve_time = 0.0
+        gui.trace.panel_time = 1.0
         _select!(gui)
         _key!(gui, Keyboard.left)
-        @test gui.coarse
+        @test gui.trace.coarse
         @test size(gui.panels[1].heat_I[]) == (16, 16)
         @test endswith(gui.panels[1].ax.title[], "(preview)")
-        gui.last_change -= 1
+        gui.trace.last_change -= 1
         notify(events(gui.ax.scene).tick)
-        @test !gui.coarse
+        @test !gui.trace.coarse
         @test size(gui.panels[1].heat_I[]) == (40, 40)
         @test !endswith(gui.panels[1].ax.title[], "(preview)")
         close(gui)
@@ -483,43 +483,43 @@ const BMO = BeamletOptics
         # no window while the loop has run shorter than `progress_delay`
         @test waitfor(() -> items(job) == 0)
         Ext._poll!(gui, job)
-        @test !gui.progress.visible[]
+        @test !gui.trace.progress.visible[]
         # A solve longer than `progress_delay` continues in the background, where its loop, which
         # has run that long, shows its window at once
         @test !Ext._run!(gui, job, "tracing, Esc cancels")
-        @test gui.job === job
+        @test gui.trace.job === job
         @test gui.status.text[] == "tracing, Esc cancels"
         tick!()
-        @test gui.progress.visible[]
-        @test gui.progress.anchor[] == Ext._screen_anchor(scene, anchor)
-        @test gui.progress.label[] == "Tracing beams 0 %"
+        @test gui.trace.progress.visible[]
+        @test gui.trace.progress.anchor[] == Ext._screen_anchor(scene, anchor)
+        @test gui.trace.progress.label[] == "Tracing beams 0 %"
         # the remaining time follows from the rate since the window appeared
         foreach(_ -> put!(gate, nothing), 1:3)
         @test waitfor(() -> items(job) == 3)
         tick!()
-        @test startswith(gui.progress.label[], "Tracing beams 30 % · ")
+        @test startswith(gui.trace.progress.label[], "Tracing beams 30 % · ")
         foreach(_ -> put!(gate, nothing), 1:7)
         @test waitfor(() -> istaskdone(job.task))
         tick!()
         @test applied[] == 1
-        @test isnothing(gui.job)
-        @test !gui.progress.visible[]
+        @test isnothing(gui.trace.job)
+        @test !gui.trace.progress.visible[]
         @test gui.status.text[] == "traced"
 
         # `t` starts no second solve, Esc cancels after the current item
         job = slow_job()
         @test !Ext._run!(gui, job, "tracing, Esc cancels")
         _key!(gui, Keyboard.t)
-        @test gui.job === job
+        @test gui.trace.job === job
         _key!(gui, Keyboard.escape)
-        @test isnothing(gui.job)
+        @test isnothing(gui.trace.job)
         @test istaskfailed(job.task)
         @test BMO._is_cancelled(TaskFailedException(job.task))
         @test applied[] == 1
-        @test gui.stale
+        @test gui.trace.stale
         @test startswith(gui.status.text[], "trace cancelled")
         # the elapsed time counts as the duration of the solve
-        @test gui.solve_time >= 0.15
+        @test gui.trace.solve_time >= 0.15
 
         # a change of an object cancels the solve before the object moves
         _select!(gui)
@@ -533,7 +533,7 @@ const BMO = BeamletOptics
         _key!(gui, Keyboard.up)
         @test done_before_change[]
         @test Vector(position(m)) != P0
-        @test gui.job !== job
+        @test gui.trace.job !== job
         gui.controls.before_change = hook
         @test waitfor(() -> (tick!(); !Ext._running(gui)))
 
@@ -544,10 +544,10 @@ const BMO = BeamletOptics
         r = fetch(job.task)
         @test job.anchors == [Point3f(position(src)), Point3f(position(pd))]
         @test length(r.fields) == 1
-        gui.progress_delay = 0.0
+        gui.trace.progress_delay = 0.0
         Ext._trace!(gui)
         @test waitfor(() -> (tick!(); !Ext._running(gui)))
-        @test !gui.stale
+        @test !gui.trace.stale
         @test occursin("Detector 1", gui.panels[1].ax.title[])
         close(gui)
 
@@ -572,11 +572,11 @@ const BMO = BeamletOptics
         m, pd = _fixture()
         gui = _live_view(System([m, pd]), Beam([0.0, 0, 0], [0.0, 1, 0]); auto_trace = false,
             throttle = false)
-        @test !gui.stale
+        @test !gui.trace.stale
         # solve_system! fails for this beam
         gui.pairs[1] = gui.pairs[1].first => nothing
         @test_logs (:error, r"solving the systems") Ext._trace!(gui)
-        @test gui.stale
+        @test gui.trace.stale
         @test occursin("failed", gui.status.text[])
         close(gui)
     end
@@ -601,13 +601,13 @@ const BMO = BeamletOptics
             n_calls = Ref(0)
             gui = _live_view(sys, beam; auto_trace = false, throttle = false, mode = :rotate,
                 fine_angle = 1e-2, on_change = (g, obj) -> (n_calls[] += 1))
-            @test !gui.auto_trace[]
-            @test !gui.auto_trace_toggle.active[]
-            @test gui.trace_button isa Makie.Button
+            @test !gui.trace.auto[]
+            @test !gui.widgets.auto_trace_toggle.active[]
+            @test gui.widgets.trace_button isa Makie.Button
             # the initial solve runs anyway
             @test n_calls[] == 1
             @test length(BMO.hits(pd)) == 1
-            @test !gui.stale
+            @test !gui.trace.stale
             bh = gui.beam_handles[1]
 
             gui.controls.selected[] = m
@@ -623,7 +623,7 @@ const BMO = BeamletOptics
             @test length(BMO.hits(pd)) == n_hits
             @test bh.points[] == pts0
             @test gui.panels[1].xy[] == xy0
-            @test gui.stale
+            @test gui.trace.stale
             @test occursin("outdated, press t to trace", gui.status.text[])
             @test startswith(gui.status.text[], "$(nameof(typeof(m))) at (")
             @test bh.plot.alpha[] ≈ 0.3
@@ -631,7 +631,7 @@ const BMO = BeamletOptics
             # t solves the system
             _key!(gui, Keyboard.t)
             @test n_calls[] == 2
-            @test !gui.stale
+            @test !gui.trace.stale
             @test bh.plot.alpha[] ≈ 1.0
             pts_gui, n_gui, xy_gui = copy(bh.points[]), length(BMO.hits(pd)), copy(gui.panels[1].xy[])
             spot_gui = _spot(pd)
@@ -643,11 +643,11 @@ const BMO = BeamletOptics
 
             # the trace button solves the system as well, rotate back to keep the spot on the detector
             _key!(gui, Keyboard.right)
-            @test gui.stale
+            @test gui.trace.stale
             @test n_calls[] == 2
-            notify(gui.trace_button.clicks)
+            notify(gui.widgets.trace_button.clicks)
             @test n_calls[] == 3
-            @test !gui.stale
+            @test !gui.trace.stale
             pts_gui, xy_gui2 = copy(bh.points[]), copy(gui.panels[1].xy[])
             @test xy_gui2 != xy_gui
             pts, n, spot = _fresh(sys, pd)
@@ -655,9 +655,9 @@ const BMO = BeamletOptics
             @test pts_gui ≈ pts
 
             # switching auto trace on without changes does not solve
-            gui.auto_trace_toggle.active[] = true
+            gui.widgets.auto_trace_toggle.active[] = true
             @test n_calls[] == 3
-            gui.auto_trace_toggle.active[] = false
+            gui.widgets.auto_trace_toggle.active[] = false
 
             close(gui)
             _key!(gui, Keyboard.t)
@@ -683,25 +683,25 @@ const BMO = BeamletOptics
             @test gui.system_handles[1].handles[2].P ≈ BMO.position(pd)
             @test n_calls[] == 1
             @test gui.panels[1].xy[] == xy0
-            @test gui.stale
+            @test gui.trace.stale
             @test gui.status.text[] == "outdated, press t to trace"
 
             # switching auto trace on solves once, since the state is outdated
-            gui.auto_trace_toggle.active[] = true
-            @test gui.auto_trace[]
+            gui.widgets.auto_trace_toggle.active[] = true
+            @test gui.trace.auto[]
             @test n_calls[] == 2
-            @test !gui.stale
+            @test !gui.trace.stale
             @test gui.panels[1].xy[] != xy0
 
             # auto tracing resumes
             gui.controls.selected[] = m
             _key!(gui, Keyboard.up)
             @test n_calls[] == 3
-            @test !gui.stale
+            @test !gui.trace.stale
             gui.sliders.sliders[1].value[] = 0.5
             notify(events(gui.ax.scene).tick)
             @test n_calls[] == 4
-            @test !gui.stale
+            @test !gui.trace.stale
             close(gui)
         end
 
@@ -710,12 +710,12 @@ const BMO = BeamletOptics
             n_calls = Ref(0)
             gui = _live_view(System([m, pd]), Beam([0.0, 0, 0], [0.0, 1, 0]); throttle = false,
                 on_change = (g, obj) -> (n_calls[] += 1))
-            @test gui.auto_trace[]
-            @test gui.auto_trace_toggle.active[]
+            @test gui.trace.auto[]
+            @test gui.widgets.auto_trace_toggle.active[]
             gui.controls.selected[] = m
             _key!(gui, Keyboard.up)
             @test n_calls[] == 2
-            @test !gui.stale
+            @test !gui.trace.stale
             _key!(gui, Keyboard.t)
             @test n_calls[] == 3
             close(gui)
@@ -747,10 +747,10 @@ const BMO = BeamletOptics
             gui = _live_view(System([m, pd]), _beam(); throttle = false, fine_step = 1e-3,
                 clip_planes = [[0, 0.1, 0] => [0, 1, 0]], on_change = (g, obj) -> (n_calls[] += 1),
                 pick = ax -> (pick_plot[], 0))
-            @test length(gui.clip_planes) == 1
-            plane = gui.clip_planes[1]
+            @test length(gui.clip.planes) == 1
+            plane = gui.clip.planes[1]
             @test isnothing(gui.controls.selected[])
-            @test gui.clipping
+            @test gui.clip.enabled
             @test plane in gui.controls.movable
             @test gui.ax.scene.theme.clip_planes[] == P1
             @test !isempty(_optics_plots(gui))
@@ -781,7 +781,7 @@ const BMO = BeamletOptics
 
             # a key step along the normal moves the plane, without solving the systems
             n0, spot0 = n_calls[], copy(BMO.spot_diagram(pd))
-            stale0 = gui.stale
+            stale0 = gui.trace.stale
             _key!(gui, Keyboard.up)
             @test collect(position(plane)) ≈ [0, 0.101, 0]
             @test abs(_planes(gui)[1].distance - P1[1].distance - 1e-3) < 1e-6
@@ -790,7 +790,7 @@ const BMO = BeamletOptics
             @test marker.P ≈ position(plane)
             @test n_calls[] == n0
             @test BMO.spot_diagram(pd) == spot0
-            @test gui.stale == stale0
+            @test gui.trace.stale == stale0
             @test startswith(gui.status.text[], "Clip plane at (")
 
             # shift+c flips the selected plane, c switches clipping off and on
@@ -798,14 +798,14 @@ const BMO = BeamletOptics
             @test Ext._normal(plane) ≈ [0, -1, 0]
             @test _planes(gui)[1].normal ≈ Vec3f(0, -1, 0)
             @test collect(position(plane)) ≈ [0, 0.101, 0]
-            @test gui.clipping
+            @test gui.clip.enabled
             flipped = _planes(gui)
             _key!(gui, Keyboard.c)
-            @test !gui.clipping
+            @test !gui.clip.enabled
             @test _planes(gui) == Plane3f[]
             @test all(p -> p.clip_planes[] == Plane3f[], reduce(vcat, _nested.(added)))
             _key!(gui, Keyboard.c)
-            @test gui.clipping
+            @test gui.clip.enabled
             @test _planes(gui) == flipped
             @test n_calls[] == n0
 
@@ -832,12 +832,12 @@ const BMO = BeamletOptics
             @test !isempty(_beam_plots(gui))
             @test all(p -> p.clip_planes[] == P1, _beam_plots(gui))
             @test all(p -> p.clip_planes[] == Plane3f[], _marker_plots(gui))
-            @test gui.clip_beams_toggle.active[]
+            @test gui.widgets.clip_beams_toggle.active[]
             # switched off and on again at runtime via the toggle
-            gui.clip_beams_toggle.active[] = false
-            @test !gui.clip_beams
+            gui.widgets.clip_beams_toggle.active[] = false
+            @test !gui.clip.beams
             @test all(p -> p.clip_planes[] == Plane3f[], _beam_plots(gui))
-            gui.clip_beams_toggle.active[] = true
+            gui.widgets.clip_beams_toggle.active[] = true
             @test all(p -> p.clip_planes[] == P1, _beam_plots(gui))
             # clipping off: the beams follow as well
             _key!(gui, Keyboard.c)
@@ -848,9 +848,9 @@ const BMO = BeamletOptics
             m, pd = _fixture()
             gui = _live_view(System([m, pd]), _gauss(); clip_planes = [[0, 0.1, 0] => [0, 1, 0]],
                 beam_kwargs = Dict())
-            @test !gui.clip_beams_toggle.active[]
+            @test !gui.widgets.clip_beams_toggle.active[]
             @test all(p -> p.clip_planes[] == Plane3f[], _beam_plots(gui))
-            gui.clip_beams_toggle.active[] = true
+            gui.widgets.clip_beams_toggle.active[] = true
             @test all(p -> p.clip_planes[] == P1, _beam_plots(gui))
             close(gui)
 
@@ -869,7 +869,7 @@ const BMO = BeamletOptics
             pick_plot = Ref{Any}(nothing)
             gui = _live_view(System([m, pd]), _beam(); throttle = false,
                 clip_planes = [[0, 0.1, 0] => [0, 0, 1]], pick = ax -> (pick_plot[], 0))
-            plane = gui.clip_planes[1]
+            plane = gui.clip.planes[1]
             pick_plot[] = _handle(gui, plane).plots[2]
             scene = gui.ax.scene
             events(scene).mouseposition[] = (100.0, 100.0)
@@ -906,7 +906,7 @@ const BMO = BeamletOptics
             n_calls = Ref(0)
             gui = _live_view(System([m, pd]), _beam(); throttle = false, fine_step = 1e-3,
                 fine_angle = 1e-2, on_change = (g, obj) -> (n_calls[] += 1))
-            @test isempty(gui.clip_planes)
+            @test isempty(gui.clip.planes)
             # no clip planes: nothing is written
             @test all(p -> p.clip_planes[] == Plane3f[], _optics_plots(gui))
             @test occursin("p: add clip plane", Ext._help_text(:move, 1e-9, 1e-6) * "\n" * gui.controls.help_extra)
@@ -922,8 +922,8 @@ const BMO = BeamletOptics
             lookat, eye = Vector{Float64}(cam.lookat[]), Vector{Float64}(cam.eyeposition[])
             view_dir = (lookat - eye) / sqrt(sum(abs2, lookat - eye))
             _key!(gui, Keyboard.p)
-            @test length(gui.clip_planes) == 1
-            plane = gui.clip_planes[1]
+            @test length(gui.clip.planes) == 1
+            plane = gui.clip.planes[1]
             @test gui.controls.selected[] === plane
             @test collect(position(plane)) ≈ lookat
             @test maximum(abs.(Ext._normal(plane) - view_dir)) < 1e-6
@@ -944,8 +944,8 @@ const BMO = BeamletOptics
             # a selected component: through its position
             gui.controls.selected[] = m
             _key!(gui, Keyboard.p)
-            @test length(gui.clip_planes) == 2
-            plane2 = gui.clip_planes[2]
+            @test length(gui.clip.planes) == 2
+            plane2 = gui.clip.planes[2]
             @test gui.controls.selected[] === plane2
             @test collect(position(plane2)) ≈ collect(position(m))
             @test maximum(abs.(Ext._normal(plane2) - view_dir)) < 1e-6
@@ -954,14 +954,14 @@ const BMO = BeamletOptics
             # Delete with a component selected does nothing
             gui.controls.selected[] = m
             _key!(gui, Keyboard.delete)
-            @test length(gui.clip_planes) == 2
+            @test length(gui.clip.planes) == 2
             @test gui.controls.selected[] === m
 
             # Delete removes the marker and the plane
             marker_plots = copy(_handle(gui, plane2).plots)
             gui.controls.selected[] = plane2
             _key!(gui, Keyboard.delete)
-            @test gui.clip_planes == [plane]
+            @test gui.clip.planes == [plane]
             @test isnothing(gui.controls.selected[])
             @test !(plane2 in gui.controls.movable)
             @test !haskey(gui.controls.init_poses, plane2)
@@ -972,7 +972,7 @@ const BMO = BeamletOptics
             @test all(e -> e.obj !== plane2, gui.controls.undo_stack)
             gui.controls.selected[] = plane
             _key!(gui, Keyboard.delete)
-            @test isempty(gui.clip_planes)
+            @test isempty(gui.clip.planes)
             @test all(p -> p.clip_planes[] == Plane3f[], _optics_plots(gui))
             @test gui.ax.scene.theme.clip_planes[] == Plane3f[]
             @test n_calls[] == n0
@@ -981,9 +981,9 @@ const BMO = BeamletOptics
             for _ in 1:8
                 _key!(gui, Keyboard.p)
             end
-            @test length(gui.clip_planes) == 8
+            @test length(gui.clip.planes) == 8
             @test_logs _key!(gui, Keyboard.p)
-            @test length(gui.clip_planes) == 8
+            @test length(gui.clip.planes) == 8
             @test gui.status.text[] == "at most 8 clip planes"
             @test length(_planes(gui)) == 8
             @test n_calls[] == n0
@@ -995,11 +995,11 @@ const BMO = BeamletOptics
         m, pd = _fixture()
         gui = _live_view(System([m, pd]), Beam([0.0, 0, 0], [0.0, 1, 0]))
         settings = cameracontrols(gui.ax.scene).settings
-        @test !gui.orthographic_toggle.active[]
+        @test !gui.widgets.orthographic_toggle.active[]
         @test settings.projectiontype[] == Makie.Perspective
         cam = cameracontrols(gui.ax.scene)
         perspective_depth = (settings.clipping_mode[], cam.near[], cam.far[])
-        gui.orthographic_toggle.active[] = true
+        gui.widgets.orthographic_toggle.active[] = true
         @test settings.projectiontype[] == Makie.Orthographic
         # Eye inside the scene, e.g. after zooming in: the depth range covers the whole scene on
         # both sides of the eye, so that the near plane does not cut it
@@ -1033,7 +1033,7 @@ const BMO = BeamletOptics
         @test iszero(shift) && scale < 0.95
         shift, scale = _walk(Keyboard.s)
         @test iszero(shift) && scale > 1.05
-        gui.orthographic_toggle.active[] = false
+        gui.widgets.orthographic_toggle.active[] = false
         @test settings.projectiontype[] == Makie.Perspective
         @test (settings.clipping_mode[], cam.near[], cam.far[]) == perspective_depth
         shift, scale = _walk(Keyboard.w)
@@ -1044,7 +1044,7 @@ const BMO = BeamletOptics
 
         m, pd = _fixture()
         gui = _live_view(System([m, pd]), Beam([0.0, 0, 0], [0.0, 1, 0]); orthographic = true)
-        @test gui.orthographic_toggle.active[]
+        @test gui.widgets.orthographic_toggle.active[]
         @test cameracontrols(gui.ax.scene).settings.projectiontype[] == Makie.Orthographic
         close(gui)
     end
@@ -1062,9 +1062,9 @@ const BMO = BeamletOptics
         events(scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, Mouse.release)
         @test cam.selected[]
         # Typing in a textbox does not move the camera
-        gui.step_box.focused[] = true
+        gui.widgets.step_box.focused[] = true
         @test !cam.selected[]
-        gui.step_box.focused[] = false
+        gui.widgets.step_box.focused[] = false
         @test cam.selected[]
         close(gui)
     end
@@ -1163,7 +1163,7 @@ const BMO = BeamletOptics
         @test !occursin("translate_to3d!", code)
 
         # mirror: selected via the menu, moved and rotated via keys
-        gui.menu.i_selected[] = 1
+        gui.widgets.menu.i_selected[] = 1
         @test gui.controls.selected[] === m
         _key!(gui, Keyboard.up)
         _key!(gui, Keyboard.m)
@@ -1218,7 +1218,7 @@ const BMO = BeamletOptics
         # the export button prints the same code
         out = mktemp() do path, io
             redirect_stdout(io) do
-                notify(gui.export_button.clicks)
+                notify(gui.widgets.export_button.clicks)
             end
             flush(io)
             read(path, String)
@@ -1246,7 +1246,7 @@ const BMO = BeamletOptics
         gui = _live_view(System([lens, m, pd]), Beam([0.0, 0, 0], [0.0, 1, 0]); throttle = false,
             fine_angle = 1e-3, fine_step = 1e-3, pick = ax -> (gui_ref[].controls.h.handles[2].plots[1], 0))
         gui_ref[] = gui
-        box(k) = Ext._card_widget(gui.card, (:x, :y, :z, :rx, :ry, :rv)[k])
+        box(k) = Ext._card_widget(gui.cards.selection, (:x, :y, :z, :rx, :ry, :rv)[k])
         texts() = [isnothing(box(k)) ? "" : box(k).displayed_string[] for k in 1:6]
         @test texts() == fill("", 6)
 
@@ -1256,13 +1256,13 @@ const BMO = BeamletOptics
         @test collect(BMO.position(lens)) == [0.01, 0.05, 0.002]
 
         # the boxes follow the selection
-        gui.menu.i_selected[] = 1
+        gui.widgets.menu.i_selected[] = 1
         @test gui.controls.selected[] === lens
         @test texts() == ["10.0", "50.0", "2.0", "", "", ""]
         _select!(gui)
         @test gui.controls.selected[] === m
         @test texts() == ["0.0", "100.0", "0.0", "", "", ""]
-        gui.menu.i_selected[] = 1
+        gui.widgets.menu.i_selected[] = 1
 
         # absolute position [mm]
         P0 = collect(BMO.position(lens))
@@ -1327,101 +1327,21 @@ const BMO = BeamletOptics
         # deselect
         _key!(gui, Keyboard.escape)
         @test isnothing(gui.controls.selected[])
-        @test !gui.card.scene.visible[]
+        @test !gui.cards.selection.scene.visible[]
         close(gui)
 
         # constraints are respected
         m, pd = _fixture()
         gui = _live_view(System([m, pd]), Beam([0.0, 0, 0], [0.0, 1, 0]); throttle = false,
             constraints = Dict(m => (; move = (:v,), rotate = ())))
-        gui.menu.i_selected[] = 1
+        gui.widgets.menu.i_selected[] = 1
         P0, R0 = collect(BMO.position(m)), Matrix(BMO.orientation(m))
-        Ext._card_widget(gui.card, (:x, :y, :z, :rx, :ry, :rv)[1]).stored_string[] = "5"
-        Ext._card_widget(gui.card, (:x, :y, :z, :rx, :ry, :rv)[6]).stored_string[] = "5"
+        Ext._card_widget(gui.cards.selection, (:x, :y, :z, :rx, :ry, :rv)[1]).stored_string[] = "5"
+        Ext._card_widget(gui.cards.selection, (:x, :y, :z, :rx, :ry, :rv)[6]).stored_string[] = "5"
         @test collect(BMO.position(m)) == P0
         @test BMO.orientation(m) == R0
-        Ext._card_widget(gui.card, (:x, :y, :z, :rx, :ry, :rv)[3]).stored_string[] = "5"
+        Ext._card_widget(gui.cards.selection, (:x, :y, :z, :rx, :ry, :rv)[3]).stored_string[] = "5"
         @test collect(BMO.position(m)) ≈ [0, 0.1, 0.005]
-        close(gui)
-    end
-
-    @testset "component menu, hide and show" begin
-        m, pd = _fixture()
-        g = ObjectGroup([RoundPlanoMirror(0.02, 0.004), RoundPlanoMirror(0.02, 0.004)])
-        translate3d!(g.objects[2], [0, 0.05, 0])
-        translate3d!(g, [0.3, 0, 0])
-        beam = Beam([0.0, 0, 0], [0.0, 1, 0])
-        gui_ref = Ref{Any}(nothing)
-        gui = _live_view(System([m, pd, g]), beam; throttle = false,
-            labels = Dict(m => "M1", g.objects[1] => "G1"),
-            pick = ax -> (gui_ref[].controls.h.handles[1].plots[1], 0))
-        gui_ref[] = gui
-        # every movable object once, the objects of the group after the group, indented
-        @test first.(gui.menu.options[]) == ["M1", "Detector", "ObjectGroup", "  G1", "  Mirror", "Beam"]
-        @test all(gui.menu_objects .=== Any[m, pd, g, g.objects[1], g.objects[2], beam])
-        @test gui.menu.i_selected[] == 0
-
-        # the menu selects, the selection in the 3D view updates the menu
-        gui.menu.i_selected[] = 4
-        @test gui.controls.selected[] === g.objects[1]
-        @test !isempty(gui.controls.box_obs[])
-        @test startswith(gui.status.text[], "G1 at (")
-        _select!(gui)
-        @test gui.controls.selected[] === m
-        @test gui.menu.i_selected[] == 1
-        _key!(gui, Keyboard.escape)
-        @test gui.menu.i_selected[] == 0
-
-        # keys are ignored while the menu is open, e.g. for its search
-        gui.menu.is_open[] = true
-        _key!(gui, Keyboard.m)
-        @test gui.controls.mode[] == :move
-        gui.menu.is_open[] = false
-
-        # ray picking of the mirror in the center of the view
-        set_view(gui.ax, [0.3, -0.2, 0.3], [0.0, 0.1, 0.0], [0.0, 0, 1])
-        scene = gui.ax.scene
-        vp = scene.viewport[]
-        events(scene).mouseposition[] = (vp.origin[1] + vp.widths[1] / 2, vp.origin[2] + vp.widths[2] / 2)
-        @test first(Ext._ray_pick(gui.controls, scene)) === m
-
-        # hide
-        Ext._toggle_hidden!(gui, nothing)
-        @test startswith(gui.status.text[], "select a component")
-        gui.menu.i_selected[] = 1
-        notify(Ext._card_widget(gui.card, :hide).clicks)
-        @test isnothing(gui.controls.selected[])
-        @test gui.menu.i_selected[] == 0
-        @test m in gui.hidden
-        @test all(p -> !p.visible[], gui.controls.h.handles[1].plots)
-        @test isnothing(first(Ext._ray_pick(gui.controls, scene)))
-        # also not via the `pick` function
-        _select!(gui)
-        @test isnothing(gui.controls.selected[])
-        # still traced
-        Ext._trace!(gui)
-        @test length(BMO.hits(pd)) == 1
-
-        # a hidden object can be selected in the menu and shown again
-        gui.menu.i_selected[] = 1
-        @test gui.controls.selected[] === m
-        notify(Ext._card_widget(gui.card, :hide).clicks)
-        @test !(m in gui.hidden)
-        @test all(p -> p.visible[], gui.controls.h.handles[1].plots)
-        @test gui.controls.selected[] === m
-
-        # groups: all objects, show all
-        gui.menu.i_selected[] = 3
-        notify(Ext._card_widget(gui.card, :hide).clicks)
-        gui.menu.i_selected[] = 1
-        notify(Ext._card_widget(gui.card, :hide).clicks)
-        @test length(gui.hidden) == 3
-        leaf_plots = [p for oh in gui.controls.h.handles if oh.obj in (m, g.objects...) for p in oh.plots]
-        @test all(p -> !p.visible[], leaf_plots)
-        notify(gui.show_all_button.clicks)
-        @test isempty(gui.hidden)
-        @test all(p -> p.visible[], leaf_plots)
-        @test first(Ext._ray_pick(gui.controls, scene)) === m
         close(gui)
     end
 
@@ -1435,14 +1355,14 @@ const BMO = BeamletOptics
         n_calls = Ref(0)
         gui = _live_view(System([m, pd]) => cs; throttle = false, fine_step = 1e-4, idle_delay = 10.0,
             on_change = (g, obj) -> (n_calls[] += 1))
-        @test gui.preview_enabled
+        @test gui.trace.preview_enabled
         @test length(BMO.hits(pd)) == 40
         @test !endswith(gui.panels[1].ax.title[], "(preview)")
         n0 = n_calls[]
         gui.controls.selected[] = m
         _key!(gui, Keyboard.up)
         # only the rendered beams are traced, the others are reset
-        @test gui.preview
+        @test gui.trace.preview
         @test findall(_traced, BMO.beams(cs)) == collect(1:5:40)
         @test length(BMO.hits(pd)) == 8
         @test endswith(gui.panels[1].ax.title[], "8 rays (preview)")
@@ -1450,11 +1370,11 @@ const BMO = BeamletOptics
         pts = copy(gui.beam_handles[1].points[])
         # still moving
         _tick!(gui)
-        @test gui.preview
+        @test gui.trace.preview
         # the full solve once the movement pauses
-        gui.last_change -= 100
+        gui.trace.last_change -= 100
         _tick!(gui)
-        @test !gui.preview
+        @test !gui.trace.preview
         @test all(_traced, BMO.beams(cs))
         @test length(BMO.hits(pd)) == 40
         @test gui.panels[1].ax.title[] == "Detector 1: 40 rays"
@@ -1463,9 +1383,9 @@ const BMO = BeamletOptics
         @test gui.beam_handles[1].points[] == pts
         # t solves fully as well
         _key!(gui, Keyboard.up)
-        @test gui.preview
+        @test gui.trace.preview
         _key!(gui, Keyboard.t)
-        @test !gui.preview
+        @test !gui.trace.preview
         @test length(BMO.hits(pd)) == 40
         close(gui)
 
@@ -1473,12 +1393,12 @@ const BMO = BeamletOptics
         m, pd = _fixture()
         gui = _live_view(System([m, pd]) => _source(); throttle = false, fine_step = 1e-4,
             trace_budget = 0.5)
-        gui.solve_time = 1.0 # pretend that the full solve is slow
+        gui.trace.solve_time = 1.0 # pretend that the full solve is slow
         gui.controls.selected[] = m
         _key!(gui, Keyboard.up)
-        @test !gui.pending
-        @test gui.preview
-        @test gui.preview_time < 0.5
+        @test !gui.trace.pending
+        @test gui.trace.preview
+        @test gui.trace.preview_time < 0.5
         close(gui)
 
         # without preview tracing, all beams are traced immediately
@@ -1487,7 +1407,7 @@ const BMO = BeamletOptics
         gui = _live_view(System([m, pd]) => cs; throttle = false, fine_step = 1e-4, preview = false)
         gui.controls.selected[] = m
         _key!(gui, Keyboard.up)
-        @test !gui.preview
+        @test !gui.trace.preview
         @test all(_traced, BMO.beams(cs))
         @test length(BMO.hits(pd)) == 40
         close(gui)
@@ -1499,7 +1419,7 @@ const BMO = BeamletOptics
                 beam_kwargs = beam isa BMO.AbstractBeamGroup ? Dict(beam => (; render_every = 1)) : Dict())
             gui.controls.selected[] = m
             _key!(gui, Keyboard.up)
-            @test !gui.preview
+            @test !gui.trace.preview
             @test !endswith(gui.panels[1].ax.title[], "(preview)")
             close(gui)
         end
@@ -1626,7 +1546,7 @@ const BMO = BeamletOptics
             set_view(gui.ax, eye, mid, [0.0, 1, 0])
             _cursor_to!(gui, mid)
             _select!(gui)
-            info = gui.inspection
+            info = gui.measure.inspection
             @test !isnothing(info)
             @test maximum(abs.(info.point .- mid)) < 1e-6
             @test info.direction ≈ collect(BMO.direction(r))
@@ -1639,30 +1559,30 @@ const BMO = BeamletOptics
             @test isnothing(info.w) && isnothing(info.R)
             @test startswith(gui.status.text[], "beam at (")
             @test occursin("OPL", gui.status.text[])
-            @test !isnothing(gui.inspection_plot)
+            @test !isnothing(gui.measure.inspection_plot)
             @test isnothing(gui.controls.selected[])
         end
         # esc removes the marker
-        plot = gui.inspection_plot
+        plot = gui.measure.inspection_plot
         _key!(gui, Keyboard.escape)
-        @test isnothing(gui.inspection) && isnothing(gui.inspection_plot)
+        @test isnothing(gui.measure.inspection) && isnothing(gui.measure.inspection_plot)
         @test !any(q -> q === plot, gui.ax.scene.plots)
         # a click elsewhere removes it as well
         r = rays[4]
         mid = collect(BMO.position(r)) .+ 0.5 * length(r) .* collect(BMO.direction(r))
         _cursor_to!(gui, mid)
         _select!(gui)
-        @test !isnothing(gui.inspection)
+        @test !isnothing(gui.measure.inspection)
         _cursor_to!(gui, mid .+ [0.0, 0.03, 0])
         _select!(gui)
-        @test isnothing(gui.inspection) && isnothing(gui.inspection_plot)
+        @test isnothing(gui.measure.inspection) && isnothing(gui.measure.inspection_plot)
 
         # components win over beams: the beam passes the center of the mirror
         set_view(gui.ax, [0.1, 0.0, 0.25], collect(BMO.position(m)), [0.0, 1, 0])
         _cursor_to!(gui, collect(BMO.position(m)))
         _select!(gui)
         @test gui.controls.selected[] === m
-        @test isnothing(gui.inspection)
+        @test isnothing(gui.measure.inspection)
         close(gui)
 
         # Gaussian beamlet: w and R of gauss_parameters
@@ -1674,7 +1594,7 @@ const BMO = BeamletOptics
         set_view(gui.ax, [0.1, 0.04, 0.2], mid, [0.0, 1, 0])
         _cursor_to!(gui, mid)
         _select!(gui)
-        info = gui.inspection
+        info = gui.measure.inspection
         @test maximum(abs.(info.point .- mid)) < 1e-6
         @test abs(info.length - 0.4 * length(r)) < 1e-6
         w, R = BMO.gauss_parameters(gauss, info.length)
@@ -1695,27 +1615,27 @@ const BMO = BeamletOptics
         gui = _live_view(System([m1, m2]), Beam([0.0, 0, 0], [0.0, 1, 0]); throttle = false,
             labels = Dict(m1 => "M1", m2 => "M2"), pick = ax -> (pick_plot[], 0))
         _plot(obj) = gui.controls.h.handles[findfirst(oh -> oh.obj === obj, gui.controls.h.handles)].plots[1]
-        gui.measure_toggle.active[] = true
+        gui.widgets.measure_toggle.active[] = true
         @test startswith(gui.status.text[], "measure:")
         pick_plot[] = _plot(m1)
         _select!(gui)
-        @test length(gui.measure_points) == 1
+        @test length(gui.measure.points) == 1
         @test occursin("click the second point", gui.status.text[])
         pick_plot[] = _plot(m2)
         _select!(gui)
-        d = gui.measurement
+        d = gui.measure.result
         @test abs(d.distance - norm(collect(BMO.position(m2)) - collect(BMO.position(m1)))) < 1e-9
         n1, n2 = BMO.orientation(m1)[:, 2], BMO.orientation(m2)[:, 2]
         @test d.angle ≈ acos(dot(n1, n2))
         @test occursin("M1 to M2: distance", gui.status.text[])
         @test occursin("angle", gui.status.text[])
-        @test length(gui.measure_plots) == 2
-        @test gui.measure_plots[1] isa Makie.Lines
+        @test length(gui.measure.plots) == 2
+        @test gui.measure.plots[1] isa Makie.Lines
         # a third point starts a new measurement, the toggle clears it
         _select!(gui)
-        @test length(gui.measure_points) == 1 && isnothing(gui.measurement)
-        gui.measure_toggle.active[] = false
-        @test isempty(gui.measure_points) && isempty(gui.measure_plots)
+        @test length(gui.measure.points) == 1 && isnothing(gui.measure.result)
+        gui.widgets.measure_toggle.active[] = false
+        @test isempty(gui.measure.points) && isempty(gui.measure.plots)
         close(gui)
     end
 
@@ -1731,7 +1651,7 @@ const BMO = BeamletOptics
         set_view(gui.ax, [0.3, -0.2, 0.25], [0.0, 0.05, 0.0], [0.0, 0.0, 1.0])
         _tick!(gui)
         home = _view()
-        @test gui.home_set
+        @test gui.camera.home_set
 
         # g: zoom to the selected lens, the view direction is kept
         eye0, lookat0, _ = _view()
@@ -1750,24 +1670,24 @@ const BMO = BeamletOptics
         gui.controls.selected[] = nothing
         _key!(gui, Keyboard.g)
         _tick!(gui, 0.05)
-        @test !isnothing(gui.camera_animation)
+        @test !isnothing(gui.camera.animation)
         _tick!(gui)
-        @test isnothing(gui.camera_animation)
+        @test isnothing(gui.camera.animation)
         eye, lookat, _ = _view()
         bbs = [Makie.boundingbox(p) for h in gui.system_handles for oh in h.handles for p in oh.plots]
         bb = reduce(Ext.GeometryBasics.union, bbs)
         @test lookat ≈ collect(minimum(bb) .+ Makie.widths(bb) ./ 2) atol = 1e-6
 
         # home
-        notify(gui.home_button.clicks)
+        notify(gui.widgets.home_button.clicks)
         _tick!(gui)
         for (a, b) in zip(_view(), home)
             @test a ≈ b atol = 1e-6
         end
 
         # views menu
-        @test first.(gui.views_menu.options[]) == ["top"]
-        gui.views_menu.i_selected[] = 1
+        @test first.(gui.widgets.views_menu.options[]) == ["top"]
+        gui.widgets.views_menu.i_selected[] = 1
         _tick!(gui)
         for (a, b) in zip(_view(), views[1].second)
             @test a ≈ b atol = 1e-6
@@ -1776,7 +1696,7 @@ const BMO = BeamletOptics
         set_view(gui.ax, [0.1, 0.2, 0.3], [0.0, 0.01, 0.02], [0.0, 0.0, 1.0])
         out = mktemp() do path, io
             redirect_stdout(io) do
-                notify(gui.save_view_button.clicks)
+                notify(gui.widgets.save_view_button.clicks)
             end
             flush(io)
             read(path, String)
@@ -1787,8 +1707,8 @@ const BMO = BeamletOptics
         for (a, b) in zip(entry.second, _view())
             @test a == b
         end
-        @test first.(gui.views_menu.options[]) == ["top", "view 2"]
-        @test gui.views[2] == entry
+        @test first.(gui.widgets.views_menu.options[]) == ["top", "view 2"]
+        @test gui.camera.views[2] == entry
         close(gui)
 
         @test_throws ArgumentError _live_view(System([lens]), Beam([0.0, 0, 0], [0.0, 1, 0]); views = ["a" => [1, 2, 3]])

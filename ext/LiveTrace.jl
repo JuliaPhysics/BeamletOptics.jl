@@ -11,7 +11,7 @@ _render_every(_) = 1
 _previewable(beam, h) = beam isa BMO.AbstractBeamGroup && _render_every(h) > 1
 
 """Returns `true` if the `gui` solves any of its beams as a preview while moving, see `_resolve!`."""
-_has_preview(gui::LiveView) = gui.preview_enabled &&
+_has_preview(gui::LiveView) = gui.trace.preview_enabled &&
                               any(i -> _previewable(gui.pairs[i].second, gui.beam_handles[i]), eachindex(gui.pairs))
 
 """
@@ -78,7 +78,7 @@ durations of the adaptive tracing and the status line, and calls the user `on_ch
 moved `obj` (or `nothing`) after a full solve.
 
 After a preview (see `_compute`), the titles of the detector panels are marked with "(preview)"
-and `gui.preview` is set, such that the full solve follows once the movement pauses, see
+and `gui.trace.preview` is set, such that the full solve follows once the movement pauses, see
 `_on_idle!`. `on_change` is only called after full solves, the metrics of a preview are not
 recorded in the history of the panels.
 """
@@ -92,14 +92,14 @@ function _apply!(gui::LiveView, r, obj; coarse = false)
     end
     solve_time = r.solve_time + 1e-9 * (t1 - t0)
     if previewed
-        gui.preview_time = solve_time
+        gui.trace.preview_time = solve_time
     else
-        gui.solve_time = solve_time
-        coarse || (gui.panel_time = r.field_time + 1e-9 * (time_ns() - t1))
+        gui.trace.solve_time = solve_time
+        coarse || (gui.trace.panel_time = r.field_time + 1e-9 * (time_ns() - t1))
     end
-    gui.coarse = coarse
-    gui.preview = previewed
-    gui.preview_obj = obj
+    gui.trace.coarse = coarse
+    gui.trace.preview = previewed
+    gui.trace.preview_obj = obj
     if !previewed
         try
             gui.on_change(gui, obj)
@@ -178,16 +178,16 @@ _progress_anchor(_) = Point3f(NaN)
 """
     _run!(gui, job, msg)
 
-Waits for the `job` at most `gui.progress_delay`: if it is done by then, its result is shown at
+Waits for the `job` at most `gui.trace.progress_delay`: if it is done by then, its result is shown at
 once, see `_finish!`, and `true` is returned on success. Otherwise the job continues in the
-background as `gui.job` (shown once it is done, see `_poll_job!`), the status line shows `msg`
+background as `gui.trace.job` (shown once it is done, see `_poll_job!`), the status line shows `msg`
 and `false` is returned. Solves up to `progress_delay` thus behave as if they ran on the render
 task, only longer ones keep the window responsive and show their progress.
 """
 function _run!(gui::LiveView, job::_SolveJob, msg::AbstractString)
-    _wait(job.done, gui.progress_delay)
+    _wait(job.done, gui.trace.progress_delay)
     istaskdone(job.task) && return _finish!(gui, job)
-    gui.job = job
+    gui.trace.job = job
     gui.status.text[] = msg
     return false
 end
@@ -201,7 +201,7 @@ function _wait(done::Base.Event, timeout::Real)
     return nothing
 end
 
-_running(gui::LiveView) = _running(gui.job)
+_running(gui::LiveView) = _running(gui.trace.job)
 _running(::Nothing) = false
 _running(::_SolveJob) = true
 
@@ -214,7 +214,7 @@ detector panels as outdated and counts the elapsed time as the duration of the s
 further changes defer the solve until the movement pauses, see `_on_change!`. A deferred solve,
 preview or coarse panel is not completed afterwards, the next change or `t` solves again.
 """
-_cancel_solve!(gui::LiveView) = _cancel!(gui, gui.job)
+_cancel_solve!(gui::LiveView) = _cancel!(gui, gui.trace.job)
 _cancel!(::LiveView, ::Nothing) = nothing
 
 function _cancel!(gui::LiveView, job::_SolveJob)
@@ -224,10 +224,10 @@ function _cancel!(gui::LiveView, job::_SolveJob)
     catch
         # cancelled or failed, the result is discarded either way
     end
-    gui.job = nothing
-    _hide_progress!(gui.progress)
-    setproperty!(gui, job.timing, max(getproperty(gui, job.timing), time() - job.t0))
-    gui.pending = gui.preview = gui.coarse = false
+    gui.trace.job = nothing
+    _hide_progress!(gui.trace.progress)
+    setproperty!(gui.trace, job.timing, max(getproperty(gui.trace, job.timing), time() - job.t0))
+    gui.trace.pending = gui.trace.preview = gui.trace.coarse = false
     _mark_stale!(gui, nothing; msg = _CANCELLED)
     return nothing
 end
@@ -243,8 +243,8 @@ of the beams after a solve (a job that only computed detector panels leaves them
 marked as outdated. Returns `true` on success.
 """
 function _finish!(gui::LiveView, job::_SolveJob)
-    gui.job === job && (gui.job = nothing)
-    _hide_progress!(gui.progress)
+    gui.trace.job === job && (gui.trace.job = nothing)
+    _hide_progress!(gui.trace.progress)
     try
         job.apply(fetch(job.task))
     catch e
@@ -253,7 +253,7 @@ function _finish!(gui::LiveView, job::_SolveJob)
     end
     if _solves(job)
         _restore_beams!(gui)
-        gui.stale = false
+        gui.trace.stale = false
     end
     return true
 end
@@ -268,8 +268,8 @@ function _fail!(gui::LiveView, e)
         return nothing
     end
     gui.last_error = _log_once(_task_error(e), gui.last_error, "solving the systems")
-    gui.stale || _dim_beams!(gui)
-    gui.stale = true
+    gui.trace.stale || _dim_beams!(gui)
+    gui.trace.stale = true
     gui.status.text[] = "solving the systems failed, see the log"
     return nothing
 end
@@ -283,7 +283,7 @@ _task_error(e) = e
 Called every frame: shows the result of the solve of the `gui` in the background once it is done,
 see `_finish!`, and until then the progress window of its running loop, see `_show_loop!`.
 """
-_poll_job!(gui::LiveView) = _poll!(gui, gui.job)
+_poll_job!(gui::LiveView) = _poll!(gui, gui.trace.job)
 _poll!(::LiveView, ::Nothing) = nothing
 
 function _poll!(gui::LiveView, job::_SolveJob)
@@ -293,7 +293,7 @@ function _poll!(gui::LiveView, job::_SolveJob)
     end
     shown = any(k -> _show_loop!(gui, job, k, BMO._progress_state(job.sinks[k])),
         eachindex(job.sinks))
-    shown || _hide_progress!(gui.progress)
+    shown || _hide_progress!(gui.trace.progress)
     return nothing
 end
 
@@ -302,17 +302,17 @@ end
 
 Shows the progress window of the loop of the sink `k` of the `job` with the `state` of
 `BMO._progress_state`, at the position of its source or detector, once the loop has run for
-`gui.progress_delay`, like the terminal bars after `get_progress_threshold()`. Returns `true` if
+`gui.trace.progress_delay`, like the terminal bars after `get_progress_threshold()`. Returns `true` if
 the window is shown.
 """
 _show_loop!(::LiveView, ::_SolveJob, ::Int, ::Nothing) = false
 
 function _show_loop!(gui::LiveView, job::_SolveJob, k::Int, state::NamedTuple)
     t = time()
-    t - state.t0 >= gui.progress_delay || return false
+    t - state.t0 >= gui.trace.progress_delay || return false
     s = job.shown
     (s.k == k && s.t0 == state.t0) || (job.shown = s = (; k, state.t0, t, state.count))
-    _show_progress!(gui.progress, job.anchors[k], state.count / max(state.n, 1),
+    _show_progress!(gui.trace.progress, job.anchors[k], state.count / max(state.n, 1),
         _progress_label(state, s, t))
     return true
 end
@@ -351,7 +351,7 @@ _beam_plots(h) = AbstractPlot[]
 function _dim_beams!(gui::LiveView)
     for h in gui.beam_handles, plot in _beam_plots(h)
         haskey(plot, :alpha) || continue
-        haskey(gui.beam_alphas, plot) || (gui.beam_alphas[plot] = plot.alpha[])
+        haskey(gui.trace.beam_alphas, plot) || (gui.trace.beam_alphas[plot] = plot.alpha[])
         plot.alpha[] = _STALE_ALPHA
     end
     return nothing
@@ -359,17 +359,17 @@ end
 
 """Restores the `alpha` of all beam plots of the `gui` after dimming."""
 function _restore_beams!(gui::LiveView)
-    for (plot, alpha) in gui.beam_alphas
+    for (plot, alpha) in gui.trace.beam_alphas
         plot.alpha[] = alpha
     end
-    empty!(gui.beam_alphas)
+    empty!(gui.trace.beam_alphas)
     return nothing
 end
 
 """Marks the beams and detector panels of the `gui` as outdated after `obj` (or a slider) changed."""
 function _mark_stale!(gui::LiveView, obj; msg = "outdated, press t to trace")
-    gui.stale || _dim_beams!(gui)
-    gui.stale = true
+    gui.trace.stale || _dim_beams!(gui)
+    gui.trace.stale = true
     gui.status.text[] = isnothing(obj) ? msg : "$(_pose_string(gui, obj)) — $msg"
     return nothing
 end
@@ -386,14 +386,14 @@ the background.
 """
 function _solve!(gui::LiveView, obj; coarse = false, preview = false)
     _cancel_solve!(gui)
-    gui.pending = false
+    gui.trace.pending = false
     job = _start_job(gui, r -> _apply!(gui, r, obj; coarse), obj, gui.pairs, gui.beam_handles;
         coarse, preview, timing = preview ? :preview_time : :solve_time)
     done = _run!(gui, job, "tracing, Esc cancels")
     if _running(gui)
         # Outdated until the solve in the background is shown, see `_finish!`
-        gui.stale || _dim_beams!(gui)
-        gui.stale = true
+        gui.trace.stale || _dim_beams!(gui)
+        gui.trace.stale = true
     end
     return done
 end
@@ -403,7 +403,7 @@ function _refine!(gui::LiveView, r)
     for (p, field) in zip(r.panels, r.fields)
         _update_panel!(p, field; record = false)
     end
-    gui.coarse = false
+    gui.trace.coarse = false
     return nothing
 end
 
@@ -416,16 +416,16 @@ them as outdated. If solving (the preview solve, if any) is slower than the `tra
 solve is deferred until the movement pauses, see `_on_idle!`.
 """
 function _on_change!(gui::LiveView, obj)
-    gui.last_change = time()
+    gui.trace.last_change = time()
     preview = _has_preview(gui)
-    if !gui.auto_trace[]
+    if !gui.trace.auto[]
         _mark_stale!(gui, obj)
-    elseif (preview ? gui.preview_time : gui.solve_time) <= gui.trace_budget
-        _solve!(gui, obj; coarse = gui.panel_time > gui.trace_budget, preview)
+    elseif (preview ? gui.trace.preview_time : gui.trace.solve_time) <= gui.trace.budget
+        _solve!(gui, obj; coarse = gui.trace.panel_time > gui.trace.budget, preview)
     else
         _mark_stale!(gui, obj; msg = "tracing when the movement pauses")
-        gui.pending = true
-        gui.pending_obj = obj
+        gui.trace.pending = true
+        gui.trace.pending_obj = obj
     end
     return nothing
 end
@@ -435,15 +435,15 @@ Solves deferred changes, completes a preview solve with a full solve and refines
 the detector panels once the movement pauses and no solve runs in the background.
 """
 function _on_idle!(gui::LiveView)
-    time() - gui.last_change > gui.idle_delay || return nothing
+    time() - gui.trace.last_change > gui.trace.idle_delay || return nothing
     _running(gui) && return nothing
-    if gui.pending && gui.auto_trace[]
-        _solve!(gui, gui.pending_obj)
-    elseif gui.preview
+    if gui.trace.pending && gui.trace.auto[]
+        _solve!(gui, gui.trace.pending_obj)
+    elseif gui.trace.preview
         # Also if auto tracing was switched off in the meantime, since the preview is incomplete
-        _solve!(gui, gui.preview_obj)
-    elseif gui.coarse
-        job = _start_job(gui, r -> _refine!(gui, r), gui.preview_obj, empty(gui.pairs),
+        _solve!(gui, gui.trace.preview_obj)
+    elseif gui.trace.coarse
+        job = _start_job(gui, r -> _refine!(gui, r), gui.trace.preview_obj, empty(gui.pairs),
             empty(gui.beam_handles), _shown_panels(gui); timing = :panel_time)
         _run!(gui, job, "computing the detector fields, Esc cancels")
     end
@@ -470,7 +470,7 @@ solve in the background, of the `gui`.
 function _connect_trace!(gui::LiveView)
     listeners = gui.controls.listeners
     scene = gui.ax.scene
-    push!(listeners, on(_ -> _trace!(gui), gui.trace_button.clicks))
+    push!(listeners, on(_ -> _trace!(gui), gui.widgets.trace_button.clicks))
     push!(listeners, on(events(scene).keyboardbutton, priority = 200) do event
         (event.action == Keyboard.press && event.key == Keyboard.t) || return Consume(false)
         gui.controls.ignore_keys() && return Consume(false)
@@ -484,8 +484,8 @@ function _connect_trace!(gui::LiveView)
         _cancel_solve!(gui)
         return Consume(true)
     end)
-    push!(listeners, on(gui.auto_trace) do active
-        active && gui.stale && _trace!(gui)
+    push!(listeners, on(gui.trace.auto) do active
+        active && gui.trace.stale && _trace!(gui)
         return nothing
     end)
     push!(listeners, on(events(scene).tick) do _

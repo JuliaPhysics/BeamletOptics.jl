@@ -263,7 +263,7 @@ const BMO = BeamletOptics
         pick_plot = Ref{Any}(nothing)
         gui = live_view(System([m, pd]), beam; throttle = false, trace_budget = Inf,
             pick = ax -> (pick_plot[], 0))
-        cube = gui.view_cube
+        cube = gui.widgets.view_cube
         @test cube isa Ext.ViewCube
         @test cube.scene in gui.ax.scene.children
         cube.duration = 0
@@ -309,9 +309,9 @@ const BMO = BeamletOptics
 
         gui = live_view(System([m, pd]), GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], 1e-6, 0.5e-3);
             view_cube = false)
-        @test isnothing(gui.view_cube)
+        @test isnothing(gui.widgets.view_cube)
         # the only child scene is the one of the progress window
-        @test gui.ax.scene.children == [gui.progress.hud]
+        @test gui.ax.scene.children == [gui.trace.progress.hud]
         close(gui)
     end
 end

@@ -18,7 +18,7 @@ const _POSE_COLORS = (:black, :black, :black, :red, :green, :blue)
 
 """Returns `true` if a textbox or a menu of the `gui` takes keyboard input."""
 function _typing(gui::LiveView)
-    any(c -> any(tb -> tb.focused[], _card_boxes(c)), gui.cards) && return true
+    any(c -> any(tb -> tb.focused[], _card_boxes(c)), gui.cards.all) && return true
     any(tb -> tb.focused[], _layout_boxes(gui)) && return true
     # the widgets of `add_controls!` and `add_panel!`, see `_register_widgets!`
     _custom_typing(gui.custom) && return true
@@ -46,7 +46,7 @@ an object in its pose boxes, see `_refresh_card!`, and, in layouts with an inspe
 see `_refresh_inspector!`. Focused textboxes keep the typed text, unless `force`.
 """
 function _update_inspector!(gui::LiveView; force::Bool = false)
-    foreach(c -> _refresh_card!(gui, c; force), gui.cards)
+    foreach(c -> _refresh_card!(gui, c; force), gui.cards.all)
     _refresh_inspector!(gui; force)
     return nothing
 end
@@ -133,17 +133,17 @@ Component card
 
 """
 Returns the object of the card `c` of the `gui`: the pinned object, the selected object for the card
-of the selection (`gui.card`), `nothing` for a spare card.
+of the selection (`gui.cards.selection`), `nothing` for a spare card.
 """
 function _card_object(gui::LiveView, c::_ComponentCard)
     c.pinned && return c.obj
-    return c === gui.card ? gui.controls.selected[] : nothing
+    return c === gui.cards.selection ? gui.controls.selected[] : nothing
 end
 
 """
     _update_cards!(gui)
 
-Shows the card of the selection (`gui.card`) next to the selected object, unless it has a pinned
+Shows the card of the selection (`gui.cards.selection`) next to the selected object, unless it has a pinned
 card, and the pinned cards of the `gui` next to their objects; see `_update_card!`. The cards are
 placed in this order, each off the view cube and the cards before, so that none covers another:
 the cards that the mouse moved to their `spot` first, where they stay (see `_drag_cards!`), then
@@ -154,11 +154,11 @@ moves the cards with the camera and the objects.
 function _update_cards!(gui::LiveView)
     menu = _menu_open(gui)
     sel = gui.controls.selected[]
-    obstacles = _obstacles(gui.view_cube)
-    shown = menu || !_selection_card_shown(gui) || any(c -> c.pinned && c.obj === sel, gui.cards) ?
+    obstacles = _obstacles(gui.widgets.view_cube)
+    shown = menu || !_selection_card_shown(gui) || any(c -> c.pinned && c.obj === sel, gui.cards.all) ?
         nothing : sel
-    target(c) = c === gui.card ? shown : c.pinned && !menu ? c.obj : nothing
-    order = [gui.card; filter(c -> c !== gui.card, gui.cards)]
+    target(c) = c === gui.cards.selection ? shown : c.pinned && !menu ? c.obj : nothing
+    order = [gui.cards.selection; filter(c -> c !== gui.cards.selection, gui.cards.all)]
     for moved in (true, false), c in order
         isnothing(c.spot) == moved || _update_card!(gui, c, target(c), obstacles)
     end
@@ -166,7 +166,7 @@ function _update_cards!(gui::LiveView)
 end
 
 """
-Returns `true` if the layout of the `gui` shows the card of the selection (`gui.card`) next to the
+Returns `true` if the layout of the `gui` shows the card of the selection (`gui.cards.selection`) next to the
 selected object; layouts that show the card elsewhere, e.g. docked in the inspector of the app
 layout, return `false`. Pinned cards are shown in all layouts.
 """
@@ -396,7 +396,7 @@ function _toggle_pinned!(gui::LiveView, c::_ComponentCard)
         # the plots of an inspected point or a measurement, unless it is still pinned elsewhere,
         # e.g. after it was docked, see `_forget!`
         _is_pinned(gui, obj) || _forget!(gui, obj)
-    elseif c === gui.card && !isnothing(gui.controls.selected[])
+    elseif c === gui.cards.selection && !isnothing(gui.controls.selected[])
         c.pinned, c.obj, c.key = true, gui.controls.selected[], nothing
         _use_card!(gui, _spare_card!(gui))
     end
@@ -414,10 +414,10 @@ _unpin!(gui::LiveView, obj) = foreach(c -> _toggle_pinned!(gui, c), _floating_ca
 _is_pinned(gui::LiveView, obj) = _is_floating(gui, obj)
 
 """Returns the pinned cards of the `gui` that float next to `obj` in the 3D view."""
-_floating_cards(gui::LiveView, obj) = filter(c -> c.pinned && c.obj === obj, gui.cards)
+_floating_cards(gui::LiveView, obj) = filter(c -> c.pinned && c.obj === obj, gui.cards.all)
 
 """Returns `true` if a pinned card of the `gui` floats next to `obj` in the 3D view."""
-_is_floating(gui::LiveView, obj) = any(c -> c.pinned && c.obj === obj, gui.cards)
+_is_floating(gui::LiveView, obj) = any(c -> c.pinned && c.obj === obj, gui.cards.all)
 
 """
     _float!(gui, obj)
@@ -464,10 +464,10 @@ _on_pinned!(::LiveView) = nothing
 
 """Returns a card of the `gui` that is neither pinned nor the card of the selection, or a new one."""
 function _spare_card!(gui::LiveView)
-    i = findfirst(c -> !c.pinned && c !== gui.card, gui.cards)
-    isnothing(i) || return gui.cards[i]
-    c = _ComponentCard(gui.fig, gui.layout, _card_z(length(gui.cards) + 1))
-    push!(gui.cards, c)
+    i = findfirst(c -> !c.pinned && c !== gui.cards.selection, gui.cards.all)
+    isnothing(i) || return gui.cards.all[i]
+    c = _ComponentCard(gui.fig, gui.layout, _card_z(length(gui.cards.all) + 1))
+    push!(gui.cards.all, c)
     _connect_card!(gui, c)
     # The listeners of the new widgets come after the mouse shield of the cards, which must come last
     _shield_cards!(gui)
@@ -492,8 +492,8 @@ _card_tools!(::AbstractLiveLayout, c::_ComponentCard) = c
 
 """Makes `c` the card of the selection of the `gui`, whose `step_box` sets the keyboard step."""
 function _use_card!(gui::LiveView, c::_ComponentCard)
-    gui.card = c
-    gui.step_box = c.step_box
+    gui.cards.selection = c
+    gui.widgets.step_box = c.step_box
     c.key, c.pose, c.spot = nothing, nothing, nothing
     return nothing
 end
@@ -530,12 +530,12 @@ otherwise, and before the camera (0).
 function _shield_cards!(gui::LiveView)
     ev = events(gui.ax.scene)
     listeners = gui.controls.listeners
-    foreach(off, gui.card_shield)
-    filter!(l -> !any(s -> s === l, gui.card_shield), listeners)
-    over = () -> any(c -> _over_card(c, ev), gui.cards)
-    gui.card_shield = Any[on(event -> Consume(event.action == Mouse.press && over()), ev.mousebutton; priority = 1),
+    foreach(off, gui.cards.shield)
+    filter!(l -> !any(s -> s === l, gui.cards.shield), listeners)
+    over = () -> any(c -> _over_card(c, ev), gui.cards.all)
+    gui.cards.shield = Any[on(event -> Consume(event.action == Mouse.press && over()), ev.mousebutton; priority = 1),
         on(_ -> Consume(over()), ev.scroll; priority = 1)]
-    append!(listeners, gui.card_shield)
+    append!(listeners, gui.cards.shield)
     return nothing
 end
 
@@ -559,13 +559,13 @@ elsewhere ends the input into the textboxes of the cards, also if the controls c
 function _connect_cards!(gui::LiveView)
     ctrl = gui.controls
     ev = events(gui.ax.scene)
-    over = () -> any(c -> _over_card(c, ev), gui.cards)
+    over = () -> any(c -> _over_card(c, ev), gui.cards.all)
     ctrl.ignore_mouse = () -> over() || _outside_view(gui)
-    foreach(c -> _connect_card!(gui, c), gui.cards)
+    foreach(c -> _connect_card!(gui, c), gui.cards.all)
     push!(ctrl.listeners, on(_ -> _update_cards!(gui), ev.tick))
     # Before the controls (200)
     push!(ctrl.listeners, on(ev.mousebutton, priority = 250) do event
-        event.action == Mouse.press && !over() && foreach(_defocus_card!, gui.cards)
+        event.action == Mouse.press && !over() && foreach(_defocus_card!, gui.cards.all)
         return Consume(false)
     end)
     _drag_cards!(gui)
@@ -601,9 +601,9 @@ function _drag_cards!(gui::LiveView)
     push!(listeners, on(ev.mousebutton, priority = 2) do event
         event.button == Mouse.left || return Consume(false)
         if event.action == Mouse.press
-            i = findlast(c -> _over_handle(c, ev), gui.cards)
+            i = findlast(c -> _over_handle(c, ev), gui.cards.all)
             isnothing(i) && return Consume(false)
-            c = gui.cards[i]
+            c = gui.cards.all[i]
             r = c.background.layoutobservables.suggestedbbox[]
             drag[] = (c, Point2f(ev.mouseposition[]), Point2f(minimum(r)[1], maximum(r)[2]), false)
             return Consume(true)

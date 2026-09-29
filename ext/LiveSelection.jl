@@ -74,8 +74,8 @@ Selects the object of the option `i` of the component menu, like a click in the 
 option `0`, i.e. no selection, is set by `_on_select!` and ignored.
 """
 function _on_menu_select!(gui::LiveView, i)
-    1 <= i <= length(gui.menu_objects) || return nothing
-    _select!(gui, gui.menu_objects[i])
+    1 <= i <= length(gui.objects.menu) || return nothing
+    _select!(gui, gui.objects.menu[i])
     return nothing
 end
 
@@ -90,7 +90,7 @@ function _select!(gui::LiveView, obj)
     ctrl.selected[] === obj && return nothing
     if ctrl.spectator[]
         gui.status.text[] = "spectator mode, press v to select components"
-        _show_menu_selection!(gui.menu, 0)
+        _show_menu_selection!(gui.widgets.menu, 0)
         return nothing
     end
     ctrl.selected[] = obj
@@ -102,8 +102,8 @@ end
 """Shows the selected object of the controls in the component menu and in the component card."""
 function _on_select!(gui::LiveView)
     obj = gui.controls.selected[]
-    i = isnothing(obj) ? nothing : findfirst(o -> o === obj, gui.menu_objects)
-    _show_menu_selection!(gui.menu, something(i, 0))
+    i = isnothing(obj) ? nothing : findfirst(o -> o === obj, gui.objects.menu)
+    _show_menu_selection!(gui.widgets.menu, something(i, 0))
     _update_inspector!(gui)
     _update_cards!(gui)
     _on_selected!(gui)
@@ -143,14 +143,14 @@ again whose opacity was set to 0 gets its initial opacity back, see `_set_opacit
 """
 function _set_hidden!(gui::LiveView, obj, hide::Bool)
     for leaf in _leaves(obj)
-        hide ? push!(gui.hidden, leaf) : delete!(gui.hidden, leaf)
+        hide ? push!(gui.objects.hidden, leaf) : delete!(gui.objects.hidden, leaf)
         i = findfirst(oh -> oh.obj === leaf, gui.controls.h.handles)
         isnothing(i) && continue
-        visible = !hide && (gui.sources_toggle.active[] || !_is_source(leaf))
+        visible = !hide && (gui.widgets.sources_toggle.active[] || !_is_source(leaf))
         for plot in gui.controls.h.handles[i].plots
             plot.visible[] == visible || (plot.visible[] = visible)
         end
-        hide || _restore_opacity!(gui, leaf, get(gui.opacity, leaf, nothing))
+        hide || _restore_opacity!(gui, leaf, get(gui.objects.opacity, leaf, nothing))
     end
     return nothing
 end
@@ -168,7 +168,7 @@ function _set_show_sources!(gui::LiveView, show::Bool)
     ctrl = gui.controls
     for oh in ctrl.h.handles
         _is_source(oh.obj) || continue
-        visible = show && !(oh.obj in gui.hidden)
+        visible = show && !(oh.obj in gui.objects.hidden)
         for plot in oh.plots
             plot.visible[] == visible || (plot.visible[] = visible)
         end
@@ -187,14 +187,14 @@ which moves the camera backwards (WASD keys of Makie's `Camera3D`).
 """
 function _connect_sources!(gui::LiveView)
     listeners = gui.controls.listeners
-    push!(listeners, on(v -> _set_show_sources!(gui, v), gui.sources_toggle.active))
+    push!(listeners, on(v -> _set_show_sources!(gui, v), gui.widgets.sources_toggle.active))
     push!(listeners, on(events(gui.ax.scene).keyboardbutton, priority = 200) do event
         (event.action == Keyboard.press && event.key == Keyboard._1) || return Consume(false)
         gui.controls.ignore_keys() && return Consume(false)
-        gui.sources_toggle.active[] = !gui.sources_toggle.active[]
+        gui.widgets.sources_toggle.active[] = !gui.widgets.sources_toggle.active[]
         return Consume(true)
     end)
-    gui.sources_toggle.active[] || _set_show_sources!(gui, false)
+    gui.widgets.sources_toggle.active[] || _set_show_sources!(gui, false)
     return nothing
 end
 
@@ -232,14 +232,14 @@ function _toggle_hidden!(gui::LiveView, ::LiveClipPlane)
 end
 
 """Returns `true` if all rendered objects (leaves) of `obj` are hidden in the `gui`."""
-_all_hidden(gui::LiveView, obj) = all(leaf -> leaf in gui.hidden, _leaves(obj))
+_all_hidden(gui::LiveView, obj) = all(leaf -> leaf in gui.objects.hidden, _leaves(obj))
 
 """Returns how a hidden object of the `gui` is shown again, for the status line."""
 _show_hint(::LiveView) = "select it in the menu to show it again"
 
 """Shows all hidden objects of the `gui`."""
 function _show_all!(gui::LiveView)
-    foreach(leaf -> _set_hidden!(gui, leaf, false), collect(gui.hidden))
+    foreach(leaf -> _set_hidden!(gui, leaf, false), collect(gui.objects.hidden))
     gui.status.text[] = "all components shown"
     _update_inspector!(gui)
     _update_cards!(gui)
@@ -251,26 +251,34 @@ end
 """Connects the export button, the component menu and "show all"; the cards connect their widgets."""
 function _connect_tools!(gui::LiveView)
     listeners = gui.controls.listeners
-    push!(listeners, on(_ -> _export!(gui), gui.export_button.clicks))
-    _listen!(listeners, i -> _on_menu_select!(gui, i), _menu_selection(gui.menu))
+    push!(listeners, on(_ -> _export!(gui), gui.widgets.export_button.clicks))
+    _listen!(listeners, i -> _on_menu_select!(gui, i), _menu_selection(gui.widgets.menu))
     push!(listeners, on(_ -> _on_select!(gui), gui.controls.selected))
-    _listen!(listeners, _ -> _show_all!(gui), _clicks(gui.show_all_button))
+    _listen!(listeners, _ -> _show_all!(gui), _clicks(gui.widgets.show_all_button))
     return nothing
 end
 
 """Returns `true` if the component menu (if any) or the views menu of the `gui` is open."""
-_menu_open(gui::LiveView) = _is_open(gui.menu) || _is_open(gui.views_menu)
+_menu_open(gui::LiveView) = _is_open(gui.widgets.menu) || _is_open(gui.widgets.views_menu)
 
 _clip_plane_label(::LiveView) = "Clip plane"
 
+"""
+    _name_objects!(gui)
+
+Names the objects of the `gui` without an entry in `labels` in `gui.objects.names`, see `_label`:
+none by default.
+"""
+_name_objects!(::LiveView) = nothing
+
 """Clip planes of the app layout are numbered, e.g. "Clip plane 2", see `_clip_plane_label`."""
 function _clip_plane_label(gui::AppView)
-    n = get(gui.layout.counters, "Clip plane", 0) + 1
-    gui.layout.counters["Clip plane"] = n
+    n = get(gui.objects.counters, "Clip plane", 0) + 1
+    gui.objects.counters["Clip plane"] = n
     return "Clip plane $n"
 end
 
 """The label of `obj` in the app layout: its entry of `labels`, else its name in the tree."""
-_label(gui::AppView, obj) = get(() -> get(gui.layout.names, obj, string(nameof(typeof(obj)))),
+_label(gui::AppView, obj) = get(() -> get(gui.objects.names, obj, string(nameof(typeof(obj)))),
     gui.labels, obj)
 

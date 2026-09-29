@@ -81,7 +81,7 @@ function _build_layout(layout::CompactLayout, fig, spec)
     layout.tool_row = tool_row
     return (; ax, cube, panels, sliders, status, trace_button, auto_trace_toggle, clip_beams_toggle,
         orthographic_toggle, sources_toggle, export_button, show_all_button, measure_toggle,
-        home_button, save_view_button, tool_row)
+        home_button, save_view_button, tool_row, info = nothing)
 end
 
 function _build_menus(::CompactLayout, w, options, views_options)

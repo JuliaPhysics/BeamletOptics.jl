@@ -58,7 +58,7 @@ BMO.card_actions(::CardTestObject) = ()
     _eye(gui) = Vector{Float64}(cameracontrols(gui.ax.scene).eyeposition[])
     # The card lies inside the 3D view, with the margin
     function _inside(gui)
-        r, v = _rect(gui.card.background), Rect2f(gui.ax.scene.viewport[])
+        r, v = _rect(gui.cards.selection.background), Rect2f(gui.ax.scene.viewport[])
         return all(minimum(r) .>= minimum(v) .+ Ext._CARD_MARGIN .- 1.0f-3) &&
                all(maximum(r) .<= maximum(v) .- Ext._CARD_MARGIN .+ 1.0f-3)
     end
@@ -74,8 +74,8 @@ BMO.card_actions(::CardTestObject) = ()
     @testset "widgets in the card" begin
         m, pd = _fixture()
         gui = _live_view(System([m, pd]), _gauss(); labels = Dict(m => "M1"))
-        c = gui.card
-        @test gui.step_box === c.step_box
+        c = gui.cards.selection
+        @test gui.widgets.step_box === c.step_box
         # no textboxes and no hide button below the 3D view
         @test !any(b -> b isa Textbox, gui.fig.content)
         @test !any(b -> b isa Button && b.label[] == "hide", gui.fig.content)
@@ -126,10 +126,10 @@ BMO.card_actions(::CardTestObject) = ()
         @test c.scene.visible[] && _inside(gui)
 
         # an open menu would be covered
-        gui.menu.is_open[] = true
+        gui.widgets.menu.is_open[] = true
         _tick!(gui)
         @test !c.scene.visible[]
-        gui.menu.is_open[] = false
+        gui.widgets.menu.is_open[] = false
         _tick!(gui)
         @test c.scene.visible[]
 
@@ -172,7 +172,7 @@ BMO.card_actions(::CardTestObject) = ()
         # off the view cube
         m, pd = _fixture()
         gui = _live_view(System([m, pd]), _gauss())
-        cube = gui.view_cube
+        cube = gui.widgets.view_cube
         C = Rect2f(Makie.viewport(cube.scene)[])
         view = Rect2f(gui.ax.scene.viewport[])
         p = Point2f(minimum(C)[1] - 50, maximum(C)[2])
@@ -192,7 +192,7 @@ BMO.card_actions(::CardTestObject) = ()
     @testset "mouse and keyboard" begin
         m, pd = _fixture()
         gui = _live_view(System([m, pd]), _gauss())
-        c, ctrl = gui.card, gui.controls
+        c, ctrl = gui.cards.selection, gui.controls
         ev = events(gui.ax.scene)
         _select!(gui, m)
         @test c.scene.visible[]
@@ -224,16 +224,16 @@ BMO.card_actions(::CardTestObject) = ()
         xy = _center(_rect(hide))
         _click!(gui, xy)
         @test hide.clicks[] == 1
-        @test m in gui.hidden && isnothing(ctrl.selected[])
+        @test m in gui.objects.hidden && isnothing(ctrl.selected[])
         @test !c.scene.visible[]
         # hidden widgets are away and take no clicks at their former position
         _click!(gui, xy)
         @test hide.clicks[] == 1 && c.collapse_button.clicks[] == 0
         # selected in the menu, the hidden object shows "show"; the same declarations keep the widgets
-        gui.menu.i_selected[] = findfirst(o -> o === m, gui.menu_objects)
+        gui.widgets.menu.i_selected[] = findfirst(o -> o === m, gui.objects.menu)
         @test ctrl.selected[] === m && _w(c, :hide) === hide && hide.label[] == "show"
         notify(hide.clicks)
-        @test !(m in gui.hidden) && hide.label[] == "hide"
+        @test !(m in gui.objects.hidden) && hide.label[] == "hide"
 
         # a textbox gets the keyboard, a press elsewhere ends the input
         box = _pose(c, 1)
@@ -250,7 +250,7 @@ BMO.card_actions(::CardTestObject) = ()
     @testset "clip planes" begin
         m, pd = _fixture()
         gui = _live_view(System([m, pd]), _gauss())
-        c, ctrl = gui.card, gui.controls
+        c, ctrl = gui.cards.selection, gui.controls
         plane = Ext._add_clip_plane!(gui, [0, 0.05, 0], [0, 1, 0])
         @test ctrl.selected[] === plane
         @test c.title.text[] == "Clip plane"
@@ -259,14 +259,14 @@ BMO.card_actions(::CardTestObject) = ()
         notify(_w(c, :flip).clicks)
         @test plane.dir[:, 2] ≈ -n
         notify(_w(c, :remove).clicks)
-        @test !(plane in gui.clip_planes)
+        @test !(plane in gui.clip.planes)
         @test isnothing(ctrl.selected[]) && !c.scene.visible[]
         # another object gets its own actions
         _select!(gui, m)
         @test isnothing(_w(c, :flip)) && !isnothing(_w(c, :hide))
         # a pinned plane is unpinned when it is removed
         plane = Ext._add_clip_plane!(gui, [0, 0.05, 0], [0, 1, 0])
-        pinned = gui.card
+        pinned = gui.cards.selection
         _pin!(pinned)
         @test pinned.pinned && pinned.obj === plane
         notify(_w(pinned, :remove).clicks)
@@ -280,7 +280,7 @@ BMO.card_actions(::CardTestObject) = ()
         # room for three cards next to each other, one of them with the rows of the detector
         gui = _live_view(System([m, pd]), beam; labels = Dict(m => "M1", pd => "PD"), size = (1800, 1100))
         ctrl = gui.controls
-        c1 = gui.card
+        c1 = gui.cards.selection
         # nothing to pin without a selection
         _pin!(c1)
         @test !c1.pinned && !c1.pin_button.active[]
@@ -289,18 +289,18 @@ BMO.card_actions(::CardTestObject) = ()
         _pin!(c1)
         @test c1.pinned && c1.obj === m && c1.pin_button.active[]
         # the selection gets another card
-        @test gui.card !== c1 && length(gui.cards) == 2 && gui.step_box === gui.card.step_box
+        @test gui.cards.selection !== c1 && length(gui.cards.all) == 2 && gui.widgets.step_box === gui.cards.selection.step_box
         # the pinned object shows its pinned card only, without the keyboard step
-        @test c1.scene.visible[] && !gui.card.scene.visible[]
+        @test c1.scene.visible[] && !gui.cards.selection.scene.visible[]
         @test _away(c1.step) && !_away(c1.rows)
         @test length(c1.link[]) == 2
 
         # the pinned card stays when the selection changes
         _select!(gui, pd)
-        @test c1.scene.visible[] && gui.card.scene.visible[]
-        @test c1.title.text[] == "M1" && gui.card.title.text[] == "PD"
+        @test c1.scene.visible[] && gui.cards.selection.scene.visible[]
+        @test c1.title.text[] == "M1" && gui.cards.selection.title.text[] == "PD"
         _select!(gui, nothing)
-        @test c1.scene.visible[] && !gui.card.scene.visible[]
+        @test c1.scene.visible[] && !gui.cards.selection.scene.visible[]
         # and follows its object, also when it is moved elsewhere
         set_view(gui.ax, [0.3, -0.2, 0.3], [0.0, 0.1, 0.0], [0.0, 0, 1])
         _tick!(gui)
@@ -316,23 +316,23 @@ BMO.card_actions(::CardTestObject) = ()
         @test BMO.position(m)[3] ≈ 5e-3
         @test BMO.position(pd)[3] ≈ 0 atol = 1e-12
         notify(_w(c1, :hide).clicks)
-        @test m in gui.hidden && ctrl.selected[] === pd
+        @test m in gui.objects.hidden && ctrl.selected[] === pd
         @test c1.scene.visible[] && _w(c1, :hide).label[] == "show"
         notify(_w(c1, :hide).clicks)
-        @test !(m in gui.hidden) && _w(c1, :hide).label[] == "hide"
+        @test !(m in gui.objects.hidden) && _w(c1, :hide).label[] == "hide"
         _pose(c1, 1).focused[] = true
         @test Ext._typing(gui)
         _pose(c1, 1).focused[] = false
         @test !Ext._typing(gui)
 
         # a second pinned card; the widgets of the newest card take the clicks
-        _pin!(gui.card)
-        @test length(gui.cards) == 3 && count(c -> c.pinned, gui.cards) == 2
+        _pin!(gui.cards.selection)
+        @test length(gui.cards.all) == 3 && count(c -> c.pinned, gui.cards.all) == 2
         _select!(gui, beam)
-        c3 = gui.card
-        @test c3 === gui.cards[3] && c3.scene.visible[]
+        c3 = gui.cards.selection
+        @test c3 === gui.cards.all[3] && c3.scene.visible[]
         # no card covers another
-        rects = [_rect(c.background) for c in gui.cards]
+        rects = [_rect(c.background) for c in gui.cards.all]
         @test !any(Ext._overlaps(rects[i], rects[j]) for i in 1:3 for j in (i + 1):3)
         _click!(gui, _center(_rect(c3.collapse_button.box)))
         @test c3.collapsed
@@ -340,20 +340,20 @@ BMO.card_actions(::CardTestObject) = ()
         _click!(gui, _center(_rect(c3.collapse_button.box)))
         @test !c3.collapsed
         # the menu hides all cards
-        gui.menu.is_open[] = true
+        gui.widgets.menu.is_open[] = true
         _tick!(gui)
-        @test !any(c -> c.scene.visible[], gui.cards)
-        gui.menu.is_open[] = false
+        @test !any(c -> c.scene.visible[], gui.cards.all)
+        gui.widgets.menu.is_open[] = false
         _tick!(gui)
-        @test count(c -> c.scene.visible[], gui.cards) == 3
+        @test count(c -> c.scene.visible[], gui.cards.all) == 3
 
         # unpinned: hidden, and reused for the next pin
         _pin!(c1)
         @test !c1.pinned && !c1.scene.visible[] && !c1.pin_button.active[]
         _pin!(c3)
-        @test gui.card === c1 && length(gui.cards) == 3
+        @test gui.cards.selection === c1 && length(gui.cards.all) == 3
         close(gui)
-        @test !any(c -> c.scene.visible[], gui.cards)
+        @test !any(c -> c.scene.visible[], gui.cards.all)
     end
 
     @testset "cards moved by the mouse" begin
@@ -370,7 +370,7 @@ BMO.card_actions(::CardTestObject) = ()
 
         m, pd = _fixture()
         gui = _live_view(System([m, pd]), _gauss(); size = (1400, 900))
-        c, ctrl = gui.card, gui.controls
+        c, ctrl = gui.cards.selection, gui.controls
         ev = events(gui.ax.scene)
         vp = Rect2f(gui.ax.scene.viewport[])
         _select!(gui, m)
@@ -413,7 +413,7 @@ BMO.card_actions(::CardTestObject) = ()
         @test c.pinned && top_left(c) ≈ target
         _select!(gui, m)
         _tick!(gui)
-        s = gui.card
+        s = gui.cards.selection
         @test s !== c && isnothing(s.spot) && s.scene.visible[]
         @test !Ext._overlaps(_rect(s.background), _rect(c.background))
         # a double click at the head places the card next to its object again
@@ -445,11 +445,11 @@ BMO.card_actions(::CardTestObject) = ()
         m, pd = _fixture()
         gui = _live_view(System([m, pd]), _gauss())
         _select!(gui, m)
-        c = gui.card
+        c = gui.cards.selection
         _pin!(c)
         _tick!(gui)
         @test c.pinned && c.scene.visible[] && isnothing(c.dock_button)
-        @test all(c -> isnothing(c.dock_button), gui.cards)
+        @test all(c -> isnothing(c.dock_button), gui.cards.all)
         @test Ext._is_floating(gui, m) && Ext._is_pinned(gui, m)
         # the head holds the pin and the chevron only
         @test length(c.tools.content) == 2
@@ -457,7 +457,7 @@ BMO.card_actions(::CardTestObject) = ()
         Ext._dock!(gui, m)
         Ext._float!(gui, m)
         _tick!(gui)
-        @test c.pinned && c.obj === m && c.scene.visible[] && count(c -> c.pinned, gui.cards) == 1
+        @test c.pinned && c.obj === m && c.scene.visible[] && count(c -> c.pinned, gui.cards.all) == 1
         close(gui)
     end
 
@@ -470,7 +470,7 @@ BMO.card_actions(::CardTestObject) = ()
         translate3d!(m2, [0.1, 0.25, 0])
         solves = Ref(0)
         gui = _live_view(System([m, pd, t, m2]), _gauss(); on_change = (gui, obj) -> (solves[] += 1))
-        c, ctrl = gui.card, gui.controls
+        c, ctrl = gui.cards.selection, gui.controls
         _select!(gui, t)
         # the pose rows, then its own rows; no actions
         @test _pose(c, 1) isa Textbox && _w(c, :height).text[] == "0 mm"
@@ -512,7 +512,7 @@ BMO.card_actions(::CardTestObject) = ()
         src = CollimatedSource([0.0, 0, 0], [0.0, 1, 0], 2e-3, 1e-6; num_rings = 2, num_rays = 40)
         # without the preview solve of the rendered rays only, see `preview` of `live_view`
         gui = _live_view(System([m, pd]), src; preview = false)
-        c = gui.card
+        c = gui.cards.selection
         _select!(gui, src)
         rays = _w(c, :rays)
         @test rays.value[] == 40 && _w(c, :ray_count).text[] == "40 rays"
@@ -527,7 +527,7 @@ BMO.card_actions(::CardTestObject) = ()
         wrapped = CollimatedSource(BMO.beams(src), 2e-3, [0.0, 0, 0], [0.0, 1, 0])
         gui = _live_view(System([m, pd]), wrapped)
         _select!(gui, wrapped)
-        @test isnothing(_w(gui.card, :rays)) && _pose(gui.card, 1) isa Textbox
+        @test isnothing(_w(gui.cards.selection, :rays)) && _pose(gui.cards.selection, 1) isa Textbox
         close(gui)
     end
 
@@ -542,15 +542,15 @@ BMO.card_actions(::CardTestObject) = ()
             # a pinned card: floating in the compact layout, docked below the inspector in the app
             # layout, whose floating cards keep the colors of the theme
             Ext._toggle_pin!(gui, m)
-            @test _rgba(gui.card.background.color[]) == _rgba(t.sidebar)
-            @test _rgba(gui.card.background.strokecolor[]) == _rgba(t.border)
+            @test _rgba(gui.cards.selection.background.color[]) == _rgba(t.sidebar)
+            @test _rgba(gui.cards.selection.background.strokecolor[]) == _rgba(t.border)
             if layout === :app
                 c = only(gui.layout.inspector.pinned)
-                @test c.theme === t && !any(c -> c.scene.visible[], gui.cards)
+                @test c.theme === t && !any(c -> c.scene.visible[], gui.cards.all)
                 @test _rgba(c.head.title.color[]) == _rgba(t.text) && c.head.title.text[] == "M1"
                 @test c.head.pin.active[] && c.head.icon[] === Ext._icon(:mirror)
             else
-                c = only(filter(c -> c.pinned, gui.cards))
+                c = only(filter(c -> c.pinned, gui.cards.all))
                 @test c.theme === t && c.scene.visible[]
                 @test _rgba(c.title.color[]) == _rgba(t.text) && c.title.text[] == "M1"
                 @test c.pin_button.active[] && c.icon[] === Ext._icon(:mirror)
@@ -563,7 +563,7 @@ BMO.card_actions(::CardTestObject) = ()
             @test _rgba(_label(c, "x").color[]) == _rgba(t.text)
             @test [_rgba(_label(c, k).color[]) for k in ("rx", "ry", "rv")] == _rgba.(collect(t.gizmo))
             # the progress window: panel and text from the theme, the bar orange
-            panel, track, bar, text = gui.progress.plots
+            panel, track, bar, text = gui.trace.progress.plots
             @test _rgba(panel.color[]) == _rgba(t.sidebar) && _rgba(text.color[]) == _rgba(t.text)
             @test _rgba(track.color[]) == _rgba(t.border) && bar.color[] == Ext._PROGRESS_FILL_COLOR
             close(gui)
@@ -573,9 +573,9 @@ BMO.card_actions(::CardTestObject) = ()
         gui = _live_view(System([m, pd]), _gauss())
         _select!(gui, m)
         _tick!(gui)
-        c = gui.card
+        c = gui.cards.selection
         _click!(gui, _center(_rect(c.pin_button.box)))
-        @test c.pinned && c.pin_button.active[] && gui.card !== c
+        @test c.pinned && c.pin_button.active[] && gui.cards.selection !== c
         sleep(0.3)  # later than a double click
         _click!(gui, _center(_rect(c.pin_button.box)))
         @test !c.pinned && !c.pin_button.active[]
@@ -588,7 +588,7 @@ BMO.card_actions(::CardTestObject) = ()
         pd2 = Detector(5e-3)
         translate3d!(pd2, [0, 0.3, 0.2])
         gui = _live_view(System([m, pd, pd2]), _gauss(); detectors = [pd])
-        c = gui.card
+        c = gui.cards.selection
         p = only(gui.panels)
         # the pose rows, the beam, the signal, then the mode and the color scale of the panel
         @test length(card_rows(pd)) == length(pose_card_rows(pd)) + 3
@@ -635,7 +635,7 @@ BMO.card_actions(::CardTestObject) = ()
         @test !c.transient && c.pinned && isnothing(Ext._info_card(gui))
         # the card keeps the marker of the point, which the next inspection does not remove
         marker = only(c.obj.plots)
-        @test isnothing(gui.inspection_plot) && marker in gui.ax.scene.plots
+        @test isnothing(gui.measure.inspection_plot) && marker in gui.ax.scene.plots
         Ext._show_inspection!(gui, _info(0.07))
         c2 = Ext._info_card(gui)
         @test c2 !== c && c.scene.visible[] && c2.scene.visible[]
@@ -648,7 +648,7 @@ BMO.card_actions(::CardTestObject) = ()
         @test !(marker in gui.ax.scene.plots)
 
         # a measurement: the first point, then the distance, its components and the angle
-        gui.measure_toggle.active[] = true
+        gui.widgets.measure_toggle.active[] = true
         Ext._add_measure_point!(gui, BMO.position(m), m)
         c = Ext._info_card(gui)
         @test c.obj isa Ext._Measurement && c.title.text[] == "Measurement"
@@ -662,7 +662,7 @@ BMO.card_actions(::CardTestObject) = ()
         # only the transient card of a new measurement
         c.pin_button.active[] = true
         kept = copy(c.obj.plots)
-        @test length(kept) == 2 && isempty(gui.measure_plots)
+        @test length(kept) == 2 && isempty(gui.measure.plots)
         Ext._add_measure_point!(gui, BMO.position(m), m)
         c3 = Ext._info_card(gui)
         @test c3 !== c && all(p -> p in gui.ax.scene.plots, kept)
@@ -670,7 +670,7 @@ BMO.card_actions(::CardTestObject) = ()
         c.pin_button.active[] = false
         @test !c.pinned && !any(p -> p in gui.ax.scene.plots, kept)
         c = c3
-        gui.measure_toggle.active[] = false
+        gui.widgets.measure_toggle.active[] = false
         @test isnothing(Ext._info_card(gui)) && !c.scene.visible[]
         close(gui)
 

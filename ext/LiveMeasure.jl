@@ -181,11 +181,11 @@ end
 
 """Removes the marker and the result of the beam inspection of the `gui`, if any."""
 function _clear_inspection!(gui::LiveView)
-    gui.inspection = nothing
+    gui.measure.inspection = nothing
     _release_info!(gui, _BeamPoint)
-    isnothing(gui.inspection_plot) && return nothing
-    delete!(gui.ax, gui.inspection_plot)
-    gui.inspection_plot = nothing
+    isnothing(gui.measure.inspection_plot) && return nothing
+    delete!(gui.ax, gui.measure.inspection_plot)
+    gui.measure.inspection_plot = nothing
     return nothing
 end
 
@@ -195,8 +195,8 @@ point in the 3D view (see `_show_info!`) of the `gui`.
 """
 function _show_inspection!(gui::LiveView, info)
     _clear_inspection!(gui)
-    gui.inspection = info
-    gui.inspection_plot = _point_marker!(gui, [Point3f(info.point)])
+    gui.measure.inspection = info
+    gui.measure.inspection_plot = _point_marker!(gui, [Point3f(info.point)])
     gui.status.text[] = _inspection_string(info)
     _show_info!(gui, _BeamPoint(info))
     return nothing
@@ -204,11 +204,11 @@ end
 
 """Removes the points, the result, the plots and the card of the measurement of the `gui`."""
 function _clear_measurement!(gui::LiveView)
-    empty!(gui.measure_points)
-    gui.measurement = nothing
+    empty!(gui.measure.points)
+    gui.measure.result = nothing
     _release_info!(gui, _Measurement)
-    foreach(p -> delete!(gui.ax, p), gui.measure_plots)
-    empty!(gui.measure_plots)
+    foreach(p -> delete!(gui.ax, p), gui.measure.plots)
+    empty!(gui.measure.plots)
     return nothing
 end
 
@@ -237,27 +237,27 @@ of the `gui`. The second point shows the distance, and the angle between two com
 status line with a dashed line between the points; a third point starts a new measurement.
 """
 function _add_measure_point!(gui::LiveView, point, obj)
-    length(gui.measure_points) >= 2 && _clear_measurement!(gui)
-    foreach(p -> delete!(gui.ax, p), gui.measure_plots)
-    empty!(gui.measure_plots)
-    push!(gui.measure_points, (; point = Vector{Float64}(point), obj))
-    pts = [Point3f(m.point) for m in gui.measure_points]
+    length(gui.measure.points) >= 2 && _clear_measurement!(gui)
+    foreach(p -> delete!(gui.ax, p), gui.measure.plots)
+    empty!(gui.measure.plots)
+    push!(gui.measure.points, (; point = Vector{Float64}(point), obj))
+    pts = [Point3f(m.point) for m in gui.measure.points]
     name(m) = isnothing(m.obj) ? "beam" : _label(gui, m.obj)
     if length(pts) == 1
-        gui.status.text[] = "measure: $(name(gui.measure_points[1])) at $(_point_string(point)), " *
+        gui.status.text[] = "measure: $(name(gui.measure.points[1])) at $(_point_string(point)), " *
                             "click the second point"
     else
-        a, b = gui.measure_points
-        gui.measurement = _measure(a, b)
-        s = "measure: $(name(a)) to $(name(b)): distance $(round(1e3 * gui.measurement.distance, digits = 6)) mm"
-        isnothing(gui.measurement.angle) || (s *= ", angle $(_angle_string(gui.measurement.angle))")
+        a, b = gui.measure.points
+        gui.measure.result = _measure(a, b)
+        s = "measure: $(name(a)) to $(name(b)): distance $(round(1e3 * gui.measure.result.distance, digits = 6)) mm"
+        isnothing(gui.measure.result.angle) || (s *= ", angle $(_angle_string(gui.measure.result.angle))")
         gui.status.text[] = s
-        push!(gui.measure_plots, lines!(gui.ax, pts; color = :magenta, linestyle = :dash,
+        push!(gui.measure.plots, lines!(gui.ax, pts; color = :magenta, linestyle = :dash,
             linewidth = 2, overdraw = true, clip_planes = Plane3f[]))
     end
-    push!(gui.measure_plots, _point_marker!(gui, pts))
-    _show_info!(gui, _Measurement(copy(gui.measure_points), gui.measurement,
-        [name(m) for m in gui.measure_points]))
+    push!(gui.measure.plots, _point_marker!(gui, pts))
+    _show_info!(gui, _Measurement(copy(gui.measure.points), gui.measure.result,
+        [name(m) for m in gui.measure.points]))
     return nothing
 end
 
@@ -281,7 +281,7 @@ selection is kept.
 function _on_click!(gui::LiveView, obj)
     obj isa LiveClipPlane && (obj = nothing)
     info = isnothing(obj) ? _inspect_beam(gui) : nothing
-    if gui.measure_toggle.active[]
+    if gui.widgets.measure_toggle.active[]
         if !isnothing(obj)
             _add_measure_point!(gui, position(obj), obj)
         elseif !isnothing(info)
@@ -314,7 +314,7 @@ function _connect_inspection!(gui::LiveView)
         _clear_measurement!(gui)
         return Consume(false)
     end)
-    push!(listeners, on(v -> _set_measuring!(gui, v), gui.measure_toggle.active))
+    push!(listeners, on(v -> _set_measuring!(gui, v), gui.widgets.measure_toggle.active))
     return nothing
 end
 

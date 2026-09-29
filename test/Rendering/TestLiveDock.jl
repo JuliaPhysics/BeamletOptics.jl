@@ -105,8 +105,8 @@ const BMO = BeamletOptics
         @test n[4] == 1
         @test gui.panels[4].heat_plot.visible[]
         @test !isempty(gui.panels[4].profile_x[])
-        @test isnothing(gui.job)
-        @test !gui.stale
+        @test isnothing(gui.trace.job)
+        @test !gui.trace.stale
         # the history panel records every full solve, also while it is not shown, but draws it
         # only when shown
         p1 = gui.panels[1]
@@ -177,7 +177,7 @@ const BMO = BeamletOptics
         Ext._activate_tab!(gui, 4)
         # a panel that shows a coarse preview is computed again when it is shown next
         Ext._resolve!(gui, nothing; coarse = true)
-        @test gui.coarse
+        @test gui.trace.coarse
         @test size(gui.panels[4].heat_I[]) == (16, 16)
         @test Ext._shown_panels(gui) == gui.panels[4:4]
         Ext._activate_tab!(gui, 1)

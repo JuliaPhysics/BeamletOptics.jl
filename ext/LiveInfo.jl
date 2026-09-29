@@ -84,8 +84,8 @@ end
 
 """Returns the transient card of the `gui` (see `_show_info!`), or `nothing`."""
 function _info_card(gui::LiveView)
-    i = findfirst(c -> c.transient, gui.cards)
-    return isnothing(i) ? nothing : gui.cards[i]
+    i = findfirst(c -> c.transient, gui.cards.all)
+    return isnothing(i) ? nothing : gui.cards.all[i]
 end
 
 """
@@ -145,14 +145,14 @@ such that the next inspection or measurement does not remove them; `_forget!` re
 card of `x`.
 """
 function _keep_plots!(gui::LiveView, x::_BeamPoint)
-    isnothing(gui.inspection_plot) && return nothing
-    push!(x.plots, gui.inspection_plot)
-    gui.inspection_plot = nothing
+    isnothing(gui.measure.inspection_plot) && return nothing
+    push!(x.plots, gui.measure.inspection_plot)
+    gui.measure.inspection_plot = nothing
     return nothing
 end
 function _keep_plots!(gui::LiveView, x::_Measurement)
-    append!(x.plots, gui.measure_plots)
-    empty!(gui.measure_plots)
+    append!(x.plots, gui.measure.plots)
+    empty!(gui.measure.plots)
     return nothing
 end
 

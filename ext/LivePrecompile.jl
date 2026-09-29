@@ -59,8 +59,8 @@
         tree.clicked[] = pd
         tree.eye_clicked[] = pd
         tree.expand_clicked[] = first(gui.controls.movable)
-        gui.show_all_button.clicks[] += 1
-        gui.orthographic_toggle.active[] = true
+        gui.widgets.show_all_button.clicks[] += 1
+        gui.widgets.orthographic_toggle.active[] = true
         close(gui)
     end
 end

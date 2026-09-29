@@ -103,7 +103,7 @@ _plot_base(p::AbstractPlot) = (_plot_alpha(p), Bool(p.transparency[]), _plot_opa
 _rendered_opacity(plots) = isempty(plots) ? 1.0 : Float64(maximum(_plot_opacity, plots))
 
 """Returns the opacity of `obj` in the `gui` (0 to 1), see `_set_opacity!`."""
-_opacity(gui::LiveView, obj) = _opacity(gui, obj, get(gui.opacity, obj, nothing))
+_opacity(gui::LiveView, obj) = _opacity(gui, obj, get(gui.objects.opacity, obj, nothing))
 _opacity(gui::LiveView, obj, ::Nothing) = _rendered_opacity(_object_plots(gui.controls.h, obj))
 _opacity(::LiveView, _, o::_Opacity) = o.value
 
@@ -112,7 +112,7 @@ _opacity(::LiveView, _, o::_Opacity) = o.value
 
 Sets the opacity of the rendered object `obj` of the `gui` to `o` (0 to 1): the opacity of its most
 opaque plot, see `_plot_opacity`; the other plots, e.g. the feature edges, are scaled with it. The
-opacity as rendered and the attributes of the plots are stored in `gui.opacity` on the first call
+opacity as rendered and the attributes of the plots are stored in `gui.objects.opacity` on the first call
 (see `_Opacity`), such that the opacity survives hiding and showing. Only the plots of `obj` change:
 plots that are not opaque become `transparency = true` (order independent transparency of GLMakie),
 an opaque object keeps the cheaper opaque rendering, see `_set_transparency!`. At 0 the object is
@@ -122,7 +122,7 @@ function _set_opacity!(gui::LiveView, obj, o::Real)
     o = clamp(Float64(o), 0.0, 1.0)
     plots = _object_plots(gui.controls.h, obj)
     rec = get!(() -> _Opacity(o, _rendered_opacity(plots), IdDict{AbstractPlot, Tuple{Float32, Bool, Float32}}()),
-        gui.opacity, obj)
+        gui.objects.opacity, obj)
     rec.value = o
     s = rec.initial > 0 ? o / rec.initial : o
     for p in plots

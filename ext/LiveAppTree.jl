@@ -50,7 +50,7 @@ type and a running index per type, e.g. "Lens 2", in the order of the tree. Name
 kept, see `_label`.
 """
 function _name_objects!(gui::AppView)
-    layout = gui.layout
+    layout = gui.objects
     function name!(obj)
         (haskey(gui.labels, obj) || haskey(layout.names, obj)) && return nothing
         base = string(nameof(typeof(obj)))
@@ -75,7 +75,7 @@ i.e. it can not be hidden, otherwise whether any of them is shown.
 function _tree_visible(gui::LiveView, rendered, obj)
     leaves = filter(leaf -> leaf in rendered, _leaves(obj))
     isempty(leaves) && return nothing
-    return !all(leaf -> leaf in gui.hidden, leaves)
+    return !all(leaf -> leaf in gui.objects.hidden, leaves)
 end
 # Clip planes are switched off, not hidden, see `_toggle_hidden!`
 _tree_visible(::LiveView, _, ::LiveClipPlane) = nothing
@@ -98,7 +98,7 @@ including static objects such as housings, which can be hidden, but not selected
 extras (see the `extras` kwarg of `live_view`) in the same way under a row "Extras" (key:
 `gui.extras`, only if there are extras), the sources and the clip planes. The keys of all other
 rows are the objects. Systems and the extras are expanded, and groups collapsed, by default.
-Objects whose plots are all hidden (see `gui.hidden`) are muted.
+Objects whose plots are all hidden (see `gui.objects.hidden`) are muted.
 """
 function _tree_rows(gui::AppView)
     rendered = Base.IdSet{Any}(oh.obj for oh in gui.controls.h.handles)
@@ -106,7 +106,7 @@ function _tree_rows(gui::AppView)
     foreach(h -> _push_system_rows!(rows, gui, rendered, h, :system), gui.system_handles)
     isempty(gui.extras.handles) || _push_system_rows!(rows, gui, rendered, gui.extras, :group)
     foreach(src -> _push_tree_rows!(rows, gui, rendered, src, 0), _sources(gui))
-    foreach(plane -> _push_tree_rows!(rows, gui, rendered, plane, 0), gui.clip_planes)
+    foreach(plane -> _push_tree_rows!(rows, gui, rendered, plane, 0), gui.clip.planes)
     return rows
 end
 

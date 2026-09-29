@@ -510,8 +510,8 @@ function _inspector_rows(gui::AppView, ::Nothing)
     rows = Tuple{String, String}[
         ("Systems", string(length(gui.system_handles))), ("Objects", string(objects)),
         ("Sources", string(length(_sources(gui)))), ("Detector panels", string(length(gui.panels))),
-        ("Clip planes", string(length(gui.clip_planes))),
-        ("Last trace", gui.solve_time > 0 ? _ms_string(gui.solve_time) : "–")]
+        ("Clip planes", string(length(gui.clip.planes))),
+        ("Last trace", gui.trace.solve_time > 0 ? _ms_string(gui.trace.solve_time) : "–")]
     return rows
 end
 
@@ -545,15 +545,15 @@ function _connect_inspector!(gui::AppView)
         return nothing
     end)
     push!(listeners, on(v -> v && _refresh_inspector!(gui), layout.collapse.right.active))
-    push!(listeners, on(s -> _set_step!(gui, s), gui.step_box.stored_string))
-    push!(listeners, on(_ -> _keep_keyboard!(gui), gui.step_box.focused))
+    push!(listeners, on(s -> _set_step!(gui, s), gui.widgets.step_box.stored_string))
+    push!(listeners, on(_ -> _keep_keyboard!(gui), gui.widgets.step_box.focused))
     _refresh_inspector!(gui)
     return nothing
 end
 
 # The step box and the textboxes of the docked card take the keyboard like those of the floating
 # cards, see `_typing`
-_layout_boxes(gui::AppView) = (gui.step_box, _card_boxes(gui.layout.inspector.card)...,
+_layout_boxes(gui::AppView) = (gui.widgets.step_box, _card_boxes(gui.layout.inspector.card)...,
     (tb for c in gui.layout.inspector.pinned for tb in _card_boxes(c))...)
 
 # The card of the selection is docked in the inspector, only pinned cards float in the 3D view

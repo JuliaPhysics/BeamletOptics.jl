@@ -54,10 +54,10 @@ const BMO = BeamletOptics
         # the card of the selection shows the slider at the opacity as rendered
         Ext._select!(gui, housing)
         _tick!(gui)
-        slider = Ext._card_widget(gui.card, :opacity)
+        slider = Ext._card_widget(gui.cards.selection, :opacity)
         @test slider isa Slider
         @test slider.value[] == 100
-        @test Ext._card_widget(gui.card, :opacity_value).text[] == "100 %"
+        @test Ext._card_widget(gui.cards.selection, :opacity_value).text[] == "100 %"
         @test Ext._opacity(gui, housing) == 1
         plots = _handle(gui, housing).plots
         @test all(p -> !p.transparency[], plots)
@@ -66,35 +66,35 @@ const BMO = BeamletOptics
         @test Ext._opacity(gui, housing) ≈ 0.4
         @test all(a -> a ≈ 0.4f0, _alphas(gui, housing))
         @test all(p -> p.transparency[], plots)
-        @test Ext._card_widget(gui.card, :opacity_value).text[] == "40 %"
+        @test Ext._card_widget(gui.cards.selection, :opacity_value).text[] == "40 %"
         @test occursin("opacity 40 %", gui.status.text[])
         # no solve: the optics are unchanged, the beams are not outdated
-        @test !gui.stale
+        @test !gui.trace.stale
         # the other objects keep their look
         @test all(a -> a == 1, _alphas(gui, m))
         # 0 % hides the object like "hide", the selection and its card stay
         Makie.set_close_to!(slider, 0)
-        @test housing in gui.hidden
+        @test housing in gui.objects.hidden
         @test all(p -> !p.visible[], plots)
         @test ctrl.selected[] === housing
-        @test Ext._card_widget(gui.card, :hide).label[] == "show"
+        @test Ext._card_widget(gui.cards.selection, :hide).label[] == "show"
         # raising the slider shows it again
         Makie.set_close_to!(slider, 60)
-        @test !(housing in gui.hidden)
+        @test !(housing in gui.objects.hidden)
         @test all(p -> p.visible[], plots)
         @test all(a -> a ≈ 0.6f0, _alphas(gui, housing))
         # the opacity survives hiding and showing
         Ext._toggle_hidden!(gui, housing)
-        @test housing in gui.hidden
+        @test housing in gui.objects.hidden
         @test Ext._opacity(gui, housing) ≈ 0.6
         Ext._toggle_hidden!(gui, housing)
-        @test !(housing in gui.hidden)
+        @test !(housing in gui.objects.hidden)
         @test all(a -> a ≈ 0.6f0, _alphas(gui, housing))
         # showing an object hidden at 0 % restores its initial opacity
         Ext._set_opacity!(gui, housing, 0)
-        @test housing in gui.hidden
+        @test housing in gui.objects.hidden
         Ext._show_all!(gui)
-        @test !(housing in gui.hidden)
+        @test !(housing in gui.objects.hidden)
         @test Ext._opacity(gui, housing) == 1
         # 100 % restores the plots as rendered, opaque
         @test all(a -> a == 1, _alphas(gui, housing))
@@ -151,16 +151,16 @@ const BMO = BeamletOptics
         # selectable like the objects of the systems: via the plot under the cursor, the menu
         @test Ext._pick_leaf(ctrl.h, _handle(gui, housing).plots[1]) === housing
         @test Ext._is_movable(ctrl, housing)
-        @test any(o -> o === housing, gui.menu_objects)
+        @test any(o -> o === housing, gui.objects.menu)
         Ext._select!(gui, housing)
         _tick!(gui)
-        @test Ext._card_widget(gui.card, :opacity) isa Slider
+        @test Ext._card_widget(gui.cards.selection, :opacity) isa Slider
         # moving an extra does not solve, the systems keep their beams
         hits = length(BMO.hits(pd))
-        solve_time = gui.solve_time
+        solve_time = gui.trace.solve_time
         BMO.translate3d!(housing, [0, 0, 0.01])
         ctrl.on_change(housing)
-        @test !gui.stale
+        @test !gui.trace.stale
         @test startswith(gui.status.text[], "housing")
         @test length(BMO.hits(pd)) == hits
         # the move is exported
@@ -169,7 +169,7 @@ const BMO = BeamletOptics
         @test occursin("translate_to3d!(housing", code)
         # hide and show
         Ext._toggle_hidden!(gui, mount)
-        @test mount in gui.hidden
+        @test mount in gui.objects.hidden
         close(gui)
 
         # invalid entries
@@ -197,7 +197,7 @@ const BMO = BeamletOptics
         # below 50 %, a click passes through them; they stay selectable via the menu
         Ext._set_opacity!(gui, housing, 0.4)
         @test !Ext._pickable(ctrl, housing)
-        @test any(o -> o === housing, gui.menu_objects)
+        @test any(o -> o === housing, gui.objects.menu)
         Ext._set_opacity!(gui, housing, 0.5)
         @test Ext._pickable(ctrl, housing)
         Ext._set_opacity!(gui, housing, 0)
@@ -243,7 +243,7 @@ const BMO = BeamletOptics
         _size(bb) = maximum(Makie.widths(bb))
         marker(gui) = _size(Ext._selection_bbox(gui.controls, beam, Ext._object_plots(gui.controls.h, beam)))
         gui = _live_view(System([m, pd]), beam)
-        clip0, marker0 = gui.clip_size, marker(gui)
+        clip0, marker0 = gui.clip.size, marker(gui)
         close(gui)
         # a housing of 0.5 m around the optics: larger source markers and clip planes
         housing = NonInteractableObject(BMO.CubeMesh(0.5))
@@ -253,10 +253,10 @@ const BMO = BeamletOptics
         end
         gui = _live_view(System([m, pd]), beam; extras = [housing])
         ctrl = gui.controls
-        @test gui.clip_size > clip0 && gui.clip_size >= 1.2 * _size(bb_housing) - 1e-9
+        @test gui.clip.size > clip0 && gui.clip.size >= 1.2 * _size(bb_housing) - 1e-9
         @test marker(gui) > marker0
         plane = Ext._add_clip_plane!(gui, [0, 0.1, 0], [0, 1, 0])
-        @test plane.size ≈ gui.clip_size
+        @test plane.size ≈ gui.clip.size
         Ext._remove_clip_plane!(gui, plane)
         # `g` and fit all: the systems and the visible extras
         ctrl.selected[] = nothing
@@ -296,17 +296,17 @@ const BMO = BeamletOptics
         slider = Ext._card_widget(card, :opacity)
         @test slider isa Slider
         Makie.set_close_to!(slider, 0)
-        @test housing in gui.hidden
+        @test housing in gui.objects.hidden
         # the eye of the row shows the object hidden at 0 %
         row(key) = only(r for r in tree.rows if r.key === key)
         @test row(housing).visible === false
         tree.eye_clicked[] = housing
-        @test !(housing in gui.hidden)
+        @test !(housing in gui.objects.hidden)
         @test row(housing).visible === true
         @test Ext._opacity(gui, housing) == 1
         # the eye of "Extras" hides all extras
         tree.eye_clicked[] = gui.extras
-        @test all(leaf -> leaf in gui.hidden, Ext._leaves(gui.extras))
+        @test all(leaf -> leaf in gui.objects.hidden, Ext._leaves(gui.extras))
         @test row(gui.extras).visible === false
         # the group is selected in the tree like one of a system, its objects are revealed
         Ext._select!(gui, BMO.shape(group)[1])

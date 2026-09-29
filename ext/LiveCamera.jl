@@ -54,15 +54,15 @@ end
 
 """Advances the camera animation of the `gui` by `dt` [s]. A new animation of the view cube wins."""
 function _step_camera!(gui::LiveView, dt)
-    a = gui.camera_animation
+    a = gui.camera.animation
     isnothing(a) && return nothing
-    if !isnothing(gui.view_cube) && !isnothing(gui.view_cube.anim)
-        gui.camera_animation = nothing
+    if !isnothing(gui.widgets.view_cube) && !isnothing(gui.widgets.view_cube.anim)
+        gui.camera.animation = nothing
         return nothing
     end
     a.elapsed += dt
     t = a.duration > 0 ? min(a.elapsed / a.duration, 1.0) : 1.0
-    t >= 1 && (gui.camera_animation = nothing)
+    t >= 1 && (gui.camera.animation = nothing)
     _apply_camera_frame!(gui, a, t)
     return nothing
 end
@@ -84,9 +84,9 @@ function _animate_camera!(gui::LiveView, eye, lookat, up)
     axis, angle = _rotation_between(o0, o1, cross(o0, u0))
     ur = _rotate(u0, axis, angle)
     roll = atan(dot(cross(ur, u1), o1), dot(ur, u1))
-    duration = isnothing(gui.view_cube) ? 0.3 : gui.view_cube.duration
-    isnothing(gui.view_cube) || (gui.view_cube.anim = nothing)
-    gui.camera_animation = _CameraAnimation(lookat0, dist0, o0, u0, Vector{Float64}(eye),
+    duration = isnothing(gui.widgets.view_cube) ? 0.3 : gui.widgets.view_cube.duration
+    isnothing(gui.widgets.view_cube) || (gui.widgets.view_cube.anim = nothing)
+    gui.camera.animation = _CameraAnimation(lookat0, dist0, o0, u0, Vector{Float64}(eye),
         Vector{Float64}(lookat), Vector{Float64}(up), dist1, axis, angle, roll, duration, 0.0)
     duration > 0 || _step_camera!(gui, 0.0)
     return nothing
@@ -171,8 +171,8 @@ end
 
 """Sets the camera of the `gui` to the saved view `i`, see `views`."""
 function _set_saved_view!(gui::LiveView, i)
-    1 <= i <= length(gui.views) || return nothing
-    name, (eye, lookat, up) = gui.views[i]
+    1 <= i <= length(gui.camera.views) || return nothing
+    name, (eye, lookat, up) = gui.camera.views[i]
     _animate_camera!(gui, eye, lookat, up)
     gui.status.text[] = "view \"$name\""
     return nothing
@@ -185,15 +185,15 @@ Appends the current view of the `gui` as `"view n"` to the saved views and print
 code of an entry of the `views` kwarg of `live_view` to `io`. Returns the code.
 """
 function _save_view!(gui::LiveView; io::IO = stdout)
-    n = length(gui.views) + 1
-    names = Set(first.(gui.views))
+    n = length(gui.camera.views) + 1
+    names = Set(first.(gui.camera.views))
     while "view $n" in names
         n += 1
     end
     name = "view $n"
     view = _current_view(gui)
-    push!(gui.views, name => view)
-    gui.views_menu.options[] = _views_options(gui.views)
+    push!(gui.camera.views, name => view)
+    gui.widgets.views_menu.options[] = _views_options(gui.camera.views)
     code = "$(repr(name)) => ($(join(_vector_code.(view), ", ")))"
     println(io, code)
     gui.status.text[] = "saved $(repr(name)), printed as code"
@@ -202,7 +202,7 @@ end
 
 """Restores the home view of the `gui`, i.e. the view when the window was shown."""
 function _go_home!(gui::LiveView)
-    _animate_camera!(gui, gui.home...)
+    _animate_camera!(gui, gui.camera.home...)
     gui.status.text[] = "home view"
     return nothing
 end
@@ -222,22 +222,22 @@ function _connect_camera!(gui::LiveView)
     end)
     push!(listeners, on(events(scene).tick) do tick
         # The home view is the view when the window is shown, e.g. after `set_view`
-        if !gui.home_set
-            gui.home = _current_view(gui)
-            gui.home_set = true
+        if !gui.camera.home_set
+            gui.camera.home = _current_view(gui)
+            gui.camera.home_set = true
         end
         _step_camera!(gui, tick.delta_time)
         return nothing
     end)
     # The textboxes of the cards are connected with their cards, see `_connect_card!`, those of the
     # layout (see `_layout_boxes`) by the layout
-    for obs in (cameracontrols(scene).selected, _open_observable(gui.menu), gui.views_menu.is_open)
+    for obs in (cameracontrols(scene).selected, _open_observable(gui.widgets.menu), gui.widgets.views_menu.is_open)
         _listen!(listeners, _ -> _keep_keyboard!(gui), obs)
     end
     _keep_keyboard!(gui)
-    push!(listeners, on(_ -> _go_home!(gui), gui.home_button.clicks))
-    push!(listeners, on(i -> _set_saved_view!(gui, something(i, 0)), gui.views_menu.i_selected))
-    push!(listeners, on(_ -> _save_view!(gui), gui.save_view_button.clicks))
+    push!(listeners, on(_ -> _go_home!(gui), gui.widgets.home_button.clicks))
+    push!(listeners, on(i -> _set_saved_view!(gui, something(i, 0)), gui.widgets.views_menu.i_selected))
+    push!(listeners, on(_ -> _save_view!(gui), gui.widgets.save_view_button.clicks))
     gui.controls.help_extra *= "\n" * _CAMERA_HELP
     _update_help!(gui.controls)
     return nothing
@@ -302,7 +302,7 @@ function _connect_projection!(gui::LiveView, orthographic::Bool)
         return nothing
     end
     listeners = gui.controls.listeners
-    push!(listeners, on(set_projection!, gui.orthographic_toggle.active))
+    push!(listeners, on(set_projection!, gui.widgets.orthographic_toggle.active))
     push!(listeners, on(cam.eyeposition) do _
         is_ortho() && set_depth!()
         return nothing

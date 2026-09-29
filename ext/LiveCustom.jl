@@ -58,7 +58,7 @@ _mark_panel_stale!(::LiveView, _) = nothing
 Whether the detectors and beams of the `gui` hold the result of a full solve, which the `update`
 of a panel may read: not while a solve runs in the background or after a preview solve.
 """
-_results_valid(gui::LiveView) = !_running(gui) && !gui.preview
+_results_valid(gui::LiveView) = !_running(gui) && !gui.trace.preview
 
 """
     _update_user_panels!(gui)

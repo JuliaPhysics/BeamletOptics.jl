@@ -63,6 +63,10 @@ and implements
     anything with `clicks::Observable{Int}`, or `nothing` for the last one
   - `auto_trace_toggle`, `clip_beams_toggle`, `orthographic_toggle`, `sources_toggle`,
     `measure_toggle`: anything with `active::Observable{Bool}`, initialized from `spec`
+  - `info`: the `Label` of the last solve, the number of rays and the projection, or `nothing`
+
+  `live_view` collects the widgets in a `_LayoutWidgets`, whose typed fields reject a missing or
+  wrong widget at construction.
 - `_build_menus(layout::L, w, options, views_options) -> (; menu, views_menu)`: called with the
   result `w` of `_build_layout` once the movable objects are known; the component `menu` (a `Menu`
   with the `options`, or `nothing`) and the `views_menu` (a `Menu` with the `views_options`)
@@ -148,39 +152,170 @@ end
 _UserParts() = _UserParts(_UserPanel[], Textbox[], Menu[], Dict{Keyboard.Button, String}())
 
 """
+    _TraceState
+
+Tracing of a `LiveView`: the systems are solved after each change if `auto[]` (the `active`
+observable of the auto trace toggle) is `true`, otherwise only via the trace button, the key `t` or
+by switching auto tracing on. `stale` is `true` if the beams and detector panels do not match the
+current poses of the objects; the alpha of the beam plots before dimming is stored in
+`beam_alphas`. If solving takes longer than `budget` [s], the systems are solved once the movement
+pauses for `idle_delay` [s] (`pending`, the moved `pending_obj`, the time of the `last_change`);
+`solve_time`, `panel_time` and `preview_time` are the durations of the last solve, panel update
+and preview solve [s], `coarse` is `true` while the panels show a preview on a coarse grid.
+
+While moving, beam groups are solved only for their rendered beams if `preview_enabled`; `preview`
+is `true` from such a solve (of the moved `preview_obj`) until the full solve. A solve that takes
+longer than `budget` continues in the background as `job`, the `progress` window shows its loops
+after `progress_delay` [s]. The duration fields are named by `_SolveJob.timing`.
+"""
+Base.@kwdef mutable struct _TraceState
+    auto::Observable{Bool}
+    budget::Float64
+    idle_delay::Float64
+    preview_enabled::Bool
+    progress::_ProgressOverlay
+    progress_delay::Float64
+    stale::Bool = false
+    beam_alphas::IdDict{Any, Any} = IdDict{Any, Any}()
+    solve_time::Float64 = 0.0
+    panel_time::Float64 = 0.0
+    preview_time::Float64 = 0.0
+    pending::Bool = false
+    pending_obj::Any = nothing
+    last_change::Float64 = 0.0
+    coarse::Bool = false
+    preview::Bool = false
+    preview_obj::Any = nothing
+    job::Union{Nothing, _SolveJob} = nothing
+end
+
+"""
+    _ClipState
+
+Clip planes of a `LiveView`: the `planes`, applied if `enabled`, to the beams as well if `beams`.
+`size` is the edge length of the outline of new planes, fixed at construction, since the bounding
+boxes of clipped plots only cover their visible part.
+"""
+Base.@kwdef mutable struct _ClipState
+    planes::Vector{LiveClipPlane} = LiveClipPlane[]
+    enabled::Bool = true
+    size::Float64
+    beams::Bool
+end
+
+"""
+    _MeasureState
+
+Beam inspection and measuring of a `LiveView`: the inspected point of a beam (see
+`_inspect_beam`) and its marker `inspection_plot`; up to two measured `points` `(; point, obj)`,
+the `result` `(; distance, angle)` and its `plots`.
+"""
+Base.@kwdef mutable struct _MeasureState
+    inspection::Any = nothing
+    inspection_plot::Union{Nothing, AbstractPlot} = nothing
+    points::Vector{Any} = Any[]
+    result::Any = nothing
+    plots::Vector{AbstractPlot} = AbstractPlot[]
+end
+
+"""
+    _CameraState
+
+Camera tools of a `LiveView`: the `home` view `(eye, lookat, up)`, taken at the first tick
+(`home_set`), the saved `views` and the running `animation` of a camera transition.
+"""
+Base.@kwdef mutable struct _CameraState
+    home::NTuple{3, Vector{Float64}} = (zeros(3), zeros(3), zeros(3))
+    home_set::Bool = false
+    views::Vector{Pair{String, NTuple{3, Vector{Float64}}}}
+    animation::Any = nothing
+end
+
+"""
+    _CardState
+
+Cards of a `LiveView`: the card of the `selection` next to the selected object, which shows the
+rows and actions declared for it (see [`card_rows`](@ref)); `all` cards, including the pinned
+ones; the listeners that keep the camera from the cards (`shield`, see `_shield_cards!`).
+"""
+Base.@kwdef mutable struct _CardState
+    selection::_ComponentCard
+    all::Vector{_ComponentCard} = [selection]
+    shield::Vector{Any} = Any[]
+end
+
+"""
+    _ObjectState
+
+The objects of a `LiveView` as the selection shows them: the movable objects of the component
+`menu` (the option `i` selects `menu[i]`), the `hidden` objects (rendered objects, i.e. leaves of
+groups, whose plots are invisible, see the action "hide" of the cards), the `opacity` of objects
+set via their card (see `_set_opacity!`), and the automatic `names` of objects without a label
+with the `counters` of their running indices per type, see `_name_objects!`.
+"""
+Base.@kwdef mutable struct _ObjectState
+    menu::Vector{Any} = Any[]
+    hidden::Base.IdSet{Any} = Base.IdSet{Any}()
+    opacity::IdDict{Any, Any} = IdDict{Any, Any}()
+    names::IdDict{Any, String} = IdDict{Any, String}()
+    counters::Dict{String, Int} = Dict{String, Int}()
+end
+
+"""
+    _LayoutWidgets
+
+The widgets of a `LiveView` that its layout creates (see `_build_layout` and `_build_menus`) and
+the shared logic uses. They are typed by what the logic uses, since the layouts use different
+widgets: buttons have `clicks::Observable{Int}`, toggles `active::Observable{Bool}`.
+
+- buttons: `trace_button`, `export_button` (see [`export_changes`](@ref)), `home_button`,
+  `save_view_button`, `show_all_button` (or `nothing`)
+- toggles: `auto_trace_toggle`, `clip_beams_toggle`, `orthographic_toggle`, `sources_toggle` (the
+  markers of the movable sources, also the key `1`), `measure_toggle`
+- `step_box`: the `Textbox` of the keyboard step (replaced when another card becomes the card of
+  the selection, see `_use_card!`); `menu`: the component menu (or `nothing`),
+  `views_menu`: the saved views; `view_cube`: the view cube of the 3D view (or `nothing`)
+- `info`: the label of the last solve, the number of rays and the projection (or `nothing`)
+"""
+Base.@kwdef mutable struct _LayoutWidgets
+    trace_button::Any
+    auto_trace_toggle::Any
+    clip_beams_toggle::Any
+    orthographic_toggle::Any
+    sources_toggle::Any
+    measure_toggle::Any
+    export_button::Any
+    home_button::Any
+    save_view_button::Any
+    show_all_button::Any
+    step_box::Textbox
+    menu::Union{Nothing, Menu}
+    views_menu::Menu
+    view_cube::Union{Nothing, ViewCube}
+    info::Union{Nothing, Label} = nothing
+end
+
+"""
     LiveView
 
 Interactive window returned by [`live_view`](@ref). The `Figure` is stored in `fig`, the `LScene`
-of the 3D view in `ax`, the `KinematicController` in `controls` and the view cube in `view_cube`
-(or `nothing`). Use `display` to show the window and `close` to remove the controls and the view
-cube.
+of the 3D view in `ax`, the `KinematicController` in `controls`, the detector `panels`, the
+`status` line and the `sliders` (or `nothing`). Use `display` to show the window and `close` to
+remove the controls and the view cube.
 
-The systems are solved after each change if `auto_trace[]` is `true`, otherwise only via the
-`trace_button`, the key `t` or by switching the `auto_trace_toggle` on. `stale` is `true` if the
-beams and detector panels do not match the current poses of the objects. If solving takes longer
-than `trace_budget` [s], the systems are solved once the movement pauses for `idle_delay` [s].
-The clip planes of the 3D view are stored in `clip_planes`, which are applied if `clipping` is
-`true`. The `orthographic_toggle` switches the 3D view between perspective and orthographic
-projection.
-
-The `export_button` prints the changed poses as Julia code, see [`export_changes`](@ref), and
-copies them to the clipboard if `export_clipboard` is `true`. The component `menu` lists the
-movable objects `menu_objects`, the objects hidden via "hide" are stored in `hidden`. The `card`
-next to the selected object shows the rows and actions declared for it (see [`card_rows`](@ref),
-e.g. its pose) and the `step_box` of the keyboard step. `cards` holds all cards, including the
-pinned ones.
-
-While moving, beam groups are solved only for their rendered beams if `preview_enabled`, `preview`
-is `true` until the full solve. A solve that takes longer than `trace_budget` continues in the
-background as `job`, the `progress` window shows its loops after `progress_delay` [s]. A click on a beam stores the inspected point in `inspection`, the
-`measure_toggle` switches measuring on, the result is stored in `measurement`. The `home_button`
-restores the `home` view, the `views_menu` sets one of the saved `views`, which the
-`save_view_button` extends.
+The state of the shared logic is grouped by concern: `trace` (`_TraceState`), `clip`
+(`_ClipState`), `measure` (`_MeasureState`), `camera` (`_CameraState`), `cards` (`_CardState`) and
+`objects` (`_ObjectState`); the widgets that the layout creates are in `widgets`
+(`_LayoutWidgets`). The export button prints the changed poses as Julia code, see
+[`export_changes`](@ref), and copies them to the clipboard if `export_clipboard` is `true`. The
+objects of the `extras` kwarg are rendered, selectable and movable, but not part of any system,
+see `_live_render_extras!`. Panels, widgets and tool keys added via the customization API are in
+`custom`, see `LiveCustom.jl`.
 
 The type parameter `L` is the type of the `layout`, see `AbstractLiveLayout`: `CompactView` and
 `AppView` are the `LiveView`s of `live_view(...; layout = :compact)` and `layout = :app`.
 """
-mutable struct LiveView{L <: AbstractLiveLayout}
+Base.@kwdef mutable struct LiveView{L <: AbstractLiveLayout}
     fig::Figure
     ax::LScene
     pairs::Vector{Pair{BMO.AbstractSystem, Any}}
@@ -191,101 +326,23 @@ mutable struct LiveView{L <: AbstractLiveLayout}
     status::Label
     sliders::Union{Nothing, SliderGrid}
     on_change::Function
-    last_error::Union{Nothing, String}
-    # manual tracing, auto_trace is the `active` observable of the toggle
-    auto_trace::Observable{Bool}
-    stale::Bool
-    # The widgets are typed by what the logic uses, since the layouts use different widgets:
-    # buttons have `clicks::Observable{Int}`, toggles `active::Observable{Bool}`
-    trace_button::Any
-    auto_trace_toggle::Any
-    # alpha of the beam plots before dimming, restored after tracing
-    beam_alphas::IdDict{Any, Any}
-    # adaptive tracing, durations of the last solve and panel update [s]
-    trace_budget::Float64
-    idle_delay::Float64
-    solve_time::Float64
-    panel_time::Float64
-    # a solve is deferred until the movement pauses
-    pending::Bool
-    pending_obj::Any
-    last_change::Float64
-    # the panels show a preview on a coarse grid
-    coarse::Bool
+    last_error::Union{Nothing, String} = nothing
     labels::IdDict{Any, String}
-    step_box::Textbox
-    # clip planes, switched on and off via `clipping`
-    clip_planes::Vector{LiveClipPlane}
-    clipping::Bool
-    # edge length of the outline of new clip planes, fixed at construction, since the bounding
-    # boxes of clipped plots only cover their visible part
-    clip_size::Float64
-    # the beams are clipped as well, switched via the toggle
-    clip_beams::Bool
-    clip_beams_toggle::Any
-    # view cube in the corner of the 3D view, see `view_cube!`
-    view_cube::Union{Nothing, ViewCube}
-    # orthographic projection of the 3D view, switched via the toggle
-    orthographic_toggle::Any
-    # export of the changed poses, see `export_changes`
-    export_button::Any
-    export_clipboard::Bool
-    # component menu, the option `i` selects `menu_objects[i]`, `nothing` in layouts without it
-    menu::Union{Nothing, Menu}
-    menu_objects::Vector{Any}
-    # hidden objects, i.e. rendered objects (leaves of groups) whose plots are invisible, see the
-    # action "hide" of the cards; "show all" shows them again (anything with `clicks`)
-    show_all_button::Any
-    hidden::Base.IdSet{Any}
-    # preview tracing: while moving, beam groups are solved only for their rendered beams, see
-    # `_resolve!`; `preview` is set after such a solve, until the full solve once the movement pauses
-    preview_enabled::Bool
-    preview::Bool
-    preview_obj::Any
-    # duration of the last preview solve [s]
-    preview_time::Float64
-    # beam inspection: the inspected point of a beam (see `_inspect_beam`) and its marker
-    inspection::Any
-    inspection_plot::Union{Nothing, AbstractPlot}
-    # measuring: up to two points `(; point, obj)`, the result `(; distance, angle)` and its plots
-    measure_toggle::Any
-    measure_points::Vector{Any}
-    measurement::Any
-    measure_plots::Vector{AbstractPlot}
-    # camera tools: home view (eye, lookat, up), taken at the first tick, the saved views, the
-    # animated camera transition
-    home_button::Any
-    home::NTuple{3, Vector{Float64}}
-    home_set::Bool
-    views::Vector{Pair{String, NTuple{3, Vector{Float64}}}}
-    views_menu::Menu
-    save_view_button::Any
-    camera_animation::Any
-    # markers of the movable sources, shown or hidden via the toggle or the key `1`
-    sources_toggle::Any
-    # solve in a background task, see `_solve!`, its progress window and the delay [s] after which
-    # the window of a loop appears
-    job::Union{Nothing, _SolveJob}
-    progress::_ProgressOverlay
-    progress_delay::Float64
-    # card with the controls of the selected object next to it in the 3D view, which holds
-    # `step_box` in the compact layout; all cards, including the pinned ones; the listeners that
-    # keep the camera from the cards, see `_shield_cards!`
-    card::_ComponentCard
-    cards::Vector{_ComponentCard}
-    card_shield::Vector{Any}
-    # objects of the `extras` kwarg: rendered, selectable and movable, but not part of any system,
-    # see `_live_render_extras!`; the opacity of objects set via their card, see `_set_opacity!`
+    export_clipboard::Bool = true
     extras::SystemRenderHandle
-    opacity::IdDict{Any, Any}
-    # panels, widgets and tool keys added via the customization API, see `LiveCustom.jl`
-    custom::_UserParts
-    # state of the layout, e.g. the slots of the app layout, see `AbstractLiveLayout`; the last
-    # field, see the constructor below
+    custom::_UserParts = _UserParts()
+    trace::_TraceState
+    clip::_ClipState
+    measure::_MeasureState = _MeasureState()
+    camera::_CameraState
+    cards::_CardState
+    objects::_ObjectState
+    widgets::_LayoutWidgets
+    # state of the layout, e.g. the slots of the app layout, see `AbstractLiveLayout`
     layout::L
 end
 
-# Converts the fields like the constructor of a non-parametric type, the layout is the last field
+# Infers the layout type like the constructor of a non-parametric type
 LiveView(fields...) = LiveView{typeof(last(fields))}(fields...)
 
 
@@ -322,8 +379,8 @@ end
 function Base.close(gui::LiveView)
     _cancel_solve!(gui)
     close(gui.controls)
-    isnothing(gui.view_cube) || close(gui.view_cube)
-    foreach(_hide_card!, gui.cards)
+    isnothing(gui.widgets.view_cube) || close(gui.widgets.view_cube)
+    foreach(_hide_card!, gui.cards.all)
     return nothing
 end
 
@@ -703,18 +760,20 @@ function live_view(
     labels_dict = IdDict{Any, String}(labels)
     entries = _menu_entries(controls)
     menus = _build_menus(lay, w, _menu_options(labels_dict, entries), _views_options(view_specs))
-    gui = LiveView(fig, ax, ps, system_handles, beam_handles, controls, w.panels, w.status,
-        w.sliders, on_change, nothing, w.auto_trace_toggle.active, false, w.trace_button,
-        w.auto_trace_toggle, IdDict{Any, Any}(), Float64(trace_budget), Float64(idle_delay), 0.0,
-        0.0, false, nothing, 0.0, false, labels_dict, _step_box(lay, w, card), LiveClipPlane[], true,
-        1.2 * extent, clip_beams, w.clip_beams_toggle, w.cube, w.orthographic_toggle,
-        w.export_button, true, menus.menu, Any[first.(entries)...], w.show_all_button,
-        Base.IdSet{Any}(), preview, false, nothing, 0.0, nothing, nothing, w.measure_toggle, Any[],
-        nothing, AbstractPlot[], w.home_button, (zeros(3), zeros(3), zeros(3)), false, view_specs,
-        menus.views_menu, w.save_view_button, nothing, w.sources_toggle, nothing,
-        _ProgressOverlay(ax, lay.theme), Float64(progress_delay), card, [card], Any[], extras_handle,
-        IdDict{Any, Any}(), _UserParts(), lay)
+    widgets = _LayoutWidgets(; w.trace_button, w.auto_trace_toggle, w.clip_beams_toggle,
+        w.orthographic_toggle, w.sources_toggle, w.measure_toggle, w.export_button, w.home_button,
+        w.save_view_button, w.show_all_button, step_box = _step_box(lay, w, card), menus.menu,
+        menus.views_menu, view_cube = w.cube, w.info)
+    trace = _TraceState(; auto = w.auto_trace_toggle.active, budget = trace_budget, idle_delay,
+        preview_enabled = preview, progress = _ProgressOverlay(ax, lay.theme), progress_delay)
+    gui = LiveView(; fig, ax, pairs = ps, system_handles, beam_handles, controls, w.panels,
+        w.status, w.sliders, on_change, labels = labels_dict, extras = extras_handle, trace,
+        clip = _ClipState(; size = 1.2 * extent, beams = clip_beams),
+        camera = _CameraState(; views = view_specs), cards = _CardState(; selection = card),
+        objects = _ObjectState(; menu = Any[first.(entries)...]), widgets, layout = lay)
     gui_ref[] = gui
+    # Names of the objects without a label, e.g. for the object tree, see `_name_objects!`
+    _name_objects!(gui)
     # Objects must not change while a solve in the background traces them
     controls.before_change = () -> _cancel_solve!(gui)
     for (point, normal) in clip_specs
@@ -727,8 +786,8 @@ function live_view(
     _connect_inspection!(gui)
     _connect_camera!(gui)
     _connect_cards!(gui)
-    push!(controls.listeners, on(v -> v == gui.clip_beams || _set_clip_beams!(gui, v),
-        gui.clip_beams_toggle.active))
+    push!(controls.listeners, on(v -> v == gui.clip.beams || _set_clip_beams!(gui, v),
+        gui.widgets.clip_beams_toggle.active))
     _connect_projection!(gui, orthographic)
     _connect_sources!(gui)
     _connect_layout!(gui)
@@ -741,7 +800,7 @@ function live_view(
     o, up = _region_view((1, -1, 1))
     set_view(ax, lookat .+ dist .* o, lookat, up)
     # Replaced by the view at the first tick, i.e. when the window is shown
-    gui.home = _current_view(gui)
+    gui.camera.home = _current_view(gui)
     return gui
 end
 

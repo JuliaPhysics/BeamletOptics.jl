@@ -18,7 +18,7 @@ const BMO = BeamletOptics
         return nothing
     end
     # Text of the declared label `name` on the card of the selection
-    _text(gui, name) = Ext._card_widget(gui.card, name).text[]
+    _text(gui, name) = Ext._card_widget(gui.cards.selection, name).text[]
 
     # Beam along +y, mirror at 45° reflects it along +x onto the detector
     function _fixture()
@@ -46,7 +46,7 @@ const BMO = BeamletOptics
         @test _text(gui, :signal) == "N = 1"
         # refreshed after the solve of a change: the mirror rotated by 1° about z
         _select!(gui, m)
-        Ext._card_widget(gui.card, :rv).stored_string[] = string(1e3 * deg2rad(1))
+        Ext._card_widget(gui.cards.selection, :rv).stored_string[] = string(1e3 * deg2rad(1))
         @test _text(gui, :beam) in ("1 ray, AOI 44.0°", "1 ray, AOI 46.0°")
         close(gui)
     end

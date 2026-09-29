@@ -122,7 +122,7 @@ const BMO = BeamletOptics
         @test Ext._tree_kind(RoundLinearPolarizer(25e-3, 1e-3, 1e-3, λ -> 1.5)) == :polarizer
         @test Ext._tree_kind(PolarizationFilter(1e-2)) == :polarizer
         # a clip plane
-        ctrl.selected[] = gui.clip_planes[1]
+        ctrl.selected[] = gui.clip.planes[1]
         @test insp.name.text[] == "Clip plane 1"
         @test insp.icon[] === Ext._icon(:clip_plane)
         @test _value(gui, "Normal") == "(0, 0, 1)"
@@ -206,7 +206,7 @@ const BMO = BeamletOptics
         # and follows the key `m` and the step box
         events(gui.ax.scene).keyboardbutton[] = Makie.KeyEvent(Keyboard.m, Keyboard.press)
         @test ctrl.mode[] == :move && sel[] == :move
-        gui.step_box.stored_string[] = "1 mrad"
+        gui.widgets.step_box.stored_string[] = "1 mrad"
         @test sel[] == :rotate
         close(gui)
     end
@@ -241,7 +241,7 @@ const BMO = BeamletOptics
         # the rows of `card_rows`, the same as on the floating cards
         key(c) = map(Ext._layout_key, Ext._declarations(c, o.pd))
         @test length(Ext._declarations(gui.layout.inspector.card, o.pd)[2]) == length(card_rows(o.pd))
-        @test key(gui.layout.inspector.card) == key(gui.card)
+        @test key(gui.layout.inspector.card) == key(gui.cards.selection)
         close(gui)
     end
 
@@ -252,22 +252,22 @@ const BMO = BeamletOptics
         ctrl.selected[] = o.m
         events(gui.ax.scene).tick[] = Makie.Tick(Makie.RegularRenderTick, 0, 0.0, 1.0)
         @test !Ext._selection_card_shown(gui)
-        @test !any(c -> c.scene.visible[], gui.cards)
+        @test !any(c -> c.scene.visible[], gui.cards.all)
         @test insp.name.text[] == "Mirror 1"
         # the actions of the card: hide shows the hint of the tree and clears the selection
         notify(_w(gui, :hide).clicks)
-        @test o.m in gui.hidden && isnothing(ctrl.selected[])
+        @test o.m in gui.objects.hidden && isnothing(ctrl.selected[])
         @test occursin("eye", gui.status.text[])
         Ext._toggle_hidden!(gui, o.m)
-        @test !(o.m in gui.hidden)
+        @test !(o.m in gui.objects.hidden)
         # a clip plane: flip and remove
-        plane = gui.clip_planes[1]
+        plane = gui.clip.planes[1]
         ctrl.selected[] = plane
         n = plane.dir[:, 2]
         notify(_w(gui, :flip).clicks)
         @test plane.dir[:, 2] ≈ -n
         notify(_w(gui, :remove).clicks)
-        @test isempty(gui.clip_planes) && isnothing(ctrl.selected[])
+        @test isempty(gui.clip.planes) && isnothing(ctrl.selected[])
         @test isempty(insp.card.widgets)
         close(gui)
     end
@@ -296,15 +296,15 @@ const BMO = BeamletOptics
     @testset "pin" begin
         gui, o = _fixture()
         insp, ctrl = gui.layout.inspector, gui.controls
-        n = length(gui.cards)
+        n = length(gui.cards.all)
         ctrl.selected[] = o.m
         # the pin in the header docks a card of the selected object below the inspector, no
         # floating card
         insp.pin.active[] = true
         c = only(insp.pinned)
-        @test c.pinned && c.obj === o.m && Ext._is_pinned(gui, o.m) && length(gui.cards) == n
+        @test c.pinned && c.obj === o.m && Ext._is_pinned(gui, o.m) && length(gui.cards.all) == n
         _tick!(gui)
-        @test !any(c -> c.scene.visible[], gui.cards)
+        @test !any(c -> c.scene.visible[], gui.cards.all)
         @test Ext._card_widget(c, :hide) isa Button && Ext._card_widget(c, :x) isa Textbox
         @test c.head.title.text[] == "Mirror 1" && c.head.icon[] === Ext._icon(:mirror)
         @test c.head.pin.active[]
@@ -345,7 +345,7 @@ const BMO = BeamletOptics
         insp.pin.active[] = false
         @test !Ext._is_pinned(gui, o.m) && only(insp.pinned) === c2
         # the keyboard step stays in the inspector
-        @test gui.step_box !== gui.card.step_box
+        @test gui.widgets.step_box !== gui.cards.selection.step_box
         close(gui)
     end
 
@@ -394,7 +394,7 @@ const BMO = BeamletOptics
         @test gui.layout.right.shown
         _tick!(gui)
         c = only(insp.pinned)
-        @test c.obj === o.m && !any(c -> c.scene.visible[], gui.cards)
+        @test c.obj === o.m && !any(c -> c.scene.visible[], gui.cards.all)
         # a click on a widget of the docked card keeps the selection, too
         _click!(gui, _center(_rect(_w(gui, :y))))
         @test ctrl.selected[] === o.m && _w(gui, :y).focused[]
@@ -438,11 +438,11 @@ const BMO = BeamletOptics
         @test isempty(insp.pinned) && Ext._is_pinned(gui, o.m) && Ext._is_floating(gui, o.m)
         @test insp.pin.active[] && isempty(d.widgets) && d.head.title.parent === nothing
         c = only(_floating(o.m))
-        @test c !== gui.card && c.scene.visible[] && c.title.text[] == "Mirror 1"
+        @test c !== gui.cards.selection && c.scene.visible[] && c.title.text[] == "Mirror 1"
         @test c.icon[] === Ext._icon(:mirror) && Ext._card_widget(c, :x) isa Textbox
         @test c.dock_button.icon[] === Ext._icon(:dock) && c.dock_button.tooltip[] == "Dock in the sidebar"
         # the card of the selection stays docked in the inspector, whose header has no float button
-        @test insp.name.text[] == "Mirror 1" && _w(gui, :x) isa Textbox && !gui.card.scene.visible[]
+        @test insp.name.text[] == "Mirror 1" && _w(gui, :x) isa Textbox && !gui.cards.selection.scene.visible[]
         _icons(g) = [p.marker[] for gc in g.content if gc.content isa Box
                      for p in gc.content.blockscene.plots if p isa Scatter]
         @test Ext._icon(:pin) in _icons(insp.card.header) || Ext._icon(:pinned) in _icons(insp.card.header)
@@ -471,9 +471,9 @@ const BMO = BeamletOptics
         # hidden and shown again: the card stays floating, like in the compact layout
         notify(Ext._card_widget(c, :hide).clicks)
         _tick!(gui)
-        @test o.m in gui.hidden && Ext._is_floating(gui, o.m) && c.scene.visible[]
+        @test o.m in gui.objects.hidden && Ext._is_floating(gui, o.m) && c.scene.visible[]
         notify(Ext._card_widget(c, :hide).clicks)
-        @test !(o.m in gui.hidden) && only(_floating(o.m)) === c
+        @test !(o.m in gui.objects.hidden) && only(_floating(o.m)) === c
         # docked again: at the end of the pinned cards, in its collapsed state
         Ext._toggle_pin!(gui, o.pd)
         notify(c.collapse_button.clicks)
@@ -533,10 +533,10 @@ const BMO = BeamletOptics
             Ext._float!(gui, obj)
         end
         @test only(insp.pinned).obj === o.l1 && !Ext._overflows(gui)
-        @test count(c -> c.pinned, gui.cards) == 4
+        @test count(c -> c.pinned, gui.cards.all) == 4
         _tick!(gui)
         # the floating cards cover neither each other nor the view cube
-        rects = [_rect(c.background) for c in gui.cards if c.scene.visible[]]
+        rects = [_rect(c.background) for c in gui.cards.all if c.scene.visible[]]
         @test length(rects) == 4
         @test !any(Ext._overlaps(rects[i], rects[j]) for i in eachindex(rects) for j in (i + 1):length(rects))
         close(gui)
@@ -598,9 +598,9 @@ const BMO = BeamletOptics
         box.focused[] = false
         @test !Ext._typing(gui) && cam.selected[]
         # the step box as well
-        gui.step_box.focused[] = true
+        gui.widgets.step_box.focused[] = true
         @test Ext._typing(gui) && !cam.selected[]
-        gui.step_box.focused[] = false
+        gui.widgets.step_box.focused[] = false
         @test !Ext._typing(gui)
         # another selection ends the input into the old box
         box = _w(gui, :x)

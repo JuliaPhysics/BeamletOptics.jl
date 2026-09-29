@@ -33,13 +33,13 @@ const BMO = BeamletOptics
     function _move!(gui, m)
         gui.controls.selected[] = m
         _key!(gui, Keyboard.up)
-        @test gui.preview
+        @test gui.trace.preview
         return nothing
     end
     function _pause!(gui)
-        gui.last_change -= 100
+        gui.trace.last_change -= 100
         _tick!(gui)
-        @test !gui.preview
+        @test !gui.trace.preview
         return nothing
     end
 
@@ -187,11 +187,11 @@ const BMO = BeamletOptics
         hits0 = length(BMO.hits(pd))
         @test hits0 == 40
         retrace!(() -> zrotate3d!(m, deg2rad(20)), gui)
-        @test gui.stale
+        @test gui.trace.stale
         @test length(BMO.hits(pd)) == hits0
         # with auto tracing on, the change is solved: the reflected beam misses the detector
-        gui.auto_trace[] = true
-        @test !gui.stale
+        gui.trace.auto[] = true
+        @test !gui.trace.stale
         @test isnothing(BMO.hits(pd))
         zrotate3d!(m, deg2rad(-20))
         retrace!(gui)

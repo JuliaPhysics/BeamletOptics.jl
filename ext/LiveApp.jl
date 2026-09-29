@@ -147,16 +147,12 @@ mutable struct AppLayout <: AbstractLiveLayout
     views_button::_IconButton
     help_button::_IconButton
     # object tree, see `_tree_rows`: the expanded systems and groups (by key, the default is
-    # expanded for systems, collapsed for groups), the names of unlabelled objects and the counters
-    # per type of their running indices, see `_name_objects!`
+    # expanded for systems, collapsed for groups); the names of its rows are in `gui.objects`, see
+    # `_name_objects!`
     tree::_ObjectTree
     expanded::IdDict{Any, Bool}
-    names::IdDict{Any, String}
-    counters::Dict{String, Int}
     # the inspector with the docked card of the selection, an `_Inspector`, see LiveInspector.jl
     inspector::Any
-    # the info label of the status bar
-    info::Label
     AppLayout(theme::NamedTuple) = new(theme)
 end
 
@@ -377,8 +373,6 @@ function _build_tree!(layout::AppLayout)
         eye_marker = v -> _icon(v ? :eye : :eye_off), eye_size = 15,
         expand_marker = e -> _icon(e ? :collapse : :expand), expand_size = 16)
     layout.expanded = IdDict{Any, Bool}()
-    layout.names = IdDict{Any, String}()
-    layout.counters = Dict{String, Int}()
     return (; show_all_button)
 end
 
@@ -505,11 +499,11 @@ function _build_layout(layout::AppLayout, fig, spec)
     sb = GridLayout(root[4, 1]; alignmode = Outside(10, 10, 4, 4))
     status = Label(sb[1, 1], "Click on a component to select it, press h to show the controls";
         halign = :left, tellwidth = false)
-    layout.info = Label(sb[1, 2], ""; halign = :right, color = t.muted)
+    info = Label(sb[1, 2], ""; halign = :right, color = t.muted)
     return (; ax, cube, panels, sliders, status, tb.trace_button, tb.auto_trace_toggle,
         tb.clip_beams_toggle, tb.orthographic_toggle, tb.sources_toggle, inspector.step_box,
         tb.export_button, objects.show_all_button, tb.measure_toggle, tb.home_button,
-        tb.save_view_button, tb.views_menu)
+        tb.save_view_button, tb.views_menu, info)
 end
 
 _build_menus(::AppLayout, w, _, _) = (; menu = nothing, views_menu = w.views_menu)
@@ -531,9 +525,9 @@ _ms_string(s) = s < 1e-3 ? "<1 ms" : "$(round(Int, 1e3 * s)) ms"
 """Returns the text of the info label of the status bar: last solve, number of rays, projection."""
 function _status_info(gui::LiveView)
     n = sum(p -> _ray_count(p.second), gui.pairs)
-    traced = gui.preview ? "preview in $(_ms_string(gui.preview_time))" :
-             "traced in $(_ms_string(gui.solve_time))"
-    projection = gui.orthographic_toggle.active[] ? "orthographic" : "perspective"
+    traced = gui.trace.preview ? "preview in $(_ms_string(gui.trace.preview_time))" :
+             "traced in $(_ms_string(gui.trace.solve_time))"
+    projection = gui.widgets.orthographic_toggle.active[] ? "orthographic" : "perspective"
     return "$traced · $n $(n == 1 ? "ray" : "rays") · $projection"
 end
 
@@ -544,7 +538,7 @@ end
 
 function _on_solved!(gui::AppView)
     # The inspector shows e.g. the hits of a detector after `_update_inspector!` of `_apply!`
-    _set_text!(gui.layout.info, _status_info(gui))
+    _set_text!(gui.widgets.info, _status_info(gui))
     return nothing
 end
 
@@ -562,7 +556,7 @@ _show_hint(::AppView) = "click its eye in the object tree to show it again"
 
 function _on_clipping!(gui::AppView)
     active = gui.layout.clip_toggle.active
-    active[] == gui.clipping || (active[] = gui.clipping)
+    active[] == gui.clip.enabled || (active[] = gui.clip.enabled)
     return nothing
 end
 
@@ -575,7 +569,7 @@ function _connect_layout!(gui::AppView)
     layout = gui.layout
     ctrl = gui.controls
     listeners = ctrl.listeners
-    push!(listeners, on(v -> v == gui.clipping || _set_clipping!(gui, v), layout.clip_toggle.active))
+    push!(listeners, on(v -> v == gui.clip.enabled || _set_clipping!(gui, v), layout.clip_toggle.active))
     push!(listeners, on(_ -> _zoom_to_selection!(gui), layout.fit_button.clicks))
     push!(listeners, on(layout.help_button.clicks) do _
         ctrl.help_shown = !ctrl.help_shown
@@ -586,13 +580,12 @@ function _connect_layout!(gui::AppView)
     push!(listeners, on(v -> _set_shown!(layout.right, v), layout.collapse.right.active))
     push!(listeners, on(_ -> _update_dock!(layout), layout.collapse.dock.active))
     _connect_dock!(gui)
-    push!(listeners, on(_ -> _on_solved!(gui), gui.orthographic_toggle.active))
+    push!(listeners, on(_ -> _on_solved!(gui), gui.widgets.orthographic_toggle.active))
     # Object tree
     tree = layout.tree
     push!(listeners, on(key -> _tree_click!(gui, key), tree.clicked))
     push!(listeners, on(key -> _toggle_hidden!(gui, key), tree.eye_clicked))
     push!(listeners, on(key -> _toggle_expanded!(gui, key), tree.expand_clicked))
-    _name_objects!(gui)
     _update_tree!(gui)
     _on_clipping!(gui)
     _connect_inspector!(gui)
@@ -607,7 +600,7 @@ in the toolbar group `:user` before "Help"
 =#
 
 _mark_panel_stale!(gui::AppView, p::_UserPanel) = (push!(gui.layout.tabs.stale, p); nothing)
-_results_valid(gui::AppView) = gui.layout.tabs.hits_valid && !_running(gui) && !gui.preview
+_results_valid(gui::AppView) = gui.layout.tabs.hits_valid && !_running(gui) && !gui.trace.preview
 
 """Hides the blocks of the collapsed `part`, e.g. those added to it since it was collapsed."""
 function _hide_collapsed!(part::_AppPart)

@@ -495,7 +495,7 @@ function _activate_tab!(gui::AppView, i::Int)
     tabs = gui.layout.tabs
     (1 <= i <= length(tabs.parts) && i != tabs.active) || return nothing
     old = _active_panel(tabs)
-    (gui.coarse || gui.preview) && !isnothing(old) && push!(tabs.stale, old)
+    (gui.trace.coarse || gui.trace.preview) && !isnothing(old) && push!(tabs.stale, old)
     _select_tab!(gui.layout, i)
     _refresh_dock!(gui)
     return nothing
@@ -534,7 +534,7 @@ function _refresh_tab!(gui::AppView, p::DetectorPanel)
     status = gui.status.text[]
     # The job has the panel as its object, such that the status line is not set to "traced"
     job = _start_job(gui, r -> _show_panels!(gui, r, msg, status), p, empty(gui.pairs),
-        empty(gui.beam_handles), Any[p]; coarse = gui.coarse, timing = :panel_time)
+        empty(gui.beam_handles), Any[p]; coarse = gui.trace.coarse, timing = :panel_time)
     _run!(gui, job, msg)
     return nothing
 end
@@ -553,7 +553,7 @@ end
 
 """Shows the `field` of the panel `p`, which the last solve left stale, see `_refresh_dock!`."""
 function _show_panel!(gui::AppView, p::DetectorPanel, field)
-    _update_panel!(p, field; coarse = gui.coarse, preview = gui.preview, record = false)
+    _update_panel!(p, field; coarse = gui.trace.coarse, preview = gui.trace.preview, record = false)
     _draw_history!(p)
     delete!(gui.layout.tabs.stale, p)
     return nothing

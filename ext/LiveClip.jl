@@ -29,7 +29,7 @@ as there are no planes to apply or reset.
 """
 function _apply_clip_planes!(gui::LiveView)
     scene = gui.ax.scene
-    planes = gui.clipping ? Plane3f[_plane3f(p) for p in gui.clip_planes] : Plane3f[]
+    planes = gui.clip.enabled ? Plane3f[_plane3f(p) for p in gui.clip.planes] : Plane3f[]
     # Plots added later inherit the planes of the scene when they are created
     isempty(planes) && isempty(scene.theme.clip_planes[]) && return nothing
     scene.theme.clip_planes[] = planes
@@ -40,7 +40,7 @@ function _apply_clip_planes!(gui::LiveView)
         plot.clip_planes[] == planes || (plot.clip_planes = planes)
     end
     # The beams are created with explicit `clip_planes`, hence they are set here in both cases
-    beam_planes = gui.clip_beams ? planes : Plane3f[]
+    beam_planes = gui.clip.beams ? planes : Plane3f[]
     for plot in beam_plots
         plot.clip_planes[] == beam_planes || (plot.clip_planes = beam_planes)
     end
@@ -49,15 +49,15 @@ end
 
 """Switches the clipping of the beams of the `gui` on or off, see `clip_beams`."""
 function _set_clip_beams!(gui::LiveView, on::Bool)
-    gui.clip_beams = on
-    gui.clip_beams_toggle.active[] == on || (gui.clip_beams_toggle.active[] = on)
+    gui.clip.beams = on
+    gui.widgets.clip_beams_toggle.active[] == on || (gui.widgets.clip_beams_toggle.active[] = on)
     _apply_clip_planes!(gui)
     return nothing
 end
 
 """Switches the clip planes of the `gui` on or off, see `clipping`."""
 function _set_clipping!(gui::LiveView, on::Bool)
-    gui.clipping = on
+    gui.clip.enabled = on
     _apply_clip_planes!(gui)
     gui.status.text[] = on ? "clipping on" : "clipping off"
     _on_clipping!(gui)
@@ -79,12 +79,12 @@ it as a movable object of the controls and applies the planes. Selects the plane
 """
 function _add_clip_plane!(gui::LiveView, point, normal; select::Bool = true)
     ctrl = gui.controls
-    plane = LiveClipPlane(point, normal, gui.clip_size)
+    plane = LiveClipPlane(point, normal, gui.clip.size)
     push!(ctrl.h.handles, _live_render_clip_plane!(gui.ax, plane;
         color = _clip_plane_color(gui.layout), strokecolor = _marker_stroke(gui.layout)))
     push!(ctrl.movable, plane)
     ctrl.init_poses[plane] = _pose(plane)
-    push!(gui.clip_planes, plane)
+    push!(gui.clip.planes, plane)
     haskey(gui.labels, plane) || (gui.labels[plane] = _clip_plane_label(gui))
     _apply_clip_planes!(gui)
     _on_clip_planes_changed!(gui)
@@ -123,7 +123,7 @@ function _remove_clip_plane!(gui::LiveView, plane::LiveClipPlane)
         ctrl.selected[] = nothing
         _update_selection_box!(ctrl)
     end
-    filter!(p -> p !== plane, gui.clip_planes)
+    filter!(p -> p !== plane, gui.clip.planes)
     delete!(gui.labels, plane)
     _apply_clip_planes!(gui)
     _unpin!(gui, plane)
@@ -167,13 +167,13 @@ function _clip_key!(gui::LiveView, key)
             _flip_clip_plane!(gui, sel)
             return true
         end
-        isempty(gui.clip_planes) && return false
-        _set_clipping!(gui, !gui.clipping)
+        isempty(gui.clip.planes) && return false
+        _set_clipping!(gui, !gui.clip.enabled)
         return true
     elseif key == Keyboard.p
         # Nothing can be selected in the spectator mode
         ctrl.spectator[] && return false
-        if length(gui.clip_planes) >= _MAX_CLIP_PLANES
+        if length(gui.clip.planes) >= _MAX_CLIP_PLANES
             gui.status.text[] = "at most $_MAX_CLIP_PLANES clip planes"
             return true
         end

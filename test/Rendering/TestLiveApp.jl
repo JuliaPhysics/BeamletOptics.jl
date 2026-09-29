@@ -41,14 +41,14 @@ const BMO = BeamletOptics
         @test Tuple(gui.fig.scene.viewport[].widths) == (1600, 950)
         @test length(gui.panels) == 1
         @test gui.layout.dock.shown
-        @test isnothing(gui.menu)
+        @test isnothing(gui.widgets.menu)
         @test gui.sliders isa Makie.SliderGrid
         @test first.(gui.layout.sections[:left]) == ["Objects", "Parameters"]
         @test first.(gui.layout.sections[:right]) == ["Properties"]
         @test first.(gui.layout.dock_panels) == ["Detector 1"]
         @test first.(gui.layout.groups) == [:trace, :camera, :display, :tools, :panels, :help]
-        @test occursin("1 ray", gui.layout.info.text[])
-        @test occursin("perspective", gui.layout.info.text[])
+        @test occursin("1 ray", gui.widgets.info.text[])
+        @test occursin("perspective", gui.widgets.info.text[])
         @test sprint(show, gui) == "LiveView(1 systems, 1 detector panels)"
         close(gui)
 
@@ -67,7 +67,7 @@ const BMO = BeamletOptics
         # the compact layout is the default
         gui = live_view(System([m, pd]), Beam([0.0, 0, 0], [0.0, 1, 0]); trace_budget = Inf)
         @test gui isa Ext.CompactView
-        @test gui.menu isa Makie.Menu
+        @test gui.widgets.menu isa Makie.Menu
         close(gui)
 
         @test_throws ArgumentError _live_app(System([m, pd]), Beam([0.0, 0, 0], [0.0, 1, 0]);
@@ -100,16 +100,16 @@ const BMO = BeamletOptics
         @test _detector_color(dark, pd) == t.materials[:detector]
         # the mirror keeps the color of the look
         @test _rgb(first(_plots(dark, m)).color[]) == Ext._materials()[:reflective].color
-        plane = only(dark.clip_planes)
+        plane = only(dark.clip.planes)
         @test only(p for p in _plots(dark, plane) if p isa Makie.Lines).color[] == t.clip_plane
         @test all(p -> p.strokecolor[] == t.marker_stroke,
             filter(p -> p isa Makie.Scatter, [_plots(dark, plane); _plots(dark, beam)]))
         help = only(p for p in dark.controls.plots if p isa Makie.Text && p.parent === dark.ax.blockscene)
         @test help.color[] == t.help
         # the floating cards in the colors of the theme, with a border
-        @test dark.card.background.strokevisible[] && dark.card.background.strokecolor[] == t.border
-        @test dark.card.background.color[] == t.sidebar
-        @test dark.trace_button.plots[3].backgroundcolor[] == t.tooltip
+        @test dark.cards.selection.background.strokevisible[] && dark.cards.selection.background.strokecolor[] == t.border
+        @test dark.cards.selection.background.color[] == t.sidebar
+        @test dark.widgets.trace_button.plots[3].backgroundcolor[] == t.tooltip
         px, pz = filter(p -> p isa Makie.Lines, only(dark.panels).profiles_ax.scene.plots)
         @test (px.color[], pz.color[]) == (t.gizmo[1], t.gizmo[3])
         close(dark)
@@ -119,7 +119,7 @@ const BMO = BeamletOptics
         @test _detector_color(light, pd) == Ext._materials()[:detector].color
         @test _rgb(light.beam_handles[1].plot.color[]) == _rgb(:blue)
         # the cards in the light colors, with a border
-        @test light.card.background.color[] == Ext._app_theme(:light).sidebar
+        @test light.cards.selection.background.color[] == Ext._app_theme(:light).sidebar
         close(light)
     end
 
@@ -128,77 +128,77 @@ const BMO = BeamletOptics
         beam = Beam([0.0, 0, 0], [0.0, 1, 0])
         gui = _live_app(System([m, pd]), beam; throttle = false, clip_planes = [[0, 0.1, 0] => [0, 1, 0]])
         # flat icon buttons and toggles
-        @test gui.trace_button isa Ext._IconButton
-        @test gui.auto_trace_toggle isa Ext._IconToggle
+        @test gui.widgets.trace_button isa Ext._IconButton
+        @test gui.widgets.auto_trace_toggle isa Ext._IconToggle
         @test gui.layout.clip_toggle isa Ext._IconToggle
         @test gui.layout.fit_button isa Ext._IconButton
         @test all(t -> t isa Ext._IconToggle, gui.layout.collapse)
-        @test gui.orthographic_toggle.tooltip[] == "Orthographic"
+        @test gui.widgets.orthographic_toggle.tooltip[] == "Orthographic"
         @test gui.layout.clip_toggle.tooltip[] == "Clipping (c)"
         # orthographic, via a click on the toggle
         cam = cameracontrols(gui.ax.scene)
         @test cam.settings.projectiontype[] == Makie.Perspective
-        bb = gui.orthographic_toggle.box.layoutobservables.computedbbox[]
+        bb = gui.widgets.orthographic_toggle.box.layoutobservables.computedbbox[]
         events(gui.fig.scene).mouseposition[] = Tuple(Makie.origin(bb) .+ Makie.widths(bb) ./ 2)
         for action in (Mouse.press, Mouse.release)
             events(gui.fig.scene).mousebutton[] = Makie.MouseButtonEvent(Mouse.left, action)
         end
-        @test gui.orthographic_toggle.active[]
+        @test gui.widgets.orthographic_toggle.active[]
         @test cam.settings.projectiontype[] == Makie.Orthographic
-        gui.orthographic_toggle.active[] = false
+        gui.widgets.orthographic_toggle.active[] = false
         # the views icon opens the views menu
         gui.layout.views_button.clicks[] += 1
-        @test gui.views_menu.is_open[]
+        @test gui.widgets.views_menu.is_open[]
         gui.layout.views_button.clicks[] += 1
-        @test !gui.views_menu.is_open[]
-        gui.orthographic_toggle.active[] = true
+        @test !gui.widgets.views_menu.is_open[]
+        gui.widgets.orthographic_toggle.active[] = true
         @test cam.settings.projectiontype[] == Makie.Orthographic
-        @test occursin("orthographic", gui.layout.info.text[])
-        gui.orthographic_toggle.active[] = false
+        @test occursin("orthographic", gui.widgets.info.text[])
+        gui.widgets.orthographic_toggle.active[] = false
         @test cam.settings.projectiontype[] == Makie.Perspective
         # auto trace and trace button
-        @test gui.auto_trace === gui.auto_trace_toggle.active
-        gui.auto_trace_toggle.active[] = false
+        @test gui.trace.auto === gui.widgets.auto_trace_toggle.active
+        gui.widgets.auto_trace_toggle.active[] = false
         gui.controls.selected[] = m
         _key!(gui, Keyboard.left)
-        @test gui.stale
-        gui.trace_button.clicks[] += 1
-        @test !gui.stale
-        gui.auto_trace_toggle.active[] = true
+        @test gui.trace.stale
+        gui.widgets.trace_button.clicks[] += 1
+        @test !gui.trace.stale
+        gui.widgets.auto_trace_toggle.active[] = true
         # clipping, in sync with the key `c`
-        @test gui.clipping && gui.layout.clip_toggle.active[]
+        @test gui.clip.enabled && gui.layout.clip_toggle.active[]
         gui.layout.clip_toggle.active[] = false
-        @test !gui.clipping
+        @test !gui.clip.enabled
         @test isempty(gui.ax.scene.theme.clip_planes[])
         _key!(gui, Keyboard.c)
-        @test gui.clipping && gui.layout.clip_toggle.active[]
+        @test gui.clip.enabled && gui.layout.clip_toggle.active[]
         @test length(gui.ax.scene.theme.clip_planes[]) == 1
         # clip beams
-        gui.clip_beams_toggle.active[] = true
-        @test gui.clip_beams
-        gui.clip_beams_toggle.active[] = false
-        @test !gui.clip_beams
+        gui.widgets.clip_beams_toggle.active[] = true
+        @test gui.clip.beams
+        gui.widgets.clip_beams_toggle.active[] = false
+        @test !gui.clip.beams
         # sources
         marker = _marker(gui, beam)
-        gui.sources_toggle.active[] = false
+        gui.widgets.sources_toggle.active[] = false
         @test !any(p -> p.visible[], marker.plots)
-        gui.sources_toggle.active[] = true
+        gui.widgets.sources_toggle.active[] = true
         @test all(p -> p.visible[], marker.plots)
         # measure
-        gui.measure_toggle.active[] = true
+        gui.widgets.measure_toggle.active[] = true
         @test startswith(gui.status.text[], "measure:")
-        gui.measure_toggle.active[] = false
+        gui.widgets.measure_toggle.active[] = false
         # help and fit
         help = gui.controls.help_shown
         gui.layout.help_button.clicks[] += 1
         @test gui.controls.help_shown != help
         gui.layout.fit_button.clicks[] += 1
-        @test !isnothing(gui.camera_animation)
+        @test !isnothing(gui.camera.animation)
         # the views menu is in the toolbar
-        n = length(gui.views)
-        redirect_stdout(() -> (gui.save_view_button.clicks[] += 1), devnull)
-        @test length(gui.views) == n + 1
-        @test length(gui.views_menu.options[]) == n + 1
+        n = length(gui.camera.views)
+        redirect_stdout(() -> (gui.widgets.save_view_button.clicks[] += 1), devnull)
+        @test length(gui.camera.views) == n + 1
+        @test length(gui.widgets.views_menu.options[]) == n + 1
         close(gui)
     end
 
@@ -216,12 +216,12 @@ const BMO = BeamletOptics
         Ext._card_widget(card, :x).stored_string[] = "5"
         @test BMO.position(m)[1] ≈ 5e-3
         @test gui.layout.inspector.mode.selected[] == :move
-        gui.step_box.stored_string[] = "1 mrad"
+        gui.widgets.step_box.stored_string[] = "1 mrad"
         @test gui.layout.inspector.mode.selected[] == :rotate
         # the step box is in the inspector, not on a card
-        @test gui.step_box !== gui.card.step_box
+        @test gui.widgets.step_box !== gui.cards.selection.step_box
         # no component menu, the eyes of the tree and "show all" in its title replace it
-        @test gui.show_all_button isa Ext._IconButton
+        @test gui.widgets.show_all_button isa Ext._IconButton
         close(gui)
     end
 
@@ -260,7 +260,7 @@ const BMO = BeamletOptics
         @test _row(gui, gui.system_handles[1]).expanded
         # eyes for everything that is rendered, none for clip planes
         @test all(r -> r.visible === true, _rows(gui)[1:6])
-        @test isnothing(_row(gui, gui.clip_planes[1]).visible)
+        @test isnothing(_row(gui, gui.clip.planes[1]).visible)
         # the names are used in the status line and the inspector
         @test Ext._label(gui, o.m) == "Mirror 1"
         # the kinds of the tree, by dispatch
@@ -277,7 +277,7 @@ const BMO = BeamletOptics
         @test isnothing(Ext._on_clip_planes_changed!(gui))
         @test Ext._label(gui, o.m) == "Mirror"
         _key!(gui, Keyboard.p)
-        @test gui.labels[gui.clip_planes[1]] == "Clip plane"
+        @test gui.labels[gui.clip.planes[1]] == "Clip plane"
         close(gui)
     end
 
@@ -316,25 +316,25 @@ const BMO = BeamletOptics
         # the eye hides and shows, the row is muted
         handle(obj) = only(oh for oh in ctrl.h.handles if oh.obj === obj)
         tree.eye_clicked[] = o.housing
-        @test o.housing in gui.hidden
+        @test o.housing in gui.objects.hidden
         @test !any(p -> p.visible[], handle(o.housing).plots)
         @test _row(gui, o.housing).visible === false
         @test tree.plots.labels.color[][5] == tree.muted_color
         tree.eye_clicked[] = o.housing
-        @test isempty(gui.hidden)
+        @test isempty(gui.objects.hidden)
         @test all(p -> p.visible[], handle(o.housing).plots)
         @test _row(gui, o.housing).visible === true
         # hiding a group hides its objects and clears a selection within it
         ctrl.selected[] = o.l1
         tree.eye_clicked[] = o.group
-        @test o.l1 in gui.hidden && o.l2 in gui.hidden
+        @test o.l1 in gui.objects.hidden && o.l2 in gui.objects.hidden
         @test isnothing(ctrl.selected[])
         @test _row(gui, o.group).visible === false
         # the system eye hides everything, "show all" shows everything again
         tree.eye_clicked[] = gui.system_handles[1]
         @test all(r -> r.visible === false, _rows(gui)[1:5])
-        gui.show_all_button.clicks[] += 1
-        @test isempty(gui.hidden)
+        gui.widgets.show_all_button.clicks[] += 1
+        @test isempty(gui.objects.hidden)
         @test all(r -> r.visible !== false, _rows(gui))
         # the source marker
         tree.eye_clicked[] = o.beam
@@ -349,7 +349,7 @@ const BMO = BeamletOptics
         tree = gui.layout.tree
         # `p` adds a numbered plane, selected and shown in the tree
         _key!(gui, Keyboard.p)
-        plane = gui.clip_planes[end]
+        plane = gui.clip.planes[end]
         @test _labels(gui)[end] == "Clip plane 2"
         @test tree.selected === plane
         @test gui.layout.inspector.name.text[] == "Clip plane 2"
@@ -362,8 +362,8 @@ const BMO = BeamletOptics
         # a click selects a plane
         ctrl = gui.controls
         ctrl.selected[] = nothing
-        tree.clicked[] = gui.clip_planes[1]
-        @test ctrl.selected[] === gui.clip_planes[1]
+        tree.clicked[] = gui.clip.planes[1]
+        @test ctrl.selected[] === gui.clip.planes[1]
         close(gui)
     end
 
@@ -373,7 +373,7 @@ const BMO = BeamletOptics
             sliders = ["a" => (0:0.1:1, v -> nothing)])
         layout = gui.layout
         w0, h0 = _width(gui.ax), _height(gui.ax)
-        box = gui.step_box
+        box = gui.widgets.step_box
         layout.collapse.right.active[] = false
         @test !layout.right.shown
         @test _width(gui.ax) ≈ w0 + 300
