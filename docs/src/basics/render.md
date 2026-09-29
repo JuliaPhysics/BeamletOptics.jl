@@ -1,6 +1,38 @@
 # Visualization
 
-As mentioned in other sections of this documentation, the [Makie](https://docs.makie.org) backend can be used in order to generate 2D/3D renderings of optical systems and results generated with this package. Refer to the extensive `Makie` documentation and the **Examples** and the **Tutorials** sections of this package for a variety of showcases on how to visualize your simulation.
+There are two ways to look at a simulation: the interactive GUI of the package BeamletOpticsGUI,
+in which the components are moved with the mouse and the beams and detector signals follow live,
+and the render functions of BeamletOptics itself, which draw systems and beams into any
+[Makie](https://docs.makie.org) scene, e.g. for figures. The GUI draws with the same render
+functions.
+
+## Interactive GUI
+
+[BeamletOpticsGUI](https://github.com/StackEnjoyer/BeamletOpticsGUI.jl) opens a setup in an interactive window: select and move components
+with the mouse, keyboard or the card of a component, and the systems are solved again after each
+change. Detector panels show spot diagrams or intensities with metrics, clip planes cut into the
+setup, beams and distances can be measured, and the changed poses are exported as Julia code.
+Own components get their own cards, and own panels, controls and tools can be added.
+
+```julia
+using GLMakie, BeamletOptics, BeamletOpticsGUI
+
+gui = live_view(system, beam; layout = :app)
+display(gui)
+```
+
+![Live view of a Michelson interferometer](../assets/gui/live_view_michelson.png)
+
+The GUI is a separate package, since it depends on Makie and changes independently of the optics.
+It builds on the [live rendering](@ref "Live rendering") and the
+[render handle protocol](@ref "Render handle protocol") described below. Installation, the
+features and the API are documented in the [BeamletOpticsGUI repository](https://github.com/StackEnjoyer/BeamletOpticsGUI.jl).
+
+## Rendering with Makie
+
+The following sections describe the render functions of BeamletOptics. Refer to the extensive
+`Makie` documentation and the **Examples** and the **Tutorials** sections of this package for a
+variety of showcases on how to visualize your simulation.
 
 ## Rendering elements
 
@@ -224,10 +256,3 @@ BeamletOptics.pickable_plots
 BeamletOptics.look_colors
 ```
 
-## Interactive GUI
-
-The interactive live view (docked panels, mouse-driven kinematics, detector panels, view cube and
-component cards) is not part of BeamletOptics. It is provided by the package
-[BeamletOpticsGUI](https://github.com/StackEnjoyer/BeamletOpticsGUI.jl), which builds on the
-[render handle protocol](@ref "Render handle protocol") above. See its documentation for
-the live view, the kinematic controls and the view cube.

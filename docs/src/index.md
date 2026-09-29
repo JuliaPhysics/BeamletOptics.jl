@@ -43,8 +43,8 @@ features:
     link: /basics/kinematics/kinematics
     linkText: Learn more
   - icon: "📊"
-    title: Makie visualization
-    details: Render setups and beams in 2D and 3D with CairoMakie or GLMakie.
+    title: Visualization + GUI
+    details: Move components in an interactive live view with BeamletOpticsGUI, render setups and beams in 2D and 3D with CairoMakie or GLMakie.
     link: /basics/render
     linkText: Learn more
   - icon: "🧩"
