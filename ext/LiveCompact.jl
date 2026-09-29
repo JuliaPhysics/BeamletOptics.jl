@@ -8,8 +8,12 @@ Compact layout of `live_view(...; layout = :compact)`, see `CompactLayout`
 Layout of `live_view(...; layout = :compact)`: the 3D view with the detector panels on its right,
 the sliders, the status row and the tool row below. The positions in `gui.fig` are fixed, e.g. the
 panels are placed in `gui.fig[1, 2]`, where users may add their own axes (see
-[`add_panel!`](@ref)). The widgets have Makie's look, the floating cards and the progress window
-the colors of the `theme` tokens.
+[`add_panel!`](@ref)). The widgets are Makie's buttons, toggles and menus with text labels, in the
+colors of the `theme` tokens like the whole window.
+
+The status row holds the tools of the groups `:trace` and `:display` (see `_BUILTIN_TOOLS`), the
+status line and the info label; the tool row the component menu, the views menu and the tools of
+all other groups, including those of [`add_tool!`](@ref), see `_tool_grid`.
 """
 mutable struct CompactLayout <: AbstractLiveLayout
     # the color tokens of the `theme` kwarg, see `_APP_THEMES`
@@ -19,16 +23,23 @@ mutable struct CompactLayout <: AbstractLiveLayout
     panels::Union{Nothing, GridLayout}
     status_row::GridLayout
     tool_row::GridLayout
+    # the grids of the tools in the status row and in the tool row, see `_tool_grid`
+    status_tools::GridLayout
+    tools::GridLayout
     CompactLayout(theme::NamedTuple) = new(theme, nothing)
 end
 
 """`LiveView` with the compact layout, i.e. `live_view(...; layout = :compact)`."""
 const CompactView = LiveView{CompactLayout}
 
+# The colors of the theme, with Makie's padding around the figure, unlike the app layout
+_figure(layout::CompactLayout, size) =
+    Figure(; size, backgroundcolor = layout.theme.background, _makie_theme(layout.theme)...)
+
 function _build_layout(layout::CompactLayout, fig, spec)
-    (; specs, slider_specs, labels, lighting, view_cube, auto_trace, clip_beams, orthographic,
-        show_sources) = spec
-    ax = LScene(fig[1, 1]; show_axis = false)
+    (; specs, slider_specs, labels, lighting, view_cube) = spec
+    t = layout.theme
+    ax = LScene(fig[1, 1]; show_axis = false, scenekw = (; clear = true, backgroundcolor = t.view))
     studio_lighting!(ax; preset = lighting)
     # Its click listener runs before the controls, hence clicks on the cube never select objects
     cube = view_cube ? view_cube!(ax) : nothing
@@ -41,7 +52,9 @@ function _build_layout(layout::CompactLayout, fig, spec)
         nc = ceil(Int, sqrt(length(specs)))
         for (i, (pd, mode, kw)) in enumerate(specs)
             parent = grid[(i - 1) ÷ nc + 1, (i - 1) % nc + 1]
-            push!(panels, DetectorPanel(parent, pd, get(labels, pd, "Detector $i"), mode, kw))
+            p = DetectorPanel(parent, pd, get(labels, pd, "Detector $i"), mode, kw)
+            _theme_panel!(p, t)
+            push!(panels, p)
         end
         colsize!(fig.layout, 1, Relative(0.6))
         layout.panels = grid
@@ -51,45 +64,62 @@ function _build_layout(layout::CompactLayout, fig, spec)
     else
         SliderGrid(fig[2, 1:ncols], first.(slider_specs)...)
     end
-    # Status row: trace button, auto trace toggle and status line
+    # Status row: tools, the status line and the info label at the right
     status_row = GridLayout(fig[isnothing(sliders) ? 2 : 3, 1:ncols])
-    trace_button = Button(status_row[1, 1]; label = "Trace (t)")
-    auto_trace_toggle = Toggle(status_row[1, 2]; active = auto_trace)
-    Label(status_row[1, 3], "auto trace")
-    clip_beams_toggle = Toggle(status_row[1, 4]; active = clip_beams)
-    Label(status_row[1, 5], "clip beams")
-    orthographic_toggle = Toggle(status_row[1, 6]; active = orthographic)
-    Label(status_row[1, 7], "orthographic")
-    sources_toggle = Toggle(status_row[1, 8]; active = show_sources)
-    Label(status_row[1, 9], "sources (1)")
-    export_button = Button(status_row[1, 10]; label = "Export")
-    status = Label(status_row[1, 11],
+    layout.status_tools = GridLayout(status_row[1, 1]; default_colgap = 12)
+    status = Label(status_row[1, 2],
         "Click on a component to select it, press h to show the controls"; tellwidth = false)
-    # Tool row: component menu (added by `_build_menus`, once the movable objects are known) and
-    # "show all"
+    info = Label(status_row[1, 3], ""; halign = :right, color = t.muted)
+    # Tool row: the component menu (added by `_build_menus`, once the movable objects are known)
+    # and tools, left-aligned by the filler, which keeps the row compact enough for narrow windows
     tool_row = GridLayout(fig[isnothing(sliders) ? 3 : 4, 1:ncols])
-    show_all_button = Button(tool_row[1, 2]; label = "show all")
-    # Measuring and camera tools, the views menu is added with the component menu
-    measure_toggle = Toggle(tool_row[1, 3]; active = false)
-    Label(tool_row[1, 4], "measure")
-    home_button = Button(tool_row[1, 5]; label = "home")
-    save_view_button = Button(tool_row[1, 7]; label = "save view")
-    # Keeps the tool row left-aligned and compact enough for narrow windows
-    Label(tool_row[1, 8], ""; tellwidth = false)
-    colgap!(tool_row, 6)
+    layout.tools = GridLayout(tool_row[1, 1]; default_colgap = 6)
+    Label(tool_row[1, 2], ""; tellwidth = false)
     layout.status_row = status_row
     layout.tool_row = tool_row
-    return (; ax, cube, panels, sliders, status, trace_button, auto_trace_toggle, clip_beams_toggle,
-        orthographic_toggle, sources_toggle, export_button, show_all_button, measure_toggle,
-        home_button, save_view_button, tool_row, info = nothing)
+    tools = _build_tools(layout, spec)
+    return (; ax, cube, panels, sliders, status, info, tools...)
 end
 
-function _build_menus(::CompactLayout, w, options, views_options)
-    menu = Menu(w.tool_row[1, 1]; options, default = nothing, prompt = "select component",
-        width = 150)
-    views_menu = Menu(w.tool_row[1, 6]; options = views_options, default = nothing,
+function _build_menus(layout::CompactLayout, w, options, views_options)
+    tools = layout.tools
+    # The component menu first, the views menu after "home"
+    _GLB.insertcols!(tools, 1, 1)
+    menu = Menu(tools[1, 1]; options, default = nothing, prompt = "select component", width = 150)
+    views_menu = Menu(_column_after!(w.home_button); options = views_options, default = nothing,
         prompt = "views", width = 90)
     return (; menu, views_menu)
+end
+
+# The step box is on the card of the selection; the info label and the colors of the controls are
+# shared with the app layout
+_connect_layout!(gui::CompactView) = _connect_theme!(gui)
+
+#=
+Tools: buttons with their label, toggles with a label next to them
+=#
+
+"""
+    _tool_grid(layout::CompactLayout, ::Val{group}) -> GridLayout
+
+The grid of the tools of the `group` (see `_BUILTIN_TOOLS`): the status row for tracing and the
+display, otherwise the tool row, e.g. for the camera and the tools of [`add_tool!`](@ref).
+"""
+_tool_grid(layout::CompactLayout, ::Val) = layout.tools
+_tool_grid(layout::CompactLayout, ::Union{Val{:trace}, Val{:display}}) = layout.status_tools
+
+"""Returns the position of a new tool at the end of the `grid`, one tool per column."""
+_next_tool!(grid::GridLayout) = grid[1, length(grid.content) + 1]
+
+_tool_widget(layout::CompactLayout, group::Symbol, ::Val{false}, label, _, _, ::Bool) =
+    Button(_next_tool!(_tool_grid(layout, Val(group))); label)
+
+function _tool_widget(layout::CompactLayout, group::Symbol, ::Val{true}, label, _, _,
+        active::Bool)
+    g = GridLayout(_next_tool!(_tool_grid(layout, Val(group))); default_colgap = 4)
+    toggle = Toggle(g[1, 1]; active)
+    Label(g[1, 2], label)
+    return toggle
 end
 
 #=
@@ -138,22 +168,3 @@ function _controls_slot!(gui::CompactView, title::String)
     colgap!(box, 10)
     return layout
 end
-
-"""Returns `n` positions at the end of the tool row of the compact `layout`, before its filler."""
-function _tool_slots!(layout::CompactLayout, n::Int)
-    row = layout.tool_row
-    k = _GLB.ncols(row)
-    row[1, k + n] = only(_GLB.contents(row[1, k]))
-    return [row[1, k + i] for i in 0:(n - 1)]
-end
-
-_tool_widget(gui::CompactView, ::Val{false}, label, _, _) =
-    Button(only(_tool_slots!(gui.layout, 1)); label)
-
-function _tool_widget(gui::CompactView, ::Val{true}, label, _, _)
-    toggle_pos, label_pos = _tool_slots!(gui.layout, 2)
-    toggle = Toggle(toggle_pos; active = false)
-    Label(label_pos, label)
-    return toggle
-end
-
