@@ -33,7 +33,7 @@ render!(::Union{GLMakie.Axis3, GLMakie.LScene}, ::BeamletOptics.AbstractSystem)
 
 ## Shapes (advanced)
 
-The following methods render the shapes that components are built from. They are mainly of interest when writing custom components, see the [Signed Distance Functions (SDFs)](@ref) and [Meshes](@ref) pages of the API documentation. A [`BeamletOptics.UnionSDF`](@ref) is rendered by drawing each of its SDFs. The spherical, aspherical and acylindrical lens surfaces have dedicated analytical renderers that are used automatically when a lens is rendered.
+The following methods render the shapes that components are built from. They are mainly of interest when writing custom components, see the [Signed Distance Functions (SDFs)](@ref) and [Meshes](@ref) pages of the API documentation. A [`BeamletOptics.UnionSDF`](@ref) or [`BeamletOptics.DifferenceSDF`](@ref) is rendered as one mesh, which is merged from the analytical meshes of its SDFs if all of them have one, and otherwise sampled via marching cubes. The spherical, aspherical and acylindrical lens surfaces have dedicated analytical renderers that are used automatically when a lens is rendered.
 
 ```@docs
 render!(::Union{GLMakie.Axis3, GLMakie.LScene}, ::BeamletOptics.AbstractSDF)

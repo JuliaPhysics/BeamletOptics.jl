@@ -5,7 +5,7 @@ and triplet lenses. Two looks are available, which are selected via [`set_render
 
 - `:modern` (default): a restrained palette of clear, slightly tinted glass with highlights,
   metallic mirrors and neutral mechanics. Only the glass (`:refractive`, `:coating` and
-  `:interface`) gets faint silhouettes, i.e. its feature edges at 60 % of the opacity of the
+  `:interface`) gets faint silhouettes, i.e. its feature edges at 50 % of the opacity of the
   `:cad` look, such that lenses stay readable in front of a housing
 - `:cad`: saturated materials with thin dark lines along the feature edges, like a CAD program
 
@@ -65,5 +65,5 @@ studio_lighting!(ax)
 render!(ax, system)
 ```
 
-`studio_lighting!(ax; preset = :none)` keeps the default lights of Makie and
-`edges = true` or `false` overrides the edges of the look.
+It works for an `LScene` and an `Axis3`. `studio_lighting!(ax; preset = :none)` keeps the
+default lights of Makie.

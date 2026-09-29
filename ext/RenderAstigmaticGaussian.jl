@@ -47,7 +47,7 @@ function _append_astigmatic_mesh!(
         pts::Vector{Point3f}, faces::Vector{GLTriangleFace}, agb::BMO.AstigmaticGaussianBeamlet{T};
         flen, r_res::Int, z_res::Int
     ) where {T}
-    vs = LinRange(0, 2π, r_res)
+    vs = _ring_angles(r_res)
     for child in PreOrderDFS(agb)
         p = child.parent
         l = isnothing(p) ? zero(T) : length(p)
@@ -55,6 +55,11 @@ function _append_astigmatic_mesh!(
             l_local = isnothing(BMO.intersection(ray)) ? flen : length(ray)
             us = LinRange(0, l_local, z_res) .+ l
             p0s, bs, cs, = BMO.waist_parameters(child, us)
+            # The rings must run counterclockwise about the ray, such that the faces point
+            # outwards, see `_push_grid_faces!`. The smoothing keeps this handedness.
+            if dot(cross(bs[1], cs[1]), BMO.direction(ray)) < 0
+                bs[1] = -bs[1]
+            end
             _smooth_astigmatic_axes!(bs, cs)
             offset = length(pts)
             for i in eachindex(p0s), v in vs

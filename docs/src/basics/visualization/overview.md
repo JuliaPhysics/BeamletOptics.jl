@@ -117,11 +117,11 @@ julia> using GLMakie
 
 julia> methods(render!)
 # ... methods for generic function "render!" from BeamletOptics:
-  [1] render!(ax::Union{Axis3, LScene}, s::BeamletOptics.UnionSDF; kwargs...)
-     @ BeamletOpticsMakieExt C:\Users\anon\.julia\dev\BeamletOptics\ext\RenderSDF.jl:32
-  [2] render!(axis::Union{Axis3, LScene}, css::BeamletOptics.ConcaveSphericalSurfaceSDF; color, kwargs...)
-     @ BeamletOpticsMakieExt C:\Users\anon\.julia\dev\BeamletOptics\ext\RenderLenses.jl:1
-  [3] render!(axis::Union{Axis3, LScene}, gauss::GaussianBeamlet; r_res, z_res, kwargs...)
-     @ BeamletOpticsMakieExt C:\Users\anon\.julia\dev\BeamletOptics\ext\RenderGaussian.jl:193
+  [1] render!(axis::Union{Axis3, LScene}, gauss::GaussianBeamlet; r_res, z_res, kwargs...)
+     @ BeamletOpticsMakieExt C:\Users\anon\.julia\dev\BeamletOptics\ext\RenderGaussian.jl:207
+  [2] render!(axis::Union{Axis3, LScene}, bg::AstigmaticBeamGroup; r_res, z_res, kwargs...)
+     @ BeamletOpticsMakieExt C:\Users\anon\.julia\dev\BeamletOptics\ext\RenderAstigmaticGaussian.jl:237
+  [3] render!(axis::Union{Axis3, LScene}, beam::Beam; kwargs...)
+     @ BeamletOpticsMakieExt C:\Users\anon\.julia\dev\BeamletOptics\ext\RenderBeam.jl:279
   ⋮
 ```

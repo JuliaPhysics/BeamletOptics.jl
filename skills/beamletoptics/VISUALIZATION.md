@@ -50,7 +50,8 @@ usually dwarfs a millimeter-scale setup.
   `set_render_look(:cad)` (saturated materials with feature edges); applies to later `render!` calls.
 - Each component class has a material (`:refractive`, `:reflective`, `:coating`, `:polarizer`,
   `:detector`, `:mechanics`); `render!(ax, obj; material = :mechanics, edges = false)` overrides it.
-- `studio_lighting!(ax)`: key, fill and rim light relative to the camera.
+- `studio_lighting!(ax)`: key, fill and rim light relative to the camera, for an `LScene` or
+  an `Axis3`.
 
 ## Views
 

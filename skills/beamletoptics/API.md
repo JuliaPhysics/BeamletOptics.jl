@@ -87,7 +87,8 @@ solve_system!(system, beam_group; progress = true, kwargs...)   # multithreaded 
 - Julia threads (`julia -t auto`) speed up solving of sources with many beams.
 - `progress`: beam groups and detector readout show a progress bar once they have run for
   `get_progress_threshold()` s (default 5 s, `set_progress_threshold!(Inf)` disables it). It is
-  only drawn if `stderr` is a terminal, so scripts with piped output see nothing. In a
+  only drawn if `stderr` is a terminal, so scripts with piped output see nothing. In the live
+  view of BeamletOpticsGUI, the same loops show a progress window in the 3D view instead.
 
 ## Beam queries
 

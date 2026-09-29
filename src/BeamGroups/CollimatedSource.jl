@@ -50,12 +50,6 @@ function CollimatedSource(beams::Vector{Beam{T, R}}, diameter, pos, orientation:
 end
 diameter(cs::CollimatedSource) = cs.diameter
 
-function set_num_rays!(cs::CollimatedSource{T}, n::Integer) where {T}
-    M = cs.orientation
-    cs.beams = source_beams(cs.sampling, cs.center, M[:, 2], M[:, 1], cs.diameter, source_wavelength(cs), Int(n), T)
-    return cs
-end
-
 """
     CollimatedSource(pos, dir, diameter, λ; num_rings, num_rays, basis)
 

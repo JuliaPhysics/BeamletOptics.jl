@@ -262,7 +262,7 @@ end
         nseg = _count_gaussian_segments(gauss)
         m = _mesh(h)
         @test length(coordinates(m)) == nseg * r_res * z_res
-        @test length(faces(m)) == nseg * 2 * (r_res - 1) * (z_res - 1)
+        @test length(faces(m)) == nseg * 2 * r_res * (z_res - 1)
     end
 
     @testset "Vertex radius at segment start matches gauss_parameters waist" begin
@@ -341,7 +341,7 @@ end
         nseg = _count_astigmatic_segments(agb)
         m = _mesh(h)
         @test length(coordinates(m)) == nseg * r_res * z_res
-        @test length(faces(m)) == nseg * 2 * (r_res - 1) * (z_res - 1)
+        @test length(faces(m)) == nseg * 2 * r_res * (z_res - 1)
     end
 
     @testset "First ring radii match waist_parameters" begin
@@ -352,8 +352,34 @@ end
 
         ring = coordinates(_mesh(h))[1:r_res]
         (p0, b, c) = BMO.waist_parameters(agb, 0.0)
-        expected = [Point3f(BMO.ellipse(v, p0, b, c)) for v in LinRange(0, 2π, r_res)]
+        # the ring runs counterclockwise about the beam, without a duplicate vertex at 2π
+        d = BMO.direction(first(BMO.rays(agb.c)))
+        b = dot(cross(b, c), d) < 0 ? -b : b
+        expected = [Point3f(BMO.ellipse(v, p0, b, c)) for v in 2π .* (0:(r_res - 1)) ./ r_res]
         @test all(isapprox.(ring, expected; atol = 1e-6))
+    end
+
+    @testset "Closed rings, all faces point outwards" begin
+        _, _, agb = _agb_lens_fixture()
+        _, _, _, _, gauss = _michelson_fixture()
+        # the chief ray segments in the order of the mesh, i.e. depth-first
+        segments(b, chief) = vcat(BMO.rays(chief(b)), (segments(c, chief) for c in b.children)...)
+        r_res, z_res = 12, 8
+        nf = 2 * r_res * (z_res - 1)
+        for (beam, chief) in ((agb, b -> b.c), (gauss, b -> b.chief))
+            m = _mesh(live_render!(LScene(Figure()[1, 1]), beam; r_res, z_res))
+            verts, fs = coordinates(m), faces(m)
+            for (k, ray) in enumerate(segments(beam, chief))
+                d = direction(ray)
+                # every face normal has a positive component away from the segment axis
+                outward = map(fs[((k - 1) * nf + 1):(k * nf)]) do f
+                    p1, p2, p3 = (Vector(verts[i]) for i in f)
+                    v = (p1 + p2 + p3) / 3 - position(ray)
+                    dot(cross(p2 - p1, p3 - p1), v - dot(v, d) * d) > 0
+                end
+                @test all(outward)
+            end
+        end
     end
 
     @testset "update_render! after moving a component and re-solving" begin

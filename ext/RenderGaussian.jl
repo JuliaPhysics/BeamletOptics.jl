@@ -77,7 +77,7 @@ see the `render!` method of the [`GaussianBeamlet`](@ref).
 function _gaussian_mesh(gauss::BMO.GaussianBeamlet{T}; flen, r_res::Int, z_res::Int) where {T}
     pts = Point3f[]
     faces = GLTriangleFace[]
-    vs = LinRange(0, 2π, r_res)
+    vs = _ring_angles(r_res)
     for child in PreOrderDFS(gauss)
         # Length tracking variable
         l = isnothing(child.parent) ? zero(T) : length(child.parent)
@@ -87,9 +87,10 @@ function _gaussian_mesh(gauss::BMO.GaussianBeamlet{T}; flen, r_res::Int, z_res::
             R = BMO.align3d([0, 1, 0], ray.dir)
             p = position(ray)
             offset = length(pts)
-            # Beam surface along the local y-axis, transformed into world coords
+            # Beam surface along the local y-axis, transformed into world coords. The rings run
+            # counterclockwise about +y, i.e. the faces point outwards, see `_push_grid_faces!`
             for (i, ui) in enumerate(u), v in vs
-                push!(pts, Point3f(R * Point3(w[i] * cos(v), ui, w[i] * sin(v)) + p))
+                push!(pts, Point3f(R * Point3(w[i] * cos(v), ui, -w[i] * sin(v)) + p))
             end
             _push_grid_faces!(faces, offset, r_res, z_res)
             if !isnothing(BMO.intersection(ray))
@@ -103,18 +104,31 @@ end
 """
     _push_grid_faces!(faces, offset, r_res, z_res)
 
-Pushes the triangles of a `z_res × r_res` grid of vertices (radial index fastest), which start at
-index `offset + 1`, onto `faces`.
+Pushes the triangles of a tube of `z_res` rings of `r_res` vertices each (radial index fastest),
+which start at index `offset + 1`, onto `faces`. Each ring is closed, i.e. its last vertex is
+connected to its first, see `_ring_angles`. The faces point outwards if the rings run
+counterclockwise about the direction in which the rings follow each other.
 """
 function _push_grid_faces!(faces::Vector{GLTriangleFace}, offset, r_res, z_res)
-    for i in 1:(z_res - 1), j in 1:(r_res - 1)
+    for i in 1:(z_res - 1), j in 1:r_res
         a = offset + (i - 1) * r_res + j
-        c = offset + i * r_res + j
-        push!(faces, GLTriangleFace(a, a + 1, c))
-        push!(faces, GLTriangleFace(a + 1, c + 1, c))
+        a1 = offset + (i - 1) * r_res + mod1(j + 1, r_res)
+        c = a + r_res
+        c1 = a1 + r_res
+        push!(faces, GLTriangleFace(a, a1, c))
+        push!(faces, GLTriangleFace(a1, c1, c))
     end
     return nothing
 end
+
+"""
+    _ring_angles(r_res)
+
+The `r_res` angles [rad] of the vertices of a ring of the envelope mesh, without the duplicate of
+the first vertex at 2π: `_push_grid_faces!` closes the ring, such that the vertices on the seam
+are shared and its normals are smooth.
+"""
+_ring_angles(r_res::Int) = 2π .* (0:(r_res - 1)) ./ r_res
 
 """
     _plot_generating_beams!(bp, axis, thing; flen, render_every, show_pos, transparency)

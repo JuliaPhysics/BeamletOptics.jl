@@ -363,6 +363,39 @@ const BMO = BeamletOptics
         wrapped = CollimatedSource(BMO.beams(cs), 5e-3, pos, dir)
         @test_throws ArgumentError set_num_rays!(wrapped, 100)
         @test_throws ArgumentError set_num_rays!(PointSource(BMO.beams(ps), 0.5, pos, dir), 100)
+
+        # the rays start at the emission point, not at a pivot moved by set_pivot3d!
+        for make in sources
+            src = make(pos, dir, 200, nothing)
+            rotate3d!(src, normalize([1.0, 0.3, 0.2]), 0.4)
+            M = src.orientation
+            set_pivot3d!(src, pos + [0.0, -0.1, 0.02])
+            set_num_rays!(src, 300)
+            fresh = make(pos, Vector(M[:, 2]), 300, Vector(M[:, 1]))
+            @test same(src, fresh)
+            @test position(src) ≈ pos + [0.0, -0.1, 0.02]
+        end
+
+        # min_num_rays is the lower bound of set_num_rays!, the source keeps its rays below it
+        for (make, n_min) in zip(sources, (80, 1, 80, 1))
+            src = make(pos, dir, 200, nothing)
+            @test BMO.min_num_rays(src) == n_min
+            @test_throws ErrorException set_num_rays!(src, n_min - 1)
+            @test length(src) == 200
+            @test length(set_num_rays!(src, n_min)) == n_min
+        end
+        @test isnothing(BMO.min_num_rays(wrapped))
+        @test isnothing(BMO.min_num_rays(Beam(pos, dir, λ)))
+    end
+
+    @testset "wavelength" begin
+        λ = 633e-9
+        beam = Beam([0, 0, 0], [0, 1, 0], λ)
+        @test BMO.wavelength(beam) == λ
+        @test BMO.wavelength(first(rays(beam))) == λ
+        @test BMO.wavelength(UniformDiscSource([0, 0, 0], [0, 1, 0], 1e-3, λ; num_rays = 10)) == λ
+        @test BMO.wavelength(PointSource([0, 0, 0], [0, 1, 0], 0.1, λ; num_rings = 2, num_rays = 50)) == λ
+        @test Base.ispublic(BeamletOptics, :wavelength)
     end
 end
 

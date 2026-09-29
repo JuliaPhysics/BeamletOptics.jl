@@ -369,9 +369,9 @@ function _apply_lighting!(scene, preset::Symbol, multi::Bool)
 end
 
 """
-    studio_lighting!(ls::LScene; preset = :studio)
+    studio_lighting!(ax::Union{LScene, Axis3}; preset = :studio)
 
-Sets up the lighting of the 3D view `ls`. The `:studio` rig consists of an ambient light, a key
+Sets up the lighting of the 3D view `ax`. The `:studio` rig consists of an ambient light, a key
 light from the upper right front, a fill light from the left and a rim light from behind, all
 relative to the camera. Backends that support a single directional light only (e.g. CairoMakie)
 get the ambient and the key light. `preset = :none` leaves the lights unchanged.
@@ -385,7 +385,9 @@ studio_lighting!(ax)
 render!(ax, system)
 ```
 """
-function studio_lighting!(ls::LScene; preset::Symbol = :studio)
-    _apply_lighting!(ls.scene, preset, _multi_light_backend())
+function studio_lighting!(ax::_RenderEnv; preset::Symbol = :studio)
+    _apply_lighting!(ax.scene, preset, _multi_light_backend())
     return nothing
 end
+
+studio_lighting!(ax::Makie.Axis; kwargs...) = throw(InvalidAxisError(typeof(ax)))

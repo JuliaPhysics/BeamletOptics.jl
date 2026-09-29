@@ -365,6 +365,19 @@ end
         ax = LScene(Figure()[1, 1])
         studio_lighting!(ax; preset = :none)
         @test Makie.get_lights(ax.scene) == default_lights
+
+        # Axis3 gets the same rig, a 2D Axis is rejected
+        ax3 = Axis3(Figure()[1, 1])
+        @test isnothing(studio_lighting!(ax3))
+        @test only(Makie.get_lights(ax3.scene)) isa Makie.DirectionalLight
+        @test_throws Ext.InvalidAxisError studio_lighting!(Axis(Figure()[1, 1]))
+    end
+
+    @testset "look_colors" begin
+        colors = BMO.look_colors()
+        @test colors isa Dict{Symbol, RGBf}
+        @test issubset([:refractive, :reflective, :coating, :polarizer, :detector, :mechanics],
+            keys(colors))
     end
     set_render_look(:modern)
 end

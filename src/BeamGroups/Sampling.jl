@@ -39,30 +39,81 @@ const _GOLDEN_ANGLE = π * (3 - √5)
 """
     AbstractSampling
 
-How a [`CollimatedSource`](@ref) or [`PointSource`](@ref) sampled its rays: stored in the source,
-such that [`set_num_rays!`](@ref) can regenerate them with another number of rays. The methods of
-`source_beams` generate the beams of each sampling, the constructors use them as well.
+How the rays of a [`CollimatedSource`](@ref) or [`PointSource`](@ref) are sampled. The source
+stores its sampling in the field `sampling`, such that [`set_num_rays!`](@ref) can regenerate its
+rays with another number of rays. The constructors of the sources generate their beams with the
+same methods.
+
+# Implementation reqs.
+
+A subtype `S <: AbstractSampling` implements:
+
+- `source_beams(s::S, pos, dir, b1, args..., λ, num_rays::Int, T) -> Vector{<:Beam}`: the beams
+  of the source, see [`BeamletOptics.source_beams`](@ref). `args` are the arguments of the source
+  type, i.e. the `diameter` [m] for a `CollimatedSource` and none for a `PointSource`. The
+  sampling pattern must depend on the pose only via `pos`, `dir` and `b1`, i.e. it must move
+  rigidly with the source. Throws an `ErrorException` if `num_rays` is below
+  `min_num_rays(s)`.
+- `min_num_rays(s::S) -> Union{Nothing, Int}` (optional): the fewest rays of the sampling,
+  default `1`, see [`BeamletOptics.min_num_rays`](@ref).
+
+Parameters of the sampling other than the number of rays (e.g. the number of rings or the
+half spread angle) are fields of the subtype.
+
+# Implementations
+
+- [`BeamletOptics.NoSampling`](@ref): given beams, can not be regenerated
+- [`BeamletOptics.DiscRings`](@ref), [`BeamletOptics.DiscSunflower`](@ref): `CollimatedSource`
+- [`BeamletOptics.ConeRings`](@ref), [`BeamletOptics.ConeSunflower`](@ref): `PointSource`
 """
 abstract type AbstractSampling end
 
-"""The beams were given to the constructor, they can not be regenerated."""
+"""
+    NoSampling()
+
+The beams of the source were given to its constructor, e.g.
+`CollimatedSource(beams, diameter, pos, dir)`. They can not be regenerated:
+[`set_num_rays!`](@ref) throws an `ArgumentError` and `min_num_rays` returns `nothing`.
+"""
 struct NoSampling <: AbstractSampling end
 
-"""Concentric rings of rays around a center ray on a disc, see [`CollimatedSource`](@ref)."""
+"""
+    DiscRings(num_rings::Int)
+
+Concentric rings of rays around a center ray on the disc of a [`CollimatedSource`](@ref). The
+outermost ring lies on the edge of the disc; the rays are distributed over the rings in
+proportion to their circumference. Needs at least `20 num_rings` rays.
+"""
 struct DiscRings <: AbstractSampling
     num_rings::Int
 end
 
-"""Sunflower (Fibonacci) sampling of a disc, see [`UniformDiscSource`](@ref)."""
+"""
+    DiscSunflower()
+
+Sunflower (Fibonacci) sampling of the disc of a [`UniformDiscSource`](@ref): every ray
+represents the same area of the disc. Needs at least one ray.
+"""
 struct DiscSunflower <: AbstractSampling end
 
-"""Concentric cones of rays with the half spread angle `θ`, see [`PointSource`](@ref)."""
+"""
+    ConeRings(num_rings::Int, θ::Float64)
+
+Concentric cones of rays around a center ray of a [`PointSource`](@ref), the outermost with the
+half spread angle `θ` [rad]. The rays are distributed over the cones in proportion to their
+circumference. Needs at least `20 num_rings` rays.
+"""
 struct ConeRings <: AbstractSampling
     num_rings::Int
     θ::Float64
 end
 
-"""Sunflower (Fibonacci) sampling of the cap with the half spread angle `θ`, see [`UniformPointSource`](@ref)."""
+"""
+    ConeSunflower(θ::Float64)
+
+Sunflower (Fibonacci) sampling of the spherical cap with the half spread angle `θ` [rad] of a
+[`UniformPointSource`](@ref): every ray represents the same solid angle. Needs at least one ray.
+"""
 struct ConeSunflower <: AbstractSampling
     θ::Float64
 end
@@ -70,10 +121,15 @@ end
 """
     source_beams(sampling::AbstractSampling, pos, dir, b1, args..., λ, num_rays, T) -> Vector{<:Beam}
 
-The beams of a source at `pos` along the unit vector `dir`, sampled by `sampling` with `num_rays`
-rays of the wavelength `λ`. `b1` is the unit sampling reference vector normal to `dir`, see
-[`sampling_basis`](@ref). The arguments between `b1` and `λ` depend on the sampling, e.g. the
-`diameter` of a disc. Used by the constructors of the sources and by [`set_num_rays!`](@ref).
+The beams of a source at `pos` [m] along the unit vector `dir`, sampled by `sampling` with
+`num_rays` rays of the wavelength `λ` [m] and the number type `T`. `b1` is the unit sampling
+reference vector normal to `dir`, see [`BeamletOptics.sampling_basis`](@ref); it sets the
+azimuth of the pattern about `dir`. `args` depend on the source: the `diameter` [m] of a
+[`CollimatedSource`](@ref), none for a [`PointSource`](@ref).
+
+Throws an `ErrorException` if `num_rays` is below [`BeamletOptics.min_num_rays`](@ref) of the
+sampling, and an `ArgumentError` for [`BeamletOptics.NoSampling`](@ref). Used by the
+constructors of the sources and by [`set_num_rays!`](@ref).
 """
 function source_beams end
 
@@ -85,11 +141,12 @@ CollimatedSource: rings and sunflower on a disc
 =#
 
 """
-    source_beams(sampling, pos, dir, b1, diameter, λ, num_rays, T)
+    source_beams(sampling::Union{DiscRings, DiscSunflower}, pos, dir, b1, diameter, λ, num_rays, T)
 
-Beams of a [`CollimatedSource`](@ref) at `pos` along the unit vector `dir` with the `diameter`
-and the wavelength `λ`, sampled by `sampling` with `num_rays` rays. `b1` is the unit sampling
-reference vector normal to `dir`, see `sampling_basis`.
+Beams of a [`CollimatedSource`](@ref) whose disc with the `diameter` [m] is centered at `pos`
+[m] normal to the unit vector `dir`, with the wavelength `λ` [m], sampled by `sampling` with
+`num_rays` rays. `b1` is the unit sampling reference vector normal to `dir`, see
+`sampling_basis`.
 """
 function source_beams(s::DiscRings, pos, dir, b1, diameter, λ, num_rays::Int, ::Type{T}) where {T}
     num_rings = s.num_rings
@@ -129,6 +186,9 @@ function source_beams(s::DiscRings, pos, dir, b1, diameter, λ, num_rays::Int, :
 end
 
 function source_beams(::DiscSunflower, pos, dir, e1, diameter, λ, num_rays::Int, ::Type{T}) where {T}
+    if num_rays < 1
+        throw(ErrorException("No. of rays must be at least 1 (passed: $num_rays)"))
+    end
     R = diameter / 2
     beams = Vector{Beam{T, Ray{T}}}(undef, num_rays)
     # orthogonal basis in the pupil plane
@@ -148,11 +208,11 @@ PointSource: cones of rings and sunflower on a cap
 =#
 
 """
-    source_beams(sampling, pos, dir, b1, λ, num_rays, T)
+    source_beams(sampling::Union{ConeRings, ConeSunflower}, pos, dir, b1, λ, num_rays, T)
 
-Beams of a [`PointSource`](@ref) at `pos` around the unit vector `dir` with the wavelength `λ`,
-sampled by `sampling` (which holds the half spread angle) with `num_rays` rays. `b1` is the unit
-sampling reference vector normal to `dir`, see `sampling_basis`.
+Beams of a [`PointSource`](@ref) at `pos` [m] around the unit vector `dir` with the wavelength
+`λ` [m], sampled by `sampling` (which holds the half spread angle) with `num_rays` rays. `b1` is
+the unit sampling reference vector normal to `dir`, see `sampling_basis`.
 """
 function source_beams(s::ConeRings, pos, dir, b1, λ, num_rays::Int, ::Type{T}) where {T}
     num_rings, θ = s.num_rings, s.θ

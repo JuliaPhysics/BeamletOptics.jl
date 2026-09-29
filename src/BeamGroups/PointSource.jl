@@ -50,12 +50,6 @@ function PointSource(beams::Vector{Beam{T, R}}, NA, pos, orientation::AbstractMa
 end
 numerical_aperture(ps::PointSource) = ps.NA
 
-function set_num_rays!(ps::PointSource{T}, n::Integer) where {T}
-    M = ps.orientation
-    ps.beams = source_beams(ps.sampling, ps.center, M[:, 2], M[:, 1], source_wavelength(ps), Int(n), T)
-    return ps
-end
-
 """
     PointSource(pos, dir, θ, λ; num_rings, num_rays, basis)
 

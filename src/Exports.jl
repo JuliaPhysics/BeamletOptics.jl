@@ -76,7 +76,7 @@ export live_render!, update_render!, remove_render!, pick_object, studio_lightin
 public AbstractRenderHandle, AbstractObjectRenderHandle, AbstractSystemRenderHandle,
        AbstractBeamRenderHandle, rendered, render_plots, render_children, render_parent,
        render_settings, pickable_plots, look_colors
-public is_static, hit_count, source_wavelength, min_num_rays, ProgressSink, PROGRESS_SINK,
+public is_static, hit_count, wavelength, min_num_rays, ProgressSink, PROGRESS_SINK,
        progress_state, is_cancelled
 public AbstractSampling, NoSampling, DiscRings, DiscSunflower, ConeRings, ConeSunflower,
        source_beams, sampling_basis
