@@ -76,7 +76,8 @@ function _TabBar(parent::Makie.GridPosition; background = RGBf(0.97, 0.97, 0.98)
         backgroundcolor = RGBAf(Makie.to_color(background)))
     common = (; inspectable = false, space = :pixel)
     lines = poly!(scene, [Rect2f(0, 0, 0, 0)]; common..., strokewidth = 0, color = RGBAf[_TRANSPARENT])
-    markers = scatter!(scene, Point2f[]; common..., marker = Makie.BezierPath[], markersize = _TAB_ICON,
+    # GLMakie can not draw an empty vector of markers, see `_tab_markers`
+    markers = scatter!(scene, Point2f[]; common..., marker = _icon(:expand), markersize = _TAB_ICON,
         color = RGBAf[], rotation = Float32[], strokewidth = 0)
     labels = text!(scene, Point2f[]; common..., text = String[], color = RGBAf[], font, fontsize,
         align = (:left, :center), markerspace = :pixel)
@@ -244,11 +245,17 @@ function _redraw!(bar::_TabBar)
     end
     p = bar.plots
     Makie.update!(p.lines; arg1 = rects, color = rect_colors)
-    Makie.update!(p.markers; arg1 = marker_pos, marker = _tree_markers(marker_shape),
+    Makie.update!(p.markers; arg1 = marker_pos, marker = _tab_markers(marker_shape),
         color = marker_color, rotation = marker_rot)
     Makie.update!(p.labels; arg1 = label_pos, text = label_text, color = label_color)
     return nothing
 end
+
+"""
+The markers of the icons of the tabs: one per tab, or a single marker without tabs, e.g. while the
+dock has no panels, since GLMakie can not draw an empty vector of markers.
+"""
+_tab_markers(shapes::Vector{Any}) = isempty(shapes) ? _icon(:expand) : _tree_markers(shapes)
 
 """
     _DockTabs
