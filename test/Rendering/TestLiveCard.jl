@@ -308,7 +308,7 @@ BMO.card_actions(::CardTestObject) = ()
         c, ctrl = gui.cards.selection, gui.controls
         plane = Ext._add_clip_plane!(gui, [0, 0.05, 0], [0, 1, 0])
         @test ctrl.selected[] === plane
-        @test c.title.text[] == "Clip plane"
+        @test c.title.text[] == "Clip plane 1"
         @test isnothing(_w(c, :hide)) && !isnothing(_w(c, :flip))
         n = plane.dir[:, 2]
         notify(_w(c, :flip).clicks)

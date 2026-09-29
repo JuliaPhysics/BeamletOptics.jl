@@ -415,7 +415,6 @@ function _connect_layout!(gui::AppView)
     _update_tree!(gui)
     _on_clipping!(gui)
     _connect_inspector!(gui)
-    _connect_theme!(gui)
     return nothing
 end
 

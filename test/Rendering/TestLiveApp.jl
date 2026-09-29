@@ -275,9 +275,9 @@ const BMO = BeamletOptics
         gui = live_view(System([o.m, o.pd]), o.beam; trace_budget = Inf)
         @test !hasproperty(gui.layout, :tree)
         @test isnothing(Ext._on_clip_planes_changed!(gui))
-        @test Ext._label(gui, o.m) == "Mirror"
+        @test Ext._label(gui, o.m) == "Mirror 1"
         _key!(gui, Keyboard.p)
-        @test gui.labels[gui.clip.planes[1]] == "Clip plane"
+        @test gui.labels[gui.clip.planes[1]] == "Clip plane 1"
         close(gui)
     end
 

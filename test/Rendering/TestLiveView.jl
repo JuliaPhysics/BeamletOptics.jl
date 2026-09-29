@@ -133,7 +133,7 @@ const BMO = BeamletOptics
         @test length(BMO.hits(pd)) == 1
         x1 = _mean_x(gui.panels[1].xy[])
         @test abs(x1 - x0) > 1 # [mm], 20 mrad deflection over 100 mm
-        @test startswith(gui.status.text[], "$(nameof(typeof(m))) at (")
+        @test startswith(gui.status.text[], "$(nameof(typeof(m))) 1 at (")
 
         # move the mirror out of the beam
         _key!(gui, Keyboard.m)
@@ -270,7 +270,7 @@ const BMO = BeamletOptics
         # solved again from the new start point
         @test length(BMO.hits(pd)) == 1
         @test gui.beam_handles[1].points[][1] ≈ Point3f(0, 1e-3, 0)
-        @test startswith(gui.status.text[], "Beam at (")
+        @test startswith(gui.status.text[], "Beam 1 at (")
         # rotate the source, the spot moves on the detector
         x0 = _mean_x(gui.panels[1].xy[])
         _key!(gui, Keyboard.m)
@@ -625,7 +625,7 @@ const BMO = BeamletOptics
             @test gui.panels[1].xy[] == xy0
             @test gui.trace.stale
             @test occursin("outdated, press t to trace", gui.status.text[])
-            @test startswith(gui.status.text[], "$(nameof(typeof(m))) at (")
+            @test startswith(gui.status.text[], "$(nameof(typeof(m))) 1 at (")
             @test bh.plot.alpha[] ≈ 0.3
 
             # t solves the system
@@ -791,7 +791,7 @@ const BMO = BeamletOptics
             @test n_calls[] == n0
             @test BMO.spot_diagram(pd) == spot0
             @test gui.trace.stale == stale0
-            @test startswith(gui.status.text[], "Clip plane at (")
+            @test startswith(gui.status.text[], "Clip plane 1 at (")
 
             # shift+c flips the selected plane, c switches clipping off and on
             _shift_key!(gui, Keyboard.c)

@@ -91,9 +91,6 @@ function _build_menus(layout::CompactLayout, w, options, views_options)
     return (; menu, views_menu)
 end
 
-# The step box is on the card of the selection; the info label and the colors of the controls are
-# shared with the app layout
-_connect_layout!(gui::CompactView) = _connect_theme!(gui)
 
 #=
 Tools: buttons with their label, toggles with a label next to them

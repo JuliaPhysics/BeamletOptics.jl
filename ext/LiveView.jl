@@ -59,10 +59,9 @@ and implements
     or `nothing`
   - `panels`: the `DetectorPanel`s of `spec.specs`, `sliders`: a `SliderGrid` of
     `spec.slider_specs` or `nothing`, `status`: the `Label` of the status line
-  - `trace_button`, `export_button`, `home_button`, `save_view_button`, `show_all_button`:
-    anything with `clicks::Observable{Int}`, or `nothing` for the last one
-  - `auto_trace_toggle`, `clip_beams_toggle`, `orthographic_toggle`, `sources_toggle`,
-    `measure_toggle`: anything with `active::Observable{Bool}`, initialized from `spec`
+  - the built-in tools by role, e.g. `trace_button` (anything with `clicks::Observable{Int}`) or
+    `auto_trace_toggle` (anything with `active::Observable{Bool}`, initialized from `spec`), created
+    by `_build_tools(layout, spec)`, see "Tools" below
   - `info`: the `Label` of the last solve, the number of rays and the projection, or `nothing`
 
   `live_view` collects the widgets in a `_LayoutWidgets`, whose typed fields reject a missing or
@@ -99,21 +98,29 @@ and optionally, with defaults for any layout,
   some of them: `_computed_panels(gui, preview)`, `_shown_panels(gui)` and
   `_apply_panel!(gui, p, field; coarse, preview)` (all panels by default), with the hooks
   `_on_solve_started!(gui)` and `_on_applied!(gui)` around a solve, see `LiveDock.jl`
-- `_clip_plane_label(gui)`: the label of a new clip plane (`"Clip plane"`), and
-  `_show_hint(gui)`: how a hidden object is shown again, for the status line
-- colors of the 3D view, e.g. for a dark background: `_clip_plane_color(layout)` (`:purple`),
-  `_marker_stroke(layout)` (`:black`, the outline of the handles of sources, clip planes and
-  measured points), `_beam_style(layout, beam)` (default kwargs of `live_render!` of a source,
-  none by default) and `_theme_render!(layout, h)` for the rendered objects (see `AppLayout`)
+- `_show_hint(gui)`: how a hidden object is shown again, for the status line
+- colors of the 3D view: by default from the tokens of the `theme` (see `LiveLayout.jl`),
+  `_clip_plane_color(layout)`, `_marker_stroke(layout)` (the outline of the handles of sources,
+  clip planes and measured points), `_beam_style(layout, beam)` (default kwargs of `live_render!`
+  of a source) and `_theme_render!(layout, h)` for the rendered objects
 - slots for additional parts: `_add_toolbar_entry!(gui, group)`, `_add_sidebar_section!(gui,
   side, title)` and `_add_dock_panel!(gui, title)`, which return the `GridPosition` or
   `GridLayout` to place widgets in, see `AppLayout`
 - the places of the public customization API (see `LiveCustom.jl`), without which it throws for
   the layout: `_add_user_panel!(f, gui, title, select)` for [`add_panel!`](@ref),
-  `_controls_slot!(gui, title)` for [`add_controls!`](@ref) and
-  `_tool_widget(gui, toggle::Val, name, icon, tooltip)` for [`add_tool!`](@ref). A layout that
+  `_controls_slot!(gui, title)` for [`add_controls!`](@ref) and `_tool_widget` (see "Tools")
+  for [`add_tool!`](@ref). A layout that
   hides panels implements `_panel_shown(gui, p)` and `_mark_panel_stale!(gui, p)` and updates a
   stale panel once it is shown, see `_UserPanel`
+
+# Tools
+
+The built-in tools (buttons and toggles such as trace, clipping or export) are declared once in
+`_BUILTIN_TOOLS` (see `_ToolSpec`). A layout implements `_tool_widget(layout, group, toggle::Val,
+label, icon, tooltip, active)`, which creates a tool of a `group` in the place of the layout, e.g.
+a labelled button in a row or an icon in a toolbar; `_build_tools(layout, spec)` builds all tools
+that `_has_tool(layout, Val(role))` selects (by default those with a field in `_LayoutWidgets`)
+this way, and [`add_tool!`](@ref) its tools with the group `:user`.
 
 The layouts of `live_view` are `CompactLayout` and `AppLayout`.
 """
@@ -791,6 +798,8 @@ function live_view(
     _connect_projection!(gui, orthographic)
     _connect_sources!(gui)
     _connect_layout!(gui)
+    # The info label and the colors of the controls, shared by all layouts
+    _connect_theme!(gui)
     _resolve!(gui, nothing)
     # Initial view from the Front-Right-Top corner, in which the labels of the view cube read
     # correctly. Only set once, later changes of the view, e.g. via `set_view`, are kept.
