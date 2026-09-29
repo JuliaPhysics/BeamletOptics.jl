@@ -93,6 +93,10 @@ not inspectable. For a pinned card, `corners` are the corners of the bounding bo
 the pose `key = (obj, P, R)` when it was pinned; they move with the object, see `_card_corners`.
 `pose` is the object and its pose that the widgets show.
 
+A drag at the head of the card (outside its buttons) moves it to a `spot` in the 3D view, where it
+stays with its line to the object, also when it is pinned, see `_drag_cards!`; a double click there
+places it next to its object again.
+
 Parts that are not shown are moved far outside of the figure (`_CARD_AWAY`), since hidden widgets
 still take clicks within their bounding box. `scene` is translated to `z` (see `_card_z`), so that
 GLMakie draws the card over the 3D scene, including plots added later and transparent plots.
@@ -130,6 +134,9 @@ mutable struct _ComponentCard <: _AbstractCard
     # a card of an inspected point or a measurement that is replaced by the next one unless it is
     # pinned, see `_show_info!`
     transient::Bool
+    # the place in the 3D view to which the mouse moved the card, see `_card_spot`; `nothing` places
+    # it next to its object
+    spot::Union{Nothing, Tuple{Bool, Bool, Vec2f}}
 end
 
 # Content of a layout of the card `scene`, aligned at the top left corner of its suggested bounding box
@@ -165,7 +172,7 @@ function _ComponentCard(fig::Figure, theme::NamedTuple, z::Real = _CARD_Z)
     return _ComponentCard(scene, t, background, head, _card_part(scene), tools, _card_part(scene), step,
         icon, icon_color, title, collapse_button, pin_button, step_box, link, Tuple{Any, CardWidget}[],
         Any[], Textbox[], Any[], nothing, false, false, false, false, nothing, Point3f[], nothing, nothing,
-        nothing, false)
+        nothing, false, nothing)
 end
 
 #=
@@ -552,6 +559,55 @@ function _card_position(sel::Rect2f, size::Vec2f, view::Rect2f)
         fits(q) && return q
     end
     return Point2f(clamp(candidates[1][1], lo[1], max(lo[1], hi[1] - size[1])), top)
+end
+
+"""
+    _card_spot(p::Point2f, size::Vec2f, view::Rect2f) -> (right, top, d)
+
+The place of a card of the `size` with the top left corner `p` [figure px] in the 3D view `view`,
+relative to the corner of the view nearest to the center of the card: `right` and `top` name the
+corner, `d` is the distance [px] of the edges of the card from its edges. A card at an edge stays
+there when the window is resized or the card changes its size, e.g. when it collapses, see
+`_spot_position`.
+"""
+function _card_spot(p::Point2f, size::Vec2f, view::Rect2f)
+    lo, hi = minimum(view), maximum(view)
+    mid = lo .+ Makie.widths(view) ./ 2
+    right, top = p[1] + size[1] / 2 > mid[1], p[2] - size[2] / 2 > mid[2]
+    dx = right ? hi[1] - p[1] - size[1] : p[1] - lo[1]
+    dy = top ? hi[2] - p[2] : p[2] - size[2] - lo[2]
+    return (right, top, Vec2f(dx, dy))
+end
+
+"""
+    _spot_position(spot, size::Vec2f, view::Rect2f) -> Point2f
+
+Top left corner [figure px] of a card of the `size` at its `spot` (see `_card_spot`) in the 3D view
+`view`, moved into the view with the margin `_CARD_MARGIN`.
+"""
+function _spot_position(spot::Tuple{Bool, Bool, Vec2f}, size::Vec2f, view::Rect2f)
+    right, top, d = spot
+    lo, hi = minimum(view) .+ _CARD_MARGIN, maximum(view) .- _CARD_MARGIN
+    x = right ? maximum(view)[1] - d[1] - size[1] : minimum(view)[1] + d[1]
+    y = top ? maximum(view)[2] - d[2] : minimum(view)[2] + d[2] + size[2]
+    return Point2f(clamp(x, lo[1], max(lo[1], hi[1] - size[1])), clamp(y, min(hi[2], lo[2] + size[2]), hi[2]))
+end
+
+# Rectangle [figure px] of a part of a card, which hangs down from the point of its suggested bounding box
+function _part_rect(x::GridLayout)
+    p, s = minimum(x.layoutobservables.suggestedbbox[]), _card_size(x)
+    return Rect2f(p[1], p[2] - s[2], s...)
+end
+
+"""
+Returns `true` if the mouse of the `events` is over the handle of the shown card `c`, by which the
+mouse moves it (see `_drag_cards!`): the card except its actions, its tools and the parts below the
+head, i.e. its icon, its title and the free room around them.
+"""
+function _over_handle(c::_ComponentCard, events::Makie.Events)
+    _over_card(c, events) || return false
+    p = Point2f(events.mouseposition[])
+    return !any(x -> p in _part_rect(x), (c.actions, c.tools, c.rows, c.step))
 end
 
 # Rectangle of a card with the top left corner `p` and the `size`

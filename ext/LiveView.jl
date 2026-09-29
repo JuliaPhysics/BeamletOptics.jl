@@ -2210,9 +2210,10 @@ end
 Shows the card of the selection (`gui.card`) next to the selected object, unless it has a pinned
 card, and the pinned cards of the `gui` next to their objects; see `_update_card!`. The cards are
 placed in this order, each off the view cube and the cards before, so that none covers another:
-the card of the selection first, at its object; a pinned card without room is collapsed to its
-head. All cards are hidden while a menu is open, whose options they would cover. Called every
-frame, which moves the cards with the camera and the objects.
+the cards that the mouse moved to their `spot` first, where they stay (see `_drag_cards!`), then
+the card of the selection, at its object; a pinned card without room is collapsed to its head. All
+cards are hidden while a menu is open, whose options they would cover. Called every frame, which
+moves the cards with the camera and the objects.
 """
 function _update_cards!(gui::LiveView)
     menu = _menu_open(gui)
@@ -2220,10 +2221,10 @@ function _update_cards!(gui::LiveView)
     obstacles = _obstacles(gui.view_cube)
     shown = menu || !_selection_card_shown(gui) || any(c -> c.pinned && c.obj === sel, gui.cards) ?
         nothing : sel
-    _update_card!(gui, gui.card, shown, obstacles)
-    for c in gui.cards
-        c === gui.card && continue
-        _update_card!(gui, c, c.pinned && !menu ? c.obj : nothing, obstacles)
+    target(c) = c === gui.card ? shown : c.pinned && !menu ? c.obj : nothing
+    order = [gui.card; filter(c -> c !== gui.card, gui.cards)]
+    for moved in (true, false), c in order
+        isnothing(c.spot) == moved || _update_card!(gui, c, target(c), obstacles)
     end
     return nothing
 end
@@ -2242,8 +2243,9 @@ Shows the card `c` for `obj` (or hides it for `nothing`): builds its declared wi
 another object (see `_build_content!`) and shows the values of `obj` when it or its pose changes,
 then moves the card next to the bounding box of `obj` (see `_card_position`), off the `obstacles`
 (see `_avoid`), to which it adds its rectangle, and connects it to `obj` by a line. A pinned card
-that finds no room is collapsed to its head (`auto_collapsed`) until there is room again. Only
-changed values update the layout.
+that finds no room is collapsed to its head (`auto_collapsed`) until there is room again. A card
+that the mouse moved stays at its `spot` instead (see `_spot_position`). Only changed values update
+the layout.
 """
 _update_card!(::LiveView, c::_ComponentCard, ::Nothing, ::Vector{Rect2f}) = _hide_card!(c)
 function _update_card!(gui::LiveView, c::_ComponentCard, obj, obstacles::Vector{Rect2f})
@@ -2264,8 +2266,9 @@ function _update_card!(gui::LiveView, c::_ComponentCard, obj, obstacles::Vector{
     sel = _screen_rect(scene, corners, obj)
     c.auto_collapsed = false
     size = _card_size(c)
-    p = _avoid(_card_position(sel, size, view), size, view, obstacles)
-    if c.pinned && !c.collapsed && _covers(p, size, obstacles)
+    p = isnothing(c.spot) ? _avoid(_card_position(sel, size, view), size, view, obstacles) :
+        _spot_position(c.spot, size, view)
+    if isnothing(c.spot) && c.pinned && !c.collapsed && _covers(p, size, obstacles)
         c.auto_collapsed = true
         size = _card_size(c)
         p = _avoid(_card_position(sel, size, view), size, view, obstacles)
@@ -2444,15 +2447,15 @@ end
     _toggle_pinned!(gui, c)
 
 Pins the card `c` of the selection to the selected object, which keeps the card next to the object
-independent of the selection; the selection gets another card. Unpins a pinned card, which hides
-it.
+(or at the spot to which the mouse moved it, see `_drag_cards!`) independent of the selection; the
+selection gets another card. Unpins a pinned card, which hides it and forgets its spot.
 """
 function _toggle_pinned!(gui::LiveView, c::_ComponentCard)
     # The card of an inspected point or a measurement stays, see `_keep_info!`
     c.transient && return _keep_info!(gui, c)
     if c.pinned
         obj = c.obj
-        c.pinned, c.obj = false, nothing
+        c.pinned, c.obj, c.spot = false, nothing, nothing
         _hide_card!(c)
         # the plots of an inspected point or a measurement, unless it is still pinned elsewhere,
         # e.g. after it was docked, see `_forget!`
@@ -2510,11 +2513,11 @@ _toggle_pin!(::LiveView, ::Nothing) = nothing
     _pin!(gui, c::_ComponentCard, obj)
 
 Pins a floating card to `obj`: the card `c`, by default a spare card (see `_spare_card!`), see
-`_toggle_pin!`.
+`_toggle_pin!`. The card is placed next to `obj`, also if the mouse moved it before.
 """
-_pin!(gui::LiveView, obj) = _pin!(gui, _spare_card!(gui), obj)
+_pin!(gui::LiveView, obj) =_pin!(gui, _spare_card!(gui), obj)
 function _pin!(gui::LiveView, c::_ComponentCard, obj)
-    c.pinned, c.obj, c.key, c.pose = true, obj, nothing, nothing
+    c.pinned, c.obj, c.key, c.pose, c.spot = true, obj, nothing, nothing, nothing
     _show_head!(c)
     _update_cards!(gui)
     return nothing
@@ -2555,7 +2558,7 @@ _card_tools!(::AbstractLiveLayout, c::_ComponentCard) = c
 function _use_card!(gui::LiveView, c::_ComponentCard)
     gui.card = c
     gui.step_box = c.step_box
-    c.key, c.pose = nothing, nothing
+    c.key, c.pose, c.spot = nothing, nothing, nothing
     return nothing
 end
 
@@ -2680,8 +2683,8 @@ _outside_view(::LiveView) = false
 
 Connects the cards of the `gui`: their widgets, their update every frame and the mouse. Presses on
 a card reach its widgets only: the controls ignore them (`ignore_mouse`) and the camera does not
-get them, see `_shield_cards!`. A press elsewhere ends the input into the textboxes of the cards,
-also if the controls consume it.
+get them, see `_shield_cards!`; a drag at its head moves the card, see `_drag_cards!`. A press
+elsewhere ends the input into the textboxes of the cards, also if the controls consume it.
 """
 function _connect_cards!(gui::LiveView)
     ctrl = gui.controls
@@ -2695,8 +2698,73 @@ function _connect_cards!(gui::LiveView)
         event.action == Mouse.press && !over() && foreach(_defocus_card!, gui.cards)
         return Consume(false)
     end)
+    _drag_cards!(gui)
     _shield_cards!(gui)
     _update_cards!(gui)
+    return nothing
+end
+
+# Distance [px] that the mouse must move with the button down until a press at the head of a card
+# moves it, and the longest pause [s] between the two clicks of a double click there
+const _CARD_DRAG_MIN = 3.0f0
+const _CARD_DOUBLE_CLICK = 0.4
+
+"""
+    _drag_cards!(gui)
+
+Connects the mouse to the handles of the floating cards of the `gui`, i.e. their heads outside the
+buttons (see `_over_handle`): a drag moves the card, which then stays at its new `spot` (see
+`_card_spot`) with its line to the object, while the camera and the objects move, when it is pinned
+and, on the card of the selection, when another object is selected. The cards without a spot keep
+off it, see `_update_cards!`. A double click on the handle places the card next to its object again;
+so do unpinning it and pinning another card, see `_pin!`. The listeners come before the widgets of
+the cards (Button 1) and the mouse shield (1), after the controls (200), which ignore the presses on
+the cards.
+"""
+function _drag_cards!(gui::LiveView)
+    ev = events(gui.ax.scene)
+    listeners = gui.controls.listeners
+    # The card, the mouse at the press, the top left corner of the card at the press and whether it moved
+    drag = Ref{Any}(nothing)
+    # The card and the time of the last click on a handle, for the double click
+    click = Ref{Any}((nothing, 0.0))
+    push!(listeners, on(ev.mousebutton, priority = 2) do event
+        event.button == Mouse.left || return Consume(false)
+        if event.action == Mouse.press
+            i = findlast(c -> _over_handle(c, ev), gui.cards)
+            isnothing(i) && return Consume(false)
+            c = gui.cards[i]
+            r = c.background.layoutobservables.suggestedbbox[]
+            drag[] = (c, Point2f(ev.mouseposition[]), Point2f(minimum(r)[1], maximum(r)[2]), false)
+            return Consume(true)
+        elseif event.action == Mouse.release && !isnothing(drag[])
+            c, _, _, moved = drag[]
+            drag[] = nothing
+            moved && return Consume(true)
+            prev, t = click[]
+            if prev === c && time() - t < _CARD_DOUBLE_CLICK
+                c.spot = nothing
+                click[] = (nothing, 0.0)
+                _update_cards!(gui)
+            else
+                click[] = (c, time())
+            end
+            return Consume(true)
+        end
+        return Consume(false)
+    end)
+    push!(listeners, on(ev.mouseposition, priority = 2) do xy
+        isnothing(drag[]) && return Consume(false)
+        c, start, p0, moved = drag[]
+        d = Point2f(xy) - start
+        (moved || maximum(abs, d) >= _CARD_DRAG_MIN) || return Consume(true)
+        drag[] = (c, start, p0, true)
+        size, view = _card_size(c), Rect2f(Makie.viewport(gui.ax.scene)[])
+        # The spot of the card inside the view
+        c.spot = _card_spot(_spot_position(_card_spot(p0 + d, size, view), size, view), size, view)
+        _update_cards!(gui)
+        return Consume(true)
+    end)
     return nothing
 end
 

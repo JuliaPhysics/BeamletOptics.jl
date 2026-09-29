@@ -571,6 +571,12 @@ view, off the view cube and the other cards. It has the colors of `theme = :ligh
 - The pin keeps the card with its component when the selection changes, e.g. to watch or type the
   poses of several components; the widgets of a pinned card act on its component. Clicking the
   pin again closes it.
+- Dragging the head (icon, label or the free room around them) moves the card to another place in
+  the view, e.g. to line up several pinned cards at an edge. It stays there, connected to its
+  component by the line, when the camera or the component moves and when it is pinned; the card of
+  the selection also keeps its place for the next selected component. The place is kept relative
+  to the nearest corner of the view, so a card at an edge stays there when the window is resized.
+  A double click on the head places the card next to its component again, as does unpinning it.
 - Below the pose, rows of the component type, refreshed after each solve and move:
 
   | Component | Rows |

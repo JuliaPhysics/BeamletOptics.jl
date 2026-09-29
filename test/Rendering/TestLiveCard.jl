@@ -207,11 +207,11 @@ BMO.card_actions(::CardTestObject) = ()
         # a click on the card keeps the selection
         _click!(gui, _center(_rect(c.title)))
         @test ctrl.selected[] === m
-        # a drag from the card does not move the camera, a drag beside it does
+        # a drag from the card moves the card, not the camera, a drag beside it moves the camera
         eye = _eye(gui)
         _drag!(gui, _center(_rect(c.title)), _center(_rect(c.title)) .+ Point2f(150, -100))
         @test _eye(gui) ≈ eye
-        @test ctrl.selected[] === m
+        @test ctrl.selected[] === m && !isnothing(c.spot)
         ev.mouseposition[] = Tuple(Float64.(_center(_rect(c.title))))
         ev.scroll[] = (0.0, 3.0)
         @test _eye(gui) ≈ eye
@@ -354,6 +354,90 @@ BMO.card_actions(::CardTestObject) = ()
         @test gui.card === c1 && length(gui.cards) == 3
         close(gui)
         @test !any(c -> c.scene.visible[], gui.cards)
+    end
+
+    @testset "cards moved by the mouse" begin
+        # the spot of a card is relative to the nearest corner of the view, inside the view
+        view, size = Rect2f(0, 0, 1000, 800), Vec2f(200, 100)
+        spot = Ext._card_spot(Point2f(780, 750), size, view)
+        @test spot == (true, true, Vec2f(20, 50))
+        @test Ext._spot_position(spot, size, view) == Point2f(780, 750)
+        @test Ext._spot_position(spot, size, Rect2f(0, 0, 1200, 600)) == Point2f(980, 550)
+        @test Ext._spot_position(spot, size, Rect2f(0, 0, 150, 90)) == Point2f(8, 82)
+        spot = Ext._card_spot(Point2f(30, 140), size, view)
+        @test spot == (false, false, Vec2f(30, 40))
+        @test Ext._spot_position(spot, Vec2f(200, 30), view) == Point2f(30, 70)
+
+        m, pd = _fixture()
+        gui = _live_view(System([m, pd]), _gauss(); size = (1400, 900))
+        c, ctrl = gui.card, gui.controls
+        ev = events(gui.ax.scene)
+        vp = Rect2f(gui.ax.scene.viewport[])
+        _select!(gui, m)
+        _tick!(gui)
+        @test isnothing(c.spot)
+        top_left(c) = Point2f(minimum(_rect(c.background))[1], maximum(_rect(c.background))[2])
+        # a drag at a widget does not move the card
+        box = _pose(c, 1)
+        p0 = top_left(c)
+        _drag!(gui, _center(_rect(box)), _center(_rect(box)) .+ Point2f(-200, 100))
+        @test isnothing(c.spot) && top_left(c) == p0
+        box.focused[] && Makie.defocus!(box)
+        # a drag at the title moves the card to the top left corner of the view, off the objects
+        target = Point2f(minimum(vp)[1] + 40, maximum(vp)[2] - 40)
+        a = _center(_rect(c.title))
+        eye = _eye(gui)
+        _drag!(gui, a, a .+ (target - p0))
+        @test _eye(gui) ≈ eye && ctrl.selected[] === m
+        @test top_left(c) ≈ target
+        @test c.spot[1:2] == (false, true)
+        # it stays there when the camera moves, with its line to the object
+        set_view(gui.ax, [0.3, -0.2, 0.3], [0.0, 0.1, 0.0], [0.0, 0, 1])
+        _tick!(gui)
+        @test top_left(c) ≈ target && length(c.link[]) == 2
+        # and for another selected object
+        _select!(gui, pd)
+        _tick!(gui)
+        @test top_left(c) ≈ target && c.pose[1] === pd
+        # a drag beyond the view keeps the card inside the view
+        a = _center(_rect(c.title))
+        _drag!(gui, a, a .+ Point2f(-500, 500))
+        r = _rect(c.background)
+        @test minimum(r)[1] ≈ minimum(vp)[1] + Ext._CARD_MARGIN
+        @test maximum(r)[2] ≈ maximum(vp)[2] - Ext._CARD_MARGIN
+        _drag!(gui, _center(_rect(c.title)), _center(_rect(c.title)) .+ (target - top_left(c)))
+        @test top_left(c) ≈ target
+
+        # pinned, the card stays at its spot; the new card of the selection keeps off it
+        _pin!(c)
+        @test c.pinned && top_left(c) ≈ target
+        _select!(gui, m)
+        _tick!(gui)
+        s = gui.card
+        @test s !== c && isnothing(s.spot) && s.scene.visible[]
+        @test !Ext._overlaps(_rect(s.background), _rect(c.background))
+        # a double click at the head places the card next to its object again
+        a = _center(_rect(c.title))
+        _click!(gui, a)
+        _click!(gui, a)
+        @test isnothing(c.spot) && c.pinned
+        @test !(top_left(c) ≈ target)
+        # two slow clicks do not
+        a = _center(_rect(c.title))
+        _drag!(gui, a, a .+ (target - top_left(c)))
+        @test !isnothing(c.spot)
+        a = _center(_rect(c.title))
+        _click!(gui, a)
+        sleep(1.2 * Ext._CARD_DOUBLE_CLICK)
+        _click!(gui, a)
+        @test !isnothing(c.spot)
+        # the buttons at the head are no handle: a click on the collapse button collapses the card
+        _click!(gui, _center(_rect(c.collapse_button.box)))
+        @test c.collapsed && !isnothing(c.spot) && top_left(c) ≈ target
+        # an unpinned card forgets its spot
+        _pin!(c)
+        @test !c.pinned && isnothing(c.spot)
+        close(gui)
     end
 
     @testset "no dock toggle in the compact layout" begin
