@@ -16,12 +16,13 @@ const _PROPERTY_MAX_ROWS = 14      # longer lists end with a row "… n more"
 const _PROPERTY_GAP = 12.0f0       # minimal gap between a label and its value
 
 """
-    _PropertyList(parent; label_color, value_color, line_color)
+    _PropertyList(parent; label_color, value_color, line_color, attributes...)
 
 A list of `label  value` rows at the grid position `parent`, the label left in `label_color`, the
 value right-aligned in `value_color`, rows separated by thin lines. Drawn with a constant number of
 plots (one `text!` for all labels, one for all values, one `linesegments!` for the lines) in the
-scene of an invisible `Box` that holds the place in the layout; the box is as high as the rows.
+scene of an invisible `Box` that holds the place in the layout; the box is as high as the rows and
+takes the `attributes`, by default `tellwidth = false` (it fills the width of its column).
 Values that do not fit are ellipsized, lists with more than `_PROPERTY_MAX_ROWS` rows end with
 a row "… n more". Updated only by [`_set_rows!`](@ref) and on layout changes.
 """
@@ -36,8 +37,8 @@ mutable struct _PropertyList
     const widths::Dict{String, Float32}
 end
 
-function _PropertyList(parent; label_color, value_color, line_color)
-    box = Box(parent; visible = false, height = 0, tellwidth = false)
+function _PropertyList(parent; label_color, value_color, line_color, attributes...)
+    box = Box(parent; visible = false, height = 0, tellwidth = false, attributes...)
     scene = box.blockscene
     common = (; space = :pixel, inspectable = false, fontsize = _PROPERTY_FONTSIZE,
         markerspace = :pixel)
@@ -169,11 +170,12 @@ Segmented control
 =#
 
 """
-    _Segmented(parent, options; theme)
+    _Segmented(parent, options; theme, selected = first(options).first, attributes...)
 
 A segmented control at the grid position `parent`: a row of text buttons, one per option
 `key => label`, of which the one of `selected[]` (a key) is highlighted with the accent colors of
-the `theme` tokens. A click sets `selected`, which can also be set from code.
+the `theme` tokens. A click sets `selected`, which can also be set from code. The `attributes` go
+to the `GridLayout` of the buttons, by default `tellwidth = false`.
 """
 struct _Segmented
     grid::GridLayout
@@ -182,12 +184,15 @@ struct _Segmented
     selected::Observable{Symbol}
 end
 
-function _Segmented(parent, options::Vector{Pair{Symbol, String}}; theme, selected::Symbol = first(options).first)
+function _Segmented(parent, options::Vector{Pair{Symbol, String}}; theme,
+        selected::Symbol = first(options).first, attributes...)
     t = theme
-    grid = GridLayout(parent; default_colgap = 2, halign = :left, tellwidth = false)
+    grid = GridLayout(parent; default_colgap = 2, halign = :left, tellwidth = false, attributes...)
     sel = Observable(selected)
     ks = first.(options)
-    buttons = [Button(grid[1, i]; label, fontsize = 12, padding = (7, 7, 4, 4), cornerradius = 4)
+    # the colors of the theme also where the figure has Makie's theme, e.g. on a floating card
+    buttons = [Button(grid[1, i]; label, fontsize = 12, padding = (7, 7, 4, 4), cornerradius = 4,
+                   buttoncolor_hover = t.hover, buttoncolor_active = t.accent_soft, strokewidth = 1)
                for (i, (_, label)) in enumerate(options)]
     function look!(k)
         for (key, b) in zip(ks, buttons)

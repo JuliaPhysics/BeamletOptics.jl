@@ -110,9 +110,11 @@ to bottom:
   built by the shared parts of the cards, see `_card_icon!`
 - the docked `card` of the selected object: the rows of [`card_rows`](@ref), e.g. the pose, see
   `_DockedCard`
-- the step box and the mode as a segmented control (`mode`), bound to the `mode` of the controls
-- the properties of the object, see `BeamletOptics.properties` and `_PropertyList`; without a
-  selection, a summary of the live view
+- the part of the selection, built and connected like on the floating card of the selection (see
+  `_selection_part!` and `_connect_selection_part!`): the `step_box` and the mode as a segmented
+  control (`mode`), bound to the `mode` of the controls, then the `list` of the properties of the
+  object, see `BeamletOptics.properties` and `_show_properties!`; without a selection, a summary
+  of the live view
 - the `pinned` cards in the layout `pinned_grid`, one below the other in the order of pinning,
   each with its own head, see `_dock_pinned!`. The "Properties" section is formed by the card of
   the selection and the docked pinned cards; a pinned card can float next to its object in the 3D
@@ -130,6 +132,7 @@ mutable struct _Inspector
     const type::Label
     const pin::_IconToggle
     const card::_DockedCard
+    const step_box::Textbox
     const mode::_Segmented
     const list::_PropertyList
     const pinned_grid::GridLayout
@@ -142,9 +145,6 @@ mutable struct _Inspector
     # widths of the texts of the header in pixels, per label, see `_text_width`
     const widths::NTuple{2, Dict{String, Float32}}
 end
-
-# Names of `properties` that the inspector shows elsewhere: in the header and the pose rows
-const _INSPECTOR_SKIPPED = ("Type", "Position [m]")
 
 """
     _build_inspector!(layout::AppLayout) -> (; step_box)
@@ -168,16 +168,10 @@ function _build_inspector!(layout::AppLayout)
     rowgap!(header, 0)
     colsize!(header, 2, Auto(false))
     card = _DockedCard(header, g, t)
-    # Step and mode
-    pose = GridLayout(g[3, 1]; default_colgap = 6, default_rowgap = 2, tellwidth = false)
-    Label(pose[1, 1], "step"; halign = :left, fontsize = 11, color = t.muted, tellwidth = false)
-    Label(pose[1, 2:3], "mode"; halign = :left, fontsize = 11, color = t.muted, tellwidth = false)
-    step_box = _step_box!(pose[2, 1], t; placeholder = "250 nm", width = 80, halign = :left)
-    mode = _Segmented(pose[2, 2:3], [:move => "Move", :rotate => "Rotate"]; theme = t)
-    # Properties
+    # The part of the selection like on the floating card: step and mode, below a line the properties
+    pose = GridLayout(g[3, 1]; default_colgap = 6, tellwidth = false)
     Box(g[4, 1]; height = 1, color = t.border, strokewidth = 0)
-    list = _PropertyList(g[5, 1]; label_color = t.muted, value_color = t.text,
-        line_color = RGBAf(Makie.to_color(t.border)))
+    step_box, mode, list = _selection_part!(pose, g[5, 1], t)
     # Pinned cards, see `_dock_pinned!`
     pinned_grid = GridLayout(g[6, 1]; default_rowgap = 10, tellwidth = false)
     # the rows of the card are empty without a selection, see `_refresh_inspector!`, and there are
@@ -185,7 +179,7 @@ function _build_inspector!(layout::AppLayout)
     rowsize!(g, 2, Fixed(0))
     rowsize!(g, 6, Fixed(0))
     rowgap!(g, 10)
-    layout.inspector = _Inspector(g, icon, icon_color, name, type, pin, card, mode, list,
+    layout.inspector = _Inspector(g, icon, icon_color, name, type, pin, card, step_box, mode, list,
         pinned_grid, _DockedCard[], nothing, true, nothing, (Dict{String, Float32}(), Dict{String, Float32}()))
     return (; step_box)
 end
@@ -433,7 +427,7 @@ function _refresh_inspector!(gui::AppView; force::Bool = false)
     end
     _refresh_card!(gui, insp.card; force)
     _show_pin!(gui)
-    _set_rows!(insp.list, _inspector_rows(gui, obj))
+    _show_properties!(gui, insp, obj)
     foreach(c -> _refresh_pinned!(gui, c; force), insp.pinned)
     _fit_pinned!(gui; keep = insp.keep)
     return nothing
@@ -493,67 +487,31 @@ end
 _actions_width(c::_DockedCard) =
     isempty(c.actions.content) ? 0.0f0 : Makie.widths(c.actions.layoutobservables.computedbbox[])[1] + 6
 
-"""Returns the rows of the property list for `obj`, see `BeamletOptics.properties`."""
-function _inspector_rows(::AppView, obj)
-    props = try
-        BMO.properties(obj)
-    catch e
-        # a failing `properties` method of a user type must not break the live view
-        Pair{String, Any}["Error" => sprint(showerror, e)]
-    end
-    return [_property_row(name, value) for (name, value) in props if !(name in _INSPECTOR_SKIPPED)]
-end
-
-"""Summary of the live view, shown without a selection."""
-function _inspector_rows(gui::AppView, ::Nothing)
-    objects = sum(h -> length(h.handles), gui.system_handles; init = 0)
-    rows = Tuple{String, String}[
-        ("Systems", string(length(gui.system_handles))), ("Objects", string(objects)),
-        ("Sources", string(length(_sources(gui)))), ("Detector panels", string(length(gui.panels))),
-        ("Clip planes", string(length(gui.clip.planes))),
-        ("Last trace", gui.trace.solve_time > 0 ? _ms_string(gui.trace.solve_time) : "–")]
-    return rows
-end
-
-"""Sets the mode of the controls of the `gui`, like the key `m`."""
-function _set_mode!(gui::LiveView, mode::Symbol)
-    ctrl = gui.controls
-    ctrl.mode[] == mode && return nothing
-    ctrl.mode[] = mode
-    _update_selection_box!(ctrl)
-    _update_help!(ctrl)
-    gui.status.text[] = "$mode mode, step: $(_step_string(mode, ctrl.fine_step, ctrl.fine_angle))"
-    return nothing
-end
-
 """
-Connects the inspector of the `gui`: the mode control in both directions with the `mode` of the
-controls, the pin, the step box, and a refresh when the right sidebar is shown again. The widgets of
-the docked card are connected when they are built, see `_build_content!`.
+Connects the inspector of the `gui`: the part of the selection like on the floating card (the step
+box and the mode control, see `_connect_selection_part!`), the pin, and a refresh when the right
+sidebar is shown again. The widgets of the docked card are connected when they are built, see
+`_build_content!`.
 """
 function _connect_inspector!(gui::AppView)
     layout = gui.layout
     insp = layout.inspector
     ctrl = gui.controls
     listeners = ctrl.listeners
-    sel = insp.mode.selected
-    push!(listeners, on(m -> _set_mode!(gui, m), sel))
-    push!(listeners, on(m -> (sel[] == m || (sel[] = m)), ctrl.mode; update = true))
+    _connect_selection_part!(gui, insp)
     push!(listeners, on(insp.pin.active) do v
         obj = ctrl.selected[]
         (isnothing(obj) || v == _is_pinned(gui, obj)) || _toggle_pin!(gui, obj)
         return nothing
     end)
     push!(listeners, on(v -> v && _refresh_inspector!(gui), layout.collapse.right.active))
-    push!(listeners, on(s -> _set_step!(gui, s), gui.widgets.step_box.stored_string))
-    push!(listeners, on(_ -> _keep_keyboard!(gui), gui.widgets.step_box.focused))
     _refresh_inspector!(gui)
     return nothing
 end
 
 # The step box and the textboxes of the docked card take the keyboard like those of the floating
 # cards, see `_typing`
-_layout_boxes(gui::AppView) = (gui.widgets.step_box, _card_boxes(gui.layout.inspector.card)...,
+_layout_boxes(gui::AppView) = (gui.layout.inspector.step_box, _card_boxes(gui.layout.inspector.card)...,
     (tb for c in gui.layout.inspector.pinned for tb in _card_boxes(c))...)
 
 # The card of the selection is docked in the inspector, only pinned cards float in the 3D view

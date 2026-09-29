@@ -79,8 +79,14 @@ a scene with a pixel camera over the whole figure:
   `_card_tools!`
 - `rows`, below the head unless `collapsed`: the rows of [`card_rows`](@ref) for the object, each in
   its own layout
-- `step`, below the rows, only on the card of the selection (the keyboard steps move the selected
-  object): the `step_box` of the keyboard step
+- `step` and `properties`, below the rows, only on the card of the selection (the keyboard steps
+  and the mode belong to the selection, not to the object): the part of the selection, see
+  `_selection_part!`, shared with the inspector of the app layout. `step` holds the `step_box` of
+  the keyboard step, the Move/Rotate control `mode` of the mode of the controls (see `_bind_mode!`)
+  and a disclosure row "Properties" with the chevron `properties_button`; `properties` holds the
+  `list` of the properties of the object (see `_show_properties!`), shown only while
+  `properties_shown` (collapsed by default, see `_toggle_properties!`). The state is kept while
+  the card follows the selection.
 
 The widgets of the actions and the rows are built from their declarations when the card gets an
 object with other declarations, see `_build_content!`: `widgets` holds each widget with its
@@ -110,12 +116,16 @@ mutable struct _ComponentCard <: _AbstractCard
     tools::GridLayout
     rows::GridLayout
     step::GridLayout
+    properties::GridLayout
     icon::Observable{BezierPath}
     icon_color::Observable{RGBAf}
     title::Label
     collapse_button::_IconButton
     pin_button::_IconToggle
     step_box::Textbox
+    mode::_Segmented
+    list::_PropertyList
+    properties_button::_IconButton
     link::Observable{Vector{Point2f}}
     widgets::Vector{Tuple{Any, CardWidget}}
     blocks::Vector{Any}
@@ -137,6 +147,7 @@ mutable struct _ComponentCard <: _AbstractCard
     # the place in the 3D view to which the mouse moved the card, see `_card_spot`; `nothing` places
     # it next to its object
     spot::Union{Nothing, Tuple{Bool, Bool, Vec2f}}
+    properties_shown::Bool
 end
 
 # Content of a layout of the card `scene`, aligned at the top left corner of its suggested bounding box
@@ -158,21 +169,23 @@ function _ComponentCard(fig::Figure, theme::NamedTuple, z::Real = _CARD_Z)
         strokecolor = t.view, strokewidth = 1.5, inspectable = false)
     background = Box(scene; bbox = _CARD_AWAY, color = t.sidebar, strokecolor = t.border,
         strokewidth = 1, cornerradius = _CARD_CORNER)
-    head, tools, step = _card_part(scene), _card_part(scene), _card_part(scene)
+    head, tools, step, properties = _card_part(scene), _card_part(scene), _card_part(scene), _card_part(scene)
     icon, icon_color = _card_icon!(head[1, 1])
     title = _card_title!(head[1, 2], t)
     pin_button = _card_pin!(tools[1, 1], t)
     collapse_button = _card_collapse!(tools[1, 2], t)
     Makie.colgap!(tools, 2)
-    foreach(_fix_tooltip!, (pin_button, collapse_button))
-    Label(step[1, 1], "step"; halign = :right, _card_style(t, Label)..., color = t.muted)
-    step_box = _step_box!(step[1, 2], t; width = 110)
-    _fix_caret!(step_box, z)
+    # The part of the selection: step, mode and, below a disclosure row, the properties, whose
+    # width follows the card, see `_fit_properties!`
+    part = _selection_part!(step, properties[1, 1], t; width = _CARD_PROPERTIES_WIDTH, tellwidth = true)
+    properties_button = _properties_disclosure!(step[3, 1:2], t)
+    foreach(_fix_tooltip!, (pin_button, collapse_button, properties_button))
+    _fix_caret!(part.step_box, z)
     scene.visible[] = false
     return _ComponentCard(scene, t, background, head, _card_part(scene), tools, _card_part(scene), step,
-        icon, icon_color, title, collapse_button, pin_button, step_box, link, Tuple{Any, CardWidget}[],
-        Any[], Textbox[], Any[], nothing, false, false, false, false, nothing, Point3f[], nothing, nothing,
-        nothing, false, nothing)
+        properties, icon, icon_color, title, collapse_button, pin_button, part.step_box, part.mode,
+        part.list, properties_button, link, Tuple{Any, CardWidget}[], Any[], Textbox[], Any[], nothing,
+        false, false, false, false, nothing, Point3f[], nothing, nothing, nothing, false, nothing, false)
 end
 
 #=
@@ -231,6 +244,57 @@ _card_collapse!(pos, t::NamedTuple; kwargs...) =
 """The textbox of the keyboard step of a card at the grid position `pos`, see `_set_step!`."""
 _step_box!(pos, t::NamedTuple; kwargs...) =
     Textbox(pos; placeholder = "e.g. 250 nm", _card_style(t, Textbox)..., kwargs...)
+
+#=
+Part of the selection, shared by the card of the selection (the floating `_ComponentCard`) and the
+inspector of the app layout (`_Inspector`)
+=#
+
+# Width of the property list of a floating card at least [px], see `_fit_properties!`
+const _CARD_PROPERTIES_WIDTH = 240.0f0
+
+"""
+    _selection_part!(grid::GridLayout, list_pos, t::NamedTuple; list_attributes...) -> (; step_box, mode, list)
+
+Builds the part of the card of the selection that belongs to the selection, not to the declarations
+of the object, in the color tokens `t`: in the rows 1 and 2 of `grid`, the textbox of the keyboard
+step (`step_box`, see `_set_step!`) and the Move/Rotate control (`mode`, a `_Segmented`, see
+`_bind_mode!`), each below a small label; at the grid position `list_pos`, the property list of the
+selected object (`list`, see `_PropertyList` and `_show_properties!`), whose `Box` takes the
+`list_attributes`. Shared by the floating card of the selection (see `_ComponentCard`) and the
+inspector of the app layout (see `_build_inspector!`), both connected by `_connect_selection_part!`.
+"""
+function _selection_part!(grid::GridLayout, list_pos, t::NamedTuple; list_attributes...)
+    small = (; _card_style(t, Label)..., fontsize = 11, color = t.muted, halign = :left)
+    Label(grid[1, 1], "step"; small...)
+    Label(grid[1, 2], "mode"; small...)
+    step_box = _step_box!(grid[2, 1], t; placeholder = "250 nm", width = 80, halign = :left)
+    mode = _Segmented(grid[2, 2], [:move => "Move", :rotate => "Rotate"]; theme = t, tellwidth = true)
+    rowgap!(grid, 1, 2)
+    list = _PropertyList(list_pos; label_color = t.muted, value_color = t.text,
+        line_color = RGBAf(Makie.to_color(t.border)), list_attributes...)
+    return (; step_box, mode, list)
+end
+
+"""
+The disclosure row of the properties of the floating card of the selection at the grid position
+`pos`: the chevron (see `_card_collapse!`), right while the properties are collapsed, and the text
+"Properties". Returns the chevron, see `_toggle_properties!`.
+"""
+function _properties_disclosure!(pos, t::NamedTuple)
+    g = GridLayout(pos; default_colgap = 2, halign = :left)
+    b = _IconButton(g[1, 1]; icon = :expand, tooltip = "Show the properties",
+        _card_icons(t; size = 18, icon_size = 14)...)
+    Label(g[1, 2], "Properties"; _card_style(t, Label)..., color = t.muted, halign = :left)
+    return b
+end
+
+"""Shows on the chevron `b` of the properties of a floating card whether they are `shown`."""
+function _show_properties_state!(b::_IconButton, shown::Bool)
+    _update!(b.icon, _icon(shown ? :collapse : :expand))
+    _update!(b.tooltip, shown ? "Hide the properties" : "Show the properties")
+    return nothing
+end
 
 """
     _show_kind!(icon, color, t, obj)
@@ -387,7 +451,8 @@ _declared_widgets(w::CardWidget) = (w,)
 _declared_widgets(::String) = ()
 
 """Moves the parts of the card `c` away, see `_CARD_AWAY`."""
-_park_card!(c::_ComponentCard) = foreach(_park!, (c.head, c.actions, c.tools, c.rows, c.step, c.background))
+_park_card!(c::_ComponentCard) =
+    foreach(_park!, (c.head, c.actions, c.tools, c.rows, c.step, c.properties, c.background))
 
 """Removes the declared widgets of the card `c`, with their listeners and layouts."""
 function _clear_content!(c::_AbstractCard)
@@ -413,7 +478,9 @@ end
 function _lower_parts(c::_ComponentCard)
     (c.collapsed || c.auto_collapsed) && return GridLayout[]
     rows = isempty(c.rows.content) ? GridLayout[] : [c.rows]
-    return c.pinned ? rows : [rows..., c.step]
+    # the part of the selection, see `_selection_part!`, only on the card of the selection
+    c.pinned && return rows
+    return c.properties_shown ? [rows..., c.step, c.properties] : [rows..., c.step]
 end
 
 # Size of a layout or block [px], which does not depend on its position
@@ -442,6 +509,25 @@ function _card_size(c::_ComponentCard)
 end
 
 """
+    _fit_properties!(c::_ComponentCard)
+
+Sets the width of the property list of the card `c`, if it is shown, to the width of the other parts
+of the card, at least `_CARD_PROPERTIES_WIDTH`, such that the expanded list makes the card higher,
+but not wider than it needs. Only a changed width updates the layout.
+"""
+function _fit_properties!(c::_ComponentCard)
+    lower = _lower_parts(c)
+    any(p -> p === c.properties, lower) || return nothing
+    h, a, t = _card_size(c.head), _actions_size(c), _card_size(c.tools)
+    w = h[1] + _CARD_PADDING + a[1] + _CARD_PADDING + t[1]
+    for part in lower
+        part === c.properties || (w = max(w, _card_size(part)[1]))
+    end
+    _update!(c.list.box.width, max(w, _CARD_PROPERTIES_WIDTH))
+    return nothing
+end
+
+"""
     _arrange_card!(c::_ComponentCard, p::Point2f)
 
 Moves the card `c` such that its top left corner is at the figure pixel `p`, the parts that are not
@@ -458,7 +544,7 @@ function _arrange_card!(c::_ComponentCard, p::Point2f)
     _place!(c.tools, Point2f(p[1] + size[1] - _CARD_PADDING - t[1], y - (line - t[2]) / 2))
     y -= line
     lower = _lower_parts(c)
-    for part in (c.rows, c.step)
+    for part in (c.rows, c.step, c.properties)
         if any(l -> l === part, lower)
             y -= _CARD_PADDING
             _place!(part, Point2f(x, y))
@@ -607,7 +693,7 @@ head, i.e. its icon, its title and the free room around them.
 function _over_handle(c::_ComponentCard, events::Makie.Events)
     _over_card(c, events) || return false
     p = Point2f(events.mouseposition[])
-    return !any(x -> p in _part_rect(x), (c.actions, c.tools, c.rows, c.step))
+    return !any(x -> p in _part_rect(x), (c.actions, c.tools, c.rows, c.step, c.properties))
 end
 
 # Rectangle of a card with the top left corner `p` and the `size`
