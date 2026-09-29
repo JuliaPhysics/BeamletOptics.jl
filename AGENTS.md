@@ -134,7 +134,9 @@ output in `docs/build/1`, served with LiveServer) and the figure pattern (script
 
 - `GLOBAL_USE_PLACEHOLDERS` at the top of [docs/DocUtils.jl](docs/DocUtils.jl) switches
   local builds between real figures and fast placeholders. Keep it `true`; set it to `false`
-  only to regenerate figures, and set it back before committing. CI always renders.
+  only to regenerate figures, and set it back before committing. CI always renders. Such a run
+  fills `docs/figure_cache` (untracked), which later placeholder builds use instead of
+  placeholders; delete a cached figure after changing its script.
 - **GLMakie is the Makie backend.** Use it for figures, ad-hoc checks of `render!` and anything
   under `ext/`. On headless Linux, run it under `xvfb-run -a` (CI does the same).
 - **Windows link bug:** Documenter reads `[text]` followed by a parenthesized aside, e.g.

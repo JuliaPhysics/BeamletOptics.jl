@@ -166,3 +166,6 @@ Examples for this pattern can be found at the top of most .md files of the docum
 
 !!! tip
     Usage of placeholders can be disabled for each script via the `use_placeholder=false` keyword argument. It can also be deactivated globally by setting `GLOBAL_USE_PLACEHOLDERS=false` in the `DocUtils.jl` file.
+
+!!! tip "Figure cache"
+    A local build that runs a script keeps its figures in `docs/figure_cache` (not tracked by git). Later builds with placeholders use these real figures instead of placeholders, so one build with `GLOBAL_USE_PLACEHOLDERS=false` is enough to preview all figures. A cached figure shows the state of its last run: delete it (or the folder) to render it again.

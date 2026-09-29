@@ -7,6 +7,23 @@ import Documenter, DocumenterVitepress
 const GLOBAL_USE_PLACEHOLDERS = true
 
 """
+Real figures of earlier local builds, reused instead of placeholders by `conditional_include`, by
+their path relative to the build folder, e.g. `basics/beams/beam_showcase.png`. Filled by every
+local build that runs the scripts; delete a file (or the folder) to render it again. Not tracked by
+git.
+"""
+const FIGURE_CACHE = joinpath(@__DIR__, "figure_cache")
+
+"""Returns the key of the figure `save_name` in `FIGURE_CACHE`, or `nothing` outside the build folder."""
+function _cache_key(save_name::AbstractString)
+    path = abspath(save_name)
+    for root in (joinpath(@__DIR__, "build", ".documenter"), joinpath(@__DIR__, "build"))
+        startswith(path, root * Base.Filesystem.path_separator) && return relpath(path, root)
+    end
+    return nothing
+end
+
+"""
     conditional_include(fname; use_placeholder=!haskey(ENV, "CI"))
 
 This is a function to speed up compilation time when building the docs locally.
@@ -16,6 +33,11 @@ each `save` call within the script.
 
 Evaluation can be forced by setting `use_placeholder = false`. Global evaluation can be forced
 by setting `GLOBAL_USE_PLACEHOLDERS = false` in this file (does not apply for CI env.).
+
+Locally, a script that runs stores its figures in `FIGURE_CACHE`, and a placeholder is only
+created for a figure that is not cached. A build with real figures therefore makes the following
+builds with placeholders show real figures as well; a changed script shows its old figures until
+it runs again or its figures are deleted from the cache.
 """
 function conditional_include(fname::String; use_placeholder::Bool=!haskey(ENV, "CI"))
     # Check for global flag if not within CI env.
@@ -30,6 +52,14 @@ function conditional_include(fname::String; use_placeholder::Bool=!haskey(ENV, "
         for match in eachmatch(pattern, content)
             save_name = match.captures[1]
             fig_name = match.captures[2]
+            # a real figure of an earlier build instead of the placeholder
+            key = _cache_key(save_name)
+            cached = isnothing(key) ? "" : joinpath(FIGURE_CACHE, key)
+            if isfile(cached)
+                cp(cached, save_name; force = true)
+                @info "Using cached figure for $save_name"
+                continue
+            end
             offset = match.offset
             prior_content = content[1:offset]
             # find last missing fig_name variable match
@@ -63,7 +93,23 @@ function conditional_include(fname::String; use_placeholder::Bool=!haskey(ENV, "
         include(fname)
         t2 = now()
         @info " Runtime: $(t2-t1)"
+        # keep the real figures for later builds with placeholders, not in CI
+        haskey(ENV, "CI") || _cache_figures(fname)
     end
+end
+
+"""Copies the figures that the script `fname` saved into `FIGURE_CACHE`, see `conditional_include`."""
+function _cache_figures(fname::String)
+    pattern = Regex("^[ \\t]*save\\(\\s*\"([^\"]+)\"", "m")
+    for match in eachmatch(pattern, read(fname, String))
+        save_name = match.captures[1]
+        key = _cache_key(save_name)
+        (isnothing(key) || !isfile(save_name)) && continue
+        dest = joinpath(FIGURE_CACHE, key)
+        mkpath(dirname(dest))
+        cp(save_name, dest; force = true)
+    end
+    return nothing
 end
 
 function replace_build_with_src(path::String)
