@@ -15,6 +15,25 @@ _has_preview(gui::LiveView) = gui.trace.preview_enabled &&
                               any(i -> _previewable(gui.pairs[i].second, gui.beam_handles[i]), eachindex(gui.pairs))
 
 """
+    _solve_from_start!(system, beam)
+
+Solves the `beam` (a beam or a beam group) in the `system` by brute force: from its start ray, with
+`retrace = false`, since retracing the path of the last solve is not reliable in the live view.
+Each beam is reset to its untraced start state first (`empty!`): without retracing,
+`solve_system!` does not trace a beam whose last ray already ends on a surface.
+"""
+function _solve_from_start!(system, beam::BMO.AbstractBeam)
+    empty!(beam)
+    solve_system!(system, beam; retrace = false)
+    return nothing
+end
+function _solve_from_start!(system, bg::BMO.AbstractBeamGroup)
+    foreach(empty!, BMO.beams(bg))
+    solve_system!(system, bg; retrace = false)
+    return nothing
+end
+
+"""
     _solve_preview!(system, bg, k)
 
 Solves only the rendered beams `beams(bg)[1:k:end]` of the beam group `bg` and resets all other
@@ -25,7 +44,7 @@ function _solve_preview!(system, bg::BMO.AbstractBeamGroup, k::Int)
     idx = 1:k:length(bms)
     # Like `solve_system!` of a beam group
     Threads.@threads for i in idx
-        solve_system!(system, bms[i])
+        _solve_from_start!(system, bms[i])
     end
     for i in eachindex(bms)
         (i - 1) % k == 0 || empty!(bms[i])
@@ -58,7 +77,7 @@ function _compute(pairs, handles, panels, sinks; coarse = false, preview = false
             if preview && _previewable(beam, h)
                 _solve_preview!(sys, beam, _render_every(h))
             else
-                solve_system!(sys, beam)
+                _solve_from_start!(sys, beam)
             end
         end
     end

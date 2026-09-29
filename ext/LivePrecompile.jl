@@ -22,7 +22,7 @@
         for beam in (Beam([0.0, 0, 0], [0.0, 1, 0]), GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], 1e-6, 0.5e-3),
                 CollimatedSource([0.0, 0, 0], [0.0, 1, 0], 2e-3, 1e-6; num_rings = 2, num_rays = 40))
             hb = live_render!(ax, beam)
-            solve_system!(_live_precompile_system(), beam)
+            _solve_from_start!(_live_precompile_system(), beam)
             update_render!(hb)
             remove_render!(hb)
         end
