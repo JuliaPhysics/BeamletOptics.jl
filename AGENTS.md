@@ -29,9 +29,9 @@ Evaluate every API and architecture decision against this. The core principles, 
 `interact3d(system, object, beam, ray)` method (plus `intersect3d` if it needs custom
 geometry), and the rest of the API (kinematics, threading, retracing) works without further
 integration. A component may also add a `card_rows` method (and `card_actions`) to show its own rows
-on its card in the live view; the recipe for cards and controls is
-[docs/src/api/live_widgets.md](docs/src/api/live_widgets.md) (for agents:
-[skills/beamletoptics/WIDGETS.md](skills/beamletoptics/WIDGETS.md)). When adding infrastructure,
+on its card in the interactive GUI, which lives in the separate package
+[BeamletOpticsGUI](https://github.com/StackEnjoyer/BeamletOpticsGUI.jl) (recipe and developer
+instructions there). When adding infrastructure,
 prefer pushing complexity into the generic solver over asking component authors to handle it.
 
 Current exception: coincident-boundary disambiguation (plate beamsplitters, cemented
@@ -59,7 +59,13 @@ doublets) is handled per component by returning a `Hint`
 - `src/OpticalComponents/`: components, one family per folder or file.
 - `src/SDFs/`, `src/Mesh.jl`: geometry backends.
 - `src/Exports.jl`: the public API. Changing it affects the agent skill (below).
-- `ext/`: `BeamletOpticsMakieExt` and its `Render*.jl` files.
+- `ext/`: `BeamletOpticsMakieExt` and its `Render*.jl` files: `render!` and the live rendering
+  (`RenderLive.jl`, `LiveBeams.jl`) behind the render handle protocol of `src/Render.jl`.
+- The interactive GUI (`live_view`, cards, kinematic controls, view cube) is the separate package
+  [BeamletOpticsGUI](https://github.com/StackEnjoyer/BeamletOpticsGUI.jl). It uses only exported
+  names, the render handle protocol and the `public` developer API (`src/Exports.jl`,
+  [docs/src/api/developer_api.md](docs/src/api/developer_api.md)): renaming or changing any of
+  these breaks the GUI, so treat them like exported API.
 - `skills/beamletoptics/`: the user-facing agent skill.
 
 ## Running Julia
