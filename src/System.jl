@@ -1,17 +1,163 @@
+const _SystemMetadata = IdDict{Any, Dict{Symbol, Any}}
+
+function _register_metadata!(metadata::_SystemMetadata, object::AbstractObject)
+    get!(metadata, object) do
+        Dict{Symbol, Any}()
+    end
+    return nothing
+end
+
+function _register_metadata!(metadata::_SystemMetadata, group::AbstractObjectGroup)
+    get!(metadata, group) do
+        Dict{Symbol, Any}()
+    end
+    for object in objects(group)
+        _register_metadata!(metadata, object)
+    end
+    return nothing
+end
+
+function _register_metadata!(metadata::_SystemMetadata, objects)
+    for object in objects
+        _register_metadata!(metadata, object)
+    end
+    return nothing
+end
+
+function _system_entries(entries)
+    objects = AbstractObject[]
+    labels = Pair{AbstractObject, String}[]
+    labels_by_object = IdDict{Any, String}()
+    for entry in entries
+        if entry isa Pair
+            name, object = entry
+            object isa AbstractObject || throw(ArgumentError("system entries must contain AbstractObjects"))
+            name isa AbstractString || throw(ArgumentError("system labels must be AbstractStrings"))
+            name = String(name)
+            existing_name = get(labels_by_object, object, nothing)
+            if existing_name !== nothing && existing_name != name
+                throw(ArgumentError("object already has label $existing_name in this system"))
+            end
+            push!(objects, object)
+            push!(labels, object => name)
+            labels_by_object[object] = name
+        else
+            entry isa AbstractObject || throw(ArgumentError("system entries must be AbstractObjects or pairs"))
+            push!(objects, entry)
+        end
+    end
+    return objects, labels
+end
+
 """
     System <: AbstractSystem
 
 A container storing the optical elements of, i.e. a camera lens or lab setup.
 
+Metadata is stored per system and keyed by object identity. A string/object pair
+assigns a system-local label during construction, while an object entry remains
+unlabeled.
+
 # Fields
 
 - `objects`: vector containing the different objects that are part of the system (subtypes of [`AbstractObject`](@ref))
+- `meta`: system-local metadata keyed by object identity
 """
 struct System <: AbstractSystem
     objects::Vector{AbstractObject}
+    meta::IdDict{Any, Dict{Symbol, Any}}
+end
+
+function System(entries::AbstractArray)
+    objects, labels = _system_entries(entries)
+    metadata = _SystemMetadata()
+    _register_metadata!(metadata, objects)
+    system = System(objects, metadata)
+    for (object, name) in labels
+        label!(system, object, name)
+    end
+    return system
 end
 
 System(object::AbstractObject) = System([object])
+
+"""
+    meta(system, object)
+
+Return the metadata dictionary associated with `object` in `system`. Metadata is
+specific to the system and supports arbitrary `Symbol` keys. The object must be
+part of the system, including as a nested object-group member.
+"""
+function meta(system::AbstractSystem, object::AbstractObject)
+    haskey(system.meta, object) || throw(ArgumentError("object is not part of the system"))
+    return system.meta[object]
+end
+
+"""
+    label(system, object)
+
+Return the system-local name of `object`, or `nothing` if it has no name.
+"""
+label(system::AbstractSystem, object::AbstractObject) =
+    get(meta(system, object), :name, nothing)
+
+function _label_owner(system::AbstractSystem, name::String)
+    for object in objects(system)
+        if get(meta(system, object), :name, nothing) == name
+            return object
+        end
+    end
+    return nothing
+end
+
+"""
+    label!(system, object, name)
+
+Assign or replace the system-local name of `object`. Names must be unique within
+the system. Labels are stored as `String`s, so `SubString` inputs are supported.
+"""
+function label!(system::AbstractSystem, object::AbstractObject, name::AbstractString)
+    metadata = meta(system, object)
+    name = String(name)
+    owner = _label_owner(system, name)
+    if owner !== nothing && owner !== object
+        throw(ArgumentError("label $name is already assigned in this system"))
+    end
+    metadata[:name] = name
+    return system
+end
+
+function Base.getindex(system::AbstractSystem, name::AbstractString)
+    object = _label_owner(system, String(name))
+    object === nothing && throw(KeyError(name))
+    return object
+end
+
+function Base.push!(system::System, object::AbstractObject)
+    push!(system.objects, object)
+    _register_metadata!(system.meta, object)
+    return system
+end
+
+function Base.push!(system::System, entry::Pair)
+    name, object = entry
+    object isa AbstractObject || throw(ArgumentError("system entries must contain AbstractObjects"))
+    name isa AbstractString || throw(ArgumentError("system labels must be AbstractStrings"))
+    name = String(name)
+    if haskey(system.meta, object)
+        existing_name = get(meta(system, object), :name, nothing)
+        if existing_name !== nothing && existing_name != name
+            throw(ArgumentError("object already has label $existing_name in this system"))
+        end
+        label!(system, object, name)
+        return system
+    end
+    owner = _label_owner(system, name)
+    owner === nothing || throw(ArgumentError("label $name is already assigned in this system"))
+    push!(system, object)
+    label!(system, object, name)
+    return system
+end
 
 """
     objects(system::System)
@@ -37,11 +183,25 @@ can be added or removed after construction but it allows for more performant ray
 """
 struct StaticSystem{T <: Tuple} <: AbstractSystem
     objects::T
+    meta::IdDict{Any, Dict{Symbol, Any}}
 end
-StaticSystem(object::AbstractObject) = StaticSystem((object))
+
+function StaticSystem(entries::AbstractArray)
+    objects, labels = _system_entries(entries)
+    metadata = _SystemMetadata()
+    _register_metadata!(metadata, objects)
+    system = StaticSystem(tuple(collect(Leaves(objects))...), metadata)
+    for (object, name) in labels
+        label!(system, object, name)
+    end
+    return system
+end
+
+StaticSystem(object::AbstractObject) = StaticSystem([object])
 StaticSystem(object::AbstractObjectGroup) = StaticSystem([object])
-function StaticSystem(objects::AbstractArray{<:AbstractObject})
-    StaticSystem(tuple(collect(Leaves(objects))...))
+
+function StaticSystem(entries::T) where {T <: Tuple}
+    StaticSystem(collect(entries))
 end
 
 objects(system::StaticSystem) = system.objects

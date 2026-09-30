@@ -11,7 +11,7 @@ export CollimatedGaussianBeamletSource, GaussianBeamletDecomposition,
        SphericalGaussianBeamletSource, EllipticalGaussianBeamletSource, WavefrontBeamletDecomposition, AstigmaticBeamGroup
 
 # system
-export System, StaticSystem, solve_system!
+export System, StaticSystem, solve_system!, meta, label, label!
 
 # object group
 export ObjectGroup

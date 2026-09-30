@@ -24,6 +24,53 @@ const BMO = BeamletOptics
             beam)
     end
 
+    @testset "System metadata and labels" begin
+        mutable struct MetadataObject{T} <: BMO.AbstractObject{T}
+            id::Int
+        end
+        object1 = MetadataObject{Float64}(1)
+        object2 = MetadataObject{Float64}(2)
+        object3 = MetadataObject{Float64}(3)
+
+        system = System(["M1" => object1, "BS" => object2, object3])
+        @test_throws ArgumentError System(["M1" => object1, "M1" => object2])
+        @test_throws ArgumentError System(["M1" => object1, "M2" => object1])
+        BMO.meta(system, object1)[:description] = "front mirror"
+        @test BMO.meta(system, object1)[:description] == "front mirror"
+        @test BMO.label(system, object1) == "M1"
+        @test BMO.label(system, object3) === nothing
+        @test system["BS"] === object2
+
+        BMO.label!(system, object1, "M2")
+        @test BMO.label(system, object1) == "M2"
+        BMO.label!(system, object1, "M2")
+        @test BMO.label(system, object1) == "M2"
+        @test_throws ArgumentError BMO.label!(system, object2, "M2")
+        @test_throws ArgumentError BMO.label(system, MetadataObject{Float64}(4))
+
+        source = "Lens 1"
+        BMO.label!(system, object3, SubString(source, 1, 6))
+        @test BMO.label(system, object3) == "Lens 1"
+        push!(system, "L2" => MetadataObject{Float64}(5))
+        @test system["L2"] isa MetadataObject
+        @test_throws ArgumentError push!(system, "L2" => MetadataObject{Float64}(6))
+
+        static = StaticSystem(["S1" => object1, object2])
+        BMO.meta(static, object1)[:foo] = 42
+        @test BMO.meta(static, object1)[:foo] == 42
+        @test BMO.label(static, object1) == "S1"
+        BMO.label!(static, object2, "S2")
+        @test static["S2"] === object2
+        copied_static = deepcopy(static)
+        @test BMO.meta(copied_static, copied_static["S1"]) !== BMO.meta(static, object1)
+
+        copied = deepcopy(system)
+        copied_object = copied["M2"]
+        @test BMO.meta(copied, copied_object) !== BMO.meta(system, object1)
+        BMO.label!(copied, copied_object, "copy")
+        @test BMO.label(system, object1) == "M2"
+    end
+
     # Setup circular multipass cell with flat mirrors
     n_mirrors = 101
     radius = 1

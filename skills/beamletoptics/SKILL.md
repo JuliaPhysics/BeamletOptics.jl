@@ -58,6 +58,19 @@ When this Skill is active:
 - `solve_system!(system, beam_or_source)`.
 - For parameter scans, mutate the scene in a loop, `empty!` detectors, and re-solve (retracing is automatic).
 
+System metadata and labels are setup-specific, not fields on optical objects:
+
+```julia
+system = System(["M1" => mirror, "L1" => lens, detector])
+label(system, lens)                 # "L1"
+label!(system, lens, "front lens")  # rename
+system["front lens"]                # lens
+meta(system, lens)[:description] = "front element"
+```
+
+Labels must be unique within a system. Objects without a pair remain unlabeled,
+and the object must belong to the system before its metadata or label is accessed.
+
 5) Evaluate
 - Rays: `rays(beam)`, `position`, `direction`, `length(beam)`, `beam.children` (splitters: transmitted first).
 - Detector: `spot_diagram`, `intensity`, `electric_field`, `optical_power` (`components/detectors.md`).
