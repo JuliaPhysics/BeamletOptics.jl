@@ -393,3 +393,136 @@ function WavefrontBeamletDecomposition(
     e1_o = isnothing(basis) ? e1_v : sampling_basis(dir_n, basis[1], T)
     return AstigmaticBeamGroup(beams, zeros(T, 3), _group_orientation(dir_n, e1_o, T))
 end
+
+"""
+    GaussianModeDecomposition(x, y, Eu, Ev, dir, λ; basis = nothing, origin = zeros(3))
+
+Fits a single [`AstigmaticGaussianBeamlet`](@ref) to a transverse complex vector field,
+given by its components `Eu`, `Ev` along the sampling axes `e1`, `e2` of a plane normal to
+`dir`. This is the lowest-order Gaussian mode decomposition: the counterpart of
+[`WavefrontBeamletDecomposition`](@ref) for fields that are close to one Gaussian mode and
+too small to be tiled into many beamlets, e.g. the output of a single-mode fiber
+(beamlets must be much larger than λ).
+
+# Arguments
+
+- `x`, `y`: 1D sample coordinates along `e1`, `e2` in \\[m\\], relative to `origin`.
+- `Eu`, `Ev`: `length(x) × length(y)` complex field components along `e1`, `e2` in
+  \\[V/m\\] (peak amplitude), with the full spatial phase and travelling along `dir`.
+- `dir`: propagation direction, the normal of the sampling plane.
+- `λ`: vacuum wavelength in \\[m\\]. The plane must lie in vacuum or air (`n = 1`), where
+  BMO starts beams.
+- `basis`: optional tuple `(ex, ey)` of the sampling axes `e1`, `e2`, as in
+  [`WavefrontBeamletDecomposition`](@ref). Default: `e1 = normal3d(dir)`, `e2 = dir × e1`.
+- `origin`: global position of the sample `x = y = 0` in \\[m\\].
+
+# Fit
+
+1. Polarization: the dominant eigenvector of the coherence matrix `Σ E Eᴴ`; the field
+   is projected onto it.
+2. Position and waist: centroid and principal axes of the second intensity moments;
+   the beam radius along a principal axis is twice the rms width.
+3. Direction: the mean transverse wave vector `Im⟨ψ* ∇ψ⟩`.
+4. Curvature: the quadratic phase from the moments `Im⟨ψ* rᵢ ∂ⱼψ⟩`, taken along the
+   principal axes of the intensity. Twist between curvature and intensity axes
+   (general astigmatism) is not represented.
+5. Amplitude and phase: the projection of the field onto the fitted mode.
+
+The beamlet starts at the centroid on the plane, with waist radii and waist positions
+along its principal axes that reproduce the fitted radii and curvatures there. The
+widths are measured in the plane, so the tilt of the fitted direction against `dir` must
+be small.
+
+The beamlet carries only the projected part of the field: `optical_power(beamlet)`
+divided by the power of the input is the fraction of the power in the fitted Gaussian
+mode, i.e. the quality of the approximation.
+"""
+function GaussianModeDecomposition(
+        x::AbstractVector{<:Real},
+        y::AbstractVector{<:Real},
+        Eu::AbstractMatrix{<:Number},
+        Ev::AbstractMatrix{<:Number},
+        dir::AbstractVector{<:Real},
+        λ::Real;
+        basis::Union{Nothing, Tuple{AbstractVector, AbstractVector}} = nothing,
+        origin::AbstractVector{<:Real} = zeros(3)
+)
+    nx, ny = length(x), length(y)
+    size(Eu) == size(Ev) == (nx, ny) ||
+        throw(DimensionMismatch("Eu and Ev arrays must match the dimensions of x and y."))
+    nx > 2 && ny > 2 || throw(ArgumentError("the field needs at least 3 × 3 samples"))
+
+    dir_n = normalize(dir)
+    e1 = isnothing(basis) ? normal3d(dir_n) : normalize(basis[1])
+    e2 = isnothing(basis) ? normalize(cross(dir_n, e1)) : normalize(basis[2])
+    dx, dy = x[2] - x[1], y[2] - y[1]
+    k = 2π / λ
+
+    # 1. dominant polarization (Jones vector in e1, e2) and the projected scalar field
+    # Σ E Eᴴ: element (1, 2) is Σ Eu conj(Ev) = dot(Ev, Eu), since `dot` conjugates its
+    # first argument
+    Jm = [sum(abs2, Eu) dot(Ev, Eu); dot(Eu, Ev) sum(abs2, Ev)]
+    p = eigen(Hermitian(Jm)).vectors[:, 2]
+    ψ = conj(p[1]) .* Eu .+ conj(p[2]) .* Ev
+
+    # 2. centroid and second moments of the intensity
+    I_ = abs2.(ψ)
+    P = sum(I_)
+    P > 0 || throw(ArgumentError("cannot fit a Gaussian mode to a zero field"))
+    xc = sum(I_ .* x) / P
+    yc = sum(I_ .* y') / P
+    X = x .- xc
+    Y = y' .- yc
+    M = [sum(I_ .* X .^ 2) sum(I_ .* X .* Y); sum(I_ .* X .* Y) sum(I_ .* Y .^ 2)] ./ P
+
+    # 3. mean transverse wave vector
+    ∂x, ∂y = _central_gradient(ψ, dx, dy)
+    kx = sum(imag.(conj.(ψ) .* ∂x)) / P
+    ky = sum(imag.(conj.(ψ) .* ∂y)) / P
+    kx^2 + ky^2 < k^2 || throw(ArgumentError("the mean phase gradient exceeds the wavenumber"))
+
+    # 4. quadratic phase (k/2) rᵀ C r of the untilted field: ⟨rᵢ ∂ⱼφ⟩ = k (M C)ᵢⱼ
+    ψt = ψ .* cis.(-(kx .* X .+ ky .* Y))
+    ∂x, ∂y = _central_gradient(ψt, dx, dy)
+    phase_moment(D) = sum(imag.(conj.(ψt) .* D)) / P
+    G = [phase_moment(X .* ∂x) phase_moment(X .* ∂y)
+         phase_moment(Y .* ∂x) phase_moment(Y .* ∂y)]
+    C = M \ G ./ k
+    C = (C + C') ./ 2
+
+    # principal axes of the intensity; beam radius w = 2 σ, curvature 1/R along each axis
+    σ2, A = eigen(Symmetric(M))
+    ws = 2 .* sqrt.(σ2)
+    curv = [A[:, i]' * C * A[:, i] for i in 1:2]
+    # complex beam parameter 1/q = 1/R − i λ/(π w²): the plane lies Re(q) behind the waist
+    qs = [1 / complex(curv[i], -λ / (π * ws[i]^2)) for i in 1:2]
+    w0s = [sqrt(λ * imag(q) / π) for q in qs]
+    z0s = [-real(q) for q in qs]
+
+    # 5. projection onto the fitted mode (unit amplitude and zero phase at the centroid)
+    ξ1 = A[1, 1] .* X .+ A[2, 1] .* Y
+    ξ2 = A[1, 2] .* X .+ A[2, 2] .* Y
+    g = exp.(-ξ1 .^ 2 ./ ws[1]^2 .- ξ2 .^ 2 ./ ws[2]^2) .*
+        cis.(k .* (curv[1] .* ξ1 .^ 2 .+ curv[2] .* ξ2 .^ 2) ./ 2 .+ kx .* X .+ ky .* Y)
+    a = dot(g, ψ) / sum(abs2, g)
+
+    d = normalize(kx / k * e1 + ky / k * e2 + sqrt(1 - (kx^2 + ky^2) / k^2) * dir_n)
+    s = A[1, 1] * e1 + A[2, 1] * e2
+    support = normalize(s - dot(s, d) * d)
+    position = origin + xc * e1 + yc * e2
+    E0 = a .* (p[1] .* e1 .+ p[2] .* e2)
+    return AstigmaticGaussianBeamlet(position, d, λ, w0s[1], w0s[2];
+        E0, support, z0_x = z0s[1], z0_y = z0s[2])
+end
+
+# Central differences of a sampled field along both grid axes, one-sided at the edges.
+function _central_gradient(ψ::AbstractMatrix, dx, dy)
+    ∂x = similar(ψ)
+    ∂y = similar(ψ)
+    nx, ny = size(ψ)
+    for j in 1:ny, i in 1:nx
+        ∂x[i, j] = (ψ[min(i + 1, nx), j] - ψ[max(i - 1, 1), j]) / ((min(i + 1, nx) - max(i - 1, 1)) * dx)
+        ∂y[i, j] = (ψ[i, min(j + 1, ny)] - ψ[i, max(j - 1, 1)]) / ((min(j + 1, ny) - max(j - 1, 1)) * dy)
+    end
+    return ∂x, ∂y
+end

@@ -18,7 +18,8 @@ using BeamletOptics
 import BeamletOptics: Detector, GaussianBeamletHit, AstigmaticGaussianBeamletHit,
                        position, direction, orientation, wavelength, refractive_index,
                        beamlet_hit_field, beamlet_hit_polarization,
-                       WavefrontBeamletDecomposition, translate_to3d!, _with_progress,
+                       WavefrontBeamletDecomposition, GaussianModeDecomposition,
+                       translate_to3d!, _with_progress,
                        _tick!
 const BMO = BeamletOptics
 
@@ -235,6 +236,35 @@ function BeamletOptics.WavefrontBeamletDecomposition(f::OpticsBase.PlaneField; k
     group = WavefrontBeamletDecomposition(x, y, Eu, Ev, n, f.λ; basis = (u, v), kwargs...)
     translate_to3d!(group, SVector{3}(f.origin))
     return group
+end
+
+# -----------------------------------------------------------------------------------------
+# OpticsBase.PlaneField -> BeamletOptics.GaussianModeDecomposition
+
+"""
+    BeamletOptics.GaussianModeDecomposition(f::OpticsBase.PlaneField)
+
+Fits a single `AstigmaticGaussianBeamlet` to the forward-travelling part of a
+[`PlaneField`](@ref OpticsBase.PlaneField), e.g. the output of a single-mode fiber. The
+beamlet starts on `f`'s plane at the centroid of the field; see
+[`GaussianModeDecomposition`](@ref BeamletOptics.GaussianModeDecomposition) for the fit.
+Use it for fields close to one Gaussian mode that are too small for
+[`WavefrontBeamletDecomposition`](@ref BeamletOptics.WavefrontBeamletDecomposition)
+(which needs beamlets much larger than λ).
+
+`optical_power(beamlet) / OpticsBase.power(f)` is the fraction of the power captured by
+the Gaussian mode. The field used is `forward(f).E .* reference_phase(f)`. `f` must lie in
+vacuum or air (`f.n == 1`), where BMO starts beams; an `ArgumentError` is thrown
+otherwise.
+"""
+function BeamletOptics.GaussianModeDecomposition(f::OpticsBase.PlaneField)
+    f.n == 1 || throw(ArgumentError(
+        "$_PREFIX: the PlaneField must lie in vacuum or air (n = 1), got n = $(f.n)"))
+    E = forward(f).E .* reference_phase(f)
+    u, v, n = (SVector{3}(f.axes[:, i]) for i in 1:3)
+    return GaussianModeDecomposition(collect(OpticsBase.coordinates(f, 1)),
+        collect(OpticsBase.coordinates(f, 2)), E[:, :, 1], E[:, :, 2], n, f.λ;
+        basis = (u, v), origin = SVector{3}(f.origin))
 end
 
 end # module

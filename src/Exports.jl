@@ -8,7 +8,8 @@ export Ray, PolarizedRay, Beam, PointSource, CollimatedSource, UniformDiscSource
        GaussianBeamlet, AstigmaticGaussianBeamlet, rayleigh_range, rays, point_on_beam,
        normal3d
 export CollimatedGaussianBeamletSource, GaussianBeamletDecomposition,
-       SphericalGaussianBeamletSource, EllipticalGaussianBeamletSource, WavefrontBeamletDecomposition, AstigmaticBeamGroup
+       SphericalGaussianBeamletSource, EllipticalGaussianBeamletSource, WavefrontBeamletDecomposition,
+       GaussianModeDecomposition, AstigmaticBeamGroup
 
 # system
 export System, StaticSystem, solve_system!

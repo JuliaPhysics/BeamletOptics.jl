@@ -34,7 +34,7 @@ Use `scripts/api_lookup.jl NAME` to print the docstring and signatures of any na
 |---------------|-------|
 | Kinematics    | `translate3d!`, `translate_to3d!`, `rotate3d!`, `xrotate3d!`, `yrotate3d!`, `zrotate3d!`, `align3d!`, `reset_translation3d!`, `reset_rotation3d!`, `set_pivot3d!`, `position`, `direction`, `orientation` |
 | Rays & beams  | `Ray`, `PolarizedRay`, `Beam`, `GaussianBeamlet`, `AstigmaticGaussianBeamlet`, `rays`, `point_on_beam`, `rayleigh_range`, `normal3d` |
-| Sources       | `CollimatedSource`, `UniformDiscSource`, `PointSource`, `UniformPointSource`, `set_num_rays!`, `CollimatedGaussianBeamletSource`, `SphericalGaussianBeamletSource`, `EllipticalGaussianBeamletSource`, `GaussianBeamletDecomposition`, `WavefrontBeamletDecomposition`, `AstigmaticBeamGroup` |
+| Sources       | `CollimatedSource`, `UniformDiscSource`, `PointSource`, `UniformPointSource`, `set_num_rays!`, `CollimatedGaussianBeamletSource`, `SphericalGaussianBeamletSource`, `EllipticalGaussianBeamletSource`, `GaussianBeamletDecomposition`, `WavefrontBeamletDecomposition`, `GaussianModeDecomposition`, `AstigmaticBeamGroup` |
 | System        | `System`, `StaticSystem`, `solve_system!`, `ObjectGroup` |
 | Inspection    | `properties`, `default_properties` |
 | Materials     | `DiscreteRefractiveIndex`, `SellmeierEquation` |
@@ -134,12 +134,17 @@ They also take `progress = true` (see Solving). See `components/detectors.md`.
 f = PlaneField(det; size = (256, 256), spacing = (1e-6, 1e-6))  # after solve_system!
 power(f)                                                        # W, Poynting flux
 group = WavefrontBeamletDecomposition(f)                        # beamlets on f's plane
+beamlet = GaussianModeDecomposition(f)                          # one fitted Gaussian beamlet
+optical_power(beamlet) / power(f)                               # power fraction it captures
 ```
 
 `PlaneField(det)` is the physical field: unlike `electric_field(det)` it has no `√cos θ`
 projection factor, so for an oblique beam `power(f)` is the full beam power. Beamlet hits
 only (not rays). `WavefrontBeamletDecomposition(x, y, Eu, Ev, dir, λ)` is the vector-field
 form that takes two field components instead of amplitude, phase and one `E0`.
+`WavefrontBeamletDecomposition` needs beamlets much larger than λ (one per sample, waist 1.2
+samples); for small fields close to one Gaussian mode, e.g. single-mode fiber output, use
+`GaussianModeDecomposition` (plane in air, small tilt, no general astigmatism).
 
 ## Makie rendering
 

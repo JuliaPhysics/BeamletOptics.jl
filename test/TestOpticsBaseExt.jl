@@ -184,4 +184,59 @@ end
     @test_throws ArgumentError BMO.WavefrontBeamletDecomposition(f; basis = ([1.0,0,0],[0.0,0,1.0]))
 end
 
+@testset "GaussianModeDecomposition(::PlaneField): analytic astigmatic mode" begin
+    # Plane at the origin with the default detector frame (n = +y); detector one
+    # wavelength behind it, so the propagation phase is 2π and diffraction negligible.
+    det = detector_at(λ)
+    axes = Base.get_extension(BMO, :BeamletOpticsOpticsBaseExt)._default_plane_axes(det)
+    N, Δ = 128, 3e-6
+    k = 2π / λ
+    w1, w2, R1, R2 = 40e-6, 60e-6, 0.1, -0.2        # radii and curvatures along ξ1, ξ2
+    θ = deg2rad(30)                                  # principal axes rotated against (u, v)
+    uc, vc, tilt = 30e-6, -20e-6, 2e-3               # centroid and tilt along u
+    jones = normalize([1.0, 0.5im])
+    amp = 100 * cis(0.7)
+    cs = ((0:(N - 1)) .- N ÷ 2) .* Δ
+    ψ = [begin
+             X, Y = x - uc, y - vc
+             ξ1, ξ2 = cos(θ) * X + sin(θ) * Y, -sin(θ) * X + cos(θ) * Y
+             amp * exp(-ξ1^2 / w1^2 - ξ2^2 / w2^2) *
+             cis(k * (ξ1^2 / R1 + ξ2^2 / R2) / 2 + k * tilt * X)
+         end
+         for x in cs, y in cs]
+    E = cat(jones[1] .* ψ, jones[2] .* ψ; dims = 3)
+    f = OpticsBase.PlaneField(E, (Δ, Δ), zeros(3), axes, λ)
+
+    beamlet = BMO.GaussianModeDecomposition(f)
+    @test BMO.optical_power(beamlet) / power(f) ≈ 1 rtol = 1e-3
+
+    g = PlaneField(trace!(det, beamlet); size = (N, N), spacing = (Δ, Δ), progress = false)
+    c = dot(f.E, g.E) / (norm(f.E) * norm(g.E))
+    @test abs(c) > 0.9999
+    @test abs(angle(c)) < 1e-3
+    @test power(g) ≈ power(f) rtol = 1e-3
+end
+
+@testset "GaussianModeDecomposition(::PlaneField): propagates like the original beam" begin
+    # A beamlet far from its waist (curved wavefront) is sampled, fitted and traced on;
+    # the result must match the original beamlet traced directly to the same plane.
+    z1, z2 = 0.5, 0.8
+    sample(det) = PlaneField(det; size = (96, 96), spacing = (w0 / 12, w0 / 12),
+        progress = false)
+    f = sample(trace!(detector_at(z1), agb_at()))
+    beamlet = BMO.GaussianModeDecomposition(f)
+    @test BMO.optical_power(beamlet) / power(f) ≈ 1 rtol = 1e-4
+
+    fit = sample(trace!(detector_at(z2), beamlet))
+    ref = sample(trace!(detector_at(z2), agb_at()))
+    c = dot(ref.E, fit.E) / (norm(ref.E) * norm(fit.E))
+    @test abs(c) > 0.9999
+    @test abs(angle(c)) < 1e-3
+    @test power(fit) ≈ power(ref) rtol = 1e-4
+
+    # only planes in air: BMO starts beams in vacuum
+    fn = OpticsBase.PlaneField(f.E, f.H, f.spacing, f.origin, f.axes, f.λ; n = 1.5)
+    @test_throws ArgumentError BMO.GaussianModeDecomposition(fn)
+end
+
 end # module

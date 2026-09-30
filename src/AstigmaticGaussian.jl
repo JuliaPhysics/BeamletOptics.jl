@@ -183,23 +183,27 @@ function AstigmaticGaussianBeamlet(
     # Divergence angles
     θx = divergence_angle(λ, w0_x, M2_x)
     θy = divergence_angle(λ, w0_y, M2_y)
-    # Waist rays
-    wxp = Ray(position + s1 * w0_x + z0_x * direction, direction, λ)
-    wxm = Ray(position - s1 * w0_x + z0_x * direction, direction, λ)
-    wyp = Ray(position + s2 * w0_y + z0_y * direction, direction, λ)
-    wym = Ray(position - s2 * w0_y + z0_y * direction, direction, λ)
-    # Divergence rays
+    # All nine rays start in the plane of the chief ray start, `position + z0 * direction`,
+    # so that none of them starts behind an object the beamlet should hit (e.g. when a
+    # waist lies downstream of the start, as for a converging beam).
+    start = position + z0 * direction
+    # Waist rays: parallel to the axis at the waist radius, the same lines wherever they
+    # start
+    wxp = Ray(start + s1 * w0_x, direction, λ)
+    wxm = Ray(start - s1 * w0_x, direction, λ)
+    wyp = Ray(start + s2 * w0_y, direction, λ)
+    wym = Ray(start - s2 * w0_y, direction, λ)
+    # Divergence rays through the waist centers at z0_x and z0_y
     div_dir_xp = normalize(direction + s1 * tan(θx))
     div_dir_xm = normalize(direction - s1 * tan(θx))
     div_dir_yp = normalize(direction + s2 * tan(θy))
     div_dir_ym = normalize(direction - s2 * tan(θy))
-    # Corrected divergence ray positions to ensure waist is at z0_x and z0_y
-    dxp = Ray(position - z0_x * s1 * tan(θx), div_dir_xp, λ)
-    dxm = Ray(position + z0_x * s1 * tan(θx), div_dir_xm, λ)
-    dyp = Ray(position - z0_y * s2 * tan(θy), div_dir_yp, λ)
-    dym = Ray(position + z0_y * s2 * tan(θy), div_dir_ym, λ)
+    dxp = Ray(start + (z0 - z0_x) * s1 * tan(θx), div_dir_xp, λ)
+    dxm = Ray(start - (z0 - z0_x) * s1 * tan(θx), div_dir_xm, λ)
+    dyp = Ray(start + (z0 - z0_y) * s2 * tan(θy), div_dir_yp, λ)
+    dym = Ray(start - (z0 - z0_y) * s2 * tan(θy), div_dir_ym, λ)
     # Chief ray
-    c = PolarizedRay(position + z0 * direction, direction, λ, E0)
+    c = PolarizedRay(start, direction, λ, E0)
     return AstigmaticGaussianBeamlet(
         Beam(c),
         Beam(wxp),

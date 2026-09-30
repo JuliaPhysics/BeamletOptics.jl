@@ -67,6 +67,7 @@ UniformPointSource
 For complex sources, the package provides the [`AstigmaticBeamGroup`](@ref) container. Several constructors are available for different scenarios:
 
 - [`GaussianBeamletDecomposition`](@ref): Tiling a large Gaussian beam into many small stable beamlets.
+- [`GaussianModeDecomposition`](@ref): Fitting a single astigmatic Gaussian beamlet to a field close to one Gaussian mode, e.g. the output of a single-mode fiber, which is too small to be tiled into beamlets.
 - [`WavefrontBeamletDecomposition`](@ref): Importing an arbitrary complex scalar field (e.g. from a phase screen or camera data), or a vector field with an independent, spatially varying polarization (e.g. `OpticsBase`'s `PlaneField`, see below).
 - [`CollimatedGaussianBeamletSource`](@ref): A square grid of parallel beamlets (ideal for aperture diffraction).
 - [`SphericalGaussianBeamletSource`](@ref): A point-like source emitting a cone of beamlets (ideal for focused/divergent beams).
