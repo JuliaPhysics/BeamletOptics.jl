@@ -125,6 +125,22 @@ Grid keywords for `electric_field`/`intensity`/`optical_power`: `n`, `crop_facto
 `z_min`, `z_max`, `x0_shift`, `z0_shift`, `center = Centroid() | MinMax()`, and for beamlets `num_spots`.
 They also take `progress = true` (see Solving). See `components/detectors.md`.
 
+## Coupling to other solvers (OpticsBase)
+
+`using OpticsBase` activates the extension. Fields go to and come from other solvers
+(e.g. BeamletFibers) as `OpticsBase.PlaneField` (tangential E and H on a plane):
+
+```julia
+f = PlaneField(det; size = (256, 256), spacing = (1e-6, 1e-6))  # after solve_system!
+power(f)                                                        # W, Poynting flux
+group = WavefrontBeamletDecomposition(f)                        # beamlets on f's plane
+```
+
+`PlaneField(det)` is the physical field: unlike `electric_field(det)` it has no `√cos θ`
+projection factor, so for an oblique beam `power(f)` is the full beam power. Beamlet hits
+only (not rays). `WavefrontBeamletDecomposition(x, y, Eu, Ev, dir, λ)` is the vector-field
+form that takes two field components instead of amplitude, phase and one `E0`.
+
 ## Makie rendering
 
 `using GLMakie` before or after `using BeamletOptics` activates the extension.

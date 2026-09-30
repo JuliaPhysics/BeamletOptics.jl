@@ -92,6 +92,47 @@ function GaussianBeamletDecomposition(
     return AstigmaticBeamGroup(beams, pos, _group_orientation(dir_n, e1_o, T))
 end
 
+@inline _wrap_phase(Δ::Real) = mod2pi(Δ + π) - π
+
+"""
+    _eikonal_direction(phase, i, j, nx, ny, dx, dy, k, e1, e2, dir_n)
+
+Local propagation direction at grid index `(i, j)` of a 2D `phase` map, from the Eikonal
+equation `∇φ = k sin θ`: the phase gradient (central differences, one-sided at the grid
+edges) gives the transverse direction cosines `sin θx`, `sin θy` along `e1`, `e2`. Returns
+`nothing` if the gradient is too steep to represent a real propagation direction
+(`sin²θx + sin²θy > 1`) or is `NaN`. Shared by both [`WavefrontBeamletDecomposition`](@ref)
+methods (scalar and vector) so the two stay numerically identical.
+"""
+function _eikonal_direction(phase::AbstractMatrix, i, j, nx, ny, dx, dy, k, e1, e2, dir_n)
+    ph = phase[i, j]
+    if i > 1 && i < nx
+        dφ_dx = (_wrap_phase(phase[i + 1, j] - ph) +
+                 _wrap_phase(ph - phase[i - 1, j])) / (2dx)
+    elseif i == 1
+        dφ_dx = _wrap_phase(phase[i + 1, j] - ph) / dx
+    else
+        dφ_dx = _wrap_phase(ph - phase[i - 1, j]) / dx
+    end
+
+    if j > 1 && j < ny
+        dφ_dy = (_wrap_phase(phase[i, j + 1] - ph) +
+                 _wrap_phase(ph - phase[i, j - 1])) / (2dy)
+    elseif j == 1
+        dφ_dy = _wrap_phase(phase[i, j + 1] - ph) / dy
+    else
+        dφ_dy = _wrap_phase(ph - phase[i, j - 1]) / dy
+    end
+
+    sin_θx = dφ_dx / k
+    sin_θy = dφ_dy / k
+    if isnan(sin_θx) || isnan(sin_θy) || (sin_θx^2 + sin_θy^2 > 1.0)
+        return nothing
+    end
+    cos_θz = sqrt(1.0 - sin_θx^2 - sin_θy^2)
+    return normalize(sin_θx * e1 + sin_θy * e2 + cos_θz * dir_n)
+end
+
 """
     WavefrontBeamletDecomposition(x, y, amplitude, phase, dir, λ; threshold=1e-4)
 
@@ -170,43 +211,13 @@ function WavefrontBeamletDecomposition(
                 continue
             end
 
-            # Compute local phase gradients using central differences
-            # Use mod2pi wrap to avoid slow angle(exp(im*x))
-            _wrap = Δ -> mod2pi(Δ + π) - π
-            
-            if i > 1 && i < nx
-                dφ_dx = (_wrap(phase[i + 1, j] - ph) +
-                         _wrap(ph - phase[i - 1, j])) / (2dx)
-            elseif i == 1
-                dφ_dx = _wrap(phase[i + 1, j] - ph) / dx
-            else
-                dφ_dx = _wrap(ph - phase[i - 1, j]) / dx
-            end
-
-            if j > 1 && j < ny
-                dφ_dy = (_wrap(phase[i, j + 1] - ph) +
-                         _wrap(ph - phase[i, j - 1])) / (2dy)
-            elseif j == 1
-                dφ_dy = _wrap(phase[i, j + 1] - ph) / dy
-            else
-                dφ_dy = _wrap(ph - phase[i, j - 1]) / dy
-            end
-
-            # Convert phase gradient to angular deviation (Eikonal equation: ∇φ = k * sin(θ))
-            sin_θx = dφ_dx / k
-            sin_θy = dφ_dy / k
-
-            # Ensure valid angles and handle NaNs
-            if isnan(sin_θx) || isnan(sin_θy) || (sin_θx^2 + sin_θy^2 > 1.0)
+            # Local propagation direction from the Eikonal equation (shared helper, see
+            # `_eikonal_direction`)
+            local_dir = _eikonal_direction(phase, i, j, nx, ny, dx, dy, k, e1_v, e2_v, dir_n)
+            if isnothing(local_dir)
                 @warn lazy"Phase gradient too steep or NaN at ($i, $j); skipping."
                 continue
             end
-
-            cos_θz = sqrt(1.0 - sin_θx^2 - sin_θy^2)
-
-            # Construct the local direction vector
-            local_dir = sin_θx * e1_v + sin_θy * e2_v + cos_θz * dir_n
-            local_dir = normalize(local_dir)
 
             # Position
             pos = x[i] * e1_v + y[j] * e2_v
@@ -215,9 +226,12 @@ function WavefrontBeamletDecomposition(
             # The E0 vector MUST be orthogonal to local_dir.
             # We project the macroscopic polarization (E0 or e1_v) onto the plane orthogonal to local_dir:
             base_pol = isnothing(E0) ? e1_v : E0
-            pol_axis = base_pol .- dot(base_pol, local_dir) .* local_dir
+            # `local_dir` is real, so the (possibly complex) parallel coefficient is the
+            # bilinear `dot(local_dir, base_pol)`, not `dot(base_pol, local_dir)` (its
+            # conjugate for complex base_pol): `dot` conjugates its first argument.
+            pol_axis = base_pol .- dot(local_dir, base_pol) .* local_dir
             if norm(pol_axis) < 1e-6
-                pol_axis = e2_v .- dot(e2_v, local_dir) .* local_dir
+                pol_axis = e2_v .- dot(local_dir, e2_v) .* local_dir
             end
 
             # Normalization factor for power conservation:
@@ -250,6 +264,132 @@ function WavefrontBeamletDecomposition(
     end
 
     # grid coordinates `x`, `y` are given relative to the global origin
+    e1_o = isnothing(basis) ? e1_v : sampling_basis(dir_n, basis[1], T)
+    return AstigmaticBeamGroup(beams, zeros(T, 3), _group_orientation(dir_n, e1_o, T))
+end
+
+"""
+    WavefrontBeamletDecomposition(x, y, Eu, Ev, dir, λ; threshold=1e-4)
+
+Vector-field counterpart of [`WavefrontBeamletDecomposition`](@ref)`(x, y, amplitude,
+phase, dir, λ)`: decomposes a transverse complex vector field, given as its two
+components `Eu`, `Ev` along the sampling axes `e1`, `e2` (`basis`, default `e1 =
+normal3d(dir)`, `e2 = dir × e1`), into a collection of `AstigmaticGaussianBeamlet`s.
+
+Unlike the scalar method (one amplitude/phase pair plus a single macroscopic
+polarization `E0`), this method carries an independent complex amplitude per polarization
+component and grid point, i.e. an arbitrary, spatially varying polarization state
+(including elliptical and depolarizing-looking patterns coming from separate `Eu`, `Ev`
+measurements). This is the minimal generic addition needed for
+`BeamletOptics.WavefrontBeamletDecomposition(::OpticsBase.PlaneField)`
+(`ext/BeamletOpticsOpticsBaseExt.jl`), which hands in the plane's tangential `E` field
+directly; it is not extension-specific and works standalone.
+
+# Arguments
+
+- `x`, `y`: 1D spatial coordinates of the field grid, along `e1`, `e2`, in \\[m\\].
+- `Eu`, `Ev`: `length(x) × length(y)` complex matrices, the field components along `e1`,
+  `e2` in \\[V/m\\] (peak amplitude). Both must have the full spatial phase.
+- `dir`: macroscopic reference propagation direction (e.g. `[0, 1, 0]`).
+- `λ`: wavelength in \\[m\\].
+- `threshold`: relative amplitude (of `hypot.(abs.(Eu), abs.(Ev))`) below which no beamlet
+  is spawned.
+- `overlap`, `basis`, `randomize_axes`, `rng`: as in the scalar method.
+
+# Local propagation direction and polarization
+
+The local propagation direction at each grid point is found from the Eikonal equation
+applied to the phase of the locally dominant component (`Eu` where `|Eu| ≥ |Ev|`, `Ev`
+otherwise); this assumes both components share one local wavevector, i.e. that the field
+is not the superposition of two waves with genuinely different directions at that point.
+The full complex vector `Eu·e1 + Ev·e2` (not merely its dominant component) becomes the
+beamlet's `E0`; the [`AstigmaticGaussianBeamlet`](@ref) constructor itself projects it
+onto the plane orthogonal to the local direction if it is not already orthogonal to
+`dir` (paraxial correction for the tilt).
+
+The grid is placed in the plane normal to `dir` through the global origin; use
+[`translate3d!`](@ref) to move it to its actual position.
+"""
+function WavefrontBeamletDecomposition(
+        x::AbstractVector{P1},
+        y::AbstractVector{P2},
+        Eu::AbstractMatrix{<:Complex},
+        Ev::AbstractMatrix{<:Complex},
+        dir::AbstractArray{D},
+        λ::L;
+        threshold::Float64 = 1e-4,
+        overlap::Float64 = 1.2,
+        basis::Union{Nothing, Tuple{AbstractVector, AbstractVector}} = nothing,
+        randomize_axes::Bool = false,
+        rng = Random.GLOBAL_RNG
+) where {P1 <: Real, P2 <: Real, D <: Real, L <: Real}
+    T = promote_type(P1, P2, real(eltype(Eu)), real(eltype(Ev)), D, L)
+
+    nx, ny = length(x), length(y)
+    if size(Eu) != (nx, ny) || size(Ev) != (nx, ny)
+        throw(DimensionMismatch("Eu and Ev arrays must match the dimensions of x and y."))
+    end
+
+    dir_n = normalize(dir)
+    e1_v = isnothing(basis) ? normal3d(dir_n) : normalize(basis[1])
+    e2_v = isnothing(basis) ? normalize(cross(dir_n, e1_v)) : normalize(basis[2])
+
+    dx = nx > 1 ? (x[2] - x[1]) : 1.0
+    dy = ny > 1 ? (y[2] - y[1]) : 1.0
+
+    w0s_x = T(dx * overlap)
+    w0s_y = T(dy * overlap)
+    k = 2π / λ
+
+    amp = sqrt.(abs2.(Eu) .+ abs2.(Ev))
+    dominant = ifelse.(abs.(Eu) .>= abs.(Ev), Eu, Ev)
+    phase = angle.(dominant)
+
+    beams = Vector{AstigmaticGaussianBeamlet{T}}()
+    sizehint!(beams, ceil(Int, nx * ny * 0.1))
+    beams_lock = ReentrantLock()
+    max_amp = maximum(amp)
+
+    Threads.@threads for i in 1:nx
+        for j in 1:ny
+            a = amp[i, j]
+            if isnan(a) || a < max_amp * threshold
+                continue
+            end
+            ph = phase[i, j]
+            if isnan(ph)
+                continue
+            end
+
+            local_dir = _eikonal_direction(phase, i, j, nx, ny, dx, dy, k, e1_v, e2_v, dir_n)
+            if isnothing(local_dir)
+                @warn lazy"Phase gradient too steep or NaN at ($i, $j); skipping."
+                continue
+            end
+
+            pos = x[i] * e1_v + y[j] * e2_v
+
+            # Normalization factor for power conservation (see the scalar method)
+            norm_factor = (dx * dy) / (π * w0s_x * w0s_y)
+            E0_complex = (Eu[i, j] * e1_v + Ev[i, j] * e2_v) .* norm_factor
+
+            if randomize_axes
+                base_s = normal3d(local_dir)
+                ortho_s = cross(local_dir, base_s)
+                phi = 2π * rand(rng)
+                local_support = base_s * cos(phi) + ortho_s * sin(phi)
+            else
+                s1 = cross(local_dir, e2_v)
+                local_support = norm(s1) < 1e-6 ? nothing : normalize(s1)
+            end
+
+            b = AstigmaticGaussianBeamlet(pos, local_dir, λ, w0s_x, w0s_y; E0 = E0_complex, support = local_support)
+            lock(beams_lock) do
+                push!(beams, b)
+            end
+        end
+    end
+
     e1_o = isnothing(basis) ? e1_v : sampling_basis(dir_n, basis[1], T)
     return AstigmaticBeamGroup(beams, zeros(T, 3), _group_orientation(dir_n, e1_o, T))
 end

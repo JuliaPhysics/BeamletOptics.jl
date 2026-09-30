@@ -7,9 +7,15 @@ DocumenterVitepress = "4710194d-e776-4893-9690-8d956a29c365"
 GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
 Literate = "98b081ad-f1c9-55d3-8b20-4c87d4299306"
 NodeJS_20_jll = "c7aee132-11e1-519c-8219-0a43005e73c2"
+OpticsBase = "0a174593-c395-4975-8599-97e6c4e949e6"
 
 [sources.BeamletOptics]
 path = ".."
+
+# OpticsBase 0.2 is not registered yet; drop this entry once it is.
+[sources.OpticsBase]
+url = "https://github.com/StackEnjoyer/OpticsBase.jl"
+rev = "rewrite/huygens-core"
 
 [compat]
 BeamletOptics = "0.13"
@@ -20,3 +26,4 @@ DocumenterVitepress = "0.3.6"
 GLMakie = "0.13"
 Literate = "2"
 NodeJS_20_jll = "20"
+OpticsBase = "0.2"

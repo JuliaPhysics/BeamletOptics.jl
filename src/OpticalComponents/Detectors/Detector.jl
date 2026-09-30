@@ -178,9 +178,13 @@ end
 
 position(hit::GaussianBeamletHit) = position(hit.gauss.chief.rays[hit.id])
 direction(hit::GaussianBeamletHit) = direction(hit.gauss.chief.rays[hit.id])
+wavelength(hit::GaussianBeamletHit) = wavelength(hit.gauss.chief.rays[hit.id])
+refractive_index(hit::GaussianBeamletHit) = refractive_index(hit.gauss.chief.rays[hit.id])
 
 position(hit::AstigmaticGaussianBeamletHit) = position(hit.agb.c.rays[hit.id])
 direction(hit::AstigmaticGaussianBeamletHit) = direction(hit.agb.c.rays[hit.id])
+wavelength(hit::AstigmaticGaussianBeamletHit) = wavelength(hit.agb.c.rays[hit.id])
+refractive_index(hit::AstigmaticGaussianBeamletHit) = refractive_index(hit.agb.c.rays[hit.id])
 
 function hit_point(hit::GaussianBeamletHit)
     position(hit) + length(hit.gauss.chief.rays[hit.id]) * direction(hit)

@@ -1,6 +1,7 @@
 using CairoMakie
 using GLMakie
 using BeamletOptics
+using OpticsBase
 using Documenter
 using DocumenterCitations
 using DocumenterVitepress

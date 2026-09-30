@@ -77,3 +77,13 @@ For [`PolarizedRay`](@ref)s the field is added as 3D vectors, so [`electric_fiel
 
 !!! tip "PSF examples"
     The [Point spread functions](@ref) example page covers the Airy disc, an aberrated asphere and the vectorial focus of a parabolic mirror at NA 0.88, including the caveats on collimated sources and ray amplitudes.
+
+### OpticsBase interoperability
+
+If [OpticsBase.jl](https://github.com/OpticsBase-jl/OpticsBase.jl) is loaded alongside BMO (`using OpticsBase`), the `BeamletOpticsOpticsBaseExt` package extension adds a `PlaneField` constructor for a `Detector`: it samples the same coherent beamlet sum as [`electric_field`](@ref)`(::Detector)`, but returns the tangential electric *and* magnetic field on a plane, OpticsBase's single exchange format for coupling to other Maxwell solvers (angular spectrum propagators, BPM, FDTD, ...).
+
+```@docs; canonical=false
+OpticsBase.PlaneField(::Detector)
+```
+
+The return path, [`WavefrontBeamletDecomposition`](@ref)`(::OpticsBase.PlaneField)`, is documented in [Astigmatic Beam Groups](@ref).

@@ -171,7 +171,12 @@ function AstigmaticGaussianBeamlet(
         if !isorthogonal3d(direction, E0)
             # If user provided E0 but it's not orthogonal, project it.
             # This is a convenience for tilted setups.
-            E0 = E0 .- dot(E0, direction) .* direction
+            # `direction` is real, so the parallel component's (possibly complex)
+            # coefficient is the bilinear `dot(direction, E0)`, not `dot(E0, direction)`
+            # (= conj of the former): `dot` conjugates its first argument, and conjugating
+            # E0 here would project onto the wrong (conjugated) coefficient, leaving a
+            # residual component along `direction` for complex E0.
+            E0 = E0 .- dot(direction, E0) .* direction
         end
     end
 
