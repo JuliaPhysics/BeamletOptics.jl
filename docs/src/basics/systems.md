@@ -9,9 +9,28 @@ BeamletOptics.list_subtypes(BeamletOptics.AbstractSystem); # hide
 
 Refer to the **Tutorials** section for examples on how to define optical systems.
 
+System metadata is local to each system and is keyed by object identity. Use pairs
+to assign names during construction, or assign them later without modifying the
+optical objects themselves:
+
+```julia
+system = System(["M1" => mirror, "L1" => lens, detector])
+label(system, lens)                 # "L1"
+label!(system, lens, "front lens")  # rename within this system
+system["front lens"]                # lens
+meta(system, lens)[:description] = "front element"
+```
+
+Names must be unique within a system. Objects without a pair are unlabeled, and
+an object must belong to the system before its metadata or label is accessed.
+The same object can have different metadata in different systems.
+
 ```@docs; canonical=false
 System
 StaticSystem
+meta
+label
+label!
 ```
 
 ## Solving systems

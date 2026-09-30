@@ -149,6 +149,15 @@ const BMO = BeamletOptics
             ctr += 1
         end
         @test ctr == n + 1
+
+        labeled_system = System(["assembly" => objects])
+        BMO.meta(labeled_system, objects)[:description] = "nested assembly"
+        @test BMO.meta(labeled_system, objects)[:description] == "nested assembly"
+        @test BMO.label(labeled_system, objects) == "assembly"
+        member = first(BMO.objects(objects))
+        BMO.label!(labeled_system, member, "member")
+        @test labeled_system["member"] === member
+        @test BMO.meta(labeled_system, member) isa Dict{Symbol, Any}
     end
 end
 

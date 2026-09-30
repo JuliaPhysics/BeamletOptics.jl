@@ -35,7 +35,7 @@ Use `scripts/api_lookup.jl NAME` to print the docstring and signatures of any na
 | Kinematics    | `translate3d!`, `translate_to3d!`, `rotate3d!`, `xrotate3d!`, `yrotate3d!`, `zrotate3d!`, `align3d!`, `reset_translation3d!`, `reset_rotation3d!`, `set_pivot3d!`, `position`, `direction`, `orientation` |
 | Rays & beams  | `Ray`, `PolarizedRay`, `Beam`, `GaussianBeamlet`, `AstigmaticGaussianBeamlet`, `rays`, `point_on_beam`, `rayleigh_range`, `normal3d` |
 | Sources       | `CollimatedSource`, `UniformDiscSource`, `PointSource`, `UniformPointSource`, `set_num_rays!`, `CollimatedGaussianBeamletSource`, `SphericalGaussianBeamletSource`, `EllipticalGaussianBeamletSource`, `GaussianBeamletDecomposition`, `WavefrontBeamletDecomposition`, `AstigmaticBeamGroup` |
-| System        | `System`, `StaticSystem`, `solve_system!`, `ObjectGroup` |
+| System        | `System`, `StaticSystem`, `solve_system!`, `ObjectGroup`, `meta`, `label`, `label!` |
 | Inspection    | `properties`, `default_properties` |
 | Materials     | `DiscreteRefractiveIndex`, `SellmeierEquation` |
 | Lenses        | `Lens`, `ThinLens`, `SphericalLens`, `DoubletLens`, `SphericalDoubletLens`, `TripletLens`, `SphericalTripletLens`, `thickness` |
@@ -54,6 +54,25 @@ Useful non-exported helpers: `BeamletOptics.inch`, `lensmakers_eq(R1, R2, n)` (r
 `divergence_angle(λ, w0, M2)`, `numerical_aperture(θ, n=1)`, `optical_path_length(beam)`,
 `isparaxial(system, beam, θ=π/4)`, `fresnel_coefficients`, `beams(group)`, `objects(system)`,
 `list_subtypes(T)`, constants `Z_vacuum`, `c_vacuum`.
+
+## System metadata and labels
+
+Names and arbitrary metadata belong to a particular system, not to the optical
+objects. Construct labeled systems with string/object pairs or assign labels
+after construction:
+
+```julia
+system = System(["M1" => mirror, "L1" => lens, detector])
+label(system, lens)                 # "L1"
+label!(system, lens, "front lens")  # rename
+system["front lens"]                # lens
+meta(system, lens)[:description] = "front element"
+```
+
+Labels are unique within one system and unlabeled objects are supported. Metadata
+is system-specific, so the same object may have different names or metadata in
+different systems. An object must be part of the system before `meta`, `label`, or
+`label!` is used with it.
 
 ## Properties of objects
 

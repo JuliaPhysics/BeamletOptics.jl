@@ -11,10 +11,13 @@ Subtypes of `AbstractSystem` must implement the following:
 
 - `objects`: a vector or tuple of [`AbstractObject`](@ref)s that make up the system
 - `n`: (optional) [`RefractiveIndex`](@ref) of the surrounding medium, default value is 1.0
+- `meta`: system-local metadata keyed by object identity
 
 ## Functions:
 
 - `refractive_index`: returns the [`RefractiveIndex`](@ref) `n` of the system medium, see above
+- `meta`: returns the metadata dictionary for an object in the system
+- `label` and `label!`: get and assign unique system-local object names
 """
 abstract type AbstractSystem end
 
