@@ -13,7 +13,7 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 [sources.BeamletOptics]
 path = ".."
 
-# OpticsBase 0.2 is not registered yet; drop this entry once it is.
+# OpticsBase is not registered yet; drop this entry once it is.
 [sources.OpticsBase]
 url = "https://github.com/StackEnjoyer/OpticsBase.jl"
 rev = "rewrite/huygens-core"
@@ -25,5 +25,5 @@ BeamletOptics = "0.13"
 GeometryBasics = "0.5"
 Logging = "1"
 Makie = "0.24"
-OpticsBase = "0.2"
+OpticsBase = "0.1"
 Test = "1"

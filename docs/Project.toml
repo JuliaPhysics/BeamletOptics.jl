@@ -12,7 +12,7 @@ OpticsBase = "0a174593-c395-4975-8599-97e6c4e949e6"
 [sources.BeamletOptics]
 path = ".."
 
-# OpticsBase 0.2 is not registered yet; drop this entry once it is.
+# OpticsBase is not registered yet; drop this entry once it is.
 [sources.OpticsBase]
 url = "https://github.com/StackEnjoyer/OpticsBase.jl"
 rev = "rewrite/huygens-core"
@@ -26,4 +26,4 @@ DocumenterVitepress = "0.3.6"
 GLMakie = "0.13"
 Literate = "2"
 NodeJS_20_jll = "20"
-OpticsBase = "0.2"
+OpticsBase = "0.1"
