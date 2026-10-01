@@ -188,9 +188,13 @@ end
 # -----------------------------------------------------------------------------------------
 # OpticsBase.PlaneField -> BeamletOptics.WavefrontBeamletDecomposition
 
-# Physical field of the part of `f` travelling along +n. A field without forward light
-# (e.g. a purely backward wave, whose forward part is rounding noise) cannot be decomposed.
+# Physical field of the part of `f` travelling along +n, for decomposition into BMO beams.
+# BMO starts beams in vacuum, so `f` must lie in vacuum or air. A field without forward
+# light (e.g. a purely backward wave, whose forward part is rounding noise) cannot be
+# decomposed.
 function _forward_field(f::OpticsBase.PlaneField)
+    f.n == 1 || throw(ArgumentError(
+        "$_PREFIX: the PlaneField must lie in vacuum or air (n = 1), got n = $(f.n)"))
     E = forward(f).E
     norm(E) > sqrt(eps(real(eltype(E)))) * norm(f.E) || throw(ArgumentError(
         "$_PREFIX: the PlaneField has no forward-travelling light to decompose"))
@@ -229,10 +233,10 @@ original field (round trip), up to beamlet-grid discretization error.
   (`translate_to3d!` after construction; [`WavefrontBeamletDecomposition`](@ref
   BeamletOptics.WavefrontBeamletDecomposition) itself always centers the undecomposed
   group on the global origin).
-- `f.n` (the medium refractive index) and `f.R` are not carried over:
-  `AstigmaticGaussianBeamlet` traces in vacuum from the plane (BMO assigns the medium
-  index by tracing through the scene), and `f`'s reference-sphere phase is folded into
-  the sampled amplitude/phase before decomposition, so no curvature information is lost.
+- `f` must lie in vacuum or air (`f.n == 1`): BMO starts beams in vacuum, and a field
+  in a medium would need a medium-to-vacuum conversion of amplitude and optical path.
+  An `ArgumentError` is thrown otherwise. `f.R` is folded into the sampled
+  amplitude/phase before decomposition, so no curvature information is lost.
 
 Throws an `ArgumentError` if `f` has no forward-travelling light (e.g. a purely backward
 wave), and whatever `WavefrontBeamletDecomposition(x, y, Eu, Ev, dir, λ)` throws.
@@ -275,8 +279,6 @@ vacuum or air (`f.n == 1`), where BMO starts beams, and must contain forward-tra
 light; an `ArgumentError` is thrown otherwise.
 """
 function BeamletOptics.GaussianModeDecomposition(f::OpticsBase.PlaneField)
-    f.n == 1 || throw(ArgumentError(
-        "$_PREFIX: the PlaneField must lie in vacuum or air (n = 1), got n = $(f.n)"))
     E = _forward_field(f)
     u, v, n = (SVector{3}(f.axes[:, i]) for i in 1:3)
     return GaussianModeDecomposition(collect(OpticsBase.coordinates(f, 1)),

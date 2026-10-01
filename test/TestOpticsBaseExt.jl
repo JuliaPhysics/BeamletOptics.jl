@@ -7,6 +7,7 @@ using BeamletOptics
 using OpticsBase
 using Test
 using LinearAlgebra
+using Logging: with_logger, NullLogger
 
 const BMO = BeamletOptics
 const Z0 = OpticsBase.VACUUM_IMPEDANCE
@@ -314,6 +315,37 @@ end
     xs = collect(range(-1e-4, 1e-4; length = 8))
     @test_throws ArgumentError BMO.WavefrontBeamletDecomposition(xs, xs, zeros(8, 8),
         zeros(8, 8), [0.0, 1, 0], λ)
+    # BMO starts beams in vacuum: a field in a medium is rejected by both decompositions
+    in_glass = OpticsBase.PlaneField(f.E, f.H, f.spacing, f.origin, f.axes, f.λ; n = 1.5)
+    @test_throws ArgumentError BMO.WavefrontBeamletDecomposition(in_glass)
+    @test_throws ArgumentError BMO.GaussianModeDecomposition(in_glass)
+end
+
+@testset "Decompositions: masked samples and grazing directions" begin
+    # one NaN sample must not hide the rest of the field
+    xs = collect(((0:15) .- 8) .* (w0 / 4))
+    Eu = [complex(exp(-(x^2 + y^2) / w0^2)) for x in xs, y in xs]
+    Eu[3, 3] = NaN
+    group = with_logger(NullLogger()) do
+        BMO.WavefrontBeamletDecomposition(xs, xs, Eu, zero(Eu), [0.0, 1, 0], λ)
+    end
+    @test length(BMO.beams(group)) > 0
+    @test all(b -> all(isfinite, BMO.polarization(b)), BMO.beams(group))
+    amplitude = abs.(Eu)
+    phase = zeros(16, 16)
+    group = with_logger(NullLogger()) do
+        BMO.WavefrontBeamletDecomposition(xs, xs, amplitude, phase, [0.0, 1, 0], λ)
+    end
+    @test length(BMO.beams(group)) > 0
+
+    # a phase gradient of exactly k is grazing: no direction along `dir` to carry the
+    # normal field component, so it is rejected
+    e1, e2, n = [1.0, 0, 0], [0.0, 0, -1], [0.0, 1, 0]
+    @test BMO._eikonal_direction((a, b) -> 1.0, 2, 2, 3, 3, 1.0, 1.0, 1.0, e1, e2, n) ===
+          nothing
+    # sin θ = 0.5 along both e1 and e2
+    @test BMO._eikonal_direction((a, b) -> 0.5, 2, 2, 3, 3, 1.0, 1.0, 1.0, e1, e2, n) ≈
+          0.5 * e1 + 0.5 * e2 + sqrt(0.5) * n
 end
 
 end # module

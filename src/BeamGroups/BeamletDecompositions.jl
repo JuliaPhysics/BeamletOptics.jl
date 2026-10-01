@@ -101,8 +101,8 @@ Local propagation direction at grid index `(i, j)` from the Eikonal equation
 `∇φ = k sin θ`. `Δφ(a, b)` returns the phase difference from grid index `a` to the
 neighboring index `b` (tuples); central differences, one-sided at the grid edges, give the
 transverse direction cosines `sin θx`, `sin θy` along `e1`, `e2`. Returns `nothing` if the
-gradient is too steep to represent a real propagation direction (`sin²θx + sin²θy > 1`) or
-is `NaN`. Shared by both [`WavefrontBeamletDecomposition`](@ref) methods, which differ only
+gradient is too steep to represent a non-grazing propagation direction
+(`sin²θx + sin²θy ≥ 1`) or is `NaN`. Shared by both [`WavefrontBeamletDecomposition`](@ref) methods, which differ only
 in how they measure `Δφ` (scalar phase or vector overlap).
 """
 function _eikonal_direction(Δφ, i, j, nx, ny, dx, dy, k, e1, e2, dir_n)
@@ -113,12 +113,17 @@ function _eikonal_direction(Δφ, i, j, nx, ny, dx, dy, k, e1, e2, dir_n)
 
     sin_θx = dφ_dx / k
     sin_θy = dφ_dy / k
-    if isnan(sin_θx) || isnan(sin_θy) || (sin_θx^2 + sin_θy^2 > 1.0)
+    # grazing directions (sin²θ = 1) are rejected too: they have no component along
+    # `dir_n` to carry the field's normal component (see `_transverse_field`)
+    if isnan(sin_θx) || isnan(sin_θy) || (sin_θx^2 + sin_θy^2 >= 1.0)
         return nothing
     end
     cos_θz = sqrt(1.0 - sin_θx^2 - sin_θy^2)
     return normalize(sin_θx * e1 + sin_θy * e2 + cos_θz * dir_n)
 end
+
+# Largest non-NaN value, so that masked (NaN) samples do not hide the rest of the field.
+_finite_maximum(A) = maximum(a for a in A if !isnan(a); init = zero(eltype(A)))
 
 """
     _transverse_field(E1, E2, e1, e2, n, d)
@@ -198,8 +203,8 @@ function WavefrontBeamletDecomposition(
     beams = Vector{AstigmaticGaussianBeamlet{T}}()
     sizehint!(beams, ceil(Int, nx * ny * 0.1)) # Conservative estimate
     beams_lock = ReentrantLock()
-    max_amp = maximum(amplitude)
-    max_amp > 0 || throw(ArgumentError("cannot decompose a zero field"))
+    max_amp = _finite_maximum(amplitude)
+    max_amp > 0 || throw(ArgumentError("cannot decompose a field without nonzero samples"))
     Δφ(a, b) = _wrap_phase(phase[b...] - phase[a...])
 
     Threads.@threads for i in 1:nx
@@ -354,8 +359,8 @@ function WavefrontBeamletDecomposition(
     beams = Vector{AstigmaticGaussianBeamlet{T}}()
     sizehint!(beams, ceil(Int, nx * ny * 0.1))
     beams_lock = ReentrantLock()
-    max_amp = maximum(amp)
-    max_amp > 0 || throw(ArgumentError("cannot decompose a zero field"))
+    max_amp = _finite_maximum(amp)
+    max_amp > 0 || throw(ArgumentError("cannot decompose a field without nonzero samples"))
 
     Threads.@threads for i in 1:nx
         for j in 1:ny
