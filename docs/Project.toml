@@ -15,7 +15,7 @@ path = ".."
 # OpticsBase is not registered yet; drop this entry once it is.
 [sources.OpticsBase]
 url = "https://github.com/StackEnjoyer/OpticsBase.jl"
-rev = "rewrite/huygens-core"
+rev = "main"
 
 [compat]
 BeamletOptics = "0.13"
