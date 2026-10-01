@@ -203,4 +203,27 @@ const BMO = BeamletOptics
     end
 end
 
+@testset "Gouy phase through a focus" begin
+    # The beamlet starts D before its waist, so between the start and points behind the
+    # focus its Gouy phase changes by more than π/2. Both field paths must follow the
+    # analytic -atan(z/zR) continuously (the principal branch of √(a_ref/a) jumped by π).
+    # The parabasal rays are paraxial, which leaves O(θ²) ≈ 5e-4 rad at θ = λ/(π w0).
+    λ, w0, D = 1e-6, 20e-6, 5e-3
+    k, zR = 2π / λ, π * w0^2 / λ
+    wrap(x) = mod2pi(x + π) - π
+    gouy(s) = -atan((s - D) / zR) - atan(D / zR)          # relative to the start
+    for s in (D - zR, D, D + 0.5zR, D + 2zR, D + 5zR)
+        beam() = AstigmaticGaussianBeamlet([0.0, -D, 0], [0.0, 1, 0], λ, w0, w0;
+            z0_x = D, z0_y = D, support = [1.0, 0, 0])
+        E = BMO.parabasal_field(beam(), zeros(3), s)
+        @test wrap(angle(E[argmax(abs.(E))]) - k * s - gouy(s)) ≈ 0 atol = 2e-3
+
+        det = Detector(0.05)
+        BMO.translate3d!(det, [0, s - D, 0])
+        solve_system!(System([det]), beam())
+        ψ = BMO.beamlet_hit_field(only(BMO.hits(det)), [0.0, s - D, 0])
+        @test wrap(angle(ψ) - k * s - gouy(s)) ≈ 0 atol = 2e-3
+    end
+end
+
 end # MODULE

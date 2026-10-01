@@ -432,8 +432,8 @@ too small to be tiled into many beamlets, e.g. the output of a single-mode fiber
    the beam radius along a principal axis is twice the rms width.
 3. Direction: the mean transverse wave vector, from the intensity-weighted phase step
    between neighboring samples.
-4. Curvature: the quadratic phase from the moments `Im⟨ψ* rᵢ ∂ⱼψ⟩`, taken along the
-   principal axes of the intensity. Twist between curvature and intensity axes
+4. Curvature: the quadratic phase from the moments `⟨rᵢ ∂ⱼφ⟩` of the phase gradient
+   (phase steps between neighbors), taken along the principal axes of the intensity. Twist between curvature and intensity axes
    (general astigmatism) is not represented.
 5. Amplitude and phase: the projection of the field onto the fitted mode.
 
@@ -490,12 +490,19 @@ function GaussianModeDecomposition(
     ky = angle(sum(conj.(ψ[:, 1:(end - 1)]) .* ψ[:, 2:end])) / dy
     kx^2 + ky^2 < k^2 || throw(ArgumentError("the mean phase gradient exceeds the wavenumber"))
 
-    # 4. quadratic phase (k/2) rᵀ C r of the untilted field: ⟨rᵢ ∂ⱼφ⟩ = k (M C)ᵢⱼ
+    # 4. quadratic phase (k/2) rᵀ C r of the untilted field: ⟨rᵢ ∂ⱼφ⟩ = k (M C)ᵢⱼ. The
+    # phase gradient is the phase step between neighbors, taken at their midpoint, which
+    # is exact for a quadratic phase (finite differences of ψ would be biased by
+    # sin(Δφ)/Δφ where the wavefront is strongly curved).
     ψt = ψ .* cis.(-(kx .* X .+ ky .* Y))
-    ∂x, ∂y = _central_gradient(ψt, dx, dy)
-    phase_moment(D) = sum(imag.(conj.(ψt) .* D)) / P
-    G = [phase_moment(X .* ∂x) phase_moment(X .* ∂y)
-         phase_moment(Y .* ∂x) phase_moment(Y .* ∂y)]
+    Sx = conj.(ψt[1:(end - 1), :]) .* ψt[2:end, :]      # neighbors along x
+    Sy = conj.(ψt[:, 1:(end - 1)]) .* ψt[:, 2:end]      # neighbors along y
+    ∂x, ∂y = angle.(Sx) ./ dx, angle.(Sy) ./ dy
+    Wx, Wy = abs.(Sx), abs.(Sy)                         # ≈ intensity at the midpoints
+    Xx, Yy = (X[1:(end - 1)] .+ X[2:end]) ./ 2, (Y[1:(end - 1)] .+ Y[2:end]) ./ 2
+    moment(W, R, D) = sum(W .* R .* D) / sum(W)
+    G = [moment(Wx, Xx, ∂x) moment(Wy, X, ∂y)
+         moment(Wx, Y, ∂x) moment(Wy, Yy', ∂y)]
     C = M \ G ./ k
     C = (C + C') ./ 2
 
@@ -522,16 +529,4 @@ function GaussianModeDecomposition(
     E0 = _transverse_field(a * p[1], a * p[2], e1, e2, dir_n, d)
     return AstigmaticGaussianBeamlet(position, d, λ, w0s[1], w0s[2];
         E0, support, z0_x = z0s[1], z0_y = z0s[2])
-end
-
-# Central differences of a sampled field along both grid axes, one-sided at the edges.
-function _central_gradient(ψ::AbstractMatrix, dx, dy)
-    ∂x = similar(ψ)
-    ∂y = similar(ψ)
-    nx, ny = size(ψ)
-    for j in 1:ny, i in 1:nx
-        ∂x[i, j] = (ψ[min(i + 1, nx), j] - ψ[max(i - 1, 1), j]) / ((min(i + 1, nx) - max(i - 1, 1)) * dx)
-        ∂y[i, j] = (ψ[i, min(j + 1, ny)] - ψ[i, max(j - 1, 1)]) / ((min(j + 1, ny) - max(j - 1, 1)) * dy)
-    end
-    return ∂x, ∂y
 end

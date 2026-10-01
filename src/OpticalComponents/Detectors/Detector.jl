@@ -168,6 +168,7 @@ struct AstigmaticGaussianBeamletHit{T} <: AbstractBeamletHit{T}
     h2::Point3{Complex{T}}
     u2::Point3{Complex{T}}
     area_ref::Complex{T}
+    area_arg0::T            # continuous arg of the area at p0 relative to the reference
     k0::T
     Δl::T
     n_eff::T
@@ -395,6 +396,7 @@ function interact3d(system::AbstractSystem, d::Detector,
     dirn = direction(rays(agb.c)[in_])
     h1n, _, h2n, _, _ = parabasal_ray_parameters(agb, p0n, in_)
     area_ref = _pseudo_cross2d(h1n, h2n, dirn)
+    area_arg0 = _area_arg(agb, id, zero(R)) - _area_arg(agb, in_, _local_distance(agb, p0n, in_))
 
     # Extract complex reference amplitude
     E_vec = polarization(rays(agb.c)[in_])
@@ -422,7 +424,7 @@ function interact3d(system::AbstractSystem, d::Detector,
 
     push!(d,
         AstigmaticGaussianBeamletHit(
-            agb, l0, id, p0, d0, h1, u1, h2, u2, area_ref, k0, Δl,
+            agb, l0, id, p0, d0, h1, u1, h2, u2, area_ref, area_arg0, k0, Δl,
             n_eff, E_ref_amp, sqrt_proj, w_max
         ))
     if stop(d)

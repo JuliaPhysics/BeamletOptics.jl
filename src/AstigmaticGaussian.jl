@@ -649,6 +649,58 @@ Calculates the non-conjugating dot product `a ⋅ b = Σ aᵢbᵢ`.
     return a[1] * b[1] + a[2] * b[2] + a[3] * b[3]
 end
 
+# Coefficients (A0, A1, A2) of the complex beam area a(l) = (h1 + l u1) × (h2 + l u2) · d
+# = A0 + A1 l + A2 l² along a segment, with the parabasal parameters at its start.
+@inline function _area_coefficients(h1, u1, h2, u2, d)
+    return (_pseudo_cross2d(h1, h2, d),
+        _pseudo_cross2d(h1, u2, d) + _pseudo_cross2d(u1, h2, d),
+        _pseudo_cross2d(u1, u2, d))
+end
+
+_area_value((A0, A1, A2), l) = A0 + A1 * l + A2 * l^2
+
+# Continuous change of arg a(l) from l = 0 to l along a segment. a(l) factors into
+# (l − r1)(l − r2) with roots off the real axis (a Gaussian beam has no real focus point),
+# so the argument of each factor changes continuously, by less than π, along the real l
+# axis. The principal branch of √(a_ref/a) instead jumps by π once the Gouy phase has
+# changed by more than π/2, e.g. behind a focus.
+function _area_arg_change((A0, A1, A2), l)
+    factor(r) = angle((l - r) / -r)
+    if iszero(A2)
+        return iszero(A1) ? zero(real(A0)) : factor(-A0 / A1)
+    end
+    s = sqrt(A1^2 - 4 * A2 * A0)
+    q = -(A1 + (real(conj(A1) * s) >= 0 ? s : -s)) / 2     # roots without cancellation
+    return factor(q / A2) + factor(A0 / q)
+end
+
+"""
+    _area_arg(agb, i, l)
+
+Continuous argument of the complex beam area of `agb` at the local distance `l` along the
+chief ray segment `i` (measured from the start of that segment, may be negative in the
+first segment), relative to the start of the first segment. Interface jumps between
+segments are small and taken on the principal branch.
+"""
+function _area_arg(agb::AstigmaticGaussianBeamlet, i::Int, l::Real)
+    Δ = zero(float(l))
+    a_end = zero(Complex{typeof(Δ)})
+    for j in 1:i
+        ray = rays(agb.c)[j]
+        h1, u1, h2, u2, _ = parabasal_ray_parameters(agb, position(ray), j)
+        A = _area_coefficients(h1, u1, h2, u2, direction(ray))
+        j > 1 && (Δ += angle(A[1] / a_end))
+        lj = j < i ? length(ray) : l
+        Δ += _area_arg_change(A, lj)
+        a_end = _area_value(A, lj)
+    end
+    return Δ
+end
+
+# Local distance of the point `p` along chief ray segment `i`
+_local_distance(agb::AstigmaticGaussianBeamlet, p, i) =
+    dot(p - position(rays(agb.c)[i]), direction(rays(agb.c)[i]))
+
 """
     parabasal_field(agb, r, z; E_ref_amp, area_ref, z_norm)
 
@@ -736,10 +788,14 @@ function parabasal_field(
 
     k0 = 2π / wavelength(chief)
 
-    # area_ref / area is essentially (1 / (1 + i*z/zr))^2 for stigmatic beams.
-    # The sqrt gives the standard -atan(z/zr) Gouy phase natively.
+    # area_ref / area is essentially (1 / (1 + i*z/zr))^2 for stigmatic beams, so its
+    # square root carries the Gouy phase. The argument is followed continuously from the
+    # reference point (the principal branch would jump by π behind a focus).
     # The phase includes the OPL correction Δl to ensure coherence in media.
-    ψ = sqrt(area_ref / area) * exp(im * k0 * (z + w + Δl))
+    p_ref, i_ref = point_on_beam(agb, z_norm)
+    Δarg = _area_arg(agb, i, _local_distance(agb, p0, i)) -
+           _area_arg(agb, i_ref, _local_distance(agb, p_ref, i_ref))
+    ψ = sqrt(abs(area_ref / area)) * cis(-Δarg / 2) * exp(im * k0 * (z + w + Δl))
     return E_ref_amp * ψ
 end
 

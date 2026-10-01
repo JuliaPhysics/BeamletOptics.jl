@@ -348,4 +348,22 @@ end
           0.5 * e1 + 0.5 * e2 + sqrt(0.5) * n
 end
 
+@testset "GaussianModeDecomposition: strongly curved field" begin
+    # Behind a focus the phase changes by up to ~2 rad per sample at the window edge; the
+    # curvature fit must not be biased by finite differences of the field there.
+    λs, w = 1e-6, 20e-6
+    zR = π * w^2 / λs
+    beam() = BMO.AstigmaticGaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], λs, w, w;
+        support = [1.0, 0, 0])
+    sample(y) = PlaneField(trace!(detector_at(y), beam()); size = (64, 64),
+        spacing = (w * sqrt(5) / 8, w * sqrt(5) / 8), progress = false)
+    f = sample(2zR)
+    fit = PlaneField(trace!(detector_at(3zR), BMO.GaussianModeDecomposition(f));
+        size = (64, 64), spacing = f.spacing, progress = false)
+    ref = sample(3zR)
+    c = dot(ref.E, fit.E) / (norm(ref.E) * norm(fit.E))
+    @test 1 - abs(c) < 1e-6
+    @test abs(angle(c)) < 1e-3
+end
+
 end # module
