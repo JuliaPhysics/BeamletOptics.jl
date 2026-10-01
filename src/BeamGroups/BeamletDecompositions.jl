@@ -95,34 +95,21 @@ end
 @inline _wrap_phase(Δ::Real) = mod2pi(Δ + π) - π
 
 """
-    _eikonal_direction(phase, i, j, nx, ny, dx, dy, k, e1, e2, dir_n)
+    _eikonal_direction(Δφ, i, j, nx, ny, dx, dy, k, e1, e2, dir_n)
 
-Local propagation direction at grid index `(i, j)` of a 2D `phase` map, from the Eikonal
-equation `∇φ = k sin θ`: the phase gradient (central differences, one-sided at the grid
-edges) gives the transverse direction cosines `sin θx`, `sin θy` along `e1`, `e2`. Returns
-`nothing` if the gradient is too steep to represent a real propagation direction
-(`sin²θx + sin²θy > 1`) or is `NaN`. Shared by both [`WavefrontBeamletDecomposition`](@ref)
-methods (scalar and vector) so the two stay numerically identical.
+Local propagation direction at grid index `(i, j)` from the Eikonal equation
+`∇φ = k sin θ`. `Δφ(a, b)` returns the phase difference from grid index `a` to the
+neighboring index `b` (tuples); central differences, one-sided at the grid edges, give the
+transverse direction cosines `sin θx`, `sin θy` along `e1`, `e2`. Returns `nothing` if the
+gradient is too steep to represent a real propagation direction (`sin²θx + sin²θy > 1`) or
+is `NaN`. Shared by both [`WavefrontBeamletDecomposition`](@ref) methods, which differ only
+in how they measure `Δφ` (scalar phase or vector overlap).
 """
-function _eikonal_direction(phase::AbstractMatrix, i, j, nx, ny, dx, dy, k, e1, e2, dir_n)
-    ph = phase[i, j]
-    if i > 1 && i < nx
-        dφ_dx = (_wrap_phase(phase[i + 1, j] - ph) +
-                 _wrap_phase(ph - phase[i - 1, j])) / (2dx)
-    elseif i == 1
-        dφ_dx = _wrap_phase(phase[i + 1, j] - ph) / dx
-    else
-        dφ_dx = _wrap_phase(ph - phase[i - 1, j]) / dx
-    end
-
-    if j > 1 && j < ny
-        dφ_dy = (_wrap_phase(phase[i, j + 1] - ph) +
-                 _wrap_phase(ph - phase[i, j - 1])) / (2dy)
-    elseif j == 1
-        dφ_dy = _wrap_phase(phase[i, j + 1] - ph) / dy
-    else
-        dφ_dy = _wrap_phase(ph - phase[i, j - 1]) / dy
-    end
+function _eikonal_direction(Δφ, i, j, nx, ny, dx, dy, k, e1, e2, dir_n)
+    ip, im_ = min(i + 1, nx), max(i - 1, 1)
+    jp, jm = min(j + 1, ny), max(j - 1, 1)
+    dφ_dx = (Δφ((i, j), (ip, j)) + Δφ((im_, j), (i, j))) / ((ip - im_) * dx)
+    dφ_dy = (Δφ((i, j), (i, jp)) + Δφ((i, jm), (i, j))) / ((jp - jm) * dy)
 
     sin_θx = dφ_dx / k
     sin_θy = dφ_dy / k
@@ -131,6 +118,19 @@ function _eikonal_direction(phase::AbstractMatrix, i, j, nx, ny, dx, dy, k, e1, 
     end
     cos_θz = sqrt(1.0 - sin_θx^2 - sin_θy^2)
     return normalize(sin_θx * e1 + sin_θy * e2 + cos_θz * dir_n)
+end
+
+"""
+    _transverse_field(E1, E2, e1, e2, n, d)
+
+3D field vector with the tangential components `E1`, `E2` along `e1`, `e2` of a plane with
+normal `n`, completed by the normal component that makes it transverse to the propagation
+direction `d` (`E·d = 0`). Keeps the given tangential field of an oblique beam instead of
+projecting it, which would scale it by `cos²θ`.
+"""
+function _transverse_field(E1, E2, e1, e2, n, d)
+    En = -(dot(d, e1) * E1 + dot(d, e2) * E2) / dot(d, n)
+    return E1 * e1 + E2 * e2 + En * n
 end
 
 """
@@ -199,6 +199,8 @@ function WavefrontBeamletDecomposition(
     sizehint!(beams, ceil(Int, nx * ny * 0.1)) # Conservative estimate
     beams_lock = ReentrantLock()
     max_amp = maximum(amplitude)
+    max_amp > 0 || throw(ArgumentError("cannot decompose a zero field"))
+    Δφ(a, b) = _wrap_phase(phase[b...] - phase[a...])
 
     Threads.@threads for i in 1:nx
         for j in 1:ny
@@ -213,7 +215,7 @@ function WavefrontBeamletDecomposition(
 
             # Local propagation direction from the Eikonal equation (shared helper, see
             # `_eikonal_direction`)
-            local_dir = _eikonal_direction(phase, i, j, nx, ny, dx, dy, k, e1_v, e2_v, dir_n)
+            local_dir = _eikonal_direction(Δφ, i, j, nx, ny, dx, dy, k, e1_v, e2_v, dir_n)
             if isnothing(local_dir)
                 @warn lazy"Phase gradient too steep or NaN at ($i, $j); skipping."
                 continue
@@ -298,14 +300,16 @@ directly; it is not extension-specific and works standalone.
 
 # Local propagation direction and polarization
 
-The local propagation direction at each grid point is found from the Eikonal equation
-applied to the phase of the locally dominant component (`Eu` where `|Eu| ≥ |Ev|`, `Ev`
-otherwise); this assumes both components share one local wavevector, i.e. that the field
-is not the superposition of two waves with genuinely different directions at that point.
-The full complex vector `Eu·e1 + Ev·e2` (not merely its dominant component) becomes the
-beamlet's `E0`; the [`AstigmaticGaussianBeamlet`](@ref) constructor itself projects it
-onto the plane orthogonal to the local direction if it is not already orthogonal to
-`dir` (paraxial correction for the tilt).
+The local propagation direction at each grid point is found from the Eikonal equation,
+with the phase difference between neighboring samples taken from the complex vector
+overlap `E(a)ᴴ E(b)`. This is continuous where the polarization changes and assumes that
+both components share one local wavevector, i.e. that the field is not the superposition
+of two waves with genuinely different directions at that point. The beamlet's `E0` keeps
+the given tangential components `Eu`, `Ev` and gets the normal component that makes it
+transverse to the local direction (`E·d = 0`), so oblique beamlets reproduce the sampled
+tangential field.
+
+Throws an `ArgumentError` for a field that is zero everywhere.
 
 The grid is placed in the plane normal to `dir` through the global origin; use
 [`translate3d!`](@ref) to move it to its actual position.
@@ -342,13 +346,16 @@ function WavefrontBeamletDecomposition(
     k = 2π / λ
 
     amp = sqrt.(abs2.(Eu) .+ abs2.(Ev))
-    dominant = ifelse.(abs.(Eu) .>= abs.(Ev), Eu, Ev)
-    phase = angle.(dominant)
+    # Phase difference between neighbors from the complex vector overlap E(a)ᴴ E(b): it
+    # does not depend on which component dominates, so it stays continuous where the
+    # polarization changes.
+    Δφ(a, b) = angle(conj(Eu[a...]) * Eu[b...] + conj(Ev[a...]) * Ev[b...])
 
     beams = Vector{AstigmaticGaussianBeamlet{T}}()
     sizehint!(beams, ceil(Int, nx * ny * 0.1))
     beams_lock = ReentrantLock()
     max_amp = maximum(amp)
+    max_amp > 0 || throw(ArgumentError("cannot decompose a zero field"))
 
     Threads.@threads for i in 1:nx
         for j in 1:ny
@@ -356,12 +363,7 @@ function WavefrontBeamletDecomposition(
             if isnan(a) || a < max_amp * threshold
                 continue
             end
-            ph = phase[i, j]
-            if isnan(ph)
-                continue
-            end
-
-            local_dir = _eikonal_direction(phase, i, j, nx, ny, dx, dy, k, e1_v, e2_v, dir_n)
+            local_dir = _eikonal_direction(Δφ, i, j, nx, ny, dx, dy, k, e1_v, e2_v, dir_n)
             if isnothing(local_dir)
                 @warn lazy"Phase gradient too steep or NaN at ($i, $j); skipping."
                 continue
@@ -371,7 +373,8 @@ function WavefrontBeamletDecomposition(
 
             # Normalization factor for power conservation (see the scalar method)
             norm_factor = (dx * dy) / (π * w0s_x * w0s_y)
-            E0_complex = (Eu[i, j] * e1_v + Ev[i, j] * e2_v) .* norm_factor
+            E0_complex = _transverse_field(Eu[i, j], Ev[i, j], e1_v, e2_v, dir_n, local_dir) .*
+                         norm_factor
 
             if randomize_axes
                 base_s = normal3d(local_dir)
@@ -422,7 +425,8 @@ too small to be tiled into many beamlets, e.g. the output of a single-mode fiber
    is projected onto it.
 2. Position and waist: centroid and principal axes of the second intensity moments;
    the beam radius along a principal axis is twice the rms width.
-3. Direction: the mean transverse wave vector `Im⟨ψ* ∇ψ⟩`.
+3. Direction: the mean transverse wave vector, from the intensity-weighted phase step
+   between neighboring samples.
 4. Curvature: the quadratic phase from the moments `Im⟨ψ* rᵢ ∂ⱼψ⟩`, taken along the
    principal axes of the intensity. Twist between curvature and intensity axes
    (general astigmatism) is not represented.
@@ -475,10 +479,10 @@ function GaussianModeDecomposition(
     Y = y' .- yc
     M = [sum(I_ .* X .^ 2) sum(I_ .* X .* Y); sum(I_ .* X .* Y) sum(I_ .* Y .^ 2)] ./ P
 
-    # 3. mean transverse wave vector
-    ∂x, ∂y = _central_gradient(ψ, dx, dy)
-    kx = sum(imag.(conj.(ψ) .* ∂x)) / P
-    ky = sum(imag.(conj.(ψ) .* ∂y)) / P
+    # 3. mean transverse wave vector from the phase step between neighbors, which is
+    # exact for a linear phase (finite differences of ψ would give sin(kx Δ)/Δ)
+    kx = angle(sum(conj.(ψ[1:(end - 1), :]) .* ψ[2:end, :])) / dx
+    ky = angle(sum(conj.(ψ[:, 1:(end - 1)]) .* ψ[:, 2:end])) / dy
     kx^2 + ky^2 < k^2 || throw(ArgumentError("the mean phase gradient exceeds the wavenumber"))
 
     # 4. quadratic phase (k/2) rᵀ C r of the untilted field: ⟨rᵢ ∂ⱼφ⟩ = k (M C)ᵢⱼ
@@ -510,7 +514,7 @@ function GaussianModeDecomposition(
     s = A[1, 1] * e1 + A[2, 1] * e2
     support = normalize(s - dot(s, d) * d)
     position = origin + xc * e1 + yc * e2
-    E0 = a .* (p[1] .* e1 .+ p[2] .* e2)
+    E0 = _transverse_field(a * p[1], a * p[2], e1, e2, dir_n, d)
     return AstigmaticGaussianBeamlet(position, d, λ, w0s[1], w0s[2];
         E0, support, z0_x = z0s[1], z0_y = z0s[2])
 end

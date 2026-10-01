@@ -82,7 +82,9 @@ emptying the detector. Requires `using OpticsBase` (package extension).
   [`GaussianBeamletHit`](@ref BeamletOptics.GaussianBeamletHit)s carry no polarization in
   BMO (the model is scalar); by convention, matching `OpticsBase`'s own rule for a scalar
   field (`PlaneField(E::AbstractMatrix, ...)` puts a scalar field entirely into `Eu`),
-  such a hit's contribution is placed along the plane's own `u` axis.
+  such a hit's contribution is polarized along the plane's `u` axis, made transverse to
+  the hit direction (along `v` if `u` is parallel to it). At normal incidence this is
+  exactly `u`.
 - `n` (medium refractive index) is that of the hits; `λ` is their shared wavelength.
 - Time convention `exp(−iωt)`, as in BMO and `OpticsBase`.
 
@@ -129,10 +131,17 @@ function _common_wavelength_index(hs::AbstractVector{<:Union{GaussianBeamletHit,
 end
 _common_wavelength_index(hs::AbstractVector) = _beamlet_hits_error(hs)
 
-# Per-hit 3D field direction: the chief ray's own polarization for astigmatic hits, the
-# plane's own `u` axis (no intrinsic polarization in BMO) for stigmatic ones.
-_hit_field_direction(::GaussianBeamletHit, u) = u
-_hit_field_direction(hit::AstigmaticGaussianBeamletHit, u) = beamlet_hit_polarization(hit)
+# Per-hit 3D field direction: the chief ray's own polarization for astigmatic hits. A
+# stigmatic hit has no polarization in BMO; it gets the plane's `u` axis made transverse
+# to the hit direction (`v` if `u` is parallel to it), so that E ⟂ d and H = (n/Z₀) d × E
+# form a consistent plane wave.
+function _hit_field_direction(hit::GaussianBeamletHit, u, v)
+    d = direction(hit)
+    e = norm(cross(d, u)) > 1e-6 ? u : v
+    p = e - dot(d, e) * d
+    return p / norm(p)
+end
+_hit_field_direction(hit::AstigmaticGaussianBeamletHit, u, v) = beamlet_hit_polarization(hit)
 
 function _sample_plane_field(hs, λ, n_medium, (nx, ny), (Δu, Δv), origin, axes, progress)
     T = typeof(float(λ))
@@ -147,7 +156,7 @@ function _sample_plane_field(hs, λ, n_medium, (nx, ny), (Δu, Δv), origin, axe
     H = zeros(Complex{T}, nx, ny, 2)
 
     hit_dirs = [SVector{3, T}(direction(h)) for h in hs]
-    hit_pols = [SVector{3, Complex{T}}(_hit_field_direction(h, u)) for h in hs]
+    hit_pols = [SVector{3, Complex{T}}(_hit_field_direction(h, u, v)) for h in hs]
 
     Y = T(n_medium / VACUUM_IMPEDANCE)
 
@@ -178,6 +187,15 @@ end
 
 # -----------------------------------------------------------------------------------------
 # OpticsBase.PlaneField -> BeamletOptics.WavefrontBeamletDecomposition
+
+# Physical field of the part of `f` travelling along +n. A field without forward light
+# (e.g. a purely backward wave, whose forward part is rounding noise) cannot be decomposed.
+function _forward_field(f::OpticsBase.PlaneField)
+    E = forward(f).E
+    norm(E) > sqrt(eps(real(eltype(E)))) * norm(f.E) || throw(ArgumentError(
+        "$_PREFIX: the PlaneField has no forward-travelling light to decompose"))
+    return E .* reference_phase(f)
+end
 
 """
     BeamletOptics.WavefrontBeamletDecomposition(f::OpticsBase.PlaneField; kwargs...)
@@ -216,14 +234,13 @@ original field (round trip), up to beamlet-grid discretization error.
   index by tracing through the scene), and `f`'s reference-sphere phase is folded into
   the sampled amplitude/phase before decomposition, so no curvature information is lost.
 
-Throws whatever `WavefrontBeamletDecomposition(x, y, Eu, Ev, dir, λ)` throws, e.g. if `f`
-is entirely below the beamlet amplitude `threshold`.
+Throws an `ArgumentError` if `f` has no forward-travelling light (e.g. a purely backward
+wave), and whatever `WavefrontBeamletDecomposition(x, y, Eu, Ev, dir, λ)` throws.
 """
 function BeamletOptics.WavefrontBeamletDecomposition(f::OpticsBase.PlaneField; kwargs...)
     haskey(kwargs, :basis) &&
         throw(ArgumentError("$_PREFIX: `basis` is fixed to the PlaneField's own (u, v) axes and cannot be overridden"))
-    fw = forward(f)
-    phys = fw.E .* reference_phase(fw)
+    phys = _forward_field(f)
     Eu = phys[:, :, 1]
     Ev = phys[:, :, 2]
 
@@ -254,13 +271,13 @@ Use it for fields close to one Gaussian mode that are too small for
 
 `optical_power(beamlet) / OpticsBase.power(f)` is the fraction of the power captured by
 the Gaussian mode. The field used is `forward(f).E .* reference_phase(f)`. `f` must lie in
-vacuum or air (`f.n == 1`), where BMO starts beams; an `ArgumentError` is thrown
-otherwise.
+vacuum or air (`f.n == 1`), where BMO starts beams, and must contain forward-travelling
+light; an `ArgumentError` is thrown otherwise.
 """
 function BeamletOptics.GaussianModeDecomposition(f::OpticsBase.PlaneField)
     f.n == 1 || throw(ArgumentError(
         "$_PREFIX: the PlaneField must lie in vacuum or air (n = 1), got n = $(f.n)"))
-    E = forward(f).E .* reference_phase(f)
+    E = _forward_field(f)
     u, v, n = (SVector{3}(f.axes[:, i]) for i in 1:3)
     return GaussianModeDecomposition(collect(OpticsBase.coordinates(f, 1)),
         collect(OpticsBase.coordinates(f, 2)), E[:, :, 1], E[:, :, 2], n, f.λ;

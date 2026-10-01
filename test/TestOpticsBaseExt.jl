@@ -239,4 +239,81 @@ end
     @test_throws ArgumentError BMO.GaussianModeDecomposition(fn)
 end
 
+@testset "Oblique fields keep their tangential components" begin
+    # A plane wave tilted by θ = 10° against the plane normal, sampled finely enough to
+    # resolve its phase ramp. Every beamlet must reproduce the sampled tangential field
+    # and be transverse to its own direction; a projection onto the transverse plane
+    # would scale the tangential field by cos²θ.
+    θ = deg2rad(10)
+    k = 2π / λ
+    e1, e2, n = [1.0, 0, 0], [0.0, 0, -1], [0.0, 1, 0]
+    xs = collect(((0:15) .- 8) .* 0.5e-6)
+    Eu = [complex(cis(k * sin(θ) * x)) for x in xs, y in xs]
+    Ev = 0.3im .* Eu
+    overlap = 1.2
+    group = BMO.WavefrontBeamletDecomposition(xs, xs, Eu, Ev, n, λ; basis = (e1, e2),
+        overlap)
+    nf = 1 / (π * overlap^2)                     # amplitude normalization per beamlet
+    for b in BMO.beams(group)
+        r = BMO.first_ray(b)
+        E0 = BMO.polarization(b)
+        i = argmin(abs.(xs .- dot(BMO.position(r), e1)))
+        j = argmin(abs.(xs .- dot(BMO.position(r), e2)))
+        @test dot(e1, E0) ≈ Eu[i, j] * nf rtol = 1e-9
+        @test dot(e2, E0) ≈ Ev[i, j] * nf rtol = 1e-9
+        @test abs(dot(BMO.direction(r), E0)) < 1e-12 * norm(E0)
+        @test dot(BMO.direction(r), n) ≈ cos(θ) rtol = 1e-3
+    end
+
+    # the Gaussian mode fit keeps the tangential field at the centroid as well
+    # (wide enough window: a truncated Gaussian biases the moments)
+    xg = collect(((0:63) .- 32) .* 0.5e-6)
+    ψ = [exp(-(x^2 + y^2) / (2e-6)^2) * cis(k * sin(θ) * x) for x in xg, y in xg]
+    c = 33                                       # index of x = 0
+    f = OpticsBase.PlaneField(cat(ψ, 0.3im .* ψ; dims = 3), (0.5e-6, 0.5e-6), zeros(3),
+        hcat(e1, e2, n), λ)
+    m = BMO.GaussianModeDecomposition(f)
+    E0 = BMO.polarization(m)
+    @test dot(e1, E0) ≈ ψ[c, c] rtol = 1e-3
+    @test dot(e2, E0) ≈ 0.3im * ψ[c, c] rtol = 1e-3
+    @test abs(dot(BMO.direction(BMO.first_ray(m)), E0)) < 1e-12 * norm(E0)
+end
+
+@testset "PlaneField: stigmatic beamlet on a tilted plane is a transverse wave" begin
+    # The scalar beamlet is polarized along u made transverse to the beam, here in the
+    # plane of incidence (TM). For a transverse wave the tangential admittance is then
+    # Hv / Eu = Y / cos θ (with E along u itself it would be Y cos θ).
+    tilt = deg2rad(10)
+    gb = BMO.GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], λ, w0; P0, support = [1.0, 0, 0])
+    f = PlaneField(trace!(detector_at(zdet; tilt), gb); size = (17, 17),
+        spacing = (w0 / 4, w0 / 4), progress = false)
+    c = 9
+    @test f.H[c, c, 2] / f.E[c, c, 1] ≈ (1 / Z0) / cos(tilt) rtol = 1e-9
+    @test power(f) ≈ P0 rtol = 2e-2              # coarse sampling of the footprint
+end
+
+@testset "WavefrontBeamletDecomposition: phase gradient independent of the dominant component" begin
+    # Eu = A e^{iφ}, Ev = i B e^{iφ}: one flat wavefront whose polarization changes from u
+    # to v across x = 0, where |Eu| = |Ev|. Every beamlet must travel along `dir`.
+    xs = collect(range(-200e-6, 200e-6; length = 41))
+    A = [exp(-((x + 50e-6)^2 + y^2) / (80e-6)^2) for x in xs, y in xs]
+    B = [exp(-((x - 50e-6)^2 + y^2) / (80e-6)^2) for x in xs, y in xs]
+    φ = cis(0.3)
+    group = BMO.WavefrontBeamletDecomposition(xs, xs, complex.(A) .* φ, im .* B .* φ,
+        [0.0, 1, 0], λ)
+    dirs = [BMO.direction(BMO.first_ray(b)) for b in BMO.beams(group)]
+    @test maximum(d -> norm(d - [0, 1, 0]), dirs) < 1e-9
+end
+
+@testset "Decompositions reject fields without forward-travelling light" begin
+    f = PlaneField(trace!(detector_at(zdet), agb_at()); size = (16, 16),
+        spacing = (w0 / 4, w0 / 4), progress = false)
+    backward_only = OpticsBase.PlaneField(f.E, -f.H, f.spacing, f.origin, f.axes, f.λ)
+    @test_throws ArgumentError BMO.WavefrontBeamletDecomposition(backward_only)
+    @test_throws ArgumentError BMO.GaussianModeDecomposition(backward_only)
+    xs = collect(range(-1e-4, 1e-4; length = 8))
+    @test_throws ArgumentError BMO.WavefrontBeamletDecomposition(xs, xs, zeros(8, 8),
+        zeros(8, 8), [0.0, 1, 0], λ)
+end
+
 end # module
