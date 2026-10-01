@@ -109,7 +109,8 @@ DocMeta.setdocmeta!(
 bib = CitationBibliography(joinpath(@__DIR__, "src", "refs.bib"))
 
 makedocs(;
-    modules=[BeamletOptics, Base.get_extension(BeamletOptics, :BeamletOpticsMakieExt)],
+    modules=[BeamletOptics, Base.get_extension(BeamletOptics, :BeamletOpticsMakieExt),
+        Base.get_extension(BeamletOptics, :BeamletOpticsOpticsBaseExt)],
     authors="Hugo Uittenbosch <hugo.uittenbosch@dlr.de>, Oliver Kliebisch <oliver.kliebisch@dlr.de> and contributors",
     sitename="BeamletOptics.jl",
     format=DocumenterVitepress.MarkdownVitepress(;

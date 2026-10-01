@@ -68,7 +68,16 @@ For complex sources, the package provides the [`AstigmaticBeamGroup`](@ref) cont
 
 - [`GaussianBeamletDecomposition`](@ref): Tiling a large Gaussian beam into many small stable beamlets.
 - [`GaussianModeDecomposition`](@ref): Fitting a single astigmatic Gaussian beamlet to a field close to one Gaussian mode, e.g. the output of a single-mode fiber, which is too small to be tiled into beamlets.
-- [`WavefrontBeamletDecomposition`](@ref): Importing an arbitrary complex scalar field (e.g. from a phase screen or camera data), or a vector field with an independent, spatially varying polarization (e.g. `OpticsBase`'s `PlaneField`, see below).
+- [`WavefrontBeamletDecomposition`](@ref): Importing an arbitrary complex scalar field (e.g. from a phase screen or camera data), or a vector field with an independent, spatially varying polarization (e.g. `OpticsBase`'s `PlaneField`, see [OpticsBase fields as beam groups](@ref)).
 - [`CollimatedGaussianBeamletSource`](@ref): A square grid of parallel beamlets (ideal for aperture diffraction).
 - [`SphericalGaussianBeamletSource`](@ref): A point-like source emitting a cone of beamlets (ideal for focused/divergent beams).
 - [`EllipticalGaussianBeamletSource`](@ref): A point-like source emitting an elliptical cone of beamlets (ideal for sources with different fast/slow axis divergence).
+
+### OpticsBase fields as beam groups
+
+With `using OpticsBase`, a `PlaneField` handed over by another solver (e.g. the exit field of a fiber computed by a beam propagation method) becomes BMO beams again. [`WavefrontBeamletDecomposition`](@ref) tiles it into one beamlet per sample, which needs beamlets much larger than λ. [`GaussianModeDecomposition`](@ref) fits a single Gaussian beamlet instead, for small fields close to one Gaussian mode such as single-mode fiber output. Both take only the forward-travelling part of the field and require the plane to lie in vacuum or air. The detector side, `PlaneField(::Detector)`, is described under [OpticsBase interoperability](@ref).
+
+```@docs
+WavefrontBeamletDecomposition(::OpticsBase.PlaneField)
+GaussianModeDecomposition(::OpticsBase.PlaneField)
+```

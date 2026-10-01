@@ -39,7 +39,7 @@ const _PREFIX = "BeamletOptics/OpticsBase extension"
         origin = BeamletOptics.position(detector), axes = <default detector frame, see below>)
 
 Samples the coherent field of the beamlets hitting a BeamletOptics (BMO) `Detector` into
-an [`OpticsBase.PlaneField`](@ref). Call it after `solve_system!` and before moving or
+an [`OpticsBase.PlaneField`](https://StackEnjoyer.github.io/OpticsBase.jl/dev/). Call it after `solve_system!` and before moving or
 emptying the detector. Requires `using OpticsBase` (package extension).
 
 # Arguments
@@ -53,11 +53,11 @@ emptying the detector. Requires `using OpticsBase` (package extension).
 - `size` (keyword, required): number of samples `(nx, ny)` along the plane's `u`, `v`
   axes.
 - `spacing` (keyword, required): sample spacings `(Δu, Δv)` in \\[m\\], as in
-  [`OpticsBase.PlaneField`](@ref).
+  [`OpticsBase.PlaneField`](https://StackEnjoyer.github.io/OpticsBase.jl/dev/).
 - `origin` (keyword): center of the plane in global coordinates in \\[m\\]. Default: the
   detector position.
 - `axes` (keyword): `3×3` matrix with columns `u`, `v`, `n` (see
-  [`OpticsBase.PlaneField`](@ref)). Default: `n = −orientation(detector)[:, 2]` (BMO's
+  [`OpticsBase.PlaneField`](https://StackEnjoyer.github.io/OpticsBase.jl/dev/)). Default: `n = −orientation(detector)[:, 2]` (BMO's
   detector normal points against the beam; `n` points downstream, i.e. the direction the
   light was travelling in when it hit the detector), `u = −orientation(detector)[:, 1]`
   (BMO's local detector x axis) and `v = n × u` (BMO's local −z axis), matching the
@@ -204,7 +204,7 @@ end
 """
     BeamletOptics.WavefrontBeamletDecomposition(f::OpticsBase.PlaneField; kwargs...)
 
-Decomposes the forward-travelling part of a [`PlaneField`](@ref OpticsBase.PlaneField)
+Decomposes the forward-travelling part of a [`PlaneField`](https://StackEnjoyer.github.io/OpticsBase.jl/dev/)
 `f` into an [`AstigmaticBeamGroup`](@ref BeamletOptics.AstigmaticBeamGroup) of
 `AstigmaticGaussianBeamlet`s, placed on `f`'s plane and travelling along `f`'s normal
 `n`. This is the return path for `OpticsBase.PlaneField(detector; ...)`: passing the
@@ -228,8 +228,7 @@ original field (round trip), up to beamlet-grid discretization error.
   array with the reference-sphere phase (if any) and the local-plane-wave forward/backward
   split both applied, in \\[V/m\\] peak amplitude, matching the units
   `AstigmaticGaussianBeamlet`'s `E0` expects.
-- The beam group's sampling grid is `f`'s own `(u, v)` grid ([`coordinates`](@ref
-  OpticsBase.coordinates)), placed at `f.origin` with local axes `f.axes[:, 1:2]`
+- The beam group's sampling grid is `f`'s own `(u, v)` grid (`OpticsBase.coordinates`), placed at `f.origin` with local axes `f.axes[:, 1:2]`
   (`translate_to3d!` after construction; [`WavefrontBeamletDecomposition`](@ref
   BeamletOptics.WavefrontBeamletDecomposition) itself always centers the undecomposed
   group on the global origin).
@@ -266,7 +265,7 @@ end
     BeamletOptics.GaussianModeDecomposition(f::OpticsBase.PlaneField)
 
 Fits a single `AstigmaticGaussianBeamlet` to the forward-travelling part of a
-[`PlaneField`](@ref OpticsBase.PlaneField), e.g. the output of a single-mode fiber. The
+[`PlaneField`](https://StackEnjoyer.github.io/OpticsBase.jl/dev/), e.g. the output of a single-mode fiber. The
 beamlet starts on `f`'s plane at the centroid of the field; see
 [`GaussianModeDecomposition`](@ref BeamletOptics.GaussianModeDecomposition) for the fit.
 Use it for fields close to one Gaussian mode that are too small for

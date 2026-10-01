@@ -80,10 +80,10 @@ For [`PolarizedRay`](@ref)s the field is added as 3D vectors, so [`electric_fiel
 
 ### OpticsBase interoperability
 
-If [OpticsBase.jl](https://github.com/OpticsBase-jl/OpticsBase.jl) is loaded alongside BMO (`using OpticsBase`), the `BeamletOpticsOpticsBaseExt` package extension adds a `PlaneField` constructor for a `Detector`: it samples the same coherent beamlet sum as [`electric_field`](@ref)`(::Detector)`, but returns the tangential electric *and* magnetic field on a plane, OpticsBase's single exchange format for coupling to other Maxwell solvers (angular spectrum propagators, BPM, FDTD, ...).
+If [OpticsBase.jl](https://github.com/StackEnjoyer/OpticsBase.jl) is loaded alongside BMO (`using OpticsBase`), the `BeamletOpticsOpticsBaseExt` package extension adds a `PlaneField` constructor for a `Detector`. It samples the physical field of the beamlet hits as tangential electric *and* magnetic field on the detector plane, OpticsBase's single exchange format for coupling to other Maxwell solvers (angular spectrum propagators, BPM, FDTD, ...). Unlike [`electric_field`](@ref)`(::Detector)`, it carries no `√cos θ` projection factor, so for an oblique beam its Poynting flux is the full beam power.
 
-```@docs; canonical=false
+```@docs
 OpticsBase.PlaneField(::Detector)
 ```
 
-The return path, [`WavefrontBeamletDecomposition`](@ref)`(::OpticsBase.PlaneField)`, is documented in [Astigmatic Beam Groups](@ref).
+The return paths, [`WavefrontBeamletDecomposition`](@ref) and [`GaussianModeDecomposition`](@ref) for a `PlaneField`, are documented in [OpticsBase fields as beam groups](@ref).
