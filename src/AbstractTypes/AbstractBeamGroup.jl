@@ -92,6 +92,17 @@ orientation!(bg::AbstractBeamGroup{T}, M) where {T} = (bg.orientation = SMatrix{
 wavelength(bg::AbstractBeamGroup) = wavelength(first(rays(first(beams(bg)))))
 
 """
+    empty!(bg::AbstractBeamGroup)
+
+Resets every beam of the group to its untraced start state, e.g. to solve the group again after
+the objects of a [`System`](@ref) were changed. The pose of the group is unchanged.
+"""
+function Base.empty!(bg::AbstractBeamGroup)
+    foreach(empty!, beams(bg))
+    return bg
+end
+
+"""
     translate3d!(::Movable, bg::AbstractBeamGroup, offset)
 
 Moves all beams of the group and its `center` by `offset`. Every beam is reset to its untraced start state.

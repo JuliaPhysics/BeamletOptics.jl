@@ -61,6 +61,21 @@ deleting its plots (use [`remove_render!`](@ref) for that). [`update_render!`](@
 [`remove_render!`](@ref) and [`pick_object`](@ref) work on any system handle through these accessors,
 so a handle type of your own only needs to implement them.
 
+An object that is added to a system at runtime, see [Changing a system](@ref), is rendered into the
+handle of the system, and removed from it again, by:
+
+```@docs; canonical=false
+BeamletOptics.live_render!(::BeamletOptics.AbstractSystemRenderHandle, ::BeamletOptics.AbstractObject)
+BeamletOptics.remove_render!(::BeamletOptics.AbstractSystemRenderHandle, ::BeamletOptics.AbstractObject)
+```
+
+```julia
+push!(system, lens)
+live_render!(hsys, lens)     # draws the lens, hsys now updates and picks it
+delete!(system, lens)
+remove_render!(hsys, lens)   # deletes its plots and its handle
+```
+
 Beam handles report how they were drawn:
 
 ```@docs; canonical=false
