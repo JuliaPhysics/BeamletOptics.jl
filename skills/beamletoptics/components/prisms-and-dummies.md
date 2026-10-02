@@ -3,7 +3,7 @@
 ## Prisms
 
 - `RightAnglePrism(leg_length, height, n)`: refractive right-angle prism with legs in x/y and height in z.
-  It is not aligned with the y-axis at spawn, so render it once to check its orientation.
+  `n` may be a number for a constant refractive index. It is not aligned with the y-axis at spawn, so render it once to check its orientation.
 - `Prism(shape, n)`: generic refractive body from an SDF or mesh shape (advanced).
 
 Dispersion needs a λ-dependent index (`SellmeierEquation`). Trace one `Beam` per wavelength.

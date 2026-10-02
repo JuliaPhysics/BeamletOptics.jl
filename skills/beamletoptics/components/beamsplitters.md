@@ -21,7 +21,7 @@ Splitting creates a beam tree: `beam.children == [transmitted, reflected]`.
 
 | Constructor | Geometry at spawn |
 |-------------|-------------------|
-| `CubeBeamsplitter(leg_length, n; reflectance = 0.5)` | centered at the origin, coating at 45° to the y-axis |
+| `CubeBeamsplitter(leg_length, n; reflectance = 0.5)` | centered at the origin, coating at 45° to the y-axis; `n` may be a number |
 | `RectangularPlateBeamsplitter(width, height, thickness, n; reflectance = 0.5)` | coating centered at the origin, substrate towards −y |
 | `RoundPlateBeamsplitter(diameter, thickness, n; reflectance = 0.5)` | as above, round |
 | `ThinBeamsplitter(width[, height]; reflectance = 0.5)` | zero-thickness coating (testing, composites) |

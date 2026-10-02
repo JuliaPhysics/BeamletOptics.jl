@@ -24,9 +24,10 @@ Creates a right angle symmetric [`Prism`](@ref). The prism is *not aligned* with
 
 - `leg_length`: dimension in x- and y-direction in [m]
 - `height`: in [m]
-- `n`: [`RefractiveIndex`](@ref) of the prism
+- `n`: [`RefractiveIndex`](@ref) of the prism, or a number for a constant refractive index
 """
 function RightAnglePrism(leg_length::Real, height::Real, n::RefractiveIndex)
     shape = RightAnglePrismSDF(leg_length, height)
     return Prism(shape, n)
 end
+RightAnglePrism(leg_length::Real, height::Real, n::Real) = RightAnglePrism(leg_length, height, λ -> n)
