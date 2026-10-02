@@ -11,6 +11,18 @@ StaticSystem([obj1, obj2, ...])     # Tuple-backed: faster repeated solves, long
 - `ObjectGroup`s are flattened (`BeamletOptics.objects(system)`).
 - Prefer `System` while building and iterating and for large scenes. Use `StaticSystem` for small,
   fixed systems in tight loops.
+- A `System` can be changed after construction (a `StaticSystem` can not):
+
+```julia
+system = System()                 # empty
+push!(system, lens, mirror)       # objects or groups; an object already in the system throws
+delete!(system, mirror)           # by identity; an object inside a group throws, remove the group
+pop!(system)                      # removes and returns the last top-level object
+popat!(system, i)                 # removes and returns the i-th top-level object (a group is one)
+```
+
+  Beams solved before a change keep their old path: `empty!(beam)`, then
+  `solve_system!(system, beam; retrace = false)`.
 
 ```julia
 solve_system!(system, beam_or_source; r_max = 100, retrace = true, depth_max = 100,

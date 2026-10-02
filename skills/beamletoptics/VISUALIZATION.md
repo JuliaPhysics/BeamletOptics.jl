@@ -78,6 +78,9 @@ hbeam = live_render!(ax, beam)    # all ray segments in one plot
 zrotate3d!(mirror, 1e-3)
 solve_system!(system, beam)
 update_render!(hsys); update_render!(hbeam)   # remove_render!(h) deletes the plots
+
+push!(system, lens); live_render!(hsys, lens)       # object added at runtime
+delete!(system, lens); remove_render!(hsys, lens)   # and removed again
 ```
 
 ## Interactive GUI

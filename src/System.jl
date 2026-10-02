@@ -14,11 +14,87 @@ end
 System(object::AbstractObject) = System([object])
 
 """
+    System()
+
+Creates an empty system, to which objects are added via `push!`.
+"""
+System() = System(AbstractObject[])
+
+"""
     objects(system::System)
 
 Exposes all objects stored within the system. By exposing the `Leaves` of the tree only, it is ensured that `AbstractObjectGroup`s are flattened into a regular vector.
+An empty system exposes no objects.
 """
-objects(system::System) = Leaves(system.objects)
+# `Leaves` of an empty vector is the vector itself, which is no object
+objects(system::System) = isempty(system.objects) ? () : Leaves(system.objects)
+
+"""Returns `true` if `obj` is one of the `leaves`, compared by identity."""
+_is_leaf_of(obj, leaves) = any(leaf -> leaf === obj, leaves)
+
+"""
+    push!(system::System, objects::AbstractObject...) -> system
+
+Adds the `objects` (or object groups) at the top level of the `system`, such that they are traced
+by the following calls of [`solve_system!`](@ref). An object that is already part of the `system`,
+directly or within a group, throws an `ArgumentError`; in this case nothing is added.
+
+Beams that were solved before do not know the new object: solve them again from their start, i.e.
+`empty!(beam)` followed by `solve_system!(system, beam; retrace = false)`. The `system` must not
+be changed while it is being solved.
+"""
+function Base.push!(system::System, objs::AbstractObject...)
+    leaves = AbstractObject[o for o in objects(system)]
+    for obj in objs, leaf in Leaves(obj)
+        _is_leaf_of(leaf, leaves) && throw(ArgumentError(
+            "the $(nameof(typeof(leaf))) is already an object of the system"))
+        push!(leaves, leaf)
+    end
+    append!(system.objects, objs)
+    return system
+end
+
+"""
+    pop!(system::System) -> AbstractObject
+
+Removes the last top-level object (or object group) of the `system` and returns it. Beams that
+were solved before must be solved again from their start, see `delete!(system, object)`.
+"""
+Base.pop!(system::System) = pop!(system.objects)
+
+"""
+    popat!(system::System, i::Integer) -> AbstractObject
+
+Removes the `i`-th top-level object (or object group) of the `system` and returns it. The index
+counts the objects and groups as they were added, a group counts as one. An index out of bounds
+throws a `BoundsError`. Beams that were solved before must be solved again from their start, see
+`delete!(system, object)`.
+"""
+Base.popat!(system::System, i::Integer) = popat!(system.objects, i)
+
+"""
+    delete!(system::System, object::AbstractObject) -> system
+
+Removes the top-level `object` (or object group) from the `system`, compared by identity. An
+object within a group can not be removed on its own, and an `object` that is not part of the
+`system` can not be removed: both throw an `ArgumentError`.
+
+Beams that were solved before still end on the removed object: solve them again from their start,
+i.e. `empty!(beam)` followed by `solve_system!(system, beam; retrace = false)`. The `system` must
+not be changed while it is being solved.
+"""
+function Base.delete!(system::System, obj::AbstractObject)
+    i = findfirst(o -> o === obj, system.objects)
+    if isnothing(i)
+        for top in system.objects
+            any(o -> o === obj, PreOrderDFS(top)) && throw(ArgumentError(
+                "the $(nameof(typeof(obj))) is part of a $(nameof(typeof(top))) of the system, remove the group instead"))
+        end
+        throw(ArgumentError("the $(nameof(typeof(obj))) is not an object of the system"))
+    end
+    deleteat!(system.objects, i)
+    return system
+end
 
 """
     StaticSystem <: AbstractSystem

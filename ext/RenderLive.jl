@@ -242,18 +242,47 @@ object, such that each object of a group can be moved on its own without renderi
 function live_render!(ax::_RenderEnv, sys::BMO.AbstractSystem; kwargs...)
     handles = AbstractObjectRenderHandle[]
     parent = IdDict{BMO.AbstractObject, BMO.AbstractObject}()
-    function render_obj!(obj)
-        if obj isa BMO.AbstractObjectGroup
-            for child in BMO.shape(obj)
-                parent[child] = obj
-                render_obj!(child)
-            end
-            return nothing
+    # Avoid use of objects(sys), which flattens the groups
+    foreach(obj -> _live_render_leaves!(handles, parent, ax, obj; kwargs...), sys.objects)
+    return SystemRenderHandle(ax, sys, handles, parent)
+end
+
+"""
+Live-renders `obj` into the `ax`, an object group per object: pushes the object handles to
+`handles` and stores the enclosing group of each object of a group in `parent`.
+"""
+function _live_render_leaves!(handles, parent, ax::_RenderEnv, obj; kwargs...)
+    if obj isa BMO.AbstractObjectGroup
+        for child in BMO.shape(obj)
+            parent[child] = obj
+            _live_render_leaves!(handles, parent, ax, child; kwargs...)
         end
-        push!(handles, live_render!(ax, obj; kwargs...))
         return nothing
     end
-    # Avoid use of objects(sys), which flattens the groups
-    foreach(render_obj!, sys.objects)
-    return SystemRenderHandle(ax, sys, handles, parent)
+    push!(handles, live_render!(ax, obj; kwargs...))
+    return nothing
+end
+
+"""
+    live_render!(h::SystemRenderHandle, obj::AbstractObject; kwargs...)
+
+Live-renders `obj` into the axis of `h` and adds its object handles to `h`, see
+[`live_render!`](@ref). Returns the new object handles.
+"""
+function live_render!(h::SystemRenderHandle, obj::BMO.AbstractObject; kwargs...)
+    for leaf in BMO.Leaves(obj)
+        any(oh -> rendered(oh) === leaf, h.handles) && throw(ArgumentError(
+            "the $(nameof(typeof(leaf))) is already rendered by the system handle"))
+    end
+    handles = AbstractObjectRenderHandle[]
+    _live_render_leaves!(handles, h.parent, h.ax, obj; kwargs...)
+    append!(h.handles, handles)
+    return handles
+end
+
+# Also forgets the hierarchy of the groups of `obj`
+function remove_render!(h::SystemRenderHandle, obj::BMO.AbstractObject)
+    invoke(remove_render!, Tuple{AbstractSystemRenderHandle, BMO.AbstractObject}, h, obj)
+    foreach(o -> delete!(h.parent, o), BMO.PreOrderDFS(obj))
+    return nothing
 end
