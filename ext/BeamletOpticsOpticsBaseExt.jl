@@ -24,7 +24,7 @@ import BeamletOptics: Detector, GaussianBeamletHit, AstigmaticGaussianBeamletHit
 const BMO = BeamletOptics
 
 import OpticsBase
-using OpticsBase: PlaneField, VACUUM_IMPEDANCE, forward, reference_phase
+using OpticsBase: PlaneField, VACUUM_IMPEDANCE, forward
 using LinearAlgebra: cross, dot, norm
 using StaticArrays: SVector, SMatrix
 
@@ -188,17 +188,27 @@ end
 # -----------------------------------------------------------------------------------------
 # OpticsBase.PlaneField -> BeamletOptics.WavefrontBeamletDecomposition
 
-# Physical field of the part of `f` travelling along +n, for decomposition into BMO beams.
-# BMO starts beams in vacuum, so `f` must lie in vacuum or air. A field without forward
-# light (e.g. a purely backward wave, whose forward part is rounding noise) cannot be
-# decomposed.
+# Samples of the part of `f` travelling along +n, for decomposition into BMO beams. The
+# reference sphere is not multiplied in: its phase may be unresolved by the grid, so the
+# decompositions take the samples and `R = f.R` separately. BMO starts beams in vacuum, so
+# `f` must lie in vacuum or air. A field without forward light (e.g. a purely backward
+# wave, whose forward part is rounding noise) cannot be decomposed.
 function _forward_field(f::OpticsBase.PlaneField)
     f.n == 1 || throw(ArgumentError(
         "$_PREFIX: the PlaneField must lie in vacuum or air (n = 1), got n = $(f.n)"))
     E = forward(f).E
     norm(E) > sqrt(eps(real(eltype(E)))) * norm(f.E) || throw(ArgumentError(
         "$_PREFIX: the PlaneField has no forward-travelling light to decompose"))
-    return E .* reference_phase(f)
+    return E
+end
+
+# Keywords that the PlaneField fixes and a caller must not override
+function _check_fixed_keywords(kwargs)
+    for key in (:basis, :R)
+        haskey(kwargs, key) && throw(ArgumentError(
+            "$_PREFIX: `$key` is taken from the PlaneField and cannot be overridden"))
+    end
+    return nothing
 end
 
 """
@@ -220,32 +230,35 @@ original field (round trip), up to beamlet-grid discretization error.
 - `kwargs...`: forwarded to [`WavefrontBeamletDecomposition`](@ref
   BeamletOptics.WavefrontBeamletDecomposition)`(x, y, Eu, Ev, dir, λ; kwargs...)`
   (`threshold`, `overlap`, `randomize_axes`, `rng`); `basis` is fixed to `f`'s own `(u,
-  v)` and cannot be overridden.
+  v)` and `R` to `f.R`, neither can be overridden.
 
 # Conventions
 
-- The physical field used is `forward(f).E .* reference_phase(forward(f))`: the stored
-  array with the reference-sphere phase (if any) and the local-plane-wave forward/backward
-  split both applied, in \\[V/m\\] peak amplitude, matching the units
-  `AstigmaticGaussianBeamlet`'s `E0` expects.
+- The physical field used is `forward(f).E .* reference_phase(f)`: the stored array with
+  the local-plane-wave forward/backward split and the reference-sphere phase (if any)
+  applied, in \\[V/m\\] peak amplitude, matching the units `AstigmaticGaussianBeamlet`'s
+  `E0` expects. The samples and the sphere are handed on separately (`R = f.R`), so the
+  grid only has to resolve the phase of the stored array, not that of the sphere.
+- `forward` splits each sample as a local plane wave along the reference direction; a
+  beam at the angle `θ` to it loses an amplitude of the order `(1 − cos θ)/2`. Keep the
+  plane close to normal to the beam, which the beamlet size requires anyway (see
+  [`WavefrontBeamletDecomposition`](@ref BeamletOptics.WavefrontBeamletDecomposition)).
 - The beam group's sampling grid is `f`'s own `(u, v)` grid (`OpticsBase.coordinates`), placed at `f.origin` with local axes `f.axes[:, 1:2]`
   (`translate_to3d!` after construction; [`WavefrontBeamletDecomposition`](@ref
   BeamletOptics.WavefrontBeamletDecomposition) itself always centers the undecomposed
   group on the global origin).
 - `f` must lie in vacuum or air (`f.n == 1`): BMO starts beams in vacuum, and a field
   in a medium would need a medium-to-vacuum conversion of amplitude and optical path.
-  An `ArgumentError` is thrown otherwise. `f.R` is folded into the sampled
-  amplitude/phase before decomposition, so no curvature information is lost.
+  An `ArgumentError` is thrown otherwise.
 
 Throws an `ArgumentError` if `f` has no forward-travelling light (e.g. a purely backward
 wave), and whatever `WavefrontBeamletDecomposition(x, y, Eu, Ev, dir, λ)` throws.
 """
 function BeamletOptics.WavefrontBeamletDecomposition(f::OpticsBase.PlaneField; kwargs...)
-    haskey(kwargs, :basis) &&
-        throw(ArgumentError("$_PREFIX: `basis` is fixed to the PlaneField's own (u, v) axes and cannot be overridden"))
-    phys = _forward_field(f)
-    Eu = phys[:, :, 1]
-    Ev = phys[:, :, 2]
+    _check_fixed_keywords(kwargs)
+    E = _forward_field(f)
+    Eu = E[:, :, 1]
+    Ev = E[:, :, 2]
 
     x = collect(OpticsBase.coordinates(f, 1))
     y = collect(OpticsBase.coordinates(f, 2))
@@ -253,7 +266,8 @@ function BeamletOptics.WavefrontBeamletDecomposition(f::OpticsBase.PlaneField; k
     u = SVector{3}(f.axes[:, 1])
     v = SVector{3}(f.axes[:, 2])
 
-    group = WavefrontBeamletDecomposition(x, y, Eu, Ev, n, f.λ; basis = (u, v), kwargs...)
+    group = WavefrontBeamletDecomposition(x, y, Eu, Ev, n, f.λ; basis = (u, v), R = f.R,
+        kwargs...)
     translate_to3d!(group, SVector{3}(f.origin))
     return group
 end
@@ -273,16 +287,17 @@ Use it for fields close to one Gaussian mode that are too small for
 (which needs beamlets much larger than λ).
 
 `optical_power(beamlet) / OpticsBase.power(f)` is the fraction of the power captured by
-the Gaussian mode. The field used is `forward(f).E .* reference_phase(f)`. `f` must lie in
-vacuum or air (`f.n == 1`), where BMO starts beams, and must contain forward-travelling
-light; an `ArgumentError` is thrown otherwise.
+the Gaussian mode. The field used is `forward(f).E .* reference_phase(f)`; the reference
+sphere enters the fit analytically (`R = f.R`), so the grid only has to resolve the phase
+of the stored array. `f` must lie in vacuum or air (`f.n == 1`), where BMO starts beams,
+and must contain forward-travelling light; an `ArgumentError` is thrown otherwise.
 """
 function BeamletOptics.GaussianModeDecomposition(f::OpticsBase.PlaneField)
     E = _forward_field(f)
     u, v, n = (SVector{3}(f.axes[:, i]) for i in 1:3)
     return GaussianModeDecomposition(collect(OpticsBase.coordinates(f, 1)),
         collect(OpticsBase.coordinates(f, 2)), E[:, :, 1], E[:, :, 2], n, f.λ;
-        basis = (u, v), origin = SVector{3}(f.origin))
+        basis = (u, v), origin = SVector{3}(f.origin), R = f.R)
 end
 
 end # module

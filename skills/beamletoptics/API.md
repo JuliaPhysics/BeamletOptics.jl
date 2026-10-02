@@ -144,7 +144,11 @@ only (not rays). `WavefrontBeamletDecomposition(x, y, Eu, Ev, dir, λ)` is the v
 form that takes two field components instead of amplitude, phase and one `E0`.
 `WavefrontBeamletDecomposition` needs beamlets much larger than λ (one per sample, waist 1.2
 samples); for small fields close to one Gaussian mode, e.g. single-mode fiber output, use
-`GaussianModeDecomposition` (plane in air, small tilt, no general astigmatism).
+`GaussianModeDecomposition` (plane in air, small tilt, no general astigmatism). Both resolve
+the phase step between samples only below π: keep the plane normal to the beam (a tilt θ
+needs a spacing below `λ / (2 sin θ)`). Strongly curved wavefronts go in relative to a
+reference sphere: keyword `R` of the `(x, y, Eu, Ev, dir, λ)` forms, taken from `f.R` for a
+`PlaneField`; the sphere itself need not be resolved by the grid.
 
 ## Makie rendering
 

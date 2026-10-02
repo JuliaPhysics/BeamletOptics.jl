@@ -242,9 +242,10 @@ end
 
 @testset "Oblique fields keep their tangential components" begin
     # A plane wave tilted by θ = 10° against the plane normal, sampled finely enough to
-    # resolve its phase ramp. Every beamlet must reproduce the sampled tangential field
-    # and be transverse to its own direction; a projection onto the transverse plane
-    # would scale the tangential field by cos²θ.
+    # resolve its phase ramp. Every beamlet must carry the polarization of the sampled
+    # tangential field and be transverse to its own direction; a projection onto the
+    # transverse plane would scale the tangential field by cos²θ. Its amplitude has the
+    # factor cos θ of its stretched footprint on the plane (see the power test below).
     θ = deg2rad(10)
     k = 2π / λ
     e1, e2, n = [1.0, 0, 0], [0.0, 0, -1], [0.0, 1, 0]
@@ -254,12 +255,13 @@ end
     overlap = 1.2
     group = BMO.WavefrontBeamletDecomposition(xs, xs, Eu, Ev, n, λ; basis = (e1, e2),
         overlap)
-    nf = 1 / (π * overlap^2)                     # amplitude normalization per beamlet
     for b in BMO.beams(group)
         r = BMO.first_ray(b)
         E0 = BMO.polarization(b)
         i = argmin(abs.(xs .- dot(BMO.position(r), e1)))
         j = argmin(abs.(xs .- dot(BMO.position(r), e2)))
+        # amplitude normalization per beamlet
+        nf = dot(BMO.direction(r), n) / (π * overlap^2)
         @test dot(e1, E0) ≈ Eu[i, j] * nf rtol = 1e-9
         @test dot(e2, E0) ≈ Ev[i, j] * nf rtol = 1e-9
         @test abs(dot(BMO.direction(r), E0)) < 1e-12 * norm(E0)
@@ -364,6 +366,91 @@ end
     c = dot(ref.E, fit.E) / (norm(ref.E) * norm(fit.E))
     @test 1 - abs(c) < 1e-6
     @test abs(angle(c)) < 1e-3
+end
+
+@testset "Oblique fields: the traced beamlets carry the power of the field" begin
+    # A Gaussian-enveloped plane wave tilted by θ against the plane normal is decomposed
+    # and traced to a detector. The footprint of a tilted beamlet on the sampling plane is
+    # stretched by 1/cos θ; without the matching cos θ in its amplitude the sum of the
+    # beamlets is 1/cos θ too large, the power 1/cos²θ (7 % at 15°).
+    λo, wenv, dx, overlap = 1e-6, 10e-6, 1e-6, 2.5
+    k = 2π / λo
+    e1, e2, n = [1.0, 0, 0], [0.0, 0, -1], [0.0, 1, 0]
+    xs = collect(((0:47) .- 24) .* dx)
+    traced_power(group) = power(PlaneField(trace!(detector_at(100e-6), group);
+        size = (64, 64), spacing = (3e-6, 3e-6), progress = false))
+    w0 = overlap * dx
+    for θ in deg2rad.((0, 15))
+        ψ = [complex(exp(-(x^2 + y^2) / wenv^2)) * cis(k * sin(θ) * x) for x in xs, y in xs]
+        # The beamlets smooth the envelope with their footprint (radius w0, along e1
+        # w0 / cos θ), which takes this known share of the power of the narrow envelope.
+        smoothing = wenv^2 / sqrt((wenv^2 + (w0 / cos(θ))^2) * (wenv^2 + w0^2))
+        S = smoothing * sum(abs2, ψ) * dx^2 / (2Z0)
+        decompose(Eu, Ev) = BMO.WavefrontBeamletDecomposition(xs, xs, Eu, Ev, n, λo;
+            basis = (e1, e2), overlap)
+        # s-polarized (E along e2, normal to the plane of incidence): flux |E|² cos θ / 2Z₀
+        @test traced_power(decompose(zero(ψ), ψ)) ≈ S * cos(θ) rtol = 1e-2
+        # p-polarized: the tangential field is |E| cos θ, so the flux is |Eu|² / (2Z₀ cos θ)
+        @test traced_power(decompose(ψ, zero(ψ))) ≈ S / cos(θ) rtol = 1e-2
+        # scalar method, amplitude |E|, s-polarized by E0
+        scalar = BMO.WavefrontBeamletDecomposition(xs, xs, abs.(ψ), angle.(ψ), n, λo;
+            basis = (e1, e2), overlap, E0 = e2)
+        @test traced_power(scalar) ≈ S * cos(θ) rtol = 1e-2
+    end
+end
+
+@testset "Decompositions: reference sphere that the grid does not resolve" begin
+    # A converging beam (w = 0.8 mm, R = −50 mm) stored relative to its reference sphere,
+    # i.e. as a flat Gaussian. Between neighboring samples the phase of the sphere changes
+    # by about 5 rad at the beam radius, so it must enter analytically: phase steps of the
+    # physical field would alias.
+    λr, w, R = 1e-6, 0.8e-3, -0.05
+    N, Δ = 80, 50e-6
+    k = 2π / λr
+    @test k * w * Δ / abs(R) > π
+    u, v, n = [1.0, 0, 0], [0.0, 0, -1], [0.0, 1, 0]
+    cs = ((0:(N - 1)) .- N ÷ 2) .* Δ
+    xc, yc = 0.2e-3, -0.1e-3                         # beam off the axis of the sphere
+    E = [complex(exp(-((x - xc)^2 + (y - yc)^2) / w^2)) for x in cs, y in cs]
+    f = OpticsBase.PlaneField(E, (Δ, Δ), zeros(3), hcat(u, v, n), λr; R)
+    focus = abs(R) * n                               # center of the sphere
+
+    # one fitted mode: radius, curvature, direction towards the focus and power
+    mode() = BMO.GaussianModeDecomposition(f)
+    m = mode()
+    w1, w2, R1, R2 = BMO.gauss_parameters(m, 0.0)
+    @test w1 ≈ w rtol = 1e-3
+    @test w2 ≈ w rtol = 1e-3
+    @test R1 ≈ R rtol = 1e-2
+    @test R2 ≈ R rtol = 1e-2
+    r = BMO.first_ray(m)
+    @test BMO.position(r) ≈ xc * u + yc * v rtol = 1e-3
+    @test BMO.direction(r) ≈ normalize(focus - BMO.position(r)) atol = 1e-5
+    @test BMO.optical_power(m) / power(f) ≈ 1 rtol = 1e-3
+
+    # beamlet tiling: every beamlet travels along the ray of the sphere through its sample
+    group() = BMO.WavefrontBeamletDecomposition(f)
+    g = group()
+    @test all(BMO.beams(g)) do b
+        r = BMO.first_ray(b)
+        norm(BMO.direction(r) - normalize(focus - BMO.position(r))) < 1e-9
+    end
+
+    # both decompositions give the same field 10 mm further on, where the beam has
+    # shrunk to 0.8 w
+    sample(beams) = PlaneField(trace!(detector_at(0.01), beams); size = (64, 64),
+        spacing = (50e-6, 50e-6), progress = false)
+    tiled, fitted = sample(group()), sample(mode())
+    c = dot(fitted.E, tiled.E) / (norm(fitted.E) * norm(tiled.E))
+    @test abs(c) > 0.999
+    @test abs(angle(c)) < 0.02
+    @test power(tiled) ≈ power(f) rtol = 1e-2
+    @test power(fitted) ≈ power(f) rtol = 1e-2
+
+    # `basis` and `R` come from the PlaneField
+    @test_throws ArgumentError BMO.WavefrontBeamletDecomposition(f; R = 1.0)
+    @test_throws ArgumentError BMO.GaussianModeDecomposition(cs, cs, E, zero(E), n, λr;
+        R = 0)
 end
 
 end # module
