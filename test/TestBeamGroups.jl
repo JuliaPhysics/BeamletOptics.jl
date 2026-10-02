@@ -397,6 +397,20 @@ const BMO = BeamletOptics
         @test BMO.wavelength(PointSource([0, 0, 0], [0, 1, 0], 0.1, λ; num_rings = 2, num_rays = 50)) == λ
         @test Base.ispublic(BeamletOptics, :wavelength)
     end
+
+    @testset "empty!" begin
+        mirror = RoundPlanoMirror(25e-3, 5e-3)
+        translate3d!(mirror, [0, 0.1, 0])
+        source = CollimatedSource([0, 0, 0], [0, 1, 0], 5e-3, 1e-6; num_rings = 2)
+        pos, R = position(source), BMO.orientation(source)
+        solve_system!(System([mirror]), source)
+        @test all(b -> length(rays(b)) == 2, BMO.beams(source))
+        @test empty!(source) === source
+        @test all(b -> length(rays(b)) == 1, BMO.beams(source))
+        @test all(b -> isnothing(BMO.intersection(first(rays(b)))), BMO.beams(source))
+        @test position(source) == pos
+        @test BMO.orientation(source) == R
+    end
 end
 
 end # MODULE

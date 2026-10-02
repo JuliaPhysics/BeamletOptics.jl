@@ -121,9 +121,16 @@ const BMO = BeamletOptics
         hit(beam) = BMO.intersection(first(BMO.rays(beam)))
         function solve!(system, beam)
             empty!(beam)
-            solve_system!(system, beam; retrace = false)
+            solve_system!(system, beam)
             return beam
         end
+
+        # the system holds a copy of the vector of objects
+        objs = BMO.AbstractObject[m1]
+        copied = System(objs)
+        push!(copied, m4)
+        @test objs == [m1]
+        @test System(objs).objects !== objs
 
         # an empty system exposes no objects and is solved without a hit
         system = System()
@@ -158,11 +165,22 @@ const BMO = BeamletOptics
         # delete!
         @test_throws "ObjectGroup" delete!(system, m2)
         @test_throws ArgumentError delete!(system, m2)
-        @test_throws ArgumentError delete!(system, m4)
+        # nothing happens for an object that is not part of the system
+        @test delete!(system, m4) === system
         @test length(system.objects) == 2
         @test delete!(system, m1) === system
         @test collect(BMO.objects(system)) == [m2, m3]
         @test isnothing(hit(solve!(system, beam)))
+
+        # a beam group is solved again from its start like a beam
+        source = CollimatedSource([0.0, 0, 0], [0.0, 1, 0], 5e-3, 1e-6; num_rings = 2)
+        blocked = System([m1])
+        solve_system!(blocked, source)
+        @test all(b -> length(BMO.rays(b)) == 2, BMO.beams(source))
+        delete!(blocked, m1)
+        @test empty!(source) === source
+        solve_system!(blocked, source)
+        @test all(b -> length(BMO.rays(b)) == 1 && isnothing(hit(b)), BMO.beams(source))
 
         # pop!
         @test pop!(system) === group

@@ -323,9 +323,13 @@ per object, with its hierarchy known to [`render_parent`](@ref), like the groups
 `h` is not changed. An `obj` that `h` already renders throws an `ArgumentError`.
 
 Keyword arguments are passed on as for [`render!`](@ref). Implemented by the handle returned by
-`live_render!(ax, system)`.
+`live_render!(ax, system)`. A system handle that does not implement it throws an `ArgumentError`:
+render `obj` via `live_render!(ax, obj)` and add its handle via `push!(h, oh)` instead.
 """
-live_render!(::AbstractSystemRenderHandle, ::AbstractObject; kwargs...)
+function live_render!(h::AbstractSystemRenderHandle, ::AbstractObject; kwargs...)
+    throw(ArgumentError(
+        "a $(nameof(typeof(h))) can not render objects, use live_render!(ax, obj) and push!(h, oh) instead"))
+end
 
 """
     update_render!(handle)
@@ -361,9 +365,14 @@ end
 
 Removes `obj` from the system handle `h`: deletes the plots of `obj` (of all objects of an object
 group) from the axis and removes their object handles from `h`, e.g. after `delete!(system, obj)`.
-The system of `h` is not changed. Nothing happens for an `obj` that `h` does not render.
+The system of `h` is not changed. Nothing happens for an `obj` that `h` does not render. An object
+within a group can not be removed on its own and throws an `ArgumentError`: remove the group
+instead.
 """
 function remove_render!(h::AbstractSystemRenderHandle, obj::AbstractObject)
+    parent = render_parent(h, obj)
+    isnothing(parent) || throw(ArgumentError(
+        "the $(nameof(typeof(obj))) is part of a $(nameof(typeof(parent))) of the system handle, remove the group instead"))
     leaves = collect(Leaves(obj))
     for oh in filter(oh -> _is_leaf_of(rendered(oh), leaves), render_children(h))
         remove_render!(oh)

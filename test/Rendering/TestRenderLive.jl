@@ -38,6 +38,9 @@ BMO.kinematic_trait_of(::_Marker) = BMO.Movable(BMO.Oriented())
 # clicks on the outline reach what lies behind it
 BMO.pickable_plots(::_Marker, plots) = filter(p -> !(p isa Makie.Lines), plots)
 
+# An object without a shape, whose rendering throws
+struct _Unrenderable <: BMO.AbstractObject{Float64} end
+
 # An own system handle on the protocol, e.g. of a GUI that combines the handles of several systems
 struct _Combined <: BMO.AbstractSystemRenderHandle
     sys::System
@@ -385,6 +388,11 @@ Base.delete!(h::_Combined, oh::BMO.AbstractObjectRenderHandle) = (filter!(c -> c
         @test isnothing(BMO.render_parent(h, group))
         @test pick_object(h, BMO.render_plots(new[2])[1]) === group
         @test_throws ArgumentError live_render!(h, m3)
+        # an object of a group can not be removed on its own
+        @test_throws "ObjectGroup" remove_render!(h, m2)
+        @test_throws ArgumentError remove_render!(h, inner)
+        @test length(BMO.render_children(h)) == 4
+        @test BMO.render_parent(h, m2) === group
 
         # the plots of the added objects follow them
         translate3d!(group, [0.02, -0.01, 0.005])
@@ -411,8 +419,20 @@ Base.delete!(h::_Combined, oh::BMO.AbstractObjectRenderHandle) = (filter!(c -> c
         remove_render!(h, group)
         @test length(BMO.render_children(h)) == 2
 
-        # an own system handle removes objects through the protocol
+        # a group that can not be rendered completely leaves the handle and the axis unchanged
+        m4 = RoundPlanoMirror(0.02, 0.004)
+        broken = ObjectGroup([m4, _Unrenderable()])
+        n_plots = length(ax.scene.plots)
+        @test_throws Exception live_render!(h, broken)
+        @test length(ax.scene.plots) == n_plots
+        @test length(BMO.render_children(h)) == 2
+        @test isnothing(BMO.render_parent(h, m4))
+        @test length(live_render!(h, m4)) == 1
+        remove_render!(h, m4)
+
+        # an own system handle removes objects through the protocol, but can not render them
         c = _Combined(sys, copy(BMO.render_children(h)))
+        @test_throws ArgumentError live_render!(c, m4)
         lens_plots = copy(BMO.render_plots(BMO.render_children(h)[2]))
         remove_render!(c, lens)
         @test [BMO.rendered(oh) for oh in BMO.render_children(c)] == [m]

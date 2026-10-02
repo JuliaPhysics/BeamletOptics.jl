@@ -5,10 +5,12 @@ A container storing the optical elements of, i.e. a camera lens or lab setup.
 
 # Fields
 
-- `objects`: vector containing the different objects that are part of the system (subtypes of [`AbstractObject`](@ref))
+- `objects`: vector containing the different objects that are part of the system (subtypes of [`AbstractObject`](@ref)).
+  The constructor copies the vector it is given, such that `push!` and `delete!` of the system do not change it.
 """
 struct System <: AbstractSystem
     objects::Vector{AbstractObject}
+    System(objects::AbstractVector) = new(collect(AbstractObject, objects))
 end
 
 System(object::AbstractObject) = System([object])
@@ -20,13 +22,13 @@ Creates an empty system, to which objects are added via `push!`.
 """
 System() = System(AbstractObject[])
 
+# `Leaves` of an empty vector is the vector itself, which is no object
 """
     objects(system::System)
 
 Exposes all objects stored within the system. By exposing the `Leaves` of the tree only, it is ensured that `AbstractObjectGroup`s are flattened into a regular vector.
 An empty system exposes no objects.
 """
-# `Leaves` of an empty vector is the vector itself, which is no object
 objects(system::System) = isempty(system.objects) ? () : Leaves(system.objects)
 
 """Returns `true` if `obj` is one of the `leaves`, compared by identity."""
@@ -39,8 +41,8 @@ Adds the `objects` (or object groups) at the top level of the `system`, such tha
 by the following calls of [`solve_system!`](@ref). An object that is already part of the `system`,
 directly or within a group, throws an `ArgumentError`; in this case nothing is added.
 
-Beams that were solved before do not know the new object: solve them again from their start, i.e.
-`empty!(beam)` followed by `solve_system!(system, beam; retrace = false)`. The `system` must not
+Beams and beam groups that were solved before do not know the new object: solve them again from
+their start, i.e. `empty!(beam)` followed by `solve_system!(system, beam)`. The `system` must not
 be changed while it is being solved.
 """
 function Base.push!(system::System, objs::AbstractObject...)
@@ -75,12 +77,12 @@ Base.popat!(system::System, i::Integer) = popat!(system.objects, i)
 """
     delete!(system::System, object::AbstractObject) -> system
 
-Removes the top-level `object` (or object group) from the `system`, compared by identity. An
-object within a group can not be removed on its own, and an `object` that is not part of the
-`system` can not be removed: both throw an `ArgumentError`.
+Removes the top-level `object` (or object group) from the `system`, compared by identity. Nothing
+happens for an `object` that is not part of the `system`. An object within a group can not be
+removed on its own and throws an `ArgumentError`: remove the group instead.
 
-Beams that were solved before still end on the removed object: solve them again from their start,
-i.e. `empty!(beam)` followed by `solve_system!(system, beam; retrace = false)`. The `system` must
+Beams and beam groups that were solved before still end on the removed object: solve them again
+from their start, i.e. `empty!(beam)` followed by `solve_system!(system, beam)`. The `system` must
 not be changed while it is being solved.
 """
 function Base.delete!(system::System, obj::AbstractObject)
@@ -90,7 +92,7 @@ function Base.delete!(system::System, obj::AbstractObject)
             any(o -> o === obj, PreOrderDFS(top)) && throw(ArgumentError(
                 "the $(nameof(typeof(obj))) is part of a $(nameof(typeof(top))) of the system, remove the group instead"))
         end
-        throw(ArgumentError("the $(nameof(typeof(obj))) is not an object of the system"))
+        return system
     end
     deleteat!(system.objects, i)
     return system

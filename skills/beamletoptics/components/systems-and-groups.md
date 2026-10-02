@@ -16,13 +16,13 @@ StaticSystem([obj1, obj2, ...])     # Tuple-backed: faster repeated solves, long
 ```julia
 system = System()                 # empty
 push!(system, lens, mirror)       # objects or groups; an object already in the system throws
-delete!(system, mirror)           # by identity; an object inside a group throws, remove the group
+delete!(system, mirror)           # by identity, no-op if absent; an object inside a group throws
 pop!(system)                      # removes and returns the last top-level object
 popat!(system, i)                 # removes and returns the i-th top-level object (a group is one)
 ```
 
-  Beams solved before a change keep their old path: `empty!(beam)`, then
-  `solve_system!(system, beam; retrace = false)`.
+  Beams and sources solved before a change keep their old path: `empty!(beam)`, then
+  `solve_system!(system, beam)`. `System(v)` copies the vector `v`.
 
 ```julia
 solve_system!(system, beam_or_source; r_max = 100, retrace = true, depth_max = 100,

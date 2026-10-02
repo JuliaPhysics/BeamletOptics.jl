@@ -27,11 +27,14 @@ pop!(system)                  # removes the last top-level object and returns it
 popat!(system, 1)             # removes the first top-level object and returns it
 ```
 
-`push!` rejects an object that is already part of the system, `delete!` an object that is not, or
-that is part of an object group (remove the group instead). The index of `popat!` counts the objects
-and groups as they were added, a group counts as one. Beams that were solved before the change
-must be solved again from their start: call `empty!(beam)` and then
-`solve_system!(system, beam; retrace = false)`. A [`StaticSystem`](@ref) can not be changed.
+A [`StaticSystem`](@ref) can not be changed.
+
+```@docs; canonical=false
+Base.push!(::System, ::Vararg{BeamletOptics.AbstractObject})
+Base.pop!(::System)
+Base.popat!(::System, ::Integer)
+Base.delete!(::System, ::BeamletOptics.AbstractObject)
+```
 
 ## Solving systems
 

@@ -251,15 +251,16 @@ end
 Live-renders `obj` into the `ax`, an object group per object: pushes the object handles to
 `handles` and stores the enclosing group of each object of a group in `parent`.
 """
-function _live_render_leaves!(handles, parent, ax::_RenderEnv, obj; kwargs...)
-    if obj isa BMO.AbstractObjectGroup
-        for child in BMO.shape(obj)
-            parent[child] = obj
-            _live_render_leaves!(handles, parent, ax, child; kwargs...)
-        end
-        return nothing
-    end
+function _live_render_leaves!(handles, parent, ax::_RenderEnv, obj::BMO.AbstractObject; kwargs...)
     push!(handles, live_render!(ax, obj; kwargs...))
+    return nothing
+end
+
+function _live_render_leaves!(handles, parent, ax::_RenderEnv, group::BMO.AbstractObjectGroup; kwargs...)
+    for child in BMO.shape(group)
+        parent[child] = group
+        _live_render_leaves!(handles, parent, ax, child; kwargs...)
+    end
     return nothing
 end
 
@@ -267,7 +268,8 @@ end
     live_render!(h::SystemRenderHandle, obj::AbstractObject; kwargs...)
 
 Live-renders `obj` into the axis of `h` and adds its object handles to `h`, see
-[`live_render!`](@ref). Returns the new object handles.
+[`live_render!`](@ref). Returns the new object handles. If an object of `obj` can not be rendered,
+`h` and its axis are left as they were.
 """
 function live_render!(h::SystemRenderHandle, obj::BMO.AbstractObject; kwargs...)
     for leaf in BMO.Leaves(obj)
@@ -275,7 +277,15 @@ function live_render!(h::SystemRenderHandle, obj::BMO.AbstractObject; kwargs...)
             "the $(nameof(typeof(leaf))) is already rendered by the system handle"))
     end
     handles = AbstractObjectRenderHandle[]
-    _live_render_leaves!(handles, h.parent, h.ax, obj; kwargs...)
+    before = Set(objectid(p) for p in h.ax.scene.plots)
+    try
+        _live_render_leaves!(handles, h.parent, h.ax, obj; kwargs...)
+    catch
+        # Leave no plots and no hierarchy of a partially rendered group behind
+        foreach(p -> delete!(h.ax, p), [p for p in h.ax.scene.plots if objectid(p) ∉ before])
+        foreach(o -> delete!(h.parent, o), BMO.PreOrderDFS(obj))
+        rethrow()
+    end
     append!(h.handles, handles)
     return handles
 end
