@@ -360,38 +360,45 @@ function interact3d(::AbstractSystem, d::Detector, beam::Beam{T, R},
     end
 end
 
-function interact3d(::AbstractSystem, d::Detector, g::GaussianBeamlet{R}, id::Int) where {R}
-    l0 = length(g) - length(g.chief.rays[id])
-    # Pre-calculate cache
+"""
+    GaussianBeamletHit(g::GaussianBeamlet, id)
+
+Hit record of the traced segment `id` of `g`: the data that [`beamlet_hit_field`](@ref)
+needs to evaluate the field of that segment at any point near it. [`Detector`](@ref)s store
+one per beamlet that hits them; it can also be built for any traced segment, e.g. to sample
+a beamlet on a plane of one's own. `l0` is the length of the beam (including its parents)
+up to the start of the segment. The projection factor is `1` if the segment ends without an
+intersection.
+"""
+function GaussianBeamletHit(g::GaussianBeamlet{R}, id::Integer) where {R}
     ray = g.chief.rays[id]
+    l0 = _length_before(g.chief, id)
     p0 = position(ray)
     d0 = direction(ray)
-    sqrt_proj = sqrt(abs(dot(d0, normal3d(intersection(ray)))))
-
-    # Calculate actual beam radius at detector for auto-limits
-    w_at_detector, _, _, _ = gauss_parameters(g, length(g))
-    w_max = w_at_detector
-
-    push!(d, GaussianBeamletHit(g, l0, id, p0, d0, sqrt_proj, w_max))
-    if stop(d)
-        # Stop solver (hard target)
-        return nothing
-    else
-        # Continue tracing # FIXME
-        throw(ErrorException("Continued tracing for GaussianBeamlet not yet implemented."))
-    end
+    sqrt_proj = _projection_factor(ray)
+    # Beam radius at the end of the segment, for the auto-limits of the field plots
+    l_end = isfinite(length(ray)) ? l0 + length(ray) : l0
+    w_max, _, _, _ = gauss_parameters(g, l_end)
+    return GaussianBeamletHit(g, l0, Int(id), p0, d0, sqrt_proj, w_max)
 end
 
-function interact3d(system::AbstractSystem, d::Detector,
-        agb::AstigmaticGaussianBeamlet{R}, id::Int) where {R}
-    l0 = length(agb) - length(agb.c.rays[id])
+"""
+    AstigmaticGaussianBeamletHit(agb::AstigmaticGaussianBeamlet, id)
 
+Hit record of the traced segment `id` of `agb`: the data that [`beamlet_hit_field`](@ref)
+needs to evaluate the field of that segment at any point near it, including the optical
+path from the source (parents included), the Gouy factor and the reference amplitude.
+[`Detector`](@ref)s store one per beamlet that hits them; it can also be built for any
+traced segment, e.g. to sample a beamlet on a plane of one's own. The projection factor is
+`1` if the segment ends without an intersection.
+"""
+function AstigmaticGaussianBeamletHit(agb::AstigmaticGaussianBeamlet{R}, id::Integer) where {R}
     # Pre-calculate cache
     chief = rays(agb.c)[id]
     p0 = position(chief)
     d0 = direction(chief)
     k0 = 2π / wavelength(chief)
-    sqrt_proj = sqrt(abs(dot(d0, normal3d(intersection(chief)))))
+    sqrt_proj = _projection_factor(chief)
 
     # Parabasal parameters at segment start (p0)
     h1, u1, h2, u2, _ = parabasal_ray_parameters(agb, p0, id)
@@ -413,30 +420,61 @@ function interact3d(system::AbstractSystem, d::Detector,
     max_idx = argmax(abs.(E_vec))
     E_ref_amp = Complex{R}(norm(E_vec) * cis(angle(E_vec[max_idx])))
 
-    # OPL correction (Δl)
+    # OPL correction (Δl) and geometric length up to the start of the segment (l0)
     p_parent = agb.parent
     l_parent = isnothing(p_parent) ? 0.0 : length(p_parent)
     opl_parent = isnothing(p_parent) ? 0.0 : optical_path_length(p_parent)
 
     Δl = opl_parent - l_parent
-    z_sum = l_parent
+    l0 = l_parent
     for j in 1:(id - 1)
         ray_j = rays(agb.c)[j]
         Δl += optical_path_length(ray_j) - length(ray_j)
-        z_sum += length(ray_j)
+        l0 += length(ray_j)
     end
-    # Note: the (n-1)*z term in parabasal_field depends on (z - z_sum).
-    # Propagate semi-axes to detector for w_max (auto-limits)
-    H1 = h1 + length(chief) * u1
-    H2 = h2 + length(chief) * u2
+    # Note: the (n-1)*z term in parabasal_field depends on (z - l0).
+    # Propagate semi-axes to the end of the segment for w_max (auto-limits)
+    l_seg = isfinite(length(chief)) ? length(chief) : zero(R)
+    H1 = h1 + l_seg * u1
+    H2 = h2 + l_seg * u2
     w_max = max(norm(H1), norm(H2))
     n_eff = refractive_index(agb, id)
 
-    push!(d,
-        AstigmaticGaussianBeamletHit(
-            agb, l0, id, p0, d0, h1, u1, h2, u2, gouy0, ρ1, ρ2, k0, Δl,
-            n_eff, E_ref_amp, sqrt_proj, w_max
-        ))
+    return AstigmaticGaussianBeamletHit(
+        agb, R(l0), Int(id), p0, d0, h1, u1, h2, u2, gouy0, ρ1, ρ2, k0, R(Δl),
+        n_eff, E_ref_amp, sqrt_proj, w_max)
+end
+
+# Geometric length of `beam` (including its parents) up to the start of ray `id`
+function _length_before(beam::Beam{T}, id::Integer) where {T}
+    p = AbstractTrees.parent(beam)
+    l = isnothing(p) ? zero(T) : length(p)
+    for j in 1:(id - 1)
+        l += length(rays(beam)[j])
+    end
+    return l
+end
+
+# √|d·n| of a ray ending on a surface with normal n; 1 without an intersection
+function _projection_factor(ray::AbstractRay{T}) where {T}
+    isnothing(intersection(ray)) && return one(T)
+    return sqrt(abs(dot(direction(ray), normal3d(intersection(ray)))))
+end
+
+function interact3d(::AbstractSystem, d::Detector, g::GaussianBeamlet{R}, id::Int) where {R}
+    push!(d, GaussianBeamletHit(g, id))
+    if stop(d)
+        # Stop solver (hard target)
+        return nothing
+    else
+        # Continue tracing # FIXME
+        throw(ErrorException("Continued tracing for GaussianBeamlet not yet implemented."))
+    end
+end
+
+function interact3d(system::AbstractSystem, d::Detector,
+        agb::AstigmaticGaussianBeamlet{R}, id::Int) where {R}
+    push!(d, AstigmaticGaussianBeamletHit(agb, id))
     if stop(d)
         # Stop solver (hard target)
         return nothing

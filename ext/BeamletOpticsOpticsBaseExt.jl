@@ -16,6 +16,7 @@ module BeamletOpticsOpticsBaseExt
 
 using BeamletOptics
 import BeamletOptics: Detector, GaussianBeamletHit, AstigmaticGaussianBeamletHit,
+                       GaussianBeamlet, AstigmaticGaussianBeamlet,
                        position, direction, orientation, wavelength, refractive_index,
                        beamlet_hit_field, beamlet_hit_polarization,
                        WavefrontBeamletDecomposition, GaussianModeDecomposition,
@@ -96,6 +97,35 @@ function OpticsBase.PlaneField(detector::Detector;
         origin = position(detector), axes = _default_plane_axes(detector),
         progress::Bool = true)
     hs = _beamlet_hits(detector)
+    λ, n_medium = _common_wavelength_index(hs)
+    return _sample_plane_field(hs, λ, n_medium, size, spacing, origin, axes, progress)
+end
+
+"""
+    OpticsBase.PlaneField(beam::BeamletOptics.AstigmaticGaussianBeamlet, id::Integer;
+        size::NTuple{2,Int}, spacing::NTuple{2,Real}, origin, axes, progress = false)
+    OpticsBase.PlaneField(beam::BeamletOptics.GaussianBeamlet, id::Integer; kwargs...)
+
+Samples the field of segment `id` of a traced beamlet `beam` on a plane, as
+`PlaneField(detector; ...)` does for the beamlets that hit a detector. Use it where there is
+no detector, e.g. in the `interact3d` of a component that hands the incoming beamlet to
+another solver: the segment that just hit the component is `id`.
+
+`size` and `spacing` are as for `PlaneField(detector; ...)`; `origin` (in \\[m\\]) and
+`axes` (columns `u`, `v`, `n`) place the plane and have no default. The field is that of
+the segment's straight continuation through the plane (no further interaction), including
+the optical path from the source (parents included), and follows the conventions of
+`PlaneField(detector; ...)`: no projection factor, `H` from the beamlet direction, a scalar
+`GaussianBeamlet` polarized along `u`, `R = Inf`, `n` the refractive index of the segment.
+"""
+OpticsBase.PlaneField(beam::Union{GaussianBeamlet, AstigmaticGaussianBeamlet}, id::Integer;
+    size::NTuple{2, Int}, spacing::NTuple{2, <:Real}, origin, axes, progress::Bool = false) =
+    _plane_field([_hit(beam, id)], size, spacing, origin, axes, progress)
+
+_hit(beam::GaussianBeamlet, id) = GaussianBeamletHit(beam, id)
+_hit(beam::AstigmaticGaussianBeamlet, id) = AstigmaticGaussianBeamletHit(beam, id)
+
+function _plane_field(hs, size, spacing, origin, axes, progress)
     λ, n_medium = _common_wavelength_index(hs)
     return _sample_plane_field(hs, λ, n_medium, size, spacing, origin, axes, progress)
 end

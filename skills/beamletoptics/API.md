@@ -128,7 +128,7 @@ They also take `progress = true` (see Solving). See `components/detectors.md`.
 ## Coupling to other solvers (OpticsBase)
 
 `using OpticsBase` activates the extension. Fields go to and come from other solvers
-(e.g. BeamletFibers) as `OpticsBase.PlaneField` (tangential E and H on a plane):
+(e.g. FiberOptics) as `OpticsBase.PlaneField` (tangential E and H on a plane):
 
 ```julia
 f = PlaneField(det; size = (256, 256), spacing = (1e-6, 1e-6))  # after solve_system!
@@ -149,6 +149,19 @@ the phase step between samples only below π: keep the plane normal to the beam 
 needs a spacing below `λ / (2 sin θ)`). Strongly curved wavefronts go in relative to a
 reference sphere: keyword `R` of the `(x, y, Eu, Ev, dir, λ)` forms, taken from `f.R` for a
 `PlaneField`; the sphere itself need not be resolved by the grid.
+
+Components that hand a beamlet to another solver and emit the result again (e.g. a fiber
+from FiberOptics) use two developer functions in their `interact3d(system, obj, agb, id)`:
+
+```julia
+f = PlaneField(agb, id; size, spacing, origin, axes)   # the segment that hit obj, on a plane
+g = other_solver(f)                                     # PlaneField at the exit, full phase
+BeamletOptics.relaunch!(agb, [GaussianModeDecomposition(g)])   # traced on, own phase reference
+```
+
+`relaunch!` (public, not exported) attaches the new beamlets as children that count their
+optical path from their own start; `children!` would add the parent's path and reference
+plane a second time and is only right for beams that continue where the parent ended.
 
 ## Makie rendering
 

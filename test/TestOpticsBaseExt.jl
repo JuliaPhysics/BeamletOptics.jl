@@ -453,4 +453,98 @@ end
         R = 0)
 end
 
+@testset "PlaneField of one traced beamlet segment" begin
+    det = trace!(detector_at(zdet), agb_at())
+    hit = only(BMO.hits(det))
+    fd = PlaneField(det; size = (48, 48), spacing = (w0 / 6, w0 / 6), progress = false)
+    fb = PlaneField(hit.agb, hit.id; size = (48, 48), spacing = (w0 / 6, w0 / 6),
+        origin = fd.origin, axes = fd.axes)
+    @test fb.E == fd.E && fb.H == fd.H
+    @test fb.origin == fd.origin && fb.axes == fd.axes && fb.n == fd.n
+    # stigmatic beamlets too
+    det = trace!(detector_at(zdet), BMO.GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], λ, w0; P0))
+    hit = only(BMO.hits(det))
+    fd = PlaneField(det; size = (32, 32), spacing = (w0 / 4, w0 / 4), progress = false)
+    fb = PlaneField(hit.gauss, hit.id; size = (32, 32), spacing = (w0 / 4, w0 / 4),
+        origin = fd.origin, axes = fd.axes)
+    @test fb.E == fd.E
+end
+
+# A minimal re-emitting component: samples the incoming beamlet on its plane, moves the
+# field by `shift` (as if it had travelled through a fiber) and emits it again as one
+# fitted beamlet with `relaunch!`.
+mutable struct Relauncher{T, S <: BMO.AbstractShape{T}} <: BMO.AbstractObject{T}
+    const shape::S
+    shift::Vector{T}
+    phase::T
+end
+
+function Relauncher(edge, shift, phase)
+    shape = BMO.QuadraticFlatMesh(edge)
+    BMO.zrotate3d!(shape, π)            # normal along −y, like a Detector
+    return Relauncher{Float64, typeof(shape)}(shape, shift, phase)
+end
+
+const RN, RΔ = 64, w0 / 8
+
+function plane_axes(o)
+    R = BMO.orientation(o)
+    n, u = -R[:, 2], -R[:, 1]
+    return hcat(u, cross(n, u), n)
+end
+
+relaunched_field(f, r) = PlaneField(f.E .* cis(r.phase), f.H .* cis(r.phase), f.spacing,
+    f.origin + r.shift, f.axes, f.λ; n = f.n)
+
+function BMO.interact3d(::BMO.AbstractSystem, r::Relauncher,
+        agb::BMO.AstigmaticGaussianBeamlet, id::Int)
+    f = PlaneField(agb, id; size = (RN, RN), spacing = (RΔ, RΔ),
+        origin = BMO.position(r), axes = plane_axes(r))
+    BMO.relaunch!(agb, [BMO.GaussianModeDecomposition(relaunched_field(f, r))])
+    return nothing
+end
+
+@testset "relaunch!: re-emitted beamlets keep the absolute phase" begin
+    zr, zd = 0.1, 0.3                    # relauncher, detector behind its output
+    shift, phase = [2e-3, 0.05, 1e-3], 0.7
+    sample(det) = PlaneField(det; size = (RN, RN), spacing = (RΔ, RΔ), progress = false)
+    output_detector() = (d = detector_at(zd); BMO.translate3d!(d, shift); d)
+
+    # Independent function chain: detector at the relauncher plane → PlaneField → move →
+    # fitted beamlet as a new source → detector
+    function chain(source; at = [0, zr, 0])
+        d = BMO.Detector(0.05)
+        BMO.translate3d!(d, at)
+        f = sample(trace!(d, source))
+        emitted = BMO.GaussianModeDecomposition(relaunched_field(f, Relauncher(0.05, shift, phase)))
+        return sample(trace!(output_detector(), emitted))
+    end
+    close_to(a, b) = maximum(abs, a.E - b.E) <= 1e-9 * maximum(abs, b.E)
+
+    r = Relauncher(0.05, shift, phase)
+    BMO.translate3d!(r, [0, zr, 0])
+    det = output_detector()
+    system = BMO.System([r, det])
+    source = agb_at()
+    BMO.solve_system!(system, source)
+    @test length(BMO.children(source)) == 1
+    @test close_to(sample(det), chain(agb_at()))
+
+    # Moving the source traces anew
+    BMO.translate3d!(source, [3e-4, 0, 0])
+    empty!(det)
+    BMO.solve_system!(system, source)
+    @test length(BMO.children(source)) == 1
+    moved() = (b = agb_at(); BMO.translate3d!(b, [3e-4, 0, 0]); b)   # a fresh, untraced source
+    @test close_to(sample(det), chain(moved()))
+
+    # Moving the component retraces: the child is updated in place
+    child = only(BMO.children(source))
+    BMO.translate3d!(r, [-2e-4, 0, 0])
+    empty!(det)
+    BMO.solve_system!(system, source)
+    @test only(BMO.children(source)) === child
+    @test close_to(sample(det), chain(moved(); at = [-2e-4, zr, 0]))
+end
+
 end # module
