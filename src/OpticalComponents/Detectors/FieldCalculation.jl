@@ -110,9 +110,10 @@ function beamlet_hit_field(hit::AstigmaticGaussianBeamletHit{G}, p::AbstractArra
     if abs(area_z) < 1e-25
         area_z = Complex{G}(1e-25, 1e-25)
     end
-    # continuous argument of the area (Gouy phase), see `_area_arg`
-    area_arg = hit.area_arg0 +
-               _area_arg_change(_area_coefficients(hit.h1, hit.u1, hit.h2, hit.u2, hit.d0), l1)
+    # Gouy factor √(a_ref / a(l1)) with the continuous argument of the area: each factor
+    # of a(l1) stays off the negative real axis (see `_area_inverse_roots`), so the
+    # principal square roots follow the Gouy phase through a focus
+    gouy = hit.gouy0 / (sqrt(1 - hit.ρ1 * l1) * sqrt(1 - hit.ρ2 * l1))
 
     ξ1 = _pseudo_cross2d(h1_z, r_vec, hit.d0)
     ξ2 = _pseudo_cross2d(h2_z, r_vec, hit.d0)
@@ -121,8 +122,7 @@ function beamlet_hit_field(hit::AstigmaticGaussianBeamletHit{G}, p::AbstractArra
 
     phase_corr = (hit.n_eff - 1) * l1
     z_total = hit.l0 + l1
-    ψ = sqrt(abs(hit.area_ref / area_z)) * cis(-area_arg / 2) *
-        cis(hit.k0 * (z_total + w + hit.Δl + phase_corr))
+    ψ = gouy * cis(hit.k0 * (z_total + w + hit.Δl + phase_corr))
 
     return hit.E_ref_amp * ψ
 end

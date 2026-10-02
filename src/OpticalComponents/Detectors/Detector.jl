@@ -167,8 +167,13 @@ struct AstigmaticGaussianBeamletHit{T} <: AbstractBeamletHit{T}
     u1::Point3{Complex{T}}
     h2::Point3{Complex{T}}
     u2::Point3{Complex{T}}
-    area_ref::Complex{T}
-    area_arg0::T            # continuous arg of the area at p0 relative to the reference
+    # Gouy factor √(a_ref / a(l)) of the complex beam area a at the local distance l
+    # behind p0, as gouy0 / (√(1 − ρ1 l) √(1 − ρ2 l)): its value at p0, with the argument
+    # followed continuously from the reference (see `_area_arg`), and the inverse roots
+    # of a(l) (see `_area_inverse_roots`)
+    gouy0::Complex{T}
+    ρ1::Complex{T}
+    ρ2::Complex{T}
     k0::T
     Δl::T
     n_eff::T
@@ -397,6 +402,11 @@ function interact3d(system::AbstractSystem, d::Detector,
     h1n, _, h2n, _, _ = parabasal_ray_parameters(agb, p0n, in_)
     area_ref = _pseudo_cross2d(h1n, h2n, dirn)
     area_arg0 = _area_arg(agb, id, zero(R)) - _area_arg(agb, in_, _local_distance(agb, p0n, in_))
+    # Gouy factor at p0 and inverse roots of the area along the hit segment, constant per
+    # hit, so that the field loop over the detector pixels does not recompute them
+    A = _area_coefficients(h1, u1, h2, u2, d0)
+    gouy0 = sqrt(abs(area_ref / A[1])) * cis(-area_arg0 / 2)
+    ρ1, ρ2 = _area_inverse_roots(A)
 
     # Extract complex reference amplitude
     E_vec = polarization(rays(agb.c)[in_])
@@ -424,7 +434,7 @@ function interact3d(system::AbstractSystem, d::Detector,
 
     push!(d,
         AstigmaticGaussianBeamletHit(
-            agb, l0, id, p0, d0, h1, u1, h2, u2, area_ref, area_arg0, k0, Δl,
+            agb, l0, id, p0, d0, h1, u1, h2, u2, gouy0, ρ1, ρ2, k0, Δl,
             n_eff, E_ref_amp, sqrt_proj, w_max
         ))
     if stop(d)

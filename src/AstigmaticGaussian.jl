@@ -659,19 +659,23 @@ end
 
 _area_value((A0, A1, A2), l) = A0 + A1 * l + A2 * l^2
 
-# Continuous change of arg a(l) from l = 0 to l along a segment. a(l) factors into
-# (l − r1)(l − r2) with roots off the real axis (a Gaussian beam has no real focus point),
-# so the argument of each factor changes continuously, by less than π, along the real l
-# axis. The principal branch of √(a_ref/a) instead jumps by π once the Gouy phase has
-# changed by more than π/2, e.g. behind a focus.
-function _area_arg_change((A0, A1, A2), l)
-    factor(r) = angle((l - r) / -r)
-    if iszero(A2)
-        return iszero(A1) ? zero(real(A0)) : factor(-A0 / A1)
-    end
+# Inverse roots (ρ1, ρ2) of the complex beam area along a segment:
+# a(l) = A0 (1 − ρ1 l)(1 − ρ2 l). A root that does not exist (A2 = 0, e.g. a collimated
+# axis) is ρ = 0. The roots lie off the real axis (a Gaussian beam has no real focus
+# point), so each factor 1 − ρ l stays off the negative real axis for real l: its argument
+# changes continuously, by less than π, and its principal square root is continuous.
+function _area_inverse_roots((A0, A1, A2))
     s = sqrt(A1^2 - 4 * A2 * A0)
     q = -(A1 + (real(conj(A1) * s) >= 0 ? s : -s)) / 2     # roots without cancellation
-    return factor(q / A2) + factor(A0 / q)
+    return q / A0, iszero(q) ? zero(q) : A2 / q
+end
+
+# Continuous change of arg a(l) from l = 0 to l along a segment, as the sum over the two
+# factors of `_area_inverse_roots`. The principal branch of √(a_ref/a) instead jumps by π
+# once the Gouy phase has changed by more than π/2, e.g. behind a focus.
+function _area_arg_change(A, l)
+    ρ1, ρ2 = _area_inverse_roots(A)
+    return angle(1 - ρ1 * l) + angle(1 - ρ2 * l)
 end
 
 """
