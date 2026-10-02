@@ -43,7 +43,8 @@ AstigmaticGaussianBeamlet(pos, dir, λ, w0_x, w0_y; M2_x, M2_y, P0, E0, support,
 
 All sources are iterable collections of beams (`BeamletOptics.beams(src)`). `solve_system!(system, src)`
 traces them multithreaded, and `render!(ax, src; render_every = 5)` draws them.
-Kinematics act on the whole group; `set_pivot3d!` moves its pivot.
+Kinematics act on the whole group; `set_pivot3d!` moves its pivot. `empty!(src)` resets all its beams
+to their untraced start state.
 
 | Constructor | Samples |
 |-------------|---------|

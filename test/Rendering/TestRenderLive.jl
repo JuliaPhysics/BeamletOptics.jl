@@ -38,6 +38,9 @@ BMO.kinematic_trait_of(::_Marker) = BMO.Movable(BMO.Oriented())
 # clicks on the outline reach what lies behind it
 BMO.pickable_plots(::_Marker, plots) = filter(p -> !(p isa Makie.Lines), plots)
 
+# An object without a shape, whose rendering throws
+struct _Unrenderable <: BMO.AbstractObject{Float64} end
+
 # An own system handle on the protocol, e.g. of a GUI that combines the handles of several systems
 struct _Combined <: BMO.AbstractSystemRenderHandle
     sys::System
@@ -46,6 +49,7 @@ end
 BMO.rendered(h::_Combined) = h.sys
 BMO.render_children(h::_Combined) = h.children
 BMO.render_parent(::_Combined, _) = nothing
+Base.delete!(h::_Combined, oh::BMO.AbstractObjectRenderHandle) = (filter!(c -> c !== oh, h.children); h)
 
 @testset "Live rendering: objects & systems" begin
     Ext = Base.get_extension(BeamletOptics, :BeamletOpticsMakieExt)
@@ -347,6 +351,92 @@ BMO.render_parent(::_Combined, _) = nothing
         @test pick_object(h, BMO.render_plots(hm)[1]) === nothing
         @test !isempty(BMO.render_plots(hm)) # delete! keeps the plots
         remove_render!(hm)
+        remove_render!(h)
+    end
+
+    @testset "Objects added to and removed from a system handle" begin
+        in_scene(p) = any(q -> q === p, ax.scene.plots)
+        m = RoundPlanoMirror(0.025, 0.005)
+        sys = System([m])
+        h = live_render!(ax, sys)
+
+        # a single object
+        lens = SphericalLens(0.05, -0.05, 0.01, 0.02)
+        push!(sys, lens)
+        new = live_render!(h, lens)
+        @test length(new) == 1
+        @test BMO.rendered(only(new)) === lens
+        @test BMO.render_children(h)[end] === only(new)
+        @test isnothing(BMO.render_parent(h, lens))
+        @test pick_object(h, BMO.render_plots(only(new))[1]) === lens
+        @test_throws ArgumentError live_render!(h, lens)
+        @test length(BMO.render_children(h)) == 2
+
+        # a group is rendered per object, with its hierarchy
+        m2 = RoundPlanoMirror(0.02, 0.004)
+        m3 = RoundPlanoMirror(0.02, 0.004)
+        translate3d!(m3, [0, 0.05, 0])
+        inner = ObjectGroup([m3])
+        group = ObjectGroup([m2, inner])
+        push!(sys, group)
+        new = live_render!(h, group)
+        @test [BMO.rendered(oh) for oh in new] == [m2, m3]
+        @test length(BMO.render_children(h)) == 4
+        @test BMO.render_parent(h, m2) === group
+        @test BMO.render_parent(h, m3) === inner
+        @test BMO.render_parent(h, inner) === group
+        @test isnothing(BMO.render_parent(h, group))
+        @test pick_object(h, BMO.render_plots(new[2])[1]) === group
+        @test_throws ArgumentError live_render!(h, m3)
+        # an object of a group can not be removed on its own
+        @test_throws "ObjectGroup" remove_render!(h, m2)
+        @test_throws ArgumentError remove_render!(h, inner)
+        @test length(BMO.render_children(h)) == 4
+        @test BMO.render_parent(h, m2) === group
+
+        # the plots of the added objects follow them
+        translate3d!(group, [0.02, -0.01, 0.005])
+        zrotate3d!(group, deg2rad(15))
+        update_render!(h)
+        for oh in new
+            P, R = BMO.position(oh.obj), BMO.orientation(oh.obj)
+            for plot in oh.plots
+                _check_reference_points(plot, oh.P0, oh.R0, P, R)
+            end
+        end
+
+        # removing the group deletes its plots, handles and hierarchy
+        plots = [p for oh in new for p in BMO.render_plots(oh)]
+        @test all(in_scene, plots)
+        delete!(sys, group)
+        @test isnothing(remove_render!(h, group))
+        @test [BMO.rendered(oh) for oh in BMO.render_children(h)] == [m, lens]
+        @test !any(in_scene, plots)
+        @test isnothing(BMO.render_parent(h, m2))
+        @test isnothing(BMO.render_parent(h, m3))
+        @test isnothing(BMO.render_parent(h, inner))
+        # nothing happens for an object that is not rendered
+        remove_render!(h, group)
+        @test length(BMO.render_children(h)) == 2
+
+        # a group that can not be rendered completely leaves the handle and the axis unchanged
+        m4 = RoundPlanoMirror(0.02, 0.004)
+        broken = ObjectGroup([m4, _Unrenderable()])
+        n_plots = length(ax.scene.plots)
+        @test_throws Exception live_render!(h, broken)
+        @test length(ax.scene.plots) == n_plots
+        @test length(BMO.render_children(h)) == 2
+        @test isnothing(BMO.render_parent(h, m4))
+        @test length(live_render!(h, m4)) == 1
+        remove_render!(h, m4)
+
+        # an own system handle removes objects through the protocol, but can not render them
+        c = _Combined(sys, copy(BMO.render_children(h)))
+        @test_throws ArgumentError live_render!(c, m4)
+        lens_plots = copy(BMO.render_plots(BMO.render_children(h)[2]))
+        remove_render!(c, lens)
+        @test [BMO.rendered(oh) for oh in BMO.render_children(c)] == [m]
+        @test !any(in_scene, lens_plots)
         remove_render!(h)
     end
 

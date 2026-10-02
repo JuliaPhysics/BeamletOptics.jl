@@ -124,6 +124,23 @@ const mm = 1e-3
         end
     end
 
+    @testset "CubeBeamsplitter and RightAnglePrism with a constant refractive index" begin
+        prism = RightAnglePrism(25e-3, 20e-3, N0)
+        @test prism isa Prism
+        @test BMO.refractive_index(prism, 1e-6) == N0
+        @test BMO.refractive_index(prism, 500e-9) == N0
+
+        cbs = CubeBeamsplitter(25e-3, N0; reflectance = 0.3)
+        @test BMO.refractive_index(cbs, 1e-6) == N0
+        @test BMO.refractive_index(cbs, 500e-9) == N0
+        @test cbs.coating.reflectance ≈ CubeBeamsplitter(25e-3, n -> N0; reflectance = 0.3).coating.reflectance
+        translate3d!(cbs, [0, 50mm, 0])
+        beam = Beam([0, 0, 0], [0, 1, 0], 1e-6)
+        solve_system!(System([cbs]), beam)
+        @test BMO.refractive_index.(BMO.rays(beam)) == [1, N0]
+        @test length(beam.children) == 2
+    end
+
     @testset "depth_max branch limiting" begin
         beamsplitter = CubeBeamsplitter(25e-3, n -> N0)
         translate3d!(beamsplitter, [0, 50mm, 0])

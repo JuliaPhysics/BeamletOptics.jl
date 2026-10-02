@@ -189,6 +189,10 @@ its own. A subtype implements
 
 [`render_plots`](@ref), [`update_render!`](@ref), [`remove_render!`](@ref) and
 [`pick_object`](@ref) of a system handle are defined in terms of these.
+
+A handle that knows its axis, like the one returned by `live_render!(ax, sys)`, also implements
+`live_render!(h, obj; kwargs...)`, which renders an object (or object group) into `h` at runtime,
+and extends `remove_render!(h, obj)` by the hierarchy of the groups.
 """
 abstract type AbstractSystemRenderHandle <: AbstractRenderHandle end
 
@@ -310,6 +314,24 @@ If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown
 live_render!(::Function, ::Any, ::Any) = throw(MissingBackendError())
 
 """
+    live_render!(h::AbstractSystemRenderHandle, obj::AbstractObject; kwargs...) -> Vector{<:AbstractObjectRenderHandle}
+
+Live-renders `obj` into the axis of the system handle `h` and adds it to `h`, e.g. an object that
+was added to the system via `push!(system, obj)` after `h` was created. An object group is rendered
+per object, with its hierarchy known to [`render_parent`](@ref), like the groups of
+`live_render!(ax, system)`. Returns the new object handles, one per rendered object. The system of
+`h` is not changed. An `obj` that `h` already renders throws an `ArgumentError`.
+
+Keyword arguments are passed on as for [`render!`](@ref). Implemented by the handle returned by
+`live_render!(ax, system)`. A system handle that does not implement it throws an `ArgumentError`:
+render `obj` via `live_render!(ax, obj)` and add its handle via `push!(h, oh)` instead.
+"""
+function live_render!(h::AbstractSystemRenderHandle, ::AbstractObject; kwargs...)
+    throw(ArgumentError(
+        "a $(nameof(typeof(h))) can not render objects, use live_render!(ax, obj) and push!(h, oh) instead"))
+end
+
+"""
     update_render!(handle)
 
 Re-synchronizes the plots of the `handle` with the current state of the rendered object or beam,
@@ -335,6 +357,27 @@ remove_render!(::Any) = throw(MissingBackendError())
 
 function remove_render!(h::AbstractSystemRenderHandle)
     foreach(remove_render!, render_children(h))
+    return nothing
+end
+
+"""
+    remove_render!(h::AbstractSystemRenderHandle, obj::AbstractObject)
+
+Removes `obj` from the system handle `h`: deletes the plots of `obj` (of all objects of an object
+group) from the axis and removes their object handles from `h`, e.g. after `delete!(system, obj)`.
+The system of `h` is not changed. Nothing happens for an `obj` that `h` does not render. An object
+within a group can not be removed on its own and throws an `ArgumentError`: remove the group
+instead.
+"""
+function remove_render!(h::AbstractSystemRenderHandle, obj::AbstractObject)
+    parent = render_parent(h, obj)
+    isnothing(parent) || throw(ArgumentError(
+        "the $(nameof(typeof(obj))) is part of a $(nameof(typeof(parent))) of the system handle, remove the group instead"))
+    leaves = collect(Leaves(obj))
+    for oh in filter(oh -> _is_leaf_of(rendered(oh), leaves), render_children(h))
+        remove_render!(oh)
+        delete!(h, oh)
+    end
     return nothing
 end
 
