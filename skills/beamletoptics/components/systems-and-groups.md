@@ -53,3 +53,16 @@ periscope = ObjectGroup([m1, m2])
 set_pivot3d!(periscope, [0, 0, 50mm])
 zrotate3d!(periscope, deg2rad(10))
 ```
+
+## Clear aperture (vignetting)
+
+```julia
+D = clear_aperture(system, pos, dir; λ = 1e-6)   # largest collimated bundle diameter [m] without vignetting
+vignetted(source, axial_beam)                    # indices of the vignetted beams of a traced source
+```
+
+A ray is vignetted if it hits another sequence of objects than the axial ray (found by tracing, no
+object order assumed) or leaves the system early. Collimated input only; sampling-based
+(`rings`, `azimuths`), assumes a disc-shaped clear region (no central obstruction). Throws if the
+axial ray hits nothing; returns `d_max` (default 1 m) if nothing vignettes. Use `0.9D` for a
+vignetting-free source.

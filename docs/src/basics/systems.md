@@ -43,3 +43,19 @@ In order to solve optical systems, this package uses a hybrid sequential and non
 ```@docs; canonical=false
 solve_system!
 ```
+
+## Clear aperture and vignetting
+
+To trace e.g. a zoom lens without vignetting, the largest bundle diameter that passes the system completely is needed. [`clear_aperture`](@ref) finds it by bisection. A ray counts as vignetted if the sequence of objects it hits differs from that of the axial ray or if it leaves the system early; this is derived from the traced geometry, so no order of the objects in the [`System`](@ref) is assumed. For an already traced source, [`vignetted`](@ref) returns the indices of the vignetted beams.
+
+```julia
+D = clear_aperture(system, [0, -0.1, 0], [0, 1, 0]; λ = 633e-9)
+src = UniformDiscSource([0, -0.1, 0], [0, 1, 0], 0.9D)
+```
+
+The result is sampling-based and for a collimated bundle, see the limitations in the docstring.
+
+```@docs; canonical=false
+clear_aperture
+vignetted
+```
