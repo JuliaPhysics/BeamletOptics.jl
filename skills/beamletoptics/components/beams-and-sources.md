@@ -28,7 +28,7 @@ GaussianBeamlet(pos, dir, λ = 1e-6, w0 = 1e-3; M2 = 1, P0 = 1e-3, z0 = 0, suppo
   orthogonal to `dir` (any non-zero length), otherwise the constructor throws an `ArgumentError`.
 - Valid for on-axis, untilted, (nearly) aberration-free systems only.
 - Queries: `gauss_parameters(g, z)` → `(w, R, ψ, w0)`, `waist_parameters`, `rayleigh_range(g; M2)`,
-  `optical_power(g)`, `electric_field(g, r, z)`, `point_on_beam(g, t)`.
+  `optical_power(g)`, `electric_field(g, r, z)`, `point_on_beam(g, t)`, `path_segments(g)` (segments of the chief ray and all child beamlets with accumulated path lengths).
 
 ```julia
 AstigmaticGaussianBeamlet(pos, dir, λ, w0; M2, P0, E0, support, z0)

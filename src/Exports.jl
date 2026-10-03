@@ -6,7 +6,7 @@ export position, direction, orientation
 # ray and beam type export
 export Ray, PolarizedRay, Beam, PointSource, CollimatedSource, UniformDiscSource, UniformPointSource,
        UniformLineSource, UniformFanSource, set_num_rays!,
-       GaussianBeamlet, AstigmaticGaussianBeamlet, rayleigh_range, rays, point_on_beam,
+       GaussianBeamlet, AstigmaticGaussianBeamlet, rayleigh_range, rays, point_on_beam, path_segments,
        normal3d
 export CollimatedGaussianBeamletSource, GaussianBeamletDecomposition,
        SphericalGaussianBeamletSource, EllipticalGaussianBeamletSource, WavefrontBeamletDecomposition,
