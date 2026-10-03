@@ -4,9 +4,11 @@ Rendered objects get a material per component class and visible cemented interfa
 and triplet lenses. Two looks are available, which are selected via [`set_render_look`](@ref):
 
 - `:modern` (default): a restrained palette of clear, slightly tinted glass with highlights,
-  metallic mirrors and neutral mechanics. Only the glass (`:refractive`, `:coating` and
-  `:interface`) gets faint silhouettes, i.e. its feature edges at 50 % of the opacity of the
-  `:cad` look, such that lenses stay readable in front of a housing
+  metallic mirrors and neutral mechanics; the coatings of beamsplitters and the films of
+  polarizers are saturated, such that the coated side of a plate is seen at a glance. Only the
+  glass (`:refractive`, `:coating` and `:interface`) gets faint silhouettes, i.e. its feature
+  edges at 50 % of the opacity of the `:cad` look, such that lenses stay readable in front of a
+  housing
 - `:cad`: saturated materials with thin dark lines along the feature edges, like a CAD program
 
 ```julia
@@ -17,8 +19,8 @@ set_render_look(:cad)
 |:--------------|:-------------------------------------------|:---------------------|:-------------------|
 | `:refractive` | lenses, prisms, plates, windows            | clear glass, 0.3     | light blue, 0.5    |
 | `:reflective` | mirrors, retroreflector                    | metallic silver      | silver             |
-| `:coating`    | beamsplitter coatings                      | pale violet, 0.28    | magenta, 0.6       |
-| `:polarizer`  | polarization filters                       | dark slate, 0.75     | dark teal, 0.8     |
+| `:coating`    | beamsplitter coatings                      | violet, 0.9          | magenta, 0.9       |
+| `:polarizer`  | polarization filters                       | green, 0.8           | green, 0.8         |
 | `:detector`   | detectors                                  | graphite             | dark blue          |
 | `:mechanics`  | mechanics, dummies and other objects       | neutral grey         | mid grey           |
 | `:interface`  | cemented interfaces of doublets, triplets  | pale amber, 0.15     | amber, 0.25        |
