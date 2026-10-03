@@ -31,6 +31,11 @@ An empty system exposes no objects.
 """
 objects(system::System) = isempty(system.objects) ? () : Leaves(system.objects)
 
+function clear_hits!(system::AbstractSystem)
+    foreach(clear_hits!, objects(system))
+    return system
+end
+
 """Returns `true` if `obj` is one of the `leaves`, compared by identity."""
 _is_leaf_of(obj, leaves) = any(leaf -> leaf === obj, leaves)
 
@@ -740,6 +745,11 @@ Manage the tracing of an `AbstractBeam` through an optical `system`. The functio
 The condition to stop ray tracing is that the last `beam` intersection is `nothing` or the beam interaction is `nothing`. Then, the system is considered to be solved.
 A maximum number of rays per `beam` (`r_max`) can be specified in order to avoid infinite calculations under resonant conditions, i.e. two facing mirrors. Likewise, `depth_max` limits how many branching levels are explored when new sub-beams are generated (for example, by beamsplitters) so that the tree cannot grow without bound. Sub-beams beyond the depth limit are dropped from the tree.
 
+!!! warning "Detector hits accumulate"
+    `solve_system!` never resets [`Detector`](@ref)s: their hits accumulate across calls, so that several sources
+    solved one after another superpose. To start from empty detectors, e.g. after changing a component, call
+    [`clear_hits!`](@ref)`(system)` before solving.
+
 # Arguments
 
 - `system::System`: The optical system in which the beam will be traced.
@@ -791,7 +801,9 @@ end
     solve_system!(system::AbstractSystem, bg::AbstractBeamGroup; progress=true, kwargs...)
 
 Trace every beam of the beam group `bg` through the `system`, multithreaded over the member
-beams. All other `kwargs` are passed on to [`solve_system!`](@ref) for each beam.
+beams. All other `kwargs` are passed on to [`solve_system!`](@ref) for each beam. The hits of all beams
+accumulate on the same [`Detector`](@ref)s (guarded by a lock), and so do the hits of previous solves:
+call [`clear_hits!`](@ref)`(system)` beforehand to start from empty detectors.
 
 ## Keyword Arguments
 

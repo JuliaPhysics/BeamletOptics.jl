@@ -12,7 +12,7 @@ export CollimatedGaussianBeamletSource, GaussianBeamletDecomposition,
        GaussianModeDecomposition, AstigmaticBeamGroup
 
 # system
-export System, StaticSystem, solve_system!
+export System, StaticSystem, solve_system!, clear_hits!
 
 # object group
 export ObjectGroup

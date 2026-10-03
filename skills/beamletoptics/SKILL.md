@@ -26,7 +26,7 @@ When this Skill is active:
 - The **optical axis is +y**, not z. Components spawn at the origin aligned with +y.
 - **Refractive indices are callables** `n(λ)` (λ in meters), never plain numbers:
   `λ -> 1.5`, `DiscreteRefractiveIndex(...)` or `SellmeierEquation(...)`.
-- **Detectors accumulate.** Call `empty!(detector)` before every `solve_system!` that reuses it.
+- **Detectors accumulate.** Call `clear_hits!(system)` (or `empty!(detector)`) before every `solve_system!` that reuses the detectors; never reset between sources that should superpose.
 - **All kinematics are relative** (`translate3d!`, `xrotate3d!`, …), angles in radians (`deg2rad`).
   Use `translate_to3d!` for absolute positioning.
 - Run the script after writing it. A simulation that "looks right" but was never executed is not done.
@@ -56,7 +56,7 @@ When this Skill is active:
 - `system = System([obj1, obj2, ...])` (order does not matter, tracing is non-sequential);
   `StaticSystem` for small fixed systems that are solved many times.
 - `solve_system!(system, beam_or_source)`.
-- For parameter scans, mutate the scene in a loop, `empty!` detectors, and re-solve (retracing is automatic).
+- For parameter scans, mutate the scene in a loop, `clear_hits!(system)`, and re-solve (retracing is automatic).
 
 5) Evaluate
 - Rays: `rays(beam)`, `position`, `direction`, `length(beam)`, `beam.children` (splitters: transmitted first).
