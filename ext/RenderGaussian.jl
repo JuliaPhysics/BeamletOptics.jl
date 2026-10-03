@@ -131,19 +131,19 @@ are shared and its normals are smooth.
 _ring_angles(r_res::Int) = 2π .* (0:(r_res - 1)) ./ r_res
 
 """
-    _plot_generating_beams!(bp, axis, thing; flen, render_every, show_pos, transparency)
+    _plot_generating_beams!(bp, axis, thing; show_pos, transparency)
 
-Adds the `show_beams` overlay of the Gaussian `thing` to `bp`: one `linesegments` plot per group of
+Adds the `show_beams` overlay of the Gaussian `thing` to `bp`, drawn with its settings: one `linesegments` plot per group of
 generating beams (chief: red, divergence: green, waist: blue) and, with `show_pos`, one `scatter`
 plot of their positions per group.
 """
-function _plot_generating_beams!(bp::_BeamPlots, axis::_RenderEnv, thing; flen, render_every::Int = 1,
-        show_pos, transparency)
+function _plot_generating_beams!(bp::_BeamPlots, axis::_RenderEnv, thing; show_pos, transparency)
     for (group, color) in zip(_GAUSS_BEAM_GROUPS, _GAUSS_BEAM_COLORS)
-        segments = _observe!(bp, () -> _generating_segments(thing, group; flen, render_every))
+        segments = _observe!(bp,
+            () -> _generating_segments(thing, group; bp.settings[].flen, bp.settings[].render_every))
         _add!(bp, linesegments!(axis, segments; color, transparency))
         if show_pos
-            ends = _observe!(bp, () -> _generating_ends(thing, group; render_every))
+            ends = _observe!(bp, () -> _generating_ends(thing, group; bp.settings[].render_every))
             _add!(bp, scatter!(axis, ends; color))
         end
     end
@@ -168,12 +168,12 @@ function _plot_gaussian!(
         transparency,
         kwargs...
     )
-    bp = _BeamPlots()
+    bp = _BeamPlots((; flen = Float64(flen), render_every = 1, r_res, z_res))
     # the mesh type depends on its size, hence Any
-    geometry = () -> _gaussian_mesh(gauss; flen, r_res, z_res)
+    geometry = () -> _gaussian_mesh(gauss; bp.settings[].flen, bp.settings[].r_res, bp.settings[].z_res)
     envelope = _observe!(bp, geometry, Observable{Any}(geometry()))
     _add!(bp, mesh!(axis, envelope; color, transparency, kwargs...))
-    show_beams && _plot_generating_beams!(bp, axis, gauss; flen, show_pos, transparency)
+    show_beams && _plot_generating_beams!(bp, axis, gauss; show_pos, transparency)
     return bp
 end
 
@@ -225,5 +225,5 @@ see [`live_render!`](@ref). The kwargs are those of `render!`, with a coarser de
 function live_render!(axis::_RenderEnv, gauss::BMO.GaussianBeamlet; r_res::Int = 24, z_res::Int = 40, kwargs...)
     kw = _gaussian_defaults(kwargs)
     bp = _plot_gaussian!(axis, gauss; kw..., r_res, z_res)
-    return BeamRenderHandle(gauss, axis, bp, (; flen = Float64(kw.flen), render_every = 1, r_res, z_res))
+    return BeamRenderHandle(gauss, axis, bp)
 end
