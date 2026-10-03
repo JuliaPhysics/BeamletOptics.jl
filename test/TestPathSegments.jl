@@ -8,6 +8,29 @@ const BMO = BeamletOptics
 
 # Michelson-like layout: beam along +y, 45 deg beamsplitter at the origin, mirrors at 0.1 m (+x) and
 # 0.2 m (+y)
+# A component that absorbs the incoming beam and re-emits a new one at `shift` from its own position
+struct Reemitter{T, S <: BMO.AbstractShape{T}} <: BMO.AbstractObject{T}
+    shape::S
+    shift::Vector{T}
+end
+
+function Reemitter(shift)
+    shape = BMO.QuadraticFlatMesh(0.05)
+    zrotate3d!(shape, π)
+    return Reemitter{Float64, typeof(shape)}(shape, shift)
+end
+
+function BMO.interact3d(::BMO.AbstractSystem, r::Reemitter, beam::Beam{T, R},
+        ray::R) where {T <: Real, R <: Ray{T}}
+    BMO.relaunch!(beam, [Beam(Ray(position(r) + r.shift, direction(ray), BMO.wavelength(ray)))])
+    return nothing
+end
+
+function BMO.interact3d(::BMO.AbstractSystem, r::Reemitter, g::GaussianBeamlet, ::Int)
+    BMO.relaunch!(g, [GaussianBeamlet(position(r) + r.shift, direction(g), 1e-6, 1e-3)])
+    return nothing
+end
+
 function michelson()
     bs = ThinBeamsplitter(BMO.inch, reflectance = 0.5)
     zrotate3d!(bs, deg2rad(45))
@@ -90,6 +113,25 @@ end
         @test path_segments(a.c; flen = 0.05) == as[1:length(a.c.rays)]
         @test length(as) == length(gs)
         @test eltype(as) == BMO.PathSegment{Float64}
+    end
+
+    @testset "relaunched beams start their own path" begin
+        for beam in (Beam([0, 0, 0], [0, 1.0, 0]), GaussianBeamlet([0, 0, 0], [0, 1.0, 0], 1e-6, 1e-3))
+            r = Reemitter([2e-3, 0.05, 1e-3])
+            translate3d!(r, [0, 0.1, 0])
+            det = Detector(0.05)
+            translate3d!(det, [0, 0.3, 0] + r.shift)
+            solve_system!(System([r, det]), beam)
+            segs = path_segments(beam; flen = 0.05)
+            child = only(BMO.children(beam))
+            @test isnothing(BMO.AbstractTrees.parent(child))
+            @test length(segs) == 2
+            @test segs[1].s_stop ≈ 0.1
+            @test segs[2].s_start == 0 && segs[2].opl_start == 0 && segs[2].parent == 0
+            @test segs[2].depth == 2
+            @test segs[2].s_stop ≈ length(child) ≈ 0.2
+            @test segs[2].opl_stop ≈ BMO.optical_path_length(child)
+        end
     end
 
     @testset "beam groups" begin
