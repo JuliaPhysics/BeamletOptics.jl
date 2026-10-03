@@ -154,7 +154,8 @@ Every handle implements [`rendered`](@ref) and [`render_plots`](@ref). The subty
   `live_render!(draw, ax, x)`
 - [`AbstractSystemRenderHandle`](@ref): the object handles of a system, with its hierarchy of
   groups
-- [`AbstractBeamRenderHandle`](@ref): a ray, beam or beam group, with [`render_settings`](@ref)
+- [`AbstractBeamRenderHandle`](@ref): a ray, beam or beam group, with [`render_settings`](@ref) and
+  [`render_settings!`](@ref)
 
 Code that uses handles, e.g. a GUI, relies on this protocol only, and may add own subtypes, e.g.
 a system handle that combines the handles of several systems.
@@ -200,7 +201,8 @@ abstract type AbstractSystemRenderHandle <: AbstractRenderHandle end
     AbstractBeamRenderHandle <: AbstractRenderHandle
 
 Handle of a ray, beam or beam group, returned by `live_render!(ax, beam)`. Implements
-[`rendered`](@ref), [`render_plots`](@ref) and [`render_settings`](@ref).
+[`rendered`](@ref), [`render_plots`](@ref), [`render_settings`](@ref) and
+[`render_settings!`](@ref).
 [`update_render!`](@ref) draws the current rays of the beam, e.g. after
 [`solve_system!`](@ref).
 """
@@ -262,9 +264,37 @@ Base.delete!(::AbstractSystemRenderHandle, ::AbstractObjectRenderHandle)
 
 The settings with which the beam handle `h` draws its beam, at least `flen` (length of a final
 ray without intersection [m]) and `render_every` (every how many beams of a beam group are drawn,
-`1` for other beams), e.g. to find the drawn segments of a beam.
+`1` for other beams), e.g. to find the drawn segments of a beam. The handles of Gaussian beamlets
+and of beam groups of beamlets also report the resolution of the envelope, `r_res` and `z_res`.
+Change them via [`render_settings!`](@ref).
 """
 function render_settings end
+
+"""
+    render_settings!(h::AbstractBeamRenderHandle; kwargs...) -> h
+
+Changes the settings of the beam handle `h` and draws the beam again with them, without creating
+new plots: the plots of [`render_plots`](@ref)`(h)` stay in the axis, with their other attributes
+(color, visibility, clip planes, ...) unchanged. The keywords are among the keys of
+[`render_settings`](@ref)`(h)`:
+
+- `flen`: length of a final ray without intersection [m], positive and finite
+- `render_every`: every how many beams of a beam group are drawn, a positive integer (no effect on
+  other beams)
+- `r_res`, `z_res`: radial and longitudinal resolution of an envelope mesh, integers of at least 2
+
+Any other keyword, e.g. `r_res` for a ray, throws an `ArgumentError`, and then `h` is not changed.
+The beam is drawn as it is, i.e. nothing is solved, like [`update_render!`](@ref). The overlays of
+the handle, e.g. `show_beams` or `show_pos`, follow the settings.
+
+```julia
+h = live_render!(ax, beam; flen = 0.1)
+render_settings!(h; flen = 0.5)    # the final ray is now 0.5 m long
+```
+
+If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
+"""
+render_settings!(::Any; kwargs...) = throw(MissingBackendError())
 
 """
     pickable_plots(x, plots) -> AbstractVector

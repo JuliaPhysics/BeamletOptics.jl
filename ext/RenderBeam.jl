@@ -17,9 +17,17 @@ current geometry, see [`_observe!`](@ref).
 struct _BeamPlots
     plots::Vector{AbstractPlot}
     fills::Vector{Pair{Observable, Function}}
+    settings::Base.RefValue{NamedTuple}
 end
 
-_BeamPlots() = _BeamPlots(AbstractPlot[], Pair{Observable, Function}[])
+"""
+    _BeamPlots(settings::NamedTuple)
+
+Empty plots of a beam drawn with the `settings` (`flen`, `render_every`, and `r_res`, `z_res` of
+envelopes). The geometry functions of `fills` read the settings from `bp.settings[]` whenever they
+are called, such that [`render_settings!`](@ref) changes the geometry of the next `update_render!`.
+"""
+_BeamPlots(settings::NamedTuple) = _BeamPlots(AbstractPlot[], Pair{Observable, Function}[], Ref{NamedTuple}(settings))
 
 """
     _observe!(bp::_BeamPlots, geometry, obs = Observable(geometry()))
@@ -49,11 +57,10 @@ mutable struct BeamRenderHandle{B} <: AbstractBeamRenderHandle
     axis::_RenderEnv
     plots::Vector{AbstractPlot}
     fills::Vector{Pair{Observable, Function}}
-    settings::NamedTuple
+    settings::Base.RefValue{NamedTuple}
 end
 
-BeamRenderHandle(thing, axis, bp::_BeamPlots, settings::NamedTuple) =
-    BeamRenderHandle(thing, axis, bp.plots, bp.fills, settings)
+BeamRenderHandle(thing, axis, bp::_BeamPlots) = BeamRenderHandle(thing, axis, bp.plots, bp.fills, bp.settings)
 
 function Base.show(io::IO, h::BeamRenderHandle{B}) where {B}
     print(io, "BeamRenderHandle{", B, "}(", length(h.plots), " plots)")
@@ -74,7 +81,34 @@ end
 
 rendered(h::BeamRenderHandle) = h.thing
 render_plots(h::BeamRenderHandle) = h.plots
-render_settings(h::BeamRenderHandle) = h.settings
+render_settings(h::BeamRenderHandle) = h.settings[]
+
+function render_settings!(h::BeamRenderHandle; kwargs...)
+    isempty(kwargs) && return h
+    old = h.settings[]
+    for (key, value) in pairs(kwargs)
+        haskey(old, key) || throw(ArgumentError(
+            "a $(nameof(typeof(h.thing))) handle has no render setting `$key`, the settings are $(join(keys(old), ", "))"))
+        _check_setting(Val(key), value)
+    end
+    new = merge(old, (; (k => _setting(Val(k), v) for (k, v) in pairs(kwargs))...))
+    # a beam that is not a group draws one beam: render_every does not apply
+    new = haskey(new, :render_every) ? merge(new, (; render_every = _render_every(h.thing, new.render_every))) : new
+    h.settings[] = new
+    return update_render!(h)
+end
+
+# The values are checked as they are stored (see `_setting`): e.g. `big(10)^1000` is finite, but `Inf`
+# as a Float64, and `big(10)^-1000` becomes 0
+_check_setting(::Val{:flen}, x) = (x isa Real && (y = Float64(x); isfinite(y) && y > 0)) ||
+    throw(ArgumentError("the render setting `flen` must be positive and finite as a Float64, got $x"))
+_check_setting(::Val{:render_every}, x) = (x isa Integer && 1 <= x <= typemax(Int)) ||
+    throw(ArgumentError("the render setting `render_every` must be a positive integer, got $x"))
+_check_setting(::Union{Val{:r_res}, Val{:z_res}}, x) = (x isa Integer && 2 <= x <= typemax(Int)) ||
+    throw(ArgumentError("the render settings `r_res` and `z_res` must be integers of at least 2, got $x"))
+
+_setting(::Val{:flen}, x) = Float64(x)
+_setting(::Val, x) = Int(x)
 
 """
     _render_every(thing, render_every)
@@ -184,16 +218,17 @@ function _plot_rays!(
         kwargs...
     )
     show_polarization && _check_polarized(thing)
-    bp = _BeamPlots()
-    segments = _observe!(bp, () -> _ray_segments(thing; flen, render_every))
+    bp = _BeamPlots((; flen = Float64(flen), render_every = _render_every(thing, render_every)))
+    segments = _observe!(bp, () -> _ray_segments(thing; bp.settings[].flen, bp.settings[].render_every))
     _add!(bp, linesegments!(axis, segments; color, linewidth, transparency, kwargs...))
     if show_pos
-        ends = _observe!(bp, () -> _ray_ends(thing; render_every))
+        ends = _observe!(bp, () -> _ray_ends(thing; bp.settings[].render_every))
         _add!(bp, scatter!(axis, ends; color))
     end
     if show_polarization
         curve = _observe!(bp,
-            () -> _field_curve(thing; flen, render_every, λ_vis = pol_λ, amplitude = pol_amplitude, ppl = pol_ppl))
+            () -> _field_curve(thing; bp.settings[].flen, bp.settings[].render_every, λ_vis = pol_λ,
+                amplitude = pol_amplitude, ppl = pol_ppl))
         _add!(bp, lines!(axis, curve; color = pol_color, linewidth = pol_linewidth))
     end
     return bp
@@ -317,6 +352,5 @@ the same defaults.
 function live_render!(axis::_RenderEnv, thing::Union{BMO.AbstractRay, Beam, BMO.AbstractBeamGroup}; kwargs...)
     kw = _ray_defaults(kwargs)
     bp = _plot_rays!(axis, thing; kw...)
-    settings = (; flen = Float64(kw.flen), render_every = _render_every(thing, kw.render_every))
-    return BeamRenderHandle(thing, axis, bp, settings)
+    return BeamRenderHandle(thing, axis, bp)
 end
