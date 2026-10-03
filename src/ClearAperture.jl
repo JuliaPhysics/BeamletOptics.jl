@@ -1,15 +1,46 @@
 """
-    hit_sequence(beam::Beam)
+    surface_part(shape::AbstractShape, point)
 
-The objects that the rays of the `beam` and of all its child beams hit, in depth-first order, with
-`nothing` for a ray that leaves the system without an intersection. Two beams of a non-vignetted
-bundle that were traced through the same system have the same hit sequence, see [`vignetted`](@ref).
+The part of `shape` that owns the boundary at `point`: `shape` itself, or for an
+[`AbstractCompositeSDF`](@ref) the (recursively resolved) operand whose surface is closest to `point`.
+This distinguishes e.g. the optical faces of a lens from its mechanical rim, which are all
+reported by the same [`Intersection`](@ref) `shape`.
 """
-function hit_sequence(beam::Beam)
+surface_part(shape::AbstractShape, point) = shape
+
+function surface_part(shape::AbstractCompositeSDF, point)
+    ops = operands(shape)
+    return surface_part(ops[argmin(abs(sdf(op, point)) for op in ops)], point)
+end
+
+# the traversed surface of a ray: its object and the boundary part of the object that it hits
+function _hit_surface(ray::AbstractRay)
+    isect = intersection(ray)
+    isnothing(isect) && return nothing
+    s = shape(isect)
+    isnothing(s) && return (object(isect), nothing)
+    return (object(isect), surface_part(s, position(ray) + length(isect) * direction(ray)))
+end
+
+# the chief beam, i.e. the scalar-ray path, of a beam or beamlet
+_chief_beam(b::Beam) = b
+_chief_beam(b::GaussianBeamlet) = b.chief
+_chief_beam(b::AstigmaticGaussianBeamlet) = b.c
+
+"""
+    hit_sequence(beam::AbstractBeam)
+
+The surfaces that the chief rays of the `beam` and of all its child beams hit, in depth-first
+order, as tuples of the hit object and the boundary part of the object (see [`surface_part`](@ref))
+with `nothing` for a ray that leaves the system without an intersection. Two beams of a
+non-vignetted bundle that were traced through the same system have the same hit sequence, see
+[`vignetted`](@ref). For a [`GaussianBeamlet`](@ref) or [`AstigmaticGaussianBeamlet`](@ref) the
+`chief` ray is traversed.
+"""
+function hit_sequence(beam::AbstractBeam)
     seq = Any[]
-    for b in PreOrderDFS(beam), ray in rays(b)
-        isect = intersection(ray)
-        push!(seq, isnothing(isect) ? nothing : object(isect))
+    for b in PreOrderDFS(beam), ray in rays(_chief_beam(b))
+        push!(seq, _hit_surface(ray))
     end
     return seq
 end
@@ -17,15 +48,17 @@ end
 _same_sequence(a, b) = length(a) == length(b) && all(((x, y),) -> x === y, zip(a, b))
 
 """
-    vignetted(group::AbstractBeamGroup, reference::Beam) -> Vector{Int}
+    vignetted(group::AbstractBeamGroup, reference::AbstractBeam) -> Vector{Int}
 
 Indices of the beams of the traced `group` that are vignetted with respect to the traced
 `reference` beam, e.g. the axial or chief ray of a bundle. A beam is vignetted if the sequence of
-objects that it hits (including its child beams, and a ray that leaves the system without
-intersection) differs from the one of the `reference`, e.g. because it misses a lens or is stopped
+surfaces that it hits (object and boundary part of the object, including its child beams, and a
+ray that leaves the system without intersection) differs from the one of the `reference`, e.g. because it misses a lens or is stopped
 by an aperture. The criterion derives from the traced geometry only, no order of the objects in the
 [`System`](@ref) is assumed. A beam that is not vignetted by an object but changes its path
-otherwise, e.g. by total internal reflection at a steep lens rim, is also reported.
+otherwise, e.g. by total internal reflection at a steep lens rim, is also reported. The `group` and the `reference` can consist of [`Beam`](@ref)s,
+[`GaussianBeamlet`](@ref)s or [`AstigmaticGaussianBeamlet`](@ref)s, in which case the chief rays are
+compared.
 
 # Examples
 
@@ -37,7 +70,7 @@ solve_system!(system, axis)
 vignetted(src, axis)
 ```
 """
-function vignetted(group::AbstractBeamGroup, reference::Beam)
+function vignetted(group::AbstractBeamGroup, reference::AbstractBeam)
     ref = hit_sequence(reference)
     return findall(b -> !_same_sequence(hit_sequence(b), ref), beams(group))
 end
@@ -80,6 +113,10 @@ does not hit any object.
     [`PointSource`](@ref) and [`vignetted`](@ref). The rays of the bundle are traced
     as [`Beam`](@ref)s of scalar [`Ray`](@ref)s, no Gaussian beam clipping is considered.
 
+The probe traces do not change the state of the `system`: the hits stored in its
+[`Detector`](@ref)s (also inside object groups) are saved before and restored afterwards, also if
+an error is thrown.
+
 # Examples
 
 ```julia
@@ -98,34 +135,42 @@ function clear_aperture(system::AbstractSystem, pos::AbstractVector, dir::Abstra
     e1 = sampling_basis(d, nothing, T)
     e2 = normal3d(d, e1)
 
-    axis = Beam(pos, d, λ)
-    solve_system!(system, axis; kwargs...)
-    ref = hit_sequence(axis)
-    all(isnothing, ref) && throw(ArgumentError("the axial ray does not hit any object of the system"))
+    # the probe traces must not leave data in stateful components, e.g. detector hits
+    detectors = Detector[o for o in objects(system) if o isa Detector]
+    saved = map(hits, detectors)
+    try
+        foreach(empty!, detectors)
+        axis = Beam(pos, d, λ)
+        solve_system!(system, axis; kwargs...)
+        ref = hit_sequence(axis)
+        all(isnothing, ref) && throw(ArgumentError("the axial ray does not hit any object of the system"))
 
-    function isclear(D)
-        bundle = Beam{T, Ray{T}}[]
-        for k in 1:rings, j in 1:azimuths
-            φ = 2π * (j - 1 + (isodd(k) ? 0 : 0.5)) / azimuths
-            r = D / 2 * k / rings
-            push!(bundle, Beam(Ray(pos + r * (cos(φ) * e1 + sin(φ) * e2), d, λ)))
+        function isclear(D)
+            bundle = Beam{T, Ray{T}}[]
+            for k in 1:rings, j in 1:azimuths
+                φ = 2π * (j - 1 + (isodd(k) ? 0 : 0.5)) / azimuths
+                r = D / 2 * k / rings
+                push!(bundle, Beam(Ray(pos + r * (cos(φ) * e1 + sin(φ) * e2), d, λ)))
+            end
+            src = CollimatedSource(bundle, D, pos, d)
+            solve_system!(system, src; progress = false, kwargs...)
+            return all(b -> _same_sequence(hit_sequence(b), ref), beams(src))
         end
-        src = CollimatedSource(bundle, D, pos, d)
-        solve_system!(system, src; progress = false, kwargs...)
-        return all(b -> _same_sequence(hit_sequence(b), ref), beams(src))
-    end
 
-    # bracket the limit, then bisect
-    lo, hi = zero(T), T(d_start)
-    while isclear(hi)
-        lo = hi
-        hi >= d_max && return T(d_max)
-        hi = min(2hi, T(d_max))
+        # bracket the limit, then bisect
+        lo, hi = zero(T), T(d_start)
+        while isclear(hi)
+            lo = hi
+            hi >= d_max && return T(d_max)
+            hi = min(2hi, T(d_max))
+        end
+        for _ in 1:64
+            hi - lo <= rtol * hi && break
+            mid = (lo + hi) / 2
+            isclear(mid) ? (lo = mid) : (hi = mid)
+        end
+        return lo
+    finally
+        foreach(hits!, detectors, saved)
     end
-    for _ in 1:64
-        hi - lo <= rtol * hi && break
-        mid = (lo + hi) / 2
-        isclear(mid) ? (lo = mid) : (hi = mid)
-    end
-    return lo
 end

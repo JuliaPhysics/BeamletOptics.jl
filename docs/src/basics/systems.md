@@ -46,7 +46,7 @@ solve_system!
 
 ## Clear aperture and vignetting
 
-To trace e.g. a zoom lens without vignetting, the largest bundle diameter that passes the system completely is needed. [`clear_aperture`](@ref) finds it by bisection. A ray counts as vignetted if the sequence of objects it hits differs from that of the axial ray or if it leaves the system early; this is derived from the traced geometry, so no order of the objects in the [`System`](@ref) is assumed. For an already traced source, [`vignetted`](@ref) returns the indices of the vignetted beams.
+To trace e.g. a zoom lens without vignetting, the largest bundle diameter that passes the system completely is needed. [`clear_aperture`](@ref) finds it by bisection. A ray counts as vignetted if the sequence of surfaces it hits (object and boundary part of the object, so the mechanical rim of a lens differs from its optical faces) differs from that of the axial ray or if it leaves the system early; this is derived from the traced geometry, so no order of the objects in the [`System`](@ref) is assumed. For an already traced source (of rays or beamlets, whose chief rays are compared), [`vignetted`](@ref) returns the indices of the vignetted beams. The hits stored in detectors are left unchanged.
 
 ```julia
 D = clear_aperture(system, [0, -0.1, 0], [0, 1, 0]; λ = 633e-9)

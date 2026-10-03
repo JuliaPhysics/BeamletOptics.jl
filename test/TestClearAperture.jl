@@ -63,6 +63,65 @@ const mm = 1e-3
         @test clear_aperture(s, R * pos, R * dir) ≈ D0 rtol = 5e-3
     end
 
+    @testset "mechanical rim is not clear aperture" begin
+        # the annular rim ring is entered and exited by the same lens, like the optical faces
+        lens = Lens(BMO.SphericalSurface{Float64}(0.5, 20mm, 40mm),
+            BMO.SphericalSurface{Float64}(-0.5, 20mm, 40mm), 4mm, λ -> 1.5)
+        s = System([lens])
+        axis = Beam(pos, dir)
+        solve_system!(s, axis)
+        rim = Beam([15mm, pos[2], 0], dir)
+        solve_system!(s, rim)
+        # same object sequence, different boundary parts
+        @test all(r -> BMO.object(BMO.intersection(r)) === lens, rays(rim)[1:2])
+        @test BMO.hit_sequence(rim) != BMO.hit_sequence(axis)
+        @test clear_aperture(s, pos, dir) ≈ 20mm rtol = 5e-3
+    end
+
+    @testset "detectors are not modified" begin
+        det = Detector(0.2)
+        translate3d!(det, [0, 0.2, 0])
+        s = System([l1, det])
+        D0 = clear_aperture(System([l1]), pos, dir)
+        # a fresh detector stays empty
+        @test clear_aperture(s, pos, dir) ≈ D0 rtol = 5e-3
+        @test isnothing(BMO.hits(det))
+        # existing beamlet hits are neither overwritten nor does the scalar probe throw
+        solve_system!(s, GaussianBeamlet(pos, dir, 1e-6, 1mm))
+        old = BMO.hits(det)
+        @test old isa Vector{<:BMO.GaussianBeamletHit}
+        @test clear_aperture(s, pos, dir) ≈ D0 rtol = 5e-3
+        @test BMO.hits(det) === old
+        @test length(old) == 1
+        # also for detectors inside object groups
+        det2 = Detector(0.2)
+        translate3d!(det2, [0, 0.2, 0])
+        sg = System([l1, ObjectGroup([det2])])
+        solve_system!(sg, GaussianBeamlet(pos, dir, 1e-6, 1mm))
+        old2 = BMO.hits(det2)
+        @test !isnothing(old2)
+        @test clear_aperture(sg, pos, dir) ≈ D0 rtol = 5e-3
+        @test BMO.hits(det2) === old2
+        # the state is restored if the function throws
+        @test_throws ArgumentError clear_aperture(s, pos .+ [0.3, 0, 0], dir)
+        @test BMO.hits(det) === old
+    end
+
+    @testset "beamlet groups" begin
+        # the chief rays of Gaussian beamlets are compared
+        axis = AstigmaticGaussianBeamlet(pos, dir, 1e-6, 1mm)
+        solve_system!(System([l1]), axis)
+        src = CollimatedGaussianBeamletSource(pos, dir, 60mm, 1e-6, 1mm; n_grid = 10)
+        solve_system!(System([l1]), src; progress = false)
+        idx = vignetted(src, axis)
+        @test !isempty(idx)
+        @test length(idx) < length(src)
+        @test all(i -> max(abs(position(src[i])[1]), abs(position(src[i])[3])) > 15mm, idx)
+        g = GaussianBeamlet(pos, dir, 1e-6, 1mm)
+        solve_system!(System([l1]), g)
+        @test length(BMO.hit_sequence(g)) == length(BMO.hit_sequence(axis))
+    end
+
     @testset "argument checks" begin
         @test_throws ArgumentError clear_aperture(system, pos, dir; rings = 0)
         @test_throws ArgumentError clear_aperture(system, pos, dir; azimuths = 2)
