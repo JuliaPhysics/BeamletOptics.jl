@@ -622,6 +622,13 @@ end
         @test_throws ArgumentError BMO.render_settings!(h; color = :red)
         @test_throws ArgumentError BMO.render_settings!(h; flen = -1.0)
         @test_throws ArgumentError BMO.render_settings!(h; flen = Inf)
+        # checked as stored, i.e. as Float64 and Int: neither Inf, 0 nor an InexactError
+        @test_throws ArgumentError BMO.render_settings!(h; flen = big(10)^1000)
+        @test_throws ArgumentError BMO.render_settings!(h; flen = big(10.0)^-1000)
+        @test_throws ArgumentError BMO.render_settings!(h; render_every = big(2)^70)
+        hg = live_render!(ax, gauss; r_res = 8, z_res = 10)
+        @test_throws ArgumentError BMO.render_settings!(hg; z_res = big(2)^70)
+        @test BMO.render_settings(hg).z_res == 10
         @test_throws ArgumentError BMO.render_settings!(h; render_every = 0)
         @test_throws ArgumentError BMO.render_settings!(h; flen = 0.5, r_res = 10)
         @test BMO.render_settings(h) == (; flen = 0.3, render_every = 1)

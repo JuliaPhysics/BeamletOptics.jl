@@ -98,11 +98,13 @@ function render_settings!(h::BeamRenderHandle; kwargs...)
     return update_render!(h)
 end
 
-_check_setting(::Val{:flen}, x) = (isfinite(x) && x > 0) ||
-    throw(ArgumentError("the render setting `flen` must be positive and finite, got $x"))
-_check_setting(::Val{:render_every}, x) = (x isa Integer && x >= 1) ||
+# The values are checked as they are stored (see `_setting`): e.g. `big(10)^1000` is finite, but `Inf`
+# as a Float64, and `big(10)^-1000` becomes 0
+_check_setting(::Val{:flen}, x) = (x isa Real && (y = Float64(x); isfinite(y) && y > 0)) ||
+    throw(ArgumentError("the render setting `flen` must be positive and finite as a Float64, got $x"))
+_check_setting(::Val{:render_every}, x) = (x isa Integer && 1 <= x <= typemax(Int)) ||
     throw(ArgumentError("the render setting `render_every` must be a positive integer, got $x"))
-_check_setting(::Union{Val{:r_res}, Val{:z_res}}, x) = (x isa Integer && x >= 2) ||
+_check_setting(::Union{Val{:r_res}, Val{:z_res}}, x) = (x isa Integer && 2 <= x <= typemax(Int)) ||
     throw(ArgumentError("the render settings `r_res` and `z_res` must be integers of at least 2, got $x"))
 
 _setting(::Val{:flen}, x) = Float64(x)
