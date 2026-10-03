@@ -175,6 +175,20 @@
     "teaser": "Right-angle symmetric prism, e.g. for cube beamsplitters."
   },
   {
+    "name": "EquilateralPrism",
+    "category": "Prisms",
+    "image": "catalog_EquilateralPrism.png",
+    "href": "/reference#BeamletOptics.EquilateralPrism-Tuple{Real,%20Real,%20Union{Function,%20DiscreteRefractiveIndex,%20SellmeierEquation}}",
+    "teaser": "Equilateral triangular prism for dispersion."
+  },
+  {
+    "name": "DovePrism",
+    "category": "Prisms",
+    "image": "catalog_DovePrism.png",
+    "href": "/reference#BeamletOptics.DovePrism-Tuple{Real,%20Real,%20Real,%20Union{Function,%20DiscreteRefractiveIndex,%20SellmeierEquation}}",
+    "teaser": "Trapezoidal Dove prism with 45 degree end faces."
+  },
+  {
     "name": "ThinBeamsplitter",
     "category": "Beamsplitters",
     "image": "catalog_ThinBeamsplitter.png",

@@ -154,6 +154,7 @@ makedocs(;
                 "Overview"                  => joinpath("basics", "components", "components.md"),
                 "Mirrors"                   => joinpath("basics", "components", "mirrors.md"),
                 "Lenses"                    => joinpath("basics", "components", "lenses.md"),
+                "Prisms"                    => joinpath("basics", "components", "prisms.md"),
                 "Beamsplitters"             => joinpath("basics", "components", "beamsplitters.md"),
                 "Detectors"                 => joinpath("basics", "components", "detectors.md"),
                 "Polarizing components"     => joinpath("basics", "components", "polarizers.md"),
