@@ -30,8 +30,8 @@ passed to the mesh plot of an object, explicit kwargs of `render!` (e.g. `color`
 const _CAD_MATERIALS = Dict{Symbol, _Material}(
     :refractive => _preset(RGBf(0.45, 0.72, 0.88), 0.5, true, 0.6, 1.0, 96),
     :reflective => _preset(RGBf(0.82, 0.83, 0.85), 1, false, 0.5, 1.0, 128),
-    :coating => _preset(RGBf(0.95, 0.40, 0.90), 0.6, true, 0.7, 0.6, 64),
-    :polarizer => _preset(RGBf(0.15, 0.30, 0.35), 0.8, true, 0.7, 0.4, 32),
+    :coating => _preset(RGBf(0.90, 0.15, 0.90), 0.9, true, 0.8, 0.6, 64),
+    :polarizer => _preset(RGBf(0.10, 0.60, 0.20), 0.8, true, 0.7, 0.4, 32),
     :detector => _preset(RGBf(0.12, 0.22, 0.35), 1, false, 0.8, 0.2, 16),
     :mechanics => _preset(RGBf(0.55, 0.56, 0.58), 1, false, 0.9, 0.15, 16),
     :interface => _preset(RGBf(0.95, 0.80, 0.45), 0.25, true, 0.6, 0.3, 32),
@@ -41,13 +41,14 @@ const _CAD_MATERIALS = Dict{Symbol, _Material}(
     _MODERN_MATERIALS
 
 Material presets of the `:modern` look, see `_CAD_MATERIALS`. A restrained palette: clear glass with
-highlights, bright metallic mirrors, neutral mechanics, and a subtle coating of beamsplitters.
+highlights, bright metallic mirrors and neutral mechanics. The coatings of beamsplitters and the
+films of polarizers are saturated, such that the coated side of a plate is seen at a glance.
 """
 const _MODERN_MATERIALS = Dict{Symbol, _Material}(
     :refractive => _preset(RGBf(0.68, 0.85, 0.94), 0.3, true, 0.85, 0.8, 64),
     :reflective => _preset(RGBf(0.82, 0.83, 0.86), 1, false, 0.8, 0.9, 64),
-    :coating => _preset(RGBf(0.82, 0.70, 0.90), 0.28, true, 0.6, 0.6, 64),
-    :polarizer => _preset(RGBf(0.22, 0.28, 0.32), 0.75, true, 0.7, 0.8, 64),
+    :coating => _preset(RGBf(0.75, 0.15, 0.95), 0.9, true, 0.8, 0.6, 64),
+    :polarizer => _preset(RGBf(0.10, 0.62, 0.25), 0.8, true, 0.7, 0.8, 64),
     :detector => _preset(RGBf(0.16, 0.18, 0.22), 1, false, 0.8, 0.6, 64),
     :mechanics => _preset(RGBf(0.60, 0.61, 0.63), 1, false, 0.9, 0.3, 32),
     :interface => _preset(RGBf(0.90, 0.85, 0.70), 0.15, true, 0.6, 0.6, 64),
