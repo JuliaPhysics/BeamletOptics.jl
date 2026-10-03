@@ -208,3 +208,98 @@ function sdf(prism:: RightAnglePrismSDF{T}, point) where T
     pln_dist = (p[1] + p[2]) / sqrt(2)
     return max(box_dist, pln_dist)
 end
+
+"""
+    PolygonPrismSDF <: AbstractSDF
+
+Implements the exact `SDF` of a right prism, i.e. the extrusion of a convex polygon along the local
+z-axis (the same axis as the `height` of [`RightAnglePrismSDF`](@ref)).
+
+# Fields
+
+- `vertices`: corners of the cross-section in the local x-y-plane in [m], in counter-clockwise order
+- `height`: extent along the local z-axis in [m], the prism spans `z ∈ [-height/2, height/2]`
+
+The local origin is the origin of the coordinates given to the constructor, it is not shifted.
+"""
+mutable struct PolygonPrismSDF{T} <: AbstractSDF{T}
+    dir::SMatrix{3, 3, T, 9}
+    transposed_dir::SMatrix{3, 3, T, 9}
+    pos::Point3{T}
+    vertices::Vector{Point2{T}}
+    height::T
+end
+
+"""
+    PolygonPrismSDF(vertices, height)
+
+Constructs the prism over the convex polygon given by `vertices`, a vector of 2D points `(x, y)` in
+[m], extruded symmetrically by `height` in [m] along the local z-axis. Both vertex orders are
+accepted and normalized to counter-clockwise. Throws an `ArgumentError` for fewer than three
+vertices, for degenerate (zero area or collinear) corners and for non-convex or self-intersecting
+polygons.
+"""
+function PolygonPrismSDF(vertices::AbstractVector, height::H) where {H <: Real}
+    length(vertices) >= 3 || throw(ArgumentError("a polygon needs at least 3 vertices"))
+    height > 0 || throw(ArgumentError("the prism height must be positive"))
+    T = float(promote_type(H, mapreduce(v -> eltype(v), promote_type, vertices)))
+    pts = [Point2{T}(v[1], v[2]) for v in vertices]
+    n = length(pts)
+    # signed area (shoelace) of the polygon relative to its first vertex, which makes the test
+    # invariant under translation (no cancellation for polygons far from the origin); the
+    # orientation is normalized to counter-clockwise
+    rel = [p - pts[1] for p in pts]
+    area = sum(i -> rel[i][1] * rel[mod1(i + 1, n)][2] - rel[mod1(i + 1, n)][1] * rel[i][2], 1:n) / 2
+    scale = maximum(p -> maximum(abs, p), rel)
+    abs(area) > eps(T) * scale^2 * n || throw(ArgumentError("the polygon has zero area"))
+    area < 0 && reverse!(pts)
+    # convex: every corner turns left, and the edges turn by 2π in total (no star polygons)
+    turning = zero(T)
+    for i in 1:n
+        e1 = pts[mod1(i + 1, n)] - pts[i]
+        e2 = pts[mod1(i + 2, n)] - pts[mod1(i + 1, n)]
+        c = e1[1] * e2[2] - e1[2] * e2[1]
+        c > sqrt(eps(T)) * norm(e1) * norm(e2) ||
+            throw(ArgumentError("the polygon must be strictly convex (no reflex or collinear vertices)"))
+        turning += atan(c, dot(e1, e2))
+    end
+    isapprox(turning, 2π; atol = sqrt(eps(T))) ||
+        throw(ArgumentError("the polygon must not be self-intersecting"))
+    return PolygonPrismSDF{T}(
+        Matrix{T}(I, 3, 3),
+        Matrix{T}(I, 3, 3),
+        Point3{T}(0),
+        pts,
+        T(height))
+end
+
+thickness(s::PolygonPrismSDF) = (ys = getindex.(s.vertices, 2); maximum(ys) - minimum(ys))
+
+function sdf(prism::PolygonPrismSDF, point)
+    p = _world_to_sdf(prism, point)
+    q = Point2(p[1], p[2]) # element type of `p` may be a dual number
+    S = eltype(q)
+    V = prism.vertices
+    n = length(V)
+    # exact 2D distance of the convex polygon: the largest signed distance to an edge line is
+    # exact inside and wherever the closest point lies within that edge. This keeps the gradient
+    # smooth on the faces. Only in the corner regions the distance to the closest vertex is used.
+    inside = typemin(S)
+    k = 1
+    for i in 1:n
+        e = V[mod1(i + 1, n)] - V[i]
+        w = q - V[i]
+        d = (e[1] * w[2] - e[2] * w[1]) / -norm(e)
+        if d > inside
+            inside, k = d, i
+        end
+    end
+    e = V[mod1(k + 1, n)] - V[k]
+    t = dot(q - V[k], e) / dot(e, e)
+    d2 = inside
+    if inside > 0 && !(0 <= t <= 1)
+        d2 = minimum(v -> norm(q - v), V)
+    end
+    dz = abs(p[3]) - prism.height / 2
+    return min(max(d2, dz), zero(S)) + norm(max.(Point2(d2, dz), zero(S)))
+end

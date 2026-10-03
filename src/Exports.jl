@@ -44,7 +44,7 @@ export CircularFlatSurface, RectangularFlatSurface, SphericalSurface, EvenAspher
        CylindricalSurface, AcylindricalSurface
 
 # prisms
-export Prism, RightAnglePrism
+export Prism, RightAnglePrism, EquilateralPrism, DovePrism
 
 # detectors
 export Detector, electric_field, intensity, spot_diagram, optical_power, gauss_parameters,

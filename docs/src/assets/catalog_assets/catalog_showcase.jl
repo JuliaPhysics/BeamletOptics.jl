@@ -69,6 +69,8 @@ const TILES = [
     # prisms
     "Prism" => object_tile(() -> Prism(BMO.BoxSDF(20mm, 20mm, 20mm), n_crown)),
     "RightAnglePrism" => object_tile(() -> RightAnglePrism(inch, inch, n_crown)),
+    "EquilateralPrism" => object_tile(() -> EquilateralPrism(inch, inch, n_crown)),
+    "DovePrism" => object_tile(() -> DovePrism(4inch, inch, inch, n_crown)),
     # beamsplitters
     "ThinBeamsplitter" => object_tile(() -> ThinBeamsplitter(inch)),
     "RoundThinBeamsplitter" => object_tile(() -> RoundThinBeamsplitter(inch)),

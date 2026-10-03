@@ -156,6 +156,8 @@ BMO.sdf(s::BlobSDF, p) = norm(BMO._world_to_sdf(s, p)) - 5e-3
         for s in (BMO.BoxSDF(20e-3, 10e-3, 30e-3), BMO.CylinderSDF(12e-3, 4e-3),
                 BMO.PlanoSurfaceSDF(5e-3, 25e-3), BMO.RingSDF(10e-3, 4e-3, 6e-3),
                 BMO.RightAnglePrismSDF(20e-3, 15e-3), BMO.CutSphereSDF(10e-3, 4e-3),
+                BMO.PolygonPrismSDF([(-10e-3, -5.77e-3), (10e-3, -5.77e-3), (0.0, 11.55e-3)], 12e-3),
+                BMO.PolygonPrismSDF([(0.0, 0.0), (20e-3, 0.0), (25e-3, 10e-3), (8e-3, 18e-3), (-4e-3, 9e-3)], 7e-3),
                 BMO.CutSphereSDF(10e-3, -3e-3))
             @testset "$(nameof(typeof(s)))" begin
                 check_bounding_box(s)
@@ -171,6 +173,7 @@ BMO.sdf(s::BlobSDF, p) = norm(BMO._world_to_sdf(s, p)) - 5e-3
         # minimal number of triangles
         @test length(mesh_data(BMO.BoxSDF(1.0, 2.0, 3.0))[3]) == 12
         @test length(mesh_data(BMO.RightAnglePrismSDF(1.0, 2.0))[3]) == 8
+        @test length(mesh_data(BMO.PolygonPrismSDF([(0.0, 0.0), (1.0, 0.0), (0.0, 1.0)], 2.0))[3]) == 8
     end
 
     @testset "lenses" begin
