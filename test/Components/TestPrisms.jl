@@ -2,6 +2,7 @@ module TestPrisms
 
 using BeamletOptics
 using LinearAlgebra
+using Random
 using Test
 
 const BMO = BeamletOptics
@@ -33,6 +34,33 @@ const mm = 1e-3
         @test BMO.sdf(tri, [3, 3, 0.0]) ≈ norm([3, 3] - [2.5, 1.5] + [0, 0]) atol = 1.5 # outside, finite
         @test BMO.sdf(tri, [3, 3, 0.0]) > 0
         @test BMO.sdf(tri, [1.5, 1, 0.0]) < 0
+        # exterior distance equals the brute-force distance to the nearest edge segment (random convex polygons)
+        segdist(q, a, b) = (e = b - a; norm(q - (a + clamp(dot(q - a, e) / dot(e, e), 0, 1) * e)))
+        rng = MersenneTwister(1)
+        let nchecked = 0
+            for _ in 1:100
+                θ = sort(2π * rand(rng, rand(rng, 3:9)))
+                V = [(cos(t), sin(t)) .* (0.2 + 3rand(rng)) for t in θ]
+                s = try BMO.PolygonPrismSDF(V, 1.0) catch; continue end
+                P = s.vertices
+                n = length(P)
+                for _ in 1:100
+                    q = BMO.Point2(4randn(rng), 4randn(rng))
+                    ref = minimum(i -> segdist(q, P[i], P[mod1(i + 1, n)]), 1:n)
+                    inside = all(i -> (e = P[mod1(i + 1, n)] - P[i]; w = q - P[i]; e[1] * w[2] - e[2] * w[1] >= 0), 1:n)
+                    inside && continue
+                    nchecked += 1
+                    @test BMO.sdf(s, [q[1], q[2], 0.0]) ≈ ref atol = 1e-12
+                end
+            end
+            @test nchecked > 1000
+        end
+        # a polygon with a reflex corner (where a vertex-only fallback would be wrong) is rejected
+        @test_throws ArgumentError BMO.PolygonPrismSDF([(0.0, 0.0), (5.0, 0.0), (4.0, 1.0), (3.0, 5.0), (0.0, 4.0)], 1.0)
+        # the degeneracy test is translation invariant, also in Float32
+        for off in (0f0, 1f0, 100f0)
+            @test BMO.PolygonPrismSDF([(off, off), (off + 5f-4, off), (off + 5f-4, off + 5f-4), (off, off + 5f-4)], 1f0) isa BMO.PolygonPrismSDF{Float32}
+        end
         # kinematics: the SDF follows the pose
         BMO.translate3d!(tri, [1, 1, 1.0])
         BMO.zrotate3d!(tri, deg2rad(30))

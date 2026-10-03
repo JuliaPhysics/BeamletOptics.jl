@@ -245,9 +245,12 @@ function PolygonPrismSDF(vertices::AbstractVector, height::H) where {H <: Real}
     T = float(promote_type(H, mapreduce(v -> eltype(v), promote_type, vertices)))
     pts = [Point2{T}(v[1], v[2]) for v in vertices]
     n = length(pts)
-    # signed area (shoelace), the orientation is normalized to counter-clockwise
-    area = sum(i -> pts[i][1] * pts[mod1(i + 1, n)][2] - pts[mod1(i + 1, n)][1] * pts[i][2], 1:n) / 2
-    scale = maximum(p -> maximum(abs, p), pts)
+    # signed area (shoelace) of the polygon relative to its first vertex, which makes the test
+    # invariant under translation (no cancellation for polygons far from the origin); the
+    # orientation is normalized to counter-clockwise
+    rel = [p - pts[1] for p in pts]
+    area = sum(i -> rel[i][1] * rel[mod1(i + 1, n)][2] - rel[mod1(i + 1, n)][1] * rel[i][2], 1:n) / 2
+    scale = maximum(p -> maximum(abs, p), rel)
     abs(area) > eps(T) * scale^2 * n || throw(ArgumentError("the polygon has zero area"))
     area < 0 && reverse!(pts)
     # convex: every corner turns left, and the edges turn by 2π in total (no star polygons)
