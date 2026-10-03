@@ -208,6 +208,85 @@ end
     end
 end
 
+@testset "clear_hits!" begin
+    # two detectors, one nested two levels deep in groups, plus a stateless mirror
+    pd1 = Detector(10mm, false)
+    pd2 = Detector(10mm)
+    translate3d!(pd1, [0, 50mm, 0])
+    translate3d!(pd2, [0, 60mm, 0])
+    mirror = RoundPlanoMirror(10mm, 5mm)
+    translate3d!(mirror, [0, 200mm, 0])
+    inner = ObjectGroup([pd2])
+    outer = ObjectGroup([mirror, inner])
+    system = System([pd1, outer])
+    make_source() = CollimatedSource([0, 0, 0], [0, 1, 0], 2mm, 1e-6; num_rings = 2, num_rays = 41)
+    solve_system!(system, make_source(); progress = false)
+    @test length(BMO.hits(pd1)) == 41
+    @test length(BMO.hits(pd2)) == 41
+    # accumulation is intended: a second source solved afterwards superposes
+    solve_system!(system, make_source(); progress = false)
+    @test length(BMO.hits(pd1)) == 82
+    # objects without hit state are a no-op
+    @test isnothing(clear_hits!(mirror))
+    # nested groups are reached from groups and from systems
+    clear_hits!(inner)
+    @test isnothing(BMO.hits(pd2))
+    @test length(BMO.hits(pd1)) == 82
+    solve_system!(system, make_source(); progress = false)
+    clear_hits!(system)
+    @test isnothing(BMO.hits(pd1))
+    @test isnothing(BMO.hits(pd2))
+    solve_system!(StaticSystem([pd1, outer]), make_source(); progress = false)
+    clear_hits!(StaticSystem([pd1, outer]))
+    @test isnothing(BMO.hits(pd1))
+    @test isnothing(BMO.hits(pd2))
+    @test clear_hits!(System()) isa System
+end
+
+@testset "Beam group accumulation and thread safety" begin
+    pd = Detector(20mm)
+    translate3d!(pd, [0, 50mm, 0])
+    system = System([pd])
+    cs = CollimatedSource([0, 0, 0], [0, 1, 0], 10mm, 1e-6; num_rings = 20, num_rays = 2000)
+    solve_system!(system, cs; progress = false)
+    # every beam of the group contributes exactly one hit, none is lost to a race
+    @test length(BMO.hits(pd)) == length(cs)
+    # solving the group again without a reset accumulates
+    empty!(cs)
+    solve_system!(system, cs; progress = false)
+    @test length(BMO.hits(pd)) == 2 * length(cs)
+    clear_hits!(system)
+    @test isnothing(BMO.hits(pd))
+end
+
+@testset "Reset in a loop equals a fresh solve" begin
+    function setup()
+        m = RoundPlanoMirror(25.4mm, 5mm)
+        pd = Detector(10mm)
+        translate3d!(m, [0, 20mm, 0])
+        zrotate3d!(m, deg2rad(45))
+        translate3d!(pd, [20mm, 20mm, 0])
+        zrotate3d!(pd, deg2rad(90))
+        return m, pd, System([m, pd])
+    end
+    beam() = GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], 632.8e-9, 1e-3)
+    m, pd, system = setup()
+    b = beam()
+    solve_system!(system, b)
+    n_first = length(BMO.hits(pd))
+    # change the setup and solve again after a reset
+    zrotate3d!(m, 1e-3)
+    clear_hits!(system)
+    solve_system!(system, b)
+    P_loop = optical_power(pd)
+    m2, pd2, system2 = setup()
+    zrotate3d!(m2, 1e-3)
+    solve_system!(system2, beam())
+    @test n_first > 0
+    @test length(BMO.hits(pd)) == length(BMO.hits(pd2))
+    @test P_loop ≈ optical_power(pd2)
+end
+
 end # TESTSET
 
 end # MODULE

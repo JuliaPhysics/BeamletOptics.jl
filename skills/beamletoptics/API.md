@@ -35,7 +35,7 @@ Use `scripts/api_lookup.jl NAME` to print the docstring and signatures of any na
 | Kinematics    | `translate3d!`, `translate_to3d!`, `rotate3d!`, `xrotate3d!`, `yrotate3d!`, `zrotate3d!`, `align3d!`, `reset_translation3d!`, `reset_rotation3d!`, `set_pivot3d!`, `position`, `direction`, `orientation` |
 | Rays & beams  | `Ray`, `PolarizedRay`, `Beam`, `GaussianBeamlet`, `AstigmaticGaussianBeamlet`, `rays`, `point_on_beam`, `rayleigh_range`, `normal3d` |
 | Sources       | `CollimatedSource`, `UniformDiscSource`, `PointSource`, `UniformPointSource`, `set_num_rays!`, `CollimatedGaussianBeamletSource`, `SphericalGaussianBeamletSource`, `EllipticalGaussianBeamletSource`, `GaussianBeamletDecomposition`, `WavefrontBeamletDecomposition`, `GaussianModeDecomposition`, `AstigmaticBeamGroup` |
-| System        | `System`, `StaticSystem`, `solve_system!`, `ObjectGroup` |
+| System        | `System`, `StaticSystem`, `solve_system!`, `clear_hits!`, `ObjectGroup` |
 | Inspection    | `properties`, `default_properties` |
 | Materials     | `DiscreteRefractiveIndex`, `SellmeierEquation` |
 | Lenses        | `Lens`, `ThinLens`, `SphericalLens`, `DoubletLens`, `SphericalDoubletLens`, `TripletLens`, `SphericalTripletLens`, `thickness` |
@@ -76,7 +76,8 @@ BeamletOptics.properties(x::MyFilter) =
 ```julia
 solve_system!(system, beam; r_max = 100, retrace = true, depth_max = 100,
               check_invariant = true, threshold = get_invariant_threshold())
-solve_system!(system, beam_group; progress = true, kwargs...)   # multithreaded over member beams
+solve_system!(system, beam_group; progress = true, kwargs...)   # multithreaded over member beams, hits of all beams accumulate on the detectors
+clear_hits!(system)   # empties all detectors of the system (nested groups included); solve_system! never does
 ```
 
 - `r_max`: max. rays per beam leaf (raise it for resonators, e.g. facing mirrors)
@@ -113,7 +114,7 @@ solve_system!(system, beam_group; progress = true, kwargs...)   # multithreaded 
 ## Detector readout
 
 ```julia
-empty!(det)                                   # before each solve that reuses det
+clear_hits!(system)                           # before each solve that reuses detectors (or empty!(det) for one)
 solve_system!(system, source)
 pts        = spot_diagram(det)                # Vector{Point2}: local (x, z) in m
 x, z, E    = electric_field(det; n = 200)     # complex field on an n×n grid

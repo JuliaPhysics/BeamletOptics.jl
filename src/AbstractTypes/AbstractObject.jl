@@ -104,3 +104,32 @@ Subtypes of `AbstractObjectGroup` must implement the following:
 abstract type AbstractObjectGroup{T} <: AbstractObject{T} end
 
 AbstractTrees.children(group::AbstractObjectGroup) = group.objects
+
+"""
+    clear_hits!(x)
+
+Discards the hits that detectors have recorded during previous calls of [`solve_system!`](@ref),
+so that the next solve starts from empty detectors. `x` can be a [`System`](@ref), an
+[`ObjectGroup`](@ref) (nested groups are included), a single object or a detector.
+
+[`Detector`](@ref)s accumulate hits across calls of `solve_system!` on purpose, so that
+the beams of a beam group and several sources solved one after another superpose. Hence a solve never resets them
+itself: call `clear_hits!(system)` before solving again after changing the setup, e.g. in a parameter scan.
+Objects that store no hits are left unchanged. The beams of the `system` are not touched, see `empty!(beam)`
+to restart a beam.
+
+New objects that store hits implement this function, see [`AbstractDetector`](@ref).
+
+# Examples
+
+```julia
+for shift in shifts
+    translate_to3d!(mirror, shift)
+    clear_hits!(system)             # instead of empty!(pd) for every detector
+    solve_system!(system, beam)
+    P = optical_power(pd)
+end
+```
+"""
+clear_hits!(::AbstractObject) = nothing
+clear_hits!(group::AbstractObjectGroup) = foreach(clear_hits!, AbstractTrees.children(group))

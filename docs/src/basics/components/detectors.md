@@ -12,7 +12,7 @@ In practice, photodetectors allow the conversion of electromagnetic radiation in
 In general, detector-like elements are supposed to fall under the [`BeamletOptics.AbstractDetector`](@ref) type, which defines a interface for detector implementations.
 
 !!! warning "Resetting detectors"
-    In general, the data stored in a `Detector` is not automatically reset between calls of [`solve_system!`](@ref). This task is placed within the responsibility of the user. A detector reset can be performed with the [`empty!`](@ref) function.
+    In general, the data stored in a `Detector` is not automatically reset between calls of [`solve_system!`](@ref). This is intentional, since all beams of a beam group and several sources solved one after another are meant to superpose on the same detectors. To start from empty detectors, e.g. when a component is changed in a loop, call [`clear_hits!`](@ref)`(system)`, which resets all detectors of a [`System`](@ref) including those in nested [`ObjectGroup`](@ref)s. A single detector is reset with [`empty!`](@ref). Hits are pushed under a lock, so beam groups can safely be solved multithreaded.
 
 ## Detector type
 
