@@ -35,9 +35,9 @@ save("setup.png", fig)                  # or display(fig) for an interactive win
 |-------------------------------|----------------------------|
 | `System`                      | forwarded to each object |
 | optical object                | `material` (e.g. `:refractive`, `:mechanics`), `edges`, `color`, `alpha`, `transparency` (override the material of the look) |
-| `Beam` / `Ray`                | `color = :blue`, `linewidth = 1`, `flen = 1.0` (length drawn for an open-ended last ray), `show_pos = false`, `show_polarization = false` |
+| `Beam` / `Ray`                | `color = :blue` (`:wavelength` or `(:wavelength, alpha)`: each ray in the color of its wavelength, see `wavelength_color`), `linewidth = 1`, `flen = 1.0` (length drawn for an open-ended last ray), `show_pos = false`, `show_polarization = false` |
 | beam group (source)           | `render_every = 5` (draw every n-th beam), plus beam keywords |
-| `GaussianBeamlet`             | `color = :red`, `flen = 0.1`, `show_beams = false` (show chief/waist/divergence rays), `r_res`, `z_res`, `transparency = true` |
+| `GaussianBeamlet`             | `color = :red` (`:wavelength` colors each segment by its wavelength), `flen = 0.1`, `show_beams = false` (show chief/waist/divergence rays), `r_res`, `z_res`, `transparency = true` |
 | `AstigmaticGaussianBeamlet`   | as above, plus `show_polarization`, `pol_*` |
 | polarizer / filter            | `show_transmission_axis = true`, `axis_color`, `axis_linewidth` |
 

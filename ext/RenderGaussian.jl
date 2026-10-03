@@ -102,6 +102,39 @@ function _gaussian_mesh(gauss::BMO.GaussianBeamlet{T}; flen, r_res::Int, z_res::
 end
 
 """
+    _envelope_colors(x, color::_ByWavelength; r_res, z_res, render_every = 1) -> Vector{RGBAf}
+
+The color of each vertex of the envelope mesh of the Gaussian `x` (see [`_gaussian_mesh`](@ref)): the
+color of the wavelength of the beamlet segment that the vertex belongs to.
+"""
+function _envelope_colors(x, color::_ByWavelength; r_res::Int, z_res::Int, render_every::Int = 1)
+    cols = RGBAf[]
+    for beamlet in _beamlets(x, render_every), child in PreOrderDFS(beamlet)
+        c = _wavelength_rgba(BMO.wavelength(child), color)
+        for beam in _generating_beams(child, :chief), _ in BMO.rays(beam)
+            append!(cols, Iterators.repeated(c, r_res * z_res))
+        end
+    end
+    return cols
+end
+
+"""
+    _envelope!(bp, color, geometry, colors) -> (mesh, color)
+
+Registers the observable of the envelope mesh `geometry()` in `bp` and returns it with the `color`
+attribute of its plot: `color` itself, or for a [`_ByWavelength`](@ref) an observable of the vertex
+colors `colors()`, which is refilled together with the mesh. The mesh type depends on its size, hence
+`Any`.
+"""
+_envelope!(bp::_BeamPlots, color, geometry::Function, colors::Function) =
+    (_observe!(bp, geometry, Observable{Any}(geometry())), color)
+
+function _envelope!(bp::_BeamPlots, ::_ByWavelength, geometry::Function, colors::Function)
+    both = _observe!(bp, () -> (geometry(), colors()), Observable{Any}((geometry(), colors())))
+    return lift(first, both), lift(last, both)
+end
+
+"""
     _push_grid_faces!(faces, offset, r_res, z_res)
 
 Pushes the triangles of a tube of `z_res` rings of `r_res` vertices each (radial index fastest),
@@ -169,10 +202,10 @@ function _plot_gaussian!(
         kwargs...
     )
     bp = _BeamPlots()
-    # the mesh type depends on its size, hence Any
-    geometry = () -> _gaussian_mesh(gauss; flen, r_res, z_res)
-    envelope = _observe!(bp, geometry, Observable{Any}(geometry()))
-    _add!(bp, mesh!(axis, envelope; color, transparency, kwargs...))
+    coloring = _coloring(color)
+    envelope, envelope_color = _envelope!(bp, coloring, () -> _gaussian_mesh(gauss; flen, r_res, z_res),
+        () -> _envelope_colors(gauss, coloring; r_res, z_res))
+    _add!(bp, mesh!(axis, envelope; color = envelope_color, transparency, kwargs...))
     show_beams && _plot_generating_beams!(bp, axis, gauss; flen, show_pos, transparency)
     return bp
 end
@@ -199,7 +232,8 @@ With `show_beams = true` the generating rays are overlayed into the axis as foll
 
 # Makie kwargs
 
-- `color = :red`
+- `color = :red`: envelope color. `color = :wavelength` (or `(:wavelength, alpha)`) colors each
+  segment by its wavelength, see [`wavelength_color`](@ref). The overlay of `show_beams` keeps its colors.
 - `transparency = true`
 
 Additional kwargs are passed into the mesh plot of the Gaussian envelope.

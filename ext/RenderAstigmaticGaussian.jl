@@ -124,14 +124,14 @@ function _plot_astigmatic!(
         kwargs...
     )
     bp = _BeamPlots()
-    # the mesh type depends on its size, hence Any
-    geometry = () -> _gaussian_mesh(x; flen, r_res, z_res, render_every)
-    envelope = _observe!(bp, geometry, Observable{Any}(geometry()))
-    _add!(bp, mesh!(axis, envelope; color, transparency, kwargs...))
+    coloring = _coloring(color)
+    envelope, envelope_color = _envelope!(bp, coloring, () -> _gaussian_mesh(x; flen, r_res, z_res, render_every),
+        () -> _envelope_colors(x, coloring; r_res, z_res, render_every))
+    _add!(bp, mesh!(axis, envelope; color = envelope_color, transparency, kwargs...))
     if show_waist
         # the vertices of the envelope, updated with it
         rings = lift(m -> Vector{Point3f}(GeometryBasics.coordinates(m)), envelope)
-        _add!(bp, scatter!(axis, rings; color, markersize))
+        _add!(bp, scatter!(axis, rings; color = envelope_color, markersize))
     end
     show_beams && _plot_generating_beams!(bp, axis, x; flen, render_every, show_pos, transparency)
     if show_polarization
@@ -208,7 +208,9 @@ With `show_beams = true` the generating rays are overlayed into the axis as foll
 
 # Makie kwargs
 
-- `color = :red`
+- `color = :red`: envelope color. `color = :wavelength` (or `(:wavelength, alpha)`) colors each
+  beamlet segment by its wavelength, see [`wavelength_color`](@ref). The overlay of `show_beams`
+  keeps its colors.
 - `transparency = true`
 - `markersize = 10`: size of the points of `show_waist`
 

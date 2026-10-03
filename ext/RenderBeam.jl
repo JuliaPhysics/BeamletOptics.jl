@@ -160,6 +160,47 @@ function _ray_ends(thing; render_every::Int = 1)
 end
 
 """
+    _ray_colors(thing, color::_ByWavelength; render_every = 1, ends = false) -> Vector{RGBAf}
+
+The color of each vertex of [`_ray_segments`](@ref) (two per ray), or of [`_ray_ends`](@ref) (one or
+two per ray) with `ends = true`: the color of the wavelength of its ray.
+"""
+function _ray_colors(thing, color::_ByWavelength; render_every::Int = 1, ends::Bool = false)
+    cols = RGBAf[]
+    _foreach_ray(thing, render_every) do ray
+        c = _wavelength_rgba(BMO.wavelength(ray), color)
+        push!(cols, c)
+        (!ends || !isnothing(BMO.intersection(ray))) && push!(cols, c)
+    end
+    return cols
+end
+
+"""
+    _segments!(bp, color, thing; flen, render_every) -> (points, color)
+    _ends!(bp, color, thing; render_every) -> (points, color)
+
+Registers the observable of the segments (or of the end points of `show_pos`) of `thing` in `bp`
+and returns it with the `color` attribute of its plot: `color` itself, or for a
+[`_ByWavelength`](@ref) an observable of one color per vertex, which is refilled together with the
+points, such that both always have the same length.
+"""
+_segments!(bp::_BeamPlots, color, thing; flen, render_every) =
+    (_observe!(bp, () -> _ray_segments(thing; flen, render_every)), color)
+
+_ends!(bp::_BeamPlots, color, thing; render_every) = (_observe!(bp, () -> _ray_ends(thing; render_every)), color)
+
+function _segments!(bp::_BeamPlots, color::_ByWavelength, thing; flen, render_every)
+    both = _observe!(bp, () -> (_ray_segments(thing; flen, render_every), _ray_colors(thing, color; render_every)))
+    return lift(first, both), lift(last, both)
+end
+
+function _ends!(bp::_BeamPlots, color::_ByWavelength, thing; render_every)
+    both = _observe!(bp,
+        () -> (_ray_ends(thing; render_every), _ray_colors(thing, color; render_every, ends = true)))
+    return lift(first, both), lift(last, both)
+end
+
+"""
     _plot_rays!(axis, thing; kwargs...) -> _BeamPlots
 
 The plot function of rays, [`Beam`](@ref)s and beam groups of `Beam`s: all segments in a single
@@ -185,11 +226,12 @@ function _plot_rays!(
     )
     show_polarization && _check_polarized(thing)
     bp = _BeamPlots()
-    segments = _observe!(bp, () -> _ray_segments(thing; flen, render_every))
-    _add!(bp, linesegments!(axis, segments; color, linewidth, transparency, kwargs...))
+    coloring = _coloring(color)
+    segments, segment_color = _segments!(bp, coloring, thing; flen, render_every)
+    _add!(bp, linesegments!(axis, segments; color = segment_color, linewidth, transparency, kwargs...))
     if show_pos
-        ends = _observe!(bp, () -> _ray_ends(thing; render_every))
-        _add!(bp, scatter!(axis, ends; color))
+        ends, end_color = _ends!(bp, coloring, thing; render_every)
+        _add!(bp, scatter!(axis, ends; color = end_color))
     end
     if show_polarization
         curve = _observe!(bp,
@@ -241,7 +283,9 @@ Renders a `ray` as a 3D line into the specified `axis`.
 
 # Makie kwargs
 
-- `color = :blue`: ray color
+- `color = :blue`: ray color. `color = :wavelength` draws each ray in the display color of its
+  wavelength, see [`wavelength_color`](@ref), e.g. to show the rays of white light after a prism;
+  `color = (:wavelength, 0.3)` sets the opacity
 - `linewidth = 1.0`: ray line width
 - `transparency = true`: ray transparency
 
