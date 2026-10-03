@@ -547,4 +547,46 @@ end
     @test close_to(sample(det), chain(moved(); at = [-2e-4, zr, 0]))
 end
 
+@testset "PlaneField of the segments of a beamlet through a glass window" begin
+    # A 20 mm window (n = 1.5, front surface at y = 0) between source and detector: the
+    # chief ray has three segments (air, glass, air). Each is sampled on a plane within it.
+    n_glass, t, ys = 1.5, 20e-3, -0.05
+    T = 1 - ((n_glass - 1) / (n_glass + 1))^2          # power transmission of one surface
+    k, zR = 2π / λ, π * w0^2 / λ
+    source() = BMO.AstigmaticGaussianBeamlet([0.0, ys, 0], [0.0, 1, 0], λ, w0; P0,
+        support = [1.0, 0, 0])
+    beam, det = source(), detector_at(0.1)
+    BMO.solve_system!(BMO.System([BMO.SphericalLens(Inf, Inf, t, BMO.inch, λ -> n_glass), det]),
+        beam)
+    @test length(BMO.rays(beam.c)) == 3
+    kw = (size = (64, 64), spacing = (w0 / 8, w0 / 8))
+    fd = PlaneField(det; kw..., progress = false)
+    segment(id, y) = PlaneField(beam, id; kw..., origin = [0, y, 0], axes = fd.axes)
+    c = 33                                              # sample on the axis
+
+    # first segment: what follows does not change it, so it equals a free trace
+    free = PlaneField(trace!(detector_at(-0.02), source()); kw..., progress = false)
+    f1 = segment(1, -0.02)
+    @test f1.E ≈ free.E rtol = 1e-12
+    @test f1.H ≈ free.H rtol = 1e-12
+
+    # segment in the glass: index, Fresnel loss of the front surface, admittance, optical
+    # path and Gouy phase (reduced distance l/n in the glass), and the beam radius
+    l = 10e-3
+    f2 = segment(2, l)
+    @test f2.n == n_glass
+    @test power(f2) ≈ T * P0 rtol = 1e-6
+    @test f2.H[c, c, 2] / f2.E[c, c, 1] ≈ n_glass / Z0 rtol = 1e-12
+    z_red = -ys + l / n_glass
+    @test angle(f2.E[c, c, 1] * cis(-k * (-ys + n_glass * l))) ≈ -atan(z_red / zR) atol = 1e-6
+    I2 = abs2.(f2.E[:, :, 1])
+    xs = collect(OpticsBase.coordinates(f2, 1))
+    @test 2 * sqrt(sum(I2 .* xs .^ 2) / sum(I2)) ≈ w0 * sqrt(1 + (z_red / zR)^2) rtol = 1e-4
+
+    # last segment: the hit record of the detector
+    f3 = segment(3, 0.1)
+    @test f3.E == fd.E && f3.H == fd.H
+    @test power(f3) ≈ T^2 * P0 rtol = 1e-6
+end
+
 end # module

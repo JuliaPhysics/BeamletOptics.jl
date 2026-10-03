@@ -795,11 +795,14 @@ function parabasal_field(
     # area_ref / area is essentially (1 / (1 + i*z/zr))^2 for stigmatic beams, so its
     # square root carries the Gouy phase. The argument is followed continuously from the
     # reference point (the principal branch would jump by π behind a focus).
-    # The phase includes the OPL correction Δl to ensure coherence in media.
+    # The phase includes the OPL correction Δl to ensure coherence in media. The
+    # transverse term w = rᵀQr/2 is a geometric length like z, so in a medium it enters
+    # with the wavenumber n k0 as well (beam radius and wavefront curvature).
     p_ref, i_ref = point_on_beam(agb, z_norm)
     Δarg = _area_arg(agb, i, _local_distance(agb, p0, i)) -
            _area_arg(agb, i_ref, _local_distance(agb, p_ref, i_ref))
-    ψ = sqrt(abs(area_ref / area)) * cis(-Δarg / 2) * exp(im * k0 * (z + w + Δl))
+    ψ = sqrt(abs(area_ref / area)) * cis(-Δarg / 2) *
+        exp(im * k0 * (z + refractive_index(chief) * w + Δl))
     return E_ref_amp * ψ
 end
 

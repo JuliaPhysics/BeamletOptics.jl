@@ -86,4 +86,4 @@ If [OpticsBase.jl](https://github.com/StackEnjoyer/OpticsBase.jl) is loaded alon
 OpticsBase.PlaneField(::Detector)
 ```
 
-The return paths, [`WavefrontBeamletDecomposition`](@ref) and [`GaussianModeDecomposition`](@ref) for a `PlaneField`, are documented in [OpticsBase fields as beam groups](@ref).
+The return paths, [`WavefrontBeamletDecomposition`](@ref) and [`GaussianModeDecomposition`](@ref) for a `PlaneField`, are documented in [OpticsBase fields as beam groups](@ref). Without a detector, a single traced beamlet segment is sampled with `PlaneField(beamlet, id; ...)`, which components that hand light to another solver use in their `interact3d` method, see [Re-emitting components](@ref).

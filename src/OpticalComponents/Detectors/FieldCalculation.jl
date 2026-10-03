@@ -122,7 +122,8 @@ function beamlet_hit_field(hit::AstigmaticGaussianBeamletHit{G}, p::AbstractArra
 
     phase_corr = (hit.n_eff - 1) * l1
     z_total = hit.l0 + l1
-    ψ = gouy * cis(hit.k0 * (z_total + w + hit.Δl + phase_corr))
+    # the transverse term w enters with the wavenumber n k0 of the medium, like l1
+    ψ = gouy * cis(hit.k0 * (z_total + hit.n_eff * w + hit.Δl + phase_corr))
 
     return hit.E_ref_amp * ψ
 end

@@ -226,4 +226,19 @@ end
     end
 end
 
+@testset "Beam radius within a medium" begin
+    # Inside a glass window the transverse term of the field enters with the wavenumber
+    # n k0: the beam keeps its radius (with k0 alone it was √n too wide) and spreads with
+    # the reduced distance l/n.
+    λ, w0, n, d = 1e-6, 100e-6, 1.5, 0.05
+    zR = π * w0^2 / λ
+    beam = AstigmaticGaussianBeamlet([0.0, -d, 0], [0.0, 1, 0], λ, w0; support = [1.0, 0, 0])
+    solve_system!(System([SphericalLens(Inf, Inf, 20e-3, BMO.inch, λ -> n)]), beam)
+    for l in (0.0, 5e-3, 15e-3)                         # depth in the glass
+        w = w0 * sqrt(1 + ((d + l / n) / zR)^2)
+        field(r) = BMO.parabasal_field(beam, [r, 0.0, 0], d + l + 1e-9)
+        @test abs(field(w) / field(0.0)) ≈ exp(-1) rtol = 1e-4
+    end
+end
+
 end # MODULE

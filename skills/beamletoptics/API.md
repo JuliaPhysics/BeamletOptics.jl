@@ -162,6 +162,9 @@ BeamletOptics.relaunch!(agb, [GaussianModeDecomposition(g)])   # traced on, own 
 `relaunch!` (public, not exported) attaches the new beamlets as children that count their
 optical path from their own start; `children!` would add the parent's path and reference
 plane a second time and is only right for beams that continue where the parent ended.
+`PlaneField(agb, id)` works for any segment of an `AstigmaticGaussianBeamlet`, also inside
+glass (`f.n` is the index there); for the scalar `GaussianBeamlet` only for its last
+segment in air.
 
 ## Makie rendering
 
