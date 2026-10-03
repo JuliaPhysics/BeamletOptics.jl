@@ -10,7 +10,7 @@ Element type of the vector returned by [`path_segments`](@ref), a `NamedTuple` w
 - `depth`: depth of the beam in the beam tree, `1` for a root beam, `2` for its children, ...
 - `parent`: index of the preceding segment in the vector (the previous segment of the same beam or,
   for the first segment of a child beam, the last segment of its parent beam), `0` for the first
-  segment of a root beam
+  segment of a root beam or of a relaunched beam
 - `beam`: index of the root beam in a beam group, `1` for a single beam
 - `final`: `true` if the segment is a final ray without intersection, drawn with the length `flen`
 """
@@ -44,7 +44,10 @@ accumulated geometric path length `s_start`, `s_stop` and optical path length `o
 `opl_stop` (refractive index of the medium of the ray times its length), the wavelength `λ`, the
 `depth` in the beam tree and the `parent` segment index, from which the branches can be rebuilt. A
 child beam continues from the end of its parent beam, i.e. its first segment starts at the path
-length at which its parent ends. A final ray without an intersection has no length of its own: it
+length at which its parent ends. A beam attached with [`relaunch!`](@ref BeamletOptics.relaunch!)
+(e.g. the output of a fiber) instead starts its own path: its first segment has `parent = 0`,
+`s_start = 0` and `opl_start = 0`, like `length` and `optical_path_length` of that beam, while its
+`depth` still counts the levels of the beam tree. A final ray without an intersection has no length of its own: it
 is `flen` [m] long and flagged by `final = true`.
 
 !!! note
@@ -106,7 +109,15 @@ function _path_segments!(segments::Vector{PathSegment{T}}, beam::AbstractBeam, i
         opl += n * len
     end
     for child in children(beam)
-        _path_segments!(segments, child, index, flen, parent, depth + 1, s, opl)
+        _continue_path!(segments, child, AbstractTrees.parent(child), index, flen, parent, depth + 1, s, opl)
     end
     return segments
 end
+
+# A child continues the path of its parent beam
+_continue_path!(segments, child, ::AbstractBeam, index, flen, parent, depth, s, opl) =
+    _path_segments!(segments, child, index, flen, parent, depth, s, opl)
+
+# A relaunched child (see `relaunch!`) has no parent link and starts its own path
+_continue_path!(segments::Vector{PathSegment{T}}, child, ::Nothing, index, flen, parent, depth,
+    s, opl) where {T} = _path_segments!(segments, child, index, flen, 0, depth, zero(T), zero(T))
