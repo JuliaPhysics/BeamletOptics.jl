@@ -8,7 +8,8 @@ export Ray, PolarizedRay, Beam, PointSource, CollimatedSource, UniformDiscSource
        GaussianBeamlet, AstigmaticGaussianBeamlet, rayleigh_range, rays, point_on_beam,
        normal3d
 export CollimatedGaussianBeamletSource, GaussianBeamletDecomposition,
-       SphericalGaussianBeamletSource, EllipticalGaussianBeamletSource, WavefrontBeamletDecomposition, AstigmaticBeamGroup
+       SphericalGaussianBeamletSource, EllipticalGaussianBeamletSource, WavefrontBeamletDecomposition,
+       GaussianModeDecomposition, AstigmaticBeamGroup
 
 # system
 export System, StaticSystem, solve_system!
@@ -78,5 +79,7 @@ public AbstractRenderHandle, AbstractObjectRenderHandle, AbstractSystemRenderHan
        render_settings, pickable_plots, look_colors
 public is_static, hit_count, wavelength, min_num_rays, ProgressSink, PROGRESS_SINK,
        progress_state, is_cancelled
+# re-emitting components (e.g. solvers coupled through a field)
+public relaunch!, beamlet_hit_field, GaussianBeamletHit, AstigmaticGaussianBeamletHit
 public AbstractSampling, NoSampling, DiscRings, DiscSunflower, ConeRings, ConeSunflower,
        source_beams, sampling_basis

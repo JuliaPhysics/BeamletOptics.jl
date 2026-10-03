@@ -205,4 +205,98 @@ const BMO = BeamletOptics
     end
 end
 
+# A component that absorbs the incoming beam and emits a new one at `shift` from its own
+# position, attached with `relaunch!`
+struct Reemitter{T, S <: BMO.AbstractShape{T}} <: BMO.AbstractObject{T}
+    shape::S
+    shift::Vector{T}
+end
+
+function Reemitter(shift)
+    shape = BMO.QuadraticFlatMesh(0.05)
+    zrotate3d!(shape, π)                # normal along −y, like a Detector
+    return Reemitter{Float64, typeof(shape)}(shape, shift)
+end
+
+const reemit_λ, reemit_w0 = 1e-6, 1e-3
+
+function BMO.interact3d(::BMO.AbstractSystem, r::Reemitter, beam::Beam{T, R},
+        ray::R) where {T <: Real, R <: Ray{T}}
+    BMO.relaunch!(beam, [Beam(Ray(position(r) + r.shift, direction(ray), BMO.wavelength(ray)))])
+    return nothing
+end
+
+function BMO.interact3d(::BMO.AbstractSystem, r::Reemitter, g::GaussianBeamlet, ::Int)
+    BMO.relaunch!(g,
+        [GaussianBeamlet(position(r) + r.shift, direction(g), reemit_λ, reemit_w0)])
+    return nothing
+end
+
+@testset "relaunch!: re-emitted beams count their path from their own start" begin
+    zr, zd, shift = 0.1, 0.3, [2e-3, 0.05, 1e-3]
+    function setup()
+        r = Reemitter(shift)
+        translate3d!(r, [0, zr, 0])
+        det = Detector(0.05)
+        translate3d!(det, [0, zd, 0] + shift)
+        return r, det, System([r, det])
+    end
+    path = zd - zr                      # from the point of re-emission to the detector
+
+    @testset "Beam" begin
+        r, det, system = setup()
+        beam = Beam(Ray([0.0, 0, 0], [0.0, 1, 0], reemit_λ))
+        solve_system!(system, beam)
+        child = only(BMO.children(beam))
+        @test isnothing(BMO.AbstractTrees.parent(child))
+        @test position(child) ≈ position(r) + shift
+        # the path of the parent (zr) is not counted
+        @test only(BMO.hits(det)).opl ≈ path
+        @test length(child) ≈ path
+
+        # retrace after moving the component: the child is updated in place
+        translate3d!(r, [1e-4, 0, 0])
+        empty!(det)
+        solve_system!(system, beam)
+        @test only(BMO.children(beam)) === child
+        @test position(child) ≈ position(r) + shift
+        @test only(BMO.hits(det)).opl ≈ path
+
+        # another number of beams replaces the children
+        new = [Beam(Ray([0.0, 0, 0], [0.0, 1, 0], reemit_λ)) for _ in 1:2]
+        BMO.relaunch!(beam, new)
+        @test BMO.children(beam) == new
+        @test all(isnothing ∘ BMO.AbstractTrees.parent, new)
+        BMO.relaunch!(beam, typeof(beam)[])
+        @test isempty(BMO.children(beam))
+    end
+
+    @testset "GaussianBeamlet" begin
+        r, det, system = setup()
+        gauss = GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], reemit_λ, reemit_w0)
+        solve_system!(system, gauss)
+        child = only(BMO.children(gauss))
+        @test isnothing(BMO.AbstractTrees.parent(child))
+
+        # the field at the detector is that of the same beamlet traced as a source
+        reference = GaussianBeamlet(position(r) + shift, [0.0, 1, 0], reemit_λ, reemit_w0)
+        ref_det = Detector(0.05)
+        translate3d!(ref_det, [0, zd, 0] + shift)
+        solve_system!(System([ref_det]), reference)
+        hit, ref_hit = only(BMO.hits(det)), only(BMO.hits(ref_det))
+        @test hit.l0 == ref_hit.l0 == 0
+        for offset in ([0.0, 0, 0], [0.5e-3, 0, 0], [0, 0, -1e-3])
+            p = position(det) + offset
+            @test BMO.beamlet_hit_field(hit, p) ≈ BMO.beamlet_hit_field(ref_hit, p) rtol = 1e-12
+        end
+
+        # retrace after moving the component: the child is updated in place
+        translate3d!(r, [1e-4, 0, 0])
+        empty!(det)
+        solve_system!(system, gauss)
+        @test only(BMO.children(gauss)) === child
+        @test position(child) ≈ position(r) + shift
+    end
+end
+
 end # MODULE

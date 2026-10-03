@@ -171,30 +171,39 @@ function AstigmaticGaussianBeamlet(
         if !isorthogonal3d(direction, E0)
             # If user provided E0 but it's not orthogonal, project it.
             # This is a convenience for tilted setups.
-            E0 = E0 .- dot(E0, direction) .* direction
+            # `direction` is real, so the parallel component's (possibly complex)
+            # coefficient is the bilinear `dot(direction, E0)`, not `dot(E0, direction)`
+            # (= conj of the former): `dot` conjugates its first argument, and conjugating
+            # E0 here would project onto the wrong (conjugated) coefficient, leaving a
+            # residual component along `direction` for complex E0.
+            E0 = E0 .- dot(direction, E0) .* direction
         end
     end
 
     # Divergence angles
     θx = divergence_angle(λ, w0_x, M2_x)
     θy = divergence_angle(λ, w0_y, M2_y)
-    # Waist rays
-    wxp = Ray(position + s1 * w0_x + z0_x * direction, direction, λ)
-    wxm = Ray(position - s1 * w0_x + z0_x * direction, direction, λ)
-    wyp = Ray(position + s2 * w0_y + z0_y * direction, direction, λ)
-    wym = Ray(position - s2 * w0_y + z0_y * direction, direction, λ)
-    # Divergence rays
+    # All nine rays start in the plane of the chief ray start, `position + z0 * direction`,
+    # so that none of them starts behind an object the beamlet should hit (e.g. when a
+    # waist lies downstream of the start, as for a converging beam).
+    start = position + z0 * direction
+    # Waist rays: parallel to the axis at the waist radius, the same lines wherever they
+    # start
+    wxp = Ray(start + s1 * w0_x, direction, λ)
+    wxm = Ray(start - s1 * w0_x, direction, λ)
+    wyp = Ray(start + s2 * w0_y, direction, λ)
+    wym = Ray(start - s2 * w0_y, direction, λ)
+    # Divergence rays through the waist centers at z0_x and z0_y
     div_dir_xp = normalize(direction + s1 * tan(θx))
     div_dir_xm = normalize(direction - s1 * tan(θx))
     div_dir_yp = normalize(direction + s2 * tan(θy))
     div_dir_ym = normalize(direction - s2 * tan(θy))
-    # Corrected divergence ray positions to ensure waist is at z0_x and z0_y
-    dxp = Ray(position - z0_x * s1 * tan(θx), div_dir_xp, λ)
-    dxm = Ray(position + z0_x * s1 * tan(θx), div_dir_xm, λ)
-    dyp = Ray(position - z0_y * s2 * tan(θy), div_dir_yp, λ)
-    dym = Ray(position + z0_y * s2 * tan(θy), div_dir_ym, λ)
+    dxp = Ray(start + (z0 - z0_x) * s1 * tan(θx), div_dir_xp, λ)
+    dxm = Ray(start - (z0 - z0_x) * s1 * tan(θx), div_dir_xm, λ)
+    dyp = Ray(start + (z0 - z0_y) * s2 * tan(θy), div_dir_yp, λ)
+    dym = Ray(start - (z0 - z0_y) * s2 * tan(θy), div_dir_ym, λ)
     # Chief ray
-    c = PolarizedRay(position + z0 * direction, direction, λ, E0)
+    c = PolarizedRay(start, direction, λ, E0)
     return AstigmaticGaussianBeamlet(
         Beam(c),
         Beam(wxp),
@@ -640,6 +649,62 @@ Calculates the non-conjugating dot product `a ⋅ b = Σ aᵢbᵢ`.
     return a[1] * b[1] + a[2] * b[2] + a[3] * b[3]
 end
 
+# Coefficients (A0, A1, A2) of the complex beam area a(l) = (h1 + l u1) × (h2 + l u2) · d
+# = A0 + A1 l + A2 l² along a segment, with the parabasal parameters at its start.
+@inline function _area_coefficients(h1, u1, h2, u2, d)
+    return (_pseudo_cross2d(h1, h2, d),
+        _pseudo_cross2d(h1, u2, d) + _pseudo_cross2d(u1, h2, d),
+        _pseudo_cross2d(u1, u2, d))
+end
+
+_area_value((A0, A1, A2), l) = A0 + A1 * l + A2 * l^2
+
+# Inverse roots (ρ1, ρ2) of the complex beam area along a segment:
+# a(l) = A0 (1 − ρ1 l)(1 − ρ2 l). A root that does not exist (A2 = 0, e.g. a collimated
+# axis) is ρ = 0. The roots lie off the real axis (a Gaussian beam has no real focus
+# point), so each factor 1 − ρ l stays off the negative real axis for real l: its argument
+# changes continuously, by less than π, and its principal square root is continuous.
+function _area_inverse_roots((A0, A1, A2))
+    s = sqrt(A1^2 - 4 * A2 * A0)
+    q = -(A1 + (real(conj(A1) * s) >= 0 ? s : -s)) / 2     # roots without cancellation
+    return q / A0, iszero(q) ? zero(q) : A2 / q
+end
+
+# Continuous change of arg a(l) from l = 0 to l along a segment, as the sum over the two
+# factors of `_area_inverse_roots`. The principal branch of √(a_ref/a) instead jumps by π
+# once the Gouy phase has changed by more than π/2, e.g. behind a focus.
+function _area_arg_change(A, l)
+    ρ1, ρ2 = _area_inverse_roots(A)
+    return angle(1 - ρ1 * l) + angle(1 - ρ2 * l)
+end
+
+"""
+    _area_arg(agb, i, l)
+
+Continuous argument of the complex beam area of `agb` at the local distance `l` along the
+chief ray segment `i` (measured from the start of that segment, may be negative in the
+first segment), relative to the start of the first segment. Interface jumps between
+segments are small and taken on the principal branch.
+"""
+function _area_arg(agb::AstigmaticGaussianBeamlet, i::Int, l::Real)
+    Δ = zero(float(l))
+    a_end = zero(Complex{typeof(Δ)})
+    for j in 1:i
+        ray = rays(agb.c)[j]
+        h1, u1, h2, u2, _ = parabasal_ray_parameters(agb, position(ray), j)
+        A = _area_coefficients(h1, u1, h2, u2, direction(ray))
+        j > 1 && (Δ += angle(A[1] / a_end))
+        lj = j < i ? length(ray) : l
+        Δ += _area_arg_change(A, lj)
+        a_end = _area_value(A, lj)
+    end
+    return Δ
+end
+
+# Local distance of the point `p` along chief ray segment `i`
+_local_distance(agb::AstigmaticGaussianBeamlet, p, i) =
+    dot(p - position(rays(agb.c)[i]), direction(rays(agb.c)[i]))
+
 """
     parabasal_field(agb, r, z; E_ref_amp, area_ref, z_norm)
 
@@ -727,10 +792,17 @@ function parabasal_field(
 
     k0 = 2π / wavelength(chief)
 
-    # area_ref / area is essentially (1 / (1 + i*z/zr))^2 for stigmatic beams.
-    # The sqrt gives the standard -atan(z/zr) Gouy phase natively.
-    # The phase includes the OPL correction Δl to ensure coherence in media.
-    ψ = sqrt(area_ref / area) * exp(im * k0 * (z + w + Δl))
+    # area_ref / area is essentially (1 / (1 + i*z/zr))^2 for stigmatic beams, so its
+    # square root carries the Gouy phase. The argument is followed continuously from the
+    # reference point (the principal branch would jump by π behind a focus).
+    # The phase includes the OPL correction Δl to ensure coherence in media. The
+    # transverse term w = rᵀQr/2 is a geometric length like z, so in a medium it enters
+    # with the wavenumber n k0 as well (beam radius and wavefront curvature).
+    p_ref, i_ref = point_on_beam(agb, z_norm)
+    Δarg = _area_arg(agb, i, _local_distance(agb, p0, i)) -
+           _area_arg(agb, i_ref, _local_distance(agb, p_ref, i_ref))
+    ψ = sqrt(abs(area_ref / area)) * cis(-Δarg / 2) *
+        exp(im * k0 * (z + refractive_index(chief) * w + Δl))
     return E_ref_amp * ψ
 end
 

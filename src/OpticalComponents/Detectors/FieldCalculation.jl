@@ -72,6 +72,87 @@ function electric_field(d::Detector, ::Nothing; kwargs...)
     throw(ErrorException("No hits available on detector."))
 end
 
+"""
+    beamlet_hit_field(hit::AbstractBeamletHit, p::AbstractArray)
+
+Complex scalar field of a single beamlet `hit` at the global point `p` \\[m\\]: the
+physical field amplitude in \\[V/m\\], *without* the `√|cos θ|` projection factor that
+`electric_field(::Detector, ::Vector{<:AbstractBeamletHit})` multiplies each term with
+before summing (that factor makes `|E|²` integrate to the power per detector area; it is
+not part of the physical field). It is kept as its own function (rather than inlined in that
+loop) so that other code that needs the *individual* hit contributions at a point — e.g.
+to build a 3D field vector via [`beamlet_hit_polarization`](@ref), as the
+`BeamletOpticsOpticsBaseExt` package extension does to assemble the tangential magnetic
+field — does not have to duplicate the beamlet field formulas.
+"""
+function beamlet_hit_field(hit::GaussianBeamletHit{G}, p::AbstractArray) where {G}
+    v = p - hit.p0
+    l1 = _pseudo_dot(v, hit.d0)
+
+    # Transverse distance r
+    r_vec = v - l1 * hit.d0
+    r = norm(r_vec)
+
+    # Distance along beam
+    z = hit.l0 + l1
+
+    return electric_field(hit.gauss, r, z; hint = (hit.p0 + l1 * hit.d0, hit.id))
+end
+
+function beamlet_hit_field(hit::AstigmaticGaussianBeamletHit{G}, p::AbstractArray) where {G}
+    v = p - hit.p0
+    l1 = _pseudo_dot(v, hit.d0)
+    r_vec = v - l1 * hit.d0
+
+    h1_z = hit.h1 + l1 * hit.u1
+    h2_z = hit.h2 + l1 * hit.u2
+    area_z = _pseudo_cross2d(h1_z, h2_z, hit.d0)
+    if abs(area_z) < 1e-25
+        area_z = Complex{G}(1e-25, 1e-25)
+    end
+    # Gouy factor √(a_ref / a(l1)) with the continuous argument of the area: each factor
+    # of a(l1) stays off the negative real axis (see `_area_inverse_roots`), so the
+    # principal square roots follow the Gouy phase through a focus
+    gouy = hit.gouy0 / (sqrt(1 - hit.ρ1 * l1) * sqrt(1 - hit.ρ2 * l1))
+
+    ξ1 = _pseudo_cross2d(h1_z, r_vec, hit.d0)
+    ξ2 = _pseudo_cross2d(h2_z, r_vec, hit.d0)
+    w = (ξ1 * _pseudo_dot(hit.u2, r_vec) -
+         ξ2 * _pseudo_dot(hit.u1, r_vec)) / (2 * area_z)
+
+    phase_corr = (hit.n_eff - 1) * l1
+    z_total = hit.l0 + l1
+    # the transverse term w enters with the wavenumber n k0 of the medium, like l1
+    ψ = gouy * cis(hit.k0 * (z_total + hit.n_eff * w + hit.Δl + phase_corr))
+
+    return hit.E_ref_amp * ψ
+end
+
+"""
+    beamlet_hit_polarization(hit::AstigmaticGaussianBeamletHit)
+
+Complex 3D vector (global frame) that turns the scalar
+[`beamlet_hit_field`](@ref)`(hit, p)` of an astigmatic beamlet hit into its 3D field
+vector at `p`: the polarization of the hit segment's chief ray divided by the complex
+reference amplitude `E_ref_amp` that the scalar field already contains. For a beamlet
+whose polarization did not change on its path it is a unit vector with the phase of the
+reference component removed.
+
+Stigmatic [`GaussianBeamletHit`](@ref)s have no method: the underlying [`GaussianBeamlet`](@ref)
+model is scalar and carries no polarization in BMO, so there is no principled 3D
+direction to return. Callers that need a vector for such a hit (e.g. to build a
+tangential field on some plane) must supply their own convention, such as the local `u`
+axis of that plane (this matches `OpticsBase`'s rule for a purely scalar field: it is
+placed entirely along `u`).
+"""
+function beamlet_hit_polarization(hit::AstigmaticGaussianBeamletHit)
+    # `beamlet_hit_field` already carries the complex reference amplitude `E_ref_amp`
+    # (magnitude and phase of the start polarization), so dividing it out keeps the
+    # beamlet phase from being counted twice. What remains is the polarization of the hit
+    # segment relative to the start, including changes by polarizing elements.
+    return polarization(rays(hit.agb.c)[hit.id]) / hit.E_ref_amp
+end
+
 function electric_field(
         pd::Detector,
         hits::Vector{GaussianBeamletHit{G}};
@@ -119,17 +200,7 @@ function electric_field(
 
                 acc = Complex{G}(0.0)
                 for hit in hits
-                    v = p1 - hit.p0
-                    l1 = _pseudo_dot(v, hit.d0)
-
-                    # Transverse distance r
-                    r_vec = v - l1 * hit.d0
-                    r = norm(r_vec)
-
-                    # Distance along beam
-                    z = hit.l0 + l1
-
-                    acc += electric_field(hit.gauss, r, z; hint = (hit.p0 + l1 * hit.d0, hit.id)) * hit.sqrt_proj
+                    acc += beamlet_hit_field(hit, p1) * hit.sqrt_proj
                 end
                 field[i, j] = acc
             end
@@ -186,28 +257,7 @@ function electric_field(
 
                 acc = Complex{G}(0.0)
                 for hit in hits
-                    v = p1 - hit.p0
-                    l1 = _pseudo_dot(v, hit.d0)
-                    r_vec = v - l1 * hit.d0
-
-                    h1_z = hit.h1 + l1 * hit.u1
-                    h2_z = hit.h2 + l1 * hit.u2
-                    area_z = _pseudo_cross2d(h1_z, h2_z, hit.d0)
-                    if abs(area_z) < 1e-25
-                        area_z = Complex{G}(1e-25, 1e-25)
-                    end
-
-                    ξ1 = _pseudo_cross2d(h1_z, r_vec, hit.d0)
-                    ξ2 = _pseudo_cross2d(h2_z, r_vec, hit.d0)
-                    w = (ξ1 * _pseudo_dot(hit.u2, r_vec) -
-                         ξ2 * _pseudo_dot(hit.u1, r_vec)) / (2 * area_z)
-
-                    phase_corr = (hit.n_eff - 1) * l1
-                    z_total = hit.l0 + l1
-                    ψ = sqrt(hit.area_ref / area_z) *
-                        cis(hit.k0 * (z_total + w + hit.Δl + phase_corr))
-
-                    acc += (hit.E_ref_amp * ψ) * hit.sqrt_proj
+                    acc += beamlet_hit_field(hit, p1) * hit.sqrt_proj
                 end
                 field[i, j] = acc
             end

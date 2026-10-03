@@ -65,6 +65,9 @@ include(joinpath(@__DIR__, "Rendering", "TestLiveBeams.jl"))
 # Test regressions
 include(joinpath(@__DIR__, "TestBugFixes.jl"))
 
+# Test package extensions
+include(joinpath(@__DIR__, "TestOpticsBaseExt.jl"))
+
 # Test agent skill docs against the public API
 include(joinpath(@__DIR__, "TestAgentSkill.jl"))
 

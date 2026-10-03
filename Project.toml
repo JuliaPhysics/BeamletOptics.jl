@@ -1,6 +1,6 @@
 name = "BeamletOptics"
 uuid = "c387492b-ffec-4e51-9a46-bd230226031c"
-version = "0.13.12"
+version = "0.13.13"
 authors = ["Hugo Uittenbosch <hugo.uittenbosch@dlr.de>, Oliver Kliebisch <oliver.kliebisch@dlr.de> and Thomas Dekorsy <thomas.dekorsy@dlr.de>"]
 
 [deps]
@@ -21,9 +21,11 @@ Trapz = "592b5752-818d-11e9-1e9a-2b8ca4a44cd1"
 
 [weakdeps]
 Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
+OpticsBase = "0a174593-c395-4975-8599-97e6c4e949e6"
 
 [extensions]
 BeamletOpticsMakieExt = "Makie"
+BeamletOpticsOpticsBaseExt = "OpticsBase"
 
 [compat]
 AbstractTrees = "0.4"
@@ -35,6 +37,7 @@ LinearAlgebra = "1"
 Makie = "0.24"
 MarchingCubes = "0.1"
 MeshIO = "0.5"
+OpticsBase = "0.1"
 PrecompileTools = "1"
 Preferences = "1.5.2"
 ProgressMeter = "1.11"
