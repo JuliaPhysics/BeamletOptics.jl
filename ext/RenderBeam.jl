@@ -1,4 +1,4 @@
-using Makie: Observable, AbstractPlot, lift
+using Makie: Observable, AbstractPlot, lift, on
 
 #=
 One drawing path per beam type: a pure geometry function per beam type (segments of rays, mesh of a
@@ -160,6 +160,67 @@ function _ray_ends(thing; render_every::Int = 1)
 end
 
 """
+    _ray_colors(thing, color::_ByWavelength; render_every = 1, ends = false) -> Vector{RGBAf}
+
+The color of each vertex of [`_ray_segments`](@ref) (two per ray), or of [`_ray_ends`](@ref) (one or
+two per ray) with `ends = true`: the color of the wavelength of its ray.
+"""
+function _ray_colors(thing, color::_ByWavelength; render_every::Int = 1, ends::Bool = false)
+    cols = RGBAf[]
+    _foreach_ray(thing, render_every) do ray
+        c = _wavelength_rgba(BMO.wavelength(ray), color)
+        push!(cols, c)
+        (!ends || !isnothing(BMO.intersection(ray))) && push!(cols, c)
+    end
+    return cols
+end
+
+"""
+    _coupled!(bp, plotfn!, axis, source, color, select = identity; kwargs...) -> plot
+
+Draws `plotfn!(axis, select(geometry); color, kwargs...)`, where `source` is the observable of the
+geometry registered by [`_observe!`](@ref) and `select` extracts the plotted argument from it (e.g.
+the vertices of a mesh).
+
+For a [`_ByWavelength`](@ref) `color`, `source` is instead the observable of the tuple `(geometry,
+colors)` of the geometry and its one color per vertex. The plot is then updated with
+`Makie.update!`, which sets the positions and the colors in one step: the number of vertices may
+change on `update_render!`, and the observables of two attributes, notified one after the other,
+would leave the plot with the new positions and the old colors in between.
+"""
+_coupled!(bp::_BeamPlots, plotfn!, axis, source::Observable, color, select = identity; kwargs...) =
+    _add!(bp, plotfn!(axis, lift(select, source); color, kwargs...))
+
+function _coupled!(bp::_BeamPlots, plotfn!, axis, source::Observable, ::_ByWavelength, select = identity;
+        kwargs...)
+    geometry, colors = source[]
+    plot = _add!(bp, plotfn!(axis, select(geometry); color = colors, kwargs...))
+    on(source) do (geometry, colors)
+        Makie.update!(plot; arg1 = select(geometry), color = colors)
+    end
+    return plot
+end
+
+"""
+    _segments!(bp, color, thing; flen, render_every) -> source
+    _ends!(bp, color, thing; render_every) -> source
+
+Registers the observable of the segments (or of the end points of `show_pos`) of `thing` in `bp`
+and returns it, for [`_coupled!`](@ref): for a [`_ByWavelength`](@ref) `color` together with one
+color per vertex.
+"""
+_segments!(bp::_BeamPlots, color, thing; flen, render_every) =
+    _observe!(bp, () -> _ray_segments(thing; flen, render_every))
+
+_ends!(bp::_BeamPlots, color, thing; render_every) = _observe!(bp, () -> _ray_ends(thing; render_every))
+
+_segments!(bp::_BeamPlots, color::_ByWavelength, thing; flen, render_every) =
+    _observe!(bp, () -> (_ray_segments(thing; flen, render_every), _ray_colors(thing, color; render_every)))
+
+_ends!(bp::_BeamPlots, color::_ByWavelength, thing; render_every) =
+    _observe!(bp, () -> (_ray_ends(thing; render_every), _ray_colors(thing, color; render_every, ends = true)))
+
+"""
     _plot_rays!(axis, thing; kwargs...) -> _BeamPlots
 
 The plot function of rays, [`Beam`](@ref)s and beam groups of `Beam`s: all segments in a single
@@ -185,11 +246,12 @@ function _plot_rays!(
     )
     show_polarization && _check_polarized(thing)
     bp = _BeamPlots()
-    segments = _observe!(bp, () -> _ray_segments(thing; flen, render_every))
-    _add!(bp, linesegments!(axis, segments; color, linewidth, transparency, kwargs...))
+    coloring = _coloring(color)
+    segments = _segments!(bp, coloring, thing; flen, render_every)
+    _coupled!(bp, linesegments!, axis, segments, coloring; linewidth, transparency, kwargs...)
     if show_pos
-        ends = _observe!(bp, () -> _ray_ends(thing; render_every))
-        _add!(bp, scatter!(axis, ends; color))
+        ends = _ends!(bp, coloring, thing; render_every)
+        _coupled!(bp, scatter!, axis, ends, coloring)
     end
     if show_polarization
         curve = _observe!(bp,
@@ -241,7 +303,9 @@ Renders a `ray` as a 3D line into the specified `axis`.
 
 # Makie kwargs
 
-- `color = :blue`: ray color
+- `color = :blue`: ray color. `color = :wavelength` draws each ray in the display color of its
+  wavelength, see [`wavelength_color`](@ref), e.g. to show the rays of white light after a prism;
+  `color = (:wavelength, 0.3)` sets the opacity
 - `linewidth = 1.0`: ray line width
 - `transparency = true`: ray transparency
 

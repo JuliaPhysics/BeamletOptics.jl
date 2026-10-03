@@ -54,6 +54,7 @@ function render!(::_RenderEnv, ::T; kwargs...) where {T <: _RenderTypes}
 end
 
 # include order dependant!
+include("RenderWavelength.jl")
 include("RenderBeam.jl")
 include("RenderPolarization.jl")
 include("RenderGaussian.jl")
