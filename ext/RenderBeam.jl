@@ -1,4 +1,4 @@
-using Makie: Observable, AbstractPlot, lift
+using Makie: Observable, AbstractPlot, lift, on
 
 #=
 One drawing path per beam type: a pure geometry function per beam type (segments of rays, mesh of a
@@ -176,29 +176,49 @@ function _ray_colors(thing, color::_ByWavelength; render_every::Int = 1, ends::B
 end
 
 """
-    _segments!(bp, color, thing; flen, render_every) -> (points, color)
-    _ends!(bp, color, thing; render_every) -> (points, color)
+    _coupled!(bp, plotfn!, axis, source, color, select = identity; kwargs...) -> plot
+
+Draws `plotfn!(axis, select(geometry); color, kwargs...)`, where `source` is the observable of the
+geometry registered by [`_observe!`](@ref) and `select` extracts the plotted argument from it (e.g.
+the vertices of a mesh).
+
+For a [`_ByWavelength`](@ref) `color`, `source` is instead the observable of the tuple `(geometry,
+colors)` of the geometry and its one color per vertex. The plot is then updated with
+`Makie.update!`, which sets the positions and the colors in one step: the number of vertices may
+change on `update_render!`, and the observables of two attributes, notified one after the other,
+would leave the plot with the new positions and the old colors in between.
+"""
+_coupled!(bp::_BeamPlots, plotfn!, axis, source::Observable, color, select = identity; kwargs...) =
+    _add!(bp, plotfn!(axis, lift(select, source); color, kwargs...))
+
+function _coupled!(bp::_BeamPlots, plotfn!, axis, source::Observable, ::_ByWavelength, select = identity;
+        kwargs...)
+    geometry, colors = source[]
+    plot = _add!(bp, plotfn!(axis, select(geometry); color = colors, kwargs...))
+    on(source) do (geometry, colors)
+        Makie.update!(plot; arg1 = select(geometry), color = colors)
+    end
+    return plot
+end
+
+"""
+    _segments!(bp, color, thing; flen, render_every) -> source
+    _ends!(bp, color, thing; render_every) -> source
 
 Registers the observable of the segments (or of the end points of `show_pos`) of `thing` in `bp`
-and returns it with the `color` attribute of its plot: `color` itself, or for a
-[`_ByWavelength`](@ref) an observable of one color per vertex, which is refilled together with the
-points, such that both always have the same length.
+and returns it, for [`_coupled!`](@ref): for a [`_ByWavelength`](@ref) `color` together with one
+color per vertex.
 """
 _segments!(bp::_BeamPlots, color, thing; flen, render_every) =
-    (_observe!(bp, () -> _ray_segments(thing; flen, render_every)), color)
+    _observe!(bp, () -> _ray_segments(thing; flen, render_every))
 
-_ends!(bp::_BeamPlots, color, thing; render_every) = (_observe!(bp, () -> _ray_ends(thing; render_every)), color)
+_ends!(bp::_BeamPlots, color, thing; render_every) = _observe!(bp, () -> _ray_ends(thing; render_every))
 
-function _segments!(bp::_BeamPlots, color::_ByWavelength, thing; flen, render_every)
-    both = _observe!(bp, () -> (_ray_segments(thing; flen, render_every), _ray_colors(thing, color; render_every)))
-    return lift(first, both), lift(last, both)
-end
+_segments!(bp::_BeamPlots, color::_ByWavelength, thing; flen, render_every) =
+    _observe!(bp, () -> (_ray_segments(thing; flen, render_every), _ray_colors(thing, color; render_every)))
 
-function _ends!(bp::_BeamPlots, color::_ByWavelength, thing; render_every)
-    both = _observe!(bp,
-        () -> (_ray_ends(thing; render_every), _ray_colors(thing, color; render_every, ends = true)))
-    return lift(first, both), lift(last, both)
-end
+_ends!(bp::_BeamPlots, color::_ByWavelength, thing; render_every) =
+    _observe!(bp, () -> (_ray_ends(thing; render_every), _ray_colors(thing, color; render_every, ends = true)))
 
 """
     _plot_rays!(axis, thing; kwargs...) -> _BeamPlots
@@ -227,11 +247,11 @@ function _plot_rays!(
     show_polarization && _check_polarized(thing)
     bp = _BeamPlots()
     coloring = _coloring(color)
-    segments, segment_color = _segments!(bp, coloring, thing; flen, render_every)
-    _add!(bp, linesegments!(axis, segments; color = segment_color, linewidth, transparency, kwargs...))
+    segments = _segments!(bp, coloring, thing; flen, render_every)
+    _coupled!(bp, linesegments!, axis, segments, coloring; linewidth, transparency, kwargs...)
     if show_pos
-        ends, end_color = _ends!(bp, coloring, thing; render_every)
-        _add!(bp, scatter!(axis, ends; color = end_color))
+        ends = _ends!(bp, coloring, thing; render_every)
+        _coupled!(bp, scatter!, axis, ends, coloring)
     end
     if show_polarization
         curve = _observe!(bp,

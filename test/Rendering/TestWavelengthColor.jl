@@ -124,4 +124,62 @@ end
     end
 end
 
+"""The number of vertices of the positions (`arg1`) of the plot `p`: of a mesh, points or segments."""
+_nvertices(p) = (a = to_value(p.arg1); a isa AbstractVector ? length(a) : length(coordinates(a)))
+
+"""
+    _transient_lengths(h, solve)
+
+Calls `solve()` and `update_render!(h)` and returns the pairs `(vertices, colors)` of the `color = :wavelength`
+plots of `h` that Makie sees whenever the positions or the colors of one of them are notified, i.e. at
+every step of the update.
+"""
+function _transient_lengths(h, solve)
+    seen = Tuple{Int, Int}[]
+    plots = filter(p -> to_value(p.color) isa AbstractVector{<:Makie.RGBAf}, BMO.render_plots(h))
+    for p in plots
+        check(_) = push!(seen, (_nvertices(p), length(to_value(p.color))))
+        on(check, p.arg1)
+        on(check, p.color)
+    end
+    solve()
+    update_render!(h)
+    return seen
+end
+
+@testset "color = :wavelength: positions and colors are updated together" begin
+    # a mirror that is moved in and out of the beam changes the number of segments on every solve
+    lens = SphericalLens(50e-3, -50e-3, 10e-3, 25e-3, 1.5168)
+    ax = LScene(Figure()[1, 1])
+
+    @testset "$name" for (name, make, kwargs) in (
+            ("Beam", () -> Beam([0.0, -20e-3, 0.0], [0.0, 1.0, 0.0], 550e-9), (; show_pos = true, render_every = 1)),
+            ("GaussianBeamlet", () -> GaussianBeamlet([0.0, -20e-3, 0.0], [0.0, 1.0, 0.0], 550e-9, 1e-3),
+                (; r_res = 8, z_res = 6)),
+            ("AstigmaticGaussianBeamlet",
+                () -> AstigmaticGaussianBeamlet([0, -20e-3, 0], [0, 1, 0], 550e-9, 1e-3; support = [0, 0, 1]),
+                (; r_res = 8, z_res = 6, show_waist = true)),
+        )
+        mir = RoundPlanoMirror(25.4e-3, 5e-3)
+        translate3d!(mir, [0, 60e-3, 0])
+        zrotate3d!(mir, deg2rad(45))
+        sys = System([lens, mir])
+        thing = make()
+        solve_system!(sys, thing; check_invariant = false)
+        h = live_render!(ax, thing; color = :wavelength, kwargs...)
+        sizes = Int[]
+        for d in (10.0, -10.0, 10.0, -10.0)
+            seen = _transient_lengths(h, () -> begin
+                translate3d!(mir, [d, 0, 0])
+                solve_system!(sys, thing; check_invariant = false)
+            end)
+            push!(sizes, maximum(first, seen; init = 0))
+            @test !isempty(seen)
+            @test all(l -> l[1] == l[2], seen)
+        end
+        # the vertex count did change
+        @test length(unique(sizes)) > 1
+    end
+end
+
 end # module

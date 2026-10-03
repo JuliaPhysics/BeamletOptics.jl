@@ -119,20 +119,17 @@ function _envelope_colors(x, color::_ByWavelength; r_res::Int, z_res::Int, rende
 end
 
 """
-    _envelope!(bp, color, geometry, colors) -> (mesh, color)
+    _envelope!(bp, color, geometry, colors) -> source
 
-Registers the observable of the envelope mesh `geometry()` in `bp` and returns it with the `color`
-attribute of its plot: `color` itself, or for a [`_ByWavelength`](@ref) an observable of the vertex
-colors `colors()`, which is refilled together with the mesh. The mesh type depends on its size, hence
-`Any`.
+Registers the observable of the envelope mesh `geometry()` in `bp` and returns it, for
+[`_coupled!`](@ref): for a [`_ByWavelength`](@ref) `color` together with the vertex colors
+`colors()`. The mesh type depends on its size, hence `Any`.
 """
 _envelope!(bp::_BeamPlots, color, geometry::Function, colors::Function) =
-    (_observe!(bp, geometry, Observable{Any}(geometry())), color)
+    _observe!(bp, geometry, Observable{Any}(geometry()))
 
-function _envelope!(bp::_BeamPlots, ::_ByWavelength, geometry::Function, colors::Function)
-    both = _observe!(bp, () -> (geometry(), colors()), Observable{Any}((geometry(), colors())))
-    return lift(first, both), lift(last, both)
-end
+_envelope!(bp::_BeamPlots, ::_ByWavelength, geometry::Function, colors::Function) =
+    _observe!(bp, () -> (geometry(), colors()), Observable{Any}((geometry(), colors())))
 
 """
     _push_grid_faces!(faces, offset, r_res, z_res)
@@ -203,9 +200,9 @@ function _plot_gaussian!(
     )
     bp = _BeamPlots()
     coloring = _coloring(color)
-    envelope, envelope_color = _envelope!(bp, coloring, () -> _gaussian_mesh(gauss; flen, r_res, z_res),
+    envelope = _envelope!(bp, coloring, () -> _gaussian_mesh(gauss; flen, r_res, z_res),
         () -> _envelope_colors(gauss, coloring; r_res, z_res))
-    _add!(bp, mesh!(axis, envelope; color = envelope_color, transparency, kwargs...))
+    _coupled!(bp, mesh!, axis, envelope, coloring; transparency, kwargs...)
     show_beams && _plot_generating_beams!(bp, axis, gauss; flen, show_pos, transparency)
     return bp
 end

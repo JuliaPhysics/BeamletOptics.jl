@@ -125,14 +125,12 @@ function _plot_astigmatic!(
     )
     bp = _BeamPlots()
     coloring = _coloring(color)
-    envelope, envelope_color = _envelope!(bp, coloring, () -> _gaussian_mesh(x; flen, r_res, z_res, render_every),
+    envelope = _envelope!(bp, coloring, () -> _gaussian_mesh(x; flen, r_res, z_res, render_every),
         () -> _envelope_colors(x, coloring; r_res, z_res, render_every))
-    _add!(bp, mesh!(axis, envelope; color = envelope_color, transparency, kwargs...))
-    if show_waist
-        # the vertices of the envelope, updated with it
-        rings = lift(m -> Vector{Point3f}(GeometryBasics.coordinates(m)), envelope)
-        _add!(bp, scatter!(axis, rings; color = envelope_color, markersize))
-    end
+    _coupled!(bp, mesh!, axis, envelope, coloring; transparency, kwargs...)
+    # the vertices of the envelope, updated with it
+    show_waist && _coupled!(bp, scatter!, axis, envelope, coloring, m -> Vector{Point3f}(GeometryBasics.coordinates(m));
+        markersize)
     show_beams && _plot_generating_beams!(bp, axis, x; flen, render_every, show_pos, transparency)
     if show_polarization
         curve = _observe!(bp,
