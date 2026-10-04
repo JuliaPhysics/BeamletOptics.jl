@@ -82,6 +82,16 @@ For [`PolarizedRay`](@ref)s the field is added as 3D vectors, so [`electric_fiel
 
 If [OpticsBase.jl](https://github.com/StackEnjoyer/OpticsBase.jl) is loaded alongside BMO (`using OpticsBase`), the `BeamletOpticsOpticsBaseExt` package extension adds a `PlaneField` constructor for a `Detector`. It samples the physical field of the beamlet hits as tangential electric *and* magnetic field on the detector plane, OpticsBase's single exchange format for coupling to other Maxwell solvers (angular spectrum propagators, BPM, FDTD, ...). Unlike [`electric_field`](@ref)`(::Detector)`, it carries no `√cos θ` projection factor, so for an oblique beam its Poynting flux is the full beam power.
 
+!!! note "OpticsBase is not registered yet"
+    Until OpticsBase is in the General registry, BMO cannot declare the extension, and `using OpticsBase` alone does not load it. Add OpticsBase from its repository and include the extension file once per session:
+
+    ```julia
+    using Pkg
+    Pkg.add(url = "https://github.com/StackEnjoyer/OpticsBase.jl")
+    using BeamletOptics, OpticsBase
+    include(joinpath(pkgdir(BeamletOptics), "ext", "BeamletOpticsOpticsBaseExt.jl"))
+    ```
+
 ```@docs
 OpticsBase.PlaneField(::Detector)
 ```

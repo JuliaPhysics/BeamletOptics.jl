@@ -1,6 +1,6 @@
 # Tests of BeamletOpticsOpticsBaseExt: BMO detector hits -> OpticsBase.PlaneField and
-# back via WavefrontBeamletDecomposition. Evaluated with `using OpticsBase` loaded (see
-# runtests.jl), which triggers the package extension.
+# back via WavefrontBeamletDecomposition. OpticsBase is not registered yet, so the root
+# Project.toml does not declare the extension and its file is included here instead.
 module TestOpticsBaseExt
 
 using BeamletOptics
@@ -10,6 +10,8 @@ using LinearAlgebra
 using Logging: with_logger, NullLogger
 
 const BMO = BeamletOptics
+const Ext = @something Base.get_extension(BMO, :BeamletOpticsOpticsBaseExt) include(
+    joinpath(@__DIR__, "..", "ext", "BeamletOpticsOpticsBaseExt.jl"))
 const Z0 = OpticsBase.VACUUM_IMPEDANCE
 
 const λ = 1.064e-6
@@ -189,7 +191,7 @@ end
     # Plane at the origin with the default detector frame (n = +y); detector one
     # wavelength behind it, so the propagation phase is 2π and diffraction negligible.
     det = detector_at(λ)
-    axes = Base.get_extension(BMO, :BeamletOpticsOpticsBaseExt)._default_plane_axes(det)
+    axes = Ext._default_plane_axes(det)
     N, Δ = 128, 3e-6
     k = 2π / λ
     w1, w2, R1, R2 = 40e-6, 60e-6, 0.1, -0.2        # radii and curvatures along ξ1, ξ2

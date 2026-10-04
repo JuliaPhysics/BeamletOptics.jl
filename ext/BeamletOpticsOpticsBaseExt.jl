@@ -27,7 +27,9 @@ const BMO = BeamletOptics
 import OpticsBase
 using OpticsBase: PlaneField, VACUUM_IMPEDANCE, forward
 using LinearAlgebra: cross, dot, norm
-using StaticArrays: SVector, SMatrix
+# Through BMO, so that this file also loads by `include` where StaticArrays is no direct
+# dependency (needed while the extension is not declared in Project.toml).
+import BeamletOptics: SVector, SMatrix
 
 const _PREFIX = "BeamletOptics/OpticsBase extension"
 

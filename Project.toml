@@ -19,13 +19,14 @@ Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Trapz = "592b5752-818d-11e9-1e9a-2b8ca4a44cd1"
 
+# OpticsBase (0a174593-c395-4975-8599-97e6c4e949e6) is not registered yet, and General rejects
+# a package with an unregistered weak dependency. Once it is, add it back to [weakdeps] and
+# [compat] ("0.1") and add `BeamletOpticsOpticsBaseExt = "OpticsBase"` to [extensions].
 [weakdeps]
 Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
-OpticsBase = "0a174593-c395-4975-8599-97e6c4e949e6"
 
 [extensions]
 BeamletOpticsMakieExt = "Makie"
-BeamletOpticsOpticsBaseExt = "OpticsBase"
 
 [compat]
 AbstractTrees = "0.4"
@@ -37,7 +38,6 @@ LinearAlgebra = "1"
 Makie = "0.24"
 MarchingCubes = "0.1"
 MeshIO = "0.5"
-OpticsBase = "0.1"
 PrecompileTools = "1"
 Preferences = "1.5.2"
 ProgressMeter = "1.11"
