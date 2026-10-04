@@ -12,7 +12,7 @@ Install the copy matching this package version into a project with
 """
 module BeamletOptics
 
-using LinearAlgebra: norm, normalize, normalize!, dot, cross, I, eigen, Symmetric, svd
+using LinearAlgebra: norm, normalize, normalize!, dot, cross, I, eigen, Symmetric, Hermitian, svd
 using MarchingCubes: MC, march
 using Trapz: trapz
 using PrecompileTools: @setup_workload, @compile_workload

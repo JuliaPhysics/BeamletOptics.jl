@@ -100,6 +100,32 @@ end
 
 _drop_beams!(b::B) where {B <: AbstractBeam} = (b.children = Vector{B}())
 
+"""
+    relaunch!(beam::B, new_beams::AbstractVector{B}) where {B <: AbstractBeam}
+
+Attaches `new_beams` as children of `beam` that start their own optical reference: they are
+traced, retraced and removed together with `beam`, but their length, optical path and phase
+are counted from their own start instead of being continued from `beam`. The new beams carry
+the full phase in their amplitude.
+
+Use it in the `interact3d` of a component that re-emits light elsewhere, e.g. the output end
+of a fiber or a solver coupled through a field: the light leaves at another place than where
+`beam` ended, so the geometric continuation of [`children!`](@ref BeamletOptics.children!)
+(parent length, reference plane of a beamlet) does not apply.
+
+On a retrace with as many new beams as existing children, the children are updated in place
+like with `children!`; otherwise they are replaced.
+"""
+function relaunch!(beam::B, new_beams::AbstractVector{B}) where {B <: AbstractBeam}
+    if !isempty(new_beams) && length(children(beam)) == length(new_beams)
+        foreach(_modify_beam_head!, children(beam), new_beams)
+    else
+        _drop_beams!(beam)
+        append!(children(beam), new_beams)
+    end
+    return nothing
+end
+
 function _modify_beam_head!(::B, ::B) where {B <: AbstractBeam}
     throw(ArgumentError(lazy"_modify_beam_head not implemented for $B"))
 end
