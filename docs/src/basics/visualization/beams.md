@@ -22,6 +22,21 @@ render!(::Union{GLMakie.Axis3, GLMakie.LScene}, ::Beam)
 render!(::Union{GLMakie.Axis3, GLMakie.LScene}, ::BeamletOptics.AbstractBeamGroup)
 ```
 
+## Coloring by wavelength
+
+`color = :wavelength` draws each ray in the display color of its own wavelength, e.g. to show white light that is dispersed by a prism: child beams that leave a dispersive element keep the color of their wavelength, and every beam of a beam group gets its own color. The opacity is set by `color = (:wavelength, 0.3)`. The same option colors the envelope of Gaussian beamlets, segment by segment. [`live_render!`](@ref) takes it as well.
+
+```julia
+render!(ax, beam_group; color = :wavelength)
+render!(ax, gauss; color = (:wavelength, 0.5))
+```
+
+The color of a wavelength is available without a plotting backend via [`wavelength_color`](@ref), e.g. to color other plots consistently:
+
+```@docs
+wavelength_color
+```
+
 ## Polarization overlay
 
 For a [`PolarizedRay`](@ref) or a `Beam` of polarized rays, `render!(ax, beam; show_polarization=true)` overlays a curve that shows the electric field component perpendicular to the ray direction along the optical path. The appearance of the curve is controlled via the `pol_*` keyword arguments listed above. Passing `show_polarization=true` for non-polarized rays throws an `ArgumentError`. An example is shown in the [Polarized rays](@ref) section.

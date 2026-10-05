@@ -61,6 +61,7 @@ include(joinpath(@__DIR__, "Rendering", "TestTessellation.jl"))
 include(joinpath(@__DIR__, "Rendering", "TestRenderLook.jl"))
 include(joinpath(@__DIR__, "Rendering", "TestRenderLive.jl"))
 include(joinpath(@__DIR__, "Rendering", "TestLiveBeams.jl"))
+include(joinpath(@__DIR__, "Rendering", "TestWavelengthColor.jl"))
 
 # Test regressions
 include(joinpath(@__DIR__, "TestBugFixes.jl"))

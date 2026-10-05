@@ -56,6 +56,57 @@ Refer to the `BeamletOptics` extension docs for `Makie` for more information.
 render!(::Any, ::_RenderTypes, kwargs...) = throw(MissingBackendError())
 
 """
+    wavelength_color(λ) -> NTuple{3, Float64}
+
+The display color `(r, g, b)` (each in `[0, 1]`, sRGB) of light of the vacuum wavelength `λ` [m], e.g.
+to draw rays in the color of their wavelength, see the `color = :wavelength` option of
+[`render!`](@ref). Uses the piecewise linear approximation of Dan Bruton (violet at 380 nm over
+blue, cyan, green, yellow and orange to red at 780 nm) with a gamma of 0.8, and the intensity falls
+off to 30 % towards both ends of the visible range (380 to 420 nm and 700 to 780 nm).
+
+Outside of 380 to 780 nm there is no visible color: the color of the nearest end of the spectrum
+is returned, i.e. a dim violet for UV and a dim red for IR, such that rays of an invisible
+wavelength are still drawn, and the color stays continuous. The result is a perceptual
+approximation for plots, not a colorimetric conversion.
+
+The function is plain Julia and needs no plotting backend. Throws an `ArgumentError` unless `λ` is
+positive and finite.
+
+```julia
+wavelength_color(450e-9)   # blue
+wavelength_color(650e-9)   # red
+```
+"""
+function wavelength_color(λ::Real)
+    (isfinite(λ) && λ > 0) || throw(ArgumentError("the wavelength must be positive and finite, got $λ"))
+    # [nm], clamped to the visible range
+    nm = clamp(1e9 * Float64(λ), 380.0, 780.0)
+    r, g, b = if nm < 440
+        (-(nm - 440) / 60, 0.0, 1.0)
+    elseif nm < 490
+        (0.0, (nm - 440) / 50, 1.0)
+    elseif nm < 510
+        (0.0, 1.0, -(nm - 510) / 20)
+    elseif nm < 580
+        ((nm - 510) / 70, 1.0, 0.0)
+    elseif nm < 645
+        (1.0, -(nm - 645) / 65, 0.0)
+    else
+        (1.0, 0.0, 0.0)
+    end
+    # intensity fall-off at the ends of the spectrum
+    f = if nm < 420
+        0.3 + 0.7 * (nm - 380) / 40
+    elseif nm <= 700
+        1.0
+    else
+        0.3 + 0.7 * (780 - nm) / 80
+    end
+    γ = 0.8
+    return map(c -> clamp((f * c)^γ, 0.0, 1.0), (r, g, b))
+end
+
+"""
     get_view(ls)
 
 Returns the current camera view matrix of an `LScene` `ls`, if a suitable backend is loaded.
@@ -154,7 +205,8 @@ Every handle implements [`rendered`](@ref) and [`render_plots`](@ref). The subty
   `live_render!(draw, ax, x)`
 - [`AbstractSystemRenderHandle`](@ref): the object handles of a system, with its hierarchy of
   groups
-- [`AbstractBeamRenderHandle`](@ref): a ray, beam or beam group, with [`render_settings`](@ref)
+- [`AbstractBeamRenderHandle`](@ref): a ray, beam or beam group, with [`render_settings`](@ref) and
+  [`render_settings!`](@ref)
 
 Code that uses handles, e.g. a GUI, relies on this protocol only, and may add own subtypes, e.g.
 a system handle that combines the handles of several systems.
@@ -200,7 +252,8 @@ abstract type AbstractSystemRenderHandle <: AbstractRenderHandle end
     AbstractBeamRenderHandle <: AbstractRenderHandle
 
 Handle of a ray, beam or beam group, returned by `live_render!(ax, beam)`. Implements
-[`rendered`](@ref), [`render_plots`](@ref) and [`render_settings`](@ref).
+[`rendered`](@ref), [`render_plots`](@ref), [`render_settings`](@ref) and
+[`render_settings!`](@ref).
 [`update_render!`](@ref) draws the current rays of the beam, e.g. after
 [`solve_system!`](@ref).
 """
@@ -262,9 +315,50 @@ Base.delete!(::AbstractSystemRenderHandle, ::AbstractObjectRenderHandle)
 
 The settings with which the beam handle `h` draws its beam, at least `flen` (length of a final
 ray without intersection [m]) and `render_every` (every how many beams of a beam group are drawn,
-`1` for other beams), e.g. to find the drawn segments of a beam.
+`1` for other beams), e.g. to find the drawn segments of a beam, and `color` (the color of the rays
+or of the envelope as it was given, e.g. `:blue` or `:wavelength`). The handles of Gaussian beamlets
+and of beam groups of beamlets also report the resolution of the envelope, `r_res` and `z_res`.
+Change them via [`render_settings!`](@ref).
 """
 function render_settings end
+
+"""
+    render_settings!(h::AbstractBeamRenderHandle; kwargs...) -> h
+
+Changes the settings of the beam handle `h` and draws the beam again with them, without creating
+new plots: the plots of [`render_plots`](@ref)`(h)` stay in the axis, with their other attributes
+(visibility, opacity, line width, clip planes, ...) unchanged. The keywords are among the keys of
+[`render_settings`](@ref)`(h)`:
+
+- `flen`: length of a final ray without intersection [m], positive and finite
+- `render_every`: every how many beams of a beam group are drawn, a positive integer (no effect on
+  other beams)
+- `r_res`, `z_res`: radial and longitudinal resolution of an envelope mesh, integers of at least 2
+- `color`: the color of the rays or of the envelope, a single color that `Makie` knows (e.g. `:red`,
+  `(:red, 0.3)`), or `:wavelength` or `(:wavelength, alpha)` for the color of the wavelength of each
+  ray, see [`wavelength_color`](@ref)
+
+Any other keyword, e.g. `r_res` for a ray, throws an `ArgumentError`, and then `h` is not changed.
+The beam is drawn as it is, i.e. nothing is solved, like [`update_render!`](@ref). The overlays of
+the handle, e.g. `show_beams` or `show_pos`, follow the settings; the generating rays of
+`show_beams` and the polarization curve keep their colors.
+
+The plots of a handle that draw the `color` hold one color per vertex, which the handle sets
+together with the positions. Change the color via `render_settings!`, not via the `color` attribute
+of the plots, which the next update overwrites. A `color` that is neither a single color nor the
+wavelength, e.g. a vector of colors, is passed on to `Makie` by `live_render!` and can not be
+changed here.
+
+```julia
+h = live_render!(ax, beam; flen = 0.1)
+render_settings!(h; flen = 0.5)             # the final ray is now 0.5 m long
+render_settings!(h; color = :wavelength)    # each ray in the color of its wavelength
+render_settings!(h; color = :orange)        # and all in one color again
+```
+
+If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
+"""
+render_settings!(::Any; kwargs...) = throw(MissingBackendError())
 
 """
     pickable_plots(x, plots) -> AbstractVector

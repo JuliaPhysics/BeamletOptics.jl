@@ -548,11 +548,11 @@ end
     bg = CollimatedGaussianBeamletSource([0, 0, 0], [0, 1, 0], 10e-3, 1000e-9, 2e-3; n_grid = 3)
     ax = LScene(Figure()[1, 1])
     for (x, kw, settings) in (
-            (beam, (; flen = 0.3), (; flen = 0.3, render_every = 1)),
-            (src, (; render_every = 3), (; flen = 1.0, render_every = 3)),
-            (gauss, (; r_res = 8, z_res = 10), (; flen = 0.1, render_every = 1, r_res = 8, z_res = 10)),
-            (agb, (;), (; flen = 0.1, render_every = 1, r_res = 64, z_res = 100)),
-            (bg, (;), (; flen = 0.1, render_every = 5, r_res = 10, z_res = 8)),
+            (beam, (; flen = 0.3), (; flen = 0.3, render_every = 1, color = :blue)),
+            (src, (; render_every = 3, color = :wavelength), (; flen = 1.0, render_every = 3, color = :wavelength)),
+            (gauss, (; r_res = 8, z_res = 10), (; flen = 0.1, render_every = 1, r_res = 8, z_res = 10, color = :red)),
+            (agb, (;), (; flen = 0.1, render_every = 1, r_res = 64, z_res = 100, color = :red)),
+            (bg, (;), (; flen = 0.1, render_every = 5, r_res = 10, z_res = 8, color = :red)),
         )
         h = live_render!(ax, x; kw...)
         @test h isa BMO.AbstractBeamRenderHandle
@@ -562,6 +562,77 @@ end
         @test all(p -> any(q -> q === p, ax.scene.plots), BMO.render_plots(h))
         remove_render!(h)
         @test isempty(BMO.render_plots(h))
+    end
+end
+
+@testset "render_settings! of beam handles" begin
+    _, _, _, beam = _lens_mirror_fixture()
+    _, _, _, _, gauss = _michelson_fixture()
+    _, _, agb = _agb_lens_fixture()
+    src = CollimatedSource([0.0, 0, 0], [0.0, 1.0, 0.0], 10e-3; num_rings = 4, num_rays = 80)
+    bg = CollimatedGaussianBeamletSource([0, 0, 0], [0, 1, 0], 10e-3, 1000e-9, 2e-3; n_grid = 3)
+    ax = LScene(Figure()[1, 1])
+
+    @testset "rays, beams and groups" begin
+        h = live_render!(ax, beam; flen = 0.3)
+        plots = copy(BMO.render_plots(h))
+        @test BMO.render_settings!(h; flen = 0.7) === h
+        @test BMO.render_settings(h) == (; flen = 0.7, render_every = 1, color = :blue)
+        @test _points(h) == _expected_beam_points(beam; flen = 0.7)
+        @test BMO.render_plots(h) == plots
+        # same as rendering with the new setting
+        @test _points(h) == _points(live_render!(ax, beam; flen = 0.7))
+        # render_every does not apply to a single beam
+        BMO.render_settings!(h; render_every = 3)
+        @test BMO.render_settings(h).render_every == 1
+
+        h = live_render!(ax, src; render_every = 5, show_pos = true)
+        n = length(_points(h))
+        BMO.render_settings!(h; render_every = 1, flen = 2.0)
+        @test BMO.render_settings(h) == (; flen = 2.0, render_every = 1, color = :blue)
+        @test length(_points(h)) > n
+        @test _points(h) == _points(live_render!(ax, src; render_every = 1, flen = 2.0))
+    end
+
+    @testset "Gaussian beamlets" begin
+        h = live_render!(ax, gauss; r_res = 8, z_res = 10, show_beams = true)
+        BMO.render_settings!(h; flen = 0.4, r_res = 12, z_res = 6)
+        @test BMO.render_settings(h) == (; flen = 0.4, render_every = 1, r_res = 12, z_res = 6, color = :red)
+        ref = live_render!(ax, gauss; r_res = 12, z_res = 6, flen = 0.4, show_beams = true)
+        @test _same_data(_mesh(h), _mesh(ref))
+        # the generating rays follow flen
+        gen = filter(p -> p isa Makie.LineSegments, BMO.render_plots(h))
+        genref = filter(p -> p isa Makie.LineSegments, BMO.render_plots(ref))
+        @test length(gen) == 3
+        @test all(_data(a) == _data(b) for (a, b) in zip(gen, genref))
+
+        h = live_render!(ax, agb)
+        BMO.render_settings!(h; flen = 0.25, r_res = 16)
+        @test _same_data(_mesh(h), _mesh(live_render!(ax, agb; flen = 0.25, r_res = 16)))
+
+        h = live_render!(ax, bg; show_waist = true)
+        BMO.render_settings!(h; render_every = 1)
+        @test BMO.render_settings(h).render_every == 1
+        @test _same_data(_mesh(h), _mesh(live_render!(ax, bg; render_every = 1, show_waist = true)))
+    end
+
+    @testset "errors" begin
+        h = live_render!(ax, beam; flen = 0.3)
+        @test_throws ArgumentError BMO.render_settings!(h; r_res = 10)
+        @test_throws ArgumentError BMO.render_settings!(h; linewidth = 2.0)
+        @test_throws ArgumentError BMO.render_settings!(h; flen = -1.0)
+        @test_throws ArgumentError BMO.render_settings!(h; flen = Inf)
+        # checked as stored, i.e. as Float64 and Int: neither Inf, 0 nor an InexactError
+        @test_throws ArgumentError BMO.render_settings!(h; flen = big(10)^1000)
+        @test_throws ArgumentError BMO.render_settings!(h; flen = big(10.0)^-1000)
+        @test_throws ArgumentError BMO.render_settings!(h; render_every = big(2)^70)
+        hg = live_render!(ax, gauss; r_res = 8, z_res = 10)
+        @test_throws ArgumentError BMO.render_settings!(hg; z_res = big(2)^70)
+        @test BMO.render_settings(hg).z_res == 10
+        @test_throws ArgumentError BMO.render_settings!(h; render_every = 0)
+        @test_throws ArgumentError BMO.render_settings!(h; flen = 0.5, r_res = 10)
+        @test BMO.render_settings(h) == (; flen = 0.3, render_every = 1, color = :blue)
+        @test BMO.render_settings!(h) === h
     end
 end
 

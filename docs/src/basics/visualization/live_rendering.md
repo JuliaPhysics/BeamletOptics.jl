@@ -76,10 +76,13 @@ delete!(system, lens)
 remove_render!(hsys, lens)   # deletes its plots and its handle
 ```
 
-Beam handles report how they were drawn:
+Beam handles report how they were drawn, and can change it at runtime, e.g. the drawn length of the
+final rays or the color (a single color or the color of the wavelength of each ray), without
+creating new plots:
 
 ```@docs; canonical=false
 BeamletOptics.render_settings
+BeamletOptics.render_settings!
 ```
 
 Overlays that are not part of a component, e.g. markers, are drawn with the function form of

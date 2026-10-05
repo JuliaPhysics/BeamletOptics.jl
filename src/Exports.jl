@@ -70,13 +70,13 @@ export Retroreflector, get_invariant_threshold, set_invariant_threshold!,
     get_progress_threshold, set_progress_threshold!
 
 # render
-export render!, get_view, set_view, hide_axis, set_orthographic, arrow!, render_lcs!, look_at!
+export wavelength_color, render!, get_view, set_view, hide_axis, set_orthographic, arrow!, render_lcs!, look_at!
 export live_render!, update_render!, remove_render!, pick_object, studio_lighting!, set_render_look
 
 # render handle protocol and developer API for packages built on BeamletOptics: public, not exported
 public AbstractRenderHandle, AbstractObjectRenderHandle, AbstractSystemRenderHandle,
        AbstractBeamRenderHandle, rendered, render_plots, render_children, render_parent,
-       render_settings, pickable_plots, look_colors
+       render_settings, render_settings!, pickable_plots, look_colors
 public is_static, hit_count, wavelength, min_num_rays, ProgressSink, PROGRESS_SINK,
        progress_state, is_cancelled
 # re-emitting components (e.g. solvers coupled through a field)
