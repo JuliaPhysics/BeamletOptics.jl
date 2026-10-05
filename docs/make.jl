@@ -30,40 +30,6 @@ if Sys.iswindows()
     ENV["PATH"] = string(dirname(NodeJS_20_jll.node_path), ";", ENV["PATH"])
 end
 
-# DocumenterVitepress only merges plugin `vitepress_dependencies` (used below for mermaid)
-# into `docs/package.json` when that file already exists; otherwise it first `cp`s its own
-# read-only template into place. On Windows, `cp` preserves the source's read-only
-# attribute, so the subsequent write to merge in the mermaid deps fails with
-# `IOError: ... Permission denied`. Pre-seed a writable copy ourselves so DV finds an
-# existing (non-read-only) `package.json` and skips its own `cp`. `docs/package.json` is
-# gitignored and regenerated on every build.
-if Sys.iswindows()
-    pkg_json = joinpath(@__DIR__, "package.json")
-    if !isfile(pkg_json)
-        template = joinpath(dirname(pathof(DocumenterVitepress)), "..", "template", "package.json")
-        write(pkg_json, read(template))
-    end
-end
-
-# DocumenterCitations 1.5 wraps every in-text citation in a `CitationSiteNode`, an HTML
-# anchor the bibliography backlinks point at. DocumenterVitepress only handles the
-# `BibliographyNode`, so without this method the node itself ends up in the markdown as
-# `DocumenterCitations.CitationSiteNode("...")`. Emit the anchor, then the citation link,
-# mirroring what the LaTeX writer of DocumenterCitations does.
-function DocumenterVitepress.render(
-    io::IO,
-    mime::MIME"text/plain",
-    node::Documenter.MarkdownAST.Node,
-    citation_site::DocumenterCitations.CitationSiteNode,
-    page,
-    doc;
-    kwargs...
-)
-    print(io, "<a id=\"", citation_site.id, "\"></a>")
-    DocumenterVitepress.render(io, mime, node, node.children, page, doc; kwargs...)
-    return nothing
-end
-
 # On Windows, `@contents` listings of pages in subfolders are broken twice. Documenter
 # matches `Pages` against `relpath`s with backslashes, so pages must be given as
 # `joinpath("beams", "beams.md")` (see `basics/intro.md`) rather than "beams/beams.md".
