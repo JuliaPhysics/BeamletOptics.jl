@@ -262,6 +262,33 @@ function _tessellate(s::BMO.RightAnglePrismSDF)
     return _transform!(m, s)
 end
 
+# Convex polygon extruded along z, see `PolygonPrismSDF`. The side walls have flat normals, the
+# caps are triangle fans.
+function _tessellate(s::BMO.PolygonPrismSDF)
+    V = [Vec3d(v[1], v[2], 0) for v in s.vertices]
+    n = length(V)
+    h = s.height / 2
+    m = _TriMesh()
+    for i in 1:n
+        a, b = V[i], V[mod1(i + 1, n)]
+        e = b - a
+        nrm = normalize(Vec3d(e[2], -e[1], 0)) # outward for counter-clockwise vertices
+        ia = _add_vertex!(m, Vec3d(a[1], a[2], -h), nrm)
+        ib = _add_vertex!(m, Vec3d(b[1], b[2], -h), nrm)
+        ic = _add_vertex!(m, Vec3d(b[1], b[2], h), nrm)
+        id = _add_vertex!(m, Vec3d(a[1], a[2], h), nrm)
+        _add_triangle!(m, ia, ib, ic)
+        _add_triangle!(m, ia, ic, id)
+    end
+    for sg in (-1, 1)
+        idx = [_add_vertex!(m, Vec3d(v[1], v[2], sg * h), Vec3d(0, 0, sg)) for v in V]
+        for i in 2:(n - 1)
+            _add_triangle!(m, idx[1], idx[i], idx[i + 1])
+        end
+    end
+    return _transform!(m, s)
+end
+
 function _tessellate(s::BMO.CylinderSDF)
     r, h = s.radius, s.height
     m = _TriMesh()
@@ -317,7 +344,7 @@ function _tessellate(s::BMO.CutSphereSDF)
     return _transform!(m, s)
 end
 
-const _PrimitiveSDF = Union{BMO.BoxSDF, BMO.RightAnglePrismSDF, BMO.CylinderSDF,
+const _PrimitiveSDF = Union{BMO.BoxSDF, BMO.RightAnglePrismSDF, BMO.PolygonPrismSDF, BMO.CylinderSDF,
     BMO.PlanoSurfaceSDF, BMO.RingSDF, BMO.SphereSDF, BMO.CutSphereSDF}
 
 _has_mesh(::_PrimitiveSDF) = true

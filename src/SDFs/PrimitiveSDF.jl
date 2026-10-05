@@ -208,3 +208,112 @@ function sdf(prism:: RightAnglePrismSDF{T}, point) where T
     pln_dist = (p[1] + p[2]) / sqrt(2)
     return max(box_dist, pln_dist)
 end
+
+thickness(s::RightAnglePrismSDF) = 2 * s.dimensions[2]
+
+"""
+    PolygonPrismSDF <: AbstractSDF
+
+Implements the exact `SDF` of a right prism, i.e. the extrusion of a convex polygon along the local
+z-axis. The local origin is the origin of the coordinates given to the constructor, it is not
+shifted.
+
+# Fields
+
+- `vertices`: corners of the cross-section in the local x-y-plane in [m], in counter-clockwise order
+- `normals`: outward unit normals of the edges, where edge `i` runs from vertex `i` to vertex `i + 1`
+- `height`: extent along the local z-axis in [m], the prism spans `z ∈ [-height/2, height/2]`
+"""
+mutable struct PolygonPrismSDF{T} <: AbstractSDF{T}
+    dir::SMatrix{3, 3, T, 9}
+    transposed_dir::SMatrix{3, 3, T, 9}
+    pos::Point3{T}
+    vertices::Vector{Point2{T}}
+    normals::Vector{Point2{T}}
+    height::T
+end
+
+"""
+    PolygonPrismSDF(vertices, height)
+
+Constructs the prism over the convex polygon given by `vertices`, a vector of 2D points `(x, y)` in
+[m], extruded symmetrically by `height` in [m] along the local z-axis. Both vertex orders are
+accepted and normalized to counter-clockwise. Throws an `ArgumentError` for fewer than three
+vertices, for points that are not 2D, for degenerate (zero area or collinear) corners and for
+non-convex or self-intersecting polygons.
+"""
+function PolygonPrismSDF(vertices::AbstractVector, height::H) where {H <: Real}
+    length(vertices) >= 3 || throw(ArgumentError("a polygon needs at least 3 vertices"))
+    all(v -> length(v) == 2, vertices) ||
+        throw(ArgumentError("the vertices must be 2D points (x, y) in the local x-y-plane"))
+    height > 0 || throw(ArgumentError("the prism height must be positive"))
+    T = float(mapreduce(v -> promote_type(typeof(v[1]), typeof(v[2])), promote_type, vertices; init = H))
+    pts = [Point2{T}(v[1], v[2]) for v in vertices]
+    n = length(pts)
+    # signed area (shoelace) of the polygon relative to its first vertex, which makes the test
+    # invariant under translation (no cancellation for polygons far from the origin); the
+    # orientation is normalized to counter-clockwise
+    rel = [p - pts[1] for p in pts]
+    area = sum(i -> rel[i][1] * rel[mod1(i + 1, n)][2] - rel[mod1(i + 1, n)][1] * rel[i][2], 1:n) / 2
+    scale = maximum(p -> maximum(abs, p), rel)
+    abs(area) > eps(T) * scale^2 * n || throw(ArgumentError("the polygon has zero area"))
+    area < 0 && reverse!(pts)
+    # convex: every corner turns left, and the edges turn by 2π in total (no star polygons)
+    turning = zero(T)
+    for i in 1:n
+        e1 = pts[mod1(i + 1, n)] - pts[i]
+        e2 = pts[mod1(i + 2, n)] - pts[mod1(i + 1, n)]
+        c = e1[1] * e2[2] - e1[2] * e2[1]
+        c > sqrt(eps(T)) * norm(e1) * norm(e2) ||
+            throw(ArgumentError("the polygon must be strictly convex (no reflex or collinear vertices)"))
+        turning += atan(c, dot(e1, e2))
+    end
+    isapprox(turning, 2π; atol = sqrt(eps(T))) ||
+        throw(ArgumentError("the polygon must not be self-intersecting"))
+    normals = map(1:n) do i
+        e = pts[mod1(i + 1, n)] - pts[i]
+        return normalize(Point2{T}(e[2], -e[1]))
+    end
+    return PolygonPrismSDF{T}(
+        Matrix{T}(I, 3, 3),
+        Matrix{T}(I, 3, 3),
+        Point3{T}(0),
+        pts,
+        normals,
+        T(height))
+end
+
+function thickness(s::PolygonPrismSDF)
+    lo, hi = extrema(v -> v[2], s.vertices)
+    return hi - lo
+end
+
+"""
+    sdf_convex_polygon(q, vertices, normals)
+
+Exact signed distance of the 2D point `q` to the convex polygon with the counter-clockwise
+`vertices` and the outward unit `normals` of its edges, see [`PolygonPrismSDF`](@ref).
+"""
+function sdf_convex_polygon(q, vertices, normals)
+    # the largest signed distance to an edge line is exact inside and wherever the closest point
+    # lies within that edge, which keeps the gradient smooth on the faces
+    d, k = dot(normals[1], q - vertices[1]), 1
+    @inbounds for i in 2:length(vertices)
+        di = dot(normals[i], q - vertices[i])
+        if di > d
+            d, k = di, i
+        end
+    end
+    d > 0 || return d
+    # outside and beside that edge, the closest point is the vertex at the end the point lies beyond
+    a, b = vertices[k], vertices[k == length(vertices) ? 1 : k + 1]
+    t = dot(q - a, b - a)
+    t < 0 && return norm(q - a)
+    t > sum(abs2, b - a) && return norm(q - b)
+    return d
+end
+
+function sdf(prism::PolygonPrismSDF, point)
+    p = Point3(_world_to_sdf(prism, point))
+    return op_extrude_z(p, q -> sdf_convex_polygon(q, prism.vertices, prism.normals), prism.height / 2)
+end
