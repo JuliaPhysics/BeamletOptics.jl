@@ -3,7 +3,7 @@ name: beamletoptics
 description: Build, modify, and debug optical simulations with BeamletOptics.jl (Julia, "BMO"). Use when writing Julia code that uses BeamletOptics, or when the user asks to simulate or ray-trace lenses, mirrors, beamsplitters, polarizers, detectors, Gaussian beams/beamlets, interferometers, PSFs, spot diagrams, or to render an optical setup with Makie.
 allowed-tools: Read, Write, Edit, Grep, Glob, Bash
 metadata:
-  beamletoptics-version: "0.13"
+  beamletoptics-version: "0.14"
 ---
 
 You are helping the user build optical simulations with **BeamletOptics.jl**: a Julia package for
@@ -11,7 +11,7 @@ non-sequential 3D ray tracing and Gaussian beamlet propagation, with a Makie ext
 
 When this Skill is active:
 
-- This skill describes BeamletOptics **0.13** (`beamletoptics-version` above). Check the installed version
+- This skill describes BeamletOptics **0.14** (`beamletoptics-version` above). Check the installed version
   with `julia --project=<env> -e 'using BeamletOptics; println(pkgversion(BeamletOptics))'`. If its
   major or minor version differs, treat signatures in these files as possibly outdated and confirm every
   constructor, keyword and function with `scripts/api_lookup.jl` before using it, and tell the user
@@ -56,7 +56,8 @@ When this Skill is active:
 - `system = System([obj1, obj2, ...])` (order does not matter, tracing is non-sequential);
   `StaticSystem` for small fixed systems that are solved many times.
 - `solve_system!(system, beam_or_source)`.
-- For parameter scans, mutate the scene in a loop, `empty!` detectors, and re-solve (retracing is automatic).
+- For parameter scans, mutate the scene in a loop, `empty!` detectors, and call `solve_system!` again (it solves from the start).
+  Mesh scenes solved thousands of times can use `StaticSystem`.
 
 5) Evaluate
 - Rays: `rays(beam)`, `position`, `direction`, `length(beam)`, `beam.children` (splitters: transmitted first).

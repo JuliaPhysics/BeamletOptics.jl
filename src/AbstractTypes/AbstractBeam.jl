@@ -20,9 +20,10 @@ Subtypes of `AbstractBeam` must implement the following:
 
 ## Functions:
 
-- `_modify_beam_head!`: modifies the beam path for retracing purposes
-- `_last_beam_intersection`: returns the last `Beam` intersection
-- `empty!`: resets the beam to its unsolved state
+- `trace_system!(system, beam; r_max, kwargs...)`: traces the beam from its last ray through the `system`
+  until no object is hit or an interaction returns `nothing`
+- `push!(beam, interaction)`: appends the result of an interaction to the beam
+- `empty!`: resets the beam to its unsolved state. [`solve_system!`](@ref) calls it before tracing
 - `first_ray`: returns the start ray on the optical axis of the beam; for beamlets the first chief ray.
   Defines the generic `position`/`direction` of the beam (the pivot for rotations)
 
@@ -62,40 +63,24 @@ AbstractTrees.printnode(io::IO, node::B; kw...) where {B <: AbstractBeam} = show
 """
     children!(beam::B, child::B) where {B<:AbstractBeam}
 
-Handles the inclusion of adding a single `child` to an existing `beam`. The function behaves as follows:
+    children!(beam::B, children::AbstractVector{B}) where {B<:AbstractBeam}
 
-1. If no previous children exist, add child
-2. If `beam` already has a single child, modify child beam starting ray (retracing)
-3. Else throw error
+Attaches the `child` or the `children` to `beam` and links `beam` as their parent, e.g. the
+transmitted and the reflected beam at a beamsplitter. The children continue `beam`: its length,
+optical path and reference plane are counted on, see [`relaunch!`](@ref BeamletOptics.relaunch!)
+for beams that start their own reference.
+
+A beam is split once, at its end: a `beam` that already has children throws an `ArgumentError`.
 """
-function children!(beam::B, child::B) where {B <: AbstractBeam}
-    if isempty(children(beam))
-        # Link parent and add child to tree
-        parent!(child, beam)
-        push!(children(beam), child)
-        return nothing
-    end
-    if length(children(beam)) == 1
-        _modify_beam_head!(first(children(beam)), child)
-        return nothing
-    end
-    return error("Adding child to beam failed")
-end
+children!(beam::B, child::B) where {B <: AbstractBeam} = children!(beam, [child])
 
 function children!(beam::B, _children::AbstractVector{B}) where {B <: AbstractBeam}
-    if isempty(children(beam))
-        # Link parent and add children to tree
-        parent!.(_children, Ref(beam))
-        append!(children(beam), _children)
-        return nothing
-    end
-    if length(children(beam)) == length(_children)
-        for (i, child) in enumerate(children(beam))
-            _modify_beam_head!(child, _children[i])
-        end
-        return nothing
-    end
-    return error("Adding children to beam failed")
+    isempty(children(beam)) ||
+        throw(ArgumentError("the beam already has children; a beam is split once, at its end"))
+    # Link parent and add children to tree
+    parent!.(_children, Ref(beam))
+    append!(children(beam), _children)
+    return nothing
 end
 
 _drop_beams!(b::B) where {B <: AbstractBeam} = (b.children = Vector{B}())
@@ -104,7 +89,7 @@ _drop_beams!(b::B) where {B <: AbstractBeam} = (b.children = Vector{B}())
     relaunch!(beam::B, new_beams::AbstractVector{B}) where {B <: AbstractBeam}
 
 Attaches `new_beams` as children of `beam` that start their own optical reference: they are
-traced, retraced and removed together with `beam`, but their length, optical path and phase
+traced and removed together with `beam`, but their length, optical path and phase
 are counted from their own start instead of being continued from `beam`. The new beams carry
 the full phase in their amplitude.
 
@@ -113,25 +98,13 @@ of a fiber or a solver coupled through a field: the light leaves at another plac
 `beam` ended, so the geometric continuation of [`children!`](@ref BeamletOptics.children!)
 (parent length, reference plane of a beamlet) does not apply.
 
-On a retrace with as many new beams as existing children, the children are updated in place
-like with `children!`; otherwise they are replaced.
+The `new_beams` replace any children that `beam` already has. A beam that the component keeps
+and attaches again is solved from its first ray, like every beam.
 """
 function relaunch!(beam::B, new_beams::AbstractVector{B}) where {B <: AbstractBeam}
-    if !isempty(new_beams) && length(children(beam)) == length(new_beams)
-        foreach(_modify_beam_head!, children(beam), new_beams)
-    else
-        _drop_beams!(beam)
-        append!(children(beam), new_beams)
-    end
+    _drop_beams!(beam)
+    append!(children(beam), new_beams)
     return nothing
-end
-
-function _modify_beam_head!(::B, ::B) where {B <: AbstractBeam}
-    throw(ArgumentError(lazy"_modify_beam_head not implemented for $B"))
-end
-
-function _last_beam_intersection(::B) where {B <: AbstractBeam}
-    throw(ArgumentError(lazy"_last_beam_intersection not implemented for $B"))
 end
 
 function Base.empty!(::B) where {B <: AbstractBeam}

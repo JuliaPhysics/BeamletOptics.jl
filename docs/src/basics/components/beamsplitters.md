@@ -7,7 +7,7 @@ Main.DocUtils.conditional_include(joinpath(bs_showcase_dir, "cbs_showcase.jl"))
 
 # Beamsplitters
 
-Beamsplitters are used to split beams of light, enabling the separation of an incoming beam into reflected and transmitted parts. In this package, beamsplitters are implemented via the [`BeamletOptics.AbstractBeamsplitter`](@ref) interface. This type loosely defines the interaction logic used for the tracing and retracing of optical systems that incorporate these devices. When a beam is
+Beamsplitters are used to split beams of light, enabling the separation of an incoming beam into reflected and transmitted parts. In this package, beamsplitters are implemented via the [`BeamletOptics.AbstractBeamsplitter`](@ref) interface. This type loosely defines the interaction logic used for the tracing of optical systems that incorporate these devices. When a beam is
 split the new beams are referred to as the `children` of the `parent` beam. This package uses the `AbstractTrees.jl` interface in order to represent the splitting of [`BeamletOptics.AbstractBeam`](@ref)s.
 For concrete implementations of splitters, skip to the [Rectangular plate beamsplitter](@ref) or [Cube beamsplitter](@ref) section.
 

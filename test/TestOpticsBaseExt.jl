@@ -540,12 +540,11 @@ end
     moved() = (b = agb_at(); BMO.translate3d!(b, [3e-4, 0, 0]); b)   # a fresh, untraced source
     @test close_to(sample(det), chain(moved()))
 
-    # Moving the component retraces: the child is updated in place
-    child = only(BMO.children(source))
+    # Moving the component solves anew: the child beam is a new object
     BMO.translate3d!(r, [-2e-4, 0, 0])
     empty!(det)
     BMO.solve_system!(system, source)
-    @test only(BMO.children(source)) === child
+    @test length(BMO.children(source)) == 1
     @test close_to(sample(det), chain(moved(); at = [-2e-4, zr, 0]))
 end
 

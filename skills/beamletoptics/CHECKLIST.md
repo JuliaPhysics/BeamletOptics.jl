@@ -45,6 +45,5 @@
     use `set_pivot3d!`.
 12. **`reset_rotation3d!` throws for rays/beams**; use `align3d!` there.
 13. **Moving a child beam is not allowed**; move the source (this also resets its trace).
-14. **`retrace = false`** is needed when a moved element newly blocks an old path segment.
-15. **Rendering**: `flen` defaults to 1 m for rays; camera helpers need an `LScene`; GLMakie needs a
+14. **Rendering**: `flen` defaults to 1 m for rays; camera helpers need an `LScene`; GLMakie needs a
     display (`xvfb-run -a` on headless Linux). Without OpenGL, fall back to CairoMakie (`Axis3` only).

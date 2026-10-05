@@ -3,7 +3,7 @@
 [`Ray`](@ref)s, [`Beam`](@ref)s, beamlets like the [`GaussianBeamlet`](@ref) and groups of beams can be repositioned with the commands listed in the [Kinematics](@ref) section.
 
 !!! warning "Every move resets the source"
-    A traced beam/beamlet whose start is moved would otherwise keep stale rays and child beams from the old, now geometrically wrong, light path. To avoid this, **every** call to one of the translation, rotation or reset commands first resets the moved beam (or, for a group, every one of its beams) to its untraced start state: all rays beyond the start ray (of every component beam of a beamlet) are dropped, and any child beams (e.g. created by a beamsplitter interaction) are removed. Call [`solve_system!`](@ref) again after moving a source to retrace it. [`set_pivot3d!`](@ref) is the exception, see below.
+    A traced beam/beamlet whose start is moved would otherwise keep stale rays and child beams from the old, now geometrically wrong, light path. To avoid this, **every** call to one of the translation, rotation or reset commands first resets the moved beam (or, for a group, every one of its beams) to its untraced start state: all rays beyond the start ray (of every component beam of a beamlet) are dropped, and any child beams (e.g. created by a beamsplitter interaction) are removed. Call [`solve_system!`](@ref) again after moving a source to trace it again. [`set_pivot3d!`](@ref) is the exception, see below.
 
 ```julia
 using BeamletOptics

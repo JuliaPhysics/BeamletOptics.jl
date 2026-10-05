@@ -42,11 +42,11 @@ const mm = 1e-3
             @test BMO.direction(first(r)) ≈ [1, 0, 0]
         end
 
-        # Retrace backside
+        # Solve again with the backside
         zrotate3d!(pbs, π)
         solve_system!(system, beam; depth_max=4)
 
-        @testset "Test children after retracing" begin
+        @testset "Test children after solving again" begin
             p = beam.rays
             t = beam.children[1].rays
             r = beam.children[2].rays
@@ -89,8 +89,8 @@ const mm = 1e-3
             @test BMO.direction(last(r)) ≈ [-1, 0, 0]
         end
 
-        @testset "Retrace after 45° CBS rotation" begin
-            # Retrace
+        @testset "Solve again after 45° CBS rotation" begin
+            # Solve again
             zrotate3d!(cbs, π / 2)
             solve_system!(system, beam)
 
@@ -101,10 +101,11 @@ const mm = 1e-3
 
             @test BMO.direction(last(t)) ≈ BMO.direction(first(p))
             @test BMO.direction(last(t)) ≈ [0, 1, 0]
+            @test BMO.position(p[2]) ≈ [0, 50mm - 12.5mm, 0]
         end
 
-        @testset "Retrace CBS backside" begin
-            # Retrace backside
+        @testset "Solve again, CBS backside" begin
+            # Solve again, backside
             zrotate3d!(cbs, π / 2)
             solve_system!(system, beam)
 

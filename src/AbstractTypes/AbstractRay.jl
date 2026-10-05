@@ -1,7 +1,7 @@
 """
     Intersection{T}
 
-Stores data calculated by the [`intersect3d`](@ref) method. This information can be reused, i.e. for retracing.
+Stores data calculated by the [`intersect3d`](@ref) method.
 
 # Fields:
 

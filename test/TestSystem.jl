@@ -7,6 +7,41 @@ using Test
 
 const BMO = BeamletOptics
 
+# A component that re-emits one beam, which it keeps, from just behind its own position
+struct KeepingReemitter{T, S <: BMO.AbstractShape{T}} <: BMO.AbstractObject{T}
+    shape::S
+    kept::Beam{T, Ray{T}}
+end
+
+function KeepingReemitter()
+    shape = BMO.QuadraticFlatMesh(0.05)
+    zrotate3d!(shape, π)                # normal along −y, like a Detector
+    return KeepingReemitter{Float64, typeof(shape)}(shape, Beam([0.0, 0, 0], [0.0, 1, 0], 1e-6))
+end
+
+function BMO.interact3d(::BMO.AbstractSystem, k::KeepingReemitter, beam::Beam{T, R},
+        ::R) where {T <: Real, R <: Ray{T}}
+    BMO.position!(BMO.first_ray(k.kept), position(k) + [0, 0.01, 0])
+    BMO.relaunch!(beam, [k.kept])
+    return nothing
+end
+
+# A component whose interaction fails
+struct FailingObject{T, S <: BMO.AbstractShape{T}} <: BMO.AbstractObject{T}
+    shape::S
+end
+
+function FailingObject()
+    shape = BMO.QuadraticFlatMesh(0.05)
+    zrotate3d!(shape, π)                # normal along −y, like a Detector
+    return FailingObject{Float64, typeof(shape)}(shape)
+end
+
+function BMO.interact3d(::BMO.AbstractSystem, ::FailingObject, ::Beam{T, R},
+        ::R) where {T <: Real, R <: Ray{T}}
+    error("interaction failed")
+end
+
 @testset "System" begin
     @testset "Testing implementation" begin
         struct SystemTestBeam{T} <: BMO.AbstractBeam{T, Ray{T}} end
@@ -19,9 +54,9 @@ const BMO = BeamletOptics
         @test_logs (:warn, "Tracing for $(typeof(beam)) not implemented") BMO.trace_system!(
             system,
             beam)
-        @test_logs (:warn, "Retracing for $(typeof(beam)) not implemented") BMO.retrace_system!(
-            system,
-            beam)
+        # also with the keywords that solve_system! passes on
+        @test_logs (:warn, "Tracing for $(typeof(beam)) not implemented") BMO.trace_system!(
+            system, beam; r_max = 10, check_invariant = true, threshold = 1e-6)
     end
 
     # Setup circular multipass cell with flat mirrors
@@ -97,15 +132,113 @@ const BMO = BeamletOptics
               mirrors[(n_mirrors + 1) ÷ 2 + 2]
     end
 
-    @testset "Testing system retracing" begin
-        system = System(mirrors)
-        first_ray = Ray(origin, dir)
-        beam = Beam(first_ray)
-        t1 = @timed BMO.trace_system!(system, beam, r_max = 1000000)
-        t2 = @timed BMO.retrace_system!(system, beam) # for precompilation
-        t2 = @timed BMO.retrace_system!(system, beam)
-        if t1.time < t2.time
-            @warn "Retracing took longer than tracing, something might be bugged...\n   Tracing: $(t1.time) s\n   Retracing: $(t2.time) s"
+    @testset "Solving again" begin
+        # rays of a beam and of all its sub-beams, for exact comparisons of two solves
+        ray_data(b::Beam) = [(position(r), BMO.direction(r),
+                                 isnothing(BMO.intersection(r)) ? nothing : length(BMO.intersection(r)))
+                             for r in BMO.rays(b)]
+        tree_data(b::Beam) = (ray_data(b), map(tree_data, BMO.children(b)))
+        tree_data(b) = (map(ray_data, BMO._component_beams(b)), map(tree_data, BMO.children(b)))
+
+        # Michelson interferometer with a thin beamsplitter, one arm blocked by `stop` later on
+        function interferometer()
+            m1 = SquarePlanoMirror2D(BMO.inch)
+            m2 = SquarePlanoMirror2D(BMO.inch)
+            bs = ThinBeamsplitter(BMO.inch, reflectance = 0.5)
+            pd = Detector(BMO.inch)
+            translate3d!(m1, [0.1, 0, 0])
+            translate3d!(m2, [0, 0.1, 0])
+            translate3d!(pd, [-0.1, 0, 0])
+            zrotate3d!(bs, deg2rad(45))
+            zrotate3d!(m1, deg2rad(90))
+            zrotate3d!(pd, deg2rad(90))
+            return m1, m2, bs, pd
+        end
+        sources = (
+            () -> Beam([0, -0.1, 0], [0, 1.0, 0], 1e-6),
+            () -> GaussianBeamlet([0, -0.1, 0], [0, 1.0, 0], 1e-6, 1e-4),
+            () -> AstigmaticGaussianBeamlet([0, -0.1, 0], [0, 1.0, 0], 1e-6, 1e-4),
+        )
+
+        @testset "$(nameof(typeof(source())))" for source in sources
+            m1, m2, bs, pd = interferometer()
+            system = System([m1, m2, bs, pd])
+            beam = source()
+            solve_system!(system, beam)
+            first_ray = BMO.first_ray(beam)
+            old_children = copy(BMO.children(beam))
+            @test length(old_children) == 2
+
+            # moved and solved again: equal to a new beam, nothing of the first solve is left
+            translate3d!(m2, [1e-3, 2e-3, 0])
+            zrotate3d!(m1, deg2rad(0.1))
+            solve_system!(system, beam)
+            reference = source()
+            solve_system!(system, reference)
+            @test tree_data(beam) == tree_data(reference)
+            # only the beam and its first ray keep their identity
+            @test BMO.first_ray(beam) === first_ray
+            @test length(BMO.children(beam)) == 2
+            @test !any(new -> any(old -> old === new, old_children), BMO.children(beam))
+
+            # an object moved into a path that was free before is hit
+            stop = Detector(BMO.inch)
+            translate3d!(stop, [0, -0.05, 0])
+            push!(system, stop)
+            solve_system!(system, beam)
+            @test isempty(BMO.children(beam))
+            @test BMO.object(BMO.intersection(first_ray)) === stop
+            reference = source()
+            solve_system!(system, reference)
+            @test tree_data(beam) == tree_data(reference)
+            # ... and a removed one is no longer hit
+            delete!(system, stop)
+            solve_system!(system, beam)
+            @test BMO.object(BMO.intersection(first_ray)) === bs
+            @test length(BMO.children(beam)) == 2
+
+            # sub-beams dropped by a small `depth_max` are restored by the next solve
+            solve_system!(system, beam; depth_max = 0)
+            @test isempty(BMO.children(beam))
+            solve_system!(system, beam)
+            @test length(BMO.children(beam)) == 2
+
+            # the keyword of the removed retracing is rejected
+            @test_throws MethodError solve_system!(system, beam; retrace = false)
+        end
+
+        @testset "Component that attaches a beam it keeps" begin
+            keeper = KeepingReemitter()
+            translate3d!(keeper, [0, 0.1, 0])
+            mirror = RoundPlanoMirror(BMO.inch, 5e-3)
+            translate3d!(mirror, [0, 0.3, 0])
+            zrotate3d!(mirror, deg2rad(20))
+            system = System([keeper, mirror])
+            beam = Beam([0.0, 0, 0], [0.0, 1, 0], 1e-6)
+            solve_system!(system, beam)
+            kept = only(BMO.children(beam))
+            @test kept === keeper.kept
+            @test length(BMO.rays(kept)) == 2
+            # the kept beam is solved from its first ray, its old second ray is not continued
+            translate3d!(keeper, [1e-3, 0, 0])
+            solve_system!(system, beam)
+            @test only(BMO.children(beam)) === kept
+            @test length(BMO.rays(kept)) == 2
+            @test position(kept)[1] ≈ 1e-3
+            @test position(last(BMO.rays(kept)))[1] ≈ 1e-3
+        end
+
+        @testset "Failed solve of a beam group" begin
+            mirror = RoundPlanoMirror(BMO.inch, 5e-3)
+            translate3d!(mirror, [0, 0.1, 0])
+            source = CollimatedSource([0.0, 0, 0], [0.0, 1, 0], 5e-3, 1e-6; num_rings = 5)
+            solve_system!(System([mirror]), source)
+            @test all(b -> length(BMO.rays(b)) == 2, BMO.beams(source))
+            # the solve fails at the first interaction: no beam keeps the path to the mirror
+            failing = FailingObject()
+            translate3d!(failing, [0, 0.05, 0])
+            @test_throws CompositeException solve_system!(System([failing, mirror]), source)
+            @test all(b -> length(BMO.rays(b)) == 1, BMO.beams(source))
         end
     end
 
@@ -120,7 +253,6 @@ const BMO = BeamletOptics
         translate3d!(m4, [0.4, 0, 0])
         hit(beam) = BMO.intersection(first(BMO.rays(beam)))
         function solve!(system, beam)
-            empty!(beam)
             solve_system!(system, beam)
             return beam
         end
@@ -178,8 +310,11 @@ const BMO = BeamletOptics
         solve_system!(blocked, source)
         @test all(b -> length(BMO.rays(b)) == 2, BMO.beams(source))
         delete!(blocked, m1)
-        @test empty!(source) === source
         solve_system!(blocked, source)
+        @test all(b -> length(BMO.rays(b)) == 1 && isnothing(hit(b)), BMO.beams(source))
+        push!(blocked, m1)
+        solve_system!(blocked, source)
+        @test empty!(source) === source
         @test all(b -> length(BMO.rays(b)) == 1 && isnothing(hit(b)), BMO.beams(source))
 
         # pop!
@@ -254,15 +389,15 @@ end
         @test only(BMO.hits(det)).opl ≈ path
         @test length(child) ≈ path
 
-        # retrace after moving the component: the child is updated in place
+        # solved again after moving the component: the child is a new beam
         translate3d!(r, [1e-4, 0, 0])
         empty!(det)
         solve_system!(system, beam)
-        @test only(BMO.children(beam)) === child
-        @test position(child) ≈ position(r) + shift
+        @test only(BMO.children(beam)) !== child
+        @test position(only(BMO.children(beam))) ≈ position(r) + shift
         @test only(BMO.hits(det)).opl ≈ path
 
-        # another number of beams replaces the children
+        # the given beams replace the children, whatever their number
         new = [Beam(Ray([0.0, 0, 0], [0.0, 1, 0], reemit_λ)) for _ in 1:2]
         BMO.relaunch!(beam, new)
         @test BMO.children(beam) == new
@@ -290,12 +425,12 @@ end
             @test BMO.beamlet_hit_field(hit, p) ≈ BMO.beamlet_hit_field(ref_hit, p) rtol = 1e-12
         end
 
-        # retrace after moving the component: the child is updated in place
+        # solved again after moving the component: the child is a new beamlet
         translate3d!(r, [1e-4, 0, 0])
         empty!(det)
         solve_system!(system, gauss)
-        @test only(BMO.children(gauss)) === child
-        @test position(child) ≈ position(r) + shift
+        @test only(BMO.children(gauss)) !== child
+        @test position(only(BMO.children(gauss))) ≈ position(r) + shift
     end
 end
 

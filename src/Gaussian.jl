@@ -81,7 +81,6 @@ hint(i::GaussianBeamletInteraction) = hint(i.chief)
 hint!(i::GaussianBeamletInteraction, new_hint::Nullable{Hint}) = hint!(i.chief, new_hint)
 
 wavelength(beam::GaussianBeamlet) = beam.λ
-wavelength!(beam::GaussianBeamlet, new) = (beam.λ = new)
 beam_waist(beam::GaussianBeamlet) = beam.w0
 electric_field(beam::GaussianBeamlet) = beam.E0
 electric_field!(beam::GaussianBeamlet{T}, new) where {T} = (beam.E0 = Complex{T}(new))
@@ -158,26 +157,6 @@ function Base.push!(gauss::GaussianBeamlet{T},
     push!(gauss.divergence, interaction.divergence)
     return nothing
 end
-
-function Base.replace!(gauss::GaussianBeamlet{T},
-        interaction::GaussianBeamletInteraction{T},
-        index::Int) where {T}
-    replace!(gauss.chief, interaction.chief, index)
-    replace!(gauss.waist, interaction.waist, index)
-    replace!(gauss.divergence, interaction.divergence, index)
-    return nothing
-end
-
-function _modify_beam_head!(old::GaussianBeamlet{T},
-        new::GaussianBeamlet{T}) where {T <: Real}
-    _modify_beam_head!(old.chief, new.chief)
-    _modify_beam_head!(old.waist, new.waist)
-    _modify_beam_head!(old.divergence, new.divergence)
-    wavelength!(old, wavelength(new))
-    electric_field!(old, electric_field(new))
-end
-
-_last_beam_intersection(gauss::GaussianBeamlet) = intersection(last(rays(gauss.chief)))
 
 """
     _beams_hits_same_shape(gauss, id)
