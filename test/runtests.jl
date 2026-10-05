@@ -16,10 +16,12 @@ include(joinpath(@__DIR__, "TestKinematicTrait.jl"))
 
 # Test geometry representation
 include(joinpath(@__DIR__, "Geometry", "TestMesh.jl"))
+include(joinpath(@__DIR__, "Geometry", "TestBoundingSphere.jl"))
 include(joinpath(@__DIR__, "Geometry", "SDFs", "TestAbstractSDF.jl"))
 include(joinpath(@__DIR__, "Geometry", "SDFs", "TestUnionSDF.jl"))
 include(joinpath(@__DIR__, "Geometry", "SDFs", "TestDifferenceSDF.jl"))
 include(joinpath(@__DIR__, "Geometry", "SDFs", "TestConicSDF.jl"))
+include(joinpath(@__DIR__, "Geometry", "SDFs", "TestSDFBoundingSpheres.jl"))
 
 # Test system and object containers
 include(joinpath(@__DIR__, "TestSystem.jl"))
@@ -61,6 +63,7 @@ include(joinpath(@__DIR__, "Rendering", "TestRenderPolarization.jl"))
 include(joinpath(@__DIR__, "Rendering", "TestTessellation.jl"))
 include(joinpath(@__DIR__, "Rendering", "TestRenderLook.jl"))
 include(joinpath(@__DIR__, "Rendering", "TestRenderLive.jl"))
+include(joinpath(@__DIR__, "Rendering", "TestRenderBoundingSphere.jl"))
 include(joinpath(@__DIR__, "Rendering", "TestLiveBeams.jl"))
 include(joinpath(@__DIR__, "Rendering", "TestWavelengthColor.jl"))
 

@@ -28,6 +28,8 @@ see [`BeamletOptics.AbstractKinematicTrait`](@ref). The default primitives
 ## Ray Tracing:
 
 - [`intersect3d`](@ref): returns the intersection between an `AbstractShape` and `AbstractRay`, or lack thereof. See also [`Intersection`](@ref)
+- [`bounding_sphere`](@ref) (optional): a sphere that encloses the shape. The solver then skips the
+  shape for every ray that misses the sphere, without a call of `intersect3d`
 
 ## Rendering (with Makie):
 
@@ -44,6 +46,44 @@ position!(shape::AbstractShape, pos) = (shape.pos = pos)
 "Enforces that `shape` has to have the field `dir` or implement `orientation()`."
 orientation(shape::AbstractShape) = shape.dir
 orientation!(shape::AbstractShape, dir) = (shape.dir = dir)
+
+"""
+    bounding_sphere(shape::AbstractShape)
+
+Returns `nothing`, or the `center` and the `radius` in [m] of a sphere that encloses the `shape`,
+as a tuple `(center, radius)`. The `center` is given in the local frame of the `shape`, i.e.
+relative to its [`position`](@ref) and along the axes of its [`orientation`](@ref), such that the
+sphere does not change when the shape is moved. See [`world_bounding_sphere`](@ref) for the sphere in
+world coordinates.
+
+The method is an optional part of the [`AbstractShape`](@ref) interface. With the default `nothing`
+every ray is tested via [`intersect3d`](@ref). With a sphere, a ray that misses the sphere is not
+tested against the shape at all, which pays off for shapes with a costly `intersect3d`.
+
+The sphere must enclose every point of the shape, for all its parameters: a hit outside of the
+sphere is lost without a warning. It should also be tight, since a ray that hits the sphere is
+tested as before. A safety margin is not needed, the solver adds its own tolerance. Use
+[`render_bounding_sphere!`](@ref) to look at the result.
+
+```julia
+# a cylinder of the radius `r` and the height `h`, with the origin at the center of its base
+bounding_sphere(c::MyCylinder) = (Point3(0, c.h / 2, 0), sqrt(c.r^2 + (c.h / 2)^2))
+```
+"""
+bounding_sphere(::AbstractShape) = nothing
+
+"""
+    world_bounding_sphere(shape::AbstractShape)
+
+Returns `nothing`, or the [`bounding_sphere`](@ref) of the `shape` as a tuple `(center, radius)`
+with the `center` in world coordinates, for the current position and orientation of the `shape`.
+"""
+world_bounding_sphere(shape::AbstractShape) = world_bounding_sphere(bounding_sphere(shape), shape)
+world_bounding_sphere(::Nothing, ::AbstractShape) = nothing
+function world_bounding_sphere(sphere::Tuple, shape::AbstractShape)
+    center, radius = sphere
+    return (position(shape) + orientation(shape) * center, radius)
+end
 
 """
     translate3d!(::Movable, shape::AbstractShape, offset)

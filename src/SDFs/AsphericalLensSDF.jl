@@ -302,6 +302,31 @@ function concave_aspheric_surface_distance(r, z, c, k, d, α_coeffs, max_sag)
     end
 end
 
+"""
+    _aspheric_axial_extent(s)
+
+Returns the smallest and the largest coordinate along the optical axis of the volume of an
+aspheric or acylindric surface SDF `s`, as a tuple. The candidates are the vertex, the edge and the
+stationary point of the sag (`max_sag`), which is exact for profiles with at most one stationary
+point within the aperture.
+"""
+function _aspheric_axial_extent(s)
+    edge = aspheric_equation(s.diameter / 2, s)
+    peak = s.max_sag[1]
+    return min(zero(edge), edge, peak), max(zero(edge), edge, peak)
+end
+
+"""
+    bounding_sphere(s::AbstractAsphericalSurfaceSDF)
+
+Returns the sphere around the cylinder of the lens diameter that spans the axial extent of the
+surface volume, centered on the axis.
+"""
+function bounding_sphere(s::AbstractAsphericalSurfaceSDF{T}) where T
+    lo, hi = _aspheric_axial_extent(s)
+    return (Point3{T}(0, (lo + hi) / 2, 0), sqrt((s.diameter / 2)^2 + ((hi - lo) / 2)^2))
+end
+
 function sdf(surface::ConvexAsphericalSurfaceSDF{T}, point) where {T}
     p_local = _world_to_sdf(surface, point)
     # spherical logic is to have the z-axis as optical axis, so the aspheric code is written

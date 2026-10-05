@@ -57,6 +57,16 @@ BeamletOptics.Intersection
 
 Since an optical element can consist of multiple joint shapes, the return type must store which specific part of the object was hit.
 
+### Bounding sphere pretest
+
+Since the tracing is non-sequential, every ray is tested against every shape of the system, and most of these tests are misses. A shape can therefore state a sphere that encloses it. A ray that does not pass through this sphere is a miss without a call of `intersect3d`. This is optional: a shape without a sphere is tested as described above.
+
+```@docs; canonical=false
+BeamletOptics.bounding_sphere(::BeamletOptics.AbstractShape)
+```
+
+All [Signed Distance Functions (SDFs)](@ref) have a bounding sphere, meshes currently have none. The spheres of a system can be shown via [`render_bounding_sphere!`](@ref) or the `show_bounding_sphere` keyword of [`render!`](@ref).
+
 ## Interactions
 
 Optical interactions are performed after the point of intersection has been determined. The `interact3d` interface allows users to implement algorithms that calculate or try to mimic optical effects. The fidelity of the algorithm is effectively only limited by the amount of information that can be passed into the `interact3d` interface. The method is defined as follows:

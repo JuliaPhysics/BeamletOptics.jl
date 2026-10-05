@@ -101,6 +101,11 @@ BMO.sdf(c::CountingSDF, point) = (c.count += 1; BMO.sdf(c.shape, point))
         @test length(BMO.intersect3d(far, Ray(zeros(3), [0.0, 1, 0]))) ≈ 1e6 - 1
         translate3d!(far, [0, 10 * BMO.SDF_MISS_DISTANCE, 0])
         @test isnothing(BMO.intersect3d(far, Ray(zeros(3), [0.0, 1, 0])))
+        # the miss distance of a single test
+        near = BMO.SphereSDF(1.0)
+        translate3d!(near, [0, 10, 0])
+        @test length(BMO.intersect3d(near, Ray(zeros(3), [0.0, 1, 0]), 9.5)) ≈ 9
+        @test isnothing(BMO.intersect3d(near, Ray(zeros(3), [0.0, 1, 0]), 8.5))
     end
 
     @testset "Testing normal3d" begin

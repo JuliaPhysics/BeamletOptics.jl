@@ -2,7 +2,7 @@ module BeamletOpticsMakieExt
 
 using BeamletOptics
 import BeamletOptics: render!, RenderException, _RenderTypes, get_view, set_view, hide_axis,
-                       set_orthographic, arrow!, render_lcs!, look_at!, live_render!, update_render!,
+                       set_orthographic, arrow!, render_lcs!, render_bounding_sphere!, look_at!, live_render!, update_render!,
                        remove_render!, pick_object, studio_lighting!, set_render_look, look_colors,
                        rendered, render_plots, render_children, render_parent, render_settings, render_settings!,
                        pickable_plots, AbstractRenderHandle, AbstractObjectRenderHandle,
@@ -64,6 +64,7 @@ include("RenderLook.jl")
 include("RenderSDF.jl")
 include("RenderMesh.jl")
 include("RenderObjects.jl")
+include("RenderBoundingSphere.jl")
 include("RenderLenses.jl")
 include("RenderCylinderLenses.jl")
 include("RenderMirrors.jl")

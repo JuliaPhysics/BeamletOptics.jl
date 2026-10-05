@@ -166,6 +166,54 @@ function intersect3d(shape::AbstractShape, ::AbstractRay)
 end
 
 """
+    intersect3d(sphere, shape::AbstractShape, ray::AbstractRay)
+
+Returns the intersection between the `shape` and the `ray` like `intersect3d(shape, ray)`, but tests
+the `ray` against the `sphere` first, which is the [`world_bounding_sphere`](@ref) of the `shape`.
+This is the method that the solver calls for the shape of an object:
+
+- `sphere = nothing`, i.e. the shape has no [`bounding_sphere`](@ref): the shape is tested via
+  `intersect3d(shape, ray)`
+- the `ray` misses the `sphere`, or the `sphere` lies behind it: returns `nothing` without a test of
+  the `shape`
+- otherwise the shape is tested via `intersect3d(shape, ray)`
+
+A shape type implements `intersect3d(shape, ray)` and, optionally, `bounding_sphere(shape)`, not
+this method.
+"""
+intersect3d(::Nothing, shape::AbstractShape, ray::AbstractRay) = intersect3d(shape, ray)
+
+function intersect3d(sphere::Tuple, shape::AbstractShape, ray::AbstractRay)
+    isnothing(_sphere_exit(sphere, ray)) && return nothing
+    return intersect3d(shape, ray)
+end
+
+"""
+    _sphere_exit(sphere, ray, margin = 0)
+
+Returns the path length in [m] at which the `ray` leaves the `sphere`, a tuple `(center, radius)` in
+world coordinates, or `nothing` if the `ray` does not pass through it, i.e. if its line misses the
+sphere or the sphere lies behind its start. The radius is enlarged by the `margin` in [m] and by the
+rounding error of the test, such that a ray towards a point on the sphere still passes through it.
+"""
+function _sphere_exit(sphere::Tuple, ray::AbstractRay, margin = 0)
+    center, radius = sphere
+    dir = direction(ray)
+    oc = center - position(ray)
+    b = dot(oc, dir)
+    # Distance of the center from the line of the ray. This form does not cancel for a far start,
+    # in contrast to |oc|² - b².
+    perp = oc - b * dir
+    q = dot(perp, perp)
+    tol = sqrt(eps(float(typeof(radius))))
+    ρ = radius + margin + tol * (radius + norm(center) + norm(oc))
+    q > ρ^2 && return nothing
+    t_out = b + sqrt(ρ^2 - q)
+    t_out < 0 && return nothing
+    return t_out
+end
+
+"""
     intersect3d(object::AbstractObject, ray::AbstractRay)
 
 In general, the intersection logic between an [`AbstractObject`](@ref) and an [`AbstractRay`](@ref) depends on the [`AbstractShapeTrait`](@ref).
@@ -175,7 +223,8 @@ intersect3d(object::AbstractObject, ray::AbstractRay) = intersect3d(shape_trait_
 
 function intersect3d(::SingleShape, object::AbstractObject, ray::AbstractRay)
     # FIXME: isinfrontof check?
-    intersection = intersect3d(shape(object), ray)
+    _shape = shape(object)
+    intersection = intersect3d(world_bounding_sphere(_shape), _shape, ray)
     # Ensure that the intersection knows about the object if intersected
     if !isnothing(intersection)
         object!(intersection, object)

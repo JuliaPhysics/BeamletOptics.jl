@@ -183,6 +183,46 @@ render_lcs!(::Any, ::AbstractArray = zeros(3), ::AbstractMatrix = Matrix{Float64
     throw(MissingBackendError())
 render_lcs!(::Any, ::AbstractObject; kwargs...) = throw(MissingBackendError())
 
+"""
+    render_bounding_sphere!(ax, shape; color = :magenta, linewidth = 1, kwargs...)
+    render_bounding_sphere!(ax, object; color = :magenta, linewidth = 1, kwargs...)
+    render_bounding_sphere!(ax, system; color = :magenta, linewidth = 1, kwargs...)
+
+Draws the bounding sphere of an `AbstractShape` into `ax` (an `LScene` or `Axis3`), if a suitable
+backend is loaded: the sphere of [`BeamletOptics.bounding_sphere`](@ref) in world coordinates, for
+the current position and orientation of the shape, as a wireframe of three great circles (parallel
+to the xy-, yz- and zx-plane of the world frame) in one `lines` plot. The solver skips a shape for
+every ray that misses this sphere, hence the function shows what the solver tests, e.g. to check the
+`bounding_sphere` method of an own shape type: the sphere must enclose the whole shape and should
+be tight.
+
+- shape: one plot, or none if the shape has no bounding sphere (e.g. a mesh)
+- object: the sphere of its shape, or of each of its parts if it consists of several (e.g. a
+  doublet lens, a cube beamsplitter or an `ObjectGroup`), since the solver tests each part on its own
+- system: the spheres of all its objects
+
+# Keyword args
+
+- `color = :magenta`: color of the lines
+- `linewidth = 1`: line width in screen units
+
+All other `kwargs` are passed on to the `lines` plot of `Makie`. Returns `nothing`. The spheres are
+drawn once and do not follow an object that is moved afterwards. For spheres that follow, use the
+`show_bounding_sphere` option of [`render!`](@ref) for objects with [`live_render!`](@ref).
+
+```julia
+render!(ax, system)
+render_bounding_sphere!(ax, system)
+
+# or in one call
+render!(ax, system; show_bounding_sphere = true)
+```
+
+If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
+"""
+render_bounding_sphere!(::Any, ::Union{AbstractShape, AbstractObject, AbstractSystem}; kwargs...) =
+    throw(MissingBackendError())
+
 
 #=
 Live rendering and the render handle protocol. Packages built on BeamletOptics, e.g. a GUI, use

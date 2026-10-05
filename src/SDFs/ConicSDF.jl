@@ -108,23 +108,33 @@ Returns the radius of curvature `R = 2f` of the parent conic at its vertex \\[m\
 """
 radius(s::ConicSDF) = 2s.f
 
+"""
+    bounding_sphere(s::ConicSDF)
+
+Returns the sphere around the cylinder of the segment diameter that extends from the lowest point
+of the reflecting surface to the back side at `y = thickness`, centered on the local y-axis.
+"""
 function bounding_sphere(s::ConicSDF{T}) where {T}
     R = 2s.f
     Z_off = _conic_sag(s.x_off, R, s.k)
     r_max = s.diameter / 2
 
+    # the sag is monotonic in the parent radius, so the surface is lowest at one end of its range
     r_lo = max(zero(T), abs(s.x_off) - r_max)
     r_hi = abs(s.x_off) + r_max
     y_lo = -(_conic_sag(r_hi, R, s.k) - Z_off)
     y_hi = -(_conic_sag(r_lo, R, s.k) - Z_off)
 
-    y_min = min(y_lo, y_hi, zero(T))
-    y_max = max(y_lo, y_hi, s.thickness)
+    y_min = min(y_lo, y_hi)
+    y_max = max(s.thickness, y_min)
 
     y_center = (y_min + y_max) / 2
-    r_bound = sqrt(r_max^2 + ((y_max - y_min) / 2)^2) + T(0.05)
+    r_bound = sqrt(r_max^2 + ((y_max - y_min) / 2)^2)
     return Point3{T}(0, y_center, 0), r_bound
 end
+
+# The SDF is not exact far away from the shape, hence the box around the bounding sphere
+bounding_box(s::ConicSDF) = bounding_box(world_bounding_sphere(s))
 
 function sdf(s::ConicSDF{T}, point) where {T}
     p = _world_to_sdf(s, point)

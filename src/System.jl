@@ -147,8 +147,9 @@ end
 @inline function trace_one(
         system::AbstractSystem, ray::AbstractRay{R}, hint::Hint) where {R}
     # Trace against hinted shape of object
+    _shape = shape(hint)::AbstractShape{R}
     intersection::Nullable{Intersection{R}} = intersect3d(
-        shape(hint)::AbstractShape{R}, ray)
+        world_bounding_sphere(_shape), _shape, ray)
     if isnothing(intersection)
         # If hinted object is not intersected, trace the entire system
         intersection = trace_all(system, ray)

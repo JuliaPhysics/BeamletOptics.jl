@@ -53,6 +53,14 @@ function UnionSDF{T}(sdfs::Vararg{AbstractSDF{T}, N}) where {T, N}
         )
 end
 
+"""
+    bounding_sphere(u::UnionSDF)
+
+Returns the sphere that encloses the bounding spheres of all operands in their current poses, or
+`nothing` if one of the operands has none.
+"""
+bounding_sphere(u::UnionSDF) = _local_sphere(u, _enclosing_sphere(u.sdfs))
+
 function sdf(s::UnionSDF, pos)
     # sdf to world transform handled by sub-SDFs
     return minimum(sdf(_sdf, pos) for _sdf in s.sdfs)

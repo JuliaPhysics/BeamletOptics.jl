@@ -31,13 +31,18 @@ end
 diameter(ml::MeniscusLensSDF) = diameter(ml.cylinder)
 thickness(ml::MeniscusLensSDF) = ml.thickness
 
+"""
+    bounding_sphere(ml::MeniscusLensSDF)
+
+Returns the sphere that encloses the bounding spheres of the convex and the cylindrical part, which
+are positioned in the local frame of the lens; the concave part only removes volume.
+"""
 function bounding_sphere(ml::MeniscusLensSDF)
-    d = diameter(ml.cylinder)
-    l = thickness(ml)
-    center = Point3(0, l / 2, 0)
-    radius = sqrt((l / 2)^2 + (d / 2)^2)
-    return (center, radius)
+    return _enclosing_sphere(world_bounding_sphere(ml.convex), world_bounding_sphere(ml.cylinder))
 end
+
+# The SDF is not exact far away from the shape, hence the box around the bounding sphere
+bounding_box(ml::MeniscusLensSDF) = bounding_box(world_bounding_sphere(ml))
 
 function sdf(ml::MeniscusLensSDF, pos)
     p = _world_to_sdf(ml, pos)
