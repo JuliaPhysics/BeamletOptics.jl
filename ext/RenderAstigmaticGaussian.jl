@@ -123,18 +123,21 @@ function _plot_astigmatic!(
         markersize,
         kwargs...
     )
-    bp = _BeamPlots()
+    bp = _BeamPlots((; flen = Float64(flen), render_every = _render_every(x, render_every), r_res, z_res))
     coloring = _coloring(color)
-    envelope = _envelope!(bp, coloring, () -> _gaussian_mesh(x; flen, r_res, z_res, render_every),
-        () -> _envelope_colors(x, coloring; r_res, z_res, render_every))
+    envelope = _envelope!(bp, coloring,
+        () -> _gaussian_mesh(x; bp.settings[].flen, bp.settings[].r_res, bp.settings[].z_res,
+            bp.settings[].render_every),
+        () -> _envelope_colors(x, coloring; bp.settings[].r_res, bp.settings[].z_res,
+            bp.settings[].render_every))
     _coupled!(bp, mesh!, axis, envelope, coloring; transparency, kwargs...)
     # the vertices of the envelope, updated with it
     show_waist && _coupled!(bp, scatter!, axis, envelope, coloring, m -> Vector{Point3f}(GeometryBasics.coordinates(m));
         markersize)
-    show_beams && _plot_generating_beams!(bp, axis, x; flen, render_every, show_pos, transparency)
+    show_beams && _plot_generating_beams!(bp, axis, x; show_pos, transparency)
     if show_polarization
         curve = _observe!(bp,
-            () -> _field_curve(x; flen, render_every, λ_vis = pol_λ, scale = pol_scale,
+            () -> _field_curve(x; bp.settings[].flen, bp.settings[].render_every, λ_vis = pol_λ, scale = pol_scale,
                 focus_exponent = pol_focus_exponent, gain_max = pol_gain_max, ppl = pol_ppl))
         _add!(bp, lines!(axis, curve; color = pol_color, linewidth = pol_linewidth))
     end
@@ -248,7 +251,7 @@ single mesh, see [`live_render!`](@ref). The kwargs and their defaults are those
 function live_render!(axis::_RenderEnv, agb::BMO.AstigmaticGaussianBeamlet; r_res::Int = 64, z_res::Int = 100, kwargs...)
     kw = _astigmatic_defaults(kwargs)
     bp = _plot_astigmatic!(axis, agb; kw..., r_res, z_res)
-    return BeamRenderHandle(agb, axis, bp, (; flen = Float64(kw.flen), render_every = 1, r_res, z_res))
+    return BeamRenderHandle(agb, axis, bp)
 end
 
 """
@@ -270,5 +273,5 @@ All other kwargs of `render!` apply with the same defaults.
 function live_render!(axis::_RenderEnv, bg::BMO.AstigmaticBeamGroup; r_res::Int = 10, z_res::Int = 8, kwargs...)
     kw = _astigmatic_defaults(kwargs)
     bp = _plot_astigmatic!(axis, bg; kw..., r_res, z_res)
-    return BeamRenderHandle(bg, axis, bp, (; flen = Float64(kw.flen), kw.render_every, r_res, z_res))
+    return BeamRenderHandle(bg, axis, bp)
 end

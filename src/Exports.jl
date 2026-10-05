@@ -76,7 +76,7 @@ export live_render!, update_render!, remove_render!, pick_object, studio_lightin
 # render handle protocol and developer API for packages built on BeamletOptics: public, not exported
 public AbstractRenderHandle, AbstractObjectRenderHandle, AbstractSystemRenderHandle,
        AbstractBeamRenderHandle, rendered, render_plots, render_children, render_parent,
-       render_settings, pickable_plots, look_colors
+       render_settings, render_settings!, pickable_plots, look_colors
 public is_static, hit_count, wavelength, min_num_rays, ProgressSink, PROGRESS_SINK,
        progress_state, is_cancelled
 # re-emitting components (e.g. solvers coupled through a field)

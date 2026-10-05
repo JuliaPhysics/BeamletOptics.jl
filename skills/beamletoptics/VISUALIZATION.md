@@ -81,6 +81,9 @@ update_render!(hsys); update_render!(hbeam)   # remove_render!(h) deletes the pl
 
 push!(system, lens); live_render!(hsys, lens)       # object added at runtime
 delete!(system, lens); remove_render!(hsys, lens)   # and removed again (a group only as a whole)
+
+BeamletOptics.render_settings(hbeam)                # (; flen, render_every, ...) of a beam handle
+BeamletOptics.render_settings!(hbeam; flen = 0.5)   # change the final ray length (or render_every, r_res, z_res), keeps the plots
 ```
 
 ## Interactive GUI
