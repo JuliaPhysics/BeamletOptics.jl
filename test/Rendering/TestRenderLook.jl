@@ -79,6 +79,21 @@ end
         @test set_render_look(:modern) == :modern
     end
 
+    @testset "coatings and polarizers stand out" begin
+        # saturated and nearly opaque in both looks, such that the coated side of a plate is seen
+        saturation(c) = (max(c.r, c.g, c.b) - min(c.r, c.g, c.b)) / max(c.r, c.g, c.b)
+        for mats in (Ext._MODERN_MATERIALS, Ext._CAD_MATERIALS)
+            coating, polarizer = mats[:coating], mats[:polarizer]
+            @test saturation(coating.color) > 0.75 && coating.alpha >= 0.8
+            @test saturation(polarizer.color) > 0.75 && polarizer.alpha >= 0.75
+            # violet or magenta, and green
+            @test coating.color.b > coating.color.g && coating.color.r > coating.color.g
+            @test polarizer.color.g > 2 * max(polarizer.color.r, polarizer.color.b)
+            # unlike the glass they sit on
+            @test saturation(mats[:refractive].color) < 0.6 && mats[:refractive].alpha <= 0.5
+        end
+    end
+
     @testset "modern silhouettes" begin
         mat = Ext._materials()[:refractive]
         lens = SphericalLens(0.05, -0.05, 5e-3, 25.4e-3)
