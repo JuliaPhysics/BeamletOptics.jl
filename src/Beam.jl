@@ -43,6 +43,14 @@ end
 
 first_ray(b::Beam) = first(rays(b))
 
+"""
+    _chief_beam(beam::AbstractBeam)
+
+The [`Beam`](@ref) of `beam` that carries its geometric path: the beam itself, or the chief beam of a
+beamlet. Defined next to [`first_ray`](@ref BeamletOptics.first_ray) of each beam type.
+"""
+_chief_beam(b::Beam) = b
+
 function translate3d!(::Movable, b::Beam, offset)
     isroot(b) || throw(ArgumentError("cannot move a child beam; move its root beam instead"))
     empty!(b)

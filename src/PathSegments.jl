@@ -13,22 +13,16 @@ Element type of the vector returned by [`path_segments`](@ref), a `NamedTuple` w
   segment of a root beam or of a relaunched beam
 - `beam`: index of the root beam in a beam group, `1` for a single beam
 - `final`: `true` if the segment is a final ray without intersection, drawn with the length `flen`
+- `object`: the [`AbstractObject`](@ref) hit at the end of the segment (the object itself, not
+  its [`ObjectGroup`](@ref)), `nothing` for a final segment or if the intersection does not
+  name its object
 """
 const PathSegment{T} = @NamedTuple{
     start::Point3{T}, stop::Point3{T},
     s_start::T, s_stop::T, opl_start::T, opl_stop::T,
-    λ::T, depth::Int, parent::Int, beam::Int, final::Bool
+    λ::T, depth::Int, parent::Int, beam::Int, final::Bool,
+    object::Nullable{AbstractObject}
 }
-
-"""
-    _chief_beam(beam::AbstractBeam)
-
-The [`Beam`](@ref) of `beam` that carries its geometric path: the beam itself, or the chief beam of a
-beamlet.
-"""
-_chief_beam(beam::Beam) = beam
-_chief_beam(gauss::GaussianBeamlet) = gauss.chief
-_chief_beam(agb::AstigmaticGaussianBeamlet) = agb.c
 
 """
     path_segments(beam::AbstractBeam; flen = 1.0) -> Vector{PathSegment}
@@ -42,7 +36,8 @@ segments of all its beams are concatenated, the `beam` field gives the index of 
 Each segment is a [`BeamletOptics.PathSegment`](@ref) `NamedTuple` with the start and end point, the
 accumulated geometric path length `s_start`, `s_stop` and optical path length `opl_start`,
 `opl_stop` (refractive index of the medium of the ray times its length), the wavelength `λ`, the
-`depth` in the beam tree and the `parent` segment index, from which the branches can be rebuilt. A
+`depth` in the beam tree, the `parent` segment index, from which the branches can be rebuilt, and the
+`object` hit at the end of the segment. A
 child beam continues from the end of its parent beam, i.e. its first segment starts at the path
 length at which its parent ends. A beam attached with [`relaunch!`](@ref BeamletOptics.relaunch!)
 (e.g. the output of a fiber) instead starts its own path: its first segment has `parent = 0`,
@@ -103,7 +98,8 @@ function _path_segments!(segments::Vector{PathSegment{T}}, beam::AbstractBeam, i
         push!(segments,
             (start = p0, stop = p0 + len * Point3{T}(direction(ray)),
                 s_start = s, s_stop = s + len, opl_start = opl, opl_stop = opl + n * len,
-                λ = T(wavelength(ray)), depth, parent, beam = index, final))
+                λ = T(wavelength(ray)), depth, parent, beam = index, final,
+                object = final ? nothing : object(isect)))
         parent = length(segments)
         s += len
         opl += n * len

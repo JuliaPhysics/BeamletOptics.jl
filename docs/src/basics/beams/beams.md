@@ -18,7 +18,7 @@ A ray tracing example through an arbitrary system using a [`Beam`](@ref) is show
 
 ## Inspecting a traced beam
 
-The rays of a [`Beam`](@ref) are available via `rays`, its child beams via `beam.children`, and `point_on_beam` returns the point at a given distance along one beam. To analyse or animate the whole tree, [`path_segments`](@ref) flattens a traced [`Beam`](@ref), [`GaussianBeamlet`](@ref) (its chief ray), [`BeamletOptics.AstigmaticGaussianBeamlet`](@ref) or beam group into a vector of segments with start and end point, the accumulated geometric and optical path length, the wavelength and the position in the beam tree. A final ray without intersection has no length of its own and is drawn `flen` long.
+The rays of a [`Beam`](@ref) are available via `rays`, its child beams via `beam.children`, and `point_on_beam` returns the point at a given distance along one beam. To analyse or animate the whole tree, [`path_segments`](@ref) flattens a traced [`Beam`](@ref), [`GaussianBeamlet`](@ref) (its chief ray), [`BeamletOptics.AstigmaticGaussianBeamlet`](@ref) or beam group into a vector of segments with start and end point, the accumulated geometric and optical path length, the wavelength, the position in the beam tree and the object hit at the end of the segment. A final ray without intersection has no length of its own and is drawn `flen` long.
 
 ```julia
 solve_system!(system, beam)

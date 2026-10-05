@@ -84,6 +84,21 @@ end
         @test path_segments(beam; flen = 1) != segs
     end
 
+    @testset "hit objects" begin
+        bs, m1, m2 = BMO.objects(system)
+        # the root beam ends on the beamsplitter, every other non-final segment on an object of
+        # the system, a final segment on none
+        @test first(segs).object === bs
+        @test all(s -> isnothing(s.object), filter(s -> s.final, segs))
+        @test all(s -> any(o -> o === s.object, (bs, m1, m2)), filter(s -> !s.final, segs))
+        @test any(s -> s.object === m1, segs) && any(s -> s.object === m2, segs)
+        # inside an object group, the object itself is reported, not the group
+        group = ObjectGroup([m2])
+        b = Beam([0, -0.1, 0], [0, 1.0, 0])
+        solve_system!(System([group]), b)
+        @test first(path_segments(b)).object === m2
+    end
+
     @testset "untraced beam and refractive index" begin
         b = Beam([0, 0, 0], [1.0, 0, 0])
         s = only(path_segments(b))
