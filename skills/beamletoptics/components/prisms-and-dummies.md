@@ -10,7 +10,7 @@
 - `EquilateralPrism(side, height, n)`: dispersing prism, origin at the centroid, apex along +y, base normal -y.
   A symmetric (minimum deviation) ray runs parallel to the base, entering and leaving the faces next to the apex, and is deflected towards the base.
 - `DovePrism(length, aperture, height, n)`: trapezoid with 45° ends, long axis along y, TIR base face has normal -x.
-  A ray along its axis exits undeviated. Requires `length > 2 * aperture`.
+  A ray along its axis exits undeviated. Requires `length > 2 * aperture > 0`.
 - `Prism(shape, n)`: generic refractive body from an SDF or mesh shape (advanced).
 
 Dispersion needs a λ-dependent index (`SellmeierEquation`). Trace one `Beam` per wavelength.

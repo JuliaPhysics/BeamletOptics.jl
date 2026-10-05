@@ -283,8 +283,7 @@ function _tessellate(s::BMO.PolygonPrismSDF)
     for sg in (-1, 1)
         idx = [_add_vertex!(m, Vec3d(v[1], v[2], sg * h), Vec3d(0, 0, sg)) for v in V]
         for i in 2:(n - 1)
-            sg > 0 ? _add_triangle!(m, idx[1], idx[i], idx[i + 1]) :
-            _add_triangle!(m, idx[1], idx[i + 1], idx[i])
+            _add_triangle!(m, idx[1], idx[i], idx[i + 1])
         end
     end
     return _transform!(m, s)

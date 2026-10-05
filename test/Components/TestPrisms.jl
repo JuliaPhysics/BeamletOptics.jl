@@ -31,8 +31,8 @@ const mm = 1e-3
         tri = BMO.PolygonPrismSDF([(0.0, 0.0), (4.0, 0.0), (1.0, 3.0)], 1.0)
         @test BMO.sdf(tri, [-1, -1, 0.0]) ≈ sqrt(2)
         @test BMO.sdf(tri, [2.5, 1.5, 0.0]) ≈ 0 atol = 1e-12 # on the hypotenuse
-        @test BMO.sdf(tri, [3, 3, 0.0]) ≈ norm([3, 3] - [2.5, 1.5] + [0, 0]) atol = 1.5 # outside, finite
-        @test BMO.sdf(tri, [3, 3, 0.0]) > 0
+        @test BMO.sdf(tri, [3, 3, 0.0]) ≈ sqrt(2) # outside, closest point (2, 2) on the hypotenuse
+        @test BMO.sdf(tri, [6, -1, 0.0]) ≈ sqrt(5) # outside, closest point is the corner (4, 0)
         @test BMO.sdf(tri, [1.5, 1, 0.0]) < 0
         # exterior distance equals the brute-force distance to the nearest edge segment (random convex polygons)
         segdist(q, a, b) = (e = b - a; norm(q - (a + clamp(dot(q - a, e) / dot(e, e), 0, 1) * e)))
@@ -41,7 +41,12 @@ const mm = 1e-3
             for _ in 1:100
                 θ = sort(2π * rand(rng, rand(rng, 3:9)))
                 V = [(cos(t), sin(t)) .* (0.2 + 3rand(rng)) for t in θ]
-                s = try BMO.PolygonPrismSDF(V, 1.0) catch; continue end
+                s = try
+                    BMO.PolygonPrismSDF(V, 1.0)
+                catch err
+                    err isa ArgumentError || rethrow()
+                    continue # not convex
+                end
                 P = s.vertices
                 n = length(P)
                 for _ in 1:100
@@ -74,6 +79,13 @@ const mm = 1e-3
         @test_throws ArgumentError BMO.PolygonPrismSDF([(0.0, 0.0), (1.0, 0.0), (2.0, 0.0), (1.0, 1.0)], 1.0) # collinear
         @test_throws ArgumentError BMO.PolygonPrismSDF([(0.0, 0.0), (1.0, 1.0), (1.0, 0.0), (0.0, 1.0)], 1.0) # bow tie
         @test_throws ArgumentError BMO.PolygonPrismSDF([(0.0, 0.0), (1.0, 0.0), (2.0, 0.0)], 1.0) # zero area
+        @test_throws ArgumentError BMO.PolygonPrismSDF([(0.0, 0.0, 5.0), (1.0, 0.0, 5.0), (0.0, 1.0, 7.0)], 1.0) # 3D points
+        @test_throws ArgumentError BMO.PolygonPrismSDF([1, 2, 3], 1.0) # no points
+
+        # the element type is promoted over the coordinates and the height
+        @test BMO.PolygonPrismSDF([(0f0, 0.0), (1f0, 0.0), (0f0, 1.0)], 1f0) isa BMO.PolygonPrismSDF{Float64}
+        @test BMO.PolygonPrismSDF([(0, 0), (1, 0), (0, 1)], 1) isa BMO.PolygonPrismSDF{Float64}
+        @test BMO.PolygonPrismSDF([(0f0, 0f0), (1f0, 0f0), (0f0, 1f0)], 1) isa BMO.PolygonPrismSDF{Float32}
     end
 
     @testset "Constructors" begin
@@ -84,10 +96,15 @@ const mm = 1e-3
         @test sum(V) / 3 ≈ zeros(2) atol = 1e-15 # centroid at the origin
         @test V[3][2] > 0 && V[3][1] == 0 # apex along +y
         @test all(norm(V[i] - V[mod1(i + 1, 3)]) ≈ 20mm for i in 1:3)
+        @test EquilateralPrism(20f-3, 10f-3, 1.5).shape isa BMO.PolygonPrismSDF{Float32}
+        @test_throws ArgumentError EquilateralPrism(-20mm, 10mm, 1.5)
         dove = DovePrism(50mm, 10mm, 10mm, 1.5)
         @test dove isa Prism
         @test BMO.thickness(dove) ≈ 50mm
+        @test DovePrism(50f-3, 10mm, 10mm, 1.5) isa Prism # mixed element types
         @test_throws ArgumentError DovePrism(10mm, 10mm, 10mm, 1.5)
+        @test_throws ArgumentError DovePrism(50mm, -10mm, 10mm, 1.5)
+        @test BMO.thickness(RightAnglePrism(20mm, 10mm, 1.5)) ≈ 20mm
         # a Dove prism does not deviate a beam on its axis (n = 1.5, parallel to the base)
         system = System([dove])
         beam = Beam([-1mm, -40mm, 0], [0, 1, 0], 1e-6)
