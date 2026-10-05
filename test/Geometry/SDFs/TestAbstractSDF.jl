@@ -31,6 +31,16 @@ function BMO.sdf(tps::TestPointSDF, point)
     return norm(p)
 end
 
+# Counts the evaluations of the sdf of the wrapped shape
+mutable struct CountingSDF{T, S <: BMO.AbstractSDF{T}} <: BMO.AbstractSDF{T}
+    shape::S
+    count::Int
+end
+
+CountingSDF(shape) = CountingSDF(shape, 0)
+
+BMO.sdf(c::CountingSDF, point) = (c.count += 1; BMO.sdf(c.shape, point))
+
 @testset "Abstract SDF" begin
     @testset "Testing type definitions" begin
         @test isdefined(BMO, :AbstractSDF)
@@ -68,6 +78,29 @@ end
         @test length(i1) == t
         @test isnothing(i2)
         @test isnothing(i3)
+    end
+
+    @testset "Testing misses" begin
+        radius = 10e-3
+        counting = CountingSDF(BMO.SphereSDF(radius))
+        # a ray that leaves the shape is a miss after few evaluations, whatever its start distance
+        for distance in (1e-3, 1.0, 1e3), dir in ([0.0, 1, 0], [1.0, 0, 0], [1.0, 1, 1] / sqrt(3))
+            counting.count = 0
+            ray = Ray([radius + distance, 0, 0], dir)
+            @test isnothing(BMO.intersect3d(counting, ray))
+            @test counting.count < 100
+        end
+        # a hit needs few evaluations as well
+        counting.count = 0
+        hit = BMO.intersect3d(counting, Ray([1.0, 0, 0], [-1.0, 0, 0]))
+        @test length(hit) ≈ 1 - radius
+        @test counting.count < 100
+        # a shape far away is still hit, one beyond the miss distance is not
+        far = BMO.SphereSDF(1.0)
+        translate3d!(far, [0, 1e6, 0])
+        @test length(BMO.intersect3d(far, Ray(zeros(3), [0.0, 1, 0]))) ≈ 1e6 - 1
+        translate3d!(far, [0, 10 * BMO.SDF_MISS_DISTANCE, 0])
+        @test isnothing(BMO.intersect3d(far, Ray(zeros(3), [0.0, 1, 0])))
     end
 
     @testset "Testing normal3d" begin
