@@ -88,9 +88,13 @@ end
         n0 = length(ax.scene.plots)
         render!(ax, group; color = :wavelength, render_every = 1)
         @test Set(_colors(ax.scene.plots[n0 + 1])) == Set(rgba.(λs))
-        # other colors are unchanged
+        # a single color is passed on by render!, a handle draws it per vertex, see render_settings!
+        n0 = length(ax.scene.plots)
+        render!(ax, beams[1]; color = :red)
+        @test _colors(ax.scene.plots[n0 + 1]) == Makie.to_color(:red)
         h = live_render!(ax, beams[1]; color = :red)
-        @test _colors(_lines(h)) == Makie.to_color(:red)
+        @test length(_colors(_lines(h))) == length(to_value(_lines(h).arg1))
+        @test all(==(Makie.RGBAf(Makie.to_color(:red))), _colors(_lines(h)))
     end
 
     @testset "Gaussian beamlets" begin
@@ -179,6 +183,103 @@ end
         end
         # the vertex count did change
         @test length(unique(sizes)) > 1
+    end
+end
+
+@testset "render_settings!: color" begin
+    rgba(λ, α = 1) = Makie.RGBAf(wavelength_color(λ)..., α)
+    red = Makie.RGBAf(Makie.to_color(:red))
+    lens = SphericalLens(50e-3, -50e-3, 10e-3, 25e-3, 1.5168)
+    sys = System([lens])
+    ax = LScene(Figure()[1, 1])
+    # positions and colors of every colored plot of `h` have the same length
+    consistent(h) = all(p -> length(_colors(p)) == _nvertices(p),
+        filter(p -> _colors(p) isa AbstractVector, BMO.render_plots(h)))
+
+    @testset "rays, beams and groups" begin
+        beams = [Beam([x, -20e-3, 0.0], [0.0, 1.0, 0.0], λ) for (x, λ) in ((-1e-3, 450e-9), (1e-3, 650e-9))]
+        group = CollimatedSource(beams, 1e-3, [0.0, -20e-3, 0], [0.0, 1.0, 0.0])
+        solve_system!(sys, group)
+        h = live_render!(ax, group; color = :wavelength, render_every = 1, show_pos = true)
+        plots = copy(BMO.render_plots(h))
+        nplots = length(ax.scene.plots)
+        @test Set(_colors(_lines(h))) == Set(rgba.((450e-9, 650e-9)))
+
+        # a single color, without new plots
+        @test BMO.render_settings!(h; color = :red) === h
+        @test BMO.render_settings(h).color === :red
+        @test all(p -> all(==(red), _colors(p)), BMO.render_plots(h))
+        @test consistent(h)
+        @test length(BMO.render_plots(h)) == length(plots)
+        @test all(a === b for (a, b) in zip(BMO.render_plots(h), plots))
+        @test length(ax.scene.plots) == nplots
+        # it is kept by the updates
+        update_render!(h)
+        BMO.render_settings!(h; flen = 0.2)
+        @test all(p -> all(==(red), _colors(p)), BMO.render_plots(h))
+        @test consistent(h)
+
+        # with an opacity, and back to the wavelengths
+        BMO.render_settings!(h; color = (:green, 0.25))
+        @test all(c -> c.alpha ≈ 0.25f0, _colors(_lines(h)))
+        BMO.render_settings!(h; color = (:wavelength, 0.5))
+        @test BMO.render_settings(h).color == (:wavelength, 0.5)
+        @test Set(_colors(_lines(h))) == Set(rgba.((450e-9, 650e-9), 0.5))
+        @test all(a === b for (a, b) in zip(BMO.render_plots(h), plots))
+        @test length(ax.scene.plots) == nplots
+
+        # the colors follow the other settings
+        BMO.render_settings!(h; render_every = 2)
+        @test Set(_colors(_lines(h))) == Set((rgba(450e-9, 0.5),))
+        @test consistent(h)
+
+        # a handle of a single color takes the wavelengths
+        h = live_render!(ax, group; render_every = 1)
+        @test BMO.render_settings(h).color === :blue
+        BMO.render_settings!(h; color = :wavelength)
+        @test Set(_colors(_lines(h))) == Set(rgba.((450e-9, 650e-9)))
+        @test consistent(h)
+    end
+
+    @testset "Gaussian beamlets" begin
+        gauss = GaussianBeamlet([0.0, -20e-3, 0.0], [0.0, 1.0, 0.0], 650e-9, 1e-3)
+        solve_system!(sys, gauss)
+        h = live_render!(ax, gauss; r_res = 8, z_res = 6, show_beams = true)
+        mesh = only(filter(p -> p isa Makie.Mesh, BMO.render_plots(h)))
+        gen = filter(p -> p isa Makie.LineSegments, BMO.render_plots(h))
+        gencolors = [to_value(p.color) for p in gen]
+        @test all(==(red), _colors(mesh))
+        BMO.render_settings!(h; color = (:wavelength, 0.5), z_res = 4)
+        @test all(==(rgba(650e-9, 0.5)), _colors(mesh))
+        @test consistent(h)
+        BMO.render_settings!(h; color = :green)
+        @test all(==(Makie.RGBAf(Makie.to_color(:green))), _colors(mesh))
+        # the overlay of show_beams keeps its colors
+        @test [to_value(p.color) for p in gen] == gencolors
+
+        bg = CollimatedGaussianBeamletSource([0, -20e-3, 0], [0, 1, 0], 4e-3, 450e-9, 1e-3; n_grid = 3)
+        solve_system!(sys, bg; check_invariant = false)
+        h = live_render!(ax, bg; render_every = 2, show_waist = true)
+        BMO.render_settings!(h; color = :wavelength, render_every = 1)
+        @test all(p -> all(==(rgba(450e-9)), _colors(p)),
+            filter(p -> p isa Union{Makie.Mesh, Makie.Scatter}, BMO.render_plots(h)))
+        @test consistent(h)
+    end
+
+    @testset "errors" begin
+        beam = Beam([0.0, -20e-3, 0.0], [0.0, 1.0, 0.0], 550e-9)
+        solve_system!(sys, beam)
+        h = live_render!(ax, beam)
+        for color in (1, :nocolor, [:red, :blue], (:red, :blue))
+            @test_throws ArgumentError BMO.render_settings!(h; color)
+        end
+        @test_throws ArgumentError BMO.render_settings!(h; color = :red, flen = -1.0)
+        @test BMO.render_settings(h).color === :blue
+        # colors that are passed on to Makie are not managed by the handle
+        n = length(to_value(_lines(h).arg1))
+        hv = live_render!(ax, beam; color = fill(Makie.RGBAf(0, 1, 0, 1), n))
+        @test_throws ArgumentError BMO.render_settings!(hv; color = :red)
+        BMO.render_settings!(hv; flen = 0.2)
     end
 end
 

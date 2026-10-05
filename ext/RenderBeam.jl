@@ -18,16 +18,20 @@ struct _BeamPlots
     plots::Vector{AbstractPlot}
     fills::Vector{Pair{Observable, Function}}
     settings::Base.RefValue{NamedTuple}
+    live::Bool
 end
 
 """
-    _BeamPlots(settings::NamedTuple)
+    _BeamPlots(settings::NamedTuple; live = false)
 
-Empty plots of a beam drawn with the `settings` (`flen`, `render_every`, and `r_res`, `z_res` of
-envelopes). The geometry functions of `fills` read the settings from `bp.settings[]` whenever they
-are called, such that [`render_settings!`](@ref) changes the geometry of the next `update_render!`.
+Empty plots of a beam drawn with the `settings` (`flen`, `render_every`, `color`, and `r_res`,
+`z_res` of envelopes). The geometry functions of `fills` read the settings from `bp.settings[]`
+whenever they are called, such that [`render_settings!`](@ref) changes the geometry and the colors
+of the next `update_render!`. `live` plots, i.e. those of a handle, draw a single color with one
+color per vertex, see [`_coloring`](@ref).
 """
-_BeamPlots(settings::NamedTuple) = _BeamPlots(AbstractPlot[], Pair{Observable, Function}[], Ref{NamedTuple}(settings))
+_BeamPlots(settings::NamedTuple; live::Bool = false) =
+    _BeamPlots(AbstractPlot[], Pair{Observable, Function}[], Ref{NamedTuple}(settings), live)
 
 """
     _observe!(bp::_BeamPlots, geometry, obs = Observable(geometry()))
@@ -91,6 +95,9 @@ function render_settings!(h::BeamRenderHandle; kwargs...)
             "a $(nameof(typeof(h.thing))) handle has no render setting `$key`, the settings are $(join(keys(old), ", "))"))
         _check_setting(Val(key), value)
     end
+    haskey(kwargs, :color) && !(_coloring(old.color) isa Union{_ByWavelength, _SingleColor}) &&
+        throw(ArgumentError("the color of this handle was given as a $(typeof(old.color)) and passed on " *
+            "to Makie, it can not be changed by `render_settings!`"))
     new = merge(old, (; (k => _setting(Val(k), v) for (k, v) in pairs(kwargs))...))
     # a beam that is not a group draws one beam: render_every does not apply
     new = haskey(new, :render_every) ? merge(new, (; render_every = _render_every(h.thing, new.render_every))) : new
@@ -107,7 +114,12 @@ _check_setting(::Val{:render_every}, x) = (x isa Integer && 1 <= x <= typemax(In
 _check_setting(::Union{Val{:r_res}, Val{:z_res}}, x) = (x isa Integer && 2 <= x <= typemax(Int)) ||
     throw(ArgumentError("the render settings `r_res` and `z_res` must be integers of at least 2, got $x"))
 
+_check_setting(::Val{:color}, x) = _coloring(x) isa Union{_ByWavelength, _SingleColor} ||
+    throw(ArgumentError("the render setting `color` must be a single color, `:wavelength` or " *
+        "`(:wavelength, alpha)`, got $(repr(x))"))
+
 _setting(::Val{:flen}, x) = Float64(x)
+_setting(::Val{:color}, x) = x
 _setting(::Val, x) = Int(x)
 
 """
@@ -209,52 +221,53 @@ function _ray_colors(thing, color::_ByWavelength; render_every::Int = 1, ends::B
     return cols
 end
 
+""" The coloring of the plots of `bp` with its current setting `color`, see [`_coloring`](@ref). """
+_coloring(bp::_BeamPlots) = _coloring(bp.settings[].color, bp.live)
+
 """
-    _coupled!(bp, plotfn!, axis, source, color, select = identity; kwargs...) -> plot
+    _coupled!(bp, plotfn!, axis, source, select = identity; kwargs...) -> plot
 
 Draws `plotfn!(axis, select(geometry); color, kwargs...)`, where `source` is the observable of the
-geometry registered by [`_observe!`](@ref) and `select` extracts the plotted argument from it (e.g.
-the vertices of a mesh).
+tuple `(geometry, colors)` registered by [`_observe!`](@ref) and `select` extracts the plotted
+argument from the geometry (e.g. the vertices of a mesh). `colors` holds one color per vertex, or
+`nothing` for a `color` that is passed on to `Makie` as it is, see [`_vertex_colors`](@ref).
 
-For a [`_ByWavelength`](@ref) `color`, `source` is instead the observable of the tuple `(geometry,
-colors)` of the geometry and its one color per vertex. The plot is then updated with
-`Makie.update!`, which sets the positions and the colors in one step: the number of vertices may
-change on `update_render!`, and the observables of two attributes, notified one after the other,
-would leave the plot with the new positions and the old colors in between.
+The plot is updated with `Makie.update!`, which sets the positions and the colors in one step: the
+number of vertices may change on `update_render!`, and the observables of two attributes, notified
+one after the other, would leave the plot with the new positions and the old colors in between.
 """
-_coupled!(bp::_BeamPlots, plotfn!, axis, source::Observable, color, select = identity; kwargs...) =
-    _add!(bp, plotfn!(axis, lift(select, source); color, kwargs...))
-
-function _coupled!(bp::_BeamPlots, plotfn!, axis, source::Observable, ::_ByWavelength, select = identity;
-        kwargs...)
+function _coupled!(bp::_BeamPlots, plotfn!, axis, source::Observable, select = identity; kwargs...)
     geometry, colors = source[]
-    plot = _add!(bp, plotfn!(axis, select(geometry); color = colors, kwargs...))
+    color = isnothing(colors) ? bp.settings[].color : colors
+    plot = _add!(bp, plotfn!(axis, select(geometry); color, kwargs...))
     on(source) do (geometry, colors)
-        Makie.update!(plot; arg1 = select(geometry), color = colors)
+        if isnothing(colors)
+            Makie.update!(plot; arg1 = select(geometry))
+        else
+            Makie.update!(plot; arg1 = select(geometry), color = colors)
+        end
     end
     return plot
 end
 
 """
-    _segments!(bp, color, thing) -> source
-    _ends!(bp, color, thing) -> source
+    _segments!(bp, thing) -> source
+    _ends!(bp, thing) -> source
 
-Registers the observable of the segments (or of the end points of `show_pos`) of `thing`, drawn
-with the settings of `bp`, in `bp` and returns it, for [`_coupled!`](@ref): for a
-[`_ByWavelength`](@ref) `color` together with one color per vertex.
+Registers the observable of the segments (or of the end points of `show_pos`) of `thing` and their
+colors, drawn with the settings of `bp`, in `bp` and returns it, for [`_coupled!`](@ref).
 """
-_segments!(bp::_BeamPlots, color, thing) =
-    _observe!(bp, () -> _ray_segments(thing; bp.settings[].flen, bp.settings[].render_every))
+_segments!(bp::_BeamPlots, thing) = _observe!(bp, () -> begin
+    s = bp.settings[]
+    pts = _ray_segments(thing; s.flen, s.render_every)
+    (pts, _vertex_colors(_coloring(bp), length(pts), c -> _ray_colors(thing, c; s.render_every)))
+end)
 
-_ends!(bp::_BeamPlots, color, thing) = _observe!(bp, () -> _ray_ends(thing; bp.settings[].render_every))
-
-_segments!(bp::_BeamPlots, color::_ByWavelength, thing) =
-    _observe!(bp, () -> (_ray_segments(thing; bp.settings[].flen, bp.settings[].render_every),
-        _ray_colors(thing, color; bp.settings[].render_every)))
-
-_ends!(bp::_BeamPlots, color::_ByWavelength, thing) =
-    _observe!(bp, () -> (_ray_ends(thing; bp.settings[].render_every),
-        _ray_colors(thing, color; bp.settings[].render_every, ends = true)))
+_ends!(bp::_BeamPlots, thing) = _observe!(bp, () -> begin
+    s = bp.settings[]
+    pts = _ray_ends(thing; s.render_every)
+    (pts, _vertex_colors(_coloring(bp), length(pts), c -> _ray_colors(thing, c; s.render_every, ends = true)))
+end)
 
 """
     _plot_rays!(axis, thing; kwargs...) -> _BeamPlots
@@ -266,6 +279,7 @@ curve of `show_polarization` in a single `lines` plot. See `render!(axis, ray)` 
 function _plot_rays!(
         axis::_RenderEnv,
         thing;
+        live::Bool = false,
         flen,
         render_every::Int,
         show_pos,
@@ -281,13 +295,10 @@ function _plot_rays!(
         kwargs...
     )
     show_polarization && _check_polarized(thing)
-    bp = _BeamPlots((; flen = Float64(flen), render_every = _render_every(thing, render_every)))
-    coloring = _coloring(color)
-    segments = _segments!(bp, coloring, thing)
-    _coupled!(bp, linesegments!, axis, segments, coloring; linewidth, transparency, kwargs...)
+    bp = _BeamPlots((; flen = Float64(flen), render_every = _render_every(thing, render_every), color); live)
+    _coupled!(bp, linesegments!, axis, _segments!(bp, thing); linewidth, transparency, kwargs...)
     if show_pos
-        ends = _ends!(bp, coloring, thing)
-        _coupled!(bp, scatter!, axis, ends, coloring)
+        _coupled!(bp, scatter!, axis, _ends!(bp, thing))
     end
     if show_polarization
         curve = _observe!(bp,
@@ -413,10 +424,11 @@ segments may change between updates.
 - `render_every = 5`: renders only every e.g. fifth beam of a beam group
 
 All other kwargs of `render!(axis, ray)` (`show_pos`, polarization and Makie kwargs) apply with
-the same defaults.
+the same defaults. `flen`, `render_every` and `color` can be changed later, see
+[`render_settings!`](@ref).
 """
 function live_render!(axis::_RenderEnv, thing::Union{BMO.AbstractRay, Beam, BMO.AbstractBeamGroup}; kwargs...)
     kw = _ray_defaults(kwargs)
-    bp = _plot_rays!(axis, thing; kw...)
+    bp = _plot_rays!(axis, thing; kw..., live = true)
     return BeamRenderHandle(thing, axis, bp)
 end

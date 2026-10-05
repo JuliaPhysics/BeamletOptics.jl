@@ -119,17 +119,20 @@ function _envelope_colors(x, color::_ByWavelength; r_res::Int, z_res::Int, rende
 end
 
 """
-    _envelope!(bp, color, geometry, colors) -> source
+    _envelope!(bp, geometry, by_wavelength) -> source
 
-Registers the observable of the envelope mesh `geometry()` in `bp` and returns it, for
-[`_coupled!`](@ref): for a [`_ByWavelength`](@ref) `color` together with the vertex colors
-`colors()`. The mesh type depends on its size, hence `Any`.
+Registers the observable of the envelope mesh `geometry()` and its vertex colors in `bp` and
+returns it, for [`_coupled!`](@ref). `by_wavelength(coloring)` returns the colors of a
+[`_ByWavelength`](@ref) coloring, see [`_envelope_colors`](@ref). The mesh type depends on its
+size, hence `Any`.
 """
-_envelope!(bp::_BeamPlots, color, geometry::Function, colors::Function) =
-    _observe!(bp, geometry, Observable{Any}(geometry()))
-
-_envelope!(bp::_BeamPlots, ::_ByWavelength, geometry::Function, colors::Function) =
-    _observe!(bp, () -> (geometry(), colors()), Observable{Any}((geometry(), colors())))
+function _envelope!(bp::_BeamPlots, geometry::Function, by_wavelength::Function)
+    envelope = () -> begin
+        mesh = geometry()
+        (mesh, _vertex_colors(_coloring(bp), length(GeometryBasics.coordinates(mesh)), by_wavelength))
+    end
+    return _observe!(bp, envelope, Observable{Any}(envelope()))
+end
 
 """
     _push_grid_faces!(faces, offset, r_res, z_res)
@@ -189,6 +192,7 @@ The plot function of the [`GaussianBeamlet`](@ref): the envelope of all segments
 function _plot_gaussian!(
         axis::_RenderEnv,
         gauss::BMO.GaussianBeamlet;
+        live::Bool = false,
         show_beams,
         show_pos,
         r_res::Int,
@@ -198,12 +202,11 @@ function _plot_gaussian!(
         transparency,
         kwargs...
     )
-    bp = _BeamPlots((; flen = Float64(flen), render_every = 1, r_res, z_res))
-    coloring = _coloring(color)
-    envelope = _envelope!(bp, coloring,
+    bp = _BeamPlots((; flen = Float64(flen), render_every = 1, r_res, z_res, color); live)
+    envelope = _envelope!(bp,
         () -> _gaussian_mesh(gauss; bp.settings[].flen, bp.settings[].r_res, bp.settings[].z_res),
-        () -> _envelope_colors(gauss, coloring; bp.settings[].r_res, bp.settings[].z_res))
-    _coupled!(bp, mesh!, axis, envelope, coloring; transparency, kwargs...)
+        c -> _envelope_colors(gauss, c; bp.settings[].r_res, bp.settings[].z_res))
+    _coupled!(bp, mesh!, axis, envelope; transparency, kwargs...)
     show_beams && _plot_generating_beams!(bp, axis, gauss; show_pos, transparency)
     return bp
 end
@@ -256,6 +259,6 @@ see [`live_render!`](@ref). The kwargs are those of `render!`, with a coarser de
 """
 function live_render!(axis::_RenderEnv, gauss::BMO.GaussianBeamlet; r_res::Int = 24, z_res::Int = 40, kwargs...)
     kw = _gaussian_defaults(kwargs)
-    bp = _plot_gaussian!(axis, gauss; kw..., r_res, z_res)
+    bp = _plot_gaussian!(axis, gauss; kw..., r_res, z_res, live = true)
     return BeamRenderHandle(gauss, axis, bp)
 end

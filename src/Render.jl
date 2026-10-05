@@ -315,7 +315,8 @@ Base.delete!(::AbstractSystemRenderHandle, ::AbstractObjectRenderHandle)
 
 The settings with which the beam handle `h` draws its beam, at least `flen` (length of a final
 ray without intersection [m]) and `render_every` (every how many beams of a beam group are drawn,
-`1` for other beams), e.g. to find the drawn segments of a beam. The handles of Gaussian beamlets
+`1` for other beams), e.g. to find the drawn segments of a beam, and `color` (the color of the rays
+or of the envelope as it was given, e.g. `:blue` or `:wavelength`). The handles of Gaussian beamlets
 and of beam groups of beamlets also report the resolution of the envelope, `r_res` and `z_res`.
 Change them via [`render_settings!`](@ref).
 """
@@ -326,21 +327,33 @@ function render_settings end
 
 Changes the settings of the beam handle `h` and draws the beam again with them, without creating
 new plots: the plots of [`render_plots`](@ref)`(h)` stay in the axis, with their other attributes
-(color, visibility, clip planes, ...) unchanged. The keywords are among the keys of
+(visibility, opacity, line width, clip planes, ...) unchanged. The keywords are among the keys of
 [`render_settings`](@ref)`(h)`:
 
 - `flen`: length of a final ray without intersection [m], positive and finite
 - `render_every`: every how many beams of a beam group are drawn, a positive integer (no effect on
   other beams)
 - `r_res`, `z_res`: radial and longitudinal resolution of an envelope mesh, integers of at least 2
+- `color`: the color of the rays or of the envelope, a single color that `Makie` knows (e.g. `:red`,
+  `(:red, 0.3)`), or `:wavelength` or `(:wavelength, alpha)` for the color of the wavelength of each
+  ray, see [`wavelength_color`](@ref)
 
 Any other keyword, e.g. `r_res` for a ray, throws an `ArgumentError`, and then `h` is not changed.
 The beam is drawn as it is, i.e. nothing is solved, like [`update_render!`](@ref). The overlays of
-the handle, e.g. `show_beams` or `show_pos`, follow the settings.
+the handle, e.g. `show_beams` or `show_pos`, follow the settings; the generating rays of
+`show_beams` and the polarization curve keep their colors.
+
+The plots of a handle that draw the `color` hold one color per vertex, which the handle sets
+together with the positions. Change the color via `render_settings!`, not via the `color` attribute
+of the plots, which the next update overwrites. A `color` that is neither a single color nor the
+wavelength, e.g. a vector of colors, is passed on to `Makie` by `live_render!` and can not be
+changed here.
 
 ```julia
 h = live_render!(ax, beam; flen = 0.1)
-render_settings!(h; flen = 0.5)    # the final ray is now 0.5 m long
+render_settings!(h; flen = 0.5)             # the final ray is now 0.5 m long
+render_settings!(h; color = :wavelength)    # each ray in the color of its wavelength
+render_settings!(h; color = :orange)        # and all in one color again
 ```
 
 If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.

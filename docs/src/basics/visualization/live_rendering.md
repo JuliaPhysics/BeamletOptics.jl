@@ -77,7 +77,8 @@ remove_render!(hsys, lens)   # deletes its plots and its handle
 ```
 
 Beam handles report how they were drawn, and can change it at runtime, e.g. the drawn length of the
-final rays, without creating new plots:
+final rays or the color (a single color or the color of the wavelength of each ray), without
+creating new plots:
 
 ```@docs; canonical=false
 BeamletOptics.render_settings
