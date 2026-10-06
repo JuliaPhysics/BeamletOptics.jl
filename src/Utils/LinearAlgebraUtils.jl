@@ -96,23 +96,25 @@ end
 Returns the rotation matrix R that will align the start vector to be parallel to the target vector.
 Based on ['Avoiding Trigonometry'](https://gist.github.com/kevinmoran/b45980723e53edeb8a5a43c49f134724) by Íñigo Quílez. The resulting matrix
 was transposed due to column/row major issues. Vector length is maintained. This function is very fast.
+
+The rotation is exact for all angles, including angles of a few nrad (alignment of optics) and
+angles close to π. For antiparallel vectors (within `√(2eps)`), R is a rotation by π about an
+axis normal to `start`.
 """
-function align3d(start::AbstractVector{A}, target::AbstractVector{B}) where {A, B}
-    T = promote_type(A, B)
+function align3d(start::AbstractVector, target::AbstractVector)
     start = normalize(start)
     target = normalize(target)
+    T = promote_type(eltype(start), eltype(target))
     rx, ry, rz = cross(target, start)
     cosA = dot(start, target)
-    # if start and target are already (almost) parallel return unity
-    if cosA ≈ 1
-        return SMatrix{3,3}(one(T)I)
+    # 1 + cos(A) = |start + target|² / 2, without the cancellation of 1 + cosA close to A = π
+    q = sum(abs2, start + target) / 2
+    if q < eps(T)
+        # antiparallel: rotation by π about an axis normal to start
+        u = normal3d(start)
+        return SMatrix{3, 3, T}(2 * u * u' - I)
     end
-    if cosA ≈ -1
-        return @SArray [-one(T) zero(T) zero(T);
-                        zero(T) -one(T) zero(T);
-                        zero(T) zero(T) one(T)]
-    end
-    k = 1 / (1 + cosA)
+    k = 1 / q
     R = @SArray [
         rx^2*k+cosA rx*ry*k+rz rx*rz*k-ry
         ry*rx*k-rz ry^2*k+cosA ry*rz*k+rx

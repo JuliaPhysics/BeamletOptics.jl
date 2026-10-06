@@ -71,6 +71,45 @@ const BMO = BeamletOptics
         @test T * start ≈ normalize(target)
     end
 
+    @testset "align3d is exact for small angles and close to π" begin
+        isrotation(R; tol = 1e-14) = norm(R' * R - I) < tol && det(R) ≈ 1
+        s = normalize([1.0, 2.0, -0.5])
+        n = BMO.normal3d(s)
+        # small angles (alignment of optics): no tolerance that drops them
+        for δ in (1e-9, 1e-7, 1e-5, 1e-4, 1e-3, 0.1)
+            t = cos(δ) * s + sin(δ) * n
+            R = BMO.align3d(s, t)
+            @test norm(R * s - t) < 1e-15
+            @test isapprox(dot(R * s, n), sin(δ); rtol = 1e-8)
+            @test isrotation(R)
+        end
+        # antiparallel along any axis, also z
+        for v in ([0.0, 0, 1], [1.0, 0, 0], [0.0, -1, 0], s)
+            R = BMO.align3d(v, -v)
+            @test R * v ≈ -v
+            @test isrotation(R)
+        end
+        # close to π: the cross product of almost antiparallel vectors cancels, error ~ eps / δ
+        for δ in (1e-6, 1e-3)
+            t = -(cos(δ) * s + sin(δ) * n)
+            R = BMO.align3d(s, t)
+            @test norm(R * s - t) < 1e-9
+            @test isrotation(R; tol = 1e-9)
+        end
+        # Float32
+        R = BMO.align3d(Float32[0, 1, 0], Float32[1f-3, 1, 0])
+        @test eltype(R) == Float32
+        @test (R * Float32[0, 1, 0])[1] ≈ 1f-3 rtol = 1e-3
+    end
+
+    @testset "align3d! rotates objects by µrad" begin
+        m = RoundPlanoMirror(25.4e-3, 5e-3)
+        d = normalize([1e-6, 1, 0])
+        align3d!(m, d)
+        @test norm(BMO.orientation(m)[:, 2] - d) < 1e-15
+        @test isapprox(BMO.orientation(m)[1, 2], 1e-6; rtol = 1e-8)
+    end
+
     @testset "Testing angle3d for resulting angle" begin
         a = BMO.angle3d([1, 0, 0], [0, 0, 1])
         @test isapprox(a, π / 2)
