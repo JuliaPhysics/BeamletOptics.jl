@@ -14,6 +14,9 @@ export CollimatedGaussianBeamletSource, GaussianBeamletDecomposition,
 # system
 export System, StaticSystem, solve_system!
 
+# analysis
+export clear_aperture, vignetted
+
 # object group
 export ObjectGroup
 
