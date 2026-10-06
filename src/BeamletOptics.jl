@@ -53,7 +53,7 @@ include("System.jl")
 include("OpticalComponents/Components.jl")
 include("ObjectGroups.jl")
 include("Properties.jl")
-include("Render.jl")
+include("Render/Render.jl")
 include("AgentSkill.jl")
 include("Exports.jl")
 

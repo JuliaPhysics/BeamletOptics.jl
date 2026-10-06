@@ -62,9 +62,11 @@ doublets) is handled per component by returning a `Hint`
 - `src/Exports.jl`: the public API. Changing it affects the agent skill (below).
 - `ext/`: `BeamletOpticsMakieExt` and its `Render*.jl` files: `render!` and the live rendering
   (`RenderLive.jl` for objects and systems, the beam files for beams) behind the render handle
-  protocol of `src/Render.jl`. `BeamletOpticsOpticsBaseExt` couples BMO to other solvers through
-  the `PlaneField` of [OpticsBase](https://github.com/StackEnjoyer/OpticsBase.jl): detector hits
-  and beamlet segments to a field, and a field back to beamlets.
+  protocol of `src/Render/RenderHandles.jl`. `src/Render/` holds the entry points and docstrings
+  of the render pipeline, one file per extension file of the same name.
+  `BeamletOpticsOpticsBaseExt` couples BMO to other solvers through the `PlaneField` of
+  [OpticsBase](https://github.com/StackEnjoyer/OpticsBase.jl): detector hits and beamlet segments
+  to a field, and a field back to beamlets.
 - The interactive GUI (`live_view`, cards, kinematic controls, view cube) is the separate package
   [BeamletOpticsGUI](https://github.com/StackEnjoyer/BeamletOpticsGUI.jl). It uses the exported
   names, the render handle protocol and the names declared `public` in `src/Exports.jl` (see

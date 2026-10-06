@@ -1,7 +1,7 @@
 using Makie: translate!, rotate!, Quaternion, AbstractPlot
 
 #=
-Live rendering of objects and systems, see the render handle protocol in `src/Render.jl`
+Live rendering of objects and systems, see the render handle protocol in `src/Render/RenderHandles.jl`
 =#
 
 """

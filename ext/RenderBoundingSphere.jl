@@ -1,4 +1,4 @@
-# for docs refer to Render.jl
+# for docs refer to src/Render/RenderBoundingSphere.jl
 
 """
     _great_circles(center, radius; segments = 64)

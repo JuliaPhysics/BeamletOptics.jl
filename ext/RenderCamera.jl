@@ -1,4 +1,4 @@
-# for docs refer to Render.jl
+# for docs refer to src/Render/RenderCamera.jl
 
 get_view(ls::LScene) = ls.scene.camera.view[]
 

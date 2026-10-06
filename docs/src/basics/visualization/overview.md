@@ -95,7 +95,7 @@ julia> using BeamletOptics
 julia> methods(render!)
 # 1 method for generic function "render!" from BeamletOptics:
  [1] render!(::Any, ::Union{BeamletOptics.AbstractSystem, BeamletOptics.AbstractBeam, BeamletOptics.AbstractObject, BeamletOptics.AbstractObjectGroup, BeamletOptics.AbstractRay, BeamletOptics.AbstractShape}, kwargs...)
-     @ C:\Users\anon\.julia\dev\BeamletOptics\src\Render.jl:56
+     @ C:\Users\anon\.julia\dev\BeamletOptics\src\Render\RenderCore.jl:59
 
 julia> axis = nothing;
 
@@ -105,7 +105,7 @@ julia> render!(axis, mirror)
 ERROR: It appears no suitable Makie backend is loaded in this session.
 Stacktrace:
  [1] render!(::Nothing, ::Mirror{Float64, BeamletOptics.PlanoSurfaceSDF{Float64}})
-   @ BeamletOptics c:\Users\anon\.julia\dev\BeamletOptics\src\Render.jl:46
+   @ BeamletOptics c:\Users\anon\.julia\dev\BeamletOptics\src\Render\RenderCore.jl:59
  [2] top-level scope
    @ REPL[5]:1
 ```
