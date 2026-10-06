@@ -22,6 +22,39 @@ const BMO = BeamletOptics
         @test isempty(beam.children)
     end
 
+    @testset "Support vector" begin
+        pos = [0.0, 0, 0]
+        dir = [0.0, 1, 0]
+        wxp_start(beam) = position(first(BMO.rays(beam.wxp)))
+        wyp_start(beam) = position(first(BMO.rays(beam.wyp)))
+        ref = AstigmaticGaussianBeamlet(pos, dir, λ0, w0, 2w0; support = [1.0, 0, 0])
+        @test wxp_start(ref) ≈ [w0, 0, 0]
+        @test wyp_start(ref) ≈ [0, 0, -2w0]
+        # the length of an orthogonal support vector does not matter
+        for scale in (1e-9, 5, 1e9)
+            beam = AstigmaticGaussianBeamlet(pos, dir, λ0, w0, 2w0; support = scale .* [1.0, 0, 0])
+            @test wxp_start(beam) ≈ wxp_start(ref)
+            @test wyp_start(beam) ≈ wyp_start(ref)
+        end
+        # nor does the length of the direction
+        @test wxp_start(AstigmaticGaussianBeamlet(pos, 3 .* dir, λ0, w0, 2w0; support = [2.0, 0, 0])) ≈ wxp_start(ref)
+        # deviations within the threshold pass, e.g. a support vector from a rotation
+        @test AstigmaticGaussianBeamlet(pos, dir, λ0, w0; support = [1.0, 1e-12, 0]) isa AstigmaticGaussianBeamlet
+        @test AstigmaticGaussianBeamlet(pos, dir, λ0, w0; support = 1e9 .* [1.0, 1e-12, 0]) isa AstigmaticGaussianBeamlet
+        # not orthogonal
+        @test_throws ArgumentError AstigmaticGaussianBeamlet(pos, dir, λ0, w0; support = [1.0, 1, 0])
+        @test_throws ArgumentError AstigmaticGaussianBeamlet(pos, dir, λ0, w0; support = [1.0, 1e-6, 0])
+        @test_throws ArgumentError AstigmaticGaussianBeamlet(pos, dir, λ0, w0; support = 1e-9 .* [1.0, 1e-6, 0])
+        # parallel and anti-parallel
+        @test_throws ArgumentError AstigmaticGaussianBeamlet(pos, dir, λ0, w0; support = [0.0, 1, 0])
+        @test_throws ArgumentError AstigmaticGaussianBeamlet(pos, dir, λ0, w0; support = [0.0, -2, 0])
+        # no direction
+        @test_throws ArgumentError AstigmaticGaussianBeamlet(pos, dir, λ0, w0; support = [0.0, 0, 0])
+        # the symmetric constructor passes the support vector on
+        @test_throws ArgumentError AstigmaticGaussianBeamlet(pos, dir, λ0, w0; support = [1, 1, 0])
+        @test wxp_start(AstigmaticGaussianBeamlet(pos, dir, λ0, w0; support = [3, 0, 0])) ≈ [w0, 0, 0]
+    end
+
     @testset "Component beam consistency" begin
         beam = AstigmaticGaussianBeamlet([0.0, 0, 0], [0, 1, 0], λ0, w0; E0=[0,0,1], support=[0,0,1])
         all_beams = BMO._component_beams(beam)

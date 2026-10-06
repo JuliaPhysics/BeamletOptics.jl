@@ -196,7 +196,9 @@ The following inputs and arguments can be used to configure the beamlet:
 - `M2`: beam quality factor. Default is 1
 - `P0`: beam total power in [W]. Default is 1 mW
 - `z0`: beam waist offset in [m]. Default is 0 m
-- `support`: [`Nullable`](@ref) support vector for the construction of the waist and div rays
+- `support`: [`Nullable`](@ref) support vector for the construction of the waist and div rays. Must be
+  orthogonal to `direction`, has any non-zero length and is normalized internally. Default is `nothing`,
+  i.e. a vector orthogonal to `direction` is chosen.
 
 # Additional information
 
@@ -207,6 +209,10 @@ The following inputs and arguments can be used to configure the beamlet:
 !!! info "Support vector"
     In order to calculate the basis vectors required for the beamlet construction, a random orthogonal vector is chosen.
     If results fluctuate due to the randomness of this vector, make sure to specify a fixed orthogonal `support` vector.
+    The waist and divergence rays start from the chief ray along this vector. A `support` that is not
+    orthogonal to the `direction` (the dot product of the unit vectors exceeds
+    `get_orthogonality_threshold()`, default `1e-10`) throws an `ArgumentError`, since it would
+    give a beamlet with a smaller waist radius and a shifted waist.
 """
 function GaussianBeamlet(
         position::AbstractArray{P},
@@ -224,10 +230,13 @@ function GaussianBeamlet(
     if isnothing(support)
         s1 = normal3d(dir)
     else
-        # FIXME check for orthogonality (see Pol. astigm. beamlet MR)
         s1 = support
     end
     s1 = normalize(s1)
+    # Both vectors have unit length, hence the test does not depend on the length of `support`
+    if !isorthogonal3d(dir, s1; atol = Config.get_orthogonality_threshold())
+        throw(ArgumentError("the support vector must be orthogonal to the direction (dot product of the unit vectors: $(dot(dir, s1)))"))
+    end
     # Divergence angle in rad
     tanθ = tan(divergence_angle(λ, w0, M2))
     # Waist ray
