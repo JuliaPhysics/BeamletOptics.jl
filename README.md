@@ -21,7 +21,7 @@
 
 # Features
 
-- Non-sequential 3D ray tracing with sequential shortcuts through `Hint`s, without paraxial approximation
+- Non-sequential 3D ray tracing without paraxial approximation
 - TEM₀₀ Gaussian beamlet models
 - Various optical components
     - Mirrors

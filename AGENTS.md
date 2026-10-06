@@ -27,7 +27,7 @@ Evaluate every API and architecture decision against this. The core principles, 
 
 **The extension promise:** a developer defines a new `AbstractObject` subtype and its
 `interact3d(system, object, beam, ray)` method (plus `intersect3d` if it needs custom
-geometry), and the rest of the API (kinematics, threading, solving again) works without further
+geometry), and the rest of the API (kinematics, threading) works without further
 integration. A component may also add a `card_rows` method (and `card_actions`) to show its own rows
 on its card in the interactive GUI, which lives in the separate package
 [BeamletOpticsGUI](https://github.com/StackEnjoyer/BeamletOpticsGUI.jl) (recipe and developer
