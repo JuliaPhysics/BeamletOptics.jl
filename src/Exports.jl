@@ -83,6 +83,6 @@ public is_static, hit_count, wavelength, min_num_rays, ProgressSink, PROGRESS_SI
 # re-emitting components (e.g. solvers coupled through a field)
 public relaunch!, beamlet_hit_field, GaussianBeamletHit, AstigmaticGaussianBeamletHit
 # optional part of the shape interface, see AbstractShape
-public bounding_sphere, world_bounding_sphere
+public bounding_sphere_of, AbstractBoundingSphere, NoBoundingSphere, SingleBoundingSphere
 public AbstractSampling, NoSampling, DiscRings, DiscSunflower, ConeRings, ConeSunflower,
        source_beams, sampling_basis

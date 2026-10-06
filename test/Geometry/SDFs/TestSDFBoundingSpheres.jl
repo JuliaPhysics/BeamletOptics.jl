@@ -8,7 +8,7 @@ using Random
 
 const BMO = BeamletOptics
 
-# SDF without a `bounding_sphere` method
+# SDF without a `bounding_sphere_of` method
 mutable struct NoSphereSDF <: BMO.AbstractSDF{Float64}
     dir::Matrix{Float64}
     transposed_dir::Matrix{Float64}
@@ -115,12 +115,12 @@ function instances()
     ]
 end
 
-allocations(s) = @allocated BMO.bounding_sphere(s)
+allocations(s) = @allocated BMO.bounding_sphere_of(s)
 
 random_direction(rng) = normalize(Point3(randn(rng), randn(rng), randn(rng)))
 
 # The test with the bounding sphere, as called by the solver
-bounded(shape, ray) = BMO.intersect3d(BMO.world_bounding_sphere(shape), shape, ray)
+bounded(shape, ray) = BMO.intersect3d(BMO.bounding_sphere_of(shape), shape, ray)
 
 same(::Nothing, ::Nothing) = true
 same(a, b) = !isnothing(a) && !isnothing(b) && a.t == b.t
@@ -166,20 +166,19 @@ end
 
     @testset "$label" for (i, (label, s)) in collect(enumerate(list))
         T = eltype(position(s))
-        sphere = @inferred BMO.bounding_sphere(s)
-        @test sphere isa Tuple{Point3{T}, T}
-        @test isfinite(sphere[2]) && sphere[2] > 0
+        sphere = @inferred BMO.bounding_sphere_of(s)
+        @test sphere isa BMO.SingleBoundingSphere{T}
+        @test isfinite(sphere.radius) && sphere.radius > 0
         @test allocations(s) == 0
 
         # the sphere is fixed in the local frame of the shape
+        local_center = BMO.transposed_orientation(s) * (sphere.pos - position(s))
         translate3d!(s, [0.3, -0.2, 0.5])
         rotate3d!(s, normalize([1.0, 2.0, 3.0]), 0.7)
-        center, r = @inferred BMO.world_bounding_sphere(s)
-        local_center, local_r = BMO.bounding_sphere(s)
-        @test local_center ≈ sphere[1] atol = 1e-12
-        @test local_r ≈ sphere[2]
+        moved = @inferred BMO.bounding_sphere_of(s)
+        center, r = moved.pos, moved.radius
         @test center ≈ position(s) + BMO.orientation(s) * local_center
-        @test r == local_r
+        @test r ≈ sphere.radius
 
         rng = MersenneTwister(1000 + i)
         hits, dmax, differing = farthest_hit(rng, s, center, r)
@@ -191,45 +190,46 @@ end
 
     @testset "composites" begin
         # an operand without a sphere
-        @test BMO.bounding_sphere(BMO.SphereSDF(1e-2) + NoSphereSDF()) === nothing
-        @test BMO.bounding_sphere(NoSphereSDF() + BMO.SphereSDF(1e-2) + BMO.SphereSDF(1e-2)) === nothing
-        @test BMO.bounding_sphere(NoSphereSDF() - BMO.SphereSDF(1e-3)) === nothing
-        @test BMO.world_bounding_sphere(NoSphereSDF() - BMO.SphereSDF(1e-3)) === nothing
+        @test BMO.bounding_sphere_of(BMO.SphereSDF(1e-2) + NoSphereSDF()) === BMO.NoBoundingSphere()
+        @test BMO.bounding_sphere_of(NoSphereSDF() + BMO.SphereSDF(1e-2) + BMO.SphereSDF(1e-2)) === BMO.NoBoundingSphere()
+        @test BMO.bounding_sphere_of(NoSphereSDF() - BMO.SphereSDF(1e-3)) === BMO.NoBoundingSphere()
         # a difference is bounded by its base, a tool without a sphere does not matter
-        @test BMO.bounding_sphere(BMO.SphereSDF(1e-2) - NoSphereSDF()) == (Point3(0.0), 1e-2)
+        @test BMO.bounding_sphere_of(BMO.SphereSDF(1e-2) - NoSphereSDF()) == BMO.SingleBoundingSphere(Point3(0.0), 1e-2)
 
         # union of two spheres: the smallest sphere around both
         a, b = BMO.SphereSDF(1e-2), BMO.SphereSDF(2e-2)
         translate3d!(b, [0, 0.1, 0])
         u = a + b
-        center, r = BMO.bounding_sphere(u)
+        sphere = BMO.bounding_sphere_of(u)
+        center, r = sphere.pos, sphere.radius
         @test r ≈ (0.1 + 1e-2 + 2e-2) / 2
         @test center ≈ Point3(0, 0.055, 0)
         # one sphere within the other
         c = BMO.SphereSDF(5e-2)
         translate3d!(c, [0, 0.01, 0])
-        @test BMO.bounding_sphere(a + c) == (Point3(0, 0.01, 0), 5e-2)
-        @test BMO.bounding_sphere(c + a) == (Point3(0, 0.01, 0), 5e-2)
+        @test BMO.bounding_sphere_of(a + c) == BMO.SingleBoundingSphere(Point3(0, 0.01, 0), 5e-2)
+        @test BMO.bounding_sphere_of(c + a) == BMO.SingleBoundingSphere(Point3(0, 0.01, 0), 5e-2)
 
         # an operand that is moved on its own: the sphere follows, in the frame of the composite
         zrotate3d!(u, π / 2)
         translate3d!(u, [1.0, 2.0, 3.0])
         translate3d!(b, [-0.1, 0, 0])
-        center, r = BMO.world_bounding_sphere(u)
+        sphere = BMO.bounding_sphere_of(u)
+        center, r = sphere.pos, sphere.radius
         @test r ≈ (0.2 + 1e-2 + 2e-2) / 2
         @test center ≈ Point3(1.0 - 0.105, 2.0, 3.0)
-        @test BMO.bounding_sphere(u)[1] ≈ Point3(0, 0.105, 0)
+        @test BMO.transposed_orientation(u) * (center - position(u)) ≈ Point3(0, 0.105, 0)
 
         base = BMO.SphereSDF(1e-2)
         translate3d!(base, [0, 0.1, 0])
         d = base - BMO.SphereSDF(1e-3)
-        @test BMO.bounding_sphere(d) == (Point3(0, 0.1, 0), 1e-2)
+        @test BMO.bounding_sphere_of(d) == BMO.SingleBoundingSphere(Point3(0, 0.1, 0), 1e-2)
         yrotate3d!(d, π / 3)
         translate3d!(d, [0.5, 0, 0])
-        @test BMO.world_bounding_sphere(d)[1] ≈ position(base)
+        @test BMO.bounding_sphere_of(d).pos ≈ position(base)
         translate3d!(base, [0, 0, 0.2])
-        @test BMO.world_bounding_sphere(d)[1] ≈ position(base)
-        @test BMO.world_bounding_sphere(d)[2] == 1e-2
+        @test BMO.bounding_sphere_of(d).pos ≈ position(base)
+        @test BMO.bounding_sphere_of(d).radius == 1e-2
     end
 end
 

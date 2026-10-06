@@ -42,7 +42,7 @@ end
 Returns the limits `(xmin, xmax, ymin, ymax, zmin, zmax)` of an axis-aligned box around `s` in world
 coordinates, e.g. for the sampling grid of the rendering. The SDF is probed from ±1000 m along the
 axes, which gives the extent of the shape if the SDF is exact outside of it. A type whose SDF is
-not exact far away returns the box around its bounding sphere instead, via `bounding_box(sphere)`.
+not exact far away returns the box around its [`bounding_sphere_of`](@ref) instead.
 """
 function bounding_box(s::AbstractSDF)
     xmin = sdf(s, Point3(-1000, 0, 0)) - 1000
@@ -52,17 +52,6 @@ function bounding_box(s::AbstractSDF)
     ymax = 1000 - sdf(s, Point3(0, 1000, 0))
     zmax = 1000 - sdf(s, Point3(0, 0, 1000))
     return xmin, xmax, ymin, ymax, zmin, zmax
-end
-
-"""
-    bounding_box(sphere::Tuple)
-
-Returns the limits of the axis-aligned box around the `sphere`, a tuple `(center, radius)` in world
-coordinates as returned by [`world_bounding_sphere`](@ref).
-"""
-function bounding_box(sphere::Tuple)
-    center, r = sphere
-    return center[1] - r, center[1] + r, center[2] - r, center[2] + r, center[3] - r, center[3] + r
 end
 
 """
@@ -209,9 +198,9 @@ function intersect3d(object::AbstractSDF, ray::AbstractRay, t_max = SDF_MISS_DIS
 end
 
 """
-    intersect3d(sphere::Tuple, object::AbstractSDF, ray::AbstractRay)
+    intersect3d(sphere::SingleBoundingSphere, object::AbstractSDF, ray::AbstractRay)
 
-Tests the `ray` against the `sphere`, the [`world_bounding_sphere`](@ref) of the `object`, see
+Tests the `ray` against the bounding `sphere` of the `object`, see
 `intersect3d(sphere, shape, ray)`. If the ray passes through the sphere, it is marched as in
 `intersect3d(object, ray)`, but is a miss as soon as it has left the sphere, since the `object` lies
 within. A ray that leaves the `object` is thus a miss after a few steps.
@@ -219,7 +208,7 @@ within. A ray that leaves the `object` is thus a miss after a few steps.
 The radius is enlarged by the surface threshold of the marching algorithm
 (`Config.get_sdf_surface_threshold()`), below which a ray counts as starting on the surface.
 """
-function intersect3d(sphere::Tuple, object::AbstractSDF, ray::AbstractRay)
+function intersect3d(sphere::SingleBoundingSphere, object::AbstractSDF, ray::AbstractRay)
     t_out = _sphere_exit(sphere, ray, Config.get_sdf_surface_threshold())
     isnothing(t_out) && return nothing
     return intersect3d(object, ray, t_out)

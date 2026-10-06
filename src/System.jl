@@ -127,29 +127,20 @@ function trace_system!(::AbstractSystem, beam::B; r_max = 0, kwargs...) where {B
     return nothing
 end
 
-@inline function trace_all(system::AbstractSystem, ray::AbstractRay{R}) where {R}
-    result::Union{Nothing, Intersection{R}} = nothing
-    for obj in objects(system)
-        # Find shortest intersection
-        temp::Union{Nothing, Intersection{R}} = intersect3d(obj, ray)
-        if temp === nothing
-            continue
-        end
+# The objects and object groups at the top level of the system. A group tests its objects itself, see
+# `intersect3d(::MultiShape, group, ray)`, hence the tracing does not use the flattened `objects(system)`.
+_top_level(system::AbstractSystem) = objects(system)
+_top_level(system::System) = system.objects
 
-        # Catch first valid intersection and replace current with closer intersection
-        if result === nothing || length(temp) < length(result)
-            result = temp
-        end
-    end
-    return result
-end
+# Find the shortest intersection among all objects of the system
+@inline trace_all(system::AbstractSystem, ray::AbstractRay) = intersect3d(_top_level(system), ray)
 
 @inline function trace_one(
         system::AbstractSystem, ray::AbstractRay{R}, hint::Hint) where {R}
     # Trace against hinted shape of object
     _shape = shape(hint)::AbstractShape{R}
     intersection::Nullable{Intersection{R}} = intersect3d(
-        world_bounding_sphere(_shape), _shape, ray)
+        bounding_sphere_of(BOUNDING_SPHERES[], _shape), _shape, ray)
     if isnothing(intersection)
         # If hinted object is not intersected, trace the entire system
         intersection = trace_all(system, ray)
@@ -398,6 +389,15 @@ function solve_system!(
         check_invariant::Bool = true,
         threshold::Real = get_invariant_threshold()
 ) where {B <: AbstractBeam}
+    # The bounding spheres of the objects are computed once, unless the solve of a beam group did so
+    with_bounding_spheres(system) do
+        _solve_beam!(system, beam; r_max, depth_max, check_invariant, threshold)
+    end
+    return nothing
+end
+
+function _solve_beam!(system::AbstractSystem, beam::B; r_max, depth_max, check_invariant,
+        threshold) where {B <: AbstractBeam}
     queue = Tuple{B, Int}[(beam, 1)]
     while !isempty(queue)
         # Process beams in FIFO order.
@@ -436,10 +436,13 @@ first beam is traced, such that a cancelled or failed solve leaves no beam with 
 function solve_system!(
         system::AbstractSystem, bg::AbstractBeamGroup; progress::Bool = true, kwargs...)
     empty!(bg)
-    _with_progress(progress, length(bg), "Tracing beams: ") do prog
-        Threads.@threads for _beam in beams(bg)
-            solve_system!(system, _beam; kwargs...)
-            _tick!(prog)
+    # One table of bounding spheres for all beams, which the tasks of the threads inherit
+    with_bounding_spheres(system) do
+        _with_progress(progress, length(bg), "Tracing beams: ") do prog
+            Threads.@threads for _beam in beams(bg)
+                solve_system!(system, _beam; kwargs...)
+                _tick!(prog)
+            end
         end
     end
     return nothing

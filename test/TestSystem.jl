@@ -97,6 +97,35 @@ end
         @test BMO.object(BMO.intersection(ray)) === first_obj
     end
 
+    @testset "intersect3d of several parts" begin
+        near, far, beside = (RoundPlanoMirror(25e-3, 5e-3) for _ in 1:3)
+        translate3d!(near, [0, 0.1, 0])
+        translate3d!(far, [0, 0.2, 0])
+        translate3d!(beside, [1, 0.05, 0])
+        ray = Ray([0.0, 0, 0], [0.0, 1, 0])
+        ref = BMO.intersect3d(near, ray)
+        # the closest part is hit, whatever holds the parts and in whatever order
+        for parts in ((far, near, beside), [far, near, beside], BMO.AbstractObject[beside, far, near],
+            BMO.objects(System([far, beside, near])))
+            hit = BMO.intersect3d(parts, ray)
+            @test BMO.object(hit) === near
+            @test length(hit) == length(ref)
+        end
+        # a group is one part and reports its object that was hit
+        parts = [beside, ObjectGroup([far, near])]
+        @test BMO.object(BMO.intersect3d(parts, ray)) === near
+        # shapes are parts as well, the intersection then knows no object
+        hit = BMO.intersect3d((BMO.shape(far), BMO.shape(near)), ray)
+        @test BMO.shape(hit) === BMO.shape(near)
+        @test isnothing(BMO.object(hit))
+        @test length(hit) == length(ref)
+        # no part is hit
+        @test isnothing(BMO.intersect3d((beside,), ray))
+        @test isnothing(BMO.intersect3d((), ray))
+        @test isnothing(BMO.intersect3d(BMO.AbstractObject[], ray))
+        @test isnothing(BMO.intersect3d(BMO.objects(System()), ray))
+    end
+
     @testset "Testing system tracing" begin
         system = System(mirrors)
         first_ray = Ray(origin, dir)

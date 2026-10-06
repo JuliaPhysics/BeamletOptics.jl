@@ -39,11 +39,11 @@ end
 thickness(s::BoxSDF) = 2*s.dimensions[2]
 
 """
-    bounding_sphere(box::BoxSDF)
+    bounding_sphere_of(box::BoxSDF)
 
 Returns the sphere through the eight corners of the box, centered at the local origin.
 """
-bounding_sphere(box::BoxSDF{T}) where T = (Point3{T}(0), norm(box.dimensions))
+bounding_sphere_of(box::BoxSDF{T}) where T = SingleBoundingSphere(box, Point3{T}(0), norm(box.dimensions))
 
 function sdf(box::BoxSDF{T}, point) where T
     p = _world_to_sdf(box, point)
@@ -83,13 +83,13 @@ function sdf(cylinder::CylinderSDF{T}, point) where T
 end
 
 """
-    bounding_sphere(cylinder::CylinderSDF)
+    bounding_sphere_of(cylinder::CylinderSDF)
 
 Returns the sphere through both rims of the cylinder, centered at the local origin. Note that the
 `height` field stores half of the cylinder height.
 """
-function bounding_sphere(cylinder::CylinderSDF{T}) where T
-    return (Point3{T}(0), sqrt(cylinder.radius^2 + cylinder.height^2))
+function bounding_sphere_of(cylinder::CylinderSDF{T}) where T
+    return SingleBoundingSphere(cylinder, Point3{T}(0), sqrt(cylinder.radius^2 + cylinder.height^2))
 end
 
 """
@@ -141,15 +141,15 @@ function sdf(cs::CutSphereSDF, point)
 end
 
 """
-    bounding_sphere(cs::CutSphereSDF)
+    bounding_sphere_of(cs::CutSphereSDF)
 
 Returns the smallest sphere around the spherical cap `y ≥ height`: the sphere through the rim,
 centered in the cut plane, for a cap of at most a hemisphere (`height ≥ 0`), and the full sphere
 otherwise.
 """
-function bounding_sphere(cs::CutSphereSDF{T}) where T
-    cs.height > 0 || return (Point3{T}(0), cs.radius)
-    return (Point3{T}(0, cs.height, 0), cs.w)
+function bounding_sphere_of(cs::CutSphereSDF{T}) where T
+    cs.height > 0 || return SingleBoundingSphere(cs, Point3{T}(0), cs.radius)
+    return SingleBoundingSphere(cs, Point3{T}(0, cs.height, 0), cs.w)
 end
 
 """
@@ -195,13 +195,13 @@ function sdf(ring::RingSDF, point)
 end
 
 """
-    bounding_sphere(ring::RingSDF)
+    bounding_sphere_of(ring::RingSDF)
 
 Returns the sphere through both outer rims of the ring, centered at the local origin. Note that the
 `inner_radius` field stores the mean radius of the ring.
 """
-function bounding_sphere(ring::RingSDF{T}) where T
-    return (Point3{T}(0), sqrt((ring.inner_radius + ring.hwidth)^2 + ring.hthickness^2))
+function bounding_sphere_of(ring::RingSDF{T}) where T
+    return SingleBoundingSphere(ring, Point3{T}(0), sqrt((ring.inner_radius + ring.hwidth)^2 + ring.hthickness^2))
 end
 
 """
@@ -251,12 +251,12 @@ end
 thickness(s::RightAnglePrismSDF) = 2 * s.dimensions[2]
 
 """
-    bounding_sphere(prism::RightAnglePrismSDF)
+    bounding_sphere_of(prism::RightAnglePrismSDF)
 
 Returns the sphere through the four corners of the hypotenuse face, centered at the local origin,
 which is the center of that face.
 """
-bounding_sphere(prism::RightAnglePrismSDF{T}) where T = (Point3{T}(0), norm(prism.dimensions))
+bounding_sphere_of(prism::RightAnglePrismSDF{T}) where T = SingleBoundingSphere(prism, Point3{T}(0), norm(prism.dimensions))
 
 """
     PolygonPrismSDF <: AbstractSDF
@@ -388,13 +388,13 @@ function _enclosing_circle(vertices::AbstractVector{Point2{T}}) where T
 end
 
 """
-    bounding_sphere(prism::PolygonPrismSDF)
+    bounding_sphere_of(prism::PolygonPrismSDF)
 
 Returns the sphere around the prism over a circle that encloses the cross-section (the smaller one
 of the circles around the mean of the vertices and around the center of their bounding box),
 centered in the local plane `z = 0`. It passes through at least two corners of the prism.
 """
-function bounding_sphere(prism::PolygonPrismSDF{T}) where T
+function bounding_sphere_of(prism::PolygonPrismSDF{T}) where T
     c, r = _enclosing_circle(prism.vertices)
-    return (Point3{T}(c[1], c[2], 0), sqrt(r^2 + (prism.height / 2)^2))
+    return SingleBoundingSphere(prism, Point3{T}(c[1], c[2], 0), sqrt(r^2 + (prism.height / 2)^2))
 end

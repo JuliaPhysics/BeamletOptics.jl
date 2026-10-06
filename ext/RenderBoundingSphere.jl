@@ -26,30 +26,35 @@ function _great_circles(center, radius; segments::Int = 64)
     return points
 end
 
-render_bounding_sphere!(ax::_RenderEnv, shape::BMO.AbstractShape; kwargs...) =
-    render_bounding_sphere!(ax, BMO.world_bounding_sphere(shape); kwargs...)
+# Spheres. `main_color` is consumed by objects and groups, a sphere value has no use for it.
+render_bounding_sphere!(::_RenderEnv, ::BMO.NoBoundingSphere; kwargs...) = nothing
 
-# A shape without a bounding sphere
-render_bounding_sphere!(::_RenderEnv, ::Nothing; kwargs...) = nothing
-
-# A sphere `(center, radius)` in world coordinates
-function render_bounding_sphere!(ax::_RenderEnv, sphere::Tuple; color = :magenta, linewidth = 1, kwargs...)
-    center, radius = sphere
-    lines!(ax, _great_circles(center, radius); color, linewidth, kwargs...)
+function render_bounding_sphere!(
+        ax::_RenderEnv, sphere::BMO.SingleBoundingSphere; color = :magenta, linewidth = 1, main_color = nothing, kwargs...
+    )
+    lines!(ax, _great_circles(sphere.pos, sphere.radius); color, linewidth, kwargs...)
     return nothing
 end
 
+# A shape
+render_bounding_sphere!(ax::_RenderEnv, shape::BMO.AbstractShape; kwargs...) =
+    render_bounding_sphere!(ax, BMO.bounding_sphere_of(shape); kwargs...)
+
+# An object: the sphere of its shape, or of each part and then the main sphere of the object
 render_bounding_sphere!(ax::_RenderEnv, obj::BMO.AbstractObject; kwargs...) =
     render_bounding_sphere!(ax, BMO.shape_trait_of(obj), obj; kwargs...)
 
+# `bounding_sphere_of` of the object, e.g. none for a `NonInteractableObject` whatever its shape
 render_bounding_sphere!(ax::_RenderEnv, ::BMO.SingleShape, obj; kwargs...) =
-    render_bounding_sphere!(ax, BMO.shape(obj); kwargs...)
+    render_bounding_sphere!(ax, BMO.bounding_sphere_of(obj); kwargs...)
 
-# The solver tests the parts one by one, hence one sphere per part
-function render_bounding_sphere!(ax::_RenderEnv, ::BMO.MultiShape, obj; kwargs...)
+# The solver tests the parts one by one, hence one sphere per part, and the main sphere of the object
+# first, which is drawn in `main_color`
+function render_bounding_sphere!(ax::_RenderEnv, ::BMO.MultiShape, obj; main_color = :orange, kwargs...)
     for part in BMO.shape(obj)
-        render_bounding_sphere!(ax, part; kwargs...)
+        render_bounding_sphere!(ax, part; main_color, kwargs...)
     end
+    render_bounding_sphere!(ax, BMO.bounding_sphere_of(obj); kwargs..., color = main_color)
     return nothing
 end
 

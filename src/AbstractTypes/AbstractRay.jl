@@ -166,54 +166,6 @@ function intersect3d(shape::AbstractShape, ::AbstractRay)
 end
 
 """
-    intersect3d(sphere, shape::AbstractShape, ray::AbstractRay)
-
-Returns the intersection between the `shape` and the `ray` like `intersect3d(shape, ray)`, but tests
-the `ray` against the `sphere` first, which is the [`world_bounding_sphere`](@ref) of the `shape`.
-This is the method that the solver calls for the shape of an object:
-
-- `sphere = nothing`, i.e. the shape has no [`bounding_sphere`](@ref): the shape is tested via
-  `intersect3d(shape, ray)`
-- the `ray` misses the `sphere`, or the `sphere` lies behind it: returns `nothing` without a test of
-  the `shape`
-- otherwise the shape is tested via `intersect3d(shape, ray)`
-
-A shape type implements `intersect3d(shape, ray)` and, optionally, `bounding_sphere(shape)`, not
-this method.
-"""
-intersect3d(::Nothing, shape::AbstractShape, ray::AbstractRay) = intersect3d(shape, ray)
-
-function intersect3d(sphere::Tuple, shape::AbstractShape, ray::AbstractRay)
-    isnothing(_sphere_exit(sphere, ray)) && return nothing
-    return intersect3d(shape, ray)
-end
-
-"""
-    _sphere_exit(sphere, ray, margin = 0)
-
-Returns the path length in [m] at which the `ray` leaves the `sphere`, a tuple `(center, radius)` in
-world coordinates, or `nothing` if the `ray` does not pass through it, i.e. if its line misses the
-sphere or the sphere lies behind its start. The radius is enlarged by the `margin` in [m] and by the
-rounding error of the test, such that a ray towards a point on the sphere still passes through it.
-"""
-function _sphere_exit(sphere::Tuple, ray::AbstractRay, margin = 0)
-    center, radius = sphere
-    dir = direction(ray)
-    oc = center - position(ray)
-    b = dot(oc, dir)
-    # Distance of the center from the line of the ray. This form does not cancel for a far start,
-    # in contrast to |oc|² - b².
-    perp = oc - b * dir
-    q = dot(perp, perp)
-    tol = sqrt(eps(float(typeof(radius))))
-    ρ = radius + margin + tol * (radius + norm(center) + norm(oc))
-    q > ρ^2 && return nothing
-    t_out = b + sqrt(ρ^2 - q)
-    t_out < 0 && return nothing
-    return t_out
-end
-
-"""
     intersect3d(object::AbstractObject, ray::AbstractRay)
 
 In general, the intersection logic between an [`AbstractObject`](@ref) and an [`AbstractRay`](@ref) depends on the [`AbstractShapeTrait`](@ref).
@@ -222,9 +174,9 @@ Refer to the respective documentation.
 intersect3d(object::AbstractObject, ray::AbstractRay) = intersect3d(shape_trait_of(object), object, ray)
 
 function intersect3d(::SingleShape, object::AbstractObject, ray::AbstractRay)
-    # FIXME: isinfrontof check?
-    _shape = shape(object)
-    intersection = intersect3d(world_bounding_sphere(_shape), _shape, ray)
+    s = shape(object)
+    # the sphere that the table of a running solve holds for the shape, none outside of a solve
+    intersection = intersect3d(bounding_sphere_of(BOUNDING_SPHERES[], s), s, ray)
     # Ensure that the intersection knows about the object if intersected
     if !isnothing(intersection)
         object!(intersection, object)
@@ -232,31 +184,50 @@ function intersect3d(::SingleShape, object::AbstractObject, ray::AbstractRay)
     return intersection
 end
 
-function intersect3d(::MultiShape, object::AbstractObject, ray::AbstractRay{R}) where R
-    # Init return intersection
-    intersection::Nullable{Intersection{R}} = nothing
-    for part in shape(object)
-        # Buffer intersection
-        temp::Nullable{Intersection{R}} = intersect3d(part, ray)
-        # Continue if miss
-        if isnothing(temp)
-            continue
-        end
-        # Catch first valid intersection
-        if isnothing(intersection)
-            intersection = temp
-            continue
-        end
-        # Replace current with closer intersection
-        if length(temp) < length(intersection)
-            intersection = temp
-        end
-    end
+function intersect3d(::MultiShape, object::AbstractObject, ray::AbstractRay)
+    # No part is tested if the ray misses the sphere around all of them
+    _misses(bounding_sphere_of(BOUNDING_SPHERES[], object), ray) && return nothing
+    intersection = intersect3d(shape(object), ray)
     # Ensure that the intersection knows about the correct object if intersected
     if !isnothing(intersection)
         object!(intersection, object)
     end
     return intersection
+end
+
+"""
+    intersect3d(::MultiShape, group::AbstractObjectGroup, ray::AbstractRay)
+
+Returns the closest intersection of the `ray` with the objects of the `group`. In contrast to a
+[`MultiShape`](@ref) object, the intersection keeps the object of the group that was hit, since
+this object, not the group, interacts with the ray. No object is tested if the ray misses the
+bounding sphere of the group, which the table of a running solve holds, see
+`bounding_sphere_of(table, x)`.
+"""
+function intersect3d(::MultiShape, group::AbstractObjectGroup, ray::AbstractRay)
+    _misses(bounding_sphere_of(BOUNDING_SPHERES[], group), ray) && return nothing
+    return intersect3d(shape(group), ray)
+end
+
+"""
+    intersect3d(parts, ray::AbstractRay)
+
+Returns the closest [`Intersection`](@ref) of the `ray` with the `parts`, or `nothing` if it hits
+none of them. The `parts` are a tuple, a vector or the `Leaves` of shapes or objects, e.g. the shapes
+of a [`MultiShape`](@ref) object, the objects of a group or the objects of a system. Each part is
+tested via its own `intersect3d` method, hence parts that consist of parts, e.g. the groups of a
+system, are tested as a whole. No parts give `nothing`.
+"""
+function intersect3d(parts::Union{Tuple, AbstractVector, Leaves}, ray::AbstractRay{R}) where {R}
+    result::Nullable{Intersection{R}} = nothing
+    for part in parts
+        temp::Nullable{Intersection{R}} = intersect3d(part, ray)
+        isnothing(temp) && continue
+        if isnothing(result) || length(temp) < length(result)
+            result = temp
+        end
+    end
+    return result
 end
 
 """

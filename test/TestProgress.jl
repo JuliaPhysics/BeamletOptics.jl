@@ -43,6 +43,9 @@ struct ProbeSystem{S <: BMO.AbstractSystem} <: BMO.AbstractSystem
 end
 ProbeSystem(inner, sink) = ProbeSystem(inner, sink, Any[], Float64[], ReentrantLock())
 
+# The solve of a beam group computes the bounding spheres of the objects of its system
+BMO.objects(probe::ProbeSystem) = BMO.objects(probe.inner)
+
 function BMO.solve_system!(probe::ProbeSystem, beam::BMO.AbstractBeam; kwargs...)
     lock(probe.lock) do
         push!(probe.seen, @atomic probe.sink.current)

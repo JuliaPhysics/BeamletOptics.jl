@@ -37,49 +37,6 @@ and must not be relied upon to identify an operand's role in the boolean express
 function operands end
 
 """
-    _enclosing_sphere(a, b)
-
-Returns the smallest sphere that encloses the spheres `a` and `b`, each a tuple `(center, radius)`
-in the same frame, or `nothing` if one of them is `nothing`.
-"""
-function _enclosing_sphere(a::Tuple, b::Tuple)
-    (c1, r1), (c2, r2) = a, b
-    Δ = c2 - c1
-    d = norm(Δ)
-    # one sphere contains the other
-    d + r2 ≤ r1 && return (c1, r1)
-    d + r1 ≤ r2 && return (c2, r2)
-    r = (d + r1 + r2) / 2
-    return (c1 + (r - r1) / d * Δ, r)
-end
-_enclosing_sphere(::Nothing, ::Tuple) = nothing
-_enclosing_sphere(::Tuple, ::Nothing) = nothing
-_enclosing_sphere(::Nothing, ::Nothing) = nothing
-
-"""
-    _enclosing_sphere(shapes::Tuple)
-
-Returns the sphere that encloses the [`world_bounding_sphere`](@ref) of every entry of `shapes`, in
-world coordinates, or `nothing` if one of the `shapes` has none.
-"""
-_enclosing_sphere(shapes::Tuple{Any}) = world_bounding_sphere(shapes[1])
-function _enclosing_sphere(shapes::Tuple{Any, Any, Vararg})
-    return _enclosing_sphere(world_bounding_sphere(shapes[1]), _enclosing_sphere(Base.tail(shapes)))
-end
-
-"""
-    _local_sphere(c::AbstractSDF, sphere)
-
-Converts a `sphere` given in world coordinates into the local frame of `c`, as returned by
-[`bounding_sphere`](@ref). Passes on `nothing`.
-"""
-function _local_sphere(c::AbstractSDF, sphere::Tuple)
-    center, r = sphere
-    return (transposed_orientation(c) * (center - position(c)), r)
-end
-_local_sphere(::AbstractSDF, ::Nothing) = nothing
-
-"""
     kinematic_trait_of(c::AbstractCompositeSDF)
 
 A composite takes the kinematic class of its [`operands`](@ref), which the constructor ensures

@@ -317,14 +317,14 @@ function _aspheric_axial_extent(s)
 end
 
 """
-    bounding_sphere(s::AbstractAsphericalSurfaceSDF)
+    bounding_sphere_of(s::AbstractAsphericalSurfaceSDF)
 
 Returns the sphere around the cylinder of the lens diameter that spans the axial extent of the
 surface volume, centered on the axis.
 """
-function bounding_sphere(s::AbstractAsphericalSurfaceSDF{T}) where T
+function bounding_sphere_of(s::AbstractAsphericalSurfaceSDF{T}) where T
     lo, hi = _aspheric_axial_extent(s)
-    return (Point3{T}(0, (lo + hi) / 2, 0), sqrt((s.diameter / 2)^2 + ((hi - lo) / 2)^2))
+    return SingleBoundingSphere(s, Point3{T}(0, (lo + hi) / 2, 0), sqrt((s.diameter / 2)^2 + ((hi - lo) / 2)^2))
 end
 
 function sdf(surface::ConvexAsphericalSurfaceSDF{T}, point) where {T}

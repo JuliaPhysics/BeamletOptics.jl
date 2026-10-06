@@ -65,13 +65,13 @@ function sdf(ps::PlanoSurfaceSDF{T}, point) where T
 end
 
 """
-    bounding_sphere(ps::PlanoSurfaceSDF)
+    bounding_sphere_of(ps::PlanoSurfaceSDF)
 
 Returns the sphere through both rims of the cylinder, centered on the axis at half of the thickness.
 """
-function bounding_sphere(ps::PlanoSurfaceSDF{T}) where T
+function bounding_sphere_of(ps::PlanoSurfaceSDF{T}) where T
     l, d = thickness(ps), diameter(ps)
-    return (Point3{T}(0, l / 2, 0), sqrt((d / 2)^2 + (l / 2)^2))
+    return SingleBoundingSphere(ps, Point3{T}(0, l / 2, 0), sqrt((d / 2)^2 + (l / 2)^2))
 end
 
 """
@@ -99,11 +99,11 @@ function sdf(sphere::SphereSDF, point)
 end
 
 """
-    bounding_sphere(sphere::SphereSDF)
+    bounding_sphere_of(sphere::SphereSDF)
 
 Returns the sphere itself.
 """
-bounding_sphere(sphere::SphereSDF{T}) where T = (Point3{T}(0), sphere.radius)
+bounding_sphere_of(sphere::SphereSDF{T}) where T = SingleBoundingSphere(sphere, Point3{T}(0), sphere.radius)
 
 """
     AbstractSphericalSurfaceSDF{T} <: AbstractSDF{T}
@@ -187,14 +187,14 @@ function sdf(css::ConcaveSphericalSurfaceSDF{T}, point) where T
 end
 
 """
-    bounding_sphere(css::ConcaveSphericalSurfaceSDF)
+    bounding_sphere_of(css::ConcaveSphericalSurfaceSDF)
 
 Returns the sphere through both rims of the surface, which lie at `y = 0` and `y = -sag`, centered
 on the axis in between.
 """
-function bounding_sphere(css::ConcaveSphericalSurfaceSDF{T}) where T
+function bounding_sphere_of(css::ConcaveSphericalSurfaceSDF{T}) where T
     s, d = sag(css), diameter(css)
-    return (Point3{T}(0, -s / 2, 0), sqrt((d / 2)^2 + (s / 2)^2))
+    return SingleBoundingSphere(css, Point3{T}(0, -s / 2, 0), sqrt((d / 2)^2 + (s / 2)^2))
 end
 
 """
@@ -260,13 +260,13 @@ function sdf(css::ConvexSphericalSurfaceSDF, point)
 end
 
 """
-    bounding_sphere(css::ConvexSphericalSurfaceSDF)
+    bounding_sphere_of(css::ConvexSphericalSurfaceSDF)
 
 Returns the smallest sphere around the spherical cap, which extends from its vertex at the local
 origin to its flat side at `y = sag`: the sphere through the rim, centered in the plane of the rim.
 """
-function bounding_sphere(css::ConvexSphericalSurfaceSDF{T}) where T
-    return (Point3{T}(0, sag(css), 0), diameter(css) / 2)
+function bounding_sphere_of(css::ConvexSphericalSurfaceSDF{T}) where T
+    return SingleBoundingSphere(css, Point3{T}(0, sag(css), 0), diameter(css) / 2)
 end
 
 """

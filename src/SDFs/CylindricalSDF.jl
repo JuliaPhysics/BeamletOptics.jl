@@ -74,14 +74,14 @@ function sdf(s::ConvexCylinderSDF{T}, point) where {T}
 end
 
 """
-    bounding_sphere(s::ConvexCylinderSDF)
+    bounding_sphere_of(s::ConvexCylinderSDF)
 
 Returns the sphere through the four corners of the flat side, centered in that side. In the local
 frame the cylinder axis is the x-axis and the flat side is normal to the z-axis.
 """
-function bounding_sphere(s::ConvexCylinderSDF{T}) where T
+function bounding_sphere_of(s::ConvexCylinderSDF{T}) where T
     w = s.diameter / 2
-    return (Point3{T}(0, 0, sqrt(s.radius^2 - w^2)), sqrt(w^2 + (s.height / 2)^2))
+    return SingleBoundingSphere(s, Point3{T}(0, 0, sqrt(s.radius^2 - w^2)), sqrt(w^2 + (s.height / 2)^2))
 end
 
 function sdf_cut_disk(point::Point2, r, h)
@@ -150,14 +150,14 @@ function sdf(s::ConcaveCylinderSDF{T}, point) where {T}
 end
 
 """
-    bounding_sphere(s::ConcaveCylinderSDF)
+    bounding_sphere_of(s::ConcaveCylinderSDF)
 
 Returns the sphere through the eight corners of the box that the cylinder is cut out of, which
 extends from `y = 0` to the sagitta, on the side given by the sign of the radius.
 """
-function bounding_sphere(s::ConcaveCylinderSDF{T}) where T
+function bounding_sphere_of(s::ConcaveCylinderSDF{T}) where T
     hs = sag(abs(s.radius), s.diameter) / 2
-    return (Point3{T}(0, sign(s.radius) * hs, 0), sqrt((s.height / 2)^2 + hs^2 + (s.diameter / 2)^2))
+    return SingleBoundingSphere(s, Point3{T}(0, sign(s.radius) * hs, 0), sqrt((s.height / 2)^2 + hs^2 + (s.diameter / 2)^2))
 end
 
 # Surface API implementation
