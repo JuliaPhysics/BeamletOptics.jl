@@ -65,6 +65,7 @@ const mm = 1e-3
         end
         @testset "Tilted detector projection" begin
             zrotate3d!(pd, deg2rad(45))
+            empty!(pd)
             solve_system!(system, gb)
             crop_factor = 1.5
             num_spots = 980

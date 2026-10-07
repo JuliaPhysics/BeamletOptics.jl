@@ -255,7 +255,9 @@ Handle of a ray, beam or beam group, returned by `live_render!(ax, beam)`. Imple
 [`rendered`](@ref), [`render_plots`](@ref), [`render_settings`](@ref) and
 [`render_settings!`](@ref).
 [`update_render!`](@ref) draws the current rays of the beam, e.g. after
-[`solve_system!`](@ref).
+[`solve_system!`](@ref). Keep the handle on a root beam or a beam group: child beams and all rays
+after the first are new objects after every solve, so a handle on one of them does not follow the
+solved beam.
 """
 abstract type AbstractBeamRenderHandle <: AbstractRenderHandle end
 
@@ -429,7 +431,8 @@ end
     update_render!(handle)
 
 Re-synchronizes the plots of the `handle` with the current state of the rendered object or beam,
-e.g. after moving components or calling [`solve_system!`](@ref).
+e.g. after moving components or calling [`solve_system!`](@ref). Keep render handles on root beams and
+groups: child beams and all rays after the first are new objects after every solve.
 
 If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
 """

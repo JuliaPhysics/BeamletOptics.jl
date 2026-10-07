@@ -24,7 +24,7 @@ beam = Beam([0, -50mm, 0], [0, 1, 0], 633e-9)
 solve_system!(system, beam)
 println("path 1: ", length(rays(beam)), " ray segments, end direction ", direction(last(rays(beam))))
 
-# Nudge the whole assembly and resolve (retrace is automatic; reset the detector first)
+# Nudge the whole assembly and resolve (reset the detector first)
 translate3d!(periscope, [0, 5mm, 0])
 empty!(det)
 solve_system!(system, beam)

@@ -183,12 +183,12 @@ end
         @test delta ≈ 1
     end
 
-    @testset "Testing electric_field mutation during retracing" begin
+    @testset "Testing electric_field mutation when solving again" begin
         gb_prb = GaussianBeamlet([0, -start_offset, 0], [0, 1, 0], 1e-6, 0.5mm)
         gb_ref = GaussianBeamlet([start_offset, 0, 0], [-1, 0, 0], 1e-6, 0.5mm)
         phis = LinRange(0, 2pi, 50)
         pwr = zeros(length(phis))
-        # Vary starting phase by 0...2pi via retracing
+        # Vary starting phase by 0...2pi by solving again
         for (i, phi) in enumerate(phis)
             empty!(detector)
             solve_system!(system, gb_prb)
@@ -321,12 +321,12 @@ end
     @test length(BMO.children(agb)) == 2
 end
 
-@testset "Retrace Tail Trimming Consistency" begin
-    # Issue: When retracing reaches the old tail (i == n_c), a new segment
-    # can be pushed and then rejected by check_optical_invariant.
-    # Stale n_c caused inconsistent trimming between chief and aux beams.
+@testset "Solving Again Tail Trimming Consistency" begin
+    # Issue: When a second solve pushes a new segment
+    # and it is rejected by check_optical_invariant.
+    # Chief and aux beams must be trimmed consistently.
 
-    # We need a system where we can trigger an invariant violation during retrace.
+    # We need a system where we can trigger an invariant violation during the second solve.
     # We'll use a very small invariant threshold to make it easy to trigger.
     strict_threshold = 1e-15
 
@@ -345,12 +345,12 @@ end
         n_initial = length(BMO.rays(agb.c))
         @test n_initial == 2
 
-        # Now move the surface further away such that retracing will
-        # reach the old tail and try to push a new segment.
+        # Now move the surface further away such that the second solve will
+        # reach the old end and try to push a new segment.
         BMO.translate3d!(surf, [0, 10mm, 0])
 
         # Also tilt it or change parameters to trigger invariant violation if possible.
-        BMO.retrace_system!(system, agb; threshold = strict_threshold)
+        solve_system!(system, agb; threshold = strict_threshold)
     end
 
     # Verification of consistency

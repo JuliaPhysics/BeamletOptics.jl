@@ -18,7 +18,7 @@ url = "https://github.com/StackEnjoyer/OpticsBase.jl"
 rev = "main"
 
 [compat]
-BeamletOptics = "0.13"
+BeamletOptics = "0.14"
 CairoMakie = "0.15"
 Documenter = "1.11"
 DocumenterCitations = "1.5"

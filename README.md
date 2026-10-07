@@ -21,7 +21,7 @@
 
 # Features
 
-- Hybrid sequential and non-sequential 3D ray tracing without paraxial approximation
+- Non-sequential 3D ray tracing without paraxial approximation
 - TEM₀₀ Gaussian beamlet models
 - Various optical components
     - Mirrors

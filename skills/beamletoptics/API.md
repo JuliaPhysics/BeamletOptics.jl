@@ -74,16 +74,15 @@ BeamletOptics.properties(x::MyFilter) =
 ## Solving
 
 ```julia
-solve_system!(system, beam; r_max = 100, retrace = true, depth_max = 100,
+solve_system!(system, beam; r_max = 100, depth_max = 100,
               check_invariant = true, threshold = get_invariant_threshold())
 solve_system!(system, beam_group; progress = true, kwargs...)   # multithreaded over member beams
 ```
 
 - `r_max`: max. rays per beam leaf (raise it for resonators, e.g. facing mirrors)
 - `depth_max`: max. splitting depth of the beam tree
-- `retrace`: after the first solve, try to retrace the previous path sequentially and fall back to a
-  full non-sequential solve where it breaks. Pass `retrace = false` if an element was moved *into*
-  the existing beam path (e.g. a chopper), which otherwise fails silently.
+- Every call solves the beam again from its start; `empty!` detectors first. Child beams are new
+  objects after every solve: read `beam.children` again after each solve instead of keeping a child.
 - Julia threads (`julia -t auto`) speed up solving of sources with many beams.
 - `progress`: beam groups and detector readout show a progress bar once they have run for
   `get_progress_threshold()` s (default 5 s, `set_progress_threshold!(Inf)` disables it). It is

@@ -32,7 +32,8 @@ For long stacks keep a running `y` and `translate3d!(Li, [0, y, 0]); y += thickn
 
 ## Parameter scans (focus search, alignment, fringes)
 
-Mutate the scene inside a loop and re-solve. Retracing is automatic and fast.
+Mutate the scene inside a loop and call `solve_system!` again; it solves from the start each time.
+Mesh scenes solved thousands of times can use `StaticSystem`.
 
 ```julia
 for y in ys
@@ -43,8 +44,7 @@ for y in ys
 end
 ```
 
-- Read everything you need from a detector **before** moving it again (hits reference beam state).
-- If a moved element blocks a path segment that was previously free, pass `retrace = false`.
+- Read everything you need from a detector **before** moving anything or solving again (hits reference beam state).
 - See `templates/01_singlet_spot_diagram.jl` (focus scan) and `templates/04_michelson_scan.jl` (fringes).
 
 ## Interferometers and coherent sums

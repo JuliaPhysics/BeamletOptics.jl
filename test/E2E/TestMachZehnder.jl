@@ -55,7 +55,7 @@ const BMO = BeamletOptics
     end
     
     @testset "x-polarized ray along y-axis" begin
-        # Test num. of leaves before retracing
+        # Test num. of leaves before solving again
         @test length(collect(Leaves(beam))) == 4
         # Retrace with z-polarized ray along y-axis
         BMO.polarization!(ray, [1, 0, 0])

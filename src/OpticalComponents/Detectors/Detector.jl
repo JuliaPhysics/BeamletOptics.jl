@@ -240,9 +240,11 @@ of a **left-handed** (x, z) surface coordinate system, where incoming beams inte
     overwrite previous results using the [`empty!`](@ref) function.
     Otherwise, the current result will be added onto the previous result.
 
-!!! warning "Moving after solving"
-    Do not move the detector before calculating all parameters of interest for the current system configuration.
-    Since the detector stores pointers to the current system and beam states, silent errors might occur.
+!!! warning "Reading hits"
+    Read the hits of the detector before moving any object or solving again.
+    The hits refer to the rays and beams of the current solve, which a new call of
+    [`solve_system!`](@ref) replaces (child beams and all rays after the first are new objects),
+    and moving objects afterwards leaves the stored hits inconsistent with the system.
 
 # Fields
 

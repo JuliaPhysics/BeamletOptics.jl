@@ -38,7 +38,7 @@ Base.delete!(::System, ::BeamletOptics.AbstractObject)
 
 ## Solving systems
 
-In order to solve optical systems, this package uses a hybrid sequential and non-sequential mode. Which mode is being used is determined automatically by the [`solve_system!`](@ref) function. This is explained in more detail in the section: [Tracing logic](@ref).
+Optical systems are solved non-sequentially by the [`solve_system!`](@ref) function: for every ray the solver searches the system for the object that is hit next. A component can shortcut this search for the following ray by returning a [`BeamletOptics.Hint`](@ref). This is explained in more detail in the section: [Tracing logic](@ref).
 
 ```@docs; canonical=false
 solve_system!

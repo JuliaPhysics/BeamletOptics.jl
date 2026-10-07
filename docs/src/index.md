@@ -24,7 +24,7 @@ hero:
 features:
   - icon: "🔦"
     title: 3D ray tracing
-    details: Hybrid sequential and non-sequential ray tracing without paraxial approximation.
+    details: Non-sequential ray tracing with sequential shortcuts through `Hint`s, without paraxial approximation.
     link: /basics/beams/overview#Beam-catalog
     linkText: Learn more
   - icon: "🌊"

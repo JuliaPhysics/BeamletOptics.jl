@@ -21,11 +21,11 @@ pop!(system)                      # removes and returns the last top-level objec
 popat!(system, i)                 # removes and returns the i-th top-level object (a group is one)
 ```
 
-  Beams and sources solved before a change keep their old path: `empty!(beam)`, then
-  `solve_system!(system, beam)`. `System(v)` copies the vector `v`.
+  Solve beams and sources again after a change: `solve_system!(system, beam)`.
+  `System(v)` copies the vector `v`.
 
 ```julia
-solve_system!(system, beam_or_source; r_max = 100, retrace = true, depth_max = 100,
+solve_system!(system, beam_or_source; r_max = 100, depth_max = 100,
               check_invariant = true, threshold = get_invariant_threshold())
 ```
 

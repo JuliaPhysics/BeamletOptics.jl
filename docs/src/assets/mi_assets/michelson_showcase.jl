@@ -7,20 +7,6 @@ const BMO = BeamletOptics
 const cm = 1e-2
 const mm = 1e-3
 
-function reset_beamlet!(beam::GaussianBeamlet)
-    BeamletOptics._drop_beams!(beam)
-    r_c = first(BeamletOptics.rays(beam.chief))
-    r_w = first(BeamletOptics.rays(beam.waist))
-    r_d = first(BeamletOptics.rays(beam.divergence))
-    BeamletOptics.intersection!(r_c, nothing)
-    BeamletOptics.intersection!(r_w, nothing)
-    BeamletOptics.intersection!(r_d, nothing)
-    beam.chief.rays = [r_c]
-    beam.waist.rays = [r_w]
-    beam.divergence.rays = [r_d]
-    return nothing
-end
-
 splitter_origin = [18.81cm, 23.5cm,0]
 
 asset_dir = @__DIR__
@@ -148,8 +134,6 @@ set_view(ax, mirror_camera_view)
 save("mi_corner_mirror.png", fig; px_per_unit=8, update = false)
 
 ## splitter fig
-reset_beamlet!(beam)
-
 system = System([laser_assembly, mirror_assembly, splitter_assembly])
 solve_system!(system, beam)
 
@@ -172,8 +156,6 @@ set_view(ax, splitter_view)
 save("mi_beamsplitter.png", splitter_fig; px_per_unit=8, update = false)
 
 ## arms fig
-reset_beamlet!(beam)
-
 system = System([
     laser_assembly,
     mirror_assembly,
@@ -202,8 +184,6 @@ set_view(ax, mi_arms_view)
 save("mi_arms.png", fig; px_per_unit=8, update = false)
 
 ## system figure
-reset_beamlet!(beam)
-
 system = System([
     laser_assembly,
     mirror_assembly,

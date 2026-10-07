@@ -16,7 +16,7 @@ The first two principles will be elaborated upon in more detail in the [Geometry
 flowchart TB
     S(["<b>solve_system!</b><br/>system + beam"]) --> I
     I["<b>1. Intersect</b><br/>hinted shape first,<br/>else all objects"] -- hit --> X["<b>2. Interact</b><br/>compute<br/>AbstractInteraction"]
-    X --> R["<b>3. Repeat</b><br/>attach / overwrite next<br/>ray or beam segment"]
+    X --> R["<b>3. Repeat</b><br/>attach next<br/>ray or beam segment"]
     R -- "optional Hint" --> I
     I -- "no hit or r_max" --> E([done])
 
@@ -34,10 +34,10 @@ This scheme is loosely referred to as the **Intersect-Interact-Repeat-Loop** and
 
 1. Calculate the closest **Intersection** between a ray/beam and the objects within the system
 2. Calculate the optical **Interaction** that occurs at the surface or within the volume of the element
-3. Attach or overwrite the next part of the ray chain or beam tree
+3. Attach the next part of the ray chain or beam tree
 4. Use the new information to repeat 1.
 
-Once this procedure has been completed, the alignment of the system or other time-dependent optical properties (e.g. the phase of a Gaussian beamlet) can be updated. When rerunning the solver, the algorithm will try to reuse information about the previously intersected objects to speed up the calculation of the next simulation step. This is described in more detail in the sections: [Tracing systems](@ref) and [Retracing systems](@ref).
+Once this procedure has been completed, the alignment of the system or other time-dependent optical properties (e.g. the phase of a Gaussian beamlet) can be updated. A new call of [`solve_system!`](@ref) solves the beam again from its start. This is described in more detail in the section: [Tracing systems](@ref).
 
 The next sections will focus on the **Intersection** and **Interaction** steps.
 
@@ -119,37 +119,10 @@ In the initial state, is is assumed that the problem consists of `objects <: Abs
 BeamletOptics.trace_system!
 ```
 
-This non-sequential mode is comparatively safe in determining the "true" beam path, but will scale suboptimally in time-complexity with the amount of optical elements. After solving the system, the beam path is known and can be potentially reused in the future.
+This non-sequential mode is comparatively safe in determining the "true" beam path, but will scale suboptimally in time-complexity with the amount of optical elements.
 
 !!! info "Object order"
-    Unlike with classic, surface-based ray tracers, the order in which objects are listed in the [`System`](@ref) object vector/tuple is not considered for the purpose of tracing or retracing.
-
-### Retracing systems
-
-Once a system has been traced for the first time, the system and beam can be solved again. However, this time the solver will try to reuse as much information from the previous run as possible by testing if the previous beam trajectory is still valid in a sequential tracing mode. Retracing systems assumes that the kinematic changes (e.g. optomechanical aligment) between the current tracing procedure and the previous one are small. If an intersection along the beam trajectory becomes invalid, the solver will perform a non-sequential trace for all invalidated parts of the beam.
-
-```mermaid
-flowchart TB
-    A(["<b>retrace_system!</b>"]) --> B{"Beam path<br/>known?"}
-    B -- "no, first trace" --> C["<b>Brute-force</b><br/>trace_system!"]
-    B -- "yes, reuse hints" --> D["<b>Sequential retrace</b><br/>along known path"]
-    D --> E{"Previous<br/>intersections<br/>still valid?"}
-    E -- "no" --> G["<b>Brute-force</b><br/>trace of invalidated<br/>segments"]
-    E -- "yes" --> F([done])
-    G --> F
-    C --> F
-
-    classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
-    classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
-    classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
-    class C,G blue
-    class D purple
-    class A,F terminal
-```
-
-```@docs; canonical=false
-BeamletOptics.retrace_system!
-```
+    Unlike with classic, surface-based ray tracers, the order in which objects are listed in the [`System`](@ref) object vector/tuple is not considered for the purpose of tracing.
 
 ## CPU and GPU support
 

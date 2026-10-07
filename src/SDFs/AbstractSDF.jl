@@ -93,9 +93,18 @@ function normal_fd(s::AbstractSDF, p)
 end
 
 """
+    SDF_MISS_DISTANCE
+
+Path length in [m] after which a ray that is marched towards an `AbstractSDF` counts as a
+miss. A shape that lies farther away than this from the start of the ray is not hit.
+"""
+const SDF_MISS_DISTANCE = 1e15
+
+"""
     _raymarch_outside(shape::AbstractSDF, pos, dir; num_iter=1000, eps=1e-10)
 
-Perform the ray marching algorithm if the starting pos is outside of `shape`.
+Perform the ray marching algorithm if the starting pos is outside of `shape`. The ray is a miss
+once it has travelled `SDF_MISS_DISTANCE` without a hit.
 """
 function _raymarch_outside(shape::AbstractSDF{S},
         pos::AbstractArray{R},
@@ -122,10 +131,11 @@ function _raymarch_outside(shape::AbstractSDF{S},
         i += 1
 
         # A ray escaping the scene makes `dist` track the true remaining distance, so `t0`
-        # grows geometrically and overflows to `Inf` well inside `num_iter`. `sdf` then
-        # returns `NaN`, which fails `dist > eps` below and would be misread as re-entering
-        # the surface, returning a bogus `Intersection(Inf, ...)`. A non-finite probe is a
-        # miss, not a hit.
+        # doubles with every step. Up to the overflow to `Inf` that takes about 1000 steps,
+        # i.e. all of `num_iter`, whereas `SDF_MISS_DISTANCE` is passed after about 60.
+        t0 > SDF_MISS_DISTANCE && return nothing
+        # A non-finite probe, e.g. a `NaN` returned by `sdf`, fails `dist > eps` below and
+        # would be misread as re-entering the surface. It is a miss, not a hit.
         (isfinite(dist) && isfinite(t0)) || return nothing
 
         if dist > eps
