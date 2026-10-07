@@ -400,7 +400,9 @@ end
 
 Hit record of the traced segment `id` of `agb`: the data that [`beamlet_hit_field`](@ref)
 needs to evaluate the field of that segment at any point near it, including the optical
-path from the source (parents included), the Gouy factor and the reference amplitude.
+path from the source (parents included), the Gouy factor and the reference amplitude. The
+amplitude and the Gouy phase refer to the start of the root beam, i.e. a child beamlet
+continues its parent.
 [`Detector`](@ref)s store one per beamlet that hits them; it can also be built for any
 traced segment, e.g. to sample a beamlet on a plane of one's own. The projection factor is
 `1` if the segment ends without an intersection.
@@ -416,12 +418,10 @@ function AstigmaticGaussianBeamletHit(agb::AstigmaticGaussianBeamlet{R}, id::Int
     # Parabasal parameters at segment start (p0)
     h1, u1, h2, u2, _ = parabasal_ray_parameters(agb, p0, id)
 
-    # Reference normalization at z=0
-    p0n, in_ = point_on_beam(agb, 0.0)
-    dirn = direction(rays(agb.c)[in_])
-    h1n, _, h2n, _, _ = parabasal_ray_parameters(agb, p0n, in_)
-    area_ref = _pseudo_cross2d(h1n, h2n, dirn)
-    area_arg0 = _area_arg(agb, id, zero(R)) - _area_arg(agb, in_, _local_distance(agb, p0n, in_))
+    # Reference of the amplitude and of the Gouy phase: the start of the root beam, which a
+    # child continues through its parents
+    area_ref = _root_area(agb)
+    area_arg0 = _area_arg(agb, id, zero(R))
     # Gouy factor at p0 and inverse roots of the area along the hit segment, constant per
     # hit, so that the field loop over the detector pixels does not recompute them
     A = _area_coefficients(h1, u1, h2, u2, d0)
@@ -429,7 +429,7 @@ function AstigmaticGaussianBeamletHit(agb::AstigmaticGaussianBeamlet{R}, id::Int
     ρ1, ρ2 = _area_inverse_roots(A)
 
     # Extract complex reference amplitude
-    E_vec = polarization(rays(agb.c)[in_])
+    E_vec = polarization(first(rays(agb.c)))
     max_idx = argmax(abs.(E_vec))
     E_ref_amp = Complex{R}(norm(E_vec) * cis(angle(E_vec[max_idx])))
 
