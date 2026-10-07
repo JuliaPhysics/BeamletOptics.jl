@@ -21,7 +21,7 @@ be tight.
   beamsplitter or an `ObjectGroup`), the sphere of each part, since the solver tests each part on its
   own, and the main sphere around all parts in `main_color`. The solver tests a ray against the main
   sphere first. An object without a main sphere, because a part has none, gets none. An object
-  without a sphere, e.g. a `MeshDummy`, gets no plot.
+  without a sphere, e.g. a `NonInteractableObject`, gets no plot.
 - system: the spheres of all its objects
 
 # Keyword args

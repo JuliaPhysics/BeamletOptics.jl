@@ -224,7 +224,7 @@ end
         test_on_sphere(only(plots), only(spheres(lens)))
 
         # SingleShape without a sphere
-        dummy = MeshDummy(joinpath(pkgdir(BeamletOptics), "docs", "src", "assets", "Benchy.stl"))
+        dummy = NonInteractableObject(joinpath(pkgdir(BeamletOptics), "docs", "src", "assets", "Benchy.stl"))
         @test isempty(spheres(dummy))
         @test isempty(new_plots(() -> BMO.render_bounding_sphere!(ax, dummy), ax))
 

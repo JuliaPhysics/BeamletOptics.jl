@@ -33,7 +33,7 @@ render!(::Union{GLMakie.Axis3, GLMakie.LScene}, ::BeamletOptics.AbstractSystem)
 
 ## Bounding spheres
 
-A shape can state a sphere that encloses it, see [`BeamletOptics.bounding_sphere_of`](@ref). The solver then skips the shape for every ray that misses the sphere. The spheres are drawn as magenta wireframes, either along with the components via the keyword `show_bounding_sphere` of `render!`, or on their own via [`render_bounding_sphere!`](@ref), which also takes a single shape or a sphere value. This is a debugging aid, e.g. to check that the sphere of a custom shape encloses the shape and is tight. An object that consists of several parts, e.g. a doublet lens, and an object group show one sphere per part and, in orange (keyword `main_color`), the main sphere around all parts, which the solver tests first. A shape or object without a sphere (`NoBoundingSphere`), e.g. a `MeshDummy`, shows none.
+A shape can state a sphere that encloses it, see [`BeamletOptics.bounding_sphere_of`](@ref). The solver then skips the shape for every ray that misses the sphere. The spheres are drawn as magenta wireframes, either along with the components via the keyword `show_bounding_sphere` of `render!`, or on their own via [`render_bounding_sphere!`](@ref), which also takes a single shape or a sphere value. This is a debugging aid, e.g. to check that the sphere of a custom shape encloses the shape and is tight. An object that consists of several parts, e.g. a doublet lens, and an object group show one sphere per part and, in orange (keyword `main_color`), the main sphere around all parts, which the solver tests first. A shape or object without a sphere (`NoBoundingSphere`), e.g. a `NonInteractableObject`, shows none.
 
 ```julia
 using GLMakie, BeamletOptics
