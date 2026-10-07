@@ -198,4 +198,39 @@ const mm = 1e-3
     end
 end
 
+@testset "Field phase in and in front of a medium" begin
+    # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/126
+    λ = 1e-6
+    n = 1.5
+    # glass from y = 50.0 mm to about 50.5 mm
+    lens = ThinLens(50mm, 50mm, 10mm, n)
+    translate3d!(lens, [0, 50mm, 0])
+    system = System([lens])
+    Δφ(a, b) = rad2deg(angle(a / b))
+    args = ([0.0, 0, 0], [0.0, 1, 0], λ, 1mm)
+    free = GaussianBeamlet(args...; support = [1.0, 0, 0])
+    gb = GaussianBeamlet(args...; support = [1.0, 0, 0])
+    agb = AstigmaticGaussianBeamlet(args...; support = [1.0, 0, 0])
+    solve_system!(system, gb)
+    solve_system!(system, agb)
+    @test BMO.refractive_index(gb, 2) == n
+    @test length(BMO.rays(gb.chief)[2]) > 0.4mm
+    # the lens does not change the field in front of it
+    @test electric_field(gb, 0.0, 10mm) ≈ electric_field(free, 0.0, 10mm)
+    @test electric_field(gb, 0.3mm, 40mm) ≈ electric_field(free, 0.3mm, 40mm)
+    # inside the glass the phase advances with n k0 along the axis ...
+    Δz = 100.2e-6
+    @test Δφ(electric_field(gb, 0.0, 50.1mm + Δz), electric_field(gb, 0.0, 50.1mm)) ≈ mod(360 * n * Δz / λ, 360) atol = 0.01
+    # ... and across the beam, as in the astigmatic model
+    r = 0.1mm
+    across_gb = Δφ(electric_field(gb, r, 50.25mm), electric_field(gb, 0.0, 50.25mm))
+    across_agb = Δφ(electric_field(agb, [r, 0, 0], 50.25mm), electric_field(agb, [0.0, 0, 0], 50.25mm))
+    @test across_gb ≈ across_agb atol = 0.01
+    @test abs(across_gb) > 15
+    # a hit of the segment in the glass gives the field of the beam
+    hit = BMO.GaussianBeamletHit(gb, 2)
+    p = BMO.Point3(r, 50.25mm, 0.0)
+    @test BMO.beamlet_hit_field(hit, p) ≈ electric_field(gb, r, 50.25mm)
+end
+
 end # MODULE

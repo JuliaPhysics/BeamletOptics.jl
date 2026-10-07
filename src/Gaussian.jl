@@ -401,22 +401,42 @@ end
     electric_field(gauss::GaussianBeamlet, r, z)
 
 Calculates the electric field phasor [V/m] of the [`GaussianBeamlet`](@ref) at the radial and longitudinal positions `r` and `z`.
-This function also considers phase changes due to changes in the [`optical_path_length`](@ref) of the beamlet.
+The phase contains the [`optical_path_length`](@ref) from the start of the beam (parents included) up to `z`: within a medium
+of refractive index `n` it advances with the wavenumber `n k₀`, along the beam and across it.
 
 !!! warning
     Note that `z` and `r` must be specified as cartesian distances. Using the optical path length for `z` can lead to false results.
 """
 function electric_field(gauss::GaussianBeamlet, r, z; hint = point_on_beam(gauss, z))
     point, index = hint
+    return _segment_field(gauss, r, z, point, index, _length_before(gauss.chief, index),
+        _path_excess_before(gauss, index))
+end
+
+# Optical minus geometric path of `gauss` (including its parents) up to the start of segment `index`
+function _path_excess_before(gauss::GaussianBeamlet{T}, index::Integer) where {T}
+    p = AbstractTrees.parent(gauss.chief)
+    Δl = isnothing(p) ? zero(T) : optical_path_length(p) - length(p)
+    for j in 1:(index - 1)
+        ray = rays(gauss.chief)[j]
+        Δl += optical_path_length(ray) - length(ray)
+    end
+    return Δl
+end
+
+# Field of segment `index` at the distance `z` along the beam and the radius `r`, where `point` is the
+# point on the chief ray at `z`. `l0` is the geometric length and `Δl0` the optical minus the geometric
+# path of the beam in front of the segment (see `_length_before`, `_path_excess_before`).
+function _segment_field(gauss::GaussianBeamlet, r, z, point, index, l0, Δl0)
     w, R, ψ, w0 = gauss_parameters(gauss, z, hint = (point, index))
-    k = wavenumber(wavelength(gauss))
+    k0 = wavenumber(wavelength(gauss))
+    n = refractive_index(gauss, index)
     # Calculate new local field strength based on E0*w0 = const.
     E0 = electric_field(gauss) * (beam_waist(gauss) / w0)
-    # Calculate phase change due to optical path length
-    Δl = optical_path_length(gauss) - length(gauss)
-    # Note: geometrical length changes considered in `electric_field` call below
-    ref_ϕ = Δl / wavelength(gauss) * 2π
-    return electric_field(r, z, E0, w0, w, k, ψ, R) * exp(im * ref_ϕ)
+    # Optical path up to the point. The curvature term is a geometric length like z, hence it enters
+    # with the wavenumber n k0 of the medium as well.
+    opl = z + Δl0 + (n - 1) * (z - l0)
+    return E0 * w0 / w * exp(-r^2 / w^2) * cis(k0 * opl + ψ + n * k0 * r^2 * R / 2)
 end
 
 function optical_power(gauss::GaussianBeamlet)
