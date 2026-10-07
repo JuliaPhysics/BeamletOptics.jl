@@ -45,7 +45,7 @@ BeamletOptics.AbstractObject
 
 ## Single and multi-shaped objects
 
-An `AbstractObject` can consist of multiple `AbstractShape`s or even multiple subsidiary `AbstractObject`s, facilitating the creation of composite optical elements. For example, a lens with an anti-reflective coating could be represented as the substrate and a seperate model for the coating, each with its own geometric and optical properties. In general, an `object` can have the `SingleShape` or a `MultiShape` trait. The [`BeamletOptics.AbstractShapeTrait`](@ref) allows the solver and kinematic API to apply different implementations of basis functions via multiple dispatch. 
+An `AbstractObject` can consist of multiple `AbstractShape`s or even multiple subsidiary `AbstractObject`s, facilitating the creation of composite optical elements. For example, a lens with an anti-reflective coating could be represented as the substrate and a separate model for the coating, each with its own geometric and optical properties. In general, an `object` can have the `SingleShape` or a `MultiShape` trait. The [`BeamletOptics.AbstractShapeTrait`](@ref) allows the solver and kinematic API to apply different implementations of basis functions via multiple dispatch. 
 
 ```@docs; canonical=false
 BeamletOptics.SingleShape

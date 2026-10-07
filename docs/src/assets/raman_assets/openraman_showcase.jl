@@ -26,12 +26,12 @@ const λ_raman = (561nm, 588nm, 633nm)
 #=
 Optomechanics
 
-The baseplate and cover are imported as `MeshDummy`s: they are rendered but ignored by the
+The baseplate and cover are imported as `NonInteractableObject`s: they are rendered but ignored by the
 solver, so beam clearance can be inspected in the same scene as the optical path. Every
 position below is a CAD coordinate relative to the baseplate origin.
 =#
-baseplate = MeshDummy(joinpath(asset_dir, "Baseplate.stl"))
-cover = MeshDummy(joinpath(asset_dir, "Cover.stl"))
+baseplate = NonInteractableObject(joinpath(asset_dir, "Baseplate.stl"))
+cover = NonInteractableObject(joinpath(asset_dir, "Cover.stl"))
 
 #=
 Cuvette holder
@@ -41,7 +41,7 @@ cylindrical lens on the entrance side. The three parts are bundled in an `Object
 they move as one, but only the doublet is handed to the solver -- see the tutorial for why
 the cylindrical lens is held out of the traced set.
 =#
-cuvette_mesh = MeshDummy(joinpath(asset_dir, "Cuvette Holder.stl"))
+cuvette_mesh = NonInteractableObject(joinpath(asset_dir, "Cuvette Holder.stl"))
 
 AC127_019 = SphericalDoubletLens(12.9mm, -11mm, -59.3mm, 4.5mm, 1.5mm, 12.7mm, N_BAF10, N_SF6HT)
 
@@ -106,7 +106,7 @@ zrotate3d!(pd, deg2rad(-grating_alpha))
 
 #=
 The system. Note that only `AC127_019` of the cuvette group is handed over: the
-cylindrical lens is rendered but not traced, and the holder mesh is a `MeshDummy`.
+cylindrical lens is rendered but not traced, and the holder mesh is a `NonInteractableObject`.
 =#
 optical_system = StaticSystem([
     AC127_019, PF10G01, DMLP550, FELH0550, WG41050,

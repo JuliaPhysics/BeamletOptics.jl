@@ -86,8 +86,7 @@ const TILES = [
     "LinearPolarizer" => object_tile(() -> RoundLinearPolarizer(inch, 1mm, 1mm, n_crown)),
     "RoundLinearPolarizer" => object_tile(() -> RoundLinearPolarizer(inch, 1mm, 1mm, n_crown)),
     # dummies
-    "MeshDummy" => object_tile(() -> MeshDummy(joinpath(@__DIR__, "..", "detector_assets", "FDS010.stl"))),
-    "NonInteractableObject" => object_tile(() -> NonInteractableObject(BMO.CylinderSDF(6mm, 50mm))),
+    "NonInteractableObject" => object_tile(() -> NonInteractableObject(joinpath(@__DIR__, "..", "detector_assets", "FDS010.stl"))),
     "IntersectableObject" => object_tile(() -> IntersectableObject(BMO.BoxSDF(20mm, 10mm, 20mm))),
 ]
 

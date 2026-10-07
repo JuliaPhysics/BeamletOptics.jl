@@ -8,12 +8,12 @@ const mm = 1e-3
 ##
 n = 1.5
 cbs = RectangularPlateBeamsplitter(36mm, 25mm, 5mm, _->n)
-cbs_mount = MeshDummy(joinpath(@__DIR__, "PBS Mount.stl"))
+cbs_mount = NonInteractableObject(joinpath(@__DIR__, "PBS Mount.stl"))
 
 cbs_assembly = ObjectGroup([cbs, cbs_mount])
 
 cmp = RectangularCompensatorPlate(36mm, 25mm, 5mm, _->n)
-cmp_mount = MeshDummy(joinpath(@__DIR__, "PBS Mount.stl"))
+cmp_mount = NonInteractableObject(joinpath(@__DIR__, "PBS Mount.stl"))
 
 cmp_assembly = ObjectGroup([cmp, cmp_mount])
 

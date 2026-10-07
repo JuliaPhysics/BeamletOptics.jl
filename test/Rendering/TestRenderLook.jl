@@ -227,7 +227,7 @@ end
         s = BMO.CylinderSDF(5e-3, 2e-3)
         cyl = Prism(s, λ -> 1.5)
 
-        # mechanics: no edges by default, a mesh (e.g. a MeshDummy) keeps its smooth shading
+        # mechanics: no edges by default, a mesh (e.g. loaded from a file) keeps its smooth shading
         mech = NonInteractableObject(BMO.CylinderSDF(5e-3, 2e-3))
         @test isempty(edge_plots(rendered_plots(mech)))
         @test length(edge_plots(rendered_plots(mech; edges = true))) == 1
