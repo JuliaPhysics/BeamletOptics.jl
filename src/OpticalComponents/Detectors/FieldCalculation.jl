@@ -14,9 +14,11 @@ The following generic kwargs can be used for all hit types:
 
 - `n::Int=100`
   Number of sample points per axis.
-- `crop_factor::Real=1`
+- `crop_factor::Real`
   Scales the width of the sampling window returned by
-  [`calc_local_lims`](@ref); values >1 expand, <1 shrink.
+  [`calc_local_lims`](@ref); values >1 expand, <1 shrink. The default is `1` for ray hits
+  (the box around the hit points) and `3` for beamlet hits (three beam radii around each
+  hit, which holds the power of a Gaussian beam except for a part of `10⁻⁸`).
 - `x_min, x_max, z_min, z_max`
   Manually override the sampling bounds in the local x or z directions.
   If left as `Inf`, the bounds from `calc_local_lims` are used.
@@ -158,7 +160,7 @@ function electric_field(
         hits::Vector{GaussianBeamletHit{G}};
         # kwargs
         n::Int = 100,
-        crop_factor::Real = 1.5,
+        crop_factor::Real = 3.0,
         num_spots::Int = 50,
         x_min = Inf,
         x_max = Inf,
