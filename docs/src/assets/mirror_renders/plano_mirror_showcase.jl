@@ -6,7 +6,7 @@ const BMO = BeamletOptics
 
 function spawn_mirror_mount()
     m1 = RoundPlanoMirror(1BeamletOptics.inch, 6e-3)
-    holder = MeshDummy(joinpath(@__DIR__, "Mirror_Post.stl"))
+    holder = NonInteractableObject(joinpath(@__DIR__, "Mirror_Post.stl"))
     translate_to3d!(holder, [0,0,-(5.68e-2)])
     BeamletOptics.set_new_origin3d!(holder)
     mirror_mount = ObjectGroup([holder, m1])

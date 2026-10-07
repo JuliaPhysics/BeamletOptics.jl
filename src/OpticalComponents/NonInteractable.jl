@@ -22,17 +22,20 @@ bounding_sphere_of(::NonInteractableObject) = NoBoundingSphere()
 interact3d(::AbstractSystem, ::NonInteractableObject, ::AbstractBeam, ::AbstractRay) = nothing
 
 """
-    MeshDummy(loadpath::String)
+    NonInteractableObject(loadpath::String)
 
 Creates a [`NonInteractableObject`](@ref) with a [`Mesh`](@ref) loaded from the specified file path.
 Useful for rendering background objects or geometry that does not interact with rays.
 """
-MeshDummy(loadpath::String) = NonInteractableObject(Mesh(load(loadpath)))
+NonInteractableObject(loadpath::String) = NonInteractableObject(Mesh(load(loadpath)))
+
+# Former name, kept for backwards compatibility
+Base.@deprecate_binding MeshDummy NonInteractableObject
 
 """
     KM100CPMount()
 
-Returns a [`MeshDummy`](@ref) of a Thorlabs [KM100CP/M](https://www.thorlabs.com/thorproduct.cfm?partnumber=KM100CP/M)
+Returns a [`NonInteractableObject`](@ref) of a Thorlabs [KM100CP/M](https://www.thorlabs.com/thorproduct.cfm?partnumber=KM100CP/M)
 kinematic mount for Ø1" optics on a post. The origin lies at the center of a mounted Ø1" mirror, i.e. a
 [`RoundPlanoMirror`](@ref) spawned at the origin sits in the mount, and the post base is 81.8 mm below it.
 
@@ -40,7 +43,7 @@ The mesh is loaded from the documentation assets that ship with the package. Com
 [`ObjectGroup`](@ref) to move both together.
 """
 function KM100CPMount()
-    mount = MeshDummy(joinpath(pkgdir(@__MODULE__), "docs", "src", "assets", "mirror_renders", "Mirror_Post.stl"))
+    mount = NonInteractableObject(joinpath(pkgdir(@__MODULE__), "docs", "src", "assets", "mirror_renders", "Mirror_Post.stl"))
     translate_to3d!(mount, [0, 0, -5.68e-2])
     set_new_origin3d!(mount)
     return mount

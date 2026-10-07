@@ -91,13 +91,13 @@ component is rotated about `z` only.
 
 ![Baseplate coordinate frame](or_coordinates.png)
 
-The housing itself is loaded with [`MeshDummy`](@ref), which wraps a mesh in a
-[`NonInteractableObject`](@ref): it is rendered, but the solver ignores it. That lets you
+The housing itself is loaded from its mesh files as [`NonInteractableObject`](@ref)s:
+they are rendered, but the solver ignores them. That lets you
 inspect beam clearance against the real hardware in the same scene as the optical path.
 
 ```julia
-baseplate = MeshDummy(joinpath(raman_dir, "Baseplate.stl"))
-cover     = MeshDummy(joinpath(raman_dir, "Cover.stl"))
+baseplate = NonInteractableObject(joinpath(raman_dir, "Baseplate.stl"))
+cover     = NonInteractableObject(joinpath(raman_dir, "Cover.stl"))
 ```
 
 ## The excitation path
@@ -124,7 +124,7 @@ parts, including the holder mesh, are bundled into an [`ObjectGroup`](@ref) so t
 move as one rigid assembly:
 
 ```julia
-cuvette_mesh = MeshDummy(joinpath(raman_dir, "Cuvette Holder.stl"))
+cuvette_mesh = NonInteractableObject(joinpath(raman_dir, "Cuvette Holder.stl"))
 
 AC127_019 = SphericalDoubletLens(12.9mm, -11mm, -59.3mm, 4.5mm, 1.5mm, 12.7mm, N_BAF10, N_SF6HT)
 

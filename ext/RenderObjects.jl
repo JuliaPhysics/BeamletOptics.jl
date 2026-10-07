@@ -61,7 +61,7 @@ Renders the shape of `obj` as one mesh if it has an analytic tessellation (see `
 otherwise via the `render!` method of the shape. The mesh plot gets the attributes of the
 `material` (see `_material`), the `kwargs` override them. The feature `edges` are drawn for
 analytic meshes only, by default depending on the material and the look, see `_default_edges`.
-Mechanics given as a mesh (e.g. a `MeshDummy`) keep the smooth shading of their mesh. The
+Mechanics given as a mesh (e.g. a `NonInteractableObject` loaded from a file) keep the smooth shading of their mesh. The
 `show_normals` kwargs of `render!(ax, ::AbstractMesh)` also select the `render!` method of the shape.
 """
 function render!(ax::_RenderEnv, ::BMO.SingleShape, obj; material = nothing,

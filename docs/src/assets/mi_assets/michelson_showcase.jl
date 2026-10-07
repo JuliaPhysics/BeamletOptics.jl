@@ -14,10 +14,10 @@ asset_dir = @__DIR__
 NBK7 = DiscreteRefractiveIndex([632.8e-9], [1.51509])
 
 ## Laser
-laser_assembly = MeshDummy(joinpath(asset_dir, "Laser Assembly.stl"))
+laser_assembly = NonInteractableObject(joinpath(asset_dir, "Laser Assembly.stl"))
 
 # Mirror
-mirror_holder = MeshDummy(joinpath(asset_dir, "Mirror Assembly.stl"))
+mirror_holder = NonInteractableObject(joinpath(asset_dir, "Mirror Assembly.stl"))
 rpm = RightAnglePrismMirror(25e-3, 25e-3)
 zrotate3d!(rpm, deg2rad(45))
 translate3d!(rpm, [0,33.5cm,0])
@@ -25,15 +25,15 @@ translate3d!(rpm, [0,33.5cm,0])
 mirror_assembly = ObjectGroup([rpm, mirror_holder])
 
 # Beamsplitter
-splitter_holder = MeshDummy(joinpath(asset_dir, "Splitter Assembly.stl"))
+splitter_holder = NonInteractableObject(joinpath(asset_dir, "Splitter Assembly.stl"))
 cbs = CubeBeamsplitter(BeamletOptics.inch, NBK7)
 zrotate3d!(cbs, deg2rad(-90))
 
 splitter_assembly = ObjectGroup([cbs, splitter_holder])
 
 # Arms
-arm_holder_1 = MeshDummy(joinpath(asset_dir, "Arm Assembly 1.stl"))
-arm_holder_2 = MeshDummy(joinpath(asset_dir, "Arm Assembly 2.stl"))
+arm_holder_1 = NonInteractableObject(joinpath(asset_dir, "Arm Assembly 1.stl"))
+arm_holder_2 = NonInteractableObject(joinpath(asset_dir, "Arm Assembly 2.stl"))
 m1 = RoundPlanoMirror(BeamletOptics.inch, 5e-3)
 zrotate3d!(m1, deg2rad(-90))
 translate3d!(m1, [22cm,0,0])
@@ -45,7 +45,7 @@ arm_1 = ObjectGroup([m1, arm_holder_1])
 arm_2 = ObjectGroup([m2, arm_holder_2])
 
 # PD
-pd_holder = MeshDummy(joinpath(asset_dir, "PD Assembly.stl"))
+pd_holder = NonInteractableObject(joinpath(asset_dir, "PD Assembly.stl"))
 pd_size = 5mm
 pd = Detector(pd_size)
 translate3d!(pd, [0, -12cm, 0])

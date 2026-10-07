@@ -37,7 +37,7 @@
 #
 # ## Setting up the mirrors
 #
-# Each mirror is a Ø1" [`RoundPlanoMirror`](@ref) with a thickness of 6 mm (e.g. [PF10-03-P01](https://www.thorlabs.com/thorproduct.cfm?partnumber=PF10-03-P01)), held by a [KM100CP/M](https://www.thorlabs.com/thorproduct.cfm?partnumber=KM100CP/M) kinematic mount on a post. The mount model ships with the package: `BMO.KM100CPMount()` returns it as a [`MeshDummy`](@ref), which is rendered but ignored by the ray tracer. Its origin lies at the center of the mirror, so grouping mount and mirror into an [`ObjectGroup`](@ref) lets us move and rotate both together.
+# Each mirror is a Ø1" [`RoundPlanoMirror`](@ref) with a thickness of 6 mm (e.g. [PF10-03-P01](https://www.thorlabs.com/thorproduct.cfm?partnumber=PF10-03-P01)), held by a [KM100CP/M](https://www.thorlabs.com/thorproduct.cfm?partnumber=KM100CP/M) kinematic mount on a post. The mount model ships with the package: `BMO.KM100CPMount()` returns it as a [`NonInteractableObject`](@ref), which is rendered but ignored by the ray tracer. Its origin lies at the center of the mirror, so grouping mount and mirror into an [`ObjectGroup`](@ref) lets us move and rotate both together.
 
 using GLMakie, BeamletOptics
 GLMakie.activate!(; ssao=true) #hide

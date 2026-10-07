@@ -18,7 +18,7 @@ N_BK7 = SellmeierEquation(
 )
 
 ##
-periscope = MeshDummy(joinpath(@__DIR__, "periscope.stl"))
+periscope = NonInteractableObject(joinpath(@__DIR__, "periscope.stl"))
 
 ##
 m1 = PSF10_03_P01()
