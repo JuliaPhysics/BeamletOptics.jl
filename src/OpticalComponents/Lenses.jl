@@ -182,7 +182,8 @@ The material properties are supplied via the `n` parameter.
     The ROC is defined to be positive if the center is to the right of the surface. Otherwise it is negative.
 
 !!! warning "Meniscus"
-    If your specification results in a meniscus lens, only spherical meniscus lenses are supported at the moment.
+    A meniscus lens, whose center thickness does not exceed the sagitta of its convex surface, must consist of
+    spherical surfaces. An aspherical surface throws an `ArgumentError` in this case.
 """
 function Lens(
         front_surface::AbstractRotationallySymmetricSurface,

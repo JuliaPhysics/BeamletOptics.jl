@@ -213,10 +213,16 @@ The following image shows the [AC254-150-AB](https://www.thorlabs.com/thorproduc
 !!! tip "Spherical lens example"
     For a complex showcase featuring spherical singlet and doublet lenses, refer to the [Double Gauss lens](@ref) example page.
 
+Doublet lenses with aspherical surfaces, or with a different clear aperture per surface, are specified via the surface types introduced in the [Surface based lens construction](@ref) section.
+
+```@docs; canonical=false
+DoubletLens(::BeamletOptics.AbstractRotationallySymmetricSurface, ::BeamletOptics.AbstractRotationallySymmetricSurface, ::BeamletOptics.AbstractRotationallySymmetricSurface, ::Real, ::Real, ::BeamletOptics.RefractiveIndex, ::BeamletOptics.RefractiveIndex)
+```
+
 ## Triplet lenses
 
 The [`TripletLens`](@ref) extends the doublet to three cemented elements, which share two
-common surfaces. For spherical triplet lenses the following constructor can be used.
+common surfaces. As for the doublet, a triplet lens is constructed from surface specifications or, for spherical triplet lenses, from radii of curvature.
 
 ```@docs; canonical=false
 TripletLens
