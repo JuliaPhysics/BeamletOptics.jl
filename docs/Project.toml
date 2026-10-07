@@ -12,11 +12,6 @@ OpticsBase = "0a174593-c395-4975-8599-97e6c4e949e6"
 [sources.BeamletOptics]
 path = ".."
 
-# OpticsBase is not registered yet; drop this entry once it is.
-[sources.OpticsBase]
-url = "https://github.com/StackEnjoyer/OpticsBase.jl"
-rev = "main"
-
 [compat]
 BeamletOptics = "0.14"
 CairoMakie = "0.15"

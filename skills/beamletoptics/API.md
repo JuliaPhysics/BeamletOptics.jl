@@ -126,15 +126,12 @@ They also take `progress = true` (see Solving). See `components/detectors.md`.
 
 ## Coupling to other solvers (OpticsBase)
 
-OpticsBase is not registered yet, so in this release `using OpticsBase` alone does not
-activate the extension: add OpticsBase by URL
-(`Pkg.add(url = "https://github.com/StackEnjoyer/OpticsBase.jl")`) and include the
-extension file once per session, as in the first lines below. Fields go to and come from
-other solvers (e.g. FiberOptics) as `OpticsBase.PlaneField` (tangential E and H on a plane):
+`using OpticsBase` (`Pkg.add("OpticsBase")`) activates the extension. Fields go to and come
+from other solvers (e.g. FiberOptics) as `OpticsBase.PlaneField` (tangential E and H on a
+plane):
 
 ```julia
 using BeamletOptics, OpticsBase
-include(joinpath(pkgdir(BeamletOptics), "ext", "BeamletOpticsOpticsBaseExt.jl"))
 
 f = PlaneField(det; size = (256, 256), spacing = (1e-6, 1e-6))  # after solve_system!
 power(f)                                                        # W, Poynting flux

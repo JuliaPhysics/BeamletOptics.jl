@@ -1,6 +1,5 @@
 # Tests of BeamletOpticsOpticsBaseExt: BMO detector hits -> OpticsBase.PlaneField and
-# back via WavefrontBeamletDecomposition. OpticsBase is not registered yet, so the root
-# Project.toml does not declare the extension and its file is included here instead.
+# back via WavefrontBeamletDecomposition.
 module TestOpticsBaseExt
 
 using BeamletOptics
@@ -10,8 +9,7 @@ using LinearAlgebra
 using Logging: with_logger, NullLogger
 
 const BMO = BeamletOptics
-const Ext = @something Base.get_extension(BMO, :BeamletOpticsOpticsBaseExt) include(
-    joinpath(@__DIR__, "..", "ext", "BeamletOpticsOpticsBaseExt.jl"))
+const Ext = Base.get_extension(BMO, :BeamletOpticsOpticsBaseExt)
 const Z0 = OpticsBase.VACUUM_IMPEDANCE
 
 const λ = 1.064e-6
