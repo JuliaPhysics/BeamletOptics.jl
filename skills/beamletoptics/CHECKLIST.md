@@ -8,7 +8,7 @@
 - [ ] Lens radius signs follow ISO 10110 (biconvex: `r1 > 0`, `r2 < 0`).
 - [ ] Geometry assumes +y as the optical axis; rotations are cumulative and relative.
 - [ ] Sources start **outside** of all elements and point at them.
-- [ ] `empty!(detector)` before every re-solve; results read out before the detector is moved.
+- [ ] Detectors emptied before every re-solve in a loop (`initialize = true`, `initialize!(system)` or `empty!(detector)`); results read out before the detector is moved.
 - [ ] Beam model fits the question (see below).
 - [ ] Script was **run**, and the printed numbers were compared with a paraxial or analytic estimate.
 - [ ] For non-trivial geometry, a rendered image was checked.
@@ -27,7 +27,7 @@
 
 ## Common pitfalls
 
-1. **Detectors accumulate** hits across solves. Forgetting `empty!(det)` silently sums results.
+1. **Detectors accumulate** hits across solves. Forgetting `initialize = true` (or `initialize!(system)`, `empty!(det)`) silently sums results. By default `solve_system!` does not reset them, because the beams of a beam group and consecutive sources are meant to superpose.
 2. **One hit type per detector**: don't send `Beam`s and `GaussianBeamlet`s to the same detector.
 3. **Blocked polarized rays terminate** at the filter: then `last(rays(beam))` is the *incident* ray.
    Check `length(rays(beam))` or read power at a detector instead.

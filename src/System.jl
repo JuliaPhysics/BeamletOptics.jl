@@ -135,6 +135,11 @@ _top_level(system::System) = system.objects
 # Find the shortest intersection among all objects of the system
 @inline trace_all(system::AbstractSystem, ray::AbstractRay) = intersect3d(_top_level(system), ray)
 
+function initialize!(system::AbstractSystem)
+    foreach(initialize!, _top_level(system))
+    return nothing
+end
+
 @inline function trace_one(
         system::AbstractSystem, ray::AbstractRay{R}, hint::Hint) where {R}
     # Trace against hinted shape of object
@@ -359,14 +364,14 @@ function trace_system!(
 end
 
 """
-    solve_system!(system::AbstractSystem, beam::AbstractBeam; r_max=get_default_r_max(), depth_max=get_default_depth_max(), check_invariant=true, threshold=get_invariant_threshold())
+    solve_system!(system::AbstractSystem, beam::AbstractBeam; initialize=false, r_max=get_default_r_max(), depth_max=get_default_depth_max(), check_invariant=true, threshold=get_invariant_threshold())
 
 Trace an `AbstractBeam` and all sub-beams it generates through an optical `system`. Every call solves the `beam` from its start: the `beam` is first reset to its untraced state with `empty!`, so nothing of an earlier solve is reused. A call after objects were moved, added or removed therefore gives the same result as solving a newly constructed beam.
 The condition to stop ray tracing is that the last `beam` intersection is `nothing` or the beam interaction is `nothing`. Then, the system is considered to be solved.
 A maximum number of rays per `beam` (`r_max`) can be specified in order to avoid infinite calculations under resonant conditions, i.e. two facing mirrors. Likewise, `depth_max` limits how many branching levels are explored when new sub-beams are generated (for example, by beamsplitters) so that the tree cannot grow without bound. Sub-beams beyond the depth limit are dropped from the tree.
 
 Between two calls only the `beam` itself and its first ray keep their identity. The child beams and all later rays are new objects after every call: read `children(beam)` again instead of keeping a child.
-A [`Detector`](@ref) is not reset by this function. Call `empty!(detector)` before solving again, otherwise the hits of both solves add up.
+The objects of the `system` are not reset by default: a [`Detector`](@ref) keeps the hits of earlier solves, such that several sources solved one after another superpose on it. With `initialize = true` the `system` is initialized first (see [`initialize!`](@ref)), i.e. all its detectors are emptied. Otherwise the hits of both solves add up.
 
 # Arguments
 
@@ -375,6 +380,7 @@ A [`Detector`](@ref) is not reset by this function. Call `empty!(detector)` befo
 
 ## Keyword Arguments
 
+- `initialize = false`: if `true`, [`initialize!`](@ref)`(system)` is called before the `beam` is traced
 - `r_max = get_default_r_max()`: Maximum number of tracing iterations for each leaf.
 - `depth_max = get_default_depth_max()`: Maximum number of branching levels explored from the root beam
 - `check_invariant = true`: enables or disables optical invariant checks where applicable
@@ -384,11 +390,13 @@ function solve_system!(
         system::AbstractSystem,
         beam::B;
         # kwargs
+        initialize::Bool = false,
         r_max::Int = get_default_r_max(),
         depth_max::Int = get_default_depth_max(),
         check_invariant::Bool = true,
         threshold::Real = get_invariant_threshold()
 ) where {B <: AbstractBeam}
+    initialize && initialize!(system)
     # The bounding spheres of the objects are computed once, unless the solve of a beam group did so
     with_bounding_spheres(system) do
         _solve_beam!(system, beam; r_max, depth_max, check_invariant, threshold)
@@ -420,22 +428,30 @@ function _solve_beam!(system::AbstractSystem, beam::B; r_max, depth_max, check_i
 end
 
 """
-    solve_system!(system::AbstractSystem, bg::AbstractBeamGroup; progress=true, kwargs...)
+    solve_system!(system::AbstractSystem, bg::AbstractBeamGroup; progress=true, initialize=false, kwargs...)
 
 Trace every beam of the beam group `bg` through the `system`, multithreaded over the member
 beams. All other `kwargs` are passed on to [`solve_system!`](@ref) for each beam. Every beam
 of the group is reset with `empty!` and solved from its start. The reset happens before the
 first beam is traced, such that a cancelled or failed solve leaves no beam with an old path.
 
+The hits of all beams accumulate on the same [`Detector`](@ref)s, and so do the hits of earlier
+solves unless `initialize = true`.
+
 ## Keyword Arguments
 
 - `progress = true`: show a progress bar once tracing has run for `get_progress_threshold()`
   seconds (default 5 s). It is only drawn if `stderr` is a terminal, so documentation builds,
   CI logs and piped output stay clean.
+- `initialize = false`: if `true`, [`initialize!`](@ref)`(system)` is called once, before the first
+  beam is traced. The beams themselves are solved without initializing, otherwise each beam would
+  discard the hits of the others.
 """
 function solve_system!(
-        system::AbstractSystem, bg::AbstractBeamGroup; progress::Bool = true, kwargs...)
+        system::AbstractSystem, bg::AbstractBeamGroup; progress::Bool = true,
+        initialize::Bool = false, kwargs...)
     empty!(bg)
+    initialize && initialize!(system)
     # One table of bounding spheres for all beams. It belongs to a task, hence each task of the
     # threads sets it for its beams.
     with_bounding_spheres(system) do

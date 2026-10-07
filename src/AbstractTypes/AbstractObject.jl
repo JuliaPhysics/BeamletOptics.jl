@@ -35,8 +35,41 @@ kinematic API via `BeamletOptics.kinematic_trait_of(::Foo) = BeamletOptics.Stati
 ## Functions:
 
 - [`interact3d`](@ref): defines the optical interaction, the return type must be `Nothing` or an [`AbstractInteraction`](@ref)
+- [`initialize!`](@ref) (optional): resets the data that the object stores during a solve, e.g. the hits of a detector. By default nothing is reset.
 """
 abstract type AbstractObject{T <: Real} end
+
+"""
+    initialize!(x)
+
+Brings `x` into the state that a new solve starts from, by discarding the data that its objects
+have stored during previous calls of [`solve_system!`](@ref). `x` can be a [`System`](@ref) or
+[`StaticSystem`](@ref), an [`ObjectGroup`](@ref) (nested groups are included) or a single object.
+Currently this empties all [`Detector`](@ref)s. Objects that store no such data are left
+unchanged. Returns `nothing`.
+
+`solve_system!` does not call this function unless its keyword `initialize` is set: a
+[`Detector`](@ref) accumulates the hits of several solves on purpose, such that several sources
+solved one after another superpose. Initialize before solving again after the setup was changed,
+e.g. in a parameter scan. The beams are not touched, `solve_system!` resets them itself.
+
+A new object type that stores data during a solve implements `initialize!(object)`. For an
+[`AbstractDetector`](@ref) it calls `empty!(detector)`.
+
+# Examples
+
+```julia
+for shift in shifts
+    translate_to3d!(mirror, shift)
+    initialize!(system)             # instead of empty!(pd) for every detector
+    solve_system!(system, beam)
+    P = optical_power(pd)
+end
+```
+
+or in one call via `solve_system!(system, beam; initialize = true)`.
+"""
+initialize!(::AbstractObject) = nothing
 
 "Default trait"
 shape_trait_of(::AbstractObject) = SingleShape()
@@ -104,3 +137,8 @@ Subtypes of `AbstractObjectGroup` must implement the following:
 abstract type AbstractObjectGroup{T} <: AbstractObject{T} end
 
 AbstractTrees.children(group::AbstractObjectGroup) = group.objects
+
+function initialize!(group::AbstractObjectGroup)
+    foreach(initialize!, AbstractTrees.children(group))
+    return nothing
+end

@@ -6,7 +6,7 @@ The returned E-field map is sampled on a regular `n×n` grid in the detector's l
 Note that the `pd` local coordinates are given in a (x, z) basis where the normal vector forms a left-handed system.
 
 !!! note "Resetting detectors"
-    Be sure to call `empty!(pd)` before each new measurement if reusing the same detector.
+    Be sure to call `empty!(pd)` (or [`initialize!`](@ref)`(system)` for all detectors) before each new measurement if reusing the same detector.
 
 # Keyword Arguments
 

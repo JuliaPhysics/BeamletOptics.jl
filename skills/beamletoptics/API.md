@@ -35,7 +35,7 @@ Use `scripts/api_lookup.jl NAME` to print the docstring and signatures of any na
 | Kinematics    | `translate3d!`, `translate_to3d!`, `rotate3d!`, `xrotate3d!`, `yrotate3d!`, `zrotate3d!`, `align3d!`, `reset_translation3d!`, `reset_rotation3d!`, `set_pivot3d!`, `position`, `direction`, `orientation` |
 | Rays & beams  | `Ray`, `PolarizedRay`, `Beam`, `GaussianBeamlet`, `AstigmaticGaussianBeamlet`, `rays`, `point_on_beam`, `rayleigh_range`, `normal3d` |
 | Sources       | `CollimatedSource`, `UniformDiscSource`, `PointSource`, `UniformPointSource`, `UniformLineSource`, `UniformFanSource`, `set_num_rays!`, `CollimatedGaussianBeamletSource`, `SphericalGaussianBeamletSource`, `EllipticalGaussianBeamletSource`, `GaussianBeamletDecomposition`, `WavefrontBeamletDecomposition`, `GaussianModeDecomposition`, `AstigmaticBeamGroup` |
-| System        | `System`, `StaticSystem`, `solve_system!`, `ObjectGroup` |
+| System        | `System`, `StaticSystem`, `solve_system!`, `initialize!`, `ObjectGroup` |
 | Inspection    | `properties`, `default_properties` |
 | Materials     | `DiscreteRefractiveIndex`, `SellmeierEquation` |
 | Lenses        | `Lens`, `ThinLens`, `SphericalLens`, `DoubletLens`, `SphericalDoubletLens`, `TripletLens`, `SphericalTripletLens`, `thickness` |
@@ -74,14 +74,18 @@ BeamletOptics.properties(x::MyFilter) =
 ## Solving
 
 ```julia
-solve_system!(system, beam; r_max = 100, depth_max = 100,
+solve_system!(system, beam; initialize = false, r_max = 100, depth_max = 100,
               check_invariant = true, threshold = get_invariant_threshold())
-solve_system!(system, beam_group; progress = true, kwargs...)   # multithreaded over member beams
+solve_system!(system, beam_group; progress = true, initialize = false, kwargs...)   # multithreaded over member beams
+initialize!(system)   # empties all detectors of the system (nested groups included)
 ```
+
+- `initialize`: `true` calls `initialize!(system)` before tracing. The default `false` keeps the hits of
+  earlier solves, such that several sources solved one after another superpose on a detector.
 
 - `r_max`: max. rays per beam leaf (raise it for resonators, e.g. facing mirrors)
 - `depth_max`: max. splitting depth of the beam tree
-- Every call solves the beam again from its start; `empty!` detectors first. Child beams are new
+- Every call solves the beam again from its start; the detectors are not emptied unless `initialize = true`. Child beams are new
   objects after every solve: read `beam.children` again after each solve instead of keeping a child.
 - Julia threads (`julia -t auto`) speed up solving of sources with many beams.
 - `progress`: beam groups and detector readout show a progress bar once they have run for
@@ -112,8 +116,7 @@ solve_system!(system, beam_group; progress = true, kwargs...)   # multithreaded 
 ## Detector readout
 
 ```julia
-empty!(det)                                   # before each solve that reuses det
-solve_system!(system, source)
+solve_system!(system, source; initialize = true)   # empties the detectors first (or initialize!(system), empty!(det))
 pts        = spot_diagram(det)                # Vector{Point2}: local (x, z) in m
 x, z, E    = electric_field(det; n = 200)     # complex field on an n×n grid
 x, z, I    = intensity(det; n = 200)          # W/m²

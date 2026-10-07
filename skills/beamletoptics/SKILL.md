@@ -26,7 +26,9 @@ When this Skill is active:
 - The **optical axis is +y**, not z. Components spawn at the origin aligned with +y.
 - **Refractive indices are callables** `n(λ)` (λ in meters), never plain numbers:
   `λ -> 1.5`, `DiscreteRefractiveIndex(...)` or `SellmeierEquation(...)`.
-- **Detectors accumulate.** Call `empty!(detector)` before every `solve_system!` that reuses it.
+- **Detectors accumulate.** Solve with `solve_system!(system, beam; initialize = true)`, or call `initialize!(system)`
+  (all detectors) or `empty!(detector)` (one) before every `solve_system!` that reuses the detectors; never reset
+  between sources that should superpose.
 - **All kinematics are relative** (`translate3d!`, `xrotate3d!`, …), angles in radians (`deg2rad`).
   Use `translate_to3d!` for absolute positioning.
 - Run the script after writing it. A simulation that "looks right" but was never executed is not done.
@@ -57,7 +59,7 @@ When this Skill is active:
 - `system = System([obj1, obj2, ...])` (order does not matter, tracing is non-sequential);
   `StaticSystem` for small fixed systems that are solved many times.
 - `solve_system!(system, beam_or_source)`.
-- For parameter scans, mutate the scene in a loop, `empty!` detectors, and call `solve_system!` again (it solves from the start).
+- For parameter scans, mutate the scene in a loop and call `solve_system!(...; initialize = true)` again (it empties the detectors and solves from the start).
   Mesh scenes solved thousands of times can use `StaticSystem`.
 
 5) Evaluate

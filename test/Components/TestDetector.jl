@@ -208,6 +208,112 @@ end
     end
 end
 
+@testset "initialize!" begin
+    # two detectors, one nested two levels deep in groups, plus a mirror that stores nothing
+    pd1 = Detector(10mm, false)
+    pd2 = Detector(10mm)
+    translate3d!(pd1, [0, 50mm, 0])
+    translate3d!(pd2, [0, 60mm, 0])
+    mirror = RoundPlanoMirror(10mm, 5mm)
+    translate3d!(mirror, [0, 200mm, 0])
+    inner = ObjectGroup([pd2])
+    outer = ObjectGroup([mirror, inner])
+    system = System([pd1, outer])
+    make_source() = CollimatedSource([0, 0, 0], [0, 1, 0], 2mm, 1e-6; num_rings = 2, num_rays = 41)
+    solve_system!(system, make_source(); progress = false)
+    @test BMO.hit_count(pd1) == 41
+    @test BMO.hit_count(pd2) == 41
+    # accumulation is intended: a second source solved afterwards superposes
+    solve_system!(system, make_source(); progress = false)
+    @test BMO.hit_count(pd1) == 82
+    # an object that stores nothing is left alone
+    @test isnothing(initialize!(mirror))
+    @test isnothing(initialize!(pd2))
+    @test isnothing(BMO.hits(pd2))
+    solve_system!(system, make_source(); progress = false)
+    # nested groups are reached from groups and from systems
+    @test isnothing(initialize!(inner))
+    @test isnothing(BMO.hits(pd2))
+    @test BMO.hit_count(pd1) == 123
+    solve_system!(system, make_source(); progress = false)
+    @test isnothing(initialize!(system))
+    @test isnothing(BMO.hits(pd1))
+    @test isnothing(BMO.hits(pd2))
+    static = StaticSystem([pd1, outer])
+    solve_system!(static, make_source(); progress = false)
+    @test BMO.hit_count(pd2) == 41
+    @test isnothing(initialize!(static))
+    @test isnothing(BMO.hits(pd1))
+    @test isnothing(BMO.hits(pd2))
+    @test isnothing(initialize!(System()))
+end
+
+@testset "solve_system! with initialize" begin
+    @testset "Beam" begin
+        pd = Detector(10mm)
+        translate3d!(pd, [0, 50mm, 0])
+        system = System([pd])
+        beam = Beam([0.0, 0, 0], [0.0, 1, 0], 1e-6)
+        solve_system!(system, beam)
+        solve_system!(system, beam)
+        # by default the hits of both solves add up
+        @test BMO.hit_count(pd) == 2
+        solve_system!(system, beam; initialize = true)
+        @test BMO.hit_count(pd) == 1
+        solve_system!(system, beam; initialize = false)
+        @test BMO.hit_count(pd) == 2
+    end
+
+    @testset "Beam group" begin
+        pd = Detector(20mm)
+        translate3d!(pd, [0, 50mm, 0])
+        system = System([pd])
+        cs = CollimatedSource([0, 0, 0], [0, 1, 0], 10mm, 1e-6; num_rings = 20, num_rays = 2000)
+        solve_system!(system, cs; progress = false)
+        # every beam of the group contributes exactly one hit, none is lost to a race
+        @test BMO.hit_count(pd) == length(cs)
+        # solving the group again without initializing accumulates
+        solve_system!(system, cs; progress = false)
+        @test BMO.hit_count(pd) == 2 * length(cs)
+        # the system is initialized once, not for every beam of the group
+        solve_system!(system, cs; progress = false, initialize = true)
+        @test BMO.hit_count(pd) == length(cs)
+        solve_system!(system, cs; progress = false, initialize = true)
+        @test BMO.hit_count(pd) == length(cs)
+    end
+
+    @testset "Scan loop equals a newly built setup" begin
+        function setup()
+            m = RoundPlanoMirror(25.4mm, 5mm)
+            pd = Detector(10mm)
+            translate3d!(m, [0, 20mm, 0])
+            zrotate3d!(m, deg2rad(45))
+            translate3d!(pd, [20mm, 20mm, 0])
+            zrotate3d!(pd, deg2rad(90))
+            return m, pd, System([m, pd])
+        end
+        beam() = GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], 632.8e-9, 1e-3)
+        m, pd, system = setup()
+        b = beam()
+        solve_system!(system, b)
+        n_first = BMO.hit_count(pd)
+        @test n_first > 0
+        m2, pd2, system2 = setup()
+        zrotate3d!(m2, 1e-3)
+        solve_system!(system2, beam())
+        # change the setup and solve again, via the keyword ...
+        zrotate3d!(m, 1e-3)
+        solve_system!(system, b; initialize = true)
+        @test BMO.hit_count(pd) == BMO.hit_count(pd2)
+        @test optical_power(pd) ≈ optical_power(pd2)
+        # ... and via the function
+        initialize!(system)
+        solve_system!(system, b)
+        @test BMO.hit_count(pd) == BMO.hit_count(pd2)
+        @test optical_power(pd) ≈ optical_power(pd2)
+    end
+end
+
 end # TESTSET
 
 end # MODULE
