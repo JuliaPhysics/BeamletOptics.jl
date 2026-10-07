@@ -96,7 +96,7 @@ function beamlet_hit_field(hit::GaussianBeamletHit{G}, p::AbstractArray) where {
     # Distance along beam
     z = hit.l0 + l1
 
-    return _segment_field(hit.gauss, r, z, hit.p0 + l1 * hit.d0, hit.id, hit.l0, hit.Δl0)
+    return _segment_field(hit.gauss, r, z, hit.p0 + l1 * hit.d0, hit.id, hit.l0, hit.Δl0, hit.ψ0)
 end
 
 function beamlet_hit_field(hit::AstigmaticGaussianBeamletHit{G}, p::AbstractArray) where {G}
