@@ -74,14 +74,9 @@ DocMeta.setdocmeta!(
 
 bib = CitationBibliography(joinpath(@__DIR__, "src", "refs.bib"))
 
-# OpticsBase is not registered yet, so the root Project.toml does not declare the extension
-# and its file is included here instead.
-const OpticsBaseExt = @something Base.get_extension(BeamletOptics, :BeamletOpticsOpticsBaseExt) include(
-    joinpath(@__DIR__, "..", "ext", "BeamletOpticsOpticsBaseExt.jl"))
-
 makedocs(;
     modules=[BeamletOptics, Base.get_extension(BeamletOptics, :BeamletOpticsMakieExt),
-        OpticsBaseExt],
+        Base.get_extension(BeamletOptics, :BeamletOpticsOpticsBaseExt)],
     authors="Hugo Uittenbosch <hugo.uittenbosch@dlr.de>, Oliver Kliebisch <oliver.kliebisch@dlr.de> and contributors",
     sitename="BeamletOptics.jl",
     format=DocumenterVitepress.MarkdownVitepress(;

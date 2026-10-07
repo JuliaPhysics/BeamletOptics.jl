@@ -13,11 +13,6 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 [sources.BeamletOptics]
 path = ".."
 
-# OpticsBase is not registered yet; drop this entry once it is.
-[sources.OpticsBase]
-url = "https://github.com/StackEnjoyer/OpticsBase.jl"
-rev = "main"
-
 [compat]
 AbstractTrees = "0.4"
 Aqua = "0.8"
