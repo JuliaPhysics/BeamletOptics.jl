@@ -38,8 +38,7 @@ Mesh scenes solved thousands of times can use `StaticSystem`.
 ```julia
 for y in ys
     translate_to3d!(det, [0, y, 0])   # absolute
-    empty!(det)                       # REQUIRED: detectors accumulate hits
-    solve_system!(system, source)
+    solve_system!(system, source; initialize = true)   # REQUIRED: detectors accumulate hits otherwise
     push!(metric, f(spot_diagram(det)))
 end
 ```

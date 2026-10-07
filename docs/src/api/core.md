@@ -92,6 +92,8 @@ As with the `intersect3d` method, a predefined return type must be provided in o
 BeamletOptics.AbstractInteraction
 ```
 
+An object whose `interact3d` method stores data in the object, e.g. a detector its hits, also implements [`initialize!`](@ref), which discards this data before a new solve.
+
 The `interact3d` return type limits the interface to only accepting one new `beam` segment per interaction at the moment. The developer needs to take into account that after e.g. a lens surface air-to-glass interaction, the solver "forgets" that the next logical step is to immediately test against the lens again, since the most likely step will be the refraction at the glass-to-air surface. In order to alleviate this issue, the `Hint` type can be used.
 
 ### Re-emitting components

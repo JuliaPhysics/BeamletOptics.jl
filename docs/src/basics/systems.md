@@ -43,3 +43,9 @@ Optical systems are solved non-sequentially by the [`solve_system!`](@ref) funct
 ```@docs; canonical=false
 solve_system!
 ```
+
+Some objects store data during a solve, e.g. a [`Detector`](@ref) its hits. This data is kept between solves unless the system is initialized:
+
+```@docs; canonical=false
+initialize!
+```

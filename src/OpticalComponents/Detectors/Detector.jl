@@ -11,7 +11,7 @@ Subtypes of `AbstractDetector` should implement all supertype requirements as we
 ## Functions
 
 - `interact3d`: see e.g. [`Detector`](@ref) for reference
-- `empty!`: resets data stored in the detector, see below
+- `empty!`: resets data stored in the detector, see below. [`initialize!`](@ref) calls it for all detectors of a system
 
 # Additional information
 
@@ -27,7 +27,10 @@ Only if the data can be accumulated sequentially, multiple beam interactions can
 ## Data reset
 
 Since e.g. E-field data is supposed to be accumulated by mutability of the detector data, the burden of resetting the data for a new solver call
-is placed on the user. This function should be called `empty!`.
+is placed on the user. This function should be called `empty!`. A single detector is reset with `empty!(detector)`, all
+detectors of a [`System`](@ref) or [`ObjectGroup`](@ref) with [`initialize!`](@ref), which calls `empty!` on every `AbstractDetector`.
+The solver does not reset detectors unless asked to (keyword `initialize` of [`solve_system!`](@ref)), since the beams of a beam group
+and several sources solved one after another are meant to superpose.
 """
 abstract type AbstractDetector{T} <: AbstractObject{T} end
 
@@ -40,6 +43,8 @@ function empty!(::D) where {D <: AbstractDetector}
     @warn "Detector reset logic for $D not implemented"
     return nothing
 end
+
+initialize!(d::AbstractDetector) = (empty!(d); nothing)
 
 """
     AbstractDetectorHit
@@ -236,9 +241,15 @@ the surface normals point towards the negative y-axis for the initial positionin
 of a **left-handed** (x, z) surface coordinate system, where incoming beams intersect against the detector surface normal.
 
 !!! warning "Reset behavior"
-    The `Detector` must be reset between each call of [`solve_system!`](@ref) in order to
-    overwrite previous results using the [`empty!`](@ref) function.
-    Otherwise, the current result will be added onto the previous result.
+    A `Detector` accumulates hits across calls of [`solve_system!`](@ref), on purpose: all beams of a beam group
+    and several sources solved one after another superpose on it. To discard the results of previous solves,
+    e.g. after changing a component in a loop, call [`initialize!`](@ref)`(system)` for all detectors of a system
+    (nested groups included), `empty!(detector)` for a single one, or solve with `initialize = true`.
+    Otherwise, the current result is added onto the previous result.
+
+!!! note "Thread safety"
+    Beam groups are solved multithreaded. Pushing hits is guarded by the `lock` of the detector, so
+    all beams can hit the same detector concurrently. The order of the stored hits is not deterministic.
 
 !!! warning "Reading hits"
     Read the hits of the detector before moving any object or solving again.

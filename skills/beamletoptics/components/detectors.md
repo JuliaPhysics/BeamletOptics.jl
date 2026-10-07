@@ -9,7 +9,7 @@ Detector(edge_length, stop = true)
   it catches beams travelling along −x.
 - With `stop = false`, beams continue behind the detector.
 - Stores *hits* of exactly **one** type (Ray, PolarizedRay, GaussianBeamlet or AstigmaticGaussianBeamlet).
-- **Accumulates across solves:** call `empty!(det)` before each `solve_system!` that reuses it.
+- **Accumulates across solves:** solve with `initialize = true`, or call `initialize!(system)` (all detectors of a system, nested groups included) or `empty!(det)` (one detector) before each `solve_system!` that reuses it. By default the solver does not reset detectors: all beams of a beam group, and several sources solved one after another, superpose on purpose.
 - Read out all results before moving the detector again.
 
 ## Readout
