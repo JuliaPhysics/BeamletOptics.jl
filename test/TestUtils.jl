@@ -83,6 +83,13 @@ const BMO = BeamletOptics
             @test isapprox(dot(R * s, n), sin(δ); rtol = 1e-8)
             @test isrotation(R)
         end
+        # parallel vectors: exactly the identity, also if the squared length of the normalized
+        # vector rounds to 1 - eps (the first two), such that a repeated alignment does not scale
+        for v in ([0.3, -0.7, 0.2], Float32[1, 2, 3], [1.0, 2, 3], [0.0, 0, 1], s)
+            R = BMO.align3d(v, v)
+            @test R == I
+            @test eltype(R) == eltype(v)
+        end
         # antiparallel along any axis, also z
         for v in ([0.0, 0, 1], [1.0, 0, 0], [0.0, -1, 0], s)
             R = BMO.align3d(v, -v)

@@ -118,10 +118,13 @@ function align3d(start::AbstractVector, target::AbstractVector)
     end
     rx, ry, rz = cross(target, start)
     k = 1 / (1 + cosA)
+    # Rodrigues form I + K + k K² with the cross product matrix K of cross(start, target). Its
+    # diagonal is 1 - k (r² - rᵢ²) rather than the equivalent rᵢ² k + cosA: the rounding of cosA
+    # would scale R by 1 ± eps, also for parallel vectors, where R must be the identity.
     R = @SArray [
-        rx^2*k+cosA rx*ry*k+rz rx*rz*k-ry
-        ry*rx*k-rz ry^2*k+cosA ry*rz*k+rx
-        rz*rx*k+ry rz*ry*k-rx rz^2*k+cosA
+        1-(ry^2+rz^2)*k rx*ry*k+rz rx*rz*k-ry
+        ry*rx*k-rz 1-(rx^2+rz^2)*k ry*rz*k+rx
+        rz*rx*k+ry rz*ry*k-rx 1-(rx^2+ry^2)*k
     ]
     return R
 end
