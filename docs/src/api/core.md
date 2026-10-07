@@ -72,6 +72,7 @@ The spheres are not stored in the shapes or objects. [`solve_system!`](@ref) com
 ```@docs; canonical=false
 BeamletOptics.bounding_sphere_of(::BeamletOptics.BoundingSphereTable, ::Any)
 BeamletOptics.SingleBoundingSphere
+BeamletOptics.MultiBoundingSphere
 BeamletOptics.NoBoundingSphere
 ```
 

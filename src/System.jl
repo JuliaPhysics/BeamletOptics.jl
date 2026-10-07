@@ -140,7 +140,7 @@ _top_level(system::System) = system.objects
     # Trace against hinted shape of object
     _shape = shape(hint)::AbstractShape{R}
     intersection::Nullable{Intersection{R}} = intersect3d(
-        bounding_sphere_of(BOUNDING_SPHERES[], _shape), _shape, ray)
+        bounding_sphere_of(current_bounding_spheres(), _shape), _shape, ray)
     if isnothing(intersection)
         # If hinted object is not intersected, trace the entire system
         intersection = trace_all(system, ray)
@@ -436,11 +436,15 @@ first beam is traced, such that a cancelled or failed solve leaves no beam with 
 function solve_system!(
         system::AbstractSystem, bg::AbstractBeamGroup; progress::Bool = true, kwargs...)
     empty!(bg)
-    # One table of bounding spheres for all beams, which the tasks of the threads inherit
+    # One table of bounding spheres for all beams. It belongs to a task, hence each task of the
+    # threads sets it for its beams.
     with_bounding_spheres(system) do
+        table = current_bounding_spheres()::BoundingSphereTable
         _with_progress(progress, length(bg), "Tracing beams: ") do prog
             Threads.@threads for _beam in beams(bg)
-                solve_system!(system, _beam; kwargs...)
+                with_bounding_spheres(table) do
+                    solve_system!(system, _beam; kwargs...)
+                end
                 _tick!(prog)
             end
         end

@@ -176,7 +176,7 @@ intersect3d(object::AbstractObject, ray::AbstractRay) = intersect3d(shape_trait_
 function intersect3d(::SingleShape, object::AbstractObject, ray::AbstractRay)
     s = shape(object)
     # the sphere that the table of a running solve holds for the shape, none outside of a solve
-    intersection = intersect3d(bounding_sphere_of(BOUNDING_SPHERES[], s), s, ray)
+    intersection = intersect3d(bounding_sphere_of(current_bounding_spheres(), s), s, ray)
     # Ensure that the intersection knows about the object if intersected
     if !isnothing(intersection)
         object!(intersection, object)
@@ -186,8 +186,7 @@ end
 
 function intersect3d(::MultiShape, object::AbstractObject, ray::AbstractRay)
     # No part is tested if the ray misses the sphere around all of them
-    _misses(bounding_sphere_of(BOUNDING_SPHERES[], object), ray) && return nothing
-    intersection = intersect3d(shape(object), ray)
+    intersection = intersect3d(bounding_sphere_of(current_bounding_spheres(), object), shape(object), ray)
     # Ensure that the intersection knows about the correct object if intersected
     if !isnothing(intersection)
         object!(intersection, object)
@@ -205,8 +204,7 @@ bounding sphere of the group, which the table of a running solve holds, see
 `bounding_sphere_of(table, x)`.
 """
 function intersect3d(::MultiShape, group::AbstractObjectGroup, ray::AbstractRay)
-    _misses(bounding_sphere_of(BOUNDING_SPHERES[], group), ray) && return nothing
-    return intersect3d(shape(group), ray)
+    return intersect3d(bounding_sphere_of(current_bounding_spheres(), group), shape(group), ray)
 end
 
 """

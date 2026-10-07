@@ -30,9 +30,9 @@ end
 render_bounding_sphere!(::_RenderEnv, ::BMO.NoBoundingSphere; kwargs...) = nothing
 
 function render_bounding_sphere!(
-        ax::_RenderEnv, sphere::BMO.SingleBoundingSphere; color = :magenta, linewidth = 1, main_color = nothing, kwargs...
+        ax::_RenderEnv, sphere::BMO.AbstractBoundingSphere; color = :magenta, linewidth = 1, main_color = nothing, kwargs...
     )
-    lines!(ax, _great_circles(sphere.pos, sphere.radius); color, linewidth, kwargs...)
+    lines!(ax, _great_circles(position(sphere), BMO.radius(sphere)); color, linewidth, kwargs...)
     return nothing
 end
 

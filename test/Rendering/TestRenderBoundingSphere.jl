@@ -43,7 +43,7 @@ Returns the bounding spheres of `x` that are drawn, in the order of drawing, der
 object, for an object with several parts (also a group) the spheres of the parts and then its own
 (main) sphere. Only spheres, no `NoBoundingSphere`.
 """
-spheres(x) = filter(s -> s isa BMO.SingleBoundingSphere, all_spheres(x))
+spheres(x) = filter(s -> !(s isa BMO.NoBoundingSphere), all_spheres(x))
 all_spheres(shape::BMO.AbstractShape) = Any[shape_sphere(shape)]
 all_spheres(obj::BMO.AbstractObject) = all_spheres(BMO.shape_trait_of(obj), obj)
 all_spheres(::BMO.SingleShape, obj) = Any[BMO.bounding_sphere_of(obj)]
@@ -54,7 +54,7 @@ end
 all_spheres(sys::System) = reduce(vcat, (all_spheres(obj) for obj in sys.objects); init = Any[])
 
 """Returns the main spheres of `x` that are drawn: those of objects with several parts, also nested ones."""
-main_spheres(x) = filter(s -> s isa BMO.SingleBoundingSphere, all_main_spheres(x))
+main_spheres(x) = filter(s -> s isa BMO.MultiBoundingSphere, all_main_spheres(x))
 all_main_spheres(::BMO.AbstractShape) = Any[]
 all_main_spheres(obj::BMO.AbstractObject) = all_main_spheres(BMO.shape_trait_of(obj), obj)
 all_main_spheres(::BMO.SingleShape, obj) = Any[]
@@ -248,7 +248,7 @@ end
         translate3d!(inner.objects[2], [0, 30mm, 0])
         outer = ObjectGroup([meniscus_lens(), inner])
         translate3d!(outer.objects[1], [50mm, 0, 0])
-        @test BMO.bounding_sphere_of(outer) isa BMO.SingleBoundingSphere
+        @test BMO.bounding_sphere_of(outer) isa BMO.MultiBoundingSphere
         @test length(main_spheres(outer)) == 2
         plots = new_plots(() -> BMO.render_bounding_sphere!(ax, outer; color = :red, main_color = :green), ax)
         @test length(plots) == length(spheres(outer)) == 5

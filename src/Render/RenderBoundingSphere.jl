@@ -14,7 +14,8 @@ every ray that misses this sphere, hence the function shows what the solver test
 `bounding_sphere_of` method of an own shape type: the sphere must enclose the whole shape and should
 be tight.
 
-- sphere: a [`SingleBoundingSphere`](@ref) is drawn as it is, a [`NoBoundingSphere`](@ref) gives no plot
+- sphere: a [`SingleBoundingSphere`](@ref) or [`MultiBoundingSphere`](@ref) is drawn as it is, a
+  [`NoBoundingSphere`](@ref) gives no plot
 - shape: one plot, or none if the shape has no bounding sphere
 - object: the sphere of its shape, or, if it consists of several parts (e.g. a doublet lens, a cube
   beamsplitter or an `ObjectGroup`), the sphere of each part, since the solver tests each part on its

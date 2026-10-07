@@ -1,27 +1,50 @@
-using Base.ScopedValues: ScopedValue, with
-
 """
     AbstractBoundingSphere
 
-Supertype of the results of [`bounding_sphere_of`](@ref): a [`SingleBoundingSphere`](@ref), or
-[`NoBoundingSphere`](@ref) for anything without one. Like a trait, `bounding_sphere_of(x)` selects
-by the type of `x` how `x` is tested against a ray, see `intersect3d(sphere, shape, ray)`; in
-contrast to a trait, a `SingleBoundingSphere` also holds data of `x`, its center and radius.
+Supertype of the results of [`bounding_sphere_of`](@ref): a [`SingleBoundingSphere`](@ref) for a
+shape, a [`MultiBoundingSphere`](@ref) for several shapes or objects, or [`NoBoundingSphere`](@ref)
+for anything without one. Like a trait, `bounding_sphere_of(x)` selects by the type of `x` how `x`
+is tested against a ray, see `intersect3d(sphere, x, ray)`; in contrast to a trait, a sphere also
+holds data of `x`, its center and radius.
+
+# Interface
+
+A subtype that describes a sphere has the fields
+
+- `pos`: the center in world coordinates [m], read via `position(sphere)`
+- `radius`: the radius [m], read via `radius(sphere)`
+
+The generic methods for an `AbstractBoundingSphere`, e.g. the test against a ray, use these. They
+do not apply to a [`NoBoundingSphere`](@ref), which has its own methods wherever no sphere is a
+valid input, and whose `position` and `radius` throw an `ArgumentError`.
 """
 abstract type AbstractBoundingSphere end
+
+Base.position(sphere::AbstractBoundingSphere) = sphere.pos
+radius(sphere::AbstractBoundingSphere) = sphere.radius
 
 """
     NoBoundingSphere <: AbstractBoundingSphere
 
 States that a shape or object has no bounding sphere. It is then tested against every ray via
 [`intersect3d`](@ref), see [`bounding_sphere_of`](@ref).
+
+It has no center and no radius: `position` and `radius` throw an `ArgumentError`. Code that needs
+them handles `NoBoundingSphere` by a method of its own, or tests for it first.
 """
 struct NoBoundingSphere <: AbstractBoundingSphere end
+
+function _no_sphere_error(what)
+    throw(ArgumentError(lazy"a NoBoundingSphere has no $what, handle the case of no bounding sphere before the $what is used"))
+end
+
+Base.position(::NoBoundingSphere) = _no_sphere_error("center")
+radius(::NoBoundingSphere) = _no_sphere_error("radius")
 
 """
     SingleBoundingSphere{T} <: AbstractBoundingSphere
 
-A sphere that encloses a shape, an object or a group, see [`bounding_sphere_of`](@ref).
+A sphere that encloses one shape, see [`bounding_sphere_of`](@ref).
 
 # Fields
 
@@ -37,6 +60,68 @@ function SingleBoundingSphere(pos::AbstractVector{P}, radius::R) where {P <: Rea
     T = promote_type(P, R)
     return SingleBoundingSphere{T}(Point3{T}(pos), T(radius))
 end
+
+"""
+    MultiBoundingSphere{T} <: AbstractBoundingSphere
+
+A sphere that encloses several bounding spheres, i.e. all parts of a [`MultiShape`](@ref) object or
+all objects of an object group, see [`bounding_sphere_of`](@ref). A ray that misses it hits none of
+the parts, hence a solve tests it before the parts. It is tested against a ray like a
+[`SingleBoundingSphere`](@ref) and differs only in what it states: the sphere of several things.
+
+# Fields
+
+- `pos`: the center in world coordinates [m]
+- `radius`: the radius [m]
+"""
+struct MultiBoundingSphere{T <: Real} <: AbstractBoundingSphere
+    pos::Point3{T}
+    radius::T
+end
+
+function MultiBoundingSphere(pos::AbstractVector{P}, radius::R) where {P <: Real, R <: Real}
+    T = promote_type(P, R)
+    return MultiBoundingSphere{T}(Point3{T}(pos), T(radius))
+end
+
+"""
+    MultiBoundingSphere(a::AbstractBoundingSphere, b::AbstractBoundingSphere)
+    MultiBoundingSphere(spheres::Tuple)
+
+Returns the smallest sphere that encloses the bounding spheres `a` and `b`, or all `spheres`, e.g.
+those of the parts of an object. The result is `NoBoundingSphere()` if one of them is none, since
+then no sphere encloses all parts, and for no spheres at all.
+"""
+function MultiBoundingSphere(a::AbstractBoundingSphere, b::AbstractBoundingSphere)
+    Δ = position(b) - position(a)
+    d = norm(Δ)
+    # one sphere contains the other
+    d + radius(b) ≤ radius(a) && return MultiBoundingSphere(position(a) + zero(Δ), radius(a) + zero(d))
+    d + radius(a) ≤ radius(b) && return MultiBoundingSphere(position(b) + zero(Δ), radius(b) + zero(d))
+    r = (d + radius(a) + radius(b)) / 2
+    return MultiBoundingSphere(position(a) + (r - radius(a)) / d * Δ, r)
+end
+MultiBoundingSphere(::NoBoundingSphere, ::AbstractBoundingSphere) = NoBoundingSphere()
+MultiBoundingSphere(::AbstractBoundingSphere, ::NoBoundingSphere) = NoBoundingSphere()
+MultiBoundingSphere(::NoBoundingSphere, ::NoBoundingSphere) = NoBoundingSphere()
+
+function MultiBoundingSphere(spheres::Tuple{AbstractBoundingSphere, Vararg{AbstractBoundingSphere}})
+    # a type as the operator of `foldl` is not inferred, hence the closure
+    return MultiBoundingSphere(foldl((a, b) -> MultiBoundingSphere(a, b), spheres))
+end
+MultiBoundingSphere(::Tuple{}) = NoBoundingSphere()
+
+"""
+    SingleBoundingSphere(sphere::AbstractBoundingSphere)
+    MultiBoundingSphere(sphere::AbstractBoundingSphere)
+
+The `sphere` with the same center and radius as a sphere of the other kind, e.g. the sphere around
+the parts of a composite shape as the sphere of this one shape. `NoBoundingSphere()` is passed on.
+"""
+SingleBoundingSphere(sphere::AbstractBoundingSphere) = SingleBoundingSphere(position(sphere), radius(sphere))
+SingleBoundingSphere(sphere::NoBoundingSphere) = sphere
+MultiBoundingSphere(sphere::AbstractBoundingSphere) = MultiBoundingSphere(position(sphere), radius(sphere))
+MultiBoundingSphere(sphere::NoBoundingSphere) = sphere
 
 """
     SingleBoundingSphere(shape::AbstractShape, center, radius)
@@ -57,17 +142,18 @@ The `sphere`, whose center is given in the local frame of the `shape`, in world 
 the sphere around the parts of a shape that are positioned in its local frame. `NoBoundingSphere()`
 is passed on.
 """
-SingleBoundingSphere(shape::AbstractShape, sphere::SingleBoundingSphere) = SingleBoundingSphere(shape, sphere.pos, sphere.radius)
+function SingleBoundingSphere(shape::AbstractShape, sphere::AbstractBoundingSphere)
+    return SingleBoundingSphere(shape, position(sphere), radius(sphere))
+end
 SingleBoundingSphere(::AbstractShape, sphere::NoBoundingSphere) = sphere
-
-Base.position(sphere::SingleBoundingSphere) = sphere.pos
 
 """
     bounding_sphere_of(shape::AbstractShape)
     bounding_sphere_of(object::AbstractObject)
 
 Computes a sphere that encloses the `shape` or `object` in its current pose and returns it as a
-[`SingleBoundingSphere`](@ref), or returns [`NoBoundingSphere`](@ref)`()` if there is none.
+[`SingleBoundingSphere`](@ref) or [`MultiBoundingSphere`](@ref), or returns
+[`NoBoundingSphere`](@ref)`()` if there is none.
 
 For a shape, the method is an optional part of the [`AbstractShape`](@ref) interface. With the
 default `NoBoundingSphere()` every ray is tested via [`intersect3d`](@ref). With a sphere, a
@@ -89,8 +175,8 @@ end
 
 For an object, the result follows from its shapes, see [`AbstractShapeTrait`](@ref): the sphere of
 the shape of a [`SingleShape`](@ref) object, and for a [`MultiShape`](@ref) object or an object
-group the sphere that encloses the spheres of all its parts, or `NoBoundingSphere()` if one part has
-none.
+group the [`MultiBoundingSphere`](@ref) that encloses the spheres of all its parts, or
+`NoBoundingSphere()` if one part has none.
 
 A solve does not call this method per ray. It computes the spheres once into a table and looks
 them up via `bounding_sphere_of(table, x)`.
@@ -102,37 +188,16 @@ bounding_sphere_of(object::AbstractObject) = bounding_sphere_of(shape_trait_of(o
 bounding_sphere_of(::SingleShape, object::AbstractObject) = bounding_sphere_of(shape(object))
 
 function bounding_sphere_of(::MultiShape, object::AbstractObject)
-    return _enclosing_sphere(map(bounding_sphere_of, shape(object)))
+    return MultiBoundingSphere(map(bounding_sphere_of, shape(object)))
 end
 
 """
-    _enclosing_sphere(a, b)
-
-Returns the smallest sphere that encloses the bounding spheres `a` and `b`, or
-`NoBoundingSphere()` if one of them is none.
-"""
-function _enclosing_sphere(a::SingleBoundingSphere, b::SingleBoundingSphere)
-    Δ = b.pos - a.pos
-    d = norm(Δ)
-    # one sphere contains the other
-    d + b.radius ≤ a.radius && return SingleBoundingSphere(a.pos + zero(Δ), a.radius + zero(d))
-    d + a.radius ≤ b.radius && return SingleBoundingSphere(b.pos + zero(Δ), b.radius + zero(d))
-    r = (d + a.radius + b.radius) / 2
-    return SingleBoundingSphere(a.pos + (r - a.radius) / d * Δ, r)
-end
-_enclosing_sphere(::AbstractBoundingSphere, ::AbstractBoundingSphere) = NoBoundingSphere()
-
-# The sphere that encloses all `spheres`, none for an object without parts
-_enclosing_sphere(spheres::Tuple{Vararg{AbstractBoundingSphere}}) = foldl(_enclosing_sphere, spheres)
-_enclosing_sphere(::Tuple{}) = NoBoundingSphere()
-
-"""
-    bounding_box(sphere::SingleBoundingSphere)
+    bounding_box(sphere::AbstractBoundingSphere)
 
 Returns the limits `(xmin, xmax, ymin, ymax, zmin, zmax)` of the axis-aligned box around the `sphere`.
 """
-function bounding_box(sphere::SingleBoundingSphere)
-    c, r = sphere.pos, sphere.radius
+function bounding_box(sphere::AbstractBoundingSphere)
+    c, r = position(sphere), radius(sphere)
     return c[1] - r, c[1] + r, c[2] - r, c[2] + r, c[3] - r, c[3] + r
 end
 
@@ -142,17 +207,29 @@ Table of the bounding spheres of a solve
 
 """
 The table of the bounding spheres of a solve, see [`bounding_spheres`](@ref): the sphere of a shape
-under the shape, the sphere of a [`MultiShape`](@ref) object or group under the object. The keys are
-compared by identity.
+under the shape, the [`MultiBoundingSphere`](@ref) of a [`MultiShape`](@ref) object or group under
+the object. The keys are compared by identity. The values are of these two concrete types, not of
+the abstract type, such that the lookup per ray needs no dynamic dispatch.
 """
-const BoundingSphereTable = IdDict{Any, SingleBoundingSphere{Float64}}
+const BoundingSphereTable = IdDict{Any, Union{SingleBoundingSphere{Float64}, MultiBoundingSphere{Float64}}}
+
+# Key of the table of the running solve in the task-local storage
+const BOUNDING_SPHERES_KEY = :BeamletOptics_bounding_spheres
 
 """
-The [`BoundingSphereTable`](@ref) of the solve that is running in the current task, or `nothing`
-outside of a solve. It is set by [`with_bounding_spheres`](@ref), and the intersection code passes
-it to `bounding_sphere_of(table, x)`.
+    current_bounding_spheres() -> Union{Nothing, BoundingSphereTable}
+
+Returns the [`BoundingSphereTable`](@ref) of the solve that is running in the current task, or
+`nothing` outside of a solve. It is set by [`with_bounding_spheres`](@ref), and the intersection
+code passes it to `bounding_sphere_of(table, x)`.
+
+The table lives in the task-local storage, since the intersection code reads it for every object
+and ray, and this read is several times cheaper than that of a `ScopedValue`. A task that is
+spawned within a solve therefore does not see the table of its parent.
 """
-const BOUNDING_SPHERES = ScopedValue{Union{Nothing, BoundingSphereTable}}(nothing)
+function current_bounding_spheres()
+    return get(task_local_storage(), BOUNDING_SPHERES_KEY, nothing)::Union{Nothing, BoundingSphereTable}
+end
 
 """
     bounding_sphere_of(table::BoundingSphereTable, x)
@@ -163,7 +240,7 @@ Returns the bounding sphere that the `table` holds for the shape or object `x`, 
 `bounding_sphere_of(x)`, which fills the table, see [`bounding_spheres`](@ref).
 
 The intersection code calls this method per ray with the table of the solve that is running in the
-current task, `BOUNDING_SPHERES[]`. Outside of a solve this table is `nothing` and the result is
+current task, [`current_bounding_spheres`](@ref)`()`. Outside of a solve this table is `nothing` and the result is
 always `NoBoundingSphere()`, i.e. `intersect3d(object, ray)` then tests the object without a sphere.
 """
 bounding_sphere_of(table::BoundingSphereTable, x) = get(table, x, NoBoundingSphere())
@@ -203,48 +280,64 @@ end
 function _register!(table::BoundingSphereTable, ::MultiShape, object::AbstractObject)
     # the spheres of the parts are computed once and reused for the sphere around them
     parts = map(part -> _register!(table, part), shape(object))
-    return _store!(table, object, _enclosing_sphere(parts))
+    return _store!(table, object, MultiBoundingSphere(parts))
 end
 
+# Center and radius of the `sphere` as the table holds them: as `Float64`, with the radius enlarged
+# by the rounding of the pose and the parameters of the shape in its own number type
+function _table_values(sphere::AbstractBoundingSphere)
+    T = typeof(radius(sphere))
+    pos = Point3{Float64}(position(sphere))
+    r = Float64(radius(sphere))
+    return pos, r + sqrt(eps(T)) * (r + norm(pos))
+end
+
+# Stores the `sphere` under the `key` and returns what is stored. No sphere, and a sphere of a number
+# type that is no `AbstractFloat`, is not stored.
 _store!(::BoundingSphereTable, key, ::AbstractBoundingSphere) = NoBoundingSphere()
-function _store!(table::BoundingSphereTable, key, sphere::SingleBoundingSphere{T}) where {T <: AbstractFloat}
-    pos = Point3{Float64}(sphere.pos)
-    r = Float64(sphere.radius)
-    # rounding of the pose and the parameters of the shape in its own number type
-    stored = SingleBoundingSphere(pos, r + sqrt(eps(T)) * (r + norm(pos)))
-    table[key] = stored
-    return stored
+function _store!(table::BoundingSphereTable, key, sphere::SingleBoundingSphere{<:AbstractFloat})
+    return table[key] = SingleBoundingSphere(_table_values(sphere)...)
+end
+function _store!(table::BoundingSphereTable, key, sphere::MultiBoundingSphere{<:AbstractFloat})
+    return table[key] = MultiBoundingSphere(_table_values(sphere)...)
 end
 
 """
     with_bounding_spheres(f, system::AbstractSystem)
+    with_bounding_spheres(f, table::BoundingSphereTable)
 
-Calls `f()` with the [`bounding_spheres`](@ref) of the `system` as the table of the current task
-and of the tasks it spawns, such that the intersection code finds them. If a table is
-already set, e.g. by the solve of the beam group that a beam belongs to, it is kept and nothing is
-computed.
+Calls `f()` with the [`bounding_spheres`](@ref) of the `system`, or with the given `table`, as the
+table of the current task, such that the intersection code finds them, see
+[`current_bounding_spheres`](@ref). If a table is already set when a `system` is given, e.g. by the
+solve of the beam group that a beam belongs to, it is kept and nothing is computed.
+
+The table belongs to the current task only. Code that spawns tasks within `f`, e.g. via
+`Threads.@threads`, passes the table on by calling `with_bounding_spheres(g, table)` in each task,
+as the solve of a beam group does.
 
 The `system` must not be changed while `f` runs: the spheres are those of the poses at the call.
 """
 function with_bounding_spheres(f, system::AbstractSystem)
-    isnothing(BOUNDING_SPHERES[]) || return f()
-    return with(f, BOUNDING_SPHERES => bounding_spheres(system))
+    isnothing(current_bounding_spheres()) || return f()
+    return with_bounding_spheres(f, bounding_spheres(system))
 end
+
+with_bounding_spheres(f, table::BoundingSphereTable) = task_local_storage(f, BOUNDING_SPHERES_KEY, table)
 
 #=
 Test of a ray against a bounding sphere
 =#
 
 """
-    _sphere_exit(sphere::SingleBoundingSphere, ray, margin = 0)
+    _sphere_exit(sphere::AbstractBoundingSphere, ray, margin = 0)
 
 Returns the path length in [m] at which the `ray` leaves the `sphere`, or `nothing` if the `ray`
 does not pass through it, i.e. if its line misses the sphere or the sphere lies behind its start.
 The radius is enlarged by the `margin` in [m] and by the rounding error of the test, such that a ray
 towards a point on the sphere still passes through it.
 """
-function _sphere_exit(sphere::SingleBoundingSphere, ray::AbstractRay, margin = 0)
-    center, radius = sphere.pos, sphere.radius
+function _sphere_exit(sphere::AbstractBoundingSphere, ray::AbstractRay, margin = 0)
+    center, r = position(sphere), radius(sphere)
     dir = direction(ray)
     oc = center - position(ray)
     b = dot(oc, dir)
@@ -252,36 +345,37 @@ function _sphere_exit(sphere::SingleBoundingSphere, ray::AbstractRay, margin = 0
     # in contrast to |oc|² - b².
     perp = oc - b * dir
     q = dot(perp, perp)
-    tol = sqrt(eps(float(typeof(radius))))
-    ρ = radius + margin + tol * (radius + norm(center) + norm(oc))
+    tol = sqrt(eps(float(typeof(r))))
+    ρ = r + margin + tol * (r + norm(center) + norm(oc))
     q > ρ^2 && return nothing
     t_out = b + sqrt(ρ^2 - q)
     t_out < 0 && return nothing
     return t_out
 end
 
-# Whether the `ray` can not hit anything within the bounding sphere
-_misses(::NoBoundingSphere, ::AbstractRay) = false
-_misses(sphere::SingleBoundingSphere, ray::AbstractRay) = isnothing(_sphere_exit(sphere, ray))
-
 """
-    intersect3d(sphere::AbstractBoundingSphere, shape::AbstractShape, ray::AbstractRay)
+    intersect3d(sphere::AbstractBoundingSphere, x::Union{AbstractShape, Tuple, AbstractVector, Leaves}, ray::AbstractRay)
 
-Returns the intersection between the `shape` and the `ray` like `intersect3d(shape, ray)`, but tests
-the `ray` against the bounding `sphere` of the `shape` first:
+Returns the intersection between `x` and the `ray` like `intersect3d(x, ray)`, but tests the `ray`
+against the bounding `sphere` of `x` first. `x` is a shape, or the parts of a [`MultiShape`](@ref)
+object or of an object group, see `intersect3d(parts, ray)`:
 
-- [`NoBoundingSphere`](@ref): the shape is tested via `intersect3d(shape, ray)`
-- the `ray` misses the [`SingleBoundingSphere`](@ref), or the sphere lies behind it: returns
-  `nothing` without a test of the `shape`
-- otherwise the shape is tested via `intersect3d(shape, ray)`
+- [`NoBoundingSphere`](@ref): `x` is tested via `intersect3d(x, ray)`
+- the `ray` misses the [`SingleBoundingSphere`](@ref) or [`MultiBoundingSphere`](@ref), or the
+  sphere lies behind it: returns
+  `nothing` without a test of `x`, i.e. of any of the parts
+- otherwise `x` is tested via `intersect3d(x, ray)`
 
 The intersection code of the objects calls this method with the sphere that the table of the
-running solve holds for the `shape`, `bounding_sphere_of(BOUNDING_SPHERES[], shape)`. A shape type
-implements `intersect3d(shape, ray)` and, optionally, `bounding_sphere_of(shape)`, not this method.
+running solve holds for the shape, object or group, e.g. `bounding_sphere_of(current_bounding_spheres(), shape)`.
+A shape type implements `intersect3d(shape, ray)` and, optionally, `bounding_sphere_of(shape)`, not
+this method.
 """
-intersect3d(::NoBoundingSphere, shape::AbstractShape, ray::AbstractRay) = intersect3d(shape, ray)
+function intersect3d(::NoBoundingSphere, x::Union{AbstractShape, Tuple, AbstractVector, Leaves}, ray::AbstractRay)
+    return intersect3d(x, ray)
+end
 
-function intersect3d(sphere::SingleBoundingSphere, shape::AbstractShape, ray::AbstractRay)
-    _misses(sphere, ray) && return nothing
-    return intersect3d(shape, ray)
+function intersect3d(sphere::AbstractBoundingSphere, x::Union{AbstractShape, Tuple, AbstractVector, Leaves}, ray::AbstractRay)
+    isnothing(_sphere_exit(sphere, ray)) && return nothing
+    return intersect3d(x, ray)
 end

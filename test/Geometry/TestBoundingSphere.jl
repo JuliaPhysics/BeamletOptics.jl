@@ -77,6 +77,73 @@ sphere_prism(radius, bound = radius) = BMO.Prism(WrappedSDF(BMO.SphereSDF(radius
         @test BMO.SingleBoundingSphere(Point3(0.0f0, 0, 0), 1.0) isa BMO.SingleBoundingSphere{Float64}
     end
 
+    @testset "MultiBoundingSphere" begin
+        none = BMO.NoBoundingSphere()
+        a = BMO.SingleBoundingSphere([0.0, 0, 0], 1.0)
+        b = BMO.SingleBoundingSphere([4.0, 0, 0], 2.0)
+        # the smallest sphere around two spheres, which touch it from within
+        ab = @inferred BMO.MultiBoundingSphere(a, b)
+        @test ab isa BMO.MultiBoundingSphere{Float64}
+        @test ab.pos ≈ [2.5, 0, 0]
+        @test ab.radius ≈ 3.5
+        @test position(ab) == ab.pos
+        @test BMO.radius(ab) == ab.radius
+        @test BMO.radius(a) == a.radius
+        @test BMO.MultiBoundingSphere(b, a).pos ≈ ab.pos
+        @test BMO.MultiBoundingSphere(b, a).radius ≈ ab.radius
+        @test encloses(ab, a) && encloses(ab, b)
+        # one sphere within the other, also the same sphere twice
+        big = BMO.SingleBoundingSphere([0.5, 0, 0], 3.0)
+        for (x, y) in ((a, big), (big, a), (big, big))
+            inner = BMO.MultiBoundingSphere(x, y)
+            @test inner isa BMO.MultiBoundingSphere{Float64}
+            @test inner.pos == big.pos
+            @test inner.radius == big.radius
+        end
+        # a sphere around several spheres is a part like any other
+        c = BMO.SingleBoundingSphere([0.0, 10, 0], 1.0)
+        abc = BMO.MultiBoundingSphere(ab, c)
+        @test abc isa BMO.MultiBoundingSphere{Float64}
+        @test all(s -> encloses(abc, s), (a, b, c, ab))
+        # all spheres of a tuple
+        all3 = @inferred BMO.MultiBoundingSphere((a, b, c))
+        @test all3.pos ≈ abc.pos
+        @test all3.radius ≈ abc.radius
+        @test BMO.MultiBoundingSphere((a,)) == BMO.MultiBoundingSphere(a.pos, a.radius)
+        @test BMO.MultiBoundingSphere((ab,)) === ab
+        # no sphere if one of them is none, and for nothing at all
+        @test BMO.MultiBoundingSphere(a, none) === none
+        @test BMO.MultiBoundingSphere(none, a) === none
+        @test BMO.MultiBoundingSphere(none, none) === none
+        @test BMO.MultiBoundingSphere((a, none, b)) === none
+        @test BMO.MultiBoundingSphere((none,)) === none
+        @test BMO.MultiBoundingSphere(()) === none
+        # the same sphere as the other kind
+        @test BMO.SingleBoundingSphere(ab) == BMO.SingleBoundingSphere(ab.pos, ab.radius)
+        @test BMO.MultiBoundingSphere(a) == BMO.MultiBoundingSphere(a.pos, a.radius)
+        @test BMO.SingleBoundingSphere(a) === a
+        @test BMO.SingleBoundingSphere(none) === none
+        @test BMO.MultiBoundingSphere(none) === none
+        # no sphere has no center and no radius, with an error that says so
+        @test_throws ArgumentError position(none)
+        @test_throws ArgumentError BMO.radius(none)
+        @test_throws "NoBoundingSphere has no center" position(none)
+        @test_throws "NoBoundingSphere has no radius" BMO.radius(none)
+        @test_throws ArgumentError BMO.bounding_box(none)
+        @test_throws ArgumentError BMO._sphere_exit(none, Ray([0.0, 0, 0], [0.0, 1, 0]))
+        # number types are promoted
+        @test BMO.MultiBoundingSphere(Point3(0.0f0, 0, 0), 1.0) isa BMO.MultiBoundingSphere{Float64}
+        f32 = BMO.SingleBoundingSphere(Point3(1.0f0, 0, 0), 1.0f0)
+        @test BMO.MultiBoundingSphere(f32, f32) isa BMO.MultiBoundingSphere{Float32}
+        @test BMO.MultiBoundingSphere(a, f32) isa BMO.MultiBoundingSphere{Float64}
+        # tested against a ray like the sphere of a single shape
+        through = Ray([2.5, -10, 0], [0.0, 1, 0])
+        passing = Ray([7.0, -10, 0], [0.0, 1, 0])
+        @test BMO._sphere_exit(ab, through) ≈ BMO._sphere_exit(BMO.SingleBoundingSphere(ab), through)
+        @test isnothing(BMO._sphere_exit(ab, passing))
+        @test BMO.bounding_box(ab) == BMO.bounding_box(BMO.SingleBoundingSphere(ab))
+    end
+
     @testset "Meshes" begin
         mesh = BMO.CubeMesh(20e-3)
         translate3d!(mesh, [0.1, 0.2, -0.3])
@@ -107,7 +174,7 @@ sphere_prism(radius, bound = radius) = BMO.Prism(WrappedSDF(BMO.SphereSDF(radius
         outer = ObjectGroup([inner, other])
         for object in (doublet, cube, inner, outer)
             main = BMO.bounding_sphere_of(object)
-            @test main isa BMO.SingleBoundingSphere
+            @test main isa BMO.MultiBoundingSphere{Float64}
             @test all(part -> encloses(main, BMO.bounding_sphere_of(part)), BMO.shape(object))
         end
         # tight for two spheres: they touch the sphere around them from within
@@ -144,6 +211,10 @@ sphere_prism(radius, bound = radius) = BMO.Prism(WrappedSDF(BMO.SphereSDF(radius
         @test table[BMO.shape(prism)].pos == computed.pos
         @test computed.radius < table[BMO.shape(prism)].radius < computed.radius * (1 + 1e-6)
         @test encloses(table[group], table[BMO.shape(first(BMO.shape(group)))])
+        # the kind of the sphere is kept
+        @test all(s -> table[s] isa BMO.SingleBoundingSphere{Float64}, shapes)
+        @test table[doublet] isa BMO.MultiBoundingSphere{Float64}
+        @test table[group] isa BMO.MultiBoundingSphere{Float64}
         @test isempty(BMO.bounding_spheres(System()))
         @test length(BMO.bounding_spheres(StaticSystem([prism, group]))) == 3
 
@@ -156,21 +227,58 @@ sphere_prism(radius, bound = radius) = BMO.Prism(WrappedSDF(BMO.SphereSDF(radius
         @test BMO.bounding_sphere_of(nothing, group) === BMO.NoBoundingSphere()
 
         # the table of the current task is only set in a running solve
-        @test isnothing(BMO.BOUNDING_SPHERES[])
-        @test BMO.bounding_sphere_of(BMO.BOUNDING_SPHERES[], shape) === BMO.NoBoundingSphere()
+        @test isnothing(BMO.current_bounding_spheres())
+        @test BMO.bounding_sphere_of(BMO.current_bounding_spheres(), shape) === BMO.NoBoundingSphere()
         stranger = sphere_prism(radius)
         BMO.with_bounding_spheres(system) do
-            @test BMO.bounding_sphere_of(BMO.BOUNDING_SPHERES[], shape) === table[shape]
-            @test BMO.bounding_sphere_of(BMO.BOUNDING_SPHERES[], group) === table[group]
-            @test BMO.bounding_sphere_of(BMO.BOUNDING_SPHERES[], BMO.shape(none)) === BMO.NoBoundingSphere()
-            @test BMO.bounding_sphere_of(BMO.BOUNDING_SPHERES[], BMO.shape(stranger)) === BMO.NoBoundingSphere()
+            @test BMO.bounding_sphere_of(BMO.current_bounding_spheres(), shape) === table[shape]
+            @test BMO.bounding_sphere_of(BMO.current_bounding_spheres(), group) === table[group]
+            @test BMO.bounding_sphere_of(BMO.current_bounding_spheres(), BMO.shape(none)) === BMO.NoBoundingSphere()
+            @test BMO.bounding_sphere_of(BMO.current_bounding_spheres(), BMO.shape(stranger)) === BMO.NoBoundingSphere()
             # a table that is set is kept
             BMO.with_bounding_spheres(System([stranger])) do
-                @test BMO.bounding_sphere_of(BMO.BOUNDING_SPHERES[], shape) === table[shape]
-                @test BMO.bounding_sphere_of(BMO.BOUNDING_SPHERES[], BMO.shape(stranger)) === BMO.NoBoundingSphere()
+                @test BMO.bounding_sphere_of(BMO.current_bounding_spheres(), shape) === table[shape]
+                @test BMO.bounding_sphere_of(BMO.current_bounding_spheres(), BMO.shape(stranger)) === BMO.NoBoundingSphere()
             end
         end
-        @test BMO.bounding_sphere_of(BMO.BOUNDING_SPHERES[], shape) === BMO.NoBoundingSphere()
+        @test BMO.bounding_sphere_of(BMO.current_bounding_spheres(), shape) === BMO.NoBoundingSphere()
+
+        # the table belongs to the task: a spawned task sees none, unless it is passed on
+        BMO.with_bounding_spheres(system) do
+            current = BMO.current_bounding_spheres()
+            @test current isa BMO.BoundingSphereTable
+            @test isnothing(fetch(Threads.@spawn BMO.current_bounding_spheres()))
+            passed = fetch(Threads.@spawn BMO.with_bounding_spheres(BMO.current_bounding_spheres, current))
+            @test passed === current
+            # a given table replaces the one that is set, and the latter is restored
+            other = BMO.bounding_spheres(System([stranger]))
+            @test BMO.with_bounding_spheres(BMO.current_bounding_spheres, other) === other
+            @test BMO.current_bounding_spheres() === current
+        end
+        # no table is left if the function throws
+        @test_throws ErrorException BMO.with_bounding_spheres(() -> error("failed"), system)
+        @test isnothing(BMO.current_bounding_spheres())
+    end
+
+    @testset "Sphere before a shape or parts" begin
+        a = BMO.SphereSDF(radius)
+        b = BMO.SphereSDF(radius)
+        translate3d!(b, [0, 4radius, 0])
+        around = BMO.SingleBoundingSphere([0.0, 2radius, 0], 3radius)
+        beside = BMO.SingleBoundingSphere([1.0, 0, 0], radius)
+        hit = Ray([0.0, -3radius, 0], [0.0, 1, 0])
+        passing = Ray([4radius, -3radius, 0], [0.0, 1, 0])
+        # a shape, and the parts of an object or group as a tuple or a vector
+        for x in (a, (b, a), [b, a])
+            ref = BMO.intersect3d(x, hit)
+            @test length(ref) ≈ 2radius
+            @test length(BMO.intersect3d(BMO.NoBoundingSphere(), x, hit)) == length(ref)
+            @test length(BMO.intersect3d(around, x, hit)) ≈ length(ref)
+            @test isnothing(BMO.intersect3d(BMO.NoBoundingSphere(), x, passing))
+            @test isnothing(BMO.intersect3d(around, x, passing))
+            # the sphere decides: `x` is not tested if the ray misses the sphere
+            @test isnothing(BMO.intersect3d(beside, x, hit))
+        end
     end
 
     @testset "Evaluations of the shape" begin

@@ -38,7 +38,7 @@ Returns the sphere that encloses the bounding spheres of the convex and the cyli
 are positioned in the local frame of the lens; the concave part only removes volume.
 """
 function bounding_sphere_of(ml::MeniscusLensSDF)
-    merged = _enclosing_sphere(bounding_sphere_of(ml.convex), bounding_sphere_of(ml.cylinder))
+    merged = MultiBoundingSphere(bounding_sphere_of(ml.convex), bounding_sphere_of(ml.cylinder))
     return SingleBoundingSphere(ml, merged)
 end
 

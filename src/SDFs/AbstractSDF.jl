@@ -198,7 +198,7 @@ function intersect3d(object::AbstractSDF, ray::AbstractRay, t_max = SDF_MISS_DIS
 end
 
 """
-    intersect3d(sphere::SingleBoundingSphere, object::AbstractSDF, ray::AbstractRay)
+    intersect3d(sphere::AbstractBoundingSphere, object::AbstractSDF, ray::AbstractRay)
 
 Tests the `ray` against the bounding `sphere` of the `object`, see
 `intersect3d(sphere, shape, ray)`. If the ray passes through the sphere, it is marched as in
@@ -208,11 +208,14 @@ within. A ray that leaves the `object` is thus a miss after a few steps.
 The radius is enlarged by the surface threshold of the marching algorithm
 (`Config.get_sdf_surface_threshold()`), below which a ray counts as starting on the surface.
 """
-function intersect3d(sphere::SingleBoundingSphere, object::AbstractSDF, ray::AbstractRay)
+function intersect3d(sphere::AbstractBoundingSphere, object::AbstractSDF, ray::AbstractRay)
     t_out = _sphere_exit(sphere, ray, Config.get_sdf_surface_threshold())
     isnothing(t_out) && return nothing
     return intersect3d(object, ray, t_out)
 end
+
+# Without a sphere the ray is marched up to the miss distance
+intersect3d(::NoBoundingSphere, object::AbstractSDF, ray::AbstractRay) = intersect3d(object, ray)
 
 # generic SDF transformations
 """
