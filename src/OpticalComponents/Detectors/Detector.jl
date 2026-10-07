@@ -172,10 +172,10 @@ struct AstigmaticGaussianBeamletHit{T} <: AbstractBeamletHit{T}
     u1::Point3{Complex{T}}
     h2::Point3{Complex{T}}
     u2::Point3{Complex{T}}
-    # Gouy factor √(a_ref / a(l)) of the complex beam area a at the local distance l
-    # behind p0, as gouy0 / (√(1 − ρ1 l) √(1 − ρ2 l)): its value at p0, with the argument
-    # followed continuously from the reference (see `_area_arg`), and the inverse roots
-    # of a(l) (see `_area_inverse_roots`)
+    # Amplitude and Gouy factor of the complex beam area a at the local distance l behind
+    # p0, as gouy0 / (√(1 − ρ1 l) √(1 − ρ2 l)): gouy0 is the change of the amplitude with the
+    # beam area and the Gouy phase up to p0, followed from the start of the root beam (see
+    # `_area_history`), ρ1 and ρ2 are the inverse roots of a(l) (see `_area_inverse_roots`)
     gouy0::Complex{T}
     ρ1::Complex{T}
     ρ2::Complex{T}
@@ -400,9 +400,10 @@ end
 
 Hit record of the traced segment `id` of `agb`: the data that [`beamlet_hit_field`](@ref)
 needs to evaluate the field of that segment at any point near it, including the optical
-path from the source (parents included), the Gouy factor and the reference amplitude. The
-amplitude and the Gouy phase refer to the start of the root beam, i.e. a child beamlet
-continues its parent.
+path from the source (parents included), the Gouy factor and the amplitude. The amplitude is
+that of the polarization of the chief ray of the segment, times the change with the beam
+area within the segments since the start of the root beam; the Gouy phase is followed from
+there as well, i.e. a child beamlet continues its parent.
 [`Detector`](@ref)s store one per beamlet that hits them; it can also be built for any
 traced segment, e.g. to sample a beamlet on a plane of one's own. The projection factor is
 `1` if the segment ends without an intersection.
@@ -418,18 +419,18 @@ function AstigmaticGaussianBeamletHit(agb::AstigmaticGaussianBeamlet{R}, id::Int
     # Parabasal parameters at segment start (p0)
     h1, u1, h2, u2, _ = parabasal_ray_parameters(agb, p0, id)
 
-    # Reference of the amplitude and of the Gouy phase: the start of the root beam, which a
-    # child continues through its parents
-    area_ref = _root_area(agb)
-    area_arg0 = _area_arg(agb, id, zero(R))
+    # Change of the amplitude with the beam area and Gouy phase up to p0, from the start of the
+    # root beam, which a child continues through its parents
+    area_arg0, _, s0 = _area_history(agb, id, zero(R))
     # Gouy factor at p0 and inverse roots of the area along the hit segment, constant per
     # hit, so that the field loop over the detector pixels does not recompute them
     A = _area_coefficients(h1, u1, h2, u2, d0)
-    gouy0 = sqrt(abs(area_ref / A[1])) * cis(-area_arg0 / 2)
+    gouy0 = s0 * cis(-area_arg0 / 2)
     ρ1, ρ2 = _area_inverse_roots(A)
 
-    # Extract complex reference amplitude
-    E_vec = polarization(first(rays(agb.c)))
+    # Complex amplitude of the segment: its chief ray carries what the surfaces on the way did
+    # to the field (Fresnel coefficients, polarizers, beamsplitters)
+    E_vec = polarization(chief)
     max_idx = argmax(abs.(E_vec))
     E_ref_amp = Complex{R}(norm(E_vec) * cis(angle(E_vec[max_idx])))
 

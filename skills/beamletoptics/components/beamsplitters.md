@@ -13,7 +13,9 @@ universal π shift:
 | `GaussianBeamlet` | scalar amplitude `r`, times `exp(iπ)` **only if** the incident direction faces the splitter normal (`dot(dir, normal) < 0`), otherwise no extra phase |
 | `AstigmaticGaussianBeamlet` | s/p Jones matrix as for `PolarizedRay`, **plus** the same conditional π as `GaussianBeamlet` on the chief polarization |
 
-Transmitted beams get the amplitude `t` and no phase shift. In interferometers, only relative phases
+Transmitted beams get the amplitude `t` and no phase shift. Behind the coating of a plate beamsplitter the
+field of a polarized beam is scaled for the glass (the coating transmits the power fraction `t²`), and it
+leaves the uncoated back with the Fresnel loss of that surface. In interferometers, only relative phases
 between arms are meaningful. Do not add phase offsets by hand to "correct" for the splitter; if a
 fringe offset matters, check which side of the coating each arm reflects from.
 

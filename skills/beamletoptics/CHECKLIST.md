@@ -39,6 +39,8 @@
    radii and diameter, the constructor throws ("cylinder section length ≤ 0"): increase `l` or reduce `d`.
 7. **`Mirror`s reflect on every face**, including the back and edges.
 8. **Polarized refraction** traces only the refracted ray (no ghost reflections); no coatings are modeled.
+   The refracted field carries the Fresnel transmission: a `PolarizedRay` or an `AstigmaticGaussianBeamlet`
+   loses about 4 % of its power per uncoated surface (n = 1.5), a `GaussianBeamlet` nothing.
 9. **Doublets/triplets** assume flush cemented contact; only spherical menisci are supported;
    aspheres are experimental.
 10. **Resonators** (facing mirrors, cavities) need a bounded `r_max`/`depth_max`.

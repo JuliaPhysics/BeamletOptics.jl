@@ -134,9 +134,9 @@ end
 Complex 3D vector (global frame) that turns the scalar
 [`beamlet_hit_field`](@ref)`(hit, p)` of an astigmatic beamlet hit into its 3D field
 vector at `p`: the polarization of the hit segment's chief ray divided by the complex
-reference amplitude `E_ref_amp` that the scalar field already contains. For a beamlet
-whose polarization did not change on its path it is a unit vector with the phase of the
-reference component removed.
+amplitude `E_ref_amp` that the scalar field already contains, i.e. a unit vector with the
+phase of its largest component removed. It is the zero vector if the segment carries no
+light, e.g. behind a crossed polarizer.
 
 Stigmatic [`GaussianBeamletHit`](@ref)s have no method: the underlying [`GaussianBeamlet`](@ref)
 model is scalar and carries no polarization in BMO, so there is no principled 3D
@@ -146,11 +146,12 @@ axis of that plane (this matches `OpticsBase`'s rule for a purely scalar field: 
 placed entirely along `u`).
 """
 function beamlet_hit_polarization(hit::AstigmaticGaussianBeamletHit)
-    # `beamlet_hit_field` already carries the complex reference amplitude `E_ref_amp`
-    # (magnitude and phase of the start polarization), so dividing it out keeps the
-    # beamlet phase from being counted twice. What remains is the polarization of the hit
-    # segment relative to the start, including changes by polarizing elements.
-    return polarization(rays(hit.agb.c)[hit.id]) / hit.E_ref_amp
+    # `beamlet_hit_field` already carries the complex amplitude `E_ref_amp` (magnitude of the
+    # polarization of the segment and phase of its largest component), so dividing it out
+    # keeps amplitude and phase from being counted twice.
+    E = polarization(rays(hit.agb.c)[hit.id])
+    iszero(hit.E_ref_amp) && return zero(E)
+    return E / hit.E_ref_amp
 end
 
 function electric_field(

@@ -1,6 +1,7 @@
 module TestBeamsplitters
 
 using BeamletOptics
+using LinearAlgebra
 using Test
 
 const BMO = BeamletOptics
@@ -165,6 +166,32 @@ const mm = 1e-3
         @test BMO.get_default_depth_max() == 100
         solve_system!(system, beam)
         @test length(beam.children) == 2
+    end
+
+    @testset "Field of a polarized ray behind the plate" begin
+        # the coating transmits half of the power into the glass, the uncoated back takes its
+        # Fresnel loss: the field of the transmitted ray is transverse and has this amplitude
+        n = 1.5
+        θ_i = π / 4
+        θ_t = asin(sin(θ_i) / n)
+        r_s = (cos(θ_i) - n * cos(θ_t)) / (cos(θ_i) + n * cos(θ_t))
+        r_p = (n * cos(θ_i) - cos(θ_t)) / (n * cos(θ_i) + cos(θ_t))
+        for (e, R_back) in (([0.0, 0, 1], r_s^2), ([1.0, 0, 0], r_p^2))
+            pbs = RectangularPlateBeamsplitter(25e-3, 25e-3, 5e-3, λ -> n)
+            zrotate3d!(pbs, π / 4)
+            beam = Beam(PolarizedRay([0.0, -0.1, 0], [0.0, 1, 0], 1e-6, e))
+            solve_system!(System([pbs]), beam)
+            transmitted, reflected = BMO.children(beam)
+            inside, outside = BMO.rays(transmitted)
+            @test BMO.refractive_index(inside) == n
+            for ray in (inside, outside, first(BMO.rays(reflected)))
+                @test abs(dot(BMO.direction(ray), BMO.polarization(ray))) < 1e-12
+            end
+            @test sum(abs2, BMO.polarization(first(BMO.rays(reflected)))) ≈ 1 / 2
+            @test sum(abs2, BMO.polarization(outside)) ≈ (1 - R_back) / 2
+            # in the glass the power is n cos(θ) |E|² per area of the surface
+            @test n * cos(θ_t) * sum(abs2, BMO.polarization(inside)) ≈ cos(θ_i) / 2
+        end
     end
 end
 
