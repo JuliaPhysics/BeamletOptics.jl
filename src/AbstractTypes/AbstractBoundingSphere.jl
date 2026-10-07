@@ -93,13 +93,16 @@ those of the parts of an object. The result is `NoBoundingSphere()` if one of th
 then no sphere encloses all parts, and for no spheres at all.
 """
 function MultiBoundingSphere(a::AbstractBoundingSphere, b::AbstractBoundingSphere)
-    Δ = position(b) - position(a)
+    # asserted, the spheres of the parts of an object are not inferred
+    pa, pb = position(a)::Point3, position(b)::Point3
+    ra, rb = radius(a)::Real, radius(b)::Real
+    Δ = pb - pa
     d = norm(Δ)
     # one sphere contains the other
-    d + radius(b) ≤ radius(a) && return MultiBoundingSphere(position(a) + zero(Δ), radius(a) + zero(d))
-    d + radius(a) ≤ radius(b) && return MultiBoundingSphere(position(b) + zero(Δ), radius(b) + zero(d))
-    r = (d + radius(a) + radius(b)) / 2
-    return MultiBoundingSphere(position(a) + (r - radius(a)) / d * Δ, r)
+    d + rb ≤ ra && return MultiBoundingSphere(pa + zero(Δ), ra + zero(d))
+    d + ra ≤ rb && return MultiBoundingSphere(pb + zero(Δ), rb + zero(d))
+    r = (d + ra + rb) / 2
+    return MultiBoundingSphere(pa + (r - ra) / d * Δ, r)
 end
 MultiBoundingSphere(::NoBoundingSphere, ::AbstractBoundingSphere) = NoBoundingSphere()
 MultiBoundingSphere(::AbstractBoundingSphere, ::NoBoundingSphere) = NoBoundingSphere()
@@ -337,9 +340,10 @@ The radius is enlarged by the `margin` in [m] and by the rounding error of the t
 towards a point on the sphere still passes through it.
 """
 function _sphere_exit(sphere::AbstractBoundingSphere, ray::AbstractRay, margin = 0)
-    center, r = position(sphere), radius(sphere)
-    dir = direction(ray)
-    oc = center - position(ray)
+    # asserted, since the sphere or ray may not be inferred
+    center, r = position(sphere)::Point3, radius(sphere)::Real
+    dir = direction(ray)::Point3
+    oc = center - position(ray)::Point3
     b = dot(oc, dir)
     # Distance of the center from the line of the ray. This form does not cancel for a far start,
     # in contrast to |oc|² - b².
@@ -371,11 +375,19 @@ running solve holds for the shape, object or group, e.g. `bounding_sphere_of(cur
 A shape type implements `intersect3d(shape, ray)` and, optionally, `bounding_sphere_of(shape)`, not
 this method.
 """
-function intersect3d(::NoBoundingSphere, x::Union{AbstractShape, Tuple, AbstractVector, Leaves}, ray::AbstractRay)
-    return intersect3d(x, ray)
+intersect3d(::NoBoundingSphere, shape::AbstractShape, ray::AbstractRay) = intersect3d(shape, ray)
+
+function intersect3d(sphere::AbstractBoundingSphere, shape::AbstractShape, ray::AbstractRay)
+    isnothing(_sphere_exit(sphere, ray)) && return nothing
+    return intersect3d(shape, ray)
 end
 
-function intersect3d(sphere::AbstractBoundingSphere, x::Union{AbstractShape, Tuple, AbstractVector, Leaves}, ray::AbstractRay)
+# The parts have methods of their own, not shared with the shapes: the parts of an object reach the
+# shapes, and inference widens the argument types of a method that is called again within its own
+# call, i.e. the shapes would be tested by code compiled for abstract types.
+intersect3d(::NoBoundingSphere, parts::Union{Tuple, AbstractVector, Leaves}, ray::AbstractRay) = intersect3d(parts, ray)
+
+function intersect3d(sphere::AbstractBoundingSphere, parts::Union{Tuple, AbstractVector, Leaves}, ray::AbstractRay)
     isnothing(_sphere_exit(sphere, ray)) && return nothing
-    return intersect3d(x, ray)
+    return intersect3d(parts, ray)
 end

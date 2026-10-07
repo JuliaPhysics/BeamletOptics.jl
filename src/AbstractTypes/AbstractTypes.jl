@@ -25,6 +25,12 @@ Core Functions:
     trace_system!(system, GaussianBeamlet)
 =#
 
+# A call of `intersect3d` on an abstract shape or object is dispatched at runtime. Inference must not
+# compile the few generic methods it matches for abstract arguments: their code would call `dot`,
+# `normalize` etc. on values of unknown type, and loading a package that adds such methods, e.g.
+# Makie, would invalidate the precompiled tracing code. Calls with concrete arguments match one method.
+Base.Experimental.@max_methods 1 function intersect3d end
+
 # Order of inclusion matters!
 include("AbstractKinematicTrait.jl")
 include("AbstractShape.jl")

@@ -47,7 +47,8 @@ end
 
 function normal3d(input::AbstractArray)
     T = float(eltype(input))
-    v = normalize(SVector{3,T}(Tuple(input)))
+    # by index, the length of `Tuple(input)` is not inferred for a vector
+    v = normalize(SVector{3,T}(input[1], input[2], input[3]))
     n = _orthogonal_basis_vector(v)
     # stabilize output type
     if input isa SVector

@@ -139,6 +139,8 @@ abstract type AbstractObjectGroup{T} <: AbstractObject{T} end
 AbstractTrees.children(group::AbstractObjectGroup) = group.objects
 
 function initialize!(group::AbstractObjectGroup)
-    foreach(initialize!, AbstractTrees.children(group))
+    for object in AbstractTrees.children(group)
+        initialize!(object)
+    end
     return nothing
 end

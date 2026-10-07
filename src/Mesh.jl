@@ -131,9 +131,11 @@ the right-hand rule. The vertices must be listed row-wise within the face matrix
 function normal3d(mesh::AbstractMesh{T}, fID::Int) where{T}
     @views begin
         face = vertices(mesh)[faces(mesh)[fID, :], :]
+        # asserted, the vertices of a mesh type that is not known are not inferred
+        v1 = Point3{T}(face[1, :])::Point3{T}
         n = cross(
-            (Point3{T}(face[2, :]) - Point3{T}(face[1, :])),
-            (Point3{T}(face[3, :]) - Point3{T}(face[1, :]))
+            (Point3{T}(face[2, :])::Point3{T} - v1),
+            (Point3{T}(face[3, :])::Point3{T} - v1)
         )
     end
     return normalize(n)
@@ -149,9 +151,10 @@ If no intersection occurs, `Inf` is returned. `kϵ` is the abort threshold for b
 This algorithm is fast due to multiple breakout conditions.
 """
 function MoellerTrumboreAlgorithm(face, ray::AbstractRay{T}; kϵ = 1e-9, lϵ = 1e-9) where {T}
-    V1 = Point3(face[1, 1], face[1, 2], face[1, 3])
-    V2 = Point3(face[2, 1], face[2, 2], face[2, 3])
-    V3 = Point3(face[3, 1], face[3, 2], face[3, 3])
+    # in the number type of the ray and asserted, since the type of `face` may not be inferred
+    V1 = Point3{T}(face[1, 1], face[1, 2], face[1, 3])::Point3{T}
+    V2 = Point3{T}(face[2, 1], face[2, 2], face[2, 3])::Point3{T}
+    V3 = Point3{T}(face[3, 1], face[3, 2], face[3, 3])::Point3{T}
 
     E1 = V2 - V1
     E2 = V3 - V1
@@ -214,7 +217,7 @@ This function is a generic implementation to check if a `ray` intersects the `me
 """
 function intersect3d(mesh::AbstractMesh{M},
         ray::AbstractRay{R}) where {M <: Real, R <: Real}
-    numEl = size(faces(mesh), 1)
+    numEl = size(faces(mesh), 1)::Int
     # allocate all intermediate vectors once (note that this is NOT THREAD-SAFE)
     T = promote_type(M, R)
     fID::Int = 0
@@ -231,9 +234,8 @@ function intersect3d(mesh::AbstractMesh{M},
     if isinf(t0)
         return nothing
     else
-        face = @views vertices(mesh)[faces(mesh)[fID, :], :]
-        normal = normal3d(mesh, fID)
-        return Intersection(t0, normalize(T.(normal)), mesh)
+        normal = normal3d(mesh, fID)::Point3{M}
+        return Intersection(t0, normalize(Point3{T}(normal)), mesh)
     end
 end
 
