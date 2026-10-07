@@ -15,7 +15,7 @@
 
 1. Construct every element at the origin.
 2. Orient (`x/y/zrotate3d!`, `align3d!`), then position (`translate3d!`/`translate_to3d!`).
-3. Put everything, including detectors and `MeshDummy` mounts, into one `System`.
+3. Put everything, including detectors and `NonInteractableObject` mounts, into one `System`.
 4. Create the source *after* deciding where it starts; `solve_system!`.
 5. Read out results; print numbers you can sanity-check.
 
@@ -64,7 +64,7 @@ end
 ## Sub-assemblies
 
 ```julia
-arm = ObjectGroup([mirror, mount])    # mount = MeshDummy("mount.stl")
+arm = ObjectGroup([mirror, mount])    # mount = NonInteractableObject("mount.stl")
 set_pivot3d!(arm, position(mirror))   # rotate about the mirror instead of the origin
 translate_to3d!(arm, [0.1, 0, 0])
 zrotate3d!(arm, deg2rad(90))

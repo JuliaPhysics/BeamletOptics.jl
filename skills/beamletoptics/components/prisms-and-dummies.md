@@ -23,7 +23,7 @@ Dispersion needs a λ-dependent index (`SellmeierEquation`). Trace one `Beam` pe
 
 | Constructor | Behavior |
 |-------------|----------|
-| `MeshDummy(path_to_stl)` | visual only, rays pass through (mounts, housings) |
+| `NonInteractableObject(path_to_stl)` | visual only, rays pass through (mounts, housings) |
 | `NonInteractableObject(shape)` | visual only, generic shape |
 | `IntersectableObject(path_to_stl)` | hard stop: rays terminate on it (apertures, beam dumps) |
 

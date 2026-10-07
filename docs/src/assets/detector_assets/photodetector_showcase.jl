@@ -4,7 +4,7 @@ GLMakie.activate!(; ssao=true)
 
 ##
 pd = Detector(1e-3)
-pd_body = MeshDummy(joinpath(@__DIR__, "FDS010.stl"))
+pd_body = NonInteractableObject(joinpath(@__DIR__, "FDS010.stl"))
 zrotate3d!(pd_body, π)
 translate3d!(pd, [0,-3e-3,0])
 

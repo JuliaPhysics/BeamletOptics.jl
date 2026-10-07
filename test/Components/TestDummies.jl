@@ -33,6 +33,16 @@ const BMO = BeamletOptics
         @test isnothing(BMO.interact3d(system, noninteract, beam, first(BMO.rays(beam))))
     end
 
+    @testset "NonInteractableObject from file" begin
+        loadpath = joinpath(pkgdir(BMO), "docs", "src", "assets", "mirror_renders", "Mirror_Post.stl")
+        dummy = NonInteractableObject(loadpath)
+        @test dummy isa NonInteractableObject
+        @test BMO.shape(dummy) isa BMO.Mesh
+        # former name
+        @test Base.isdeprecated(BMO, :MeshDummy)
+        @test BMO.MeshDummy === NonInteractableObject
+    end
+
     @testset "KM100CPMount" begin
         mount = BMO.KM100CPMount()
         @test mount isa NonInteractableObject

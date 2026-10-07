@@ -60,7 +60,7 @@ export PolarizationFilter, RoundPolarizationFilter, LinearPolarizer, RoundLinear
        transmission_axis
 
 # dummies
-export NonInteractableObject, MeshDummy, IntersectableObject
+export NonInteractableObject, IntersectableObject
 
 # misc
 export Retroreflector, get_invariant_threshold, set_invariant_threshold!,
