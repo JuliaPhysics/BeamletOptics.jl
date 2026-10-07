@@ -21,10 +21,8 @@ flowchart TB
     FR -.-> OR
     FR -.-> DI
 
-    classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
     classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
-    class TR,ST,MV purple
-    class FR,OR,DI blue
+    class TR,ST,MV,FR,OR,DI purple
 ```
 
 ```@docs; canonical=false

@@ -5,7 +5,7 @@ Provides a generic container type interface for bundles of [`Beam`](@ref)s.
 This interface assumes that there exists a central beam around which the bundle propagates,
 e.g. akin to an optical axis.
 
-# AbstractBeamGroup implementation reqs.
+# Implementation reqs.
 
 Subtypes of `AbstractBeamGroup` must implement the following:
 

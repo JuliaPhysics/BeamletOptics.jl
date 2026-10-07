@@ -113,7 +113,7 @@ end
 end
 
 @testset "Testing Gaussian beamlet interference" begin
-    @testset "Pre-Beamsplitter tests with seperate beams" begin
+    @testset "Pre-Beamsplitter tests with separate beams" begin
         # Gauss beam parameters (selected for ring fringes)
         w0 = 0.01e-3
         λ = 1000e-9

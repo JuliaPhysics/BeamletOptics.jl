@@ -165,7 +165,7 @@ The generated figure can be seen below. A dashdot line has been added to indicat
 
 ## The filter and collection group
 
-The miniscope features a dichroic beamsplitter to seperate the emission path from the imaging optics. For the imaging path, the beamsplitter is followed by two filters and a collection lens. For the purpose of this tutorial, we will model the beamsplitter and filters as simple glass plates, i.e. [`Prism`](@ref)s. However, for an accurate representation, we will first have to move the lens group into position. This involves a rotation around the x-axis by 90°. We can achieve this simply with the following command. Note that the pivot point lies at the origin.
+The miniscope features a dichroic beamsplitter to separate the emission path from the imaging optics. For the imaging path, the beamsplitter is followed by two filters and a collection lens. For the purpose of this tutorial, we will model the beamsplitter and filters as simple glass plates, i.e. [`Prism`](@ref)s. However, for an accurate representation, we will first have to move the lens group into position. This involves a rotation around the x-axis by 90°. We can achieve this simply with the following command. Note that the pivot point lies at the origin.
 
 ```julia
 xrotate3d!(obj_group, deg2rad(90))
