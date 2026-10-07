@@ -97,24 +97,27 @@ Returns the rotation matrix R that will align the start vector to be parallel to
 Based on ['Avoiding Trigonometry'](https://gist.github.com/kevinmoran/b45980723e53edeb8a5a43c49f134724) by Íñigo Quílez. The resulting matrix
 was transposed due to column/row major issues. Vector length is maintained. This function is very fast.
 
-The rotation is exact for all angles, including angles of a few nrad (alignment of optics) and
-angles close to π. For antiparallel vectors (within `√(2eps)`), R is a rotation by π about an
-axis normal to `start`.
+R is the rotation about the axis normal to both vectors (the smallest rotation). It is exact and
+orthonormal for all angles, including angles of a few nrad (alignment of optics) and angles close
+to π. For antiparallel vectors, R is a rotation by π about an axis normal to `start`.
 """
 function align3d(start::AbstractVector, target::AbstractVector)
     start = normalize(start)
     target = normalize(target)
     T = promote_type(eltype(start), eltype(target))
-    rx, ry, rz = cross(target, start)
     cosA = dot(start, target)
-    # 1 + cos(A) = |start + target|² / 2, without the cancellation of 1 + cosA close to A = π
-    q = sum(abs2, start + target) / 2
-    if q < eps(T)
-        # antiparallel: rotation by π about an axis normal to start
-        u = normal3d(start)
-        return SMatrix{3, 3, T}(2 * u * u' - I)
+    if cosA < 0
+        # Obtuse angle: the formula below loses orthonormality close to π (error ~eps/(π - A)).
+        # Rotate by π about the axis normal to start and target instead, then by the remaining
+        # acute angle about the same axis; both rotations are orthonormal.
+        r = cross(start, target)
+        r = r - dot(r, start) * start
+        u = norm(r) > eps(T) ? normalize(r) : normal3d(start)
+        Rπ = SMatrix{3, 3, T}(2 * u * u' - I)
+        return align3d(Rπ * start, target) * Rπ
     end
-    k = 1 / q
+    rx, ry, rz = cross(target, start)
+    k = 1 / (1 + cosA)
     R = @SArray [
         rx^2*k+cosA rx*ry*k+rz rx*rz*k-ry
         ry*rx*k-rz ry^2*k+cosA ry*rz*k+rx

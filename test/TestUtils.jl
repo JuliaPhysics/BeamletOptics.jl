@@ -89,14 +89,20 @@ const BMO = BeamletOptics
             @test R * v ≈ -v
             @test isrotation(R)
         end
-        # close to π: the cross product of almost antiparallel vectors cancels, error ~ eps / δ
-        for δ in (1e-6, 1e-3)
-            t = -(cos(δ) * s + sin(δ) * n)
-            R = BMO.align3d(s, t)
-            @test norm(R * s - t) < 1e-9
-            @test isrotation(R; tol = 1e-9)
+        # obtuse angles up to close to π, Float64 and Float32: orthonormal, and the smallest
+        # rotation (the axis normal to start and target stays fixed; close to π, start and target
+        # define that axis only to ~eps / (π - A))
+        for T in (Float64, Float32), A in (2.0, 3.0, π - 1e-2, π - 6e-4, π - 1e-6)
+            sT = T.(s)
+            t = T.(cos(A) * s + sin(A) * n)
+            R = BMO.align3d(sT, t)
+            ϵ = 10 * eps(T)
+            @test eltype(R) == T
+            @test norm(R * sT - t) < ϵ
+            @test isrotation(R; tol = ϵ)
+            @test norm(R * normalize(cross(s, n)) - normalize(cross(s, n))) < 10ϵ / (π - A)
         end
-        # Float32
+        # Float32, small angle
         R = BMO.align3d(Float32[0, 1, 0], Float32[1f-3, 1, 0])
         @test eltype(R) == Float32
         @test (R * Float32[0, 1, 0])[1] ≈ 1f-3 rtol = 1e-3
