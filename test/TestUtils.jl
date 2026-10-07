@@ -71,6 +71,58 @@ const BMO = BeamletOptics
         @test T * start ≈ normalize(target)
     end
 
+    @testset "align3d is exact for small angles and close to π" begin
+        isrotation(R; tol = 1e-14) = norm(R' * R - I) < tol && det(R) ≈ 1
+        s = normalize([1.0, 2.0, -0.5])
+        n = BMO.normal3d(s)
+        # small angles (alignment of optics): no tolerance that drops them
+        for δ in (1e-9, 1e-7, 1e-5, 1e-4, 1e-3, 0.1)
+            t = cos(δ) * s + sin(δ) * n
+            R = BMO.align3d(s, t)
+            @test norm(R * s - t) < 1e-15
+            @test isapprox(dot(R * s, n), sin(δ); rtol = 1e-8)
+            @test isrotation(R)
+        end
+        # parallel vectors: exactly the identity, also if the squared length of the normalized
+        # vector rounds to 1 - eps (the first two), such that a repeated alignment does not scale
+        for v in ([0.3, -0.7, 0.2], Float32[1, 2, 3], [1.0, 2, 3], [0.0, 0, 1], s)
+            R = BMO.align3d(v, v)
+            @test R == I
+            @test eltype(R) == eltype(v)
+        end
+        # antiparallel along any axis, also z
+        for v in ([0.0, 0, 1], [1.0, 0, 0], [0.0, -1, 0], s)
+            R = BMO.align3d(v, -v)
+            @test R * v ≈ -v
+            @test isrotation(R)
+        end
+        # obtuse angles up to close to π, Float64 and Float32: orthonormal, and the smallest
+        # rotation (the axis normal to start and target stays fixed; close to π, start and target
+        # define that axis only to ~eps / (π - A))
+        for T in (Float64, Float32), A in (2.0, 3.0, π - 1e-2, π - 6e-4, π - 1e-6)
+            sT = T.(s)
+            t = T.(cos(A) * s + sin(A) * n)
+            R = BMO.align3d(sT, t)
+            ϵ = 10 * eps(T)
+            @test eltype(R) == T
+            @test norm(R * sT - t) < ϵ
+            @test isrotation(R; tol = ϵ)
+            @test norm(R * normalize(cross(s, n)) - normalize(cross(s, n))) < 10ϵ / (π - A)
+        end
+        # Float32, small angle
+        R = BMO.align3d(Float32[0, 1, 0], Float32[1f-3, 1, 0])
+        @test eltype(R) == Float32
+        @test (R * Float32[0, 1, 0])[1] ≈ 1f-3 rtol = 1e-3
+    end
+
+    @testset "align3d! rotates objects by µrad" begin
+        m = RoundPlanoMirror(25.4e-3, 5e-3)
+        d = normalize([1e-6, 1, 0])
+        align3d!(m, d)
+        @test norm(BMO.orientation(m)[:, 2] - d) < 1e-15
+        @test isapprox(BMO.orientation(m)[1, 2], 1e-6; rtol = 1e-8)
+    end
+
     @testset "Testing angle3d for resulting angle" begin
         a = BMO.angle3d([1, 0, 0], [0, 0, 1])
         @test isapprox(a, π / 2)
