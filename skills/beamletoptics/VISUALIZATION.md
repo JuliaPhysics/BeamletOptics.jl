@@ -68,6 +68,8 @@ usually dwarfs a millimeter-scale setup.
 - `look_at!(ls, target, offset; up = [0, 0, 1])`
 - `arrow!(ax, pos, dir; scale)`, `render_lcs!(ax, obj; scale, show_labels)` (draw local frames)
 
+Debugging (`LScene` or `Axis3`): `render_bounding_sphere!(ax, x; color = :magenta, main_color = :orange, linewidth = 1)` draws the bounding spheres that the solver tests before each shape, for a sphere value, shape, object or system `x` (one wireframe per shape with a sphere, plus one in `main_color` around the parts of each multi-part object or group; none for `NoBoundingSphere`); `render!(ax, x; show_bounding_sphere = true)` does the same along with the object or system, and with `live_render!` the spheres follow the objects.
+
 ## Live rendering (GLMakie)
 
 `render!` creates new plots on every call. For animations or parameter sweeps, render once and update:

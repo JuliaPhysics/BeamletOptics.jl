@@ -17,6 +17,8 @@ end
 
 set_new_origin3d!(d::NonInteractableObject) = set_new_origin3d!(d.shape)
 intersect3d(::NonInteractableObject, ::AbstractRay) = nothing
+# never hit, hence no bounding sphere is computed for its shape, e.g. a large mesh
+bounding_sphere_of(::NonInteractableObject) = NoBoundingSphere()
 interact3d(::AbstractSystem, ::NonInteractableObject, ::AbstractBeam, ::AbstractRay) = nothing
 
 """

@@ -32,10 +32,11 @@ const BMO = BeamletOptics
         sag_max = r_max^2 / (4f)
 
         sdf = BMO.ConicSDF(2f, -1, 0, 2r_max, thickness)
-        center, r = BMO.bounding_sphere(sdf)
+        sphere = BMO.bounding_sphere_of(sdf)
+        center, r = sphere.pos, sphere.radius
 
         @test center ≈ Point3(0, (thickness - sag_max) / 2, 0)
-        @test r ≈ sqrt(r_max^2 + ((thickness + sag_max) / 2)^2) + 0.05
+        @test r ≈ sqrt(r_max^2 + ((thickness + sag_max) / 2)^2)
 
         # bounding_box must transform the sphere into a symmetric, aperture-covering box
         xmin, xmax, ymin, ymax, zmin, zmax = BMO.bounding_box(sdf)

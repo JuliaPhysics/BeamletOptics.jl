@@ -82,7 +82,9 @@ In the 5-argument version, independent waists `w0_x` and `w0_y` can be specified
 - `M2`, `M2_x`, `M2_y`: beam quality factors. Default is 1
 - `P0`: beam total power in [W]. Default is 1 mW.
 - `E0`: electric field vector in [V/m]. Default is `nothing` (aligned with support axes, scaled by `P0`).
-- `support`: optional support vector for basis construction
+- `support`: optional support vector for basis construction, i.e. the X axis of the beamlet. Must be
+  orthogonal to `direction`, otherwise an `ArgumentError` is thrown; has any non-zero length and is
+  normalized internally. Default is `nothing`, i.e. a vector orthogonal to `direction` is chosen.
 - `z0`: beam waist offset in [m]. Default is 0 m
 
 # Additional information
@@ -126,7 +128,10 @@ This constructor supports modeling astigmatic sources where the waists in X and 
 - `M2_x`, `M2_y`: Beam quality factors. Default is 1.
 - `P0`: Total power in [W].
 - `E0`: Optional Jones vector for polarization.
-- `support`: Optional vector orthogonal to `direction` to define the X axis.
+- `support`: Optional vector orthogonal to `direction` to define the X axis. Has any non-zero length
+  and is normalized internally. A `support` that is not orthogonal to the `direction` (the dot
+  product of the unit vectors exceeds `get_orthogonality_threshold()`, default `1e-10`) throws an
+  `ArgumentError`. Default is `nothing`, i.e. a vector orthogonal to `direction` is chosen.
 
 # Additional information
 
@@ -154,10 +159,11 @@ function AstigmaticGaussianBeamlet(
     if isnothing(support)
         s1 = normal3d(direction)
     else
-        if !isorthogonal3d(direction, support)
-            error("Ray direction and support vector must be orthogonal!")
-        end
         s1 = normalize(support)
+    end
+    # Both vectors have unit length, hence the test does not depend on the length of `support`
+    if !isorthogonal3d(direction, s1; atol = Config.get_orthogonality_threshold())
+        throw(ArgumentError("the support vector must be orthogonal to the direction (dot product of the unit vectors: $(dot(direction, s1)))"))
     end
     s2 = cross(direction, s1)
 

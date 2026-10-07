@@ -174,8 +174,9 @@ Refer to the respective documentation.
 intersect3d(object::AbstractObject, ray::AbstractRay) = intersect3d(shape_trait_of(object), object, ray)
 
 function intersect3d(::SingleShape, object::AbstractObject, ray::AbstractRay)
-    # FIXME: isinfrontof check?
-    intersection = intersect3d(shape(object), ray)
+    s = shape(object)
+    # the sphere that the table of a running solve holds for the shape, none outside of a solve
+    intersection = intersect3d(bounding_sphere_of(current_bounding_spheres(), s), s, ray)
     # Ensure that the intersection knows about the object if intersected
     if !isnothing(intersection)
         object!(intersection, object)
@@ -183,31 +184,48 @@ function intersect3d(::SingleShape, object::AbstractObject, ray::AbstractRay)
     return intersection
 end
 
-function intersect3d(::MultiShape, object::AbstractObject, ray::AbstractRay{R}) where R
-    # Init return intersection
-    intersection::Nullable{Intersection{R}} = nothing
-    for part in shape(object)
-        # Buffer intersection
-        temp::Nullable{Intersection{R}} = intersect3d(part, ray)
-        # Continue if miss
-        if isnothing(temp)
-            continue
-        end
-        # Catch first valid intersection
-        if isnothing(intersection)
-            intersection = temp
-            continue
-        end
-        # Replace current with closer intersection
-        if length(temp) < length(intersection)
-            intersection = temp
-        end
-    end
+function intersect3d(::MultiShape, object::AbstractObject, ray::AbstractRay)
+    # No part is tested if the ray misses the sphere around all of them
+    intersection = intersect3d(bounding_sphere_of(current_bounding_spheres(), object), shape(object), ray)
     # Ensure that the intersection knows about the correct object if intersected
     if !isnothing(intersection)
         object!(intersection, object)
     end
     return intersection
+end
+
+"""
+    intersect3d(::MultiShape, group::AbstractObjectGroup, ray::AbstractRay)
+
+Returns the closest intersection of the `ray` with the objects of the `group`. In contrast to a
+[`MultiShape`](@ref) object, the intersection keeps the object of the group that was hit, since
+this object, not the group, interacts with the ray. No object is tested if the ray misses the
+bounding sphere of the group, which the table of a running solve holds, see
+`bounding_sphere_of(table, x)`.
+"""
+function intersect3d(::MultiShape, group::AbstractObjectGroup, ray::AbstractRay)
+    return intersect3d(bounding_sphere_of(current_bounding_spheres(), group), shape(group), ray)
+end
+
+"""
+    intersect3d(parts, ray::AbstractRay)
+
+Returns the closest [`Intersection`](@ref) of the `ray` with the `parts`, or `nothing` if it hits
+none of them. The `parts` are a tuple, a vector or the `Leaves` of shapes or objects, e.g. the shapes
+of a [`MultiShape`](@ref) object, the objects of a group or the objects of a system. Each part is
+tested via its own `intersect3d` method, hence parts that consist of parts, e.g. the groups of a
+system, are tested as a whole. No parts give `nothing`.
+"""
+function intersect3d(parts::Union{Tuple, AbstractVector, Leaves}, ray::AbstractRay{R}) where {R}
+    result::Nullable{Intersection{R}} = nothing
+    for part in parts
+        temp::Nullable{Intersection{R}} = intersect3d(part, ray)
+        isnothing(temp) && continue
+        if isnothing(result) || length(temp) < length(result)
+            result = temp
+        end
+    end
+    return result
 end
 
 """

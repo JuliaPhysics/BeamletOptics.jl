@@ -84,6 +84,43 @@ const mm = 1e-3
         @test P0 ≈ BMO.optical_power(gauss_2)
     end
 
+    @testset "Support vector" begin
+        pos = [0.0, 0, 0]
+        dir = [0.0, 1, 0]
+        λ = 1000e-9
+        w0 = 1mm
+        waist_start(gauss) = position(first(BMO.rays(gauss.waist)))
+        ref = GaussianBeamlet(pos, dir, λ, w0; support = [1.0, 0, 0])
+        @test waist_start(ref) ≈ [w0, 0, 0]
+        # the length of an orthogonal support vector does not matter
+        for scale in (1e-9, 5, 1e9)
+            gauss = GaussianBeamlet(pos, dir, λ, w0; support = scale .* [1.0, 0, 0])
+            @test waist_start(gauss) ≈ waist_start(ref)
+            @test BMO.direction(first(BMO.rays(gauss.divergence))) ≈
+                  BMO.direction(first(BMO.rays(ref.divergence)))
+        end
+        # nor does the length of the direction
+        @test waist_start(GaussianBeamlet(pos, 3 .* dir, λ, w0; support = [2.0, 0, 0])) ≈ waist_start(ref)
+        # deviations within the threshold pass, e.g. a support vector from a rotation
+        @test GaussianBeamlet(pos, dir, λ, w0; support = [1.0, 1e-12, 0]) isa GaussianBeamlet
+        # not orthogonal: the waist radius would be w0 * sin of the angle to the direction
+        @test_throws ArgumentError GaussianBeamlet(pos, dir, λ, w0; support = [1.0, 1, 0])
+        @test_throws ArgumentError GaussianBeamlet(pos, dir, λ, w0; support = [1.0, 1e-6, 0])
+        @test_throws ArgumentError GaussianBeamlet(pos, dir, λ, w0; support = 1e9 .* [1.0, 1e-6, 0])
+        # parallel and anti-parallel
+        @test_throws ArgumentError GaussianBeamlet(pos, dir, λ, w0; support = [0.0, 1, 0])
+        @test_throws ArgumentError GaussianBeamlet(pos, dir, λ, w0; support = [0.0, -2, 0])
+        # no direction
+        @test_throws ArgumentError GaussianBeamlet(pos, dir, λ, w0; support = [0.0, 0, 0])
+        # the default is orthogonal for any direction
+        for d in ([1.0, 0, 0], [0.0, 0, -1], [1.0, 2, 3], [-1e-3, 1, 1e-3])
+            gauss = GaussianBeamlet(pos, d, λ, w0)
+            s = waist_start(gauss) - pos
+            @test isapprox(BMO.dot(s, BMO.normalize(d)), 0; atol = 1e-15)
+            @test BMO.norm(s) ≈ w0
+        end
+    end
+
     @testset "Testing propagation correctness" begin
         # Analytical result using complex q factor
         q_ana(q0::Complex, M::Matrix) = (M[1] * q0 + M[3]) / (M[2] * q0 + M[4])

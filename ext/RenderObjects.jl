@@ -1,5 +1,5 @@
 """
-    render!(ax, object; material = nothing, edges = nothing, kwargs...)
+    render!(ax, object; material = nothing, edges = nothing, show_bounding_sphere = false, kwargs...)
 
 Renders the `object` into the specified `ax`is. Additional `kwargs` can be piped through to the backend.
 
@@ -20,6 +20,14 @@ coating of a `CubeBeamsplitter`) are rendered with the class of each part. Expli
 The cemented interfaces of doublet and triplet lenses are rendered as thin amber surfaces. See also
 [`studio_lighting!`](@ref) for the lighting of the scene.
 
+# Debugging
+
+- `show_bounding_sphere = false`: also draws the bounding sphere of the shape of the object as a
+  magenta wireframe, for an object of several parts one sphere per part, see
+  [`render_bounding_sphere!`](@ref). A shape without a bounding sphere (e.g. a mesh) gets none.
+  With [`live_render!`](@ref) the spheres follow the object. Call `render_bounding_sphere!` directly
+  to change the color or the line width
+
 # Examples
 
 It is recommended to use the following snippet in order to generate plots:
@@ -37,8 +45,14 @@ for each `object`.
 """
 render!(ax::_RenderEnv, object::BMO.AbstractObject; kwargs...) = _render!(ax, object; kwargs...)
 
-# Dispatch helper fct. for RenderPolarizers.jl, do not remove
-_render!(ax::_RenderEnv, obj::BMO.AbstractObject; kwargs...) = render!(ax, BMO.shape_trait_of(obj), obj; kwargs...)
+# Dispatch helper fct. for RenderPolarizers.jl, do not remove.
+# Consumes `show_bounding_sphere`: the trait methods and the parts of a `MultiShape` object never see
+# the keyword, the outermost object draws the spheres of all its parts.
+function _render!(ax::_RenderEnv, obj::BMO.AbstractObject; show_bounding_sphere::Bool = false, kwargs...)
+    render!(ax, BMO.shape_trait_of(obj), obj; kwargs...)
+    show_bounding_sphere && render_bounding_sphere!(ax, obj)
+    return nothing
+end
 
 """
     render!(ax, ::SingleShape, obj; material = nothing, edges = nothing, kwargs...)
@@ -99,9 +113,10 @@ function render!(ax::_RenderEnv, ::BMO.MultiShape, obj; edges::Union{Nothing, Bo
 end
 
 """
-    render!(ax::_RenderEnv, sys::AbstractSystem)
+    render!(ax::_RenderEnv, sys::AbstractSystem; kwargs...)
 
-Render all objects contained in the `sys`tem.
+Render all objects contained in the `sys`tem. The `kwargs` are passed on to `render!` of each
+object, e.g. `show_bounding_sphere = true` to draw the bounding spheres of all shapes.
 """
 function render!(ax::_RenderEnv, sys::BMO.AbstractSystem; kwargs...)
     # Avoid use of objects(sys)

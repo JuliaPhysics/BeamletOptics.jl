@@ -185,6 +185,29 @@ function MoellerTrumboreAlgorithm(face, ray::AbstractRay{T}; kϵ = 1e-9, lϵ = 1
 end
 
 """
+    bounding_sphere_of(mesh::AbstractMesh)
+
+Returns the sphere around the center of the axis-aligned box of the vertices that passes through the
+farthest vertex. All vertices are read, i.e. the cost grows with the size of the mesh.
+"""
+function bounding_sphere_of(mesh::AbstractMesh{T}) where {T}
+    v = vertices(mesh)
+    n = size(v, 1)
+    n == 0 && return NoBoundingSphere()
+    lo = hi = Point3{T}(v[1, 1], v[1, 2], v[1, 3])
+    @inbounds for i in 2:n
+        p = Point3{T}(v[i, 1], v[i, 2], v[i, 3])
+        lo, hi = min.(lo, p), max.(hi, p)
+    end
+    center = (lo + hi) / 2
+    r2 = zero(T)
+    @inbounds for i in 1:n
+        r2 = max(r2, sum(abs2, Point3{T}(v[i, 1], v[i, 2], v[i, 3]) - center))
+    end
+    return SingleBoundingSphere(center, sqrt(r2))
+end
+
+"""
     intersect3d(mesh::Mesh, ray::Ray)
 
 This function is a generic implementation to check if a `ray` intersects the `mesh`.

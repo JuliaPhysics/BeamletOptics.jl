@@ -230,11 +230,17 @@ function _sdf(s::AcylindricalSurface, ::BackwardOrientation)
     return back
 end
 
-function bounding_sphere(s::AbstractAcylindricalSurfaceSDF{T}) where T
-    y = aspheric_equation(diameter(s) / 2, s)
-    z = diameter(s) / 2
-    x = height(s) / 2
-    r = max(x, y, z)
-    center = Point3{T}(zero(T))
-    return (center, r)
+"""
+    bounding_sphere_of(s::AbstractAcylindricalSurfaceSDF)
+
+Returns the sphere through the corners of the box around the surface volume: the cylinder height
+along x, the axial extent of the sag along y and the diameter along z.
+"""
+function bounding_sphere_of(s::AbstractAcylindricalSurfaceSDF{T}) where T
+    lo, hi = _aspheric_axial_extent(s)
+    r = sqrt((height(s) / 2)^2 + ((hi - lo) / 2)^2 + (diameter(s) / 2)^2)
+    return SingleBoundingSphere(s, Point3{T}(0, (lo + hi) / 2, 0), r)
 end
+
+# The SDF is not exact far away from the shape, hence the box around the bounding sphere
+bounding_box(s::AbstractAcylindricalSurfaceSDF) = bounding_box(bounding_sphere_of(s))

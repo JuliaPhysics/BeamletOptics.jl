@@ -42,6 +42,7 @@ Renders the [`PolarizationFilter`](@ref) `pf` into the specified `ax`, optionall
 - `show_transmission_axis = true`: draws the [`transmission_axis`](@ref) as a line on the filter
 - `axis_color = :black`: color of the transmission axis line
 - `axis_linewidth = 2`: line width of the transmission axis line
+- `show_bounding_sphere = false`: draws the bounding sphere of the shape, see [`render_bounding_sphere!`](@ref)
 
 Remaining kwargs are passed on to the Makie mesh plot.
 """
@@ -65,10 +66,12 @@ of the render look; explicit kwargs (e.g. `material`, `edges`) apply to all part
 - `axis_color = :black`: color of the transmission axis line
 - `axis_linewidth = 2`: line width of the transmission axis line
 
+- `show_bounding_sphere = false`: draws the bounding spheres of the parts, see [`render_bounding_sphere!`](@ref)
+
 Remaining kwargs are passed on to the Makie mesh plots of the substrate halves.
 """
 function render!(ax::_RenderEnv, lipo::LinearPolarizer; show_transmission_axis::Bool=true,
-        axis_color=:black, axis_linewidth=2, kwargs...)
+        axis_color=:black, axis_linewidth=2, show_bounding_sphere::Bool=false, kwargs...)
     render!(ax, lipo.front; kwargs...)
     render!(ax, lipo.back; kwargs...)
     # The film uses the polarizer material, explicit kwargs (e.g. `material`, `edges`) apply to all parts
@@ -78,5 +81,7 @@ function render!(ax::_RenderEnv, lipo::LinearPolarizer; show_transmission_axis::
         t_b = thickness(lipo.back)
         _render_transmission_axis!(ax, lipo.filter; color=axis_color, linewidth=axis_linewidth, rim=(t_f, t_b), rim_radius=BMO.diameter(BMO.shape(lipo.front)) / 2)
     end
+    # The parts are rendered without the keyword, such that each sphere is drawn once
+    show_bounding_sphere && render_bounding_sphere!(ax, lipo)
     return nothing
 end

@@ -57,6 +57,27 @@ BeamletOptics.Intersection
 
 Since an optical element can consist of multiple joint shapes, the return type must store which specific part of the object was hit.
 
+### Bounding sphere pretest
+
+Since the tracing is non-sequential, every ray is tested against every shape of the system, and most of these tests are misses. A shape can therefore provide a sphere that encloses it. A ray that does not pass through this sphere is a miss without a call of `intersect3d`. This is optional: a shape without a sphere is tested as described above.
+
+```@docs; canonical=false
+BeamletOptics.bounding_sphere_of(::BeamletOptics.AbstractShape)
+```
+
+All [Signed Distance Functions (SDFs)](@ref) and [Meshes](@ref) have a bounding sphere. An object of several shapes and an object group have the sphere around the spheres of their parts, such that a ray that misses it is tested against none of them.
+
+The spheres are not stored in the shapes or objects. [`solve_system!`](@ref) computes them once per call, for the poses that the objects have at that time, via `bounding_sphere_of(x)` into a table, which the intersection code reads per ray via `bounding_sphere_of(table, x)`. Outside of a solve there is no table, i.e. a direct call of `intersect3d(object, ray)` tests the object without a sphere.
+
+```@docs; canonical=false
+BeamletOptics.bounding_sphere_of(::BeamletOptics.BoundingSphereTable, ::Any)
+BeamletOptics.SingleBoundingSphere
+BeamletOptics.MultiBoundingSphere
+BeamletOptics.NoBoundingSphere
+```
+
+The spheres of a system can be shown via [`render_bounding_sphere!`](@ref) or the `show_bounding_sphere` keyword of [`render!`](@ref).
+
 ## Interactions
 
 Optical interactions are performed after the point of intersection has been determined. The `interact3d` interface allows users to implement algorithms that calculate or try to mimic optical effects. The fidelity of the algorithm is effectively only limited by the amount of information that can be passed into the `interact3d` interface. The method is defined as follows:

@@ -72,6 +72,7 @@ export Retroreflector, get_invariant_threshold, set_invariant_threshold!,
 
 # render
 export wavelength_color, render!, get_view, set_view, hide_axis, set_orthographic, arrow!, render_lcs!, look_at!
+export render_bounding_sphere!
 export live_render!, update_render!, remove_render!, pick_object, studio_lighting!, set_render_look
 
 # render handle protocol and developer API for packages built on BeamletOptics: public, not exported
@@ -82,5 +83,7 @@ public is_static, hit_count, wavelength, min_num_rays, ProgressSink, PROGRESS_SI
        progress_state, is_cancelled
 # re-emitting components (e.g. solvers coupled through a field)
 public relaunch!, beamlet_hit_field, GaussianBeamletHit, AstigmaticGaussianBeamletHit
+# optional part of the shape interface, see AbstractShape
+public bounding_sphere_of, AbstractBoundingSphere, NoBoundingSphere, SingleBoundingSphere, MultiBoundingSphere
 public AbstractSampling, NoSampling, DiscRings, DiscSunflower, DiscLine, ConeRings, ConeSunflower,
        ConeFan, source_beams, sampling_basis

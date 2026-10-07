@@ -65,6 +65,16 @@ function sdf(ps::PlanoSurfaceSDF{T}, point) where T
 end
 
 """
+    bounding_sphere_of(ps::PlanoSurfaceSDF)
+
+Returns the sphere through both rims of the cylinder, centered on the axis at half of the thickness.
+"""
+function bounding_sphere_of(ps::PlanoSurfaceSDF{T}) where T
+    l, d = thickness(ps), diameter(ps)
+    return SingleBoundingSphere(ps, Point3{T}(0, l / 2, 0), sqrt((d / 2)^2 + (l / 2)^2))
+end
+
+"""
     SphereSDF
 
 Implements the SDF of a perfect sphere. Orientation is fixed to unity matrix.
@@ -87,6 +97,13 @@ function sdf(sphere::SphereSDF, point)
     p = _world_to_sdf(sphere, point)
     return norm(p) - sphere.radius
 end
+
+"""
+    bounding_sphere_of(sphere::SphereSDF)
+
+Returns the sphere itself.
+"""
+bounding_sphere_of(sphere::SphereSDF{T}) where T = SingleBoundingSphere(sphere, Point3{T}(0), sphere.radius)
 
 """
     AbstractSphericalSurfaceSDF{T} <: AbstractSDF{T}
@@ -170,6 +187,17 @@ function sdf(css::ConcaveSphericalSurfaceSDF{T}, point) where T
 end
 
 """
+    bounding_sphere_of(css::ConcaveSphericalSurfaceSDF)
+
+Returns the sphere through both rims of the surface, which lie at `y = 0` and `y = -sag`, centered
+on the axis in between.
+"""
+function bounding_sphere_of(css::ConcaveSphericalSurfaceSDF{T}) where T
+    s, d = sag(css), diameter(css)
+    return SingleBoundingSphere(css, Point3{T}(0, -s / 2, 0), sqrt((d / 2)^2 + (s / 2)^2))
+end
+
+"""
     ConvexSphericalSurfaceSDF
 
 [`AbstractSDF`](@ref)-based representation of a convex spherical lens surface.
@@ -229,6 +257,16 @@ function sdf(css::ConvexSphericalSurfaceSDF, point)
     else
         return norm(q - Point2(diameter(css)/2, css.height))
     end
+end
+
+"""
+    bounding_sphere_of(css::ConvexSphericalSurfaceSDF)
+
+Returns the smallest sphere around the spherical cap, which extends from its vertex at the local
+origin to its flat side at `y = sag`: the sphere through the rim, centered in the plane of the rim.
+"""
+function bounding_sphere_of(css::ConvexSphericalSurfaceSDF{T}) where T
+    return SingleBoundingSphere(css, Point3{T}(0, sag(css), 0), diameter(css) / 2)
 end
 
 """

@@ -28,6 +28,8 @@ see [`BeamletOptics.AbstractKinematicTrait`](@ref). The default primitives
 ## Ray Tracing:
 
 - [`intersect3d`](@ref): returns the intersection between an `AbstractShape` and `AbstractRay`, or lack thereof. See also [`Intersection`](@ref)
+- [`bounding_sphere_of`](@ref) (optional): computes a sphere that encloses the shape. A solve then skips
+  the shape for every ray that misses the sphere, without a call of `intersect3d`
 
 ## Rendering (with Makie):
 

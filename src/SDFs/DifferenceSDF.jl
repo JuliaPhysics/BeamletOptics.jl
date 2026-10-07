@@ -79,13 +79,16 @@ function thickness(d::DifferenceSDF{T}) where T
 end
 
 """
-    bounding_sphere(d::DifferenceSDF)
+    bounding_sphere_of(d::DifferenceSDF)
 
-Returns the [`bounding_sphere`](@ref) of `d.base` — the result of a subtraction is always a
-subset of the base, so the base's bounding sphere (or `nothing`, if it has none) also bounds
-`d`.
+Returns the [`bounding_sphere_of`](@ref) of `d.base` in its current pose: the result of a subtraction
+is always a subset of the base, so the bounding sphere of
+the base (or `NoBoundingSphere()`, if it has none) also bounds `d`.
 """
-bounding_sphere(d::DifferenceSDF) = bounding_sphere(d.base)
+bounding_sphere_of(d::DifferenceSDF) = bounding_sphere_of(d.base)
+
+# The result of a subtraction is a subset of the base
+bounding_box(d::DifferenceSDF) = bounding_box(d.base)
 
 function sdf(d::DifferenceSDF, pos)
     # sdf to world transform handled by sub-SDFs

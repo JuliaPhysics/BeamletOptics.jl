@@ -24,6 +24,8 @@ GaussianBeamlet(pos, dir, λ = 1e-6, w0 = 1e-3; M2 = 1, P0 = 1e-3, z0 = 0, suppo
 
 - Stigmatic TEM00 beam represented by 3 rays (chief, waist, divergence). `w0` = waist **radius**,
   `z0` = waist offset along the axis, `P0` in W, `M2` beam quality factor.
+- `support` fixes the direction from the chief ray to the waist and divergence ray. It must be
+  orthogonal to `dir` (any non-zero length), otherwise the constructor throws an `ArgumentError`.
 - Valid for on-axis, untilted, (nearly) aberration-free systems only.
 - Queries: `gauss_parameters(g, z)` → `(w, R, ψ, w0)`, `waist_parameters`, `rayleigh_range(g; M2)`,
   `optical_power(g)`, `electric_field(g, r, z)`, `point_on_beam(g, t)`.
@@ -35,6 +37,8 @@ AstigmaticGaussianBeamlet(pos, dir, λ, w0_x, w0_y; M2_x, M2_y, P0, E0, support,
 
 - General astigmatic beamlet (9 rays, polarized chief ray). Use it for tilted, off-axis, cylindrical
   or polarization-dependent setups. `E0` defaults to a field along the `support` axis scaled to `P0`.
+- `support` is the x axis of the beamlet (`w0_x`, `M2_x`, `z0_x`). As for `GaussianBeamlet` it must
+  be orthogonal to `dir` (any non-zero length), otherwise the constructor throws an `ArgumentError`.
 - `solve_system!` checks the optical invariant and stops tracing if it is violated.
 - Queries: `gauss_parameters(agb, z)` → `(w1, w2, R1, R2, ψ, w01, w02)`, `rayleigh_range(agb)` →
   `(z_rx, z_ry)`, `intensity(agb, r, z)`, `electric_field`, `BeamletOptics.polarized_field`.
