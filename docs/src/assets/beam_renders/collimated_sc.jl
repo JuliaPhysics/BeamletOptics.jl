@@ -43,3 +43,16 @@ cs_view = [
 
 set_view(cs_ax, cs_view)
 save("collimated_uniform_beam_source.png", cs_fig; px_per_unit=8, update = false)
+
+## uniform line source
+cs = UniformLineSource([0,0,0], [0,1,0], 15e-3; num_rays=15, basis=[0,0,1])
+
+cs_fig = Figure(; size=(600,200))
+display(cs_fig)
+cs_ax = LScene(cs_fig[1,1])
+hide_axis(cs_ax)
+
+render!(cs_ax, cs, show_pos=true, flen=0.05, color=:red, render_every=1)
+
+set_view(cs_ax, cs_view)
+save("line_beam_source.png", cs_fig; px_per_unit=8, update = false)

@@ -248,7 +248,7 @@ start_rays(b) = map(BMO.first_ray, BMO._component_beams(b))
         pos = [1.0, 2, 3]
         us = UniformDiscSource(pos, [0, 1, 0], 10mm; num_rays = 50)
         @test position(us) == pos
-        @test position(first(BMO.beams(us))) != pos
+        @test position(last(BMO.beams(us))) != pos
         @test BMO.direction(us) == [0, 1, 0]
         # positional ctor takes explicit pos/dir, dir is normalized
         cs = CollimatedSource(BMO.beams(us), 10mm, pos, [0, 2, 0])
@@ -330,7 +330,9 @@ start_rays(b) = map(BMO.first_ray, BMO._component_beams(b))
             SphericalGaussianBeamletSource(pos, dir, 0.1, 1e-6; num_rings = 2, num_rays = 40),
             EllipticalGaussianBeamletSource(pos, dir, 0.1, 0.05, 1e-6; num_rings = 2, num_rays = 40),
             GaussianBeamletDecomposition(pos, dir, 1e-6, 1mm; n_grid = 3),
-            WavefrontBeamletDecomposition(x, x, amp, phase, dir, 1e-6)
+            WavefrontBeamletDecomposition(x, x, amp, phase, dir, 1e-6),
+            UniformLineSource(pos, dir, 5mm; num_rays = 20),
+            UniformFanSource(pos, dir, 0.1; num_rays = 20)
         ]
         # sources with basis kwarg
         based = Any[
@@ -342,7 +344,9 @@ start_rays(b) = map(BMO.first_ray, BMO._component_beams(b))
             SphericalGaussianBeamletSource(pos, dir, 0.1, 1e-6; num_rings = 2, num_rays = 40, basis = b),
             EllipticalGaussianBeamletSource(pos, dir, 0.1, 0.05, 1e-6; num_rings = 2, num_rays = 40, basis = b),
             GaussianBeamletDecomposition(pos, dir, 1e-6, 1mm; n_grid = 3, basis = (b, b2)),
-            WavefrontBeamletDecomposition(x, x, amp, phase, dir, 1e-6; basis = (b, b2))
+            WavefrontBeamletDecomposition(x, x, amp, phase, dir, 1e-6; basis = (b, b2)),
+            UniformLineSource(pos, dir, 5mm; num_rays = 20, basis = b),
+            UniformFanSource(pos, dir, 0.1; num_rays = 20, basis = b)
         ]
         for bg in vcat(groups, based)
             O = orientation(bg)
