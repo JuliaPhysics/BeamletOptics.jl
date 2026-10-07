@@ -66,6 +66,18 @@ const mm = 1e-3
         @test wd≈93.2mm atol=1e-4
     end
 
+    @testset "Aspherical meniscus without cylinder section" begin
+        # A meniscus, whose center thickness does not exceed the sagitta of the convex surface,
+        # is only supported for spherical surfaces
+        d = 25.4mm
+        n = λ -> 1.5
+        asphere(R) = EvenAsphericalSurface(R, d, 0.0, [0, 1e-7 * (1e3)^3])
+        @test Lens(SphericalSurface(20mm, d), SphericalSurface(21mm, d), 1mm, n) isa Lens
+        @test_throws ArgumentError Lens(SphericalSurface(20mm, d), asphere(21mm), 1mm, n)
+        @test_throws ArgumentError Lens(asphere(20mm), SphericalSurface(21mm, d), 1mm, n)
+        @test_throws ArgumentError Lens(asphere(-21mm), asphere(-20mm), 1mm, n)
+    end
+
     @testset "Complex aspherical imaging system" begin
         # setup system
         L1 = Lens(

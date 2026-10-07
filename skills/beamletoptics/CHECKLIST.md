@@ -19,6 +19,7 @@
 |--------------------------------------------|-----|
 | ray paths, spot diagram, aberrations       | `Beam`, `CollimatedSource`, `PointSource` |
 | PSF / intensity from rays                  | `UniformDiscSource`, `UniformPointSource` |
+| 2D layout sketch, one section of a system  | `UniformLineSource`, `UniformFanSource` (pass `basis`) |
 | on-axis laser beam: waist, z_R, power      | `GaussianBeamlet` |
 | tilted/off-axis/cylindrical Gaussian beam  | `AstigmaticGaussianBeamlet` |
 | extended Gaussian/diverging wavefronts     | `CollimatedGaussianBeamletSource`, `SphericalGaussianBeamletSource`, `GaussianBeamletDecomposition` |

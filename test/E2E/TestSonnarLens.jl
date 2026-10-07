@@ -12,13 +12,11 @@ const mm = 1e-3
     # Sonnar 50 mm F1.5, source: pencilofrays.com, Sonnar_50mmF1p5_FR837616.zmx,
     # scaled to f = 100 mm
     l1 = SphericalLens(69.21mm, 433.84mm, 9.33mm, 70mm, λ -> 1.671)
-    # front triplet: last surface only 40 mm clear aperture -> assembled from individual lenses
-    l2 = SphericalLens(35.86mm, 85.87mm, 11.81mm, 60mm, λ -> 1.671)
-    l3 = SphericalLens(85.87mm, -646.31mm, 7.05mm, 60mm, λ -> 1.4892)
-    l4 = Lens(SphericalSurface(-646.31mm, 60mm), SphericalSurface(23.51mm, 40mm), 1.9mm, λ -> 1.7394)
-    translate3d!(l3, [0, thickness(l2), 0])
-    translate3d!(l4, [0, thickness(l2) + thickness(l3), 0])
-    l234 = TripletLens(l2, l3, l4)
+    # front triplet: last surface only 40 mm clear aperture -> constructed from surfaces
+    l234 = TripletLens(
+        SphericalSurface(35.86mm, 60mm), SphericalSurface(85.87mm, 60mm),
+        SphericalSurface(-646.31mm, 60mm), SphericalSurface(23.51mm, 40mm),
+        11.81mm, 7.05mm, 1.9mm, λ -> 1.671, λ -> 1.4892, λ -> 1.7394)
     l567 = SphericalTripletLens(Inf, 51.09mm, -22.12mm, -103.13mm, 2.48mm, 19.81mm, 4.57mm, 42mm,
         λ -> 1.5232, λ -> 1.6578, λ -> 1.5894)
     l_234 = thickness(l1) + 0.38mm

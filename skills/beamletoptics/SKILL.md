@@ -41,6 +41,7 @@ When this Skill is active:
 2) Pick the beam model (see `components/beams-and-sources.md`)
 - Geometric rays / spot diagrams / aberrations → `Beam`, `CollimatedSource`, `PointSource`
 - PSF / coherent intensity from rays → `UniformDiscSource` (equal-area sampling) + `Detector`
+- 2D layout sketch / one section of a system (ray sheet or fan in a plane) → `UniformLineSource`, `UniformFanSource`
 - Paraxial laser beam on-axis (waist, Rayleigh range, interferometer power) → `GaussianBeamlet`
 - Tilted, off-axis, cylindrical, or polarization-sensitive Gaussian beam → `AstigmaticGaussianBeamlet`
 - Polarization with rays → `Beam(pos, dir, λ, E0)` (a `PolarizedRay` beam)

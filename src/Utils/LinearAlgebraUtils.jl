@@ -96,27 +96,35 @@ end
 Returns the rotation matrix R that will align the start vector to be parallel to the target vector.
 Based on ['Avoiding Trigonometry'](https://gist.github.com/kevinmoran/b45980723e53edeb8a5a43c49f134724) by Íñigo Quílez. The resulting matrix
 was transposed due to column/row major issues. Vector length is maintained. This function is very fast.
+
+R is the rotation about the axis normal to both vectors (the smallest rotation). It is exact and
+orthonormal for all angles, including angles of a few nrad (alignment of optics) and angles close
+to π. For antiparallel vectors, R is a rotation by π about an axis normal to `start`.
 """
-function align3d(start::AbstractVector{A}, target::AbstractVector{B}) where {A, B}
-    T = promote_type(A, B)
+function align3d(start::AbstractVector, target::AbstractVector)
     start = normalize(start)
     target = normalize(target)
-    rx, ry, rz = cross(target, start)
+    T = promote_type(eltype(start), eltype(target))
     cosA = dot(start, target)
-    # if start and target are already (almost) parallel return unity
-    if cosA ≈ 1
-        return SMatrix{3,3}(one(T)I)
+    if cosA < 0
+        # Obtuse angle: the formula below loses orthonormality close to π (error ~eps/(π - A)).
+        # Rotate by π about the axis normal to start and target instead, then by the remaining
+        # acute angle about the same axis; both rotations are orthonormal.
+        r = cross(start, target)
+        r = r - dot(r, start) * start
+        u = norm(r) > eps(T) ? normalize(r) : normal3d(start)
+        Rπ = SMatrix{3, 3, T}(2 * u * u' - I)
+        return align3d(Rπ * start, target) * Rπ
     end
-    if cosA ≈ -1
-        return @SArray [-one(T) zero(T) zero(T);
-                        zero(T) -one(T) zero(T);
-                        zero(T) zero(T) one(T)]
-    end
+    rx, ry, rz = cross(target, start)
     k = 1 / (1 + cosA)
+    # Rodrigues form I + K + k K² with the cross product matrix K of cross(start, target). Its
+    # diagonal is 1 - k (r² - rᵢ²) rather than the equivalent rᵢ² k + cosA: the rounding of cosA
+    # would scale R by 1 ± eps, also for parallel vectors, where R must be the identity.
     R = @SArray [
-        rx^2*k+cosA rx*ry*k+rz rx*rz*k-ry
-        ry*rx*k-rz ry^2*k+cosA ry*rz*k+rx
-        rz*rx*k+ry rz*ry*k-rx rz^2*k+cosA
+        1-(ry^2+rz^2)*k rx*ry*k+rz rx*rz*k-ry
+        ry*rx*k-rz 1-(rx^2+rz^2)*k ry*rz*k+rx
+        rz*rx*k+ry rz*ry*k-rx 1-(rx^2+ry^2)*k
     ]
     return R
 end

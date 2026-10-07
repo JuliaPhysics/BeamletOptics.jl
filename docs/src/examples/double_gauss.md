@@ -60,17 +60,15 @@ end
 
 The reference above compares the Double Gauss lens to a [Sonnar lens](https://www.pencilofrays.com/zemax/Sonnar_50mmF1p5_FR837616.zmx) (French patent 837616, scaled to the same effective focal length ``f = 100~\text{mm}``). While the Double Gauss lens is an F/2 design with a back focal length of ``f_{\text{bfl}} = 59.21~\text{mm}``, the Sonnar reaches F/1.5 with ``f_{\text{bfl}} = 44.90~\text{mm}``. It consists of a front singlet followed by two cemented triplets, i.e. 7 elements in 3 groups. This reduces the number of glass-air interfaces from 8 to 6.
 
-The cemented triplets are modeled with the [`TripletLens`](@ref) type. The steep last surface of the front triplet only has a clear aperture of 40 mm, hence this triplet is assembled from individual [`Lens`](@ref)es with different [`SphericalSurface`](@ref) diameters. The rear triplet can be created directly with the [`SphericalTripletLens`](@ref) constructor.
+The cemented triplets are modeled with the [`TripletLens`](@ref) type. The steep last surface of the front triplet only has a clear aperture of 40 mm, hence this triplet is constructed from [`SphericalSurface`](@ref)s with different diameters. The rear triplet can be created directly with the [`SphericalTripletLens`](@ref) constructor.
 
 ```julia
 s1 = SphericalLens(69.21e-3, 433.84e-3, 9.33e-3, 70e-3, λ -> 1.671)
-# front triplet: last surface only has a clear aperture of 40 mm -> assembled from individual lenses
-s2 = SphericalLens(35.86e-3, 85.87e-3, 11.81e-3, 60e-3, λ -> 1.671)
-s3 = SphericalLens(85.87e-3, -646.31e-3, 7.05e-3, 60e-3, λ -> 1.4892)
-s4 = Lens(SphericalSurface(-646.31e-3, 60e-3), SphericalSurface(23.51e-3, 40e-3), 1.9e-3, λ -> 1.7394)
-translate3d!(s3, [0, thickness(s2), 0])
-translate3d!(s4, [0, thickness(s2) + thickness(s3), 0])
-s234 = TripletLens(s2, s3, s4)
+# front triplet: last surface only has a clear aperture of 40 mm -> constructed from surfaces
+s234 = TripletLens(
+    SphericalSurface(35.86e-3, 60e-3), SphericalSurface(85.87e-3, 60e-3),
+    SphericalSurface(-646.31e-3, 60e-3), SphericalSurface(23.51e-3, 40e-3),
+    11.81e-3, 7.05e-3, 1.9e-3, λ -> 1.671, λ -> 1.4892, λ -> 1.7394)
 s567 = SphericalTripletLens(Inf, 51.09e-3, -22.12e-3, -103.13e-3, 2.48e-3, 19.81e-3, 4.57e-3, 42e-3,
                             λ -> 1.5232, λ -> 1.6578, λ -> 1.5894)
 

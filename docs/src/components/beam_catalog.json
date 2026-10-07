@@ -63,6 +63,20 @@
     "teaser": "Point source with an equal solid angle per ray."
   },
   {
+    "name": "UniformLineSource",
+    "category": "Beam groups",
+    "image": "catalog_UniformLineSource.png",
+    "href": "/reference#BeamletOptics.UniformLineSource-Union{Tuple{L},%20Tuple{D2},%20Tuple{D1},%20Tuple{P},%20Tuple{AbstractArray{P},%20AbstractArray{D1},%20D2},%20Tuple{AbstractArray{P},%20AbstractArray{D1},%20D2,%20L}}%20where%20{P<:Real,%20D1<:Real,%20D2<:Real,%20L<:Real}",
+    "teaser": "Plane sheet of parallel beams on a line, incl. marginal rays."
+  },
+  {
+    "name": "UniformFanSource",
+    "category": "Beam groups",
+    "image": "catalog_UniformFanSource.png",
+    "href": "/reference#BeamletOptics.UniformFanSource-Union{Tuple{L},%20Tuple{H},%20Tuple{D},%20Tuple{P},%20Tuple{AbstractArray{P},%20AbstractArray{D},%20H},%20Tuple{AbstractArray{P},%20AbstractArray{D},%20H,%20L}}%20where%20{P<:Real,%20D<:Real,%20H<:Real,%20L<:Real}",
+    "teaser": "Plane fan of beams from a single point, incl. marginal rays."
+  },
+  {
     "name": "AstigmaticBeamGroup",
     "category": "Beam groups",
     "image": "catalog_AstigmaticBeamGroup.png",
