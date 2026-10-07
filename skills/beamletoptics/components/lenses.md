@@ -53,7 +53,27 @@ A = [0, A4 * 1e3^3, A6 * 1e3^5, A8 * 1e3^7, A10 * 1e3^9]
 AL75150 = Lens(EvenAsphericalSurface(76.68mm, 75mm, -0.675, A), 15mm, λ -> 1.5006520430)
 ```
 
-Aspheres are experimental. General lenses support only spherical meniscus shapes.
+Aspheres are experimental. A meniscus whose center thickness does not exceed the sagitta of its convex
+surface must be spherical on both sides; with an aspherical surface the constructor throws an `ArgumentError`.
+
+## Cemented lenses from surfaces
+
+```julia
+DoubletLens(s1, s2, s3, l1, l2, n1, n2)              # s2: cemented surface
+TripletLens(s1, s2, s3, s4, l1, l2, l3, n1, n2, n3)  # s2, s3: cemented surfaces
+```
+
+Surfaces are the rotationally symmetric surfaces listed above, in order along +y; `l` are center
+thicknesses, `n` are `RefractiveIndex` functions (not plain numbers). Element `i` is
+`Lens(s[i], s[i+1], l[i], n[i])`, placed flush behind the previous one, so the limits of the general `Lens`
+constructor apply to each element. Use these for aspherical surfaces or a different clear aperture per
+surface. Cylindrical surfaces are not supported (`MethodError`).
+
+```julia
+# doublet with an aspherical front surface, A as above
+dl = DoubletLens(EvenAsphericalSurface(50mm, 25.4mm, -0.8, A), SphericalSurface(-40mm, 25.4mm),
+    SphericalSurface(-200mm, 25.4mm), 8mm, 3mm, λ -> 1.6456, λ -> 1.7168)
+```
 
 ## Multi-element lenses from parts
 
@@ -62,6 +82,8 @@ DoubletLens(front::Lens, back::Lens)
 TripletLens(front::Lens, middle::Lens, back::Lens)
 ```
 
-Pre-translate the elements yourself so that the cemented surfaces touch. Gaps give wrong results, and
-TIR at cemented interfaces is not modeled. To model zoom or multi-group objectives, nest `ObjectGroup`s
-of lenses (see `docs/src/assets/examples/lens_groups.jl` in the package repo).
+Pre-translate the elements yourself so that the cemented surfaces touch. Gaps give wrong results. Prefer
+the surface-based constructors above, which do this for you. To model zoom or multi-group objectives, nest
+`ObjectGroup`s of lenses (see `docs/src/assets/examples/lens_groups.jl` in the package repo).
+
+TIR at cemented interfaces is not modeled, for all doublets and triplets.

@@ -2,7 +2,8 @@
     TripletLens
 
 Represents a three-component cemented triplet lens with three respective refractive indices `n = n(λ)`.
-See also [`SphericalTripletLens`](@ref).
+See also [`SphericalTripletLens`](@ref) and the surface-based constructor
+`TripletLens(s1, s2, s3, s4, l1, l2, l3, n1, n2, n3)`.
 
 # Fields
 
@@ -13,9 +14,9 @@ See also [`SphericalTripletLens`](@ref).
 # Additional information
 
 !!! info "Clear apertures"
-    If the surfaces need different clear apertures (e.g. a steep last surface), build the elements via
-    `Lens(SphericalSurface(r1, d1), SphericalSurface(r2, d2), l, n)` and pass them to `TripletLens`.
-    [`SphericalTripletLens`](@ref) uses one diameter for all surfaces.
+    If the surfaces need different clear apertures (e.g. a steep last surface), use the surface-based
+    constructor `TripletLens(s1, s2, s3, s4, l1, l2, l3, n1, n2, n3)` with e.g. `SphericalSurface(r, d)`
+    for each surface. [`SphericalTripletLens`](@ref) uses one diameter for all surfaces.
 
 !!! warning "Air gap"
     This component type strongly assumes that all three lenses are mounted fully flush with respect to each other.
@@ -39,6 +40,66 @@ Base.position(tl::TripletLens) = position(tl.front)
 orientation(tl::TripletLens) = orientation(tl.front)
 
 thickness(tl::TripletLens) = thickness(shape(tl.front)) + thickness(shape(tl.middle)) + thickness(shape(tl.back))
+
+"""
+    TripletLens(s1, s2, s3, s4, l1, l2, l3, n1, n2, n3)
+
+Generates a three-component "cemented" [`TripletLens`](@ref) from four surface specifications, e.g.
+[`SphericalSurface`](@ref), [`EvenAsphericalSurface`](@ref) or [`CircularFlatSurface`](@ref).
+The front, middle and back elements are `Lens(s1, s2, l1, n1)`, `Lens(s2, s3, l2, n2)` and
+`Lens(s3, s4, l3, n3)`, refer to the surface-based [`Lens`](@ref) constructor for the construction
+of the elements. The front vertex lies at the origin and the middle and back elements are translated
+along +y by `l1` and `l1 + l2`, so that neighbouring elements share the cemented surfaces `s2` and `s3`.
+
+# Arguments
+
+- `s1`: first surface
+- `s2`: second (first cemented) surface
+- `s3`: third (second cemented) surface
+- `s4`: fourth surface
+- `l1`: first lens center thickness in m
+- `l2`: second lens center thickness in m
+- `l3`: third lens center thickness in m
+- `n1`: first lens [`RefractiveIndex`](@ref)
+- `n2`: second lens [`RefractiveIndex`](@ref)
+- `n3`: third lens [`RefractiveIndex`](@ref)
+
+# Additional information
+
+!!! info "Radius of curvature (ROC) sign definition"
+    The ROC is defined to be positive if the center is to the right of the surface, i.e. at +y. Otherwise it is negative.
+
+!!! info "Clear apertures"
+    Each surface has its own clear aperture and mechanical diameter, which are leveled per element as for a single [`Lens`](@ref).
+
+!!! warning "Supported surfaces"
+    Only rotationally symmetric surfaces are supported, cylindrical surfaces are not. The limitations of the
+    surface-based [`Lens`](@ref) constructor apply to each element: a meniscus element, whose center thickness
+    does not exceed the sagitta of its convex surface, must consist of spherical surfaces.
+
+!!! warning "Total internal reflection"
+    Total internal reflection at a cemented interface between two elements is not modeled correctly.
+"""
+function TripletLens(
+        s1::AbstractRotationallySymmetricSurface,
+        s2::AbstractRotationallySymmetricSurface,
+        s3::AbstractRotationallySymmetricSurface,
+        s4::AbstractRotationallySymmetricSurface,
+        l1::Real,
+        l2::Real,
+        l3::Real,
+        n1::RefractiveIndex,
+        n2::RefractiveIndex,
+        n3::RefractiveIndex)
+    # Generate "cemented" front, middle and back lenses that share the surfaces s2 and s3
+    front = Lens(s1, s2, l1, n1)
+    middle = Lens(s2, s3, l2, n2)
+    back = Lens(s3, s4, l3, n3)
+    # Move triplet parts into position
+    translate3d!(middle, [0, thickness(shape(front)), 0])
+    translate3d!(back, [0, thickness(shape(front)) + thickness(shape(middle)), 0])
+    return TripletLens(front, middle, back)
+end
 
 """
     SphericalTripletLens(r1, r2, r3, r4, l1, l2, l3, d, n1, n2, n3)

@@ -2,7 +2,8 @@
     DoubletLens
 
 Represents a two-component cemented doublet lens with two respective refractive indices `n = n(λ)`.
-See also [`SphericalDoubletLens`](@ref).
+See also [`SphericalDoubletLens`](@ref) and the surface-based constructor
+`DoubletLens(s1, s2, s3, l1, l2, n1, n2)`.
 
 # Fields
 
@@ -28,6 +29,58 @@ Base.position(dl::DoubletLens) = position(dl.front)
 orientation(dl::DoubletLens) = orientation(dl.front)
 
 thickness(dl::DoubletLens) = thickness(shape(dl.front)) + thickness(shape(dl.back))
+
+"""
+    DoubletLens(s1, s2, s3, l1, l2, n1, n2)
+
+Generates a two-component "cemented" [`DoubletLens`](@ref) from three surface specifications, e.g.
+[`SphericalSurface`](@ref), [`EvenAsphericalSurface`](@ref) or [`CircularFlatSurface`](@ref).
+The front element is `Lens(s1, s2, l1, n1)` and the back element is `Lens(s2, s3, l2, n2)`,
+refer to the surface-based [`Lens`](@ref) constructor for the construction of the elements.
+The front vertex lies at the origin and the back element is translated along +y by `l1`, so that
+both elements share the cemented surface `s2`.
+
+# Arguments
+
+- `s1`: first surface
+- `s2`: second (cemented) surface
+- `s3`: third surface
+- `l1`: first lens center thickness in m
+- `l2`: second lens center thickness in m
+- `n1`: first lens [`RefractiveIndex`](@ref)
+- `n2`: second lens [`RefractiveIndex`](@ref)
+
+# Additional information
+
+!!! info "Radius of curvature (ROC) sign definition"
+    The ROC is defined to be positive if the center is to the right of the surface, i.e. at +y. Otherwise it is negative.
+
+!!! info "Clear apertures"
+    Each surface has its own clear aperture and mechanical diameter, which are leveled per element as for a single [`Lens`](@ref).
+
+!!! warning "Supported surfaces"
+    Only rotationally symmetric surfaces are supported, cylindrical surfaces are not. The limitations of the
+    surface-based [`Lens`](@ref) constructor apply to each element: a meniscus element, whose center thickness
+    does not exceed the sagitta of its convex surface, must consist of spherical surfaces.
+
+!!! warning "Total internal reflection"
+    Total internal reflection at the cemented interface between the two elements is not modeled correctly.
+"""
+function DoubletLens(
+        s1::AbstractRotationallySymmetricSurface,
+        s2::AbstractRotationallySymmetricSurface,
+        s3::AbstractRotationallySymmetricSurface,
+        l1::Real,
+        l2::Real,
+        n1::RefractiveIndex,
+        n2::RefractiveIndex)
+    # Generate "cemented" front and back lenses that share the surface s2
+    front = Lens(s1, s2, l1, n1)
+    back = Lens(s2, s3, l2, n2)
+    # Move doublet parts into position
+    translate3d!(back, [0, thickness(shape(front)), 0])
+    return DoubletLens(front, back)
+end
 
 """
     SphericalDoubletLens(r1, r2, r3, l1, l2, d, n1, n2)

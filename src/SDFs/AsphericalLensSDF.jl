@@ -492,3 +492,9 @@ function _sdf(s::EvenAsphericalSurface, ::BackwardOrientation)
 
     return back
 end
+
+# The remaining orientation types are only requested for the MeniscusLensSDF
+function _sdf(::EvenAsphericalSurface, ::AbstractOrientationType)
+    throw(ArgumentError("A meniscus lens, whose center thickness does not exceed the sagitta of its convex surface, \
+        must consist of spherical surfaces. Aspherical surfaces are not supported in this case."))
+end
