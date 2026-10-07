@@ -52,6 +52,8 @@ to their untraced start state.
 | `UniformDiscSource(pos, dir, diameter, λ = 1e-6; num_rays = 1000, basis)` | parallel rays, equal-area (Fibonacci) sampling. **Use for PSF/intensity.** |
 | `PointSource(pos, dir, θ, λ = 1e-6; num_rings = 10, num_rays, basis)` | diverging rays, half-angle `θ` (rad, < π) |
 | `UniformPointSource(pos, dir, θ, λ = 1e-6; num_rays = 1000, basis)` | diverging rays, equal solid angle |
+| `UniformLineSource(pos, dir, width, λ = 1e-6; num_rays = 101, basis)` | 2D: parallel rays equidistant on a line of length `width` along `basis`, marginal rays included. Returns a `CollimatedSource`. |
+| `UniformFanSource(pos, dir, θ, λ = 1e-6; num_rays = 101, basis)` | 2D: diverging rays with equidistant angles in `[-θ, θ]` (rad, θ < π) in the plane of `dir` and `basis`, marginal rays included. Returns a `PointSource`. |
 | `CollimatedSource(beams, diameter, pos, dir)` / `PointSource(beams, NA, pos, dir)` | wrap your own beams (e.g. polarized ones) |
 | `CollimatedGaussianBeamletSource(pos, dir, D, λ, w0s; n_grid = 20, basis, randomize_axes, rng)` | square grid of astigmatic beamlets, `w0s ≈ D/n_grid` |
 | `SphericalGaussianBeamletSource(pos, dir, θ, λ; num_rings, num_rays, overlap = 1.2, basis, randomize_axes, rng, P0, E0)` | diverging beamlet fan |
@@ -60,7 +62,16 @@ to their untraced start state.
 | `WavefrontBeamletDecomposition(x, y, amplitude, phase, dir, λ; threshold, overlap, basis, randomize_axes, rng, E0)` | arbitrary sampled wavefront; the grid is centered at the origin, move it with `translate3d!` |
 | `AstigmaticBeamGroup(beams, pos, dir_or_orientation)` | wrap your own astigmatic beamlets |
 
-`set_num_rays!(src, n)` regenerates the rays of the first four sources above with `n` rays, same
+The 2D sources are for layout sketches and for tracing one section (e.g. the meridional plane) of
+a system. **Always pass `basis`** (the direction of the line, or the direction the fan opens
+towards): without it the plane of the rays is an arbitrary normal of `dir`. Use an odd `num_rays`
+(an even one duplicates the center ray). Do not use them for PSF/intensity, their rays are not
+equal-area or equal solid angle samples.
+
+The first beam of the first six sources above is the center ray, which starts at `pos` along `dir`:
+`first(BeamletOptics.beams(src))`.
+
+`set_num_rays!(src, n)` regenerates the rays of the first six sources above with `n` rays, same
 sampling, in the current pose (e.g. a coarse trace first, a fine one later); solve again afterwards.
 Wrapped beams can not be regenerated (`ArgumentError`).
 

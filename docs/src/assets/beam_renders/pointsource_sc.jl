@@ -23,3 +23,16 @@ ps_view = [
 
 set_view(ps_ax, ps_view)
 save("point_beam_source.png", ps_fig; px_per_unit=8, update = false)
+
+## uniform fan source
+ps = UniformFanSource([0,0,0], [0,1,0], deg2rad(10); num_rays=15, basis=[0,0,1])
+
+ps_fig = Figure(; size=(600,200))
+display(ps_fig)
+ps_ax = LScene(ps_fig[1,1])
+hide_axis(ps_ax)
+
+render!(ps_ax, ps, show_pos=true, flen=0.1, color=:red, render_every=1)
+
+set_view(ps_ax, ps_view)
+save("fan_beam_source.png", ps_fig; px_per_unit=8, update = false)

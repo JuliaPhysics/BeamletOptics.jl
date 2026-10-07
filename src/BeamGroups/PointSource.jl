@@ -5,11 +5,12 @@ Represents a cone of [`Beam`](@ref)s being emitted from a single point in space.
 
 # Fields
 
-- `beams`: a vector of all [`Beam`](@ref)s originating from the source
+- `beams`: a vector of all [`Beam`](@ref)s originating from the source. The first one is the center beam,
+  which starts at the source position along the central source direction, unless the source wraps given beams.
 - `NA`: the [`numerical_aperture`](@ref) of the point source spread angle
 - `center`: source position, pivot for rotations
 - `orientation`: right-handed orthonormal matrix, columns are the sampling reference vector, the central source direction and their cross product, see [`AbstractBeamGroup`](@ref)
-- `sampling`: how the rays were sampled (rings, sunflower, or given beams), see [`set_num_rays!`](@ref)
+- `sampling`: how the rays were sampled (rings, sunflower, fan, or given beams), see [`set_num_rays!`](@ref)
 
 # Functions
 
@@ -109,13 +110,16 @@ end
 
 Generates a cone of [`Beam`](@ref)s emitted from `pos` with *equal solid angle per ray*
 across the spherical cap `0 ≤ ϑ ≤ θ` around `dir`, using the deterministic sunflower
-(Fibonacci) pattern. The polar angle `ϑₖ` of the `k`-th ray (`k = 0 … N-1`) follows from
+(Fibonacci) pattern. The spiral starts with the center ray along `dir` (`k = 0`). The polar
+angle `ϑₖ` of the `k`-th ray (`k = 1 … N-1`) follows from
 `cos ϑₖ = 1 - (k + ½)/N ⋅ (1 - cos θ)`, its azimuth is `k` times the golden angle `π(3 - √5)`.
 
 !!! note
     This is merely a [`PointSource`](@ref) constructor which uses Fibonacci sampling
-    instead of concentric rings. Unlike [`PointSource`](@ref), there is no dedicated center
-    beam along `dir`, i.e. all rays are equally weighted samples of the cap.
+    instead of concentric rings. All rays are equally weighted samples of the cap: ray `k`
+    represents the part of the cap with
+    `1 - (k + 1)/N ⋅ (1 - cos θ) ≤ cos ϑ ≤ 1 - k/N ⋅ (1 - cos θ)`. The center ray represents the
+    innermost of these parts, a cap, by its center.
 
 # Arguments
 
@@ -155,6 +159,75 @@ function UniformPointSource(
     dir = normalize(dir)
     e1 = sampling_basis(dir, basis, T)
     sampling = ConeSunflower(θ)
+    beams = source_beams(sampling, pos, dir, e1, λ, num_rays, T)
+    return PointSource(beams, numerical_aperture(θ), pos, _group_orientation(dir, e1, T), sampling)
+end
+
+"""
+    UniformFanSource(pos, dir, θ, λ; num_rays=101, basis)
+
+Generates a plane fan of [`Beam`](@ref)s emitted from `pos`, i.e. a two-dimensional point
+source: the rays lie in the plane spanned by `dir` and `basis`, with equidistant angles between
+`-θ` and `θ` to `dir`. This is useful for layout sketches and for tracing a single (e.g.
+meridional or sagittal) section of a system.
+
+The first ray is the center ray along `dir`. It is followed by `h = (N - 1) ÷ 2` rays on each
+side of it, which enclose the angles `φⱼ = j/h ⋅ θ` with `dir` for `j = -h … h` without `j = 0`
+and point along `cos φⱼ ⋅ dir + sin φⱼ ⋅ basis`, i.e. from one marginal ray at the edge of the
+fan to the other. A single ray points along `dir`.
+
+!!! info "Use an odd number of rays"
+    A pattern that is symmetric to its center ray has an odd number of rays. An even `num_rays`
+    yields the pattern of `num_rays - 1` rays and a second ray along `dir`.
+
+!!! note
+    This is merely a [`PointSource`](@ref) constructor which samples one section of the cone
+    instead of concentric rings.
+
+!!! warning
+    The rays sample a plane angle, not a solid angle: they are not equal solid angle samples of
+    a cone. For a point spread function or an [`intensity`](@ref) use
+    [`UniformPointSource`](@ref).
+
+# Arguments
+
+The following inputs and arguments can be used to configure the underlying [`PointSource`](@ref):
+
+## Inputs
+
+- `pos`: starting position of all beams
+- `dir`: central source direction, i.e. the axis of the fan
+- `θ`: half spread angle in rad, must be `< π`
+- `λ = 1e-6`: wavelength in [m], default val. is 1000 nm
+
+## Keyword Arguments
+
+- `num_rays=101`: total number of rays in the source, must be `≥ 1`
+- `basis`: direction (e.g. `[1,0,0]`) that spans the plane of the fan together with `dir`,
+  projected into the plane normal to `dir`. Rays with a positive angle are tilted towards it.
+  Must not be zero or parallel to `dir`.
+
+!!! info "Orientation of the fan"
+    If no `basis` is passed, the plane of the fan is derived from `dir` deterministically via
+    [`normal3d`](@ref), which is rarely the section of interest: pass a `basis` to choose the
+    plane of the rays. The fan can also be turned about `dir` afterwards with
+    [`rotate3d!`](@ref).
+"""
+function UniformFanSource(
+        pos::AbstractArray{P},
+        dir::AbstractArray{D},
+        θ::H,
+        λ::L = 1e-6;
+        num_rays::Int = 101,
+        basis::Union{Nothing, AbstractVector} = nothing
+) where {P <: Real, D <: Real, H <: Real, L <: Real}
+    T = promote_type(P, D, H, L)
+    if θ ≥ pi
+        throw(ErrorException("Point source opening half-angle θ must be < π"))
+    end
+    dir = normalize(dir)
+    e1 = sampling_basis(dir, basis, T)
+    sampling = ConeFan(θ)
     beams = source_beams(sampling, pos, dir, e1, λ, num_rays, T)
     return PointSource(beams, numerical_aperture(θ), pos, _group_orientation(dir, e1, T), sampling)
 end

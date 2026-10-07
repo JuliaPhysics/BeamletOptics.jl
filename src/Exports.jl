@@ -4,7 +4,8 @@ export translate3d!, translate_to3d!, rotate3d!, xrotate3d!, yrotate3d!, zrotate
 export position, direction, orientation
 
 # ray and beam type export
-export Ray, PolarizedRay, Beam, PointSource, CollimatedSource, UniformDiscSource, UniformPointSource, set_num_rays!,
+export Ray, PolarizedRay, Beam, PointSource, CollimatedSource, UniformDiscSource, UniformPointSource,
+       UniformLineSource, UniformFanSource, set_num_rays!,
        GaussianBeamlet, AstigmaticGaussianBeamlet, rayleigh_range, rays, point_on_beam,
        normal3d
 export CollimatedGaussianBeamletSource, GaussianBeamletDecomposition,
@@ -81,5 +82,5 @@ public is_static, hit_count, wavelength, min_num_rays, ProgressSink, PROGRESS_SI
        progress_state, is_cancelled
 # re-emitting components (e.g. solvers coupled through a field)
 public relaunch!, beamlet_hit_field, GaussianBeamletHit, AstigmaticGaussianBeamletHit
-public AbstractSampling, NoSampling, DiscRings, DiscSunflower, ConeRings, ConeSunflower,
-       source_beams, sampling_basis
+public AbstractSampling, NoSampling, DiscRings, DiscSunflower, DiscLine, ConeRings, ConeSunflower,
+       ConeFan, source_beams, sampling_basis

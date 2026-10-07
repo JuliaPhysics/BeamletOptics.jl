@@ -321,6 +321,205 @@ const BMO = BeamletOptics
         end
     end
 
+    @testset "Uniform line source" begin
+        # define parameters
+        lambda = 486.0e-9
+        pos = [0, -0.5, 0]
+        dir = [0, 1, 1]
+        dir_n = normalize(dir)
+        width = 2BMO.inch
+        num_rays = 101
+        # not normal to dir, the line lies along its projection
+        basis = [1.0, 2.0, 0.5]
+        b = normalize(basis - dot(basis, dir_n) * dir_n)
+
+        source = UniformLineSource(pos, dir, width, lambda; num_rays, basis)
+        starts(s) = position.(first.(BMO.rays.(BMO.beams(s))))
+        # signed coordinate of the ray starts along the line
+        coords(s, e1) = [dot(p - pos, e1) for p in starts(s)]
+
+        @testset "Testing getters and sampling" begin
+            @test source isa CollimatedSource
+            @test length(source) == num_rays
+            @test BMO.diameter(source) == width
+            @test position(source) == pos
+            @test BMO.direction(source) ≈ dir_n
+            @test BMO.wavelength(source) == lambda
+            @test all(BMO.direction(beam) ≈ dir_n for beam in BMO.beams(source))
+            # all rays start on the line along the projected basis
+            @test all(norm(p - pos - dot(p - pos, b) * b) < 1e-12 for p in starts(source))
+            # the center ray first, then equidistant from one marginal ray to the other
+            x = coords(source, b)
+            @test first(starts(source)) == pos
+            @test is_strictly_sorted(x[2:end])
+            @test x[2] ≈ -width / 2
+            @test last(x) ≈ width / 2
+            @test sort(x) ≈ range(-width / 2, width / 2; length = num_rays)
+            # an even number of rays has a second ray at the center
+            even = UniformLineSource(pos, dir, width, lambda; num_rays = 4, basis)
+            @test coords(even, b) ≈ [0, -1, 1, 0] * width / 2
+            @test first(starts(even)) == pos
+            @test starts(UniformLineSource(pos, dir, width, lambda; num_rays = 2, basis)) == [pos, pos]
+            # default wavelength and number of rays
+            @test length(UniformLineSource(pos, dir, width)) == 101
+            # single ray
+            single = UniformLineSource(pos, dir, width; num_rays = 1)
+            @test length(single) == 1
+            @test only(starts(single)) == pos
+        end
+
+        @testset "Testing basis kwarg" begin
+            # orientation: local x is the projected basis, local y is dir
+            O = orientation(source)
+            @test norm(O[:, 1] - b) < 1e-12
+            @test BMO.direction(source) == O[:, 2]
+            @test norm(O' * O - I) < 1e-12
+            @test abs(det(O) - 1) < 1e-12
+            # the default is reproducible, and passing the default basis reproduces it
+            b0 = BMO.normal3d(dir_n)
+            default = UniformLineSource(pos, dir, width, lambda; num_rays)
+            @test sort(coords(default, b0)) ≈ range(-width / 2, width / 2; length = num_rays)
+            @test all(starts(default) .≈ starts(UniformLineSource(pos, dir, width, lambda; num_rays, basis = b0)))
+        end
+
+        @testset "Testing plane of the rays" begin
+            # a line source in a plane that contains the axis of a lens stays in this plane
+            lens = SphericalLens(50e-3, -50e-3, 5e-3, BMO.inch, λ -> 1.5)
+            system = System([lens])
+            sheet = UniformLineSource([0, -0.1, 0], [0, 1, 0], 20e-3, lambda; num_rays = 21, basis = [1, 0, 0])
+            solve_system!(system, sheet)
+            traced = [r for beam in BMO.beams(sheet) for r in BMO.rays(beam)]
+            @test length(traced) == 3 * 21
+            @test all(abs(position(r)[3]) < 1e-12 && abs(BMO.direction(r)[3]) < 1e-12 for r in traced)
+        end
+
+        @testset "Testing throw errors" begin
+            @test_throws ErrorException UniformLineSource(pos, dir, width, lambda; num_rays = 0)
+            # basis parallel to dir has no component normal to it
+            @test_throws ErrorException UniformLineSource(pos, dir, width, lambda; num_rays, basis = dir)
+            @test_throws ErrorException UniformLineSource(pos, dir, width, lambda; num_rays, basis = [0, 0, 0])
+        end
+    end
+
+    @testset "Uniform fan source" begin
+        # define parameters
+        lambda = 486.0e-9
+        pos = [0, -0.5, 0]
+        dir = [0, 1, 1]
+        dir_n = normalize(dir)
+        θ = deg2rad(20)
+        num_rays = 101
+        # not normal to dir, the fan is tilted towards its projection
+        basis = [1.0, 2.0, 0.5]
+        b = normalize(basis - dot(basis, dir_n) * dir_n)
+
+        source = UniformFanSource(pos, dir, θ, lambda; num_rays, basis)
+        start_dirs(s) = BMO.direction.(first.(BMO.rays.(BMO.beams(s))))
+        # signed angle of the rays to dir in the plane of the fan, positive towards e1
+        angles(s, e1) = [atan(dot(d, e1), dot(d, dir_n)) for d in start_dirs(s)]
+
+        @testset "Testing getters and sampling" begin
+            @test source isa PointSource
+            @test length(source) == num_rays
+            @test BMO.numerical_aperture(source) == sin(θ)
+            @test position(source) == pos
+            @test BMO.direction(source) ≈ dir_n
+            @test BMO.wavelength(source) == lambda
+            @test all(position(beam) == pos for beam in BMO.beams(source))
+            @test all(norm(d) ≈ 1 for d in start_dirs(source))
+            # all rays lie in the plane spanned by dir and the projected basis
+            @test all(abs(dot(d, cross(dir_n, b))) < 1e-12 for d in start_dirs(source))
+            # the center ray first, then equidistant angles from one marginal ray to the other
+            φ = angles(source, b)
+            @test first(start_dirs(source)) == BMO.direction(source)
+            @test is_strictly_sorted(φ[2:end])
+            @test φ[2] ≈ -θ
+            @test last(φ) ≈ θ
+            @test sort(φ) ≈ range(-θ, θ; length = num_rays)
+            # an even number of rays has a second ray at the center
+            even = UniformFanSource(pos, dir, θ, lambda; num_rays = 4, basis)
+            @test isapprox(angles(even, b), [0, -1, 1, 0] * θ; atol = 1e-12)
+            @test first(start_dirs(even)) == BMO.direction(even)
+            @test start_dirs(UniformFanSource(pos, dir, θ, lambda; num_rays = 2, basis)) == fill(BMO.direction(source), 2)
+            # a fan wider than 90°
+            wide = UniformFanSource(pos, dir, deg2rad(100), lambda; num_rays = 11, basis)
+            @test sort(angles(wide, b)) ≈ range(-deg2rad(100), deg2rad(100); length = 11)
+            # default wavelength and number of rays
+            @test length(UniformFanSource(pos, dir, θ)) == 101
+            # single ray
+            single = UniformFanSource(pos, dir, θ; num_rays = 1)
+            @test length(single) == 1
+            @test only(start_dirs(single)) ≈ dir_n
+        end
+
+        @testset "Testing basis kwarg" begin
+            # orientation: local x is the projected basis, local y is dir
+            O = orientation(source)
+            @test norm(O[:, 1] - b) < 1e-12
+            @test BMO.direction(source) == O[:, 2]
+            @test norm(O' * O - I) < 1e-12
+            @test abs(det(O) - 1) < 1e-12
+            # the default is reproducible, and passing the default basis reproduces it
+            b0 = BMO.normal3d(dir_n)
+            default = UniformFanSource(pos, dir, θ, lambda; num_rays)
+            @test sort(angles(default, b0)) ≈ range(-θ, θ; length = num_rays)
+            @test all(start_dirs(default) .≈ start_dirs(UniformFanSource(pos, dir, θ, lambda; num_rays, basis = b0)))
+        end
+
+        @testset "Testing throw errors" begin
+            @test_throws ErrorException UniformFanSource(pos, dir, 1.1 * π, lambda; num_rays)
+            @test_throws ErrorException UniformFanSource(pos, dir, π, lambda; num_rays)
+            @test_throws ErrorException UniformFanSource(pos, dir, θ, lambda; num_rays = 0)
+            # basis parallel to dir has no component normal to it
+            @test_throws ErrorException UniformFanSource(pos, dir, θ, lambda; num_rays, basis = dir)
+            @test_throws ErrorException UniformFanSource(pos, dir, θ, lambda; num_rays, basis = [0, 0, 0])
+        end
+    end
+
+    @testset "Center ray" begin
+        pos, dir, λ = [0.1, -0.2, 0.3], [0.2, 1.0, -0.1], 633e-9
+        dir_n, basis = normalize(dir), [1.0, 2.0, 0.5]
+        start(b) = position(first(rays(b)))
+        heading(b) = BMO.direction(first(rays(b)))
+        # constructor by the number of rays, and numbers of rays to test
+        sources = [
+            (n -> CollimatedSource(pos, dir, 5e-3, λ; num_rings = 2, num_rays = n, basis), (40, 41, 1000)),
+            (n -> PointSource(pos, dir, deg2rad(100), λ; num_rings = 2, num_rays = n, basis), (40, 41, 1000)),
+            (n -> UniformDiscSource(pos, dir, 5e-3, λ; num_rays = n, basis), (1, 2, 10, 11, 1000)),
+            (n -> UniformPointSource(pos, dir, deg2rad(100), λ; num_rays = n, basis), (1, 2, 10, 11, 1000)),
+            (n -> UniformLineSource(pos, dir, 5e-3, λ; num_rays = n, basis), (1, 2, 10, 11, 1000)),
+            (n -> UniformFanSource(pos, dir, deg2rad(100), λ; num_rays = n, basis), (1, 2, 10, 11, 1000))
+        ]
+        for (make, counts) in sources, n in counts
+            src = make(n)
+            @test length(src) == n
+            # the first beam starts exactly at the source position along the source direction, which
+            # is the direction passed to the constructor up to rounding
+            center = first(BMO.beams(src))
+            @test start(center) == pos
+            @test start(center) == position(src)
+            @test heading(center) == BMO.direction(src)
+            @test heading(center) ≈ dir_n
+            # also after the source was moved and its rays were regenerated
+            translate3d!(src, [0.01, 0.02, -0.03])
+            rotate3d!(src, normalize([1.0, 0.3, 0.2]), 0.4)
+            for m in (n, last(counts))
+                set_num_rays!(src, m)
+                center = first(BMO.beams(src))
+                @test isapprox(start(center), position(src); atol = 1e-12)
+                @test isapprox(heading(center), BMO.direction(src); atol = 1e-12)
+            end
+        end
+        # the sunflower patterns differ from the equal-area and equal solid angle rule only in their first ray
+        N, R, θ = 500, 2.5e-3, deg2rad(100)
+        disc = UniformDiscSource(pos, dir, 2R, λ; num_rays = N)
+        radii = [norm(start(b) - pos) for b in BMO.beams(disc)]
+        @test radii[2:end] ≈ [R * sqrt((k + 0.5) / N) for k in 1:(N - 1)]
+        cap = UniformPointSource(pos, dir, θ, λ; num_rays = N)
+        cosines = [dot(heading(b), dir_n) for b in BMO.beams(cap)]
+        @test cosines[2:end] ≈ [1 - (k + 0.5) / N * (1 - cos(θ)) for k in 1:(N - 1)]
+    end
+
     @testset "set_num_rays!" begin
         pos, dir, λ = [0.1, -0.2, 0.3], normalize([0.2, 1.0, -0.1]), 633e-9
         start(b) = Vector(BMO.position(first(rays(b))))
@@ -337,7 +536,9 @@ const BMO = BeamletOptics
             (p, d, n, b) -> CollimatedSource(p, d, 5e-3, λ; num_rings = 4, num_rays = n, basis = b),
             (p, d, n, b) -> UniformDiscSource(p, d, 5e-3, λ; num_rays = n, basis = b),
             (p, d, n, b) -> PointSource(p, d, deg2rad(100), λ; num_rings = 4, num_rays = n, basis = b),
-            (p, d, n, b) -> UniformPointSource(p, d, 0.3, λ; num_rays = n, basis = b)
+            (p, d, n, b) -> UniformPointSource(p, d, 0.3, λ; num_rays = n, basis = b),
+            (p, d, n, b) -> UniformLineSource(p, d, 5e-3, λ; num_rays = n, basis = b),
+            (p, d, n, b) -> UniformFanSource(p, d, deg2rad(100), λ; num_rays = n, basis = b)
         ]
         for make in sources
             src = make(pos, dir, 200, nothing)
@@ -377,7 +578,7 @@ const BMO = BeamletOptics
         end
 
         # min_num_rays is the lower bound of set_num_rays!, the source keeps its rays below it
-        for (make, n_min) in zip(sources, (80, 1, 80, 1))
+        for (make, n_min) in zip(sources, (80, 1, 80, 1, 1, 1))
             src = make(pos, dir, 200, nothing)
             @test BMO.min_num_rays(src) == n_min
             @test_throws ErrorException set_num_rays!(src, n_min - 1)

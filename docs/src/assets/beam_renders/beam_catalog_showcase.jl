@@ -81,6 +81,12 @@ const TILES = [
     "UniformPointSource" => traced_tile(
         () -> UniformPointSource([0, 0, 0], [0, 1, 0], deg2rad(8), λ; num_rays = 60);
         ray_group_kwargs...),
+    "UniformLineSource" => traced_tile(
+        () -> UniformLineSource([0, 0, 0], [0, 1, 0], 15mm, λ; num_rays = 15, basis = [0, 0, 1]);
+        ray_group_kwargs...),
+    "UniformFanSource" => traced_tile(
+        () -> UniformFanSource([0, 0, 0], [0, 1, 0], deg2rad(8), λ; num_rays = 15, basis = [0, 0, 1]);
+        ray_group_kwargs...),
     "AstigmaticBeamGroup" => traced_tile(astigmatic_group; beamlet_group_kwargs...),
     "CollimatedGaussianBeamletSource" => traced_tile(
         () -> CollimatedGaussianBeamletSource([0, 0, 0], [0, 1, 0], 12mm, λ, 3mm; n_grid = 4);
