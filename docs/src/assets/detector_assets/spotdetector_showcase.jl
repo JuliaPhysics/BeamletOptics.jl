@@ -8,13 +8,11 @@ const mm = 1e-3
 ##
 # define spherical lenses
 l1 = SphericalLens(69.21e-3, 433.84e-3, 9.33e-3, 70e-3, λ -> 1.671)
-# front triplet: last surface only 40 mm clear aperture -> assembled from individual lenses
-l2 = SphericalLens(35.86e-3, 85.87e-3, 11.81e-3, 60e-3, λ -> 1.671)
-l3 = SphericalLens(85.87e-3, -646.31e-3, 7.05e-3, 60e-3, λ -> 1.4892)
-l4 = Lens(SphericalSurface(-646.31e-3, 60e-3), SphericalSurface(23.51e-3, 40e-3), 1.9e-3, λ -> 1.7394)
-translate3d!(l3, [0, thickness(l2), 0])
-translate3d!(l4, [0, thickness(l2) + thickness(l3), 0])
-l234 = TripletLens(l2, l3, l4)
+# front triplet: last surface only 40 mm clear aperture -> constructed from surfaces
+l234 = TripletLens(
+    SphericalSurface(35.86e-3, 60e-3), SphericalSurface(85.87e-3, 60e-3),
+    SphericalSurface(-646.31e-3, 60e-3), SphericalSurface(23.51e-3, 40e-3),
+    11.81e-3, 7.05e-3, 1.9e-3, λ -> 1.671, λ -> 1.4892, λ -> 1.7394)
 l567 = SphericalTripletLens(Inf, 51.09e-3, -22.12e-3, -103.13e-3, 2.48e-3, 19.81e-3, 4.57e-3, 42e-3,
                             λ -> 1.5232, λ -> 1.6578, λ -> 1.5894)
 

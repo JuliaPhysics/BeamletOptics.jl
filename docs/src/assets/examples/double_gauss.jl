@@ -52,13 +52,11 @@ save("double_gauss.png", fig; px_per_unit=8, update = false)
 
 ## Sonnar comparison
 s1 = SphericalLens(69.21e-3, 433.84e-3, 9.33e-3, 70e-3, λ -> 1.671)
-# front triplet: last surface only has a clear aperture of 40 mm -> assembled from individual lenses
-s2 = SphericalLens(35.86e-3, 85.87e-3, 11.81e-3, 60e-3, λ -> 1.671)
-s3 = SphericalLens(85.87e-3, -646.31e-3, 7.05e-3, 60e-3, λ -> 1.4892)
-s4 = Lens(SphericalSurface(-646.31e-3, 60e-3), SphericalSurface(23.51e-3, 40e-3), 1.9e-3, λ -> 1.7394)
-translate3d!(s3, [0, thickness(s2), 0])
-translate3d!(s4, [0, thickness(s2) + thickness(s3), 0])
-s234 = TripletLens(s2, s3, s4)
+# front triplet: last surface only has a clear aperture of 40 mm -> constructed from surfaces
+s234 = TripletLens(
+    SphericalSurface(35.86e-3, 60e-3), SphericalSurface(85.87e-3, 60e-3),
+    SphericalSurface(-646.31e-3, 60e-3), SphericalSurface(23.51e-3, 40e-3),
+    11.81e-3, 7.05e-3, 1.9e-3, λ -> 1.671, λ -> 1.4892, λ -> 1.7394)
 s567 = SphericalTripletLens(Inf, 51.09e-3, -22.12e-3, -103.13e-3, 2.48e-3, 19.81e-3, 4.57e-3, 42e-3,
                             λ -> 1.5232, λ -> 1.6578, λ -> 1.5894)
 
