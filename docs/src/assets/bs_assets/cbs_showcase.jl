@@ -9,21 +9,21 @@ const mm = 1e-3
 n = 1.5
 
 cbs1 = CubeBeamsplitter(BeamletOptics.inch, _->n)
-cbs1_mount = MeshDummy(joinpath(@__DIR__, "CBS Mount.stl"))
+cbs1_mount = NonInteractableObject(joinpath(@__DIR__, "CBS Mount.stl"))
 
 cbs2 = CubeBeamsplitter(BeamletOptics.inch, _->n)
-cbs2_mount = MeshDummy(joinpath(@__DIR__, "CBS Mount.stl"))
+cbs2_mount = NonInteractableObject(joinpath(@__DIR__, "CBS Mount.stl"))
 zrotate3d!(cbs2_mount, π)
 
 cbs1_assembly = ObjectGroup([cbs1, cbs1_mount])
 cbs2_assembly = ObjectGroup([cbs2, cbs2_mount])
 
 m1 = RightAnglePrismMirror(BeamletOptics.inch, BeamletOptics.inch)
-m1_mount = MeshDummy(joinpath(@__DIR__, "CBS Mount.stl"))
+m1_mount = NonInteractableObject(joinpath(@__DIR__, "CBS Mount.stl"))
 zrotate3d!(m1, π)
 
 m2 = RightAnglePrismMirror(BeamletOptics.inch, BeamletOptics.inch)
-m2_mount = MeshDummy(joinpath(@__DIR__, "CBS Mount.stl"))
+m2_mount = NonInteractableObject(joinpath(@__DIR__, "CBS Mount.stl"))
 zrotate3d!(m2, π)
 
 m1_assembly = ObjectGroup([m1, m1_mount])

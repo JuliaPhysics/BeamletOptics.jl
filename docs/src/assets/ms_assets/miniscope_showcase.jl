@@ -20,7 +20,7 @@ NLASF44 = DiscreteRefractiveIndex(lambdas, [1.80832, 1.79901]) # https://www.sch
 
 ##
 function miniscope_body()
-    miniscope = MeshDummy(joinpath(@__DIR__, "Miniscope.stl"))
+    miniscope = NonInteractableObject(joinpath(@__DIR__, "Miniscope.stl"))
     # offset from CAD model
     dx = -3.646mm 
     dy = 41.933mm

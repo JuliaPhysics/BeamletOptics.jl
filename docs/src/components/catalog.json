@@ -266,18 +266,11 @@
     "teaser": "Builds a round film polarizer with glass substrates."
   },
   {
-    "name": "MeshDummy",
-    "category": "Dummies",
-    "image": "catalog_MeshDummy.png",
-    "href": "/reference#BeamletOptics.MeshDummy-Tuple{String}",
-    "teaser": "Non-interacting mesh loaded from a file, e.g. a mount."
-  },
-  {
     "name": "NonInteractableObject",
     "category": "Dummies",
     "image": "catalog_NonInteractableObject.png",
     "href": "/reference#BeamletOptics.NonInteractableObject",
-    "teaser": "Shape that is rendered but ignored by the ray tracer."
+    "teaser": "Shape or mesh file that is rendered but ignored by the ray tracer."
   },
   {
     "name": "IntersectableObject",
