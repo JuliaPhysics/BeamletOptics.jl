@@ -491,6 +491,14 @@ const nm = 1e-9
         @test BMO.hit_count(pd_t) == 1 && BMO.hit_count(pd_r) == 1
         @test optical_power(pd_t) ≈ P0 / 2 rtol = 1e-3
         @test optical_power(pd_r) ≈ P0 / 2 rtol = 1e-3
+        # the reported Gouy phase of both children starts where that of the parent ends
+        # (the distance along a child counts from the start of the root beam)
+        L = length(b.c)
+        ψ_end = BMO.gauss_parameters(b, L)[5]
+        @test ψ_end ≈ -atan(L / (π * w0^2 / λ)) atol = 1e-6
+        for child in BMO.children(b)
+            @test BMO.gauss_parameters(child, L)[5] ≈ ψ_end atol = 1e-6
+        end
 
         # behind the lens the beam converges: the children refer to the start of the root beam,
         # not to a point on their backwards extended first ray. The two uncoated surfaces of

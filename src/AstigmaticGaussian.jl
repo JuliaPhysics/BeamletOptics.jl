@@ -847,7 +847,8 @@ Compute the scalar Gaussian beam parameters at distance `z`.
 Returns a tuple `(w1, w2, R1, R2, ψ, w01, w02)` where:
 - `w1`, `w2`: beam radii along the principal axes
 - `R1`, `R2`: radii of curvature along the principal axes
-- `ψ`: total Gouy phase shift
+- `ψ`: total Gouy phase shift, collected continuously along the beam: it does not jump behind
+  a focus or at a mirror, and a child beam continues its parent
 - `w01`, `w02`: waist radii along the principal axes
 """
 function gauss_parameters(agb::AstigmaticGaussianBeamlet, z::Real)
