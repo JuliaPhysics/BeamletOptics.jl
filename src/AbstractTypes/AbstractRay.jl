@@ -195,7 +195,7 @@ function intersect3d(::MultiShape, object::AbstractObject, ray::AbstractRay)
 end
 
 """
-    intersect3d(::MultiShape, group::AbstractObjectGroup, ray::AbstractRay)
+    intersect3d(group::AbstractObjectGroup, ray::AbstractRay)
 
 Returns the closest intersection of the `ray` with the objects of the `group`. In contrast to a
 [`MultiShape`](@ref) object, the intersection keeps the object of the group that was hit, since
@@ -203,8 +203,8 @@ this object, not the group, interacts with the ray. No object is tested if the r
 bounding sphere of the group, which the table of a running solve holds, see
 `bounding_sphere_of(table, x)`.
 """
-function intersect3d(::MultiShape, group::AbstractObjectGroup, ray::AbstractRay)
-    return intersect3d(bounding_sphere_of(current_bounding_spheres(), group), shape(group), ray)
+function intersect3d(group::AbstractObjectGroup, ray::AbstractRay)
+    return intersect3d(bounding_sphere_of(current_bounding_spheres(), group), objects(group), ray)
 end
 
 """

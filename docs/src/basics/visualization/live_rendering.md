@@ -65,8 +65,8 @@ An object that is added to a system at runtime, see [Changing a system](@ref), i
 handle of the system, and removed from it again, by:
 
 ```@docs; canonical=false
-BeamletOptics.live_render!(::BeamletOptics.AbstractSystemRenderHandle, ::BeamletOptics.AbstractObject)
-BeamletOptics.remove_render!(::BeamletOptics.AbstractSystemRenderHandle, ::BeamletOptics.AbstractObject)
+BeamletOptics.live_render!(::BeamletOptics.AbstractSystemRenderHandle, ::BeamletOptics.ObjectOrGroup)
+BeamletOptics.remove_render!(::BeamletOptics.AbstractSystemRenderHandle, ::BeamletOptics.ObjectOrGroup)
 ```
 
 ```julia

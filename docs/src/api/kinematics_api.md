@@ -56,4 +56,5 @@ The primitives `translate3d!(::Movable, x, offset)` and `rotate3d!(::Movable, x,
 - [`BeamletOptics.AbstractObject`](@ref): the primitives forward to the [`BeamletOptics.AbstractShapeTrait`](@ref) of the object, see [`BeamletOptics.SingleShape`](@ref) and [`BeamletOptics.MultiShape`](@ref)
 - [`BeamletOptics.AbstractRay`](@ref): only subtypes carrying direction-dependent data (e.g. the field vector of a [`PolarizedRay`](@ref)) need their own `rotate3d!`
 - [`BeamletOptics.AbstractBeam`](@ref): either implement `_component_beams` or the two primitives; every move resets the beam via `empty!`
+- [`BeamletOptics.AbstractObjectGroup`](@ref): no `AbstractObject` and without shape trait; the primitives move all members of `objects(group)` rigidly about the group `center`
 - [`BeamletOptics.AbstractBeamGroup`](@ref): moves its `beams` rigidly about the group `center`

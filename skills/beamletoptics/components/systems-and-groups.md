@@ -38,6 +38,9 @@ tracing has run for `get_progress_threshold()` s (default 5 s).
 group = ObjectGroup([lens1, lens2, mount])   # members may be objects or other groups
 ```
 
+- An `ObjectGroup` is a kinematic container, not an `AbstractObject`: it has no shape trait. A
+  component made of several shapes is its own `AbstractObject` subtype with `MultiShape`, never an
+  `ObjectGroup` subtype. Read the members with `BeamletOptics.objects(group)`.
 - `position(group)` is the group `center`. It starts at the **origin**, not at the centroid;
   `orientation(group)` starts as identity.
 - `translate3d!(group, Δ)` moves all members and the center.

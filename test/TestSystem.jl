@@ -293,6 +293,17 @@ end
         @test objs == [m1]
         @test System(objs).objects !== objs
 
+        # objects and groups share no supertype: a vector of both has the element type `Any`
+        mixed = [RoundPlanoMirror(25e-3, 5e-3), ObjectGroup([RoundPlanoMirror(25e-3, 5e-3)])]
+        @test eltype(mixed) === Any
+        @test System(mixed).objects == mixed
+        @test StaticSystem(mixed).objects === (mixed[1], only(BMO.objects(mixed[2])))
+        @test StaticSystem(mixed[1]).objects === (mixed[1],)
+        @test StaticSystem(mixed[2]).objects === (only(BMO.objects(mixed[2])),)
+        # anything else is no part of a system
+        @test_throws MethodError System([mixed[1], 42])
+        @test_throws MethodError push!(System(), 42)
+
         # an empty system exposes no objects and is solved without a hit
         system = System()
         @test isempty(system.objects)

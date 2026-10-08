@@ -68,11 +68,12 @@ look_at!(::Any, ::AbstractVector, ::AbstractVector; kwargs...) = throw(MissingBa
     render_lcs!(ax, pos, lcs; scale = 10, show_labels = false)
     render_lcs!(ax, object; scale = 10, show_labels = false)
 
-Draws the local coordinate system of an object (or of an explicit `pos`/orientation pair)
-into `ax` as a red/green/yellow arrow triad, if a suitable backend is loaded. Useful to
+Draws the local coordinate system of an object or object group (or of an explicit
+`pos`/orientation pair) into `ax` as a red/green/yellow arrow triad, if a suitable backend is
+loaded. Useful to
 make the reference frame of an imported CAD mesh visible in the scene. If no suitable
 backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
 """
 render_lcs!(::Any, ::AbstractArray = zeros(3), ::AbstractMatrix = Matrix{Float64}(I, 3, 3); kwargs...) =
     throw(MissingBackendError())
-render_lcs!(::Any, ::AbstractObject; kwargs...) = throw(MissingBackendError())
+render_lcs!(::Any, ::ObjectOrGroup; kwargs...) = throw(MissingBackendError())
