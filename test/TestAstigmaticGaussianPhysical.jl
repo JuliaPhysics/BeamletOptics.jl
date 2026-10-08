@@ -122,6 +122,37 @@ const nm = 1e-9
         end
     end
 
+    @testset "Gouy phase does not change at a mirror (#128)" begin
+        λ = 1064e-9
+        k = 2π / λ
+        mirror(p) = (m = SquarePlanoMirror2D(25e-3); translate3d!(m, p); zrotate3d!(m, π / 4); m)
+        # +y → +x → +y → +x, detector 0.1 m behind the last mirror
+        mirror_pos = [[0, 0.1, 0], [0.1, 0.1, 0], [0.1, 0.2, 0]]
+        detector_pos = [[0, 0.2, 0], [0.1, 0.1, 0], [0.1, 0.3, 0], [0.2, 0.2, 0]]
+        # Phase on the axis of the detector minus k * OPL
+        function axis_phase(n_mirrors, beam)
+            pd = Detector(20e-3)
+            translate3d!(pd, detector_pos[n_mirrors + 1])
+            isodd(n_mirrors) && zrotate3d!(pd, -π / 2)
+            system = System([mirror.(mirror_pos[1:n_mirrors])..., pd])
+            solve_system!(system, beam)
+            _, _, E = BMO.electric_field(pd; n = 1, x_min = 0, x_max = 0, z_min = 0, z_max = 0)
+            return angle(E[1] * cis(-k * BMO.optical_path_length(beam)))
+        end
+        for n_mirrors in 0:3
+            gb = GaussianBeamlet([0.0, -0.1, 0], [0.0, 1, 0], λ, 0.5e-3)
+            agb = AstigmaticGaussianBeamlet([0.0, -0.1, 0], [0.0, 1, 0], λ, 0.5e-3;
+                support = [1.0, 0, 0])
+            Δ = axis_phase(n_mirrors, agb) - axis_phase(n_mirrors, gb)
+            @test isapprox(cis(Δ), 1; atol = 1e-6)
+            # Reported Gouy phase agrees with the field and with the stigmatic beamlet
+            L = BMO.optical_path_length(agb)
+            ψ = BMO.gauss_parameters(agb, L)[5]
+            ψ_gb = BMO.gauss_parameters(gb, L)[3]
+            @test ψ ≈ ψ_gb atol = 1e-6
+        end
+    end
+
     @testset "Transverse phase curvature" begin
         λ = 633e-9
         w0_x = 1e-4
