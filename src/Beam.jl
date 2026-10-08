@@ -43,6 +43,8 @@ end
 
 first_ray(b::Beam) = first(rays(b))
 
+_chief_beam(b::Beam) = b
+
 function translate3d!(::Movable, b::Beam, offset)
     isroot(b) || throw(ArgumentError("cannot move a child beam; move its root beam instead"))
     empty!(b)
