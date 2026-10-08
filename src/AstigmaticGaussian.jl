@@ -654,13 +654,21 @@ function _area_arg_change(A, l)
     return angle(1 - ρ1 * l) + angle(1 - ρ2 * l)
 end
 
+# Change of arg a at an interface, from the ratio of the areas behind and in front of it,
+# modulo π (sign of the pseudoscalar area dropped)
+_area_arg_jump(r) = angle(real(r) < 0 ? -r : r)
+
 """
     _area_arg(agb, i, l)
 
 Continuous argument of the complex beam area of `agb` at the local distance `l` along the
 chief ray segment `i` (measured from the start of that segment, may be negative in the
-first segment), relative to the start of the first segment. Interface jumps between
-segments are small and taken on the principal branch.
+first segment), relative to the start of the first segment.
+
+The area `(h1 × h2) ⋅ d` is a pseudoscalar: a reflection mirrors the transverse frame
+against the chief ray and flips its sign, which is no change of the beam. The jump at
+an interface is therefore taken modulo π, on (−π/2, π/2], and the Gouy phase does not
+change at a mirror. Physical interface jumps (refraction) are small.
 """
 function _area_arg(agb::AstigmaticGaussianBeamlet, i::Int, l::Real)
     Δ = zero(float(l))
@@ -669,7 +677,7 @@ function _area_arg(agb::AstigmaticGaussianBeamlet, i::Int, l::Real)
         ray = rays(agb.c)[j]
         h1, u1, h2, u2, _ = parabasal_ray_parameters(agb, position(ray), j)
         A = _area_coefficients(h1, u1, h2, u2, direction(ray))
-        j > 1 && (Δ += angle(A[1] / a_end))
+        j > 1 && (Δ += _area_arg_jump(A[1] / a_end))
         lj = j < i ? length(ray) : l
         Δ += _area_arg_change(A, lj)
         a_end = _area_value(A, lj)
@@ -845,7 +853,6 @@ function gauss_parameters(agb::AstigmaticGaussianBeamlet, z::Real)
     n = refractive_index(agb, i)
     λ = wavelength(agb)
     T = typeof(λ)
-    dir = direction(rays(agb.c)[i])
 
     # Axis 1
     w1 = norm(h1)
@@ -873,9 +880,12 @@ function gauss_parameters(agb::AstigmaticGaussianBeamlet, z::Real)
               imag(h2[3]) * real(u2[3]) - real(h2[3]) * imag(u2[3])))
     w02 = H2 / (n * norm(u2))
 
-    # Total Gouy phase
-    area = _pseudo_cross2d(h1, h2, dir)
-    ψ = -0.5 * angle(area)
+    # Total Gouy phase: argument of the area at the start, followed continuously along the
+    # beam (no jump behind a focus or at a mirror)
+    c1 = first(rays(agb.c))
+    h1s, _, h2s, _, _ = parabasal_ray_parameters(agb, position(c1), 1)
+    arg_start = angle(_pseudo_cross2d(h1s, h2s, direction(c1)))
+    ψ = -0.5 * (arg_start + _area_arg(agb, i, _local_distance(agb, p0, i)))
 
     return (w1, w2, R1, R2, ψ, w01, w02)
 end
