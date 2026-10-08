@@ -172,10 +172,11 @@ sphere_prism(radius, bound = radius) = BMO.Prism(WrappedSDF(BMO.SphereSDF(radius
         other = sphere_prism(radius)
         translate3d!(other, [0.2, -0.1, 0.05])
         outer = ObjectGroup([inner, other])
-        for object in (doublet, cube, inner, outer)
+        for (object, parts) in ((doublet, BMO.shape(doublet)), (cube, BMO.shape(cube)),
+            (inner, BMO.objects(inner)), (outer, BMO.objects(outer)))
             main = BMO.bounding_sphere_of(object)
             @test main isa BMO.MultiBoundingSphere{Float64}
-            @test all(part -> encloses(main, BMO.bounding_sphere_of(part)), BMO.shape(object))
+            @test all(part -> encloses(main, BMO.bounding_sphere_of(part)), parts)
         end
         # tight for two spheres: they touch the sphere around them from within
         a, b = sphere_prism(radius), sphere_prism(2radius)
@@ -201,7 +202,7 @@ sphere_prism(radius, bound = radius) = BMO.Prism(WrappedSDF(BMO.SphereSDF(radius
         @test table isa BMO.BoundingSphereTable
         # the shapes of the single-shape objects, and the multi-shape object and the group themselves
         shapes = [BMO.shape(prism), BMO.shape(doublet.front), BMO.shape(doublet.back),
-            BMO.shape.(BMO.shape(group))...]
+            BMO.shape.(BMO.objects(group))...]
         @test all(s -> haskey(table, s), shapes)
         @test haskey(table, doublet) && haskey(table, group)
         @test length(table) == length(shapes) + 2
@@ -210,7 +211,7 @@ sphere_prism(radius, bound = radius) = BMO.Prism(WrappedSDF(BMO.SphereSDF(radius
         computed = BMO.bounding_sphere_of(prism)
         @test table[BMO.shape(prism)].pos == computed.pos
         @test computed.radius < table[BMO.shape(prism)].radius < computed.radius * (1 + 1e-6)
-        @test encloses(table[group], table[BMO.shape(first(BMO.shape(group)))])
+        @test encloses(table[group], table[BMO.shape(first(BMO.objects(group)))])
         # the kind of the sphere is kept
         @test all(s -> table[s] isa BMO.SingleBoundingSphere{Float64}, shapes)
         @test table[doublet] isa BMO.MultiBoundingSphere{Float64}
@@ -349,7 +350,7 @@ sphere_prism(radius, bound = radius) = BMO.Prism(WrappedSDF(BMO.SphereSDF(radius
         end
         # also for a group within a group
         nested = ObjectGroup([ObjectGroup([sphere_prism(radius)]), sphere_prism(radius)])
-        @test BMO.object(BMO.intersect3d(nested, ray)) === only(BMO.shape(first(BMO.shape(nested))))
+        @test BMO.object(BMO.intersect3d(nested, ray)) === only(BMO.objects(first(BMO.objects(nested))))
     end
 
     @testset "Same result as without spheres" begin

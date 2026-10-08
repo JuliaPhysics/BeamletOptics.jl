@@ -8,7 +8,7 @@ Types:
         AbstractRefractiveOptic
         AbstractDetector
         AbstractBeamsplitter
-        AbstractObjectGroup
+    AbstractObjectGroup
     AbstractRay
     AbstractBeam
     AbstractSystem

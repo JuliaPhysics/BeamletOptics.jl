@@ -139,6 +139,19 @@ const BMO = BeamletOptics
         end
     end
 
+    @testset "A group is no object" begin
+        # a kinematic container, see issue 113: no `AbstractObject`, no shape trait
+        @test !(BMO.AbstractObjectGroup <: BMO.AbstractObject)
+        @test !(objects isa BMO.AbstractObject)
+        @test objects isa BMO.ObjectOrGroup && center isa BMO.ObjectOrGroup
+        @test !hasmethod(BMO.shape_trait_of, Tuple{typeof(objects)})
+        @test !hasmethod(BMO.shape, Tuple{typeof(objects)})
+        @test BMO.objects(objects) === (center, circle)
+        @test collect(AbstractTrees.children(objects)) == [center, circle]
+        # only objects and groups are members, e.g. no shapes
+        @test_throws TypeError ObjectGroup([center, BMO.CylinderSDF(1e-3, 2e-3)])
+    end
+
     @testset "System compatibility" begin
         # Test if objects in ObjectGroup are exposed correctly when iterating
         system = System(objects)

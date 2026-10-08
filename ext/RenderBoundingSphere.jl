@@ -50,11 +50,18 @@ render_bounding_sphere!(ax::_RenderEnv, ::BMO.SingleShape, obj; kwargs...) =
 
 # The solver tests the parts one by one, hence one sphere per part, and the main sphere of the object
 # first, which is drawn in `main_color`
-function render_bounding_sphere!(ax::_RenderEnv, ::BMO.MultiShape, obj; main_color = :orange, kwargs...)
-    for part in BMO.shape(obj)
+render_bounding_sphere!(ax::_RenderEnv, ::BMO.MultiShape, obj; kwargs...) =
+    _render_part_spheres!(ax, obj, BMO.shape(obj); kwargs...)
+
+# An object group: the spheres of its objects, then the main sphere of the group
+render_bounding_sphere!(ax::_RenderEnv, group::BMO.AbstractObjectGroup; kwargs...) =
+    _render_part_spheres!(ax, group, BMO.objects(group); kwargs...)
+
+function _render_part_spheres!(ax::_RenderEnv, whole, parts; main_color = :orange, kwargs...)
+    for part in parts
         render_bounding_sphere!(ax, part; main_color, kwargs...)
     end
-    render_bounding_sphere!(ax, BMO.bounding_sphere_of(obj); kwargs..., color = main_color)
+    render_bounding_sphere!(ax, BMO.bounding_sphere_of(whole); kwargs..., color = main_color)
     return nothing
 end
 

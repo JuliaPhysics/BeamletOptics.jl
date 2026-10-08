@@ -10,9 +10,12 @@ Main purpose is handling of, i.e., groups of lenses.
 - `dir`: a 3x3 matrix that describes the common `orientation` of the group
 - `objects`: stores [`AbstractObject`](@ref), can also store subgroups of type [`AbstractObjectGroup`](@ref)
 
+An `ObjectGroup` is a container and no [`AbstractObject`](@ref): each of its `objects` is traced and
+interacts on its own, read them via [`objects`](@ref)`(group)`.
+
 ## Kinematic
 
-A `ObjectGroup` implements the kinematic functions of [`AbstractObject`](@ref). The following logic is applied to
+An `ObjectGroup` can be moved like an [`AbstractObject`](@ref). The following logic is applied to
 
 - [`translate3d!`](@ref): all objects in the group are translated by the offset vector
 - [`translate_to3d!`](@ref): all objects are moved in parallel such that the group `center` is equal to the target position
@@ -22,23 +25,11 @@ A `ObjectGroup` implements the kinematic functions of [`AbstractObject`](@ref). 
 The `objects` must be either all static or all movable, otherwise the constructor throws an `ArgumentError`.
 The group takes that kinematic class, see [`BeamletOptics.AbstractKinematicTrait`](@ref).
 """
-mutable struct ObjectGroup{T, O <: Tuple{Vararg{AbstractObject}}} <: AbstractObjectGroup{T}
+mutable struct ObjectGroup{T, O <: Tuple{Vararg{ObjectOrGroup}}} <: AbstractObjectGroup{T}
     dir::SMatrix{3, 3, T, 9}
     center::Point3{T}
     const objects::O
 end
-
-shape_trait_of(::ObjectGroup) = MultiShape()
-
-kinematic_trait_of(g::ObjectGroup) = _container_trait(objects(g))
-
-shape(o::ObjectGroup) = o.objects
-
-Base.position(group::ObjectGroup) = group.center
-position!(group::ObjectGroup, pos) = (group.center = pos)
-
-orientation(group::ObjectGroup) = group.dir
-orientation!(group::ObjectGroup, dir) = (group.dir = dir)
 
 """
     set_pivot3d!(group::ObjectGroup, pivot)
@@ -68,12 +59,5 @@ function ObjectGroup(v::V, T = Float64) where {V <: Tuple}
     _check_kinematic_members(v)
     ObjectGroup{T, V}(SMatrix{3,3}(one(T)*I), Point3{T}(0), v)
 end
-
-"""
-    objects(group::ObjectGroup)
-
-Exposes all objects/subgroups stored within the group.
-"""
-objects(group::ObjectGroup) = group.objects
 
 Base.show(::IO, ::MIME"text/plain", group::ObjectGroup) = print_tree(group)
