@@ -237,10 +237,11 @@ function calc_local_lims(
 end
 
 """
-    calc_local_lims(pd::Detector, hits::Vector{GaussianBeamletHit}; crop_factor=1, num_spots=50, kwargs...)
+    calc_local_lims(pd::Detector, hits::Vector{GaussianBeamletHit}; crop_factor=3, num_spots=50, kwargs...)
 
 Computes a 2D bounding box around the circular or elliptical waist of [`GaussianBeamlet`](@ref) hits.
 Assumes that the beamlet is approximately cylindrical around its optical axis at the point of intersection.
+The box reaches `crop_factor` beam radii beyond each hit point.
 
 # Keyword arguments
 
@@ -249,7 +250,7 @@ For available keyword args., refer to the corresponding [`calc_local_pos`](@ref)
 function calc_local_lims(
         pd::Detector,
         hits::Vector{H};
-        crop_factor::Real=1.5,
+        crop_factor::Real=3,
         kwargs...
     ) where {T, H <: AbstractBeamletHit{T}}
     

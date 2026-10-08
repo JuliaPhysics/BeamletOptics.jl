@@ -314,6 +314,22 @@ end
     end
 end
 
+@testset "Default window holds the beam power" begin
+    # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/127
+    P0 = 1e-3
+    for beam in (GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], 1e-6, 1mm; P0),
+        AstigmaticGaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], 1e-6, 1mm; P0))
+        pd = Detector(20mm)
+        translate3d!(pd, [0, 100mm, 0])
+        solve_system!(System([pd]), beam)
+        @test optical_power(pd) ≈ P0 rtol = 1e-4
+        x_min, x_max, z_min, z_max = BMO.calc_local_lims(pd)
+        w = first(BMO.hits(pd)).w_max
+        @test x_max - x_min ≈ 6w
+        @test z_max - z_min ≈ 6w
+    end
+end
+
 end # TESTSET
 
 end # MODULE
