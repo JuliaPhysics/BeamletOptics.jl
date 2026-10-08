@@ -546,20 +546,17 @@ end
 """
     optical_power(agb)
 
-Compute the total integrated optical power of the beamlet. For a Gaussian beamlet,
+Compute the total integrated optical power of the beamlet at its start. For a Gaussian beamlet,
 this is typically constant through lossless propagation.
 """
 function optical_power(agb::AstigmaticGaussianBeamlet)
-    p0n, in_ = point_on_beam(agb, 0.0)
-    chiefn = rays(agb.c)[in_]
-    dirn = direction(chiefn)
-    h1n, _, h2n, _, _ = parabasal_ray_parameters(agb, p0n, in_)
-    area_ref = abs(_pseudo_cross2d(h1n, h2n, dirn))
-    E_ref_amp = norm(polarization(chiefn))
+    # Beam area and field amplitude at the start of the beam (for a child: behind its parents)
+    _, area, s = _area_history(agb, 1, 0)
+    E_amp = s * norm(polarization(first(rays(agb.c))))
     # Corrected power: P = I_peak * π * w0x * w0y / 2
     # We use the built-in intensity function to account for wave impedance
-    I_ref = intensity(E_ref_amp)
-    return 0.5 * π * area_ref * I_ref
+    I_ref = intensity(E_amp)
+    return 0.5 * π * abs(area) * I_ref
 end
 
 """
@@ -662,64 +659,80 @@ _area_arg_jump(r) = angle(real(r) < 0 ? -r : r)
     _area_arg(agb, i, l)
 
 Continuous argument of the complex beam area of `agb` at the local distance `l` along the
-chief ray segment `i` (measured from the start of that segment, may be negative in the
-first segment), relative to the start of the first segment.
+chief ray segment `i` (measured from the start of that segment), relative to the start of
+the root beam: a child continues the last segment of its parent, see `_area_history`.
 
 The area `(h1 × h2) ⋅ d` is a pseudoscalar: a reflection mirrors the transverse frame
 against the chief ray and flips its sign, which is no change of the beam. The jump at
 an interface is therefore taken modulo π, on (−π/2, π/2], and the Gouy phase does not
 change at a mirror. Physical interface jumps (refraction) are small.
 """
-function _area_arg(agb::AstigmaticGaussianBeamlet, i::Int, l::Real)
-    Δ = zero(float(l))
-    a_end = zero(Complex{typeof(Δ)})
+_area_arg(agb::AstigmaticGaussianBeamlet, i::Int, l::Real) = first(_area_history(agb, i, l))
+
+# Argument (see `_area_arg`) and value of the complex beam area at the local distance `l`
+# along the chief ray segment `i`, and the factor `s` by which the field amplitude has changed
+# with the beam area on the way from the start of the root beam. Only the change within the
+# segments counts for `s`. At a surface the amplitude follows from the polarization of the chief
+# ray instead: the Fresnel coefficients relate the fields on both sides, and they include that
+# the cross section of the beam changes with the angle of refraction.
+function _area_history(agb::AstigmaticGaussianBeamlet{T}, i::Int, l::Real) where {T}
+    p = agb.parent
+    Δ, a_end, s = isnothing(p) ? (zero(T), zero(Complex{T}), one(T)) :
+                  _area_history(p, length(rays(p.c)), length(last(rays(p.c))))
     for j in 1:i
         ray = rays(agb.c)[j]
         h1, u1, h2, u2, _ = parabasal_ray_parameters(agb, position(ray), j)
         A = _area_coefficients(h1, u1, h2, u2, direction(ray))
-        j > 1 && (Δ += _area_arg_jump(A[1] / a_end))
+        (j > 1 || !isnothing(p)) && (Δ += _area_arg_jump(A[1] / a_end))
         lj = j < i ? length(ray) : l
         Δ += _area_arg_change(A, lj)
         a_end = _area_value(A, lj)
+        s *= sqrt(abs(A[1] / a_end))
     end
-    return Δ
+    return Δ, a_end, s
 end
 
 # Local distance of the point `p` along chief ray segment `i`
 _local_distance(agb::AstigmaticGaussianBeamlet, p, i) =
     dot(p - position(rays(agb.c)[i]), direction(rays(agb.c)[i]))
 
-"""
-    parabasal_field(agb, r, z; E_ref_amp, area_ref, z_norm)
+# Root of the beam tree that `agb` continues. A child that a component attached with `children!`
+# knows its parent, a beam re-emitted with `relaunch!` does not and is its own root.
+_root(agb::AstigmaticGaussianBeamlet) = isnothing(agb.parent) ? agb : _root(agb.parent)
 
-Compute the complex scalar electric field of the [`AstigmaticGaussianBeamlet`](@ref)
+
+"""
+    parabasal_field(agb, r, z; E_ref_amp)
+
+Compute the complex scalar electric field [V/m] of the [`AstigmaticGaussianBeamlet`](@ref)
 at a transverse offset `r` (a 3D vector in the plane perpendicular to the chief ray)
 and longitudinal position `z`.
 
-Uses the built-in normalization `√(area_ref / area(z))` so that the result is
-physical [V/m] when `E_ref_amp` matches the initial polarization amplitude.
+The amplitude is that of the polarization of the chief ray of the segment at `z`, which
+holds everything that changed the field at the surfaces on the way (Fresnel coefficients,
+polarizers, beamsplitters), times the change with the beam area within the segments since
+the start of the root beam. A child beamlet continues its parent, in amplitude and in Gouy
+phase.
 
 # Arguments
 
 - `agb`: the astigmatic Gaussian beamlet
 - `r`: transverse offset vector (must be orthogonal to the chief ray direction at `z`)
 - `z`: distance along the beam
-- `E_ref_amp`: reference field amplitude (auto-computed from `z_norm` if `nothing`)
-- `area_ref`: reference area (auto-computed from `z_norm` if `nothing`).
-- `z_norm`: longitudinal position for reference normalization (default: 0).
+- `E_ref_amp`: complex field amplitude of the segment (if `nothing`: the norm of the
+  polarization of its chief ray with the phase of its largest component)
 
 # Formalism
 The field is computed using the **Parabasal Gaussian Beamlet** formalism:
 ψ(r, z) = √(area_ref / area(z)) * exp(i * k * [z + 1/2 * rᵀ * Q(z) * r])
-where area(z) = (h1 × h2) · dir is the complex beam area.
+where area(z) = (h1 × h2) · dir is the complex beam area and `area_ref` its value at the start
+of the segment, continued over all segments in front of it.
 """
 function parabasal_field(
         agb::AstigmaticGaussianBeamlet,
         r::AbstractArray,
         z::Real;
-        E_ref_amp::Union{Nothing, Number} = nothing,
-        area_ref::Union{Nothing, Complex} = nothing,
-        z_norm::Real = 0.0
+        E_ref_amp::Union{Nothing, Number} = nothing
 )
     p0, i = point_on_beam(agb, z)
     chief = rays(agb.c)[i]
@@ -729,21 +742,11 @@ function parabasal_field(
         error("r must lie in plane at p0/dir (dot product: $(dot(dir, r)))")
     end
 
-    # Lazy init of reference normalization (computed once if not supplied)
-    if area_ref === nothing || E_ref_amp === nothing
-        p0n, in_ = point_on_beam(agb, z_norm)
-        chiefn = rays(agb.c)[in_]
-        if area_ref === nothing
-            dirn = direction(chiefn)
-            h1n, _, h2n, _, _ = parabasal_ray_parameters(agb, p0n, in_)
-            area_ref = _pseudo_cross2d(h1n, h2n, dirn)
-        end
-        if E_ref_amp === nothing
-            # Extract complex amplitude (scalar projection) to preserve phase
-            E_vec = polarization(chiefn)
-            max_idx = argmax(abs.(E_vec))
-            E_ref_amp = Complex(norm(E_vec) * cis(angle(E_vec[max_idx])))
-        end
+    if E_ref_amp === nothing
+        # Extract complex amplitude (scalar projection) to preserve phase
+        E_vec = polarization(chief)
+        max_idx = argmax(abs.(E_vec))
+        E_ref_amp = Complex(norm(E_vec) * cis(angle(E_vec[max_idx])))
     end
 
     h1, u1, h2, u2, _ = parabasal_ray_parameters(agb, p0, i)
@@ -778,14 +781,14 @@ function parabasal_field(
 
     # area_ref / area is essentially (1 / (1 + i*z/zr))^2 for stigmatic beams, so its
     # square root carries the Gouy phase. The argument is followed continuously from the
-    # reference point (the principal branch would jump by π behind a focus).
+    # start of the root beam (the principal branch would jump by π behind a focus), the
+    # magnitude within the segments only (see `_area_history`).
     # The phase includes the OPL correction Δl to ensure coherence in media. The
     # transverse term w = rᵀQr/2 is a geometric length like z, so in a medium it enters
     # with the wavenumber n k0 as well (beam radius and wavefront curvature).
-    p_ref, i_ref = point_on_beam(agb, z_norm)
-    Δarg = _area_arg(agb, i, _local_distance(agb, p0, i)) -
-           _area_arg(agb, i_ref, _local_distance(agb, p_ref, i_ref))
-    ψ = sqrt(abs(area_ref / area)) * cis(-Δarg / 2) *
+    Δarg = _area_arg(agb, i, _local_distance(agb, p0, i))
+    _, area_start, s = _area_history(agb, i, 0)
+    ψ = s * sqrt(abs(area_start / area)) * cis(-Δarg / 2) *
         exp(im * k0 * (z + refractive_index(chief) * w + Δl))
     return E_ref_amp * ψ
 end
@@ -793,11 +796,10 @@ end
 """
     electric_field(agb, r, z)
 
-Convenience wrapper for [`parabasal_field`](@ref) using the beamlet's starting position (z=0)
-as the reference normalization.
+Convenience wrapper for [`parabasal_field`](@ref).
 """
 function electric_field(agb::AstigmaticGaussianBeamlet, r::AbstractArray, z::Real)
-    return parabasal_field(agb, r, z; z_norm = 0.0)
+    return parabasal_field(agb, r, z)
 end
 
 """
@@ -811,7 +813,8 @@ function polarized_field(agb::AstigmaticGaussianBeamlet, r::AbstractArray, z::Re
     chief = rays(agb.c)[i]
     E_vec = polarization(chief)
     # The complex scalar field already includes the propagation phase and Gouy phase.
-    # We normalize to the chief ray's polarization magnitude to avoid double-counting amplitude.
+    # The polarization of the chief ray of the segment is the amplitude, hence the scalar
+    # field is taken for a unit amplitude.
     ψ = parabasal_field(agb, r, z; E_ref_amp = 1.0)
     return E_vec * ψ
 end
@@ -844,7 +847,8 @@ Compute the scalar Gaussian beam parameters at distance `z`.
 Returns a tuple `(w1, w2, R1, R2, ψ, w01, w02)` where:
 - `w1`, `w2`: beam radii along the principal axes
 - `R1`, `R2`: radii of curvature along the principal axes
-- `ψ`: total Gouy phase shift
+- `ψ`: total Gouy phase shift, collected continuously along the beam: it does not jump behind
+  a focus or at a mirror, and a child beam continues its parent
 - `w01`, `w02`: waist radii along the principal axes
 """
 function gauss_parameters(agb::AstigmaticGaussianBeamlet, z::Real)
@@ -880,12 +884,11 @@ function gauss_parameters(agb::AstigmaticGaussianBeamlet, z::Real)
               imag(h2[3]) * real(u2[3]) - real(h2[3]) * imag(u2[3])))
     w02 = H2 / (n * norm(u2))
 
-    # Total Gouy phase: argument of the area at the start, followed continuously along the
-    # beam (no jump behind a focus or at a mirror)
-    c1 = first(rays(agb.c))
-    h1s, _, h2s, _, _ = parabasal_ray_parameters(agb, position(c1), 1)
-    arg_start = angle(_pseudo_cross2d(h1s, h2s, direction(c1)))
-    ψ = -0.5 * (arg_start + _area_arg(agb, i, _local_distance(agb, p0, i)))
+    # Total Gouy phase: argument of the area at the start of the root beam, followed
+    # continuously along the beam and its parents (no jump behind a focus, at a mirror or
+    # from parent to child)
+    _, area_root, _ = _area_history(_root(agb), 1, 0)
+    ψ = -0.5 * (angle(area_root) + _area_arg(agb, i, _local_distance(agb, p0, i)))
 
     return (w1, w2, R1, R2, ψ, w01, w02)
 end

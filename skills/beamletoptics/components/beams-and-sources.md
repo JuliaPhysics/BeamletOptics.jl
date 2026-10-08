@@ -40,6 +40,9 @@ AstigmaticGaussianBeamlet(pos, dir, λ, w0_x, w0_y; M2_x, M2_y, P0, E0, support,
 - `support` is the x axis of the beamlet (`w0_x`, `M2_x`, `z0_x`). As for `GaussianBeamlet` it must
   be orthogonal to `dir` (any non-zero length), otherwise the constructor throws an `ArgumentError`.
 - `solve_system!` checks the optical invariant and stops tracing if it is violated.
+- The field and the detector power follow the polarization of the chief ray: uncoated surfaces take
+  their Fresnel loss (about 4 % of the power per surface at n = 1.5), polarizers and beamsplitters
+  act, a mirror reverses the field. A `GaussianBeamlet` has no such losses.
 - Queries: `gauss_parameters(agb, z)` → `(w1, w2, R1, R2, ψ, w01, w02)`, `rayleigh_range(agb)` →
   `(z_rx, z_ry)`, `intensity(agb, r, z)`, `electric_field`, `BeamletOptics.polarized_field`.
 
