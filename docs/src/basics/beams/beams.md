@@ -18,15 +18,17 @@ A ray tracing example through an arbitrary system using a [`Beam`](@ref) is show
 
 ## Inspecting a traced beam
 
-The rays of a [`Beam`](@ref) are available via `rays`, its child beams via `beam.children`, and `point_on_beam` returns the point at a given distance along one beam. To analyse or animate the whole tree, [`path_segments`](@ref) flattens a traced [`Beam`](@ref), [`GaussianBeamlet`](@ref) (its chief ray), [`BeamletOptics.AstigmaticGaussianBeamlet`](@ref) or beam group into a vector of segments with start and end point, the accumulated geometric and optical path length, the wavelength, the position in the beam tree and the object hit at the end of the segment. A final ray without intersection has no length of its own and is drawn `flen` long.
+The rays of a [`Beam`](@ref) are available via `rays`, its child beams via `beam.children`, and `point_on_beam` returns the point at a given distance along one beam. To analyse or animate the whole tree, [`path_segments`](@ref) flattens a traced [`Beam`](@ref), [`GaussianBeamlet`](@ref) (its chief ray), [`BeamletOptics.AstigmaticGaussianBeamlet`](@ref) or beam group into a vector of segments with start and end point, the accumulated geometric and optical path length, the wavelength, the position in the beam tree and the object hit at the end of the segment. A final ray without intersection has no length of its own and is drawn `flen` long. The last segment of each branch has `leaf = true`, whether it leaves the system as a final ray or ends on an object, e.g. a detector.
 
 ```julia
 solve_system!(system, beam)
 segs = path_segments(beam; flen = 0.1)
 
-# path length of the last intersection of each branch
+# path length at the last intersection of each branch
 for seg in segs
-    seg.final && println("branch ends after ", seg.s_start, " m (OPL: ", seg.opl_start, " m)")
+    seg.leaf || continue
+    s, opl = seg.final ? (seg.s_start, seg.opl_start) : (seg.s_stop, seg.opl_stop)
+    println("branch ends after ", s, " m (OPL: ", opl, " m)")
 end
 ```
 

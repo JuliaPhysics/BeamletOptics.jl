@@ -108,7 +108,6 @@ end
 _component_beams(g::GaussianBeamlet) = (g.chief, g.waist, g.divergence)
 
 first_ray(g::GaussianBeamlet) = first_ray(g.chief)
-_chief_beam(g::GaussianBeamlet) = g.chief
 
 Base.length(gauss::GaussianBeamlet) = length(gauss.chief)
 optical_path_length(gauss::GaussianBeamlet) = optical_path_length(gauss.chief)

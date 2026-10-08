@@ -247,7 +247,6 @@ function Base.empty!(agb::AstigmaticGaussianBeamlet)
 end
 
 first_ray(agb::AstigmaticGaussianBeamlet) = first_ray(agb.c)
-_chief_beam(agb::AstigmaticGaussianBeamlet) = agb.c
 
 Base.length(agb::AstigmaticGaussianBeamlet) = length(agb.c)
 optical_path_length(agb::AstigmaticGaussianBeamlet) = optical_path_length(agb.c)

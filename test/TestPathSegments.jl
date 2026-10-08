@@ -76,6 +76,23 @@ end
         end
     end
 
+    @testset "leaf segments and ray indices" begin
+        # a leaf is a segment that no other segment continues; here every branch leaves the system
+        for (i, s) in enumerate(segs)
+            @test s.leaf == !any(t -> t.parent == i, segs)
+        end
+        @test findall(s -> s.leaf, segs) == findall(s -> s.final, segs)
+        # the segments follow the beams in depth-first order, the ray index restarts with every beam
+        bms = collect(BMO.PreOrderDFS(beam))
+        k = 0
+        for s in segs
+            s.ray_index == 1 && (k += 1)
+            @test position(rays(bms[k])[s.ray_index]) ≈ s.start
+        end
+        @test k == length(bms)
+        @test all(s -> s.beam_index == 1, segs)
+    end
+
     @testset "final rays" begin
         finals = filter(s -> s.final, segs)
         @test length(finals) == length(collect(BMO.Leaves(beam)))
@@ -102,7 +119,8 @@ end
     @testset "untraced beam and refractive index" begin
         b = Beam([0, 0, 0], [1.0, 0, 0])
         s = only(path_segments(b))
-        @test s.final && s.s_stop == 1.0
+        @test s.final && s.leaf && s.s_stop == 1.0
+        @test s.ray_index == 1 && s.parent == 0
         lens = SphericalLens(0.1, -0.1, 5e-3, BMO.inch, 1.5)
         sys = System([lens])
         b2 = Beam([0, -0.1, 0], [0, 1.0, 0])
@@ -117,15 +135,18 @@ end
         solve_system!(system, g)
         gs = path_segments(g; flen = 0.05)
         cs = path_segments(g.chief; flen = 0.05)
-        # the chief beam alone is the first branch, the children hang on the beamlet
-        @test cs == gs[1:length(cs)]
+        # the chief beam alone is the first branch; the children hang on the beamlet, so the
+        # branch ends for the chief beam alone and goes on for the beamlet
+        unleaf(segs) = [merge(s, (; leaf = false)) for s in segs]
+        @test unleaf(cs) == unleaf(gs[1:length(cs)])
+        @test last(cs).leaf && !gs[length(cs)].leaf
         @test length(gs) > 3
         @test maximum(s -> s.depth, gs) == 3
 
         a = AstigmaticGaussianBeamlet([0, -0.1, 0], [0, 1.0, 0], 1e-6, 1e-3)
         solve_system!(system, a)
         as = path_segments(a; flen = 0.05)
-        @test path_segments(a.c; flen = 0.05) == as[1:length(a.c.rays)]
+        @test unleaf(path_segments(a.c; flen = 0.05)) == unleaf(as[1:length(a.c.rays)])
         @test length(as) == length(gs)
         @test eltype(as) == BMO.PathSegment{Float64}
     end
@@ -142,8 +163,12 @@ end
             @test isnothing(BMO.AbstractTrees.parent(child))
             @test length(segs) == 2
             @test segs[1].s_stop ≈ 0.1
-            @test segs[2].s_start == 0 && segs[2].opl_start == 0 && segs[2].parent == 0
-            @test segs[2].depth == 2
+            # the path lengths restart, the link to the segment that launched the child stays
+            @test segs[2].s_start == 0 && segs[2].opl_start == 0 && segs[2].parent == 1
+            @test segs[2].depth == 2 && segs[2].ray_index == 1
+            # the child ends on the detector: a leaf, but not a final ray
+            @test !segs[1].leaf && segs[2].leaf && !segs[2].final
+            @test segs[2].object === det
             @test segs[2].s_stop ≈ length(child) ≈ 0.2
             @test segs[2].opl_stop ≈ BMO.optical_path_length(child)
         end
@@ -153,9 +178,9 @@ end
         src = UniformDiscSource([0, -0.1, 0], [0, 1.0, 0], 2e-3, 1e-6; num_rays = 7)
         solve_system!(system, src)
         gsegs = path_segments(src; flen = 0.05)
-        @test Set(s.beam for s in gsegs) == Set(1:length(src))
+        @test Set(s.beam_index for s in gsegs) == Set(1:length(src))
         for (i, b) in enumerate(BMO.beams(src))
-            idx = findall(s -> s.beam == i, gsegs)
+            idx = findall(s -> s.beam_index == i, gsegs)
             ref = path_segments(b; flen = 0.05)
             @test length(idx) == length(ref)
             for (j, k) in enumerate(idx)
@@ -165,6 +190,13 @@ end
                 @test gsegs[k].s_stop == ref[j].s_stop
             end
         end
+        # the number type is that of the group, also for a group without beams
+        src32 = CollimatedSource([Beam(Float32[0, 0, 0], Float32[0, 1, 0], 1.0f-6)], 1.0f-3,
+            Float32[0, 0, 0], Float32[0, 1, 0])
+        @test eltype(path_segments(src32)) == BMO.PathSegment{Float32}
+        empty!(BMO.beams(src32))
+        @test path_segments(src32) == BMO.PathSegment{Float32}[]
+        @test eltype(path_segments(src32)) == BMO.PathSegment{Float32}
     end
 end
 
