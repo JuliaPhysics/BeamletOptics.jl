@@ -249,7 +249,9 @@ of a **left-handed** (x, z) surface coordinate system, where incoming beams inte
 
 !!! note "Thread safety"
     Beam groups are solved multithreaded. Pushing hits is guarded by the `lock` of the detector, so
-    all beams can hit the same detector concurrently. The order of the stored hits is not deterministic.
+    all beams can hit the same detector concurrently. Each task of the solve of a beam group collects its
+    hits and stores them at its end, see [`with_hit_buffers`](@ref). The order of the stored hits is not
+    deterministic.
 
 !!! warning "Reading hits"
     Read the hits of the detector before moving any object or solving again.
@@ -309,17 +311,100 @@ hits!(d::Detector, new) = (d.hits = new)
 "Allows continued tracing if set to false"
 stop(d::Detector) = d.stop
 
-function push!(d::Detector, new::AbstractDetectorHit)
-    # Lock d to avoid race conditions
+"""
+    push!(d::Detector, hit::AbstractDetectorHit)
+
+Stores the `hit` in the detector `d`, guarded by the `lock` of `d`. Within [`with_hit_buffers`](@ref),
+e.g. in the solve of a beam group, the `hit` is collected in the buffer of the current task instead
+and reaches `d` when the buffer is flushed.
+"""
+push!(d::Detector, new::AbstractDetectorHit) = store_hit!(current_hit_buffers(), d, new)
+
+"""
+    append!(d::Detector, new::Vector{<:AbstractDetectorHit})
+
+Stores all hits of `new` in the detector `d` at once, guarded by the `lock` of `d`. The vector
+`new` may become the vector of hits of `d`, i.e. it must not be used afterwards.
+"""
+function Base.append!(d::Detector, new::Vector{<:AbstractDetectorHit})
+    lock(d.lock) do
+        # set data type on first push
+        if isnothing(hits(d))
+            hits!(d, new)
+            return nothing
+        end
+        # if the hit type does not match, throws a conversion error
+        append!(hits(d), new)
+        return nothing
+    end
+    return d
+end
+
+#=
+Hit buffers
+
+The tasks that solve the beams of a group push hits concurrently. Under the lock of a detector each
+push waits for the others, e.g. 8 threads were slower than 4 for a detector only. Hence each task
+collects its hits and appends them once per detector at its end.
+=#
+
+"""
+The hits of the current task per [`Detector`](@ref), see [`with_hit_buffers`](@ref). The buffer of
+the last detector is kept at hand, since consecutive hits mostly go to the same detector.
+"""
+mutable struct HitBuffers
+    const buffers::IdDict{Detector, Vector}
+    last_detector::Union{Nothing, Detector}
+    last_buffer::Vector
+    HitBuffers() = new(IdDict{Detector, Vector}(), nothing, [])
+end
+
+# Key of the buffers of the current task in the task-local storage
+const HIT_BUFFERS_KEY = :BeamletOptics_hit_buffers
+
+current_hit_buffers() = get(task_local_storage(), HIT_BUFFERS_KEY, nothing)::Union{Nothing, HitBuffers}
+
+"""
+    with_hit_buffers(f)
+
+Calls `f()` such that the hits that the current task pushes to a [`Detector`](@ref) are collected
+in a buffer of the task, and appends them to their detectors when `f` returns or throws, one
+`append!` per detector. The solve of a beam group calls it in each of its tasks, which then do not
+wait for the lock of a detector at every hit. The hits are stored when `with_hit_buffers` returns,
+not while `f` runs.
+"""
+function with_hit_buffers(f)
+    buffers = HitBuffers()
+    try
+        return task_local_storage(f, HIT_BUFFERS_KEY, buffers)
+    finally
+        for (d, new) in buffers.buffers
+            append!(d, new)
+        end
+    end
+end
+
+# Stores the hit in the detector, or in the buffer of the current task
+function store_hit!(::Nothing, d::Detector, new::AbstractDetectorHit)
     lock(d.lock) do
         # set data type on first push
         if isnothing(hits(d))
             hits!(d, [new])
             return nothing
         end
-        # if new<:AbstractData does not match, throws push! error
+        # if the hit type does not match, throws a conversion error
         push!(hits(d), new)
+        return nothing
     end
+end
+
+function store_hit!(b::HitBuffers, d::Detector, new::H) where {H <: AbstractDetectorHit}
+    if b.last_detector !== d
+        b.last_buffer = get!(() -> H[], b.buffers, d)
+        b.last_detector = d
+    end
+    push!(b.last_buffer::Vector{H}, new)
+    return nothing
 end
 
 function interact3d(::AbstractSystem, d::Detector, beam::Beam{T, R},

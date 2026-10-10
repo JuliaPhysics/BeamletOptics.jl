@@ -314,6 +314,33 @@ end
     end
 end
 
+@testset "Hit buffers of a beam group solve" begin
+    # two detectors side by side, the beams of a group hit both
+    pd1, pd2 = Detector(20mm), Detector(20mm)
+    translate3d!(pd1, [-10mm, 50mm, 0])
+    translate3d!(pd2, [10mm, 50mm, 0])
+    system = System([pd1, pd2])
+    cs = CollimatedSource([0, 0, 0], [0, 1, 0], 30mm, 1e-6; num_rings = 10, num_rays = 500)
+    solve_system!(system, cs; progress = false)
+    n1, n2 = BMO.hit_count(pd1), BMO.hit_count(pd2)
+    @test n1 > 0 && n2 > 0
+    # the group stores the same hits as its beams solved one by one
+    pts(pd) = sort(map(h -> Tuple(BMO.hit_point(h)), BMO.hits(pd)))
+    group = (pts(pd1), pts(pd2))
+    initialize!(system)
+    foreach(b -> solve_system!(system, b), BMO.beams(cs))
+    @test (pts(pd1), pts(pd2)) == group
+    # within `with_hit_buffers` the hits are collected, and stored also if the code throws
+    initialize!(system)
+    b = first(BMO.beams(cs))
+    @test_throws ErrorException BMO.with_hit_buffers() do
+        solve_system!(system, b)
+        @test BMO.hit_count(pd1) + BMO.hit_count(pd2) == 0
+        error("cancelled")
+    end
+    @test BMO.hit_count(pd1) + BMO.hit_count(pd2) == 1
+end
+
 @testset "Default window holds the beam power" begin
     # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/127
     P0 = 1e-3

@@ -456,12 +456,19 @@ function solve_system!(
     # threads sets it for its beams.
     with_bounding_spheres(system) do
         table = current_bounding_spheres()::BoundingSphereTable
+        # A few chunks per thread for the load balance. Each chunk collects its detector hits and
+        # stores them at its end, see `with_hit_buffers`.
+        chunks = Iterators.partition(beams(bg), max(1, cld(length(bg), 4 * Threads.nthreads())))
         _with_progress(progress, length(bg), "Tracing beams: ") do prog
-            Threads.@threads for _beam in beams(bg)
+            Threads.@threads for chunk in collect(chunks)
                 with_bounding_spheres(table) do
-                    solve_system!(system, _beam; kwargs...)
+                    with_hit_buffers() do
+                        for _beam in chunk
+                            solve_system!(system, _beam; kwargs...)
+                            _tick!(prog)
+                        end
+                    end
                 end
-                _tick!(prog)
             end
         end
     end
