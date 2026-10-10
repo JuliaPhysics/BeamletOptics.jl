@@ -22,6 +22,7 @@ mutable struct AconvexCylinderSDF{T} <: AbstractAcylindricalSurfaceSDF{T}
     conic_constant::T
     coefficients::Vector{T}
     max_sag::Point2{T}
+    edge::Point2{T}
 end
 
 """
@@ -42,7 +43,8 @@ function AconvexCylinderSDF(radius::R, diameter::D, height::H, conic_constant::C
         height,
         conic_constant,
         coefficients,
-        Point2(max_aspheric_value(1 / radius, conic_constant, coefficients, diameter))
+        Point2(max_aspheric_value(1 / radius, conic_constant, coefficients, diameter)),
+        aspheric_edge(1 / radius, conic_constant, coefficients, diameter)
     )
 
     return s
@@ -65,7 +67,8 @@ function sdf(s::AconvexCylinderSDF{T}, point) where {T}
             s.conic_constant,
             s.diameter,
             s.coefficients,
-            s.max_sag
+            s.max_sag,
+            s.edge
         ),
         s.height / 2
     )
@@ -88,6 +91,7 @@ mutable struct AconcaveCylinderSDF{T} <: AbstractAcylindricalSurfaceSDF{T}
     conic_constant::T
     coefficients::Vector{T}
     max_sag::Point2{T}
+    edge::Point2{T}
 end
 
 """
@@ -108,7 +112,8 @@ function AconcaveCylinderSDF(radius::R, diameter::D, height::H, conic_constant::
         height,
         conic_constant,
         coefficients,
-        Point2(max_aspheric_value(1 / radius, conic_constant, coefficients, diameter))
+        Point2(max_aspheric_value(1 / radius, conic_constant, coefficients, diameter)),
+        aspheric_edge(1 / radius, conic_constant, coefficients, diameter)
     )
 
     return s
@@ -132,7 +137,8 @@ function sdf(s::AconcaveCylinderSDF{T}, point) where {T}
             s.conic_constant,
             s.diameter,
             s.coefficients,
-            s.max_sag
+            s.max_sag,
+            s.edge
         ),
         s.height / 2
     )

@@ -3,6 +3,7 @@ module TestAsphericalLenses
 using BeamletOptics
 using Test
 using GeometryBasics
+using LinearAlgebra: norm
 
 const BMO = BeamletOptics
 
@@ -64,6 +65,27 @@ const mm = 1e-3
         wd = cosd(α) * dist
 
         @test wd≈93.2mm atol=1e-4
+    end
+
+    @testset "Aspheric equation and its gradient" begin
+        R, k = 50.3583mm, -0.789119
+        A = [0, 2.10405e-7 * (1e3)^3, 1.76468e-11 * (1e3)^5, 1.02641e-15 * (1e3)^7]
+        c = 1 / R
+        for r in (0.0, 3mm, 12.5mm, 25mm)
+            # the conic sag plus the explicit sum of the even terms
+            sag = c * r^2 / (1 + sqrt(1 - (1 + k) * c^2 * r^2)) + sum(A[i] * r^(2i) for i in eachindex(A))
+            @test BMO.aspheric_equation(r, c, k, A) ≈ sag rtol=1e-12
+            # the gradient of the 2D distance field holds -dz/dr in its first component
+            h = 1e-7
+            dz = (BMO.aspheric_equation(r + h, c, k, A) - BMO.aspheric_equation(r - h, c, k, A)) / 2h
+            @test BMO.gradient_aspheric_equation(r, c, k, A)[1] ≈ -dz rtol=1e-6 atol=1e-9
+        end
+        # without coefficients, the surface is a conic
+        @test BMO.aspheric_equation(10mm, c, k, Float64[]) ≈ BMO.aspheric_equation(10mm, c, k, [0.0])
+        # the SDFs store the sag and the gradient norm at the edge
+        s = BMO.ConvexAsphericalSurfaceSDF(A, R, k, 50mm)
+        @test s.edge[1] == BMO.aspheric_equation(25mm, c, k, A)
+        @test s.edge[2] ≈ norm(BMO.gradient_aspheric_equation(25mm, c, k, A))
     end
 
     @testset "Aspherical meniscus without cylinder section" begin
