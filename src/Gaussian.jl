@@ -107,6 +107,13 @@ end
 """Return a tuple of the `chief`, `waist` and `divergence` beams of the [`GaussianBeamlet`](@ref)."""
 _component_beams(g::GaussianBeamlet) = (g.chief, g.waist, g.divergence)
 
+function detached_copy(g::GaussianBeamlet, n::Integer = length(rays(g.chief)))
+    snapshot = GaussianBeamlet(map(b -> detached_copy(b, n), _component_beams(g))...,
+        wavelength(g), beam_waist(g), electric_field(g))
+    isnothing(g.parent) || parent!(snapshot, detached_copy(g.parent))
+    return snapshot
+end
+
 first_ray(g::GaussianBeamlet) = first_ray(g.chief)
 
 Base.length(gauss::GaussianBeamlet) = length(gauss.chief)
