@@ -115,16 +115,24 @@ function projection_factor(hit::AbstractRayHit)
     abs(dot(direction(hit), normal3d(intersection(hit.ray))))
 end
 
-"Stores a [`Ray`](@ref) hit"
+"""
+Stores a [`Ray`](@ref) hit: a copy of the `ray` (see `detached_copy`), such that a new solve of the
+beam does not change the hit, and its optical path length `opl`.
+"""
 struct RayHit{T} <: AbstractRayHit{T}
     ray::Ray{T}
     opl::T
+    RayHit(ray::Ray{T}, opl::Real) where {T} = new{T}(detached_copy(ray), opl)
 end
 
-"Stores a [`PolarizedRay`](@ref) hit"
+"""
+Stores a [`PolarizedRay`](@ref) hit: a copy of the `ray` (see `detached_copy`), such that a new
+solve of the beam does not change the hit, and its optical path length `opl`.
+"""
 struct PolarizedRayHit{T} <: AbstractRayHit{T}
     ray::PolarizedRay{T}
     opl::T
+    PolarizedRayHit(ray::PolarizedRay{T}, opl::Real) where {T} = new{T}(detached_copy(ray), opl)
 end
 
 polarization(hit::PolarizedRayHit) = polarization(hit.ray)
@@ -142,7 +150,9 @@ abstract type AbstractBeamletHit{T} <: AbstractDetectorHit end
     GaussianBeamletHit{T} <: AbstractBeamletHit{T}
 
 Stores a [`GaussianBeamlet`], where `l0` represents the length of the parent beam
-up until the current beam section, identified by the `id` index.
+up until the current beam section, identified by the `id` index. The `gauss` of the hit is a copy
+of the traced beamlet (see `detached_copy`), such that a new solve of the beam
+does not change the hit.
 """
 struct GaussianBeamletHit{T} <: AbstractBeamletHit{T}
     gauss::GaussianBeamlet{T}
@@ -159,7 +169,9 @@ end
     AstigmaticGaussianBeamletHit{T} <: AbstractBeamletHit{T}
 
 Stores an [`AstigmaticGaussianBeamlet`], where `l0` represents the length of the parent beam
-up until the current beam section, identified by the `id` index.
+up until the current beam section, identified by the `id` index. The `agb` of the hit is a copy
+of the traced beamlet (see `detached_copy`), such that a new solve of the beam
+does not change the hit.
 """
 struct AstigmaticGaussianBeamletHit{T} <: AbstractBeamletHit{T}
     agb::AstigmaticGaussianBeamlet{T}
@@ -252,10 +264,10 @@ of a **left-handed** (x, z) surface coordinate system, where incoming beams inte
     all beams can hit the same detector concurrently. The order of the stored hits is not deterministic.
 
 !!! warning "Reading hits"
-    Read the hits of the detector before moving any object or solving again.
-    The hits refer to the rays and beams of the current solve, which a new call of
-    [`solve_system!`](@ref) replaces (child beams and all rays after the first are new objects),
-    and moving objects afterwards leaves the stored hits inconsistent with the system.
+    A hit stores a copy of the ray or beamlet that hit the detector: solving again or moving a beam or
+    another object does not change the stored hits. They are stored in world coordinates, whereas
+    [`spot_diagram`](@ref), [`electric_field`](@ref) and the functions based on them evaluate the hits
+    in the current pose of the detector. Evaluate the hits before moving the detector itself.
 
 # Fields
 
@@ -383,7 +395,9 @@ a beamlet on a plane of one's own. `l0` is the length of the beam (including its
 up to the start of the segment. The projection factor is `1` if the segment ends without an
 intersection.
 """
-function GaussianBeamletHit(g::GaussianBeamlet{R}, id::Integer) where {R}
+function GaussianBeamletHit(traced::GaussianBeamlet{R}, id::Integer) where {R}
+    # a new solve of the traced beamlet must not change the hit
+    g = detached_copy(traced)
     ray = g.chief.rays[id]
     l0 = _length_before(g.chief, id)
     p0 = position(ray)
@@ -405,7 +419,9 @@ path from the source (parents included), the Gouy factor and the reference ampli
 traced segment, e.g. to sample a beamlet on a plane of one's own. The projection factor is
 `1` if the segment ends without an intersection.
 """
-function AstigmaticGaussianBeamletHit(agb::AstigmaticGaussianBeamlet{R}, id::Integer) where {R}
+function AstigmaticGaussianBeamletHit(traced::AstigmaticGaussianBeamlet{R}, id::Integer) where {R}
+    # a new solve of the traced beamlet must not change the hit
+    agb = detached_copy(traced)
     # Pre-calculate cache
     chief = rays(agb.c)[id]
     p0 = position(chief)

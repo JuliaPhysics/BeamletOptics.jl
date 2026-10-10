@@ -285,6 +285,12 @@ function parent!(child::AstigmaticGaussianBeamlet, parent::AstigmaticGaussianBea
     return nothing
 end
 
+function detached_copy(agb::AstigmaticGaussianBeamlet, n::Integer = length(rays(agb.c)))
+    snapshot = AstigmaticGaussianBeamlet(map(b -> detached_copy(b, n), _component_beams(agb))...)
+    isnothing(agb.parent) || parent!(snapshot, detached_copy(agb.parent))
+    return snapshot
+end
+
 function Base.show(io::IO, agb::AstigmaticGaussianBeamlet)
     p0 = position(first(rays(agb.c)))
     d0 = direction(first(rays(agb.c)))
