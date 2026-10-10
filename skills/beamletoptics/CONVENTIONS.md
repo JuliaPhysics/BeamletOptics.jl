@@ -72,7 +72,9 @@ moved, not children created by splitters.
   in SI units. Convert mm-based catalog values `A_2i` with `A_2i * (1e3)^(2i-1)`:
   `[0, A4*1e3^3, A6*1e3^5, A8*1e3^7, ...]`.
 - **Gaussian beam**: `w0` is the waist *radius* (1/e² intensity); `gauss_parameters` returns
-  curvature `R` as 1/r (not a radius) and Gouy phase ψ = −atan(z/z_R).
+  curvature `R` as 1/r (not a radius) and Gouy phase ψ = −atan(z/z_R), where `z` counts from the
+  waist of the local segment. The field (`electric_field`, detectors) carries the Gouy phase along the
+  whole beam path instead, continuous at every surface.
 - **Beamsplitter** `reflectance` keyword is the reflected **power** fraction (0.7 → 70:30, default 0.5 → 50:50);
   internally the amplitudes are `r = √reflectance`, `t = √(1 − r²)`. The reflection phase depends on the
   beam type and the incidence side (see `components/beamsplitters.md`). Children are ordered `[transmitted, reflected]`.

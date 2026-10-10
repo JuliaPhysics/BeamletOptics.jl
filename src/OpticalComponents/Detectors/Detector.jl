@@ -142,12 +142,15 @@ abstract type AbstractBeamletHit{T} <: AbstractDetectorHit end
     GaussianBeamletHit{T} <: AbstractBeamletHit{T}
 
 Stores a [`GaussianBeamlet`], where `l0` represents the length of the parent beam
-up until the current beam section, identified by the `id` index.
+up until the current beam section, identified by the `id` index, `Δl0` the optical
+minus the geometric path and `ψ0` the Gouy phase that the beam has collected up to there.
 """
 struct GaussianBeamletHit{T} <: AbstractBeamletHit{T}
     gauss::GaussianBeamlet{T}
     l0::T
     id::Int
+    Δl0::T
+    ψ0::T
     # Cache
     p0::Point3{T}
     d0::Point3{T}
@@ -392,7 +395,7 @@ function GaussianBeamletHit(g::GaussianBeamlet{R}, id::Integer) where {R}
     # Beam radius at the end of the segment, for the auto-limits of the field plots
     l_end = isfinite(length(ray)) ? l0 + length(ray) : l0
     w_max, _, _, _ = gauss_parameters(g, l_end)
-    return GaussianBeamletHit(g, l0, Int(id), p0, d0, sqrt_proj, w_max)
+    return GaussianBeamletHit(g, l0, Int(id), _path_excess_before(g, id), _gouy_before(g, id), p0, d0, sqrt_proj, w_max)
 end
 
 """

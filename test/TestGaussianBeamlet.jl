@@ -198,4 +198,130 @@ const mm = 1e-3
     end
 end
 
+@testset "Field phase in and in front of a medium" begin
+    # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/126
+    λ = 1e-6
+    n = 1.5
+    # glass from y = 50.0 mm to about 50.5 mm
+    lens = ThinLens(50mm, 50mm, 10mm, n)
+    translate3d!(lens, [0, 50mm, 0])
+    system = System([lens])
+    Δφ(a, b) = rad2deg(angle(a / b))
+    args = ([0.0, 0, 0], [0.0, 1, 0], λ, 1mm)
+    free = GaussianBeamlet(args...; support = [1.0, 0, 0])
+    gb = GaussianBeamlet(args...; support = [1.0, 0, 0])
+    agb = AstigmaticGaussianBeamlet(args...; support = [1.0, 0, 0])
+    solve_system!(system, gb)
+    solve_system!(system, agb)
+    @test BMO.refractive_index(gb, 2) == n
+    @test length(BMO.rays(gb.chief)[2]) > 0.4mm
+    # the lens does not change the field in front of it
+    @test electric_field(gb, 0.0, 10mm) ≈ electric_field(free, 0.0, 10mm)
+    @test electric_field(gb, 0.3mm, 40mm) ≈ electric_field(free, 0.3mm, 40mm)
+    # inside the glass the phase advances with n k0 along the axis ...
+    Δz = 100.2e-6
+    @test Δφ(electric_field(gb, 0.0, 50.1mm + Δz), electric_field(gb, 0.0, 50.1mm)) ≈ mod(360 * n * Δz / λ, 360) atol = 0.01
+    # ... and across the beam, as in the astigmatic model
+    r = 0.1mm
+    across_gb = Δφ(electric_field(gb, r, 50.25mm), electric_field(gb, 0.0, 50.25mm))
+    across_agb = Δφ(electric_field(agb, [r, 0, 0], 50.25mm), electric_field(agb, [0.0, 0, 0], 50.25mm))
+    @test across_gb ≈ across_agb atol = 0.01
+    @test abs(across_gb) > 15
+    # a hit of the segment in the glass gives the field of the beam
+    hit = BMO.GaussianBeamletHit(gb, 2)
+    p = BMO.Point3(r, 50.25mm, 0.0)
+    @test BMO.beamlet_hit_field(hit, p) ≈ electric_field(gb, r, 50.25mm)
+end
+
+@testset "Gouy phase is collected along the beam" begin
+    # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/125
+    λ = 1e-6
+    n = 1.5
+    w0 = 1mm
+    R = 50mm
+    k = 2π / λ
+    lens(y) = (l = ThinLens(R, R, 10mm, n); translate3d!(l, [0, y, 0]); l)   # f = 50 mm
+    gb() = GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], λ, w0; support = [1.0, 0, 0])
+    agb() = AstigmaticGaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], λ, w0; support = [1.0, 0, 0])
+    # field on the axis of the detector without the phase of the optical path [deg]
+    function axis_field(system, pd, beam)
+        empty!(pd)
+        solve_system!(system, beam)
+        _, _, E = electric_field(pd; n = 1, x_min = 0, x_max = 0, z_min = 0, z_max = 0)
+        return E[1] * cis(-k * BMO.optical_path_length(beam))
+    end
+    gouy(args...) = rad2deg(angle(axis_field(args...)))
+    detector(y) = (pd = Detector(20mm); translate3d!(pd, [0, y, 0]); pd)
+
+    @testset "Behind one lens" begin
+        for y in (70mm, 95mm, 110mm, 200mm)
+            pd = detector(y)
+            system = System([lens(50mm), pd])
+            beam = gb()
+            ψ = gouy(system, pd, beam)
+            # ABCD law for the traced thick lens: Gouy phase = -arg(A + B/q) with q = -i z_R at the waist
+            l1, l2, l3 = length.(BMO.rays(beam.chief))
+            M = [1 l3; 0 1] * [1 0; (n - 1) / -R n] * [1 l2; 0 1] * [1 0; (1 - n) / (n * R) 1 / n] * [1 l1; 0 1]
+            ψ_abcd = rad2deg(-angle(M[1, 1] + M[1, 2] / (-im * π * w0^2 / λ)))
+            @test rad2deg(angle(cis(deg2rad(ψ - ψ_abcd)))) ≈ 0 atol = 0.1
+        end
+        # the astigmatic model agrees away from the focus, where its parabasal rays see other aberrations
+        pd = detector(70mm)
+        system = System([lens(50mm), pd])
+        @test gouy(system, pd, gb()) ≈ gouy(system, pd, agb()) atol = 0.1
+        # the phase is continuous through the lens
+        beam = gb()
+        empty!(pd)
+        solve_system!(system, beam)
+        Δφ(a, b) = rad2deg(angle(a / b))
+        step = Δφ(electric_field(beam, 0.0, 50.6mm), electric_field(beam, 0.0, 49.9mm))
+        opl = BMO.optical_path_length(beam) - length(beam) + 0.7mm
+        @test rad2deg(angle(cis(deg2rad(step) - k * opl))) ≈ 0 atol = 0.5
+    end
+
+    @testset "Behind two lenses" begin
+        pd = detector(250mm)
+        system = System([lens(50mm), lens(150mm), pd])
+        @test gouy(system, pd, gb()) ≈ gouy(system, pd, agb()) atol = 0.1
+    end
+
+    @testset "Without a lens" begin
+        pd = detector(70mm)
+        system = System([pd])
+        @test gouy(system, pd, gb()) ≈ rad2deg(-atan(70mm / (π * w0^2 / λ))) atol = 1e-6
+        m = SquarePlanoMirror2D(25mm)
+        translate3d!(m, [0, 100mm, 0])
+        zrotate3d!(m, π / 4)
+        pd = detector(0.0)
+        translate3d!(pd, [50mm, 100mm, 0])
+        zrotate3d!(pd, -π / 2)
+        beam = gb()
+        ψ = gouy(System([m, pd]), pd, beam)
+        @test length(BMO.rays(beam.chief)) == 2
+        @test ψ ≈ rad2deg(-atan(150mm / (π * w0^2 / λ))) atol = 1e-6
+    end
+
+    @testset "From a parent to its children" begin
+        pd_t = detector(200mm)
+        pd_r = detector(0.0)
+        translate3d!(pd_r, [100mm, 100mm, 0])
+        zrotate3d!(pd_r, -π / 2)
+        bs = ThinBeamsplitter(25mm)
+        translate3d!(bs, [0, 100mm, 0])
+        zrotate3d!(bs, π / 4)
+        direct = axis_field(System([lens(50mm), pd_t]), pd_t, gb())
+        system = System([lens(50mm), bs, pd_t, pd_r])
+        empty!(pd_r)
+        beam = gb()
+        transmitted = axis_field(system, pd_t, beam)
+        @test BMO.hit_count(pd_t) == 1 && BMO.hit_count(pd_r) == 1
+        @test transmitted ≈ direct / sqrt(2) rtol = 1e-6
+        # same distance behind the splitter: the reflected field differs by its sign only
+        _, _, E_r = electric_field(pd_r; n = 1, x_min = 0, x_max = 0, z_min = 0, z_max = 0)
+        reflected = E_r[1] * cis(-k * BMO.optical_path_length(beam.children[2]))
+        @test abs(reflected) ≈ abs(transmitted) rtol = 1e-6
+        @test abs(sind(rad2deg(angle(reflected / transmitted)))) < 1e-6
+    end
+end
+
 end # MODULE
