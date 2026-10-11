@@ -9,7 +9,7 @@ All positions and directions are 3-vectors in m; directions are normalized for y
 | `Ray(pos, dir, λ = 1e-6)` | single geometric ray, starts in n = 1 |
 | `PolarizedRay(pos, dir, λ = 1e-6, E0 = [1, 0, 0])` | `E0` complex 3-vector (V/m), **must be ⟂ `dir`** |
 | `Beam(pos, dir, λ = 1e-6)` | beam of `Ray`s: the usual thing to trace |
-| `Beam(pos, dir, λ, E0)` | beam of `PolarizedRay`s |
+| `Beam(pos, dir, λ, E0)` | beam of `PolarizedRay`s; `E0` may be complex, e.g. `[1, 0, im] / √2` (circular) |
 | `Beam(ray)` | wrap an existing ray |
 
 A `Beam` is a tree: `rays(beam)` are its segments, `beam.children` the sub-beams created by
