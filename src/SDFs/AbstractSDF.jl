@@ -228,31 +228,34 @@ function _exit_normal(shape::AbstractSDF, pos, dir, t, eps, h)
 end
 
 # The path length at which the ray from `pos` along `dir` leaves `shape`, for the SDF values
-# fa = sdf(a) ≤ 0 < fb = sdf(b) or fa ≤ eps < fb: a point outside, at most `eps` behind the last point
-# inside that was found. As the exits found by `_raymarch_outside` from outside, it lies outside,
-# such that a ray that starts there and leaves the shape is not taken for a ray inside. The Illinois
-# variant of the regula falsi keeps the bracket, i.e. the result is reliable also where the SDF is
-# not exact, and converges in a few steps where the SDF is about linear, as near a surface.
+# fa = sdf(a) ≤ 0 < fb = sdf(b) or fa ≤ eps < fb. The Illinois variant of the regula falsi keeps the
+# bracket, i.e. the result is reliable also where the SDF is not exact, and converges in a few steps
+# where the SDF is about linear, as near a surface. The result is the secant root of the final bracket
+# of width ≤ `eps`: it changes continuously with the parameters of the shape and the ray, e.g. for
+# finite differences and automatic differentiation, and it lies within `eps` of the surface, i.e. a
+# ray that starts there and leaves the shape is not taken for a ray inside.
 function _bracketed_exit(shape::AbstractSDF, pos, dir, a, fa, b, fb, eps)
+    # the SDF values at the ends, `fa` and `fb` are scaled by the Illinois steps
+    sa, sb = fa, fb
     side = 0
     for _ in 1:100
         b - a > eps || break
         m = (a * fb - b * fa) / (fb - fa)
-        # fall back to bisection if the secant leaves the bracket, e.g. for a NaN, or does not
-        # shrink it noticeably
+        # fall back to bisection if the secant leaves the bracket, e.g. for a NaN
         (a < m < b) || (m = (a + b) / 2)
         fm = sdf(shape, pos + m * dir)
         if fm > 0
-            b, fb = m, fm
+            b, fb, sb = m, fm, fm
             side == -1 && (fa /= 2)
             side = -1
         else
-            a, fa = m, fm
+            a, fa, sa = m, fm, fm
             side == 1 && (fb /= 2)
             side = 1
         end
     end
-    return b
+    m = (a * sb - b * sa) / (sb - sa)
+    return a ≤ m ≤ b ? m : (a + b) / 2
 end
 
 """
