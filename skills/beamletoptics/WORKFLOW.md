@@ -46,6 +46,15 @@ end
 - Read everything you need from a detector **before** moving anything or solving again (hits reference beam state).
 - See `templates/01_singlet_spot_diagram.jl` (focus scan) and `templates/04_michelson_scan.jl` (fringes).
 
+## Derivatives (optimization, sensitivity)
+
+- `ForwardDiff.derivative`/`gradient` work through `solve_system!` when every component, beam and
+  detector is built in the number type `T` of the parameter (`T = typeof(p)`); pass it to
+  `ObjectGroup(objects, T)`, groups are `Float64` otherwise.
+- The derivative is that of the current light path: it is not defined where the path changes, e.g. a
+  ray that starts to miss a component, hits an edge, or begins total internal reflection.
+- See the docs page "Automatic differentiation" (`docs/src/basics/autodiff.md`).
+
 ## Interferometers and coherent sums
 
 - Use `GaussianBeamlet` (on-axis, paraxial) or `AstigmaticGaussianBeamlet` (tilted/off-axis) sources and

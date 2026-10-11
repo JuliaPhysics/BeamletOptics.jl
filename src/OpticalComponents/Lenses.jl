@@ -106,10 +106,8 @@ function interact3d(system::AbstractSystem, optic::AbstractRefractiveOptic,
         # Flip normal for refraction3d
         normal = -normal
     end
-    # Calculate (and correct into 1. quadrant) the angle of incidence
-    θi = angle3d(direction(ray), -normal)
-    # Get Fresnel coefficients
-    rs, rp, ts, tp = fresnel_coefficients(θi, n2 / n1)
+    # Fresnel coefficients from the cosine of the angle of incidence (in the 1. quadrant)
+    rs, rp, ts, tp = _fresnel_coefficients(cos_angle3d(direction(ray), -normal), n2 / n1)
     # Optical interaction
     if is_internally_reflected(rp, rs)
         # Update hint and outgoing ref. index

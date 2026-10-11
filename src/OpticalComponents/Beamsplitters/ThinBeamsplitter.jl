@@ -19,6 +19,12 @@ struct ThinBeamsplitter{T <: Real, S <: AbstractShape{T}} <: AbstractBeamsplitte
     transmittance::T
 end
 
+# The factors in the number type of the `shape`, e.g. of a shape built from dual numbers for
+# automatic differentiation w.r.t. its pose, while the reflectance is a `Float64`
+function ThinBeamsplitter(shape::AbstractShape{T}, reflectance::Real, transmittance::Real) where {T}
+    return ThinBeamsplitter{T, typeof(shape)}(shape, T(reflectance), T(transmittance))
+end
+
 reflectance(bs::ThinBeamsplitter) = bs.reflectance
 transmittance(bs::ThinBeamsplitter) = bs.transmittance
 

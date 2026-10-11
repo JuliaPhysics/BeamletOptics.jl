@@ -121,10 +121,14 @@ and the refractive index ratio `n = n₂ / n₁`. Returns rₛ, rₚ, tₛ and t
 !!! info
     The signs of rₛ, rₚ are based on the definition by Fowles (1975, 2nd Ed. p. 44) and Peatross (2015, 2023 Ed. p. 78)
 """
-function fresnel_coefficients(θ::T, n::Number) where {T}
+fresnel_coefficients(θ::Real, n::Number) = _fresnel_coefficients(cos(θ), n)
+
+# The Fresnel coefficients for the cosine `cost` of the angle of incidence. Computed from the cosine,
+# they are differentiable also at normal incidence, e.g. in automatic differentiation, where the
+# derivative of the angle, an `acos`, is not defined.
+function _fresnel_coefficients(cost::T, n::Number) where {T}
     C = Complex{T}
-    cost = cos(θ)
-    n2s2 = sqrt(C(n^2 - sin(θ)^2))
+    n2s2 = sqrt(C(n^2 - (1 - cost^2)))
     # Calculate coefficients for reflection/transmission
     rs = (cost - n2s2) / (cost + n2s2)
     rp = (-n^2 * cost + n2s2) / (n^2 * cost + n2s2)

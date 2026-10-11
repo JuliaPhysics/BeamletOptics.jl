@@ -295,12 +295,13 @@ Creates a 2D rectangular [`Mesh`](@ref) that is centered around the origin and a
 function CircularFlatMesh(radius::T, n::Int=30) where T<:Real
     # calculate vertices
     xs = [cos(x)*radius for x in LinRange(0, 2pi * (n-1)/n, n)]
-    ys = zeros(n+1)
+    ys = zeros(T, n+1)
     zs = [sin(x)*radius for x in LinRange(0, 2pi * (n-1)/n, n)]
     # add center vertex
     pushfirst!(xs, 0)
     pushfirst!(zs, 0)
-    vertices = Matrix{Float64}(undef, n+1, 3)
+    # in the number type of the radius, e.g. dual numbers in automatic differentiation
+    vertices = Matrix{T}(undef, n+1, 3)
     vertices[:, 1] = xs
     vertices[:, 2] = ys
     vertices[:, 3] = zs
