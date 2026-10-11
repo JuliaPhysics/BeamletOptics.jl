@@ -77,7 +77,7 @@ end
 
 function sdf(cylinder::CylinderSDF{T}, point) where T
     p = _world_to_sdf(cylinder, point)
-    d = abs.(Point2(norm(Point2(p[1], p[3])), p[2])) -
+    d = abs.(Point2(_radial(p[1], p[3]), p[2])) -
         Point2(cylinder.radius, cylinder.height)
     return min(maximum(d), zero(T)) + norm(max.(d, zero(T)))
 end
@@ -128,11 +128,12 @@ end
 
 function sdf(cs::CutSphereSDF, point)
     p = _world_to_sdf(cs, point)
-    q = Point2(norm(Point2(p[1], p[3])), p[2])
+    q = Point2(_radial(p[1], p[3]), p[2])
     s = max((cs.height - cs.radius) * q[1]^2 + cs.w^2 * (cs.height + cs.radius - 2 * q[2]),
         cs.height * q[1] - cs.w * q[2])
     if s < 0
-        return norm(q) - cs.radius
+        # the 3D norm, not `norm(q)`: its derivatives are defined on the axis, where `q[1]` is not
+        return norm(Point3(p[1], p[3], q[2])) - cs.radius
     elseif q[1] < cs.w
         return cs.height - q[2]
     else
@@ -191,7 +192,7 @@ end
 function sdf(ring::RingSDF, point)
     p = _world_to_sdf(ring, point)
 
-    return sdf_box(Point2(norm(Point2(p[1], p[3]))- ring.inner_radius, p[2]), Point2(ring.hwidth, ring.hthickness))
+    return sdf_box(Point2(_radial(p[1], p[3])- ring.inner_radius, p[2]), Point2(ring.hwidth, ring.hthickness))
 end
 
 """

@@ -1,4 +1,6 @@
-_conic_sag(r, R, k)   = r^2 / (R * (1 + sqrt(1 - (1 + k) * r^2 / R^2)))
+_conic_sag(r, R, k)   = _conic_sag_r2(r^2, R, k)
+# the sag as a function of r², which is smooth also on the axis, see `_radial`
+_conic_sag_r2(r2, R, k) = r2 / (R * (1 + sqrt(1 - (1 + k) * r2 / R^2)))
 _conic_slope(r, R, k) = (r / R) / sqrt(1 - (1 + k) * r^2 / R^2)
 
 """
@@ -144,10 +146,11 @@ function sdf(s::ConicSDF{T}, point) where {T}
     Z_off = _conic_sag(s.x_off, R, s.k)
 
     r_hi = abs(s.x_off) + s.diameter / 2
-    r_p = sqrt((x + s.x_off)^2 + z^2)
-    r_c = min(r_p, r_hi)
+    # r² of the point, clamped to the aperture: the sag via r² is smooth on the axis, also for
+    # automatic differentiation, in contrast to the radius
+    r_c2 = min((x + s.x_off)^2 + z^2, r_hi^2)
 
-    y_surf = -(_conic_sag(r_c, R, s.k) - Z_off)
+    y_surf = -(_conic_sag_r2(r_c2, R, s.k) - Z_off)
     # `g` uses the *global* (aperture-rim) slope rather than the local one at `r_c`. `Z'`
     # is monotone increasing in `r` for every conic family here, so `r_hi` is where the
     # true gradient magnitude is largest over the whole segment; dividing by this
@@ -163,7 +166,7 @@ function sdf(s::ConicSDF{T}, point) where {T}
     g = sqrt(one(T) + _conic_slope(r_hi, R, s.k)^2)
 
     d_front = (y_surf - y) / g
-    d_cyl = sqrt(x^2 + z^2) - s.diameter / 2
+    d_cyl = _radial(x, z) - s.diameter / 2
     d_back = y - s.thickness
 
     return max(d_front, d_cyl, d_back)

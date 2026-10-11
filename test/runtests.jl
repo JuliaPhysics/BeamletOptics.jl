@@ -47,6 +47,9 @@ include(joinpath(@__DIR__, "Components", "ConicMirrors", "TestParabolicMirror.jl
 include(joinpath(@__DIR__, "Components", "ConicMirrors", "TestEllipsoidalMirror.jl"))
 include(joinpath(@__DIR__, "Components", "ConicMirrors", "TestHyperbolicMirror.jl"))
 
+# Test automatic differentiation through the tracing
+include(joinpath(@__DIR__, "TestAutoDiff.jl"))
+
 # Test progress bars of long-running calls
 include(joinpath(@__DIR__, "TestProgress.jl"))
 

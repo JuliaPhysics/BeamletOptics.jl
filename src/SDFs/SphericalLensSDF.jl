@@ -59,7 +59,7 @@ end
 
 function sdf(ps::PlanoSurfaceSDF{T}, point) where T
     p = _world_to_sdf(ps, point)
-    d = abs.(Point2(norm(Point2(p[1], p[3])), p[2] - thickness(ps)/2)) -
+    d = abs.(Point2(_radial(p[1], p[3]), p[2] - thickness(ps)/2)) -
         Point2(diameter(ps)/2, thickness(ps)/2)
     return min(maximum(d), zero(T)) + norm(max.(d, zero(T)))
 end
@@ -177,7 +177,7 @@ function sdf(css::ConcaveSphericalSurfaceSDF{T}, point) where T
     p = _world_to_sdf(css, point)
     # cylinder sdf
     ps = p + Point3(zero(T), sag(css)/2, zero(T))
-    d = abs.(Point2(norm(Point2(ps[1], ps[3])), ps[2])) -
+    d = abs.(Point2(_radial(ps[1], ps[3]), ps[2])) -
         Point2(diameter(css)/2, sag(css)/2)
     sdf1 = min(maximum(d), zero(T)) + norm(max.(d, zero(T)))
     # sphere sdf
@@ -247,11 +247,12 @@ end
 function sdf(css::ConvexSphericalSurfaceSDF, point)
     p = _world_to_sdf(css, point)
     # -p[2] to align surface with neg. y-axis
-    q = Point2(norm(Point2(p[1], p[3])), -p[2] + radius(css))
+    q = Point2(_radial(p[1], p[3]), -p[2] + radius(css))
     s = max((css.height - radius(css)) * q[1]^2 + (diameter(css)/2)^2 * (css.height + radius(css) - 2 * q[2]),
         css.height * q[1] - diameter(css)/2 * q[2])
     if s < 0
-        return norm(q) - radius(css)
+        # the 3D norm, not `norm(q)`: its derivatives are defined on the axis, where `q[1]` is not
+        return norm(Point3(p[1], p[3], q[2])) - radius(css)
     elseif q[1] < diameter(css)/2
         return css.height - q[2]
     else
