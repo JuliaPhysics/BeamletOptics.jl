@@ -10,12 +10,11 @@ Main purpose is handling of, i.e., groups of lenses.
 - `dir`: a 3x3 matrix that describes the common `orientation` of the group
 - `objects`: stores [`AbstractObject`](@ref), can also store subgroups of type [`AbstractObjectGroup`](@ref)
 
-An `ObjectGroup` is a container and no [`AbstractObject`](@ref): each of its `objects` is traced and
-interacts on its own, read them via [`objects`](@ref)`(group)`.
+Each of its `objects` is traced and interacts on its own, read them via [`objects`](@ref)`(group)`.
 
 ## Kinematic
 
-An `ObjectGroup` can be moved like an [`AbstractObject`](@ref). The following logic is applied to
+An `ObjectGroup` implements the kinematic API, see [`BeamletOptics.AbstractKinematicTrait`](@ref). The following logic is applied to
 
 - [`translate3d!`](@ref): all objects in the group are translated by the offset vector
 - [`translate_to3d!`](@ref): all objects are moved in parallel such that the group `center` is equal to the target position

@@ -122,10 +122,8 @@ rotate3d!(::Movable, object::AbstractObject, R::AbstractMatrix) = rotate3d!(shap
 Container type for groups of optical elements, based on a tree-like data structure. Intended for easier kinematic handling of connected elements.
 See also [`ObjectGroup`](@ref) for a concrete implementation.
 
-A group is no [`AbstractObject`](@ref): it has no shape, no [`AbstractShapeTrait`](@ref) and no
-[`interact3d`](@ref) method. A ray or beam interacts with the object of the group that it hits, never
-with the group. A component that consists of several parts which interact as one, e.g. a cemented
-doublet, is therefore an `AbstractObject` with the [`MultiShape`](@ref) trait and not a group.
+A ray or beam interacts with the object of the group that it hits. A component whose parts interact
+as one, e.g. a cemented doublet, is an [`AbstractObject`](@ref) with the [`MultiShape`](@ref) trait.
 
 # Implementation reqs.
 
@@ -161,7 +159,7 @@ abstract type AbstractObjectGroup{T} end
     ObjectOrGroup
 
 Union of [`AbstractObject`](@ref) and [`AbstractObjectGroup`](@ref): what a [`System`](@ref) or a
-group stores and what [`render!`](@ref) draws. The two types share no supertype.
+group stores and what [`render!`](@ref) draws.
 """
 const ObjectOrGroup = Union{AbstractObject, AbstractObjectGroup}
 

@@ -139,8 +139,7 @@ const BMO = BeamletOptics
         end
     end
 
-    @testset "A group is no object" begin
-        # a kinematic container, see issue 113: no `AbstractObject`, no shape trait
+    @testset "Type and members" begin
         @test !(BMO.AbstractObjectGroup <: BMO.AbstractObject)
         @test !(objects isa BMO.AbstractObject)
         @test objects isa BMO.ObjectOrGroup && center isa BMO.ObjectOrGroup

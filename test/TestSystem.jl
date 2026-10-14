@@ -293,7 +293,7 @@ end
         @test objs == [m1]
         @test System(objs).objects !== objs
 
-        # objects and groups share no supertype: a vector of both has the element type `Any`
+        # a vector of objects and groups has the element type `Any`
         mixed = [RoundPlanoMirror(25e-3, 5e-3), ObjectGroup([RoundPlanoMirror(25e-3, 5e-3)])]
         @test eltype(mixed) === Any
         @test System(mixed).objects == mixed
