@@ -24,6 +24,7 @@ mutable struct ConvexAsphericalSurfaceSDF{T} <: AbstractAsphericalSurfaceSDF{T}
     dir::SMatrix{3, 3, T, 9}
     transposed_dir::SMatrix{3, 3, T, 9}
     max_sag::Point2{T}
+    edge::Point2{T}
 end
 
 function thickness(s::ConvexAsphericalSurfaceSDF)
@@ -42,7 +43,8 @@ function ConvexAsphericalSurfaceSDF(
         Point3{T}(0),
         Matrix{T}(I, 3, 3),
         Matrix{T}(I, 3, 3),
-        Point2(max_aspheric_value(1/radius, conic_constant, coefficients, diameter))
+        Point2(max_aspheric_value(1/radius, conic_constant, coefficients, diameter)),
+        aspheric_edge(1/radius, conic_constant, coefficients, diameter)
     )
 end
 
@@ -61,6 +63,19 @@ function max_aspheric_value(c, k, α_coeffs, d)
     end
     return f(r_max), r_max
 end
+
+"""
+    aspheric_edge(c, k, α_coeffs, d)
+
+Returns the sag of the asphere at its edge `r = d/2` and the norm of the gradient of its 2D
+distance field there, as a `Point2`. Both are constant for a surface, hence the SDFs store them
+instead of evaluating the asphere at the edge for every distance.
+"""
+function aspheric_edge(c, k, α_coeffs, d)
+    z = aspheric_equation(d / 2, c, k, α_coeffs)
+    return Point2(z, norm(gradient_aspheric_equation(d / 2, c, k, α_coeffs)))
+end
+
 """
     ConcaveAsphericalSurfaceSDF
 
@@ -88,6 +103,7 @@ mutable struct ConcaveAsphericalSurfaceSDF{T} <: AbstractAsphericalSurfaceSDF{T}
     dir::SMatrix{3, 3, T, 9}
     transposed_dir::SMatrix{3, 3, T, 9}
     max_sag::Point2{T}
+    edge::Point2{T}
 end
 
 function thickness(s::ConcaveAsphericalSurfaceSDF{T}) where {T}
@@ -108,7 +124,8 @@ function ConcaveAsphericalSurfaceSDF(
         Point3{T}(0),
         SMatrix{3, 3}(one(T) * I),
         SMatrix{3, 3}(one(T) * I),
-        Point2(max_aspheric_value(1/radius, conic_constant, coefficients, diameter))
+        Point2(max_aspheric_value(1/radius, conic_constant, coefficients, diameter)),
+        aspheric_edge(1/radius, conic_constant, coefficients, diameter)
     )
 end
 
@@ -132,8 +149,26 @@ function aspheric_equation(r, c, k, α_coeffs)
     if sqrt_arg < 0
         return NaN  # Handle as desired
     end
-    sum_α = sum(i -> α_coeffs[i] * r2^(i), eachindex(α_coeffs))
-    return c * r2 / (1 + sqrt(sqrt_arg)) + sum_α
+    return c * r2 / (1 + sqrt(sqrt_arg)) + _even_aspheric_sum(r2, α_coeffs)
+end
+
+# Σᵢ αᵢ r²ⁱ of the even aspheric terms, via Horner's scheme in r²
+function _even_aspheric_sum(r2, α_coeffs)
+    acc = zero(r2 * zero(eltype(α_coeffs)))
+    for i in reverse(eachindex(α_coeffs))
+        acc = muladd(acc, r2, α_coeffs[i])
+    end
+    return acc * r2
+end
+
+# d/dr of `_even_aspheric_sum(r^2, α_coeffs)`, i.e. Σᵢ 2i αᵢ r²ⁱ⁻¹, via Horner's scheme in r²
+function _even_aspheric_sum_derivative(r, α_coeffs)
+    r2 = r^2
+    acc = zero(r2 * zero(eltype(α_coeffs)))
+    for i in reverse(eachindex(α_coeffs))
+        acc = muladd(acc, r2, 2i * α_coeffs[i])
+    end
+    return acc * r
 end
 
 function aspheric_equation(r::Real, a::AbstractAsphericalSurfaceSDF)
@@ -146,7 +181,7 @@ function gradient_aspheric_equation(r, c, k, α_coeffs)
     sqrt_arg < 0 && return NaN
     gr = 2 * r / (Ri * (√(sqrt_arg) + 1)) +
          r^3 * (1 + k) / (Ri^3 * √(sqrt_arg) * (√(sqrt_arg) + 1)^2)
-    sum_r = sum(m -> 2 * (m) * α_coeffs[m] * r^(2(m - 1) + 1), eachindex(α_coeffs))
+    sum_r = _even_aspheric_sum_derivative(r, α_coeffs)
 
     return Point2(-sum_r - gr, 1)
 end
@@ -165,7 +200,7 @@ function sd_line_segment(p, a, b)
 end
 
 """
-    convex_aspheric_surface_distance(r, z, c, k, d, α_coeffs)
+    convex_aspheric_surface_distance(r, z, c, k, d, α_coeffs, max_sag, edge)
 
 Calculates the 2D distance field for an aspheric surface at radius `r` away from the optical axis
 position `z`. The asphere is defined by:
@@ -173,20 +208,22 @@ position `z`. The asphere is defined by:
 - `k` : The conic constant of the surface
 - `d` : The diameter of the asphere
 - `α_coeffs` : The (even) aspheric coefficients, starting with A2.
+- `max_sag` : the extremal sag and its radius, see `max_aspheric_value`
+- `edge` : the sag and the gradient norm at the edge, see `aspheric_edge`
 
 Note that this is not just an infinite aspheric surface and also not a surface segment but
 a closed 2D perimeter.
 
 It is intended to pair the SDF derived from this distance field with a cylinder SDF to build a real lens.
 """
-function convex_aspheric_surface_distance(r, z, c, k, d, α_coeffs, max_sag)
+function convex_aspheric_surface_distance(r, z, c, k, d, α_coeffs, max_sag, edge)
     r2 = r^2
     r2_bound = (d / 2)^2
     z_aspheric_value = aspheric_equation(r, c, k, α_coeffs)
     grad_z = gradient_aspheric_equation(r, c, k, α_coeffs)
 
-    z_aspheric_boundary = aspheric_equation(d / 2, c, k, α_coeffs)
-    grad_z_boundary = gradient_aspheric_equation(d / 2, c, k, α_coeffs)
+    # sag and gradient norm at the edge, see `aspheric_edge`
+    z_aspheric_boundary, n_grad_z_boundary = edge
 
     # Handling NaN for points outside the aspheric surface
     if isnan(z_aspheric_value) || isnan(grad_z) || r2 > r2_bound
@@ -199,7 +236,7 @@ function convex_aspheric_surface_distance(r, z, c, k, d, α_coeffs, max_sag)
         else
             distance_to_boundary = sqrt((r - sign(r) * d / 2)^2 + (z - z_aspheric_boundary)^2)
         end
-        return distance_to_boundary / norm(grad_z_boundary)
+        return distance_to_boundary / n_grad_z_boundary
     end
 
     # Calculate distance to the aspheric surface
@@ -208,14 +245,13 @@ function convex_aspheric_surface_distance(r, z, c, k, d, α_coeffs, max_sag)
         # the asphere curves towards negative sag so we need to close the perimeter
         # at its max sag value instead of the boundary
         p = Point2(r, z)
-        n_gzb = norm(grad_z_boundary)
 
         a1, b1 = Point2(d / 2, z_aspheric_boundary), Point2(d / 2, max_sag[1])
-        sdl1 = sd_line_segment(p, a1, b1) / n_gzb
+        sdl1 = sd_line_segment(p, a1, b1) / n_grad_z_boundary
         a2, b2 = Point2(d / 2, max_sag[1]), Point2(-d / 2, max_sag[1])
-        sdl2 = sd_line_segment(p, a2, b2) / n_gzb
+        sdl2 = sd_line_segment(p, a2, b2) / n_grad_z_boundary
         a3, b3 = Point2(-d / 2, max_sag[1]), Point2(-d / 2, z_aspheric_boundary)
-        sdl3 = sd_line_segment(p, a3, b3) / n_gzb
+        sdl3 = sd_line_segment(p, a3, b3) / n_grad_z_boundary
 
         if z_aspheric_value < z < max_sag[1]
             return -min(distance_to_aspheric, sdl1, sdl2, sdl3)
@@ -225,7 +261,7 @@ function convex_aspheric_surface_distance(r, z, c, k, d, α_coeffs, max_sag)
     else
         # If we are inside the aperture, let's close the perimeter with a line segment
         a, b = Point2(d / 2, z_aspheric_boundary), Point2(-d / 2, z_aspheric_boundary)
-        sdl = sd_line_segment(Point2(r, z), a, b) / norm(grad_z_boundary)
+        sdl = sd_line_segment(Point2(r, z), a, b) / n_grad_z_boundary
         if sign(c) * z_aspheric_value < sign(c) * z < sign(c) * z_aspheric_boundary
             return -min(sdl, distance_to_aspheric)
         else
@@ -234,14 +270,14 @@ function convex_aspheric_surface_distance(r, z, c, k, d, α_coeffs, max_sag)
     end
 end
 
-function concave_aspheric_surface_distance(r, z, c, k, d, α_coeffs, max_sag)
+function concave_aspheric_surface_distance(r, z, c, k, d, α_coeffs, max_sag, edge)
     r2 = r^2
     r2_bound = (d / 2)^2
     z_aspheric_value = aspheric_equation(r, c, k, α_coeffs)
     grad_z = gradient_aspheric_equation(r, c, k, α_coeffs)
 
-    z_aspheric_boundary = aspheric_equation(d / 2, c, k, α_coeffs)
-    grad_z_boundary = gradient_aspheric_equation(d / 2, c, k, α_coeffs)
+    # sag and gradient norm at the edge, see `aspheric_edge`
+    z_aspheric_boundary, n_grad_z_boundary = edge
     # Handling NaN for points outside the aspheric surface
     if isnan(z_aspheric_value) || isnan(grad_z)
         if z < 0
@@ -251,9 +287,7 @@ function concave_aspheric_surface_distance(r, z, c, k, d, α_coeffs, max_sag)
         else
             distance_to_boundary = sqrt((r - sign(r) * d / 2)^2 + (z - z_aspheric_boundary)^2)
         end
-        return distance_to_boundary / norm(grad_z_boundary)
-        # distance_to_boundary = sqrt((r - sign(r) * d / 2)^2 + z^2)
-        # return distance_to_boundary / norm(grad_z_boundary)
+        return distance_to_boundary / n_grad_z_boundary
     end
 
     distance_to_aspheric = abs(z - z_aspheric_value) / norm(grad_z)
@@ -261,7 +295,7 @@ function concave_aspheric_surface_distance(r, z, c, k, d, α_coeffs, max_sag)
 
     if max_sag[1] > 0 && z_aspheric_boundary < 0
         a, b = Point2(d / 2, z_aspheric_boundary), Point2(-d / 2, z_aspheric_boundary)
-        sdl = sd_line_segment(p, a, b) / norm(grad_z_boundary)
+        sdl = sd_line_segment(p, a, b) / n_grad_z_boundary
 
         if r2 > r2_bound
             # we are outside of the aperture, so the shortest distance can be determined
@@ -279,11 +313,11 @@ function concave_aspheric_surface_distance(r, z, c, k, d, α_coeffs, max_sag)
         end
     else
         a1, b1 = Point2(d / 2, z_aspheric_boundary), Point2(d / 2, 0.0)
-        sdl1 = sd_line_segment(p, a1, b1) / norm(grad_z_boundary)
+        sdl1 = sd_line_segment(p, a1, b1) / n_grad_z_boundary
         a2, b2 = Point2(d / 2, 0.0), Point2(-d / 2, 0.0)
-        sdl2 = sd_line_segment(p, a2, b2) / norm(grad_z_boundary)
+        sdl2 = sd_line_segment(p, a2, b2) / n_grad_z_boundary
         a3, b3 = Point2(-d / 2, 0.0), Point2(-d / 2, z_aspheric_boundary)
-        sdl3 = sd_line_segment(p, a3, b3) / norm(grad_z_boundary)
+        sdl3 = sd_line_segment(p, a3, b3) / n_grad_z_boundary
 
         if r2 > r2_bound
             # we are outside of the aperture, so the shortest distance can be determined
@@ -343,7 +377,8 @@ function sdf(surface::ConvexAsphericalSurfaceSDF{T}, point) where {T}
             surface.conic_constant,
             surface.diameter,
             surface.coefficients,
-            surface.max_sag
+            surface.max_sag,
+            surface.edge
         ), zero(T))
     return sdf_v
 end
@@ -364,7 +399,8 @@ function sdf(surface::ConcaveAsphericalSurfaceSDF{T}, point) where {T}
             surface.conic_constant,
             surface.diameter,
             surface.coefficients,
-            surface.max_sag
+            surface.max_sag,
+            surface.edge
         ), zero(T))
     return sdf_v
 end
