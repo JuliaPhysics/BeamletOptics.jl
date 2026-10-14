@@ -220,4 +220,41 @@ const nm = 1e-9
     end
 end
 
+@testset "Power and profile of beamlet sources" begin
+    # the power of a source on a detector that captures all of it
+    function power(source, L, half_width)
+        pd = Detector(2half_width)
+        translate3d!(pd, [0, L, 0])
+        solve_system!(System([pd]), source; progress = false)
+        return BeamletOptics.optical_power(pd; progress = false, n = 200)
+    end
+    P0 = 1e-3
+    @testset "GaussianBeamletDecomposition is the Gaussian beam of w0 and P0" begin
+        λ, w0, L = 1e-6, 2e-3, 0.1
+        for n_grid in (10, 20)
+            g = GaussianBeamletDecomposition([0.0, 0, 0], [0.0, 1, 0], λ, w0; n_grid, P0)
+            pd = Detector(12w0)
+            translate3d!(pd, [0, L, 0])
+            solve_system!(System([pd]), g; progress = false)
+            x, z, I = intensity(pd; progress = false, n = 201, x_min = -3w0, x_max = 3w0, z_min = -3w0, z_max = 3w0)
+            w = w0 * sqrt(1 + (L * λ / (π * w0^2))^2)
+            @test BeamletOptics.trapz((x, z), I) ≈ P0 rtol = 1e-3
+            # the peak intensity 2 P0 / (π w²) of the Gaussian beam, i.e. also its radius
+            @test maximum(I) ≈ 2P0 / (π * w^2) rtol = 1e-3
+        end
+        # the sub-waist of the beamlets must be smaller than the waist
+        @test_throws ArgumentError GaussianBeamletDecomposition([0.0, 0, 0], [0.0, 1, 0], λ, w0; n_grid = 4)
+    end
+    @testset "SphericalGaussianBeamletSource emits P0" begin
+        for (θ, num_rings, num_rays) in ((0.02, 5, 200), (0.02, 10, 1000))
+            source = SphericalGaussianBeamletSource([0.0, 0, 0], [0.0, 1, 0], θ, 1e-6; num_rings, num_rays, P0)
+            @test power(source, 0.2, 3θ * 0.2) ≈ P0 rtol = 1e-2
+        end
+    end
+    @testset "EllipticalGaussianBeamletSource emits P0" begin
+        source = EllipticalGaussianBeamletSource([0.0, 0, 0], [0.0, 1, 0], 0.02, 0.01, 1e-6; num_rings = 10, num_rays = 1000, P0)
+        @test power(source, 0.2, 3 * 0.02 * 0.2) ≈ P0 rtol = 1e-2
+    end
+end
+
 end # MODULE
