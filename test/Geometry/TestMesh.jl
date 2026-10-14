@@ -189,6 +189,23 @@ const BMO = BeamletOptics
             @warn "Allocated number of bytes for MTA larger than expected!" alloc
         end
     end
+    @testset "Moeller-Trumbore algorithm at all scales" begin
+        # the test of a ray parallel to the face does not depend on the size of the face
+        for w in (10.0, 1e-3, 30e-6, 1e-6)
+            mesh = BMO.QuadraticFlatMesh(w)
+            translate3d!(mesh, [0, w, 0])
+            # normal and oblique incidence onto the face
+            for dir in ([0.0, 1, 0], [0.3, 1, -0.2])
+                ray = Ray([w / 10, 0, w / 10] - w * dir / dir[2], dir)
+                i = BMO.intersect3d(mesh, ray)
+                @test !isnothing(i)
+                @test length(i) ≈ 2w * norm(dir) / dir[2] rtol = 1e-9
+            end
+            # a ray in the plane of the face misses it
+            @test isnothing(BMO.intersect3d(mesh, Ray([-w, w, 0], [1.0, 0, 0])))
+        end
+    end
+
     @testset "Testing intersect3d" begin
         # Setup test cube and ray
         cube = BMO.CubeMesh(1)
