@@ -551,8 +551,8 @@ this is typically constant through lossless propagation.
 """
 function optical_power(agb::AstigmaticGaussianBeamlet)
     # Beam area and field amplitude at the start of the beam (for a child: behind its parents)
-    _, area, s = _area_history(agb, 1, 0)
-    E_amp = s * norm(polarization(first(rays(agb.c))))
+    (; area, scale) = _area_from_root(agb, 1, 0)
+    E_amp = scale * norm(polarization(first(rays(agb.c))))
     # Corrected power: P = I_peak * π * w0x * w0y / 2
     # We use the built-in intensity function to account for wave impedance
     I_ref = intensity(E_amp)
@@ -660,36 +660,40 @@ _area_arg_jump(r) = angle(real(r) < 0 ? -r : r)
 
 Continuous argument of the complex beam area of `agb` at the local distance `l` along the
 chief ray segment `i` (measured from the start of that segment), relative to the start of
-the root beam: a child continues the last segment of its parent, see `_area_history`.
+the root beam: a child continues the last segment of its parent, see `_area_from_root`.
 
 The area `(h1 × h2) ⋅ d` is a pseudoscalar: a reflection mirrors the transverse frame
 against the chief ray and flips its sign, which is no change of the beam. The jump at
 an interface is therefore taken modulo π, on (−π/2, π/2], and the Gouy phase does not
 change at a mirror. Physical interface jumps (refraction) are small.
 """
-_area_arg(agb::AstigmaticGaussianBeamlet, i::Int, l::Real) = first(_area_history(agb, i, l))
+_area_arg(agb::AstigmaticGaussianBeamlet, i::Int, l::Real) = _area_from_root(agb, i, l).arg
 
-# Argument (see `_area_arg`) and value of the complex beam area at the local distance `l`
-# along the chief ray segment `i`, and the factor `s` by which the field amplitude has changed
-# with the beam area on the way from the start of the root beam. Only the change within the
-# segments counts for `s`. At a surface the amplitude follows from the polarization of the chief
-# ray instead: the Fresnel coefficients relate the fields on both sides, and they include that
-# the cross section of the beam changes with the angle of refraction.
-function _area_history(agb::AstigmaticGaussianBeamlet{T}, i::Int, l::Real) where {T}
+# Complex beam area at the local distance `l` along the chief ray segment `i`, followed from the
+# start of the root beam, as a named tuple:
+# - `arg`: its continuous argument, see `_area_arg`
+# - `area`: its value
+# - `scale`: the factor by which the field amplitude has changed with the beam area on the way.
+#   Only the change within the segments counts. At a surface the amplitude follows from the
+#   polarization of the chief ray instead: the Fresnel coefficients relate the fields on both
+#   sides, and they include that the cross section of the beam changes with the angle of
+#   refraction.
+function _area_from_root(agb::AstigmaticGaussianBeamlet{T}, i::Int, l::Real) where {T}
     p = agb.parent
-    Δ, a_end, s = isnothing(p) ? (zero(T), zero(Complex{T}), one(T)) :
-                  _area_history(p, length(rays(p.c)), length(last(rays(p.c))))
+    (; arg, area, scale) = isnothing(p) ?
+                           (arg = zero(T), area = zero(Complex{T}), scale = one(T)) :
+                           _area_from_root(p, length(rays(p.c)), length(last(rays(p.c))))
     for j in 1:i
         ray = rays(agb.c)[j]
         h1, u1, h2, u2, _ = parabasal_ray_parameters(agb, position(ray), j)
         A = _area_coefficients(h1, u1, h2, u2, direction(ray))
-        (j > 1 || !isnothing(p)) && (Δ += _area_arg_jump(A[1] / a_end))
+        (j > 1 || !isnothing(p)) && (arg += _area_arg_jump(A[1] / area))
         lj = j < i ? length(ray) : l
-        Δ += _area_arg_change(A, lj)
-        a_end = _area_value(A, lj)
-        s *= sqrt(abs(A[1] / a_end))
+        arg += _area_arg_change(A, lj)
+        area = _area_value(A, lj)
+        scale *= sqrt(abs(A[1] / area))
     end
-    return Δ, a_end, s
+    return (; arg, area, scale)
 end
 
 # Local distance of the point `p` along chief ray segment `i`
@@ -782,13 +786,13 @@ function parabasal_field(
     # area_ref / area is essentially (1 / (1 + i*z/zr))^2 for stigmatic beams, so its
     # square root carries the Gouy phase. The argument is followed continuously from the
     # start of the root beam (the principal branch would jump by π behind a focus), the
-    # magnitude within the segments only (see `_area_history`).
+    # magnitude within the segments only (see `_area_from_root`).
     # The phase includes the OPL correction Δl to ensure coherence in media. The
     # transverse term w = rᵀQr/2 is a geometric length like z, so in a medium it enters
     # with the wavenumber n k0 as well (beam radius and wavefront curvature).
     Δarg = _area_arg(agb, i, _local_distance(agb, p0, i))
-    _, area_start, s = _area_history(agb, i, 0)
-    ψ = s * sqrt(abs(area_start / area)) * cis(-Δarg / 2) *
+    start = _area_from_root(agb, i, 0)
+    ψ = start.scale * sqrt(abs(start.area / area)) * cis(-Δarg / 2) *
         exp(im * k0 * (z + refractive_index(chief) * w + Δl))
     return E_ref_amp * ψ
 end
@@ -887,7 +891,7 @@ function gauss_parameters(agb::AstigmaticGaussianBeamlet, z::Real)
     # Total Gouy phase: argument of the area at the start of the root beam, followed
     # continuously along the beam and its parents (no jump behind a focus, at a mirror or
     # from parent to child)
-    _, area_root, _ = _area_history(_root(agb), 1, 0)
+    area_root = _area_from_root(_root(agb), 1, 0).area
     ψ = -0.5 * (angle(area_root) + _area_arg(agb, i, _local_distance(agb, p0, i)))
 
     return (w1, w2, R1, R2, ψ, w01, w02)

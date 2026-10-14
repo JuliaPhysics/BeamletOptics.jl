@@ -175,7 +175,7 @@ struct AstigmaticGaussianBeamletHit{T} <: AbstractBeamletHit{T}
     # Amplitude and Gouy factor of the complex beam area a at the local distance l behind
     # p0, as gouy0 / (√(1 − ρ1 l) √(1 − ρ2 l)): gouy0 is the change of the amplitude with the
     # beam area and the Gouy phase up to p0, followed from the start of the root beam (see
-    # `_area_history`), ρ1 and ρ2 are the inverse roots of a(l) (see `_area_inverse_roots`)
+    # `_area_from_root`), ρ1 and ρ2 are the inverse roots of a(l) (see `_area_inverse_roots`)
     gouy0::Complex{T}
     ρ1::Complex{T}
     ρ2::Complex{T}
@@ -421,11 +421,11 @@ function AstigmaticGaussianBeamletHit(agb::AstigmaticGaussianBeamlet{R}, id::Int
 
     # Change of the amplitude with the beam area and Gouy phase up to p0, from the start of the
     # root beam, which a child continues through its parents
-    area_arg0, _, s0 = _area_history(agb, id, zero(R))
+    start = _area_from_root(agb, id, zero(R))
     # Gouy factor at p0 and inverse roots of the area along the hit segment, constant per
     # hit, so that the field loop over the detector pixels does not recompute them
     A = _area_coefficients(h1, u1, h2, u2, d0)
-    gouy0 = s0 * cis(-area_arg0 / 2)
+    gouy0 = start.scale * cis(-start.arg / 2)
     ρ1, ρ2 = _area_inverse_roots(A)
 
     # Complex amplitude of the segment: its chief ray carries what the surfaces on the way did
