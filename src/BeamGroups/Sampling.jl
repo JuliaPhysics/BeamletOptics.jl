@@ -84,7 +84,10 @@ struct NoSampling <: AbstractSampling end
 
 Concentric rings of rays around a center ray on the disc of a [`CollimatedSource`](@ref). The
 outermost ring lies on the edge of the disc; the rays are distributed over the rings in
-proportion to their circumference. Needs at least `20 num_rings` rays.
+proportion to the area of the disc each ring represents, i.e. to its circumference, but half of
+it for the outermost ring, which represents only the inner half of its annulus. Every ray then
+represents about the same area (trapezoidal rule), e.g. for spot sizes or point spread
+functions, which weight every ray equally. Needs at least `20 num_rings` rays.
 """
 struct DiscRings <: AbstractSampling
     num_rings::Int
@@ -113,8 +116,10 @@ struct DiscLine <: AbstractSampling end
     ConeRings(num_rings::Int, θ::Float64)
 
 Concentric cones of rays around a center ray of a [`PointSource`](@ref), the outermost with the
-half spread angle `θ` [rad]. The rays are distributed over the cones in proportion to their
-circumference. Needs at least `20 num_rings` rays.
+half spread angle `θ` [rad]. The rays are distributed over the cones in proportion to the solid
+angle each cone represents, i.e. to its circumference, but half of it for the outermost cone,
+which represents only the inner half of its band. Every ray then represents about the same solid
+angle (trapezoidal rule). Needs at least `20 num_rings` rays.
 """
 struct ConeRings <: AbstractSampling
     num_rings::Int
@@ -214,8 +219,10 @@ function source_beams(s::DiscRings, pos, dir, b1, diameter, λ, num_rays::Int, :
     # setup concentric beam ring radii
     r_max = diameter / 2
     radii = LinRange(0, r_max, num_rings)[2:end]
-    # calculate total accumulated circumference of all rings
-    circm = radii * 2π
+    # the area of the disc that each ring represents, in units of the ring spacing: the
+    # circumference, half of it for the ring on the edge (trapezoidal rule)
+    circm = collect(radii * 2π)
+    circm[end] /= 2
     total = sum(circm)
     ds = total / num_rays
     # calculate number of rays per ring
@@ -292,6 +299,8 @@ function source_beams(s::ConeRings, pos, dir, b1, λ, num_rays::Int, ::Type{T}) 
     # calculate total accumulated circumference of all rings
     ndirs = [rotate3d(b2, step(θ_NA) * i) * dir for i in eachindex(θ_NA[2:end])]
     circm = norm.(ndirs .- dot.(ndirs, Ref(dir)) .* Ref(dir)) .* Ref(2π)
+    # the solid angle that each cone represents: half of it for the outermost (trapezoidal rule)
+    circm[end] /= 2
     total = sum(circm)
     ds = total / num_rays
     # calculate number of rays per ring
