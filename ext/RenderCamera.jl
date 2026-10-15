@@ -63,7 +63,7 @@ function render_lcs!(
     return nothing
 end
 
-function render_lcs!(ax::LScene, object::BMO.AbstractObject; scale::Real = 10, show_labels::Bool = false)
+function render_lcs!(ax::LScene, object::BMO.ObjectOrGroup; scale::Real = 10, show_labels::Bool = false)
     render_lcs!(ax, BMO.position(object), BMO.orientation(object); scale, show_labels)
     return nothing
 end

@@ -30,8 +30,8 @@ The canonical entry point is `SKILL.md`.
 
 ## Templates
 
-The files in `templates/` are small, complete scripts. Templates 01 to 06 run headless with only
-BeamletOptics installed. `07_render_system.jl` additionally needs `GLMakie` and a display
+The files in `templates/` are small, complete scripts. All templates except `07_render_system.jl`
+run headless with only BeamletOptics installed. `07_render_system.jl` additionally needs `GLMakie` and a display
 (`xvfb-run -a` on headless Linux).
 
 Paths below are relative to this skill directory; `<env>` is a Julia project that has BeamletOptics
@@ -39,11 +39,11 @@ Paths below are relative to this skill directory; `<env>` is a Julia project tha
 
 ```sh
 julia --project=<env> templates/03_psf_airy.jl
-julia --project=<env> scripts/run_templates.jl            # smoke-test 01-06
+julia --project=<env> scripts/run_templates.jl            # smoke-test the headless templates
 julia --project=<env> scripts/run_templates.jl --render   # all templates, needs GLMakie
 ```
 
-From the root of the BeamletOptics repository, use the package env (templates 01 to 06) or the docs
+From the root of the BeamletOptics repository, use the package env (headless templates) or the docs
 env (all templates):
 
 ```sh

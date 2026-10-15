@@ -31,8 +31,8 @@ abstract type AbstractRenderHandle end
 """
     AbstractObjectRenderHandle <: AbstractRenderHandle
 
-Handle of one movable thing, returned by `live_render!(ax, obj)` for an `AbstractObject` and by
-`live_render!(draw, ax, x)` for anything with a pose. The plots are drawn once;
+Handle of one movable thing, returned by `live_render!(ax, obj)` for an `AbstractObject` or an
+object group and by `live_render!(draw, ax, x)` for anything with a pose. The plots are drawn once;
 [`update_render!`](@ref) applies the current pose of [`rendered`](@ref)`(h)` as their model
 matrix (and draws them again if the parts of a `MultiShape` object moved relative to each other).
 [`pick_object`](@ref) returns `rendered(h)` for the plots of [`pickable_plots`](@ref).

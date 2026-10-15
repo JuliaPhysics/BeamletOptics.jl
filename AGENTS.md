@@ -113,7 +113,7 @@ with every release, so it must describe exactly that release.
 - [test/TestAgentSkill.jl](test/TestAgentSkill.jl) catches mechanical drift only. It fails if
   the export table in `API.md` differs from `names(BeamletOptics)`, if
   `metadata.beamletoptics-version` in `SKILL.md` differs from the major.minor version in
-  `Project.toml`, if `install_agent_skill` breaks, or if a headless template (01–06) throws.
+  `Project.toml`, if `install_agent_skill` breaks, or if a headless template (all but `07_render_system.jl`) throws.
   Passing tests do not show that the skill is correct: a changed meaning, e.g. a flipped sign
   convention, still runs. Checking that is the author's job (above).
 - On a minor version bump, review the whole skill and update both the version field and the

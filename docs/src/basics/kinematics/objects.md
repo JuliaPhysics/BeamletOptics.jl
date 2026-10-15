@@ -20,5 +20,16 @@ For the easier representation of a group of [`BeamletOptics.AbstractObject`](@re
 
 ```@docs; canonical=false
 ObjectGroup
-set_pivot3d!(::ObjectGroup, ::Any)
+set_pivot3d!(::BeamletOptics.AbstractObjectGroup, ::Any)
 ```
+
+## Assemblies: group or multi-shape object
+
+An assembly such as a telescope, a periscope or an interferometer arm can be modeled in two ways, and the choice follows from whether its parts touch:
+
+| Parts of the assembly | Model | `interact3d` |
+|---|---|---|
+| separate, with air between them | an [`ObjectGroup`](@ref) or an own subtype of [`BeamletOptics.AbstractObjectGroup`](@ref) | none: each part is traced and interacts on its own |
+| touching and interacting as one, e.g. cemented or with a shared face | an [`BeamletOptics.AbstractObject`](@ref) with the [`BeamletOptics.MultiShape`](@ref) trait, like the [`CubeBeamsplitter`](@ref) | required: the solver hands every hit to the object, which forwards it to the part that was hit |
+
+The solver can find out by itself which of several separate parts a ray hits next. Parts that touch need a [`BeamletOptics.Hint`](@ref) across their shared face, which only the component knows. An own subtype of `AbstractObjectGroup` adds named parts and an own constructor to a group and needs no `interact3d` method; its fields and its constructor check are listed in the docstring of [`BeamletOptics.AbstractObjectGroup`](@ref), and the agent skill has a complete example in `templates/08_custom_group.jl`. A `MultiShape` object without an `interact3d` method stops every ray that hits it, with the warning `No interact3d method defined for the MultiShape object`.

@@ -62,6 +62,7 @@ Returns the properties that [`properties`](@ref) lists for any `x`, see its conv
 - for an [`AbstractObject`](@ref), depending on its [`BeamletOptics.AbstractShapeTrait`](@ref):
   the [`properties`](@ref) of its shape (`"Shape"` and the stored dimensions, e.g.
   `"Diameter [m]"`) or the number of its `"Parts"`
+- for an object group: the number of its objects as `"Parts"`
 
 Methods of `properties` for specific types start from this list, see [`properties`](@ref).
 """
@@ -70,9 +71,12 @@ default_properties(x) = Pair{String, Any}["Type" => _type_name(x); default_prope
 default_properties(x::AbstractObject) = Pair{String, Any}["Type" => _type_name(x);
     default_properties(kinematic_trait_of(x), x); default_properties(shape_trait_of(x), x)]
 
+default_properties(x::AbstractObjectGroup) = Pair{String, Any}["Type" => _type_name(x);
+    default_properties(kinematic_trait_of(x), x); "Parts" => length(objects(x))]
+
 # Pose by the kinematic trait
 default_properties(::Static, _) = Pair{String, Any}[]
-default_properties(::Static, x::AbstractObject) = Pair{String, Any}["Position [m]" => _vector(position(x))]
+default_properties(::Static, x::ObjectOrGroup) = Pair{String, Any}["Position [m]" => _vector(position(x))]
 default_properties(::Movable{Oriented}, x) = Pair{String, Any}["Position [m]" => _vector(position(x)),
     "Optical axis" => _vector(direction(x))]
 default_properties(::Movable{Directed}, x) = Pair{String, Any}["Position [m]" => _vector(position(x)),

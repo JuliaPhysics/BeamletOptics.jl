@@ -53,7 +53,9 @@ When this Skill is active:
   place with `translate3d!`/`translate_to3d!`. Rotations pivot about `position(obj)`, so for a single
   object the order of rotate/translate does not matter; pass a `pivot` to `rotate3d!` to rotate about another point.
 - Stack lenses along +y using `thickness(lens)`.
-- Group rigid sub-assemblies with `ObjectGroup` (see `components/systems-and-groups.md`).
+- Group rigid sub-assemblies with `ObjectGroup` or an own subtype of `BeamletOptics.AbstractObjectGroup`;
+  only parts that touch and interact as one form a `MultiShape` object with its own `interact3d`
+  (see "Assemblies" in `components/systems-and-groups.md`).
 
 4) Solve
 - `system = System([obj1, obj2, ...])` (order does not matter, tracing is non-sequential);

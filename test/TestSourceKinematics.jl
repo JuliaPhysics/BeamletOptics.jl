@@ -514,7 +514,7 @@ start_rays(b) = map(BMO.first_ray, BMO._component_beams(b))
         axis = [1.0, -2.0, 0.5]
         θ = 0.8
         # compared state: (position, orientation/direction) for objects, start rays for sources
-        state(x::Union{BMO.AbstractShape, BMO.AbstractObject}) = (position(x), BMO.orientation(x))
+        state(x::Union{BMO.AbstractShape, BMO.ObjectOrGroup}) = (position(x), BMO.orientation(x))
         state(r::BMO.AbstractRay) = (position(r), BMO.direction(r))
         state(b::BMO.Beam) = state(BMO.first_ray(b))
         state(b::BMO.AbstractBeam) = map(c -> state(BMO.first_ray(c)), BMO._component_beams(b))
