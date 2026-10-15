@@ -85,5 +85,7 @@ public is_static, hit_count, wavelength, min_num_rays, ProgressSink, PROGRESS_SI
 public relaunch!, beamlet_hit_field, GaussianBeamletHit, AstigmaticGaussianBeamletHit
 # optional part of the shape interface, see AbstractShape
 public bounding_sphere_of, AbstractBoundingSphere, NoBoundingSphere, SingleBoundingSphere, MultiBoundingSphere
+# own assembly types of separate parts, see AbstractObjectGroup
+public AbstractObjectGroup
 public AbstractSampling, NoSampling, DiscRings, DiscSunflower, DiscLine, ConeRings, ConeSunflower,
        ConeFan, source_beams, sampling_basis

@@ -7,6 +7,12 @@ See also [`ObjectGroup`](@ref) for a concrete implementation.
 A ray or beam interacts with the object of the group that it hits. A component whose parts interact
 as one, e.g. a cemented doublet, is an [`AbstractObject`](@ref) with the [`MultiShape`](@ref) trait.
 
+!!! tip "Own assembly types"
+    An assembly of separate parts, e.g. a telescope from its mirrors, can be a subtype of
+    `AbstractObjectGroup` with named parts and its own constructor: it needs the fields below and
+    no `interact3d` method, and the kinematic API, [`set_pivot3d!`](@ref), systems and rendering
+    work as for an [`ObjectGroup`](@ref). See `templates/08_custom_group.jl` of the agent skill.
+
 # Implementation reqs.
 
 Subtypes of `AbstractObjectGroup` must implement the following:
@@ -32,7 +38,7 @@ If the fields above do not exist, the following getters/setters must be dispatch
 An `AbstractObjectGroup` is a container: it takes the kinematic class of its `objects`, i.e.
 [`BeamletOptics.Movable`](@ref) with an [`BeamletOptics.Oriented`](@ref) frame for movable objects, see
 [`BeamletOptics.AbstractKinematicTrait`](@ref). The constructors must check that the `objects` are either
-all static or all movable. The primitives `translate3d!(::Movable, group, offset)` and
+all static or all movable, e.g. with `allequal(BeamletOptics.is_static, objects)`. The primitives `translate3d!(::Movable, group, offset)` and
 `rotate3d!(::Movable, group, R::AbstractMatrix)` move all `objects` and the pose of the group.
 """
 abstract type AbstractObjectGroup{T} end
@@ -64,6 +70,29 @@ orientation!(group::AbstractObjectGroup{T}, dir) where {T} = (group.dir = SMatri
 
 function initialize!(group::AbstractObjectGroup)
     foreach(initialize!, objects(group))
+    return nothing
+end
+
+"""
+    set_pivot3d!(group::AbstractObjectGroup, pivot)
+
+Moves the kinematic pivot (`center`) of `group` to `pivot`, without moving any of its
+`objects`. The pivot is the reference point used by [`rotate3d!`](@ref),
+[`translate_to3d!`](@ref) and [`reset_translation3d!`](@ref); the group [`orientation`](@ref)
+is unchanged.
+
+# Example
+
+Rotate a lens group about its first surface instead of the group's default center:
+
+```julia
+group = ObjectGroup([lens1, lens2])
+set_pivot3d!(group, position(lens1))
+rotate3d!(group, [0, 0, 1], deg2rad(5))   # rotates about lens1's position, not the old center
+```
+"""
+function set_pivot3d!(group::AbstractObjectGroup, pivot)
+    position!(group, pivot)
     return nothing
 end
 

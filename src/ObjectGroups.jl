@@ -30,29 +30,6 @@ mutable struct ObjectGroup{T, O <: Tuple{Vararg{ObjectOrGroup}}} <: AbstractObje
     const objects::O
 end
 
-"""
-    set_pivot3d!(group::ObjectGroup, pivot)
-
-Moves the kinematic pivot (`center`) of `group` to `pivot`, without moving any of its
-`objects`. The pivot is the reference point used by [`rotate3d!`](@ref),
-[`translate_to3d!`](@ref) and [`reset_translation3d!`](@ref); the group [`orientation`](@ref)
-is unchanged.
-
-# Example
-
-Rotate a lens group about its first surface instead of the group's default center:
-
-```julia
-group = ObjectGroup([lens1, lens2])
-set_pivot3d!(group, position(lens1))
-rotate3d!(group, [0, 0, 1], deg2rad(5))   # rotates about lens1's position, not the old center
-```
-"""
-function set_pivot3d!(group::ObjectGroup{T}, pivot) where {T}
-    position!(group, Point3{T}(pivot))
-    return nothing
-end
-
 ObjectGroup(v::AbstractArray, T = Float64) = ObjectGroup(tuple(v...), T)
 function ObjectGroup(v::V, T = Float64) where {V <: Tuple}
     _check_kinematic_members(v)

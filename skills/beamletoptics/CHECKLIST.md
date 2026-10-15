@@ -48,3 +48,7 @@
 13. **Moving a child beam is not allowed**; move the source (this also resets its trace).
 14. **Rendering**: `flen` defaults to 1 m for rays; camera helpers need an `LScene`; GLMakie needs a
     display (`xvfb-run -a` on headless Linux). Without OpenGL, fall back to CairoMakie (`Axis3` only).
+15. **An assembly of separate parts is a group**, not a `MultiShape` object: a `MultiShape` wrapper
+    without `interact3d` stops every ray that hits it. Use `ObjectGroup` or a subtype of
+    `BeamletOptics.AbstractObjectGroup` (`templates/08_custom_group.jl`); only parts that touch and
+    interact as one get a `MultiShape` type with `interact3d` (`components/systems-and-groups.md`).
