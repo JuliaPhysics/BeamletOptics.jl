@@ -144,17 +144,24 @@ const mm = 1e-3
         ys = 0:dy:1.5
         w_analytical = Vector{Float64}(undef, length(ys))
         R_analytical = Vector{Float64}(undef, length(ys))
+        ψ_analytical = Vector{Float64}(undef, length(ys))
         # Propagate using ABCD formalism
-        q0 = 0 + zr * im
+        q_start = 0 + zr * im
+        q0 = q_start
+        M = [1.0 0; 0 1]
         for i in 1:length(ys)
             w_analytical[i] = w_ana(q0, λ)
             R_analytical[i] = R_ana(q0)
+            # Gouy phase collected from the start: argument of A + B / q_start
+            ψ_analytical[i] = angle(M[1, 1] + M[1, 2] / q_start)
             # catch first lens
             if i * dy == lens_y_location
                 q0 = q_ana(q0, lensmaker_ABCD(f))
+                M = lensmaker_ABCD(f) * M
                 continue
             end
             q0 = q_ana(q0, propagate_ABCD(dy))
+            M = propagate_ABCD(dy) * M
         end
 
         # Numerical result
@@ -178,10 +185,10 @@ const mm = 1e-3
         temp = isapprox.(R_analytical, R_numerical, atol = 1e-2)
         @test sum(temp) / length(temp) > 0.95
         @test !any(isnan.(R_numerical))
-        # Compare if Gouy phase zero at waists
+        # Gouy phase zero at the first waist, collected along the beam behind the lens
         w0, i = findmin(w_analytical)
         @test isapprox(ψ_numerical[1], 0, atol = 1mm)
-        @test isapprox(ψ_numerical[i], 0, atol = 1mm)
+        @test maximum(abs, ψ_numerical .- ψ_analytical) < 1e-2
         # Compare calculated waist after lens
         @test isapprox(w0_numerical[i], w0, atol = 1e-7)
 
@@ -283,6 +290,25 @@ end
         pd = detector(250mm)
         system = System([lens(50mm), lens(150mm), pd])
         @test gouy(system, pd, gb()) ≈ gouy(system, pd, agb()) atol = 0.1
+    end
+
+    @testset "gauss_parameters reports the collected phase" begin
+        # the ψ of gauss_parameters is the Gouy phase of the field
+        for y in (70mm, 95mm, 110mm, 200mm)
+            pd = detector(y)
+            beam = gb()
+            ψ_field = gouy(System([lens(50mm), pd]), pd, beam)
+            ψ = rad2deg(BMO.gauss_parameters(beam, y)[3])
+            @test rad2deg(angle(cis(deg2rad(ψ - ψ_field)))) ≈ 0 atol = 1e-6
+        end
+        # as for the astigmatic model, also behind two lenses
+        system = System([lens(50mm), lens(150mm)])
+        g, a = gb(), agb()
+        solve_system!(system, g)
+        solve_system!(system, a)
+        for y in (70mm, 250mm)
+            @test rad2deg(BMO.gauss_parameters(g, y)[3]) ≈ rad2deg(BMO.gauss_parameters(a, y)[5]) atol = 0.1
+        end
     end
 
     @testset "Without a lens" begin

@@ -277,8 +277,10 @@ Calculate the local waist radius and Gouy phase of an unastigmatic Gaussian beam
 
 - `w`: local radius
 - `R`: curvature, i.e. 1/r where r is the radius of curvature
-- `ψ`: Gouy phase relative to the waist of the local segment (note that -atan definition is used).
-  The field of [`electric_field`](@ref) collects the Gouy phase along the whole beam instead.
+- `ψ`: Gouy phase (note that -atan definition is used), collected along the beam from the start
+  of the root beam: continuous at every surface and from a parent beam to its children, i.e. the
+  Gouy phase that [`electric_field`](@ref) contains. The same holds for an
+  [`AstigmaticGaussianBeamlet`](@ref).
 - `w0`: local beam waist radius
 """
 function gauss_parameters(
@@ -286,7 +288,13 @@ function gauss_parameters(
         z::Real;
         hint = point_on_beam(gauss, z)
 )
-    p0, index = hint
+    w, R, ψ, w0 = _local_gauss_parameters(gauss, hint)
+    return (w, R, ψ + _gouy_before(gauss, last(hint)), w0)
+end
+
+# Parameters of `gauss_parameters` at the point `p0` on segment `index` of the chief ray, with the
+# Gouy phase relative to the waist of that segment
+function _local_gauss_parameters(gauss::GaussianBeamlet, (p0, index))
     chief = gauss.chief.rays[index]
     div = gauss.divergence.rays[index]
     waist = gauss.waist.rays[index]
@@ -327,8 +335,8 @@ function gauss_parameters(
     F_kt = sqrt(m_d^2 + m_w^2)
     w = sqrt(y_d^2 + y_w^2)
     R = E_kt / w^2
-    z = E_kt / F_kt^2
-    ψ = -atan(1, √(1 / (R * z) - 1))
+    z_w = E_kt / F_kt^2
+    ψ = -atan(1, √(1 / (R * z_w) - 1))
     w0 = H / (n * F_kt)
     # Catch NaNs and correct Gouy phase sign based on curvature sign
     isnan(R) && (R = zero(R))
@@ -348,7 +356,7 @@ Returns the vectors `(p0, w1, w2)` and scalar waist radii `(w0, w0)`.
 """
 function waist_parameters(gb::GaussianBeamlet, z::Real)
     p0, i = point_on_beam(gb, z)
-    w, _, _, _ = gauss_parameters(gb, z, hint = (p0, i))
+    w, _, _, _ = _local_gauss_parameters(gb, (p0, i))
     chief = rays(gb.chief)[i]
     waist = rays(gb.waist)[i]
     dir = direction(chief)
@@ -364,7 +372,7 @@ function waist_parameters(gb::GaussianBeamlet, z::Real)
     end
     s2 = cross(dir, s1)
     # Get waist size for unification
-    _, _, _, w0 = gauss_parameters(gb, z)
+    _, _, _, w0 = _local_gauss_parameters(gb, (p0, i))
     return p0, w * s1, w * s2, w0, w0
 end
 
@@ -404,8 +412,8 @@ end
 Calculates the electric field phasor [V/m] of the [`GaussianBeamlet`](@ref) at the radial and longitudinal positions `r` and `z`.
 The phase contains the [`optical_path_length`](@ref) from the start of the beam (parents included) up to `z`: within a medium
 of refractive index `n` it advances with the wavenumber `n k₀`, along the beam and across it. The Gouy phase is collected
-along the beam as well, i.e. it is continuous at every surface and from a parent beam to its children, whereas the `ψ` of
-[`gauss_parameters`](@ref) refers to the waist of the local segment.
+along the beam as well, i.e. it is continuous at every surface and from a parent beam to its children, and equals the `ψ`
+of [`gauss_parameters`](@ref).
 
 !!! warning
     Note that `z` and `r` must be specified as cartesian distances. Using the optical path length for `z` can lead to false results.
@@ -416,23 +424,24 @@ function electric_field(gauss::GaussianBeamlet, r, z; hint = point_on_beam(gauss
         _path_excess_before(gauss, index), _gouy_before(gauss, index))
 end
 
-# Gouy phase relative to the local waist at the start and at the end of segment `index`, see `gauss_parameters`
-_local_gouy_start(gauss::GaussianBeamlet{T}, index::Integer) where {T} =
-    gauss_parameters(gauss, zero(T); hint = (position(rays(gauss.chief)[index]), index))[3]
-function _local_gouy_end(gauss::GaussianBeamlet{T}, index::Integer) where {T}
+# Gouy phase relative to the local waist at the start and at the end of segment `index`, see
+# `_local_gauss_parameters`
+_local_gouy_start(gauss::GaussianBeamlet, index::Integer) =
+    _local_gauss_parameters(gauss, (position(rays(gauss.chief)[index]), index))[3]
+function _local_gouy_end(gauss::GaussianBeamlet, index::Integer)
     ray = rays(gauss.chief)[index]
-    return gauss_parameters(gauss, zero(T); hint = (position(ray) + length(ray) * direction(ray), index))[3]
+    return _local_gauss_parameters(gauss, (position(ray) + length(ray) * direction(ray), index))[3]
 end
 
 """
     _gouy_before(gauss::GaussianBeamlet, index)
 
 Gouy phase that the beam (including its parents) has collected in front of segment `index`, as the
-offset between the phase of the field and the `ψ` of [`gauss_parameters`](@ref), which refers to the
-waist of the local segment. The phase on the axis is continuous at a surface, whereas the local waist
-and with it `ψ` changes there, e.g. at a lens. The offset is zero on the first segment of a root beam
-and collects the steps of `ψ` at every surface on the way. A child continues the last segment of its
-parent.
+offset between the collected Gouy phase (the `ψ` of [`gauss_parameters`](@ref)) and the Gouy phase
+relative to the waist of the local segment (`_local_gauss_parameters`). The collected phase is
+continuous at a surface, whereas the local waist and with it the local phase changes there, e.g. at
+a lens. The offset is zero on the first segment of a root beam and collects the steps of the local
+phase at every surface on the way. A child continues the last segment of its parent.
 """
 function _gouy_before(gauss::GaussianBeamlet{T}, index::Integer) where {T}
     p = gauss.parent
@@ -463,7 +472,7 @@ end
 # path and `ψ0` the Gouy phase of the beam in front of the segment (see `_length_before`,
 # `_path_excess_before`, `_gouy_before`).
 function _segment_field(gauss::GaussianBeamlet, r, z, point, index, l0, Δl0, ψ0)
-    w, R, ψ, w0 = gauss_parameters(gauss, z, hint = (point, index))
+    w, R, ψ, w0 = _local_gauss_parameters(gauss, (point, index))
     k0 = wavenumber(wavelength(gauss))
     n = refractive_index(gauss, index)
     # Calculate new local field strength based on E0*w0 = const.
