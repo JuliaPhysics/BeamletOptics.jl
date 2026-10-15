@@ -26,11 +26,27 @@ refractive_index(::AbstractSystem, λ::Real) = 1.0
 Defines the optical interaction between an incoming/outgoing beam/ray of light and an optical element, must return an [`AbstractInteraction`](@ref) or `nothing`.
 The default behavior is that no interaction occurs, i.e. return of `nothing`, which should stop the system tracing procedure.
 Refer to the [`AbstractInteraction`](@ref) typedocs for more information on the return type value.
+
+A [`MultiShape`](@ref) object receives this call for whichever of its parts was hit. Its method
+finds that part, e.g. via `shape(intersection(ray))`, and hands the beam to it, see
+[`CubeBeamsplitter`](@ref). Parts that do not interact as one belong in an
+[`ObjectGroup`](@ref) or another [`AbstractObjectGroup`](@ref) instead, where each part
+interacts on its own.
 """
-function interact3d(::AbstractSystem, ::ObjectType, ::AbstractBeam, ::RayType) where {ObjectType<:AbstractObject, RayType<:AbstractRay}
-    @warn lazy"No interact3d method defined for:" ObjectType RayType
+function interact3d(::AbstractSystem, object::AbstractObject, ::AbstractBeam, ray::AbstractRay)
+    _warn_no_interact3d(shape_trait_of(object), object, ray)
     return nothing
 end
+
+# Warning of the fallback above; for a multi-shape object it names both ways to fix it
+_warn_no_interact3d(::AbstractShapeTrait, object, ray) =
+    @warn lazy"No interact3d method defined for:" ObjectType = typeof(object) RayType = typeof(ray)
+_warn_no_interact3d(::MultiShape, object, ray) = @warn lazy"""
+    No interact3d method defined for the MultiShape object $(nameof(typeof(object))).
+    If its parts interact as one (e.g. cemented, with a Hint across a shared face), define
+    interact3d and hand the beam to the part that was hit, like CubeBeamsplitter.
+    If its parts interact on their own, make it an ObjectGroup or a subtype of
+    AbstractObjectGroup, which needs no interact3d.""" RayType = typeof(ray)
 
 """
     Hint
