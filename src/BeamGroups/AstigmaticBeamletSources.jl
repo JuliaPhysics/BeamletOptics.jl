@@ -84,7 +84,8 @@ adjacent beamlets in the grid.
 - `basis`: Optional reference vector (e.g. `[1,0,0]`) to define the starting azimuthal angle for the source rings.
 - `randomize_axes`: If `true`, the internal principal axes of each individual beamlet are randomly rotated. This averages out numerical artifacts in the far-field focus.
 - `rng`: Random number generator to use for `randomize_axes`.
-- `P0`: Total power of the spherical source in [W].
+- `P0`: Total power of the spherical source in [W]. The beamlets overlap and add coherently in the
+  far field; their fields are scaled such that the superposition carries `P0`.
 - `E0`: Optional Jones vector defining the polarization and phase of the spherical wave.
 
 !!! info "Reproducible sampling"
@@ -115,9 +116,9 @@ function SphericalGaussianBeamletSource(
         throw(ErrorException("Spherical source opening half-angle θ must be < π"))
     end
 
-    # Calculate optimal sub-waist for smooth far-field overlap
-    # Angular spacing between rings:
-    Δθ = θ / num_rings
+    # Calculate optimal sub-waist for smooth far-field overlap, from the angular spacing of the
+    # rings, see θ_NA below
+    Δθ = θ / (num_rings - 1)
     # We want beamlet divergence θ_div = λ / (π * w0s) to be approx overlap * Δθ
     w0s = λ / (π * overlap * Δθ)
 
@@ -126,7 +127,7 @@ function SphericalGaussianBeamletSource(
     b2 = normalize(cross(dir_n, b1))
     θ_NA = LinRange(0, θ, num_rings)
 
-    # Initial ray count for power distribution
+    # Initial ray count for power distribution, normalized for the coherent superposition below
     total_rays = num_rays
     P_sub = P0 / total_rays
 
@@ -139,6 +140,9 @@ function SphericalGaussianBeamletSource(
     # Calculate circumference weights
     ndirs = [rotate3d(b2, step(θ_NA) * i) * dir_n for i in eachindex(θ_NA[2:end])]
     circm = norm.(ndirs .- dot.(ndirs, Ref(dir_n)) .* Ref(dir_n)) .* Ref(2π)
+    # the outermost ring represents only the inner half of its band (trapezoidal rule), such
+    # that every beamlet represents about the same solid angle
+    circm[end] /= 2
     total = sum(circm)
     ds = total / num_rays
 
@@ -170,6 +174,7 @@ function SphericalGaussianBeamletSource(
         end
     end
 
+    _normalize_coherent_power!(beams, λ / (π * w0s))
     return AstigmaticBeamGroup(beams, pos, _group_orientation(dir_n, b1, T))
 end
 
@@ -191,7 +196,8 @@ such as tapered amplifiers or edge-emitting laser diodes.
 - `basis`: Optional reference vector (e.g. `[1,0,0]`) to define the starting azimuthal angle for the source rings.
 - `randomize_axes`: If `true`, the internal principal axes of each individual beamlet are randomly rotated.
 - `rng`: Random number generator to use for `randomize_axes`.
-- `P0`: Total power of the source in [W].
+- `P0`: Total power of the source in [W]. The beamlets overlap and add coherently in the far field;
+  their fields are scaled such that the superposition carries `P0`.
 - `E0`: Optional Jones vector defining the polarization and phase of the wave.
 
 !!! info "Reproducible sampling"
@@ -237,6 +243,7 @@ function EllipticalGaussianBeamletSource(
     tx = tan(θ_x)
     ty = tan(θ_y)
 
+    # Initial ray count for power distribution, normalized for the coherent superposition below
     total_rays = num_rays
     P_sub = P0 / total_rays
 
@@ -257,6 +264,9 @@ function EllipticalGaussianBeamletSource(
         b = ρ * ty
         circm[i] = π * (3*(a+b) - sqrt((3a+b)*(a+3b)))
     end
+    # the outermost ring represents only the inner half of its band (trapezoidal rule), such
+    # that every beamlet represents about the same area of the tangent plane
+    circm[end] /= 2
     
     total_circm = sum(circm)
     ds = total_circm / num_rays
@@ -297,5 +307,31 @@ function EllipticalGaussianBeamletSource(
         end
     end
 
+    _normalize_coherent_power!(beams, λ / (π * w0s))
     return AstigmaticBeamGroup(beams, pos, _group_orientation(dir_n, b1, T))
+end
+
+"""
+    _normalize_coherent_power!(beams, θs)
+
+Scales the fields of `beams`, beamlets that start in phase at one point with the far-field
+divergence `θs` (the 1/e² half angle of the intensity), such that their coherent superposition
+carries the sum of their powers. In the far field the fields of overlapping beamlets add: two
+beamlets of the same power `P` whose directions differ by `δ` contribute `P exp(-δ² / (2θs²))` to
+the power of the superposition per pair, i.e. it carries `P Σᵢⱼ exp(-|dᵢ - dⱼ|² / (2θs²))` instead
+of `N P`. This holds for all beamlets, also at the edge of the source, where fewer neighbors overlap.
+"""
+function _normalize_coherent_power!(beams, θs)
+    dirs = [direction(first(rays(b.c))) for b in beams]
+    cutoff = (8θs)^2
+    S = zero(θs)
+    for i in eachindex(dirs), j in eachindex(dirs)
+        δ2 = sum(abs2, dirs[i] - dirs[j])
+        δ2 < cutoff && (S += exp(-δ2 / (2θs^2)))
+    end
+    scale = sqrt(length(dirs) / S)
+    for b in beams
+        electric_field!(b, electric_field(b) * scale)
+    end
+    return beams
 end

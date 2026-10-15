@@ -184,13 +184,19 @@ end
     _refract_transmitted!(child, ray, dir)
 
 Sets the direction of the transmitted `child` ray of the coating to the refracted direction `dir`.
-For a [`PolarizedRay`](@ref), the field is transformed into the new direction as well.
+For a [`PolarizedRay`](@ref), the field is transformed into the new direction as well, and scaled
+for the medium behind the coating: the coating transmits a fraction of the power, and the power of
+a beam is proportional to `n cos(θ) |E|²`. The refractive index of the `child` must be set before.
 """
 _refract_transmitted!(child::AbstractRay, ::AbstractRay, dir) = direction!(child, dir)
 
 function _refract_transmitted!(child::PolarizedRay, ray::PolarizedRay, dir)
-    P = _calculate_global_E0(direction(ray), dir, normal3d(intersection(ray)), SPBasis(1, 0, 0, 1))
-    polarization!(child, _transverse(P * polarization(child), dir))
+    normal = normal3d(intersection(ray))
+    P = _calculate_global_E0(direction(ray), dir, normal, SPBasis(1, 0, 0, 1))
+    cos_in = abs(dot(direction(ray), normal))
+    cos_out = abs(dot(normalize(dir), normal))
+    scale = sqrt(refractive_index(ray) * cos_in / (refractive_index(child) * cos_out))
+    polarization!(child, scale * _transverse(P * polarization(child), dir))
     direction!(child, dir)
     return nothing
 end
@@ -319,7 +325,7 @@ function interact3d(
         n_target = isentering(agb, id) ? n_optics : n_system
         for (beam, pbeam) in zip(_component_beams(agb.children[1]), _component_beams(agb))
             n_d, _ = refraction3d(rays(pbeam)[id], n_target)
-            direction!(first(rays(beam)), n_d)
+            _refract_transmitted!(first(rays(beam)), rays(pbeam)[id], n_d)
         end
         return nothing
     end

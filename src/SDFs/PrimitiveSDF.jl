@@ -175,9 +175,9 @@ Constructs a ring with `inner_radius` with a `width` and some thickness.
 function RingSDF(inner_radius::R, width::W, thickness::T) where {R, W, T}
     TT = promote_type(R, W, T)
     return RingSDF{TT}(
-        Matrix{T}(I, 3, 3),
-        Matrix{T}(I, 3, 3),
-        zeros(T, 3),
+        Matrix{TT}(I, 3, 3),
+        Matrix{TT}(I, 3, 3),
+        zeros(TT, 3),
         inner_radius + width / 2,
         width / 2,
         thickness / 2)

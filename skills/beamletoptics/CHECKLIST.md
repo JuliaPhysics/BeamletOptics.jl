@@ -39,6 +39,8 @@
    radii and diameter, the constructor throws ("cylinder section length ≤ 0"): increase `l` or reduce `d`.
 7. **`Mirror`s reflect on every face**, including the back and edges.
 8. **Polarized refraction** traces only the refracted ray (no ghost reflections); no coatings are modeled.
+   The refracted field carries the Fresnel transmission: a `PolarizedRay` or an `AstigmaticGaussianBeamlet`
+   loses about 4 % of its power per uncoated surface (n = 1.5), a `GaussianBeamlet` nothing.
 9. **Doublets/triplets** assume flush cemented contact; only spherical menisci are supported;
    aspheres are experimental.
 10. **Resonators** (facing mirrors, cavities) need a bounded `r_max`/`depth_max`.
@@ -48,3 +50,7 @@
 13. **Moving a child beam is not allowed**; move the source (this also resets its trace).
 14. **Rendering**: `flen` defaults to 1 m for rays; camera helpers need an `LScene`; GLMakie needs a
     display (`xvfb-run -a` on headless Linux). Without OpenGL, fall back to CairoMakie (`Axis3` only).
+15. **An assembly of separate parts is a group**, not a `MultiShape` object: a `MultiShape` wrapper
+    without `interact3d` stops every ray that hits it. Use `ObjectGroup` or a subtype of
+    `BeamletOptics.AbstractObjectGroup` (`templates/08_custom_group.jl`); only parts that touch and
+    interact as one get a `MultiShape` type with `interact3d` (`components/systems-and-groups.md`).

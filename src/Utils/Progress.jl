@@ -135,7 +135,11 @@ Report a tick of `p`. To an `IO`, the bar is drawn lazily (threshold and redraw 
 """
 @inline function _report!(::IO, p::_LazyProgress)
     time() < p.tnext[] && return nothing
-    return _draw!(p)
+    # Drawing prints to an `IO` of unknown type. Behind `invokelatest`, the compiled loops do not
+    # depend on `print`, whose methods other packages extend, e.g. Makie: loading them would
+    # invalidate every loop with a progress bar.
+    Base.invokelatest(_draw!, p)
+    return nothing
 end
 
 @inline function _report!(s::ProgressSink, ::_LazyProgress)
@@ -212,7 +216,8 @@ end
 function _stop!(p::_LazyProgress, stop)
     lock(p.lock) do
         p.tnext[] = Inf
-        isnothing(p.bar) || stop(p.bar)
+        # behind `invokelatest` for the reason given in `_report!`
+        isnothing(p.bar) || Base.invokelatest(stop, p.bar)
     end
     return nothing
 end

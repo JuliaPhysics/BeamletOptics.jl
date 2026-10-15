@@ -33,7 +33,7 @@ Use `scripts/api_lookup.jl NAME` to print the docstring and signatures of any na
 | Category      | Names |
 |---------------|-------|
 | Kinematics    | `translate3d!`, `translate_to3d!`, `rotate3d!`, `xrotate3d!`, `yrotate3d!`, `zrotate3d!`, `align3d!`, `reset_translation3d!`, `reset_rotation3d!`, `set_pivot3d!`, `position`, `direction`, `orientation` |
-| Rays & beams  | `Ray`, `PolarizedRay`, `Beam`, `GaussianBeamlet`, `AstigmaticGaussianBeamlet`, `rays`, `point_on_beam`, `rayleigh_range`, `normal3d` |
+| Rays & beams  | `Ray`, `PolarizedRay`, `Beam`, `GaussianBeamlet`, `AstigmaticGaussianBeamlet`, `rays`, `point_on_beam`, `path_segments`, `rayleigh_range`, `normal3d` |
 | Sources       | `CollimatedSource`, `UniformDiscSource`, `PointSource`, `UniformPointSource`, `UniformLineSource`, `UniformFanSource`, `set_num_rays!`, `CollimatedGaussianBeamletSource`, `SphericalGaussianBeamletSource`, `EllipticalGaussianBeamletSource`, `GaussianBeamletDecomposition`, `WavefrontBeamletDecomposition`, `GaussianModeDecomposition`, `AstigmaticBeamGroup` |
 | System        | `System`, `StaticSystem`, `solve_system!`, `initialize!`, `ObjectGroup` |
 | Inspection    | `properties`, `default_properties` |
@@ -102,6 +102,7 @@ initialize!(system)   # empties all detectors of the system (nested groups inclu
 | `length(beam)`                    | geometric path length up to the last intersection |
 | `BeamletOptics.optical_path_length(beam)` | optical path length |
 | `point_on_beam(beam, t)`          | `(point, ray_index)` at distance `t` along the beam |
+| `path_segments(beam; flen = 1.0)` | flat vector of `(start, stop, s_start, s_stop, opl_start, opl_stop, λ, depth, parent, beam_index, ray_index, final, leaf, object)` for the whole beam tree (chief ray of beamlets, all beams of a group); path lengths accumulate from the source, children continue at their parent's end, a final ray without intersection is `flen` long and has `final = true`; `leaf = true` marks the last segment of a branch (a final ray, or a ray that ends on e.g. a detector); `object` is the object hit at the end of the segment (`nothing` for a final segment) |
 | `beam.children`                   | sub-beams after a split, `[transmitted, reflected]` |
 | `last(rays(beam)).E0`             | field vector of a polarized beam's last segment |
 | `gauss_parameters(g, z)`          | `(w, R, ψ, w0)` for `GaussianBeamlet`; `z` scalar or vector |

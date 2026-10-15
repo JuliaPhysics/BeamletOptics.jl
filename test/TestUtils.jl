@@ -14,6 +14,8 @@ const BMO = BeamletOptics
             k = BMO.normal3d(v)
             @test dot(v, k)≈0 atol=2e-14
             @test norm(k) ≈ 1
+            # an uninferred result spreads to the constructors of beamlets and sources
+            @test (@inferred BMO.normal3d(v)) isa Vector{Float64}
         end
 
         @testset "normal3d(v) with Point3" begin

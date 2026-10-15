@@ -7,8 +7,8 @@ Live rendering of objects and systems, see the render handle protocol in `src/Re
 """
     ObjectRenderHandle <: AbstractObjectRenderHandle
 
-Live rendering handle of an `AbstractObject`, see [`live_render!`](@ref), or of anything with a pose
-that is drawn by a function, see `live_render!(draw, ax, x)`.
+Live rendering handle of an `AbstractObject` or an object group, see [`live_render!`](@ref), or of
+anything with a pose that is drawn by a function, see `live_render!(draw, ax, x)`.
 
 The plots are generated once by the `draw` function in the reference pose `P0`, `R0` of the object.
 Afterwards, the rigid transformation from the reference pose to the current pose is applied as the
@@ -23,7 +23,7 @@ mutable struct ObjectRenderHandle{O} <: AbstractObjectRenderHandle
     # reference pose
     P0::Point3{Float64}
     R0::Matrix{Float64}
-    # reference poses of the MultiShape subparts
+    # reference poses of the subparts, see `_rigid_parts`
     subP0::Vector{Point3{Float64}}
     subR0::Vector{Matrix{Float64}}
     # last rendered pose
@@ -50,11 +50,21 @@ function _direction_frame(d)
     return hcat(x, y, cross(x, y))
 end
 
-function _subposes(obj)
-    (obj isa BMO.AbstractObject && BMO.shape_trait_of(obj) isa BMO.MultiShape) ||
-        return Point3{Float64}[], Matrix{Float64}[]
-    parts = BMO.shape(obj)
-    return [_pose(p)[1] for p in parts], [_pose(p)[2] for p in parts]
+"""
+    _rigid_parts(x)
+
+Returns the subparts of `x` that can be moved on their own, i.e. the parts of a `MultiShape` object
+or the objects of an object group. Anything else has none.
+"""
+_rigid_parts(::Any) = ()
+_rigid_parts(obj::BMO.AbstractObject) = _rigid_parts(BMO.shape_trait_of(obj), obj)
+_rigid_parts(::BMO.AbstractShapeTrait, obj) = ()
+_rigid_parts(::BMO.MultiShape, obj) = BMO.shape(obj)
+_rigid_parts(group::BMO.AbstractObjectGroup) = BMO.objects(group)
+
+function _subposes(x)
+    parts = _rigid_parts(x)
+    return Point3{Float64}[_pose(p)[1] for p in parts], Matrix{Float64}[_pose(p)[2] for p in parts]
 end
 
 """Returns the plots that are added to the `ax` by `f()`."""
@@ -72,6 +82,17 @@ Renders the `obj` via [`render!`](@ref) and returns an `ObjectRenderHandle`. Kin
 """
 function live_render!(ax::_RenderEnv, obj::BMO.AbstractObject; kwargs...)
     return live_render!(() -> render!(ax, obj; kwargs...), ax, obj)
+end
+
+"""
+    live_render!(ax, group::AbstractObjectGroup; kwargs...)
+
+Renders the `group` via [`render!`](@ref) and returns one `ObjectRenderHandle` for the whole group.
+If an object of the group is moved on its own, the group is rendered again by
+[`update_render!`](@ref).
+"""
+function live_render!(ax::_RenderEnv, group::BMO.AbstractObjectGroup; kwargs...)
+    return live_render!(() -> render!(ax, group; kwargs...), ax, group)
 end
 
 """
@@ -125,11 +146,12 @@ end
 """
     _is_rigid(h::ObjectRenderHandle; atol = 1e-6, rtol = 1e-6)
 
-Checks if all subparts of a `MultiShape` object still match a rigid motion of the whole object.
+Checks if all subparts of a `MultiShape` object or of an object group still match a rigid motion
+of the whole.
 """
 function _is_rigid(h::ObjectRenderHandle; atol = 1e-6, rtol = 1e-6)
     isempty(h.subP0) && return true
-    parts = BMO.shape(h.obj)
+    parts = _rigid_parts(h.obj)
     length(parts) != length(h.subP0) && return false
     P, R = _pose(h.obj)
     Rd = R * h.R0'
@@ -155,8 +177,8 @@ end
 """
     update_render!(h::ObjectRenderHandle)
 
-Applies the current pose of the object to its plots. If the subparts of a `MultiShape` object have
-not been moved rigidly, the object is rendered again.
+Applies the current pose of the object to its plots. If the subparts of a `MultiShape` object or of
+an object group have not been moved rigidly, the object is rendered again.
 """
 function update_render!(h::ObjectRenderHandle)
     # The pose of a MultiShape object is the pose of its first part, hence check the other parts first
@@ -210,7 +232,7 @@ mutable struct SystemRenderHandle{S <: BMO.AbstractSystem} <: AbstractSystemRend
     ax::_RenderEnv
     sys::S
     handles::Vector{AbstractObjectRenderHandle}
-    parent::IdDict{BMO.AbstractObject, BMO.AbstractObject}
+    parent::IdDict{BMO.ObjectOrGroup, BMO.AbstractObjectGroup}
 end
 
 function Base.show(io::IO, h::SystemRenderHandle)
@@ -241,7 +263,7 @@ object, such that each object of a group can be moved on its own without renderi
 """
 function live_render!(ax::_RenderEnv, sys::BMO.AbstractSystem; kwargs...)
     handles = AbstractObjectRenderHandle[]
-    parent = IdDict{BMO.AbstractObject, BMO.AbstractObject}()
+    parent = IdDict{BMO.ObjectOrGroup, BMO.AbstractObjectGroup}()
     # Avoid use of objects(sys), which flattens the groups
     foreach(obj -> _live_render_leaves!(handles, parent, ax, obj; kwargs...), sys.objects)
     return SystemRenderHandle(ax, sys, handles, parent)
@@ -257,7 +279,7 @@ function _live_render_leaves!(handles, parent, ax::_RenderEnv, obj::BMO.Abstract
 end
 
 function _live_render_leaves!(handles, parent, ax::_RenderEnv, group::BMO.AbstractObjectGroup; kwargs...)
-    for child in BMO.shape(group)
+    for child in BMO.objects(group)
         parent[child] = group
         _live_render_leaves!(handles, parent, ax, child; kwargs...)
     end
@@ -265,13 +287,13 @@ function _live_render_leaves!(handles, parent, ax::_RenderEnv, group::BMO.Abstra
 end
 
 """
-    live_render!(h::SystemRenderHandle, obj::AbstractObject; kwargs...)
+    live_render!(h::SystemRenderHandle, obj; kwargs...)
 
-Live-renders `obj` into the axis of `h` and adds its object handles to `h`, see
-[`live_render!`](@ref). Returns the new object handles. If an object of `obj` can not be rendered,
+Live-renders `obj`, an object or object group, into the axis of `h` and adds its object handles to
+`h`, see [`live_render!`](@ref). Returns the new object handles. If an object of `obj` can not be rendered,
 `h` and its axis are left as they were.
 """
-function live_render!(h::SystemRenderHandle, obj::BMO.AbstractObject; kwargs...)
+function live_render!(h::SystemRenderHandle, obj::BMO.ObjectOrGroup; kwargs...)
     for leaf in BMO.Leaves(obj)
         any(oh -> rendered(oh) === leaf, h.handles) && throw(ArgumentError(
             "the $(nameof(typeof(leaf))) is already rendered by the system handle"))
@@ -291,8 +313,8 @@ function live_render!(h::SystemRenderHandle, obj::BMO.AbstractObject; kwargs...)
 end
 
 # Also forgets the hierarchy of the groups of `obj`
-function remove_render!(h::SystemRenderHandle, obj::BMO.AbstractObject)
-    invoke(remove_render!, Tuple{AbstractSystemRenderHandle, BMO.AbstractObject}, h, obj)
+function remove_render!(h::SystemRenderHandle, obj::BMO.ObjectOrGroup)
+    invoke(remove_render!, Tuple{AbstractSystemRenderHandle, BMO.ObjectOrGroup}, h, obj)
     foreach(o -> delete!(h.parent, o), BMO.PreOrderDFS(obj))
     return nothing
 end

@@ -80,7 +80,12 @@ const BMO = BeamletOptics
                 rays_per_angle[i] = count(_required .≈ angles)
             end
             @test first(rays_per_angle) == 1
-            @test is_strictly_sorted(rays_per_angle)
+            @test is_strictly_sorted(rays_per_angle[1:end-1])
+            # the rays per cone in proportion to the solid angle it represents, i.e. to sin θ, half
+            # of it for the outermost cone (trapezoidal rule)
+            weights = sin.(required_angles[2:end])
+            weights[end] /= 2
+            @test rays_per_angle[2:end] ./ sum(rays_per_angle[2:end]) ≈ weights ./ sum(weights) atol = 2e-3
             # Test if all generated rays are unique
             @test length(unique(directions)) == length(directions)
         end
@@ -161,7 +166,12 @@ const BMO = BeamletOptics
                 rays_per_radius[i] = count(_required .≈ radii)
             end
             @test first(rays_per_radius) == 1
-            @test is_strictly_sorted(rays_per_radius)
+            @test is_strictly_sorted(rays_per_radius[1:end-1])
+            # the rays per ring in proportion to the area it represents, i.e. to its radius, half
+            # of it for the ring on the edge (trapezoidal rule)
+            weights = collect(required_pos[2:end])
+            weights[end] /= 2
+            @test rays_per_radius[2:end] ./ sum(rays_per_radius[2:end]) ≈ weights ./ sum(weights) atol = 5e-3
             # Test if all generated rays are unique
             @test length(unique(positions)) == length(positions)
         end
@@ -612,6 +622,32 @@ const BMO = BeamletOptics
         @test position(source) == pos
         @test BMO.orientation(source) == R
     end
+end
+
+@testset "Ring sampling represents equal areas and solid angles" begin
+    mm = 1e-3
+    mean_point(pts) = sum(pts) / length(pts)
+    # the RMS spot behind a plano-convex lens, which weights every ray equally: the rings agree
+    # with the equal-area sunflower sampling, in contrast to rays per ring in proportion to the
+    # circumference, which weight the edge twice and gave +4 % here
+    lens = SphericalLens(50mm, Inf, 5mm, 25mm, _ -> 1.5)
+    function rms_spot(source)
+        pd = Detector(30mm)
+        translate3d!(pd, [0, 95mm, 0])
+        solve_system!(System([lens, pd]), source; progress = false)
+        pts = spot_diagram(pd)
+        c = mean_point(pts)
+        return sqrt(sum(p -> sum(abs2, p - c), pts) / length(pts))
+    end
+    rings = rms_spot(CollimatedSource([0.0, -20mm, 0], [0.0, 1, 0], 20mm, 1e-6; num_rings = 10, num_rays = 1000))
+    reference = rms_spot(UniformDiscSource([0.0, -20mm, 0], [0.0, 1, 0], 20mm, 1e-6; num_rays = 20_000))
+    @test rings ≈ reference rtol = 1e-2
+    # the fraction of the rays of a point source within half its spread angle equals the fraction
+    # of the solid angle
+    θ = 0.3
+    ps = PointSource([0.0, 0, 0], [0.0, 1, 0], sin(θ), 1e-6; num_rings = 20, num_rays = 4000)
+    angles = [acos(clamp(BMO.direction(first(BMO.rays(b)))[2], -1, 1)) for b in BMO.beams(ps)]
+    @test count(≤(θ / 2 + 1e-9), angles) / length(angles) ≈ (1 - cos(θ / 2)) / (1 - cos(θ)) rtol = 3e-2
 end
 
 end # MODULE

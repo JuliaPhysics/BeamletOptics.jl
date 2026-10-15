@@ -1,4 +1,4 @@
-# Smoke-test the headless templates (01-06) against the active BeamletOptics environment.
+# Smoke-test the headless templates (all but 07) against the active BeamletOptics environment.
 #
 #   julia --project=<env with BeamletOptics> scripts/run_templates.jl
 #

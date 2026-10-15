@@ -24,7 +24,7 @@ Detector(edge_length, stop = true)
 Grid keywords:
 
 - `n = 100`: grid points per axis
-- `crop_factor = 1`: enlarges the automatic window around the hits
+- `crop_factor`: scales the automatic window around the hits; default `1` for rays (box around the hit points) and `3` for beamlets (three beam radii around each hit)
 - `center = Centroid()` or `MinMax()`: how the automatic window is centered
 - `x_min, x_max, z_min, z_max`: explicit window in local coordinates (m)
 - `x0_shift, z0_shift`: shift the window

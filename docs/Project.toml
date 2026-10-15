@@ -13,7 +13,7 @@ OpticsBase = "0a174593-c395-4975-8599-97e6c4e949e6"
 path = ".."
 
 [compat]
-BeamletOptics = "0.14"
+BeamletOptics = "0.14, 0.13"
 CairoMakie = "0.15"
 Documenter = "1.11"
 DocumenterCitations = "1.5"
