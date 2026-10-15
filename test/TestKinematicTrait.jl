@@ -262,6 +262,8 @@ end
         set_pivot3d!(g_static, [1.0, 2.0, 3.0])
         @test position(g_static) == [1.0, 2.0, 3.0]
         @test all(position(o) == zeros(3) for o in BMO.objects(g_static))
+        # a static group lists its position like a static object
+        @test properties(g_static) == ["Type" => "ObjectGroup", "Position [m]" => [1.0, 2.0, 3.0], "Parts" => 2]
     end
 
     @testset "Primitive fallback" begin

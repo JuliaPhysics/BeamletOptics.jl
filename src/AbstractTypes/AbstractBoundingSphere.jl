@@ -153,8 +153,9 @@ SingleBoundingSphere(::AbstractShape, sphere::NoBoundingSphere) = sphere
 """
     bounding_sphere_of(shape::AbstractShape)
     bounding_sphere_of(object::AbstractObject)
+    bounding_sphere_of(group::AbstractObjectGroup)
 
-Computes a sphere that encloses the `shape` or `object` in its current pose and returns it as a
+Computes a sphere that encloses the `shape`, `object` or `group` in its current pose and returns it as a
 [`SingleBoundingSphere`](@ref) or [`MultiBoundingSphere`](@ref), or returns
 [`NoBoundingSphere`](@ref)`()` if there is none.
 
@@ -193,6 +194,8 @@ bounding_sphere_of(::SingleShape, object::AbstractObject) = bounding_sphere_of(s
 function bounding_sphere_of(::MultiShape, object::AbstractObject)
     return MultiBoundingSphere(map(bounding_sphere_of, shape(object)))
 end
+
+bounding_sphere_of(group::AbstractObjectGroup) = MultiBoundingSphere(map(bounding_sphere_of, objects(group)))
 
 """
     bounding_box(sphere::AbstractBoundingSphere)
@@ -284,6 +287,11 @@ function _register!(table::BoundingSphereTable, ::MultiShape, object::AbstractOb
     # the spheres of the parts are computed once and reused for the sphere around them
     parts = map(part -> _register!(table, part), shape(object))
     return _store!(table, object, MultiBoundingSphere(parts))
+end
+
+function _register!(table::BoundingSphereTable, group::AbstractObjectGroup)
+    parts = map(part -> _register!(table, part), objects(group))
+    return _store!(table, group, MultiBoundingSphere(parts))
 end
 
 # Center and radius of the `sphere` as the table holds them: as `Float64`, with the radius enlarged

@@ -30,6 +30,7 @@ end
 shapes(obj) = shapes(BMO.shape_trait_of(obj), obj)
 shapes(::BMO.SingleShape, obj) = Any[BMO.shape(obj)]
 shapes(::BMO.MultiShape, obj) = reduce(vcat, (shapes(part) for part in BMO.shape(obj)); init = Any[])
+shapes(group::BMO.AbstractObjectGroup) = reduce(vcat, (shapes(part) for part in BMO.objects(group)); init = Any[])
 shapes(sys::System) = reduce(vcat, (shapes(obj) for obj in sys.objects); init = Any[])
 
 # The sphere of a shape. While shape types may still return a tuple (center_local, radius), convert it.
@@ -51,6 +52,10 @@ function all_spheres(::BMO.MultiShape, obj)
     parts = reduce(vcat, (all_spheres(part) for part in BMO.shape(obj)); init = Any[])
     return push!(parts, BMO.bounding_sphere_of(obj))
 end
+function all_spheres(group::BMO.AbstractObjectGroup)
+    parts = reduce(vcat, (all_spheres(part) for part in BMO.objects(group)); init = Any[])
+    return push!(parts, BMO.bounding_sphere_of(group))
+end
 all_spheres(sys::System) = reduce(vcat, (all_spheres(obj) for obj in sys.objects); init = Any[])
 
 """Returns the main spheres of `x` that are drawn: those of objects with several parts, also nested ones."""
@@ -61,6 +66,10 @@ all_main_spheres(::BMO.SingleShape, obj) = Any[]
 function all_main_spheres(::BMO.MultiShape, obj)
     parts = reduce(vcat, (all_main_spheres(part) for part in BMO.shape(obj)); init = Any[])
     return push!(parts, BMO.bounding_sphere_of(obj))
+end
+function all_main_spheres(group::BMO.AbstractObjectGroup)
+    parts = reduce(vcat, (all_main_spheres(part) for part in BMO.objects(group)); init = Any[])
+    return push!(parts, BMO.bounding_sphere_of(group))
 end
 all_main_spheres(sys::System) = reduce(vcat, (all_main_spheres(obj) for obj in sys.objects); init = Any[])
 

@@ -5,22 +5,23 @@ A container storing the optical elements of, i.e. a camera lens or lab setup.
 
 # Fields
 
-- `objects`: vector containing the different objects that are part of the system (subtypes of [`AbstractObject`](@ref)).
+- `objects`: vector containing the different objects (subtypes of [`AbstractObject`](@ref)) and object groups
+  (subtypes of [`AbstractObjectGroup`](@ref)) that are part of the system.
   The constructor copies the vector it is given, such that `push!` and `delete!` of the system do not change it.
 """
 struct System <: AbstractSystem
-    objects::Vector{AbstractObject}
-    System(objects::AbstractVector) = new(collect(AbstractObject, objects))
+    objects::Vector{ObjectOrGroup}
+    System(objects::AbstractVector) = new(collect(ObjectOrGroup, objects))
 end
 
-System(object::AbstractObject) = System([object])
+System(object::ObjectOrGroup) = System([object])
 
 """
     System()
 
 Creates an empty system, to which objects are added via `push!`.
 """
-System() = System(AbstractObject[])
+System() = System(ObjectOrGroup[])
 
 # `Leaves` of an empty vector is the vector itself, which is no object
 """
@@ -35,7 +36,7 @@ objects(system::System) = isempty(system.objects) ? () : Leaves(system.objects)
 _is_leaf_of(obj, leaves) = any(leaf -> leaf === obj, leaves)
 
 """
-    push!(system::System, objects::AbstractObject...) -> system
+    push!(system::System, objects::ObjectOrGroup...) -> system
 
 Adds the `objects` (or object groups) at the top level of the `system`, such that they are traced
 by the following calls of [`solve_system!`](@ref). An object that is already part of the `system`,
@@ -44,7 +45,7 @@ directly or within a group, throws an `ArgumentError`; in this case nothing is a
 Beams and beam groups that were solved before do not know the new object: solve them again with
 `solve_system!(system, beam)`. The `system` must not be changed while it is being solved.
 """
-function Base.push!(system::System, objs::AbstractObject...)
+function Base.push!(system::System, objs::ObjectOrGroup...)
     leaves = AbstractObject[o for o in objects(system)]
     for obj in objs, leaf in Leaves(obj)
         _is_leaf_of(leaf, leaves) && throw(ArgumentError(
@@ -56,7 +57,7 @@ function Base.push!(system::System, objs::AbstractObject...)
 end
 
 """
-    pop!(system::System) -> AbstractObject
+    pop!(system::System) -> ObjectOrGroup
 
 Removes the last top-level object (or object group) of the `system` and returns it. Beams that
 were solved before must be solved again, see `delete!(system, object)`.
@@ -64,7 +65,7 @@ were solved before must be solved again, see `delete!(system, object)`.
 Base.pop!(system::System) = pop!(system.objects)
 
 """
-    popat!(system::System, i::Integer) -> AbstractObject
+    popat!(system::System, i::Integer) -> ObjectOrGroup
 
 Removes the `i`-th top-level object (or object group) of the `system` and returns it. The index
 counts the objects and groups as they were added, a group counts as one. An index out of bounds
@@ -74,7 +75,7 @@ throws a `BoundsError`. Beams that were solved before must be solved again, see
 Base.popat!(system::System, i::Integer) = popat!(system.objects, i)
 
 """
-    delete!(system::System, object::AbstractObject) -> system
+    delete!(system::System, object::ObjectOrGroup) -> system
 
 Removes the top-level `object` (or object group) from the `system`, compared by identity. Nothing
 happens for an `object` that is not part of the `system`. An object within a group can not be
@@ -83,7 +84,7 @@ removed on its own and throws an `ArgumentError`: remove the group instead.
 Beams and beam groups that were solved before still end on the removed object: solve them again
 with `solve_system!(system, beam)`. The `system` must not be changed while it is being solved.
 """
-function Base.delete!(system::System, obj::AbstractObject)
+function Base.delete!(system::System, obj::ObjectOrGroup)
     i = findfirst(o -> o === obj, system.objects)
     if isnothing(i)
         for top in system.objects
@@ -114,9 +115,9 @@ can be added or removed after construction but it allows for more performant ray
 struct StaticSystem{T <: Tuple} <: AbstractSystem
     objects::T
 end
-StaticSystem(object::AbstractObject) = StaticSystem((object))
-StaticSystem(object::AbstractObjectGroup) = StaticSystem([object])
-function StaticSystem(objects::AbstractArray{<:AbstractObject})
+StaticSystem(object::ObjectOrGroup) = StaticSystem([object])
+# No bound on the element type: a vector of objects and groups has the element type `Any`
+function StaticSystem(objects::AbstractArray)
     StaticSystem(tuple(collect(Leaves(objects))...))
 end
 
@@ -468,12 +469,7 @@ function solve_system!(
     return nothing
 end
 
-function AbstractTrees.printnode(io::IO, node::B; kw...) where {B <: AbstractObject}
-    show(io, node)
-end
-function AbstractTrees.printnode(io::IO,
-        node::B;
-        kw...) where {B <: AbstractObjectGroup}
+function AbstractTrees.printnode(io::IO, node::ObjectOrGroup; kw...)
     show(io, node)
 end
 

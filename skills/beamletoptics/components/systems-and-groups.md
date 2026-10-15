@@ -38,6 +38,9 @@ tracing has run for `get_progress_threshold()` s (default 5 s).
 group = ObjectGroup([lens1, lens2, mount])   # members may be objects or other groups
 ```
 
+- An `ObjectGroup` is a kinematic container: each member is traced and interacts on its own. Read
+  the members with `BeamletOptics.objects(group)`. A component whose parts interact as one (e.g. a
+  cemented doublet) is an `AbstractObject` subtype with the `MultiShape` trait.
 - `position(group)` is the group `center`. It starts at the **origin**, not at the centroid;
   `orientation(group)` starts as identity.
 - `translate3d!(group, Δ)` moves all members and the center.
@@ -53,3 +56,23 @@ periscope = ObjectGroup([m1, m2])
 set_pivot3d!(periscope, [0, 0, 50mm])
 zrotate3d!(periscope, deg2rad(10))
 ```
+
+## Assemblies: group or one multi-shape object
+
+Decide by whether the parts touch:
+
+| Parts of the assembly | Use | `interact3d` |
+|---|---|---|
+| separate, with air between them (telescope, periscope, lens group, arm with mounts) | `ObjectGroup`, or an own subtype of `BeamletOptics.AbstractObjectGroup` | none: each part interacts on its own |
+| touching and interacting as one (cemented, a `Hint` across a shared face, a shared medium) | an `AbstractObject` subtype with `shape_trait_of(::T) = MultiShape()` | required, for every beam model it must support |
+
+- An own group type gives named parts and an own constructor. It needs the fields `objects`,
+  `center::Point3{T}` and `dir::SMatrix{3,3,T,9}`, is a `mutable struct`, and its constructor
+  checks `allequal(BeamletOptics.is_static, objects)`. Moving, `set_pivot3d!`, systems and rendering
+  work as for an `ObjectGroup`. See `templates/08_custom_group.jl`.
+- Never wrap separate parts in a `MultiShape` object without `interact3d`: the solver hands every
+  hit to the wrapper, finds no method, warns `No interact3d method defined` and stops the ray.
+- A `MultiShape` object finds the part that was hit via `shape(intersection(ray))` and forwards to
+  it (see `CubeBeamsplitter`, `DoubletLens`). Beamlets reach this ray method through their generic
+  `interact3d(system, obj, beamlet, id::Int)`, once per ray of the beamlet. If a part has its own
+  beamlet method (detectors, beamsplitters), the object needs a beamlet method that forwards to it.
