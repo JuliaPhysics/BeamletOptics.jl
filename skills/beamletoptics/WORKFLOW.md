@@ -43,7 +43,8 @@ for y in ys
 end
 ```
 
-- Read everything you need from a detector **before** moving anything or solving again (hits reference beam state).
+- Hits are copies: solving again or moving a source or another component does not change the stored hits.
+  They are evaluated in the current pose of the detector, so read what you need **before** moving the detector itself.
 - See `templates/01_singlet_spot_diagram.jl` (focus scan) and `templates/04_michelson_scan.jl` (fringes).
 
 ## Interferometers and coherent sums

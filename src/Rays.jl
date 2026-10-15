@@ -43,3 +43,19 @@ function Ray(pos::AbstractArray{P},
         F(λ),
         F(1))
 end
+
+"""
+    detached_copy(ray)
+
+Returns a copy of the `ray` that shares no mutable state with it, i.e. a later change of the
+`ray`, e.g. by a new solve or a move of its beam, does not change the copy. The copy shares the
+[`Intersection`](@ref) of the `ray`: an intersection is not changed after the tracing step that
+computes it, a new solve replaces it.
+
+Detector hits store such copies, since [`solve_system!`](@ref) reuses the beam, its first ray and
+its vector of rays in the next solve. See also `detached_copy(beam, n)`.
+"""
+function detached_copy(ray::Ray{T}) where {T}
+    return Ray{T}(position(ray), direction(ray), intersection(ray),
+        wavelength(ray), refractive_index(ray))
+end

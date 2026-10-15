@@ -40,8 +40,10 @@ const _PREFIX = "BeamletOptics/OpticsBase extension"
         origin = BeamletOptics.position(detector), axes = <default detector frame, see below>)
 
 Samples the coherent field of the beamlets hitting a BeamletOptics (BMO) `Detector` into
-an [`OpticsBase.PlaneField`](https://StackEnjoyer.github.io/OpticsBase.jl/dev/). Call it after `solve_system!` and before moving any object, solving again or
-emptying the detector. Requires `using OpticsBase` (package extension).
+an [`OpticsBase.PlaneField`](https://StackEnjoyer.github.io/OpticsBase.jl/dev/). Call it after `solve_system!`. The hits are
+copies that a later solve does not change, but the default `origin` and `axes` follow the current
+pose of the detector: call it before moving the detector. Requires `using OpticsBase` (package
+extension).
 
 # Arguments
 

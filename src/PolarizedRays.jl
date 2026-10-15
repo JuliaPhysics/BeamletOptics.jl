@@ -112,6 +112,11 @@ function PolarizedRay(
     )
 end
 
+function detached_copy(ray::PolarizedRay{T}) where {T}
+    return PolarizedRay{T}(position(ray), direction(ray), intersection(ray),
+        wavelength(ray), refractive_index(ray), polarization(ray))
+end
+
 abstract type AbstractJonesMatrix{T} <: AbstractMatrix{T} end
 
 # Required methods for AbstractArray

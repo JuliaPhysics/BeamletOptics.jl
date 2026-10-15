@@ -330,6 +330,62 @@ end
     end
 end
 
+@testset "A new solve does not change the stored hits" begin
+    # The hits of a solve stay as they were when the same beam is solved again without
+    # initializing, i.e. the hits keep no reference to the traced, live beam.
+    E0 = [1.0, 0, 0]
+    beams = (
+        "Beam" => () -> Beam([0.0, 0, 0], [0.0, 1, 0], 1e-6),
+        "Beam of PolarizedRays" => () -> Beam([0.0, 0, 0], [0.0, 1, 0], 1e-6, E0),
+        "GaussianBeamlet" => () -> GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], 1e-6, 1mm),
+        "AstigmaticGaussianBeamlet" => () -> AstigmaticGaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], 1e-6, 1mm))
+    # what a hit holds, also the field of a beamlet hit near its hit point
+    record(h::BMO.AbstractRayHit) = (BMO.hit_point(h), BMO.position(h), BMO.direction(h),
+        BMO.projection_factor(h), BMO.optical_path_length(h))
+    function record(h::BMO.AbstractBeamletHit)
+        p = BMO.hit_point(h)
+        return (p, BMO.position(h), BMO.direction(h), BMO.projection_factor(h),
+            BMO.beamlet_hit_field(h, p), BMO.beamlet_hit_field(h, p + [0.3mm, 0, 0.2mm]))
+    end
+    # the hit is on the first ray, on the second ray behind a mirror, or on a child beam
+    for (label, beam) in beams, path in (:direct, :mirror, :splitter)
+        @testset "$label, $path" begin
+            pd = Detector(20mm)
+            system = System([pd])
+            if path === :mirror
+                m = RoundPlanoMirror(30mm, 5mm)
+                zrotate3d!(m, deg2rad(45))
+                translate3d!(m, [0, 50mm, 0])
+                zrotate3d!(pd, deg2rad(90))
+                translate3d!(pd, [100mm, 50mm, 0])
+                push!(system, m)
+            else
+                translate3d!(pd, [0, 150mm, 0])
+            end
+            if path === :splitter
+                bs = ThinBeamsplitter(30mm)
+                zrotate3d!(bs, deg2rad(45))
+                translate3d!(bs, [0, 50mm, 0])
+                push!(system, bs)
+            end
+            b = beam()
+            solve_system!(system, b)
+            @test BMO.hit_count(pd) == 1
+            before = record(only(BMO.hits(pd)))
+            # move the source and the mirror or splitter, the beam still hits the detector
+            translate3d!(b, [0, 0, 0.5mm])
+            path === :mirror && translate3d!(m, [5mm, 0, 0])
+            path === :splitter && translate3d!(bs, [0, 10mm, 0])
+            solve_system!(system, b)
+            @test BMO.hit_count(pd) == 2
+            after = record(first(BMO.hits(pd)))
+            @test all(map(isequal, before, after))
+            # the new hit is where the moved beam is
+            @test BMO.hit_point(last(BMO.hits(pd)))[3] ≈ 0.5mm
+        end
+    end
+end
+
 end # TESTSET
 
 end # MODULE

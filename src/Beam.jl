@@ -43,6 +43,18 @@ end
 
 first_ray(b::Beam) = first(rays(b))
 
+"""
+    detached_copy(beam, n = length(rays(beam)))
+
+Returns a copy of the first `n` rays of the `beam` that shares no mutable state with it, see
+`detached_copy(ray)`. The copy of a [`Beam`](@ref) has no parent and no children. The copy of a
+beamlet ([`GaussianBeamlet`](@ref), [`AstigmaticGaussianBeamlet`](@ref)) has the copies of its
+parent beamlets as parents, since their paths enter its length and phase, but no children.
+"""
+function detached_copy(b::Beam{T, R}, n::Integer = length(rays(b))) where {T, R}
+    return Beam{T, R}(map(detached_copy, view(rays(b), 1:n)), nothing, Beam{T, R}[])
+end
+
 _chief_beam(b::Beam) = b
 
 function translate3d!(::Movable, b::Beam, offset)
