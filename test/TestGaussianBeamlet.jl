@@ -217,9 +217,7 @@ end
     args = ([0.0, 0, 0], [0.0, 1, 0], λ, 1mm)
     free = GaussianBeamlet(args...; support = [1.0, 0, 0])
     gb = GaussianBeamlet(args...; support = [1.0, 0, 0])
-    agb = AstigmaticGaussianBeamlet(args...; support = [1.0, 0, 0])
     solve_system!(system, gb)
-    solve_system!(system, agb)
     @test BMO.refractive_index(gb, 2) == n
     @test length(BMO.rays(gb.chief)[2]) > 0.4mm
     # the lens does not change the field in front of it
@@ -228,12 +226,14 @@ end
     # inside the glass the phase advances with n k0 along the axis ...
     Δz = 100.2e-6
     @test Δφ(electric_field(gb, 0.0, 50.1mm + Δz), electric_field(gb, 0.0, 50.1mm)) ≈ mod(360 * n * Δz / λ, 360) atol = 0.01
-    # ... and across the beam, as in the astigmatic model
+    # ... and across the beam: n k0 r² Re(1/q) / 2, with q from the ABCD law, 0.25 mm behind
+    # the front surface (radius 50 mm), and q = z + i z_R in front of it
     r = 0.1mm
-    across_gb = Δφ(electric_field(gb, r, 50.25mm), electric_field(gb, 0.0, 50.25mm))
-    across_agb = Δφ(electric_field(agb, [r, 0, 0], 50.25mm), electric_field(agb, [0.0, 0, 0], 50.25mm))
-    @test across_gb ≈ across_agb atol = 0.01
-    @test abs(across_gb) > 15
+    across = Δφ(electric_field(gb, r, 50.25mm), electric_field(gb, 0.0, 50.25mm))
+    q = 50mm + im * π * (1mm)^2 / λ
+    q = q / ((1 - n) / (n * 50mm) * q + 1 / n) + 0.25mm
+    @test across ≈ rad2deg(n * 2π / λ * r^2 * real(1 / q) / 2) atol = 0.01
+    @test abs(across) > 15
     # a hit of the segment in the glass gives the field of the beam
     hit = BMO.GaussianBeamletHit(gb, 2)
     p = BMO.Point3(r, 50.25mm, 0.0)
@@ -249,7 +249,23 @@ end
     k = 2π / λ
     lens(y) = (l = ThinLens(R, R, 10mm, n); translate3d!(l, [0, y, 0]); l)   # f = 50 mm
     gb() = GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], λ, w0; support = [1.0, 0, 0])
-    agb() = AstigmaticGaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], λ, w0; support = [1.0, 0, 0])
+    # ABCD law for the traced thick lenses: Gouy phase [deg] at the distance z along the beam,
+    # -arg(A + B/q) with q = -i z_R at the waist. The segments alternate between air and glass.
+    function abcd_gouy(beam, z)
+        M = [1.0 0; 0 1]
+        z_seg = 0.0
+        for (i, ray) in enumerate(BMO.rays(beam.chief))
+            l = min(length(ray), z - z_seg)
+            M = [1 l; 0 1] * M
+            z_seg += l
+            z_seg >= z && break
+            # surface at the end of the segment: into the glass after air, out of it after glass
+            M = (isodd(i) ? [1 0; (1 - n) / (n * R) 1 / n] : [1 0; (n - 1) / -R n]) * M
+        end
+        return rad2deg(-angle(M[1, 1] + M[1, 2] / (-im * π * w0^2 / λ)))
+    end
+    # difference of two phases [deg] modulo 360°
+    Δdeg(a, b) = rad2deg(angle(cis(deg2rad(a - b))))
     # field on the axis of the detector without the phase of the optical path [deg]
     function axis_field(system, pd, beam)
         empty!(pd)
@@ -266,17 +282,12 @@ end
             system = System([lens(50mm), pd])
             beam = gb()
             ψ = gouy(system, pd, beam)
-            # ABCD law for the traced thick lens: Gouy phase = -arg(A + B/q) with q = -i z_R at the waist
-            l1, l2, l3 = length.(BMO.rays(beam.chief))
-            M = [1 l3; 0 1] * [1 0; (n - 1) / -R n] * [1 l2; 0 1] * [1 0; (1 - n) / (n * R) 1 / n] * [1 l1; 0 1]
-            ψ_abcd = rad2deg(-angle(M[1, 1] + M[1, 2] / (-im * π * w0^2 / λ)))
-            @test rad2deg(angle(cis(deg2rad(ψ - ψ_abcd)))) ≈ 0 atol = 0.1
+            @test length(BMO.rays(beam.chief)) == 3
+            @test Δdeg(ψ, abcd_gouy(beam, y)) ≈ 0 atol = 0.1
         end
-        # the astigmatic model agrees away from the focus, where its parabasal rays see other aberrations
+        # the phase is continuous through the lens
         pd = detector(70mm)
         system = System([lens(50mm), pd])
-        @test gouy(system, pd, gb()) ≈ gouy(system, pd, agb()) atol = 0.1
-        # the phase is continuous through the lens
         beam = gb()
         empty!(pd)
         solve_system!(system, beam)
@@ -287,27 +298,24 @@ end
     end
 
     @testset "Behind two lenses" begin
-        pd = detector(250mm)
-        system = System([lens(50mm), lens(150mm), pd])
-        @test gouy(system, pd, gb()) ≈ gouy(system, pd, agb()) atol = 0.1
+        for y in (200mm, 250mm)
+            pd = detector(y)
+            system = System([lens(50mm), lens(150mm), pd])
+            beam = gb()
+            ψ = gouy(system, pd, beam)
+            @test length(BMO.rays(beam.chief)) == 5
+            @test Δdeg(ψ, abcd_gouy(beam, y)) ≈ 0 atol = 0.1
+        end
     end
 
     @testset "gauss_parameters reports the collected phase" begin
-        # the ψ of gauss_parameters is the Gouy phase of the field
-        for y in (70mm, 95mm, 110mm, 200mm)
-            pd = detector(y)
+        for (lenses, ys) in (((lens(50mm),), (40mm, 70mm, 95mm, 110mm, 200mm)),
+            ((lens(50mm), lens(150mm)), (120mm, 200mm, 250mm)))
             beam = gb()
-            ψ_field = gouy(System([lens(50mm), pd]), pd, beam)
-            ψ = rad2deg(BMO.gauss_parameters(beam, y)[3])
-            @test rad2deg(angle(cis(deg2rad(ψ - ψ_field)))) ≈ 0 atol = 1e-6
-        end
-        # as for the astigmatic model, also behind two lenses
-        system = System([lens(50mm), lens(150mm)])
-        g, a = gb(), agb()
-        solve_system!(system, g)
-        solve_system!(system, a)
-        for y in (70mm, 250mm)
-            @test rad2deg(BMO.gauss_parameters(g, y)[3]) ≈ rad2deg(BMO.gauss_parameters(a, y)[5]) atol = 0.1
+            solve_system!(System(collect(lenses)), beam)
+            for y in ys
+                @test Δdeg(rad2deg(BMO.gauss_parameters(beam, y)[3]), abcd_gouy(beam, y)) ≈ 0 atol = 0.1
+            end
         end
     end
 
