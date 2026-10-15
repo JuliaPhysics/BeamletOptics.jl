@@ -52,7 +52,16 @@ A tuple `(xs, zs, E)` where
 - `xs::LinRange{T}` and `zs::LinRange{T}` are the sampled coordinates
   in the detector's local x and z axes,
 - `E::Matrix{Complex{T}}` is the corresponding raw/unscaled intensity map,
-  except for [`PolarizedRayHit`](@ref)s, see below.
+  except for [`PolarizedRayHit`](@ref)s and [`AstigmaticGaussianBeamletHit`](@ref)s, see below.
+
+# [`AstigmaticGaussianBeamletHit`](@ref) hits
+
+The fields of [`AstigmaticGaussianBeamlet`](@ref)s carry their polarization and are added as 3D
+vectors in global coordinates, `E::Matrix{Point3{Complex{T}}}`: the field at a point is
+`Σ beamlet_hit_field(hit, p) ⋅ beamlet_hit_polarization(hit)` over the hits, with the projection
+factor of each hit. Beamlets of orthogonal polarizations do not interfere, and the phase of a
+circular polarization is well defined. [`intensity`](@ref) and [`optical_power`](@ref) use
+`|E|²`.
 
 # [`PolarizedRayHit`](@ref) hits
 
@@ -246,8 +255,14 @@ function electric_field(
     end
     xs = LinRange(_x_min, _x_max, n) .+ x0_shift
     zs = LinRange(_z_min, _z_max, n) .+ z0_shift
-    # Preallocate e-field matrix
-    field = zeros(Complex{G}, n, n)
+    # The field is added as 3D vectors: the scalar field of a hit carries the reference amplitude
+    # `E_ref_amp` of its polarization, whose phase is that of its largest component. For a
+    # circular polarization two components are equally large and the choice differs between
+    # hits, a scalar sum would add them with 90° phase errors. The vector field ψ · polarization
+    # does not depend on this choice.
+    field = fill(zero(Point3{Complex{G}}), n, n)
+    # constant per hit
+    pols = [beamlet_hit_polarization(hit) * hit.sqrt_proj for hit in hits]
     # PD local coordinate axes (left-handed coords.)
     local_x = Point3(-orientation(pd)[:, 1])
     local_z = Point3(orientation(pd)[:, 3])
@@ -263,9 +278,9 @@ function electric_field(
                 x_grid = xs[i]
                 p1 = p_row + x_grid * local_x
 
-                acc = Complex{G}(0.0)
-                for hit in hits
-                    acc += beamlet_hit_field(hit, p1) * hit.sqrt_proj
+                acc = zero(Point3{Complex{G}})
+                for (hit, pol) in zip(hits, pols)
+                    acc += beamlet_hit_field(hit, p1) * pol
                 end
                 field[i, j] = acc
             end
