@@ -117,7 +117,8 @@ function SphericalGaussianBeamletSource(
 
     # Calculate optimal sub-waist for smooth far-field overlap
     # Angular spacing between rings:
-    Δθ = θ / num_rings
+    # the angular spacing of the rings, see θ_NA below
+    Δθ = θ / (num_rings - 1)
     # We want beamlet divergence θ_div = λ / (π * w0s) to be approx overlap * Δθ
     w0s = λ / (π * overlap * Δθ)
 
@@ -139,6 +140,9 @@ function SphericalGaussianBeamletSource(
     # Calculate circumference weights
     ndirs = [rotate3d(b2, step(θ_NA) * i) * dir_n for i in eachindex(θ_NA[2:end])]
     circm = norm.(ndirs .- dot.(ndirs, Ref(dir_n)) .* Ref(dir_n)) .* Ref(2π)
+    # the outermost ring represents only the inner half of its band (trapezoidal rule), such
+    # that every beamlet represents about the same solid angle
+    circm[end] /= 2
     total = sum(circm)
     ds = total / num_rays
 
@@ -257,6 +261,9 @@ function EllipticalGaussianBeamletSource(
         b = ρ * ty
         circm[i] = π * (3*(a+b) - sqrt((3a+b)*(a+3b)))
     end
+    # the outermost ring represents only the inner half of its band (trapezoidal rule), such
+    # that every beamlet represents about the same area of the tangent plane
+    circm[end] /= 2
     
     total_circm = sum(circm)
     ds = total_circm / num_rays
