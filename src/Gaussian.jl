@@ -356,7 +356,7 @@ Returns the vectors `(p0, w1, w2)` and scalar waist radii `(w0, w0)`.
 """
 function waist_parameters(gb::GaussianBeamlet, z::Real)
     p0, i = point_on_beam(gb, z)
-    w, _, _, _ = _local_gauss_parameters(gb, (p0, i))
+    w, _, _, _ = gauss_parameters(gb, z, hint = (p0, i))
     chief = rays(gb.chief)[i]
     waist = rays(gb.waist)[i]
     dir = direction(chief)
@@ -372,7 +372,7 @@ function waist_parameters(gb::GaussianBeamlet, z::Real)
     end
     s2 = cross(dir, s1)
     # Get waist size for unification
-    _, _, _, w0 = _local_gauss_parameters(gb, (p0, i))
+    _, _, _, w0 = gauss_parameters(gb, z)
     return p0, w * s1, w * s2, w0, w0
 end
 
