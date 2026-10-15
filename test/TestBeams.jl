@@ -29,4 +29,13 @@ const BMO = BeamletOptics
     @test BMO.isparentbeam(beam, r2) == true
 end
 
+@testset "Beam of PolarizedRays with a complex field" begin
+    # a complex `E0`, e.g. circular polarization, gives a beam of real number type
+    for E0 in ([1.0, 0, 0], [1, 0, im] / sqrt(2), ComplexF32[1, 0, 0], [1, 0, 0])
+        b = Beam([0.0, 0, 0], [0.0, 1, 0], 1e-6, E0)
+        @test b isa Beam{Float64, PolarizedRay{Float64}}
+        @test BMO.polarization(first(BMO.rays(b))) ≈ E0
+    end
+end
+
 end # MODULE

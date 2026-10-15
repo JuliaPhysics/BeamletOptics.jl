@@ -43,6 +43,8 @@ end
 
 first_ray(b::Beam) = first(rays(b))
 
+_chief_beam(b::Beam) = b
+
 function translate3d!(::Movable, b::Beam, offset)
     isroot(b) || throw(ArgumentError("cannot move a child beam; move its root beam instead"))
     empty!(b)
@@ -76,26 +78,12 @@ end
 """
     Beam(pos, dir, λ, E0)
 
-Spawns a [`Beam`](@ref) at the start `pos`ition in the specified `dir`ection
-with the wavelength `λ` and field vector `E0`.
+Spawns a [`Beam`](@ref) of [`PolarizedRay`](@ref)s at the start `pos`ition in the specified
+`dir`ection with the wavelength `λ` and the electric field vector `E0`, which may be complex,
+e.g. `[1, 0, im] / √2` for circular polarization. The number type of the beam is that of the
+[`PolarizedRay`](@ref), i.e. real also for a complex `E0`.
 """
-function Beam(pos::AbstractArray{P}, dir::AbstractArray{D}, λ::L, E0) where {P,D,L}
-    T = promote_type(P,D,L)
-    ray = PolarizedRay(pos, dir, λ, E0)
-    return Beam{T, PolarizedRay{T}}([ray], nothing, Vector{Beam{T, PolarizedRay{T}}}())
-end
-
-"""
-    Beam(pos, dir, λ, E0)
-
-Spawns a [`Beam`](@ref) of [`PolarizedRay`](@ref)s at the start `pos`ition in the specified `dir`ection
-with the wavelength `λ` and electric field vector `E0`
-"""
-function Beam(pos::AbstractArray{P}, dir::AbstractArray{D}, λ::L, E0::Vector{E}) where {P,D,L,E}
-    T = promote_type(P,D,L,E)
-    ray = PolarizedRay(pos, dir, λ, E0)
-    return Beam{T, PolarizedRay{T}}([ray], nothing, Vector{Beam{T, PolarizedRay{T}}}())
-end
+Beam(pos::AbstractArray, dir::AbstractArray, λ, E0) = Beam(PolarizedRay(pos, dir, λ, E0))
 
 """
     BeamInteraction <: AbstractInteraction

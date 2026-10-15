@@ -26,6 +26,8 @@ Subtypes of `AbstractBeam` must implement the following:
 - `empty!`: resets the beam to its unsolved state. [`solve_system!`](@ref) calls it before tracing
 - `first_ray`: returns the start ray on the optical axis of the beam; for beamlets the first chief ray.
   Defines the generic `position`/`direction` of the beam (the pivot for rotations)
+- `_chief_beam`: returns the beam whose `rays` carry the geometric path, used by [`path_segments`](@ref).
+  Defaults to the first of `_component_beams`; a beam that stores its rays directly returns itself
 
 The tree functions `parent`, `children` and `isroot` (from `AbstractTrees`) work via the `parent`/`children` fields.
 
@@ -133,6 +135,14 @@ chief beam first. Required for the kinematic API of composite beams.
 function _component_beams(::B) where {B <: AbstractBeam}
     throw(ArgumentError(lazy"_component_beams not implemented for $B"))
 end
+
+"""
+    _chief_beam(beam::AbstractBeam)
+
+Returns the beam whose `rays` carry the geometric path of `beam`: the first of its `_component_beams`,
+i.e. the chief beam of a beamlet. A beam that stores its rays directly (e.g. [`Beam`](@ref)) returns itself.
+"""
+_chief_beam(b::AbstractBeam) = first(_component_beams(b))
 
 """
     translate3d!(::Movable, beam::AbstractBeam, offset)

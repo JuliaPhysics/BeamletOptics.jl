@@ -6,7 +6,7 @@ export position, direction, orientation
 # ray and beam type export
 export Ray, PolarizedRay, Beam, PointSource, CollimatedSource, UniformDiscSource, UniformPointSource,
        UniformLineSource, UniformFanSource, set_num_rays!,
-       GaussianBeamlet, AstigmaticGaussianBeamlet, rayleigh_range, rays, point_on_beam,
+       GaussianBeamlet, AstigmaticGaussianBeamlet, rayleigh_range, rays, point_on_beam, path_segments,
        normal3d
 export CollimatedGaussianBeamletSource, GaussianBeamletDecomposition,
        SphericalGaussianBeamletSource, EllipticalGaussianBeamletSource, WavefrontBeamletDecomposition,
@@ -87,5 +87,7 @@ public relaunch!, beamlet_hit_field, GaussianBeamletHit, AstigmaticGaussianBeaml
 public bounding_sphere_of, AbstractBoundingSphere, NoBoundingSphere, SingleBoundingSphere, MultiBoundingSphere
 # own assembly types of separate parts, see AbstractObjectGroup
 public AbstractObjectGroup
+# element type of path_segments
+public PathSegment
 public AbstractSampling, NoSampling, DiscRings, DiscSunflower, DiscLine, ConeRings, ConeSunflower,
        ConeFan, source_beams, sampling_basis

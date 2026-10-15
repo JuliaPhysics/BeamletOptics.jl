@@ -144,7 +144,12 @@ const nm = 1e-9
             agb = AstigmaticGaussianBeamlet([0.0, -0.1, 0], [0.0, 1, 0], λ, 0.5e-3;
                 support = [1.0, 0, 0])
             Δ = axis_phase(n_mirrors, agb) - axis_phase(n_mirrors, gb)
-            @test isapprox(cis(Δ), 1; atol = 1e-6)
+            # The astigmatic field follows the polarization of its chief ray, which a mirror
+            # reverses. The stigmatic beamlet has no such sign.
+            E_pol = BMO.polarization(last(BMO.rays(agb.c)))
+            ψ_pol = angle(E_pol[argmax(abs.(E_pol))])
+            @test abs(sin(ψ_pol)) < 1e-12
+            @test isapprox(cis(Δ - ψ_pol), 1; atol = 1e-6)
             # Reported Gouy phase agrees with the field and with the stigmatic beamlet
             L = BMO.optical_path_length(agb)
             ψ = BMO.gauss_parameters(agb, L)[5]
@@ -451,6 +456,230 @@ const nm = 1e-9
         # Verify that the beam stopped tracing once the invariant failed
         # (solve_system calls trace_system! which has a break on invariant failure)
         @test length(BMO.rays(beam.c)) < 10 # It should stop early
+    end
+
+    @testset "A child beamlet continues its parent" begin
+        # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/124
+        λ = 1000nm
+        w0 = 1mm
+        P0 = 1e-3
+        n = 1.5
+        lens() = (l = ThinLens(200mm, 200mm, 5mm, n); translate3d!(l, [0, 30mm, 0]); l)    # f = 200 mm
+        function splitter()
+            bs = ThinBeamsplitter(25mm, reflectance = 0.5)
+            translate3d!(bs, [0, 80mm, 0])
+            zrotate3d!(bs, π / 4)
+            return bs
+        end
+        pd_t = Detector(20mm)
+        translate3d!(pd_t, [0, 140mm, 0])
+        pd_r = Detector(20mm)
+        BMO.align3d!(pd_r, [-1.0, 0, 0])
+        translate_to3d!(pd_r, [60mm, 80mm, 0])
+        beam() = AstigmaticGaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], λ, w0; P0, support = [1.0, 0, 0])
+        axis_field(pd) = electric_field(pd; n = 1, x_min = 0, x_max = 0, z_min = 0, z_max = 0)[3][1]
+        function solve(objects...)
+            empty!(pd_t)
+            empty!(pd_r)
+            b = beam()
+            solve_system!(System([objects..., pd_t, pd_r]), b)
+            return b
+        end
+
+        # without the lens
+        b = solve(splitter())
+        @test BMO.hit_count(pd_t) == 1 && BMO.hit_count(pd_r) == 1
+        @test optical_power(pd_t) ≈ P0 / 2 rtol = 1e-3
+        @test optical_power(pd_r) ≈ P0 / 2 rtol = 1e-3
+        # the reported Gouy phase of both children starts where that of the parent ends
+        # (the distance along a child counts from the start of the root beam)
+        L = length(b.c)
+        ψ_end = BMO.gauss_parameters(b, L)[5]
+        @test ψ_end ≈ -atan(L / (π * w0^2 / λ)) atol = 1e-6
+        for child in BMO.children(b)
+            @test BMO.gauss_parameters(child, L)[5] ≈ ψ_end atol = 1e-6
+        end
+
+        # behind the lens the beam converges: the children refer to the start of the root beam,
+        # not to a point on their backwards extended first ray. The two uncoated surfaces of
+        # the lens take their Fresnel loss at normal incidence.
+        T_lens = (4n / (n + 1)^2)^2
+        solve(lens())
+        E_direct = axis_field(pd_t)
+        b = solve(lens(), splitter())
+        @test BMO.hit_count(pd_t) == 1 && BMO.hit_count(pd_r) == 1
+        @test optical_power(pd_t) ≈ T_lens * P0 / 2 rtol = 1e-3
+        @test optical_power(pd_r) ≈ T_lens * P0 / 2 rtol = 1e-3
+        @test BMO.optical_power(b.children[1]) ≈ T_lens * P0 / 2 rtol = 1e-3
+        @test BMO.optical_power(b.children[2]) ≈ T_lens * P0 / 2 rtol = 1e-3
+        # the transmitted child keeps the phase of the beam without the splitter
+        @test angle(axis_field(pd_t) / E_direct) ≈ 0 atol = 1e-6
+        @test abs(axis_field(pd_t) / E_direct) ≈ 1 / sqrt(2) rtol = 1e-5
+    end
+
+    @testset "Detector field follows the polarization" begin
+        # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/123
+        λ = 1000nm
+        w0 = 1mm
+        P0 = 1e-3
+        n = 1.5
+        beam() = AstigmaticGaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], λ, w0; P0, support = [1.0, 0, 0])   # polarized along x
+        detector(p, dir) = (pd = Detector(30mm); BMO.align3d!(pd, -dir); translate_to3d!(pd, p); pd)
+        # largest part of the field of a chief ray along its direction, over the whole beam tree
+        function longitudinal(b)
+            m = 0.0
+            for ray in BMO.rays(b.c)
+                E = BMO.polarization(ray)
+                norm(E) > 0 && (m = max(m, abs(dot(BMO.direction(ray), E)) / norm(E)))
+            end
+            return maximum(longitudinal, BMO.children(b); init = m)
+        end
+
+        @testset "Polarization filter" begin
+            # transmission axis along x, turned about the beam
+            for (θ, T) in ((0, 1.0), (π / 4, 0.5), (π / 3, 0.25))
+                pf = PolarizationFilter(10mm)
+                translate3d!(pf, [0, 50mm, 0])
+                yrotate3d!(pf, θ)
+                pd = detector([0, 100mm, 0], [0.0, 1, 0])
+                solve_system!(System([pf, pd]), beam())
+                @test optical_power(pd) ≈ T * P0 rtol = 1e-3
+            end
+            pf = PolarizationFilter(10mm)
+            translate3d!(pf, [0, 50mm, 0])
+            yrotate3d!(pf, π / 2)
+            pd = detector([0, 100mm, 0], [0.0, 1, 0])
+            solve_system!(System([pf, pd]), beam())
+            @test optical_power(pd) < 1e-6 * P0
+            @test all(isfinite, BMO.beamlet_hit_polarization(only(BMO.hits(pd))))
+            # a segment without any light has no polarization direction
+            pd = detector([0, 100mm, 0], [0.0, 1, 0])
+            solve_system!(System([pd]), AstigmaticGaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], λ, w0; E0 = [0.0, 0, 0]))
+            @test optical_power(pd) == 0
+            @test iszero(BMO.beamlet_hit_polarization(only(BMO.hits(pd))))
+        end
+
+        # two uncoated surfaces at normal incidence
+        T_normal = (4n / (n + 1)^2)^2
+
+        @testset "Uncoated lens" begin
+            lens = ThinLens(200mm, 200mm, 5mm, n)
+            translate3d!(lens, [0, 30mm, 0])
+            pd = detector([0, 140mm, 0], [0.0, 1, 0])
+            b = beam()
+            solve_system!(System([lens, pd]), b)
+            @test optical_power(pd) ≈ T_normal * P0 rtol = 1e-3
+            hit = only(BMO.hits(pd))
+            @test norm(BMO.beamlet_hit_polarization(hit)) ≈ 1
+            @test BMO.optical_power(b) ≈ P0 rtol = 1e-9
+        end
+
+        @testset "Cube beamsplitter" begin
+            # coating at 135°: +y is reflected to -x
+            cbs = CubeBeamsplitter(25mm, n)
+            pd_t = detector([0, 100mm, 0], [0.0, 1, 0])
+            pd_r = detector([-100mm, 0, 0], [-1.0, 0, 0])
+            b = AstigmaticGaussianBeamlet([0.0, -100mm, 0], [0.0, 1, 0], λ, w0; P0, support = [1.0, 0, 0])
+            solve_system!(System([cbs, pd_t, pd_r]), b)
+            @test BMO.hit_count(pd_t) == 1 && BMO.hit_count(pd_r) == 1
+            @test optical_power(pd_t) ≈ T_normal * P0 / 2 rtol = 1e-3
+            @test optical_power(pd_r) ≈ T_normal * P0 / 2 rtol = 1e-3
+            @test longitudinal(b) < 1e-12
+        end
+
+        @testset "Plate beamsplitter" begin
+            # coating towards the source, at 45°: +y is reflected to +x, the transmitted beam
+            # leaves the uncoated back with the Fresnel loss of that surface
+            θ_i = π / 4
+            θ_t = asin(sin(θ_i) / n)
+            r_s = (cos(θ_i) - n * cos(θ_t)) / (cos(θ_i) + n * cos(θ_t))
+            r_p = (n * cos(θ_i) - cos(θ_t)) / (n * cos(θ_i) + cos(θ_t))
+            # (polarization, power reflection of the back surface): s is normal to the plane of incidence
+            for (e, R_back) in (([0.0, 0, 1], r_s^2), ([1.0, 0, 0], r_p^2))
+                pbs = RectangularPlateBeamsplitter(25mm, 25mm, 5mm, λ -> n)
+                zrotate3d!(pbs, π / 4)
+                pd_t = detector([0, 100mm, 0], [0.0, 1, 0])
+                pd_r = detector([100mm, 0, 0], [1.0, 0, 0])
+                E = norm(BMO.polarization(beam()))
+                b = AstigmaticGaussianBeamlet([0.0, -100mm, 0], [0.0, 1, 0], λ, w0; E0 = E * e)
+                solve_system!(System([pbs, pd_t, pd_r]), b)
+                @test BMO.hit_count(pd_t) == 1 && BMO.hit_count(pd_r) == 1
+                @test optical_power(pd_r) ≈ P0 / 2 rtol = 1e-3
+                @test optical_power(pd_t) ≈ (1 - R_back) * P0 / 2 rtol = 1e-3
+                @test longitudinal(b) < 1e-12
+            end
+        end
+    end
+
+    @testset "Two inputs on one beamsplitter" begin
+        # the sum of both outputs does not depend on the relative phase of the inputs
+        λ = 1064nm
+        w0 = 0.5mm
+        P0 = 1e-3
+        l0 = 0.1
+        bs = ThinBeamsplitter(10mm)
+        zrotate3d!(bs, π / 4)
+        pd_1 = Detector(10mm)
+        translate3d!(pd_1, [0, l0, 0])
+        pd_2 = Detector(10mm)
+        translate3d!(pd_2, [l0, 0, 0])
+        zrotate3d!(pd_2, π / 2)
+        system = System([bs, pd_1, pd_2])
+        E = norm(BMO.polarization(AstigmaticGaussianBeamlet([0.0, -l0, 0], [0.0, 1, 0], λ, w0; P0)))
+        # (polarization of the input along +y, polarization of the input along +x)
+        for (e1, e2) in (([0.0, 0, 1], [0.0, 0, 1]), ([1.0, 0, 0], [0.0, 1, 0]), ([1.0, 0, 0], [0.0, -1, 0]))
+            total = Float64[]
+            first_port = Float64[]
+            for φ in LinRange(0, 2π, 13)[1:12]
+                empty!(pd_1)
+                empty!(pd_2)
+                solve_system!(system, AstigmaticGaussianBeamlet([0.0, -l0, 0], [0.0, 1, 0], λ, w0; E0 = E * cis(φ) * e1))
+                solve_system!(system, AstigmaticGaussianBeamlet([-l0, 0.0, 0], [1.0, 0, 0], λ, w0; E0 = E * e2))
+                push!(first_port, optical_power(pd_1))
+                push!(total, optical_power(pd_1) + optical_power(pd_2))
+            end
+            @test all(≈(2P0; rtol = 1e-4), total)
+            @test minimum(first_port) < 1e-4 * P0
+            @test maximum(first_port) ≈ 2P0 rtol = 1e-4
+        end
+    end
+
+    @testset "Michelson with unequal numbers of mirrors" begin
+        λ = 1064nm
+        w0 = 0.5mm
+        P0 = 1e-3
+        l0 = 0.1
+        mirror(p, angle) = (m = SquarePlanoMirror2D(BMO.inch); translate3d!(m, p); zrotate3d!(m, angle); m)
+        E = norm(BMO.polarization(AstigmaticGaussianBeamlet([0.0, -l0, 0], [0.0, 1, 0], λ, w0; P0)))
+        # `fold`: arm 2 goes over a 45° mirror to its end mirror, i.e. 3 reflections against 1
+        for fold in (false, true)
+            bs = ThinBeamsplitter(BMO.inch, reflectance = 0.5)
+            zrotate3d!(bs, π / 4)
+            m1 = mirror([fold ? 2l0 : l0, 0, 0], π / 2)
+            m2 = fold ? mirror([l0, l0, 0], π / 2) : mirror([0, l0, 0], 0)
+            arm2 = fold ? [mirror([0, l0, 0], π / 4), m2] : [m2]
+            pd = Detector(10mm)
+            translate3d!(pd, [-l0, 0, 0])
+            zrotate3d!(pd, π / 2)
+            source_port = Detector(10mm)
+            translate3d!(source_port, [0, -1.5l0, 0])
+            zrotate3d!(source_port, π)
+            system = System([bs, m1, arm2..., pd, source_port])
+            start = Vector(position(m2))
+            shift = fold ? [1.0, 0, 0] : [0.0, 1, 0]
+            for e in ([0.0, 0, 1], [1.0, 0, 0])
+                for Δ in LinRange(0, λ / 2, 9)[1:8]
+                    translate_to3d!(m2, start + Δ * shift)
+                    empty!(pd)
+                    empty!(source_port)
+                    solve_system!(system, AstigmaticGaussianBeamlet([0.0, -l0, 0], [0.0, 1, 0], λ, w0; E0 = E * e))
+                    out = optical_power(pd) / P0
+                    back = optical_power(source_port) / P0
+                    @test out ≈ (1 - cos(4π * Δ / λ)) / 2 atol = 1e-4
+                    @test out + back ≈ 1 atol = 1e-4
+                end
+            end
+        end
     end
 end # outer testset
 
