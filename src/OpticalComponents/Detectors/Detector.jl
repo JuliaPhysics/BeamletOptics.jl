@@ -318,7 +318,7 @@ Stores the `hit` in the detector `d`, guarded by the `lock` of `d`. Within [`wit
 e.g. in the solve of a beam group, the `hit` is collected in the buffer of the current task instead
 and reaches `d` when the buffer is flushed.
 """
-push!(d::Detector, new::AbstractDetectorHit) = store_hit!(current_hit_buffers(), d, new)
+push!(d::Detector, new::AbstractDetectorHit) = push!(current_hit_sink(), d => new)
 
 """
     append!(d::Detector, new::Vector{<:AbstractDetectorHit})
@@ -349,8 +349,9 @@ collects its hits and appends them once per detector at its end.
 =#
 
 """
-The hits of the current task per [`Detector`](@ref), see [`with_hit_buffers`](@ref). The buffer of
-the last detector is kept at hand, since consecutive hits mostly go to the same detector.
+The hits of the current task per [`Detector`](@ref), see [`with_hit_buffers`](@ref). Pushing
+`detector => hit` collects the `hit` in the buffer of the `detector`. The buffer of the last
+detector is kept at hand, since consecutive hits mostly go to the same detector.
 """
 mutable struct HitBuffers
     const buffers::IdDict{Detector, Vector}
@@ -362,7 +363,11 @@ end
 # Key of the buffers of the current task in the task-local storage
 const HIT_BUFFERS_KEY = :BeamletOptics_hit_buffers
 
-current_hit_buffers() = get(task_local_storage(), HIT_BUFFERS_KEY, nothing)::Union{Nothing, HitBuffers}
+"Stores each pushed `detector => hit` directly in its detector, guarded by the `lock` of the detector."
+struct LockedHits end
+
+# Where the current task pushes its hits: its buffers within `with_hit_buffers`, otherwise the detectors
+current_hit_sink() = get(task_local_storage(), HIT_BUFFERS_KEY, LockedHits())::Union{LockedHits, HitBuffers}
 
 """
     with_hit_buffers(f)
@@ -384,8 +389,7 @@ function with_hit_buffers(f)
     end
 end
 
-# Stores the hit in the detector, or in the buffer of the current task
-function store_hit!(::Nothing, d::Detector, new::AbstractDetectorHit)
+function push!(::LockedHits, (d, new)::Pair{<:Detector, <:AbstractDetectorHit})
     lock(d.lock) do
         # set data type on first push
         if isnothing(hits(d))
@@ -398,7 +402,7 @@ function store_hit!(::Nothing, d::Detector, new::AbstractDetectorHit)
     end
 end
 
-function store_hit!(b::HitBuffers, d::Detector, new::H) where {H <: AbstractDetectorHit}
+function push!(b::HitBuffers, (d, new)::Pair{<:Detector, H}) where {H <: AbstractDetectorHit}
     if b.last_detector !== d
         b.last_buffer = get!(() -> H[], b.buffers, d)
         b.last_detector = d
