@@ -22,7 +22,7 @@ coherent superposition of the sub-beamlets.
 - `randomize_axes`: If `true`, the internal principal axes of each individual beamlet are randomly rotated. This averages out numerical grid-alignment biases and is essential for preserving rotational symmetry in focused spots.
 - `rng`: Random number generator to use for `randomize_axes`.
 - `P0`: Total power of the macroscopic Gaussian beam in [W].
-- `E0`: Optional Jones vector defining the polarization and initial phase of the beam. If `nothing`, defaults to linear polarization along the first grid axis.
+- `E0`: Optional Jones vector defining the polarization and initial phase of the beam; its component transverse to `dir` is used, its magnitude does not matter, the power is `P0`. If `nothing`, defaults to linear polarization along the first grid axis.
 - `threshold`: Relative amplitude below which beamlets are not spawned (default `1e-4`).
 """
 function GaussianBeamletDecomposition(
@@ -45,15 +45,10 @@ function GaussianBeamletDecomposition(
     e1 = isnothing(basis) ? normal3d(dir_n) : normalize(basis[1])
     e2 = isnothing(basis) ? normalize(cross(dir_n, e1)) : normalize(basis[2])
 
-    # Determine macroscopic peak amplitude
-    if isnothing(E0)
-        I0 = (2 * P0) / (π * w0^2)
-        E_phasor = T(electric_field(I0))
-        pol = e1
-    else
-        E_phasor = one(T)
-        pol = E0
-    end
+    # Determine macroscopic peak amplitude, from P0 also for a given polarization E0
+    I0 = (2 * P0) / (π * w0^2)
+    E_phasor = T(electric_field(I0))
+    pol = isnothing(E0) ? e1 : _jones_field(E0, dir_n, one(T))
 
     # We tile over a 4*w0 x 4*w0 area to capture the macroscopic Gaussian tails
     D = 4 * w0

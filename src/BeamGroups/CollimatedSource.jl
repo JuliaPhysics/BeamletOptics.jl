@@ -74,7 +74,7 @@ The following inputs and arguments can be used to configure the [`CollimatedSour
 
 ## Keyword Arguments
 
-- `num_rings`: number of concentric beam rings, default is 10
+- `num_rings`: number of concentric beam rings, default is 10; the number of rings counts the center as the innermost one, i.e. `num_rings - 1` rings lie around it
 - `num_rays`: total number of rays in the source, default is 100x num_rings
 - `basis`: Optional reference vector (e.g. `[1,0,0]`) to define the starting azimuthal angle for the beam rings.
 

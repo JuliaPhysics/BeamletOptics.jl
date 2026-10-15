@@ -82,7 +82,8 @@ struct NoSampling <: AbstractSampling end
 """
     DiscRings(num_rings::Int)
 
-Concentric rings of rays around a center ray on the disc of a [`CollimatedSource`](@ref). The
+Concentric rings of rays around a center ray on the disc of a [`CollimatedSource`](@ref), the center
+counted as the innermost of the `num_rings` rings. The
 outermost ring lies on the edge of the disc; the rays are distributed over the rings in
 proportion to the area of the disc each ring represents, i.e. to its circumference, but half of
 it for the outermost ring, which represents only the inner half of its annulus. Every ray then
@@ -115,7 +116,8 @@ struct DiscLine <: AbstractSampling end
 """
     ConeRings(num_rings::Int, θ::Float64)
 
-Concentric cones of rays around a center ray of a [`PointSource`](@ref), the outermost with the
+Concentric cones of rays around a center ray of a [`PointSource`](@ref), the center counted as the
+innermost of the `num_rings` cones, the outermost with the
 half spread angle `θ` [rad]. The rays are distributed over the cones in proportion to the solid
 angle each cone represents, i.e. to its circumference, but half of it for the outermost cone,
 which represents only the inner half of its band. Every ray then represents about the same solid
