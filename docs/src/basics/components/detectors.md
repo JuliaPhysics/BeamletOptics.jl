@@ -73,7 +73,7 @@ If a [`Detector`](@ref) is placed in the focal plane of an imaging system, the c
 
 ![Sonnar Airy disc PSF](sonnar_psf_showcase.png)
 
-For [`PolarizedRay`](@ref)s the field is added as 3D vectors, so [`electric_field`](@ref) returns a matrix of complex vectors and each component of the focal field can be analyzed separately. This becomes relevant at high NA, where the field vectors tilt towards the optical axis.
+For [`PolarizedRay`](@ref)s the field is added as 3D vectors, so [`electric_field`](@ref) returns a matrix of complex vectors and each component of the focal field can be analyzed separately. This becomes relevant at high NA, where the field vectors tilt towards the optical axis. The same holds for [`AstigmaticGaussianBeamlet`](@ref)s, which carry a polarization: beamlets of orthogonal polarizations do not interfere.
 
 !!! tip "PSF examples"
     The [Point spread functions](@ref) example page covers the Airy disc, an aberrated asphere and the vectorial focus of a parabolic mirror at NA 0.88, including the caveats on collimated sources and ray amplitudes.

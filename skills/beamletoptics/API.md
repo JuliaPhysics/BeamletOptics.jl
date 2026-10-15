@@ -119,7 +119,7 @@ initialize!(system)   # empties all detectors of the system (nested groups inclu
 ```julia
 solve_system!(system, source; initialize = true)   # empties the detectors first (or initialize!(system), empty!(det))
 pts        = spot_diagram(det)                # Vector{Point2}: local (x, z) in m
-x, z, E    = electric_field(det; n = 200)     # complex field on an n×n grid
+x, z, E    = electric_field(det; n = 200)     # complex field on an n×n grid (3-vectors for polarized rays and astigmatic beamlets)
 x, z, I    = intensity(det; n = 200)          # W/m²
 P          = optical_power(det)               # W
 ```

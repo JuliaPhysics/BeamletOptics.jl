@@ -8,6 +8,10 @@ const BMO = BeamletOptics
 const mm = 1e-3
 const nm = 1e-9
 
+# The component of largest magnitude of a field vector of astigmatic beamlets, which has the phase
+# of a scalar field with the reference amplitude of the polarization
+dominant(E) = E[argmax(abs.(E))]
+
 @testset "AGB Physical Validation" begin
 
     # Use support=[1,0,0] so that w0_x → X-axis, w0_y → Z-axis
@@ -137,7 +141,7 @@ const nm = 1e-9
             system = System([mirror.(mirror_pos[1:n_mirrors])..., pd])
             solve_system!(system, beam)
             _, _, E = BMO.electric_field(pd; n = 1, x_min = 0, x_max = 0, z_min = 0, z_max = 0)
-            return angle(E[1] * cis(-k * BMO.optical_path_length(beam)))
+            return angle(dominant(E[1]) * cis(-k * BMO.optical_path_length(beam)))
         end
         for n_mirrors in 0:3
             gb = GaussianBeamlet([0.0, -0.1, 0], [0.0, 1, 0], λ, 0.5e-3)
@@ -232,6 +236,35 @@ const nm = 1e-9
         end
     end
 
+    @testset "Coherent sum of polarized beamlets" begin
+        # the fields of the hits add as 3D vectors
+        function power(E0s...)
+            pd = Detector(20e-3)
+            translate3d!(pd, [0, 0.1, 0])
+            system = System([pd])
+            for E0 in E0s
+                solve_system!(system, AstigmaticGaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], 1e-6, 1e-3; E0))
+            end
+            return optical_power(pd; progress = false, n = 150)
+        end
+        P1 = power([1.0, 0, 0])
+        @test power([1.0, 0, 0], [1.0, 0, 0]) ≈ 4P1 rtol = 1e-9
+        # orthogonal polarizations do not interfere
+        @test power([1.0, 0, 0], [0, 0, 1.0]) ≈ 2P1 rtol = 1e-9
+        @test power([1.0, 0, 0], [-1.0, 0, 0]) ≈ 0 atol = 1e-12
+        # a circular polarization has two components of equal magnitude, the phase of its field
+        # must not depend on which of them a hit takes as its reference
+        function source_power(E0)
+            source = SphericalGaussianBeamletSource([0.0, 0, 0], [0.0, 1, 0], 0.02, 1e-6;
+                num_rings = 10, num_rays = 1000, E0)
+            pd = Detector(24e-3)
+            translate3d!(pd, [0, 0.2, 0])
+            solve_system!(System([pd]), source; progress = false)
+            return optical_power(pd; progress = false, n = 200)
+        end
+        @test source_power([1, 0, im] / sqrt(2)) ≈ source_power(ComplexF64[1, 0, 0]) rtol = 1e-3
+    end
+
     @testset "Detector integrated power" begin
         λ = 633e-9
         w0 = 0.5mm
@@ -247,7 +280,8 @@ const nm = 1e-9
         @test size(E) == (50, 50)
         @test any(!iszero, E)
 
-        I = abs2.(E)
+        # the field of astigmatic beamlets is a 3D vector
+        I = map(e -> sum(abs2, e), E)
         max_idx = argmax(I)
         mid = size(I, 1) ÷ 2 + 1
         @test abs(max_idx[1] - mid) < 5
@@ -477,7 +511,7 @@ const nm = 1e-9
         BMO.align3d!(pd_r, [-1.0, 0, 0])
         translate_to3d!(pd_r, [60mm, 80mm, 0])
         beam() = AstigmaticGaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], λ, w0; P0, support = [1.0, 0, 0])
-        axis_field(pd) = electric_field(pd; n = 1, x_min = 0, x_max = 0, z_min = 0, z_max = 0)[3][1]
+        axis_field(pd) = dominant(electric_field(pd; n = 1, x_min = 0, x_max = 0, z_min = 0, z_max = 0)[3][1])
         function solve(objects...)
             empty!(pd_t)
             empty!(pd_r)
