@@ -533,15 +533,14 @@ function GaussianBeamletHit(g::GaussianBeamlet{R}, id::Integer) where {R}
     λ = wavelength(g)
     n = refractive_index(ray)
     # Complex beam parameter q0 = s0 + i z_R at the segment start, along which the beam evolves
-    # within the segment as q(l) = q0 + l: s0 is the signed distance from the local waist w0 and
-    # z_R = w0 / F, both from the waist and divergence rays, as in `gauss_parameters`
-    w, _, s0, w0, F = _local_beam(g, p0, id)
-    q0, w0 = if isfinite(s0) && isfinite(w0) && w0 > 0 && F > 0
-        Complex{R}(s0, w0 / F), R(w0)
+    # within the segment as q(l) = q0 + l. From the local Gouy phase ψ = −atan(s0 / z_R) and the
+    # curvature c = s0 / (s0² + z_R²) of `gauss_parameters`: q0 = −i sin(ψ) exp(iψ) / c
+    _, curv, ψ, w0 = gauss_parameters(g, l0, zero(R); hint = (p0, id))
+    q0 = if iszero(curv)
+        # waist at p0 (curvature and Gouy phase 0)
+        Complex{R}(0, π * n * w0^2 / λ)
     else
-        # no divergence measurable at p0 (e.g. the divergence ray crosses the chief ray there):
-        # a waist at p0, as the NaN fallback of `gauss_parameters`
-        Complex{R}(0, π * n * w^2 / λ), R(w)
+        Complex{R}(-im * sin(ψ) * cis(ψ) / curv)
     end
     l_seg = length(ray)
     # Beam radius at the end of the segment, for the auto-limits of the field plots
