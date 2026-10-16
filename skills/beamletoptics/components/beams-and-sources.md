@@ -55,17 +55,17 @@ to their untraced start state.
 
 | Constructor | Samples |
 |-------------|---------|
-| `CollimatedSource(pos, dir, diameter, λ = 1e-6; num_rings = 10, num_rays = 100num_rings, basis)` | parallel rays on concentric rings (use `num_rays ≥ 20 num_rings`) |
+| `CollimatedSource(pos, dir, diameter, λ = 1e-6; num_rings = 10, num_rays = 100num_rings, basis)` | parallel rays on concentric rings (use `num_rays ≥ 20 num_rings`); `num_rings` counts the center ray as a ring, as for all ring sources |
 | `UniformDiscSource(pos, dir, diameter, λ = 1e-6; num_rays = 1000, basis)` | parallel rays, equal-area (Fibonacci) sampling. **Use for PSF/intensity.** |
 | `PointSource(pos, dir, θ, λ = 1e-6; num_rings = 10, num_rays, basis)` | diverging rays, half-angle `θ` (rad, < π) |
 | `UniformPointSource(pos, dir, θ, λ = 1e-6; num_rays = 1000, basis)` | diverging rays, equal solid angle |
 | `UniformLineSource(pos, dir, width, λ = 1e-6; num_rays = 101, basis)` | 2D: parallel rays equidistant on a line of length `width` along `basis`, marginal rays included. Returns a `CollimatedSource`. |
 | `UniformFanSource(pos, dir, θ, λ = 1e-6; num_rays = 101, basis)` | 2D: diverging rays with equidistant angles in `[-θ, θ]` (rad, θ < π) in the plane of `dir` and `basis`, marginal rays included. Returns a `PointSource`. |
 | `CollimatedSource(beams, diameter, pos, dir)` / `PointSource(beams, NA, pos, dir)` | wrap your own beams (e.g. polarized ones) |
-| `CollimatedGaussianBeamletSource(pos, dir, D, λ, w0s; n_grid = 20, basis, randomize_axes, rng)` | square grid of astigmatic beamlets, `w0s ≈ D/n_grid` |
-| `SphericalGaussianBeamletSource(pos, dir, θ, λ; num_rings, num_rays, overlap = 1.2, basis, randomize_axes, rng, P0, E0)` | diverging beamlet fan |
-| `EllipticalGaussianBeamletSource(pos, dir, θ_x, θ_y, λ; …)` | elliptical diverging beamlet fan |
-| `GaussianBeamletDecomposition(pos, dir, λ, w0; n_grid, overlap, basis, randomize_axes, rng, P0, E0, threshold = 1e-4)` | one large Gaussian beam decomposed into beamlets |
+| `CollimatedGaussianBeamletSource(pos, dir, D, λ, w0s; n_grid = 20, basis, randomize_axes, rng, P0)` | square grid of astigmatic beamlets, `w0s ≈ D/n_grid`; total power `P0` |
+| `SphericalGaussianBeamletSource(pos, dir, θ, λ; num_rings, num_rays, overlap = 1.2, basis, randomize_axes, rng, P0, E0)` | diverging beamlet fan; total power `P0`, `E0` sets only polarization and phase |
+| `EllipticalGaussianBeamletSource(pos, dir, θ_x, θ_y, λ; …)` | elliptical diverging beamlet fan; as above |
+| `GaussianBeamletDecomposition(pos, dir, λ, w0; n_grid, overlap, basis, randomize_axes, rng, P0, E0, threshold = 1e-4)` | one large Gaussian beam decomposed into beamlets; power `P0`, `E0` sets only polarization and phase, `n_grid > 4 overlap` |
 | `WavefrontBeamletDecomposition(x, y, amplitude, phase, dir, λ; threshold, overlap, basis, randomize_axes, rng, E0)` | arbitrary sampled wavefront; the grid is centered at the origin, move it with `translate3d!` |
 | `AstigmaticBeamGroup(beams, pos, dir_or_orientation)` | wrap your own astigmatic beamlets |
 
