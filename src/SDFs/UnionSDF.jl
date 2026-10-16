@@ -74,8 +74,30 @@ Base.:+(u1::UnionSDF{T}, u2::UnionSDF{T}) where T = UnionSDF{T}(u1.sdfs..., u2.s
 # Without this function it is not possible for SDFs encapsulated in a UnionSDF
 # to specialize normal3d as always the generic normal3d function is called.
 function normal3d(s::UnionSDF, pos)
-    # find the closes sub-sdf and call its normal method
-    idx = argmin(sdf(_sdf, pos) for _sdf in s.sdfs)
+    ds = map(_sdf -> sdf(_sdf, pos), s.sdfs)
+    return normal3d(s.sdfs[_closest_operand(s.sdfs, ds, pos)], pos)
+end
 
-    return normal3d(s.sdfs[idx], pos)
+"""
+    _closest_operand(operands, ds, pos)
+
+Returns the index of the operand closest to `pos`, for the SDF values `ds` of the `operands` at
+`pos`. Operands that are equally close up to rounding touch each other tangentially near `pos`,
+e.g. the vertex of a concave lens surface touches the face of the lens body. Both give the same
+normal, but only the outer one, i.e. the boundary of the union next to `pos`, gives its change,
+e.g. its derivative w.r.t. the pose of the lens in automatic differentiation. The outer one is the
+closest operand at four points beside `pos`, `ρ` along the tangent plane and `ρ` outward, i.e.
+outside of the union also if `pos` lies on its surface.
+"""
+function _closest_operand(operands, ds, pos; ρ = 1e-6)
+    d_min = minimum(ds)
+    tol = Config.get_sdf_raymarch_eps() / 100
+    # the usual case, one closest operand, without allocations
+    count(d -> d ≤ d_min + tol, ds) == 1 && return findfirst(d -> d ≤ d_min + tol, ds)
+    tied = findall(d -> d ≤ d_min + tol, collect(ds))
+    n = normal3d(operands[first(tied)], pos)
+    t1 = normal3d(Point3(n))
+    t2 = cross(n, t1)
+    beside(o) = sum(sdf(o, pos + ρ * (t + n)) for t in (t1, -t1, t2, -t2))
+    return tied[argmin(map(i -> beside(operands[i]), tied))]
 end

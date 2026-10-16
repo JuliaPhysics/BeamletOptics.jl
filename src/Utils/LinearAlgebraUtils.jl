@@ -6,7 +6,9 @@ vectors, `norm(cross(v1, v2))` of the normalized vectors, is at most `atol`.
 """
 function isparallel3d(v1::AbstractArray, v2::AbstractArray;
         atol = sqrt(eps(float(promote_type(eltype(v1), eltype(v2))))))
-    return norm(cross(normalize(v1), normalize(v2))) ≤ atol
+    # the squared norm: `norm` of a cross product that vanishes is `NaN` for dual numbers whose
+    # derivative does not vanish, e.g. at normal incidence in automatic differentiation
+    return sum(abs2, cross(normalize(v1), normalize(v2))) ≤ atol^2
 end
 
 """
@@ -140,6 +142,13 @@ function angle3d(target::AbstractArray{T}, start::AbstractArray{R}) where {T,R}
     arg = clamp(dot(target, start) / (norm(target) * norm(start)), -one(G), one(G))
     angle = acos(arg)
     return angle
+end
+
+# The cosine of `angle3d(target, start)`, without the `acos`: differentiable also for parallel
+# vectors, e.g. at normal incidence, where the derivative of the angle is not defined.
+function cos_angle3d(target::AbstractArray{T}, start::AbstractArray{R}) where {T, R}
+    G = promote_type(T, R)
+    return clamp(dot(target, start) / (norm(target) * norm(start)), -one(G), one(G))
 end
 
 """
