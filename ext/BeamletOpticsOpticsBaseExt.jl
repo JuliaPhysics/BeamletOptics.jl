@@ -119,9 +119,8 @@ the optical path from the source (parents included), and follows the conventions
 `GaussianBeamlet` polarized along `u`, `R = Inf`, `n` the refractive index of the segment.
 
 An `AstigmaticGaussianBeamlet` can be sampled on any of its segments, also within a medium.
-The scalar `GaussianBeamlet` model only gives the field of its last segment in vacuum or
-air: on an earlier segment the optical path of the whole beam enters the phase, and in a
-medium of index `n` the amplitude is `√n` too large.
+The scalar `GaussianBeamlet` model can be sampled on any of its segments as well, but in a
+medium of index `n` its amplitude is `√n` too large.
 """
 OpticsBase.PlaneField(beam::Union{GaussianBeamlet, AstigmaticGaussianBeamlet}, id::Integer;
     size::NTuple{2, Int}, spacing::NTuple{2, <:Real}, origin, axes, progress::Bool = false) =
