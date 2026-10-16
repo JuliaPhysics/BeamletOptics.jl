@@ -25,6 +25,30 @@ Detector
 
 After solving a system containing a `Detector`, the methods listed below can be used in order to analyze the stored data. If no data is obtained during the tracing procedure, an error message will be stored.
 
+## Reading out a detector
+
+A detector stores *hits*. The following rules define what a readout computes.
+
+1. A hit holds the values of the ray or beamlet at the moment of the solve. Solving again, or moving a source or any other component, does not change hits that are already stored.
+2. Any kinematic call on the detector (e.g. [`translate3d!`](@ref) or [`rotate3d!`](@ref)) empties it, also when it is moved as part of an [`ObjectGroup`](@ref), since its hits would no longer lie on its surface.
+3. A detector can hold the hits of solves that follow each other in time side by side. It is up to the user when to evaluate them. [`spot_diagram`](@ref) shows all hits, which is harmless. [`electric_field`](@ref), [`intensity`](@ref) and [`optical_power`](@ref) superpose all hits **coherently**. This is right for beams that exist at the same time, e.g. a beam group or an interferometer. For solves that follow each other in time, the user must know what this computes, or evaluate after each solve and reset the detector (`initialize = true`, [`initialize!`](@ref) or [`empty!`](@ref)).
+
+```julia
+# Reset and evaluate after every solve
+for y in ys
+    translate_to3d!(mirror, [0, y, 0])
+    solve_system!(system, source; initialize = true)
+    push!(powers, optical_power(pd))
+end
+
+# Solve several times, evaluate once: the spots of all solves
+for _ in 1:10
+    zrotate3d!(source, deg2rad(1))
+    solve_system!(system, source)
+end
+spots = spot_diagram(pd)
+```
+
 ## Spot diagrams
 
 The `spot_diagram` method provides a straight forward way to generate spot diagrams, which are commonly used to perform initial assessments of the optical performance of an imaging setup.

@@ -301,6 +301,26 @@ function gauss_parameters(
         hint = point_on_beam(gauss, z)
 )
     p0, index = hint
+    w, R, z, w0, _ = _local_beam(gauss, p0, index)
+    ψ = -atan(1, √(1 / (R * z) - 1))
+    # Catch NaNs and correct Gouy phase sign based on curvature sign
+    isnan(R) && (R = zero(R))
+    isnan(ψ) && (ψ = zero(ψ))
+    isnan(w0) && (w0 = w)
+    R < 0 && (ψ = -ψ)
+    return (w, R, ψ + ψ0, w0)
+end
+
+"""
+    _local_beam(gauss::GaussianBeamlet, p0, index)
+
+Parameters of the segment `index` of `gauss` on the plane through `p0` normal to its chief ray,
+from the heights and slopes of the waist and divergence rays (Arnaud 1985, DeJager 1992): beam
+radius `w`, curvature `R` (1/radius of curvature), signed distance `z` from the local waist, waist
+radius `w0` and far-field divergence `F` (`w² = w0² + F² z²` within the segment). Values can be NaN,
+e.g. at a plane where the divergence ray crosses the chief ray.
+"""
+function _local_beam(gauss::GaussianBeamlet, p0, index)
     chief = gauss.chief.rays[index]
     div = gauss.divergence.rays[index]
     waist = gauss.waist.rays[index]
@@ -342,14 +362,8 @@ function gauss_parameters(
     w = sqrt(y_d^2 + y_w^2)
     R = E_kt / w^2
     z = E_kt / F_kt^2
-    ψ = -atan(1, √(1 / (R * z) - 1))
     w0 = H / (n * F_kt)
-    # Catch NaNs and correct Gouy phase sign based on curvature sign
-    isnan(R) && (R = zero(R))
-    isnan(ψ) && (ψ = zero(ψ))
-    isnan(w0) && (w0 = w)
-    R < 0 && (ψ = -ψ)
-    return (w, R, ψ + ψ0, w0)
+    return (w, R, z, w0, F_kt)
 end
 
 """

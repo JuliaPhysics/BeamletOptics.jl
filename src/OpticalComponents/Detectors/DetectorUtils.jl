@@ -171,7 +171,7 @@ function calc_local_pos(
         # Use cached parabasal parameters at segment start
         # Propagate to detector (end of segment)
         # chief segment length
-        l_seg = length(rays(hit.agb.c)[hit.id])
+        l_seg = hit.l_seg
         h1 = (hit.h1 + l_seg * hit.u1) * crop_factor
         h2 = (hit.h2 + l_seg * hit.u2) * crop_factor
         
