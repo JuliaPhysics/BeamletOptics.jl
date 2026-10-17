@@ -357,6 +357,129 @@ end
     end
 end
 
+@testset "Hits are values" begin
+    # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/42: a hit holds no reference to the
+    # beam that made it, hence a vector of hits is one block of memory
+    for H in (BMO.RayHit, BMO.PolarizedRayHit, BMO.GaussianBeamletHit, BMO.AstigmaticGaussianBeamletHit)
+        @test isbitstype(H{Float64})
+    end
+end
+
+@testset "A new solve does not change the stored hits" begin
+    # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/42
+    @testset "Beam rotated between solves" begin
+        pd = Detector(50mm)
+        translate3d!(pd, [0, 100mm, 0])
+        system = System([pd])
+        beam = Beam([0.0, 0, 0], [0.0, 1, 0])
+        for _ in 1:5
+            solve_system!(system, beam)
+            zrotate3d!(beam, deg2rad(1))
+        end
+        # the hit of the i-th solve lies 100 mm · tan((i − 1)°) to the side
+        xs = sort(abs.(first.(spot_diagram(pd))))
+        @test xs ≈ 100mm .* tan.(deg2rad.(0:4)) atol = 1e-12
+    end
+    E0 = [1.0, 0, 0]
+    beams = (
+        "Beam" => () -> Beam([0.0, 0, 0], [0.0, 1, 0], 1e-6),
+        "Beam of PolarizedRays" => () -> Beam([0.0, 0, 0], [0.0, 1, 0], 1e-6, E0),
+        "GaussianBeamlet" => () -> GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], 1e-6, 1mm),
+        "AstigmaticGaussianBeamlet" => () -> AstigmaticGaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], 1e-6, 1mm))
+    # the hit is on the first ray, on the second ray behind a mirror, or on a child beam
+    for (label, beam) in beams, path in (:direct, :mirror, :splitter)
+        @testset "$label, $path" begin
+            pd = Detector(20mm)
+            system = System([pd])
+            if path === :mirror
+                m = RoundPlanoMirror(30mm, 5mm)
+                zrotate3d!(m, deg2rad(45))
+                translate3d!(m, [0, 50mm, 0])
+                zrotate3d!(pd, deg2rad(90))
+                translate3d!(pd, [100mm, 50mm, 0])
+                push!(system, m)
+            else
+                translate3d!(pd, [0, 150mm, 0])
+            end
+            if path === :splitter
+                bs = ThinBeamsplitter(30mm)
+                zrotate3d!(bs, deg2rad(45))
+                translate3d!(bs, [0, 50mm, 0])
+                push!(system, bs)
+            end
+            b = beam()
+            solve_system!(system, b)
+            before = only(BMO.hits(pd))
+            # move the source and the mirror or splitter, the beam still hits the detector
+            translate3d!(b, [0, 0, 0.5mm])
+            path === :mirror && translate3d!(m, [5mm, 0, 0])
+            path === :splitter && translate3d!(bs, [0, 10mm, 0])
+            solve_system!(system, b)
+            @test BMO.hit_count(pd) == 2
+            @test first(BMO.hits(pd)) === before
+            @test BMO.hit_point(last(BMO.hits(pd)))[3] ≈ 0.5mm
+        end
+    end
+    @testset "Field of a stored GaussianBeamletHit" begin
+        # free space from the waist: E0 w0 / w(L) · exp(i (k L − atan(L / z_R))) on the axis
+        λ, w0, L = 1e-6, 0.5mm, 300mm
+        pd = Detector(20mm)
+        translate3d!(pd, [0, L, 0])
+        system = System([pd])
+        gb = GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], λ, w0)
+        solve_system!(system, gb)
+        hit = only(BMO.hits(pd))
+        translate3d!(gb, [0, 0, 1mm])
+        solve_system!(system, gb)
+        z_R = π * w0^2 / λ
+        w = w0 * sqrt(1 + (L / z_R)^2)
+        E = electric_field(gb) * w0 / w * cis(2π / λ * L - atan(L / z_R))
+        @test BMO.beamlet_hit_field(first(BMO.hits(pd)), BMO.Point3(0.0, L, 0.0)) ≈ E
+        @test first(BMO.hits(pd)) === hit
+    end
+end
+
+@testset "Moving a detector empties it" begin
+    pivot = [1mm, 2mm, 3mm]
+    R = BMO.rotate3d([0.0, 0, 1], 0.1)
+    moves = (
+        "translate3d!" => pd -> translate3d!(pd, [0, 1mm, 0]),
+        "translate_to3d!" => pd -> translate_to3d!(pd, [0, 120mm, 0]),
+        "reset_translation3d!" => pd -> reset_translation3d!(pd),
+        "rotate3d!(R)" => pd -> rotate3d!(pd, R),
+        "rotate3d!(R, pivot)" => pd -> rotate3d!(pd, R, pivot),
+        "rotate3d!(axis, θ)" => pd -> rotate3d!(pd, [0.0, 0, 1], 0.1),
+        "rotate3d!(axis, θ, pivot)" => pd -> rotate3d!(pd, [0.0, 0, 1], 0.1, pivot),
+        "xrotate3d!" => pd -> xrotate3d!(pd, 0.1),
+        "yrotate3d!" => pd -> yrotate3d!(pd, 0.1),
+        "zrotate3d!" => pd -> zrotate3d!(pd, 0.1),
+        "align3d!" => pd -> align3d!(pd, [0.1, 1, 0]),
+        "reset_rotation3d!" => pd -> reset_rotation3d!(pd),
+        "translate3d! of a group" => pd -> translate3d!(ObjectGroup([pd]), [0, 1mm, 0]),
+        "zrotate3d! of a group" => pd -> zrotate3d!(ObjectGroup([pd]), 0.1))
+    for (label, move!) in moves
+        @testset "$label" begin
+            pd = Detector(50mm)
+            translate3d!(pd, [0, 100mm, 0])
+            solve_system!(System([pd]), Beam([0.0, 0, 0], [0.0, 1, 0]))
+            @test BMO.hit_count(pd) == 1
+            move!(pd)
+            @test isnothing(BMO.hits(pd))
+        end
+    end
+    @testset "Moving other objects keeps the hits" begin
+        pd = Detector(50mm)
+        translate3d!(pd, [0, 100mm, 0])
+        lens = ThinLens(80mm, 80mm, 4mm, 1.5)
+        translate3d!(lens, [0, 50mm, 0])
+        beam = Beam([0.0, 0, 0], [0.0, 1, 0])
+        solve_system!(System([lens, pd]), beam)
+        translate3d!(lens, [1mm, 0, 0])
+        translate3d!(beam, [0, 0, 1mm])
+        @test BMO.hit_count(pd) == 1
+    end
+end
+
 end # TESTSET
 
 end # MODULE

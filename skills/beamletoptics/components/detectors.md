@@ -9,8 +9,10 @@ Detector(edge_length, stop = true)
   it catches beams travelling along −x.
 - With `stop = false`, beams continue behind the detector.
 - Stores *hits* of exactly **one** type (Ray, PolarizedRay, GaussianBeamlet or AstigmaticGaussianBeamlet).
-- **Accumulates across solves:** solve with `initialize = true`, or call `initialize!(system)` (all detectors of a system, nested groups included) or `empty!(det)` (one detector) before each `solve_system!` that reuses it. By default the solver does not reset detectors: all beams of a beam group, and several sources solved one after another, superpose on purpose.
-- Read out all results before moving the detector again.
+- **Hits are values** of the beam state at the solve. Solving again, or moving a source, mirror or lens, never changes stored hits.
+- **Moving the detector empties it:** every kinematic call on it (also a move of a group containing it) clears its hits.
+- **Accumulates across solves:** by default the solver does not reset detectors, so hits of consecutive solves sit side by side and all beams of a beam group, and several sources solved one after another, superpose on purpose. The user decides when to evaluate. To start empty, solve with `initialize = true`, or call `initialize!(system)` (all detectors of a system, nested groups included) or `empty!(det)` (one detector).
+- `spot_diagram` shows all stored hits. `electric_field`, `intensity` and `optical_power` superpose **all** stored hits **coherently**, as for beams that exist at the same time. For solves that follow each other in time, know what this computes, or evaluate after each solve and reset (`initialize = true`).
 
 ## Readout
 

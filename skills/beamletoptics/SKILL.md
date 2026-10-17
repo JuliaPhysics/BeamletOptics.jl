@@ -28,7 +28,7 @@ When this Skill is active:
   `λ -> 1.5`, `DiscreteRefractiveIndex(...)` or `SellmeierEquation(...)`.
 - **Detectors accumulate.** Solve with `solve_system!(system, beam; initialize = true)`, or call `initialize!(system)`
   (all detectors) or `empty!(detector)` (one) before every `solve_system!` that reuses the detectors; never reset
-  between sources that should superpose.
+  between sources that should superpose. Field functions superpose all stored hits coherently; moving the detector empties it.
 - **All kinematics are relative** (`translate3d!`, `xrotate3d!`, …), angles in radians (`deg2rad`).
   Use `translate_to3d!` for absolute positioning.
 - Run the script after writing it. A simulation that "looks right" but was never executed is not done.
