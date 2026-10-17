@@ -200,6 +200,11 @@ the geometric path and `ψ0` the Gouy phase that the beam has collected up to th
 segment, of refractive index `n`, the beam follows the complex beam parameter `q0 = s0 + i z_R`
 at `p0`: `s0` is the signed distance from the local waist of radius `w0`. `E_amp` is the field
 amplitude times the beam radius, `E0 w0` of the source.
+
+Where the stigmatic model applies, the field agrees with the waist and divergence rays of the
+beamlet (see [`gauss_parameters`](@ref)) to about `1e-6`. Near the focus of a beam made
+astigmatic by a tilted or decentered lens the beam radius can differ by tens of percent; use
+an [`AstigmaticGaussianBeamlet`](@ref) there.
 """
 struct GaussianBeamletHit{T} <: AbstractBeamletHit{T}
     l0::T
@@ -252,13 +257,12 @@ struct AstigmaticGaussianBeamletHit{T} <: AbstractBeamletHit{T}
     E_pol::Point3{Complex{T}}
 end
 
-position(hit::AbstractBeamletHit) = hit.p0
 direction(hit::AbstractBeamletHit) = hit.d0
 wavelength(hit::AbstractBeamletHit) = hit.λ
 refractive_index(hit::GaussianBeamletHit) = hit.n
 refractive_index(hit::AstigmaticGaussianBeamletHit) = hit.n_eff
 
-hit_point(hit::AbstractBeamletHit) = position(hit) + hit.l_seg * direction(hit)
+hit_point(hit::AbstractBeamletHit) = hit.p0 + hit.l_seg * hit.d0
 
 projection_factor(hit::AbstractBeamletHit) = hit.sqrt_proj^2
 
@@ -546,7 +550,7 @@ function GaussianBeamletHit(g::GaussianBeamlet{R}, id::Integer) where {R}
     # Beam radius at the end of the segment, for the auto-limits of the field plots
     w_max = _beam_radius(q0, w0, isfinite(l_seg) ? l_seg : zero(R))
     return GaussianBeamletHit{R}(l0, _path_excess_before(g, id), _gouy_before(g, id), p0, d0, l_seg,
-        q0, w0, n, λ, electric_field(g) * beam_waist(g), _projection_factor(ray), w_max)
+        q0, w0, n, λ, electric_field(g) * beam_waist(g), _sqrt_projection(ray), w_max)
 end
 
 # Radius of a Gaussian beam with the beam parameter `q0` = s0 + i z_R and the waist radius `w0`
@@ -576,7 +580,7 @@ function AstigmaticGaussianBeamletHit(agb::AstigmaticGaussianBeamlet{R}, id::Int
     p0 = position(chief)
     d0 = direction(chief)
     k0 = 2π / wavelength(chief)
-    sqrt_proj = _projection_factor(chief)
+    sqrt_proj = _sqrt_projection(chief)
 
     # Parabasal parameters at segment start (p0)
     h1, u1, h2, u2, _ = parabasal_ray_parameters(agb, p0, id)
@@ -632,7 +636,7 @@ function _length_before(beam::Beam{T}, id::Integer) where {T}
 end
 
 # √|d·n| of a ray ending on a surface with normal n; 1 without an intersection
-_projection_factor(ray::AbstractRay) = sqrt(_projection(ray))
+_sqrt_projection(ray::AbstractRay) = sqrt(_projection(ray))
 
 function interact3d(::AbstractSystem, d::Detector, g::GaussianBeamlet{R}, id::Int) where {R}
     push!(d, GaussianBeamletHit(g, id))
