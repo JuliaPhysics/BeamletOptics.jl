@@ -434,7 +434,8 @@ end
         z_R = π * w0^2 / λ
         w = w0 * sqrt(1 + (L / z_R)^2)
         E = electric_field(gb) * w0 / w * cis(2π / λ * L - atan(L / z_R))
-        @test BMO.beamlet_hit_field(first(BMO.hits(pd)), BMO.Point3(0.0, L, 0.0)) ≈ E
+        # the waist and divergence rays give the Gouy phase to about 1e-7 rad
+        @test BMO.beamlet_hit_field(first(BMO.hits(pd)), BMO.Point3(0.0, L, 0.0)) ≈ E rtol = 1e-6
         @test first(BMO.hits(pd)) === hit
     end
 end

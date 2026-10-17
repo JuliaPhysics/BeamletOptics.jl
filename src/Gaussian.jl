@@ -302,40 +302,80 @@ function gauss_parameters(
 )
     p0, index = hint
     chief = gauss.chief.rays[index]
-    div = gauss.divergence.rays[index]
-    waist = gauss.waist.rays[index]
+    w, R, ψ, w0 = gauss_parameters(GaussianSegment(gauss, index), dot(p0 - position(chief), direction(chief)))
+    return (w, R, ψ + ψ0, w0)
+end
+
+"""
+    GaussianSegment{T}
+
+The waist and divergence rays of one segment of a [`GaussianBeamlet`](@ref), as values relative
+to its chief ray: on the plane normal to the chief ray at the distance `l` behind its start, an
+auxiliary ray with direction `a` crosses at the transverse offset `y0 + l * v` from the chief ray.
+Both rays are straight within the segment, hence this holds exactly. `n` is the refractive index
+of the segment and `λ` the vacuum wavelength. [`gauss_parameters`](@ref)`(segment, l)` evaluates it,
+a [`GaussianBeamletHit`](@ref) stores it.
+"""
+struct GaussianSegment{T}
+    y0_w::Point3{T}
+    v_w::Point3{T}
+    a_w::Point3{T}
+    y0_d::Point3{T}
+    v_d::Point3{T}
+    a_d::Point3{T}
+    n::T
+    λ::T
+end
+
+function GaussianSegment(gauss::GaussianBeamlet{T}, index::Integer) where {T}
+    chief = gauss.chief.rays[index]
+    p, d = position(chief), direction(chief)
+    y0_w, v_w, a_w = _crossing(p, d, gauss.waist.rays[index])
+    y0_d, v_d, a_d = _crossing(p, d, gauss.divergence.rays[index])
+    return GaussianSegment{T}(y0_w, v_w, a_w, y0_d, v_d, a_d, refractive_index(chief), wavelength(gauss))
+end
+
+# Offset `y0 + l v` from the chief ray (start `p`, direction `d`) at which `ray` crosses the plane
+# normal to `d` at the distance `l` behind `p`, and the direction of `ray`
+function _crossing(p, d, ray)
+    a = direction(ray)
+    c = dot(d, a)
+    return position(ray) + dot(p - position(ray), d) / c * a - p, a / c - d, a
+end
+
+# Height and slope of an auxiliary ray with the offset `y0 + l v` and the direction `a`: the slope
+# is tan(π/2 − θ) = cot θ of the angle θ between the offset and `a`
+function _height_slope(y0, v, a, l)
+    y = y0 + l * v
+    h = norm(y)
+    ŷ = y / h
+    return h, dot(ŷ, a) / norm(cross(ŷ, a))
+end
+
+"""
+    gauss_parameters(segment::GaussianSegment, l)
+
+Returns `(w, R, ψ, w0)` of the [`GaussianSegment`](@ref) at the distance `l` behind the start of
+its chief ray, as [`gauss_parameters`](@ref)`(gauss, z)` does, but with the Gouy phase `ψ` relative
+to the local waist of the segment.
+"""
+function gauss_parameters(s::GaussianSegment, l::Real)
     #=
-    Divergence ray height and slope (same for waist ray)
-    - find divergence ray "height" and "slope" at intersection point y0 with target plane at p0 of chief ray
-    - ray height "y_d" is length between p0 and y0
-    - ray slope "m_d" is angle between vector p0 -> y0 and divergence ray direction -> gives unambiguous angle for signed ray slope calculation
-    - fails if y_d is zero -> catch R=Inf, ψ=0 and H=λ/π
+    Height y and slope m of the divergence and waist rays on the plane at l
+    - the height is the distance between the chief ray and the crossing point of the ray
+    - the slope is the cotangent of the angle between the offset and the ray direction, which
+      gives the signed slope
+    - fails if a height is zero -> catch R=Inf, ψ=0 and H=λ/π
     =#
-    intersection_len = line_plane_distance3d(p0,
-        direction(chief),
-        position(div),
-        direction(div))
-    y0 = position(div) + intersection_len * direction(div) - p0
-    y_d = norm(y0)
-    y0 /= y_d
-    m_d = tan(π / 2 - angle3d(y0, direction(div)))
-    # Waist ray height and slope
-    intersection_len = line_plane_distance3d(p0,
-        direction(chief),
-        position(waist),
-        direction(waist))
-    y0 = position(waist) + intersection_len * direction(waist) - p0
-    y_w = norm(y0)
-    y0 /= y_w
-    m_w = tan(π / 2 - angle3d(y0, direction(waist)))
+    y_d, m_d = _height_slope(s.y0_d, s.v_d, s.a_d, l)
+    y_w, m_w = _height_slope(s.y0_w, s.v_w, s.a_w, l)
     # Beam parameters as per Arnaud (1985) and DeJager (1992)
-    n = refractive_index(chief)
+    n = s.n
     H = abs(n * (y_w * m_d - y_d * m_w))
     # Test optical invariant
-    λ = wavelength(gauss)
+    λ = s.λ
     if !isapprox(H, λ / π, atol = Config.get_invariant_threshold())
         H = λ / π
-        # println("H not fulfilled at z=$z")
     end
     E_kt = y_d * m_d + y_w * m_w
     F_kt = sqrt(m_d^2 + m_w^2)
@@ -349,7 +389,7 @@ function gauss_parameters(
     isnan(ψ) && (ψ = zero(ψ))
     isnan(w0) && (w0 = w)
     R < 0 && (ψ = -ψ)
-    return (w, R, ψ + ψ0, w0)
+    return (w, R, ψ, w0)
 end
 
 """

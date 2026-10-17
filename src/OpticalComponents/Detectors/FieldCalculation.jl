@@ -94,17 +94,14 @@ function beamlet_hit_field(hit::GaussianBeamletHit{G}, p::AbstractArray) where {
     # Transverse distance r
     r = norm(v - l1 * hit.d0)
 
-    # Beam radius, curvature and Gouy phase from q(l1) = q0 + l1 = s + i z_R
-    s0, z_R = reim(hit.q0)
-    s = s0 + l1
-    w = _beam_radius(hit.q0, hit.w0, l1)
-    curv = s / (s^2 + z_R^2)
-    ψ = hit.ψ0 - atan(s / z_R)
+    # Beam radius, curvature and Gouy phase from the waist and divergence rays of the segment
+    w, curv, ψ, _ = gauss_parameters(hit.segment, l1)
+    ψ += hit.ψ0
 
     # Optical path up to the point, l0 + l1 along the beam. The curvature term is a geometric
     # length like l1, hence it enters with the wavenumber n k0 of the medium as well.
-    k0 = wavenumber(hit.λ)
-    n = hit.n
+    k0 = wavenumber(hit.segment.λ)
+    n = hit.segment.n
     opl = hit.l0 + l1 + hit.Δl0 + (n - 1) * l1
     return hit.E_amp / w * exp(-r^2 / w^2) * cis(k0 * opl + ψ + n * k0 * r^2 * curv / 2)
 end

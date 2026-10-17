@@ -196,15 +196,10 @@ abstract type AbstractBeamletHit{T} <: AbstractDetectorHit end
 Stores the segment of a [`GaussianBeamlet`](@ref) that hit the detector as values, without a
 reference to the beamlet: `p0` and `d0` are start and direction of the segment, `l_seg` its
 length, `l0` the length of the beam (including its parents) up to `p0`, `Δl0` the optical minus
-the geometric path and `ψ0` the Gouy phase that the beam has collected up to there. Within the
-segment, of refractive index `n`, the beam follows the complex beam parameter `q0 = s0 + i z_R`
-at `p0`: `s0` is the signed distance from the local waist of radius `w0`. `E_amp` is the field
-amplitude times the beam radius, `E0 w0` of the source.
-
-Where the stigmatic model applies, the field agrees with the waist and divergence rays of the
-beamlet (see [`gauss_parameters`](@ref)) to about `1e-6`. Near the focus of a beam made
-astigmatic by a tilted or decentered lens the beam radius can differ by tens of percent; use
-an [`AstigmaticGaussianBeamlet`](@ref) there.
+the geometric path and `ψ0` the Gouy phase that the beam has collected up to there. `segment`
+holds the waist and divergence rays of the segment (see [`BeamletOptics.GaussianSegment`](@ref)),
+from which the field follows as from the beamlet itself, see [`gauss_parameters`](@ref).
+`E_amp` is the field amplitude times the beam radius, `E0 w0` of the source.
 """
 struct GaussianBeamletHit{T} <: AbstractBeamletHit{T}
     l0::T
@@ -213,10 +208,7 @@ struct GaussianBeamletHit{T} <: AbstractBeamletHit{T}
     p0::Point3{T}
     d0::Point3{T}
     l_seg::T
-    q0::Complex{T}
-    w0::T
-    n::T
-    λ::T
+    segment::GaussianSegment{T}
     E_amp::Complex{T}
     sqrt_proj::T
     w_max::T
@@ -258,8 +250,9 @@ struct AstigmaticGaussianBeamletHit{T} <: AbstractBeamletHit{T}
 end
 
 direction(hit::AbstractBeamletHit) = hit.d0
-wavelength(hit::AbstractBeamletHit) = hit.λ
-refractive_index(hit::GaussianBeamletHit) = hit.n
+wavelength(hit::GaussianBeamletHit) = hit.segment.λ
+wavelength(hit::AstigmaticGaussianBeamletHit) = hit.λ
+refractive_index(hit::GaussianBeamletHit) = hit.segment.n
 refractive_index(hit::AstigmaticGaussianBeamletHit) = hit.n_eff
 
 hit_point(hit::AbstractBeamletHit) = hit.p0 + hit.l_seg * hit.d0
@@ -534,30 +527,12 @@ function GaussianBeamletHit(g::GaussianBeamlet{R}, id::Integer) where {R}
     l0 = _length_before(g.chief, id)
     p0 = position(ray)
     d0 = direction(ray)
-    λ = wavelength(g)
-    n = refractive_index(ray)
-    # Complex beam parameter q0 = s0 + i z_R at the segment start, along which the beam evolves
-    # within the segment as q(l) = q0 + l. From the local Gouy phase ψ = −atan(s0 / z_R) and the
-    # curvature c = s0 / (s0² + z_R²) of `gauss_parameters`: q0 = −i sin(ψ) exp(iψ) / c
-    _, curv, ψ, w0 = gauss_parameters(g, l0, zero(R); hint = (p0, id))
-    q0 = if iszero(curv)
-        # waist at p0 (curvature and Gouy phase 0)
-        Complex{R}(0, π * n * w0^2 / λ)
-    else
-        Complex{R}(-im * sin(ψ) * cis(ψ) / curv)
-    end
+    segment = GaussianSegment(g, id)
     l_seg = length(ray)
     # Beam radius at the end of the segment, for the auto-limits of the field plots
-    w_max = _beam_radius(q0, w0, isfinite(l_seg) ? l_seg : zero(R))
+    w_max = first(gauss_parameters(segment, isfinite(l_seg) ? l_seg : zero(R)))
     return GaussianBeamletHit{R}(l0, _path_excess_before(g, id), _gouy_before(g, id), p0, d0, l_seg,
-        q0, w0, n, λ, electric_field(g) * beam_waist(g), _sqrt_projection(ray), w_max)
-end
-
-# Radius of a Gaussian beam with the beam parameter `q0` = s0 + i z_R and the waist radius `w0`
-# at the distance `l` behind the point of `q0`
-function _beam_radius(q0::Complex, w0::Real, l::Real)
-    s0, z_R = reim(q0)
-    return w0 * sqrt(1 + ((s0 + l) / z_R)^2)
+        segment, electric_field(g) * beam_waist(g), _sqrt_projection(ray), w_max)
 end
 
 """

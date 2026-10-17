@@ -60,7 +60,4 @@ Once a `GaussianBeamlet` has been traced through an optical system, several para
 
 The user can obtain parameters such as the beam waist radius, the radius of curvature and more using the [`gauss_parameters`](@ref) and/or [`waist_parameters`](@ref) functions. Below the local waist radius and curvature ``R = r^{-1}`` have been calculated for the example above.
 
-!!! warning "Outside the stigmatic model"
-    A [`Detector`](@ref) evaluates a beamlet segment from its complex beam parameter at the segment start, whereas [`gauss_parameters`](@ref) evaluates the waist and divergence rays at every plane. Where the stigmatic model applies, both agree to about ``10^{-6}``. Behind a tilted or decentered lens the beam becomes astigmatic and the auxiliary rays no longer cross: near the focus of such a beam the beam radius of the two can differ by tens of percent, and neither is right. Use an [`AstigmaticGaussianBeamlet`](@ref) there.
-
 ![Gauss beam parameters](gauss_parameters.png)
