@@ -477,7 +477,7 @@ _local_gouy_start(gauss::GaussianBeamlet{T}, index::Integer) where {T} =
 function _local_gouy_end(gauss::GaussianBeamlet{T}, index::Integer) where {T}
     ray = rays(gauss.chief)[index]
     return gauss_parameters(gauss, zero(T), zero(T);
-        hint = (position(ray) + length(ray) * direction(ray), index))[3]
+        hint = (hit_point(ray), index))[3]
 end
 
 """

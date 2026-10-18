@@ -247,7 +247,7 @@ function Base.show(io::IO, ::MIME"text/plain", beam::Beam)
             println(io, "    Intersects with $(typeof(object(intersection(ray))))")
             println(io, "    Pos.: $(position(ray))")
             println(io, "    Dir.: $(direction(ray))")
-            println(io, "    End.: $(position(ray) .+ length(ray) .* direction(ray))")
+            println(io, "    End.: $(hit_point(ray))")
         end
     end
     return nothing

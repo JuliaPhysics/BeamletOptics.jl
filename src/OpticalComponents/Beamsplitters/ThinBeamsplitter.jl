@@ -74,7 +74,7 @@ Base.isvalid(bs::AbstractBeamsplitter) = reflectance(bs)^2 + transmittance(bs)^2
 
 @inline function _beamsplitter_transmitted_beam(
         ::AbstractBeamsplitter, ::Beam{T, R}, ray::R) where {T <: Real, R <: Ray{T}}
-    pos = position(ray) + length(ray) * direction(ray)
+    pos = hit_point(ray)
     dir = direction(ray)
     return Beam(Ray(pos, dir, wavelength(ray)))
 end
@@ -82,7 +82,7 @@ end
 @inline function _beamsplitter_reflected_beam(
         ::AbstractBeamsplitter, ::Beam{T, R}, ray::R) where {T <: Real, R <: Ray{T}}
     normal = normal3d(intersection(ray))
-    pos = position(ray) + length(ray) * direction(ray)
+    pos = hit_point(ray)
     dir = reflection3d(direction(ray), normal)
     return Beam(Ray(pos, dir, wavelength(ray)))
 end
@@ -90,7 +90,7 @@ end
 @inline function _beamsplitter_transmitted_beam(bs::AbstractBeamsplitter, ::Beam{T, R},
         ray::R) where {T <: Real, R <: PolarizedRay{T}}
     J = SPBasis(transmittance(bs), 0, 0, transmittance(bs))
-    pos = position(ray) + length(ray) * direction(ray)
+    pos = hit_point(ray)
     dir = direction(ray)
     E0 = _calculate_global_E0(bs, ray, dir, J)
     return Beam(PolarizedRay(pos, dir, wavelength(ray), E0))
@@ -100,7 +100,7 @@ end
         ray::R) where {T <: Real, R <: PolarizedRay{T}}
     J = SPBasis(-reflectance(bs), 0, 0, reflectance(bs))
     normal = normal3d(intersection(ray))
-    pos = position(ray) + length(ray) * direction(ray)
+    pos = hit_point(ray)
     in_dir = direction(ray)
     out_dir = reflection3d(in_dir, normal)
     E0 = _calculate_global_E0(bs, ray, out_dir, J)

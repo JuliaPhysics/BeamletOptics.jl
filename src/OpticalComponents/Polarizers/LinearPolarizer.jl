@@ -96,7 +96,7 @@ function _is_film_interface(lp::LinearPolarizer, from, ray::AbstractRay)
     nrm = normal3d(intersection(ray))
     abs(dot(nrm, y)) ≥ 0.5 || return false
     c = position(lp)
-    p = position(ray) + length(ray) * direction(ray)
+    p = hit_point(ray)
     if from === lp.front
         return dot(p - c, y) > -thickness(lp.front) / 2
     else
@@ -117,7 +117,7 @@ function _film_interface(system::AbstractSystem, lp::LinearPolarizer, from, to,
     n2 = refractive_index(to, λ)
     normal = -normal3d(intersection(ray))
     ndir, TIR = refraction3d(direction(ray), normal, n1, n2)
-    npos = position(ray) + length(ray) * direction(ray)
+    npos = hit_point(ray)
     if TIR
         hint = Hint(lp, shape(from))
         n = n1
@@ -141,7 +141,7 @@ function _film_interface(system::AbstractSystem, lp::LinearPolarizer, from, to,
     n1 = refractive_index(from, λ)
     n2 = refractive_index(to, λ)
     normal = -normal3d(intersection(ray))
-    npos = position(ray) + length(ray) * direction(ray)
+    npos = hit_point(ray)
     in_dir = direction(ray)
     θi = angle3d(in_dir, -normal)
     rs, rp, ts, tp = fresnel_coefficients(θi, n2 / n1)

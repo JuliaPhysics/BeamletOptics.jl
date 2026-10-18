@@ -172,20 +172,6 @@ PolarizedRayHit(ray::PolarizedRay{T}, opl::Real) where {T} =
 
 polarization(hit::PolarizedRayHit) = hit.E
 
-"Returns the point where the `ray` ends at its [`Intersection`](@ref) with a surface."
-hit_point(ray::AbstractRay) = position(ray) + length(ray) * direction(ray)
-
-"""
-    projection_factor(ray::AbstractRay)
-
-Returns `|d · n|` of the direction `d` of the `ray` and the normal `n` of the surface it ends on;
-`1` if the ray ends without an intersection.
-"""
-function projection_factor(ray::AbstractRay{T}) where {T}
-    isnothing(intersection(ray)) && return one(T)
-    return abs(dot(direction(ray), normal3d(intersection(ray))))
-end
-
 """
     AbstractBeamletHit
 

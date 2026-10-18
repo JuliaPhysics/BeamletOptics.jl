@@ -62,7 +62,7 @@ function interact3d(::AbstractSystem,
         polfilter::PolarizationFilter,
         ::Beam{T, R},
         ray::R) where {T <: Real, R <: PolarizedRay{T}}
-    npos = position(ray) + length(ray) * direction(ray)
+    npos = hit_point(ray)
     ndir = direction(ray)
 
     E0 = _calculate_global_E0(polfilter, ray, ndir, polfilter.JMat)
@@ -83,7 +83,7 @@ function interact3d(
         ray::R
     ) where {T <: Real, R <: Ray{T}}
     # unpolarized rays (e.g. beamlet auxiliary rays) pass through the ideal filter unchanged
-    npos = position(ray) + length(ray) * direction(ray)
+    npos = hit_point(ray)
     ndir = direction(ray)
     return BeamInteraction{T, R}(nothing,
         Ray{T}(npos, ndir, nothing, wavelength(ray), refractive_index(ray)))
