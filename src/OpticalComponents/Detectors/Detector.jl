@@ -148,7 +148,7 @@ struct RayHit{T} <: AbstractRayHit{T}
 end
 
 RayHit(ray::Ray{T}, opl::Real) where {T} =
-    RayHit{T}(_ray_end(ray), direction(ray), opl, wavelength(ray), refractive_index(ray), _projection(ray))
+    RayHit{T}(hit_point(ray), direction(ray), opl, wavelength(ray), refractive_index(ray), projection_factor(ray))
 
 """
     PolarizedRayHit(ray::PolarizedRay, opl)
@@ -167,16 +167,21 @@ struct PolarizedRayHit{T} <: AbstractRayHit{T}
 end
 
 PolarizedRayHit(ray::PolarizedRay{T}, opl::Real) where {T} =
-    PolarizedRayHit{T}(_ray_end(ray), direction(ray), opl, wavelength(ray), refractive_index(ray),
-        _projection(ray), polarization(ray))
+    PolarizedRayHit{T}(hit_point(ray), direction(ray), opl, wavelength(ray), refractive_index(ray),
+        projection_factor(ray), polarization(ray))
 
 polarization(hit::PolarizedRayHit) = hit.E
 
-# End point of a ray that hit a surface
-_ray_end(ray::AbstractRay) = position(ray) + length(ray) * direction(ray)
+"Returns the point where the `ray` ends at its [`Intersection`](@ref) with a surface."
+hit_point(ray::AbstractRay) = position(ray) + length(ray) * direction(ray)
 
-# |d·n| of a ray ending on a surface with normal n; 1 without an intersection
-function _projection(ray::AbstractRay{T}) where {T}
+"""
+    projection_factor(ray::AbstractRay)
+
+Returns `|d · n|` of the direction `d` of the `ray` and the normal `n` of the surface it ends on;
+`1` if the ray ends without an intersection.
+"""
+function projection_factor(ray::AbstractRay{T}) where {T}
     isnothing(intersection(ray)) && return one(T)
     return abs(dot(direction(ray), normal3d(intersection(ray))))
 end
@@ -532,7 +537,7 @@ function GaussianBeamletHit(g::GaussianBeamlet{R}, id::Integer) where {R}
     # Beam radius at the end of the segment, for the auto-limits of the field plots
     w_max = first(gauss_parameters(segment, isfinite(l_seg) ? l_seg : zero(R)))
     return GaussianBeamletHit{R}(l0, _path_excess_before(g, id), _gouy_before(g, id), p0, d0, l_seg,
-        segment, electric_field(g) * beam_waist(g), _sqrt_projection(ray), w_max)
+        segment, electric_field(g) * beam_waist(g), sqrt(projection_factor(ray)), w_max)
 end
 
 """
@@ -555,7 +560,7 @@ function AstigmaticGaussianBeamletHit(agb::AstigmaticGaussianBeamlet{R}, id::Int
     p0 = position(chief)
     d0 = direction(chief)
     k0 = 2π / wavelength(chief)
-    sqrt_proj = _sqrt_projection(chief)
+    sqrt_proj = sqrt(projection_factor(chief))
 
     # Parabasal parameters at segment start (p0)
     h1, u1, h2, u2, _ = parabasal_ray_parameters(agb, p0, id)
@@ -609,9 +614,6 @@ function _length_before(beam::Beam{T}, id::Integer) where {T}
     end
     return l
 end
-
-# √|d·n| of a ray ending on a surface with normal n; 1 without an intersection
-_sqrt_projection(ray::AbstractRay) = sqrt(_projection(ray))
 
 function interact3d(::AbstractSystem, d::Detector, g::GaussianBeamlet{R}, id::Int) where {R}
     push!(d, GaussianBeamletHit(g, id))
