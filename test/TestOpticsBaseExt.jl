@@ -454,18 +454,18 @@ end
 end
 
 @testset "PlaneField of one traced beamlet segment" begin
-    det = trace!(detector_at(zdet), agb_at())
-    hit = only(BMO.hits(det))
+    agb = agb_at()
+    det = trace!(detector_at(zdet), agb)
     fd = PlaneField(det; size = (48, 48), spacing = (w0 / 6, w0 / 6), progress = false)
-    fb = PlaneField(hit.agb, hit.id; size = (48, 48), spacing = (w0 / 6, w0 / 6),
+    fb = PlaneField(agb, length(BMO.rays(agb.c)); size = (48, 48), spacing = (w0 / 6, w0 / 6),
         origin = fd.origin, axes = fd.axes)
     @test fb.E == fd.E && fb.H == fd.H
     @test fb.origin == fd.origin && fb.axes == fd.axes && fb.n == fd.n
     # stigmatic beamlets too
-    det = trace!(detector_at(zdet), BMO.GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], λ, w0; P0))
-    hit = only(BMO.hits(det))
+    gb = BMO.GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], λ, w0; P0)
+    det = trace!(detector_at(zdet), gb)
     fd = PlaneField(det; size = (32, 32), spacing = (w0 / 4, w0 / 4), progress = false)
-    fb = PlaneField(hit.gauss, hit.id; size = (32, 32), spacing = (w0 / 4, w0 / 4),
+    fb = PlaneField(gb, length(BMO.rays(gb.chief)); size = (32, 32), spacing = (w0 / 4, w0 / 4),
         origin = fd.origin, axes = fd.axes)
     @test fb.E == fd.E
 end

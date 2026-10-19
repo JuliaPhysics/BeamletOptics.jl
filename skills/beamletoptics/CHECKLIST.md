@@ -8,7 +8,7 @@
 - [ ] Lens radius signs follow ISO 10110 (biconvex: `r1 > 0`, `r2 < 0`).
 - [ ] Geometry assumes +y as the optical axis; rotations are cumulative and relative.
 - [ ] Sources start **outside** of all elements and point at them.
-- [ ] Detectors emptied before every re-solve in a loop (`initialize = true`, `initialize!(system)` or `empty!(detector)`); results read out before the detector is moved.
+- [ ] Detectors emptied before every re-solve in a loop (`initialize = true`, `initialize!(system)` or `empty!(detector)`), unless the hits of all solves are wanted together (e.g. the spots of a scan); `electric_field`, `intensity` and `optical_power` superpose all stored hits coherently; moving the detector empties it.
 - [ ] Beam model fits the question (see below).
 - [ ] Script was **run**, and the printed numbers were compared with a paraxial or analytic estimate.
 - [ ] For non-trivial geometry, a rendered image was checked.

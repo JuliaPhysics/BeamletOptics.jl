@@ -66,7 +66,7 @@ function interact3d(system::AbstractSystem,
     end
     # Calculate new dir. and pos.
     ndir, TIR = refraction3d(direction(ray), normal, n1, n2)
-    npos = position(ray) + length(ray) * direction(ray)
+    npos = hit_point(ray)
     # In case of TIR, update hint and n2
     if TIR
         hint = Hint(optic)
@@ -87,7 +87,7 @@ function interact3d(system::AbstractSystem, optic::AbstractRefractiveOptic,
         ::Beam{T, R}, ray::R) where {T <: Real, R <: PolarizedRay{T}}
     lambda = wavelength(ray)
     normal = normal3d(intersection(ray))
-    raypos = position(ray) + length(ray) * direction(ray)
+    raypos = hit_point(ray)
     if isentering(ray)
         # Entering optic
         n1 = refractive_index(ray)

@@ -39,7 +39,7 @@ function interact3d(::AbstractSystem,
         ::Beam{T, R},
         ray::R) where {T <: Real, R <: Ray{T}}
     normal = normal3d(intersection(ray))
-    npos = position(ray) + length(ray) * direction(ray)
+    npos = hit_point(ray)
     ndir = reflection3d(direction(ray), normal)
     return BeamInteraction{T, R}(nothing,
         Ray{T}(npos, ndir, nothing, wavelength(ray), refractive_index(ray)))
@@ -56,7 +56,7 @@ function interact3d(::AbstractSystem,
         ::Beam{T, R},
         ray::R) where {T <: Real, R <: PolarizedRay{T}}
     normal = normal3d(intersection(ray))
-    npos = position(ray) + length(ray) * direction(ray)
+    npos = hit_point(ray)
     ndir = reflection3d(direction(ray), normal)
     # Jones reflection matrix
     J = SPBasis(-1, 0, 0, 1)

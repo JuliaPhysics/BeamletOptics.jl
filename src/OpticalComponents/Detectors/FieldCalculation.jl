@@ -92,13 +92,18 @@ function beamlet_hit_field(hit::GaussianBeamletHit{G}, p::AbstractArray) where {
     l1 = _pseudo_dot(v, hit.d0)
 
     # Transverse distance r
-    r_vec = v - l1 * hit.d0
-    r = norm(r_vec)
+    r = norm(v - l1 * hit.d0)
 
-    # Distance along beam
-    z = hit.l0 + l1
+    # Beam radius, curvature and Gouy phase from the waist and divergence rays of the segment
+    w, curv, ψ, _ = gauss_parameters(hit.segment, l1)
+    ψ += hit.ψ0
 
-    return _segment_field(hit.gauss, r, z, hit.p0 + l1 * hit.d0, hit.id, hit.l0, hit.Δl0, hit.ψ0)
+    # Optical path up to the point, l0 + l1 along the beam. The curvature term is a geometric
+    # length like l1, hence it enters with the wavenumber n k0 of the medium as well.
+    k0 = wavenumber(hit.segment.λ)
+    n = hit.segment.n
+    opl = hit.l0 + l1 + hit.Δl0 + (n - 1) * l1
+    return hit.E_amp / w * exp(-r^2 / w^2) * cis(k0 * opl + ψ + n * k0 * r^2 * curv / 2)
 end
 
 function beamlet_hit_field(hit::AstigmaticGaussianBeamletHit{G}, p::AbstractArray) where {G}
@@ -151,7 +156,7 @@ function beamlet_hit_polarization(hit::AstigmaticGaussianBeamletHit)
     # `beamlet_hit_field` already carries the complex amplitude `E_ref_amp` (magnitude of the
     # polarization of the segment and phase of its largest component), so dividing it out
     # keeps amplitude and phase from being counted twice.
-    E = polarization(rays(hit.agb.c)[hit.id])
+    E = hit.E_pol
     iszero(hit.E_ref_amp) && return zero(E)
     return E / hit.E_ref_amp
 end
@@ -308,7 +313,7 @@ function electric_field(
 
     hit_data = map(hits) do hit
         dir = direction(hit)
-        p_hit = position(hit) + length(hit) * dir
+        p_hit = hit_point(hit)
         proj = projection_factor(hit)
         k = wavenumber(hit)
         opl = optical_path_length(hit)
@@ -375,7 +380,7 @@ function electric_field(
 
     hit_data = map(hits) do hit
         dir = direction(hit)
-        p_hit = position(hit) + length(hit) * dir
+        p_hit = hit_point(hit)
         E0 = polarization(hit)
         k = wavenumber(hit)
         opl = optical_path_length(hit)

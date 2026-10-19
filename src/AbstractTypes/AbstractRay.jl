@@ -130,6 +130,24 @@ end
 Base.empty!(ray::AbstractRay) = intersection!(ray, nothing)
 
 """
+    hit_point(ray::AbstractRay)
+
+Returns the point where the `ray` ends, i.e. where it hits the surface of its [`Intersection`](@ref).
+"""
+hit_point(ray::AbstractRay) = position(ray) + length(ray) * direction(ray)
+
+"""
+    projection_factor(ray::AbstractRay)
+
+Returns `|d · n|` of the direction `d` of the `ray` and the normal `n` of the surface it ends on;
+`1` if the ray ends without an intersection.
+"""
+function projection_factor(ray::AbstractRay{T}) where {T}
+    isnothing(intersection(ray)) && return one(T)
+    return abs(dot(direction(ray), normal3d(intersection(ray))))
+end
+
+"""
     translate3d!(::Movable, ray::AbstractRay, offset)
 
 Moves the start position of the `ray` by `offset` and clears its intersection.
