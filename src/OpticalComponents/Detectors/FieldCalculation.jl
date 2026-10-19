@@ -59,9 +59,7 @@ A tuple `(xs, zs, E)` where
 The fields of [`AstigmaticGaussianBeamlet`](@ref)s carry their polarization and are added as 3D
 vectors in global coordinates, `E::Matrix{Point3{Complex{T}}}`: the field at a point is
 `Σ beamlet_hit_field(hit, p) ⋅ beamlet_hit_polarization(hit)` over the hits, with the projection
-factor of each hit. Beamlets of orthogonal polarizations do not interfere, and the phase of a
-circular polarization is well defined. [`intensity`](@ref) and [`optical_power`](@ref) use
-`|E|²`.
+factor of each hit. [`intensity`](@ref) and [`optical_power`](@ref) use `|E|²`.
 
 # [`PolarizedRayHit`](@ref) hits
 
