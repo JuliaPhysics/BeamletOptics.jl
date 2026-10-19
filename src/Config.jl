@@ -39,7 +39,9 @@ get_sdf_raymarch_eps() = SDF_RAYMARCH_EPS
 """
     get_sdf_inside_step()
 
-Returns the global configuration step size when inside an SDF volume.
+Returns the preference `sdf_inside_step`, the former fixed step size [m] of the ray marching
+inside an SDF volume. It is no longer used: a ray inside an SDF is marched by the distance that
+the SDF returns, see `BeamletOptics._raymarch_inside`.
 """
 get_sdf_inside_step() = SDF_INSIDE_STEP
 

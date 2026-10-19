@@ -139,44 +139,132 @@ function _raymarch_outside(shape::AbstractSDF{S},
 end
 
 """
-    _raymarch_inside(object::AbstractSDF, pos, dir; num_iter=1000, dl=0.1)
+    _raymarch_inside(shape::AbstractSDF, pos, dir, t_max=SDF_MISS_DISTANCE, num_iter=10_000, eps=1e-10, h=1e-9)
 
-Perform the ray marching algorithm if the starting pos is inside of `object`.
+Perform the ray marching algorithm if the starting pos is inside of `shape`, or on its surface with
+`dir` pointing inside, and return the intersection where the ray leaves `shape` first. The ray is
+marched by the distance `-sdf`, which is not larger than the distance to the surface for an SDF that
+is exact or a lower bound inside, hence no step passes the exit. A point where the SDF is about 0 is
+an exit only if the ray leaves the object there, not at an internal seam of a composite SDF. If a
+step ends outside, e.g. for an SDF that overestimates the distance inside or after a minimum step,
+the exit within this step is found within the bracket of this step, see `_bracketed_exit`. The ray is a miss once it has travelled the path length `t_max`
+in [m] without leaving `shape`. A ray that grazes the surface of a thin part from inside takes
+steps of about its depth, hence the many iterations. A ray that starts on the surface may start up to the surface
+threshold `h` outside of it, see `intersect3d(object::AbstractSDF, ray)`.
 """
-function _raymarch_inside(object::AbstractSDF{S},
+function _raymarch_inside(shape::AbstractSDF{S},
         pos::AbstractArray{R},
         dir::AbstractArray{R},
-        num_iter = 1000,
-        dl = Config.get_sdf_inside_step()) where {S, R}
-    # this method assumes semi-concave objects, i.e. might fail depending on the choice of dl
+        t_max = SDF_MISS_DISTANCE,
+        num_iter = 10_000,
+        eps = Config.get_sdf_raymarch_eps(),
+        h = Config.get_sdf_surface_threshold()) where {S, R}
     T = promote_type(S, R)
-    t0::T = 0
-    i = 1
-    # march the ray a fixed distance dl until position is outside of sdf, since some sdfs are not exact on the inside
-    while i <= num_iter
-        pos = pos + dl * dir
-        t0 += dl
-        dist = sdf(object, pos)
-        # once outside the sdf, fall back to _raymarch_outside
-        if dist > 0
-            intersection = _raymarch_outside(object, pos, -dir)
-            if intersection === nothing
-                break
-            end
-            intersection.t = t0 - intersection.t
-            return intersection
+    t0 = zero(T)
+    dist = sdf(shape, pos)
+    # A ray that starts on the surface counts as inside once it is deeper than `eps`, before that a
+    # point of the starting surface is no exit.
+    entered = dist < -eps
+    ω = T(1.6)
+    for _ in 1:num_iter
+        # The minimum step leaves the starting surface and the internal seams of composite SDFs, e.g.
+        # the face between two parts of a `UnionSDF`, where the SDF is about 0 within the object. A
+        # step that thereby passes the exit is caught below.
+        t_prev, dist_prev = t0, dist
+        step = max(-dist, eps + t0 * T(1e-3))
+        # Over-relaxed step (Keinert et al., 2014): it is kept if the balls of radius -sdf around
+        # both ends cover it, i.e. no surface lies in between, else the plain step is taken. The
+        # factor grows while steps are kept, e.g. when the ray leaves the starting surface or a seam.
+        t0 = t_prev + ω * step
+        dist = sdf(shape, pos + t0 * dir)
+        if dist ≤ 0 && -dist_prev - dist ≥ t0 - t_prev
+            ω = min(2ω, T(32))
+        else
+            ω = T(1.6)
+            t0 = t_prev + step
+            dist = sdf(shape, pos + t0 * dir)
         end
-        i += 1
+        t0 > t_max && return nothing
+        p = pos + t0 * dir
+        # A non-finite probe, e.g. a `NaN` returned by `sdf`, is a miss
+        (isfinite(dist) && isfinite(t0)) || return nothing
+        # The normal at the exit, see `_exit_normal`
+        if dist > eps && entered
+            # The step ended outside: the exit lies within it
+            t_exit = _bracketed_exit(shape, pos, dir, t_prev, dist_prev, t0, dist, eps)
+            return Intersection(t_exit, _exit_normal(shape, pos, dir, t_exit, eps, h), shape)
+        elseif dist > h
+            # The ray left before it got deeper than `eps`, i.e. it grazes the surface
+            return Intersection(t0, normal3d(shape, p), shape)
+        elseif dist < -eps
+            entered = true
+        elseif entered
+            dist_ahead = sdf(shape, p + h * dir)
+            if dist_ahead > 0
+                # On the surface and leaving it, in contrast to an internal seam. The SDF value is
+                # not the distance for every SDF, hence the exit is refined within (t0, t0 + h].
+                t_exit = _bracketed_exit(shape, pos, dir, t0, dist, t0 + h, dist_ahead, eps)
+                return Intersection(t_exit, _exit_normal(shape, pos, dir, t_exit, eps, h), shape)
+            end
+        end
     end
-    # return no intersection if too many iterations or actual miss occurs
+    # return no intersection if too many iterations
     return nothing
+end
+
+# The outward normal where the ray from `pos` along `dir` leaves `shape` at the path length `t`. It is
+# evaluated outside, `eps` behind the exit, like the normal of a hit of `_raymarch_outside`:
+# - within a composite SDF, e.g. where the parts of a union overlap, the gradient may stem from a part
+#   other than the one whose surface is left
+# - exactly on the surface, the gradient of some SDFs is not defined, e.g. of a distance that is 0
+# - as close as possible, since near thin features another surface may lie close behind the exit
+# A normal that points against the ray, which leaves, stems from a part that touches the exit point
+# from outside, e.g. at the vertex of a concave face on the back of a plate. It is then evaluated
+# farther outside.
+function _exit_normal(shape::AbstractSDF, pos, dir, t, eps, h)
+    normal = normal3d(shape, pos + (t + eps) * dir)
+    dot(normal, dir) > 0 && return normal
+    return normal3d(shape, pos + (t + h) * dir)
+end
+
+# The path length at which the ray from `pos` along `dir` leaves `shape`, for the SDF values
+# fa = sdf(a) ≤ 0 < fb = sdf(b) or fa ≤ eps < fb. The Illinois variant of the regula falsi keeps the
+# bracket, i.e. the result is reliable also where the SDF is not exact, and converges in a few steps
+# where the SDF is about linear, as near a surface. The result is the secant root of the final bracket
+# of width ≤ `eps`: it changes continuously with the parameters of the shape and the ray, e.g. for
+# finite differences and automatic differentiation, and it lies within `eps` of the surface, i.e. a
+# ray that starts there and leaves the shape is not taken for a ray inside.
+function _bracketed_exit(shape::AbstractSDF, pos, dir, a, fa, b, fb, eps)
+    # the SDF values at the ends, `fa` and `fb` are scaled by the Illinois steps
+    sa, sb = fa, fb
+    side = 0
+    for _ in 1:100
+        b - a > eps || break
+        m = (a * fb - b * fa) / (fb - fa)
+        # fall back to bisection if the secant leaves the bracket, e.g. for a NaN
+        (a < m < b) || (m = (a + b) / 2)
+        fm = sdf(shape, pos + m * dir)
+        if fm > 0
+            b, fb, sb = m, fm, fm
+            side == -1 && (fa /= 2)
+            side = -1
+        else
+            a, fa, sa = m, fm, fm
+            side == 1 && (fb /= 2)
+            side = 1
+        end
+    end
+    m = (a * sb - b * sa) / (sb - sa)
+    return a ≤ m ≤ b ? m : (a + b) / 2
 end
 
 """
     intersect3d(object::AbstractSDF, ray::AbstractRay, t_max = SDF_MISS_DISTANCE)
 
 Intersection algorithm for sdf based shapes. A ray that starts outside of the `object` is a miss
-once it has travelled the path length `t_max` in [m] without a hit.
+once it has travelled the path length `t_max` in [m] without a hit. A ray that starts inside, or on
+the surface pointing inside, hits the surface where it leaves the `object` first, see
+`_raymarch_inside`.
 """
 function intersect3d(object::AbstractSDF, ray::AbstractRay, t_max = SDF_MISS_DISTANCE)
     pos = position(ray)
@@ -187,8 +275,10 @@ function intersect3d(object::AbstractSDF, ray::AbstractRay, t_max = SDF_MISS_DIS
     if d > h
         return _raymarch_outside(object, pos, dir, t_max)
     end
-    # The one-sided difference along the ray is used to determine inside/outside instead of the normal
-    if sdf(object, pos + h * dir) ≤ d
+    # On the surface, the one-sided difference along the ray determines whether the ray points
+    # inside or outside, instead of the normal. Below the surface the ray is inside in any direction.
+    if d < -h || sdf(object, pos + h * dir) ≤ d
+        # within the object, the exit lies within any bounding sphere, hence no `t_max`
         return _raymarch_inside(object, pos, dir)
     else
         return _raymarch_outside(object, pos, dir, t_max)
