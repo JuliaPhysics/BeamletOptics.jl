@@ -481,6 +481,67 @@ end
     end
 end
 
+@testset "Flux through a tilted detector" begin
+    P0, λ, w0 = 1e-3, 1e-6, 1e-3
+    function tilted(θ)
+        pd = Detector(50mm)
+        zrotate3d!(pd, θ)
+        translate3d!(pd, [0, 100mm, 0])
+        return pd
+    end
+    gb(pos = [0.0, 0, 0], dir = [0.0, 1, 0]) = GaussianBeamlet(pos, dir, λ, w0; P0)
+    agb() = AstigmaticGaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], λ, w0; P0)
+
+    @testset "$name holds the beam power at $(θd)°" for (name, beam) in (("GaussianBeamlet", gb),
+            ("AstigmaticGaussianBeamlet", agb)), θd in (0, 30, 60)
+        pd = tilted(deg2rad(θd))
+        solve_system!(System([pd]), beam())
+        @test optical_power(pd; n = 300, progress = false) ≈ P0 rtol = 1e-4
+    end
+
+    @testset "The field is not projected onto the detector" begin
+        pd = tilted(deg2rad(60))
+        beam = gb()
+        solve_system!(System([pd]), beam)
+        E = electric_field(pd, [0.0], [0.0]; progress = false)[1]
+        @test abs(E) ≈ abs(BMO.electric_field(beam, 0.0, 100mm)) rtol = 1e-9
+    end
+
+    @testset "Irradiance of a ray falls with cos θ" begin
+        θ = deg2rad(60)
+        d, p = [sin(θ), cos(θ), 0], [-100mm * tan(θ), 0, 0]
+        function irradiance(ray)
+            pd = tilted(0)
+            solve_system!(System([pd]), Beam(ray))
+            return intensity(pd, [0.0], [0.0]; progress = false)[1]
+        end
+        # a ray has the amplitude 1, a polarized ray that of its field vector
+        @test irradiance(Ray(p, d, λ)) ≈ cos(θ) / (2 * BMO.Z_vacuum)
+        @test irradiance(PolarizedRay(p, d, λ, [0, 0, 2.0])) ≈ 4cos(θ) / (2 * BMO.Z_vacuum)
+    end
+
+    @testset "Crossing beams add their powers" begin
+        # beams at ±2 mrad give fringes of 0.25 mm, whose cross term integrates to zero
+        pd = tilted(deg2rad(45))
+        α = 2e-3
+        system = System([pd])
+        for s in (-1, 1)
+            dir = [s * sin(α), cos(α), 0]
+            solve_system!(system, gb(-100mm / cos(α) * dir + [0, 100mm, 0], dir))
+        end
+        @test optical_power(pd; n = 800, progress = false) ≈ 2P0 rtol = 1e-3
+    end
+
+    @testset "The grid methods sample the automatic grid" begin
+        pd = tilted(deg2rad(30))
+        solve_system!(System([pd]), agb())
+        xs, zs, E = electric_field(pd; n = 20, progress = false)
+        @test electric_field(pd, xs, zs; progress = false) == E
+        xs, zs, I = intensity(pd; n = 20, progress = false)
+        @test intensity(pd, xs, zs; progress = false) == I
+    end
+end
+
 end # TESTSET
 
 end # MODULE

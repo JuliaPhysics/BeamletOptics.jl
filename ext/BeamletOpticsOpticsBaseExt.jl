@@ -68,9 +68,9 @@ empties it. Requires `using OpticsBase` (package extension).
 # Conventions
 
 - `E` is the physical field: the coherent sum of the beamlet fields at the plane's
-  sample points, projected onto `u`, `v`. Unlike `electric_field(detector)`, it carries
-  no `√|cos θ|` projection factor; for oblique beams `power(f)` is the full beam power
-  crossing the plane, not the detector-area power density integral. `H` is the coherent sum, **over hits**, of `(n_medium/Z₀) dᵢ × Eᵢ`, with
+  sample points, projected onto `u`, `v`. Like `electric_field(detector)`, it carries
+  no projection factor; for oblique beams `power(f)` is the full beam power crossing the
+  plane, as `optical_power(detector)`. `H` is the coherent sum, **over hits**, of `(n_medium/Z₀) dᵢ × Eᵢ`, with
   `dᵢ` the propagation direction of the chief/stigmatic ray of hit `i` and `Eᵢ` that
   hit's own 3D field contribution at the sample point (not the paraxial `(n/Z₀) n × E`
   built from the *total* field, which would be exact only for normal incidence); this

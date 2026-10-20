@@ -20,8 +20,9 @@ Detector(edge_length, stop = true)
 |------|---------|
 | `spot_diagram(det)` | `Vector{Point2}` of local `(x, z)` hit points (beamlets: projected 1/e² contour, kwargs `num_spots`, `crop_factor`) |
 | `electric_field(det; kwargs...)` | `(xs, zs, E)`: complex field on an `n×n` grid (hits of `PolarizedRay`s and `AstigmaticGaussianBeamlet`s: a matrix of complex 3-vectors, use `sum(abs2, e)` per element) |
-| `intensity(det[, Z]; kwargs...)` | `(xs, zs, I)` with I = \|E\|²/(2Z) in W/m² |
-| `optical_power(det; kwargs...)` | integrated power in W |
+| `intensity(det; kwargs...)` | `(xs, zs, I)`: power per detector area in W/m², the Poynting flux through the detector; a single hit gives `n\|E\|² cos θ / (2Z₀)` |
+| `optical_power(det; kwargs...)` | integrated power in W, the beam power for any angle of incidence |
+| `electric_field(det, xs, zs)`, `intensity(det, xs, zs)` | the same on a grid of one's own (local `x`, `z` vectors in m) |
 
 Grid keywords:
 

@@ -67,12 +67,14 @@ Alternatively, the detector data can also be used to reconstruct electric field 
 
 ```@docs; canonical=false
 electric_field(::Detector)
+electric_field(::Detector, ::AbstractVector, ::AbstractVector)
 ```
 
-For convienience, the [`intensity`](@ref) function returns flux values directly. The [`optical_power`](@ref) method can be used in order to obtain the total optical power on the detector surface.
+The [`intensity`](@ref) function returns the power per detector area, the flux of the Poynting vector through the detector. It takes the angle of incidence of each hit into account, so that [`optical_power`](@ref), its integral over the detector, is the power of the beams for any orientation of the detector.
 
 ```@docs; canonical=false
 intensity(::Detector)
+intensity(::Detector, ::AbstractVector, ::AbstractVector)
 ```
 
 ### Gaussian beamlet interference
@@ -104,7 +106,7 @@ For [`PolarizedRay`](@ref)s the field is added as 3D vectors, so [`electric_fiel
 
 ### OpticsBase interoperability
 
-If [OpticsBase.jl](https://github.com/StackEnjoyer/OpticsBase.jl) is loaded alongside BMO (`using OpticsBase`), the `BeamletOpticsOpticsBaseExt` package extension adds a `PlaneField` constructor for a `Detector`. It samples the physical field of the beamlet hits as tangential electric *and* magnetic field on the detector plane, OpticsBase's single exchange format for coupling to other Maxwell solvers (angular spectrum propagators, BPM, FDTD, ...). Unlike [`electric_field`](@ref)`(::Detector)`, it carries no `√cos θ` projection factor, so for an oblique beam its Poynting flux is the full beam power.
+If [OpticsBase.jl](https://github.com/StackEnjoyer/OpticsBase.jl) is loaded alongside BMO (`using OpticsBase`), the `BeamletOpticsOpticsBaseExt` package extension adds a `PlaneField` constructor for a `Detector`. It samples the physical field of the beamlet hits as tangential electric *and* magnetic field on the detector plane, OpticsBase's single exchange format for coupling to other Maxwell solvers (angular spectrum propagators, BPM, FDTD, ...). As for [`intensity`](@ref)`(::Detector)`, the Poynting flux of an oblique beam through the plane is the full beam power.
 
 ```@docs
 OpticsBase.PlaneField(::Detector)

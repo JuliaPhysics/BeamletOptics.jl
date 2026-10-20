@@ -120,12 +120,14 @@ initialize!(system)   # empties all detectors of the system (nested groups inclu
 solve_system!(system, source; initialize = true)   # empties the detectors first (or initialize!(system), empty!(det))
 pts        = spot_diagram(det)                # Vector{Point2}: local (x, z) in m
 x, z, E    = electric_field(det; n = 200)     # complex field on an n×n grid (3-vectors for polarized rays and astigmatic beamlets)
-x, z, I    = intensity(det; n = 200)          # W/m²
-P          = optical_power(det)               # W
+x, z, I    = intensity(det; n = 200)          # W/m², power per detector area (Poynting flux)
+P          = optical_power(det)               # W, beam power for any angle of incidence
+E          = electric_field(det, xs, zs)      # on a grid of one's own: local x, z vectors in m
+I          = intensity(det, xs, zs)
 ```
 
 Grid keywords for `electric_field`/`intensity`/`optical_power`: `n`, `crop_factor`, `x_min`, `x_max`,
-`z_min`, `z_max`, `x0_shift`, `z0_shift`, `center = Centroid() | MinMax()`, and for beamlets `num_spots`.
+`z_min`, `z_max`, `x0_shift`, `z0_shift`, `center = Centroid() | MinMax()` (rays).
 They also take `progress = true` (see Solving). See `components/detectors.md`.
 
 ## Coupling to other solvers (OpticsBase)
@@ -144,8 +146,8 @@ beamlet = GaussianModeDecomposition(f)                          # one fitted Gau
 optical_power(beamlet) / power(f)                               # power fraction it captures
 ```
 
-`PlaneField(det)` is the physical field: unlike `electric_field(det)` it has no `√cos θ`
-projection factor, so for an oblique beam `power(f)` is the full beam power. Beamlet hits
+`PlaneField(det)` is the physical field (tangential E and H); as for `optical_power(det)`,
+`power(f)` of an oblique beam is the full beam power. Beamlet hits
 only (not rays). `WavefrontBeamletDecomposition(x, y, Eu, Ev, dir, λ)` is the vector-field
 form that takes two field components instead of amplitude, phase and one `E0`.
 `WavefrontBeamletDecomposition` needs beamlets much larger than λ (one per sample, waist 1.2

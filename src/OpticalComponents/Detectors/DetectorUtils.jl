@@ -220,7 +220,8 @@ function calc_local_lims(
         hits::Vector{<:AbstractRayHit{T}};
         # kwargs
         crop_factor::Real=one(T),
-        center::AbstractCenterAlgorithm=Centroid()
+        center::AbstractCenterAlgorithm=Centroid(),
+        kwargs...
     ) where T
     # get provided hit‐points in local (x,y)
     local_hits = calc_local_pos(pd, hits)
@@ -241,7 +242,8 @@ end
 
 Computes a 2D bounding box around the circular or elliptical waist of [`GaussianBeamlet`](@ref) hits.
 Assumes that the beamlet is approximately cylindrical around its optical axis at the point of intersection.
-The box reaches `crop_factor` beam radii beyond each hit point.
+The box reaches `crop_factor` beam radii beyond each hit point, divided by the `cos θ` of the
+angle of incidence, which stretches the footprint of the beam on the detector.
 
 # Keyword arguments
 
@@ -256,8 +258,9 @@ function calc_local_lims(
     
     pos_pd = position(pd)
     ex = -orientation(pd)[:, 1]
+    ey = orientation(pd)[:, 2]
     ez = orientation(pd)[:, 3]
-    
+
     xmin = T(Inf)
     xmax = T(-Inf)
     zmin = T(Inf)
@@ -269,9 +272,9 @@ function calc_local_lims(
         x = dot(p_hit, ex)
         z = dot(p_hit, ez)
         
-        # Conservative bounding box using cached w_max
-        # w_max is the maximum semi-axis at the detector plane
-        w = hit.w_max * crop_factor
+        # Conservative bounding box using cached w_max, the maximum semi-axis of the beam at
+        # the detector. On the detector its footprint is stretched by 1/cos θ.
+        w = hit.w_max * crop_factor / abs(dot(direction(hit), ey))
         
         xmin = min(xmin, x - w)
         xmax = max(xmax, x + w)

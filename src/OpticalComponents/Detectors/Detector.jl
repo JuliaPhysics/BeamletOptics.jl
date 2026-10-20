@@ -85,6 +85,10 @@ surface. Instead of directly accumulating values (e.g. optical power), the hit
 object stores all relevant information about the incident field for a posteriori
 evaluation (such as plotting, power integration, or polarization analysis).
 
+A subtype implements [`electric_field`](@ref)`(hit, p)`, its field at a global point `p`, as
+well as `direction(hit)` and `refractive_index(hit)`, from which the readouts of the
+`Detector` on a grid follow (see [`intensity`](@ref)).
+
 !!! info
     Note that new subtypes of `AbstractDetectorHit` must be manually added to the `Detector`
     definition to be eligible.
@@ -201,7 +205,6 @@ struct GaussianBeamletHit{T} <: AbstractBeamletHit{T}
     l_seg::T
     segment::GaussianSegment{T}
     E_amp::Complex{T}
-    sqrt_proj::T
     w_max::T
 end
 
@@ -233,7 +236,6 @@ struct AstigmaticGaussianBeamletHit{T} <: AbstractBeamletHit{T}
     Δl::T
     n_eff::T
     E_ref_amp::Complex{T}
-    sqrt_proj::T
     w_max::T
     l_seg::T
     λ::T
@@ -247,8 +249,6 @@ refractive_index(hit::GaussianBeamletHit) = hit.segment.n
 refractive_index(hit::AstigmaticGaussianBeamletHit) = hit.n_eff
 
 hit_point(hit::AbstractBeamletHit) = hit.p0 + hit.l_seg * hit.d0
-
-projection_factor(hit::AbstractBeamletHit) = hit.sqrt_proj^2
 
 """
     Detector <: AbstractDetector
@@ -510,8 +510,8 @@ Hit record of the traced segment `id` of `g`: the data that [`beamlet_hit_field`
 needs to evaluate the field of that segment at any point near it. [`Detector`](@ref)s store
 one per beamlet that hits them; it can also be built for any traced segment, e.g. to sample
 a beamlet on a plane of one's own. `l0` is the length of the beam (including its parents)
-up to the start of the segment. The projection factor is `1` if the segment ends without an
-intersection. The hit keeps no reference to `g`: a new solve of `g` does not change it.
+up to the start of the segment. The hit keeps no reference to `g`: a new solve of `g` does not
+change it.
 """
 function GaussianBeamletHit(g::GaussianBeamlet{R}, id::Integer) where {R}
     ray = g.chief.rays[id]
@@ -523,7 +523,7 @@ function GaussianBeamletHit(g::GaussianBeamlet{R}, id::Integer) where {R}
     # Beam radius at the end of the segment, for the auto-limits of the field plots
     w_max = first(gauss_parameters(segment, isfinite(l_seg) ? l_seg : zero(R)))
     return GaussianBeamletHit{R}(l0, _path_excess_before(g, id), _gouy_before(g, id), p0, d0, l_seg,
-        segment, electric_field(g) * beam_waist(g), sqrt(projection_factor(ray)), w_max)
+        segment, electric_field(g) * beam_waist(g), w_max)
 end
 
 """
@@ -536,9 +536,8 @@ that of the polarization of the chief ray of the segment, times the change with 
 area within the segments since the start of the root beam; the Gouy phase is followed from
 there as well, i.e. a child beamlet continues its parent.
 [`Detector`](@ref)s store one per beamlet that hits them; it can also be built for any
-traced segment, e.g. to sample a beamlet on a plane of one's own. The projection factor is
-`1` if the segment ends without an intersection. The hit keeps no reference to `agb`: a new
-solve of `agb` does not change it.
+traced segment, e.g. to sample a beamlet on a plane of one's own. The hit keeps no reference
+to `agb`: a new solve of `agb` does not change it.
 """
 function AstigmaticGaussianBeamletHit(agb::AstigmaticGaussianBeamlet{R}, id::Integer) where {R}
     # Pre-calculate cache
@@ -546,7 +545,6 @@ function AstigmaticGaussianBeamletHit(agb::AstigmaticGaussianBeamlet{R}, id::Int
     p0 = position(chief)
     d0 = direction(chief)
     k0 = 2π / wavelength(chief)
-    sqrt_proj = sqrt(projection_factor(chief))
 
     # Parabasal parameters at segment start (p0)
     h1, u1, h2, u2, _ = parabasal_ray_parameters(agb, p0, id)
@@ -588,7 +586,7 @@ function AstigmaticGaussianBeamletHit(agb::AstigmaticGaussianBeamlet{R}, id::Int
 
     return AstigmaticGaussianBeamletHit{R}(
         R(l0), p0, d0, h1, u1, h2, u2, gouy0, ρ1, ρ2, k0, R(Δl),
-        n_eff, E_ref_amp, sqrt_proj, w_max, length(chief), wavelength(chief), E_vec)
+        n_eff, E_ref_amp, w_max, length(chief), wavelength(chief), E_vec)
 end
 
 # Geometric length of `beam` (including its parents) up to the start of ray `id`
