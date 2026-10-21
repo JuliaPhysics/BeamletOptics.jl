@@ -106,15 +106,15 @@ onto the detector: a complex scalar for [`RayHit`](@ref)s and [`GaussianBeamletH
 complex 3D vector in global coordinates for [`PolarizedRayHit`](@ref)s and
 [`AstigmaticGaussianBeamletHit`](@ref)s. It is a phasor with the time dependence `exp(-iωt)`, so
 that a plane wave in a medium of index `n` carries the intensity `n|E|²/(2Z₀)`. With the vacuum
-wavenumber `k₀ = 2π/λ`, the direction `s` of the hit and the optical path length `L` from the
-source to the hit point `p_hit`:
+wavenumber `k₀ = 2π/λ`, the direction `s` of the hit, the refractive index `n` in front of the
+detector and the optical path length `L` from the source to the hit point `p_hit`:
 
 - [`RayHit`](@ref): a plane wave of amplitude `1`,
   ```math
-  E_j(\\mathbf{p}) = \\exp\\!\\big(i k_0 \\,[L + (\\mathbf{p} - \\mathbf{p}_\\mathrm{hit}) \\cdot \\mathbf{s}]\\big)
+  E_j(\\mathbf{p}) = \\exp\\!\\big(i k_0 \\,[L + n\\, (\\mathbf{p} - \\mathbf{p}_\\mathrm{hit}) \\cdot \\mathbf{s}]\\big)
   ```
 - [`PolarizedRayHit`](@ref): the same plane wave times the field vector `E₀` of the ray,
-  ``\\mathbf{E}_j(\\mathbf{p}) = \\mathbf{E}_0 \\exp(i k_0 [L + (\\mathbf{p} - \\mathbf{p}_\\mathrm{hit}) \\cdot \\mathbf{s}])``
+  ``\\mathbf{E}_j(\\mathbf{p}) = \\mathbf{E}_0 \\exp(i k_0 [L + n\\, (\\mathbf{p} - \\mathbf{p}_\\mathrm{hit}) \\cdot \\mathbf{s}])``
 - [`GaussianBeamletHit`](@ref): the TEM₀₀ field of the traced segment, at the distance `l` along
   its chief ray and the distance `r` from it,
   ```math
@@ -152,9 +152,9 @@ electric_field(hit::GaussianBeamletHit, p::AbstractVector) =
 electric_field(hit::AstigmaticGaussianBeamletHit, p::AbstractVector) =
     hit.E_pol * _astigmatic_phasor(hit, p)
 
-# Phase factor of a ray hit at `p`, from its optical path and the distance along the ray
-_ray_phasor(hit::AbstractRayHit, p) =
-    cis(wavenumber(hit) * (optical_path_length(hit) + dot(p - hit_point(hit), direction(hit))))
+# Phase factor of a ray hit at `p`, from its optical path and the optical distance along the ray
+_ray_phasor(hit::AbstractRayHit, p) = cis(wavenumber(hit) *
+    (optical_path_length(hit) + refractive_index(hit) * dot(p - hit_point(hit), direction(hit))))
 
 """
     intensity(pd::Detector; kwargs...)

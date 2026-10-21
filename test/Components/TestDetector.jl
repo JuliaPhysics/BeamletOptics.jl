@@ -520,6 +520,17 @@ end
         @test irradiance(PolarizedRay(p, d, λ, [0, 0, 2.0])) ≈ 4cos(θ) / (2 * BMO.Z_vacuum)
     end
 
+    @testset "The phase of a ray grows with the optical distance" begin
+        # in a medium, the phase behind the hit point grows with n k₀, as along the traced path
+        n, opl, δ = 1.5, 0.1, 0.3λ
+        p0, s = BMO.Point3(0.0, 0.1, 0.0), BMO.Point3(sin(0.5), cos(0.5), 0.0)
+        expected = cis(2π / λ * (opl + n * δ))
+        hit = BMO.RayHit{Float64}(p0, s, opl, λ, n, 1.0)
+        @test BMO.electric_field(hit, p0 + δ * s) ≈ expected
+        hit = BMO.PolarizedRayHit{Float64}(p0, s, opl, λ, n, 1.0, BMO.Point3{ComplexF64}(0, 0, 1))
+        @test BMO.electric_field(hit, p0 + δ * s) ≈ [0, 0, expected]
+    end
+
     @testset "Crossing beams add their powers" begin
         # beams at ±2 mrad give fringes of 0.25 mm, whose cross term integrates to zero
         pd = tilted(deg2rad(45))
