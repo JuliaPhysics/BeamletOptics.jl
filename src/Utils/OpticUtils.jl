@@ -104,10 +104,10 @@ Calculates the E-field phasor in [V/m] for a given intensity `I` and phase ϕ. V
 """
 electric_field(I::Real, Z = Z_vacuum, ϕ = 0) = sqrt(2 * I * Z) * exp(im * ϕ)
 
-"Calculates the intensity in [W/m²] for a given complex electric field phasor `E`. Vacuum wave impedance is assumed."
+"Calculates the intensity `|E|²/(2Z)` in [W/m²] of a plane wave with the complex electric field phasor `E` in a medium of the wave impedance `Z` (default: vacuum, use `Z₀/n` in a medium of index `n`). It is not projected onto a surface; the irradiance on a [`Detector`](@ref) is [`intensity`](@ref)`(pd)`."
 intensity(E::Number, Z = Z_vacuum) = abs2(E) / (2 * Z)
 
-"Calculates the intensity in [W/m²] for a given complex electric field vector `E` (e.g. a [`PolarizedRay`](@ref) field). Vacuum wave impedance is assumed."
+"Calculates the intensity `|E|²/(2Z)` in [W/m²] of a plane wave with the complex electric field vector `E` (e.g. a [`PolarizedRay`](@ref) field) in a medium of the wave impedance `Z` (default: vacuum). It is not projected onto a surface; the irradiance on a [`Detector`](@ref) is [`intensity`](@ref)`(pd)`."
 intensity(E::AbstractVector{<:Number}, Z = Z_vacuum) = sum(abs2, E) / (2 * Z)
 
 """

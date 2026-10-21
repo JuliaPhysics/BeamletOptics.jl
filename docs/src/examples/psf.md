@@ -125,7 +125,7 @@ NA = sin(2 * atan(D / (4f)))
 R = 1.5λ / NA
 xs, zs, E = electric_field(pd; n = 201, x_min = -R, x_max = R, z_min = -R, z_max = R)
 
-I  = intensity.(E)                # total intensity
+I  = intensity.(E)                # |E|²/(2Z₀) per point, not projected onto the detector
 Ey = map(e -> abs2(e[2]), E)      # longitudinal component
 ```
 

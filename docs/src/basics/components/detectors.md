@@ -63,16 +63,15 @@ The following image shows the spot diagram of a Sonnar lens. Two [`CollimatedSou
 
 ## Field distributions
 
-Alternatively, the detector data can also be used to reconstruct electric field distributions of incoming beams on its surface using coherent addition. Depending on the beam type, either plane wave or Gaussian beam models are used. As a user, this data can be accessed using the [`electric_field`](@ref) interface.
+Alternatively, the detector data can also be used to reconstruct electric field distributions of incoming beams on its surface using coherent addition. Three readouts build on each other: [`electric_field`](@ref) is the coherent sum of the fields of all hits, [`intensity`](@ref) the flux of the Poynting vector of that field through the detector, and [`optical_power`](@ref) the integral of the intensity. Their definitions follow.
 
 ```@docs; canonical=false
 electric_field(::Detector)
-```
-
-For convienience, the [`intensity`](@ref) function returns flux values directly. The [`optical_power`](@ref) method can be used in order to obtain the total optical power on the detector surface.
-
-```@docs; canonical=false
+electric_field(::Detector, ::AbstractVector, ::AbstractVector)
+electric_field(::BeamletOptics.AbstractDetectorHit, ::AbstractVector)
 intensity(::Detector)
+intensity(::Detector, ::AbstractVector, ::AbstractVector)
+optical_power(::Detector)
 ```
 
 ### Gaussian beamlet interference
@@ -97,14 +96,14 @@ If a [`Detector`](@ref) is placed in the focal plane of an imaging system, the c
 
 ![Sonnar Airy disc PSF](sonnar_psf_showcase.png)
 
-For [`PolarizedRay`](@ref)s the field is added as 3D vectors, so [`electric_field`](@ref) returns a matrix of complex vectors and each component of the focal field can be analyzed separately. This becomes relevant at high NA, where the field vectors tilt towards the optical axis.
+For [`PolarizedRay`](@ref)s the field is added as 3D vectors, so [`electric_field`](@ref) returns a matrix of complex vectors and each component of the focal field can be analyzed separately. This becomes relevant at high NA, where the field vectors tilt towards the optical axis. The same holds for [`AstigmaticGaussianBeamlet`](@ref)s.
 
 !!! tip "PSF examples"
     The [Point spread functions](@ref) example page covers the Airy disc, an aberrated asphere and the vectorial focus of a parabolic mirror at NA 0.88, including the caveats on collimated sources and ray amplitudes.
 
 ### OpticsBase interoperability
 
-If [OpticsBase.jl](https://github.com/StackEnjoyer/OpticsBase.jl) is loaded alongside BMO (`using OpticsBase`), the `BeamletOpticsOpticsBaseExt` package extension adds a `PlaneField` constructor for a `Detector`. It samples the physical field of the beamlet hits as tangential electric *and* magnetic field on the detector plane, OpticsBase's single exchange format for coupling to other Maxwell solvers (angular spectrum propagators, BPM, FDTD, ...). Unlike [`electric_field`](@ref)`(::Detector)`, it carries no `√cos θ` projection factor, so for an oblique beam its Poynting flux is the full beam power.
+If [OpticsBase.jl](https://github.com/StackEnjoyer/OpticsBase.jl) is loaded alongside BMO (`using OpticsBase`), the `BeamletOpticsOpticsBaseExt` package extension adds a `PlaneField` constructor for a `Detector`. It samples the physical field of the beamlet hits as tangential electric *and* magnetic field on the detector plane, OpticsBase's single exchange format for coupling to other Maxwell solvers (angular spectrum propagators, BPM, FDTD, ...). As for [`intensity`](@ref)`(::Detector)`, the Poynting flux of an oblique beam through the plane is the full beam power.
 
 ```@docs
 OpticsBase.PlaneField(::Detector)

@@ -14,7 +14,7 @@ For [`GaussianBeamlet`](@ref)s, the projected 1/e² waist is returned. The numbe
 """
 spot_diagram(d::Detector) = spot_diagram(d, hits(d))
 
-spot_diagram(d::Detector, ::Nothing; kwargs...) = throw(ErrorException("No hits available on detector."))
+spot_diagram(::Detector, ::Nothing; kwargs...) = throw(ErrorException("No hits available on detector."))
 
 function spot_diagram(pd::Detector, ::Vector{<:AbstractRayHit{T}}; kwargs...) where T
     return calc_local_pos(pd)

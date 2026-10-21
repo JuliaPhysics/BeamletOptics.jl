@@ -220,11 +220,12 @@ const BMO = BeamletOptics
             xs, zs, I = intensity(pd; n = 101, x_min = -Λ, x_max = Λ, z_min = -Λ, z_max = Λ)
 
             @test maximum(I) - minimum(I) < 1e-12 * maximum(I)
-            @test 2 * BMO.Z_vacuum * maximum(I) ≈ 2
+            # the flux of each ray through the detector is cos θ of its unit irradiance
+            @test 2 * BMO.Z_vacuum * maximum(I) ≈ 2cos(θ)
         end
 
-        @testset "tilted detector: no projection factor" begin
-            # Documents that, unlike RayHit, the vector field is not weighted by the incidence angle
+        @testset "tilted detector: flux falls with cos θ" begin
+            # rays with and without polarization are weighted alike by the angle of incidence
             tilt = deg2rad(40)
             probe(pd) = intensity(pd; n = 1, x_min = 0.0, x_max = 0.0, z_min = 0.0, z_max = 0.0)[3][1, 1]
 
@@ -236,8 +237,8 @@ const BMO = BeamletOptics
             zrotate3d!(pd_ray, tilt)
             solve_system!(StaticSystem([pd_ray]), Beam([0, -1.0, 0], [0, 1.0, 0], λ))
 
-            @test 2 * BMO.Z_vacuum * probe(pd_pol) ≈ 1
-            @test 2 * BMO.Z_vacuum * probe(pd_ray) ≈ cos(tilt)^2
+            @test 2 * BMO.Z_vacuum * probe(pd_pol) ≈ cos(tilt)
+            @test 2 * BMO.Z_vacuum * probe(pd_ray) ≈ cos(tilt)
         end
 
         @testset "parabolic mirror: real high-NA trace" begin

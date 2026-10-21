@@ -19,9 +19,10 @@ Detector(edge_length, stop = true)
 | Call | Returns |
 |------|---------|
 | `spot_diagram(det)` | `Vector{Point2}` of local `(x, z)` hit points (beamlets: projected 1/e² contour, kwargs `num_spots`, `crop_factor`) |
-| `electric_field(det; kwargs...)` | `(xs, zs, E)`: complex field on an `n×n` grid (polarized hits: a matrix of 3-vectors) |
-| `intensity(det[, Z]; kwargs...)` | `(xs, zs, I)` with I = \|E\|²/(2Z) in W/m² |
-| `optical_power(det; kwargs...)` | integrated power in W |
+| `electric_field(det; kwargs...)` | `(xs, zs, E)`: complex field on an `n×n` grid (hits of `PolarizedRay`s and `AstigmaticGaussianBeamlet`s: a matrix of complex 3-vectors, use `sum(abs2, e)` per element) |
+| `intensity(det; kwargs...)` | `(xs, zs, I)`: power per detector area in W/m², the Poynting flux through the detector; a single hit gives `n\|E\|² cos θ / (2Z₀)` |
+| `optical_power(det; kwargs...)` | integrated power in W, the beam power for any angle of incidence |
+| `electric_field(det, xs, zs)`, `intensity(det, xs, zs)` | the same on a grid of one's own (local `x`, `z` vectors in m) |
 
 Grid keywords:
 
@@ -36,7 +37,7 @@ Grid keywords:
 `get_progress_threshold()` s (default 5 s).
 
 Local `(x, z)` form a left-handed frame with the normal, as seen by the incoming beam.
-For polarized hits, `I = intensity.(E)` converts a matrix of field vectors to intensity.
+`intensity.(E)` turns a field matrix into `|E|²/(2Z₀)` per point (vacuum, not projected onto the detector); the irradiance on the detector, with `n` and `cos θ` of each hit, is `intensity(det)` or `intensity(det, xs, zs)`.
 Ray-based PSFs are not normalized: compare shapes and positions, not absolute Strehl values.
 
 If nothing reaches the detector, readout throws "No hits available on detector."
