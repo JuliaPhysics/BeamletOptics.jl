@@ -66,12 +66,28 @@ The following image shows the spot diagram of a Sonnar lens. Two [`CollimatedSou
 Alternatively, the detector data can also be used to reconstruct electric field distributions of incoming beams on its surface using coherent addition. Three readouts build on each other: [`electric_field`](@ref) is the coherent sum of the fields of all hits, [`intensity`](@ref) the flux of the Poynting vector of that field through the detector, and [`optical_power`](@ref) the integral of the intensity. Their definitions follow.
 
 ```@docs; canonical=false
-electric_field(::Detector)
-electric_field(::Detector, ::AbstractVector, ::AbstractVector)
+electric_field(::Detector, ::BeamletOptics.AbstractDetectorSampling)
 electric_field(::BeamletOptics.AbstractDetectorHit, ::AbstractVector)
-intensity(::Detector)
-intensity(::Detector, ::AbstractVector, ::AbstractVector)
-optical_power(::Detector)
+intensity(::Detector, ::BeamletOptics.AbstractDetectorSampling)
+optical_power(::Detector, ::BeamletOptics.AbstractDetectorSampling)
+```
+
+### Sampling
+
+Where on the detector the readouts are evaluated is set by a sampling, the second argument of each readout. It chooses its window, the points in local detector coordinates and the weights with which [`optical_power`](@ref) integrates the intensity. The default is a [`RegularGrid`](@ref) around the hits; a [`RectilinearGrid`](@ref) is a grid of one's own with any spacing.
+
+```julia
+x, z, I = intensity(pd, RegularGrid(n = 200, crop_factor = 5))
+P = optical_power(pd, RectilinearGrid(xs, zs))
+```
+
+```@docs; canonical=false
+RegularGrid
+RectilinearGrid
+BeamletOptics.AbstractDetectorSampling
+BeamletOptics.sample_points
+electric_field(::Detector, ::AbstractArray)
+intensity(::Detector, ::AbstractArray)
 ```
 
 ### Gaussian beamlet interference

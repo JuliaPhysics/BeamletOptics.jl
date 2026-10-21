@@ -44,7 +44,7 @@ Use `scripts/api_lookup.jl NAME` to print the docstring and signatures of any na
 | Splitters     | `ThinBeamsplitter`, `RoundThinBeamsplitter`, `RectangularPlateBeamsplitter`, `RoundPlateBeamsplitter`, `CubeBeamsplitter`, `RectangularCompensatorPlate` |
 | Prisms        | `Prism`, `RightAnglePrism`, `EquilateralPrism`, `DovePrism` |
 | Polarizers    | `PolarizationFilter`, `RoundPolarizationFilter`, `LinearPolarizer`, `RoundLinearPolarizer`, `transmission_axis` |
-| Detectors     | `Detector`, `spot_diagram`, `intensity`, `electric_field`, `optical_power`, `gauss_parameters`, `waist_parameters`, `Centroid`, `MinMax` |
+| Detectors     | `Detector`, `RegularGrid`, `RectilinearGrid`, `spot_diagram`, `intensity`, `electric_field`, `optical_power`, `gauss_parameters`, `waist_parameters`, `Centroid`, `MinMax` |
 | Dummies       | `NonInteractableObject`, `IntersectableObject` |
 | Config        | `get_default_wavelength`, `get_default_waist`, `get_default_power`, `get_default_r_max`, `get_default_depth_max`, `get_invariant_threshold`, `set_invariant_threshold!`, `get_internal_reflection_threshold`, `get_line_plane_intersection_threshold`, `get_orthogonality_threshold`, `get_sdf_surface_threshold`, `get_sdf_raymarch_eps`, `get_sdf_inside_step`, `get_progress_threshold`, `set_progress_threshold!` |
 | Render (Makie)| `wavelength_color`, `render!`, `get_view`, `set_view`, `hide_axis`, `set_orthographic`, `look_at!`, `arrow!`, `render_lcs!`, `render_bounding_sphere!`, `set_render_look`, `studio_lighting!` |
@@ -119,16 +119,19 @@ initialize!(system)   # empties all detectors of the system (nested groups inclu
 ```julia
 solve_system!(system, source; initialize = true)   # empties the detectors first (or initialize!(system), empty!(det))
 pts        = spot_diagram(det)                # Vector{Point2}: local (x, z) in m
-x, z, E    = electric_field(det; n = 200)     # complex field on an n×n grid (3-vectors for polarized rays and astigmatic beamlets)
-x, z, I    = intensity(det; n = 200)          # W/m², power per detector area (Poynting flux)
+x, z, E    = electric_field(det)              # complex field on a 100×100 RegularGrid (3-vectors for polarized rays and astigmatic beamlets)
+x, z, I    = intensity(det, RegularGrid(n = 200))   # W/m², power per detector area (Poynting flux)
 P          = optical_power(det)               # W, beam power for any angle of incidence
-E          = electric_field(det, xs, zs)      # on a grid of one's own: local x, z vectors in m
-I          = intensity(det, xs, zs)
+s          = RectilinearGrid(xs, zs)          # a grid of one's own: local x, z vectors in m, any spacing
+x, z, E    = electric_field(det, s)
+x, z, I    = intensity(det, s)
+P          = optical_power(det, s)            # trapezoidal rule on xs × zs
 ```
 
-Grid keywords for `electric_field`/`intensity`/`optical_power`: `n`, `crop_factor`, `x_min`, `x_max`,
-`z_min`, `z_max`, `x0_shift`, `z0_shift`, `center = Centroid() | MinMax()` (rays).
-They also take `progress = true` (see Solving). See `components/detectors.md`.
+The second argument of `electric_field`/`intensity`/`optical_power` is a sampling (default
+`RegularGrid()`). Keywords of `RegularGrid`: `n`, `crop_factor`, `x_min`, `x_max`, `z_min`, `z_max`,
+`x0_shift`, `z0_shift`, `center = Centroid() | MinMax()` (rays). The readouts take `progress = true`
+(see Solving). See `components/detectors.md`.
 
 ## Coupling to other solvers (OpticsBase)
 

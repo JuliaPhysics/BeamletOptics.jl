@@ -1,9 +1,10 @@
 """
-    electric_field(pd::Detector; kwargs...)
+    electric_field(pd::Detector, s::AbstractDetectorSampling = RegularGrid(); progress = true)
 
-Samples the electric field of the hits of the [`Detector`](@ref) `pd` on a regular `n×n` grid in
-its local (x, z) plane, in a window around the hits. The field at the local point `(x, z)` is the
-coherent sum of the fields `Eⱼ` of all hits `j`,
+Samples the electric field of the hits of the [`Detector`](@ref) `pd` at the points of the
+sampling `s` in its local (x, z) plane, by default a [`RegularGrid`](@ref) in a window around
+the hits. The field at the local point `(x, z)` is the coherent sum of the fields `Eⱼ` of all
+hits `j`,
 
 ```math
 \\mathbf{E}(x, z) = \\sum_j \\mathbf{E}_j(\\mathbf{p}), \\qquad \\mathbf{p} = \\mathbf{p}_d + x\\,\\hat{\\mathbf{x}} + z\\,\\hat{\\mathbf{z}},
@@ -14,8 +15,8 @@ system with the detector normal. `Eⱼ` is defined per hit type in
 [`electric_field(::BeamletOptics.AbstractDetectorHit, ::AbstractVector)`](@ref). The field is
 not projected onto the detector: it is the field that is there, for any angle of incidence.
 The power per detector area follows from [`intensity`](@ref), which takes the angle of incidence
-of each hit into account. To sample on a grid of one's own, use
-[`electric_field(::Detector, ::AbstractVector, ::AbstractVector)`](@ref).
+of each hit into account. To sample on a grid of one's own, pass a [`RectilinearGrid`](@ref);
+other samplings are subtypes of [`BeamletOptics.AbstractDetectorSampling`](@ref).
 
 !!! warning "Coherent sum"
     All hits are summed as one monochromatic, mutually coherent field, also hits of different
@@ -25,33 +26,13 @@ of each hit into account. To sample on a grid of one's own, use
 !!! note "Resetting detectors"
     Be sure to call `empty!(pd)` (or [`initialize!`](@ref)`(system)` for all detectors) before each new measurement if reusing the same detector.
 
-# Keyword Arguments
+# Keyword arguments
 
-The following generic kwargs can be used for all hit types:
+- `progress::Bool = true`: shows a progress bar once the calculation has run for
+  `get_progress_threshold()` seconds (default 5 s). It is only drawn if `stderr` is a terminal.
 
-- `n::Int=100`
-  Number of sample points per axis.
-- `crop_factor::Real`
-  Scales the width of the sampling window returned by
-  [`calc_local_lims`](@ref); values >1 expand, <1 shrink. The default is `1` for ray hits
-  (the box around the hit points) and `3` for beamlet hits (three beam radii around each
-  hit, which holds the power of a Gaussian beam except for a part of `10⁻⁸`).
-- `x_min, x_max, z_min, z_max`
-  Manually override the sampling bounds in the local x or z directions.
-  If left as `Inf`, the bounds from `calc_local_lims` are used.
-- `x0_shift::Real=0, z0_shift::Real=0`
-  Applies a constant offset to the entire x or z coordinate arrays,
-  useful for recentring or testing alignment.
-- `progress::Bool=true`
-  Shows a progress bar once the calculation has run for `get_progress_threshold()`
-  seconds (default 5 s). It is only drawn if `stderr` is a terminal.
-
-## Ray specific keyword arguments
-
-- `center::AbstractCenterAlgorithm=Centroid()`
-  How the sampling window is centred.
-  `Centroid()` uses the projection‑weighted centroid,
-  `MinMax()` uses the geometric mid‑point of the bounding box.
+The grid, its window and its resolution are set by the sampling, e.g.
+`electric_field(pd, RegularGrid(n = 200, crop_factor = 5))`, see [`RegularGrid`](@ref).
 
 !!! note "Scaling"
     The returned values for ray hits correspond to the E-field of the point spread function.
@@ -61,33 +42,33 @@ The following generic kwargs can be used for all hit types:
 
 # Returns
 
-A tuple `(xs, zs, E)` where
-- `xs::LinRange{T}` and `zs::LinRange{T}` are the sampled coordinates
-  in the detector's local x and z axes,
-- `E` is the field at `(xs[i], zs[j])`: a `Matrix{Complex{T}}` for [`Ray`](@ref)s and
-  [`GaussianBeamlet`](@ref)s, a `Matrix{Point3{Complex{T}}}` of 3D vectors in global coordinates
-  for [`PolarizedRay`](@ref)s and [`AstigmaticGaussianBeamlet`](@ref)s, which carry a polarization.
+The coordinates of the sampling followed by the field at its points, for the grids
+`(xs, zs, E)` with `E[i, j]` at `(xs[i], zs[j])`, see [`sample_points`](@ref). The values are
+complex scalars for [`Ray`](@ref)s and [`GaussianBeamlet`](@ref)s, `Point3{Complex{T}}` 3D vectors
+in global coordinates for [`PolarizedRay`](@ref)s and [`AstigmaticGaussianBeamlet`](@ref)s,
+which carry a polarization.
 
 !!! note "Unpolarized light"
     An unpolarized PSF is **not** obtained from a single coherent trace. Instead, trace twice
     with orthogonal input polarizations (e.g. `E0 = [1,0,0]` and `E0 = [0,0,1]`), evaluate
-    [`intensity`](@ref)`(pd, xs, zs)` on the same grid after each trace and add the results.
+    [`intensity`](@ref)`(pd, s)` with the same [`RectilinearGrid`](@ref) `s` after each trace
+    and add the results.
 """
-function electric_field(pd::Detector; progress::Bool = true, kwargs...)
-    xs, zs = _sampling_grid(pd; kwargs...)
-    return xs, zs, electric_field(pd, xs, zs; progress)
+function electric_field(pd::Detector, s::AbstractDetectorSampling = RegularGrid();
+        progress::Bool = true)
+    grid = sample_points(pd, s)
+    return (grid.coordinates..., electric_field(pd, grid.points; progress))
 end
 
 """
-    electric_field(pd::Detector, xs::AbstractVector, zs::AbstractVector; progress = true)
+    electric_field(pd::Detector, points::AbstractArray; progress = true)
 
-Samples the electric field of the hits of the [`Detector`](@ref) `pd` on the grid `xs × zs` of
-its local coordinates in \\[m\\]: `E[i, j]` is the field at `(xs[i], zs[j])`. The type of `E` and
-the meaning of its values are those of [`electric_field`](@ref)`(pd; kwargs...)`, which picks
-the grid automatically.
+The field of the hits of the [`Detector`](@ref) `pd` at the local detector coordinates
+`points` in \\[m\\], each indexable as `q[1]`, `q[2]` (e.g. a `Point2`), see
+[`electric_field`](@ref)`(pd, s)`. Returns the values only, in the shape of `points`.
 """
-electric_field(pd::Detector, xs::AbstractVector, zs::AbstractVector; progress::Bool = true) =
-    _sample(electric_field, pd, xs, zs, progress)
+electric_field(pd::Detector, points::AbstractArray; progress::Bool = true) =
+    _sample(electric_field, pd, points, progress)
 
 """
     electric_field(hits::AbstractVector{<:AbstractDetectorHit}, p::AbstractVector)
@@ -132,7 +113,7 @@ detector and the optical path length `L` from the source to the hit point `p_hit
   [Astigmatic polarized beamlets](@ref).
 
 Beamlet hits give the physical field in \\[V/m\\]. Ray hits are raw and unscaled: `|E|²` does not
-carry the power of the ray, see the note on scaling in [`electric_field`](@ref)`(pd; kwargs...)`.
+carry the power of the ray, see the note on scaling in [`electric_field`](@ref)`(pd, s)`.
 
 A new hit type implements this method, `direction(hit)` and `refractive_index(hit)`; the
 readouts of a [`Detector`](@ref) on a grid ([`electric_field`](@ref), [`intensity`](@ref),
@@ -157,12 +138,12 @@ _ray_phasor(hit::AbstractRayHit, p) = cis(wavenumber(hit) *
     (optical_path_length(hit) + refractive_index(hit) * dot(p - hit_point(hit), direction(hit))))
 
 """
-    intensity(pd::Detector; kwargs...)
+    intensity(pd::Detector, s::AbstractDetectorSampling = RegularGrid(); progress = true)
 
 Samples the irradiance on the [`Detector`](@ref) `pd`, the power per detector area in \\[W/m²\\],
-on the grid of [`electric_field`](@ref)`(pd; kwargs...)`, with the same keyword arguments.
-Returns a tuple `(xs, zs, I)`. To sample on a grid of one's own, use
-[`intensity(::Detector, ::AbstractVector, ::AbstractVector)`](@ref).
+at the points of the sampling `s`, by default a [`RegularGrid`](@ref) around the hits. Returns
+the coordinates of the sampling followed by the irradiance at its points, for the grids
+`(xs, zs, I)`; `progress` as for [`electric_field`](@ref)`(pd, s)`.
 
 `I` is the flux of the coherent sum of all hits through the detector: the time-averaged Poynting
 vector along the detector normal `n̂`, which points along the incoming beams. Hits with a
@@ -194,29 +175,30 @@ mean of their `n cos θ`.
 `I` is in \\[W/m²\\] for beamlet hits. For ray hits, whose fields are unscaled, it has the same
 form but no absolute unit.
 """
-function intensity(pd::Detector; progress::Bool = true, kwargs...)
-    xs, zs = _sampling_grid(pd; kwargs...)
-    return xs, zs, intensity(pd, xs, zs; progress)
+function intensity(pd::Detector, s::AbstractDetectorSampling = RegularGrid();
+        progress::Bool = true)
+    grid = sample_points(pd, s)
+    return (grid.coordinates..., intensity(pd, grid.points; progress))
 end
 
 """
-    intensity(pd::Detector, xs::AbstractVector, zs::AbstractVector; progress = true)
+    intensity(pd::Detector, points::AbstractArray; progress = true)
 
-Samples the irradiance on the [`Detector`](@ref) `pd` in \\[W/m²\\] on the grid `xs × zs` of its
-local coordinates in \\[m\\]: `I[i, j]` is the irradiance at `(xs[i], zs[j])`, see
-[`intensity`](@ref)`(pd; kwargs...)`.
+The irradiance on the [`Detector`](@ref) `pd` in \\[W/m²\\] at the local detector coordinates
+`points` in \\[m\\], each indexable as `q[1]`, `q[2]` (e.g. a `Point2`), see
+[`intensity`](@ref)`(pd, s)`. Returns the values only, in the shape of `points`.
 """
-function intensity(pd::Detector, xs::AbstractVector, zs::AbstractVector; progress::Bool = true)
+function intensity(pd::Detector, points::AbstractArray; progress::Bool = true)
     # downstream normal: the detector normal points against the incoming beams
     n̂ = Point3(-orientation(pd)[:, 2])
-    return _sample((hs, p) -> intensity(hs, p, n̂), pd, xs, zs, progress)
+    return _sample((hs, p) -> intensity(hs, p, n̂), pd, points, progress)
 end
 
 """
     intensity(hits::AbstractVector{<:AbstractDetectorHit}, p::AbstractVector, n̂::AbstractVector)
 
 Irradiance \\[W/m²\\] of the coherent sum of the detector `hits` at the global point `p` through
-a plane with the unit normal `n̂`, see [`intensity`](@ref)`(pd; kwargs...)`.
+a plane with the unit normal `n̂`, see [`intensity`](@ref)`(pd, s)`.
 """
 intensity(::AbstractVector{<:AbstractDetectorHit}, ::AbstractVector, ::AbstractVector)
 
@@ -245,64 +227,52 @@ function intensity(hits::AbstractVector{<:Union{RayHit, GaussianBeamletHit}},
 end
 
 """
-    optical_power(pd::Detector; kwargs...)
+    optical_power(pd::Detector, s::AbstractDetectorSampling = RegularGrid(); progress = true)
 
 Calculates the total optical power on `pd` in \\[W\\] as the integral of its [`intensity`](@ref)
-over the sampling window in the local detector coordinates,
+over the window of the sampling `s` in the local detector coordinates,
 
 ```math
-P = \\int_{x_\\mathrm{min}}^{x_\\mathrm{max}} \\int_{z_\\mathrm{min}}^{z_\\mathrm{max}} I(x, z)\\, \\mathrm{d}z\\, \\mathrm{d}x,
+P = \\iint I(x, z)\\, \\mathrm{d}x\\, \\mathrm{d}z \\approx \\sum_i w_i\\, I(x_i, z_i),
 ```
 
-evaluated with the trapezoidal rule on the `n×n` grid of [`electric_field`](@ref)`(pd; kwargs...)`,
-with the same keyword arguments. Since `I` is the flux through the detector, `P` is the power of
-the beams for any angle of incidence.
+with the points `(xᵢ, zᵢ)` and the weights `wᵢ` \\[m²\\] of the sampling, see
+[`sample_points`](@ref): the trapezoidal rule for [`RegularGrid`](@ref) and
+[`RectilinearGrid`](@ref). Since `I` is the flux through the detector, `P` is the power of the
+beams for any angle of incidence.
 
-The integral runs over the sampling window, not over the active area of the detector: the
-window is not cut at the edges of the detector. The default window of beamlet hits holds the
-power of each beamlet except for a part of `10⁻⁸`, see `crop_factor`. For ray hits, `P` has no
-absolute unit, see [`intensity`](@ref).
+The integral runs over the window of the sampling, not over the active area of the detector:
+the window is not cut at the edges of the detector. The default window of beamlet hits holds
+the power of each beamlet except for a part of `10⁻⁸`, see `crop_factor` of
+[`RegularGrid`](@ref). For ray hits, `P` has no absolute unit, see [`intensity`](@ref).
 """
-function optical_power(pd::Detector; kwargs...)
-    x, y, I = intensity(pd; kwargs...)
-    return trapz((x, y), I)
+function optical_power(pd::Detector, s::AbstractDetectorSampling = RegularGrid();
+        progress::Bool = true)
+    grid = sample_points(pd, s)
+    return sum(grid.weights .* intensity(pd, grid.points; progress))
 end
 
-# The local grid of `electric_field(pd; kwargs...)`: `n` points per axis in the window of
-# `calc_local_lims`, or within the given bounds
-function _sampling_grid(pd::Detector; n::Int = 100, x_min = Inf, x_max = Inf, z_min = Inf,
-        z_max = Inf, x0_shift::Real = 0, z0_shift::Real = 0, kwargs...)
-    _x_min, _x_max, _z_min, _z_max = calc_local_lims(pd, _detector_hits(pd); kwargs...)
-    if x_min != Inf && x_max != Inf
-        _x_min = x_min
-        _x_max = x_max
-    end
-    if z_min != Inf && z_max != Inf
-        _z_min = z_min
-        _z_max = z_max
-    end
-    xs = LinRange(_x_min, _x_max, n) .+ x0_shift
-    zs = LinRange(_z_min, _z_max, n) .+ z0_shift
-    return xs, zs
-end
-
-# Samples `f(hits, p)` at the global points `p` of the local detector coordinates `xs × zs`,
-# threaded over `zs`. All readouts of a detector on a grid share this loop.
-function _sample(f, pd::Detector, xs::AbstractVector, zs::AbstractVector, progress::Bool)
+# Samples `f(hits, p)` at the global points `p` of the local detector coordinates `points`,
+# threaded over chunks of the points. All readouts of a detector share this loop.
+function _sample(f, pd::Detector, points::AbstractArray, progress::Bool)
     # PD local coordinate axes (left-handed coords.), flipped x due to the rotated pd mesh
     local_x = Point3(-orientation(pd)[:, 1])
     local_z = Point3(orientation(pd)[:, 3])
-    return _sample(f, _detector_hits(pd), position(pd), local_x, local_z, xs, zs, progress)
+    return _sample(f, _detector_hits(pd), position(pd), local_x, local_z, points, progress)
 end
 
 # function barrier: `hits` has a concrete type here
-function _sample(f, hits::AbstractVector, origin, local_x, local_z, xs, zs, progress::Bool)
-    point(i, j) = origin + xs[i] * local_x + zs[j] * local_z
-    values = Matrix{typeof(f(hits, point(1, 1)))}(undef, length(xs), length(zs))
-    _with_progress(progress, length(zs), "Detector field: ") do prog
-        Threads.@threads for j in eachindex(zs)
-            @inbounds for i in eachindex(xs)
-                values[i, j] = f(hits, point(i, j))
+function _sample(f, hits::AbstractVector, origin, local_x, local_z, points::AbstractArray,
+        progress::Bool)
+    point(q) = origin + q[1] * local_x + q[2] * local_z
+    values = similar(points, typeof(f(hits, point(first(points)))))
+    # chunks of consecutive points, a column of a grid; one tick per chunk
+    chunk = max(1, size(points, 1) < length(points) ? size(points, 1) : cld(length(points), 100))
+    parts = collect(Iterators.partition(eachindex(values, points), chunk))
+    _with_progress(progress, length(parts), "Detector field: ") do prog
+        Threads.@threads for part in parts
+            @inbounds for k in part
+                values[k] = f(hits, point(points[k]))
             end
             _tick!(prog)
         end

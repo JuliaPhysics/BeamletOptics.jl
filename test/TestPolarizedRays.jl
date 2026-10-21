@@ -189,7 +189,7 @@ const BMO = BeamletOptics
         end
 
         # index 101 is x = 0 (crossing point), index 51 is x = -Λ/2 (half a fringe away)
-        x_scan(pd) = electric_field(pd; n = 201, x_min = -Λ, x_max = Λ, z_min = 0.0, z_max = 0.0)
+        x_scan(pd) = electric_field(pd, RegularGrid(n = 201, x_min = -Λ, x_max = Λ, z_min = 0.0, z_max = 0.0))
         visibility(I) = (maximum(I) - minimum(I)) / (maximum(I) + minimum(I))
 
         @testset "s-polarization: full-contrast fringes" begin
@@ -217,7 +217,7 @@ const BMO = BeamletOptics
 
         @testset "orthogonal polarizations do not interfere" begin
             pd = two_ray_detector(s_pol, p_minus)
-            xs, zs, I = intensity(pd; n = 101, x_min = -Λ, x_max = Λ, z_min = -Λ, z_max = Λ)
+            xs, zs, I = intensity(pd, RegularGrid(n = 101, x_min = -Λ, x_max = Λ, z_min = -Λ, z_max = Λ))
 
             @test maximum(I) - minimum(I) < 1e-12 * maximum(I)
             # the flux of each ray through the detector is cos θ of its unit irradiance
@@ -227,7 +227,7 @@ const BMO = BeamletOptics
         @testset "tilted detector: flux falls with cos θ" begin
             # rays with and without polarization are weighted alike by the angle of incidence
             tilt = deg2rad(40)
-            probe(pd) = intensity(pd; n = 1, x_min = 0.0, x_max = 0.0, z_min = 0.0, z_max = 0.0)[3][1, 1]
+            probe(pd) = intensity(pd, RegularGrid(n = 1, x_min = 0.0, x_max = 0.0, z_min = 0.0, z_max = 0.0))[3][1, 1]
 
             pd_pol = Detector(1.0)
             zrotate3d!(pd_pol, tilt)
@@ -284,7 +284,7 @@ const BMO = BeamletOptics
 
             W = 1.5λ / NA
             function normalized_psf(detector)
-                E = electric_field(detector; n = 101, x_min = -W, x_max = W, z_min = -W, z_max = W)[3]
+                E = electric_field(detector, RegularGrid(n = 101, x_min = -W, x_max = W, z_min = -W, z_max = W))[3]
                 I = intensity.(E)
                 Ex2 = map(e -> abs2(e[1]), E)
                 Ey2 = map(e -> abs2(e[2]), E)
@@ -333,7 +333,7 @@ const BMO = BeamletOptics
         sys = System([lens, psfd])
         solve_system!(sys, pcs)
 
-        x, y, I_num = intensity(psfd; n = 500, crop_factor = 5, center = MinMax())
+        x, y, I_num = intensity(psfd, RegularGrid(n = 500, crop_factor = 5, center = MinMax()))
 
         # walk from the peak to the first local minimum through the centre column
         ix_ctr, jx_ctr = Tuple(argmax(I_num))
@@ -348,9 +348,9 @@ const BMO = BeamletOptics
         @test x[i_min] - x[ix_ctr] ≈ airy_radius rtol = 2e-2
 
         # vector field result feeds the scalar intensity/power pipeline
-        E_map = electric_field(psfd; n = 200, crop_factor = 5, center = MinMax())[3]
+        E_map = electric_field(psfd, RegularGrid(n = 200, crop_factor = 5, center = MinMax()))[3]
         @test eltype(E_map) <: BMO.Point3{<:Complex}
-        @test BMO.optical_power(psfd; n = 100, crop_factor = 5, center = MinMax()) > 0
+        @test BMO.optical_power(psfd, RegularGrid(n = 100, crop_factor = 5, center = MinMax())) > 0
 
         # at this NA the PSF stays isotropic and the vector effects vanish
         row = I_num[ix_ctr, :]

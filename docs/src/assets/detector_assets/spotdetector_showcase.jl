@@ -54,7 +54,7 @@ b2_spots = spot_diagram(pd)
 empty!(pd)
 
 solve_system!(system, b3)
-x, z, I = intensity(pd; n=300, crop_factor=1)
+x, z, I = intensity(pd, RegularGrid(n=300, crop_factor=1))
 empty!(pd)
 
 ##

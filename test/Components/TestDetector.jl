@@ -88,7 +88,7 @@ end
         solve_system!(sys, cs)
 
         # get PSF
-        x, y, I_num = intensity(psfd; n=500, crop_factor=5, center=MinMax())
+        x, y, I_num = intensity(psfd, RegularGrid(n=500, crop_factor=5, center=MinMax()))
 
         # walk from the peak to the first local minimum through the centre column
         ix_ctr, jx_ctr = Tuple(argmax(I_num))
@@ -168,8 +168,8 @@ end
 
             # Compare solutions
             I_analytical = intensity.(screen)
-            ~, ~, I_numerical = intensity(pd_l; n, x_min=-l/2, x_max=l/2, z_min=-l/2, z_max=l/2)
-            Pt = optical_power(pd_l; n, x_min=-l/2, x_max=l/2, z_min=-l/2, z_max=l/2)
+            ~, ~, I_numerical = intensity(pd_l, RegularGrid(; n, x_min=-l/2, x_max=l/2, z_min=-l/2, z_max=l/2))
+            Pt = optical_power(pd_l, RegularGrid(; n, x_min=-l/2, x_max=l/2, z_min=-l/2, z_max=l/2))
             @test all(isapprox.(I_analytical, I_numerical, atol = 2e-1))
             @test isapprox(Pt, 2 * P0, atol = 3e-5)
         end
@@ -496,14 +496,14 @@ end
             ("AstigmaticGaussianBeamlet", agb)), θd in (0, 30, 60)
         pd = tilted(deg2rad(θd))
         solve_system!(System([pd]), beam())
-        @test optical_power(pd; n = 300, progress = false) ≈ P0 rtol = 1e-4
+        @test optical_power(pd, RegularGrid(n = 300); progress = false) ≈ P0 rtol = 1e-4
     end
 
     @testset "The field is not projected onto the detector" begin
         pd = tilted(deg2rad(60))
         beam = gb()
         solve_system!(System([pd]), beam)
-        E = electric_field(pd, [0.0], [0.0]; progress = false)[1]
+        E = electric_field(pd, RectilinearGrid([0.0], [0.0]); progress = false)[3][1]
         @test abs(E) ≈ abs(BMO.electric_field(beam, 0.0, 100mm)) rtol = 1e-9
     end
 
@@ -513,7 +513,7 @@ end
         function irradiance(ray)
             pd = tilted(0)
             solve_system!(System([pd]), Beam(ray))
-            return intensity(pd, [0.0], [0.0]; progress = false)[1]
+            return intensity(pd, RectilinearGrid([0.0], [0.0]); progress = false)[3][1]
         end
         # a ray has the amplitude 1, a polarized ray that of its field vector
         @test irradiance(Ray(p, d, λ)) ≈ cos(θ) / (2 * BMO.Z_vacuum)
@@ -540,16 +540,16 @@ end
             dir = [s * sin(α), cos(α), 0]
             solve_system!(system, gb(-100mm / cos(α) * dir + [0, 100mm, 0], dir))
         end
-        @test optical_power(pd; n = 800, progress = false) ≈ 2P0 rtol = 1e-3
+        @test optical_power(pd, RegularGrid(n = 800); progress = false) ≈ 2P0 rtol = 1e-3
     end
 
     @testset "The grid methods sample the automatic grid" begin
         pd = tilted(deg2rad(30))
         solve_system!(System([pd]), agb())
-        xs, zs, E = electric_field(pd; n = 20, progress = false)
-        @test electric_field(pd, xs, zs; progress = false) == E
-        xs, zs, I = intensity(pd; n = 20, progress = false)
-        @test intensity(pd, xs, zs; progress = false) == I
+        xs, zs, E = electric_field(pd, RegularGrid(n = 20); progress = false)
+        @test electric_field(pd, RectilinearGrid(xs, zs); progress = false)[3] == E
+        xs, zs, I = intensity(pd, RegularGrid(n = 20); progress = false)
+        @test intensity(pd, RectilinearGrid(xs, zs); progress = false)[3] == I
     end
 end
 

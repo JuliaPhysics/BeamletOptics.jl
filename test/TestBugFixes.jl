@@ -81,13 +81,15 @@ end
     BMO.solve_system!(system, beam)
 
     pd_pwr = optical_power(
-        pd;
+        pd,
         # restore pre-v0.11 behavior, e.g. no autolims
-        n = pd_res,
-        x_min = -pd_size / 2,
-        x_max = pd_size / 2,
-        z_min = -pd_size / 2,
-        z_max = pd_size / 2
+        RegularGrid(
+            n = pd_res,
+            x_min = -pd_size / 2,
+            x_max = pd_size / 2,
+            z_min = -pd_size / 2,
+            z_max = pd_size / 2
+        )
     )
 
     @test pd_pwr≈10e-3 atol=1e-5
@@ -166,13 +168,15 @@ end
             solve_system!(system, gb_prb)
             solve_system!(system, gb_ref)
             pd_pwr = optical_power(
-                detector;
+                detector,
                 # restore pre-v0.11 behavior, e.g. no autolims
-                n = pd_res,
-                x_min = -pd_size / 2,
-                x_max = pd_size / 2,
-                z_min = -pd_size / 2,
-                z_max = pd_size / 2
+                RegularGrid(
+                    n = pd_res,
+                    x_min = -pd_size / 2,
+                    x_max = pd_size / 2,
+                    z_min = -pd_size / 2,
+                    z_max = pd_size / 2
+                )
             )
             @test isapprox(pd_pwr, ref_signal(2pi * nf, 2e-3), atol = 1e-8)
         end
@@ -194,13 +198,15 @@ end
             solve_system!(system, gb_prb)
             solve_system!(system, gb_ref)
             pd_pwr = optical_power(
-                detector;
+                detector,
                 # restore pre-v0.11 behavior, e.g. no autolims
-                n = pd_res,
-                x_min = -pd_size / 2,
-                x_max = pd_size / 2,
-                z_min = -pd_size / 2,
-                z_max = pd_size / 2
+                RegularGrid(
+                    n = pd_res,
+                    x_min = -pd_size / 2,
+                    x_max = pd_size / 2,
+                    z_min = -pd_size / 2,
+                    z_max = pd_size / 2
+                )
             )
             @test isapprox(pd_pwr, ref_signal(phi, 2e-3), atol = 1e-8)
             shift_phase(gb_prb, step(phis))

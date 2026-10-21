@@ -57,7 +57,7 @@ end
 ## PSFs from rays
 
 - Use `UniformDiscSource` (equal-area sampling) with thousands of rays and a `Detector` near focus;
-  read `intensity(det; n, crop_factor)` or give explicit `x_min/x_max/z_min/z_max` windows.
+  read `intensity(det, RegularGrid(n = ..., crop_factor = ...))` or give explicit `x_min/x_max/z_min/z_max` windows in the `RegularGrid`.
 - For unpolarized PSFs, trace two orthogonal polarizations (polarized beams wrapped in a
   `CollimatedSource(beams, diameter, pos, dir)`) and add the intensities incoherently.
 

@@ -7,4 +7,5 @@ include("HitBuffers.jl")
 # eval and helper functions
 include("DetectorUtils.jl")
 include("SpotDiagram.jl")
+include("Sampling.jl")
 include("FieldCalculation.jl")

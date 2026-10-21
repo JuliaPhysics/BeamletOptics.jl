@@ -227,7 +227,7 @@ end
             zrotate3d!(pd, π / 2)
             translate3d!(pd, [-5cm, 23.5cm, 0])
             solve_system!(System([cbs, m1, m2, pd]), GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], λ, 0.5mm))
-            return optical_power(pd; progress = false, n = 60)
+            return optical_power(pd, RegularGrid(n = 60); progress = false)
         end
         # one fringe over λ/2 of the mirror position, sampled finely enough for its contrast
         xs = range(0, λ / 2, 33)
