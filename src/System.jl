@@ -457,11 +457,14 @@ function solve_system!(
     # threads sets it for its beams.
     with_bounding_spheres(system) do
         table = current_bounding_spheres()::BoundingSphereTable
-        # A few chunks per thread for the load balance. Each chunk collects its detector hits and
-        # stores them at its end, see `with_hit_buffers`.
+        # Each chunk collects its detector hits and stores them at its end, see `with_hit_buffers`.
+        # With `:greedy`, a free task takes the next chunk. The beams of a group differ in cost
+        # (e.g. the inner rings of a source pass a lens, the outer ones miss it), and those of
+        # similar cost lie next to each other. 4 chunks per thread balance most of the load. Each
+        # further chunk costs a channel access and a flush, which shows if all beams cost the same.
         chunks = Iterators.partition(beams(bg), max(1, cld(length(bg), 4 * Threads.nthreads())))
         _with_progress(progress, length(bg), "Tracing beams: ") do prog
-            Threads.@threads for chunk in collect(chunks)
+            Threads.@threads :greedy for chunk in collect(chunks)
                 with_bounding_spheres(table) do
                     with_hit_buffers() do
                         for _beam in chunk
