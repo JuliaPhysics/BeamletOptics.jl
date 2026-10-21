@@ -2,13 +2,25 @@
     electric_field(pd::Detector; kwargs...)
 
 Samples the electric field of the hits of the [`Detector`](@ref) `pd` on a regular `n×n` grid in
-its local (x, z) plane, in a window around the hits. The field at a point is the coherent sum of
-the fields of all hits, see [`electric_field(::BeamletOptics.AbstractDetectorHit, ::AbstractVector)`](@ref).
-It is not projected onto the detector: the power per detector area follows from
-[`intensity`](@ref), which takes the angle of incidence of each hit into account.
-Note that the `pd` local coordinates are given in a (x, z) basis where the normal vector forms a
-left-handed system. To sample on a grid of one's own, use
+its local (x, z) plane, in a window around the hits. The field at the local point `(x, z)` is the
+coherent sum of the fields `Eⱼ` of all hits `j`,
+
+```math
+\\mathbf{E}(x, z) = \\sum_j \\mathbf{E}_j(\\mathbf{p}), \\qquad \\mathbf{p} = \\mathbf{p}_d + x\\,\\hat{\\mathbf{x}} + z\\,\\hat{\\mathbf{z}},
+```
+
+with the position `p_d` of the detector and its local axes `x̂`, `ẑ`, which form a left-handed
+system with the detector normal. `Eⱼ` is defined per hit type in
+[`electric_field(::BeamletOptics.AbstractDetectorHit, ::AbstractVector)`](@ref). The field is
+not projected onto the detector: it is the field that is there, for any angle of incidence.
+The power per detector area follows from [`intensity`](@ref), which takes the angle of incidence
+of each hit into account. To sample on a grid of one's own, use
 [`electric_field(::Detector, ::AbstractVector, ::AbstractVector)`](@ref).
+
+!!! warning "Coherent sum"
+    All hits are summed as one monochromatic, mutually coherent field, also hits of different
+    wavelengths or of sources that are mutually incoherent. For those, evaluate the
+    [`intensity`](@ref) of each wavelength or source on its own and add the intensities.
 
 !!! note "Resetting detectors"
     Be sure to call `empty!(pd)` (or [`initialize!`](@ref)`(system)` for all detectors) before each new measurement if reusing the same detector.
@@ -89,12 +101,38 @@ electric_field(hits::AbstractVector{<:AbstractDetectorHit}, p::AbstractVector) =
 """
     electric_field(hit::AbstractDetectorHit, p::AbstractVector)
 
-Electric field of a single detector `hit` at the global point `p` \\[m\\], not projected onto
-the detector: a complex scalar for [`RayHit`](@ref)s and [`GaussianBeamletHit`](@ref)s, a complex
-3D vector in global coordinates for [`PolarizedRayHit`](@ref)s and
-[`AstigmaticGaussianBeamletHit`](@ref)s. Beamlet hits give the physical field in \\[V/m\\]. A
-`RayHit` has the amplitude `1` and a `PolarizedRayHit` the field vector of its ray, see the
-note on scaling in [`electric_field`](@ref)`(pd; kwargs...)`.
+Electric field `Eⱼ(p)` of a single detector `hit` at the global point `p` \\[m\\], not projected
+onto the detector: a complex scalar for [`RayHit`](@ref)s and [`GaussianBeamletHit`](@ref)s, a
+complex 3D vector in global coordinates for [`PolarizedRayHit`](@ref)s and
+[`AstigmaticGaussianBeamletHit`](@ref)s. It is a phasor with the time dependence `exp(-iωt)`, so
+that a plane wave in a medium of index `n` carries the intensity `n|E|²/(2Z₀)`. With the vacuum
+wavenumber `k₀ = 2π/λ`, the direction `s` of the hit and the optical path length `L` from the
+source to the hit point `p_hit`:
+
+- [`RayHit`](@ref): a plane wave of amplitude `1`,
+  ```math
+  E_j(\\mathbf{p}) = \\exp\\!\\big(i k_0 \\,[L + (\\mathbf{p} - \\mathbf{p}_\\mathrm{hit}) \\cdot \\mathbf{s}]\\big)
+  ```
+- [`PolarizedRayHit`](@ref): the same plane wave times the field vector `E₀` of the ray,
+  ``\\mathbf{E}_j(\\mathbf{p}) = \\mathbf{E}_0 \\exp(i k_0 [L + (\\mathbf{p} - \\mathbf{p}_\\mathrm{hit}) \\cdot \\mathbf{s}])``
+- [`GaussianBeamletHit`](@ref): the TEM₀₀ field of the traced segment, at the distance `l` along
+  its chief ray and the distance `r` from it,
+  ```math
+  E_j(\\mathbf{p}) = \\frac{E_0 w_0}{\\sqrt{n}\\, w(l)} \\exp\\!\\left(-\\frac{r^2}{w(l)^2}\\right)
+      \\exp\\!\\left(i\\left[k_0 L(l) + \\psi(l) + \\frac{n k_0 r^2}{2 R(l)}\\right]\\right)
+  ```
+  with the field `E₀` and waist `w₀` of the beamlet, the beam radius `w`, the radius of curvature
+  `R` and the Gouy phase `ψ` of the segment (see [`gauss_parameters`](@ref)), the index `n` of
+  the segment and the optical path `L(l)` along the chief ray.
+- [`AstigmaticGaussianBeamletHit`](@ref): the field vector of the chief ray of the segment, `E_pol`,
+  times the general astigmatic Gaussian beam of its parabasal rays,
+  ``\\mathbf{E}_j(\\mathbf{p}) = \\mathbf{E}_\\mathrm{pol}\\, g(l) \\exp(i k_0 [L(l) + n\\, W(\\mathbf{p})])``,
+  with the Gouy factor `g`, which also holds the change of the amplitude with the beam area, and
+  the complex transverse phase `W`, whose imaginary part is the Gaussian envelope, see
+  [Astigmatic polarized beamlets](@ref).
+
+Beamlet hits give the physical field in \\[V/m\\]. Ray hits are raw and unscaled: `|E|²` does not
+carry the power of the ray, see the note on scaling in [`electric_field`](@ref)`(pd; kwargs...)`.
 
 A new hit type implements this method, `direction(hit)` and `refractive_index(hit)`; the
 readouts of a [`Detector`](@ref) on a grid ([`electric_field`](@ref), [`intensity`](@ref),
@@ -126,15 +164,35 @@ on the grid of [`electric_field`](@ref)`(pd; kwargs...)`, with the same keyword 
 Returns a tuple `(xs, zs, I)`. To sample on a grid of one's own, use
 [`intensity(::Detector, ::AbstractVector, ::AbstractVector)`](@ref).
 
-`I` is the flux of the coherent sum of all hits through the detector, the Poynting vector along
-its normal `n̂`, `I = ½ Re(E × H*) ⋅ n̂`. Each hit adds `(n/Z₀) s × E` to `H`, with its direction
-`s`, the refractive index `n` in front of the detector and the vacuum impedance `Z₀`. A single
-hit under the angle `θ` to the normal gives `I = n |E|² cos θ / (2Z₀)`, so that
-[`optical_power`](@ref) is the power of the beam for any angle of incidence. Hits under
-different angles interfere with the mean of their `cos θ`. Hits without a polarization
-([`Ray`](@ref)s, [`GaussianBeamlet`](@ref)s) have no vector `H` and use the scalar form of the
-same flux, `½ Re(E* F)` with `F = Σ (n/Z₀) cos θ E` over the hits. Hits on the back side of the
-detector count like hits on its front side.
+`I` is the flux of the coherent sum of all hits through the detector: the time-averaged Poynting
+vector along the detector normal `n̂`, which points along the incoming beams. Hits with a
+polarization ([`PolarizedRay`](@ref)s, [`AstigmaticGaussianBeamlet`](@ref)s) give
+
+```math
+I = \\frac{1}{2} \\operatorname{Re}\\big[(\\mathbf{E} \\times \\mathbf{H}^*) \\cdot \\hat{\\mathbf{n}}\\big],
+\\qquad \\mathbf{E} = \\sum_j \\mathbf{E}_j, \\qquad
+\\mathbf{H} = \\sum_j \\frac{n_j}{Z_0}\\, \\sigma_j \\mathbf{s}_j \\times \\mathbf{E}_j,
+```
+
+with the field `Eⱼ` of hit `j` (see [`electric_field`](@ref)`(hit, p)`), its direction `sⱼ`, the
+refractive index `nⱼ` in front of the detector, the vacuum impedance `Z₀` and
+`σⱼ = sign(sⱼ ⋅ n̂)`, i.e. a hit on the back side of the detector counts like one on its front
+side. Hits without a polarization ([`Ray`](@ref)s, [`GaussianBeamlet`](@ref)s) have no vector `H`
+and give the scalar form of the same flux,
+
+```math
+I = \\frac{1}{2} \\operatorname{Re}\\big[E^* F\\big], \\qquad E = \\sum_j E_j, \\qquad
+F = \\sum_j \\frac{n_j}{Z_0} \\cos\\theta_j\\, E_j, \\qquad \\cos\\theta_j = |\\mathbf{s}_j \\cdot \\hat{\\mathbf{n}}|.
+```
+
+A single hit under the angle `θ` to the normal gives `I = n|E|² cos θ / (2Z₀)`, the power of the
+beam per detector area, so that [`optical_power`](@ref) is the power of the beam for any angle of
+incidence. No projection factor is applied to the field. For two scalar hits, the cross term is
+`Re(E₁* E₂) (n₁ cos θ₁ + n₂ cos θ₂) / (2Z₀)`, i.e. hits under different angles interfere with the
+mean of their `n cos θ`.
+
+`I` is in \\[W/m²\\] for beamlet hits. For ray hits, whose fields are unscaled, it has the same
+form but no absolute unit.
 """
 function intensity(pd::Detector; progress::Bool = true, kwargs...)
     xs, zs = _sampling_grid(pd; kwargs...)
@@ -189,9 +247,21 @@ end
 """
     optical_power(pd::Detector; kwargs...)
 
-Calculates the total optical power on `pd` in [W] by integration of its [`intensity`](@ref)
-over the sampling window. For more information on keyword argument options, refer to the
-[`electric_field`](@ref) docs.
+Calculates the total optical power on `pd` in \\[W\\] as the integral of its [`intensity`](@ref)
+over the sampling window in the local detector coordinates,
+
+```math
+P = \\int_{x_\\mathrm{min}}^{x_\\mathrm{max}} \\int_{z_\\mathrm{min}}^{z_\\mathrm{max}} I(x, z)\\, \\mathrm{d}z\\, \\mathrm{d}x,
+```
+
+evaluated with the trapezoidal rule on the `n×n` grid of [`electric_field`](@ref)`(pd; kwargs...)`,
+with the same keyword arguments. Since `I` is the flux through the detector, `P` is the power of
+the beams for any angle of incidence.
+
+The integral runs over the sampling window, not over the active area of the detector: the
+window is not cut at the edges of the detector. The default window of beamlet hits holds the
+power of each beamlet except for a part of `10⁻⁸`, see `crop_factor`. For ray hits, `P` has no
+absolute unit, see [`intensity`](@ref).
 """
 function optical_power(pd::Detector; kwargs...)
     x, y, I = intensity(pd; kwargs...)

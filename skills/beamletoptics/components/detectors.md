@@ -37,7 +37,7 @@ Grid keywords:
 `get_progress_threshold()` s (default 5 s).
 
 Local `(x, z)` form a left-handed frame with the normal, as seen by the incoming beam.
-For polarized hits, `I = intensity.(E)` converts a matrix of field vectors to intensity.
+`intensity.(E)` turns a field matrix into `|E|²/(2Z₀)` per point (vacuum, not projected onto the detector); the irradiance on the detector, with `n` and `cos θ` of each hit, is `intensity(det)` or `intensity(det, xs, zs)`.
 Ray-based PSFs are not normalized: compare shapes and positions, not absolute Strehl values.
 
 If nothing reaches the detector, readout throws "No hits available on detector."

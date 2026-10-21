@@ -63,18 +63,15 @@ The following image shows the spot diagram of a Sonnar lens. Two [`CollimatedSou
 
 ## Field distributions
 
-Alternatively, the detector data can also be used to reconstruct electric field distributions of incoming beams on its surface using coherent addition. Depending on the beam type, either plane wave or Gaussian beam models are used. As a user, this data can be accessed using the [`electric_field`](@ref) interface.
+Alternatively, the detector data can also be used to reconstruct electric field distributions of incoming beams on its surface using coherent addition. Three readouts build on each other: [`electric_field`](@ref) is the coherent sum of the fields of all hits, [`intensity`](@ref) the flux of the Poynting vector of that field through the detector, and [`optical_power`](@ref) the integral of the intensity. Their definitions follow.
 
 ```@docs; canonical=false
 electric_field(::Detector)
 electric_field(::Detector, ::AbstractVector, ::AbstractVector)
-```
-
-The [`intensity`](@ref) function returns the power per detector area, the flux of the Poynting vector through the detector. It takes the angle of incidence of each hit into account, so that [`optical_power`](@ref), its integral over the detector, is the power of the beams for any orientation of the detector.
-
-```@docs; canonical=false
+electric_field(::BeamletOptics.AbstractDetectorHit, ::AbstractVector)
 intensity(::Detector)
 intensity(::Detector, ::AbstractVector, ::AbstractVector)
+optical_power(::Detector)
 ```
 
 ### Gaussian beamlet interference
