@@ -510,8 +510,7 @@ Hit record of the traced segment `id` of `g`: the data that [`beamlet_hit_field`
 needs to evaluate the field of that segment at any point near it. [`Detector`](@ref)s store
 one per beamlet that hits them; it can also be built for any traced segment, e.g. to sample
 a beamlet on a plane of one's own. `l0` is the length of the beam (including its parents)
-up to the start of the segment. The hit keeps no reference to `g`: a new solve of `g` does not
-change it.
+up to the start of the segment.
 """
 function GaussianBeamletHit(g::GaussianBeamlet{R}, id::Integer) where {R}
     ray = g.chief.rays[id]
