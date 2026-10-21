@@ -21,6 +21,7 @@ Concrete subtypes include:
 - [`RayHit`](@ref) — unpolarized geometric ray
 - [`PolarizedRayHit`](@ref) — ray carrying a polarization state
 - [`GaussianBeamletHit`](@ref) — single Gaussian beamlet
+- [`AstigmaticGaussianBeamletHit`](@ref) — single astigmatic Gaussian beamlet with a vector field
 """
 abstract type AbstractDetectorHit end
 
