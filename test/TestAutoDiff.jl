@@ -66,6 +66,10 @@ mirrors = [
 pd_at(T, y) = (d = Detector(T(40mm)); translate3d!(d, T[0, y, 0]); d)
 hit_x(pd) = BMO.hit_point(only(BMO.hits(pd)))[1]
 bi_convex(T) = SphericalLens(T(50mm), T(-50mm), T(5mm), T(25mm), _ -> T(1.5))
+# paraxial ABCD matrices in reduced angles: a translation by the reduced distance `d` (length / n),
+# and a refraction or reflection with the power `P`
+translation(d) = [1 d; 0 1]
+refraction(P) = [1 0; -P 1]
 polarized(T, x) = Beam(PolarizedRay(T[x, -50mm, 0], T[0, 1, 0], T(1e-6), Complex{T}[1, 0, 0]))
 
 """
@@ -137,6 +141,20 @@ parametric_cases = [
         ad, fd = check_derivative(c; h, mirror = true)
         @test isfinite(ad)
         @test ad ≈ fd rtol = 1e-5
+    end
+    @testset "paraxial reference, $label" for (label, c, M, mirror) in [
+            # front vertex at y = 0, back vertex at y = t, detector at y = 100 mm
+            ("bi-convex SphericalLens", bi_convex,
+                translation(100mm - 5mm) * refraction((1 - 1.5) / -50mm) * translation(5mm / 1.5) *
+                refraction((1.5 - 1) / 50mm), false),
+            # vertex at y = 0, detector at y = -30 mm
+            ("SphericalMirror", last(mirrors[1]), translation(30mm) * refraction(2 / 200mm), true),
+        ]
+        # A ray on the axis and the component shifted laterally by `dx`: the ray meets it at the
+        # height -dx, i.e. the spot lies at dx + A (-dx), with A the position element of the paraxial
+        # ABCD matrix `M` from the vertex to the detector, exact for the derivative at dx = 0.
+        ad = ForwardDiff.derivative(dx -> spot_x(c, dx; h = 0.0, mirror), 0.0)
+        @test ad ≈ 1 - M[1, 1] rtol = 1e-6
     end
     @testset "refractive index" begin
         # the spot of a ray at h = 2 mm behind a bi-convex lens with the refractive index `n0`
