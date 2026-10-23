@@ -128,7 +128,10 @@ function _raymarch_outside(shape::AbstractSDF{S},
         if dist > eps
             escaped = true
         elseif escaped
-            normal = normal3d(shape, pos)
+            # The normal is evaluated outside: a step may end slightly within the shape, where the
+            # gradient of a composite SDF may stem from a part other than the one whose surface is hit,
+            # e.g. the face of a lens body that the vertex of a concave surface touches.
+            normal = normal3d(shape, dist < 0 ? pos - (eps - dist) * dir : pos)
             # Filter out false positive hits caused by numerical noise when leaving an SDF.
             if !(dot(dir, normal) > eps)
                 return Intersection(t0, normal, shape)
@@ -308,6 +311,16 @@ end
 intersect3d(::NoBoundingSphere, object::AbstractSDF, ray::AbstractRay) = intersect3d(object, ray)
 
 # generic SDF transformations
+# The distance √(a² + b²) from an axis, e.g. the radius of revolution. It is exactly 0 on the axis,
+# also within nested automatic differentiation (e.g. the derivative of a normal, which is itself a
+# gradient), where `norm(Point2(a, b))` gives `NaN` there and would let comparisons of SDF branches
+# fail. The derivative w.r.t. a and b is not defined on the axis; SDFs that need it there use a
+# smooth expression, e.g. the 3D distance from the center of a sphere.
+function _radial(a, b)
+    r2 = a^2 + b^2
+    return iszero(r2) ? zero(r2) : sqrt(r2)
+end
+
 """
     op_revolve_z(p, sdf2d::Function, offset)
 
@@ -316,7 +329,7 @@ the 2D shape around the z-axis.
 
 """
 function op_revolve_z(p::Point3{T}, sdf2d::Function, offset = zero(T)) where {T <: Real}
-    q = Point2(norm(Point2(p[1], p[2])) - offset, p[3])
+    q = Point2(_radial(p[1], p[2]) - offset, p[3])
     return sdf2d(q)
 end
 
@@ -328,7 +341,7 @@ the 2D shape around the y-axis.
 
 """
 function op_revolve_y(p::Point3{T}, sdf2d::Function, offset = zero(T)) where {T <: Real}
-    q = Point2(norm(Point2(p[1], p[3])) - offset, p[2])
+    q = Point2(_radial(p[1], p[3]) - offset, p[2])
     return sdf2d(q)
 end
 
