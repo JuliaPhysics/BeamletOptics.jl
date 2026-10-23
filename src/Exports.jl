@@ -91,5 +91,5 @@ public bounding_sphere_of, AbstractBoundingSphere, NoBoundingSphere, SingleBound
 public AbstractObjectGroup
 # element type of path_segments
 public PathSegment
-public AbstractSampling, NoSampling, DiscRings, DiscSunflower, DiscLine, ConeRings, ConeSunflower,
+public AbstractSourceSampling, NoSampling, DiscRings, DiscSunflower, DiscLine, ConeRings, ConeSunflower,
        ConeFan, source_beams, sampling_basis

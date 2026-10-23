@@ -22,7 +22,7 @@ mutable struct PointSource{T, R <: AbstractRay{T}} <: AbstractBeamGroup{T, R}
     NA::T
     center::Point3{T}
     orientation::SMatrix{3, 3, T, 9}
-    sampling::AbstractSampling
+    sampling::AbstractSourceSampling
 end
 
 """
@@ -45,7 +45,7 @@ PointSource(beams::Vector{<:Beam}, NA, pos, orientation::AbstractMatrix) =
     PointSource(beams, NA, pos, orientation, NoSampling())
 
 function PointSource(beams::Vector{Beam{T, R}}, NA, pos, orientation::AbstractMatrix,
-        sampling::AbstractSampling) where {T, R <: AbstractRay{T}}
+        sampling::AbstractSourceSampling) where {T, R <: AbstractRay{T}}
     _check_kinematic_members(beams)
     return PointSource{T, R}(beams, T(NA), Point3{T}(pos), _check_orientation(orientation, T), sampling)
 end
