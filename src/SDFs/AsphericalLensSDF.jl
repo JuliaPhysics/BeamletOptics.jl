@@ -145,11 +145,8 @@ Only even aspheres are implemented at the moment. This will change soon.
 """
 function aspheric_equation(r, c, k, α_coeffs)
     r2 = r^2
-    sqrt_arg = 1 - (1 + k) * c^2 * r2
-    if sqrt_arg < 0
-        return NaN  # Handle as desired
-    end
-    return c * r2 / (1 + sqrt(sqrt_arg)) + _even_aspheric_sum(r2, α_coeffs)
+    _aspheric_sqrt_arg(r2, c, k) < 0 && return NaN
+    return _aspheric_sag_r2(r2, c, k, α_coeffs)
 end
 
 # Σᵢ αᵢ r²ⁱ of the even aspheric terms, via Horner's scheme in r²
@@ -161,48 +158,38 @@ function _even_aspheric_sum(r2, α_coeffs)
     return acc * r2
 end
 
-# d/dr of `_even_aspheric_sum(r^2, α_coeffs)`, i.e. Σᵢ 2i αᵢ r²ⁱ⁻¹, via Horner's scheme in r²
-function _even_aspheric_sum_derivative(r, α_coeffs)
-    r2 = r^2
-    acc = zero(r2 * zero(eltype(α_coeffs)))
-    for i in reverse(eachindex(α_coeffs))
-        acc = muladd(acc, r2, 2i * α_coeffs[i])
-    end
-    return acc * r
-end
-
 function aspheric_equation(r::Real, a::AbstractAsphericalSurfaceSDF)
     aspheric_equation(r, 1 / a.radius, a.conic_constant, a.coefficients)
 end
 
 function gradient_aspheric_equation(r, c, k, α_coeffs)
-    Ri = 1 / c
-    sqrt_arg = 1 - r^2 * (1 + k) / Ri^2
-    sqrt_arg < 0 && return NaN
-    gr = 2 * r / (Ri * (√(sqrt_arg) + 1)) +
-         r^3 * (1 + k) / (Ri^3 * √(sqrt_arg) * (√(sqrt_arg) + 1)^2)
-    sum_r = _even_aspheric_sum_derivative(r, α_coeffs)
-
-    return Point2(-sum_r - gr, 1)
+    r2 = r^2
+    _aspheric_sqrt_arg(r2, c, k) < 0 && return NaN
+    return Point2(-r * _aspheric_slope_r2(r2, c, k, α_coeffs), 1)
 end
 
-# The sag and the squared slope (dz/dr)² of the asphere as functions of r². Both are smooth on the
-# axis, also for automatic differentiation, in contrast to functions of the radius r.
+# The argument of the square root in the sag of the asphere; the asphere is not defined where it is
+# negative.
+_aspheric_sqrt_arg(r2, c, k) = 1 - (1 + k) * c^2 * r2
+
+# The sag, the slope divided by the radius, G = (dz/dr) / r, and the squared slope (dz/dr)² = r² G²
+# of the asphere as functions of r². They are smooth on the axis, also for automatic
+# differentiation, in contrast to functions of the radius r.
 function _aspheric_sag_r2(r2, c, k, α_coeffs)
-    return c * r2 / (1 + sqrt(1 - (1 + k) * c^2 * r2)) + _even_aspheric_sum(r2, α_coeffs)
+    return c * r2 / (1 + sqrt(_aspheric_sqrt_arg(r2, c, k))) + _even_aspheric_sum(r2, α_coeffs)
 end
 
-function _aspheric_slope2_r2(r2, c, k, α_coeffs)
-    Ri = 1 / c
-    sq = sqrt(1 - r2 * (1 + k) / Ri^2)
-    # dz/dr = r * G(r²)
+function _aspheric_slope_r2(r2, c, k, α_coeffs)
+    sq = sqrt(_aspheric_sqrt_arg(r2, c, k))
+    # Σᵢ 2i αᵢ r²⁽ⁱ⁻¹⁾ of the even aspheric terms, via Horner's scheme in r²
     acc = zero(r2 * zero(eltype(α_coeffs)))
     for i in reverse(eachindex(α_coeffs))
         acc = muladd(acc, r2, 2i * α_coeffs[i])
     end
-    G = 2 / (Ri * (sq + 1)) + r2 * (1 + k) / (Ri^3 * sq * (sq + 1)^2) + acc
-    return r2 * G^2
+    return 2c / (sq + 1) + r2 * (1 + k) * c^3 / (sq * (sq + 1)^2) + acc
 end
+
+_aspheric_slope2_r2(r2, c, k, α_coeffs) = r2 * _aspheric_slope_r2(r2, c, k, α_coeffs)^2
 
 # The smaller of the distance to the aspheric surface, `d_surface`, and the distance to the segments
 # that close the 2D perimeter, `d_closure`, divided, i.e. scaled down, by the factor `g` (≥ 1) as the
@@ -248,14 +235,12 @@ It is intended to pair the SDF derived from this distance field with a cylinder 
 """
 function convex_aspheric_surface_distance(r, z, c, k, d, α_coeffs, max_sag, edge, r2 = r^2)
     r2_bound = (d / 2)^2
-    z_aspheric_value = aspheric_equation(r, c, k, α_coeffs)
-    grad_z = gradient_aspheric_equation(r, c, k, α_coeffs)
 
     # sag and gradient norm at the edge, see `aspheric_edge`
     z_aspheric_boundary, n_grad_z_boundary = edge
 
-    # Handling NaN for points outside the aspheric surface
-    if isnan(z_aspheric_value) || isnan(grad_z) || r2 > r2_bound
+    # Points outside the aspheric surface, where it is not defined or beyond its edge
+    if _aspheric_sqrt_arg(r2, c, k) < 0 || r2 > r2_bound
         if z < z_aspheric_boundary
             distance_to_boundary = sqrt((r - sign(r) * d / 2)^2 + (z - z_aspheric_boundary)^2)
         elseif z_aspheric_boundary < z < 0
@@ -268,9 +253,9 @@ function convex_aspheric_surface_distance(r, z, c, k, d, α_coeffs, max_sag, edg
         return distance_to_boundary / n_grad_z_boundary
     end
 
-    # Calculate distance to the aspheric surface
-    # via r², i.e. smooth on the axis, equal to abs(z - z_aspheric_value) / norm(grad_z)
-    distance_to_aspheric = abs(z - _aspheric_sag_r2(r2, c, k, α_coeffs)) / sqrt(1 + _aspheric_slope2_r2(r2, c, k, α_coeffs))
+    # Calculate distance to the aspheric surface, via r², i.e. smooth on the axis
+    z_aspheric_value = _aspheric_sag_r2(r2, c, k, α_coeffs)
+    distance_to_aspheric = abs(z - z_aspheric_value) / sqrt(1 + _aspheric_slope2_r2(r2, c, k, α_coeffs))
     if sign(c) == 1 && z_aspheric_boundary < 0
         # the asphere curves towards negative sag so we need to close the perimeter
         # at its max sag value instead of the boundary
@@ -301,13 +286,11 @@ end
 
 function concave_aspheric_surface_distance(r, z, c, k, d, α_coeffs, max_sag, edge, r2 = r^2)
     r2_bound = (d / 2)^2
-    z_aspheric_value = aspheric_equation(r, c, k, α_coeffs)
-    grad_z = gradient_aspheric_equation(r, c, k, α_coeffs)
 
     # sag and gradient norm at the edge, see `aspheric_edge`
     z_aspheric_boundary, n_grad_z_boundary = edge
-    # Handling NaN for points outside the aspheric surface
-    if isnan(z_aspheric_value) || isnan(grad_z)
+    # Points outside the aspheric surface, where it is not defined
+    if _aspheric_sqrt_arg(r2, c, k) < 0
         if z < 0
             distance_to_boundary = sqrt((r - sign(r) * d / 2)^2 + z^2)
         elseif 0 < z < z_aspheric_boundary
@@ -318,8 +301,9 @@ function concave_aspheric_surface_distance(r, z, c, k, d, α_coeffs, max_sag, ed
         return distance_to_boundary / n_grad_z_boundary
     end
 
-    # via r², i.e. smooth on the axis, equal to abs(z - z_aspheric_value) / norm(grad_z)
-    distance_to_aspheric = abs(z - _aspheric_sag_r2(r2, c, k, α_coeffs)) / sqrt(1 + _aspheric_slope2_r2(r2, c, k, α_coeffs))
+    # distance to the aspheric surface, via r², i.e. smooth on the axis
+    z_aspheric_value = _aspheric_sag_r2(r2, c, k, α_coeffs)
+    distance_to_aspheric = abs(z - z_aspheric_value) / sqrt(1 + _aspheric_slope2_r2(r2, c, k, α_coeffs))
     p = Point2(r, z)
 
     if max_sag[1] > 0 && z_aspheric_boundary < 0
