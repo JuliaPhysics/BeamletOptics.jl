@@ -88,6 +88,13 @@ normal, but only the outer one, i.e. the boundary of the union next to `pos`, gi
 e.g. its derivative w.r.t. the pose of the lens in automatic differentiation. The outer one is the
 closest operand at four points beside `pos`, `ρ` along the tangent plane and `ρ` outward, i.e.
 outside of the union also if `pos` lies on its surface.
+
+!!! note
+    The offset `ρ` is absolute, 1 µm by default. The tie-break is valid for features that are
+    large against `ρ`, i.e. for optics on the mm scale. For features on the µm scale, e.g.
+    micro-optics, the probes can land beyond the feature and pick the inner operand. The traced
+    values are the same for either pick, as the tied operands give the same normal, but the
+    derivatives in automatic differentiation are those of the inner operand then.
 """
 function _closest_operand(operands, ds, pos; ρ = 1e-6)
     d_min = minimum(ds)
