@@ -66,12 +66,21 @@ end
         @test optical_power(pd, g; progress = false) ≈ 1e-3 rtol = 1e-4
         # a single node has no area
         @test optical_power(pd, RectilinearGrid([0.0], [0.0]); progress = false) == 0
+        # the weights stay lazy and add up to the area of the window
+        w = BMO.sample_points(pd, g).weights
+        @test !(w isa AbstractArray)
+        @test sum(w) ≈ 8mm * 6mm rtol = 1e-12
+        # a wide and a tall grid give the same values as their transposes
+        xs1, zs1 = range(-3mm, 3mm, length = 3), range(-2mm, 2mm, length = 301)
+        I_tall = intensity(pd, RectilinearGrid(zs1, xs1); progress = false)[3]
+        I_wide = intensity(pd, RectilinearGrid(xs1, zs1); progress = false)[3]
+        @test size(I_tall) == (301, 3) && size(I_wide) == (3, 301)
     end
 
     @testset "A sampling of one's own" begin
         g = RectilinearGrid(range(-3mm, 3mm, length = 41), range(-2mm, 2mm, length = 31))
         grid = BMO.sample_points(pd, g)
-        cloud = PointCloud(vec(grid.points), vec(grid.weights))
+        cloud = PointCloud(vec(grid.points), vec(copy(grid.weights)))
         pts, I = intensity(pd, cloud; progress = false)
         @test pts === cloud.points
         @test I isa Vector
@@ -87,6 +96,14 @@ end
 
     @testset "Errors" begin
         @test_throws ArgumentError RegularGrid(n = 0)
+        # a bound beyond its opposite side would give a descending grid and a negative power
+        x_auto, z_auto, _ = intensity(pd, RegularGrid(n = 5); progress = false)
+        @test_throws ArgumentError intensity(pd, RegularGrid(x_min = last(x_auto) + 1mm))
+        @test_throws ArgumentError optical_power(pd, RegularGrid(z_max = first(z_auto) - 1mm))
+        @test_throws ArgumentError RectilinearGrid([1.0, 0.0], [0.0, 1.0])
+        @test_throws ArgumentError RectilinearGrid(Float64[], [0.0])
+        # a single point is not an array of points
+        @test_throws MethodError intensity(pd, BMO.Point2(0.0, 0.0))
         empty = Detector(10mm)
         for s in (RegularGrid(), RectilinearGrid([0.0], [0.0]))
             @test_throws "No hits available on detector." intensity(empty, s; progress = false)

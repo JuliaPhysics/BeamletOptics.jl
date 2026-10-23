@@ -86,8 +86,8 @@ RegularGrid
 RectilinearGrid
 BeamletOptics.AbstractDetectorSampling
 BeamletOptics.sample_points
-electric_field(::Detector, ::AbstractArray)
-intensity(::Detector, ::AbstractArray)
+electric_field(::Detector, ::AbstractArray{<:AbstractVector})
+intensity(::Detector, ::AbstractArray{<:AbstractVector})
 ```
 
 ### Gaussian beamlet interference

@@ -61,13 +61,13 @@ function electric_field(pd::Detector, s::AbstractDetectorSampling = RegularGrid(
 end
 
 """
-    electric_field(pd::Detector, points::AbstractArray; progress = true)
+    electric_field(pd::Detector, points::AbstractArray{<:AbstractVector}; progress = true)
 
 The field of the hits of the [`Detector`](@ref) `pd` at the local detector coordinates
-`points` in \\[m\\], each indexable as `q[1]`, `q[2]` (e.g. a `Point2`), see
+`points` in \\[m\\], an array of vectors `(x, z)` (e.g. `Point2`s), see
 [`electric_field`](@ref)`(pd, s)`. Returns the values only, in the shape of `points`.
 """
-electric_field(pd::Detector, points::AbstractArray; progress::Bool = true) =
+electric_field(pd::Detector, points::AbstractArray{<:AbstractVector}; progress::Bool = true) =
     _sample(electric_field, pd, points, progress)
 
 """
@@ -182,13 +182,14 @@ function intensity(pd::Detector, s::AbstractDetectorSampling = RegularGrid();
 end
 
 """
-    intensity(pd::Detector, points::AbstractArray; progress = true)
+    intensity(pd::Detector, points::AbstractArray{<:AbstractVector}; progress = true)
 
 The irradiance on the [`Detector`](@ref) `pd` in \\[W/m²\\] at the local detector coordinates
-`points` in \\[m\\], each indexable as `q[1]`, `q[2]` (e.g. a `Point2`), see
+`points` in \\[m\\], an array of vectors `(x, z)` (e.g. `Point2`s), see
 [`intensity`](@ref)`(pd, s)`. Returns the values only, in the shape of `points`.
 """
-function intensity(pd::Detector, points::AbstractArray; progress::Bool = true)
+function intensity(pd::Detector, points::AbstractArray{<:AbstractVector};
+        progress::Bool = true)
     # downstream normal: the detector normal points against the incoming beams
     n̂ = Point3(-orientation(pd)[:, 2])
     return _sample((hs, p) -> intensity(hs, p, n̂), pd, points, progress)
@@ -249,7 +250,9 @@ the power of each beamlet except for a part of `10⁻⁸`, see `crop_factor` of
 function optical_power(pd::Detector, s::AbstractDetectorSampling = RegularGrid();
         progress::Bool = true)
     grid = sample_points(pd, s)
-    return sum(grid.weights .* intensity(pd, grid.points; progress))
+    I = intensity(pd, grid.points; progress)
+    # lazy: neither the weights nor their product with I are materialized
+    return sum(Broadcast.instantiate(Broadcast.broadcasted(*, grid.weights, I)))
 end
 
 # Samples `f(hits, p)` at the global points `p` of the local detector coordinates `points`,
@@ -266,9 +269,9 @@ function _sample(f, hits::AbstractVector, origin, local_x, local_z, points::Abst
         progress::Bool)
     point(q) = origin + q[1] * local_x + q[2] * local_z
     values = similar(points, typeof(f(hits, point(first(points)))))
-    # chunks of consecutive points, a column of a grid; one tick per chunk
-    chunk = max(1, size(points, 1) < length(points) ? size(points, 1) : cld(length(points), 100))
-    parts = collect(Iterators.partition(eachindex(values, points), chunk))
+    # equal chunks of consecutive points, independent of the shape; one tick per chunk
+    nparts = min(length(points), max(100, 4 * Threads.nthreads()))
+    parts = collect(Iterators.partition(eachindex(values, points), cld(length(points), nparts)))
     _with_progress(progress, length(parts), "Detector field: ") do prog
         Threads.@threads for part in parts
             @inbounds for k in part
