@@ -233,4 +233,56 @@ end
     end
 end
 
+# The first t > t_min at which the SDF changes from ≤ 0 to > 0, sampled with the step h and refined by
+# bisection: the exit of a ray from its sign alone, which is reliable also where the SDF value is not
+function first_exit(s, p, d, tmax; h = 1e-5, t_min = 1e-7)
+    f(t) = BMO.sdf(s, p + t * d)
+    for t in t_min:h:tmax
+        f(t + h) > 0 || continue
+        a, b = t, t + h
+        for _ in 1:60
+            m = (a + b) / 2
+            f(m) > 0 ? (b = m) : (a = m)
+        end
+        return (a + b) / 2
+    end
+    return nothing
+end
+
+@testset "Rays from the surface into an SDF leave at the first exit" begin
+    # as a refracted ray: from a hit point into the object, for all shapes, e.g. through the walls of
+    # rings, meniscus lenses, mirrors with holes and over the internal faces of unions
+    for (i, (label, s)) in enumerate(instances())
+        rng = MersenneTwister(2000 + i)
+        sphere = BMO.bounding_sphere_of(s)
+        c, r = sphere.pos, sphere.radius
+        n, wrong = 0, 0
+        while n < 25
+            pos = c + 3r * random_direction(rng)
+            target = c + 0.8r * cbrt(rand(rng)) * random_direction(rng)
+            hit = BMO.intersect3d(s, Ray(pos, target - pos))
+            isnothing(hit) && continue
+            p = pos + hit.t * normalize(target - pos)
+            d = random_direction(rng)
+            # actually entering
+            (dot(d, BMO.normal3d(hit)) < -0.05 && BMO.sdf(s, p + 1e-6 * d) < 0) || continue
+            ref = first_exit(s, p, d, 2.5r)
+            isnothing(ref) && continue
+            n += 1
+            exit = BMO.intersect3d(s, Ray(p, d))
+            if isnothing(exit) || abs(exit.t - ref) > 1e-6
+                wrong += 1
+                continue
+            end
+            # the normal of the surface that is left, i.e. evaluated just behind the exit
+            n_ref = BMO.normal3d(s, p + (ref + 1e-9) * d)
+            wrong += acos(clamp(dot(n_ref, BMO.normal3d(exit)), -1, 1)) > 1e-6
+            # the exit lies outside up to rounding, such that the next ray from there does not start
+            # inside, i.e. deeper than the surface threshold
+            wrong += BMO.sdf(s, p + exit.t * d) < -BMO.Config.get_sdf_raymarch_eps()
+        end
+        @test wrong == 0
+    end
+end
+
 end

@@ -43,7 +43,8 @@ for y in ys
 end
 ```
 
-- Read everything you need from a detector **before** moving anything or solving again (hits reference beam state).
+- Hits are values of the solve: solving again or moving anything but the detector does not change them. Moving the detector (also via a group) empties it.
+- A detector holds the hits of consecutive solves side by side; you decide when to evaluate. `spot_diagram` shows all hits; `electric_field`, `intensity`, `optical_power` superpose all hits **coherently**. For solves that follow each other in time, know what this computes, or evaluate after each solve and reset (`initialize = true`).
 - See `templates/01_singlet_spot_diagram.jl` (focus scan) and `templates/04_michelson_scan.jl` (fringes).
 
 ## Derivatives (optimization, sensitivity)
@@ -65,7 +66,7 @@ end
 ## PSFs from rays
 
 - Use `UniformDiscSource` (equal-area sampling) with thousands of rays and a `Detector` near focus;
-  read `intensity(det; n, crop_factor)` or give explicit `x_min/x_max/z_min/z_max` windows.
+  read `intensity(det, RegularGrid(n = ..., crop_factor = ...))` or give explicit `x_min/x_max/z_min/z_max` windows in the `RegularGrid`.
 - For unpolarized PSFs, trace two orthogonal polarizations (polarized beams wrapped in a
   `CollimatedSource(beams, diameter, pos, dir)`) and add the intensities incoherently.
 

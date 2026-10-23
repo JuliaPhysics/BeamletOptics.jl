@@ -277,50 +277,105 @@ Calculate the local waist radius and Gouy phase of an unastigmatic Gaussian beam
 
 - `w`: local radius
 - `R`: curvature, i.e. 1/r where r is the radius of curvature
-- `ψ`: Gouy phase (note that -atan definition is used)
+- `ψ`: Gouy phase (note that -atan definition is used), collected along the beam from the start
+  of the root beam: continuous at every surface and from a parent beam to its children, i.e. the
+  Gouy phase that [`electric_field`](@ref) contains. The same holds for an
+  [`AstigmaticGaussianBeamlet`](@ref).
 - `w0`: local beam waist radius
+"""
+gauss_parameters(gauss::GaussianBeamlet, z::Real; hint = point_on_beam(gauss, z)) =
+    gauss_parameters(gauss, z, _gouy_before(gauss, last(hint)); hint)
+
+"""
+    gauss_parameters(gauss::GaussianBeamlet, z, ψ0; hint)
+
+As [`gauss_parameters`](@ref)`(gauss, z)`, but the returned Gouy phase is the one relative to the
+waist of the local segment plus `ψ0`. With `ψ0 = 0` it is the local Gouy phase, which jumps at every
+surface, e.g. at a lens; `gauss_parameters(gauss, z)` passes the Gouy phase that the beam has
+collected in front of the segment.
 """
 function gauss_parameters(
         gauss::GaussianBeamlet,
-        z::Real;
+        z::Real,
+        ψ0::Real;
         hint = point_on_beam(gauss, z)
 )
     p0, index = hint
     chief = gauss.chief.rays[index]
-    div = gauss.divergence.rays[index]
-    waist = gauss.waist.rays[index]
+    w, R, ψ, w0 = gauss_parameters(GaussianSegment(gauss, index), dot(p0 - position(chief), direction(chief)))
+    return (w, R, ψ + ψ0, w0)
+end
+
+"""
+    GaussianSegment{T}
+
+The waist and divergence rays of one segment of a [`GaussianBeamlet`](@ref), as values relative
+to its chief ray: on the plane normal to the chief ray at the distance `l` behind its start, an
+auxiliary ray with direction `a` crosses at the transverse offset `y0 + l * v` from the chief ray.
+Both rays are straight within the segment, hence this holds exactly. `n` is the refractive index
+of the segment and `λ` the vacuum wavelength. [`gauss_parameters`](@ref)`(segment, l)` evaluates it,
+a [`GaussianBeamletHit`](@ref) stores it.
+"""
+struct GaussianSegment{T}
+    y0_w::Point3{T}
+    v_w::Point3{T}
+    a_w::Point3{T}
+    y0_d::Point3{T}
+    v_d::Point3{T}
+    a_d::Point3{T}
+    n::T
+    λ::T
+end
+
+function GaussianSegment(gauss::GaussianBeamlet{T}, index::Integer) where {T}
+    chief = gauss.chief.rays[index]
+    p, d = position(chief), direction(chief)
+    y0_w, v_w, a_w = _crossing(p, d, gauss.waist.rays[index])
+    y0_d, v_d, a_d = _crossing(p, d, gauss.divergence.rays[index])
+    return GaussianSegment{T}(y0_w, v_w, a_w, y0_d, v_d, a_d, refractive_index(chief), wavelength(gauss))
+end
+
+# Offset `y0 + l v` from the chief ray (start `p`, direction `d`) at which `ray` crosses the plane
+# normal to `d` at the distance `l` behind `p`, and the direction of `ray`
+function _crossing(p, d, ray)
+    a = direction(ray)
+    c = dot(d, a)
+    return position(ray) + dot(p - position(ray), d) / c * a - p, a / c - d, a
+end
+
+# Height and slope of an auxiliary ray with the offset `y0 + l v` and the direction `a`: the slope
+# is tan(π/2 − θ) = cot θ of the angle θ between the offset and `a`
+function _height_slope(y0, v, a, l)
+    y = y0 + l * v
+    h = norm(y)
+    ŷ = y / h
+    return h, dot(ŷ, a) / norm(cross(ŷ, a))
+end
+
+"""
+    gauss_parameters(segment::GaussianSegment, l)
+
+Returns `(w, R, ψ, w0)` of the [`GaussianSegment`](@ref) at the distance `l` behind the start of
+its chief ray, as [`gauss_parameters`](@ref)`(gauss, z)` does, but with the Gouy phase `ψ` relative
+to the local waist of the segment.
+"""
+function gauss_parameters(s::GaussianSegment, l::Real)
     #=
-    Divergence ray height and slope (same for waist ray)
-    - find divergence ray "height" and "slope" at intersection point y0 with target plane at p0 of chief ray
-    - ray height "y_d" is length between p0 and y0
-    - ray slope "m_d" is angle between vector p0 -> y0 and divergence ray direction -> gives unambiguous angle for signed ray slope calculation
-    - fails if y_d is zero -> catch R=Inf, ψ=0 and H=λ/π
+    Height y and slope m of the divergence and waist rays on the plane at l
+    - the height is the distance between the chief ray and the crossing point of the ray
+    - the slope is the cotangent of the angle between the offset and the ray direction, which
+      gives the signed slope
+    - fails if a height is zero -> catch R=Inf, ψ=0 and H=λ/π
     =#
-    intersection_len = line_plane_distance3d(p0,
-        direction(chief),
-        position(div),
-        direction(div))
-    y0 = position(div) + intersection_len * direction(div) - p0
-    y_d = norm(y0)
-    y0 /= y_d
-    m_d = tan(π / 2 - angle3d(y0, direction(div)))
-    # Waist ray height and slope
-    intersection_len = line_plane_distance3d(p0,
-        direction(chief),
-        position(waist),
-        direction(waist))
-    y0 = position(waist) + intersection_len * direction(waist) - p0
-    y_w = norm(y0)
-    y0 /= y_w
-    m_w = tan(π / 2 - angle3d(y0, direction(waist)))
+    y_d, m_d = _height_slope(s.y0_d, s.v_d, s.a_d, l)
+    y_w, m_w = _height_slope(s.y0_w, s.v_w, s.a_w, l)
     # Beam parameters as per Arnaud (1985) and DeJager (1992)
-    n = refractive_index(chief)
+    n = s.n
     H = abs(n * (y_w * m_d - y_d * m_w))
     # Test optical invariant
-    λ = wavelength(gauss)
+    λ = s.λ
     if !isapprox(H, λ / π, atol = Config.get_invariant_threshold())
         H = λ / π
-        # println("H not fulfilled at z=$z")
     end
     E_kt = y_d * m_d + y_w * m_w
     F_kt = sqrt(m_d^2 + m_w^2)
@@ -401,22 +456,78 @@ end
     electric_field(gauss::GaussianBeamlet, r, z)
 
 Calculates the electric field phasor [V/m] of the [`GaussianBeamlet`](@ref) at the radial and longitudinal positions `r` and `z`.
-This function also considers phase changes due to changes in the [`optical_path_length`](@ref) of the beamlet.
+The phase contains the [`optical_path_length`](@ref) from the start of the beam (parents included) up to `z`: within a medium
+of refractive index `n` it advances with the wavenumber `n k₀`, along the beam and across it. The Gouy phase is collected
+along the beam as well, i.e. it is continuous at every surface and from a parent beam to its children, and equals the `ψ`
+of [`gauss_parameters`](@ref).
 
 !!! warning
     Note that `z` and `r` must be specified as cartesian distances. Using the optical path length for `z` can lead to false results.
 """
 function electric_field(gauss::GaussianBeamlet, r, z; hint = point_on_beam(gauss, z))
     point, index = hint
-    w, R, ψ, w0 = gauss_parameters(gauss, z, hint = (point, index))
-    k = wavenumber(wavelength(gauss))
+    return _segment_field(gauss, r, z, point, index, _length_before(gauss.chief, index),
+        _path_excess_before(gauss, index), _gouy_before(gauss, index))
+end
+
+# Gouy phase relative to the local waist at the start and at the end of segment `index`, see
+# `gauss_parameters(gauss, z, ψ0)`
+_local_gouy_start(gauss::GaussianBeamlet{T}, index::Integer) where {T} =
+    gauss_parameters(gauss, zero(T), zero(T); hint = (position(rays(gauss.chief)[index]), index))[3]
+function _local_gouy_end(gauss::GaussianBeamlet{T}, index::Integer) where {T}
+    ray = rays(gauss.chief)[index]
+    return gauss_parameters(gauss, zero(T), zero(T);
+        hint = (hit_point(ray), index))[3]
+end
+
+"""
+    _gouy_before(gauss::GaussianBeamlet, index)
+
+Gouy phase that the beam (including its parents) has collected in front of segment `index`, as the
+offset between the collected Gouy phase (the `ψ` of [`gauss_parameters`](@ref)) and the Gouy phase
+relative to the waist of the local segment (`gauss_parameters(gauss, z, 0)`). The collected phase is
+continuous at a surface, whereas the local waist and with it the local phase changes there, e.g. at
+a lens. The offset is zero on the first segment of a root beam and collects the steps of the local
+phase at every surface on the way. A child continues the last segment of its parent.
+"""
+function _gouy_before(gauss::GaussianBeamlet{T}, index::Integer) where {T}
+    p = gauss.parent
+    ψ0 = zero(T)
+    if !isnothing(p)
+        last_id = length(rays(p.chief))
+        ψ0 = _gouy_before(p, last_id) + _local_gouy_end(p, last_id) - _local_gouy_start(gauss, 1)
+    end
+    for i in 2:index
+        ψ0 += _local_gouy_end(gauss, i - 1) - _local_gouy_start(gauss, i)
+    end
+    return ψ0
+end
+
+# Optical minus geometric path of `gauss` (including its parents) up to the start of segment `index`
+function _path_excess_before(gauss::GaussianBeamlet{T}, index::Integer) where {T}
+    p = AbstractTrees.parent(gauss.chief)
+    Δl = isnothing(p) ? zero(T) : optical_path_length(p) - length(p)
+    for j in 1:(index - 1)
+        ray = rays(gauss.chief)[j]
+        Δl += optical_path_length(ray) - length(ray)
+    end
+    return Δl
+end
+
+# Field of segment `index` at the distance `z` along the beam and the radius `r`, where `point` is the
+# point on the chief ray at `z`. `l0` is the geometric length, `Δl0` the optical minus the geometric
+# path and `ψ0` the Gouy phase of the beam in front of the segment (see `_length_before`,
+# `_path_excess_before`, `_gouy_before`).
+function _segment_field(gauss::GaussianBeamlet, r, z, point, index, l0, Δl0, ψ0)
+    w, R, ψ, w0 = gauss_parameters(gauss, z, ψ0; hint = (point, index))
+    k0 = wavenumber(wavelength(gauss))
+    n = refractive_index(gauss, index)
     # Calculate new local field strength based on E0*w0 = const.
     E0 = electric_field(gauss) * (beam_waist(gauss) / w0)
-    # Calculate phase change due to optical path length
-    Δl = optical_path_length(gauss) - length(gauss)
-    # Note: geometrical length changes considered in `electric_field` call below
-    ref_ϕ = Δl / wavelength(gauss) * 2π
-    return electric_field(r, z, E0, w0, w, k, ψ, R) * exp(im * ref_ϕ)
+    # Optical path up to the point. The curvature term is a geometric length like z, hence it enters
+    # with the wavenumber n k0 of the medium as well.
+    opl = z + Δl0 + (n - 1) * (z - l0)
+    return E0 * w0 / w * exp(-r^2 / w^2) * cis(k0 * opl + ψ + n * k0 * r^2 * R / 2)
 end
 
 function optical_power(gauss::GaussianBeamlet)

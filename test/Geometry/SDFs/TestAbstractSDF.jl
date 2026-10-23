@@ -119,6 +119,32 @@ BMO.sdf(c::CountingSDF, point) = (c.count += 1; BMO.sdf(c.shape, point))
         @test BMO.normal3d(point, p2 + offset) == p2
         @test BMO.normal3d(point, p3 + offset) == p3
     end
+
+    @testset "Rays inside leave at the first exit" begin
+        mm = 1e-3
+        # a ray within the wall of a ring (radius 10 to 12 mm) that runs across the hole leaves the
+        # wall at the inner face, not at the far side of the ring, also if it starts in the middle
+        # of the wall, where the SDF increases along the ray
+        ring = BMO.RingSDF(10mm, 2mm, 5mm)
+        i = BMO.intersect3d(ring, Ray([-11mm, 0, 0], [1.0, 0, 0]))
+        @test i.t ≈ 1mm atol = 1e-9
+        @test BMO.normal3d(i) ≈ [1, 0, 0] atol = 1e-6
+        # the same from the surface: the ray enters the wall at -12 mm, the exit is at -10 mm
+        i = BMO.intersect3d(ring, Ray([-12mm, 0, 0], [1.0, 0, 0]))
+        @test i.t ≈ 2mm atol = 1e-9
+        # from the inner face into the hole, the next hit is the opposite wall
+        i = BMO.intersect3d(ring, Ray([-10mm, 0, 0], [1.0, 0, 0]))
+        @test i.t ≈ 20mm atol = 1e-9
+        # a lens is a union of parts: the faces between the parts within the lens are no exit
+        lens = BMO.shape(SphericalLens(50mm, -50mm, 5mm, 25.4mm, λ -> 1.5))
+        front = BMO.intersect3d(lens, Ray([2mm, -50mm, 1mm], [0.0, 1, 0]))
+        p = Point3(2mm, -50mm, 1mm) + front.t * Point3(0.0, 1, 0)
+        d = normalize(Point3(0.1, 1, 0.05))
+        i = BMO.intersect3d(lens, Ray(p, d))
+        @test BMO.sdf(lens, p + i.t * d) ≈ 0 atol = 1e-9
+        @test BMO.sdf(lens, p + (i.t - 1e-6) * d) < 0
+        @test BMO.sdf(lens, p + (i.t + 1e-6) * d) > 0
+    end
 end
 
 end # MODULE

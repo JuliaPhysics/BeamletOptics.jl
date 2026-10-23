@@ -39,6 +39,7 @@ include(joinpath(@__DIR__, "Lenses", "TestCylindricalLenses.jl"))
 include(joinpath(@__DIR__, "Components", "TestDummies.jl"))
 include(joinpath(@__DIR__, "Components", "TestDetectorUtils.jl"))
 include(joinpath(@__DIR__, "Components", "TestDetector.jl"))
+include(joinpath(@__DIR__, "Components", "TestDetectorSampling.jl"))
 include(joinpath(@__DIR__, "Components", "TestBeamsplitters.jl"))
 include(joinpath(@__DIR__, "Components", "TestPolarizers.jl"))
 include(joinpath(@__DIR__, "Components", "TestPrisms.jl"))
@@ -59,6 +60,7 @@ include(joinpath(@__DIR__, "E2E", "TestSonnarLens.jl"))
 include(joinpath(@__DIR__, "E2E", "TestMichelson.jl"))
 include(joinpath(@__DIR__, "E2E", "TestMachZehnder.jl"))
 include(joinpath(@__DIR__, "E2E", "TestFraunhofer.jl"))
+include(joinpath(@__DIR__, "E2E", "TestAnalyticReferences.jl"))
 
 # Test rendering
 # MUST stay first: TestRenderErrors.jl needs to run before anything loads the BMO Makie ext.

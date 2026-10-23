@@ -184,6 +184,15 @@ const BMO = BeamletOptics
 
     TestObject() = TestObject(TestShapeless())
 
+    # a wrapper of two objects with the MultiShape trait but without interact3d
+    struct TestMultiObject{T, A, B} <: BMO.AbstractObject{T}
+        a::A
+        b::B
+    end
+    TestMultiObject(a::BMO.AbstractObject{T}, b) where {T} = TestMultiObject{T, typeof(a), typeof(b)}(a, b)
+    BMO.shape_trait_of(::TestMultiObject) = BMO.MultiShape()
+    BMO.shape(o::TestMultiObject) = (o.a, o.b)
+
     @testset "AbstractObject" begin
         object = TestObject()
         @test isa(BMO.shape(object), TestShapeless)
@@ -215,6 +224,10 @@ const BMO = BeamletOptics
                 obj,
                 beam,
                 ray)===nothing
+            # a MultiShape object without interact3d: the warning names both ways to fix it
+            multi = TestMultiObject(TestObject(), TestObject())
+            @test_logs (:warn, r"MultiShape object .*interact3d.*AbstractObjectGroup"s) BMO.interact3d(
+                sys, multi, beam, ray) === nothing
         end
     end
 end

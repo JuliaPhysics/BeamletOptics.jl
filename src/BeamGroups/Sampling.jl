@@ -37,7 +37,7 @@ The golden angle `π(3 - √5) ≈ 2.39996` rad, i.e. the azimuthal increment of
 const _GOLDEN_ANGLE = π * (3 - √5)
 
 """
-    AbstractSampling
+    AbstractSourceSampling
 
 How the rays of a [`CollimatedSource`](@ref) or [`PointSource`](@ref) are sampled. The source
 stores its sampling in the field `sampling`, such that [`set_num_rays!`](@ref) can regenerate its
@@ -46,7 +46,7 @@ same methods.
 
 # Implementation reqs.
 
-A subtype `S <: AbstractSampling` implements:
+A subtype `S <: AbstractSourceSampling` implements:
 
 - `source_beams(s::S, pos, dir, b1, args..., λ, num_rays::Int, T) -> Vector{<:Beam}`: the beams
   of the source, see [`BeamletOptics.source_beams`](@ref). `args` are the arguments of the source
@@ -68,7 +68,7 @@ half spread angle) are fields of the subtype.
 - [`BeamletOptics.ConeRings`](@ref), [`BeamletOptics.ConeSunflower`](@ref),
   [`BeamletOptics.ConeFan`](@ref): `PointSource`
 """
-abstract type AbstractSampling end
+abstract type AbstractSourceSampling end
 
 """
     NoSampling()
@@ -77,16 +77,20 @@ The beams of the source were given to its constructor, e.g.
 `CollimatedSource(beams, diameter, pos, dir)`. They can not be regenerated:
 [`set_num_rays!`](@ref) throws an `ArgumentError` and `min_num_rays` returns `nothing`.
 """
-struct NoSampling <: AbstractSampling end
+struct NoSampling <: AbstractSourceSampling end
 
 """
     DiscRings(num_rings::Int)
 
-Concentric rings of rays around a center ray on the disc of a [`CollimatedSource`](@ref). The
+Concentric rings of rays around a center ray on the disc of a [`CollimatedSource`](@ref), the center
+counted as the innermost of the `num_rings` rings. The
 outermost ring lies on the edge of the disc; the rays are distributed over the rings in
-proportion to their circumference. Needs at least `20 num_rings` rays.
+proportion to the area of the disc each ring represents, i.e. to its circumference, but half of
+it for the outermost ring, which represents only the inner half of its annulus. Every ray then
+represents about the same area (trapezoidal rule), e.g. for spot sizes or point spread
+functions, which weight every ray equally. Needs at least `20 num_rings` rays.
 """
-struct DiscRings <: AbstractSampling
+struct DiscRings <: AbstractSourceSampling
     num_rings::Int
 end
 
@@ -97,7 +101,7 @@ Sunflower (Fibonacci) sampling of the disc of a [`UniformDiscSource`](@ref): eve
 represents the same area of the disc. The spiral starts with the center ray. Needs at least one
 ray.
 """
-struct DiscSunflower <: AbstractSampling end
+struct DiscSunflower <: AbstractSourceSampling end
 
 """
     DiscLine()
@@ -107,16 +111,19 @@ along the sampling reference vector. The center ray comes first, followed by the
 one end of the line to the other, both ends included. An even number of rays has a second ray at
 the center, see [`UniformLineSource`](@ref). Needs at least one ray.
 """
-struct DiscLine <: AbstractSampling end
+struct DiscLine <: AbstractSourceSampling end
 
 """
     ConeRings(num_rings::Int, θ::Float64)
 
-Concentric cones of rays around a center ray of a [`PointSource`](@ref), the outermost with the
-half spread angle `θ` [rad]. The rays are distributed over the cones in proportion to their
-circumference. Needs at least `20 num_rings` rays.
+Concentric cones of rays around a center ray of a [`PointSource`](@ref), the center counted as the
+innermost of the `num_rings` cones, the outermost with the
+half spread angle `θ` [rad]. The rays are distributed over the cones in proportion to the solid
+angle each cone represents, i.e. to its circumference, but half of it for the outermost cone,
+which represents only the inner half of its band. Every ray then represents about the same solid
+angle (trapezoidal rule). Needs at least `20 num_rings` rays.
 """
-struct ConeRings <: AbstractSampling
+struct ConeRings <: AbstractSourceSampling
     num_rings::Int
     θ::Float64
 end
@@ -128,7 +135,7 @@ Sunflower (Fibonacci) sampling of the spherical cap with the half spread angle `
 [`UniformPointSource`](@ref): every ray represents the same solid angle. The spiral starts with
 the center ray. Needs at least one ray.
 """
-struct ConeSunflower <: AbstractSampling
+struct ConeSunflower <: AbstractSourceSampling
     θ::Float64
 end
 
@@ -141,7 +148,7 @@ to the source direction. The center ray comes first, followed by the other rays 
 the fan to the other, both edges included. An even number of rays has a second ray at the center,
 see [`UniformFanSource`](@ref). Needs at least one ray.
 """
-struct ConeFan <: AbstractSampling
+struct ConeFan <: AbstractSourceSampling
     θ::Float64
 end
 
@@ -172,7 +179,7 @@ function _fan_coordinates(n::Int)
 end
 
 """
-    source_beams(sampling::AbstractSampling, pos, dir, b1, args..., λ, num_rays, T) -> Vector{<:Beam}
+    source_beams(sampling::AbstractSourceSampling, pos, dir, b1, args..., λ, num_rays, T) -> Vector{<:Beam}
 
 The beams of a source at `pos` [m] along the unit vector `dir`, sampled by `sampling` with
 `num_rays` rays of the wavelength `λ` [m] and the number type `T`. `b1` is the unit sampling
@@ -214,8 +221,10 @@ function source_beams(s::DiscRings, pos, dir, b1, diameter, λ, num_rays::Int, :
     # setup concentric beam ring radii
     r_max = diameter / 2
     radii = LinRange(0, r_max, num_rings)[2:end]
-    # calculate total accumulated circumference of all rings
-    circm = radii * 2π
+    # the area of the disc that each ring represents, in units of the ring spacing: the
+    # circumference, half of it for the ring on the edge (trapezoidal rule)
+    circm = collect(radii * 2π)
+    circm[end] /= 2
     total = sum(circm)
     ds = total / num_rays
     # calculate number of rays per ring
@@ -292,6 +301,8 @@ function source_beams(s::ConeRings, pos, dir, b1, λ, num_rays::Int, ::Type{T}) 
     # calculate total accumulated circumference of all rings
     ndirs = [rotate3d(b2, step(θ_NA) * i) * dir for i in eachindex(θ_NA[2:end])]
     circm = norm.(ndirs .- dot.(ndirs, Ref(dir)) .* Ref(dir)) .* Ref(2π)
+    # the solid angle that each cone represents: half of it for the outermost (trapezoidal rule)
+    circm[end] /= 2
     total = sum(circm)
     ds = total / num_rays
     # calculate number of rays per ring
@@ -344,4 +355,4 @@ end
 # The fewest rays of a sampling, see `min_num_rays`
 min_num_rays(::NoSampling) = nothing
 min_num_rays(s::Union{DiscRings, ConeRings}) = 20 * s.num_rings
-min_num_rays(::AbstractSampling) = 1
+min_num_rays(::AbstractSourceSampling) = 1

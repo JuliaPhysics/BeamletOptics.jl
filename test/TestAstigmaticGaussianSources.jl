@@ -220,4 +220,77 @@ const nm = 1e-9
     end
 end
 
+@testset "Power and profile of beamlet sources" begin
+    # the power of a source on a detector that captures all of it
+    function power(source, L, half_width)
+        pd = Detector(2half_width)
+        translate3d!(pd, [0, L, 0])
+        solve_system!(System([pd]), source; progress = false)
+        return BeamletOptics.optical_power(pd, RegularGrid(n = 200); progress = false)
+    end
+    P0 = 1e-3
+    @testset "GaussianBeamletDecomposition is the Gaussian beam of w0 and P0" begin
+        λ, w0, L = 1e-6, 2e-3, 0.1
+        for n_grid in (10, 20)
+            g = GaussianBeamletDecomposition([0.0, 0, 0], [0.0, 1, 0], λ, w0; n_grid, P0)
+            pd = Detector(12w0)
+            translate3d!(pd, [0, L, 0])
+            solve_system!(System([pd]), g; progress = false)
+            s = RegularGrid(n = 201, x_min = -3w0, x_max = 3w0, z_min = -3w0, z_max = 3w0)
+            x, z, I = intensity(pd, s; progress = false)
+            w = w0 * sqrt(1 + (L * λ / (π * w0^2))^2)
+            @test optical_power(pd, s; progress = false) ≈ P0 rtol = 1e-3
+            # the peak intensity 2 P0 / (π w²) of the Gaussian beam, i.e. also its radius
+            @test maximum(I) ≈ 2P0 / (π * w^2) rtol = 1e-3
+        end
+        # the sub-waist of the beamlets must be smaller than the waist
+        @test_throws ArgumentError GaussianBeamletDecomposition([0.0, 0, 0], [0.0, 1, 0], λ, w0; n_grid = 4)
+    end
+    @testset "SphericalGaussianBeamletSource emits P0" begin
+        for (θ, num_rings, num_rays) in ((0.02, 5, 200), (0.02, 10, 1000))
+            source = SphericalGaussianBeamletSource([0.0, 0, 0], [0.0, 1, 0], θ, 1e-6; num_rings, num_rays, P0)
+            @test power(source, 0.2, 3θ * 0.2) ≈ P0 rtol = 1e-2
+        end
+    end
+    @testset "EllipticalGaussianBeamletSource emits P0" begin
+        source = EllipticalGaussianBeamletSource([0.0, 0, 0], [0.0, 1, 0], 0.02, 0.01, 1e-6; num_rings = 10, num_rays = 1000, P0)
+        @test power(source, 0.2, 3 * 0.02 * 0.2) ≈ P0 rtol = 1e-2
+    end
+    @testset "CollimatedGaussianBeamletSource emits P0" begin
+        for n_grid in (5, 10)
+            D = 10e-3
+            source = CollimatedGaussianBeamletSource([0.0, 0, 0], [0.0, 1, 0], D, 1e-6, 1.2D / n_grid; n_grid, P0)
+            @test power(source, 0.05, D) ≈ P0 rtol = 1e-2
+        end
+    end
+    @testset "E0 sets the polarization, P0 the power" begin
+        # E0 of any magnitude, linear or elliptical
+        for E0 in ([3.0, 0, 0], [7.0, 0, 3.5im])
+            spherical = SphericalGaussianBeamletSource([0.0, 0, 0], [0.0, 1, 0], 0.02, 1e-6; num_rings = 10, num_rays = 1000, P0, E0)
+            @test power(spherical, 0.2, 0.012) ≈ P0 rtol = 1e-2
+            elliptical = EllipticalGaussianBeamletSource([0.0, 0, 0], [0.0, 1, 0], 0.02, 0.01, 1e-6; num_rings = 10, num_rays = 1000, P0, E0)
+            @test power(elliptical, 0.2, 0.012) ≈ P0 rtol = 1e-2
+            decomposition = GaussianBeamletDecomposition([0.0, 0, 0], [0.0, 1, 0], 1e-6, 2e-3; P0, E0)
+            @test power(decomposition, 0.1, 0.012) ≈ P0 rtol = 1e-2
+            # the polarization of a beamlet is that of E0
+            p = BeamletOptics.electric_field(first(BeamletOptics.beams(spherical)))
+            @test p / norm(p) ≈ E0 / norm(E0)
+        end
+    end
+    @testset "num_rings counts the center as a ring" begin
+        # the center and num_rings - 1 rings around it, as for PointSource
+        dir = [0.0, 1, 0]
+        spherical = SphericalGaussianBeamletSource([0.0, 0, 0], dir, 0.02, 1e-6; num_rings = 5, num_rays = 500)
+        angles = unique(round.([acos(clamp(dot(BeamletOptics.direction(b), dir), -1, 1)) for b in BeamletOptics.beams(spherical)], digits = 6))
+        @test length(angles) == 5
+        θx, θy = 0.02, 0.01
+        elliptical = EllipticalGaussianBeamletSource([0.0, 0, 0], dir, θx, θy, 1e-6; num_rings = 5, num_rays = 500)
+        b1 = BeamletOptics.orientation(elliptical)[:, 1]
+        b2 = normalize(cross(dir, b1))
+        ρ(d) = (u = dot(d, b1) / dot(d, dir); v = dot(d, b2) / dot(d, dir); sqrt((u / tan(θx))^2 + (v / tan(θy))^2))
+        radii = unique(round.([ρ(BeamletOptics.direction(b)) for b in BeamletOptics.beams(elliptical)], digits = 6))
+        @test sort(radii) ≈ collect(LinRange(0, 1, 5))
+    end
+end
+
 end # MODULE

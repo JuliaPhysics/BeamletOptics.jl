@@ -30,10 +30,10 @@ popat!(system, 1)             # removes the first top-level object and returns i
 A [`StaticSystem`](@ref) can not be changed.
 
 ```@docs; canonical=false
-Base.push!(::System, ::Vararg{BeamletOptics.AbstractObject})
+Base.push!(::System, ::Vararg{BeamletOptics.ObjectOrGroup})
 Base.pop!(::System)
 Base.popat!(::System, ::Integer)
-Base.delete!(::System, ::BeamletOptics.AbstractObject)
+Base.delete!(::System, ::BeamletOptics.ObjectOrGroup)
 ```
 
 ## Solving systems

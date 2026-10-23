@@ -88,7 +88,7 @@ end
         solve_system!(sys, cs)
 
         # get PSF
-        x, y, I_num = intensity(psfd; n=500, crop_factor=5, center=MinMax())
+        x, y, I_num = intensity(psfd, RegularGrid(n=500, crop_factor=5, center=MinMax()))
 
         # walk from the peak to the first local minimum through the centre column
         ix_ctr, jx_ctr = Tuple(argmax(I_num))
@@ -168,8 +168,8 @@ end
 
             # Compare solutions
             I_analytical = intensity.(screen)
-            ~, ~, I_numerical = intensity(pd_l; n, x_min=-l/2, x_max=l/2, z_min=-l/2, z_max=l/2)
-            Pt = optical_power(pd_l; n, x_min=-l/2, x_max=l/2, z_min=-l/2, z_max=l/2)
+            ~, ~, I_numerical = intensity(pd_l, RegularGrid(; n, x_min=-l/2, x_max=l/2, z_min=-l/2, z_max=l/2))
+            Pt = optical_power(pd_l, RegularGrid(; n, x_min=-l/2, x_max=l/2, z_min=-l/2, z_max=l/2))
             @test all(isapprox.(I_analytical, I_numerical, atol = 2e-1))
             @test isapprox(Pt, 2 * P0, atol = 3e-5)
         end
@@ -314,6 +314,33 @@ end
     end
 end
 
+@testset "Hit buffers of a beam group solve" begin
+    # two detectors side by side, the beams of a group hit both
+    pd1, pd2 = Detector(20mm), Detector(20mm)
+    translate3d!(pd1, [-10mm, 50mm, 0])
+    translate3d!(pd2, [10mm, 50mm, 0])
+    system = System([pd1, pd2])
+    cs = CollimatedSource([0, 0, 0], [0, 1, 0], 30mm, 1e-6; num_rings = 10, num_rays = 500)
+    solve_system!(system, cs; progress = false)
+    n1, n2 = BMO.hit_count(pd1), BMO.hit_count(pd2)
+    @test n1 > 0 && n2 > 0
+    # the group stores the same hits as its beams solved one by one
+    pts(pd) = sort(map(h -> Tuple(BMO.hit_point(h)), BMO.hits(pd)))
+    group = (pts(pd1), pts(pd2))
+    initialize!(system)
+    foreach(b -> solve_system!(system, b), BMO.beams(cs))
+    @test (pts(pd1), pts(pd2)) == group
+    # within `with_hit_buffers` the hits are collected, and stored also if the code throws
+    initialize!(system)
+    b = first(BMO.beams(cs))
+    @test_throws ErrorException BMO.with_hit_buffers() do
+        solve_system!(system, b)
+        @test BMO.hit_count(pd1) + BMO.hit_count(pd2) == 0
+        error("cancelled")
+    end
+    @test BMO.hit_count(pd1) + BMO.hit_count(pd2) == 1
+end
+
 @testset "Default window holds the beam power" begin
     # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/127
     P0 = 1e-3
@@ -327,6 +354,202 @@ end
         w = first(BMO.hits(pd)).w_max
         @test x_max - x_min ≈ 6w
         @test z_max - z_min ≈ 6w
+    end
+end
+
+@testset "Hits are values" begin
+    # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/42: a hit holds no reference to the
+    # beam that made it, hence a vector of hits is one block of memory
+    for H in (BMO.RayHit, BMO.PolarizedRayHit, BMO.GaussianBeamletHit, BMO.AstigmaticGaussianBeamletHit)
+        @test isbitstype(H{Float64})
+    end
+end
+
+@testset "A new solve does not change the stored hits" begin
+    # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/42
+    @testset "Beam rotated between solves" begin
+        pd = Detector(50mm)
+        translate3d!(pd, [0, 100mm, 0])
+        system = System([pd])
+        beam = Beam([0.0, 0, 0], [0.0, 1, 0])
+        for _ in 1:5
+            solve_system!(system, beam)
+            zrotate3d!(beam, deg2rad(1))
+        end
+        # the hit of the i-th solve lies 100 mm · tan((i − 1)°) to the side
+        xs = sort(abs.(first.(spot_diagram(pd))))
+        @test xs ≈ 100mm .* tan.(deg2rad.(0:4)) atol = 1e-12
+    end
+    E0 = [1.0, 0, 0]
+    beams = (
+        "Beam" => () -> Beam([0.0, 0, 0], [0.0, 1, 0], 1e-6),
+        "Beam of PolarizedRays" => () -> Beam([0.0, 0, 0], [0.0, 1, 0], 1e-6, E0),
+        "GaussianBeamlet" => () -> GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], 1e-6, 1mm),
+        "AstigmaticGaussianBeamlet" => () -> AstigmaticGaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], 1e-6, 1mm))
+    # the hit is on the first ray, on the second ray behind a mirror, or on a child beam
+    for (label, beam) in beams, path in (:direct, :mirror, :splitter)
+        @testset "$label, $path" begin
+            pd = Detector(20mm)
+            system = System([pd])
+            if path === :mirror
+                m = RoundPlanoMirror(30mm, 5mm)
+                zrotate3d!(m, deg2rad(45))
+                translate3d!(m, [0, 50mm, 0])
+                zrotate3d!(pd, deg2rad(90))
+                translate3d!(pd, [100mm, 50mm, 0])
+                push!(system, m)
+            else
+                translate3d!(pd, [0, 150mm, 0])
+            end
+            if path === :splitter
+                bs = ThinBeamsplitter(30mm)
+                zrotate3d!(bs, deg2rad(45))
+                translate3d!(bs, [0, 50mm, 0])
+                push!(system, bs)
+            end
+            b = beam()
+            solve_system!(system, b)
+            before = only(BMO.hits(pd))
+            # move the source and the mirror or splitter, the beam still hits the detector
+            translate3d!(b, [0, 0, 0.5mm])
+            path === :mirror && translate3d!(m, [5mm, 0, 0])
+            path === :splitter && translate3d!(bs, [0, 10mm, 0])
+            solve_system!(system, b)
+            @test BMO.hit_count(pd) == 2
+            @test first(BMO.hits(pd)) === before
+            @test BMO.hit_point(last(BMO.hits(pd)))[3] ≈ 0.5mm
+        end
+    end
+    @testset "Field of a stored GaussianBeamletHit" begin
+        # free space from the waist: E0 w0 / w(L) · exp(i (k L − atan(L / z_R))) on the axis
+        λ, w0, L = 1e-6, 0.5mm, 300mm
+        pd = Detector(20mm)
+        translate3d!(pd, [0, L, 0])
+        system = System([pd])
+        gb = GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], λ, w0)
+        solve_system!(system, gb)
+        hit = only(BMO.hits(pd))
+        translate3d!(gb, [0, 0, 1mm])
+        solve_system!(system, gb)
+        z_R = π * w0^2 / λ
+        w = w0 * sqrt(1 + (L / z_R)^2)
+        E = electric_field(gb) * w0 / w * cis(2π / λ * L - atan(L / z_R))
+        # the waist and divergence rays give the Gouy phase to about 1e-7 rad
+        @test BMO.beamlet_hit_field(first(BMO.hits(pd)), BMO.Point3(0.0, L, 0.0)) ≈ E rtol = 1e-6
+        @test first(BMO.hits(pd)) === hit
+    end
+end
+
+@testset "Moving a detector empties it" begin
+    pivot = [1mm, 2mm, 3mm]
+    R = BMO.rotate3d([0.0, 0, 1], 0.1)
+    moves = (
+        "translate3d!" => pd -> translate3d!(pd, [0, 1mm, 0]),
+        "translate_to3d!" => pd -> translate_to3d!(pd, [0, 120mm, 0]),
+        "reset_translation3d!" => pd -> reset_translation3d!(pd),
+        "rotate3d!(R)" => pd -> rotate3d!(pd, R),
+        "rotate3d!(R, pivot)" => pd -> rotate3d!(pd, R, pivot),
+        "rotate3d!(axis, θ)" => pd -> rotate3d!(pd, [0.0, 0, 1], 0.1),
+        "rotate3d!(axis, θ, pivot)" => pd -> rotate3d!(pd, [0.0, 0, 1], 0.1, pivot),
+        "xrotate3d!" => pd -> xrotate3d!(pd, 0.1),
+        "yrotate3d!" => pd -> yrotate3d!(pd, 0.1),
+        "zrotate3d!" => pd -> zrotate3d!(pd, 0.1),
+        "align3d!" => pd -> align3d!(pd, [0.1, 1, 0]),
+        "reset_rotation3d!" => pd -> reset_rotation3d!(pd),
+        "translate3d! of a group" => pd -> translate3d!(ObjectGroup([pd]), [0, 1mm, 0]),
+        "zrotate3d! of a group" => pd -> zrotate3d!(ObjectGroup([pd]), 0.1))
+    for (label, move!) in moves
+        @testset "$label" begin
+            pd = Detector(50mm)
+            translate3d!(pd, [0, 100mm, 0])
+            solve_system!(System([pd]), Beam([0.0, 0, 0], [0.0, 1, 0]))
+            @test BMO.hit_count(pd) == 1
+            move!(pd)
+            @test isnothing(BMO.hits(pd))
+        end
+    end
+    @testset "Moving other objects keeps the hits" begin
+        pd = Detector(50mm)
+        translate3d!(pd, [0, 100mm, 0])
+        lens = ThinLens(80mm, 80mm, 4mm, 1.5)
+        translate3d!(lens, [0, 50mm, 0])
+        beam = Beam([0.0, 0, 0], [0.0, 1, 0])
+        solve_system!(System([lens, pd]), beam)
+        translate3d!(lens, [1mm, 0, 0])
+        translate3d!(beam, [0, 0, 1mm])
+        @test BMO.hit_count(pd) == 1
+    end
+end
+
+@testset "Flux through a tilted detector" begin
+    P0, λ, w0 = 1e-3, 1e-6, 1e-3
+    function tilted(θ)
+        pd = Detector(50mm)
+        zrotate3d!(pd, θ)
+        translate3d!(pd, [0, 100mm, 0])
+        return pd
+    end
+    gb(pos = [0.0, 0, 0], dir = [0.0, 1, 0]) = GaussianBeamlet(pos, dir, λ, w0; P0)
+    agb() = AstigmaticGaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], λ, w0; P0)
+
+    @testset "$name holds the beam power at $(θd)°" for (name, beam) in (("GaussianBeamlet", gb),
+            ("AstigmaticGaussianBeamlet", agb)), θd in (0, 30, 60)
+        pd = tilted(deg2rad(θd))
+        solve_system!(System([pd]), beam())
+        @test optical_power(pd, RegularGrid(n = 300); progress = false) ≈ P0 rtol = 1e-4
+    end
+
+    @testset "The field is not projected onto the detector" begin
+        pd = tilted(deg2rad(60))
+        beam = gb()
+        solve_system!(System([pd]), beam)
+        E = electric_field(pd, RectilinearGrid([0.0], [0.0]); progress = false)[3][1]
+        @test abs(E) ≈ abs(BMO.electric_field(beam, 0.0, 100mm)) rtol = 1e-9
+    end
+
+    @testset "Irradiance of a ray falls with cos θ" begin
+        θ = deg2rad(60)
+        d, p = [sin(θ), cos(θ), 0], [-100mm * tan(θ), 0, 0]
+        function irradiance(ray)
+            pd = tilted(0)
+            solve_system!(System([pd]), Beam(ray))
+            return intensity(pd, RectilinearGrid([0.0], [0.0]); progress = false)[3][1]
+        end
+        # a ray has the amplitude 1, a polarized ray that of its field vector
+        @test irradiance(Ray(p, d, λ)) ≈ cos(θ) / (2 * BMO.Z_vacuum)
+        @test irradiance(PolarizedRay(p, d, λ, [0, 0, 2.0])) ≈ 4cos(θ) / (2 * BMO.Z_vacuum)
+    end
+
+    @testset "The phase of a ray grows with the optical distance" begin
+        # in a medium, the phase behind the hit point grows with n k₀, as along the traced path
+        n, opl, δ = 1.5, 0.1, 0.3λ
+        p0, s = BMO.Point3(0.0, 0.1, 0.0), BMO.Point3(sin(0.5), cos(0.5), 0.0)
+        expected = cis(2π / λ * (opl + n * δ))
+        hit = BMO.RayHit{Float64}(p0, s, opl, λ, n, 1.0)
+        @test BMO.electric_field(hit, p0 + δ * s) ≈ expected
+        hit = BMO.PolarizedRayHit{Float64}(p0, s, opl, λ, n, 1.0, BMO.Point3{ComplexF64}(0, 0, 1))
+        @test BMO.electric_field(hit, p0 + δ * s) ≈ [0, 0, expected]
+    end
+
+    @testset "Crossing beams add their powers" begin
+        # beams at ±2 mrad give fringes of 0.25 mm, whose cross term integrates to zero
+        pd = tilted(deg2rad(45))
+        α = 2e-3
+        system = System([pd])
+        for s in (-1, 1)
+            dir = [s * sin(α), cos(α), 0]
+            solve_system!(system, gb(-100mm / cos(α) * dir + [0, 100mm, 0], dir))
+        end
+        @test optical_power(pd, RegularGrid(n = 800); progress = false) ≈ 2P0 rtol = 1e-3
+    end
+
+    @testset "The grid methods sample the automatic grid" begin
+        pd = tilted(deg2rad(30))
+        solve_system!(System([pd]), agb())
+        xs, zs, E = electric_field(pd, RegularGrid(n = 20); progress = false)
+        @test electric_field(pd, RectilinearGrid(xs, zs); progress = false)[3] == E
+        xs, zs, I = intensity(pd, RegularGrid(n = 20); progress = false)
+        @test intensity(pd, RectilinearGrid(xs, zs); progress = false)[3] == I
     end
 end
 

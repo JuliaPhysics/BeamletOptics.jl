@@ -49,7 +49,7 @@ export Prism, RightAnglePrism, EquilateralPrism, DovePrism
 
 # detectors
 export Detector, electric_field, intensity, spot_diagram, optical_power, gauss_parameters,
-       waist_parameters, Centroid, MinMax
+       waist_parameters, Centroid, MinMax, RegularGrid, RectilinearGrid
 
 # splitters
 export ThinBeamsplitter, RoundThinBeamsplitter, RectangularPlateBeamsplitter,
@@ -83,9 +83,13 @@ public is_static, hit_count, wavelength, min_num_rays, ProgressSink, PROGRESS_SI
        progress_state, is_cancelled
 # re-emitting components (e.g. solvers coupled through a field)
 public relaunch!, beamlet_hit_field, GaussianBeamletHit, AstigmaticGaussianBeamletHit
+# own detector samplings, see AbstractDetectorSampling
+public AbstractDetectorSampling, sample_points
 # optional part of the shape interface, see AbstractShape
 public bounding_sphere_of, AbstractBoundingSphere, NoBoundingSphere, SingleBoundingSphere, MultiBoundingSphere
+# own assembly types of separate parts, see AbstractObjectGroup
+public AbstractObjectGroup
 # element type of path_segments
 public PathSegment
-public AbstractSampling, NoSampling, DiscRings, DiscSunflower, DiscLine, ConeRings, ConeSunflower,
+public AbstractSourceSampling, NoSampling, DiscRings, DiscSunflower, DiscLine, ConeRings, ConeSunflower,
        ConeFan, source_beams, sampling_basis

@@ -12,13 +12,17 @@ coherent superposition of the sub-beamlets.
 - `dir`: Propagation direction.
 - `λ`: Wavelength.
 - `w0`: Macroscopic beam waist.
-- `n_grid`: Number of beamlets along one axis (default `20` yields `400` total beamlets).
+- `n_grid`: Number of beamlets along one axis (default `20` yields `400` total beamlets). The grid
+  spans `4 w0`; the sub-waist `overlap ⋅ 4 w0 / n_grid` of the beamlets must be smaller than `w0`,
+  i.e. `n_grid > 4 overlap`, else an `ArgumentError` is thrown. The superposition of the beamlets
+  is the Gaussian beam of the waist `w0` and the power `P0`: the sampled envelope is deconvolved
+  with the profile of a beamlet.
 - `overlap`: Scaling factor for the sub-waist relative to grid spacing (default `1.2` ensures smooth overlap).
 - `basis`: Optional tuple `(ex, ey)` of the macroscopic sampling grid axes, i.e. the 3D directions corresponding to the `x` and `y` grid axes. `ex` must not be zero or parallel to `dir`; its component normal to `dir` becomes the local x-axis of the group [`orientation`](@ref).
 - `randomize_axes`: If `true`, the internal principal axes of each individual beamlet are randomly rotated. This averages out numerical grid-alignment biases and is essential for preserving rotational symmetry in focused spots.
 - `rng`: Random number generator to use for `randomize_axes`.
 - `P0`: Total power of the macroscopic Gaussian beam in [W].
-- `E0`: Optional Jones vector defining the polarization and initial phase of the beam. If `nothing`, defaults to linear polarization along the first grid axis.
+- `E0`: Optional Jones vector defining the polarization and initial phase of the beam; its component transverse to `dir` is used, its magnitude does not matter, the power is `P0`. If `nothing`, defaults to linear polarization along the first grid axis.
 - `threshold`: Relative amplitude below which beamlets are not spawned (default `1e-4`).
 """
 function GaussianBeamletDecomposition(
@@ -41,15 +45,10 @@ function GaussianBeamletDecomposition(
     e1 = isnothing(basis) ? normal3d(dir_n) : normalize(basis[1])
     e2 = isnothing(basis) ? normalize(cross(dir_n, e1)) : normalize(basis[2])
 
-    # Determine macroscopic peak amplitude
-    if isnothing(E0)
-        I0 = (2 * P0) / (π * w0^2)
-        E_phasor = T(electric_field(I0))
-        pol = e1
-    else
-        E_phasor = one(T)
-        pol = E0
-    end
+    # Determine macroscopic peak amplitude, from P0 also for a given polarization E0
+    I0 = (2 * P0) / (π * w0^2)
+    E_phasor = T(electric_field(I0))
+    pol = isnothing(E0) ? e1 : _jones_field(E0, dir_n, one(T))
 
     # We tile over a 4*w0 x 4*w0 area to capture the macroscopic Gaussian tails
     D = 4 * w0
@@ -57,6 +56,13 @@ function GaussianBeamletDecomposition(
 
     # The sub-waist should be slightly larger than grid spacing to ensure smooth overlap
     w0s = Δ * overlap
+    # The superposition of the beamlets is the sampled envelope convolved with a beamlet. For a
+    # Gaussian envelope of the waist w_env it is a Gaussian of the waist √(w_env² + w0s²) and the
+    # peak amplitude w_env² / (w_env² + w0s²). The envelope is therefore deconvolved, such that the
+    # superposition is the macroscopic beam of the waist w0, its peak amplitude and its power P0.
+    w0s < w0 || throw(ArgumentError("the sub-waist $(w0s) of the beamlets must be smaller than the waist w0 = $(w0), increase n_grid or decrease overlap"))
+    w_env = sqrt(w0^2 - w0s^2)
+    E_phasor *= w0^2 / w_env^2
 
     beams = Vector{AstigmaticGaussianBeamlet{T}}()
     xs = LinRange(-D / 2 + Δ / 2, D / 2 - Δ / 2, n_grid)
@@ -65,8 +71,8 @@ function GaussianBeamletDecomposition(
     for x in xs
         for y in ys
             offset = x * e1 + y * e2
-            # Macroscopic Gaussian envelope amplitude weighting
-            amp = exp(-(x^2 + y^2) / w0^2)
+            # Macroscopic Gaussian envelope amplitude weighting, deconvolved, see above
+            amp = exp(-(x^2 + y^2) / w_env^2)
             # Threshold to avoid tracing zero-amplitude beamlets
             if amp > threshold
                 # Normalization factor for coherent superposition

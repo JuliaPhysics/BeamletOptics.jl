@@ -40,7 +40,7 @@ const nm = 1e-9
 
     # Use a low resolution grid (n=50) for fast testing
     x, z, I = BMO.intensity(
-        pd, n = 50, x_min = -100mm, x_max = 100mm, z_min = -100mm, z_max = 100mm)
+        pd, RegularGrid(n = 50, x_min = -100mm, x_max = 100mm, z_min = -100mm, z_max = 100mm))
 
     # Compare with analytical solution: I(x,z) ∝ sinc²(D*x/(λ*L)) * sinc²(D*z/(λ*L))
     x_norm = x .* D ./ (λ * L)

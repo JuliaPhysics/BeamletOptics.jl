@@ -18,10 +18,12 @@ be tight.
   [`NoBoundingSphere`](@ref) gives no plot
 - shape: one plot, or none if the shape has no bounding sphere
 - object: the sphere of its shape, or, if it consists of several parts (e.g. a doublet lens, a cube
-  beamsplitter or an `ObjectGroup`), the sphere of each part, since the solver tests each part on its
+  beamsplitter), the sphere of each part, since the solver tests each part on its
   own, and the main sphere around all parts in `main_color`. The solver tests a ray against the main
   sphere first. An object without a main sphere, because a part has none, gets none. An object
   without a sphere, e.g. a `NonInteractableObject`, gets no plot.
+- object group (`ObjectGroup`): like an object of several parts, the spheres of its objects and then
+  the main sphere of the group
 - system: the spheres of all its objects
 
 # Keyword args
@@ -45,5 +47,5 @@ render!(ax, system; show_bounding_sphere = true)
 
 If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
 """
-render_bounding_sphere!(::Any, ::Union{AbstractBoundingSphere, AbstractShape, AbstractObject, AbstractSystem}; kwargs...) =
+render_bounding_sphere!(::Any, ::Union{AbstractBoundingSphere, AbstractShape, ObjectOrGroup, AbstractSystem}; kwargs...) =
     throw(MissingBackendError())

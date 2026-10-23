@@ -8,7 +8,7 @@
 - [ ] Lens radius signs follow ISO 10110 (biconvex: `r1 > 0`, `r2 < 0`).
 - [ ] Geometry assumes +y as the optical axis; rotations are cumulative and relative.
 - [ ] Sources start **outside** of all elements and point at them.
-- [ ] Detectors emptied before every re-solve in a loop (`initialize = true`, `initialize!(system)` or `empty!(detector)`); results read out before the detector is moved.
+- [ ] Detectors emptied before every re-solve in a loop (`initialize = true`, `initialize!(system)` or `empty!(detector)`), unless the hits of all solves are wanted together (e.g. the spots of a scan); `electric_field`, `intensity` and `optical_power` superpose all stored hits coherently; moving the detector empties it.
 - [ ] Beam model fits the question (see below).
 - [ ] Script was **run**, and the printed numbers were compared with a paraxial or analytic estimate.
 - [ ] For non-trivial geometry, a rendered image was checked.
@@ -50,3 +50,7 @@
 13. **Moving a child beam is not allowed**; move the source (this also resets its trace).
 14. **Rendering**: `flen` defaults to 1 m for rays; camera helpers need an `LScene`; GLMakie needs a
     display (`xvfb-run -a` on headless Linux). Without OpenGL, fall back to CairoMakie (`Axis3` only).
+15. **An assembly of separate parts is a group**, not a `MultiShape` object: a `MultiShape` wrapper
+    without `interact3d` stops every ray that hits it. Use `ObjectGroup` or a subtype of
+    `BeamletOptics.AbstractObjectGroup` (`templates/08_custom_group.jl`); only parts that touch and
+    interact as one get a `MultiShape` type with `interact3d` (`components/systems-and-groups.md`).

@@ -8,7 +8,7 @@ Types:
         AbstractRefractiveOptic
         AbstractDetector
         AbstractBeamsplitter
-        AbstractObjectGroup
+    AbstractObjectGroup
     AbstractRay
     AbstractBeam
     AbstractSystem
@@ -35,6 +35,7 @@ Base.Experimental.@max_methods 1 function intersect3d end
 include("AbstractKinematicTrait.jl")
 include("AbstractShape.jl")
 include("AbstractObject.jl")
+include("AbstractObjectGroup.jl")
 include("AbstractShapeTrait.jl")
 include("AbstractRay.jl")
 include("AbstractBeam.jl")

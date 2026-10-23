@@ -329,7 +329,7 @@ start_rays(b) = map(BMO.first_ray, BMO._component_beams(b))
             CollimatedGaussianBeamletSource(pos, dir, 4mm, 1e-6, 1mm; n_grid = 2),
             SphericalGaussianBeamletSource(pos, dir, 0.1, 1e-6; num_rings = 2, num_rays = 40),
             EllipticalGaussianBeamletSource(pos, dir, 0.1, 0.05, 1e-6; num_rings = 2, num_rays = 40),
-            GaussianBeamletDecomposition(pos, dir, 1e-6, 1mm; n_grid = 3),
+            GaussianBeamletDecomposition(pos, dir, 1e-6, 1mm; n_grid = 6),
             WavefrontBeamletDecomposition(x, x, amp, phase, dir, 1e-6),
             UniformLineSource(pos, dir, 5mm; num_rays = 20),
             UniformFanSource(pos, dir, 0.1; num_rays = 20)
@@ -343,7 +343,7 @@ start_rays(b) = map(BMO.first_ray, BMO._component_beams(b))
             CollimatedGaussianBeamletSource(pos, dir, 4mm, 1e-6, 1mm; n_grid = 2, basis = (b, b2)),
             SphericalGaussianBeamletSource(pos, dir, 0.1, 1e-6; num_rings = 2, num_rays = 40, basis = b),
             EllipticalGaussianBeamletSource(pos, dir, 0.1, 0.05, 1e-6; num_rings = 2, num_rays = 40, basis = b),
-            GaussianBeamletDecomposition(pos, dir, 1e-6, 1mm; n_grid = 3, basis = (b, b2)),
+            GaussianBeamletDecomposition(pos, dir, 1e-6, 1mm; n_grid = 6, basis = (b, b2)),
             WavefrontBeamletDecomposition(x, x, amp, phase, dir, 1e-6; basis = (b, b2)),
             UniformLineSource(pos, dir, 5mm; num_rays = 20, basis = b),
             UniformFanSource(pos, dir, 0.1; num_rays = 20, basis = b)
@@ -514,7 +514,7 @@ start_rays(b) = map(BMO.first_ray, BMO._component_beams(b))
         axis = [1.0, -2.0, 0.5]
         θ = 0.8
         # compared state: (position, orientation/direction) for objects, start rays for sources
-        state(x::Union{BMO.AbstractShape, BMO.AbstractObject}) = (position(x), BMO.orientation(x))
+        state(x::Union{BMO.AbstractShape, BMO.ObjectOrGroup}) = (position(x), BMO.orientation(x))
         state(r::BMO.AbstractRay) = (position(r), BMO.direction(r))
         state(b::BMO.Beam) = state(BMO.first_ray(b))
         state(b::BMO.AbstractBeam) = map(c -> state(BMO.first_ray(c)), BMO._component_beams(b))

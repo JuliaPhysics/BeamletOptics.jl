@@ -47,6 +47,8 @@ BeamletOptics.AbstractObject
 
 An `AbstractObject` can consist of multiple `AbstractShape`s or even multiple subsidiary `AbstractObject`s, facilitating the creation of composite optical elements. For example, a lens with an anti-reflective coating could be represented as the substrate and a separate model for the coating, each with its own geometric and optical properties. In general, an `object` can have the `SingleShape` or a `MultiShape` trait. The [`BeamletOptics.AbstractShapeTrait`](@ref) allows the solver and kinematic API to apply different implementations of basis functions via multiple dispatch. 
 
+The solver treats a `MultiShape` object as one optical element: whichever of its parts a ray hits, [`BeamletOptics.interact3d`](@ref) is called for the object, which must find that part, e.g. via `shape(intersection(ray))`, and forward the beam to it. This is meant for parts that interact as one, e.g. the prisms and the coating of a [`CubeBeamsplitter`](@ref) or the lenses of a [`DoubletLens`](@ref), which hand the ray on to each other with a [`BeamletOptics.Hint`](@ref). Parts that are separate and interact on their own belong in an [`ObjectGroup`](@ref) or an own subtype of [`BeamletOptics.AbstractObjectGroup`](@ref) instead, see [Assemblies: group or multi-shape object](@ref).
+
 ```@docs; canonical=false
 BeamletOptics.SingleShape
 BeamletOptics.MultiShape

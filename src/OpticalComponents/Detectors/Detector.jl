@@ -1,217 +1,4 @@
 """
-    AbstractDetector <: AbstractObject
-
-A generic representation of a detector that evaluates [`AbstractBeam`](@ref) data during and/or after interaction.
-Refer to e.g. [`Detector`](@ref) for more information.
-
-# Implementation reqs.
-
-Subtypes of `AbstractDetector` should implement all supertype requirements as well as:
-
-## Functions
-
-- `interact3d`: see e.g. [`Detector`](@ref) for reference
-- `empty!`: resets data stored in the detector, see below. [`initialize!`](@ref) calls it for all detectors of a system
-
-# Additional information
-
-The information provided below applies to the standard functional implementation of this type and may be overwritten
-by specialized subtypes.
-
-## Data mutability
-
-In order to model field superposition effects, the concrete implementation of an `AbstractDetector` should be a **mutable struct**
-with a `const`ant `shape` field. This is necessary, since (sub-)beams will interact sequentially with the detector during [`solve_system!`](@ref).
-Only if the data can be accumulated sequentially, multiple beam interactions can be captured for a complex system, e.g. an interferometer.
-
-## Data reset
-
-Since e.g. E-field data is supposed to be accumulated by mutability of the detector data, the burden of resetting the data for a new solver call
-is placed on the user. This function should be called `empty!`. A single detector is reset with `empty!(detector)`, all
-detectors of a [`System`](@ref) or [`ObjectGroup`](@ref) with [`initialize!`](@ref), which calls `empty!` on every `AbstractDetector`.
-The solver does not reset detectors unless asked to (keyword `initialize` of [`solve_system!`](@ref)), since the beams of a beam group
-and several sources solved one after another are meant to superpose.
-"""
-abstract type AbstractDetector{T} <: AbstractObject{T} end
-
-"""
-    empty!(detector)
-
-Resets the field data of the `detector`. Must be implemented for each concrete subtype of [`AbstractDetector`](@ref).
-"""
-function empty!(::D) where {D <: AbstractDetector}
-    @warn "Detector reset logic for $D not implemented"
-    return nothing
-end
-
-initialize!(d::AbstractDetector) = (empty!(d); nothing)
-
-"""
-    AbstractDetectorHit
-
-Abstract supertype for all [`Detector`](@ref) hit records.
-
-A hit of this type encapsulates the interaction of a ray or beamlet with the [`Detector`](@ref)
-surface. Instead of directly accumulating values (e.g. optical power), the hit
-object stores all relevant information about the incident field for a posteriori
-evaluation (such as plotting, power integration, or polarization analysis).
-
-!!! info
-    Note that new subtypes of `AbstractDetectorHit` must be manually added to the `Detector`
-    definition to be eligible.
-
-Concrete subtypes include:
-
-- [`RayHit`](@ref) — unpolarized geometric ray
-- [`PolarizedRayHit`](@ref) — ray carrying a polarization state
-- [`GaussianBeamletHit`](@ref) — single Gaussian beamlet
-"""
-abstract type AbstractDetectorHit end
-
-"""
-    AbstractRayHit{T} <: AbstractDetectorHit
-
-Abstract supertype for detector hits produced by [`AbstractRay`](@ref)s.
-Provides a common interface for extracting positional and optical path
-information from rays stored in a detector hit.
-Currently the following concrete types are implemented:
-
-- [`RayHit`](@ref)
-- [`PolarizedRayHit`](@ref)
-
-# Implementation reqs.
-
-Subtypes of `AbstractRayHit` must implement the following:
-
-## Fields
-
-- `ray`: stores the `AbstractRay` that has intersected the detector
-- `opl`: stores the [`optical_path_length`](@ref) of the parent beam (incl. the ray)
-
-## Functions
-
-The interface provides the following functions for the fields above:
-
-- `position`: returns the `ray` position
-- `direction`: returns the `ray` direction
-- `length`: returns the `ray` length
-- `optical_path_length`: returns the `opl`
-- `wavenumber`: returns the `ray` wavenumber
-- `hit_point`: returns the R³ point of intersection
-- `projection_factor`: returns the scalar projection between the surface normal and ray dir.
-"""
-abstract type AbstractRayHit{T} <: AbstractDetectorHit end
-
-position(hit::AbstractRayHit) = position(hit.ray)
-direction(hit::AbstractRayHit) = direction(hit.ray)
-
-length(hit::AbstractRayHit) = length(hit.ray)
-optical_path_length(hit::AbstractRayHit) = hit.opl
-wavenumber(hit::AbstractRayHit) = wavenumber(hit.ray)
-
-hit_point(hit::AbstractRayHit) = position(hit) + length(hit.ray) * direction(hit)
-
-function projection_factor(hit::AbstractRayHit)
-    abs(dot(direction(hit), normal3d(intersection(hit.ray))))
-end
-
-"Stores a [`Ray`](@ref) hit"
-struct RayHit{T} <: AbstractRayHit{T}
-    ray::Ray{T}
-    opl::T
-end
-
-"Stores a [`PolarizedRay`](@ref) hit"
-struct PolarizedRayHit{T} <: AbstractRayHit{T}
-    ray::PolarizedRay{T}
-    opl::T
-end
-
-polarization(hit::PolarizedRayHit) = polarization(hit.ray)
-
-"""
-    AbstractBeamletHit
-
-Stores beamlet hits. Currently implemented:
-
-- [`GaussianBeamletHit`](@ref)
-"""
-abstract type AbstractBeamletHit{T} <: AbstractDetectorHit end
-
-"""
-    GaussianBeamletHit{T} <: AbstractBeamletHit{T}
-
-Stores a [`GaussianBeamlet`], where `l0` represents the length of the parent beam
-up until the current beam section, identified by the `id` index.
-"""
-struct GaussianBeamletHit{T} <: AbstractBeamletHit{T}
-    gauss::GaussianBeamlet{T}
-    l0::T
-    id::Int
-    # Cache
-    p0::Point3{T}
-    d0::Point3{T}
-    sqrt_proj::T
-    w_max::T
-end
-
-"""
-    AstigmaticGaussianBeamletHit{T} <: AbstractBeamletHit{T}
-
-Stores an [`AstigmaticGaussianBeamlet`], where `l0` represents the length of the parent beam
-up until the current beam section, identified by the `id` index.
-"""
-struct AstigmaticGaussianBeamletHit{T} <: AbstractBeamletHit{T}
-    agb::AstigmaticGaussianBeamlet{T}
-    l0::T
-    id::Int
-    # Cache
-    p0::Point3{T}
-    d0::Point3{T}
-    h1::Point3{Complex{T}}
-    u1::Point3{Complex{T}}
-    h2::Point3{Complex{T}}
-    u2::Point3{Complex{T}}
-    # Amplitude and Gouy factor of the complex beam area a at the local distance l behind
-    # p0, as gouy0 / (√(1 − ρ1 l) √(1 − ρ2 l)): gouy0 is the change of the amplitude with the
-    # beam area and the Gouy phase up to p0, followed from the start of the root beam (see
-    # `_area_from_root`), ρ1 and ρ2 are the inverse roots of a(l) (see `_area_inverse_roots`)
-    gouy0::Complex{T}
-    ρ1::Complex{T}
-    ρ2::Complex{T}
-    k0::T
-    Δl::T
-    n_eff::T
-    E_ref_amp::Complex{T}
-    sqrt_proj::T
-    w_max::T
-end
-
-position(hit::GaussianBeamletHit) = position(hit.gauss.chief.rays[hit.id])
-direction(hit::GaussianBeamletHit) = direction(hit.gauss.chief.rays[hit.id])
-wavelength(hit::GaussianBeamletHit) = wavelength(hit.gauss.chief.rays[hit.id])
-refractive_index(hit::GaussianBeamletHit) = refractive_index(hit.gauss.chief.rays[hit.id])
-
-position(hit::AstigmaticGaussianBeamletHit) = position(hit.agb.c.rays[hit.id])
-direction(hit::AstigmaticGaussianBeamletHit) = direction(hit.agb.c.rays[hit.id])
-wavelength(hit::AstigmaticGaussianBeamletHit) = wavelength(hit.agb.c.rays[hit.id])
-refractive_index(hit::AstigmaticGaussianBeamletHit) = refractive_index(hit.agb.c.rays[hit.id])
-
-function hit_point(hit::GaussianBeamletHit)
-    position(hit) + length(hit.gauss.chief.rays[hit.id]) * direction(hit)
-end
-function hit_point(hit::AstigmaticGaussianBeamletHit)
-    position(hit) + length(hit.agb.c.rays[hit.id]) * direction(hit)
-end
-
-function projection_factor(hit::GaussianBeamletHit)
-    abs(dot(direction(hit), normal3d(intersection(hit.gauss.chief.rays[hit.id]))))
-end
-function projection_factor(hit::AstigmaticGaussianBeamletHit)
-    abs(dot(direction(hit), normal3d(intersection(hit.agb.c.rays[hit.id]))))
-end
-
-"""
     Detector <: AbstractDetector
 
 Represents a **flat** rectangular or quadratic, infinitesimally thin surface in R³.
@@ -249,13 +36,17 @@ of a **left-handed** (x, z) surface coordinate system, where incoming beams inte
 
 !!! note "Thread safety"
     Beam groups are solved multithreaded. Pushing hits is guarded by the `lock` of the detector, so
-    all beams can hit the same detector concurrently. The order of the stored hits is not deterministic.
+    all beams can hit the same detector concurrently. Each task of the solve of a beam group collects its
+    hits and stores them at its end, see [`with_hit_buffers`](@ref). The order of the stored hits is not
+    deterministic.
 
 !!! warning "Reading hits"
-    Read the hits of the detector before moving any object or solving again.
-    The hits refer to the rays and beams of the current solve, which a new call of
-    [`solve_system!`](@ref) replaces (child beams and all rays after the first are new objects),
-    and moving objects afterwards leaves the stored hits inconsistent with the system.
+    A hit stores the values of the ray or beamlet at the moment of the solve, in world coordinates.
+    Solving again or moving a source or another object does not change the stored hits. Moving the
+    detector itself empties it, since its hits would no longer lie on its surface. The hits of
+    consecutive solves are kept side by side, and it is up to the user when to evaluate them:
+    [`spot_diagram`](@ref) shows all of them, whereas [`electric_field`](@ref), [`intensity`](@ref) and
+    [`optical_power`](@ref) superpose all of them coherently, as for beams that exist at the same time.
 
 # Fields
 
@@ -309,17 +100,33 @@ hits!(d::Detector, new) = (d.hits = new)
 "Allows continued tracing if set to false"
 stop(d::Detector) = d.stop
 
-function push!(d::Detector, new::AbstractDetectorHit)
-    # Lock d to avoid race conditions
+"""
+    push!(d::Detector, hit::AbstractDetectorHit)
+
+Stores the `hit` in the detector `d`, guarded by the `lock` of `d`. Within [`with_hit_buffers`](@ref),
+e.g. in the solve of a beam group, the `hit` is collected in the buffer of the current task instead
+and reaches `d` when the buffer is flushed.
+"""
+push!(d::Detector, new::AbstractDetectorHit) = push!(current_hit_sink(), d => new)
+
+"""
+    append!(d::Detector, new::Vector{<:AbstractDetectorHit})
+
+Stores all hits of `new` in the detector `d` at once, guarded by the `lock` of `d`. The vector
+`new` may become the vector of hits of `d`, i.e. it must not be used afterwards.
+"""
+function Base.append!(d::Detector, new::Vector{<:AbstractDetectorHit})
     lock(d.lock) do
         # set data type on first push
         if isnothing(hits(d))
-            hits!(d, [new])
+            hits!(d, new)
             return nothing
         end
-        # if new<:AbstractData does not match, throws push! error
-        push!(hits(d), new)
+        # if the hit type does not match, throws a conversion error
+        append!(hits(d), new)
+        return nothing
     end
+    return d
 end
 
 function interact3d(::AbstractSystem, d::Detector, beam::Beam{T, R},
@@ -373,108 +180,6 @@ function interact3d(::AbstractSystem, d::Detector, beam::Beam{T, R},
     end
 end
 
-"""
-    GaussianBeamletHit(g::GaussianBeamlet, id)
-
-Hit record of the traced segment `id` of `g`: the data that [`beamlet_hit_field`](@ref)
-needs to evaluate the field of that segment at any point near it. [`Detector`](@ref)s store
-one per beamlet that hits them; it can also be built for any traced segment, e.g. to sample
-a beamlet on a plane of one's own. `l0` is the length of the beam (including its parents)
-up to the start of the segment. The projection factor is `1` if the segment ends without an
-intersection.
-"""
-function GaussianBeamletHit(g::GaussianBeamlet{R}, id::Integer) where {R}
-    ray = g.chief.rays[id]
-    l0 = _length_before(g.chief, id)
-    p0 = position(ray)
-    d0 = direction(ray)
-    sqrt_proj = _projection_factor(ray)
-    # Beam radius at the end of the segment, for the auto-limits of the field plots
-    l_end = isfinite(length(ray)) ? l0 + length(ray) : l0
-    w_max, _, _, _ = gauss_parameters(g, l_end)
-    return GaussianBeamletHit(g, l0, Int(id), p0, d0, sqrt_proj, w_max)
-end
-
-"""
-    AstigmaticGaussianBeamletHit(agb::AstigmaticGaussianBeamlet, id)
-
-Hit record of the traced segment `id` of `agb`: the data that [`beamlet_hit_field`](@ref)
-needs to evaluate the field of that segment at any point near it, including the optical
-path from the source (parents included), the Gouy factor and the amplitude. The amplitude is
-that of the polarization of the chief ray of the segment, times the change with the beam
-area within the segments since the start of the root beam; the Gouy phase is followed from
-there as well, i.e. a child beamlet continues its parent.
-[`Detector`](@ref)s store one per beamlet that hits them; it can also be built for any
-traced segment, e.g. to sample a beamlet on a plane of one's own. The projection factor is
-`1` if the segment ends without an intersection.
-"""
-function AstigmaticGaussianBeamletHit(agb::AstigmaticGaussianBeamlet{R}, id::Integer) where {R}
-    # Pre-calculate cache
-    chief = rays(agb.c)[id]
-    p0 = position(chief)
-    d0 = direction(chief)
-    k0 = 2π / wavelength(chief)
-    sqrt_proj = _projection_factor(chief)
-
-    # Parabasal parameters at segment start (p0)
-    h1, u1, h2, u2, _ = parabasal_ray_parameters(agb, p0, id)
-
-    # Change of the amplitude with the beam area and Gouy phase up to p0, from the start of the
-    # root beam, which a child continues through its parents
-    start = _area_from_root(agb, id, zero(R))
-    # Gouy factor at p0 and inverse roots of the area along the hit segment, constant per
-    # hit, so that the field loop over the detector pixels does not recompute them
-    A = _area_coefficients(h1, u1, h2, u2, d0)
-    gouy0 = start.scale * cis(-start.arg / 2)
-    ρ1, ρ2 = _area_inverse_roots(A)
-
-    # Complex amplitude of the segment: its chief ray carries what the surfaces on the way did
-    # to the field (Fresnel coefficients, polarizers, beamsplitters)
-    E_vec = polarization(chief)
-    max_idx = argmax(abs.(E_vec))
-    E_ref_amp = Complex{R}(norm(E_vec) * cis(angle(E_vec[max_idx])))
-
-    # OPL correction (Δl) and geometric length up to the start of the segment (l0)
-    p_parent = agb.parent
-    l_parent = isnothing(p_parent) ? 0.0 : length(p_parent)
-    opl_parent = isnothing(p_parent) ? 0.0 : optical_path_length(p_parent)
-
-    Δl = opl_parent - l_parent
-    l0 = l_parent
-    for j in 1:(id - 1)
-        ray_j = rays(agb.c)[j]
-        Δl += optical_path_length(ray_j) - length(ray_j)
-        l0 += length(ray_j)
-    end
-    # Note: the (n-1)*z term in parabasal_field depends on (z - l0).
-    # Propagate semi-axes to the end of the segment for w_max (auto-limits)
-    l_seg = isfinite(length(chief)) ? length(chief) : zero(R)
-    H1 = h1 + l_seg * u1
-    H2 = h2 + l_seg * u2
-    w_max = max(norm(H1), norm(H2))
-    n_eff = refractive_index(agb, id)
-
-    return AstigmaticGaussianBeamletHit(
-        agb, R(l0), Int(id), p0, d0, h1, u1, h2, u2, gouy0, ρ1, ρ2, k0, R(Δl),
-        n_eff, E_ref_amp, sqrt_proj, w_max)
-end
-
-# Geometric length of `beam` (including its parents) up to the start of ray `id`
-function _length_before(beam::Beam{T}, id::Integer) where {T}
-    p = AbstractTrees.parent(beam)
-    l = isnothing(p) ? zero(T) : length(p)
-    for j in 1:(id - 1)
-        l += length(rays(beam)[j])
-    end
-    return l
-end
-
-# √|d·n| of a ray ending on a surface with normal n; 1 without an intersection
-function _projection_factor(ray::AbstractRay{T}) where {T}
-    isnothing(intersection(ray)) && return one(T)
-    return sqrt(abs(dot(direction(ray), normal3d(intersection(ray)))))
-end
-
 function interact3d(::AbstractSystem, d::Detector, g::GaussianBeamlet{R}, id::Int) where {R}
     push!(d, GaussianBeamletHit(g, id))
     if stop(d)
@@ -497,8 +202,3 @@ function interact3d(system::AbstractSystem, d::Detector,
         throw(ErrorException("Continued tracing for AstigmaticGaussianBeamlet not yet implemented."))
     end
 end
-
-# include eval and helper functions
-include("DetectorUtils.jl")
-include("SpotDiagram.jl")
-include("FieldCalculation.jl")

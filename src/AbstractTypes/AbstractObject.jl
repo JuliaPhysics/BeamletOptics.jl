@@ -85,7 +85,7 @@ E.g. for a custom multi-shape object the user of this API needs to define:
 `BeamletOptics.shape(obj::MyObject) = (obj.front, obj.back)`
 
 !!! warning
-    Whenever your object consists of nested structures (e.g. [`ObjectGroup`](@ref)s or other [`MultiShape`](@ref)s) 
+    Whenever your object consists of nested structures (e.g. other [`MultiShape`](@ref)s) 
     it is the responsibility of the user to ensure that **each atomic shape, i.e. `SingleShape`, is only listed once**.
     Failure to ensure this can lead to spurious behaviour when using the kinematic API.
 """
@@ -115,32 +115,3 @@ orientation!(object::AbstractObject, dir) = orientation!(shape_trait_of(object),
 translate3d!(::Movable, object::AbstractObject, offset) = translate3d!(shape_trait_of(object), object, offset)
 
 rotate3d!(::Movable, object::AbstractObject, R::AbstractMatrix) = rotate3d!(shape_trait_of(object), object, R)
-
-"""
-    AbstractObjectGroup <: AbstractObject
-
-Container type for groups of optical elements, based on a tree-like data structure. Intended for easier kinematic handling of connected elements.
-See also [`ObjectGroup`](@ref) for a concrete implementation.
-
-# Implementation reqs.
-
-Subtypes of `AbstractObjectGroup` must implement the following:
-
-## Fields:
-
-- `objects`: stores objects or additional subgroups of objects, allows for hierarchical structures
-
-## Functions:
-
-- for the kinematic API, all corresponding functions of [`AbstractObject`](@ref) must be implemented
-"""
-abstract type AbstractObjectGroup{T} <: AbstractObject{T} end
-
-AbstractTrees.children(group::AbstractObjectGroup) = group.objects
-
-function initialize!(group::AbstractObjectGroup)
-    for object in AbstractTrees.children(group)
-        initialize!(object)
-    end
-    return nothing
-end

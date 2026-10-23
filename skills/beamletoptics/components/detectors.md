@@ -9,32 +9,41 @@ Detector(edge_length, stop = true)
   it catches beams travelling along −x.
 - With `stop = false`, beams continue behind the detector.
 - Stores *hits* of exactly **one** type (Ray, PolarizedRay, GaussianBeamlet or AstigmaticGaussianBeamlet).
-- **Accumulates across solves:** solve with `initialize = true`, or call `initialize!(system)` (all detectors of a system, nested groups included) or `empty!(det)` (one detector) before each `solve_system!` that reuses it. By default the solver does not reset detectors: all beams of a beam group, and several sources solved one after another, superpose on purpose.
-- Read out all results before moving the detector again.
+- **Hits are values** of the beam state at the solve. Solving again, or moving a source, mirror or lens, never changes stored hits.
+- **Moving the detector empties it:** every kinematic call on it (also a move of a group containing it) clears its hits.
+- **Accumulates across solves:** by default the solver does not reset detectors, so hits of consecutive solves sit side by side and all beams of a beam group, and several sources solved one after another, superpose on purpose. The user decides when to evaluate. To start empty, solve with `initialize = true`, or call `initialize!(system)` (all detectors of a system, nested groups included) or `empty!(det)` (one detector).
+- `spot_diagram` shows all stored hits. `electric_field`, `intensity` and `optical_power` superpose **all** stored hits **coherently**, as for beams that exist at the same time. For solves that follow each other in time, know what this computes, or evaluate after each solve and reset (`initialize = true`).
 
 ## Readout
 
 | Call | Returns |
 |------|---------|
 | `spot_diagram(det)` | `Vector{Point2}` of local `(x, z)` hit points (beamlets: projected 1/e² contour, kwargs `num_spots`, `crop_factor`) |
-| `electric_field(det; kwargs...)` | `(xs, zs, E)`: complex field on an `n×n` grid (polarized hits: a matrix of 3-vectors) |
-| `intensity(det[, Z]; kwargs...)` | `(xs, zs, I)` with I = \|E\|²/(2Z) in W/m² |
-| `optical_power(det; kwargs...)` | integrated power in W |
+| `electric_field(det, s = RegularGrid())` | `(xs, zs, E)`: complex field on the sampling `s`, by default an `n×n` grid (hits of `PolarizedRay`s and `AstigmaticGaussianBeamlet`s: a matrix of complex 3-vectors, use `sum(abs2, e)` per element) |
+| `intensity(det, s = RegularGrid())` | `(xs, zs, I)`: power per detector area in W/m², the Poynting flux through the detector; a single hit gives `n\|E\|² cos θ / (2Z₀)` |
+| `optical_power(det, s = RegularGrid())` | power in W, `Σ wᵢ Iᵢ` with the quadrature weights of the sampling, the beam power for any angle of incidence |
 
-Grid keywords:
+The sampling `s` decides where the readouts are evaluated, its window and the weights of `optical_power`:
+
+- `RegularGrid(; kwargs...)`: `n×n` equidistant points in a window around the hits (keywords below), trapezoidal rule
+- `RectilinearGrid(xs, zs)`: a grid of one's own (local `x`, `z` vectors in m, any spacing), the window is `xs × zs` as given, trapezoidal rule; use `optical_power(det, RectilinearGrid(xs, zs))` for the power on it
+- `electric_field(det, points)`, `intensity(det, points)`: the values only, at an array of local `(x, z)` points (e.g. `Point2`) in m, in the shape of `points`
+
+Keywords of `RegularGrid` (not of the readouts):
 
 - `n = 100`: grid points per axis
 - `crop_factor`: scales the automatic window around the hits; default `1` for rays (box around the hit points) and `3` for beamlets (three beam radii around each hit)
 - `center = Centroid()` or `MinMax()`: how the automatic window is centered
 - `x_min, x_max, z_min, z_max`: explicit window in local coordinates (m)
 - `x0_shift, z0_shift`: shift the window
-- `num_spots`: beamlet contour resolution used for the automatic limits
 
-`progress = true` shows a progress bar in the terminal once the readout has run for
+A given bound replaces only its own side of the automatic window.
+
+`progress = true` (keyword of the readout) shows a progress bar in the terminal once the readout has run for
 `get_progress_threshold()` s (default 5 s).
 
 Local `(x, z)` form a left-handed frame with the normal, as seen by the incoming beam.
-For polarized hits, `I = intensity.(E)` converts a matrix of field vectors to intensity.
+`intensity.(E)` turns a field matrix into `|E|²/(2Z₀)` per point (vacuum, not projected onto the detector); the irradiance on the detector, with `n` and `cos θ` of each hit, is `intensity(det)` or `intensity(det, RectilinearGrid(xs, zs))`.
 Ray-based PSFs are not normalized: compare shapes and positions, not absolute Strehl values.
 
 If nothing reaches the detector, readout throws "No hits available on detector."

@@ -219,6 +219,43 @@ Base.delete!(h::_Combined, oh::BMO.AbstractObjectRenderHandle) = (filter!(c -> c
         remove_render!(h)
     end
 
+    @testset "Nested AbstractObjectGroup: render! and live_render!" begin
+        inner = ObjectGroup([RoundPlanoMirror(0.02, 0.004), RoundPlanoMirror(0.02, 0.004)])
+        translate3d!(inner.objects[2], [0, 0.05, 0])
+        outer = ObjectGroup([RoundPlanoMirror(0.02, 0.004), inner])
+        translate3d!(outer.objects[1], [0, 0.1, 0])
+
+        # render!: the meshes of all objects are merged by the outermost group
+        ax2 = LScene(Figure()[1, 1])
+        n0 = length(ax2.scene.plots)
+        @test isnothing(render!(ax2, outer))
+        rendered = ax2.scene.plots[(n0 + 1):end]
+        @test count(p -> p isa Makie.Mesh, rendered) == 1
+        @test length(rendered) == 1 + Ext._default_edges(:reflective)
+
+        # live_render!: one handle for the whole group with the plots of render!
+        h = live_render!(ax, outer)
+        @test h isa Ext.ObjectRenderHandle
+        @test BMO.rendered(h) === outer
+        @test map(Makie.plotfunc, h.plots) == map(Makie.plotfunc, rendered)
+        @test length(h.subP0) == 2 # the mirror and the inner group
+
+        # rigid motion of the outer group: the plots are kept
+        plots = copy(h.plots)
+        translate3d!(outer, [0.02, 0, 0])
+        zrotate3d!(outer, deg2rad(10))
+        update_render!(h)
+        @test h.plots == plots
+
+        # the inner group moved on its own: rendered again
+        translate3d!(inner, [0, 0, 0.03])
+        update_render!(h)
+        @test length(h.plots) == length(plots)
+        @test !any(p -> any(q -> q === p, plots), h.plots)
+
+        remove_render!(h)
+    end
+
     @testset "System: one handle per object, update & pick" begin
         sys = System([RoundPlanoMirror(0.025, 0.005), SphericalLens(0.05, -0.05, 0.01, 0.02)])
         translate3d!(sys.objects[2], [0.0, 0.15, 0.0])

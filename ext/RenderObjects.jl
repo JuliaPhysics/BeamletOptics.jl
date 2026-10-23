@@ -45,6 +45,21 @@ for each `object`.
 """
 render!(ax::_RenderEnv, object::BMO.AbstractObject; kwargs...) = _render!(ax, object; kwargs...)
 
+"""
+    render!(ax, group::AbstractObjectGroup; edges = nothing, show_bounding_sphere = false, kwargs...)
+
+Renders all objects of the `group`, merged like the parts of a `MultiShape` object, see
+`_render_parts!`. Nested groups are merged into the meshes of the outermost group. The `kwargs`,
+e.g. `material` or `color`, and an explicit `edges` apply to all objects. `show_bounding_sphere`
+is consumed by the outermost group, which draws the spheres of all its objects, see
+[`render_bounding_sphere!`](@ref).
+"""
+function render!(ax::_RenderEnv, group::BMO.AbstractObjectGroup; show_bounding_sphere::Bool = false, kwargs...)
+    _render_parts!(ax, BMO.objects(group); kwargs...)
+    show_bounding_sphere && render_bounding_sphere!(ax, group)
+    return nothing
+end
+
 # Dispatch helper fct. for RenderPolarizers.jl, do not remove.
 # Consumes `show_bounding_sphere`: the trait methods and the parts of a `MultiShape` object never see
 # the keyword, the outermost object draws the spheres of all its parts.
@@ -93,22 +108,30 @@ class and the look, see `_default_edges`, i.e. mechanics parts have no edges. Ne
 parts are merged into the meshes of the outermost object. The `kwargs`, e.g. `material` or
 `color`, and an explicit `edges` apply to all parts.
 """
-function render!(ax::_RenderEnv, ::BMO.MultiShape, obj; edges::Union{Nothing, Bool} = nothing,
-        kwargs...)
+render!(ax::_RenderEnv, ::BMO.MultiShape, obj; kwargs...) = _render_parts!(ax, BMO.shape(obj); kwargs...)
+
+"""
+    _render_parts!(ax, parts; edges = nothing, kwargs...)
+
+Renders the `parts` of a `MultiShape` object or the objects of an object group and merges their
+analytic meshes, see `render!(ax, ::MultiShape, obj)`. Within an enclosing call the meshes are
+left to the collector of the outermost one.
+"""
+function _render_parts!(ax::_RenderEnv, parts; edges::Union{Nothing, Bool} = nothing, kwargs...)
     kw = isnothing(edges) ? kwargs : (; kwargs..., edges)
     if !isnothing(_MESH_COLLECTOR[])
-        for _obj in BMO.shape(obj)
-            render!(ax, _obj; kw...)
+        for part in parts
+            render!(ax, part; kw...)
         end
         return nothing
     end
-    parts = Any[]
-    with(_MESH_COLLECTOR => parts) do
-        for _obj in BMO.shape(obj)
-            render!(ax, _obj; kw...)
+    collected = Any[]
+    with(_MESH_COLLECTOR => collected) do
+        for part in parts
+            render!(ax, part; kw...)
         end
     end
-    _plot_collected!(ax, parts)
+    _plot_collected!(ax, collected)
     return nothing
 end
 

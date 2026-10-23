@@ -40,8 +40,9 @@ const _PREFIX = "BeamletOptics/OpticsBase extension"
         origin = BeamletOptics.position(detector), axes = <default detector frame, see below>)
 
 Samples the coherent field of the beamlets hitting a BeamletOptics (BMO) `Detector` into
-an [`OpticsBase.PlaneField`](https://StackEnjoyer.github.io/OpticsBase.jl/dev/). Call it after `solve_system!` and before moving any object, solving again or
-emptying the detector. Requires `using OpticsBase` (package extension).
+an [`OpticsBase.PlaneField`](https://StackEnjoyer.github.io/OpticsBase.jl/dev/). Call it after `solve_system!`. The hits keep the state of
+their solve: solving again or moving other objects does not change them, moving the detector
+empties it. Requires `using OpticsBase` (package extension).
 
 # Arguments
 
@@ -67,9 +68,9 @@ emptying the detector. Requires `using OpticsBase` (package extension).
 # Conventions
 
 - `E` is the physical field: the coherent sum of the beamlet fields at the plane's
-  sample points, projected onto `u`, `v`. Unlike `electric_field(detector)`, it carries
-  no `√|cos θ|` projection factor; for oblique beams `power(f)` is the full beam power
-  crossing the plane, not the detector-area power density integral. `H` is the coherent sum, **over hits**, of `(n_medium/Z₀) dᵢ × Eᵢ`, with
+  sample points, projected onto `u`, `v`. Like `electric_field(detector)`, it carries
+  no projection factor; for oblique beams `power(f)` is the full beam power crossing the
+  plane, as `optical_power(detector)`. `H` is the coherent sum, **over hits**, of `(n_medium/Z₀) dᵢ × Eᵢ`, with
   `dᵢ` the propagation direction of the chief/stigmatic ray of hit `i` and `Eᵢ` that
   hit's own 3D field contribution at the sample point (not the paraxial `(n/Z₀) n × E`
   built from the *total* field, which would be exact only for normal incidence); this
@@ -119,9 +120,8 @@ the optical path from the source (parents included), and follows the conventions
 `GaussianBeamlet` polarized along `u`, `R = Inf`, `n` the refractive index of the segment.
 
 An `AstigmaticGaussianBeamlet` can be sampled on any of its segments, also within a medium.
-The scalar `GaussianBeamlet` model only gives the field of its last segment in vacuum or
-air: on an earlier segment the optical path of the whole beam enters the phase, and in a
-medium of index `n` the amplitude is `√n` too large.
+The scalar `GaussianBeamlet` model can be sampled on any of its segments as well, but in a
+medium of index `n` its amplitude is `√n` too large.
 """
 OpticsBase.PlaneField(beam::Union{GaussianBeamlet, AstigmaticGaussianBeamlet}, id::Integer;
     size::NTuple{2, Int}, spacing::NTuple{2, <:Real}, origin, axes, progress::Bool = false) =
