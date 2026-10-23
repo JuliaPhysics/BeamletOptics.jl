@@ -230,7 +230,7 @@ const BMO = BeamletOptics
         @test isa(BMO.hits(pd)[1], BMO.AstigmaticGaussianBeamletHit)
         
         # Test field calculation
-        xs, zs, E = BMO.electric_field(pd; n=20)
+        xs, zs, E = BMO.electric_field(pd, RegularGrid(n = 20))
         @test size(E) == (20, 20)
         @test any(!iszero, E)
     end

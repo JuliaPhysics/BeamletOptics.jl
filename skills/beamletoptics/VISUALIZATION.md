@@ -99,7 +99,7 @@ not part of BeamletOptics. It is the package BeamletOpticsGUI
 ## Detector data plots
 
 ```julia
-x, z, I = intensity(det; n = 301, crop_factor = 5)
+x, z, I = intensity(det, RegularGrid(n = 301, crop_factor = 5))
 fig = Figure()
 ax = Axis(fig[1, 1], aspect = 1, xlabel = "x [µm]", ylabel = "z [µm]")
 heatmap!(ax, x * 1e6, z * 1e6, I)

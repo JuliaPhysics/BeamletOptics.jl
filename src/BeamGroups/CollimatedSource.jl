@@ -22,7 +22,7 @@ mutable struct CollimatedSource{T, R <: AbstractRay{T}} <: AbstractBeamGroup{T, 
     diameter::T
     center::Point3{T}
     orientation::SMatrix{3, 3, T, 9}
-    sampling::AbstractSampling
+    sampling::AbstractSourceSampling
 end
 
 """
@@ -45,7 +45,7 @@ CollimatedSource(beams::Vector{<:Beam}, diameter, pos, orientation::AbstractMatr
     CollimatedSource(beams, diameter, pos, orientation, NoSampling())
 
 function CollimatedSource(beams::Vector{Beam{T, R}}, diameter, pos, orientation::AbstractMatrix,
-        sampling::AbstractSampling) where {T, R <: AbstractRay{T}}
+        sampling::AbstractSourceSampling) where {T, R <: AbstractRay{T}}
     _check_kinematic_members(beams)
     return CollimatedSource{T, R}(beams, T(diameter), Point3{T}(pos), _check_orientation(orientation, T), sampling)
 end

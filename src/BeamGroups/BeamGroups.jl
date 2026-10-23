@@ -82,7 +82,7 @@ end
 The fewest rays with which [`set_num_rays!`](@ref) regenerates the source `src`: `20 num_rings`
 for ring sources, `1` for sunflower, line and fan sources, and `nothing` if the rays of `src` can
 not be regenerated, e.g. a source built from given beams or any other beam or beam group. Also
-defined for the [`BeamletOptics.AbstractSampling`](@ref) of a source.
+defined for the [`BeamletOptics.AbstractSourceSampling`](@ref) of a source.
 """
 min_num_rays(src) = nothing
 min_num_rays(src::Union{CollimatedSource, PointSource}) = min_num_rays(src.sampling)

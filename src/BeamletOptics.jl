@@ -14,7 +14,6 @@ module BeamletOptics
 
 using LinearAlgebra: norm, normalize, normalize!, dot, cross, I, eigen, Symmetric, Hermitian, svd
 using MarchingCubes: MC, march
-using Trapz: trapz
 using PrecompileTools: @setup_workload, @compile_workload
 using StaticArrays: @SArray, @SVector, SMatrix, SArray, SVector
 using GeometryBasics: Point3, Point2, Mat

@@ -140,7 +140,7 @@ dominant(E) = E[argmax(abs.(E))]
             isodd(n_mirrors) && zrotate3d!(pd, -π / 2)
             system = System([mirror.(mirror_pos[1:n_mirrors])..., pd])
             solve_system!(system, beam)
-            _, _, E = BMO.electric_field(pd; n = 1, x_min = 0, x_max = 0, z_min = 0, z_max = 0)
+            _, _, E = BMO.electric_field(pd, RegularGrid(n = 1, x_min = 0, x_max = 0, z_min = 0, z_max = 0))
             return angle(dominant(E[1]) * cis(-k * BMO.optical_path_length(beam)))
         end
         for n_mirrors in 0:3
@@ -245,7 +245,7 @@ dominant(E) = E[argmax(abs.(E))]
             for E0 in E0s
                 solve_system!(system, AstigmaticGaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], 1e-6, 1e-3; E0))
             end
-            return optical_power(pd; progress = false, n = 150)
+            return optical_power(pd, RegularGrid(n = 150); progress = false)
         end
         P1 = power([1.0, 0, 0])
         @test power([1.0, 0, 0], [1.0, 0, 0]) ≈ 4P1 rtol = 1e-9
@@ -260,7 +260,7 @@ dominant(E) = E[argmax(abs.(E))]
             pd = Detector(24e-3)
             translate3d!(pd, [0, 0.2, 0])
             solve_system!(System([pd]), source; progress = false)
-            return optical_power(pd; progress = false, n = 200)
+            return optical_power(pd, RegularGrid(n = 200); progress = false)
         end
         @test source_power([1, 0, im] / sqrt(2)) ≈ source_power(ComplexF64[1, 0, 0]) rtol = 1e-3
     end
@@ -276,7 +276,7 @@ dominant(E) = E[argmax(abs.(E))]
             E0 = [0, 0, 1], support = [1, 0, 0])
         solve_system!(system, beam)
 
-        xs, zs, E = BMO.electric_field(pd; n = 50)
+        xs, zs, E = BMO.electric_field(pd, RegularGrid(n = 50))
         @test size(E) == (50, 50)
         @test any(!iszero, E)
 
@@ -301,9 +301,9 @@ dominant(E) = E[argmax(abs.(E))]
             [0.0, 0, 0], [0, 1, 0], λ, w0;
             E0 = [0, 0, 1], support = [1, 0, 0])
         solve_system!(s1, b1)
-        P1 = BMO.optical_power(pd1;
-            n = 80, x_min = -pd_size / 2, x_max = pd_size / 2,
-            z_min = -pd_size / 2, z_max = pd_size / 2)
+        P1 = BMO.optical_power(pd1,
+            RegularGrid(n = 80, x_min = -pd_size / 2, x_max = pd_size / 2,
+                z_min = -pd_size / 2, z_max = pd_size / 2))
 
         pd2 = BMO.Detector(pd_size)
         BMO.translate3d!(pd2, [0, 0.10, 0])
@@ -312,9 +312,9 @@ dominant(E) = E[argmax(abs.(E))]
             [0.0, 0, 0], [0, 1, 0], λ, w0;
             E0 = [0, 0, 1], support = [1, 0, 0])
         solve_system!(s2, b2)
-        P2 = BMO.optical_power(pd2;
-            n = 80, x_min = -pd_size / 2, x_max = pd_size / 2,
-            z_min = -pd_size / 2, z_max = pd_size / 2)
+        P2 = BMO.optical_power(pd2,
+            RegularGrid(n = 80, x_min = -pd_size / 2, x_max = pd_size / 2,
+                z_min = -pd_size / 2, z_max = pd_size / 2))
 
         # Power should be conserved (both detectors capture full beam)
         @test isapprox(P1, P2; rtol = 0.05)
@@ -339,7 +339,7 @@ dominant(E) = E[argmax(abs.(E))]
         BMO.zrotate3d!(pd_ref, deg2rad(180))
 
         pd_size = 10mm
-        kw = (n = 80, x_min = -pd_size / 2, x_max = pd_size / 2,
+        grid = RegularGrid(n = 80, x_min = -pd_size / 2, x_max = pd_size / 2,
             z_min = -pd_size / 2, z_max = pd_size / 2)
 
         # Measure reference power (no BS)
@@ -348,7 +348,7 @@ dominant(E) = E[argmax(abs.(E))]
             [0.0, -0.1, 0], [0, 1, 0], λ, w0;
             E0 = [0, 0, 1], support = [1, 0, 0])
         solve_system!(sys_ref, b_ref)
-        P_ref = BMO.optical_power(pd_ref; kw...)
+        P_ref = BMO.optical_power(pd_ref, grid)
 
         # Measure split power
         system = BMO.System([bs, pd_t, pd_r])
@@ -358,8 +358,8 @@ dominant(E) = E[argmax(abs.(E))]
         solve_system!(system, beam)
         @test length(beam.children) == 2
 
-        P_t = BMO.optical_power(pd_t; kw...)
-        P_r = BMO.optical_power(pd_r; kw...)
+        P_t = BMO.optical_power(pd_t, grid)
+        P_r = BMO.optical_power(pd_r, grid)
 
         # P_t + P_r ≈ P_ref (lossless beamsplitter)
         @test isapprox(P_t + P_r, P_ref; rtol = 0.15)
@@ -396,9 +396,9 @@ dominant(E) = E[argmax(abs.(E))]
                 E0 = [0, 0, 1], support = [1, 0, 0])
             BMO.empty!(pd)
             solve_system!(system, beam)
-            powers[i] = BMO.optical_power(pd;
-                n = 60, x_min = -pd_size / 2, x_max = pd_size / 2,
-                z_min = -pd_size / 2, z_max = pd_size / 2)
+            powers[i] = BMO.optical_power(pd,
+                RegularGrid(n = 60, x_min = -pd_size / 2, x_max = pd_size / 2,
+                    z_min = -pd_size / 2, z_max = pd_size / 2))
         end
 
         # Signal periodic with period λ
@@ -511,7 +511,7 @@ dominant(E) = E[argmax(abs.(E))]
         BMO.align3d!(pd_r, [-1.0, 0, 0])
         translate_to3d!(pd_r, [60mm, 80mm, 0])
         beam() = AstigmaticGaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], λ, w0; P0, support = [1.0, 0, 0])
-        axis_field(pd) = dominant(electric_field(pd; n = 1, x_min = 0, x_max = 0, z_min = 0, z_max = 0)[3][1])
+        axis_field(pd) = dominant(electric_field(pd, RegularGrid(n = 1, x_min = 0, x_max = 0, z_min = 0, z_max = 0))[3][1])
         function solve(objects...)
             empty!(pd_t)
             empty!(pd_r)

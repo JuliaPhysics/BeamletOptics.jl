@@ -270,7 +270,7 @@ end
     function axis_field(system, pd, beam)
         empty!(pd)
         solve_system!(system, beam)
-        _, _, E = electric_field(pd; n = 1, x_min = 0, x_max = 0, z_min = 0, z_max = 0)
+        _, _, E = electric_field(pd, RegularGrid(n = 1, x_min = 0, x_max = 0, z_min = 0, z_max = 0))
         return E[1] * cis(-k * BMO.optical_path_length(beam))
     end
     gouy(args...) = rad2deg(angle(axis_field(args...)))
@@ -351,7 +351,7 @@ end
         @test BMO.hit_count(pd_t) == 1 && BMO.hit_count(pd_r) == 1
         @test transmitted ≈ direct / sqrt(2) rtol = 1e-6
         # same distance behind the splitter: the reflected field differs by its sign only
-        _, _, E_r = electric_field(pd_r; n = 1, x_min = 0, x_max = 0, z_min = 0, z_max = 0)
+        _, _, E_r = electric_field(pd_r, RegularGrid(n = 1, x_min = 0, x_max = 0, z_min = 0, z_max = 0))
         reflected = E_r[1] * cis(-k * BMO.optical_path_length(beam.children[2]))
         @test abs(reflected) ≈ abs(transmitted) rtol = 1e-6
         @test abs(sind(rad2deg(angle(reflected / transmitted)))) < 1e-6

@@ -57,8 +57,8 @@ solve_system!(system, beams)
 @info "Calculating Intensity Pattern..."
 n_eval = 500
 # Evaluate over a 30mm window to see many fringes
-xs_eval, zs_eval, I = intensity(target_pd; n = n_eval,
-    x_min = -15e-3, x_max = 15e-3, z_min = -15e-3, z_max = 15e-3)
+xs_eval, zs_eval, I = intensity(target_pd,
+    RegularGrid(n = n_eval, x_min = -15e-3, x_max = 15e-3, z_min = -15e-3, z_max = 15e-3))
 
 ##
 # Visualization

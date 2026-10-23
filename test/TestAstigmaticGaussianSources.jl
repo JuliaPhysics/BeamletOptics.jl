@@ -226,7 +226,7 @@ end
         pd = Detector(2half_width)
         translate3d!(pd, [0, L, 0])
         solve_system!(System([pd]), source; progress = false)
-        return BeamletOptics.optical_power(pd; progress = false, n = 200)
+        return BeamletOptics.optical_power(pd, RegularGrid(n = 200); progress = false)
     end
     P0 = 1e-3
     @testset "GaussianBeamletDecomposition is the Gaussian beam of w0 and P0" begin
@@ -236,9 +236,10 @@ end
             pd = Detector(12w0)
             translate3d!(pd, [0, L, 0])
             solve_system!(System([pd]), g; progress = false)
-            x, z, I = intensity(pd; progress = false, n = 201, x_min = -3w0, x_max = 3w0, z_min = -3w0, z_max = 3w0)
+            s = RegularGrid(n = 201, x_min = -3w0, x_max = 3w0, z_min = -3w0, z_max = 3w0)
+            x, z, I = intensity(pd, s; progress = false)
             w = w0 * sqrt(1 + (L * λ / (π * w0^2))^2)
-            @test BeamletOptics.trapz((x, z), I) ≈ P0 rtol = 1e-3
+            @test optical_power(pd, s; progress = false) ≈ P0 rtol = 1e-3
             # the peak intensity 2 P0 / (π w²) of the Gaussian beam, i.e. also its radius
             @test maximum(I) ≈ 2P0 / (π * w^2) rtol = 1e-3
         end
