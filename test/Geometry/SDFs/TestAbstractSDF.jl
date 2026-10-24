@@ -145,6 +145,32 @@ BMO.sdf(c::CountingSDF, point) = (c.count += 1; BMO.sdf(c.shape, point))
         @test BMO.sdf(lens, p + (i.t - 1e-6) * d) < 0
         @test BMO.sdf(lens, p + (i.t + 1e-6) * d) > 0
     end
+
+    @testset "Hits from outside lie on the surface" begin
+        # the hit is the root of the SDF, not the first step within the marching tolerance, hence it
+        # varies smoothly with the ray
+        mm = 1e-3
+        R = 10mm
+        sphere = BMO.SphereSDF(R)
+        for b in (0.0, 0.5R, 0.9R, 0.99R)
+            ray = Ray([b, -100mm, 0.0], [0.0, 1.0, 0])
+            i = BMO.intersect3d(sphere, ray)
+            @test i.t ≈ 100mm - sqrt(R^2 - b^2) atol = 1e-13
+            @test BMO.normal3d(i) ≈ normalize([b, -sqrt(R^2 - b^2), 0]) atol = 1e-9
+        end
+        # the same for a cylinder cap hit under an angle
+        cyl = BMO.CylinderSDF(R, 5mm)
+        d = normalize([0.1, 1.0, 0.05])
+        p0 = Point3(0.0, -50mm, 0.0)
+        i = BMO.intersect3d(cyl, Ray(p0, d))
+        @test p0[2] + i.t * d[2] ≈ -5mm atol = 1e-13
+        @test BMO.normal3d(i) ≈ [0, -1, 0]
+        # finite differences of the hit distance are smooth
+        t(x) = BMO.intersect3d(sphere, Ray([x, -100mm, 0.0], [0.0, 1.0, 0])).t
+        h = 1e-6
+        dt = (t(3mm + h) - t(3mm - h)) / 2h
+        @test dt ≈ 3mm / sqrt(R^2 - (3mm)^2) rtol = 1e-5
+    end
 end
 
 end # MODULE
