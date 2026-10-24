@@ -118,7 +118,8 @@ length, `l0` the length of the beam (including its parents) up to `p0`, `Δl0` t
 the geometric path and `ψ0` the Gouy phase that the beam has collected up to there. `segment`
 holds the waist and divergence rays of the segment (see [`BeamletOptics.GaussianSegment`](@ref)),
 from which the field follows as from the beamlet itself, see [`gauss_parameters`](@ref).
-`E_amp` is the field amplitude times the beam radius, `E0 w0` of the source.
+`E_amp` is the reference amplitude times the beam radius, `E0 w0` of the source, which is normalized to the
+power of the beamlet: the physical field in a medium of index `n` is smaller by `√n`, see [`beamlet_hit_field`](@ref).
 """
 struct GaussianBeamletHit{T} <: AbstractBeamletHit{T}
     l0::T
