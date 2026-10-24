@@ -58,33 +58,43 @@ function transmission_axis(pf::PolarizationFilter)
     return normalize(real(F.V[:, 1]))
 end
 
-function interact3d(::AbstractSystem,
+"""
+    interact3d(system::AbstractSystem, polfilter::PolarizationFilter, beam::Beam, ray::PolarizedRay)
+
+Applies the Jones matrix of the filter to the field of the `ray`. The filter may lie on the boundary
+between two media, e.g. a film cemented between two glass plates, see [`LinearPolarizer`](@ref): the
+filtered field is then refracted into the medium behind the filter with the
+[`fresnel_coefficients`](@ref) of the [`transition`](@ref). Beyond the critical angle of these media,
+the `ray` is totally reflected before it reaches the filter. A ray whose field falls to or below the
+`cutoff` of the filter is stopped.
+"""
+function interact3d(system::AbstractSystem,
         polfilter::PolarizationFilter,
-        ::Beam{T, R},
+        beam::Beam{T, R},
         ray::R) where {T <: Real, R <: PolarizedRay{T}}
-    npos = hit_point(ray)
-    ndir = direction(ray)
-
-    E0 = _calculate_global_E0(polfilter, ray, ndir, polfilter.JMat)
-
+    t = transition(system, ray)
+    is_totally_reflected(ray, t) && return cross_boundary(t, beam, ray)
+    E = _calculate_global_E0(polfilter, ray, direction(ray), polfilter.JMat)
     # Terminate blocked rays
-    if norm(E0) ≤ polfilter.cutoff
+    if norm(E) ≤ polfilter.cutoff
         return nothing
     end
-
-    return BeamInteraction{T, R}(nothing,
-        PolarizedRay{T}(npos, ndir, nothing, wavelength(ray), refractive_index(ray), E0))
+    n1, n2 = medium_in(t), medium_out(t)
+    new_dir, _ = refraction3d(direction(ray), normal3d(t), n1, n2)
+    _, _, ts, tp = fresnel_coefficients(angle3d(direction(ray), -normal3d(t)), n2 / n1)
+    P = _calculate_global_E0(direction(ray), new_dir, normal3d(intersection(ray)), SPBasis(ts, 0, 0, tp))
+    E0 = _transverse(P * E, new_dir)
+    return BeamInteraction{T, R}(hint_out(t),
+        PolarizedRay{T}(hit_point(ray), new_dir, nothing, wavelength(ray), n2, E0))
 end
 
+# unpolarized rays (e.g. beamlet auxiliary rays) pass through the ideal filter, refracted at the
+# boundary between the media on both sides of the filter
 function interact3d(
-        ::AbstractSystem,
+        system::AbstractSystem,
         ::PolarizationFilter,
-        ::Beam{T, R},
+        beam::Beam{T, R},
         ray::R
     ) where {T <: Real, R <: Ray{T}}
-    # unpolarized rays (e.g. beamlet auxiliary rays) pass through the ideal filter unchanged
-    npos = hit_point(ray)
-    ndir = direction(ray)
-    return BeamInteraction{T, R}(nothing,
-        Ray{T}(npos, ndir, nothing, wavelength(ray), refractive_index(ray)))
+    return cross_boundary(system, beam, ray)
 end

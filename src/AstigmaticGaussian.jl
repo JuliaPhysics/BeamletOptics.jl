@@ -334,7 +334,19 @@ Generic dispatch: traces each component beam's ray through `object` independentl
 Returns `nothing` if any interaction fails; otherwise returns an
 [`AstigmaticGaussianBeamletInteraction`](@ref).
 """
+interact3d(system::AbstractSystem, object::AbstractObject, agb::AstigmaticGaussianBeamlet, ray_id::Int) =
+    interact3d(system, shape_trait_of(object), object, agb, ray_id)
+
+# A multi-shape object hands the beamlet to the part that the chief ray hits, see the GaussianBeamlet
+function interact3d(system::AbstractSystem, ::MultiShape, object::AbstractObject,
+        agb::AstigmaticGaussianBeamlet, ray_id::Int)
+    part = part_of(intersection(rays(agb.c)[ray_id])::Intersection)
+    part === object && return interact3d(system, SingleShape(), object, agb, ray_id)
+    return interact3d(system, part, agb, ray_id)
+end
+
 function interact3d(system::AbstractSystem,
+        ::AbstractShapeTrait,
         object::AbstractObject,
         agb::AstigmaticGaussianBeamlet{R},
         ray_id::Int) where {R}

@@ -9,6 +9,7 @@ Stores data calculated by the [`intersect3d`](@ref) method.
 - `shape`: a [`Nullable`](@ref) reference to the [`AbstractShape`](@ref) of the `object` that has been hit (optional but recommended)
 - `t`: length of the ray parametrization in [m]
 - `n`: normal vector at the point of intersection
+- `part`: the object that was hit, a part of `object` if this consists of objects, or `nothing`, see [`part_of`](@ref)
 - `next`: the next hit of the ray at the same point, or `nothing`, see [`coincident_hits`](@ref)
 
 # Coincident hits
@@ -24,12 +25,13 @@ mutable struct Intersection{T}
     shape::Nullable{AbstractShape}
     t::T
     n::Point3{T}
+    part::Nullable{AbstractObject}
     next::Union{Nothing, Intersection{T}}
 end
 
 function Intersection(object::Nullable{AbstractObject}, shape::Nullable{AbstractShape}, t::T,
         n::AbstractArray) where {T}
-    return Intersection{T}(object, shape, t, Point3{T}(n), nothing)
+    return Intersection{T}(object, shape, t, Point3{T}(n), nothing, nothing)
 end
 
 function Intersection(t::T, n::AbstractArray{T}) where {T}
@@ -57,6 +59,21 @@ function object!(i::Intersection, new::AbstractObject)
 end
 
 object!(::Nothing, ::AbstractObject) = nothing
+
+"""
+    part!(intersection, part) -> intersection
+
+Sets the `part` of the `intersection` and of its [`coincident_hits`](@ref) that have none, i.e. the
+object of the hit shape. An object of several objects keeps the parts that they set.
+"""
+function part!(i::Intersection, part::AbstractObject)
+    for hit in coincident_hits(i)
+        isnothing(hit.part) && (hit.part = part)
+    end
+    return i
+end
+
+part!(::Nothing, ::AbstractObject) = nothing
 
 Base.length(i::Intersection) = i.t
 
@@ -292,7 +309,7 @@ function intersect3d(::SingleShape, object::AbstractObject, ray::AbstractRay)
     # the sphere that the table of a running solve holds for the shape, none outside of a solve
     intersection = intersect3d(bounding_sphere_of(current_bounding_spheres(), s), s, ray)
     # Ensure that the intersection knows about the object if intersected
-    return object!(intersection, object)
+    return part!(object!(intersection, object), object)
 end
 
 function intersect3d(::MultiShape, object::AbstractObject, ray::AbstractRay)

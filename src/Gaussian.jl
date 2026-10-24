@@ -137,7 +137,20 @@ chief, waist and divergence rays with an object.
 
 The `interact3d` method for the [`GaussianBeamlet`](@ref) must return a `GaussianBeamletInteraction`.
 """
+interact3d(system::AbstractSystem, object::AbstractObject, gauss::GaussianBeamlet, ray_id::Int) =
+    interact3d(system, shape_trait_of(object), object, gauss, ray_id)
+
+# A multi-shape object hands the beamlet to the part that the chief ray hits, such that the beamlet
+# methods of the part apply, e.g. of the coating of a beamsplitter
+function interact3d(system::AbstractSystem, ::MultiShape, object::AbstractObject,
+        gauss::GaussianBeamlet, ray_id::Int)
+    part = part_of(intersection(rays(gauss.chief)[ray_id])::Intersection)
+    part === object && return interact3d(system, SingleShape(), object, gauss, ray_id)
+    return interact3d(system, part, gauss, ray_id)
+end
+
 function interact3d(system::AbstractSystem,
+        ::AbstractShapeTrait,
         object::AbstractObject,
         gauss::GaussianBeamlet{R},
         ray_id::Int) where {R}

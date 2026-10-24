@@ -35,10 +35,11 @@ on its card in the interactive GUI, which lives in the separate package
 instructions there). When adding infrastructure,
 prefer pushing complexity into the generic solver over asking component authors to handle it.
 
-Current exception: coincident-boundary disambiguation (plate beamsplitters, cemented
-doublets) is handled per component by returning a `Hint`
-([src/AbstractTypes/AbstractSystem.jl](src/AbstractTypes/AbstractSystem.jl), consumed in
-[src/System.jl](src/System.jl)). core.md explicitly calls this a burden on the developer.
+Touching elements (cemented lenses, coatings on substrates, plates against each other) are
+resolved by the solver: it collects all surfaces at a hit point (`coincident_hits`), picks the one
+that interacts (`first_to_interact`) and derives the media on both sides (`transition`), see
+[src/Transitions.jl](src/Transitions.jl). Components read the media from `transition(system, ray)`
+and never need a `Hint` for correctness; a `Hint` only speeds up the next intersection.
 
 **When reviewing or writing code, be suspicious of:**
 

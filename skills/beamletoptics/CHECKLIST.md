@@ -41,8 +41,8 @@
 8. **Polarized refraction** traces only the refracted ray (no ghost reflections); no coatings are modeled.
    The refracted field carries the Fresnel transmission: a `PolarizedRay` or an `AstigmaticGaussianBeamlet`
    loses about 4 % of its power per uncoated surface (n = 1.5), a `GaussianBeamlet` nothing.
-9. **Doublets/triplets** assume flush cemented contact; only spherical menisci are supported;
-   aspheres are experimental.
+9. **Doublets/triplets**: surfaces within 1 nm count as cemented, a larger gap is an air gap; only
+   spherical menisci are supported; aspheres are experimental.
 10. **Resonators** (facing mirrors, cavities) need a bounded `r_max`/`depth_max`.
 11. **`ObjectGroup` rotates about its `center`**, which starts at the origin, not the centroid:
     use `set_pivot3d!`.

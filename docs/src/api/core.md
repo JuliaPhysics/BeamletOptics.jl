@@ -15,7 +15,7 @@ The first two principles will be elaborated upon in more detail in the [Geometry
 ```mermaid
 flowchart TB
     S(["<b>solve_system!</b><br/>system + beam"]) --> I
-    I["<b>1. Intersect</b><br/>hinted shape first,<br/>else all objects"] -- hit --> X["<b>2. Interact</b><br/>compute<br/>AbstractInteraction"]
+    I["<b>1. Intersect</b><br/>all objects,<br/>hinted object first"] -- hit --> X["<b>2. Interact</b><br/>compute<br/>AbstractInteraction"]
     X --> R["<b>3. Repeat</b><br/>attach next<br/>ray or beam segment"]
     R -- "optional Hint" --> I
     I -- "no hit or r_max" --> E([done])
@@ -57,6 +57,32 @@ BeamletOptics.Intersection
 
 Since an optical element can consist of multiple joint shapes, the return type must store which specific part of the object was hit.
 
+### Coincident hits
+
+Where elements touch, e.g. the two lenses of a cemented doublet, a coating on its substrate or two plates
+placed against each other, a ray hits several surfaces at the same point. The solver keeps all surfaces that
+the ray hits within `get_coincidence_tolerance()` (1 nm by default) of the closest hit as a chain of
+coincident hits. Each hit holds its own object, shape and normal.
+
+```@docs; canonical=false
+BeamletOptics.coincident_hits
+```
+
+One of these hits interacts with the ray. A surface that is no refracting body comes first, e.g. a coating, a
+mirror or a detector, then the surface of the body that the ray enters, then that of the body it leaves:
+
+```@docs; canonical=false
+BeamletOptics.first_to_interact
+BeamletOptics.interaction_rank
+```
+
+The `object` of every hit is the object of the system (or of an object group) that was hit. For an object of
+several parts, e.g. a [`DoubletLens`](@ref), the part follows from the shape:
+
+```@docs; canonical=false
+BeamletOptics.part_of(::BeamletOptics.AbstractObject, ::Any)
+```
+
 ### Bounding sphere pretest
 
 Since the tracing is non-sequential, every ray is tested against every shape of the system, and most of these tests are misses. A shape can therefore provide a sphere that encloses it. A ray that does not pass through this sphere is a miss without a call of `intersect3d`. This is optional: a shape without a sphere is tested as described above.
@@ -94,7 +120,26 @@ BeamletOptics.AbstractInteraction
 
 An object whose `interact3d` method stores data in the object, e.g. a detector its hits, also implements [`initialize!`](@ref), which discards this data before a new solve.
 
-The `interact3d` return type limits the interface to only accepting one new `beam` segment per interaction at the moment. The developer needs to take into account that after e.g. a lens surface air-to-glass interaction, the solver "forgets" that the next logical step is to immediately test against the lens again, since the most likely step will be the refraction at the glass-to-air surface. In order to alleviate this issue, the `Hint` type can be used.
+### Transitions
+
+At a boundary, the ray passes from one medium into another. The [`BeamletOptics.transition`](@ref) at the hit
+of a ray tells an `interact3d` method both media, derived from the bodies whose surfaces the ray leaves and
+enters there. Hence a component needs no knowledge of the elements that touch it: the surface of a lens
+cemented to another lens refracts from one glass into the other, a coating on a substrate transmits into the
+substrate, and a coating between two plates transmits from one plate into the other.
+
+```@docs; canonical=false
+BeamletOptics.transition
+BeamletOptics.Transition
+BeamletOptics.body_refractive_index
+BeamletOptics.cross_boundary(::BeamletOptics.Transition, ::BeamletOptics.Beam, ::BeamletOptics.Ray)
+```
+
+A refracting component is a subtype of [`BeamletOptics.AbstractRefractiveOptic`](@ref), for which
+`body_refractive_index` returns its refractive index. Its `interact3d` methods for a [`Ray`](@ref) and a
+[`PolarizedRay`](@ref) cross the bare boundary of the transition.
+
+The `interact3d` return type limits the interface to only accepting one new `beam` segment per interaction at the moment. After e.g. a lens surface air-to-glass interaction, the most likely next step is the refraction at the glass-to-air surface of the same lens. An interaction can tell the solver so with a `Hint`, which speeds up the next intersection.
 
 ### Re-emitting components
 
@@ -121,16 +166,18 @@ OpticsBase.PlaneField(::Union{GaussianBeamlet, AstigmaticGaussianBeamlet}, ::Int
 
 ## Hints
 
-As mentioned in the previous section, the [`BeamletOptics.Hint`](@ref) interface allows developers to manipulate the non-sequential solver algorithm into testing against a specific component and shape during the next cycle of the [Intersect-Interact-Repeat-Loop](@ref). This interface has very high priority during intersection testing.
+The [`BeamletOptics.Hint`](@ref) interface allows developers to tell the non-sequential solver which object
+will probably be hit during the next cycle of the [Intersect-Interact-Repeat-Loop](@ref). The solver tests this
+object first. Its hit lets the solver skip all objects whose bounding sphere lies beyond it, which saves most of
+the intersection tests in a large system.
 
 ```@docs; canonical=false
 BeamletOptics.Hint
 ```
 
-The main reason for this is the intersection ambiguity encountered at interfaces between air-tight component interfaces, e.g. [Plate beamsplitters](@ref) or cemented [Doublet lenses](@ref). This is caused by the fact that for a ray with a starting point at this interface, technically both shapes are being "touched" at the same time. Additional program logic considering the ray direction of propagation can not always resolve this ambiguity. Therefore the task of providing additional information to the solver via the `Hint` interface is placed as a **burden on the developer**.
-
-!!! tip
-    Use of the `Hint` interface is primarily intended for multishape objects with joint surfaces.
+A `Hint` never changes the result of the trace: the hinted object is not preferred over a closer one, and an
+object that is moved away from its hinted neighbour, e.g. the back lens of a doublet, leaves an air gap that the
+trace sees. Touching elements need no `Hint`, see [Coincident hits](@ref) and [Transitions](@ref).
 
 ## Tracing logic
 

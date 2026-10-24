@@ -27,36 +27,43 @@ Defines the optical interaction between an incoming/outgoing beam/ray of light a
 The default behavior is that no interaction occurs, i.e. return of `nothing`, which should stop the system tracing procedure.
 Refer to the [`AbstractInteraction`](@ref) typedocs for more information on the return type value.
 
-A [`MultiShape`](@ref) object receives this call for whichever of its parts was hit. Its method
-finds that part, e.g. via `shape(intersection(ray))`, and hands the beam to it, see
-[`CubeBeamsplitter`](@ref). Parts that do not interact as one belong in an
-[`ObjectGroup`](@ref) or another [`AbstractObjectGroup`](@ref) instead, where each part
-interacts on its own.
+The media on both sides of the boundary at the hit are given by [`transition`](@ref)`(system, ray)`,
+also where several elements touch, e.g. at the cemented faces of a doublet.
+
+A [`MultiShape`](@ref) object whose parts are objects needs no method: the call is handed to the part
+that was hit, see [`part_of`](@ref), e.g. to the front or back lens of a [`DoubletLens`](@ref). A
+`MultiShape` object of plain shapes defines its own method.
 """
-function interact3d(::AbstractSystem, object::AbstractObject, ::AbstractBeam, ray::AbstractRay)
-    _warn_no_interact3d(shape_trait_of(object), object, ray)
+interact3d(system::AbstractSystem, object::AbstractObject, beam::AbstractBeam, ray::AbstractRay) =
+    interact3d(system, shape_trait_of(object), object, beam, ray)
+
+function interact3d(::AbstractSystem, ::AbstractShapeTrait, object::AbstractObject, ::AbstractBeam,
+        ray::AbstractRay)
+    _warn_no_interact3d(object, ray)
     return nothing
 end
 
-# Warning of the fallback above; for a multi-shape object it names both ways to fix it
-_warn_no_interact3d(::AbstractShapeTrait, object, ray) =
+function interact3d(system::AbstractSystem, ::MultiShape, object::AbstractObject,
+        beam::AbstractBeam, ray::AbstractRay)
+    part = part_of(intersection(ray)::Intersection)
+    part === object && return interact3d(system, SingleShape(), object, beam, ray)
+    return interact3d(system, part, beam, ray)
+end
+
+# Warning of the fallback above
+_warn_no_interact3d(object, ray) =
     @warn lazy"No interact3d method defined for:" ObjectType = typeof(object) RayType = typeof(ray)
-_warn_no_interact3d(::MultiShape, object, ray) = @warn lazy"""
-    No interact3d method defined for the MultiShape object $(nameof(typeof(object))).
-    If its parts interact as one (e.g. cemented, with a Hint across a shared face), define
-    interact3d and hand the beam to the part that was hit, like CubeBeamsplitter.
-    If its parts interact on their own, make it an ObjectGroup or a subtype of
-    AbstractObjectGroup, which needs no interact3d.""" RayType = typeof(ray)
 
 """
     Hint
 
 A `Hint` can be passed as part of an [`AbstractInteraction`](@ref) and will inform the tracing algorithm about which [`AbstractObject`](@ref)
-in the [`AbstractSystem`](@ref) will be hit next.
+in the [`AbstractSystem`](@ref) will probably be hit next.
 
-!!! info 
-    The `Hint` does not need to result in a guaranteed [`Intersection`](@ref). However, if the hinted shape is intersected, it will
-    be immediately assumed as the correct global intersection.
+!!! info
+    The `Hint` only speeds up the tracing: the hinted object is tested first, and objects beyond its hit are skipped.
+    It does not change which object is hit, and touching elements (e.g. cemented lenses) need no `Hint`, since the
+    solver finds all surfaces at the hit point, see [`coincident_hits`](@ref) and [`transition`](@ref).
 
 # Fields
 

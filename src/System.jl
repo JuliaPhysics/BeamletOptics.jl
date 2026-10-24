@@ -176,63 +176,37 @@ end
 
 Returns the closest [`Intersection`](@ref) of the `ray` with the objects of the `system` like
 [`trace_all`](@ref), but tests the hinted object first. Its hit lets the solver skip all objects that
-lie beyond it, hence the `hint` speeds up the trace but does not change the closest hit. Among the
-[`coincident_hits`](@ref) at the closest point, the hit of the hinted shape comes first.
+lie beyond it, hence the `hint` speeds up the trace but does not change its result.
 """
 @inline function trace_one(
         system::AbstractSystem, ray::AbstractRay{R}, hint::Hint) where {R}
     seed::Nullable{Intersection{R}} = intersect3d(object(hint), ray)
-    result = closest_hits(_top_level(system), ray, seed, isnothing(seed) ? nothing : object(hint))
-    return first_of_shape(result, shape(hint))
+    return closest_hits(_top_level(system), ray, seed, isnothing(seed) ? nothing : object(hint))
 end
-
-"""
-    first_of_shape(hit, s)
-
-Returns the chain of [`coincident_hits`](@ref) `hit` with the hit of the shape `s` first, if the chain
-holds one, else `hit` unchanged. No hit (`nothing`) stays `nothing`.
-"""
-function first_of_shape(hit::Intersection, s)
-    shape(hit) === s && return hit
-    prev = hit
-    while !isnothing(prev.next)
-        current = prev.next
-        if shape(current) === s
-            prev.next = current.next
-            current.next = hit
-            return current
-        end
-        prev = current
-    end
-    return hit
-end
-
-first_of_shape(::Nothing, s) = nothing
 
 """
     tracing_step!(system::AbstractSystem, ray::AbstractRay{R}, hint::Hint)
 
-Tests if the `ray` intersects an `object` in the optical `system`. Returns the closest intersection.
+Tests if the `ray` intersects an `object` in the optical `system` and sets the closest intersection
+of the `ray`. Of the [`coincident_hits`](@ref) at the closest point, the hit that interacts with the
+`ray` comes first, see [`first_to_interact`](@ref).
 
 # Hint
 
-An optional [`Hint`](@ref) can be provided to test against a specific object (and shape) in the `system` first.
-
-!!! warning
-    If a hint is provided and the object intersection is valid, the intersection will be returned immediately.
-    However, it is not guaranteed that this is the true closest intersection.
+An optional [`Hint`](@ref) can be provided to test against a specific object in the `system` first,
+which speeds up the trace without changing its result, see [`trace_one`](@ref).
 """
 @inline function tracing_step!(
         system::AbstractSystem, ray::AbstractRay{R}, hint::Hint) where {R <: Real}
-    # Test against hinted object
-    intersection!(ray, trace_one(system, ray, hint))
+    # Test against hinted object first
+    intersection!(ray, first_to_interact(trace_one(system, ray, hint), ray))
     return nothing
 end
 
 @inline function tracing_step!(
         system::AbstractSystem, ray::AbstractRay{R}, ::Nothing) where {R <: Real}
     # Test against all objects in system
-    intersection!(ray, trace_all(system, ray))
+    intersection!(ray, first_to_interact(trace_all(system, ray), ray))
     return nothing
 end
 

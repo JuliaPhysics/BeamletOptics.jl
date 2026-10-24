@@ -17,10 +17,8 @@ Every expectation is derived without BMO: the vector form of Snell's law and the
 in `follow`, an exact meridional trace through spherical surfaces (`trace_surfaces`), closed-form
 results (plate offset, Fresnel power transmission, ABCD law of Gaussian beams) and physical
 constructions (equal glass = no interface, reversibility of light paths, covariance under rigid
-motion). `@test_broken` marks a case that the current master gets wrong or cannot run; the comment
-names the cause. The tests of this file are the regression base for a generic resolution of
-coincident hits: when one of them starts to pass, `@test_broken` reports it and must be turned
-into `@test`.
+motion). Touching elements need no `Hint`: the solver collects the surfaces at a hit point
+(`coincident_hits`) and derives the media on both sides from them (`transition`).
 =#
 
 #=
@@ -369,11 +367,10 @@ Tests
             ref = follow([plane([0, 0, 0], [0, 1, 0], nA), plane([0, tA, 0], [0, 1, 0], nB),
                     plane([0, tA + tB, 0], [0, 1, 0], 1.0)], p, d)
             err = path_error(beam, ref)
-            # Cause: the plates are separate objects without a Hint. A leaves into air (index of the system), and the
-            # coincident front face of B (zero distance) is not found, so the ray runs through B as if in air.
-            @test_broken agrees(err)
-            @test_broken BMO.refractive_index.(rays(beam)) == [1.0, nA, nB, 1.0]
-            @test_broken direction(rays(beam)[3]) ≈ ref.hits[2].dir atol = TOL_DIR
+            # the plates are separate objects: the rear face of A and the front face of B are one boundary
+            @test agrees(err)
+            @test BMO.refractive_index.(rays(beam)) == [1.0, nA, nB, 1.0]
+            @test direction(rays(beam)[3]) ≈ ref.hits[2].dir atol = TOL_DIR
         end
 
         @testset "Three touching plates" begin
@@ -386,8 +383,8 @@ Tests
             beam = solve([A, B, C], beam_at(p, d))
             ref = follow([plane([0, 0, 0], [0, 1, 0], nA), plane([0, tA, 0], [0, 1, 0], nB),
                     plane([0, tA + tB, 0], [0, 1, 0], nC), plane([0, tA + tB + tC, 0], [0, 1, 0], 1.0)], p, d)
-            # Cause: as above, every touching face pair is passed in air
-            @test_broken agrees(path_error(beam, ref))
+            # every touching face pair is one boundary
+            @test agrees(path_error(beam, ref))
         end
     end
 
@@ -633,9 +630,8 @@ Tests
             # the reflection: position and direction by the law of reflection
             @test position(r[3]) ≈ ref.hits[2].pos atol = TOL_POS
             @test direction(r[3]) ≈ ref.hits[2].dir atol = TOL_DIR
-            # Cause: `interact3d(::DoubletLens)` hints the back lens, whose refraction code reports the back index n2
-            # for the reflected ray, which is still in the front lens (n1) and must not enter the back lens.
-            @test_broken BMO.refractive_index(r[3]) == n1
+            # the reflected ray stays in the front lens (n1)
+            @test BMO.refractive_index(r[3]) == n1
             # the reflected ray hits the cemented surface a second time: the second event of the reference
             ref2 = follow([sphere(6mm, R2, n2), plane([0, 0, 0], [0, 1, 0], 1.0)], ref.hits[2].pos, ref.hits[2].dir; n0 = n1)
             @test ref2.hits[1].tir
@@ -686,8 +682,8 @@ Tests
                     @test agrees(err)
                 else
                     @test !tir
-                    # Cause: without a Hint the front prism refracts into air (system index) instead of into the touching back prism
-                    @test_broken agrees(err)
+                    # without a Hint the front prism refracts into the touching back prism
+                    @test agrees(err)
                 end
             end
         end
@@ -768,9 +764,9 @@ Tests
             # the coating is in air, 2 mm in front of the substrate: the transmitted light travels in air, enters, leaves
             @test position(first(rays(rf))) ≈ [0, -gap, 0] atol = TOL_POS
             @test direction(first(rays(rf))) ≈ [0, -1, 0] atol = TOL_DIR
-            # Cause: the coating interaction assumes the substrate behind it and sets its index for the transmitted ray
-            @test_broken BMO.refractive_index(first(rays(tr))) == 1.0
-            @test_broken BMO.refractive_index.(rays(tr)) == [1.0, n, 1.0]
+            # the transmitted ray stays in air between the coating and the substrate
+            @test BMO.refractive_index(first(rays(tr))) == 1.0
+            @test BMO.refractive_index.(rays(tr)) == [1.0, n, 1.0]
             # and back
             translate3d!(pbs.coating, [0, gap, 0])
             @test flatten(solve([pbs], beam_at([0, -20mm, 0], [0, 1, 0]))) ≈ before atol = TOL_POS
@@ -831,15 +827,15 @@ Tests
             d = [sin(θ), cos(θ), 0]
             p = [0.0, -10mm, 0.0]
             beam = solve([A, bs, B], beam_at(p, d))
-            # Cause: with three coincident hits the splitter at zero distance is not found: the beam is not split.
-            @test_broken length(leaves(beam)) == 2
+            # three coincident hits: the splitter between the plates splits the beam
+            @test length(leaves(beam)) == 2
             # reference of the transmitted branch: A into B (Snell) and out of B, and of the reflected one: back out of A
             ref_t = follow([plane([0, 0, 0], [0, 1, 0], nA), plane([0, tA, 0], [0, 1, 0], nB),
                     plane([0, tA + tB, 0], [0, 1, 0], 1.0)], p, d)
-            @test_broken any(b -> isapprox(end_point(b)[2], ref_t.hits[3].dir; atol = TOL_DIR), leaves(beam))
+            @test any(b -> isapprox(end_point(b)[2], ref_t.hits[3].dir; atol = TOL_DIR), leaves(beam))
             ref_r = follow([plane([0, 0, 0], [0, 1, 0], nA), plane([0, tA, 0], [0, 1, 0], nA; mirror = true),
                     plane([0, 0, 0], [0, 1, 0], 1.0)], p, d)
-            @test_broken any(b -> isapprox(end_point(b)[2], ref_r.hits[3].dir; atol = TOL_DIR), leaves(beam))
+            @test any(b -> isapprox(end_point(b)[2], ref_r.hits[3].dir; atol = TOL_DIR), leaves(beam))
         end
 
         @testset "Triplet: two cemented surfaces in sequence" begin
