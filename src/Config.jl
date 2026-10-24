@@ -46,6 +46,20 @@ the SDF returns, see `BeamletOptics._raymarch_inside`.
 get_sdf_inside_step() = SDF_INSIDE_STEP
 
 
+# --- Coincident boundaries ---
+const COINCIDENCE_TOLERANCE = @load_preference("coincidence_tolerance", 1e-9)
+
+"""
+    get_coincidence_tolerance()
+
+Returns the path length in [m] within which the hits of a ray with several surfaces count as one
+point, e.g. the faces of two cemented lenses or a coating on a substrate. Gaps below this length are
+taken as contact. The default of 1 nm lies above the accuracy of the intersection algorithms and far
+below any gap that matters optically.
+"""
+get_coincidence_tolerance() = COINCIDENCE_TOLERANCE
+
+
 # --- Numerical Thresholds ---
 const INTERNAL_REFLECTION_THRESHOLD = @load_preference("internal_reflection_threshold", 1e-6)
 const LINE_PLANE_INTERSECTION_THRESHOLD = @load_preference("line_plane_intersection_threshold", 1e-6)

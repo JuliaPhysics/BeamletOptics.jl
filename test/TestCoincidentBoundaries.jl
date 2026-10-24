@@ -722,10 +722,9 @@ Tests
             surfaces = [sphere(v[1], R[1], n1), sphere(v[2], R[2], 1.0), sphere(v[2] + gap, R[2], n2),
                 sphere(v[3] + gap, R[3], 1.0)]
             ref = follow(surfaces, [h, -20mm, 0], [0, 1, 0])
-            # Cause: the Hint of the front lens points to the back lens, which is accepted as the closest hit
-            # although the rear surface of the front lens comes first: the gap is skipped.
-            @test_broken agrees(path_error(beam, ref))
-            @test_broken BMO.refractive_index.(rays(beam)) == [1.0, n1, 1.0, n2, 1.0]
+            # the Hint of the front lens points to the back lens, but the rear surface of the front lens comes first
+            @test agrees(path_error(beam, ref))
+            @test BMO.refractive_index.(rays(beam)) == [1.0, n1, 1.0, n2, 1.0]
         end
 
         @testset "Rigid motion of the whole component" begin
@@ -791,10 +790,10 @@ Tests
             ref = follow([plane([0, -L / 2 - gap * v[2], 0], [0, -1, 0], n),
                     plane(-gap * v, v, n; mirror = true), plane([-L / 2 - gap * v[1], 0, 0], [-1, 0, 0], 1.0)],
                 p0, [0, 1, 0])
-            # Cause: the Hint of the front prism points to the coating, which is accepted as the closest hit
-            @test_broken isempty(BMO.children(beam))
-            @test_broken position(last(rays(beam))) ≈ ref.hits[3].pos atol = TOL_POS
-            @test_broken direction(last(rays(beam))) ≈ ref.hits[3].dir atol = TOL_DIR
+            # the Hint of the front prism points to the coating, but the hypotenuse of the prism comes first
+            @test isempty(BMO.children(beam))
+            @test position(last(rays(beam))) ≈ ref.hits[3].pos atol = TOL_POS
+            @test direction(last(rays(beam))) ≈ ref.hits[3].dir atol = TOL_DIR
             # and back
             translate3d!(cbs.front, gap * v)
             @test flatten(solve([cbs], beam_at(p0, [0, 1, 0]))) ≈ before atol = TOL_POS
@@ -1025,6 +1024,133 @@ Tests
                 P_ref = prod(T(a, b) for (a, b) in zip(chain[1:(end - 1)], chain[2:end]))
                 @test flux(last(rays(beam))) ≈ P_ref atol = 1e-12
                 # no power change without an index step: same glass gives T = 1 at the cemented surface
+            end
+        end
+    end
+end
+
+
+#=
+The hits of a ray at one point, see `BMO.coincident_hits`: the solver collects all surfaces that a
+ray hits within `get_coincidence_tolerance()` of the closest hit. This is checked directly on
+`trace_all` and `trace_one`, for rays that start inside the first body.
+=#
+
+"""The hits of a ray from `p` along `d` in the `system`, traced like a solve does it."""
+function hits_at(system, p, d; hint = nothing)
+    ray = Ray(collect(Float64, p), collect(Float64, d), λ0)
+    return BMO.with_bounding_spheres(system) do
+        isnothing(hint) ? BMO.trace_all(system, ray) : BMO.trace_one(system, ray, hint)
+    end
+end
+
+hit_shapes(hit) = [BMO.shape(h) for h in BMO.coincident_hits(hit)]
+hit_lengths(hit) = [length(h) for h in BMO.coincident_hits(hit)]
+holds(shapes, s) = any(x -> x === s, shapes)
+
+@testset "Coincident hits are collected" begin
+    tol = BMO.get_coincidence_tolerance()
+    @test tol == 1e-9
+
+    @testset "Doublet: the cemented faces of front and back" begin
+        dl = doublet(1.5, 1.7)
+        system = System([dl])
+        # from within the front lens to the cemented surface at y = 4 mm
+        hit = hits_at(system, [1mm, 2mm, 0], [0, 1, 0])
+        shapes = hit_shapes(hit)
+        @test length(shapes) == 2
+        @test holds(shapes, BMO.shape(dl.front)) && holds(shapes, BMO.shape(dl.back))
+        @test all(t -> abs(t - first(hit_lengths(hit))) ≤ tol, hit_lengths(hit))
+        @test all(h -> BMO.object(h) === dl, BMO.coincident_hits(hit))
+        # the outward normals of both faces are opposite
+        n_front, n_back = (BMO.normal3d(h) for h in BMO.coincident_hits(hit) if BMO.shape(h) === BMO.shape(dl.front)),
+            (BMO.normal3d(h) for h in BMO.coincident_hits(hit) if BMO.shape(h) === BMO.shape(dl.back))
+        @test dot(first(n_front), first(n_back)) ≈ -1 atol = 1e-6
+        # the front face of the doublet is a single hit
+        @test length(hit_shapes(hits_at(system, [1mm, -10mm, 0], [0, 1, 0]))) == 1
+    end
+
+    @testset "Doublet with a hint: the hinted face first, the touching face added" begin
+        dl = doublet(1.5, 1.7)
+        system = System([dl])
+        hit = hits_at(system, [1mm, 2mm, 0], [0, 1, 0]; hint = BMO.Hint(dl, BMO.shape(dl.back)))
+        shapes = hit_shapes(hit)
+        @test first(shapes) === BMO.shape(dl.back)
+        @test length(shapes) == 2 && holds(shapes, BMO.shape(dl.front))
+    end
+
+    @testset "Triplet: two cemented surfaces, one at a time" begin
+        tl = triplet(1.5, 1.7, 1.6)
+        system = System([tl])
+        v = triplet_vertices(0.0)
+        hit = hits_at(system, [1mm, (v[2] + v[3]) / 2, 0], [0, 1, 0])
+        shapes = hit_shapes(hit)
+        @test length(shapes) == 2
+        @test holds(shapes, BMO.shape(tl.middle)) && holds(shapes, BMO.shape(tl.back))
+    end
+
+    @testset "Cube beamsplitter: front, coating and back at the hypotenuse" begin
+        cbs = CubeBeamsplitter(20mm, 1.5)
+        system = System([cbs])
+        hit = hits_at(system, [2mm, -8mm, 0], [0, 1, 0])
+        shapes = hit_shapes(hit)
+        @test length(shapes) == 3
+        @test holds(shapes, BMO.shape(cbs.front)) && holds(shapes, BMO.shape(cbs.back)) &&
+              holds(shapes, BMO.shape(cbs.coating))
+    end
+
+    @testset "Separate touching objects, also within a group" begin
+        A = RectangularCompensatorPlate(40mm, 40mm, 5mm, λ -> 1.7)
+        B = RectangularCompensatorPlate(40mm, 40mm, 3mm, λ -> 1.4)
+        translate3d!(B, [0, 5mm, 0])
+        d = normalize([0.3, 1, 0.1])
+        for system in (System([A, B]), System([B, A]), System(ObjectGroup([A, B])), StaticSystem([A, B]))
+            hit = hits_at(system, [0, 2mm, 0], d)
+            objs = [BMO.object(h) for h in BMO.coincident_hits(hit)]
+            @test length(objs) == 2
+            @test any(o -> o === A, objs) && any(o -> o === B, objs)
+        end
+    end
+
+    @testset "Gaps: below the tolerance a contact, above two hits" begin
+        for (gap, n_hits) in ((0.3e-9, 2), (5e-9, 1), (1e-6, 1))
+            A = RectangularCompensatorPlate(40mm, 40mm, 5mm, λ -> 1.7)
+            B = RectangularCompensatorPlate(40mm, 40mm, 3mm, λ -> 1.4)
+            translate3d!(B, [0, 5mm + gap, 0])
+            hit = hits_at(System([A, B]), [0, 2mm, 0], [0, 1, 0])
+            @test length(hit_shapes(hit)) == n_hits
+            @test BMO.object(hit) === A
+        end
+    end
+
+    @testset "Skipping parts beyond the closest hit gives the same hits" begin
+        # lenses and plates scattered in space, rays from the origin in many directions: the pruned
+        # trace equals the closest hits of all objects without bounding spheres
+        objs = Any[]
+        for k in 1:12
+            o = isodd(k) ? SphericalLens(30mm, -30mm, 5mm, 15mm, λ -> 1.5) :
+                RectangularCompensatorPlate(10mm, 10mm, 2mm, λ -> 1.6)
+            φ = 2π * k / 12
+            translate3d!(o, [60mm * cos(φ), 60mm * sin(φ), 10mm * sin(3φ)])
+            push!(objs, o)
+        end
+        # a touching pair among them
+        A = RectangularCompensatorPlate(10mm, 10mm, 2mm, λ -> 1.6)
+        B = RectangularCompensatorPlate(10mm, 10mm, 2mm, λ -> 1.4)
+        translate3d!(A, [0, 30mm, 0])
+        translate3d!(B, [0, 32mm, 0])
+        append!(objs, [A, B])
+        system = System(objs)
+        for k in 0:359
+            φ = deg2rad(k + 0.5)
+            for p in ([0.0, 0, 0], [0.0, 31mm, 0])
+                ray = Ray(p, [cos(φ), sin(φ), 0.02], λ0)
+                pruned = BMO.with_bounding_spheres(() -> BMO.trace_all(system, ray), system)
+                plain = BMO.intersect3d(objs, ray)
+                @test isnothing(pruned) == isnothing(plain)
+                isnothing(plain) && continue
+                @test length(pruned) == length(plain)
+                @test Set(objectid.(hit_shapes(pruned))) == Set(objectid.(hit_shapes(plain)))
             end
         end
     end

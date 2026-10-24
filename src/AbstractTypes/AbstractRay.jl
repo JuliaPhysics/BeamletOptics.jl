@@ -9,12 +9,27 @@ Stores data calculated by the [`intersect3d`](@ref) method.
 - `shape`: a [`Nullable`](@ref) reference to the [`AbstractShape`](@ref) of the `object` that has been hit (optional but recommended)
 - `t`: length of the ray parametrization in [m]
 - `n`: normal vector at the point of intersection
+- `next`: the next hit of the ray at the same point, or `nothing`, see [`coincident_hits`](@ref)
+
+# Coincident hits
+
+Where surfaces touch, e.g. the faces of a cemented doublet or a coating on its substrate, the ray
+hits several of them within the tolerance `get_coincidence_tolerance()` of the closest hit. The
+intersection of the ray then is a chain of all of them, linked by `next`. A shape or object type
+returns a single hit from `intersect3d`; the chain is built by `intersect3d(parts, ray)` and the
+solver.
 """
 mutable struct Intersection{T}
     object::Nullable{AbstractObject}
     shape::Nullable{AbstractShape}
     t::T
     n::Point3{T}
+    next::Union{Nothing, Intersection{T}}
+end
+
+function Intersection(object::Nullable{AbstractObject}, shape::Nullable{AbstractShape}, t::T,
+        n::AbstractArray) where {T}
+    return Intersection{T}(object, shape, t, Point3{T}(n), nothing)
 end
 
 function Intersection(t::T, n::AbstractArray{T}) where {T}
@@ -27,11 +42,92 @@ end
 
 shape(i::Intersection) = i.shape
 object(i::Intersection) = i.object
-object!(i::Intersection, new::AbstractObject) = (i.object = new)
+
+"""
+    object!(intersection, object) -> intersection
+
+Sets the `object` of the `intersection` and of its [`coincident_hits`](@ref), i.e. of all hits of the
+ray at this point within the `object`. No intersection (`nothing`) stays `nothing`.
+"""
+function object!(i::Intersection, new::AbstractObject)
+    for hit in coincident_hits(i)
+        hit.object = new
+    end
+    return i
+end
+
+object!(::Nothing, ::AbstractObject) = nothing
 
 Base.length(i::Intersection) = i.t
 
 normal3d(i::Intersection) = i.n
+
+"""
+    coincident_hits(intersection::Intersection)
+
+Iterates over the hits of a ray at the same point: the `intersection` itself, followed by the other
+surfaces that the ray hits within `get_coincidence_tolerance()`, e.g. the touching faces of a cemented
+doublet. Each hit is an [`Intersection`](@ref) with its own object, shape and normal. A ray that hits a
+single surface has a single hit.
+"""
+coincident_hits(i::Intersection) = CoincidentHits(i)
+
+struct CoincidentHits{T}
+    first::Intersection{T}
+end
+
+Base.IteratorSize(::Type{<:CoincidentHits}) = Base.SizeUnknown()
+Base.eltype(::Type{CoincidentHits{T}}) where {T} = Intersection{T}
+Base.iterate(h::CoincidentHits) = (h.first, h.first.next)
+Base.iterate(::CoincidentHits, next::Intersection) = (next, next.next)
+Base.iterate(::CoincidentHits, ::Nothing) = nothing
+
+"""
+    merge_hits(a::Intersection, b::Intersection, tol = get_coincidence_tolerance())
+
+Merges the hits `a` and `b` of the same ray, each possibly a chain of [`coincident_hits`](@ref), into
+one chain. Its first hit is the closer of `a` and `b`, `a` if both lie equally far. It holds all hits of
+both chains within `tol` of the first hit, the others are dropped. The chains are linked anew, hence
+`a` and `b` must not be used afterwards.
+"""
+function merge_hits(a::Intersection, b::Intersection, tol = get_coincidence_tolerance())
+    head, other = length(b) < length(a) ? (b, a) : (a, b)
+    return append_hits!(head, other, tol)
+end
+
+merge_hits(a::Intersection, ::Nothing, tol = get_coincidence_tolerance()) = a
+merge_hits(::Nothing, b::Intersection, tol = get_coincidence_tolerance()) = b
+merge_hits(::Nothing, ::Nothing, tol = get_coincidence_tolerance()) = nothing
+
+"""
+    append_hits!(head::Intersection, other::Intersection, tol = get_coincidence_tolerance())
+
+Appends the hits of the chain `other` that lie within `tol` of the first hit of `head` to the chain of
+`head`, which stays the first hit. A hit of a shape that the chain holds already is dropped.
+"""
+function append_hits!(head::Intersection, other::Intersection, tol = get_coincidence_tolerance())
+    t0 = length(head)
+    tail = head
+    while !isnothing(tail.next)
+        tail = tail.next
+    end
+    hit = other
+    while !isnothing(hit)
+        next = hit.next
+        if abs(length(hit) - t0) ≤ tol && !_holds_shape(head, shape(hit))
+            hit.next = nothing
+            tail.next = hit
+            tail = hit
+        end
+        hit = next
+    end
+    return head
+end
+
+append_hits!(head::Intersection, ::Nothing, tol = get_coincidence_tolerance()) = head
+
+# whether a hit of the chain `head` belongs to `s`, compared by identity
+_holds_shape(head::Intersection, s) = any(hit -> shape(hit) === s, coincident_hits(head))
 
 function Base.show(io::IO, ::MIME"text/plain", _intersection::Intersection)
     println(io, "Intersected object: $(typeof(object(_intersection)))")
@@ -196,20 +292,15 @@ function intersect3d(::SingleShape, object::AbstractObject, ray::AbstractRay)
     # the sphere that the table of a running solve holds for the shape, none outside of a solve
     intersection = intersect3d(bounding_sphere_of(current_bounding_spheres(), s), s, ray)
     # Ensure that the intersection knows about the object if intersected
-    if !isnothing(intersection)
-        object!(intersection, object)
-    end
-    return intersection
+    return object!(intersection, object)
 end
 
 function intersect3d(::MultiShape, object::AbstractObject, ray::AbstractRay)
     # No part is tested if the ray misses the sphere around all of them
     intersection = intersect3d(bounding_sphere_of(current_bounding_spheres(), object), shape(object), ray)
-    # Ensure that the intersection knows about the correct object if intersected
-    if !isnothing(intersection)
-        object!(intersection, object)
-    end
-    return intersection
+    # Ensure that the intersection knows about the correct object if intersected. The parts that the
+    # ray hits at the same point belong to the object as well, their shapes tell them apart.
+    return object!(intersection, object)
 end
 
 """
@@ -232,16 +323,15 @@ Returns the closest [`Intersection`](@ref) of the `ray` with the `parts`, or `no
 none of them. The `parts` are a tuple, a vector or the `Leaves` of shapes or objects, e.g. the shapes
 of a [`MultiShape`](@ref) object, the objects of a group or the objects of a system. Each part is
 tested via its own `intersect3d` method, hence parts that consist of parts, e.g. the groups of a
-system, are tested as a whole. No parts give `nothing`.
+system, are tested as a whole. No parts give `nothing`. Parts that the ray hits within
+`get_coincidence_tolerance()` of the closest hit are kept as its [`coincident_hits`](@ref).
 """
 function intersect3d(parts::Union{Tuple, AbstractVector, Leaves}, ray::AbstractRay{R}) where {R}
     result::Nullable{Intersection{R}} = nothing
+    tol = get_coincidence_tolerance()
     for part in parts
         temp::Nullable{Intersection{R}} = intersect3d(part, ray)
-        isnothing(temp) && continue
-        if isnothing(result) || length(temp) < length(result)
-            result = temp
-        end
+        result = merge_hits(result, temp, tol)
     end
     return result
 end
