@@ -127,7 +127,8 @@ merge_hits(::Nothing, ::Nothing, tol = get_coincidence_tolerance()) = nothing
     append_hits!(head::Intersection, other::Intersection, tol = get_coincidence_tolerance())
 
 Appends the hits of the chain `other` that lie within `tol` of the first hit of `head` to the chain of
-`head`, which stays the first hit. A hit of a shape that the chain holds already is dropped.
+`head`, which stays the first hit. A hit of a shape that the chain holds already is dropped. A hit
+without a shape (the `shape` of an [`Intersection`](@ref) is optional) is always kept.
 """
 function append_hits!(head::Intersection, other::Intersection, tol = get_coincidence_tolerance())
     t0 = length(head)
@@ -152,6 +153,7 @@ append_hits!(head::Intersection, ::Nothing, tol = get_coincidence_tolerance()) =
 
 # whether a hit of the chain `head` belongs to `s`, compared by identity
 _holds_shape(head::Intersection, s) = any(hit -> shape(hit) === s, coincident_hits(head))
+_holds_shape(::Intersection, ::Nothing) = false
 
 function Base.show(io::IO, ::MIME"text/plain", _intersection::Intersection)
     println(io, "Intersected object: $(typeof(object(_intersection)))")
