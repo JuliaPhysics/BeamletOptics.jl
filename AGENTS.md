@@ -38,8 +38,10 @@ prefer pushing complexity into the generic solver over asking component authors 
 Touching elements (cemented lenses, coatings on substrates, plates against each other) are
 resolved by the solver: it collects all surfaces at a hit point (`coincident_hits`), picks the one
 that interacts (`first_to_interact`) and derives the media on both sides (`transition`), see
-[src/Transitions.jl](src/Transitions.jl). Components read the media from `transition(system, ray)`
-and never need a `Hint` for correctness; a `Hint` only speeds up the next intersection.
+[src/Transitions.jl](src/Transitions.jl). Bodies declare their medium via `medium(x)`; the physics
+at a boundary belongs to its surface model (`interact3d(system, surface_model(t), t, beam, ray)`)
+or to the thin layer at it (`interact3d(system, layer, t, beam, ray)`). Components never need a
+`Hint` for correctness; a `Hint` only speeds up the next intersection.
 
 **When reviewing or writing code, be suspicious of:**
 

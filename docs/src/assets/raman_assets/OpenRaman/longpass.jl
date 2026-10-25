@@ -19,8 +19,8 @@ end
 
 BMO.refractive_index(lpm::LongpassDichroicMirror) = lpm.n
 BMO.refractive_index(lpm::LongpassDichroicMirror, λ::Real)::Float64 = lpm.n(λ)
-# the substrate is a refracting body, which the transitions at its surfaces take into account
-BMO.body_refractive_index(lpm::LongpassDichroicMirror, λ) = BMO.refractive_index(lpm, λ)
+# the substrate is a body, whose medium the transitions at its surfaces take into account
+BMO.medium(lpm::LongpassDichroicMirror) = BMO.IsotropicMedium(lpm.n)
 
 """
     LongpassDichroicMirror(diameter, thickness, n, cuton)
@@ -55,6 +55,7 @@ function BMO.interact3d(
     else
         # above cut-on: behave like a refractive plate. The transition at the hit holds the media on
         # both sides, the substrate and the medium of the system or of a touching body.
-        return BMO.cross_boundary(BMO.transition(system, ray), beam, ray)
+        t = BMO.transition(system, ray)
+        return BMO.interact3d(system, BMO.surface_model(t), t, beam, ray)
     end
 end

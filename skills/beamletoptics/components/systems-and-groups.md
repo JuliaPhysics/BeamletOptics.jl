@@ -79,7 +79,10 @@ assembly is used:
   `shape(intersection(ray))`.
 - A `MultiShape` object of objects forwards rays and beamlets to the part that was hit, also the
   beamlet methods of the part (detectors, beamsplitters).
-- In an own `interact3d`, read the media on both sides of the hit with
-  `t = BeamletOptics.transition(system, ray)`: `BeamletOptics.medium_in(t)`, `BeamletOptics.medium_out(t)`
-  (refractive indices at the ray's wavelength). `BeamletOptics.cross_boundary(t, beam, ray)` refracts
-  or totally reflects at the bare boundary. A `Hint` only speeds up the trace.
+- Media and boundaries (not exported, may still change): a body declares its medium with
+  `BeamletOptics.medium(x::MyBody) = BeamletOptics.IsotropicMedium(n)` (every `AbstractRefractiveOptic`
+  has one). In an own `interact3d`, `t = BeamletOptics.transition(system, ray)` holds the media on both
+  sides of the hit (`BeamletOptics.refractive_index_in(t)`, `BeamletOptics.refractive_index_out(t)` at
+  the ray's wavelength) and the thin layer at it; `BeamletOptics.interact3d(system,
+  BeamletOptics.surface_model(t), t, beam, ray)` refracts or totally reflects at the boundary. A
+  `Hint` only speeds up the trace.

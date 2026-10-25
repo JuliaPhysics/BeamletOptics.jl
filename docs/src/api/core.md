@@ -122,22 +122,37 @@ An object whose `interact3d` method stores data in the object, e.g. a detector i
 
 ### Transitions
 
-At a boundary, the ray passes from one medium into another. The [`BeamletOptics.transition`](@ref) at the hit
-of a ray tells an `interact3d` method both media, derived from the bodies whose surfaces the ray leaves and
-enters there. Hence a component needs no knowledge of the elements that touch it: the surface of a lens
-cemented to another lens refracts from one glass into the other, a coating on a substrate transmits into the
-substrate, and a coating between two plates transmits from one plate into the other.
+At a boundary, the ray passes from one medium into another. The parts that the ray hits there play two roles:
+a part with a medium is a **body**, which the ray leaves or enters, e.g. a lens or a prism; a part without one
+is a **thin layer** between the media, e.g. a thin beamsplitter or a polarizing film. The
+[`BeamletOptics.transition`](@ref) at the hit of a ray holds both media and the layer. Hence a component needs no
+knowledge of the elements that touch it: the surface of a lens cemented to another lens refracts from one glass
+into the other, a beamsplitter coating on a substrate transmits into the substrate, and a film between two plates
+transmits from one plate into the other.
 
 ```@docs; canonical=false
+BeamletOptics.AbstractMedium
+BeamletOptics.IsotropicMedium
+BeamletOptics.medium
 BeamletOptics.transition
 BeamletOptics.Transition
-BeamletOptics.body_refractive_index
+```
+
+The physics at the boundary belongs to the boundary, not to one of the bodies. A body, e.g. any
+[`BeamletOptics.AbstractRefractiveOptic`](@ref), hands the ray to the [`BeamletOptics.surface_model`](@ref) of the
+transition, which is an uncoated surface so far. A thin layer implements the interaction between the media of the
+transition for itself:
+
+```@docs; canonical=false
+BeamletOptics.interact3d(::BeamletOptics.AbstractSystem, ::BeamletOptics.Uncoated, ::BeamletOptics.Transition, ::BeamletOptics.Beam, ::BeamletOptics.AbstractRay)
+BeamletOptics.AbstractSurfaceModel
 BeamletOptics.cross_boundary
 ```
 
-A refracting component is a subtype of [`BeamletOptics.AbstractRefractiveOptic`](@ref), for which
-`body_refractive_index` returns its refractive index. Its `interact3d` methods for a [`Ray`](@ref) and a
-[`PolarizedRay`](@ref) cross the bare boundary of the transition.
+A new refracting component declares its body via `medium` and needs no `interact3d` method of its own if it
+subtypes `AbstractRefractiveOptic`. A new thin layer implements
+`interact3d(system, layer::MyLayer, t::Transition, beam, ray)` and calls it from its `interact3d` method with
+`transition(system, ray)`, like the [`ThinBeamsplitter`](@ref).
 
 The `interact3d` return type limits the interface to only accepting one new `beam` segment per interaction at the moment. After e.g. a lens surface air-to-glass interaction, the most likely next step is the refraction at the glass-to-air surface of the same lens. An interaction can tell the solver so with a `Hint`, which speeds up the next intersection.
 

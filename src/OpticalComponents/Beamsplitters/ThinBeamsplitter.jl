@@ -111,27 +111,27 @@ end
     transmit!(child::AbstractRay, ray::AbstractRay, t::Transition)
 
 Turns the first ray `child` of the transmitted beam of a coating, which continues along the incident
-`ray`, into the ray behind the boundary of the transition `t`: refracted into `medium_out(t)`. For a
+`ray`, into the ray behind the boundary of the transition `t`: refracted into the medium behind it. For a
 [`PolarizedRay`](@ref), the field is transformed into the new direction as well, and scaled for the
 medium behind the boundary: the coating transmits a fraction of the power, and the power of a beam is
 proportional to `n cos(θ) |E|²`.
 """
 function transmit!(child::AbstractRay, ray::AbstractRay, t::Transition)
-    dir, _ = refraction3d(direction(ray), normal3d(t), medium_in(t), medium_out(t))
-    refractive_index!(child, medium_out(t))
+    dir, _ = refraction3d(direction(ray), normal3d(t), refractive_index_in(t), refractive_index_out(t))
+    refractive_index!(child, refractive_index_out(t))
     direction!(child, dir)
     return nothing
 end
 
 function transmit!(child::PolarizedRay, ray::PolarizedRay, t::Transition)
-    dir, _ = refraction3d(direction(ray), normal3d(t), medium_in(t), medium_out(t))
+    dir, _ = refraction3d(direction(ray), normal3d(t), refractive_index_in(t), refractive_index_out(t))
     normal = normal3d(t)
     P = _calculate_global_E0(direction(ray), dir, normal3d(intersection(ray)), SPBasis(1, 0, 0, 1))
     cos_in = abs(dot(direction(ray), normal))
     cos_out = abs(dot(dir, normal))
-    scale = sqrt(medium_in(t) * cos_in / (medium_out(t) * cos_out))
+    scale = sqrt(refractive_index_in(t) * cos_in / (refractive_index_out(t) * cos_out))
     polarization!(child, scale * _transverse(P * polarization(child), dir))
-    refractive_index!(child, medium_out(t))
+    refractive_index!(child, refractive_index_out(t))
     direction!(child, dir)
     return nothing
 end
@@ -142,7 +142,7 @@ end
 Sets the medium of the first ray `child` of the reflected beam of a coating: the medium before the
 boundary of the transition `t`.
 """
-reflect!(child::AbstractRay, t::Transition) = refractive_index!(child, medium_in(t))
+reflect!(child::AbstractRay, t::Transition) = refractive_index!(child, refractive_index_in(t))
 
 """
     interact3d(system::AbstractSystem, bs::ThinBeamsplitter, beam::Beam, ray)
@@ -152,9 +152,11 @@ follow from the [`transition`](@ref) at the hit: the transmitted beam is refract
 behind the splitter, e.g. the substrate that it is coated on, the reflected beam stays in the medium
 before it. Beyond the critical angle of these media, the `ray` is totally reflected and not split.
 """
-function interact3d(system::AbstractSystem, bs::ThinBeamsplitter, beam::Beam{T, R},
+interact3d(system::AbstractSystem, bs::ThinBeamsplitter, beam::Beam{T, R}, ray::R) where {T <: Real, R <: AbstractRay{T}} =
+    interact3d(system, bs, transition(system, ray), beam, ray)
+
+function interact3d(::AbstractSystem, bs::ThinBeamsplitter, t::Transition, beam::Beam{T, R},
         ray::R) where {T <: Real, R <: AbstractRay{T}}
-    t = transition(system, ray)
     is_totally_reflected(ray, t) && return cross_boundary(t, beam, ray)
     transmitted = _beamsplitter_transmitted_beam(bs, beam, ray)
     reflected = _beamsplitter_reflected_beam(bs, beam, ray)

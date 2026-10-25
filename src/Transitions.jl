@@ -1,10 +1,10 @@
 #=
 Transitions: what a ray crosses at a boundary
 
-The solver collects all surfaces that a ray hits at one point, see `coincident_hits`. Of these, one
-hit interacts with the ray (`first_to_interact`), and the bodies that the ray leaves and enters
-there define the media on both sides of the boundary (`transition`). Hence touching elements, e.g.
-cemented lenses or a coating on its substrate, need no knowledge of each other.
+The solver collects all surfaces that a ray hits at one point, see `coincident_hits`. The bodies
+that the ray leaves and enters there define the media on both sides of the boundary, and the thin
+layers at it (coatings, films, beamsplitters) act between them, see `transition`. Hence touching
+elements, e.g. cemented lenses or a coating on its substrate, need no knowledge of each other.
 =#
 
 """
@@ -38,25 +38,16 @@ part_of(object::AbstractObject, s) = something(find_part(object, s), object)
 part_of(hit::Intersection) = isnothing(hit.part) ? part_of(object(hit), shape(hit)) : hit.part
 
 """
-    body_refractive_index(part, λ)
-
-Returns the refractive index of the body of the `part` at the wavelength `λ`, or `nothing` if the
-`part` is no refracting body. A ray that enters such a body propagates within it, see
-[`Transition`](@ref).
-"""
-body_refractive_index(::AbstractObject, λ) = nothing
-
-"""
-    interaction_rank(hit, ray, n)
+    interaction_rank(hit, ray, medium)
 
 Returns the rank of the `hit` of the `ray` among the [`coincident_hits`](@ref): the hit of the lowest
-rank interacts with the `ray`. `n` is the [`body_refractive_index`](@ref) of the part that was hit. A
-surface that is no refracting body (`n` is `nothing`) ranks first, e.g. a coating, a mirror or a
-detector on a lens. The surface of a body that the `ray` enters ranks before the surface of a body
-that it leaves.
+rank interacts with the `ray`. `medium` is the [`medium`](@ref) of the part that was hit. A surface
+that is no body (`medium` is `nothing`) ranks first, e.g. a thin beamsplitter, a mirror or a detector
+on a lens: it acts at the boundary, see [`Transition`](@ref). The surface of a body that the `ray`
+enters ranks before the surface of a body that it leaves.
 """
 interaction_rank(hit, ray, ::Nothing) = 0
-interaction_rank(hit, ray, ::Real) = isentering(direction(ray), normal3d(hit)) ? 1 : 2
+interaction_rank(hit, ray, ::AbstractMedium) = isentering(direction(ray), normal3d(hit)) ? 1 : 2
 
 """
     first_to_interact(hit, ray)
@@ -81,7 +72,7 @@ end
 
 # the part is not inferred: the rank is computed behind a function barrier
 _rank(hit::Intersection, ray::AbstractRay) = _rank(part_of(hit), hit, ray)
-_rank(part, hit, ray) = interaction_rank(hit, ray, body_refractive_index(part, wavelength(ray)))
+_rank(part, hit, ray) = interaction_rank(hit, ray, medium(part))
 
 """
     first_of(hit, chosen)
@@ -102,36 +93,69 @@ end
 """
     Transition{T}
 
-The boundary that a ray crosses at its [`Intersection`](@ref), see [`transition`](@ref).
+The boundary that a ray crosses at its [`Intersection`](@ref): the medium on each side and the thin
+layer between them, see [`transition`](@ref).
 
 # Fields
 
-- `medium_in`: the medium before the boundary, in which the ray propagates
-- `medium_out`: the medium behind the boundary, into which the ray is transmitted
+- `system`: the system of the boundary
+- `n_in`, `n_out`: the refractive indices before and behind the boundary at the wavelength of the ray
 - `normal`: the unit normal of the boundary at the hit, against the direction of the ray
 - `exiting`: the hit of the body that the ray leaves, or `nothing`
 - `entering`: the hit of the body that the ray enters, or `nothing`
+- `layer`: the hit of the thin layer at the boundary (a surface that is no body, e.g. a thin
+  beamsplitter or a polarizing film), or `nothing`
 
 # Media
 
-A medium is represented by its refractive index at the wavelength of the ray. Behind a boundary at
-which the ray leaves a body and enters none, the ray propagates in the medium of the system, i.e.
-`refractive_index(system, λ)`. Bodies within bodies (e.g. a lens immersed in a
-cuvette) are not resolved: the medium behind the boundary of the inner body is the medium of the
-system.
+The media on both sides are [`medium_in`](@ref) and [`medium_out`](@ref), each an
+[`AbstractMedium`](@ref). Before the boundary, the ray propagates in the body that it leaves. If it leaves none, its medium is
+known only by its refractive index: an [`IsotropicMedium`](@ref) of the index of the ray. Behind the
+boundary lies the body that the ray enters. If it enters none but leaves one, the medium of the
+system follows ([`SystemMedium`](@ref)), else the medium before the boundary, e.g. at a beamsplitter
+in air or within a body. Bodies within bodies (e.g. a lens immersed in a cuvette) are not resolved:
+behind the boundary of the inner body follows the medium of the system.
+
+# Layers
+
+At most one thin layer acts at a boundary. If several coincide, e.g. two films on top of each other,
+the closest one acts and a warning is issued once.
 """
 struct Transition{T}
-    medium_in::T
-    medium_out::T
+    system::AbstractSystem
+    n_in::T
+    n_out::T
     normal::Point3{T}
     exiting::Nullable{Intersection{T}}
     entering::Nullable{Intersection{T}}
+    layer::Nullable{Intersection{T}}
 end
 
-"""Refractive index of the medium before the boundary, see [`Transition`](@ref)."""
-medium_in(t::Transition) = t.medium_in
-"""Refractive index of the medium behind the boundary, see [`Transition`](@ref)."""
-medium_out(t::Transition) = t.medium_out
+"""
+    medium_in(t::Transition)
+
+The [`AbstractMedium`](@ref) before the boundary, in which the ray propagates: the body that the ray
+leaves, else an [`IsotropicMedium`](@ref) of the refractive index of the ray, see [`Transition`](@ref).
+"""
+medium_in(t::Transition) = _medium_in(t, t.exiting)
+_medium_in(t::Transition, ::Nothing) = IsotropicMedium(t.n_in)
+_medium_in(::Transition, exiting::Intersection) = medium(part_of(exiting))
+
+"""
+    medium_out(t::Transition)
+
+The [`AbstractMedium`](@ref) behind the boundary, into which the ray is transmitted: the body that the
+ray enters, else the medium of the system if it leaves a body, else [`medium_in`](@ref), see
+[`Transition`](@ref).
+"""
+medium_out(t::Transition) = _medium_out(t, t.exiting, t.entering)
+_medium_out(::Transition, _, entering::Intersection) = medium(part_of(entering))
+_medium_out(t::Transition, ::Intersection, ::Nothing) = medium(t.system)
+_medium_out(t::Transition, ::Nothing, ::Nothing) = medium_in(t)
+"""The refractive index before the boundary at the wavelength of the ray, see [`Transition`](@ref)."""
+refractive_index_in(t::Transition) = t.n_in
+"""The refractive index behind the boundary at the wavelength of the ray, see [`Transition`](@ref)."""
+refractive_index_out(t::Transition) = t.n_out
 normal3d(t::Transition) = t.normal
 
 """
@@ -153,26 +177,14 @@ hint_out(t::Transition) = Hint(t.entering)
 Hint(hit::Intersection) = Hint(object(hit), shape(hit))
 Hint(::Nothing) = nothing
 
-# the index of the body of a part, NaN if it is no body, see `transition`
-_body_index(part, λ) = _as_index(body_refractive_index(part, λ))
-_as_index(::Nothing) = NaN
-_as_index(n::Real) = Float64(n)
-
 """
     transition(system::AbstractSystem, ray::AbstractRay)
 
-Returns the [`Transition`](@ref) at the [`Intersection`](@ref) of the `ray`. The bodies whose surfaces
-the `ray` hits at this point (see [`coincident_hits`](@ref)) determine the media:
-
-- the `ray` leaves a body: the medium before the boundary is the body, else the refractive index of
-  the `ray`
-- the `ray` enters a body: the medium behind the boundary is the body; it leaves a body and enters
-  none: the medium of the `system`; else the medium before the boundary, e.g. at a coating within a
-  body or in air
-
-A body is a part for which [`body_refractive_index`](@ref) returns a value, see
-[`AbstractRefractiveOptic`](@ref). The normal is the normal of the hit that interacts with the `ray`,
-see [`first_to_interact`](@ref), turned against the `ray`.
+Returns the [`Transition`](@ref) at the [`Intersection`](@ref) of the `ray`. The parts whose surfaces
+the `ray` hits at this point (see [`coincident_hits`](@ref)) determine it: a part with a
+[`medium`](@ref) is a body, which the `ray` leaves or enters depending on the normal of its hit, a
+part without one is a thin layer. The normal of the transition is that of the hit that interacts with
+the `ray` (see [`first_to_interact`](@ref)), turned against the `ray`.
 """
 function transition(system::AbstractSystem, ray::AbstractRay{T}) where {T}
     hit = intersection(ray)::Intersection{T}
@@ -180,48 +192,94 @@ function transition(system::AbstractSystem, ray::AbstractRay{T}) where {T}
     dir = direction(ray)
     exiting::Nullable{Intersection{T}} = nothing
     entering::Nullable{Intersection{T}} = nothing
-    n_exiting = n_entering = T(refractive_index(ray))
+    layer::Nullable{Intersection{T}} = nothing
+    n_in = n_out = T(refractive_index(ray))
+    layers = 0
     for h in coincident_hits(hit)
         # the part is not inferred: its index is read behind a function barrier, NaN for no body
-        n = _body_index(part_of(h), λ)::Float64
-        isnan(n) && continue
-        if isentering(dir, normal3d(h))
-            isnothing(entering) && ((entering, n_entering) = (h, T(n)))
+        n = _medium_index(part_of(h), λ)::Float64
+        if isnan(n)
+            layers += 1
+            isnothing(layer) && (layer = h)
+        elseif isentering(dir, normal3d(h))
+            isnothing(entering) && ((entering, n_out) = (h, T(n)))
         else
-            isnothing(exiting) && ((exiting, n_exiting) = (h, T(n)))
+            isnothing(exiting) && ((exiting, n_in) = (h, T(n)))
         end
     end
-    n_in = n_exiting
-    n_out = if !isnothing(entering)
-        n_entering
-    elseif !isnothing(exiting)
-        T(refractive_index(system, λ))
-    else
-        n_in
+    layers > 1 && @warn "Several thin layers coincide at a boundary, only the closest one acts" maxlog = 1
+    if isnothing(entering)
+        n_out = isnothing(exiting) ? n_in : T(refractive_index(system, λ))
     end
     normal = normal3d(hit)
     normal = isentering(dir, normal) ? normal : -normal
-    return Transition{T}(n_in, n_out, normal, exiting, entering)
+    return Transition{T}(system, n_in, n_out, normal, exiting, entering, layer)
 end
+
+_medium_index(part, λ) = _medium_index(medium(part), λ)
+_medium_index(::Nothing, λ) = NaN
+_medium_index(m::AbstractMedium, λ) = Float64(refractive_index(m, λ))
+
+"""
+    AbstractSurfaceModel
+
+The optical model of a boundary between two media, e.g. an uncoated surface or a coating. A model
+`M` implements `interact3d(system, model::M, t::Transition, beam, ray)`, which returns the
+interaction of the `ray` at the boundary of the transition `t`, see [`surface_model`](@ref).
+"""
+abstract type AbstractSurfaceModel end
+
+"""
+    Uncoated <: AbstractSurfaceModel
+
+A bare boundary between two media: refraction or total internal reflection, see
+[`cross_boundary`](@ref).
+"""
+struct Uncoated <: AbstractSurfaceModel end
+
+"""
+    surface_model(t::Transition)
+
+Returns the [`AbstractSurfaceModel`](@ref) of the boundary of the transition `t`. All surfaces are
+[`Uncoated`](@ref) so far; coatings on the faces of the bodies on both sides will enter here.
+"""
+surface_model(::Transition) = Uncoated()
+
+"""
+    interact3d(system, model::AbstractSurfaceModel, t::Transition, beam, ray)
+    interact3d(system, layer::AbstractObject, t::Transition, beam, ray)
+
+The interaction of the `ray` at the boundary of the transition `t`. A body, e.g. a lens, calls the
+first method with the [`surface_model`](@ref) of the boundary. A thin layer, e.g. a
+[`ThinBeamsplitter`](@ref), implements the second method for itself: it acts between the media of the
+transition, e.g. it refracts the transmitted beam from one into the other.
+"""
+interact3d(::AbstractSystem, ::Uncoated, t::Transition, beam::Beam, ray::AbstractRay) =
+    cross_boundary(t, beam, ray)
 
 """
     cross_boundary(t::Transition, beam::Beam, ray)
 
 Returns the [`BeamInteraction`](@ref) of the `ray` with the bare boundary of the transition `t`:
-refraction from `medium_in` into `medium_out` via [`refraction3d`](@ref), or total internal reflection
-beyond the critical angle. A [`PolarizedRay`](@ref) is transmitted or reflected with the
-[`fresnel_coefficients`](@ref), only the stronger part is traced. The hint points into the medium in
-which the new ray propagates.
+refraction from the medium before into the medium behind the boundary via [`refraction3d`](@ref), or
+total internal reflection beyond the critical angle. A [`PolarizedRay`](@ref) is transmitted or
+reflected with the [`fresnel_coefficients`](@ref), only the stronger part is traced. Between equal
+indices the ray passes unchanged. The hint points into the medium in which the new ray propagates.
 """
 function cross_boundary(t::Transition, ::Beam{T, R}, ray::R) where {T <: Real, R <: Ray{T}}
-    ndir, TIR = refraction3d(direction(ray), normal3d(t), medium_in(t), medium_out(t))
-    n, hint = TIR ? (medium_in(t), hint_in(t)) : (medium_out(t), hint_out(t))
+    n1, n2 = refractive_index_in(t), refractive_index_out(t)
+    ndir, TIR = n1 == n2 ? (direction(ray), false) : refraction3d(direction(ray), normal3d(t), n1, n2)
+    n, hint = TIR ? (n1, hint_in(t)) : (n2, hint_out(t))
     return BeamInteraction{T, R}(hint, Ray{T}(hit_point(ray), ndir, nothing, wavelength(ray), n))
 end
 
 function cross_boundary(t::Transition, ::Beam{T, R}, ray::R) where {T <: Real, R <: PolarizedRay{T}}
     normal = normal3d(t)
-    n1, n2 = medium_in(t), medium_out(t)
+    n1, n2 = refractive_index_in(t), refractive_index_out(t)
+    if n1 == n2
+        return BeamInteraction{T, R}(hint_out(t),
+            PolarizedRay{T}(hit_point(ray), direction(ray), nothing, wavelength(ray), n2, polarization(ray)))
+    end
     # angle of incidence in the first quadrant
     θi = angle3d(direction(ray), -normal)
     rs, rp, ts, tp = fresnel_coefficients(θi, n2 / n1)
@@ -242,7 +300,7 @@ end
 
 """Returns `true` if the `ray` is totally reflected at the bare boundary of the transition `t`."""
 is_totally_reflected(ray::AbstractRay, t::Transition) =
-    last(refraction3d(direction(ray), normal3d(t), medium_in(t), medium_out(t)))
+    last(refraction3d(direction(ray), normal3d(t), refractive_index_in(t), refractive_index_out(t)))
 
 """
     cross_boundary(system::AbstractSystem, beam::Beam, ray)

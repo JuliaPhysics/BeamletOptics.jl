@@ -1152,4 +1152,71 @@ holds(shapes, s) = any(x -> x === s, shapes)
     end
 end
 
+
+"""The transition of a ray from `p` along `d` at its first hit in the `system`."""
+function transition_at(system, p, d; λ = λ0)
+    ray = Ray(collect(Float64, p), collect(Float64, d), λ)
+    return BMO.with_bounding_spheres(system) do
+        BMO.intersection!(ray, BMO.first_to_interact(BMO.trace_all(system, ray), ray))
+        BMO.transition(system, ray)
+    end
+end
+
+@testset "Transitions" begin
+    @testset "Media" begin
+        @test BMO.refractive_index(BMO.IsotropicMedium(1.5), λ0) == 1.5
+        @test BMO.refractive_index(BMO.IsotropicMedium(λ -> 1.4 + λ), 1e-6) ≈ 1.400001
+        lens = SphericalLens(30mm, -30mm, 5mm, 15mm, λ -> 1.6)
+        @test BMO.medium(lens) isa BMO.IsotropicMedium
+        @test BMO.refractive_index(BMO.medium(lens), λ0) == 1.6
+        @test isnothing(BMO.medium(RoundPlanoMirror(25.4mm, 5mm)))
+        @test isnothing(BMO.medium(ThinBeamsplitter(10mm)))
+        system = System([lens])
+        @test BMO.medium(system) isa BMO.SystemMedium
+        @test BMO.refractive_index(BMO.medium(system), λ0) == 1.0
+    end
+
+    @testset "Single lens: air into glass, glass into the system medium" begin
+        lens = SphericalLens(30mm, -30mm, 5mm, 15mm, λ -> 1.6)
+        system = System([lens])
+        t = transition_at(system, [1mm, -10mm, 0], [0, 1, 0])
+        @test BMO.refractive_index_in(t) == 1.0 && BMO.refractive_index_out(t) == 1.6
+        @test isnothing(t.exiting) && BMO.shape(t.entering) === BMO.shape(lens) && isnothing(t.layer)
+        @test dot(BMO.normal3d(t), [0, 1, 0]) < 0
+        @test BMO.surface_model(t) === BMO.Uncoated()
+        t = transition_at(system, [1mm, 1mm, 0], [0, 1, 0])
+        @test BMO.refractive_index_in(t) == 1.6 && BMO.refractive_index_out(t) == 1.0
+        @test BMO.medium_out(t) isa BMO.SystemMedium
+        @test BMO.shape(t.exiting) === BMO.shape(lens) && isnothing(t.entering)
+    end
+
+    @testset "Cemented surface: from one glass into the other" begin
+        dl = doublet(1.5, 1.7)
+        t = transition_at(System([dl]), [1mm, 2mm, 0], [0, 1, 0])
+        @test BMO.refractive_index_in(t) == 1.5 && BMO.refractive_index_out(t) == 1.7
+        @test BMO.shape(t.exiting) === BMO.shape(dl.front) && BMO.shape(t.entering) === BMO.shape(dl.back)
+        @test BMO.hint_out(t).shape === BMO.shape(dl.back) && BMO.hint_in(t).shape === BMO.shape(dl.front)
+    end
+
+    @testset "Thin layer between two plates, and in air" begin
+        A = RectangularCompensatorPlate(40mm, 40mm, 5mm, λ -> 1.7)
+        B = RectangularCompensatorPlate(40mm, 40mm, 3mm, λ -> 1.4)
+        translate3d!(B, [0, 5mm, 0])
+        bs = ThinBeamsplitter(40mm, 40mm; reflectance = 0.5)
+        translate3d!(bs, [0, 5mm, 0])
+        t = transition_at(System([A, B, bs]), [0, 2mm, 0], [0, 1, 0])
+        @test BMO.shape(t.layer) === BMO.shape(bs)
+        @test BMO.refractive_index_in(t) == 1.7 && BMO.refractive_index_out(t) == 1.4
+        t = transition_at(System([bs]), [0, 2mm, 0], [0, 1, 0])
+        @test BMO.shape(t.layer) === BMO.shape(bs) && isnothing(t.exiting) && isnothing(t.entering)
+        @test BMO.refractive_index_in(t) == BMO.refractive_index_out(t) == 1.0
+    end
+
+    @testset "Several layers at one point: the closest acts, one warning" begin
+        f1, f2 = PolarizationFilter(20mm), PolarizationFilter(20mm)
+        system = System([f1, f2])
+        @test_logs (:warn, r"Several thin layers") transition_at(system, [0, -10mm, 0], [0, 1, 0])
+    end
+end
+
 end # module

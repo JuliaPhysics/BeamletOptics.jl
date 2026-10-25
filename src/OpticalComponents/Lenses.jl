@@ -37,34 +37,24 @@ abstract type AbstractRefractiveOptic{T, F} <: AbstractObject{T} end
 refractive_index(object::AbstractRefractiveOptic) = object.n
 refractive_index(object::AbstractRefractiveOptic{<:Any, <:RefractiveIndex}, λ::Real)::Float64 = object.n(λ)
 
-body_refractive_index(optic::AbstractRefractiveOptic, λ) = refractive_index(optic, λ)
+medium(optic::AbstractRefractiveOptic) = IsotropicMedium(refractive_index(optic))
 
 """
-    interact3d(AbstractSystem, AbstractRefractiveOptic, Beam, Ray)
+    interact3d(AbstractSystem, AbstractRefractiveOptic, Beam, AbstractRay)
 
-Implements the refraction of a [`Ray`](@ref) at an optical surface, or the total internal reflection beyond
-the critical angle (see [`refraction3d`](@ref)). The refractive indices on both sides follow from the
-[`transition`](@ref) at the hit: the optic, the system medium, or another optic that touches the surface,
-e.g. the other lens of a cemented doublet.
+Implements the interaction of a [`Ray`](@ref) or a [`PolarizedRay`](@ref) at a surface of a refracting
+optic: the [`transition`](@ref) at the hit gives the media on both sides, the optic, the system
+medium, or another optic that touches the surface, e.g. the other lens of a cemented doublet. The
+[`surface_model`](@ref) of the boundary acts between them. For an uncoated surface, the ray is
+refracted, or totally reflected beyond the critical angle (see [`cross_boundary`](@ref)); a
+[`PolarizedRay`](@ref) is transmitted with the [`fresnel_coefficients`](@ref), stray light is not tracked.
 """
 function interact3d(system::AbstractSystem,
         ::AbstractRefractiveOptic,
         beam::Beam{T, R},
-        ray::R) where {T <: Real, R <: Ray{T}}
-    return cross_boundary(transition(system, ray), beam, ray)
-end
-
-"""
-    interact3d(AbstractSystem, AbstractRefractiveOptic, Beam, PolarizedRay)
-
-Implements the refraction of a [`PolarizedRay`](@ref) at an uncoated optical surface. The refractive indices
-on both sides follow from the [`transition`](@ref) at the hit. Reflection and transmission values are
-calculated via the [`fresnel_coefficients`](@ref). Stray light is not tracked.
-In the case of total internal reflection, only the reflected light is traced.
-"""
-function interact3d(system::AbstractSystem, ::AbstractRefractiveOptic,
-        beam::Beam{T, R}, ray::R) where {T <: Real, R <: PolarizedRay{T}}
-    return cross_boundary(transition(system, ray), beam, ray)
+        ray::R) where {T <: Real, R <: AbstractRay{T}}
+    t = transition(system, ray)
+    return interact3d(system, surface_model(t), t, beam, ray)
 end
 
 """

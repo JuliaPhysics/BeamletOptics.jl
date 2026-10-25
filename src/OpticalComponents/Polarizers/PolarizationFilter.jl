@@ -68,18 +68,24 @@ filtered field is then refracted into the medium behind the filter with the
 the `ray` is totally reflected before it reaches the filter. A ray whose field falls to or below the
 `cutoff` of the filter is stopped.
 """
-function interact3d(system::AbstractSystem,
+interact3d(system::AbstractSystem, polfilter::PolarizationFilter, beam::Beam{T, R}, ray::R) where {T <: Real, R <: AbstractRay{T}} =
+    interact3d(system, polfilter, transition(system, ray), beam, ray)
+
+function interact3d(::AbstractSystem,
         polfilter::PolarizationFilter,
+        t::Transition,
         beam::Beam{T, R},
         ray::R) where {T <: Real, R <: PolarizedRay{T}}
-    t = transition(system, ray)
     is_totally_reflected(ray, t) && return cross_boundary(t, beam, ray)
     E = _calculate_global_E0(polfilter, ray, direction(ray), polfilter.JMat)
     # Terminate blocked rays
     if norm(E) ≤ polfilter.cutoff
         return nothing
     end
-    n1, n2 = medium_in(t), medium_out(t)
+    n1, n2 = refractive_index_in(t), refractive_index_out(t)
+    # between equal media, e.g. a filter in air, the filtered ray passes unchanged
+    n1 == n2 && return BeamInteraction{T, R}(hint_out(t),
+        PolarizedRay{T}(hit_point(ray), direction(ray), nothing, wavelength(ray), n2, E))
     new_dir, _ = refraction3d(direction(ray), normal3d(t), n1, n2)
     _, _, ts, tp = fresnel_coefficients(angle3d(direction(ray), -normal3d(t)), n2 / n1)
     P = _calculate_global_E0(direction(ray), new_dir, normal3d(intersection(ray)), SPBasis(ts, 0, 0, tp))
@@ -90,11 +96,5 @@ end
 
 # unpolarized rays (e.g. beamlet auxiliary rays) pass through the ideal filter, refracted at the
 # boundary between the media on both sides of the filter
-function interact3d(
-        system::AbstractSystem,
-        ::PolarizationFilter,
-        beam::Beam{T, R},
-        ray::R
-    ) where {T <: Real, R <: Ray{T}}
-    return cross_boundary(system, beam, ray)
-end
+interact3d(::AbstractSystem, ::PolarizationFilter, t::Transition, beam::Beam{T, R}, ray::R) where {T <: Real, R <: Ray{T}} =
+    cross_boundary(t, beam, ray)

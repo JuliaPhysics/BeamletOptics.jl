@@ -224,16 +224,17 @@ end
 ```
 
 The transmitting branch is the standard two-surface plate refraction. The component declares its
-substrate a refracting body, and the [`BeamletOptics.transition`](@ref) at the hit then holds the
-refractive indices on both sides of the surface: the substrate and the medium of the system, or of a
-body that touches the surface. [`BeamletOptics.cross_boundary`](@ref) refracts the ray, or totally
-reflects it beyond the critical angle:
+substrate a body via [`BeamletOptics.medium`](@ref), and the [`BeamletOptics.transition`](@ref) at the
+hit then holds the media on both sides of the surface: the substrate and the medium of the system, or
+of a body that touches the surface. The surface model of the boundary, an uncoated surface, refracts the
+ray, or totally reflects it beyond the critical angle:
 
 ```julia
-BMO.body_refractive_index(lpm::LongpassDichroicMirror, λ) = BMO.refractive_index(lpm, λ)
+BMO.medium(lpm::LongpassDichroicMirror) = BMO.IsotropicMedium(lpm.n)
 
 # in interact3d, above cut-on
-return BMO.cross_boundary(BMO.transition(system, ray), beam, ray)
+t = BMO.transition(system, ray)
+return BMO.interact3d(system, BMO.surface_model(t), t, beam, ray)
 ```
 
 The full component is in `OpenRaman/longpass.jl`, named after the Thorlabs
