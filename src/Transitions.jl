@@ -115,8 +115,8 @@ The boundary that a ray crosses at its [`Intersection`](@ref), see [`transition`
 # Media
 
 A medium is represented by its refractive index at the wavelength of the ray. Behind a boundary at
-which the ray leaves a body and enters none, the ray propagates in the medium of the system, see
-[`refractive_index(::AbstractSystem, λ)`](@ref). Bodies within bodies (e.g. a lens immersed in a
+which the ray leaves a body and enters none, the ray propagates in the medium of the system, i.e.
+`refractive_index(system, λ)`. Bodies within bodies (e.g. a lens immersed in a
 cuvette) are not resolved: the medium behind the boundary of the inner body is the medium of the
 system.
 """
@@ -153,6 +153,11 @@ hint_out(t::Transition) = Hint(t.entering)
 Hint(hit::Intersection) = Hint(object(hit), shape(hit))
 Hint(::Nothing) = nothing
 
+# the index of the body of a part, NaN if it is no body, see `transition`
+_body_index(part, λ) = _as_index(body_refractive_index(part, λ))
+_as_index(::Nothing) = NaN
+_as_index(n::Real) = Float64(n)
+
 """
     transition(system::AbstractSystem, ray::AbstractRay)
 
@@ -169,10 +174,6 @@ A body is a part for which [`body_refractive_index`](@ref) returns a value, see
 [`AbstractRefractiveOptic`](@ref). The normal is the normal of the hit that interacts with the `ray`,
 see [`first_to_interact`](@ref), turned against the `ray`.
 """
-_body_index(part, λ) = _as_index(body_refractive_index(part, λ))
-_as_index(::Nothing) = NaN
-_as_index(n::Real) = Float64(n)
-
 function transition(system::AbstractSystem, ray::AbstractRay{T}) where {T}
     hit = intersection(ray)::Intersection{T}
     λ = wavelength(ray)

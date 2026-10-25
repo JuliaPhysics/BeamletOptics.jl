@@ -132,7 +132,7 @@ substrate, and a coating between two plates transmits from one plate into the ot
 BeamletOptics.transition
 BeamletOptics.Transition
 BeamletOptics.body_refractive_index
-BeamletOptics.cross_boundary(::BeamletOptics.Transition, ::BeamletOptics.Beam, ::BeamletOptics.Ray)
+BeamletOptics.cross_boundary
 ```
 
 A refracting component is a subtype of [`BeamletOptics.AbstractRefractiveOptic`](@ref), for which
