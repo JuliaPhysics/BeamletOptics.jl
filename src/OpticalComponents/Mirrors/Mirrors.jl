@@ -42,7 +42,7 @@ function interact3d(::AbstractSystem,
     npos = hit_point(ray)
     ndir = reflection3d(direction(ray), normal)
     return BeamInteraction{T, R}(nothing,
-        Ray{T}(npos, ndir, nothing, wavelength(ray), refractive_index(ray)))
+        Ray{T}(npos, ndir, nothing, wavelength(ray), refractive_index(ray), enclosure(ray)))
 end
 
 """
@@ -63,7 +63,7 @@ function interact3d(::AbstractSystem,
     E0 = _calculate_global_E0(obj, ray, ndir, J)
     return BeamInteraction{T, R}(nothing,
         PolarizedRay{T}(
-            npos, ndir, nothing, wavelength(ray), refractive_index(ray), E0))
+            npos, ndir, nothing, wavelength(ray), refractive_index(ray), E0, enclosure(ray)))
 end
 
 """

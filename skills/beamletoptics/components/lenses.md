@@ -89,4 +89,5 @@ gap. Prefer the surface-based constructors above, which do this for you. To mode
 
 At a cemented interface the ray refracts from one glass into the other; beyond the critical angle it is
 totally reflected and stays in the first glass. The same holds for any touching refracting bodies, e.g.
-two plates placed against each other in a `System`.
+two plates placed against each other in a `System`. Lenses within other bodies (e.g. a cuvette of
+water) refract into the surrounding body, not into air.

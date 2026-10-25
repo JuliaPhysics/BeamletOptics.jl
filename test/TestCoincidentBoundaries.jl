@@ -1219,4 +1219,71 @@ end
     end
 end
 
+
+@testset "Enclosure: bodies within bodies" begin
+    θ = deg2rad(25)
+    d = [sin(θ), cos(θ), 0]
+    p = [0, -10mm, 0]
+
+    @testset "Plate within a cuvette: back into the water, not into air" begin
+        nw, ng = 1.33, 1.6
+        water = RectangularCompensatorPlate(60mm, 60mm, 20mm, λ -> nw)
+        glass = RectangularCompensatorPlate(20mm, 20mm, 4mm, λ -> ng)
+        translate3d!(glass, [0, 8mm, 0])
+        beam = solve([water, glass], beam_at(p, d))
+        ref = follow([plane([0, 0, 0], [0, 1, 0], nw), plane([0, 8mm, 0], [0, 1, 0], ng),
+                plane([0, 12mm, 0], [0, 1, 0], nw), plane([0, 20mm, 0], [0, 1, 0], 1.0)], p, d)
+        @test agrees(path_error(beam, ref))
+        @test BMO.refractive_index.(rays(beam)) == [1.0, nw, ng, nw, 1.0]
+        r = rays(beam)
+        @test isnothing(BMO.enclosure(r[1])) && isnothing(BMO.enclosure(r[5]))
+        @test BMO.innermost(BMO.enclosure(r[3])) === glass
+        @test BMO.innermost(BMO.enclosure(r[4])) === water
+        # the medium behind the glass is the water
+        @test direction(r[4]) ≈ direction(r[2]) atol = TOL_DIR
+    end
+
+    @testset "Cemented doublet in water" begin
+        nw, n1, n2 = 1.33, 1.5, 1.7
+        dl = doublet(n1, n2; y0 = 10mm)
+        water = RectangularCompensatorPlate(60mm, 60mm, 30mm, λ -> nw)
+        for h in (0.0, 2mm, -3.5mm)
+            beam = solve([water, dl], beam_at([h, -10mm, 0], [0, 1, 0]))
+            v, R, _ = doublet_surfaces(10mm, n1, n2)
+            surfaces = [plane([0, 0, 0], [0, 1, 0], nw); lens_surfaces(v, R, [n1, n2, nw]);
+                        plane([0, 30mm, 0], [0, 1, 0], 1.0)]
+            ref = follow(surfaces, [h, -10mm, 0], [0, 1, 0])
+            @test agrees(path_error(beam, ref))
+            @test BMO.refractive_index.(rays(beam)) == [1.0, nw, n1, n2, nw, 1.0]
+        end
+    end
+
+    @testset "Detector that does not stop, on a glass face: the ray leaves the glass" begin
+        ng = 1.6
+        A = RectangularCompensatorPlate(40mm, 40mm, 5mm, λ -> ng)
+        det = Detector(30mm, false)
+        translate3d!(det, [0, 5mm, 0])
+        beam = solve([A, det], beam_at(p, d))
+        ref = follow([plane([0, 0, 0], [0, 1, 0], ng), plane([0, 5mm, 0], [0, 1, 0], 1.0)], p, d)
+        @test agrees(path_error(beam, ref))
+        @test BMO.refractive_index(last(rays(beam))) == 1.0
+        @test length(BMO.hits(det)) == 1
+    end
+
+    @testset "Rays of components without an enclosure" begin
+        # a ray that starts within glass without knowing it is taken to be in the medium of its index
+        dl = doublet(1.5, 1.7)
+        ray = Ray([1mm, 2mm, 0], [0, 1, 0], λ0)
+        BMO.refractive_index!(ray, 1.5)
+        t = BMO.with_bounding_spheres(System([dl])) do
+            BMO.intersection!(ray, BMO.first_to_interact(BMO.trace_all(System([dl]), ray), ray))
+            BMO.transition(System([dl]), ray)
+        end
+        @test BMO.refractive_index_in(t) == 1.5 && BMO.refractive_index_out(t) == 1.7
+        @test BMO.innermost(BMO.enclosure_in(t)) === dl.front
+        @test BMO.innermost(BMO.enclosure_out(t)) === dl.back
+        @test isnothing(BMO.enclosure_out(t).outer)
+    end
+end
+
 end # module

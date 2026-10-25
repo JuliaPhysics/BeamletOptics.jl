@@ -111,6 +111,6 @@ function BMO.interact3d(
 
     return BMO.BeamInteraction{T, R}(
         nothing, # No secondary surface interaction hint required for single reflection
-        BMO.Ray{T}(npos, ndir, nothing, lambda, BMO.refractive_index(ray))
+        BMO.Ray{T}(npos, ndir, nothing, lambda, BMO.refractive_index(ray), BMO.enclosure(ray))
     )
 end

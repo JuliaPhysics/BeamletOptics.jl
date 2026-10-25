@@ -214,7 +214,7 @@ function BMO.interact3d(system::BMO.AbstractSystem, ldm::LongpassDichroicMirror,
         ndir = BMO.reflection3d(BMO.direction(ray), normal)
         return BMO.BeamInteraction{T, R}(
             nothing,
-            Ray{T}(npos, ndir, nothing, BMO.wavelength(ray), BMO.refractive_index(ray))
+            Ray{T}(npos, ndir, nothing, BMO.wavelength(ray), BMO.refractive_index(ray), BMO.enclosure(ray))
         )
     else
         # above cut-on: behave like a refractive plate
@@ -379,7 +379,7 @@ function BMO.interact3d(::BMO.AbstractSystem, gr::ReflectiveGrating,
 
     return BMO.BeamInteraction{T, R}(
         nothing,
-        BMO.Ray{T}(npos, ndir, nothing, lambda, BMO.refractive_index(ray))
+        BMO.Ray{T}(npos, ndir, nothing, lambda, BMO.refractive_index(ray), BMO.enclosure(ray))
     )
 end
 ```

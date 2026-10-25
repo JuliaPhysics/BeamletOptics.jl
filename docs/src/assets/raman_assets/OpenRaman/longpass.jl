@@ -50,7 +50,7 @@ function BMO.interact3d(
         ndir = BMO.reflection3d(BMO.direction(ray), normal)
         return BMO.BeamInteraction{T, R}(
             nothing,
-            Ray{T}(npos, ndir, nothing, BMO.wavelength(ray), BMO.refractive_index(ray))
+            Ray{T}(npos, ndir, nothing, BMO.wavelength(ray), BMO.refractive_index(ray), BMO.enclosure(ray))
         )
     else
         # above cut-on: behave like a refractive plate. The transition at the hit holds the media on

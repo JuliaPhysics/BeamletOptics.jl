@@ -176,6 +176,8 @@ Subtypes of `AbstractRay` must implement the following:
 - `intersection`: a `Nullable` field that stores the current [`Intersection`] or `nothing`
 - `λ`: wavelength in [m]
 - `n`: refractive index along the ray path
+- `enclosure` (optional): the bodies that enclose the ray, see [`Enclosure`](@ref). Without it, the ray
+  is taken to be in the medium of its refractive index `n`
 
 ## Functions:
 
@@ -233,6 +235,17 @@ wavenumber(ray::AbstractRay) = 2π/wavelength(ray)
 
 refractive_index(ray::AbstractRay) = ray.n
 refractive_index!(ray::AbstractRay, n) = (ray.n = n)
+
+"""
+    enclosure(ray::AbstractRay)
+
+Returns the [`Enclosure`](@ref) of the `ray`, the bodies that enclose it, or `nothing` in the medium of
+the system. A ray type without the field `enclosure` is always taken to be outside of all bodies.
+"""
+enclosure(::AbstractRay) = nothing
+
+"""Sets the [`Enclosure`](@ref) of the `ray`, which has the field `enclosure`."""
+enclosure!(ray::AbstractRay, e) = (ray.enclosure = e)
 
 intersection(ray::AbstractRay) = ray.intersection
 function intersection!(ray::AbstractRay, _intersection::Nullable{Intersection})

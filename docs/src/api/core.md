@@ -138,6 +138,18 @@ BeamletOptics.transition
 BeamletOptics.Transition
 ```
 
+Every ray carries the bodies that enclose it, which the transitions update. Hence the medium behind
+a boundary is the body around the one that the ray leaves, e.g. the water of a cuvette around a lens:
+
+```@docs; canonical=false
+BeamletOptics.Enclosure
+```
+
+A component that creates a new ray, e.g. after a reflection, passes on the enclosure of the incoming
+ray (`BeamletOptics.enclosure(ray)` as the last argument of the `Ray` or `PolarizedRay` constructor).
+After a boundary, the enclosure follows from the transition: `enclosure_in(t)` for a ray that stays
+before it, `enclosure_out(t)` for a transmitted ray.
+
 The physics at the boundary belongs to the boundary, not to one of the bodies. A body, e.g. any
 [`BeamletOptics.AbstractRefractiveOptic`](@ref), hands the ray to the [`BeamletOptics.surface_model`](@ref) of the
 transition, which is an uncoated surface so far. A thin layer implements the interaction between the media of the
