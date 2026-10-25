@@ -1045,6 +1045,17 @@ function hits_at(system, p, d; hint = nothing)
 end
 
 hit_shapes(hit) = [BMO.shape(h) for h in BMO.coincident_hits(hit)]
+
+# an object of an own geometry, a plane at y = `y0`, whose hits carry no shape
+mutable struct Wall <: BMO.AbstractObject{Float64}
+    shape::BMO.Mesh{Float64}
+    y0::Float64
+end
+Wall(y0) = Wall(BMO.QuadraticFlatMesh(10mm), y0)
+function BMO.intersect3d(w::Wall, ray::BMO.AbstractRay)
+    hit = BMO.intersect3d([0, w.y0, 0], [0, -1.0, 0], ray)
+    return BMO.object!(hit, w)
+end
 hit_lengths(hit) = [length(h) for h in BMO.coincident_hits(hit)]
 holds(shapes, s) = any(x -> x === s, shapes)
 
@@ -1109,6 +1120,17 @@ holds(shapes, s) = any(x -> x === s, shapes)
             objs = [BMO.object(h) for h in BMO.coincident_hits(hit)]
             @test length(objs) == 2
             @test any(o -> o === A, objs) && any(o -> o === B, objs)
+        end
+    end
+
+    @testset "Hits without a shape, of objects with an own intersect3d" begin
+        # the shape of an intersection is optional: such hits are kept, not taken for duplicates
+        for system in (System([Wall(5mm), Wall(5mm)]), System([Wall(5mm), Wall(5mm), Wall(5mm + 0.5e-9)]))
+            hit = hits_at(system, [0, 0, 0], normalize([0.2, 1, 0]))
+            objs = [BMO.object(h) for h in BMO.coincident_hits(hit)]
+            @test length(objs) == length(collect(BMO.objects(system)))
+            @test all(o -> any(x -> x === o, objs), BMO.objects(system))
+            @test all(isnothing, BMO.shape.(BMO.coincident_hits(hit)))
         end
     end
 
