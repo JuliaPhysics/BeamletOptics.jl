@@ -1270,6 +1270,31 @@ end
         @test length(BMO.hits(det)) == 1
     end
 
+    @testset "New rays of components learn their enclosure from the solver" begin
+        # a thin beamsplitter and a mirror within water create rays without an enclosure
+        nw = 1.33
+        water = RectangularCompensatorPlate(60mm, 60mm, 40mm, λ -> nw)
+        bs = ThinBeamsplitter(20mm, 20mm; reflectance = 0.5)
+        zrotate3d!(bs, deg2rad(45))
+        translate3d!(bs, [0, 20mm, 0])
+        beam = solve([water, bs], beam_at([0, -10mm, 0], [0, 1, 0]))
+        tr, rf = BMO.children(beam)
+        @test BMO.innermost(BMO.enclosure(first(rays(tr)))) === water
+        @test BMO.innermost(BMO.enclosure(first(rays(rf)))) === water
+        # both leave the water into air, the reflected beam through a side face at normal incidence
+        @test BMO.refractive_index.(rays(tr)) == [nw, 1.0]
+        @test BMO.refractive_index.(rays(rf)) == [nw, 1.0]
+        @test abs(position(last(rays(rf)))[1]) ≈ 30mm atol = TOL_POS
+
+        mirror = RoundPlanoMirror(20mm, 2mm)
+        xrotate3d!(mirror, deg2rad(10))
+        translate3d!(mirror, [0, 25mm, 0])
+        beam = solve([water, mirror], beam_at([0, -10mm, 0], [0, 1, 0]))
+        r = rays(beam)
+        @test BMO.innermost(BMO.enclosure(r[3])) === water
+        @test BMO.refractive_index.(r) == [1.0, nw, nw, 1.0]
+    end
+
     @testset "Rays of components without an enclosure" begin
         # a ray that starts within glass without knowing it is taken to be in the medium of its index
         dl = doublet(1.5, 1.7)

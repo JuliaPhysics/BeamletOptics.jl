@@ -87,6 +87,6 @@ assembly is used:
   BeamletOptics.surface_model(t), t, beam, ray)` refracts or totally reflects at the boundary. A
   `Hint` only speeds up the trace.
 - Rays carry the bodies that enclose them (`BeamletOptics.enclosure(ray)`), so bodies within bodies
-  work (a lens in a water cuvette). A new ray built in an own `interact3d` passes it on as the last
-  constructor argument: `Ray{T}(pos, dir, nothing, λ, n, BeamletOptics.enclosure(ray))`. A source
-  that starts inside a body is taken to be in the medium of the system.
+  work (a lens in a water cuvette). The solver assigns the enclosure to the new rays of an own
+  `interact3d` (continued ray and children starting at the hit); nothing to pass on. A source that
+  starts inside a body is taken to be in the medium of the system.

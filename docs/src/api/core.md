@@ -145,10 +145,14 @@ a boundary is the body around the one that the ray leaves, e.g. the water of a c
 BeamletOptics.Enclosure
 ```
 
-A component that creates a new ray, e.g. after a reflection, passes on the enclosure of the incoming
-ray (`BeamletOptics.enclosure(ray)` as the last argument of the `Ray` or `PolarizedRay` constructor).
-After a boundary, the enclosure follows from the transition: `enclosure_in(t)` for a ray that stays
-before it, `enclosure_out(t)` for a transmitted ray.
+A component creates its new rays without an enclosure. After each interaction, the solver assigns it
+to every new ray that starts at the hit, the continued ray and the first rays of child beams, by the
+side of the boundary into which the ray propagates: back into the medium before it, e.g. after a
+reflection, or into the medium behind it.
+
+```@docs; canonical=false
+BeamletOptics.enclose!
+```
 
 The physics at the boundary belongs to the boundary, not to one of the bodies. A body, e.g. any
 [`BeamletOptics.AbstractRefractiveOptic`](@ref), hands the ray to the [`BeamletOptics.surface_model`](@ref) of the

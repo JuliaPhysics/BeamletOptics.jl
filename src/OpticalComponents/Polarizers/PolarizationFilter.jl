@@ -85,13 +85,13 @@ function interact3d(::AbstractSystem,
     n1, n2 = refractive_index_in(t), refractive_index_out(t)
     # between equal media, e.g. a filter in air, the filtered ray passes unchanged
     n1 == n2 && return BeamInteraction{T, R}(hint_out(t),
-        PolarizedRay{T}(hit_point(ray), direction(ray), nothing, wavelength(ray), n2, E, enclosure_out(t)))
+        PolarizedRay{T}(hit_point(ray), direction(ray), nothing, wavelength(ray), n2, E))
     new_dir, _ = refraction3d(direction(ray), normal3d(t), n1, n2)
     _, _, ts, tp = fresnel_coefficients(angle3d(direction(ray), -normal3d(t)), n2 / n1)
     P = _calculate_global_E0(direction(ray), new_dir, normal3d(intersection(ray)), SPBasis(ts, 0, 0, tp))
     E0 = _transverse(P * E, new_dir)
     return BeamInteraction{T, R}(hint_out(t),
-        PolarizedRay{T}(hit_point(ray), new_dir, nothing, wavelength(ray), n2, E0, enclosure_out(t)))
+        PolarizedRay{T}(hit_point(ray), new_dir, nothing, wavelength(ray), n2, E0))
 end
 
 # unpolarized rays (e.g. beamlet auxiliary rays) pass through the ideal filter, refracted at the

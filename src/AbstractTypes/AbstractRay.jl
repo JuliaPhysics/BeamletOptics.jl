@@ -10,6 +10,7 @@ Stores data calculated by the [`intersect3d`](@ref) method.
 - `t`: length of the ray parametrization in [m]
 - `n`: normal vector at the point of intersection
 - `part`: the object that was hit, a part of `object` if this consists of objects, or `nothing`, see [`part_of`](@ref)
+- `isbody`: whether `part` is a body, i.e. has a [`medium`](@ref), see [`is_body`](@ref)
 - `next`: the next hit of the ray at the same point, or `nothing`, see [`coincident_hits`](@ref)
 
 # Coincident hits
@@ -26,12 +27,13 @@ mutable struct Intersection{T}
     t::T
     n::Point3{T}
     part::Nullable{AbstractObject}
+    isbody::Bool
     next::Union{Nothing, Intersection{T}}
 end
 
 function Intersection(object::Nullable{AbstractObject}, shape::Nullable{AbstractShape}, t::T,
         n::AbstractArray) where {T}
-    return Intersection{T}(object, shape, t, Point3{T}(n), nothing, nothing)
+    return Intersection{T}(object, shape, t, Point3{T}(n), nothing, false, nothing)
 end
 
 function Intersection(t::T, n::AbstractArray{T}) where {T}
@@ -64,11 +66,16 @@ object!(::Nothing, ::AbstractObject) = nothing
     part!(intersection, part) -> intersection
 
 Sets the `part` of the `intersection` and of its [`coincident_hits`](@ref) that have none, i.e. the
-object of the hit shape. An object of several objects keeps the parts that they set.
+object of the hit shape, and whether it is a body. An object of several objects keeps the parts that
+they set. The type of `part` is known here, hence [`medium`](@ref) is cheap to call.
 """
 function part!(i::Intersection, part::AbstractObject)
+    isbody = !isnothing(medium(part))
     for hit in coincident_hits(i)
-        isnothing(hit.part) && (hit.part = part)
+        if isnothing(hit.part)
+            hit.part = part
+            hit.isbody = isbody
+        end
     end
     return i
 end
@@ -244,8 +251,8 @@ the system. A ray type without the field `enclosure` is always taken to be outsi
 """
 enclosure(::AbstractRay) = nothing
 
-"""Sets the [`Enclosure`](@ref) of the `ray`, which has the field `enclosure`."""
-enclosure!(ray::AbstractRay, e) = (ray.enclosure = e)
+"""Sets the [`Enclosure`](@ref) of the `ray`. A ray type without the field `enclosure` ignores it."""
+enclosure!(::AbstractRay, e) = nothing
 
 intersection(ray::AbstractRay) = ray.intersection
 function intersection!(ray::AbstractRay, _intersection::Nullable{Intersection})

@@ -25,6 +25,7 @@ end
 Ray{T}(pos, dir, intersection, λ, n) where {T} = Ray{T}(pos, dir, intersection, λ, n, nothing)
 
 enclosure(ray::Ray) = ray.enclosure
+enclosure!(ray::Ray, e) = (ray.enclosure = e)
 
 """
     Ray(pos, dir, λ=1000e-9)

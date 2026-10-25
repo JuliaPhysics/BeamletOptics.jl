@@ -119,7 +119,6 @@ proportional to `n cos(θ) |E|²`.
 function transmit!(child::AbstractRay, ray::AbstractRay, t::Transition)
     dir, _ = refraction3d(direction(ray), normal3d(t), refractive_index_in(t), refractive_index_out(t))
     refractive_index!(child, refractive_index_out(t))
-    enclosure!(child, enclosure_out(t))
     direction!(child, dir)
     return nothing
 end
@@ -133,7 +132,6 @@ function transmit!(child::PolarizedRay, ray::PolarizedRay, t::Transition)
     scale = sqrt(refractive_index_in(t) * cos_in / (refractive_index_out(t) * cos_out))
     polarization!(child, scale * _transverse(P * polarization(child), dir))
     refractive_index!(child, refractive_index_out(t))
-    enclosure!(child, enclosure_out(t))
     direction!(child, dir)
     return nothing
 end
@@ -144,11 +142,7 @@ end
 Sets the medium of the first ray `child` of the reflected beam of a coating: the medium before the
 boundary of the transition `t`.
 """
-function reflect!(child::AbstractRay, t::Transition)
-    refractive_index!(child, refractive_index_in(t))
-    enclosure!(child, enclosure_in(t))
-    return nothing
-end
+reflect!(child::AbstractRay, t::Transition) = refractive_index!(child, refractive_index_in(t))
 
 """
     interact3d(system::AbstractSystem, bs::ThinBeamsplitter, beam::Beam, ray)

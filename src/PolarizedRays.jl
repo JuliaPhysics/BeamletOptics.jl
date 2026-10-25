@@ -74,6 +74,7 @@ end
 
 polarization(ray::PolarizedRay) = ray.E0
 enclosure(ray::PolarizedRay) = ray.enclosure
+enclosure!(ray::PolarizedRay, e) = (ray.enclosure = e)
 polarization!(ray::PolarizedRay, new) = (ray.E0 = new)
 
 """

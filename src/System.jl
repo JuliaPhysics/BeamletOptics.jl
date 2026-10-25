@@ -251,6 +251,8 @@ function trace_system!(
         obj = object(ray_intersection)
         interaction = interact3d(
             system, obj, beam, ray)::Union{Nothing, BeamInteraction{T, R}}
+        # the new rays learn the bodies around them
+        enclose_new!(system, beam, ray, interaction)
         if isnothing(interaction)
             break
         end
@@ -317,6 +319,7 @@ function trace_system!(
             _object,
             gauss,
             seg_counter)
+        enclose_new!(system, gauss, seg_counter, interaction)
         if isnothing(interaction)
             break
         end
@@ -374,6 +377,7 @@ function trace_system!(
         end
         # Calculate interaction
         interaction = interact3d(system, _object, agb, seg_counter)
+        enclose_new!(system, agb, seg_counter, interaction)
         if isnothing(interaction)
             break
         end
