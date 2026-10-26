@@ -89,7 +89,8 @@ const SDF_MISS_DISTANCE = 1e15
     _raymarch_outside(shape::AbstractSDF, pos, dir, t_max=SDF_MISS_DISTANCE, num_iter=1000, eps=1e-10)
 
 Perform the ray marching algorithm if the starting pos is outside of `shape`. The ray is a miss
-once it has travelled the path length `t_max` in [m] without a hit.
+once it has travelled the path length `t_max` in [m] without a hit. The hit is the root of the SDF
+along the ray, refined from the last two probes of the marching.
 """
 function _raymarch_outside(shape::AbstractSDF{S},
         pos::AbstractArray{R},
@@ -100,6 +101,9 @@ function _raymarch_outside(shape::AbstractSDF{S},
     T = promote_type(S, R)
     dist = sdf(shape, pos)
     t0 = zero(T)
+    # the start of the ray and the previous probe, which the hit is refined with
+    pos0 = pos
+    t_prev, dist_prev = t0, dist
 
     # `escaped` tracks if the ray has definitively moved away from the surface
     escaped = dist > eps
@@ -112,6 +116,7 @@ function _raymarch_outside(shape::AbstractSDF{S},
         min_step = escaped ? eps : (eps + t0 * 0.01)
         step_size = max(dist, min_step)
         pos = pos + step_size * dir
+        t_prev, dist_prev = t0, dist
         t0 += step_size
         dist = sdf(shape, pos)
         i += 1
@@ -128,14 +133,35 @@ function _raymarch_outside(shape::AbstractSDF{S},
         if dist > eps
             escaped = true
         elseif escaped
-            normal = normal3d(shape, pos)
+            # The probe lies within `eps` of the surface (inside or outside): the hit is its root. A
+            # rejected hit leaves the marching at the probe.
+            t_hit = _secant_root(shape, pos0, dir, t_prev, dist_prev, t0, dist, eps)
+            normal = normal3d(shape, pos0 + t_hit * dir)
             # Filter out false positive hits caused by numerical noise when leaving an SDF.
             if !(dot(dir, normal) > eps)
-                return Intersection(t0, normal, shape)
+                return Intersection(t_hit, normal, shape)
             end
         end
     end
     return nothing
+end
+
+# The path length of the root of the SDF along the ray from `pos` along `dir`, started from the probes
+# (a, fa) and (b, fb) with b close to the root. A few secant steps, which converge quickly where the
+# SDF is about linear, as near a surface. A step is kept if it reduces |SDF| and does not lead back
+# before the probe `a`. The result is the hit of `_raymarch_outside` within `eps` of the surface: the
+# hit changes continuously with the ray and the shape, e.g. for finite differences, instead of
+# jumping with the marching steps.
+function _secant_root(shape::AbstractSDF, pos, dir, a, fa, b, fb, eps)
+    for _ in 1:8
+        abs(fb) ≤ eps * 1e-3 && break
+        m = b - fb * (b - a) / (fb - fa)
+        (isfinite(m) && m > a) || break
+        fm = sdf(shape, pos + m * dir)
+        abs(fm) < abs(fb) || break
+        a, fa, b, fb = b, fb, m, fm
+    end
+    return b
 end
 
 """
