@@ -125,10 +125,7 @@ electric_field(hit::RayHit, p::AbstractVector) = _ray_phasor(hit, p)
 
 electric_field(hit::PolarizedRayHit, p::AbstractVector) = polarization(hit) * _ray_phasor(hit, p)
 
-# The scalar beamlet model keeps |E|²/(2Z₀) at the beam power in any medium, i.e. its amplitude
-# is √n larger than the physical field
-electric_field(hit::GaussianBeamletHit, p::AbstractVector) =
-    beamlet_hit_field(hit, p) / sqrt(refractive_index(hit))
+electric_field(hit::GaussianBeamletHit, p::AbstractVector) = beamlet_hit_field(hit, p)
 
 electric_field(hit::AstigmaticGaussianBeamletHit, p::AbstractVector) =
     hit.E_pol * _astigmatic_phasor(hit, p)
@@ -295,7 +292,8 @@ end
 Complex scalar field of a single beamlet `hit` at the global point `p` \\[m\\]. For an
 [`AstigmaticGaussianBeamletHit`](@ref) it is the field along the polarization of the hit, see
 [`beamlet_hit_polarization`](@ref) for the 3D field vector; for a [`GaussianBeamletHit`](@ref) it
-is the field of the scalar model, whose amplitude is `√n` too large in a medium of index `n`.
+is the physical field of the segment, which is smaller by `√n` in a medium of index `n` than in
+vacuum for the same power, as for an astigmatic beamlet.
 The fields that the readouts of a [`Detector`](@ref) add are those of
 [`electric_field(::BeamletOptics.AbstractDetectorHit, ::AbstractVector)`](@ref). It is kept as
 its own function so that other code that needs the *individual* hit contributions at a point,
@@ -318,7 +316,8 @@ function beamlet_hit_field(hit::GaussianBeamletHit{G}, p::AbstractArray) where {
     k0 = wavenumber(hit.segment.λ)
     n = hit.segment.n
     opl = hit.l0 + l1 + hit.Δl0 + (n - 1) * l1
-    return hit.E_amp / w * exp(-r^2 / w^2) * cis(k0 * opl + ψ + n * k0 * r^2 * curv / 2)
+    # `E_amp` is normalized to the power of the beamlet, the physical field in the medium is smaller by √n
+    return hit.E_amp / (sqrt(n) * w) * exp(-r^2 / w^2) * cis(k0 * opl + ψ + n * k0 * r^2 * curv / 2)
 end
 
 beamlet_hit_field(hit::AstigmaticGaussianBeamletHit, p::AbstractArray) =
