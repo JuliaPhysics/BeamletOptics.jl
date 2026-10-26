@@ -58,6 +58,7 @@ include(joinpath(@__DIR__, "E2E", "TestMichelson.jl"))
 include(joinpath(@__DIR__, "E2E", "TestMachZehnder.jl"))
 include(joinpath(@__DIR__, "E2E", "TestFraunhofer.jl"))
 include(joinpath(@__DIR__, "E2E", "TestAnalyticReferences.jl"))
+include(joinpath(@__DIR__, "TestBeamletFieldInMedia.jl"))
 
 # Test rendering
 # MUST stay first: TestRenderErrors.jl needs to run before anything loads the BMO Makie ext.
