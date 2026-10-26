@@ -133,14 +133,13 @@ function _raymarch_outside(shape::AbstractSDF{S},
         if dist > eps
             escaped = true
         elseif escaped
-            # The probe lies within `eps` of the surface (inside or outside): the hit is its root
+            # The probe lies within `eps` of the surface (inside or outside): the hit is its root. A
+            # rejected hit leaves the marching at the probe.
             t_hit = _secant_root(shape, pos0, dir, t_prev, dist_prev, t0, dist, eps)
-            pos = pos0 + t_hit * dir
-            t0 = t_hit
-            normal = normal3d(shape, pos)
+            normal = normal3d(shape, pos0 + t_hit * dir)
             # Filter out false positive hits caused by numerical noise when leaving an SDF.
             if !(dot(dir, normal) > eps)
-                return Intersection(t0, normal, shape)
+                return Intersection(t_hit, normal, shape)
             end
         end
     end

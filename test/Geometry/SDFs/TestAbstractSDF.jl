@@ -165,11 +165,12 @@ BMO.sdf(c::CountingSDF, point) = (c.count += 1; BMO.sdf(c.shape, point))
         i = BMO.intersect3d(cyl, Ray(p0, d))
         @test p0[2] + i.t * d[2] ≈ -5mm atol = 1e-13
         @test BMO.normal3d(i) ≈ [0, -1, 0]
-        # finite differences of the hit distance are smooth
+        # finite differences of the hit distance are smooth across the aperture: hits at the first
+        # probe within the marching tolerance put relative errors of up to 1e-4 into them
         t(x) = BMO.intersect3d(sphere, Ray([x, -100mm, 0.0], [0.0, 1.0, 0])).t
-        h = 1e-6
-        dt = (t(3mm + h) - t(3mm - h)) / 2h
-        @test dt ≈ 3mm / sqrt(R^2 - (3mm)^2) rtol = 1e-5
+        h = 1e-7
+        rel_err(x) = abs((t(x + h) - t(x - h)) / 2h / (x / sqrt(R^2 - x^2)) - 1)
+        @test maximum(rel_err, range(1mm, 9mm, 81)) < 1e-6
     end
 end
 
