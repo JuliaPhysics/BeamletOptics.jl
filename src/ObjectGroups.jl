@@ -26,8 +26,8 @@ The group takes that kinematic class, see [`BeamletOptics.AbstractKinematicTrait
 
 ## Changing the objects
 
-Objects and subgroups are added to and removed from the top level of the group via `push!` and
-`delete!`, like those of a [`System`](@ref). The constructor copies the vector or tuple it is
+Objects and subgroups are added to and removed from the top level of the group via `push!`,
+`delete!`, `pop!` and `popat!`, like those of a [`System`](@ref). The constructor copies the vector or tuple it is
 given, such that these do not change it.
 """
 mutable struct ObjectGroup{T} <: AbstractObjectGroup{T}
@@ -95,5 +95,24 @@ function Base.delete!(group::ObjectGroup, obj::ObjectOrGroup)
     deleteat!(group.objects, i)
     return group
 end
+
+"""
+    pop!(group::ObjectGroup) -> ObjectOrGroup
+
+Removes the last top-level object (or subgroup) of the `group` and returns it. The pose of the
+`group` and the pose of the object stay as they are, see `delete!(group, object)`. An empty
+`group` throws an `ArgumentError`.
+"""
+Base.pop!(group::ObjectGroup) = pop!(group.objects)
+
+"""
+    popat!(group::ObjectGroup, i::Integer) -> ObjectOrGroup
+
+Removes the `i`-th top-level object (or subgroup) of the `group` and returns it. The index counts
+the objects and subgroups as they were added, a subgroup counts as one. An index out of bounds
+throws a `BoundsError`. The pose of the `group` and the pose of the object stay as they are, see
+`delete!(group, object)`.
+"""
+Base.popat!(group::ObjectGroup, i::Integer) = popat!(group.objects, i)
 
 Base.show(::IO, ::MIME"text/plain", group::ObjectGroup) = print_tree(group)

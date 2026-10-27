@@ -24,6 +24,7 @@ Objects and subgroups are added to and removed from a group like from a [`System
 group = ObjectGroup([lens1, lens2])
 push!(group, lens3)       # lens3 now moves with the group
 delete!(group, lens1)     # lens1 stays where it is and no longer moves with the group
+pop!(group)               # removes and returns lens3, popat!(group, i) the i-th part
 ```
 
 ```@docs; canonical=false
@@ -31,6 +32,8 @@ ObjectGroup
 set_pivot3d!(::BeamletOptics.AbstractObjectGroup, ::Any)
 Base.push!(::ObjectGroup, ::Vararg{BeamletOptics.ObjectOrGroup})
 Base.delete!(::ObjectGroup, ::BeamletOptics.ObjectOrGroup)
+Base.pop!(::ObjectGroup)
+Base.popat!(::ObjectGroup, ::Integer)
 ```
 
 ## Assemblies: group or multi-shape object

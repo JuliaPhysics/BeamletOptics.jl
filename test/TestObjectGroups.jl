@@ -172,7 +172,7 @@ BMO.kinematic_trait_of(::StaticTestObject) = BMO.Static()
     end
 end
 
-@testset "push! and delete! of an ObjectGroup" begin
+@testset "push!, delete!, pop! and popat! of an ObjectGroup" begin
     pose(x) = (copy(position(x)), copy(orientation(x)))
     same(xs, ys) = length(xs) == length(ys) && all(xs[i] === ys[i] for i in eachindex(xs))
     m1, m2, m3, m4 = (RoundPlanoMirror(10e-3, 2e-3) for _ in 1:4)
@@ -229,6 +229,19 @@ end
     translate3d!(e, [1.0, 0, 0])
     @test position(e) == [1.0, 0, 0]
     @test pose(m3) == poses[m3]
+
+    # pop! and popat! remove at the top level, a subgroup counts as one
+    p = ObjectGroup([m3, inner, m4])
+    p_pose = pose(p)
+    @test pop!(p) === m4
+    @test popat!(p, 2) === inner
+    @test same(BMO.objects(p), [m3])
+    @test same(BMO.objects(inner), [m2])
+    @test_throws BoundsError popat!(p, 2)
+    @test pop!(p) === m3
+    @test_throws ArgumentError pop!(p)
+    @test pose(p) == p_pose
+    @test all(pose(o) == poses[o] for o in (m2, m3, m4, inner))
 
     # tracing follows the objects of a group in a system
     mirror = RoundPlanoMirror(10e-3, 2e-3)
