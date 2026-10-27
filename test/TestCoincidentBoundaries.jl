@@ -1242,6 +1242,28 @@ end
 end
 
 
+# a refracting body with its own interact3d, which counts its calls and absorbs every ray
+mutable struct AbsorbingGlass{S <: BMO.AbstractShape{Float64}, N} <: BMO.AbstractRefractiveOptic{Float64, N}
+    shape::S
+    n::N
+    calls::Int
+end
+function BMO.interact3d(::BMO.AbstractSystem, g::AbsorbingGlass, ::Beam, ::BMO.AbstractRay)
+    g.calls += 1
+    return nothing
+end
+
+@testset "Own interact3d methods take precedence" begin
+    # the solver dispatches on the object that was hit; the transition and the surface models are
+    # only the default methods of refracting bodies and thin layers
+    g = AbsorbingGlass(BMO.CuboidMesh(40mm, 5mm, 40mm), λ -> 1.5, 0)
+    beam = solve([g], beam_at([20mm, -20mm, 20mm], [0, 1, 0]))
+    @test g.calls == 1
+    @test length(rays(beam)) == 1
+    # it is still a body for the transitions of others: a plate touching it refracts into it
+    @test BMO.medium(g) isa BMO.IsotropicMedium
+end
+
 @testset "Enclosure: bodies within bodies" begin
     θ = deg2rad(25)
     d = [sin(θ), cos(θ), 0]

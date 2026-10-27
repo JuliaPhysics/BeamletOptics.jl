@@ -15,26 +15,38 @@ The first two principles will be elaborated upon in more detail in the [Geometry
 ```mermaid
 flowchart TB
     S(["<b>solve_system!</b><br/>system + beam"]) --> I
-    I["<b>1. Intersect</b><br/>all objects,<br/>hinted object first"] -- hit --> X["<b>2. Interact</b><br/>compute<br/>AbstractInteraction"]
-    X --> R["<b>3. Repeat</b><br/>attach next<br/>ray or beam segment"]
-    R -- "optional Hint" --> I
+    I["<b>1. Intersect</b><br/>all objects,<br/>hinted object first;<br/>all surfaces at the<br/>closest point"] -- "coincident hits" --> F["<b>first_to_interact</b><br/>thin layer, then<br/>entered body, then<br/>left body"]
+    F --> X
+    subgraph INT [" "]
+        X["<b>2. Interact</b><br/>interact3d(system, object,<br/>beam, ray)<br/>dispatch on the object"]
+        X -- "lens, prism,<br/>beamsplitter, filter" --> T["<b>transition(system, ray)</b><br/>media on both sides,<br/>thin layer, normal"]
+        T -- "body" --> M["<b>surface model</b><br/>Uncoated: refraction, TIR"]
+        T -- "thin layer" --> L["<b>layer method</b><br/>split, filter"]
+    end
+    X -- "own method, e.g.<br/>mirror, detector" --> R
+    M --> R
+    L --> R
+    R["<b>3. Repeat</b><br/>attach next ray or children,<br/>assign their enclosure"] -- "optional Hint" --> I
     I -- "no hit or r_max" --> E([done])
 
     classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
     classDef green fill:#38982626,stroke:#389826,stroke-width:2px
+    classDef lightgreen fill:#38982610,stroke:#389826,stroke-width:1px,stroke-dasharray:3 2
     classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
     classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
-    class I blue
+    class I,F blue
     class X green
+    class T,M,L lightgreen
     class R purple
     class S,E terminal
+    style INT fill:transparent,stroke:#389826,stroke-width:1px
 ```
 
 This scheme is loosely referred to as the **Intersect-Interact-Repeat-Loop** and consists of the following steps:
 
-1. Calculate the closest **Intersection** between a ray/beam and the objects within the system
-2. Calculate the optical **Interaction** that occurs at the surface or within the volume of the element
-3. Attach the next part of the ray chain or beam tree
+1. Calculate the closest **Intersection** between a ray/beam and the objects within the system. All surfaces at the closest point are kept as [Coincident hits](@ref), e.g. the faces of a cemented doublet, and the one that interacts comes first.
+2. Calculate the optical **Interaction**: `interact3d` is dispatched on the object that was hit. An object with its own method computes the interaction itself, e.g. a mirror or a detector. The default methods of refracting bodies and thin layers read the [Transitions](@ref) at the hit, the media on both sides, and hand the ray to the surface model of the boundary or to the thin layer.
+3. Attach the next part of the ray chain or beam tree. The solver assigns the bodies that enclose the new rays.
 4. Use the new information to repeat 1.
 
 Once this procedure has been completed, the alignment of the system or other time-dependent optical properties (e.g. the phase of a Gaussian beamlet) can be updated. A new call of [`solve_system!`](@ref) solves the beam again from its start. This is described in more detail in the section: [Tracing systems](@ref).

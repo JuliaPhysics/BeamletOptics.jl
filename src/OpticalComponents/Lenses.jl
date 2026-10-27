@@ -48,11 +48,11 @@ medium, or another optic that touches the surface, e.g. the other lens of a ceme
 [`surface_model`](@ref) of the boundary acts between them. For an uncoated surface, the ray is
 refracted, or totally reflected beyond the critical angle (see [`cross_boundary`](@ref)); a
 [`PolarizedRay`](@ref) is transmitted with the [`fresnel_coefficients`](@ref), stray light is not tracked.
+
+The method is typed loosely in the beam and the ray, such that the own `interact3d` method of a subtype
+takes precedence, e.g. `interact3d(system, ::MyOptic, ::Beam, ::AbstractRay)`.
 """
-function interact3d(system::AbstractSystem,
-        ::AbstractRefractiveOptic,
-        beam::Beam{T, R},
-        ray::R) where {T <: Real, R <: AbstractRay{T}}
+function interact3d(system::AbstractSystem, ::AbstractRefractiveOptic, beam::Beam, ray::AbstractRay)
     t = transition(system, ray)
     return interact3d(system, surface_model(t), t, beam, ray)
 end
