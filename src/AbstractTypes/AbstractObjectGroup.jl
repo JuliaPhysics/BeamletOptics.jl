@@ -70,7 +70,8 @@ empty collection.
 """
 _leaf_objects(tree) = Iterators.filter(_is_object, Leaves(tree))
 
-_is_object(x) = x isa AbstractObject
+_is_object(::AbstractObject) = true
+_is_object(::Any) = false
 
 # The type of `_leaf_objects(tree)`, e.g. of the objects of a `System`, see `intersect3d(parts, ray)`
 const _LeafObjects = Iterators.Filter{typeof(_is_object), <:Leaves}

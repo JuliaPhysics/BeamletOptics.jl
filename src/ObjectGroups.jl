@@ -51,6 +51,11 @@ Adds the `objects` (or object groups) at the top level of the `group`. The pose 
 (its pivot and [`orientation`](@ref)) and the poses of the `objects` stay as they are, i.e. the
 `objects` are added where they are.
 
+The `objects` join the current frame of the `group`, like parts put onto a mount that was moved
+before: [`reset_rotation3d!`](@ref) and [`reset_translation3d!`](@ref) of the `group` undo its
+rotation and translation so far and move the added `objects` by the same amount, although these
+did not take part in that motion.
+
 Throws an `ArgumentError` and adds nothing if an object is already part of the `group`, directly
 or within a subgroup, or if the `objects` and those of the `group` would not be all static or all
 movable, see [`BeamletOptics.AbstractKinematicTrait`](@ref). Objects are compared by identity.
@@ -59,7 +64,8 @@ The `group` does not know the systems that hold it: an object that is also part 
 is then traced twice, so remove it from the system first, e.g. via `delete!(system, object)`.
 Beams that were solved before must be solved again, see `push!(system, objects...)`. A
 [`StaticSystem`](@ref) keeps the objects that its groups had when it was built and does not trace
-the new `objects`: trace the `group` in a `System`, or build a new `StaticSystem`.
+the new `objects`: trace the `group` in a `System`, or build a new `StaticSystem`. The `group`
+must not be changed while a system that holds it is being solved.
 """
 function Base.push!(group::ObjectGroup, objs::ObjectOrGroup...)
     # objects and subgroups, also the `group` itself, such that a group can not hold itself
@@ -84,13 +90,14 @@ its subgroup instead. A group without objects remains a valid, empty group.
 
 Beams that were solved before must be solved again, see `delete!(system, object)`. A
 [`StaticSystem`](@ref) keeps the objects that its groups had when it was built and still traces the
-removed `object`: trace the `group` in a `System`, or build a new `StaticSystem`.
+removed `object`: trace the `group` in a `System`, or build a new `StaticSystem`. The `group`
+must not be changed while a system that holds it is being solved.
 """
 function Base.delete!(group::ObjectGroup, obj::ObjectOrGroup)
     i = findfirst(o -> o === obj, group.objects)
     if isnothing(i)
+        # an object yields only itself, which `findfirst` did not find
         for sub in group.objects
-            sub isa AbstractObjectGroup || continue
             any(o -> o === obj, PreOrderDFS(sub)) && throw(ArgumentError(
                 "the $(nameof(typeof(obj))) is part of a subgroup of the group, remove it from its subgroup instead"))
         end

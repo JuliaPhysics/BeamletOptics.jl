@@ -27,6 +27,8 @@ delete!(group, lens1)     # lens1 stays where it is and no longer moves with the
 pop!(group)               # removes and returns lens3, popat!(group, i) the i-th part
 ```
 
+Added objects join the current frame of the group: [`reset_rotation3d!`](@ref) and [`reset_translation3d!`](@ref) of the group undo its rotation and translation so far and move the added objects by the same amount, like parts put onto a mount that was turned before.
+
 A [`StaticSystem`](@ref) keeps the objects that its groups had when it was built: trace a changed group in a [`System`](@ref), or build a new `StaticSystem`.
 
 ```@docs; canonical=false

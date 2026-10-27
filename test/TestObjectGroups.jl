@@ -282,6 +282,26 @@ end
     @test same(BMO.objects(ss), [c])
     push!(cg, d)
     @test same(BMO.objects(ss), [c])
+
+    # added objects join the current frame of the group: resetting it moves them as well
+    r1, r2 = (RoundPlanoMirror(10e-3, 2e-3) for _ in 1:2)
+    rg = ObjectGroup([r1])
+    zrotate3d!(rg, deg2rad(30))
+    translate3d!(r2, [0.03, 0, 0])
+    push!(rg, r2)
+    reset_rotation3d!(rg)
+    Rz = [cosd(30) -sind(30) 0; sind(30) cosd(30) 0; 0 0 1]
+    @test orientation(r2) ≈ transpose(Rz)
+    @test position(r2) ≈ transpose(Rz) * [0.03, 0, 0]
+    @test orientation(r1) ≈ I
+    t1, t2 = (RoundPlanoMirror(10e-3, 2e-3) for _ in 1:2)
+    tg = ObjectGroup([t1])
+    translate3d!(tg, [0.005, 0, 0])
+    translate3d!(t2, [0, 0.05, 0])
+    push!(tg, t2)
+    reset_translation3d!(tg)
+    @test position(t2) ≈ [-0.005, 0.05, 0]
+    @test position(t1) ≈ zeros(3)
 end
 
 @testset "rotate3d! about an arbitrary pivot" begin

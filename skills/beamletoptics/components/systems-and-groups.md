@@ -55,7 +55,9 @@ group = ObjectGroup([lens1, lens2, mount])   # members may be objects or other g
   The group does not know its systems: `delete!(system, obj)` before `push!(group, obj)` if the
   system holds `obj` at its top level. Only `ObjectGroup` can be changed, not own group types.
   A `StaticSystem` keeps the objects its groups had when it was built: trace a changed group in a
-  `System` or build a new `StaticSystem`.
+  `System` or build a new `StaticSystem`. Added objects join the current frame of the group:
+  `reset_rotation3d!`/`reset_translation3d!` of the group later move them by the group's whole
+  rotation/translation so far. Do not change a group while a system that holds it is solved.
 
 Typical pattern (see `templates/05_periscope_objectgroup.jl`):
 
