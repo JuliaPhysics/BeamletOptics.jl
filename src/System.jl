@@ -23,14 +23,13 @@ Creates an empty system, to which objects are added via `push!`.
 """
 System() = System(ObjectOrGroup[])
 
-# `Leaves` of an empty vector is the vector itself, which is no object
 """
     objects(system::System)
 
 Exposes all objects stored within the system. By exposing the `Leaves` of the tree only, it is ensured that `AbstractObjectGroup`s are flattened into a regular vector.
-An empty system exposes no objects.
+An empty system exposes no objects, nor does an empty group, e.g. one whose objects were removed.
 """
-objects(system::System) = isempty(system.objects) ? () : Leaves(system.objects)
+objects(system::System) = _leaf_objects(system.objects)
 
 """Returns `true` if `obj` is one of the `leaves`, compared by identity."""
 _is_leaf_of(obj, leaves) = any(leaf -> leaf === obj, leaves)
@@ -47,7 +46,7 @@ Beams and beam groups that were solved before do not know the new object: solve 
 """
 function Base.push!(system::System, objs::ObjectOrGroup...)
     leaves = AbstractObject[o for o in objects(system)]
-    for obj in objs, leaf in Leaves(obj)
+    for obj in objs, leaf in _leaf_objects(obj)
         _is_leaf_of(leaf, leaves) && throw(ArgumentError(
             "the $(nameof(typeof(leaf))) is already an object of the system"))
         push!(leaves, leaf)
@@ -103,6 +102,8 @@ end
 A static container storing the optical elements of, i.e. a camera lens or lab setup.
 Compared to `System` this way defining the system is less flexible, i.e. no elements
 can be added or removed after construction but it allows for more performant ray-tracing.
+The objects of its groups are stored when it is built: objects that are added to or removed from
+a group later, e.g. via `push!(group, object)`, are not seen.
 
 !!! warning
     This type uses long tuples for storing the elements. This container should not be used
@@ -118,7 +119,7 @@ end
 StaticSystem(object::ObjectOrGroup) = StaticSystem([object])
 # No bound on the element type: a vector of objects and groups has the element type `Any`
 function StaticSystem(objects::AbstractArray)
-    StaticSystem(tuple(collect(Leaves(objects))...))
+    StaticSystem(tuple(collect(_leaf_objects(objects))...))
 end
 
 objects(system::StaticSystem) = system.objects

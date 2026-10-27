@@ -238,7 +238,7 @@ Base.delete!(h::_Combined, oh::BMO.AbstractObjectRenderHandle) = (filter!(c -> c
         @test h isa Ext.ObjectRenderHandle
         @test BMO.rendered(h) === outer
         @test map(Makie.plotfunc, h.plots) == map(Makie.plotfunc, rendered)
-        @test length(h.subP0) == 2 # the mirror and the inner group
+        @test length(h.subP0) == 3 # the objects at all depths
 
         # rigid motion of the outer group: the plots are kept
         plots = copy(h.plots)
@@ -293,15 +293,12 @@ Base.delete!(h::_Combined, oh::BMO.AbstractObjectRenderHandle) = (filter!(c -> c
         sys = System([outer])
         h = live_render!(ax, sys)
 
-        # one handle per leaf, hierarchy in parent
+        # one handle per leaf, hierarchy via render_parent
         @test length(h.handles) == 3
         @test [oh.obj for oh in h.handles] == [m1, m2, m3]
         @test all(oh -> oh isa Ext.ObjectRenderHandle, h.handles)
-        @test h.parent[m1] === outer
-        @test h.parent[m2] === inner
-        @test h.parent[m3] === inner
-        @test h.parent[inner] === outer
-        @test !haskey(h.parent, outer)
+        @test BMO.render_parent(h, m1) === outer
+        @test BMO.render_parent(h, m3) === inner
         @test BMO.render_parent(h, m2) === inner
         @test BMO.render_parent(h, inner) === outer
         @test BMO.render_parent(h, outer) === nothing
@@ -475,6 +472,67 @@ Base.delete!(h::_Combined, oh::BMO.AbstractObjectRenderHandle) = (filter!(c -> c
         @test [BMO.rendered(oh) for oh in BMO.render_children(c)] == [m]
         @test !any(in_scene, lens_plots)
         remove_render!(h)
+    end
+
+    @testset "Groups changed after live_render!" begin
+        # system handle: the hierarchy follows push! and delete! of a group
+        a = RoundPlanoMirror(0.02, 0.004)
+        b = RoundPlanoMirror(0.02, 0.004)
+        c = RoundPlanoMirror(0.02, 0.004)
+        translate3d!(b, [0, 0.05, 0])
+        translate3d!(c, [0, 0.1, 0])
+        inner = ObjectGroup([c])
+        g = ObjectGroup([b, inner])
+        sys = System([a, g])
+        h = live_render!(ax, sys)
+        delete!(sys, a)
+        push!(g, a)
+        @test BMO.render_parent(h, a) === g
+        @test pick_object(h, BMO.render_plots(h.handles[1])[1]) === g
+        delete!(g, a)
+        push!(sys, a)
+        @test isnothing(BMO.render_parent(h, a))
+        @test pick_object(h, BMO.render_plots(h.handles[1])[1]) === a
+        # an object moved into a subgroup and an object rendered later into a group
+        delete!(g, b)
+        push!(inner, b)
+        @test BMO.render_parent(h, b) === inner
+        d = RoundPlanoMirror(0.02, 0.004)
+        push!(g, d)
+        new = live_render!(h, d)
+        @test BMO.render_parent(h, d) === g
+        @test pick_object(h, BMO.render_plots(only(new))[1]) === g
+        # a group removed from the handle is forgotten, also the objects it got later
+        delete!(g, d)
+        remove_render!(h, d)
+        delete!(sys, g)
+        remove_render!(h, g)
+        @test isnothing(BMO.render_parent(h, b))
+        @test [BMO.rendered(oh) for oh in BMO.render_children(h)] == [a]
+        remove_render!(h)
+
+        # group handle: rendered again when its objects change, also at the same count
+        x = RoundPlanoMirror(0.02, 0.004)
+        y = RoundPlanoMirror(0.02, 0.004)
+        z = RoundPlanoMirror(0.02, 0.004)
+        translate3d!(y, [0, 0.05, 0])
+        translate3d!(z, [0, 0.05, 0])
+        sub = ObjectGroup([y])
+        group = ObjectGroup([x, sub])
+        hg = live_render!(ax, group)
+        plots = copy(hg.plots)
+        update_render!(hg)
+        @test hg.plots == plots
+        delete!(sub, y)
+        push!(sub, z) # same pose and count, another object
+        update_render!(hg)
+        @test !any(p -> any(q -> q === p, plots), hg.plots)
+        plots = copy(hg.plots)
+        push!(group, y)
+        update_render!(hg)
+        @test !any(p -> any(q -> q === p, plots), hg.plots)
+        @test hg.subs == Any[x, z, y]
+        remove_render!(hg)
     end
 
     @testset "pickable_plots" begin
