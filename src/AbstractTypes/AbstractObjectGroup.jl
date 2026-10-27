@@ -61,6 +61,20 @@ objects(group::AbstractObjectGroup) = group.objects
 
 AbstractTrees.children(group::AbstractObjectGroup) = objects(group)
 
+"""
+    _leaf_objects(tree)
+
+Iterates the objects at all depths of `tree`, an object, an object group or a collection of them.
+`Leaves(tree)` without the nodes that have no children but are no objects, i.e. empty groups and an
+empty collection.
+"""
+_leaf_objects(tree) = Iterators.filter(_is_object, Leaves(tree))
+
+_is_object(x) = x isa AbstractObject
+
+# The type of `_leaf_objects(tree)`, e.g. of the objects of a `System`, see `intersect3d(parts, ray)`
+const _LeafObjects = Iterators.Filter{typeof(_is_object), <:Leaves}
+
 kinematic_trait_of(group::AbstractObjectGroup) = _container_trait(objects(group))
 
 Base.position(group::AbstractObjectGroup) = group.center

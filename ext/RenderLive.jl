@@ -63,7 +63,7 @@ _rigid_parts(obj::BMO.AbstractObject) = _rigid_parts(BMO.shape_trait_of(obj), ob
 _rigid_parts(::BMO.AbstractShapeTrait, obj) = ()
 _rigid_parts(::BMO.MultiShape, obj) = BMO.shape(obj)
 # the objects at all depths, such that an object that moves or is added within a subgroup is seen
-_rigid_parts(group::BMO.AbstractObjectGroup) = collect(BMO.Leaves(group))
+_rigid_parts(group::BMO.AbstractObjectGroup) = collect(BMO._leaf_objects(group))
 
 function _subposes(x)
     parts = _rigid_parts(x)
@@ -306,7 +306,7 @@ Live-renders `obj`, an object or object group, into the axis of `h` and adds its
 `h` and its axis are left as they were.
 """
 function live_render!(h::SystemRenderHandle, obj::BMO.ObjectOrGroup; kwargs...)
-    for leaf in BMO.Leaves(obj)
+    for leaf in BMO._leaf_objects(obj)
         any(oh -> rendered(oh) === leaf, h.handles) && throw(ArgumentError(
             "the $(nameof(typeof(leaf))) is already rendered by the system handle"))
     end

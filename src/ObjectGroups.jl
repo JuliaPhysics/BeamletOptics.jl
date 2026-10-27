@@ -57,7 +57,9 @@ movable, see [`BeamletOptics.AbstractKinematicTrait`](@ref). Objects are compare
 
 The `group` does not know the systems that hold it: an object that is also part of such a system
 is then traced twice, so remove it from the system first, e.g. via `delete!(system, object)`.
-Beams that were solved before must be solved again, see `push!(system, objects...)`.
+Beams that were solved before must be solved again, see `push!(system, objects...)`. A
+[`StaticSystem`](@ref) keeps the objects that its groups had when it was built and does not trace
+the new `objects`: trace the `group` in a `System`, or build a new `StaticSystem`.
 """
 function Base.push!(group::ObjectGroup, objs::ObjectOrGroup...)
     # objects and subgroups, also the `group` itself, such that a group can not hold itself
@@ -80,7 +82,9 @@ the `group` and the pose of the `object` stay as they are. Nothing happens for a
 not part of the `group`. An object within a subgroup throws an `ArgumentError`: remove it from
 its subgroup instead. A group without objects remains a valid, empty group.
 
-Beams that were solved before must be solved again, see `delete!(system, object)`.
+Beams that were solved before must be solved again, see `delete!(system, object)`. A
+[`StaticSystem`](@ref) keeps the objects that its groups had when it was built and still traces the
+removed `object`: trace the `group` in a `System`, or build a new `StaticSystem`.
 """
 function Base.delete!(group::ObjectGroup, obj::ObjectOrGroup)
     i = findfirst(o -> o === obj, group.objects)

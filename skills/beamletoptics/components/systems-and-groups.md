@@ -54,6 +54,8 @@ group = ObjectGroup([lens1, lens2, mount])   # members may be objects or other g
   `pop!(group)` and `popat!(group, i)` remove and return the last or the `i`-th top-level part.
   The group does not know its systems: `delete!(system, obj)` before `push!(group, obj)` if the
   system holds `obj` at its top level. Only `ObjectGroup` can be changed, not own group types.
+  A `StaticSystem` keeps the objects its groups had when it was built: trace a changed group in a
+  `System` or build a new `StaticSystem`.
 
 Typical pattern (see `templates/05_periscope_objectgroup.jl`):
 

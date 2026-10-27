@@ -372,7 +372,7 @@ function _sphere_exit(sphere::AbstractBoundingSphere, ray::AbstractRay, margin =
 end
 
 """
-    intersect3d(sphere::AbstractBoundingSphere, x::Union{AbstractShape, Tuple, AbstractVector, Leaves}, ray::AbstractRay)
+    intersect3d(sphere::AbstractBoundingSphere, x::Union{AbstractShape, Tuple, AbstractVector, Leaves, _LeafObjects}, ray::AbstractRay)
 
 Returns the intersection between `x` and the `ray` like `intersect3d(x, ray)`, but tests the `ray`
 against the bounding `sphere` of `x` first. `x` is a shape, or the parts of a [`MultiShape`](@ref)
@@ -399,9 +399,9 @@ end
 # The parts have methods of their own, not shared with the shapes: the parts of an object reach the
 # shapes, and inference widens the argument types of a method that is called again within its own
 # call, i.e. the shapes would be tested by code compiled for abstract types.
-intersect3d(::NoBoundingSphere, parts::Union{Tuple, AbstractVector, Leaves}, ray::AbstractRay) = intersect3d(parts, ray)
+intersect3d(::NoBoundingSphere, parts::Union{Tuple, AbstractVector, Leaves, _LeafObjects}, ray::AbstractRay) = intersect3d(parts, ray)
 
-function intersect3d(sphere::AbstractBoundingSphere, parts::Union{Tuple, AbstractVector, Leaves}, ray::AbstractRay)
+function intersect3d(sphere::AbstractBoundingSphere, parts::Union{Tuple, AbstractVector, Leaves, _LeafObjects}, ray::AbstractRay)
     isnothing(_sphere_exit(sphere, ray)) && return nothing
     return intersect3d(parts, ray)
 end

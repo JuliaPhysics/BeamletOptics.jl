@@ -257,6 +257,31 @@ end
     delete!(mg, mirror)
     solve_system!(system, beam)
     @test isnothing(BMO.intersection(first(BMO.rays(beam))))
+
+    # an empty group or subgroup is no object of its system, also after its last object was removed
+    a, b, c = (RoundPlanoMirror(10e-3, 2e-3) for _ in 1:3)
+    sub = ObjectGroup([a])
+    outer = ObjectGroup([sub, b])
+    es = System([outer])
+    delete!(sub, a)
+    @test same(collect(BMO.objects(es)), [b])
+    @test push!(es, a) === es
+    @test same(collect(BMO.objects(es)), [b, a])
+    @test pop!(outer) === b
+    @test same(collect(BMO.objects(es)), [a])
+    @test_throws "already an object of the system" push!(es, ObjectGroup([ObjectGroup([]), a]))
+    push!(es, b)
+    @test same(collect(BMO.objects(es)), [a, b])
+    @test isempty(collect(BMO.objects(System([ObjectGroup([ObjectGroup([])])]))))
+    @test same(collect(BMO.objects(push!(System([ObjectGroup([])]), c))), [c])
+
+    # a StaticSystem keeps the objects that its groups had when it was built, without empty groups
+    d = RoundPlanoMirror(10e-3, 2e-3)
+    cg = ObjectGroup([c])
+    ss = StaticSystem([ObjectGroup([]), cg])
+    @test same(BMO.objects(ss), [c])
+    push!(cg, d)
+    @test same(BMO.objects(ss), [c])
 end
 
 @testset "rotate3d! about an arbitrary pivot" begin

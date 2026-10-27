@@ -27,6 +27,8 @@ delete!(group, lens1)     # lens1 stays where it is and no longer moves with the
 pop!(group)               # removes and returns lens3, popat!(group, i) the i-th part
 ```
 
+A [`StaticSystem`](@ref) keeps the objects that its groups had when it was built: trace a changed group in a [`System`](@ref), or build a new `StaticSystem`.
+
 ```@docs; canonical=false
 ObjectGroup
 set_pivot3d!(::BeamletOptics.AbstractObjectGroup, ::Any)
