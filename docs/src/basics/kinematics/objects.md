@@ -18,9 +18,19 @@ Objects which consist of more than one shape, e.g. a [`CubeBeamsplitter`](@ref) 
 
 For the easier representation of a group of [`BeamletOptics.AbstractObject`](@ref)s that moves as one, the [`ObjectGroup`](@ref) can be used. Refer to the [Lens groups](@ref) example for more information. The group's pivot (its `center`) can be moved without moving its members via [`set_pivot3d!`](@ref).
 
+Objects and subgroups are added to and removed from a group like from a [`System`](@ref), where they are, without changing the pose of the group:
+
+```julia
+group = ObjectGroup([lens1, lens2])
+push!(group, lens3)       # lens3 now moves with the group
+delete!(group, lens1)     # lens1 stays where it is and no longer moves with the group
+```
+
 ```@docs; canonical=false
 ObjectGroup
 set_pivot3d!(::BeamletOptics.AbstractObjectGroup, ::Any)
+Base.push!(::ObjectGroup, ::Vararg{BeamletOptics.ObjectOrGroup})
+Base.delete!(::ObjectGroup, ::BeamletOptics.ObjectOrGroup)
 ```
 
 ## Assemblies: group or multi-shape object

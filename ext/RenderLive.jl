@@ -26,6 +26,8 @@ mutable struct ObjectRenderHandle{O} <: AbstractObjectRenderHandle
     # reference poses of the subparts, see `_rigid_parts`
     subP0::Vector{Point3{Float64}}
     subR0::Vector{Matrix{Float64}}
+    # the subparts as rendered, compared by identity, e.g. after `push!` to a group
+    subs::Vector{Any}
     # last rendered pose
     P::Point3{Float64}
     R::Matrix{Float64}
@@ -60,7 +62,8 @@ _rigid_parts(::Any) = ()
 _rigid_parts(obj::BMO.AbstractObject) = _rigid_parts(BMO.shape_trait_of(obj), obj)
 _rigid_parts(::BMO.AbstractShapeTrait, obj) = ()
 _rigid_parts(::BMO.MultiShape, obj) = BMO.shape(obj)
-_rigid_parts(group::BMO.AbstractObjectGroup) = BMO.objects(group)
+# the objects at all depths, such that an object that moves or is added within a subgroup is seen
+_rigid_parts(group::BMO.AbstractObjectGroup) = collect(BMO.Leaves(group))
 
 function _subposes(x)
     parts = _rigid_parts(x)
@@ -88,8 +91,8 @@ end
     live_render!(ax, group::AbstractObjectGroup; kwargs...)
 
 Renders the `group` via [`render!`](@ref) and returns one `ObjectRenderHandle` for the whole group.
-If an object of the group is moved on its own, the group is rendered again by
-[`update_render!`](@ref).
+If an object of the group is moved on its own, or objects are added to or removed from the group
+or its subgroups, the group is rendered again by [`update_render!`](@ref).
 """
 function live_render!(ax::_RenderEnv, group::BMO.AbstractObjectGroup; kwargs...)
     return live_render!(() -> render!(ax, group; kwargs...), ax, group)
@@ -105,7 +108,7 @@ function live_render!(draw::Function, ax::_RenderEnv, x)
     plots = _capture_new_plots(draw, ax)
     P0, R0 = _pose(x)
     subP0, subR0 = _subposes(x)
-    return ObjectRenderHandle(ax, x, plots, draw, P0, R0, subP0, subR0, P0, R0)
+    return ObjectRenderHandle(ax, x, plots, draw, P0, R0, subP0, subR0, collect(Any, _rigid_parts(x)), P0, R0)
 end
 
 """
@@ -146,13 +149,14 @@ end
 """
     _is_rigid(h::ObjectRenderHandle; atol = 1e-6, rtol = 1e-6)
 
-Checks if all subparts of a `MultiShape` object or of an object group still match a rigid motion
-of the whole.
+Checks if all subparts of a `MultiShape` object or of an object group are still those that were
+rendered and match a rigid motion of the whole.
 """
 function _is_rigid(h::ObjectRenderHandle; atol = 1e-6, rtol = 1e-6)
-    isempty(h.subP0) && return true
     parts = _rigid_parts(h.obj)
-    length(parts) != length(h.subP0) && return false
+    length(parts) != length(h.subs) && return false
+    isempty(parts) && return true
+    all(i -> parts[i] === h.subs[i], eachindex(parts)) || return false
     P, R = _pose(h.obj)
     Rd = R * h.R0'
     for (i, part) in enumerate(parts)
@@ -171,6 +175,7 @@ function _rerender!(h::ObjectRenderHandle)
     h.P0, h.R0 = _pose(h.obj)
     h.P, h.R = h.P0, h.R0
     h.subP0, h.subR0 = _subposes(h.obj)
+    h.subs = collect(Any, _rigid_parts(h.obj))
     return h
 end
 
@@ -225,14 +230,15 @@ end
     SystemRenderHandle <: AbstractSystemRenderHandle
 
 Live rendering handle of an `AbstractSystem`, which holds one object handle per object. Object
-groups are rendered per object, their hierarchy is stored in `parent`, which maps each object of a
-group to the enclosing group. Top-level objects have no entry.
+groups are rendered per object. Their hierarchy is looked up in `roots`, the objects and groups
+that were rendered at the top level, when [`render_parent`](@ref) is called, such that it follows
+`push!` and `delete!` of the groups.
 """
 mutable struct SystemRenderHandle{S <: BMO.AbstractSystem} <: AbstractSystemRenderHandle
     ax::_RenderEnv
     sys::S
     handles::Vector{AbstractObjectRenderHandle}
-    parent::IdDict{BMO.ObjectOrGroup, BMO.AbstractObjectGroup}
+    roots::Vector{BMO.ObjectOrGroup}
 end
 
 function Base.show(io::IO, h::SystemRenderHandle)
@@ -242,7 +248,14 @@ end
 
 rendered(h::SystemRenderHandle) = h.sys
 render_children(h::SystemRenderHandle) = h.handles
-render_parent(h::SystemRenderHandle, obj) = get(h.parent, obj, nothing)
+
+function render_parent(h::SystemRenderHandle, obj)
+    for root in h.roots, node in BMO.PreOrderDFS(root)
+        node isa BMO.AbstractObjectGroup || continue
+        any(o -> o === obj, BMO.objects(node)) && return node
+    end
+    return nothing
+end
 
 function Base.push!(h::SystemRenderHandle, oh::AbstractObjectRenderHandle)
     push!(h.handles, oh)
@@ -263,25 +276,24 @@ object, such that each object of a group can be moved on its own without renderi
 """
 function live_render!(ax::_RenderEnv, sys::BMO.AbstractSystem; kwargs...)
     handles = AbstractObjectRenderHandle[]
-    parent = IdDict{BMO.ObjectOrGroup, BMO.AbstractObjectGroup}()
     # Avoid use of objects(sys), which flattens the groups
-    foreach(obj -> _live_render_leaves!(handles, parent, ax, obj; kwargs...), sys.objects)
-    return SystemRenderHandle(ax, sys, handles, parent)
+    roots = collect(BMO.ObjectOrGroup, BMO._top_level(sys))
+    foreach(obj -> _live_render_leaves!(handles, ax, obj; kwargs...), roots)
+    return SystemRenderHandle(ax, sys, handles, roots)
 end
 
 """
-Live-renders `obj` into the `ax`, an object group per object: pushes the object handles to
-`handles` and stores the enclosing group of each object of a group in `parent`.
+Live-renders `obj` into the `ax`, an object group per object, and pushes the object handles to
+`handles`.
 """
-function _live_render_leaves!(handles, parent, ax::_RenderEnv, obj::BMO.AbstractObject; kwargs...)
+function _live_render_leaves!(handles, ax::_RenderEnv, obj::BMO.AbstractObject; kwargs...)
     push!(handles, live_render!(ax, obj; kwargs...))
     return nothing
 end
 
-function _live_render_leaves!(handles, parent, ax::_RenderEnv, group::BMO.AbstractObjectGroup; kwargs...)
+function _live_render_leaves!(handles, ax::_RenderEnv, group::BMO.AbstractObjectGroup; kwargs...)
     for child in BMO.objects(group)
-        parent[child] = group
-        _live_render_leaves!(handles, parent, ax, child; kwargs...)
+        _live_render_leaves!(handles, ax, child; kwargs...)
     end
     return nothing
 end
@@ -301,20 +313,21 @@ function live_render!(h::SystemRenderHandle, obj::BMO.ObjectOrGroup; kwargs...)
     handles = AbstractObjectRenderHandle[]
     before = Set(objectid(p) for p in h.ax.scene.plots)
     try
-        _live_render_leaves!(handles, h.parent, h.ax, obj; kwargs...)
+        _live_render_leaves!(handles, h.ax, obj; kwargs...)
     catch
-        # Leave no plots and no hierarchy of a partially rendered group behind
+        # Leave no plots of a partially rendered group behind
         foreach(p -> delete!(h.ax, p), [p for p in h.ax.scene.plots if objectid(p) ∉ before])
-        foreach(o -> delete!(h.parent, o), BMO.PreOrderDFS(obj))
         rethrow()
     end
     append!(h.handles, handles)
+    push!(h.roots, obj)
     return handles
 end
 
-# Also forgets the hierarchy of the groups of `obj`
+# Also forgets `obj` and its groups as top-level objects of `h`
 function remove_render!(h::SystemRenderHandle, obj::BMO.ObjectOrGroup)
     invoke(remove_render!, Tuple{AbstractSystemRenderHandle, BMO.ObjectOrGroup}, h, obj)
-    foreach(o -> delete!(h.parent, o), BMO.PreOrderDFS(obj))
+    nodes = collect(BMO.PreOrderDFS(obj))
+    filter!(r -> !any(o -> o === r, nodes), h.roots)
     return nothing
 end

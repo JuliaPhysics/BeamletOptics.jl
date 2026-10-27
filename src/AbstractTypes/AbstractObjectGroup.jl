@@ -19,7 +19,8 @@ Subtypes of `AbstractObjectGroup` must implement the following:
 
 ## Fields:
 
-- `objects`: a tuple of [`AbstractObject`](@ref)s or additional subgroups, allows for hierarchical structures
+- `objects`: a tuple or a vector of [`AbstractObject`](@ref)s or additional subgroups, allows for hierarchical structures.
+  Only [`ObjectGroup`](@ref) can be changed after its construction, via `push!` and `delete!`.
 - `center`: a `Point3{T}` which is regarded as the reference origin (pivot) of the group
 - `dir`: a `SMatrix{3,3,T,9}` that describes the local coordinate system of the group
 

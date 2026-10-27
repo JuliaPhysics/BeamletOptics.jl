@@ -87,10 +87,11 @@ end
 """
     MultiBoundingSphere(a::AbstractBoundingSphere, b::AbstractBoundingSphere)
     MultiBoundingSphere(spheres::Tuple)
+    MultiBoundingSphere(spheres::AbstractVector)
 
 Returns the smallest sphere that encloses the bounding spheres `a` and `b`, or all `spheres`, e.g.
-those of the parts of an object. The result is `NoBoundingSphere()` if one of them is none, since
-then no sphere encloses all parts, and for no spheres at all.
+those of the parts of an object or of the objects of a group. The result is `NoBoundingSphere()` if
+one of them is none, since then no sphere encloses all parts, and for no spheres at all.
 """
 function MultiBoundingSphere(a::AbstractBoundingSphere, b::AbstractBoundingSphere)
     # asserted, the spheres of the parts of an object are not inferred
@@ -113,6 +114,11 @@ function MultiBoundingSphere(spheres::Tuple{AbstractBoundingSphere, Vararg{Abstr
     return MultiBoundingSphere(foldl((a, b) -> MultiBoundingSphere(a, b), spheres))
 end
 MultiBoundingSphere(::Tuple{}) = NoBoundingSphere()
+# the element type of the spheres of the objects of a group is not inferred, e.g. `Any` if there are none
+function MultiBoundingSphere(spheres::AbstractVector)
+    isempty(spheres) && return NoBoundingSphere()
+    return MultiBoundingSphere(foldl((a, b) -> MultiBoundingSphere(a, b), spheres))
+end
 
 """
     SingleBoundingSphere(sphere::AbstractBoundingSphere)

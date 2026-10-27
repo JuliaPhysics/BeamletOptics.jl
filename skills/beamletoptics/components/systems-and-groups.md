@@ -48,6 +48,11 @@ group = ObjectGroup([lens1, lens2, mount])   # members may be objects or other g
 - `rotate3d!` and `x|y|zrotate3d!` rotate all members about the center.
 - `set_pivot3d!(group, p)` moves the center (the pivot) without moving the members.
 - Groups can be nested, e.g. for zoom lenses or interferometer arms with mounts.
+- `push!(group, objs...)` and `delete!(group, obj)` change the top level of the group like those of
+  a `System`: by identity, poses and pivot unchanged; an object already in the group (at any depth)
+  or a mix of static and movable objects throws, so does `delete!` of an object inside a subgroup.
+  The group does not know its systems: `delete!(system, obj)` before `push!(group, obj)` if the
+  system holds `obj` at its top level. Only `ObjectGroup` can be changed, not own group types.
 
 Typical pattern (see `templates/05_periscope_objectgroup.jl`):
 
