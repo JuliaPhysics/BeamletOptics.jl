@@ -17,7 +17,9 @@ and
 - `divergence`: a [`Beam`](@ref) of [`Ray`](@ref)s to store the divergence ray
 - `λ`: beam wavelength in [m]
 - `w0`: local beam waist radius in [m]
-- `E0`: complex field value in [V/m]
+- `E0`: complex reference amplitude in [V/m] of the field, normalized to the power of the beamlet: `P = |E0|² π w0² / (4 Z₀)`
+  for any medium. The physical field of a segment in a medium of refractive index `n` is `E0 / √n` (times the
+  profile), so that the irradiance `n |E|² / (2 Z₀)` of a beam of fixed power does not depend on the medium, see [`electric_field`](@ref)
 - `parent`: reference to the parent beam, if any ([`Nullable`](@ref) to account for the root beam which has no parent)
 - `children`: vector of child beams, each child beam represents a branching or bifurcation of the original beam, i.e. beam-splitting
 
@@ -456,6 +458,9 @@ end
     electric_field(gauss::GaussianBeamlet, r, z)
 
 Calculates the electric field phasor [V/m] of the [`GaussianBeamlet`](@ref) at the radial and longitudinal positions `r` and `z`.
+It is the physical field, like that of an [`AstigmaticGaussianBeamlet`](@ref): with the irradiance `n |E|² / (2 Z₀)`
+of a medium of refractive index `n`, a beam of fixed power has the amplitude `∝ 1/√n`, hence the field of a
+segment in a medium is the reference amplitude `E0` of the beamlet divided by `√n`.
 The phase contains the [`optical_path_length`](@ref) from the start of the beam (parents included) up to `z`: within a medium
 of refractive index `n` it advances with the wavenumber `n k₀`, along the beam and across it. The Gouy phase is collected
 along the beam as well, i.e. it is continuous at every surface and from a parent beam to its children, and equals the `ψ`
@@ -522,14 +527,21 @@ function _segment_field(gauss::GaussianBeamlet, r, z, point, index, l0, Δl0, ψ
     w, R, ψ, w0 = gauss_parameters(gauss, z, ψ0; hint = (point, index))
     k0 = wavenumber(wavelength(gauss))
     n = refractive_index(gauss, index)
-    # Calculate new local field strength based on E0*w0 = const.
-    E0 = electric_field(gauss) * (beam_waist(gauss) / w0)
+    # Calculate new local field strength based on E0*w0 = const. The reference amplitude is normalized
+    # to the power, the physical field in the medium is smaller by √n.
+    E0 = electric_field(gauss) * (beam_waist(gauss) / w0) / sqrt(n)
     # Optical path up to the point. The curvature term is a geometric length like z, hence it enters
     # with the wavenumber n k0 of the medium as well.
     opl = z + Δl0 + (n - 1) * (z - l0)
     return E0 * w0 / w * exp(-r^2 / w^2) * cis(k0 * opl + ψ + n * k0 * r^2 * R / 2)
 end
 
+"""
+    optical_power(gauss::GaussianBeamlet)
+
+Power of the beamlet in [W] at its start. The reference amplitude `E0` is normalized to the power, hence
+the power does not depend on the medium of the beamlet.
+"""
 function optical_power(gauss::GaussianBeamlet)
     intensity(electric_field(gauss)) / 2 * π * beam_waist(gauss)^2
 end

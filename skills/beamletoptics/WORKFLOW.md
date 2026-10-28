@@ -47,6 +47,15 @@ end
 - A detector holds the hits of consecutive solves side by side; you decide when to evaluate. `spot_diagram` shows all hits; `electric_field`, `intensity`, `optical_power` superpose all hits **coherently**. For solves that follow each other in time, know what this computes, or evaluate after each solve and reset (`initialize = true`).
 - See `templates/01_singlet_spot_diagram.jl` (focus scan) and `templates/04_michelson_scan.jl` (fringes).
 
+## Derivatives (optimization, sensitivity)
+
+- `ForwardDiff.derivative`/`gradient` work through `solve_system!` when every component, beam and
+  detector is built in the number type `T` of the parameter (`T = typeof(p)`); pass it to
+  `ObjectGroup(objects, T)`, groups are `Float64` otherwise.
+- The derivative is that of the current light path: it is not defined where the path changes, e.g. a
+  ray that starts to miss a component, hits an edge, or begins total internal reflection.
+- See the docs page "Automatic differentiation" (`docs/src/basics/autodiff.md`).
+
 ## Interferometers and coherent sums
 
 - Use `GaussianBeamlet` (on-axis, paraxial) or `AstigmaticGaussianBeamlet` (tilted/off-axis) sources and

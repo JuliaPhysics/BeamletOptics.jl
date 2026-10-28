@@ -106,7 +106,8 @@ function render_children end
     render_parent(h::AbstractSystemRenderHandle, obj)
 
 The object group of the system of `h` that holds `obj` (an object or a group), or `nothing` if
-`obj` is at the top level or not in `h`.
+`obj` is at the top level or not in `h`. The handle returned by `live_render!(ax, system)` looks
+the group up when it is called, hence it follows `push!` and `delete!` of an [`ObjectGroup`](@ref).
 """
 function render_parent end
 

@@ -89,7 +89,8 @@ const SDF_MISS_DISTANCE = 1e15
     _raymarch_outside(shape::AbstractSDF, pos, dir, t_max=SDF_MISS_DISTANCE, num_iter=1000, eps=1e-10)
 
 Perform the ray marching algorithm if the starting pos is outside of `shape`. The ray is a miss
-once it has travelled the path length `t_max` in [m] without a hit.
+once it has travelled the path length `t_max` in [m] without a hit. The hit is the root of the SDF
+along the ray, refined from the last two probes of the marching.
 """
 function _raymarch_outside(shape::AbstractSDF{S},
         pos::AbstractArray{R},
@@ -100,6 +101,9 @@ function _raymarch_outside(shape::AbstractSDF{S},
     T = promote_type(S, R)
     dist = sdf(shape, pos)
     t0 = zero(T)
+    # the start of the ray and the previous probe, which the hit is refined with
+    pos0 = pos
+    t_prev, dist_prev = t0, dist
 
     # `escaped` tracks if the ray has definitively moved away from the surface
     escaped = dist > eps
@@ -112,6 +116,7 @@ function _raymarch_outside(shape::AbstractSDF{S},
         min_step = escaped ? eps : (eps + t0 * 0.01)
         step_size = max(dist, min_step)
         pos = pos + step_size * dir
+        t_prev, dist_prev = t0, dist
         t0 += step_size
         dist = sdf(shape, pos)
         i += 1
@@ -128,14 +133,44 @@ function _raymarch_outside(shape::AbstractSDF{S},
         if dist > eps
             escaped = true
         elseif escaped
-            normal = normal3d(shape, pos)
+            # The probe lies within `eps` of the surface (inside or outside): the hit is its root. A
+            # rejected hit leaves the marching at the probe.
+            t_hit, d_hit, slope = _secant_root(shape, pos0, dir, t_prev, dist_prev, t0, dist, eps)
+            p_hit = pos0 + t_hit * dir
+            # The normal is evaluated outside: the root may lie slightly within the shape, where the
+            # gradient of a composite SDF may stem from a part other than the one whose surface is hit,
+            # e.g. the face of a lens body that the vertex of a concave surface touches. Exactly on the
+            # surface, such parts tie. The point is moved back along the ray until it lies about as far
+            # outside as the root lies inside, by the slope of the SDF along the ray, at least by
+            # `eps / 100` and at most by `eps`.
+            back = clamp(d_hit < 0 ? 2 * d_hit / slope : zero(d_hit), eps / 100, eps)
+            normal = normal3d(shape, p_hit - back * dir)
             # Filter out false positive hits caused by numerical noise when leaving an SDF.
             if !(dot(dir, normal) > eps)
-                return Intersection(t0, normal, shape)
+                return Intersection(t_hit, normal, shape)
             end
         end
     end
     return nothing
+end
+
+# The path length of the root of the SDF along the ray from `pos` along `dir`, started from the probes
+# (a, fa) and (b, fb) with b close to the root. A few secant steps, which converge quickly where the
+# SDF is about linear, as near a surface. A step is kept if it reduces |SDF| and does not lead back
+# before the probe `a`. The result is the hit of `_raymarch_outside` within `eps` of the surface: the
+# hit changes continuously with the ray and the shape, e.g. for finite differences, instead of
+# jumping with the marching steps. Returns the path length of the root, the SDF there and the slope of
+# the SDF along the ray between the last two points, which is negative for a ray towards the surface.
+function _secant_root(shape::AbstractSDF, pos, dir, a, fa, b, fb, eps)
+    for _ in 1:8
+        abs(fb) ≤ eps * 1e-3 && break
+        m = b - fb * (b - a) / (fb - fa)
+        (isfinite(m) && m > a) || break
+        fm = sdf(shape, pos + m * dir)
+        abs(fm) < abs(fb) || break
+        a, fa, b, fb = b, fb, m, fm
+    end
+    return b, fb, (fb - fa) / (b - a)
 end
 
 """
@@ -308,6 +343,16 @@ end
 intersect3d(::NoBoundingSphere, object::AbstractSDF, ray::AbstractRay) = intersect3d(object, ray)
 
 # generic SDF transformations
+# The distance √(a² + b²) from an axis, e.g. the radius of revolution. It is exactly 0 on the axis,
+# also within nested automatic differentiation (e.g. the derivative of a normal, which is itself a
+# gradient), where `norm(Point2(a, b))` gives `NaN` there and would let comparisons of SDF branches
+# fail. The derivative w.r.t. a and b is not defined on the axis; SDFs that need it there use a
+# smooth expression, e.g. the 3D distance from the center of a sphere.
+function _radial(a, b)
+    r2 = a^2 + b^2
+    return iszero(r2) ? zero(r2) : sqrt(r2)
+end
+
 """
     op_revolve_z(p, sdf2d::Function, offset)
 
@@ -316,7 +361,7 @@ the 2D shape around the z-axis.
 
 """
 function op_revolve_z(p::Point3{T}, sdf2d::Function, offset = zero(T)) where {T <: Real}
-    q = Point2(norm(Point2(p[1], p[2])) - offset, p[3])
+    q = Point2(_radial(p[1], p[2]) - offset, p[3])
     return sdf2d(q)
 end
 
@@ -328,7 +373,7 @@ the 2D shape around the y-axis.
 
 """
 function op_revolve_y(p::Point3{T}, sdf2d::Function, offset = zero(T)) where {T <: Real}
-    q = Point2(norm(Point2(p[1], p[3])) - offset, p[2])
+    q = Point2(_radial(p[1], p[3]) - offset, p[2])
     return sdf2d(q)
 end
 

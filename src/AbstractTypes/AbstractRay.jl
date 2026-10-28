@@ -322,13 +322,13 @@ end
     intersect3d(parts, ray::AbstractRay)
 
 Returns the closest [`Intersection`](@ref) of the `ray` with the `parts`, or `nothing` if it hits
-none of them. The `parts` are a tuple, a vector or the `Leaves` of shapes or objects, e.g. the shapes
-of a [`MultiShape`](@ref) object, the objects of a group or the objects of a system. Each part is
-tested via its own `intersect3d` method, hence parts that consist of parts, e.g. the groups of a
-system, are tested as a whole. No parts give `nothing`. Parts that the ray hits within
+none of them. The `parts` are a tuple, a vector, the `Leaves` of shapes or objects or the
+[`objects`](@ref) of a system, e.g. the shapes of a [`MultiShape`](@ref) object or the objects of
+a group. Each part is tested via its own `intersect3d` method, hence parts that consist of parts,
+e.g. the groups of a system, are tested as a whole. No parts give `nothing`. Parts that the ray hits within
 `get_coincidence_tolerance()` of the closest hit are kept as its [`coincident_hits`](@ref).
 """
-function intersect3d(parts::Union{Tuple, AbstractVector, Leaves}, ray::AbstractRay{R}) where {R}
+function intersect3d(parts::Union{Tuple, AbstractVector, Leaves, _LeafObjects}, ray::AbstractRay{R}) where {R}
     result::Nullable{Intersection{R}} = nothing
     tol = get_coincidence_tolerance()
     for part in parts

@@ -87,10 +87,11 @@ end
 """
     MultiBoundingSphere(a::AbstractBoundingSphere, b::AbstractBoundingSphere)
     MultiBoundingSphere(spheres::Tuple)
+    MultiBoundingSphere(spheres::AbstractVector)
 
 Returns the smallest sphere that encloses the bounding spheres `a` and `b`, or all `spheres`, e.g.
-those of the parts of an object. The result is `NoBoundingSphere()` if one of them is none, since
-then no sphere encloses all parts, and for no spheres at all.
+those of the parts of an object or of the objects of a group. The result is `NoBoundingSphere()` if
+one of them is none, since then no sphere encloses all parts, and for no spheres at all.
 """
 function MultiBoundingSphere(a::AbstractBoundingSphere, b::AbstractBoundingSphere)
     # asserted, the spheres of the parts of an object are not inferred
@@ -113,6 +114,11 @@ function MultiBoundingSphere(spheres::Tuple{AbstractBoundingSphere, Vararg{Abstr
     return MultiBoundingSphere(foldl((a, b) -> MultiBoundingSphere(a, b), spheres))
 end
 MultiBoundingSphere(::Tuple{}) = NoBoundingSphere()
+# the element type of the spheres of the objects of a group is not inferred, e.g. `Any` if there are none
+function MultiBoundingSphere(spheres::AbstractVector)
+    isempty(spheres) && return NoBoundingSphere()
+    return MultiBoundingSphere(foldl((a, b) -> MultiBoundingSphere(a, b), spheres))
+end
 
 """
     SingleBoundingSphere(sphere::AbstractBoundingSphere)
@@ -406,7 +412,7 @@ function beyond(sphere::AbstractBoundingSphere, ray::AbstractRay, t)
 end
 
 """
-    intersect3d(sphere::AbstractBoundingSphere, x::Union{AbstractShape, Tuple, AbstractVector, Leaves}, ray::AbstractRay)
+    intersect3d(sphere::AbstractBoundingSphere, x::Union{AbstractShape, Tuple, AbstractVector, Leaves, _LeafObjects}, ray::AbstractRay)
 
 Returns the intersection between `x` and the `ray` like `intersect3d(x, ray)`, but tests the `ray`
 against the bounding `sphere` of `x` first. `x` is a shape, or the parts of a [`MultiShape`](@ref)
@@ -433,9 +439,9 @@ end
 # The parts have methods of their own, not shared with the shapes: the parts of an object reach the
 # shapes, and inference widens the argument types of a method that is called again within its own
 # call, i.e. the shapes would be tested by code compiled for abstract types.
-intersect3d(::NoBoundingSphere, parts::Union{Tuple, AbstractVector, Leaves}, ray::AbstractRay) = intersect3d(parts, ray)
+intersect3d(::NoBoundingSphere, parts::Union{Tuple, AbstractVector, Leaves, _LeafObjects}, ray::AbstractRay) = intersect3d(parts, ray)
 
-function intersect3d(sphere::AbstractBoundingSphere, parts::Union{Tuple, AbstractVector, Leaves}, ray::AbstractRay)
+function intersect3d(sphere::AbstractBoundingSphere, parts::Union{Tuple, AbstractVector, Leaves, _LeafObjects}, ray::AbstractRay)
     isnothing(_sphere_exit(sphere, ray)) && return nothing
     return intersect3d(parts, ray)
 end

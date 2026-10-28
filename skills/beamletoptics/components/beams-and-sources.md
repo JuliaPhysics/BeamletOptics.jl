@@ -28,7 +28,7 @@ GaussianBeamlet(pos, dir, λ = 1e-6, w0 = 1e-3; M2 = 1, P0 = 1e-3, z0 = 0, suppo
   orthogonal to `dir` (any non-zero length), otherwise the constructor throws an `ArgumentError`.
 - Valid for on-axis, untilted, (nearly) aberration-free systems only.
 - Queries: `gauss_parameters(g, z)` → `(w, R, ψ, w0)`, `waist_parameters`, `rayleigh_range(g; M2)`,
-  `optical_power(g)`, `electric_field(g, r, z)`, `point_on_beam(g, t)`, `path_segments(g)` (segments of the chief ray and all child beamlets with accumulated path lengths).
+  `optical_power(g)`, `electric_field(g, r, z)` (the physical field in V/m: smaller by `√n` in a medium of index `n` for the same power, as for `agb`), `point_on_beam(g, t)`, `path_segments(g)` (segments of the chief ray and all child beamlets with accumulated path lengths).
 
 ```julia
 AstigmaticGaussianBeamlet(pos, dir, λ, w0; M2, P0, E0, support, z0)
@@ -44,7 +44,7 @@ AstigmaticGaussianBeamlet(pos, dir, λ, w0_x, w0_y; M2_x, M2_y, P0, E0, support,
   their Fresnel loss (about 4 % of the power per surface at n = 1.5), polarizers and beamsplitters
   act, a mirror reverses the field. A `GaussianBeamlet` has no such losses.
 - Queries: `gauss_parameters(agb, z)` → `(w1, w2, R1, R2, ψ, w01, w02)`, `rayleigh_range(agb)` →
-  `(z_rx, z_ry)`, `intensity(agb, r, z)`, `electric_field`, `BeamletOptics.polarized_field`.
+  `(z_rx, z_ry)`, `intensity(agb, r, z)` (`n|E|²/(2Z₀)`), `electric_field`, `BeamletOptics.polarized_field`.
 
 ## Beam groups (sources)
 

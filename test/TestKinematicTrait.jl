@@ -253,8 +253,7 @@ end
         g_movable = ObjectGroup([mirror(), lens()])
         @test BMO.kinematic_trait_of(g_static) === BMO.Static()
         @test BMO.kinematic_trait_of(g_movable) === BMO.Movable(BMO.Oriented())
-        @test (@inferred BMO.kinematic_trait_of(g_static)) === BMO.Static()
-        @test (@inferred BMO.kinematic_trait_of(g_movable)) === BMO.Movable(BMO.Oriented())
+        # not inferred: the members of a group can change (push!, delete!), its trait is found at runtime
         cs = CollimatedSource([0, -50mm, 0], [0, 1, 0], 5mm, 1e-6; num_rings = 2, num_rays = 40)
         @test (@inferred BMO.kinematic_trait_of(cs)) === BMO.Movable(BMO.Oriented())
         # All verbs throw for a static group, set_pivot3d! still works

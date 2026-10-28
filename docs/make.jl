@@ -126,6 +126,7 @@ makedocs(;
                 "Polarizing components"     => joinpath("basics", "components", "polarizers.md"),
             ],
             "Optical systems"               => joinpath("basics", "systems.md"),
+            "Automatic differentiation"     => joinpath("basics", "autodiff.md"),
             "Kinematics" => Any[
                 "Overview"                  => joinpath("basics", "kinematics", "kinematics.md"),
                 "Optical elements"          => joinpath("basics", "kinematics", "objects.md"),

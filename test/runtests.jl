@@ -49,6 +49,9 @@ include(joinpath(@__DIR__, "Components", "ConicMirrors", "TestParabolicMirror.jl
 include(joinpath(@__DIR__, "Components", "ConicMirrors", "TestEllipsoidalMirror.jl"))
 include(joinpath(@__DIR__, "Components", "ConicMirrors", "TestHyperbolicMirror.jl"))
 
+# Test automatic differentiation through the tracing
+include(joinpath(@__DIR__, "TestAutoDiff.jl"))
+
 # Test progress bars of long-running calls
 include(joinpath(@__DIR__, "TestProgress.jl"))
 
@@ -59,6 +62,7 @@ include(joinpath(@__DIR__, "E2E", "TestMichelson.jl"))
 include(joinpath(@__DIR__, "E2E", "TestMachZehnder.jl"))
 include(joinpath(@__DIR__, "E2E", "TestFraunhofer.jl"))
 include(joinpath(@__DIR__, "E2E", "TestAnalyticReferences.jl"))
+include(joinpath(@__DIR__, "TestBeamletFieldInMedia.jl"))
 
 # Test rendering
 # MUST stay first: TestRenderErrors.jl needs to run before anything loads the BMO Makie ext.
