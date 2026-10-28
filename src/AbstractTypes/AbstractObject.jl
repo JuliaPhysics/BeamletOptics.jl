@@ -32,6 +32,20 @@ is dispatched.
 `rotate3d!(::Movable, object, R::AbstractMatrix)` forward to the shape trait. A subtype can opt out of the
 kinematic API via `BeamletOptics.kinematic_trait_of(::Foo) = BeamletOptics.Static()`.
 
+A container (e.g. an [`ObjectGroup`](@ref)) moves its objects with the carried methods
+`translate3d!(object, offset, carried)` and `rotate3d!(object, R, pivot, carried)`, not with the primitives, see
+`translate3d!(::AbstractShape, offset, carried)`. A subtype that overrides the primitives to do more than move its
+shape (e.g. an [`AbstractDetector`](@ref) empties itself) must override these carried methods as well, otherwise
+that extra step is skipped whenever the object moves as part of a container:
+
+```julia
+function BeamletOptics.translate3d!(x::Foo, offset, carried::IdSet)
+    extra_step!(x)
+    BeamletOptics.translate3d!(BeamletOptics.shape_trait_of(x), x, offset, carried)
+    return nothing
+end
+```
+
 ## Functions:
 
 - [`interact3d`](@ref): defines the optical interaction, the return type must be `Nothing` or an [`AbstractInteraction`](@ref)
@@ -84,10 +98,11 @@ E.g. for a custom multi-shape object the user of this API needs to define:
 
 `BeamletOptics.shape(obj::MyObject) = (obj.front, obj.back)`
 
-!!! warning
-    Whenever your object consists of nested structures (e.g. other [`MultiShape`](@ref)s) 
-    it is the responsibility of the user to ensure that **each atomic shape, i.e. `SingleShape`, is only listed once**.
-    Failure to ensure this can lead to spurious behaviour when using the kinematic API.
+!!! note "Shared parts"
+    A part may be listed several times, e.g. through nested [`MultiShape`](@ref)s, or be shared with
+    another object, e.g. two fields that hold the same shape or an operand of a composite SDF that is
+    also listed on its own. The kinematic API moves every part once per motion, compared by identity
+    (`===`), see the carried motion in [`BeamletOptics.AbstractKinematicTrait`](@ref).
 """
 shape(object::AbstractObject) = shape(shape_trait_of(object), object)
 

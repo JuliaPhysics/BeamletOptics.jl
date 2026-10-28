@@ -171,3 +171,19 @@ function rotate3d!(::Movable, b::AbstractBeam, R::AbstractMatrix)
     foreach(c -> rotate3d!(c, R, p), _component_beams(b))
     return nothing
 end
+
+# Carried motion of a beam, e.g. in a beam group, see translate3d!(::AbstractShape, offset, carried)
+
+function translate3d!(b::AbstractBeam, offset, carried::IdSet)
+    if _mark_carried!(carried, b)
+        translate3d!(b, offset)
+    end
+    return nothing
+end
+
+function rotate3d!(b::AbstractBeam, R::AbstractMatrix, pivot::AbstractVector, carried::IdSet)
+    if _mark_carried!(carried, b)
+        rotate3d!(b, R, pivot)
+    end
+    return nothing
+end

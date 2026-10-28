@@ -108,8 +108,7 @@ end
 Moves all beams of the group and its `center` by `offset`. Every beam is reset to its untraced start state.
 """
 function translate3d!(::Movable, bg::AbstractBeamGroup, offset)
-    foreach(b -> translate3d!(b, offset), beams(bg))
-    position!(bg, position(bg) + offset)
+    translate3d!(bg, offset, IdSet{Any}())
     return nothing
 end
 
@@ -120,9 +119,23 @@ Rotates all beams of the group by `R` about the group `center` and updates the g
 [`orientation`](@ref) to `R * orientation(bg)`. Every beam is reset to its untraced start state.
 """
 function rotate3d!(::Movable, bg::AbstractBeamGroup, R::AbstractMatrix)
+    rotate3d!(bg, R, position(bg), IdSet{Any}())
+    return nothing
+end
+
+function translate3d!(bg::AbstractBeamGroup, offset, carried::IdSet)
+    _mark_carried!(carried, bg) || return nothing
+    foreach(b -> translate3d!(b, offset, carried), beams(bg))
+    position!(bg, position(bg) + offset)
+    return nothing
+end
+
+function rotate3d!(bg::AbstractBeamGroup, R::AbstractMatrix, pivot::AbstractVector, carried::IdSet)
+    _mark_carried!(carried, bg) || return nothing
     p = position(bg)
-    foreach(b -> rotate3d!(b, R, p), beams(bg))
+    foreach(b -> rotate3d!(b, R, pivot, carried), beams(bg))
     orientation!(bg, R * orientation(bg))
+    position!(bg, pivot + R * (p - pivot))
     return nothing
 end
 

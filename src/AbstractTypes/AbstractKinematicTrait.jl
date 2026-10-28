@@ -37,6 +37,17 @@ class from its own constructor. The container then takes that class: `Static` if
 are `Static`, else `Movable(`[`Oriented`](@ref)`())`. All shapes returned
 by `shape(object)` of a [`MultiShape`](@ref) object must be movable, since `MultiShape` objects
 (e.g. a `CubeBeamsplitter`) have no shared constructor to enforce this.
+
+# Carried motion
+
+A container moves its members with the carried methods `translate3d!(x, offset, carried)` and
+`rotate3d!(x, R, pivot, carried)` instead of the public commands. A container starts a rigid
+motion in its primitives with an empty `IdSet{Any}()` and passes it through all carried calls,
+so that a member that can be reached along several paths (a shape listed twice, the same object
+in two subgroups, an operand of a composite SDF that is also listed on its own) moves exactly
+once. A container type therefore implements carried methods that add the container itself to
+that set, move its own frame and carry its members with the same set, see
+`translate3d!(::AbstractShape, offset, carried)`.
 """
 abstract type AbstractKinematicTrait end
 
@@ -365,3 +376,18 @@ function rotate3d!(::Movable, x, axis::AbstractVector, θ::Real, pivot::Abstract
 end
 
 direction(::Movable{Oriented}, x) = Point3(orientation(x)[:, 2])
+
+# Carried motion: a container moves its members with the methods of translate3d!/rotate3d! that
+# take `carried::IdSet`, see AbstractKinematicTrait and translate3d!(::AbstractShape, offset, carried)
+
+"""
+    _mark_carried!(carried::IdSet, k) -> Bool
+
+Adds `k` to `carried` and returns `true` if it was not in it yet, i.e. if the current rigid
+motion still has to move `k`.
+"""
+function _mark_carried!(carried::IdSet, k)
+    k in carried && return false
+    push!(carried, k)
+    return true
+end

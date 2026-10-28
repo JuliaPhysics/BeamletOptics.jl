@@ -27,6 +27,7 @@ include(joinpath(@__DIR__, "Geometry", "SDFs", "TestSDFBoundingSpheres.jl"))
 # Test system and object containers
 include(joinpath(@__DIR__, "TestSystem.jl"))
 include(joinpath(@__DIR__, "TestObjectGroups.jl"))
+include(joinpath(@__DIR__, "TestSharedParts.jl"))
 include(joinpath(@__DIR__, "TestProperties.jl"))
 
 # Test lens models

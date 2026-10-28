@@ -58,3 +58,11 @@ The primitives `translate3d!(::Movable, x, offset)` and `rotate3d!(::Movable, x,
 - [`BeamletOptics.AbstractBeam`](@ref): either implement `_component_beams` or the two primitives; every move resets the beam via `empty!`
 - [`BeamletOptics.AbstractObjectGroup`](@ref): moves all members of `objects(group)` rigidly about the group `center`
 - [`BeamletOptics.AbstractBeamGroup`](@ref): moves its `beams` rigidly about the group `center`
+
+## Carried motion
+
+Containers (object groups, [`BeamletOptics.MultiShape`](@ref) objects, composite SDFs, beam groups) do not command their members with the primitives, they carry them along. Every member moves once per motion, even if it can be reached along several paths, e.g. an object in two subgroups. An object type that overrides the primitives also overrides the carried methods, see the `Kinematic` section of [`BeamletOptics.AbstractObject`](@ref).
+
+```@docs; canonical=false
+BeamletOptics.translate3d!(::BeamletOptics.AbstractShape, ::Any, ::IdSet)
+```

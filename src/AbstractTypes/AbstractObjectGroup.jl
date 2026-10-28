@@ -115,11 +115,12 @@ end
 """
     translate3d!(::Movable, group::AbstractObjectGroup, offset)
 
-Moves all objects of the `group` and its `center` by `offset`.
+Moves all objects of the `group` and its `center` by `offset`. An object that the `group` holds
+along several paths, e.g. in two subgroups, moves once, see the carried motion in
+[`BeamletOptics.AbstractKinematicTrait`](@ref).
 """
 function translate3d!(::Movable, group::AbstractObjectGroup, offset)
-    position!(group, position(group) .+ offset)
-    foreach(member -> translate3d!(member, offset), objects(group))
+    translate3d!(group, offset, IdSet{Any}())
     return nothing
 end
 
@@ -127,11 +128,27 @@ end
     rotate3d!(::Movable, group::AbstractObjectGroup, R::AbstractMatrix)
 
 Rotates all objects of the `group` by `R` about the group `center` and updates the group
-[`orientation`](@ref) to `R * orientation(group)`.
+[`orientation`](@ref) to `R * orientation(group)`. Every object rotates once, see
+`translate3d!(::Movable, group::AbstractObjectGroup, offset)`.
 """
 function rotate3d!(::Movable, group::AbstractObjectGroup, R::AbstractMatrix)
+    rotate3d!(group, R, position(group), IdSet{Any}())
+    return nothing
+end
+
+function translate3d!(group::AbstractObjectGroup, offset, carried::IdSet)
+    _mark_carried!(carried, group) || return nothing
+    position!(group, position(group) .+ offset)
+    foreach(member -> translate3d!(member, offset, carried), objects(group))
+    return nothing
+end
+
+function rotate3d!(group::AbstractObjectGroup, R::AbstractMatrix, pivot::AbstractVector, carried::IdSet)
+    _mark_carried!(carried, group) || return nothing
+    # Read the group center first, a nested group rotates it about the pivot of its parent
+    p = position(group)
     orientation!(group, R * orientation(group))
-    pivot = position(group)
-    foreach(member -> rotate3d!(member, R, pivot), objects(group))
+    position!(group, pivot + R * (p - pivot))
+    foreach(member -> rotate3d!(member, R, pivot, carried), objects(group))
     return nothing
 end
