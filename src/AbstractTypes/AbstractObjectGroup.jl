@@ -40,7 +40,8 @@ An `AbstractObjectGroup` is a container: it takes the kinematic class of its `ob
 [`BeamletOptics.Movable`](@ref) with an [`BeamletOptics.Oriented`](@ref) frame for movable objects, see
 [`BeamletOptics.AbstractKinematicTrait`](@ref). The constructors must check that the `objects` are either
 all static or all movable, e.g. with `allequal(BeamletOptics.is_static, objects)`. The primitives `translate3d!(::Movable, group, offset)` and
-`rotate3d!(::Movable, group, R::AbstractMatrix)` move all `objects` and the pose of the group.
+`rotate3d!(::Movable, group, R::AbstractMatrix)` move all `objects` and the pose of the group. A group that is
+nested in another group moves as a frame (`position!`/`orientation!`), its own primitives are not called then.
 """
 abstract type AbstractObjectGroup{T} end
 
@@ -118,7 +119,7 @@ end
 Unwinds the tree of `group` for one rigid motion, each node once, compared by identity (`===`):
 `frames` are `group` and its subgroups with members, whose `center` and `dir` move;
 `leaves` are the objects and empty subgroups, which are moved with their public verbs. Throws an
-`ArgumentError` before anything moves if a leaf is static or if two objects share a shape.
+`ArgumentError` before anything moves, see `_check_parts`.
 """
 function _unwind(group::AbstractObjectGroup)
     frames, leaves = Any[group], Any[]
@@ -128,20 +129,12 @@ function _unwind(group::AbstractObjectGroup)
         push!(seen, node)
         push!(isempty(children(node)) ? leaves : frames, node)
     end
-    # a shape held by two objects would move twice
-    owner = IdDict{Any, Any}()
-    for leaf in leaves
-        is_static(leaf) && _static_error(leaf)
-        for s in _shapes(leaf)
-            is_static(s) && _static_error(s)
-            get!(owner, s, leaf) === leaf || throw(ArgumentError(
-                lazy"two objects of the group share a $(nameof(typeof(s))), it would move twice"))
-        end
-    end
+    _check_parts(leaves)
     return frames, leaves
 end
 
-_shapes(::AbstractObjectGroup) = ()
+# an empty subgroup is a leaf without shapes
+_claim_shapes!(owner::IdDict, ::AbstractObjectGroup, part) = nothing
 
 """
     translate3d!(::Movable, group::AbstractObjectGroup, offset)

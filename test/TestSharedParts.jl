@@ -129,11 +129,16 @@ Rz(θ) = BMO.rotate3d([0, 0, 1], θ)
         @test isapprox(position(b), [1, 0, 1]; atol = 1e-12)
         rotate3d!(u, Rz(π / 2))
         @test isapprox(position(b), [0, 1, 1]; atol = 1e-12)
-        # known limit: an operand that is also the shape of another object moves twice
+        # an operand that is also the shape of another object would move twice
         a, b = BMO.SphereSDF(1.0), placed(BMO.SphereSDF(0.5), [1.0, 0, 0])
         g = ObjectGroup([Single(a + b), Single(b)])
-        translate3d!(g, [0, 0, 1.0])
-        @test_broken isapprox(position(b), [1, 0, 1]; atol = 1e-12)
+        @test_throws ArgumentError translate3d!(g, [0, 0, 1.0])
+        @test isapprox(position(b), [1, 0, 0]; atol = 1e-12)
+        # the same within one composite
+        a, b = BMO.SphereSDF(1.0), placed(BMO.SphereSDF(0.5), [1.0, 0, 0])
+        u = BMO.UnionSDF{Float64}(a + b, b)
+        @test_throws ArgumentError translate3d!(u, [0, 0, 1.0])
+        @test isapprox(position(b), [1, 0, 0]; atol = 1e-12)
     end
 
     @testset "Primitives of an object type apply in nested groups" begin
@@ -193,6 +198,39 @@ Rz(θ) = BMO.rotate3d([0, 0, 1], θ)
         g = ObjectGroup([Parts(s, cyl()), Single(s)])
         @test_throws ArgumentError translate3d!(g, [0, 0, 1.0])
         @test isapprox(position(s), [0, 0, 0]; atol = 1e-12)
+        # the shape is one level down, below an object part
+        s = cyl()
+        g = ObjectGroup([Parts(Single(s), cyl()), Single(s)])
+        @test_throws ArgumentError translate3d!(g, [0, 0, 1.0])
+        @test isapprox(position(s), [0, 0, 0]; atol = 1e-12)
+        # within one MultiShape object
+        s = cyl()
+        @test_throws ArgumentError translate3d!(Parts(Single(s), s), [0, 0, 1.0])
+        @test isapprox(position(s), [0, 0, 0]; atol = 1e-12)
+        # a cemented doublet and its own front lens
+        dl = SphericalDoubletLens(40mm, -30mm, -120mm, 6mm, 2.5mm, 25mm, _ -> 1.62, _ -> 1.72)
+        p_front, p_back = position(dl.front), position(dl.back)
+        g = ObjectGroup([dl, dl.front])
+        @test_throws ArgumentError translate3d!(g, [0, 0, 1.0])
+        @test isapprox(position(dl.front), p_front; atol = 1e-12)
+        @test isapprox(position(dl.back), p_back; atol = 1e-12)
+        # a static object two levels down
+        a = Single(cyl())
+        g = ObjectGroup([a, Parts(cyl(), Parts(cyl(), Fixed(cyl())))])
+        @test_throws ArgumentError translate3d!(g, [0, 0, 1.0])
+        @test isapprox(position(a), [0, 0, 0]; atol = 1e-12)
+        @test isapprox(position(g), [0, 0, 0]; atol = 1e-12)
+    end
+
+    @testset "Built-in MultiShape objects in a group" begin
+        dl = SphericalDoubletLens(40mm, -30mm, -120mm, 6mm, 2.5mm, 25mm, _ -> 1.62, _ -> 1.72)
+        cbs = CubeBeamsplitter(10mm, n -> 1.5)
+        pbs = RectangularPlateBeamsplitter(36mm, 25mm, 1mm, n -> 1.5)
+        p = [position(x) for x in (dl.front, dl.back, cbs, pbs)]
+        g = ObjectGroup([ObjectGroup([dl, cbs]), ObjectGroup([pbs, dl])])
+        translate3d!(g, [0, 0, 1.0])
+        q = [position(x) for x in (dl.front, dl.back, cbs, pbs)]
+        @test all(isapprox.(q .- p, Ref([0, 0, 1.0]); atol = 1e-12))
     end
 end
 

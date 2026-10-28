@@ -41,8 +41,10 @@ by `shape(object)` of a [`MultiShape`](@ref) object must be movable, since `Mult
 A container moves each of its members once per motion, also if a member is listed several times,
 compared by identity (`===`). An [`ObjectGroup`](@ref) first unwinds its tree: it moves the frames
 of its subgroups and calls the public verbs on every object once, such that the kinematic
-methods of an object type apply also within nested groups. A static member, or two objects that
-share a shape (see `shape`), throw an `ArgumentError` before anything moves.
+methods of an object type apply also within nested groups. Before anything moves, a container
+collects the shapes of its members recursively via `shape(object)` (down to the operands of
+composite SDFs) and throws an `ArgumentError` if a value at any level is static, or if two
+different members reach the same shape, see `shape`.
 """
 abstract type AbstractKinematicTrait end
 
