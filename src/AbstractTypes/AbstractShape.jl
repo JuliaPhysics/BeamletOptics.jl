@@ -66,37 +66,3 @@ function rotate3d!(::Movable, shape::AbstractShape, R::AbstractMatrix)
     orientation!(shape, R * orientation(shape))
     return nothing
 end
-
-"""
-    translate3d!(x, offset, carried::IdSet)
-    rotate3d!(x, R::AbstractMatrix, pivot::AbstractVector, carried::IdSet)
-
-Carried motion: moves `x` because its parent container moves, which is not a command to `x`
-itself. Containers ([`ObjectGroup`](@ref)s, [`MultiShape`](@ref) objects, composite SDFs and
-beam groups) move their members with these methods.
-
-`carried` holds every part that the current rigid motion has already moved, compared by identity
-(`===`). A part that can be reached along several paths, e.g. a shape listed twice by a
-`MultiShape` object or an object in two subgroups, therefore moves exactly once. A container
-starts a motion in its own primitive with an empty `IdSet{Any}()` and passes it on to its parts.
-
-For a shape or a beam, the member types without parts, the carried method calls the public
-`translate3d!(x, offset)` or `rotate3d!(x, R, pivot)` if `x` is not in `carried` yet. A container
-implements its own carried methods: it adds itself to `carried`, rotates its own frame about
-`pivot` (reading its `position` before its parts move) and carries its parts with the same
-`carried`. An object type that overrides the primitives, e.g. an [`AbstractDetector`](@ref) that
-empties itself, also overrides its carried methods, see [`AbstractObject`](@ref).
-"""
-function translate3d!(x::AbstractShape, offset, carried::IdSet)
-    if _mark_carried!(carried, x)
-        translate3d!(x, offset)
-    end
-    return nothing
-end
-
-function rotate3d!(x::AbstractShape, R::AbstractMatrix, pivot::AbstractVector, carried::IdSet)
-    if _mark_carried!(carried, x)
-        rotate3d!(x, R, pivot)
-    end
-    return nothing
-end

@@ -113,14 +113,47 @@ function set_pivot3d!(group::AbstractObjectGroup, pivot)
 end
 
 """
+    _unwind(group) -> (frames, leaves)
+
+Unwinds the tree of `group` for one rigid motion, each node once, compared by identity (`===`):
+`frames` are `group` and its subgroups with members, whose `center` and `dir` move;
+`leaves` are the objects and empty subgroups, which are moved with their public verbs. Throws an
+`ArgumentError` before anything moves if a leaf is static or if two objects share a shape.
+"""
+function _unwind(group::AbstractObjectGroup)
+    frames, leaves = Any[group], Any[]
+    seen = IdSet{Any}((group,))
+    for node in PreOrderDFS(group)
+        node in seen && continue
+        push!(seen, node)
+        push!(isempty(children(node)) ? leaves : frames, node)
+    end
+    # a shape held by two objects would move twice
+    owner = IdDict{Any, Any}()
+    for leaf in leaves
+        is_static(leaf) && _static_error(leaf)
+        for s in _shapes(leaf)
+            is_static(s) && _static_error(s)
+            get!(owner, s, leaf) === leaf || throw(ArgumentError(
+                lazy"two objects of the group share a $(nameof(typeof(s))), it would move twice"))
+        end
+    end
+    return frames, leaves
+end
+
+_shapes(::AbstractObjectGroup) = ()
+
+"""
     translate3d!(::Movable, group::AbstractObjectGroup, offset)
 
-Moves all objects of the `group` and its `center` by `offset`. An object that the `group` holds
-along several paths, e.g. in two subgroups, moves once, see the carried motion in
+Moves all objects of the `group` and its `center` by `offset`. Every object and subgroup moves
+once, also if the `group` holds it along several paths, see the containers in
 [`BeamletOptics.AbstractKinematicTrait`](@ref).
 """
 function translate3d!(::Movable, group::AbstractObjectGroup, offset)
-    translate3d!(group, offset, IdSet{Any}())
+    frames, leaves = _unwind(group)
+    foreach(g -> position!(g, position(g) .+ offset), frames)
+    foreach(x -> translate3d!(x, offset), leaves)
     return nothing
 end
 
@@ -128,27 +161,18 @@ end
     rotate3d!(::Movable, group::AbstractObjectGroup, R::AbstractMatrix)
 
 Rotates all objects of the `group` by `R` about the group `center` and updates the group
-[`orientation`](@ref) to `R * orientation(group)`. Every object rotates once, see
+[`orientation`](@ref) to `R * orientation(group)`. Every object and subgroup moves once, see
 `translate3d!(::Movable, group::AbstractObjectGroup, offset)`.
 """
 function rotate3d!(::Movable, group::AbstractObjectGroup, R::AbstractMatrix)
-    rotate3d!(group, R, position(group), IdSet{Any}())
-    return nothing
-end
-
-function translate3d!(group::AbstractObjectGroup, offset, carried::IdSet)
-    _mark_carried!(carried, group) || return nothing
-    position!(group, position(group) .+ offset)
-    foreach(member -> translate3d!(member, offset, carried), objects(group))
-    return nothing
-end
-
-function rotate3d!(group::AbstractObjectGroup, R::AbstractMatrix, pivot::AbstractVector, carried::IdSet)
-    _mark_carried!(carried, group) || return nothing
-    # Read the group center first, a nested group rotates it about the pivot of its parent
-    p = position(group)
-    orientation!(group, R * orientation(group))
-    position!(group, pivot + R * (p - pivot))
-    foreach(member -> rotate3d!(member, R, pivot, carried), objects(group))
+    pivot = position(group)
+    frames, leaves = _unwind(group)
+    for g in frames
+        # subgroup centers rotate about the pivot of `group`
+        p = position(g)
+        orientation!(g, R * orientation(g))
+        position!(g, pivot + R * (p - pivot))
+    end
+    foreach(x -> rotate3d!(x, R, pivot), leaves)
     return nothing
 end

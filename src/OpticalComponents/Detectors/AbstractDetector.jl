@@ -55,8 +55,7 @@ initialize!(d::AbstractDetector) = (empty!(d); nothing)
 Empties the `detector` (see `empty!`) and moves it by `offset`. Its hits lie on the surface
 where it was during the solve, hence they are discarded when it moves. All kinematic functions
 are derived from this one and [`rotate3d!`](@ref)`(::Movable, ::AbstractDetector, R)`, so each of
-them empties the detector. The carried methods empty it as well, i.e. also when it moves as a
-member of an [`ObjectGroup`](@ref), see [`AbstractObject`](@ref).
+them empties the detector, also when it moves as a member of an [`ObjectGroup`](@ref).
 """
 function translate3d!(::Movable, d::AbstractDetector, offset)
     empty!(d)
@@ -73,19 +72,5 @@ Empties the `detector` (see `empty!`) and rotates it by `R` about its `position`
 function rotate3d!(::Movable, d::AbstractDetector, R::AbstractMatrix)
     empty!(d)
     rotate3d!(shape_trait_of(d), d, R)
-    return nothing
-end
-
-# Carried motion, e.g. as a member of an ObjectGroup: emptying twice is harmless, so a detector
-# that is reached along several paths needs no check here
-function translate3d!(d::AbstractDetector, offset, carried::IdSet)
-    empty!(d)
-    translate3d!(shape_trait_of(d), d, offset, carried)
-    return nothing
-end
-
-function rotate3d!(d::AbstractDetector, R::AbstractMatrix, pivot::AbstractVector, carried::IdSet)
-    empty!(d)
-    rotate3d!(shape_trait_of(d), d, R, pivot, carried)
     return nothing
 end

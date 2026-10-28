@@ -56,13 +56,5 @@ The primitives `translate3d!(::Movable, x, offset)` and `rotate3d!(::Movable, x,
 - [`BeamletOptics.AbstractObject`](@ref): the primitives forward to the [`BeamletOptics.AbstractShapeTrait`](@ref) of the object, see [`BeamletOptics.SingleShape`](@ref) and [`BeamletOptics.MultiShape`](@ref)
 - [`BeamletOptics.AbstractRay`](@ref): only subtypes carrying direction-dependent data (e.g. the field vector of a [`PolarizedRay`](@ref)) need their own `rotate3d!`
 - [`BeamletOptics.AbstractBeam`](@ref): either implement `_component_beams` or the two primitives; every move resets the beam via `empty!`
-- [`BeamletOptics.AbstractObjectGroup`](@ref): moves all members of `objects(group)` rigidly about the group `center`
+- [`BeamletOptics.AbstractObjectGroup`](@ref): moves all members of `objects(group)` rigidly about the group `center`; it unwinds nested subgroups first and calls the public verbs on every object once, such that the primitives of an object type also apply within nested groups
 - [`BeamletOptics.AbstractBeamGroup`](@ref): moves its `beams` rigidly about the group `center`
-
-## Carried motion
-
-Containers (object groups, [`BeamletOptics.MultiShape`](@ref) objects, composite SDFs, beam groups) do not command their members with the primitives, they carry them along. Every member moves once per motion, even if it can be reached along several paths, e.g. an object in two subgroups. An object type that overrides the primitives also overrides the carried methods, see the `Kinematic` section of [`BeamletOptics.AbstractObject`](@ref).
-
-```@docs; canonical=false
-BeamletOptics.translate3d!(::BeamletOptics.AbstractShape, ::Any, ::IdSet)
-```

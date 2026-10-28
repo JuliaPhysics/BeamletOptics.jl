@@ -42,6 +42,10 @@ translate3d!(::SingleShape, object::AbstractObject, offset) = translate3d!(shape
 
 rotate3d!(::SingleShape, object::AbstractObject, R::AbstractMatrix) = rotate3d!(shape(object), R)
 
+"All shapes of `object` as an iterable, used to find shapes that two objects share."
+_shapes(object::AbstractObject) = _shapes(shape_trait_of(object), object)
+_shapes(::SingleShape, object::AbstractObject) = (shape(object),)
+
 """
     MultiShape <: AbstractShapeTrait
 
@@ -56,13 +60,6 @@ If `shape_trait_of(::Foo) = MultiShape()` is defined, `Foo` must implement the f
 - `shape(::Foo)`: a getter function that returns a `Tuple` of all relevant shapes, e.g. `(foo.front, foo.middle, foo.back)`
 
 All shapes returned by `shape(::Foo)` must be movable, see [`BeamletOptics.AbstractKinematicTrait`](@ref).
-
-The parts may be shared: a part listed several times, or also held by another part (e.g. an
-object on the same shape), is moved once per rigid motion, compared by identity (`===`), see
-the carried motion in [`BeamletOptics.AbstractKinematicTrait`](@ref). The kinematic primitives of
-`MultiShape` objects are their carried methods `translate3d!(object, offset, carried)` and
-`rotate3d!(object, R, pivot, carried)`; a `MultiShape` type with its own kinematics overrides
-these carried methods, since its parent moves it with them.
 
 # Additional information
 
@@ -81,14 +78,22 @@ position!(::MultiShape, object::AbstractObject, ::Any) = nothing
 orientation(::MultiShape, object::AbstractObject) = orientation(first(shape(object)))
 orientation!(::MultiShape, object::AbstractObject, ::Any) = nothing
 
+_shapes(::MultiShape, object::AbstractObject) = shape(object)
+
 """
     translate3d!(::MultiShape, object, offset)
 
-Moves all parts of the [`MultiShape`](@ref) `object` along the specified `offset` vector, each
-part once. The parts are carried along, see [`MultiShape`](@ref).
+Moves all parts of the [`MultiShape`](@ref) `object` along the specified `offset` vector, a part
+that `shape(object)` lists several times once.
 """
 function translate3d!(::MultiShape, object::AbstractObject, offset)
-    translate3d!(object, offset, IdSet{Any}())
+    parts = _unique_members(shape(object))
+    # Translate tracking vector
+    position!(object, position(object) .+ offset)
+    # Recursively translate all subparts
+    for subpart in parts
+        translate3d!(subpart, offset)
+    end
     return nothing
 end
 
@@ -96,61 +101,16 @@ end
     rotate3d!(::MultiShape, object, R::AbstractMatrix)
 
 All parts of the [`MultiShape`](@ref) `object` are rotated around the pivot center via the rotation matrix `R`,
-each part once. The parts are carried along, see [`MultiShape`](@ref).
+a part that `shape(object)` lists several times once.
 """
 function rotate3d!(::MultiShape, object::AbstractObject, R::AbstractMatrix)
-    rotate3d!(object, R, position(object), IdSet{Any}())
-    return nothing
-end
-
-# Carried motion of objects: dispatch on the shape trait
-
-function translate3d!(object::AbstractObject, offset, carried::IdSet)
-    translate3d!(shape_trait_of(object), object, offset, carried)
-    return nothing
-end
-
-function rotate3d!(object::AbstractObject, R::AbstractMatrix, pivot::AbstractVector, carried::IdSet)
-    rotate3d!(shape_trait_of(object), object, R, pivot, carried)
-    return nothing
-end
-
-# The shape is carried with the same set, so that an operand of a composite SDF that is also
-# listed elsewhere moves once
-function translate3d!(::SingleShape, object::AbstractObject, offset, carried::IdSet)
-    _mark_carried!(carried, object) || return nothing
-    translate3d!(shape(object), offset, carried)
-    return nothing
-end
-
-function rotate3d!(::SingleShape, object::AbstractObject, R::AbstractMatrix, pivot::AbstractVector,
-        carried::IdSet)
-    _mark_carried!(carried, object) || return nothing
-    rotate3d!(shape(object), R, pivot, carried)
-    return nothing
-end
-
-function translate3d!(::MultiShape, object::AbstractObject, offset, carried::IdSet)
-    _mark_carried!(carried, object) || return nothing
-    # Translate tracking vector
-    position!(object, position(object) .+ offset)
-    # Recursively translate all subparts
-    for subpart in shape(object)
-        translate3d!(subpart, offset, carried)
-    end
-    return nothing
-end
-
-function rotate3d!(::MultiShape, object::AbstractObject, R::AbstractMatrix, pivot::AbstractVector,
-        carried::IdSet)
-    _mark_carried!(carried, object) || return nothing
-    # Read the tracking position first, by default it is the position of the first subpart
-    p = position(object)
+    parts = _unique_members(shape(object))
+    # Update group orientation
     orientation!(object, R * orientation(object))
-    position!(object, pivot + R * (p - pivot))
     # Recursively rotate all subgroups and objects around the pivot point
-    for subpart in shape(object)
-        rotate3d!(subpart, R, pivot, carried)
+    pivot = position(object)
+    for subpart in parts
+        rotate3d!(subpart, R, pivot)
     end
     return nothing
 end

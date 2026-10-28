@@ -47,10 +47,14 @@ kinematic_trait_of(c::AbstractCompositeSDF) = _container_trait(operands(c))
 """
     translate3d!(::Movable, c::AbstractCompositeSDF, offset)
 
-Translates `c` and all of its [`operands`](@ref) by `offset`, a shared operand once.
+Translates `c` and all of its [`operands`](@ref) by `offset`, an operand listed several times once.
 """
 function translate3d!(::Movable, c::AbstractCompositeSDF, offset)
-    translate3d!(c, offset, IdSet{Any}())
+    ops = _unique_members(operands(c))
+    position!(c, position(c) .+ offset)
+    for s in ops
+        translate3d!(s, offset)
+    end
     return nothing
 end
 
@@ -58,31 +62,16 @@ end
     rotate3d!(::Movable, c::AbstractCompositeSDF, R::AbstractMatrix)
 
 Rotates `c` and all of its [`operands`](@ref) around `c`'s own origin (pivot), by the
-rotation matrix `R`, a shared operand once.
+rotation matrix `R`, an operand listed several times once.
 """
 function rotate3d!(::Movable, c::AbstractCompositeSDF, R::AbstractMatrix)
-    rotate3d!(c, R, position(c), IdSet{Any}())
-    return nothing
-end
-
-function translate3d!(c::AbstractCompositeSDF, offset, carried::IdSet)
-    _mark_carried!(carried, c) || return nothing
-    position!(c, position(c) .+ offset)
-    for s in operands(c)
-        translate3d!(s, offset, carried)
-    end
-    return nothing
-end
-
-function rotate3d!(c::AbstractCompositeSDF, R::AbstractMatrix, pivot::AbstractVector, carried::IdSet)
-    _mark_carried!(carried, c) || return nothing
-    p = position(c)
-    # Update group orientation and move the composite center about the pivot
+    ops = _unique_members(operands(c))
+    # Update group orientation
     orientation!(c, R * orientation(c))
-    position!(c, pivot + R * (p - pivot))
-    # Rotate all operands around the pivot
-    for s in operands(c)
-        rotate3d!(s, R, pivot, carried)
+    # Rotate all operands around the composite center
+    pivot = position(c)
+    for s in ops
+        rotate3d!(s, R, pivot)
     end
     return nothing
 end
