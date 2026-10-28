@@ -558,7 +558,8 @@ end
 """
     optical_power(agb)
 
-Compute the total integrated optical power of the beamlet at its start. For a Gaussian beamlet,
+Compute the total integrated optical power of the beamlet at its start, from the irradiance
+`n |E|² / (2 Z₀)` with the refractive index `n` of its first segment. For a Gaussian beamlet,
 this is typically constant through lossless propagation.
 """
 function optical_power(agb::AstigmaticGaussianBeamlet)
@@ -566,8 +567,9 @@ function optical_power(agb::AstigmaticGaussianBeamlet)
     (; area, scale) = _area_from_root(agb, 1, 0)
     E_amp = scale * norm(polarization(first(rays(agb.c))))
     # Corrected power: P = I_peak * π * w0x * w0y / 2
-    # We use the built-in intensity function to account for wave impedance
-    I_ref = intensity(E_amp)
+    # We use the built-in intensity function to account for the wave impedance Z₀ / n of the medium
+    n = refractive_index(first(rays(agb.c)))
+    I_ref = intensity(E_amp, Z_vacuum / n)
     return 0.5 * π * abs(area) * I_ref
 end
 
@@ -838,11 +840,13 @@ end
 """
     intensity(agb::AstigmaticGaussianBeamlet, r, z)
 
-Compute the optical intensity [W/m²] of the beamlet at position `(r, z)`.
+Compute the optical intensity `n |E|² / (2 Z₀)` [W/m²] of the beamlet at position `(r, z)`, with the refractive index `n` of the segment at `z`.
 """
 function intensity(agb::AstigmaticGaussianBeamlet, r::AbstractArray, z::Real)
     E = electric_field(agb, r, z)
-    return intensity(E)
+    # wave impedance Z₀ / n of the medium of the segment
+    n = refractive_index(agb, last(point_on_beam(agb, z)))
+    return intensity(E, Z_vacuum / n)
 end
 
 """

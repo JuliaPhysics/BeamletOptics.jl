@@ -101,7 +101,7 @@ function remove_render!(h::AbstractSystemRenderHandle, obj::ObjectOrGroup)
     parent = render_parent(h, obj)
     isnothing(parent) || throw(ArgumentError(
         "the $(nameof(typeof(obj))) is part of a $(nameof(typeof(parent))) of the system handle, remove the group instead"))
-    leaves = collect(Leaves(obj))
+    leaves = collect(_leaf_objects(obj))
     for oh in filter(oh -> _is_leaf_of(rendered(oh), leaves), render_children(h))
         remove_render!(oh)
         delete!(h, oh)

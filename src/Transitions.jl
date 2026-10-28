@@ -307,14 +307,12 @@ end
 _enclosing(e, ::Nothing) = e
 _enclosing(e, body::AbstractObject) = encloses(e, body) ? e : enter(e, body)
 
-# the index of the innermost body (read behind a function barrier), else the index `n` outside of all
-# bodies
+# the index of the innermost body in the number type `T` of the ray, e.g. a `ForwardDiff.Dual` within
+# automatic differentiation (read behind a function barrier), else the index `n` outside of all bodies
 _index(::Nothing, λ, n::T) where {T} = n
-_index(body, λ, n::T) where {T} = T(_medium_index(body, λ)::Float64)
+_index(body, λ, n::T) where {T} = convert(T, _medium_index(body, λ))::T
 
-_medium_index(part, λ) = _medium_index(medium(part), λ)
-_medium_index(::Nothing, λ) = NaN
-_medium_index(m::AbstractMedium, λ) = Float64(refractive_index(m, λ))
+_medium_index(part, λ) = refractive_index(medium(part), λ)
 
 """
     enclose_new!(system, beam, ray, interaction)
@@ -415,9 +413,9 @@ function cross_boundary(t::Transition, ::Beam{T, R}, ray::R) where {T <: Real, R
         return BeamInteraction{T, R}(hint_out(t), PolarizedRay{T}(hit_point(ray), direction(ray),
             nothing, wavelength(ray), n2, polarization(ray)))
     end
-    # angle of incidence in the first quadrant
-    θi = angle3d(direction(ray), -normal)
-    rs, rp, ts, tp = fresnel_coefficients(θi, n2 / n1)
+    # Fresnel coefficients from the cosine of the angle of incidence (in the 1. quadrant), which is
+    # smooth for automatic differentiation also at normal incidence
+    rs, rp, ts, tp = _fresnel_coefficients(cos_angle3d(direction(ray), -normal), n2 / n1)
     if is_internally_reflected(rp, rs)
         new_dir = reflection3d(direction(ray), normal)
         J = SPBasis(-rs, 0, 0, rp)

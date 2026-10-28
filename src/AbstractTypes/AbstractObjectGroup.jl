@@ -19,7 +19,8 @@ Subtypes of `AbstractObjectGroup` must implement the following:
 
 ## Fields:
 
-- `objects`: a tuple of [`AbstractObject`](@ref)s or additional subgroups, allows for hierarchical structures
+- `objects`: a tuple or a vector of [`AbstractObject`](@ref)s or additional subgroups, allows for hierarchical structures.
+  Only [`ObjectGroup`](@ref) can be changed after its construction, via `push!` and `delete!`.
 - `center`: a `Point3{T}` which is regarded as the reference origin (pivot) of the group
 - `dir`: a `SMatrix{3,3,T,9}` that describes the local coordinate system of the group
 
@@ -59,6 +60,21 @@ Exposes all objects/subgroups stored within the group.
 objects(group::AbstractObjectGroup) = group.objects
 
 AbstractTrees.children(group::AbstractObjectGroup) = objects(group)
+
+"""
+    _leaf_objects(tree)
+
+Iterates the objects at all depths of `tree`, an object, an object group or a collection of them.
+`Leaves(tree)` without the nodes that have no children but are no objects, i.e. empty groups and an
+empty collection.
+"""
+_leaf_objects(tree) = Iterators.filter(_is_object, Leaves(tree))
+
+_is_object(::AbstractObject) = true
+_is_object(::Any) = false
+
+# The type of `_leaf_objects(tree)`, e.g. of the objects of a `System`, see `intersect3d(parts, ray)`
+const _LeafObjects = Iterators.Filter{typeof(_is_object), <:Leaves}
 
 kinematic_trait_of(group::AbstractObjectGroup) = _container_trait(objects(group))
 

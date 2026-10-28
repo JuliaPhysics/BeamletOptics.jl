@@ -8,6 +8,13 @@ using AbstractTrees
 
 const BMO = BeamletOptics
 
+"Static test object: opts out of the kinematic API via its trait."
+struct StaticTestObject{T, S <: BMO.AbstractShape{T}} <: BMO.AbstractObject{T}
+    shape::S
+end
+StaticTestObject() = StaticTestObject(BMO.CylinderSDF(1e-3, 2e-3))
+BMO.kinematic_trait_of(::StaticTestObject) = BMO.Static()
+
 @testset "Object groups" begin
     mutable struct TestPoint{T} <: BMO.AbstractShape{T}
         pos::Point3{T}
@@ -145,7 +152,8 @@ const BMO = BeamletOptics
         @test objects isa BMO.ObjectOrGroup && center isa BMO.ObjectOrGroup
         @test !hasmethod(BMO.shape_trait_of, Tuple{typeof(objects)})
         @test !hasmethod(BMO.shape, Tuple{typeof(objects)})
-        @test BMO.objects(objects) === (center, circle)
+        @test BMO.objects(objects) isa Vector{BMO.ObjectOrGroup}
+        @test BMO.objects(objects)[1] === center && BMO.objects(objects)[2] === circle
         @test collect(AbstractTrees.children(objects)) == [center, circle]
         # only objects and groups are members, e.g. no shapes
         @test_throws TypeError ObjectGroup([center, BMO.CylinderSDF(1e-3, 2e-3)])
@@ -162,6 +170,138 @@ const BMO = BeamletOptics
         end
         @test ctr == n + 1
     end
+end
+
+@testset "push!, delete!, pop! and popat! of an ObjectGroup" begin
+    pose(x) = (copy(position(x)), copy(orientation(x)))
+    same(xs, ys) = length(xs) == length(ys) && all(xs[i] === ys[i] for i in eachindex(xs))
+    m1, m2, m3, m4 = (RoundPlanoMirror(10e-3, 2e-3) for _ in 1:4)
+    foreach(((i, m),) -> translate3d!(m, [0, 0.05i, 0]), enumerate((m1, m2, m3, m4)))
+    inner = ObjectGroup([m2])
+    g = ObjectGroup([m1, inner])
+    set_pivot3d!(g, [0.01, 0.02, 0.03])
+    zrotate3d!(g, deg2rad(20))
+    poses = IdDict{Any, Any}(o => pose(o) for o in (m1, m2, m3, m4, inner))
+    g_pose = pose(g)
+
+    # the constructor copies its argument
+    v = [m3]
+    h = ObjectGroup(v)
+    push!(h, m4)
+    @test length(v) == 1
+
+    @test push!(g, m3, m4) === g
+    @test same(BMO.objects(g), [m1, inner, m3, m4])
+    @test pose(g) == g_pose
+    @test all(pose(o) == poses[o] for o in (m1, m2, m3, m4, inner))
+    @test delete!(g, m3) === g
+    @test same(BMO.objects(g), [m1, inner, m4])
+    @test pose(m3) == poses[m3]
+    @test pose(g) == g_pose
+    # nothing happens for an object that is not part of the group
+    @test same(BMO.objects(delete!(g, m3)), [m1, inner, m4])
+
+    # refused changes leave the group as it was
+    before = copy(BMO.objects(g))
+    @test_throws "already part of the group" push!(g, m1)
+    @test_throws "already part of the group" push!(g, m2)  # within a subgroup
+    @test_throws "already part of the group" push!(g, m3, m3)
+    @test_throws "already part of the group" push!(g, g)
+    @test_throws "already part of the group" push!(inner, g)  # a group can not hold itself
+    @test_throws "already part of the group" push!(g, m3, ObjectGroup([m1]))
+    @test_throws "remove it from its subgroup" delete!(g, m2)
+    @test same(BMO.objects(g), before)
+    @test same(BMO.objects(inner), [m2])
+
+    # static and movable objects are not mixed
+    @test_throws ArgumentError push!(g, StaticTestObject())
+    @test same(BMO.objects(g), before)
+    sg = ObjectGroup([])
+    push!(sg, StaticTestObject())
+    @test BMO.is_static(sg)
+    @test_throws ArgumentError push!(sg, m3)
+    @test length(BMO.objects(sg)) == 1
+
+    # the last object can be removed
+    e = ObjectGroup([m3])
+    delete!(e, m3)
+    @test isempty(BMO.objects(e))
+    translate3d!(e, [1.0, 0, 0])
+    @test position(e) == [1.0, 0, 0]
+    @test pose(m3) == poses[m3]
+
+    # pop! and popat! remove at the top level, a subgroup counts as one
+    p = ObjectGroup([m3, inner, m4])
+    p_pose = pose(p)
+    @test pop!(p) === m4
+    @test popat!(p, 2) === inner
+    @test same(BMO.objects(p), [m3])
+    @test same(BMO.objects(inner), [m2])
+    @test_throws BoundsError popat!(p, 2)
+    @test pop!(p) === m3
+    @test_throws ArgumentError pop!(p)
+    @test pose(p) == p_pose
+    @test all(pose(o) == poses[o] for o in (m2, m3, m4, inner))
+
+    # tracing follows the objects of a group in a system
+    mirror = RoundPlanoMirror(10e-3, 2e-3)
+    translate3d!(mirror, [0, 0.1, 0])
+    mg = ObjectGroup([])
+    system = System([mg])
+    beam = Beam([0.0, 0, 0], [0.0, 1, 0], 1e-6)
+    solve_system!(system, beam)
+    @test isnothing(BMO.intersection(first(BMO.rays(beam))))
+    push!(mg, mirror)
+    solve_system!(system, beam)
+    @test BMO.object(BMO.intersection(first(BMO.rays(beam)))) === mirror
+    delete!(mg, mirror)
+    solve_system!(system, beam)
+    @test isnothing(BMO.intersection(first(BMO.rays(beam))))
+
+    # an empty group or subgroup is no object of its system, also after its last object was removed
+    a, b, c = (RoundPlanoMirror(10e-3, 2e-3) for _ in 1:3)
+    sub = ObjectGroup([a])
+    outer = ObjectGroup([sub, b])
+    es = System([outer])
+    delete!(sub, a)
+    @test same(collect(BMO.objects(es)), [b])
+    @test push!(es, a) === es
+    @test same(collect(BMO.objects(es)), [b, a])
+    @test pop!(outer) === b
+    @test same(collect(BMO.objects(es)), [a])
+    @test_throws "already an object of the system" push!(es, ObjectGroup([ObjectGroup([]), a]))
+    push!(es, b)
+    @test same(collect(BMO.objects(es)), [a, b])
+    @test isempty(collect(BMO.objects(System([ObjectGroup([ObjectGroup([])])]))))
+    @test same(collect(BMO.objects(push!(System([ObjectGroup([])]), c))), [c])
+
+    # a StaticSystem keeps the objects that its groups had when it was built, without empty groups
+    d = RoundPlanoMirror(10e-3, 2e-3)
+    cg = ObjectGroup([c])
+    ss = StaticSystem([ObjectGroup([]), cg])
+    @test same(BMO.objects(ss), [c])
+    push!(cg, d)
+    @test same(BMO.objects(ss), [c])
+
+    # added objects join the current frame of the group: resetting it moves them as well
+    r1, r2 = (RoundPlanoMirror(10e-3, 2e-3) for _ in 1:2)
+    rg = ObjectGroup([r1])
+    zrotate3d!(rg, deg2rad(30))
+    translate3d!(r2, [0.03, 0, 0])
+    push!(rg, r2)
+    reset_rotation3d!(rg)
+    Rz = [cosd(30) -sind(30) 0; sind(30) cosd(30) 0; 0 0 1]
+    @test orientation(r2) ≈ transpose(Rz)
+    @test position(r2) ≈ transpose(Rz) * [0.03, 0, 0]
+    @test orientation(r1) ≈ I
+    t1, t2 = (RoundPlanoMirror(10e-3, 2e-3) for _ in 1:2)
+    tg = ObjectGroup([t1])
+    translate3d!(tg, [0.005, 0, 0])
+    translate3d!(t2, [0, 0.05, 0])
+    push!(tg, t2)
+    reset_translation3d!(tg)
+    @test position(t2) ≈ [-0.005, 0.05, 0]
+    @test position(t1) ≈ zeros(3)
 end
 
 @testset "rotate3d! about an arbitrary pivot" begin
