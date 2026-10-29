@@ -142,7 +142,7 @@ The objects that the `ray` hits within `get_coincidence_tolerance()` of the clos
 faces, are its [`coincident_hits`](@ref). An object whose bounding sphere the `ray` enters only beyond
 the closest hit found so far is not tested.
 """
-@inline trace_all(system::AbstractSystem, ray::AbstractRay{R}) where {R} =
+@inline trace_all(system::AbstractSystem, ray::AbstractRay) =
     closest_hits(_top_level(system), ray, nothing, nothing)
 
 """
@@ -194,16 +194,8 @@ Returns the chain of [`coincident_hits`](@ref) `hit` with the hit of the shape `
 holds one, else `hit` unchanged. No hit (`nothing`) stays `nothing`.
 """
 function first_of_shape(hit::Intersection, s)
-    shape(hit) === s && return hit
-    prev = hit
-    while !isnothing(prev.next)
-        current = prev.next
-        if shape(current) === s
-            prev.next = current.next
-            current.next = hit
-            return current
-        end
-        prev = current
+    for h in coincident_hits(hit)
+        shape(h) === s && return first_of(hit, h)
     end
     return hit
 end

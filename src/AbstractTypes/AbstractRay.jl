@@ -83,30 +83,31 @@ Base.iterate(::CoincidentHits, next::Intersection) = (next, next.next)
 Base.iterate(::CoincidentHits, ::Nothing) = nothing
 
 """
-    merge_hits(a::Intersection, b::Intersection, tol = get_coincidence_tolerance())
+    merge_hits(a, b, tol = get_coincidence_tolerance())
 
-Merges the hits `a` and `b` of the same ray, each possibly a chain of [`coincident_hits`](@ref), into
-one chain. Its first hit is the closer of `a` and `b`, `a` if both lie equally far. It holds all hits of
-both chains within `tol` of the first hit, the others are dropped. The chains are linked anew, hence
-`a` and `b` must not be used afterwards.
+Merges the hits `a` and `b` of the same ray, each `nothing` or a chain of [`coincident_hits`](@ref),
+into one chain. Its first hit is the closer of `a` and `b`, `a` if both lie equally far. It holds all
+hits of both chains within `tol` of the first hit, the others are dropped. The chains are linked anew,
+hence `a` and `b` must not be used afterwards.
 """
-function merge_hits(a::Intersection, b::Intersection, tol = get_coincidence_tolerance())
+merge_hits(a, b) = merge_hits(a, b, get_coincidence_tolerance())
+
+function merge_hits(a::Intersection, b::Intersection, tol)
     head, other = length(b) < length(a) ? (b, a) : (a, b)
     return append_hits!(head, other, tol)
 end
 
-merge_hits(a::Intersection, ::Nothing, tol = get_coincidence_tolerance()) = a
-merge_hits(::Nothing, b::Intersection, tol = get_coincidence_tolerance()) = b
-merge_hits(::Nothing, ::Nothing, tol = get_coincidence_tolerance()) = nothing
+merge_hits(a::Intersection, ::Nothing, tol) = a
+merge_hits(::Nothing, b, tol) = b
 
 """
-    append_hits!(head::Intersection, other::Intersection, tol = get_coincidence_tolerance())
+    append_hits!(head::Intersection, other::Intersection, tol)
 
 Appends the hits of the chain `other` that lie within `tol` of the first hit of `head` to the chain of
 `head`, which stays the first hit. A hit of a shape that the chain holds already is dropped. A hit
 without a shape (the `shape` of an [`Intersection`](@ref) is optional) is always kept.
 """
-function append_hits!(head::Intersection, other::Intersection, tol = get_coincidence_tolerance())
+function append_hits!(head::Intersection, other::Intersection, tol)
     t0 = length(head)
     tail = head
     while !isnothing(tail.next)
@@ -125,7 +126,21 @@ function append_hits!(head::Intersection, other::Intersection, tol = get_coincid
     return head
 end
 
-append_hits!(head::Intersection, ::Nothing, tol = get_coincidence_tolerance()) = head
+"""
+    first_of(hit::Intersection, chosen::Intersection)
+
+Returns the chain of [`coincident_hits`](@ref) `hit` with its hit `chosen` first.
+"""
+function first_of(hit::Intersection, chosen::Intersection)
+    chosen === hit && return hit
+    prev = hit
+    while prev.next !== chosen
+        prev = prev.next
+    end
+    prev.next = chosen.next
+    chosen.next = hit
+    return chosen
+end
 
 # whether a hit of the chain `head` belongs to `s`, compared by identity
 _holds_shape(head::Intersection, s) = any(hit -> shape(hit) === s, coincident_hits(head))
