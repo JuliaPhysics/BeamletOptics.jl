@@ -42,22 +42,19 @@ translate3d!(::SingleShape, object::AbstractObject, offset) = translate3d!(shape
 
 rotate3d!(::SingleShape, object::AbstractObject, R::AbstractMatrix) = rotate3d!(shape(object), R)
 
-"The parts that `shape(object)` returns, as an iterable: shapes or, e.g. for a `DoubletLens`, objects."
-_shapes(object::AbstractObject) = _shapes(shape_trait_of(object), object)
-_shapes(::SingleShape, object::AbstractObject) = (shape(object),)
-
 """
-    _check_parts(parts)
+    _movable_parts(parts) -> Vector
 
-Checks the `parts` of one rigid motion before anything moves. Throws an `ArgumentError` if a
-part, or an object or shape below it, is static, or if two different `parts` reach the same
-shape, compared by identity (`===`), since that shape would then move twice. The shapes are
-collected recursively via `shape(object)`, down to the operands of composite SDFs.
+Returns the `parts` of one rigid motion in their order, each once, compared by identity (`===`).
+Throws an `ArgumentError` before anything moves if a part, or an object or shape below it, is
+static, or if two different parts reach the same shape, which would then move twice. The shapes
+are collected recursively via `shape(object)`, down to the operands of composite SDFs.
 """
-function _check_parts(parts)
+function _movable_parts(parts::Union{Tuple, AbstractVector})
+    unique_parts = unique(objectid, parts)
     owner = IdDict{Any, Any}()
-    foreach(p -> _claim_shapes!(owner, p, p), parts)
-    return nothing
+    foreach(part -> _claim_shapes!(owner, part, part), unique_parts)
+    return unique_parts
 end
 
 """
@@ -66,11 +63,13 @@ end
 Records `part` as the owner of every shape below `x` and throws an `ArgumentError` if a shape
 already belongs to another part, or if `x` or a value below it is static.
 """
-function _claim_shapes!(owner::IdDict, x::AbstractObject, part)
-    is_static(x) && _static_error(x)
-    foreach(s -> _claim_shapes!(owner, s, part), _shapes(x))
+function _claim_shapes!(owner::IdDict, object::AbstractObject, part)
+    is_static(object) && _static_error(object)
+    _claim_shapes!(shape_trait_of(object), owner, object, part)
     return nothing
 end
+
+_claim_shapes!(::SingleShape, owner::IdDict, object::AbstractObject, part) = _claim_shapes!(owner, shape(object), part)
 
 function _claim_shapes!(owner::IdDict, s::AbstractShape, part)
     is_static(s) && _static_error(s)
@@ -111,7 +110,10 @@ position!(::MultiShape, object::AbstractObject, ::Any) = nothing
 orientation(::MultiShape, object::AbstractObject) = orientation(first(shape(object)))
 orientation!(::MultiShape, object::AbstractObject, ::Any) = nothing
 
-_shapes(::MultiShape, object::AbstractObject) = shape(object)
+function _claim_shapes!(::MultiShape, owner::IdDict, object::AbstractObject, part)
+    foreach(s -> _claim_shapes!(owner, s, part), shape(object))
+    return nothing
+end
 
 """
     translate3d!(::MultiShape, object, offset)
@@ -120,8 +122,7 @@ Moves all parts of the [`MultiShape`](@ref) `object` along the specified `offset
 that `shape(object)` lists several times once.
 """
 function translate3d!(::MultiShape, object::AbstractObject, offset)
-    parts = _unique_members(shape(object))
-    _check_parts(parts)
+    parts = _movable_parts(shape(object))
     # Translate tracking vector
     position!(object, position(object) .+ offset)
     # Recursively translate all subparts
@@ -138,8 +139,7 @@ All parts of the [`MultiShape`](@ref) `object` are rotated around the pivot cent
 a part that `shape(object)` lists several times once.
 """
 function rotate3d!(::MultiShape, object::AbstractObject, R::AbstractMatrix)
-    parts = _unique_members(shape(object))
-    _check_parts(parts)
+    parts = _movable_parts(shape(object))
     # Update group orientation
     orientation!(object, R * orientation(object))
     # Recursively rotate all subgroups and objects around the pivot point

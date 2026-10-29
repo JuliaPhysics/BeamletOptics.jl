@@ -18,7 +18,7 @@ Parts(parts...) = Parts{Float64, typeof(parts)}(parts)
 BMO.shape_trait_of(::Parts) = BMO.MultiShape()
 BMO.shape(p::Parts) = p.parts
 
-"SingleShape test object on a given, possibly shared, shape."
+"SingleShape test object on a given, possibly shared, shape. Two `Single`s on the same shape are `===`."
 struct Single{T, S <: BMO.AbstractShape{T}} <: BMO.AbstractObject{T}
     shape::S
 end
@@ -57,13 +57,13 @@ placed(x, p) = (translate3d!(x, p); x)
 
 Rz(θ) = BMO.rotate3d([0, 0, 1], θ)
 
-@testset "Shared parts" begin
+@testset "Issue#46" begin
     @testset "Shape listed twice" begin
         s1, s2 = cyl(), placed(cyl(), [1.0, 0, 0])
         o = Parts(s1, s2, s2)
         translate3d!(o, [0, 0, 1.0])
         @test isapprox(position(s2), [1, 0, 1]; atol = 1e-12)
-        # about position(o) = position(s1)
+        # About position(s1)
         rotate3d!(o, Rz(π / 2))
         @test isapprox(position(s2), [0, 1, 1]; atol = 1e-12)
         @test isapprox(orientation(s2), Rz(π / 2); atol = 1e-12)
@@ -75,11 +75,11 @@ Rz(θ) = BMO.rotate3d([0, 0, 1], θ)
         translate3d!(g, [0, 0, 1.0])
         @test isapprox(position(x), [1, 0, 1]; atol = 1e-12)
         @test isapprox(position(g), [0, 0, 1]; atol = 1e-12)
-        # about the group center, which moved to (0, 0, 1)
+        # About moved group center
         rotate3d!(g, Rz(π / 2))
         @test isapprox(position(x), [0, 1, 1]; atol = 1e-12)
         @test isapprox(orientation(x), Rz(π / 2); atol = 1e-12)
-        # derived verbs are built from the primitives and move x once as well
+        # Derived verbs move once
         rotate3d!(g, [0, 0, 1], -π / 2, [0, 0, 1])
         @test isapprox(position(x), [1, 0, 1]; atol = 1e-12)
         @test isapprox(orientation(x), I; atol = 1e-12)
@@ -129,12 +129,12 @@ Rz(θ) = BMO.rotate3d([0, 0, 1], θ)
         @test isapprox(position(b), [1, 0, 1]; atol = 1e-12)
         rotate3d!(u, Rz(π / 2))
         @test isapprox(position(b), [0, 1, 1]; atol = 1e-12)
-        # an operand that is also the shape of another object would move twice
+        # Operand shared with another object
         a, b = BMO.SphereSDF(1.0), placed(BMO.SphereSDF(0.5), [1.0, 0, 0])
         g = ObjectGroup([Single(a + b), Single(b)])
         @test_throws ArgumentError translate3d!(g, [0, 0, 1.0])
         @test isapprox(position(b), [1, 0, 0]; atol = 1e-12)
-        # the same within one composite
+        # Shared within one composite
         a, b = BMO.SphereSDF(1.0), placed(BMO.SphereSDF(0.5), [1.0, 0, 0])
         u = BMO.UnionSDF{Float64}(a + b, b)
         @test_throws ArgumentError translate3d!(u, [0, 0, 1.0])
@@ -148,7 +148,7 @@ Rz(θ) = BMO.rotate3d([0, 0, 1], θ)
         @test c.calls == 1
         @test isapprox(position(c), [0, 0, 1]; atol = 1e-12)
         zrotate3d!(g, π / 2)
-        # a rotation about the group pivot is derived from rotate3d! and translate3d!
+        # Pivot rotation calls both primitives
         @test c.calls == 3
         o = Parts(cyl())
         g = ObjectGroup([o, ObjectGroup([c])])
@@ -174,7 +174,7 @@ Rz(θ) = BMO.rotate3d([0, 0, 1], θ)
     end
 
     @testset "Errors before anything moves" begin
-        # a static object as a part of a MultiShape object
+        # Static object as a part
         s = cyl()
         o = Parts(s, Fixed(cyl()))
         @test_throws ArgumentError translate3d!(o, [0, 0, 1.0])
@@ -183,8 +183,7 @@ Rz(θ) = BMO.rotate3d([0, 0, 1], θ)
         @test isapprox(position(s), [0, 0, 0]; atol = 1e-12)
         @test isapprox(orientation(s), I; atol = 1e-12)
         @test isapprox(orientation(g), I; atol = 1e-12)
-        # two objects on the same shape; two `Single(shared)` would be one object, since an
-        # immutable struct with the same fields is `===`
+        # Two objects on one shape
         x = Single(placed(cyl(), [1.0, 0, 0]))
         shared = cyl()
         g = ObjectGroup([x, ObjectGroup([Single(shared), Counting(shared)])])
@@ -193,28 +192,28 @@ Rz(θ) = BMO.rotate3d([0, 0, 1], θ)
         @test isapprox(position(x), [1, 0, 0]; atol = 1e-12)
         @test isapprox(position(shared), [0, 0, 0]; atol = 1e-12)
         @test isapprox(position(g), [0, 0, 0]; atol = 1e-12)
-        # a MultiShape object and a SingleShape object on one of its shapes
+        # MultiShape and SingleShape on one shape
         s = cyl()
         g = ObjectGroup([Parts(s, cyl()), Single(s)])
         @test_throws ArgumentError translate3d!(g, [0, 0, 1.0])
         @test isapprox(position(s), [0, 0, 0]; atol = 1e-12)
-        # the shape is one level down, below an object part
+        # Shape below an object part
         s = cyl()
         g = ObjectGroup([Parts(Single(s), cyl()), Single(s)])
         @test_throws ArgumentError translate3d!(g, [0, 0, 1.0])
         @test isapprox(position(s), [0, 0, 0]; atol = 1e-12)
-        # within one MultiShape object
+        # Within one MultiShape object
         s = cyl()
         @test_throws ArgumentError translate3d!(Parts(Single(s), s), [0, 0, 1.0])
         @test isapprox(position(s), [0, 0, 0]; atol = 1e-12)
-        # a cemented doublet and its own front lens
+        # Doublet and its own front lens
         dl = SphericalDoubletLens(40mm, -30mm, -120mm, 6mm, 2.5mm, 25mm, _ -> 1.62, _ -> 1.72)
         p_front, p_back = position(dl.front), position(dl.back)
         g = ObjectGroup([dl, dl.front])
         @test_throws ArgumentError translate3d!(g, [0, 0, 1.0])
         @test isapprox(position(dl.front), p_front; atol = 1e-12)
         @test isapprox(position(dl.back), p_back; atol = 1e-12)
-        # a static object two levels down
+        # Static object two levels down
         a = Single(cyl())
         g = ObjectGroup([a, Parts(cyl(), Parts(cyl(), Fixed(cyl())))])
         @test_throws ArgumentError translate3d!(g, [0, 0, 1.0])

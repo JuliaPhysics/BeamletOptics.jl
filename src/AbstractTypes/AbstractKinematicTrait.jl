@@ -38,13 +38,9 @@ are `Static`, else `Movable(`[`Oriented`](@ref)`())`. All shapes returned
 by `shape(object)` of a [`MultiShape`](@ref) object must be movable, since `MultiShape` objects
 (e.g. a `CubeBeamsplitter`) have no shared constructor to enforce this.
 
-A container moves each of its members once per motion, also if a member is listed several times,
-compared by identity (`===`). An [`ObjectGroup`](@ref) first unwinds its tree: it moves the frames
-of its subgroups and calls the public verbs on every object once, such that the kinematic
-methods of an object type apply also within nested groups. Before anything moves, a container
-collects the shapes of its members recursively via `shape(object)` (down to the operands of
-composite SDFs) and throws an `ArgumentError` if a value at any level is static, or if two
-different members reach the same shape, see `shape`.
+A container moves each of its members once per motion, compared by identity (`===`). Two members
+that reach the same shape, or a static value at any level, throw an `ArgumentError` before
+anything moves, see `shape`.
 """
 abstract type AbstractKinematicTrait end
 
@@ -193,25 +189,6 @@ members are static, else `Movable(Oriented())`.
 _container_trait(members) = (!isempty(members) && is_static(first(members))) ? Static() : Movable(Oriented())
 
 _static_error(x) = throw(ArgumentError(lazy"$(typeof(x)) is static and cannot be moved, see `kinematic_trait_of`"))
-
-"""
-    _unique_members(members) -> Vector
-
-Returns the `members` of a container in their order, each once, compared by identity (`===`).
-Throws an `ArgumentError` for a static member, before the container moves anything.
-"""
-function _unique_members(members)
-    seen = IdSet{Any}()
-    # keeps the element type, e.g. of the beams of a beam group
-    unique = eltype(members)[]
-    for m in members
-        m in seen && continue
-        is_static(m) && _static_error(m)
-        push!(seen, m)
-        push!(unique, m)
-    end
-    return unique
-end
 
 # entry point functions below
 

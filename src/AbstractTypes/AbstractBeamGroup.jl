@@ -109,7 +109,7 @@ Moves all beams of the group and its `center` by `offset`, a beam listed several
 Every beam is reset to its untraced start state.
 """
 function translate3d!(::Movable, bg::AbstractBeamGroup, offset)
-    foreach(b -> translate3d!(b, offset), _unique_members(beams(bg)))
+    foreach(b -> translate3d!(b, offset), unique(objectid, beams(bg)))
     position!(bg, position(bg) + offset)
     return nothing
 end
@@ -123,7 +123,7 @@ reset to its untraced start state.
 """
 function rotate3d!(::Movable, bg::AbstractBeamGroup, R::AbstractMatrix)
     p = position(bg)
-    foreach(b -> rotate3d!(b, R, p), _unique_members(beams(bg)))
+    foreach(b -> rotate3d!(b, R, p), unique(objectid, beams(bg)))
     orientation!(bg, R * orientation(bg))
     return nothing
 end

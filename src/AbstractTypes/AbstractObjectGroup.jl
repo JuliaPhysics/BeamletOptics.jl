@@ -114,27 +114,17 @@ function set_pivot3d!(group::AbstractObjectGroup, pivot)
 end
 
 """
-    _unwind(group) -> (frames, leaves)
+    _unwind(group) -> (subgroups, leaves)
 
 Unwinds the tree of `group` for one rigid motion, each node once, compared by identity (`===`):
-`frames` are `group` and its subgroups with members, whose `center` and `dir` move;
-`leaves` are the objects and empty subgroups, which are moved with their public verbs. Throws an
-`ArgumentError` before anything moves, see `_check_parts`.
+the `subgroups`, including `group`, move their `center` and `dir`; the `leaves` are its objects,
+which are moved with their public verbs, see `_movable_parts`.
 """
 function _unwind(group::AbstractObjectGroup)
-    frames, leaves = Any[group], Any[]
-    seen = IdSet{Any}((group,))
-    for node in PreOrderDFS(group)
-        node in seen && continue
-        push!(seen, node)
-        push!(isempty(children(node)) ? leaves : frames, node)
-    end
-    _check_parts(leaves)
-    return frames, leaves
+    subgroups = unique(objectid, Iterators.filter(!_is_object, PreOrderDFS(group)))
+    leaves = _movable_parts(collect(_leaf_objects(group)))
+    return subgroups, leaves
 end
-
-# an empty subgroup is a leaf without shapes
-_claim_shapes!(owner::IdDict, ::AbstractObjectGroup, part) = nothing
 
 """
     translate3d!(::Movable, group::AbstractObjectGroup, offset)
@@ -144,9 +134,9 @@ once, also if the `group` holds it along several paths, see the containers in
 [`BeamletOptics.AbstractKinematicTrait`](@ref).
 """
 function translate3d!(::Movable, group::AbstractObjectGroup, offset)
-    frames, leaves = _unwind(group)
-    foreach(g -> position!(g, position(g) .+ offset), frames)
-    foreach(x -> translate3d!(x, offset), leaves)
+    subgroups, leaves = _unwind(group)
+    foreach(subgroup -> position!(subgroup, position(subgroup) .+ offset), subgroups)
+    foreach(object -> translate3d!(object, offset), leaves)
     return nothing
 end
 
@@ -159,13 +149,13 @@ Rotates all objects of the `group` by `R` about the group `center` and updates t
 """
 function rotate3d!(::Movable, group::AbstractObjectGroup, R::AbstractMatrix)
     pivot = position(group)
-    frames, leaves = _unwind(group)
-    for g in frames
-        # subgroup centers rotate about the pivot of `group`
-        p = position(g)
-        orientation!(g, R * orientation(g))
-        position!(g, pivot + R * (p - pivot))
+    subgroups, leaves = _unwind(group)
+    for subgroup in subgroups
+        # Rotate center about pivot
+        p = position(subgroup)
+        orientation!(subgroup, R * orientation(subgroup))
+        position!(subgroup, pivot + R * (p - pivot))
     end
-    foreach(x -> rotate3d!(x, R, pivot), leaves)
+    foreach(object -> rotate3d!(object, R, pivot), leaves)
     return nothing
 end
