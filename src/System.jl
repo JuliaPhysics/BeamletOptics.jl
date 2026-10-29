@@ -142,7 +142,7 @@ The objects that the `ray` hits within `get_coincidence_tolerance()` of the clos
 faces, are its [`coincident_hits`](@ref). An object whose bounding sphere the `ray` enters only beyond
 the closest hit found so far is not tested.
 """
-@inline trace_all(system::AbstractSystem, ray::AbstractRay{R}) where {R} =
+@inline trace_all(system::AbstractSystem, ray::AbstractRay) =
     closest_hits(_top_level(system), ray, nothing, nothing)
 
 """

@@ -79,22 +79,6 @@ function first_to_interact(hit::Intersection, ray::AbstractRay)
 end
 
 """
-    first_of(hit, chosen)
-
-Returns the chain of [`coincident_hits`](@ref) `hit` with the hit `chosen` of the chain first.
-"""
-function first_of(hit::Intersection, chosen::Intersection)
-    chosen === hit && return hit
-    prev = hit
-    while prev.next !== chosen
-        prev = prev.next
-    end
-    prev.next = chosen.next
-    chosen.next = hit
-    return chosen
-end
-
-"""
     Transition{T}
 
 The boundary that a ray crosses at its [`Intersection`](@ref): the medium on each side and the thin
