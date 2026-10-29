@@ -37,6 +37,10 @@ class from its own constructor. The container then takes that class: `Static` if
 are `Static`, else `Movable(`[`Oriented`](@ref)`())`. All shapes returned
 by `shape(object)` of a [`MultiShape`](@ref) object must be movable, since `MultiShape` objects
 (e.g. a `CubeBeamsplitter`) have no shared constructor to enforce this.
+
+A container moves each of its members once per motion, compared by identity (`===`). Two members
+that reach the same shape, or a static value at any level, throw an `ArgumentError` before
+anything moves, see `shape`.
 """
 abstract type AbstractKinematicTrait end
 

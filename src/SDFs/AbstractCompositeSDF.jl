@@ -44,14 +44,22 @@ to be either all static or all movable, see [`BeamletOptics.AbstractKinematicTra
 """
 kinematic_trait_of(c::AbstractCompositeSDF) = _container_trait(operands(c))
 
+# Claim composite and its operands
+function _claim_shapes!(owner::IdDict, c::AbstractCompositeSDF, part)
+    invoke(_claim_shapes!, Tuple{IdDict, AbstractShape, Any}, owner, c, part)
+    foreach(s -> _claim_shapes!(owner, s, part), operands(c))
+    return nothing
+end
+
 """
     translate3d!(::Movable, c::AbstractCompositeSDF, offset)
 
-Translates `c` and all of its [`operands`](@ref) by `offset`.
+Translates `c` and all of its [`operands`](@ref) by `offset`, an operand listed several times once.
 """
 function translate3d!(::Movable, c::AbstractCompositeSDF, offset)
+    ops = _movable_parts(operands(c))
     position!(c, position(c) .+ offset)
-    for s in operands(c)
+    for s in ops
         translate3d!(s, offset)
     end
     return nothing
@@ -61,14 +69,15 @@ end
     rotate3d!(::Movable, c::AbstractCompositeSDF, R::AbstractMatrix)
 
 Rotates `c` and all of its [`operands`](@ref) around `c`'s own origin (pivot), by the
-rotation matrix `R`.
+rotation matrix `R`, an operand listed several times once.
 """
 function rotate3d!(::Movable, c::AbstractCompositeSDF, R::AbstractMatrix)
+    ops = _movable_parts(operands(c))
     # Update group orientation
     orientation!(c, R * orientation(c))
     # Rotate all operands around the composite center
     pivot = position(c)
-    for s in operands(c)
+    for s in ops
         rotate3d!(s, R, pivot)
     end
     return nothing

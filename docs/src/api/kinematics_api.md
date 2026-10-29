@@ -56,5 +56,20 @@ The primitives `translate3d!(::Movable, x, offset)` and `rotate3d!(::Movable, x,
 - [`BeamletOptics.AbstractObject`](@ref): the primitives forward to the [`BeamletOptics.AbstractShapeTrait`](@ref) of the object, see [`BeamletOptics.SingleShape`](@ref) and [`BeamletOptics.MultiShape`](@ref)
 - [`BeamletOptics.AbstractRay`](@ref): only subtypes carrying direction-dependent data (e.g. the field vector of a [`PolarizedRay`](@ref)) need their own `rotate3d!`
 - [`BeamletOptics.AbstractBeam`](@ref): either implement `_component_beams` or the two primitives; every move resets the beam via `empty!`
-- [`BeamletOptics.AbstractObjectGroup`](@ref): moves all members of `objects(group)` rigidly about the group `center`
+- [`BeamletOptics.AbstractObjectGroup`](@ref): moves all members of `objects(group)` rigidly about the group `center`, see below
 - [`BeamletOptics.AbstractBeamGroup`](@ref): moves its `beams` rigidly about the group `center`
+
+## Shared parts
+
+A part can be reachable along several paths, e.g. an object in two subgroups or a shape listed twice by a [`BeamletOptics.MultiShape`](@ref) object. Every container moves each of its parts once per motion, compared by identity (`===`). An object group first unwinds its tree, so that the primitives of an object type also apply within nested groups:
+
+```mermaid
+flowchart TB
+    CMD["translate3d!(group, offset)"] --> UW["unwind: subgroups and objects, each once"]
+    UW --> CK{"static value or shape reached<br/>by two objects, at any level?"}
+    CK -- yes --> ERR["ArgumentError, nothing has moved"]
+    CK -- no --> FR["move center and dir of every subgroup"]
+    FR --> OB["public verb on every object, e.g. translate3d!(detector, offset)"]
+```
+
+The shapes are collected recursively via `shape(object)`, down to the operands of composite SDFs. A group nested in another group moves as a frame via `position!`/`orientation!`; its own primitives are not called then.
