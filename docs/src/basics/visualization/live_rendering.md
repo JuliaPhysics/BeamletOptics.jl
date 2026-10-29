@@ -20,6 +20,52 @@ update_render!(hsys)              # moved components: only their model transform
 update_render!(hbeam)             # beam path: point buffer is replaced in place
 ```
 
+The diagram shows which `live_render!` method draws a thing and which handle it returns; the green boxes are the `render!` methods a component or shape adds to be drawn:
+
+```mermaid
+flowchart TB
+    LR(["<b>live_render!</b>"])
+    S1["<b>live_render!</b>(ax, sys)<br/>each top-level object,<br/>groups per object"]
+    O1["<b>live_render!</b>(ax, obj)<br/>object or object group"]
+    S2["<b>live_render!</b>(h, obj)<br/>each object of obj,<br/>added to the system handle h"]
+    D["<b>live_render!</b>(draw, ax, x)<br/>keeps the plots that draw() adds"]
+    R["<b>render!</b>(ax, obj)<br/>own method, e.g. PolarizationFilter"]
+    TR["<b>render!</b>(ax, shape_trait_of(obj), obj)"]
+    SHP["<b>render!</b>(ax, shape)<br/>or the analytic mesh of the shape"]
+    B1["<b>live_render!</b>(ax, beam)<br/>plots of render!, live = true"]
+    SH["<b>SystemRenderHandle</b><br/><i>#lt;: AbstractSystemRenderHandle</i>"]
+    OH["<b>ObjectRenderHandle</b><br/><i>#lt;: AbstractObjectRenderHandle</i>"]
+    BH["<b>BeamRenderHandle</b><br/><i>#lt;: AbstractBeamRenderHandle</i>"]
+
+    LR -- "(ax, system)" --> S1
+    LR -- "(ax, object or group)" --> O1
+    LR -- "(system handle, object or group)" --> S2
+    S2 -- "each object" --> O1
+    S2 -. "push! to children(h)" .-> SH
+    LR -- "(draw, ax, x)" --> D
+    LR -- "(ax, ray, beam, beam group<br/>or Gaussian beamlet)" --> B1
+    S1 -- "each object" --> O1
+    O1 -- "draw = () -> render!(ax, obj)" --> D
+    D -- "draw(), from live_render!(ax, obj):<br/>render!(ax, obj)" --> R
+    R -- "object group:<br/>each object" --> R
+    R -- "AbstractObject default" --> TR
+    TR -- "SingleShape: shape(obj)" --> SHP
+    TR -- "MultiShape: each part" --> R
+    D --> OH
+    S1 --> SH
+    SH -. "children(h)" .-> OH
+    B1 --> BH
+
+    classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
+    classDef green fill:#38982626,stroke:#389826,stroke-width:2px
+    classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
+    classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
+    class S1,S2,O1,D,B1,TR blue
+    class R,SHP green
+    class SH,OH,BH purple
+    class LR terminal
+```
+
 - **Objects and systems**: the geometry is rendered once with `render!`. Kinematic changes
   (`translate3d!`, `rotate3d!`, ...) are then applied as a rigid model transformation of the
   existing plots, which costs microseconds regardless of the mesh resolution.
@@ -29,6 +75,32 @@ update_render!(hbeam)             # beam path: point buffer is replaced in place
 - **Gaussian beamlets**: the 1/e² envelope of all segments is merged into a single mesh. This
   applies to `GaussianBeamlet`s, `AstigmaticGaussianBeamlet`s and groups of astigmatic beamlets,
   of which every `render_every`-th beamlet is rendered.
+
+The diagram shows what `update_render!` does for each handle type:
+
+```mermaid
+flowchart TB
+    U(["<b>update_render!</b>(h)"])
+    SC["for each oh in<br/><b>children</b>(h)"]
+    RG{"<b>_is_rigid</b>(h)<br/>parts unchanged and<br/>moved rigidly?"}
+    MM["<b>translate!</b>, <b>rotate!</b><br/>model matrix of the plots"]
+    RR["<b>_rerender!</b>(h)<br/>delete the plots, draw() again"]
+    OB["refill the observables<br/>obs[] = geometry()"]
+
+    U -- "AbstractSystemRenderHandle" --> SC
+    SC -- "update_render!(oh)" --> RG
+    U -- "ObjectRenderHandle" --> RG
+    U -- "BeamRenderHandle" --> OB
+    RG -- yes --> MM
+    RG -- no --> RR
+
+    classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
+    classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
+    classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
+    class SC,MM,RR,OB blue
+    class RG purple
+    class U terminal
+```
 
 `live_render!` draws the same plots as `render!`, see [Rays and beams](@ref "Rendering rays and beams") and [Gaussian beamlets](@ref "Rendering Gaussian beamlets"); it only keeps the data they are drawn from. Use [`remove_render!`](@ref) to delete the plots of a handle.
 
@@ -50,7 +122,7 @@ BeamletOptics.render_plots
 A system handle groups the handles of its objects. It can be searched and changed at runtime:
 
 ```@docs; canonical=false
-BeamletOptics.render_children
+BeamletOptics.children(::BeamletOptics.AbstractSystemRenderHandle)
 BeamletOptics.render_parent
 Base.push!(::BeamletOptics.AbstractSystemRenderHandle, ::BeamletOptics.AbstractObjectRenderHandle)
 Base.delete!(::BeamletOptics.AbstractSystemRenderHandle, ::BeamletOptics.AbstractObjectRenderHandle)
@@ -60,6 +132,39 @@ Base.delete!(::BeamletOptics.AbstractSystemRenderHandle, ::BeamletOptics.Abstrac
 deleting its plots (use [`remove_render!`](@ref) for that). [`update_render!`](@ref),
 [`remove_render!`](@ref) and [`pick_object`](@ref) work on any system handle through these accessors,
 so a handle type of your own only needs to implement them.
+
+The diagram shows which accessors and hooks (green) the methods of a system handle (blue) call, and where they pass on to the object handles (purple):
+
+```mermaid
+flowchart TB
+    UPD["<b>update_render!</b>(h)"]
+    RPL["<b>render_plots</b>(h)"]
+    REM["<b>remove_render!</b>(h, obj)"]
+    PCK["<b>pick_object</b>(h, plot)"]
+    CH["<b>AbstractTrees.children</b>(h)"]
+    PAR["<b>render_parent</b>(h, obj)"]
+    DEL["<b>delete!</b>(h, oh)"]
+    OHM["each object handle oh:<br/>rendered, update_render!, render_plots,<br/>remove_render!, pick_object"]
+    PP["<b>pickable_plots</b>(x, plots)<br/><i>method per type of x</i>"]
+
+    UPD --> CH
+    RPL --> CH
+    REM -- "obj in a group:<br/>ArgumentError" --> PAR
+    REM --> CH
+    REM -- "rendered(oh) in obj?" --> OHM
+    REM -- "after remove_render!(oh)" --> DEL
+    PCK --> CH
+    PCK -- "up to the<br/>outermost group" --> PAR
+    CH -- "each oh" --> OHM
+    OHM -- "pick_object(oh, plot)" --> PP
+
+    classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
+    classDef green fill:#38982626,stroke:#389826,stroke-width:2px
+    classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
+    class UPD,RPL,REM,PCK blue
+    class CH,PAR,DEL,PP green
+    class OHM purple
+```
 
 An object that is added to a system at runtime, see [Changing a system](@ref), is rendered into the
 handle of the system, and removed from it again, by:

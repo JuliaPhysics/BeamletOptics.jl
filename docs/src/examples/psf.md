@@ -47,7 +47,7 @@ sys = System([lens, detector])
 solve_system!(sys, cs)
 
 # retrieve intensity
-x, z, I_num = intensity(detector, RegularGrid(n=500, crop_factor=10))
+x, z, I_num = intensity(detector, RegularGrid(num_points = 500, crop_factor=10))
 ```
 
 Visualizing the result yields the expected Airy-disk pattern.
@@ -123,7 +123,7 @@ solve_system!(System([mirror, pd]), pol_src)
 
 NA = sin(2 * atan(D / (4f)))
 R = 1.5λ / NA
-xs, zs, E = electric_field(pd, RegularGrid(n = 201, x_min = -R, x_max = R, z_min = -R, z_max = R))
+xs, zs, E = electric_field(pd, RegularGrid(num_points = 201, x_min = -R, x_max = R, z_min = -R, z_max = R))
 
 I  = intensity.(E)                # |E|²/(2Z₀) per point, not projected onto the detector
 Ey = map(e -> abs2(e[2]), E)      # longitudinal component

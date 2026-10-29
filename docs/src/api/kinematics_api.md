@@ -32,7 +32,7 @@ BeamletOptics.kinematic_trait_of
 
 ## Static and movable entities
 
-Whether an entity can be moved at all is defined by its trait. The fallback of [`BeamletOptics.kinematic_trait_of`](@ref) is [`BeamletOptics.Static`](@ref), so types that do not opt in cannot be moved. The abstract types [`BeamletOptics.AbstractObject`](@ref), [`BeamletOptics.AbstractRay`](@ref), [`BeamletOptics.AbstractBeam`](@ref) and [`BeamletOptics.AbstractBeamGroup`](@ref) declare themselves [`BeamletOptics.Movable`](@ref), so a new subtype of them only has to implement the kinematic primitives listed below.
+Whether an entity can be moved at all is defined by its trait. There is no fallback for [`BeamletOptics.kinematic_trait_of`](@ref): types that do not opt in throw an `ErrorException` when their trait is queried. A [`System`](@ref) is [`BeamletOptics.Static`](@ref). The abstract types [`BeamletOptics.AbstractObject`](@ref), [`BeamletOptics.AbstractRay`](@ref), [`BeamletOptics.AbstractBeam`](@ref) and [`BeamletOptics.AbstractBeamGroup`](@ref) declare themselves [`BeamletOptics.Movable`](@ref), so a new subtype of them only has to implement the kinematic primitives listed below.
 
 ```@docs; canonical=false
 BeamletOptics.Static
