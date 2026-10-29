@@ -21,7 +21,7 @@ abstract type AbstractSystem end
 refractive_index(::AbstractSystem, λ::Real) = 1.0
 
 """
-    interact3d(::AbstractSystem, object::AbstractObject, ::AbstractBeam, ::AbstractRay)
+    interact3d(::AbstractSystem, object::AbstractObject, beam::AbstractBeam, at)
 
 Defines the optical interaction between an incoming/outgoing beam/ray of light and an optical element, must return an [`AbstractInteraction`](@ref) or `nothing`.
 The default behavior is that no interaction occurs, i.e. return of `nothing`, which should stop the system tracing procedure.
@@ -30,24 +30,27 @@ Refer to the [`AbstractInteraction`](@ref) typedocs for more information on the 
 The media on both sides of the boundary at the hit are given by [`transition`](@ref)`(system, ray)`,
 also where several elements touch, e.g. at the cemented faces of a doublet.
 
+The beam interacts `at` its ray that hit the object, i.e. a [`Beam`](@ref) at the `ray` itself and a
+beamlet at the index `ray_id` of the segment of its component rays, see `intersection(beam, at)`.
+
 A [`MultiShape`](@ref) object whose parts are objects needs no method: the call is handed to the part
 that was hit, see [`part_of`](@ref), e.g. to the front or back lens of a [`DoubletLens`](@ref). A
 `MultiShape` object of plain shapes defines its own method.
 """
-interact3d(system::AbstractSystem, object::AbstractObject, beam::AbstractBeam, ray::AbstractRay) =
-    interact3d(system, shape_trait_of(object), object, beam, ray)
+interact3d(system::AbstractSystem, object::AbstractObject, beam::AbstractBeam, at::Union{AbstractRay, Int}) =
+    interact3d(system, shape_trait_of(object), object, beam, at)
 
-function interact3d(::AbstractSystem, ::AbstractShapeTrait, object::AbstractObject, ::AbstractBeam,
+function interact3d(::AbstractSystem, ::SingleShape, object::AbstractObject, ::AbstractBeam,
         ray::AbstractRay)
     _warn_no_interact3d(object, ray)
     return nothing
 end
 
 function interact3d(system::AbstractSystem, ::MultiShape, object::AbstractObject,
-        beam::AbstractBeam, ray::AbstractRay)
-    part = part_of(intersection(ray)::Intersection)
-    part === object && return interact3d(system, SingleShape(), object, beam, ray)
-    return interact3d(system, part, beam, ray)
+        beam::AbstractBeam, at::Union{AbstractRay, Int})
+    part = part_of(intersection(beam, at)::Intersection)
+    part === object && return interact3d(system, SingleShape(), object, beam, at)
+    return interact3d(system, part, beam, at)
 end
 
 # Warning of the fallback above

@@ -144,6 +144,11 @@ i.e. the chief beam of a beamlet. A beam that stores its rays directly (e.g. [`B
 """
 _chief_beam(b::AbstractBeam) = first(_component_beams(b))
 
+# The hit at which a beam interacts `at` its ray, see interact3d: the ray of a beam, or the segment
+# `ray_id` of the chief beam of a beamlet
+intersection(::AbstractBeam, ray::AbstractRay) = intersection(ray)
+intersection(beam::AbstractBeam, ray_id::Int) = intersection(rays(_chief_beam(beam))[ray_id])
+
 """
     translate3d!(::Movable, beam::AbstractBeam, offset)
 

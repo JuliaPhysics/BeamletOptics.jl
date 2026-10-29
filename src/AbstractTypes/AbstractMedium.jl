@@ -77,8 +77,15 @@ end
 innermost(e::Enclosure) = e.body
 innermost(::Nothing) = nothing
 
-"""Returns the enclosure `e` within the `body`, which is the new innermost body."""
-enter(e::Union{Nothing, Enclosure}, body::AbstractObject) = Enclosure(body, e)
+"""
+    enter(e, body)
+
+Returns the enclosure `e` within the `body`, which is the new innermost body. A `body` that `e` holds
+already leaves `e` unchanged, e.g. the body that a ray leaves for a ray that a component created
+without an enclosure. No body (`nothing`) leaves `e` unchanged as well.
+"""
+enter(e::Nullable{Enclosure}, body::AbstractObject) = encloses(e, body) ? e : Enclosure(body, e)
+enter(e::Nullable{Enclosure}, ::Nothing) = e
 
 """
     leave(e, body)

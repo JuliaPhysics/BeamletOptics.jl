@@ -34,8 +34,10 @@ Returns the part of the `object` whose shape is `s`: the object itself for a sin
 """
 part_of(object::AbstractObject, s) = something(find_part(object, s), object)
 
-"""Returns the part of the object that the hit `hit` belongs to, see [`part_of`](@ref)."""
+"""Returns the part of the object that the hit `hit` belongs to, see [`part_of`](@ref). No hit
+(`nothing`) belongs to no part."""
 part_of(hit::Intersection) = isnothing(hit.part) ? part_of(object(hit), shape(hit)) : hit.part
+part_of(::Nothing) = nothing
 
 """
     is_body(hit::Intersection)
@@ -153,67 +155,34 @@ normal3d(t::Transition) = t.normal
 enclosure_in(t::Transition) = t.enclosure
 
 """The [`Enclosure`](@ref) of a ray that is transmitted through the boundary."""
-enclosure_out(t::Transition) = _entered(_left(t), t.entering)
+enclosure_out(t::Transition) = _beyond(t.enclosure, t.exiting, t.entering)
 
-# the enclosure without the body that the ray leaves, and within the body that it enters
-_left(t::Transition) = leave(t.enclosure, _part(t.exiting))
-_entered(e, ::Nothing) = e
-_entered(e, entering::Intersection) = enter(e, part_of(entering))
-_part(::Nothing) = nothing
-_part(hit::Intersection) = part_of(hit)
-
-"""
-    enclose!(new_ray::AbstractRay, t::Transition)
-
-Sets the [`Enclosure`](@ref) of the `new_ray`, which starts at the boundary of the transition `t`, by
-the side of the boundary into which it propagates: [`enclosure_in`](@ref) for a ray back into the
-medium before the boundary, e.g. a reflected ray, else [`enclosure_out`](@ref).
-"""
-enclose!(new_ray::AbstractRay, t::Transition) =
-    enclosure!(new_ray, dot(direction(new_ray), normal3d(t)) > 0 ? enclosure_in(t) : enclosure_out(t))
+# the enclosure `e` without the body of the hit `exiting` and within the body of the hit `entering`
+_beyond(e, exiting, entering) = enter(leave(e, part_of(exiting)), part_of(entering))
 
 """
     enclose!(system::AbstractSystem, ray::AbstractRay, new_rays)
 
 Sets the [`Enclosure`](@ref) of each of the `new_rays` that starts at the hit of the `ray`: the
 continued ray and the first rays of child beams. The side of the boundary into which a new ray
-propagates decides, as for `enclose!(new_ray, t)`: back into the medium before the boundary,
-or into the medium behind it. The solver calls it after each interaction, hence a component needs no
-knowledge of the bodies around the ray. A new ray that starts elsewhere, e.g. one that a component
-re-emits at another place, keeps its enclosure.
+propagates decides: back into the medium before the boundary ([`enclosure_in`](@ref)), or into
+the medium behind it ([`enclosure_out`](@ref)). The solver calls it after each interaction, hence a
+component needs no knowledge of the bodies around the ray. A new ray that starts elsewhere, e.g. one
+that a component re-emits at another place, keeps its enclosure.
 """
 function enclose!(::AbstractSystem, ray::AbstractRay{T}, new_rays) where {T}
     hit = intersection(ray)::Intersection{T}
     p = hit_point(ray)
-    dir = direction(ray)
-    # the bodies that the ray leaves and enters at the hit
-    left = entered = nothing
-    for h in coincident_hits(hit)
-        is_body(h) || continue
-        if isentering(dir, normal3d(h))
-            isnothing(entered) && (entered = part_of(h))
-        else
-            isnothing(left) && (left = part_of(h))
-        end
-    end
-    e = enclosure(ray)
-    if isnothing(left) && isnothing(entered)
-        # no body at the hit: all new rays stay in the medium of the ray
-        for r in new_rays
-            _starts_at(r, p) && enclosure!(r, e)
-        end
-        return nothing
-    end
-    e_in = _enclosing(e, left)
-    normal = normal3d(hit)
-    normal = isentering(dir, normal) ? normal : -normal
+    exiting, entering, _ = boundary_hits(hit, ray)
+    e_in = enter(enclosure(ray), part_of(exiting))
+    normal = _against(normal3d(hit), ray)
     e_out = nothing
     for r in new_rays
         _starts_at(r, p) || continue
         if dot(direction(r), normal) > 0
             enclosure!(r, e_in)
         else
-            isnothing(e_out) && (e_out = _entered(leave(e_in, left), entered))
+            isnothing(e_out) && (e_out = _beyond(e_in, exiting, entering))
             enclosure!(r, e_out)
         end
     end
@@ -221,7 +190,37 @@ function enclose!(::AbstractSystem, ray::AbstractRay{T}, new_rays) where {T}
 end
 
 _starts_at(r::AbstractRay, p) = norm(position(r) - p) ≤ get_coincidence_tolerance()
-_entered(e, part::AbstractObject) = enter(e, part)
+
+# the normal `n` turned against the direction of the `ray`
+_against(n, ray::AbstractRay) = isentering(direction(ray), n) ? n : -n
+
+"""
+    boundary_hits(hit::Intersection, ray) -> (exiting, entering, layer)
+
+Sorts the [`coincident_hits`](@ref) `hit` of the `ray` by their role at the boundary, see
+[`Transition`](@ref): the first hit of a body that the `ray` leaves, of a body that it enters and of a
+thin layer, each `nothing` if there is none. Several thin layers warn once, only the first one acts.
+"""
+function boundary_hits(hit::Intersection{T}, ray::AbstractRay) where {T}
+    dir = direction(ray)
+    exiting::Nullable{Intersection{T}} = nothing
+    entering::Nullable{Intersection{T}} = nothing
+    layer::Nullable{Intersection{T}} = nothing
+    for h in coincident_hits(hit)
+        if !is_body(h)
+            if isnothing(layer)
+                layer = h
+            else
+                @warn "Several thin layers coincide at a boundary, only the closest one acts" maxlog = 1
+            end
+        elseif isentering(dir, normal3d(h))
+            isnothing(entering) && (entering = h)
+        else
+            isnothing(exiting) && (exiting = h)
+        end
+    end
+    return exiting, entering, layer
+end
 
 """
     hint_in(t::Transition)
@@ -255,41 +254,21 @@ normal of the transition is that of the hit that interacts with the `ray` (see
 function transition(system::AbstractSystem, ray::AbstractRay{T}) where {T}
     hit = intersection(ray)::Intersection{T}
     λ = wavelength(ray)
-    dir = direction(ray)
-    exiting::Nullable{Intersection{T}} = nothing
-    entering::Nullable{Intersection{T}} = nothing
-    layer::Nullable{Intersection{T}} = nothing
-    layers = 0
-    for h in coincident_hits(hit)
-        if !is_body(h)
-            layers += 1
-            isnothing(layer) && (layer = h)
-        elseif isentering(dir, normal3d(h))
-            isnothing(entering) && (entering = h)
-        else
-            isnothing(exiting) && (exiting = h)
-        end
-    end
-    layers > 1 && @warn "Several thin layers coincide at a boundary, only the closest one acts" maxlog = 1
+    exiting, entering, layer = boundary_hits(hit, ray)
     # the bodies around the ray: the body that it leaves encloses it, also for a ray that a component
     # created without an enclosure
-    left = _part(exiting)
-    e_in = _enclosing(enclosure(ray), left)
+    e_in = enter(enclosure(ray), part_of(exiting))
     n_in = _index(innermost(e_in), λ, T(refractive_index(ray)))
     n_out = if !isnothing(entering)
         _index(part_of(entering), λ, n_in)
     elseif !isnothing(exiting)
-        _index(innermost(leave(e_in, left)), λ, T(refractive_index(system, λ)))
+        _index(innermost(leave(e_in, part_of(exiting))), λ, T(refractive_index(system, λ)))
     else
         n_in
     end
-    normal = normal3d(hit)
-    normal = isentering(dir, normal) ? normal : -normal
-    return Transition{T}(system, T(λ), n_in, n_out, normal, exiting, entering, layer, e_in)
+    return Transition{T}(system, T(λ), n_in, n_out, _against(normal3d(hit), ray), exiting, entering,
+        layer, e_in)
 end
-
-_enclosing(e, ::Nothing) = e
-_enclosing(e, body::AbstractObject) = encloses(e, body) ? e : enter(e, body)
 
 # the index of the innermost body in the number type `T` of the ray, e.g. a `ForwardDiff.Dual` within
 # automatic differentiation (read behind a function barrier), else the index `n` outside of all bodies
@@ -315,16 +294,15 @@ enclose_new!(system::AbstractSystem, beam::Beam, ray::AbstractRay, ::Nothing) =
 
 # The component beams of a beamlet differ in their ray type, hence they are handled by `map` over the
 # tuples, which is unrolled, not by a loop
-function enclose_new!(system::AbstractSystem, beam::Union{GaussianBeamlet, AstigmaticGaussianBeamlet},
-        ray_id::Int, i::AbstractInteraction)
+function enclose_new!(system::AbstractSystem, beam::GaussianBeamlets, ray_id::Int,
+        i::AbstractInteraction)
     map(_component_beams(beam), _component_interactions(i)) do b, bi
         enclose!(system, rays(b)[ray_id], (bi.ray,))
     end
     return nothing
 end
 
-function enclose_new!(system::AbstractSystem, beam::Union{GaussianBeamlet, AstigmaticGaussianBeamlet},
-        ray_id::Int, ::Nothing)
+function enclose_new!(system::AbstractSystem, beam::GaussianBeamlets, ray_id::Int, ::Nothing)
     for c in children(beam)
         map(_component_beams(beam), _component_beams(c)) do b, cb
             enclose!(system, rays(b)[ray_id], (first(rays(cb)),))
@@ -382,6 +360,9 @@ refraction from the medium before into the medium behind the boundary via [`refr
 total internal reflection beyond the critical angle. A [`PolarizedRay`](@ref) is transmitted or
 reflected with the [`fresnel_coefficients`](@ref), only the stronger part is traced. Between equal
 indices the ray passes unchanged. The hint points into the medium in which the new ray propagates.
+
+For a [`PolarizedRay`](@ref), `cross_boundary(t, beam, ray, E)` crosses the boundary with the field `E`
+instead of the field of the `ray`, e.g. the field behind a polarizing film.
 """
 function cross_boundary(t::Transition, ::Beam{T, R}, ray::R) where {T <: Real, R <: Ray{T}}
     n1, n2 = refractive_index_in(t), refractive_index_out(t)
@@ -390,12 +371,15 @@ function cross_boundary(t::Transition, ::Beam{T, R}, ray::R) where {T <: Real, R
     return BeamInteraction{T, R}(hint, Ray{T}(hit_point(ray), ndir, nothing, wavelength(ray), n))
 end
 
-function cross_boundary(t::Transition, ::Beam{T, R}, ray::R) where {T <: Real, R <: PolarizedRay{T}}
+cross_boundary(t::Transition, beam::Beam{T, R}, ray::R) where {T <: Real, R <: PolarizedRay{T}} =
+    cross_boundary(t, beam, ray, polarization(ray))
+
+function cross_boundary(t::Transition, ::Beam{T, R}, ray::R, E) where {T <: Real, R <: PolarizedRay{T}}
     normal = normal3d(t)
     n1, n2 = refractive_index_in(t), refractive_index_out(t)
     if n1 == n2
         return BeamInteraction{T, R}(hint_out(t), PolarizedRay{T}(hit_point(ray), direction(ray),
-            nothing, wavelength(ray), n2, polarization(ray)))
+            nothing, wavelength(ray), n2, E))
     end
     # Fresnel coefficients from the cosine of the angle of incidence (in the 1. quadrant), which is
     # smooth for automatic differentiation also at normal incidence
@@ -410,7 +394,7 @@ function cross_boundary(t::Transition, ::Beam{T, R}, ray::R) where {T <: Real, R
         n, hint = n2, hint_out(t)
     end
     P = _calculate_global_E0(direction(ray), new_dir, normal3d(intersection(ray)), J)
-    E0 = _transverse(P * polarization(ray), new_dir)
+    E0 = _transverse(P * E, new_dir)
     return BeamInteraction{T, R}(
         hint, PolarizedRay{T}(hit_point(ray), new_dir, nothing, wavelength(ray), n, E0))
 end
@@ -427,3 +411,19 @@ The interaction of the `ray` with the bare boundary at its hit, see
 """
 cross_boundary(system::AbstractSystem, beam::Beam, ray::AbstractRay) =
     cross_boundary(transition(system, ray), beam, ray)
+
+"""
+    cross_boundary(system::AbstractSystem, beamlet, ray_id::Int)
+
+The interaction of a [`GaussianBeamlet`](@ref) or an [`AstigmaticGaussianBeamlet`](@ref) with the bare
+boundary at the segment `ray_id`: each component ray crosses it at its own hit, see
+`cross_boundary(system, beam, ray)`.
+"""
+cross_boundary(system::AbstractSystem, g::GaussianBeamlet{R}, ray_id::Int) where {R} =
+    GaussianBeamletInteraction{R}(_cross_components(system, g, ray_id)...)
+
+cross_boundary(system::AbstractSystem, agb::AstigmaticGaussianBeamlet{R}, ray_id::Int) where {R} =
+    AstigmaticGaussianBeamletInteraction{R}(_cross_components(system, agb, ray_id)...)
+
+_cross_components(system, beamlet, ray_id) =
+    map(b -> cross_boundary(system, b, rays(b)[ray_id]), _component_beams(beamlet))

@@ -79,19 +79,9 @@ function interact3d(::AbstractSystem,
     is_totally_reflected(ray, t) && return cross_boundary(t, beam, ray)
     E = _calculate_global_E0(polfilter, ray, direction(ray), polfilter.JMat)
     # Terminate blocked rays
-    if norm(E) ≤ polfilter.cutoff
-        return nothing
-    end
-    n1, n2 = refractive_index_in(t), refractive_index_out(t)
-    # between equal media, e.g. a filter in air, the filtered ray passes unchanged
-    n1 == n2 && return BeamInteraction{T, R}(hint_out(t),
-        PolarizedRay{T}(hit_point(ray), direction(ray), nothing, wavelength(ray), n2, E))
-    new_dir, _ = refraction3d(direction(ray), normal3d(t), n1, n2)
-    _, _, ts, tp = _fresnel_coefficients(cos_angle3d(direction(ray), -normal3d(t)), n2 / n1)
-    P = _calculate_global_E0(direction(ray), new_dir, normal3d(intersection(ray)), SPBasis(ts, 0, 0, tp))
-    E0 = _transverse(P * E, new_dir)
-    return BeamInteraction{T, R}(hint_out(t),
-        PolarizedRay{T}(hit_point(ray), new_dir, nothing, wavelength(ray), n2, E0))
+    norm(E) ≤ polfilter.cutoff && return nothing
+    # the filtered field crosses the boundary between the media on both sides of the filter
+    return cross_boundary(t, beam, ray, E)
 end
 
 # unpolarized rays (e.g. beamlet auxiliary rays) pass through the ideal filter, refracted at the
