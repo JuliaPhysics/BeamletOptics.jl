@@ -39,7 +39,9 @@ If the fields above do not exist, the following getters/setters must be dispatch
 An `AbstractObjectGroup` is a container: it takes the kinematic class of its `objects`, i.e.
 [`BeamletOptics.Movable`](@ref) with an [`BeamletOptics.Oriented`](@ref) frame for movable objects, see
 [`BeamletOptics.AbstractKinematicTrait`](@ref). The constructors must check that the `objects` are either
-all static or all movable, e.g. with `allequal(BeamletOptics.is_static, objects)`. The primitives `translate3d!(::Movable, group, offset)` and
+all static or all movable, i.e. that [`kinematic_trait_of`](@ref) returns
+[`BeamletOptics.Static`](@ref) for every object or a `Movable` for every object: call
+[`BeamletOptics.check_kinematic_members`](@ref)`(objects)`. The primitives `translate3d!(::Movable, group, offset)` and
 `rotate3d!(::Movable, group, R::AbstractMatrix)` move all `objects` and the pose of the group. A group that is
 nested in another group moves as a frame (`position!`/`orientation!`), its own primitives are not called then.
 """

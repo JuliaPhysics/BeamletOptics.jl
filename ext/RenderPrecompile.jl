@@ -28,7 +28,7 @@
             update_render!(hb)
             remove_render!(hb)
         end
-        translate3d!(rendered(first(render_children(h))), [0, 1e-3, 0])
+        translate3d!(rendered(first(AbstractTrees.children(h))), [0, 1e-3, 0])
         update_render!(h)
         remove_render!(h)
     end

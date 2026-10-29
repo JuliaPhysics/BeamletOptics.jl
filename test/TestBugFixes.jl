@@ -84,7 +84,7 @@ end
         pd,
         # restore pre-v0.11 behavior, e.g. no autolims
         RegularGrid(
-            n = pd_res,
+            num_points = pd_res,
             x_min = -pd_size / 2,
             x_max = pd_size / 2,
             z_min = -pd_size / 2,
@@ -171,7 +171,7 @@ end
                 detector,
                 # restore pre-v0.11 behavior, e.g. no autolims
                 RegularGrid(
-                    n = pd_res,
+                    num_points = pd_res,
                     x_min = -pd_size / 2,
                     x_max = pd_size / 2,
                     z_min = -pd_size / 2,
@@ -201,7 +201,7 @@ end
                 detector,
                 # restore pre-v0.11 behavior, e.g. no autolims
                 RegularGrid(
-                    n = pd_res,
+                    num_points = pd_res,
                     x_min = -pd_size / 2,
                     x_max = pd_size / 2,
                     z_min = -pd_size / 2,

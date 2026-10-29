@@ -10,19 +10,19 @@ Represents a parallel bundle of [`Beam`](@ref)s being emitted from a disk in spa
 - `diameter`: the diameter of the outermost beam ring
 - `center`: source position, pivot for rotations
 - `orientation`: right-handed orthonormal matrix, columns are the sampling reference vector, the central source direction and their cross product, see [`AbstractBeamGroup`](@ref)
-- `sampling`: how the rays were sampled (rings, sunflower, line, or given beams), see [`set_num_rays!`](@ref)
+- `sampling`: how the rays were sampled (rings, sunflower or line) (or `NoSampling()` for given beams), see [`num_rays!`](@ref)
 
 # Functions
 
 - `diameter`: returns the diameter of the source
-- [`set_num_rays!`](@ref): regenerates the rays with another number of rays
+- [`num_rays!`](@ref): regenerates the rays with another number of rays
 """
-mutable struct CollimatedSource{T, R <: AbstractRay{T}} <: AbstractBeamGroup{T, R}
+mutable struct CollimatedSource{T, R <: AbstractRay{T}, S <: AbstractSourceSampling} <: AbstractBeamGroup{T, R}
     beams::Vector{Beam{T, R}}
     diameter::T
     center::Point3{T}
     orientation::SMatrix{3, 3, T, 9}
-    sampling::AbstractSourceSampling
+    sampling::S
 end
 
 """
@@ -34,7 +34,7 @@ source position `pos`. The group orientation is either derived from the central 
 `dir` (the sampling reference vector is then picked deterministically via [`normal3d`](@ref)),
 or passed explicitly as a right-handed orthonormal 3x3 `orientation` matrix whose second column
 is the central direction. An invalid `orientation` throws an `ArgumentError`. The rays of such a
-source can not be regenerated with [`set_num_rays!`](@ref).
+source can not be regenerated with [`num_rays!`](@ref): its `sampling` is `NoSampling()`.
 """
 function CollimatedSource(beams::Vector{Beam{T, R}}, diameter, pos, dir::AbstractVector) where {T, R <: AbstractRay{T}}
     d = normalize(dir)
@@ -45,9 +45,9 @@ CollimatedSource(beams::Vector{<:Beam}, diameter, pos, orientation::AbstractMatr
     CollimatedSource(beams, diameter, pos, orientation, NoSampling())
 
 function CollimatedSource(beams::Vector{Beam{T, R}}, diameter, pos, orientation::AbstractMatrix,
-        sampling::AbstractSourceSampling) where {T, R <: AbstractRay{T}}
-    _check_kinematic_members(beams)
-    return CollimatedSource{T, R}(beams, T(diameter), Point3{T}(pos), _check_orientation(orientation, T), sampling)
+        sampling::S) where {T, R <: AbstractRay{T}, S <: AbstractSourceSampling}
+    check_kinematic_members(beams)
+    return CollimatedSource{T, R, S}(beams, T(diameter), Point3{T}(pos), _check_orientation(orientation, T), sampling)
 end
 diameter(cs::CollimatedSource) = cs.diameter
 

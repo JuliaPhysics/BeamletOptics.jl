@@ -55,7 +55,7 @@ end
 operands(d::DifferenceSDF) = (d.base, d.tools...)
 
 function DifferenceSDF{T}(base::AbstractSDF{T}, tools::Tuple{Vararg{AbstractSDF{T}}}) where T
-    _check_kinematic_members((base, tools...))
+    check_kinematic_members((base, tools...))
     DifferenceSDF{T, typeof(base), typeof(tools)}(
         SMatrix{3,3}(one(T)*I),
         SMatrix{3,3}(one(T)*I),

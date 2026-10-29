@@ -13,8 +13,10 @@ struct PointCloud{P, W} <: BMO.AbstractDetectorSampling
     weights::W
 end
 
-BMO.sample_points(::Detector, s::PointCloud) =
-    (; coordinates = (s.points,), points = s.points, weights = s.weights)
+BMO.sample_points(::Detector, s::PointCloud) = BMO.DetectorSamples((s.points,), s.points, s.weights)
+
+# A sampling without `sample_points`
+struct NoPoints <: BMO.AbstractDetectorSampling end
 
 # A Gaussian beam of 1 mW on a detector tilted by 30°
 function tilted_detector()
@@ -30,14 +32,14 @@ end
 
     @testset "RegularGrid gives the values of the former keyword readouts" begin
         # recorded with `intensity(pd; n = 50)`, `optical_power(pd; ...)` before the samplings
-        x, z, I = intensity(pd, RegularGrid(n = 50); progress = false)
+        x, z, I = intensity(pd, RegularGrid(num_points = 50); progress = false)
         @test sum(I) ≈ 49970.20330881326 rtol = 1e-12
         @test I[20, 27] ≈ 203.20885922342407 rtol = 1e-12
         @test first(x) ≈ -0.0034658561053307387 rtol = 1e-12
         @test last(x) ≈ 0.0034658561053307387 rtol = 1e-12
-        @test optical_power(pd, RegularGrid(n = 50); progress = false) ≈ 0.0010000000061118099 rtol = 1e-12
+        @test optical_power(pd, RegularGrid(num_points = 50); progress = false) ≈ 0.0010000000061118099 rtol = 1e-12
         @test optical_power(pd; progress = false) ≈ 0.0010000000063770916 rtol = 1e-12
-        s = RegularGrid(n = 31, crop_factor = 2, x_min = -1e-3, x_max = 2e-3)
+        s = RegularGrid(num_points = 31, crop_factor = 2, x_min = -1e-3, x_max = 2e-3)
         x, z, I = intensity(pd, s; progress = false)
         @test sum(I) ≈ 62674.78458469183 rtol = 1e-12
         @test (first(x), last(x)) == (-1e-3, 2e-3)
@@ -45,12 +47,12 @@ end
     end
 
     @testset "A single bound replaces only its side" begin
-        x_auto, z_auto, _ = electric_field(pd, RegularGrid(n = 11); progress = false)
-        x, z, _ = electric_field(pd, RegularGrid(n = 11, x_min = -1mm); progress = false)
+        x_auto, z_auto, _ = electric_field(pd, RegularGrid(num_points = 11); progress = false)
+        x, z, _ = electric_field(pd, RegularGrid(num_points = 11, x_min = -1mm); progress = false)
         @test first(x) == -1mm
         @test last(x) == last(x_auto)
         @test z == z_auto
-        x, z, _ = electric_field(pd, RegularGrid(n = 11, z_max = 2mm, x0_shift = 1mm); progress = false)
+        x, z, _ = electric_field(pd, RegularGrid(num_points = 11, z_max = 2mm, x0_shift = 1mm); progress = false)
         @test x ≈ x_auto .+ 1mm
         @test (first(z), last(z)) == (first(z_auto), 2mm)
     end
@@ -67,6 +69,7 @@ end
         # a single node has no area
         @test optical_power(pd, RectilinearGrid([0.0], [0.0]); progress = false) == 0
         # the weights stay lazy and add up to the area of the window
+        @test BMO.sample_points(pd, g) isa BMO.DetectorSamples
         w = BMO.sample_points(pd, g).weights
         @test !(w isa AbstractArray)
         @test sum(w) ≈ 8mm * 6mm rtol = 1e-12
@@ -95,9 +98,10 @@ end
     end
 
     @testset "Errors" begin
-        @test_throws ArgumentError RegularGrid(n = 0)
+        @test_throws ArgumentError RegularGrid(num_points = 0)
+        @test_throws "sample_points not defined for $(NoPoints)" intensity(pd, NoPoints())
         # a bound beyond its opposite side would give a descending grid and a negative power
-        x_auto, z_auto, _ = intensity(pd, RegularGrid(n = 5); progress = false)
+        x_auto, z_auto, _ = intensity(pd, RegularGrid(num_points = 5); progress = false)
         @test_throws ArgumentError intensity(pd, RegularGrid(x_min = last(x_auto) + 1mm))
         @test_throws ArgumentError optical_power(pd, RegularGrid(z_max = first(z_auto) - 1mm))
         @test_throws ArgumentError RectilinearGrid([1.0, 0.0], [0.0, 1.0])

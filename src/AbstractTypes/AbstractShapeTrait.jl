@@ -63,16 +63,20 @@ end
 Records `part` as the owner of every shape below `x` and throws an `ArgumentError` if a shape
 already belongs to another part, or if `x` or a value below it is static.
 """
-function _claim_shapes!(owner::IdDict, object::AbstractObject, part)
-    is_static(object) && _static_error(object)
+_claim_shapes!(owner::IdDict, object::AbstractObject, part) = _claim_shapes!(kinematic_trait_of(object), owner, object, part)
+
+_claim_shapes!(::Static, ::IdDict, x, _) = static_error(x)
+
+function _claim_shapes!(::Movable, owner::IdDict, object::AbstractObject, part)
     _claim_shapes!(shape_trait_of(object), owner, object, part)
     return nothing
 end
 
 _claim_shapes!(::SingleShape, owner::IdDict, object::AbstractObject, part) = _claim_shapes!(owner, shape(object), part)
 
-function _claim_shapes!(owner::IdDict, s::AbstractShape, part)
-    is_static(s) && _static_error(s)
+_claim_shapes!(owner::IdDict, s::AbstractShape, part) = _claim_shapes!(kinematic_trait_of(s), owner, s, part)
+
+function _claim_shapes!(::Movable, owner::IdDict, s::AbstractShape, part)
     get!(owner, s, part) === part || throw(ArgumentError(
         lazy"two parts of a moved container share a $(nameof(typeof(s))), it would move twice"))
     return nothing

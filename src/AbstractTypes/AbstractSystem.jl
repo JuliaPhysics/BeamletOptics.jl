@@ -20,6 +20,9 @@ abstract type AbstractSystem end
 
 refractive_index(::AbstractSystem, λ::Real) = 1.0
 
+# A system is not moved as a whole, its objects are
+kinematic_trait_of(::AbstractSystem) = Static()
+
 """
     interact3d(::AbstractSystem, object::AbstractObject, ::AbstractBeam, ::AbstractRay)
 

@@ -5,6 +5,7 @@ using Makie
 using GeometryBasics
 using Test
 using LinearAlgebra
+using AbstractTrees: AbstractTrees
 
 const BMO = BeamletOptics
 
@@ -171,7 +172,7 @@ end
         sphere = shape_sphere(sdf)
         @test sphere isa BMO.SingleBoundingSphere
 
-        plots = new_plots(() -> (@test isnothing(BMO.render_bounding_sphere!(ax, sdf))), ax)
+        plots = new_plots(() -> (@test isnothing(Ext.render_bounding_spheres!(ax, sdf))), ax)
         @test length(plots) == 1
         @test is_sphere_plot(only(plots))
         @test only(plots).linewidth[] == 1
@@ -179,7 +180,7 @@ end
 
         # keywords: color and linewidth, all others are passed to the plot
         plots = new_plots(ax) do
-            BMO.render_bounding_sphere!(ax, sdf; color = :orange, linewidth = 3, visible = false)
+            Ext.render_bounding_spheres!(ax, sdf; color = :orange, linewidth = 3, visible = false)
         end
         p = only(plots)
         @test p isa Makie.Lines
@@ -190,38 +191,38 @@ end
         # a shape without a bounding sphere
         none = NoSphereShape()
         @test BMO.bounding_sphere_of(none) isa BMO.NoBoundingSphere
-        plots = new_plots(() -> (@test isnothing(BMO.render_bounding_sphere!(ax, none))), ax)
+        plots = new_plots(() -> (@test isnothing(Ext.render_bounding_spheres!(ax, none))), ax)
         @test isempty(plots)
 
         # a mesh: plots follow its bounding sphere
         cube = BMO.CubeMesh(10mm)
-        plots = new_plots(() -> BMO.render_bounding_sphere!(ax, cube), ax)
+        plots = new_plots(() -> Ext.render_bounding_spheres!(ax, cube), ax)
         @test length(plots) == length(spheres(cube))
     end
 
     @testset "Sphere values" begin
         ax = LScene(Figure()[1, 1])
         sphere = BMO.SingleBoundingSphere(Point3(1.0, 2.0, 3.0), 0.5)
-        plots = new_plots(() -> (@test isnothing(BMO.render_bounding_sphere!(ax, sphere))), ax)
+        plots = new_plots(() -> (@test isnothing(render!(ax, sphere))), ax)
         @test length(plots) == 1
         @test is_sphere_plot(only(plots))
         @test has_color(only(plots), :magenta)
         test_great_circles(only(plots), sphere)
 
-        # color and linewidth, `main_color` is not passed to the plot
+        # color and linewidth
         plots = new_plots(ax) do
-            BMO.render_bounding_sphere!(ax, sphere; color = :red, linewidth = 2, main_color = :green)
+            render!(ax, sphere; color = :red, linewidth = 2)
         end
         @test only(plots) isa Makie.Lines
         @test has_color(only(plots), :red)
         @test only(plots).linewidth[] == 2
 
         # no sphere, no plot
-        plots = new_plots(() -> (@test isnothing(BMO.render_bounding_sphere!(ax, BMO.NoBoundingSphere()))), ax)
+        plots = new_plots(() -> (@test isnothing(render!(ax, BMO.NoBoundingSphere()))), ax)
         @test isempty(plots)
     end
 
-    @testset "Objects and systems" begin
+    @testset "Objects and groups" begin
         ax = LScene(Figure()[1, 1])
 
         # SingleShape with a sphere
@@ -229,13 +230,13 @@ end
         translate3d!(lens, [5mm, 10mm, -15mm])
         yrotate3d!(lens, deg2rad(33))
         @test length(spheres(lens)) == 1
-        plots = new_plots(() -> (@test isnothing(BMO.render_bounding_sphere!(ax, lens))), ax)
+        plots = new_plots(() -> (@test isnothing(Ext.render_bounding_spheres!(ax, lens))), ax)
         test_on_sphere(only(plots), only(spheres(lens)))
 
         # SingleShape without a sphere
         dummy = NonInteractableObject(joinpath(pkgdir(BeamletOptics), "docs", "src", "assets", "Benchy.stl"))
         @test isempty(spheres(dummy))
-        @test isempty(new_plots(() -> BMO.render_bounding_sphere!(ax, dummy), ax))
+        @test isempty(new_plots(() -> Ext.render_bounding_spheres!(ax, dummy), ax))
 
         # MultiShape, nested: one plot per shape with a sphere, in the order of the shapes. The dummy
         # has no sphere, hence neither the inner nor the outer group has a main sphere.
@@ -246,7 +247,7 @@ end
         @test length(shapes(group)) == 4
         @test BMO.bounding_sphere_of(group) isa BMO.NoBoundingSphere
         @test length(spheres(group)) == 3
-        plots = new_plots(() -> (@test isnothing(BMO.render_bounding_sphere!(ax, group; linewidth = 2))), ax)
+        plots = new_plots(() -> (@test isnothing(Ext.render_bounding_spheres!(ax, group; linewidth = 2))), ax)
         @test length(plots) == length(spheres(group))
         @test isempty(main_plots(plots))
         @test all(p -> p.linewidth[] == 2, plots)
@@ -259,31 +260,32 @@ end
         translate3d!(outer.objects[1], [50mm, 0, 0])
         @test BMO.bounding_sphere_of(outer) isa BMO.MultiBoundingSphere
         @test length(main_spheres(outer)) == 2
-        plots = new_plots(() -> BMO.render_bounding_sphere!(ax, outer; color = :red, main_color = :green), ax)
+        plots = new_plots(() -> Ext.render_bounding_spheres!(ax, outer; color = :red, main_color = :green), ax)
         @test length(plots) == length(spheres(outer)) == 5
         @test count(p -> has_color(p, :green), plots) == 2
         @test count(p -> has_color(p, :red), plots) == 3
         foreach(test_on_sphere, plots, spheres(outer))
         @test !has_color(plots[end], :red) # the main sphere of the outer group is drawn last
         # default colors
-        plots = new_plots(() -> BMO.render_bounding_sphere!(ax, outer), ax)
+        plots = new_plots(() -> Ext.render_bounding_spheres!(ax, outer), ax)
         @test length(main_plots(plots)) == 2
         @test count(p -> has_color(p, :magenta), plots) == 3
         # main_color is no plot attribute
         @test !any(p -> haskey(p.attributes, :main_color), plots)
 
-        # system
+        # all objects of a system
         sys = test_system()
         expected = spheres(sys)
         @test length(expected) >= 2 # the meniscus lenses
-        plots = new_plots(() -> (@test isnothing(BMO.render_bounding_sphere!(ax, sys))), ax)
+        render_all!(ax) = foreach(obj -> (@test isnothing(Ext.render_bounding_spheres!(ax, obj))), sys.objects)
+        plots = new_plots(() -> render_all!(ax), ax)
         @test length(plots) == length(expected)
         @test all(is_sphere_plot, plots)
         foreach(test_great_circles, plots, expected)
 
         # Axis3
         ax3 = Axis3(Figure()[1, 1])
-        plots = new_plots(() -> BMO.render_bounding_sphere!(ax3, sys), ax3)
+        plots = new_plots(() -> render_all!(ax3), ax3)
         @test length(plots) == length(expected)
     end
 
@@ -393,13 +395,13 @@ end
             n0 = length(ax.scene.plots)
             h = live_render!(ax, sys; show_bounding_sphere = true)
             # groups are rendered per member: no main sphere of a group, the system handle has no handle for it
-            @test length(sphere_plots(BMO.render_plots(h))) == sum(oh -> length(spheres(BMO.rendered(oh))), BMO.render_children(h))
+            @test length(sphere_plots(BMO.render_plots(h))) == sum(oh -> length(spheres(BMO.rendered(oh))), AbstractTrees.children(h))
             for (i, obj) in enumerate(BMO.objects(sys))
                 translate3d!(obj, [i * 3mm, 0, -i * 2mm])
                 rotate3d!(obj, normalize([1.0, i, 0.3]), deg2rad(11 * i))
             end
             update_render!(h)
-            for oh in BMO.render_children(h)
+            for oh in AbstractTrees.children(h)
                 found = sphere_plots(BMO.render_plots(oh))
                 expected = spheres(BMO.rendered(oh))
                 @test length(found) == length(expected)

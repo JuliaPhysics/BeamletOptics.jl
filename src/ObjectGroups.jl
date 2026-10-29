@@ -40,7 +40,7 @@ function ObjectGroup(v::Union{AbstractArray, Tuple}, T = Float64)
     for x in v
         x isa ObjectOrGroup || throw(TypeError(:ObjectGroup, "objects", ObjectOrGroup, x))
     end
-    _check_kinematic_members(v)
+    check_kinematic_members(v)
     ObjectGroup{T}(SMatrix{3,3}(one(T)*I), Point3{T}(0), collect(ObjectOrGroup, v))
 end
 
@@ -75,7 +75,7 @@ function Base.push!(group::ObjectGroup, objs::ObjectOrGroup...)
             "the $(nameof(typeof(node))) is already part of the group"))
         push!(nodes, node)
     end
-    _check_kinematic_members((group.objects..., objs...))
+    check_kinematic_members((group.objects..., objs...))
     append!(group.objects, objs)
     return group
 end

@@ -119,7 +119,8 @@ the geometric path and `ψ0` the Gouy phase that the beam has collected up to th
 holds the waist and divergence rays of the segment (see [`BeamletOptics.GaussianSegment`](@ref)),
 from which the field follows as from the beamlet itself, see [`gauss_parameters`](@ref).
 `E_amp` is the reference amplitude times the beam radius, `E0 w0` of the source, which is normalized to the
-power of the beamlet: the physical field in a medium of index `n` is smaller by `√n`, see [`beamlet_hit_field`](@ref).
+power of the beamlet: the physical field in a medium of index `n` is smaller by `√n`, see
+[`electric_field(::BeamletOptics.AbstractDetectorHit, ::AbstractVector)`](@ref).
 """
 struct GaussianBeamletHit{T} <: AbstractBeamletHit{T}
     l0::T
@@ -178,7 +179,7 @@ hit_point(hit::AbstractBeamletHit) = hit.p0 + hit.l_seg * hit.d0
 """
     GaussianBeamletHit(g::GaussianBeamlet, id)
 
-Hit record of the traced segment `id` of `g`: the data that [`beamlet_hit_field`](@ref)
+Hit record of the traced segment `id` of `g`: the data that [`electric_field`](@ref)`(hit, p)`
 needs to evaluate the field of that segment at any point near it. [`Detector`](@ref)s store
 one per beamlet that hits them; it can also be built for any traced segment, e.g. to sample
 a beamlet on a plane of one's own. `l0` is the length of the beam (including its parents)
@@ -200,7 +201,7 @@ end
 """
     AstigmaticGaussianBeamletHit(agb::AstigmaticGaussianBeamlet, id)
 
-Hit record of the traced segment `id` of `agb`: the data that [`beamlet_hit_field`](@ref)
+Hit record of the traced segment `id` of `agb`: the data that [`electric_field`](@ref)`(hit, p)`
 needs to evaluate the field of that segment at any point near it, including the optical
 path from the source (parents included), the Gouy factor and the amplitude. The amplitude is
 that of the polarization of the chief ray of the segment, times the change with the beam
