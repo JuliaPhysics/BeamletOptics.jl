@@ -1,7 +1,7 @@
-_conic_sag(r, R, k)   = _conic_sag_r2(r^2, R, k)
+_conic_sag(r, R, k)   = conic_sag_r2(r^2, R, k)
 # the sag as a function of r², which is smooth also on the axis, see `_radial`
-_conic_sag_r2(r2, R, k) = r2 / (R * (1 + sqrt(1 - (1 + k) * r2 / R^2)))
-_conic_slope(r, R, k) = (r / R) / sqrt(1 - (1 + k) * r^2 / R^2)
+conic_sag_r2(r2, R, k) = r2 / (R * (1 + sqrt(1 - (1 + k) * r2 / R^2)))
+conic_slope(r, R, k) = (r / R) / sqrt(1 - (1 + k) * r^2 / R^2)
 
 """
     ConicSDF{T} <: AbstractSDF{T}
@@ -63,7 +63,7 @@ end
 
 Constructs a [`ConicSDF`](@ref) representing a segment of a conic of revolution.
 
-# Inputs
+# Arguments
 
 - `R`: radius of curvature at the parent vertex \\[m\\]; `R > 0` is concave (opens towards
   `-y`), `R < 0` is convex (opens towards `+y`). Must be non-zero.
@@ -117,23 +117,42 @@ Returns the sphere around the cylinder of the segment diameter that extends from
 of the reflecting surface to the back side at `y = thickness`, centered on the local y-axis.
 """
 function bounding_sphere_of(s::ConicSDF{T}) where {T}
-    R = 2s.f
-    Z_off = _conic_sag(s.x_off, R, s.k)
     r_max = s.diameter / 2
-
-    # the sag is monotonic in the parent radius, so the surface is lowest at one end of its range
-    r_lo = max(zero(T), abs(s.x_off) - r_max)
-    r_hi = abs(s.x_off) + r_max
-    y_lo = -(_conic_sag(r_hi, R, s.k) - Z_off)
-    y_hi = -(_conic_sag(r_lo, R, s.k) - Z_off)
-
-    y_min = min(y_lo, y_hi)
+    y_min, _ = axial_extent(s)
     y_max = max(s.thickness, y_min)
 
     y_center = (y_min + y_max) / 2
     r_bound = sqrt(r_max^2 + ((y_max - y_min) / 2)^2)
     return SingleBoundingSphere(s, Point3{T}(0, y_center, 0), r_bound)
 end
+
+"""
+    axial_extent(s::ConicSDF)
+
+Returns `(lo, hi)`, the smallest and largest local y-coordinate of the surface of `s` over its
+aperture. The back side at `thickness` is not included. The range contains 0, since the origin
+lies on the surface.
+"""
+function axial_extent(s::ConicSDF{T}) where {T}
+    R = 2s.f
+    Z_off = _conic_sag(s.x_off, R, s.k)
+    r_max = s.diameter / 2
+
+    # Find surface ends in parent radius
+    r_lo = max(zero(T), abs(s.x_off) - r_max)
+    r_hi = abs(s.x_off) + r_max
+    y_lo = -(_conic_sag(r_hi, R, s.k) - Z_off)
+    y_hi = -(_conic_sag(r_lo, R, s.k) - Z_off)
+
+    return min(y_lo, y_hi), max(y_lo, y_hi)
+end
+
+"""
+    thickness(s::ConicSDF)
+
+Returns the substrate thickness of `s` in y-direction \\[m\\].
+"""
+thickness(s::ConicSDF) = s.thickness
 
 # The SDF is not exact far away from the shape, hence the box around the bounding sphere
 bounding_box(s::ConicSDF) = bounding_box(bounding_sphere_of(s))
@@ -146,24 +165,12 @@ function sdf(s::ConicSDF{T}, point) where {T}
     Z_off = _conic_sag(s.x_off, R, s.k)
 
     r_hi = abs(s.x_off) + s.diameter / 2
-    # r² of the point, clamped to the aperture: the sag via r² is smooth on the axis, also for
-    # automatic differentiation, in contrast to the radius
+    # Clamp r² to aperture, smooth on axis for AD
     r_c2 = min((x + s.x_off)^2 + z^2, r_hi^2)
 
-    y_surf = -(_conic_sag_r2(r_c2, R, s.k) - Z_off)
-    # `g` uses the *global* (aperture-rim) slope rather than the local one at `r_c`. `Z'`
-    # is monotone increasing in `r` for every conic family here, so `r_hi` is where the
-    # true gradient magnitude is largest over the whole segment; dividing by this
-    # upper bound can only shrink `|d_front|` relative to the locally-linearized estimate
-    # `(y_surf - y) / sqrt(1 + Z'(r_c)^2)`, i.e. it can only make `d_front` *more*
-    # conservative. This matters because the local estimate is only a first-order
-    # (graph/gradient) approximation of the true distance to a curved surface and can
-    # slightly *overestimate* it away from the vertex (unlike a plane, a conic's true
-    # distance-to-surface has a curvature-dependent second-order correction the local
-    # estimate ignores) — this is exactly the failure mode the global-Lipschitz fallback
-    # in the plan's Rationale anticipates. It does not change the surface itself: `d_front`
-    # is still exactly zero on `y = y_surf(x, z)` regardless of `g`.
-    g = sqrt(one(T) + _conic_slope(r_hi, R, s.k)^2)
+    y_surf = -(conic_sag_r2(r_c2, R, s.k) - Z_off)
+    # Scale by global Lipschitz bound
+    g = sqrt(one(T) + conic_slope(r_hi, R, s.k)^2)
 
     d_front = (y_surf - y) / g
     d_cyl = _radial(x, z) - s.diameter / 2
