@@ -8,19 +8,18 @@ module Config
 using Preferences
 
 # --- Paraxial Invariants ---
-const INVARIANT_THRESHOLD = @load_preference("invariant_threshold", 1e-6)
+const invariant_threshold = @load_preference("invariant_threshold", 1e-6)
 """
     get_invariant_threshold()
 
 Returns the global configuration threshold for the paraxial optical invariant check.
 """
-get_invariant_threshold() = INVARIANT_THRESHOLD
+get_invariant_threshold() = invariant_threshold
 
 
 # --- SDF & Ray Marching ---
-const SDF_SURFACE_THRESHOLD = @load_preference("sdf_surface_threshold", 1e-9)
-const SDF_RAYMARCH_EPS = @load_preference("sdf_raymarch_eps", 1e-10)
-const SDF_INSIDE_STEP = @load_preference("sdf_inside_step", 1.0)
+const sdf_surface_threshold = @load_preference("sdf_surface_threshold", 1e-9)
+const sdf_raymarch_eps = @load_preference("sdf_raymarch_eps", 1e-10)
 const sdf_miss_distance = @load_preference("sdf_miss_distance", 1e15)
 
 """
@@ -28,14 +27,14 @@ const sdf_miss_distance = @load_preference("sdf_miss_distance", 1e15)
 
 Returns the global configuration threshold for the Signed Distance Field (SDF) surface detection.
 """
-get_sdf_surface_threshold() = SDF_SURFACE_THRESHOLD
+get_sdf_surface_threshold() = sdf_surface_threshold
 
 """
     get_sdf_raymarch_eps()
 
 Returns the global configuration epsilon for the SDF ray marching algorithm.
 """
-get_sdf_raymarch_eps() = SDF_RAYMARCH_EPS
+get_sdf_raymarch_eps() = sdf_raymarch_eps
 
 """
     get_sdf_miss_distance()
@@ -46,53 +45,44 @@ a miss: a shape farther from the start of the ray than this is not hit. Defaults
 """
 get_sdf_miss_distance() = sdf_miss_distance
 
-"""
-    get_sdf_inside_step()
-
-Returns the preference `sdf_inside_step`, the former fixed step size [m] of the ray marching
-inside an SDF volume. It is no longer used: a ray inside an SDF is marched by the distance that
-the SDF returns, see `BeamletOptics._raymarch_inside`.
-"""
-get_sdf_inside_step() = SDF_INSIDE_STEP
-
 
 # --- Numerical Thresholds ---
-const INTERNAL_REFLECTION_THRESHOLD = @load_preference("internal_reflection_threshold", 1e-6)
-const LINE_PLANE_INTERSECTION_THRESHOLD = @load_preference("line_plane_intersection_threshold", 1e-6)
-const ORTHOGONALITY_THRESHOLD = @load_preference("orthogonality_threshold", 1e-10)
+const internal_reflection_threshold = @load_preference("internal_reflection_threshold", 1e-6)
+const line_plane_intersection_threshold = @load_preference("line_plane_intersection_threshold", 1e-6)
+const orthogonality_threshold = @load_preference("orthogonality_threshold", 1e-10)
 
 """
     get_internal_reflection_threshold()
 
 Returns the global configuration threshold for total internal reflection detection.
 """
-get_internal_reflection_threshold() = INTERNAL_REFLECTION_THRESHOLD
+get_internal_reflection_threshold() = internal_reflection_threshold
 
 """
     get_line_plane_intersection_threshold()
 
 Returns the global configuration threshold for line-plane intersection calculations.
 """
-get_line_plane_intersection_threshold() = LINE_PLANE_INTERSECTION_THRESHOLD
+get_line_plane_intersection_threshold() = line_plane_intersection_threshold
 
 """
     get_orthogonality_threshold()
 
 Returns the global configuration threshold for orthogonality checks (e.g., beam support axes).
 """
-get_orthogonality_threshold() = ORTHOGONALITY_THRESHOLD
+get_orthogonality_threshold() = orthogonality_threshold
 
 
 # --- Tracing Defaults ---
-const DEFAULT_R_MAX = @load_preference("default_r_max", 100)
-const DEFAULT_DEPTH_MAX = @load_preference("default_depth_max", 100)
+const default_r_max = @load_preference("default_r_max", 100)
+const default_depth_max = @load_preference("default_depth_max", 100)
 
 """
     get_default_r_max()
 
 Returns the default maximum number of segments for ray tracing.
 """
-get_default_r_max() = DEFAULT_R_MAX
+get_default_r_max() = default_r_max
 
 """
     get_default_depth_max()
@@ -100,38 +90,38 @@ get_default_r_max() = DEFAULT_R_MAX
 Returns the default maximum depth for recursive ray tracing (e.g., reflections/refractions).
 Defaults to 100 (configurable via the `default_depth_max` preference).
 """
-get_default_depth_max() = DEFAULT_DEPTH_MAX
+get_default_depth_max() = default_depth_max
 
 
 # --- Physical Defaults ---
-const DEFAULT_WAVELENGTH = @load_preference("default_wavelength", 1e-6)
-const DEFAULT_WAIST = @load_preference("default_waist", 1e-3)
-const DEFAULT_POWER = @load_preference("default_power", 1e-3)
+const default_wavelength = @load_preference("default_wavelength", 1e-6)
+const default_waist = @load_preference("default_waist", 1e-3)
+const default_power = @load_preference("default_power", 1e-3)
 
 """
     get_default_wavelength()
 
 Returns the default wavelength in meters.
 """
-get_default_wavelength() = DEFAULT_WAVELENGTH
+get_default_wavelength() = default_wavelength
 
 """
     get_default_waist()
 
 Returns the default beam waist radius in meters.
 """
-get_default_waist() = DEFAULT_WAIST
+get_default_waist() = default_waist
 
 """
     get_default_power()
 
 Returns the default beam total power in Watts.
 """
-get_default_power() = DEFAULT_POWER
+get_default_power() = default_power
 
 
 # --- Progress Bars ---
-const PROGRESS_THRESHOLD = @load_preference("progress_threshold", 5.0)
+const progress_threshold = @load_preference("progress_threshold", 5.0)
 
 """
     get_progress_threshold()
@@ -141,7 +131,7 @@ Returns the runtime in seconds after which long-running calls (`solve_system!` o
 Defaults to 5 s (configurable via the `progress_threshold` preference, see
 [`set_progress_threshold!`](@ref)). `Inf` disables all progress bars.
 """
-get_progress_threshold() = PROGRESS_THRESHOLD
+get_progress_threshold() = progress_threshold
 
 
 """
