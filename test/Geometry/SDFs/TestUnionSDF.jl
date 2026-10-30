@@ -130,7 +130,7 @@ BMO.normal3d(::NormalProbeSDF, ::Any) = SENTINEL
         ring = BMO.RingSDF(1.0, 0.5, 2.0)
         @test BMO.thickness(a + b + ring) ≈ 3.0
         # operands without a `thickness` method fail loudly
-        @test_throws MethodError BMO.thickness(a + BMO.CutSphereSDF(1.0, 0.5))
+        @test_throws "thickness not defined for" BMO.thickness(a + BMO.CutSphereSDF(1.0, 0.5))
     end
 
     @testset "Kinematics (AbstractCompositeSDF)" begin

@@ -113,8 +113,8 @@ BMO.sdf(c::CountingSDF, point) = (c.count += 1; BMO.sdf(c.shape, point))
         @test BMO.thickness(BMO.CylinderSDF(0.5, 1.0)) === 2.0
         # no material on the axis of a ring
         @test BMO.thickness(BMO.RingSDF(10.0f-3, 2.0f-3, 5.0f-3)) === 0.0f0
-        # no generic fallback
-        @test_throws MethodError BMO.thickness(BMO.CutSphereSDF(1.0, 0.5))
+        # the fallback throws instead of returning 0
+        @test_throws "thickness not defined for" BMO.thickness(BMO.CutSphereSDF(1.0, 0.5))
     end
 
     @testset "Testing normal3d" begin

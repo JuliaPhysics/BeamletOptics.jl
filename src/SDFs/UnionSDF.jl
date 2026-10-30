@@ -37,8 +37,7 @@ operands(u::UnionSDF) = u.sdfs
     thickness(union)
 
 Calculates the thickness of a union of [`AbstractLensSDF`](@ref)s as the sum of the thicknesses
-of its operands, e.g. 0 for a mount ring. Throws a `MethodError` for an operand without
-`thickness`.
+of its operands, e.g. 0 for a mount ring. Throws for an operand without its own `thickness`.
 """
 function thickness(u::UnionSDF{T}) where T
     t = zero(T)

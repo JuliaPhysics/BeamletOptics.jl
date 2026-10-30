@@ -15,6 +15,14 @@ Subtypes of `AbstractSDF` should implement all reqs. of `AbstractShape` as well 
 """
 abstract type AbstractSDF{T} <: AbstractShape{T} end
 
+"""
+    thickness(s::AbstractSDF)
+
+Returns the material of `s` on its optical axis (local y) in \\[m\\]. Throws for a shape without its
+own method.
+"""
+thickness(s::AbstractSDF) = error(lazy"thickness not defined for $(typeof(s))")
+
 function orientation!(sdf::AbstractSDF, dir)
     sdf.dir = dir
     transposed_orientation!(sdf, copy(transpose(dir)))
