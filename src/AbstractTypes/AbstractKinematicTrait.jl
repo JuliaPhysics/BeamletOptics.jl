@@ -14,6 +14,10 @@ Two traits are defined:
    ([`Oriented`](@ref) or [`Directed`](@ref))
    selects orientation- or direction-based behaviour
 
+The trait is opt-in: shapes, objects, rays, beams, beam groups and object groups declare it on
+their abstract type, any other type with its own `kinematic_trait_of` method. For a type without
+a method, `kinematic_trait_of` and every kinematic function throw an `ErrorException`.
+
 A subtype of a movable abstract type can opt out of the kinematic API by declaring its own
 `kinematic_trait_of` method, e.g.
 
@@ -37,6 +41,10 @@ class from its own constructor. The container then takes that class: `Static` if
 are `Static`, else `Movable(`[`Oriented`](@ref)`())`. All shapes returned
 by `shape(object)` of a [`MultiShape`](@ref) object must be movable, since `MultiShape` objects
 (e.g. a `CubeBeamsplitter`) have no shared constructor to enforce this.
+
+A container moves each of its members once per motion, compared by identity (`===`). Two members
+that reach the same shape, or a static value at any level, throw an `ArgumentError` before
+anything moves, see `shape`.
 """
 abstract type AbstractKinematicTrait end
 
@@ -45,7 +53,6 @@ abstract type AbstractKinematicTrait end
 
 Represents a value that cannot be moved. Every kinematic function throws an `ArgumentError`; the
 getters (e.g. `position`, [`orientation`](@ref)) stay available.
-This is the fallback of [`kinematic_trait_of`](@ref).
 """
 struct Static <: AbstractKinematicTrait end
 
@@ -141,52 +148,69 @@ end
 """
     kinematic_trait_of(x) -> AbstractKinematicTrait
 
-Returns the [`AbstractKinematicTrait`](@ref) of `x`. Defaults to [`Static`](@ref)`()`.
-Movable types declare [`Movable`](@ref)`(`[`Oriented`](@ref)`())` or `Movable(`[`Directed`](@ref)`())`.
+Returns the [`AbstractKinematicTrait`](@ref) of `x`. A type takes part in the kinematic API only
+if it opts in with a typed method: movable types declare [`Movable`](@ref)`(`[`Oriented`](@ref)`())`
+or `Movable(`[`Directed`](@ref)`())`, static types [`Static`](@ref)`()`. Throws an
+`ErrorException` for any other type.
 """
-kinematic_trait_of(x) = Static()
+kinematic_trait_of(x) = error(lazy"kinematic_trait_of not defined for $(typeof(x))")
 
 """
-    is_static(x)
-
-Returns `true` if the [`kinematic_trait_of`](@ref) `x` is [`Static`](@ref).
-"""
-is_static(x) = kinematic_trait_of(x) isa Static
-
-"""
-    _check_kinematic_members(members)
+    check_kinematic_members(members)
 
 Throws an `ArgumentError` if some `members` of a container are [`Static`](@ref)
-and some are [`Movable`](@ref). Empty collections pass.
+and some are [`Movable`](@ref). Empty collections pass. The constructor of an own
+[`AbstractObjectGroup`](@ref) calls it on its objects.
 """
-function _check_kinematic_members(members)
-    has_static = false
-    has_movable = false
-    for m in members
-        if is_static(m)
-            has_static = true
-        else
-            has_movable = true
-        end
-        if has_static && has_movable
-            throw(ArgumentError("container members must be either all static or all movable, see `kinematic_trait_of`"))
-        end
-    end
-    return nothing
+function check_kinematic_members(members::Union{Tuple, AbstractArray})
+    allequal(m -> _container_trait(kinematic_trait_of(m)), members) && return nothing
+    throw(ArgumentError("container members must be either all static or all movable, see `kinematic_trait_of`"))
 end
 
 """
     _container_trait(members)
+    _container_trait(trait::AbstractKinematicTrait)
 
 Returns the kinematic trait of a container with homogeneous `members` (see
-`_check_kinematic_members`): `Static()` if the
-members are static, else `Movable(Oriented())`.
+`check_kinematic_members`), or of a container whose members have the trait `trait`:
+`Static()` for static members, else `Movable(Oriented())`. An empty container is movable.
 """
-_container_trait(members) = (!isempty(members) && is_static(first(members))) ? Static() : Movable(Oriented())
+function _container_trait(members::Union{Tuple, AbstractArray})
+    isempty(members) && return Movable(Oriented())
+    return _container_trait(kinematic_trait_of(first(members)))
+end
 
-_static_error(x) = throw(ArgumentError(lazy"$(typeof(x)) is static and cannot be moved, see `kinematic_trait_of`"))
+_container_trait(::Static) = Static()
+_container_trait(::Movable) = Movable(Oriented())
 
-# entry point functions below
+"""
+    _move_rigidly!(frames, parts, offset)
+    _move_rigidly!(frames, parts, R::AbstractMatrix, pivot::AbstractVector)
+
+Moves a container by `offset`, or rotates it by `R` about `pivot`: first the pose of every frame,
+then every part with the public [`translate3d!`](@ref) or [`rotate3d!`](@ref). The caller passes
+each part once.
+"""
+function _move_rigidly!(frames::Union{Tuple, AbstractVector}, parts::Union{Tuple, AbstractVector}, offset)
+    foreach(frame -> position!(frame, position(frame) .+ offset), frames)
+    foreach(part -> translate3d!(part, offset), parts)
+    return nothing
+end
+
+function _move_rigidly!(frames::Union{Tuple, AbstractVector}, parts::Union{Tuple, AbstractVector},
+                        R::AbstractMatrix, pivot::AbstractVector)
+    for frame in frames
+        p = position(frame)
+        orientation!(frame, R * orientation(frame))
+        position!(frame, pivot + R * (p - pivot))
+    end
+    foreach(part -> rotate3d!(part, R, pivot), parts)
+    return nothing
+end
+
+static_error(x) = throw(ArgumentError(lazy"$(typeof(x)) is static and cannot be moved, see `kinematic_trait_of`"))
+
+# Entry points
 
 """
     translate3d!(x, offset)
@@ -253,14 +277,16 @@ align3d!(x, target) = align3d!(kinematic_trait_of(x), x, target)
 """
     reset_translation3d!(x)
 
-Moves `x` such that its `position` is the global origin. See [`BeamletOptics.Movable`](@ref).
+Moves `x` such that its `position` is the global origin. The result is exact, because `p + (-p)`
+is zero in IEEE arithmetic. See [`BeamletOptics.Movable`](@ref).
 """
 reset_translation3d!(x) = reset_translation3d!(kinematic_trait_of(x), x)
 
 """
     reset_rotation3d!(x)
 
-Rotates `x` about its `position` such that its [`orientation`](@ref) is the identity. Only
+Rotates `x` about its `position` such that its [`orientation`](@ref) is the identity. The
+inverse of the orientation is its transpose, which is exact for all angles, including π. Only
 available for [`BeamletOptics.Oriented`](@ref) values, see [`BeamletOptics.Movable`](@ref).
 """
 reset_rotation3d!(x) = reset_rotation3d!(kinematic_trait_of(x), x)
@@ -275,29 +301,25 @@ direction(x) = direction(kinematic_trait_of(x), x)
 
 # Static branch: every kinematic functions throws
 
-translate3d!(::Static, x, offset) = _static_error(x)
-rotate3d!(::Static, x, R::AbstractMatrix) = _static_error(x)
-rotate3d!(::Static, x, axis::AbstractVector, θ::Real) = _static_error(x)
-rotate3d!(::Static, x, R::AbstractMatrix, pivot::AbstractVector) = _static_error(x)
-rotate3d!(::Static, x, axis::AbstractVector, θ::Real, pivot::AbstractVector) = _static_error(x)
-translate_to3d!(::Static, x, target) = _static_error(x)
-xrotate3d!(::Static, x, θ) = _static_error(x)
-yrotate3d!(::Static, x, θ) = _static_error(x)
-zrotate3d!(::Static, x, θ) = _static_error(x)
-align3d!(::Static, x, target) = _static_error(x)
-reset_translation3d!(::Static, x) = _static_error(x)
-reset_rotation3d!(::Static, x) = _static_error(x)
-direction(::Static, x) = _static_error(x)
+translate3d!(::Static, x, offset) = static_error(x)
+rotate3d!(::Static, x, R::AbstractMatrix) = static_error(x)
+rotate3d!(::Static, x, axis::AbstractVector, θ::Real) = static_error(x)
+rotate3d!(::Static, x, R::AbstractMatrix, pivot::AbstractVector) = static_error(x)
+rotate3d!(::Static, x, axis::AbstractVector, θ::Real, pivot::AbstractVector) = static_error(x)
+translate_to3d!(::Static, x, target) = static_error(x)
+xrotate3d!(::Static, x, θ) = static_error(x)
+yrotate3d!(::Static, x, θ) = static_error(x)
+zrotate3d!(::Static, x, θ) = static_error(x)
+align3d!(::Static, x, target) = static_error(x)
+reset_translation3d!(::Static, x) = static_error(x)
+reset_rotation3d!(::Static, x) = static_error(x)
+direction(::Static, x) = static_error(x)
 
 # Movable branch: primitive fallbacks, must be implemented per type
 
-function translate3d!(::Movable, x, offset)
-    throw(ErrorException(lazy"translate3d!(::Movable, x, offset) not implemented for $(typeof(x))"))
-end
+translate3d!(::Movable, x, offset) = error(lazy"translate3d!(::Movable, x, offset) not defined for $(typeof(x))")
 
-function rotate3d!(::Movable, x, R::AbstractMatrix)
-    throw(ErrorException(lazy"rotate3d!(::Movable, x, R::AbstractMatrix) not implemented for $(typeof(x))"))
-end
+rotate3d!(::Movable, x, R::AbstractMatrix) = error(lazy"rotate3d!(::Movable, x, R::AbstractMatrix) not defined for $(typeof(x))")
 
 # Movable branch: generic derived verbs, inner calls use the public entry points
 
@@ -335,15 +357,15 @@ function align3d!(::Movable, x, target)
 end
 
 function reset_translation3d!(::Movable, x)
-    # p + (-p) is exactly zero in IEEE arithmetic
+    # Translate by the negative position
     translate3d!(x, -position(x))
     return nothing
 end
 
 function reset_rotation3d!(::Movable{Oriented}, x)
-    # The inverse of the orthonormal orientation is its transpose (robust for all angles incl. π)
+    # Rotate by the inverse orientation
     rotate3d!(x, transpose(orientation(x)))
-    # Reset orientation (removes precision artifacts)
+    # Remove precision artifacts
     orientation!(x, one(orientation(x)))
     return nothing
 end

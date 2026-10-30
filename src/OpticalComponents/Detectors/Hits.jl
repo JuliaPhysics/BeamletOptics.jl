@@ -119,7 +119,8 @@ the geometric path and `ψ0` the Gouy phase that the beam has collected up to th
 holds the waist and divergence rays of the segment (see [`BeamletOptics.GaussianSegment`](@ref)),
 from which the field follows as from the beamlet itself, see [`gauss_parameters`](@ref).
 `E_amp` is the reference amplitude times the beam radius, `E0 w0` of the source, which is normalized to the
-power of the beamlet: the physical field in a medium of index `n` is smaller by `√n`, see [`beamlet_hit_field`](@ref).
+power of the beamlet: the physical field in a medium of index `n` is smaller by `√n`, see
+[`electric_field(::BeamletOptics.AbstractDetectorHit, ::AbstractVector)`](@ref).
 """
 struct GaussianBeamletHit{T} <: AbstractBeamletHit{T}
     l0::T
@@ -153,7 +154,7 @@ struct AstigmaticGaussianBeamletHit{T} <: AbstractBeamletHit{T}
     # Amplitude and Gouy factor of the complex beam area a at the local distance l behind
     # p0, as gouy0 / (√(1 − ρ1 l) √(1 − ρ2 l)): gouy0 is the change of the amplitude with the
     # beam area and the Gouy phase up to p0, followed from the start of the root beam (see
-    # `_area_from_root`), ρ1 and ρ2 are the inverse roots of a(l) (see `_area_inverse_roots`)
+    # `_area_from_root`), ρ1 and ρ2 are the inverse roots of a(l) (see `area_inverse_roots`)
     gouy0::Complex{T}
     ρ1::Complex{T}
     ρ2::Complex{T}
@@ -178,7 +179,7 @@ hit_point(hit::AbstractBeamletHit) = hit.p0 + hit.l_seg * hit.d0
 """
     GaussianBeamletHit(g::GaussianBeamlet, id)
 
-Hit record of the traced segment `id` of `g`: the data that [`beamlet_hit_field`](@ref)
+Hit record of the traced segment `id` of `g`: the data that [`electric_field`](@ref)`(hit, p)`
 needs to evaluate the field of that segment at any point near it. [`Detector`](@ref)s store
 one per beamlet that hits them; it can also be built for any traced segment, e.g. to sample
 a beamlet on a plane of one's own. `l0` is the length of the beam (including its parents)
@@ -186,21 +187,21 @@ up to the start of the segment.
 """
 function GaussianBeamletHit(g::GaussianBeamlet{R}, id::Integer) where {R}
     ray = g.chief.rays[id]
-    l0 = _length_before(g.chief, id)
+    l0 = length_before(g, id)
     p0 = position(ray)
     d0 = direction(ray)
     segment = GaussianSegment(g, id)
     l_seg = length(ray)
     # Beam radius at the end of the segment, for the auto-limits of the field plots
     w_max = first(gauss_parameters(segment, isfinite(l_seg) ? l_seg : zero(R)))
-    return GaussianBeamletHit{R}(l0, _path_excess_before(g, id), _gouy_before(g, id), p0, d0, l_seg,
+    return GaussianBeamletHit{R}(l0, path_excess_before(g, id), _gouy_before(g, id), p0, d0, l_seg,
         segment, electric_field(g) * beam_waist(g), w_max)
 end
 
 """
     AstigmaticGaussianBeamletHit(agb::AstigmaticGaussianBeamlet, id)
 
-Hit record of the traced segment `id` of `agb`: the data that [`beamlet_hit_field`](@ref)
+Hit record of the traced segment `id` of `agb`: the data that [`electric_field`](@ref)`(hit, p)`
 needs to evaluate the field of that segment at any point near it, including the optical
 path from the source (parents included), the Gouy factor and the amplitude. The amplitude is
 that of the polarization of the chief ray of the segment, times the change with the beam
@@ -225,9 +226,9 @@ function AstigmaticGaussianBeamletHit(agb::AstigmaticGaussianBeamlet{R}, id::Int
     start = _area_from_root(agb, id, zero(R))
     # Gouy factor at p0 and inverse roots of the area along the hit segment, constant per
     # hit, so that the field loop over the detector pixels does not recompute them
-    A = _area_coefficients(h1, u1, h2, u2, d0)
+    A = area_coefficients(h1, u1, h2, u2, d0)
     gouy0 = start.scale * cis(-start.arg / 2)
-    ρ1, ρ2 = _area_inverse_roots(A)
+    ρ1, ρ2 = area_inverse_roots(A)
 
     # Complex amplitude of the segment: its chief ray carries what the surfaces on the way did
     # to the field (Fresnel coefficients, polarizers, beamsplitters)
@@ -258,14 +259,4 @@ function AstigmaticGaussianBeamletHit(agb::AstigmaticGaussianBeamlet{R}, id::Int
     return AstigmaticGaussianBeamletHit{R}(
         R(l0), p0, d0, h1, u1, h2, u2, gouy0, ρ1, ρ2, k0, R(Δl),
         n_eff, E_ref_amp, w_max, length(chief), wavelength(chief), E_vec)
-end
-
-# Geometric length of `beam` (including its parents) up to the start of ray `id`
-function _length_before(beam::Beam{T}, id::Integer) where {T}
-    p = AbstractTrees.parent(beam)
-    l = isnothing(p) ? zero(T) : length(p)
-    for j in 1:(id - 1)
-        l += length(rays(beam)[j])
-    end
-    return l
 end

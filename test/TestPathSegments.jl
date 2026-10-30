@@ -137,7 +137,7 @@ end
         cs = path_segments(g.chief; flen = 0.05)
         # the chief beam alone is the first branch; the children hang on the beamlet, so the
         # branch ends for the chief beam alone and goes on for the beamlet
-        unleaf(segs) = [merge(s, (; leaf = false)) for s in segs]
+        unleaf(segs) = [map(f -> getfield(s, f), filter(!=(:leaf), fieldnames(typeof(s)))) for s in segs]
         @test unleaf(cs) == unleaf(gs[1:length(cs)])
         @test last(cs).leaf && !gs[length(cs)].leaf
         @test length(gs) > 3

@@ -47,7 +47,7 @@ sampling_args(cs::CollimatedSource) = (cs.diameter,)
 sampling_args(::PointSource) = ()
 
 """
-    set_num_rays!(group, n)
+    num_rays!(group, n)
 
 Regenerates the rays of the source `group` with `n` rays: a [`CollimatedSource`](@ref) or
 [`PointSource`](@ref), including [`UniformDiscSource`](@ref), [`UniformPointSource`](@ref),
@@ -57,7 +57,7 @@ the line or fan), in the current pose of the source and at its wavelength, i.e. 
 a new one with `num_rays = n` at its position and orientation. The rays start at the emission
 point of the current rays, also if [`set_pivot3d!`](@ref) moved the pivot of the source away from
 it. The previous beams, including their traced rays, are replaced: solve the system again
-afterwards.
+afterwards. Returns `group`.
 
 `n` must be at least [`BeamletOptics.min_num_rays`](@ref) of the source, i.e. `20 num_rings`
 for ring sources and `1` for sunflower, line and fan sources, otherwise an `ErrorException` is
@@ -65,7 +65,7 @@ thrown, like by the constructors, and the source keeps its rays. A source built 
 beams, e.g. `CollimatedSource(beams, diameter, pos, dir)`, can not be regenerated and throws an
 `ArgumentError`.
 """
-function set_num_rays!(src::Union{CollimatedSource{T}, PointSource{T}}, n::Integer) where {T}
+function num_rays!(src::Union{CollimatedSource{T}, PointSource{T}}, n::Integer) where {T}
     s, M, λ = src.sampling, src.orientation, wavelength(src)
     dir, b1, args = M[:, 2], M[:, 1], sampling_args(src)
     # The emission point, i.e. the start of the first ray minus its offset in the current
@@ -79,12 +79,13 @@ end
 """
     min_num_rays(src) -> Union{Nothing, Int}
 
-The fewest rays with which [`set_num_rays!`](@ref) regenerates the source `src`: `20 num_rings`
+The fewest rays with which [`num_rays!`](@ref) regenerates the source `src`: `20 num_rings`
 for ring sources, `1` for sunflower, line and fan sources, and `nothing` if the rays of `src` can
 not be regenerated, e.g. a source built from given beams or any other beam or beam group. Also
 defined for the [`BeamletOptics.AbstractSourceSampling`](@ref) of a source.
 """
-min_num_rays(src) = nothing
+min_num_rays(::AbstractBeam) = nothing
+min_num_rays(::AbstractBeamGroup) = nothing
 min_num_rays(src::Union{CollimatedSource, PointSource}) = min_num_rays(src.sampling)
 
 include("AstigmaticBeamGroup.jl")

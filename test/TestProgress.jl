@@ -123,8 +123,8 @@ end
     end
 
     @testset "electric_field for beamlet and polarized hits" begin
-        field_matches(pd) = electric_field(pd, RegularGrid(n = 50); progress = true) ==
-                            electric_field(pd, RegularGrid(n = 50); progress = false)
+        field_matches(pd) = electric_field(pd, RegularGrid(num_points = 50); progress = true) ==
+                            electric_field(pd, RegularGrid(num_points = 50); progress = false)
 
         @testset "GaussianBeamletHit" begin
             pd = Detector(20mm)

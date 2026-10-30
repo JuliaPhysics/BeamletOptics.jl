@@ -18,7 +18,7 @@ using BeamletOptics
 import BeamletOptics: Detector, GaussianBeamletHit, AstigmaticGaussianBeamletHit,
                        GaussianBeamlet, AstigmaticGaussianBeamlet,
                        position, direction, orientation, wavelength, refractive_index,
-                       beamlet_hit_field, beamlet_hit_polarization,
+                       electric_field,
                        WavefrontBeamletDecomposition, GaussianModeDecomposition,
                        translate_to3d!, _with_progress,
                        _tick!
@@ -77,10 +77,10 @@ empties it. Requires `using OpticsBase` (package extension).
   matches the surface-equivalence-theorem content of `PlaneField` even for beams that hit
   the plane off-normal. `R = Inf` (no reference sphere removed: BMO's beamlet field
   already carries the full spatial phase without needing one).
-- `Eᵢ` needs a 3D direction for each hit's otherwise-scalar contribution:
-  [`AstigmaticGaussianBeamletHit`](@ref BeamletOptics.AstigmaticGaussianBeamletHit)s use
-  their chief ray's own polarization ([`beamlet_hit_polarization`](@ref
-  BeamletOptics.beamlet_hit_polarization)). Stigmatic
+- `Eᵢ` is the 3D field of each hit:
+  [`AstigmaticGaussianBeamletHit`](@ref BeamletOptics.AstigmaticGaussianBeamletHit)s
+  carry the polarization of their chief ray, `Eᵢ` is their field vector
+  ([`electric_field`](@ref BeamletOptics.electric_field)`(hit, p)`). Stigmatic
   [`GaussianBeamletHit`](@ref BeamletOptics.GaussianBeamletHit)s carry no polarization in
   BMO (the model is scalar); by convention, matching `OpticsBase`'s own rule for a scalar
   field (`PlaneField(E::AbstractMatrix, ...)` puts a scalar field entirely into `Eu`),
@@ -166,17 +166,21 @@ function _common_wavelength_index(hs::AbstractVector{<:Union{GaussianBeamletHit,
 end
 _common_wavelength_index(hs::AbstractVector) = _beamlet_hits_error(hs)
 
-# Per-hit 3D field direction: the chief ray's own polarization for astigmatic hits. A
-# stigmatic hit has no polarization in BMO; it gets the plane's `u` axis made transverse
-# to the hit direction (`v` if `u` is parallel to it), so that E ⟂ d and H = (n/Z₀) d × E
-# form a consistent plane wave.
-function _hit_field_direction(hit::GaussianBeamletHit, u, v)
+# Per-hit 3D field direction on the plane with the axes `u` and `v`. A stigmatic hit has no
+# polarization in BMO; it gets the plane's `u` axis made transverse to the hit direction
+# (`v` if `u` is parallel to it), so that E ⟂ d and H = (n/Z₀) d × E form a consistent
+# plane wave. An astigmatic hit needs none: its field is a 3D vector already.
+function hit_field_direction(hit::GaussianBeamletHit, u::SVector{3, T}, v) where {T}
     d = direction(hit)
     e = norm(cross(d, u)) > 1e-6 ? u : v
     p = e - dot(d, e) * d
-    return p / norm(p)
+    return SVector{3, Complex{T}}(p / norm(p))
 end
-_hit_field_direction(hit::AstigmaticGaussianBeamletHit, u, v) = beamlet_hit_polarization(hit)
+hit_field_direction(::AstigmaticGaussianBeamletHit, u, v) = nothing
+
+# 3D field of a hit at `p`, with its direction `pol` from `hit_field_direction`
+hit_field(hit::GaussianBeamletHit, p, pol::SVector{3}) = electric_field(hit, p) .* pol
+hit_field(hit::AstigmaticGaussianBeamletHit, p, ::Nothing) = electric_field(hit, p)
 
 function _sample_plane_field(hs, λ, n_medium, (nx, ny), (Δu, Δv), origin, axes, progress)
     T = typeof(float(λ))
@@ -191,7 +195,7 @@ function _sample_plane_field(hs, λ, n_medium, (nx, ny), (Δu, Δv), origin, axe
     H = zeros(Complex{T}, nx, ny, 2)
 
     hit_dirs = [SVector{3, T}(direction(h)) for h in hs]
-    hit_pols = [SVector{3, Complex{T}}(_hit_field_direction(h, u, v)) for h in hs]
+    hit_pols = [hit_field_direction(h, u, v) for h in hs]
 
     Y = T(n_medium / VACUUM_IMPEDANCE)
 
@@ -203,7 +207,7 @@ function _sample_plane_field(hs, λ, n_medium, (nx, ny), (Δu, Δv), origin, axe
                 E3 = zero(SVector{3, Complex{T}})
                 C3 = zero(SVector{3, Complex{T}})    # Σᵢ dᵢ × Eᵢ
                 for (hit, d, pol) in zip(hs, hit_dirs, hit_pols)
-                    Ei = beamlet_hit_field(hit, p) .* pol
+                    Ei = hit_field(hit, p, pol)
                     E3 += Ei
                     C3 += cross(d, Ei)
                 end

@@ -17,7 +17,7 @@ as one, e.g. a cemented doublet, is an [`AbstractObject`](@ref) with the [`Multi
 
 Subtypes of `AbstractObjectGroup` must implement the following:
 
-## Fields:
+## Fields
 
 - `objects`: a tuple or a vector of [`AbstractObject`](@ref)s or additional subgroups, allows for hierarchical structures.
   Only [`ObjectGroup`](@ref) can be changed after its construction, via `push!` and `delete!`.
@@ -26,7 +26,7 @@ Subtypes of `AbstractObjectGroup` must implement the following:
 
 Since the kinematic API modifies `center` and `dir`, the subtype must be a `mutable struct`.
 
-## Functions:
+## Getters/setters
 
 If the fields above do not exist, the following getters/setters must be dispatched:
 
@@ -34,13 +34,20 @@ If the fields above do not exist, the following getters/setters must be dispatch
 - `position` / `position!`: gets or sets the reference origin (pivot)
 - [`orientation`](@ref) / `orientation!`: gets or sets the orientation matrix
 
+## Functions
+
+None required: no `interact3d` method; the kinematic primitives below are generic.
+
 ## Kinematic
 
 An `AbstractObjectGroup` is a container: it takes the kinematic class of its `objects`, i.e.
 [`BeamletOptics.Movable`](@ref) with an [`BeamletOptics.Oriented`](@ref) frame for movable objects, see
 [`BeamletOptics.AbstractKinematicTrait`](@ref). The constructors must check that the `objects` are either
-all static or all movable, e.g. with `allequal(BeamletOptics.is_static, objects)`. The primitives `translate3d!(::Movable, group, offset)` and
-`rotate3d!(::Movable, group, R::AbstractMatrix)` move all `objects` and the pose of the group.
+all static or all movable, i.e. that [`kinematic_trait_of`](@ref) returns
+[`BeamletOptics.Static`](@ref) for every object or a `Movable` for every object: call
+[`BeamletOptics.check_kinematic_members`](@ref)`(objects)`. The primitives `translate3d!(::Movable, group, offset)` and
+`rotate3d!(::Movable, group, R::AbstractMatrix)` move all `objects` and the pose of the group. A group that is
+nested in another group moves as a frame (`position!`/`orientation!`), its own primitives are not called then.
 """
 abstract type AbstractObjectGroup{T} end
 
@@ -68,13 +75,13 @@ Iterates the objects at all depths of `tree`, an object, an object group or a co
 `Leaves(tree)` without the nodes that have no children but are no objects, i.e. empty groups and an
 empty collection.
 """
-_leaf_objects(tree) = Iterators.filter(_is_object, Leaves(tree))
+_leaf_objects(tree::Union{ObjectOrGroup, Tuple, AbstractArray}) = Iterators.filter(_is_object, Leaves(tree))
 
 _is_object(::AbstractObject) = true
 _is_object(::Any) = false
 
 # The type of `_leaf_objects(tree)`, e.g. of the objects of a `System`, see `intersect3d(parts, ray)`
-const _LeafObjects = Iterators.Filter{typeof(_is_object), <:Leaves}
+const LeafObjects = Iterators.Filter{typeof(_is_object), <:Leaves}
 
 kinematic_trait_of(group::AbstractObjectGroup) = _container_trait(objects(group))
 
@@ -113,13 +120,28 @@ function set_pivot3d!(group::AbstractObjectGroup, pivot)
 end
 
 """
+    unwind(group) -> (subgroups, leaves)
+
+Unwinds the tree of `group` for one rigid motion, each node once, compared by identity (`===`):
+the `subgroups`, including `group`, move their `center` and `dir`; the `leaves` are its objects,
+which are moved with their public verbs, see `_movable_parts`.
+"""
+function unwind(group::AbstractObjectGroup)
+    subgroups = unique(objectid, Iterators.filter(!_is_object, PreOrderDFS(group)))
+    leaves = _movable_parts(collect(_leaf_objects(group)))
+    return subgroups, leaves
+end
+
+"""
     translate3d!(::Movable, group::AbstractObjectGroup, offset)
 
-Moves all objects of the `group` and its `center` by `offset`.
+Moves all objects of the `group` and its `center` by `offset`. Every object and subgroup moves
+once, also if the `group` holds it along several paths, see the containers in
+[`BeamletOptics.AbstractKinematicTrait`](@ref).
 """
 function translate3d!(::Movable, group::AbstractObjectGroup, offset)
-    position!(group, position(group) .+ offset)
-    foreach(member -> translate3d!(member, offset), objects(group))
+    subgroups, leaves = unwind(group)
+    _move_rigidly!(subgroups, leaves, offset)
     return nothing
 end
 
@@ -127,11 +149,12 @@ end
     rotate3d!(::Movable, group::AbstractObjectGroup, R::AbstractMatrix)
 
 Rotates all objects of the `group` by `R` about the group `center` and updates the group
-[`orientation`](@ref) to `R * orientation(group)`.
+[`orientation`](@ref) to `R * orientation(group)`. Every object and subgroup moves once, see
+`translate3d!(::Movable, group::AbstractObjectGroup, offset)`.
 """
 function rotate3d!(::Movable, group::AbstractObjectGroup, R::AbstractMatrix)
-    orientation!(group, R * orientation(group))
     pivot = position(group)
-    foreach(member -> rotate3d!(member, R, pivot), objects(group))
+    subgroups, leaves = unwind(group)
+    _move_rigidly!(subgroups, leaves, R, pivot)
     return nothing
 end

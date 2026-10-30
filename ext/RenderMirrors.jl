@@ -18,7 +18,7 @@ function _tessellate_conic(s::BMO.ConicSDF, r_hole)
     # outward normal of the front face y = y_surf(x, z), the substrate lies at y ≥ y_surf
     function n_surf(xl, zl)
         r_p = sqrt((xl + s.x_off)^2 + zl^2)
-        slope = r_p > 0 ? BMO._conic_slope(r_p, R, s.k) / r_p : zero(r_p)
+        slope = r_p > 0 ? BMO.conic_slope(r_p, R, s.k) / r_p : zero(r_p)
         return (-slope * (xl + s.x_off), -1, -slope * zl)
     end
     substrate = 0x01

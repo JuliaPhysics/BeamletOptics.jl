@@ -10,19 +10,19 @@ Represents a cone of [`Beam`](@ref)s being emitted from a single point in space.
 - `NA`: the [`numerical_aperture`](@ref) of the point source spread angle
 - `center`: source position, pivot for rotations
 - `orientation`: right-handed orthonormal matrix, columns are the sampling reference vector, the central source direction and their cross product, see [`AbstractBeamGroup`](@ref)
-- `sampling`: how the rays were sampled (rings, sunflower, fan, or given beams), see [`set_num_rays!`](@ref)
+- `sampling`: how the rays were sampled (rings, sunflower or fan) (or `NoSampling()` for given beams), see [`num_rays!`](@ref)
 
 # Functions
 
 - `numerical_aperture`: returns the NA of the source
-- [`set_num_rays!`](@ref): regenerates the rays with another number of rays
+- [`num_rays!`](@ref): regenerates the rays with another number of rays
 """
-mutable struct PointSource{T, R <: AbstractRay{T}} <: AbstractBeamGroup{T, R}
+mutable struct PointSource{T, R <: AbstractRay{T}, S <: AbstractSourceSampling} <: AbstractBeamGroup{T, R}
     beams::Vector{Beam{T, R}}
     NA::T
     center::Point3{T}
     orientation::SMatrix{3, 3, T, 9}
-    sampling::AbstractSourceSampling
+    sampling::S
 end
 
 """
@@ -34,7 +34,7 @@ source position `pos`. The group orientation is either derived from the central 
 `dir` (the sampling reference vector is then picked deterministically via [`normal3d`](@ref)),
 or passed explicitly as a right-handed orthonormal 3x3 `orientation` matrix whose second column
 is the central direction. An invalid `orientation` throws an `ArgumentError`. The rays of such a
-source can not be regenerated with [`set_num_rays!`](@ref).
+source can not be regenerated with [`num_rays!`](@ref): its `sampling` is `NoSampling()`.
 """
 function PointSource(beams::Vector{Beam{T, R}}, NA, pos, dir::AbstractVector) where {T, R <: AbstractRay{T}}
     d = normalize(dir)
@@ -45,9 +45,9 @@ PointSource(beams::Vector{<:Beam}, NA, pos, orientation::AbstractMatrix) =
     PointSource(beams, NA, pos, orientation, NoSampling())
 
 function PointSource(beams::Vector{Beam{T, R}}, NA, pos, orientation::AbstractMatrix,
-        sampling::AbstractSourceSampling) where {T, R <: AbstractRay{T}}
-    _check_kinematic_members(beams)
-    return PointSource{T, R}(beams, T(NA), Point3{T}(pos), _check_orientation(orientation, T), sampling)
+        sampling::S) where {T, R <: AbstractRay{T}, S <: AbstractSourceSampling}
+    check_kinematic_members(beams)
+    return PointSource{T, R, S}(beams, T(NA), Point3{T}(pos), _check_orientation(orientation, T), sampling)
 end
 numerical_aperture(ps::PointSource) = ps.NA
 

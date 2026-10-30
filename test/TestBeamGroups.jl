@@ -514,7 +514,7 @@ const BMO = BeamletOptics
             translate3d!(src, [0.01, 0.02, -0.03])
             rotate3d!(src, normalize([1.0, 0.3, 0.2]), 0.4)
             for m in (n, last(counts))
-                set_num_rays!(src, m)
+                num_rays!(src, m)
                 center = first(BMO.beams(src))
                 @test isapprox(start(center), position(src); atol = 1e-12)
                 @test isapprox(heading(center), BMO.direction(src); atol = 1e-12)
@@ -530,7 +530,7 @@ const BMO = BeamletOptics
         @test cosines[2:end] ≈ [1 - (k + 0.5) / N * (1 - cos(θ)) for k in 1:(N - 1)]
     end
 
-    @testset "set_num_rays!" begin
+    @testset "num_rays!" begin
         pos, dir, λ = [0.1, -0.2, 0.3], normalize([0.2, 1.0, -0.1]), 633e-9
         start(b) = Vector(BMO.position(first(rays(b))))
         heading(b) = Vector(BMO.direction(first(rays(b))))
@@ -555,7 +555,7 @@ const BMO = BeamletOptics
             # moved and rotated, i.e. not in the pose of the constructor
             translate3d!(src, [0.01, 0.02, -0.03])
             rotate3d!(src, normalize([1.0, 0.3, 0.2]), 0.4)
-            @test set_num_rays!(src, 500) === src
+            @test num_rays!(src, 500) === src
             M = src.orientation
             fresh = make(Vector(position(src)), Vector(M[:, 2]), 500, Vector(M[:, 1]))
             @test same(src, fresh)
@@ -564,16 +564,16 @@ const BMO = BeamletOptics
         end
         # a point source wider than 90°, whose NA does not tell its half angle
         ps = PointSource(pos, dir, deg2rad(100), λ; num_rings = 4, num_rays = 200)
-        set_num_rays!(ps, 100)
+        num_rays!(ps, 100)
         @test maximum(b -> acosd(clamp(dot(heading(b), dir), -1, 1)), BMO.beams(ps)) ≈ 100
         # too few rays for the rings, like the constructor
         cs = CollimatedSource(pos, dir, 5e-3, λ; num_rings = 4, num_rays = 200)
-        @test_throws ErrorException set_num_rays!(cs, 79)
+        @test_throws ErrorException num_rays!(cs, 79)
         @test length(cs) == 200
         # given beams can not be regenerated
         wrapped = CollimatedSource(BMO.beams(cs), 5e-3, pos, dir)
-        @test_throws ArgumentError set_num_rays!(wrapped, 100)
-        @test_throws ArgumentError set_num_rays!(PointSource(BMO.beams(ps), 0.5, pos, dir), 100)
+        @test_throws ArgumentError num_rays!(wrapped, 100)
+        @test_throws ArgumentError num_rays!(PointSource(BMO.beams(ps), 0.5, pos, dir), 100)
 
         # the rays start at the emission point, not at a pivot moved by set_pivot3d!
         for make in sources
@@ -581,22 +581,44 @@ const BMO = BeamletOptics
             rotate3d!(src, normalize([1.0, 0.3, 0.2]), 0.4)
             M = src.orientation
             set_pivot3d!(src, pos + [0.0, -0.1, 0.02])
-            set_num_rays!(src, 300)
+            num_rays!(src, 300)
             fresh = make(pos, Vector(M[:, 2]), 300, Vector(M[:, 1]))
             @test same(src, fresh)
             @test position(src) ≈ pos + [0.0, -0.1, 0.02]
         end
 
-        # min_num_rays is the lower bound of set_num_rays!, the source keeps its rays below it
+        # min_num_rays is the lower bound of num_rays!, the source keeps its rays below it
         for (make, n_min) in zip(sources, (80, 1, 80, 1, 1, 1))
             src = make(pos, dir, 200, nothing)
             @test BMO.min_num_rays(src) == n_min
-            @test_throws ErrorException set_num_rays!(src, n_min - 1)
+            @test_throws ErrorException num_rays!(src, n_min - 1)
             @test length(src) == 200
-            @test length(set_num_rays!(src, n_min)) == n_min
+            @test length(num_rays!(src, n_min)) == n_min
         end
         @test isnothing(BMO.min_num_rays(wrapped))
         @test isnothing(BMO.min_num_rays(Beam(pos, dir, λ)))
+        @test_throws MethodError BMO.min_num_rays(1)
+
+        # a source built from given beams stores no sampling
+        wrapped_ps = PointSource(BMO.beams(ps), 0.5, pos, dir)
+        @test wrapped.sampling === BMO.NoSampling()
+        @test wrapped_ps.sampling === BMO.NoSampling()
+        @test_throws ArgumentError BMO.source_beams(BMO.NoSampling(), pos, dir, dir, λ, 10, Float64)
+
+        # a sampling without a source_beams method
+        struct NoMethodSampling <: BMO.AbstractSourceSampling end
+        @test_throws "source_beams not defined for" BMO.source_beams(NoMethodSampling(), pos, dir, dir, λ, 10, Float64)
+        @test BMO.min_num_rays(NoMethodSampling()) == 1
+    end
+
+    @testset "Source constructors infer" begin
+        pos, dir, λ = [0.1, -0.2, 0.3], [0.2, 1.0, -0.1], 633e-9
+        cs = @inferred CollimatedSource(pos, dir, 5e-3, λ; num_rings = 4, num_rays = 200)
+        ps = @inferred PointSource(pos, dir, 0.3, λ; num_rings = 4, num_rays = 200)
+        @test cs isa CollimatedSource{Float64, Ray{Float64}, BMO.DiscRings}
+        @test ps isa PointSource{Float64, Ray{Float64}, BMO.ConeRings}
+        @test (@inferred CollimatedSource(BMO.beams(cs), 5e-3, pos, dir)) isa CollimatedSource{Float64, Ray{Float64}, BMO.NoSampling}
+        @test (@inferred PointSource(BMO.beams(ps), 0.3, pos, dir)) isa PointSource{Float64, Ray{Float64}, BMO.NoSampling}
     end
 
     @testset "wavelength" begin

@@ -37,6 +37,14 @@ const BMO = BeamletOptics
         @test !BMO.isentering(r3)
     end
 
+    @testset "empty! returns the ray" begin
+        r = Ray([0, 0, 0], [0, 1, 0])
+        BMO.intersection!(r, BMO.Intersection(nothing, nothing, 0.0, Point3(0, 1.0, 0)))
+        @test !isnothing(BMO.intersection(r))
+        @test empty!(r) === r
+        @test isnothing(BMO.intersection(r))
+    end
+
     @testset "Testing refraction3d" begin
         n1 = 1
         n2 = 1.5

@@ -1,7 +1,8 @@
 """
     PathSegment{T}
 
-Element type of the vector returned by [`path_segments`](@ref), a `NamedTuple` with the fields
+Element type of the vector returned by [`path_segments`](@ref), a straight segment of a beam with
+the fields
 
 - `start`, `stop`: start and end point of the segment, `Point3{T}` in [m]
 - `s_start`, `s_stop`: geometric path length from the source to the start and the end of the segment [m]
@@ -21,12 +22,23 @@ Element type of the vector returned by [`path_segments`](@ref), a `NamedTuple` w
   its [`ObjectGroup`](@ref)), `nothing` for a final segment or if the intersection does not
   name its object
 """
-const PathSegment{T} = @NamedTuple{
-    start::Point3{T}, stop::Point3{T},
-    s_start::T, s_stop::T, opl_start::T, opl_stop::T,
-    λ::T, depth::Int, parent::Int, beam_index::Int, ray_index::Int, final::Bool, leaf::Bool,
+struct PathSegment{T}
+    start::Point3{T}
+    stop::Point3{T}
+    s_start::T
+    s_stop::T
+    opl_start::T
+    opl_stop::T
+    λ::T
+    depth::Int
+    parent::Int
+    beam_index::Int
+    ray_index::Int
+    final::Bool
+    leaf::Bool
+    # Any object of the system, the segments of one beam hit objects of different types
     object::Nullable{AbstractObject}
-}
+end
 
 """
     path_segments(beam::AbstractBeam; flen = 1.0) -> Vector{PathSegment}
@@ -37,7 +49,7 @@ straight segments, one per ray, in depth-first order. For a [`GaussianBeamlet`](
 [`AstigmaticGaussianBeamlet`](@ref) the segments are those of the chief ray. For a beam group the
 segments of all its beams are concatenated, the `beam_index` field gives the index of the beam.
 
-Each segment is a [`BeamletOptics.PathSegment`](@ref) `NamedTuple` with the start and end point, the
+Each segment is a [`BeamletOptics.PathSegment`](@ref) with the start and end point, the
 accumulated geometric path length `s_start`, `s_stop` and optical path length `opl_start`,
 `opl_stop` (refractive index of the medium of the ray times its length), the wavelength `λ`, the
 `depth` in the beam tree, the `parent` segment index, from which the branches can be rebuilt, and the
@@ -90,7 +102,7 @@ Appends the segments of `beam` and, recursively, of its children to `segments`, 
 """
 function _path_segments!(segments::Vector{PathSegment{T}}, beam::AbstractBeam, beam_index::Int, flen::T,
         parent::Int = 0, depth::Int = 1, s::T = zero(T), opl::T = zero(T)) where {T}
-    chief_rays = rays(_chief_beam(beam))
+    chief_rays = rays(beam)
     ends_branch = isempty(children(beam))
     for (ray_index, ray) in enumerate(chief_rays)
         isect = intersection(ray)
@@ -99,25 +111,18 @@ function _path_segments!(segments::Vector{PathSegment{T}}, beam::AbstractBeam, b
         p0 = Point3{T}(position(ray))
         n = refractive_index(ray)
         push!(segments,
-            (start = p0, stop = p0 + len * Point3{T}(direction(ray)),
-                s_start = s, s_stop = s + len, opl_start = opl, opl_stop = opl + n * len,
-                λ = T(wavelength(ray)), depth, parent, beam_index, ray_index, final,
-                leaf = ends_branch && ray_index == length(chief_rays),
-                object = final ? nothing : object(isect)))
+            PathSegment{T}(p0, p0 + len * Point3{T}(direction(ray)), s, s + len, opl,
+                opl + n * len, wavelength(ray), depth, parent, beam_index, ray_index, final,
+                ends_branch && ray_index == length(chief_rays), final ? nothing : object(isect)))
         parent = length(segments)
         s += len
         opl += n * len
     end
     for child in children(beam)
-        _continue_path!(segments, child, AbstractTrees.parent(child), beam_index, flen, parent, depth + 1, s, opl)
+        # Relaunched child starts its own path lengths
+        relaunched = isnothing(AbstractTrees.parent(child))
+        _path_segments!(segments, child, beam_index, flen, parent, depth + 1,
+            relaunched ? zero(T) : s, relaunched ? zero(T) : opl)
     end
     return segments
 end
-
-# A child continues the path of its parent beam
-_continue_path!(segments, child, ::AbstractBeam, beam_index, flen, parent, depth, s, opl) =
-    _path_segments!(segments, child, beam_index, flen, parent, depth, s, opl)
-
-# A relaunched child (see `relaunch!`) has no parent link and starts its own path lengths
-_continue_path!(segments::Vector{PathSegment{T}}, child, ::Nothing, beam_index, flen, parent, depth,
-    s, opl) where {T} = _path_segments!(segments, child, beam_index, flen, parent, depth, zero(T), zero(T))

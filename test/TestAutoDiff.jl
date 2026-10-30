@@ -92,7 +92,7 @@ function michelson_power(dx)
     translate3d!(pd, T[-5cm, 23.5cm, 0])
     g = GaussianBeamlet(T[0, 0, 0], T[0, 1, 0], T(632.8e-9), T(0.5mm))
     solve_system!(System([cbs, m1, m2, pd]), g)
-    return optical_power(pd, RegularGrid(n = 40); progress = false)
+    return optical_power(pd, RegularGrid(num_points = 40); progress = false)
 end
 
 # label, function of the parameter, value of the parameter
@@ -127,7 +127,7 @@ parametric_cases = [
         solve_system!(System([f, d]), b); sum(abs2, BMO.polarization(only(BMO.hits(d))))), 0.5),
     ("optical_power of a clipped GaussianBeamlet", dx -> (T = typeof(dx); d = Detector(T(2mm)); translate3d!(d, [dx, T(100mm), zero(T)]);
         g = GaussianBeamlet(T[0, 0, 0], T[0, 1, 0], T(1e-6), T(1mm)); solve_system!(System([d]), g);
-        optical_power(d, RegularGrid(n = 60, x_min = -1mm, x_max = 1mm, z_min = -1mm, z_max = 1mm); progress = false)), 0.5mm),
+        optical_power(d, RegularGrid(num_points = 60, x_min = -1mm, x_max = 1mm, z_min = -1mm, z_max = 1mm); progress = false)), 0.5mm),
     ("Michelson interferometer, power vs. mirror position", michelson_power, 1e-8),
 ]
 

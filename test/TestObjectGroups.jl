@@ -218,7 +218,7 @@ end
     @test same(BMO.objects(g), before)
     sg = ObjectGroup([])
     push!(sg, StaticTestObject())
-    @test BMO.is_static(sg)
+    @test BMO.kinematic_trait_of(sg) === BMO.Static()
     @test_throws ArgumentError push!(sg, m3)
     @test length(BMO.objects(sg)) == 1
 

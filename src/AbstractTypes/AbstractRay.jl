@@ -90,7 +90,7 @@ into one chain. Its first hit is the closer of `a` and `b`, `a` if both lie equa
 hits of both chains within `tol` of the first hit, the others are dropped. The chains are linked anew,
 hence `a` and `b` must not be used afterwards.
 """
-merge_hits(a, b) = merge_hits(a, b, get_coincidence_tolerance())
+merge_hits(a::Nullable{Intersection}, b) = merge_hits(a, b, get_coincidence_tolerance())
 
 function merge_hits(a::Intersection, b::Intersection, tol)
     head, other = length(b) < length(a) ? (b, a) : (a, b)
@@ -116,7 +116,7 @@ function append_hits!(head::Intersection, other::Intersection, tol)
     hit = other
     while !isnothing(hit)
         next = hit.next
-        if abs(length(hit) - t0) ≤ tol && !_holds_shape(head, shape(hit))
+        if abs(length(hit) - t0) ≤ tol && !holds_shape(head, shape(hit))
             hit.next = nothing
             tail.next = hit
             tail = hit
@@ -142,9 +142,9 @@ function first_of(hit::Intersection, chosen::Intersection)
     return chosen
 end
 
-# whether a hit of the chain `head` belongs to `s`, compared by identity
-_holds_shape(head::Intersection, s) = any(hit -> shape(hit) === s, coincident_hits(head))
-_holds_shape(::Intersection, ::Nothing) = false
+# Whether a hit of the chain `head` belongs to `s`, compared by identity
+holds_shape(head::Intersection, s) = any(hit -> shape(hit) === s, coincident_hits(head))
+holds_shape(::Intersection, ::Nothing) = false
 
 function Base.show(io::IO, ::MIME"text/plain", _intersection::Intersection)
     println(io, "Intersected object: $(typeof(object(_intersection)))")
@@ -240,7 +240,10 @@ function intersection!(ray::AbstractRay, _intersection::Nullable{Intersection})
      return nothing
 end
 
-Base.empty!(ray::AbstractRay) = intersection!(ray, nothing)
+function Base.empty!(ray::AbstractRay)
+    intersection!(ray, nothing)
+    return ray
+end
 
 """
     hit_point(ray::AbstractRay)
@@ -306,14 +309,14 @@ intersect3d(object::AbstractObject, ray::AbstractRay) = intersect3d(shape_trait_
 
 function intersect3d(::SingleShape, object::AbstractObject, ray::AbstractRay)
     s = shape(object)
-    # the sphere that the table of a running solve holds for the shape, none outside of a solve
+    # Test bounding sphere first
     intersection = intersect3d(bounding_sphere_of(current_bounding_spheres(), s), s, ray)
     # Ensure that the intersection knows about the object if intersected
     return object!(intersection, object)
 end
 
 function intersect3d(::MultiShape, object::AbstractObject, ray::AbstractRay)
-    # No part is tested if the ray misses the sphere around all of them
+    # Test bounding sphere first
     intersection = intersect3d(bounding_sphere_of(current_bounding_spheres(), object), shape(object), ray)
     # Ensure that the intersection knows about the correct object if intersected. The parts that the
     # ray hits at the same point belong to the object as well, their shapes tell them apart.
@@ -343,7 +346,7 @@ a group. Each part is tested via its own `intersect3d` method, hence parts that 
 e.g. the groups of a system, are tested as a whole. No parts give `nothing`. Parts that the ray hits within
 `get_coincidence_tolerance()` of the closest hit are kept as its [`coincident_hits`](@ref).
 """
-function intersect3d(parts::Union{Tuple, AbstractVector, Leaves, _LeafObjects}, ray::AbstractRay{R}) where {R}
+function intersect3d(parts::Union{Tuple, AbstractVector, Leaves, LeafObjects}, ray::AbstractRay{R}) where {R}
     result::Nullable{Intersection{R}} = nothing
     tol = get_coincidence_tolerance()
     for part in parts

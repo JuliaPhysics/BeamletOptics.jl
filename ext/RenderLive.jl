@@ -247,7 +247,7 @@ function Base.show(io::IO, h::SystemRenderHandle)
 end
 
 rendered(h::SystemRenderHandle) = h.sys
-render_children(h::SystemRenderHandle) = h.handles
+AbstractTrees.children(h::SystemRenderHandle) = h.handles
 
 function render_parent(h::SystemRenderHandle, obj)
     for root in h.roots, node in BMO.PreOrderDFS(root)

@@ -9,7 +9,7 @@ e.g. akin to an optical axis.
 
 Subtypes of `AbstractBeamGroup` must implement the following:
 
-## Fields:
+## Fields
 
 - `beams`: a vector or tuple of root [`AbstractBeam`](@ref)s, e.g. [`Beam`](@ref)s or [`AstigmaticGaussianBeamlet`](@ref)s
 - `center`: a `Point3{T}` which is regarded as the source position, i.e. the reference origin (pivot) of the group
@@ -24,7 +24,7 @@ tracks a roll of the group about its own optical axis.
 
 Since the kinematic API modifies `center` and `orientation`, the subtype must be a `mutable struct`.
 
-## Functions:
+## Getters/setters
 
 If the fields above do not exist, the following getters/setters must be dispatched:
 
@@ -34,6 +34,10 @@ If the fields above do not exist, the following getters/setters must be dispatch
 - `wavelength`: getter for the common wavelength of the beam bundle
 
 The central source direction is derived from the orientation via [`direction`](@ref).
+
+## Functions
+
+None required; the kinematic primitives below are generic.
 
 ## Kinematic
 
@@ -105,11 +109,11 @@ end
 """
     translate3d!(::Movable, bg::AbstractBeamGroup, offset)
 
-Moves all beams of the group and its `center` by `offset`. Every beam is reset to its untraced start state.
+Moves all beams of the group and its `center` by `offset`, a beam listed several times once.
+Every beam is reset to its untraced start state.
 """
 function translate3d!(::Movable, bg::AbstractBeamGroup, offset)
-    foreach(b -> translate3d!(b, offset), beams(bg))
-    position!(bg, position(bg) + offset)
+    _move_rigidly!((bg,), unique(objectid, beams(bg)), offset)
     return nothing
 end
 
@@ -117,12 +121,11 @@ end
     rotate3d!(::Movable, bg::AbstractBeamGroup, R::AbstractMatrix)
 
 Rotates all beams of the group by `R` about the group `center` and updates the group
-[`orientation`](@ref) to `R * orientation(bg)`. Every beam is reset to its untraced start state.
+[`orientation`](@ref) to `R * orientation(bg)`, a beam listed several times once. Every beam is
+reset to its untraced start state.
 """
 function rotate3d!(::Movable, bg::AbstractBeamGroup, R::AbstractMatrix)
-    p = position(bg)
-    foreach(b -> rotate3d!(b, R, p), beams(bg))
-    orientation!(bg, R * orientation(bg))
+    _move_rigidly!((bg,), unique(objectid, beams(bg)), R, position(bg))
     return nothing
 end
 

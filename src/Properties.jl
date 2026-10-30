@@ -6,8 +6,8 @@ the app layout of the GUI package BeamletOpticsGUI
 """
     properties(x) -> Vector{Pair{String, Any}}
 
-Returns the properties of `x` (an [`AbstractObject`](@ref), shape, beam or source) as a list of
-`name => value` pairs for display, e.g. in the inspector of the GUI package BeamletOpticsGUI. Only stored or
+Returns the properties of `x` (an [`AbstractObject`](@ref), shape, beam, source or object group)
+as a list of `name => value` pairs for display, e.g. in the inspector of the GUI package BeamletOpticsGUI. Only stored or
 cheaply derived values are listed, e.g. the reflectance of a beamsplitter (the power ratio R, as
 passed to its constructor) or the number of hits of a [`Detector`](@ref), no design parameters
 that the object does not store. The list is computed on each call, i.e. it shows the current pose
@@ -22,7 +22,7 @@ and hits.
   shape
 
 ```julia
-julia> properties(SphericalLens(50e-3, -50e-3, 5e-3, 25.4e-3))
+julia> BeamletOptics.properties(SphericalLens(50e-3, -50e-3, 5e-3, 25.4e-3))
 8-element Vector{Pair{String, Any}}:
           "Type" => "Lens"
   "Position [m]" => [0.0, 0.0, 0.0]
@@ -48,12 +48,13 @@ BeamletOptics.properties(x::MyFilter) =
 
 Without a method, [`default_properties`](@ref) is shown.
 """
-properties(x) = default_properties(x)
+properties(x::Union{AbstractObject, AbstractBeam, AbstractObjectGroup}) = default_properties(x)
 
 """
     default_properties(x) -> Vector{Pair{String, Any}}
 
-Returns the properties that [`properties`](@ref) lists for any `x`, see its conventions:
+Returns the properties that [`properties`](@ref) lists for any object, shape, beam, source or
+object group `x`, see its conventions:
 
 - `"Type"`: the name of the type of `x`
 - depending on the [`BeamletOptics.AbstractKinematicTrait`](@ref) of `x`: `"Position [m]"` and
@@ -66,7 +67,8 @@ Returns the properties that [`properties`](@ref) lists for any `x`, see its conv
 
 Methods of `properties` for specific types start from this list, see [`properties`](@ref).
 """
-default_properties(x) = Pair{String, Any}["Type" => _type_name(x); default_properties(kinematic_trait_of(x), x)]
+default_properties(x::Union{AbstractShape, AbstractBeam, AbstractBeamGroup}) =
+    Pair{String, Any}["Type" => _type_name(x); default_properties(kinematic_trait_of(x), x)]
 
 default_properties(x::AbstractObject) = Pair{String, Any}["Type" => _type_name(x);
     default_properties(kinematic_trait_of(x), x); default_properties(shape_trait_of(x), x)]
@@ -140,7 +142,7 @@ end
 _index_model(::Function) = "function of λ"
 _index_model(n) = _type_name(n)
 
-properties(x::AbstractRefractiveOptic) = [default_properties(x); _index_properties(x.n)]
+properties(x::AbstractRefractiveOptic) = [default_properties(x); _index_properties(refractive_index(x))]
 
 properties(x::Union{DoubletLens, TripletLens}) =
     [default_properties(x); "Thickness [m]" => thickness(x)]
@@ -154,31 +156,24 @@ _splitting_ratio(coating::ThinBeamsplitter) = Pair{String, Any}[
 
 properties(bs::ThinBeamsplitter) = [default_properties(bs); _flat_size(shape(bs)); _splitting_ratio(bs)]
 properties(bs::AbstractPlateBeamsplitter) = [default_properties(bs); _splitting_ratio(coating(bs));
-    "Thickness [m]" => thickness(substrate(bs)); _index_properties(substrate(bs).n)]
+    "Thickness [m]" => thickness(substrate(bs)); _index_properties(refractive_index(substrate(bs)))]
 properties(bs::CubeBeamsplitter) =
-    [default_properties(bs); _splitting_ratio(bs.coating); _index_properties(bs.front.n)]
+    [default_properties(bs); _splitting_ratio(bs.coating); _index_properties(refractive_index(bs.front))]
 
 properties(pf::PolarizationFilter) = [default_properties(pf); _flat_size(shape(pf));
     "Transmission axis" => _vector(transmission_axis(pf))]
 properties(lp::LinearPolarizer) = [default_properties(lp);
     "Transmission axis" => _vector(transmission_axis(lp)); "Thickness [m]" => thickness(lp);
-    _index_properties(lp.front.n)]
+    _index_properties(refractive_index(lp.front))]
 
-"""
-    hit_count(d::Detector) -> Int
-
-The number of hits stored in the detector `d`, `0` before the first solve.
-"""
-hit_count(d::Detector) = isnothing(hits(d)) ? 0 : length(hits(d))
-
-properties(d::Detector) = [default_properties(d); _flat_size(shape(d)); "Hits" => hit_count(d);
+properties(d::Detector) = [default_properties(d); _flat_size(shape(d)); "Hits" => length(d);
     "Stops beams" => stop(d)]
 
 #=
 Beams and sources
 =#
 
-properties(b::Beam) = [default_properties(b); "Wavelength [m]" => wavelength(first(rays(b)))]
+properties(b::Beam) = [default_properties(b); "Wavelength [m]" => wavelength(b)]
 properties(b::GaussianBeamlet) = [default_properties(b); "Wavelength [m]" => wavelength(b);
     "Waist radius [m]" => beam_waist(b); "Rayleigh range [m]" => rayleigh_range(b)]
 properties(b::AstigmaticGaussianBeamlet) = [default_properties(b); "Wavelength [m]" => wavelength(b)]
