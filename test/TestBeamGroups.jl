@@ -14,7 +14,7 @@ const BMO = BeamletOptics
         mutable struct BeamTestGroup{T} <: BMO.AbstractBeamGroup{T, Ray{T}}
             central_beam::BMO.Beam{T, Ray{T}}
             center::Point3{T}
-            orientation::BMO.SMatrix{3, 3, T, 9}
+            dir::BMO.SMatrix{3, 3, T, 9}
         end
 
         struct BeamTestSystem <: BMO.AbstractSystem end
@@ -120,10 +120,10 @@ const BMO = BeamletOptics
         end
 
         @testset "Testing throw errors" begin
-            @test_throws ErrorException PointSource(pos, dir, 1.1*π, lambda; num_rays, num_rings)
-            @test_throws ErrorException PointSource(pos, dir, alpha, lambda; num_rays=100, num_rings=10)
+            @test_throws ArgumentError PointSource(pos, dir, 1.1*π, lambda; num_rays, num_rings)
+            @test_throws ArgumentError PointSource(pos, dir, alpha, lambda; num_rays=100, num_rings=10)
             # basis parallel to dir has no component in the sampling plane
-            @test_throws ErrorException PointSource(pos, dir, alpha, lambda; num_rays, num_rings,
+            @test_throws ArgumentError PointSource(pos, dir, alpha, lambda; num_rays, num_rings,
                 basis = dir)
         end
     end
@@ -214,9 +214,9 @@ const BMO = BeamletOptics
         end
 
         @testset "Testing throw errors" begin
-            @test_throws ErrorException CollimatedSource(pos, dir, diameter; num_rays=100, num_rings=10)
+            @test_throws ArgumentError CollimatedSource(pos, dir, diameter; num_rays=100, num_rings=10)
             # basis parallel to dir has no component in the pupil plane
-            @test_throws ErrorException CollimatedSource(pos, dir, diameter; num_rays, num_rings,
+            @test_throws ArgumentError CollimatedSource(pos, dir, diameter; num_rays, num_rings,
                 basis = dir)
         end
     end
@@ -255,7 +255,7 @@ const BMO = BeamletOptics
         end
 
         @testset "Testing throw errors" begin
-            @test_throws ErrorException UniformDiscSource(pos, dir, diameter, lambda;
+            @test_throws ArgumentError UniformDiscSource(pos, dir, diameter, lambda;
                 num_rays, basis = dir)
         end
     end
@@ -322,12 +322,12 @@ const BMO = BeamletOptics
         end
 
         @testset "Testing throw errors" begin
-            @test_throws ErrorException UniformPointSource(pos, dir, 1.1 * π, lambda; num_rays)
-            @test_throws ErrorException UniformPointSource(pos, dir, π, lambda; num_rays)
-            @test_throws ErrorException UniformPointSource(pos, dir, θ, lambda; num_rays = 0)
+            @test_throws ArgumentError UniformPointSource(pos, dir, 1.1 * π, lambda; num_rays)
+            @test_throws ArgumentError UniformPointSource(pos, dir, π, lambda; num_rays)
+            @test_throws ArgumentError UniformPointSource(pos, dir, θ, lambda; num_rays = 0)
             # basis parallel to dir has no component in the sampling plane
-            @test_throws ErrorException UniformPointSource(pos, dir, θ, lambda; num_rays, basis = dir)
-            @test_throws ErrorException UniformPointSource(pos, dir, θ, lambda; num_rays, basis = [0, 0, 0])
+            @test_throws ArgumentError UniformPointSource(pos, dir, θ, lambda; num_rays, basis = dir)
+            @test_throws ArgumentError UniformPointSource(pos, dir, θ, lambda; num_rays, basis = [0, 0, 0])
         end
     end
 
@@ -404,10 +404,10 @@ const BMO = BeamletOptics
         end
 
         @testset "Testing throw errors" begin
-            @test_throws ErrorException UniformLineSource(pos, dir, width, lambda; num_rays = 0)
+            @test_throws ArgumentError UniformLineSource(pos, dir, width, lambda; num_rays = 0)
             # basis parallel to dir has no component normal to it
-            @test_throws ErrorException UniformLineSource(pos, dir, width, lambda; num_rays, basis = dir)
-            @test_throws ErrorException UniformLineSource(pos, dir, width, lambda; num_rays, basis = [0, 0, 0])
+            @test_throws ArgumentError UniformLineSource(pos, dir, width, lambda; num_rays, basis = dir)
+            @test_throws ArgumentError UniformLineSource(pos, dir, width, lambda; num_rays, basis = [0, 0, 0])
         end
     end
 
@@ -477,12 +477,12 @@ const BMO = BeamletOptics
         end
 
         @testset "Testing throw errors" begin
-            @test_throws ErrorException UniformFanSource(pos, dir, 1.1 * π, lambda; num_rays)
-            @test_throws ErrorException UniformFanSource(pos, dir, π, lambda; num_rays)
-            @test_throws ErrorException UniformFanSource(pos, dir, θ, lambda; num_rays = 0)
+            @test_throws ArgumentError UniformFanSource(pos, dir, 1.1 * π, lambda; num_rays)
+            @test_throws ArgumentError UniformFanSource(pos, dir, π, lambda; num_rays)
+            @test_throws ArgumentError UniformFanSource(pos, dir, θ, lambda; num_rays = 0)
             # basis parallel to dir has no component normal to it
-            @test_throws ErrorException UniformFanSource(pos, dir, θ, lambda; num_rays, basis = dir)
-            @test_throws ErrorException UniformFanSource(pos, dir, θ, lambda; num_rays, basis = [0, 0, 0])
+            @test_throws ArgumentError UniformFanSource(pos, dir, θ, lambda; num_rays, basis = dir)
+            @test_throws ArgumentError UniformFanSource(pos, dir, θ, lambda; num_rays, basis = [0, 0, 0])
         end
     end
 
@@ -556,7 +556,7 @@ const BMO = BeamletOptics
             translate3d!(src, [0.01, 0.02, -0.03])
             rotate3d!(src, normalize([1.0, 0.3, 0.2]), 0.4)
             @test num_rays!(src, 500) === src
-            M = src.orientation
+            M = BMO.orientation(src)
             fresh = make(Vector(position(src)), Vector(M[:, 2]), 500, Vector(M[:, 1]))
             @test same(src, fresh)
             @test length(src) == 500
@@ -568,7 +568,7 @@ const BMO = BeamletOptics
         @test maximum(b -> acosd(clamp(dot(heading(b), dir), -1, 1)), BMO.beams(ps)) ≈ 100
         # too few rays for the rings, like the constructor
         cs = CollimatedSource(pos, dir, 5e-3, λ; num_rings = 4, num_rays = 200)
-        @test_throws ErrorException num_rays!(cs, 79)
+        @test_throws ArgumentError num_rays!(cs, 79)
         @test length(cs) == 200
         # given beams can not be regenerated
         wrapped = CollimatedSource(BMO.beams(cs), 5e-3, pos, dir)
@@ -579,7 +579,7 @@ const BMO = BeamletOptics
         for make in sources
             src = make(pos, dir, 200, nothing)
             rotate3d!(src, normalize([1.0, 0.3, 0.2]), 0.4)
-            M = src.orientation
+            M = BMO.orientation(src)
             set_pivot3d!(src, pos + [0.0, -0.1, 0.02])
             num_rays!(src, 300)
             fresh = make(pos, Vector(M[:, 2]), 300, Vector(M[:, 1]))
@@ -591,7 +591,7 @@ const BMO = BeamletOptics
         for (make, n_min) in zip(sources, (80, 1, 80, 1, 1, 1))
             src = make(pos, dir, 200, nothing)
             @test BMO.min_num_rays(src) == n_min
-            @test_throws ErrorException num_rays!(src, n_min - 1)
+            @test_throws ArgumentError num_rays!(src, n_min - 1)
             @test length(src) == 200
             @test length(num_rays!(src, n_min)) == n_min
         end
@@ -616,9 +616,85 @@ const BMO = BeamletOptics
         cs = @inferred CollimatedSource(pos, dir, 5e-3, λ; num_rings = 4, num_rays = 200)
         ps = @inferred PointSource(pos, dir, 0.3, λ; num_rings = 4, num_rays = 200)
         @test cs isa CollimatedSource{Float64, Ray{Float64}, BMO.DiscRings}
-        @test ps isa PointSource{Float64, Ray{Float64}, BMO.ConeRings}
+        @test ps isa PointSource{Float64, Ray{Float64}, BMO.ConeRings{Float64}}
         @test (@inferred CollimatedSource(BMO.beams(cs), 5e-3, pos, dir)) isa CollimatedSource{Float64, Ray{Float64}, BMO.NoSampling}
         @test (@inferred PointSource(BMO.beams(ps), 0.3, pos, dir)) isa PointSource{Float64, Ray{Float64}, BMO.NoSampling}
+    end
+
+    @testset "Generic source constructors" begin
+        pos, dir, λ, basis = [0.1, -0.2, 0.3], [0.2, 1.0, -0.1], 633e-9, [1.0, 2.0, 0.5]
+        θ, D = 0.3, 5e-3
+        starts(src) = [(position(first(rays(b))), BMO.direction(first(rays(b)))) for b in BMO.beams(src)]
+        # catalog constructor, generic constructor with the same sampling, size getter
+        pairs = [
+            (@inferred(PointSource(pos, dir, θ, λ; num_rings = 4, num_rays = 200, basis)),
+             @inferred(PointSource(pos, dir, BMO.ConeRings(4, θ), λ; num_rays = 200, basis)),
+             BMO.numerical_aperture),
+            (@inferred(UniformPointSource(pos, dir, θ, λ; num_rays = 50, basis)),
+             @inferred(PointSource(pos, dir, BMO.ConeSunflower(θ), λ; num_rays = 50, basis)),
+             BMO.numerical_aperture),
+            (@inferred(UniformFanSource(pos, dir, θ, λ; num_rays = 21, basis)),
+             @inferred(PointSource(pos, dir, BMO.ConeFan(θ), λ; num_rays = 21, basis)),
+             BMO.numerical_aperture),
+            (@inferred(CollimatedSource(pos, dir, D, λ; num_rings = 4, num_rays = 200, basis)),
+             @inferred(CollimatedSource(pos, dir, D, BMO.DiscRings(4), λ; num_rays = 200, basis)),
+             BMO.diameter),
+            (@inferred(UniformDiscSource(pos, dir, D, λ; num_rays = 50, basis)),
+             @inferred(CollimatedSource(pos, dir, D, BMO.DiscSunflower(), λ; num_rays = 50, basis)),
+             BMO.diameter),
+            (@inferred(UniformLineSource(pos, dir, D, λ; num_rays = 21, basis)),
+             @inferred(CollimatedSource(pos, dir, D, BMO.DiscLine(), λ; num_rays = 21, basis)),
+             BMO.diameter)
+        ]
+        for (catalog, generic, size_of) in pairs
+            @test typeof(catalog) == typeof(generic)
+            @test position(catalog) == position(generic)
+            @test BMO.orientation(catalog) == BMO.orientation(generic)
+            @test catalog.sampling == generic.sampling
+            @test size_of(catalog) == size_of(generic)
+            @test starts(catalog) == starts(generic)
+        end
+        # the default number type of the generic constructors and of the factories
+        @test (@inferred PointSource(pos, dir, BMO.ConeRings(4, θ); num_rays = 200)) isa
+            PointSource{Float64, Ray{Float64}, BMO.ConeRings{Float64}}
+        @test (@inferred CollimatedSource(pos, dir, D, BMO.DiscRings(4); num_rays = 200)) isa
+            CollimatedSource{Float64, Ray{Float64}, BMO.DiscRings}
+
+        # the half spread angle of a cone sampling must be below π
+        @test_throws ArgumentError BMO.ConeRings(2, π)
+        @test_throws ArgumentError BMO.ConeSunflower(π)
+        @test_throws ArgumentError BMO.ConeFan(π)
+        @test BMO.numerical_aperture(BMO.ConeFan(θ)) == sin(θ)
+
+        # a Float32 source samples in Float32
+        ps32 = PointSource(Float32.(pos), Float32.(dir), 0.3f0, 633f-9; num_rings = 4, num_rays = 200)
+        @test ps32.sampling.θ isa Float32
+        @test ps32 isa PointSource{Float32, Ray{Float32}, BMO.ConeRings{Float32}}
+        @test CollimatedSource(Float32.(pos), Float32.(dir), 5f-3, 633f-9; num_rings = 4, num_rays = 200) isa
+            CollimatedSource{Float32, Ray{Float32}, BMO.DiscRings}
+        # mixed precision: the source takes the promoted type
+        @test CollimatedSource(Float32.(pos), Float32.(dir), D, 633f-9; num_rings = 4, num_rays = 200) isa
+            CollimatedSource{Float64, Ray{Float64}, BMO.DiscRings}
+
+        # the rays per ring add up to the number of rays
+        for n in (1, 7, 39, 200, 1001)
+            @test sum(BMO.rays_per_ring([0.1, 0.4, 0.9, 1.3], n)) == n
+        end
+
+        # a custom sampling: one ray per offset along b1
+        struct OffsetSampling <: BMO.AbstractSourceSampling end
+        BMO.source_beams(::OffsetSampling, pos, dir, b1, diameter, λ, num_rays::Int, ::Type{T}) where {T} =
+            Beam{T, Ray{T}}[Beam(pos + diameter / 2 * (k / num_rays) * b1, dir, λ) for k in 0:(num_rays - 1)]
+        BMO.source_beams(::OffsetSampling, pos, dir, b1, λ, num_rays::Int, ::Type{T}) where {T} =
+            Beam{T, Ray{T}}[Beam(pos, dir, λ) for _ in 1:num_rays]
+        cs = CollimatedSource(pos, dir, D, OffsetSampling(), λ; num_rays = 5, basis)
+        @test cs isa CollimatedSource{Float64, Ray{Float64}, OffsetSampling}
+        @test length(cs) == 5
+        @test BMO.min_num_rays(cs) == 1
+        @test starts(num_rays!(cs, 8)) == starts(CollimatedSource(pos, dir, D, OffsetSampling(), λ; num_rays = 8, basis))
+        # a PointSource sampling needs numerical_aperture
+        @test_throws ErrorException PointSource(pos, dir, OffsetSampling(), λ; num_rays = 5)
+        @test_throws "numerical_aperture not defined for" PointSource(pos, dir, OffsetSampling(), λ; num_rays = 5)
     end
 
     @testset "wavelength" begin

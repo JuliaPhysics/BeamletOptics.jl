@@ -11,10 +11,11 @@ Returns the unit-length reference vector that seeds the azimuthal sampling of a 
 
 If `basis` is `nothing`, a vector normal to `dir` is picked deterministically via
 [`normal3d`](@ref). Otherwise `basis` is projected into the plane normal to `dir`, which
-lets a caller rotate the sampling pattern of a source about its own axis.
+lets a caller rotate the sampling pattern of a source about its own axis. For a tuple of grid
+axes `(ex, ey)`, the first axis is used.
 
-Throws if `basis` has no significant component in that plane, i.e. if it is zero or
-parallel to `dir`. The test is relative to `norm(basis)` because projecting an
+Throws an `ArgumentError` if `basis` has no significant component in that plane, i.e. if it is
+zero or parallel to `dir`. The test is relative to `norm(basis)` because projecting an
 unnormalized vector leaves a residual that scales with its length; an absolute
 tolerance would let a parallel `basis` through and yield `NaN` sampling.
 """
@@ -23,18 +24,64 @@ sampling_basis(dir::AbstractVector, ::Nothing, ::Type{<:Real}) = normal3d(dir)
 function sampling_basis(dir::AbstractVector, basis::AbstractVector, ::Type{T}) where {T <: Real}
     b1 = basis - dot(basis, dir) * dir
     if norm(b1) ≤ sqrt(eps(T)) * norm(basis)
-        throw(ErrorException("Source `basis` must not be zero or parallel to `dir`"))
+        throw(ArgumentError("Source `basis` must not be zero or parallel to `dir`"))
     end
     return normalize(b1)
 end
 
-"""
-    _GOLDEN_ANGLE
+sampling_basis(dir::AbstractVector, basis::Tuple{AbstractVector, AbstractVector}, ::Type{T}) where {T <: Real} =
+    sampling_basis(dir, first(basis), T)
 
-The golden angle `π(3 - √5) ≈ 2.39996` rad, i.e. the azimuthal increment of the sunflower
-(Fibonacci) sampling shared by [`UniformDiscSource`](@ref) and [`UniformPointSource`](@ref).
 """
-const _GOLDEN_ANGLE = π * (3 - √5)
+    rays_per_ring(weights, num_rays) -> Vector{Int}
+
+The numbers of rays on the rings of a ring sampling, `num_rays` in total, in proportion to the
+`weights` (circumferences) of the rings, half of it for the outermost ring (trapezoidal rule).
+"""
+function rays_per_ring(weights::AbstractVector{<:Real}, num_rays::Integer)
+    w = collect(float(eltype(weights)), weights)
+    w[end] /= 2
+    total = sum(w)
+    ds = total / num_rays
+    counts = round.(Int, w / ds)
+    # Assign the rounding remainder to the outermost ring
+    counts[end] += num_rays - sum(counts)
+    return counts
+end
+
+"""
+    cone_ring_directions(dir, b1, θ, num_rings, num_rays) -> Vector
+
+The `num_rays` directions on the cones around the unit vector `dir` of a ring sampling with the
+half spread angle `θ` [rad], without the center: `num_rings - 1` cones, the outermost at `θ`,
+each starting at the azimuth of `b1`. The rays per cone follow `rays_per_ring`. The angles are
+computed in the precision of `dir` and `θ`.
+"""
+function cone_ring_directions(dir::AbstractVector, b1::AbstractVector, θ::Real, num_rings::Integer, num_rays::Integer)
+    T = promote_type(float(eltype(dir)), float(typeof(θ)))
+    b2 = normal3d(dir, b1)
+    θ_NA = LinRange(0, θ, num_rings)
+    ndirs = [rotate3d(b2, step(θ_NA) * i) * dir for i in eachindex(θ_NA[2:end])]
+    counts = rays_per_ring(norm.(ndirs .- dot.(ndirs, Ref(dir)) .* Ref(dir)) .* Ref(2π), num_rays)
+    dirs = Vector{eltype(ndirs)}()
+    for (ndir, n) in zip(ndirs, counts)
+        iszero(n) && continue
+        R = rotate3d(dir, 2 * T(π) / n)
+        d = ndir
+        for _ in 1:n
+            push!(dirs, d)
+            d = R * d
+        end
+    end
+    return dirs
+end
+
+"""
+    golden_angle
+
+The golden angle `π(3 - √5) ≈ 2.39996` rad, the azimuthal increment of the sunflower samplings.
+"""
+const golden_angle = π * (3 - √5)
 
 """
     AbstractSourceSampling
@@ -42,8 +89,10 @@ const _GOLDEN_ANGLE = π * (3 - √5)
 How the rays of a [`CollimatedSource`](@ref) or [`PointSource`](@ref) are sampled. The source
 stores its sampling in the field `sampling`, such that [`num_rays!`](@ref) can regenerate its
 rays with another number of rays. A source built from given beams stores
-[`BeamletOptics.NoSampling`](@ref). The constructors of the sources generate their beams with
-the same methods.
+[`BeamletOptics.NoSampling`](@ref). The generic constructors
+`CollimatedSource(pos, dir, diameter, sampling, λ; num_rays)` and
+`PointSource(pos, dir, sampling, λ; num_rays)` build a source from any sampling; the catalog
+constructors call them.
 
 # Implementation reqs.
 
@@ -59,9 +108,11 @@ A subtype `S <: AbstractSourceSampling` implements:
   type, i.e. the `diameter` [m] for a `CollimatedSource` and none for a `PointSource`. The
   sampling pattern must depend on the pose only via `pos`, `dir` and `b1`, i.e. it must move
   rigidly with the source. The first beam must be the center ray, which starts at `pos` along
-  `dir`. Throws an `ErrorException` if `num_rays` is below `min_num_rays(s)`.
+  `dir`. Throws an `ArgumentError` if `num_rays` is below `min_num_rays(s)`.
 - `min_num_rays(s::S) -> Union{Nothing, Int}` (optional): the fewest rays of the sampling,
   default `1`, see [`BeamletOptics.min_num_rays`](@ref).
+- `numerical_aperture(s::S)`: the numerical aperture of the half spread angle, required for a
+  sampling of a `PointSource`. The fallback throws an `ErrorException`.
 
 # Implementations
 
@@ -117,68 +168,88 @@ the center, see [`UniformLineSource`](@ref). Needs at least one ray.
 struct DiscLine <: AbstractSourceSampling end
 
 """
-    ConeRings(num_rings::Int, θ::Float64)
+    check_half_angle(θ) -> θ
+
+Returns the half spread angle `θ` [rad] of a cone sampling, or throws an `ArgumentError` unless
+`θ < π` in the precision of `θ`.
+"""
+function check_half_angle(θ::T) where {T <: Real}
+    θ < float(T)(π) || throw(ArgumentError("Point source opening half-angle θ must be < π"))
+    return θ
+end
+
+"""
+    ConeRings(num_rings::Int, θ::Real)
 
 Concentric cones of rays around a center ray of a [`PointSource`](@ref), the center counted as the
 innermost of the `num_rings` cones, the outermost with the
 half spread angle `θ` [rad]. The rays are distributed over the cones in proportion to the solid
 angle each cone represents, i.e. to its circumference, but half of it for the outermost cone,
 which represents only the inner half of its band. Every ray then represents about the same solid
-angle (trapezoidal rule). Needs at least `20 num_rings` rays.
+angle (trapezoidal rule). Needs at least `20 num_rings` rays. `θ ≥ π` throws an `ArgumentError`.
 """
-struct ConeRings <: AbstractSourceSampling
+struct ConeRings{T <: Real} <: AbstractSourceSampling
     num_rings::Int
-    θ::Float64
+    θ::T
+    ConeRings(num_rings::Integer, θ::T) where {T <: Real} = new{T}(num_rings, check_half_angle(θ))
 end
 
 """
-    ConeSunflower(θ::Float64)
+    ConeSunflower(θ::Real)
 
 Sunflower (Fibonacci) sampling of the spherical cap with the half spread angle `θ` [rad] of a
 [`UniformPointSource`](@ref): every ray represents the same solid angle. The spiral starts with
-the center ray. Needs at least one ray.
+the center ray. Needs at least one ray. `θ ≥ π` throws an `ArgumentError`.
 """
-struct ConeSunflower <: AbstractSourceSampling
-    θ::Float64
+struct ConeSunflower{T <: Real} <: AbstractSourceSampling
+    θ::T
+    ConeSunflower(θ::T) where {T <: Real} = new{T}(check_half_angle(θ))
 end
 
 """
-    ConeFan(θ::Float64)
+    ConeFan(θ::Real)
 
 Rays with equidistant angles in the plane fan of a [`UniformFanSource`](@ref), i.e. in the plane
 spanned by the source direction and the sampling reference vector, between `-θ` and `θ` [rad]
 to the source direction. The center ray comes first, followed by the other rays from one edge of
 the fan to the other, both edges included. An even number of rays has a second ray at the center,
-see [`UniformFanSource`](@ref). Needs at least one ray.
+see [`UniformFanSource`](@ref). Needs at least one ray. `θ ≥ π` throws an `ArgumentError`.
 """
-struct ConeFan <: AbstractSourceSampling
-    θ::Float64
+struct ConeFan{T <: Real} <: AbstractSourceSampling
+    θ::T
+    ConeFan(θ::T) where {T <: Real} = new{T}(check_half_angle(θ))
 end
 
 """
-    _sunflower_fraction(k, n)
+    sunflower_fraction(k, n, T)
 
-The fraction of the area of a disc (or of the solid angle of a cap) within the radius (or the
-polar angle) of the `k`-th of `n` sunflower samples (`k = 0 … n-1`). Sample `k` represents the
-cell between the fractions `k/n` and `(k + 1)/n`. The first cell is the disc (or cap) around the
-center and is sampled at its center, i.e. at `0`, the others at the middle `(k + ½)/n` of their
-cell.
+The area (or solid angle) fraction of the `k`-th of `n` sunflower samples (`k = 0 … n-1`) in the
+number type `T`: `0` for the center, `(k + ½)/n` for the others.
 """
-_sunflower_fraction(k::Int, n::Int) = k == 0 ? 0.0 : (k + 0.5) / n
+sunflower_fraction(k::Int, n::Int, ::Type{T}) where {T <: Real} = k == 0 ? zero(T) : T((k + 0.5) / n)
 
 """
-    _fan_coordinates(n) -> Vector{Float64}
+    fan_coordinates(n, T) -> Vector{T}
 
-The positions of the `n` samples of a line or fan on `[-1, 1]`: the center `0` first, then
-`(n - 1) ÷ 2` equidistant samples on each side of it from `-1` to `1`, both ends included. These
-are `n` samples for an odd `n`. An even `n` leaves one sample, which lies at the center as well,
-since a pattern that is symmetric to its center sample has an odd number of samples.
+The `n` sample positions of a line or fan on `[-1, 1]`: the center first, then equidistant
+samples from `-1` to `1`. An even `n` repeats the center.
 """
-function _fan_coordinates(n::Int)
+function fan_coordinates(n::Int, ::Type{T}) where {T <: Real}
     h = (n - 1) ÷ 2
-    side = [j / h for j in 1:h]
-    x = [0.0; -reverse(side); side]
-    return iseven(n) ? push!(x, 0.0) : x
+    side = [T(j / h) for j in 1:h]
+    x = [zero(T); -reverse(side); side]
+    return iseven(n) ? push!(x, zero(T)) : x
+end
+
+"""
+    check_num_rays(sampling, num_rays)
+
+Throws an `ArgumentError` if `num_rays` is below `min_num_rays(sampling)`.
+"""
+function check_num_rays(s::AbstractSourceSampling, n::Integer)
+    n_min = min_num_rays(s)
+    n ≥ n_min || throw(ArgumentError(lazy"$(nameof(typeof(s))) needs at least $n_min rays (passed: $n)"))
+    return nothing
 end
 
 """
@@ -191,10 +262,9 @@ azimuth of the pattern about `dir`. `args` depend on the source: the `diameter` 
 [`CollimatedSource`](@ref), none for a [`PointSource`](@ref). The first beam is the center ray,
 which starts at `pos` along `dir`.
 
-Throws an `ErrorException` if `num_rays` is below [`BeamletOptics.min_num_rays`](@ref) of the
-sampling or if the sampling type has no method, and an `ArgumentError` for
-[`BeamletOptics.NoSampling`](@ref). Used by the constructors of the sources and by
-[`num_rays!`](@ref).
+Throws an `ArgumentError` if `num_rays` is below [`BeamletOptics.min_num_rays`](@ref) of the
+sampling or for [`BeamletOptics.NoSampling`](@ref), and an `ErrorException` if the sampling type
+has no method. Used by the constructors of the sources and by [`num_rays!`](@ref).
 """
 source_beams(s::AbstractSourceSampling, args...) = error(lazy"source_beams not defined for $(typeof(s))")
 
@@ -214,68 +284,44 @@ Beams of a [`CollimatedSource`](@ref) whose disc with the `diameter` [m] is cent
 `sampling_basis`. For `DiscLine`, the rays lie on the diameter of the disc along `b1`.
 """
 function source_beams(s::DiscRings, pos, dir, b1, diameter, λ, num_rays::Int, ::Type{T}) where {T}
-    num_rings = s.num_rings
-    if num_rays < num_rings * 20
-        throw(ErrorException("No. of rays should be atleast 20x no. of rings (passed: $num_rays, req: $(num_rings*20))"))
-    end
-    # define buffer
+    check_num_rays(s, num_rays)
     beams = Vector{Beam{T, Ray{T}}}()
+    # Center ray
     push!(beams, Beam(Ray(pos, dir, λ)))
-    num_rays -= 1
-    # setup concentric beam ring radii
-    r_max = diameter / 2
-    radii = LinRange(0, r_max, num_rings)[2:end]
-    # the area of the disc that each ring represents, in units of the ring spacing: the
-    # circumference, half of it for the ring on the edge (trapezoidal rule)
-    circm = collect(radii * 2π)
-    circm[end] /= 2
-    total = sum(circm)
-    ds = total / num_rays
-    # calculate number of rays per ring
-    n_rays = round.(Int, circm / ds)
-    # correct n_rays to match num_rays
-    n_rays[end] += (num_rays - sum(n_rays))
-    # Generate beam rings
-    for (i, r) in enumerate(radii)
-        numEl = n_rays[i]
-        if iszero(numEl)
-            continue
-        end
-        dphi = 2π / numEl
-        RotMat = rotate3d(dir, dphi)
-        helper = b1 * r
-        for _ in 1:numEl
-            push!(beams, Beam(pos + helper, dir, λ))
-            helper = RotMat * helper
+    # Rings
+    radii = LinRange(0, diameter / 2, s.num_rings)[2:end]
+    counts = rays_per_ring(radii * 2π, num_rays - 1)
+    for (r, n) in zip(radii, counts)
+        iszero(n) && continue
+        R = rotate3d(dir, 2 * T(π) / n)
+        offset = b1 * r
+        for _ in 1:n
+            push!(beams, Beam(pos + offset, dir, λ))
+            offset = R * offset
         end
     end
     return beams
 end
 
-function source_beams(::DiscSunflower, pos, dir, e1, diameter, λ, num_rays::Int, ::Type{T}) where {T}
-    if num_rays < 1
-        throw(ErrorException("No. of rays must be at least 1 (passed: $num_rays)"))
-    end
+function source_beams(s::DiscSunflower, pos, dir, b1, diameter, λ, num_rays::Int, ::Type{T}) where {T}
+    check_num_rays(s, num_rays)
     R = diameter / 2
     beams = Vector{Beam{T, Ray{T}}}(undef, num_rays)
-    # orthogonal basis in the pupil plane
-    e2 = normal3d(dir, e1)
+    b2 = normal3d(dir, b1)
     for k in 0:(num_rays - 1)
-        ρ = √_sunflower_fraction(k, num_rays)     # equal-area radius
-        φ = k * _GOLDEN_ANGLE
-        r = R * ρ
-        x = r * cos(φ) * e1 + r * sin(φ) * e2
+        # Equal-area radius
+        r = R * √sunflower_fraction(k, num_rays, T)
+        φ = k * T(golden_angle)
+        x = r * cos(φ) * b1 + r * sin(φ) * b2
         beams[k + 1] = Beam(pos + x, dir, λ)
     end
     return beams
 end
 
-function source_beams(::DiscLine, pos, dir, b1, diameter, λ, num_rays::Int, ::Type{T}) where {T}
-    if num_rays < 1
-        throw(ErrorException("No. of rays must be at least 1 (passed: $num_rays)"))
-    end
+function source_beams(s::DiscLine, pos, dir, b1, diameter, λ, num_rays::Int, ::Type{T}) where {T}
+    check_num_rays(s, num_rays)
     R = diameter / 2
-    return Beam{T, Ray{T}}[Beam(pos + R * c * b1, dir, λ) for c in _fan_coordinates(num_rays)]
+    return Beam{T, Ray{T}}[Beam(pos + R * c * b1, dir, λ) for c in fan_coordinates(num_rays, T)]
 end
 
 #=
@@ -288,71 +334,39 @@ PointSource: cones of rings and sunflower on a cap
 Beams of a [`PointSource`](@ref) at `pos` [m] around the unit vector `dir` with the wavelength
 `λ` [m], sampled by `sampling` (which holds the half spread angle) with `num_rays` rays. `b1` is
 the unit sampling reference vector normal to `dir`, see `sampling_basis`. For `ConeFan`, the rays
-lie in the plane spanned by `dir` and `b1`.
+lie in the plane spanned by `dir` and `b1`. The angles are computed in `T`.
 """
 function source_beams(s::ConeRings, pos, dir, b1, λ, num_rays::Int, ::Type{T}) where {T}
-    num_rings, θ = s.num_rings, s.θ
-    if num_rays < num_rings * 20
-        throw(ErrorException("No. of rays should be atleast 20x no. of rings (passed: $num_rays, req: $(num_rings*20))"))
-    end
-    # define basis vectors
-    b2 = normal3d(dir, b1)
-    θ_NA = LinRange(0, θ, num_rings)
-    # define buffer
+    check_num_rays(s, num_rays)
     beams = Vector{Beam{T, Ray{T}}}()
+    # Center ray
     push!(beams, Beam(Ray(pos, dir, λ)))
-    num_rays -= 1
-    # calculate total accumulated circumference of all rings
-    ndirs = [rotate3d(b2, step(θ_NA) * i) * dir for i in eachindex(θ_NA[2:end])]
-    circm = norm.(ndirs .- dot.(ndirs, Ref(dir)) .* Ref(dir)) .* Ref(2π)
-    # the solid angle that each cone represents: half of it for the outermost (trapezoidal rule)
-    circm[end] /= 2
-    total = sum(circm)
-    ds = total / num_rays
-    # calculate number of rays per ring
-    n_rays = round.(Int, circm / ds)
-    # correct n_rays to match num_rays
-    n_rays[end] += (num_rays - sum(n_rays))
-    for (i, ndir) in enumerate(ndirs)
-        numEl = n_rays[i]
-        if iszero(numEl)
-            continue
-        end
-        dphi = 2π / numEl
-        RotMat = rotate3d(dir, dphi)
-        cdir = ndir
-        for _ in 1:numEl
-            push!(beams, Beam(pos, cdir, λ))
-            # rotate vector (not-thread safe!)
-            cdir = RotMat * cdir
-        end
+    # Cones
+    for d in cone_ring_directions(dir, b1, T(s.θ), s.num_rings, num_rays - 1)
+        push!(beams, Beam(pos, d, λ))
     end
     return beams
 end
 
-function source_beams(s::ConeSunflower, pos, dir, e1, λ, num_rays::Int, ::Type{T}) where {T}
-    if num_rays < 1
-        throw(ErrorException("No. of rays must be at least 1 (passed: $num_rays)"))
-    end
+function source_beams(s::ConeSunflower, pos, dir, b1, λ, num_rays::Int, ::Type{T}) where {T}
+    check_num_rays(s, num_rays)
     beams = Vector{Beam{T, Ray{T}}}(undef, num_rays)
-    # orthogonal basis normal to the cone axis
-    e2 = normal3d(dir, e1)
-    one_minus_cosθ = 1 - cos(s.θ)
+    b2 = normal3d(dir, b1)
+    one_minus_cosθ = 1 - cos(T(s.θ))
     for k in 0:(num_rays - 1)
-        cosϑ = 1 - _sunflower_fraction(k, num_rays) * one_minus_cosθ    # equal solid angle
+        # Equal solid angle
+        cosϑ = 1 - sunflower_fraction(k, num_rays, T) * one_minus_cosθ
         sinϑ = sqrt(max(0, (1 - cosϑ) * (1 + cosϑ)))
-        φ = k * _GOLDEN_ANGLE
-        cdir = cosϑ * dir + sinϑ * (cos(φ) * e1 + sin(φ) * e2)
+        φ = k * T(golden_angle)
+        cdir = cosϑ * dir + sinϑ * (cos(φ) * b1 + sin(φ) * b2)
         beams[k + 1] = Beam(pos, cdir, λ)
     end
     return beams
 end
 
 function source_beams(s::ConeFan, pos, dir, b1, λ, num_rays::Int, ::Type{T}) where {T}
-    if num_rays < 1
-        throw(ErrorException("No. of rays must be at least 1 (passed: $num_rays)"))
-    end
-    angles = s.θ * _fan_coordinates(num_rays)
+    check_num_rays(s, num_rays)
+    angles = T(s.θ) * fan_coordinates(num_rays, T)
     return Beam{T, Ray{T}}[Beam(pos, cos(φ) * dir + sin(φ) * b1, λ) for φ in angles]
 end
 
@@ -360,3 +374,7 @@ end
 min_num_rays(::NoSampling) = nothing
 min_num_rays(s::Union{DiscRings, ConeRings}) = 20 * s.num_rings
 min_num_rays(::AbstractSourceSampling) = 1
+
+# The numerical aperture of the half spread angle of a PointSource sampling
+numerical_aperture(s::AbstractSourceSampling) = error(lazy"numerical_aperture not defined for $(typeof(s))")
+numerical_aperture(s::Union{ConeRings, ConeSunflower, ConeFan}) = numerical_aperture(s.θ)

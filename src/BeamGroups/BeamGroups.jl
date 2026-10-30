@@ -14,18 +14,18 @@ function _group_orientation(dir::AbstractVector, e1::AbstractVector, ::Type{T}) 
 end
 
 """
-    _check_orientation(M, T) -> SMatrix{3,3,T,9}
+    check_orientation(M, T) -> SMatrix{3,3,T,9}
 
 Validates that `M` is a right-handed orthonormal 3x3 matrix, i.e. `MᵀM ≈ I` and `det M ≈ 1`
 within `√eps(T)`, and converts it into an `SMatrix{3,3,T,9}`. Throws an `ArgumentError` otherwise.
 """
-function _check_orientation(M::AbstractMatrix, ::Type{T}) where {T <: Real}
+function check_orientation(M::AbstractMatrix, ::Type{T}) where {T <: Real}
     if size(M) != (3, 3)
         throw(ArgumentError("Beam group orientation must be a 3x3 matrix"))
     end
     S = SMatrix{3, 3, T, 9}(M)
     tol = sqrt(eps(T))
-    # determinant as triple product of the columns
+    # Determinant as triple product
     detS = dot(S[:, 1], cross(S[:, 2], S[:, 3]))
     if !isapprox(transpose(S) * S, SMatrix{3, 3, T, 9}(I); atol = tol) ||
        !isapprox(detS, one(T); atol = tol)
@@ -60,16 +60,15 @@ it. The previous beams, including their traced rays, are replaced: solve the sys
 afterwards. Returns `group`.
 
 `n` must be at least [`BeamletOptics.min_num_rays`](@ref) of the source, i.e. `20 num_rings`
-for ring sources and `1` for sunflower, line and fan sources, otherwise an `ErrorException` is
+for ring sources and `1` for sunflower, line and fan sources, otherwise an `ArgumentError` is
 thrown, like by the constructors, and the source keeps its rays. A source built from given
 beams, e.g. `CollimatedSource(beams, diameter, pos, dir)`, can not be regenerated and throws an
 `ArgumentError`.
 """
 function num_rays!(src::Union{CollimatedSource{T}, PointSource{T}}, n::Integer) where {T}
-    s, M, λ = src.sampling, src.orientation, wavelength(src)
+    s, M, λ = src.sampling, orientation(src), wavelength(src)
     dir, b1, args = M[:, 2], M[:, 1], sampling_args(src)
-    # The emission point, i.e. the start of the first ray minus its offset in the current
-    # sampling. The pivot `position(src)` differs from it after `set_pivot3d!`.
+    # Emission point
     ref = source_beams(s, zero(Point3{T}), dir, b1, args..., λ, length(src), T)
     pos = position(first(rays(first(beams(src))))) - position(first(rays(first(ref))))
     src.beams = source_beams(s, pos, dir, b1, args..., λ, Int(n), T)

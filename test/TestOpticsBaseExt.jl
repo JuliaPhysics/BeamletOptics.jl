@@ -253,7 +253,7 @@ end
     Eu = [complex(cis(k * sin(θ) * x)) for x in xs, y in xs]
     Ev = 0.3im .* Eu
     overlap = 1.2
-    group = BMO.WavefrontBeamletDecomposition(xs, xs, Eu, Ev, n, λ; basis = (e1, e2),
+    group = BMO.WavefrontBeamletDecomposition(xs, xs, Eu, Ev, zeros(3), n, λ; basis = (e1, e2),
         overlap)
     for b in BMO.beams(group)
         r = BMO.first_ray(b)
@@ -303,7 +303,7 @@ end
     B = [exp(-((x - 50e-6)^2 + y^2) / (80e-6)^2) for x in xs, y in xs]
     φ = cis(0.3)
     group = BMO.WavefrontBeamletDecomposition(xs, xs, complex.(A) .* φ, im .* B .* φ,
-        [0.0, 1, 0], λ)
+        zeros(3), [0.0, 1, 0], λ)
     dirs = [BMO.direction(BMO.first_ray(b)) for b in BMO.beams(group)]
     @test maximum(d -> norm(d - [0, 1, 0]), dirs) < 1e-9
 end
@@ -316,7 +316,7 @@ end
     @test_throws ArgumentError BMO.GaussianModeDecomposition(backward_only)
     xs = collect(range(-1e-4, 1e-4; length = 8))
     @test_throws ArgumentError BMO.WavefrontBeamletDecomposition(xs, xs, zeros(8, 8),
-        zeros(8, 8), [0.0, 1, 0], λ)
+        zeros(8, 8), zeros(3), [0.0, 1, 0], λ)
     # BMO starts beams in vacuum: a field in a medium is rejected by both decompositions
     in_glass = OpticsBase.PlaneField(f.E, f.H, f.spacing, f.origin, f.axes, f.λ; n = 1.5)
     @test_throws ArgumentError BMO.WavefrontBeamletDecomposition(in_glass)
@@ -329,24 +329,24 @@ end
     Eu = [complex(exp(-(x^2 + y^2) / w0^2)) for x in xs, y in xs]
     Eu[3, 3] = NaN
     group = with_logger(NullLogger()) do
-        BMO.WavefrontBeamletDecomposition(xs, xs, Eu, zero(Eu), [0.0, 1, 0], λ)
+        BMO.WavefrontBeamletDecomposition(xs, xs, Eu, zero(Eu), zeros(3), [0.0, 1, 0], λ)
     end
     @test length(BMO.beams(group)) > 0
     @test all(b -> all(isfinite, BMO.polarization(b)), BMO.beams(group))
     amplitude = abs.(Eu)
     phase = zeros(16, 16)
     group = with_logger(NullLogger()) do
-        BMO.WavefrontBeamletDecomposition(xs, xs, amplitude, phase, [0.0, 1, 0], λ)
+        BMO.WavefrontBeamletDecomposition(xs, xs, amplitude, phase, zeros(3), [0.0, 1, 0], λ)
     end
     @test length(BMO.beams(group)) > 0
 
     # a phase gradient of exactly k is grazing: no direction along `dir` to carry the
     # normal field component, so it is rejected
     e1, e2, n = [1.0, 0, 0], [0.0, 0, -1], [0.0, 1, 0]
-    @test BMO._eikonal_direction((a, b) -> 1.0, 2, 2, 3, 3, 1.0, 1.0, 1.0, e1, e2, n) ===
+    @test BMO.eikonal_direction((a, b) -> 1.0, 2, 2, 3, 3, 1.0, 1.0, 1.0, e1, e2, n) ===
           nothing
     # sin θ = 0.5 along both e1 and e2
-    @test BMO._eikonal_direction((a, b) -> 0.5, 2, 2, 3, 3, 1.0, 1.0, 1.0, e1, e2, n) ≈
+    @test BMO.eikonal_direction((a, b) -> 0.5, 2, 2, 3, 3, 1.0, 1.0, 1.0, e1, e2, n) ≈
           0.5 * e1 + 0.5 * e2 + sqrt(0.5) * n
 end
 
@@ -386,14 +386,14 @@ end
         # w0 / cos θ), which takes this known share of the power of the narrow envelope.
         smoothing = wenv^2 / sqrt((wenv^2 + (w0 / cos(θ))^2) * (wenv^2 + w0^2))
         S = smoothing * sum(abs2, ψ) * dx^2 / (2Z0)
-        decompose(Eu, Ev) = BMO.WavefrontBeamletDecomposition(xs, xs, Eu, Ev, n, λo;
+        decompose(Eu, Ev) = BMO.WavefrontBeamletDecomposition(xs, xs, Eu, Ev, zeros(3), n, λo;
             basis = (e1, e2), overlap)
         # s-polarized (E along e2, normal to the plane of incidence): flux |E|² cos θ / 2Z₀
         @test traced_power(decompose(zero(ψ), ψ)) ≈ S * cos(θ) rtol = 1e-2
         # p-polarized: the tangential field is |E| cos θ, so the flux is |Eu|² / (2Z₀ cos θ)
         @test traced_power(decompose(ψ, zero(ψ))) ≈ S / cos(θ) rtol = 1e-2
         # scalar method, amplitude |E|, s-polarized by E0
-        scalar = BMO.WavefrontBeamletDecomposition(xs, xs, abs.(ψ), angle.(ψ), n, λo;
+        scalar = BMO.WavefrontBeamletDecomposition(xs, xs, abs.(ψ), angle.(ψ), zeros(3), n, λo;
             basis = (e1, e2), overlap, E0 = e2)
         @test traced_power(scalar) ≈ S * cos(θ) rtol = 1e-2
     end
@@ -449,7 +449,7 @@ end
 
     # `basis` and `R` come from the PlaneField
     @test_throws ArgumentError BMO.WavefrontBeamletDecomposition(f; R = 1.0)
-    @test_throws ArgumentError BMO.GaussianModeDecomposition(cs, cs, E, zero(E), n, λr;
+    @test_throws ArgumentError BMO.GaussianModeDecomposition(cs, cs, E, zero(E), zeros(3), n, λr;
         R = 0)
 end
 

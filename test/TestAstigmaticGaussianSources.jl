@@ -30,23 +30,6 @@ const nm = 1e-9
         end
     end
 
-    @testset "GaussianBeamletDecomposition" begin
-        w0 = 1mm
-        # A 21x21 grid will trim beamlets with amp < 1e-4, so length will be < 441
-        bg = GaussianBeamletDecomposition(pos, dir, λ, w0; n_grid = 21)
-        @test bg isa AstigmaticBeamGroup
-        beams = BMO.beams(bg)
-
-        @test length(beams) > 0
-        @test length(beams) <= 441
-
-        # Find the beamlet with the maximum amplitude
-        center_beam = argmax([norm(BMO.polarization(b)) for b in bg])
-
-        # The peak amplitude beamlet should be at the center (0, 0, 0)
-        @test norm(BMO.position(bg[center_beam]) - pos)≈0.0 atol=1e-5
-    end
-
     @testset "SphericalGaussianBeamletSource" begin
         θ = 0.1 # radians
         bg = SphericalGaussianBeamletSource(pos, dir, θ, λ; num_rings = 5, num_rays = 500)
@@ -72,8 +55,15 @@ const nm = 1e-9
             @test all(dirs .≈ [BMO.direction(b) for b in SphericalGaussianBeamletSource(
                 pos, dir, θ, λ; num_rings = 5, num_rays = 500, basis = b0)])
             # a degenerate basis would silently yield NaN directions, so it throws
-            @test_throws ErrorException SphericalGaussianBeamletSource(pos, dir, θ, λ;
+            @test_throws ArgumentError SphericalGaussianBeamletSource(pos, dir, θ, λ;
                 num_rings = 5, num_rays = 500, basis = dir)
+        end
+
+        @testset "invalid num_rays and θ" begin
+            @test_throws ArgumentError SphericalGaussianBeamletSource(pos, dir, θ, λ;
+                num_rings = 5, num_rays = 99)
+            @test_throws ArgumentError SphericalGaussianBeamletSource(pos, dir, π, λ;
+                num_rings = 5, num_rays = 500)
         end
     end
 
@@ -113,110 +103,31 @@ const nm = 1e-9
             @test all(dirs .≈ [BMO.direction(b) for b in EllipticalGaussianBeamletSource(
                 pos, dir, θ_x, θ_y, λ; num_rings = 5, num_rays = 500, basis = b0)])
             # a degenerate basis would silently yield NaN directions, so it throws
-            @test_throws ErrorException EllipticalGaussianBeamletSource(pos, dir, θ_x, θ_y, λ;
+            @test_throws ArgumentError EllipticalGaussianBeamletSource(pos, dir, θ_x, θ_y, λ;
                 num_rings = 5, num_rays = 500, basis = dir)
         end
-    end
 
-    @testset "WavefrontBeamletDecomposition" begin
-        # Generate a synthetic wavefront (a tilted plane wave)
-        nx, ny = 11, 11
-        x = LinRange(-1mm, 1mm, nx)
-        y = LinRange(-1mm, 1mm, ny)
-
-        amp = ones(nx, ny)
-        # Tilt in x by angle alpha
-        alpha = 0.001
-        k = 2π / λ
-        phase = [k * xi * alpha for xi in x, yi in y]
-
-        bg = WavefrontBeamletDecomposition(x, y, amp, phase, dir, λ)
-        @test bg isa AstigmaticBeamGroup
-
-        @test length(bg) == nx * ny
-
-        # We check the direction of the beamlets
-        # The true local propagation direction should be tilted by alpha
-        for b in bg
-            d = normalize(BMO.direction(b))
-            # Projection onto the original dir should be approximately cos(alpha)
-            @test dot(d, dir)≈cos(alpha) atol=1e-3
+        @testset "invalid num_rays and θ" begin
+            @test_throws ArgumentError EllipticalGaussianBeamletSource(pos, dir, θ_x, θ_y, λ;
+                num_rings = 5, num_rays = 99)
+            @test_throws ArgumentError EllipticalGaussianBeamletSource(pos, dir, π / 2, θ_y, λ;
+                num_rings = 5, num_rays = 500)
+            @test_throws ArgumentError EllipticalGaussianBeamletSource(pos, dir, θ_x, π / 2, λ;
+                num_rings = 5, num_rays = 500)
         end
     end
 
-    @testset "WavefrontBeamletDecomposition Energy Conservation" begin
-        # Define a simple Gaussian wavefront
-        λ = 1e-6
-        w0_input = 1.0e-3 # 1 mm
-        k = 2π / λ
-
-        # Grid
-        L = 5.0e-3 # 5 mm total width
-        N = 41
-        x = LinRange(-L / 2, L / 2, N)
-        y = LinRange(-L / 2, L / 2, N)
-        dx = x[2] - x[1]
-        dy = y[2] - y[1]
-
-        X = [xi for xi in x, yi in y]
-        Y = [yi for xi in x, yi in y]
-        R2 = X .^ 2 .+ Y .^ 2
-
-        # Input field: A = exp(-r^2/w0^2)
-        # Total power P = integral |A|^2 dA / (2Z) = pi * w0^2 / 4Z
-        amplitude = exp.(-R2 / w0_input^2)
-        phase = zeros(size(amplitude)) # Flat wavefront
-
-        dir = [0.0, 0.0, 1.0]
-
-        # Decomposition
-        overlap = 1.2
-        w0_beamlet = dx * overlap
-
-        # The normalization in the code is for AMPLITUDE reconstruction.
-        # E0 = A * (dx * dy) / (pi * w0s^2)
-        # Let's see if this leads to power conservation.
-
-        bg = WavefrontBeamletDecomposition(
-            x, y, amplitude, phase, dir, λ; overlap = overlap, threshold = 1e-6)
-
-        # Total power of beamlets (sum of individual powers)
-        P_beamlets_sum = sum(optical_power(b) for b in bg.beams)
-
-        # Total power of input field (discrete integral)
-        # Using Z_vacuum to match library defaults
-        P_input = sum(abs2.(amplitude)) * (dx * dy) / (2 * BeamletOptics.Z_vacuum)
-
-        if length(bg.beams) > 0
-            b1 = bg.beams[1]
-            params1 = BeamletOptics.gauss_parameters(b1, 0.0)
-        end
-
-        # Reconstructed field power at z=0
-        # Sample on a finer grid to check field reconstruction
-        N_fine = 81
-        x_fine = LinRange(-L / 2, L / 2, N_fine)
-        y_fine = LinRange(-L / 2, L / 2, N_fine)
-        dx_f = x_fine[2] - x_fine[1]
-        dy_f = y_fine[2] - y_fine[1]
-
-        E_rec = zeros(ComplexF64, N_fine, N_fine)
-        for (ii, xf) in enumerate(x_fine)
-            for (jj, yf) in enumerate(y_fine)
-                r_vec = [xf, yf, 0.0]
-                # Sum up contributions from all beamlets (coherent superposition)
-                for b in bg.beams
-                    p0 = BeamletOptics.position(b)
-                    # For flat wavefront at z=0, the polarized field is appropriate
-                    E_rec[ii, jj] += norm(BeamletOptics.polarized_field(b, r_vec - p0, 0.0))
-                end
-            end
-        end
-
-        P_rec = sum(abs2.(E_rec)) * (dx_f * dy_f) / (2 * BeamletOptics.Z_vacuum)
-
-        # The coherent reconstruction should ideally match the input power
-        @test isapprox(P_rec / P_input, 1.0, atol = 0.05)
+    @testset "AstigmaticBeamGroup from dir and from orientation" begin
+        bs = BMO.beams(SphericalGaussianBeamletSource(pos, dir, 0.1, λ; num_rings = 2, num_rays = 40))
+        p = [1.0, 2.0, 3.0]
+        d = normalize([0.3, 1.0, -0.2])
+        e1 = BMO.normal3d(d)
+        g_dir = AstigmaticBeamGroup(bs, p, d)
+        g_mat = AstigmaticBeamGroup(bs, p, hcat(e1, d, cross(e1, d)))
+        @test BMO.position(g_dir) == BMO.position(g_mat) == p
+        @test BMO.orientation(g_dir) ≈ BMO.orientation(g_mat) atol = 1e-15
+        @test BMO.beams(g_dir) === bs
+        @test BMO.beams(g_mat) === bs
     end
 end
 
@@ -229,23 +140,6 @@ end
         return BeamletOptics.optical_power(pd, RegularGrid(num_points = 200); progress = false)
     end
     P0 = 1e-3
-    @testset "GaussianBeamletDecomposition is the Gaussian beam of w0 and P0" begin
-        λ, w0, L = 1e-6, 2e-3, 0.1
-        for n_grid in (10, 20)
-            g = GaussianBeamletDecomposition([0.0, 0, 0], [0.0, 1, 0], λ, w0; n_grid, P0)
-            pd = Detector(12w0)
-            translate3d!(pd, [0, L, 0])
-            solve_system!(System([pd]), g; progress = false)
-            s = RegularGrid(num_points = 201, x_min = -3w0, x_max = 3w0, z_min = -3w0, z_max = 3w0)
-            x, z, I = intensity(pd, s; progress = false)
-            w = w0 * sqrt(1 + (L * λ / (π * w0^2))^2)
-            @test optical_power(pd, s; progress = false) ≈ P0 rtol = 1e-3
-            # the peak intensity 2 P0 / (π w²) of the Gaussian beam, i.e. also its radius
-            @test maximum(I) ≈ 2P0 / (π * w^2) rtol = 1e-3
-        end
-        # the sub-waist of the beamlets must be smaller than the waist
-        @test_throws ArgumentError GaussianBeamletDecomposition([0.0, 0, 0], [0.0, 1, 0], λ, w0; n_grid = 4)
-    end
     @testset "SphericalGaussianBeamletSource emits P0" begin
         for (θ, num_rings, num_rays) in ((0.02, 5, 200), (0.02, 10, 1000))
             source = SphericalGaussianBeamletSource([0.0, 0, 0], [0.0, 1, 0], θ, 1e-6; num_rings, num_rays, P0)

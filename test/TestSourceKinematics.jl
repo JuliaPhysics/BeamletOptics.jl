@@ -330,7 +330,7 @@ start_rays(b) = map(BMO.first_ray, BMO._component_beams(b))
             SphericalGaussianBeamletSource(pos, dir, 0.1, 1e-6; num_rings = 2, num_rays = 40),
             EllipticalGaussianBeamletSource(pos, dir, 0.1, 0.05, 1e-6; num_rings = 2, num_rays = 40),
             GaussianBeamletDecomposition(pos, dir, 1e-6, 1mm; n_grid = 6),
-            WavefrontBeamletDecomposition(x, x, amp, phase, dir, 1e-6),
+            WavefrontBeamletDecomposition(x, x, amp, phase, pos, dir, 1e-6),
             UniformLineSource(pos, dir, 5mm; num_rays = 20),
             UniformFanSource(pos, dir, 0.1; num_rays = 20)
         ]
@@ -344,7 +344,7 @@ start_rays(b) = map(BMO.first_ray, BMO._component_beams(b))
             SphericalGaussianBeamletSource(pos, dir, 0.1, 1e-6; num_rings = 2, num_rays = 40, basis = b),
             EllipticalGaussianBeamletSource(pos, dir, 0.1, 0.05, 1e-6; num_rings = 2, num_rays = 40, basis = b),
             GaussianBeamletDecomposition(pos, dir, 1e-6, 1mm; n_grid = 6, basis = (b, b2)),
-            WavefrontBeamletDecomposition(x, x, amp, phase, dir, 1e-6; basis = (b, b2)),
+            WavefrontBeamletDecomposition(x, x, amp, phase, pos, dir, 1e-6; basis = (b, b2)),
             UniformLineSource(pos, dir, 5mm; num_rays = 20, basis = b),
             UniformFanSource(pos, dir, 0.1; num_rays = 20, basis = b)
         ]

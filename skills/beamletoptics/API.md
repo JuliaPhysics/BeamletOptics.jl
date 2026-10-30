@@ -50,7 +50,8 @@ Use `scripts/api_lookup.jl NAME` to print the docstring and signatures of any na
 | Live (Makie)  | `live_render!`, `update_render!`, `remove_render!`, `pick_object` |
 
 Useful non-exported helpers: `BeamletOptics.inch`, `lensmakers_eq(R1, R2, n)` (returns f),
-`divergence_angle(λ, w0, M2)`, `numerical_aperture(θ, n=1)`, `optical_path_length(beam)`,
+`divergence_angle(λ, w0, M2)`, `numerical_aperture(θ, n=1)` (also of a `PointSource` or a cone
+sampling, public), `optical_path_length(beam)`,
 `isparaxial(system, beam, θ=π/4)`, `fresnel_coefficients`, `beams(group)`, `objects(system)`,
 `list_subtypes(T)`, constants `Z_vacuum`, `c_vacuum`.
 
@@ -150,14 +151,15 @@ optical_power(beamlet) / power(f)                               # power fraction
 
 `PlaneField(det)` is the physical field (tangential E and H); as for `optical_power(det)`,
 `power(f)` of an oblique beam is the full beam power. Beamlet hits
-only (not rays). `WavefrontBeamletDecomposition(x, y, Eu, Ev, dir, λ)` is the vector-field
-form that takes two field components instead of amplitude, phase and one `E0`.
+only (not rays). `WavefrontBeamletDecomposition(x, y, Eu, Ev, pos, dir, λ)` is the vector-field
+form that takes two field components instead of amplitude, phase and one `E0`; `pos` is the
+global position of the sample `x = y = 0`, as in `GaussianModeDecomposition(x, y, Eu, Ev, pos, dir, λ)`.
 `WavefrontBeamletDecomposition` needs beamlets much larger than λ (one per sample, waist 1.2
 samples); for small fields close to one Gaussian mode, e.g. single-mode fiber output, use
 `GaussianModeDecomposition` (plane in air, small tilt, no general astigmatism). Both resolve
 the phase step between samples only below π: keep the plane normal to the beam (a tilt θ
 needs a spacing below `λ / (2 sin θ)`). Strongly curved wavefronts go in relative to a
-reference sphere: keyword `R` of the `(x, y, Eu, Ev, dir, λ)` forms, taken from `f.R` for a
+reference sphere: keyword `R` of the `(x, y, Eu, Ev, pos, dir, λ)` forms, taken from `f.R` for a
 `PlaneField`; the sphere itself need not be resolved by the grid.
 
 Components that hand a beamlet to another solver and emit the result again (e.g. a fiber

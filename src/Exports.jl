@@ -89,4 +89,4 @@ public AbstractObjectGroup, check_kinematic_members
 # element type of path_segments
 public PathSegment
 public AbstractSourceSampling, NoSampling, DiscRings, DiscSunflower, DiscLine, ConeRings, ConeSunflower,
-       ConeFan, source_beams, sampling_basis
+       ConeFan, source_beams, sampling_basis, numerical_aperture

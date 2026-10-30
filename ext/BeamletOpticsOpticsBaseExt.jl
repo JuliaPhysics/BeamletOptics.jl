@@ -20,7 +20,7 @@ import BeamletOptics: Detector, GaussianBeamletHit, AstigmaticGaussianBeamletHit
                        position, direction, orientation, wavelength, refractive_index,
                        electric_field,
                        WavefrontBeamletDecomposition, GaussianModeDecomposition,
-                       translate_to3d!, _with_progress,
+                       _with_progress,
                        _tick!
 const BMO = BeamletOptics
 
@@ -267,7 +267,7 @@ original field (round trip), up to beamlet-grid discretization error.
   direction for its backward part in this constructor, which needs one direction per
   call).
 - `kwargs...`: forwarded to [`WavefrontBeamletDecomposition`](@ref
-  BeamletOptics.WavefrontBeamletDecomposition)`(x, y, Eu, Ev, dir, λ; kwargs...)`
+  BeamletOptics.WavefrontBeamletDecomposition)`(x, y, Eu, Ev, pos, dir, λ; kwargs...)`
   (`threshold`, `overlap`, `randomize_axes`, `rng`); `basis` is fixed to `f`'s own `(u,
   v)` and `R` to `f.R`, neither can be overridden.
 
@@ -283,15 +283,13 @@ original field (round trip), up to beamlet-grid discretization error.
   plane close to normal to the beam, which the beamlet size requires anyway (see
   [`WavefrontBeamletDecomposition`](@ref BeamletOptics.WavefrontBeamletDecomposition)).
 - The beam group's sampling grid is `f`'s own `(u, v)` grid (`OpticsBase.coordinates`), placed at `f.origin` with local axes `f.axes[:, 1:2]`
-  (`translate_to3d!` after construction; [`WavefrontBeamletDecomposition`](@ref
-  BeamletOptics.WavefrontBeamletDecomposition) itself always centers the undecomposed
-  group on the global origin).
+  (the position argument `pos = f.origin`).
 - `f` must lie in vacuum or air (`f.n == 1`): BMO starts beams in vacuum, and a field
   in a medium would need a medium-to-vacuum conversion of amplitude and optical path.
   An `ArgumentError` is thrown otherwise.
 
 Throws an `ArgumentError` if `f` has no forward-travelling light (e.g. a purely backward
-wave), and whatever `WavefrontBeamletDecomposition(x, y, Eu, Ev, dir, λ)` throws.
+wave), and whatever `WavefrontBeamletDecomposition(x, y, Eu, Ev, pos, dir, λ)` throws.
 """
 function BeamletOptics.WavefrontBeamletDecomposition(f::OpticsBase.PlaneField; kwargs...)
     _check_fixed_keywords(kwargs)
@@ -305,10 +303,8 @@ function BeamletOptics.WavefrontBeamletDecomposition(f::OpticsBase.PlaneField; k
     u = SVector{3}(f.axes[:, 1])
     v = SVector{3}(f.axes[:, 2])
 
-    group = WavefrontBeamletDecomposition(x, y, Eu, Ev, n, f.λ; basis = (u, v), R = f.R,
-        kwargs...)
-    translate_to3d!(group, SVector{3}(f.origin))
-    return group
+    return WavefrontBeamletDecomposition(x, y, Eu, Ev, SVector{3}(f.origin), n, f.λ;
+        basis = (u, v), R = f.R, kwargs...)
 end
 
 # -----------------------------------------------------------------------------------------
@@ -335,8 +331,8 @@ function BeamletOptics.GaussianModeDecomposition(f::OpticsBase.PlaneField)
     E = _forward_field(f)
     u, v, n = (SVector{3}(f.axes[:, i]) for i in 1:3)
     return GaussianModeDecomposition(collect(OpticsBase.coordinates(f, 1)),
-        collect(OpticsBase.coordinates(f, 2)), E[:, :, 1], E[:, :, 2], n, f.λ;
-        basis = (u, v), origin = SVector{3}(f.origin), R = f.R)
+        collect(OpticsBase.coordinates(f, 2)), E[:, :, 1], E[:, :, 2], SVector{3}(f.origin), n,
+        f.λ; basis = (u, v), R = f.R)
 end
 
 end # module

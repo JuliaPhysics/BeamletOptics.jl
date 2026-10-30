@@ -90,23 +90,26 @@ A [`CollimatedSource`](@ref) or [`PointSource`](@ref) stores how its rays were s
 
 ```mermaid
 flowchart TB
-    C(["<b>source constructor</b><br/>e.g. CollimatedSource(pos, dir, diameter, λ)"])
+    C(["<b>catalog constructor</b><br/>e.g. CollimatedSource(pos, dir, diameter, λ)"])
+    GC(["<b>generic constructor</b><br/>CollimatedSource(pos, dir, diameter, sampling, λ; num_rays)<br/>PointSource(pos, dir, sampling, λ; num_rays)"])
     N(["<b>num_rays!</b>(src, n)"])
     W(["<b>given beams</b><br/>e.g. CollimatedSource(beams, diameter, pos, dir)"])
     SB["<b>sampling_basis</b>(dir, basis, T)<br/>reference vector b1"]
     SBM["<b>source_beams</b>(sampling, pos, dir, b1,<br/>args..., λ, num_rays, T)"]
     DISC["<b>DiscRings, DiscSunflower, DiscLine</b><br/><i>CollimatedSource</i>"]
     CONE["<b>ConeRings, ConeSunflower, ConeFan</b><br/><i>PointSource</i>"]
-    OWN["<b>own AbstractSourceSampling</b><br/>methods of source_beams<br/>and min_num_rays (optional)"]
+    OWN["<b>own AbstractSourceSampling</b><br/>methods of source_beams, min_num_rays (optional)<br/>and numerical_aperture (PointSource)"]
     NO["<b>NoSampling</b>"]
     ERR(["ArgumentError"])
     BM["<b>Vector{Beam}</b><br/>first beam: center ray"]
-    G["<b>CollimatedSource / PointSource</b><br/>beams, center, orientation, sampling"]
+    NA["<b>numerical_aperture</b>(sampling)<br/>NA of a PointSource"]
+    G["<b>CollimatedSource / PointSource</b><br/>beams, center, dir, sampling"]
     MIN["<b>min_num_rays</b>(src.sampling)<br/>20 num_rings, 1 or nothing"]
 
-    C --> SB
-    SB -- "sampling of the constructor" --> SBM
-    N -- "src.sampling, orientation, n" --> SBM
+    C -- "its sampling, e.g. DiscRings(num_rings)" --> GC
+    GC --> SB
+    SB --> SBM
+    N -- "src.sampling, orientation(src), n" --> SBM
     SBM -.-> DISC
     SBM -.-> CONE
     SBM -.-> OWN
@@ -114,8 +117,11 @@ flowchart TB
     DISC --> BM
     CONE --> BM
     OWN --> BM
+    DISC -- "num_rays < min_num_rays" --> ERR
+    CONE -- "num_rays < min_num_rays" --> ERR
     NO --> ERR
-    BM -- "new source, or replaces src.beams" --> G
+    BM -- "replaces src.beams" --> G
+    BM -- "new source" --> NA --> G
     W -- "sampling = NoSampling()" --> G
     G -- "min_num_rays(src)" --> MIN
 
@@ -123,11 +129,20 @@ flowchart TB
     classDef green fill:#38982626,stroke:#389826,stroke-width:2px
     classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
     classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
-    class SB,SBM,MIN blue
+    class SB,SBM,MIN,NA blue
     class OWN green
     class DISC,CONE,NO,BM,G purple
-    class C,N,W,ERR terminal
+    class C,GC,N,W,ERR terminal
 ```
+
+The catalog constructors above build their sampling and call the generic constructors, which take the sampling as an argument:
+
+```@docs; canonical=false
+CollimatedSource(::AbstractArray{<:Real}, ::AbstractArray{<:Real}, ::Real, ::BeamletOptics.AbstractSourceSampling, ::Real)
+PointSource(::AbstractArray{<:Real}, ::AbstractArray{<:Real}, ::BeamletOptics.AbstractSourceSampling, ::Real)
+```
+
+An own sampling is a subtype of [`BeamletOptics.AbstractSourceSampling`](@ref) with a method of `source_beams`; the generic constructors and [`num_rays!`](@ref) then work for it without further code. A sampling for a `PointSource` also implements `numerical_aperture(s)`. A sampling with a lower bound on the number of rays implements `min_num_rays(s)`, and its `source_beams` throws an `ArgumentError` for a `num_rays` below it, as the samplings of BMO do.
 
 ## Astigmatic Beam Groups
 
@@ -140,6 +155,30 @@ For complex sources, the package provides the [`AstigmaticBeamGroup`](@ref) cont
 - [`EllipticalGaussianBeamletSource`](@ref): A point-like source emitting an elliptical cone of beamlets (ideal for sources with different fast/slow axis divergence).
 
 A field that is close to one Gaussian mode and too small to be tiled into beamlets, e.g. the output of a single-mode fiber, is not turned into a group: [`GaussianModeDecomposition`](@ref) fits a single [`AstigmaticGaussianBeamlet`](@ref) to it.
+
+The decompositions of a sampled field take the grid position as a positional argument, like every other source: `WavefrontBeamletDecomposition(x, y, amplitude, phase, pos, dir, λ)`, `WavefrontBeamletDecomposition(x, y, Eu, Ev, pos, dir, λ)` and `GaussianModeDecomposition(x, y, Eu, Ev, pos, dir, λ)`. The grid lies in the plane normal to `dir` through `pos`, and `pos` is the global position of the sample `x = y = 0` and the center of the group.
+
+### Beamlet sources and decompositions
+
+The beamlet sources and decompositions normalize the beamlets such that their coherent superposition is the intended field. This section collects how.
+
+**Gaussian beamlet decomposition.** The superposition of the beamlets of [`GaussianBeamletDecomposition`](@ref) is the sampled envelope convolved with a beamlet. For a Gaussian envelope of the waist ``w_\mathrm{env}`` it is a Gaussian of the waist ``\sqrt{w_\mathrm{env}^2 + w_{0s}^2}`` and the peak amplitude ``w_\mathrm{env}^2 / (w_\mathrm{env}^2 + w_{0s}^2)``, with the sub-waist ``w_{0s}`` of the beamlets. The envelope is therefore deconvolved, such that the superposition is the macroscopic beam of the waist `w0`, its peak amplitude and its power `P0`.
+
+**Power of a tilted beamlet.** In [`WavefrontBeamletDecomposition`](@ref), each beamlet represents a cell of the area ``\Delta x \Delta y``. The footprint of a beamlet tilted by ``\theta`` against `dir` is stretched by ``1/\cos\theta`` on the sampling plane, so the Gaussian overlap integral there is ``\pi w_{0x} w_{0y} / \cos\theta``, and the field is scaled by ``\Delta x \Delta y \cos\theta / (\pi w_{0x} w_{0y})``.
+
+**Local propagation direction and polarization of the vector field.** In the vector-field method of [`WavefrontBeamletDecomposition`](@ref), the local propagation direction at each grid point is found from the Eikonal equation, with the phase difference between neighboring samples taken from the complex vector overlap ``\mathbf{E}(a)^\mathsf{H} \mathbf{E}(b)``. This is continuous where the polarization changes and assumes that both components share one local wavevector, i.e. that the field is not the superposition of two waves with genuinely different directions at that point. The phase step between neighbors must stay below ``\pi``: a field tilted by ``\theta`` against `dir` needs ``\Delta x < \lambda / (2 \sin\theta)``, while the beamlets (waist `overlap * dx`) must stay much larger than ``\lambda``, so keep the sampling plane close to normal to the beam.
+
+The `E0` of a beamlet keeps the given tangential components `Eu`, `Ev` and gets the normal component that makes it transverse to the local direction (``\mathbf{E} \cdot \mathbf{d} = 0``). Its amplitude is scaled by ``\cos\theta = \mathbf{d} \cdot \mathbf{dir}``, because the footprint of a tilted beamlet on the sampling plane is stretched by ``1/\cos\theta``. The sum of the beamlets then reproduces the sampled tangential field for oblique beams as well.
+
+**Fit of the Gaussian mode decomposition.** [`GaussianModeDecomposition`](@ref) fits its beamlet in five steps:
+
+1. Polarization: the dominant eigenvector of the coherence matrix ``\sum \mathbf{E} \mathbf{E}^\mathsf{H}``; the field is projected onto it.
+2. Position and waist: centroid and principal axes of the second intensity moments; the beam radius along a principal axis is twice the rms width.
+3. Direction: the mean transverse wave vector, from the intensity-weighted phase step between neighboring samples.
+4. Curvature: the quadratic phase from the moments ``\langle r_i \partial_j \varphi \rangle`` of the phase gradient (phase steps between neighbors), taken along the principal axes of the intensity. Twist between curvature and intensity axes (general astigmatism) is not represented.
+5. Amplitude and phase: the projection of the field onto the fitted mode.
+
+**Coherent power of beamlet sources.** [`CollimatedGaussianBeamletSource`](@ref), [`SphericalGaussianBeamletSource`](@ref) and [`EllipticalGaussianBeamletSource`](@ref) emit beamlets of equal power that start in phase. Their profiles are Gaussians of the width ``w`` (the ``1/e^2`` half width of the intensity) about vectors ``\mathbf{v}_i`` in a common plane: the positions with the waist in the source plane of collimated beamlets, or the directions with the far-field divergence of beamlets from one point. Where the beamlets overlap, their fields add: two beamlets of the power ``P`` whose vectors differ by ``\delta`` contribute ``P \exp(-\delta^2 / (2 w^2))`` to the power of the superposition per pair, i.e. it carries ``P \sum_{ij} \exp(-|\mathbf{v}_i - \mathbf{v}_j|^2 / (2 w^2))`` instead of ``N P``. The fields of the beamlets are scaled such that the superposition carries the sum of their powers. This holds for all beamlets, also at the edge of the source, where fewer neighbors overlap.
 
 ### OpticsBase fields as beam groups
 
