@@ -317,7 +317,7 @@ function _astigmatic_phasor(hit::AstigmaticGaussianBeamletHit{G}, p::AbstractArr
         area_z = Complex{G}(1e-25, 1e-25)
     end
     # Gouy factor √(a_ref / a(l1)) with the continuous argument of the area: each factor
-    # of a(l1) stays off the negative real axis (see `_area_inverse_roots`), so the
+    # of a(l1) stays off the negative real axis (see `area_inverse_roots`), so the
     # principal square roots follow the Gouy phase through a focus
     gouy = hit.gouy0 / (sqrt(1 - hit.ρ1 * l1) * sqrt(1 - hit.ρ2 * l1))
 

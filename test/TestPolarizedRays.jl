@@ -39,6 +39,13 @@ const BMO = BeamletOptics
         @test_throws ErrorException PolarizedRay(zeros(3), [0,1,0], 1e-6, [0,1,1])
     end
 
+    @testset "Orthogonality tolerance is relative to |E0|" begin
+        thr = get_orthogonality_threshold()
+        E0(f) = 3 .* [1, f, 0]
+        @test PolarizedRay(zeros(3), [0, 1, 0], 1e-6, E0(0.5 * thr)) isa PolarizedRay
+        @test_throws ErrorException PolarizedRay(zeros(3), [0, 1, 0], 1e-6, E0(2 * thr))
+    end
+
     @testset "Mirror reflections" begin
         # Setup system as in https://opg.optica.org/ao/fulltext.cfm?uri=ao-50-18-2855&id=218813
         m1 = SquarePlanoMirror2D(1.0)

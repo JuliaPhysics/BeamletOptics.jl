@@ -86,35 +86,9 @@ wavelength(beam::GaussianBeamlet) = beam.λ
 beam_waist(beam::GaussianBeamlet) = beam.w0
 electric_field(beam::GaussianBeamlet) = beam.E0
 electric_field!(beam::GaussianBeamlet{T}, new) where {T} = (beam.E0 = Complex{T}(new))
-refractive_index(beam::GaussianBeamlet, id::Int) = refractive_index(rays(beam.chief)[id])
-function refractive_index!(beam::GaussianBeamlet, id::Int, n_new::Real)
-    refractive_index!(rays(beam.chief)[id], n_new)
-    refractive_index!(rays(beam.waist)[id], n_new)
-    refractive_index!(rays(beam.divergence)[id], n_new)
-    return nothing
-end
-
-"""
-    empty!(gauss::GaussianBeamlet)
-
-Resets the beamlet to its untraced start state, i.e. resets the `chief`, `waist` and
-`divergence` beams and drops all child beamlets.
-"""
-function Base.empty!(g::GaussianBeamlet)
-    foreach(empty!, _component_beams(g))
-    _drop_beams!(g)
-    return g
-end
 
 """Return a tuple of the `chief`, `waist` and `divergence` beams of the [`GaussianBeamlet`](@ref)."""
 _component_beams(g::GaussianBeamlet) = (g.chief, g.waist, g.divergence)
-
-first_ray(g::GaussianBeamlet) = first_ray(g.chief)
-
-Base.length(gauss::GaussianBeamlet) = length(gauss.chief)
-optical_path_length(gauss::GaussianBeamlet) = optical_path_length(gauss.chief)
-
-isentering(beam::GaussianBeamlet, id::Int) = isentering(rays(beam.chief)[id])
 
 """
     parent!(beam::GaussianBeamlet, parent::GaussianBeamlet)
@@ -235,7 +209,7 @@ function GaussianBeamlet(
         s1 = support
     end
     s1 = normalize(s1)
-    # Both vectors have unit length, hence the test does not depend on the length of `support`
+    # Unit vectors: test independent of support length
     if !isorthogonal3d(dir, s1; atol = Config.get_orthogonality_threshold())
         throw(ArgumentError("the support vector must be orthogonal to the direction (dot product of the unit vectors: $(dot(dir, s1)))"))
     end
@@ -261,8 +235,6 @@ function GaussianBeamlet(
         E0
     )
 end
-
-point_on_beam(gauss::GaussianBeamlet, t::Real) = point_on_beam(gauss.chief, t)
 
 """
     gauss_parameters(gauss::GaussianBeamlet, z; hint::Union{Nothing, Tuple{Int, Vector{<:Real}}}=nothing)
@@ -303,55 +275,56 @@ function gauss_parameters(
         hint = point_on_beam(gauss, z)
 )
     p0, index = hint
-    chief = gauss.chief.rays[index]
+    chief = rays(gauss.chief)[index]
     w, R, ψ, w0 = gauss_parameters(GaussianSegment(gauss, index), dot(p0 - position(chief), direction(chief)))
     return (w, R, ψ + ψ0, w0)
 end
 
 """
+    RayCrossing{T}
+
+Offset `y0 + l * v` from the chief ray at distance `l` and direction `a` of an auxiliary ray.
+"""
+struct RayCrossing{T}
+    y0::Point3{T}
+    v::Point3{T}
+    a::Point3{T}
+end
+
+function RayCrossing{T}(p::AbstractVector, d::AbstractVector, ray::AbstractRay) where {T}
+    a = direction(ray)
+    c = dot(d, a)
+    return RayCrossing{T}(position(ray) + dot(p - position(ray), d) / c * a - p, a / c - d, a)
+end
+
+"""
     GaussianSegment{T}
 
-The waist and divergence rays of one segment of a [`GaussianBeamlet`](@ref), as values relative
-to its chief ray: on the plane normal to the chief ray at the distance `l` behind its start, an
-auxiliary ray with direction `a` crosses at the transverse offset `y0 + l * v` from the chief ray.
-Both rays are straight within the segment, hence this holds exactly. `n` is the refractive index
-of the segment and `λ` the vacuum wavelength. [`gauss_parameters`](@ref)`(segment, l)` evaluates it,
-a [`GaussianBeamletHit`](@ref) stores it.
+The waist and divergence rays of one segment of a [`GaussianBeamlet`](@ref), as two `RayCrossing`s
+relative to its chief ray. Both rays are straight within the segment, hence the crossings hold exactly.
+`n` is the refractive index of the segment and `λ` the vacuum wavelength.
+[`gauss_parameters`](@ref)`(segment, l)` evaluates it, a [`GaussianBeamletHit`](@ref) stores it.
 """
 struct GaussianSegment{T}
-    y0_w::Point3{T}
-    v_w::Point3{T}
-    a_w::Point3{T}
-    y0_d::Point3{T}
-    v_d::Point3{T}
-    a_d::Point3{T}
+    waist::RayCrossing{T}
+    divergence::RayCrossing{T}
     n::T
     λ::T
 end
 
 function GaussianSegment(gauss::GaussianBeamlet{T}, index::Integer) where {T}
-    chief = gauss.chief.rays[index]
+    chief = rays(gauss.chief)[index]
     p, d = position(chief), direction(chief)
-    y0_w, v_w, a_w = _crossing(p, d, gauss.waist.rays[index])
-    y0_d, v_d, a_d = _crossing(p, d, gauss.divergence.rays[index])
-    return GaussianSegment{T}(y0_w, v_w, a_w, y0_d, v_d, a_d, refractive_index(chief), wavelength(gauss))
+    waist, divergence = map(b -> RayCrossing{T}(p, d, rays(b)[index]), (gauss.waist, gauss.divergence))
+    return GaussianSegment{T}(waist, divergence, refractive_index(chief), wavelength(gauss))
 end
 
-# Offset `y0 + l v` from the chief ray (start `p`, direction `d`) at which `ray` crosses the plane
-# normal to `d` at the distance `l` behind `p`, and the direction of `ray`
-function _crossing(p, d, ray)
-    a = direction(ray)
-    c = dot(d, a)
-    return position(ray) + dot(p - position(ray), d) / c * a - p, a / c - d, a
-end
-
-# Height and slope of an auxiliary ray with the offset `y0 + l v` and the direction `a`: the slope
-# is tan(π/2 − θ) = cot θ of the angle θ between the offset and `a`
-function _height_slope(y0, v, a, l)
-    y = y0 + l * v
+# Height and slope (cotangent of the angle between offset and direction) of an aux ray at distance `l`
+function height_slope(c::RayCrossing, l)
+    y = c.y0 + l * c.v
     h = norm(y)
     ŷ = y / h
-    return h, dot(ŷ, a) / norm(cross(ŷ, a))
+    return h, dot(ŷ, c.a) / norm(cross(ŷ, c.a))
 end
 
 """
@@ -362,15 +335,8 @@ its chief ray, as [`gauss_parameters`](@ref)`(gauss, z)` does, but with the Gouy
 to the local waist of the segment.
 """
 function gauss_parameters(s::GaussianSegment, l::Real)
-    #=
-    Height y and slope m of the divergence and waist rays on the plane at l
-    - the height is the distance between the chief ray and the crossing point of the ray
-    - the slope is the cotangent of the angle between the offset and the ray direction, which
-      gives the signed slope
-    - fails if a height is zero -> catch R=Inf, ψ=0 and H=λ/π
-    =#
-    y_d, m_d = _height_slope(s.y0_d, s.v_d, s.a_d, l)
-    y_w, m_w = _height_slope(s.y0_w, s.v_w, s.a_w, l)
+    # Height and slope of aux rays
+    (y_w, m_w), (y_d, m_d) = map(c -> height_slope(c, l), (s.waist, s.divergence))
     # Beam parameters as per Arnaud (1985) and DeJager (1992)
     n = s.n
     H = abs(n * (y_w * m_d - y_d * m_w))
@@ -408,8 +374,7 @@ function waist_parameters(gb::GaussianBeamlet, z::Real)
     chief = rays(gb.chief)[i]
     waist = rays(gb.waist)[i]
     dir = direction(chief)
-    # Recover the basis vector from the auxiliary waist ray
-    # p_waist = p_chief + w * s1
+    # Basis vector from aux waist ray
     vec = position(waist) - p0
     # Project to transverse plane to be sure
     vec = vec - dot(vec, dir) * dir
@@ -471,15 +436,14 @@ of [`gauss_parameters`](@ref).
 """
 function electric_field(gauss::GaussianBeamlet, r, z; hint = point_on_beam(gauss, z))
     point, index = hint
-    return _segment_field(gauss, r, z, point, index, _length_before(gauss.chief, index),
-        _path_excess_before(gauss, index), _gouy_before(gauss, index))
+    return segment_field(gauss, r, z, point, index, length_before(gauss, index),
+        path_excess_before(gauss, index), _gouy_before(gauss, index))
 end
 
-# Gouy phase relative to the local waist at the start and at the end of segment `index`, see
-# `gauss_parameters(gauss, z, ψ0)`
-_local_gouy_start(gauss::GaussianBeamlet{T}, index::Integer) where {T} =
+# Gouy phase relative to the local waist at the start and at the end of segment `index`
+local_gouy_start(gauss::GaussianBeamlet{T}, index::Integer) where {T} =
     gauss_parameters(gauss, zero(T), zero(T); hint = (position(rays(gauss.chief)[index]), index))[3]
-function _local_gouy_end(gauss::GaussianBeamlet{T}, index::Integer) where {T}
+function local_gouy_end(gauss::GaussianBeamlet{T}, index::Integer) where {T}
     ray = rays(gauss.chief)[index]
     return gauss_parameters(gauss, zero(T), zero(T);
         hint = (hit_point(ray), index))[3]
@@ -488,28 +452,23 @@ end
 """
     _gouy_before(gauss::GaussianBeamlet, index)
 
-Gouy phase that the beam (including its parents) has collected in front of segment `index`, as the
-offset between the collected Gouy phase (the `ψ` of [`gauss_parameters`](@ref)) and the Gouy phase
-relative to the waist of the local segment (`gauss_parameters(gauss, z, 0)`). The collected phase is
-continuous at a surface, whereas the local waist and with it the local phase changes there, e.g. at
-a lens. The offset is zero on the first segment of a root beam and collects the steps of the local
-phase at every surface on the way. A child continues the last segment of its parent.
+Gouy phase collected in front of segment `index`, parents included.
 """
 function _gouy_before(gauss::GaussianBeamlet{T}, index::Integer) where {T}
     p = gauss.parent
     ψ0 = zero(T)
     if !isnothing(p)
         last_id = length(rays(p.chief))
-        ψ0 = _gouy_before(p, last_id) + _local_gouy_end(p, last_id) - _local_gouy_start(gauss, 1)
+        ψ0 = _gouy_before(p, last_id) + local_gouy_end(p, last_id) - local_gouy_start(gauss, 1)
     end
     for i in 2:index
-        ψ0 += _local_gouy_end(gauss, i - 1) - _local_gouy_start(gauss, i)
+        ψ0 += local_gouy_end(gauss, i - 1) - local_gouy_start(gauss, i)
     end
     return ψ0
 end
 
 # Optical minus geometric path of `gauss` (including its parents) up to the start of segment `index`
-function _path_excess_before(gauss::GaussianBeamlet{T}, index::Integer) where {T}
+function path_excess_before(gauss::GaussianBeamlet{T}, index::Integer) where {T}
     p = AbstractTrees.parent(gauss.chief)
     Δl = isnothing(p) ? zero(T) : optical_path_length(p) - length(p)
     for j in 1:(index - 1)
@@ -519,19 +478,14 @@ function _path_excess_before(gauss::GaussianBeamlet{T}, index::Integer) where {T
     return Δl
 end
 
-# Field of segment `index` at the distance `z` along the beam and the radius `r`, where `point` is the
-# point on the chief ray at `z`. `l0` is the geometric length, `Δl0` the optical minus the geometric
-# path and `ψ0` the Gouy phase of the beam in front of the segment (see `_length_before`,
-# `_path_excess_before`, `_gouy_before`).
-function _segment_field(gauss::GaussianBeamlet, r, z, point, index, l0, Δl0, ψ0)
+# Field of segment `index` at distance `z` and radius `r` from the length, path and Gouy offsets in front of it
+function segment_field(gauss::GaussianBeamlet, r, z, point, index, l0, Δl0, ψ0)
     w, R, ψ, w0 = gauss_parameters(gauss, z, ψ0; hint = (point, index))
     k0 = wavenumber(wavelength(gauss))
     n = refractive_index(gauss, index)
-    # Calculate new local field strength based on E0*w0 = const. The reference amplitude is normalized
-    # to the power, the physical field in the medium is smaller by √n.
+    # Local field strength from E0 * w0 = const, reduced by √n
     E0 = electric_field(gauss) * (beam_waist(gauss) / w0) / sqrt(n)
-    # Optical path up to the point. The curvature term is a geometric length like z, hence it enters
-    # with the wavenumber n k0 of the medium as well.
+    # Optical path up to the point
     opl = z + Δl0 + (n - 1) * (z - l0)
     return E0 * w0 / w * exp(-r^2 / w^2) * cis(k0 * opl + ψ + n * k0 * r^2 * R / 2)
 end
@@ -566,13 +520,6 @@ isparaxial(system::AbstractSystem, gb::GaussianBeamlet, threshold::Real = π / 4
 Tests if refractive elements are tilted with respect to the beamlet optical axis, i.e. introduce simple astigmatism.
 """
 istilted(system::AbstractSystem, gb::GaussianBeamlet) = !isparaxial(system, gb.chief, 0)
-
-function isparentbeam(beam::GaussianBeamlet, ray::AbstractRay)
-    c = isparentbeam(beam.chief, ray)
-    w = isparentbeam(beam.waist, ray)
-    d = isparentbeam(beam.divergence, ray)
-    return any((c, w, d))
-end
 
 """
     rayleigh_range(g::GaussianBeamlet; M2=1)

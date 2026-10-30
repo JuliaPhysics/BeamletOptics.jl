@@ -43,6 +43,8 @@ The next figure shows a circularly polarized [`AstigmaticGaussianBeamlet`](@ref)
 
 ![Polarized ray plot](polray_showcase.png)
 
+The field `E0` must be orthogonal to the direction of the ray. This is tested for each polarized ray, with a tolerance relative to the amplitude `|E0|`, because a field with a longitudinal part has no meaning for a transverse wave. Where a field is derived from other quantities, e.g. in a beamlet constructor, its longitudinal part is removed first.
+
 ### Fresnel coefficients
 
 This package uses the equations of Fowles [Fowles1989; p. 44](@cite) and Peatross [Peatross2015; p. 78](@cite) to determine the [Fresnel coefficents](https://www.rp-photonics.com/fresnel_equations.html) at a given surface where the [`PolarizedRay`](@ref) enters from a medium with (complex) refractive index ``n_1`` into a medium with ``n_2``. The ability to define coatings is currently not included. 
