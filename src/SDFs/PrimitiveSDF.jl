@@ -132,7 +132,7 @@ function sdf(cs::CutSphereSDF, point)
     s = max((cs.height - cs.radius) * q[1]^2 + cs.w^2 * (cs.height + cs.radius - 2 * q[2]),
         cs.height * q[1] - cs.w * q[2])
     if s < 0
-        # the 3D norm, not `norm(q)`: its derivatives are defined on the axis, where `q[1]` is not
+        # Use 3D norm, smooth on axis
         return norm(Point3(p[1], p[3], q[2])) - cs.radius
     elseif q[1] < cs.w
         return cs.height - q[2]
@@ -298,15 +298,14 @@ function PolygonPrismSDF(vertices::AbstractVector, height::H) where {H <: Real}
     T = float(mapreduce(v -> promote_type(typeof(v[1]), typeof(v[2])), promote_type, vertices; init = H))
     pts = [Point2{T}(v[1], v[2]) for v in vertices]
     n = length(pts)
-    # signed area (shoelace) of the polygon relative to its first vertex, which makes the test
-    # invariant under translation (no cancellation for polygons far from the origin); the
-    # orientation is normalized to counter-clockwise
+    # Compute shoelace area relative to first vertex
     rel = [p - pts[1] for p in pts]
     area = sum(i -> rel[i][1] * rel[mod1(i + 1, n)][2] - rel[mod1(i + 1, n)][1] * rel[i][2], 1:n) / 2
     scale = maximum(p -> maximum(abs, p), rel)
     abs(area) > eps(T) * scale^2 * n || throw(ArgumentError("the polygon has zero area"))
+    # Normalize to counter-clockwise
     area < 0 && reverse!(pts)
-    # convex: every corner turns left, and the edges turn by 2π in total (no star polygons)
+    # Check that every corner turns left
     turning = zero(T)
     for i in 1:n
         e1 = pts[mod1(i + 1, n)] - pts[i]
@@ -316,6 +315,7 @@ function PolygonPrismSDF(vertices::AbstractVector, height::H) where {H <: Real}
             throw(ArgumentError("the polygon must be strictly convex (no reflex or collinear vertices)"))
         turning += atan(c, dot(e1, e2))
     end
+    # Reject star polygons by total turning of 2π
     isapprox(turning, 2π; atol = sqrt(eps(T))) ||
         throw(ArgumentError("the polygon must not be self-intersecting"))
     normals = map(1:n) do i
@@ -343,8 +343,7 @@ Exact signed distance of the 2D point `q` to the convex polygon with the counter
 `vertices` and the outward unit `normals` of its edges, see [`PolygonPrismSDF`](@ref).
 """
 function sdf_convex_polygon(q, vertices, normals)
-    # the largest signed distance to an edge line is exact inside and wherever the closest point
-    # lies within that edge, which keeps the gradient smooth on the faces
+    # Find edge with largest signed distance
     d, k = dot(normals[1], q - vertices[1]), 1
     @inbounds for i in 2:length(vertices)
         di = dot(normals[i], q - vertices[i])
@@ -353,7 +352,7 @@ function sdf_convex_polygon(q, vertices, normals)
         end
     end
     d > 0 || return d
-    # outside and beside that edge, the closest point is the vertex at the end the point lies beyond
+    # Use end vertex beyond edge
     a, b = vertices[k], vertices[k == length(vertices) ? 1 : k + 1]
     t = dot(q - a, b - a)
     t < 0 && return norm(q - a)
@@ -367,14 +366,14 @@ function sdf(prism::PolygonPrismSDF, point)
 end
 
 """
-    _enclosing_circle(vertices)
+    enclosing_circle(vertices)
 
 Returns the center and the radius of a circle that encloses the 2D points `vertices` and passes
 through at least one of them. Of the circles around the mean of the points (exact for regular
 polygons) and around the center of their bounding box (exact for rectangles and right triangles)
 the smaller one is returned, which is not the smallest enclosing circle in general.
 """
-function _enclosing_circle(vertices::AbstractVector{Point2{T}}) where T
+function enclosing_circle(vertices::AbstractVector{Point2{T}}) where T
     lo = hi = acc = first(vertices)
     @inbounds for i in 2:length(vertices)
         v = vertices[i]
@@ -396,6 +395,6 @@ of the circles around the mean of the vertices and around the center of their bo
 centered in the local plane `z = 0`. It passes through at least two corners of the prism.
 """
 function bounding_sphere_of(prism::PolygonPrismSDF{T}) where T
-    c, r = _enclosing_circle(prism.vertices)
+    c, r = enclosing_circle(prism.vertices)
     return SingleBoundingSphere(prism, Point3{T}(c[1], c[2], 0), sqrt(r^2 + (prism.height / 2)^2))
 end

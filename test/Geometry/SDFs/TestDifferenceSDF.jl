@@ -199,6 +199,20 @@ const BMO = BeamletOptics
         @test BMO.sdf(diff, p3) ≈ BMO.sdf(base, p3)
     end
 
+    @testset "sdf is type-stable for heterogeneous tools" begin
+        base = BMO.SphereSDF(2.0)
+        cyl = BMO.CylinderSDF(0.5, 3.0)
+        box = BMO.BoxSDF(0.5, 0.5, 0.5)
+        translate3d!(box, [1.5, 0, 0])
+        p = Point3(1.2, 0.2, 0.1)
+        for o in (base, cyl, box)
+            @test (@inferred BMO.sdf(o, p)) isa Float64
+        end
+        diff = base - cyl - box
+        @test length(diff.tools) == 2
+        @test @inferred(BMO.sdf(diff, p)) == max(BMO.sdf(base, p), -BMO.sdf(cyl, p), -BMO.sdf(box, p))
+    end
+
     @testset "Conservativeness" begin
         # A cylinder minus a longer coaxial bore is a tube. Its exact signed distance is
         # the 2D distance to the cross-section rectangle [r,R] x [-H,H] in the (ρ, y)
