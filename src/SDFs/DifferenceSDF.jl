@@ -33,15 +33,8 @@ rather than deepening the type on every chained `-`. Mixed `+`/`-` chains still 
 [`UnionSDF`](@ref)) — this is what keeps their meaning, since material added after a
 subtraction must not be carved away by it.
 
-# Exactness
-
-Per [iquilezles.org/articles/distfunctions](https://iquilezles.org/articles/distfunctions/),
-`opSubtraction = max(-a, b)` is only a *bound*, not an exact SDF: it under-estimates the true
-distance near the seam between `base` and `tool`. This is the *safe* direction for sphere
-tracing — an under-estimate never causes tunneling, it only costs a few extra ray marching
-iterations near concave creases. Correctness of ray marching hinges on [`normal3d`](@ref)
-being resolved by explicit operand selection (as implemented here) rather than by automatic
-differentiation, which picks the wrong sub-shape at the seam.
+!!! note
+    The SDF is a lower bound of the distance, not exact; normals are exact through operand selection.
 """
 mutable struct DifferenceSDF{T <: Number, S <: AbstractSDF{T},
         TT <: Tuple{Vararg{AbstractSDF{T}}}} <: AbstractCompositeSDF{T}
@@ -71,12 +64,7 @@ end
 Calculates the thickness of a [`DifferenceSDF`](@ref) as the thickness of its `base` —
 removing material cannot increase the axial extent.
 """
-function thickness(d::DifferenceSDF{T}) where T
-    if hasmethod(thickness, Tuple{typeof(d.base)})
-        return thickness(d.base)
-    end
-    return zero(T)
-end
+thickness(d::DifferenceSDF) = thickness(d.base)
 
 """
     bounding_sphere_of(d::DifferenceSDF)
@@ -90,10 +78,7 @@ bounding_sphere_of(d::DifferenceSDF) = bounding_sphere_of(d.base)
 # The result of a subtraction is a subset of the base
 bounding_box(d::DifferenceSDF) = bounding_box(d.base)
 
-function sdf(d::DifferenceSDF, pos)
-    # sdf to world transform handled by sub-SDFs
-    return max(sdf(d.base, pos), maximum(-sdf(t, pos) for t in d.tools))
-end
+sdf(d::DifferenceSDF, pos) = max(sdf(d.base, pos), maximum(map(t -> -sdf(t, pos), d.tools)))
 
 Base.:-(s1::AbstractSDF{T}, s2::AbstractSDF{T}) where T = DifferenceSDF{T}(s1, (s2,))
 Base.:-(d::DifferenceSDF{T}, s::AbstractSDF{T}) where T = DifferenceSDF{T}(d.base, (d.tools..., s))
@@ -118,8 +103,6 @@ function normal3d(d::DifferenceSDF, pos)
             idx = i
         end
     end
-    # On a carved wall, the outward normal of the result is the inward normal of the
-    # active tool, hence the sign flip. Returned directly in world coordinates, per the
-    # AbstractCompositeSDF convention (no orientation(d) * factor).
+    # Flip normal of active tool
     return idx == 0 ? normal3d(d.base, pos) : -normal3d(d.tools[idx], pos)
 end

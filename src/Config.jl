@@ -20,6 +20,7 @@ get_invariant_threshold() = invariant_threshold
 # --- SDF & Ray Marching ---
 const sdf_surface_threshold = @load_preference("sdf_surface_threshold", 1e-9)
 const sdf_raymarch_eps = @load_preference("sdf_raymarch_eps", 1e-10)
+const sdf_miss_distance = @load_preference("sdf_miss_distance", 1e15)
 
 """
     get_sdf_surface_threshold()
@@ -34,6 +35,15 @@ get_sdf_surface_threshold() = sdf_surface_threshold
 Returns the global configuration epsilon for the SDF ray marching algorithm.
 """
 get_sdf_raymarch_eps() = sdf_raymarch_eps
+
+"""
+    get_sdf_miss_distance()
+
+Returns the path length in \\[m\\] after which a ray that is marched towards an SDF shape counts as
+a miss: a shape farther from the start of the ray than this is not hit. Defaults to `1e15`
+(configurable via the `sdf_miss_distance` preference).
+"""
+get_sdf_miss_distance() = sdf_miss_distance
 
 
 # --- Numerical Thresholds ---

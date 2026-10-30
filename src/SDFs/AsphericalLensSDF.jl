@@ -149,15 +149,6 @@ function aspheric_equation(r, c, k, α_coeffs)
     return _aspheric_sag_r2(r2, c, k, α_coeffs)
 end
 
-# Σᵢ αᵢ r²ⁱ of the even aspheric terms, via Horner's scheme in r²
-function _even_aspheric_sum(r2, α_coeffs)
-    acc = zero(r2 * zero(eltype(α_coeffs)))
-    for i in reverse(eachindex(α_coeffs))
-        acc = muladd(acc, r2, α_coeffs[i])
-    end
-    return acc * r2
-end
-
 function aspheric_equation(r::Real, a::AbstractAsphericalSurfaceSDF)
     aspheric_equation(r, 1 / a.radius, a.conic_constant, a.coefficients)
 end
@@ -165,7 +156,7 @@ end
 function gradient_aspheric_equation(r, c, k, α_coeffs)
     r2 = r^2
     _aspheric_sqrt_arg(r2, c, k) < 0 && return NaN
-    return Point2(-r * _aspheric_slope_r2(r2, c, k, α_coeffs), 1)
+    return Point2(-r * aspheric_slope_r2(r2, c, k, α_coeffs), 1)
 end
 
 # The argument of the square root in the sag of the asphere; the asphere is not defined where it is
@@ -176,12 +167,17 @@ _aspheric_sqrt_arg(r2, c, k) = 1 - (1 + k) * c^2 * r2
 # of the asphere as functions of r². They are smooth on the axis, also for automatic
 # differentiation, in contrast to functions of the radius r.
 function _aspheric_sag_r2(r2, c, k, α_coeffs)
-    return c * r2 / (1 + sqrt(_aspheric_sqrt_arg(r2, c, k))) + _even_aspheric_sum(r2, α_coeffs)
+    # Even aspheric terms Σᵢ αᵢ r²ⁱ via Horner in r²
+    acc = zero(r2 * zero(eltype(α_coeffs)))
+    for i in reverse(eachindex(α_coeffs))
+        acc = muladd(acc, r2, α_coeffs[i])
+    end
+    return c * r2 / (1 + sqrt(_aspheric_sqrt_arg(r2, c, k))) + acc * r2
 end
 
-function _aspheric_slope_r2(r2, c, k, α_coeffs)
+function aspheric_slope_r2(r2, c, k, α_coeffs)
     sq = sqrt(_aspheric_sqrt_arg(r2, c, k))
-    # Σᵢ 2i αᵢ r²⁽ⁱ⁻¹⁾ of the even aspheric terms, via Horner's scheme in r²
+    # Even aspheric terms Σᵢ 2i αᵢ r²⁽ⁱ⁻¹⁾ via Horner in r²
     acc = zero(r2 * zero(eltype(α_coeffs)))
     for i in reverse(eachindex(α_coeffs))
         acc = muladd(acc, r2, 2i * α_coeffs[i])
@@ -189,7 +185,7 @@ function _aspheric_slope_r2(r2, c, k, α_coeffs)
     return 2c / (sq + 1) + r2 * (1 + k) * c^3 / (sq * (sq + 1)^2) + acc
 end
 
-_aspheric_slope2_r2(r2, c, k, α_coeffs) = r2 * _aspheric_slope_r2(r2, c, k, α_coeffs)^2
+aspheric_slope2_r2(r2, c, k, α_coeffs) = r2 * aspheric_slope_r2(r2, c, k, α_coeffs)^2
 
 # The smaller of the distance to the aspheric surface, `d_surface`, and the distance to the segments
 # that close the 2D perimeter, `d_closure`, divided, i.e. scaled down, by the factor `g` (≥ 1) as the
@@ -236,10 +232,10 @@ It is intended to pair the SDF derived from this distance field with a cylinder 
 function convex_aspheric_surface_distance(r, z, c, k, d, α_coeffs, max_sag, edge, r2 = r^2)
     r2_bound = (d / 2)^2
 
-    # sag and gradient norm at the edge, see `aspheric_edge`
+    # Get edge sag and gradient norm
     z_aspheric_boundary, n_grad_z_boundary = edge
 
-    # Points outside the aspheric surface, where it is not defined or beyond its edge
+    # Handle points outside the asphere
     if _aspheric_sqrt_arg(r2, c, k) < 0 || r2 > r2_bound
         if z < z_aspheric_boundary
             distance_to_boundary = sqrt((r - sign(r) * d / 2)^2 + (z - z_aspheric_boundary)^2)
@@ -253,18 +249,17 @@ function convex_aspheric_surface_distance(r, z, c, k, d, α_coeffs, max_sag, edg
         return distance_to_boundary / n_grad_z_boundary
     end
 
-    # Calculate distance to the aspheric surface, via r², i.e. smooth on the axis
+    # Distance to asphere via r²
     z_aspheric_value = _aspheric_sag_r2(r2, c, k, α_coeffs)
-    distance_to_aspheric = abs(z - z_aspheric_value) / sqrt(1 + _aspheric_slope2_r2(r2, c, k, α_coeffs))
+    distance_to_aspheric = abs(z - z_aspheric_value) / sqrt(1 + aspheric_slope2_r2(r2, c, k, α_coeffs))
     if sign(c) == 1 && z_aspheric_boundary < 0
-        # the asphere curves towards negative sag so we need to close the perimeter
-        # at its max sag value instead of the boundary
+        # Close perimeter at max sag
         p = Point2(r, z)
 
         a1, b1 = Point2(d / 2, z_aspheric_boundary), Point2(d / 2, max_sag[1])
         a2, b2 = Point2(d / 2, max_sag[1]), Point2(-d / 2, max_sag[1])
         a3, b3 = Point2(-d / 2, max_sag[1]), Point2(-d / 2, z_aspheric_boundary)
-        # unscaled distance to the closing segments
+        # Distance to closing segments
         d_closure = min(sd_line_segment(p, a1, b1), sd_line_segment(p, a2, b2), sd_line_segment(p, a3, b3))
 
         if z_aspheric_value < z < max_sag[1]
@@ -273,7 +268,7 @@ function convex_aspheric_surface_distance(r, z, c, k, d, α_coeffs, max_sag, edg
             return _min_surface_first(distance_to_aspheric, d_closure, n_grad_z_boundary)
         end
     else
-        # If we are inside the aperture, let's close the perimeter with a line segment
+        # Close perimeter with line segment
         a, b = Point2(d / 2, z_aspheric_boundary), Point2(-d / 2, z_aspheric_boundary)
         d_closure = sd_line_segment(Point2(r, z), a, b)
         if sign(c) * z_aspheric_value < sign(c) * z < sign(c) * z_aspheric_boundary
@@ -287,9 +282,9 @@ end
 function concave_aspheric_surface_distance(r, z, c, k, d, α_coeffs, max_sag, edge, r2 = r^2)
     r2_bound = (d / 2)^2
 
-    # sag and gradient norm at the edge, see `aspheric_edge`
+    # Get edge sag and gradient norm
     z_aspheric_boundary, n_grad_z_boundary = edge
-    # Points outside the aspheric surface, where it is not defined
+    # Handle points outside the asphere
     if _aspheric_sqrt_arg(r2, c, k) < 0
         if z < 0
             distance_to_boundary = sqrt((r - sign(r) * d / 2)^2 + z^2)
@@ -301,9 +296,9 @@ function concave_aspheric_surface_distance(r, z, c, k, d, α_coeffs, max_sag, ed
         return distance_to_boundary / n_grad_z_boundary
     end
 
-    # distance to the aspheric surface, via r², i.e. smooth on the axis
+    # Distance to asphere via r²
     z_aspheric_value = _aspheric_sag_r2(r2, c, k, α_coeffs)
-    distance_to_aspheric = abs(z - z_aspheric_value) / sqrt(1 + _aspheric_slope2_r2(r2, c, k, α_coeffs))
+    distance_to_aspheric = abs(z - z_aspheric_value) / sqrt(1 + aspheric_slope2_r2(r2, c, k, α_coeffs))
     p = Point2(r, z)
 
     if max_sag[1] > 0 && z_aspheric_boundary < 0
@@ -312,11 +307,10 @@ function concave_aspheric_surface_distance(r, z, c, k, d, α_coeffs, max_sag, ed
         sdl = d_closure / n_grad_z_boundary
 
         if r2 > r2_bound
-            # we are outside of the aperture, so the shortest distance can be determined
-            # by the perimeter line segments which include the boundary points of the asphere
+            # Outside aperture, use perimeter segments
             return sdl
         else
-            # return a negative sign within the asphere
+            # Negate inside asphere
             if z_aspheric_boundary < z < z_aspheric_value
                 return -_min_surface_first(distance_to_aspheric, d_closure, n_grad_z_boundary)
             elseif z_aspheric_boundary > 0 && (0.0 < z < z_aspheric_value)
@@ -329,15 +323,14 @@ function concave_aspheric_surface_distance(r, z, c, k, d, α_coeffs, max_sag, ed
         a1, b1 = Point2(d / 2, z_aspheric_boundary), Point2(d / 2, 0.0)
         a2, b2 = Point2(d / 2, 0.0), Point2(-d / 2, 0.0)
         a3, b3 = Point2(-d / 2, 0.0), Point2(-d / 2, z_aspheric_boundary)
-        # unscaled distance to the closing segments
+        # Distance to closing segments
         d_closure = min(sd_line_segment(p, a1, b1), sd_line_segment(p, a2, b2), sd_line_segment(p, a3, b3))
 
         if r2 > r2_bound
-            # we are outside of the aperture, so the shortest distance can be determined
-            # by the perimeter line segments which include the boundary points of the asphere
+            # Outside aperture, use perimeter segments
             return d_closure / n_grad_z_boundary
         else
-            # return a negative sign within the asphere
+            # Negate inside asphere
             if z_aspheric_boundary < 0 && (z_aspheric_value < z < 0.0)
                 return -_min_surface_first(distance_to_aspheric, d_closure, n_grad_z_boundary)
             elseif z_aspheric_boundary > 0 && (0.0 < z < z_aspheric_value)
@@ -350,37 +343,19 @@ function concave_aspheric_surface_distance(r, z, c, k, d, α_coeffs, max_sag, ed
 end
 
 """
-    _aspheric_axial_extent(s)
-
-Returns the smallest and the largest coordinate along the optical axis of the volume of an
-aspheric or acylindric surface SDF `s`, as a tuple. The candidates are the vertex, the edge and the
-stationary point of the sag (`max_sag`), which is exact for profiles with at most one stationary
-point within the aperture.
-"""
-function _aspheric_axial_extent(s)
-    edge = aspheric_equation(s.diameter / 2, s)
-    peak = s.max_sag[1]
-    return min(zero(edge), edge, peak), max(zero(edge), edge, peak)
-end
-
-"""
     bounding_sphere_of(s::AbstractAsphericalSurfaceSDF)
 
 Returns the sphere around the cylinder of the lens diameter that spans the axial extent of the
 surface volume, centered on the axis.
 """
 function bounding_sphere_of(s::AbstractAsphericalSurfaceSDF{T}) where T
-    lo, hi = _aspheric_axial_extent(s)
+    lo, hi = axial_extent(s)
     return SingleBoundingSphere(s, Point3{T}(0, (lo + hi) / 2, 0), sqrt((s.diameter / 2)^2 + ((hi - lo) / 2)^2))
 end
 
 function sdf(surface::ConvexAsphericalSurfaceSDF{T}, point) where {T}
     p_local = _world_to_sdf(surface, point)
-    # spherical logic is to have the z-axis as optical axis, so the aspheric code is written
-    # with that convention in mind so everything matches ISO10110/textbook definitions.
-    # We reinterpret the coordinates here, so xz is the transversal direction and y is the
-    # optical axis. The 2D distance is revolved around the optical axis, with r² from the
-    # coordinates, see `_aspheric_sag_r2`.
+    # Revolve 2D distance around y
     x, z = p_local[1], p_local[3]
     return convex_aspheric_surface_distance(
         _radial(x, z),
@@ -396,11 +371,7 @@ end
 
 function sdf(surface::ConcaveAsphericalSurfaceSDF{T}, point) where {T}
     p_local = _world_to_sdf(surface, point)
-    # spherical logic is to have the z-axis as optical axis, so the aspheric code is written
-    # with that convention in mind so everything matches ISO10110/textbook definitions.
-    # We reinterpret the coordinates here, so xz is the transversal direction and y is the
-    # optical axis. The 2D distance is revolved around the optical axis, with r² from the
-    # coordinates, see `_aspheric_sag_r2`.
+    # Revolve 2D distance around y
     x, z = p_local[1], p_local[3]
     return concave_aspheric_surface_distance(
         _radial(x, z),
