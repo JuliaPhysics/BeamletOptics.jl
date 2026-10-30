@@ -126,13 +126,7 @@ Moves all parts of the [`MultiShape`](@ref) `object` along the specified `offset
 that `shape(object)` lists several times once.
 """
 function translate3d!(::MultiShape, object::AbstractObject, offset)
-    parts = _movable_parts(shape(object))
-    # Translate tracking vector
-    position!(object, position(object) .+ offset)
-    # Recursively translate all subparts
-    for subpart in parts
-        translate3d!(subpart, offset)
-    end
+    _move_rigidly!((object,), _movable_parts(shape(object)), offset)
     return nothing
 end
 
@@ -143,13 +137,6 @@ All parts of the [`MultiShape`](@ref) `object` are rotated around the pivot cent
 a part that `shape(object)` lists several times once.
 """
 function rotate3d!(::MultiShape, object::AbstractObject, R::AbstractMatrix)
-    parts = _movable_parts(shape(object))
-    # Update group orientation
-    orientation!(object, R * orientation(object))
-    # Recursively rotate all subgroups and objects around the pivot point
-    pivot = position(object)
-    for subpart in parts
-        rotate3d!(subpart, R, pivot)
-    end
+    _move_rigidly!((object,), _movable_parts(shape(object)), R, position(object))
     return nothing
 end

@@ -48,6 +48,9 @@ struct Bare end
 
 BMO.kinematic_trait_of(::Bare) = BMO.Movable(BMO.Oriented())
 
+"Composite SDF without an `operands` method."
+struct BareComposite{T} <: BMO.AbstractCompositeSDF{T} end
+
 """
 Astigmatic beamlets that are declared static. Only `Float32` beamlets are affected, which are
 not used anywhere else in the test suite.
@@ -270,6 +273,9 @@ end
     @testset "Primitive fallback" begin
         @test_throws ErrorException translate3d!(Bare(), [1.0, 0, 0])
         @test_throws ErrorException rotate3d!(Bare(), Matrix(1.0I, 3, 3))
+        @test_throws "not defined for" translate3d!(Bare(), [1.0, 0, 0])
+        @test_throws ErrorException BMO.operands(BareComposite{Float64}())
+        @test_throws "operands not defined for" BMO.operands(BareComposite{Float64}())
     end
 end
 

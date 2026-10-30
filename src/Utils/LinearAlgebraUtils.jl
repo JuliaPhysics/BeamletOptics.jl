@@ -2,12 +2,13 @@
     isparallel3d(v1, v2; atol = √eps)
 
 Tests if `v1` is parallel (or anti-parallel) to `v2`, i.e. if the sine of the angle between both
-vectors, `norm(cross(v1, v2))` of the normalized vectors, is at most `atol`.
+vectors, `norm(cross(v1, v2))` of the normalized vectors, is at most `atol`. The test uses the
+squared norm, because `norm` of a vanishing cross product is `NaN` for dual numbers whose
+derivative does not vanish, e.g. at normal incidence in automatic differentiation.
 """
 function isparallel3d(v1::AbstractArray, v2::AbstractArray;
         atol = sqrt(eps(float(promote_type(eltype(v1), eltype(v2))))))
-    # the squared norm: `norm` of a cross product that vanishes is `NaN` for dual numbers whose
-    # derivative does not vanish, e.g. at normal incidence in automatic differentiation
+    # Squared norm, safe for AD
     return sum(abs2, cross(normalize(v1), normalize(v2))) ≤ atol^2
 end
 
@@ -31,12 +32,6 @@ function normal3d(target::AbstractVector, reference::AbstractVector)
     return normalize(n)
 end
 
-"""
-    normal3d(input)
-
-Returns a vector with unit length that is perpendicular to the `input` vector.
-The orientation is chosen deterministically to guarantee reproducible bases.
-"""
 @inline function _orthogonal_basis_vector(v::SVector{3,T}) where {T}
     if abs(v[1]) > abs(v[2])
         inv_len = inv(sqrt(v[1]^2 + v[3]^2))
@@ -47,12 +42,18 @@ The orientation is chosen deterministically to guarantee reproducible bases.
     end
 end
 
+"""
+    normal3d(input)
+
+Returns a vector with unit length that is perpendicular to the `input` vector.
+The orientation is chosen deterministically to guarantee reproducible bases.
+"""
 function normal3d(input::AbstractArray)
     T = float(eltype(input))
-    # by index, the length of `Tuple(input)` is not inferred for a vector
+    # Convert by index
     v = normalize(SVector{3,T}(input[1], input[2], input[3]))
     n = _orthogonal_basis_vector(v)
-    # stabilize output type
+    # Stabilize output type
     if input isa SVector
         return convert(typeof(input), n)
     elseif input isa AbstractVector
@@ -103,6 +104,12 @@ was transposed due to column/row major issues. Vector length is maintained. This
 R is the rotation about the axis normal to both vectors (the smallest rotation). It is exact and
 orthonormal for all angles, including angles of a few nrad (alignment of optics) and angles close
 to π. For antiparallel vectors, R is a rotation by π about an axis normal to `start`.
+
+For an obtuse angle, the closed form loses orthonormality close to π (error ~eps/(π - A)), so
+R is composed of a rotation by π and one by the remaining acute angle, both about the same
+normal axis. The closed form is the Rodrigues form, whose diagonal avoids `rᵢ² k + cosA`, because
+the rounding of `cosA` would scale R by 1 ± eps, also for parallel vectors, where R must be the
+identity.
 """
 function align3d(start::AbstractVector, target::AbstractVector)
     start = normalize(start)
@@ -110,9 +117,7 @@ function align3d(start::AbstractVector, target::AbstractVector)
     T = promote_type(eltype(start), eltype(target))
     cosA = dot(start, target)
     if cosA < 0
-        # Obtuse angle: the formula below loses orthonormality close to π (error ~eps/(π - A)).
-        # Rotate by π about the axis normal to start and target instead, then by the remaining
-        # acute angle about the same axis; both rotations are orthonormal.
+        # Obtuse angle: two rotations
         r = cross(start, target)
         r = r - dot(r, start) * start
         u = norm(r) > eps(T) ? normalize(r) : normal3d(start)
@@ -121,9 +126,7 @@ function align3d(start::AbstractVector, target::AbstractVector)
     end
     rx, ry, rz = cross(target, start)
     k = 1 / (1 + cosA)
-    # Rodrigues form I + K + k K² with the cross product matrix K of cross(start, target). Its
-    # diagonal is 1 - k (r² - rᵢ²) rather than the equivalent rᵢ² k + cosA: the rounding of cosA
-    # would scale R by 1 ± eps, also for parallel vectors, where R must be the identity.
+    # Rodrigues form
     R = @SArray [
         1-(ry^2+rz^2)*k rx*ry*k+rz rx*rz*k-ry
         ry*rx*k-rz 1-(rx^2+rz^2)*k ry*rz*k+rx
@@ -144,8 +147,12 @@ function angle3d(target::AbstractArray{T}, start::AbstractArray{R}) where {T,R}
     return angle
 end
 
-# The cosine of `angle3d(target, start)`, without the `acos`: differentiable also for parallel
-# vectors, e.g. at normal incidence, where the derivative of the angle is not defined.
+"""
+    cos_angle3d(target::AbstractArray, start::AbstractArray)
+
+Returns the cosine of `angle3d(target, start)`, without the `acos`: differentiable also for parallel
+vectors, e.g. at normal incidence, where the derivative of the angle is not defined.
+"""
 function cos_angle3d(target::AbstractArray{T}, start::AbstractArray{R}) where {T, R}
     G = promote_type(T, R)
     return clamp(dot(target, start) / (norm(target) * norm(start)), -one(G), one(G))

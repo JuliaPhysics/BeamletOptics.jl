@@ -33,6 +33,7 @@ given, such that these do not change it.
 mutable struct ObjectGroup{T} <: AbstractObjectGroup{T}
     dir::SMatrix{3, 3, T, 9}
     center::Point3{T}
+    # Heterogeneous: objects and subgroups
     const objects::Vector{ObjectOrGroup}
 end
 
@@ -67,16 +68,16 @@ Beams that were solved before must be solved again, see `push!(system, objects..
 the new `objects`: trace the `group` in a `System`, or build a new `StaticSystem`. The `group`
 must not be changed while a system that holds it is being solved.
 """
-function Base.push!(group::ObjectGroup, objs::ObjectOrGroup...)
-    # objects and subgroups, also the `group` itself, such that a group can not hold itself
+function Base.push!(group::ObjectGroup, objects::ObjectOrGroup...)
+    # Collect all nodes, including the group
     nodes = ObjectOrGroup[o for o in PreOrderDFS(group)]
-    for obj in objs, node in PreOrderDFS(obj)
+    for object in objects, node in PreOrderDFS(object)
         _is_leaf_of(node, nodes) && throw(ArgumentError(
             "the $(nameof(typeof(node))) is already part of the group"))
         push!(nodes, node)
     end
-    check_kinematic_members((group.objects..., objs...))
-    append!(group.objects, objs)
+    check_kinematic_members((group.objects..., objects...))
+    append!(group.objects, objects)
     return group
 end
 
@@ -93,13 +94,13 @@ Beams that were solved before must be solved again, see `delete!(system, object)
 removed `object`: trace the `group` in a `System`, or build a new `StaticSystem`. The `group`
 must not be changed while a system that holds it is being solved.
 """
-function Base.delete!(group::ObjectGroup, obj::ObjectOrGroup)
-    i = findfirst(o -> o === obj, group.objects)
+function Base.delete!(group::ObjectGroup, object::ObjectOrGroup)
+    i = findfirst(o -> o === object, group.objects)
     if isnothing(i)
-        # an object yields only itself, which `findfirst` did not find
+        # Search the subgroups
         for sub in group.objects
-            any(o -> o === obj, PreOrderDFS(sub)) && throw(ArgumentError(
-                "the $(nameof(typeof(obj))) is part of a subgroup of the group, remove it from its subgroup instead"))
+            any(o -> o === object, PreOrderDFS(sub)) && throw(ArgumentError(
+                "the $(nameof(typeof(object))) is part of a subgroup of the group, remove it from its subgroup instead"))
         end
         return group
     end
