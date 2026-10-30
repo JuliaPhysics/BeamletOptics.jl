@@ -5,17 +5,6 @@ function conic_from_conjugates(s, s′)
     return R, k
 end
 
-function conic_y_range(R, k, x_off, diameter)
-    # Z is monotone in r
-    T = promote_type(typeof(R), typeof(k), typeof(x_off), typeof(diameter))
-    r_hi = abs(x_off) + diameter / 2
-    r_lo = max(zero(T), abs(x_off) - diameter / 2)
-    Z_off = _conic_sag(x_off, R, k)
-    y_a = -(_conic_sag(r_lo, R, k) - Z_off)
-    y_b = -(_conic_sag(r_hi, R, k) - Z_off)
-    return y_a <= y_b ? (y_a, y_b) : (y_b, y_a)
-end
-
 """
     OffAxisConicMirror(R, k, x_off, diameter; thickness=nothing, hole_diameter=nothing)
 
@@ -54,8 +43,8 @@ function OffAxisConicMirror(
         typeof(thickness === nothing ? 0.0 : thickness)))
     Rt, kt, x_offt, dt = T(R), T(k), T(x_off), T(diameter)
     # Validate aperture before auto thickness
-    ConicSDF(Rt, kt, x_offt, dt, one(T))
-    y_min, y_max = conic_y_range(Rt, kt, x_offt, dt)
+    probe = ConicSDF(Rt, kt, x_offt, dt, one(T))
+    y_min, y_max = axial_extent(probe)
     t = thickness === nothing ? y_max - y_min + T(10e-3) : T(thickness)
     conic_sdf = ConicSDF(Rt, kt, x_offt, dt, t)
     return Mirror(_pierce_substrate(conic_sdf, dt, min(y_min, zero(T)), t, hole_diameter))
