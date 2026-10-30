@@ -36,16 +36,22 @@ _BeamPlots(settings::NamedTuple; live::Bool = false) =
 """
     _observe!(bp::_BeamPlots, geometry, obs = Observable(geometry()))
 
-Registers the observable `obs` of the geometry function `geometry()` in `bp`, such that
-`update_render!` refills it, and returns `obs`.
+Registers the observable `obs` of the geometry function `geometry()` in `bp` through
+`push!(bp, obs => geometry)`, such that `update_render!` refills it, and returns `obs`.
 """
 function _observe!(bp::_BeamPlots, geometry::Function, obs::Observable = Observable(geometry()))
-    push!(bp.fills, obs => geometry)
+    push!(bp, obs => geometry)
     return obs
 end
 
-"""Adds the plot `p` to `bp` and returns it."""
-_add!(bp::_BeamPlots, p::AbstractPlot) = (push!(bp.plots, p); p)
+"""
+    push!(bp::_BeamPlots, plot::AbstractPlot)
+    push!(bp::_BeamPlots, fill::Pair{<:Observable, <:Function})
+
+Adds the `plot`, or the observable and its geometry function `fill`, to `bp` and returns `bp`.
+"""
+Base.push!(bp::_BeamPlots, plot::AbstractPlot) = (push!(bp.plots, plot); bp)
+Base.push!(bp::_BeamPlots, fill::Pair{<:Observable, <:Function}) = (push!(bp.fills, fill); bp)
 
 """
     BeamRenderHandle{B} <: AbstractBeamRenderHandle
@@ -239,7 +245,8 @@ one after the other, would leave the plot with the new positions and the old col
 function _coupled!(bp::_BeamPlots, plotfn!, axis, source::Observable, select = identity; kwargs...)
     geometry, colors = source[]
     color = isnothing(colors) ? bp.settings[].color : colors
-    plot = _add!(bp, plotfn!(axis, select(geometry); color, kwargs...))
+    plot = plotfn!(axis, select(geometry); color, kwargs...)
+    push!(bp, plot)
     on(source) do (geometry, colors)
         if isnothing(colors)
             Makie.update!(plot; arg1 = select(geometry))
@@ -304,7 +311,7 @@ function _plot_rays!(
         curve = _observe!(bp,
             () -> _field_curve(thing; bp.settings[].flen, bp.settings[].render_every, λ_vis = pol_λ,
                 amplitude = pol_amplitude, ppl = pol_ppl))
-        _add!(bp, lines!(axis, curve; color = pol_color, linewidth = pol_linewidth))
+        push!(bp, lines!(axis, curve; color = pol_color, linewidth = pol_linewidth))
     end
     return bp
 end

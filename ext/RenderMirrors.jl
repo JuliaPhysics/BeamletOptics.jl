@@ -76,14 +76,17 @@ Returns the radius of `d`'s tool if it is a single [`CylinderSDF`](@ref) coaxial
 [`BeamletOptics.ConicSDF`](@ref) base and centered on its axis, or `nothing` otherwise.
 """
 function _axial_bore_radius(d::BMO.DifferenceSDF{T, <:BMO.ConicSDF}) where {T}
-    s = d.base
-    if length(d.tools) == 1 && d.tools[1] isa BMO.CylinderSDF
-        tool = d.tools[1]
-        dot_axis = abs(dot(BMO.orientation(s)[:, 2], BMO.orientation(tool)[:, 2]))
+    s = first(BMO.operands(d))
+    tools = Base.tail(BMO.operands(d))
+    if length(tools) == 1 && tools[1] isa BMO.CylinderSDF
+        tool = tools[1]
         rel_pos = BMO.position(tool) - BMO.position(s)
         x_proj = dot(rel_pos, BMO.orientation(s)[:, 1])
         z_proj = dot(rel_pos, BMO.orientation(s)[:, 3])
-        if isapprox(dot_axis, 1; atol = 1e-3) && abs(x_proj) < 1e-4 && abs(z_proj) < 1e-4
+        # the sine tolerance equivalent to |cos| ≥ 0.999, i.e. axes within about 2.56°
+        coaxial = BMO.isparallel3d(BMO.orientation(s)[:, 2], BMO.orientation(tool)[:, 2];
+            atol = sqrt(1 - 0.999^2))
+        if coaxial && abs(x_proj) < 1e-4 && abs(z_proj) < 1e-4
             return tool.radius
         end
     end
@@ -92,9 +95,11 @@ end
 
 # An axial bore is part of the conic mesh, other tools are cut via `_difference`
 function _tessellate_difference(::BMO.ConicSDF, d::BMO.DifferenceSDF)
+    base = first(BMO.operands(d))
     r_hole = _axial_bore_radius(d)
-    r_hole === nothing || return _tessellate_conic(d.base, r_hole)
-    return _difference((_tessellate(d.base), d.base), [(_tessellate(t), t) for t in d.tools])
+    r_hole === nothing || return _tessellate_conic(base, r_hole)
+    return _difference((_tessellate(base), base),
+        [(_tessellate(t), t) for t in Base.tail(BMO.operands(d))])
 end
 
 _default_color(::BMO.DifferenceSDF{T, <:BMO.ConicSDF}) where {T} = :silver

@@ -22,7 +22,7 @@ function render!(
     # Get object limits, padded relative to the object size
     xmin, xmax, ymin, ymax, zmin, zmax = BMO.bounding_box(sdf)
     limits = ((xmin, xmax), (ymin, ymax), (zmin, zmax))
-    wmax = maximum(hi - lo for (lo, hi) in limits)
+    wmax = _max_width(BMO.bounding_box(sdf))
     pad = 0.02 * wmax
     voxel = wmax / 100
     function samples((lo, hi), n)

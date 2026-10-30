@@ -377,6 +377,28 @@ Base.delete!(h::_Combined, oh::BMO.AbstractObjectRenderHandle) = (filter!(c -> c
         @test P ≈ position(src)
         _check_reference_points(BMO.render_plots(hm)[1], hm.P0, hm.R0, P, R)
 
+        # a directed thing is turned by the smallest rotation from +y onto its direction
+        for rotate! in (
+                b -> xrotate3d!(b, 0.3),
+                b -> zrotate3d!(b, π),
+                b -> (zrotate3d!(b, 0.5); xrotate3d!(b, 0.3)),
+                b -> xrotate3d!(b, 1.3),
+            )
+            beam = Beam([0.0, 0, 0], [0.0, 1, 0], 1e-6)
+            hb = live_render!(ax, beam) do
+                scatter!(ax, [Makie.Point3f(position(beam))]; color = :orange)
+                lines!(ax, [Makie.Point3f(0, 0, 0), Makie.Point3f(0, 0.01, 0)])
+            end
+            rotate!(beam)
+            update_render!(hb)
+            d = BMO.direction(beam)
+            @test norm(hb.R - BMO.align3d([0.0, 1, 0], d)) < 1e-12
+            @test norm(hb.R * [0, 1, 0] - d) < 1e-12
+            @test norm(hb.R' * hb.R - I) < 1e-12
+            _check_reference_points(BMO.render_plots(hb)[1], hb.P0, hb.R0, hb.P, hb.R)
+            remove_render!(hb)
+        end
+
         # adding and removing a child handle after live_render!
         push!(h, hm)
         @test AbstractTrees.children(h)[end] === hm
