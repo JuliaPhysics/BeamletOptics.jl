@@ -108,10 +108,13 @@ BMO.sdf(c::CountingSDF, point) = (c.count += 1; BMO.sdf(c.shape, point))
         @test isnothing(BMO.intersect3d(near, Ray(zeros(3), [0.0, 1, 0]), 8.5))
     end
 
-    @testset "thickness fallback" begin
-        # SDFs without their own `thickness` method have zero thickness
-        @test BMO.thickness(BMO.CylinderSDF(0.5, 1.0)) === 0.0
+    @testset "thickness on the optical axis" begin
+        # the `height` field of a cylinder is half its height
+        @test BMO.thickness(BMO.CylinderSDF(0.5, 1.0)) === 2.0
+        # no material on the axis of a ring
         @test BMO.thickness(BMO.RingSDF(10.0f-3, 2.0f-3, 5.0f-3)) === 0.0f0
+        # no generic fallback
+        @test_throws MethodError BMO.thickness(BMO.CutSphereSDF(1.0, 0.5))
     end
 
     @testset "Testing normal3d" begin

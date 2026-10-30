@@ -11,16 +11,9 @@ Subtypes of `AbstractSDF` should implement all reqs. of `AbstractShape` as well 
 # Functions
 
 - `sdf(::AbstractSDF, point)`: a function that returns the signed distance for a point in 3D space
-- `thickness(::AbstractSDF)` (optional): the thickness of the shape in \\[m\\], 0 by default
+- `thickness(::AbstractSDF)` (optional): the material of the shape on its optical axis (local y) in \\[m\\]
 """
 abstract type AbstractSDF{T} <: AbstractShape{T} end
-
-"""
-    thickness(s::AbstractSDF)
-
-Returns 0 for a shape without its own `thickness` method, e.g. a `CylinderSDF`.
-"""
-thickness(::AbstractSDF{T}) where T = zero(T)
 
 function orientation!(sdf::AbstractSDF, dir)
     sdf.dir = dir

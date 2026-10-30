@@ -125,10 +125,12 @@ BMO.normal3d(::NormalProbeSDF, ::Any) = SENTINEL
 
         @test BMO.thickness(a + b) ≈ 3.0
 
-        # operands without their own `thickness` method count as 0
-        @test BMO.thickness(a + b + cyl) ≈ 3.0
-        t0 = BMO.thickness(cyl + BMO.CylinderSDF(0.2, 1.0))
-        @test t0 === 0.0
+        @test BMO.thickness(a + b + cyl) ≈ 5.0
+        # a mount ring adds no material on the axis
+        ring = BMO.RingSDF(1.0, 0.5, 2.0)
+        @test BMO.thickness(a + b + ring) ≈ 3.0
+        # operands without a `thickness` method fail loudly
+        @test_throws MethodError BMO.thickness(a + BMO.CutSphereSDF(1.0, 0.5))
     end
 
     @testset "Kinematics (AbstractCompositeSDF)" begin

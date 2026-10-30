@@ -75,6 +75,13 @@ function CylinderSDF(r::R, h::H) where {R, H}
         h)
 end
 
+"""
+    thickness(cylinder::CylinderSDF)
+
+Returns the height of the cylinder, i.e. twice the `height` field.
+"""
+thickness(cylinder::CylinderSDF) = 2 * cylinder.height
+
 function sdf(cylinder::CylinderSDF{T}, point) where T
     p = _world_to_sdf(cylinder, point)
     d = abs.(Point2(_radial(p[1], p[3]), p[2])) -
@@ -183,6 +190,14 @@ function RingSDF(inner_radius::R, width::W, thickness::T) where {R, W, T}
         width / 2,
         thickness / 2)
 end
+
+"""
+    thickness(ring::RingSDF)
+
+Returns 0: the ring has no material on its optical axis, hence a mount ring does not add to the
+thickness of a lens.
+"""
+thickness(::RingSDF{T}) where T = zero(T)
 
 function sdf_box(p, b)
     d = abs.(p) - b
