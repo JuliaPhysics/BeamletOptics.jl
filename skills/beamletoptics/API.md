@@ -176,7 +176,8 @@ optical path from their own start; `children!` would add the parent's path and r
 plane a second time and is only right for beams that continue where the parent ended.
 `PlaneField(agb, id)` works for any segment of an `AstigmaticGaussianBeamlet`, also inside
 glass (`f.n` is the index there); for the scalar `GaussianBeamlet` only for its last
-segment in air.
+segment in air. `PlaneField(hits; size, spacing, origin, axes)` samples a vector of beamlet
+hits built with `GaussianBeamletHit(beam, id)` or `AstigmaticGaussianBeamletHit(beam, id)`.
 
 ## Makie rendering
 

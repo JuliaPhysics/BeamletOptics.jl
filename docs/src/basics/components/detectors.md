@@ -186,6 +186,50 @@ For [`PolarizedRay`](@ref)s the field is added as 3D vectors, so [`electric_fiel
 
 If [OpticsBase.jl](https://github.com/StackEnjoyer/OpticsBase.jl) is loaded alongside BMO (`using OpticsBase`), the `BeamletOpticsOpticsBaseExt` package extension adds a `PlaneField` constructor for a `Detector`. It samples the physical field of the beamlet hits as tangential electric *and* magnetic field on the detector plane, OpticsBase's single exchange format for coupling to other Maxwell solvers (angular spectrum propagators, BPM, FDTD, ...). As for [`intensity`](@ref)`(::Detector)`, the Poynting flux of an oblique beam through the plane is the full beam power.
 
+The field is built from the hits as follows:
+
+- `E` is the coherent sum of the 3D fields ``\mathbf{E}_i`` of the hits at the sample points, projected onto the plane axes ``\mathbf{u}`` and ``\mathbf{v}``.
+- `H` is the coherent sum, **over hits**, of ``(n_\mathrm{medium}/Z_0)\, \mathbf{d}_i \times \mathbf{E}_i``. Here ``\mathbf{d}_i`` is the propagation direction of the chief or stigmatic ray of hit ``i`` and ``\mathbf{E}_i`` is that hit's own 3D field contribution at the sample point. It is not the paraxial ``(n/Z_0)\, \mathbf{n} \times \mathbf{E}`` built from the *total* field, which would be exact only for normal incidence. This matches the surface-equivalence-theorem content of `PlaneField` even for beams that hit the plane off-normal.
+- The default `axes` follow the detector: ``\mathbf{n}`` is `-direction(detector)` (BMO's detector normal points against the beam, so ``\mathbf{n}`` points downstream, the direction the light was travelling in when it hit the detector), ``\mathbf{u}`` is the local detector x axis of BMO and ``\mathbf{v} = \mathbf{n} \times \mathbf{u}`` is BMO's local ``-z`` axis. This is the default port of BMO's detector readouts.
+- [`AstigmaticGaussianBeamletHit`](@ref BeamletOptics.AstigmaticGaussianBeamletHit)s carry the polarization of their chief ray, so their field is `electric_field(hit, p)` already. A stigmatic [`GaussianBeamletHit`](@ref BeamletOptics.GaussianBeamletHit) carries no polarization in BMO (the model is scalar). By convention, matching OpticsBase's own rule for a scalar field (`PlaneField(E::AbstractMatrix, ...)` puts a scalar field entirely into `Eu`), its contribution is polarized along the plane's ``\mathbf{u}`` axis, made transverse to the hit direction ``\mathbf{d}_i`` (along ``\mathbf{v}`` if ``\mathbf{u}`` is parallel to it), so that ``\mathbf{E}_i \perp \mathbf{d}_i`` and ``\mathbf{H}_i = (n/Z_0)\, \mathbf{d}_i \times \mathbf{E}_i`` form a consistent plane wave. At normal incidence this is exactly ``\mathbf{u}``.
+- `R = Inf`: no reference sphere is removed, because BMO's beamlet field already carries the full spatial phase without needing one.
+
+The diagram shows how the constructors share one sampling of the hits and how the return path leaves the `PlaneField` again. Blue boxes are BMO's detector internals that the extension reuses, green boxes depend on the hit type, purple boxes are the rest of the extension.
+
+```mermaid
+flowchart TB
+    DET(["<b>PlaneField</b>(detector; size, spacing)"]) --> DH["<b>_detector_hits</b>(detector)<br/>error if the detector has no hits"]
+    DET -- "default axes" --> DA["<b>default_plane_axes</b>(detector)<br/>u from <b>local_axes</b>, n = −<b>direction</b>"]
+    BEAM(["<b>PlaneField</b>(beamlet, id; size, spacing,<br/>origin, axes)"]) --> OH["one <b>GaussianBeamletHit</b> or<br/><b>AstigmaticGaussianBeamletHit</b><br/>(beamlet, id)"]
+    DH --> PH
+    DA -- "axes" --> PH
+    OH --> PH
+    PH["<b>PlaneField</b>(hits; size, spacing, origin, axes)<br/>beamlet hits only, otherwise ArgumentError"]
+    PH --> CW["<b>common_wavelength_index</b>(hits)<br/>all hits share λ and n"]
+    CW --> HFD["<b>hit_field_direction</b>(hit, u, v)<br/>per hit type"]
+    HFD -- AstigmaticGaussianBeamletHit --> HA["nothing: <b>electric_field</b>(hit, p)<br/>is a 3D vector"]
+    HFD -- GaussianBeamletHit --> HG["u made transverse to d<br/>(v if u ∥ d)"]
+    HA --> SM["<b>_sample</b>(hits, origin, u, v, points)<br/>threaded over points, shared with the readouts"]
+    HG --> SM
+    SM -- "per point p" --> HF["<b>hit_field</b>(hit, p, pol)<br/>per hit type"]
+    HF --> EH["E = Σᵢ Eᵢ projected on u, v<br/>H = Σᵢ (n/Z₀) dᵢ × Eᵢ projected on u, v"]
+    EH --> PF(["<b>OpticsBase.PlaneField</b>"])
+    PF -- "<b>forward</b>(f), n = 1" --> FF["<b>forward_field</b>(f)<br/>and <b>plane_frame</b>(f)"]
+    FF --> WD(["<b>WavefrontBeamletDecomposition</b>(f)"])
+    FF --> GD(["<b>GaussianModeDecomposition</b>(f)"])
+    WD -- "position f.origin" --> BG["AstigmaticBeamGroup"]
+    GD -- "starts at the centroid of the field" --> AB["AstigmaticGaussianBeamlet"]
+
+    classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
+    classDef green fill:#38982626,stroke:#389826,stroke-width:2px
+    classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
+    classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
+    class DH,SM blue
+    class OH,HFD,HA,HG,HF green
+    class DA,PH,CW,EH,FF purple
+    class DET,BEAM,PF,WD,GD,BG,AB terminal
+```
+
 ```@docs
 OpticsBase.PlaneField(::Detector)
 ```

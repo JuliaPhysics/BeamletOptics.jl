@@ -184,6 +184,14 @@ The `E0` of a beamlet keeps the given tangential components `Eu`, `Ev` and gets 
 
 With `using OpticsBase`, a `PlaneField` handed over by another solver (e.g. the exit field of a fiber computed by a beam propagation method) becomes BMO beams again. [`WavefrontBeamletDecomposition`](@ref) tiles it into one beamlet per sample, which needs beamlets much larger than λ. [`GaussianModeDecomposition`](@ref) fits a single Gaussian beamlet instead, for small fields close to one Gaussian mode such as single-mode fiber output. Both take only the forward-travelling part of the field and require the plane to lie in vacuum or air. The detector side, `PlaneField(::Detector)`, is described under [OpticsBase interoperability](@ref).
 
+Details of the `PlaneField` return path:
+
+- The field used is `forward(f).E .* reference_phase(f)` in \[V/m\] peak amplitude, matching the units `AstigmaticGaussianBeamlet`'s `E0` expects. `forward(f)` is the stored array with the local-plane-wave forward/backward split applied, and `reference_phase(f)` the phase of the reference sphere (if any). The samples and the sphere are handed on separately (`R = f.R`), so the grid only has to resolve the phase of the stored array, not that of the sphere. For [`GaussianModeDecomposition`](@ref) the sphere likewise enters the fit analytically.
+- Only the forward part is decomposed, because a `PlaneField` has no ready single propagation direction for its backward part, while the constructor needs one direction per call. A field without forward light (e.g. a purely backward wave, whose forward part is rounding noise) cannot be decomposed.
+- `forward` splits each sample as a local plane wave along the reference direction. A beam at the angle ``\theta`` to it loses an amplitude of the order ``(1 - \cos\theta)/2``. Keep the plane close to normal to the beam, which the beamlet size requires anyway (see [`WavefrontBeamletDecomposition`](@ref)).
+- `f` must lie in vacuum or air (`f.n == 1`): BMO starts beams in vacuum, and a field in a medium would need a medium-to-vacuum conversion of amplitude and optical path. An `ArgumentError` is thrown otherwise.
+- Passing the result of `PlaneField(detector; ...)` back into [`WavefrontBeamletDecomposition`](@ref) and tracing the resulting beam group reproduces the original field (round trip), up to beamlet-grid discretization error.
+
 ```@docs
 WavefrontBeamletDecomposition(::OpticsBase.PlaneField)
 GaussianModeDecomposition(::OpticsBase.PlaneField)
