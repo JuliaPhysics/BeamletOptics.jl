@@ -160,13 +160,13 @@ Rz(θ) = BMO.rotate3d([0, 0, 1], θ)
         pd = Detector(50mm)
         translate3d!(pd, [0, 100mm, 0])
         solve_system!(System([pd]), Beam([0.0, 0, 0], [0.0, 1, 0]))
-        @test BMO.hit_count(pd) == 1
+        @test length(pd) == 1
         g = ObjectGroup([ObjectGroup([pd]), ObjectGroup([pd])])
         translate3d!(g, [0, 0, 1mm])
         @test isnothing(BMO.hits(pd))
         @test isapprox(position(pd), [0, 100mm, 1mm]; atol = 1e-12)
         solve_system!(System([pd]), Beam([0.0, 0, 1mm], [0.0, 1, 0]))
-        @test BMO.hit_count(pd) == 1
+        @test length(pd) == 1
         D = orientation(pd)
         zrotate3d!(g, 0.1)
         @test isnothing(BMO.hits(pd))

@@ -22,7 +22,7 @@ sys = System([lens, psfd])
 
 solve_system!(sys, cs)
 
-x, z, I_num = intensity(psfd, RegularGrid(n=500, crop_factor=10))
+x, z, I_num = intensity(psfd, RegularGrid(num_points = 500, crop_factor=10))
 
 fringes_fig = Figure()
 srf = Axis3(fringes_fig[1, 1], xlabel="x [µm]", ylabel="z [µm]", elevation=0.9, azimuth=2.372)
@@ -57,7 +57,7 @@ solve_system!(system, ps)
 
 asph_fig = Figure(size=(800, 500))
 
-xs, ys, _intensity = intensity(pd, RegularGrid(n=801, x_min=-25e-6, x_max=25e-6, z_min=-25e-6, z_max=25e-6, z0_shift=-50e-6))
+xs, ys, _intensity = intensity(pd, RegularGrid(num_points = 801, x_min=-25e-6, x_max=25e-6, z_min=-25e-6, z_max=25e-6, z0_shift=-50e-6))
 
 ax = Axis(asph_fig[1,1], xlabel="x [µm]", ylabel="z [µm]", aspect=1)
 

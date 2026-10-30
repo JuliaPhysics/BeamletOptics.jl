@@ -173,8 +173,8 @@ not stored in the shape, hence the method may take some time, e.g. look at all v
 
 The sphere must enclose every point of the shape, for all its parameters: a hit outside of the
 sphere is lost without a warning. It should also be tight, since a ray that hits the sphere is
-tested as before. A safety margin is not needed, the solver adds its own tolerance. Use
-[`render_bounding_sphere!`](@ref) to look at the result.
+tested as before. A safety margin is not needed, the solver adds its own tolerance.
+Draw the result with [`render!`](@ref)`(ax, sphere)` to look at it.
 
 ```julia
 # a cylinder of the radius `r` and the height `h`, with the origin at the center of its base

@@ -237,7 +237,7 @@ end
     # a hit of the segment in the glass gives the field of the beam
     hit = BMO.GaussianBeamletHit(gb, 2)
     p = BMO.Point3(r, 50.25mm, 0.0)
-    @test BMO.beamlet_hit_field(hit, p) ≈ electric_field(gb, r, 50.25mm)
+    @test electric_field(hit, p) ≈ electric_field(gb, r, 50.25mm)
 end
 
 @testset "Gouy phase is collected along the beam" begin
@@ -270,7 +270,7 @@ end
     function axis_field(system, pd, beam)
         empty!(pd)
         solve_system!(system, beam)
-        _, _, E = electric_field(pd, RegularGrid(n = 1, x_min = 0, x_max = 0, z_min = 0, z_max = 0))
+        _, _, E = electric_field(pd, RegularGrid(num_points = 1, x_min = 0, x_max = 0, z_min = 0, z_max = 0))
         return E[1] * cis(-k * BMO.optical_path_length(beam))
     end
     gouy(args...) = rad2deg(angle(axis_field(args...)))
@@ -348,10 +348,10 @@ end
         empty!(pd_r)
         beam = gb()
         transmitted = axis_field(system, pd_t, beam)
-        @test BMO.hit_count(pd_t) == 1 && BMO.hit_count(pd_r) == 1
+        @test length(pd_t) == 1 && length(pd_r) == 1
         @test transmitted ≈ direct / sqrt(2) rtol = 1e-6
         # same distance behind the splitter: the reflected field differs by its sign only
-        _, _, E_r = electric_field(pd_r, RegularGrid(n = 1, x_min = 0, x_max = 0, z_min = 0, z_max = 0))
+        _, _, E_r = electric_field(pd_r, RegularGrid(num_points = 1, x_min = 0, x_max = 0, z_min = 0, z_max = 0))
         reflected = E_r[1] * cis(-k * BMO.optical_path_length(beam.children[2]))
         @test abs(reflected) ≈ abs(transmitted) rtol = 1e-6
         @test abs(sind(rad2deg(angle(reflected / transmitted)))) < 1e-6

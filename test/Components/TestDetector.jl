@@ -2,6 +2,7 @@ module TestDetector
 
 using BeamletOptics
 using Test
+using LinearAlgebra: norm
 
 const BMO = BeamletOptics
 
@@ -88,7 +89,7 @@ end
         solve_system!(sys, cs)
 
         # get PSF
-        x, y, I_num = intensity(psfd, RegularGrid(n=500, crop_factor=5, center=MinMax()))
+        x, y, I_num = intensity(psfd, RegularGrid(num_points = 500, crop_factor=5, center=MinMax()))
 
         # walk from the peak to the first local minimum through the centre column
         ix_ctr, jx_ctr = Tuple(argmax(I_num))
@@ -168,8 +169,8 @@ end
 
             # Compare solutions
             I_analytical = intensity.(screen)
-            ~, ~, I_numerical = intensity(pd_l, RegularGrid(; n, x_min=-l/2, x_max=l/2, z_min=-l/2, z_max=l/2))
-            Pt = optical_power(pd_l, RegularGrid(; n, x_min=-l/2, x_max=l/2, z_min=-l/2, z_max=l/2))
+            ~, ~, I_numerical = intensity(pd_l, RegularGrid(; num_points = n, x_min=-l/2, x_max=l/2, z_min=-l/2, z_max=l/2))
+            Pt = optical_power(pd_l, RegularGrid(; num_points = n, x_min=-l/2, x_max=l/2, z_min=-l/2, z_max=l/2))
             @test all(isapprox.(I_analytical, I_numerical, atol = 2e-1))
             @test isapprox(Pt, 2 * P0, atol = 3e-5)
         end
@@ -220,12 +221,14 @@ end
     outer = ObjectGroup([mirror, inner])
     system = System([pd1, outer])
     make_source() = CollimatedSource([0, 0, 0], [0, 1, 0], 2mm, 1e-6; num_rings = 2, num_rays = 41)
+    # no hits before the first solve
+    @test length(pd1) == 0
     solve_system!(system, make_source(); progress = false)
-    @test BMO.hit_count(pd1) == 41
-    @test BMO.hit_count(pd2) == 41
+    @test length(pd1) == 41
+    @test length(pd2) == 41
     # accumulation is intended: a second source solved afterwards superposes
     solve_system!(system, make_source(); progress = false)
-    @test BMO.hit_count(pd1) == 82
+    @test length(pd1) == 82
     # an object that stores nothing is left alone
     @test isnothing(initialize!(mirror))
     @test isnothing(initialize!(pd2))
@@ -234,14 +237,14 @@ end
     # nested groups are reached from groups and from systems
     @test isnothing(initialize!(inner))
     @test isnothing(BMO.hits(pd2))
-    @test BMO.hit_count(pd1) == 123
+    @test length(pd1) == 123
     solve_system!(system, make_source(); progress = false)
     @test isnothing(initialize!(system))
     @test isnothing(BMO.hits(pd1))
     @test isnothing(BMO.hits(pd2))
     static = StaticSystem([pd1, outer])
     solve_system!(static, make_source(); progress = false)
-    @test BMO.hit_count(pd2) == 41
+    @test length(pd2) == 41
     @test isnothing(initialize!(static))
     @test isnothing(BMO.hits(pd1))
     @test isnothing(BMO.hits(pd2))
@@ -257,11 +260,11 @@ end
         solve_system!(system, beam)
         solve_system!(system, beam)
         # by default the hits of both solves add up
-        @test BMO.hit_count(pd) == 2
+        @test length(pd) == 2
         solve_system!(system, beam; initialize = true)
-        @test BMO.hit_count(pd) == 1
+        @test length(pd) == 1
         solve_system!(system, beam; initialize = false)
-        @test BMO.hit_count(pd) == 2
+        @test length(pd) == 2
     end
 
     @testset "Beam group" begin
@@ -271,15 +274,15 @@ end
         cs = CollimatedSource([0, 0, 0], [0, 1, 0], 10mm, 1e-6; num_rings = 20, num_rays = 2000)
         solve_system!(system, cs; progress = false)
         # every beam of the group contributes exactly one hit, none is lost to a race
-        @test BMO.hit_count(pd) == length(cs)
+        @test length(pd) == length(cs)
         # solving the group again without initializing accumulates
         solve_system!(system, cs; progress = false)
-        @test BMO.hit_count(pd) == 2 * length(cs)
+        @test length(pd) == 2 * length(cs)
         # the system is initialized once, not for every beam of the group
         solve_system!(system, cs; progress = false, initialize = true)
-        @test BMO.hit_count(pd) == length(cs)
+        @test length(pd) == length(cs)
         solve_system!(system, cs; progress = false, initialize = true)
-        @test BMO.hit_count(pd) == length(cs)
+        @test length(pd) == length(cs)
     end
 
     @testset "Scan loop equals a newly built setup" begin
@@ -296,7 +299,7 @@ end
         m, pd, system = setup()
         b = beam()
         solve_system!(system, b)
-        n_first = BMO.hit_count(pd)
+        n_first = length(pd)
         @test n_first > 0
         m2, pd2, system2 = setup()
         zrotate3d!(m2, 1e-3)
@@ -304,12 +307,12 @@ end
         # change the setup and solve again, via the keyword ...
         zrotate3d!(m, 1e-3)
         solve_system!(system, b; initialize = true)
-        @test BMO.hit_count(pd) == BMO.hit_count(pd2)
+        @test length(pd) == length(pd2)
         @test optical_power(pd) ≈ optical_power(pd2)
         # ... and via the function
         initialize!(system)
         solve_system!(system, b)
-        @test BMO.hit_count(pd) == BMO.hit_count(pd2)
+        @test length(pd) == length(pd2)
         @test optical_power(pd) ≈ optical_power(pd2)
     end
 end
@@ -322,7 +325,7 @@ end
     system = System([pd1, pd2])
     cs = CollimatedSource([0, 0, 0], [0, 1, 0], 30mm, 1e-6; num_rings = 10, num_rays = 500)
     solve_system!(system, cs; progress = false)
-    n1, n2 = BMO.hit_count(pd1), BMO.hit_count(pd2)
+    n1, n2 = length(pd1), length(pd2)
     @test n1 > 0 && n2 > 0
     # the group stores the same hits as its beams solved one by one
     pts(pd) = sort(map(h -> Tuple(BMO.hit_point(h)), BMO.hits(pd)))
@@ -335,10 +338,10 @@ end
     b = first(BMO.beams(cs))
     @test_throws ErrorException BMO.with_hit_buffers() do
         solve_system!(system, b)
-        @test BMO.hit_count(pd1) + BMO.hit_count(pd2) == 0
+        @test length(pd1) + length(pd2) == 0
         error("cancelled")
     end
-    @test BMO.hit_count(pd1) + BMO.hit_count(pd2) == 1
+    @test length(pd1) + length(pd2) == 1
 end
 
 @testset "Default window holds the beam power" begin
@@ -415,7 +418,7 @@ end
             path === :mirror && translate3d!(m, [5mm, 0, 0])
             path === :splitter && translate3d!(bs, [0, 10mm, 0])
             solve_system!(system, b)
-            @test BMO.hit_count(pd) == 2
+            @test length(pd) == 2
             @test first(BMO.hits(pd)) === before
             @test BMO.hit_point(last(BMO.hits(pd)))[3] ≈ 0.5mm
         end
@@ -435,8 +438,40 @@ end
         w = w0 * sqrt(1 + (L / z_R)^2)
         E = electric_field(gb) * w0 / w * cis(2π / λ * L - atan(L / z_R))
         # the waist and divergence rays give the Gouy phase to about 1e-7 rad
-        @test BMO.beamlet_hit_field(first(BMO.hits(pd)), BMO.Point3(0.0, L, 0.0)) ≈ E rtol = 1e-6
+        @test electric_field(first(BMO.hits(pd)), BMO.Point3(0.0, L, 0.0)) ≈ E rtol = 1e-6
         @test first(BMO.hits(pd)) === hit
+    end
+
+    @testset "Field of a beamlet hit as from the former scalar field" begin
+        # the former scalar field of a beamlet hit, from the stored fields of the hit
+        function scalar_field(hit::BMO.GaussianBeamletHit, p)
+            v = p - hit.p0
+            l1 = BMO._pseudo_dot(v, hit.d0)
+            r = norm(v - l1 * hit.d0)
+            w, curv, ψ, _ = BMO.gauss_parameters(hit.segment, l1)
+            ψ += hit.ψ0
+            k0 = BMO.wavenumber(hit.segment.λ)
+            n = hit.segment.n
+            opl = hit.l0 + l1 + hit.Δl0 + (n - 1) * l1
+            return hit.E_amp / (sqrt(n) * w) * exp(-r^2 / w^2) *
+                   cis(k0 * opl + ψ + n * k0 * r^2 * curv / 2)
+        end
+        # an astigmatic hit: the scalar field along the unit reference polarization
+        scalar_field(hit::BMO.AstigmaticGaussianBeamletHit, p) =
+            hit.E_ref_amp * BMO._astigmatic_phasor(hit, p) .* (hit.E_pol / hit.E_ref_amp)
+        relative_error(E, E_ref) = norm(E - E_ref) / norm(E_ref)
+
+        λ, w0, L = 1e-6, 0.5mm, 300mm
+        p = BMO.Point3(0.2mm, L, -0.1mm)
+        for beam in (GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], λ, w0),
+                     AstigmaticGaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], λ, w0, 2w0;
+                         support = [1.0, 0, 0]))
+            pd = Detector(20mm)
+            translate3d!(pd, [0, L, 0])
+            solve_system!(System([pd]), beam)
+            hit = only(BMO.hits(pd))
+            @test relative_error(electric_field(hit, p), scalar_field(hit, p)) < 1e-12
+        end
     end
 end
 
@@ -463,7 +498,7 @@ end
             pd = Detector(50mm)
             translate3d!(pd, [0, 100mm, 0])
             solve_system!(System([pd]), Beam([0.0, 0, 0], [0.0, 1, 0]))
-            @test BMO.hit_count(pd) == 1
+            @test length(pd) == 1
             move!(pd)
             @test isnothing(BMO.hits(pd))
         end
@@ -477,7 +512,7 @@ end
         solve_system!(System([lens, pd]), beam)
         translate3d!(lens, [1mm, 0, 0])
         translate3d!(beam, [0, 0, 1mm])
-        @test BMO.hit_count(pd) == 1
+        @test length(pd) == 1
     end
 end
 
@@ -496,7 +531,7 @@ end
             ("AstigmaticGaussianBeamlet", agb)), θd in (0, 30, 60)
         pd = tilted(deg2rad(θd))
         solve_system!(System([pd]), beam())
-        @test optical_power(pd, RegularGrid(n = 300); progress = false) ≈ P0 rtol = 1e-4
+        @test optical_power(pd, RegularGrid(num_points = 300); progress = false) ≈ P0 rtol = 1e-4
     end
 
     @testset "The field is not projected onto the detector" begin
@@ -540,15 +575,15 @@ end
             dir = [s * sin(α), cos(α), 0]
             solve_system!(system, gb(-100mm / cos(α) * dir + [0, 100mm, 0], dir))
         end
-        @test optical_power(pd, RegularGrid(n = 800); progress = false) ≈ 2P0 rtol = 1e-3
+        @test optical_power(pd, RegularGrid(num_points = 800); progress = false) ≈ 2P0 rtol = 1e-3
     end
 
     @testset "The grid methods sample the automatic grid" begin
         pd = tilted(deg2rad(30))
         solve_system!(System([pd]), agb())
-        xs, zs, E = electric_field(pd, RegularGrid(n = 20); progress = false)
+        xs, zs, E = electric_field(pd, RegularGrid(num_points = 20); progress = false)
         @test electric_field(pd, RectilinearGrid(xs, zs); progress = false)[3] == E
-        xs, zs, I = intensity(pd, RegularGrid(n = 20); progress = false)
+        xs, zs, I = intensity(pd, RegularGrid(num_points = 20); progress = false)
         @test intensity(pd, RectilinearGrid(xs, zs); progress = false)[3] == I
     end
 end

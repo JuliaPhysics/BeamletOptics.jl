@@ -70,7 +70,7 @@ If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown
 update_render!(::Any; kwargs...) = throw(MissingBackendError())
 
 function update_render!(h::AbstractSystemRenderHandle)
-    foreach(update_render!, render_children(h))
+    foreach(update_render!, children(h))
     return h
 end
 
@@ -84,7 +84,7 @@ If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown
 remove_render!(::Any) = throw(MissingBackendError())
 
 function remove_render!(h::AbstractSystemRenderHandle)
-    foreach(remove_render!, render_children(h))
+    foreach(remove_render!, children(h))
     return nothing
 end
 
@@ -102,7 +102,7 @@ function remove_render!(h::AbstractSystemRenderHandle, obj::ObjectOrGroup)
     isnothing(parent) || throw(ArgumentError(
         "the $(nameof(typeof(obj))) is part of a $(nameof(typeof(parent))) of the system handle, remove the group instead"))
     leaves = collect(_leaf_objects(obj))
-    for oh in filter(oh -> _is_leaf_of(rendered(oh), leaves), render_children(h))
+    for oh in filter(oh -> _is_leaf_of(rendered(oh), leaves), children(h))
         remove_render!(oh)
         delete!(h, oh)
     end
@@ -122,7 +122,7 @@ If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown
 pick_object(::Any, ::Any) = throw(MissingBackendError())
 
 function pick_object(h::AbstractSystemRenderHandle, plot)
-    for child in render_children(h)
+    for child in children(h)
         obj = pick_object(child, plot)
         isnothing(obj) && continue
         parent = render_parent(h, obj)

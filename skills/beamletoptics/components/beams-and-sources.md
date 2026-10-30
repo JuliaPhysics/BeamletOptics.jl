@@ -78,7 +78,7 @@ equal-area or equal solid angle samples.
 The first beam of the first six sources above is the center ray, which starts at `pos` along `dir`:
 `first(BeamletOptics.beams(src))`.
 
-`set_num_rays!(src, n)` regenerates the rays of the first six sources above with `n` rays, same
+`num_rays!(src, n)` regenerates the rays of the first six sources above with `n` rays, same
 sampling, in the current pose (e.g. a coarse trace first, a fine one later); solve again afterwards.
 Wrapped beams can not be regenerated (`ArgumentError`).
 

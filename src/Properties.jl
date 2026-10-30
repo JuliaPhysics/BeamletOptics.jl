@@ -6,8 +6,8 @@ the app layout of the GUI package BeamletOpticsGUI
 """
     properties(x) -> Vector{Pair{String, Any}}
 
-Returns the properties of `x` (an [`AbstractObject`](@ref), shape, beam or source) as a list of
-`name => value` pairs for display, e.g. in the inspector of the GUI package BeamletOpticsGUI. Only stored or
+Returns the properties of `x` (an [`AbstractObject`](@ref), shape, beam, source or object group)
+as a list of `name => value` pairs for display, e.g. in the inspector of the GUI package BeamletOpticsGUI. Only stored or
 cheaply derived values are listed, e.g. the reflectance of a beamsplitter (the power ratio R, as
 passed to its constructor) or the number of hits of a [`Detector`](@ref), no design parameters
 that the object does not store. The list is computed on each call, i.e. it shows the current pose
@@ -22,7 +22,7 @@ and hits.
   shape
 
 ```julia
-julia> properties(SphericalLens(50e-3, -50e-3, 5e-3, 25.4e-3))
+julia> BeamletOptics.properties(SphericalLens(50e-3, -50e-3, 5e-3, 25.4e-3))
 8-element Vector{Pair{String, Any}}:
           "Type" => "Lens"
   "Position [m]" => [0.0, 0.0, 0.0]
@@ -48,12 +48,13 @@ BeamletOptics.properties(x::MyFilter) =
 
 Without a method, [`default_properties`](@ref) is shown.
 """
-properties(x) = default_properties(x)
+properties(x::Union{AbstractObject, AbstractBeam, AbstractObjectGroup}) = default_properties(x)
 
 """
     default_properties(x) -> Vector{Pair{String, Any}}
 
-Returns the properties that [`properties`](@ref) lists for any `x`, see its conventions:
+Returns the properties that [`properties`](@ref) lists for any object, shape, beam, source or
+object group `x`, see its conventions:
 
 - `"Type"`: the name of the type of `x`
 - depending on the [`BeamletOptics.AbstractKinematicTrait`](@ref) of `x`: `"Position [m]"` and
@@ -66,7 +67,8 @@ Returns the properties that [`properties`](@ref) lists for any `x`, see its conv
 
 Methods of `properties` for specific types start from this list, see [`properties`](@ref).
 """
-default_properties(x) = Pair{String, Any}["Type" => _type_name(x); default_properties(kinematic_trait_of(x), x)]
+default_properties(x::Union{AbstractShape, AbstractBeam, AbstractBeamGroup}) =
+    Pair{String, Any}["Type" => _type_name(x); default_properties(kinematic_trait_of(x), x)]
 
 default_properties(x::AbstractObject) = Pair{String, Any}["Type" => _type_name(x);
     default_properties(kinematic_trait_of(x), x); default_properties(shape_trait_of(x), x)]
@@ -164,14 +166,7 @@ properties(lp::LinearPolarizer) = [default_properties(lp);
     "Transmission axis" => _vector(transmission_axis(lp)); "Thickness [m]" => thickness(lp);
     _index_properties(lp.front.n)]
 
-"""
-    hit_count(d::Detector) -> Int
-
-The number of hits stored in the detector `d`, `0` before the first solve.
-"""
-hit_count(d::Detector) = isnothing(hits(d)) ? 0 : length(hits(d))
-
-properties(d::Detector) = [default_properties(d); _flat_size(shape(d)); "Hits" => hit_count(d);
+properties(d::Detector) = [default_properties(d); _flat_size(shape(d)); "Hits" => length(d);
     "Stops beams" => stop(d)]
 
 #=

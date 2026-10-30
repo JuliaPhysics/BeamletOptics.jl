@@ -219,7 +219,7 @@ You can recreate this figure by running the following code:
 # evaluate intensity, overwrite autlims 
 x, y, I = intensity(
     pd,
-    RegularGrid(n=200, x_min=-pd_size/2, x_max=pd_size/2, z_min=-pd_size/2, z_max=pd_size/2),
+    RegularGrid(num_points = 200, x_min=-pd_size/2, x_max=pd_size/2, z_min=-pd_size/2, z_max=pd_size/2),
 )
 spots = spot_diagram(pd)
 
@@ -240,7 +240,7 @@ solve_system!(system, beam)
 # reevaluate intensity, overwrite autlims 
 x, y, I = intensity(
     pd,
-    RegularGrid(n=200, x_min=-pd_size/2, x_max=pd_size/2, z_min=-pd_size/2, z_max=pd_size/2),
+    RegularGrid(num_points = 200, x_min=-pd_size/2, x_max=pd_size/2, z_min=-pd_size/2, z_max=pd_size/2),
 )
 spots = spot_diagram(pd)
 

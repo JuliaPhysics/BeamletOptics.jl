@@ -23,10 +23,11 @@ The cemented interfaces of doublet and triplet lenses are rendered as thin amber
 # Debugging
 
 - `show_bounding_sphere = false`: also draws the bounding sphere of the shape of the object as a
-  magenta wireframe, for an object of several parts one sphere per part, see
-  [`render_bounding_sphere!`](@ref). A shape without a bounding sphere (e.g. a mesh) gets none.
-  With [`live_render!`](@ref) the spheres follow the object. Call `render_bounding_sphere!` directly
-  to change the color or the line width
+  magenta wireframe, for an object of several parts one sphere per part and the main sphere around
+  all parts in orange, which the solver tests first. A shape without a bounding sphere (e.g. a mesh)
+  gets none. With [`live_render!`](@ref) the spheres follow the object. To draw a single sphere in
+  another color or line width, call `render!(ax, sphere)` (see [`render!`](@ref) of an
+  `AbstractBoundingSphere`) with a sphere of [`BeamletOptics.bounding_sphere_of`](@ref)
 
 # Examples
 
@@ -51,12 +52,12 @@ render!(ax::_RenderEnv, object::BMO.AbstractObject; kwargs...) = _render!(ax, ob
 Renders all objects of the `group`, merged like the parts of a `MultiShape` object, see
 `_render_parts!`. Nested groups are merged into the meshes of the outermost group. The `kwargs`,
 e.g. `material` or `color`, and an explicit `edges` apply to all objects. `show_bounding_sphere`
-is consumed by the outermost group, which draws the spheres of all its objects, see
-[`render_bounding_sphere!`](@ref).
+is consumed by the outermost group, which draws the spheres of all its objects and then the main
+sphere of the group in orange, see `render_bounding_spheres!`.
 """
 function render!(ax::_RenderEnv, group::BMO.AbstractObjectGroup; show_bounding_sphere::Bool = false, kwargs...)
     _render_parts!(ax, BMO.objects(group); kwargs...)
-    show_bounding_sphere && render_bounding_sphere!(ax, group)
+    show_bounding_sphere && render_bounding_spheres!(ax, group)
     return nothing
 end
 
@@ -65,7 +66,7 @@ end
 # the keyword, the outermost object draws the spheres of all its parts.
 function _render!(ax::_RenderEnv, obj::BMO.AbstractObject; show_bounding_sphere::Bool = false, kwargs...)
     render!(ax, BMO.shape_trait_of(obj), obj; kwargs...)
-    show_bounding_sphere && render_bounding_sphere!(ax, obj)
+    show_bounding_sphere && render_bounding_spheres!(ax, obj)
     return nothing
 end
 

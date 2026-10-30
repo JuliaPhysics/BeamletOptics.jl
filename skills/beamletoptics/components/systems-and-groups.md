@@ -78,7 +78,7 @@ Decide by whether the parts touch:
 
 - An own group type gives named parts and an own constructor. It needs the fields `objects`,
   `center::Point3{T}` and `dir::SMatrix{3,3,T,9}`, is a `mutable struct`, and its constructor
-  checks `allequal(BeamletOptics.is_static, objects)`. Moving, `set_pivot3d!`, systems and rendering
+  calls `BeamletOptics.check_kinematic_members(objects)`. Moving, `set_pivot3d!`, systems and rendering
   work as for an `ObjectGroup`. See `templates/08_custom_group.jl`.
 - Never wrap separate parts in a `MultiShape` object without `interact3d`: the solver hands every
   hit to the wrapper, finds no method, warns `No interact3d method defined` and stops the ray.
