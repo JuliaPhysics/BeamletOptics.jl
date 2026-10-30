@@ -31,8 +31,8 @@ An empty system exposes no objects, nor does an empty group, e.g. one whose obje
 """
 objects(system::System) = _leaf_objects(system.objects)
 
-"""Returns `true` if `obj` is one of the `leaves`, compared by identity."""
-_is_leaf_of(obj, leaves) = any(leaf -> leaf === obj, leaves)
+"""Returns `true` if `object` is one of the `leaves`, compared by identity."""
+_is_leaf_of(object::ObjectOrGroup, leaves) = any(leaf -> leaf === object, leaves)
 
 """
     push!(system::System, objects::ObjectOrGroup...) -> system
@@ -44,14 +44,14 @@ directly or within a group, throws an `ArgumentError`; in this case nothing is a
 Beams and beam groups that were solved before do not know the new object: solve them again with
 `solve_system!(system, beam)`. The `system` must not be changed while it is being solved.
 """
-function Base.push!(system::System, objs::ObjectOrGroup...)
+function Base.push!(system::System, _objects::ObjectOrGroup...)
     leaves = AbstractObject[o for o in objects(system)]
-    for obj in objs, leaf in _leaf_objects(obj)
+    for object in _objects, leaf in _leaf_objects(object)
         _is_leaf_of(leaf, leaves) && throw(ArgumentError(
             "the $(nameof(typeof(leaf))) is already an object of the system"))
         push!(leaves, leaf)
     end
-    append!(system.objects, objs)
+    append!(system.objects, _objects)
     return system
 end
 
@@ -83,12 +83,12 @@ removed on its own and throws an `ArgumentError`: remove the group instead.
 Beams and beam groups that were solved before still end on the removed object: solve them again
 with `solve_system!(system, beam)`. The `system` must not be changed while it is being solved.
 """
-function Base.delete!(system::System, obj::ObjectOrGroup)
-    i = findfirst(o -> o === obj, system.objects)
+function Base.delete!(system::System, object::ObjectOrGroup)
+    i = findfirst(o -> o === object, system.objects)
     if isnothing(i)
         for top in system.objects
-            any(o -> o === obj, PreOrderDFS(top)) && throw(ArgumentError(
-                "the $(nameof(typeof(obj))) is part of a $(nameof(typeof(top))) of the system, remove the group instead"))
+            any(o -> o === object, PreOrderDFS(top)) && throw(ArgumentError(
+                "the $(nameof(typeof(object))) is part of a $(nameof(typeof(top))) of the system, remove the group instead"))
         end
         return system
     end
@@ -399,30 +399,29 @@ function solve_system!(
         threshold::Real = get_invariant_threshold()
 ) where {B <: AbstractBeam}
     initialize && initialize!(system)
-    # The bounding spheres of the objects are computed once, unless the solve of a beam group did so
+    # Bounding spheres are computed once, unless a beam group solve did so
     with_bounding_spheres(system) do
-        _solve_beam!(system, beam; r_max, depth_max, check_invariant, threshold)
+        solve_beam!(system, beam; r_max, depth_max, check_invariant, threshold)
     end
     return nothing
 end
 
-function _solve_beam!(system::AbstractSystem, beam::B; r_max, depth_max, check_invariant,
+function solve_beam!(system::AbstractSystem, beam::B; r_max, depth_max, check_invariant,
         threshold) where {B <: AbstractBeam}
     queue = Tuple{B, Int}[(beam, 1)]
     while !isempty(queue)
-        # Process beams in FIFO order.
+        # Process beams in FIFO order
         current, depth = popfirst!(queue)
-        # Nothing of an earlier solve survives, also for a child that a component attached again.
+        # Discard earlier solve, also for a child attached again
         empty!(current)
         trace_system!(system, current; r_max, check_invariant, threshold)
-        # Check if the maximum branching depth has been reached.
+        # Enqueue children only below the maximum branching depth
         if depth <= depth_max
-            # Enqueue all child beams for subsequent processing.
-            for child in children(current) # 'children' returns an iterable of sub-beams.
+            for child in children(current)
                 push!(queue, (child, depth + 1))
             end
         else
-            # Maximum braching depth is reached. Remove childrens of the current beam because they will not be solved.
+            # Children beyond the maximum depth are not solved, drop them
             _drop_beams!(current)
         end
     end
@@ -454,22 +453,17 @@ function solve_system!(
         initialize::Bool = false, kwargs...)
     empty!(bg)
     initialize && initialize!(system)
-    # One table of bounding spheres for all beams. It belongs to a task, hence each task of the
-    # threads sets it for its beams.
+    # One bounding sphere table for all beams, set again in each task
     with_bounding_spheres(system) do
         table = current_bounding_spheres()::BoundingSphereTable
-        # Each chunk collects its detector hits and stores them at its end, see `with_hit_buffers`.
-        # With `:greedy`, a free task takes the next chunk. The beams of a group differ in cost
-        # (e.g. the inner rings of a source pass a lens, the outer ones miss it), and those of
-        # similar cost lie next to each other. 4 chunks per thread balance most of the load. Each
-        # further chunk costs a channel access and a flush, which shows if all beams cost the same.
+        # 4 chunks per thread balance the load
         chunks = Iterators.partition(beams(bg), max(1, cld(length(bg), 4 * Threads.nthreads())))
         _with_progress(progress, length(bg), "Tracing beams: ") do prog
             Threads.@threads :greedy for chunk in collect(chunks)
                 with_bounding_spheres(table) do
                     with_hit_buffers() do
-                        for _beam in chunk
-                            solve_system!(system, _beam; kwargs...)
+                        for beam in chunk
+                            solve_system!(system, beam; kwargs...)
                             _tick!(prog)
                         end
                     end

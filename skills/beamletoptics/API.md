@@ -96,7 +96,7 @@ initialize!(system)   # empties all detectors of the system (nested groups inclu
 
 | Call                              | Returns |
 |-----------------------------------|---------|
-| `rays(beam)`                      | vector of traced ray segments of this beam (not children) |
+| `rays(beam)`                      | vector of traced ray segments of this beam (not children); for a beamlet, those of its chief ray |
 | `position(ray)`, `direction(ray)` | start point and unit direction of a segment |
 | `length(beam)`                    | geometric path length up to the last intersection |
 | `BeamletOptics.optical_path_length(beam)` | optical path length |

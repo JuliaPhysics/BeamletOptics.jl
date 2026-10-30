@@ -102,7 +102,7 @@ Appends the segments of `beam` and, recursively, of its children to `segments`, 
 """
 function _path_segments!(segments::Vector{PathSegment{T}}, beam::AbstractBeam, beam_index::Int, flen::T,
         parent::Int = 0, depth::Int = 1, s::T = zero(T), opl::T = zero(T)) where {T}
-    chief_rays = rays(_chief_beam(beam))
+    chief_rays = rays(beam)
     ends_branch = isempty(children(beam))
     for (ray_index, ray) in enumerate(chief_rays)
         isect = intersection(ray)
@@ -119,15 +119,10 @@ function _path_segments!(segments::Vector{PathSegment{T}}, beam::AbstractBeam, b
         opl += n * len
     end
     for child in children(beam)
-        _continue_path!(segments, child, AbstractTrees.parent(child), beam_index, flen, parent, depth + 1, s, opl)
+        # Relaunched child starts its own path lengths
+        relaunched = isnothing(AbstractTrees.parent(child))
+        _path_segments!(segments, child, beam_index, flen, parent, depth + 1,
+            relaunched ? zero(T) : s, relaunched ? zero(T) : opl)
     end
     return segments
 end
-
-# A child continues the path of its parent beam
-_continue_path!(segments, child, ::AbstractBeam, beam_index, flen, parent, depth, s, opl) =
-    _path_segments!(segments, child, beam_index, flen, parent, depth, s, opl)
-
-# A relaunched child (see `relaunch!`) has no parent link and starts its own path lengths
-_continue_path!(segments::Vector{PathSegment{T}}, child, ::Nothing, beam_index, flen, parent, depth,
-    s, opl) where {T} = _path_segments!(segments, child, beam_index, flen, parent, depth, zero(T), zero(T))
