@@ -57,8 +57,8 @@ end
 function sdf(s::AconvexCylinderSDF{T}, point) where {T}
     p = _world_to_sdf(s, point)
 
-    _pp = Point3(p[1], p[3], p[2]) # xzy
-    # rotate 2D sdf around the optical axis
+    _pp = Point3(p[1], p[3], p[2]) # Swap to xzy
+    # Extrude 2D distance along x
     sdf_v = op_extrude_x(_pp,
         x -> convex_aspheric_surface_distance(
             x[1],
@@ -127,8 +127,8 @@ end
 function sdf(s::AconcaveCylinderSDF{T}, point) where {T}
     p = _world_to_sdf(s, point)
 
-    _pp = Point3(p[1], p[3], p[2]) # xzy
-    # rotate 2D sdf around the optical axis
+    _pp = Point3(p[1], p[3], p[2]) # Swap to xzy
+    # Extrude 2D distance along x
     sdf_v = op_extrude_x(_pp,
         x -> concave_aspheric_surface_distance(
             x[1],
@@ -236,6 +236,20 @@ function _sdf(s::AcylindricalSurface, ::BackwardOrientation)
     return back
 end
 
+# Siblings under AbstractLensSDF; only these two store max_sag
+"""
+    axial_extent(s::Union{AbstractAsphericalSurfaceSDF, AbstractAcylindricalSurfaceSDF})
+
+Returns `(lo, hi)`, the smallest and largest local y-coordinate of the surface of `s` over its
+aperture. The candidates are the vertex, the edge and the stationary point of the sag
+(`max_sag`), which is exact for profiles with at most one stationary point within the aperture.
+"""
+function axial_extent(s::Union{AbstractAsphericalSurfaceSDF, AbstractAcylindricalSurfaceSDF})
+    edge = aspheric_equation(s.diameter / 2, s)
+    peak = s.max_sag[1]
+    return min(zero(edge), edge, peak), max(zero(edge), edge, peak)
+end
+
 """
     bounding_sphere_of(s::AbstractAcylindricalSurfaceSDF)
 
@@ -243,7 +257,7 @@ Returns the sphere through the corners of the box around the surface volume: the
 along x, the axial extent of the sag along y and the diameter along z.
 """
 function bounding_sphere_of(s::AbstractAcylindricalSurfaceSDF{T}) where T
-    lo, hi = _aspheric_axial_extent(s)
+    lo, hi = axial_extent(s)
     r = sqrt((height(s) / 2)^2 + ((hi - lo) / 2)^2 + (diameter(s) / 2)^2)
     return SingleBoundingSphere(s, Point3{T}(0, (lo + hi) / 2, 0), r)
 end

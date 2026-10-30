@@ -285,4 +285,12 @@ end
     end
 end
 
+@testset "axial_extent of an on-axis paraboloid" begin
+    R, d, t = 0.2, 60e-3, 20e-3
+    s = BMO.ConicSDF(R, -1, 0, d, t)
+    y_min, y_max = BMO.axial_extent(s)
+    @test y_min ≈ -(d / 2)^2 / (2R)
+    @test y_max == 0
+end
+
 end
