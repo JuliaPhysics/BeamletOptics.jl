@@ -11,7 +11,7 @@ need to define the boolean combination semantics (`sdf`, `normal3d`, `thickness`
 Subtypes of `AbstractCompositeSDF` should implement all reqs. of `AbstractSDF` as well as
 the following:
 
-# Fields
+## Fields
 
 - `dir::SMatrix{3, 3, T, 9}`: the composite's own orientation matrix
 - `transposed_dir::SMatrix{3, 3, T, 9}`: transpose of `dir`
@@ -19,7 +19,11 @@ the following:
   must be `mutable` since every setter in `AbstractShape.jl`/`AbstractSDF.jl` assigns
   fields directly
 
-# Functions
+## Getters/setters
+
+The [`AbstractShape`](@ref) getters and setters read these fields, so the composite needs no getters of its own.
+
+## Functions
 
 - [`operands`](@ref): returns a `Tuple` of every child `AbstractSDF`, in any order
 - `sdf`, `normal3d` and `thickness` specific to the boolean combination
@@ -34,7 +38,7 @@ any order. This is the accessor the shared kinematics of [`AbstractCompositeSDF`
 iterate over, so every concrete composite must implement it; the order carries no meaning
 and must not be relied upon to identify an operand's role in the boolean expression.
 """
-function operands end
+operands(c::AbstractCompositeSDF) = error(lazy"operands not defined for $(typeof(c))")
 
 """
     kinematic_trait_of(c::AbstractCompositeSDF)
@@ -57,11 +61,7 @@ end
 Translates `c` and all of its [`operands`](@ref) by `offset`, an operand listed several times once.
 """
 function translate3d!(::Movable, c::AbstractCompositeSDF, offset)
-    ops = _movable_parts(operands(c))
-    position!(c, position(c) .+ offset)
-    for s in ops
-        translate3d!(s, offset)
-    end
+    _move_rigidly!((c,), _movable_parts(operands(c)), offset)
     return nothing
 end
 
@@ -72,13 +72,6 @@ Rotates `c` and all of its [`operands`](@ref) around `c`'s own origin (pivot), b
 rotation matrix `R`, an operand listed several times once.
 """
 function rotate3d!(::Movable, c::AbstractCompositeSDF, R::AbstractMatrix)
-    ops = _movable_parts(operands(c))
-    # Update group orientation
-    orientation!(c, R * orientation(c))
-    # Rotate all operands around the composite center
-    pivot = position(c)
-    for s in ops
-        rotate3d!(s, R, pivot)
-    end
+    _move_rigidly!((c,), _movable_parts(operands(c)), R, position(c))
     return nothing
 end
