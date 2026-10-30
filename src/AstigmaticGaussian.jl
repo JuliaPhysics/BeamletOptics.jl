@@ -161,7 +161,7 @@ function AstigmaticGaussianBeamlet(
     else
         s1 = normalize(support)
     end
-    # Both vectors have unit length, hence the test does not depend on the length of `support`
+    # Unit vectors: test independent of support length
     if !isorthogonal3d(direction, s1; atol = Config.get_orthogonality_threshold())
         throw(ArgumentError("the support vector must be orthogonal to the direction (dot product of the unit vectors: $(dot(direction, s1)))"))
     end
@@ -175,52 +175,29 @@ function AstigmaticGaussianBeamlet(
         E0 = s1 .* E_phasor # Default to linear polarization along first transverse axis
     else
         if !isorthogonal3d(direction, E0)
-            # If user provided E0 but it's not orthogonal, project it.
-            # This is a convenience for tilted setups.
-            # `direction` is real, so the parallel component's (possibly complex)
-            # coefficient is the bilinear `dot(direction, E0)`, not `dot(E0, direction)`
-            # (= conj of the former): `dot` conjugates its first argument, and conjugating
-            # E0 here would project onto the wrong (conjugated) coefficient, leaving a
-            # residual component along `direction` for complex E0.
-            E0 = E0 .- dot(direction, E0) .* direction
+            # Project user E0 onto transverse plane
+            E0 = _transverse(E0, direction)
         end
     end
 
     # Divergence angles
     θx = divergence_angle(λ, w0_x, M2_x)
     θy = divergence_angle(λ, w0_y, M2_y)
-    # All nine rays start in the plane of the chief ray start, `position + z0 * direction`,
-    # so that none of them starts behind an object the beamlet should hit (e.g. when a
-    # waist lies downstream of the start, as for a converging beam).
+    # All rays start in plane of chief ray start
     start = position + z0 * direction
-    # Waist rays: parallel to the axis at the waist radius, the same lines wherever they
-    # start
-    wxp = Ray(start + s1 * w0_x, direction, λ)
-    wxm = Ray(start - s1 * w0_x, direction, λ)
-    wyp = Ray(start + s2 * w0_y, direction, λ)
-    wym = Ray(start - s2 * w0_y, direction, λ)
-    # Divergence rays through the waist centers at z0_x and z0_y
-    div_dir_xp = normalize(direction + s1 * tan(θx))
-    div_dir_xm = normalize(direction - s1 * tan(θx))
-    div_dir_yp = normalize(direction + s2 * tan(θy))
-    div_dir_ym = normalize(direction - s2 * tan(θy))
-    dxp = Ray(start + (z0 - z0_x) * s1 * tan(θx), div_dir_xp, λ)
-    dxm = Ray(start - (z0 - z0_x) * s1 * tan(θx), div_dir_xm, λ)
-    dyp = Ray(start + (z0 - z0_y) * s2 * tan(θy), div_dir_yp, λ)
-    dym = Ray(start - (z0 - z0_y) * s2 * tan(θy), div_dir_ym, λ)
+    # Waist and divergence rays per transverse axis and sign
+    (wxp, wxm, dxp, dxm), (wyp, wym, dyp, dym) = map(
+        ((s1, w0_x, θx, z0_x), (s2, w0_y, θy, z0_y))) do (s, w0, θ, z0_ax)
+        waist = map(σ -> Beam(Ray(start + σ * (s * w0), direction, λ)), (1, -1))
+        divergence = map(
+            σ -> Beam(Ray(start + σ * ((z0 - z0_ax) * s * tan(θ)),
+                normalize(direction + σ * (s * tan(θ))), λ)),
+            (1, -1))
+        return (waist..., divergence...)
+    end
     # Chief ray
     c = PolarizedRay(start, direction, λ, E0)
-    return AstigmaticGaussianBeamlet(
-        Beam(c),
-        Beam(wxp),
-        Beam(wxm),
-        Beam(wyp),
-        Beam(wym),
-        Beam(dxp),
-        Beam(dxm),
-        Beam(dyp),
-        Beam(dym)
-    )
+    return AstigmaticGaussianBeamlet(Beam(c), wxp, wxm, wyp, wym, dxp, dxm, dyp, dym)
 end
 
 # The beamlet types, which interact at the segment `ray_id` of their component beams
@@ -234,47 +211,12 @@ const GaussianBeamlets = Union{GaussianBeamlet, AstigmaticGaussianBeamlet}
 @inline _aux_beams(agb::AstigmaticGaussianBeamlet) = (
     agb.wxp, agb.wxm, agb.wyp, agb.wym, agb.dxp, agb.dxm, agb.dyp, agb.dym)
 
-# Implementation of AbstractBeam interface
-rays(agb::AstigmaticGaussianBeamlet) = rays(agb.c)
-
-"""
-    empty!(agb::AstigmaticGaussianBeamlet)
-
-Resets the beamlet to its untraced start state, i.e. resets all 9 component beams and
-drops all child beamlets.
-"""
-function Base.empty!(agb::AstigmaticGaussianBeamlet)
-    foreach(empty!, _component_beams(agb))
-    _drop_beams!(agb)
-    return agb
-end
-
-first_ray(agb::AstigmaticGaussianBeamlet) = first_ray(agb.c)
-
-Base.length(agb::AstigmaticGaussianBeamlet) = length(agb.c)
-optical_path_length(agb::AstigmaticGaussianBeamlet) = optical_path_length(agb.c)
-
-isentering(agb::AstigmaticGaussianBeamlet, id::Int) = isentering(rays(agb.c)[id])
-
-point_on_beam(agb::AstigmaticGaussianBeamlet, t::Real) = point_on_beam(agb.c, t)
-
 wavelength(agb::AstigmaticGaussianBeamlet) = wavelength(first(rays(agb.c)))
 polarization(agb::AstigmaticGaussianBeamlet) = polarization(first(rays(agb.c)))
 
 electric_field(agb::AstigmaticGaussianBeamlet) = polarization(agb)
 function electric_field!(agb::AstigmaticGaussianBeamlet, new_E0)
     polarization!(first(rays(agb.c)), new_E0)
-end
-
-function refractive_index(agb::AstigmaticGaussianBeamlet, id::Int)
-    return refractive_index(rays(agb.c)[id])
-end
-
-function refractive_index!(agb::AstigmaticGaussianBeamlet, id::Int, n_new::Real)
-    for beam in _component_beams(agb)
-        refractive_index!(rays(beam)[id], n_new)
-    end
-    return nothing
 end
 
 """
@@ -296,10 +238,6 @@ function Base.show(io::IO, agb::AstigmaticGaussianBeamlet)
     print(io,
         "AstigmaticGaussianBeamlet(pos: $p0, dir: $d0, λ: $λ, w_x: $(norm(w1)), w_y: $(norm(w2)))")
 end
-
-# AbstractTrees integration
-AbstractTrees.children(agb::AstigmaticGaussianBeamlet) = agb.children
-AbstractTrees.nodevalue(agb::AstigmaticGaussianBeamlet) = agb
 
 """
     AstigmaticGaussianBeamletInteraction <: AbstractInteraction
@@ -406,13 +344,6 @@ Tests if all 9 component rays at section `id` hit the same object shape.
         _check(agb.dym) || return false
         return true
     end
-end
-
-function isparentbeam(beam::AstigmaticGaussianBeamlet, ray::AbstractRay)
-    for b in _component_beams(beam)
-        isparentbeam(b, ray) && return true
-    end
-    return false
 end
 
 """
@@ -559,8 +490,7 @@ function optical_power(agb::AstigmaticGaussianBeamlet)
     # Beam area and field amplitude at the start of the beam (for a child: behind its parents)
     (; area, scale) = _area_from_root(agb, 1, 0)
     E_amp = scale * norm(polarization(first(rays(agb.c))))
-    # Corrected power: P = I_peak * π * w0x * w0y / 2
-    # We use the built-in intensity function to account for the wave impedance Z₀ / n of the medium
+    # P = I_peak * π * w0x * w0y / 2, wave impedance Z₀ / n of the medium
     n = refractive_index(first(rays(agb.c)))
     I_ref = intensity(E_amp, Z_vacuum / n)
     return 0.5 * π * abs(area) * I_ref
@@ -631,60 +561,35 @@ end
 
 # Coefficients (A0, A1, A2) of the complex beam area a(l) = (h1 + l u1) × (h2 + l u2) · d
 # = A0 + A1 l + A2 l² along a segment, with the parabasal parameters at its start.
-@inline function _area_coefficients(h1, u1, h2, u2, d)
+@inline function area_coefficients(h1, u1, h2, u2, d)
     return (_pseudo_cross2d(h1, h2, d),
         _pseudo_cross2d(h1, u2, d) + _pseudo_cross2d(u1, h2, d),
         _pseudo_cross2d(u1, u2, d))
 end
-
-_area_value((A0, A1, A2), l) = A0 + A1 * l + A2 * l^2
 
 # Inverse roots (ρ1, ρ2) of the complex beam area along a segment:
 # a(l) = A0 (1 − ρ1 l)(1 − ρ2 l). A root that does not exist (A2 = 0, e.g. a collimated
 # axis) is ρ = 0. The roots lie off the real axis (a Gaussian beam has no real focus
 # point), so each factor 1 − ρ l stays off the negative real axis for real l: its argument
 # changes continuously, by less than π, and its principal square root is continuous.
-function _area_inverse_roots((A0, A1, A2))
+function area_inverse_roots((A0, A1, A2))
     s = sqrt(A1^2 - 4 * A2 * A0)
     q = -(A1 + (real(conj(A1) * s) >= 0 ? s : -s)) / 2     # roots without cancellation
     return q / A0, iszero(q) ? zero(q) : A2 / q
 end
 
 # Continuous change of arg a(l) from l = 0 to l along a segment, as the sum over the two
-# factors of `_area_inverse_roots`. The principal branch of √(a_ref/a) instead jumps by π
+# factors of `area_inverse_roots`. The principal branch of √(a_ref/a) instead jumps by π
 # once the Gouy phase has changed by more than π/2, e.g. behind a focus.
-function _area_arg_change(A, l)
-    ρ1, ρ2 = _area_inverse_roots(A)
+function area_arg_change(A, l)
+    ρ1, ρ2 = area_inverse_roots(A)
     return angle(1 - ρ1 * l) + angle(1 - ρ2 * l)
 end
 
-# Change of arg a at an interface, from the ratio of the areas behind and in front of it,
-# modulo π (sign of the pseudoscalar area dropped)
-_area_arg_jump(r) = angle(real(r) < 0 ? -r : r)
+"""Continuous argument of the complex beam area at local distance `l` on segment `i`, from the root start."""
+area_arg(agb::AstigmaticGaussianBeamlet, i::Int, l::Real) = _area_from_root(agb, i, l).arg
 
-"""
-    _area_arg(agb, i, l)
-
-Continuous argument of the complex beam area of `agb` at the local distance `l` along the
-chief ray segment `i` (measured from the start of that segment), relative to the start of
-the root beam: a child continues the last segment of its parent, see `_area_from_root`.
-
-The area `(h1 × h2) ⋅ d` is a pseudoscalar: a reflection mirrors the transverse frame
-against the chief ray and flips its sign, which is no change of the beam. The jump at
-an interface is therefore taken modulo π, on (−π/2, π/2], and the Gouy phase does not
-change at a mirror. Physical interface jumps (refraction) are small.
-"""
-_area_arg(agb::AstigmaticGaussianBeamlet, i::Int, l::Real) = _area_from_root(agb, i, l).arg
-
-# Complex beam area at the local distance `l` along the chief ray segment `i`, followed from the
-# start of the root beam, as a named tuple:
-# - `arg`: its continuous argument, see `_area_arg`
-# - `area`: its value
-# - `scale`: the factor by which the field amplitude has changed with the beam area on the way.
-#   Only the change within the segments counts. At a surface the amplitude follows from the
-#   polarization of the chief ray instead: the Fresnel coefficients relate the fields on both
-#   sides, and they include that the cross section of the beam changes with the angle of
-#   refraction.
+# Complex beam area at local distance `l` on segment `i` from root start: (; arg, area, scale)
 function _area_from_root(agb::AstigmaticGaussianBeamlet{T}, i::Int, l::Real) where {T}
     p = agb.parent
     (; arg, area, scale) = isnothing(p) ?
@@ -693,23 +598,24 @@ function _area_from_root(agb::AstigmaticGaussianBeamlet{T}, i::Int, l::Real) whe
     for j in 1:i
         ray = rays(agb.c)[j]
         h1, u1, h2, u2, _ = parabasal_ray_parameters(agb, position(ray), j)
-        A = _area_coefficients(h1, u1, h2, u2, direction(ray))
-        (j > 1 || !isnothing(p)) && (arg += _area_arg_jump(A[1] / area))
+        A = area_coefficients(h1, u1, h2, u2, direction(ray))
+        if j > 1 || !isnothing(p)
+            # Arg jump at interface, modulo π
+            r = A[1] / area
+            arg += angle(real(r) < 0 ? -r : r)
+        end
         lj = j < i ? length(ray) : l
-        arg += _area_arg_change(A, lj)
-        area = _area_value(A, lj)
+        arg += area_arg_change(A, lj)
+        # Area at end of segment part
+        area = A[1] + A[2] * lj + A[3] * lj^2
         scale *= sqrt(abs(A[1] / area))
     end
     return (; arg, area, scale)
 end
 
 # Local distance of the point `p` along chief ray segment `i`
-_local_distance(agb::AstigmaticGaussianBeamlet, p, i) =
+local_distance(agb::AstigmaticGaussianBeamlet, p, i) =
     dot(p - position(rays(agb.c)[i]), direction(rays(agb.c)[i]))
-
-# Root of the beam tree that `agb` continues. A child that a component attached with `children!`
-# knows its parent, a beam re-emitted with `relaunch!` does not and is its own root.
-_root(agb::AstigmaticGaussianBeamlet) = isnothing(agb.parent) ? agb : _root(agb.parent)
 
 
 """
@@ -790,15 +696,10 @@ function parabasal_field(
 
     k0 = 2π / wavelength(chief)
 
-    # area_ref / area is essentially (1 / (1 + i*z/zr))^2 for stigmatic beams, so its
-    # square root carries the Gouy phase. The argument is followed continuously from the
-    # start of the root beam (the principal branch would jump by π behind a focus), the
-    # magnitude within the segments only (see `_area_from_root`).
-    # The phase includes the OPL correction Δl to ensure coherence in media. The
-    # transverse term w = rᵀQr/2 is a geometric length like z, so in a medium it enters
-    # with the wavenumber n k0 as well (beam radius and wavefront curvature).
-    Δarg = _area_arg(agb, i, _local_distance(agb, p0, i))
+    # Gouy phase from continuous area arg, amplitude from area change within segments
+    Δarg = area_arg(agb, i, local_distance(agb, p0, i))
     start = _area_from_root(agb, i, 0)
+    # Phase with OPL correction Δl, transverse term w with wavenumber n k0
     ψ = start.scale * sqrt(abs(start.area / area)) * cis(-Δarg / 2) *
         exp(im * k0 * (z + refractive_index(chief) * w + Δl))
     return E_ref_amp * ψ
@@ -823,9 +724,7 @@ function polarized_field(agb::AstigmaticGaussianBeamlet, r::AbstractArray, z::Re
     p0, i = point_on_beam(agb, z)
     chief = rays(agb.c)[i]
     E_vec = polarization(chief)
-    # The complex scalar field already includes the propagation phase and Gouy phase.
-    # The polarization of the chief ray of the segment is the amplitude, hence the scalar
-    # field is taken for a unit amplitude.
+    # Scalar field with unit amplitude, chief ray polarization is the amplitude
     ψ = parabasal_field(agb, r, z; E_ref_amp = 1.0)
     return E_vec * ψ
 end
@@ -897,11 +796,9 @@ function gauss_parameters(agb::AstigmaticGaussianBeamlet, z::Real)
               imag(h2[3]) * real(u2[3]) - real(h2[3]) * imag(u2[3])))
     w02 = H2 / (n * norm(u2))
 
-    # Total Gouy phase: argument of the area at the start of the root beam, followed
-    # continuously along the beam and its parents (no jump behind a focus, at a mirror or
-    # from parent to child)
-    area_root = _area_from_root(_root(agb), 1, 0).area
-    ψ = -0.5 * (angle(area_root) + _area_arg(agb, i, _local_distance(agb, p0, i)))
+    # Total Gouy phase, continuous from root start
+    area_root = _area_from_root(AbstractTrees.getroot(agb), 1, 0).area
+    ψ = -0.5 * (angle(area_root) + area_arg(agb, i, local_distance(agb, p0, i)))
 
     return (w1, w2, R1, R2, ψ, w01, w02)
 end

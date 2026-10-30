@@ -32,7 +32,7 @@ other samplings are subtypes of [`BeamletOptics.AbstractDetectorSampling`](@ref)
   `get_progress_threshold()` seconds (default 5 s). It is only drawn if `stderr` is a terminal.
 
 The grid, its window and its resolution are set by the sampling, e.g.
-`electric_field(pd, RegularGrid(n = 200, crop_factor = 5))`, see [`RegularGrid`](@ref).
+`electric_field(pd, RegularGrid(num_points = 200, crop_factor = 5))`, see [`RegularGrid`](@ref).
 
 !!! note "Scaling"
     The returned values for ray hits correspond to the E-field of the point spread function.
@@ -125,7 +125,25 @@ electric_field(hit::RayHit, p::AbstractVector) = _ray_phasor(hit, p)
 
 electric_field(hit::PolarizedRayHit, p::AbstractVector) = polarization(hit) * _ray_phasor(hit, p)
 
-electric_field(hit::GaussianBeamletHit, p::AbstractVector) = beamlet_hit_field(hit, p)
+function electric_field(hit::GaussianBeamletHit, p::AbstractVector)
+    v = p - hit.p0
+    l1 = _pseudo_dot(v, hit.d0)
+
+    # Transverse distance r
+    r = norm(v - l1 * hit.d0)
+
+    # Beam radius, curvature and Gouy phase from the waist and divergence rays of the segment
+    w, curv, ψ, _ = gauss_parameters(hit.segment, l1)
+    ψ += hit.ψ0
+
+    # Optical path up to the point, l0 + l1 along the beam. The curvature term is a geometric
+    # length like l1, hence it enters with the wavenumber n k0 of the medium as well.
+    k0 = wavenumber(hit.segment.λ)
+    n = hit.segment.n
+    opl = hit.l0 + l1 + hit.Δl0 + (n - 1) * l1
+    # `E_amp` is normalized to the power of the beamlet, the physical field in the medium is smaller by √n
+    return hit.E_amp / (sqrt(n) * w) * exp(-r^2 / w^2) * cis(k0 * opl + ψ + n * k0 * r^2 * curv / 2)
+end
 
 electric_field(hit::AstigmaticGaussianBeamletHit, p::AbstractVector) =
     hit.E_pol * _astigmatic_phasor(hit, p)
@@ -286,43 +304,6 @@ function _detector_hits(pd::Detector)
     return hs
 end
 
-"""
-    beamlet_hit_field(hit::AbstractBeamletHit, p::AbstractArray)
-
-Complex scalar field of a single beamlet `hit` at the global point `p` \\[m\\]. For an
-[`AstigmaticGaussianBeamletHit`](@ref) it is the field along the polarization of the hit, see
-[`beamlet_hit_polarization`](@ref) for the 3D field vector; for a [`GaussianBeamletHit`](@ref) it
-is the physical field of the segment, which is smaller by `√n` in a medium of index `n` than in
-vacuum for the same power, as for an astigmatic beamlet.
-The fields that the readouts of a [`Detector`](@ref) add are those of
-[`electric_field(::BeamletOptics.AbstractDetectorHit, ::AbstractVector)`](@ref). It is kept as
-its own function so that other code that needs the *individual* hit contributions at a point,
-e.g. the `BeamletOpticsOpticsBaseExt` package extension, does not have to duplicate the beamlet
-field formulas.
-"""
-function beamlet_hit_field(hit::GaussianBeamletHit{G}, p::AbstractArray) where {G}
-    v = p - hit.p0
-    l1 = _pseudo_dot(v, hit.d0)
-
-    # Transverse distance r
-    r = norm(v - l1 * hit.d0)
-
-    # Beam radius, curvature and Gouy phase from the waist and divergence rays of the segment
-    w, curv, ψ, _ = gauss_parameters(hit.segment, l1)
-    ψ += hit.ψ0
-
-    # Optical path up to the point, l0 + l1 along the beam. The curvature term is a geometric
-    # length like l1, hence it enters with the wavenumber n k0 of the medium as well.
-    k0 = wavenumber(hit.segment.λ)
-    n = hit.segment.n
-    opl = hit.l0 + l1 + hit.Δl0 + (n - 1) * l1
-    # `E_amp` is normalized to the power of the beamlet, the physical field in the medium is smaller by √n
-    return hit.E_amp / (sqrt(n) * w) * exp(-r^2 / w^2) * cis(k0 * opl + ψ + n * k0 * r^2 * curv / 2)
-end
-
-beamlet_hit_field(hit::AstigmaticGaussianBeamletHit, p::AbstractArray) =
-    hit.E_ref_amp * _astigmatic_phasor(hit, p)
-
 # Field of an astigmatic beamlet hit at `p` per unit amplitude: Gouy factor and phase
 function _astigmatic_phasor(hit::AstigmaticGaussianBeamletHit{G}, p::AbstractArray) where {G}
     v = p - hit.p0
@@ -336,7 +317,7 @@ function _astigmatic_phasor(hit::AstigmaticGaussianBeamletHit{G}, p::AbstractArr
         area_z = Complex{G}(1e-25, 1e-25)
     end
     # Gouy factor √(a_ref / a(l1)) with the continuous argument of the area: each factor
-    # of a(l1) stays off the negative real axis (see `_area_inverse_roots`), so the
+    # of a(l1) stays off the negative real axis (see `area_inverse_roots`), so the
     # principal square roots follow the Gouy phase through a focus
     gouy = hit.gouy0 / (sqrt(1 - hit.ρ1 * l1) * sqrt(1 - hit.ρ2 * l1))
 
@@ -349,30 +330,4 @@ function _astigmatic_phasor(hit::AstigmaticGaussianBeamletHit{G}, p::AbstractArr
     z_total = hit.l0 + l1
     # the transverse term w enters with the wavenumber n k0 of the medium, like l1
     return gouy * cis(hit.k0 * (z_total + hit.n_eff * w + hit.Δl + phase_corr))
-end
-
-"""
-    beamlet_hit_polarization(hit::AstigmaticGaussianBeamletHit)
-
-Complex 3D vector (global frame) that turns the scalar
-[`beamlet_hit_field`](@ref)`(hit, p)` of an astigmatic beamlet hit into its 3D field
-vector at `p`: the polarization of the hit segment's chief ray divided by the complex
-amplitude `E_ref_amp` that the scalar field already contains, i.e. a unit vector with the
-phase of its largest component removed. It is the zero vector if the segment carries no
-light, e.g. behind a crossed polarizer.
-
-Stigmatic [`GaussianBeamletHit`](@ref)s have no method: the underlying [`GaussianBeamlet`](@ref)
-model is scalar and carries no polarization in BMO, so there is no principled 3D
-direction to return. Callers that need a vector for such a hit (e.g. to build a
-tangential field on some plane) must supply their own convention, such as the local `u`
-axis of that plane (this matches `OpticsBase`'s rule for a purely scalar field: it is
-placed entirely along `u`).
-"""
-function beamlet_hit_polarization(hit::AstigmaticGaussianBeamletHit)
-    # `beamlet_hit_field` already carries the complex amplitude `E_ref_amp` (magnitude of the
-    # polarization of the segment and phase of its largest component), so dividing it out
-    # keeps amplitude and phase from being counted twice.
-    E = hit.E_pol
-    iszero(hit.E_ref_amp) && return zero(E)
-    return E / hit.E_ref_amp
 end

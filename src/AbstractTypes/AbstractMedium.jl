@@ -102,10 +102,11 @@ function leave(e::Enclosure, body::AbstractObject)
     e.body === body && return e.outer
     encloses(e, body) || return e
     @warn "A ray leaves a body that is not its innermost one: bodies overlap" maxlog = 1
-    return _without(e, body)
+    return enclosure_without(e, body)
 end
 
-_without(e::Enclosure, body) = e.body === body ? e.outer : Enclosure(e.body, _without(e.outer, body))
+enclosure_without(e::Enclosure, body) =
+    e.body === body ? e.outer : Enclosure(e.body, enclosure_without(e.outer, body))
 
 """Returns `true` if the enclosure `e` holds the `body`."""
 encloses(::Nothing, body) = false

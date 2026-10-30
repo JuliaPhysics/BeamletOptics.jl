@@ -3,7 +3,7 @@
 
 A generic type for a container type which holds rays, beams etc.
 
-# Parametrization:
+# Parametrization
 
 A subtype of `AbstractBeam` is parameterized by its main data type `T <: Real`, as well as the underlying ray representation `R <: AbstractRay{T}`.
 If a beam is to be compatible with different [`AbstractRay`](@ref) implementations, it must be parameterized by `T` and `R`.
@@ -13,38 +13,38 @@ However, it can also be set to a fixed type for `T` and `R`, i.e. `MyBeam <: Abs
 
 Subtypes of `AbstractBeam` must implement the following:
 
-## Fields:
+## Fields
 
 - `parent`: a [`Nullable`](@ref) field that holds the same type as the subtype, used for tree navigation
 - `children`: a vector that holds the same type as the subtype, used for sub-beam tracking, i.e. beamsplitting
 
-## Functions:
+## Getters/setters
+
+The tree functions `parent`, `children` and `isroot` (from `AbstractTrees`) work via the `parent`/`children` fields.
+
+## Functions
 
 - `trace_system!(system, beam; r_max, kwargs...)`: traces the beam from its last ray through the `system`
   until no object is hit or an interaction returns `nothing`
 - `push!(beam, interaction)`: appends the result of an interaction to the beam
-- `empty!`: resets the beam to its unsolved state. [`solve_system!`](@ref) calls it before tracing
-- `first_ray`: returns the start ray on the optical axis of the beam; for beamlets the first chief ray.
-  Defines the generic `position`/`direction` of the beam (the pivot for rotations)
-- `_chief_beam`: returns the beam whose `rays` carry the geometric path, used by [`path_segments`](@ref).
-  Defaults to the first of `_component_beams`; a beam that stores its rays directly returns itself
+- `_component_beams(beam)`: returns a tuple of the beams that store the rays of `beam`, chief beam first.
+  A beam that stores its rays itself (e.g. [`Beam`](@ref)) returns `(beam,)`
 
-The tree functions `parent`, `children` and `isroot` (from `AbstractTrees`) work via the `parent`/`children` fields.
+A beam that stores its rays itself must also implement `rays` and `empty!`, otherwise the generic
+methods recurse. Everything else (`rays`, `first_ray`, `empty!`, `position`, `direction`, the lengths
+and the kinematic API) has generic methods built on `_component_beams`.
 
-## Kinematic API:
+## Kinematic API
 
 `AbstractBeam`s are [`BeamletOptics.Movable`](@ref) with a [`BeamletOptics.Directed`](@ref) frame, see
-[`BeamletOptics.AbstractKinematicTrait`](@ref). Only root beams can be moved.
-Every move resets the beam to its untraced start state via `empty!`; moving a child beam throws an `ArgumentError`.
-Rotations are applied about the `position` of the beam, i.e. the start of `first_ray`.
+[`BeamletOptics.AbstractKinematicTrait`](@ref). A subtype needs no move methods of its own: the generic
+`translate3d!`/`rotate3d!` move the start ray of every component beam. Rotations are applied about the
+`position` of the beam, i.e. the start of `first_ray`.
 [`reset_rotation3d!`](@ref) throws an `ArgumentError`, since a beam has no orientation.
 
-To support the kinematic API, a subtype additionally implements one of the following:
-
-- `_component_beams`: for beams made up of component [`Beam`](@ref)s (e.g. [`GaussianBeamlet`](@ref)),
-  returns a tuple of these beams. The generic `translate3d!`/`rotate3d!` then delegate to them.
-- `translate3d!(::Movable, beam, offset)` and `rotate3d!(::Movable, beam, R::AbstractMatrix)`: for beams that
-  store rays directly (e.g. [`Beam`](@ref)), move the start ray(s) via the ray verbs.
+!!! warning
+    Only root beams can be moved. Every move resets the beam to its untraced start state via `empty!`;
+    moving a child beam throws an `ArgumentError`.
 """
 abstract type AbstractBeam{T <: Real, R <: AbstractRay{T}} end
 
@@ -56,9 +56,8 @@ AbstractTrees.nodetype(::Type{T}) where {T <: AbstractBeam} = T
 AbstractTrees.ParentLinks(::Type{<:AbstractBeam}) = AbstractTrees.StoredParents()
 AbstractTrees.parent(beam::AbstractBeam) = beam.parent
 parent!(beam::B, parent::B) where {B <: AbstractBeam} = (beam.parent = parent)
-# `isroot(beam)` is provided by AbstractTrees via `parent`, i.e. `isnothing(parent(beam))`
 
-AbstractTrees.children(b::AbstractBeam) = b.children
+AbstractTrees.children(beam::AbstractBeam) = beam.children
 
 AbstractTrees.printnode(io::IO, node::B; kw...) where {B <: AbstractBeam} = show(io, B)
 
@@ -85,7 +84,7 @@ function children!(beam::B, _children::AbstractVector{B}) where {B <: AbstractBe
     return nothing
 end
 
-_drop_beams!(b::B) where {B <: AbstractBeam} = (b.children = Vector{B}())
+_drop_beams!(beam::B) where {B <: AbstractBeam} = (beam.children = Vector{B}())
 
 """
     relaunch!(beam::B, new_beams::AbstractVector{B}) where {B <: AbstractBeam}
@@ -109,9 +108,21 @@ function relaunch!(beam::B, new_beams::AbstractVector{B}) where {B <: AbstractBe
     return nothing
 end
 
-function Base.empty!(::B) where {B <: AbstractBeam}
-    throw(ArgumentError(lazy"empty! not implemented for $B"))
-end
+"""
+    _component_beams(beam::AbstractBeam)
+
+Returns a tuple of the beams that store the rays of `beam`, chief beam first: `(beam,)` for a beam
+that stores its rays itself (e.g. [`Beam`](@ref)), the component beams of a composite beam (e.g. a
+[`GaussianBeamlet`](@ref)). The generic beam methods, including the kinematic API, are built on it.
+"""
+_component_beams(beam::AbstractBeam) = error(lazy"_component_beams not defined for $(typeof(beam))")
+
+"""
+    rays(beam::AbstractBeam)
+
+Returns the rays of the `beam`; for beamlets the rays of the chief beam.
+"""
+rays(beam::AbstractBeam) = rays(first(_component_beams(beam)))
 
 """
     first_ray(beam::AbstractBeam)
@@ -119,60 +130,188 @@ end
 Returns the start ray on the optical axis of the `beam`; for beamlets the first chief ray.
 Defines the generic `position` and `direction` of the `beam`, which are used as the pivot for rotations.
 """
-function first_ray(::B) where {B <: AbstractBeam}
-    throw(ArgumentError(lazy"first_ray not implemented for $B"))
+first_ray(beam::AbstractBeam) = first(rays(beam))
+
+Base.position(beam::AbstractBeam) = position(first_ray(beam))
+direction(beam::AbstractBeam) = direction(first_ray(beam))
+
+"""
+    empty!(beam::AbstractBeam)
+
+Resets the `beam` to its untraced start state: resets every component beam (e.g. the `chief`,
+`waist` and `divergence` beams of a [`GaussianBeamlet`](@ref)) and drops all child beams.
+"""
+function Base.empty!(beam::AbstractBeam)
+    foreach(empty!, _component_beams(beam))
+    _drop_beams!(beam)
+    return beam
 end
 
-Base.position(b::AbstractBeam) = position(first_ray(b))
-direction(b::AbstractBeam) = direction(first_ray(b))
+refractive_index(beam::AbstractBeam, id::Int) = refractive_index(rays(beam)[id])
+
+function refractive_index!(beam::AbstractBeam, id::Int, n_new::Real)
+    for b in _component_beams(beam)
+        refractive_index!(rays(b)[id], n_new)
+    end
+    return nothing
+end
+
+isentering(beam::AbstractBeam, id::Int) = isentering(rays(beam)[id])
 
 """
-    _component_beams(beam::AbstractBeam)
+    isparentbeam(beam, ray)
 
-Returns a tuple of the component [`Beam`](@ref)s of a composite `beam` (e.g. a [`GaussianBeamlet`](@ref)),
-chief beam first. Required for the kinematic API of composite beams.
+Tests if the given `beam` contains the `ray` as a part of its solution.
 """
-function _component_beams(::B) where {B <: AbstractBeam}
-    throw(ArgumentError(lazy"_component_beams not implemented for $B"))
+function isparentbeam(beam::AbstractBeam, ray::AbstractRay)
+    return any(b -> any(r -> r === ray, rays(b)), _component_beams(beam))
 end
 
 """
-    _chief_beam(beam::AbstractBeam)
+    Base.length(beam::AbstractBeam)
 
-Returns the beam whose `rays` carry the geometric path of `beam`: the first of its `_component_beams`,
-i.e. the chief beam of a beamlet. A beam that stores its rays directly (e.g. [`Beam`](@ref)) returns itself.
+Calculate the length of a beam up to the point of the last intersection.
+
+!!! tip
+    Use [`optical_path_length`](@ref) to get the optical path length instead.
 """
-_chief_beam(b::AbstractBeam) = first(_component_beams(b))
+function Base.length(beam::AbstractBeam{T}) where {T}
+    # Recursively get length of beam parents
+    l0 = length_parent(beam)
+    l = length_rays(beam)
+    return l + l0
+end
+
+"""
+    optical_path_length(beam::AbstractBeam)
+
+Calculate the optical path length of the `beam`, i.e. ``\\mathrm{OPL} = n \\cdot l``.
+"""
+function optical_path_length(beam::AbstractBeam{T}) where {T}
+    p = AbstractTrees.parent(beam)
+    l0 = isnothing(p) ? zero(T) : optical_path_length(p)
+    for ray in rays(beam)
+        if isnothing(intersection(ray))
+            break
+        end
+
+        l0 += optical_path_length(ray)
+    end
+
+    return l0
+end
+
+function length_parent(beam::AbstractBeam{T}) where {T}
+    p = AbstractTrees.parent(beam)
+    if isnothing(p)
+        return zero(T)
+    else
+        return length(p)::T
+    end
+end
+
+"""
+    length_before(beam::AbstractBeam, id::Integer)
+
+Returns the geometric length of the `beam`, its parents included, up to the start of ray `id`.
+"""
+function length_before(beam::AbstractBeam{T}, id::Integer) where {T}
+    l = length_parent(beam)
+    for j in 1:(id - 1)
+        l += length(rays(beam)[j])
+    end
+    return l
+end
+
+function length_rays(beam::AbstractBeam{T}) where {T}
+    l = zero(T)
+    for ray in rays(beam)
+        if isnothing(intersection(ray))
+            break
+        end
+        l += length(ray)::T
+    end
+    return l
+end
+
+"""
+    point_on_beam(beam::AbstractBeam, t::Real)
+
+Function to find a point given a specific distance `t` along the beam. Return the ray `index` aswell.
+For negative distances, assume first ray backwards.
+"""
+function point_on_beam(beam::AbstractBeam{T}, t::Real)::Tuple{Point3{T}, Int} where {T}
+    # Initialize counter to track cumulative length
+    p = AbstractTrees.parent(beam)
+    if isnothing(p)
+        temp = zero(T)
+    else
+        temp = length(p)
+    end
+    numEl = length(rays(beam))
+    for (index, ray) in enumerate(rays(beam))
+        # Catch final ray
+        if index == numEl
+            break
+        end
+        temp += length(ray)
+        # If the specified distance `t` is less than the cumulative length,
+        # calculate the local ray length `b` and find the point along the ray
+        if t < temp
+            b = temp - t
+            point = position(ray) + (length(ray) - b) * direction(ray)
+            return point, index
+        end
+    end
+    # If no solution at this point assume final ray with infinite length
+    ray = last(rays(beam))
+    b = t - temp
+    point = position(ray) + b * direction(ray)
+    return point, numEl
+end
+
+"""
+    reset_root!(beam::AbstractBeam)
+
+Resets the root `beam` to its untraced start state before a move; throws an `ArgumentError` for a child beam.
+"""
+function reset_root!(beam::AbstractBeam)
+    isroot(beam) || throw(ArgumentError("cannot move a child beam; move its root beam instead"))
+    empty!(beam)
+    return nothing
+end
 
 # The hit at which a beam interacts `at` its ray, see interact3d: the ray of a beam, or the segment
 # `ray_id` of the chief beam of a beamlet
 intersection(::AbstractBeam, ray::AbstractRay) = intersection(ray)
-intersection(beam::AbstractBeam, ray_id::Int) = intersection(rays(_chief_beam(beam))[ray_id])
+intersection(beam::AbstractBeam, ray_id::Int) = intersection(rays(beam)[ray_id])
 
 """
     translate3d!(::Movable, beam::AbstractBeam, offset)
 
-Resets the root `beam` to its untraced start state and moves it by `offset`.
-Composite beams delegate to their component beams. Throws an `ArgumentError` for child beams.
+Resets the root `beam` to its untraced start state and moves the start ray of every component beam
+by `offset`. Throws an `ArgumentError` for child beams.
 """
-function translate3d!(::Movable, b::AbstractBeam, offset)
-    isroot(b) || throw(ArgumentError("cannot move a child beam; move its root beam instead"))
-    empty!(b)
-    foreach(c -> translate3d!(c, offset), _component_beams(b))
+function translate3d!(::Movable, beam::AbstractBeam, offset)
+    reset_root!(beam)
+    for b in _component_beams(beam)
+        translate3d!(first_ray(b), offset)
+    end
     return nothing
 end
 
 """
     rotate3d!(::Movable, beam::AbstractBeam, R::AbstractMatrix)
 
-Resets the root `beam` to its untraced start state and rotates it by `R` about its `position`
-(the chief ray start for beamlets). Composite beams delegate to their component beams.
-Throws an `ArgumentError` for child beams.
+Resets the root `beam` to its untraced start state and rotates the start ray of every component beam
+by `R` about the `position` of the `beam` (the chief ray start for beamlets). Throws an `ArgumentError`
+for child beams.
 """
-function rotate3d!(::Movable, b::AbstractBeam, R::AbstractMatrix)
-    isroot(b) || throw(ArgumentError("cannot move a child beam; move its root beam instead"))
-    empty!(b)
-    p = position(b)
-    foreach(c -> rotate3d!(c, R, p), _component_beams(b))
+function rotate3d!(::Movable, beam::AbstractBeam, R::AbstractMatrix)
+    reset_root!(beam)
+    pivot = position(beam)
+    for b in _component_beams(beam)
+        rotate3d!(first_ray(b), R, pivot)
+    end
     return nothing
 end

@@ -20,6 +20,9 @@ abstract type AbstractSystem end
 
 refractive_index(::AbstractSystem, λ::Real) = 1.0
 
+# A system is not moved as a whole, its objects are
+kinematic_trait_of(::AbstractSystem) = Static()
+
 """
     interact3d(::AbstractSystem, object::AbstractObject, beam::AbstractBeam, at)
 
@@ -37,12 +40,13 @@ A [`MultiShape`](@ref) object whose parts are objects needs no method: the call 
 that was hit, see [`part_of`](@ref), e.g. to the front or back lens of a [`DoubletLens`](@ref). A
 `MultiShape` object of plain shapes defines its own method.
 """
-interact3d(system::AbstractSystem, object::AbstractObject, beam::AbstractBeam, at::Union{AbstractRay, Int}) =
+interact3d(system::AbstractSystem, object::AbstractObject, beam::AbstractBeam,
+        at::Union{AbstractRay, Int}) =
     interact3d(system, shape_trait_of(object), object, beam, at)
 
 function interact3d(::AbstractSystem, ::SingleShape, object::AbstractObject, ::AbstractBeam,
         ray::AbstractRay)
-    _warn_no_interact3d(object, ray)
+    warn_no_interact3d(shape_trait_of(object), object, ray)
     return nothing
 end
 
@@ -53,9 +57,13 @@ function interact3d(system::AbstractSystem, ::MultiShape, object::AbstractObject
     return interact3d(system, part, beam, at)
 end
 
-# Warning of the fallback above
-_warn_no_interact3d(object, ray) =
+# Warning of the interact3d fallback
+warn_no_interact3d(::AbstractShapeTrait, object, ray) =
     @warn lazy"No interact3d method defined for:" ObjectType = typeof(object) RayType = typeof(ray)
+warn_no_interact3d(::MultiShape, object, ray) = @warn lazy"""
+    No interact3d method defined for the MultiShape object $(nameof(typeof(object))).
+    Its parts are plain shapes: define interact3d for it, or build it from objects with
+    their own interact3d (e.g. lenses), to which the solver hands the beam.""" RayType = typeof(ray)
 
 """
     Hint

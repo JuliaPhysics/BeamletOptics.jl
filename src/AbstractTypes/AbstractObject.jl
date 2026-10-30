@@ -84,10 +84,12 @@ E.g. for a custom multi-shape object the user of this API needs to define:
 
 `BeamletOptics.shape(obj::MyObject) = (obj.front, obj.back)`
 
-!!! warning
-    Whenever your object consists of nested structures (e.g. other [`MultiShape`](@ref)s) 
-    it is the responsibility of the user to ensure that **each atomic shape, i.e. `SingleShape`, is only listed once**.
-    Failure to ensure this can lead to spurious behaviour when using the kinematic API.
+!!! note "Shared parts"
+    The kinematic API moves every part once per motion, compared by identity (`===`): a part that
+    `shape(object)` lists several times, and an object that an [`ObjectGroup`](@ref) holds along several
+    paths. Two different parts of one motion must not reach the same shape at any level, e.g. a group
+    that holds a `DoubletLens` and its front lens, or an object whose shape is an operand of a
+    [`UnionSDF`](@ref) of another object; moving them throws an `ArgumentError` before anything moves.
 """
 shape(object::AbstractObject) = shape(shape_trait_of(object), object)
 

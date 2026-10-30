@@ -82,7 +82,7 @@ assembly is used:
 
 - An own group type gives named parts and an own constructor. It needs the fields `objects`,
   `center::Point3{T}` and `dir::SMatrix{3,3,T,9}`, is a `mutable struct`, and its constructor
-  checks `allequal(BeamletOptics.is_static, objects)`. Moving, `set_pivot3d!`, systems and rendering
+  calls `BeamletOptics.check_kinematic_members(objects)`. Moving, `set_pivot3d!`, systems and rendering
   work as for an `ObjectGroup`. See `templates/08_custom_group.jl`.
 - A `MultiShape` object of plain shapes without `interact3d` stops every ray that hits it with the
   warning `No interact3d method defined`. Its method finds the part that was hit via

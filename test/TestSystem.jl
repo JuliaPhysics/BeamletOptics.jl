@@ -462,7 +462,7 @@ end
         @test hit.l0 == ref_hit.l0 == 0
         for offset in ([0.0, 0, 0], [0.5e-3, 0, 0], [0, 0, -1e-3])
             p = position(det) + offset
-            @test BMO.beamlet_hit_field(hit, p) ≈ BMO.beamlet_hit_field(ref_hit, p) rtol = 1e-12
+            @test electric_field(hit, p) ≈ electric_field(ref_hit, p) rtol = 1e-12
         end
 
         # solved again after moving the component: the child is a new beamlet

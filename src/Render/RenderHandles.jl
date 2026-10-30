@@ -47,7 +47,7 @@ per object, object groups rendered per object, such that each object of a group 
 its own. A subtype implements
 
 - [`rendered`](@ref)`(h)`: the system
-- [`render_children`](@ref)`(h)`: the object handles
+- `AbstractTrees.children(h)`: the object handles
 - [`render_parent`](@ref)`(h, obj)`: the group that holds `obj`, or `nothing` at the top level
 - `push!(h, oh::AbstractObjectRenderHandle)`: adds the object handle `oh` at the top level, e.g. of
   an object added to the scene, and returns `h`
@@ -92,15 +92,15 @@ plots of an object handle may be replaced by [`update_render!`](@ref), hence do 
 function render_plots end
 
 render_plots(h::AbstractSystemRenderHandle) =
-    reduce(vcat, (render_plots(c) for c in render_children(h)); init = Any[])
+    reduce(vcat, (render_plots(c) for c in children(h)); init = Any[])
 
 """
-    render_children(h::AbstractSystemRenderHandle) -> AbstractVector{<:AbstractObjectRenderHandle}
+    AbstractTrees.children(h::AbstractSystemRenderHandle) -> AbstractVector{<:AbstractObjectRenderHandle}
 
 The object handles of the system handle `h`, one per rendered object (the objects of groups, not
 the groups). Change them via `push!` and `delete!` of `h`, not via the returned vector.
 """
-function render_children end
+AbstractTrees.children(::AbstractSystemRenderHandle)
 
 """
     render_parent(h::AbstractSystemRenderHandle, obj)

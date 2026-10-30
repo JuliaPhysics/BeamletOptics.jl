@@ -68,7 +68,8 @@ filtered field is then refracted into the medium behind the filter with the
 the `ray` is totally reflected before it reaches the filter. A ray whose field falls to or below the
 `cutoff` of the filter is stopped.
 """
-interact3d(system::AbstractSystem, polfilter::PolarizationFilter, beam::Beam{T, R}, ray::R) where {T <: Real, R <: AbstractRay{T}} =
+interact3d(system::AbstractSystem, polfilter::PolarizationFilter, beam::Beam{T, R},
+        ray::R) where {T <: Real, R <: AbstractRay{T}} =
     interact3d(system, polfilter, transition(system, ray), beam, ray)
 
 function interact3d(::AbstractSystem,
@@ -80,11 +81,12 @@ function interact3d(::AbstractSystem,
     E = _calculate_global_E0(polfilter, ray, direction(ray), polfilter.JMat)
     # Terminate blocked rays
     norm(E) ≤ polfilter.cutoff && return nothing
-    # the filtered field crosses the boundary between the media on both sides of the filter
+    # The filtered field crosses the boundary between the media on both sides of the filter
     return cross_boundary(t, beam, ray, E)
 end
 
-# unpolarized rays (e.g. beamlet auxiliary rays) pass through the ideal filter, refracted at the
+# Unpolarized rays (e.g. beamlet auxiliary rays) pass through the ideal filter, refracted at the
 # boundary between the media on both sides of the filter
-interact3d(::AbstractSystem, ::PolarizationFilter, t::Transition, beam::Beam{T, R}, ray::R) where {T <: Real, R <: Ray{T}} =
+interact3d(::AbstractSystem, ::PolarizationFilter, t::Transition, beam::Beam{T, R},
+        ray::R) where {T <: Real, R <: Ray{T}} =
     cross_boundary(t, beam, ray)

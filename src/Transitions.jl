@@ -130,7 +130,7 @@ end
 
 The [`AbstractMedium`](@ref) before the boundary, in which the ray propagates, see [`Transition`](@ref).
 """
-medium_in(t::Transition) = _medium(t, innermost(enclosure_in(t)), t.n_in)
+medium_in(t::Transition) = side_medium(t, innermost(enclosure_in(t)), t.n_in)
 
 """
     medium_out(t::Transition)
@@ -138,11 +138,11 @@ medium_in(t::Transition) = _medium(t, innermost(enclosure_in(t)), t.n_in)
 The [`AbstractMedium`](@ref) behind the boundary, into which the ray is transmitted, see
 [`Transition`](@ref).
 """
-medium_out(t::Transition) = _medium(t, innermost(enclosure_out(t)), t.n_out)
+medium_out(t::Transition) = side_medium(t, innermost(enclosure_out(t)), t.n_out)
 
-# outside of all bodies: the medium of the system, or of the index of a ray without an enclosure
-_medium(::Transition, body::AbstractObject, n) = medium(body)
-_medium(t::Transition, ::Nothing, n) =
+# Outside of all bodies: the medium of the system, or of the index of a ray without an enclosure
+side_medium(::Transition, body::AbstractObject, n) = medium(body)
+side_medium(t::Transition, ::Nothing, n) =
     n == refractive_index(t.system, t.λ) ? medium(t.system) : IsotropicMedium(n)
 
 """The refractive index before the boundary at the wavelength of the ray, see [`Transition`](@ref)."""
@@ -155,10 +155,11 @@ normal3d(t::Transition) = t.normal
 enclosure_in(t::Transition) = t.enclosure
 
 """The [`Enclosure`](@ref) of a ray that is transmitted through the boundary."""
-enclosure_out(t::Transition) = _beyond(t.enclosure, t.exiting, t.entering)
+enclosure_out(t::Transition) = enclosure_beyond(t.enclosure, t.exiting, t.entering)
 
-# the enclosure `e` without the body of the hit `exiting` and within the body of the hit `entering`
-_beyond(e, exiting, entering) = enter(leave(e, part_of(exiting)), part_of(entering))
+# The enclosure `e` without the body of the hit `exiting` and within the body of the hit `entering`
+enclosure_beyond(e::Nullable{Enclosure}, exiting, entering) =
+    enter(leave(e, part_of(exiting)), part_of(entering))
 
 """
     enclose!(system::AbstractSystem, ray::AbstractRay, new_rays)
@@ -175,24 +176,22 @@ function enclose!(::AbstractSystem, ray::AbstractRay{T}, new_rays) where {T}
     p = hit_point(ray)
     exiting, entering, _ = boundary_hits(hit, ray)
     e_in = enter(enclosure(ray), part_of(exiting))
-    normal = _against(normal3d(hit), ray)
+    normal = normal_against(normal3d(hit), ray)
     e_out = nothing
     for r in new_rays
-        _starts_at(r, p) || continue
+        norm(position(r) - p) ≤ get_coincidence_tolerance() || continue
         if dot(direction(r), normal) > 0
             enclosure!(r, e_in)
         else
-            isnothing(e_out) && (e_out = _beyond(e_in, exiting, entering))
+            isnothing(e_out) && (e_out = enclosure_beyond(e_in, exiting, entering))
             enclosure!(r, e_out)
         end
     end
     return nothing
 end
 
-_starts_at(r::AbstractRay, p) = norm(position(r) - p) ≤ get_coincidence_tolerance()
-
-# the normal `n` turned against the direction of the `ray`
-_against(n, ray::AbstractRay) = isentering(direction(ray), n) ? n : -n
+# The normal `n` turned against the direction of the `ray`
+normal_against(n::AbstractVector, ray::AbstractRay) = isentering(direction(ray), n) ? n : -n
 
 """
     boundary_hits(hit::Intersection, ray) -> (exiting, entering, layer)
@@ -255,7 +254,7 @@ function transition(system::AbstractSystem, ray::AbstractRay{T}) where {T}
     hit = intersection(ray)::Intersection{T}
     λ = wavelength(ray)
     exiting, entering, layer = boundary_hits(hit, ray)
-    # the bodies around the ray: the body that it leaves encloses it, also for a ray that a component
+    # The bodies around the ray: the body that it leaves encloses it, also for a ray that a component
     # created without an enclosure
     e_in = enter(enclosure(ray), part_of(exiting))
     n_in = _index(innermost(e_in), λ, T(refractive_index(ray)))
@@ -266,16 +265,16 @@ function transition(system::AbstractSystem, ray::AbstractRay{T}) where {T}
     else
         n_in
     end
-    return Transition{T}(system, T(λ), n_in, n_out, _against(normal3d(hit), ray), exiting, entering,
-        layer, e_in)
+    normal = normal_against(normal3d(hit), ray)
+    return Transition{T}(system, T(λ), n_in, n_out, normal, exiting, entering, layer, e_in)
 end
 
-# the index of the innermost body in the number type `T` of the ray, e.g. a `ForwardDiff.Dual` within
+# The index of the innermost body in the number type `T` of the ray, e.g. a `ForwardDiff.Dual` within
 # automatic differentiation (read behind a function barrier), else the index `n` outside of all bodies
 _index(::Nothing, λ, n::T) where {T} = n
-_index(body, λ, n::T) where {T} = convert(T, _medium_index(body, λ))::T
+_index(body::AbstractObject, λ, n::T) where {T} = convert(T, medium_index(body, λ))::T
 
-_medium_index(part, λ) = refractive_index(medium(part), λ)
+medium_index(part::AbstractObject, λ) = refractive_index(medium(part), λ)
 
 """
     enclose_new!(system, beam, ray, interaction)
@@ -296,7 +295,7 @@ enclose_new!(system::AbstractSystem, beam::Beam, ray::AbstractRay, ::Nothing) =
 # tuples, which is unrolled, not by a loop
 function enclose_new!(system::AbstractSystem, beam::GaussianBeamlets, ray_id::Int,
         i::AbstractInteraction)
-    map(_component_beams(beam), _component_interactions(i)) do b, bi
+    map(_component_beams(beam), component_interactions(i)) do b, bi
         enclose!(system, rays(b)[ray_id], (bi.ray,))
     end
     return nothing
@@ -311,8 +310,8 @@ function enclose_new!(system::AbstractSystem, beam::GaussianBeamlets, ray_id::In
     return nothing
 end
 
-_component_interactions(i::GaussianBeamletInteraction) = (i.chief, i.waist, i.divergence)
-_component_interactions(i::AstigmaticGaussianBeamletInteraction) =
+component_interactions(i::GaussianBeamletInteraction) = (i.chief, i.waist, i.divergence)
+component_interactions(i::AstigmaticGaussianBeamletInteraction) =
     (i.chief, i.wxp, i.wxm, i.wyp, i.wym, i.dxp, i.dxm, i.dyp, i.dym)
 
 """
@@ -420,10 +419,10 @@ boundary at the segment `ray_id`: each component ray crosses it at its own hit, 
 `cross_boundary(system, beam, ray)`.
 """
 cross_boundary(system::AbstractSystem, g::GaussianBeamlet{R}, ray_id::Int) where {R} =
-    GaussianBeamletInteraction{R}(_cross_components(system, g, ray_id)...)
+    GaussianBeamletInteraction{R}(cross_components(system, g, ray_id)...)
 
 cross_boundary(system::AbstractSystem, agb::AstigmaticGaussianBeamlet{R}, ray_id::Int) where {R} =
-    AstigmaticGaussianBeamletInteraction{R}(_cross_components(system, agb, ray_id)...)
+    AstigmaticGaussianBeamletInteraction{R}(cross_components(system, agb, ray_id)...)
 
-_cross_components(system, beamlet, ray_id) =
+cross_components(system::AbstractSystem, beamlet, ray_id) =
     map(b -> cross_boundary(system, b, rays(b)[ray_id]), _component_beams(beamlet))

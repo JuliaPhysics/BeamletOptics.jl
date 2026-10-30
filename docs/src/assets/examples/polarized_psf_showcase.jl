@@ -30,7 +30,7 @@ solve_system!(system, beam)
 ##
 NA = sin(2 * atan(D / (4f)))
 R = 1.5λ / NA
-xs, zs, E = electric_field(pd, RegularGrid(n = 201, x_min = -R, x_max = R, z_min = -R, z_max = R))
+xs, zs, E = electric_field(pd, RegularGrid(num_points = 201, x_min = -R, x_max = R, z_min = -R, z_max = R))
 
 I = intensity.(E)
 I0 = maximum(I)

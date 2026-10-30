@@ -29,7 +29,7 @@ function Periscope(height::Real; diameter::Real = 25.4mm)
     translate3d!(upper, [0, 0, height])
     objects = (lower, upper)
     # the members of a group are either all static or all movable
-    allequal(BMO.is_static, objects) || throw(ArgumentError("mixed static and movable parts"))
+    BMO.check_kinematic_members(objects)
     # pivot halfway up, frame of the global axes
     return Periscope(BMO.Point3(0.0, 0.0, height / 2), BMO.SMatrix{3, 3}(1.0I), objects)
 end

@@ -137,6 +137,13 @@ of repeating them, constructor docstrings must be self-sufficient in the REPL (u
 conventions, limitations), and abstract type docstrings state the interface a subtype
 implements.
 
+Docstrings stay short; the explanation of a core system (a protocol or data flow across several
+types or files, e.g. the intersect-interact loop, tracing and hints, detector readout, sources,
+kinematics, the render protocol) goes on the docs page that embeds its docstrings, as a Mermaid
+flowchart in the style of "Diagrams" in [docs/src/api/docdev.md](docs/src/api/docdev.md). A
+patch that changes such a system updates its diagram, and a new core system comes with one.
+Derive diagrams from the code, not from memory.
+
 ## Documentation build
 
 [docs/src/api/docdev.md](docs/src/api/docdev.md) describes the build (DocumenterVitepress,
@@ -170,8 +177,9 @@ output in `docs/build/1`, served with LiveServer) and the figure pattern (script
     pivot): add a method of the same verb that converts the argument and calls the verb
     again, e.g. `rotate3d!(x, axis, θ)` → `rotate3d!(x, R)`.
   - *Branching on a type or trait* (`isa`, `isnothing(kw)` selecting a code path): dispatch
-    on the type or on a trait (`kinematic_trait_of`, `shape_trait_of`). An optional argument
-    that changes behavior is a positional method, not a `kw = nothing` keyword.
+    on the type or on a trait (`kinematic_trait_of`, `shape_trait_of`). A user-facing keyword
+    may default to `nothing`; inside the package, an optional argument that selects a code
+    path is a positional method on `::Nothing`.
   - *Repeating an existing operation* (rotating about a pivot, aligning a direction): call
     the existing public verb. Derived methods call public entry points only, so type-specific
     methods of those verbs apply automatically.
@@ -185,13 +193,19 @@ output in `docs/build/1`, served with LiveServer) and the figure pattern (script
 
   ```julia
   point_at3d!(x, target) = point_at3d!(kinematic_trait_of(x), x, target)
-  point_at3d!(::Static, x, target) = _static_error(x)
+  point_at3d!(::Static, x, target) = static_error(x)
   point_at3d!(t::Movable, x, target) = point_at3d!(t, x, position(target))   # any positioned target
   point_at3d!(::Movable, x, target::AbstractVector) = align3d!(x, target - position(x))
   ```
 
-  A `_helper` is fine for type-independent work that has no natural verb: error
-  constructors (`_static_error`), numeric kernels, internal data plumbing. It must not
-  branch on argument types.
+  The entry point is untyped only because the kinematic API is an opt-in trait:
+  `kinematic_trait_of(x)` throws for types that do not opt in. Every other function is typed
+  at least in its first argument.
+
+  The `_` prefix is reserved for three roles: an internal protocol hook listed in the
+  abstract type's docstring, a private twin of a public verb (e.g. `_render!`), and a helper
+  with three or more call sites. `_` functions may dispatch. Any other unexported helper gets
+  a plain name (`static_error`, `trace_all`); a one-line helper with a single call site stays
+  inline.
 - New or changed functionality comes with tests, docstrings, and docs or examples where
   relevant ([docs/src/api/contribute.md](docs/src/api/contribute.md)).

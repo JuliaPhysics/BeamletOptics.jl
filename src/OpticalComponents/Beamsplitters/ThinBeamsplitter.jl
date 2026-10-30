@@ -158,7 +158,8 @@ follow from the [`transition`](@ref) at the hit: the transmitted beam is refract
 behind the splitter, e.g. the substrate that it is coated on, the reflected beam stays in the medium
 before it. Beyond the critical angle of these media, the `ray` is totally reflected and not split.
 """
-interact3d(system::AbstractSystem, bs::ThinBeamsplitter, beam::Beam{T, R}, ray::R) where {T <: Real, R <: AbstractRay{T}} =
+interact3d(system::AbstractSystem, bs::ThinBeamsplitter, beam::Beam{T, R},
+        ray::R) where {T <: Real, R <: AbstractRay{T}} =
     interact3d(system, bs, transition(system, ray), beam, ray)
 
 function interact3d(::AbstractSystem, bs::ThinBeamsplitter, t::Transition, beam::Beam{T, R},
@@ -244,7 +245,7 @@ The phase jump is applied to the reflected portion of any incoming beam that fac
 This is intended to model the effect of the Fresnel equations without full polarization calculus.
 """
 function interact3d(system::AbstractSystem, bs::ThinBeamsplitter, beamlet::GaussianBeamlets, ray_id::Int)
-    ray = rays(_chief_beam(beamlet))[ray_id]
+    ray = rays(beamlet)[ray_id]
     is_totally_reflected(ray, transition(system, ray)) && return cross_boundary(system, beamlet, ray_id)
     t = _beamsplitter_transmitted_beam(bs, beamlet, ray_id)
     r = _beamsplitter_reflected_beam(bs, beamlet, ray_id)

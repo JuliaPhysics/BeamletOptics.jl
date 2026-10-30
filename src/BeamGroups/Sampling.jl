@@ -40,11 +40,17 @@ const _GOLDEN_ANGLE = π * (3 - √5)
     AbstractSourceSampling
 
 How the rays of a [`CollimatedSource`](@ref) or [`PointSource`](@ref) are sampled. The source
-stores its sampling in the field `sampling`, such that [`set_num_rays!`](@ref) can regenerate its
-rays with another number of rays. The constructors of the sources generate their beams with the
-same methods.
+stores its sampling in the field `sampling`, such that [`num_rays!`](@ref) can regenerate its
+rays with another number of rays. A source built from given beams stores
+[`BeamletOptics.NoSampling`](@ref). The constructors of the sources generate their beams with
+the same methods.
 
 # Implementation reqs.
+
+Parameters of the sampling other than the number of rays (e.g. the number of rings or the
+half spread angle) are fields of the subtype.
+
+## Functions
 
 A subtype `S <: AbstractSourceSampling` implements:
 
@@ -56,9 +62,6 @@ A subtype `S <: AbstractSourceSampling` implements:
   `dir`. Throws an `ErrorException` if `num_rays` is below `min_num_rays(s)`.
 - `min_num_rays(s::S) -> Union{Nothing, Int}` (optional): the fewest rays of the sampling,
   default `1`, see [`BeamletOptics.min_num_rays`](@ref).
-
-Parameters of the sampling other than the number of rays (e.g. the number of rings or the
-half spread angle) are fields of the subtype.
 
 # Implementations
 
@@ -75,7 +78,7 @@ abstract type AbstractSourceSampling end
 
 The beams of the source were given to its constructor, e.g.
 `CollimatedSource(beams, diameter, pos, dir)`. They can not be regenerated:
-[`set_num_rays!`](@ref) throws an `ArgumentError` and `min_num_rays` returns `nothing`.
+[`num_rays!`](@ref) throws an `ArgumentError` and `min_num_rays` returns `nothing`.
 """
 struct NoSampling <: AbstractSourceSampling end
 
@@ -189,10 +192,11 @@ azimuth of the pattern about `dir`. `args` depend on the source: the `diameter` 
 which starts at `pos` along `dir`.
 
 Throws an `ErrorException` if `num_rays` is below [`BeamletOptics.min_num_rays`](@ref) of the
-sampling, and an `ArgumentError` for [`BeamletOptics.NoSampling`](@ref). Used by the
-constructors of the sources and by [`set_num_rays!`](@ref).
+sampling or if the sampling type has no method, and an `ArgumentError` for
+[`BeamletOptics.NoSampling`](@ref). Used by the constructors of the sources and by
+[`num_rays!`](@ref).
 """
-function source_beams end
+source_beams(s::AbstractSourceSampling, args...) = error(lazy"source_beams not defined for $(typeof(s))")
 
 source_beams(::NoSampling, args...) =
     throw(ArgumentError("the rays of a source that wraps given beams can not be regenerated"))

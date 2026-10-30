@@ -43,7 +43,7 @@ function probe(b, id)
     return pd
 end
 
-power(pd) = optical_power(pd, RegularGrid(n = 301, crop_factor = 4))
+power(pd) = optical_power(pd, RegularGrid(num_points = 301, crop_factor = 4))
 
 function plate_beamsplitter()
     pbs = RectangularPlateBeamsplitter(30mm, 30mm, 5mm, _ -> n_glass)
@@ -119,8 +119,8 @@ end
             # in air behind the plate
             @test optical_power(pd) ≈ P0 * loss[M]^2 rtol = 1e-3
             # the field in air is that of the same beam without a medium
-            E_air = abs(BMO.beamlet_hit_field(M == GaussianBeamlet ? BMO.GaussianBeamletHit(b, 3) :
-                                              BMO.AstigmaticGaussianBeamletHit(b, 3), [0.0, 80mm, 0]))
+            E_air = norm(electric_field(M == GaussianBeamlet ? BMO.GaussianBeamletHit(b, 3) :
+                                        BMO.AstigmaticGaussianBeamletHit(b, 3), [0.0, 80mm, 0]))
             @test E_air ≈ peak_field(P0 * loss[M]^2, 1.0, radius(b, 80mm)) rtol = 1e-3
         end
         @test fields[GaussianBeamlet] ≈ fields[AstigmaticGaussianBeamlet] rtol = 1e-3
@@ -139,8 +139,8 @@ end
             @test power(probe(b, 2)) ≈ T * P0 rtol = 1e-3
             # the field of the hits at the surface point (the beam radius is the same there)
             p = [0.0, 50mm, 0]
-            E_air = abs(BMO.beamlet_hit_field(hit_air, p))
-            E_glass = abs(BMO.beamlet_hit_field(hit_glass, p))
+            E_air = norm(electric_field(hit_air, p))
+            E_glass = norm(electric_field(hit_glass, p))
             @test E_glass / E_air ≈ sqrt(T / n_glass) rtol = 1e-3
         end
     end

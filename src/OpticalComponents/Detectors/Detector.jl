@@ -97,6 +97,14 @@ empty!(d::Detector) = hits!(d, nothing)
 hits(d::Detector) = d.hits
 hits!(d::Detector, new) = (d.hits = new)
 
+"""
+    length(d::Detector) -> Int
+
+The number of hits stored in the detector `d`, `0` before the first solve and after
+`empty!(d)`.
+"""
+length(d::Detector) = isnothing(hits(d)) ? 0 : length(hits(d))
+
 "Allows continued tracing if set to false"
 stop(d::Detector) = d.stop
 

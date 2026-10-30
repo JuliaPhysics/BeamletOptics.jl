@@ -230,7 +230,7 @@ const BMO = BeamletOptics
         @test isa(BMO.hits(pd)[1], BMO.AstigmaticGaussianBeamletHit)
         
         # Test field calculation
-        xs, zs, E = BMO.electric_field(pd, RegularGrid(n = 20))
+        xs, zs, E = BMO.electric_field(pd, RegularGrid(num_points = 20))
         @test size(E) == (20, 20)
         @test any(!iszero, E)
     end
@@ -254,7 +254,8 @@ end
         det = Detector(0.05)
         BMO.translate3d!(det, [0, s - D, 0])
         solve_system!(System([det]), beam())
-        ψ = BMO.beamlet_hit_field(only(BMO.hits(det)), [0.0, s - D, 0])
+        E_hit = electric_field(only(BMO.hits(det)), [0.0, s - D, 0])
+        ψ = E_hit[argmax(abs.(E_hit))]
         @test wrap(angle(ψ) - k * s - gouy(s)) ≈ 0 atol = 2e-3
     end
 end

@@ -25,6 +25,79 @@ Pages = ["beams.md", "stigmatic_beam.md", "astigmatic_beam.md", "beam_groups.md"
 Depth = 2
 ```
 
+## Beam models
+
+A [`Beam`](@ref) stores a vector of rays, and the beamlets are built from it: a [`GaussianBeamlet`](@ref) traces a chief, a waist and a divergence `Beam` side by side, an [`AstigmaticGaussianBeamlet`](@ref) a chief `Beam` of [`PolarizedRay`](@ref)s and eight auxiliary ones. The diagram shows the beam types, the beams and rays they are made of, and the interface a new beam type implements (green):
+
+```mermaid
+flowchart TB
+    ABS["<b>AbstractBeam</b><br/><i>abstract type</i>"]
+    IF["<b>beam interface</b><br/>trace_system!, push!, and<br/>every beam: _component_beams<br/>ray-storing beam: also rays, empty!"]
+    TREE["<b>parent, children</b><br/><i>beam tree, split by children!</i>"]
+    BM["<b>Beam</b><br/><i>beam type</i>"]
+    GB["<b>GaussianBeamlet</b><br/><i>beam type</i>"]
+    AGB["<b>AstigmaticGaussianBeamlet</b><br/><i>beam type</i>"]
+    RAY["<b>AbstractRay</b><br/><i>Ray, PolarizedRay</i>"]
+
+    ABS -- "subtype implements" --> IF
+    ABS -- fields --> TREE
+    ABS -.-> BM
+    ABS -.-> GB
+    ABS -.-> AGB
+    GB -- "chief, waist, divergence" --> BM
+    AGB -- "chief c and 8 auxiliary<br/>(waist, divergence in x, y)" --> BM
+    BM -- rays --> RAY
+
+    classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
+    classDef green fill:#38982626,stroke:#389826,stroke-width:2px
+    classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
+    class ABS,BM,GB,AGB blue
+    class IF green
+    class TREE,RAY purple
+```
+
+### Interactions of beamlets
+
+Components define [`BeamletOptics.interact3d`](@ref) for a `Beam` and one of its rays; a beamlet hands this call on to each of its component beams, unless the component defines a method for the beamlet itself. The diagram shows the tracing loop of a `GaussianBeamlet` and where the methods of a component author (green) are called; an `AstigmaticGaussianBeamlet` runs the same loop with its nine beams and also stops when its optical invariant check fails:
+
+```mermaid
+flowchart TB
+    S(["<b>trace_system!</b><br/>system, gauss"])
+    T["<b>tracing_step!</b><br/>last ray of chief,<br/>then waist and divergence"]
+    C{"all rays hit<br/>the same shape?"}
+    I{"<b>interact3d</b><br/>(system, object, gauss, id)<br/><i>dispatch on object</i>"}
+    OWN["<b>method for the beamlet</b><br/>e.g. ThinBeamsplitter: children!<br/>Detector: push! hit"]
+    GEN["<b>generic beamlet method</b><br/>one call per component beam"]
+    CB["<b>interact3d</b><br/>(system, object, beam, ray)<br/><i>method for a Beam</i>"]
+    GBI["<b>GaussianBeamletInteraction</b><br/>chief, waist, divergence"]
+    P["<b>push!(gauss, interaction)</b><br/>push! to each component Beam"]
+    E([stop])
+
+    S --> T
+    T -- "a ray hits nothing" --> E
+    T -- hit --> C
+    C -- no --> E
+    C -- yes --> I
+    I -- "method for<br/>the object" --> OWN
+    I -- otherwise --> GEN
+    GEN --> CB
+    CB -- "3 BeamInteractions" --> GBI
+    CB -- "any nothing" --> E
+    OWN -- interaction --> GBI
+    OWN -- nothing --> E
+    GBI --> P
+    P -- "next segment<br/>(fewer than r_max rays)" --> T
+
+    classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
+    classDef green fill:#38982626,stroke:#389826,stroke-width:2px
+    classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
+    classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
+    class T,C,P blue
+    class I,GEN,GBI purple
+    class OWN,CB green
+    class S,E terminal
+```
+
 ## Moving beams
 
 Rays, beams and beam groups can be moved with the same kinematic API as optical elements, see [Moving sources](@ref) in the [Kinematics](@ref) section.
