@@ -37,7 +37,7 @@ dir = [0.0, 1.0, 0.0] # Propagation along Y
 # We explicitly define the basis to ensure Grid X = World X
 e1 = [1.0, 0.0, 0.0]
 e2 = [0.0, 0.0, 1.0]
-beams = WavefrontBeamletDecomposition(x, z, amplitude, phase, dir, λ;
+beams = WavefrontBeamletDecomposition(x, z, amplitude, phase, [0.0, 0.0, 0.0], dir, λ;
     threshold = 1e-3, overlap = overlap, basis = (e1, e2))
 
 @info "Number of beamlets generated: $(length(beams))"
