@@ -61,3 +61,9 @@ Once a `GaussianBeamlet` has been traced through an optical system, several para
 The user can obtain parameters such as the beam waist radius, the radius of curvature and more using the [`gauss_parameters`](@ref) and/or [`waist_parameters`](@ref) functions. Below the local waist radius and curvature ``R = r^{-1}`` have been calculated for the example above.
 
 ![Gauss beam parameters](gauss_parameters.png)
+
+The Gouy phase `ψ` collected along the beam is continuous at a surface, whereas the Gouy phase relative to the local waist of a segment jumps there, e.g. at a lens. The field of a segment therefore adds an offset to the local phase. The offset is zero on the first segment of a root beam and collects the steps of the local phase at every surface on the way. A child beam continues the last segment of its parent.
+
+The height and slope of the waist and divergence rays on a plane give the beam parameters of a segment. The height is the distance between the chief ray and the crossing point of the ray, and the slope is the cotangent of the angle between this offset and the ray direction, which makes it signed. If a height is zero, the radius of curvature is infinite, the Gouy phase is zero and the beam invariant ``H`` falls back to ``\lambda/\pi``. If the waist radius cannot be computed, it is set to the local beam radius.
+
+The field amplitude follows from ``E_0 w_0 = \mathrm{const}``. The reference amplitude is normalized to the power, so the physical field in a medium is smaller by ``\sqrt{n}``. The optical path up to a point includes the curvature term, which is a geometric length like ``z`` and enters with the wavenumber ``n k_0`` of the medium as well.

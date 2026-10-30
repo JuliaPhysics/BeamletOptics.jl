@@ -37,14 +37,14 @@ finds that part, e.g. via `shape(intersection(ray))`, and hands the beam to it, 
 interacts on its own.
 """
 function interact3d(::AbstractSystem, object::AbstractObject, ::AbstractBeam, ray::AbstractRay)
-    _warn_no_interact3d(shape_trait_of(object), object, ray)
+    warn_no_interact3d(shape_trait_of(object), object, ray)
     return nothing
 end
 
-# Warning of the fallback above; for a multi-shape object it names both ways to fix it
-_warn_no_interact3d(::AbstractShapeTrait, object, ray) =
+# Warning of the interact3d fallback
+warn_no_interact3d(::AbstractShapeTrait, object, ray) =
     @warn lazy"No interact3d method defined for:" ObjectType = typeof(object) RayType = typeof(ray)
-_warn_no_interact3d(::MultiShape, object, ray) = @warn lazy"""
+warn_no_interact3d(::MultiShape, object, ray) = @warn lazy"""
     No interact3d method defined for the MultiShape object $(nameof(typeof(object))).
     If its parts interact as one (e.g. cemented, with a Hint across a shared face), define
     interact3d and hand the beam to the part that was hit, like CubeBeamsplitter.

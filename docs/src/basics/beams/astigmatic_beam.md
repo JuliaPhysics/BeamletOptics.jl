@@ -85,6 +85,12 @@ beams = WavefrontBeamletDecomposition(x, z, amplitude, phase, dir, λ)
 solve_system!(system, beams)
 ```
 
+The Gouy phase follows the argument of the complex beam area ``(\mathbf{h}_1 \times \mathbf{h}_2) \cdot \mathbf{d}`` along the chief ray, starting at the root beam, and a child continues the last segment of its parent. The area is a pseudoscalar: a reflection mirrors the transverse frame against the chief ray and flips its sign, which is no change of the beam. The jump of the argument at an interface is therefore taken modulo ``\pi``, on ``(-\pi/2, \pi/2]``, and the Gouy phase does not change at a mirror. Physical jumps at refraction are small. The argument is followed continuously, because the principal branch would jump by ``\pi`` behind a focus.
+
+The amplitude changes with the beam area only within a segment. At a surface it follows from the polarization of the chief ray instead: the Fresnel coefficients relate the fields on both sides, and they include that the cross section of the beam changes with the angle of refraction.
+
+All nine rays start in the plane of the chief ray start, so that none of them starts behind an object the beamlet should hit, e.g. when a waist lies downstream of the start, as for a converging beam. The waist rays are parallel to the axis at the waist radius, so they are the same lines wherever they start. The phase includes the optical path correction in media for coherence. The transverse term is a geometric length like ``z``, so in a medium it enters with the wavenumber ``n k_0`` as well.
+
 ## [The Curvature Matrix $\mathbf{Q}$](@id The-Curvature-Matrix-Q)
 
 The relationship between the auxiliary rays and the complex curvature of the beam is defined by the matrix equation $\mathbf{Q} = \mathbf{U}\mathbf{H}^{-1}$. By arranging the transverse components of the complex rays into $2 \times 2$ matrices $\mathbf{H} = [\mathbf{h}_1, \mathbf{h}_2]$ and $\mathbf{U} = [\mathbf{u}_1, \mathbf{u}_2]$, we can solve for the individual components of $\mathbf{Q}$:

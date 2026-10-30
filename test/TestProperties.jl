@@ -85,6 +85,8 @@ prop(props, name) = (i = findfirst(p -> p.first == name, props); isnothing(i) ? 
         @test prop(BMO.properties(mirror), "Thickness [m]") ≈ 5e-3
         @test prop(BMO.properties(SphericalMirror(100e-3, 25e-3, 5e-3)), "Shape") == "UnionSDF"
         @test prop(BMO.properties(ParabolicMirror(25e-3, 50e-3)), "Conic constant") == -1
+        pierced = ConicMirror(200e-3, -0.5, 25e-3; thickness = 4e-3, hole_diameter = 5e-3)
+        @test prop(BMO.properties(pierced), "Thickness [m]") == 4e-3
 
         bs = ThinBeamsplitter(10e-3, 20e-3; reflectance = 0.3)
         @test prop(BMO.properties(bs), "Reflectance") ≈ 0.3
