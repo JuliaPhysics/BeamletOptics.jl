@@ -183,9 +183,34 @@ end
 _container_trait(::Static) = Static()
 _container_trait(::Movable) = Movable(Oriented())
 
+"""
+    _move_rigidly!(frames, parts, offset)
+    _move_rigidly!(frames, parts, R::AbstractMatrix, pivot::AbstractVector)
+
+Moves a container by `offset`, or rotates it by `R` about `pivot`: first the pose of every frame,
+then every part with the public [`translate3d!`](@ref) or [`rotate3d!`](@ref). The caller passes
+each part once.
+"""
+function _move_rigidly!(frames::Union{Tuple, AbstractVector}, parts::Union{Tuple, AbstractVector}, offset)
+    foreach(frame -> position!(frame, position(frame) .+ offset), frames)
+    foreach(part -> translate3d!(part, offset), parts)
+    return nothing
+end
+
+function _move_rigidly!(frames::Union{Tuple, AbstractVector}, parts::Union{Tuple, AbstractVector},
+                        R::AbstractMatrix, pivot::AbstractVector)
+    for frame in frames
+        p = position(frame)
+        orientation!(frame, R * orientation(frame))
+        position!(frame, pivot + R * (p - pivot))
+    end
+    foreach(part -> rotate3d!(part, R, pivot), parts)
+    return nothing
+end
+
 static_error(x) = throw(ArgumentError(lazy"$(typeof(x)) is static and cannot be moved, see `kinematic_trait_of`"))
 
-# entry point functions below
+# Entry points
 
 """
     translate3d!(x, offset)
@@ -252,14 +277,16 @@ align3d!(x, target) = align3d!(kinematic_trait_of(x), x, target)
 """
     reset_translation3d!(x)
 
-Moves `x` such that its `position` is the global origin. See [`BeamletOptics.Movable`](@ref).
+Moves `x` such that its `position` is the global origin. The result is exact, because `p + (-p)`
+is zero in IEEE arithmetic. See [`BeamletOptics.Movable`](@ref).
 """
 reset_translation3d!(x) = reset_translation3d!(kinematic_trait_of(x), x)
 
 """
     reset_rotation3d!(x)
 
-Rotates `x` about its `position` such that its [`orientation`](@ref) is the identity. Only
+Rotates `x` about its `position` such that its [`orientation`](@ref) is the identity. The
+inverse of the orientation is its transpose, which is exact for all angles, including π. Only
 available for [`BeamletOptics.Oriented`](@ref) values, see [`BeamletOptics.Movable`](@ref).
 """
 reset_rotation3d!(x) = reset_rotation3d!(kinematic_trait_of(x), x)
@@ -290,13 +317,9 @@ direction(::Static, x) = static_error(x)
 
 # Movable branch: primitive fallbacks, must be implemented per type
 
-function translate3d!(::Movable, x, offset)
-    throw(ErrorException(lazy"translate3d!(::Movable, x, offset) not implemented for $(typeof(x))"))
-end
+translate3d!(::Movable, x, offset) = error(lazy"translate3d!(::Movable, x, offset) not defined for $(typeof(x))")
 
-function rotate3d!(::Movable, x, R::AbstractMatrix)
-    throw(ErrorException(lazy"rotate3d!(::Movable, x, R::AbstractMatrix) not implemented for $(typeof(x))"))
-end
+rotate3d!(::Movable, x, R::AbstractMatrix) = error(lazy"rotate3d!(::Movable, x, R::AbstractMatrix) not defined for $(typeof(x))")
 
 # Movable branch: generic derived verbs, inner calls use the public entry points
 
@@ -334,15 +357,15 @@ function align3d!(::Movable, x, target)
 end
 
 function reset_translation3d!(::Movable, x)
-    # p + (-p) is exactly zero in IEEE arithmetic
+    # Translate by the negative position
     translate3d!(x, -position(x))
     return nothing
 end
 
 function reset_rotation3d!(::Movable{Oriented}, x)
-    # The inverse of the orthonormal orientation is its transpose (robust for all angles incl. π)
+    # Rotate by the inverse orientation
     rotate3d!(x, transpose(orientation(x)))
-    # Reset orientation (removes precision artifacts)
+    # Remove precision artifacts
     orientation!(x, one(orientation(x)))
     return nothing
 end

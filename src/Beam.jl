@@ -41,23 +41,7 @@ function Base.empty!(b::Beam)
     return b
 end
 
-first_ray(b::Beam) = first(rays(b))
-
-_chief_beam(b::Beam) = b
-
-function translate3d!(::Movable, b::Beam, offset)
-    isroot(b) || throw(ArgumentError("cannot move a child beam; move its root beam instead"))
-    empty!(b)
-    translate3d!(first_ray(b), offset)
-    return nothing
-end
-
-function rotate3d!(::Movable, b::Beam, R::AbstractMatrix)
-    isroot(b) || throw(ArgumentError("cannot move a child beam; move its root beam instead"))
-    empty!(b)
-    rotate3d!(first_ray(b), R)
-    return nothing
-end
+_component_beams(b::Beam) = (b,)
 
 function Beam(ray::R) where {T, R <: AbstractRay{T}}
     Beam{T, R}([ray], nothing, Vector{Beam{T, R}}())
@@ -104,96 +88,6 @@ end
 Base.push!(b::Beam, interaction::BeamInteraction) = push!(b, interaction.ray)
 
 """
-    Base.length(beam::Beam)
-
-Calculate the length of a beam up to the point of the last intersection.
-
-!!! tip
-    Use [`optical_path_length`](@ref) to get the optical path length instead.
-"""
-function Base.length(beam::Beam{T}) where {T}
-    # Recursively get length of beam parents
-    l0 = length_parent(beam)
-    l = length_rays(beam)
-    return l + l0
-end
-
-"""
-    optical_path_length(beam::Beam)
-
-Calculate the optical path length of the `beam`, i.e. ``\\mathrm{OPL} = n \\cdot l``.
-"""
-function optical_path_length(beam::Beam{T}) where {T}
-    p = AbstractTrees.parent(beam)
-    l0 = isnothing(p) ? zero(T) : optical_path_length(p)
-    for ray in rays(beam)
-        if isnothing(intersection(ray))
-            break
-        end
-
-        l0 += optical_path_length(ray)
-    end
-
-    return l0
-end
-
-function length_parent(beam::Beam{T}) where {T}
-    p = AbstractTrees.parent(beam)
-    if isnothing(p)
-        return zero(T)
-    else
-        return length(p)::T
-    end
-end
-
-function length_rays(beam::Beam{T}) where {T}
-    l = zero(T)
-    for ray in rays(beam)
-        if isnothing(intersection(ray))
-            break
-        end
-        l += length(ray)::T
-    end
-    return l
-end
-
-"""
-    point_on_beam(beam::Beam, t::Real)
-
-Function to find a point given a specific distance `t` along the beam. Return the ray `index` aswell.
-For negative distances, assume first ray backwards.
-"""
-function point_on_beam(beam::B, t::Real)::Tuple{Point3{T}, Int} where {T, R <: AbstractRay{T}, B <: Beam{T, R}}
-    # Initialize counter to track cumulative length
-    p = AbstractTrees.parent(beam)
-    if isnothing(p)
-        temp = zero(T)
-    else
-        temp = length(p)
-    end
-    numEl = length(rays(beam))
-    for (index, ray) in enumerate(rays(beam))
-        # Catch final ray
-        if index == numEl
-            break
-        end
-        temp += length(ray)
-        # If the specified distance `t` is less than the cumulative length,
-        # calculate the local ray length `b` and find the point along the ray
-        if t < temp
-            b = temp - t
-            point = position(ray) + (length(ray) - b) * direction(ray)
-            return point, index
-        end
-    end
-    # If no solution at this point assume final ray with infinite length
-    ray = last(rays(beam))
-    b = t - temp
-    point = position(ray) + b * direction(ray)
-    return point, numEl
-end
-
-"""
     isparaxial(system, beam, threshold=π/4)
 
 Tests the angle between the `beam` direction and surface normal at each intersection.
@@ -220,20 +114,6 @@ function isparaxial(::AbstractSystem, beam::Beam, threshold::Real = π / 4)
         end
     end
     return true
-end
-
-"""
-    isparentbeam(beam, ray)
-
-Tests if the given `beam` contains the `ray` as a part of its solution.
-"""
-function isparentbeam(beam::Beam, _ray::AbstractRay)
-    for ray in rays(beam)
-        if ray === _ray
-            return true
-        end
-    end
-    return false
 end
 
 function Base.show(io::IO, ::MIME"text/plain", beam::Beam)

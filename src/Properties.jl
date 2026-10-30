@@ -142,7 +142,7 @@ end
 _index_model(::Function) = "function of λ"
 _index_model(n) = _type_name(n)
 
-properties(x::AbstractRefractiveOptic) = [default_properties(x); _index_properties(x.n)]
+properties(x::AbstractRefractiveOptic) = [default_properties(x); _index_properties(refractive_index(x))]
 
 properties(x::Union{DoubletLens, TripletLens}) =
     [default_properties(x); "Thickness [m]" => thickness(x)]
@@ -156,15 +156,15 @@ _splitting_ratio(coating::ThinBeamsplitter) = Pair{String, Any}[
 
 properties(bs::ThinBeamsplitter) = [default_properties(bs); _flat_size(shape(bs)); _splitting_ratio(bs)]
 properties(bs::AbstractPlateBeamsplitter) = [default_properties(bs); _splitting_ratio(coating(bs));
-    "Thickness [m]" => thickness(substrate(bs)); _index_properties(substrate(bs).n)]
+    "Thickness [m]" => thickness(substrate(bs)); _index_properties(refractive_index(substrate(bs)))]
 properties(bs::CubeBeamsplitter) =
-    [default_properties(bs); _splitting_ratio(bs.coating); _index_properties(bs.front.n)]
+    [default_properties(bs); _splitting_ratio(bs.coating); _index_properties(refractive_index(bs.front))]
 
 properties(pf::PolarizationFilter) = [default_properties(pf); _flat_size(shape(pf));
     "Transmission axis" => _vector(transmission_axis(pf))]
 properties(lp::LinearPolarizer) = [default_properties(lp);
     "Transmission axis" => _vector(transmission_axis(lp)); "Thickness [m]" => thickness(lp);
-    _index_properties(lp.front.n)]
+    _index_properties(refractive_index(lp.front))]
 
 properties(d::Detector) = [default_properties(d); _flat_size(shape(d)); "Hits" => length(d);
     "Stops beams" => stop(d)]
@@ -173,7 +173,7 @@ properties(d::Detector) = [default_properties(d); _flat_size(shape(d)); "Hits" =
 Beams and sources
 =#
 
-properties(b::Beam) = [default_properties(b); "Wavelength [m]" => wavelength(first(rays(b)))]
+properties(b::Beam) = [default_properties(b); "Wavelength [m]" => wavelength(b)]
 properties(b::GaussianBeamlet) = [default_properties(b); "Wavelength [m]" => wavelength(b);
     "Waist radius [m]" => beam_waist(b); "Rayleigh range [m]" => rayleigh_range(b)]
 properties(b::AstigmaticGaussianBeamlet) = [default_properties(b); "Wavelength [m]" => wavelength(b)]

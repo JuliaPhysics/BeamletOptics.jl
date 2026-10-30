@@ -127,7 +127,10 @@ function intersection!(ray::AbstractRay, _intersection::Nullable{Intersection})
      return nothing
 end
 
-Base.empty!(ray::AbstractRay) = intersection!(ray, nothing)
+function Base.empty!(ray::AbstractRay)
+    intersection!(ray, nothing)
+    return ray
+end
 
 """
     hit_point(ray::AbstractRay)
@@ -193,7 +196,7 @@ intersect3d(object::AbstractObject, ray::AbstractRay) = intersect3d(shape_trait_
 
 function intersect3d(::SingleShape, object::AbstractObject, ray::AbstractRay)
     s = shape(object)
-    # the sphere that the table of a running solve holds for the shape, none outside of a solve
+    # Test bounding sphere first
     intersection = intersect3d(bounding_sphere_of(current_bounding_spheres(), s), s, ray)
     # Ensure that the intersection knows about the object if intersected
     if !isnothing(intersection)
@@ -203,7 +206,7 @@ function intersect3d(::SingleShape, object::AbstractObject, ray::AbstractRay)
 end
 
 function intersect3d(::MultiShape, object::AbstractObject, ray::AbstractRay)
-    # No part is tested if the ray misses the sphere around all of them
+    # Test bounding sphere first
     intersection = intersect3d(bounding_sphere_of(current_bounding_spheres(), object), shape(object), ray)
     # Ensure that the intersection knows about the correct object if intersected
     if !isnothing(intersection)
@@ -234,7 +237,7 @@ none of them. The `parts` are a tuple, a vector, the `Leaves` of shapes or objec
 a group. Each part is tested via its own `intersect3d` method, hence parts that consist of parts,
 e.g. the groups of a system, are tested as a whole. No parts give `nothing`.
 """
-function intersect3d(parts::Union{Tuple, AbstractVector, Leaves, _LeafObjects}, ray::AbstractRay{R}) where {R}
+function intersect3d(parts::Union{Tuple, AbstractVector, Leaves, LeafObjects}, ray::AbstractRay{R}) where {R}
     result::Nullable{Intersection{R}} = nothing
     for part in parts
         temp::Nullable{Intersection{R}} = intersect3d(part, ray)

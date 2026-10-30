@@ -32,7 +32,7 @@ BeamletOptics.kinematic_trait_of
 
 ## Static and movable entities
 
-Whether an entity can be moved at all is defined by its trait. There is no fallback for [`BeamletOptics.kinematic_trait_of`](@ref): types that do not opt in throw an `ErrorException` when their trait is queried. A [`System`](@ref) is [`BeamletOptics.Static`](@ref). The abstract types [`BeamletOptics.AbstractObject`](@ref), [`BeamletOptics.AbstractRay`](@ref), [`BeamletOptics.AbstractBeam`](@ref) and [`BeamletOptics.AbstractBeamGroup`](@ref) declare themselves [`BeamletOptics.Movable`](@ref), so a new subtype of them only has to implement the kinematic primitives listed below.
+Whether an entity can be moved at all is defined by its trait. There is no fallback for [`BeamletOptics.kinematic_trait_of`](@ref): types that do not opt in throw an `ErrorException` when their trait is queried. A [`System`](@ref) is [`BeamletOptics.Static`](@ref). The abstract types [`BeamletOptics.AbstractObject`](@ref), [`BeamletOptics.AbstractRay`](@ref), [`BeamletOptics.AbstractBeam`](@ref) and [`BeamletOptics.AbstractBeamGroup`](@ref) declare themselves [`BeamletOptics.Movable`](@ref), so a new subtype of them only has to implement what the list below gives for its abstract type.
 
 ```@docs; canonical=false
 BeamletOptics.Static
@@ -55,7 +55,7 @@ The primitives `translate3d!(::Movable, x, offset)` and `rotate3d!(::Movable, x,
 
 - [`BeamletOptics.AbstractObject`](@ref): the primitives forward to the [`BeamletOptics.AbstractShapeTrait`](@ref) of the object, see [`BeamletOptics.SingleShape`](@ref) and [`BeamletOptics.MultiShape`](@ref)
 - [`BeamletOptics.AbstractRay`](@ref): only subtypes carrying direction-dependent data (e.g. the field vector of a [`PolarizedRay`](@ref)) need their own `rotate3d!`
-- [`BeamletOptics.AbstractBeam`](@ref): either implement `_component_beams` or the two primitives; every move resets the beam via `empty!`
+- [`BeamletOptics.AbstractBeam`](@ref): a subtype needs no move methods, only `_component_beams` (a ray-storing beam returns itself and also implements `rays` and `empty!`); every move resets the beam via `empty!`, and moving a child beam throws an `ArgumentError`
 - [`BeamletOptics.AbstractObjectGroup`](@ref): moves all members of `objects(group)` rigidly about the group `center`, see below
 - [`BeamletOptics.AbstractBeamGroup`](@ref): moves its `beams` rigidly about the group `center`
 

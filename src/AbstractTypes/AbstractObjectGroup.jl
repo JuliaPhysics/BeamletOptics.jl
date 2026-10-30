@@ -17,7 +17,7 @@ as one, e.g. a cemented doublet, is an [`AbstractObject`](@ref) with the [`Multi
 
 Subtypes of `AbstractObjectGroup` must implement the following:
 
-## Fields:
+## Fields
 
 - `objects`: a tuple or a vector of [`AbstractObject`](@ref)s or additional subgroups, allows for hierarchical structures.
   Only [`ObjectGroup`](@ref) can be changed after its construction, via `push!` and `delete!`.
@@ -26,13 +26,17 @@ Subtypes of `AbstractObjectGroup` must implement the following:
 
 Since the kinematic API modifies `center` and `dir`, the subtype must be a `mutable struct`.
 
-## Functions:
+## Getters/setters
 
 If the fields above do not exist, the following getters/setters must be dispatched:
 
 - [`objects`](@ref): getter for the `objects` field or equivalent return type
 - `position` / `position!`: gets or sets the reference origin (pivot)
 - [`orientation`](@ref) / `orientation!`: gets or sets the orientation matrix
+
+## Functions
+
+None required: no `interact3d` method; the kinematic primitives below are generic.
 
 ## Kinematic
 
@@ -71,13 +75,13 @@ Iterates the objects at all depths of `tree`, an object, an object group or a co
 `Leaves(tree)` without the nodes that have no children but are no objects, i.e. empty groups and an
 empty collection.
 """
-_leaf_objects(tree) = Iterators.filter(_is_object, Leaves(tree))
+_leaf_objects(tree::Union{ObjectOrGroup, Tuple, AbstractArray}) = Iterators.filter(_is_object, Leaves(tree))
 
 _is_object(::AbstractObject) = true
 _is_object(::Any) = false
 
 # The type of `_leaf_objects(tree)`, e.g. of the objects of a `System`, see `intersect3d(parts, ray)`
-const _LeafObjects = Iterators.Filter{typeof(_is_object), <:Leaves}
+const LeafObjects = Iterators.Filter{typeof(_is_object), <:Leaves}
 
 kinematic_trait_of(group::AbstractObjectGroup) = _container_trait(objects(group))
 
@@ -116,13 +120,13 @@ function set_pivot3d!(group::AbstractObjectGroup, pivot)
 end
 
 """
-    _unwind(group) -> (subgroups, leaves)
+    unwind(group) -> (subgroups, leaves)
 
 Unwinds the tree of `group` for one rigid motion, each node once, compared by identity (`===`):
 the `subgroups`, including `group`, move their `center` and `dir`; the `leaves` are its objects,
 which are moved with their public verbs, see `_movable_parts`.
 """
-function _unwind(group::AbstractObjectGroup)
+function unwind(group::AbstractObjectGroup)
     subgroups = unique(objectid, Iterators.filter(!_is_object, PreOrderDFS(group)))
     leaves = _movable_parts(collect(_leaf_objects(group)))
     return subgroups, leaves
@@ -136,9 +140,8 @@ once, also if the `group` holds it along several paths, see the containers in
 [`BeamletOptics.AbstractKinematicTrait`](@ref).
 """
 function translate3d!(::Movable, group::AbstractObjectGroup, offset)
-    subgroups, leaves = _unwind(group)
-    foreach(subgroup -> position!(subgroup, position(subgroup) .+ offset), subgroups)
-    foreach(object -> translate3d!(object, offset), leaves)
+    subgroups, leaves = unwind(group)
+    _move_rigidly!(subgroups, leaves, offset)
     return nothing
 end
 
@@ -151,13 +154,7 @@ Rotates all objects of the `group` by `R` about the group `center` and updates t
 """
 function rotate3d!(::Movable, group::AbstractObjectGroup, R::AbstractMatrix)
     pivot = position(group)
-    subgroups, leaves = _unwind(group)
-    for subgroup in subgroups
-        # Rotate center about pivot
-        p = position(subgroup)
-        orientation!(subgroup, R * orientation(subgroup))
-        position!(subgroup, pivot + R * (p - pivot))
-    end
-    foreach(object -> rotate3d!(object, R, pivot), leaves)
+    subgroups, leaves = unwind(group)
+    _move_rigidly!(subgroups, leaves, R, pivot)
     return nothing
 end
