@@ -676,20 +676,11 @@ function parabasal_field(
     w = (ξ1 * _pseudo_dot(u2, r) - ξ2 * _pseudo_dot(u1, r)) / (2 * area)
 
     # Phase correction for refractive index (OPL - geometric length)
-    p_parent = agb.parent
-    l_parent = isnothing(p_parent) ? 0.0 : length(p_parent)
-    opl_parent = isnothing(p_parent) ? 0.0 : optical_path_length(p_parent)
-
-    Δl = opl_parent - l_parent
-    z_sum = l_parent
-    for j in 1:(i - 1)
-        ray_j = rays(agb.c)[j]
-        Δl += optical_path_length(ray_j) - length(ray_j)
-        z_sum += length(ray_j)
-    end
+    z_sum = length_before(agb, i)
+    Δl = path_excess_before(agb, i)
     Δl += (refractive_index(chief) - 1) * (z - z_sum)
 
-    k0 = 2π / wavelength(chief)
+    k0 = wavenumber(chief)
 
     # Gouy phase from continuous area arg, amplitude from area change within segments
     Δarg = area_arg(agb, i, local_distance(agb, p0, i))

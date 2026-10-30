@@ -115,11 +115,11 @@ The following diagram shows how a readout turns a sampling into points and evalu
 
 ```mermaid
 flowchart TB
-    R(["<b>electric_field</b> / <b>intensity</b> / <b>optical_power</b><br/>(pd, s = RegularGrid())"]) --> SP["<b>sample_points</b>(pd, s)"]
+    R(["<b>electric_field</b> / <b>intensity</b> / <b>optical_power</b><br/>(pd, sampling = RegularGrid())"]) --> SP["<b>sample_points</b>(pd, sampling)"]
     SP -- RegularGrid --> RG["<b>RegularGrid</b><br/>window around the hits<br/>via calc_local_lims"]
     SP -- RectilinearGrid --> RL["<b>RectilinearGrid</b><br/>points xs × zs,<br/>trapezoidal weights"]
     SP -- "own AbstractDetectorSampling" --> OWN["own <b>sample_points</b> method"]
-    RG -- "own hit type, unless an<br/>AbstractRayHit or AbstractBeamletHit" --> LIM["own <b>calc_local_lims</b>(pd, hits) method"]
+    RG -- "own hit type, unless an<br/>AbstractRayHit or AbstractBeamletHit" --> LIM["own <b>calc_local_lims</b>(pd, hits, crop_factor) methods"]
     RG -- "RectilinearGrid(xs, zs)" --> RL
     RL --> DS["<b>DetectorSamples</b><br/>coordinates, points, weights"]
     OWN --> DS

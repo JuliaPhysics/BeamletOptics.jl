@@ -80,8 +80,7 @@ const BMO = BeamletOptics
         nρ, nθ = 600, 720
         Random.seed!(2)
         for (R, k, x_off) in segments
-            t = BMO._conic_auto_thickness(R, k, x_off, D, Float64)
-            s = BMO.ConicSDF(R, k, x_off, D, t)
+            s = BMO.shape(OffAxisConicMirror(R, k, x_off, D))
             Z_off = BMO._conic_sag(x_off, R, k)
             r_max = D / 2
 

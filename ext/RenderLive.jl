@@ -43,14 +43,7 @@ render_plots(h::ObjectRenderHandle) = h.plots
 _pose(x) = _pose(BMO.kinematic_trait_of(x), x)
 _pose(::Any, x) = (Point3{Float64}(position(x)), Matrix{Float64}(orientation(x)))
 # Beams only have a direction, which is the local y-axis of the frame
-_pose(::BMO.Movable{BMO.Directed}, x) = (Point3{Float64}(position(x)), _direction_frame(BMO.direction(x)))
-
-"""Returns a right-handed orthonormal frame with the local y-axis along `d`."""
-function _direction_frame(d)
-    y = normalize(Vector{Float64}(d))
-    x = normalize(cross(y, abs(y[3]) < 0.9 ? [0.0, 0, 1] : [1.0, 0, 0]))
-    return hcat(x, y, cross(x, y))
-end
+_pose(::BMO.Movable{BMO.Directed}, x) = (Point3{Float64}(position(x)), Matrix{Float64}(BMO.align3d([0.0, 1, 0], BMO.direction(x))))
 
 """
     _rigid_parts(x)

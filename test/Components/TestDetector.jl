@@ -8,6 +8,9 @@ const BMO = BeamletOptics
 
 const mm = 1e-3
 
+# a hit type that implements none of the readout functions
+struct DummyHit <: BMO.AbstractDetectorHit end
+
 @testset "Detector" begin
 
 @testset "Testing spot diagram" begin
@@ -446,8 +449,8 @@ end
         # the former scalar field of a beamlet hit, from the stored fields of the hit
         function scalar_field(hit::BMO.GaussianBeamletHit, p)
             v = p - hit.p0
-            l1 = BMO._pseudo_dot(v, hit.d0)
-            r = norm(v - l1 * hit.d0)
+            l1 = BMO._pseudo_dot(v, hit.dir)
+            r = norm(v - l1 * hit.dir)
             w, curv, ψ, _ = BMO.gauss_parameters(hit.segment, l1)
             ψ += hit.ψ0
             k0 = BMO.wavenumber(hit.segment.λ)
@@ -456,9 +459,8 @@ end
             return hit.E_amp / (sqrt(n) * w) * exp(-r^2 / w^2) *
                    cis(k0 * opl + ψ + n * k0 * r^2 * curv / 2)
         end
-        # an astigmatic hit: the scalar field along the unit reference polarization
-        scalar_field(hit::BMO.AstigmaticGaussianBeamletHit, p) =
-            hit.E_ref_amp * BMO._astigmatic_phasor(hit, p) .* (hit.E_pol / hit.E_ref_amp)
+        # an astigmatic hit: the phasor along the polarization of the chief ray
+        scalar_field(hit::BMO.AstigmaticGaussianBeamletHit, p) = BMO.astigmatic_phasor(hit, p) .* hit.E0
         relative_error(E, E_ref) = norm(E - E_ref) / norm(E_ref)
 
         λ, w0, L = 1e-6, 0.5mm, 300mm
@@ -585,6 +587,36 @@ end
         @test electric_field(pd, RectilinearGrid(xs, zs); progress = false)[3] == E
         xs, zs, I = intensity(pd, RegularGrid(num_points = 20); progress = false)
         @test intensity(pd, RectilinearGrid(xs, zs); progress = false)[3] == I
+    end
+end
+
+@testset "A new hit type without readout methods" begin
+    p, n̂ = BMO.Point3(0.0, 0.1, 0.0), BMO.Point3(0.0, 1.0, 0.0)
+    @test_throws "electric_field not defined for" electric_field(DummyHit(), p)
+    @test_throws "intensity not defined for" intensity([DummyHit()], p, n̂)
+    @test_throws ErrorException electric_field(DummyHit(), p)
+    @test_throws ErrorException intensity([DummyHit()], p, n̂)
+end
+
+@testset "Path lengths of a child beamlet equal those of its chief beam" begin
+    λ, w0 = 1e-6, 0.5mm
+    for (beam, chief) in (
+            (GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], λ, w0), b -> b.chief),
+            (AstigmaticGaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], λ, w0), b -> b.c))
+        # lens in front of and behind the splitter
+        lens = ThinLens(200mm, 200mm, 5mm, 1.5)
+        translate3d!(lens, [0, 30mm, 0])
+        bs = ThinBeamsplitter(25mm)
+        zrotate3d!(bs, π / 4)
+        translate3d!(bs, [0, 80mm, 0])
+        lens2 = ThinLens(200mm, 200mm, 5mm, 1.5)
+        translate3d!(lens2, [0, 130mm, 0])
+        solve_system!(System([lens, bs, lens2]), beam)
+        @test length(BMO.children(beam)) == 2
+        for b in BMO.children(beam), id in eachindex(BMO.rays(b))
+            @test BMO.path_excess_before(b, id) == BMO.path_excess_before(chief(b), id)
+            @test BMO.length_before(b, id) == BMO.length_before(chief(b), id)
+        end
     end
 end
 

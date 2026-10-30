@@ -213,8 +213,7 @@ the edges of coincident flat faces are skipped. The orientation of the faces of 
 function _feature_edges(m::_TriMesh; angle = _EDGE_ANGLE)
     pts = Point3f[]
     isempty(m.faces) && return pts
-    lo, hi = _bbox(m)
-    tol = 1e-9 * max(maximum(hi - lo), floatmin(Float64))
+    tol = 1e-9 * max(_max_width(BMO.bounding_box(m)), floatmin(Float64))
     ids = _weld(m.points, tol)
     normals = Vector{Vec3d}(undef, length(m.faces))
     cmin = cos(angle)

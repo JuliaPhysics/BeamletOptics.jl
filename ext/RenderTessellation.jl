@@ -65,9 +65,10 @@ function _tessellate end
 
 Returns the `GeometryBasics.Mesh` of the shape `s` in world coordinates, with per-vertex normals.
 """
-_mesh(s) = _to_geometry(_tessellate(s))
+_mesh(s) = Mesh(_tessellate(s))
 
-function _to_geometry(m::_TriMesh)
+"""Converts the [`_TriMesh`](@ref) `m` into a `GeometryBasics.Mesh` with per-vertex normals."""
+function GeometryBasics.Mesh(m::_TriMesh)
     faces = [GLTriangleFace(f...) for f in m.faces]
     return Mesh(m.points, faces; normal = [Vec3f(n...) for n in m.normals])
 end
@@ -205,8 +206,9 @@ end
 
 _transform!(m::_TriMesh, s::BMO.AbstractSDF) = _transform!(m, BMO.orientation(s), BMO.position(s))
 
-"""Concatenates the `meshes` into a single [`_TriMesh`](@ref)."""
-function _merge(meshes)
+"""Concatenates the meshes into a single [`_TriMesh`](@ref), in argument order."""
+function Base.merge(m::_TriMesh, ms::_TriMesh...)
+    meshes = (m, ms...)
     out = _TriMesh(; two_sided = any(m -> m.two_sided, meshes))
     nv = sum(m -> length(m.points), meshes; init = 0)
     sizehint!(out.points, nv)
@@ -223,16 +225,28 @@ function _merge(meshes)
     return out
 end
 
-"""Returns the lower and upper corner of the axis-aligned bounding box of the `meshes`."""
-function _bbox(meshes...)
+"""
+    bounding_box(m::_TriMesh, ms::_TriMesh...)
+
+Returns the axis-aligned bounding box around the points of all meshes as
+`(xmin, xmax, ymin, ymax, zmin, zmax)`, or six `0.0` if the lower corner is not finite, e.g. for
+meshes without points.
+"""
+function BMO.bounding_box(m::_TriMesh, ms::_TriMesh...)
     lo = Vec3d(Inf)
     hi = Vec3d(-Inf)
-    for m in meshes, p in m.points
+    for mesh in (m, ms...), p in mesh.points
         lo = min.(lo, p)
         hi = max.(hi, p)
     end
-    all(isfinite, lo) || return Vec3d(0), Vec3d(0)
-    return lo, hi
+    all(isfinite, lo) || return (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+    return (lo[1], hi[1], lo[2], hi[2], lo[3], hi[3])
+end
+
+"""Returns the largest edge of the bounding `box`, see [`bounding_box`](@ref)."""
+function _max_width(box::NTuple{6, T}) where {T <: Real}
+    xmin, xmax, ymin, ymax, zmin, zmax = box
+    return max(xmax - xmin, ymax - ymin, zmax - zmin)
 end
 
 """Flips the orientation of `m`, i.e. reverses the faces and negates the normals."""
@@ -449,7 +463,7 @@ function _clip(m::_TriMesh, g, own, τ; on = nothing, interface::Union{Nothing, 
                 # each step reduces the distance by about α²/2, α the angle between n and the surface normal
                 nc = normalize(sum(i -> m.normals[i], tri))
                 for _ in 1:3
-                    d = _sdf(own, ctr)
+                    d = BMO.sdf(own, ctr)
                     abs(d) ≤ τ && break
                     ctr = ctr - d * nc
                 end
@@ -549,9 +563,11 @@ end
 
 """
     _BoundedSDF(s, lo, hi, pad)
+    _BoundedSDF(s, box, pad)
 
 Callable `p -> sdf(s, p)` that skips the SDF evaluation outside of the box `lo`, `hi` padded by
-`pad` and returns the (smaller, positive) distance to that box instead.
+`pad` and returns the (smaller, positive) distance to that box instead. The `box` is given as
+`(xmin, xmax, ymin, ymax, zmin, zmax)`, see [`bounding_box`](@ref).
 """
 struct _BoundedSDF{S}
     s::S
@@ -560,19 +576,16 @@ struct _BoundedSDF{S}
     pad::Float64
 end
 
+function _BoundedSDF(s, box::NTuple{6}, pad)
+    xmin, xmax, ymin, ymax, zmin, zmax = box
+    return _BoundedSDF(s, Vec3d(xmin, ymin, zmin), Vec3d(xmax, ymax, zmax), pad)
+end
+
 function (b::_BoundedSDF)(p)
     d = max.(b.lo .- b.pad .- p, p .- b.hi .- b.pad, 0.0)
     any(>(0), d) && return norm(d) + b.pad
-    return _sdf(b.s, p)
+    return BMO.sdf(b.s, p)
 end
-
-# Type stable evaluation of `sdf(::UnionSDF)`, whose generator over the parts allocates
-_sdf(s, p) = BMO.sdf(s, p)
-_sdf(u::BMO.UnionSDF, p) = _min_sdf(u.sdfs, p)
-
-# unrolled over the heterogeneous tuple of parts
-_min_sdf(t::Tuple, p) = min(_sdf(first(t), p), _min_sdf(Base.tail(t), p))
-_min_sdf(::Tuple{}, p) = Inf
 
 """Callable `p -> minimum(f(p) for f in fs)` for a tuple `fs`, type stable for the composition."""
 struct _MinOf{F <: Tuple}
@@ -603,11 +616,11 @@ part) touch are added to it once, i.e. the copy of the first of both parts.
 """
 function _union(parts; interface::Union{Nothing, _TriMesh} = nothing, cemented = nothing)
     length(parts) == 1 && return first(first(parts))
-    lo, hi = _bbox((m for (m, _) in parts)...)
-    τ = _TAU * maximum(hi - lo)
+    box = BMO.bounding_box((m for (m, _) in parts)...)
+    τ = _TAU * _max_width(box)
     # the padding exceeds the chord error of the curved faces
-    pad = 1e-3 * maximum(hi - lo)
-    bounded = [isnothing(s) ? nothing : _BoundedSDF(s, _bbox(m)..., pad) for (m, s) in parts]
+    pad = 1e-3 * _max_width(box)
+    bounded = [isnothing(s) ? nothing : _BoundedSDF(s, BMO.bounding_box(m), pad) for (m, s) in parts]
     meshes = _TriMesh[]
     for (i, (m, s)) in enumerate(parts)
         others = Tuple(bounded[j] for j in eachindex(parts) if j != i && !isnothing(bounded[j]))
@@ -622,7 +635,7 @@ function _union(parts; interface::Union{Nothing, _TriMesh} = nothing, cemented =
         end
         push!(meshes, _clip(m, _MinOf(others), s, τ; on, interface))
     end
-    return _merge(meshes)
+    return merge(meshes...)
 end
 
 """
@@ -634,8 +647,7 @@ The kept faces of the tools are flipped.
 """
 function _difference(base, tools)
     bm, bs = base
-    lo, hi = _bbox(bm)
-    size = maximum(hi - lo)
+    size = _max_width(BMO.bounding_box(bm))
     τ = _TAU * size
     L = size / 24
     sdfs = Tuple(p -> BMO.sdf(ts, p) for (_, ts) in tools)
@@ -644,22 +656,24 @@ function _difference(base, tools)
         g = _MinOf((_Outside(bs), (sdfs[j] for j in eachindex(sdfs) if j != k)...))
         push!(meshes, _flip!(_clip(_refine(tm, L), g, ts, τ)))
     end
-    return _merge(meshes)
+    return merge(meshes...)
 end
 
-_has_mesh(u::BMO.UnionSDF) = all(_has_mesh, u.sdfs)
+_has_mesh(u::BMO.UnionSDF) = all(_has_mesh, BMO.operands(u))
 
 # the parts of a UnionSDF are in world coordinates
-_tessellate(u::BMO.UnionSDF) = _union([(_tessellate(s), s) for s in u.sdfs])
+_tessellate(u::BMO.UnionSDF) = _union([(_tessellate(s), s) for s in BMO.operands(u)])
 
-_has_mesh(d::BMO.DifferenceSDF) = _has_mesh(d.base) && all(_has_mesh, d.tools)
+_has_mesh(d::BMO.DifferenceSDF) = all(_has_mesh, BMO.operands(d))
 
 # dispatch on the base, since a method for `DifferenceSDF{T, <:ConicSDF}` is not more specific
 # than one for `DifferenceSDF` (the parameters of the latter are constrained by T)
-_tessellate(d::BMO.DifferenceSDF) = _tessellate_difference(d.base, d)
+_tessellate(d::BMO.DifferenceSDF) = _tessellate_difference(first(BMO.operands(d)), d)
 
 function _tessellate_difference(::Any, d::BMO.DifferenceSDF)
-    return _difference((_tessellate(d.base), d.base), [(_tessellate(t), t) for t in d.tools])
+    base = first(BMO.operands(d))
+    tools = Base.tail(BMO.operands(d))
+    return _difference((_tessellate(base), base), [(_tessellate(t), t) for t in tools])
 end
 
 _has_mesh(ml::BMO.MeniscusLensSDF) = _has_mesh(ml.convex) && _has_mesh(ml.concave)
@@ -684,9 +698,8 @@ function _tessellate(ml::BMO.MeniscusLensSDF)
         g_convex(p) = min(BMO.sdf(cylinder, p), BMO.sdf(concave, p))
         g_cylinder(p) = min(BMO.sdf(convex, p), BMO.sdf(concave, p))
         mc, my = _tessellate(convex), _tessellate(cylinder)
-        lo, hi = _bbox(mc, my)
-        τ = _TAU * maximum(hi - lo)
-        m = _merge([_clip(mc, g_convex, convex, τ), _clip(my, g_cylinder, cylinder, τ), cap_mesh])
+        τ = _TAU * _max_width(BMO.bounding_box(mc, my))
+        m = merge(_clip(mc, g_convex, convex, τ), _clip(my, g_cylinder, cylinder, τ), cap_mesh)
     else
         m = _difference((_union([(_tessellate(convex), convex), (_tessellate(cylinder), cylinder)]),
                 convex + cylinder), [(_tessellate(concave), concave)])
@@ -733,7 +746,7 @@ function _plot_mesh!(ax::_RenderEnv, m::_TriMesh; color = nothing, kwargs...)
     if m.two_sided && !haskey(kw, :backlight)
         kw = (; backlight = 1.0f0, kw...)
     end
-    mesh!(ax, _to_geometry(m); kw...)
+    mesh!(ax, Mesh(m); kw...)
     return nothing
 end
 
