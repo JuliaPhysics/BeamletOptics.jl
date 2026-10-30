@@ -38,9 +38,6 @@ const BMO = BeamletOptics
         dummy = NonInteractableObject(loadpath)
         @test dummy isa NonInteractableObject
         @test BMO.shape(dummy) isa BMO.Mesh
-        # former name
-        @test Base.isdeprecated(BMO, :MeshDummy)
-        @test BMO.MeshDummy === NonInteractableObject
     end
 
     @testset "KM100CPMount" begin

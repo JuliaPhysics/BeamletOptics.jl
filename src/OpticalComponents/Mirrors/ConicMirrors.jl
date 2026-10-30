@@ -1,12 +1,12 @@
-function _conic_from_conjugates(s, s′)
+function conic_from_conjugates(s, s′)
     iszero(s + s′) && throw(ArgumentError("s + s′ must be non-zero (s = $s, s′ = $s′)"))
     R = 2 * s * s′ / (s + s′)
     k = -((s′ - s) / (s′ + s))^2
     return R, k
 end
 
-function _conic_y_range(R, k, x_off, diameter)
-    # extrema of y_surf over the aperture disc; Z is monotone in r
+function conic_y_range(R, k, x_off, diameter)
+    # Z is monotone in r
     T = promote_type(typeof(R), typeof(k), typeof(x_off), typeof(diameter))
     r_hi = abs(x_off) + diameter / 2
     r_lo = max(zero(T), abs(x_off) - diameter / 2)
@@ -14,11 +14,6 @@ function _conic_y_range(R, k, x_off, diameter)
     y_a = -(_conic_sag(r_lo, R, k) - Z_off)
     y_b = -(_conic_sag(r_hi, R, k) - Z_off)
     return y_a <= y_b ? (y_a, y_b) : (y_b, y_a)
-end
-
-function _conic_auto_thickness(R, k, x_off, diameter, ::Type{T}) where {T}
-    y_min, y_max = _conic_y_range(R, k, x_off, diameter)
-    return y_max - y_min + T(10e-3)
 end
 
 """
@@ -29,7 +24,7 @@ paraboloid, ellipsoid or hyperboloid), offset by `x_off` from the parent vertex.
 [`ConicSDF`](@ref) for the frame convention (origin, parent axis, opening direction, vertex
 location).
 
-# Inputs
+# Arguments
 
 - `R`:          Radius of curvature at the parent vertex \\[m\\]; `R > 0` is concave (opens
                 towards `-y`), `R < 0` is convex (opens towards `+y`). Must be non-zero.
@@ -58,20 +53,11 @@ function OffAxisConicMirror(
     T = float(promote_type(typeof(R), typeof(k), typeof(x_off), typeof(diameter),
         typeof(thickness === nothing ? 0.0 : thickness)))
     Rt, kt, x_offt, dt = T(R), T(k), T(x_off), T(diameter)
-    if thickness === nothing
-        # Validate (R, k, x_off, diameter) via the SDF constructor itself first: computing
-        # the auto thickness below evaluates the sag function outside its domain if the
-        # aperture is invalid, which would raise a DomainError instead of an ArgumentError.
-        ConicSDF(Rt, kt, x_offt, dt, one(T))
-        t = _conic_auto_thickness(Rt, kt, x_offt, dt, T)
-    else
-        t = T(thickness)
-    end
+    # Validate aperture before auto thickness
+    ConicSDF(Rt, kt, x_offt, dt, one(T))
+    y_min, y_max = conic_y_range(Rt, kt, x_offt, dt)
+    t = thickness === nothing ? y_max - y_min + T(10e-3) : T(thickness)
     conic_sdf = ConicSDF(Rt, kt, x_offt, dt, t)
-    if hole_diameter === nothing
-        return Mirror(conic_sdf)
-    end
-    (y_min, _) = _conic_y_range(Rt, kt, x_offt, dt)
     return Mirror(_pierce_substrate(conic_sdf, dt, min(y_min, zero(T)), t, hole_diameter))
 end
 
@@ -87,7 +73,7 @@ If `hole_diameter` is given, a cylindrical bore centred on the optical axis (the
 +y-axis) is subtracted from the substrate, piercing it completely (e.g. Cassegrain,
 Ritchey-Chrétien, or Dall-Kirkham primary).
 
-# Inputs
+# Arguments
 
 - `R`:              Radius of curvature at the vertex \\[m\\]; `R > 0` concave, `R < 0` convex
 - `k`:              Conic constant; `k = -1` is a paraboloid (see [`ParabolicMirror`](@ref)),

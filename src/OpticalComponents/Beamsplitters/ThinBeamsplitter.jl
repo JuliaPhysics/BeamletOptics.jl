@@ -163,7 +163,7 @@ This is intended to model the effect of the Fresnel equations without full polar
 function interact3d(
         ::AbstractSystem, bs::ThinBeamsplitter, gauss::GaussianBeamlet, ray_id::Int)
     # Phase flip
-    ray = gauss.chief.rays[ray_id]
+    ray = rays(gauss.chief)[ray_id]
     df = dot(direction(ray), normal3d(intersection(ray)))
     if df < 0
         ϕ = π
