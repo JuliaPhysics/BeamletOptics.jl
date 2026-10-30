@@ -72,7 +72,7 @@ end
 Creates a [`RectangularPlateBeamsplitter`](@ref). The splitter is aligned with the negative y-axis.
 The splitter coating is centered at the origin. See also [`RoundPlateBeamsplitter`](@ref).
 
-# Inputs
+# Arguments
 
 - `width`: substrate width along the x-axis in [m]
 - `height`: substrate height along the z-axis in [m]
@@ -127,7 +127,7 @@ end
 Creates a [`RoundPlateBeamsplitter`](@ref). The splitter is aligned with the negative y-axis.
 The coating is centered at the origin. See also [`RectangularPlateBeamsplitter`](@ref).
 
-# Inputs
+# Arguments
 
 - `diameter`: x-z-plane substrate diameter in [m]
 - `thickness`: substrate thickness along the z-axis in [m]
@@ -181,20 +181,20 @@ function intersect3d(pbs::AbstractPlateBeamsplitter, ray::AbstractRay)
 end
 
 """
-    _refract_transmitted!(child, ray, dir)
+    refract_transmitted!(child, ray, dir)
 
 Sets the direction of the transmitted `child` ray of the coating to the refracted direction `dir`.
 For a [`PolarizedRay`](@ref), the field is transformed into the new direction as well, and scaled
 for the medium behind the coating: the coating transmits a fraction of the power, and the power of
 a beam is proportional to `n cos(θ) |E|²`. The refractive index of the `child` must be set before.
 """
-_refract_transmitted!(child::AbstractRay, ::AbstractRay, dir) = direction!(child, dir)
+refract_transmitted!(child::AbstractRay, ::AbstractRay, dir) = direction!(child, dir)
 
-function _refract_transmitted!(child::PolarizedRay, ray::PolarizedRay, dir)
+function refract_transmitted!(child::PolarizedRay, ray::PolarizedRay, dir)
     normal = normal3d(intersection(ray))
     P = _calculate_global_E0(direction(ray), dir, normal, SPBasis(1, 0, 0, 1))
-    cos_in = abs(dot(direction(ray), normal))
-    cos_out = abs(dot(normalize(dir), normal))
+    cos_in = abs(cos_angle3d(direction(ray), normal))
+    cos_out = abs(cos_angle3d(dir, normal))
     scale = sqrt(refractive_index(ray) * cos_in / (refractive_index(child) * cos_out))
     polarization!(child, scale * _transverse(P * polarization(child), dir))
     direction!(child, dir)
@@ -235,7 +235,7 @@ function interact3d(
         end
         refractive_index!(first(rays(beam.children[1])), _nt)
         refractive_index!(first(rays(beam.children[2])), _nr)
-        _refract_transmitted!(first(rays(beam.children[1])), ray, n_d)
+        refract_transmitted!(first(rays(beam.children[1])), ray, n_d)
         return nothing
     end
     # if nothing worked, return nothing
@@ -325,7 +325,7 @@ function interact3d(
         n_target = isentering(agb, id) ? n_optics : n_system
         for (beam, pbeam) in zip(_component_beams(agb.children[1]), _component_beams(agb))
             n_d, _ = refraction3d(rays(pbeam)[id], n_target)
-            _refract_transmitted!(first(rays(beam)), rays(pbeam)[id], n_d)
+            refract_transmitted!(first(rays(beam)), rays(pbeam)[id], n_d)
         end
         return nothing
     end
