@@ -41,90 +41,24 @@ function refractive_index(object::AbstractRefractiveOptic{T, <:RefractiveIndex},
     return convert(promote_type(T, L), object.n(λ))::promote_type(T, L)
 end
 
-"""
-    interact3d(AbstractSystem, AbstractRefractiveOptic, Beam, Ray)
-
-Implements the refraction of a [`Ray`](@ref) at an optical surface. The "outside" ref. index is obtained from the `system` unless specified otherwise.
-At the critical angle, total internal reflection occurs (see [`refraction3d`](@ref)).
-"""
-function interact3d(system::AbstractSystem,
-        optic::AbstractRefractiveOptic,
-        ::Beam{T, R},
-        ray::R) where {T <: Real, R <: Ray{T}}
-    # Check dir. of ray and surface normal
-    normal = normal3d(intersection(ray))
-    lambda = wavelength(ray)
-    if isentering(ray)
-        # Entering optic
-        n1 = refractive_index(ray)
-        n2 = refractive_index(optic, lambda)
-        # Hint to test optic again
-        hint = Hint(optic)
-    else
-        # Exiting optic
-        n1 = refractive_index(optic, lambda)
-        n2 = refractive_index(system, lambda)
-        hint = nothing
-        # Flip normal for refraction3d
-        normal = -normal
-    end
-    # Calculate new dir. and pos.
-    ndir, TIR = refraction3d(direction(ray), normal, n1, n2)
-    npos = hit_point(ray)
-    # In case of TIR, update hint and n2
-    if TIR
-        hint = Hint(optic)
-        n2 = refractive_index(optic, lambda)
-    end
-    return BeamInteraction{T, R}(hint,
-        Ray{T}(npos, ndir, nothing, wavelength(ray), n2))
-end
+medium(optic::AbstractRefractiveOptic) = IsotropicMedium(refractive_index(optic))
 
 """
-    interact3d(AbstractSystem, AbstractRefractiveOptic, Beam, PolarizedRay)
+    interact3d(AbstractSystem, AbstractRefractiveOptic, Beam, AbstractRay)
 
-Implements the refraction of a [`PolarizedRay`](@ref) at an uncoated optical surface. The "outside" ref. index is obtained from the `system` unless specified otherwise.
-Reflection and transmission values are calculated via the [`fresnel_coefficients`](@ref). Stray light is not tracked.
-In the case of total internal reflection, only the reflected light is traced.
+Implements the interaction of a [`Ray`](@ref) or a [`PolarizedRay`](@ref) at a surface of a refracting
+optic: the [`transition`](@ref) at the hit gives the media on both sides, the optic, the system
+medium, or another optic that touches the surface, e.g. the other lens of a cemented doublet. The
+[`surface_model`](@ref) of the boundary acts between them. For an uncoated surface, the ray is
+refracted, or totally reflected beyond the critical angle (see [`cross_boundary`](@ref)); a
+[`PolarizedRay`](@ref) is transmitted with the [`fresnel_coefficients`](@ref), stray light is not tracked.
+
+The method is typed loosely in the beam and the ray, such that the own `interact3d` method of a subtype
+takes precedence, e.g. `interact3d(system, ::MyOptic, ::Beam, ::AbstractRay)`.
 """
-function interact3d(system::AbstractSystem, optic::AbstractRefractiveOptic,
-        ::Beam{T, R}, ray::R) where {T <: Real, R <: PolarizedRay{T}}
-    lambda = wavelength(ray)
-    normal = normal3d(intersection(ray))
-    raypos = hit_point(ray)
-    if isentering(ray)
-        # Entering optic
-        n1 = refractive_index(ray)
-        n2 = refractive_index(optic, lambda)
-        # Hint to test optic again
-        hint = Hint(optic)
-    else
-        # Exiting optic
-        n1 = refractive_index(optic, lambda)
-        n2 = refractive_index(system, lambda)
-        hint = nothing
-        # Flip normal for refraction3d
-        normal = -normal
-    end
-    # Fresnel coefficients from the cosine of the angle of incidence (in the 1. quadrant)
-    rs, rp, ts, tp = _fresnel_coefficients(cos_angle3d(direction(ray), -normal), n2 / n1)
-    # Optical interaction
-    if is_internally_reflected(rp, rs)
-        # Update hint and outgoing ref. index
-        hint = Hint(optic)
-        n2 = refractive_index(optic, lambda)
-        # Calculate reflection
-        new_dir = reflection3d(direction(ray), normal)
-        J = SPBasis(-rs, 0, 0, rp)
-    else
-        # Calculate refraction
-        new_dir, ~ = refraction3d(direction(ray), normal, n1, n2)
-        J = SPBasis(ts, 0, 0, tp)
-    end
-    # Calculate new polarization
-    E0 = _calculate_global_E0(optic, ray, new_dir, J)
-    return BeamInteraction{T, R}(
-        hint, PolarizedRay{T}(raypos, new_dir, nothing, wavelength(ray), n2, E0))
+function interact3d(system::AbstractSystem, ::AbstractRefractiveOptic, beam::Beam, ray::AbstractRay)
+    t = transition(system, ray)
+    return interact3d(system, surface_model(t), t, beam, ray)
 end
 
 """

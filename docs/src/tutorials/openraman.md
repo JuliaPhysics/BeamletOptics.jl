@@ -206,7 +206,7 @@ stops) or a [`BeamletOptics.BeamInteraction`](@ref) holding the next ray segment
 
 ```julia
 function BMO.interact3d(system::BMO.AbstractSystem, ldm::LongpassDichroicMirror,
-                        ::BMO.Beam{T, R}, ray::R) where {T <: Real, R <: Ray{T}}
+                        beam::BMO.Beam{T, R}, ray::R) where {T <: Real, R <: Ray{T}}
     if BMO.wavelength(ray) < ldm.cuton
         # below cut-on: behave like a plane mirror
         normal = BMO.normal3d(BMO.intersection(ray))
@@ -223,23 +223,18 @@ function BMO.interact3d(system::BMO.AbstractSystem, ldm::LongpassDichroicMirror,
 end
 ```
 
-The transmitting branch is the standard two-surface plate refraction. It is worth looking
-at in the source, because it shows the [`BeamletOptics.Hint`](@ref) mechanism: after
-entering the substrate the solver has to be told to test this same object again, otherwise
-it would go looking for the next element and never find the exit surface. See the
-[Hints](@ref) section for why this burden sits with the component author.
+The transmitting branch is the standard two-surface plate refraction. The component declares its
+substrate a body via [`BeamletOptics.medium`](@ref), and the [`BeamletOptics.transition`](@ref) at the
+hit then holds the media on both sides of the surface: the substrate and the medium of the system, or
+of a body that touches the surface. The surface model of the boundary, an uncoated surface, refracts the
+ray, or totally reflects it beyond the critical angle:
 
 ```julia
-if BMO.isentering(ray)
-    n1 = BMO.refractive_index(ray)
-    n2 = BMO.refractive_index(ldm, lambda)
-    hint = BMO.Hint(ldm)          # test this object again next cycle
-else
-    n1 = BMO.refractive_index(ldm, lambda)
-    n2 = BMO.refractive_index(system, lambda)
-    hint = nothing
-    normal = -normal              # flip for refraction3d
-end
+BMO.medium(lpm::LongpassDichroicMirror) = BMO.IsotropicMedium(lpm.n)
+
+# in interact3d, above cut-on
+t = BMO.transition(system, ray)
+return BMO.interact3d(system, BMO.surface_model(t), t, beam, ray)
 ```
 
 The full component is in `OpenRaman/longpass.jl`, named after the Thorlabs

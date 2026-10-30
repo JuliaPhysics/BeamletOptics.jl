@@ -134,54 +134,81 @@ end
 _top_level(system::AbstractSystem) = objects(system)
 _top_level(system::System) = system.objects
 
-# Find the shortest intersection among all objects of the system
-@inline trace_all(system::AbstractSystem, ray::AbstractRay) = intersect3d(_top_level(system), ray)
+"""
+    trace_all(system::AbstractSystem, ray::AbstractRay)
+
+Returns the closest [`Intersection`](@ref) of the `ray` with the objects of the `system`, or `nothing`.
+The objects that the `ray` hits within `get_coincidence_tolerance()` of the closest hit, e.g. touching
+faces, are its [`coincident_hits`](@ref). An object whose bounding sphere the `ray` enters only beyond
+the closest hit found so far is not tested.
+"""
+@inline trace_all(system::AbstractSystem, ray::AbstractRay) =
+    closest_hits(_top_level(system), ray, nothing, nothing)
+
+"""
+    closest_hits(parts, ray, result, skip)
+
+Merges the hits of the `ray` with the `parts` (objects and groups) into the hits `result` (or
+`nothing`), see [`merge_hits`](@ref), and returns them. The part `skip` (or `nothing`) is not tested,
+since `result` holds its hits already. A part whose bounding sphere lies [`beyond`](@ref) the closest
+hit found so far is not tested either.
+"""
+function closest_hits(parts::Union{Tuple, AbstractVector, Leaves, LeafObjects}, ray::AbstractRay{R},
+        result::Nullable{Intersection{R}}, skip) where {R}
+    table = current_bounding_spheres()
+    tol = get_coincidence_tolerance()
+    for part in parts
+        part === skip && continue
+        if !isnothing(result) && beyond(bounding_sphere_of(table, part), ray, length(result) + tol)
+            continue
+        end
+        temp::Nullable{Intersection{R}} = intersect3d(part, ray)
+        result = merge_hits(result, temp, tol)
+    end
+    return result
+end
 
 function initialize!(system::AbstractSystem)
     foreach(initialize!, _top_level(system))
     return nothing
 end
 
+"""
+    trace_one(system::AbstractSystem, ray::AbstractRay, hint::Hint)
+
+Returns the closest [`Intersection`](@ref) of the `ray` with the objects of the `system` like
+[`trace_all`](@ref), but tests the hinted object first. Its hit lets the solver skip all objects that
+lie beyond it, hence the `hint` speeds up the trace but does not change its result.
+"""
 @inline function trace_one(
         system::AbstractSystem, ray::AbstractRay{R}, hint::Hint) where {R}
-    # Trace against hinted shape of object
-    _shape = shape(hint)::AbstractShape{R}
-    intersection::Nullable{Intersection{R}} = intersect3d(
-        bounding_sphere_of(current_bounding_spheres(), _shape), _shape, ray)
-    if isnothing(intersection)
-        # If hinted object is not intersected, trace the entire system
-        intersection = trace_all(system, ray)
-    else
-        # If hinted object is intersected, update intersection
-        object!(intersection, object(hint))
-    end
-    return intersection
+    seed::Nullable{Intersection{R}} = intersect3d(object(hint), ray)
+    return closest_hits(_top_level(system), ray, seed, isnothing(seed) ? nothing : object(hint))
 end
 
 """
     tracing_step!(system::AbstractSystem, ray::AbstractRay{R}, hint::Hint)
 
-Tests if the `ray` intersects an `object` in the optical `system`. Returns the closest intersection.
+Tests if the `ray` intersects an `object` in the optical `system` and sets the closest intersection
+of the `ray`. Of the [`coincident_hits`](@ref) at the closest point, the hit that interacts with the
+`ray` comes first, see [`first_to_interact`](@ref).
 
 # Hint
 
-An optional [`Hint`](@ref) can be provided to test against a specific object (and shape) in the `system` first.
-
-!!! warning
-    If a hint is provided and the object intersection is valid, the intersection will be returned immediately.
-    However, it is not guaranteed that this is the true closest intersection.
+An optional [`Hint`](@ref) can be provided to test against a specific object in the `system` first,
+which speeds up the trace without changing its result, see [`trace_one`](@ref).
 """
 @inline function tracing_step!(
         system::AbstractSystem, ray::AbstractRay{R}, hint::Hint) where {R <: Real}
-    # Test against hinted object
-    intersection!(ray, trace_one(system, ray, hint))
+    # Test against hinted object first
+    intersection!(ray, first_to_interact(trace_one(system, ray, hint), ray))
     return nothing
 end
 
 @inline function tracing_step!(
         system::AbstractSystem, ray::AbstractRay{R}, ::Nothing) where {R <: Real}
     # Test against all objects in system
-    intersection!(ray, trace_all(system, ray))
+    intersection!(ray, first_to_interact(trace_all(system, ray), ray))
     return nothing
 end
 
@@ -226,6 +253,8 @@ function trace_system!(
         obj = object(ray_intersection)
         interaction = interact3d(
             system, obj, beam, ray)::Union{Nothing, BeamInteraction{T, R}}
+        # The new rays learn the bodies around them
+        enclose_new!(system, beam, ray, interaction)
         if isnothing(interaction)
             break
         end
@@ -292,6 +321,7 @@ function trace_system!(
             _object,
             gauss,
             seg_counter)
+        enclose_new!(system, gauss, seg_counter, interaction)
         if isnothing(interaction)
             break
         end
@@ -349,6 +379,7 @@ function trace_system!(
         end
         # Calculate interaction
         interaction = interact3d(system, _object, agb, seg_counter)
+        enclose_new!(system, agb, seg_counter, interaction)
         if isnothing(interaction)
             break
         end

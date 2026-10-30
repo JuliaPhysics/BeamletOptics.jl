@@ -82,8 +82,12 @@ DoubletLens(front::Lens, back::Lens)
 TripletLens(front::Lens, middle::Lens, back::Lens)
 ```
 
-Pre-translate the elements yourself so that the cemented surfaces touch. Gaps give wrong results. Prefer
-the surface-based constructors above, which do this for you. To model zoom or multi-group objectives, nest
+Pre-translate the elements yourself so that the cemented surfaces touch: surfaces within 1 nm
+(`BeamletOptics.Config.get_coincidence_tolerance()`) count as cemented, a larger gap is traced as an air
+gap. Prefer the surface-based constructors above, which do this for you. To model zoom or multi-group objectives, nest
 `ObjectGroup`s of lenses (see `docs/src/assets/examples/lens_groups.jl` in the package repo).
 
-TIR at cemented interfaces is not modeled, for all doublets and triplets.
+At a cemented interface the ray refracts from one glass into the other; beyond the critical angle it is
+totally reflected and stays in the first glass. The same holds for any touching refracting bodies, e.g.
+two plates placed against each other in a `System`. Lenses within other bodies (e.g. a cuvette of
+water) refract into the surrounding body, not into air.

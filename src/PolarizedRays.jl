@@ -43,13 +43,15 @@ mutable struct PolarizedRay{T} <: AbstractRay{T}
     λ::T
     n::T
     E0::Point3{Complex{T}}
+    enclosure::Union{Nothing, Enclosure}
     function PolarizedRay{T}(
             pos::AbstractArray{P},
             dir::AbstractArray{D},
             int::Nullable{Intersection},
             λ::L,
             n::N,
-            E0::AbstractArray{<:Union{E, Complex{E}}}
+            E0::AbstractArray{<:Union{E, Complex{E}}},
+            enclosure::Union{Nothing, Enclosure} = nothing
         ) where {T, P, D, L, N, E}
         M = promote_type(T, P, D, L, N, E)
         if isapprox(norm(dir), 0, atol=1e-14)
@@ -65,12 +67,15 @@ mutable struct PolarizedRay{T} <: AbstractRay{T}
             int,
             M(λ),
             M(n),
-            Point3{Complex{M}}(E0)
+            Point3{Complex{M}}(E0),
+            enclosure
         )
     end
 end
 
 polarization(ray::PolarizedRay) = ray.E0
+enclosure(ray::PolarizedRay) = ray.enclosure
+enclosure!(ray::PolarizedRay, e) = (ray.enclosure = e)
 polarization!(ray::PolarizedRay, new) = (ray.E0 = new)
 
 """

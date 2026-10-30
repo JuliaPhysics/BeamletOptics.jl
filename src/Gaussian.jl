@@ -103,17 +103,19 @@ function parent!(child::GaussianBeamlet, parent::GaussianBeamlet)
 end
 
 """
-    interact3d(system::AbstractSystem, object::AbstractObject, gauss::GaussianBeamlet{R}, ray_id::Int)
+    interact3d(system::AbstractSystem, ::SingleShape, object::AbstractObject, gauss::GaussianBeamlet{R}, ray_id::Int)
 
 Generic dispatch for the [`interact3d`](@ref) method of a [`GaussianBeamlet`](@ref) with an [`AbstractObject`](@ref).
 Unless a more concrete implementation exists, the interaction of the Gaussian is assumed to be the interaction of the
-chief, waist and divergence rays with an object.
+chief, waist and divergence rays with an object. A [`MultiShape`](@ref) object hands the beamlet to the part that the
+chief ray hits, such that the beamlet methods of the part apply, e.g. of the coating of a beamsplitter.
 
 # Returns
 
 The `interact3d` method for the [`GaussianBeamlet`](@ref) must return a `GaussianBeamletInteraction`.
 """
 function interact3d(system::AbstractSystem,
+        ::SingleShape,
         object::AbstractObject,
         gauss::GaussianBeamlet{R},
         ray_id::Int) where {R}

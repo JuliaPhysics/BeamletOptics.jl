@@ -10,6 +10,7 @@ Mutable struct to store ray information.
 - `intersection`: refer to [`Intersection`](@ref)
 - `λ`: wavelength in [m]
 - `n`: refractive index along the beam path
+- `enclosure`: the bodies that enclose the ray, see [`Enclosure`](@ref); `nothing` in the medium of the system
 """
 mutable struct Ray{T} <: AbstractRay{T}
     pos::Point3{T}
@@ -17,7 +18,14 @@ mutable struct Ray{T} <: AbstractRay{T}
     intersection::Nullable{Intersection{T}}
     λ::T
     n::T
+    enclosure::Union{Nothing, Enclosure}
 end
+
+# A ray without the bodies that enclose it starts in the medium of the system, see `Enclosure`
+Ray{T}(pos, dir, intersection, λ, n) where {T} = Ray{T}(pos, dir, intersection, λ, n, nothing)
+
+enclosure(ray::Ray) = ray.enclosure
+enclosure!(ray::Ray, e) = (ray.enclosure = e)
 
 """
     Ray(pos, dir, λ=1000e-9)
@@ -41,5 +49,6 @@ function Ray(pos::AbstractArray{P},
         normalize(Point3{F}(dir)),
         nothing,
         F(λ),
-        F(1))
+        F(1),
+        nothing)
 end

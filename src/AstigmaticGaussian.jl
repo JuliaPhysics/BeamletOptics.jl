@@ -200,6 +200,9 @@ function AstigmaticGaussianBeamlet(
     return AstigmaticGaussianBeamlet(Beam(c), wxp, wxm, wyp, wym, dxp, dxm, dyp, dym)
 end
 
+# The beamlet types, which interact at the segment `ray_id` of their component beams
+const GaussianBeamlets = Union{GaussianBeamlet, AstigmaticGaussianBeamlet}
+
 """Return a tuple of all 9 component beams of the [`AstigmaticGaussianBeamlet`](@ref)."""
 @inline _component_beams(agb::AstigmaticGaussianBeamlet) = (
     agb.c, agb.wxp, agb.wxm, agb.wyp, agb.wym, agb.dxp, agb.dxm, agb.dyp, agb.dym)
@@ -266,13 +269,15 @@ function hint!(i::AstigmaticGaussianBeamletInteraction, new_hint::Nullable{Hint}
 end
 
 """
-    interact3d(system, object, agb::AstigmaticGaussianBeamlet, ray_id)
+    interact3d(system, ::SingleShape, object, agb::AstigmaticGaussianBeamlet, ray_id)
 
 Generic dispatch: traces each component beam's ray through `object` independently.
 Returns `nothing` if any interaction fails; otherwise returns an
-[`AstigmaticGaussianBeamletInteraction`](@ref).
+[`AstigmaticGaussianBeamletInteraction`](@ref). A [`MultiShape`](@ref) object hands the beamlet to the
+part that the chief ray hits, see the [`GaussianBeamlet`](@ref).
 """
 function interact3d(system::AbstractSystem,
+        ::SingleShape,
         object::AbstractObject,
         agb::AstigmaticGaussianBeamlet{R},
         ray_id::Int) where {R}

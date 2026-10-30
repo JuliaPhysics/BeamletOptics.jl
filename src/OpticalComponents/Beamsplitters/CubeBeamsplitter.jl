@@ -15,9 +15,10 @@ For more information refer to the [`AbstractPlateBeamsplitter`](@ref) docs.
 
 # Additional information
 
-!!! info "Hints and interaction logic"
-    In order to model gap-free beam propagation, the `interact3d` model relies heavily on the [`Hint`](@ref)-API.
-    If the `front` or `back` substrate is hit, the `Hint` will ensure that the beam intersects the `coating`.
+!!! info "Interaction logic"
+    The prisms and the coating meet at the hypotenuse. A ray that reaches it hits all three at once, and the
+    coating splits it, the transmitted beam passing from one prism into the other, see [`transition`](@ref).
+    Moved apart, e.g. via `translate3d!(cbs.front, ...)`, the parts leave an air gap that the trace sees.
 """
 struct CubeBeamsplitter{T} <: AbstractBeamsplitter{T}
     front::Prism{T, RightAnglePrismSDF{T}}
@@ -60,92 +61,3 @@ function CubeBeamsplitter(
     return CubeBeamsplitter(front, back, bs)
 end
 CubeBeamsplitter(leg_length::Real, n::Real; reflectance::Real=0.5) = CubeBeamsplitter(leg_length, λ -> n; reflectance)
-
-function interact3d(
-    system::AbstractSystem,
-    cbs::CubeBeamsplitter,
-    beam::Beam{T, R},
-    ray::R) where {T <: Real, R <: AbstractRay{T}}
-    # Front prism interaction
-    if shape(intersection(ray)) === shape(cbs.front)
-        interaction = interact3d(system, cbs.front, beam, ray)
-        # Hint towards coating
-        hint!(interaction, Hint(cbs, shape(cbs.coating)))
-        return interaction
-    end
-    # Splitter "coating" interaction
-    if shape(intersection(ray)) === shape(cbs.coating)
-        # Beamsplitter coating interaction
-        interact3d(system, cbs.coating, beam, ray)
-        # Update refractive index
-        _n = refractive_index(cbs, wavelength(ray))
-        refractive_index!(first(rays(beam.children[1])), _n)
-        refractive_index!(first(rays(beam.children[2])), _n)
-        return nothing
-    end
-    # Back prism interaction
-    if shape(intersection(ray)) === shape(cbs.back)
-        interaction = interact3d(system, cbs.back, beam, ray)
-        # Hint towards coating
-        hint!(interaction, Hint(cbs, shape(cbs.coating)))
-        return interaction
-    end
-end
-
-function interact3d(
-    system::AbstractSystem,
-    cbs::CubeBeamsplitter,
-    gauss::GaussianBeamlet,
-    id::Int)
-    _shape = shape(intersection(rays(gauss.chief)[id]))
-    # Front prism interaction
-    if _shape === shape(cbs.front)
-        interaction = interact3d(system, cbs.front, gauss, id)
-        hint!(interaction, Hint(cbs, shape(cbs.coating)))
-        return interaction
-    end
-    # Splitter "coating" interaction
-    if _shape === shape(cbs.coating)
-        interact3d(system, cbs.coating, gauss, id)
-        # Update refractive index
-        _n = refractive_index(cbs, wavelength(gauss))
-        refractive_index!(gauss.children[1], 1, _n)
-        refractive_index!(gauss.children[2], 1, _n)
-        return nothing
-    end
-    # Back prism interaction
-    if _shape === shape(cbs.back)
-        interaction = interact3d(system, cbs.back, gauss, id)
-        hint!(interaction, Hint(cbs, shape(cbs.coating)))
-        return interaction
-    end
-end
-
-function interact3d(
-    system::AbstractSystem,
-    cbs::CubeBeamsplitter,
-    agb::AstigmaticGaussianBeamlet,
-    id::Int)
-    _shape = shape(intersection(rays(agb.c)[id]))
-    # Front prism interaction
-    if _shape === shape(cbs.front)
-        interaction = interact3d(system, cbs.front, agb, id)
-        hint!(interaction, Hint(cbs, shape(cbs.coating)))
-        return interaction
-    end
-    # Splitter "coating" interaction
-    if _shape === shape(cbs.coating)
-        interact3d(system, cbs.coating, agb, id)
-        # Update refractive index
-        _n = refractive_index(cbs, wavelength(agb))
-        refractive_index!(agb.children[1], 1, _n)
-        refractive_index!(agb.children[2], 1, _n)
-        return nothing
-    end
-    # Back prism interaction
-    if _shape === shape(cbs.back)
-        interaction = interact3d(system, cbs.back, agb, id)
-        hint!(interaction, Hint(cbs, shape(cbs.coating)))
-        return interaction
-    end
-end

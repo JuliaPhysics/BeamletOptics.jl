@@ -137,55 +137,22 @@ function Base.append!(d::Detector, new::Vector{<:AbstractDetectorHit})
     return d
 end
 
-function interact3d(::AbstractSystem, d::Detector, beam::Beam{T, R},
+# A detector that does not stop the ray is a thin layer: the ray passes it, refracted if the detector
+# lies on a boundary between two media, see `transition`
+function interact3d(system::AbstractSystem, d::Detector, beam::Beam{T, R},
         ray::R) where {T <: Real, R <: Ray{T}}
-    # Optical path length and wavenumber
-    opl = optical_path_length(beam)
-    # Push hit data into detector, determine stop
-    hit = RayHit(ray, opl)
-    push!(d, hit)
-    if stop(d)
-        # Stop solver (hard target)
-        return nothing
-    else
-        # Continue tracing with hit point as starting position
-        return BeamInteraction{T, R}(
-            nothing,
-            Ray{T}(
-                hit_point(hit),
-                direction(hit),
-                nothing,
-                wavelength(ray),
-                refractive_index(ray)
-            )
-        )
-    end
+    push!(d, RayHit(ray, optical_path_length(beam)))
+    # Stop solver (hard target)
+    stop(d) && return nothing
+    return cross_boundary(system, beam, ray)
 end
 
-function interact3d(::AbstractSystem, d::Detector, beam::Beam{T, R},
+function interact3d(system::AbstractSystem, d::Detector, beam::Beam{T, R},
         ray::R) where {T <: Real, R <: PolarizedRay{T}}
-    # Optical path length and wavenumber
-    opl = optical_path_length(beam)
-    # Push hit data into detector, determine stop
-    hit = PolarizedRayHit(ray, opl)
-    push!(d, hit)
-    if stop(d)
-        # Stop solver (hard target)
-        return nothing
-    else
-        # Continue tracing with hit point as starting position
-        return BeamInteraction{T, R}(
-            nothing,
-            PolarizedRay{T}(
-                hit_point(hit),
-                direction(hit),
-                nothing,
-                wavelength(ray),
-                refractive_index(ray),
-                polarization(ray)
-            )
-        )
-    end
+    push!(d, PolarizedRayHit(ray, optical_path_length(beam)))
+    # Stop solver (hard target)
+    stop(d) && return nothing
+    return cross_boundary(system, beam, ray)
 end
 
 function interact3d(::AbstractSystem, d::Detector, g::GaussianBeamlet{R}, id::Int) where {R}
