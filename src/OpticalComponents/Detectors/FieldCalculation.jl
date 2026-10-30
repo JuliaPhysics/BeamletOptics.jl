@@ -1,8 +1,8 @@
 """
-    electric_field(pd::Detector, s::AbstractDetectorSampling = RegularGrid(); progress = true)
+    electric_field(pd::Detector, sampling::AbstractDetectorSampling = RegularGrid(); progress = true)
 
-Samples the electric field of the hits of the [`Detector`](@ref) `pd` at the points of the
-sampling `s` in its local (x, z) plane, by default a [`RegularGrid`](@ref) in a window around
+Samples the electric field of the hits of the [`Detector`](@ref) `pd` at the points of
+`sampling` in its local (x, z) plane, by default a [`RegularGrid`](@ref) in a window around
 the hits. The field at the local point `(x, z)` is the coherent sum of the fields `Eⱼ` of all
 hits `j`,
 
@@ -51,12 +51,12 @@ which carry a polarization.
 !!! note "Unpolarized light"
     An unpolarized PSF is **not** obtained from a single coherent trace. Instead, trace twice
     with orthogonal input polarizations (e.g. `E0 = [1,0,0]` and `E0 = [0,0,1]`), evaluate
-    [`intensity`](@ref)`(pd, s)` with the same [`RectilinearGrid`](@ref) `s` after each trace
-    and add the results.
+    [`intensity`](@ref)`(pd, sampling)` with the same [`RectilinearGrid`](@ref) `sampling` after
+    each trace and add the results.
 """
-function electric_field(pd::Detector, s::AbstractDetectorSampling = RegularGrid();
+function electric_field(pd::Detector, sampling::AbstractDetectorSampling = RegularGrid();
         progress::Bool = true)
-    grid = sample_points(pd, s)
+    grid = sample_points(pd, sampling)
     return (grid.coordinates..., electric_field(pd, grid.points; progress))
 end
 
@@ -65,7 +65,7 @@ end
 
 The field of the hits of the [`Detector`](@ref) `pd` at the local detector coordinates
 `points` in \\[m\\], an array of vectors `(x, z)` (e.g. `Point2`s), see
-[`electric_field`](@ref)`(pd, s)`. Returns the values only, in the shape of `points`.
+[`electric_field`](@ref)`(pd, sampling)`. Returns the values only, in the shape of `points`.
 """
 electric_field(pd::Detector, points::AbstractArray{<:AbstractVector}; progress::Bool = true) =
     _sample(electric_field, pd, points, progress)
@@ -105,60 +105,60 @@ detector and the optical path length `L` from the source to the hit point `p_hit
   with the field `E₀` and waist `w₀` of the beamlet, the beam radius `w`, the radius of curvature
   `R` and the Gouy phase `ψ` of the segment (see [`gauss_parameters`](@ref)), the index `n` of
   the segment and the optical path `L(l)` along the chief ray.
-- [`AstigmaticGaussianBeamletHit`](@ref): the field vector of the chief ray of the segment, `E_pol`,
+- [`AstigmaticGaussianBeamletHit`](@ref): the field vector of the chief ray of the segment, `E₀`,
   times the general astigmatic Gaussian beam of its parabasal rays,
-  ``\\mathbf{E}_j(\\mathbf{p}) = \\mathbf{E}_\\mathrm{pol}\\, g(l) \\exp(i k_0 [L(l) + n\\, W(\\mathbf{p})])``,
+  ``\\mathbf{E}_j(\\mathbf{p}) = \\mathbf{E}_0\\, g(l) \\exp(i k_0 [L(l) + n\\, W(\\mathbf{p})])``,
   with the Gouy factor `g`, which also holds the change of the amplitude with the beam area, and
   the complex transverse phase `W`, whose imaginary part is the Gaussian envelope, see
   [Astigmatic polarized beamlets](@ref).
 
 Beamlet hits give the physical field in \\[V/m\\]. Ray hits are raw and unscaled: `|E|²` does not
-carry the power of the ray, see the note on scaling in [`electric_field`](@ref)`(pd, s)`.
+carry the power of the ray, see the note on scaling in [`electric_field`](@ref)`(pd, sampling)`.
 
-A new hit type implements this method, `direction(hit)` and `refractive_index(hit)`; the
-readouts of a [`Detector`](@ref) on a grid ([`electric_field`](@ref), [`intensity`](@ref),
-[`optical_power`](@ref)) then work for it.
+A new hit type implements this method and the other functions listed in
+[`BeamletOptics.AbstractDetectorHit`](@ref); the readouts of a [`Detector`](@ref) on a grid
+([`electric_field`](@ref), [`intensity`](@ref), [`optical_power`](@ref)) then work for it.
 """
-electric_field(::AbstractDetectorHit, ::AbstractVector)
+electric_field(hit::AbstractDetectorHit, ::AbstractVector) =
+    error(lazy"electric_field not defined for $(typeof(hit))")
 
-electric_field(hit::RayHit, p::AbstractVector) = _ray_phasor(hit, p)
+electric_field(hit::RayHit, p::AbstractVector) = ray_phasor(hit, p)
 
-electric_field(hit::PolarizedRayHit, p::AbstractVector) = polarization(hit) * _ray_phasor(hit, p)
+electric_field(hit::PolarizedRayHit, p::AbstractVector) = polarization(hit) * ray_phasor(hit, p)
 
 function electric_field(hit::GaussianBeamletHit, p::AbstractVector)
     v = p - hit.p0
-    l1 = _pseudo_dot(v, hit.d0)
+    l1 = _pseudo_dot(v, direction(hit))
 
     # Transverse distance r
-    r = norm(v - l1 * hit.d0)
+    r = norm(v - l1 * direction(hit))
 
-    # Beam radius, curvature and Gouy phase from the waist and divergence rays of the segment
+    # Beam parameters of the segment
     w, curv, ψ, _ = gauss_parameters(hit.segment, l1)
     ψ += hit.ψ0
 
-    # Optical path up to the point, l0 + l1 along the beam. The curvature term is a geometric
-    # length like l1, hence it enters with the wavenumber n k0 of the medium as well.
-    k0 = wavenumber(hit.segment.λ)
-    n = hit.segment.n
+    # Optical path up to the point, curvature term with n k0
+    k0 = wavenumber(wavelength(hit))
+    n = refractive_index(hit)
     opl = hit.l0 + l1 + hit.Δl0 + (n - 1) * l1
-    # `E_amp` is normalized to the power of the beamlet, the physical field in the medium is smaller by √n
+    # Field in the medium, smaller by √n
     return hit.E_amp / (sqrt(n) * w) * exp(-r^2 / w^2) * cis(k0 * opl + ψ + n * k0 * r^2 * curv / 2)
 end
 
 electric_field(hit::AstigmaticGaussianBeamletHit, p::AbstractVector) =
-    hit.E_pol * _astigmatic_phasor(hit, p)
+    hit.E0 * astigmatic_phasor(hit, p)
 
 # Phase factor of a ray hit at `p`, from its optical path and the optical distance along the ray
-_ray_phasor(hit::AbstractRayHit, p) = cis(wavenumber(hit) *
+ray_phasor(hit::AbstractRayHit, p) = cis(wavenumber(hit) *
     (optical_path_length(hit) + refractive_index(hit) * dot(p - hit_point(hit), direction(hit))))
 
 """
-    intensity(pd::Detector, s::AbstractDetectorSampling = RegularGrid(); progress = true)
+    intensity(pd::Detector, sampling::AbstractDetectorSampling = RegularGrid(); progress = true)
 
 Samples the irradiance on the [`Detector`](@ref) `pd`, the power per detector area in \\[W/m²\\],
-at the points of the sampling `s`, by default a [`RegularGrid`](@ref) around the hits. Returns
+at the points of `sampling`, by default a [`RegularGrid`](@ref) around the hits. Returns
 the coordinates of the sampling followed by the irradiance at its points, for the grids
-`(xs, zs, I)`; `progress` as for [`electric_field`](@ref)`(pd, s)`.
+`(xs, zs, I)`; `progress` as for [`electric_field`](@ref)`(pd, sampling)`.
 
 `I` is the flux of the coherent sum of all hits through the detector: the time-averaged Poynting
 vector along the detector normal `n̂`, which points along the incoming beams. Hits with a
@@ -190,9 +190,9 @@ mean of their `n cos θ`.
 `I` is in \\[W/m²\\] for beamlet hits. For ray hits, whose fields are unscaled, it has the same
 form but no absolute unit.
 """
-function intensity(pd::Detector, s::AbstractDetectorSampling = RegularGrid();
+function intensity(pd::Detector, sampling::AbstractDetectorSampling = RegularGrid();
         progress::Bool = true)
-    grid = sample_points(pd, s)
+    grid = sample_points(pd, sampling)
     return (grid.coordinates..., intensity(pd, grid.points; progress))
 end
 
@@ -201,12 +201,12 @@ end
 
 The irradiance on the [`Detector`](@ref) `pd` in \\[W/m²\\] at the local detector coordinates
 `points` in \\[m\\], an array of vectors `(x, z)` (e.g. `Point2`s), see
-[`intensity`](@ref)`(pd, s)`. Returns the values only, in the shape of `points`.
+[`intensity`](@ref)`(pd, sampling)`. Returns the values only, in the shape of `points`.
 """
 function intensity(pd::Detector, points::AbstractArray{<:AbstractVector};
         progress::Bool = true)
-    # downstream normal: the detector normal points against the incoming beams
-    n̂ = Point3(-orientation(pd)[:, 2])
+    # Downstream normal
+    n̂ = -direction(pd)
     return _sample((hs, p) -> intensity(hs, p, n̂), pd, points, progress)
 end
 
@@ -214,16 +214,17 @@ end
     intensity(hits::AbstractVector{<:AbstractDetectorHit}, p::AbstractVector, n̂::AbstractVector)
 
 Irradiance \\[W/m²\\] of the coherent sum of the detector `hits` at the global point `p` through
-a plane with the unit normal `n̂`, see [`intensity`](@ref)`(pd, s)`.
+a plane with the unit normal `n̂`, see [`intensity`](@ref)`(pd, sampling)`.
 """
-intensity(::AbstractVector{<:AbstractDetectorHit}, ::AbstractVector, ::AbstractVector)
+intensity(hits::AbstractVector{<:AbstractDetectorHit}, ::AbstractVector, ::AbstractVector) =
+    error(lazy"intensity not defined for $(eltype(hits))")
 
 function intensity(hits::AbstractVector{<:Union{PolarizedRayHit, AstigmaticGaussianBeamletHit}},
         p::AbstractVector, n̂::AbstractVector)
     E = H = zero(Point3{Complex{eltype(p)}})
     for hit in hits
         Ej = electric_field(hit, p)
-        # a hit on the back side counts like one on the front side
+        # Back side counts like front side
         s = sign(dot(direction(hit), n̂)) * direction(hit)
         E += Ej
         H += refractive_index(hit) * cross(s, Ej)
@@ -243,10 +244,10 @@ function intensity(hits::AbstractVector{<:Union{RayHit, GaussianBeamletHit}},
 end
 
 """
-    optical_power(pd::Detector, s::AbstractDetectorSampling = RegularGrid(); progress = true)
+    optical_power(pd::Detector, sampling::AbstractDetectorSampling = RegularGrid(); progress = true)
 
 Calculates the total optical power on `pd` in \\[W\\] as the integral of its [`intensity`](@ref)
-over the window of the sampling `s` in the local detector coordinates,
+over the window of `sampling` in the local detector coordinates,
 
 ```math
 P = \\iint I(x, z)\\, \\mathrm{d}x\\, \\mathrm{d}z \\approx \\sum_i w_i\\, I(x_i, z_i),
@@ -262,29 +263,27 @@ the window is not cut at the edges of the detector. The default window of beamle
 the power of each beamlet except for a part of `10⁻⁸`, see `crop_factor` of
 [`RegularGrid`](@ref). For ray hits, `P` has no absolute unit, see [`intensity`](@ref).
 """
-function optical_power(pd::Detector, s::AbstractDetectorSampling = RegularGrid();
+function optical_power(pd::Detector, sampling::AbstractDetectorSampling = RegularGrid();
         progress::Bool = true)
-    grid = sample_points(pd, s)
+    grid = sample_points(pd, sampling)
     I = intensity(pd, grid.points; progress)
-    # lazy: neither the weights nor their product with I are materialized
+    # Lazy weighted sum
     return sum(Broadcast.instantiate(Broadcast.broadcasted(*, grid.weights, I)))
 end
 
 # Samples `f(hits, p)` at the global points `p` of the local detector coordinates `points`,
 # threaded over chunks of the points. All readouts of a detector share this loop.
 function _sample(f, pd::Detector, points::AbstractArray, progress::Bool)
-    # PD local coordinate axes (left-handed coords.), flipped x due to the rotated pd mesh
-    local_x = Point3(-orientation(pd)[:, 1])
-    local_z = Point3(orientation(pd)[:, 3])
+    local_x, local_z = local_axes(pd)
     return _sample(f, _detector_hits(pd), position(pd), local_x, local_z, points, progress)
 end
 
-# function barrier: `hits` has a concrete type here
+# Function barrier
 function _sample(f, hits::AbstractVector, origin, local_x, local_z, points::AbstractArray,
         progress::Bool)
     point(q) = origin + q[1] * local_x + q[2] * local_z
     values = similar(points, typeof(f(hits, point(first(points)))))
-    # equal chunks of consecutive points, independent of the shape; one tick per chunk
+    # Equal chunks of consecutive points, one tick per chunk
     nparts = min(length(points), max(100, 4 * Threads.nthreads()))
     parts = collect(Iterators.partition(eachindex(values, points), cld(length(points), nparts)))
     _with_progress(progress, length(parts), "Detector field: ") do prog
@@ -305,29 +304,30 @@ function _detector_hits(pd::Detector)
 end
 
 # Field of an astigmatic beamlet hit at `p` per unit amplitude: Gouy factor and phase
-function _astigmatic_phasor(hit::AstigmaticGaussianBeamletHit{G}, p::AbstractArray) where {G}
+function astigmatic_phasor(hit::AstigmaticGaussianBeamletHit{G}, p::AbstractArray) where {G}
+    dir = direction(hit)
     v = p - hit.p0
-    l1 = _pseudo_dot(v, hit.d0)
-    r_vec = v - l1 * hit.d0
+    l1 = _pseudo_dot(v, dir)
+    r_vec = v - l1 * dir
 
     h1_z = hit.h1 + l1 * hit.u1
     h2_z = hit.h2 + l1 * hit.u2
-    area_z = _pseudo_cross2d(h1_z, h2_z, hit.d0)
+    area_z = _pseudo_cross2d(h1_z, h2_z, dir)
+    # Regularization of the area at caustics
     if abs(area_z) < 1e-25
         area_z = Complex{G}(1e-25, 1e-25)
     end
-    # Gouy factor √(a_ref / a(l1)) with the continuous argument of the area: each factor
-    # of a(l1) stays off the negative real axis (see `area_inverse_roots`), so the
-    # principal square roots follow the Gouy phase through a focus
+    # Gouy factor from the continuous area argument
     gouy = hit.gouy0 / (sqrt(1 - hit.ρ1 * l1) * sqrt(1 - hit.ρ2 * l1))
 
-    ξ1 = _pseudo_cross2d(h1_z, r_vec, hit.d0)
-    ξ2 = _pseudo_cross2d(h2_z, r_vec, hit.d0)
+    ξ1 = _pseudo_cross2d(h1_z, r_vec, dir)
+    ξ2 = _pseudo_cross2d(h2_z, r_vec, dir)
     w = (ξ1 * _pseudo_dot(hit.u2, r_vec) -
          ξ2 * _pseudo_dot(hit.u1, r_vec)) / (2 * area_z)
 
-    phase_corr = (hit.n_eff - 1) * l1
+    n = refractive_index(hit)
+    phase_corr = (n - 1) * l1
     z_total = hit.l0 + l1
-    # the transverse term w enters with the wavenumber n k0 of the medium, like l1
-    return gouy * cis(hit.k0 * (z_total + hit.n_eff * w + hit.Δl + phase_corr))
+    # Transverse term with n k0
+    return gouy * cis(hit.k0 * (z_total + n * w + hit.Δl0 + phase_corr))
 end
