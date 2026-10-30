@@ -463,7 +463,7 @@ function _clip(m::_TriMesh, g, own, τ; on = nothing, interface::Union{Nothing, 
                 # each step reduces the distance by about α²/2, α the angle between n and the surface normal
                 nc = normalize(sum(i -> m.normals[i], tri))
                 for _ in 1:3
-                    d = _sdf(own, ctr)
+                    d = BMO.sdf(own, ctr)
                     abs(d) ≤ τ && break
                     ctr = ctr - d * nc
                 end
@@ -584,16 +584,8 @@ end
 function (b::_BoundedSDF)(p)
     d = max.(b.lo .- b.pad .- p, p .- b.hi .- b.pad, 0.0)
     any(>(0), d) && return norm(d) + b.pad
-    return _sdf(b.s, p)
+    return BMO.sdf(b.s, p)
 end
-
-# Type stable evaluation of `sdf(::UnionSDF)`, whose generator over the parts allocates
-_sdf(s, p) = BMO.sdf(s, p)
-_sdf(u::BMO.UnionSDF, p) = _min_sdf(u.sdfs, p)
-
-# unrolled over the heterogeneous tuple of parts
-_min_sdf(t::Tuple, p) = min(_sdf(first(t), p), _min_sdf(Base.tail(t), p))
-_min_sdf(::Tuple{}, p) = Inf
 
 """Callable `p -> minimum(f(p) for f in fs)` for a tuple `fs`, type stable for the composition."""
 struct _MinOf{F <: Tuple}

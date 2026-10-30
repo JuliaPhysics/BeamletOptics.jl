@@ -12,9 +12,9 @@ function _tessellate_conic(s::BMO.ConicSDF, r_hole)
     N_r = 50
     θs = [2π * (j - 1) / _N_THETA for j in 1:_N_THETA]
 
-    R = 2 * s.f
+    R = BMO.radius(s)
     Z_off = BMO._conic_sag(s.x_off, R, s.k)
-    y_surf(xl, zl) = min(s.thickness, -(BMO._conic_sag(sqrt((xl + s.x_off)^2 + zl^2), R, s.k) - Z_off))
+    y_surf(xl, zl) = min(BMO.thickness(s), -(BMO._conic_sag(sqrt((xl + s.x_off)^2 + zl^2), R, s.k) - Z_off))
     # outward normal of the front face y = y_surf(x, z), the substrate lies at y ≥ y_surf
     function n_surf(xl, zl)
         r_p = sqrt((xl + s.x_off)^2 + zl^2)
@@ -32,17 +32,17 @@ function _tessellate_conic(s::BMO.ConicSDF, r_hole)
     # 2. Substrate cylindrical side wall
     radial(x, z, θ) = (cos(θ), 0, sin(θ))
     _add_rows!(m, [ring(r_max, y_surf, radial; tag = substrate),
-        ring(r_max, (_, _) -> s.thickness, radial; tag = substrate)])
+        ring(r_max, (_, _) -> BMO.thickness(s), radial; tag = substrate)])
     # 3. Inner bore wall (only if pierced)
     if r_hole > 0
         inward(x, z, θ) = (-cos(θ), 0, -sin(θ))
         _add_rows!(m, [ring(r_hole, y_surf, inward; tag = substrate),
-            ring(r_hole, (_, _) -> s.thickness, inward; tag = substrate)])
+            ring(r_hole, (_, _) -> BMO.thickness(s), inward; tag = substrate)])
     end
     # 4. Substrate rear (annular) base
     back(x, z, θ) = (0, 1, 0)
-    _add_rows!(m, [ring(r_hole, (_, _) -> s.thickness, back; tag = substrate),
-        ring(r_max, (_, _) -> s.thickness, back; tag = substrate)])
+    _add_rows!(m, [ring(r_hole, (_, _) -> BMO.thickness(s), back; tag = substrate),
+        ring(r_max, (_, _) -> BMO.thickness(s), back; tag = substrate)])
 
     return _transform!(m, s)
 end
