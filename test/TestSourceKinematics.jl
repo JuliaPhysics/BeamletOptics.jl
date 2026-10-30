@@ -507,6 +507,26 @@ start_rays(b) = map(BMO.first_ray, BMO._component_beams(b))
         # moving the root drops the children
         translate3d!(beam, [1mm, 0, 0])
         @test is_reset(beam)
+        # child beamlets throw the same error
+        msg = "cannot move a child beam; move its root beam instead"
+        g = GaussianBeamlet([0, -50mm, 0], [0, 1, 0], 1e-6, 1mm)
+        a = AstigmaticGaussianBeamlet([0, -50mm, 0], [0, 1, 0], 1e-6, 1mm)
+        for root in (g, a)
+            solve_system!(bs_system, root; depth_max = 4)
+            child = first(BMO.children(root))
+            @test_throws ArgumentError(msg) translate3d!(child, [1mm, 0, 0])
+            @test_throws ArgumentError(msg) rotate3d!(child, R)
+        end
+    end
+
+    @testset "Traced GaussianBeamlet rotated about its start" begin
+        g = GaussianBeamlet([1mm, -50mm, 0.5mm], [0, 1, 0], 1e-6, 1mm)
+        solve_system!(system, g)
+        p0 = position(g)
+        rotate3d!(g, R)
+        @test is_reset(g)
+        @test norm(position(g) - p0) < 1e-12
+        @test BMO.direction(g) ≈ R * [0, 1, 0]
     end
 
     @testset "Non-unit rotation axis is consistent across all kinematic types" begin

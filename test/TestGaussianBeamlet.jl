@@ -358,4 +358,27 @@ end
     end
 end
 
+@testset "GaussianSegment matches gauss_parameters" begin
+    lens(y) = (l = ThinLens(50mm, 50mm, 10mm, 1.5); translate3d!(l, [0, y, 0]); l)
+    gauss = GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], 1e-6, 1mm; support = [1.0, 0, 0])
+    solve_system!(System([lens(50mm), lens(150mm)]), gauss)
+    chief_rays = BMO.rays(gauss.chief)
+    @test length(chief_rays) == 5
+    z_start = 0.0
+    for (i, ray) in enumerate(chief_rays)
+        z = z_start + (isfinite(length(ray)) ? length(ray) / 2 : 10mm)
+        p, index = BMO.point_on_beam(gauss, z)
+        @test index == i
+        l = z - z_start
+        w, R, ψ, w0 = BMO.gauss_parameters(gauss, z)
+        ws, Rs, ψs, w0s = BMO.gauss_parameters(BMO.GaussianSegment(gauss, i), l)
+        @test ws ≈ w
+        @test Rs ≈ R
+        @test w0s ≈ w0
+        # the Gouy offset is 0 only on the first segment of the root beam
+        i == 1 && @test ψs ≈ ψ
+        z_start += length(ray)
+    end
+end
+
 end # MODULE

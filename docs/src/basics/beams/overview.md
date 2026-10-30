@@ -32,7 +32,7 @@ A [`Beam`](@ref) stores a vector of rays, and the beamlets are built from it: a 
 ```mermaid
 flowchart TB
     ABS["<b>AbstractBeam</b><br/><i>abstract type</i>"]
-    IF["<b>beam interface</b><br/>trace_system!, push!, empty!, first_ray, and<br/>composite: _component_beams<br/>or ray-storing: _chief_beam, translate3d!, rotate3d!"]
+    IF["<b>beam interface</b><br/>trace_system!, push!, and<br/>every beam: _component_beams<br/>ray-storing beam: also rays, empty!"]
     TREE["<b>parent, children</b><br/><i>beam tree, split by children!</i>"]
     BM["<b>Beam</b><br/><i>beam type</i>"]
     GB["<b>GaussianBeamlet</b><br/><i>beam type</i>"]
