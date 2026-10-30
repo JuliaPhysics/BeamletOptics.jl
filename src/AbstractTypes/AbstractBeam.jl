@@ -223,6 +223,22 @@ function length_before(beam::AbstractBeam{T}, id::Integer) where {T}
     return l
 end
 
+"""
+    path_excess_before(beam::AbstractBeam, id::Integer)
+
+Returns the optical minus the geometric path length of the `beam`, its parents included, up to
+the start of ray `id`.
+"""
+function path_excess_before(beam::AbstractBeam{T}, id::Integer) where {T}
+    p = AbstractTrees.parent(beam)
+    Δl = isnothing(p) ? zero(T) : optical_path_length(p) - length(p)
+    for j in 1:(id - 1)
+        ray = rays(beam)[j]
+        Δl += optical_path_length(ray) - length(ray)
+    end
+    return Δl
+end
+
 function length_rays(beam::AbstractBeam{T}) where {T}
     l = zero(T)
     for ray in rays(beam)
