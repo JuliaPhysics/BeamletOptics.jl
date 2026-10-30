@@ -675,6 +675,23 @@ const BMO = BeamletOptics
         # mixed precision: the source takes the promoted type
         @test CollimatedSource(Float32.(pos), Float32.(dir), D, 633f-9; num_rings = 4, num_rays = 200) isa
             CollimatedSource{Float64, Ray{Float64}, BMO.DiscRings}
+        # a Float32 direction in a Float64 source, for every direction of a grid
+        dirs32 = [Float32[a, b, c] for a in -1:0.25f0:1, b in -1:0.25f0:1, c in -1:0.25f0:1 if !iszero(a^2 + b^2 + c^2)]
+        @test all(dirs32) do d
+            PointSource(zeros(Float32, 3), d, 0.3f0; num_rings = 3, num_rays = 80) isa PointSource{Float64} &&
+                UniformPointSource(zeros(Float32, 3), d, 0.3f0; num_rays = 20) isa PointSource{Float64} &&
+                UniformFanSource(zeros(Float32, 3), d, 0.3f0; num_rays = 20) isa PointSource{Float64} &&
+                CollimatedSource(zeros(Float32, 3), d, 5f-3; num_rings = 3, num_rays = 80) isa CollimatedSource{Float64} &&
+                UniformDiscSource(zeros(Float32, 3), d, 5f-3; num_rays = 20) isa CollimatedSource{Float64} &&
+                UniformLineSource(zeros(Float32, 3), d, 5f-3; num_rays = 20) isa CollimatedSource{Float64}
+        end
+        # an integer diameter in a Float32 source
+        for src in (CollimatedSource(Float32.(pos), Float32.(dir), 1, 633f-9; num_rings = 3, num_rays = 80),
+                    UniformDiscSource(Float32.(pos), Float32.(dir), 1, 633f-9; num_rays = 80),
+                    UniformLineSource(Float32.(pos), Float32.(dir), 1, 633f-9; num_rays = 80))
+            @test src isa CollimatedSource{Float32}
+            @test BMO.diameter(src) === 1.0f0
+        end
 
         # the rays per ring add up to the number of rays
         for n in (1, 7, 39, 200, 1001)

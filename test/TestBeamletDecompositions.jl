@@ -165,13 +165,15 @@ end
     Eu = amp .* cis.(phase)
     Ev = 0.3im .* Eu
     beam_positions(g) = [BMO.position(BMO.first_ray(b)) for b in BMO.beams(g)]
+    # the threads of a decomposition push the beamlets in any order
+    same_positions(a, b) = length(a) == length(b) && all(any(isapprox(q, r; rtol = 1e-12) for r in b) for q in a)
 
     @testset "$name" for (name, F1, F2) in (("scalar", amp, phase), ("vector", Eu, Ev))
         g = WavefrontBeamletDecomposition(x, y, F1, F2, p, dir, λ)
         @test BMO.position(g) == p
         ref = WavefrontBeamletDecomposition(x, y, F1, F2, zeros(3), dir, λ)
         translate3d!(ref, p)
-        @test all(isapprox.(beam_positions(g), beam_positions(ref); rtol = 1e-12))
+        @test same_positions(beam_positions(g), beam_positions(ref))
     end
 
     @testset "Float32 grid, Float64 position" begin
@@ -179,6 +181,14 @@ end
             Float32.(phase), p, Float32.(dir), 1.0f-6)
         @test g isa AstigmaticBeamGroup{Float64}
         @test BMO.position(g) == p
+        # a Float32 direction that fails without the conversion of dir to Float64
+        @test WavefrontBeamletDecomposition(Float32.(x), Float32.(y), Float32.(amp), Float32.(phase),
+            zeros(3), Float32[-0.75, -0.75, -0.25], 1.0f-6) isa AstigmaticBeamGroup{Float64}
+    end
+
+    @testset "Rational phase" begin
+        g = WavefrontBeamletDecomposition(x, y, amp, rationalize.(phase ./ 1e3; tol = 1e-6), p, dir, λ)
+        @test length(BMO.beams(g)) > 0
     end
 
     @testset "GaussianModeDecomposition" begin

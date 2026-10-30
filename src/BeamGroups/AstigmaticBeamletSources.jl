@@ -32,7 +32,7 @@ function CollimatedGaussianBeamletSource(
         P0::Real = get_default_power()
 ) where {P <: Real, D1 <: Real, D2 <: Real, L <: Real, W <: Real}
     T = promote_type(P, D1, D2, L, W)
-    dir_n = normalize(dir)
+    dir_n = normalize(T.(dir))
     e1, e2 = grid_axes(dir_n, basis)
 
     beams = Vector{AstigmaticGaussianBeamlet{T}}()
@@ -110,7 +110,7 @@ function SphericalGaussianBeamletSource(
     Δθ = θ / (num_rings - 1)
     w0s = λ / (π * overlap * Δθ)
 
-    dir_n = normalize(dir)
+    dir_n = normalize(T.(dir))
     b1 = sampling_basis(dir_n, basis, T)
     dirs = cone_ring_directions(dir_n, b1, θ, num_rings, num_rays - 1)
     beams = cone_beamlets(pos, dir_n, dirs, λ, w0s, P0, E0, randomize_axes, rng, T)
@@ -172,7 +172,7 @@ function EllipticalGaussianBeamletSource(
     Δθ = θ_avg / (num_rings - 1)
     w0s = λ / (π * overlap * Δθ)
 
-    dir_n = normalize(dir)
+    dir_n = normalize(T.(dir))
     b1 = sampling_basis(dir_n, basis, T)
     b2 = normalize(cross(dir_n, b1))
 
@@ -259,7 +259,7 @@ The field of the amplitude `a` [V/m] along the direction `d` with the polarizati
 the Jones vector `E0`: its component transverse to `d`, normalized. Throws an `ArgumentError` for
 an `E0` along `d`; returns `nothing` for `E0 = nothing`.
 """
-function jones_field(E0, d, a)
+function jones_field(E0::AbstractVector, d, a)
     p = _transverse(E0, d)
     n = norm(p)
     # Parallel to d within round-off

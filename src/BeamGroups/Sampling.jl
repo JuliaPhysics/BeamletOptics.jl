@@ -375,6 +375,11 @@ min_num_rays(::NoSampling) = nothing
 min_num_rays(s::Union{DiscRings, ConeRings}) = 20 * s.num_rings
 min_num_rays(::AbstractSourceSampling) = 1
 
-# The numerical aperture of the half spread angle of a PointSource sampling
+"""
+    numerical_aperture(s::AbstractSourceSampling)
+
+Returns the numerical aperture `sin θ` of the half spread angle `θ` of a [`PointSource`](@ref)
+sampling. A sampling for a `PointSource` implements it; the fallback throws.
+"""
 numerical_aperture(s::AbstractSourceSampling) = error(lazy"numerical_aperture not defined for $(typeof(s))")
 numerical_aperture(s::Union{ConeRings, ConeSunflower, ConeFan}) = numerical_aperture(s.θ)

@@ -156,7 +156,7 @@ For complex sources, the package provides the [`AstigmaticBeamGroup`](@ref) cont
 
 A field that is close to one Gaussian mode and too small to be tiled into beamlets, e.g. the output of a single-mode fiber, is not turned into a group: [`GaussianModeDecomposition`](@ref) fits a single [`AstigmaticGaussianBeamlet`](@ref) to it.
 
-The decompositions of a sampled field take the grid position as a positional argument, like every other source: `WavefrontBeamletDecomposition(x, y, amplitude, phase, pos, dir, λ)`, `WavefrontBeamletDecomposition(x, y, Eu, Ev, pos, dir, λ)` and `GaussianModeDecomposition(x, y, Eu, Ev, pos, dir, λ)`. The grid lies in the plane normal to `dir` through `pos`, and `pos` is the global position of the sample `x = y = 0` and the center of the group.
+The decompositions of a sampled field take the grid position as a positional argument, like every other source: `WavefrontBeamletDecomposition(x, y, amplitude, phase, pos, dir, λ)`, `WavefrontBeamletDecomposition(x, y, Eu, Ev, pos, dir, λ)` and `GaussianModeDecomposition(x, y, Eu, Ev, pos, dir, λ)`. The grid lies in the plane normal to `dir` through `pos`, and `pos` is the global position of the sample `x = y = 0`. For the two `WavefrontBeamletDecomposition` forms, `pos` is also the center of the returned group; the single beamlet of `GaussianModeDecomposition` starts at the centroid of the field on that plane.
 
 ### Beamlet sources and decompositions
 

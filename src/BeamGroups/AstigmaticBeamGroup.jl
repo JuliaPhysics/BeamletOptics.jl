@@ -26,7 +26,7 @@ explicitly as a right-handed orthonormal 3x3 `orientation` matrix whose second c
 central direction. An invalid `orientation` throws an `ArgumentError`.
 """
 function AstigmaticBeamGroup(beams::Vector{AstigmaticGaussianBeamlet{T}}, pos, dir::AbstractVector) where {T}
-    d = normalize(dir)
+    d = normalize(T.(dir))
     return AstigmaticBeamGroup(beams, pos, _group_orientation(d, sampling_basis(d, nothing, T), T))
 end
 

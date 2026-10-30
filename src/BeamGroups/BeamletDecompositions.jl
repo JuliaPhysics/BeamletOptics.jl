@@ -40,7 +40,7 @@ function GaussianBeamletDecomposition(
         threshold::Float64 = 1e-4
 ) where {P <: Real, D1 <: Real, W <: Real, L <: Real}
     T = promote_type(P, D1, W, L)
-    dir_n = normalize(dir)
+    dir_n = normalize(T.(dir))
     e1, e2 = grid_axes(dir_n, basis)
 
     # Macroscopic peak amplitude, from P0 also for a given polarization E0
@@ -88,7 +88,7 @@ end
 Local propagation direction at the grid index `(i, j)` from the phase steps `Δφ(a, b)` between
 neighbors plus the known gradient `∇φ0`, or `nothing` if it is grazing, evanescent or `NaN`.
 """
-function eikonal_direction(Δφ, i::Integer, j::Integer, nx::Integer, ny::Integer, dx, dy, k, e1, e2, dir_n, ∇φ0 = (0, 0))
+function eikonal_direction(Δφ::Function, i::Integer, j::Integer, nx::Integer, ny::Integer, dx, dy, k, e1, e2, dir_n, ∇φ0 = (0, 0))
     ip, im_ = min(i + 1, nx), max(i - 1, 1)
     jp, jm = min(j + 1, ny), max(j - 1, 1)
     dφ_dx = (Δφ((i, j), (ip, j)) + Δφ((im_, j), (i, j))) / ((ip - im_) * dx) + ∇φ0[1]
@@ -110,7 +110,7 @@ end
 The field with the tangential components `E1`, `E2` along `e1`, `e2` of a plane with the normal
 `n`, completed by the normal component that makes it transverse to the direction `d`.
 """
-function transverse_field(E1, E2, e1, e2, n, d)
+function transverse_field(E1::Number, E2, e1, e2, n, d)
     En = -(dot(d, e1) * E1 + dot(d, e2) * E2) / dot(d, n)
     return E1 * e1 + E2 * e2 + En * n
 end
@@ -121,7 +121,7 @@ end
 Phase `sign(R) k (√(ρ² + R²) − |R|)` of a reference sphere with the radius `R` about the axis
 through `x = y = 0`, without cancellation for `ρ ≪ |R|`. Zero for `R = Inf`.
 """
-sphere_phase(x, y, R, k) = sign(R) * k * (x^2 + y^2) / (sqrt(x^2 + y^2 + R^2) + abs(R))
+sphere_phase(x::Real, y, R, k) = sign(R) * k * (x^2 + y^2) / (sqrt(x^2 + y^2 + R^2) + abs(R))
 
 function check_reference_radius(R::Real)
     !isnan(R) && !iszero(R) ||
@@ -165,7 +165,7 @@ function wavefront_beamlets(
         rng
 ) where {T <: Real}
     nx, ny = length(x), length(y)
-    dir_n = normalize(dir)
+    dir_n = normalize(T.(dir))
     e1_v, e2_v = grid_axes(dir_n, basis)
 
     dx = nx > 1 ? (x[2] - x[1]) : 1.0
@@ -280,7 +280,7 @@ function WavefrontBeamletDecomposition(
         throw(DimensionMismatch("Amplitude and phase arrays must match the dimensions of x and y."))
     end
 
-    Δφ(a, b) = rem2pi(phase[b...] - phase[a...], RoundNearest)
+    Δφ(a, b) = rem2pi(float(phase[b...] - phase[a...]), RoundNearest)
     function field(i, j, d, c, axes, k)
         e1, e2 = axes
         # Project the polarization normal to d, `dot` conjugates its first argument

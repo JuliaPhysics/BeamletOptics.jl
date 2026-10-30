@@ -37,7 +37,7 @@ is the central direction. An invalid `orientation` throws an `ArgumentError`. Th
 source can not be regenerated with [`num_rays!`](@ref): its `sampling` is `NoSampling()`.
 """
 function PointSource(beams::Vector{Beam{T, R}}, NA, pos, dir::AbstractVector) where {T, R <: AbstractRay{T}}
-    d = normalize(dir)
+    d = normalize(T.(dir))
     return PointSource(beams, NA, pos, _group_orientation(d, sampling_basis(d, nothing, T), T))
 end
 
@@ -49,6 +49,12 @@ function PointSource(beams::Vector{Beam{T, R}}, NA, pos, orientation::AbstractMa
     check_kinematic_members(beams)
     return PointSource{T, R, S}(beams, T(NA), Point3{T}(pos), check_orientation(orientation, T), sampling)
 end
+
+"""
+    numerical_aperture(ps::PointSource)
+
+Returns the numerical aperture of the half spread angle of `ps`.
+"""
 numerical_aperture(ps::PointSource) = ps.NA
 
 """
@@ -75,7 +81,7 @@ function PointSource(
         basis = nothing
 ) where {P <: Real, D <: Real, L <: Real}
     T = promote_type(P, D, L)
-    dir = normalize(dir)
+    dir = normalize(T.(dir))
     b1 = sampling_basis(dir, basis, T)
     beams = source_beams(sampling, pos, dir, b1, T(λ), num_rays, T)
     return PointSource(beams, numerical_aperture(sampling), pos, _group_orientation(dir, b1, T), sampling)

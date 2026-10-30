@@ -37,7 +37,7 @@ is the central direction. An invalid `orientation` throws an `ArgumentError`. Th
 source can not be regenerated with [`num_rays!`](@ref): its `sampling` is `NoSampling()`.
 """
 function CollimatedSource(beams::Vector{Beam{T, R}}, diameter, pos, dir::AbstractVector) where {T, R <: AbstractRay{T}}
-    d = normalize(dir)
+    d = normalize(T.(dir))
     return CollimatedSource(beams, diameter, pos, _group_orientation(d, sampling_basis(d, nothing, T), T))
 end
 
@@ -76,10 +76,10 @@ function CollimatedSource(
         basis = nothing
 ) where {P <: Real, D <: Real, Dm <: Real, L <: Real}
     T = promote_type(P, D, Dm, L)
-    dir = normalize(dir)
+    dir = normalize(T.(dir))
     b1 = sampling_basis(dir, basis, T)
-    beams = source_beams(sampling, pos, dir, b1, diameter, T(λ), num_rays, T)
-    return CollimatedSource(beams, diameter, pos, _group_orientation(dir, b1, T), sampling)
+    beams = source_beams(sampling, pos, dir, b1, T(diameter), T(λ), num_rays, T)
+    return CollimatedSource(beams, T(diameter), pos, _group_orientation(dir, b1, T), sampling)
 end
 
 """
