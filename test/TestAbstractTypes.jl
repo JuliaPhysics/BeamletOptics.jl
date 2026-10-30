@@ -113,6 +113,12 @@ const BMO = BeamletOptics
         # Test child removal
         BMO._drop_beams!(cb2)
         @test isempty(BMO.children(cb2))
+        # Without `_component_beams` the generic beam methods throw and name the hook
+        R = BMO.rotate3d([0, 0, 1.0], 0.1)
+        for f in (BMO.rays, b -> translate3d!(b, [0, 0, 1]), b -> rotate3d!(b, R))
+            @test_throws ErrorException f(TestBeam())
+            @test_throws r"_component_beams not defined for" f(TestBeam())
+        end
     end
 
     mutable struct TestShapeless{T} <: BMO.AbstractShape{T}
