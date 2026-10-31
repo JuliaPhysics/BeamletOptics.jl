@@ -12,9 +12,9 @@ function _tessellate_conic(s::BMO.ConicSDF, r_hole)
     N_r = 50
     θs = [2π * (j - 1) / _N_THETA for j in 1:_N_THETA]
 
-    R = 2 * s.f
+    R = BMO.radius(s)
     Z_off = BMO._conic_sag(s.x_off, R, s.k)
-    y_surf(xl, zl) = min(s.thickness, -(BMO._conic_sag(sqrt((xl + s.x_off)^2 + zl^2), R, s.k) - Z_off))
+    y_surf(xl, zl) = min(BMO.thickness(s), -(BMO._conic_sag(sqrt((xl + s.x_off)^2 + zl^2), R, s.k) - Z_off))
     # outward normal of the front face y = y_surf(x, z), the substrate lies at y ≥ y_surf
     function n_surf(xl, zl)
         r_p = sqrt((xl + s.x_off)^2 + zl^2)
@@ -32,17 +32,17 @@ function _tessellate_conic(s::BMO.ConicSDF, r_hole)
     # 2. Substrate cylindrical side wall
     radial(x, z, θ) = (cos(θ), 0, sin(θ))
     _add_rows!(m, [ring(r_max, y_surf, radial; tag = substrate),
-        ring(r_max, (_, _) -> s.thickness, radial; tag = substrate)])
+        ring(r_max, (_, _) -> BMO.thickness(s), radial; tag = substrate)])
     # 3. Inner bore wall (only if pierced)
     if r_hole > 0
         inward(x, z, θ) = (-cos(θ), 0, -sin(θ))
         _add_rows!(m, [ring(r_hole, y_surf, inward; tag = substrate),
-            ring(r_hole, (_, _) -> s.thickness, inward; tag = substrate)])
+            ring(r_hole, (_, _) -> BMO.thickness(s), inward; tag = substrate)])
     end
     # 4. Substrate rear (annular) base
     back(x, z, θ) = (0, 1, 0)
-    _add_rows!(m, [ring(r_hole, (_, _) -> s.thickness, back; tag = substrate),
-        ring(r_max, (_, _) -> s.thickness, back; tag = substrate)])
+    _add_rows!(m, [ring(r_hole, (_, _) -> BMO.thickness(s), back; tag = substrate),
+        ring(r_max, (_, _) -> BMO.thickness(s), back; tag = substrate)])
 
     return _transform!(m, s)
 end
@@ -76,14 +76,17 @@ Returns the radius of `d`'s tool if it is a single [`CylinderSDF`](@ref) coaxial
 [`BeamletOptics.ConicSDF`](@ref) base and centered on its axis, or `nothing` otherwise.
 """
 function _axial_bore_radius(d::BMO.DifferenceSDF{T, <:BMO.ConicSDF}) where {T}
-    s = d.base
-    if length(d.tools) == 1 && d.tools[1] isa BMO.CylinderSDF
-        tool = d.tools[1]
-        dot_axis = abs(dot(BMO.orientation(s)[:, 2], BMO.orientation(tool)[:, 2]))
+    s = first(BMO.operands(d))
+    tools = Base.tail(BMO.operands(d))
+    if length(tools) == 1 && tools[1] isa BMO.CylinderSDF
+        tool = tools[1]
         rel_pos = BMO.position(tool) - BMO.position(s)
         x_proj = dot(rel_pos, BMO.orientation(s)[:, 1])
         z_proj = dot(rel_pos, BMO.orientation(s)[:, 3])
-        if isapprox(dot_axis, 1; atol = 1e-3) && abs(x_proj) < 1e-4 && abs(z_proj) < 1e-4
+        # the sine tolerance equivalent to |cos| ≥ 0.999, i.e. axes within about 2.56°
+        coaxial = BMO.isparallel3d(BMO.orientation(s)[:, 2], BMO.orientation(tool)[:, 2];
+            atol = sqrt(1 - 0.999^2))
+        if coaxial && abs(x_proj) < 1e-4 && abs(z_proj) < 1e-4
             return tool.radius
         end
     end
@@ -92,9 +95,11 @@ end
 
 # An axial bore is part of the conic mesh, other tools are cut via `_difference`
 function _tessellate_difference(::BMO.ConicSDF, d::BMO.DifferenceSDF)
+    base = first(BMO.operands(d))
     r_hole = _axial_bore_radius(d)
-    r_hole === nothing || return _tessellate_conic(d.base, r_hole)
-    return _difference((_tessellate(d.base), d.base), [(_tessellate(t), t) for t in d.tools])
+    r_hole === nothing || return _tessellate_conic(base, r_hole)
+    return _difference((_tessellate(base), base),
+        [(_tessellate(t), t) for t in Base.tail(BMO.operands(d))])
 end
 
 _default_color(::BMO.DifferenceSDF{T, <:BMO.ConicSDF}) where {T} = :silver

@@ -78,8 +78,9 @@ E_vec = polarized_field(agb, [0.01, 0, 0], 10.0)
 ```
 
 ```julia
-# Decompose a field from a detector into a new AstigmaticBeamGroup
-beams = WavefrontBeamletDecomposition(x, z, amplitude, phase, dir, λ)
+# Decompose a field from a detector into a new AstigmaticBeamGroup,
+# with the sample x = z = 0 at pos
+beams = WavefrontBeamletDecomposition(x, z, amplitude, phase, pos, dir, λ)
 
 # Solve system (propagate all beamlets to next segment)
 solve_system!(system, beams)

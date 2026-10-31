@@ -1,13 +1,3 @@
-function _hyperboloid_from_conjugates(s, s′)
-    R, k = _conic_from_conjugates(s, s′)
-    if !(k < -1)
-        throw(ArgumentError(
-            "s and s′ must have opposite signs for a hyperboloid (got s = $s, s′ = $s′ ⇒ k = $k); " *
-            "use (OffAxis)EllipsoidalMirror"))
-    end
-    return R, k
-end
-
 """
     OffAxisHyperbolicMirror(s, s′, x_off, diameter; thickness=nothing, hole_diameter=nothing)
 
@@ -15,7 +5,7 @@ Constructs an off-axis segment of a hyperboloidal [`Mirror`](@ref) whose conjuga
 object/image distances `s`, `s′` from the parent vertex, offset by `x_off`. Exactly one focus
 is virtual, i.e. `s` and `s′` have opposite signs.
 
-# Inputs
+# Arguments
 
 - `s`, `s′`:    Conjugate object/image distances from the parent vertex \\[m\\], measured
                 positive towards `-y` (real focus, in front of the mirror) and negative
@@ -44,7 +34,12 @@ function OffAxisHyperbolicMirror(
         thickness::Union{Real, Nothing} = nothing,
         hole_diameter::Union{Real, Nothing} = nothing
     )
-    R, k = _hyperboloid_from_conjugates(s, s′)
+    R, k = conic_from_conjugates(s, s′)
+    if !(k < -1)
+        throw(ArgumentError(
+            "s and s′ must have opposite signs for a hyperboloid (got s = $s, s′ = $s′ ⇒ k = $k); " *
+            "use (OffAxis)EllipsoidalMirror"))
+    end
     return OffAxisConicMirror(R, k, x_off, diameter; thickness, hole_diameter)
 end
 
@@ -62,7 +57,7 @@ If `hole_diameter` is given, a cylindrical bore centred on the optical axis (the
     The secondary of a Cassegrain/Gregory telescope sees the prime focus behind itself, so
     pass it as a negative `s`.
 
-# Inputs
+# Arguments
 
 - `s`, `s′`:        Conjugate object/image distances from the vertex \\[m\\], opposite signs
 - `diameter`:       Mirror aperture diameter \\[m\\]

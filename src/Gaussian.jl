@@ -467,17 +467,6 @@ function _gouy_before(gauss::GaussianBeamlet{T}, index::Integer) where {T}
     return ψ0
 end
 
-# Optical minus geometric path of `gauss` (including its parents) up to the start of segment `index`
-function path_excess_before(gauss::GaussianBeamlet{T}, index::Integer) where {T}
-    p = AbstractTrees.parent(gauss.chief)
-    Δl = isnothing(p) ? zero(T) : optical_path_length(p) - length(p)
-    for j in 1:(index - 1)
-        ray = rays(gauss.chief)[j]
-        Δl += optical_path_length(ray) - length(ray)
-    end
-    return Δl
-end
-
 # Field of segment `index` at distance `z` and radius `r` from the length, path and Gouy offsets in front of it
 function segment_field(gauss::GaussianBeamlet, r, z, point, index, l0, Δl0, ψ0)
     w, R, ψ, w0 = gauss_parameters(gauss, z, ψ0; hint = (point, index))

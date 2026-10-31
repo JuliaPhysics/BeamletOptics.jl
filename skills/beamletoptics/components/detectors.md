@@ -19,11 +19,11 @@ Detector(edge_length, stop = true)
 | Call | Returns |
 |------|---------|
 | `spot_diagram(det)` | `Vector{Point2}` of local `(x, z)` hit points (beamlets: projected 1/e² contour, kwargs `num_spots`, `crop_factor`) |
-| `electric_field(det, s = RegularGrid())` | `(xs, zs, E)`: complex field on the sampling `s`, by default a `num_points×num_points` grid (hits of `PolarizedRay`s and `AstigmaticGaussianBeamlet`s: a matrix of complex 3-vectors, use `sum(abs2, e)` per element) |
-| `intensity(det, s = RegularGrid())` | `(xs, zs, I)`: power per detector area in W/m², the Poynting flux through the detector; a single hit gives `n\|E\|² cos θ / (2Z₀)` |
-| `optical_power(det, s = RegularGrid())` | power in W, `Σ wᵢ Iᵢ` with the quadrature weights of the sampling, the beam power for any angle of incidence |
+| `electric_field(det, sampling = RegularGrid())` | `(xs, zs, E)`: complex field on the `sampling`, by default a `num_points×num_points` grid (hits of `PolarizedRay`s and `AstigmaticGaussianBeamlet`s: a matrix of complex 3-vectors, use `sum(abs2, e)` per element) |
+| `intensity(det, sampling = RegularGrid())` | `(xs, zs, I)`: power per detector area in W/m², the Poynting flux through the detector; a single hit gives `n\|E\|² cos θ / (2Z₀)` |
+| `optical_power(det, sampling = RegularGrid())` | power in W, `Σ wᵢ Iᵢ` with the quadrature weights of the sampling, the beam power for any angle of incidence |
 
-The sampling `s` decides where the readouts are evaluated, its window and the weights of `optical_power`:
+The `sampling` decides where the readouts are evaluated, its window and the weights of `optical_power`:
 
 - `RegularGrid(; kwargs...)`: `num_points×num_points` equidistant points in a window around the hits (keywords below), trapezoidal rule
 - `RectilinearGrid(xs, zs)`: a grid of one's own (local `x`, `z` vectors in m, any spacing), the window is `xs × zs` as given, trapezoidal rule; use `optical_power(det, RectilinearGrid(xs, zs))` for the power on it

@@ -53,7 +53,7 @@ function wavefront_decomposition()
     x = y = collect(range(-6mm, 6mm; length = 5))
     amplitude = [exp(-(xi^2 + yi^2) / (4mm)^2) for xi in x, yi in y]
     phase = zeros(length(x), length(y))
-    return WavefrontBeamletDecomposition(x, y, amplitude, phase, [0, 1, 0], λ)
+    return WavefrontBeamletDecomposition(x, y, amplitude, phase, [0, 0, 0], [0, 1, 0], λ)
 end
 
 const TILES = [

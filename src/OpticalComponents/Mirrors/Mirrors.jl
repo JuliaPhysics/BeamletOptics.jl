@@ -78,7 +78,7 @@ struct Mirror{T, S <: AbstractShape{T}} <: AbstractReflectiveOptic{T}
     shape::S
 end
 
-# order of inclusion matters
+# Order of inclusion matters
 include("MirrorUtils.jl")
 include("PlanoMirrors.jl")
 include("SphericalMirrors.jl")

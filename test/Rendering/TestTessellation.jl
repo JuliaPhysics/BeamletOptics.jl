@@ -266,6 +266,29 @@ BMO.sdf(s::BlobSDF, p) = norm(BMO._world_to_sdf(s, p)) - 5e-3
         @test all(nrm[i] ≈ face_normal(pts, f) for f in fcs for i in f)
     end
 
+    @testset "bounding_box of meshes" begin
+        extremes(pts) = (minimum(p[1] for p in pts), maximum(p[1] for p in pts),
+            minimum(p[2] for p in pts), maximum(p[2] for p in pts),
+            minimum(p[3] for p in pts), maximum(p[3] for p in pts))
+        m1 = Ext._tessellate(posed!(BMO.BoxSDF(20e-3, 10e-3, 30e-3)))
+        sphere = BMO.SphereSDF(8e-3)
+        BMO.translate3d!(sphere, [0.05, 0.0, -0.01])
+        m2 = Ext._tessellate(sphere)
+        # one mesh
+        box = BMO.bounding_box(m1)
+        @test box isa NTuple{6, Float64}
+        @test box == extremes(m1.points)
+        # two meshes
+        box = BMO.bounding_box(m1, m2)
+        @test box isa NTuple{6, Float64}
+        @test box == extremes(vcat(m1.points, m2.points))
+        @test box[2] > BMO.bounding_box(m1)[2] # the sphere extends the box in +x
+        # no points
+        box = BMO.bounding_box(Ext._TriMesh())
+        @test box isa NTuple{6, Float64}
+        @test box == (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+    end
+
     @testset "marching cubes fallback" begin
         s = BlobSDF()
         @test !Ext._has_mesh(s)

@@ -62,11 +62,12 @@ to their untraced start state.
 | `UniformLineSource(pos, dir, width, λ = 1e-6; num_rays = 101, basis)` | 2D: parallel rays equidistant on a line of length `width` along `basis`, marginal rays included. Returns a `CollimatedSource`. |
 | `UniformFanSource(pos, dir, θ, λ = 1e-6; num_rays = 101, basis)` | 2D: diverging rays with equidistant angles in `[-θ, θ]` (rad, θ < π) in the plane of `dir` and `basis`, marginal rays included. Returns a `PointSource`. |
 | `CollimatedSource(beams, diameter, pos, dir)` / `PointSource(beams, NA, pos, dir)` | wrap your own beams (e.g. polarized ones) |
+| `CollimatedSource(pos, dir, diameter, sampling, λ = 1e-6; num_rays, basis)` / `PointSource(pos, dir, sampling, λ = 1e-6; num_rays, basis)` | generic form behind the six constructors above, e.g. `PointSource(pos, dir, BeamletOptics.ConeSunflower(θ), λ; num_rays = 500)`. `sampling` is a `BeamletOptics.AbstractSourceSampling`: `DiscRings(num_rings)`, `DiscSunflower()`, `DiscLine()`, `ConeRings(num_rings, θ)`, `ConeSunflower(θ)`, `ConeFan(θ)` or your own |
 | `CollimatedGaussianBeamletSource(pos, dir, D, λ, w0s; n_grid = 20, basis, randomize_axes, rng, P0)` | square grid of astigmatic beamlets, `w0s ≈ D/n_grid`; total power `P0` |
 | `SphericalGaussianBeamletSource(pos, dir, θ, λ; num_rings, num_rays, overlap = 1.2, basis, randomize_axes, rng, P0, E0)` | diverging beamlet fan; total power `P0`, `E0` sets only polarization and phase |
 | `EllipticalGaussianBeamletSource(pos, dir, θ_x, θ_y, λ; …)` | elliptical diverging beamlet fan; as above |
 | `GaussianBeamletDecomposition(pos, dir, λ, w0; n_grid, overlap, basis, randomize_axes, rng, P0, E0, threshold = 1e-4)` | one large Gaussian beam decomposed into beamlets; power `P0`, `E0` sets only polarization and phase, `n_grid > 4 overlap` |
-| `WavefrontBeamletDecomposition(x, y, amplitude, phase, dir, λ; threshold, overlap, basis, randomize_axes, rng, E0)` | arbitrary sampled wavefront; the grid is centered at the origin, move it with `translate3d!` |
+| `WavefrontBeamletDecomposition(x, y, amplitude, phase, pos, dir, λ; threshold, overlap, basis, randomize_axes, rng, E0)` | arbitrary sampled wavefront; the sample `x = y = 0` lies at `pos` |
 | `AstigmaticBeamGroup(beams, pos, dir_or_orientation)` | wrap your own astigmatic beamlets |
 
 The 2D sources are for layout sketches and for tracing one section (e.g. the meridional plane) of
@@ -81,6 +82,11 @@ The first beam of the first six sources above is the center ray, which starts at
 `num_rays!(src, n)` regenerates the rays of the first six sources above with `n` rays, same
 sampling, in the current pose (e.g. a coarse trace first, a fine one later); solve again afterwards.
 Wrapped beams can not be regenerated (`ArgumentError`).
+
+Invalid input throws an `ArgumentError`: a `num_rays` below the minimum of the sampling (e.g.
+`num_rays < 20 num_rings` for the ring sources and the cone beamlet sources), a half spread angle
+`θ ≥ π` (`θ_x` or `θ_y ≥ π/2` for `EllipticalGaussianBeamletSource`), and a `basis` that is zero
+or parallel to `dir`.
 
 Trace beamlet groups onto a `Detector` and read them out with `intensity`/`electric_field`, which sum
 the beamlets coherently.
