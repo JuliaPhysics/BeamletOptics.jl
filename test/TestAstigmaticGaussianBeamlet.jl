@@ -244,7 +244,7 @@ end
     λ, w0, D = 1e-6, 20e-6, 5e-3
     k, zR = 2π / λ, π * w0^2 / λ
     wrap(x) = mod2pi(x + π) - π
-    gouy(s) = -atan((s - D) / zR) - atan(D / zR)          # relative to the start
+    gouy(s) = -atan((s - D) / zR)                         # relative to the waist
     for s in (D - zR, D, D + 0.5zR, D + 2zR, D + 5zR)
         beam() = AstigmaticGaussianBeamlet([0.0, -D, 0], [0.0, 1, 0], λ, w0, w0;
             z0_x = D, z0_y = D, support = [1.0, 0, 0])
@@ -257,6 +257,67 @@ end
         E_hit = electric_field(only(BMO.hits(det)), [0.0, s - D, 0])
         ψ = E_hit[argmax(abs.(E_hit))]
         @test wrap(angle(ψ) - k * s - gouy(s)) ≈ 0 atol = 2e-3
+    end
+end
+
+@testset "Waist offset" begin
+    λ, w0, z0, P0 = 1.064e-6, 0.5e-3, 0.2, 2e-3
+    pos, dir, s = [0.0, -0.1, 0], [0.0, 1, 0], [1.0, 0, 0]
+
+    # The field holds up to the paraxial error O(θ²) ≈ 1e-7 of the parabasal rays
+    @testset "Same beam as a GaussianBeamlet" for (p, d, x) in ((pos, dir, s),
+        ([1.0, 2, 3], normalize([1.0, 2, -1]), normalize([2.0, -1, 0])))
+        g = GaussianBeamlet(p, d, λ, w0; z0, P0, support = x)
+        a = AstigmaticGaussianBeamlet(p, d, λ, w0; z0, P0, support = x)
+        @test position(first(BMO.rays(a.c))) ≈ p
+        @test optical_power(a) ≈ P0
+        @test all(isapprox.(rayleigh_range(a), rayleigh_range(g); rtol = 1e-6))
+        for z in (0.0, 0.1, z0, 0.3, 0.6)
+            w, _, ψ, _ = gauss_parameters(g, z)
+            w1, w2, _, _, ψa, w01, w02 = gauss_parameters(a, z)
+            @test w1 ≈ w
+            @test w2 ≈ w
+            @test ψa ≈ ψ atol = 1e-6
+            @test w01 ≈ w0
+            @test w02 ≈ w0
+            @test electric_field(a, 0.2e-3 * x, z) ≈ electric_field(g, 0.2e-3, z) rtol = 1e-6
+        end
+    end
+
+    @testset "Same field on a detector" begin
+        function field(beam)
+            pd = Detector(0.05)
+            BMO.translate3d!(pd, [0, 0.3, 0])
+            solve_system!(System([pd]), beam)
+            return electric_field(only(BMO.hits(pd)), [0.2e-3, 0.3, 0])
+        end
+        E = field(GaussianBeamlet(pos, dir, λ, w0; z0, P0, support = s))
+        Ea = field(AstigmaticGaussianBeamlet(pos, dir, λ, w0; z0, P0, support = s))
+        @test Ea[1] ≈ E rtol = 1e-6
+    end
+
+    @testset "Waists per axis" begin
+        a = AstigmaticGaussianBeamlet(pos, dir, λ, w0, 2w0; z0, z0_y = -0.1, P0, support = s)
+        @test position(first(BMO.rays(a.c))) ≈ pos
+        @test optical_power(a) ≈ P0
+        @test gauss_parameters(a, z0)[1] ≈ w0
+        # the waist of the y axis lies in front of the start
+        zR = π * (2w0)^2 / λ
+        @test gauss_parameters(a, 0.0)[2] ≈ 2w0 * sqrt(1 + (0.1 / zR)^2)
+    end
+
+    @testset "M2" begin
+        M2 = 1.5
+        g = GaussianBeamlet(pos, dir, λ, w0; z0, M2, support = s)
+        a = AstigmaticGaussianBeamlet(pos, dir, λ, w0; z0, M2, support = s)
+        @test all(isapprox.(rayleigh_range(a), rayleigh_range(g; M2); rtol = 1e-6))
+    end
+
+    @testset "E0 is the field at the start" begin
+        E0 = [0.0, 0, 2.0]
+        a = AstigmaticGaussianBeamlet(pos, dir, λ, w0; z0, E0, support = s)
+        @test BMO.electric_field(a) ≈ E0
+        @test abs(electric_field(a, zeros(3), 0.0)) ≈ 2
     end
 end
 

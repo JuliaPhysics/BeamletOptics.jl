@@ -81,13 +81,18 @@ In the 5-argument version, independent waists `w0_x` and `w0_y` can be specified
 
 - `M2`, `M2_x`, `M2_y`: beam quality factors. Default is 1
 - `P0`: beam total power in [W]. Default is 1 mW.
-- `E0`: electric field vector in [V/m]. Default is `nothing` (aligned with support axes, scaled by `P0`).
+- `E0`: electric field vector in \\[V/m\\] at `position`, it replaces `P0`. Default is `nothing`
+  (aligned with support axes, scaled by `P0`, zero Gouy phase at the waist).
 - `support`: optional support vector for basis construction, i.e. the X axis of the beamlet. Must be
   orthogonal to `direction`, otherwise an `ArgumentError` is thrown; has any non-zero length and is
   normalized internally. Default is `nothing`, i.e. a vector orthogonal to `direction` is chosen.
 - `z0`: beam waist offset in [m]. Default is 0 m
 
 # Additional information
+
+!!! tip "Waist offset"
+    As for a [`GaussianBeamlet`](@ref), the `z0` keyword arg. spawns a beam at the specified
+    `position` with its waist at an offset `z0` in \\[m\\] along the chief ray axis.
 
 !!! warning "Optical invariant check"
     When using the `solve_system!` function, the beamlet invariant will be checked for each interaction. If the invariant is violated, tracing will be stopped.
@@ -115,19 +120,19 @@ Constructs an astigmatic Gaussian beamlet with independent waists `w0_x` and `w0
 This constructor supports modeling astigmatic sources where the waists in X and Y are at different locations along the beam axis.
 
 # Arguments
-- `position`: Global reference point of the beamlet.
+- `position`: Origin of the beamlet.
 - `direction`: Propagation direction vector.
 - `λ`: Wavelength.
 - `w0_x`: Waist radius in the X direction (defined by the support vector).
 - `w0_y`: Waist radius in the Y direction.
 
 # Keyword Arguments
-- `z0_x`: Position of the X waist relative to `position` along the propagation axis. Defaults to `z0`.
-- `z0_y`: Position of the Y waist relative to `position` along the propagation axis. Defaults to `z0`.
-- `z0`: Default waist position if `z0_x` and `z0_y` are not specified. Also defines the starting point of the chief ray as `position + z0 * direction`.
+- `z0_x`: Offset of the X waist from `position` along the propagation axis in \\[m\\]. Defaults to `z0`.
+- `z0_y`: Offset of the Y waist from `position` along the propagation axis in \\[m\\]. Defaults to `z0`.
+- `z0`: Default for `z0_x` and `z0_y`. Default is 0 m.
 - `M2_x`, `M2_y`: Beam quality factors. Default is 1.
 - `P0`: Total power in [W].
-- `E0`: Optional Jones vector for polarization.
+- `E0`: Optional electric field vector in \\[V/m\\] at `position`, it replaces `P0`.
 - `support`: Optional vector orthogonal to `direction` to define the X axis. Has any non-zero length
   and is normalized internally. A `support` that is not orthogonal to the `direction` (the dot
   product of the unit vectors exceeds `get_orthogonality_threshold()`, default `1e-10`) throws an
@@ -167,11 +172,17 @@ function AstigmaticGaussianBeamlet(
     end
     s2 = cross(direction, s1)
 
+    # Divergence angles
+    θx = divergence_angle(λ, w0_x, M2_x)
+    θy = divergence_angle(λ, w0_y, M2_y)
+
     # Handle polarization and power
     if isnothing(E0)
-        # Calculate E0 magnitude based on P0
-        I0 = (2 * P0) / (π * w0_x * w0_y)
-        E_phasor = electric_field(I0)
+        # Complex beam area at the start
+        area = complex(w0_x, -z0_x * tan(θx)) * complex(w0_y, -z0_y * tan(θy))
+        # Field at the start, zero Gouy phase at the waist
+        I0 = (2 * P0) / (π * abs(area))
+        E_phasor = electric_field(I0, Z_vacuum, -angle(area) / 2)
         E0 = s1 .* E_phasor # Default to linear polarization along first transverse axis
     else
         if !isorthogonal3d(direction, E0)
@@ -180,23 +191,18 @@ function AstigmaticGaussianBeamlet(
         end
     end
 
-    # Divergence angles
-    θx = divergence_angle(λ, w0_x, M2_x)
-    θy = divergence_angle(λ, w0_y, M2_y)
-    # All rays start in plane of chief ray start
-    start = position + z0 * direction
     # Waist and divergence rays per transverse axis and sign
     (wxp, wxm, dxp, dxm), (wyp, wym, dyp, dym) = map(
         ((s1, w0_x, θx, z0_x), (s2, w0_y, θy, z0_y))) do (s, w0, θ, z0_ax)
-        waist = map(σ -> Beam(Ray(start + σ * (s * w0), direction, λ)), (1, -1))
+        waist = map(σ -> Beam(Ray(position + σ * (s * w0), direction, λ)), (1, -1))
         divergence = map(
-            σ -> Beam(Ray(start + σ * ((z0 - z0_ax) * s * tan(θ)),
+            σ -> Beam(Ray(position - σ * (z0_ax * s * tan(θ)),
                 normalize(direction + σ * (s * tan(θ))), λ)),
             (1, -1))
         return (waist..., divergence...)
     end
     # Chief ray
-    c = PolarizedRay(start, direction, λ, E0)
+    c = PolarizedRay(position, direction, λ, E0)
     return AstigmaticGaussianBeamlet(Beam(c), wxp, wxm, wyp, wym, dxp, dxm, dyp, dym)
 end
 
@@ -730,12 +736,13 @@ end
 """
     rayleigh_range(agb::AstigmaticGaussianBeamlet)
 
-Returns the Rayleigh range for the x and y axes of the beamlet as a tuple `(z_rx, z_ry)`.
+Returns the Rayleigh range for the x and y axes of the **first** beam section of the beamlet as a
+tuple `(z_rx, z_ry)`, from its waist radii and divergence (`M2` included).
 """
 function rayleigh_range(agb::AstigmaticGaussianBeamlet)
-    λ = wavelength(agb)
-    _, w1, w2 = waist_parameters(agb, 0.0)
-    return (rayleigh_range(λ, norm(w1)), rayleigh_range(λ, norm(w2)))
+    _, u1, _, u2, _ = parabasal_ray_parameters(agb, 0.0)
+    _, _, _, _, _, w01, w02 = gauss_parameters(agb, 0.0)
+    return (w01 / norm(u1), w02 / norm(u2))
 end
 
 """
