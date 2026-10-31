@@ -142,8 +142,8 @@ function first_of(hit::Intersection, chosen::Intersection)
     return chosen
 end
 
-# Whether a hit of the chain `head` belongs to `s`, compared by identity
-holds_shape(head::Intersection, s) = any(hit -> shape(hit) === s, coincident_hits(head))
+# Whether a hit of the chain `head` belongs to `target`, compared by identity
+holds_shape(head::Intersection, target) = any(hit -> shape(hit) === target, coincident_hits(head))
 holds_shape(::Intersection, ::Nothing) = false
 
 function Base.show(io::IO, ::MIME"text/plain", _intersection::Intersection)
@@ -318,8 +318,7 @@ end
 function intersect3d(::MultiShape, object::AbstractObject, ray::AbstractRay)
     # Test bounding sphere first
     intersection = intersect3d(bounding_sphere_of(current_bounding_spheres(), object), shape(object), ray)
-    # Ensure that the intersection knows about the correct object if intersected. The parts that the
-    # ray hits at the same point belong to the object as well, their shapes tell them apart.
+    # Object of the hit and of its coincident hits
     return object!(intersection, object)
 end
 
