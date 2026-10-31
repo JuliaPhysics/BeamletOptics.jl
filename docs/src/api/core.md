@@ -15,7 +15,7 @@ The first two principles will be elaborated upon in more detail in the [Geometry
 ```mermaid
 flowchart TB
     S(["<b>solve_system!</b><br/>system + beam"]) --> I
-    I["<b>1. Intersect</b><br/>hinted shape first,<br/>else all objects"] -- hit --> X["<b>2. Interact</b><br/>compute<br/>AbstractInteraction"]
+    I["<b>1. Intersect</b><br/>closest hit of all objects,<br/>hinted object first"] -- hit --> X["<b>2. Interact</b><br/>compute<br/>AbstractInteraction"]
     X --> R["<b>3. Repeat</b><br/>attach next<br/>ray or beam segment"]
     R -- "optional Hint" --> I
     I -- "no hit or r_max" --> E([done])
@@ -57,14 +57,15 @@ BeamletOptics.Intersection
 
 Since an optical element can consist of multiple joint shapes, the return type must store which specific part of the object was hit.
 
-The following diagram shows how `trace_all` reaches the shapes of the objects and groups of a system, including the [Bounding sphere pretest](@ref) (green: implemented by a component author, purple: dispatch).
+The following diagram shows how `trace_all` reaches the shapes of the objects and groups of a system, including the [Bounding sphere pretest](@ref) (green: implemented by a component author, purple: dispatch). Where surfaces touch, e.g. the faces of a cemented doublet, the ray hits several of them at the same point. The hits within `get_coincidence_tolerance()` of the closest one are kept as a chain, see [Coincident hits](@ref).
 
 ```mermaid
 flowchart TB
-    TA(["<b>trace_all(system, ray)</b>"])
+    TA(["<b>trace_all(system, ray)</b><br/><b>closest_hits</b> of the top-level<br/>objects and groups"])
     BSO["<b>bounding_sphere_of(shape)</b><br/><i>optional</i>"]
     TBL["<b>bounding_spheres(system)</b><br/>table, once per solve"]
-    P{"<b>intersect3d(parts, ray)</b><br/>each part, closest hit wins"}
+    P{"<b>intersect3d(parts, ray)</b><br/>each part, <b>merge_hits</b>:<br/>closest hit and those<br/>at the same point"}
+    BY{"<b>beyond</b>(sphere, ray, t)?<br/>sphere only behind<br/>the closest hit so far"}
     G["<b>intersect3d(group, ray)</b><br/>x = objects(group)"]
     OJ["<b>intersect3d(object, ray)</b><br/><i>own method possible,<br/>e.g. PlateBeamsplitter</i>"]
     T{"<b>shape_trait_of(object)</b>"}
@@ -77,7 +78,9 @@ flowchart TB
 
     BSO --> TBL
     TBL -. "current_bounding_spheres()" .-> PT
-    TA --> P
+    TA -- "each top-level part" --> BY
+    BY -- "yes: skipped" --> MISS
+    BY -- no --> P
     P -- "AbstractObjectGroup" --> G
     P -- "AbstractObject" --> OJ
     P -- "AbstractShape" --> SH
@@ -96,7 +99,7 @@ flowchart TB
     classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
     class TBL,G,SS,MS,OBJ blue
     class BSO,OJ,SH green
-    class P,T,PT purple
+    class P,T,PT,BY purple
     class TA,MISS terminal
 ```
 
@@ -126,6 +129,17 @@ flowchart TB
     class SH purple
     class IX terminal
 ```
+
+### Coincident hits
+
+Touching elements, e.g. the two lenses of a cemented doublet or a coating on its substrate, share a surface. A ray that reaches it hits the surfaces of both within the accuracy of the intersection algorithms. Instead of picking one of them, the solver keeps all hits within `get_coincidence_tolerance()` (1 nm by default) of the closest hit as a chain, linked by the `next` field of the [`BeamletOptics.Intersection`](@ref):
+
+```@docs; canonical=false
+BeamletOptics.coincident_hits
+BeamletOptics.merge_hits
+```
+
+Hence the hit of the ray does not depend on the order of the objects in the system or on a [`BeamletOptics.Hint`](@ref).
 
 ### Bounding sphere pretest
 
@@ -196,7 +210,7 @@ OpticsBase.PlaneField(::AbstractVector{<:Union{BeamletOptics.GaussianBeamletHit,
 
 ## Hints
 
-As mentioned in the previous section, the [`BeamletOptics.Hint`](@ref) interface allows developers to manipulate the non-sequential solver algorithm into testing against a specific component and shape during the next cycle of the [Intersect-Interact-Repeat-Loop](@ref). This interface has very high priority during intersection testing.
+As mentioned in the previous section, the [`BeamletOptics.Hint`](@ref) interface allows developers to manipulate the non-sequential solver algorithm into testing against a specific component and shape during the next cycle of the [Intersect-Interact-Repeat-Loop](@ref). The hinted object is tested first, and the objects whose bounding spheres lie beyond its hit are skipped. The hint does not change which surface is hit: a closer hit of another object wins, and among the [Coincident hits](@ref) at the closest point the hint only puts the hinted shape first.
 
 ```@docs; canonical=false
 BeamletOptics.Hint
@@ -216,16 +230,14 @@ flowchart TB
     N(["return nothing<br/>the solver queues the children"])
     P["<b>push!(beam, interaction)</b>"]
     TST{"<b>tracing_step!</b><br/>(system, ray, hint)"}
-    HS{"<b>trace_one</b><br/>hinted shape hit?"}
-    OB["<b>object!(intersection, object(hint))</b><br/>no other object is tested"]
-    TA["<b>trace_all(system, ray)</b>"]
+    HS["<b>trace_one</b><br/>intersect3d(object(hint), ray) first"]
+    OB["<b>closest_hits</b><br/>of all other objects, those<br/>beyond the hint's hit skipped"]
+    TA["<b>first_of_shape</b><br/>hinted shape first among<br/>the coincident hits"]
 
     S --> F
     F -- "cbs.front or cbs.back" --> PR --> H --> P --> TST
     F -- "cbs.coating" --> CO --> N
-    TST -- "::Hint" --> HS
-    HS -- yes --> OB
-    HS -- no --> TA
+    TST -- "::Hint" --> HS --> OB --> TA
 
     classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
     classDef green fill:#38982626,stroke:#389826,stroke-width:2px
@@ -293,7 +305,7 @@ flowchart TB
     S(["<b>trace_system!</b><br/>system + beam::Beam"])
     RM{"length(rays(beam))<br/>#lt; r_max?"}
     TST{"<b>tracing_step!</b><br/>(system, last ray, hint)"}
-    TO["<b>trace_one</b><br/>hinted shape first"]
+    TO["<b>trace_one</b><br/>hinted object first,<br/>then all others"]
     TA["<b>trace_all</b><br/>intersect3d of all top-level<br/>objects and groups"]
     HIT{"intersection(ray)<br/>is nothing?"}
     IA["<b>interact3d</b><br/>(system, object, beam, ray)"]
@@ -305,8 +317,7 @@ flowchart TB
     RM -- yes --> TST
     TST -- "::Hint" --> TO
     TST -- "::Nothing" --> TA
-    TO -- "hinted shape missed" --> TA
-    TO -- hit --> HIT
+    TO --> HIT
     TA --> HIT
     HIT -- no --> IA --> NI
     NI -- no --> P --> RM
