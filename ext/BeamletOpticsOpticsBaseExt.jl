@@ -92,10 +92,12 @@ the optical path from the source (parents included), and follows the conventions
 `PlaneField(detector; ...)`: no projection factor, `H` from the beamlet direction, a scalar
 `GaussianBeamlet` polarized along `u`, `R = Inf`, `n` the refractive index of the segment.
 
+Both beamlet models can be sampled on any of their segments, also within a medium.
+
 !!! warning
-    An `AstigmaticGaussianBeamlet` can be sampled on any of its segments, also within a
-    medium. The scalar `GaussianBeamlet` model can be sampled on any of its segments as
-    well, but in a medium of index `n` its amplitude is `√n` too large.
+    The scalar `GaussianBeamlet` takes no Fresnel losses at surfaces: within a medium its
+    field carries the full power of the beamlet, while that of an `AstigmaticGaussianBeamlet`
+    is reduced by the transmission of each surface it passed.
 """
 OpticsBase.PlaneField(beam::AstigmaticGaussianBeamlet, id::Integer; kwargs...) =
     PlaneField([AstigmaticGaussianBeamletHit(beam, id)]; kwargs...)
@@ -108,7 +110,8 @@ OpticsBase.PlaneField(beam::GaussianBeamlet, id::Integer; kwargs...) =
         size::NTuple{2,Int}, spacing::NTuple{2,Real}, origin, axes, progress = false)
 
 Samples the coherent field of a vector of beamlet hits on a plane. Build the hits with
-`GaussianBeamletHit(beam, id)` or `AstigmaticGaussianBeamletHit(beam, id)`.
+`BeamletOptics.GaussianBeamletHit(beam, id)` or `BeamletOptics.AstigmaticGaussianBeamletHit(beam, id)`
+(public, not exported).
 
 # Arguments
 
