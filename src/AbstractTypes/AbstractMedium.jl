@@ -5,14 +5,27 @@ A medium in which light propagates between two boundaries, e.g. the glass of a l
 a laboratory. The bodies of a system provide their medium via [`medium`](@ref), and a
 [`Transition`](@ref) holds the media on both sides of a boundary.
 
-# Interface
-
-- `refractive_index(medium, λ)`: the refractive index at the wavelength `λ` in [m]
-
 Further media, e.g. absorbing, birefringent or graded-index ones, will extend this interface with
 the beam models that support them.
+
+# Implementation reqs.
+
+## Fields
+
+None required.
+
+## Getters/setters
+
+None required.
+
+## Functions
+
+- `refractive_index(medium, λ)`: the refractive index at the wavelength `λ` in [m]
 """
 abstract type AbstractMedium end
+
+refractive_index(medium::AbstractMedium, ::Real) =
+    error(lazy"refractive_index not defined for $(typeof(medium))")
 
 """
     IsotropicMedium(n)
@@ -24,8 +37,8 @@ struct IsotropicMedium{N} <: AbstractMedium
     n::N
 end
 
-refractive_index(m::IsotropicMedium{<:Real}, ::Real) = m.n
-refractive_index(m::IsotropicMedium, λ::Real) = m.n(λ)
+refractive_index(medium::IsotropicMedium{<:Real}, ::Real) = medium.n
+refractive_index(medium::IsotropicMedium, λ::Real) = medium.n(λ)
 
 """
     SystemMedium(system)
@@ -37,7 +50,7 @@ struct SystemMedium{S <: AbstractSystem} <: AbstractMedium
     system::S
 end
 
-refractive_index(m::SystemMedium, λ::Real) = refractive_index(m.system, λ)
+refractive_index(medium::SystemMedium, λ::Real) = refractive_index(medium.system, λ)
 
 """
     medium(x)
@@ -73,41 +86,40 @@ struct Enclosure
     outer::Union{Nothing, Enclosure}
 end
 
-"""Returns the innermost body of the enclosure `e`, or `nothing` outside of all bodies."""
-innermost(e::Enclosure) = e.body
+"""Returns the innermost body of the `enclosure`, or `nothing` outside of all bodies."""
+innermost(enclosure::Enclosure) = enclosure.body
 innermost(::Nothing) = nothing
 
 """
-    enter(e, body)
+    enter(enclosure, body)
 
-Returns the enclosure `e` within the `body`, which is the new innermost body. A `body` that `e` holds
-already leaves `e` unchanged, e.g. the body that a ray leaves for a ray that a component created
-without an enclosure. No body (`nothing`) leaves `e` unchanged as well.
+Returns the `enclosure` within the `body`, the new innermost body. A `body` that the `enclosure`
+holds already, or no body (`nothing`), leaves it unchanged.
 """
-enter(e::Nullable{Enclosure}, body::AbstractObject) = encloses(e, body) ? e : Enclosure(body, e)
-enter(e::Nullable{Enclosure}, ::Nothing) = e
+enter(enclosure::Nullable{Enclosure}, body::AbstractObject) =
+    encloses(enclosure, body) ? enclosure : Enclosure(body, enclosure)
+enter(enclosure::Nullable{Enclosure}, ::Nothing) = enclosure
 
 """
-    leave(e, body)
+    leave(enclosure, body)
 
-Returns the enclosure `e` without the `body`, which the ray leaves. It is the innermost body of `e`
-for nested bodies. A `body` deeper within `e` is removed as well, with a warning once, since bodies
-overlap then. A `body` that `e` does not hold leaves `e` unchanged, e.g. for a ray that a component
-created without an enclosure.
+Returns the `enclosure` without the `body` that the ray leaves, its innermost body for nested
+bodies. A `body` deeper within it is removed with a warning once, since bodies overlap then; a
+`body` that it does not hold leaves it unchanged.
 """
 leave(::Nothing, body) = nothing
-leave(e::Enclosure, ::Nothing) = e
+leave(enclosure::Enclosure, ::Nothing) = enclosure
 
-function leave(e::Enclosure, body::AbstractObject)
-    e.body === body && return e.outer
-    encloses(e, body) || return e
+function leave(enclosure::Enclosure, body::AbstractObject)
+    enclosure.body === body && return enclosure.outer
+    encloses(enclosure, body) || return enclosure
     @warn "A ray leaves a body that is not its innermost one: bodies overlap" maxlog = 1
-    return enclosure_without(e, body)
+    return enclosure_without(enclosure, body)
 end
 
-enclosure_without(e::Enclosure, body) =
-    e.body === body ? e.outer : Enclosure(e.body, enclosure_without(e.outer, body))
+enclosure_without(enclosure::Enclosure, body) = enclosure.body === body ? enclosure.outer :
+    Enclosure(enclosure.body, enclosure_without(enclosure.outer, body))
 
-"""Returns `true` if the enclosure `e` holds the `body`."""
+"""Returns `true` if the `enclosure` holds the `body`."""
 encloses(::Nothing, body) = false
-encloses(e::Enclosure, body) = e.body === body || encloses(e.outer, body)
+encloses(enclosure::Enclosure, body) = enclosure.body === body || encloses(enclosure.outer, body)

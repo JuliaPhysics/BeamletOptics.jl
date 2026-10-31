@@ -1264,6 +1264,21 @@ end
     @test BMO.medium(g) isa BMO.IsotropicMedium
 end
 
+# Dummy subtypes of the medium and surface model contracts, without their hooks
+struct BareMedium <: BMO.AbstractMedium end
+struct BareModel <: BMO.AbstractSurfaceModel end
+
+@testset "Fallbacks of the medium and surface model contracts" begin
+    @test_throws ErrorException BMO.refractive_index(BareMedium(), λ0)
+    # A surface model without interact3d warns and blocks the beam
+    plate = BMO.Lens(BMO.CuboidMesh(40mm, 5mm, 40mm), λ -> 1.5)
+    p, d = [20mm, -20mm, 20mm], [0.0, 1.0, 0.0]
+    t = transition_at(System([plate]), p, d)
+    ray = Ray(p, d, λ0)
+    @test isnothing(@test_logs (:warn, r"No interact3d method") BMO.interact3d(System([plate]),
+        BareModel(), t, Beam(ray), ray))
+end
+
 @testset "Enclosure: bodies within bodies" begin
     θ = deg2rad(25)
     d = [sin(θ), cos(θ), 0]

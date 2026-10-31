@@ -253,7 +253,7 @@ function trace_system!(
         obj = object(ray_intersection)
         interaction = interact3d(
             system, obj, beam, ray)::Union{Nothing, BeamInteraction{T, R}}
-        # The new rays learn the bodies around them
+        # Enclosure of the new rays
         enclose_new!(system, beam, ray, interaction)
         if isnothing(interaction)
             break

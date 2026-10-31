@@ -10,7 +10,7 @@ Stores data calculated by the [`intersect3d`](@ref) method.
 - `t`: length of the ray parametrization in [m]
 - `n`: normal vector at the point of intersection
 - `part`: the object that was hit, a part of `object` if this consists of objects, or `nothing`, see [`part_of`](@ref)
-- `isbody`: whether `part` is a body, i.e. has a [`medium`](@ref), see [`is_body`](@ref)
+- `isbody`: whether `part` is a body, i.e. has a [`medium`](@ref), see [`isbody`](@ref)
 - `next`: the next hit of the ray at the same point, or `nothing`, see [`coincident_hits`](@ref)
 
 # Coincident hits
@@ -166,8 +166,8 @@ function first_of(hit::Intersection, chosen::Intersection)
     return chosen
 end
 
-# Whether a hit of the chain `head` belongs to `s`, compared by identity
-holds_shape(head::Intersection, s) = any(hit -> shape(hit) === s, coincident_hits(head))
+# Whether a hit of the chain `head` belongs to `target`, compared by identity
+holds_shape(head::Intersection, target) = any(hit -> shape(hit) === target, coincident_hits(head))
 holds_shape(::Intersection, ::Nothing) = false
 
 function Base.show(io::IO, ::MIME"text/plain", _intersection::Intersection)
@@ -269,7 +269,7 @@ the system. A ray type without the field `enclosure` is always taken to be outsi
 enclosure(::AbstractRay) = nothing
 
 """Sets the [`Enclosure`](@ref) of the `ray`. A ray type without the field `enclosure` ignores it."""
-enclosure!(::AbstractRay, e) = nothing
+enclosure!(::AbstractRay, new) = nothing
 
 intersection(ray::AbstractRay) = ray.intersection
 function intersection!(ray::AbstractRay, _intersection::Nullable{Intersection})
@@ -355,8 +355,7 @@ end
 function intersect3d(::MultiShape, object::AbstractObject, ray::AbstractRay)
     # Test bounding sphere first
     intersection = intersect3d(bounding_sphere_of(current_bounding_spheres(), object), shape(object), ray)
-    # Ensure that the intersection knows about the correct object if intersected. The parts that the
-    # ray hits at the same point belong to the object as well, their shapes tell them apart.
+    # Object of the hit and of its coincident hits
     return object!(intersection, object)
 end
 

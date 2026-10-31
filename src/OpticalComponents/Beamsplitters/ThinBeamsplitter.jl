@@ -124,21 +124,27 @@ proportional to `n cos(θ) |E|²`.
 """
 function transmit!(child::AbstractRay, ray::AbstractRay, t::Transition)
     dir, _ = refraction3d(direction(ray), normal3d(t), refractive_index_in(t), refractive_index_out(t))
+    transmit_field!(child, ray, dir, t)
     refractive_index!(child, refractive_index_out(t))
     direction!(child, dir)
     return nothing
 end
 
-function transmit!(child::PolarizedRay, ray::PolarizedRay, t::Transition)
-    dir, _ = refraction3d(direction(ray), normal3d(t), refractive_index_in(t), refractive_index_out(t))
+"""
+    transmit_field!(child, ray, dir, t::Transition)
+
+Transforms the field of the transmitted `child` into the refracted direction `dir` and scales it for
+the medium behind the boundary of `t`; a [`Ray`](@ref) carries no field.
+"""
+transmit_field!(::AbstractRay, ::AbstractRay, dir, ::Transition) = nothing
+
+function transmit_field!(child::PolarizedRay, ray::PolarizedRay, dir, t::Transition)
     normal = normal3d(t)
     P = _calculate_global_E0(direction(ray), dir, normal3d(intersection(ray)), SPBasis(1, 0, 0, 1))
-    cos_in = abs(dot(direction(ray), normal))
-    cos_out = abs(dot(dir, normal))
+    cos_in = abs(cos_angle3d(direction(ray), normal))
+    cos_out = abs(cos_angle3d(dir, normal))
     scale = sqrt(refractive_index_in(t) * cos_in / (refractive_index_out(t) * cos_out))
     polarization!(child, scale * _transverse(P * polarization(child), dir))
-    refractive_index!(child, refractive_index_out(t))
-    direction!(child, dir)
     return nothing
 end
 
@@ -249,16 +255,15 @@ function interact3d(system::AbstractSystem, bs::ThinBeamsplitter, beamlet::Gauss
     is_totally_reflected(ray, transition(system, ray)) && return cross_boundary(system, beamlet, ray_id)
     t = _beamsplitter_transmitted_beam(bs, beamlet, ray_id)
     r = _beamsplitter_reflected_beam(bs, beamlet, ray_id)
-    # Each component ray crosses the boundary at its own hit. The component beams differ in their ray
-    # type, hence `map` over the tuples, which is unrolled
+    # Each component ray at its own hit, map unrolls the heterogeneous tuples
     map(_component_beams(beamlet), _component_beams(t), _component_beams(r)) do b, tb, rb
         ray_b = rays(b)[ray_id]
         tr = transition(system, ray_b)
         transmit!(first(rays(tb)), ray_b, tr)
         reflect!(first(rays(rb)), tr)
     end
-    # Add conditional phase flip to the reflected beam
-    dot(direction(ray), normal3d(intersection(ray))) < 0 && phase_shift!(r, π)
+    # Conditional phase flip of the reflected beam
+    isentering(ray) && phase_shift!(r, π)
     children!(beamlet, [t, r])
     return nothing
 end

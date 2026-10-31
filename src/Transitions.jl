@@ -8,18 +8,18 @@ elements, e.g. cemented lenses or a coating on its substrate, need no knowledge 
 =#
 
 """
-    find_part(x, s)
+    find_part(object, target)
 
-Returns the object within `x` whose shape is `s`, or `nothing`. `x` is an object, which may consist
-of objects (a [`MultiShape`](@ref) object), or a shape, which holds no object.
+Returns the object within `object` whose shape is `target`, or `nothing`. A part that is a plain
+shape holds no object.
 """
-find_part(::AbstractShape, s) = nothing
-find_part(x::AbstractObject, s) = find_part(shape_trait_of(x), x, s)
-find_part(::SingleShape, x::AbstractObject, s) = shape(x) === s ? x : nothing
+find_part(::AbstractShape, target) = nothing
+find_part(object::AbstractObject, target) = find_part(shape_trait_of(object), object, target)
+find_part(::SingleShape, object::AbstractObject, target) = shape(object) === target ? object : nothing
 
-function find_part(::MultiShape, x::AbstractObject, s)
-    for part in shape(x)
-        found = find_part(part, s)
+function find_part(::MultiShape, object::AbstractObject, target)
+    for part in shape(object)
+        found = find_part(part, target)
         isnothing(found) || return found
     end
     return nothing
@@ -40,24 +40,24 @@ part_of(hit::Intersection) = isnothing(hit.part) ? part_of(object(hit), shape(hi
 part_of(::Nothing) = nothing
 
 """
-    is_body(hit::Intersection)
+    isbody(hit::Intersection)
 
 Returns `true` if the part that the `hit` belongs to is a body, i.e. has a [`medium`](@ref). The solver
 stores this with the part of the hit; a hit of an object with its own `intersect3d` is looked up.
 """
-is_body(hit::Intersection) = isnothing(hit.part) ? !isnothing(medium(part_of(hit))) : hit.isbody
+isbody(hit::Intersection) = isnothing(hit.part) ? !isnothing(medium(part_of(hit))) : hit.isbody
 
 """
     interaction_rank(hit, ray)
 
 Returns the rank of the `hit` of the `ray` among the [`coincident_hits`](@ref): the hit of the lowest
-rank interacts with the `ray`. A surface that is no body (see [`is_body`](@ref)) ranks first, e.g. a
+rank interacts with the `ray`. A surface that is no body (see [`isbody`](@ref)) ranks first, e.g. a
 thin beamsplitter, a mirror or a detector on a lens: it acts at the boundary, see
 [`Transition`](@ref). The surface of a body that the `ray` enters ranks before the surface of a body
 that it leaves.
 """
 interaction_rank(hit::Intersection, ray::AbstractRay) =
-    !is_body(hit) ? 0 : isentering(direction(ray), normal3d(hit)) ? 1 : 2
+    !isbody(hit) ? 0 : isentering(direction(ray), normal3d(hit)) ? 1 : 2
 
 """
     first_to_interact(hit, ray)
@@ -81,7 +81,7 @@ function first_to_interact(hit::Intersection, ray::AbstractRay)
 end
 
 """
-    Transition{T}
+    Transition{T, S}
 
 The boundary that a ray crosses at its [`Intersection`](@ref): the medium on each side and the thin
 layer between them, see [`transition`](@ref).
@@ -113,8 +113,8 @@ of every new ray that starts at the boundary, see [`enclose!`](@ref).
 At most one thin layer acts at a boundary. If several coincide, e.g. two films on top of each other,
 the closest one acts and a warning is issued once.
 """
-struct Transition{T}
-    system::AbstractSystem
+struct Transition{T, S <: AbstractSystem}
+    system::S
     λ::T
     n_in::T
     n_out::T
@@ -180,18 +180,19 @@ function enclose!(::AbstractSystem, ray::AbstractRay{T}, new_rays) where {T}
     e_out = nothing
     for r in new_rays
         norm(position(r) - p) ≤ get_coincidence_tolerance() || continue
-        if dot(direction(r), normal) > 0
-            enclosure!(r, e_in)
-        else
+        if isentering(direction(r), normal)
             isnothing(e_out) && (e_out = enclosure_beyond(e_in, exiting, entering))
             enclosure!(r, e_out)
+        else
+            enclosure!(r, e_in)
         end
     end
     return nothing
 end
 
-# The normal `n` turned against the direction of the `ray`
-normal_against(n::AbstractVector, ray::AbstractRay) = isentering(direction(ray), n) ? n : -n
+# The `normal` turned against the direction of the `ray`
+normal_against(normal::AbstractVector, ray::AbstractRay) =
+    isentering(direction(ray), normal) ? normal : -normal
 
 """
     boundary_hits(hit::Intersection, ray) -> (exiting, entering, layer)
@@ -206,7 +207,7 @@ function boundary_hits(hit::Intersection{T}, ray::AbstractRay) where {T}
     entering::Nullable{Intersection{T}} = nothing
     layer::Nullable{Intersection{T}} = nothing
     for h in coincident_hits(hit)
-        if !is_body(h)
+        if !isbody(h)
             if isnothing(layer)
                 layer = h
             else
@@ -254,8 +255,7 @@ function transition(system::AbstractSystem, ray::AbstractRay{T}) where {T}
     hit = intersection(ray)::Intersection{T}
     λ = wavelength(ray)
     exiting, entering, layer = boundary_hits(hit, ray)
-    # The bodies around the ray: the body that it leaves encloses it, also for a ray that a component
-    # created without an enclosure
+    # Bodies around the ray, including the body it leaves
     e_in = enter(enclosure(ray), part_of(exiting))
     n_in = _index(innermost(e_in), λ, T(refractive_index(ray)))
     n_out = if !isnothing(entering)
@@ -266,7 +266,8 @@ function transition(system::AbstractSystem, ray::AbstractRay{T}) where {T}
         n_in
     end
     normal = normal_against(normal3d(hit), ray)
-    return Transition{T}(system, T(λ), n_in, n_out, normal, exiting, entering, layer, e_in)
+    return Transition{T, typeof(system)}(system, T(λ), n_in, n_out, normal, exiting, entering, layer,
+        e_in)
 end
 
 # The index of the innermost body in the number type `T` of the ray, e.g. a `ForwardDiff.Dual` within
@@ -285,8 +286,8 @@ continued ray of the `interaction`, or, without one, the first rays of the child
 For a beamlet, each component ray at the segment `ray_id` is handled on its own. See
 [`enclose!`](@ref).
 """
-enclose_new!(system::AbstractSystem, ::Beam, ray::AbstractRay, i::BeamInteraction) =
-    enclose!(system, ray, (i.ray,))
+enclose_new!(system::AbstractSystem, ::Beam, ray::AbstractRay, interaction::BeamInteraction) =
+    enclose!(system, ray, (interaction.ray,))
 
 enclose_new!(system::AbstractSystem, beam::Beam, ray::AbstractRay, ::Nothing) =
     enclose!(system, ray, (first(rays(c)) for c in children(beam)))
@@ -294,8 +295,8 @@ enclose_new!(system::AbstractSystem, beam::Beam, ray::AbstractRay, ::Nothing) =
 # The component beams of a beamlet differ in their ray type, hence they are handled by `map` over the
 # tuples, which is unrolled, not by a loop
 function enclose_new!(system::AbstractSystem, beam::GaussianBeamlets, ray_id::Int,
-        i::AbstractInteraction)
-    map(_component_beams(beam), component_interactions(i)) do b, bi
+        interaction::AbstractInteraction)
+    map(_component_beams(beam), component_interactions(interaction)) do b, bi
         enclose!(system, rays(b)[ray_id], (bi.ray,))
     end
     return nothing
@@ -310,18 +311,40 @@ function enclose_new!(system::AbstractSystem, beam::GaussianBeamlets, ray_id::In
     return nothing
 end
 
-component_interactions(i::GaussianBeamletInteraction) = (i.chief, i.waist, i.divergence)
-component_interactions(i::AstigmaticGaussianBeamletInteraction) =
-    (i.chief, i.wxp, i.wxm, i.wyp, i.wym, i.dxp, i.dxm, i.dyp, i.dym)
+component_interactions(interaction::GaussianBeamletInteraction) =
+    (interaction.chief, interaction.waist, interaction.divergence)
+component_interactions(interaction::AstigmaticGaussianBeamletInteraction) =
+    (interaction.chief, interaction.wxp, interaction.wxm, interaction.wyp, interaction.wym,
+        interaction.dxp, interaction.dxm, interaction.dyp, interaction.dym)
 
 """
     AbstractSurfaceModel
 
-The optical model of a boundary between two media, e.g. an uncoated surface or a coating. A model
-`M` implements `interact3d(system, model::M, t::Transition, beam, ray)`, which returns the
-interaction of the `ray` at the boundary of the transition `t`, see [`surface_model`](@ref).
+The optical model of a boundary between two media, e.g. an uncoated surface or a coating, see
+[`surface_model`](@ref).
+
+# Implementation reqs.
+
+## Fields
+
+None required.
+
+## Getters/setters
+
+None required.
+
+## Functions
+
+- `interact3d(system, model, t::Transition, beam, ray)`: the interaction of the `ray` at the
+  boundary of the transition `t`; without a method, the boundary warns and blocks the beam
 """
 abstract type AbstractSurfaceModel end
+
+function interact3d(::AbstractSystem, model::AbstractSurfaceModel, ::Transition, ::Beam,
+        ray::AbstractRay)
+    @warn lazy"No interact3d method defined for:" ModelType = typeof(model) RayType = typeof(ray)
+    return nothing
+end
 
 """
     Uncoated <: AbstractSurfaceModel
@@ -380,8 +403,7 @@ function cross_boundary(t::Transition, ::Beam{T, R}, ray::R, E) where {T <: Real
         return BeamInteraction{T, R}(hint_out(t), PolarizedRay{T}(hit_point(ray), direction(ray),
             nothing, wavelength(ray), n2, E))
     end
-    # Fresnel coefficients from the cosine of the angle of incidence (in the 1. quadrant), which is
-    # smooth for automatic differentiation also at normal incidence
+    # Fresnel coefficients from the cosine, smooth for AD at normal incidence
     rs, rp, ts, tp = _fresnel_coefficients(cos_angle3d(direction(ray), -normal), n2 / n1)
     if is_internally_reflected(rp, rs)
         new_dir = reflection3d(direction(ray), normal)
@@ -418,8 +440,8 @@ The interaction of a [`GaussianBeamlet`](@ref) or an [`AstigmaticGaussianBeamlet
 boundary at the segment `ray_id`: each component ray crosses it at its own hit, see
 `cross_boundary(system, beam, ray)`.
 """
-cross_boundary(system::AbstractSystem, g::GaussianBeamlet{R}, ray_id::Int) where {R} =
-    GaussianBeamletInteraction{R}(cross_components(system, g, ray_id)...)
+cross_boundary(system::AbstractSystem, gauss::GaussianBeamlet{R}, ray_id::Int) where {R} =
+    GaussianBeamletInteraction{R}(cross_components(system, gauss, ray_id)...)
 
 cross_boundary(system::AbstractSystem, agb::AstigmaticGaussianBeamlet{R}, ray_id::Int) where {R} =
     AstigmaticGaussianBeamletInteraction{R}(cross_components(system, agb, ray_id)...)

@@ -81,7 +81,7 @@ function interact3d(::AbstractSystem,
     E = _calculate_global_E0(polfilter, ray, direction(ray), polfilter.JMat)
     # Terminate blocked rays
     norm(E) ≤ polfilter.cutoff && return nothing
-    # The filtered field crosses the boundary between the media on both sides of the filter
+    # Filtered field crosses the boundary
     return cross_boundary(t, beam, ray, E)
 end
 
