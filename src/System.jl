@@ -189,19 +189,19 @@ lie beyond it, hence the `hint` speeds up the trace but does not change the clos
 end
 
 """
-    first_of_shape(hit, s)
+    first_of_shape(hit, target)
 
-Returns the chain of [`coincident_hits`](@ref) `hit` with the hit of the shape `s` first, if the chain
+Returns the chain of [`coincident_hits`](@ref) `hit` with the hit of the shape `target` first, if the chain
 holds one, else `hit` unchanged. No hit (`nothing`) stays `nothing`.
 """
-function first_of_shape(hit::Intersection, s)
+function first_of_shape(hit::Intersection, target)
     for h in coincident_hits(hit)
-        shape(h) === s && return first_of(hit, h)
+        shape(h) === target && return first_of(hit, h)
     end
     return hit
 end
 
-first_of_shape(::Nothing, s) = nothing
+first_of_shape(::Nothing, target) = nothing
 
 """
     tracing_step!(system::AbstractSystem, ray::AbstractRay{R}, hint::Hint)
