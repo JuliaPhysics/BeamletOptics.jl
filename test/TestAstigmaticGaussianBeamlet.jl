@@ -23,6 +23,14 @@ const BMO = BeamletOptics
         @test isempty(beam.children)
     end
 
+    @testset "Number type" begin
+        pos, dir, s = Float32[0, 0, 0], Float32[0, 1, 0], Float32[1, 0, 0]
+        # the type of P0 counts only if it sets the field
+        @test AstigmaticGaussianBeamlet(pos, dir, 1.0f-6, 1.0f-3; E0 = ComplexF32[1, 0, 0], support = s) isa AstigmaticGaussianBeamlet{Float32}
+        @test AstigmaticGaussianBeamlet(pos, dir, 1.0f-6, 1.0f-3; P0 = 1.0f-3, support = s) isa AstigmaticGaussianBeamlet{Float32}
+        @test AstigmaticGaussianBeamlet(pos, dir, 1.0f-6, 1.0f-3; support = s) isa AstigmaticGaussianBeamlet{Float64}
+    end
+
     @testset "Support vector" begin
         pos = [0.0, 0, 0]
         dir = [0.0, 1, 0]
@@ -360,6 +368,46 @@ end
     @testset "Tracing does not stop, the Fresnel loss is that of M2 = 1 for M2 = $M2" for M2 in (2, 5, 10)
         ref = detector_power(AstigmaticGaussianBeamlet(pos, dir, λ, w0; P0), tilted_lens())
         @test detector_power(AstigmaticGaussianBeamlet(pos, dir, λ, w0; P0, M2), tilted_lens()) ≈ ref rtol = 1e-3
+    end
+
+    @testset "Twisted beam, M2 = ($Mx, $My)" for (Mx, My) in ((3, 3), (1, 4), (2, 8), (1, 20))
+        # A cylinder lens rotated against the axes of the beam twists it: for unequal M2,
+        # H H† is complex, and det S exceeds |h1 × h2|² by 1.86 for M2 = (1, 20)
+        function behind_cylinder_lens(M2_x, M2_y)
+            lens = Lens(CylindricalSurface(30e-3, 20e-3, 25e-3), 4e-3, _ -> 1.5)
+            BMO.yrotate3d!(lens, deg2rad(45))
+            translate3d!(lens, [0, 50e-3, 0])
+            pd = Detector(0.1)
+            translate3d!(pd, [0, 130e-3, 0])
+            beam = AstigmaticGaussianBeamlet(pos, dir, λ, w0, w0; P0, M2_x, M2_y, support = [1.0, 0, 0])
+            solve_system!(System([lens, pd]), beam)
+            return beam, pd
+        end
+        ref = optical_power(last(behind_cylinder_lens(1, 1)))
+        beam, pd = behind_cylinder_lens(Mx, My)
+        @test optical_power(pd) ≈ ref rtol = 1e-3
+        # The field falls to 1/e² of its peak at the radii of waist_parameters
+        z = 130e-3 - 1e-9
+        _, w1, w2 = BMO.waist_parameters(beam, z)
+        peak = sum(abs2, BMO.polarized_field(beam, zeros(3), z))
+        for w in (w1, w2)
+            @test sum(abs2, BMO.polarized_field(beam, w, z)) / peak ≈ exp(-2) rtol = 1e-6
+        end
+    end
+
+    @testset "The limit does not depend on M2 and λ" begin
+        # H deviates by 8.5 % in this focus, within the limit of 50 %
+        function reaches_detector(; kw...)
+            lens = SphericalLens(50e-3, -50e-3, 8e-3, 30e-3, x -> 1.5)
+            translate3d!(lens, [0, 0.1, 0])
+            pd = Detector(0.2)
+            translate3d!(pd, [0, 0.15, 0])
+            beam = AstigmaticGaussianBeamlet(pos, dir, 1064e-9, 10e-3; kw...)
+            with_logger(() -> solve_system!(System([lens, pd]), beam), NullLogger())
+            return !isnothing(BMO.hits(pd)) && !isempty(BMO.hits(pd))
+        end
+        @test reaches_detector()
+        @test reaches_detector(M2 = 100)
     end
 
     @testset "The invariants keep their start value" begin

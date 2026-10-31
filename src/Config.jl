@@ -12,7 +12,9 @@ const invariant_threshold = @load_preference("invariant_threshold", 1e-6)
 """
     get_invariant_threshold()
 
-Returns the global configuration threshold for the paraxial optical invariant check.
+Returns the global configuration threshold for the paraxial optical invariant check: the limit of
+the complex invariant of an astigmatic beamlet and of the Lagrange invariant of a stigmatic
+beamlet. The Lagrange invariants of an astigmatic beamlet use [`get_lagrange_tolerance`](@ref).
 """
 get_invariant_threshold() = invariant_threshold
 
@@ -22,7 +24,8 @@ const lagrange_tolerance = @load_preference("lagrange_tolerance", 0.5)
 
 Returns the largest relative deviation of the Lagrange invariant of an axis of an astigmatic
 beamlet from its value at the start of the root beam, beyond which the beamlet has left the
-range of its model. Defaults to `0.5` (configurable via the `lagrange_tolerance` preference).
+range of its model and tracing stops. Defaults to `0.5` (configurable via the `lagrange_tolerance`
+preference, see [`set_lagrange_tolerance!`](@ref)).
 """
 get_lagrange_tolerance() = lagrange_tolerance
 
@@ -162,6 +165,14 @@ Sets the global configuration threshold for the paraxial optical invariant check
 This preference is persistent. Please restart Julia for this to take effect.
 """
 set_invariant_threshold!(val::Real) = set_preference!("invariant_threshold", Float64(val))
+
+"""
+    set_lagrange_tolerance!(val::Real)
+
+Sets the largest relative deviation of the Lagrange invariant of an astigmatic beamlet, see
+[`get_lagrange_tolerance`](@ref). This preference is persistent. Please restart Julia for this to take effect.
+"""
+set_lagrange_tolerance!(val::Real) = set_preference!("lagrange_tolerance", Float64(val))
 
 """
     set_progress_threshold!(val::Real)

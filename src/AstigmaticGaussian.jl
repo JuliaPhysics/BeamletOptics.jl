@@ -159,9 +159,10 @@ function AstigmaticGaussianBeamlet(
         z0_x::Real = z0,
         z0_y::Real = z0
 )
-    # Common number type of all rays
+    # Common number type of all rays, P0 counts only if it sets the field
+    F = isnothing(E0) ? typeof(P0) : real(eltype(E0))
     T = float(promote_type(eltype(position), eltype(direction), typeof(λ), typeof(w0_x),
-        typeof(w0_y), typeof(M2_x), typeof(M2_y), typeof(P0), typeof(z0_x), typeof(z0_y)))
+        typeof(w0_y), typeof(M2_x), typeof(M2_y), F, typeof(z0_x), typeof(z0_y)))
     position, direction, λ = T.(position), T.(direction), T(λ)
     # Create orthogonal vectors for construction purposes (right-handed)
     direction = normalize(direction)
@@ -206,7 +207,7 @@ function AstigmaticGaussianBeamlet(
         return (waist..., divergence...)
     end
     # Chief ray
-    c = PolarizedRay(position, direction, λ, E0)
+    c = PolarizedRay(position, direction, λ, Complex{T}.(E0))
     return AstigmaticGaussianBeamlet(Beam(c), wxp, wxm, wyp, wym, dxp, dxm, dyp, dym)
 end
 
@@ -435,9 +436,9 @@ end
     check_optical_invariant(agb, i; threshold = get_invariant_threshold())
 
 Evaluate the complex optical invariant `h1 . u2 - h2 . u1 = 0` at segment `i` and the
-`lagrange_invariants` against their values at the start of the root beam. A Lagrange
-invariant must lie within `threshold` of that value and within `Config.get_lagrange_tolerance()`
-of it in relative terms: `threshold` alone is larger than `λ/π` at optical wavelengths.
+`lagrange_invariants` against their values at the start of the root beam. `threshold` is the
+limit of the complex invariant. A Lagrange invariant must lie within the share
+[`get_lagrange_tolerance`](@ref)`()` of its value, for any `M2` and `λ`.
 Returns `true` if the invariants hold, and `false` otherwise.
 """
 function check_optical_invariant(agb::AstigmaticGaussianBeamlet, i::Int;
@@ -459,8 +460,7 @@ function check_optical_invariant(agb::AstigmaticGaussianBeamlet, i::Int;
     # This ensures that each axis individually behaves like a valid Gaussian.
     targets = lagrange_invariants(AbstractTrees.getroot(agb), 1)
     for (H, H_target, label) in zip(lagrange_invariants(agb, i), targets, ("x", "y"))
-        atol = min(threshold, Config.get_lagrange_tolerance() * H_target)
-        if !isapprox(H, H_target; atol)
+        if !isapprox(H, H_target; atol = get_lagrange_tolerance() * H_target)
             @warn lazy"Lagrange invariant violation ($label) at segment $i: H=$H, target=$H_target. The beamlet has likely encountered an object that violates the paraxial assumption."
             all_pass = false
         end
@@ -577,16 +577,21 @@ end
 
 Transverse factor of the field at the offset `r` from the chief ray with direction `d`, with the
 wavenumber `nk` of the medium. The phase is the real part of `r^T Q r / 2`. The decay is
-`exp(-r^T S⁻¹ r)` with the spot matrix `S = H H†`, so that the field follows the beam radius
-for any `M2` and carries the power of the beam area: `Im Q` is `S⁻¹` only for `M2 = 1` and
-while the Lagrange invariants hold.
+`exp(-r^T S⁻¹ r)` with the spot matrix `S = Re(H H†)`, so that the field follows the beam radius
+for any `M2`: `Im Q` is `S⁻¹` only for `M2 = 1` and while the Lagrange invariants hold. As
+`H H† = S + i c J`, `det S = |area|² + c²` with `c = [Re h1, Im h1] + [Re h2, Im h2]`, which is
+nonzero e.g. for `M2_x ≠ M2_y` behind a rotated astigmatic element. The factor
+`(|area|² / det S)^(1/4)` then keeps the power of the beam area.
 """
 function transverse_profile(h1, u1, h2, u2, r, d, area, nk)
     ξ1 = _pseudo_cross2d(h1, r, d)
     ξ2 = _pseudo_cross2d(h2, r, d)
     # We use _pseudo_dot to compute the non-conjugating dot product r^T u.
     w = (ξ1 * _pseudo_dot(u2, r) - ξ2 * _pseudo_dot(u1, r)) / (2 * area)
-    return cis(nk * real(w)) * exp(-(abs2(ξ1) + abs2(ξ2)) / abs2(area))
+    c = _pseudo_cross2d(real(h1), imag(h1), d) + _pseudo_cross2d(real(h2), imag(h2), d)
+    det_S = abs2(area) + c^2
+    return sqrt(sqrt(abs2(area) / det_S)) * cis(nk * real(w)) *
+           exp(-(abs2(ξ1) + abs2(ξ2)) / det_S)
 end
 
 # Coefficients (A0, A1, A2) of the complex beam area a(l) = (h1 + l u1) × (h2 + l u2) · d
@@ -671,9 +676,9 @@ phase.
 
 # Formalism
 The field is computed using the **Parabasal Gaussian Beamlet** formalism:
-ψ(r, z) = √(area_ref / area(z)) * exp(i * k * [z + 1/2 * rᵀ * Re Q(z) * r]) * exp(-rᵀ * S(z)⁻¹ * r)
+ψ(r, z) = √(area_ref / area(z)) * (|area(z)|² / det S(z))^(1/4) * exp(i * k * [z + 1/2 * rᵀ * Re Q(z) * r]) * exp(-rᵀ * S(z)⁻¹ * r)
 where area(z) = (h1 × h2) · dir is the complex beam area, `area_ref` its value at the start
-of the segment, continued over all segments in front of it, and S = H H† the spot matrix.
+of the segment, continued over all segments in front of it, and S = Re(H H†) the spot matrix.
 """
 function parabasal_field(
         agb::AstigmaticGaussianBeamlet,

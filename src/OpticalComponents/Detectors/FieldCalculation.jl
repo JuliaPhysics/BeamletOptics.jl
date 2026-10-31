@@ -107,10 +107,10 @@ detector and the optical path length `L` from the source to the hit point `p_hit
   the segment and the optical path `L(l)` along the chief ray.
 - [`AstigmaticGaussianBeamletHit`](@ref): the field vector of the chief ray of the segment, `E₀`,
   times the general astigmatic Gaussian beam of its parabasal rays,
-  ``\\mathbf{E}_j(\\mathbf{p}) = \\mathbf{E}_0\\, g(l) \\exp(i k_0 [L(l) + n\\, W(\\mathbf{p})]) \\exp(-\\mathbf{r}^T \\mathbf{S}^{-1} \\mathbf{r})``,
+  ``\\mathbf{E}_j(\\mathbf{p}) = \\mathbf{E}_0\\, g(l) \\kappa^{-1/4} \\exp(i k_0 [L(l) + n\\, W(\\mathbf{p})]) \\exp(-\\mathbf{r}^T \\mathbf{S}^{-1} \\mathbf{r})``,
   with the Gouy factor `g`, which also holds the change of the amplitude with the beam area, the
-  transverse phase `W` and the spot matrix `S` at the offset `r` from the chief ray, see
-  [Astigmatic polarized beamlets](@ref).
+  transverse phase `W`, the spot matrix `S` at the offset `r` from the chief ray and
+  `κ = det S / |a|²` of the complex beam area `a`, see [Astigmatic polarized beamlets](@ref).
 
 Beamlet hits give the physical field in \\[V/m\\]. Ray hits are raw and unscaled: `|E|²` does not
 carry the power of the ray, see the note on scaling in [`electric_field`](@ref)`(pd, sampling)`.

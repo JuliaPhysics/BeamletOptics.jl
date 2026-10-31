@@ -459,8 +459,9 @@ dominant(E) = E[argmax(abs.(E))]
         λ = 532nm
         w0 = 0.1mm
 
-        # Create a highly non-paraxial setup:
-        # A flat plate tilted at an extreme angle (80 degrees)
+        # A flat plate tilted at an extreme angle (80 degrees) keeps the Lagrange invariants, so
+        # tracing goes on: `threshold` is the limit of the complex invariant only. A real
+        # violation is covered by "Limit of the beamlet model"
         surf1 = BMO.CircularFlatSurface(10.0mm)
         surf2 = BMO.CircularFlatSurface(10.0mm)
 
@@ -471,25 +472,13 @@ dominant(E) = E[argmax(abs.(E))]
         BMO.zrotate3d!(lens, deg2rad(80))
         BMO.translate3d!(lens, [0, 1.0mm, 0])
 
-        # Set threshold very low to trigger violation (central diffs are very accurate)
-        strict_threshold = 1e-13
-
         system = BMO.System([lens])
 
-        # Create a beamlet pointing at the lens
-        beam = AstigmaticGaussianBeamlet(
-            [0.0, 0, 0], [0, 1, 0], λ, 0.05mm; support = [1, 0, 0])
-
-        # Reset beam for the actual test
         beam = AstigmaticGaussianBeamlet(
             [0.4mm, 0, 0], [0, 1, 0], λ, 0.05mm; support = [1, 0, 0])
 
-        @test_logs (:warn, r"Lagrange invariant violation") match_mode=:any BMO.solve_system!(
-            system, beam; threshold = strict_threshold)
-
-        # Verify that the beam stopped tracing once the invariant failed
-        # (solve_system calls trace_system! which has a break on invariant failure)
-        @test length(BMO.rays(beam.c)) < 10 # It should stop early
+        @test_nowarn BMO.solve_system!(system, beam; threshold = 1e-13)
+        @test length(BMO.rays(beam.c)) == 3
     end
 
     @testset "A child beamlet continues its parent" begin

@@ -33,6 +33,7 @@ import Base: length, push!, empty!, position
 include("Constants.jl")
 include("Config.jl")
 using .Config: get_invariant_threshold, set_invariant_threshold!,
+             get_lagrange_tolerance, set_lagrange_tolerance!,
              get_sdf_surface_threshold, get_sdf_raymarch_eps,
              get_sdf_miss_distance,
              get_internal_reflection_threshold, get_line_plane_intersection_threshold,

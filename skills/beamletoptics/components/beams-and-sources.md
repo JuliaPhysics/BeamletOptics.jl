@@ -48,9 +48,12 @@ AstigmaticGaussianBeamlet(pos, dir, λ, w0_x, w0_y; M2_x, M2_y, P0, E0, support,
   be orthogonal to `dir` (any non-zero length), otherwise the constructor throws an `ArgumentError`.
 - `solve_system!` checks the optical invariant and stops tracing if it is violated, with a "Lagrange
   invariant violation" warning: a detector behind that point gets no hits. This is the limit of the
-  model. It ends where a strong focus takes the rays off the parabolic part of a surface, most
-  of all with separate waists (`w0 = 6.4 mm`, `z0_y = 3` m: f = 75 mm traces, f = 50 mm stops). Use
-  smaller beamlets or a `GaussianBeamletDecomposition`; `check_invariant = false` gives no valid field.
+  model. It ends where a strong focus takes the rays off the parabolic part of a surface, the earlier
+  the farther the waist lies from the surface (`w0 = 6.4 mm`, λ = 1064 nm: the first f that stops is
+  75 mm for `z0 = ±5`, 60 mm for `z0_y = 3`, 40 mm for `z0_y = 1`, none down to 40 mm for `z0 = 0`). Use
+  smaller beamlets or a `GaussianBeamletDecomposition`. The limit is `get_lagrange_tolerance()`, 50 %
+  of the start value for any `M2` and λ, set by `set_lagrange_tolerance!`, not by `threshold`;
+  `check_invariant = false` gives no valid field.
 - The field and the detector power follow the polarization of the chief ray: uncoated surfaces take
   their Fresnel loss (about 4 % of the power per surface at n = 1.5), polarizers and beamsplitters
   act, a mirror reverses the field. A `GaussianBeamlet` has no such losses.
