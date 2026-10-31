@@ -12,20 +12,18 @@ The hits of the current task per [`Detector`](@ref), see [`with_hit_buffers`](@r
 detector is kept at hand, since consecutive hits mostly go to the same detector.
 """
 mutable struct HitBuffers
-    const buffers::IdDict{Detector, Vector}
-    last_detector::Union{Nothing, Detector}
-    last_buffer::Vector
-    HitBuffers() = new(IdDict{Detector, Vector}(), nothing, [])
+    # Abstract element type on purpose: the detectors of a task may collect different hit types
+    const buffers::IdDict{Detector, Vector{<:AbstractDetectorHit}}
+    last_detector::Nullable{Detector}
+    last_buffer::Vector{<:AbstractDetectorHit}
+    HitBuffers() = new(IdDict{Detector, Vector{<:AbstractDetectorHit}}(), nothing, AbstractDetectorHit[])
 end
 
 # Key of the buffers of the current task in the task-local storage
-const HIT_BUFFERS_KEY = :BeamletOptics_hit_buffers
+const hit_buffers_key = :BeamletOptics_hit_buffers
 
 "Stores each pushed `detector => hit` directly in its detector, guarded by the `lock` of the detector."
 struct LockedHits end
-
-# Where the current task pushes its hits: its buffers within `with_hit_buffers`, otherwise the detectors
-current_hit_sink() = get(task_local_storage(), HIT_BUFFERS_KEY, LockedHits())::Union{LockedHits, HitBuffers}
 
 """
     with_hit_buffers(f)
@@ -39,7 +37,7 @@ not while `f` runs.
 function with_hit_buffers(f)
     buffers = HitBuffers()
     try
-        return task_local_storage(f, HIT_BUFFERS_KEY, buffers)
+        return task_local_storage(f, hit_buffers_key, buffers)
     finally
         for (d, new) in buffers.buffers
             append!(d, new)
@@ -47,7 +45,7 @@ function with_hit_buffers(f)
     end
 end
 
-function push!(::LockedHits, (d, new)::Pair{<:Detector, <:AbstractDetectorHit})
+function push!(sink::LockedHits, (d, new)::Pair{<:Detector, <:AbstractDetectorHit})
     lock(d.lock) do
         # set data type on first push
         if isnothing(hits(d))
@@ -58,6 +56,7 @@ function push!(::LockedHits, (d, new)::Pair{<:Detector, <:AbstractDetectorHit})
         push!(hits(d), new)
         return nothing
     end
+    return sink
 end
 
 function push!(b::HitBuffers, (d, new)::Pair{<:Detector, H}) where {H <: AbstractDetectorHit}
@@ -66,5 +65,5 @@ function push!(b::HitBuffers, (d, new)::Pair{<:Detector, H}) where {H <: Abstrac
         b.last_detector = d
     end
     push!(b.last_buffer::Vector{H}, new)
-    return nothing
+    return b
 end

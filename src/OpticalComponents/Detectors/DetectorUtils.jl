@@ -74,8 +74,7 @@ function calc_local_pos(
     ) where T
     pd_pos = position(pd)
     # left handed coord. sys. for correct (x, z) orientation
-    local_x = -orientation(pd)[:, 1]
-    local_z = orientation(pd)[:, 3]
+    local_x, local_z = local_axes(pd)
     hits_3D = hit_point.(hits)
     return calc_local_pos(pd_pos, local_x, local_z, hits_3D)
 end
@@ -103,9 +102,8 @@ function calc_local_pos(
     ts = LinRange(0, 2pi, num_spots)
     p0 = position(pd)
     # Left-handed coord. sys. due to pd mesh rotation
-    ex = -orientation(pd)[:,1]
-    ey = orientation(pd)[:,2]
-    ez = orientation(pd)[:,3]
+    ex, ez = local_axes(pd)
+    ey = direction(pd)
     pts_2D = Vector{Point2{T}}()
     sizehint!(pts_2D, length(hits) * num_spots)
     
@@ -119,7 +117,7 @@ function calc_local_pos(
         waist_radius = hit.w_max * crop_factor
         
         # build basis vectors
-        dir = hit.d0
+        dir = direction(hit)
         nd1 = normal3d(dir)
         nd2 = cross(dir, nd1)
         origin = hit_point(hit)
@@ -158,9 +156,8 @@ function calc_local_pos(
     ts = LinRange(0, 2pi, num_spots)
     p0 = position(pd)
     # Left-handed coord. sys. due to pd mesh rotation
-    ex = -orientation(pd)[:,1]
-    ey = orientation(pd)[:,2]
-    ez = orientation(pd)[:,3]
+    ex, ez = local_axes(pd)
+    ey = direction(pd)
     pts_2D = Vector{Point2{T}}()
     sizehint!(pts_2D, length(hits) * num_spots)
 
@@ -175,7 +172,7 @@ function calc_local_pos(
         h1 = (hit.h1 + l_seg * hit.u1) * crop_factor
         h2 = (hit.h2 + l_seg * hit.u2) * crop_factor
         
-        dir = hit.d0
+        dir = direction(hit)
         origin = hit_point(hit)
         
         for k in 1:num_spots
@@ -193,18 +190,25 @@ function calc_local_pos(
 end
 
 """
-    calc_local_lims(pd::Detector; kwargs...)
+    calc_local_lims(pd::Detector)
 
-Calculates the limiting values for the flat E-field evaluation grid based on the detector data.
+Calculates the limiting values for the flat E-field evaluation grid based on the detector data,
+with the default `crop_factor` of the hit type.
 """
-calc_local_lims(pd::Detector; kwargs...) = calc_local_lims(pd, hits(pd); kwargs...)
+calc_local_lims(pd::Detector) = calc_local_lims(pd, hits(pd), nothing)
 
-function calc_local_lims(::Detector, ::Vector{B}) where B<:AbstractDetectorHit
-    throw(ErrorException("calc_local_lims not available for $B"))
+function calc_local_lims(
+        ::Detector,
+        ::Vector{B},
+        crop_factor;
+        # kwargs
+        center::AbstractCenterAlgorithm=Centroid()
+    ) where B
+    error(lazy"calc_local_lims not defined for $B")
 end
 
 """
-    calc_local_lims(pd::Detector, hits::Vector{<:AbstractRayHit}; crop_factor=1, center=Centroid())
+    calc_local_lims(pd::Detector, hits::Vector{<:AbstractRayHit}, crop_factor; center=Centroid())
 
 Compute a symmetric [x_min,x_max]×[z_min,z_max] box around the hit positions weighted centroid for ray-based spot diagrams.
 
@@ -213,15 +217,16 @@ Compute a symmetric [x_min,x_max]×[z_min,z_max] box around the hit positions we
   with wᵢ = projection_factor.
 • If `center==MinMax()`, falls back to the midpoint of [min,max].
 
+`crop_factor` scales the half-widths of the box, `nothing` selects the default of `1`.
+
 Returns `(x_min, x_max, z_min, z_max)`.
 """
 function calc_local_lims(
         pd::Detector,
-        hits::Vector{<:AbstractRayHit{T}};
+        hits::Vector{<:AbstractRayHit{T}},
+        crop_factor::Real;
         # kwargs
-        crop_factor::Real=one(T),
-        center::AbstractCenterAlgorithm=Centroid(),
-        kwargs...
+        center::AbstractCenterAlgorithm=Centroid()
     ) where T
     # get provided hit‐points in local (x,y)
     local_hits = calc_local_pos(pd, hits)
@@ -237,29 +242,36 @@ function calc_local_lims(
     return x0 - hwx, x0 + hwx, z0 - hwy, z0 + hwy
 end
 
+calc_local_lims(
+    pd::Detector,
+    hits::Vector{<:AbstractRayHit{T}},
+    ::Nothing;
+    # kwargs
+    center::AbstractCenterAlgorithm=Centroid()
+) where T = calc_local_lims(pd, hits, one(T); center)
+
 """
-    calc_local_lims(pd::Detector, hits::Vector{GaussianBeamletHit}; crop_factor=3, num_spots=50, kwargs...)
+    calc_local_lims(pd::Detector, hits::Vector{<:AbstractBeamletHit}, crop_factor; center=Centroid())
 
 Computes a 2D bounding box around the circular or elliptical waist of [`GaussianBeamlet`](@ref) hits.
 Assumes that the beamlet is approximately cylindrical around its optical axis at the point of intersection.
 The box reaches `crop_factor` beam radii beyond each hit point, divided by the `cos θ` of the
-angle of incidence, which stretches the footprint of the beam on the detector.
+angle of incidence, which stretches the footprint of the beam on the detector. `nothing` selects
+the default `crop_factor` of `3`.
 
-# Keyword arguments
-
-For available keyword args., refer to the corresponding [`calc_local_pos`](@ref) function.
+The `center` keyword is ignored and only accepted so that all hit types share one signature.
 """
 function calc_local_lims(
         pd::Detector,
-        hits::Vector{H};
-        crop_factor::Real=3,
-        kwargs...
+        hits::Vector{H},
+        crop_factor::Real;
+        # kwargs
+        center::AbstractCenterAlgorithm=Centroid()
     ) where {T, H <: AbstractBeamletHit{T}}
-    
+
     pos_pd = position(pd)
-    ex = -orientation(pd)[:, 1]
-    ey = orientation(pd)[:, 2]
-    ez = orientation(pd)[:, 3]
+    ex, ez = local_axes(pd)
+    ey = direction(pd)
 
     xmin = T(Inf)
     xmax = T(-Inf)
@@ -272,8 +284,7 @@ function calc_local_lims(
         x = dot(p_hit, ex)
         z = dot(p_hit, ez)
         
-        # Conservative bounding box using cached w_max, the maximum semi-axis of the beam at
-        # the detector. On the detector its footprint is stretched by 1/cos θ.
+        # Footprint stretched by 1/cos θ
         w = hit.w_max * crop_factor / abs(dot(direction(hit), ey))
         
         xmin = min(xmin, x - w)
@@ -289,3 +300,11 @@ function calc_local_lims(
     
     return (xmin, xmax, zmin, zmax)
 end
+
+calc_local_lims(
+    pd::Detector,
+    hits::Vector{<:AbstractBeamletHit},
+    ::Nothing;
+    # kwargs
+    center::AbstractCenterAlgorithm=Centroid()
+) = calc_local_lims(pd, hits, 3; center)

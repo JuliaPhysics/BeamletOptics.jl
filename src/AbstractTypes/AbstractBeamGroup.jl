@@ -13,16 +13,16 @@ Subtypes of `AbstractBeamGroup` must implement the following:
 
 - `beams`: a vector or tuple of root [`AbstractBeam`](@ref)s, e.g. [`Beam`](@ref)s or [`AstigmaticGaussianBeamlet`](@ref)s
 - `center`: a `Point3{T}` which is regarded as the source position, i.e. the reference origin (pivot) of the group
-- `orientation`: a `SMatrix{3,3,T,9}` that describes the local coordinate system of the group
+- `dir`: a `SMatrix{3,3,T,9}` that describes the local coordinate system of the group
 
-The columns of `orientation` are the local x-, y- and z-axis. They must form a right-handed
-orthonormal basis, like the `orientation` of an [`ObjectGroup`](@ref). The local y-axis
+The columns of `dir` are the local x-, y- and z-axis. They must form a right-handed
+orthonormal basis, like the `dir` of an [`ObjectGroup`](@ref). The local y-axis
 (second column) is the central source direction, i.e. the optical axis of the group. The
 local x-axis (first column) is the reference vector of the azimuthal sampling (the `basis`
 of the source constructors). Unlike a direction vector, the orientation therefore also
 tracks a roll of the group about its own optical axis.
 
-Since the kinematic API modifies `center` and `orientation`, the subtype must be a `mutable struct`.
+Since the kinematic API modifies `center` and `dir`, the subtype must be a `mutable struct`.
 
 ## Getters/setters
 
@@ -79,7 +79,7 @@ The orientation tracks the full rotational state of the group, including a roll 
 own optical axis. It is updated by [`rotate3d!`](@ref) and returned to the identity by
 [`reset_rotation3d!`](@ref).
 """
-orientation(bg::AbstractBeamGroup) = bg.orientation
+orientation(bg::AbstractBeamGroup) = bg.dir
 
 """
     orientation!(bg::AbstractBeamGroup, M)
@@ -91,7 +91,7 @@ Overwrites the orientation matrix of the beam group `bg` with `M`, see [`orienta
     [`rotate3d!`](@ref) to rotate a group including its beams. `M` is not validated and must
     be a right-handed orthonormal matrix.
 """
-orientation!(bg::AbstractBeamGroup{T}, M) where {T} = (bg.orientation = SMatrix{3, 3, T, 9}(M))
+orientation!(bg::AbstractBeamGroup{T}, M) where {T} = (bg.dir = SMatrix{3, 3, T, 9}(M))
 
 wavelength(bg::AbstractBeamGroup) = wavelength(first(rays(first(beams(bg)))))
 

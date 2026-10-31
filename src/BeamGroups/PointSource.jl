@@ -9,7 +9,7 @@ Represents a cone of [`Beam`](@ref)s being emitted from a single point in space.
   which starts at the source position along the central source direction, unless the source wraps given beams.
 - `NA`: the [`numerical_aperture`](@ref) of the point source spread angle
 - `center`: source position, pivot for rotations
-- `orientation`: right-handed orthonormal matrix, columns are the sampling reference vector, the central source direction and their cross product, see [`AbstractBeamGroup`](@ref)
+- `dir`: the [`orientation`](@ref) of the group, a right-handed orthonormal matrix whose columns are the sampling reference vector, the central source direction and their cross product, see [`AbstractBeamGroup`](@ref)
 - `sampling`: how the rays were sampled (rings, sunflower or fan) (or `NoSampling()` for given beams), see [`num_rays!`](@ref)
 
 # Functions
@@ -21,7 +21,7 @@ mutable struct PointSource{T, R <: AbstractRay{T}, S <: AbstractSourceSampling} 
     beams::Vector{Beam{T, R}}
     NA::T
     center::Point3{T}
-    orientation::SMatrix{3, 3, T, 9}
+    dir::SMatrix{3, 3, T, 9}
     sampling::S
 end
 
@@ -37,7 +37,7 @@ is the central direction. An invalid `orientation` throws an `ArgumentError`. Th
 source can not be regenerated with [`num_rays!`](@ref): its `sampling` is `NoSampling()`.
 """
 function PointSource(beams::Vector{Beam{T, R}}, NA, pos, dir::AbstractVector) where {T, R <: AbstractRay{T}}
-    d = normalize(dir)
+    d = normalize(T.(dir))
     return PointSource(beams, NA, pos, _group_orientation(d, sampling_basis(d, nothing, T), T))
 end
 
@@ -47,9 +47,45 @@ PointSource(beams::Vector{<:Beam}, NA, pos, orientation::AbstractMatrix) =
 function PointSource(beams::Vector{Beam{T, R}}, NA, pos, orientation::AbstractMatrix,
         sampling::S) where {T, R <: AbstractRay{T}, S <: AbstractSourceSampling}
     check_kinematic_members(beams)
-    return PointSource{T, R, S}(beams, T(NA), Point3{T}(pos), _check_orientation(orientation, T), sampling)
+    return PointSource{T, R, S}(beams, T(NA), Point3{T}(pos), check_orientation(orientation, T), sampling)
 end
+
+"""
+    numerical_aperture(ps::PointSource)
+
+Returns the numerical aperture of the half spread angle of `ps`.
+"""
 numerical_aperture(ps::PointSource) = ps.NA
+
+"""
+    PointSource(pos, dir, sampling::AbstractSourceSampling, λ = 1e-6; num_rays, basis = nothing)
+
+Spawns a [`PointSource`](@ref) of [`Beam`](@ref)s emitted from `pos` [m] around the central
+direction `dir` with the wavelength `λ` [m], sampled by `sampling` with `num_rays` rays, e.g.
+[`BeamletOptics.ConeRings`](@ref). The catalog constructors [`PointSource`](@ref),
+[`UniformPointSource`](@ref) and [`UniformFanSource`](@ref) call this method; a custom
+[`BeamletOptics.AbstractSourceSampling`](@ref) implements `source_beams` and
+`numerical_aperture` for it. The number type is `promote_type` of `pos`, `dir` and `λ`.
+
+The optional `basis` vector sets the azimuth of the sampling pattern about `dir`, see
+[`BeamletOptics.sampling_basis`](@ref). A `num_rays` below
+[`BeamletOptics.min_num_rays`](@ref) of the sampling and a `basis` that is zero or parallel to
+`dir` throw an `ArgumentError`.
+"""
+function PointSource(
+        pos::AbstractArray{P},
+        dir::AbstractArray{D},
+        sampling::AbstractSourceSampling,
+        λ::L = 1e-6;
+        num_rays::Int,
+        basis = nothing
+) where {P <: Real, D <: Real, L <: Real}
+    T = promote_type(P, D, L)
+    dir = normalize(T.(dir))
+    b1 = sampling_basis(dir, basis, T)
+    beams = source_beams(sampling, pos, dir, b1, T(λ), num_rays, T)
+    return PointSource(beams, numerical_aperture(sampling), pos, _group_orientation(dir, b1, T), sampling)
+end
 
 """
     PointSource(pos, dir, θ, λ; num_rings, num_rays, basis)
@@ -94,14 +130,7 @@ function PointSource(
         basis::Union{Nothing, AbstractVector} = nothing
 ) where {P <: Real, D <: Real, H <: Real, L <: Real}
     T = promote_type(P, D, H, L)
-    if θ ≥ pi
-        throw(ErrorException("Point source opening half-angle θ must be < π"))
-    end
-    dir = normalize(dir)
-    b1 = sampling_basis(dir, basis, T)
-    sampling = ConeRings(num_rings, θ)
-    beams = source_beams(sampling, pos, dir, b1, λ, num_rays, T)
-    return PointSource(beams, numerical_aperture(θ), pos, _group_orientation(dir, b1, T), sampling)
+    return PointSource(pos, dir, ConeRings(num_rings, T(θ)), T(λ); num_rays, basis)
 end
 
 
@@ -153,14 +182,7 @@ function UniformPointSource(
         basis::Union{Nothing, AbstractVector} = nothing
 ) where {P <: Real, D <: Real, H <: Real, L <: Real}
     T = promote_type(P, D, H, L)
-    if θ ≥ pi
-        throw(ErrorException("Point source opening half-angle θ must be < π"))
-    end
-    dir = normalize(dir)
-    e1 = sampling_basis(dir, basis, T)
-    sampling = ConeSunflower(θ)
-    beams = source_beams(sampling, pos, dir, e1, λ, num_rays, T)
-    return PointSource(beams, numerical_aperture(θ), pos, _group_orientation(dir, e1, T), sampling)
+    return PointSource(pos, dir, ConeSunflower(T(θ)), T(λ); num_rays, basis)
 end
 
 """
@@ -222,13 +244,6 @@ function UniformFanSource(
         basis::Union{Nothing, AbstractVector} = nothing
 ) where {P <: Real, D <: Real, H <: Real, L <: Real}
     T = promote_type(P, D, H, L)
-    if θ ≥ pi
-        throw(ErrorException("Point source opening half-angle θ must be < π"))
-    end
-    dir = normalize(dir)
-    e1 = sampling_basis(dir, basis, T)
-    sampling = ConeFan(θ)
-    beams = source_beams(sampling, pos, dir, e1, λ, num_rays, T)
-    return PointSource(beams, numerical_aperture(θ), pos, _group_orientation(dir, e1, T), sampling)
+    return PointSource(pos, dir, ConeFan(T(θ)), T(λ); num_rays, basis)
 end
 

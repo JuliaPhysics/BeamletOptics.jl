@@ -284,8 +284,11 @@ The new beamlets are attached with [`BeamletOptics.relaunch!`](@ref) instead of 
 BeamletOptics.relaunch!
 ```
 
+`PlaneField(beamlet, id; ...)` is for components without a detector, e.g. in the `interact3d` of a component that hands the incoming beamlet to another solver: the segment that just hit the component is `id`. It builds a single hit of the segment and passes it to `PlaneField(hits; ...)`, which also takes the hits of several segments.
+
 ```@docs
-OpticsBase.PlaneField(::Union{GaussianBeamlet, AstigmaticGaussianBeamlet}, ::Integer)
+OpticsBase.PlaneField(::AstigmaticGaussianBeamlet, ::Integer)
+OpticsBase.PlaneField(::AbstractVector{<:Union{BeamletOptics.GaussianBeamletHit, BeamletOptics.AstigmaticGaussianBeamletHit}})
 ```
 
 ## Hints

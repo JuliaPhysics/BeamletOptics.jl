@@ -69,7 +69,7 @@ end
 Creates a [`RectangularPlateBeamsplitter`](@ref). The splitter is aligned with the negative y-axis.
 The splitter coating is centered at the origin. See also [`RoundPlateBeamsplitter`](@ref).
 
-# Inputs
+# Arguments
 
 - `width`: substrate width along the x-axis in [m]
 - `height`: substrate height along the z-axis in [m]
@@ -124,7 +124,7 @@ end
 Creates a [`RoundPlateBeamsplitter`](@ref). The splitter is aligned with the negative y-axis.
 The coating is centered at the origin. See also [`RectangularPlateBeamsplitter`](@ref).
 
-# Inputs
+# Arguments
 
 - `diameter`: x-z-plane substrate diameter in [m]
 - `thickness`: substrate thickness along the z-axis in [m]

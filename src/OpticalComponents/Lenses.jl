@@ -95,7 +95,7 @@ thickness(l::Lens) = thickness(shape(l))
     _signed_edge_sag(surface, sd)
 
 Returns the edge sagitta of the `surface` with sign, such that the edge of a front surface lies at
-`y = s` and the edge of a back surface at `y = center_thickness + s`. [`edge_sag`](@ref) returns
+`y = s` and the edge of a back surface at `y = center_thickness + s`. `edge_sag` returns
 the unsigned sagitta for spherical and cylindrical surfaces, hence the sign of the radius is
 applied; the sagitta of aspherical and acylindrical surfaces is already signed.
 """
@@ -202,11 +202,6 @@ function Lens(
                             # which has to be covered by the ring
                             leveling_thickness += abs(s_back) + thickness(back)
                         end
-                    end
-                    leveling_center = position(mid)[2] +
-                                      (l0/2 + (back !== nothing ? _signed_edge_sag(back_surface, back) : 0))
-                    if back !== nothing
-                        leveling_center += s_back / 2
                     end
                     ring = RingSDF(d_back / 2, (d_front - d_back) / 2, leveling_thickness)
                     translate3d!(ring, [0, thickness(front) + leveling_thickness/2, 0])

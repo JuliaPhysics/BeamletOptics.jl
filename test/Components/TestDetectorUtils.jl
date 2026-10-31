@@ -1,11 +1,14 @@
 module TestDetectorUtils
 
 using BeamletOptics
+using LinearAlgebra
 using Test
 
 const BMO = BeamletOptics
 
 const mm = 1e-3
+
+struct DummyHit <: BMO.AbstractDetectorHit end
 
 @testset "DetectorUtils" begin
     @testset "Testing calc_center_point with Centroid" begin
@@ -107,6 +110,50 @@ const mm = 1e-3
             @test isapprox(w * crop_factor, xmax, atol=5e-6)
             @test isapprox(w * crop_factor * sqrt(2), -ymin, atol=5e-6)
             @test isapprox(w * crop_factor * sqrt(2), ymax, atol=5e-6)
+        end
+    end
+
+    @testset "local_axes" begin
+        pd = Detector(5mm)
+        xrotate3d!(pd, deg2rad(30))
+        zrotate3d!(pd, deg2rad(-50))
+        x̂, ẑ = BMO.local_axes(pd)
+        @test cross(x̂, ẑ) ≈ BMO.direction(pd)
+        @test x̂ isa BMO.Point3 && ẑ isa BMO.Point3
+    end
+
+    @testset "calc_local_lims" begin
+        pd = Detector(20mm)
+        translate_to3d!(pd, [0, 50mm, 0])
+        @testset "Ray hits" begin
+            cs = CollimatedSource([0, 0, 0], [0, 1, 0], 5mm, 1e-6; num_rings = 2, num_rays = 41)
+            solve_system!(System([pd]), cs)
+            ray_hits = BMO.hits(pd)
+            lims = BMO.calc_local_lims(pd)
+            @test lims == BMO.calc_local_lims(pd, ray_hits, 1)
+            @test lims == BMO.calc_local_lims(pd, ray_hits, nothing)
+            x_min, x_max, z_min, z_max = BMO.calc_local_lims(pd, ray_hits, 2)
+            @test x_max - x_min ≈ 2 * (lims[2] - lims[1])
+            @test z_max - z_min ≈ 2 * (lims[4] - lims[3])
+            @test (x_min + x_max) / 2 ≈ (lims[1] + lims[2]) / 2 atol = 1e-12
+            @test (z_min + z_max) / 2 ≈ (lims[3] + lims[4]) / 2 atol = 1e-12
+        end
+        @testset "Beamlet hits" begin
+            empty!(pd)
+            solve_system!(System([pd]), GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0]))
+            beamlet_hits = BMO.hits(pd)
+            @test BMO.calc_local_lims(pd) == BMO.calc_local_lims(pd, beamlet_hits, 3)
+            @test BMO.calc_local_lims(pd, beamlet_hits, nothing) ==
+                  BMO.calc_local_lims(pd, beamlet_hits, 3)
+        end
+        @testset "Unknown hit type" begin
+            err = try
+                BMO.calc_local_lims(pd, [DummyHit()], nothing)
+            catch e
+                e
+            end
+            @test err isa ErrorException
+            @test occursin("calc_local_lims not defined for", err.msg)
         end
     end
 end

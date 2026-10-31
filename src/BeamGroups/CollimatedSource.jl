@@ -9,7 +9,7 @@ Represents a parallel bundle of [`Beam`](@ref)s being emitted from a disk in spa
   which starts at the source position along the central source direction, unless the source wraps given beams.
 - `diameter`: the diameter of the outermost beam ring
 - `center`: source position, pivot for rotations
-- `orientation`: right-handed orthonormal matrix, columns are the sampling reference vector, the central source direction and their cross product, see [`AbstractBeamGroup`](@ref)
+- `dir`: the [`orientation`](@ref) of the group, a right-handed orthonormal matrix whose columns are the sampling reference vector, the central source direction and their cross product, see [`AbstractBeamGroup`](@ref)
 - `sampling`: how the rays were sampled (rings, sunflower or line) (or `NoSampling()` for given beams), see [`num_rays!`](@ref)
 
 # Functions
@@ -21,7 +21,7 @@ mutable struct CollimatedSource{T, R <: AbstractRay{T}, S <: AbstractSourceSampl
     beams::Vector{Beam{T, R}}
     diameter::T
     center::Point3{T}
-    orientation::SMatrix{3, 3, T, 9}
+    dir::SMatrix{3, 3, T, 9}
     sampling::S
 end
 
@@ -37,7 +37,7 @@ is the central direction. An invalid `orientation` throws an `ArgumentError`. Th
 source can not be regenerated with [`num_rays!`](@ref): its `sampling` is `NoSampling()`.
 """
 function CollimatedSource(beams::Vector{Beam{T, R}}, diameter, pos, dir::AbstractVector) where {T, R <: AbstractRay{T}}
-    d = normalize(dir)
+    d = normalize(T.(dir))
     return CollimatedSource(beams, diameter, pos, _group_orientation(d, sampling_basis(d, nothing, T), T))
 end
 
@@ -47,9 +47,40 @@ CollimatedSource(beams::Vector{<:Beam}, diameter, pos, orientation::AbstractMatr
 function CollimatedSource(beams::Vector{Beam{T, R}}, diameter, pos, orientation::AbstractMatrix,
         sampling::S) where {T, R <: AbstractRay{T}, S <: AbstractSourceSampling}
     check_kinematic_members(beams)
-    return CollimatedSource{T, R, S}(beams, T(diameter), Point3{T}(pos), _check_orientation(orientation, T), sampling)
+    return CollimatedSource{T, R, S}(beams, T(diameter), Point3{T}(pos), check_orientation(orientation, T), sampling)
 end
 diameter(cs::CollimatedSource) = cs.diameter
+
+"""
+    CollimatedSource(pos, dir, diameter, sampling::AbstractSourceSampling, λ = 1e-6; num_rays, basis = nothing)
+
+Spawns a [`CollimatedSource`](@ref) of parallel [`Beam`](@ref)s along `dir` from a disc with the
+`diameter` [m] centered at `pos` [m], with the wavelength `λ` [m], sampled by `sampling` with
+`num_rays` rays, e.g. [`BeamletOptics.DiscRings`](@ref). The catalog constructors
+[`CollimatedSource`](@ref), [`UniformDiscSource`](@ref) and [`UniformLineSource`](@ref) call this
+method; a custom [`BeamletOptics.AbstractSourceSampling`](@ref) implements `source_beams` for
+it. The number type is `promote_type` of `pos`, `dir`, `diameter` and `λ`.
+
+The optional `basis` vector sets the azimuth of the sampling pattern about `dir`, see
+[`BeamletOptics.sampling_basis`](@ref). A `num_rays` below
+[`BeamletOptics.min_num_rays`](@ref) of the sampling and a `basis` that is zero or parallel to
+`dir` throw an `ArgumentError`.
+"""
+function CollimatedSource(
+        pos::AbstractArray{P},
+        dir::AbstractArray{D},
+        diameter::Dm,
+        sampling::AbstractSourceSampling,
+        λ::L = 1e-6;
+        num_rays::Int,
+        basis = nothing
+) where {P <: Real, D <: Real, Dm <: Real, L <: Real}
+    T = promote_type(P, D, Dm, L)
+    dir = normalize(T.(dir))
+    b1 = sampling_basis(dir, basis, T)
+    beams = source_beams(sampling, pos, dir, b1, T(diameter), T(λ), num_rays, T)
+    return CollimatedSource(beams, T(diameter), pos, _group_orientation(dir, b1, T), sampling)
+end
 
 """
     CollimatedSource(pos, dir, diameter, λ; num_rings, num_rays, basis)
@@ -94,13 +125,7 @@ function CollimatedSource(
         num_rays::Int = 100 * num_rings,
         basis::Union{Nothing, AbstractVector} = nothing
 ) where {P <: Real, D1 <: Real, D2 <: Real, L <: Real}
-    T = promote_type(P, D1, D2, L)
-    # ensure normalization
-    dir = normalize(dir)
-    b1 = sampling_basis(dir, basis, T)
-    sampling = DiscRings(num_rings)
-    beams = source_beams(sampling, pos, dir, b1, diameter, λ, num_rays, T)
-    return CollimatedSource(beams, diameter, pos, _group_orientation(dir, b1, T), sampling)
+    return CollimatedSource(pos, dir, diameter, DiscRings(num_rings), λ; num_rays, basis)
 end
 
 
@@ -152,11 +177,7 @@ function UniformDiscSource(
         num_rays::Int = 1_000,
         basis::Union{Nothing, AbstractVector} = nothing
 ) where {P <: Real, D1 <: Real, D2 <: Real, L <: Real}
-    T = promote_type(P, D1, D2, L)
-    dir = normalize(dir)
-    e1 = sampling_basis(dir, basis, T)
-    beams = source_beams(DiscSunflower(), pos, dir, e1, diameter, λ, num_rays, T)
-    return CollimatedSource(beams, diameter, pos, _group_orientation(dir, e1, T), DiscSunflower())
+    return CollimatedSource(pos, dir, diameter, DiscSunflower(), λ; num_rays, basis)
 end
 
 """
@@ -216,10 +237,6 @@ function UniformLineSource(
         num_rays::Int = 101,
         basis::Union{Nothing, AbstractVector} = nothing
 ) where {P <: Real, D1 <: Real, D2 <: Real, L <: Real}
-    T = promote_type(P, D1, D2, L)
-    dir = normalize(dir)
-    e1 = sampling_basis(dir, basis, T)
-    beams = source_beams(DiscLine(), pos, dir, e1, width, λ, num_rays, T)
-    return CollimatedSource(beams, width, pos, _group_orientation(dir, e1, T), DiscLine())
+    return CollimatedSource(pos, dir, width, DiscLine(), λ; num_rays, basis)
 end
 

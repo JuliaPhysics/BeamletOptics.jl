@@ -7,12 +7,12 @@ A generic container for groups of [`AstigmaticGaussianBeamlet`](@ref)s.
 
 - `beams`: vector of all beamlets
 - `center`: source position, pivot for rotations
-- `orientation`: right-handed orthonormal matrix, columns are the sampling reference vector, the central source direction and their cross product, see [`AbstractBeamGroup`](@ref)
+- `dir`: the [`orientation`](@ref) of the group, a right-handed orthonormal matrix whose columns are the sampling reference vector, the central source direction and their cross product, see [`AbstractBeamGroup`](@ref)
 """
 mutable struct AstigmaticBeamGroup{T, R <: AbstractRay{T}} <: AbstractBeamGroup{T, R}
     beams::Vector{AstigmaticGaussianBeamlet{T}}
     center::Point3{T}
-    orientation::SMatrix{3, 3, T, 9}
+    dir::SMatrix{3, 3, T, 9}
 end
 
 """
@@ -26,13 +26,11 @@ explicitly as a right-handed orthonormal 3x3 `orientation` matrix whose second c
 central direction. An invalid `orientation` throws an `ArgumentError`.
 """
 function AstigmaticBeamGroup(beams::Vector{AstigmaticGaussianBeamlet{T}}, pos, dir::AbstractVector) where {T}
-    d = normalize(dir)
-    M = _group_orientation(d, sampling_basis(d, nothing, T), T)
-    check_kinematic_members(beams)
-    return AstigmaticBeamGroup{T, PolarizedRay{T}}(beams, Point3{T}(pos), M)
+    d = normalize(T.(dir))
+    return AstigmaticBeamGroup(beams, pos, _group_orientation(d, sampling_basis(d, nothing, T), T))
 end
 
 function AstigmaticBeamGroup(beams::Vector{AstigmaticGaussianBeamlet{T}}, pos, orientation::AbstractMatrix) where {T}
     check_kinematic_members(beams)
-    return AstigmaticBeamGroup{T, PolarizedRay{T}}(beams, Point3{T}(pos), _check_orientation(orientation, T))
+    return AstigmaticBeamGroup{T, PolarizedRay{T}}(beams, Point3{T}(pos), check_orientation(orientation, T))
 end

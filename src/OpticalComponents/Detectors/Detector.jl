@@ -109,13 +109,26 @@ length(d::Detector) = isnothing(hits(d)) ? 0 : length(hits(d))
 stop(d::Detector) = d.stop
 
 """
+    local_axes(pd::Detector) -> (x̂, ẑ)
+
+The axes of the local (x, z) coordinates of `pd` in global coordinates, with
+`x̂ × ẑ = direction(pd)`. `x̂` is flipped since the detector mesh is rotated by `π`.
+"""
+local_axes(pd::Detector) = (Point3(-orientation(pd)[:, 1]), Point3(orientation(pd)[:, 3]))
+
+"""
     push!(d::Detector, hit::AbstractDetectorHit)
 
-Stores the `hit` in the detector `d`, guarded by the `lock` of `d`. Within [`with_hit_buffers`](@ref),
-e.g. in the solve of a beam group, the `hit` is collected in the buffer of the current task instead
-and reaches `d` when the buffer is flushed.
+Stores the `hit` in the detector `d`, guarded by the `lock` of `d`, and returns `d`. Within
+[`with_hit_buffers`](@ref), e.g. in the solve of a beam group, the `hit` is collected in the buffer
+of the current task instead and reaches `d` when the buffer is flushed.
 """
-push!(d::Detector, new::AbstractDetectorHit) = push!(current_hit_sink(), d => new)
+function push!(d::Detector, hit::AbstractDetectorHit)
+    # Buffers of the current task, otherwise the detector
+    sink = get(task_local_storage(), hit_buffers_key, LockedHits())::Union{LockedHits, HitBuffers}
+    push!(sink, d => hit)
+    return d
+end
 
 """
     append!(d::Detector, new::Vector{<:AbstractDetectorHit})
