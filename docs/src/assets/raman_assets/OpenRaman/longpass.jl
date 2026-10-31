@@ -19,6 +19,8 @@ end
 
 BMO.refractive_index(lpm::LongpassDichroicMirror) = lpm.n
 BMO.refractive_index(lpm::LongpassDichroicMirror, λ::Real)::Float64 = lpm.n(λ)
+# the substrate is a body, whose medium the transitions at its surfaces take into account
+BMO.medium(lpm::LongpassDichroicMirror) = BMO.IsotropicMedium(lpm.n)
 
 """
     LongpassDichroicMirror(diameter, thickness, n, cuton)
@@ -38,7 +40,7 @@ BMO.render!(ax::LScene, lpm::LongpassDichroicMirror;
 function BMO.interact3d(
     system::BMO.AbstractSystem,
     ldm::LongpassDichroicMirror,
-    ::BMO.Beam{T, R},
+    beam::BMO.Beam{T, R},
     ray::R) where {T <: Real, R <: Ray{T}}
     # test cut-on wavelength
     if BMO.wavelength(ray) < ldm.cuton
@@ -51,34 +53,9 @@ function BMO.interact3d(
             Ray{T}(npos, ndir, nothing, BMO.wavelength(ray), BMO.refractive_index(ray))
         )
     else
-        # above cut-on: behave like a refractive plate
-        normal = BMO.normal3d(BMO.intersection(ray))
-        lambda = BMO.wavelength(ray)
-        if BMO.isentering(ray)
-            # Entering ldm
-            n1 = BMO.refractive_index(ray)
-            n2 = BMO.refractive_index(ldm, lambda)
-            # Hint to test ldm again
-            hint = BMO.Hint(ldm)
-        else
-            # Exiting ldm
-            n1 = BMO.refractive_index(ldm, lambda)
-            n2 = BMO.refractive_index(system, lambda)
-            hint = nothing
-            # Flip normal for refraction3d
-            normal = -normal
-        end
-        # Calculate new dir. and pos.
-        ndir, TIR = BMO.refraction3d(BMO.direction(ray), normal, n1, n2)
-        npos = BMO.position(ray) + BMO.length(ray) * BMO.direction(ray)
-        # In case of TIR, update hint and n2
-        if TIR
-            hint = BMO.Hint(ldm)
-            n2 = BMO.refractive_index(ldm, lambda)
-        end
-        return BMO.BeamInteraction{T, R}(
-            hint,
-            BMO.Ray{T}(npos, ndir, nothing, BMO.wavelength(ray), n2)
-        )
+        # above cut-on: behave like a refractive plate. The transition at the hit holds the media on
+        # both sides, the substrate and the medium of the system or of a touching body.
+        t = BMO.transition(system, ray)
+        return BMO.interact3d(system, BMO.surface_model(t), t, beam, ray)
     end
 end

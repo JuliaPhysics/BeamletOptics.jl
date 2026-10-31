@@ -297,6 +297,11 @@ function reset_root!(beam::AbstractBeam)
     return nothing
 end
 
+# The hit at which a beam interacts `at` its ray, see interact3d: the ray of a beam, or the segment
+# `ray_id` of the chief beam of a beamlet
+intersection(::AbstractBeam, ray::AbstractRay) = intersection(ray)
+intersection(beam::AbstractBeam, ray_id::Int) = intersection(rays(beam)[ray_id])
+
 """
     translate3d!(::Movable, beam::AbstractBeam, offset)
 

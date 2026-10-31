@@ -15,8 +15,11 @@ The first two principles will be elaborated upon in more detail in the [Geometry
 ```mermaid
 flowchart TB
     S(["<b>solve_system!</b><br/>system + beam"]) --> I
-    I["<b>1. Intersect</b><br/>hinted shape first,<br/>else all objects"] -- hit --> X["<b>2. Interact</b><br/>compute<br/>AbstractInteraction"]
-    X --> R["<b>3. Repeat</b><br/>attach next<br/>ray or beam segment"]
+    I["<b>1. Intersect</b><br/>closest hit of all objects,<br/>hinted object first;<br/>all surfaces at that point"] -- "coincident hits" --> F["<b>first_to_interact</b><br/>thin layer, then entered body,<br/>then left body"]
+    F --> X["<b>2. Interact</b><br/>interact3d(system, object, beam, ray),<br/>dispatch on the object"]
+    X -- "body or thin layer" --> T["<b>transition(system, ray)</b><br/>media on both sides, thin layer"]
+    X -- "own method,<br/>e.g. mirror" --> R
+    T --> R["<b>3. Repeat</b><br/>attach next ray or children,<br/>assign their enclosure"]
     R -- "optional Hint" --> I
     I -- "no hit or r_max" --> E([done])
 
@@ -24,17 +27,17 @@ flowchart TB
     classDef green fill:#38982626,stroke:#389826,stroke-width:2px
     classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
     classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
-    class I blue
-    class X green
+    class I,F blue
+    class X,T green
     class R purple
     class S,E terminal
 ```
 
 This scheme is loosely referred to as the **Intersect-Interact-Repeat-Loop** and consists of the following steps:
 
-1. Calculate the closest **Intersection** between a ray/beam and the objects within the system
-2. Calculate the optical **Interaction** that occurs at the surface or within the volume of the element
-3. Attach the next part of the ray chain or beam tree
+1. Calculate the closest **Intersection** between a ray/beam and the objects within the system. All surfaces at the closest point are kept as [Coincident hits](@ref), e.g. the faces of a cemented doublet, and the one that interacts comes first.
+2. Calculate the optical **Interaction**: `interact3d` is dispatched on the object that was hit. An object with its own method computes the interaction itself, e.g. a mirror or a detector. The default methods of refracting bodies and thin layers read the [Transitions](@ref) at the hit, the media on both sides, and hand the ray to the surface model of the boundary or to the thin layer.
+3. Attach the next part of the ray chain or beam tree. The solver assigns the bodies that enclose the new rays.
 4. Use the new information to repeat 1.
 
 Once this procedure has been completed, the alignment of the system or other time-dependent optical properties (e.g. the phase of a Gaussian beamlet) can be updated. A new call of [`solve_system!`](@ref) solves the beam again from its start. This is described in more detail in the section: [Tracing systems](@ref).
@@ -57,16 +60,17 @@ BeamletOptics.Intersection
 
 Since an optical element can consist of multiple joint shapes, the return type must store which specific part of the object was hit.
 
-The following diagram shows how `trace_all` reaches the shapes of the objects and groups of a system, including the [Bounding sphere pretest](@ref) (green: implemented by a component author, purple: dispatch).
+The following diagram shows how `trace_all` reaches the shapes of the objects and groups of a system, including the [Bounding sphere pretest](@ref) (green: implemented by a component author, purple: dispatch). Where surfaces touch, e.g. the faces of a cemented doublet, the ray hits several of them at the same point. The hits within `get_coincidence_tolerance()` of the closest one are kept as a chain, see [Coincident hits](@ref).
 
 ```mermaid
 flowchart TB
-    TA(["<b>trace_all(system, ray)</b>"])
+    TA(["<b>trace_all(system, ray)</b><br/><b>closest_hits</b> of the top-level<br/>objects and groups"])
     BSO["<b>bounding_sphere_of(shape)</b><br/><i>optional</i>"]
     TBL["<b>bounding_spheres(system)</b><br/>table, once per solve"]
-    P{"<b>intersect3d(parts, ray)</b><br/>each part, closest hit wins"}
+    P{"<b>intersect3d(parts, ray)</b><br/>each part, <b>merge_hits</b>:<br/>closest hit and those<br/>at the same point"}
+    BY{"<b>beyond</b>(sphere, ray, t)?<br/>sphere only behind<br/>the closest hit so far"}
     G["<b>intersect3d(group, ray)</b><br/>x = objects(group)"]
-    OJ["<b>intersect3d(object, ray)</b><br/><i>own method possible,<br/>e.g. PlateBeamsplitter</i>"]
+    OJ["<b>intersect3d(object, ray)</b><br/><i>own method possible</i>"]
     T{"<b>shape_trait_of(object)</b>"}
     SS["<b>SingleShape</b><br/>x = shape(object)"]
     MS["<b>MultiShape</b><br/>x = shape(object), a tuple"]
@@ -77,7 +81,9 @@ flowchart TB
 
     BSO --> TBL
     TBL -. "current_bounding_spheres()" .-> PT
-    TA --> P
+    TA -- "each top-level part" --> BY
+    BY -- "yes: skipped" --> MISS
+    BY -- no --> P
     P -- "AbstractObjectGroup" --> G
     P -- "AbstractObject" --> OJ
     P -- "AbstractShape" --> SH
@@ -96,7 +102,7 @@ flowchart TB
     classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
     class TBL,G,SS,MS,OBJ blue
     class BSO,OJ,SH green
-    class P,T,PT purple
+    class P,T,PT,BY purple
     class TA,MISS terminal
 ```
 
@@ -127,6 +133,28 @@ flowchart TB
     class IX terminal
 ```
 
+### Coincident hits
+
+Touching elements, e.g. the two lenses of a cemented doublet or a coating on its substrate, share a surface. A ray that reaches it hits the surfaces of both within the accuracy of the intersection algorithms. Instead of picking one of them, the solver keeps all hits within `get_coincidence_tolerance()` (1 nm by default) of the closest hit as a chain, linked by the `next` field of the [`BeamletOptics.Intersection`](@ref):
+
+```@docs; canonical=false
+BeamletOptics.coincident_hits
+BeamletOptics.merge_hits
+```
+
+Hence the hit of the ray does not depend on the order of the objects in the system or on a [`BeamletOptics.Hint`](@ref). Each hit holds its own object, shape and normal. One of them interacts with the ray: a surface that is no refracting body comes first, e.g. a coating, a mirror or a detector, then the surface of the body that the ray enters, then that of the body it leaves:
+
+```@docs; canonical=false
+BeamletOptics.first_to_interact
+BeamletOptics.interaction_rank
+```
+
+The `object` of every hit is the object of the system (or of an object group) that was hit. For an object of several parts, e.g. a [`DoubletLens`](@ref), the part follows from the shape:
+
+```@docs; canonical=false
+BeamletOptics.part_of(::BeamletOptics.AbstractObject, ::Any)
+```
+
 ### Bounding sphere pretest
 
 Since the tracing is non-sequential, every ray is tested against every shape of the system, and most of these tests are misses. A shape can therefore provide a sphere that encloses it. A ray that does not pass through this sphere is a miss without a call of `intersect3d`. This is optional: a shape without a sphere is tested as described above.
@@ -155,7 +183,7 @@ The spheres of a system can be shown via `render!(ax, BeamletOptics.bounding_sph
 Optical interactions are performed after the point of intersection has been determined. The `interact3d` interface allows users to implement algorithms that calculate or try to mimic optical effects. The fidelity of the algorithm is effectively only limited by the amount of information that can be passed into the `interact3d` interface. The method is defined as follows:
 
 ```@docs; canonical=false
-BeamletOptics.interact3d(::BeamletOptics.AbstractSystem, ::BeamletOptics.AbstractObject, ::BeamletOptics.AbstractBeam, ::BeamletOptics.AbstractRay)
+BeamletOptics.interact3d(::BeamletOptics.AbstractSystem, ::BeamletOptics.AbstractObject, ::BeamletOptics.AbstractBeam, ::Union{BeamletOptics.AbstractRay, Int})
 ```
 
 As with the `intersect3d` method, a predefined return type must be provided in order to make the [`solve_system!`](@ref) interface work. The `AbstractInteraction` is used in order to create "building blocks" from which the output beam is constructed.
@@ -166,7 +194,76 @@ BeamletOptics.AbstractInteraction
 
 An object whose `interact3d` method stores data in the object, e.g. a detector its hits, also implements [`initialize!`](@ref), which discards this data before a new solve.
 
-The `interact3d` return type limits the interface to only accepting one new `beam` segment per interaction at the moment. The developer needs to take into account that after e.g. a lens surface air-to-glass interaction, the solver "forgets" that the next logical step is to immediately test against the lens again, since the most likely step will be the refraction at the glass-to-air surface. In order to alleviate this issue, the `Hint` type can be used.
+### Transitions
+
+At a boundary, the ray passes from one medium into another. The parts that the ray hits there play two roles: a part with a medium is a **body**, which the ray leaves or enters, e.g. a lens or a prism; a part without one is a **thin layer** between the media, e.g. a thin beamsplitter or a polarizing film. The [`BeamletOptics.transition`](@ref) at the hit of a ray holds both media and the layer. Hence a component needs no knowledge of the elements that touch it: the surface of a lens cemented to another lens refracts from one glass into the other, a beamsplitter coating on a substrate transmits into the substrate, and a film between two plates transmits from one plate into the other.
+
+The diagram shows how a body and a thin layer interact at a boundary and how the solver assigns the enclosure of the new rays (green: implemented by a component author, purple: dispatch).
+
+```mermaid
+flowchart TB
+    IA(["<b>interact3d</b>(system, object, beam, ray)"])
+    MS{"<b>shape_trait_of</b>(object)"}
+    PO["<b>part_of</b>(hit)<br/>the part that was hit,<br/>e.g. the back lens of a doublet"]
+    K{"own method<br/>of the part?"}
+    TR["<b>transition</b>(system, ray)<br/><b>boundary_hits</b>: left body, entered body,<br/>thin layer; media from the enclosure"]
+    BODY["<b>AbstractRefractiveOptic</b><br/><b>interact3d</b>(system, surface_model(t), t, beam, ray)"]
+    UNC["<b>Uncoated</b><br/><b>cross_boundary</b>: refraction, TIR,<br/>Fresnel for PolarizedRay"]
+    LAYER["<b>thin layer</b><br/>interact3d(system, layer, t, beam, ray)<br/>e.g. ThinBeamsplitter: split,<br/>transmit! and reflect!"]
+    OWN["<b>own interact3d</b><br/>e.g. mirror, detector"]
+    ENC["<b>enclose_new!</b><br/>enclosure of each new ray at the hit:<br/>back into the medium before the boundary<br/>or into the medium behind it"]
+    E([next tracing step])
+
+    IA --> MS
+    MS -- MultiShape --> PO --> K
+    MS -- SingleShape --> K
+    K -- "body" --> TR --> BODY --> UNC --> ENC
+    K -- "thin layer" --> LAYER --> ENC
+    TR -. "t" .-> LAYER
+    K -- "own" --> OWN --> ENC
+    ENC --> E
+
+    classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
+    classDef green fill:#38982626,stroke:#389826,stroke-width:2px
+    classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
+    classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
+    class TR,UNC,ENC blue
+    class BODY,LAYER,OWN green
+    class MS,K purple
+    class IA,E terminal
+```
+
+```@docs; canonical=false
+BeamletOptics.AbstractMedium
+BeamletOptics.IsotropicMedium
+BeamletOptics.medium
+BeamletOptics.transition
+BeamletOptics.Transition
+```
+
+Every ray carries the bodies that enclose it, which the transitions update. Hence the medium behind a boundary is the body around the one that the ray leaves, e.g. the water of a cuvette around a lens:
+
+```@docs; canonical=false
+BeamletOptics.Enclosure
+```
+
+A component creates its new rays without an enclosure. After each interaction, the solver assigns it to every new ray that starts at the hit, the continued ray and the first rays of child beams, by the side of the boundary into which the ray propagates: back into the medium before it, e.g. after a reflection, or into the medium behind it.
+
+```@docs; canonical=false
+BeamletOptics.enclose!
+```
+
+The physics at the boundary belongs to the boundary, not to one of the bodies. A body, e.g. any [`BeamletOptics.AbstractRefractiveOptic`](@ref), hands the ray to the [`BeamletOptics.surface_model`](@ref) of the transition, which is an uncoated surface so far. A thin layer implements the interaction between the media of the transition for itself:
+
+```@docs; canonical=false
+BeamletOptics.interact3d(::BeamletOptics.AbstractSystem, ::BeamletOptics.Uncoated, ::BeamletOptics.Transition, ::BeamletOptics.Beam, ::BeamletOptics.AbstractRay)
+BeamletOptics.AbstractSurfaceModel
+BeamletOptics.cross_boundary
+```
+
+A new refracting component declares its body via `medium` and needs no `interact3d` method of its own if it subtypes `AbstractRefractiveOptic`. A new thin layer implements `interact3d(system, layer::MyLayer, t::Transition, beam, ray)` and calls it from its `interact3d` method with `transition(system, ray)`, like the [`ThinBeamsplitter`](@ref).
+
+The `interact3d` return type limits the interface to only accepting one new `beam` segment per interaction at the moment. After e.g. a lens surface air-to-glass interaction, the most likely next step is the refraction at the glass-to-air surface of the same lens. An interaction can tell the solver so with a `Hint`, which speeds up the next intersection.
 
 ### Re-emitting components
 
@@ -196,49 +293,34 @@ OpticsBase.PlaneField(::AbstractVector{<:Union{BeamletOptics.GaussianBeamletHit,
 
 ## Hints
 
-As mentioned in the previous section, the [`BeamletOptics.Hint`](@ref) interface allows developers to manipulate the non-sequential solver algorithm into testing against a specific component and shape during the next cycle of the [Intersect-Interact-Repeat-Loop](@ref). This interface has very high priority during intersection testing.
+The [`BeamletOptics.Hint`](@ref) interface allows developers to tell the non-sequential solver which object will probably be hit during the next cycle of the [Intersect-Interact-Repeat-Loop](@ref). The solver tests this object first. Its hit lets the solver skip all objects whose bounding sphere lies beyond it, which saves most of the intersection tests in a large system.
 
 ```@docs; canonical=false
 BeamletOptics.Hint
 ```
 
-The main reason for this is the intersection ambiguity encountered at interfaces between air-tight component interfaces, e.g. [Plate beamsplitters](@ref) or cemented [Doublet lenses](@ref). This is caused by the fact that for a ray with a starting point at this interface, technically both shapes are being "touched" at the same time. Additional program logic considering the ray direction of propagation can not always resolve this ambiguity. Therefore the task of providing additional information to the solver via the `Hint` interface is placed as a **burden on the developer**.
-
-The diagram below shows this for the [`CubeBeamsplitter`](@ref), whose `interact3d` method finds the hit part by identity, hands the beam to it and hints the coating; the `DoubletLens` hints the other lens in the same way (green: implemented by a component author, purple: dispatch).
+A `Hint` never changes the result of the trace: the hinted object is not preferred over a closer one, and an object that is moved away from its hinted neighbour, e.g. the back lens of a doublet, leaves an air gap that the trace sees. Touching elements need no `Hint`, see [Coincident hits](@ref) and [Transitions](@ref). The diagram shows how the next tracing step uses the hint of an interaction (purple: dispatch).
 
 ```mermaid
 flowchart TB
-    S(["<b>interact3d(system, cbs, beam, ray)</b><br/>object of the intersection: cbs,<br/>shape: the part that was hit"])
-    F{"shape(intersection(ray))<br/>=== shape of which part?"}
-    PR["<b>interact3d(system, cbs.front, beam, ray)</b><br/>the prism refracts<br/>(cbs.back alike)"]
-    H["<b>hint!(interaction,</b><br/><b>Hint(cbs, shape(cbs.coating)))</b>"]
-    CO["<b>interact3d(system, cbs.coating, beam, ray)</b><br/>children!: transmitted and reflected,<br/>refractive_index! of the cube"]
-    N(["return nothing<br/>the solver queues the children"])
-    P["<b>push!(beam, interaction)</b>"]
+    P["<b>push!(beam, interaction)</b><br/>next ray, hint(interaction)"]
     TST{"<b>tracing_step!</b><br/>(system, ray, hint)"}
-    HS{"<b>trace_one</b><br/>hinted shape hit?"}
-    OB["<b>object!(intersection, object(hint))</b><br/>no other object is tested"]
-    TA["<b>trace_all(system, ray)</b>"]
+    HS["<b>trace_one</b><br/>intersect3d(object(hint), ray) first"]
+    OB["<b>closest_hits</b><br/>of all other objects, those<br/>beyond the hint's hit skipped"]
+    TA["<b>trace_all</b><br/>closest_hits of all objects"]
+    FI["<b>first_to_interact</b><br/>the hit that interacts first"]
 
-    S --> F
-    F -- "cbs.front or cbs.back" --> PR --> H --> P --> TST
-    F -- "cbs.coating" --> CO --> N
-    TST -- "::Hint" --> HS
-    HS -- yes --> OB
-    HS -- no --> TA
+    P --> TST
+    TST -- "::Hint" --> HS --> OB --> FI
+    TST -- "::Nothing" --> TA --> FI
 
     classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
     classDef green fill:#38982626,stroke:#389826,stroke-width:2px
     classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
     classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
-    class P,OB,TA,HS blue
-    class F,H,PR,CO green
+    class P,HS,OB,TA,FI blue
     class TST purple
-    class S,N terminal
 ```
-
-!!! tip
-    Use of the `Hint` interface is primarily intended for multishape objects with joint surfaces.
 
 ## Tracing logic
 
@@ -293,11 +375,12 @@ flowchart TB
     S(["<b>trace_system!</b><br/>system + beam::Beam"])
     RM{"length(rays(beam))<br/>#lt; r_max?"}
     TST{"<b>tracing_step!</b><br/>(system, last ray, hint)"}
-    TO["<b>trace_one</b><br/>hinted shape first"]
+    TO["<b>trace_one</b><br/>hinted object first,<br/>then all others"]
     TA["<b>trace_all</b><br/>intersect3d of all top-level<br/>objects and groups"]
-    HIT{"intersection(ray)<br/>is nothing?"}
+    HIT{"intersection(ray)<br/>is nothing?<br/>else first_to_interact"}
     IA["<b>interact3d</b><br/>(system, object, beam, ray)"]
     NI{"interaction<br/>is nothing?"}
+    EN["<b>enclose_new!</b><br/>enclosure of the new rays:<br/>next ray or children"]
     P["<b>push!(beam, interaction)</b><br/>next ray, hint(interaction)"]
     E([return])
 
@@ -305,10 +388,9 @@ flowchart TB
     RM -- yes --> TST
     TST -- "::Hint" --> TO
     TST -- "::Nothing" --> TA
-    TO -- "hinted shape missed" --> TA
-    TO -- hit --> HIT
+    TO --> HIT
     TA --> HIT
-    HIT -- no --> IA --> NI
+    HIT -- no --> IA --> EN --> NI
     NI -- no --> P --> RM
     RM -- no --> E
     HIT -- yes --> E
@@ -318,7 +400,7 @@ flowchart TB
     classDef green fill:#38982626,stroke:#389826,stroke-width:2px
     classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
     classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
-    class TO,TA,P blue
+    class TO,TA,P,EN blue
     class IA green
     class TST purple
     class S,E terminal

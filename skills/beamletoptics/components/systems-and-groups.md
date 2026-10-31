@@ -39,8 +39,9 @@ group = ObjectGroup([lens1, lens2, mount])   # members may be objects or other g
 ```
 
 - An `ObjectGroup` is a kinematic container: each member is traced and interacts on its own. Read
-  the members with `BeamletOptics.objects(group)`. A component whose parts interact as one (e.g. a
-  cemented doublet) is an `AbstractObject` subtype with the `MultiShape` trait.
+  the members with `BeamletOptics.objects(group)`. Members that touch (e.g. two plates against each
+  other) are traced correctly: the solver resolves the shared face. A component with named parts and
+  a fixed pivot (e.g. a cemented doublet) is an `AbstractObject` subtype with the `MultiShape` trait.
 - `position(group)` is the group `center`. It starts at the **origin**, not at the centroid;
   `orientation(group)` starts as identity.
 - `translate3d!(group, Δ)` moves all members and the center.
@@ -69,20 +70,33 @@ zrotate3d!(periscope, deg2rad(10))
 
 ## Assemblies: group or one multi-shape object
 
-Decide by whether the parts touch:
+Touching parts need no special handling: at a shared face the solver collects the surfaces of all
+touching parts and derives the media on both sides (`BeamletOptics.transition`). Decide by how the
+assembly is used:
 
 | Parts of the assembly | Use | `interact3d` |
 |---|---|---|
-| separate, with air between them (telescope, periscope, lens group, arm with mounts) | `ObjectGroup`, or an own subtype of `BeamletOptics.AbstractObjectGroup` | none: each part interacts on its own |
-| touching and interacting as one (cemented, a `Hint` across a shared face, a shared medium) | an `AbstractObject` subtype with `shape_trait_of(::T) = MultiShape()` | required, for every beam model it must support |
+| a kinematic unit of objects (telescope, periscope, lens group, arm with mounts, also touching plates) | `ObjectGroup`, or an own subtype of `BeamletOptics.AbstractObjectGroup` | none: each part interacts on its own |
+| one component with named parts (a cemented doublet, a cube beamsplitter) | an `AbstractObject` subtype with `shape_trait_of(::T) = MultiShape()` and objects as parts | none: the solver hands each hit to the part that was hit (`BeamletOptics.part_of`) |
+| one component built from plain shapes | as above, with shapes as parts | required, for every beam model it must support |
 
 - An own group type gives named parts and an own constructor. It needs the fields `objects`,
   `center::Point3{T}` and `dir::SMatrix{3,3,T,9}`, is a `mutable struct`, and its constructor
   calls `BeamletOptics.check_kinematic_members(objects)`. Moving, `set_pivot3d!`, systems and rendering
   work as for an `ObjectGroup`. See `templates/08_custom_group.jl`.
-- Never wrap separate parts in a `MultiShape` object without `interact3d`: the solver hands every
-  hit to the wrapper, finds no method, warns `No interact3d method defined` and stops the ray.
-- A `MultiShape` object finds the part that was hit via `shape(intersection(ray))` and forwards to
-  it (see `CubeBeamsplitter`, `DoubletLens`). Beamlets reach this ray method through their generic
-  `interact3d(system, obj, beamlet, id::Int)`, once per ray of the beamlet. If a part has its own
-  beamlet method (detectors, beamsplitters), the object needs a beamlet method that forwards to it.
+- A `MultiShape` object of plain shapes without `interact3d` stops every ray that hits it with the
+  warning `No interact3d method defined`. Its method finds the part that was hit via
+  `shape(intersection(ray))`.
+- A `MultiShape` object of objects forwards rays and beamlets to the part that was hit, also the
+  beamlet methods of the part (detectors, beamsplitters).
+- Media and boundaries (not exported, may still change): a body declares its medium with
+  `BeamletOptics.medium(x::MyBody) = BeamletOptics.IsotropicMedium(n)` (every `AbstractRefractiveOptic`
+  has one). In an own `interact3d`, `t = BeamletOptics.transition(system, ray)` holds the media on both
+  sides of the hit (`BeamletOptics.refractive_index_in(t)`, `BeamletOptics.refractive_index_out(t)` at
+  the ray's wavelength) and the thin layer at it; `BeamletOptics.interact3d(system,
+  BeamletOptics.surface_model(t), t, beam, ray)` refracts or totally reflects at the boundary. A
+  `Hint` only speeds up the trace.
+- Rays carry the bodies that enclose them (`BeamletOptics.enclosure(ray)`), so bodies within bodies
+  work (a lens in a water cuvette). The solver assigns the enclosure to the new rays of an own
+  `interact3d` (continued ray and children starting at the hit); nothing to pass on. A source that
+  starts inside a body is taken to be in the medium of the system.

@@ -35,10 +35,15 @@ further integration. A component may also add `card_rows` (and `card_actions`) f
 the interactive GUI, the separate package
 [BeamletOpticsGUI](https://github.com/StackEnjoyer/BeamletOpticsGUI.jl). When adding
 infrastructure, push complexity into the generic solver instead of asking component authors to
-handle it. Current exception: coincident boundaries (plate beamsplitters, cemented doublets)
-are disambiguated per component by returning a `Hint`
-([src/AbstractTypes/AbstractSystem.jl](src/AbstractTypes/AbstractSystem.jl), consumed in
-[src/System.jl](src/System.jl)); core.md calls this a burden on the developer.
+handle it.
+
+Touching elements (cemented lenses, coatings on substrates, plates against each other) are
+resolved by the solver: it collects all surfaces at a hit point (`coincident_hits`), picks the one
+that interacts (`first_to_interact`) and derives the media on both sides (`transition`), see
+[src/Transitions.jl](src/Transitions.jl). Bodies declare their medium via `medium(x)`; the physics
+at a boundary belongs to its surface model (`interact3d(system, surface_model(t), t, beam, ray)`)
+or to the thin layer at it (`interact3d(system, layer, t, beam, ray)`). Components never need a
+`Hint` for correctness; a `Hint` only speeds up the next intersection.
 
 **Be suspicious of** a component or algorithm that assumes a world-space orientation, an
 object order in a `System` or adjacency not derived from geometry at trace time; of paraxial or

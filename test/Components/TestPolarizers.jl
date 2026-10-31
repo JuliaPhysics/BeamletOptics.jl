@@ -305,7 +305,9 @@ const mm = 1e-3
                 @test_nowarn solve_system!(system, beam)
                 # The film blocks the beam at the cemented interface: start -> front prism, then terminated
                 @test length(BMO.rays(beam)) == 2
-                @test BMO.shape(BMO.intersection(last(BMO.rays(beam)))) === BMO.shape(lp.front)
+                hit = BMO.intersection(last(BMO.rays(beam)))
+                @test BMO.shape(hit) === BMO.shape(lp.filter)
+                @test any(h -> BMO.shape(h) === BMO.shape(lp.front), BMO.coincident_hits(hit))
             end
 
             @testset "Reverse" begin
@@ -316,7 +318,9 @@ const mm = 1e-3
                 @test_nowarn solve_system!(system, beam)
                 # The film blocks the beam at the cemented interface: start -> back prism, then terminated
                 @test length(BMO.rays(beam)) == 2
-                @test BMO.shape(BMO.intersection(last(BMO.rays(beam)))) === BMO.shape(lp.back)
+                hit = BMO.intersection(last(BMO.rays(beam)))
+                @test BMO.shape(hit) === BMO.shape(lp.filter)
+                @test any(h -> BMO.shape(h) === BMO.shape(lp.back), BMO.coincident_hits(hit))
             end
         end
     end
@@ -383,7 +387,9 @@ const mm = 1e-3
             @test_nowarn solve_system!(system, agb)
             lengths = map(b -> length(BMO.rays(b)), BMO._component_beams(agb))
             @test all(==(2), lengths)
-            @test BMO.shape(BMO.intersection(last(BMO.rays(agb.c)))) === BMO.shape(lp.front)
+            hit = BMO.intersection(last(BMO.rays(agb.c)))
+            @test BMO.shape(hit) === BMO.shape(lp.filter)
+            @test any(h -> BMO.shape(h) === BMO.shape(lp.front), BMO.coincident_hits(hit))
         end
     end
 end
