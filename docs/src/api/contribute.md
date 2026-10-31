@@ -1,6 +1,6 @@
 # Contributing
 
-While not strictly adhering to the [SciML Style Guide](https://github.com/SciML/SciMLStyle), we recommend consulting the guide as a baseline for contributions to this package. Refer to the [SciML Contributors Guide](https://github.com/SciML/ColPrac/blob/master/README.md) as well. Ideally, your contribution features:
+The code style of BMO, for human contributors and coding agents alike, is the section "Code style" of [AGENTS.md](https://github.com/JuliaPhysics/BeamletOptics.jl/blob/master/AGENTS.md) in the repository root. The [SciML Style Guide](https://github.com/SciML/SciMLStyle) is the formatting baseline. Refer to the [SciML Contributors Guide](https://github.com/SciML/ColPrac/blob/master/README.md) as well. Ideally, your contribution features:
 
  - tests for new or changed functionality
  - docstrings for relevant functions
