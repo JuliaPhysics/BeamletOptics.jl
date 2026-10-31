@@ -34,9 +34,9 @@ The initial ordering of the geometric beams/rays is shown in the figure below. T
 As with the [`GaussianBeamlet`](@ref), tracing these rays through a system allows the reconstruction of the waist envelope and electric field. The reduced complex amplitude of the Gaussian beamlet is computed as
 
 ```math
-\psi(\mathbf{r}) = \frac{E_0}{\sqrt{\mathbf{h}_1 \times \mathbf{h}_2}} \cdot \exp \left( i k \frac{(\mathbf{h}_1 \times \mathbf{r})(\mathbf{u}_2 \cdot \mathbf{r}) - (\mathbf{h}_2 \times \mathbf{r})(\mathbf{u}_1 \cdot \mathbf{r})}{2 \mathbf{h}_1 \times \mathbf{h}_2} \right) \,,
+\psi(\mathbf{r}) = \frac{E_0}{\sqrt{\mathbf{h}_1 \times \mathbf{h}_2}} \cdot \exp \left( i k \operatorname{Re} \frac{(\mathbf{h}_1 \times \mathbf{r})(\mathbf{u}_2 \cdot \mathbf{r}) - (\mathbf{h}_2 \times \mathbf{r})(\mathbf{u}_1 \cdot \mathbf{r})}{2 \mathbf{h}_1 \times \mathbf{h}_2} \right) \exp \left( - \frac{|\mathbf{h}_1 \times \mathbf{r}|^2 + |\mathbf{h}_2 \times \mathbf{r}|^2}{|\mathbf{h}_1 \times \mathbf{h}_2|^2} \right) \,,
 ```
-where $\mathbf{h}_{1,2}$ and $\mathbf{u}_{1,2}$ are the two-dimensional complex ray height and angle vectors on the plane perpendicular to the chief ray [Greynolds:1986_1, Wilhelm:2001, Greynolds:2014](@cite). By also tracing a 3D-field vector along the chief ray based on the formalism introduced in the [Polarized rays](@ref) section, polarization effects can be considered when calculating $\psi$ [Worku:2017](@cite). For a simple lens setup, the resulting waist is illustrated in the image below.
+where $\mathbf{h}_{1,2}$ and $\mathbf{u}_{1,2}$ are the two-dimensional complex ray height and angle vectors on the plane perpendicular to the chief ray [Greynolds:1986_1, Wilhelm:2001, Greynolds:2014](@cite). The second exponential is the Gaussian envelope $\exp(-\mathbf{r}^T \mathbf{S}^{-1} \mathbf{r})$, see [Physical Beam Cross-Section](@ref). By also tracing a 3D-field vector along the chief ray based on the formalism introduced in the [Polarized rays](@ref) section, polarization effects can be considered when calculating $\psi$ [Worku:2017](@cite). For a simple lens setup, the resulting waist is illustrated in the image below.
 
 The linear polarization state is visualized by an oscillating red line and is proportional to the on-axis peak field strength.
 
@@ -54,6 +54,8 @@ The phase factor due to the optical path length of the central ray ($e^{i k (z +
     \mathbf{h}_1 \times \mathbf{u}_2 - \mathbf{h}_2 \times \mathbf{u}_1 = 0
     ```
     This ensures that the complex curvature matrix $\mathbf{Q}$ is symmetric, since the beamlet formalism can not capture higher-order abberations.
+
+    The Lagrange invariant $H = n \operatorname{Im}(\mathbf{h}^* \cdot \mathbf{u})$ of each axis must keep its value at the start of the beam, $M^2 \lambda / \pi$. A large beamlet in a strong focus does not: the rays leave the parabolic part of the surface and $H$ of one axis can even change its sign, as happens for separate waists. Tracing stops with a warning if $H$ deviates by more than `Config.get_lagrange_tolerance()`, by default 50 %, from its start value.
 
 ## Astigmatic beamlets
 
@@ -119,6 +121,8 @@ The spatial spot matrix $\mathbf{S}$, which describes the boundary of this inten
 \operatorname{Im}(\mathbf{Q}) = (\mathbf{H} \mathbf{H}^\dagger)^{-1}
 ```
 This identity implies that the spatial spot covariance matrix $\mathbf{S}$, which defines the beam envelope, is directly proportional to the outer product of the complex ray height matrix: $\mathbf{S} \propto \mathbf{H} \mathbf{H}^\dagger$.
+
+**BeamletOptics** takes the envelope of the field from $\mathbf{S} = \mathbf{H} \mathbf{H}^\dagger$ directly, not from $\operatorname{Im}(\mathbf{Q})$. The identity holds for $M^2 = 1$ only: for $M^2 > 1$, $\operatorname{Im}(\mathbf{Q})$ is larger by $M^2$ and the field would be narrower than the beam radius, as it also would be if the Lagrange invariants drift. With $\mathbf{S}$, the field follows the beam radius and integrates to the power of the beamlet, as $\sqrt{\det \mathbf{S}} = |\mathbf{h}_1 \times \mathbf{h}_2|$.
 
 In **BeamletOptics**, this calculation is mapped directly to the 3D global coordinate system. Using the two complex 3D ray vectors $\mathbf{h}_1$ and $\mathbf{h}_2$, the $3 \times 3$ physical covariance matrix is formed by taking the real part of the tensor product:
 ```math

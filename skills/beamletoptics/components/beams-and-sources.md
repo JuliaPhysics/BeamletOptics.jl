@@ -39,11 +39,18 @@ AstigmaticGaussianBeamlet(pos, dir, λ, w0_x, w0_y; M2_x, M2_y, P0, E0, support,
   or polarization-dependent setups. `E0` defaults to a field along the `support` axis scaled to `P0`.
 - `z0` = waist offset along the axis, as for `GaussianBeamlet`: the beam starts at `pos`, its waist
   lies at `pos + z0 * dir`. `z0_x` and `z0_y` place the two waists independently (default `z0`).
-  With the default `E0`, power and field match a `GaussianBeamlet`. An explicit `E0` is the field at
-  `pos`, not at the waist, and replaces `P0`.
+  With the default `E0`, power, beam radius and field match a `GaussianBeamlet`, for any `M2`. An
+  explicit `E0` is the field at `pos`, not at the waist, and replaces `P0`.
+- `electric_field(agb, r, z)` is a scalar with the sign of the largest component of the field
+  vector, so it can differ in sign from a `GaussianBeamlet` (e.g. `support = -s`). The vector is
+  `BeamletOptics.polarized_field(agb, r, z)`.
 - `support` is the x axis of the beamlet (`w0_x`, `M2_x`, `z0_x`). As for `GaussianBeamlet` it must
   be orthogonal to `dir` (any non-zero length), otherwise the constructor throws an `ArgumentError`.
-- `solve_system!` checks the optical invariant and stops tracing if it is violated.
+- `solve_system!` checks the optical invariant and stops tracing if it is violated, with a "Lagrange
+  invariant violation" warning: a detector behind that point gets no hits. This is the limit of the
+  model. It ends where a strong focus takes the rays off the parabolic part of a surface, most
+  of all with separate waists (`w0 = 6.4 mm`, `z0_y = 3` m: f = 75 mm traces, f = 50 mm stops). Use
+  smaller beamlets or a `GaussianBeamletDecomposition`; `check_invariant = false` gives no valid field.
 - The field and the detector power follow the polarization of the chief ray: uncoated surfaces take
   their Fresnel loss (about 4 % of the power per surface at n = 1.5), polarizers and beamsplitters
   act, a mirror reverses the field. A `GaussianBeamlet` has no such losses.

@@ -16,6 +16,16 @@ Returns the global configuration threshold for the paraxial optical invariant ch
 """
 get_invariant_threshold() = invariant_threshold
 
+const lagrange_tolerance = @load_preference("lagrange_tolerance", 0.5)
+"""
+    get_lagrange_tolerance()
+
+Returns the largest relative deviation of the Lagrange invariant of an axis of an astigmatic
+beamlet from its value at the start of the root beam, beyond which the beamlet has left the
+range of its model. Defaults to `0.5` (configurable via the `lagrange_tolerance` preference).
+"""
+get_lagrange_tolerance() = lagrange_tolerance
+
 
 # --- SDF & Ray Marching ---
 const sdf_surface_threshold = @load_preference("sdf_surface_threshold", 1e-9)

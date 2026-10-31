@@ -63,7 +63,7 @@ end
 """
     AstigmaticGaussianBeamlet(position, direction, λ, w0; kwargs...)
 
-Constructs an astigmatic Gaussian beamlet at its waist with the specified beam parameters.
+Constructs an astigmatic Gaussian beamlet at `position` with the specified beam parameters.
 In the 4-argument version, the beam has circular symmetry with waist radius `w0`.
 In the 5-argument version, independent waists `w0_x` and `w0_y` can be specified.
 
@@ -159,6 +159,10 @@ function AstigmaticGaussianBeamlet(
         z0_x::Real = z0,
         z0_y::Real = z0
 )
+    # Common number type of all rays
+    T = float(promote_type(eltype(position), eltype(direction), typeof(λ), typeof(w0_x),
+        typeof(w0_y), typeof(M2_x), typeof(M2_y), typeof(P0), typeof(z0_x), typeof(z0_y)))
+    position, direction, λ = T.(position), T.(direction), T(λ)
     # Create orthogonal vectors for construction purposes (right-handed)
     direction = normalize(direction)
     if isnothing(support)
@@ -416,17 +420,29 @@ function parabasal_ray_parameters(agb::AstigmaticGaussianBeamlet, p0, i)
 end
 
 """
+    lagrange_invariants(agb, i)
+
+Lagrange invariants `H = n Im(h* . u)` of the x and y axes of `agb` at segment `i`. At the start of
+a beamlet they are `M2 λ / π`, up to the paraxial error of the divergence rays.
+"""
+function lagrange_invariants(agb::AstigmaticGaussianBeamlet, i::Int)
+    h1, u1, h2, u2, _ = parabasal_ray_parameters(agb, position(rays(agb.c)[i]), i)
+    n = refractive_index(agb, i)
+    return n * imag(sum(conj(h1) .* u1)), n * imag(sum(conj(h2) .* u2))
+end
+
+"""
     check_optical_invariant(agb, i; threshold = get_invariant_threshold())
 
-Evaluate the complex optical invariant `h1 . u2 - h2 . u1 = 0` at segment `i`.
-Returns `true` if the invariant holds (within `threshold`), and `false` otherwise.
+Evaluate the complex optical invariant `h1 . u2 - h2 . u1 = 0` at segment `i` and the
+`lagrange_invariants` against their values at the start of the root beam. A Lagrange
+invariant must lie within `threshold` of that value and within `Config.get_lagrange_tolerance()`
+of it in relative terms: `threshold` alone is larger than `λ/π` at optical wavelengths.
+Returns `true` if the invariants hold, and `false` otherwise.
 """
 function check_optical_invariant(agb::AstigmaticGaussianBeamlet, i::Int;
         threshold::Real = get_invariant_threshold())
-    chief = rays(agb.c)[i]
-    p0 = position(chief)
-    λ = wavelength(chief)
-    n = refractive_index(agb, i)
+    p0 = position(rays(agb.c)[i])
 
     h1, u1, h2, u2, _ = parabasal_ray_parameters(agb, p0, i)
 
@@ -439,16 +455,12 @@ function check_optical_invariant(agb::AstigmaticGaussianBeamlet, i::Int;
         all_pass = false
     end
 
-    # Check Lagrange Invariant (Area Invariant): n * Im(h* . u) = λ/π
+    # Check Lagrange Invariant (Area Invariant): n * Im(h* . u) keeps its start value
     # This ensures that each axis individually behaves like a valid Gaussian.
-    H_target = λ / π
-    sets = (
-        (h1, u1, "x"),
-        (h2, u2, "y")
-    )
-    for (h, u, label) in sets
-        H = n * imag(sum(conj(h) .* u))
-        if !isapprox(H, H_target, atol = threshold)
+    targets = lagrange_invariants(AbstractTrees.getroot(agb), 1)
+    for (H, H_target, label) in zip(lagrange_invariants(agb, i), targets, ("x", "y"))
+        atol = min(threshold, Config.get_lagrange_tolerance() * H_target)
+        if !isapprox(H, H_target; atol)
             @warn lazy"Lagrange invariant violation ($label) at segment $i: H=$H, target=$H_target. The beamlet has likely encountered an object that violates the paraxial assumption."
             all_pass = false
         end
@@ -560,6 +572,23 @@ Calculates the non-conjugating dot product `a ⋅ b = Σ aᵢbᵢ`.
     return a[1] * b[1] + a[2] * b[2] + a[3] * b[3]
 end
 
+"""
+    transverse_profile(h1, u1, h2, u2, r, d, area, nk)
+
+Transverse factor of the field at the offset `r` from the chief ray with direction `d`, with the
+wavenumber `nk` of the medium. The phase is the real part of `r^T Q r / 2`. The decay is
+`exp(-r^T S⁻¹ r)` with the spot matrix `S = H H†`, so that the field follows the beam radius
+for any `M2` and carries the power of the beam area: `Im Q` is `S⁻¹` only for `M2 = 1` and
+while the Lagrange invariants hold.
+"""
+function transverse_profile(h1, u1, h2, u2, r, d, area, nk)
+    ξ1 = _pseudo_cross2d(h1, r, d)
+    ξ2 = _pseudo_cross2d(h2, r, d)
+    # We use _pseudo_dot to compute the non-conjugating dot product r^T u.
+    w = (ξ1 * _pseudo_dot(u2, r) - ξ2 * _pseudo_dot(u1, r)) / (2 * area)
+    return cis(nk * real(w)) * exp(-(abs2(ξ1) + abs2(ξ2)) / abs2(area))
+end
+
 # Coefficients (A0, A1, A2) of the complex beam area a(l) = (h1 + l u1) × (h2 + l u2) · d
 # = A0 + A1 l + A2 l² along a segment, with the parabasal parameters at its start.
 @inline function area_coefficients(h1, u1, h2, u2, d)
@@ -642,9 +671,9 @@ phase.
 
 # Formalism
 The field is computed using the **Parabasal Gaussian Beamlet** formalism:
-ψ(r, z) = √(area_ref / area(z)) * exp(i * k * [z + 1/2 * rᵀ * Q(z) * r])
-where area(z) = (h1 × h2) · dir is the complex beam area and `area_ref` its value at the start
-of the segment, continued over all segments in front of it.
+ψ(r, z) = √(area_ref / area(z)) * exp(i * k * [z + 1/2 * rᵀ * Re Q(z) * r]) * exp(-rᵀ * S(z)⁻¹ * r)
+where area(z) = (h1 × h2) · dir is the complex beam area, `area_ref` its value at the start
+of the segment, continued over all segments in front of it, and S = H H† the spot matrix.
 """
 function parabasal_field(
         agb::AstigmaticGaussianBeamlet,
@@ -674,12 +703,6 @@ function parabasal_field(
     if isnan(area) || abs(area) < 1e-25
         area = Complex(1e-25, 1e-25)
     end
-    ξ1 = _pseudo_cross2d(h1, r, dir)
-    ξ2 = _pseudo_cross2d(h2, r, dir)
-
-    # Complex quadratic phase term w = r^T Q r / 2
-    # We use _pseudo_dot to compute the non-conjugating dot product r^T u.
-    w = (ξ1 * _pseudo_dot(u2, r) - ξ2 * _pseudo_dot(u1, r)) / (2 * area)
 
     # Phase correction for refractive index (OPL - geometric length)
     z_sum = length_before(agb, i)
@@ -691,9 +714,9 @@ function parabasal_field(
     # Gouy phase from continuous area arg, amplitude from area change within segments
     Δarg = area_arg(agb, i, local_distance(agb, p0, i))
     start = _area_from_root(agb, i, 0)
-    # Phase with OPL correction Δl, transverse term w with wavenumber n k0
-    ψ = start.scale * sqrt(abs(start.area / area)) * cis(-Δarg / 2) *
-        exp(im * k0 * (z + refractive_index(chief) * w + Δl))
+    # Phase with OPL correction Δl, transverse term with wavenumber n k0
+    ψ = start.scale * sqrt(abs(start.area / area)) * cis(-Δarg / 2) * cis(k0 * (z + Δl)) *
+        transverse_profile(h1, u1, h2, u2, r, dir, area, refractive_index(chief) * k0)
     return E_ref_amp * ψ
 end
 

@@ -107,9 +107,9 @@ detector and the optical path length `L` from the source to the hit point `p_hit
   the segment and the optical path `L(l)` along the chief ray.
 - [`AstigmaticGaussianBeamletHit`](@ref): the field vector of the chief ray of the segment, `E₀`,
   times the general astigmatic Gaussian beam of its parabasal rays,
-  ``\\mathbf{E}_j(\\mathbf{p}) = \\mathbf{E}_0\\, g(l) \\exp(i k_0 [L(l) + n\\, W(\\mathbf{p})])``,
-  with the Gouy factor `g`, which also holds the change of the amplitude with the beam area, and
-  the complex transverse phase `W`, whose imaginary part is the Gaussian envelope, see
+  ``\\mathbf{E}_j(\\mathbf{p}) = \\mathbf{E}_0\\, g(l) \\exp(i k_0 [L(l) + n\\, W(\\mathbf{p})]) \\exp(-\\mathbf{r}^T \\mathbf{S}^{-1} \\mathbf{r})``,
+  with the Gouy factor `g`, which also holds the change of the amplitude with the beam area, the
+  transverse phase `W` and the spot matrix `S` at the offset `r` from the chief ray, see
   [Astigmatic polarized beamlets](@ref).
 
 Beamlet hits give the physical field in \\[V/m\\]. Ray hits are raw and unscaled: `|E|²` does not
@@ -320,14 +320,10 @@ function astigmatic_phasor(hit::AstigmaticGaussianBeamletHit{G}, p::AbstractArra
     # Gouy factor from the continuous area argument
     gouy = hit.gouy0 / (sqrt(1 - hit.ρ1 * l1) * sqrt(1 - hit.ρ2 * l1))
 
-    ξ1 = _pseudo_cross2d(h1_z, r_vec, dir)
-    ξ2 = _pseudo_cross2d(h2_z, r_vec, dir)
-    w = (ξ1 * _pseudo_dot(hit.u2, r_vec) -
-         ξ2 * _pseudo_dot(hit.u1, r_vec)) / (2 * area_z)
-
     n = refractive_index(hit)
     phase_corr = (n - 1) * l1
     z_total = hit.l0 + l1
     # Transverse term with n k0
-    return gouy * cis(hit.k0 * (z_total + n * w + hit.Δl0 + phase_corr))
+    return gouy * cis(hit.k0 * (z_total + hit.Δl0 + phase_corr)) *
+           transverse_profile(h1_z, hit.u1, h2_z, hit.u2, r_vec, dir, area_z, n * hit.k0)
 end

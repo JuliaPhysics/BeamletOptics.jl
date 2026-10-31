@@ -194,6 +194,17 @@ parametric_cases = [
         fd = (spot(1e-6) - spot(-1e-6)) / 2e-6
         @test ad ≈ fd rtol = 1e-5
     end
+    @testset "AstigmaticGaussianBeamlet, waist offset" begin
+        # the beam radius at the start with the waist offset as the only Dual, w = w0 √(1 + (z0 / zR)²)
+        λ, w0, z0 = 1.064e-6, 0.5e-3, 0.2
+        zR = π * w0^2 / λ
+        dw = w0 * z0 / zR^2 / sqrt(1 + (z0 / zR)^2)
+        pos, dir = [0.0, 0, 0], [0.0, 1, 0]
+        radii(beam) = gauss_parameters(beam, 0.0)
+        @test ForwardDiff.derivative(z -> radii(AstigmaticGaussianBeamlet(pos, dir, λ, w0; z0 = z))[1], z0) ≈ dw rtol = 1e-6
+        @test ForwardDiff.derivative(z -> radii(AstigmaticGaussianBeamlet(pos, dir, λ, w0, w0; z0_x = z))[1], z0) ≈ dw rtol = 1e-6
+        @test ForwardDiff.derivative(z -> radii(AstigmaticGaussianBeamlet(pos, dir, λ, w0, w0; z0_y = z))[2], z0) ≈ dw rtol = 1e-6
+    end
 end
 
 end # MODULE
