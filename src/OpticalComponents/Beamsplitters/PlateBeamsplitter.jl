@@ -69,8 +69,8 @@ end
 """
     RectangularPlateBeamsplitter(width, height, thickness, n; reflectance=0.5)
 
-Creates a [`RectangularPlateBeamsplitter`](@ref). The splitter is aligned with the negative y-axis.
-The splitter coating is centered at the origin. See also [`RoundPlateBeamsplitter`](@ref).
+Creates a [`RectangularPlateBeamsplitter`](@ref). The splitter coating is centered at the origin and
+the substrate lies on the positive y-side of it, from y = 0 to `thickness`. See also [`RoundPlateBeamsplitter`](@ref).
 
 # Arguments
 
@@ -124,13 +124,13 @@ end
 """
     RoundPlateBeamsplitter(diameter, thickness, n; reflectance=0.5)
 
-Creates a [`RoundPlateBeamsplitter`](@ref). The splitter is aligned with the negative y-axis.
-The coating is centered at the origin. See also [`RectangularPlateBeamsplitter`](@ref).
+Creates a [`RoundPlateBeamsplitter`](@ref). The coating is centered at the origin and the substrate
+lies on the positive y-side of it, from y = 0 to `thickness`. See also [`RectangularPlateBeamsplitter`](@ref).
 
 # Arguments
 
 - `diameter`: x-z-plane substrate diameter in [m]
-- `thickness`: substrate thickness along the z-axis in [m]
+- `thickness`: substrate thickness along the y-axis in [m]
 - `n`: the [`RefractiveIndex`](@ref) of the substrate
 
 # Keywords 
