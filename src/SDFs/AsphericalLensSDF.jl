@@ -10,7 +10,7 @@ Constructs an aspheric lens with a convex-like surface according to ISO10110.
     There might be unexpected effects for complex shapes which do not show a generally convex
     behavior.
 
-- `coefficients` : (even) coefficients of the asphere.
+- `coefficients` : (even) coefficients of the asphere, starting with A2 (r²).
 - `radius` : radius of the lens
 - `conic_constant` : conic constant of the lens surface
 - `diameter`: lens diameter
@@ -86,7 +86,7 @@ Constructs an aspheric lens with a concave-like surface according to ISO10110.
     There might be unexpected effects for complex shapes which do not show a generally concave
     behavior.
 
-- `coefficients` : (even) coefficients of the asphere.
+- `coefficients` : (even) coefficients of the asphere, starting with A2 (r²).
 - `radius` : radius of the lens (negative!)
 - `conic_constant` : conic constant of the lens surface
 - `diameter`: lens diameter
@@ -135,7 +135,7 @@ aspheric_equation(r, c, k, α_coeffs)
 The aspheric surface equation. The asphere is defined by:
 - `c` : The curvature (1/radius) of the surface
 - `k` : The conic constant of the surface
-- `α_coeffs` : The (even) aspheric coefficients, starting with A4.
+- `α_coeffs` : The (even) aspheric coefficients of the terms `Σᵢ αᵢ r²ⁱ`, starting with A2 (r²).
 
 This function returns NaN if the square root argument becomes negative.
 
@@ -394,7 +394,7 @@ Constructs a plano-convex aspheric lens SDF with:
 - `l`: lens thickness
 - `d`: lens diameter
 - `k` : The conic constant of the surface
-- `α_coeffs` : The (even) aspheric coefficients, starting with A4.
+- `α_coeffs` : The (even) aspheric coefficients, starting with A2 (r²).
 
 The spherical surface is constructed flush with the cylinder surface.
 """
@@ -421,7 +421,7 @@ Constructs a plano-concave aspheric lens SDF with:
 - `d`: lens diameter
 - `cz`: aspheric surface chip zone
 - `k` : The conic constant of the surface
-- `α_coeffs` : The (even) aspheric coefficients, starting with A4.
+- `α_coeffs` : The (even) aspheric coefficients, starting with A2 (r²).
 - `md`: lens mechanical diameter (default: md = d)
 
 The spherical surface is constructed flush with the cylinder surface.
@@ -459,7 +459,8 @@ This surface is rotationally symmetric about its optical axis.
 # Fields
 - `spherical::SphericalSurface{T}`: The base spherical surface portion of the asphere.
 - `conic_constant::T`: The conic constant defining the deviation from a spherical shape.
-- `coefficients::AbstractVector{T}`: A vector of even aspheric coefficients for higher-order corrections.
+- `coefficients::AbstractVector{T}`: A vector of even aspheric coefficients for higher-order corrections,
+  starting with A2 (r²).
 
 """
 struct EvenAsphericalSurface{T} <: AbstractRotationallySymmetricSurface{T}
@@ -479,7 +480,8 @@ This constructor automatically sets the mechanical diameter equal to the optical
 - `radius`: The radius of curvature of the base spherical surface.
 - `diameter`: The clear (optical) diameter of the surface.
 - `conic_constant`: The conic constant defining the deviation from a spherical shape.
-- `coefficients::AbstractVector`: A vector of even aspheric coefficients for higher-order corrections.
+- `coefficients::AbstractVector`: The even aspheric coefficients of the terms `Σᵢ αᵢ r²ⁱ` in SI units, starting
+  with A2 (r²), e.g. `[0, A4 * 1e3^3, A6 * 1e3^5]` for mm-based catalog values without an r² term.
 - `mechanical_diameter`: The mechanical diameter of the surface; if not provided, it defaults to `diameter`.
 
 """
