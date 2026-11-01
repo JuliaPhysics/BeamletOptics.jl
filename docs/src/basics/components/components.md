@@ -67,7 +67,7 @@ flowchart TB
     S -- bounding_spheres --> BSO
     S -- "root beam,<br/>then its children" --> TR
     TR --> STEP
-    TR -- "r_max reached, or<br/>astigmatic beamlet:<br/>invariant check fails" --> E
+    TR -- "r_max reached, or<br/>beamlet:<br/>invariant check fails" --> E
     STEP -- "nothing" --> IX
     STEP -- "Hint" --> ISH
     IX -- shape_trait_of --> SHP

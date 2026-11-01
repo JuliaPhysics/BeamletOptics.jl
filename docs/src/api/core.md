@@ -286,7 +286,7 @@ flowchart TB
 BeamletOptics.trace_system!
 ```
 
-For a [`Beam`](@ref), `trace_system!` runs the loop below until the beam has `r_max` rays, its last ray hits nothing or `interact3d` returns `nothing`; the methods for beamlets run one `tracing_step!` per component ray and one `interact3d` for the whole beamlet per step, and also stop if the rays hit different shapes (an [`AstigmaticGaussianBeamlet`](@ref) also stops if the optical invariant check fails).
+For a [`Beam`](@ref), `trace_system!` runs the loop below until the beam has `r_max` rays, its last ray hits nothing or `interact3d` returns `nothing`; the methods for beamlets run one `tracing_step!` per component ray and one `interact3d` for the whole beamlet per step, and also stop if the rays hit different shapes or the optical invariant check fails.
 
 ```mermaid
 flowchart TB

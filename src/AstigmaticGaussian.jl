@@ -437,9 +437,9 @@ end
     check_optical_invariant(agb, i; threshold = get_invariant_threshold())
 
 Evaluate the complex optical invariant `h1 . u2 - h2 . u1 = 0` at segment `i` and the
-`lagrange_invariants` against their values at the start of the root beam. `threshold` is the
-limit of the complex invariant. A Lagrange invariant must lie within the share
-[`get_lagrange_tolerance`](@ref)`()` of its value, for any `M2` and `λ`.
+`lagrange_invariants` against their values at the start of the root beam with
+`check_lagrange_invariants`, as for a [`GaussianBeamlet`](@ref). `threshold` is the limit of the
+complex invariant only.
 Returns `true` if the invariants hold, and `false` otherwise.
 """
 function check_optical_invariant(agb::AstigmaticGaussianBeamlet, i::Int;
@@ -459,15 +459,7 @@ function check_optical_invariant(agb::AstigmaticGaussianBeamlet, i::Int;
 
     # Check Lagrange Invariant (Area Invariant): n * Im(h* . u) keeps its start value
     # This ensures that each axis individually behaves like a valid Gaussian.
-    targets = lagrange_invariants(AbstractTrees.getroot(agb), 1)
-    for (H, H_target, label) in zip(lagrange_invariants(agb, i), targets, ("x", "y"))
-        if !isapprox(H, H_target; atol = get_lagrange_tolerance() * H_target)
-            @warn lazy"Lagrange invariant violation ($label) at segment $i: H=$H, target=$H_target. The beamlet has likely encountered an object that violates the paraxial assumption."
-            all_pass = false
-        end
-    end
-
-    return all_pass
+    return check_lagrange_invariants(agb, i) && all_pass
 end
 
 """
