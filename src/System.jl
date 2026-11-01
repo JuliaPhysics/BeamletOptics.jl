@@ -386,7 +386,8 @@ The objects of the `system` are not reset by default: a [`Detector`](@ref) keeps
 - `r_max = get_default_r_max()`: Maximum number of tracing iterations for each leaf.
 - `depth_max = get_default_depth_max()`: Maximum number of branching levels explored from the root beam
 - `check_invariant = true`: enables or disables optical invariant checks where applicable
-- `threshold = get_invariant_threshold()`: threshold for paraxial invariant checks
+- `threshold = get_invariant_threshold()`: limit of the complex invariant of an [`AstigmaticGaussianBeamlet`](@ref).
+  Its Lagrange invariants use [`get_lagrange_tolerance`](@ref) instead
 """
 function solve_system!(
         system::AbstractSystem,

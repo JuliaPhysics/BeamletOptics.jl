@@ -3,6 +3,7 @@ module TestAstigmaticGaussianBeamlet
 using BeamletOptics
 using Test
 using LinearAlgebra
+using Logging
 
 const BMO = BeamletOptics
 
@@ -20,6 +21,17 @@ const BMO = BeamletOptics
         @test length(BMO.rays(beam.dyp)) == 1
         @test isnothing(beam.parent)
         @test isempty(beam.children)
+    end
+
+    @testset "Number type" begin
+        pos, dir, s = Float32[0, 0, 0], Float32[0, 1, 0], Float32[1, 0, 0]
+        # the type of P0 counts only if it sets the field
+        @test AstigmaticGaussianBeamlet(pos, dir, 1.0f-6, 1.0f-3; E0 = ComplexF32[1, 0, 0], support = s) isa AstigmaticGaussianBeamlet{Float32}
+        @test AstigmaticGaussianBeamlet(pos, dir, 1.0f-6, 1.0f-3; P0 = 1.0f-3, support = s) isa AstigmaticGaussianBeamlet{Float32}
+        @test AstigmaticGaussianBeamlet(pos, dir, 1.0f-6, 1.0f-3; support = s) isa AstigmaticGaussianBeamlet{Float64}
+        # a wider support widens all rays
+        @test AstigmaticGaussianBeamlet(pos, dir, 1.0f-6, 1.0f-3; P0 = 1.0f-3, support = [1.0, 0, 0]) isa AstigmaticGaussianBeamlet{Float64}
+        @test AstigmaticGaussianBeamlet(pos, dir, 1.0f-6, 1.0f-3; E0 = ComplexF32[1, 0, 0], support = [1.0, 0, 0]) isa AstigmaticGaussianBeamlet{Float64}
     end
 
     @testset "Support vector" begin
@@ -244,7 +256,7 @@ end
     λ, w0, D = 1e-6, 20e-6, 5e-3
     k, zR = 2π / λ, π * w0^2 / λ
     wrap(x) = mod2pi(x + π) - π
-    gouy(s) = -atan((s - D) / zR) - atan(D / zR)          # relative to the start
+    gouy(s) = -atan((s - D) / zR)                         # relative to the waist
     for s in (D - zR, D, D + 0.5zR, D + 2zR, D + 5zR)
         beam() = AstigmaticGaussianBeamlet([0.0, -D, 0], [0.0, 1, 0], λ, w0, w0;
             z0_x = D, z0_y = D, support = [1.0, 0, 0])
@@ -257,6 +269,185 @@ end
         E_hit = electric_field(only(BMO.hits(det)), [0.0, s - D, 0])
         ψ = E_hit[argmax(abs.(E_hit))]
         @test wrap(angle(ψ) - k * s - gouy(s)) ≈ 0 atol = 2e-3
+    end
+end
+
+@testset "Waist offset" begin
+    λ, w0, z0, P0 = 1.064e-6, 0.5e-3, 0.2, 2e-3
+    pos, dir, s = [0.0, -0.1, 0], [0.0, 1, 0], [1.0, 0, 0]
+
+    # The field holds up to the paraxial error O(θ²) ≈ 1e-7 of the parabasal rays
+    @testset "Same beam as a GaussianBeamlet" for (p, d, x) in ((pos, dir, s),
+        ([1.0, 2, 3], normalize([1.0, 2, -1]), normalize([2.0, -1, 0])))
+        g = GaussianBeamlet(p, d, λ, w0; z0, P0, support = x)
+        a = AstigmaticGaussianBeamlet(p, d, λ, w0; z0, P0, support = x)
+        @test position(first(BMO.rays(a.c))) ≈ p
+        @test optical_power(a) ≈ P0
+        @test all(isapprox.(rayleigh_range(a), rayleigh_range(g); rtol = 1e-6))
+        for z in (0.0, 0.1, z0, 0.3, 0.6)
+            w, _, ψ, _ = gauss_parameters(g, z)
+            w1, w2, _, _, ψa, w01, w02 = gauss_parameters(a, z)
+            @test w1 ≈ w
+            @test w2 ≈ w
+            @test ψa ≈ ψ atol = 1e-6
+            @test w01 ≈ w0
+            @test w02 ≈ w0
+            @test electric_field(a, 0.2e-3 * x, z) ≈ electric_field(g, 0.2e-3, z) rtol = 1e-6
+        end
+    end
+
+    @testset "Same field on a detector" begin
+        function field(beam)
+            pd = Detector(0.05)
+            BMO.translate3d!(pd, [0, 0.3, 0])
+            solve_system!(System([pd]), beam)
+            return electric_field(only(BMO.hits(pd)), [0.2e-3, 0.3, 0])
+        end
+        E = field(GaussianBeamlet(pos, dir, λ, w0; z0, P0, support = s))
+        Ea = field(AstigmaticGaussianBeamlet(pos, dir, λ, w0; z0, P0, support = s))
+        @test Ea[1] ≈ E rtol = 1e-6
+    end
+
+    @testset "Waists per axis" begin
+        a = AstigmaticGaussianBeamlet(pos, dir, λ, w0, 2w0; z0, z0_y = -0.1, P0, support = s)
+        @test position(first(BMO.rays(a.c))) ≈ pos
+        @test optical_power(a) ≈ P0
+        @test gauss_parameters(a, z0)[1] ≈ w0
+        # the waist of the y axis lies in front of the start
+        zR = π * (2w0)^2 / λ
+        @test gauss_parameters(a, 0.0)[2] ≈ 2w0 * sqrt(1 + (0.1 / zR)^2)
+    end
+
+    @testset "M2" begin
+        M2 = 1.5
+        g = GaussianBeamlet(pos, dir, λ, w0; z0, M2, support = s)
+        a = AstigmaticGaussianBeamlet(pos, dir, λ, w0; z0, M2, support = s)
+        @test all(isapprox.(rayleigh_range(a), rayleigh_range(g; M2); rtol = 1e-6))
+        for z in (0.0, z0, 0.6), r in (0.0, 0.2e-3, 1e-3)
+            @test electric_field(a, r * s, z) ≈ electric_field(g, r, z) rtol = 1e-5
+        end
+    end
+
+    @testset "E0 is the field at the start" begin
+        E0 = [0.0, 0, 2.0]
+        a = AstigmaticGaussianBeamlet(pos, dir, λ, w0; z0, E0, support = s)
+        @test BMO.electric_field(a) ≈ E0
+        @test abs(electric_field(a, zeros(3), 0.0)) ≈ 2
+    end
+end
+
+@testset "M2 > 1" begin
+    λ, w0, P0 = 1e-6, 1e-3, 1e-3
+    pos, dir = [0.0, 0, 0], [0.0, 1, 0]
+    function detector_power(beam, parts...)
+        pd = Detector(0.2)
+        translate3d!(pd, [0, 0.3, 0])
+        solve_system!(System([parts..., pd]), beam)
+        return optical_power(pd)
+    end
+    function tilted_lens()
+        lens = SphericalLens(0.5, -0.5, 8e-3, BMO.inch, x -> 1.5)
+        translate3d!(lens, [0, 0.1, 0])
+        BMO.zrotate3d!(lens, deg2rad(8))
+        BMO.xrotate3d!(lens, deg2rad(5))
+        return lens
+    end
+
+    @testset "The detector collects P0 for M2 = ($Mx, $My)" for (Mx, My) in ((1, 1), (2, 2), (10, 10), (2, 5), (7, 1.5))
+        kw = (; P0, M2_x = Mx, M2_y = My, support = [1.0, 0, 0])
+        @test detector_power(AstigmaticGaussianBeamlet(pos, dir, λ, w0, 2w0; kw...)) ≈ P0 rtol = 1e-3
+        @test detector_power(AstigmaticGaussianBeamlet(pos, dir, λ, w0, 2w0; z0_x = 0.2, z0_y = -0.1, kw...)) ≈ P0 rtol = 1e-3
+    end
+
+    @testset "The field follows the beam radius" begin
+        beam = AstigmaticGaussianBeamlet(pos, dir, λ, w0, 2w0; M2_x = 2, M2_y = 5, support = [1.0, 0, 0])
+        for z in (0.0, 0.3, 2.0)
+            w1, w2 = gauss_parameters(beam, z)
+            @test intensity(beam, [w1, 0, 0], z) / intensity(beam, zeros(3), z) ≈ exp(-2) rtol = 1e-9
+            @test intensity(beam, [0, 0, w2], z) / intensity(beam, zeros(3), z) ≈ exp(-2) rtol = 1e-9
+        end
+    end
+
+    @testset "Tracing does not stop, the Fresnel loss is that of M2 = 1 for M2 = $M2" for M2 in (2, 5, 10)
+        ref = detector_power(AstigmaticGaussianBeamlet(pos, dir, λ, w0; P0), tilted_lens())
+        @test detector_power(AstigmaticGaussianBeamlet(pos, dir, λ, w0; P0, M2), tilted_lens()) ≈ ref rtol = 1e-3
+    end
+
+    @testset "Twisted beam, M2 = ($Mx, $My)" for (Mx, My) in ((3, 3), (1, 4), (2, 8), (1, 20))
+        # A cylinder lens rotated against the axes of the beam twists it: for unequal M2,
+        # H H† is complex, and det S exceeds |h1 × h2|² by 1.86 for M2 = (1, 20)
+        function behind_cylinder_lens(M2_x, M2_y)
+            lens = Lens(CylindricalSurface(30e-3, 20e-3, 25e-3), 4e-3, _ -> 1.5)
+            BMO.yrotate3d!(lens, deg2rad(45))
+            translate3d!(lens, [0, 50e-3, 0])
+            pd = Detector(0.1)
+            translate3d!(pd, [0, 130e-3, 0])
+            beam = AstigmaticGaussianBeamlet(pos, dir, λ, w0, w0; P0, M2_x, M2_y, support = [1.0, 0, 0])
+            solve_system!(System([lens, pd]), beam)
+            return beam, pd
+        end
+        ref = optical_power(last(behind_cylinder_lens(1, 1)))
+        beam, pd = behind_cylinder_lens(Mx, My)
+        @test optical_power(pd) ≈ ref rtol = 1e-3
+        # The field falls to 1/e² of its peak at the radii of waist_parameters
+        z = 130e-3 - 1e-9
+        _, w1, w2 = BMO.waist_parameters(beam, z)
+        peak = sum(abs2, BMO.polarized_field(beam, zeros(3), z))
+        for w in (w1, w2)
+            @test sum(abs2, BMO.polarized_field(beam, w, z)) / peak ≈ exp(-2) rtol = 1e-6
+        end
+    end
+
+    @testset "The limit does not depend on M2 and λ" begin
+        # H deviates by 8.5 % in this focus, within the limit of 50 %
+        function reaches_detector(; kw...)
+            lens = SphericalLens(50e-3, -50e-3, 8e-3, 30e-3, x -> 1.5)
+            translate3d!(lens, [0, 0.1, 0])
+            pd = Detector(0.2)
+            translate3d!(pd, [0, 0.15, 0])
+            beam = AstigmaticGaussianBeamlet(pos, dir, 1064e-9, 10e-3; kw...)
+            with_logger(() -> solve_system!(System([lens, pd]), beam), NullLogger())
+            return !isnothing(BMO.hits(pd)) && !isempty(BMO.hits(pd))
+        end
+        @test reaches_detector()
+        @test reaches_detector(M2 = 100)
+    end
+
+    @testset "The invariants keep their start value" begin
+        beam = AstigmaticGaussianBeamlet(pos, dir, λ, w0, w0; M2_x = 3, M2_y = 7)
+        @test all(isapprox.(BMO.lagrange_invariants(beam, 1), (3, 7) .* (λ / π); rtol = 1e-6))
+    end
+end
+
+@testset "Limit of the beamlet model" begin
+    # The waist rays of a large beamlet leave the parabolic part of a short lens. With separate
+    # waists the Lagrange invariant of one axis drops and changes its sign: Im Q has no
+    # Gaussian decay left, the field would hold 1e6 times the power of the source.
+    function detector_behind_lens(f; check_invariant = true)
+        lens = SphericalLens(f, -f, 8e-3, BMO.inch, x -> 1.5)
+        translate3d!(lens, [0, 0.1, 0])
+        pd = Detector(0.02)
+        translate3d!(pd, [0, 0.1 + f, 0])
+        beam = AstigmaticGaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], 1064e-9, 6.4e-3, 6.4e-3;
+            z0_x = 0.0, z0_y = 3.0, P0 = 1.0)
+        solve_system!(System([lens, pd]), beam; check_invariant)
+        return pd
+    end
+    # Two surfaces of n = 1.5 transmit 0.96² ≈ 0.92
+    transmitted = 0.96^2
+
+    @testset "The power on a detector stays that of the source, f = $f" for f in (0.1, 0.075, 0.05, 0.045, 0.04)
+        pd = with_logger(() -> detector_behind_lens(f; check_invariant = false), NullLogger())
+        @test optical_power(pd) ≈ transmitted rtol = 0.02
+    end
+
+    @testset "Tracing stops with a warning, f = $f" for f in (0.05, 0.045, 0.04)
+        pd = @test_logs (:warn, r"Lagrange invariant violation") match_mode = :any detector_behind_lens(f)
+        @test isnothing(BMO.hits(pd)) || isempty(BMO.hits(pd))
+    end
+
+    @testset "A weaker focus traces, f = $f" for f in (0.1, 0.075)
+        @test optical_power(detector_behind_lens(f)) ≈ transmitted rtol = 0.02
     end
 end
 

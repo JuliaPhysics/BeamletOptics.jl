@@ -3,7 +3,6 @@ module TestBugFixes
 using BeamletOptics
 using LinearAlgebra
 using Test
-using Logging
 using Random
 
 const BMO = BeamletOptics
@@ -328,40 +327,24 @@ end
 end
 
 @testset "Solving Again Tail Trimming Consistency" begin
-    # Issue: When a second solve pushes a new segment
-    # and it is rejected by check_optical_invariant.
-    # Chief and aux beams must be trimmed consistently.
-
-    # We need a system where we can trigger an invariant violation during the second solve.
-    # We'll use a very small invariant threshold to make it easy to trigger.
-    strict_threshold = 1e-15
-
-    # A simple plane surface
-    surf = RoundPlanoMirror(50mm, 5mm)
-    BMO.translate3d!(surf, [0, 50mm, 0])
-    system = System([surf])
-
-    # Initial trace: 1 segment (2 rays)
-    agb = AstigmaticGaussianBeamlet([0, 0, 0], [0, 1, 0], 1e-6, 1mm)
-
-    with_logger(NullLogger()) do
-        # Use strict threshold for this call
-        solve_system!(system, agb; threshold = strict_threshold)
-
-        n_initial = length(BMO.rays(agb.c))
-        @test n_initial == 2
-
-        # Now move the surface further away such that the second solve will
-        # reach the old end and try to push a new segment.
-        BMO.translate3d!(surf, [0, 10mm, 0])
-
-        # Also tilt it or change parameters to trigger invariant violation if possible.
-        solve_system!(system, agb; threshold = strict_threshold)
-    end
-
-    # Verification of consistency
-    lengths = map(b -> length(BMO.rays(b)), BMO._component_beams(agb))
-    @test all(==(lengths[1]), lengths)
+    # A second solve rejects a segment: chief and aux beams stay of equal length.
+    # A large beamlet with separate waists leaves its model in this focus, see
+    # "Limit of the beamlet model" in TestAstigmaticGaussianBeamlet
+    f = 0.05
+    lens = SphericalLens(f, -f, 8e-3, BMO.inch, x -> 1.5)
+    translate3d!(lens, [0.1, 0.1, 0])                  # Beside the beam
+    pd = Detector(0.02)
+    translate3d!(pd, [0, 0.1 + f, 0])
+    system = System([lens, pd])
+    beam = AstigmaticGaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], 1064e-9, 6.4e-3, 6.4e-3;
+        z0_x = 0.0, z0_y = 3.0, P0 = 1.0)
+    @test_nowarn solve_system!(system, beam; initialize = true)
+    @test !isempty(BMO.hits(pd))
+    translate3d!(lens, [-0.1, 0, 0])                   # Into the beam
+    @test_logs (:warn, r"Lagrange invariant violation") match_mode = :any solve_system!(
+        system, beam; initialize = true)
+    @test isnothing(BMO.hits(pd)) || isempty(BMO.hits(pd))
+    @test allequal(map(b -> length(BMO.rays(b)), BMO._component_beams(beam)))
 end
 
 @testset "Issue#87" begin
