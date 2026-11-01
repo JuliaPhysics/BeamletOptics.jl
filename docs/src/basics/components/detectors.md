@@ -214,7 +214,7 @@ The diagram shows how the constructors share one sampling of the hits and how th
 
 ```mermaid
 flowchart TB
-    DET(["<b>PlaneField</b>(detector; size, spacing)"]) --> DH["<b>hits</b>(detector)<br/>error if the detector has no hits"]
+    DET(["<b>PlaneField</b>(detector; size, spacing)"]) --> DH["<b>hits</b>(detector)<br/>ArgumentError if the detector has no hits"]
     DET -- "default axes" --> DA["<b>default_plane_axes</b>(detector)<br/>u from <b>local_axes</b>, n = −<b>direction</b>"]
     BEAM(["<b>PlaneField</b>(beamlet, id; size, spacing,<br/>origin, axes)"]) --> OH["one <b>GaussianBeamletHit</b> or<br/><b>AstigmaticGaussianBeamletHit</b><br/>(beamlet, id)"]
     DH --> PH

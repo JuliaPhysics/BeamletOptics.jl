@@ -68,16 +68,16 @@ empties it. Requires `using OpticsBase` (package extension).
 - `n` (medium refractive index) is that of the hits; `λ` is their shared wavelength.
 - Time convention `exp(−iωt)`, as in BMO and `OpticsBase`.
 
-Throws an `ErrorException` if the detector has no hits, since a `PlaneField` takes `λ` and `n`
-from them, and an `ArgumentError` if the hits are not beamlet hits (e.g. ray hits) or do not
-share wavelength and refractive index.
+Throws an `ArgumentError` if the detector has no hits, since a `PlaneField` takes `λ` and `n`
+from them, if the hits are not beamlet hits (e.g. ray hits), or if they do not share
+wavelength and refractive index.
 """
 function OpticsBase.PlaneField(detector::Detector;
         size::NTuple{2, Int}, spacing::NTuple{2, <:Real},
         origin = position(detector), axes = default_plane_axes(detector),
         progress::Bool = true)
     hs = hits(detector)
-    isnothing(hs) && throw(ErrorException("No hits available on detector."))
+    isnothing(hs) && throw(ArgumentError("PlaneField: the detector has no hits"))
     return PlaneField(hs; size, spacing, origin, axes, progress)
 end
 
