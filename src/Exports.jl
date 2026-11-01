@@ -45,7 +45,7 @@ export CircularFlatSurface, RectangularFlatSurface, SphericalSurface, EvenAspher
 export Prism, RightAnglePrism, EquilateralPrism, DovePrism
 
 # detectors
-export Detector, electric_field, intensity, spot_diagram, optical_power, gauss_parameters,
+export Detector, electric_field, intensity, spot_diagram, ray_hits, optical_power, gauss_parameters,
        waist_parameters, Centroid, MinMax, RegularGrid, RectilinearGrid
 
 # splitters

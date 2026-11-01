@@ -66,7 +66,7 @@ When this Skill is active:
 
 5) Evaluate
 - Rays: `rays(beam)`, `position`, `direction`, `length(beam)`, `beam.children` (splitters: transmitted first).
-- Detector: `spot_diagram`, `intensity`, `electric_field`, `optical_power` (`components/detectors.md`).
+- Detector: `spot_diagram`, `ray_hits`, `intensity`, `electric_field`, `optical_power` (`components/detectors.md`).
 - Gaussian: `gauss_parameters(beam, z)`, `waist_parameters`, `rayleigh_range`, `optical_power`.
 - Sanity-check numbers against a paraxial estimate (`BeamletOptics.lensmakers_eq`, Airy radius, Malus, …).
 

@@ -19,6 +19,7 @@ Detector(edge_length, stop = true)
 | Call | Returns |
 |------|---------|
 | `spot_diagram(det)` | `Vector{Point2}` of local `(x, z)` hit points (beamlets: projected 1/e² contour, kwargs `num_spots`, `crop_factor`) |
+| `ray_hits(det)` | `(pts, dirs)`: per hit the local `(x, z)` point and the unit direction in the detector frame `(x̂, n̂, ẑ)`, `n̂` the downstream normal, so a beam along +y onto an unrotated detector reads `(0, 1, 0)` (beamlets: chief ray) |
 | `electric_field(det, sampling = RegularGrid())` | `(xs, zs, E)`: complex field on the `sampling`, by default a `num_points×num_points` grid (hits of `PolarizedRay`s and `AstigmaticGaussianBeamlet`s: a matrix of complex 3-vectors, use `sum(abs2, e)` per element) |
 | `intensity(det, sampling = RegularGrid())` | `(xs, zs, I)`: power per detector area in W/m², the Poynting flux through the detector; a single hit gives `n\|E\|² cos θ / (2Z₀)` |
 | `optical_power(det, sampling = RegularGrid())` | power in W, `Σ wᵢ Iᵢ` with the quadrature weights of the sampling, the beam power for any angle of incidence |
@@ -45,6 +46,16 @@ A given bound replaces only its own side of the automatic window.
 Local `(x, z)` form a left-handed frame with the normal, as seen by the incoming beam.
 `intensity.(E)` turns a field matrix into `|E|²/(2Z₀)` per point (vacuum, not projected onto the detector); the irradiance on the detector, with `n` and `cos θ` of each hit, is `intensity(det)` or `intensity(det, RectilinearGrid(xs, zs))`.
 Ray-based PSFs are not normalized: compare shapes and positions, not absolute Strehl values.
+
+Angle over radius at a plane (collimation check, data for fitting a correcting asphere): place a large
+detector at the plane, trace a ray fan (`CollimatedSource`, `PointSource`) and read
+
+```julia
+using LinearAlgebra: norm
+pts, dirs = ray_hits(det)
+r = norm.(pts)                                    # m, from the detector center
+θ = [atan(hypot(d[1], d[3]), d[2]) for d in dirs]  # rad, to the normal; not acos(d[2]), inaccurate near 0
+```
 
 If nothing reaches the detector (`length(det) == 0`), it reads as nothing: `optical_power` is `0`, `spot_diagram` is empty, and `electric_field` and `intensity` are zero on their grid (`RegularGrid` then spans the active surface).
 A scan or alignment loop needs no guard for a beam that misses; only `OpticsBase.PlaneField(det; ...)` still throws, since it takes `λ` and `n` from the hits.

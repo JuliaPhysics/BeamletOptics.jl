@@ -91,6 +91,21 @@ The following image shows the spot diagram of a Sonnar lens. Two [`CollimatedSou
 
 ![Sonnar spot diagram showcase](sonnar_spot_diagram.png)
 
+## Ray directions
+
+Where a ray crossed the detector is half of what it carries; [`ray_hits`](@ref) also returns the direction in which it went, both in the coordinates of the detector. The angle of each ray to the detector normal over its distance from the detector center shows, for example, how far a beam is from collimated:
+
+```julia
+using LinearAlgebra: norm
+pts, dirs = ray_hits(pd)
+r = norm.(pts)                                   # distance from the detector center [m]
+θ = [atan(hypot(d[1], d[3]), d[2]) for d in dirs] # angle to the normal [rad]
+```
+
+```@docs; canonical=false
+ray_hits
+```
+
 ## Field distributions
 
 Alternatively, the detector data can also be used to reconstruct electric field distributions of incoming beams on its surface using coherent addition. Three readouts build on each other: [`electric_field`](@ref) is the coherent sum of the fields of all hits, [`intensity`](@ref) the flux of the Poynting vector of that field through the detector, and [`optical_power`](@ref) the integral of the intensity. Their definitions follow.
