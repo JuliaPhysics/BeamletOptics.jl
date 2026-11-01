@@ -27,7 +27,9 @@ GaussianBeamlet(pos, dir, λ = 1e-6, w0 = 1e-3; M2 = 1, P0 = 1e-3, z0 = 0, suppo
 - `support` fixes the direction from the chief ray to the waist and divergence ray. It must be
   orthogonal to `dir` (any non-zero length), otherwise the constructor throws an `ArgumentError`.
 - Valid for on-axis, untilted, (nearly) aberration-free systems only.
-- Queries: `gauss_parameters(g, z)` → `(w, R, ψ, w0)`, `waist_parameters`, `rayleigh_range(g; M2)`,
+- `solve_system!` stops tracing with a "Lagrange invariant violation" warning where the beamlet
+  leaves its model, with the same limit as an `AstigmaticGaussianBeamlet` (see there).
+- Queries: `gauss_parameters(g, z)` → `(w, R, ψ, w0)` (`w0` is the waist radius for any `M2`), `waist_parameters`, `rayleigh_range(g; M2)`,
   `optical_power(g)`, `electric_field(g, r, z)` (the physical field in V/m: smaller by `√n` in a medium of index `n` for the same power, as for `agb`), `point_on_beam(g, t)`, `path_segments(g)` (segments of the chief ray and all child beamlets with accumulated path lengths).
 
 ```julia

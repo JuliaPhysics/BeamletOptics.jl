@@ -31,6 +31,11 @@ and
 !!! warning "Astigmatism and abberations"
     It is assumed, but not forbidden, that the optical system contains non-flat or non-parabolic beam-surface-interactions that cause the beam to obtain
     astigmatism or higher-order abberations. These can not be represented by the `GaussianBeamlet`.
+
+!!! warning "Optical invariant check"
+    When using the `solve_system!` function, the Lagrange invariant is checked for each interaction. If it deviates by more than
+    [`get_lagrange_tolerance`](@ref)`()` from its start value, the beamlet has left the range of its model and tracing is stopped
+    with a warning, as for an [`AstigmaticGaussianBeamlet`](@ref).
 """
 mutable struct GaussianBeamlet{T} <: AbstractBeam{T, Ray{T}}
     chief::Beam{T, Ray{T}}
@@ -283,18 +288,17 @@ end
 """
     RayCrossing{T}
 
-Offset `y0 + l * v` from the chief ray at distance `l` and direction `a` of an auxiliary ray.
+Offset `y0 + l * v` of an auxiliary ray from the chief ray at distance `l`, with the slope `v`.
 """
 struct RayCrossing{T}
     y0::Point3{T}
     v::Point3{T}
-    a::Point3{T}
 end
 
 function RayCrossing{T}(p::AbstractVector, d::AbstractVector, ray::AbstractRay) where {T}
     a = direction(ray)
     c = dot(d, a)
-    return RayCrossing{T}(position(ray) + dot(p - position(ray), d) / c * a - p, a / c - d, a)
+    return RayCrossing{T}(position(ray) + dot(p - position(ray), d) / c * a - p, a / c - d)
 end
 
 """
@@ -319,12 +323,39 @@ function GaussianSegment(gauss::GaussianBeamlet{T}, index::Integer) where {T}
     return GaussianSegment{T}(waist, divergence, refractive_index(chief), wavelength(gauss))
 end
 
-# Height and slope (cotangent of the angle between offset and direction) of an aux ray at distance `l`
-function height_slope(c::RayCrossing, l)
-    y = c.y0 + l * c.v
-    h = norm(y)
-    ŷ = y / h
-    return h, dot(ŷ, c.a) / norm(cross(ŷ, c.a))
+"""
+    lagrange_invariants(segment::GaussianSegment)
+
+Lagrange invariant `H = n (y_w ⋅ v_d - y_d ⋅ v_w)` of the [`GaussianSegment`](@ref) as a 1-tuple, from
+the offsets `y` and slopes `v` of its waist and divergence rays. It is constant along the segment,
+since both rays are straight. At the start of a beamlet it is `M2 λ / π`.
+"""
+lagrange_invariants(s::GaussianSegment) =
+    (s.n * (dot(s.waist.y0, s.divergence.v) - dot(s.divergence.y0, s.waist.v)),)
+
+"""
+    lagrange_invariants(gauss::GaussianBeamlet, i)
+
+Lagrange invariant of segment `i` of the [`GaussianBeamlet`](@ref), see
+[`lagrange_invariants`](@ref)`(::GaussianSegment)`.
+"""
+lagrange_invariants(gauss::GaussianBeamlet, i::Int) = lagrange_invariants(GaussianSegment(gauss, i))
+
+"""
+    check_lagrange_invariants(beam, i)
+
+Compares the `lagrange_invariants` of the beamlet `beam` at segment `i` with their values at the
+start of the root beam. If one deviates by more than the share [`get_lagrange_tolerance`](@ref)`()`
+of its start value, for any `M2` and `λ`, the beamlet has left the range of its model: warns and
+returns `false`, otherwise returns `true`.
+"""
+function check_lagrange_invariants(beam::AbstractBeam, i::Int)
+    Hs = lagrange_invariants(beam, i)
+    targets = lagrange_invariants(AbstractTrees.getroot(beam), 1)
+    tol = get_lagrange_tolerance()
+    all(isapprox(H, H0; atol = tol * abs(H0)) for (H, H0) in zip(Hs, targets)) && return true
+    @warn "Lagrange invariant violation at segment $i: H = $Hs, target = $targets. The beamlet has likely encountered an object that violates the paraxial assumption."
+    return false
 end
 
 """
@@ -335,27 +366,20 @@ its chief ray, as [`gauss_parameters`](@ref)`(gauss, z)` does, but with the Gouy
 to the local waist of the segment.
 """
 function gauss_parameters(s::GaussianSegment, l::Real)
-    # Height and slope of aux rays
-    (y_w, m_w), (y_d, m_d) = map(c -> height_slope(c, l), (s.waist, s.divergence))
+    # Offsets and slopes of aux rays
+    y_w, y_d = map(c -> c.y0 + l * c.v, (s.waist, s.divergence))
+    v_w, v_d = s.waist.v, s.divergence.v
     # Beam parameters as per Arnaud (1985) and DeJager (1992)
     n = s.n
-    H = abs(n * (y_w * m_d - y_d * m_w))
-    # Test optical invariant
-    λ = s.λ
-    if !isapprox(H, λ / π, atol = Config.get_invariant_threshold())
-        H = λ / π
-    end
-    E_kt = y_d * m_d + y_w * m_w
-    F_kt = sqrt(m_d^2 + m_w^2)
-    w = sqrt(y_d^2 + y_w^2)
+    H = abs(only(lagrange_invariants(s)))
+    E_kt = dot(y_d, v_d) + dot(y_w, v_w)
+    F_kt = hypot(norm(v_d), norm(v_w))
+    w = hypot(norm(y_d), norm(y_w))
     R = E_kt / w^2
     z = E_kt / F_kt^2
     ψ = -atan(1, √(1 / (R * z) - 1))
     w0 = H / (n * F_kt)
-    # Catch NaNs and correct Gouy phase sign based on curvature sign
-    isnan(R) && (R = zero(R))
-    isnan(ψ) && (ψ = zero(ψ))
-    isnan(w0) && (w0 = w)
+    # Correct Gouy phase sign based on curvature sign
     R < 0 && (ψ = -ψ)
     return (w, R, ψ, w0)
 end

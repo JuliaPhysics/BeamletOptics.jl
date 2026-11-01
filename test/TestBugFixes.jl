@@ -405,4 +405,78 @@ end
     end
 end
 
+@testset "Issue#209" begin
+    # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/209
+    # At the waist of a beamlet on a tilted axis the height of the divergence ray is rounding
+    # noise, and its slope was taken from the direction of that noise: w0 was up to 4000 times
+    # too small exactly at the waist
+    λ, w0, z0 = 1.064e-6, 0.5e-3, 0.2
+    axes = (([1.0, 2, -1], [2.0, -1, 0]), ([0.3, 1, 0.2], [1.0, -0.3, 0]),
+        ([-1.0, 0.5, 3], [0.5, 1, 0]), ([0.0, 1, 0], [1.0, 0, 0]))
+    for (d, s) in axes
+        g = GaussianBeamlet([1.0, 2, 3], d, λ, w0; z0, support = s)
+        for z in (z0, z0 + 1e-9, 0.0, 1.0)
+            @test gauss_parameters(g, z)[4] ≈ w0
+            @test waist_parameters(g, z)[4] ≈ w0
+        end
+        @test gauss_parameters(g, z0)[1] ≈ w0
+    end
+
+    @testset "Waist behind a lens does not depend on placement" begin
+        function waists(d)
+            lens = SphericalLens(50mm, -50mm, 5mm, 25.4mm, λ -> 1.5)
+            align3d!(lens, d)
+            translate3d!(lens, 100mm .* normalize(d))
+            g = GaussianBeamlet(zeros(3), d, λ, 1mm; support = BMO.normal3d(d))
+            solve_system!(System([lens]), g)
+            return gauss_parameters(g, range(130mm, 200mm, 71))[4]
+        end
+        ref = waists([0.0, 1, 0])
+        for (d, _) in axes
+            @test waists(d) ≈ ref rtol = 1e-9
+        end
+    end
+end
+
+@testset "Issue#210" begin
+    # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/210
+    # The Lagrange invariant of a GaussianBeamlet was replaced by λ/π when it differed by more
+    # than an absolute threshold, which gave w0 / M2 for large M2 or λ and never warned
+    @testset "Waist radius for any M2 and λ" begin
+        for (λ, M2) in ((1e-6, 1), (1e-6, 10), (10.6e-6, 2), (10.6e-6, 1))
+            g = GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], λ, 1mm; M2, z0 = 0.2)
+            # Slope tan θ of the divergence ray instead of θ: relative error θ² / 3
+            @test only(BMO.lagrange_invariants(g, 1)) ≈ M2 * λ / π rtol = 1e-4
+            @test gauss_parameters(g, 0.0)[4] ≈ 1mm
+            @test gauss_parameters(g, 0.2)[4] ≈ 1mm
+        end
+    end
+
+    @testset "Same model limit as an AstigmaticGaussianBeamlet" begin
+        function detector_behind_lens(beam, f; kwargs...)
+            lens = SphericalLens(f, -f, 8mm, 25.4mm, λ -> 1.5)
+            translate3d!(lens, [0, 0.1, 0])
+            pd = Detector(20mm)
+            translate3d!(pd, [0, 0.1 + 2f, 0])
+            solve_system!(System([lens, pd]), beam; kwargs...)
+            return pd
+        end
+        # Strong focus far from the waist: the rays leave the parabolic part of the lens
+        for beam in (GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], 1064e-9, 6.4e-3; z0 = 1.0),
+            AstigmaticGaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], 1064e-9, 6.4e-3, 6.4e-3; z0 = 1.0))
+            pd = @test_logs (:warn, r"Lagrange invariant violation") match_mode = :any detector_behind_lens(
+                beam, 40mm)
+            @test isnothing(BMO.hits(pd)) || isempty(BMO.hits(pd))
+            pd = @test_logs detector_behind_lens(beam, 40mm; check_invariant = false)
+            @test !isempty(BMO.hits(pd))
+            pd = @test_logs detector_behind_lens(beam, 100mm)
+            @test !isempty(BMO.hits(pd))
+        end
+        # The threshold of the complex invariant does not apply to the Lagrange invariant
+        g = GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], 1064e-9, 6.4e-3; M2 = 10)
+        pd = @test_logs detector_behind_lens(g, 100mm; threshold = 1e-30)
+        @test !isempty(BMO.hits(pd))
+    end
+end
+
 end # MODULE

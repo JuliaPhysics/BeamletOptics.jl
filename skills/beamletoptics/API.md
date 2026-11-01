@@ -80,8 +80,9 @@ solve_system!(system, beam_group; progress = true, initialize = false, kwargs...
 initialize!(system)   # empties all detectors of the system (nested groups included)
 ```
 
-- `threshold`: limit of the complex invariant of an `AstigmaticGaussianBeamlet`. Its Lagrange invariants
-  stop tracing at a relative deviation of `get_lagrange_tolerance()` (default 50 %) instead.
+- `threshold`: limit of the complex invariant of an `AstigmaticGaussianBeamlet`. The Lagrange invariants
+  of both beamlets stop tracing at a relative deviation of `get_lagrange_tolerance()` (default 50 %) instead.
+- `check_invariant = false` turns both checks off, for both beamlets.
 - `initialize`: `true` calls `initialize!(system)` before tracing. The default `false` keeps the hits of
   earlier solves, such that several sources solved one after another superpose on a detector.
 

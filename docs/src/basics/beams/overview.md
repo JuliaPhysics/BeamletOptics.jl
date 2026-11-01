@@ -58,7 +58,7 @@ flowchart TB
 
 ### Interactions of beamlets
 
-Components define [`BeamletOptics.interact3d`](@ref) for a `Beam` and one of its rays; a beamlet hands this call on to each of its component beams, unless the component defines a method for the beamlet itself. The diagram shows the tracing loop of a `GaussianBeamlet` and where the methods of a component author (green) are called; an `AstigmaticGaussianBeamlet` runs the same loop with its nine beams and also stops when its optical invariant check fails:
+Components define [`BeamletOptics.interact3d`](@ref) for a `Beam` and one of its rays; a beamlet hands this call on to each of its component beams, unless the component defines a method for the beamlet itself. The diagram shows the tracing loop of a `GaussianBeamlet` and where the methods of a component author (green) are called; an `AstigmaticGaussianBeamlet` runs the same loop with its nine beams and also checks its complex invariant:
 
 ```mermaid
 flowchart TB
@@ -71,6 +71,7 @@ flowchart TB
     CB["<b>interact3d</b><br/>(system, object, beam, ray)<br/><i>method for a Beam</i>"]
     GBI["<b>GaussianBeamletInteraction</b><br/>chief, waist, divergence"]
     P["<b>push!(gauss, interaction)</b><br/>push! to each component Beam"]
+    K{"check_invariant:<br/>Lagrange invariant within<br/>get_lagrange_tolerance?"}
     E([stop])
 
     S --> T
@@ -86,13 +87,15 @@ flowchart TB
     OWN -- interaction --> GBI
     OWN -- nothing --> E
     GBI --> P
-    P -- "next segment<br/>(fewer than r_max rays)" --> T
+    P --> K
+    K -- "no: warning" --> E
+    K -- "yes: next segment<br/>(fewer than r_max rays)" --> T
 
     classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
     classDef green fill:#38982626,stroke:#389826,stroke-width:2px
     classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
     classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
-    class T,C,P blue
+    class T,C,P,K blue
     class I,GEN,GBI purple
     class OWN,CB green
     class S,E terminal

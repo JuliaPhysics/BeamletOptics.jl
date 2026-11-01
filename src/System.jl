@@ -236,7 +236,7 @@ function trace_system!(
 end
 
 """
-    trace_system!(system::System, gauss::GaussianBeamlet{T}; r_max = get_default_r_max()) where {T <: Real}
+    trace_system!(system::System, gauss::GaussianBeamlet{T}; r_max = get_default_r_max(), check_invariant = true) where {T <: Real}
 
 Trace a [`GaussianBeamlet`](@ref) through an optical `system`. Maximum number of tracing steps can be capped by `r_max`.
 
@@ -245,18 +245,22 @@ Trace a [`GaussianBeamlet`](@ref) through an optical `system`. Maximum number of
 The chief, waist and divergence beams are traced step-by-step through the `system`.
 For each intersection after a [`tracing_step!`](@ref), the intersections are compared.
 If all rays hit the same target, the optical interaction is analyzed, else the tracing stops.
+Tracing also stops with a warning if the Lagrange invariant of a new segment leaves
+[`get_lagrange_tolerance`](@ref) of its start value.
 
 # Arguments
 
 - `system`: The optical system through which the [`GaussianBeamlet`](@ref) is traced.
 - `gauss`: The [`GaussianBeamlet`](@ref) object to be traced.
 - `r_max`: Maximum number of tracing iterations.
+- `check_invariant`: enables or disables the check of the Lagrange invariant.
 """
 function trace_system!(
         system::AbstractSystem,
         gauss::GaussianBeamlet{T};
         # kwargs...
         r_max::Int = get_default_r_max(),
+        check_invariant::Bool = true,
         kwargs...
 ) where {T <: Real}
     # Test until bundle is stopped
@@ -298,6 +302,10 @@ function trace_system!(
         # Add rays to gauss beam
         push!(gauss, interaction)
         seg_counter += 1
+        # Verify that the paraxial assumptions still hold for the new segment
+        if check_invariant && !check_lagrange_invariants(gauss, seg_counter)
+            break
+        end
     end
     return nothing
 end
@@ -387,7 +395,7 @@ The objects of the `system` are not reset by default: a [`Detector`](@ref) keeps
 - `depth_max = get_default_depth_max()`: Maximum number of branching levels explored from the root beam
 - `check_invariant = true`: enables or disables optical invariant checks where applicable
 - `threshold = get_invariant_threshold()`: limit of the complex invariant of an [`AstigmaticGaussianBeamlet`](@ref).
-  Its Lagrange invariants use [`get_lagrange_tolerance`](@ref) instead
+  The Lagrange invariants of both beamlets use [`get_lagrange_tolerance`](@ref) instead
 """
 function solve_system!(
         system::AbstractSystem,
