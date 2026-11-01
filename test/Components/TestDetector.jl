@@ -67,10 +67,19 @@ end
         @test maximum(norm.(ds .- dirs)) < 1e-12
         @test maximum(norm.(pts .- pts_exp)) < 1e-12
         # angle to the normal, the same quantity in both placements
-        θ(d) = atan(hypot(d[1], d[3]), d[2])
+        θ(d) = atan(hypot(d[1], d[3]), abs(d[2]))
         @test θ.(ds) ≈ [deg2rad.([20, 5, 0, 10, 30]); 0.2] atol = 1e-12
         @test pts == spot_diagram(pd)
     end
+    # A hit on the back side keeps its side in d[2], the angle is that to the normal
+    pd = Detector(100mm)
+    translate3d!(pd, [0, L, 0])
+    d_back = [sin(0.1), -cos(0.1), 0.0]
+    solve_system!(System([pd]), Beam([0.0, 2L, 0], d_back))
+    pts, ds = ray_hits(pd)
+    @test norm(only(ds) - d_back) < 1e-12
+    @test norm(only(pts) - [tan(0.1) * L, 0]) < 1e-12
+    @test atan(hypot(only(ds)[1], only(ds)[3]), abs(only(ds)[2])) ≈ 0.1 atol = 1e-12
     # Beamlets: the chief ray, not the waist contour of spot_diagram
     d = [sin(0.1), cos(0.1), 0.0]
     for beam in (GaussianBeamlet([0.0, 0, 0], d, 1e-6, 1mm),
@@ -642,6 +651,7 @@ end
     @test_throws "intensity not defined for" intensity([DummyHit()], p, n̂)
     @test_throws ErrorException electric_field(DummyHit(), p)
     @test_throws ErrorException intensity([DummyHit()], p, n̂)
+    @test_throws "hit_point not defined for" ray_hits(Detector(10mm), [DummyHit()])
 end
 
 @testset "Path lengths of a child beamlet equal those of its chief beam" begin

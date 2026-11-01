@@ -54,8 +54,9 @@ detector at the plane, trace a ray fan (`CollimatedSource`, `PointSource`) and r
 using LinearAlgebra: norm
 pts, dirs = ray_hits(det)
 r = norm.(pts)                                    # m, from the detector center
-θ = [atan(hypot(d[1], d[3]), d[2]) for d in dirs]  # rad, to the normal; not acos(d[2]), inaccurate near 0
+θ = [atan(hypot(d[1], d[3]), abs(d[2])) for d in dirs]  # rad, to the normal, either side; not acos, inaccurate near 0
 ```
 
 If nothing reaches the detector (`length(det) == 0`), it reads as nothing: `optical_power` is `0`, `spot_diagram` is empty, and `electric_field` and `intensity` are zero on their grid (`RegularGrid` then spans the active surface).
-A scan or alignment loop needs no guard for a beam that misses; only `OpticsBase.PlaneField(det; ...)` still throws, since it takes `λ` and `n` from the hits.
+In a scan, power and field need no guard for a beam that misses, but a metric of the spots does: the mean or rms of no points is `NaN` (and `argmin` picks `NaN`), `maximum` throws. Check `isempty(pts)` or `length(det) == 0` first. `OpticsBase.PlaneField(det; ...)` still throws, since it takes `λ` and `n` from the hits.
+A hit on the back of the detector has `dirs[i][2] < 0`.

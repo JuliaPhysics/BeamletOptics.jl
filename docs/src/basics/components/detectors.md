@@ -99,7 +99,7 @@ Where a ray crossed the detector is half of what it carries; [`ray_hits`](@ref) 
 using LinearAlgebra: norm
 pts, dirs = ray_hits(pd)
 r = norm.(pts)                                   # distance from the detector center [m]
-θ = [atan(hypot(d[1], d[3]), d[2]) for d in dirs] # angle to the normal [rad]
+θ = [atan(hypot(d[1], d[3]), abs(d[2])) for d in dirs] # angle to the normal [rad], either side
 ```
 
 ```@docs; canonical=false
