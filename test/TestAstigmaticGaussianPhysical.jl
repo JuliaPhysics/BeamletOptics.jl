@@ -455,7 +455,7 @@ dominant(E) = E[argmax(abs.(E))]
         @test all(isapprox.(I_agb_norm, I_gb_norm; rtol = 1e-3))
     end
 
-    @testset "Invariant Violation Test" begin
+    @testset "A plate tilted by 80° keeps the invariants" begin
         λ = 532nm
         w0 = 0.1mm
 

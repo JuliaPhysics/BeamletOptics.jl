@@ -205,6 +205,15 @@ parametric_cases = [
         @test ForwardDiff.derivative(z -> radii(AstigmaticGaussianBeamlet(pos, dir, λ, w0, w0; z0_x = z))[1], z0) ≈ dw rtol = 1e-6
         @test ForwardDiff.derivative(z -> radii(AstigmaticGaussianBeamlet(pos, dir, λ, w0, w0; z0_y = z))[2], z0) ≈ dw rtol = 1e-6
     end
+    @testset "AstigmaticGaussianBeamlet, support" begin
+        # the support vector [cos t, 0, sin t] as the only Dual: x of the field and of the waist ray
+        λ, w0, t = 1e-6, 1e-3, 0.3
+        pos, dir = [0.0, 0, 0], [0.0, 1, 0]
+        beam(t) = AstigmaticGaussianBeamlet(pos, dir, λ, w0; support = [cos(t), 0, sin(t)])
+        E = norm(BMO.polarization(first(BMO.rays(beam(t).c))))
+        @test ForwardDiff.derivative(t -> real(BMO.polarization(first(BMO.rays(beam(t).c)))[1]), t) ≈ -E * sin(t) rtol = 1e-9
+        @test ForwardDiff.derivative(t -> BMO.position(first(BMO.rays(beam(t).wxp)))[1], t) ≈ -w0 * sin(t) rtol = 1e-9
+    end
 end
 
 end # MODULE

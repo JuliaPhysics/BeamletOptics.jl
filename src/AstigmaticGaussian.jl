@@ -161,15 +161,16 @@ function AstigmaticGaussianBeamlet(
 )
     # Common number type of all rays, P0 counts only if it sets the field
     F = isnothing(E0) ? typeof(P0) : real(eltype(E0))
+    S = isnothing(support) ? Bool : eltype(support)
     T = float(promote_type(eltype(position), eltype(direction), typeof(λ), typeof(w0_x),
-        typeof(w0_y), typeof(M2_x), typeof(M2_y), F, typeof(z0_x), typeof(z0_y)))
+        typeof(w0_y), typeof(M2_x), typeof(M2_y), F, S, typeof(z0_x), typeof(z0_y)))
     position, direction, λ = T.(position), T.(direction), T(λ)
     # Create orthogonal vectors for construction purposes (right-handed)
     direction = normalize(direction)
     if isnothing(support)
         s1 = normal3d(direction)
     else
-        s1 = normalize(support)
+        s1 = normalize(T.(support))
     end
     # Unit vectors: test independent of support length
     if !isorthogonal3d(direction, s1; atol = Config.get_orthogonality_threshold())

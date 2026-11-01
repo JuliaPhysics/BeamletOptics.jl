@@ -29,6 +29,9 @@ const BMO = BeamletOptics
         @test AstigmaticGaussianBeamlet(pos, dir, 1.0f-6, 1.0f-3; E0 = ComplexF32[1, 0, 0], support = s) isa AstigmaticGaussianBeamlet{Float32}
         @test AstigmaticGaussianBeamlet(pos, dir, 1.0f-6, 1.0f-3; P0 = 1.0f-3, support = s) isa AstigmaticGaussianBeamlet{Float32}
         @test AstigmaticGaussianBeamlet(pos, dir, 1.0f-6, 1.0f-3; support = s) isa AstigmaticGaussianBeamlet{Float64}
+        # a wider support widens all rays
+        @test AstigmaticGaussianBeamlet(pos, dir, 1.0f-6, 1.0f-3; P0 = 1.0f-3, support = [1.0, 0, 0]) isa AstigmaticGaussianBeamlet{Float64}
+        @test AstigmaticGaussianBeamlet(pos, dir, 1.0f-6, 1.0f-3; E0 = ComplexF32[1, 0, 0], support = [1.0, 0, 0]) isa AstigmaticGaussianBeamlet{Float64}
     end
 
     @testset "Support vector" begin
