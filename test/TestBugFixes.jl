@@ -3,7 +3,6 @@ module TestBugFixes
 using BeamletOptics
 using LinearAlgebra
 using Test
-using Logging
 using Random
 
 const BMO = BeamletOptics
