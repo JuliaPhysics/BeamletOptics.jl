@@ -43,7 +43,7 @@ Use `scripts/api_lookup.jl NAME` to print the docstring and signatures of any na
 | Splitters     | `ThinBeamsplitter`, `RoundThinBeamsplitter`, `RectangularPlateBeamsplitter`, `RoundPlateBeamsplitter`, `CubeBeamsplitter`, `RectangularCompensatorPlate` |
 | Prisms        | `Prism`, `RightAnglePrism`, `EquilateralPrism`, `DovePrism` |
 | Polarizers    | `PolarizationFilter`, `RoundPolarizationFilter`, `LinearPolarizer`, `RoundLinearPolarizer`, `transmission_axis` |
-| Detectors     | `Detector`, `RegularGrid`, `RectilinearGrid`, `spot_diagram`, `intensity`, `electric_field`, `optical_power`, `gauss_parameters`, `waist_parameters`, `Centroid`, `MinMax` |
+| Detectors     | `Detector`, `RegularGrid`, `RectilinearGrid`, `spot_diagram`, `ray_hits`, `intensity`, `electric_field`, `optical_power`, `gauss_parameters`, `waist_parameters`, `Centroid`, `MinMax` |
 | Dummies       | `NonInteractableObject`, `IntersectableObject` |
 | Config        | `get_default_wavelength`, `get_default_waist`, `get_default_power`, `get_default_r_max`, `get_default_depth_max`, `get_invariant_threshold`, `set_invariant_threshold!`, `get_lagrange_tolerance`, `set_lagrange_tolerance!`, `get_internal_reflection_threshold`, `get_line_plane_intersection_threshold`, `get_orthogonality_threshold`, `get_sdf_surface_threshold`, `get_sdf_raymarch_eps`, `get_sdf_miss_distance`, `get_progress_threshold`, `set_progress_threshold!` |
 | Render (Makie)| `wavelength_color`, `render!`, `get_view`, `set_view`, `hide_axis`, `set_orthographic`, `look_at!`, `arrow!`, `render_lcs!`, `set_render_look`, `studio_lighting!` |
@@ -121,6 +121,7 @@ initialize!(system)   # empties all detectors of the system (nested groups inclu
 ```julia
 solve_system!(system, source; initialize = true)   # empties the detectors first (or initialize!(system), empty!(det))
 pts        = spot_diagram(det)                # Vector{Point2}: local (x, z) in m
+pts, dirs  = ray_hits(det)                    # points and unit directions in the detector frame (x̂, n̂, ẑ)
 x, z, E    = electric_field(det)              # complex field on a 100×100 RegularGrid (3-vectors for polarized rays and astigmatic beamlets)
 x, z, I    = intensity(det, RegularGrid(num_points = 200))   # W/m², power per detector area (Poynting flux)
 P          = optical_power(det)               # W, beam power for any angle of incidence

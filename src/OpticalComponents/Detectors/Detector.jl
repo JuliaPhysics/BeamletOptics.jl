@@ -18,6 +18,7 @@ The following functions allow a posteriori evaluation of hit contributions via e
 Refer to the respective function documentation.
 
 - [`spot_diagram`](@ref)
+- [`ray_hits`](@ref)
 - [`electric_field`](@ref)
 - [`intensity`](@ref)
 

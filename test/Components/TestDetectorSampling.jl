@@ -108,11 +108,34 @@ end
         @test_throws ArgumentError RectilinearGrid(Float64[], [0.0])
         # a single point is not an array of points
         @test_throws MethodError intensity(pd, BMO.Point2(0.0, 0.0))
-        empty = Detector(10mm)
-        for s in (RegularGrid(), RectilinearGrid([0.0], [0.0]))
-            @test_throws "No hits available on detector." intensity(empty, s; progress = false)
-        end
     end
+end
+
+@testset "A detector without hits reads as nothing" begin
+    # A beam that misses a tilted detector, as in a scan (#189)
+    empty = Detector(10mm)
+    zrotate3d!(empty, deg2rad(30))
+    translate3d!(empty, [20mm, 100mm, 0])
+    solve_system!(System([empty]), GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], 1e-6, 1mm))
+    @test length(empty) == 0
+    @test spot_diagram(empty) == BMO.Point2{Float64}[]
+    @test optical_power(empty; progress = false) == 0
+    # The default window is the active surface
+    x, z, I = intensity(empty, RegularGrid(num_points = 11); progress = false)
+    @test [first(x), last(x), first(z), last(z)] ≈ [-5mm, 5mm, -5mm, 5mm] rtol = 1e-12
+    @test size(I) == (11, 11) && all(iszero, I)
+    x, z, E = electric_field(empty, RegularGrid(num_points = 11, x_min = -1mm); progress = false)
+    @test first(x) == -1mm
+    @test eltype(E) == ComplexF64 && all(iszero, E)
+    g = RectilinearGrid(range(-1mm, 1mm, length = 5), range(0, 2mm, length = 3))
+    @test optical_power(empty, g; progress = false) == 0
+    @test all(iszero, intensity(empty, g; progress = false)[3])
+    # A detector that was hit and emptied, e.g. by moving it off the beam
+    pd = tilted_detector()
+    @test optical_power(pd; progress = false) > 0
+    translate3d!(pd, [20mm, 0, 0])
+    @test optical_power(pd; progress = false) == 0
+    @test isempty(spot_diagram(pd))
 end
 
 end # module

@@ -41,6 +41,61 @@ struct DummyHit <: BMO.AbstractDetectorHit end
     @test isnothing(BMO.hits(pd))
 end
 
+@testset "Ray hits: points and directions in detector coordinates" begin
+    # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/191: rays from the origin onto a
+    # detector at distance L, then the whole setup moved, which changes no local value
+    L = 50mm
+    dirs = [[sin(θ), cos(θ), 0.0] for θ in deg2rad.([-20, -5, 0, 10, 30])]
+    push!(dirs, [0.0, cos(0.2), sin(0.2)])
+    # crossings at distance L along the normal
+    pts_exp = [[d[1], d[3]] * L / d[2] for d in dirs]
+    axis = [1.0, 2, 3] / norm([1.0, 2, 3])
+    for moved in (false, true)
+        pd = Detector(100mm)
+        translate3d!(pd, [0, L, 0])
+        beams = [Beam([0.0, 0, 0], d) for d in dirs]
+        if moved
+            for x in (pd, beams...)
+                rotate3d!(x, axis, deg2rad(40), [0.0, 0, 0])
+                translate3d!(x, [10mm, -5mm, 3mm])
+            end
+        end
+        system = System([pd])
+        foreach(b -> solve_system!(system, b), beams)
+        pts, ds = ray_hits(pd)
+        @test pts isa Vector{BMO.Point2{Float64}} && ds isa Vector{BMO.Point3{Float64}}
+        @test maximum(norm.(ds .- dirs)) < 1e-12
+        @test maximum(norm.(pts .- pts_exp)) < 1e-12
+        # angle to the normal, the same quantity in both placements
+        θ(d) = atan(hypot(d[1], d[3]), abs(d[2]))
+        @test θ.(ds) ≈ [deg2rad.([20, 5, 0, 10, 30]); 0.2] atol = 1e-12
+        @test pts == spot_diagram(pd)
+    end
+    # A hit on the back side keeps its side in d[2], the angle is that to the normal
+    pd = Detector(100mm)
+    translate3d!(pd, [0, L, 0])
+    d_back = [sin(0.1), -cos(0.1), 0.0]
+    solve_system!(System([pd]), Beam([0.0, 2L, 0], d_back))
+    pts, ds = ray_hits(pd)
+    @test norm(only(ds) - d_back) < 1e-12
+    @test norm(only(pts) - [tan(0.1) * L, 0]) < 1e-12
+    @test atan(hypot(only(ds)[1], only(ds)[3]), abs(only(ds)[2])) ≈ 0.1 atol = 1e-12
+    # Beamlets: the chief ray, not the waist contour of spot_diagram
+    d = [sin(0.1), cos(0.1), 0.0]
+    for beam in (GaussianBeamlet([0.0, 0, 0], d, 1e-6, 1mm),
+        AstigmaticGaussianBeamlet([0.0, 0, 0], d, 1e-6, 1mm))
+        pd = Detector(100mm)
+        translate3d!(pd, [0, L, 0])
+        solve_system!(System([pd]), beam)
+        pts, ds = ray_hits(pd)
+        @test length(pts) == length(ds) == 1
+        @test norm(only(ds) - d) < 1e-12
+        @test norm(only(pts) - [d[1], d[3]] * L / d[2]) < 1e-12
+    end
+    # A detector without hits
+    @test ray_hits(Detector(10mm)) == (BMO.Point2{Float64}[], BMO.Point3{Float64}[])
+end
+
 @testset "Testing continued tracing (stop = false)" begin
     # Regression test: interact3d used to resume the next segment at the
     # incoming ray's origin instead of the actual hit point, which made
@@ -596,6 +651,7 @@ end
     @test_throws "intensity not defined for" intensity([DummyHit()], p, n̂)
     @test_throws ErrorException electric_field(DummyHit(), p)
     @test_throws ErrorException intensity([DummyHit()], p, n̂)
+    @test_throws "hit_point not defined for" ray_hits(Detector(10mm), [DummyHit()])
 end
 
 @testset "Path lengths of a child beamlet equal those of its chief beam" begin
