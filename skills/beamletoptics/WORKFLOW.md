@@ -97,4 +97,4 @@ and look at the image before trusting numbers. Axis-aligned top view: `Axis3(...
 - `KeyError` from `DiscreteRefractiveIndex`: wavelength not in the table.
 - `MissingBackendError` on `render!`: load `GLMakie` (or `CairoMakie` without OpenGL, see `VISUALIZATION.md`).
 - GLMakie fails to create a window/context on a headless machine: use `xvfb-run -a`, or switch to CairoMakie with `Axis3`.
-- Detector error "No hits available": nothing reached it; check position/orientation (normal −y by default).
+- Detector reads `optical_power == 0` and an empty `spot_diagram` (`length(det) == 0`): nothing reached it; check position/orientation (normal −y by default).

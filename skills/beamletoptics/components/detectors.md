@@ -46,4 +46,5 @@ Local `(x, z)` form a left-handed frame with the normal, as seen by the incoming
 `intensity.(E)` turns a field matrix into `|E|²/(2Z₀)` per point (vacuum, not projected onto the detector); the irradiance on the detector, with `n` and `cos θ` of each hit, is `intensity(det)` or `intensity(det, RectilinearGrid(xs, zs))`.
 Ray-based PSFs are not normalized: compare shapes and positions, not absolute Strehl values.
 
-If nothing reaches the detector, readout throws "No hits available on detector."
+If nothing reaches the detector (`length(det) == 0`), it reads as nothing: `optical_power` is `0`, `spot_diagram` is empty, and `electric_field` and `intensity` are zero on their grid (`RegularGrid` then spans the active surface).
+A scan or alignment loop needs no guard for a beam that misses; only `OpticsBase.PlaneField(det; ...)` still throws, since it takes `λ` and `n` from the hits.

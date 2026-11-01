@@ -46,7 +46,8 @@ The coordinates of the sampling followed by the field at its points, for the gri
 `(xs, zs, E)` with `E[i, j]` at `(xs[i], zs[j])`, see [`sample_points`](@ref). The values are
 complex scalars for [`Ray`](@ref)s and [`GaussianBeamlet`](@ref)s, `Point3{Complex{T}}` 3D vectors
 in global coordinates for [`PolarizedRay`](@ref)s and [`AstigmaticGaussianBeamlet`](@ref)s,
-which carry a polarization.
+which carry a polarization. A detector that no beam hit has the field zero at every point, as
+complex scalars, since without hits there is no polarization.
 
 !!! note "Unpolarized light"
     An unpolarized PSF is **not** obtained from a single coherent trace. Instead, trace twice
@@ -78,6 +79,9 @@ Coherent sum of the fields of the detector `hits` at the global point `p` \\[m\\
 """
 electric_field(hits::AbstractVector{<:AbstractDetectorHit}, p::AbstractVector) =
     sum(hit -> electric_field(hit, p), hits)
+
+# No hits, no field
+electric_field(::Nothing, p::AbstractVector) = zero(Complex{eltype(p)})
 
 """
     electric_field(hit::AbstractDetectorHit, p::AbstractVector)
@@ -188,7 +192,7 @@ incidence. No projection factor is applied to the field. For two scalar hits, th
 mean of their `n cos θ`.
 
 `I` is in \\[W/m²\\] for beamlet hits. For ray hits, whose fields are unscaled, it has the same
-form but no absolute unit.
+form but no absolute unit. A detector that no beam hit has `I = 0` at every point.
 """
 function intensity(pd::Detector, sampling::AbstractDetectorSampling = RegularGrid();
         progress::Bool = true)
@@ -243,6 +247,9 @@ function intensity(hits::AbstractVector{<:Union{RayHit, GaussianBeamletHit}},
     return real(conj(E) * F) / (2 * Z_vacuum)
 end
 
+# No hits, no flux
+intensity(::Nothing, p::AbstractVector, ::AbstractVector) = zero(eltype(p))
+
 """
     optical_power(pd::Detector, sampling::AbstractDetectorSampling = RegularGrid(); progress = true)
 
@@ -261,7 +268,8 @@ beams for any angle of incidence.
 The integral runs over the window of the sampling, not over the active area of the detector:
 the window is not cut at the edges of the detector. The default window of beamlet hits holds
 the power of each beamlet except for a part of `10⁻⁸`, see `crop_factor` of
-[`RegularGrid`](@ref). For ray hits, `P` has no absolute unit, see [`intensity`](@ref).
+[`RegularGrid`](@ref). For ray hits, `P` has no absolute unit, see [`intensity`](@ref). A
+detector that no beam hit gives `P = 0`, e.g. when a scan moves the beam off the detector.
 """
 function optical_power(pd::Detector, sampling::AbstractDetectorSampling = RegularGrid();
         progress::Bool = true)
@@ -275,12 +283,12 @@ end
 # threaded over chunks of the points. All readouts of a detector share this loop.
 function _sample(f, pd::Detector, points::AbstractArray, progress::Bool)
     local_x, local_z = local_axes(pd)
-    return _sample(f, _detector_hits(pd), position(pd), local_x, local_z, points, progress)
+    return _sample(f, hits(pd), position(pd), local_x, local_z, points, progress)
 end
 
 # Function barrier
-function _sample(f, hits::AbstractVector, origin, local_x, local_z, points::AbstractArray,
-        progress::Bool)
+function _sample(f, hits::Nullable{AbstractVector}, origin, local_x, local_z,
+        points::AbstractArray, progress::Bool)
     point(q) = origin + q[1] * local_x + q[2] * local_z
     values = similar(points, typeof(f(hits, point(first(points)))))
     # Equal chunks of consecutive points, one tick per chunk
@@ -295,12 +303,6 @@ function _sample(f, hits::AbstractVector, origin, local_x, local_z, points::Abst
         end
     end
     return values
-end
-
-function _detector_hits(pd::Detector)
-    hs = hits(pd)
-    isnothing(hs) && throw(ErrorException("No hits available on detector."))
-    return hs
 end
 
 # Field of an astigmatic beamlet hit at `p` per unit amplitude: Gouy factor and phase
