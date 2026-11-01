@@ -288,18 +288,17 @@ end
 """
     RayCrossing{T}
 
-Offset `y0 + l * v` from the chief ray at distance `l` and direction `a` of an auxiliary ray.
+Offset `y0 + l * v` of an auxiliary ray from the chief ray at distance `l`, with the slope `v`.
 """
 struct RayCrossing{T}
     y0::Point3{T}
     v::Point3{T}
-    a::Point3{T}
 end
 
 function RayCrossing{T}(p::AbstractVector, d::AbstractVector, ray::AbstractRay) where {T}
     a = direction(ray)
     c = dot(d, a)
-    return RayCrossing{T}(position(ray) + dot(p - position(ray), d) / c * a - p, a / c - d, a)
+    return RayCrossing{T}(position(ray) + dot(p - position(ray), d) / c * a - p, a / c - d)
 end
 
 """
