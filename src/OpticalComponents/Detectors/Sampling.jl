@@ -110,7 +110,7 @@ The default sampling of a [`Detector`](@ref): `num_points×num_points` equidista
 window around its hits, in local detector coordinates. The readouts return `(xs, zs, values)`
 with `values[i, j]` at `(xs[i], zs[j])`; [`optical_power`](@ref) integrates with the
 trapezoidal rule. The window follows from the hits when the readout is evaluated, see
-[`calc_local_lims`](@ref).
+[`calc_local_lims`](@ref). A detector that no beam hit has the window of its active surface.
 
 # Keyword arguments
 
@@ -162,7 +162,7 @@ function RegularGrid(;
 end
 
 function sample_points(pd::Detector, g::RegularGrid)
-    x_lo, x_hi, z_lo, z_hi = calc_local_lims(pd, _detector_hits(pd), g.crop_factor;
+    x_lo, x_hi, z_lo, z_hi = calc_local_lims(pd, hits(pd), g.crop_factor;
         center = g.center)
     x_lo, x_hi = something(g.x_min, x_lo), something(g.x_max, x_hi)
     z_lo, z_hi = something(g.z_min, z_lo), something(g.z_max, z_hi)

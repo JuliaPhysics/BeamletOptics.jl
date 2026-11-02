@@ -225,8 +225,11 @@ helper with one call site stays inline.
 **I2 · Factor shared logic, every time.** Logic shared by several models or parts becomes one
 generic method, helper or loop over the parts, not parallel copies and not a `Symbol` table with
 `getfield`. A check or formula that differs from an existing one only in a constant extends the
-existing one (an argument or a method), it is not copied under a new name. One file per family: abstract type and contract, defaults, then each concrete type;
-keyword-heavy signatures vertically.
+existing one (an argument or a method), it is not copied under a new name. Models that check the
+same quantity share one check and one limit: the Lagrange invariant of both beamlet models is
+compared with its start value within `get_lagrange_tolerance()` (`check_lagrange_invariants`), not
+with a fixed target and an absolute threshold. One file per family: abstract type and contract,
+defaults, then each concrete type; keyword-heavy signatures vertically.
 ```julia
 # Do
 for b in (beam.chief, beam.waist, beam.divergence)

@@ -17,6 +17,8 @@ Subtypes of `AbstractDetectorHit` must implement the following functions:
 - `electric_field(hit, p)`: the field of the hit at a global point `p`, see
   [`electric_field(::BeamletOptics.AbstractDetectorHit, ::AbstractVector)`](@ref)
 - `direction(hit)`: the direction of propagation at the hit
+- `hit_point(hit)`: the global point where the ray or chief ray crossed the detector, for
+  [`ray_hits`](@ref)
 - `refractive_index(hit)`: the refractive index in front of the detector
 - `intensity(hits, p, n̂)`: the irradiance of a vector of such hits at a global point `p`
   through a plane with the normal `n̂`, see [`intensity`](@ref)
@@ -27,7 +29,7 @@ Subtypes of `AbstractDetectorHit` must implement the following functions:
 - `calc_local_pos(pd, hits)`: the local (x, z) positions of the hits for [`spot_diagram`](@ref)
 
 The readouts of a [`Detector`](@ref) ([`electric_field`](@ref), [`intensity`](@ref),
-[`optical_power`](@ref)) need all of them except `calc_local_pos`.
+[`optical_power`](@ref)) need all of them except `hit_point` and `calc_local_pos`.
 
 !!! info
     Note that new subtypes of `AbstractDetectorHit` must be manually added to the `Detector`
@@ -41,6 +43,8 @@ Concrete subtypes include:
 - [`AstigmaticGaussianBeamletHit`](@ref) — single astigmatic Gaussian beamlet with a vector field
 """
 abstract type AbstractDetectorHit end
+
+hit_point(hit::AbstractDetectorHit) = error(lazy"hit_point not defined for $(typeof(hit))")
 
 """
     AbstractRayHit{T} <: AbstractDetectorHit
