@@ -140,7 +140,7 @@ const mm = 1e-3
 
         cbs = CubeBeamsplitter(25e-3, ConstantRefractiveIndex(N0); reflectance = 0.3)
         @test BMO.refractive_index(cbs, 1e-6) == N0
-        @test BMO.refractive_index(cbs, 500e-9) == N0
+        @test BMO.refractive_index(cbs, 500e-9) == N0
         translate3d!(cbs, [0, 50mm, 0])
         beam = Beam([0, 0, 0], [0, 1, 0], 1e-6)
         solve_system!(System([cbs]), beam)

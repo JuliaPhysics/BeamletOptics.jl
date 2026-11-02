@@ -29,7 +29,7 @@ julia> BeamletOptics.properties(SphericalLens(50e-3, -50e-3, 5e-3, 25.4e-3))
   "Optical axis" => [0.0, 1.0, 0.0]
          "Shape" => "UnionSDF"
  "Thickness [m]" => 0.005
-   "Index model" => "function of λ"
+   "Index model" => "ConstantRefractiveIndex"
          "n(λ₀)" => 1.5
         "λ₀ [m]" => 1.0e-6
 ```

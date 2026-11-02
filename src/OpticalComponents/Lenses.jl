@@ -35,8 +35,8 @@ by specialized subtypes.
 abstract type AbstractRefractiveOptic{T, F} <: AbstractObject{T} end
 
 refractive_index(object::AbstractRefractiveOptic) = object.n
-# The result is converted to the number type of the optic and the wavelength, since `n` may be any
-# function: e.g. a `ForwardDiff.Dual` within automatic differentiation, else `Float64`.
+# The result is converted to the number type of the optic and the wavelength, since a model `n` may
+# return another one: e.g. a `ForwardDiff.Dual` within automatic differentiation, else `Float64`.
 function refractive_index(object::AbstractRefractiveOptic{T, <:AbstractRefractiveIndex}, λ::L) where {T, L <: Real}
     return convert(promote_type(T, L), object.n(λ))::promote_type(T, L)
 end

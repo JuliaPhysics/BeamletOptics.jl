@@ -147,7 +147,7 @@ L3 = Lens(
         1.5264e-5*(1e3)^15]     # coeffs
     ),
     0.7e-3,                     # center_thickness
-    n -> 1.580200               # refractive index
+    ConstantRefractiveIndex(1.580200) # refractive index
 )
 ```
 

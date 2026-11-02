@@ -30,7 +30,7 @@ translate3d!(l6, [0, l_6, 0])
 system = StaticSystem([l1, l23, l45, l6])
 ```
 
-Defining a [`StaticSystem`](@ref) will allow the compiler to generate more efficient code to solve this simulation. Note that the refractive indices above are given as anonymous functions. This is because no lens material is specified. Rather, these indices are unique to ``\lambda =  486.0~\text{nm}``.
+Defining a [`StaticSystem`](@ref) will allow the compiler to generate more efficient code to solve this simulation. Note that the refractive indices above are given as [`ConstantRefractiveIndex`](@ref)s. This is because no lens material is specified. Rather, these indices are unique to ``\lambda =  486.0~\text{nm}``.
 
 In the next step, we will define a `Figure` and `Axis3` environment in which the ray-tracing results will be visualized.
 

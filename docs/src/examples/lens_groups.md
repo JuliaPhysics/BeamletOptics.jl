@@ -98,7 +98,7 @@ source = UniformDiscSource([0,-10cm,0], [0,1,0], 6mm, 1e-6; num_rays=100)
 solve_system!(system, source)
 ```
 
-Note that the wavelength `1e-6` does not change the result of the tracing solution, since the refractive indices have not been specified as a function of the wavelength (e.g. via an anonymous function, [`DiscreteRefractiveIndex`](@ref) or [`SellmeierEquation`](@ref)). The ray paths can be visualized via the following code
+Note that the wavelength `1e-6` does not change the result of the tracing solution, since the refractive indices are constant ([`ConstantRefractiveIndex`](@ref)) and not a dispersion model such as a [`DiscreteRefractiveIndex`](@ref) or a [`SellmeierEquation`](@ref). The ray paths can be visualized via the following code
 
 ```julia
 fig = Figure()
