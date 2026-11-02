@@ -116,7 +116,7 @@ flowchart TB
     RAY --> BI
     RAY -- "PolarizationFilter:<br/>blocked" --> NO
     SPL -- "children are<br/>traced next" --> NO
-    DET -- "stop = false" --> BI
+    DET -- "stop = false:<br/>pass_through, same ray<br/>from the hit point" --> BI
     DET -- "stop = true" --> NO
     HT --> NO
 

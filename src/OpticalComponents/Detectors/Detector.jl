@@ -83,7 +83,7 @@ Spawns a quadratic [`Detector`](@ref) surface that is aligned with the neg. y-ax
 The detector edge length can be configured via `edge_length`.
 Additionally, continued tracing can be configured via the `stop` flag where
 
-- `false` indicates continued tracing
+- `false` indicates continued tracing: rays and beamlets pass the detector unchanged
 - `true` stops the incoming beams as with any hard target
 """
 function Detector(edge_length::Real, stop::Bool = true)
@@ -151,76 +151,50 @@ function Base.append!(d::Detector, new::Vector{<:AbstractDetectorHit})
     return d
 end
 
+"""
+    pass_through(ray::AbstractRay) -> BeamInteraction
+
+The interaction of a `ray` that passes a [`Detector`](@ref) with `stop = false` unchanged: a new
+ray from the hit point with the direction, wavelength, refractive index and polarization of `ray`.
+"""
+function pass_through(ray::Ray{T}) where {T}
+    return BeamInteraction{T, Ray{T}}(nothing,
+        Ray{T}(hit_point(ray), direction(ray), nothing, wavelength(ray), refractive_index(ray)))
+end
+
+function pass_through(ray::PolarizedRay{T}) where {T}
+    return BeamInteraction{T, PolarizedRay{T}}(nothing,
+        PolarizedRay{T}(hit_point(ray), direction(ray), nothing, wavelength(ray),
+            refractive_index(ray), polarization(ray)))
+end
+
 function interact3d(::AbstractSystem, d::Detector, beam::Beam{T, R},
         ray::R) where {T <: Real, R <: Ray{T}}
-    # Optical path length and wavenumber
-    opl = optical_path_length(beam)
-    # Push hit data into detector, determine stop
-    hit = RayHit(ray, opl)
-    push!(d, hit)
-    if stop(d)
-        # Stop solver (hard target)
-        return nothing
-    else
-        # Continue tracing with hit point as starting position
-        return BeamInteraction{T, R}(
-            nothing,
-            Ray{T}(
-                hit_point(hit),
-                direction(hit),
-                nothing,
-                wavelength(ray),
-                refractive_index(ray)
-            )
-        )
-    end
+    push!(d, RayHit(ray, optical_path_length(beam)))
+    # Stop solver (hard target) or continue from the hit point
+    return stop(d) ? nothing : pass_through(ray)
 end
 
 function interact3d(::AbstractSystem, d::Detector, beam::Beam{T, R},
         ray::R) where {T <: Real, R <: PolarizedRay{T}}
-    # Optical path length and wavenumber
-    opl = optical_path_length(beam)
-    # Push hit data into detector, determine stop
-    hit = PolarizedRayHit(ray, opl)
-    push!(d, hit)
-    if stop(d)
-        # Stop solver (hard target)
-        return nothing
-    else
-        # Continue tracing with hit point as starting position
-        return BeamInteraction{T, R}(
-            nothing,
-            PolarizedRay{T}(
-                hit_point(hit),
-                direction(hit),
-                nothing,
-                wavelength(ray),
-                refractive_index(ray),
-                polarization(ray)
-            )
-        )
-    end
+    push!(d, PolarizedRayHit(ray, optical_path_length(beam)))
+    # Stop solver (hard target) or continue from the hit point
+    return stop(d) ? nothing : pass_through(ray)
 end
 
 function interact3d(::AbstractSystem, d::Detector, g::GaussianBeamlet{R}, id::Int) where {R}
     push!(d, GaussianBeamletHit(g, id))
-    if stop(d)
-        # Stop solver (hard target)
-        return nothing
-    else
-        # Continue tracing # FIXME
-        throw(ErrorException("Continued tracing for GaussianBeamlet not yet implemented."))
-    end
+    stop(d) && return nothing
+    # Continue all component rays from their hit points
+    return GaussianBeamletInteraction{R}(
+        map(b -> pass_through(rays(b)[id]), _component_beams(g))...)
 end
 
-function interact3d(system::AbstractSystem, d::Detector,
+function interact3d(::AbstractSystem, d::Detector,
         agb::AstigmaticGaussianBeamlet{R}, id::Int) where {R}
     push!(d, AstigmaticGaussianBeamletHit(agb, id))
-    if stop(d)
-        # Stop solver (hard target)
-        return nothing
-    else
-        # Continue tracing # FIXME
-        throw(ErrorException("Continued tracing for AstigmaticGaussianBeamlet not yet implemented."))
-    end
+    stop(d) && return nothing
+    # Continue all component rays from their hit points
+    return AstigmaticGaussianBeamletInteraction{R}(
+        map(b -> pass_through(rays(b)[id]), _component_beams(agb))...)
 end

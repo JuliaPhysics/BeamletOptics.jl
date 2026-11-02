@@ -119,6 +119,42 @@ end
     @test position(rays(beam)[2]) ≈ [0.0, 0.10, 0.0]
 end
 
+@testset "Beamlets pass a detector with stop = false" begin
+    # The field on a later detector is the same with and without the passed detector,
+    # for a beamlet along +y and one along +x
+    beamlets = (
+        "GaussianBeamlet" => (p, d) -> GaussianBeamlet(p, d, 1e-6, 1mm; z0 = 50mm),
+        "AstigmaticGaussianBeamlet" => (p, d) -> AstigmaticGaussianBeamlet(
+            p, d, 1e-6, 1mm, 0.5mm; z0_x = 50mm, z0_y = 150mm))
+    placements = (([0.0, 1, 0], 0.0), ([1.0, 0, 0], -π / 2))
+    @testset "$name along $dir" for (name, make_beamlet) in beamlets, (dir, θ) in placements
+        function detector_at(l, stop)
+            d = Detector(20mm, stop)
+            zrotate3d!(d, θ)
+            translate_to3d!(d, l * dir)
+            return d
+        end
+        d1 = detector_at(100mm, false)
+        d2 = detector_at(200mm, true)
+        d_ref = detector_at(200mm, true)
+        beamlet = make_beamlet([0.0, 0, 0], dir)
+        solve_system!(System([d1, d2]), beamlet)
+        solve_system!(System([d_ref]), make_beamlet([0.0, 0, 0], dir))
+        @test length(d1) == 1
+        @test length(d2) == 1
+        @test length(rays(beamlet)) == 2
+        @test position(rays(beamlet)[2]) ≈ 100mm * dir
+        # The passed beamlet keeps its polarization
+        if beamlet isa AstigmaticGaussianBeamlet
+            @test BMO.polarization(rays(beamlet)[2]) == BMO.polarization(rays(beamlet)[1])
+        end
+        _, _, E = electric_field(d2)
+        _, _, E_ref = electric_field(d_ref)
+        @test E ≈ E_ref
+        @test optical_power(d2) ≈ optical_power(d_ref)
+    end
+end
+
 @testset "Testing point spread function" begin
     # parameters for an almost thin-lens
     l = 1mm
