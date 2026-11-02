@@ -93,8 +93,8 @@ assembly is used:
   `BeamletOptics.medium(x::MyBody) = BeamletOptics.IsotropicMedium(n)` (every `AbstractRefractiveOptic`
   has one). In an own `interact3d`, `t = BeamletOptics.transition(system, ray)` holds the media on both
   sides of the hit (`BeamletOptics.refractive_index_in(t)`, `BeamletOptics.refractive_index_out(t)` at
-  the ray's wavelength) and the thin layer at it; `BeamletOptics.interact3d(system,
-  BeamletOptics.surface_model(t), t, beam, ray)` refracts or totally reflects at the boundary. A
+  the ray's wavelength) and the thin layer at it; `BeamletOptics.interact3d(system, t, beam, ray)`
+  lets the boundary act: refraction or total reflection, or the model of a thin layer at it. A
   `Hint` only speeds up the trace.
 - Rays carry the bodies that enclose them (`BeamletOptics.enclosure(ray)`), so bodies within bodies
   work (a lens in a water cuvette). The solver assigns the enclosure to the new rays of an own

@@ -221,7 +221,7 @@ function _calculate_global_E0(in_dir::AbstractArray, out_dir::AbstractArray, nor
     _calculate_global_E0(in_dir, out_dir, normal, static_data(J))
 end
 
-function _calculate_global_E0(::AbstractObject, ray::PolarizedRay, out_dir::AbstractArray, J::LocalJonesBasis)
+function _calculate_global_E0(_, ray::PolarizedRay, out_dir::AbstractArray, J::LocalJonesBasis)
     # Update Jones matrix according to global object orientation
     in_dir = direction(ray)
     normal = normal3d(intersection(ray))

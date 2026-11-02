@@ -1279,6 +1279,49 @@ struct BareModel <: BMO.AbstractSurfaceModel end
         BareModel(), t, Beam(ray), ray))
 end
 
+# A dummy thin layer that carries its own surface model, which counts its calls
+mutable struct CountingModel <: BMO.AbstractSurfaceModel
+    calls::Int
+end
+function BMO.interact3d(::BMO.AbstractSystem, model::CountingModel, t::BMO.Transition, beam::Beam,
+        ray::BMO.AbstractRay)
+    model.calls += 1
+    return BMO.cross_boundary(t, beam, ray)
+end
+struct CountingFilm{S <: BMO.AbstractShape{Float64}} <: BMO.AbstractObject{Float64}
+    shape::S
+    model::CountingModel
+end
+BMO.surface_model(film::CountingFilm) = film.model
+BMO.interact3d(system::BMO.AbstractSystem, ::CountingFilm, beam::BMO.AbstractBeam,
+    at::Union{BMO.AbstractRay, Int}) = BMO.interact3d(system, BMO.transition(system, beam, at), beam, at)
+
+@testset "A thin layer carries the surface model of the boundary" begin
+    θ = deg2rad(25)
+    p, d = [0, -10mm, 0], [sin(θ), cos(θ), 0]
+    plate() = RectangularCompensatorPlate(40mm, 40mm, 5mm, λ -> 1.5)
+    film = CountingFilm(BMO.QuadraticFlatMesh(40mm), CountingModel(0))
+    # The model of the layer acts at the face of the plate, between air and glass
+    t = transition_at(System([plate(), film]), p, d)
+    @test BMO.surface_model(t) === film.model
+    film_beam = solve([plate(), film], beam_at(p, d))
+    bare_beam = solve([plate()], beam_at(p, d))
+    @test film.model.calls == 1
+    @test BMO.direction(rays(film_beam)[2]) ≈ BMO.direction(rays(bare_beam)[2])
+    @test length(rays(film_beam)) == length(rays(bare_beam))
+    # Each component ray of a beamlet interacts with the model at its own hit
+    film.model.calls = 0
+    gauss = GaussianBeamlet([0.0, -10mm, 0], [0.0, 1, 0], λ0, 0.3mm)
+    solve_system!(System([plate(), film]), gauss)
+    @test film.model.calls == 3
+    # Catalog layers: a thin beamsplitter carries its coating, a detector no model
+    bs = ThinBeamsplitter(40mm)
+    @test BMO.surface_model(transition_at(System([plate(), bs]), p, d)) isa BMO.BeamsplitterCoating
+    pd = Detector(40mm, false)
+    zrotate3d!(pd, π)
+    @test BMO.surface_model(transition_at(System([plate(), pd]), p, d)) === BMO.Uncoated()
+end
+
 @testset "Enclosure: bodies within bodies" begin
     θ = deg2rad(25)
     d = [sin(θ), cos(θ), 0]

@@ -116,7 +116,7 @@ flowchart TB
     RAY --> BI
     RAY -- "PolarizationFilter:<br/>blocked" --> NO
     SPL -- "children are<br/>traced next" --> NO
-    DET -- "stop = false:<br/>cross_boundary, the ray<br/>passes the thin layer" --> BI
+    DET -- "stop = false:<br/>a thin layer without<br/>a model, the ray passes" --> BI
     DET -- "stop = true" --> NO
     HT --> NO
 

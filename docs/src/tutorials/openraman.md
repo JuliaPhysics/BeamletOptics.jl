@@ -234,7 +234,7 @@ BMO.medium(lpm::LongpassDichroicMirror) = BMO.IsotropicMedium(lpm.n)
 
 # in interact3d, above cut-on
 t = BMO.transition(system, ray)
-return BMO.interact3d(system, BMO.surface_model(t), t, beam, ray)
+return BMO.interact3d(system, t, beam, ray)
 ```
 
 The full component is in `OpenRaman/longpass.jl`, named after the Thorlabs

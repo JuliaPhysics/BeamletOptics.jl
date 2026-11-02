@@ -270,6 +270,16 @@ function transition(system::AbstractSystem, ray::AbstractRay{T}) where {T}
         e_in)
 end
 
+"""
+    transition(system::AbstractSystem, beam::AbstractBeam, at)
+
+The [`Transition`](@ref) at the hit of the `beam` at its ray `at`: of the ray itself for a
+[`Beam`](@ref), of the chief ray of the segment `at` for a beamlet, see `intersection(beam, at)`.
+"""
+transition(system::AbstractSystem, ::Beam, ray::AbstractRay) = transition(system, ray)
+transition(system::AbstractSystem, beamlet::GaussianBeamlets, ray_id::Int) =
+    transition(system, rays(beamlet)[ray_id])
+
 # The index of the innermost body in the number type `T` of the ray, e.g. a `ForwardDiff.Dual` within
 # automatic differentiation (read behind a function barrier), else the index `n` outside of all bodies
 _index(::Nothing, λ, n::T) where {T} = n
@@ -335,8 +345,14 @@ None required.
 
 ## Functions
 
-- `interact3d(system, model, t::Transition, beam, ray)`: the interaction of the `ray` at the
+- `interact3d(system, model, t::Transition, beam::Beam, ray)`: the interaction of the `ray` at the
   boundary of the transition `t`; without a method, the boundary warns and blocks the beam
+- `interact3d(system, model, t::Transition, beamlet, ray_id)`: optional, the interaction of a
+  [`GaussianBeamlet`](@ref) or an [`AstigmaticGaussianBeamlet`](@ref) at the segment `ray_id`. By
+  default, each component ray interacts with the model at its own hit; a model that splits the beamlet,
+  e.g. a [`BeamsplitterCoating`](@ref), implements it.
+
+A thin layer object carries its model via [`surface_model`](@ref)`(object)`.
 """
 abstract type AbstractSurfaceModel end
 
@@ -345,6 +361,24 @@ function interact3d(::AbstractSystem, model::AbstractSurfaceModel, ::Transition,
     @warn lazy"No interact3d method defined for:" ModelType = typeof(model) RayType = typeof(ray)
     return nothing
 end
+
+# Each component ray of the beamlet interacts with the model at its own hit, map unrolls the
+# heterogeneous tuple of component beams
+function interact3d(system::AbstractSystem, model::AbstractSurfaceModel, ::Transition,
+        beamlet::GaussianBeamlets, ray_id::Int)
+    interactions = map(_component_beams(beamlet)) do b
+        ray = rays(b)[ray_id]
+        interact3d(system, model, transition(system, ray), b, ray)
+    end
+    any(isnothing, interactions) && return nothing
+    return beamlet_interaction(beamlet, interactions)
+end
+
+# The interaction of a beamlet from the interactions of its component rays
+beamlet_interaction(::GaussianBeamlet{R}, interactions) where {R} =
+    GaussianBeamletInteraction{R}(interactions...)
+beamlet_interaction(::AstigmaticGaussianBeamlet{R}, interactions) where {R} =
+    AstigmaticGaussianBeamletInteraction{R}(interactions...)
 
 """
     Uncoated <: AbstractSurfaceModel
@@ -357,19 +391,41 @@ struct Uncoated <: AbstractSurfaceModel end
 """
     surface_model(t::Transition)
 
-Returns the [`AbstractSurfaceModel`](@ref) of the boundary of the transition `t`. All surfaces are
-[`Uncoated`](@ref) so far; coatings on the faces of the bodies on both sides will enter here.
+Returns the [`AbstractSurfaceModel`](@ref) that acts at the boundary of the transition `t`: the model
+of its thin layer, e.g. the [`BeamsplitterCoating`](@ref) of a [`ThinBeamsplitter`](@ref), else
+[`Uncoated`](@ref). A thin layer without a model, e.g. a [`Detector`](@ref) that does not stop the
+ray, leaves the boundary as it is. Coatings on the faces of bodies will enter here.
 """
-surface_model(::Transition) = Uncoated()
+surface_model(t::Transition) = something(surface_model(t.layer), Uncoated())
+
+"""
+    surface_model(object::AbstractObject)
+
+Returns the [`AbstractSurfaceModel`](@ref) of the thin layer `object`, or `nothing` (default). It acts
+at every boundary at which the `object` lies, between the media on both sides, see
+[`surface_model(::Transition)`](@ref).
+"""
+surface_model(::AbstractObject) = nothing
+surface_model(hit::Intersection) = surface_model(part_of(hit))
+surface_model(::Nothing) = nothing
+
+"""
+    interact3d(system, t::Transition, beam, at)
+
+The interaction of the `beam` at the boundary of the transition `t`, at its ray `at` (see
+[`transition`](@ref)): the [`surface_model`](@ref) of the boundary acts. Bodies and thin layers hand
+their rays and beamlets here, e.g.
+`interact3d(system, ::MyLayer, beam, at) = interact3d(system, transition(system, beam, at), beam, at)`.
+"""
+interact3d(system::AbstractSystem, t::Transition, beam::AbstractBeam, at::Union{AbstractRay, Int}) =
+    interact3d(system, surface_model(t), t, beam, at)
 
 """
     interact3d(system, model::AbstractSurfaceModel, t::Transition, beam, ray)
-    interact3d(system, layer::AbstractObject, t::Transition, beam, ray)
 
-The interaction of the `ray` at the boundary of the transition `t`. A body, e.g. a lens, calls the
-first method with the [`surface_model`](@ref) of the boundary. A thin layer, e.g. a
-[`ThinBeamsplitter`](@ref), implements the second method for itself: it acts between the media of the
-transition, e.g. it refracts the transmitted beam from one into the other.
+The interaction of the `ray` with the `model` at the boundary of the transition `t`. The model acts
+between the media of the transition, e.g. an [`Uncoated`](@ref) boundary refracts from one into the
+other, see [`cross_boundary`](@ref).
 """
 interact3d(::AbstractSystem, ::Uncoated, t::Transition, beam::Beam, ray::AbstractRay) =
     cross_boundary(t, beam, ray)
@@ -423,28 +479,3 @@ end
 """Returns `true` if the `ray` is totally reflected at the bare boundary of the transition `t`."""
 is_totally_reflected(ray::AbstractRay, t::Transition) =
     last(refraction3d(direction(ray), normal3d(t), refractive_index_in(t), refractive_index_out(t)))
-
-"""
-    cross_boundary(system::AbstractSystem, beam::Beam, ray)
-
-The interaction of the `ray` with the bare boundary at its hit, see
-`cross_boundary(transition(system, ray), beam, ray)`.
-"""
-cross_boundary(system::AbstractSystem, beam::Beam, ray::AbstractRay) =
-    cross_boundary(transition(system, ray), beam, ray)
-
-"""
-    cross_boundary(system::AbstractSystem, beamlet, ray_id::Int)
-
-The interaction of a [`GaussianBeamlet`](@ref) or an [`AstigmaticGaussianBeamlet`](@ref) with the bare
-boundary at the segment `ray_id`: each component ray crosses it at its own hit, see
-`cross_boundary(system, beam, ray)`.
-"""
-cross_boundary(system::AbstractSystem, gauss::GaussianBeamlet{R}, ray_id::Int) where {R} =
-    GaussianBeamletInteraction{R}(cross_components(system, gauss, ray_id)...)
-
-cross_boundary(system::AbstractSystem, agb::AstigmaticGaussianBeamlet{R}, ray_id::Int) where {R} =
-    AstigmaticGaussianBeamletInteraction{R}(cross_components(system, agb, ray_id)...)
-
-cross_components(system::AbstractSystem, beamlet, ray_id) =
-    map(b -> cross_boundary(system, b, rays(b)[ray_id]), _component_beams(beamlet))

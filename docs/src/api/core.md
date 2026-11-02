@@ -198,7 +198,7 @@ An object whose `interact3d` method stores data in the object, e.g. a detector i
 
 At a boundary, the ray passes from one medium into another. The parts that the ray hits there play two roles: a part with a medium is a **body**, which the ray leaves or enters, e.g. a lens or a prism; a part without one is a **thin layer** between the media, e.g. a thin beamsplitter or a polarizing film. The [`BeamletOptics.transition`](@ref) at the hit of a ray holds both media and the layer. Hence a component needs no knowledge of the elements that touch it: the surface of a lens cemented to another lens refracts from one glass into the other, a beamsplitter coating on a substrate transmits into the substrate, and a film between two plates transmits from one plate into the other.
 
-The diagram shows how a body and a thin layer interact at a boundary and how the solver assigns the enclosure of the new rays (green: implemented by a component author, purple: dispatch).
+The physics at a boundary has one place: the [`BeamletOptics.surface_model`](@ref) of the transition. It is the model that the thin layer at the boundary carries, else an uncoated surface. Bodies and thin layers both hand their rays to it, so a coating acts the same whether it stands free or lies on a substrate. The diagram shows this and how the solver assigns the enclosure of the new rays (green: implemented by a component author, purple: dispatch).
 
 ```mermaid
 flowchart TB
@@ -207,19 +207,20 @@ flowchart TB
     PO["<b>part_of</b>(hit)<br/>the part that was hit,<br/>e.g. the back lens of a doublet"]
     K{"own method<br/>of the part?"}
     TR["<b>transition</b>(system, ray)<br/><b>boundary_hits</b>: left body, entered body,<br/>thin layer; media from the enclosure"]
-    BODY["<b>AbstractRefractiveOptic</b><br/><b>interact3d</b>(system, surface_model(t), t, beam, ray)"]
+    BOUND["<b>interact3d</b>(system, t, beam, at)<br/>body or thin layer"]
+    SM{"<b>surface_model</b>(t)<br/>model of the thin layer,<br/>else Uncoated"}
     UNC["<b>Uncoated</b><br/><b>cross_boundary</b>: refraction, TIR,<br/>Fresnel for PolarizedRay"]
-    LAYER["<b>thin layer</b><br/>interact3d(system, layer, t, beam, ray)<br/>e.g. ThinBeamsplitter: split,<br/>transmit! and reflect!"]
-    OWN["<b>own interact3d</b><br/>e.g. mirror, detector"]
+    MOD["<b>model of a thin layer</b><br/>interact3d(system, model, t, beam, at)<br/>e.g. BeamsplitterCoating: split,<br/>transmit! and reflect!; JonesFilm"]
+    OWN["<b>own interact3d</b><br/>e.g. mirror, detector (a detector<br/>that does not stop: as a layer<br/>without a model)"]
     ENC["<b>enclose_new!</b><br/>enclosure of each new ray at the hit:<br/>back into the medium before the boundary<br/>or into the medium behind it"]
     E([next tracing step])
 
     IA --> MS
     MS -- MultiShape --> PO --> K
     MS -- SingleShape --> K
-    K -- "body" --> TR --> BODY --> UNC --> ENC
-    K -- "thin layer" --> LAYER --> ENC
-    TR -. "t" .-> LAYER
+    K -- "body or<br/>thin layer" --> TR --> BOUND --> SM
+    SM -- "no model" --> UNC --> ENC
+    SM -- "model" --> MOD --> ENC
     K -- "own" --> OWN --> ENC
     ENC --> E
 
@@ -227,9 +228,9 @@ flowchart TB
     classDef green fill:#38982626,stroke:#389826,stroke-width:2px
     classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
     classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
-    class TR,UNC,ENC blue
-    class BODY,LAYER,OWN green
-    class MS,K purple
+    class TR,BOUND,UNC,ENC blue
+    class MOD,OWN green
+    class MS,K,SM purple
     class IA,E terminal
 ```
 
@@ -253,15 +254,20 @@ A component creates its new rays without an enclosure. After each interaction, t
 BeamletOptics.enclose!
 ```
 
-The physics at the boundary belongs to the boundary, not to one of the bodies. A body, e.g. any [`BeamletOptics.AbstractRefractiveOptic`](@ref), hands the ray to the [`BeamletOptics.surface_model`](@ref) of the transition, which is an uncoated surface so far. A thin layer implements the interaction between the media of the transition for itself:
+The physics at the boundary belongs to the boundary, not to one of the bodies. A body, e.g. any [`BeamletOptics.AbstractRefractiveOptic`](@ref), and a thin layer, e.g. a [`ThinBeamsplitter`](@ref), hand the ray to the [`BeamletOptics.surface_model`](@ref) of the transition:
 
 ```@docs; canonical=false
-BeamletOptics.interact3d(::BeamletOptics.AbstractSystem, ::BeamletOptics.Uncoated, ::BeamletOptics.Transition, ::BeamletOptics.Beam, ::BeamletOptics.AbstractRay)
+BeamletOptics.interact3d(::BeamletOptics.AbstractSystem, ::BeamletOptics.Transition, ::BeamletOptics.AbstractBeam, ::Union{BeamletOptics.AbstractRay, Int})
+BeamletOptics.surface_model(::BeamletOptics.Transition)
+BeamletOptics.surface_model(::BeamletOptics.AbstractObject)
 BeamletOptics.AbstractSurfaceModel
+BeamletOptics.interact3d(::BeamletOptics.AbstractSystem, ::BeamletOptics.Uncoated, ::BeamletOptics.Transition, ::BeamletOptics.Beam, ::BeamletOptics.AbstractRay)
 BeamletOptics.cross_boundary
+BeamletOptics.BeamsplitterCoating
+BeamletOptics.JonesFilm
 ```
 
-A new refracting component declares its body via `medium` and needs no `interact3d` method of its own if it subtypes `AbstractRefractiveOptic`. A new thin layer implements `interact3d(system, layer::MyLayer, t::Transition, beam, ray)` and calls it from its `interact3d` method with `transition(system, ray)`, like the [`ThinBeamsplitter`](@ref).
+A new refracting component declares its body via `medium` and needs no `interact3d` method of its own if it subtypes `AbstractRefractiveOptic`. A new thin layer declares its model via `surface_model(layer::MyLayer)` and hands its rays and beamlets to the boundary with `interact3d(system, ::MyLayer, beam, at) = interact3d(system, transition(system, beam, at), beam, at)`, like the [`ThinBeamsplitter`](@ref). New physics at a boundary is a new `AbstractSurfaceModel`.
 
 The `interact3d` return type limits the interface to only accepting one new `beam` segment per interaction at the moment. After e.g. a lens surface air-to-glass interaction, the most likely next step is the refraction at the glass-to-air surface of the same lens. An interaction can tell the solver so with a `Hint`, which speeds up the next intersection.
 

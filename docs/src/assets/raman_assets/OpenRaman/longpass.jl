@@ -56,6 +56,6 @@ function BMO.interact3d(
         # above cut-on: behave like a refractive plate. The transition at the hit holds the media on
         # both sides, the substrate and the medium of the system or of a touching body.
         t = BMO.transition(system, ray)
-        return BMO.interact3d(system, BMO.surface_model(t), t, beam, ray)
+        return BMO.interact3d(system, t, beam, ray)
     end
 end

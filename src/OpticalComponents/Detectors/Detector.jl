@@ -157,14 +157,14 @@ function Base.append!(d::Detector, new::Vector{<:AbstractDetectorHit})
     return d
 end
 
-# A detector that does not stop the ray is a thin layer: the ray passes it, refracted if the detector
-# lies on a boundary between two media, see `transition`
+# A detector that does not stop the ray is a thin layer without a surface model: the ray passes it,
+# refracted if the detector lies on a boundary between two media, see `surface_model`
 function interact3d(system::AbstractSystem, d::Detector, beam::Beam{T, R},
         ray::R) where {T <: Real, R <: Ray{T}}
     push!(d, RayHit(ray, optical_path_length(beam)))
     # Stop solver (hard target)
     stop(d) && return nothing
-    return cross_boundary(system, beam, ray)
+    return interact3d(system, transition(system, ray), beam, ray)
 end
 
 function interact3d(system::AbstractSystem, d::Detector, beam::Beam{T, R},
@@ -172,19 +172,19 @@ function interact3d(system::AbstractSystem, d::Detector, beam::Beam{T, R},
     push!(d, PolarizedRayHit(ray, optical_path_length(beam)))
     # Stop solver (hard target)
     stop(d) && return nothing
-    return cross_boundary(system, beam, ray)
+    return interact3d(system, transition(system, ray), beam, ray)
 end
 
 function interact3d(system::AbstractSystem, d::Detector, g::GaussianBeamlet, id::Int)
     push!(d, GaussianBeamletHit(g, id))
     # Stop solver (hard target) or pass with all component rays
     stop(d) && return nothing
-    return cross_boundary(system, g, id)
+    return interact3d(system, transition(system, g, id), g, id)
 end
 
 function interact3d(system::AbstractSystem, d::Detector, agb::AstigmaticGaussianBeamlet, id::Int)
     push!(d, AstigmaticGaussianBeamletHit(agb, id))
     # Stop solver (hard target) or pass with all component rays
     stop(d) && return nothing
-    return cross_boundary(system, agb, id)
+    return interact3d(system, transition(system, agb, id), agb, id)
 end

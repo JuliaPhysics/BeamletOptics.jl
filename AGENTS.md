@@ -41,8 +41,9 @@ Touching elements (cemented lenses, coatings on substrates, plates against each 
 resolved by the solver: it collects all surfaces at a hit point (`coincident_hits`), picks the one
 that interacts (`first_to_interact`) and derives the media on both sides (`transition`), see
 [src/Transitions.jl](src/Transitions.jl). Bodies declare their medium via `medium(x)`; the physics
-at a boundary belongs to its surface model (`interact3d(system, surface_model(t), t, beam, ray)`)
-or to the thin layer at it (`interact3d(system, layer, t, beam, ray)`). Components never need a
+at a boundary belongs to one surface model, `surface_model(t)`: the model that the thin layer at it
+carries (`surface_model(layer)`, e.g. a `BeamsplitterCoating`), else `Uncoated`; bodies and thin
+layers hand their rays to it with `interact3d(system, t, beam, at)`. Components never need a
 `Hint` for correctness; a `Hint` only speeds up the next intersection.
 
 **Be suspicious of** a component or algorithm that assumes a world-space orientation, an

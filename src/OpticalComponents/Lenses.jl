@@ -54,12 +54,11 @@ refracted, or totally reflected beyond the critical angle (see [`cross_boundary`
 [`PolarizedRay`](@ref) is transmitted with the [`fresnel_coefficients`](@ref), stray light is not tracked.
 
 The method is typed loosely in the beam and the ray, such that the own `interact3d` method of a subtype
-takes precedence, e.g. `interact3d(system, ::MyOptic, ::Beam, ::AbstractRay)`.
+takes precedence, e.g. `interact3d(system, ::MyOptic, ::Beam, ::AbstractRay)`. A beamlet interacts
+with each of its component rays, see `interact3d(system, ::SingleShape, object, beamlet, ray_id)`.
 """
-function interact3d(system::AbstractSystem, ::AbstractRefractiveOptic, beam::Beam, ray::AbstractRay)
-    t = transition(system, ray)
-    return interact3d(system, surface_model(t), t, beam, ray)
-end
+interact3d(system::AbstractSystem, ::AbstractRefractiveOptic, beam::Beam, ray::AbstractRay) =
+    interact3d(system, transition(system, ray), beam, ray)
 
 """
     Lens{T, S <: AbstractShape{T}, N <: RefractiveIndex} <: AbstractRefractiveOptic{T, N}
