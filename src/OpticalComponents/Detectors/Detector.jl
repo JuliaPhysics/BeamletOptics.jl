@@ -85,6 +85,11 @@ Additionally, continued tracing can be configured via the `stop` flag where
 
 - `false` indicates continued tracing: rays and beamlets pass the detector unchanged
 - `true` stops the incoming beams as with any hard target
+
+!!! warning "Partly clipped beamlets"
+    A beamlet whose rays hit the detector only partly ends there, as at any other object, also
+    with `stop = false`. To sample a beamlet on an intermediate plane, make the detector larger
+    than the beamlet.
 """
 function Detector(edge_length::Real, stop::Bool = true)
     shape = QuadraticFlatMesh(edge_length)
