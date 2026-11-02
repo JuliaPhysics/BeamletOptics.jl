@@ -127,18 +127,18 @@ types(plots) = map(Makie.plotfunc, plots)
 
 # A lens whose shape has a bounding sphere on the base branch already, such that the tests do not
 # depend on which other shape types have one
-meniscus_lens() = Lens(BMO.MeniscusLensSDF(50mm, 80mm, 5mm, 25.4mm), λ -> 1.5)
+meniscus_lens() = Lens(BMO.MeniscusLensSDF(50mm, 80mm, 5mm, 25.4mm), ConstantRefractiveIndex(1.5))
 
 function test_system()
-    lens = SphericalLens(50mm, -50mm, 10mm, 25.4mm, 1.5)
+    lens = SphericalLens(50mm, -50mm, 10mm, 25.4mm, ConstantRefractiveIndex(1.5))
     meniscus = meniscus_lens()
-    doublet = SphericalDoubletLens(33.3mm, -22.3mm, -291.1mm, 9mm, 2.5mm, 25.4mm, 1.5, 1.6)
+    doublet = SphericalDoubletLens(33.3mm, -22.3mm, -291.1mm, 9mm, 2.5mm, 25.4mm, ConstantRefractiveIndex(1.5), ConstantRefractiveIndex(1.6))
     mirror = RoundPlanoMirror(25.4mm, 5mm)
-    cube = CubeBeamsplitter(25mm, λ -> 1.5)
-    plate = RectangularPlateBeamsplitter(36mm, 25mm, 1mm, λ -> 1.5)
+    cube = CubeBeamsplitter(25mm, ConstantRefractiveIndex(1.5))
+    plate = RectangularPlateBeamsplitter(36mm, 25mm, 1mm, ConstantRefractiveIndex(1.5))
     filter = RoundPolarizationFilter(10mm)
-    polarizer = RoundLinearPolarizer(25.4mm, 1.6mm, 1.6mm, λ -> 1.5)
-    prism = RightAnglePrism(20mm, 10mm, 1.5)
+    polarizer = RoundLinearPolarizer(25.4mm, 1.6mm, 1.6mm, ConstantRefractiveIndex(1.5))
+    prism = RightAnglePrism(20mm, 10mm, ConstantRefractiveIndex(1.5))
     detector = Detector(10mm)
     group = ObjectGroup([RoundPlanoMirror(20mm, 4mm), meniscus_lens()])
     objs = [lens, meniscus, doublet, mirror, cube, plate, filter, polarizer, prism, detector, group]
@@ -323,7 +323,7 @@ end
         @test length(sphere_plots(plots)) == 1
 
         # polarizers with their own keywords
-        for pol in (RoundPolarizationFilter(10mm), RoundLinearPolarizer(25.4mm, 1.6mm, 1.6mm, λ -> 1.5))
+        for pol in (RoundPolarizationFilter(10mm), RoundLinearPolarizer(25.4mm, 1.6mm, 1.6mm, ConstantRefractiveIndex(1.5)))
             plain = rendered_plots(pol; show_transmission_axis = false)
             plots = rendered_plots(pol; show_transmission_axis = false, show_bounding_sphere = true)
             @test length(plots) == length(plain) + length(spheres(pol))

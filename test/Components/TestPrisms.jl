@@ -89,22 +89,22 @@ const mm = 1e-3
     end
 
     @testset "Constructors" begin
-        @test Prism([(0, 0), (1, 0), (0, 1)], 1, 1.5) isa Prism
-        eq = EquilateralPrism(20mm, 10mm, 1.5)
+        @test Prism([(0, 0), (1, 0), (0, 1)], 1, ConstantRefractiveIndex(1.5)) isa Prism
+        eq = EquilateralPrism(20mm, 10mm, ConstantRefractiveIndex(1.5))
         @test eq isa Prism
         V = eq.shape.vertices
         @test sum(V) / 3 ≈ zeros(2) atol = 1e-15 # centroid at the origin
         @test V[3][2] > 0 && V[3][1] == 0 # apex along +y
         @test all(norm(V[i] - V[mod1(i + 1, 3)]) ≈ 20mm for i in 1:3)
-        @test EquilateralPrism(20f-3, 10f-3, 1.5).shape isa BMO.PolygonPrismSDF{Float32}
-        @test_throws ArgumentError EquilateralPrism(-20mm, 10mm, 1.5)
-        dove = DovePrism(50mm, 10mm, 10mm, 1.5)
+        @test EquilateralPrism(20f-3, 10f-3, ConstantRefractiveIndex(1.5)).shape isa BMO.PolygonPrismSDF{Float32}
+        @test_throws ArgumentError EquilateralPrism(-20mm, 10mm, ConstantRefractiveIndex(1.5))
+        dove = DovePrism(50mm, 10mm, 10mm, ConstantRefractiveIndex(1.5))
         @test dove isa Prism
         @test BMO.thickness(dove) ≈ 50mm
-        @test DovePrism(50f-3, 10mm, 10mm, 1.5) isa Prism # mixed element types
-        @test_throws ArgumentError DovePrism(10mm, 10mm, 10mm, 1.5)
-        @test_throws ArgumentError DovePrism(50mm, -10mm, 10mm, 1.5)
-        @test BMO.thickness(RightAnglePrism(20mm, 10mm, 1.5)) ≈ 20mm
+        @test DovePrism(50f-3, 10mm, 10mm, ConstantRefractiveIndex(1.5)) isa Prism # mixed element types
+        @test_throws ArgumentError DovePrism(10mm, 10mm, 10mm, ConstantRefractiveIndex(1.5))
+        @test_throws ArgumentError DovePrism(50mm, -10mm, 10mm, ConstantRefractiveIndex(1.5))
+        @test BMO.thickness(RightAnglePrism(20mm, 10mm, ConstantRefractiveIndex(1.5))) ≈ 20mm
         # a Dove prism does not deviate a beam on its axis (n = 1.5, parallel to the base)
         system = System([dove])
         beam = Beam([-1mm, -40mm, 0], [0, 1, 0], 1e-6)

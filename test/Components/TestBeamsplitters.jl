@@ -13,7 +13,7 @@ const mm = 1e-3
     @testset "Testing RectangularPlateBeamsplitter with Beam" begin
         # Init splitter
         N0 = 1.5
-        pbs = RectangularPlateBeamsplitter(36mm, 25mm, 1mm, n -> N0)
+        pbs = RectangularPlateBeamsplitter(36mm, 25mm, 1mm, ConstantRefractiveIndex(N0))
         system = System([pbs])
         beam = Beam([0, -50mm, 0], [0, 1, 0], 1e-6)
         # Trace normally
@@ -67,7 +67,7 @@ const mm = 1e-3
 
     @testset "Testing CubeBeamsplitter with Beam" begin
         # Init splitter
-        cbs = CubeBeamsplitter(25e-3, n -> N0)
+        cbs = CubeBeamsplitter(25e-3, ConstantRefractiveIndex(N0))
         translate3d!(cbs, [0, 50mm, 0])
         system = System([cbs])
         beam = Beam([0, 0, 0], [0, 1, 0], 1e-6)
@@ -126,16 +126,21 @@ const mm = 1e-3
         end
     end
 
-    @testset "CubeBeamsplitter and RightAnglePrism with a constant refractive index" begin
-        prism = RightAnglePrism(25e-3, 20e-3, N0)
+    @testset "Splitters and prisms with a constant refractive index" begin
+        prism = RightAnglePrism(25e-3, 20e-3, ConstantRefractiveIndex(N0))
         @test prism isa Prism
         @test BMO.refractive_index(prism, 1e-6) == N0
         @test BMO.refractive_index(prism, 500e-9) == N0
+        @test BMO.refractive_index(prism) == ConstantRefractiveIndex(N0)
+        for substrate in (RectangularPlateBeamsplitter(25e-3, 25e-3, 5e-3, ConstantRefractiveIndex(N0)).substrate,
+                RoundPlateBeamsplitter(25e-3, 5e-3, ConstantRefractiveIndex(N0)).substrate,
+                RectangularCompensatorPlate(25e-3, 25e-3, 5e-3, ConstantRefractiveIndex(N0)))
+            @test BMO.refractive_index(substrate) == ConstantRefractiveIndex(N0)
+        end
 
-        cbs = CubeBeamsplitter(25e-3, N0; reflectance = 0.3)
+        cbs = CubeBeamsplitter(25e-3, ConstantRefractiveIndex(N0); reflectance = 0.3)
         @test BMO.refractive_index(cbs, 1e-6) == N0
         @test BMO.refractive_index(cbs, 500e-9) == N0
-        @test cbs.coating.reflectance ≈ CubeBeamsplitter(25e-3, n -> N0; reflectance = 0.3).coating.reflectance
         translate3d!(cbs, [0, 50mm, 0])
         beam = Beam([0, 0, 0], [0, 1, 0], 1e-6)
         solve_system!(System([cbs]), beam)
@@ -144,7 +149,7 @@ const mm = 1e-3
     end
 
     @testset "depth_max branch limiting" begin
-        beamsplitter = CubeBeamsplitter(25e-3, n -> N0)
+        beamsplitter = CubeBeamsplitter(25e-3, ConstantRefractiveIndex(N0))
         translate3d!(beamsplitter, [0, 50mm, 0])
         system = System([beamsplitter])
 
@@ -158,7 +163,7 @@ const mm = 1e-3
     end
 
     @testset "depth_max default" begin
-        beamsplitter = CubeBeamsplitter(25e-3, n -> N0)
+        beamsplitter = CubeBeamsplitter(25e-3, ConstantRefractiveIndex(N0))
         translate3d!(beamsplitter, [0, 50mm, 0])
         system = System([beamsplitter])
         beam = Beam([0, 0, 0], [0, 1, 0], 1e-6)
@@ -177,7 +182,7 @@ const mm = 1e-3
         r_s = (cos(θ_i) - n * cos(θ_t)) / (cos(θ_i) + n * cos(θ_t))
         r_p = (n * cos(θ_i) - cos(θ_t)) / (n * cos(θ_i) + cos(θ_t))
         for (e, R_back) in (([0.0, 0, 1], r_s^2), ([1.0, 0, 0], r_p^2))
-            pbs = RectangularPlateBeamsplitter(25e-3, 25e-3, 5e-3, λ -> n)
+            pbs = RectangularPlateBeamsplitter(25e-3, 25e-3, 5e-3, ConstantRefractiveIndex(n))
             zrotate3d!(pbs, π / 4)
             beam = Beam(PolarizedRay([0.0, -0.1, 0], [0.0, 1, 0], 1e-6, e))
             solve_system!(System([pbs]), beam)

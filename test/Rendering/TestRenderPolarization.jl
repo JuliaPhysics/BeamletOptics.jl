@@ -14,7 +14,7 @@ const BMO = BeamletOptics
     # Shared fixture: 5 mm collimated AGB through an f = 50 mm ThinLens -- the
     # case that exposes the unbounded focus gain (afb6e18).
     agb = AstigmaticGaussianBeamlet([0, 0, 0], [0, 1, 0], 1000e-9, 5e-3; support = [0, 0, 1])
-    l = ThinLens(50e-3, 50e-3, BMO.inch, 1.5)
+    l = ThinLens(50e-3, 50e-3, BMO.inch, ConstantRefractiveIndex(1.5))
     translate3d!(l, [0, 50e-3, 0])
     solve_system!(System([l]), agb; check_invariant = false)
     flen = 0.12

@@ -10,7 +10,7 @@ const BMO = BeamletOptics
 const mm = 1e-3
 
 function lens_system()
-    lens = SphericalLens(100mm, Inf, 5mm, 25.4mm, x -> 1.5)
+    lens = SphericalLens(100mm, Inf, 5mm, 25.4mm, ConstantRefractiveIndex(1.5))
     pd = Detector(20mm)
     translate3d!(pd, [0, 100mm, 0])
     return System([lens, pd]), pd

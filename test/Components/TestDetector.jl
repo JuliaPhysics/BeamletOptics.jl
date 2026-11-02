@@ -207,7 +207,7 @@ end
     cs = UniformDiscSource([0, -10e-3, 0], [0, 1, 0], D, λ; num_rays)
     
     # test lens
-    lens = SphericalLens(R1, R2, l, d, x -> n)
+    lens = SphericalLens(R1, R2, l, d, ConstantRefractiveIndex(n))
     
     # PSF detector
     x_shift = y_shift = -2mm
@@ -265,7 +265,7 @@ end
         # Raytracing system (for all tests)
         pd_l = Detector(l) # n
         pd_s = Detector(l / 10) # n ÷ 10
-        ln = ThinLens(R1, R2, d, nl)
+        ln = ThinLens(R1, R2, d, ConstantRefractiveIndex(nl))
         translate3d!(pd_l, [0, z, 0])
         translate3d!(pd_s, [0, z, 0])
         translate3d!(ln, [0, z - f - thickness(ln) / 2, 0])
@@ -638,7 +638,7 @@ end
     @testset "Moving other objects keeps the hits" begin
         pd = Detector(50mm)
         translate3d!(pd, [0, 100mm, 0])
-        lens = ThinLens(80mm, 80mm, 4mm, 1.5)
+        lens = ThinLens(80mm, 80mm, 4mm, ConstantRefractiveIndex(1.5))
         translate3d!(lens, [0, 50mm, 0])
         beam = Beam([0.0, 0, 0], [0.0, 1, 0])
         solve_system!(System([lens, pd]), beam)
@@ -735,12 +735,12 @@ end
             (GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], λ, w0), b -> b.chief),
             (AstigmaticGaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], λ, w0), b -> b.c))
         # lens in front of and behind the splitter
-        lens = ThinLens(200mm, 200mm, 5mm, 1.5)
+        lens = ThinLens(200mm, 200mm, 5mm, ConstantRefractiveIndex(1.5))
         translate3d!(lens, [0, 30mm, 0])
         bs = ThinBeamsplitter(25mm)
         zrotate3d!(bs, π / 4)
         translate3d!(bs, [0, 80mm, 0])
-        lens2 = ThinLens(200mm, 200mm, 5mm, 1.5)
+        lens2 = ThinLens(200mm, 200mm, 5mm, ConstantRefractiveIndex(1.5))
         translate3d!(lens2, [0, 130mm, 0])
         solve_system!(System([lens, bs, lens2]), beam)
         @test length(BMO.children(beam)) == 2

@@ -5,7 +5,7 @@ const mm = 1e-3
 const µm = 1e-6
 
 λ = 1000e-9
-lens = SphericalLens(100mm, Inf, 1mm, 25.4mm, λ -> 1.5)
+lens = SphericalLens(100mm, Inf, 1mm, 25.4mm, ConstantRefractiveIndex(1.5))
 
 det = Detector(10mm)
 translate3d!(det, [0, 200mm + 0.13mm, 0])     # near best focus

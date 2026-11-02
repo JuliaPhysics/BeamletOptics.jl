@@ -315,8 +315,8 @@ end
         BMO.CylinderSDF(1e-3, 2e-3) + BMO.CylinderSDF(2e-3, 1e-3),  # composite SDF
         BMO.CubeMesh(1e-3),                                         # mesh
         RoundPlanoMirror(10e-3, 2e-3),                              # object (SingleShape)
-        CubeBeamsplitter(5e-3, λ -> 1.5),                           # object (MultiShape)
-        ObjectGroup([RoundPlanoMirror(10e-3, 2e-3), CubeBeamsplitter(5e-3, λ -> 1.5)]),
+        CubeBeamsplitter(5e-3, ConstantRefractiveIndex(1.5)),                           # object (MultiShape)
+        ObjectGroup([RoundPlanoMirror(10e-3, 2e-3), CubeBeamsplitter(5e-3, ConstantRefractiveIndex(1.5))]),
     ]
     for x in subjects
         translate3d!(x, [1e-3, 2e-3, 3e-3])

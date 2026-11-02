@@ -1,11 +1,49 @@
 """
+    AbstractRefractiveIndex
+
+A generic representation of the refractive index `n(λ)` of a material, passed as `n` to e.g.
+[`Lens`](@ref), [`Prism`](@ref) and the beamsplitters. See [`ConstantRefractiveIndex`](@ref),
+[`DiscreteRefractiveIndex`](@ref) and [`SellmeierEquation`](@ref).
+
+# Implementation reqs.
+
+Subtypes of `AbstractRefractiveIndex` must implement the following:
+
+## Functions
+
+- `(n::AbstractRefractiveIndex)(λ)`: returns the refractive index as a `Real` for the wavelength
+  `λ` in \\[m\\], for any `Real` type of `λ` within the domain of the model
+
+# Additional information
+
+!!! info "Domain"
+    A model may be defined for some wavelengths only, e.g. a [`DiscreteRefractiveIndex`](@ref)
+    only at its stored wavelengths.
+"""
+abstract type AbstractRefractiveIndex end
+
+(n::AbstractRefractiveIndex)(λ) = error(lazy"refractive index n(λ) not defined for $(typeof(n))")
+
+"""
+    ConstantRefractiveIndex{T}
+
+Represents a refractive index `n` that is the same for all wavelengths, i.e. without dispersion.
+Can be called like a function `n = n(λ)`.
+"""
+struct ConstantRefractiveIndex{T <: Real} <: AbstractRefractiveIndex
+    n::T
+end
+
+(cri::ConstantRefractiveIndex)(λ) = cri.n
+
+"""
     DiscreteRefractiveIndex{T}
 
 Represents a incomplete set of dispersion data where for each exact wavelength one refractive index value is stored in the `data` field.
 Can be called like a function `n = n(λ)`. Does not interpolate between data points.
-Refer to [`RefractiveIndex`](@ref) for more information.
+Refer to [`AbstractRefractiveIndex`](@ref) for more information.
 """
-struct DiscreteRefractiveIndex{T}
+struct DiscreteRefractiveIndex{T} <: AbstractRefractiveIndex
     data::Dict{T, T}
 end
 
@@ -30,34 +68,6 @@ end
 
 (dri::DiscreteRefractiveIndex)(λ) = dri.data[λ]
 
-"[`DiscreteRefractiveIndex`](@ref) passes test by default"
-test_refractive_index_function(::DiscreteRefractiveIndex) = nothing
-
-"""
-    test_refractive_index_function(input)
-
-Tests if `input` is callable with a single `Real` argument for the wavelength `λ` and
-returns a single `Real` value for the refractive index `n`.
-"""
-function test_refractive_index_function(input)
-    # Test function compat for the following types of λ
-    Ts = [Int, Float32, Float64]
-    try
-        for T in Ts
-            # Test if input accepts types
-            answer = input(one(T))
-            # Test if input returns single real value
-            if !isa(answer, Real)
-                error()
-            end
-        end
-    catch
-        error_msg = "Ref. index must be callable with a single Real argument and return a single real result."
-        throw(ArgumentError(error_msg))
-    end
-    return nothing
-end
-
 """
     SellmeierEquation
 
@@ -72,14 +82,14 @@ n_532 = NBK7(532e-9)
 
 !!! info
     When initializing this type, the data should be provided with the classic **μm-based coefficients**.
-    However, when calling the function, use SI-units, e.g. `532e-9` for 532 nm. 
+    However, when calling the function, use SI-units, e.g. `532e-9` for 532 nm.
 
 # Fields
 
 - `B1`, `B2`, `B3` : dimensionless Sellmeier coefficients.
 - `C1`, `C2`, `C3` : squared resonance wavelengths in μm².
 """
-struct SellmeierEquation{T<:Real}
+struct SellmeierEquation{T<:Real} <: AbstractRefractiveIndex
     B1::T
     B2::T
     B3::T
@@ -96,16 +106,3 @@ function (SE::SellmeierEquation)(λ)
              (SE.B3*λ^2)/(λ^2 - SE.C3)
     return sqrt(n²)
 end
-
-"""
-    RefractiveIndex
-
-Union type that represents valid means to pass a refractive index `n` to e.g. [`AbstractObject`](@ref)s.
-The core assumption is that:
-
-1. the refractive index is callable with a **single** `Number` argument `λ` to represent the wavelength in [m]
-2. the return value is a **single** `Number` value for the refractive index
-
-Refer to e.g. [`DiscreteRefractiveIndex`](@ref).
-"""
-const RefractiveIndex = Union{Function, DiscreteRefractiveIndex, SellmeierEquation}

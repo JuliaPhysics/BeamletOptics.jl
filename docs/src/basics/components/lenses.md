@@ -50,7 +50,7 @@ A [`Lens`](@ref) can be then constructed with the following function call:
 
 
 ```@docs; canonical=false
-Lens(::BeamletOptics.AbstractRotationallySymmetricSurface, ::BeamletOptics.AbstractRotationallySymmetricSurface, ::Real, ::BeamletOptics.RefractiveIndex)
+Lens(::BeamletOptics.AbstractRotationallySymmetricSurface, ::BeamletOptics.AbstractRotationallySymmetricSurface, ::Real, ::BeamletOptics.AbstractRefractiveIndex)
 ```
 
 ### Lens constructor example
@@ -77,6 +77,8 @@ LB1811 = Lens(
 ```
 
 ![Lens constructor](lens_constructor.png)
+
+The refractive index `n` is a [`BeamletOptics.AbstractRefractiveIndex`](@ref). For a material without dispersion pass a [`ConstantRefractiveIndex`](@ref), e.g. `ConstantRefractiveIndex(1.5)`; use a [`DiscreteRefractiveIndex`](@ref) or a [`SellmeierEquation`](@ref) whenever the result depends on the wavelength.
 
 ### SDF-based spherical lenses
 
@@ -145,7 +147,7 @@ L3 = Lens(
         1.5264e-5*(1e3)^15]     # coeffs
     ),
     0.7e-3,                     # center_thickness
-    n -> 1.580200               # refractive index
+    ConstantRefractiveIndex(1.580200) # refractive index
 )
 ```
 
@@ -169,7 +171,7 @@ ct = 5.9e-3 # center thickness
 lens = Lens(
     CylindricalSurface(r, d, h),
     ct,
-    n -> 1.517
+    ConstantRefractiveIndex(1.517)
 )
 ```
 
@@ -192,7 +194,7 @@ lens = Lens(
             [0, 1.1926075e-5*(1e3)^3, -2.9323497e-9*(1e3)^5, -1.8718889e-11*(1e3)^7, -1.7009961e-14*(1e3)^9, 3.5481542e-17*(1e3)^11, 6.5241296e-20*(1e3)^13]
         ),        
         7.5e-3,
-        n -> 1.777
+        ConstantRefractiveIndex(1.777)
     )
 ```
 
@@ -216,7 +218,7 @@ The following image shows the [AC254-150-AB](https://www.thorlabs.com/thorproduc
 Doublet lenses with aspherical surfaces, or with a different clear aperture per surface, are specified via the surface types introduced in the [Surface based lens construction](@ref) section.
 
 ```@docs; canonical=false
-DoubletLens(::BeamletOptics.AbstractRotationallySymmetricSurface, ::BeamletOptics.AbstractRotationallySymmetricSurface, ::BeamletOptics.AbstractRotationallySymmetricSurface, ::Real, ::Real, ::BeamletOptics.RefractiveIndex, ::BeamletOptics.RefractiveIndex)
+DoubletLens(::BeamletOptics.AbstractRotationallySymmetricSurface, ::BeamletOptics.AbstractRotationallySymmetricSurface, ::BeamletOptics.AbstractRotationallySymmetricSurface, ::Real, ::Real, ::BeamletOptics.AbstractRefractiveIndex, ::BeamletOptics.AbstractRefractiveIndex)
 ```
 
 ## Triplet lenses

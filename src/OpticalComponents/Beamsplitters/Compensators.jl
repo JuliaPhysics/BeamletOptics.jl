@@ -10,9 +10,9 @@ The compensator is aligned with the positive y-axis. The first surface lies at t
 - `width`: compensator width along the x-axis in [m]
 - `height`: compensator height along the z-axis in [m]
 - `thickness`: compensator thickness along the y-axis in [m]
-- `n`: the [`RefractiveIndex`](@ref) of the substrate
+- `n`: the [`AbstractRefractiveIndex`](@ref) of the substrate
 """
-function RectangularCompensatorPlate(width::W, height::H, thickness::T, n::RefractiveIndex) where {W<:Real,H<:Real,T<:Real}
+function RectangularCompensatorPlate(width::W, height::H, thickness::T, n::AbstractRefractiveIndex) where {W<:Real,H<:Real,T<:Real}
     shape = CuboidMesh(width, thickness, height)
     translate3d!(shape, [
         -width/2,
@@ -23,4 +23,3 @@ function RectangularCompensatorPlate(width::W, height::H, thickness::T, n::Refra
     return Prism(shape, n)
 end
 
-RectangularCompensatorPlate(w::Real, h::Real, t::Real, n::Real) = RectangularCompensatorPlate(w, h, t, λ->n)

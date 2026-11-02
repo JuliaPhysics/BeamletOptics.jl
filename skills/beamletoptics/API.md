@@ -7,7 +7,7 @@ using BeamletOptics
 const mm = 1e-3
 
 # 1. build components (at the origin, aligned with +y)
-lens = SphericalLens(50mm, -50mm, 5mm, 25.4mm, λ -> 1.5)
+lens = SphericalLens(50mm, -50mm, 5mm, 25.4mm, ConstantRefractiveIndex(1.5))
 det  = Detector(20mm)
 
 # 2. place them (relative moves, radians)
@@ -36,7 +36,7 @@ Use `scripts/api_lookup.jl NAME` to print the docstring and signatures of any na
 | Rays & beams  | `Ray`, `PolarizedRay`, `Beam`, `GaussianBeamlet`, `AstigmaticGaussianBeamlet`, `rays`, `point_on_beam`, `path_segments`, `rayleigh_range`, `normal3d` |
 | Sources       | `CollimatedSource`, `UniformDiscSource`, `PointSource`, `UniformPointSource`, `UniformLineSource`, `UniformFanSource`, `num_rays!`, `CollimatedGaussianBeamletSource`, `SphericalGaussianBeamletSource`, `EllipticalGaussianBeamletSource`, `GaussianBeamletDecomposition`, `WavefrontBeamletDecomposition`, `GaussianModeDecomposition`, `AstigmaticBeamGroup` |
 | System        | `System`, `StaticSystem`, `solve_system!`, `initialize!`, `ObjectGroup` |
-| Materials     | `DiscreteRefractiveIndex`, `SellmeierEquation` |
+| Materials     | `DiscreteRefractiveIndex`, `SellmeierEquation`, `ConstantRefractiveIndex` |
 | Lenses        | `Lens`, `ThinLens`, `SphericalLens`, `DoubletLens`, `SphericalDoubletLens`, `TripletLens`, `SphericalTripletLens`, `thickness` |
 | Surfaces      | `SphericalSurface`, `CircularFlatSurface`, `RectangularFlatSurface`, `EvenAsphericalSurface`, `CylindricalSurface`, `AcylindricalSurface` |
 | Mirrors       | `Mirror`, `RoundPlanoMirror`, `SquarePlanoMirror`, `SquarePlanoMirror2D`, `RectangularPlanoMirror`, `RightAnglePrismMirror`, `SphericalMirror`, `ConicMirror`, `OffAxisConicMirror`, `ParabolicMirror`, `OffAxisParabolicMirror`, `EllipsoidalMirror`, `OffAxisEllipsoidalMirror`, `HyperbolicMirror`, `OffAxisHyperbolicMirror`, `Retroreflector` |

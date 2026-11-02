@@ -14,7 +14,7 @@ LB1811 = Lens(
     SphericalSurface(r1, inch),
     SphericalSurface(r2, inch),
     l, 
-    n -> 1.5
+    ConstantRefractiveIndex(1.5)
 )
 
 translate3d!(LB1811, [0, 10mm, 0])

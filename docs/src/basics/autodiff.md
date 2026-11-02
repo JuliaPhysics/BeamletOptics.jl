@@ -18,7 +18,7 @@ using BeamletOptics, ForwardDiff
 # x coordinate of the spot behind a lens that is shifted laterally by `dx`
 function spot_x(dx)
     T = typeof(dx)
-    lens = SphericalLens(T(50e-3), T(-50e-3), T(5e-3), T(25e-3), _ -> T(1.5))
+    lens = SphericalLens(T(50e-3), T(-50e-3), T(5e-3), T(25e-3), ConstantRefractiveIndex(T(1.5)))
     translate3d!(lens, [dx, zero(T), zero(T)])
     pd = Detector(T(40e-3))
     translate3d!(pd, T[0, 0.1, 0])
@@ -31,7 +31,7 @@ ForwardDiff.derivative(spot_x, 0.0)   # ≈ 1.90
 ```
 
 The parameter can enter anywhere: the pose of a component (`translate3d!`, `rotate3d!`), its
-geometry (radii, thicknesses), a refractive index (e.g. `_ -> n0` for the parameter `n0`) or a
+geometry (radii, thicknesses), a refractive index (e.g. `ConstantRefractiveIndex(n0)` for the parameter `n0`) or a
 source. Many parameters at once are differentiated with `ForwardDiff.gradient` or
 `ForwardDiff.jacobian`.
 

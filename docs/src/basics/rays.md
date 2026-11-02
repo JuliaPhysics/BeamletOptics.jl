@@ -14,7 +14,7 @@ Individual monochromatic rays form the basic building blocks to describe the pro
 \vec{x}(t) = \vec{p} + t \cdot \vec{d}
 ```
 
-where ``\vec{p}`` and ``\vec{d}`` are the position and direction ``\mathbb{R}^3``-vectors, respectively. The ray length ``t`` is used to describe the geometrical length of the ray. This assumes that the [`BeamletOptics.RefractiveIndex`](@ref) along the ray path is constant. If after solving an optical system a ray intersection is determined, a new ray must be spawned to model an arbitrary light path. This data is stored, e.g., in a [`Beam`](@ref). More on this can be found in the [Beams](@ref) chapter. 
+where ``\vec{p}`` and ``\vec{d}`` are the position and direction ``\mathbb{R}^3``-vectors, respectively. The ray length ``t`` is used to describe the geometrical length of the ray. This assumes that the [`BeamletOptics.AbstractRefractiveIndex`](@ref) along the ray path is constant. If after solving an optical system a ray intersection is determined, a new ray must be spawned to model an arbitrary light path. This data is stored, e.g., in a [`Beam`](@ref). More on this can be found in the [Beams](@ref) chapter. 
 
 !!! tip "Moving rays"
     A ray can be translated and rotated directly via [`translate3d!`](@ref)/[`rotate3d!`](@ref) and friends, but is more commonly moved indirectly as part of a [`Beam`](@ref) or [`BeamletOptics.AbstractBeamGroup`](@ref). Refer to [Moving sources](@ref) for the full kinematic API and its reset semantics.
