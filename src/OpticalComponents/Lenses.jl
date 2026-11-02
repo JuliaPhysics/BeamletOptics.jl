@@ -172,7 +172,7 @@ _signed_edge_sag(s::SphericalSurface, sd) = sign(radius(s)) * edge_sag(s, sd)
 _signed_edge_sag(s::CylindricalSurface, sd) = sign(radius(s)) * edge_sag(s, sd)
 
 """
-     Lens(front_surface::AbstractRotationallySymmetricSurface, back_surface::AbstractRotationallySymmetricSurface, center_thickness::Real, n::RefractiveIndex)
+     Lens(front_surface::AbstractRotationallySymmetricSurface, back_surface::AbstractRotationallySymmetricSurface, center_thickness::Real, n)
 
 Constructs a new [`Lens`](@ref) object using the surface specifications `front_surface` and
 `back_surface` and the `center_thickness`. These inputs are used to construct a [`UnionSDF`](@ref)
@@ -322,7 +322,7 @@ function Lens(front_surface::CircularFlatSurface, back_surface::CircularFlatSurf
 end
 
 """
-     Lens(front_surface::AbstractCylindricalSurface, back_surface::AbstractCylindricalSurface, center_thickness::Real, n::RefractiveIndex)
+     Lens(front_surface::AbstractCylindricalSurface, back_surface::AbstractCylindricalSurface, center_thickness::Real, n)
 
 Constructs a new [`Lens`](@ref) object using the cylindric surface specifications `front_surface` and
 `back_surface` and the `center_thickness`. These inputs are used to construct a [`UnionSDF`](@ref)

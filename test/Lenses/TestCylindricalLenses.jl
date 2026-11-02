@@ -100,6 +100,19 @@ const mm = 1e-3
         # test lens thickness
         @test thickness(lens) ≈ ct
     end
+
+    @testset "Number as refractive index" begin
+        cyl = CylindricalSurface(5.2mm, 10mm, 20mm)
+        for lens in (
+                Lens(CylindricalSurface(50mm, 10mm, 20mm), CylindricalSurface(-50mm, 10mm, 20mm),
+                    2mm, 1.517),
+                Lens(cyl, 5.9mm, 1.517),
+                Lens(RectangularFlatSurface(10mm), RectangularFlatSurface(10mm), 2mm, 1.517))
+            @test BMO.refractive_index(lens) == ConstantRefractiveIndex(1.517)
+        end
+        # same back focal length as the closure above
+        @test working_distance(Lens(cyl, 5.9mm, 1.517), 0.05 * 10mm / 2) ≈ 6.1mm atol=1e-4
+    end
 end
 
 end # MODULE

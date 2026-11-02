@@ -76,9 +76,9 @@ LB1811 = Lens(
 )
 ```
 
-Every constructor that takes a refractive index also accepts a plain number, e.g. `1.5`, for a material without dispersion. It is stored as a [`ConstantRefractiveIndex`](@ref). Use a [`DiscreteRefractiveIndex`](@ref) or a [`SellmeierEquation`](@ref) whenever the result depends on the wavelength.
-
 ![Lens constructor](lens_constructor.png)
+
+Every constructor that takes a refractive index also accepts a plain number, e.g. `1.5`, for a material without dispersion. It is stored as a [`ConstantRefractiveIndex`](@ref). Use a [`DiscreteRefractiveIndex`](@ref) or a [`SellmeierEquation`](@ref) whenever the result depends on the wavelength.
 
 ### SDF-based spherical lenses
 

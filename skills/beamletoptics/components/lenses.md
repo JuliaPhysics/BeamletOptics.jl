@@ -50,7 +50,7 @@ Cylindrical surfaces (curved in one direction, extruded over `height`):
 
 ```julia
 A = [0, A4 * 1e3^3, A6 * 1e3^5, A8 * 1e3^7, A10 * 1e3^9]
-AL75150 = Lens(EvenAsphericalSurface(76.68mm, 75mm, -0.675, A), 15mm, λ -> 1.5006520430)
+AL75150 = Lens(EvenAsphericalSurface(76.68mm, 75mm, -0.675, A), 15mm, 1.5006520430)
 ```
 
 Aspheres are experimental. A meniscus whose center thickness does not exceed the sagitta of its convex
@@ -72,7 +72,7 @@ surface. Cylindrical surfaces are not supported (`MethodError`).
 ```julia
 # doublet with an aspherical front surface, A as above
 dl = DoubletLens(EvenAsphericalSurface(50mm, 25.4mm, -0.8, A), SphericalSurface(-40mm, 25.4mm),
-    SphericalSurface(-200mm, 25.4mm), 8mm, 3mm, λ -> 1.6456, λ -> 1.7168)
+    SphericalSurface(-200mm, 25.4mm), 8mm, 3mm, 1.6456, 1.7168)
 ```
 
 ## Multi-element lenses from parts

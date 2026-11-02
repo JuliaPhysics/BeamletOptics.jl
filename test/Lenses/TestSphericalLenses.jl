@@ -81,6 +81,8 @@ const mm = 1e-3
         @test BMO.refractive_index(SphericalLens(50mm, -50mm, 5mm)) isa ConstantRefractiveIndex
         @test BMO.refractive_index(ThinLens(50mm, -50mm, BMO.inch, 1.5)) isa ConstantRefractiveIndex
         @test BMO.refractive_index(Lens(sphere(50mm), 5mm, 1.5)) isa ConstantRefractiveIndex
+        flat = CircularFlatSurface(BMO.inch)
+        @test BMO.refractive_index(Lens(flat, flat, 5mm, 1.5)) isa ConstantRefractiveIndex
         dl = DoubletLens(sphere(50mm), sphere(-40mm), sphere(100mm), 6mm, 3mm, 1.5, λ -> 1.7)
         @test BMO.refractive_index(dl.front) isa ConstantRefractiveIndex
         tl = TripletLens(sphere(50mm), sphere(-40mm), sphere(100mm), sphere(-60mm), 8mm, 3mm, 6mm,

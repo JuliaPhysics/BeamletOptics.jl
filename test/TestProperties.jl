@@ -70,6 +70,9 @@ prop(props, name) = (i = findfirst(p -> p.first == name, props); isnothing(i) ? 
         @test prop(props, "n(λ₀)") ≈ 1.5
         @test prop(props, "λ₀ [m]") == get_default_wavelength()
         @test prop(props, "Index model") == "function of λ"
+        props = BMO.properties(SphericalLens(50e-3, -50e-3, 5e-3, 25.4e-3, 1.5))
+        @test prop(props, "Index model") == "ConstantRefractiveIndex"
+        @test prop(props, "n(λ₀)") == 1.5
         glass = DiscreteRefractiveIndex([1e-6, 2e-6], [1.5, 1.4])
         @test prop(BMO.properties(SphericalLens(50e-3, -50e-3, 5e-3, 25.4e-3, glass)), "Index model") ==
               "DiscreteRefractiveIndex"
