@@ -15,7 +15,7 @@ prism = Prism([(0.0, 0.0), (30e-3, 0.0), (0.0, 17.32e-3)], 20e-3, NBK7)
 ```
 
 ```@docs; canonical=false
-Prism(::AbstractVector, ::Real, ::BeamletOptics.RefractiveIndex)
+Prism(::AbstractVector, ::Real, ::Any)
 BeamletOptics.PolygonPrismSDF
 ```
 
@@ -24,7 +24,7 @@ BeamletOptics.PolygonPrismSDF
 The [`EquilateralPrism`](@ref) is centered at the centroid of its triangle with the apex along +y and is the classic dispersing prism. A ray traversing it symmetrically at minimum deviation is deflected by ``\delta = 2\arcsin(n \sin(\alpha/2)) - \alpha`` with the apex angle ``\alpha = 60^\circ``. The [`DovePrism`](@ref) is a trapezoid with 45° end faces whose long axis is the y-axis. The [`RightAnglePrism`](@ref) has its legs along x and y.
 
 ```@docs; canonical=false
-EquilateralPrism(::Real, ::Real, ::BeamletOptics.RefractiveIndex)
-DovePrism(::Real, ::Real, ::Real, ::BeamletOptics.RefractiveIndex)
-RightAnglePrism(::Real, ::Real, ::BeamletOptics.RefractiveIndex)
+EquilateralPrism(::Real, ::Real, ::Any)
+DovePrism(::Real, ::Real, ::Real, ::Any)
+RightAnglePrism(::Real, ::Real, ::Any)
 ```

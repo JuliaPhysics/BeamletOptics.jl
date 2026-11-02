@@ -280,6 +280,14 @@ const BMO = BeamletOptics
             @test_throws ArgumentError DiscreteRefractiveIndex([1], [1, 2])
         end
 
+        @testset "ConstantRefractiveIndex" begin
+            cri = ConstantRefractiveIndex(1.5)
+            @test cri isa BMO.RefractiveIndex
+            @test all(cri(λ) == 1.5 for λ in (1, 1f0, 532e-9))
+            @test ConstantRefractiveIndex(1.5f0)(532e-9) isa Float32
+            @test isnothing(BMO.test_refractive_index_function(cri))
+        end
+
         @testset "SellmeierEquation" begin
             # Known reference index for fused silica at 500 nm
             @test isapprox(ref_sellm(500e-9), 1.4623, atol=3e-5)

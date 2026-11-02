@@ -59,6 +59,19 @@ function test_refractive_index_function(input)
 end
 
 """
+    ConstantRefractiveIndex{T}
+
+Represents a refractive index `n` that is the same for all wavelengths, i.e. without dispersion.
+Can be called like a function `n = n(λ)`. Constructors that take a [`RefractiveIndex`](@ref) store
+a plain number `n` as `ConstantRefractiveIndex(n)`.
+"""
+struct ConstantRefractiveIndex{T <: Real}
+    n::T
+end
+
+(cri::ConstantRefractiveIndex)(λ) = cri.n
+
+"""
     SellmeierEquation
 
 A parametric type representing the **six-coefficient Sellmeier equation** for a transparent dielectric material.
@@ -106,6 +119,8 @@ The core assumption is that:
 1. the refractive index is callable with a **single** `Number` argument `λ` to represent the wavelength in [m]
 2. the return value is a **single** `Number` value for the refractive index
 
-Refer to e.g. [`DiscreteRefractiveIndex`](@ref).
+Refer to e.g. [`DiscreteRefractiveIndex`](@ref), [`SellmeierEquation`](@ref) and
+[`ConstantRefractiveIndex`](@ref). Constructors of optical components also accept a plain number
+`n` and store it as a [`ConstantRefractiveIndex`](@ref).
 """
-const RefractiveIndex = Union{Function, DiscreteRefractiveIndex, SellmeierEquation}
+const RefractiveIndex = Union{Function, DiscreteRefractiveIndex, SellmeierEquation, ConstantRefractiveIndex}

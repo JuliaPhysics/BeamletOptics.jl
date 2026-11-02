@@ -193,6 +193,7 @@ const mm = 1e-3
             t = transmission_axis(lp)
             @test norm(t) ≈ 1
             @test abs(dot(t, [1, 0, 0])) ≈ 1 atol = 1e-12
+            @test BMO.refractive_index(RoundLinearPolarizer(25.4mm, 1.6mm, 1.6mm, 1.5), 1e-6) == 1.5
 
             for θ in 0:15:180
                 lp2 = RoundLinearPolarizer(25.4mm, 1.6mm, 1.6mm, n)

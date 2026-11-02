@@ -50,7 +50,7 @@ A [`Lens`](@ref) can be then constructed with the following function call:
 
 
 ```@docs; canonical=false
-Lens(::BeamletOptics.AbstractRotationallySymmetricSurface, ::BeamletOptics.AbstractRotationallySymmetricSurface, ::Real, ::BeamletOptics.RefractiveIndex)
+Lens(::BeamletOptics.AbstractRotationallySymmetricSurface, ::BeamletOptics.AbstractRotationallySymmetricSurface, ::Real, ::Any)
 ```
 
 ### Lens constructor example
@@ -75,6 +75,8 @@ LB1811 = Lens(
     NBK7
 )
 ```
+
+Every constructor that takes a refractive index also accepts a plain number, e.g. `1.5`, for a material without dispersion. It is stored as a [`ConstantRefractiveIndex`](@ref). Use a [`DiscreteRefractiveIndex`](@ref) or a [`SellmeierEquation`](@ref) whenever the result depends on the wavelength.
 
 ![Lens constructor](lens_constructor.png)
 
@@ -216,7 +218,7 @@ The following image shows the [AC254-150-AB](https://www.thorlabs.com/thorproduc
 Doublet lenses with aspherical surfaces, or with a different clear aperture per surface, are specified via the surface types introduced in the [Surface based lens construction](@ref) section.
 
 ```@docs; canonical=false
-DoubletLens(::BeamletOptics.AbstractRotationallySymmetricSurface, ::BeamletOptics.AbstractRotationallySymmetricSurface, ::BeamletOptics.AbstractRotationallySymmetricSurface, ::Real, ::Real, ::BeamletOptics.RefractiveIndex, ::BeamletOptics.RefractiveIndex)
+DoubletLens(::BeamletOptics.AbstractRotationallySymmetricSurface, ::BeamletOptics.AbstractRotationallySymmetricSurface, ::BeamletOptics.AbstractRotationallySymmetricSurface, ::Real, ::Real, ::Any, ::Any)
 ```
 
 ## Triplet lenses

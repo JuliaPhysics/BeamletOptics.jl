@@ -131,6 +131,12 @@ const mm = 1e-3
         @test prism isa Prism
         @test BMO.refractive_index(prism, 1e-6) == N0
         @test BMO.refractive_index(prism, 500e-9) == N0
+        @test BMO.refractive_index(prism) isa ConstantRefractiveIndex
+        for substrate in (RectangularPlateBeamsplitter(25e-3, 25e-3, 5e-3, N0).substrate,
+                RoundPlateBeamsplitter(25e-3, 5e-3, N0).substrate,
+                RectangularCompensatorPlate(25e-3, 25e-3, 5e-3, N0))
+            @test BMO.refractive_index(substrate) == ConstantRefractiveIndex(N0)
+        end
 
         cbs = CubeBeamsplitter(25e-3, N0; reflectance = 0.3)
         @test BMO.refractive_index(cbs, 1e-6) == N0

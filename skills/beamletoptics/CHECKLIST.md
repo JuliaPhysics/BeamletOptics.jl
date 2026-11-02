@@ -3,7 +3,7 @@
 ## Correctness
 
 - [ ] All lengths and wavelengths in **meters** (`532e-9`, not `532`); angles in **radians** (`deg2rad`).
-- [ ] Refractive indices are callables of λ (`λ -> 1.5`, `SellmeierEquation`, `DiscreteRefractiveIndex`).
+- [ ] Refractive indices are `SellmeierEquation`, `DiscreteRefractiveIndex`, a function of λ, or a number (constant, no dispersion); a number only where dispersion does not matter.
 - [ ] `DiscreteRefractiveIndex` contains the exact wavelength of every source (no interpolation).
 - [ ] Lens radius signs follow ISO 10110 (biconvex: `r1 > 0`, `r2 < 0`).
 - [ ] Geometry assumes +y as the optical axis; rotations are cumulative and relative.

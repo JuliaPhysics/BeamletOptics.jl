@@ -35,7 +35,7 @@ Plate beamsplitters provide a more sophisticated model by incorporating a substr
 The [`RectangularPlateBeamsplitter`](@ref) represents a planar, rectangular substrate with a partially reflective coating. 
 
 ```@docs; canonical=false
-RectangularPlateBeamsplitter(::Real, ::Real, ::Real, ::BeamletOptics.RefractiveIndex)
+RectangularPlateBeamsplitter(::Real, ::Real, ::Real, ::Any)
 ```
 
 A common application involves that this type of beamsplitter is paired with a compensator plate. Below an exemplary illustration of such a setup is shown, where the beamsplitter reflects part of the incoming beam perpendiculary. A [`RectangularCompensatorPlate`](@ref) ensures that the parallel path offset is corrected.
@@ -49,7 +49,7 @@ The depicted system consist of a rectangular beamsplitter (e.g. [BSW26R](https:/
 This variant uses a circular substrate. While components of this type often feature a wedge angle to avoid "ghost beams" in practice, e.g. the [BSW26](https://www.thorlabs.com/thorproduct.cfm?partnumber=BSW26), this is not modeled here.
 
 ```@docs; canonical=false
-RoundPlateBeamsplitter(::Real, ::Real, ::BeamletOptics.RefractiveIndex)
+RoundPlateBeamsplitter(::Real, ::Real, ::Any)
 ```
 
 ## Cube beamsplitter
@@ -57,7 +57,7 @@ RoundPlateBeamsplitter(::Real, ::Real, ::BeamletOptics.RefractiveIndex)
 The [`CubeBeamsplitter`](@ref) is composed of two [`RightAnglePrism`](@ref)s with a partially reflective interface at their internal joint. The splitting interface is represented by a [`ThinBeamsplitter`](@ref). As with other beamsplitters in this package, the cube beamsplitter uses scalar reflection and transmission coefficients.
 
 ```@docs; canonical=false
-CubeBeamsplitter(::Real, ::BeamletOptics.RefractiveIndex)
+CubeBeamsplitter(::Real, ::Any)
 ```
 
 A classic application of cube beamsplitters is in Mach–Zehnder interferometers, where two beamsplitters combine with additional mirrors to form two optical paths that later recombine. The figure below shows a rudimentary Mach–Zehnder arrangement using two cube beamsplitters and two [`RightAnglePrismMirror`](@ref)s:

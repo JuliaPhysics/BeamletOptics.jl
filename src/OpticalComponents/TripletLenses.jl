@@ -60,9 +60,9 @@ along +y by `l1` and `l1 + l2`, so that neighbouring elements share the cemented
 - `l1`: first lens center thickness in m
 - `l2`: second lens center thickness in m
 - `l3`: third lens center thickness in m
-- `n1`: first lens [`RefractiveIndex`](@ref)
-- `n2`: second lens [`RefractiveIndex`](@ref)
-- `n3`: third lens [`RefractiveIndex`](@ref)
+- `n1`: first lens [`RefractiveIndex`](@ref), or a number for a constant refractive index
+- `n2`: second lens [`RefractiveIndex`](@ref), or a number for a constant refractive index
+- `n3`: third lens [`RefractiveIndex`](@ref), or a number for a constant refractive index
 
 # Additional information
 
@@ -88,9 +88,9 @@ function TripletLens(
         l1::Real,
         l2::Real,
         l3::Real,
-        n1::RefractiveIndex,
-        n2::RefractiveIndex,
-        n3::RefractiveIndex)
+        n1,
+        n2,
+        n3)
     # Generate "cemented" front, middle and back lenses that share the surfaces s2 and s3
     front = Lens(s1, s2, l1, n1)
     middle = Lens(s2, s3, l2, n2)
@@ -118,9 +118,9 @@ For radii sign definition, refer to the [`SphericalLens`](@ref) constructor.
 - `l2`: second lens thickness
 - `l3`: third lens thickness
 - `d`: lens diameter
-- `n1`: first lens [`RefractiveIndex`](@ref)
-- `n2`: second lens [`RefractiveIndex`](@ref)
-- `n3`: third lens [`RefractiveIndex`](@ref)
+- `n1`: first lens [`RefractiveIndex`](@ref), or a number for a constant refractive index
+- `n2`: second lens [`RefractiveIndex`](@ref), or a number for a constant refractive index
+- `n3`: third lens [`RefractiveIndex`](@ref), or a number for a constant refractive index
 
 # Additional information
 

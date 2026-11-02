@@ -76,6 +76,32 @@ const mm = 1e-3
         end
     end
 
+    @testset "Number as refractive index" begin
+        sphere(r) = SphericalSurface(r, BMO.inch)
+        @test BMO.refractive_index(SphericalLens(50mm, -50mm, 5mm)) isa ConstantRefractiveIndex
+        @test BMO.refractive_index(ThinLens(50mm, -50mm, BMO.inch, 1.5)) isa ConstantRefractiveIndex
+        @test BMO.refractive_index(Lens(sphere(50mm), 5mm, 1.5)) isa ConstantRefractiveIndex
+        dl = DoubletLens(sphere(50mm), sphere(-40mm), sphere(100mm), 6mm, 3mm, 1.5, λ -> 1.7)
+        @test BMO.refractive_index(dl.front) isa ConstantRefractiveIndex
+        tl = TripletLens(sphere(50mm), sphere(-40mm), sphere(100mm), sphere(-60mm), 8mm, 3mm, 6mm,
+            1.5, 1.6, 1.5)
+        @test all(BMO.refractive_index(l) isa ConstantRefractiveIndex for l in BMO.shape(tl))
+        # a number traces exactly like the equivalent closure, also on a moved lens
+        function trace_moved_lens(n)
+            lens = SphericalLens(50mm, -50mm, 5mm, BMO.inch, n)
+            zrotate3d!(lens, deg2rad(10))
+            translate3d!(lens, [1mm, 20mm, -2mm])
+            beam = Beam(Ray([0, -0.05, 5mm], [0, 1, 0], 1e-6))
+            solve_system!(System(lens), beam)
+            return last(rays(beam)), length(rays(beam))
+        end
+        r_number, num_rays = trace_moved_lens(1.5)
+        r_closure, _ = trace_moved_lens(λ -> 1.5)
+        @test num_rays == 3
+        @test position(r_number) == position(r_closure)
+        @test direction(r_number) == direction(r_closure)
+    end
+
     @testset "Testing lens constructor" begin
         # Test against Thorlab spherical lenses
         r1 = 34.9mm

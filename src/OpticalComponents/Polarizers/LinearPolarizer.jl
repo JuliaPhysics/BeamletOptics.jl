@@ -57,7 +57,7 @@ of the given `diameter`, flush against the film on both sides.
 - `diameter`: outer diameter of the film and substrates in [m]
 - `front_thickness`: thickness of the front glass substrate in [m]
 - `back_thickness`: thickness of the back glass substrate in [m]
-- `n`: [`RefractiveIndex`](@ref) of both glass substrates
+- `n`: [`RefractiveIndex`](@ref) of both glass substrates, or a number for a constant refractive index
 
 # Keywords
 
@@ -70,7 +70,7 @@ The component is centered on the film (local origin); the front substrate extend
 along local +y. The film transmits along local x and blocks local z.
 """
 function RoundLinearPolarizer(diameter::Real, front_thickness::Real, back_thickness::Real,
-        n::RefractiveIndex; cutoff_strength = eps())
+        n; cutoff_strength = eps())
     front_thickness > 0 || throw(ArgumentError("front_thickness must be positive"))
     back_thickness > 0 || throw(ArgumentError("back_thickness must be positive"))
 

@@ -1,11 +1,12 @@
 # Refractive index / materials
 
 A refractive index is anything of type
-`RefractiveIndex = Union{Function, DiscreteRefractiveIndex, SellmeierEquation}`. It must be callable as
-`n(λ)` with **λ in meters** and return a real number. Plain numbers are **not** accepted.
+`RefractiveIndex = Union{Function, DiscreteRefractiveIndex, SellmeierEquation, ConstantRefractiveIndex}`.
+It must be callable as `n(λ)` with **λ in meters** and return a real number. Every constructor that
+takes `n` also accepts a plain number and stores it as `ConstantRefractiveIndex(n)` (no dispersion).
 
 ```julia
-n_const = λ -> 1.5                                    # constant index
+n_const = 1.5                                         # constant index, same as ConstantRefractiveIndex(1.5)
 
 NBK7 = DiscreteRefractiveIndex([532e-9, 1064e-9],     # exact lookup table,
                                [1.5195, 1.5066])      # NO interpolation: any other λ -> KeyError
@@ -17,5 +18,7 @@ N_BK7(532e-9)                                         # still called with meters
 
 - Coefficients from refractiveindex.info or glass catalogs (µm-based) go straight into `SellmeierEquation`.
 - The surrounding medium is always n = 1.
+- A constant index ignores dispersion. Use `SellmeierEquation` or `DiscreteRefractiveIndex` whenever the
+  result depends on λ (several wavelengths, chromatic focal shift, prisms for dispersion).
 - Constructors validate the index by calling it with `1`, `1f0` and `1.0`, so closures must accept any `Real`.
 - Materials are used by lenses, prisms, plate/cube beamsplitters, compensator plates and linear polarizers.

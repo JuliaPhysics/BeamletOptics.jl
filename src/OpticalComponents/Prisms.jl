@@ -13,6 +13,8 @@ struct Prism{T, S <: AbstractShape{T}, N <: RefractiveIndex} <: AbstractRefracti
     end
 end
 
+Prism(shape::AbstractShape, n::Real) = Prism(shape, ConstantRefractiveIndex(n))
+
 thickness(p::Prism) = thickness(shape(p))
 
 """
@@ -28,11 +30,10 @@ and the hypotenuse passes through the local origin, see [`RightAnglePrismSDF`](@
 - `height`: extent along the local z-axis in [m]
 - `n`: [`RefractiveIndex`](@ref) of the prism, or a number for a constant refractive index
 """
-function RightAnglePrism(leg_length::Real, height::Real, n::RefractiveIndex)
+function RightAnglePrism(leg_length::Real, height::Real, n)
     shape = RightAnglePrismSDF(leg_length, height)
     return Prism(shape, n)
 end
-RightAnglePrism(leg_length::Real, height::Real, n::Real) = RightAnglePrism(leg_length, height, λ -> n)
 
 """
     Prism(vertices, height, n)
@@ -50,10 +51,9 @@ for the geometry. See also [`EquilateralPrism`](@ref) and [`DovePrism`](@ref).
 - `height`: extent along the local z-axis in [m], the prism is centered at `z = 0`
 - `n`: [`RefractiveIndex`](@ref) of the prism, or a number for a constant refractive index
 """
-function Prism(vertices::AbstractVector, height::Real, n::RefractiveIndex)
+function Prism(vertices::AbstractVector, height::Real, n)
     return Prism(PolygonPrismSDF(vertices, height), n)
 end
-Prism(vertices::AbstractVector, height::Real, n::Real) = Prism(vertices, height, λ -> n)
 
 """
     EquilateralPrism(side, height, n)
@@ -69,12 +69,11 @@ minimum deviation is deflected towards the base.
 - `height`: extent along the local z-axis in [m]
 - `n`: [`RefractiveIndex`](@ref) of the prism, or a number for a constant refractive index
 """
-function EquilateralPrism(side::Real, height::Real, n::RefractiveIndex)
+function EquilateralPrism(side::Real, height::Real, n)
     side > 0 || throw(ArgumentError("the side length must be positive"))
     r = side * sqrt(oftype(float(side), 3)) / 6 # inradius
     return Prism([(-side / 2, -r), (side / 2, -r), (zero(r), 2r)], height, n)
 end
-EquilateralPrism(side::Real, height::Real, n::Real) = EquilateralPrism(side, height, λ -> n)
 
 """
     DovePrism(length, aperture, height, n)
@@ -92,10 +91,9 @@ cross-section's bounding box.
 - `height`: extent along the local z-axis in [m]
 - `n`: [`RefractiveIndex`](@ref) of the prism, or a number for a constant refractive index
 """
-function DovePrism(length::Real, aperture::Real, height::Real, n::RefractiveIndex)
+function DovePrism(length::Real, aperture::Real, height::Real, n)
     aperture > 0 || throw(ArgumentError("the aperture must be positive"))
     length > 2aperture || throw(ArgumentError("the length must be larger than twice the aperture"))
     a, l = aperture / 2, length / 2
     return Prism([(-a, -l), (a, -(l - aperture)), (a, l - aperture), (-a, l)], height, n)
 end
-DovePrism(length::Real, aperture::Real, height::Real, n::Real) = DovePrism(length, aperture, height, λ -> n)
