@@ -18,6 +18,7 @@ The following functions allow a posteriori evaluation of hit contributions via e
 Refer to the respective function documentation.
 
 - [`spot_diagram`](@ref)
+- [`ray_hits`](@ref)
 - [`electric_field`](@ref)
 - [`intensity`](@ref)
 
@@ -82,8 +83,14 @@ Spawns a quadratic [`Detector`](@ref) surface that is aligned with the neg. y-ax
 The detector edge length can be configured via `edge_length`.
 Additionally, continued tracing can be configured via the `stop` flag where
 
-- `false` indicates continued tracing
+- `false` indicates continued tracing: rays and beamlets pass the detector as a thin layer,
+  unchanged within one medium and refracted on a boundary between two media
 - `true` stops the incoming beams as with any hard target
+
+!!! warning "Partly clipped beamlets"
+    A beamlet whose rays hit the detector only partly ends there, as at any other object, also
+    with `stop = false`. To sample a beamlet on an intermediate plane, make the detector larger
+    than the beamlet.
 """
 function Detector(edge_length::Real, stop::Bool = true)
     shape = QuadraticFlatMesh(edge_length)
@@ -168,25 +175,16 @@ function interact3d(system::AbstractSystem, d::Detector, beam::Beam{T, R},
     return cross_boundary(system, beam, ray)
 end
 
-function interact3d(::AbstractSystem, d::Detector, g::GaussianBeamlet{R}, id::Int) where {R}
+function interact3d(system::AbstractSystem, d::Detector, g::GaussianBeamlet, id::Int)
     push!(d, GaussianBeamletHit(g, id))
-    if stop(d)
-        # Stop solver (hard target)
-        return nothing
-    else
-        # Continue tracing # FIXME
-        throw(ErrorException("Continued tracing for GaussianBeamlet not yet implemented."))
-    end
+    # Stop solver (hard target) or pass with all component rays
+    stop(d) && return nothing
+    return cross_boundary(system, g, id)
 end
 
-function interact3d(system::AbstractSystem, d::Detector,
-        agb::AstigmaticGaussianBeamlet{R}, id::Int) where {R}
+function interact3d(system::AbstractSystem, d::Detector, agb::AstigmaticGaussianBeamlet, id::Int)
     push!(d, AstigmaticGaussianBeamletHit(agb, id))
-    if stop(d)
-        # Stop solver (hard target)
-        return nothing
-    else
-        # Continue tracing # FIXME
-        throw(ErrorException("Continued tracing for AstigmaticGaussianBeamlet not yet implemented."))
-    end
+    # Stop solver (hard target) or pass with all component rays
+    stop(d) && return nothing
+    return cross_boundary(system, agb, id)
 end

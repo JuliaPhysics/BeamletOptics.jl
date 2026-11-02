@@ -91,6 +91,21 @@ The following image shows the spot diagram of a Sonnar lens. Two [`CollimatedSou
 
 ![Sonnar spot diagram showcase](sonnar_spot_diagram.png)
 
+## Ray directions
+
+Where a ray crossed the detector is half of what it carries; [`ray_hits`](@ref) also returns the direction in which it went, both in the coordinates of the detector. The angle of each ray to the detector normal over its distance from the detector center shows, for example, how far a beam is from collimated:
+
+```julia
+using LinearAlgebra: norm
+pts, dirs = ray_hits(pd)
+r = norm.(pts)                                   # distance from the detector center [m]
+θ = [atan(hypot(d[1], d[3]), abs(d[2])) for d in dirs] # angle to the normal [rad], either side
+```
+
+```@docs; canonical=false
+ray_hits
+```
+
 ## Field distributions
 
 Alternatively, the detector data can also be used to reconstruct electric field distributions of incoming beams on its surface using coherent addition. Three readouts build on each other: [`electric_field`](@ref) is the coherent sum of the fields of all hits, [`intensity`](@ref) the flux of the Poynting vector of that field through the detector, and [`optical_power`](@ref) the integral of the intensity. Their definitions follow.
@@ -116,7 +131,7 @@ The following diagram shows how a readout turns a sampling into points and evalu
 ```mermaid
 flowchart TB
     R(["<b>electric_field</b> / <b>intensity</b> / <b>optical_power</b><br/>(pd, sampling = RegularGrid())"]) --> SP["<b>sample_points</b>(pd, sampling)"]
-    SP -- RegularGrid --> RG["<b>RegularGrid</b><br/>window around the hits<br/>via calc_local_lims"]
+    SP -- RegularGrid --> RG["<b>RegularGrid</b><br/>window around the hits via calc_local_lims,<br/>active surface without hits"]
     SP -- RectilinearGrid --> RL["<b>RectilinearGrid</b><br/>points xs × zs,<br/>trapezoidal weights"]
     SP -- "own AbstractDetectorSampling" --> OWN["own <b>sample_points</b> method"]
     RG -- "own hit type, unless an<br/>AbstractRayHit or AbstractBeamletHit" --> LIM["own <b>calc_local_lims</b>(pd, hits, crop_factor) methods"]
@@ -129,6 +144,7 @@ flowchart TB
     IH -- "PolarizedRayHit,<br/>AstigmaticGaussianBeamletHit" --> IV["vector form<br/>½ Re[(E × H*) · n̂]"]
     IH -- "RayHit,<br/>GaussianBeamletHit" --> IS["scalar form<br/>½ Re[E* F]"]
     IH -- "own hit type" --> OWNI["own <b>intensity</b>(hits, p, n̂) method"]
+    PT -- "no hits: hits(pd) = nothing" --> ZERO["zero field and flux<br/>at every point"]
     SUM --> EF["<b>electric_field</b>(hit, p)<br/>direction(hit), refractive_index(hit)"]
     IV --> EF
     IS --> EF
@@ -140,7 +156,7 @@ flowchart TB
     classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
     classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
     class SP,RG,RL,DS purple
-    class PT,SUM,IH,IV,IS blue
+    class PT,SUM,IH,IV,IS,ZERO blue
     class OWN,LIM,OWNI,EF green
     class R,RET,OP terminal
 ```
@@ -198,7 +214,7 @@ The diagram shows how the constructors share one sampling of the hits and how th
 
 ```mermaid
 flowchart TB
-    DET(["<b>PlaneField</b>(detector; size, spacing)"]) --> DH["<b>_detector_hits</b>(detector)<br/>error if the detector has no hits"]
+    DET(["<b>PlaneField</b>(detector; size, spacing)"]) --> DH["<b>hits</b>(detector)<br/>ArgumentError if the detector has no hits"]
     DET -- "default axes" --> DA["<b>default_plane_axes</b>(detector)<br/>u from <b>local_axes</b>, n = −<b>direction</b>"]
     BEAM(["<b>PlaneField</b>(beamlet, id; size, spacing,<br/>origin, axes)"]) --> OH["one <b>GaussianBeamletHit</b> or<br/><b>AstigmaticGaussianBeamletHit</b><br/>(beamlet, id)"]
     DH --> PH

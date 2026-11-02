@@ -208,6 +208,27 @@ function calc_local_lims(
 end
 
 """
+    calc_local_lims(pd::Detector, ::Nothing, crop_factor; center=Centroid())
+
+The window of a [`Detector`](@ref) without hits: the bounding box of its active surface in
+local coordinates. `crop_factor` and `center` are ignored, since there are no hits to scale or
+center on.
+"""
+function calc_local_lims(
+        pd::Detector{T},
+        ::Nothing,
+        crop_factor;
+        # kwargs
+        center::AbstractCenterAlgorithm=Centroid()
+    ) where T
+    corners = Point3{T}.(eachrow(vertices(shape(pd))))
+    local_corners = calc_local_pos(position(pd), local_axes(pd)..., corners)
+    xs = getindex.(local_corners, 1)
+    zs = getindex.(local_corners, 2)
+    return minimum(xs), maximum(xs), minimum(zs), maximum(zs)
+end
+
+"""
     calc_local_lims(pd::Detector, hits::Vector{<:AbstractRayHit}, crop_factor; center=Centroid())
 
 Compute a symmetric [x_min,x_max]×[z_min,z_max] box around the hit positions weighted centroid for ray-based spot diagrams.

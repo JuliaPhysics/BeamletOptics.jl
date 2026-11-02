@@ -147,7 +147,7 @@ end
 
 @testset "PlaneField: errors" begin
     # a detector without hits
-    @test_throws ErrorException PlaneField(detector_at(zdet); size = (8, 8), spacing = (1e-5, 1e-5))
+    @test_throws ArgumentError PlaneField(detector_at(zdet); size = (8, 8), spacing = (1e-5, 1e-5))
 
     # ray hits
     det = trace!(detector_at(zdet), BMO.Beam(BMO.Ray([0.0, 0, 0], [0.0, 1.0, 0.0], λ)))
