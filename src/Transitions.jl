@@ -362,22 +362,43 @@ function interact3d(::AbstractSystem, model::AbstractSurfaceModel, ::Transition,
     return nothing
 end
 
-# Each component ray of the beamlet interacts with the model at its own hit, map unrolls the
-# heterogeneous tuple of component beams
+# Each component ray of the beamlet interacts with the model at its own hit
 function interact3d(system::AbstractSystem, model::AbstractSurfaceModel, ::Transition,
         beamlet::GaussianBeamlets, ray_id::Int)
-    interactions = map(_component_beams(beamlet)) do b
+    return beamlet_interaction(beamlet) do b
         ray = rays(b)[ray_id]
         interact3d(system, model, transition(system, ray), b, ray)
     end
+end
+
+"""
+    interact3d(system, ::SingleShape, object, beamlet, ray_id)
+
+The interaction of a [`GaussianBeamlet`](@ref) or an [`AstigmaticGaussianBeamlet`](@ref) with an
+`object` without a beamlet method of its own. A thin layer with a model (see [`surface_model`](@ref))
+hands the beamlet to its model, which may split it, e.g. a [`BeamsplitterCoating`](@ref). Any other
+object interacts with each component ray, e.g. a body refracts each at its own hit. A
+[`MultiShape`](@ref) object hands the beamlet to the part that the chief ray hits.
+"""
+function interact3d(system::AbstractSystem, ::SingleShape, object::AbstractObject,
+        beamlet::GaussianBeamlets, ray_id::Int)
+    isnothing(surface_model(object)) ||
+        return interact3d(system, transition(system, beamlet, ray_id), beamlet, ray_id)
+    return beamlet_interaction(b -> interact3d(system, object, b, rays(b)[ray_id]), beamlet)
+end
+
+# The interaction of a beamlet from the interaction `f(b)` of each component beam `b`, or `nothing`
+# if one of them ends; map unrolls the heterogeneous tuple of component beams. `F` forces
+# specialization on `f`, which is only passed on to `map`
+function beamlet_interaction(f::F, beamlet::GaussianBeamlets) where {F}
+    interactions = map(f, _component_beams(beamlet))
     any(isnothing, interactions) && return nothing
     return beamlet_interaction(beamlet, interactions)
 end
 
-# The interaction of a beamlet from the interactions of its component rays
-beamlet_interaction(::GaussianBeamlet{R}, interactions) where {R} =
+beamlet_interaction(::GaussianBeamlet{R}, interactions::Tuple) where {R} =
     GaussianBeamletInteraction{R}(interactions...)
-beamlet_interaction(::AstigmaticGaussianBeamlet{R}, interactions) where {R} =
+beamlet_interaction(::AstigmaticGaussianBeamlet{R}, interactions::Tuple) where {R} =
     AstigmaticGaussianBeamletInteraction{R}(interactions...)
 
 """
@@ -413,9 +434,9 @@ surface_model(::Nothing) = nothing
     interact3d(system, t::Transition, beam, at)
 
 The interaction of the `beam` at the boundary of the transition `t`, at its ray `at` (see
-[`transition`](@ref)): the [`surface_model`](@ref) of the boundary acts. Bodies and thin layers hand
-their rays and beamlets here, e.g.
-`interact3d(system, ::MyLayer, beam, at) = interact3d(system, transition(system, beam, at), beam, at)`.
+[`transition`](@ref)): the [`surface_model`](@ref) of the boundary acts. Bodies and thin layers without
+an `interact3d` method of their own interact here, an own method may call it, e.g. a [`Detector`](@ref)
+that does not stop the ray.
 """
 interact3d(system::AbstractSystem, t::Transition, beam::AbstractBeam, at::Union{AbstractRay, Int}) =
     interact3d(system, surface_model(t), t, beam, at)

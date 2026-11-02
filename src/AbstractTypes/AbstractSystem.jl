@@ -27,7 +27,10 @@ kinematic_trait_of(::AbstractSystem) = Static()
     interact3d(::AbstractSystem, object::AbstractObject, beam::AbstractBeam, at)
 
 Defines the optical interaction between an incoming/outgoing beam/ray of light and an optical element, must return an [`AbstractInteraction`](@ref) or `nothing`.
-The default behavior is that no interaction occurs, i.e. return of `nothing`, which should stop the system tracing procedure.
+Without a method of its own, a body (see [`medium`](@ref)) or a thin layer with a model (see
+[`surface_model`](@ref)) acts at the boundary at its hit, see `interact3d(system, t::Transition, beam, at)`:
+a new body or thin layer declares its medium or model and needs no `interact3d` method. Any other
+object warns and returns `nothing`, which stops the beam.
 Refer to the [`AbstractInteraction`](@ref) typedocs for more information on the return type value.
 
 The media on both sides of the boundary at the hit are given by [`transition`](@ref)`(system, ray)`,
@@ -44,10 +47,14 @@ interact3d(system::AbstractSystem, object::AbstractObject, beam::AbstractBeam,
         at::Union{AbstractRay, Int}) =
     interact3d(system, shape_trait_of(object), object, beam, at)
 
-function interact3d(::AbstractSystem, ::SingleShape, object::AbstractObject, ::AbstractBeam,
+# A body or a thin layer acts at the boundary, see `surface_model`; any other object blocks the beam
+function interact3d(system::AbstractSystem, ::SingleShape, object::AbstractObject, beam::AbstractBeam,
         ray::AbstractRay)
-    warn_no_interact3d(shape_trait_of(object), object, ray)
-    return nothing
+    if isnothing(medium(object)) && isnothing(surface_model(object))
+        warn_no_interact3d(shape_trait_of(object), object, ray)
+        return nothing
+    end
+    return interact3d(system, transition(system, ray), beam, ray)
 end
 
 function interact3d(system::AbstractSystem, ::MultiShape, object::AbstractObject,
@@ -58,8 +65,9 @@ function interact3d(system::AbstractSystem, ::MultiShape, object::AbstractObject
 end
 
 # Warning of the interact3d fallback
-warn_no_interact3d(::AbstractShapeTrait, object, ray) =
-    @warn lazy"No interact3d method defined for:" ObjectType = typeof(object) RayType = typeof(ray)
+warn_no_interact3d(::AbstractShapeTrait, object, ray) = @warn lazy"""
+    No interact3d method defined for $(nameof(typeof(object))): define interact3d, or declare its
+    medium (a body) or surface_model (a thin layer).""" RayType = typeof(ray)
 warn_no_interact3d(::MultiShape, object, ray) = @warn lazy"""
     No interact3d method defined for the MultiShape object $(nameof(typeof(object))).
     Its parts are plain shapes: define interact3d for it, or build it from objects with

@@ -28,7 +28,8 @@ Evaluate every API and architecture decision against this. The core principles, 
    tool for component authors, never a requirement placed on the user.
 
 **The extension promise:** a developer defines a new `AbstractObject` subtype and its
-`interact3d(system, object, beam, ray)` method (plus `intersect3d` if it needs custom geometry,
+`interact3d(system, object, beam, ray)` method, or for a body or thin layer only its `medium` or
+`surface_model` (plus `intersect3d` if it needs custom geometry,
 optionally `bounding_sphere_of` to make misses of that geometry cheap, and `initialize!` if it
 stores data during a solve), and the rest of the API (kinematics, threading) works without
 further integration. A component may also add `card_rows` (and `card_actions`) for its card in
@@ -151,8 +152,9 @@ options are keywords (`num_rings`, `M2`). Argument order: context, actor, carrie
 conventionally named fields (`pos`, `dir`, `shape`, `n`, `λ`, `beams`); siblings name the same
 thing the same way, and code outside a type reads through the getter. Every interface verb has a
 fallback on the abstract type, never a bare `function f end`: a missing required hook throws
-`error(lazy"<verb> not defined for $(typeof(x))")`; `interact3d` without a method warns and
-returns `nothing` (the object blocks the beam); a setter for irrelevant state returns `nothing`.
+`error(lazy"<verb> not defined for $(typeof(x))")`; `interact3d` without a method lets a body
+(`medium`) or thin layer (`surface_model`) act at the boundary, any other object warns and returns
+`nothing` (it blocks the beam); a setter for irrelevant state returns `nothing`.
 
 **T2 · Types carry information.** Fields are concrete: a type parameter for a field that would
 otherwise be abstract, no `::Real`, `::Function`, `::Union{Nothing, Real}` or untyped `Vector`
@@ -175,7 +177,9 @@ only if the method ignores it or passes it on unchecked.
 
 **D2 · Choose behavior by dispatch.** No `isa`, `typeof` comparisons, `hasmethod`,
 `haskey(kwargs, ...)` or Bool pseudo-traits to pick a code path. `isnothing` in plain control
-flow and `isa` in input validation that throws are fine.
+flow and `isa` in input validation that throws are fine. So is a fallback that asks the hooks a
+type declares (the `interact3d` fallback asks `isnothing(medium(x)) && isnothing(surface_model(x))`):
+the hook is the question, a trait would duplicate it (D3).
 
 **D3 · Traits `<question>_of(x)` for questions across the hierarchy.** Trait values are empty
 singletons without a `Trait` suffix; the public verb passes the trait as the first argument to

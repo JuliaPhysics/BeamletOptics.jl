@@ -91,7 +91,8 @@ assembly is used:
   beamlet methods of the part (detectors, beamsplitters).
 - Media and boundaries (not exported, may still change): a body declares its medium with
   `BeamletOptics.medium(x::MyBody) = BeamletOptics.IsotropicMedium(n)` (every `AbstractRefractiveOptic`
-  has one). In an own `interact3d`, `t = BeamletOptics.transition(system, ray)` holds the media on both
+  has one), a thin layer its model with `BeamletOptics.surface_model(x::MyLayer)`; neither needs an
+  own `interact3d`. In an own `interact3d`, `t = BeamletOptics.transition(system, ray)` holds the media on both
   sides of the hit (`BeamletOptics.refractive_index_in(t)`, `BeamletOptics.refractive_index_out(t)` at
   the ray's wavelength) and the thin layer at it; `BeamletOptics.interact3d(system, t, beam, ray)`
   lets the boundary act: refraction or total reflection, or the model of a thin layer at it. A

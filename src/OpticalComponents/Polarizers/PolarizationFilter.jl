@@ -84,16 +84,6 @@ function surface_model(pf::PolarizationFilter)
     return JonesFilm(R * static_data(pf.JMat) * transpose(R), pf.cutoff)
 end
 
-"""
-    interact3d(system::AbstractSystem, pf::PolarizationFilter, beam, at)
-
-A [`PolarizationFilter`](@ref) is a thin layer: its [`JonesFilm`](@ref) acts at the boundary on which
-it lies, see [`surface_model`](@ref).
-"""
-interact3d(system::AbstractSystem, ::PolarizationFilter, beam::AbstractBeam,
-        at::Union{AbstractRay, Int}) =
-    interact3d(system, transition(system, beam, at), beam, at)
-
 function interact3d(::AbstractSystem, film::JonesFilm, t::Transition, beam::Beam{T, R},
         ray::R) where {T <: Real, R <: PolarizedRay{T}}
     is_totally_reflected(ray, t) && return cross_boundary(t, beam, ray)

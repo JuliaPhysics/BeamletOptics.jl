@@ -1293,13 +1293,23 @@ struct CountingFilm{S <: BMO.AbstractShape{Float64}} <: BMO.AbstractObject{Float
     model::CountingModel
 end
 BMO.surface_model(film::CountingFilm) = film.model
-BMO.interact3d(system::BMO.AbstractSystem, ::CountingFilm, beam::BMO.AbstractBeam,
-    at::Union{BMO.AbstractRay, Int}) = BMO.interact3d(system, BMO.transition(system, beam, at), beam, at)
+
+# A dummy body that declares only its medium
+struct GlassBlock{S <: BMO.AbstractShape{Float64}} <: BMO.AbstractObject{Float64}
+    shape::S
+end
+BMO.medium(::GlassBlock) = BMO.IsotropicMedium(1.5)
 
 @testset "A thin layer carries the surface model of the boundary" begin
     θ = deg2rad(25)
     p, d = [0, -10mm, 0], [sin(θ), cos(θ), 0]
     plate() = RectangularCompensatorPlate(40mm, 40mm, 5mm, λ -> 1.5)
+    # A body that declares only its medium refracts as a refracting optic
+    block = GlassBlock(BMO.shape(plate()))
+    block_beam = solve([block], beam_at(p, d))
+    plate_beam = solve([plate()], beam_at(p, d))
+    @test length(rays(block_beam)) == length(rays(plate_beam))
+    @test all(BMO.direction(a) ≈ BMO.direction(b) for (a, b) in zip(rays(block_beam), rays(plate_beam)))
     film = CountingFilm(BMO.QuadraticFlatMesh(40mm), CountingModel(0))
     # The model of the layer acts at the face of the plate, between air and glass
     t = transition_at(System([plate(), film]), p, d)

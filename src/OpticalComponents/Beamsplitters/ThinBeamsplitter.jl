@@ -1,13 +1,32 @@
 """
+    BeamsplitterCoating{T} <: AbstractSurfaceModel
+
+A lossless, non-polarizing coating that splits a ray into a transmitted and a reflected beam with the
+field factors `reflectance` and `transmittance` (R² + T² = 1). It acts between the media of the
+boundary, see [`Transition`](@ref): the transmitted beam is refracted into the medium behind it, e.g.
+the substrate that it is coated on, the reflected beam stays in the medium before it. Beyond the
+critical angle of these media, the ray is totally reflected and not split.
+
+A [`ThinBeamsplitter`](@ref) carries this coating, see [`surface_model`](@ref).
+"""
+struct BeamsplitterCoating{T <: Real} <: AbstractSurfaceModel
+    reflectance::T
+    transmittance::T
+end
+
+reflectance(coating::BeamsplitterCoating) = coating.reflectance
+transmittance(coating::BeamsplitterCoating) = coating.transmittance
+
+"""
     ThinBeamsplitter <: AbstractBeamsplitter
 
-Represents a 2D beam-splitting device.
+Represents a 2D beam-splitting device: a thin layer whose [`BeamsplitterCoating`](@ref) acts at the
+boundary on which it lies, see [`surface_model`](@ref).
 
 # Fields
 
 - `shape`: 2D [`AbstractShape`](@ref) at which the splitting process occurs (e.g. a 2D-[`Mesh`](@ref))
-- `reflectance`: scalar reflection factor
-- `transmittance`: scalar transmission factor
+- `coating`: the [`BeamsplitterCoating`](@ref) with the field factors `reflectance` and `transmittance`
 
 !!! warning
     Note that the `transmittance` should be calculated from an input `reflectance` in order
@@ -15,18 +34,18 @@ Represents a 2D beam-splitting device.
 """
 struct ThinBeamsplitter{T <: Real, S <: AbstractShape{T}} <: AbstractBeamsplitter{T}
     shape::S
-    reflectance::T
-    transmittance::T
+    coating::BeamsplitterCoating{T}
 end
 
 # The factors in the number type of the `shape`, e.g. of a shape built from dual numbers for
 # automatic differentiation w.r.t. its pose, while the reflectance is a `Float64`
 function ThinBeamsplitter(shape::AbstractShape{T}, reflectance::Real, transmittance::Real) where {T}
-    return ThinBeamsplitter{T, typeof(shape)}(shape, T(reflectance), T(transmittance))
+    return ThinBeamsplitter{T, typeof(shape)}(shape, BeamsplitterCoating(T(reflectance), T(transmittance)))
 end
 
-reflectance(bs::ThinBeamsplitter) = bs.reflectance
-transmittance(bs::ThinBeamsplitter) = bs.transmittance
+surface_model(bs::ThinBeamsplitter) = bs.coating
+reflectance(bs::ThinBeamsplitter) = reflectance(surface_model(bs))
+transmittance(bs::ThinBeamsplitter) = transmittance(surface_model(bs))
 
 """
     ThinBeamsplitter(width, height; reflectance=0.5)
@@ -78,26 +97,6 @@ end
 
 Base.isvalid(bs::AbstractBeamsplitter) = reflectance(bs)^2 + transmittance(bs)^2 ≈ 1
 
-"""
-    BeamsplitterCoating{T} <: AbstractSurfaceModel
-
-A lossless, non-polarizing coating that splits a ray into a transmitted and a reflected beam with the
-field factors `reflectance` and `transmittance` (R² + T² = 1). It acts between the media of the
-boundary, see [`Transition`](@ref): the transmitted beam is refracted into the medium behind it, e.g.
-the substrate that it is coated on, the reflected beam stays in the medium before it. Beyond the
-critical angle of these media, the ray is totally reflected and not split.
-
-A [`ThinBeamsplitter`](@ref) carries this coating, see [`surface_model`](@ref).
-"""
-struct BeamsplitterCoating{T <: Real} <: AbstractSurfaceModel
-    reflectance::T
-    transmittance::T
-end
-
-reflectance(coating::BeamsplitterCoating) = coating.reflectance
-transmittance(coating::BeamsplitterCoating) = coating.transmittance
-
-surface_model(bs::ThinBeamsplitter) = BeamsplitterCoating(reflectance(bs), transmittance(bs))
 
 @inline function _beamsplitter_transmitted_beam(
         ::BeamsplitterCoating, ::Beam{T, R}, ray::R) where {T <: Real, R <: Ray{T}}
@@ -176,16 +175,6 @@ Sets the medium of the first ray `child` of the reflected beam of a coating: the
 boundary of the transition `t`.
 """
 reflect!(child::AbstractRay, t::Transition) = refractive_index!(child, refractive_index_in(t))
-
-"""
-    interact3d(system::AbstractSystem, bs::ThinBeamsplitter, beam, at)
-
-A [`ThinBeamsplitter`](@ref) is a thin layer: its [`BeamsplitterCoating`](@ref) acts at the boundary
-on which it lies, see [`surface_model`](@ref).
-"""
-interact3d(system::AbstractSystem, ::ThinBeamsplitter, beam::AbstractBeam,
-        at::Union{AbstractRay, Int}) =
-    interact3d(system, transition(system, beam, at), beam, at)
 
 """
     interact3d(system, coating::BeamsplitterCoating, t::Transition, beam::Beam, ray)

@@ -267,7 +267,7 @@ BeamletOptics.BeamsplitterCoating
 BeamletOptics.JonesFilm
 ```
 
-A new refracting component declares its body via `medium` and needs no `interact3d` method of its own if it subtypes `AbstractRefractiveOptic`. A new thin layer declares its model via `surface_model(layer::MyLayer)` and hands its rays and beamlets to the boundary with `interact3d(system, ::MyLayer, beam, at) = interact3d(system, transition(system, beam, at), beam, at)`, like the [`ThinBeamsplitter`](@ref). New physics at a boundary is a new `AbstractSurfaceModel`.
+A new refracting component declares its body via `medium`, a new thin layer its model via `surface_model(layer::MyLayer)`, like the [`ThinBeamsplitter`](@ref). Neither needs an `interact3d` method: without one, a body or a thin layer interacts at the boundary, and a beamlet at a thin layer is handed to its model, which may split it. An object that is neither, e.g. a mirror, implements `interact3d`. New physics at a boundary is a new `AbstractSurfaceModel`.
 
 The `interact3d` return type limits the interface to only accepting one new `beam` segment per interaction at the moment. After e.g. a lens surface air-to-glass interaction, the most likely next step is the refraction at the glass-to-air surface of the same lens. An interaction can tell the solver so with a `Hint`, which speeds up the next intersection.
 

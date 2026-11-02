@@ -17,7 +17,12 @@ Subtypes of `AbstractRefractiveOptic` should implement all supertype reqs. as we
 
 ## Functions
 
-- `interact3d`: the interaction logic should be akin to [`refraction3d`](@ref) for each surface crossing
+- `interact3d`: optional. Without a method, the optic is a body of the medium [`medium`](@ref): the
+  [`transition`](@ref) at the hit gives the media on both sides, the optic, the system medium, or
+  another optic that touches the surface, e.g. the other lens of a cemented doublet, and the
+  [`surface_model`](@ref) of the boundary acts between them. An uncoated surface refracts, or totally
+  reflects beyond the critical angle, see [`cross_boundary`](@ref). A beamlet interacts with each of its
+  component rays.
 
 # Additional information
 
@@ -42,23 +47,6 @@ function refractive_index(object::AbstractRefractiveOptic{T, <:RefractiveIndex},
 end
 
 medium(optic::AbstractRefractiveOptic) = IsotropicMedium(refractive_index(optic))
-
-"""
-    interact3d(AbstractSystem, AbstractRefractiveOptic, Beam, AbstractRay)
-
-Implements the interaction of a [`Ray`](@ref) or a [`PolarizedRay`](@ref) at a surface of a refracting
-optic: the [`transition`](@ref) at the hit gives the media on both sides, the optic, the system
-medium, or another optic that touches the surface, e.g. the other lens of a cemented doublet. The
-[`surface_model`](@ref) of the boundary acts between them. For an uncoated surface, the ray is
-refracted, or totally reflected beyond the critical angle (see [`cross_boundary`](@ref)); a
-[`PolarizedRay`](@ref) is transmitted with the [`fresnel_coefficients`](@ref), stray light is not tracked.
-
-The method is typed loosely in the beam and the ray, such that the own `interact3d` method of a subtype
-takes precedence, e.g. `interact3d(system, ::MyOptic, ::Beam, ::AbstractRay)`. A beamlet interacts
-with each of its component rays, see `interact3d(system, ::SingleShape, object, beamlet, ray_id)`.
-"""
-interact3d(system::AbstractSystem, ::AbstractRefractiveOptic, beam::Beam, ray::AbstractRay) =
-    interact3d(system, transition(system, ray), beam, ray)
 
 """
     Lens{T, S <: AbstractShape{T}, N <: RefractiveIndex} <: AbstractRefractiveOptic{T, N}

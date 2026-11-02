@@ -280,35 +280,6 @@ function hint!(i::AstigmaticGaussianBeamletInteraction, new_hint::Nullable{Hint}
     hint!(i.chief, new_hint)
 end
 
-"""
-    interact3d(system, ::SingleShape, object, agb::AstigmaticGaussianBeamlet, ray_id)
-
-Generic dispatch: traces each component beam's ray through `object` independently.
-Returns `nothing` if any interaction fails; otherwise returns an
-[`AstigmaticGaussianBeamletInteraction`](@ref). A [`MultiShape`](@ref) object hands the beamlet to the
-part that the chief ray hits, see the [`GaussianBeamlet`](@ref).
-"""
-function interact3d(system::AbstractSystem,
-        ::SingleShape,
-        object::AbstractObject,
-        agb::AstigmaticGaussianBeamlet{R},
-        ray_id::Int) where {R}
-    i_c = interact3d(system, object, agb.c, rays(agb.c)[ray_id])
-    i_wxp = interact3d(system, object, agb.wxp, rays(agb.wxp)[ray_id])
-    i_wxm = interact3d(system, object, agb.wxm, rays(agb.wxm)[ray_id])
-    i_wyp = interact3d(system, object, agb.wyp, rays(agb.wyp)[ray_id])
-    i_wym = interact3d(system, object, agb.wym, rays(agb.wym)[ray_id])
-    i_dxp = interact3d(system, object, agb.dxp, rays(agb.dxp)[ray_id])
-    i_dxm = interact3d(system, object, agb.dxm, rays(agb.dxm)[ray_id])
-    i_dyp = interact3d(system, object, agb.dyp, rays(agb.dyp)[ray_id])
-    i_dym = interact3d(system, object, agb.dym, rays(agb.dym)[ray_id])
-    if any(isnothing, (i_c, i_wxp, i_wxm, i_wyp, i_wym, i_dxp, i_dxm, i_dyp, i_dym))
-        return nothing
-    end
-    return AstigmaticGaussianBeamletInteraction{R}(
-        i_c, i_wxp, i_wxm, i_wyp, i_wym, i_dxp, i_dxm, i_dyp, i_dym)
-end
-
 function Base.push!(agb::AstigmaticGaussianBeamlet{T},
         interaction::AstigmaticGaussianBeamletInteraction{T}) where {T}
     push!(agb.c, interaction.chief)
