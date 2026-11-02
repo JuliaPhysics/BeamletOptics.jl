@@ -9,7 +9,7 @@ Subtypes of `AbstractRefractiveOptic` should implement all supertype reqs. as we
 
 ## Fields
 
-- `n`: a callable field which returns the [`RefractiveIndex`](@ref) for a wavelength `λ`
+- `n`: the [`AbstractRefractiveIndex`](@ref) of the material, called as `n(λ)`
 
 ## Getters/setters
 
@@ -37,7 +37,7 @@ abstract type AbstractRefractiveOptic{T, F} <: AbstractObject{T} end
 refractive_index(object::AbstractRefractiveOptic) = object.n
 # The result is converted to the number type of the optic and the wavelength, since `n` may be any
 # function: e.g. a `ForwardDiff.Dual` within automatic differentiation, else `Float64`.
-function refractive_index(object::AbstractRefractiveOptic{T, <:RefractiveIndex}, λ::L) where {T, L <: Real}
+function refractive_index(object::AbstractRefractiveOptic{T, <:AbstractRefractiveIndex}, λ::L) where {T, L <: Real}
     return convert(promote_type(T, L), object.n(λ))::promote_type(T, L)
 end
 
@@ -128,34 +128,31 @@ function interact3d(system::AbstractSystem, optic::AbstractRefractiveOptic,
 end
 
 """
-    Lens{T, S <: AbstractShape{T}, N <: RefractiveIndex} <: AbstractRefractiveOptic{T, N}
+    Lens{T, S <: AbstractShape{T}, N <: AbstractRefractiveIndex} <: AbstractRefractiveOptic{T, N}
 
-Represents an uncoated `Lens` with a homogeneous [`RefractiveIndex`](@ref) `n = n(λ)`.
+Represents an uncoated `Lens` with a homogeneous [`AbstractRefractiveIndex`](@ref) `n = n(λ)`.
 Refer to the [`Lens`](@ref) and [`SphericalLens`](@ref) constructors for more information on how to generate lenses.
 
 # Fields
 
 - `shape`: geometry of the lens, refer to [`AbstractShape`](@ref) for more information
-- `n`: [`RefractiveIndex`](@ref) function that returns n(λ)
+- `n`: [`AbstractRefractiveIndex`](@ref) of the lens material
 
 # Additional information
 
 !!! info "Refractive index"
-    The chromatic dispersion of the lens is represented by a λ-dependent function for `n`
-    and must be provided by the user. A number, e.g. `1.5`, is stored as a
-    [`ConstantRefractiveIndex`](@ref), i.e. the lens has the same refractive index for all wavelengths.
+    The chromatic dispersion of the lens is represented by the [`AbstractRefractiveIndex`](@ref) `n`,
+    e.g. a [`SellmeierEquation`](@ref). A [`ConstantRefractiveIndex`](@ref) gives the lens the same
+    refractive index for all wavelengths.
 """
-struct Lens{T, S <: AbstractShape{T}, N <: RefractiveIndex} <: AbstractRefractiveOptic{T, N}
+struct Lens{T, S <: AbstractShape{T}, N <: AbstractRefractiveIndex} <: AbstractRefractiveOptic{T, N}
     shape::S
     n::N
     function Lens(
-            shape::S, n::N) where {T <: Real, S <: AbstractShape{T}, N <: RefractiveIndex}
-        test_refractive_index_function(n)
+            shape::S, n::N) where {T <: Real, S <: AbstractShape{T}, N <: AbstractRefractiveIndex}
         return new{T, S, N}(shape, n)
     end
 end
-
-Lens(shape::AbstractShape, n::Real) = Lens(shape, ConstantRefractiveIndex(n))
 
 thickness(l::Lens) = thickness(shape(l))
 
@@ -172,13 +169,13 @@ _signed_edge_sag(s::SphericalSurface, sd) = sign(radius(s)) * edge_sag(s, sd)
 _signed_edge_sag(s::CylindricalSurface, sd) = sign(radius(s)) * edge_sag(s, sd)
 
 """
-     Lens(front_surface::AbstractRotationallySymmetricSurface, back_surface::AbstractRotationallySymmetricSurface, center_thickness::Real, n)
+     Lens(front_surface::AbstractRotationallySymmetricSurface, back_surface::AbstractRotationallySymmetricSurface, center_thickness::Real, n::AbstractRefractiveIndex)
 
 Constructs a new [`Lens`](@ref) object using the surface specifications `front_surface` and
 `back_surface` and the `center_thickness`. These inputs are used to construct a [`UnionSDF`](@ref)
 that consists of the appropriate sub-SDFs to represent the shape of the lens.
 
-The material is supplied via the [`RefractiveIndex`](@ref) `n`, or a number for a constant refractive index.
+The material is supplied via the [`AbstractRefractiveIndex`](@ref) `n`.
 
 # Additional information
 
@@ -193,7 +190,7 @@ function Lens(
         front_surface::AbstractRotationallySymmetricSurface,
         back_surface::AbstractRotationallySymmetricSurface,
         center_thickness::Real,
-        n)
+        n::AbstractRefractiveIndex)
     # Define effective (optical and mechanical) diameters:
     d_mid = min(diameter(front_surface), diameter(back_surface))
     md_mid = max(mechanical_diameter(front_surface), mechanical_diameter(back_surface))
@@ -302,7 +299,7 @@ function Lens(
 end
 
 function Lens(front_surface::AbstractRotationallySymmetricSurface,
-        center_thickness::Real, n)
+        center_thickness::Real, n::AbstractRefractiveIndex)
     Lens(
         front_surface,
         CircularFlatSurface(diameter(front_surface)),
@@ -312,7 +309,7 @@ function Lens(front_surface::AbstractRotationallySymmetricSurface,
 end
 
 function Lens(front_surface::CircularFlatSurface, back_surface::CircularFlatSurface,
-        center_thickness::Real, n)
+        center_thickness::Real, n::AbstractRefractiveIndex)
     d_mid = min(diameter(front_surface), diameter(back_surface))
 
     return Lens(
@@ -322,7 +319,7 @@ function Lens(front_surface::CircularFlatSurface, back_surface::CircularFlatSurf
 end
 
 """
-     Lens(front_surface::AbstractCylindricalSurface, back_surface::AbstractCylindricalSurface, center_thickness::Real, n)
+     Lens(front_surface::AbstractCylindricalSurface, back_surface::AbstractCylindricalSurface, center_thickness::Real, n::AbstractRefractiveIndex)
 
 Constructs a new [`Lens`](@ref) object using the cylindric surface specifications `front_surface` and
 `back_surface` and the `center_thickness`. These inputs are used to construct a [`UnionSDF`](@ref)
@@ -332,7 +329,7 @@ This method of `Lens` is specific for cylindric lenses and has some limitations:
     - The cylinder height of both surfaces has to be identical
     - No mixture with non-cylindric surfaces is supported at the moment
 
-The material is supplied via the [`RefractiveIndex`](@ref) `n`, or a number for a constant refractive index.
+The material is supplied via the [`AbstractRefractiveIndex`](@ref) `n`.
 
 # Additional information
 
@@ -343,7 +340,7 @@ function Lens(
         front_surface::AbstractCylindricalSurface,
         back_surface::AbstractCylindricalSurface,
         center_thickness::Real,
-        n)
+        n::AbstractRefractiveIndex)
     # Initialize remaining box section length.
     l0 = center_thickness
 
@@ -401,7 +398,7 @@ function Lens(
 end
 
 function Lens(front_surface::AbstractCylindricalSurface,
-        center_thickness::Real, n)
+        center_thickness::Real, n::AbstractRefractiveIndex)
     Lens(
         front_surface,
         RectangularFlatSurface(diameter(front_surface)),
@@ -445,7 +442,7 @@ function cylindric_lens_outer_parameters(
 end
 
 function Lens(front_surface::RectangularFlatSurface, back_surface::RectangularFlatSurface,
-        center_thickness::Real, n)
+        center_thickness::Real, n::AbstractRefractiveIndex)
     d_mid = min(diameter(front_surface), diameter(back_surface))
     mid = BoxSDF(d_mid, center_thickness, d_mid)
     translate3d!(mid, [0, center_thickness / 2, 0])

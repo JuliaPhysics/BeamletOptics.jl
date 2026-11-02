@@ -14,7 +14,7 @@ c_view = [
 
 gb = GaussianBeamlet([0,0,0], [0,1,0], 9e-4, 2e-3; support=[0,0,1])
 
-l = ThinLens(20e-3, 20e-3, BMO.inch, 1.5)
+l = ThinLens(20e-3, 20e-3, BMO.inch, ConstantRefractiveIndex(1.5))
 s = System([l])
 
 translate3d!(l, [0, 30e-3, 0])

@@ -22,7 +22,7 @@ lens = Lens(
         EvenAsphericalSurface(R, d, k, A),
         SphericalSurface(Inf, d),
         ct,
-        x -> n
+        ConstantRefractiveIndex(n)
     )
 
 system = System(lens)
@@ -80,7 +80,7 @@ L1 = Lens(
             -0.34529*(1e3)^11, 5.9938*(1e3)^13] # coeffs
         ),
         0.72e-3, # center thickness
-        n -> 1.580200
+        ConstantRefractiveIndex(1.580200)
     )
 
 # construct the second lens
@@ -101,7 +101,7 @@ L2 = Lens(
             -0.080329*(1e3)^15] # coeffs
         ),
         0.55e-3, # center_thickness
-        n -> 1.804700
+        ConstantRefractiveIndex(1.804700)
     )
 
 # shift the second lens to its position, assuming L1 is at the origin (0,0,0)
@@ -126,7 +126,7 @@ L3 = Lens(
             1.5264e-5*(1e3)^15] # coeffs
         ),
         0.7e-3, # center_thickness
-        n -> 1.580200
+        ConstantRefractiveIndex(1.580200)
     )
 
 # first translate the lens to the L2 position, then shift it by the relative offset with respect to L2
@@ -138,7 +138,7 @@ Filt = Lens(
         SphericalSurface(Inf, 4.2e-3),
         SphericalSurface(Inf, 4.2e-3),
         0.15e-3,
-        n -> 1.516800
+        ConstantRefractiveIndex(1.516800)
     )
 
 # same principle as for L3
@@ -150,7 +150,7 @@ Cover = Lens(
         SphericalSurface(Inf, 4.9e-3),
         SphericalSurface(Inf, 4.9e-3),
         0.5e-3,
-        n -> 1.469200
+        ConstantRefractiveIndex(1.469200)
     )
 translate_to3d!(Cover, position(Filt))
 translate3d!(Cover, [0, BeamletOptics.thickness(Filt) + 0.18e-3,0])

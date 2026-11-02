@@ -5,7 +5,7 @@ const mm = 1e-3
 const nm = 1e-9
 
 λ = 1064nm
-n_glass = 1.5066                               # constant index, no dispersion
+n_glass = ConstantRefractiveIndex(1.5066)      # constant index, no dispersion
 
 f1, f2 = 50mm, 150mm
 # thin symmetric biconvex lenses: R = 2(n-1)f

@@ -77,7 +77,7 @@ the substrate lies on the positive y-side of it, from y = 0 to `thickness`. See 
 - `width`: substrate width along the x-axis in [m]
 - `height`: substrate height along the z-axis in [m]
 - `thickness`: substrate thickness along the y-axis in [m]
-- `n`: the [`RefractiveIndex`](@ref) of the substrate, or a number for a constant refractive index
+- `n`: the [`AbstractRefractiveIndex`](@ref) of the substrate
 
 # Keywords
 
@@ -87,7 +87,7 @@ function RectangularPlateBeamsplitter(
         width::Real,
         height::Real,
         thickness::Real,
-        n;
+        n::AbstractRefractiveIndex;
         reflectance::Real=0.5
     )
     # create substrate prism and move into pos
@@ -131,7 +131,7 @@ lies on the positive y-side of it, from y = 0 to `thickness`. See also [`Rectang
 
 - `diameter`: x-z-plane substrate diameter in [m]
 - `thickness`: substrate thickness along the y-axis in [m]
-- `n`: the [`RefractiveIndex`](@ref) of the substrate, or a number for a constant refractive index
+- `n`: the [`AbstractRefractiveIndex`](@ref) of the substrate
 
 # Keywords 
 
@@ -140,7 +140,7 @@ lies on the positive y-side of it, from y = 0 to `thickness`. See also [`Rectang
 function RoundPlateBeamsplitter(
         diameter::Real,
         thickness::Real,
-        n;
+        n::AbstractRefractiveIndex;
         reflectance::Real=0.5
     )
     # create substrate cylinder prism

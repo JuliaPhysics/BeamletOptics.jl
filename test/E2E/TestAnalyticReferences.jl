@@ -75,12 +75,12 @@ end
         n = 1.5
         hs = [0.01mm, 1mm, 4mm, 8mm, 11mm]
         lenses = [
-            "bi-convex" => (SphericalLens(50mm, -50mm, 5mm, 25mm, _ -> n), [(0.0, 50mm, n), (5mm, -50mm, 1.0)]),
-            "plano-convex" => (SphericalLens(50mm, Inf, 5mm, 25mm, _ -> n), [(0.0, 50mm, n), (5mm, Inf, 1.0)]),
-            "convex-plano" => (SphericalLens(Inf, -50mm, 5mm, 25mm, _ -> n), [(0.0, Inf, n), (5mm, -50mm, 1.0)]),
-            "bi-concave" => (SphericalLens(-50mm, 50mm, 3mm, 25mm, _ -> n), [(0.0, -50mm, n), (3mm, 50mm, 1.0)]),
-            "meniscus" => (SphericalLens(30mm, 60mm, 6mm, 25mm, _ -> n), [(0.0, 30mm, n), (6mm, 60mm, 1.0)]),
-            "cemented doublet" => (SphericalDoubletLens(40mm, -30mm, -120mm, 6mm, 2.5mm, 25mm, _ -> 1.62, _ -> 1.72),
+            "bi-convex" => (SphericalLens(50mm, -50mm, 5mm, 25mm, ConstantRefractiveIndex(n)), [(0.0, 50mm, n), (5mm, -50mm, 1.0)]),
+            "plano-convex" => (SphericalLens(50mm, Inf, 5mm, 25mm, ConstantRefractiveIndex(n)), [(0.0, 50mm, n), (5mm, Inf, 1.0)]),
+            "convex-plano" => (SphericalLens(Inf, -50mm, 5mm, 25mm, ConstantRefractiveIndex(n)), [(0.0, Inf, n), (5mm, -50mm, 1.0)]),
+            "bi-concave" => (SphericalLens(-50mm, 50mm, 3mm, 25mm, ConstantRefractiveIndex(n)), [(0.0, -50mm, n), (3mm, 50mm, 1.0)]),
+            "meniscus" => (SphericalLens(30mm, 60mm, 6mm, 25mm, ConstantRefractiveIndex(n)), [(0.0, 30mm, n), (6mm, 60mm, 1.0)]),
+            "cemented doublet" => (SphericalDoubletLens(40mm, -30mm, -120mm, 6mm, 2.5mm, 25mm, ConstantRefractiveIndex(1.62), ConstantRefractiveIndex(1.72)),
                 [(0.0, 40mm, 1.62), (6mm, -30mm, 1.72), (8.5mm, -120mm, 1.0)]),
         ]
         @testset "$label" for (label, (lens, surfaces)) in lenses
@@ -90,12 +90,12 @@ end
         end
         @testset "Sonnar 50 mm F1.5, 10 surfaces" begin
             # as in TestSonnarLens.jl
-            l1 = SphericalLens(69.21mm, 433.84mm, 9.33mm, 70mm, λ -> 1.671)
+            l1 = SphericalLens(69.21mm, 433.84mm, 9.33mm, 70mm, ConstantRefractiveIndex(1.671))
             l234 = TripletLens(SphericalSurface(35.86mm, 60mm), SphericalSurface(85.87mm, 60mm),
                 SphericalSurface(-646.31mm, 60mm), SphericalSurface(23.51mm, 40mm),
-                11.81mm, 7.05mm, 1.9mm, λ -> 1.671, λ -> 1.4892, λ -> 1.7394)
+                11.81mm, 7.05mm, 1.9mm, ConstantRefractiveIndex(1.671), ConstantRefractiveIndex(1.4892), ConstantRefractiveIndex(1.7394))
             l567 = SphericalTripletLens(Inf, 51.09mm, -22.12mm, -103.13mm, 2.48mm, 19.81mm, 4.57mm, 42mm,
-                λ -> 1.5232, λ -> 1.6578, λ -> 1.5894)
+                ConstantRefractiveIndex(1.5232), ConstantRefractiveIndex(1.6578), ConstantRefractiveIndex(1.5894))
             y2 = thickness(l1) + 0.38mm
             y3 = y2 + thickness(l234) + 13.0mm + 2.24mm
             translate3d!(l234, [0, y2, 0])
@@ -132,7 +132,7 @@ end
         # n sin(A/2) = sin((A + D_min)/2) for the apex angle A
         n, A = 1.5, π / 3
         function deviation(θ)
-            prism = EquilateralPrism(20mm, 10mm, n)
+            prism = EquilateralPrism(20mm, 10mm, ConstantRefractiveIndex(n))
             zrotate3d!(prism, θ)
             translate3d!(prism, [50mm, 0, 0])
             beam = Beam([0.0, 2mm, 0], [1.0, 0, 0], 1e-6)
@@ -161,7 +161,7 @@ end
             return pol === :s ? (c - n * ct) / (c + n * ct) : (n * c - ct) / (n * c + ct)
         end
         for θ in deg2rad.((0.0, 20.0, 45.0, 70.0)), pol in (:s, :p)
-            window = Lens(RectangularFlatSurface(30mm), RectangularFlatSurface(30mm), 5mm, _ -> n)
+            window = Lens(RectangularFlatSurface(30mm), RectangularFlatSurface(30mm), 5mm, ConstantRefractiveIndex(n))
             zrotate3d!(window, θ)
             translate3d!(window, [0, 50mm, 0])
             pd = Detector(40mm)
@@ -182,7 +182,7 @@ end
         @testset "GaussianBeamlet behind a thick lens" begin
             # a narrow beam, such that the spherical aberration of the parabasal rays is negligible
             w0 = 0.15mm
-            lens = SphericalLens(50mm, -50mm, t, 25mm, _ -> n)
+            lens = SphericalLens(50mm, -50mm, t, 25mm, ConstantRefractiveIndex(n))
             translate3d!(lens, [0, y_lens, 0])
             g = GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], λ, w0)
             solve_system!(System([lens]), g)
@@ -196,7 +196,7 @@ end
         @testset "AstigmaticGaussianBeamlet behind a cylindrical lens" begin
             # the curved axis focuses, the other one propagates as in a plate
             w0 = 0.5mm
-            lens = Lens(CylindricalSurface(30mm, 20mm, 25mm), t, _ -> n)
+            lens = Lens(CylindricalSurface(30mm, 20mm, 25mm), t, ConstantRefractiveIndex(n))
             translate3d!(lens, [0, y_lens, 0])
             g = AstigmaticGaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], λ, w0)
             solve_system!(System([lens]), g)
@@ -215,7 +215,7 @@ end
         λ = 632.8e-9
         function power(dx)
             cm = 1e-2
-            cbs = CubeBeamsplitter(25.4mm, _ -> 1.51509)
+            cbs = CubeBeamsplitter(25.4mm, ConstantRefractiveIndex(1.51509))
             zrotate3d!(cbs, -π / 2)
             translate3d!(cbs, [0, 23.5cm, 0])
             m1 = RoundPlanoMirror(25.4mm, 5mm)

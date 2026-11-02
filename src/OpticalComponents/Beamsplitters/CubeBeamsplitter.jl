@@ -40,7 +40,7 @@ coating is orientated at a 45° angle with respect to the y-axis.
 # Inputs
 
 - `leg_length`: the x-, y- and z-edge length in [m]
-- `n`: the [`RefractiveIndex`](@ref) of the front and back prism, or a number for a constant refractive index
+- `n`: the [`AbstractRefractiveIndex`](@ref) of the front and back prism
 
 # Keywords 
 
@@ -48,7 +48,7 @@ coating is orientated at a 45° angle with respect to the y-axis.
 """
 function CubeBeamsplitter(
         leg_length::Real,
-        n;
+        n::AbstractRefractiveIndex;
         reflectance::Real=0.5
     )
     front = RightAnglePrism(leg_length, leg_length, n)

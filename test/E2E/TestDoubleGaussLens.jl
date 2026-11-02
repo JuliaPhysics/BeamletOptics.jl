@@ -21,12 +21,12 @@ const mm = 1e-3
     end
 
     # Based on https://www.pencilofrays.com/double-gauss-sonnar-comparison/
-    l1 = SphericalLens(48.88mm, 182.96mm, 8.89mm, 52.3mm, λ -> 1.62286)
+    l1 = SphericalLens(48.88mm, 182.96mm, 8.89mm, 52.3mm, ConstantRefractiveIndex(1.62286))
     l23 = SphericalDoubletLens(36.92mm, Inf, 23.06mm, 15.11mm, 2.31mm,
-    45.11mm, λ -> 1.58565, λ -> 1.67764)
+    45.11mm, ConstantRefractiveIndex(1.58565), ConstantRefractiveIndex(1.67764))
     l45 = SphericalDoubletLens(-23.91mm, Inf, -36.92mm, 1.92mm, 7.77mm,
-    40.01mm, λ -> 1.57046, λ -> 1.64128)
-    l6 = SphericalLens(1063.24mm, -48.88mm, 6.73mm, 45.11mm, λ -> 1.62286)
+    40.01mm, ConstantRefractiveIndex(1.57046), ConstantRefractiveIndex(1.64128))
+    l6 = SphericalLens(1063.24mm, -48.88mm, 6.73mm, 45.11mm, ConstantRefractiveIndex(1.62286))
     # Calculate translation distances
     l_23 = thickness(l1) + 0.38mm
     l_45 = l_23 + thickness(l23) + 9.14mm + 13.36mm

@@ -1,12 +1,12 @@
 # Refractive index / materials
 
-A refractive index is anything of type
-`RefractiveIndex = Union{Function, DiscreteRefractiveIndex, SellmeierEquation, ConstantRefractiveIndex}`.
-It must be callable as `n(λ)` with **λ in meters** and return a real number. Every constructor that
-takes `n` also accepts a plain number and stores it as `ConstantRefractiveIndex(n)` (no dispersion).
+A refractive index is a subtype of `BeamletOptics.AbstractRefractiveIndex`: `ConstantRefractiveIndex`,
+`DiscreteRefractiveIndex` or `SellmeierEquation`. It is callable as `n(λ)` with **λ in meters** and returns
+a real number. Constructors take only these types: a plain number (`1.5`) or a function (`λ -> 1.5`)
+throws a `MethodError`.
 
 ```julia
-n_const = 1.5                                         # constant index, same as ConstantRefractiveIndex(1.5)
+n_const = ConstantRefractiveIndex(1.5)                # constant index, no dispersion
 
 NBK7 = DiscreteRefractiveIndex([532e-9, 1064e-9],     # exact lookup table,
                                [1.5195, 1.5066])      # NO interpolation: any other λ -> KeyError
@@ -20,5 +20,7 @@ N_BK7(532e-9)                                         # still called with meters
 - The surrounding medium is always n = 1.
 - A constant index ignores dispersion. Use `SellmeierEquation` or `DiscreteRefractiveIndex` whenever the
   result depends on λ (several wavelengths, chromatic focal shift, prisms for dispersion).
-- Constructors validate the index by calling it with `1`, `1f0` and `1.0`, so closures must accept any `Real`.
+- Another dispersion formula is a new subtype with a functor:
+  `struct Cauchy <: BeamletOptics.AbstractRefractiveIndex; A::Float64; B::Float64 end` and
+  `(c::Cauchy)(λ) = c.A + c.B / (λ * 1e6)^2`. It must accept any `Real` λ and return a `Real`.
 - Materials are used by lenses, prisms, plate/cube beamsplitters, compensator plates and linear polarizers.

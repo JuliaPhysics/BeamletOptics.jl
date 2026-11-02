@@ -12,10 +12,10 @@ This showcase is taken from the [pencilofrays.com](https://www.pencilofrays.com/
 using GLMakie, BeamletOptics
 
 # define spherical lenses
-l1 = SphericalLens(48.88e-3, 182.96e-3, 8.89e-3, 52.3e-3, λ -> 1.62286)
-l23 = SphericalDoubletLens(36.92e-3, Inf, 23.06e-3, 15.11e-3, 2.31e-3, 45.11e-3, λ -> 1.58565, λ -> 1.67764)
-l45 = SphericalDoubletLens(-23.91e-3, Inf, -36.92e-3, 1.92e-3, 7.77e-3, 40.01e-3, λ -> 1.57046, λ -> 1.64128)
-l6 = SphericalLens(1063.24e-3, -48.88e-3, 6.73e-3, 45.11e-3, λ -> 1.62286)
+l1 = SphericalLens(48.88e-3, 182.96e-3, 8.89e-3, 52.3e-3, ConstantRefractiveIndex(1.62286))
+l23 = SphericalDoubletLens(36.92e-3, Inf, 23.06e-3, 15.11e-3, 2.31e-3, 45.11e-3, ConstantRefractiveIndex(1.58565), ConstantRefractiveIndex(1.67764))
+l45 = SphericalDoubletLens(-23.91e-3, Inf, -36.92e-3, 1.92e-3, 7.77e-3, 40.01e-3, ConstantRefractiveIndex(1.57046), ConstantRefractiveIndex(1.64128))
+l6 = SphericalLens(1063.24e-3, -48.88e-3, 6.73e-3, 45.11e-3, ConstantRefractiveIndex(1.62286))
 
 # Calculate translation distances
 l_23 = thickness(l1) + 0.38e-3
@@ -63,14 +63,14 @@ The reference above compares the Double Gauss lens to a [Sonnar lens](https://ww
 The cemented triplets are modeled with the [`TripletLens`](@ref) type. The steep last surface of the front triplet only has a clear aperture of 40 mm, hence this triplet is constructed from [`SphericalSurface`](@ref)s with different diameters. The rear triplet can be created directly with the [`SphericalTripletLens`](@ref) constructor.
 
 ```julia
-s1 = SphericalLens(69.21e-3, 433.84e-3, 9.33e-3, 70e-3, λ -> 1.671)
+s1 = SphericalLens(69.21e-3, 433.84e-3, 9.33e-3, 70e-3, ConstantRefractiveIndex(1.671))
 # front triplet: last surface only has a clear aperture of 40 mm -> constructed from surfaces
 s234 = TripletLens(
     SphericalSurface(35.86e-3, 60e-3), SphericalSurface(85.87e-3, 60e-3),
     SphericalSurface(-646.31e-3, 60e-3), SphericalSurface(23.51e-3, 40e-3),
-    11.81e-3, 7.05e-3, 1.9e-3, λ -> 1.671, λ -> 1.4892, λ -> 1.7394)
+    11.81e-3, 7.05e-3, 1.9e-3, ConstantRefractiveIndex(1.671), ConstantRefractiveIndex(1.4892), ConstantRefractiveIndex(1.7394))
 s567 = SphericalTripletLens(Inf, 51.09e-3, -22.12e-3, -103.13e-3, 2.48e-3, 19.81e-3, 4.57e-3, 42e-3,
-                            λ -> 1.5232, λ -> 1.6578, λ -> 1.5894)
+                            ConstantRefractiveIndex(1.5232), ConstantRefractiveIndex(1.6578), ConstantRefractiveIndex(1.5894))
 
 # Calculate translation distances
 s_234 = thickness(s1) + 0.38e-3

@@ -6,7 +6,7 @@
 ## Spherical catalog lenses
 
 ```julia
-SphericalLens(r1, r2, l, d = BeamletOptics.inch, n = 1.5)        # l: center thickness, d: diameter
+SphericalLens(r1, r2, l, d = BeamletOptics.inch, n = ConstantRefractiveIndex(1.5))  # l: center thickness, d: diameter
 ThinLens(R1, R2, d, n)                                          # thin-lens Lens; SphericalLens uses it for l = 0
 SphericalDoubletLens(r1, r2, r3, l1, l2, d, n1, n2)             # cemented doublet
 SphericalTripletLens(r1, r2, r3, r4, l1, l2, l3, d, n1, n2, n3) # cemented triplet
@@ -50,7 +50,7 @@ Cylindrical surfaces (curved in one direction, extruded over `height`):
 
 ```julia
 A = [0, A4 * 1e3^3, A6 * 1e3^5, A8 * 1e3^7, A10 * 1e3^9]
-AL75150 = Lens(EvenAsphericalSurface(76.68mm, 75mm, -0.675, A), 15mm, 1.5006520430)
+AL75150 = Lens(EvenAsphericalSurface(76.68mm, 75mm, -0.675, A), 15mm, ConstantRefractiveIndex(1.5006520430))
 ```
 
 Aspheres are experimental. A meniscus whose center thickness does not exceed the sagitta of its convex
@@ -64,7 +64,7 @@ TripletLens(s1, s2, s3, s4, l1, l2, l3, n1, n2, n3)  # s2, s3: cemented surfaces
 ```
 
 Surfaces are the rotationally symmetric surfaces listed above, in order along +y; `l` are center
-thicknesses, `n` are refractive indices (see `materials.md`; numbers are constant indices). Element `i` is
+thicknesses, `n` are refractive indices (see `materials.md`). Element `i` is
 `Lens(s[i], s[i+1], l[i], n[i])`, placed flush behind the previous one, so the limits of the general `Lens`
 constructor apply to each element. Use these for aspherical surfaces or a different clear aperture per
 surface. Cylindrical surfaces are not supported (`MethodError`).
@@ -72,7 +72,7 @@ surface. Cylindrical surfaces are not supported (`MethodError`).
 ```julia
 # doublet with an aspherical front surface, A as above
 dl = DoubletLens(EvenAsphericalSurface(50mm, 25.4mm, -0.8, A), SphericalSurface(-40mm, 25.4mm),
-    SphericalSurface(-200mm, 25.4mm), 8mm, 3mm, 1.6456, 1.7168)
+    SphericalSurface(-200mm, 25.4mm), 8mm, 3mm, ConstantRefractiveIndex(1.6456), ConstantRefractiveIndex(1.7168))
 ```
 
 ## Multi-element lenses from parts

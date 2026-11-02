@@ -20,6 +20,7 @@ export ObjectGroup
 
 # additional
 export DiscreteRefractiveIndex, SellmeierEquation, ConstantRefractiveIndex
+public AbstractRefractiveIndex
 
 #=
 components

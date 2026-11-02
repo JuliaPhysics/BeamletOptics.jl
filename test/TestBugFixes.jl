@@ -15,12 +15,12 @@ const mm = 1e-3
     # been moved and rotated before (suspected rounding errors of `_world_to_sdf`).
     @testset "Narrow point source through a double Gauss lens" begin
         # Based on https://www.pencilofrays.com/double-gauss-sonnar-comparison/
-        l1 = SphericalLens(48.88mm, 182.96mm, 8.89mm, 52.3mm, λ -> 1.62286)
+        l1 = SphericalLens(48.88mm, 182.96mm, 8.89mm, 52.3mm, ConstantRefractiveIndex(1.62286))
         l23 = SphericalDoubletLens(36.92mm, Inf, 23.06mm, 15.11mm, 2.31mm,
-            45.11mm, λ -> 1.58565, λ -> 1.67764)
+            45.11mm, ConstantRefractiveIndex(1.58565), ConstantRefractiveIndex(1.67764))
         l45 = SphericalDoubletLens(-23.91mm, Inf, -36.92mm, 1.92mm, 7.77mm,
-            40.01mm, λ -> 1.57046, λ -> 1.64128)
-        l6 = SphericalLens(1063.24mm, -48.88mm, 6.73mm, 45.11mm, λ -> 1.62286)
+            40.01mm, ConstantRefractiveIndex(1.57046), ConstantRefractiveIndex(1.64128))
+        l6 = SphericalLens(1063.24mm, -48.88mm, 6.73mm, 45.11mm, ConstantRefractiveIndex(1.62286))
         l_23 = thickness(l1) + 0.38mm
         l_45 = l_23 + thickness(l23) + 9.14mm + 13.36mm
         l_6 = l_45 + thickness(l45) + 0.38mm
@@ -48,7 +48,7 @@ const mm = 1e-3
         # a rotationally symmetric lens: every ray must stay in its meridional plane.
         n = 1.458
         lens = Lens(CircularFlatSurface(30mm),
-            EvenAsphericalSurface((n - 1) * 50mm, 30mm, -n^2, [0.0]), 4mm, x -> n)
+            EvenAsphericalSurface((n - 1) * 50mm, 30mm, -n^2, [0.0]), 4mm, ConstantRefractiveIndex(n))
         xrotate3d!(lens, deg2rad(0.5))
         zrotate3d!(lens, deg2rad(0.2))
         axis = BMO.orientation(lens)[:, 2]
@@ -117,7 +117,7 @@ end
     ref_signal(ϕ, A) = (cos(ϕ) + 1) / 2 * A
 
     # setup system for tests below
-    splitter = CubeBeamsplitter(10mm, n -> 1)
+    splitter = CubeBeamsplitter(10mm, ConstantRefractiveIndex(1))
     substrate_length = 10mm
     substrate = TestSubstrate(BMO.CylinderSDF(5mm, substrate_length / 2), 1.5)
 
@@ -234,7 +234,7 @@ end
 @testset "Meniscus lens on-axis normal" begin
     # Issue: AD normal of MeniscusLensSDF flipped on the optical axis, on-axis rays missed the lens.
     for (r1, r2) in ((69.21mm, 433.84mm), (-433.84mm, -69.21mm))
-        lens = SphericalLens(r1, r2, 9.33mm, 70mm, λ -> 1.671)
+        lens = SphericalLens(r1, r2, 9.33mm, 70mm, ConstantRefractiveIndex(1.671))
         @test BMO.shape(lens) isa BMO.MeniscusLensSDF
         # rotate to test transformation of the normal
         zrotate3d!(lens, deg2rad(30))
@@ -260,9 +260,9 @@ end
     ct = 4mm
     d = 30mm
     concave = Lens(CircularFlatSurface(d),
-        EvenAsphericalSurface((n - 1) * f, d, -n^2, [0.0]), ct, x -> n)
+        EvenAsphericalSurface((n - 1) * f, d, -n^2, [0.0]), ct, ConstantRefractiveIndex(n))
     convex = Lens(CircularFlatSurface(d),
-        EvenAsphericalSurface(-(n - 1) * f, d, -n^2, [0.0]), 2ct, x -> n)
+        EvenAsphericalSurface(-(n - 1) * f, d, -n^2, [0.0]), 2ct, ConstantRefractiveIndex(n))
     # The conic vertex lies on the back face, `thickness` along the lens axis
     for (lens, thickness, f_signed) in ((concave, ct, -f), (convex, 2ct, f)),
         tilt in (0.0, deg2rad(0.5))
@@ -292,7 +292,7 @@ end
     n = 1.458
     spurious = 0
     for _ in 1:2000
-        lens = Lens(CircularFlatSurface(30mm), SphericalSurface(31.85mm, 30mm), 4mm, λ -> n)
+        lens = Lens(CircularFlatSurface(30mm), SphericalSurface(31.85mm, 30mm), 4mm, ConstantRefractiveIndex(n))
         rotate3d!(lens, BMO.rotate3d(normalize(randn(rng, 3)), 2π * rand(rng)))
         translate3d!(lens, 12 .* randn(rng, 3))
         dir = orientation(lens)[:, 2]
@@ -308,10 +308,10 @@ end
     # where id > 1 throws a BoundsError in interact3d for AstigmaticGaussianBeamlet.
 
     # 1 lens followed by 1 plate beamsplitter
-    lens = ThinLens(Inf, 50mm, 25mm, 1.5)
+    lens = ThinLens(Inf, 50mm, 25mm, ConstantRefractiveIndex(1.5))
     BMO.translate3d!(lens, [0, 50mm, 0])
 
-    pbs = RoundPlateBeamsplitter(25mm, 5mm, λ -> 1.5)
+    pbs = RoundPlateBeamsplitter(25mm, 5mm, ConstantRefractiveIndex(1.5))
     BMO.translate3d!(pbs, [0, 100mm, 0])
 
     system = System([lens, pbs])
@@ -331,7 +331,7 @@ end
     # A large beamlet with separate waists leaves its model in this focus, see
     # "Limit of the beamlet model" in TestAstigmaticGaussianBeamlet
     f = 0.05
-    lens = SphericalLens(f, -f, 8e-3, BMO.inch, x -> 1.5)
+    lens = SphericalLens(f, -f, 8e-3, BMO.inch, ConstantRefractiveIndex(1.5))
     translate3d!(lens, [0.1, 0.1, 0])                  # Beside the beam
     pd = Detector(0.02)
     translate3d!(pd, [0, 0.1 + f, 0])
@@ -377,7 +377,7 @@ end
     end
 
     @testset "Plate beamsplitter under 45°" begin
-        pbs = RoundPlateBeamsplitter(25mm, 3mm, λ -> 1.5; reflectance = 0.1)
+        pbs = RoundPlateBeamsplitter(25mm, 3mm, ConstantRefractiveIndex(1.5); reflectance = 0.1)
         zrotate3d!(pbs, deg2rad(45))
         for E0 in ([0, 0, 1.0], [1.0, 0, 0])
             beam = Beam(PolarizedRay([0, -20mm, 0], [0, 1.0, 0], 780e-9, E0))
@@ -394,7 +394,7 @@ end
         @test_nowarn PolarizedRay(zeros(3), [0, 1, 0], 1e-6, [1e3, 1e-8, 0])
         @test_throws ErrorException PolarizedRay(zeros(3), [0, 1, 0], 1e-6, [1e3, 1, 0])
         # Oblique rays with large field amplitudes through a lens
-        lens = SphericalLens(8mm, Inf, 3mm, 12mm, λ -> 1.51)
+        lens = SphericalLens(8mm, Inf, 3mm, 12mm, ConstantRefractiveIndex(1.51))
         for h in (0.2mm, 1mm, 3mm), θ in (0.0, 5.0, 15.0)
             dir = [sind(θ), cosd(θ), 0]
             E0 = 1e4 .* [0, 0, 1.0]
@@ -424,7 +424,7 @@ end
 
     @testset "Waist behind a lens does not depend on placement" begin
         function waists(d)
-            lens = SphericalLens(50mm, -50mm, 5mm, 25.4mm, λ -> 1.5)
+            lens = SphericalLens(50mm, -50mm, 5mm, 25.4mm, ConstantRefractiveIndex(1.5))
             align3d!(lens, d)
             translate3d!(lens, 100mm .* normalize(d))
             g = GaussianBeamlet(zeros(3), d, λ, 1mm; support = BMO.normal3d(d))
@@ -454,7 +454,7 @@ end
 
     @testset "Same model limit as an AstigmaticGaussianBeamlet" begin
         function detector_behind_lens(beam, f; kwargs...)
-            lens = SphericalLens(f, -f, 8mm, 25.4mm, λ -> 1.5)
+            lens = SphericalLens(f, -f, 8mm, 25.4mm, ConstantRefractiveIndex(1.5))
             translate3d!(lens, [0, 0.1, 0])
             pd = Detector(20mm)
             translate3d!(pd, [0, 0.1 + 2f, 0])

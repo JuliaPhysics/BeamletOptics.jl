@@ -46,13 +46,13 @@ end
 power(pd) = optical_power(pd, RegularGrid(num_points = 301, crop_factor = 4))
 
 function plate_beamsplitter()
-    pbs = RectangularPlateBeamsplitter(30mm, 30mm, 5mm, _ -> n_glass)
+    pbs = RectangularPlateBeamsplitter(30mm, 30mm, 5mm, ConstantRefractiveIndex(n_glass))
     translate3d!(pbs, [0, 50mm, 0])
     return pbs
 end
 
 function glass_plate()
-    plate = Lens(RectangularFlatSurface(30mm), RectangularFlatSurface(30mm), 5mm, _ -> n_glass)
+    plate = Lens(RectangularFlatSurface(30mm), RectangularFlatSurface(30mm), 5mm, ConstantRefractiveIndex(n_glass))
     translate3d!(plate, [0, 50mm, 0])
     return plate
 end

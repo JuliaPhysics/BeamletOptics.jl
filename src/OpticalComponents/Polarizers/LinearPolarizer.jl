@@ -1,5 +1,5 @@
 """
-    LinearPolarizer{T, N <: RefractiveIndex} <: AbstractObject{T}
+    LinearPolarizer{T, N <: AbstractRefractiveIndex} <: AbstractObject{T}
 
 Represents a real, round linear polarizing film laminated between two uncoated glass plates
 (e.g. Thorlabs LPNIRE100-B), modeled as a thin [`PolarizationFilter`](@ref) cemented between two
@@ -26,7 +26,7 @@ for the constructor.
     the beam is terminated at the cemented film interface once the norm of the transmitted electric field
     falls to or below the `cutoff_strength` of the underlying [`PolarizationFilter`](@ref).
 """
-struct LinearPolarizer{T, N <: RefractiveIndex} <: AbstractObject{T}
+struct LinearPolarizer{T, N <: AbstractRefractiveIndex} <: AbstractObject{T}
     filter::PolarizationFilter{T, Mesh{T}}
     front::Prism{T, PlanoSurfaceSDF{T}, N}
     back::Prism{T, PlanoSurfaceSDF{T}, N}
@@ -57,7 +57,7 @@ of the given `diameter`, flush against the film on both sides.
 - `diameter`: outer diameter of the film and substrates in [m]
 - `front_thickness`: thickness of the front glass substrate in [m]
 - `back_thickness`: thickness of the back glass substrate in [m]
-- `n`: [`RefractiveIndex`](@ref) of both glass substrates, or a number for a constant refractive index
+- `n`: [`AbstractRefractiveIndex`](@ref) of both glass substrates
 
 # Keywords
 
@@ -70,7 +70,7 @@ The component is centered on the film (local origin); the front substrate extend
 along local +y. The film transmits along local x and blocks local z.
 """
 function RoundLinearPolarizer(diameter::Real, front_thickness::Real, back_thickness::Real,
-        n; cutoff_strength = eps())
+        n::AbstractRefractiveIndex; cutoff_strength = eps())
     front_thickness > 0 || throw(ArgumentError("front_thickness must be positive"))
     back_thickness > 0 || throw(ArgumentError("back_thickness must be positive"))
 

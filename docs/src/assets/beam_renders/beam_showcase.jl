@@ -13,7 +13,7 @@ m1 = RoundPlanoMirror(20mm, 5mm)
 m2 = RoundPlanoMirror(20mm, 5mm)
 m3 = RoundPlanoMirror(20mm, 5mm)
 
-prism = RightAnglePrism(20mm, 20mm, n->1.2)
+prism = RightAnglePrism(20mm, 20mm, ConstantRefractiveIndex(1.2))
 
 translate_to3d!(m1, [0, 100mm, 0])
 zrotate3d!(m1, deg2rad(-30))

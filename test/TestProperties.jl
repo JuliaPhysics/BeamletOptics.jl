@@ -13,19 +13,19 @@ prop(props, name) = (i = findfirst(p -> p.first == name, props); isnothing(i) ? 
         objs = Any[
             SphericalLens(50e-3, -50e-3, 5e-3, 25.4e-3),
             SphericalLens(50e-3, 50e-3, 0, 25.4e-3),
-            Lens(EvenAsphericalSurface(20e-3, 25e-3, -1.0, [0, 1e-5]), 8e-3, λ -> 1.5),
-            Lens(CylindricalSurface(5.2e-3, 10e-3, 20e-3), 5.9e-3, λ -> 1.517),
-            SphericalDoubletLens(50e-3, -40e-3, -100e-3, 4e-3, 2e-3, 25.4e-3, λ -> 1.5, λ -> 1.6),
+            Lens(EvenAsphericalSurface(20e-3, 25e-3, -1.0, [0, 1e-5]), 8e-3, ConstantRefractiveIndex(1.5)),
+            Lens(CylindricalSurface(5.2e-3, 10e-3, 20e-3), 5.9e-3, ConstantRefractiveIndex(1.517)),
+            SphericalDoubletLens(50e-3, -40e-3, -100e-3, 4e-3, 2e-3, 25.4e-3, ConstantRefractiveIndex(1.5), ConstantRefractiveIndex(1.6)),
             SquarePlanoMirror2D(25e-3), RectangularPlanoMirror(25e-3, 20e-3, 5e-3),
             RoundPlanoMirror(25e-3, 5e-3), SphericalMirror(100e-3, 25e-3, 5e-3),
             ParabolicMirror(25e-3, 50e-3), OffAxisParabolicMirror(50e-3, 25e-3; angle = 90),
             RightAnglePrismMirror(10e-3, 10e-3), Retroreflector(1.0),
             Detector(10e-3), ThinBeamsplitter(10e-3, 10e-3), RoundThinBeamsplitter(10e-3),
-            RoundPlateBeamsplitter(25e-3, 3e-3, λ -> 1.5),
-            RectangularPlateBeamsplitter(25e-3, 25e-3, 3e-3, λ -> 1.5),
-            CubeBeamsplitter(10e-3, λ -> 1.5), RectangularCompensatorPlate(25e-3, 25e-3, 3e-3, λ -> 1.5),
+            RoundPlateBeamsplitter(25e-3, 3e-3, ConstantRefractiveIndex(1.5)),
+            RectangularPlateBeamsplitter(25e-3, 25e-3, 3e-3, ConstantRefractiveIndex(1.5)),
+            CubeBeamsplitter(10e-3, ConstantRefractiveIndex(1.5)), RectangularCompensatorPlate(25e-3, 25e-3, 3e-3, ConstantRefractiveIndex(1.5)),
             PolarizationFilter(10e-3), RoundPolarizationFilter(10e-3),
-            RoundLinearPolarizer(25e-3, 1e-3, 1e-3, λ -> 1.5), RightAnglePrism(10e-3, 10e-3, λ -> 1.5),
+            RoundLinearPolarizer(25e-3, 1e-3, 1e-3, ConstantRefractiveIndex(1.5)), RightAnglePrism(10e-3, 10e-3, ConstantRefractiveIndex(1.5)),
             ObjectGroup([RoundPlanoMirror(25e-3, 5e-3), Detector(10e-3)]),
             Beam([0, 0, 0.0], [0, 1.0, 0], 1e-6), GaussianBeamlet([0, 0, 0.0], [0, 1.0, 0], 1e-6, 1e-3),
             CollimatedSource([0, 0, 0.0], [0, 1.0, 0], 5e-3; num_rings = 2),
@@ -63,16 +63,13 @@ prop(props, name) = (i = findfirst(p -> p.first == name, props); isnothing(i) ? 
     end
 
     @testset "Component values" begin
-        lens = SphericalLens(50e-3, -50e-3, 5e-3, 25.4e-3, λ -> 1.5)
+        lens = SphericalLens(50e-3, -50e-3, 5e-3, 25.4e-3, ConstantRefractiveIndex(1.5))
         props = BMO.properties(lens)
         @test prop(props, "Shape") == "UnionSDF"
         @test prop(props, "Thickness [m]") ≈ 5e-3
         @test prop(props, "n(λ₀)") ≈ 1.5
         @test prop(props, "λ₀ [m]") == get_default_wavelength()
-        @test prop(props, "Index model") == "function of λ"
-        props = BMO.properties(SphericalLens(50e-3, -50e-3, 5e-3, 25.4e-3, 1.5))
         @test prop(props, "Index model") == "ConstantRefractiveIndex"
-        @test prop(props, "n(λ₀)") == 1.5
         glass = DiscreteRefractiveIndex([1e-6, 2e-6], [1.5, 1.4])
         @test prop(BMO.properties(SphericalLens(50e-3, -50e-3, 5e-3, 25.4e-3, glass)), "Index model") ==
               "DiscreteRefractiveIndex"
@@ -95,15 +92,15 @@ prop(props, name) = (i = findfirst(p -> p.first == name, props); isnothing(i) ? 
         @test prop(BMO.properties(bs), "Reflectance") ≈ 0.3
         @test prop(BMO.properties(bs), "Transmittance") ≈ 0.7
         @test prop(BMO.properties(bs), "Size [m]") ≈ [10e-3, 20e-3]
-        pbs = RoundPlateBeamsplitter(25e-3, 3e-3, λ -> 1.5; reflectance = 0.4)
+        pbs = RoundPlateBeamsplitter(25e-3, 3e-3, ConstantRefractiveIndex(1.5); reflectance = 0.4)
         @test prop(BMO.properties(pbs), "Reflectance") ≈ 0.4
         @test prop(BMO.properties(pbs), "Thickness [m]") ≈ 3e-3
         @test prop(BMO.properties(pbs), "Parts") == 2
-        @test prop(BMO.properties(CubeBeamsplitter(10e-3, λ -> 1.5; reflectance = 0.2)), "Reflectance") ≈ 0.2
+        @test prop(BMO.properties(CubeBeamsplitter(10e-3, ConstantRefractiveIndex(1.5); reflectance = 0.2)), "Reflectance") ≈ 0.2
 
         pf = PolarizationFilter(10e-3)
         @test prop(BMO.properties(pf), "Transmission axis") ≈ collect(transmission_axis(pf))
-        lp = RoundLinearPolarizer(25e-3, 1e-3, 1e-3, λ -> 1.5)
+        lp = RoundLinearPolarizer(25e-3, 1e-3, 1e-3, ConstantRefractiveIndex(1.5))
         @test prop(BMO.properties(lp), "Transmission axis") ≈ collect(transmission_axis(lp))
 
         group = ObjectGroup([RoundPlanoMirror(25e-3, 5e-3), Detector(10e-3), Detector(5e-3)])

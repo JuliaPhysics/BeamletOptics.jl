@@ -7,6 +7,9 @@ using GeometryBasics
 
 const BMO = BeamletOptics
 
+# Subtype without a functor, for the fallback of the refractive index contract
+struct DummyRefractiveIndex <: BMO.AbstractRefractiveIndex end
+
 @testset "Utilities" begin
     @testset "Testing normal3d" begin
         @testset "normal3d(v) with Array" begin
@@ -281,11 +284,8 @@ const BMO = BeamletOptics
         end
 
         @testset "ConstantRefractiveIndex" begin
-            cri = ConstantRefractiveIndex(1.5)
-            @test cri isa BMO.RefractiveIndex
-            @test all(cri(λ) == 1.5 for λ in (1, 1f0, 532e-9))
+            @test ConstantRefractiveIndex(1.5)(532e-9) == 1.5
             @test ConstantRefractiveIndex(1.5f0)(532e-9) isa Float32
-            @test isnothing(BMO.test_refractive_index_function(cri))
         end
 
         @testset "SellmeierEquation" begin
@@ -300,20 +300,21 @@ const BMO = BeamletOptics
             @test all(diff(n_vis) .< 0)
         end
 
-        @testset "Test ref. helper function" begin
-            f1(x::Float64) = x              # fail
-            f2(x::Union{Int, Float64}) = x  # fail
-            f3(x::Real) = "a"               # fail
-            f4(x) = x, 1                    # fail
-            f5(x) = x                       # pass
-            # Test if illegal functions are detected
-            @test_throws ArgumentError BMO.test_refractive_index_function(f1)
-            @test_throws ArgumentError BMO.test_refractive_index_function(f2)
-            @test_throws ArgumentError BMO.test_refractive_index_function(f3)
-            @test_throws ArgumentError BMO.test_refractive_index_function(f4)
-            @test isnothing(BMO.test_refractive_index_function(f5))
-            @test isnothing(BMO.test_refractive_index_function(ref_index))
-            @test isnothing(BMO.test_refractive_index_function(ref_sellm))
+        @testset "AbstractRefractiveIndex contract" begin
+            # One example per concrete subtype in BMO, with wavelengths of each Real type in its domain
+            examples = Dict(
+                ConstantRefractiveIndex => (ConstantRefractiveIndex(1.5), (1, 1f-6, 532e-9)),
+                DiscreteRefractiveIndex => (ref_index, (lambdas[1], T2(lambdas[2]))),
+                SellmeierEquation => (ref_sellm, (1, 1f-6, 532e-9)))
+            models = [getfield(BMO, s) for s in names(BMO; all = true) if isdefined(BMO, s)]
+            filter!(x -> x isa Type && x <: BMO.AbstractRefractiveIndex && !isabstracttype(x), models)
+            @test Set(models) == Set(keys(examples))
+            for (model, λs) in values(examples), λ in λs
+                @test model(λ) isa Real
+            end
+
+            @test_throws ErrorException DummyRefractiveIndex()(532e-9)
+            @test_throws "DummyRefractiveIndex" DummyRefractiveIndex()(532e-9)
         end
     end
 

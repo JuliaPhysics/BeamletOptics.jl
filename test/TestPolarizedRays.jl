@@ -109,11 +109,11 @@ const BMO = BeamletOptics
         s3 = BMO.CuboidMesh(1.0, d, 1.0)
         s4 = BMO.CuboidMesh(1.0, d, 1.0)
         s5 = BMO.CuboidMesh(1.0, d, 1.0)
-        l1 = Lens(s1, x -> n)
-        l2 = Lens(s2, x -> n)
-        l3 = Lens(s3, x -> n)
-        l4 = Lens(s4, x -> n)
-        l5 = Lens(s5, x -> n)
+        l1 = Lens(s1, ConstantRefractiveIndex(n))
+        l2 = Lens(s2, ConstantRefractiveIndex(n))
+        l3 = Lens(s3, ConstantRefractiveIndex(n))
+        l4 = Lens(s4, ConstantRefractiveIndex(n))
+        l5 = Lens(s5, ConstantRefractiveIndex(n))
         translate3d!.([l1, l2, l3, l4, l5], Ref([-0.5, -d / 2, -0.5]))
         BMO.set_new_origin3d!.(BMO.shape.([l1, l2, l3, l4, l5]))
         translate3d!(l2, [0, 0.5, -1d / 2])
@@ -146,7 +146,7 @@ const BMO = BeamletOptics
         # Create Fresnel rhomb with n=1.5 and θ=53.3° for quarter-wave plate effect
         n = 1.5
         s1 = BMO.CuboidMesh(0.5, 1.25, 0.5, deg2rad(53.3))
-        l1 = Lens(s1, x -> n)
+        l1 = Lens(s1, ConstantRefractiveIndex(n))
         translate3d!(l1, [-0.25, 0, -0.25])
         BMO.set_new_origin3d!(s1)
         # Rotate prism to obtain 45° beam input polarization
@@ -325,7 +325,7 @@ const BMO = BeamletOptics
         D = 15mm
         num_rays = 1000
 
-        lens = SphericalLens(R1, R2, l, d, x -> n)
+        lens = SphericalLens(R1, R2, l, d, ConstantRefractiveIndex(n))
 
         x_shift = y_shift = -2mm
         psfd = Detector(10e-3)

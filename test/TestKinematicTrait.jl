@@ -96,7 +96,7 @@ function oriented_subjects()
         BMO.CubeMesh(1mm),
         BMO.SphereSDF(1mm) + BMO.CylinderSDF(1mm, 2mm),
         mirror(),
-        CubeBeamsplitter(10mm, n -> 1.5),
+        CubeBeamsplitter(10mm, ConstantRefractiveIndex(1.5)),
         ObjectGroup([mirror(), lens()]),
         CollimatedSource([0, -50mm, 0], [0, 1, 0], 5mm, 1e-6; num_rings = 2, num_rays = 40),
     ]
@@ -132,7 +132,7 @@ end
             BMO.SphereSDF(1mm) + BMO.CylinderSDF(1mm, 2mm),
             BMO.SphereSDF(1mm) - BMO.CylinderSDF(1mm, 2mm),
             mirror(),
-            CubeBeamsplitter(10mm, n -> 1.5),
+            CubeBeamsplitter(10mm, ConstantRefractiveIndex(1.5)),
             ObjectGroup([mirror(), lens()]),
             CollimatedSource([0, -50mm, 0], [0, 1, 0], 5mm, 1e-6; num_rings = 2, num_rays = 40),
         ]
@@ -193,7 +193,7 @@ end
         m = mirror()
         zrotate3d!(m, deg2rad(45))
         translate3d!(m, [0, 60mm, 0])
-        bs = CubeBeamsplitter(10mm, n -> 1.5)
+        bs = CubeBeamsplitter(10mm, ConstantRefractiveIndex(1.5))
         system = System([bs, m])
         b = Beam([1mm, -50mm, 0.5mm], [0, 1, 0])
         solve_system!(system, b)

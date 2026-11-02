@@ -24,9 +24,9 @@ When this Skill is active:
   - Read `src/` of the installed package (`julia -e 'using BeamletOptics; println(pkgdir(BeamletOptics))'`).
 - Everything is **SI**: meters, radians, watts, V/m. **Wavelengths are in meters** (`532e-9`).
 - The **optical axis is +y**, not z. Components spawn at the origin aligned with +y.
-- **Refractive indices are callables** `n(λ)` (λ in meters): `DiscreteRefractiveIndex(...)`,
-  `SellmeierEquation(...)` or a function. A plain number (`1.5`) is accepted everywhere and stored as
-  `ConstantRefractiveIndex(1.5)`, i.e. without dispersion.
+- **Refractive indices are models** `n(λ)` (λ in meters): `SellmeierEquation(...)`,
+  `DiscreteRefractiveIndex(...)` or `ConstantRefractiveIndex(1.5)` (no dispersion). A plain number or a
+  function as `n` throws a `MethodError`.
 - **Detectors accumulate.** Solve with `solve_system!(system, beam; initialize = true)`, or call `initialize!(system)`
   (all detectors) or `empty!(detector)` (one) before every `solve_system!` that reuses the detectors; never reset
   between sources that should superpose. Field functions superpose all stored hits coherently; moving the detector empties it.

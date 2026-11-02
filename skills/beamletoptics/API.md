@@ -7,7 +7,7 @@ using BeamletOptics
 const mm = 1e-3
 
 # 1. build components (at the origin, aligned with +y)
-lens = SphericalLens(50mm, -50mm, 5mm, 25.4mm, 1.5)
+lens = SphericalLens(50mm, -50mm, 5mm, 25.4mm, ConstantRefractiveIndex(1.5))
 det  = Detector(20mm)
 
 # 2. place them (relative moves, radians)
