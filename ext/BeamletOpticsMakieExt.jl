@@ -14,6 +14,7 @@ import Makie
 using Makie: Figure, Axis3, LScene, mesh!, surface!, lines!, linesegments!, RGBf, RGBAf, scatter!, text!,
              update_cam!, cameracontrols, arrows3d!
 using PrecompileTools: @setup_workload, @compile_workload
+using Preferences: load_preference
 using GeometryBasics: Point2, Point3, Point3f, Point3d, Vec3f, Vec3d, GLTriangleFace, Mesh
 using StaticArrays: SMatrix
 using Base.ScopedValues: ScopedValue, with
@@ -74,6 +75,7 @@ include("RenderCamera.jl")
 # live rendering, must come after all static renderers
 include("RenderLive.jl")
 # precompiles the static and live rendering, must come last
-include("RenderPrecompile.jl")
+# PrecompileTools does not find the preference for an extension: the one of BMO switches off both
+load_preference(BeamletOptics, "precompile_workload", true) && include("RenderPrecompile.jl")
 
 end

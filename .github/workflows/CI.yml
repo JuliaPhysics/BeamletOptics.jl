@@ -33,6 +33,12 @@ jobs:
           - ubuntu-latest
         arch:
           - x64
+        # Coverage of this repository and bounds checks of its @inbounds code on one job only: each
+        # set of flags needs its own build of all dependencies (8 min on 1.12, #216)
+        include:
+          - version: '1'
+            coverage: true
+            flags: --code-coverage=@${{ github.workspace }} --check-bounds=yes
     steps:
       - uses: actions/checkout@v7
       - uses: julia-actions/setup-julia@v3
@@ -40,10 +46,30 @@ jobs:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
       - uses: julia-actions/cache@v3
-      - uses: julia-actions/julia-buildpkg@v1
-      - uses: julia-actions/julia-runtest@v1
+      - name: Instantiate the test environment
+        shell: julia --project=test --color=yes {0}
+        env:
+          JULIA_PKG_PRECOMPILE_AUTO: "0"
+        run: |
+          using Pkg
+          Pkg.instantiate()
+      # Tests do not need fast first calls, and every change of BMO would compile the workloads again.
+      # Not a file of the repository, such that local test runs keep them; the docs build with them
+      - name: Switch off the precompile workloads
+        run: printf '[BeamletOptics]\nprecompile_workload = false\n' > test/LocalPreferences.toml
+      # A step of its own, such that the log shows its time and the workers do not wait for it
+      - name: Precompile
+        run: julia --project=test --color=yes ${{ matrix.flags }} -e 'using Pkg; Pkg.precompile()'
+      # The test environment on the load path, such that the preference also holds in the environment
+      # in which Aqua precompiles the package (persistent tasks)
+      - name: Run tests
+        env:
+          JULIA_LOAD_PATH: "@:${{ github.workspace }}/test:@stdlib"
+        run: julia --project=test --color=yes ${{ matrix.flags }} test/runtests.jl --jobs=4
       - uses: julia-actions/julia-processcoverage@v1
+        if: matrix.coverage
       - uses: codecov/codecov-action@v7
+        if: matrix.coverage
         with:
           files: lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
