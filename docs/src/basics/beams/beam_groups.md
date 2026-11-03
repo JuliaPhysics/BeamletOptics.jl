@@ -86,54 +86,7 @@ Both sources include the marginal rays and should be used with an odd number of 
 
 ## Sampling and number of rays
 
-A [`CollimatedSource`](@ref) or [`PointSource`](@ref) stores how its rays were sampled as a [`BeamletOptics.AbstractSourceSampling`](@ref), such that [`num_rays!`](@ref) can regenerate them with another number of rays in the current pose of the source. The diagram shows how the constructors and `num_rays!` generate the beams with [`BeamletOptics.source_beams`](@ref): dotted arrows are its dispatch branches on the sampling type, the green box is what an own sampling type implements.
-
-```mermaid
-flowchart TB
-    C(["<b>catalog constructor</b><br/>e.g. CollimatedSource(pos, dir, diameter, λ)"])
-    GC(["<b>generic constructor</b><br/>CollimatedSource(pos, dir, diameter, sampling, λ; num_rays)<br/>PointSource(pos, dir, sampling, λ; num_rays)"])
-    N(["<b>num_rays!</b>(src, n)"])
-    W(["<b>given beams</b><br/>e.g. CollimatedSource(beams, diameter, pos, dir)"])
-    SB["<b>sampling_basis</b>(dir, basis, T)<br/>reference vector b1"]
-    SBM["<b>source_beams</b>(sampling, pos, dir, b1,<br/>args..., λ, num_rays, T)"]
-    DISC["<b>DiscRings, DiscSunflower, DiscLine</b><br/><i>CollimatedSource</i>"]
-    CONE["<b>ConeRings, ConeSunflower, ConeFan</b><br/><i>PointSource</i>"]
-    OWN["<b>own AbstractSourceSampling</b><br/>methods of source_beams, min_num_rays (optional)<br/>and numerical_aperture (PointSource)"]
-    NO["<b>NoSampling</b>"]
-    ERR(["ArgumentError"])
-    BM["<b>Vector{Beam}</b><br/>first beam: center ray"]
-    NA["<b>numerical_aperture</b>(sampling)<br/>NA of a PointSource"]
-    G["<b>CollimatedSource / PointSource</b><br/>beams, center, dir, sampling"]
-    MIN["<b>min_num_rays</b>(src.sampling)<br/>20 num_rings, 1 or nothing"]
-
-    C -- "its sampling, e.g. DiscRings(num_rings)" --> GC
-    GC --> SB
-    SB --> SBM
-    N -- "src.sampling, orientation(src), n" --> SBM
-    SBM -.-> DISC
-    SBM -.-> CONE
-    SBM -.-> OWN
-    SBM -.-> NO
-    DISC --> BM
-    CONE --> BM
-    OWN --> BM
-    DISC -- "num_rays < min_num_rays" --> ERR
-    CONE -- "num_rays < min_num_rays" --> ERR
-    NO --> ERR
-    BM -- "replaces src.beams" --> G
-    BM -- "new source" --> NA --> G
-    W -- "sampling = NoSampling()" --> G
-    G -- "min_num_rays(src)" --> MIN
-
-    classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
-    classDef green fill:#38982626,stroke:#389826,stroke-width:2px
-    classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
-    classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
-    class SB,SBM,MIN,NA blue
-    class OWN green
-    class DISC,CONE,NO,BM,G purple
-    class C,GC,N,W,ERR terminal
-```
+A [`CollimatedSource`](@ref) or [`PointSource`](@ref) stores how its rays were sampled, such that [`num_rays!`](@ref) can regenerate them with another number of rays in the current pose of the source. How the beams are generated and how to add an own sampling is described in [Source sampling](@ref).
 
 The catalog constructors above build their sampling and call the generic constructors, which take the sampling as an argument:
 
@@ -141,8 +94,6 @@ The catalog constructors above build their sampling and call the generic constru
 CollimatedSource(::AbstractArray{<:Real}, ::AbstractArray{<:Real}, ::Real, ::BeamletOptics.AbstractSourceSampling, ::Real)
 PointSource(::AbstractArray{<:Real}, ::AbstractArray{<:Real}, ::BeamletOptics.AbstractSourceSampling, ::Real)
 ```
-
-An own sampling is a subtype of [`BeamletOptics.AbstractSourceSampling`](@ref) with a method of `source_beams`; the generic constructors and [`num_rays!`](@ref) then work for it without further code. A sampling for a `PointSource` also implements `numerical_aperture(s)`. A sampling with a lower bound on the number of rays implements `min_num_rays(s)`, and its `source_beams` throws an `ArgumentError` for a `num_rays` below it, as the samplings of BMO do.
 
 ## Astigmatic Beam Groups
 
@@ -199,33 +150,4 @@ GaussianModeDecomposition(::OpticsBase.PlaneField)
 
 ## Solving a beam group
 
-[`solve_system!`](@ref) traces a beam group by solving each of its beams, multithreaded, and the hits of all beams accumulate on the same [`Detector`](@ref)s. The diagram shows the steps of `solve_system!(system, bg)`; the green box is the getter of the beams that a new [`BeamletOptics.AbstractBeamGroup`](@ref) subtype provides, as a `beams` field or a method.
-
-```mermaid
-flowchart TB
-    S(["<b>solve_system!</b>(system, bg)"])
-    BG["<b>beams</b>(bg)<br/>root beams of the group"]
-    EM["<b>empty!</b>(bg)<br/>every beam to its start state"]
-    INI{"initialize = true?"}
-    IN["<b>initialize!</b>(system)<br/>once, before the first beam"]
-    BS["<b>with_bounding_spheres</b>(system)<br/>one table for all beams"]
-    CH["<b>Threads.@threads :greedy</b><br/>over chunks of beams(bg)"]
-    HB["<b>with_hit_buffers</b><br/>detector hits of a chunk<br/>stored at its end"]
-    SB["<b>solve_system!</b>(system, beam; kwargs...)<br/>for each beam of the chunk"]
-    E([done])
-
-    S --> EM --> INI
-    INI -- yes --> IN --> BS
-    INI -- no --> BS
-    BS --> CH --> HB --> SB --> E
-    BG -.-> EM
-    BG -.-> CH
-
-    classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
-    classDef green fill:#38982626,stroke:#389826,stroke-width:2px
-    classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
-    classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
-    class EM,IN,BS,CH,HB,SB blue
-    class BG green
-    class S,E terminal
-```
+[`solve_system!`](@ref) traces a beam group by solving each of its beams, multithreaded, and the hits of all beams accumulate on the same [`Detector`](@ref)s. The internal steps are described in [Solving a beam group internally](@ref).

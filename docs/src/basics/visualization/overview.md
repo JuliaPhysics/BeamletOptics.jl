@@ -43,7 +43,7 @@ visualize your simulation.
 - [Look](look.md): materials, feature edges and lighting of the rendered objects
 - [Scene and camera](camera.md): helpers for framing and annotating a 3D scene
 - [Live rendering](live_rendering.md): plots that follow moving components and changing beams,
-  e.g. for animations, and the render handle protocol for packages built on BeamletOptics
+  e.g. for animations, and how to change a live scene
 
 ## Backends
 

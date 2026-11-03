@@ -104,7 +104,6 @@ makedocs(;
                 "Double slit"               => joinpath("examples", "double_slit.md"),
                 "Point spread functions"    => joinpath("examples", "psf.md"),
             ],
-            "AI assistants"                 => joinpath("tutorials", "ai_assistants.md"),
         ],
         "Basics" => Any[
             "Introduction"                  => joinpath("basics", "intro.md"),
@@ -141,6 +140,7 @@ makedocs(;
                 "Scene and camera"          => joinpath("basics", "visualization", "camera.md"),
                 "Live rendering"            => joinpath("basics", "visualization", "live_rendering.md"),
             ],
+            "AI assistants"                 => joinpath("basics", "ai_assistants.md"),
         ],
         "Developer Documentation" => Any[
             "Developer guide" => Any[
@@ -157,6 +157,10 @@ makedocs(;
                     "SDFs"                      => joinpath("api", "sdfs.md"),
                 ],
                 "Kinematics"                => joinpath("api", "kinematics_api.md"),
+                "Beams and sources"         => joinpath("api", "beams.md"),
+                "Components"                => joinpath("api", "components.md"),
+                "Detectors"                 => joinpath("api", "detectors.md"),
+                "Rendering"                 => joinpath("api", "rendering.md"),
             ],
             "Roadmap" => "roadmap.md",
         ],
