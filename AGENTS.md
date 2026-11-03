@@ -291,9 +291,17 @@ agent has to ask again.
 - Single test module: `julia --project=test -e 'using Pkg; Pkg.instantiate()'` once, then
   `julia --project=test test/<path>.jl`. Run the modules of the code you change.
 - Full suite: `julia --project=. -e 'using Pkg; Pkg.test()'`, once before handing over.
+  [test/runtests.jl](test/runtests.jl) runs the test files in parallel worker processes
+  (ParallelTestRunner.jl); `julia --project=test test/runtests.jl --help` lists its options
+  (`--jobs=N`, a subset of tests by name prefix). The default number of workers is limited by
+  free memory (2 GiB each) and may drop to 1; set it with `Pkg.test(; test_args = ["--jobs=4"])`
+  or `PTR_NUM_JOBS`.
 - Test-only dependencies go into `test/Project.toml`, never the root `Project.toml`.
-- New test files are `module TestXyz ... end`, included in [test/runtests.jl](test/runtests.jl).
-  `Rendering/TestRenderErrors.jl` must run before anything loads the Makie extension.
+- New test files are `module TestXyz ... end` anywhere under `test/`; they are found
+  automatically and must not depend on other test files or on their order.
+  `Rendering/TestRenderErrors.jl` runs in a fresh worker because it needs a process that never
+  loaded the Makie extension; a new test with such a need goes into `makie_free_tests` of
+  `runtests.jl`.
 
 ## Agent skill
 
