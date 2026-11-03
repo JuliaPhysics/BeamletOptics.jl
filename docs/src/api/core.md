@@ -205,9 +205,11 @@ flowchart TB
     IA(["<b>interact3d</b>(system, object, beam, ray)"])
     MS{"<b>shape_trait_of</b>(object)"}
     PO["<b>part_of</b>(hit)<br/>the part that was hit,<br/>e.g. the back lens of a doublet"]
-    K{"own method<br/>of the part?"}
+    K{"own interact3d<br/>of the part?"}
+    HK{"fallback: <b>medium</b> or<br/><b>surface_model</b> declared?"}
+    W(["warning, nothing:<br/>the object blocks the beam"])
     TR["<b>transition</b>(system, ray)<br/><b>boundary_hits</b>: left body, entered body,<br/>thin layer; media from the enclosure"]
-    BOUND["<b>interact3d</b>(system, t, beam, at)<br/>body or thin layer"]
+    BOUND["<b>interact3d</b>(system, t, beam, at)<br/>beamlet: to the model of a thin layer,<br/>else per component ray"]
     SM{"<b>surface_model</b>(t)<br/>model of the thin layer,<br/>else Uncoated"}
     UNC["<b>Uncoated</b><br/><b>cross_boundary</b>: refraction, TIR,<br/>Fresnel for PolarizedRay"]
     MOD["<b>model of a thin layer</b><br/>interact3d(system, model, t, beam, at)<br/>e.g. BeamsplitterCoating: split,<br/>transmit! and reflect!; JonesFilm"]
@@ -218,7 +220,9 @@ flowchart TB
     IA --> MS
     MS -- MultiShape --> PO --> K
     MS -- SingleShape --> K
-    K -- "body or<br/>thin layer" --> TR --> BOUND --> SM
+    K -- "no" --> HK
+    HK -- "neither" --> W
+    HK -- "body or<br/>thin layer" --> TR --> BOUND --> SM
     SM -- "no model" --> UNC --> ENC
     SM -- "model" --> MOD --> ENC
     K -- "own" --> OWN --> ENC
@@ -230,8 +234,8 @@ flowchart TB
     classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
     class TR,BOUND,UNC,ENC blue
     class MOD,OWN green
-    class MS,K,SM purple
-    class IA,E terminal
+    class MS,K,HK,SM purple
+    class IA,E,W terminal
 ```
 
 ```@docs; canonical=false
