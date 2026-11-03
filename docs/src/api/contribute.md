@@ -13,7 +13,8 @@ We would also love to feature your work with this package as part of the **Examp
 To run the full test suite, use `] test` in the package environment; the test files run in
 parallel worker processes. To run a single test
 file standalone, run `julia --project=test -e 'using Pkg; Pkg.instantiate()'` once, then
-`julia --project=test test/<path>.jl`. Tests live in a Pkg workspace subproject
+`julia --project=test test/<path>.jl`; if `test/Project.toml` changed since then, run
+`Pkg.resolve()` before `Pkg.instantiate()`. Tests live in a Pkg workspace subproject
 (`test/Project.toml`); new test-only dependencies are added there, not to the root
 `Project.toml`.
 

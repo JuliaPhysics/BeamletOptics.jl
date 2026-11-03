@@ -289,7 +289,8 @@ agent has to ask again.
 ## Tests
 
 - Single test module: `julia --project=test -e 'using Pkg; Pkg.instantiate()'` once, then
-  `julia --project=test test/<path>.jl`. Run the modules of the code you change.
+  `julia --project=test test/<path>.jl`. Run the modules of the code you change. After a change
+  of `test/Project.toml`, an existing `Manifest.toml` needs `Pkg.resolve()` before that.
 - Full suite: `julia --project=. -e 'using Pkg; Pkg.test()'`, once before handing over.
   [test/runtests.jl](test/runtests.jl) runs the test files in parallel worker processes
   (ParallelTestRunner.jl); `julia --project=test test/runtests.jl --help` lists its options
