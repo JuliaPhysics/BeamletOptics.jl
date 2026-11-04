@@ -20,8 +20,6 @@ update_render!(hsys)              # moved components: only their model transform
 update_render!(hbeam)             # beam path: point buffer is replaced in place
 ```
 
-Which `live_render!` method draws a thing, which handle it returns and how `update_render!` refreshes it are described in [Live rendering dispatch](@ref) and [Updating a handle](@ref).
-
 - **Objects and systems**: the geometry is rendered once with `render!`. Kinematic changes
   (`translate3d!`, `rotate3d!`, ...) are then applied as a rigid model transformation of the
   existing plots, which costs microseconds regardless of the mesh resolution.
@@ -33,6 +31,8 @@ Which `live_render!` method draws a thing, which handle it returns and how `upda
   of which every `render_every`-th beamlet is rendered.
 
 `live_render!` draws the same plots as `render!`, see [Rays and beams](@ref "Rendering rays and beams") and [Gaussian beamlets](@ref "Rendering Gaussian beamlets"); it only keeps the data they are drawn from. Use [`remove_render!`](@ref) to delete the plots of a handle.
+
+Which `live_render!` method draws a thing, which handle it returns and how `update_render!` refreshes it are described in [Live rendering dispatch](@ref) and [Updating a handle](@ref).
 
 ## Changing a live scene
 

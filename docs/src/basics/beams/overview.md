@@ -6,9 +6,7 @@ Main.DocUtils.conditional_include(joinpath(beam_catalog_dir, "beam_catalog_showc
 
 # Beams
 
-As mentioned in the [Rays](@ref) section, a beam within the context of this package serves as a data structure for storing collections of rays, forming the backbone of the simulation framework. Beams are intended to be designed as [AbstractTrees](https://github.com/JuliaCollections/AbstractTrees.jl) to allow for ray bifurcations, e.g. in the case of optical elements such as beamsplitters. The [`solve_system!`](@ref) function relies on this data structure to perform ray tracing computations within optical systems. 
-
-To ensure compatibility and extensibility, beam types must adhere to the [`BeamletOptics.AbstractBeam`](@ref) interface. Refer to its documentation for more information. Browse the catalog below, or refer to the table of contents for detailed documentation of the provided beam types and sources.
+As mentioned in the [Rays](@ref) section, a beam within the context of this package serves as a data structure for storing collections of rays, forming the backbone of the simulation framework. A beam splits into child beams, e.g. at a beamsplitter, and [`solve_system!`](@ref) traces it together with all its children. Browse the catalog below, or refer to the table of contents for detailed documentation of the provided beam types and sources.
 
 ## Beam catalog
 
@@ -27,7 +25,7 @@ Depth = 2
 
 ## Beam models
 
-A [`Beam`](@ref) stores a vector of rays, and the beamlets are built from it: a [`GaussianBeamlet`](@ref) traces a chief, a waist and a divergence `Beam` side by side, an [`AstigmaticGaussianBeamlet`](@ref) a chief `Beam` of [`PolarizedRay`](@ref)s and eight auxiliary ones. The diagram shows which beams and rays the beam types are made of; the full beam interface is described in [Beam interface](@ref):
+The beamlets are traced as several [`Beam`](@ref)s of rays side by side:
 
 ```mermaid
 flowchart TB
@@ -46,9 +44,7 @@ flowchart TB
     class RAY purple
 ```
 
-### Interactions of beamlets
-
-A beamlet stops when its rays hit different shapes or its invariant check fails. The tracing loop is described in [Tracing a beamlet](@ref).
+A beamlet stops when its rays hit different shapes or its invariant check fails. The tracing loop and the interface of a beam type are described in [Tracing a beamlet](@ref) and [Beam interface](@ref).
 
 ## Moving beams
 

@@ -133,7 +133,7 @@ An own sampling is a subtype of [`BeamletOptics.AbstractSourceSampling`](@ref) w
 
 ## Solving a beam group internally
 
-[`solve_system!`](@ref) traces a beam group by solving each of its beams, multithreaded, and the hits of all beams accumulate on the same [`Detector`](@ref)s. The diagram shows the steps of `solve_system!(system, bg)`; the green box is the getter of the beams that a new [`BeamletOptics.AbstractBeamGroup`](@ref) subtype provides, as a `beams` field or a method.
+The diagram shows the steps of `solve_system!(system, bg)`, see [Solving a beam group](@ref); the green box is the getter of the beams that a new [`BeamletOptics.AbstractBeamGroup`](@ref) subtype provides, as a `beams` field or a method.
 
 ```mermaid
 flowchart TB
