@@ -52,6 +52,19 @@ const SKILL_DIR = joinpath(@__DIR__, "..", "skills", "beamletoptics")
         end
     end
 
+    @testset "the copy of a read-only folder is writable" begin
+        # as Pkg installs a package; no chmod of the copy, which a network drive refuses
+        mktempdir() do dir
+            src, dst = joinpath(dir, "src"), joinpath(dir, "dst")
+            mkpath(joinpath(src, "sub"))
+            write(joinpath(src, "sub", "a.md"), "a")
+            chmod(joinpath(src, "sub", "a.md"), 0o444)
+            BeamletOptics._copy_contents(src, dst)
+            @test read(joinpath(dst, "sub", "a.md"), String) == "a"
+            @test uperm(joinpath(dst, "sub", "a.md")) & 0x02 != 0
+        end
+    end
+
     # Catches removed names and changed signatures or keywords, not changed semantics.
     # Rendering templates need a Makie backend and are skipped.
     @testset "Headless templates run" begin
