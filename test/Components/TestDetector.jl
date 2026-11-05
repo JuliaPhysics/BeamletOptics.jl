@@ -41,6 +41,21 @@ struct DummyHit <: BMO.AbstractDetectorHit end
     @test isnothing(BMO.hits(pd))
 end
 
+@testset "Spot diagram keywords of beamlets" begin
+    # The contour is the beam radius at the detector, scaled by crop_factor
+    for beam in (GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], 1e-6, 1mm),
+        AstigmaticGaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], 1e-6, 1mm))
+        pd = Detector(100mm)
+        translate3d!(pd, [0, 100mm, 0])
+        solve_system!(System([pd]), beam)
+        default = spot_diagram(pd)
+        @test length(default) == 50
+        spots = spot_diagram(pd; num_spots = 12, crop_factor = 2)
+        @test length(spots) == 12
+        @test all(p -> isapprox(norm(p), 2 * norm(first(default)); rtol = 1e-9), spots)
+    end
+end
+
 @testset "Ray hits: points and directions in detector coordinates" begin
     # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/191: rays from the origin onto a
     # detector at distance L, then the whole setup moved, which changes no local value

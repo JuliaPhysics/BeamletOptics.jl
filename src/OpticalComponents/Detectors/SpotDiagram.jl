@@ -1,20 +1,23 @@
 """
-    spot_diagram(d::Detector)
+    spot_diagram(d::Detector; num_spots = 50, crop_factor = 1)
 
-Returns an array of 2D points in local detector coordinates that represent the points of intersection for incoming beams.
+Returns an array of 2D points in the local (x, z) coordinates of the detector in \\[m\\] that
+represent where the incoming beams hit it.
 
 # Beams
 
-For [`Beam`](@ref)s, the point of intersection on the screen surface is stored.
+For [`Beam`](@ref)s, the point of intersection on the screen surface is returned. The keywords
+are ignored.
 
 # Beamlets
 
-For [`GaussianBeamlet`](@ref)s, the projected 1/e² waist is returned. The number of points and radius can be adjusted via the 
-`num_spots` and `crop_factor` keyword arguments.
+For [`GaussianBeamlet`](@ref)s and [`AstigmaticGaussianBeamlet`](@ref)s, each hit gives a contour
+of `num_spots` points: the 1/e² beam radius at the detector, scaled by `crop_factor` and projected
+onto the detector along the chief ray.
 
 A detector that no beam hit returns no points, an empty vector.
 """
-spot_diagram(d::Detector) = spot_diagram(d, hits(d))
+spot_diagram(d::Detector; kwargs...) = spot_diagram(d, hits(d); kwargs...)
 
 spot_diagram(::Detector{T}, ::Nothing; kwargs...) where T = Point2{T}[]
 
