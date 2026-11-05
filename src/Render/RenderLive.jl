@@ -119,11 +119,14 @@ end
 Returns the object of a live-rendered object or system `handle` that is visualized by the `plot`
 (one of its [`pickable_plots`](@ref), or a child plot of one), or `nothing` if the `plot` does not
 belong to the `handle`. For a system handle, the top-level object, i.e. the outermost group of
-the picked object, see [`render_parent`](@ref).
+the picked object, see [`render_parent`](@ref). Beams cannot be picked, a beam handle returns
+`nothing`.
 
 If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
 """
 pick_object(::Any, ::Any) = throw(MissingBackendError())
+
+pick_object(::AbstractBeamRenderHandle, ::Any) = nothing
 
 function pick_object(h::AbstractSystemRenderHandle, plot)
     for child in children(h)

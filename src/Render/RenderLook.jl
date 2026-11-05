@@ -7,9 +7,14 @@ The colors of the material classes (`:refractive`, `:reflective`, `:coating`, `:
 `:detector`, `:mechanics`, `:interface`) of the active look, see [`set_render_look`](@ref), e.g. to
 recolor the rendered objects of a class for a dark background.
 
-Needs the `Makie` extension, i.e. a loaded Makie backend.
+If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
 """
-function look_colors end
+function look_colors()
+    # The extension cannot add a method with the same signature, so it is looked up
+    ext = Base.get_extension(@__MODULE__, :BeamletOpticsMakieExt)
+    isnothing(ext) && throw(MissingBackendError())
+    return ext._look_colors()
+end
 
 """
     studio_lighting!(ax::Union{LScene, Axis3}; preset = :studio)

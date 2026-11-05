@@ -68,7 +68,7 @@ end
 """Returns the material presets of the active look."""
 _materials() = _LOOK[] === :cad ? _CAD_MATERIALS : _MODERN_MATERIALS
 
-look_colors() = Dict{Symbol, RGBf}(class => m.color for (class, m) in _materials())
+_look_colors() = Dict{Symbol, RGBf}(class => m.color for (class, m) in _materials())
 
 """Material classes with feature edges in the `:modern` look, i.e. faint silhouettes of the glass."""
 const _MODERN_EDGE_CLASSES = (:refractive, :coating, :interface)

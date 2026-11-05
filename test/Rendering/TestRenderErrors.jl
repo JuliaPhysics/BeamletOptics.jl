@@ -34,7 +34,7 @@ const BMO = BeamletOptics
     @test_throws BMO.MissingBackendError set_render_look(:cad)
     @test_throws BMO.MissingBackendError studio_lighting!(axis)
     @test_throws BMO.MissingBackendError live_render!(() -> nothing, axis, cube)
-    @test_throws MethodError BMO.look_colors()
+    @test_throws BMO.MissingBackendError BMO.look_colors()
 end
 
 end
