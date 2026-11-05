@@ -10,6 +10,9 @@ import NodeJS_20_jll
 
 include(joinpath(@__DIR__, "DocUtils.jl"))
 
+# The roadmap board is generated from the GitHub milestones on every build (see `.gitignore`)
+DocUtils.fetch_milestones(joinpath(@__DIR__, "src", "components", "milestones.json"))
+
 # Literate-based tutorials: the source of truth is the `.jl` file in `docs/literate`.
 # `Literate.markdown` regenerates the corresponding page in `docs/src/tutorials` (see
 # `.gitignore`), and `Literate.script`/`Literate.notebook` produce the downloadable
