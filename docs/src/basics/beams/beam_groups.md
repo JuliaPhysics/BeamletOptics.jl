@@ -7,14 +7,7 @@ Main.DocUtils.conditional_include(joinpath(beam_showcase_dir, "pointsource_sc.jl
 
 # Beam groups
 
-For convenience, the [`BeamletOptics.AbstractBeamGroup`](@ref) offers a container-like interface for groups of [`Beam`](@ref)s as commonly used in other software packages. The following concrete implementations are currently provided:
-
-```@repl
-using BeamletOptics # hide
-BeamletOptics.list_subtypes(BeamletOptics.AbstractBeamGroup);
-```
-
-Refer to the following sections for convenience constructors to generate the sources listed above.
+For convenience, the [`BeamletOptics.AbstractBeamGroup`](@ref) offers a container-like interface for groups of [`Beam`](@ref)s as commonly used in other software packages. The available beam groups are shown in the [Beam catalog](@ref); the following sections describe the constructors that generate them.
 
 !!! tip "Moving a beam group"
     Every beam group has a source position (`center`) and an [`orientation`](@ref) matrix, whose second column is the central source [`direction`](@ref) and whose first column is the sampling reference vector (`basis`). Both are updated when the group is moved. Refer to [`BeamletOptics.AbstractBeamGroup`](@ref) for the convention and to [Moving sources](@ref) for the kinematic API.

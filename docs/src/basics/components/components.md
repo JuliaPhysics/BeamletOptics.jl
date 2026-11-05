@@ -34,14 +34,5 @@ BeamletOptics.properties
 BeamletOptics.default_properties
 ```
 
-## Listing available components
-
-When using this package in the REPL, a tree view of all implemented [`BeamletOptics.AbstractObject`](@ref)s can be generated via the [`BeamletOptics.list_subtypes`](@ref) helper function. Note that this function is not able to determine all available constructors.
-
-```@repl
-using BeamletOptics # hide
-BeamletOptics.list_subtypes(BeamletOptics.AbstractObject);
-```
-
 !!! tip "Own components"
     The geometry of a component lives in its shape, its optical effect in its [`BeamletOptics.interact3d`](@ref) method. To add a component of your own, see [Implementing components](@ref) for the functions a solve calls on an object and how the component families react to a hit.

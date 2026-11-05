@@ -49,13 +49,3 @@ A beamlet stops when its rays hit different shapes or its invariant check fails.
 ## Moving beams
 
 Rays, beams and beam groups can be moved with the same kinematic API as optical elements, see [Moving sources](@ref) in the [Kinematics](@ref) section.
-
-## Listing available beams
-
-When using this package in the REPL, a tree view of all implemented [`BeamletOptics.AbstractBeam`](@ref)s and [`BeamletOptics.AbstractBeamGroup`](@ref)s can be generated via the [`BeamletOptics.list_subtypes`](@ref) helper function. Note that this function is not able to determine all available constructors.
-
-```@repl
-using BeamletOptics # hide
-BeamletOptics.list_subtypes(BeamletOptics.AbstractBeam);
-BeamletOptics.list_subtypes(BeamletOptics.AbstractBeamGroup);
-```
