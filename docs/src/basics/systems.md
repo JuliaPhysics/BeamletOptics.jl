@@ -56,14 +56,14 @@ The numerical tolerances and defaults of the solver are global settings. Each ha
 
 | Getter | Default | Meaning |
 | :--- | :---: | :--- |
-| [`get_invariant_threshold`](@ref) | `1e-6` | limit of the complex invariant of an astigmatic beamlet |
+| [`get_invariant_threshold`](@ref) | `1e-6` | limit in \[m\] of the complex invariant of an astigmatic beamlet |
 | [`get_lagrange_tolerance`](@ref) | `0.5` | relative deviation of the Lagrange invariant of a beamlet |
-| [`get_sdf_surface_threshold`](@ref) | `1e-9` | SDF value below which a ray counts as starting on the surface |
-| [`get_sdf_raymarch_eps`](@ref) | `1e-10` | epsilon of the ray marching |
+| [`get_sdf_surface_threshold`](@ref) | `1e-9` | SDF value in \[m\] below which a ray counts as starting on the surface |
+| [`get_sdf_raymarch_eps`](@ref) | `1e-10` | surface distance and minimum step of the ray marching in \[m\] |
 | [`get_sdf_miss_distance`](@ref) | `1e15` | path length in \[m\] after which a marched ray is a miss |
-| [`get_internal_reflection_threshold`](@ref) | `1e-6` | detection of total internal reflection |
-| [`get_line_plane_intersection_threshold`](@ref) | `1e-6` | line-plane intersections |
-| [`get_orthogonality_threshold`](@ref) | `1e-10` | orthogonality checks, e.g. of beam support axes |
+| [`get_internal_reflection_threshold`](@ref) | `1e-6` | deviation of the reflectances from 1 below which a reflection is total, dimensionless |
+| [`get_line_plane_intersection_threshold`](@ref) | `1e-6` | magnitude of the cosine between line and plane normal below which they are parallel, dimensionless |
+| [`get_orthogonality_threshold`](@ref) | `1e-10` | magnitude of the dot product of unit vectors that still counts as orthogonal, e.g. for beam support axes, dimensionless |
 | [`get_default_r_max`](@ref) | `100` | rays per beam, the `r_max` of [`solve_system!`](@ref) |
 | [`get_default_depth_max`](@ref) | `100` | branching levels of the beam tree, the `depth_max` of [`solve_system!`](@ref) |
 | [`get_default_wavelength`](@ref) | `1e-6` | wavelength in \[m\] |

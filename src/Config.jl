@@ -12,8 +12,9 @@ const invariant_threshold = @load_preference("invariant_threshold", 1e-6)
 """
     get_invariant_threshold()
 
-Returns the global configuration threshold for the paraxial optical invariant check: the limit of
-the complex invariant of an astigmatic beamlet. The Lagrange invariants of both beamlets use
+Returns the global configuration threshold for the paraxial optical invariant check: the limit in
+\\[m\\] of the complex coupling invariant `h1 ⋅ u2 - h2 ⋅ u1` of an astigmatic beamlet, with the ray
+heights `h` in \\[m\\] and the dimensionless slopes `u`. Defaults to `1e-6`. The Lagrange invariants of both beamlets use
 [`get_lagrange_tolerance`](@ref).
 """
 get_invariant_threshold() = invariant_threshold
@@ -38,14 +39,18 @@ const sdf_miss_distance = @load_preference("sdf_miss_distance", 1e15)
 """
     get_sdf_surface_threshold()
 
-Returns the global configuration threshold for the Signed Distance Field (SDF) surface detection.
+Returns the global configuration threshold for the Signed Distance Field (SDF) surface detection:
+a ray whose start has an SDF value below this distance in \\[m\\] counts as starting on the surface.
+Defaults to `1e-9` (configurable via the `sdf_surface_threshold` preference).
 """
 get_sdf_surface_threshold() = sdf_surface_threshold
 
 """
     get_sdf_raymarch_eps()
 
-Returns the global configuration epsilon for the SDF ray marching algorithm.
+Returns the global configuration epsilon for the SDF ray marching algorithm, a distance in \\[m\\]:
+the SDF value below which the marched ray has reached the surface, and the minimum step.
+Defaults to `1e-10` (configurable via the `sdf_raymarch_eps` preference).
 """
 get_sdf_raymarch_eps() = sdf_raymarch_eps
 
@@ -67,21 +72,29 @@ const orthogonality_threshold = @load_preference("orthogonality_threshold", 1e-1
 """
     get_internal_reflection_threshold()
 
-Returns the global configuration threshold for total internal reflection detection.
+Returns the global configuration threshold for total internal reflection detection, dimensionless:
+a reflection counts as total if the reflectances `|rs|²` and `|rp|²` both deviate from 1 by at most
+this value. Defaults to `1e-6` (configurable via the `internal_reflection_threshold` preference).
 """
 get_internal_reflection_threshold() = internal_reflection_threshold
 
 """
     get_line_plane_intersection_threshold()
 
-Returns the global configuration threshold for line-plane intersection calculations.
+Returns the global configuration threshold for line-plane intersection calculations, dimensionless:
+a line whose direction has a dot product with the plane normal of at most this magnitude counts as
+parallel to the plane and does not intersect it. Defaults to `1e-6` (configurable via the
+`line_plane_intersection_threshold` preference).
 """
 get_line_plane_intersection_threshold() = line_plane_intersection_threshold
 
 """
     get_orthogonality_threshold()
 
-Returns the global configuration threshold for orthogonality checks (e.g., beam support axes).
+Returns the global configuration threshold for orthogonality checks (e.g., beam support axes),
+dimensionless: the largest magnitude of the dot product of two unit vectors that still counts as
+orthogonal. For the field `E0` of a [`PolarizedRay`](@ref BeamletOptics.PolarizedRay) it is scaled by `|E0|`. Defaults to `1e-10`
+(configurable via the `orthogonality_threshold` preference).
 """
 get_orthogonality_threshold() = orthogonality_threshold
 
