@@ -34,7 +34,7 @@ A beam that stores its rays itself must also implement `rays` and `empty!`, othe
 methods recurse. Everything else (`rays`, `first_ray`, `empty!`, `position`, `direction`, the lengths
 and the kinematic API) has generic methods built on `_component_beams`.
 
-## Kinematic API
+## Kinematic
 
 `AbstractBeam`s are [`BeamletOptics.Movable`](@ref) with a [`BeamletOptics.Directed`](@ref) frame, see
 [`BeamletOptics.AbstractKinematicTrait`](@ref). A subtype needs no move methods of its own: the generic

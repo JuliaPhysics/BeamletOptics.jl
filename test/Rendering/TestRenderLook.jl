@@ -388,6 +388,29 @@ end
         @test_throws Ext.InvalidAxisError studio_lighting!(Axis(Figure()[1, 1]))
     end
 
+    @testset "Camera helpers need an LScene" begin
+        mirror = RoundPlanoMirror(25e-3, 5e-3)
+        for ax in (Axis3(Figure()[1, 1]), Axis(Figure()[1, 1]))
+            @test_throws Ext.InvalidAxisError get_view(ax)
+            @test_throws Ext.InvalidAxisError set_view(ax, Matrix{Float32}(I, 4, 4))
+            @test_throws Ext.InvalidAxisError set_view(ax, [0, -1, 0], [0, 0, 0], [0, 0, 1])
+            @test_throws Ext.InvalidAxisError set_orthographic(ax)
+            @test_throws Ext.InvalidAxisError hide_axis(ax)
+            @test_throws Ext.InvalidAxisError hide_axis(ax, false)
+            @test_throws Ext.InvalidAxisError look_at!(ax, [0, 0, 0], [0, -1, 0])
+            @test_throws Ext.InvalidAxisError arrow!(ax, [0, 0, 0], [1, 0, 0]; scale = 2)
+            @test_throws Ext.InvalidAxisError render_lcs!(ax)
+            @test_throws Ext.InvalidAxisError render_lcs!(ax, [0, 0, 0], Matrix(1.0I, 3, 3))
+            @test_throws Ext.InvalidAxisError render_lcs!(ax, mirror; scale = 2)
+        end
+        # The LScene methods are unaffected
+        ls = LScene(Figure()[1, 1])
+        @test isnothing(set_orthographic(ls))
+        @test isnothing(render_lcs!(ls, mirror))
+        @test endswith(Ext.InvalidAxisError(Axis3, "LScene").msg, "must be LScene")
+        @test endswith(Ext.InvalidAxisError(Axis3).msg, "must be LScene or Axis3")
+    end
+
     @testset "look_colors" begin
         colors = BMO.look_colors()
         @test colors isa Dict{Symbol, RGBf}

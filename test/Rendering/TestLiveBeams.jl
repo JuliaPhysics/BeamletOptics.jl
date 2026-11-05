@@ -634,6 +634,13 @@ end
         @test BMO.render_settings(h) == (; flen = 0.3, render_every = 1, color = :blue)
         @test BMO.render_settings!(h) === h
     end
+
+    @testset "Beams cannot be picked" begin
+        _, _, _, beam = _lens_mirror_fixture()
+        ax = LScene(Figure()[1, 1])
+        h = live_render!(ax, beam)
+        @test pick_object(h, only(BMO.render_plots(h))) === nothing
+    end
 end
 
 end # module

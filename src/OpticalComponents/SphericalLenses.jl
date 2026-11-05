@@ -35,8 +35,9 @@ end
 """
     ThinLens(R1::Real, R2::Real, d::Real, n::AbstractRefractiveIndex)
 
-Directly creates an ideal spherical thin [`Lens`](@ref) with radii of curvature `R1` and `R2` and diameter `d`
-and [`AbstractRefractiveIndex`](@ref) `n`.
+Directly creates a bi-convex spherical thin [`Lens`](@ref) with the radii of curvature `R1` and `R2` of
+its convex front and back (both positive), the diameter `d` and the [`AbstractRefractiveIndex`](@ref) `n`.
+The two spherical caps are flush, i.e. the lens has no cylindrical section between them.
 """
 function ThinLens(R1::Real, R2::Real, d::Real, n::AbstractRefractiveIndex)
     shape = ThinLensSDF(R1, R2, d)

@@ -24,7 +24,8 @@ function spot_x(dx)
     translate3d!(pd, T[0, 0.1, 0])
     beam = Beam(T[0, -0.05, 0], T[0, 1, 0], T(1e-6))
     solve_system!(System([lens, pd]), beam)
-    return BeamletOptics.hit_point(only(BeamletOptics.hits(pd)))[1]
+    # Local x of the detector equals global x in its initial orientation
+    return first(only(spot_diagram(pd)))
 end
 
 ForwardDiff.derivative(spot_x, 0.0)   # ≈ 1.90
@@ -53,5 +54,9 @@ e.g. of a Michelson interferometer vs. the position of a mirror.
   passed: `ObjectGroup(objects, T)`.
 - **Forward mode only.** The cost grows with the number of parameters. Reverse-mode AD (Zygote,
   Enzyme) is not supported, since the tracing mutates its beams and objects.
+- **No bounding sphere pretest.** The [Bounding sphere pretest](@ref) is skipped for dual numbers,
+  so every ray is tested against every object and ray marching through a signed distance function
+  runs up to [`BeamletOptics.get_sdf_miss_distance`](@ref) when it misses. A solve with dual
+  numbers is therefore slower than with `Float64`, but its result is the same.
 - **Compile time.** Each new combination of dual number and setup is compiled on its first call,
   which takes several seconds.

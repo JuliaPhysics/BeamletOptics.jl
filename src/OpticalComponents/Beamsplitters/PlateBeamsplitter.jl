@@ -81,7 +81,7 @@ the substrate lies on the positive y-side of it, from y = 0 to `thickness`. See 
 
 # Keywords
 
-- `reflectance`: defines the splitting ratio in [-], i.e. R = 0 ... 1.0
+- `reflectance`: defines the power reflectance R (dimensionless) of the coating, in the open interval (0, 1)
 """
 function RectangularPlateBeamsplitter(
         width::Real,
@@ -135,7 +135,7 @@ lies on the positive y-side of it, from y = 0 to `thickness`. See also [`Rectang
 
 # Keywords 
 
-- `reflectance`: defines the splitting ratio in [-], i.e. R = 0 ... 1.0
+- `reflectance`: defines the power reflectance R (dimensionless) of the coating, in the open interval (0, 1)
 """
 function RoundPlateBeamsplitter(
         diameter::Real,

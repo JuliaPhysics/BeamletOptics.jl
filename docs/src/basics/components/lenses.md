@@ -51,6 +51,7 @@ A [`Lens`](@ref) can be then constructed with the following function call:
 
 ```@docs; canonical=false
 Lens(::BeamletOptics.AbstractRotationallySymmetricSurface, ::BeamletOptics.AbstractRotationallySymmetricSurface, ::Real, ::BeamletOptics.AbstractRefractiveIndex)
+Lens(::BeamletOptics.AbstractRotationallySymmetricSurface, ::Real, ::BeamletOptics.AbstractRefractiveIndex)
 ```
 
 ### Lens constructor example
@@ -115,6 +116,12 @@ The spherical lenses are shown below. To recreate this figure, refer to the [Sph
 
 ![Spherical lens showcase](spherical_lens_showcase.png)
 
+A [`ThinLens`](@ref) is a bi-convex lens whose two spherical caps sit flush, without a cylindrical section between them. It is created directly or by [`SphericalLens`](@ref) with a thickness of `l = 0`. Note that its actual thickness is not zero.
+
+```@docs; canonical=false
+ThinLens
+```
+
 ## Aspherical lenses
 
 Aspherical lenses offer more advanced control over aberrations, enabling higher performance in specialized optical systems. The package offers surface support for rotationally symetrical [aspheric lenses](https://en.wikipedia.org/wiki/Aspheric_lens) that adhere to the DIN ISO 10110 convention with even terms.
@@ -161,7 +168,7 @@ L3 = Lens(
 Cylindrical lenses are non-rotationally symmetric lenses where a spherical or aspherical curvature is present only in one dimension, i.e. leading to a cylindrical shape.
 Thus, they focus or collimate light only in one dimension. This package currently supports convex/concave cylindrical and acylindrical lenses with an even aspheric deviation from the cylindrical shape.
 
-A plano-convex cylindrical lens can be constructed in the following way. Note that for this lens type a plano-surface can be constructed by passing a [`RectangularFlatSurface`](@ref) to the lens constructor:
+A plano-convex cylindrical lens can be constructed in the following way. The form with one surface, the thickness and the refractive index adds the flat back surface itself, a [`RectangularFlatSurface`](@ref) with the diameter of the front surface. Alternatively, pass a `RectangularFlatSurface` explicitly as the other surface of the two-surface constructor:
 
 ```julia
 r = 5.2e-3  # radius
@@ -228,5 +235,6 @@ common surfaces. As for the doublet, a triplet lens is constructed from surface 
 
 ```@docs; canonical=false
 TripletLens
+TripletLens(::BeamletOptics.AbstractRotationallySymmetricSurface, ::BeamletOptics.AbstractRotationallySymmetricSurface, ::BeamletOptics.AbstractRotationallySymmetricSurface, ::BeamletOptics.AbstractRotationallySymmetricSurface, ::Real, ::Real, ::Real, ::BeamletOptics.AbstractRefractiveIndex, ::BeamletOptics.AbstractRefractiveIndex, ::BeamletOptics.AbstractRefractiveIndex)
 SphericalTripletLens(::Any, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any)
 ```

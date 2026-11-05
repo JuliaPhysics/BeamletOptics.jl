@@ -44,7 +44,7 @@ This means that either one of the following packages must be loaded in combinati
 
 If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
 
-# Implementations reqs.
+# Implementation reqs.
 
 All concrete implementations of `render!` must adhere to the following minimal interface:
 
@@ -56,4 +56,4 @@ All concrete implementations of `render!` must adhere to the following minimal i
 
 Refer to the `BeamletOptics` extension docs for `Makie` for more information.
 """
-render!(::Any, ::_RenderTypes, kwargs...) = throw(MissingBackendError())
+render!(::Any, ::_RenderTypes, args...; kwargs...) = throw(MissingBackendError())

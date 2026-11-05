@@ -92,9 +92,15 @@ iscircular(ray::PolarizedRay) = iscircular(polarization(ray))
 iselliptical(ray::PolarizedRay) = iselliptical(polarization(ray))
 
 """
-    PolarizedRay(pos, dir, λ = 1000e-9, E0 = [1, 0, 0])
+    PolarizedRay(pos, dir, λ = 1000e-9, E0 = [electric_field(1), 0, 0])
 
-1 V/m in x-dir.
+Constructs a [`PolarizedRay`](@ref) at `pos` \\[m\\] along `dir` with the wavelength `λ` \\[m\\] in a
+medium of refractive index 1.
+
+The default `E0` is the field phasor of an intensity of 1 W/m², i.e. `electric_field(1)`
+≈ 27.4 V/m, polarized along x. `E0` is the complex electric field vector in \\[V/m\\] and must be
+orthogonal to `dir`, otherwise the constructor throws an `ErrorException`: the default fails for a
+`dir` along x, pass an `E0` explicitly in that case.
 """
 function PolarizedRay(
         pos::AbstractArray{P},

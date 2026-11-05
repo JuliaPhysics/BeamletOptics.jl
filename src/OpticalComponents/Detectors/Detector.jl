@@ -3,7 +3,7 @@
 
 Represents a **flat** rectangular or quadratic, infinitesimally thin surface in R³.
 The detector surface is a detection screen that captures incoming ray or beamlet data.
-The active surface is discretized in the local R² x-y-coordinate system.
+The active surface is discretized in the local R² (x, z) coordinate system, see below.
 If configured, beams or beamlets can continue tracing after hitting the detector.
 
 # Hits
@@ -21,6 +21,7 @@ Refer to the respective function documentation.
 - [`ray_hits`](@ref)
 - [`electric_field`](@ref)
 - [`intensity`](@ref)
+- [`optical_power`](@ref)
 
 # Additional information
 
@@ -52,7 +53,7 @@ of a **left-handed** (x, z) surface coordinate system, where incoming beams inte
 # Fields
 
 - `shape`:
-  geometry of the active surface, must represent 2D-`field` in `x` any `y` dimensions,
+  geometry of the active surface, must represent a 2D field in the local `x` and `z` dimensions,
   normal vector direction must adhere to definition above
 - `hits`:
   a union of `Nothing` and all implemented [`AbstractDetectorHit`](@ref)s, resettable via `empty!`

@@ -44,7 +44,7 @@ features:
     linkText: Learn more
   - icon: "📊"
     title: Visualization + GUI
-    details: Move components in an interactive live view with BeamletOpticsGUI, render setups and beams in 2D and 3D with CairoMakie or GLMakie.
+    details: Move components in an interactive live view with BeamletOpticsGUI, render setups and beams in 3D with CairoMakie or GLMakie.
     link: /basics/visualization/overview
     linkText: Learn more
   - icon: "🧩"

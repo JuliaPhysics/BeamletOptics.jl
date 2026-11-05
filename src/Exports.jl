@@ -87,7 +87,9 @@ public AbstractDetectorSampling, sample_points, DetectorSamples
 # optional part of the shape interface, see AbstractShape
 public bounding_sphere_of, AbstractBoundingSphere, NoBoundingSphere, SingleBoundingSphere, MultiBoundingSphere
 # own assembly types of separate parts, see AbstractObjectGroup
-public AbstractObjectGroup, check_kinematic_members
+public AbstractObjectGroup, check_kinematic_members, objects
+# agent skill shipped with the package, see docs/src/basics/ai_assistants.md
+public install_agent_skill
 # element type of path_segments
 public PathSegment
 public AbstractSourceSampling, NoSampling, DiscRings, DiscSunflower, DiscLine, ConeRings, ConeSunflower,

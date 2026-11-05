@@ -249,12 +249,14 @@ never `TODO`. Docstrings are short and correct: full ones on abstract types (T1)
 constructors (units such as `\\[m\\]` in the Julia source, orientation, limits as `!!! warning`,
 `# Arguments`);
 internal functions get one or two sentences. Known approximations are documented, not guarded on
-hot paths. Explanations (why, flows) go on the docs page that embeds the docstrings: every core
-system (a protocol or data flow across several types or files, e.g. the intersect-interact loop,
-detector readout, sources, kinematics, the render protocol) has a Mermaid flowchart there in the
-style of "Diagrams" in [docs/src/api/docdev.md](docs/src/api/docdev.md), derived from the code
-and updated by every change to the system. Pages embed docstrings instead of repeating them; see
-also "Documentation philosophy" and "Docstring conventions" in docdev.md.
+hot paths. Explanations (why, flows) go on the docs page that embeds the docstrings. Basics pages
+explain what a building block is and how to use it; how it works inside belongs to API design.
+Every core system (a protocol or data flow across several types or files, e.g. the
+intersect-interact loop, detector readout, sources, kinematics, the render protocol) has a Mermaid
+flowchart on its API design page, in the style of "Diagrams" in
+[docs/src/api/docdev.md](docs/src/api/docdev.md), derived from the code and updated by every
+change to the system; the Basics page of the system links there. Pages embed docstrings instead
+of repeating them; see also "Documentation philosophy" and "Docstring conventions" in docdev.md.
 
 ### E, X · Errors and tests
 
@@ -315,7 +317,7 @@ every release, so it must describe exactly that release.
   changes, run `julia --project=docs skills/beamletoptics/scripts/run_templates.jl --render`.
 - `BeamletOptics.install_agent_skill()` ([src/AgentSkill.jl](src/AgentSkill.jl)) copies
   `skills/beamletoptics/` out of the installed package; moving the folder means updating it and
-  [docs/src/tutorials/ai_assistants.md](docs/src/tutorials/ai_assistants.md).
+  [docs/src/basics/ai_assistants.md](docs/src/basics/ai_assistants.md).
 
 ## Documentation build
 

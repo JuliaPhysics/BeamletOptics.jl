@@ -44,7 +44,7 @@ coating is orientated at a 45° angle with respect to the y-axis.
 
 # Keywords 
 
-- `reflectance`: defines the splitting ratio in [-], i.e. R = 0 ... 1.0
+- `reflectance`: defines the power reflectance R (dimensionless) of the coating, in the open interval (0, 1)
 """
 function CubeBeamsplitter(
         leg_length::Real,

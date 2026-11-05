@@ -35,6 +35,8 @@ snoop_compile/
 # Edit the .jl source, never these.
 /docs/src/tutorials/laser_alignment.md
 /docs/src/assets/downloads/
+# Fetched from the GitHub milestones on every docs build (DocUtils.fetch_milestones)
+/docs/src/components/milestones.json
 
 # DocumenterVitepress runs npm inside docs/ and leaves these behind.
 # docs/package.json must stay tracked: without it DocumenterVitepress copies its
