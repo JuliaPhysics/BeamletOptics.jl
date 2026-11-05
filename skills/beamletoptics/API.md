@@ -52,7 +52,8 @@ Use `scripts/api_lookup.jl NAME` to print the docstring and signatures of any na
 Useful non-exported helpers: `BeamletOptics.inch`, `lensmakers_eq(R1, R2, n)` (returns f),
 `divergence_angle(λ, w0, M2)`, `numerical_aperture(θ, n=1)` (also of a `PointSource` or a cone
 sampling, public), `optical_path_length(beam)`,
-`isparaxial(system, beam, θ=π/4)`, `fresnel_coefficients`, `beams(group)`, `objects(system)`,
+`isparaxial(system, beam, θ=π/4)`, `fresnel_coefficients`, `beams(group)`,
+`objects(system)` and `objects(group)` (public),
 `list_subtypes(T)`, constants `Z_vacuum`, `c_vacuum`.
 
 ## Properties of objects

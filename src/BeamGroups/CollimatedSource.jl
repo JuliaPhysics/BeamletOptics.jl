@@ -14,7 +14,7 @@ Represents a parallel bundle of [`Beam`](@ref)s being emitted from a disk in spa
 
 # Functions
 
-- `diameter`: returns the diameter of the source
+- `BeamletOptics.diameter(source)`: returns the diameter of the source
 - [`num_rays!`](@ref): regenerates the rays with another number of rays
 """
 mutable struct CollimatedSource{T, R <: AbstractRay{T}, S <: AbstractSourceSampling} <: AbstractBeamGroup{T, R}

@@ -62,7 +62,8 @@ const ObjectOrGroup = Union{AbstractObject, AbstractObjectGroup}
 """
     objects(group::AbstractObjectGroup)
 
-Exposes all objects/subgroups stored within the group.
+Returns the objects and subgroups stored directly in the `group`, without flattening the
+subgroups. See also `objects(system)`, which flattens all groups of a system.
 """
 objects(group::AbstractObjectGroup) = group.objects
 
