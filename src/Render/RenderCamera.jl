@@ -42,14 +42,14 @@ Hides the axis markers of an `LScene` `ls`, if a suitable backend is loaded. Can
 toggled via `hide`. If no suitable backend is loaded, a [`MissingBackendError`](@ref)
 will be thrown.
 """
-hide_axis(::Any, ::Bool) = throw(MissingBackendError())
+hide_axis(::Any, ::Bool = true) = throw(MissingBackendError())
 
 """
     arrow!(ax, pos, dir; scale=1, kwargs...)
 
 Draws a single 3D arrow from `pos` pointing along `dir` into `ax`, if a suitable backend
-is loaded, scaled to a fixed on-screen length (independent of `dir`'s own norm) so it
-stays legible next to CAD geometry. If no suitable backend is loaded, a
+is loaded. The arrow spans `5e-3 * scale * dir` in world units \\[m\\], so a unit `dir` gives a
+5 mm arrow that is legible next to CAD geometry. If no suitable backend is loaded, a
 [`MissingBackendError`](@ref) will be thrown.
 """
 arrow!(::Any, ::AbstractVector, ::AbstractVector; kwargs...) = throw(MissingBackendError())
