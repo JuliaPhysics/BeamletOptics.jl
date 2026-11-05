@@ -50,8 +50,6 @@ An [Agent Skill](skills/beamletoptics/SKILL.md) for AI coding assistants is incl
 using BeamletOptics; BeamletOptics.install_agent_skill()   # -> ./.claude/skills/beamletoptics
 ```
 
-Alternatively, `npx skills add JuliaPhysics/BeamletOptics.jl` installs the skill from the development branch.
-
 # Examples
 
 For a variety of illustrated examples and tutorials, refer to the **Tutorials** and **Examples** in the **Getting started** sections of the documentation linked to above.
