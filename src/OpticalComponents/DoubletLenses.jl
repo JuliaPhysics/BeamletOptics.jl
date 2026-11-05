@@ -117,5 +117,6 @@ function interact3d(system::AbstractSystem, dl::DoubletLens, beam::Beam{T, R}, r
         i = interact3d(system, dl.back, beam, ray)
         hint = Hint(dl, dl.front.shape)
     end
+    isnothing(i) && return nothing
     return BeamInteraction(hint, i.ray)
 end
