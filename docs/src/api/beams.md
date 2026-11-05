@@ -4,69 +4,68 @@ This page explains how the beams and sources described in the [Beams](@ref) sect
 
 ## Beam interface
 
-A [`Beam`](@ref) stores a vector of rays, and the beamlets are built from it: a [`GaussianBeamlet`](@ref) traces a chief, a waist and a divergence `Beam` side by side, an [`AstigmaticGaussianBeamlet`](@ref) a chief `Beam` of [`PolarizedRay`](@ref)s and eight auxiliary ones. The diagram shows the beam types, the beams and rays they are made of, and the interface a new beam type implements (green):
+A [`Beam`](@ref) stores a vector of rays, and the beamlets are built from it: a [`GaussianBeamlet`](@ref) traces a chief, a waist and a divergence `Beam` side by side, an [`AstigmaticGaussianBeamlet`](@ref) a chief `Beam` of [`PolarizedRay`](@ref)s and eight auxiliary ones. The diagram shows the beam types, the beams and rays they are made of, and the interface a new beam type implements. All three beam types are subtypes of `AbstractBeam` (frame); the beamlets store their rays in `Beam`s, so in the end every beam type holds its rays in the `Vector` of a `Beam` (blue: beam types, green: interface, purple: rays):
 
 ```mermaid
 flowchart TB
-    ABS["<b>AbstractBeam</b><br/><i>abstract type</i>"]
+    ABS["<b>AbstractBeam{T, R}</b><br/><i>abstract type, R #lt;: AbstractRay</i><br/>every subtype: parent, children<br/>of its own type, split by children!"]
     IF["<b>beam interface</b><br/>trace_system!, push!, and<br/>every beam: _component_beams<br/>ray-storing beam: also rays, empty!"]
-    TREE["<b>parent, children</b><br/><i>beam tree, split by children!</i>"]
-    BM["<b>Beam</b><br/><i>beam type</i>"]
-    GB["<b>GaussianBeamlet</b><br/><i>beam type</i>"]
-    AGB["<b>AstigmaticGaussianBeamlet</b><br/><i>beam type</i>"]
+    subgraph SUB ["subtypes of AbstractBeam"]
+        GB["<b>GaussianBeamlet</b><br/><i>R = Ray</i>"]
+        AGB["<b>AstigmaticGaussianBeamlet</b><br/><i>R = PolarizedRay</i>"]
+        BM["<b>Beam{T, R}</b><br/>rays::Vector{R}"]
+    end
     RAY["<b>AbstractRay</b><br/><i>Ray, PolarizedRay</i>"]
 
+    ABS -.-> SUB
     ABS -- "subtype implements" --> IF
-    ABS -- fields --> TREE
-    ABS -.-> BM
-    ABS -.-> GB
-    ABS -.-> AGB
-    GB -- "chief, waist, divergence" --> BM
-    AGB -- "chief c and 8 auxiliary<br/>(waist, divergence in x, y)" --> BM
-    BM -- rays --> RAY
+    GB -- "chief, waist, divergence:<br/>Beam of Rays" --> BM
+    AGB -- "chief: Beam of PolarizedRays<br/>8 auxiliary: Beams of Rays" --> BM
+    BM -- "rays" --> RAY
 
     classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
     classDef green fill:#38982626,stroke:#389826,stroke-width:2px
     classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
     class ABS,BM,GB,AGB blue
     class IF green
-    class TREE,RAY purple
+    class RAY purple
+    style SUB fill:transparent,stroke:#4063D8,stroke-width:1px,stroke-dasharray:4 3
 ```
 
 ## Tracing a beamlet
 
-Components define [`BeamletOptics.interact3d`](@ref) for a `Beam` and one of its rays; a beamlet hands this call on to each of its component beams, unless the component defines a method for the beamlet itself. The diagram shows the tracing loop of a `GaussianBeamlet` and where the methods of a component author (green) are called; an `AstigmaticGaussianBeamlet` runs the same loop with its nine beams and also checks its complex invariant:
+Components define [`BeamletOptics.interact3d`](@ref) for a `Beam` and one of its rays; a beamlet hands this call on to each of its component beams, unless the component defines a method for the beamlet itself. The diagram shows the tracing loop of a `GaussianBeamlet` and where the methods of a component author are called (blue: steps of the loop, purple: dispatch and generic methods, green: methods of a component author); an `AstigmaticGaussianBeamlet` runs the same loop with its nine beams and also checks its complex invariant:
 
 ```mermaid
 flowchart TB
     S(["<b>trace_system!</b><br/>system, gauss"])
     T["<b>tracing_step!</b><br/>last ray of chief,<br/>then waist and divergence"]
-    C{"all rays hit<br/>the same shape?"}
-    I{"<b>interact3d</b><br/>(system, object, gauss, id)<br/><i>dispatch on object</i>"}
+    C["<b>check hits</b><br/>every ray hit,<br/>all the same shape?"]
+    E1(["stop"])
+    I["<b>interact3d(system, object, gauss, id)</b><br/><i>dispatch on object</i>"]
     OWN["<b>method for the beamlet</b><br/>e.g. ThinBeamsplitter: children!<br/>Detector: push! hit"]
     GEN["<b>generic beamlet method</b><br/>one call per component beam"]
-    CB["<b>interact3d</b><br/>(system, object, beam, ray)<br/><i>method for a Beam</i>"]
+    CB["<b>interact3d(system, object, beam, ray)</b><br/><i>method for a Beam</i>"]
+    E2(["stop:<br/>an interaction is nothing"])
     GBI["<b>GaussianBeamletInteraction</b><br/>chief, waist, divergence"]
     P["<b>push!(gauss, interaction)</b><br/>push! to each component Beam"]
-    K{"check_invariant:<br/>Lagrange invariant within<br/>get_lagrange_tolerance?"}
-    E([stop])
+    K["<b>check_invariant</b><br/>Lagrange invariant within<br/>get_lagrange_tolerance?"]
+    E3(["stop with warning"])
+    AGAIN(["back to <b>tracing_step!</b><br/>fewer than r_max rays"])
 
-    S --> T
-    T -- "a ray hits nothing" --> E
-    T -- hit --> C
-    C -- no --> E
+    S --> T --> C
+    C -- no --> E1
     C -- yes --> I
     I -- "method for<br/>the object" --> OWN
     I -- otherwise --> GEN
     GEN --> CB
+    CB -- nothing --> E2
+    OWN -- nothing --> E2
     CB -- "3 BeamInteractions" --> GBI
-    CB -- "any nothing" --> E
     OWN -- interaction --> GBI
-    OWN -- nothing --> E
-    GBI --> P
-    P --> K
-    K -- "no: warning" --> E
-    K -- "yes: next segment<br/>(fewer than r_max rays)" --> T
+    GBI --> P --> K
+    K -- no --> E3
+    K -- yes --> AGAIN
 
     classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
     classDef green fill:#38982626,stroke:#389826,stroke-width:2px
@@ -75,85 +74,72 @@ flowchart TB
     class T,C,P,K blue
     class I,GEN,GBI purple
     class OWN,CB green
-    class S,E terminal
+    class S,E1,E2,E3,AGAIN terminal
 ```
 
 ## Source sampling
 
-A [`CollimatedSource`](@ref) or [`PointSource`](@ref) stores how its rays were sampled as a [`BeamletOptics.AbstractSourceSampling`](@ref), such that [`num_rays!`](@ref) can regenerate them with another number of rays in the current pose of the source. The diagram shows how the constructors and `num_rays!` generate the beams with [`BeamletOptics.source_beams`](@ref): dotted arrows are its dispatch branches on the sampling type, the green box is what an own sampling type implements.
+A [`CollimatedSource`](@ref) or [`PointSource`](@ref) stores how its rays were sampled as a [`BeamletOptics.AbstractSourceSampling`](@ref), such that [`num_rays!`](@ref) can regenerate them with another number of rays in the current pose of the source. The diagram shows how the constructors and `num_rays!` generate the beams with [`BeamletOptics.source_beams`](@ref): dotted arrows are its dispatch branches on the sampling type (blue: steps, purple: samplings of BMO, green: what an own sampling type implements, red: entry points and results).
 
 ```mermaid
 flowchart TB
     C(["<b>catalog constructor</b><br/>e.g. CollimatedSource(pos, dir, diameter, λ)"])
-    GC(["<b>generic constructor</b><br/>CollimatedSource(pos, dir, diameter, sampling, λ; num_rays)<br/>PointSource(pos, dir, sampling, λ; num_rays)"])
-    N(["<b>num_rays!</b>(src, n)"])
-    W(["<b>given beams</b><br/>e.g. CollimatedSource(beams, diameter, pos, dir)"])
-    SB["<b>sampling_basis</b>(dir, basis, T)<br/>reference vector b1"]
-    SBM["<b>source_beams</b>(sampling, pos, dir, b1,<br/>args..., λ, num_rays, T)"]
-    DISC["<b>DiscRings, DiscSunflower, DiscLine</b><br/><i>CollimatedSource</i>"]
-    CONE["<b>ConeRings, ConeSunflower, ConeFan</b><br/><i>PointSource</i>"]
-    OWN["<b>own AbstractSourceSampling</b><br/>methods of source_beams, min_num_rays (optional)<br/>and numerical_aperture (PointSource)"]
-    NO["<b>NoSampling</b>"]
+    GC(["<b>generic constructor</b><br/>CollimatedSource(..., sampling, λ; num_rays)<br/>PointSource(..., sampling, λ; num_rays)"])
+    SB["<b>sampling_basis(dir, basis, T)</b><br/>reference vector b1"]
+    N(["<b>num_rays!(src, n)</b>"])
+    SBM["<b>source_beams(sampling, pos, dir, b1, ...)</b><br/>one method per sampling type"]
+    SAMP["<b>samplings of BMO</b><br/>CollimatedSource: DiscRings,<br/>DiscSunflower, DiscLine<br/>PointSource: ConeRings,<br/>ConeSunflower, ConeFan"]
+    OWN["<b>own AbstractSourceSampling</b><br/>source_beams, min_num_rays (optional),<br/>numerical_aperture (PointSource)"]
     ERR(["ArgumentError"])
     BM["<b>Vector{Beam}</b><br/>first beam: center ray"]
-    NA["<b>numerical_aperture</b>(sampling)<br/>NA of a PointSource"]
-    G["<b>CollimatedSource / PointSource</b><br/>beams, center, dir, sampling"]
-    MIN["<b>min_num_rays</b>(src.sampling)<br/>20 num_rings, 1 or nothing"]
+    W(["<b>given beams</b><br/>e.g. CollimatedSource(beams, diameter, pos, dir)"])
+    G(["<b>CollimatedSource / PointSource</b><br/>beams, center, dir, sampling<br/>PointSource: NA from<br/>numerical_aperture(sampling)"])
 
     C -- "its sampling, e.g. DiscRings(num_rings)" --> GC
-    GC --> SB
-    SB --> SBM
+    GC --> SB --> SBM
     N -- "src.sampling, orientation(src), n" --> SBM
-    SBM -.-> DISC
-    SBM -.-> CONE
+    SBM -.-> SAMP
     SBM -.-> OWN
-    SBM -.-> NO
-    DISC --> BM
-    CONE --> BM
+    SBM -. NoSampling .-> ERR
+    SAMP -- "num_rays below<br/>min_num_rays" --> ERR
+    SAMP --> BM
     OWN --> BM
-    DISC -- "num_rays < min_num_rays" --> ERR
-    CONE -- "num_rays < min_num_rays" --> ERR
-    NO --> ERR
-    BM -- "replaces src.beams" --> G
-    BM -- "new source" --> NA --> G
+    BM -- "new source, or num_rays!<br/>replaces src.beams" --> G
     W -- "sampling = NoSampling()" --> G
-    G -- "min_num_rays(src)" --> MIN
 
     classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
     classDef green fill:#38982626,stroke:#389826,stroke-width:2px
     classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
     classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
-    class SB,SBM,MIN,NA blue
+    class SB,SBM,BM blue
     class OWN green
-    class DISC,CONE,NO,BM,G purple
-    class C,GC,N,W,ERR terminal
+    class SAMP purple
+    class C,GC,N,W,ERR,G terminal
 ```
 
 An own sampling is a subtype of [`BeamletOptics.AbstractSourceSampling`](@ref) with a method of `source_beams`; the generic constructors and [`num_rays!`](@ref) then work for it without further code. A sampling for a `PointSource` also implements `numerical_aperture(s)`. A sampling with a lower bound on the number of rays implements `min_num_rays(s)`, and its `source_beams` throws an `ArgumentError` for a `num_rays` below it, as the samplings of BMO do.
 
 ## Solving a beam group internally
 
-The diagram shows the steps of `solve_system!(system, bg)`, see [Solving a beam group](@ref); the green box is the getter of the beams that a new [`BeamletOptics.AbstractBeamGroup`](@ref) subtype provides, as a `beams` field or a method.
+The diagram shows the steps of `solve_system!(system, bg)`, see [Solving a beam group](@ref); the green box is the getter of the beams that a new [`BeamletOptics.AbstractBeamGroup`](@ref) subtype provides, as a `beams` field or a method (blue: steps of the solve).
 
 ```mermaid
 flowchart TB
-    S(["<b>solve_system!</b>(system, bg)"])
-    BG["<b>beams</b>(bg)<br/>root beams of the group"]
-    EM["<b>empty!</b>(bg)<br/>every beam to its start state"]
-    INI{"initialize = true?"}
-    IN["<b>initialize!</b>(system)<br/>once, before the first beam"]
-    BS["<b>with_bounding_spheres</b>(system)<br/>one table for all beams"]
-    CH["<b>Threads.@threads :greedy</b><br/>over chunks of beams(bg)"]
+    S(["<b>solve_system!(system, bg)</b>"])
+    EM["<b>empty!(bg)</b><br/>every beam to its start state"]
+    INI{"initialize?"}
+    IN["<b>initialize!(system)</b><br/>once, before the first beam"]
+    BS["<b>with_bounding_spheres(system)</b><br/>one table for all beams"]
+    BG["<b>beams(bg)</b><br/>root beams of the group,<br/>split into 4 chunks per thread"]
+    CH["<b>Threads.@threads :greedy</b><br/>over the chunks"]
     HB["<b>with_hit_buffers</b><br/>detector hits of a chunk<br/>stored at its end"]
-    SB["<b>solve_system!</b>(system, beam; kwargs...)<br/>for each beam of the chunk"]
-    E([done])
+    SB["<b>solve_system!(system, beam; ...)</b><br/>for each beam of the chunk"]
+    E(["return nothing"])
 
     S --> EM --> INI
     INI -- yes --> IN --> BS
     INI -- no --> BS
-    BS --> CH --> HB --> SB --> E
-    BG -.-> EM
-    BG -.-> CH
+    BS --> BG --> CH --> HB --> SB --> E
 
     classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
     classDef green fill:#38982626,stroke:#389826,stroke-width:2px

@@ -4,7 +4,7 @@ This page explains how the kinematic API described in the [Kinematics](@ref) sec
 
 ## Kinematic traits
 
-Analogous to the [`BeamletOptics.AbstractShapeTrait`](@ref) of the [Geometry representation](@ref), the kinematic API is built on a trait that is dispatched on via multiple dispatch. Every public kinematic function, e.g. `translate3d!(x, offset)`, forwards to a trait-specific method `translate3d!(kinematic_trait_of(x), x, offset)`. As on the [Geometry representation](@ref) page, solid arrows are labeled with the field that leads from one type to the next, dotted arrows point to subtypes.
+Analogous to the [`BeamletOptics.AbstractShapeTrait`](@ref) of the [Geometry representation](@ref), the kinematic API is built on a trait that is dispatched on via multiple dispatch. Every public kinematic function, e.g. `translate3d!(x, offset)`, forwards to a trait-specific method `translate3d!(kinematic_trait_of(x), x, offset)`. As on the [Geometry representation](@ref) page, solid arrows are labeled with the field that leads from one type to the next, dotted arrows point to subtypes (purple: kinematic trait, green: implements the primitives `translate3d!` and `rotate3d!`, blue: frame, red: moving throws).
 
 ```mermaid
 flowchart TB
@@ -21,8 +21,14 @@ flowchart TB
     FR -.-> OR
     FR -.-> DI
 
+    classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
+    classDef green fill:#38982626,stroke:#389826,stroke-width:2px
     classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
-    class TR,ST,MV,FR,OR,DI purple
+    classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
+    class TR purple
+    class MV green
+    class FR,OR,DI blue
+    class ST terminal
 ```
 
 ```@docs; canonical=false
@@ -61,15 +67,30 @@ The primitives `translate3d!(::Movable, x, offset)` and `rotate3d!(::Movable, x,
 
 ## Shared parts
 
-A part can be reachable along several paths, e.g. an object in two subgroups or a shape listed twice by a [`BeamletOptics.MultiShape`](@ref) object. Every container moves each of its parts once per motion, compared by identity (`===`). An object group first unwinds its tree, so that the primitives of an object type also apply within nested groups:
+A part can be reachable along several paths, e.g. an object in two subgroups or a shape listed twice by a [`BeamletOptics.MultiShape`](@ref) object. Every container moves each of its parts once per motion, compared by identity (`===`). An object group first unwinds its tree, so that the primitives of an object type also apply within nested groups (blue: steps of the group, purple: check, green: the methods of the object type):
 
 ```mermaid
 flowchart TB
-    CMD["translate3d!(group, offset)"] --> UW["unwind: subgroups and objects, each once"]
-    UW --> CK{"static value or shape reached<br/>by two objects, at any level?"}
-    CK -- yes --> ERR["ArgumentError, nothing has moved"]
-    CK -- no --> FR["move center and dir of every subgroup"]
-    FR --> OB["public verb on every object, e.g. translate3d!(detector, offset)"]
+    CMD(["<b>translate3d!(group, offset)</b>"])
+    UW["<b>unwind</b><br/>subgroups and objects, each once"]
+    CK["<b>check</b><br/>static value or shape reached<br/>by two objects, at any level?"]
+    ERR(["ArgumentError,<br/>nothing has moved"])
+    FR["<b>move center and dir</b><br/>of every subgroup"]
+    OB["<b>public verb on every object</b><br/>e.g. translate3d!(detector, offset)"]
+
+    CMD --> UW --> CK
+    CK -- yes --> ERR
+    CK -- no --> FR
+    FR --> OB
+
+    classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
+    classDef green fill:#38982626,stroke:#389826,stroke-width:2px
+    classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
+    classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
+    class UW,FR blue
+    class CK purple
+    class OB green
+    class CMD,ERR terminal
 ```
 
 The shapes are collected recursively via `shape(object)`, down to the operands of composite SDFs. A group nested in another group moves as a frame via `position!`/`orientation!`; its own primitives are not called then.

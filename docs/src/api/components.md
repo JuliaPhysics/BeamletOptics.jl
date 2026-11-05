@@ -4,76 +4,65 @@ This page explains which functions a solve calls on an optical component and wha
 
 ## Hooks called during a solve
 
-The following diagram shows which functions a solve calls on an object: a new `AbstractObject` subtype implements the green ones, `interact3d` always and the others only where the defaults or the existing shapes do not fit, and may override the generic methods in purple. How the loop chooses the next hit, including a `Hint`, is described in the [Intersect-Interact-Repeat-Loop](@ref):
+The following diagram shows which functions a solve calls on an object: a new `AbstractObject` subtype implements the green ones, `interact3d` always and the others only where the defaults or the existing shapes do not fit, and may override the generic methods in purple; the loop itself is blue. How the loop chooses the next hit, including a `Hint`, is described in the [Intersect-Interact-Repeat-Loop](@ref):
 
 ```mermaid
 flowchart TB
-    S(["<b>solve_system!</b><br/>system, beam"])
-    INI["<b>initialize!</b>(object)<br/><i>default: nothing to reset</i>"]
-    BSO["<b>bounding_sphere_of</b>(shape)<br/><i>default: NoBoundingSphere</i>"]
-    LOOP["<b>Intersect-Interact-Repeat-Loop</b><br/>per beam, see core.md"]
-    IX["<b>intersect3d</b>(object, ray)<br/><i>generic method</i>"]
-    SHP["<b>shape</b>(object)<br/>SingleShape (default): object.shape<br/>MultiShape (opt in via shape_trait_of):<br/>tuple of parts"]
-    ISH["<b>intersect3d</b>(shape, ray)<br/><i>after the bounding sphere test</i>"]
-    GB["<b>interact3d</b><br/>(system, object, beamlet, id)<br/><i>generic beamlet method</i>"]
-    INT["<b>interact3d</b><br/>(system, object, beam, ray)"]
+    S(["<b>solve_system!</b>"])
+    INI["<b>initialize!(object)</b>"]
+    BSO["<b>bounding_sphere_of(shape)</b>"]
+    LOOP["<b>Intersect-Interact-Repeat-Loop</b>"]
+    IX["<b>intersect3d(object, ray)</b><br/><i>generic method</i>"]
+    GB["<b>interact3d(sys, obj, beamlet)</b><br/><i>generic beamlet method</i>"]
+    SHP["<b>shape(object), intersect3d(shape, ray)</b><br/>SingleShape (default): object.shape<br/>MultiShape (opt in via shape_trait_of):<br/>tuple of parts, tested the same way"]
+    INT["<b>interact3d</b>"]
+    BACK(["<b>Repeat loop</b>"])
 
-    S -- "initialize = true" --> INI
-    S -- "once per solve" --> BSO
-    S --> LOOP
-    LOOP -- intersect --> IX
+    S --> INI --> BSO --> LOOP
+    LOOP --> IX
+    LOOP -- "Beamlet" --> GB
+    LOOP -- "Beam" --> INT
     IX -- shape_trait_of --> SHP
-    SHP -- "shape" --> ISH
-    SHP -- "object part" --> IX
-    LOOP -- "interact: Beam" --> INT
-    LOOP -- "interact: beamlet" --> GB
-    GB -- "each component beam" --> INT
-    INT -- "interaction or nothing" --> LOOP
+    GB -- "each component Beam" --> INT
+    INT --> BACK
 
     classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
     classDef green fill:#38982626,stroke:#389826,stroke-width:2px
     classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
     classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
     class LOOP blue
-    class INI,BSO,SHP,ISH,INT green
+    class INI,BSO,SHP,INT green
     class IX,GB purple
-    class S terminal
+    class S,BACK terminal
 ```
 
 ## Interaction of the component families
 
-The `interact3d` methods of the component families decide what follows a hit: a new ray, child beams, a recorded hit, a hand-over to the part of a composite that was hit, or the end of the beam:
+The `interact3d` methods of the component families decide what follows a hit: a new ray, child beams, a recorded hit, a hand-over to the part of a composite that was hit, or the end of the beam. The families are grouped by their result (green: methods of the component families, purple: hand-over of a composite, red: entry point and results):
 
 ```mermaid
 flowchart TB
     INT(["<b>interact3d</b><br/>system, object, beam, ray"])
-    CMP["<b>MultiShape composites</b><br/>DoubletLens, TripletLens,<br/>CubeBeamsplitter,<br/>AbstractPlateBeamsplitter,<br/>LinearPolarizer"]
-    DET["<b>Detector</b><br/>push!(detector, hit)"]
-    RAY["<b>new ray</b><br/>AbstractRefractiveOptic: refraction3d<br/>AbstractReflectiveOptic: reflection3d<br/>PolarizationFilter: Jones matrix"]
-    SPL["<b>ThinBeamsplitter</b><br/>children!: transmitted, reflected"]
-    BI(["<b>BeamInteraction</b><br/>next ray, optional Hint"])
-    HT["<b>IntersectableObject</b><br/>hard target"]
-    NO(["<b>nothing</b><br/>this beam ends"])
+    CMP["<b>MultiShape composites</b><br/>Custom interact3d code e.g.DoubletLens"]
+    RAY["<b>Spawns new ray</b><br/>E.g. via refraction3d or reflection3d"]
+    FIN["<b>Ends current beam</b><br/>E.g. for ThinBeamsplitter: <br/> attach children and terminate current"]
+    AGAIN(["Repeat solver and <b>interact3d</b><br/>until part that was hit<br/>is a <b>SingleShape</b>"])
+    BI(["Return a <b>BeamInteraction</b><br/> for next ray, optional <b>Hint</b>"])
+    NO(["Return <b>nothing</b>"])
 
-    INT --> CMP
-    INT --> DET
-    INT --> RAY
-    INT --> SPL
-    INT --> HT
-    INT -- "no method:<br/>warning" --> NO
-    CMP -- "part that was hit,<br/>optional Hint to the composite" --> RAY
-    CMP -- coating --> SPL
+    INT -- isa <b>MultiShape</b> --> CMP
+    INT -- isa <b>SingleShape</b> --> RAY
+    INT -- isa <b>SingleShape</b> --> FIN
+    CMP -- "optional Hint<br/>to the composite" --> AGAIN
     RAY --> BI
-    RAY -- "PolarizationFilter:<br/>blocked" --> NO
-    SPL -- "children are<br/>traced next" --> NO
-    DET -- "stop = false:<br/>pass_through, same ray<br/>from the hit point" --> BI
-    DET -- "stop = true" --> NO
-    HT --> NO
+    RAY -- "Blocking components: <br/>e.g. PolarizationFilter" --> NO
+    FIN --> NO
 
     classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
     classDef green fill:#38982626,stroke:#389826,stroke-width:2px
     classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
     classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
-    class CMP,DET,RAY,SPL,HT green
-    class INT,BI,NO terminal
+    class RAY,FIN green
+    class CMP purple
+    class INT,AGAIN,BI,NO terminal
 ```

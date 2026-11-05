@@ -25,7 +25,7 @@ Depth = 2
 
 ## Beam models
 
-The beamlets are traced as several [`Beam`](@ref)s of rays side by side:
+The beamlets are traced as several [`Beam`](@ref)s of rays side by side (blue: beam types, purple: rays):
 
 ```mermaid
 flowchart TB

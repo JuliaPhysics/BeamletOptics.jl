@@ -43,13 +43,13 @@ The following diagram shows how `intersect3d(object::AbstractSDF, ray, t_max)` p
 
 ```mermaid
 flowchart TB
-    S(["<b>intersect3d(object, ray, t_max)</b><br/>t_max: bounding sphere exit,<br/>else get_sdf_miss_distance()"])
-    D{"<b>d = sdf(object, pos)</b>"}
-    R{"<b>on the surface</b><br/>does the ray point inside?<br/>sdf(pos + h·dir) ≤ d"}
-    O["<b>raymarch_outside</b><br/>march by sdf up to t_max"]
-    I["<b>raymarch_inside</b><br/>march by -sdf,<br/>no bounding sphere limit"]
-    H(["<b>Intersection</b><br/>t, normal, shape"])
-    M(["nothing"])
+    S(["<b>intersect3d(sdf, ray, t_max)</b>"])
+    D{"<b>d = sdf(object, pos)</b><br/>Check initial distance between ray and shape"}
+    R{"<b>Surface reached</b><br/>Does the ray point inside?<br/>sdf(pos + h·dir) ≤ d"}
+    O["<b>Ray position outside of shape</b><br/>Use raymarch_outside"]
+    I["<b>Ray position inside of shape</b><br/>Use raymarch_inside"]
+    H(["return <b>Intersection</b>"])
+    M(["return <b>nothing</b>"])
 
     S --> D
     D -- "d > h" --> O

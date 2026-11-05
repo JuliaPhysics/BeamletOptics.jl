@@ -57,47 +57,41 @@ BeamletOptics.Intersection
 
 Since an optical element can consist of multiple joint shapes, the return type must store which specific part of the object was hit.
 
-The following diagram shows how `trace_all` reaches the shapes of the objects and groups of a system, including the [Bounding sphere pretest](@ref) (green: implemented by a component author, purple: dispatch).
+The following diagram shows how `trace_all` reaches the shapes of the objects and groups of a system, including the [Bounding sphere pretest](@ref), whose table is described below (green: implemented by a component author, purple: dispatch).
 
 ```mermaid
 flowchart TB
     TA(["<b>trace_all(system, ray)</b>"])
-    BSO["<b>bounding_sphere_of(shape)</b><br/><i>optional</i>"]
-    TBL["<b>bounding_spheres(system)</b><br/>table, once per solve"]
-    P{"<b>intersect3d(parts, ray)</b><br/>each part, closest hit wins"}
+    P["<b>intersect3d(parts, ray)</b><br/>test each part, closest hit wins"]
     G["<b>intersect3d(group, ray)</b><br/>x = objects(group)"]
     OJ["<b>intersect3d(object, ray)</b><br/><i>own method possible,<br/>e.g. PlateBeamsplitter</i>"]
-    T{"<b>shape_trait_of(object)</b>"}
-    SS["<b>SingleShape</b><br/>x = shape(object)"]
-    MS["<b>MultiShape</b><br/>x = shape(object), a tuple"]
-    PT{"<b>intersect3d(sphere, x, ray)</b><br/>sphere of x from the table,<br/>else NoBoundingSphere"}
+    T["<b>shape_trait_of(object)</b><br/>SingleShape: x = shape(object)<br/>MultiShape: x = a tuple of shapes"]
+    PT["<b>intersect3d(sphere, x, ray)</b><br/>bounding sphere of x from the<br/>table of the solve, else none"]
     SH["<b>intersect3d(shape, ray)</b><br/>shape backend, see below"]
-    OBJ["<b>object!(intersection, object)</b><br/>by the SingleShape and MultiShape<br/>methods, not by a group"]
+    OBJ["<b>object!(intersection, object)</b><br/>by the SingleShape and<br/>MultiShape methods,<br/>not by a group"]
+    AGAIN(["back to<br/><b>intersect3d(parts, ray)</b><br/>with the parts of x"])
     MISS(["nothing"])
 
-    BSO --> TBL
-    TBL -. "current_bounding_spheres()" .-> PT
     TA --> P
-    P -- "AbstractObjectGroup" --> G
-    P -- "AbstractObject" --> OJ
-    P -- "AbstractShape" --> SH
+    P -- "isa AbstractObject" --> OJ
+    P -- "isa AbstractObjectGroup" --> G
+    P -- "isa AbstractShape" --> SH
     OJ --> T
-    T -- SingleShape --> SS --> PT
-    T -- MultiShape --> MS --> PT
+    T --> PT
     G --> PT
-    PT -- "ray misses the sphere" --> MISS
     PT -- "x is a shape" --> SH
-    PT -- "x are parts" --> P
+    PT -- "x are parts" --> AGAIN
+    PT -- "ray misses<br/>the sphere" --> MISS
     SH --> OBJ
 
     classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
     classDef green fill:#38982626,stroke:#389826,stroke-width:2px
     classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
     classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
-    class TBL,G,SS,MS,OBJ blue
-    class BSO,OJ,SH green
+    class G,OBJ blue
+    class OJ,SH green
     class P,T,PT purple
-    class TA,MISS terminal
+    class TA,AGAIN,MISS terminal
 ```
 
 The shape backend is selected by dispatch on the type of the shape, see [Geometry representation](@ref).
@@ -105,13 +99,13 @@ The shape backend is selected by dispatch on the type of the shape, see [Geometr
 ```mermaid
 flowchart TB
     SH{"<b>intersect3d(shape, ray)</b>"}
-    SDF["<b>AbstractSDF</b><br/>ray marching from outside<br/>or inside, up to the sphere exit<br/>if tested with its own sphere"]
-    MESH["<b>AbstractMesh</b><br/>MoellerTrumboreAlgorithm<br/>for each face, closest"]
+    SDF["<b>AbstractSDF</b><br/>Ray marching "]
+    MESH["<b>AbstractMesh</b><br/>Möller-Trumbore algorithm"]
     OWN["<b>own AbstractShape</b><br/>own intersect3d method"]
-    IX(["<b>Intersection(t, n, shape)</b><br/>or nothing"])
+    IX(["<b>return ::Intersection or ::Nothing"])
 
-    SH -- AbstractSDF --> SDF
-    SH -- AbstractMesh --> MESH
+    SH -- isa AbstractSDF --> SDF
+    SH -- isa AbstractMesh --> MESH
     SH -- "other shape" --> OWN
     SDF --> IX
     MESH --> IX
@@ -208,17 +202,17 @@ The diagram below shows this for the [`CubeBeamsplitter`](@ref), whose `interact
 
 ```mermaid
 flowchart TB
-    S(["<b>interact3d(system, cbs, beam, ray)</b><br/>object of the intersection: cbs,<br/>shape: the part that was hit"])
-    F{"shape(intersection(ray))<br/>=== shape of which part?"}
-    PR["<b>interact3d(system, cbs.front, beam, ray)</b><br/>the prism refracts<br/>(cbs.back alike)"]
-    H["<b>hint!(interaction,</b><br/><b>Hint(cbs, shape(cbs.coating)))</b>"]
-    CO["<b>interact3d(system, cbs.coating, beam, ray)</b><br/>children!: transmitted and reflected,<br/>refractive_index! of the cube"]
-    N(["return nothing<br/>the solver queues the children"])
+    S(["<b>interact3d(sys, cbs, ...)</b><br/>cbs isa ::MultiShape component<br/>"])
+    F{"<b>shape(intersection(ray))</b><br/>test which part has been hit"}
+    PR["<b>interact3d(sys, cbs.front, ...)</b><br/>Calculate refraction at substrate"]
+    H["<b>hint!</b><br>Update hint to guide solver"]
+    CO["<b>interact3d(sys, cbs.coating, ...)</b><br/>Calculate split beams and <br/> attach children to parent beam"]
+    N(["<b>return nothing</b><br/>the solver queues the children"])
     P["<b>push!(beam, interaction)</b>"]
-    TST{"<b>tracing_step!</b><br/>(system, ray, hint)"}
+    TST{"<b>tracing_step!</b><br/>(sys, ray, hint)"}
     HS{"<b>trace_one</b><br/>hinted shape hit?"}
-    OB["<b>object!(intersection, object(hint))</b><br/>no other object is tested"]
-    TA["<b>trace_all(system, ray)</b>"]
+    OB["No other object is tested"]
+    TA["<b>trace_all(sys, ray)</b>"]
 
     S --> F
     F -- "cbs.front or cbs.back" --> PR --> H --> P --> TST
@@ -250,9 +244,9 @@ A call of [`solve_system!`](@ref) traces the beam tree breadth-first: it traces 
 
 ```mermaid
 flowchart TB
-    S(["<b>solve_system!</b><br/>system + beam"])
-    INI["<b>initialize!(system)</b><br/>initialize!(object) of each object,<br/>if initialize = true"]
-    BS["<b>with_bounding_spheres</b><br/>spheres of all objects,<br/>once per solve"]
+    S(["<b>solve_system!</b>"])
+    INI["<b>initialize!(system)</b><br/>initialize! each contained object"]
+    BS["<b>with_bounding_spheres</b><br/>precalculate spheres of all objects,<br/>once per solve"]
     Q["<b>popfirst!(queue)</b><br/>next (beam, depth),<br/>the root at depth 1"]
     EM["<b>empty!(current)</b><br/>back to its first ray"]
     TS{"<b>trace_system!</b><br/>(system, current)"}
@@ -290,21 +284,21 @@ For a [`Beam`](@ref), `trace_system!` runs the loop below until the beam has `r_
 
 ```mermaid
 flowchart TB
-    S(["<b>trace_system!</b><br/>system + beam::Beam"])
-    RM{"length(rays(beam))<br/>#lt; r_max?"}
-    TST{"<b>tracing_step!</b><br/>(system, last ray, hint)"}
+    S(["<b>trace_system!</b><br/>with a ::Beam"])
+    RM{"<b>length(rays) #lt; r_max?</b><br>Safeguard resonant conditions"}
+    TST{"<b>tracing_step!</b>"}
     TO["<b>trace_one</b><br/>hinted shape first"]
     TA["<b>trace_all</b><br/>intersect3d of all top-level<br/>objects and groups"]
-    HIT{"intersection(ray)<br/>is nothing?"}
-    IA["<b>interact3d</b><br/>(system, object, beam, ray)"]
-    NI{"interaction<br/>is nothing?"}
-    P["<b>push!(beam, interaction)</b><br/>next ray, hint(interaction)"]
-    E([return])
+    HIT{"No intersection determined?"}
+    IA["<b>interact3d</b><br/>Calculate optical interaction"]
+    NI{"<b>No interaction?</b><br/>E.g. beam blocked"}
+    P["<b>push!(beam, interaction)</b><br/>Add ray to beam, repeat"]
+    E([End loop])
 
     S --> RM
     RM -- yes --> TST
-    TST -- "::Hint" --> TO
-    TST -- "::Nothing" --> TA
+    TST -- " with ::Hint" --> TO
+    TST -- "without ::Hint" --> TA
     TO -- "hinted shape missed" --> TA
     TO -- hit --> HIT
     TA --> HIT

@@ -4,71 +4,77 @@ This page explains how the [`Detector`](@ref) described in the basics is impleme
 
 ## Hit recording
 
-The following diagram shows how a solve records one hit type per beam model in a `Detector` and what empties it again; green boxes are the methods a new [`BeamletOptics.AbstractDetector`](@ref) implements.
+The following diagram shows how a solve records one hit type per beam model in a `Detector` and what empties it again; green boxes are the methods a new [`BeamletOptics.AbstractDetector`](@ref) implements (purple: hit types, blue: storage of the hits, red: what records or empties them).
 
 ```mermaid
 flowchart TB
-    S(["<b>solve_system!</b><br/>beam or beam group"]) --> IA["<b>interact3d</b>(system, d, beam, ray or id)<br/>one method per beam model"]
-    IA -- Ray --> RH["<b>RayHit</b>"]
-    IA -- PolarizedRay --> PH["<b>PolarizedRayHit</b>"]
-    IA -- GaussianBeamlet --> GH["<b>GaussianBeamletHit</b>"]
-    IA -- AstigmaticGaussianBeamlet --> AH["<b>AstigmaticGaussianBeamletHit</b>"]
-    RH --> P["<b>push!</b>(d, hit)"]
-    PH --> P
-    GH --> P
-    AH --> P
-    P -- "solve of a beam group" --> B["<b>with_hit_buffers</b><br/>one buffer per chunk of beams and detector"]
-    P -- "otherwise, under d.lock" --> H["<b>hits</b>(d)<br/>nothing or a Vector of one hit type,<br/>counted by length(d)"]
+    S(["<b>solve_system!</b><br/>"])
+    IA["<b>interact3d</b><br/>One method per beam model"]
+    HT["<b>AbstractDetectorHit</b> <br/> One type per beam model, <br/>e.g. <b>Ray</b> generates a <b>RayHit</b>"]
+    P["<b>push!(d, hit)</b>"]
+    IK(["<b>initialize!(d)</b> or<br/><b>translate3d!</b> or<br/><b>rotate3d!</b><br/>Also within an ObjectGroup"])
+    B["<b>with_hit_buffers</b><br/>one buffer per chunk<br/>of beams and detector"]
+    E["<b>empty!(d)</b>"]
+    H["<b>hits(d)</b><br/>Returns <b>nothing</b> or </br>a <b>Vector</b> of all hits"]
+
+    S -- beam hits detector --> IA -- generates --> HT --> P
+    P -- "beam group" --> B
+    P -- "otherwise,<br/>under d.lock" --> H
     B -- "append!(d, buffer)<br/>at the end of the chunk" --> H
-    I(["<b>initialize!</b>(system)<br/>or initialize = true"]) -- "initialize!(d)" --> E["<b>empty!</b>(d)"]
-    K(["<b>translate3d!</b> / <b>rotate3d!</b><br/>of d, also within an ObjectGroup"]) --> E
-    E -- "hits = nothing" --> H
+    IK --> E
+    E -- "resets: hits = nothing" --> H
 
     classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
     classDef green fill:#38982626,stroke:#389826,stroke-width:2px
     classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
     classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
     class IA,E green
-    class RH,PH,GH,AH purple
+    class HT purple
     class P,B,H blue
-    class S,I,K terminal
+    class S,IK terminal
 ```
 
 ## Readout pipeline
 
-The following diagram shows how a readout turns a sampling into points and evaluates the stored hits there; green boxes are the methods a new sampling or hit type implements. A new hit type must also be added to the `hits` field of [`Detector`](@ref).
+The following diagram shows how a readout turns a sampling into points and evaluates the stored hits there; green boxes are the methods a new sampling or hit type implements (purple: sampling, blue: evaluation at the points, red: entry point and results). A new hit type must also be added to the `hits` field of [`Detector`](@ref).
 
 ```mermaid
 flowchart TB
-    R(["<b>electric_field</b> / <b>intensity</b> / <b>optical_power</b><br/>(pd, sampling = RegularGrid())"]) --> SP["<b>sample_points</b>(pd, sampling)"]
-    SP -- RegularGrid --> RG["<b>RegularGrid</b><br/>window around the hits via calc_local_lims,<br/>active surface without hits"]
-    SP -- RectilinearGrid --> RL["<b>RectilinearGrid</b><br/>points xs × zs,<br/>trapezoidal weights"]
-    SP -- "own AbstractDetectorSampling" --> OWN["own <b>sample_points</b> method"]
-    RG -- "own hit type, unless an<br/>AbstractRayHit or AbstractBeamletHit" --> LIM["own <b>calc_local_lims</b>(pd, hits, crop_factor) methods"]
-    RG -- "RectilinearGrid(xs, zs)" --> RL
-    RL --> DS["<b>DetectorSamples</b><br/>coordinates, points, weights"]
+    R(["<b>electric_field</b> / <b>intensity</b> / <b>optical_power</b><br/>(pd, sampling = RegularGrid())"])
+    SP["<b>sample_points(pd, sampling)</b><br/><i>dispatch on the sampling</i>"]
+    BMO["<b>BMO stock samplings</b><br/>"]
+    OWN["own <b>sample_points</b> method"]
+    LIM["own <b>calc_local_lims(pd, hits, crop_factor)</b><br/>unless an AbstractRayHit<br/>or AbstractBeamletHit"]
+    DS["<b>DetectorSamples</b><br/>coordinates, points, weights"]
+    PT["<b>electric_field(pd, points)</b><br/><b>intensity(pd, points)</b><br/>threaded over the points,<br/>no hits: zero at every point"]
+    SUM["<b>electric_field(hits(pd), p)</b><br/>coherent sum over the hits"]
+    IH["<b>intensity(hits(pd), p, n̂)</b><br/>Poynting flux through the detector<br/>vector form ½ Re[(E × H*) · n̂]:<br/>PolarizedRayHit, AstigmaticGaussianBeamletHit<br/>scalar form ½ Re[E* F]:<br/>RayHit, GaussianBeamletHit"]
+    RET(["electric_field, intensity:<br/>(coordinates..., values)<br/>optical_power:<br/>sum of weights .* I"])
+    OWNI["own <b>intensity(hits, p, n)</b> method"]
+    EF["<b>electric_field(hit, p)</b><br/>direction(hit), refractive_index(hit)"]
+
+    R --> SP
+    SP -- "RegularGrid,<br/>RectilinearGrid" --> BMO
+    SP -- "own AbstractDetectorSampling" --> OWN
+    BMO -- "own hit type" --> LIM
+    BMO --> DS
     OWN --> DS
-    DS -- points --> PT["<b>electric_field</b>(pd, points)<br/><b>intensity</b>(pd, points)<br/>threaded over the points"]
-    PT -- "electric_field" --> SUM["<b>electric_field</b>(hits(pd), p)<br/>coherent sum over the hits"]
-    PT -- "intensity" --> IH["<b>intensity</b>(hits(pd), p, n̂)<br/>Poynting flux through the detector"]
-    IH -- "PolarizedRayHit,<br/>AstigmaticGaussianBeamletHit" --> IV["vector form<br/>½ Re[(E × H*) · n̂]"]
-    IH -- "RayHit,<br/>GaussianBeamletHit" --> IS["scalar form<br/>½ Re[E* F]"]
-    IH -- "own hit type" --> OWNI["own <b>intensity</b>(hits, p, n̂) method"]
-    PT -- "no hits: hits(pd) = nothing" --> ZERO["zero field and flux<br/>at every point"]
-    SUM --> EF["<b>electric_field</b>(hit, p)<br/>direction(hit), refractive_index(hit)"]
-    IV --> EF
-    IS --> EF
-    PT -- "values" --> RET(["electric_field, intensity:<br/>(coordinates..., values)"])
-    PT -- "intensity values I" --> OP(["optical_power:<br/>sum of weights .* I"])
+    DS -- points --> PT
+    PT -- electric_field --> SUM
+    PT -- intensity --> IH
+    PT -- values --> RET
+    IH -- "own hit type" --> OWNI
+    SUM --> EF
+    IH --> EF
 
     classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
     classDef green fill:#38982626,stroke:#389826,stroke-width:2px
     classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
     classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
-    class SP,RG,RL,DS purple
-    class PT,SUM,IH,IV,IS,ZERO blue
+    class SP,BMO,DS purple
+    class PT,SUM,IH blue
     class OWN,LIM,OWNI,EF green
-    class R,RET,OP terminal
+    class R,RET terminal
 ```
 
 ```@docs; canonical=false
@@ -79,38 +85,44 @@ BeamletOptics.DetectorSamples
 
 ## OpticsBase extension internals
 
-The diagram shows how the constructors share one sampling of the hits and how the return path leaves the `PlaneField` again. Blue boxes are BMO's detector internals that the extension reuses, green boxes depend on the hit type, purple boxes are the rest of the extension.
+The diagram shows how the constructors share one sampling of the hits and how the return path leaves the `PlaneField` again. Blue boxes are BMO's detector internals that the extension reuses, green boxes depend on the hit type, purple boxes are the rest of the extension, red marks entry points and results.
 
 ```mermaid
 flowchart TB
-    DET(["<b>PlaneField</b>(detector; size, spacing)"]) --> DH["<b>hits</b>(detector)<br/>ArgumentError if the detector has no hits"]
-    DET -- "default axes" --> DA["<b>default_plane_axes</b>(detector)<br/>u from <b>local_axes</b>, n = −<b>direction</b>"]
-    BEAM(["<b>PlaneField</b>(beamlet, id; size, spacing,<br/>origin, axes)"]) --> OH["one <b>GaussianBeamletHit</b> or<br/><b>AstigmaticGaussianBeamletHit</b><br/>(beamlet, id)"]
+    DET(["<b>PlaneField(detector; size, spacing)</b>"])
+    BEAM(["<b>PlaneField(beamlet, id; ...)</b><br/>size, spacing, origin, axes"])
+    DH["<b>hits(detector)</b><br/>ArgumentError if the<br/>detector has no hits"]
+    DA["<b>default_plane_axes(detector)</b><br/>u from local_axes,<br/>n = −direction"]
+    OH["one <b>GaussianBeamletHit</b> or<br/><b>AstigmaticGaussianBeamletHit</b><br/>(beamlet, id)"]
+    PH["<b>PlaneField(hits; ...)</b><br/>size, spacing, origin, axes<br/>beamlet hits only,<br/>otherwise ArgumentError"]
+    CW["<b>common_wavelength_index(hits)</b><br/>all hits share λ and n"]
+    HFD["<b>hit_field_direction(hit, u, v)</b><br/>AstigmaticGaussianBeamletHit: nothing,<br/>electric_field(hit, p) is a 3D vector<br/>GaussianBeamletHit: u made<br/>transverse to d (v if u ∥ d)"]
+    SM["<b>_sample(hits, origin, u, v, points)</b><br/>threaded over points,<br/>shared with the readouts"]
+    HF["<b>hit_field(hit, p, pol)</b><br/>per hit type"]
+    EH["<b>sum over the hits</b><br/>E = Σᵢ Eᵢ projected on u, v<br/>H = Σᵢ (n/Z₀) dᵢ × Eᵢ projected on u, v"]
+    PF(["<b>OpticsBase.PlaneField</b>"])
+    FF["<b>forward_field(f)</b><br/>and <b>plane_frame(f)</b>"]
+    WD(["<b>WavefrontBeamletDecomposition(f)</b><br/>AstigmaticBeamGroup at f.origin"])
+    GD(["<b>GaussianModeDecomposition(f)</b><br/>AstigmaticGaussianBeamlet<br/>at the centroid of the field"])
+
+    DET --> DH
+    DET -- "default axes" --> DA
+    BEAM --> OH
     DH --> PH
-    DA -- "axes" --> PH
+    DA -- axes --> PH
     OH --> PH
-    PH["<b>PlaneField</b>(hits; size, spacing, origin, axes)<br/>beamlet hits only, otherwise ArgumentError"]
-    PH --> CW["<b>common_wavelength_index</b>(hits)<br/>all hits share λ and n"]
-    CW --> HFD["<b>hit_field_direction</b>(hit, u, v)<br/>per hit type"]
-    HFD -- AstigmaticGaussianBeamletHit --> HA["nothing: <b>electric_field</b>(hit, p)<br/>is a 3D vector"]
-    HFD -- GaussianBeamletHit --> HG["u made transverse to d<br/>(v if u ∥ d)"]
-    HA --> SM["<b>_sample</b>(hits, origin, u, v, points)<br/>threaded over points, shared with the readouts"]
-    HG --> SM
-    SM -- "per point p" --> HF["<b>hit_field</b>(hit, p, pol)<br/>per hit type"]
-    HF --> EH["E = Σᵢ Eᵢ projected on u, v<br/>H = Σᵢ (n/Z₀) dᵢ × Eᵢ projected on u, v"]
-    EH --> PF(["<b>OpticsBase.PlaneField</b>"])
-    PF -- "<b>forward</b>(f), n = 1" --> FF["<b>forward_field</b>(f)<br/>and <b>plane_frame</b>(f)"]
-    FF --> WD(["<b>WavefrontBeamletDecomposition</b>(f)"])
-    FF --> GD(["<b>GaussianModeDecomposition</b>(f)"])
-    WD -- "position f.origin" --> BG["AstigmaticBeamGroup"]
-    GD -- "starts at the centroid of the field" --> AB["AstigmaticGaussianBeamlet"]
+    PH --> CW --> HFD --> SM
+    SM -- "per point p" --> HF --> EH --> PF
+    PF -- "forward(f), n = 1" --> FF
+    FF --> WD
+    FF --> GD
 
     classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
     classDef green fill:#38982626,stroke:#389826,stroke-width:2px
     classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
     classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
     class DH,SM blue
-    class OH,HFD,HA,HG,HF green
+    class OH,HFD,HF green
     class DA,PH,CW,EH,FF purple
-    class DET,BEAM,PF,WD,GD,BG,AB terminal
+    class DET,BEAM,PF,WD,GD terminal
 ```
