@@ -25,6 +25,7 @@ The generic type that describes geometrical rays is [`BeamletOptics.AbstractRay`
 
 ```@docs; canonical=false
 Ray
+Ray(::AbstractArray{<:Real}, ::AbstractArray{<:Real}, ::Real)
 ```
 
 This ray type is able to model reflection and [refraction](https://www.rp-photonics.com/refraction.html), using Snell's law, within the limits of geometrical optics. A single ray only ever describes the optical path between its starting point and the closest intersection, e.g. the surface of a [`Lens`](@ref). A visualization is shown below. The `position` of the `Ray` is stored in relation to a global coordinate system. The normed direction is indicated by the blue arrow. The `Ray` intersects with a shape and stores this data in the `intersection` field. This includes the length until the point of intersection (marked as a dashed blue line) and the normal vector at the intersected surface (marked by a black arrow). 
@@ -37,6 +38,7 @@ In order to model the effect of polarizing elements, the polarization ray tracin
 
 ```@docs; canonical=false
 PolarizedRay
+PolarizedRay(::AbstractArray{Float64}, ::AbstractArray{Float64}, ::Float64, ::AbstractArray{ComplexF64})
 ```
 
 The next figure shows a circularly polarized [`AstigmaticGaussianBeamlet`](@ref) passing through a periscope made of three 45° plano mirrors, with the mechanical [KCB1/M](https://www.thorlabs.com/item/KCB1_M) mount shown transparently for context. The helix along the beam traces the electric field vector of the chief ray, which stays circularly polarized through the mirror reflections. A [`PolarizationFilter`](@ref) between the second and third mirror passes only one linear component, so after the filter the field oscillates in a single plane. The `PolarizedRay` is fundamental to track the on-axis polarization state of the beamlet.

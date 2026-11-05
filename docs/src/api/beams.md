@@ -4,7 +4,7 @@ This page explains how the beams and sources described in the [Beams](@ref) sect
 
 ## Beam interface
 
-A [`Beam`](@ref) stores a vector of rays, and the beamlets are built from it: a [`GaussianBeamlet`](@ref) traces a chief, a waist and a divergence `Beam` side by side, an [`AstigmaticGaussianBeamlet`](@ref) a chief `Beam` of [`PolarizedRay`](@ref)s and eight auxiliary ones. The diagram shows the beam types, the beams and rays they are made of, and the interface a new beam type implements. All three beam types are subtypes of `AbstractBeam` (frame); the beamlets store their rays in `Beam`s, so in the end every beam type holds its rays in the `Vector` of a `Beam` (blue: beam types, green: interface, purple: rays):
+A [`Beam`](@ref) stores a vector of rays, and the beamlets are built from it: a [`GaussianBeamlet`](@ref) traces a chief, a waist and a divergence `Beam` side by side, an [`AstigmaticGaussianBeamlet`](@ref) a chief `Beam` of [`PolarizedRay`](@ref)s and eight auxiliary ones. The diagram shows the beam types, the beams and rays they are made of, and the interface a new beam type implements. All three beam types are subtypes of `AbstractBeam` (frame); the beamlets store their rays in `Beam`s, so in the end every beam type holds its rays in the `Vector` of a `Beam`:
 
 ```mermaid
 flowchart TB
@@ -20,7 +20,7 @@ flowchart TB
     ABS -.-> SUB
     ABS -- "subtype implements" --> IF
     GB -- "chief, waist, divergence:<br/>Beam of Rays" --> BM
-    AGB -- "chief: Beam of PolarizedRays<br/>8 auxiliary: Beams of Rays" --> BM
+    AGB -- "c: Beam of PolarizedRays<br/>wxp … dym: 8 Beams of Rays" --> BM
     BM -- "rays" --> RAY
 
     classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
@@ -34,7 +34,7 @@ flowchart TB
 
 ## Tracing a beamlet
 
-Components define [`BeamletOptics.interact3d`](@ref) for a `Beam` and one of its rays; a beamlet hands this call on to each of its component beams, unless the component defines a method for the beamlet itself. The diagram shows the tracing loop of a `GaussianBeamlet` and where the methods of a component author are called (blue: steps of the loop, purple: dispatch and generic methods, green: methods of a component author); an `AstigmaticGaussianBeamlet` runs the same loop with its nine beams and also checks its complex invariant:
+Components define [`BeamletOptics.interact3d`](@ref) for a `Beam` and one of its rays; a beamlet hands this call on to each of its component beams, unless the component defines a method for the beamlet itself. The diagram shows the tracing loop of a `GaussianBeamlet` and where the methods of a component author are called; an `AstigmaticGaussianBeamlet` runs the same loop with its nine beams and also checks its complex invariant:
 
 ```mermaid
 flowchart TB
@@ -49,9 +49,11 @@ flowchart TB
     E2(["stop:<br/>an interaction is nothing"])
     GBI["<b>GaussianBeamletInteraction</b><br/>chief, waist, divergence"]
     P["<b>push!(gauss, interaction)</b><br/>push! to each component Beam"]
-    K["<b>check_invariant</b><br/>Lagrange invariant within<br/>get_lagrange_tolerance?"]
+    K["<b>check_lagrange_invariants</b><br/>Lagrange invariant within<br/>get_lagrange_tolerance?"]
     E3(["stop with warning"])
-    AGAIN(["back to <b>tracing_step!</b><br/>fewer than r_max rays"])
+    RM{"fewer than<br/>r_max rays?"}
+    E4(["stop:<br/>r_max reached"])
+    AGAIN(["next loop pass:<br/><b>tracing_step!</b>"])
 
     S --> T --> C
     C -- no --> E1
@@ -65,21 +67,33 @@ flowchart TB
     OWN -- interaction --> GBI
     GBI --> P --> K
     K -- no --> E3
-    K -- yes --> AGAIN
+    K -- yes --> RM
+    RM -- yes --> AGAIN
+    RM -- no --> E4
 
     classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
     classDef green fill:#38982626,stroke:#389826,stroke-width:2px
     classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
     classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
-    class T,C,P,K blue
+    class T,C,P,K,RM blue
     class I,GEN,GBI purple
     class OWN,CB green
-    class S,E1,E2,E3,AGAIN terminal
+    class S,E1,E2,E3,E4,AGAIN terminal
+```
+
+## Interface contracts
+
+The docstrings of the abstract types list what a subtype implements: fields, getters and functions.
+
+```@docs; canonical=false
+BeamletOptics.AbstractBeam
+BeamletOptics.AbstractBeamGroup
+BeamletOptics.AbstractSourceSampling
 ```
 
 ## Source sampling
 
-A [`CollimatedSource`](@ref) or [`PointSource`](@ref) stores how its rays were sampled as a [`BeamletOptics.AbstractSourceSampling`](@ref), such that [`num_rays!`](@ref) can regenerate them with another number of rays in the current pose of the source. The diagram shows how the constructors and `num_rays!` generate the beams with [`BeamletOptics.source_beams`](@ref): dotted arrows are its dispatch branches on the sampling type (blue: steps, purple: samplings of BMO, green: what an own sampling type implements, red: entry points and results).
+A [`CollimatedSource`](@ref) or [`PointSource`](@ref) stores how its rays were sampled as a [`BeamletOptics.AbstractSourceSampling`](@ref), such that [`num_rays!`](@ref) can regenerate them with another number of rays in the current pose of the source. The diagram shows how the constructors and `num_rays!` generate the beams with [`BeamletOptics.source_beams`](@ref): dotted arrows are its dispatch branches on the sampling type.
 
 ```mermaid
 flowchart TB
@@ -97,7 +111,7 @@ flowchart TB
 
     C -- "its sampling, e.g. DiscRings(num_rings)" --> GC
     GC --> SB --> SBM
-    N -- "src.sampling, orientation(src), n" --> SBM
+    N -- "src.sampling, orientation(src), n,<br/>emission point of the old rays" --> SBM
     SBM -.-> SAMP
     SBM -.-> OWN
     SBM -. NoSampling .-> ERR
@@ -121,7 +135,7 @@ An own sampling is a subtype of [`BeamletOptics.AbstractSourceSampling`](@ref) w
 
 ## Solving a beam group internally
 
-The diagram shows the steps of `solve_system!(system, bg)`, see [Solving a beam group](@ref); the green box is the getter of the beams that a new [`BeamletOptics.AbstractBeamGroup`](@ref) subtype provides, as a `beams` field or a method (blue: steps of the solve).
+The diagram shows the steps of `solve_system!(system, bg)`. A new [`BeamletOptics.AbstractBeamGroup`](@ref) subtype provides the getter of its beams, as a `beams` field or a method.
 
 ```mermaid
 flowchart TB
@@ -130,8 +144,10 @@ flowchart TB
     INI{"initialize?"}
     IN["<b>initialize!(system)</b><br/>once, before the first beam"]
     BS["<b>with_bounding_spheres(system)</b><br/>one table for all beams"]
-    BG["<b>beams(bg)</b><br/>root beams of the group,<br/>split into 4 chunks per thread"]
+    BG["<b>beams(bg)</b><br/>root beams of the group,<br/>split into chunks: at most<br/>4 per thread"]
+    PR["<b>_with_progress</b><br/>progress bar, if progress = true"]
     CH["<b>Threads.@threads :greedy</b><br/>over the chunks"]
+    BT["<b>with_bounding_spheres(table)</b><br/>the table set again in each task"]
     HB["<b>with_hit_buffers</b><br/>detector hits of a chunk<br/>stored at its end"]
     SB["<b>solve_system!(system, beam; ...)</b><br/>for each beam of the chunk"]
     E(["return nothing"])
@@ -139,13 +155,13 @@ flowchart TB
     S --> EM --> INI
     INI -- yes --> IN --> BS
     INI -- no --> BS
-    BS --> BG --> CH --> HB --> SB --> E
+    BS --> BG --> PR --> CH --> BT --> HB --> SB --> E
 
     classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
     classDef green fill:#38982626,stroke:#389826,stroke-width:2px
     classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
     classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
-    class EM,IN,BS,CH,HB,SB blue
+    class EM,IN,BS,PR,CH,BT,HB,SB blue
     class BG green
     class S,E terminal
 ```

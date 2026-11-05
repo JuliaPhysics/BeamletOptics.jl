@@ -4,21 +4,23 @@ This page explains which functions a solve calls on an optical component and wha
 
 ## Hooks called during a solve
 
-The following diagram shows which functions a solve calls on an object: a new `AbstractObject` subtype implements the green ones, `interact3d` always and the others only where the defaults or the existing shapes do not fit, and may override the generic methods in purple; the loop itself is blue. How the loop chooses the next hit, including a `Hint`, is described in the [Intersect-Interact-Repeat-Loop](@ref):
+The following diagram shows which functions a solve calls on an object. A new `AbstractObject` subtype implements `interact3d` always, and `initialize!`, `bounding_sphere_of` and `shape` only where the defaults or the existing shapes do not fit; it may also override the generic methods. `initialize!` runs only if the solve is called with `initialize = true`, for a beam group once before the first beam. How the loop chooses the next hit, including a `Hint`, is described in the [Intersect-Interact-Repeat-Loop](@ref):
 
 ```mermaid
 flowchart TB
     S(["<b>solve_system!</b>"])
     INI["<b>initialize!(object)</b>"]
-    BSO["<b>bounding_sphere_of(shape)</b>"]
+    BSO["<b>bounding_sphere_of(object)</b><br/>MultiShape: once per part"]
     LOOP["<b>Intersect-Interact-Repeat-Loop</b>"]
     IX["<b>intersect3d(object, ray)</b><br/><i>generic method</i>"]
-    GB["<b>interact3d(sys, obj, beamlet)</b><br/><i>generic beamlet method</i>"]
+    GB["<b>interact3d(sys, obj, beamlet, id)</b><br/><i>generic beamlet method</i>"]
     SHP["<b>shape(object), intersect3d(shape, ray)</b><br/>SingleShape (default): object.shape<br/>MultiShape (opt in via shape_trait_of):<br/>tuple of parts, tested the same way"]
-    INT["<b>interact3d</b>"]
+    INT["<b>interact3d(sys, obj, beam, ray)</b>"]
     BACK(["<b>Repeat loop</b>"])
 
-    S --> INI --> BSO --> LOOP
+    S -- "initialize = true" --> INI --> BSO
+    S -- "otherwise" --> BSO
+    BSO --> LOOP
     LOOP --> IX
     LOOP -- "Beamlet" --> GB
     LOOP -- "Beam" --> INT
@@ -38,31 +40,38 @@ flowchart TB
 
 ## Interaction of the component families
 
-The `interact3d` methods of the component families decide what follows a hit: a new ray, child beams, a recorded hit, a hand-over to the part of a composite that was hit, or the end of the beam. The families are grouped by their result (green: methods of the component families, purple: hand-over of a composite, red: entry point and results):
+The `interact3d` methods of the component families decide what follows a hit: a new ray, child beams, a recorded hit, a hand-over to the part of a composite that was hit, or the end of the beam. The solver calls the method for a beam with the hit `ray`; for a beamlet, the generic method calls it for each component beam. The families are grouped by their result:
 
 ```mermaid
 flowchart TB
-    INT(["<b>interact3d</b><br/>system, object, beam, ray"])
-    CMP["<b>MultiShape composites</b><br/>Custom interact3d code e.g.DoubletLens"]
+    INT(["<b>interact3d</b><br/>system, object, beam, ray<br/><i>dispatch on the object type</i>"])
+    CMP["<b>MultiShape composites</b><br/>E.g. DoubletLens, TripletLens:<br/>call interact3d of the part that was hit"]
     RAY["<b>Spawns new ray</b><br/>E.g. via refraction3d or reflection3d"]
     FIN["<b>Ends current beam</b><br/>E.g. for ThinBeamsplitter: <br/> attach children and terminate current"]
-    AGAIN(["Repeat solver and <b>interact3d</b><br/>until part that was hit<br/>is a <b>SingleShape</b>"])
-    BI(["Return a <b>BeamInteraction</b><br/> for next ray, optional <b>Hint</b>"])
+    DET["<b>Detector</b><br/>records a hit"]
+    BI(["Return a <b>BeamInteraction</b><br/>for the next ray, optional <b>Hint</b>"])
     NO(["Return <b>nothing</b>"])
 
-    INT -- isa <b>MultiShape</b> --> CMP
-    INT -- isa <b>SingleShape</b> --> RAY
-    INT -- isa <b>SingleShape</b> --> FIN
-    CMP -- "optional Hint<br/>to the composite" --> AGAIN
+    INT -- "composite" --> CMP
+    INT -- "single shape" --> RAY
+    INT -- "single shape" --> FIN
+    INT -- "single shape" --> DET
+    INT -- "IntersectableObject" --> NO
+    CMP -- "BeamInteraction(Hint(composite,<br/>next part), ray)" --> BI
+    CMP -- "part returns nothing" --> NO
     RAY --> BI
     RAY -- "Blocking components: <br/>e.g. PolarizationFilter" --> NO
     FIN --> NO
+    DET -- "stop = false:<br/>new ray from the hit point" --> BI
+    DET -- "stop = true" --> NO
 
     classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
     classDef green fill:#38982626,stroke:#389826,stroke-width:2px
     classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
     classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
-    class RAY,FIN green
+    class RAY,FIN,DET green
     class CMP purple
-    class INT,AGAIN,BI,NO terminal
+    class INT,BI,NO terminal
 ```
+
+A composite calls the `interact3d` method of the part that was hit directly and does not run the solver again. It returns the `BeamInteraction` of that part with a `Hint` to the part to be tested next, or `nothing` if the part returns `nothing`. Why the hint is needed at coincident boundaries is explained in [Hints](@ref).

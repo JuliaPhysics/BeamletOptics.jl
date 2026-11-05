@@ -11,7 +11,7 @@ Main.DocUtils.conditional_include(joinpath(prism_showcase_dir, "right_angle_pris
 Refractive prisms are represented by the [`Prism`](@ref) type, which wraps any closed shape together with a (wavelength dependent) refractive index. The package provides constructors for prisms with a convex polygonal cross-section, i.e. right prisms: a 2D polygon in the local x-y-plane which is extruded symmetrically along the local z-axis (the `height`). The local origin is the origin of the polygon coordinates, and like all components the prisms can be moved freely, see [Moving optical elements](@ref).
 
 !!! info "Alignment"
-    Prisms are *not aligned* with the global optical axis (+y) after construction. Use the kinematic functions to orient them, e.g. `zrotate3d!` to rotate about the extrusion axis.
+    Except for the [`DovePrism`](@ref), whose long axis lies along +y after construction, prisms are *not aligned* with the global optical axis (+y). Use the kinematic functions to orient them, e.g. `zrotate3d!` to rotate about the extrusion axis.
 
 ## Arbitrary convex prisms
 

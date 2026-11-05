@@ -117,7 +117,7 @@ flowchart TB
 ```
 ````
 
-For example, the [Intersect-Interact-Repeat-Loop](@ref) uses `terminal` for its entry and exit points and one color per step.
+For example, the diagram of [Updating a handle](@ref) uses `terminal` for its entry and exit points and one color per group of steps.
 
 ### Readable diagrams
 
@@ -128,7 +128,7 @@ A diagram is readable if its text is as large as in the other diagrams of the pa
 - Merge parallel cases. Branches that only set a value, e.g. for `SingleShape` and `MultiShape`, become one node with one line per case.
 - Leave out side chains. Data that flows in from the side, e.g. a table built before the solve, costs a column; describe it in the text or in the diagram of the section that explains it.
 - Short labels: a short signature with `...` and one line on what the step does. Edges are named by the case (`isa AbstractSDF`, `with ::Hint`), terminal nodes by the returned value.
-- Color by group. Each group of nodes gets its own class and the lead sentence names what the colors mean; a diagram in a single color has little contrast.
+- Color by group. Each group of nodes gets its own class; a diagram in a single color has little contrast. The text does not explain the colors: the labels say what a node is.
 
 Mermaid renders in the browser, so the width of a diagram cannot be judged from its source. After each change, look at the page in a local build and compare the diagram with its neighbors.
 

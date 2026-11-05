@@ -1,8 +1,12 @@
 """
-    ObjectGroup <: AbstractObjectGroup
+    ObjectGroup(objects, T = Float64)
 
 A tree-like storage container for groups of objects. Can store individual objects and subgroups.
 Main purpose is handling of, i.e., groups of lenses.
+
+`objects` is a vector or tuple of [`AbstractObject`](@ref)s and subgroups. A new group has its `center` at
+the global origin and the identity orientation, independent of the poses of its `objects`, so
+[`rotate3d!`](@ref) rotates about the global origin until [`set_pivot3d!`](@ref) moves the pivot.
 
 ## Fields
 

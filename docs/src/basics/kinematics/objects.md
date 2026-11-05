@@ -1,6 +1,9 @@
 # Moving optical elements
 
-Optical elements that implement the [`BeamletOptics.AbstractObject`](@ref) interface, as well as the [`BeamletOptics.AbstractShape`](@ref)s they are built from, can be moved with the commands listed in the [Kinematics](@ref) section. When objects are manipulated, they are translated and rotated around their self-defined center of gravity, i.e. their [`position`](@ref). Their [`orientation`](@ref) defines their local fixed coordinate system.
+Optical elements that implement the [`BeamletOptics.AbstractObject`](@ref) interface, as well as the [`BeamletOptics.AbstractShape`](@ref)s they are built from, can be moved with the commands listed in the [Kinematics](@ref) section. When objects are manipulated, they are translated and rotated around the origin of their local coordinate system, i.e. their [`position`](@ref), which the constructor of the element defines (e.g. the front vertex of a lens). Their [`orientation`](@ref) defines their local fixed coordinate system.
+
+!!! note "Detectors"
+    Moving a detector empties its recorded hits.
 
 ```julia
 using BeamletOptics
@@ -16,7 +19,7 @@ Objects which consist of more than one shape, e.g. a [`CubeBeamsplitter`](@ref) 
 
 ## Groups of optical elements
 
-For the easier representation of a group of [`BeamletOptics.AbstractObject`](@ref)s that moves as one, the [`ObjectGroup`](@ref) can be used. Refer to the [Lens groups](@ref) example for more information. The group's pivot (its `center`) can be moved without moving its members via [`set_pivot3d!`](@ref).
+For the easier representation of a group of [`BeamletOptics.AbstractObject`](@ref)s that moves as one, the [`ObjectGroup`](@ref) can be used. Refer to the [Lens groups](@ref) example for more information. A new group is created by `ObjectGroup(objects, T = Float64)`, with its `center` at the global origin and the identity orientation, independent of where its members are. [`rotate3d!`](@ref) therefore rotates a new group about the global origin. The group's pivot (its `center`) can be moved without moving its members via [`set_pivot3d!`](@ref).
 
 Objects and subgroups are added to and removed from a group like from a [`System`](@ref), where they are, without changing the pose of the group:
 
@@ -49,7 +52,7 @@ An assembly such as a telescope, a periscope or an interferometer arm can be mod
 | separate, with air between them | an [`ObjectGroup`](@ref) or an own subtype of [`BeamletOptics.AbstractObjectGroup`](@ref) | none: each part is traced and interacts on its own |
 | touching and interacting as one, e.g. cemented or with a shared face | an [`BeamletOptics.AbstractObject`](@ref) with the [`BeamletOptics.MultiShape`](@ref) trait, like the [`CubeBeamsplitter`](@ref) | required: the solver hands every hit to the object, which forwards it to the part that was hit |
 
-The solver can find out by itself which of several separate parts a ray hits next. Parts that touch need a [`BeamletOptics.Hint`](@ref) across their shared face, which only the component knows. An own subtype of `AbstractObjectGroup` adds named parts and an own constructor to a group and needs no `interact3d` method; its fields are listed in the docstring of [`BeamletOptics.AbstractObjectGroup`](@ref), its constructor calls [`BeamletOptics.check_kinematic_members`](@ref) on its objects, and the agent skill has a complete example in `templates/08_custom_group.jl`. A `MultiShape` object without an `interact3d` method stops every ray that hits it, with the warning `No interact3d method defined for the MultiShape object`.
+The solver can find out by itself which of several separate parts a ray hits next. Parts that touch need a [`BeamletOptics.Hint`](@ref) across their shared face, which only the component knows. An own subtype of `AbstractObjectGroup` adds named parts and an own constructor to a group and needs no `interact3d` method; its fields are listed in the docstring of [`BeamletOptics.AbstractObjectGroup`](@ref), its constructor calls [`BeamletOptics.check_kinematic_members`](@ref) on its objects, and the agent skill has a complete example in [`templates/08_custom_group.jl`](https://github.com/JuliaPhysics/BeamletOptics.jl/blob/master/skills/beamletoptics/templates/08_custom_group.jl). A `MultiShape` object without an `interact3d` method stops every ray that hits it, with the warning `No interact3d method defined for the MultiShape object`.
 
 ```@docs; canonical=false
 BeamletOptics.check_kinematic_members

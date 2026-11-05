@@ -177,6 +177,8 @@ default `NoBoundingSphere()` every ray is tested via [`intersect3d`](@ref). With
 solve tests a ray against the sphere first and skips the shape if it misses, which pays off for
 shapes with a costly `intersect3d`. The sphere is computed once per [`solve_system!`](@ref) and
 not stored in the shape, hence the method may take some time, e.g. look at all vertices of a mesh.
+The table holds spheres of floating-point shapes only: for other number types, e.g. dual numbers
+under `ForwardDiff`, the shape is tested without a sphere.
 
 The sphere must enclose every point of the shape, for all its parameters: a hit outside of the
 sphere is lost without a warning. It should also be tight, since a ray that hits the sphere is

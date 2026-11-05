@@ -19,6 +19,9 @@ end
 Spawns a thin, rectangular [`PolarizationFilter`](@ref). The `edge_length` has to be specified in [m].
 The filter is aligned with the global y-axis and transmits along the x-axis, while blocking polarization components
 along the global z-axis.
+
+A [`PolarizedRay`](@ref) whose polarization vector has a norm of at most `cutoff_strength` behind the filter
+is blocked, i.e. its beam ends here. Rays without polarization pass unchanged.
 """
 function PolarizationFilter(edge_length::Real; cutoff_strength=eps())
     shape = QuadraticFlatMesh(edge_length)

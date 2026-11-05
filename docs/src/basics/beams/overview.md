@@ -25,7 +25,7 @@ Depth = 2
 
 ## Beam models
 
-The beamlets are traced as several [`Beam`](@ref)s of rays side by side (blue: beam types, purple: rays):
+The beamlets are traced as several [`Beam`](@ref)s of rays side by side:
 
 ```mermaid
 flowchart TB
@@ -44,7 +44,7 @@ flowchart TB
     class RAY purple
 ```
 
-A beamlet stops when its rays hit different shapes or its invariant check fails. The tracing loop and the interface of a beam type are described in [Tracing a beamlet](@ref) and [Beam interface](@ref).
+A beamlet stops when its rays hit different shapes, when only some of its rays hit anything (a partly clipped beamlet), when the `interact3d` method of the object returns `nothing`, or when its invariant check fails. The tracing loop and the interface of a beam type are described in [Tracing a beamlet](@ref) and [Beam interface](@ref).
 
 ## Moving beams
 

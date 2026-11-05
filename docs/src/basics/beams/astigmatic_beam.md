@@ -51,9 +51,9 @@ The phase factor due to the optical path length of the central ray ($e^{i k (z +
 !!! info "Optical invariant"
     In order to ensure the correctness of the traced beamlet, the complex ray vectors must satisfy the **vanishing complex optical invariant**:
     ```math
-    \mathbf{h}_1 \times \mathbf{u}_2 - \mathbf{h}_2 \times \mathbf{u}_1 = 0
+    \mathbf{h}_1 \cdot \mathbf{u}_2 - \mathbf{h}_2 \cdot \mathbf{u}_1 = 0
     ```
-    This ensures that the complex curvature matrix $\mathbf{Q}$ is symmetric, since the beamlet formalism can not capture higher-order abberations.
+    with the analytic bilinear form of the dot product (see below). Tracing stops with a warning if its absolute value exceeds [`get_invariant_threshold`](@ref)`()`, by default ``10^{-6}``. This ensures that the complex curvature matrix $\mathbf{Q}$ is symmetric, since the beamlet formalism can not capture higher-order abberations.
 
     The Lagrange invariant $H = n \operatorname{Im}(\mathbf{h}^* \cdot \mathbf{u})$ of each axis must keep its value at the start of the beam, $M^2 \lambda / \pi$. A large beamlet in a strong focus does not: the rays leave the parabolic part of the surface and $H$ of one axis can even change its sign, as happens for separate waists. Tracing stops with a warning if $H$ deviates by more than [`get_lagrange_tolerance`](@ref)`()`, by default 50 %, from its start value, for any $M^2$ and wavelength.
 
@@ -65,6 +65,12 @@ You can construct a single astigmatic beamlet with a specified waist and polariz
 AstigmaticGaussianBeamlet(::AbstractArray, ::AbstractArray, ::Real, ::Real)
 ```
 
+Independent waists in the two transverse axes, e.g. of a diode laser, are set with the five-argument constructor:
+
+```@docs; canonical=false
+AstigmaticGaussianBeamlet(::AbstractArray, ::AbstractArray, ::Real, ::Real, ::Real)
+```
+
 The constructor will spawn an `AstigmaticGaussianBeamlet` which is implemented as follows:
 
 ```@docs; canonical=false
@@ -73,19 +79,31 @@ AstigmaticGaussianBeamlet
 
 ### Calculating astigmatic beam parameters
 
-To obtain the physical vector electric field [V/m] at any point:
+The scalar parameters of a traced beamlet are obtained as for the [`GaussianBeamlet`](@ref):
+
+```@docs; canonical=false
+gauss_parameters(::AstigmaticGaussianBeamlet, ::Real)
+waist_parameters(::AstigmaticGaussianBeamlet, ::Real)
+rayleigh_range(::AstigmaticGaussianBeamlet)
+electric_field(::AstigmaticGaussianBeamlet, ::AbstractArray, ::Real)
+intensity(::AstigmaticGaussianBeamlet, ::AbstractArray, ::Real)
+optical_power(::AstigmaticGaussianBeamlet)
+```
+
+To obtain the physical vector electric field \[V/m\] at the transverse offset `r` from the chief ray, at the distance `z` along the beam:
 ```julia
-# Field at world position (x, y, z)
-E_vec = polarized_field(agb, [0.01, 0, 0], 10.0)
+# r is an offset vector orthogonal to the chief ray, not a point in world coordinates,
+# here along x for a beamlet along +y
+E_vec = BeamletOptics.polarized_field(agb, [0.01, 0, 0], 10.0)
 ```
 
 ```julia
-# Decompose a field from a detector into a new AstigmaticBeamGroup,
-# with the sample x = z = 0 at pos
-beams = WavefrontBeamletDecomposition(x, z, amplitude, phase, pos, dir, λ)
+# Decompose a sampled field into a new AstigmaticBeamGroup,
+# with the sample x = y = 0 at pos
+group = WavefrontBeamletDecomposition(x, y, amplitude, phase, pos, dir, λ)
 
-# Solve system (propagate all beamlets to next segment)
-solve_system!(system, beams)
+# Trace all beamlets of the group through the system
+solve_system!(system, group)
 ```
 
 The Gouy phase follows the argument of the complex beam area ``(\mathbf{h}_1 \times \mathbf{h}_2) \cdot \mathbf{d}`` along the chief ray, starting at the root beam, and a child continues the last segment of its parent. The area is a pseudoscalar: a reflection mirrors the transverse frame against the chief ray and flips its sign, which is no change of the beam. The jump of the argument at an interface is therefore taken modulo ``\pi``, on ``(-\pi/2, \pi/2]``, and the Gouy phase does not change at a mirror. Physical jumps at refraction are small. The argument is followed continuously, because the principal branch would jump by ``\pi`` behind a focus.

@@ -20,17 +20,13 @@ update_render!(hsys)              # moved components: only their model transform
 update_render!(hbeam)             # beam path: point buffer is replaced in place
 ```
 
-- **Objects and systems**: the geometry is rendered once with `render!`. Kinematic changes
-  (`translate3d!`, `rotate3d!`, ...) are then applied as a rigid model transformation of the
-  existing plots, which costs microseconds regardless of the mesh resolution.
-- **Rays, beams and beam groups**: all segments are drawn by a single `linesegments` plot, so the
-  number of plots does not grow with the number of rays. The number of segments may change
-  between updates, e.g. when a component is moved out of the beam path.
-- **Gaussian beamlets**: the 1/e² envelope of all segments is merged into a single mesh. This
-  applies to `GaussianBeamlet`s, `AstigmaticGaussianBeamlet`s and groups of astigmatic beamlets,
-  of which every `render_every`-th beamlet is rendered.
+```@docs; canonical=false
+BeamletOptics.live_render!(::Any, ::BeamletOptics._RenderTypes)
+BeamletOptics.update_render!(::Any)
+BeamletOptics.remove_render!(::Any)
+```
 
-`live_render!` draws the same plots as `render!`, see [Rays and beams](@ref "Rendering rays and beams") and [Gaussian beamlets](@ref "Rendering Gaussian beamlets"); it only keeps the data they are drawn from. Use [`remove_render!`](@ref) to delete the plots of a handle.
+`live_render!` draws the same plots as `render!`, see [Rays and beams](@ref "Rendering rays and beams") and [Gaussian beamlets](@ref "Rendering Gaussian beamlets"); it only keeps the data they are drawn from. The envelope meshes of Gaussian beamlets use coarser default resolutions `r_res` and `z_res` than `render!` (24/40 instead of 50/100 for a `GaussianBeamlet`, 10/8 instead of 64/100 per beamlet of an `AstigmaticBeamGroup`). Change them via the keywords or with [`BeamletOptics.render_settings!`](@ref).
 
 Which `live_render!` method draws a thing, which handle it returns and how `update_render!` refreshes it are described in [Live rendering dispatch](@ref) and [Updating a handle](@ref).
 
@@ -67,4 +63,10 @@ Overlays that are not part of a component, e.g. markers, are drawn with the func
 BeamletOptics.live_render!(::Function, ::Any, ::Any)
 ```
 
-[`pick_object`](@ref) finds the object that owns a picked plot. Packages built on BeamletOptics access the handles through the [Render handle protocol](@ref).
+The object that owns a picked plot is found by `pick_object`:
+
+```@docs; canonical=false
+BeamletOptics.pick_object(::Any, ::Any)
+```
+
+Packages built on BeamletOptics access the handles through the [Render handle protocol](@ref).

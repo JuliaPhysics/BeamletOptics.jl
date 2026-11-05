@@ -12,9 +12,13 @@ solved repeatedly.
 - objects and systems: the geometry is generated once, kinematic changes are applied as a model
   transformation of the existing plots
 - rays, beams and beam groups: all segments are bundled into a single plot
-- `GaussianBeamlet`: the envelope of all segments is bundled into a single mesh
+- `GaussianBeamlet`, `AstigmaticGaussianBeamlet` and `AstigmaticBeamGroup`: the envelope of all
+  segments is bundled into a single mesh
 
-Keyword arguments are passed on as for [`render!`](@ref).
+Keyword arguments are passed on as for [`render!`](@ref), but the envelope meshes of Gaussian
+beamlets are drawn with coarser default resolutions `r_res`/`z_res`: 24/40 for a `GaussianBeamlet`
+(`render!`: 50/100) and 10/8 per beamlet of an `AstigmaticBeamGroup` (`render!`: 64/100). Change them
+via the keywords or later via [`render_settings!`](@ref).
 
 If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
 """

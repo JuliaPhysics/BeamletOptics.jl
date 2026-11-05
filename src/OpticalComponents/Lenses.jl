@@ -298,6 +298,13 @@ function Lens(
     return Lens(shape, n)
 end
 
+"""
+    Lens(front_surface::AbstractRotationallySymmetricSurface, center_thickness::Real, n::AbstractRefractiveIndex)
+
+Constructs a plano-convex or plano-concave [`Lens`](@ref): the back surface is a
+[`CircularFlatSurface`](@ref) with the diameter of the `front_surface`. See the two-surface method for the
+other arguments.
+"""
 function Lens(front_surface::AbstractRotationallySymmetricSurface,
         center_thickness::Real, n::AbstractRefractiveIndex)
     Lens(
@@ -397,6 +404,12 @@ function Lens(
     return Lens(shape, n)
 end
 
+"""
+    Lens(front_surface::AbstractCylindricalSurface, center_thickness::Real, n::AbstractRefractiveIndex)
+
+Constructs a plano-cylindrical [`Lens`](@ref): the back surface is a [`RectangularFlatSurface`](@ref) with
+the diameter of the `front_surface`. See the two-surface cylindrical method for the other arguments.
+"""
 function Lens(front_surface::AbstractCylindricalSurface,
         center_thickness::Real, n::AbstractRefractiveIndex)
     Lens(

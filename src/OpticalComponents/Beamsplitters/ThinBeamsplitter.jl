@@ -6,12 +6,12 @@ Represents a 2D beam-splitting device.
 # Fields
 
 - `shape`: 2D [`AbstractShape`](@ref) at which the splitting process occurs (e.g. a 2D-[`Mesh`](@ref))
-- `reflectance`: scalar reflection factor
-- `transmittance`: scalar transmission factor
+- `reflectance`: scalar reflection factor, the amplitude ``\\sqrt{R}`` for the power reflectance ``R``
+- `transmittance`: scalar transmission factor, the amplitude ``\\sqrt{1 - R}``
 
 !!! warning
-    Note that the `transmittance` should be calculated from an input `reflectance` in order
-    to ensure that R² + T² = 1.
+    The stored `reflectance` and `transmittance` are amplitudes. They should be calculated from the
+    power reflectance ``R`` such that `reflectance^2 + transmittance^2 = 1`, as checked by `isvalid`.
 """
 struct ThinBeamsplitter{T <: Real, S <: AbstractShape{T}} <: AbstractBeamsplitter{T}
     shape::S
@@ -35,13 +35,13 @@ Creates a zero-thickness, lossless, non-polarizing 2D rectangular [`ThinBeamspli
 
 - `width`: is the x-dir. edge length in [m]
 - `height`: is the z-dir. edge length in [m]
-- `reflectance`: kw-arg that determines how much light is **reflected**, i.e. 0.7 for a 70:30 splitter
+- `reflectance`: kw-arg in the open interval (0, 1) that determines how much light is **reflected**, i.e. 0.7 for a 70:30 splitter
 
 # Additional information
 
 !!! info "Reflectance"
-    The input value for the `reflectance` R is normed such that R² + T² = 1, where T is the `transmittance`.
-    The transmittance is calculated via T = √(1 - R²).
+    The input `reflectance` is the power reflectance ``R``. The amplitudes ``\\sqrt{R}`` and ``\\sqrt{1 - R}``
+    are stored in the fields `reflectance` and `transmittance`, such that their squares sum to one.
 
 !!! warning "Reflection phase jump"
     Note that the reflection phase jump θᵣ is implemented by the individual [`interact3d`](@ref)-methods. Refer to them for more information.
@@ -213,7 +213,8 @@ end
     interact3d(::AbstractSystem, bs::ThinBeamsplitter, agb::AstigmaticGaussianBeamlet, ray_id::Int)
 
 Models the interaction between a [`ThinBeamsplitter`](@ref) and an [`AstigmaticGaussianBeamlet`](@ref).
-The reflection phase jump θᵣ = π is applied to the reflected child beam.
+The reflection phase jump θᵣ = π is applied to the reflected child beam if the beam faces the
+normal vector of the splitter, i.e. `dot(dir, normal) < 0`, otherwise θᵣ = 0.
 """
 function interact3d(
         ::AbstractSystem, bs::ThinBeamsplitter, agb::AstigmaticGaussianBeamlet, ray_id::Int)

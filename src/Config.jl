@@ -93,14 +93,17 @@ const default_depth_max = @load_preference("default_depth_max", 100)
 """
     get_default_r_max()
 
-Returns the default maximum number of segments for ray tracing.
+Returns the default maximum number of rays (segments) per beam, the keyword `r_max` of
+[`solve_system!`](@ref BeamletOptics.solve_system!). Defaults to 100 (configurable via the `default_r_max` preference).
 """
 get_default_r_max() = default_r_max
 
 """
     get_default_depth_max()
 
-Returns the default maximum depth for recursive ray tracing (e.g., reflections/refractions).
+Returns the default maximum number of branching levels of the beam tree, the keyword `depth_max` of
+[`solve_system!`](@ref BeamletOptics.solve_system!): the children of a beam at level `depth_max + 1` (the root beam is at level 1),
+e.g. those attached by a beamsplitter, are dropped.
 Defaults to 100 (configurable via the `default_depth_max` preference).
 """
 get_default_depth_max() = default_depth_max
@@ -148,9 +151,12 @@ get_progress_threshold() = progress_threshold
 
 
 """
-    set_preference!(key::String, val; persistent=true)
+    set_preference!(key::String, val)
 
-Helper to set preferences. Default is persistent.
+Stores the preference `key` with the value `val` for this package via Preferences.jl (it is kept in a
+`LocalPreferences.toml`, i.e. across Julia sessions) and logs a message. The
+configuration constants are read when the package is loaded, hence Julia must be restarted for a new
+value to take effect.
 """
 function set_preference!(key::String, val)
     @set_preferences!(key => val)

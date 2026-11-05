@@ -24,7 +24,12 @@ This model acts as a quasi-coating, representing a very thin (zero-thickness) la
 - [`RoundThinBeamsplitter`](@ref)
 
 !!! info "Beamsplitter phase jump"
-    If you want to learn more about how beam splitting is modeled, especially in the context of interferometer simulations, refer to the [`ThinBeamsplitter`](@ref) type docs and the specific [`BeamletOptics.interact3d`](@ref) documentation.
+    If you want to learn more about how beam splitting is modeled, especially in the context of interferometer simulations, refer to the [`ThinBeamsplitter`](@ref) type docs and the `interact3d` methods below, which apply the phase jump.
+
+```@docs; canonical=false
+BeamletOptics.interact3d(::BeamletOptics.AbstractSystem, ::ThinBeamsplitter, ::GaussianBeamlet, ::Int)
+BeamletOptics.interact3d(::BeamletOptics.AbstractSystem, ::ThinBeamsplitter, ::AstigmaticGaussianBeamlet, ::Int)
+```
 
 ## Plate beamsplitters
 

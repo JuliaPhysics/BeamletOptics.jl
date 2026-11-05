@@ -7,23 +7,23 @@ Main.DocUtils.conditional_include(joinpath(detector_showcase_dir, "photodetector
 
 # Detectors
 
-In practice, photodetectors allow the conversion of electromagnetic radiation into electric signals. BMO provides the [`Detector`](@ref) as an element to capture and evaluate optical data during and after running a simulation, respectively. The `Detector` is designed to accumulate e.g. field or ray data, enabling analysis of intensity distributions, interference patterns, and other beam properties. Currently, post-processing capabilities are limited to the functionality as described in the [Spot diagrams](@ref) and [Field distributions](@ref) sections.
+In practice, photodetectors allow the conversion of electromagnetic radiation into electric signals. BMO provides the [`Detector`](@ref) as an element to capture and evaluate optical data during and after running a simulation, respectively. The `Detector` is designed to accumulate e.g. field or ray data, enabling analysis of intensity distributions, interference patterns, and other beam properties. The post-processing is described in the sections [Reading out a detector](@ref), [Spot diagrams](@ref), [Ray directions](@ref) and [Field distributions](@ref), which also covers the coupling to other solvers via OpticsBase.
 
 In general, detector-like elements are supposed to fall under the [`BeamletOptics.AbstractDetector`](@ref) type, which defines a interface for detector implementations.
 
 !!! warning "Resetting detectors"
-    By default, the data stored in a `Detector` is not reset between calls of [`solve_system!`](@ref). This is intentional, since all beams of a beam group and several sources solved one after another are meant to superpose on the same detectors. To start from empty detectors, e.g. when a component is changed in a loop, solve with `initialize = true` or call [`initialize!`](@ref)`(system)`, which resets all detectors of a [`System`](@ref) including those in nested [`ObjectGroup`](@ref)s. A single detector is reset with [`empty!`](@ref). Hits are pushed under a lock, so beam groups can safely be solved multithreaded.
+    By default, the data stored in a `Detector` is not reset between calls of [`solve_system!`](@ref). This is intentional, since all beams of a beam group and several sources solved one after another are meant to superpose on the same detectors. To start from empty detectors, e.g. when a component is changed in a loop, solve with `initialize = true` or call [`initialize!`](@ref)`(system)`, which resets all detectors of a [`System`](@ref) including those in nested [`ObjectGroup`](@ref)s. A single detector is reset with [`empty!`](@ref). Hits are pushed under a lock, so beam groups can safely be solved multithreaded. In the solve of a beam group, the hits are first collected in buffers and stored in the detector at the end of each chunk of beams, see [Hit recording](@ref).
 
 ## Detector type
 
-A `Detector` can be easily spawned by initializing e.g. `pd = Detector(5mm)` which will create a 5x5 mm² detection screen.
+A `Detector` can be easily spawned by initializing e.g. `pd = Detector(5e-3)` which will create a 5x5 mm² detection screen (the edge length is given in meters).
 
 ```@docs; canonical=false
 Detector(::Real, ::Bool)
 Detector
 ```
 
-After solving a system containing a `Detector`, the methods listed below can be used in order to analyze the stored data. If no data is obtained during the tracing procedure, an error message will be stored.
+After solving a system containing a `Detector`, the methods listed below can be used in order to analyze the stored data. If no hits are stored, the readouts return zero or empty results.
 
 ## Reading out a detector
 

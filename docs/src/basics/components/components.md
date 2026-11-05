@@ -14,6 +14,18 @@ Optical elements serve as the building blocks for optical systems in the context
 <ComponentCatalog />
 ```
 
+## Passive objects
+
+Two objects have no optical effect of their own and are built from a shape, e.g. a [`Mesh`](@ref BeamletOptics.Mesh) loaded from a file:
+
+- [`IntersectableObject`](@ref) is hit by beams and blocks them like a hard target, e.g. a beam dump or a housing wall.
+- [`NonInteractableObject`](@ref) is never hit: beams pass through it as if it was not there. It is meant for visualization, e.g. kinematic mounts, and can be moved with the kinematic functions like any other component.
+
+```@docs; canonical=false
+IntersectableObject
+NonInteractableObject
+```
+
 ## Moving components
 
 Optical elements can be moved freely in 3D space and combined into groups that move as one, see [Moving optical elements](@ref) in the [Kinematics](@ref) section.

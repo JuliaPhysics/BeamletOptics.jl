@@ -4,13 +4,13 @@ This page explains how [Live rendering](@ref) is implemented, and what a develop
 
 ## Live rendering dispatch
 
-The diagram shows which `live_render!` method draws a thing and which handle it returns; the green boxes are the `render!` methods a component or shape adds to be drawn (blue: methods of BMO, each `live_render!` method is an entry point; purple: returned handles):
+The diagram shows which `live_render!` method draws a thing and which handle it returns. BMO provides `render!(ax, obj)` and `render!(ax, shape)` as defaults, which a component or shape replaces with an own method to be drawn differently:
 
 ```mermaid
 flowchart TB
     S1["<b>live_render!(ax, system)</b><br/>each top-level object,<br/>groups per object"]
-    S2["<b>live_render!(h, obj)</b><br/>each object of obj,<br/>added to the system handle h"]
-    B1["<b>live_render!(ax, beam)</b><br/>ray, beam, beam group or beamlet:<br/>plots of render!, live = true"]
+    S2["<b>live_render!(h, obj)</b><br/>each object of obj, added to h;<br/>ArgumentError if rendered,<br/>plots deleted if it fails"]
+    B1["<b>live_render!(ax, beam)</b><br/>ray, beam, beam group or beamlet:<br/>plots of render!, live = true,<br/>coarser defaults for beamlets"]
     O1["<b>live_render!(ax, obj)</b><br/>object or object group"]
     SH["<b>SystemRenderHandle</b><br/><i>#lt;: AbstractSystemRenderHandle</i>"]
     BH["<b>BeamRenderHandle</b><br/><i>#lt;: AbstractBeamRenderHandle</i>"]
@@ -23,7 +23,7 @@ flowchart TB
     S1 -- "each object" --> O1
     S2 -- "each object" --> O1
     S1 --> SH
-    S2 -. "push! to children(h)" .-> SH
+    S2 -. "append! to h.handles" .-> SH
     B1 --> BH
     O1 -- "draw = () -> render!(ax, obj)" --> D
     D -- "draw()" --> R
@@ -42,27 +42,31 @@ flowchart TB
 
 ## Updating a handle
 
-The diagram shows what `update_render!` does for each handle type (blue: updates of the plots, purple: check):
+The diagram shows what `update_render!` does for each handle type:
 
 ```mermaid
 flowchart TB
     U(["<b>update_render!(h)</b>"])
     RG["<b>_is_rigid(h)</b><br/>parts unchanged and<br/>moved rigidly?"]
     OB["<b>refill the observables</b><br/>obs[] = geometry()"]
+    PC["<b>pose of the object</b><br/>unchanged?"]
     MM["<b>translate!</b>, <b>rotate!</b><br/>model matrix of the plots"]
     RR["<b>_rerender!(h)</b><br/>delete the plots, draw() again"]
+    E(["<b>return h</b>"])
 
     U -- "ObjectRenderHandle, or<br/>update_render!(oh) for each oh in<br/>children(h) of a system handle" --> RG
     U -- "BeamRenderHandle" --> OB
-    RG -- yes --> MM
+    RG -- yes --> PC
     RG -- no --> RR
+    PC -- yes --> E
+    PC -- no --> MM
 
     classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
     classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
     classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
     class MM,RR,OB blue
-    class RG purple
-    class U terminal
+    class RG,PC purple
+    class U,E terminal
 ```
 
 ## Render handle protocol
@@ -89,16 +93,15 @@ Base.push!(::BeamletOptics.AbstractSystemRenderHandle, ::BeamletOptics.AbstractO
 Base.delete!(::BeamletOptics.AbstractSystemRenderHandle, ::BeamletOptics.AbstractObjectRenderHandle)
 ```
 
-`push!` adds an object handle at the top level, `delete!` removes it from the system handle without
-deleting its plots (use [`remove_render!`](@ref) for that). [`update_render!`](@ref),
-[`remove_render!`](@ref) and [`pick_object`](@ref) work on any system handle through these accessors,
-so a handle type of your own only needs to implement them.
+[`update_render!`](@ref), [`remove_render!`](@ref) and [`pick_object`](@ref) work on any system
+handle through these accessors, so a handle type of your own only needs to implement them.
 
-The diagram shows which accessors and hooks (green) the methods of a system handle (blue) call, and where they pass on to the object handles (purple):
+The diagram shows which accessors and hooks the methods of a system handle call, and where they pass on to the object handles:
 
 ```mermaid
 flowchart TB
     UR["<b>update_render!(h)</b><br/><b>render_plots(h)</b>"]
+    REM0["<b>remove_render!(h)</b>"]
     REM["<b>remove_render!(h, obj)</b>"]
     PCK["<b>pick_object(h, plot)</b>"]
     CH["<b>AbstractTrees.children(h)</b>"]
@@ -108,25 +111,25 @@ flowchart TB
     PP["<b>pickable_plots(x, plots)</b><br/><i>method per type of x</i>"]
 
     UR --> CH
+    REM0 --> CH
     REM --> CH
     REM -- "obj in a group:<br/>ArgumentError" --> PAR
     REM --> DEL
     PCK --> CH
     PCK -- "up to the<br/>outermost group" --> PAR
-    CH -- "each oh, for remove_render!:<br/>rendered(oh) in obj?" --> OHM
+    CH -- "each oh; for remove_render!(h, obj)<br/>only if rendered(oh) in obj" --> OHM
     OHM -- "pick_object(oh, plot)" --> PP
 
     classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
     classDef green fill:#38982626,stroke:#389826,stroke-width:2px
     classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
-    class UR,REM,PCK blue
+    class UR,REM0,REM,PCK blue
     class CH,PAR,DEL,PP green
     class OHM purple
 ```
 
-[`pick_object`](@ref) finds the object that owns a picked plot. By default all plots of an object
-select it; a method of `pickable_plots` restricts this, e.g. to exclude an outline. The colors of the
-material classes of the active look are available via `look_colors`:
+[`pick_object`](@ref) uses `pickable_plots`; the colors of the material classes of the active look
+are available via `look_colors`:
 
 ```@docs; canonical=false
 BeamletOptics.pickable_plots

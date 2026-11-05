@@ -4,7 +4,7 @@ This page explains how the [`Detector`](@ref) described in the basics is impleme
 
 ## Hit recording
 
-The following diagram shows how a solve records one hit type per beam model in a `Detector` and what empties it again; green boxes are the methods a new [`BeamletOptics.AbstractDetector`](@ref) implements (purple: hit types, blue: storage of the hits, red: what records or empties them).
+The following diagram shows how a solve records one hit type per beam model in a `Detector` and what empties it again. A new [`BeamletOptics.AbstractDetector`](@ref) implements `interact3d` and `empty!`.
 
 ```mermaid
 flowchart TB
@@ -36,7 +36,7 @@ flowchart TB
 
 ## Readout pipeline
 
-The following diagram shows how a readout turns a sampling into points and evaluates the stored hits there; green boxes are the methods a new sampling or hit type implements (purple: sampling, blue: evaluation at the points, red: entry point and results). A new hit type must also be added to the `hits` field of [`Detector`](@ref).
+The following diagram shows how a readout turns a sampling into points and evaluates the stored hits there. A new sampling type implements `sample_points`; a new hit type implements `electric_field(hit, p)`, `direction(hit)`, `refractive_index(hit)` and an `intensity` method for a vector of its hits. Only the [`RegularGrid`](@ref) calls `calc_local_lims`, to find its window around the hits; a new hit type therefore implements it for a vector of its hits with a `crop_factor` and for `crop_factor = nothing`. A new hit type must also be added to the `hits` field of [`Detector`](@ref).
 
 ```mermaid
 flowchart TB
@@ -44,7 +44,7 @@ flowchart TB
     SP["<b>sample_points(pd, sampling)</b><br/><i>dispatch on the sampling</i>"]
     BMO["<b>BMO stock samplings</b><br/>"]
     OWN["own <b>sample_points</b> method"]
-    LIM["own <b>calc_local_lims(pd, hits, crop_factor)</b><br/>unless an AbstractRayHit<br/>or AbstractBeamletHit"]
+    LIM["own <b>calc_local_lims(pd, hits, crop_factor)</b><br/>and the method for crop_factor = nothing,<br/>unless an AbstractRayHit<br/>or AbstractBeamletHit"]
     DS["<b>DetectorSamples</b><br/>coordinates, points, weights"]
     PT["<b>electric_field(pd, points)</b><br/><b>intensity(pd, points)</b><br/>threaded over the points,<br/>no hits: zero at every point"]
     SUM["<b>electric_field(hits(pd), p)</b><br/>coherent sum over the hits"]
@@ -56,7 +56,7 @@ flowchart TB
     R --> SP
     SP -- "RegularGrid,<br/>RectilinearGrid" --> BMO
     SP -- "own AbstractDetectorSampling" --> OWN
-    BMO -- "own hit type" --> LIM
+    BMO -- "RegularGrid only,<br/>own hit type" --> LIM
     BMO --> DS
     OWN --> DS
     DS -- points --> PT
@@ -85,7 +85,7 @@ BeamletOptics.DetectorSamples
 
 ## OpticsBase extension internals
 
-The diagram shows how the constructors share one sampling of the hits and how the return path leaves the `PlaneField` again. Blue boxes are BMO's detector internals that the extension reuses, green boxes depend on the hit type, purple boxes are the rest of the extension, red marks entry points and results.
+The diagram shows how the constructors share one sampling of the hits and how the return path leaves the `PlaneField` again.
 
 ```mermaid
 flowchart TB
