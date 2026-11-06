@@ -61,33 +61,44 @@ function transmission_axis(pf::PolarizationFilter)
     return normalize(real(F.V[:, 1]))
 end
 
-function interact3d(::AbstractSystem,
-        polfilter::PolarizationFilter,
-        ::Beam{T, R},
+"""
+    JonesFilm{T, M} <: AbstractSurfaceModel
+
+An ideal, infinitesimally thin polarizing film with the Jones matrix `J` (3×3, in global coordinates).
+It filters the field of a [`PolarizedRay`](@ref) with `J` projected into the plane transverse to the
+ray, see [`AbstractJonesPolarizer`](@ref), and stops the ray if the field falls to or below `cutoff`.
+Rays without a field, e.g. the auxiliary rays of a beamlet, pass unfiltered.
+
+The film acts between the media of the boundary, e.g. as a film cemented between two glass plates, see
+[`LinearPolarizer`](@ref): the filtered field is refracted into the medium behind the film with the
+[`fresnel_coefficients`](@ref). Beyond the critical angle of these media, the ray is totally reflected
+before it reaches the film.
+
+A [`PolarizationFilter`](@ref) carries this film in its current orientation, see
+[`surface_model`](@ref).
+"""
+struct JonesFilm{T, M <: AbstractMatrix} <: AbstractSurfaceModel
+    J::M
+    cutoff::T
+end
+
+function surface_model(pf::PolarizationFilter)
+    R = orientation(pf)
+    return JonesFilm(R * static_data(pf.JMat) * transpose(R), pf.cutoff)
+end
+
+function interact3d(::AbstractSystem, film::JonesFilm, t::Transition, beam::Beam{T, R},
         ray::R) where {T <: Real, R <: PolarizedRay{T}}
-    npos = hit_point(ray)
-    ndir = direction(ray)
-
-    E0 = _calculate_global_E0(polfilter, ray, ndir, polfilter.JMat)
-
+    is_totally_reflected(ray, t) && return cross_boundary(t, beam, ray)
+    # Jones matrix projected into the plane transverse to the ray
+    Q = I - direction(ray) * transpose(direction(ray))
+    E = Q * film.J * Q * polarization(ray)
     # Terminate blocked rays
-    if norm(E0) ≤ polfilter.cutoff
-        return nothing
-    end
-
-    return BeamInteraction{T, R}(nothing,
-        PolarizedRay{T}(npos, ndir, nothing, wavelength(ray), refractive_index(ray), E0))
+    norm(E) ≤ film.cutoff && return nothing
+    # Filtered field crosses the boundary
+    return cross_boundary(t, beam, ray, E)
 end
 
-function interact3d(
-        ::AbstractSystem,
-        ::PolarizationFilter,
-        ::Beam{T, R},
-        ray::R
-    ) where {T <: Real, R <: Ray{T}}
-    # unpolarized rays (e.g. beamlet auxiliary rays) pass through the ideal filter unchanged
-    npos = hit_point(ray)
-    ndir = direction(ray)
-    return BeamInteraction{T, R}(nothing,
-        Ray{T}(npos, ndir, nothing, wavelength(ray), refractive_index(ray)))
-end
+interact3d(::AbstractSystem, ::JonesFilm, t::Transition, beam::Beam{T, R},
+        ray::R) where {T <: Real, R <: Ray{T}} =
+    cross_boundary(t, beam, ray)

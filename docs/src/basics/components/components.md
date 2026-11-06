@@ -47,4 +47,4 @@ BeamletOptics.default_properties
 ```
 
 !!! tip "Own components"
-    The geometry of a component lives in its shape, its optical effect in its [`BeamletOptics.interact3d`](@ref) method. To add a component of your own, see [Implementing components](@ref) for the functions a solve calls on an object and how the component families react to a hit.
+    The geometry of a component lives in its shape, its optical effect at a boundary in its medium or surface model, or in its own [`BeamletOptics.interact3d`](@ref) method. To add a component of your own, see [Implementing components](@ref) for the functions a solve calls on an object and how the component families react to a hit.

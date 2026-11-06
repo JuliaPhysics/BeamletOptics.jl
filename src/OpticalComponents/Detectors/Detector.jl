@@ -84,7 +84,8 @@ Spawns a quadratic [`Detector`](@ref) surface that is aligned with the neg. y-ax
 The detector edge length can be configured via `edge_length`.
 Additionally, continued tracing can be configured via the `stop` flag where
 
-- `false` indicates continued tracing: rays and beamlets pass the detector unchanged
+- `false` indicates continued tracing: rays and beamlets pass the detector as a thin layer,
+  unchanged within one medium and refracted on a boundary between two media
 - `true` stops the incoming beams as with any hard target
 
 !!! warning "Partly clipped beamlets"
@@ -157,50 +158,34 @@ function Base.append!(d::Detector, new::Vector{<:AbstractDetectorHit})
     return d
 end
 
-"""
-    pass_through(ray::AbstractRay) -> BeamInteraction
-
-The interaction of a `ray` that passes a [`Detector`](@ref) with `stop = false` unchanged: a new
-ray from the hit point with the direction, wavelength, refractive index and polarization of `ray`.
-"""
-function pass_through(ray::Ray{T}) where {T}
-    return BeamInteraction{T, Ray{T}}(nothing,
-        Ray{T}(hit_point(ray), direction(ray), nothing, wavelength(ray), refractive_index(ray)))
-end
-
-function pass_through(ray::PolarizedRay{T}) where {T}
-    return BeamInteraction{T, PolarizedRay{T}}(nothing,
-        PolarizedRay{T}(hit_point(ray), direction(ray), nothing, wavelength(ray),
-            refractive_index(ray), polarization(ray)))
-end
-
-function interact3d(::AbstractSystem, d::Detector, beam::Beam{T, R},
+# A detector that does not stop the ray is a thin layer without a surface model: the ray passes it,
+# refracted if the detector lies on a boundary between two media, see `surface_model`
+function interact3d(system::AbstractSystem, d::Detector, beam::Beam{T, R},
         ray::R) where {T <: Real, R <: Ray{T}}
     push!(d, RayHit(ray, optical_path_length(beam)))
-    # Stop solver (hard target) or continue from the hit point
-    return stop(d) ? nothing : pass_through(ray)
+    # Stop solver (hard target)
+    stop(d) && return nothing
+    return interact3d(system, transition(system, ray), beam, ray)
 end
 
-function interact3d(::AbstractSystem, d::Detector, beam::Beam{T, R},
+function interact3d(system::AbstractSystem, d::Detector, beam::Beam{T, R},
         ray::R) where {T <: Real, R <: PolarizedRay{T}}
     push!(d, PolarizedRayHit(ray, optical_path_length(beam)))
-    # Stop solver (hard target) or continue from the hit point
-    return stop(d) ? nothing : pass_through(ray)
+    # Stop solver (hard target)
+    stop(d) && return nothing
+    return interact3d(system, transition(system, ray), beam, ray)
 end
 
-function interact3d(::AbstractSystem, d::Detector, g::GaussianBeamlet{R}, id::Int) where {R}
+function interact3d(system::AbstractSystem, d::Detector, g::GaussianBeamlet, id::Int)
     push!(d, GaussianBeamletHit(g, id))
+    # Stop solver (hard target) or pass with all component rays
     stop(d) && return nothing
-    # Continue all component rays from their hit points
-    return GaussianBeamletInteraction{R}(
-        map(b -> pass_through(rays(b)[id]), _component_beams(g))...)
+    return interact3d(system, transition(system, g, id), g, id)
 end
 
-function interact3d(::AbstractSystem, d::Detector,
-        agb::AstigmaticGaussianBeamlet{R}, id::Int) where {R}
+function interact3d(system::AbstractSystem, d::Detector, agb::AstigmaticGaussianBeamlet, id::Int)
     push!(d, AstigmaticGaussianBeamletHit(agb, id))
+    # Stop solver (hard target) or pass with all component rays
     stop(d) && return nothing
-    # Continue all component rays from their hit points
-    return AstigmaticGaussianBeamletInteraction{R}(
-        map(b -> pass_through(rays(b)[id]), _component_beams(agb))...)
+    return interact3d(system, transition(system, agb, id), agb, id)
 end

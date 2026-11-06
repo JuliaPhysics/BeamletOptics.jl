@@ -137,24 +137,3 @@ function SphericalTripletLens(r1, r2, r3, r4, l1, l2, l3, d, n1, n2, n3)
     return TripletLens(front, middle, back)
 end
 
-function interact3d(system::AbstractSystem, tl::TripletLens, beam::Beam{T, R}, ray::R) where {T <: Real, R <: AbstractRay{T}}
-    # Interaction logic: front/back always hint the middle element. The middle element
-    # hints the neighbour that lies ahead along the ray's direction of travel.
-    hit = shape(intersection(ray))
-    if hit === shape(tl.front)
-        i = interact3d(system, tl.front, beam, ray)
-        next = tl.middle
-    elseif hit === shape(tl.back)
-        i = interact3d(system, tl.back, beam, ray)
-        next = tl.middle
-    elseif hit === shape(tl.middle)
-        i = interact3d(system, tl.middle, beam, ray)
-        isnothing(i) && return nothing
-        s = dot(direction(i.ray), orientation(tl)[:, 2])
-        next = s ≥ 0 ? tl.back : tl.front
-    else
-        error("TripletLens: intersected shape is not part of this lens")
-    end
-    isnothing(i) && return nothing
-    return BeamInteraction(Hint(tl, shape(next)), i.ray)
-end

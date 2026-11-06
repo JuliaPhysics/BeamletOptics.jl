@@ -225,15 +225,21 @@ const BMO = BeamletOptics
             obj = TestObject()
             ray = TestRay(zeros(3), ones(3))
             beam = TestBeam()
-            @test_logs (:warn, "No interact3d method defined for:") BMO.interact3d(
+            @test_logs (:warn, r"No interact3d method defined for TestObject") BMO.interact3d(
                 sys,
                 obj,
                 beam,
                 ray)===nothing
-            # a MultiShape object without interact3d: the warning names both ways to fix it
-            multi = TestMultiObject(TestObject(), TestObject())
-            @test_logs (:warn, r"MultiShape object .*interact3d.*AbstractObjectGroup"s) BMO.interact3d(
-                sys, multi, beam, ray) === nothing
+            # a MultiShape object of objects hands the ray to the part that was hit, here a part without
+            # interact3d, which warns
+            a, b = TestObject(), TestObject()
+            multi = TestMultiObject(a, b)
+            hit_ray = Ray([0.0, 0, 0], [1.0, 0, 0])
+            BMO.intersection!(hit_ray, BMO.Intersection(multi, BMO.shape(b), 1.0, [-1.0, 0, 0]))
+            @test BMO.part_of(multi, BMO.shape(b)) === b
+            @test BMO.part_of(multi, BMO.shape(a)) === a
+            @test_logs (:warn, r"No interact3d method defined for TestObject") BMO.interact3d(
+                sys, multi, Beam(hit_ray), hit_ray) === nothing
         end
     end
 end
