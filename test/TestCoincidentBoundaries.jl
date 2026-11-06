@@ -1101,7 +1101,7 @@ holds(shapes, s) = any(x -> x === s, shapes)
     end
 
     @testset "Cube beamsplitter: front, coating and back at the hypotenuse" begin
-        cbs = CubeBeamsplitter(20mm, 1.5)
+        cbs = CubeBeamsplitter(20mm, ConstantRefractiveIndex(1.5))
         system = System([cbs])
         hit = hits_at(system, [2mm, -8mm, 0], [0, 1, 0])
         shapes = hit_shapes(hit)
@@ -1111,8 +1111,8 @@ holds(shapes, s) = any(x -> x === s, shapes)
     end
 
     @testset "Separate touching objects, also within a group" begin
-        A = RectangularCompensatorPlate(40mm, 40mm, 5mm, λ -> 1.7)
-        B = RectangularCompensatorPlate(40mm, 40mm, 3mm, λ -> 1.4)
+        A = RectangularCompensatorPlate(40mm, 40mm, 5mm, ConstantRefractiveIndex(1.7))
+        B = RectangularCompensatorPlate(40mm, 40mm, 3mm, ConstantRefractiveIndex(1.4))
         translate3d!(B, [0, 5mm, 0])
         d = normalize([0.3, 1, 0.1])
         for system in (System([A, B]), System([B, A]), System(ObjectGroup([A, B])), StaticSystem([A, B]))
@@ -1136,8 +1136,8 @@ holds(shapes, s) = any(x -> x === s, shapes)
 
     @testset "Gaps: below the tolerance a contact, above two hits" begin
         for (gap, n_hits) in ((0.3e-9, 2), (5e-9, 1), (1e-6, 1))
-            A = RectangularCompensatorPlate(40mm, 40mm, 5mm, λ -> 1.7)
-            B = RectangularCompensatorPlate(40mm, 40mm, 3mm, λ -> 1.4)
+            A = RectangularCompensatorPlate(40mm, 40mm, 5mm, ConstantRefractiveIndex(1.7))
+            B = RectangularCompensatorPlate(40mm, 40mm, 3mm, ConstantRefractiveIndex(1.4))
             translate3d!(B, [0, 5mm + gap, 0])
             hit = hits_at(System([A, B]), [0, 2mm, 0], [0, 1, 0])
             @test length(hit_shapes(hit)) == n_hits
@@ -1150,15 +1150,15 @@ holds(shapes, s) = any(x -> x === s, shapes)
         # trace equals the closest hits of all objects without bounding spheres
         objs = Any[]
         for k in 1:12
-            o = isodd(k) ? SphericalLens(30mm, -30mm, 5mm, 15mm, λ -> 1.5) :
-                RectangularCompensatorPlate(10mm, 10mm, 2mm, λ -> 1.6)
+            o = isodd(k) ? SphericalLens(30mm, -30mm, 5mm, 15mm, ConstantRefractiveIndex(1.5)) :
+                RectangularCompensatorPlate(10mm, 10mm, 2mm, ConstantRefractiveIndex(1.6))
             φ = 2π * k / 12
             translate3d!(o, [60mm * cos(φ), 60mm * sin(φ), 10mm * sin(3φ)])
             push!(objs, o)
         end
         # a touching pair among them
-        A = RectangularCompensatorPlate(10mm, 10mm, 2mm, λ -> 1.6)
-        B = RectangularCompensatorPlate(10mm, 10mm, 2mm, λ -> 1.4)
+        A = RectangularCompensatorPlate(10mm, 10mm, 2mm, ConstantRefractiveIndex(1.6))
+        B = RectangularCompensatorPlate(10mm, 10mm, 2mm, ConstantRefractiveIndex(1.4))
         translate3d!(A, [0, 30mm, 0])
         translate3d!(B, [0, 32mm, 0])
         append!(objs, [A, B])

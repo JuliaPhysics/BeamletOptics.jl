@@ -50,7 +50,7 @@ println(rpad("component", 22), rpad("source", 28), rpad("System [µs]", 14), "St
 # 50 lenses around the component, off the beam path: the cost of the other objects of a system
 function crowd()
     return [begin
-                l = SphericalLens(30mm, -30mm, 5mm, 15mm, _ -> 1.5)
+                l = SphericalLens(30mm, -30mm, 5mm, 15mm, ConstantRefractiveIndex(1.5))
                 φ = 2π * k / 50
                 translate3d!(l, [80mm * cos(φ), 80mm * sin(φ), 20mm])
                 l
