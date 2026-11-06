@@ -14,16 +14,16 @@ const λ = 1e-6
 const N = 200
 
 doublet() = begin
-    dl = SphericalDoubletLens(50mm, -40mm, -100mm, 4mm, 2mm, 20mm, _ -> 1.5, _ -> 1.7)
+    dl = SphericalDoubletLens(50mm, -40mm, -100mm, 4mm, 2mm, 20mm, ConstantRefractiveIndex(1.5), ConstantRefractiveIndex(1.7))
     translate3d!(dl, [0, 30mm, 0])
     dl
 end
 plate() = begin
-    pbs = RectangularPlateBeamsplitter(36mm, 25mm, 3mm, _ -> 1.5; reflectance = 0.3)
+    pbs = RectangularPlateBeamsplitter(36mm, 25mm, 3mm, ConstantRefractiveIndex(1.5); reflectance = 0.3)
     zrotate3d!(pbs, deg2rad(30))
     pbs
 end
-cube() = CubeBeamsplitter(20mm, 1.5; reflectance = 0.3)
+cube() = CubeBeamsplitter(20mm, ConstantRefractiveIndex(1.5); reflectance = 0.3)
 
 components = (
     "doublet" => (doublet, [2mm, -20mm, 0.0]),
