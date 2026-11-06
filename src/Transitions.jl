@@ -373,14 +373,10 @@ function interact3d(::AbstractSystem, model::AbstractSurfaceModel, t::Transition
     return realize(t, beam, ray, select_channels(splitting_of(model), cs))
 end
 
-# Each component ray of the beamlet interacts with the model at its own hit
-function interact3d(system::AbstractSystem, model::AbstractSurfaceModel, ::Transition,
-        beamlet::GaussianBeamlets, ray_id::Int)
-    return beamlet_interaction(beamlet) do b
-        ray = rays(b)[ray_id]
-        interact3d(system, model, transition(system, ray), b, ray)
-    end
-end
+# The splitting of the model decides how the beamlet interacts, see beamlet_interaction
+interact3d(system::AbstractSystem, model::AbstractSurfaceModel, ::Transition,
+    beamlet::GaussianBeamlets, ray_id::Int) =
+    beamlet_interaction(system, splitting_of(model), model, beamlet, ray_id)
 
 """
     interact3d(system, ::SingleShape, object, beamlet, ray_id)
@@ -459,20 +455,6 @@ Returns the [`BeamInteraction`](@ref) of the `ray` with the bare boundary of the
 [`Uncoated`](@ref) boundary: refraction from the medium before into the medium behind the boundary, or
 total internal reflection, see [`channels`](@ref). The hint points into the medium in which the new ray
 propagates.
-
-For a [`PolarizedRay`](@ref), `cross_boundary(t, beam, ray, E)` crosses the boundary with the field `E`
-instead of the field of the `ray`, e.g. the field behind a polarizing film.
 """
 cross_boundary(t::Transition, beam::Beam, ray::AbstractRay) =
     realize(t, beam, ray, select_channels(Dominant(), channels(t, ray)))
-
-function cross_boundary(t::Transition, beam::Beam{T, R}, ray::R, E) where {T <: Real, R <: PolarizedRay{T}}
-    c = select_channels(Dominant(), channels(t, ray))
-    E0 = _transverse(c.P * E, direction(c))
-    return BeamInteraction{T, R}(side_hint(t, side(c)), PolarizedRay{T}(hit_point(ray), direction(c),
-        nothing, wavelength(ray), refractive_index(t, side(c)), E0))
-end
-
-"""Returns `true` if the `ray` is totally reflected at the bare boundary of the transition `t`."""
-is_totally_reflected(ray::AbstractRay, t::Transition) =
-    last(refraction3d(direction(ray), normal3d(t), refractive_index_in(t), refractive_index_out(t)))

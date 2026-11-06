@@ -62,7 +62,7 @@ side_hint(t::Transition, ::Transmitted) = hint_out(t)
     channels(t::Transition, ray)
 
 Returns the channels of the bare boundary of the transition `t` for the `ray`, as the tuple
-`(reflected, transmitted)` of [`BoundaryChannel`](@ref)s. The `ray` is refracted from the medium before into
+`(transmitted, reflected)` of [`BoundaryChannel`](@ref)s. The `ray` is refracted from the medium before into
 the medium behind the boundary via [`refraction3d`](@ref); beyond the critical angle it is totally
 reflected, and the transmitted channel carries no light. The field of a [`PolarizedRay`](@ref) is
 transferred with the [`fresnel_coefficients`](@ref). Between equal indices the ray passes unchanged.
@@ -71,10 +71,13 @@ function channels(t::Transition, ray::Ray)
     d = direction(ray)
     n1, n2 = refractive_index_in(t), refractive_index_out(t)
     reflected = reflection3d(d, normal3d(t))
-    n1 == n2 && return (BoundaryChannel(Reflected(), reflected, nothing, 0), BoundaryChannel(Transmitted(), d, nothing, 1))
+    n1 == n2 && return (BoundaryChannel(Transmitted(), d, nothing, 1),
+        BoundaryChannel(Reflected(), reflected, nothing, 0))
     refracted, TIR = refraction3d(d, normal3d(t), n1, n2)
-    TIR && return (BoundaryChannel(Reflected(), reflected, nothing, 1), BoundaryChannel(Transmitted(), reflected, nothing, 0))
-    return (BoundaryChannel(Reflected(), reflected, nothing, 0), BoundaryChannel(Transmitted(), refracted, nothing, 1))
+    TIR && return (BoundaryChannel(Transmitted(), reflected, nothing, 0),
+        BoundaryChannel(Reflected(), reflected, nothing, 1))
+    return (BoundaryChannel(Transmitted(), refracted, nothing, 1),
+        BoundaryChannel(Reflected(), reflected, nothing, 0))
 end
 
 function channels(t::Transition, ray::PolarizedRay{T}) where {T}
@@ -85,17 +88,20 @@ function channels(t::Transition, ray::PolarizedRay{T}) where {T}
     O = zero(SMatrix{3, 3, Complex{T}, 9})
     if n1 == n2
         P = SMatrix{3, 3, Complex{T}, 9}(I)
-        return (BoundaryChannel(Reflected(), reflected, O, 0), BoundaryChannel(Transmitted(), d, P, 1))
+        return (BoundaryChannel(Transmitted(), d, P, 1),
+            BoundaryChannel(Reflected(), reflected, O, 0))
     end
     # Fresnel coefficients from the cosine, smooth for AD at normal incidence
     rs, rp, ts, tp = _fresnel_coefficients(cos_angle3d(d, -normal), n2 / n1)
     Pr = _calculate_global_E0(d, reflected, normal3d(intersection(ray)), SPBasis(-rs, 0, 0, rp))
     if is_internally_reflected(rp, rs)
-        return (BoundaryChannel(Reflected(), reflected, Pr, 1), BoundaryChannel(Transmitted(), reflected, O, 0))
+        return (BoundaryChannel(Transmitted(), reflected, O, 0),
+            BoundaryChannel(Reflected(), reflected, Pr, 1))
     end
     refracted, _ = refraction3d(d, normal, n1, n2)
     Pt = _calculate_global_E0(d, refracted, normal3d(intersection(ray)), SPBasis(ts, 0, 0, tp))
-    return (BoundaryChannel(Reflected(), reflected, Pr, 0), BoundaryChannel(Transmitted(), refracted, Pt, 1))
+    return (BoundaryChannel(Transmitted(), refracted, Pt, 1),
+        BoundaryChannel(Reflected(), reflected, Pr, 0))
 end
 
 """
@@ -136,12 +142,29 @@ splitting_of(::AbstractSurfaceModel) = Dominant()
     select_channels(splitting, cs)
 
 Returns the channels of `cs` that are traced: for [`Dominant`](@ref) the channel with the largest
-amplitude factor, or `nothing` if none carries light.
+amplitude factor, or `nothing` if none carries light; for [`AllChannels`](@ref) all of `cs`, of which
+[`realize`](@ref) traces those that carry light.
 """
-function select_channels(::Dominant, (reflected, transmitted)::Tuple{BoundaryChannel, BoundaryChannel})
-    c = abs2(amplitude(reflected)) > abs2(amplitude(transmitted)) ? reflected : transmitted
+function select_channels(::Dominant, cs::Tuple)
+    c = reduce((a, b) -> abs2(amplitude(a)) ≥ abs2(amplitude(b)) ? a : b, cs)
     iszero(amplitude(c)) && return nothing
     return c
+end
+
+select_channels(::AllChannels, cs::Tuple) = cs
+
+"""Returns `true` if the channel `c` carries light."""
+islit(c::BoundaryChannel) = !iszero(amplitude(c))
+
+# The child beams of the tuple `kids` whose channel carries light, `lit`, as a vector of type `B`
+function lit_children(::Type{B}, kids::Tuple, lit::Tuple) where {B}
+    v = Vector{B}(undef, count(lit))
+    k = 0
+    for i in eachindex(kids)
+        lit[i] || continue
+        v[k += 1] = kids[i]
+    end
+    return v
 end
 
 """
@@ -157,6 +180,15 @@ function realize(t::Transition, ::Beam{T, R}, ray::R, c::BoundaryChannel) where 
     return BeamInteraction{T, R}(side_hint(t, side(c)), outgoing_ray(t, ray, c))
 end
 
+# Several channels: each that carries light starts a child beam, a single one continues the beam
+function realize(t::Transition, beam::Beam{T, R}, ray::R, cs::Tuple) where {T <: Real, R <: AbstractRay{T}}
+    lit = count(islit, cs)
+    lit == 0 && return nothing
+    lit == 1 && return realize(t, beam, ray, select_channels(Dominant(), cs))
+    children!(beam, lit_children(Beam{T, R}, map(c -> Beam(outgoing_ray(t, ray, c)), cs), map(islit, cs)))
+    return nothing
+end
+
 """Returns the new ray that leaves the boundary of the transition `t` in the channel `c`."""
 outgoing_ray(t::Transition, ray::Ray{T}, c::BoundaryChannel) where {T} =
     Ray{T}(hit_point(ray), direction(c), nothing, wavelength(ray), refractive_index(t, side(c)))
@@ -166,3 +198,69 @@ function outgoing_ray(t::Transition, ray::PolarizedRay{T}, c::BoundaryChannel) w
     return PolarizedRay{T}(hit_point(ray), direction(c), nothing, wavelength(ray),
         refractive_index(t, side(c)), E)
 end
+
+"""
+    beamlet_interaction(system, splitting, model, beamlet, ray_id)
+
+The interaction of a [`GaussianBeamlet`](@ref) or an [`AstigmaticGaussianBeamlet`](@ref) with the
+surface `model` at the segment `ray_id`. For [`Dominant`](@ref), each component ray interacts with the
+model at its own hit. For [`AllChannels`](@ref), the channels of the chief ray decide: each channel
+that carries light starts a child beamlet, whose component rays leave their own hits on the same side;
+a single one continues the beamlet. The field factor of a child is that of the channel of the chief
+ray, its waist is the waist of the `beamlet` at the boundary.
+"""
+function beamlet_interaction(system::AbstractSystem, ::Dominant, model::AbstractSurfaceModel,
+        beamlet::GaussianBeamlets, ray_id::Int)
+    return beamlet_interaction(beamlet) do b
+        ray = rays(b)[ray_id]
+        interact3d(system, model, transition(system, ray), b, ray)
+    end
+end
+
+function beamlet_interaction(system::AbstractSystem, ::AllChannels, model::AbstractSurfaceModel,
+        beamlet::GaussianBeamlets, ray_id::Int)
+    # The new ray of each component ray in each channel at its own hit, and the amplitude factors;
+    # map unrolls the heterogeneous tuples, the new rays of one component share their type
+    hits = map(_component_beams(beamlet)) do b
+        ray = rays(b)[ray_id]
+        t = transition(system, ray)
+        cs = channels(model, t, ray, channels(t, ray))
+        (map(c -> outgoing_ray(t, ray, c), cs), map(amplitude, cs))
+    end
+    a = last(first(hits))
+    lit = map(!iszero, a)
+    num_lit = count(lit)
+    num_lit == 0 && return nothing
+    num_lit == 1 && return continued_beamlet(system, model, beamlet, ray_id, findfirst(lit))
+    kids = ntuple(i -> child_beamlet(beamlet, map(h -> first(h)[i], hits), a[i]), Val(length(a)))
+    children!(beamlet, lit_children(typeof(beamlet), kids, lit))
+    return nothing
+end
+
+# A single channel of the chief ray carries light, e.g. under total internal reflection: each
+# component ray continues in this channel at its own hit
+function continued_beamlet(system::AbstractSystem, model::AbstractSurfaceModel,
+        beamlet::GaussianBeamlets, ray_id::Int, i::Int)
+    return beamlet_interaction(beamlet) do b
+        ray = rays(b)[ray_id]
+        t = transition(system, ray)
+        realize(t, b, ray, channels(model, t, ray, channels(t, ray))[i])
+    end
+end
+
+"""
+    child_beamlet(beamlet, starts, a)
+
+Returns the child of the `beamlet` whose component beams start with the rays `starts`, with the amplitude
+factor `a` of the channel of its chief ray. The waist of a [`GaussianBeamlet`](@ref) is its waist at
+the boundary.
+"""
+function child_beamlet(gauss::GaussianBeamlet, starts::Tuple, a::Number)
+    chief, waist, divergence = map(Beam, starts)
+    w0 = gauss_parameters(gauss, length(gauss))[4]
+    E0 = a * electric_field(gauss) * (beam_waist(gauss) / w0)
+    return GaussianBeamlet(chief, waist, divergence, wavelength(gauss), w0, E0)
+end
+
+child_beamlet(::AstigmaticGaussianBeamlet, starts::Tuple, ::Number) =
+    AstigmaticGaussianBeamlet(map(Beam, starts)...)
