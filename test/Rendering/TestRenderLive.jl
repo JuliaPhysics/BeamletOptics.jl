@@ -146,6 +146,72 @@ Base.delete!(h::_Combined, oh::BMO.AbstractObjectRenderHandle) = (filter!(c -> c
         end
     end
 
+    @testset "rerender!: a changed shape is drawn again at the current pose" begin
+        # The mesh of a fresh render! at the same pose, to compare with
+        function fresh_vertices(obj)
+            hf = live_render!(LScene(Figure()[1, 1]), obj; edges = false)
+            return GeometryBasics.coordinates(hf.plots[1][1][])
+        end
+        prism = RightAnglePrismMirror(0.02, 0.01)
+        h = live_render!(ax, prism; edges = false)
+        old_plots = copy(h.plots)
+        translate3d!(prism, [0.03, -0.01, 0.02])
+        zrotate3d!(prism, deg2rad(20))
+        update_render!(h)
+
+        # Leg length 0.02 → 0.03, changed in place as by a component that sets its geometry
+        prism_sdf = BMO.shape(prism)
+        prism_sdf.dimensions = Point3(0.015, 0.015, prism_sdf.dimensions[3])
+        update_render!(h)
+        @test h.plots == old_plots # the pose did not change, update_render! keeps the old mesh
+
+        @test rerender!(h) === h
+        @test length(h.plots) == 1
+        @test !any(p -> any(q -> q === p, old_plots), h.plots)
+        @test !any(p -> any(q -> q === p, ax.scene.plots), old_plots) # the old plots are deleted
+        @test h.P0 == BMO.position(prism) && h.R0 == BMO.orientation(prism)
+        verts = GeometryBasics.coordinates(h.plots[1][1][])
+        @test verts == fresh_vertices(prism)
+        # The legs span ±0.015 m in the local frame, within the resolution of the mesh
+        P, R = BMO.position(prism), BMO.orientation(prism)
+        loc = [R' * (collect(Float64.(v)) - P) for v in verts]
+        for i in 1:2
+            @test isapprox(maximum(p -> p[i], loc), 0.015; atol = 1e-3)
+            @test isapprox(minimum(p -> p[i], loc), -0.015; atol = 1e-3)
+        end
+
+        # A following move only changes the model matrix again
+        plots = copy(h.plots)
+        translate3d!(prism, [0.0, 0.01, 0.0])
+        update_render!(h)
+        @test h.plots == plots
+        _check_reference_points(h.plots[1], h.P0, h.R0, BMO.position(prism), BMO.orientation(prism))
+
+        remove_render!(h)
+    end
+
+    @testset "rerender! of a system handle keeps its object handles" begin
+        prism = RightAnglePrismMirror(0.02, 0.01)
+        mirror = RoundPlanoMirror(0.025, 0.005)
+        translate3d!(mirror, [0.0, 0.1, 0.0])
+        sys = System([prism, mirror])
+        hs = live_render!(ax, sys)
+        handles = AbstractTrees.children(hs)
+        before = copy(handles)
+        old_plots = copy(BMO.render_plots(hs))
+
+        prism_sdf = BMO.shape(prism)
+        prism_sdf.dimensions = Point3(0.015, 0.015, prism_sdf.dimensions[3])
+        @test rerender!(hs) === hs
+        @test AbstractTrees.children(hs) === handles
+        @test all(handles .=== before)
+        @test !any(p -> any(q -> q === p, old_plots), BMO.render_plots(hs))
+        @test pick_object(hs, first(BMO.render_plots(handles[1]))) === prism
+        @test pick_object(hs, first(BMO.render_plots(handles[2]))) === mirror
+
+        remove_render!(hs)
+    end
+
     @testset "MultiShape (CubeBeamsplitter): rigid update + non-rigid fallback" begin
         cbs = CubeBeamsplitter(0.02, ConstantRefractiveIndex(1.5))
         h = live_render!(ax, cbs)
@@ -580,8 +646,37 @@ Base.delete!(h::_Combined, oh::BMO.AbstractObjectRenderHandle) = (filter!(c -> c
         oh = only(AbstractTrees.children(h2))
         _check_reference_points(BMO.render_plots(oh)[1], oh.P0, oh.R0, position(m2), BMO.orientation(m2))
         @test pick_object(c, BMO.render_plots(oh)[1]) === m2
+
+        # rerender! reaches the object handles through the protocol and keeps them
+        handles = copy(AbstractTrees.children(c))
+        old_plots = copy(BMO.render_plots(c))
+        @test rerender!(c) === c
+        @test all(AbstractTrees.children(c) .=== handles)
+        @test !any(p -> any(q -> q === p, old_plots), BMO.render_plots(c))
+        @test pick_object(c, BMO.render_plots(oh)[1]) === m2
+
         remove_render!(c)
         @test isempty(BMO.render_plots(c))
+    end
+
+    @testset "rerender! with a failing draw keeps the handle and the axis" begin
+        fail = Ref(false)
+        x = _Marker([0.0, 0.0, 0.0])
+        h = live_render!(ax, x) do
+            scatter!(ax, [Makie.Point3f(0, 0, 0)])
+            fail[] && error("draw failed")
+        end
+        plots = copy(BMO.render_plots(h))
+        n_plots = length(ax.scene.plots)
+        fail[] = true
+        @test_throws ErrorException rerender!(h)
+        @test BMO.render_plots(h) == plots
+        @test length(ax.scene.plots) == n_plots # the scatter of the failed draw is deleted
+        @test all(p -> any(q -> q === p, ax.scene.plots), plots)
+        fail[] = false
+        @test rerender!(h) === h
+        @test length(ax.scene.plots) == n_plots
+        remove_render!(h)
     end
 
     @testset "render! of a system, a component and a beam into an LScene" begin
