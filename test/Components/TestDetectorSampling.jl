@@ -90,6 +90,11 @@ end
         @test I ≈ vec(intensity(pd, g; progress = false)[3])
         @test optical_power(pd, cloud; progress = false) ≈ sum(cloud.weights .* I)
         @test optical_power(pd, cloud; progress = false) ≈ optical_power(pd, g; progress = false)
+        # the power of an intensity that was computed on the samples
+        @test optical_power(grid, intensity(pd, grid.points; progress = false)) ==
+              optical_power(pd, g; progress = false)
+        @test optical_power(BMO.sample_points(pd, cloud), I) ≈ optical_power(pd, cloud; progress = false)
+        @test_throws DimensionMismatch optical_power(grid, I)
         _, E = electric_field(pd, cloud; progress = false)
         @test E ≈ vec(electric_field(pd, g; progress = false)[3])
         # the values at local points alone, without a sampling

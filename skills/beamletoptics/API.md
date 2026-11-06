@@ -131,6 +131,8 @@ s          = RectilinearGrid(xs, zs)          # a grid of one's own: local x, z 
 x, z, E    = electric_field(det, s)
 x, z, I    = intensity(det, s)
 P          = optical_power(det, s)            # trapezoidal rule on xs × zs
+g          = BeamletOptics.sample_points(det, s)   # points, weights, coordinates of a sampling
+P          = optical_power(g, intensity(det, g.points))   # power of a field computed once
 ```
 
 The second argument of `electric_field`/`intensity`/`optical_power` is a sampling (default
