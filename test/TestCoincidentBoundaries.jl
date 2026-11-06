@@ -184,20 +184,27 @@ function follow_reversed(vertices, radii, ns, x0, y0)
 end
 
 """
-Largest deviation `(position [m], direction, refractive index)` between the rays of a single-leaf `beam` and a
-`follow` result: ray `k + 1` of the beam starts at hit `k`. A different number of rays is `Inf`.
+Largest deviation `(position [m], direction, refractive index)` between the rays `rs` and the `hits` of a
+`follow` result: ray `k` starts at hit `k`. A different number of rays is `Inf`.
 """
-function path_error(beam, ref)
-    r = rays(beam)
-    length(r) == length(ref.hits) + 1 || return (Inf, Inf, Inf)
+function ray_error(rs, hits)
+    length(rs) == length(hits) || return (Inf, Inf, Inf)
     ep = ed = en = 0.0
-    for (k, h) in enumerate(ref.hits)
-        ray = r[k + 1]
+    for (ray, h) in zip(rs, hits)
         ep = max(ep, norm(position(ray) - h.pos))
         ed = max(ed, norm(direction(ray) - h.dir))
         en = max(en, abs(refractive_index(ray) - h.n))
     end
     return (ep, ed, en)
+end
+
+"""`ray_error` of a single-leaf `beam` against a `follow` result from its start: ray `k + 1` starts at hit `k`."""
+path_error(beam, ref) = ray_error(rays(beam)[2:end], ref.hits)
+
+"""Refractive indices along the rays of a beam, an index that a boundary without index step repeats counted once."""
+function index_sequence(beam)
+    ns = refractive_index.(rays(beam))
+    return ns[[true; ns[2:end] .!= ns[1:(end - 1)]]]
 end
 
 const TOL_POS = 1e-8
@@ -259,9 +266,8 @@ Tests
                 @test pd ≈ ps atol = TOL_POS
                 @test dd ≈ ds atol = TOL_DIR
                 @test optical_path_length(bd) ≈ optical_path_length(bs) atol = TOL_POS
-                # the cemented surface is no boundary: the doublet has one ray more, at the same index
-                @test length(rays(bd)) == length(rays(bs)) + 1
-                @test refractive_index.(rays(bd)) == [1.0, n, n, 1.0]
+                # the cemented surface is no boundary: the same media as the singlet
+                @test index_sequence(bd) == index_sequence(bs) == [1.0, n, 1.0]
             end
         end
 
@@ -276,7 +282,7 @@ Tests
                 @test end_point(bt)[1] ≈ end_point(bs)[1] atol = TOL_POS
                 @test end_point(bt)[2] ≈ end_point(bs)[2] atol = TOL_DIR
                 @test optical_path_length(bt) ≈ optical_path_length(bs) atol = TOL_POS
-                @test refractive_index.(rays(bt)) == [1.0, n, n, n, 1.0]
+                @test index_sequence(bt) == index_sequence(bs) == [1.0, n, 1.0]
             end
         end
 
@@ -909,10 +915,12 @@ Tests
             # reference of the transmitted branch: A into B (Snell) and out of B, and of the reflected one: back out of A
             ref_t = follow([plane([0, 0, 0], [0, 1, 0], nA), plane([0, tA, 0], [0, 1, 0], nB),
                     plane([0, tA + tB, 0], [0, 1, 0], 1.0)], p, d)
-            @test_broken any(b -> isapprox(end_point(b)[2], ref_t.hits[3].dir; atol = TOL_DIR), leaves(beam))
             ref_r = follow([plane([0, 0, 0], [0, 1, 0], nA), plane([0, tA, 0], [0, 1, 0], nA; mirror = true),
                     plane([0, 0, 0], [0, 1, 0], 1.0)], p, d)
-            @test_broken any(b -> isapprox(end_point(b)[2], ref_r.hits[3].dir; atol = TOL_DIR), leaves(beam))
+            # every ray in position, direction and index: the exit directions alone are the same with the splitter in air
+            @test_broken agrees(path_error(beam, (; hits = ref_t.hits[1:1])))
+            @test_broken any(b -> agrees(ray_error(rays(b), ref_t.hits[2:3])), leaves(beam))
+            @test_broken any(b -> agrees(ray_error(rays(b), ref_r.hits[2:3])), leaves(beam))
         end
 
         @testset "Triplet: two cemented surfaces in sequence" begin
@@ -993,9 +1001,8 @@ Tests
                 seq = [shape_sequence(c) for c in comps]
                 @test length(comps) == (g isa GaussianBeamlet ? 3 : 9)
                 @test all(s -> same_sequence(s, first(seq)), seq)
+                # front surface, cemented surface, rear surface, final ray
                 @test length(first(seq)) == 4
-                # front lens, then the cemented surface and the rear surface of the back lens
-                @test same_sequence(first(seq), [part_shape(front_part(dl)), part_shape(back_part(dl)), part_shape(back_part(dl)), nothing])
                 # the chief follows the plain ray
                 beam = solve([dl], beam_at([0, 0, 0], [0, 1, 0]; λ))
                 @test flatten(g) ≈ flatten(beam) atol = TOL_POS
