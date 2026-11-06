@@ -4,7 +4,7 @@ Optical components are rendered by drawing their shape. Example renderings of th
 
 ## Components
 
-The generic methods below cover every [`BeamletOptics.AbstractObject`](@ref) and every group of components such as an [`ObjectGroup`](@ref), whose members are rendered one after another.
+The generic methods below cover every [`BeamletOptics.AbstractObject`](@ref) and every group of components such as an [`ObjectGroup`](@ref), whose members are merged into one mesh per material, like the parts of a composite object.
 
 ```@docs
 render!(::Union{GLMakie.Axis3, GLMakie.LScene}, ::BeamletOptics.AbstractObject)

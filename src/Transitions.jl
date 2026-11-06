@@ -143,7 +143,7 @@ medium_out(t::Transition) = side_medium(t, innermost(enclosure_out(t)), t.n_out)
 # Outside of all bodies: the medium of the system, or of the index of a ray without an enclosure
 side_medium(::Transition, body::AbstractObject, n) = medium(body)
 side_medium(t::Transition, ::Nothing, n) =
-    n == refractive_index(t.system, t.λ) ? medium(t.system) : IsotropicMedium(n)
+    n == refractive_index(t.system, t.λ) ? medium(t.system) : IsotropicMedium(ConstantRefractiveIndex(n))
 
 """The refractive index before the boundary at the wavelength of the ray, see [`Transition`](@ref)."""
 refractive_index_in(t::Transition) = t.n_in

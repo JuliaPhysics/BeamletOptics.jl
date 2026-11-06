@@ -19,7 +19,7 @@ const mm = 1e-3
             r = only(rings)
             return BMO.position(r)[2] - r.hthickness, BMO.position(r)[2] + r.hthickness
         end
-        n = λ -> 1.5
+        n = ConstantRefractiveIndex(1.5)
         # biconvex: edge from s to T - s
         lens = Lens(SphericalSurface(R, d, md), SphericalSurface(-R, d), 5mm, n)
         lo, hi = ring_extent(lens)
@@ -52,7 +52,7 @@ const mm = 1e-3
         nl = 1.5
         tl = BMO.ThinLensSDF(R1, R2, 0.1)
         translate3d!(tl, [0, -thickness(tl) / 2, 0])
-        p = Lens(tl, x -> 1.5)
+        p = Lens(tl, ConstantRefractiveIndex(1.5))
         system = System(p)
 
         # compare numerical and analytical focal length
@@ -73,6 +73,27 @@ const mm = 1e-3
                 df[i] = BMO.line_point_distance3d(beam.rays[end], [0, x, 0])
             end
             @test xs[findmin(df)[2]] ≈ f_analytical
+        end
+    end
+
+    @testset "Refractive index argument" begin
+        sphere(r) = SphericalSurface(r, BMO.inch)
+        n = ConstantRefractiveIndex(1.5)
+        @test BMO.refractive_index(SphericalLens(50mm, -50mm, 5mm)) == n
+        @test BMO.refractive_index(ThinLens(50mm, -50mm, BMO.inch, n)) === n
+        @test BMO.refractive_index(Lens(sphere(50mm), 5mm, n)) === n
+        flat = CircularFlatSurface(BMO.inch)
+        @test BMO.refractive_index(Lens(flat, flat, 5mm, n)) === n
+        dl = DoubletLens(sphere(50mm), sphere(-40mm), sphere(100mm), 6mm, 3mm, n, ConstantRefractiveIndex(1.7))
+        @test BMO.refractive_index(dl.front) === n
+        # anything else than an AbstractRefractiveIndex is rejected by the constructor called
+        for wrong in (1.5, λ -> 1.5, "N-BK7")
+            err = try
+                SphericalLens(50mm, -50mm, 5mm, BMO.inch, wrong)
+            catch e
+                e
+            end
+            @test err isa MethodError && err.f === SphericalLens
         end
     end
 
@@ -177,8 +198,8 @@ const mm = 1e-3
         # Every ray/beam type the solver can produce must trace through a DoubletLens.
         # Regression: the chief ray of an AstigmaticGaussianBeamlet is a PolarizedRay,
         # which is not a subtype of Ray, so the doublet interact3d must accept AbstractRay.
-        n1 = λ -> 1.5
-        n2 = λ -> 1.7
+        n1 = ConstantRefractiveIndex(1.5)
+        n2 = ConstantRefractiveIndex(1.7)
         λ = 1e-6
         w0 = 1mm
         pos = [0.0, 0, 0]
@@ -233,8 +254,8 @@ const mm = 1e-3
 
         @testset "Equal-index invariant" begin
             tl = SphericalTripletLens(50mm, -40mm, 100mm, -60mm, 8mm, 3mm, 6mm, BMO.inch,
-                λ -> 1.5, λ -> 1.5, λ -> 1.5)
-            sl = SphericalLens(50mm, -60mm, 17mm, BMO.inch, λ -> 1.5)
+                ConstantRefractiveIndex(1.5), ConstantRefractiveIndex(1.5), ConstantRefractiveIndex(1.5))
+            sl = SphericalLens(50mm, -60mm, 17mm, BMO.inch, ConstantRefractiveIndex(1.5))
             for h in (0.0, 1e-6, 1mm, 5mm, -7mm, 10mm)
                 sys_tl = System([tl])
                 sys_sl = System([sl])
@@ -250,8 +271,8 @@ const mm = 1e-3
         end
 
         @testset "Doublet equivalence" begin
-            n1 = λ -> 1.5
-            n2 = λ -> 1.7
+            n1 = ConstantRefractiveIndex(1.5)
+            n2 = ConstantRefractiveIndex(1.7)
             tl = SphericalTripletLens(33.3mm, -22.3mm, -100mm, -291.1mm, 9mm, 1mm, 1.5mm,
                 25.4mm, n1, n2, n2)
             dl = SphericalDoubletLens(33.3mm, -22.3mm, -291.1mm, 9mm, 2.5mm, 25.4mm, n1, n2)
@@ -271,7 +292,7 @@ const mm = 1e-3
 
         @testset "Kinematics" begin
             tl = SphericalTripletLens(50mm, -40mm, 100mm, -60mm, 8mm, 3mm, 6mm, BMO.inch,
-                λ -> 1.5, λ -> 1.7, λ -> 1.6)
+                ConstantRefractiveIndex(1.5), ConstantRefractiveIndex(1.7), ConstantRefractiveIndex(1.6))
             translate3d!(tl, [0.05, 0.05, 0.05])
             xrotate3d!(tl, deg2rad(-60))
             zrotate3d!(tl, deg2rad(45))
@@ -286,10 +307,10 @@ const mm = 1e-3
         end
 
         @testset "Composition from individual lenses" begin
-            front = SphericalLens(35.86mm, 85.87mm, 11.81mm, 60mm, 1.671)
-            middle = SphericalLens(85.87mm, -646.31mm, 7.05mm, 60mm, 1.4892)
+            front = SphericalLens(35.86mm, 85.87mm, 11.81mm, 60mm, ConstantRefractiveIndex(1.671))
+            middle = SphericalLens(85.87mm, -646.31mm, 7.05mm, 60mm, ConstantRefractiveIndex(1.4892))
             back = Lens(SphericalSurface(-646.31mm, 60mm), SphericalSurface(23.51mm, 40mm),
-                1.9mm, λ -> 1.7394)
+                1.9mm, ConstantRefractiveIndex(1.7394))
             translate3d!(middle, [0, thickness(front), 0])
             translate3d!(back, [0, thickness(front) + thickness(middle), 0])
             tl = TripletLens(front, middle, back)
@@ -301,9 +322,9 @@ const mm = 1e-3
         # Every ray/beam type the solver can produce must trace through a TripletLens.
         # Regression: the chief ray of an AstigmaticGaussianBeamlet is a PolarizedRay,
         # which is not a subtype of Ray, so the triplet interact3d must accept AbstractRay.
-        n1 = λ -> 1.5
-        n2 = λ -> 1.7
-        n3 = λ -> 1.6
+        n1 = ConstantRefractiveIndex(1.5)
+        n2 = ConstantRefractiveIndex(1.7)
+        n3 = ConstantRefractiveIndex(1.6)
         λ = 1e-6
         w0 = 1mm
         pos = [0.0, 0, 0]

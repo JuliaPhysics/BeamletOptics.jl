@@ -1,7 +1,17 @@
 """
     AbstractMesh <: AbstractShape
 
-A generic type for an shape whose volume can be described by a mesh. Must have a field `mesh` of type `Mesh`. See also `Mesh{T}`.
+A generic type for a shape whose volume can be described by a mesh. See also `Mesh{T}`.
+
+# Implementation reqs.
+
+Subtypes of `AbstractMesh` should implement all reqs. of `AbstractShape` as well as the following:
+
+## Fields
+
+- `vertices`: (m x 3)-matrix that stores the points of all triangles
+- `faces`: (n x 3)-matrix of row indices into `vertices`, one row per triangle
+- `scale`: scalar value that represents the current scale of the mesh
 """
 abstract type AbstractMesh{T} <: AbstractShape{T} end
 
@@ -46,8 +56,8 @@ vertices and faces. The mesh is initialized at the global origin. Data type of M
 type of vertex data (i.e `Float32`).
 
 !!! tip
-    Mesh vertex data is scaled by factor 1e-3, assuming [m] scale. Ensure that the export program is adjusted accordingly
-    when scaling issues occur.
+    Mesh vertex data is scaled by the factor 1e-3, i.e. the STL file is assumed to be in mm and the mesh is in \\[m\\].
+    Ensure that the export program is adjusted accordingly when scaling issues occur.
 """
 function Mesh(mesh)
     # Determine mesh data type (i.e. Float32)
@@ -125,8 +135,11 @@ end
 """
     normal3d(mesh::AbstractMesh, fID::Int)
 
-Returns a vector with unit length that is perpendicular to the target `face`` according to
+Returns a vector with unit length that is perpendicular to the target `face` according to
 the right-hand rule. The vertices must be listed row-wise within the face matrix.
+
+The normal is `(v2 - v1) × (v3 - v1)` of the vertices `v1`, `v2`, `v3` of the face, so it points
+outwards of a closed mesh if the vertices of each face run counter-clockwise seen from outside.
 """
 function normal3d(mesh::AbstractMesh{T}, fID::Int) where{T}
     @views begin
@@ -142,7 +155,7 @@ function normal3d(mesh::AbstractMesh{T}, fID::Int) where{T}
 end
 
 """
-    MoellerTrumboreAlgorithm(face::Matrix, ray::Ray)
+    MoellerTrumboreAlgorithm(face::Matrix, ray::AbstractRay; kϵ = 1e-9, lϵ = 1e-9)
 
 An implementation of the **Möller-Trumbore algorithm** for ray-triangle-intersection, which hits
 the `face` from both sides. This algorithm evaluates the possible intersection between a `ray` and a

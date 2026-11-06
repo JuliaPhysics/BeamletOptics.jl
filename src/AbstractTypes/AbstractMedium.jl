@@ -30,14 +30,13 @@ refractive_index(medium::AbstractMedium, ::Real) =
 """
     IsotropicMedium(n)
 
-A homogeneous, isotropic and transparent medium of the refractive index `n`, either a number or a
-[`RefractiveIndex`](@ref), i.e. a callable that returns the index for a wavelength `λ` in [m].
+A homogeneous, isotropic and transparent medium of the refractive index `n`, an
+[`AbstractRefractiveIndex`](@ref) that returns the index for a wavelength `λ` in \\[m\\].
 """
-struct IsotropicMedium{N} <: AbstractMedium
+struct IsotropicMedium{N <: AbstractRefractiveIndex} <: AbstractMedium
     n::N
 end
 
-refractive_index(medium::IsotropicMedium{<:Real}, ::Real) = medium.n
 refractive_index(medium::IsotropicMedium, λ::Real) = medium.n(λ)
 
 """

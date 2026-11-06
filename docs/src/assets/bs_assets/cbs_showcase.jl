@@ -8,10 +8,10 @@ const mm = 1e-3
 ##
 n = 1.5
 
-cbs1 = CubeBeamsplitter(BeamletOptics.inch, _->n)
+cbs1 = CubeBeamsplitter(BeamletOptics.inch, ConstantRefractiveIndex(n))
 cbs1_mount = NonInteractableObject(joinpath(@__DIR__, "CBS Mount.stl"))
 
-cbs2 = CubeBeamsplitter(BeamletOptics.inch, _->n)
+cbs2 = CubeBeamsplitter(BeamletOptics.inch, ConstantRefractiveIndex(n))
 cbs2_mount = NonInteractableObject(joinpath(@__DIR__, "CBS Mount.stl"))
 zrotate3d!(cbs2_mount, π)
 

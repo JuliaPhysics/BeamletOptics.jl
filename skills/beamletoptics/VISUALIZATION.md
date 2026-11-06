@@ -60,7 +60,7 @@ usually dwarfs a millimeter-scale setup.
 - Use `aspect = :data` so optics are not distorted; or give explicit `aspect` and `limits`.
 - Remove decorations for figures: `hidedecorations!(ax); hidespines!(ax)`.
 
-`LScene` helpers:
+`LScene` helpers (any other Makie axis, e.g. `Axis3`, throws an `InvalidAxisError`):
 
 - `hide_axis(ls)`, `set_orthographic(ls)`
 - `get_view(ls)`: rotate the scene by hand, call it, paste the printed matrix into the script

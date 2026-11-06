@@ -7,8 +7,8 @@ const mm = 1e-3
 const cm = 10mm
 
 ## focus group
-l1 = SphericalDoubletLens(103.4371e-3, 61.14925e-3, -603.2959e-3, 1.5e-3, 10.03975e-3, 55e-3, 1.963000, 1.603112)
-l2 = SphericalLens(49.97282e-3, 168.2416e-3, 8.622723e-3, 52e-3, 1.603001)
+l1 = SphericalDoubletLens(103.4371e-3, 61.14925e-3, -603.2959e-3, 1.5e-3, 10.03975e-3, 55e-3, ConstantRefractiveIndex(1.963000), ConstantRefractiveIndex(1.603112))
+l2 = SphericalLens(49.97282e-3, 168.2416e-3, 8.622723e-3, 52e-3, ConstantRefractiveIndex(1.603001))
 
 l_2 = BeamletOptics.thickness(l1) + 1e-4
 translate3d!(l2, [0, l_2, 0])
@@ -16,9 +16,9 @@ translate3d!(l2, [0, l_2, 0])
 focus_group = ObjectGroup([l1, l2])
 
 ## variator
-l3 = SphericalLens(100.3834e-3, 16.72327e-3, 1e-3, 28.00995e-3, λ -> 1.603112)
-l4 = SphericalLens(-30.28003e-3, 21.29033e-3, 0.5e-3, 22.31297e-3, λ -> 1.764500)
-l5 = SphericalLens(23.06904e-3, 243.5999e-3, 3.2e-3, 22.12162e-3, λ -> 1.963000)
+l3 = SphericalLens(100.3834e-3, 16.72327e-3, 1e-3, 28.00995e-3, ConstantRefractiveIndex(1.603112))
+l4 = SphericalLens(-30.28003e-3, 21.29033e-3, 0.5e-3, 22.31297e-3, ConstantRefractiveIndex(1.764500))
+l5 = SphericalLens(23.06904e-3, 243.5999e-3, 3.2e-3, 22.12162e-3, ConstantRefractiveIndex(1.963000))
 
 l_3 = l_2 + BeamletOptics.thickness(l2) + 1.1e-3
 l_4 = l_3 + BeamletOptics.thickness(l3) + 7.25496e-3
@@ -30,19 +30,19 @@ translate3d!(l5, [0, l_5, 0])
 variator_group = ObjectGroup([l3, l4, l5])
 
 ## compensator
-l6 = SphericalLens(-24.31747e-3, -255.5571e-3, 1e-3, 17.70449e-3, λ -> 1.638539)
+l6 = SphericalLens(-24.31747e-3, -255.5571e-3, 1e-3, 17.70449e-3, ConstantRefractiveIndex(1.638539))
 compensator = l6
 
 l_6 = l_5 + BeamletOptics.thickness(l5) + 40.889e-3
 translate3d!(l6, [0, l_6, 0])
 
 # master I
-l7 = SphericalLens(Inf, Inf, 1.2e-3, 19.896e-3, λ -> 1.516330)
-l8 = SphericalLens(1207.65e-3, -28.39078e-3, 2.4e-3, 21.05932e-3, λ -> 1.583126)
-l9 = SphericalLens(74.34233e-3, -62.52319e-3, 2.4e-3, 21.61478e-3, λ -> 1.570989)
-l10 = SphericalLens(42.10459e-3, -128.0055e-3, 2.4e-3, 20.88128e-3, λ -> 1.583126)
-l11 = SphericalLens(28.62223e-3, 378.3789e-3, 2.4e-3, 19.26452e-3, λ -> 1.651000)
-l12 = SphericalLens(-40.92189e-3, 41.10496e-3, 1e-3, 18.17719e-3, λ -> 1.854779)
+l7 = SphericalLens(Inf, Inf, 1.2e-3, 19.896e-3, ConstantRefractiveIndex(1.516330))
+l8 = SphericalLens(1207.65e-3, -28.39078e-3, 2.4e-3, 21.05932e-3, ConstantRefractiveIndex(1.583126))
+l9 = SphericalLens(74.34233e-3, -62.52319e-3, 2.4e-3, 21.61478e-3, ConstantRefractiveIndex(1.570989))
+l10 = SphericalLens(42.10459e-3, -128.0055e-3, 2.4e-3, 20.88128e-3, ConstantRefractiveIndex(1.583126))
+l11 = SphericalLens(28.62223e-3, 378.3789e-3, 2.4e-3, 19.26452e-3, ConstantRefractiveIndex(1.651000))
+l12 = SphericalLens(-40.92189e-3, 41.10496e-3, 1e-3, 18.17719e-3, ConstantRefractiveIndex(1.854779))
 
 l_7 = l_6 + BeamletOptics.thickness(l6) + 4.765141e-3
 l_8 = l_7 + BeamletOptics.thickness(l7) + 1e-3
@@ -60,10 +60,10 @@ translate3d!(l12, [0, l_12, 0])
 master_group_I = ObjectGroup([l7, l8, l9, l10, l11, l12])
 
 ## master II
-l13 = SphericalLens(34.65626e-3, -45.71147e-3, 2.4e-3, 15.6e-3, λ -> 1.762001)
-l14 = SphericalLens(27.08863e-3, 11.38107e-3, 1e-3, 14.40932e-3, λ -> 1.761821)
-l15 = SphericalLens(20.49712e-3, -203.9304e-3, 2.4e-3, 14.40932e-3, λ -> 1.693501)
-l16 = SphericalLens(Inf, Inf, 4e-3, 12.92286e-3, λ -> 1.522494)
+l13 = SphericalLens(34.65626e-3, -45.71147e-3, 2.4e-3, 15.6e-3, ConstantRefractiveIndex(1.762001))
+l14 = SphericalLens(27.08863e-3, 11.38107e-3, 1e-3, 14.40932e-3, ConstantRefractiveIndex(1.761821))
+l15 = SphericalLens(20.49712e-3, -203.9304e-3, 2.4e-3, 14.40932e-3, ConstantRefractiveIndex(1.693501))
+l16 = SphericalLens(Inf, Inf, 4e-3, 12.92286e-3, ConstantRefractiveIndex(1.522494))
 
 l_13 = l_12 + BeamletOptics.thickness(l12) + 11.97864e-3
 l_14 = l_13 + BeamletOptics.thickness(l13) + 0.1e-3

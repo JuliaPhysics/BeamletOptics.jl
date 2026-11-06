@@ -7,14 +7,7 @@ Main.DocUtils.conditional_include(joinpath(beam_showcase_dir, "pointsource_sc.jl
 
 # Beam groups
 
-For convenience, the [`BeamletOptics.AbstractBeamGroup`](@ref) offers a container-like interface for groups of [`Beam`](@ref)s as commonly used in other software packages. The following concrete implementations are currently provided:
-
-```@repl
-using BeamletOptics # hide
-BeamletOptics.list_subtypes(BeamletOptics.AbstractBeamGroup);
-```
-
-Refer to the following sections for convenience constructors to generate the sources listed above.
+For convenience, the [`BeamletOptics.AbstractBeamGroup`](@ref) offers a container-like interface for groups of [`Beam`](@ref)s as commonly used in other software packages. The available beam groups are shown in the [Beam catalog](@ref); the following sections describe the constructors that generate them.
 
 !!! tip "Moving a beam group"
     Every beam group has a source position (`center`) and an [`orientation`](@ref) matrix, whose second column is the central source [`direction`](@ref) and whose first column is the sampling reference vector (`basis`). Both are updated when the group is moved. Refer to [`BeamletOptics.AbstractBeamGroup`](@ref) for the convention and to [Moving sources](@ref) for the kinematic API.
@@ -86,54 +79,7 @@ Both sources include the marginal rays and should be used with an odd number of 
 
 ## Sampling and number of rays
 
-A [`CollimatedSource`](@ref) or [`PointSource`](@ref) stores how its rays were sampled as a [`BeamletOptics.AbstractSourceSampling`](@ref), such that [`num_rays!`](@ref) can regenerate them with another number of rays in the current pose of the source. The diagram shows how the constructors and `num_rays!` generate the beams with [`BeamletOptics.source_beams`](@ref): dotted arrows are its dispatch branches on the sampling type, the green box is what an own sampling type implements.
-
-```mermaid
-flowchart TB
-    C(["<b>catalog constructor</b><br/>e.g. CollimatedSource(pos, dir, diameter, λ)"])
-    GC(["<b>generic constructor</b><br/>CollimatedSource(pos, dir, diameter, sampling, λ; num_rays)<br/>PointSource(pos, dir, sampling, λ; num_rays)"])
-    N(["<b>num_rays!</b>(src, n)"])
-    W(["<b>given beams</b><br/>e.g. CollimatedSource(beams, diameter, pos, dir)"])
-    SB["<b>sampling_basis</b>(dir, basis, T)<br/>reference vector b1"]
-    SBM["<b>source_beams</b>(sampling, pos, dir, b1,<br/>args..., λ, num_rays, T)"]
-    DISC["<b>DiscRings, DiscSunflower, DiscLine</b><br/><i>CollimatedSource</i>"]
-    CONE["<b>ConeRings, ConeSunflower, ConeFan</b><br/><i>PointSource</i>"]
-    OWN["<b>own AbstractSourceSampling</b><br/>methods of source_beams, min_num_rays (optional)<br/>and numerical_aperture (PointSource)"]
-    NO["<b>NoSampling</b>"]
-    ERR(["ArgumentError"])
-    BM["<b>Vector{Beam}</b><br/>first beam: center ray"]
-    NA["<b>numerical_aperture</b>(sampling)<br/>NA of a PointSource"]
-    G["<b>CollimatedSource / PointSource</b><br/>beams, center, dir, sampling"]
-    MIN["<b>min_num_rays</b>(src.sampling)<br/>20 num_rings, 1 or nothing"]
-
-    C -- "its sampling, e.g. DiscRings(num_rings)" --> GC
-    GC --> SB
-    SB --> SBM
-    N -- "src.sampling, orientation(src), n" --> SBM
-    SBM -.-> DISC
-    SBM -.-> CONE
-    SBM -.-> OWN
-    SBM -.-> NO
-    DISC --> BM
-    CONE --> BM
-    OWN --> BM
-    DISC -- "num_rays < min_num_rays" --> ERR
-    CONE -- "num_rays < min_num_rays" --> ERR
-    NO --> ERR
-    BM -- "replaces src.beams" --> G
-    BM -- "new source" --> NA --> G
-    W -- "sampling = NoSampling()" --> G
-    G -- "min_num_rays(src)" --> MIN
-
-    classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
-    classDef green fill:#38982626,stroke:#389826,stroke-width:2px
-    classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
-    classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
-    class SB,SBM,MIN,NA blue
-    class OWN green
-    class DISC,CONE,NO,BM,G purple
-    class C,GC,N,W,ERR terminal
-```
+A [`CollimatedSource`](@ref) or [`PointSource`](@ref) stores how its rays were sampled, such that [`num_rays!`](@ref) can regenerate them with another number of rays in the current pose of the source. How the beams are generated and how to add an own sampling is described in [Source sampling](@ref).
 
 The catalog constructors above build their sampling and call the generic constructors, which take the sampling as an argument:
 
@@ -142,7 +88,9 @@ CollimatedSource(::AbstractArray{<:Real}, ::AbstractArray{<:Real}, ::Real, ::Bea
 PointSource(::AbstractArray{<:Real}, ::AbstractArray{<:Real}, ::BeamletOptics.AbstractSourceSampling, ::Real)
 ```
 
-An own sampling is a subtype of [`BeamletOptics.AbstractSourceSampling`](@ref) with a method of `source_beams`; the generic constructors and [`num_rays!`](@ref) then work for it without further code. A sampling for a `PointSource` also implements `numerical_aperture(s)`. A sampling with a lower bound on the number of rays implements `min_num_rays(s)`, and its `source_beams` throws an `ArgumentError` for a `num_rays` below it, as the samplings of BMO do.
+```@docs; canonical=false
+num_rays!
+```
 
 ## Astigmatic Beam Groups
 
@@ -155,6 +103,30 @@ For complex sources, the package provides the [`AstigmaticBeamGroup`](@ref) cont
 - [`EllipticalGaussianBeamletSource`](@ref): A point-like source emitting an elliptical cone of beamlets (ideal for sources with different fast/slow axis divergence).
 
 A field that is close to one Gaussian mode and too small to be tiled into beamlets, e.g. the output of a single-mode fiber, is not turned into a group: [`GaussianModeDecomposition`](@ref) fits a single [`AstigmaticGaussianBeamlet`](@ref) to it.
+
+Existing beamlets are wrapped into a group with the constructor of the container:
+
+```@docs; canonical=false
+AstigmaticBeamGroup
+AstigmaticBeamGroup(::Vector{AstigmaticGaussianBeamlet{Float64}}, ::Any, ::AbstractVector)
+```
+
+The beamlet sources and the decomposition of a Gaussian beam are generated by
+
+```@docs; canonical=false
+CollimatedGaussianBeamletSource(::AbstractArray{<:Real}, ::AbstractArray{<:Real}, ::Real, ::Real, ::Real)
+SphericalGaussianBeamletSource(::AbstractArray{<:Real}, ::AbstractArray{<:Real}, ::Real, ::Real)
+EllipticalGaussianBeamletSource(::AbstractArray{<:Real}, ::AbstractArray{<:Real}, ::Real, ::Real, ::Real)
+GaussianBeamletDecomposition(::AbstractArray{<:Real}, ::AbstractArray{<:Real}, ::Real, ::Real)
+```
+
+and the decompositions of a sampled field, given as arrays, by
+
+```@docs; canonical=false
+WavefrontBeamletDecomposition(::AbstractVector{<:Real}, ::AbstractVector{<:Real}, ::AbstractMatrix{<:Real}, ::AbstractMatrix{<:Real}, ::AbstractArray{<:Real}, ::AbstractArray{<:Real}, ::Real)
+WavefrontBeamletDecomposition(::AbstractVector{<:Real}, ::AbstractVector{<:Real}, ::AbstractMatrix{<:Complex}, ::AbstractMatrix{<:Complex}, ::AbstractArray{<:Real}, ::AbstractArray{<:Real}, ::Real)
+GaussianModeDecomposition(::AbstractVector{<:Real}, ::AbstractVector{<:Real}, ::AbstractMatrix{<:Number}, ::AbstractMatrix{<:Number}, ::AbstractVector{<:Real}, ::AbstractVector{<:Real}, ::Real)
+```
 
 The decompositions of a sampled field take the grid position as a positional argument, like every other source: `WavefrontBeamletDecomposition(x, y, amplitude, phase, pos, dir, λ)`, `WavefrontBeamletDecomposition(x, y, Eu, Ev, pos, dir, λ)` and `GaussianModeDecomposition(x, y, Eu, Ev, pos, dir, λ)`. The grid lies in the plane normal to `dir` through `pos`, and `pos` is the global position of the sample `x = y = 0`. For the two `WavefrontBeamletDecomposition` forms, `pos` is also the center of the returned group; the single beamlet of `GaussianModeDecomposition` starts at the centroid of the field on that plane.
 
@@ -178,7 +150,7 @@ The `E0` of a beamlet keeps the given tangential components `Eu`, `Ev` and gets 
 4. Curvature: the quadratic phase from the moments ``\langle r_i \partial_j \varphi \rangle`` of the phase gradient (phase steps between neighbors), taken along the principal axes of the intensity. Twist between curvature and intensity axes (general astigmatism) is not represented.
 5. Amplitude and phase: the projection of the field onto the fitted mode.
 
-**Coherent power of beamlet sources.** [`CollimatedGaussianBeamletSource`](@ref), [`SphericalGaussianBeamletSource`](@ref) and [`EllipticalGaussianBeamletSource`](@ref) emit beamlets of equal power that start in phase. Their profiles are Gaussians of the width ``w`` (the ``1/e^2`` half width of the intensity) about vectors ``\mathbf{v}_i`` in a common plane: the positions with the waist in the source plane of collimated beamlets, or the directions with the far-field divergence of beamlets from one point. Where the beamlets overlap, their fields add: two beamlets of the power ``P`` whose vectors differ by ``\delta`` contribute ``P \exp(-\delta^2 / (2 w^2))`` to the power of the superposition per pair, i.e. it carries ``P \sum_{ij} \exp(-|\mathbf{v}_i - \mathbf{v}_j|^2 / (2 w^2))`` instead of ``N P``. The fields of the beamlets are scaled such that the superposition carries the sum of their powers. This holds for all beamlets, also at the edge of the source, where fewer neighbors overlap.
+**Coherent power of beamlet sources.** [`CollimatedGaussianBeamletSource`](@ref), [`SphericalGaussianBeamletSource`](@ref) and [`EllipticalGaussianBeamletSource`](@ref) emit beamlets of equal power that start in phase. Their profiles are Gaussians of the width ``w`` (the ``1/e^2`` half width of the intensity) about vectors ``\mathbf{v}_i`` in a common plane: the positions with the waist in the source plane of collimated beamlets, or the directions with the far-field divergence of beamlets from one point. Where the beamlets overlap, their fields add: two beamlets of the power ``P`` whose vectors differ by ``\delta`` contribute ``P \exp(-\delta^2 / (2 w^2))`` to the power of the superposition per pair, i.e. it carries ``P S`` with ``S = \sum_{ij} \exp(-|\mathbf{v}_i - \mathbf{v}_j|^2 / (2 w^2))`` instead of ``N P`` (pairs farther apart than ``8 w`` are left out of the sum). The fields of all beamlets are multiplied by the same factor ``\sqrt{N / S}``, such that the superposition carries the sum ``N P`` of their powers. The factor does not depend on the beamlet, so beamlets at the edge of the source, where fewer neighbors overlap, are scaled like those in the center.
 
 ### OpticsBase fields as beam groups
 
@@ -195,37 +167,4 @@ Details of the `PlaneField` return path:
 ```@docs
 WavefrontBeamletDecomposition(::OpticsBase.PlaneField)
 GaussianModeDecomposition(::OpticsBase.PlaneField)
-```
-
-## Solving a beam group
-
-[`solve_system!`](@ref) traces a beam group by solving each of its beams, multithreaded, and the hits of all beams accumulate on the same [`Detector`](@ref)s. The diagram shows the steps of `solve_system!(system, bg)`; the green box is the getter of the beams that a new [`BeamletOptics.AbstractBeamGroup`](@ref) subtype provides, as a `beams` field or a method.
-
-```mermaid
-flowchart TB
-    S(["<b>solve_system!</b>(system, bg)"])
-    BG["<b>beams</b>(bg)<br/>root beams of the group"]
-    EM["<b>empty!</b>(bg)<br/>every beam to its start state"]
-    INI{"initialize = true?"}
-    IN["<b>initialize!</b>(system)<br/>once, before the first beam"]
-    BS["<b>with_bounding_spheres</b>(system)<br/>one table for all beams"]
-    CH["<b>Threads.@threads :greedy</b><br/>over chunks of beams(bg)"]
-    HB["<b>with_hit_buffers</b><br/>detector hits of a chunk<br/>stored at its end"]
-    SB["<b>solve_system!</b>(system, beam; kwargs...)<br/>for each beam of the chunk"]
-    E([done])
-
-    S --> EM --> INI
-    INI -- yes --> IN --> BS
-    INI -- no --> BS
-    BS --> CH --> HB --> SB --> E
-    BG -.-> EM
-    BG -.-> CH
-
-    classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
-    classDef green fill:#38982626,stroke:#389826,stroke-width:2px
-    classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
-    classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
-    class EM,IN,BS,CH,HB,SB blue
-    class BG green
-    class S,E terminal
 ```

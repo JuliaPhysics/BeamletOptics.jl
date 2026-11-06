@@ -164,8 +164,8 @@ The following inputs and arguments can be used to configure the beamlet:
     specified `position`, but rather at an offset `z0` in [m] along the chief ray axis.
 
 !!! info "Support vector"
-    In order to calculate the basis vectors required for the beamlet construction, a random orthogonal vector is chosen.
-    If results fluctuate due to the randomness of this vector, make sure to specify a fixed orthogonal `support` vector.
+    In order to calculate the basis vectors required for the beamlet construction, an orthogonal vector is chosen
+    deterministically from `direction` via [`normal3d`](@ref). Specify a `support` vector to choose it yourself.
     The waist and divergence rays start from the chief ray along this vector. A `support` that is not
     orthogonal to the `direction` (the dot product of the unit vectors exceeds
     `get_orthogonality_threshold()`, default `1e-10`) throws an `ArgumentError`, since it would
@@ -218,7 +218,7 @@ function GaussianBeamlet(
 end
 
 """
-    gauss_parameters(gauss::GaussianBeamlet, z; hint::Union{Nothing, Tuple{Int, Vector{<:Real}}}=nothing)
+    gauss_parameters(gauss::GaussianBeamlet, z; hint = point_on_beam(gauss, z))
 
 Calculate the local waist radius and Gouy phase of an unastigmatic Gaussian beamlet at a specific cartesian distance `z` based on the method of J. Arnaud (1985) and D. DeJager (1992).
 
@@ -226,7 +226,7 @@ Calculate the local waist radius and Gouy phase of an unastigmatic Gaussian beam
 
 - `gauss`: the GaussianBeamlet object for which parameters are to be calculated.
 - `z`: the position along the beam at which to calculate the parameters.
-- `hint`: an optional hint parameter for the relevant point/index of the appropriate beam segment. If not provided, the function will automatically select the ray.
+- `hint`: optional tuple `(point, index)` of the point on the beam and the index of its segment, as returned by [`point_on_beam`](@ref). Default is `point_on_beam(gauss, z)`.
 
 # Returns
 

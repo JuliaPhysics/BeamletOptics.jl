@@ -193,7 +193,7 @@ A custom component is a subtype of [`BeamletOptics.AbstractObject`](@ref). With 
 API (`translate3d!`, `zrotate3d!`, `position`, ...) then works for free:
 
 ```julia
-struct LongpassDichroicMirror{T, N <: BMO.RefractiveIndex} <: BMO.AbstractObject{T}
+struct LongpassDichroicMirror{T, N <: BMO.AbstractRefractiveIndex} <: BMO.AbstractObject{T}
     shape::BMO.PlanoSurfaceSDF{T}
     n::N
     cuton::T

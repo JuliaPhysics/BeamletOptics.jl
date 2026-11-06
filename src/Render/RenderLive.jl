@@ -12,9 +12,13 @@ solved repeatedly.
 - objects and systems: the geometry is generated once, kinematic changes are applied as a model
   transformation of the existing plots
 - rays, beams and beam groups: all segments are bundled into a single plot
-- `GaussianBeamlet`: the envelope of all segments is bundled into a single mesh
+- `GaussianBeamlet`, `AstigmaticGaussianBeamlet` and `AstigmaticBeamGroup`: the envelope of all
+  segments is bundled into a single mesh
 
-Keyword arguments are passed on as for [`render!`](@ref).
+Keyword arguments are passed on as for [`render!`](@ref), but the envelope meshes of Gaussian
+beamlets are drawn with coarser default resolutions `r_res`/`z_res`: 24/40 for a `GaussianBeamlet`
+(`render!`: 50/100) and 10/8 per beamlet of an `AstigmaticBeamGroup` (`render!`: 64/100). Change them
+via the keywords or later via [`render_settings!`](@ref).
 
 If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
 """
@@ -115,11 +119,14 @@ end
 Returns the object of a live-rendered object or system `handle` that is visualized by the `plot`
 (one of its [`pickable_plots`](@ref), or a child plot of one), or `nothing` if the `plot` does not
 belong to the `handle`. For a system handle, the top-level object, i.e. the outermost group of
-the picked object, see [`render_parent`](@ref).
+the picked object, see [`render_parent`](@ref). Beams cannot be picked, a beam handle returns
+`nothing`.
 
 If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
 """
 pick_object(::Any, ::Any) = throw(MissingBackendError())
+
+pick_object(::AbstractBeamRenderHandle, ::Any) = nothing
 
 function pick_object(h::AbstractSystemRenderHandle, plot)
     for child in children(h)

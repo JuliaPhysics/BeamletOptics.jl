@@ -29,7 +29,7 @@ const mm = 1e-3
         lens = Lens(
             CylindricalSurface(r, d, h),
             ct,
-            n -> 1.517
+            ConstantRefractiveIndex(1.517)
         )
 
         # test lens thickness
@@ -47,7 +47,7 @@ const mm = 1e-3
         lens = Lens(
             CylindricalSurface(r, d, h),
             ct,
-            n -> 1.517
+            ConstantRefractiveIndex(1.517)
         )
 
         # test lens thickness
@@ -70,7 +70,7 @@ const mm = 1e-3
                 [0, 1.1926075e-5*(1e3)^3, -2.9323497e-9*(1e3)^5, -1.8718889e-11*(1e3)^7, -1.7009961e-14*(1e3)^9, 3.5481542e-17*(1e3)^11, 6.5241296e-20*(1e3)^13]
             ),
             ct,
-            n -> 1.777
+            ConstantRefractiveIndex(1.777)
         )
 
         # test lens thickness
@@ -94,11 +94,25 @@ const mm = 1e-3
                 [0, 1.1926075e-5*(1e3)^3, -2.9323497e-9*(1e3)^5, -1.8718889e-11*(1e3)^7, -1.7009961e-14*(1e3)^9, 3.5481542e-17*(1e3)^11, 6.5241296e-20*(1e3)^13]
             ),
             ct,
-            n -> 1.777
+            ConstantRefractiveIndex(1.777)
         )
 
         # test lens thickness
         @test thickness(lens) ≈ ct
+    end
+
+    @testset "Refractive index argument" begin
+        n = ConstantRefractiveIndex(1.517)
+        cyl = CylindricalSurface(5.2mm, 10mm, 20mm)
+        rect = RectangularFlatSurface(10mm)
+        for lens in (
+                Lens(CylindricalSurface(50mm, 10mm, 20mm), CylindricalSurface(-50mm, 10mm, 20mm), 2mm, n),
+                Lens(cyl, 5.9mm, n),
+                Lens(rect, rect, 2mm, n))
+            @test BMO.refractive_index(lens) === n
+        end
+        @test_throws MethodError Lens(cyl, 5.9mm, 1.517)
+        @test_throws MethodError Lens(rect, rect, 2mm, λ -> 1.517)
     end
 end
 

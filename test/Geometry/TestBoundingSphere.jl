@@ -50,11 +50,11 @@ same(a, b) = !isnothing(a) && !isnothing(b) && length(a) == length(b) && BMO.obj
 # Whether the sphere `outer` encloses the sphere `inner`
 encloses(outer, inner) = norm(inner.pos - outer.pos) + inner.radius ≤ outer.radius + 1e-12
 
-sphere_prism(radius, bound = radius) = BMO.Prism(WrappedSDF(BMO.SphereSDF(radius), bound), λ -> 1.5)
+sphere_prism(radius, bound = radius) = BMO.Prism(WrappedSDF(BMO.SphereSDF(radius), bound), ConstantRefractiveIndex(1.5))
 
 @testset "Bounding sphere" begin
     radius = 10e-3
-    n = λ -> 1.5
+    n = ConstantRefractiveIndex(1.5)
 
     @testset "Shapes" begin
         plain = WrappedSDF(BMO.SphereSDF(radius))
@@ -455,7 +455,7 @@ sphere_prism(radius, bound = radius) = BMO.Prism(WrappedSDF(BMO.SphereSDF(radius
         r = 10.0f-3
         shape = WrappedSDF(BMO.SphereSDF(r), r)
         translate3d!(shape.shape, Float32[1, 2, 3])
-        prism = BMO.Prism(shape, λ -> 1.5f0)
+        prism = BMO.Prism(shape, ConstantRefractiveIndex(1.5f0))
         system = System([prism])
         c = Float64.(position(shape))
         @test BMO.bounding_sphere_of(shape) isa BMO.SingleBoundingSphere{Float32}

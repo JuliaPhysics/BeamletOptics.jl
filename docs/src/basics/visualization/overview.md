@@ -43,7 +43,7 @@ visualize your simulation.
 - [Look](look.md): materials, feature edges and lighting of the rendered objects
 - [Scene and camera](camera.md): helpers for framing and annotating a 3D scene
 - [Live rendering](live_rendering.md): plots that follow moving components and changing beams,
-  e.g. for animations, and the render handle protocol for packages built on BeamletOptics
+  e.g. for animations, and how to change a live scene
 
 ## Backends
 
@@ -94,7 +94,7 @@ julia> using BeamletOptics
 
 julia> methods(render!)
 # 1 method for generic function "render!" from BeamletOptics:
- [1] render!(::Any, ::Union{BeamletOptics.AbstractSystem, BeamletOptics.AbstractBeam, BeamletOptics.AbstractObject, BeamletOptics.AbstractObjectGroup, BeamletOptics.AbstractRay, BeamletOptics.AbstractShape}, kwargs...)
+ [1] render!(::Any, ::Union{BeamletOptics.AbstractSystem, BeamletOptics.AbstractBeam, BeamletOptics.AbstractObject, BeamletOptics.AbstractObjectGroup, BeamletOptics.AbstractRay, BeamletOptics.AbstractShape}, args...; kwargs...)
      @ C:\Users\anon\.julia\dev\BeamletOptics\src\Render\RenderCore.jl:59
 
 julia> axis = nothing;
@@ -118,10 +118,10 @@ julia> using GLMakie
 julia> methods(render!)
 # ... methods for generic function "render!" from BeamletOptics:
   [1] render!(axis::Union{Axis3, LScene}, gauss::GaussianBeamlet; r_res, z_res, kwargs...)
-     @ BeamletOpticsMakieExt C:\Users\anon\.julia\dev\BeamletOptics\ext\RenderGaussian.jl:207
+     @ BeamletOpticsMakieExt C:\Users\anon\.julia\dev\BeamletOptics\ext\RenderGaussian.jl:242
   [2] render!(axis::Union{Axis3, LScene}, bg::AstigmaticBeamGroup; r_res, z_res, kwargs...)
-     @ BeamletOpticsMakieExt C:\Users\anon\.julia\dev\BeamletOptics\ext\RenderAstigmaticGaussian.jl:237
+     @ BeamletOpticsMakieExt C:\Users\anon\.julia\dev\BeamletOptics\ext\RenderAstigmaticGaussian.jl:240
   [3] render!(axis::Union{Axis3, LScene}, beam::Beam; kwargs...)
-     @ BeamletOpticsMakieExt C:\Users\anon\.julia\dev\BeamletOptics\ext\RenderBeam.jl:279
+     @ BeamletOpticsMakieExt C:\Users\anon\.julia\dev\BeamletOptics\ext\RenderBeam.jl:398
   ⋮
 ```

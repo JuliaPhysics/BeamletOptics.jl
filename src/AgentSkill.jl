@@ -13,19 +13,26 @@ An existing `beamletoptics` skill in `dest` is replaced, so calling this functio
 copy are lost.
 
 !!! info "File permissions"
-    Pkg installs packages read-only. The copied files are made writable so that the copy can be
-    edited and replaced later.
+    Pkg installs packages read-only. The files are written anew instead of copied with their
+    permissions, so that the copy can be edited and replaced later.
 """
 function install_agent_skill(dest::AbstractString = joinpath(pwd(), ".claude", "skills"))
     src = joinpath(pkgdir(@__MODULE__), "skills", "beamletoptics")
     isdir(src) || throw(ErrorException("Agent skill not found at $src"))
     target = joinpath(dest, "beamletoptics")
-    mkpath(dest)
-    cp(src, target; force = true)
-    for (root, _, files) in walkdir(target)
-        chmod(root, 0o755)
-        foreach(f -> chmod(joinpath(root, f), 0o644), files)
-    end
+    rm(target; force = true, recursive = true)
+    _copy_contents(src, target)
     @info "Installed BeamletOptics agent skill (v$(pkgversion(@__MODULE__))) to $target"
     return target
+end
+
+# Copies the folder `src` to `dst` by the contents of its files: `cp` keeps the read-only
+# permissions of an installed package, new files are writable
+function _copy_contents(src, dst)
+    for (root, _, files) in walkdir(src)
+        dir = joinpath(dst, relpath(root, src))
+        mkpath(dir)
+        foreach(f -> write(joinpath(dir, f), read(joinpath(root, f))), files)
+    end
+    return nothing
 end

@@ -45,7 +45,7 @@ function check_derivative(component; h, mirror = false)
     return ForwardDiff.derivative(f, 0.0), (f(δ) - f(-δ)) / 2δ
 end
 
-n(T) = _ -> T(1.5)
+n(T) = ConstantRefractiveIndex(T(1.5))
 lenses = [
     "bi-convex SphericalLens" => T -> SphericalLens(T(50mm), T(-50mm), T(5mm), T(25mm), n(T)),
     "bi-concave SphericalLens" => T -> SphericalLens(T(-50mm), T(50mm), T(3mm), T(25mm), n(T)),
@@ -65,7 +65,7 @@ mirrors = [
 
 pd_at(T, y) = (d = Detector(T(40mm)); translate3d!(d, T[0, y, 0]); d)
 hit_x(pd) = BMO.hit_point(only(BMO.hits(pd)))[1]
-bi_convex(T) = SphericalLens(T(50mm), T(-50mm), T(5mm), T(25mm), _ -> T(1.5))
+bi_convex(T) = SphericalLens(T(50mm), T(-50mm), T(5mm), T(25mm), ConstantRefractiveIndex(T(1.5)))
 # paraxial ABCD matrices in reduced angles: a translation by the reduced distance `d` (length / n),
 # and a refraction or reflection with the power `P`
 translation(d) = [1 d; 0 1]
@@ -79,7 +79,7 @@ arm mirror `m1` shifted by `dx` along its axis.
 function michelson_power(dx)
     T = typeof(dx)
     cm = T(1e-2)
-    cbs = CubeBeamsplitter(T(25.4mm), _ -> T(1.51509))
+    cbs = CubeBeamsplitter(T(25.4mm), ConstantRefractiveIndex(T(1.51509)))
     zrotate3d!(cbs, T(-π / 2))
     translate3d!(cbs, T[0, 23.5cm, 0])
     m1 = RoundPlanoMirror(T(25.4mm), T(5mm))
@@ -97,9 +97,9 @@ end
 
 # label, function of the parameter, value of the parameter
 parametric_cases = [
-    ("radius of curvature", R -> (T = typeof(R); l = SphericalLens(R, T(-50mm), T(5mm), T(25mm), _ -> T(1.5));
+    ("radius of curvature", R -> (T = typeof(R); l = SphericalLens(R, T(-50mm), T(5mm), T(25mm), ConstantRefractiveIndex(T(1.5)));
         d = pd_at(T, 100mm); solve_system!(System([l, d]), Beam(T[2mm, -50mm, 0], T[0, 1, 0], T(1e-6))); hit_x(d)), 50mm),
-    ("center thickness", t -> (T = typeof(t); l = SphericalLens(T(50mm), T(-50mm), t, T(25mm), _ -> T(1.5));
+    ("center thickness", t -> (T = typeof(t); l = SphericalLens(T(50mm), T(-50mm), t, T(25mm), ConstantRefractiveIndex(T(1.5)));
         d = pd_at(T, 100mm); solve_system!(System([l, d]), Beam(T[2mm, -50mm, 0], T[0, 1, 0], T(1e-6))); hit_x(d)), 5mm),
     ("lens tilt", θ -> (T = typeof(θ); l = bi_convex(T); zrotate3d!(l, θ);
         d = pd_at(T, 100mm); solve_system!(System([l, d]), Beam(T[0, -50mm, 0], T[0, 1, 0], T(1e-6))); hit_x(d)), 0.0),
@@ -113,13 +113,13 @@ parametric_cases = [
     ("ThinBeamsplitter tilt, reflected beam", θ -> (T = typeof(θ); bs = ThinBeamsplitter(T(30mm)); zrotate3d!(bs, T(π / 4) + θ);
         translate3d!(bs, T[0, 50mm, 0]); d = Detector(T(40mm)); zrotate3d!(d, T(π / 2)); translate3d!(d, T[100mm, 50mm, 0]);
         solve_system!(System([bs, d]), Beam(T[0, 0, 0], T[0, 1, 0], T(1e-6))); BMO.hit_point(only(BMO.hits(d)))[2]), 0.0),
-    ("CubeBeamsplitter tilt", θ -> (T = typeof(θ); c = CubeBeamsplitter(T(25mm), _ -> T(1.5)); zrotate3d!(c, θ);
+    ("CubeBeamsplitter tilt", θ -> (T = typeof(θ); c = CubeBeamsplitter(T(25mm), ConstantRefractiveIndex(T(1.5))); zrotate3d!(c, θ);
         translate3d!(c, T[0, 50mm, 0]); d = pd_at(T, 150mm);
         solve_system!(System([c, d]), Beam(T[1mm, 0, 0], T[0, 1, 0], T(1e-6))); hit_x(d)), 0.05),
-    ("RoundPlateBeamsplitter tilt", θ -> (T = typeof(θ); p = RoundPlateBeamsplitter(T(25mm), T(5mm), _ -> T(1.5));
+    ("RoundPlateBeamsplitter tilt", θ -> (T = typeof(θ); p = RoundPlateBeamsplitter(T(25mm), T(5mm), ConstantRefractiveIndex(T(1.5)));
         zrotate3d!(p, T(π / 4) + θ); translate3d!(p, T[0, 50mm, 0]); d = pd_at(T, 150mm);
         solve_system!(System([p, d]), Beam(T[0, 0, 0], T[0, 1, 0], T(1e-6))); hit_x(d)), 0.0),
-    ("total internal reflection in a RightAnglePrism", θ -> (T = typeof(θ); p = RightAnglePrism(T(25mm), T(25mm), _ -> T(1.5));
+    ("total internal reflection in a RightAnglePrism", θ -> (T = typeof(θ); p = RightAnglePrism(T(25mm), T(25mm), ConstantRefractiveIndex(T(1.5)));
         zrotate3d!(p, θ); translate3d!(p, T[0, 50mm, 0]); b = Beam(T[4mm, 0, 0], T[0, 1, 0], T(1e-6));
         solve_system!(System([p]), b); BMO.direction(last(BMO.rays(b)))[2]), 0.0),
     ("RoundPolarizationFilter angle (Malus)", θ -> (T = typeof(θ); f = RoundPolarizationFilter(T(25mm)); yrotate3d!(f, θ);
@@ -160,7 +160,7 @@ parametric_cases = [
         # the spot of a ray at h = 2 mm behind a bi-convex lens with the refractive index `n0`
         function spot(n0)
             T = typeof(n0)
-            lens = SphericalLens(T(50mm), T(-50mm), T(5mm), T(25mm), _ -> n0)
+            lens = SphericalLens(T(50mm), T(-50mm), T(5mm), T(25mm), ConstantRefractiveIndex(n0))
             pd = Detector(T(40mm))
             translate3d!(pd, T[0, 100mm, 0])
             beam = Beam(T[2mm, -50mm, 0], T[0, 1, 0], T(1e-6))
@@ -182,7 +182,7 @@ parametric_cases = [
         # the hit point of a beamlet on the axis behind a lens that is shifted laterally
         function spot(dx)
             T = typeof(dx)
-            lens = SphericalLens(T(50mm), T(-50mm), T(5mm), T(25mm), _ -> T(1.5))
+            lens = SphericalLens(T(50mm), T(-50mm), T(5mm), T(25mm), ConstantRefractiveIndex(T(1.5)))
             translate3d!(lens, [dx, zero(T), zero(T)])
             pd = Detector(T(40mm))
             translate3d!(pd, T[0, 100mm, 0])

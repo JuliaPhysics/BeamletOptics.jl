@@ -8,10 +8,10 @@ refractive index `n`, i.e. the beam is refracted at both surfaces.
 # Fields
 
 - `shape`: a `PlanoSurfaceSDF` representing the substrate
-- `n`: the substrate [`BeamletOptics.RefractiveIndex`](@ref)
+- `n`: the substrate [`BeamletOptics.AbstractRefractiveIndex`](@ref)
 - `cuton`: the cut-on wavelength in [m]
 """
-struct LongpassDichroicMirror{T, N <: BMO.RefractiveIndex} <: BMO.AbstractObject{T}
+struct LongpassDichroicMirror{T, N <: BMO.AbstractRefractiveIndex} <: BMO.AbstractObject{T}
     shape::BMO.PlanoSurfaceSDF{T}
     n::N
     cuton::T
@@ -28,7 +28,7 @@ BMO.medium(lpm::LongpassDichroicMirror) = BMO.IsotropicMedium(lpm.n)
 Spawns a round [`LongpassDichroicMirror`](@ref) at the global origin. The reflective face
 is normal to the local y-axis.
 """
-function LongpassDichroicMirror(diameter::D, thickness::T, n::BMO.RefractiveIndex, cuton::Real) where {D, T}
+function LongpassDichroicMirror(diameter::D, thickness::T, n::BMO.AbstractRefractiveIndex, cuton::Real) where {D, T}
     TT = promote_type(D, T)
     shape = BMO.PlanoSurfaceSDF(TT(thickness), TT(diameter))
     return LongpassDichroicMirror(shape, n, TT(cuton))

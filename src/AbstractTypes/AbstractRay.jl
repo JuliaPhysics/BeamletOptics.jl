@@ -5,8 +5,9 @@ Stores data calculated by the [`intersect3d`](@ref) method.
 
 # Fields:
 
-- `object`: a [`Nullable`](@ref) reference to the [`AbstractObject`](@ref) that has been hit (optional but recommended)
-- `shape`: a [`Nullable`](@ref) reference to the [`AbstractShape`](@ref) of the `object` that has been hit (optional but recommended)
+- `object`: a [`Nullable`](@ref) reference to the [`AbstractObject`](@ref) that has been hit. The `intersect3d` methods of shapes leave it `nothing`, the solver sets it
+- `shape`: a [`Nullable`](@ref) reference to the [`AbstractShape`](@ref) of the `object` that has been hit. Provide it: composite objects
+  and the check whether the rays of a beamlet hit the same shape identify the hit part by this reference
 - `t`: length of the ray parametrization in [m]
 - `n`: normal vector at the point of intersection
 - `part`: the object that was hit, a part of `object` if this consists of objects, or `nothing`, see [`part_of`](@ref)
@@ -209,7 +210,7 @@ Subtypes of `AbstractRay` must implement the following:
 - `intersect3d`: calculates the [`Intersection`](@ref) between a ray and a shape
 - `rotate3d!(::Movable, ray, R::AbstractMatrix)`: only required for subtypes carrying direction-dependent data (e.g. field vectors); must rotate this data together with the ray direction and clear the intersection
 
-## Kinematic API:
+## Kinematic
 
 `AbstractRay`s are [`BeamletOptics.Movable`](@ref) with a [`BeamletOptics.Directed`](@ref) frame, see
 [`BeamletOptics.AbstractKinematicTrait`](@ref). Every verb clears the ray [`Intersection`](@ref), i.e. resets
@@ -220,7 +221,7 @@ the ray to its unsolved state. Rotations are applied about the ray start positio
 
 !!! info "Ray length"
     Base.`length`: this function is used to return the length of the `AbstractRay` (if no intersection exists, the ray length is `Inf`).
-    The `opl` keyword can be used to obtain the optical path length instead.
+    Use [`optical_path_length`](@ref) to obtain the optical path length instead.
 
 !!! warning "Ray direction"
     Many functions assume that the `dir`ection vector has unit length (i.e. ``|\\vec{d}| = 1``).
@@ -328,7 +329,7 @@ end
     intersect3d(shape::AbstractShape, ::AbstractRay)
 
 Defines the intersection between an [`AbstractShape`](@ref) and an [`AbstractRay`](@ref), must return an [`Intersection`](@ref) or `nothing`.
-The default behavior for concrete `shape`s and rays is to indicate no intersection, that is `nothing`, which will inform the tracing algorithm to stop.
+The default behavior for concrete `shape`s and rays is to log a warning (`No intersect3d method defined for: ...`) and to indicate no intersection, that is `nothing`, which will inform the tracing algorithm to stop.
 Refer to the [`Intersection`](@ref) documentation for more information on the return type value.
 """
 function intersect3d(shape::AbstractShape, ::AbstractRay)

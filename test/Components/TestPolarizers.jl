@@ -188,11 +188,12 @@ const mm = 1e-3
         end
 
         @testset "LinearPolarizer" begin
-            n = λ -> 1.5
+            n = ConstantRefractiveIndex(1.5)
             lp = RoundLinearPolarizer(25.4mm, 1.6mm, 1.6mm, n)
             t = transmission_axis(lp)
             @test norm(t) ≈ 1
             @test abs(dot(t, [1, 0, 0])) ≈ 1 atol = 1e-12
+            @test BMO.refractive_index(RoundLinearPolarizer(25.4mm, 1.6mm, 1.6mm, ConstantRefractiveIndex(1.5)), 1e-6) == 1.5
 
             for θ in 0:15:180
                 lp2 = RoundLinearPolarizer(25.4mm, 1.6mm, 1.6mm, n)
@@ -224,7 +225,7 @@ const mm = 1e-3
     end
 
     @testset "Linear polarizer - geometry and kinematics" begin
-        n = λ -> 1.5
+        n = ConstantRefractiveIndex(1.5)
         tf = 1.6mm
         tb = 1.0mm
 
@@ -245,7 +246,7 @@ const mm = 1e-3
     end
 
     @testset "Linear polarizer - Malus law (forward and reverse)" begin
-        n = λ -> 1.5
+        n = ConstantRefractiveIndex(1.5)
         tf = 1.6mm
         tb = 1.0mm
         D = 25.4mm
@@ -326,7 +327,7 @@ const mm = 1e-3
     end
 
     @testset "Linear polarizer - tilted plate offset" begin
-        n = λ -> 1.5
+        n = ConstantRefractiveIndex(1.5)
         tf = 1.6mm
         tb = 1.0mm
         D = 25.4mm
@@ -358,7 +359,7 @@ const mm = 1e-3
     end
 
     @testset "Linear polarizer - beamlets" begin
-        n = λ -> 1.5
+        n = ConstantRefractiveIndex(1.5)
         tf = 1.6mm
         tb = 1.0mm
         D = 25.4mm

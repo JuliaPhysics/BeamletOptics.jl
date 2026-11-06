@@ -466,7 +466,7 @@ dominant(E) = E[argmax(abs.(E))]
         surf2 = BMO.CircularFlatSurface(10.0mm)
 
         # n=2.0 (high index)
-        lens = BMO.Lens(surf1, surf2, 1.0mm, λ -> 2.0)
+        lens = BMO.Lens(surf1, surf2, 1.0mm, ConstantRefractiveIndex(2.0))
 
         # Tilt the lens by 80 degrees
         BMO.zrotate3d!(lens, deg2rad(80))
@@ -487,7 +487,7 @@ dominant(E) = E[argmax(abs.(E))]
         w0 = 1mm
         P0 = 1e-3
         n = 1.5
-        lens() = (l = ThinLens(200mm, 200mm, 5mm, n); translate3d!(l, [0, 30mm, 0]); l)    # f = 200 mm
+        lens() = (l = ThinLens(200mm, 200mm, 5mm, ConstantRefractiveIndex(n)); translate3d!(l, [0, 30mm, 0]); l)    # f = 200 mm
         function splitter()
             bs = ThinBeamsplitter(25mm, reflectance = 0.5)
             translate3d!(bs, [0, 80mm, 0])
@@ -593,7 +593,7 @@ dominant(E) = E[argmax(abs.(E))]
         T_normal = (4n / (n + 1)^2)^2
 
         @testset "Uncoated lens" begin
-            lens = ThinLens(200mm, 200mm, 5mm, n)
+            lens = ThinLens(200mm, 200mm, 5mm, ConstantRefractiveIndex(n))
             translate3d!(lens, [0, 30mm, 0])
             pd = detector([0, 140mm, 0], [0.0, 1, 0])
             b = beam()
@@ -606,7 +606,7 @@ dominant(E) = E[argmax(abs.(E))]
 
         @testset "Cube beamsplitter" begin
             # coating at 135°: +y is reflected to -x
-            cbs = CubeBeamsplitter(25mm, n)
+            cbs = CubeBeamsplitter(25mm, ConstantRefractiveIndex(n))
             pd_t = detector([0, 100mm, 0], [0.0, 1, 0])
             pd_r = detector([-100mm, 0, 0], [-1.0, 0, 0])
             b = AstigmaticGaussianBeamlet([0.0, -100mm, 0], [0.0, 1, 0], λ, w0; P0, support = [1.0, 0, 0])
@@ -626,7 +626,7 @@ dominant(E) = E[argmax(abs.(E))]
             r_p = (n * cos(θ_i) - cos(θ_t)) / (n * cos(θ_i) + cos(θ_t))
             # (polarization, power reflection of the back surface): s is normal to the plane of incidence
             for (e, R_back) in (([0.0, 0, 1], r_s^2), ([1.0, 0, 0], r_p^2))
-                pbs = RectangularPlateBeamsplitter(25mm, 25mm, 5mm, λ -> n)
+                pbs = RectangularPlateBeamsplitter(25mm, 25mm, 5mm, ConstantRefractiveIndex(n))
                 zrotate3d!(pbs, π / 4)
                 pd_t = detector([0, 100mm, 0], [0.0, 1, 0])
                 pd_r = detector([100mm, 0, 0], [1.0, 0, 0])

@@ -1186,8 +1186,9 @@ end
 
 @testset "Transitions" begin
     @testset "Media" begin
-        @test BMO.refractive_index(BMO.IsotropicMedium(1.5), λ0) == 1.5
-        @test BMO.refractive_index(BMO.IsotropicMedium(λ -> 1.4 + λ), 1e-6) ≈ 1.400001
+        @test BMO.refractive_index(BMO.IsotropicMedium(ConstantRefractiveIndex(1.5)), λ0) == 1.5
+        nbk7 = SellmeierEquation(1.03961212, 0.231792344, 1.01046945, 0.00600069867, 0.0200179144, 103.560653)
+        @test BMO.refractive_index(BMO.IsotropicMedium(nbk7), 1e-6) == nbk7(1e-6)
         lens = SphericalLens(30mm, -30mm, 5mm, 15mm, λ -> 1.6)
         @test BMO.medium(lens) isa BMO.IsotropicMedium
         @test BMO.refractive_index(BMO.medium(lens), λ0) == 1.6
@@ -1298,7 +1299,7 @@ BMO.surface_model(film::CountingFilm) = film.model
 struct GlassBlock{S <: BMO.AbstractShape{Float64}} <: BMO.AbstractObject{Float64}
     shape::S
 end
-BMO.medium(::GlassBlock) = BMO.IsotropicMedium(1.5)
+BMO.medium(::GlassBlock) = BMO.IsotropicMedium(ConstantRefractiveIndex(1.5))
 
 @testset "A thin layer carries the surface model of the boundary" begin
     θ = deg2rad(25)

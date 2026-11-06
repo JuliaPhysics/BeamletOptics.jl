@@ -29,7 +29,7 @@ julia> BeamletOptics.properties(SphericalLens(50e-3, -50e-3, 5e-3, 25.4e-3))
   "Optical axis" => [0.0, 1.0, 0.0]
          "Shape" => "UnionSDF"
  "Thickness [m]" => 0.005
-   "Index model" => "function of λ"
+   "Index model" => "ConstantRefractiveIndex"
          "n(λ₀)" => 1.5
         "λ₀ [m]" => 1.0e-6
 ```
@@ -126,21 +126,19 @@ Components
 =#
 
 """
-Returns the refractive index model `n` (see [`RefractiveIndex`](@ref)) and its value at the
+Returns the refractive index model `n` (see [`AbstractRefractiveIndex`](@ref)) and its value at the
 default wavelength λ₀, see [`get_default_wavelength`](@ref).
 """
-function _index_properties(n)
+function _index_properties(n::AbstractRefractiveIndex)
     λ0 = get_default_wavelength()
-    return Pair{String, Any}["Index model" => _index_model(n), "n(λ₀)" => n(λ0), "λ₀ [m]" => λ0]
+    return Pair{String, Any}["Index model" => _type_name(n), "n(λ₀)" => n(λ0), "λ₀ [m]" => λ0]
 end
 # Only defined at its wavelengths, which are listed instead of a value at λ₀
 function _index_properties(n::DiscreteRefractiveIndex)
     λs = sort!(collect(keys(n.data)))
-    return Pair{String, Any}["Index model" => _index_model(n), "Wavelengths [m]" => λs,
+    return Pair{String, Any}["Index model" => _type_name(n), "Wavelengths [m]" => λs,
         "Indices" => [n.data[λ] for λ in λs]]
 end
-_index_model(::Function) = "function of λ"
-_index_model(n) = _type_name(n)
 
 properties(x::AbstractRefractiveOptic) = [default_properties(x); _index_properties(refractive_index(x))]
 

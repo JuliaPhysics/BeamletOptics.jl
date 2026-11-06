@@ -5,7 +5,7 @@ The shape trait defines how many shapes an [`AbstractObject`](@ref) consists of.
 Two different traits are defined:
 
 1. [`SingleShape`](@ref): the `AbstractObject` consists of a single [`AbstractShape`](@ref)
-2. [`MultiShape`](@ref): the `AbstractObject` consists of two or more [`AbstractShape`](@ref)s
+2. [`MultiShape`](@ref): the `AbstractObject` consists of two or more parts, i.e. [`AbstractShape`](@ref)s or objects
 
 Refer to the respective documentation for more information
 """
@@ -85,21 +85,23 @@ end
 """
     MultiShape <: AbstractShapeTrait
 
-Represents that the [`AbstractObject`](@ref) consists of a two or more [`AbstractShape`](@ref)s.
+Represents that the [`AbstractObject`](@ref) consists of two or more parts, i.e. [`AbstractShape`](@ref)s or
+subsidiary [`AbstractObject`](@ref)s. The built-in composites, e.g. the [`CubeBeamsplitter`](@ref), list
+objects, such that every part has its own bounding sphere.
 
 # AbstractObject implementation reqs.
 
-If `shape_trait_of(::Foo) = MultiShape()` is defined, `Foo` must implement the following: 
+If `shape_trait_of(::Foo) = MultiShape()` is defined, `Foo` must implement the following:
 
 ## Functions
 
-- `shape(::Foo)`: a getter function that returns a `Tuple` of all relevant shapes, e.g. `(foo.front, foo.middle, foo.back)`
+- `shape(::Foo)`: a getter function that returns a `Tuple` of all parts (shapes or objects), e.g. `(foo.front, foo.middle, foo.back)`
 
-All shapes returned by `shape(::Foo)` must be movable, see [`BeamletOptics.AbstractKinematicTrait`](@ref).
+All parts returned by `shape(::Foo)` must be movable, see [`BeamletOptics.AbstractKinematicTrait`](@ref).
 
 # Additional information
 
-!!! warn "Kinematic center"
+!!! warning "Kinematic center"
     Unless specified otherwise by dispatching `position` / `position!` and `orientation` / `orientation!`
     onto custom `pos` and `dir` data fields, the **position and orientation of the first element** returned
     by `shape(object)` will be used as the **kinematic center** for e.g. `translate3d!`.

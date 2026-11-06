@@ -94,8 +94,8 @@ Spawns a point source of [`Beam`](@ref)s at the specified `pos`ition and `dir`ec
 The point source is modelled as a collection of concentric beam fans centered around the center beam.
 The amount of beam rings between the center ray and half-spread-angle `θ` can be specified via `num_rings`.
 
-!!! info
-    Note that for correct sampling, the number of rays should be atleast 20x the number of rings.
+!!! warning
+    For correct sampling, `num_rays` must be at least 20 times `num_rings`, otherwise an `ArgumentError` is thrown.
 
 # Arguments
 

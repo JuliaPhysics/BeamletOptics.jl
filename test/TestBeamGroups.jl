@@ -394,7 +394,7 @@ const BMO = BeamletOptics
 
         @testset "Testing plane of the rays" begin
             # a line source in a plane that contains the axis of a lens stays in this plane
-            lens = SphericalLens(50e-3, -50e-3, 5e-3, BMO.inch, λ -> 1.5)
+            lens = SphericalLens(50e-3, -50e-3, 5e-3, BMO.inch, ConstantRefractiveIndex(1.5))
             system = System([lens])
             sheet = UniformLineSource([0, -0.1, 0], [0, 1, 0], 20e-3, lambda; num_rays = 21, basis = [1, 0, 0])
             solve_system!(system, sheet)
@@ -745,7 +745,7 @@ end
     # the RMS spot behind a plano-convex lens, which weights every ray equally: the rings agree
     # with the equal-area sunflower sampling, in contrast to rays per ring in proportion to the
     # circumference, which weight the edge twice and gave +4 % here
-    lens = SphericalLens(50mm, Inf, 5mm, 25mm, _ -> 1.5)
+    lens = SphericalLens(50mm, Inf, 5mm, 25mm, ConstantRefractiveIndex(1.5))
     function rms_spot(source)
         pd = Detector(30mm)
         translate3d!(pd, [0, 95mm, 0])

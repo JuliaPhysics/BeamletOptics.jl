@@ -18,20 +18,21 @@ using BeamletOptics, ForwardDiff
 # x coordinate of the spot behind a lens that is shifted laterally by `dx`
 function spot_x(dx)
     T = typeof(dx)
-    lens = SphericalLens(T(50e-3), T(-50e-3), T(5e-3), T(25e-3), _ -> T(1.5))
+    lens = SphericalLens(T(50e-3), T(-50e-3), T(5e-3), T(25e-3), ConstantRefractiveIndex(T(1.5)))
     translate3d!(lens, [dx, zero(T), zero(T)])
     pd = Detector(T(40e-3))
     translate3d!(pd, T[0, 0.1, 0])
     beam = Beam(T[0, -0.05, 0], T[0, 1, 0], T(1e-6))
     solve_system!(System([lens, pd]), beam)
-    return BeamletOptics.hit_point(only(BeamletOptics.hits(pd)))[1]
+    # Local x of the detector equals global x in its initial orientation
+    return first(only(spot_diagram(pd)))
 end
 
 ForwardDiff.derivative(spot_x, 0.0)   # ≈ 1.90
 ```
 
 The parameter can enter anywhere: the pose of a component (`translate3d!`, `rotate3d!`), its
-geometry (radii, thicknesses), a refractive index (e.g. `_ -> n0` for the parameter `n0`) or a
+geometry (radii, thicknesses), a refractive index (e.g. `ConstantRefractiveIndex(n0)` for the parameter `n0`) or a
 source. Many parameters at once are differentiated with `ForwardDiff.gradient` or
 `ForwardDiff.jacobian`.
 
@@ -53,5 +54,9 @@ e.g. of a Michelson interferometer vs. the position of a mirror.
   passed: `ObjectGroup(objects, T)`.
 - **Forward mode only.** The cost grows with the number of parameters. Reverse-mode AD (Zygote,
   Enzyme) is not supported, since the tracing mutates its beams and objects.
+- **No bounding sphere pretest.** The [Bounding sphere pretest](@ref) is skipped for dual numbers,
+  so every ray is tested against every object and ray marching through a signed distance function
+  runs up to [`BeamletOptics.get_sdf_miss_distance`](@ref) when it misses. A solve with dual
+  numbers is therefore slower than with `Float64`, but its result is the same.
 - **Compile time.** Each new combination of dual number and setup is compiled on its first call,
   which takes several seconds.

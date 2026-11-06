@@ -35,7 +35,7 @@ const mm = 1e-3
         lens = Lens(
             EvenAsphericalSurface(R, d, k, A),
             ct,
-            x -> n
+            ConstantRefractiveIndex(n)
         )
 
         system = System(lens)
@@ -92,7 +92,7 @@ const mm = 1e-3
         # A meniscus, whose center thickness does not exceed the sagitta of the convex surface,
         # is only supported for spherical surfaces
         d = 25.4mm
-        n = λ -> 1.5
+        n = ConstantRefractiveIndex(1.5)
         asphere(R) = EvenAsphericalSurface(R, d, 0.0, [0, 1e-7 * (1e3)^3])
         @test Lens(SphericalSurface(20mm, d), SphericalSurface(21mm, d), 1mm, n) isa Lens
         @test_throws ArgumentError Lens(SphericalSurface(20mm, d), asphere(21mm), 1mm, n)
@@ -120,7 +120,7 @@ const mm = 1e-3
                     -0.34529 * (1e3)^11, 5.9938 * (1e3)^13] # coeffs
             ),
             0.72mm, # center thickness
-            n -> 1.580200
+            ConstantRefractiveIndex(1.580200)
         )
 
         L2 = Lens(
@@ -141,7 +141,7 @@ const mm = 1e-3
                     -0.080329 * (1e3)^15] # coeffs
             ),
             0.55mm, # center_thickness
-            n -> 1.804700
+            ConstantRefractiveIndex(1.804700)
         )
 
         translate3d!(L2, [0, thickness(L1) + 0.39mm, 0])
@@ -164,7 +164,7 @@ const mm = 1e-3
                     1.5264e-5 * (1e3)^15] # coeffs
             ),
             0.7mm, # center_thickness
-            n -> 1.580200
+            ConstantRefractiveIndex(1.580200)
         )
 
         translate_to3d!(L3, position(L2))
@@ -173,7 +173,7 @@ const mm = 1e-3
         Filt = Lens(
             CircularFlatSurface(4.2mm),
             0.15mm,
-            n -> 1.516800
+            ConstantRefractiveIndex(1.516800)
         )
 
         translate_to3d!(Filt, position(L3))
@@ -182,7 +182,7 @@ const mm = 1e-3
         Cover = Lens(
             CircularFlatSurface(4.9mm),
             0.5mm,
-            n -> 1.469200
+            ConstantRefractiveIndex(1.469200)
         )
         translate_to3d!(Cover, position(Filt))
         translate3d!(Cover, [0, thickness(Filt) + 0.18mm, 0])

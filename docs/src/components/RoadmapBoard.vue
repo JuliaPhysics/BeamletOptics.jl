@@ -1,6 +1,10 @@
 <script setup>
-import { computed, h } from 'vue'
-import data from './roadmap.json'
+import { computed } from 'vue'
+// Written by `DocUtils.fetch_milestones` before every docs build (not tracked by git): the
+// response of the GitHub API for the milestones of the repository, or `[]` if it failed.
+import milestones from './milestones.json'
+
+const MILESTONES_URL = 'https://github.com/JuliaPhysics/BeamletOptics.jl/milestones'
 
 // Status glyphs double as the accessible label so progress never depends on
 // colour alone (some readers are colour-blind, and dark/light themes shift
@@ -8,155 +12,114 @@ import data from './roadmap.json'
 const LABELS = { done: 'Done', wip: 'In progress', todo: 'Planned' }
 const GLYPHS = { done: '✓', wip: '◐', todo: '○' }
 
-// Progress must be derived from item status rather than hand-maintained, or
-// the counters go stale the moment a single item flips -- see roadmap.json.
-function leaves(item) {
-  return item.children ? item.children.flatMap(leaves) : [item]
-}
-
-// A parent's own status is never authored; it always follows its leaves so
-// the two can never disagree.
-function statusOf(item) {
-  if (!item.children) {
-    return item.status
-  }
-  const childLeaves = leaves(item)
-  if (childLeaves.every((leaf) => leaf.status === 'done')) {
+// The status is derived from the milestone, never authored: a closed milestone
+// is done, an open one is in progress as soon as one of its issues is closed.
+function statusOf(milestone) {
+  if (milestone.state === 'closed') {
     return 'done'
   }
-  if (childLeaves.every((leaf) => leaf.status === 'todo')) {
-    return 'todo'
-  }
-  return 'wip'
+  return milestone.closed_issues > 0 ? 'wip' : 'todo'
 }
 
-// Leaves only: counting parents too would double-count e.g. "Polarizing
-// optics" once for itself and once per child.
-function tally(items) {
-  const allLeaves = items.flatMap(leaves)
-  const done = allLeaves.filter((leaf) => leaf.status === 'done').length
-  const wip = allLeaves.filter((leaf) => leaf.status === 'wip').length
-  const todo = allLeaves.filter((leaf) => leaf.status === 'todo').length
-  const total = allLeaves.length
-  return { done, wip, todo, total, percent: total ? Math.round((100 * done) / total) : 0 }
+function percentOf(closed, total) {
+  return total ? Math.round((100 * closed) / total) : 0
 }
 
-// Everything below is computed from the static JSON import (no refs, no
-// lifecycle hooks) so the board is fully present in the server-rendered
-// HTML, not injected after hydration.
-const phases = computed(() =>
-  data.phases.map((phase) => ({
-    ...phase,
-    stats: tally(phase.items),
-    status: statusOf({ children: phase.items }),
-  }))
+// Milestones are versions, so sort their titles numerically ("v0.14.10" after
+// "v0.14.9"). Everything is computed from the static JSON import (no refs, no
+// lifecycle hooks) so the board is fully present in the server-rendered HTML,
+// not injected after hydration.
+const cards = computed(() =>
+  [...milestones]
+    .sort((a, b) => a.title.localeCompare(b.title, undefined, { numeric: true }))
+    .map((milestone) => {
+      const closed = milestone.closed_issues
+      const total = milestone.open_issues + closed
+      return {
+        id: milestone.number,
+        title: milestone.title,
+        description: milestone.description,
+        url: milestone.html_url,
+        status: statusOf(milestone),
+        closed,
+        total,
+        percent: milestone.state === 'closed' ? 100 : percentOf(closed, total),
+      }
+    })
 )
 
-const overall = computed(() => tally(data.phases.flatMap((phase) => phase.items)))
-
-// The nesting in roadmap.json is not fixed at one level (see "Polarizing
-// optics"), so the item list is a render-function component that recurses
-// into `item.children` instead of a template hard-coded to two levels.
-const RoadmapItem = {
-  name: 'RoadmapItem',
-  props: { item: { type: Object, required: true } },
-  setup(props) {
-    return () => {
-      const { item } = props
-      const status = statusOf(item)
-      const kids = [
-        h(
-          'span',
-          { class: ['bmo-roadmap-dot', status], 'aria-label': LABELS[status] },
-          GLYPHS[status]
-        ),
-        item.title,
-      ]
-      if (item.note) {
-        kids.push(h('span', { class: 'bmo-roadmap-note' }, item.note))
-      }
-      if (item.children) {
-        kids.push(h(RoadmapItemList, { items: item.children }))
-      }
-      return h('li', kids)
-    }
-  },
-}
-
-const RoadmapItemList = {
-  name: 'RoadmapItemList',
-  props: { items: { type: Array, required: true } },
-  setup(props) {
-    return () =>
-      h(
-        'ul',
-        { class: 'bmo-roadmap-items' },
-        props.items.map((item) => h(RoadmapItem, { key: item.title, item }))
-      )
-  },
-}
+const overall = computed(() => {
+  const count = (status) => cards.value.filter((card) => card.status === status).length
+  const closed = cards.value.reduce((sum, card) => sum + card.closed, 0)
+  const total = cards.value.reduce((sum, card) => sum + card.total, 0)
+  return {
+    done: count('done'),
+    wip: count('wip'),
+    todo: count('todo'),
+    closed,
+    total,
+    percent: percentOf(closed, total),
+  }
+})
 </script>
 
 <template>
   <section class="bmo-roadmap">
-    <div class="bmo-roadmap-summary">
-      <div class="bmo-roadmap-summary-head">
-        <span>{{ overall.done }} of {{ overall.total }} planned features implemented</span>
-        <span class="bmo-roadmap-percent">{{ overall.percent }}%</span>
-      </div>
-      <div
-        class="bmo-roadmap-bar"
-        role="progressbar"
-        :aria-valuenow="overall.percent"
-        aria-valuemin="0"
-        aria-valuemax="100"
-        aria-label="Overall progress"
-      >
-        <span
-          class="bmo-roadmap-bar-fill done"
-          :style="{ width: overall.total ? (100 * overall.done) / overall.total + '%' : '0%' }"
-        />
-        <span
-          class="bmo-roadmap-bar-fill wip"
-          :style="{ width: overall.total ? (100 * overall.wip) / overall.total + '%' : '0%' }"
-        />
-      </div>
-      <div class="bmo-roadmap-legend">
-        <span class="bmo-roadmap-key done">{{ GLYPHS.done }} {{ overall.done }} done</span>
-        <span class="bmo-roadmap-key wip">{{ GLYPHS.wip }} {{ overall.wip }} in progress</span>
-        <span class="bmo-roadmap-key todo">{{ GLYPHS.todo }} {{ overall.todo }} planned</span>
-      </div>
+    <div v-if="cards.length === 0" class="bmo-roadmap-summary">
+      The milestones could not be loaded for this build, see the
+      <a :href="MILESTONES_URL">milestones on GitHub</a>.
     </div>
-
-    <ol class="bmo-roadmap-track">
-      <li v-for="phase in phases" :key="phase.id" class="bmo-roadmap-phase">
-        <span
-          class="bmo-roadmap-marker"
-          :class="phase.status"
-          :aria-label="LABELS[phase.status]"
-        >{{ GLYPHS[phase.status] }}</span>
-        <div class="bmo-roadmap-card">
-          <div class="bmo-roadmap-card-head">
-            <h3>{{ phase.title }}</h3>
-            <span class="bmo-roadmap-count">{{ phase.stats.done }} / {{ phase.stats.total }}</span>
-          </div>
-          <div
-            class="bmo-roadmap-bar"
-            role="progressbar"
-            :aria-valuenow="phase.stats.percent"
-            aria-valuemin="0"
-            aria-valuemax="100"
-            :aria-label="phase.title + ' progress'"
-          >
-            <span
-              class="bmo-roadmap-bar-fill done"
-              :style="{ width: phase.stats.percent + '%' }"
-            />
-          </div>
-          <RoadmapItemList :items="phase.items" />
+    <template v-else>
+      <div class="bmo-roadmap-summary">
+        <div class="bmo-roadmap-summary-head">
+          <span>{{ overall.closed }} of {{ overall.total }} issues closed</span>
+          <span class="bmo-roadmap-percent">{{ overall.percent }}%</span>
         </div>
-      </li>
-    </ol>
+        <div
+          class="bmo-roadmap-bar"
+          role="progressbar"
+          :aria-valuenow="overall.percent"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-label="Overall progress"
+        >
+          <span class="bmo-roadmap-bar-fill done" :style="{ width: overall.percent + '%' }" />
+        </div>
+        <div class="bmo-roadmap-legend">
+          <span class="bmo-roadmap-key done">{{ GLYPHS.done }} {{ overall.done }} released</span>
+          <span class="bmo-roadmap-key wip">{{ GLYPHS.wip }} {{ overall.wip }} in progress</span>
+          <span class="bmo-roadmap-key todo">{{ GLYPHS.todo }} {{ overall.todo }} planned</span>
+          <a class="bmo-roadmap-source" :href="MILESTONES_URL">Milestones on GitHub</a>
+        </div>
+      </div>
+
+      <ol class="bmo-roadmap-track">
+        <li v-for="card in cards" :key="card.id" class="bmo-roadmap-phase">
+          <span
+            class="bmo-roadmap-marker"
+            :class="card.status"
+            :aria-label="LABELS[card.status]"
+          >{{ GLYPHS[card.status] }}</span>
+          <div class="bmo-roadmap-card">
+            <div class="bmo-roadmap-card-head">
+              <h3><a :href="card.url">{{ card.title }}</a></h3>
+              <span class="bmo-roadmap-count">{{ card.closed }} / {{ card.total }} issues</span>
+            </div>
+            <div
+              class="bmo-roadmap-bar"
+              role="progressbar"
+              :aria-valuenow="card.percent"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              :aria-label="card.title + ' progress'"
+            >
+              <span class="bmo-roadmap-bar-fill done" :style="{ width: card.percent + '%' }" />
+            </div>
+            <p v-if="card.description" class="bmo-roadmap-description">{{ card.description }}</p>
+          </div>
+        </li>
+      </ol>
+    </template>
   </section>
 </template>
 
@@ -218,10 +181,6 @@ const RoadmapItemList = {
 
 .bmo-roadmap-bar-fill.done {
   background: var(--bmo-done);
-}
-
-.bmo-roadmap-bar-fill.wip {
-  background: var(--bmo-wip);
 }
 
 .bmo-roadmap-legend {
@@ -334,58 +293,14 @@ const RoadmapItemList = {
   white-space: nowrap;
 }
 
-/* The item list is built with manual render functions (see script) so it can
-   recurse into arbitrarily deep `children`, which means these nodes are never
-   compiled from this SFC's own <template> and would not receive the scoped
-   `data-v-*` attribute on their own. `:deep()` keeps the styles scoped to
-   `.bmo-roadmap` while still reaching that non-template-compiled content. */
-.bmo-roadmap :deep(.bmo-roadmap-items) {
-  list-style: none;
+.bmo-roadmap-source {
+  margin-left: auto;
+}
+
+.bmo-roadmap-description {
   margin: 8px 0 0;
-  padding-left: 20px;
-}
-
-.bmo-roadmap :deep(.bmo-roadmap-items .bmo-roadmap-items) {
-  margin-top: 4px;
-}
-
-/* Hanging indent: the dot sits in the item's own left padding, so a title that
-   wraps (and the note below it) lines up with the text rather than with the
-   dot. `text-indent` inherits, so every block that starts a new line inside the
-   item has to undo it again. */
-.bmo-roadmap :deep(.bmo-roadmap-items li) {
-  padding: 2px 0 2px 1.4em;
-  text-indent: -1.4em;
-}
-
-.bmo-roadmap :deep(.bmo-roadmap-items .bmo-roadmap-items),
-.bmo-roadmap :deep(.bmo-roadmap-note) {
-  text-indent: 0;
-}
-
-.bmo-roadmap :deep(.bmo-roadmap-dot) {
-  display: inline-block;
-  width: 1.4em;
-  font-size: 11px;
-  text-align: center;
-}
-
-.bmo-roadmap :deep(.bmo-roadmap-dot.done) {
-  color: var(--bmo-done);
-}
-
-.bmo-roadmap :deep(.bmo-roadmap-dot.wip) {
-  color: var(--bmo-wip);
-}
-
-.bmo-roadmap :deep(.bmo-roadmap-dot.todo) {
-  color: var(--bmo-todo);
-}
-
-.bmo-roadmap :deep(.bmo-roadmap-note) {
-  display: block;
-  font-size: 12px;
-  color: var(--vp-c-text-3);
+  font-size: 14px;
+  color: var(--vp-c-text-2);
 }
 
 @media (max-width: 640px) {

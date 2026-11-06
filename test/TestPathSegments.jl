@@ -121,7 +121,7 @@ end
         s = only(path_segments(b))
         @test s.final && s.leaf && s.s_stop == 1.0
         @test s.ray_index == 1 && s.parent == 0
-        lens = SphericalLens(0.1, -0.1, 5e-3, BMO.inch, 1.5)
+        lens = SphericalLens(0.1, -0.1, 5e-3, BMO.inch, ConstantRefractiveIndex(1.5))
         sys = System([lens])
         b2 = Beam([0, -0.1, 0], [0, 1.0, 0])
         solve_system!(sys, b2)
