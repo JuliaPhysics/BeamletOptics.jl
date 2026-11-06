@@ -61,6 +61,7 @@ struct Channel{T, S <: AbstractSide}
     side::S               # Reflected() or Transmitted(): medium, enclosure and hint follow from it
     dir::Point3{T}        # outgoing direction
     P::SMatrix{3, 3, Complex{T}, 9}   # global field transfer, E_out = P * E_in
+    a::Complex{T}         # scalar amplitude for beams without polarization (decision 1)
 end
 
 abstract type AbstractSide end
@@ -124,23 +125,25 @@ channels at the end) may still declare their stage with a trait, so the user onl
 
 - A channel transfers the field of a ray; the coherent sum of multiple internal reflections is the
   job of a thin-film model, not of the channel cascade.
-- Scalar beams (`Ray`, `GaussianBeamlet`) carry no polarization: they use the power fraction of an
-  unpolarized field, `tr(P'P) / 2`, and its phase for the amplitude (see open question 1).
+- Scalar beams (`Ray`, `GaussianBeamlet`) carry no polarization: they use the scalar factor `a` of
+  the channel (decision 1).
 - Splitting a `GaussianBeamlet` multiplies the beamlets; the power cutoff bounds the tree.
 
-## Open questions for the maintainers
+## Decisions
 
-1. **Scalar beams:** amplitude of a channel for `Ray`/`GaussianBeamlet` as the unpolarized
-   average (`sqrt(tr(P'P)/2)` and the phase of `tr(P)`), or a separate scalar factor carried by
-   the channel next to `P`?
-2. **Ghosts:** `Uncoated` stays `Dominant()` (no Fresnel ghosts, today's results). Do we want a
-   switch to trace them, and if so as a keyword of `solve_system!` or as a model
-   (`FresnelGhosts()` as the default surface model of a system)?
-3. **Power cutoff:** relative to the incoming ray (fraction) or absolute (fraction of the root
-   beam)? Absolute bounds the tree better, relative is local.
-4. **Names:** `channels`, `realize`, `splitting_of`, `Dominant`, `AllChannels`, `Reflected`,
-   `Transmitted`. `realize` is internal; `channels` and the side types are `public` for model
-   authors.
+1. **Scalar beams carry their own factor.** A `Channel` holds a complex scalar `a` next to `P`.
+   Every model sets both: `BeamsplitterCoating` `a = r` or `t`, with π on the reflected channel
+   when entering; `Uncoated` `a = 1` (scalar beamlets have no Fresnel loss today); Jones items leave
+   `a` unchanged (scalar rays pass a polarizer unfiltered today). Deriving `a` from `P` was rejected:
+   the phase of `tr(P)` depends on the local basis at a reflection.
+2. **Ghosts come as a model.** `Uncoated` stays `Dominant()`. Fresnel ghosts will be a model with
+   `AllChannels()` (e.g. `FresnelGhosts()`), set per face or as the default model of a system
+   (`surface_model(system)`, default `Uncoated()`), in step 6/7. No keyword of `solve_system!`.
+3. **The power cutoff is absolute:** relative to the power of the root beam, `|E|² / |E_root|²`,
+   from `Config` (`get_power_cutoff()`), default 0, i.e. no cutoff and no change of results. Beams
+   without an amplitude (`Ray`) are bounded by `depth_max` only.
+4. **Names as drafted:** `Channel`, `channels`, `Reflected`, `Transmitted`, `splitting_of`,
+   `Dominant`, `AllChannels` (public for model authors); `realize` stays internal.
 
 ## Plan of the PR
 
