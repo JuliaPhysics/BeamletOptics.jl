@@ -160,7 +160,13 @@ function _is_rigid(h::ObjectRenderHandle; atol = 1e-6, rtol = 1e-6)
     return true
 end
 
-function _rerender!(h::ObjectRenderHandle)
+"""
+    rerender!(h::ObjectRenderHandle)
+
+Deletes the plots of `h` and draws the object again at its current pose, which becomes the reference
+pose of `h`.
+"""
+function rerender!(h::ObjectRenderHandle)
     for plot in h.plots
         delete!(h.ax, plot)
     end
@@ -180,7 +186,7 @@ an object group have not been moved rigidly, the object is rendered again.
 """
 function update_render!(h::ObjectRenderHandle)
     # The pose of a MultiShape object is the pose of its first part, hence check the other parts first
-    _is_rigid(h) || return _rerender!(h)
+    _is_rigid(h) || return rerender!(h)
     P, R = _pose(h.obj)
     (P == h.P && R == h.R) && return h
     # Makie model matrix: x ↦ Rd * x + t, since scale and origin are not used

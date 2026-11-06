@@ -42,20 +42,24 @@ flowchart TB
 
 ## Updating a handle
 
-The diagram shows what `update_render!` does for each handle type:
+The diagram shows what `update_render!` and `rerender!` do for each handle type. `rerender!` skips
+the checks and always draws an object again, e.g. after a change of its shape:
 
 ```mermaid
 flowchart TB
     U(["<b>update_render!(h)</b>"])
+    RE(["<b>rerender!(h)</b>"])
     RG["<b>_is_rigid(h)</b><br/>parts unchanged and<br/>moved rigidly?"]
     OB["<b>refill the observables</b><br/>obs[] = geometry()"]
     PC["<b>pose of the object</b><br/>unchanged?"]
     MM["<b>translate!</b>, <b>rotate!</b><br/>model matrix of the plots"]
-    RR["<b>_rerender!(h)</b><br/>delete the plots, draw() again"]
+    RR["<b>draw again</b><br/>delete the plots, draw() at the<br/>current pose, which becomes P0, R0"]
     E(["<b>return h</b>"])
 
     U -- "ObjectRenderHandle, or<br/>update_render!(oh) for each oh in<br/>children(h) of a system handle" --> RG
     U -- "BeamRenderHandle" --> OB
+    RE -- "ObjectRenderHandle, or<br/>rerender!(oh) for each oh in<br/>children(h) of a system handle" --> RR
+    RE -- "BeamRenderHandle" --> OB
     RG -- yes --> PC
     RG -- no --> RR
     PC -- yes --> E
@@ -66,7 +70,7 @@ flowchart TB
     classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
     class MM,RR,OB blue
     class RG,PC purple
-    class U,E terminal
+    class U,RE,E terminal
 ```
 
 ## Render handle protocol

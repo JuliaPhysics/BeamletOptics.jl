@@ -149,6 +149,14 @@ end
 
         @test length(ax.scene.plots) == n0 # no new plots created
         @test _points(h) == _expected_beam_points(beam; flen)
+
+        # rerender! of a beam handle draws the beam as update_render! does, with the same plots
+        plots = copy(BMO.render_plots(h))
+        translate3d!(mir, [-5e-3, 0, 0])
+        solve_system!(sys, beam)
+        @test rerender!(h) === h
+        @test BMO.render_plots(h) == plots
+        @test _points(h) == _expected_beam_points(beam; flen)
     end
 
     @testset "Beam: topology change keeps a single plot" begin
