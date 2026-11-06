@@ -50,17 +50,17 @@ using BeamletOptics, GLMakie
 n = SellmeierEquation(1.03961212, 0.231792344, 1.01046945, 0.00600069867, 0.0200179144, 103.560653)
 
 # Plano-convex lens: curved face towards the display, flat face towards the eye
-lens = SphericalLens(Inf, -60e-3, 8e-3, 40e-3, n)
+lens = SphericalLens(60e-3, Inf, 8e-3, 40e-3, n)
 
 # 50/50 mirror on the curved face (step 7: faces by getters, a coating per face)
-surface_model!(lens, back_face(lens), BeamsplitterCoating(0.5))          # (tentative names)
+surface_model!(lens, front_face(lens), BeamsplitterCoating(0.5))          # (tentative names)
 
 # Retarder under a reflective polarizer on the flat face, listed from the substrate outward
 film = SurfaceStack(                                                      # (tentative)
     Retarder(π / 2, deg2rad(45)),       # quarter-wave plate, fast axis at 45°       (tentative)
     ReflectivePolarizer([1, 0, 0]),     # transmits x, reflects z                     (tentative)
 )
-surface_model!(lens, front_face(lens), film)
+surface_model!(lens, back_face(lens), film)
 ```
 
 The order inside `SurfaceStack` is the physical order of the laminated films. A ray inside the
@@ -98,7 +98,7 @@ solve_system!(system, display)
    ```julia
    for δ in deg2rad.(0:2:20)
        film = SurfaceStack(Retarder(π / 2 + δ, deg2rad(45)), ReflectivePolarizer([1, 0, 0]))
-       surface_model!(lens, front_face(lens), film)
+       surface_model!(lens, back_face(lens), film)
        solve_system!(system, display)
        # ghost: rays that reach the eye without reflection at the curved face
        ...
