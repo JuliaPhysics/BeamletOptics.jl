@@ -87,18 +87,19 @@ function surface_model(pf::PolarizationFilter)
     return JonesFilm(R * static_data(pf.JMat) * transpose(R), pf.cutoff)
 end
 
-function interact3d(::AbstractSystem, film::JonesFilm, t::Transition, beam::Beam{T, R},
-        ray::R) where {T <: Real, R <: PolarizedRay{T}}
-    is_totally_reflected(ray, t) && return cross_boundary(t, beam, ray)
+# The filtered field is transmitted, a blocked ray leaves no transmitted channel; beyond the critical
+# angle the ray is totally reflected before it reaches the film
+function channels(film::JonesFilm, ::Transition, ray::PolarizedRay, cs)
+    transmitted, reflected = cs
+    islit(transmitted) || return cs
     # Jones matrix projected into the plane transverse to the ray
-    Q = I - direction(ray) * transpose(direction(ray))
-    E = Q * film.J * Q * polarization(ray)
-    # Terminate blocked rays
-    norm(E) ≤ film.cutoff && return nothing
-    # Filtered field crosses the boundary
-    return cross_boundary(t, beam, ray, E)
+    d = direction(ray)
+    Q = I - d * transpose(d)
+    J = Q * film.J * Q
+    norm(J * polarization(ray)) ≤ film.cutoff &&
+        return (transfer(transmitted, zero(transmitted.P), 0), reflected)
+    return (transfer(transmitted, transmitted.P * J, amplitude(transmitted)), reflected)
 end
 
-interact3d(::AbstractSystem, ::JonesFilm, t::Transition, beam::Beam{T, R},
-        ray::R) where {T <: Real, R <: Ray{T}} =
-    cross_boundary(t, beam, ray)
+# Rays without a field pass unfiltered
+channels(::JonesFilm, ::Transition, ::AbstractRay, cs) = cs

@@ -345,31 +345,38 @@ None required.
 
 ## Functions
 
-- `interact3d(system, model, t::Transition, beam::Beam, ray)`: the interaction of the `ray` at the
-  boundary of the transition `t`; without a method, the boundary warns and blocks the beam
-- `interact3d(system, model, t::Transition, beamlet, ray_id)`: optional, the interaction of a
-  [`GaussianBeamlet`](@ref) or an [`AstigmaticGaussianBeamlet`](@ref) at the segment `ray_id`. By
-  default, each component ray interacts with the model at its own hit; a model that splits the beamlet,
-  e.g. a [`BeamsplitterCoating`](@ref), implements it.
+- `channels(model, t::Transition, ray, cs)`: the [`BoundaryChannel`](@ref)s of the boundary of the
+  transition `t` with the model, from the channels `cs` of the bare boundary, see [`channels`](@ref)
+- `splitting_of(model)`: optional, which channels the solver traces, [`Dominant`](@ref) (default) or
+  [`AllChannels`](@ref)
+- `interact3d(system, model, t::Transition, beam::Beam, ray)`: optional, the interaction of the `ray`
+  at the boundary of the transition `t`; by default the solver builds it from the channels, see
+  [`realize`](@ref)
+
+The solver builds the new rays, child beams and child beamlets of every beam type from the channels,
+see [`beamlet_interaction`](@ref); a model needs no code per beam type.
 
 A thin layer object carries its model via [`surface_model`](@ref)`(object)`.
 """
 abstract type AbstractSurfaceModel end
 
-function interact3d(::AbstractSystem, model::AbstractSurfaceModel, ::Transition, ::Beam,
+"""
+    interact3d(system, model::AbstractSurfaceModel, t::Transition, beam::Beam, ray)
+
+The interaction of the `ray` with the `model` at the boundary of the transition `t`: the
+[`channels`](@ref) of the bare boundary, transformed by the `model`, of which the solver traces those
+that [`splitting_of`](@ref)`(model)` selects.
+"""
+function interact3d(::AbstractSystem, model::AbstractSurfaceModel, t::Transition, beam::Beam,
         ray::AbstractRay)
-    @warn lazy"No interact3d method defined for:" ModelType = typeof(model) RayType = typeof(ray)
-    return nothing
+    cs = channels(model, t, ray, channels(t, ray))
+    return realize(t, beam, ray, select_channels(splitting_of(model), cs))
 end
 
-# Each component ray of the beamlet interacts with the model at its own hit
-function interact3d(system::AbstractSystem, model::AbstractSurfaceModel, ::Transition,
-        beamlet::GaussianBeamlets, ray_id::Int)
-    return beamlet_interaction(beamlet) do b
-        ray = rays(b)[ray_id]
-        interact3d(system, model, transition(system, ray), b, ray)
-    end
-end
+# The splitting of the model decides how the beamlet interacts, see beamlet_interaction
+interact3d(system::AbstractSystem, model::AbstractSurfaceModel, ::Transition,
+    beamlet::GaussianBeamlets, ray_id::Int) =
+    beamlet_interaction(system, splitting_of(model), model, beamlet, ray_id)
 
 """
     interact3d(system, ::SingleShape, object, beamlet, ray_id)
@@ -442,61 +449,12 @@ interact3d(system::AbstractSystem, t::Transition, beam::AbstractBeam, at::Union{
     interact3d(system, surface_model(t), t, beam, at)
 
 """
-    interact3d(system, model::AbstractSurfaceModel, t::Transition, beam, ray)
-
-The interaction of the `ray` with the `model` at the boundary of the transition `t`. The model acts
-between the media of the transition, e.g. an [`Uncoated`](@ref) boundary refracts from one into the
-other, see [`cross_boundary`](@ref).
-"""
-interact3d(::AbstractSystem, ::Uncoated, t::Transition, beam::Beam, ray::AbstractRay) =
-    cross_boundary(t, beam, ray)
-
-"""
     cross_boundary(t::Transition, beam::Beam, ray)
 
-Returns the [`BeamInteraction`](@ref) of the `ray` with the bare boundary of the transition `t`:
-refraction from the medium before into the medium behind the boundary via [`refraction3d`](@ref), or
-total internal reflection beyond the critical angle. A [`PolarizedRay`](@ref) is transmitted or
-reflected with the [`fresnel_coefficients`](@ref), only the stronger part is traced. Between equal
-indices the ray passes unchanged. The hint points into the medium in which the new ray propagates.
-
-For a [`PolarizedRay`](@ref), `cross_boundary(t, beam, ray, E)` crosses the boundary with the field `E`
-instead of the field of the `ray`, e.g. the field behind a polarizing film.
+Returns the [`BeamInteraction`](@ref) of the `ray` with the bare boundary of the transition `t`, the
+[`Uncoated`](@ref) boundary: refraction from the medium before into the medium behind the boundary, or
+total internal reflection, see [`channels`](@ref). The hint points into the medium in which the new ray
+propagates.
 """
-function cross_boundary(t::Transition, ::Beam{T, R}, ray::R) where {T <: Real, R <: Ray{T}}
-    n1, n2 = refractive_index_in(t), refractive_index_out(t)
-    ndir, TIR = n1 == n2 ? (direction(ray), false) : refraction3d(direction(ray), normal3d(t), n1, n2)
-    n, hint = TIR ? (n1, hint_in(t)) : (n2, hint_out(t))
-    return BeamInteraction{T, R}(hint, Ray{T}(hit_point(ray), ndir, nothing, wavelength(ray), n))
-end
-
-cross_boundary(t::Transition, beam::Beam{T, R}, ray::R) where {T <: Real, R <: PolarizedRay{T}} =
-    cross_boundary(t, beam, ray, polarization(ray))
-
-function cross_boundary(t::Transition, ::Beam{T, R}, ray::R, E) where {T <: Real, R <: PolarizedRay{T}}
-    normal = normal3d(t)
-    n1, n2 = refractive_index_in(t), refractive_index_out(t)
-    if n1 == n2
-        return BeamInteraction{T, R}(hint_out(t), PolarizedRay{T}(hit_point(ray), direction(ray),
-            nothing, wavelength(ray), n2, E))
-    end
-    # Fresnel coefficients from the cosine, smooth for AD at normal incidence
-    rs, rp, ts, tp = _fresnel_coefficients(cos_angle3d(direction(ray), -normal), n2 / n1)
-    if is_internally_reflected(rp, rs)
-        new_dir = reflection3d(direction(ray), normal)
-        J = SPBasis(-rs, 0, 0, rp)
-        n, hint = n1, hint_in(t)
-    else
-        new_dir, _ = refraction3d(direction(ray), normal, n1, n2)
-        J = SPBasis(ts, 0, 0, tp)
-        n, hint = n2, hint_out(t)
-    end
-    P = _calculate_global_E0(direction(ray), new_dir, normal3d(intersection(ray)), J)
-    E0 = _transverse(P * E, new_dir)
-    return BeamInteraction{T, R}(
-        hint, PolarizedRay{T}(hit_point(ray), new_dir, nothing, wavelength(ray), n, E0))
-end
-
-"""Returns `true` if the `ray` is totally reflected at the bare boundary of the transition `t`."""
-is_totally_reflected(ray::AbstractRay, t::Transition) =
-    last(refraction3d(direction(ray), normal3d(t), refractive_index_in(t), refractive_index_out(t)))
+cross_boundary(t::Transition, beam::Beam, ray::AbstractRay) =
+    realize(t, beam, ray, select_channels(Dominant(), channels(t, ray)))

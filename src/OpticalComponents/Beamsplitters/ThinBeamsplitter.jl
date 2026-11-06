@@ -63,7 +63,8 @@ Creates a zero-thickness, lossless, non-polarizing 2D rectangular [`ThinBeamspli
     are stored in the fields `reflectance` and `transmittance`, such that their squares sum to one.
 
 !!! warning "Reflection phase jump"
-    Note that the reflection phase jump θᵣ is implemented by the individual [`interact3d`](@ref)-methods. Refer to them for more information.
+    The reflection phase jump θᵣ = π applies to a beam that faces the normal of the splitter, see
+    [`channels`](@ref) of its [`BeamsplitterCoating`](@ref).
 """
 function ThinBeamsplitter(width::Real, height::Real; reflectance::Real = 0.5)
     if reflectance ≥ 1 || reflectance ≈ 0
@@ -98,183 +99,40 @@ end
 Base.isvalid(bs::AbstractBeamsplitter) = reflectance(bs)^2 + transmittance(bs)^2 ≈ 1
 
 
-@inline function _beamsplitter_transmitted_beam(
-        ::BeamsplitterCoating, ::Beam{T, R}, ray::R) where {T <: Real, R <: Ray{T}}
-    pos = hit_point(ray)
-    dir = direction(ray)
-    return Beam(Ray(pos, dir, wavelength(ray)))
-end
-
-@inline function _beamsplitter_reflected_beam(
-        ::BeamsplitterCoating, ::Beam{T, R}, ray::R) where {T <: Real, R <: Ray{T}}
-    normal = normal3d(intersection(ray))
-    pos = hit_point(ray)
-    dir = reflection3d(direction(ray), normal)
-    return Beam(Ray(pos, dir, wavelength(ray)))
-end
-
-@inline function _beamsplitter_transmitted_beam(coating::BeamsplitterCoating, ::Beam{T, R},
-        ray::R) where {T <: Real, R <: PolarizedRay{T}}
-    J = SPBasis(transmittance(coating), 0, 0, transmittance(coating))
-    pos = hit_point(ray)
-    dir = direction(ray)
-    E0 = _calculate_global_E0(coating, ray, dir, J)
-    return Beam(PolarizedRay(pos, dir, wavelength(ray), E0))
-end
-
-@inline function _beamsplitter_reflected_beam(coating::BeamsplitterCoating, ::Beam{T, R},
-        ray::R) where {T <: Real, R <: PolarizedRay{T}}
-    J = SPBasis(-reflectance(coating), 0, 0, reflectance(coating))
-    normal = normal3d(intersection(ray))
-    pos = hit_point(ray)
-    in_dir = direction(ray)
-    out_dir = reflection3d(in_dir, normal)
-    E0 = _calculate_global_E0(coating, ray, out_dir, J)
-    return Beam(PolarizedRay(pos, out_dir, wavelength(ray), E0))
-end
+splitting_of(::BeamsplitterCoating) = AllChannels()
 
 """
-    transmit!(child::AbstractRay, ray::AbstractRay, t::Transition)
+    channels(coating::BeamsplitterCoating, t::Transition, ray, cs)
 
-Turns the first ray `child` of the transmitted beam of a coating, which continues along the incident
-`ray`, into the ray behind the boundary of the transition `t`: refracted into the medium behind it. For a
-[`PolarizedRay`](@ref), the field is transformed into the new direction as well, and scaled for the
-medium behind the boundary: the coating transmits a fraction of the power, and the power of a beam is
-proportional to `n cos(θ) |E|²`.
-"""
-function transmit!(child::AbstractRay, ray::AbstractRay, t::Transition)
-    dir, _ = refraction3d(direction(ray), normal3d(t), refractive_index_in(t), refractive_index_out(t))
-    transmit_field!(child, ray, dir, t)
-    refractive_index!(child, refractive_index_out(t))
-    direction!(child, dir)
-    return nothing
-end
+The channels of the `coating`: the transmitted channel is refracted into the medium behind the
+boundary with the field factor `transmittance(coating)`, the reflected one stays in the medium before
+it with `reflectance(coating)`. Beyond the critical angle of the transition `t`, the ray is totally
+reflected and not split, the channels `cs` of the bare boundary are returned.
 
-"""
-    transmit_field!(child, ray, dir, t::Transition)
-
-Transforms the field of the transmitted `child` into the refracted direction `dir` and scales it for
-the medium behind the boundary of `t`; a [`Ray`](@ref) carries no field.
-"""
-transmit_field!(::AbstractRay, ::AbstractRay, dir, ::Transition) = nothing
-
-function transmit_field!(child::PolarizedRay, ray::PolarizedRay, dir, t::Transition)
-    normal = normal3d(t)
-    P = _calculate_global_E0(direction(ray), dir, normal3d(intersection(ray)), SPBasis(1, 0, 0, 1))
-    cos_in = abs(cos_angle3d(direction(ray), normal))
-    cos_out = abs(cos_angle3d(dir, normal))
-    scale = sqrt(refractive_index_in(t) * cos_in / (refractive_index_out(t) * cos_out))
-    polarization!(child, scale * _transverse(P * polarization(child), dir))
-    return nothing
-end
-
-"""
-    reflect!(child::AbstractRay, t::Transition)
-
-Sets the medium of the first ray `child` of the reflected beam of a coating: the medium before the
-boundary of the transition `t`.
-"""
-reflect!(child::AbstractRay, t::Transition) = refractive_index!(child, refractive_index_in(t))
-
-"""
-    interact3d(system, coating::BeamsplitterCoating, t::Transition, beam::Beam, ray)
-
-Splits the `ray` into a transmitted and a reflected child beam, see [`BeamsplitterCoating`](@ref).
-"""
-function interact3d(::AbstractSystem, coating::BeamsplitterCoating, t::Transition, beam::Beam{T, R},
-        ray::R) where {T <: Real, R <: AbstractRay{T}}
-    is_totally_reflected(ray, t) && return cross_boundary(t, beam, ray)
-    transmitted = _beamsplitter_transmitted_beam(coating, beam, ray)
-    reflected = _beamsplitter_reflected_beam(coating, beam, ray)
-    transmit!(first(rays(transmitted)), ray, t)
-    reflect!(first(rays(reflected)), t)
-    # Push transmitted and reflected beams to system
-    children!(beam, [transmitted, reflected])
-    # Stop for beam spawning
-    return nothing
-end
-
-@inline function _beamsplitter_transmitted_beam(
-        coating::BeamsplitterCoating, gauss::GaussianBeamlet, ray_id::Int)
-    # Transmitted Gaussian (no phase flip)
-    chief = _beamsplitter_transmitted_beam(coating, gauss.chief, rays(gauss.chief)[ray_id])
-    waist = _beamsplitter_transmitted_beam(coating, gauss.waist, rays(gauss.waist)[ray_id])
-    divergence = _beamsplitter_transmitted_beam(
-        coating, gauss.divergence, rays(gauss.divergence)[ray_id])
-    λ = wavelength(gauss)
-    w0 = gauss_parameters(gauss, length(gauss))[4]
-    E0 = transmittance(coating) * electric_field(gauss) * (beam_waist(gauss) / w0)
-    return GaussianBeamlet(chief, waist, divergence, λ, w0, E0)
-end
-
-@inline function _beamsplitter_reflected_beam(
-        coating::BeamsplitterCoating, gauss::GaussianBeamlet, ray_id::Int)
-    # Reflected Gaussian (no phase flip)
-    chief = _beamsplitter_reflected_beam(coating, gauss.chief, rays(gauss.chief)[ray_id])
-    waist = _beamsplitter_reflected_beam(coating, gauss.waist, rays(gauss.waist)[ray_id])
-    divergence = _beamsplitter_reflected_beam(
-        coating, gauss.divergence, rays(gauss.divergence)[ray_id])
-    λ = wavelength(gauss)
-    w0 = gauss_parameters(gauss, length(gauss))[4]
-    E0 = reflectance(coating) * electric_field(gauss) * (beam_waist(gauss) / w0)
-    return GaussianBeamlet(chief, waist, divergence, λ, w0, E0)
-end
-
-@inline function _beamsplitter_transmitted_beam(
-        coating::BeamsplitterCoating, agb::AstigmaticGaussianBeamlet, ray_id::Int)
-    return AstigmaticGaussianBeamlet(map(
-        b -> _beamsplitter_transmitted_beam(coating, b, rays(b)[ray_id]), _component_beams(agb))...)
-end
-
-@inline function _beamsplitter_reflected_beam(
-        coating::BeamsplitterCoating, agb::AstigmaticGaussianBeamlet, ray_id::Int)
-    return AstigmaticGaussianBeamlet(map(
-        b -> _beamsplitter_reflected_beam(coating, b, rays(b)[ray_id]), _component_beams(agb))...)
-end
-
-"""
-    interact3d(system, coating::BeamsplitterCoating, t::Transition, beamlet, ray_id::Int)
-
-Splits a [`GaussianBeamlet`](@ref) or an [`AstigmaticGaussianBeamlet`](@ref) into a transmitted and a
-reflected child. Each component ray is refracted into the medium behind the coating or stays in the
-medium before it, at its own hit. Beyond the critical angle of the transition `t` of the chief ray, the
-`beamlet` is totally reflected and not split.
+The field of a transmitted [`PolarizedRay`](@ref) is scaled for the medium behind the boundary: the
+coating transmits a fraction of the power, and the power of a beam is proportional to
+`n cos(θ) |E|²`.
 
 # Reflection phase jump
 
-The reflection phase jump is modeled here as θᵣ = π for simplicity. This is since in practice it will have only a relative effect on the signal at the detector for interferometric setups.
-The phase jump is applied to the reflected portion of any incoming beam that faces the normal vector of the coating, which assumes that the splitter has an unambigous normal, i.e. a 2D mesh.
-This is intended to model the effect of the Fresnel equations without full polarization calculus.
+The reflection phase jump is θᵣ = π for a ray that faces the normal of the coating, i.e.
+`isentering`, and 0 from the other side, as required by the Stokes relations (r' = -r) for a lossless
+coating: only then do both outputs of an interferometer sum to its input. It applies to the field factor of beams
+without polarization, e.g. a [`GaussianBeamlet`](@ref), and to the field of a [`PolarizedRay`](@ref),
+whose s- and p-components are reflected with `-r` and `r` from the other side, like an internal Fresnel
+reflection. The coating is assumed to have an unambiguous normal, i.e. a 2D mesh.
 """
-function interact3d(system::AbstractSystem, coating::BeamsplitterCoating, t::Transition,
-        beamlet::GaussianBeamlets, ray_id::Int)
-    ray = rays(beamlet)[ray_id]
-    is_totally_reflected(ray, t) && return interact3d(system, Uncoated(), t, beamlet, ray_id)
-    tb = _beamsplitter_transmitted_beam(coating, beamlet, ray_id)
-    rb = _beamsplitter_reflected_beam(coating, beamlet, ray_id)
-    # Each component ray at its own hit, map unrolls the heterogeneous tuples
-    map(_component_beams(beamlet), _component_beams(tb), _component_beams(rb)) do b, tc, rc
-        ray_b = rays(b)[ray_id]
-        t_b = transition(system, ray_b)
-        transmit!(first(rays(tc)), ray_b, t_b)
-        reflect!(first(rays(rc)), t_b)
-    end
-    # Conditional phase flip of the reflected beam
-    isentering(ray) && phase_shift!(rb, π)
-    children!(beamlet, [tb, rb])
-    return nothing
-end
-
-"""
-    phase_shift!(beamlet, ϕ)
-
-Shifts the phase of the `beamlet` by `ϕ` in [rad]: the field of a [`GaussianBeamlet`](@ref), the
-polarization of the chief ray of an [`AstigmaticGaussianBeamlet`](@ref).
-"""
-phase_shift!(g::GaussianBeamlet, ϕ) = electric_field!(g, electric_field(g) * exp(im * ϕ))
-
-function phase_shift!(agb::AstigmaticGaussianBeamlet, ϕ)
-    chief_ray = first(rays(agb.c))
-    polarization!(chief_ray, polarization(chief_ray) * exp(im * ϕ))
-    return nothing
+function channels(coating::BeamsplitterCoating, t::Transition, ray::AbstractRay, cs)
+    transmitted, reflected = cs
+    # Total internal reflection: the ray does not reach the coating
+    islit(transmitted) || return cs
+    r, τ = reflectance(coating), transmittance(coating)
+    s = isentering(ray) ? -1 : 1
+    # The transmitted field scaled for the medium behind the boundary
+    normal = normal3d(t)
+    cos_in = abs(cos_angle3d(direction(ray), normal))
+    cos_out = abs(cos_angle3d(direction(transmitted), normal))
+    f = τ * sqrt(refractive_index_in(t) * cos_in / (refractive_index_out(t) * cos_out))
+    return (transfer(transmitted, ray, SPBasis(f, 0, 0, f), τ),
+        transfer(reflected, ray, SPBasis(-s * r, 0, 0, s * r), s * r))
 end

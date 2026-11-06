@@ -205,9 +205,7 @@ flowchart TB
     W(["warning, nothing:<br/>the object blocks the beam"])
     TR["<b>transition</b>(system, ray)<br/><b>boundary_hits</b>: left body, entered body,<br/>thin layer; media from the enclosure"]
     BOUND["<b>interact3d</b>(system, t, beam, at)<br/>beamlet: to the model of a thin layer,<br/>else per component ray"]
-    SM{"<b>surface_model</b>(t)<br/>model of the thin layer,<br/>else Uncoated"}
-    UNC["<b>Uncoated</b><br/><b>cross_boundary</b>: refraction, TIR,<br/>Fresnel for PolarizedRay"]
-    MOD["<b>model of a thin layer</b><br/>interact3d(system, model, t, beam, at)<br/>e.g. BeamsplitterCoating: split,<br/>transmit! and reflect!; JonesFilm"]
+    SM["<b>surface_model</b>(t)<br/>model of the thin layer, else Uncoated:<br/>its channels, see Surface channels"]
     OWN["<b>own interact3d</b><br/>e.g. mirror, detector (a detector<br/>that does not stop: as a layer<br/>without a model)"]
     ENC["<b>enclose_new!</b><br/>enclosure of each new ray at the hit:<br/>back into the medium before the boundary<br/>or into the medium behind it"]
     E([next tracing step])
@@ -217,9 +215,7 @@ flowchart TB
     MS -- SingleShape --> K
     K -- "no" --> HK
     HK -- "neither" --> W
-    HK -- "body or<br/>thin layer" --> TR --> BOUND --> SM
-    SM -- "no model" --> UNC --> ENC
-    SM -- "model" --> MOD --> ENC
+    HK -- "body or<br/>thin layer" --> TR --> BOUND --> SM --> ENC
     K -- "own" --> OWN --> ENC
     ENC --> E
 
@@ -227,9 +223,9 @@ flowchart TB
     classDef green fill:#38982626,stroke:#389826,stroke-width:2px
     classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
     classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
-    class TR,BOUND,UNC,ENC blue
-    class MOD,OWN green
-    class MS,K,HK,SM purple
+    class TR,BOUND,SM,ENC blue
+    class OWN green
+    class MS,K,HK purple
     class IA,E,W terminal
 ```
 
@@ -260,13 +256,70 @@ BeamletOptics.interact3d(::BeamletOptics.AbstractSystem, ::BeamletOptics.Transit
 BeamletOptics.surface_model(::BeamletOptics.Transition)
 BeamletOptics.surface_model(::BeamletOptics.AbstractObject)
 BeamletOptics.AbstractSurfaceModel
-BeamletOptics.interact3d(::BeamletOptics.AbstractSystem, ::BeamletOptics.Uncoated, ::BeamletOptics.Transition, ::BeamletOptics.Beam, ::BeamletOptics.AbstractRay)
+```
+
+#### Surface channels
+
+A surface model does not build rays. It describes the **channels** of the boundary: the directions into which the ray leaves it, reflected back into the medium before it or transmitted into the medium behind it, and how each transfers the field. The solver builds the new rays from them, once for every beam type: the continued ray, child beams, or child beamlets whose component rays leave their own hits on the same side as the chief ray. A model implements only `channels`, and optionally `splitting_of`; it needs no code per beam type. The channels of the bare boundary come first, so a coating changes the Fresnel channels instead of computing refraction again (green: implemented by a model author, purple: dispatch).
+
+```mermaid
+flowchart TB
+    T(["<b>interact3d</b>(system, model, t, beam, ray)"])
+    B["<b>channels</b>(t, ray)<br/>bare boundary: (transmitted, reflected),<br/>refraction, TIR, Fresnel"]
+    M["<b>channels</b>(model, t, ray, cs)<br/>the model changes the channels,<br/>e.g. r and t of a coating"]
+    S{"<b>splitting_of</b>(model)"}
+    D["<b>Dominant</b><br/>the channel with the<br/>largest amplitude factor"]
+    A["<b>AllChannels</b><br/>every channel that<br/>carries light"]
+    R["<b>realize</b> / <b>beamlet_interaction</b><br/>one method per beam type"]
+    BI(["BeamInteraction:<br/>one channel continues the beam"])
+    CH(["children!, nothing:<br/>a child beam per channel,<br/>above get_power_cutoff()"])
+    NO(["nothing:<br/>no channel carries light"])
+
+    T --> B --> M --> S
+    S -- Dominant --> D --> R
+    S -- AllChannels --> A --> R
+    R --> BI
+    R --> CH
+    R --> NO
+
+    classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
+    classDef green fill:#38982626,stroke:#389826,stroke-width:2px
+    classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
+    classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
+    class B,D,A,R blue
+    class M green
+    class S purple
+    class T,BI,CH,NO terminal
+```
+
+```@docs; canonical=false
+BeamletOptics.interact3d(::BeamletOptics.AbstractSystem, ::BeamletOptics.AbstractSurfaceModel, ::BeamletOptics.Transition, ::BeamletOptics.Beam, ::BeamletOptics.AbstractRay)
+BeamletOptics.BoundaryChannel
+BeamletOptics.AbstractSide
+BeamletOptics.Transmitted
+BeamletOptics.Reflected
+BeamletOptics.channels
+BeamletOptics.transfer
+BeamletOptics.AbstractSplitting
+BeamletOptics.splitting_of
+BeamletOptics.Dominant
+BeamletOptics.AllChannels
+BeamletOptics.select_channels
+BeamletOptics.realize
+BeamletOptics.beamlet_interaction
+BeamletOptics.power_fraction
+```
+
+The models of BMO:
+
+```@docs; canonical=false
+BeamletOptics.Uncoated
 BeamletOptics.cross_boundary
 BeamletOptics.BeamsplitterCoating
 BeamletOptics.JonesFilm
 ```
 
-A new refracting component declares its body via `medium`, a new thin layer its model via `surface_model(layer::MyLayer)`, like the [`ThinBeamsplitter`](@ref). Neither needs an `interact3d` method: without one, a body or a thin layer interacts at the boundary, and a beamlet at a thin layer is handed to its model, which may split it. An object that is neither, e.g. a mirror, implements `interact3d`. New physics at a boundary is a new `AbstractSurfaceModel`.
+A new refracting component declares its body via `medium`, a new thin layer its model via `surface_model(layer::MyLayer)`, like the [`ThinBeamsplitter`](@ref). Neither needs an `interact3d` method: without one, a body or a thin layer interacts at the boundary, and a beamlet at a thin layer is handed to its model, which may split it. An object that is neither, e.g. a mirror, implements `interact3d`. New physics at a boundary is a new `AbstractSurfaceModel` with a `channels` method, see [Surface channels](@ref).
 
 The `interact3d` return type holds one new `beam` segment per interaction, which the solver appends to the current beam. Further beams, e.g. the reflected part at a beamsplitter, are attached to the beam as children by the component, and the solver queues them after the current beam, see [Tracing systems](@ref). After e.g. a lens surface air-to-glass interaction, the most likely next step is the refraction at the glass-to-air surface of the same lens. An interaction can tell the solver so with a `Hint`, which speeds up the next intersection.
 

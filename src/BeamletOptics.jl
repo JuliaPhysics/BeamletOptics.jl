@@ -39,7 +39,8 @@ using .Config: get_invariant_threshold, set_invariant_threshold!,
              get_internal_reflection_threshold, get_line_plane_intersection_threshold,
              get_orthogonality_threshold, get_default_r_max, get_default_depth_max,
              get_default_wavelength, get_default_waist, get_default_power,
-             get_progress_threshold, set_progress_threshold!, get_coincidence_tolerance
+             get_progress_threshold, set_progress_threshold!, get_coincidence_tolerance,
+             get_power_cutoff
 include("Utils/Utils.jl")
 include("AbstractTypes/AbstractTypes.jl")
 include("Rays.jl")
@@ -53,6 +54,7 @@ include("Mesh.jl")
 include("SDFs/SDF.jl")
 include("System.jl")
 include("Transitions.jl")
+include("Channels.jl")
 include("OpticalComponents/Components.jl")
 include("ObjectGroups.jl")
 include("Properties.jl")

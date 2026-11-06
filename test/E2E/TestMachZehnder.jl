@@ -30,54 +30,45 @@ const BMO = BeamletOptics
     ray = PolarizedRay([0, -0.1, 0], [0.0, 1.0, 0], 1000e-9, [0, 0, 1])
     beam = Beam(ray)
     
+    # Power at each output port of the MZI: the fields of both arms that leave in its direction
+    function port_powers(beam)
+        ports = Dict{Vector{Float64}, Vector{ComplexF64}}()
+        for leaf in Leaves(beam)
+            E, d = BMO.polarization(first(BMO.rays(leaf))), BMO.direction(first(BMO.rays(leaf)))
+            k = round.(collect(d), digits = 6)
+            ports[k] = get(ports, k, zeros(ComplexF64, 3)) + E
+        end
+        return sort([norm(E)^2 for E in values(ports)])
+    end
+
     @testset "z-polarized ray along y-axis" begin
         # Solve with z-polarized ray along y-axis
         BMO.polarization!(ray, [0, 0, 1])
         solve_system!(system, beam)
-        
+
         # Extract E0s: t - transmitted, r - reflected
         t = BMO.polarization(beam.children[1].rays[1])
         r = BMO.polarization(beam.children[2].rays[1])
-        tr = BMO.polarization(beam.children[1].rays[2])
-        rr = BMO.polarization(beam.children[2].rays[2])
-        trt = BMO.polarization(beam.children[1].children[1].rays[1])
-        trr = BMO.polarization(beam.children[1].children[2].rays[1])
-        rrt = BMO.polarization(beam.children[2].children[1].rays[1])
-        rrr = BMO.polarization(beam.children[2].children[2].rays[1])
-        
-        # Test phase flips
-        @test t[3] ≈ sqrt(2) / 2
-        @test r[3] ≈ -sqrt(2) / 2
-        @test tr[3] ≈ -sqrt(2) / 2
-        @test rr[3] ≈ sqrt(2) / 2
-        @test trt ≈ rrr
-        @test trr ≈ rrt
+
+        # Lossless 50:50 split
+        @test norm(t)^2 ≈ 0.5
+        @test norm(r)^2 ≈ 0.5
+        # The balanced arms interfere: all power leaves one port (r' = -r, Stokes relations)
+        @test port_powers(beam) ≈ [0, 1] atol = 1e-12
     end
-    
+
     @testset "x-polarized ray along y-axis" begin
         # Test num. of leaves before solving again
         @test length(collect(Leaves(beam))) == 4
-        # Retrace with z-polarized ray along y-axis
+        # Retrace with x-polarized ray along y-axis
         BMO.polarization!(ray, [1, 0, 0])
         solve_system!(system, beam)
-        
-        # Extract E0s: t - transmitted, r - reflected
+
         t = BMO.polarization(beam.children[1].rays[1])
         r = BMO.polarization(beam.children[2].rays[1])
-        tr = BMO.polarization(beam.children[1].rays[2])
-        rr = BMO.polarization(beam.children[2].rays[2])
-        trt = BMO.polarization(beam.children[1].children[1].rays[1])
-        trr = BMO.polarization(beam.children[1].children[2].rays[1])
-        rrt = BMO.polarization(beam.children[2].children[1].rays[1])
-        rrr = BMO.polarization(beam.children[2].children[2].rays[1])
-        
-        # Test phase flips
-        @test t[1] ≈ sqrt(2) / 2
-        @test r[2] ≈ -sqrt(2) / 2
-        @test tr ≈ r
-        @test rr ≈ t
-        @test trt ≈ rrr
-        @test trr ≈ rrt
+        @test norm(t)^2 ≈ 0.5
+        @test norm(r)^2 ≈ 0.5
+        @test port_powers(beam) ≈ [0, 1] atol = 1e-12
     end
 end
 

@@ -1271,13 +1271,14 @@ struct BareModel <: BMO.AbstractSurfaceModel end
 
 @testset "Fallbacks of the medium and surface model contracts" begin
     @test_throws ErrorException BMO.refractive_index(BareMedium(), λ0)
-    # A surface model without interact3d warns and blocks the beam
+    # A surface model without its channels hook throws
     plate = BMO.Lens(BMO.CuboidMesh(40mm, 5mm, 40mm), ConstantRefractiveIndex(1.5))
     p, d = [20mm, -20mm, 20mm], [0.0, 1.0, 0.0]
     t = transition_at(System([plate]), p, d)
     ray = Ray(p, d, λ0)
-    @test isnothing(@test_logs (:warn, r"No interact3d method") BMO.interact3d(System([plate]),
-        BareModel(), t, Beam(ray), ray))
+    @test_throws "channels not defined for" BMO.interact3d(System([plate]), BareModel(), t,
+        Beam(ray), ray)
+    @test BMO.splitting_of(BareModel()) isa BMO.Dominant
 end
 
 # A dummy thin layer that carries its own surface model, which counts its calls
