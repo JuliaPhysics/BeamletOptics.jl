@@ -193,6 +193,8 @@ is chosen for the s- and p-components.
 - `J`: Jones matrix extended to 3x3, e.g. [-rₛ 0 0; 0 rₚ 0; 0 0 1] for reflection
 """
 function _calculate_global_E0(in_dir::AbstractArray, out_dir::AbstractArray, normal::AbstractArray, J::LocalJonesBasis)
+    # Static vectors keep the basis matrices static, e.g. for Point3 input
+    in_dir, out_dir, normal = map(v -> SVector{3}(v[1], v[2], v[3]), (in_dir, out_dir, normal))
     # Choose basis vectors
     if !isparallel3d(in_dir, out_dir)
         v = out_dir
@@ -218,7 +220,7 @@ function _calculate_global_E0(in_dir::AbstractArray, out_dir::AbstractArray, nor
         O_out = hcat(s, p2, out_dir)
     end
     # Calculate new E0
-    P = O_out * J * O_in
+    P = O_out * static_data(J) * O_in
     return P
 end
 

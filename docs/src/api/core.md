@@ -260,7 +260,14 @@ BeamletOptics.interact3d(::BeamletOptics.AbstractSystem, ::BeamletOptics.Transit
 BeamletOptics.surface_model(::BeamletOptics.Transition)
 BeamletOptics.surface_model(::BeamletOptics.AbstractObject)
 BeamletOptics.AbstractSurfaceModel
-BeamletOptics.interact3d(::BeamletOptics.AbstractSystem, ::BeamletOptics.Uncoated, ::BeamletOptics.Transition, ::BeamletOptics.Beam, ::BeamletOptics.AbstractRay)
+BeamletOptics.interact3d(::BeamletOptics.AbstractSystem, ::BeamletOptics.AbstractSurfaceModel, ::BeamletOptics.Transition, ::BeamletOptics.Beam, ::BeamletOptics.AbstractRay)
+BeamletOptics.Channel
+BeamletOptics.AbstractSide
+BeamletOptics.channels
+BeamletOptics.splitting_of
+BeamletOptics.Dominant
+BeamletOptics.AllChannels
+BeamletOptics.Uncoated
 BeamletOptics.cross_boundary
 BeamletOptics.BeamsplitterCoating
 BeamletOptics.JonesFilm
