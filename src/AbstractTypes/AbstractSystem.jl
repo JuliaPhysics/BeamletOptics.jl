@@ -9,16 +9,24 @@ Subtypes of `AbstractSystem` must implement the following:
 
 ## Fields:
 
-- `objects`: a vector or tuple of [`AbstractObject`](@ref)s that make up the system
-- `n`: (optional) [`RefractiveIndex`](@ref) of the surrounding medium, default value is 1.0
+- `objects`: a vector or tuple of [`AbstractObject`](@ref)s and object groups ([`AbstractObjectGroup`](@ref)) that make up the system.
+  The solver does not read this field itself but calls the function `objects`, see below
 
 ## Functions:
 
-- `refractive_index`: returns the [`RefractiveIndex`](@ref) `n` of the system medium, see above
+- `objects(system)`: returns the objects of the system with object groups flattened into their objects. There is no fallback
+- `refractive_index(system, λ::Real)` (optional): returns the refractive index of the surrounding medium at the wavelength `λ`.
+  The default is `1.0`; a system does not store a refractive index
+
+The solver tests a ray against the top-level objects and groups of the system. For a custom system these are the result of `objects(system)`.
+The built-in [`System`](@ref) tests its groups as a whole, a [`StaticSystem`](@ref) flattens them when it is built.
 """
 abstract type AbstractSystem end
 
 refractive_index(::AbstractSystem, λ::Real) = 1.0
+
+# A system is not moved as a whole, its objects are
+kinematic_trait_of(::AbstractSystem) = Static()
 
 """
     interact3d(::AbstractSystem, object::AbstractObject, ::AbstractBeam, ::AbstractRay)
@@ -34,14 +42,14 @@ finds that part, e.g. via `shape(intersection(ray))`, and hands the beam to it, 
 interacts on its own.
 """
 function interact3d(::AbstractSystem, object::AbstractObject, ::AbstractBeam, ray::AbstractRay)
-    _warn_no_interact3d(shape_trait_of(object), object, ray)
+    warn_no_interact3d(shape_trait_of(object), object, ray)
     return nothing
 end
 
-# Warning of the fallback above; for a multi-shape object it names both ways to fix it
-_warn_no_interact3d(::AbstractShapeTrait, object, ray) =
+# Warning of the interact3d fallback
+warn_no_interact3d(::AbstractShapeTrait, object, ray) =
     @warn lazy"No interact3d method defined for:" ObjectType = typeof(object) RayType = typeof(ray)
-_warn_no_interact3d(::MultiShape, object, ray) = @warn lazy"""
+warn_no_interact3d(::MultiShape, object, ray) = @warn lazy"""
     No interact3d method defined for the MultiShape object $(nameof(typeof(object))).
     If its parts interact as one (e.g. cemented, with a Hint across a shared face), define
     interact3d and hand the beam to the part that was hit, like CubeBeamsplitter.
@@ -60,8 +68,12 @@ in the [`AbstractSystem`](@ref) will be hit next.
 
 # Fields
 
-- `object`: the object that might or will be intersected next
+- `object`: the object that might or will be intersected next. The solver calls `interact3d` for this object, hence for a part of a
+  [`MultiShape`](@ref) object it is the composite itself, not the part
 - `shape`: the underlying shape that will be intersected next, i.e. `shape(object)`, relevant for multi-shape objects
+
+`Hint(object)` uses `shape(object)`, which is a tuple for a [`MultiShape`](@ref) object and fails. Pass the hit part explicitly there,
+`Hint(object, part)`, with the composite as `object` and the shape that will be hit as `part`.
 """
 struct Hint
     object::AbstractObject
@@ -86,7 +98,7 @@ Subtypes of `AbstractInteraction` must implement the following:
 
 ## Fields
 
-- `hint`: a nullable [`Hint`](@ref) for the solver (optional but recommended)
+- `hint`: a nullable [`Hint`](@ref) for the solver. The field is required, since the solver reads it for every interaction, but it may be `nothing`
 
 ## Beam data
 

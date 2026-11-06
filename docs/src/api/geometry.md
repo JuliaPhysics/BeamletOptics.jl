@@ -21,7 +21,7 @@ flowchart TB
     TRT -.-> SGL
     TRT -.-> MLT
     SGL -- object.shape --> SHP
-    MLT -- "shape(object)" --> SHP
+    MLT -- "shape(object):<br/>parts, shapes or objects" --> SHP
 
     classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
     classDef green fill:#38982626,stroke:#389826,stroke-width:2px

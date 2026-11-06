@@ -34,9 +34,9 @@ The initial ordering of the geometric beams/rays is shown in the figure below. T
 As with the [`GaussianBeamlet`](@ref), tracing these rays through a system allows the reconstruction of the waist envelope and electric field. The reduced complex amplitude of the Gaussian beamlet is computed as
 
 ```math
-\psi(\mathbf{r}) = \frac{E_0}{\sqrt{\mathbf{h}_1 \times \mathbf{h}_2}} \cdot \exp \left( i k \frac{(\mathbf{h}_1 \times \mathbf{r})(\mathbf{u}_2 \cdot \mathbf{r}) - (\mathbf{h}_2 \times \mathbf{r})(\mathbf{u}_1 \cdot \mathbf{r})}{2 \mathbf{h}_1 \times \mathbf{h}_2} \right) \,,
+\psi(\mathbf{r}) = \frac{E_0}{\sqrt{\mathbf{h}_1 \times \mathbf{h}_2}} \, \kappa^{-1/4} \cdot \exp \left( i k \operatorname{Re} \frac{(\mathbf{h}_1 \times \mathbf{r})(\mathbf{u}_2 \cdot \mathbf{r}) - (\mathbf{h}_2 \times \mathbf{r})(\mathbf{u}_1 \cdot \mathbf{r})}{2 \mathbf{h}_1 \times \mathbf{h}_2} \right) \exp \left( - \frac{|\mathbf{h}_1 \times \mathbf{r}|^2 + |\mathbf{h}_2 \times \mathbf{r}|^2}{\det \mathbf{S}} \right) \,,
 ```
-where $\mathbf{h}_{1,2}$ and $\mathbf{u}_{1,2}$ are the two-dimensional complex ray height and angle vectors on the plane perpendicular to the chief ray [Greynolds:1986_1, Wilhelm:2001, Greynolds:2014](@cite). By also tracing a 3D-field vector along the chief ray based on the formalism introduced in the [Polarized rays](@ref) section, polarization effects can be considered when calculating $\psi$ [Worku:2017](@cite). For a simple lens setup, the resulting waist is illustrated in the image below.
+where $\mathbf{h}_{1,2}$ and $\mathbf{u}_{1,2}$ are the two-dimensional complex ray height and angle vectors on the plane perpendicular to the chief ray [Greynolds:1986_1, Wilhelm:2001, Greynolds:2014](@cite). The second exponential is the Gaussian envelope $\exp(-\mathbf{r}^T \mathbf{S}^{-1} \mathbf{r})$ with the spot matrix $\mathbf{S}$, and $\kappa = \det \mathbf{S} / |\mathbf{h}_1 \times \mathbf{h}_2|^2$, see [Physical Beam Cross-Section](@ref). By also tracing a 3D-field vector along the chief ray based on the formalism introduced in the [Polarized rays](@ref) section, polarization effects can be considered when calculating $\psi$ [Worku:2017](@cite). For a simple lens setup, the resulting waist is illustrated in the image below.
 
 The linear polarization state is visualized by an oscillating red line and is proportional to the on-axis peak field strength.
 
@@ -51,9 +51,11 @@ The phase factor due to the optical path length of the central ray ($e^{i k (z +
 !!! info "Optical invariant"
     In order to ensure the correctness of the traced beamlet, the complex ray vectors must satisfy the **vanishing complex optical invariant**:
     ```math
-    \mathbf{h}_1 \times \mathbf{u}_2 - \mathbf{h}_2 \times \mathbf{u}_1 = 0
+    \mathbf{h}_1 \cdot \mathbf{u}_2 - \mathbf{h}_2 \cdot \mathbf{u}_1 = 0
     ```
-    This ensures that the complex curvature matrix $\mathbf{Q}$ is symmetric, since the beamlet formalism can not capture higher-order abberations.
+    with the analytic bilinear form of the dot product (see below). Tracing stops with a warning if its absolute value exceeds [`get_invariant_threshold`](@ref)`()`, by default ``10^{-6}``. This ensures that the complex curvature matrix $\mathbf{Q}$ is symmetric, since the beamlet formalism can not capture higher-order abberations.
+
+    The Lagrange invariant $H = n \operatorname{Im}(\mathbf{h}^* \cdot \mathbf{u})$ of each axis must keep its value at the start of the beam, $M^2 \lambda / \pi$. A large beamlet in a strong focus does not: the rays leave the parabolic part of the surface and $H$ of one axis can even change its sign, as happens for separate waists. Tracing stops with a warning if $H$ deviates by more than [`get_lagrange_tolerance`](@ref)`()`, by default 50 %, from its start value, for any $M^2$ and wavelength.
 
 ## Astigmatic beamlets
 
@@ -61,6 +63,12 @@ You can construct a single astigmatic beamlet with a specified waist and polariz
 
 ```@docs; canonical=false
 AstigmaticGaussianBeamlet(::AbstractArray, ::AbstractArray, ::Real, ::Real)
+```
+
+Independent waists in the two transverse axes, e.g. of a diode laser, are set with the five-argument constructor:
+
+```@docs; canonical=false
+AstigmaticGaussianBeamlet(::AbstractArray, ::AbstractArray, ::Real, ::Real, ::Real)
 ```
 
 The constructor will spawn an `AstigmaticGaussianBeamlet` which is implemented as follows:
@@ -71,19 +79,38 @@ AstigmaticGaussianBeamlet
 
 ### Calculating astigmatic beam parameters
 
-To obtain the physical vector electric field [V/m] at any point:
+The scalar parameters of a traced beamlet are obtained as for the [`GaussianBeamlet`](@ref):
+
+```@docs; canonical=false
+gauss_parameters(::AstigmaticGaussianBeamlet, ::Real)
+waist_parameters(::AstigmaticGaussianBeamlet, ::Real)
+rayleigh_range(::AstigmaticGaussianBeamlet)
+electric_field(::AstigmaticGaussianBeamlet, ::AbstractArray, ::Real)
+intensity(::AstigmaticGaussianBeamlet, ::AbstractArray, ::Real)
+optical_power(::AstigmaticGaussianBeamlet)
+```
+
+To obtain the physical vector electric field \[V/m\] at the transverse offset `r` from the chief ray, at the distance `z` along the beam:
 ```julia
-# Field at world position (x, y, z)
-E_vec = polarized_field(agb, [0.01, 0, 0], 10.0)
+# r is an offset vector orthogonal to the chief ray, not a point in world coordinates,
+# here along x for a beamlet along +y
+E_vec = BeamletOptics.polarized_field(agb, [0.01, 0, 0], 10.0)
 ```
 
 ```julia
-# Decompose a field from a detector into a new AstigmaticBeamGroup
-beams = WavefrontBeamletDecomposition(x, z, amplitude, phase, dir, λ)
+# Decompose a sampled field into a new AstigmaticBeamGroup,
+# with the sample x = y = 0 at pos
+group = WavefrontBeamletDecomposition(x, y, amplitude, phase, pos, dir, λ)
 
-# Solve system (propagate all beamlets to next segment)
-solve_system!(system, beams)
+# Trace all beamlets of the group through the system
+solve_system!(system, group)
 ```
+
+The Gouy phase follows the argument of the complex beam area ``(\mathbf{h}_1 \times \mathbf{h}_2) \cdot \mathbf{d}`` along the chief ray, starting at the root beam, and a child continues the last segment of its parent. The area is a pseudoscalar: a reflection mirrors the transverse frame against the chief ray and flips its sign, which is no change of the beam. The jump of the argument at an interface is therefore taken modulo ``\pi``, on ``(-\pi/2, \pi/2]``, and the Gouy phase does not change at a mirror. Physical jumps at refraction are small. The argument is followed continuously, because the principal branch would jump by ``\pi`` behind a focus.
+
+The amplitude changes with the beam area only within a segment. At a surface it follows from the polarization of the chief ray instead: the Fresnel coefficients relate the fields on both sides, and they include that the cross section of the beam changes with the angle of refraction.
+
+All nine rays start in the plane of the chief ray start, so that none of them starts behind an object the beamlet should hit, e.g. when a waist lies downstream of the start, as for a converging beam. The waist rays are parallel to the axis at the waist radius, so they are the same lines wherever they start. The phase includes the optical path correction in media for coherence. The transverse term is a geometric length like ``z``, so in a medium it enters with the wavenumber ``n k_0`` as well.
 
 ## [The Curvature Matrix $\mathbf{Q}$](@id The-Curvature-Matrix-Q)
 
@@ -112,6 +139,10 @@ The spatial spot matrix $\mathbf{S}$, which describes the boundary of this inten
 \operatorname{Im}(\mathbf{Q}) = (\mathbf{H} \mathbf{H}^\dagger)^{-1}
 ```
 This identity implies that the spatial spot covariance matrix $\mathbf{S}$, which defines the beam envelope, is directly proportional to the outer product of the complex ray height matrix: $\mathbf{S} \propto \mathbf{H} \mathbf{H}^\dagger$.
+
+**BeamletOptics** takes the envelope of the field from $\mathbf{S} = \operatorname{Re}(\mathbf{H} \mathbf{H}^\dagger)$ directly, not from $\operatorname{Im}(\mathbf{Q})$. The identity holds for $M^2 = 1$ only: for $M^2 > 1$, $\operatorname{Im}(\mathbf{Q})$ is larger by $M^2$ and the field would be narrower than the beam radius, and it would no longer decay at all if a Lagrange invariant changes its sign. With $\mathbf{S}$, the field follows the beam radius for any $M^2$.
+
+Usually $\sqrt{\det \mathbf{S}} = |\mathbf{h}_1 \times \mathbf{h}_2|$. An astigmatic element that is rotated against the axes of a beam with $M_x^2 \neq M_y^2$ twists it: $\mathbf{H} \mathbf{H}^\dagger$ becomes complex and $\kappa = \det \mathbf{S} / |\mathbf{h}_1 \times \mathbf{h}_2|^2 > 1$. The amplitude follows the area $|\mathbf{h}_1 \times \mathbf{h}_2|$, so the factor $\kappa^{-1/4}$ in $\psi$ keeps the power of the beamlet, which is the product of the peak intensity and $\sqrt{\det \mathbf{S}}$.
 
 In **BeamletOptics**, this calculation is mapped directly to the 3D global coordinate system. Using the two complex 3D ray vectors $\mathbf{h}_1$ and $\mathbf{h}_2$, the $3 \times 3$ physical covariance matrix is formed by taking the real part of the tensor product:
 ```math

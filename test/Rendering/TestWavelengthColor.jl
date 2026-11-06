@@ -43,7 +43,7 @@ end
     rgba(λ, α = 1) = Makie.RGBAf(wavelength_color(λ)..., α)
 
     # a dispersive prism that splits the beams, a group of beams of different wavelengths
-    prism = RightAnglePrism(30e-3, 20e-3, λ -> 1.5 + 4e-15 / λ^2)
+    prism = RightAnglePrism(30e-3, 20e-3, DiscreteRefractiveIndex(λs, 1.5 .+ 4e-15 ./ λs .^ 2))
     translate3d!(prism, [0, 20e-3, 0])
     # a beamsplitter whose child beams must keep the color of their wavelength
     bs = RoundThinBeamsplitter(25e-3; reflectance = 0.5)
@@ -153,7 +153,7 @@ end
 
 @testset "color = :wavelength: positions and colors are updated together" begin
     # a mirror that is moved in and out of the beam changes the number of segments on every solve
-    lens = SphericalLens(50e-3, -50e-3, 10e-3, 25e-3, 1.5168)
+    lens = SphericalLens(50e-3, -50e-3, 10e-3, 25e-3, ConstantRefractiveIndex(1.5168))
     ax = LScene(Figure()[1, 1])
 
     @testset "$name" for (name, make, kwargs) in (
@@ -189,7 +189,7 @@ end
 @testset "render_settings!: color" begin
     rgba(λ, α = 1) = Makie.RGBAf(wavelength_color(λ)..., α)
     red = Makie.RGBAf(Makie.to_color(:red))
-    lens = SphericalLens(50e-3, -50e-3, 10e-3, 25e-3, 1.5168)
+    lens = SphericalLens(50e-3, -50e-3, 10e-3, 25e-3, ConstantRefractiveIndex(1.5168))
     sys = System([lens])
     ax = LScene(Figure()[1, 1])
     # positions and colors of every colored plot of `h` have the same length

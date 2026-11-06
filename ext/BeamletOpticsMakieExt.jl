@@ -2,9 +2,9 @@ module BeamletOpticsMakieExt
 
 using BeamletOptics
 import BeamletOptics: render!, RenderException, _RenderTypes, get_view, set_view, hide_axis,
-                       set_orthographic, arrow!, render_lcs!, render_bounding_sphere!, look_at!, live_render!, update_render!,
-                       remove_render!, pick_object, studio_lighting!, set_render_look, look_colors,
-                       rendered, render_plots, render_children, render_parent, render_settings, render_settings!,
+                       set_orthographic, arrow!, render_lcs!, look_at!, live_render!, update_render!,
+                       remove_render!, pick_object, studio_lighting!, set_render_look,
+                       rendered, render_plots, render_parent, render_settings, render_settings!,
                        pickable_plots, AbstractRenderHandle, AbstractObjectRenderHandle,
                        AbstractSystemRenderHandle, AbstractBeamRenderHandle
 
@@ -17,7 +17,7 @@ using PrecompileTools: @setup_workload, @compile_workload
 using GeometryBasics: Point2, Point3, Point3f, Point3d, Vec3f, Vec3d, GLTriangleFace, Mesh
 using StaticArrays: SMatrix
 using Base.ScopedValues: ScopedValue, with
-using AbstractTrees: PreOrderDFS
+using AbstractTrees: AbstractTrees, PreOrderDFS
 using MarchingCubes: MC, march
 using LinearAlgebra: dot, cross, normalize, norm
 
@@ -29,8 +29,8 @@ const _RenderEnv = Union{
 struct InvalidAxisError <: RenderException
     msg::String
     ax::Type
-    function InvalidAxisError(ax::Type)
-        msg = "Invalid axis input of type $ax, must be LScene or Axis3"
+    function InvalidAxisError(ax::Type, allowed::AbstractString = "LScene or Axis3")
+        msg = "Invalid axis input of type $ax, must be $allowed"
         return new(msg, ax)
     end
 end

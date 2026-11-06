@@ -12,9 +12,13 @@ solved repeatedly.
 - objects and systems: the geometry is generated once, kinematic changes are applied as a model
   transformation of the existing plots
 - rays, beams and beam groups: all segments are bundled into a single plot
-- `GaussianBeamlet`: the envelope of all segments is bundled into a single mesh
+- `GaussianBeamlet`, `AstigmaticGaussianBeamlet` and `AstigmaticBeamGroup`: the envelope of all
+  segments is bundled into a single mesh
 
-Keyword arguments are passed on as for [`render!`](@ref).
+Keyword arguments are passed on as for [`render!`](@ref), but the envelope meshes of Gaussian
+beamlets are drawn with coarser default resolutions `r_res`/`z_res`: 24/40 for a `GaussianBeamlet`
+(`render!`: 50/100) and 10/8 per beamlet of an `AstigmaticBeamGroup` (`render!`: 64/100). Change them
+via the keywords or later via [`render_settings!`](@ref).
 
 If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
 """
@@ -70,7 +74,7 @@ If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown
 update_render!(::Any; kwargs...) = throw(MissingBackendError())
 
 function update_render!(h::AbstractSystemRenderHandle)
-    foreach(update_render!, render_children(h))
+    foreach(update_render!, children(h))
     return h
 end
 
@@ -84,7 +88,7 @@ If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown
 remove_render!(::Any) = throw(MissingBackendError())
 
 function remove_render!(h::AbstractSystemRenderHandle)
-    foreach(remove_render!, render_children(h))
+    foreach(remove_render!, children(h))
     return nothing
 end
 
@@ -101,8 +105,8 @@ function remove_render!(h::AbstractSystemRenderHandle, obj::ObjectOrGroup)
     parent = render_parent(h, obj)
     isnothing(parent) || throw(ArgumentError(
         "the $(nameof(typeof(obj))) is part of a $(nameof(typeof(parent))) of the system handle, remove the group instead"))
-    leaves = collect(Leaves(obj))
-    for oh in filter(oh -> _is_leaf_of(rendered(oh), leaves), render_children(h))
+    leaves = collect(_leaf_objects(obj))
+    for oh in filter(oh -> _is_leaf_of(rendered(oh), leaves), children(h))
         remove_render!(oh)
         delete!(h, oh)
     end
@@ -115,14 +119,17 @@ end
 Returns the object of a live-rendered object or system `handle` that is visualized by the `plot`
 (one of its [`pickable_plots`](@ref), or a child plot of one), or `nothing` if the `plot` does not
 belong to the `handle`. For a system handle, the top-level object, i.e. the outermost group of
-the picked object, see [`render_parent`](@ref).
+the picked object, see [`render_parent`](@ref). Beams cannot be picked, a beam handle returns
+`nothing`.
 
 If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
 """
 pick_object(::Any, ::Any) = throw(MissingBackendError())
 
+pick_object(::AbstractBeamRenderHandle, ::Any) = nothing
+
 function pick_object(h::AbstractSystemRenderHandle, plot)
-    for child in render_children(h)
+    for child in children(h)
         obj = pick_object(child, plot)
         isnothing(obj) && continue
         parent = render_parent(h, obj)

@@ -45,7 +45,18 @@ end
 
 - Hits are values of the solve: solving again or moving anything but the detector does not change them. Moving the detector (also via a group) empties it.
 - A detector holds the hits of consecutive solves side by side; you decide when to evaluate. `spot_diagram` shows all hits; `electric_field`, `intensity`, `optical_power` superpose all hits **coherently**. For solves that follow each other in time, know what this computes, or evaluate after each solve and reset (`initialize = true`).
+- A beam that misses the detector gives `optical_power == 0` and no spots. Power and field need no guard, spot metrics do: `f(spot_diagram(det))` of no points is `NaN` or throws, so check `length(det) == 0` before `push!(metric, ...)`.
+- Ray angles at a plane (collimation): `pts, dirs = ray_hits(det)`, see `components/detectors.md`.
 - See `templates/01_singlet_spot_diagram.jl` (focus scan) and `templates/04_michelson_scan.jl` (fringes).
+
+## Derivatives (optimization, sensitivity)
+
+- `ForwardDiff.derivative`/`gradient` work through `solve_system!` when every component, beam and
+  detector is built in the number type `T` of the parameter (`T = typeof(p)`); pass it to
+  `ObjectGroup(objects, T)`, groups are `Float64` otherwise.
+- The derivative is that of the current light path: it is not defined where the path changes, e.g. a
+  ray that starts to miss a component, hits an edge, or begins total internal reflection.
+- See the docs page "Automatic differentiation" (`docs/src/basics/autodiff.md`).
 
 ## Interferometers and coherent sums
 
@@ -57,7 +68,7 @@ end
 ## PSFs from rays
 
 - Use `UniformDiscSource` (equal-area sampling) with thousands of rays and a `Detector` near focus;
-  read `intensity(det, RegularGrid(n = ..., crop_factor = ...))` or give explicit `x_min/x_max/z_min/z_max` windows in the `RegularGrid`.
+  read `intensity(det, RegularGrid(num_points = ..., crop_factor = ...))` or give explicit `x_min/x_max/z_min/z_max` windows in the `RegularGrid`.
 - For unpolarized PSFs, trace two orthogonal polarizations (polarized beams wrapped in a
   `CollimatedSource(beams, diameter, pos, dir)`) and add the intensities incoherently.
 
@@ -88,4 +99,4 @@ and look at the image before trusting numbers. Axis-aligned top view: `Axis3(...
 - `KeyError` from `DiscreteRefractiveIndex`: wavelength not in the table.
 - `MissingBackendError` on `render!`: load `GLMakie` (or `CairoMakie` without OpenGL, see `VISUALIZATION.md`).
 - GLMakie fails to create a window/context on a headless machine: use `xvfb-run -a`, or switch to CairoMakie with `Axis3`.
-- Detector error "No hits available": nothing reached it; check position/orientation (normal −y by default).
+- Detector reads `optical_power == 0` and an empty `spot_diagram` (`length(det) == 0`): nothing reached it; check position/orientation (normal −y by default).

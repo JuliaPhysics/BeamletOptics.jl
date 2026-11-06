@@ -52,7 +52,7 @@ const mm = 1e-3
                     pd,
                     # restore pre-v0.11 behavior, e.g. no autolims
                     RegularGrid(
-                        n=pd_resolution,
+                        num_points=pd_resolution,
                         x_min=-pd_size/2,
                         x_max=pd_size/2,
                         z_min=-pd_size/2,
@@ -87,7 +87,7 @@ const mm = 1e-3
             empty!(pd)
             solve_system!(system, beam)
             
-            xs, ys, Efield = electric_field(pd, RegularGrid(n=pd_resolution))
+            xs, ys, Efield = electric_field(pd, RegularGrid(num_points = pd_resolution))
             
             # analytical solution
             short_arm = 4l_0

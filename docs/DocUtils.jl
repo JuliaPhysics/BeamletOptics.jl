@@ -2,9 +2,33 @@ module DocUtils
 
 using GLMakie: Figure, Axis, hidedecorations!, text!, save
 using Dates: now
+using Downloads: download
 import Documenter, DocumenterVitepress
 
 const GLOBAL_USE_PLACEHOLDERS = true
+
+const MILESTONES_URL = "https://api.github.com/repos/JuliaPhysics/BeamletOptics.jl/milestones?state=all&per_page=100"
+
+"""
+    fetch_milestones(path; url = MILESTONES_URL)
+
+Writes the milestones of the repository, as the GitHub API returns them, to `path` for the
+`RoadmapBoard` component. Authenticates with `GITHUB_TOKEN` if it is set, otherwise the API
+allows 60 requests per hour. If the request fails, writes `[]` and warns, so that the build goes
+on and the board only links to the milestones on GitHub.
+"""
+function fetch_milestones(path::AbstractString; url::AbstractString = MILESTONES_URL)
+    headers = ["Accept" => "application/vnd.github+json", "User-Agent" => "BeamletOptics-docs"]
+    token = get(ENV, "GITHUB_TOKEN", "")
+    isempty(token) || push!(headers, "Authorization" => "Bearer $token")
+    try
+        download(url, path; headers)
+    catch err
+        @warn "Could not fetch the milestones, the roadmap board stays empty" exception = err
+        write(path, "[]")
+    end
+    return nothing
+end
 
 """
 Real figures of earlier local builds, reused instead of placeholders by `conditional_include`, by

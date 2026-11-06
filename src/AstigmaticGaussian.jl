@@ -63,7 +63,7 @@ end
 """
     AstigmaticGaussianBeamlet(position, direction, λ, w0; kwargs...)
 
-Constructs an astigmatic Gaussian beamlet at its waist with the specified beam parameters.
+Constructs an astigmatic Gaussian beamlet at `position` with the specified beam parameters.
 In the 4-argument version, the beam has circular symmetry with waist radius `w0`.
 In the 5-argument version, independent waists `w0_x` and `w0_y` can be specified.
 
@@ -81,13 +81,18 @@ In the 5-argument version, independent waists `w0_x` and `w0_y` can be specified
 
 - `M2`, `M2_x`, `M2_y`: beam quality factors. Default is 1
 - `P0`: beam total power in [W]. Default is 1 mW.
-- `E0`: electric field vector in [V/m]. Default is `nothing` (aligned with support axes, scaled by `P0`).
+- `E0`: electric field vector in \\[V/m\\] at `position`, it replaces `P0`. Default is `nothing`
+  (aligned with support axes, scaled by `P0`, zero Gouy phase at the waist).
 - `support`: optional support vector for basis construction, i.e. the X axis of the beamlet. Must be
   orthogonal to `direction`, otherwise an `ArgumentError` is thrown; has any non-zero length and is
   normalized internally. Default is `nothing`, i.e. a vector orthogonal to `direction` is chosen.
 - `z0`: beam waist offset in [m]. Default is 0 m
 
 # Additional information
+
+!!! tip "Waist offset"
+    As for a [`GaussianBeamlet`](@ref), the `z0` keyword arg. spawns a beam at the specified
+    `position` with its waist at an offset `z0` in \\[m\\] along the chief ray axis.
 
 !!! warning "Optical invariant check"
     When using the `solve_system!` function, the beamlet invariant will be checked for each interaction. If the invariant is violated, tracing will be stopped.
@@ -115,19 +120,19 @@ Constructs an astigmatic Gaussian beamlet with independent waists `w0_x` and `w0
 This constructor supports modeling astigmatic sources where the waists in X and Y are at different locations along the beam axis.
 
 # Arguments
-- `position`: Global reference point of the beamlet.
+- `position`: Origin of the beamlet.
 - `direction`: Propagation direction vector.
 - `λ`: Wavelength.
 - `w0_x`: Waist radius in the X direction (defined by the support vector).
 - `w0_y`: Waist radius in the Y direction.
 
 # Keyword Arguments
-- `z0_x`: Position of the X waist relative to `position` along the propagation axis. Defaults to `z0`.
-- `z0_y`: Position of the Y waist relative to `position` along the propagation axis. Defaults to `z0`.
-- `z0`: Default waist position if `z0_x` and `z0_y` are not specified. Also defines the starting point of the chief ray as `position + z0 * direction`.
+- `z0_x`: Offset of the X waist from `position` along the propagation axis in \\[m\\]. Defaults to `z0`.
+- `z0_y`: Offset of the Y waist from `position` along the propagation axis in \\[m\\]. Defaults to `z0`.
+- `z0`: Default for `z0_x` and `z0_y`. Default is 0 m.
 - `M2_x`, `M2_y`: Beam quality factors. Default is 1.
 - `P0`: Total power in [W].
-- `E0`: Optional Jones vector for polarization.
+- `E0`: Optional electric field vector in \\[V/m\\] at `position`, it replaces `P0`.
 - `support`: Optional vector orthogonal to `direction` to define the X axis. Has any non-zero length
   and is normalized internally. A `support` that is not orthogonal to the `direction` (the dot
   product of the unit vectors exceeds `get_orthogonality_threshold()`, default `1e-10`) throws an
@@ -154,73 +159,57 @@ function AstigmaticGaussianBeamlet(
         z0_x::Real = z0,
         z0_y::Real = z0
 )
+    # Common number type of all rays, P0 counts only if it sets the field
+    F = isnothing(E0) ? typeof(P0) : real(eltype(E0))
+    S = isnothing(support) ? Bool : eltype(support)
+    T = float(promote_type(eltype(position), eltype(direction), typeof(λ), typeof(w0_x),
+        typeof(w0_y), typeof(M2_x), typeof(M2_y), F, S, typeof(z0_x), typeof(z0_y)))
+    position, direction, λ = T.(position), T.(direction), T(λ)
     # Create orthogonal vectors for construction purposes (right-handed)
     direction = normalize(direction)
     if isnothing(support)
         s1 = normal3d(direction)
     else
-        s1 = normalize(support)
+        s1 = normalize(T.(support))
     end
-    # Both vectors have unit length, hence the test does not depend on the length of `support`
+    # Unit vectors: test independent of support length
     if !isorthogonal3d(direction, s1; atol = Config.get_orthogonality_threshold())
         throw(ArgumentError("the support vector must be orthogonal to the direction (dot product of the unit vectors: $(dot(direction, s1)))"))
     end
     s2 = cross(direction, s1)
 
-    # Handle polarization and power
-    if isnothing(E0)
-        # Calculate E0 magnitude based on P0
-        I0 = (2 * P0) / (π * w0_x * w0_y)
-        E_phasor = electric_field(I0)
-        E0 = s1 .* E_phasor # Default to linear polarization along first transverse axis
-    else
-        if !isorthogonal3d(direction, E0)
-            # If user provided E0 but it's not orthogonal, project it.
-            # This is a convenience for tilted setups.
-            # `direction` is real, so the parallel component's (possibly complex)
-            # coefficient is the bilinear `dot(direction, E0)`, not `dot(E0, direction)`
-            # (= conj of the former): `dot` conjugates its first argument, and conjugating
-            # E0 here would project onto the wrong (conjugated) coefficient, leaving a
-            # residual component along `direction` for complex E0.
-            E0 = E0 .- dot(direction, E0) .* direction
-        end
-    end
-
     # Divergence angles
     θx = divergence_angle(λ, w0_x, M2_x)
     θy = divergence_angle(λ, w0_y, M2_y)
-    # All nine rays start in the plane of the chief ray start, `position + z0 * direction`,
-    # so that none of them starts behind an object the beamlet should hit (e.g. when a
-    # waist lies downstream of the start, as for a converging beam).
-    start = position + z0 * direction
-    # Waist rays: parallel to the axis at the waist radius, the same lines wherever they
-    # start
-    wxp = Ray(start + s1 * w0_x, direction, λ)
-    wxm = Ray(start - s1 * w0_x, direction, λ)
-    wyp = Ray(start + s2 * w0_y, direction, λ)
-    wym = Ray(start - s2 * w0_y, direction, λ)
-    # Divergence rays through the waist centers at z0_x and z0_y
-    div_dir_xp = normalize(direction + s1 * tan(θx))
-    div_dir_xm = normalize(direction - s1 * tan(θx))
-    div_dir_yp = normalize(direction + s2 * tan(θy))
-    div_dir_ym = normalize(direction - s2 * tan(θy))
-    dxp = Ray(start + (z0 - z0_x) * s1 * tan(θx), div_dir_xp, λ)
-    dxm = Ray(start - (z0 - z0_x) * s1 * tan(θx), div_dir_xm, λ)
-    dyp = Ray(start + (z0 - z0_y) * s2 * tan(θy), div_dir_yp, λ)
-    dym = Ray(start - (z0 - z0_y) * s2 * tan(θy), div_dir_ym, λ)
+
+    # Handle polarization and power
+    if isnothing(E0)
+        # Complex beam area at the start
+        area = complex(w0_x, -z0_x * tan(θx)) * complex(w0_y, -z0_y * tan(θy))
+        # Field at the start, zero Gouy phase at the waist
+        I0 = (2 * P0) / (π * abs(area))
+        E_phasor = electric_field(I0, Z_vacuum, -angle(area) / 2)
+        E0 = s1 .* E_phasor # Default to linear polarization along first transverse axis
+    else
+        if !isorthogonal3d(direction, E0)
+            # Project user E0 onto transverse plane
+            E0 = _transverse(E0, direction)
+        end
+    end
+
+    # Waist and divergence rays per transverse axis and sign
+    (wxp, wxm, dxp, dxm), (wyp, wym, dyp, dym) = map(
+        ((s1, w0_x, θx, z0_x), (s2, w0_y, θy, z0_y))) do (s, w0, θ, z0_ax)
+        waist = map(σ -> Beam(Ray(position + σ * (s * w0), direction, λ)), (1, -1))
+        divergence = map(
+            σ -> Beam(Ray(position - σ * (z0_ax * s * tan(θ)),
+                normalize(direction + σ * (s * tan(θ))), λ)),
+            (1, -1))
+        return (waist..., divergence...)
+    end
     # Chief ray
-    c = PolarizedRay(start, direction, λ, E0)
-    return AstigmaticGaussianBeamlet(
-        Beam(c),
-        Beam(wxp),
-        Beam(wxm),
-        Beam(wyp),
-        Beam(wym),
-        Beam(dxp),
-        Beam(dxm),
-        Beam(dyp),
-        Beam(dym)
-    )
+    c = PolarizedRay(position, direction, λ, Complex{T}.(E0))
+    return AstigmaticGaussianBeamlet(Beam(c), wxp, wxm, wyp, wym, dxp, dxm, dyp, dym)
 end
 
 """Return a tuple of all 9 component beams of the [`AstigmaticGaussianBeamlet`](@ref)."""
@@ -231,47 +220,12 @@ end
 @inline _aux_beams(agb::AstigmaticGaussianBeamlet) = (
     agb.wxp, agb.wxm, agb.wyp, agb.wym, agb.dxp, agb.dxm, agb.dyp, agb.dym)
 
-# Implementation of AbstractBeam interface
-rays(agb::AstigmaticGaussianBeamlet) = rays(agb.c)
-
-"""
-    empty!(agb::AstigmaticGaussianBeamlet)
-
-Resets the beamlet to its untraced start state, i.e. resets all 9 component beams and
-drops all child beamlets.
-"""
-function Base.empty!(agb::AstigmaticGaussianBeamlet)
-    foreach(empty!, _component_beams(agb))
-    _drop_beams!(agb)
-    return agb
-end
-
-first_ray(agb::AstigmaticGaussianBeamlet) = first_ray(agb.c)
-
-Base.length(agb::AstigmaticGaussianBeamlet) = length(agb.c)
-optical_path_length(agb::AstigmaticGaussianBeamlet) = optical_path_length(agb.c)
-
-isentering(agb::AstigmaticGaussianBeamlet, id::Int) = isentering(rays(agb.c)[id])
-
-point_on_beam(agb::AstigmaticGaussianBeamlet, t::Real) = point_on_beam(agb.c, t)
-
 wavelength(agb::AstigmaticGaussianBeamlet) = wavelength(first(rays(agb.c)))
 polarization(agb::AstigmaticGaussianBeamlet) = polarization(first(rays(agb.c)))
 
 electric_field(agb::AstigmaticGaussianBeamlet) = polarization(agb)
 function electric_field!(agb::AstigmaticGaussianBeamlet, new_E0)
     polarization!(first(rays(agb.c)), new_E0)
-end
-
-function refractive_index(agb::AstigmaticGaussianBeamlet, id::Int)
-    return refractive_index(rays(agb.c)[id])
-end
-
-function refractive_index!(agb::AstigmaticGaussianBeamlet, id::Int, n_new::Real)
-    for beam in _component_beams(agb)
-        refractive_index!(rays(beam)[id], n_new)
-    end
-    return nothing
 end
 
 """
@@ -293,10 +247,6 @@ function Base.show(io::IO, agb::AstigmaticGaussianBeamlet)
     print(io,
         "AstigmaticGaussianBeamlet(pos: $p0, dir: $d0, λ: $λ, w_x: $(norm(w1)), w_y: $(norm(w2)))")
 end
-
-# AbstractTrees integration
-AbstractTrees.children(agb::AstigmaticGaussianBeamlet) = agb.children
-AbstractTrees.nodevalue(agb::AstigmaticGaussianBeamlet) = agb
 
 """
     AstigmaticGaussianBeamletInteraction <: AbstractInteraction
@@ -403,13 +353,6 @@ Tests if all 9 component rays at section `id` hit the same object shape.
     end
 end
 
-function isparentbeam(beam::AstigmaticGaussianBeamlet, ray::AbstractRay)
-    for b in _component_beams(beam)
-        isparentbeam(b, ray) && return true
-    end
-    return false
-end
-
 """
     _ray_to_plane_projection(plane_pos, plane_normal, ray)
 
@@ -479,17 +422,29 @@ function parabasal_ray_parameters(agb::AstigmaticGaussianBeamlet, p0, i)
 end
 
 """
+    lagrange_invariants(agb, i)
+
+Lagrange invariants `H = n Im(h* . u)` of the x and y axes of `agb` at segment `i`. At the start of
+a beamlet they are `M2 λ / π`, up to the paraxial error of the divergence rays.
+"""
+function lagrange_invariants(agb::AstigmaticGaussianBeamlet, i::Int)
+    h1, u1, h2, u2, _ = parabasal_ray_parameters(agb, position(rays(agb.c)[i]), i)
+    n = refractive_index(agb, i)
+    return n * imag(sum(conj(h1) .* u1)), n * imag(sum(conj(h2) .* u2))
+end
+
+"""
     check_optical_invariant(agb, i; threshold = get_invariant_threshold())
 
-Evaluate the complex optical invariant `h1 . u2 - h2 . u1 = 0` at segment `i`.
-Returns `true` if the invariant holds (within `threshold`), and `false` otherwise.
+Evaluate the complex optical invariant `h1 . u2 - h2 . u1 = 0` at segment `i` and the
+`lagrange_invariants` against their values at the start of the root beam with
+`check_lagrange_invariants`, as for a [`GaussianBeamlet`](@ref). `threshold` is the limit of the
+complex invariant only.
+Returns `true` if the invariants hold, and `false` otherwise.
 """
 function check_optical_invariant(agb::AstigmaticGaussianBeamlet, i::Int;
         threshold::Real = get_invariant_threshold())
-    chief = rays(agb.c)[i]
-    p0 = position(chief)
-    λ = wavelength(chief)
-    n = refractive_index(agb, i)
+    p0 = position(rays(agb.c)[i])
 
     h1, u1, h2, u2, _ = parabasal_ray_parameters(agb, p0, i)
 
@@ -502,22 +457,9 @@ function check_optical_invariant(agb::AstigmaticGaussianBeamlet, i::Int;
         all_pass = false
     end
 
-    # Check Lagrange Invariant (Area Invariant): n * Im(h* . u) = λ/π
+    # Check Lagrange Invariant (Area Invariant): n * Im(h* . u) keeps its start value
     # This ensures that each axis individually behaves like a valid Gaussian.
-    H_target = λ / π
-    sets = (
-        (h1, u1, "x"),
-        (h2, u2, "y")
-    )
-    for (h, u, label) in sets
-        H = n * imag(sum(conj(h) .* u))
-        if !isapprox(H, H_target, atol = threshold)
-            @warn lazy"Lagrange invariant violation ($label) at segment $i: H=$H, target=$H_target. The beamlet has likely encountered an object that violates the paraxial assumption."
-            all_pass = false
-        end
-    end
-
-    return all_pass
+    return check_lagrange_invariants(agb, i) && all_pass
 end
 
 """
@@ -546,16 +488,17 @@ end
 """
     optical_power(agb)
 
-Compute the total integrated optical power of the beamlet at its start. For a Gaussian beamlet,
+Compute the total integrated optical power of the beamlet at its start, from the irradiance
+`n |E|² / (2 Z₀)` with the refractive index `n` of its first segment. For a Gaussian beamlet,
 this is typically constant through lossless propagation.
 """
 function optical_power(agb::AstigmaticGaussianBeamlet)
     # Beam area and field amplitude at the start of the beam (for a child: behind its parents)
     (; area, scale) = _area_from_root(agb, 1, 0)
     E_amp = scale * norm(polarization(first(rays(agb.c))))
-    # Corrected power: P = I_peak * π * w0x * w0y / 2
-    # We use the built-in intensity function to account for wave impedance
-    I_ref = intensity(E_amp)
+    # P = I_peak * π * w0x * w0y / 2, wave impedance Z₀ / n of the medium
+    n = refractive_index(first(rays(agb.c)))
+    I_ref = intensity(E_amp, Z_vacuum / n)
     return 0.5 * π * abs(area) * I_ref
 end
 
@@ -622,62 +565,59 @@ Calculates the non-conjugating dot product `a ⋅ b = Σ aᵢbᵢ`.
     return a[1] * b[1] + a[2] * b[2] + a[3] * b[3]
 end
 
+"""
+    transverse_profile(h1, u1, h2, u2, r, d, area, nk)
+
+Transverse factor of the field at the offset `r` from the chief ray with direction `d`, with the
+wavenumber `nk` of the medium. The phase is the real part of `r^T Q r / 2`. The decay is
+`exp(-r^T S⁻¹ r)` with the spot matrix `S = Re(H H†)`, so that the field follows the beam radius
+for any `M2`: `Im Q` is `S⁻¹` only for `M2 = 1` and while the Lagrange invariants hold. As
+`H H† = S + i c J`, `det S = |area|² + c²` with `c = [Re h1, Im h1] + [Re h2, Im h2]`, which is
+nonzero e.g. for `M2_x ≠ M2_y` behind a rotated astigmatic element. The factor
+`(|area|² / det S)^(1/4)` then keeps the power of the beam area.
+"""
+function transverse_profile(h1, u1, h2, u2, r, d, area, nk)
+    ξ1 = _pseudo_cross2d(h1, r, d)
+    ξ2 = _pseudo_cross2d(h2, r, d)
+    # We use _pseudo_dot to compute the non-conjugating dot product r^T u.
+    w = (ξ1 * _pseudo_dot(u2, r) - ξ2 * _pseudo_dot(u1, r)) / (2 * area)
+    c = _pseudo_cross2d(real(h1), imag(h1), d) + _pseudo_cross2d(real(h2), imag(h2), d)
+    det_S = abs2(area) + c^2
+    return sqrt(sqrt(abs2(area) / det_S)) * cis(nk * real(w)) *
+           exp(-(abs2(ξ1) + abs2(ξ2)) / det_S)
+end
+
 # Coefficients (A0, A1, A2) of the complex beam area a(l) = (h1 + l u1) × (h2 + l u2) · d
 # = A0 + A1 l + A2 l² along a segment, with the parabasal parameters at its start.
-@inline function _area_coefficients(h1, u1, h2, u2, d)
+@inline function area_coefficients(h1, u1, h2, u2, d)
     return (_pseudo_cross2d(h1, h2, d),
         _pseudo_cross2d(h1, u2, d) + _pseudo_cross2d(u1, h2, d),
         _pseudo_cross2d(u1, u2, d))
 end
-
-_area_value((A0, A1, A2), l) = A0 + A1 * l + A2 * l^2
 
 # Inverse roots (ρ1, ρ2) of the complex beam area along a segment:
 # a(l) = A0 (1 − ρ1 l)(1 − ρ2 l). A root that does not exist (A2 = 0, e.g. a collimated
 # axis) is ρ = 0. The roots lie off the real axis (a Gaussian beam has no real focus
 # point), so each factor 1 − ρ l stays off the negative real axis for real l: its argument
 # changes continuously, by less than π, and its principal square root is continuous.
-function _area_inverse_roots((A0, A1, A2))
+function area_inverse_roots((A0, A1, A2))
     s = sqrt(A1^2 - 4 * A2 * A0)
     q = -(A1 + (real(conj(A1) * s) >= 0 ? s : -s)) / 2     # roots without cancellation
     return q / A0, iszero(q) ? zero(q) : A2 / q
 end
 
 # Continuous change of arg a(l) from l = 0 to l along a segment, as the sum over the two
-# factors of `_area_inverse_roots`. The principal branch of √(a_ref/a) instead jumps by π
+# factors of `area_inverse_roots`. The principal branch of √(a_ref/a) instead jumps by π
 # once the Gouy phase has changed by more than π/2, e.g. behind a focus.
-function _area_arg_change(A, l)
-    ρ1, ρ2 = _area_inverse_roots(A)
+function area_arg_change(A, l)
+    ρ1, ρ2 = area_inverse_roots(A)
     return angle(1 - ρ1 * l) + angle(1 - ρ2 * l)
 end
 
-# Change of arg a at an interface, from the ratio of the areas behind and in front of it,
-# modulo π (sign of the pseudoscalar area dropped)
-_area_arg_jump(r) = angle(real(r) < 0 ? -r : r)
+"""Continuous argument of the complex beam area at local distance `l` on segment `i`, from the root start."""
+area_arg(agb::AstigmaticGaussianBeamlet, i::Int, l::Real) = _area_from_root(agb, i, l).arg
 
-"""
-    _area_arg(agb, i, l)
-
-Continuous argument of the complex beam area of `agb` at the local distance `l` along the
-chief ray segment `i` (measured from the start of that segment), relative to the start of
-the root beam: a child continues the last segment of its parent, see `_area_from_root`.
-
-The area `(h1 × h2) ⋅ d` is a pseudoscalar: a reflection mirrors the transverse frame
-against the chief ray and flips its sign, which is no change of the beam. The jump at
-an interface is therefore taken modulo π, on (−π/2, π/2], and the Gouy phase does not
-change at a mirror. Physical interface jumps (refraction) are small.
-"""
-_area_arg(agb::AstigmaticGaussianBeamlet, i::Int, l::Real) = _area_from_root(agb, i, l).arg
-
-# Complex beam area at the local distance `l` along the chief ray segment `i`, followed from the
-# start of the root beam, as a named tuple:
-# - `arg`: its continuous argument, see `_area_arg`
-# - `area`: its value
-# - `scale`: the factor by which the field amplitude has changed with the beam area on the way.
-#   Only the change within the segments counts. At a surface the amplitude follows from the
-#   polarization of the chief ray instead: the Fresnel coefficients relate the fields on both
-#   sides, and they include that the cross section of the beam changes with the angle of
-#   refraction.
+# Complex beam area at local distance `l` on segment `i` from root start: (; arg, area, scale)
 function _area_from_root(agb::AstigmaticGaussianBeamlet{T}, i::Int, l::Real) where {T}
     p = agb.parent
     (; arg, area, scale) = isnothing(p) ?
@@ -686,23 +626,24 @@ function _area_from_root(agb::AstigmaticGaussianBeamlet{T}, i::Int, l::Real) whe
     for j in 1:i
         ray = rays(agb.c)[j]
         h1, u1, h2, u2, _ = parabasal_ray_parameters(agb, position(ray), j)
-        A = _area_coefficients(h1, u1, h2, u2, direction(ray))
-        (j > 1 || !isnothing(p)) && (arg += _area_arg_jump(A[1] / area))
+        A = area_coefficients(h1, u1, h2, u2, direction(ray))
+        if j > 1 || !isnothing(p)
+            # Arg jump at interface, modulo π
+            r = A[1] / area
+            arg += angle(real(r) < 0 ? -r : r)
+        end
         lj = j < i ? length(ray) : l
-        arg += _area_arg_change(A, lj)
-        area = _area_value(A, lj)
+        arg += area_arg_change(A, lj)
+        # Area at end of segment part
+        area = A[1] + A[2] * lj + A[3] * lj^2
         scale *= sqrt(abs(A[1] / area))
     end
     return (; arg, area, scale)
 end
 
 # Local distance of the point `p` along chief ray segment `i`
-_local_distance(agb::AstigmaticGaussianBeamlet, p, i) =
+local_distance(agb::AstigmaticGaussianBeamlet, p, i) =
     dot(p - position(rays(agb.c)[i]), direction(rays(agb.c)[i]))
-
-# Root of the beam tree that `agb` continues. A child that a component attached with `children!`
-# knows its parent, a beam re-emitted with `relaunch!` does not and is its own root.
-_root(agb::AstigmaticGaussianBeamlet) = isnothing(agb.parent) ? agb : _root(agb.parent)
 
 
 """
@@ -728,9 +669,9 @@ phase.
 
 # Formalism
 The field is computed using the **Parabasal Gaussian Beamlet** formalism:
-ψ(r, z) = √(area_ref / area(z)) * exp(i * k * [z + 1/2 * rᵀ * Q(z) * r])
-where area(z) = (h1 × h2) · dir is the complex beam area and `area_ref` its value at the start
-of the segment, continued over all segments in front of it.
+ψ(r, z) = √(area_ref / area(z)) * (|area(z)|² / det S(z))^(1/4) * exp(i * k * [z + 1/2 * rᵀ * Re Q(z) * r]) * exp(-rᵀ * S(z)⁻¹ * r)
+where area(z) = (h1 × h2) · dir is the complex beam area, `area_ref` its value at the start
+of the segment, continued over all segments in front of it, and S = Re(H H†) the spot matrix.
 """
 function parabasal_field(
         agb::AstigmaticGaussianBeamlet,
@@ -760,40 +701,20 @@ function parabasal_field(
     if isnan(area) || abs(area) < 1e-25
         area = Complex(1e-25, 1e-25)
     end
-    ξ1 = _pseudo_cross2d(h1, r, dir)
-    ξ2 = _pseudo_cross2d(h2, r, dir)
-
-    # Complex quadratic phase term w = r^T Q r / 2
-    # We use _pseudo_dot to compute the non-conjugating dot product r^T u.
-    w = (ξ1 * _pseudo_dot(u2, r) - ξ2 * _pseudo_dot(u1, r)) / (2 * area)
 
     # Phase correction for refractive index (OPL - geometric length)
-    p_parent = agb.parent
-    l_parent = isnothing(p_parent) ? 0.0 : length(p_parent)
-    opl_parent = isnothing(p_parent) ? 0.0 : optical_path_length(p_parent)
-
-    Δl = opl_parent - l_parent
-    z_sum = l_parent
-    for j in 1:(i - 1)
-        ray_j = rays(agb.c)[j]
-        Δl += optical_path_length(ray_j) - length(ray_j)
-        z_sum += length(ray_j)
-    end
+    z_sum = length_before(agb, i)
+    Δl = path_excess_before(agb, i)
     Δl += (refractive_index(chief) - 1) * (z - z_sum)
 
-    k0 = 2π / wavelength(chief)
+    k0 = wavenumber(chief)
 
-    # area_ref / area is essentially (1 / (1 + i*z/zr))^2 for stigmatic beams, so its
-    # square root carries the Gouy phase. The argument is followed continuously from the
-    # start of the root beam (the principal branch would jump by π behind a focus), the
-    # magnitude within the segments only (see `_area_from_root`).
-    # The phase includes the OPL correction Δl to ensure coherence in media. The
-    # transverse term w = rᵀQr/2 is a geometric length like z, so in a medium it enters
-    # with the wavenumber n k0 as well (beam radius and wavefront curvature).
-    Δarg = _area_arg(agb, i, _local_distance(agb, p0, i))
+    # Gouy phase from continuous area arg, amplitude from area change within segments
+    Δarg = area_arg(agb, i, local_distance(agb, p0, i))
     start = _area_from_root(agb, i, 0)
-    ψ = start.scale * sqrt(abs(start.area / area)) * cis(-Δarg / 2) *
-        exp(im * k0 * (z + refractive_index(chief) * w + Δl))
+    # Phase with OPL correction Δl, transverse term with wavenumber n k0
+    ψ = start.scale * sqrt(abs(start.area / area)) * cis(-Δarg / 2) * cis(k0 * (z + Δl)) *
+        transverse_profile(h1, u1, h2, u2, r, dir, area, refractive_index(chief) * k0)
     return E_ref_amp * ψ
 end
 
@@ -816,9 +737,7 @@ function polarized_field(agb::AstigmaticGaussianBeamlet, r::AbstractArray, z::Re
     p0, i = point_on_beam(agb, z)
     chief = rays(agb.c)[i]
     E_vec = polarization(chief)
-    # The complex scalar field already includes the propagation phase and Gouy phase.
-    # The polarization of the chief ray of the segment is the amplitude, hence the scalar
-    # field is taken for a unit amplitude.
+    # Scalar field with unit amplitude, chief ray polarization is the amplitude
     ψ = parabasal_field(agb, r, z; E_ref_amp = 1.0)
     return E_vec * ψ
 end
@@ -826,22 +745,25 @@ end
 """
     intensity(agb::AstigmaticGaussianBeamlet, r, z)
 
-Compute the optical intensity [W/m²] of the beamlet at position `(r, z)`.
+Compute the optical intensity `n |E|² / (2 Z₀)` [W/m²] of the beamlet at position `(r, z)`, with the refractive index `n` of the segment at `z`.
 """
 function intensity(agb::AstigmaticGaussianBeamlet, r::AbstractArray, z::Real)
     E = electric_field(agb, r, z)
-    return intensity(E)
+    # wave impedance Z₀ / n of the medium of the segment
+    n = refractive_index(agb, last(point_on_beam(agb, z)))
+    return intensity(E, Z_vacuum / n)
 end
 
 """
     rayleigh_range(agb::AstigmaticGaussianBeamlet)
 
-Returns the Rayleigh range for the x and y axes of the beamlet as a tuple `(z_rx, z_ry)`.
+Returns the Rayleigh range for the x and y axes of the **first** beam section of the beamlet as a
+tuple `(z_rx, z_ry)`, from its waist radii and divergence (`M2` included).
 """
 function rayleigh_range(agb::AstigmaticGaussianBeamlet)
-    λ = wavelength(agb)
-    _, w1, w2 = waist_parameters(agb, 0.0)
-    return (rayleigh_range(λ, norm(w1)), rayleigh_range(λ, norm(w2)))
+    _, u1, _, u2, _ = parabasal_ray_parameters(agb, 0.0)
+    _, _, _, _, _, w01, w02 = gauss_parameters(agb, 0.0)
+    return (w01 / norm(u1), w02 / norm(u2))
 end
 
 """
@@ -888,11 +810,9 @@ function gauss_parameters(agb::AstigmaticGaussianBeamlet, z::Real)
               imag(h2[3]) * real(u2[3]) - real(h2[3]) * imag(u2[3])))
     w02 = H2 / (n * norm(u2))
 
-    # Total Gouy phase: argument of the area at the start of the root beam, followed
-    # continuously along the beam and its parents (no jump behind a focus, at a mirror or
-    # from parent to child)
-    area_root = _area_from_root(_root(agb), 1, 0).area
-    ψ = -0.5 * (angle(area_root) + _area_arg(agb, i, _local_distance(agb, p0, i)))
+    # Total Gouy phase, continuous from root start
+    area_root = _area_from_root(AbstractTrees.getroot(agb), 1, 0).area
+    ψ = -0.5 * (angle(area_root) + area_arg(agb, i, local_distance(agb, p0, i)))
 
     return (w1, w2, R1, R2, ψ, w01, w02)
 end

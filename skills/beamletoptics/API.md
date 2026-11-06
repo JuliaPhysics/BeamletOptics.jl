@@ -7,7 +7,7 @@ using BeamletOptics
 const mm = 1e-3
 
 # 1. build components (at the origin, aligned with +y)
-lens = SphericalLens(50mm, -50mm, 5mm, 25.4mm, λ -> 1.5)
+lens = SphericalLens(50mm, -50mm, 5mm, 25.4mm, ConstantRefractiveIndex(1.5))
 det  = Detector(20mm)
 
 # 2. place them (relative moves, radians)
@@ -34,30 +34,31 @@ Use `scripts/api_lookup.jl NAME` to print the docstring and signatures of any na
 |---------------|-------|
 | Kinematics    | `translate3d!`, `translate_to3d!`, `rotate3d!`, `xrotate3d!`, `yrotate3d!`, `zrotate3d!`, `align3d!`, `reset_translation3d!`, `reset_rotation3d!`, `set_pivot3d!`, `position`, `direction`, `orientation` |
 | Rays & beams  | `Ray`, `PolarizedRay`, `Beam`, `GaussianBeamlet`, `AstigmaticGaussianBeamlet`, `rays`, `point_on_beam`, `path_segments`, `rayleigh_range`, `normal3d` |
-| Sources       | `CollimatedSource`, `UniformDiscSource`, `PointSource`, `UniformPointSource`, `UniformLineSource`, `UniformFanSource`, `set_num_rays!`, `CollimatedGaussianBeamletSource`, `SphericalGaussianBeamletSource`, `EllipticalGaussianBeamletSource`, `GaussianBeamletDecomposition`, `WavefrontBeamletDecomposition`, `GaussianModeDecomposition`, `AstigmaticBeamGroup` |
+| Sources       | `CollimatedSource`, `UniformDiscSource`, `PointSource`, `UniformPointSource`, `UniformLineSource`, `UniformFanSource`, `num_rays!`, `CollimatedGaussianBeamletSource`, `SphericalGaussianBeamletSource`, `EllipticalGaussianBeamletSource`, `GaussianBeamletDecomposition`, `WavefrontBeamletDecomposition`, `GaussianModeDecomposition`, `AstigmaticBeamGroup` |
 | System        | `System`, `StaticSystem`, `solve_system!`, `initialize!`, `ObjectGroup` |
-| Inspection    | `properties`, `default_properties` |
-| Materials     | `DiscreteRefractiveIndex`, `SellmeierEquation` |
+| Materials     | `DiscreteRefractiveIndex`, `SellmeierEquation`, `ConstantRefractiveIndex` |
 | Lenses        | `Lens`, `ThinLens`, `SphericalLens`, `DoubletLens`, `SphericalDoubletLens`, `TripletLens`, `SphericalTripletLens`, `thickness` |
 | Surfaces      | `SphericalSurface`, `CircularFlatSurface`, `RectangularFlatSurface`, `EvenAsphericalSurface`, `CylindricalSurface`, `AcylindricalSurface` |
 | Mirrors       | `Mirror`, `RoundPlanoMirror`, `SquarePlanoMirror`, `SquarePlanoMirror2D`, `RectangularPlanoMirror`, `RightAnglePrismMirror`, `SphericalMirror`, `ConicMirror`, `OffAxisConicMirror`, `ParabolicMirror`, `OffAxisParabolicMirror`, `EllipsoidalMirror`, `OffAxisEllipsoidalMirror`, `HyperbolicMirror`, `OffAxisHyperbolicMirror`, `Retroreflector` |
 | Splitters     | `ThinBeamsplitter`, `RoundThinBeamsplitter`, `RectangularPlateBeamsplitter`, `RoundPlateBeamsplitter`, `CubeBeamsplitter`, `RectangularCompensatorPlate` |
 | Prisms        | `Prism`, `RightAnglePrism`, `EquilateralPrism`, `DovePrism` |
 | Polarizers    | `PolarizationFilter`, `RoundPolarizationFilter`, `LinearPolarizer`, `RoundLinearPolarizer`, `transmission_axis` |
-| Detectors     | `Detector`, `RegularGrid`, `RectilinearGrid`, `spot_diagram`, `intensity`, `electric_field`, `optical_power`, `gauss_parameters`, `waist_parameters`, `Centroid`, `MinMax` |
+| Detectors     | `Detector`, `RegularGrid`, `RectilinearGrid`, `spot_diagram`, `ray_hits`, `intensity`, `electric_field`, `optical_power`, `gauss_parameters`, `waist_parameters`, `Centroid`, `MinMax` |
 | Dummies       | `NonInteractableObject`, `IntersectableObject` |
-| Config        | `get_default_wavelength`, `get_default_waist`, `get_default_power`, `get_default_r_max`, `get_default_depth_max`, `get_invariant_threshold`, `set_invariant_threshold!`, `get_internal_reflection_threshold`, `get_line_plane_intersection_threshold`, `get_orthogonality_threshold`, `get_sdf_surface_threshold`, `get_sdf_raymarch_eps`, `get_sdf_inside_step`, `get_progress_threshold`, `set_progress_threshold!` |
-| Render (Makie)| `wavelength_color`, `render!`, `get_view`, `set_view`, `hide_axis`, `set_orthographic`, `look_at!`, `arrow!`, `render_lcs!`, `render_bounding_sphere!`, `set_render_look`, `studio_lighting!` |
+| Config        | `get_default_wavelength`, `get_default_waist`, `get_default_power`, `get_default_r_max`, `get_default_depth_max`, `get_invariant_threshold`, `set_invariant_threshold!`, `get_lagrange_tolerance`, `set_lagrange_tolerance!`, `get_internal_reflection_threshold`, `get_line_plane_intersection_threshold`, `get_orthogonality_threshold`, `get_sdf_surface_threshold`, `get_sdf_raymarch_eps`, `get_sdf_miss_distance`, `get_progress_threshold`, `set_progress_threshold!` |
+| Render (Makie)| `wavelength_color`, `render!`, `get_view`, `set_view`, `hide_axis`, `set_orthographic`, `look_at!`, `arrow!`, `render_lcs!`, `set_render_look`, `studio_lighting!` |
 | Live (Makie)  | `live_render!`, `update_render!`, `remove_render!`, `pick_object` |
 
 Useful non-exported helpers: `BeamletOptics.inch`, `lensmakers_eq(R1, R2, n)` (returns f),
-`divergence_angle(λ, w0, M2)`, `numerical_aperture(θ, n=1)`, `optical_path_length(beam)`,
-`isparaxial(system, beam, θ=π/4)`, `fresnel_coefficients`, `beams(group)`, `objects(system)`,
+`divergence_angle(λ, w0, M2)`, `numerical_aperture(θ, n=1)` (also of a `PointSource` or a cone
+sampling, public), `optical_path_length(beam)`,
+`isparaxial(system, beam, θ=π/4)`, `fresnel_coefficients`, `beams(group)`,
+`objects(system)` and `objects(group)` (public),
 `list_subtypes(T)`, constants `Z_vacuum`, `c_vacuum`.
 
 ## Properties of objects
 
-`properties(x)` lists what an object, shape, beam or source stores as `name => value` pairs, e.g.
+`BeamletOptics.properties(x)` lists what an object, shape, beam or source stores as `name => value` pairs, e.g.
 `"Thickness [m]" => 0.005`, `"Reflectance" => 0.3` (power ratio), `"Hits" => 12`. Values are SI
 numbers; the unit is in brackets at the end of the name, names without brackets are dimensionless.
 It lists only stored values: e.g. the
@@ -68,7 +69,7 @@ show its own parameters, extend it:
 
 ```julia
 BeamletOptics.properties(x::MyFilter) =
-    [default_properties(x); "Optical density" => x.od; "Center wavelength [m]" => x.λc]
+    [BeamletOptics.default_properties(x); "Optical density" => x.od; "Center wavelength [m]" => x.λc]
 ```
 
 ## Solving
@@ -80,6 +81,9 @@ solve_system!(system, beam_group; progress = true, initialize = false, kwargs...
 initialize!(system)   # empties all detectors of the system (nested groups included)
 ```
 
+- `threshold`: limit of the complex invariant of an `AstigmaticGaussianBeamlet`. The Lagrange invariants
+  of both beamlets stop tracing at a relative deviation of `get_lagrange_tolerance()` (default 50 %) instead.
+- `check_invariant = false` turns both checks off, for both beamlets.
 - `initialize`: `true` calls `initialize!(system)` before tracing. The default `false` keeps the hits of
   earlier solves, such that several sources solved one after another superpose on a detector.
 
@@ -97,12 +101,12 @@ initialize!(system)   # empties all detectors of the system (nested groups inclu
 
 | Call                              | Returns |
 |-----------------------------------|---------|
-| `rays(beam)`                      | vector of traced ray segments of this beam (not children) |
+| `rays(beam)`                      | vector of traced ray segments of this beam (not children); for a beamlet, those of its chief ray |
 | `position(ray)`, `direction(ray)` | start point and unit direction of a segment |
 | `length(beam)`                    | geometric path length up to the last intersection |
 | `BeamletOptics.optical_path_length(beam)` | optical path length |
 | `point_on_beam(beam, t)`          | `(point, ray_index)` at distance `t` along the beam |
-| `path_segments(beam; flen = 1.0)` | flat vector of `(start, stop, s_start, s_stop, opl_start, opl_stop, λ, depth, parent, beam_index, ray_index, final, leaf, object)` for the whole beam tree (chief ray of beamlets, all beams of a group); path lengths accumulate from the source, children continue at their parent's end, a final ray without intersection is `flen` long and has `final = true`; `leaf = true` marks the last segment of a branch (a final ray, or a ray that ends on e.g. a detector); `object` is the object hit at the end of the segment (`nothing` for a final segment) |
+| `path_segments(beam; flen = 1.0)` | flat vector of `PathSegment`s (a struct, not a NamedTuple) with the fields `(start, stop, s_start, s_stop, opl_start, opl_stop, λ, depth, parent, beam_index, ray_index, final, leaf, object)` for the whole beam tree (chief ray of beamlets, all beams of a group); path lengths accumulate from the source, children continue at their parent's end, a final ray without intersection is `flen` long and has `final = true`; `leaf = true` marks the last segment of a branch (a final ray, or a ray that ends on e.g. a detector); `object` is the object hit at the end of the segment (`nothing` for a final segment) |
 | `beam.children`                   | sub-beams after a split, `[transmitted, reflected]` |
 | `last(rays(beam)).E0`             | field vector of a polarized beam's last segment |
 | `gauss_parameters(g, z)`          | `(w, R, ψ, w0)` for `GaussianBeamlet`; `z` scalar or vector |
@@ -119,8 +123,9 @@ initialize!(system)   # empties all detectors of the system (nested groups inclu
 ```julia
 solve_system!(system, source; initialize = true)   # empties the detectors first (or initialize!(system), empty!(det))
 pts        = spot_diagram(det)                # Vector{Point2}: local (x, z) in m
+pts, dirs  = ray_hits(det)                    # points and unit directions in the detector frame (x̂, n̂, ẑ)
 x, z, E    = electric_field(det)              # complex field on a 100×100 RegularGrid (3-vectors for polarized rays and astigmatic beamlets)
-x, z, I    = intensity(det, RegularGrid(n = 200))   # W/m², power per detector area (Poynting flux)
+x, z, I    = intensity(det, RegularGrid(num_points = 200))   # W/m², power per detector area (Poynting flux)
 P          = optical_power(det)               # W, beam power for any angle of incidence
 s          = RectilinearGrid(xs, zs)          # a grid of one's own: local x, z vectors in m, any spacing
 x, z, E    = electric_field(det, s)
@@ -129,7 +134,7 @@ P          = optical_power(det, s)            # trapezoidal rule on xs × zs
 ```
 
 The second argument of `electric_field`/`intensity`/`optical_power` is a sampling (default
-`RegularGrid()`). Keywords of `RegularGrid`: `n`, `crop_factor`, `x_min`, `x_max`, `z_min`, `z_max`,
+`RegularGrid()`). Keywords of `RegularGrid`: `num_points`, `crop_factor`, `x_min`, `x_max`, `z_min`, `z_max`,
 `x0_shift`, `z0_shift`, `center = Centroid() | MinMax()` (rays). The readouts take `progress = true`
 (see Solving). See `components/detectors.md`.
 
@@ -151,14 +156,15 @@ optical_power(beamlet) / power(f)                               # power fraction
 
 `PlaneField(det)` is the physical field (tangential E and H); as for `optical_power(det)`,
 `power(f)` of an oblique beam is the full beam power. Beamlet hits
-only (not rays). `WavefrontBeamletDecomposition(x, y, Eu, Ev, dir, λ)` is the vector-field
-form that takes two field components instead of amplitude, phase and one `E0`.
+only (not rays). `WavefrontBeamletDecomposition(x, y, Eu, Ev, pos, dir, λ)` is the vector-field
+form that takes two field components instead of amplitude, phase and one `E0`; `pos` is the
+global position of the sample `x = y = 0`, as in `GaussianModeDecomposition(x, y, Eu, Ev, pos, dir, λ)`.
 `WavefrontBeamletDecomposition` needs beamlets much larger than λ (one per sample, waist 1.2
 samples); for small fields close to one Gaussian mode, e.g. single-mode fiber output, use
 `GaussianModeDecomposition` (plane in air, small tilt, no general astigmatism). Both resolve
 the phase step between samples only below π: keep the plane normal to the beam (a tilt θ
 needs a spacing below `λ / (2 sin θ)`). Strongly curved wavefronts go in relative to a
-reference sphere: keyword `R` of the `(x, y, Eu, Ev, dir, λ)` forms, taken from `f.R` for a
+reference sphere: keyword `R` of the `(x, y, Eu, Ev, pos, dir, λ)` forms, taken from `f.R` for a
 `PlaneField`; the sphere itself need not be resolved by the grid.
 
 Components that hand a beamlet to another solver and emit the result again (e.g. a fiber
@@ -173,9 +179,11 @@ BeamletOptics.relaunch!(agb, [GaussianModeDecomposition(g)])   # traced on, own 
 `relaunch!` (public, not exported) attaches the new beamlets as children that count their
 optical path from their own start; `children!` would add the parent's path and reference
 plane a second time and is only right for beams that continue where the parent ended.
-`PlaneField(agb, id)` works for any segment of an `AstigmaticGaussianBeamlet`, also inside
-glass (`f.n` is the index there); for the scalar `GaussianBeamlet` only for its last
-segment in air.
+`PlaneField(beam, id)` works for any segment of both beamlet models, also inside glass
+(`f.n` is the index there); the scalar `GaussianBeamlet` takes no Fresnel losses, so its
+field carries the full beamlet power. `PlaneField(hits; size, spacing, origin, axes)` samples
+a vector of beamlet hits built with `BeamletOptics.GaussianBeamletHit(beam, id)` or
+`BeamletOptics.AstigmaticGaussianBeamletHit(beam, id)` (public, not exported).
 
 ## Makie rendering
 

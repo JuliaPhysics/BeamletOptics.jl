@@ -13,7 +13,7 @@ n = 1.5
 λ = 1e-6
 
 cs = UniformDiscSource([0, -10mm, 0], [0, 1, 0], 15e-3, λ)
-lens = SphericalLens(R1, R2, l, d, x -> n)
+lens = SphericalLens(R1, R2, l, d, ConstantRefractiveIndex(n))
 
 psfd = Detector(10e-3)
 translate3d!(psfd, [0, 200mm + 0.13mm, 0])
@@ -22,7 +22,7 @@ sys = System([lens, psfd])
 
 solve_system!(sys, cs)
 
-x, z, I_num = intensity(psfd, RegularGrid(n=500, crop_factor=10))
+x, z, I_num = intensity(psfd, RegularGrid(num_points = 500, crop_factor=10))
 
 fringes_fig = Figure()
 srf = Axis3(fringes_fig[1, 1], xlabel="x [µm]", ylabel="z [µm]", elevation=0.9, azimuth=2.372)
@@ -41,7 +41,7 @@ A = [0*(1e3)^1, 2.7709219e-8*(1e3)^3, 6.418186e-13*(1e3)^5, -1.5724014e-17*(1e3)
 AL75150 = Lens(
     EvenAsphericalSurface(radius, d, k, A),
     l,
-    n -> 1.5006520430
+    ConstantRefractiveIndex(1.5006520430)
 )
 
 xrotate3d!(AL75150, deg2rad(-0.5))
@@ -57,7 +57,7 @@ solve_system!(system, ps)
 
 asph_fig = Figure(size=(800, 500))
 
-xs, ys, _intensity = intensity(pd, RegularGrid(n=801, x_min=-25e-6, x_max=25e-6, z_min=-25e-6, z_max=25e-6, z0_shift=-50e-6))
+xs, ys, _intensity = intensity(pd, RegularGrid(num_points = 801, x_min=-25e-6, x_max=25e-6, z_min=-25e-6, z_max=25e-6, z0_shift=-50e-6))
 
 ax = Axis(asph_fig[1,1], xlabel="x [µm]", ylabel="z [µm]", aspect=1)
 

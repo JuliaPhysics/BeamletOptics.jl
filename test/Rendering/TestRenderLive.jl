@@ -5,6 +5,7 @@ using Makie
 using GeometryBasics
 using Test
 using LinearAlgebra
+using AbstractTrees: AbstractTrees
 
 const BMO = BeamletOptics
 
@@ -47,7 +48,7 @@ struct _Combined <: BMO.AbstractSystemRenderHandle
     children::Vector{BMO.AbstractObjectRenderHandle}
 end
 BMO.rendered(h::_Combined) = h.sys
-BMO.render_children(h::_Combined) = h.children
+AbstractTrees.children(h::_Combined) = h.children
 BMO.render_parent(::_Combined, _) = nothing
 Base.delete!(h::_Combined, oh::BMO.AbstractObjectRenderHandle) = (filter!(c -> c !== oh, h.children); h)
 
@@ -146,7 +147,7 @@ Base.delete!(h::_Combined, oh::BMO.AbstractObjectRenderHandle) = (filter!(c -> c
     end
 
     @testset "MultiShape (CubeBeamsplitter): rigid update + non-rigid fallback" begin
-        cbs = CubeBeamsplitter(0.02, λ -> 1.5)
+        cbs = CubeBeamsplitter(0.02, ConstantRefractiveIndex(1.5))
         h = live_render!(ax, cbs)
         n = length(h.plots)
         @test count(p -> p isa Makie.Mesh, h.plots) == 2 # merged front and back, coating
@@ -238,7 +239,7 @@ Base.delete!(h::_Combined, oh::BMO.AbstractObjectRenderHandle) = (filter!(c -> c
         @test h isa Ext.ObjectRenderHandle
         @test BMO.rendered(h) === outer
         @test map(Makie.plotfunc, h.plots) == map(Makie.plotfunc, rendered)
-        @test length(h.subP0) == 2 # the mirror and the inner group
+        @test length(h.subP0) == 3 # the objects at all depths
 
         # rigid motion of the outer group: the plots are kept
         plots = copy(h.plots)
@@ -293,15 +294,12 @@ Base.delete!(h::_Combined, oh::BMO.AbstractObjectRenderHandle) = (filter!(c -> c
         sys = System([outer])
         h = live_render!(ax, sys)
 
-        # one handle per leaf, hierarchy in parent
+        # one handle per leaf, hierarchy via render_parent
         @test length(h.handles) == 3
         @test [oh.obj for oh in h.handles] == [m1, m2, m3]
         @test all(oh -> oh isa Ext.ObjectRenderHandle, h.handles)
-        @test h.parent[m1] === outer
-        @test h.parent[m2] === inner
-        @test h.parent[m3] === inner
-        @test h.parent[inner] === outer
-        @test !haskey(h.parent, outer)
+        @test BMO.render_parent(h, m1) === outer
+        @test BMO.render_parent(h, m3) === inner
         @test BMO.render_parent(h, m2) === inner
         @test BMO.render_parent(h, inner) === outer
         @test BMO.render_parent(h, outer) === nothing
@@ -339,7 +337,7 @@ Base.delete!(h::_Combined, oh::BMO.AbstractObjectRenderHandle) = (filter!(c -> c
     end
 
     @testset "pick_object after a fallback rerender" begin
-        cbs = CubeBeamsplitter(0.02, λ -> 1.5)
+        cbs = CubeBeamsplitter(0.02, ConstantRefractiveIndex(1.5))
         h = live_render!(ax, System([cbs]))
         old_plots = copy(h.handles[1].plots)
         translate3d!(cbs.front, [0.0, 0.0, 0.01])
@@ -357,7 +355,7 @@ Base.delete!(h::_Combined, oh::BMO.AbstractObjectRenderHandle) = (filter!(c -> c
         h = live_render!(ax, sys)
         @test h isa BMO.AbstractSystemRenderHandle
         @test BMO.rendered(h) === sys
-        children = BMO.render_children(h)
+        children = AbstractTrees.children(h)
         @test all(c -> c isa BMO.AbstractObjectRenderHandle, children)
         @test [BMO.rendered(c) for c in children] == [m, lens]
         @test BMO.render_parent(h, lens) === g
@@ -379,12 +377,34 @@ Base.delete!(h::_Combined, oh::BMO.AbstractObjectRenderHandle) = (filter!(c -> c
         @test P ≈ position(src)
         _check_reference_points(BMO.render_plots(hm)[1], hm.P0, hm.R0, P, R)
 
+        # a directed thing is turned by the smallest rotation from +y onto its direction
+        for rotate! in (
+                b -> xrotate3d!(b, 0.3),
+                b -> zrotate3d!(b, π),
+                b -> (zrotate3d!(b, 0.5); xrotate3d!(b, 0.3)),
+                b -> xrotate3d!(b, 1.3),
+            )
+            beam = Beam([0.0, 0, 0], [0.0, 1, 0], 1e-6)
+            hb = live_render!(ax, beam) do
+                scatter!(ax, [Makie.Point3f(position(beam))]; color = :orange)
+                lines!(ax, [Makie.Point3f(0, 0, 0), Makie.Point3f(0, 0.01, 0)])
+            end
+            rotate!(beam)
+            update_render!(hb)
+            d = BMO.direction(beam)
+            @test norm(hb.R - BMO.align3d([0.0, 1, 0], d)) < 1e-12
+            @test norm(hb.R * [0, 1, 0] - d) < 1e-12
+            @test norm(hb.R' * hb.R - I) < 1e-12
+            _check_reference_points(BMO.render_plots(hb)[1], hb.P0, hb.R0, hb.P, hb.R)
+            remove_render!(hb)
+        end
+
         # adding and removing a child handle after live_render!
         push!(h, hm)
-        @test BMO.render_children(h)[end] === hm
+        @test AbstractTrees.children(h)[end] === hm
         @test pick_object(h, BMO.render_plots(hm)[1]) === src
         delete!(h, hm)
-        @test !any(c -> c === hm, BMO.render_children(h))
+        @test !any(c -> c === hm, AbstractTrees.children(h))
         @test pick_object(h, BMO.render_plots(hm)[1]) === nothing
         @test !isempty(BMO.render_plots(hm)) # delete! keeps the plots
         remove_render!(hm)
@@ -403,11 +423,11 @@ Base.delete!(h::_Combined, oh::BMO.AbstractObjectRenderHandle) = (filter!(c -> c
         new = live_render!(h, lens)
         @test length(new) == 1
         @test BMO.rendered(only(new)) === lens
-        @test BMO.render_children(h)[end] === only(new)
+        @test AbstractTrees.children(h)[end] === only(new)
         @test isnothing(BMO.render_parent(h, lens))
         @test pick_object(h, BMO.render_plots(only(new))[1]) === lens
         @test_throws ArgumentError live_render!(h, lens)
-        @test length(BMO.render_children(h)) == 2
+        @test length(AbstractTrees.children(h)) == 2
 
         # a group is rendered per object, with its hierarchy
         m2 = RoundPlanoMirror(0.02, 0.004)
@@ -418,7 +438,7 @@ Base.delete!(h::_Combined, oh::BMO.AbstractObjectRenderHandle) = (filter!(c -> c
         push!(sys, group)
         new = live_render!(h, group)
         @test [BMO.rendered(oh) for oh in new] == [m2, m3]
-        @test length(BMO.render_children(h)) == 4
+        @test length(AbstractTrees.children(h)) == 4
         @test BMO.render_parent(h, m2) === group
         @test BMO.render_parent(h, m3) === inner
         @test BMO.render_parent(h, inner) === group
@@ -428,7 +448,7 @@ Base.delete!(h::_Combined, oh::BMO.AbstractObjectRenderHandle) = (filter!(c -> c
         # an object of a group can not be removed on its own
         @test_throws "ObjectGroup" remove_render!(h, m2)
         @test_throws ArgumentError remove_render!(h, inner)
-        @test length(BMO.render_children(h)) == 4
+        @test length(AbstractTrees.children(h)) == 4
         @test BMO.render_parent(h, m2) === group
 
         # the plots of the added objects follow them
@@ -447,14 +467,14 @@ Base.delete!(h::_Combined, oh::BMO.AbstractObjectRenderHandle) = (filter!(c -> c
         @test all(in_scene, plots)
         delete!(sys, group)
         @test isnothing(remove_render!(h, group))
-        @test [BMO.rendered(oh) for oh in BMO.render_children(h)] == [m, lens]
+        @test [BMO.rendered(oh) for oh in AbstractTrees.children(h)] == [m, lens]
         @test !any(in_scene, plots)
         @test isnothing(BMO.render_parent(h, m2))
         @test isnothing(BMO.render_parent(h, m3))
         @test isnothing(BMO.render_parent(h, inner))
         # nothing happens for an object that is not rendered
         remove_render!(h, group)
-        @test length(BMO.render_children(h)) == 2
+        @test length(AbstractTrees.children(h)) == 2
 
         # a group that can not be rendered completely leaves the handle and the axis unchanged
         m4 = RoundPlanoMirror(0.02, 0.004)
@@ -462,19 +482,80 @@ Base.delete!(h::_Combined, oh::BMO.AbstractObjectRenderHandle) = (filter!(c -> c
         n_plots = length(ax.scene.plots)
         @test_throws Exception live_render!(h, broken)
         @test length(ax.scene.plots) == n_plots
-        @test length(BMO.render_children(h)) == 2
+        @test length(AbstractTrees.children(h)) == 2
         @test isnothing(BMO.render_parent(h, m4))
         @test length(live_render!(h, m4)) == 1
         remove_render!(h, m4)
 
         # an own system handle removes objects through the protocol, but can not render them
-        c = _Combined(sys, copy(BMO.render_children(h)))
+        c = _Combined(sys, copy(AbstractTrees.children(h)))
         @test_throws ArgumentError live_render!(c, m4)
-        lens_plots = copy(BMO.render_plots(BMO.render_children(h)[2]))
+        lens_plots = copy(BMO.render_plots(AbstractTrees.children(h)[2]))
         remove_render!(c, lens)
-        @test [BMO.rendered(oh) for oh in BMO.render_children(c)] == [m]
+        @test [BMO.rendered(oh) for oh in AbstractTrees.children(c)] == [m]
         @test !any(in_scene, lens_plots)
         remove_render!(h)
+    end
+
+    @testset "Groups changed after live_render!" begin
+        # system handle: the hierarchy follows push! and delete! of a group
+        a = RoundPlanoMirror(0.02, 0.004)
+        b = RoundPlanoMirror(0.02, 0.004)
+        c = RoundPlanoMirror(0.02, 0.004)
+        translate3d!(b, [0, 0.05, 0])
+        translate3d!(c, [0, 0.1, 0])
+        inner = ObjectGroup([c])
+        g = ObjectGroup([b, inner])
+        sys = System([a, g])
+        h = live_render!(ax, sys)
+        delete!(sys, a)
+        push!(g, a)
+        @test BMO.render_parent(h, a) === g
+        @test pick_object(h, BMO.render_plots(h.handles[1])[1]) === g
+        delete!(g, a)
+        push!(sys, a)
+        @test isnothing(BMO.render_parent(h, a))
+        @test pick_object(h, BMO.render_plots(h.handles[1])[1]) === a
+        # an object moved into a subgroup and an object rendered later into a group
+        delete!(g, b)
+        push!(inner, b)
+        @test BMO.render_parent(h, b) === inner
+        d = RoundPlanoMirror(0.02, 0.004)
+        push!(g, d)
+        new = live_render!(h, d)
+        @test BMO.render_parent(h, d) === g
+        @test pick_object(h, BMO.render_plots(only(new))[1]) === g
+        # a group removed from the handle is forgotten, also the objects it got later
+        delete!(g, d)
+        remove_render!(h, d)
+        delete!(sys, g)
+        remove_render!(h, g)
+        @test isnothing(BMO.render_parent(h, b))
+        @test [BMO.rendered(oh) for oh in AbstractTrees.children(h)] == [a]
+        remove_render!(h)
+
+        # group handle: rendered again when its objects change, also at the same count
+        x = RoundPlanoMirror(0.02, 0.004)
+        y = RoundPlanoMirror(0.02, 0.004)
+        z = RoundPlanoMirror(0.02, 0.004)
+        translate3d!(y, [0, 0.05, 0])
+        translate3d!(z, [0, 0.05, 0])
+        sub = ObjectGroup([y])
+        group = ObjectGroup([x, sub])
+        hg = live_render!(ax, group)
+        plots = copy(hg.plots)
+        update_render!(hg)
+        @test hg.plots == plots
+        delete!(sub, y)
+        push!(sub, z) # same pose and count, another object
+        update_render!(hg)
+        @test !any(p -> any(q -> q === p, plots), hg.plots)
+        plots = copy(hg.plots)
+        push!(group, y)
+        update_render!(hg)
+        @test !any(p -> any(q -> q === p, plots), hg.plots)
+        @test hg.subs == Any[x, z, y]
+        remove_render!(hg)
     end
 
     @testset "pickable_plots" begin
@@ -492,11 +573,11 @@ Base.delete!(h::_Combined, oh::BMO.AbstractObjectRenderHandle) = (filter!(c -> c
     @testset "own system handle on the protocol" begin
         s1, s2 = System([RoundPlanoMirror(0.025, 0.005)]), System([RoundPlanoMirror(0.025, 0.005)])
         h1, h2 = live_render!(ax, s1), live_render!(ax, s2)
-        c = _Combined(s1, [BMO.render_children(h1); BMO.render_children(h2)])
+        c = _Combined(s1, [AbstractTrees.children(h1); AbstractTrees.children(h2)])
         m2 = only(s2.objects)
         translate3d!(m2, [0.01, 0, 0])
         update_render!(c)
-        oh = only(BMO.render_children(h2))
+        oh = only(AbstractTrees.children(h2))
         _check_reference_points(BMO.render_plots(oh)[1], oh.P0, oh.R0, position(m2), BMO.orientation(m2))
         @test pick_object(c, BMO.render_plots(oh)[1]) === m2
         remove_render!(c)

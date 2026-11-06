@@ -23,12 +23,13 @@ The following constructors can be used to generate flat reflecting shapes. Addit
 - [`SquarePlanoMirror2D`](@ref)
 - [`SquarePlanoMirror`](@ref)
 - [`RectangularPlanoMirror`](@ref)
-- [`Retroreflector`](@ref)
+
+The [`Retroreflector`](@ref) is not flat: it is an [`BeamletOptics.AbstractReflectiveOptic`](@ref) with an open tetrahedral [`Mesh`](@ref BeamletOptics.Mesh) that reflects incoming rays back toward their source, independent of the angle of incidence.
 
 
 ## Plano Mirrors
 
-A category of mirrors with a flat reflecting surface. A round version of this mirror can be easily generated using the [`RoundPlanoMirror`](@ref) or [`RightAnglePrismMirror`](@ref) constructors, which return a [`Mirror`](@ref). An optional central through-hole can be added to [`RoundPlanoMirror`](@ref) via the `hole_diameter` keyword argument:
+A category of mirrors with a flat reflecting surface. A round version of this mirror can be easily generated using the [`RoundPlanoMirror`](@ref) constructor. The [`RightAnglePrismMirror`](@ref) is a different shape: a right-angle prism shape ([`BeamletOptics.RightAnglePrismSDF`](@ref)) and not a round mirror. Both return a [`Mirror`](@ref). An optional central through-hole can be added to [`RoundPlanoMirror`](@ref) via the `hole_diameter` keyword argument:
 
 ```@docs; canonical=false
 RoundPlanoMirror(::Real, ::Real)

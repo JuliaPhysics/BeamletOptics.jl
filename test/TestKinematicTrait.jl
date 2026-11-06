@@ -48,6 +48,9 @@ struct Bare end
 
 BMO.kinematic_trait_of(::Bare) = BMO.Movable(BMO.Oriented())
 
+"Composite SDF without an `operands` method."
+struct BareComposite{T} <: BMO.AbstractCompositeSDF{T} end
+
 """
 Astigmatic beamlets that are declared static. Only `Float32` beamlets are affected, which are
 not used anywhere else in the test suite.
@@ -64,21 +67,21 @@ function float32_beamlet()
     return BMO.AstigmaticGaussianBeamlet(c, r(), r(), r(), r(), r(), r(), r(), r())
 end
 
-"Applies every kinematic verb to `x` and tests that each one throws an `ArgumentError`."
-function test_all_verbs_throw(x)
+"Applies every kinematic verb to `x` and tests that each one throws an exception of type `E`."
+function test_all_verbs_throw(x, E::Type{<:Exception} = ArgumentError)
     R = BMO.rotate3d([0.0, 0.0, 1.0], 0.3)
-    @test_throws ArgumentError translate3d!(x, [1.0, 0, 0])
-    @test_throws ArgumentError translate_to3d!(x, [1.0, 0, 0])
-    @test_throws ArgumentError rotate3d!(x, R)
-    @test_throws ArgumentError rotate3d!(x, [0.0, 0, 1], 0.3)
-    @test_throws ArgumentError rotate3d!(x, R, [1.0, 0, 0])
-    @test_throws ArgumentError rotate3d!(x, [0.0, 0, 1], 0.3, [1.0, 0, 0])
-    @test_throws ArgumentError xrotate3d!(x, 0.3)
-    @test_throws ArgumentError yrotate3d!(x, 0.3)
-    @test_throws ArgumentError zrotate3d!(x, 0.3)
-    @test_throws ArgumentError align3d!(x, [1.0, 0, 0])
-    @test_throws ArgumentError reset_translation3d!(x)
-    @test_throws ArgumentError reset_rotation3d!(x)
+    @test_throws E translate3d!(x, [1.0, 0, 0])
+    @test_throws E translate_to3d!(x, [1.0, 0, 0])
+    @test_throws E rotate3d!(x, R)
+    @test_throws E rotate3d!(x, [0.0, 0, 1], 0.3)
+    @test_throws E rotate3d!(x, R, [1.0, 0, 0])
+    @test_throws E rotate3d!(x, [0.0, 0, 1], 0.3, [1.0, 0, 0])
+    @test_throws E xrotate3d!(x, 0.3)
+    @test_throws E yrotate3d!(x, 0.3)
+    @test_throws E zrotate3d!(x, 0.3)
+    @test_throws E align3d!(x, [1.0, 0, 0])
+    @test_throws E reset_translation3d!(x)
+    @test_throws E reset_rotation3d!(x)
     return nothing
 end
 
@@ -93,7 +96,7 @@ function oriented_subjects()
         BMO.CubeMesh(1mm),
         BMO.SphereSDF(1mm) + BMO.CylinderSDF(1mm, 2mm),
         mirror(),
-        CubeBeamsplitter(10mm, n -> 1.5),
+        CubeBeamsplitter(10mm, ConstantRefractiveIndex(1.5)),
         ObjectGroup([mirror(), lens()]),
         CollimatedSource([0, -50mm, 0], [0, 1, 0], 5mm, 1e-6; num_rings = 2, num_rays = 40),
     ]
@@ -129,7 +132,7 @@ end
             BMO.SphereSDF(1mm) + BMO.CylinderSDF(1mm, 2mm),
             BMO.SphereSDF(1mm) - BMO.CylinderSDF(1mm, 2mm),
             mirror(),
-            CubeBeamsplitter(10mm, n -> 1.5),
+            CubeBeamsplitter(10mm, ConstantRefractiveIndex(1.5)),
             ObjectGroup([mirror(), lens()]),
             CollimatedSource([0, -50mm, 0], [0, 1, 0], 5mm, 1e-6; num_rings = 2, num_rays = 40),
         ]
@@ -145,8 +148,10 @@ end
         for x in directed
             @test BMO.kinematic_trait_of(x) === BMO.Movable(BMO.Directed())
         end
+        # Types without an opt-in method throw
+        @test_throws "kinematic_trait_of not defined for Int64" BMO.kinematic_trait_of(1)
+        @test_throws ErrorException BMO.kinematic_trait_of(1)
         @test BMO.kinematic_trait_of(System([mirror()])) === BMO.Static()
-        @test BMO.kinematic_trait_of(1.0) === BMO.Static()
     end
 
     @testset "Static object" begin
@@ -188,7 +193,7 @@ end
         m = mirror()
         zrotate3d!(m, deg2rad(45))
         translate3d!(m, [0, 60mm, 0])
-        bs = CubeBeamsplitter(10mm, n -> 1.5)
+        bs = CubeBeamsplitter(10mm, ConstantRefractiveIndex(1.5))
         system = System([bs, m])
         b = Beam([1mm, -50mm, 0.5mm], [0, 1, 0])
         solve_system!(system, b)
@@ -243,9 +248,9 @@ end
         @test BMO.kinematic_trait_of(AstigmaticBeamGroup([a_movable], [0, 0, 0], M32)) ===
               BMO.Movable(BMO.Oriented())
         # Frames may mix
-        @test isnothing(BMO._check_kinematic_members((mirror(), Ray([0, 0, 0], [0, 1, 0]))))
-        @test isnothing(BMO._check_kinematic_members(()))
-        @test isnothing(BMO._check_kinematic_members([fixed(), System([mirror()])]))
+        @test isnothing(BMO.check_kinematic_members((mirror(), Ray([0, 0, 0], [0, 1, 0]))))
+        @test isnothing(BMO.check_kinematic_members(()))
+        @test isnothing(BMO.check_kinematic_members([fixed(), FixedSDF()]))
     end
 
     @testset "Object group trait" begin
@@ -253,8 +258,7 @@ end
         g_movable = ObjectGroup([mirror(), lens()])
         @test BMO.kinematic_trait_of(g_static) === BMO.Static()
         @test BMO.kinematic_trait_of(g_movable) === BMO.Movable(BMO.Oriented())
-        @test (@inferred BMO.kinematic_trait_of(g_static)) === BMO.Static()
-        @test (@inferred BMO.kinematic_trait_of(g_movable)) === BMO.Movable(BMO.Oriented())
+        # not inferred: the members of a group can change (push!, delete!), its trait is found at runtime
         cs = CollimatedSource([0, -50mm, 0], [0, 1, 0], 5mm, 1e-6; num_rings = 2, num_rays = 40)
         @test (@inferred BMO.kinematic_trait_of(cs)) === BMO.Movable(BMO.Oriented())
         # All verbs throw for a static group, set_pivot3d! still works
@@ -263,12 +267,15 @@ end
         @test position(g_static) == [1.0, 2.0, 3.0]
         @test all(position(o) == zeros(3) for o in BMO.objects(g_static))
         # a static group lists its position like a static object
-        @test properties(g_static) == ["Type" => "ObjectGroup", "Position [m]" => [1.0, 2.0, 3.0], "Parts" => 2]
+        @test BMO.properties(g_static) == ["Type" => "ObjectGroup", "Position [m]" => [1.0, 2.0, 3.0], "Parts" => 2]
     end
 
     @testset "Primitive fallback" begin
         @test_throws ErrorException translate3d!(Bare(), [1.0, 0, 0])
         @test_throws ErrorException rotate3d!(Bare(), Matrix(1.0I, 3, 3))
+        @test_throws "not defined for" translate3d!(Bare(), [1.0, 0, 0])
+        @test_throws ErrorException BMO.operands(BareComposite{Float64}())
+        @test_throws "operands not defined for" BMO.operands(BareComposite{Float64}())
     end
 end
 

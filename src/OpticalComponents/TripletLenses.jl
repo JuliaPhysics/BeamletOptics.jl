@@ -26,7 +26,7 @@ See also [`SphericalTripletLens`](@ref) and the surface-based constructor
     Total internal reflection at a cemented interface between two elements is not modeled correctly.
 """
 struct TripletLens{T, F<:AbstractShape{T}, M<:AbstractShape{T}, B<:AbstractShape{T},
-                   N1<:RefractiveIndex, N2<:RefractiveIndex, N3<:RefractiveIndex} <: AbstractObject{T}
+                   N1<:AbstractRefractiveIndex, N2<:AbstractRefractiveIndex, N3<:AbstractRefractiveIndex} <: AbstractObject{T}
     front::Lens{T, F, N1}
     middle::Lens{T, M, N2}
     back::Lens{T, B, N3}
@@ -60,9 +60,9 @@ along +y by `l1` and `l1 + l2`, so that neighbouring elements share the cemented
 - `l1`: first lens center thickness in m
 - `l2`: second lens center thickness in m
 - `l3`: third lens center thickness in m
-- `n1`: first lens [`RefractiveIndex`](@ref)
-- `n2`: second lens [`RefractiveIndex`](@ref)
-- `n3`: third lens [`RefractiveIndex`](@ref)
+- `n1`: first lens [`AbstractRefractiveIndex`](@ref)
+- `n2`: second lens [`AbstractRefractiveIndex`](@ref)
+- `n3`: third lens [`AbstractRefractiveIndex`](@ref)
 
 # Additional information
 
@@ -88,9 +88,9 @@ function TripletLens(
         l1::Real,
         l2::Real,
         l3::Real,
-        n1::RefractiveIndex,
-        n2::RefractiveIndex,
-        n3::RefractiveIndex)
+        n1::AbstractRefractiveIndex,
+        n2::AbstractRefractiveIndex,
+        n3::AbstractRefractiveIndex)
     # Generate "cemented" front, middle and back lenses that share the surfaces s2 and s3
     front = Lens(s1, s2, l1, n1)
     middle = Lens(s2, s3, l2, n2)
@@ -118,9 +118,9 @@ For radii sign definition, refer to the [`SphericalLens`](@ref) constructor.
 - `l2`: second lens thickness
 - `l3`: third lens thickness
 - `d`: lens diameter
-- `n1`: first lens [`RefractiveIndex`](@ref)
-- `n2`: second lens [`RefractiveIndex`](@ref)
-- `n3`: third lens [`RefractiveIndex`](@ref)
+- `n1`: first lens [`AbstractRefractiveIndex`](@ref)
+- `n2`: second lens [`AbstractRefractiveIndex`](@ref)
+- `n3`: third lens [`AbstractRefractiveIndex`](@ref)
 
 # Additional information
 

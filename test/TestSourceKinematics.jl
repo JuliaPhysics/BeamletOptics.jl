@@ -330,7 +330,7 @@ start_rays(b) = map(BMO.first_ray, BMO._component_beams(b))
             SphericalGaussianBeamletSource(pos, dir, 0.1, 1e-6; num_rings = 2, num_rays = 40),
             EllipticalGaussianBeamletSource(pos, dir, 0.1, 0.05, 1e-6; num_rings = 2, num_rays = 40),
             GaussianBeamletDecomposition(pos, dir, 1e-6, 1mm; n_grid = 6),
-            WavefrontBeamletDecomposition(x, x, amp, phase, dir, 1e-6),
+            WavefrontBeamletDecomposition(x, x, amp, phase, pos, dir, 1e-6),
             UniformLineSource(pos, dir, 5mm; num_rays = 20),
             UniformFanSource(pos, dir, 0.1; num_rays = 20)
         ]
@@ -344,7 +344,7 @@ start_rays(b) = map(BMO.first_ray, BMO._component_beams(b))
             SphericalGaussianBeamletSource(pos, dir, 0.1, 1e-6; num_rings = 2, num_rays = 40, basis = b),
             EllipticalGaussianBeamletSource(pos, dir, 0.1, 0.05, 1e-6; num_rings = 2, num_rays = 40, basis = b),
             GaussianBeamletDecomposition(pos, dir, 1e-6, 1mm; n_grid = 6, basis = (b, b2)),
-            WavefrontBeamletDecomposition(x, x, amp, phase, dir, 1e-6; basis = (b, b2)),
+            WavefrontBeamletDecomposition(x, x, amp, phase, pos, dir, 1e-6; basis = (b, b2)),
             UniformLineSource(pos, dir, 5mm; num_rays = 20, basis = b),
             UniformFanSource(pos, dir, 0.1; num_rays = 20, basis = b)
         ]
@@ -492,7 +492,7 @@ start_rays(b) = map(BMO.first_ray, BMO._component_beams(b))
     end
 
     @testset "Moving a child beam throws" begin
-        pbs = RectangularPlateBeamsplitter(36mm, 25mm, 1mm, n -> 1.5)
+        pbs = RectangularPlateBeamsplitter(36mm, 25mm, 1mm, ConstantRefractiveIndex(1.5))
         zrotate3d!(pbs, deg2rad(45))
         bs_system = System([pbs])
         beam = Beam([0, -50mm, 0], [0, 1, 0], 1e-6)
@@ -507,6 +507,26 @@ start_rays(b) = map(BMO.first_ray, BMO._component_beams(b))
         # moving the root drops the children
         translate3d!(beam, [1mm, 0, 0])
         @test is_reset(beam)
+        # child beamlets throw the same error
+        msg = "cannot move a child beam; move its root beam instead"
+        g = GaussianBeamlet([0, -50mm, 0], [0, 1, 0], 1e-6, 1mm)
+        a = AstigmaticGaussianBeamlet([0, -50mm, 0], [0, 1, 0], 1e-6, 1mm)
+        for root in (g, a)
+            solve_system!(bs_system, root; depth_max = 4)
+            child = first(BMO.children(root))
+            @test_throws ArgumentError(msg) translate3d!(child, [1mm, 0, 0])
+            @test_throws ArgumentError(msg) rotate3d!(child, R)
+        end
+    end
+
+    @testset "Traced GaussianBeamlet rotated about its start" begin
+        g = GaussianBeamlet([1mm, -50mm, 0.5mm], [0, 1, 0], 1e-6, 1mm)
+        solve_system!(system, g)
+        p0 = position(g)
+        rotate3d!(g, R)
+        @test is_reset(g)
+        @test norm(position(g) - p0) < 1e-12
+        @test BMO.direction(g) ≈ R * [0, 1, 0]
     end
 
     @testset "Non-unit rotation axis is consistent across all kinematic types" begin
@@ -530,8 +550,8 @@ start_rays(b) = map(BMO.first_ray, BMO._component_beams(b))
             BMO.CylinderSDF(1mm, 2mm) + BMO.CylinderSDF(2mm, 1mm),   # composite SDF
             BMO.CubeMesh(1mm),                                       # mesh
             ref,                                                     # object (SingleShape)
-            CubeBeamsplitter(5mm, λ -> 1.5),                         # object (MultiShape)
-            ObjectGroup([RoundPlanoMirror(10mm, 2mm), CubeBeamsplitter(5mm, λ -> 1.5)]),
+            CubeBeamsplitter(5mm, ConstantRefractiveIndex(1.5)),                         # object (MultiShape)
+            ObjectGroup([RoundPlanoMirror(10mm, 2mm), CubeBeamsplitter(5mm, ConstantRefractiveIndex(1.5))]),
             Ray([1.0, 0, 0], [0, 1.0, 0]),
             PolarizedRay([1.0, 0, 0], [0, 1.0, 0], 1e-6, [0, 0, 1.0]),
             Beam([1.0, 0, 0], [0, 1.0, 0]),

@@ -7,23 +7,23 @@ Main.DocUtils.conditional_include(joinpath(detector_showcase_dir, "photodetector
 
 # Detectors
 
-In practice, photodetectors allow the conversion of electromagnetic radiation into electric signals. BMO provides the [`Detector`](@ref) as an element to capture and evaluate optical data during and after running a simulation, respectively. The `Detector` is designed to accumulate e.g. field or ray data, enabling analysis of intensity distributions, interference patterns, and other beam properties. Currently, post-processing capabilities are limited to the functionality as described in the [Spot diagrams](@ref) and [Field distributions](@ref) sections.
+In practice, photodetectors allow the conversion of electromagnetic radiation into electric signals. BMO provides the [`Detector`](@ref) as an element to capture and evaluate optical data during and after running a simulation, respectively. The `Detector` is designed to accumulate e.g. field or ray data, enabling analysis of intensity distributions, interference patterns, and other beam properties. The post-processing is described in the sections [Reading out a detector](@ref), [Spot diagrams](@ref), [Ray directions](@ref) and [Field distributions](@ref), which also covers the coupling to other solvers via OpticsBase.
 
 In general, detector-like elements are supposed to fall under the [`BeamletOptics.AbstractDetector`](@ref) type, which defines a interface for detector implementations.
 
 !!! warning "Resetting detectors"
-    By default, the data stored in a `Detector` is not reset between calls of [`solve_system!`](@ref). This is intentional, since all beams of a beam group and several sources solved one after another are meant to superpose on the same detectors. To start from empty detectors, e.g. when a component is changed in a loop, solve with `initialize = true` or call [`initialize!`](@ref)`(system)`, which resets all detectors of a [`System`](@ref) including those in nested [`ObjectGroup`](@ref)s. A single detector is reset with [`empty!`](@ref). Hits are pushed under a lock, so beam groups can safely be solved multithreaded.
+    By default, the data stored in a `Detector` is not reset between calls of [`solve_system!`](@ref). This is intentional, since all beams of a beam group and several sources solved one after another are meant to superpose on the same detectors. To start from empty detectors, e.g. when a component is changed in a loop, solve with `initialize = true` or call [`initialize!`](@ref)`(system)`, which resets all detectors of a [`System`](@ref) including those in nested [`ObjectGroup`](@ref)s. A single detector is reset with [`empty!`](@ref). Hits are pushed under a lock, so beam groups can safely be solved multithreaded. In the solve of a beam group, the hits are first collected in buffers and stored in the detector at the end of each chunk of beams, see [Hit recording](@ref).
 
 ## Detector type
 
-A `Detector` can be easily spawned by initializing e.g. `pd = Detector(5mm)` which will create a 5x5 mm² detection screen.
+A `Detector` can be easily spawned by initializing e.g. `pd = Detector(5e-3)` which will create a 5x5 mm² detection screen (the edge length is given in meters).
 
 ```@docs; canonical=false
 Detector(::Real, ::Bool)
 Detector
 ```
 
-After solving a system containing a `Detector`, the methods listed below can be used in order to analyze the stored data. If no data is obtained during the tracing procedure, an error message will be stored.
+After solving a system containing a `Detector`, the methods listed below can be used in order to analyze the stored data. If no hits are stored, the readouts return zero or empty results.
 
 ## Reading out a detector
 
@@ -49,6 +49,8 @@ end
 spots = spot_diagram(pd)
 ```
 
+How a solve records the hits and what empties them again is shown in [Hit recording](@ref).
+
 ## Spot diagrams
 
 The `spot_diagram` method provides a straight forward way to generate spot diagrams, which are commonly used to perform initial assessments of the optical performance of an imaging setup.
@@ -60,6 +62,21 @@ spot_diagram
 The following image shows the spot diagram of a Sonnar lens. Two [`CollimatedSource`](@ref)s are traced through the system at different angles. A [`Detector`](@ref) is positioned at the focal plane to capture the resulting spot diagrams, which are visualized using the method explained above.
 
 ![Sonnar spot diagram showcase](sonnar_spot_diagram.png)
+
+## Ray directions
+
+Where a ray crossed the detector is half of what it carries; [`ray_hits`](@ref) also returns the direction in which it went, both in the coordinates of the detector. The angle of each ray to the detector normal over its distance from the detector center shows, for example, how far a beam is from collimated:
+
+```julia
+using LinearAlgebra: norm
+pts, dirs = ray_hits(pd)
+r = norm.(pts)                                   # distance from the detector center [m]
+θ = [atan(hypot(d[1], d[3]), abs(d[2])) for d in dirs] # angle to the normal [rad], either side
+```
+
+```@docs; canonical=false
+ray_hits
+```
 
 ## Field distributions
 
@@ -77,15 +94,15 @@ optical_power(::Detector, ::BeamletOptics.AbstractDetectorSampling)
 Where on the detector the readouts are evaluated is set by a sampling, the second argument of each readout. It chooses its window, the points in local detector coordinates and the weights with which [`optical_power`](@ref) integrates the intensity. The default is a [`RegularGrid`](@ref) around the hits; a [`RectilinearGrid`](@ref) is a grid of one's own with any spacing.
 
 ```julia
-x, z, I = intensity(pd, RegularGrid(n = 200, crop_factor = 5))
+x, z, I = intensity(pd, RegularGrid(num_points = 200, crop_factor = 5))
 P = optical_power(pd, RectilinearGrid(xs, zs))
 ```
+
+The steps of a readout and the methods a new sampling or hit type implements are shown in [Readout pipeline](@ref).
 
 ```@docs; canonical=false
 RegularGrid
 RectilinearGrid
-BeamletOptics.AbstractDetectorSampling
-BeamletOptics.sample_points
 electric_field(::Detector, ::AbstractArray{<:AbstractVector})
 intensity(::Detector, ::AbstractArray{<:AbstractVector})
 ```
@@ -120,6 +137,16 @@ For [`PolarizedRay`](@ref)s the field is added as 3D vectors, so [`electric_fiel
 ### OpticsBase interoperability
 
 If [OpticsBase.jl](https://github.com/StackEnjoyer/OpticsBase.jl) is loaded alongside BMO (`using OpticsBase`), the `BeamletOpticsOpticsBaseExt` package extension adds a `PlaneField` constructor for a `Detector`. It samples the physical field of the beamlet hits as tangential electric *and* magnetic field on the detector plane, OpticsBase's single exchange format for coupling to other Maxwell solvers (angular spectrum propagators, BPM, FDTD, ...). As for [`intensity`](@ref)`(::Detector)`, the Poynting flux of an oblique beam through the plane is the full beam power.
+
+The field is built from the hits as follows:
+
+- `E` is the coherent sum of the 3D fields ``\mathbf{E}_i`` of the hits at the sample points, projected onto the plane axes ``\mathbf{u}`` and ``\mathbf{v}``.
+- `H` is the coherent sum, **over hits**, of ``(n_\mathrm{medium}/Z_0)\, \mathbf{d}_i \times \mathbf{E}_i``. Here ``\mathbf{d}_i`` is the propagation direction of the chief or stigmatic ray of hit ``i`` and ``\mathbf{E}_i`` is that hit's own 3D field contribution at the sample point. It is not the paraxial ``(n/Z_0)\, \mathbf{n} \times \mathbf{E}`` built from the *total* field, which would be exact only for normal incidence. This matches the surface-equivalence-theorem content of `PlaneField` even for beams that hit the plane off-normal.
+- The default `axes` follow the detector: ``\mathbf{n}`` is `-direction(detector)` (BMO's detector normal points against the beam, so ``\mathbf{n}`` points downstream, the direction the light was travelling in when it hit the detector), ``\mathbf{u}`` is the local detector x axis of BMO and ``\mathbf{v} = \mathbf{n} \times \mathbf{u}`` is BMO's local ``-z`` axis. This is the default port of BMO's detector readouts.
+- [`AstigmaticGaussianBeamletHit`](@ref BeamletOptics.AstigmaticGaussianBeamletHit)s carry the polarization of their chief ray, so their field is `electric_field(hit, p)` already. A stigmatic [`GaussianBeamletHit`](@ref BeamletOptics.GaussianBeamletHit) carries no polarization in BMO (the model is scalar). By convention, matching OpticsBase's own rule for a scalar field (`PlaneField(E::AbstractMatrix, ...)` puts a scalar field entirely into `Eu`), its contribution is polarized along the plane's ``\mathbf{u}`` axis, made transverse to the hit direction ``\mathbf{d}_i`` (along ``\mathbf{v}`` if ``\mathbf{u}`` is parallel to it), so that ``\mathbf{E}_i \perp \mathbf{d}_i`` and ``\mathbf{H}_i = (n/Z_0)\, \mathbf{d}_i \times \mathbf{E}_i`` form a consistent plane wave. At normal incidence this is exactly ``\mathbf{u}``.
+- `R = Inf`: no reference sphere is removed, because BMO's beamlet field already carries the full spatial phase without needing one.
+
+The internal steps of these constructors are shown in [OpticsBase extension internals](@ref).
 
 ```@docs
 OpticsBase.PlaneField(::Detector)

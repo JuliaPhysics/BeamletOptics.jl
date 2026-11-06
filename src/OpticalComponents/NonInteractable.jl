@@ -29,9 +29,6 @@ Useful for rendering background objects or geometry that does not interact with 
 """
 NonInteractableObject(loadpath::String) = NonInteractableObject(Mesh(load(loadpath)))
 
-# Former name, kept for backwards compatibility
-Base.@deprecate_binding MeshDummy NonInteractableObject
-
 """
     KM100CPMount()
 

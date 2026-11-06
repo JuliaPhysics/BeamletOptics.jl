@@ -181,12 +181,12 @@ BMO.sdf(s::BlobSDF, p) = norm(BMO._world_to_sdf(s, p)) - 5e-3
         lenses = [
             "bi-convex" => SphericalLens(34.9e-3, -34.9e-3, 6.8e-3, 25.4e-3),
             "bi-concave" => SphericalLens(-50e-3, 50e-3, 3e-3, 25.4e-3),
-            "plano-convex" => Lens(SphericalSurface(25.8e-3, 25.4e-3), CircularFlatSurface(25.4e-3), 5.3e-3, λ -> 1.5),
-            "thin" => ThinLens(34.9e-3, 34.9e-3, 25.4e-3, 1.5),
+            "plano-convex" => Lens(SphericalSurface(25.8e-3, 25.4e-3), CircularFlatSurface(25.4e-3), 5.3e-3, ConstantRefractiveIndex(1.5)),
+            "thin" => ThinLens(34.9e-3, 34.9e-3, 25.4e-3, ConstantRefractiveIndex(1.5)),
             "meniscus (left)" => SphericalLens(20e-3, 30e-3, 2e-3, 25.4e-3),
             "meniscus (right)" => SphericalLens(-30e-3, -20e-3, 2e-3, 25.4e-3),
-            "bi-concave with ring" => Lens(BMO.BiConcaveLensSDF(50e-3, 50e-3, 3e-3, 20e-3, 25.4e-3), λ -> 1.5),
-            "meniscus with ring" => Lens(BMO.MeniscusLensSDF(20e-3, 30e-3, 2e-3, 20e-3, 25.4e-3), λ -> 1.5),
+            "bi-concave with ring" => Lens(BMO.BiConcaveLensSDF(50e-3, 50e-3, 3e-3, 20e-3, 25.4e-3), ConstantRefractiveIndex(1.5)),
+            "meniscus with ring" => Lens(BMO.MeniscusLensSDF(20e-3, 30e-3, 2e-3, 20e-3, 25.4e-3), ConstantRefractiveIndex(1.5)),
         ]
         for (name, lens) in lenses
             @testset "$name" begin
@@ -201,7 +201,7 @@ BMO.sdf(s::BlobSDF, p) = norm(BMO._world_to_sdf(s, p)) - 5e-3
         @test BMO.shape(lenses[6][2]) isa BMO.MeniscusLensSDF
 
         @testset "doublet" begin
-            dl = SphericalDoubletLens(87.9e-3, -105.6e-3, -1000, 6e-3, 3e-3, 25.4e-3, 1.5, 1.6)
+            dl = SphericalDoubletLens(87.9e-3, -105.6e-3, -1000, 6e-3, 3e-3, 25.4e-3, ConstantRefractiveIndex(1.5), ConstantRefractiveIndex(1.6))
             posed!(dl)
             plots = rendered_plots(dl; edges = false)
             @test length(plots) == 2 # outer mesh and cemented interface, see TestRenderLook.jl
@@ -214,11 +214,11 @@ BMO.sdf(s::BlobSDF, p) = norm(BMO._world_to_sdf(s, p)) - 5e-3
     @testset "other SDF shapes" begin
         # the solids of the cylindric and aspheric lens surfaces
         acyl = Lens(AcylindricalSurface(-15.538e-3, 25e-3, 50e-3, -1.0,
-                [0, 1.1926075e-5 * (1e3)^3, -2.9323497e-9 * (1e3)^5]), 7.5e-3, λ -> 1.5)
-        for lens in (Lens(CylindricalSurface(5.2e-3, 10e-3, 20e-3), 5.9e-3, λ -> 1.5),
-                Lens(CylindricalSurface(-20e-3, 10e-3, 20e-3), CylindricalSurface(20e-3, 10e-3, 20e-3), 3e-3, λ -> 1.5),
+                [0, 1.1926075e-5 * (1e3)^3, -2.9323497e-9 * (1e3)^5]), 7.5e-3, ConstantRefractiveIndex(1.5))
+        for lens in (Lens(CylindricalSurface(5.2e-3, 10e-3, 20e-3), 5.9e-3, ConstantRefractiveIndex(1.5)),
+                Lens(CylindricalSurface(-20e-3, 10e-3, 20e-3), CylindricalSurface(20e-3, 10e-3, 20e-3), 3e-3, ConstantRefractiveIndex(1.5)),
                 acyl,
-                Lens(EvenAsphericalSurface(20e-3, 10e-3, -1.0, [0, 1e3]), 4e-3, λ -> 1.5))
+                Lens(EvenAsphericalSurface(20e-3, 10e-3, -1.0, [0, 1e3]), 4e-3, ConstantRefractiveIndex(1.5)))
             s = BMO.shape(posed!(lens))
             @test Ext._has_mesh(s)
             pts, _, fcs = mesh_data(s)
@@ -248,7 +248,7 @@ BMO.sdf(s::BlobSDF, p) = norm(BMO._world_to_sdf(s, p)) - 5e-3
 
     @testset "objects" begin
         # one mesh plot per color: prisms merged, coating separate
-        cbs = CubeBeamsplitter(20e-3, λ -> 1.5)
+        cbs = CubeBeamsplitter(20e-3, ConstantRefractiveIndex(1.5))
         plots = rendered_plots(cbs; edges = false)
         @test length(plots) == 2
         @test all(p -> p isa Makie.Mesh, plots)
@@ -264,6 +264,29 @@ BMO.sdf(s::BlobSDF, p) = norm(BMO._world_to_sdf(s, p)) - 5e-3
         pts, nrm, fcs = mesh_data(plots[1][1][])
         @test length(fcs) == 3
         @test all(nrm[i] ≈ face_normal(pts, f) for f in fcs for i in f)
+    end
+
+    @testset "bounding_box of meshes" begin
+        extremes(pts) = (minimum(p[1] for p in pts), maximum(p[1] for p in pts),
+            minimum(p[2] for p in pts), maximum(p[2] for p in pts),
+            minimum(p[3] for p in pts), maximum(p[3] for p in pts))
+        m1 = Ext._tessellate(posed!(BMO.BoxSDF(20e-3, 10e-3, 30e-3)))
+        sphere = BMO.SphereSDF(8e-3)
+        BMO.translate3d!(sphere, [0.05, 0.0, -0.01])
+        m2 = Ext._tessellate(sphere)
+        # one mesh
+        box = BMO.bounding_box(m1)
+        @test box isa NTuple{6, Float64}
+        @test box == extremes(m1.points)
+        # two meshes
+        box = BMO.bounding_box(m1, m2)
+        @test box isa NTuple{6, Float64}
+        @test box == extremes(vcat(m1.points, m2.points))
+        @test box[2] > BMO.bounding_box(m1)[2] # the sphere extends the box in +x
+        # no points
+        box = BMO.bounding_box(Ext._TriMesh())
+        @test box isa NTuple{6, Float64}
+        @test box == (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
     end
 
     @testset "marching cubes fallback" begin

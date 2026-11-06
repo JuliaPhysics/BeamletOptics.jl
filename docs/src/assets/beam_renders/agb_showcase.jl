@@ -16,7 +16,7 @@ c_view = [
 
 agb = AstigmaticGaussianBeamlet([0,0,0], [0,1,0], 9e-4, 2e-3; support=[0,0,1])
 
-l = ThinLens(20e-3, 20e-3, BMO.inch, 1.5)
+l = ThinLens(20e-3, 20e-3, BMO.inch, ConstantRefractiveIndex(1.5))
 s = System([l])
 
 translate3d!(l, [0, 30e-3, 0])
@@ -56,8 +56,8 @@ save("agbtest2.png", fig; px_per_unit=8, update = false)
 ##
 s1 = BMO.CylinderSDF(BMO.inch/2, BMO.inch)
 s2 = BMO.CylinderSDF(BMO.inch/2, BMO.inch)
-l1 = BMO.Lens(s1, n->1.5)
-l2 = BMO.Lens(s2, n->1.5)
+l1 = BMO.Lens(s1, ConstantRefractiveIndex(1.5))
+l2 = BMO.Lens(s2, ConstantRefractiveIndex(1.5))
 translate3d!(l1, [0, 50mm,  0])
 translate3d!(l2, [0, 100mm, 0])
 xrotate3d!(l1, deg2rad(90))

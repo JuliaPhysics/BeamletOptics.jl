@@ -3,7 +3,7 @@
 
 Constructs an Off-Axis Parabolic (OAP) [`Mirror`](@ref) from:
 
-# Inputs
+# Arguments
 
 - `rfl`:            Reflected Focal Length (distance from aperture center to focus) [m]
 - `diameter`:       Mirror aperture diameter [m]
@@ -33,19 +33,25 @@ function OffAxisParabolicMirror(
 
     t = thickness === nothing ? max(T(diameter / 2), sag_max + T(10e-3)) : T(thickness)
 
-    oap_sdf = ConicSDF(2f, -one(T), x_off, T(diameter), t)
-    if hole_diameter === nothing
-        return Mirror(oap_sdf)
-    end
+    # Parent focus in the segment frame
+    focus = Point3(-x_off, -T(rfl * cos(angle_rad)), zero(T))
+    return build_oap(hole_axis, f, x_off, diameter, t, sag_max, focus, hole_diameter)
+end
 
-    hd = T(hole_diameter)
-    _check_hole_diameter(hd, T(diameter))
+function build_oap(::Symbol, f::T, x_off::T, diameter::Real, t::T, ::T, ::Point3{T},
+        ::Nothing) where {T <: Real}
+    return OffAxisConicMirror(2f, -1, x_off, diameter; thickness = t)
+end
 
+function build_oap(hole_axis::Symbol, f::T, x_off::T, diameter::Real, t::T, sag_max::T,
+        focus::Point3{T}, hole_diameter::Real) where {T <: Real}
     if hole_axis === :collimated
-        return Mirror(_pierce_substrate(oap_sdf, diameter, -sag_max, t, hole_diameter))
+        return OffAxisConicMirror(2f, -1, x_off, diameter; thickness = t, hole_diameter)
     elseif hole_axis === :focused
-        focus_vec = Point3(-x_off, -T(rfl * cos(angle_rad)), zero(T))
-        u_dir = normalize(focus_vec)
+        oap_sdf = ConicSDF(2f, -one(T), x_off, T(diameter), t)
+        hd = T(hole_diameter)
+        check_hole_diameter(hd, T(diameter))
+        u_dir = normalize(focus)
         margin = T(10e-3)
         span = max(T(diameter), t + sag_max) + 2margin
         bore = CylinderSDF(hd / 2, span)
@@ -59,9 +65,11 @@ end
 """
     ParabolicMirror(f, diameter; thickness=nothing, hole_diameter=nothing)
 
-Constructs an on-axis parabolic [`Mirror`](@ref) with focal length `f`.
-The vertex of the concave reflecting surface lies at the origin, the mirror opens towards the negative y-axis
-and its focus lies at `(0, -f, 0)`. The shape is an [`OffAxisParaboloidSDF`](@ref) without off-axis offset.
+Constructs an on-axis parabolic [`Mirror`](@ref) with focal length `f`, i.e. a
+[`ConicMirror`](@ref) with `R = 2f` and `k = -1`. The vertex of the reflecting surface lies at
+the origin and the focus at `(0, -f, 0)`. For `f > 0` the mirror is concave and opens towards
+the negative y-axis; for `f < 0` it is convex and its focus is virtual, behind the mirror. The
+shape is an [`OffAxisParaboloidSDF`](@ref) without off-axis offset.
 
 If `hole_diameter` is given, a cylindrical bore centred on the optical axis (the local
 +y-axis) is subtracted from the substrate, piercing it completely (a Cassegrain primary).
@@ -69,11 +77,11 @@ If `hole_diameter` is given, a cylindrical bore centred on the optical axis (the
 !!! warning "Reflective bore wall"
     Rays that graze into the hole will reflect off its wall rather than being absorbed.
 
-# Inputs
+# Arguments
 
-- `f`:              Focal length \\[m\\]
+- `f`:              Focal length \\[m\\]; `f > 0` concave, `f < 0` convex
 - `diameter`:       Mirror aperture diameter \\[m\\]
-- `thickness`:      Substrate thickness \\[m\\], rim sag + 10 mm if `nothing` (default)
+- `thickness`:      Substrate thickness \\[m\\], `|rim sag| + 10 mm` if `nothing` (default)
 - `hole_diameter`:  Diameter of the central through-hole \\[m\\], no hole if `nothing` (default). Must satisfy `0 < hole_diameter < diameter`.
 """
 function ParabolicMirror(
@@ -82,12 +90,5 @@ function ParabolicMirror(
         thickness::Union{Real, Nothing} = nothing,
         hole_diameter::Union{Real, Nothing} = nothing
     )
-    T = float(promote_type(typeof(f), typeof(diameter), typeof(thickness === nothing ? 0.0 : thickness)))
-    sag_max = T(diameter / 2)^2 / (4 * T(f))
-    t = thickness === nothing ? sag_max + T(10e-3) : T(thickness)
-    substrate = ConicSDF(2 * T(f), -one(T), zero(T), T(diameter), t)
-    if hole_diameter === nothing
-        return Mirror(substrate)
-    end
-    return Mirror(_pierce_substrate(substrate, diameter, -sag_max, t, hole_diameter))
+    return ConicMirror(2f, -1, diameter; thickness, hole_diameter)
 end

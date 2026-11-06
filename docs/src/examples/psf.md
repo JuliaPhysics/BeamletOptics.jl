@@ -35,7 +35,7 @@ n = 1.5
 
 # generate uniform source, lens and detector
 cs = UniformDiscSource([0, -10mm, 0], [0, 1, 0], 15e-3, λ)
-lens = SphericalLens(R1, R2, l, d, x -> n)
+lens = SphericalLens(R1, R2, l, d, ConstantRefractiveIndex(n))
 detector = Detector(10e-3)
 
 # shift detector into focus
@@ -47,7 +47,7 @@ sys = System([lens, detector])
 solve_system!(sys, cs)
 
 # retrieve intensity
-x, z, I_num = intensity(detector, RegularGrid(n=500, crop_factor=10))
+x, z, I_num = intensity(detector, RegularGrid(num_points = 500, crop_factor=10))
 ```
 
 Visualizing the result yields the expected Airy-disk pattern.
@@ -68,7 +68,7 @@ A = [0*(1e3)^1, 2.7709219e-8*(1e3)^3, 6.418186e-13*(1e3)^5, -1.5724014e-17*(1e3)
 AL75150 = Lens(
     EvenAsphericalSurface(radius, d, k, A),
     l,
-    n -> 1.5006520430
+    ConstantRefractiveIndex(1.5006520430)
 )
 
 xrotate3d!(AL75150, deg2rad(-0.5))
@@ -123,7 +123,7 @@ solve_system!(System([mirror, pd]), pol_src)
 
 NA = sin(2 * atan(D / (4f)))
 R = 1.5λ / NA
-xs, zs, E = electric_field(pd, RegularGrid(n = 201, x_min = -R, x_max = R, z_min = -R, z_max = R))
+xs, zs, E = electric_field(pd, RegularGrid(num_points = 201, x_min = -R, x_max = R, z_min = -R, z_max = R))
 
 I  = intensity.(E)                # |E|²/(2Z₀) per point, not projected onto the detector
 Ey = map(e -> abs2(e[2]), E)      # longitudinal component

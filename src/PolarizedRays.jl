@@ -30,6 +30,8 @@ where r and t are the complex-valued Fresnel coefficients (see also [`fresnel_co
 
 !!! warning "Field vector"
     It is assumed that the electric field vector ``E_0`` stays orthogonal to the direction of propagation throughout the optical system.
+    The constructor throws an `ErrorException` if the component of `E0` along `dir` exceeds
+    `get_orthogonality_threshold()` (default `1e-10`) times `|E0|`.
 
 !!! warning "Intensity"
     E0 can not be converted into an [`intensity`](@ref) value, since a single `PolarizedRay` can not directly model the change in intensity during imaging by an optical system.
@@ -53,9 +55,8 @@ mutable struct PolarizedRay{T} <: AbstractRay{T}
         if isapprox(norm(dir), 0, atol=1e-14)
             throw(ErrorException("Direction vector to short for normalization."))
         end
-        # This test is very important and must be performed for each pol. ray, the tolerance is
-        # relative to the field amplitude
-        if !isorthogonal3d(normalize(dir), E0; atol = 1e-10 * norm(E0))
+        # Check E0 orthogonal to dir, relative tolerance
+        if !isorthogonal3d(normalize(dir), E0; atol = Config.get_orthogonality_threshold() * norm(E0))
             error("Ray dir. and E0 must be orthogonal (dot product: $(dot(dir, E0)))")
         end
         return new{M}(
@@ -91,9 +92,15 @@ iscircular(ray::PolarizedRay) = iscircular(polarization(ray))
 iselliptical(ray::PolarizedRay) = iselliptical(polarization(ray))
 
 """
-    PolarizedRay(pos, dir, λ = 1000e-9, E0 = [1, 0, 0])
+    PolarizedRay(pos, dir, λ = 1000e-9, E0 = [electric_field(1), 0, 0])
 
-1 V/m in x-dir.
+Constructs a [`PolarizedRay`](@ref) at `pos` \\[m\\] along `dir` with the wavelength `λ` \\[m\\] in a
+medium of refractive index 1.
+
+The default `E0` is the field phasor of an intensity of 1 W/m², i.e. `electric_field(1)`
+≈ 27.4 V/m, polarized along x. `E0` is the complex electric field vector in \\[V/m\\] and must be
+orthogonal to `dir`, otherwise the constructor throws an `ErrorException`: the default fails for a
+`dir` along x, pass an `E0` explicitly in that case.
 """
 function PolarizedRay(
         pos::AbstractArray{P},
@@ -227,8 +234,6 @@ end
 """
     _transverse(E0, dir)
 
-Removes the component of the field `E0` along `dir`. For nearly parallel in- and out-directions,
-the s-p basis of [`_calculate_global_E0`](@ref) is ill-conditioned and `E0` would otherwise keep a
-small component along the direction of propagation.
+Removes the component of the field `E0` along `dir`.
 """
 _transverse(E0, dir) = E0 - (dot(dir, E0) / dot(dir, dir)) * dir

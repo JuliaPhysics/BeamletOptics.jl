@@ -174,10 +174,10 @@ function _plot_generating_beams!(bp::_BeamPlots, axis::_RenderEnv, thing; show_p
     for (group, color) in zip(_GAUSS_BEAM_GROUPS, _GAUSS_BEAM_COLORS)
         segments = _observe!(bp,
             () -> _generating_segments(thing, group; bp.settings[].flen, bp.settings[].render_every))
-        _add!(bp, linesegments!(axis, segments; color, transparency))
+        push!(bp, linesegments!(axis, segments; color, transparency))
         if show_pos
             ends = _observe!(bp, () -> _generating_ends(thing, group; bp.settings[].render_every))
-            _add!(bp, scatter!(axis, ends; color))
+            push!(bp, scatter!(axis, ends; color))
         end
     end
     return bp

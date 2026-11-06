@@ -4,7 +4,7 @@ using GLMakie, BeamletOptics
 
 const mm = 1e-3
 
-lens = SphericalLens(50mm, -50mm, 6mm, 25.4mm, λ -> 1.5)
+lens = SphericalLens(50mm, -50mm, 6mm, 25.4mm, ConstantRefractiveIndex(1.5))
 mirror = RoundPlanoMirror(25.4mm, 5mm)
 zrotate3d!(mirror, deg2rad(45))               # fold +y -> +x
 translate3d!(mirror, [0, 80mm, 0])

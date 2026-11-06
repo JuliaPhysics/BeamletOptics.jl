@@ -4,7 +4,7 @@
 Constructs a 2D square plano [`Mirror`](@ref) with a given `edge_length`.
 The reflecting surface is normal to the y-axis.
 
-# Inputs
+# Arguments
 
 - `edge_length`: the edge length of the square mirror in [m]
 """
@@ -19,7 +19,7 @@ end
 Constructs a rectangular plano [`Mirror`](@ref) based on the input dimensions.
 The front reflecting surface is normal to the y-axis and lies at the origin.
 
-# Inputs
+# Arguments
 
 - `width`:      of the mirror in x-direction [m] 
 - `height`:     of the mirror in z-direction [m] 
@@ -43,7 +43,7 @@ Constructs a square plano [`Mirror`](@ref) with equal width and height.
 The front reflecting surface is normal to the y-axis and lies at the origin.
 See also [`RectangularPlanoMirror`](@ref).
 
-# Inputs
+# Arguments
 
 - `width`: the side length of the square mirror in x- and y-direction [m]
 - `thickness`: of the mirror in [m]
@@ -58,7 +58,7 @@ end
 Constructs a round plano [`Mirror`](@ref) with a flat reflecting surface and perfect reflectivity (R = 1).
 The reflecting surface is modeled using a [`BeamletOptics.PlanoSurfaceSDF`](@ref).
 
-# Inputs
+# Arguments
 
 - `diameter`: mirror diameter \\[m\\]
 - `thickness`: mirror substrate thickness \\[m\\]
@@ -66,9 +66,6 @@ The reflecting surface is modeled using a [`BeamletOptics.PlanoSurfaceSDF`](@ref
 """
 function RoundPlanoMirror(diameter::D, thickness::T; hole_diameter::Union{Real, Nothing} = nothing) where {D<:Real,T<:Real}
     shape = PlanoSurfaceSDF(thickness, diameter)
-    if hole_diameter === nothing
-        return Mirror(shape)
-    end
     T_res = typeof(float(thickness))
     return Mirror(_pierce_substrate(shape, diameter, zero(T_res), T_res(thickness), hole_diameter))
 end
@@ -79,7 +76,7 @@ end
 Constructs a right-angle prism [`Mirror`](@ref) with perfect reflectivity (R = 1).
 The reflecting surface is modeled using a [`BeamletOptics.RightAnglePrismSDF`](@ref).
 
-# Inputs
+# Arguments
 
 - `leg_length`: edge length in x and y \\[m\\]
 - `height`: height in z-axis \\[m\\]

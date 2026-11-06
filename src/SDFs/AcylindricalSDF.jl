@@ -30,7 +30,7 @@ end
 
 Constructs an aconvex cylinder with radius `r`, diameter `d` and height `h` in [m].
 The acylindric shape is defined by its `conic_constant` and the `coefficients` for the
-even aspheric polynomoial.
+even aspheric polynomial, starting with A2 (r²).
 """
 function AconvexCylinderSDF(radius::R, diameter::D, height::H, conic_constant::CC, coefficients::AbstractVector{TT}) where {R,D,H,CC,TT}
     T = promote_type(R, D, H, CC, TT)
@@ -57,8 +57,8 @@ end
 function sdf(s::AconvexCylinderSDF{T}, point) where {T}
     p = _world_to_sdf(s, point)
 
-    _pp = Point3(p[1], p[3], p[2]) # xzy
-    # rotate 2D sdf around the optical axis
+    _pp = Point3(p[1], p[3], p[2]) # Swap to xzy
+    # Extrude 2D distance along x
     sdf_v = op_extrude_x(_pp,
         x -> convex_aspheric_surface_distance(
             x[1],
@@ -99,7 +99,7 @@ end
 
 Constructs an aconcave cylinder cutout with radius `r`, diameter `d` and height `h` in [m].
 The acylindric shape is defined by its `conic_constant` and the `coefficients` for the
-even aspheric polynomoial.
+even aspheric polynomial, starting with A2 (r²).
 """
 function AconcaveCylinderSDF(radius::R, diameter::D, height::H, conic_constant::CC, coefficients::AbstractVector{TT}) where {R,D,H,CC,TT}
     T = promote_type(R, D, H, CC, TT)
@@ -127,8 +127,8 @@ end
 function sdf(s::AconcaveCylinderSDF{T}, point) where {T}
     p = _world_to_sdf(s, point)
 
-    _pp = Point3(p[1], p[3], p[2]) # xzy
-    # rotate 2D sdf around the optical axis
+    _pp = Point3(p[1], p[3], p[2]) # Swap to xzy
+    # Extrude 2D distance along x
     sdf_v = op_extrude_x(_pp,
         x -> concave_aspheric_surface_distance(
             x[1],
@@ -165,7 +165,8 @@ It is therefore a cylindric surface with a deviation from the perfect cylindric 
 - `diameter::T`: The clear (optical) aperture of the surface.
 - `height::T` : The height/length of the uncurved surface direction
 - `conic_constant::T` : The conic_constant of the curved surface
-- `coefficients::Vector{T}` : The coefficients of the even aspherical equation for the curved surface.
+- `coefficients::Vector{T}` : The coefficients of the even aspherical equation for the curved surface,
+  starting with A2 (r²).
 - `mechanical_diameter::T`: The overall mechanical diameter of the surface. In many cases, this is equal
   to the optical diameter, but it can be set independently if the mechanical mount requires a larger dimension.
 
@@ -190,7 +191,8 @@ This constructor automatically sets the mechanical diameter equal to the optical
 - `diameter`: The clear (optical) diameter of the surface.
 - `height`: The height/length of the uncurved surface direction.
 - `conic_constant::T` : The conic_constant of the curved surface
-- `coefficients::Vector{T}` : The coefficients of the even aspherical equation for the curved surface.
+- `coefficients::Vector{T}` : The coefficients of the even aspherical equation for the curved surface,
+  starting with A2 (r²).
 """
 function AcylindricalSurface(radius::T1, diameter::T2, height::T3, conic_constant::T4, coefficients::AbstractVector{T5}) where {T1,T2,T3,T4,T5}
     T = promote_type(T1, T2, T3, T4, T5)
@@ -236,6 +238,20 @@ function _sdf(s::AcylindricalSurface, ::BackwardOrientation)
     return back
 end
 
+# Siblings under AbstractLensSDF; only these two store max_sag
+"""
+    axial_extent(s::Union{AbstractAsphericalSurfaceSDF, AbstractAcylindricalSurfaceSDF})
+
+Returns `(lo, hi)`, the smallest and largest local y-coordinate of the surface of `s` over its
+aperture. The candidates are the vertex, the edge and the stationary point of the sag
+(`max_sag`), which is exact for profiles with at most one stationary point within the aperture.
+"""
+function axial_extent(s::Union{AbstractAsphericalSurfaceSDF, AbstractAcylindricalSurfaceSDF})
+    edge = aspheric_equation(s.diameter / 2, s)
+    peak = s.max_sag[1]
+    return min(zero(edge), edge, peak), max(zero(edge), edge, peak)
+end
+
 """
     bounding_sphere_of(s::AbstractAcylindricalSurfaceSDF)
 
@@ -243,7 +259,7 @@ Returns the sphere through the corners of the box around the surface volume: the
 along x, the axial extent of the sag along y and the diameter along z.
 """
 function bounding_sphere_of(s::AbstractAcylindricalSurfaceSDF{T}) where T
-    lo, hi = _aspheric_axial_extent(s)
+    lo, hi = axial_extent(s)
     r = sqrt((height(s) / 2)^2 + ((hi - lo) / 2)^2 + (diameter(s) / 2)^2)
     return SingleBoundingSphere(s, Point3{T}(0, (lo + hi) / 2, 0), r)
 end

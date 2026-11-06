@@ -18,7 +18,7 @@ g2 = GaussianBeamlet([0,-20e-3,0], [0,1,0], 532e-9, 5e-4)
 solve_system!(system, g1)
 solve_system!(system, g2)
 
-x, y, I = intensity(pd, RegularGrid(n=1000))
+x, y, I = intensity(pd, RegularGrid(num_points = 1000))
 spots = spot_diagram(pd)
 
 ## render fringes

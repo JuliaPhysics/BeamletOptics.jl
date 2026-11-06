@@ -3,7 +3,7 @@
 
 Represents a **flat** rectangular or quadratic, infinitesimally thin surface in R³.
 The detector surface is a detection screen that captures incoming ray or beamlet data.
-The active surface is discretized in the local R² x-y-coordinate system.
+The active surface is discretized in the local R² (x, z) coordinate system, see below.
 If configured, beams or beamlets can continue tracing after hitting the detector.
 
 # Hits
@@ -18,8 +18,10 @@ The following functions allow a posteriori evaluation of hit contributions via e
 Refer to the respective function documentation.
 
 - [`spot_diagram`](@ref)
+- [`ray_hits`](@ref)
 - [`electric_field`](@ref)
 - [`intensity`](@ref)
+- [`optical_power`](@ref)
 
 # Additional information
 
@@ -51,7 +53,7 @@ of a **left-handed** (x, z) surface coordinate system, where incoming beams inte
 # Fields
 
 - `shape`:
-  geometry of the active surface, must represent 2D-`field` in `x` any `y` dimensions,
+  geometry of the active surface, must represent a 2D field in the local `x` and `z` dimensions,
   normal vector direction must adhere to definition above
 - `hits`:
   a union of `Nothing` and all implemented [`AbstractDetectorHit`](@ref)s, resettable via `empty!`
@@ -82,8 +84,13 @@ Spawns a quadratic [`Detector`](@ref) surface that is aligned with the neg. y-ax
 The detector edge length can be configured via `edge_length`.
 Additionally, continued tracing can be configured via the `stop` flag where
 
-- `false` indicates continued tracing
+- `false` indicates continued tracing: rays and beamlets pass the detector unchanged
 - `true` stops the incoming beams as with any hard target
+
+!!! warning "Partly clipped beamlets"
+    A beamlet whose rays hit the detector only partly ends there, as at any other object, also
+    with `stop = false`. To sample a beamlet on an intermediate plane, make the detector larger
+    than the beamlet.
 """
 function Detector(edge_length::Real, stop::Bool = true)
     shape = QuadraticFlatMesh(edge_length)
@@ -97,17 +104,38 @@ empty!(d::Detector) = hits!(d, nothing)
 hits(d::Detector) = d.hits
 hits!(d::Detector, new) = (d.hits = new)
 
+"""
+    length(d::Detector) -> Int
+
+The number of hits stored in the detector `d`, `0` before the first solve and after
+`empty!(d)`.
+"""
+length(d::Detector) = isnothing(hits(d)) ? 0 : length(hits(d))
+
 "Allows continued tracing if set to false"
 stop(d::Detector) = d.stop
 
 """
+    local_axes(pd::Detector) -> (x̂, ẑ)
+
+The axes of the local (x, z) coordinates of `pd` in global coordinates, with
+`x̂ × ẑ = direction(pd)`. `x̂` is flipped since the detector mesh is rotated by `π`.
+"""
+local_axes(pd::Detector) = (Point3(-orientation(pd)[:, 1]), Point3(orientation(pd)[:, 3]))
+
+"""
     push!(d::Detector, hit::AbstractDetectorHit)
 
-Stores the `hit` in the detector `d`, guarded by the `lock` of `d`. Within [`with_hit_buffers`](@ref),
-e.g. in the solve of a beam group, the `hit` is collected in the buffer of the current task instead
-and reaches `d` when the buffer is flushed.
+Stores the `hit` in the detector `d`, guarded by the `lock` of `d`, and returns `d`. Within
+[`with_hit_buffers`](@ref), e.g. in the solve of a beam group, the `hit` is collected in the buffer
+of the current task instead and reaches `d` when the buffer is flushed.
 """
-push!(d::Detector, new::AbstractDetectorHit) = push!(current_hit_sink(), d => new)
+function push!(d::Detector, hit::AbstractDetectorHit)
+    # Buffers of the current task, otherwise the detector
+    sink = get(task_local_storage(), hit_buffers_key, LockedHits())::Union{LockedHits, HitBuffers}
+    push!(sink, d => hit)
+    return d
+end
 
 """
     append!(d::Detector, new::Vector{<:AbstractDetectorHit})
@@ -129,76 +157,50 @@ function Base.append!(d::Detector, new::Vector{<:AbstractDetectorHit})
     return d
 end
 
+"""
+    pass_through(ray::AbstractRay) -> BeamInteraction
+
+The interaction of a `ray` that passes a [`Detector`](@ref) with `stop = false` unchanged: a new
+ray from the hit point with the direction, wavelength, refractive index and polarization of `ray`.
+"""
+function pass_through(ray::Ray{T}) where {T}
+    return BeamInteraction{T, Ray{T}}(nothing,
+        Ray{T}(hit_point(ray), direction(ray), nothing, wavelength(ray), refractive_index(ray)))
+end
+
+function pass_through(ray::PolarizedRay{T}) where {T}
+    return BeamInteraction{T, PolarizedRay{T}}(nothing,
+        PolarizedRay{T}(hit_point(ray), direction(ray), nothing, wavelength(ray),
+            refractive_index(ray), polarization(ray)))
+end
+
 function interact3d(::AbstractSystem, d::Detector, beam::Beam{T, R},
         ray::R) where {T <: Real, R <: Ray{T}}
-    # Optical path length and wavenumber
-    opl = optical_path_length(beam)
-    # Push hit data into detector, determine stop
-    hit = RayHit(ray, opl)
-    push!(d, hit)
-    if stop(d)
-        # Stop solver (hard target)
-        return nothing
-    else
-        # Continue tracing with hit point as starting position
-        return BeamInteraction{T, R}(
-            nothing,
-            Ray{T}(
-                hit_point(hit),
-                direction(hit),
-                nothing,
-                wavelength(ray),
-                refractive_index(ray)
-            )
-        )
-    end
+    push!(d, RayHit(ray, optical_path_length(beam)))
+    # Stop solver (hard target) or continue from the hit point
+    return stop(d) ? nothing : pass_through(ray)
 end
 
 function interact3d(::AbstractSystem, d::Detector, beam::Beam{T, R},
         ray::R) where {T <: Real, R <: PolarizedRay{T}}
-    # Optical path length and wavenumber
-    opl = optical_path_length(beam)
-    # Push hit data into detector, determine stop
-    hit = PolarizedRayHit(ray, opl)
-    push!(d, hit)
-    if stop(d)
-        # Stop solver (hard target)
-        return nothing
-    else
-        # Continue tracing with hit point as starting position
-        return BeamInteraction{T, R}(
-            nothing,
-            PolarizedRay{T}(
-                hit_point(hit),
-                direction(hit),
-                nothing,
-                wavelength(ray),
-                refractive_index(ray),
-                polarization(ray)
-            )
-        )
-    end
+    push!(d, PolarizedRayHit(ray, optical_path_length(beam)))
+    # Stop solver (hard target) or continue from the hit point
+    return stop(d) ? nothing : pass_through(ray)
 end
 
 function interact3d(::AbstractSystem, d::Detector, g::GaussianBeamlet{R}, id::Int) where {R}
     push!(d, GaussianBeamletHit(g, id))
-    if stop(d)
-        # Stop solver (hard target)
-        return nothing
-    else
-        # Continue tracing # FIXME
-        throw(ErrorException("Continued tracing for GaussianBeamlet not yet implemented."))
-    end
+    stop(d) && return nothing
+    # Continue all component rays from their hit points
+    return GaussianBeamletInteraction{R}(
+        map(b -> pass_through(rays(b)[id]), _component_beams(g))...)
 end
 
-function interact3d(system::AbstractSystem, d::Detector,
+function interact3d(::AbstractSystem, d::Detector,
         agb::AstigmaticGaussianBeamlet{R}, id::Int) where {R}
     push!(d, AstigmaticGaussianBeamletHit(agb, id))
-    if stop(d)
-        # Stop solver (hard target)
-        return nothing
-    else
-        # Continue tracing # FIXME
-        throw(ErrorException("Continued tracing for AstigmaticGaussianBeamlet not yet implemented."))
-    end
+    stop(d) && return nothing
+    # Continue all component rays from their hit points
+    return AstigmaticGaussianBeamletInteraction{R}(
+        map(b -> pass_through(rays(b)[id]), _component_beams(agb))...)
 end

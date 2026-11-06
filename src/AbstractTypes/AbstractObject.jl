@@ -36,6 +36,10 @@ kinematic API via `BeamletOptics.kinematic_trait_of(::Foo) = BeamletOptics.Stati
 
 - [`interact3d`](@ref): defines the optical interaction, the return type must be `Nothing` or an [`AbstractInteraction`](@ref)
 - [`initialize!`](@ref) (optional): resets the data that the object stores during a solve, e.g. the hits of a detector. By default nothing is reset.
+- `intersect3d(object, ray)` (optional): replaces the default intersection of the object, which tests its shapes via the shape trait. A method of its own bypasses the
+  bounding sphere test of the object, e.g. the [`RectangularPlateBeamsplitter`](@ref) does so
+- `bounding_sphere_of(object)` (optional): the sphere around a [`SingleShape`](@ref) object, if it differs from the sphere of its shape. The default is the sphere of `shape(object)`,
+  see [`bounding_sphere_of`](@ref)
 """
 abstract type AbstractObject{T <: Real} end
 
@@ -84,10 +88,12 @@ E.g. for a custom multi-shape object the user of this API needs to define:
 
 `BeamletOptics.shape(obj::MyObject) = (obj.front, obj.back)`
 
-!!! warning
-    Whenever your object consists of nested structures (e.g. other [`MultiShape`](@ref)s) 
-    it is the responsibility of the user to ensure that **each atomic shape, i.e. `SingleShape`, is only listed once**.
-    Failure to ensure this can lead to spurious behaviour when using the kinematic API.
+!!! note "Shared parts"
+    The kinematic API moves every part once per motion, compared by identity (`===`): a part that
+    `shape(object)` lists several times, and an object that an [`ObjectGroup`](@ref) holds along several
+    paths. Two different parts of one motion must not reach the same shape at any level, e.g. a group
+    that holds a `DoubletLens` and its front lens, or an object whose shape is an operand of a
+    [`UnionSDF`](@ref) of another object; moving them throws an `ArgumentError` before anything moves.
 """
 shape(object::AbstractObject) = shape(shape_trait_of(object), object)
 

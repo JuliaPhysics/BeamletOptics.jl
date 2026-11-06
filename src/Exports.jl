@@ -5,7 +5,7 @@ export position, direction, orientation
 
 # ray and beam type export
 export Ray, PolarizedRay, Beam, PointSource, CollimatedSource, UniformDiscSource, UniformPointSource,
-       UniformLineSource, UniformFanSource, set_num_rays!,
+       UniformLineSource, UniformFanSource, num_rays!,
        GaussianBeamlet, AstigmaticGaussianBeamlet, rayleigh_range, rays, point_on_beam, path_segments,
        normal3d
 export CollimatedGaussianBeamletSource, GaussianBeamletDecomposition,
@@ -18,11 +18,9 @@ export System, StaticSystem, solve_system!, initialize!
 # object group
 export ObjectGroup
 
-# display
-export properties, default_properties
-
 # additional
-export DiscreteRefractiveIndex, SellmeierEquation
+export DiscreteRefractiveIndex, SellmeierEquation, ConstantRefractiveIndex
+public AbstractRefractiveIndex
 
 #=
 components
@@ -48,7 +46,7 @@ export CircularFlatSurface, RectangularFlatSurface, SphericalSurface, EvenAspher
 export Prism, RightAnglePrism, EquilateralPrism, DovePrism
 
 # detectors
-export Detector, electric_field, intensity, spot_diagram, optical_power, gauss_parameters,
+export Detector, electric_field, intensity, spot_diagram, ray_hits, optical_power, gauss_parameters,
        waist_parameters, Centroid, MinMax, RegularGrid, RectilinearGrid
 
 # splitters
@@ -64,7 +62,8 @@ export NonInteractableObject, IntersectableObject
 
 # misc
 export Retroreflector, get_invariant_threshold, set_invariant_threshold!,
-    get_sdf_surface_threshold, get_sdf_raymarch_eps, get_sdf_inside_step,
+    get_lagrange_tolerance, set_lagrange_tolerance!,
+    get_sdf_surface_threshold, get_sdf_raymarch_eps, get_sdf_miss_distance,
     get_internal_reflection_threshold, get_line_plane_intersection_threshold,
     get_orthogonality_threshold, get_default_r_max, get_default_depth_max,
     get_default_wavelength, get_default_waist, get_default_power,
@@ -72,24 +71,26 @@ export Retroreflector, get_invariant_threshold, set_invariant_threshold!,
 
 # render
 export wavelength_color, render!, get_view, set_view, hide_axis, set_orthographic, arrow!, render_lcs!, look_at!
-export render_bounding_sphere!
 export live_render!, update_render!, remove_render!, pick_object, studio_lighting!, set_render_look
 
 # render handle protocol and developer API for packages built on BeamletOptics: public, not exported
 public AbstractRenderHandle, AbstractObjectRenderHandle, AbstractSystemRenderHandle,
-       AbstractBeamRenderHandle, rendered, render_plots, render_children, render_parent,
+       AbstractBeamRenderHandle, rendered, render_plots, render_parent,
        render_settings, render_settings!, pickable_plots, look_colors
-public is_static, hit_count, wavelength, min_num_rays, ProgressSink, PROGRESS_SINK,
-       progress_state, is_cancelled
+public wavelength, min_num_rays, ProgressSink, PROGRESS_SINK, progress_state, is_cancelled
+# info cards of the GUI
+public properties, default_properties
 # re-emitting components (e.g. solvers coupled through a field)
-public relaunch!, beamlet_hit_field, GaussianBeamletHit, AstigmaticGaussianBeamletHit
+public relaunch!, GaussianBeamletHit, AstigmaticGaussianBeamletHit
 # own detector samplings, see AbstractDetectorSampling
-public AbstractDetectorSampling, sample_points
+public AbstractDetectorSampling, sample_points, DetectorSamples
 # optional part of the shape interface, see AbstractShape
 public bounding_sphere_of, AbstractBoundingSphere, NoBoundingSphere, SingleBoundingSphere, MultiBoundingSphere
 # own assembly types of separate parts, see AbstractObjectGroup
-public AbstractObjectGroup
+public AbstractObjectGroup, check_kinematic_members, objects
+# agent skill shipped with the package, see docs/src/basics/ai_assistants.md
+public install_agent_skill
 # element type of path_segments
 public PathSegment
 public AbstractSourceSampling, NoSampling, DiscRings, DiscSunflower, DiscLine, ConeRings, ConeSunflower,
-       ConeFan, source_beams, sampling_basis
+       ConeFan, source_beams, sampling_basis, numerical_aperture

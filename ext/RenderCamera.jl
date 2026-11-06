@@ -67,3 +67,17 @@ function render_lcs!(ax::LScene, object::BMO.ObjectOrGroup; scale::Real = 10, sh
     render_lcs!(ax, BMO.position(object), BMO.orientation(object); scale, show_labels)
     return nothing
 end
+
+# Camera helpers need the camera controls of an LScene
+lscene_error(ax::Makie.AbstractAxis) = throw(InvalidAxisError(typeof(ax), "LScene"))
+
+get_view(ax::Makie.AbstractAxis) = lscene_error(ax)
+set_view(ax::Makie.AbstractAxis, ::AbstractMatrix) = lscene_error(ax)
+set_view(ax::Makie.AbstractAxis, ::Any, ::Any, ::Any) = lscene_error(ax)
+set_orthographic(ax::Makie.AbstractAxis) = lscene_error(ax)
+hide_axis(ax::Makie.AbstractAxis, ::Bool = true) = lscene_error(ax)
+look_at!(ax::Makie.AbstractAxis, ::AbstractVector, ::AbstractVector; kwargs...) = lscene_error(ax)
+arrow!(ax::Makie.AbstractAxis, ::AbstractVector, ::AbstractVector; kwargs...) = lscene_error(ax)
+render_lcs!(ax::Makie.AbstractAxis, ::AbstractArray = Point3(0), ::AbstractMatrix = [1 0 0; 0 1 0; 0 0 1]; kwargs...) =
+    lscene_error(ax)
+render_lcs!(ax::Makie.AbstractAxis, ::BMO.ObjectOrGroup; kwargs...) = lscene_error(ax)

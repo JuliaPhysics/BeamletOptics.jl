@@ -288,16 +288,30 @@ const nm = 1e-9
         @test BMO.shape(m_rap) isa BMO.RightAnglePrismSDF
     end
 
-    @testset "Parabola via ConicMirror" begin
-        f = 100mm
-        D = 60mm
-        # ConicMirror(2f, -1, D) must build the same shape as ParabolicMirror(f, D), whose
-        # focusing is traced in "On-Axis Parabolic Mirror" above
-        sc = BMO.shape(ConicMirror(2f, -1, D))
-        sp = BMO.shape(ParabolicMirror(f, D))
-        for field in (:f, :k, :x_off, :diameter, :thickness)
-            @test getfield(sc, field) ≈ getfield(sp, field)
+    @testset "ParabolicMirror closed form" begin
+        # f > 0: rim sag + 10 mm, bore over y ∈ (-sag, t). Inputs of either type are promoted
+        # to Float64 if the thickness is computed, and stay Float32 with a Float32 thickness.
+        for S in (Float64, Float32), th in (nothing, S(15mm))
+            T = th === nothing ? Float64 : S
+            f, D, hd = S(100mm), S(60mm), S(10mm)
+            sag = T(D / 2)^2 / (4T(f))
+            t = th === nothing ? sag + T(10e-3) : T(th)
+            @test BMO.shape(ParabolicMirror(f, D; thickness = th)).thickness === t
+            bore = only(BMO.shape(ParabolicMirror(f, D; thickness = th, hole_diameter = hd)).tools)
+            @test position(bore)[2] === (t - sag) / 2
+            @test bore.height === (t + sag) / 2 + T(10e-3)
         end
+
+        # f < 0 (convex): |rim sag| + 10 mm, bore over y ∈ (0, t)
+        f, D, hd = -100mm, 60mm, 10mm
+        sag = (D / 2)^2 / (4f)
+        t = BMO.shape(ParabolicMirror(f, D)).thickness
+        @test t ≈ abs(sag) + 10e-3
+        bore = only(BMO.shape(ParabolicMirror(f, D; hole_diameter = hd)).tools)
+        y_lo = position(bore)[2] - (bore.height - 10e-3)
+        y_hi = position(bore)[2] + (bore.height - 10e-3)
+        @test y_lo ≈ 0 atol = 1e-15
+        @test y_hi ≈ t
     end
 end
 

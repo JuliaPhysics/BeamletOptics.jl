@@ -12,6 +12,7 @@ include(joinpath(@__DIR__, "TestGaussianBeamlet.jl"))
 include(joinpath(@__DIR__, "TestAstigmaticGaussianBeamlet.jl"))
 include(joinpath(@__DIR__, "TestAstigmaticGaussianPhysical.jl"))
 include(joinpath(@__DIR__, "TestAstigmaticGaussianSources.jl"))
+include(joinpath(@__DIR__, "TestBeamletDecompositions.jl"))
 include(joinpath(@__DIR__, "TestSourceKinematics.jl"))
 include(joinpath(@__DIR__, "TestKinematicTrait.jl"))
 
@@ -27,6 +28,7 @@ include(joinpath(@__DIR__, "Geometry", "SDFs", "TestSDFBoundingSpheres.jl"))
 # Test system and object containers
 include(joinpath(@__DIR__, "TestSystem.jl"))
 include(joinpath(@__DIR__, "TestObjectGroups.jl"))
+include(joinpath(@__DIR__, "TestSharedParts.jl"))
 include(joinpath(@__DIR__, "TestProperties.jl"))
 
 # Test lens models
@@ -39,6 +41,7 @@ include(joinpath(@__DIR__, "Lenses", "TestCylindricalLenses.jl"))
 include(joinpath(@__DIR__, "Components", "TestDummies.jl"))
 include(joinpath(@__DIR__, "Components", "TestDetectorUtils.jl"))
 include(joinpath(@__DIR__, "Components", "TestDetector.jl"))
+include(joinpath(@__DIR__, "Components", "TestHitBuffers.jl"))
 include(joinpath(@__DIR__, "Components", "TestDetectorSampling.jl"))
 include(joinpath(@__DIR__, "Components", "TestBeamsplitters.jl"))
 include(joinpath(@__DIR__, "Components", "TestPolarizers.jl"))
@@ -48,6 +51,9 @@ include(joinpath(@__DIR__, "Components", "ConicMirrors", "TestConicMirror.jl"))
 include(joinpath(@__DIR__, "Components", "ConicMirrors", "TestParabolicMirror.jl"))
 include(joinpath(@__DIR__, "Components", "ConicMirrors", "TestEllipsoidalMirror.jl"))
 include(joinpath(@__DIR__, "Components", "ConicMirrors", "TestHyperbolicMirror.jl"))
+
+# Test automatic differentiation through the tracing
+include(joinpath(@__DIR__, "TestAutoDiff.jl"))
 
 # Test progress bars of long-running calls
 include(joinpath(@__DIR__, "TestProgress.jl"))
@@ -59,12 +65,14 @@ include(joinpath(@__DIR__, "E2E", "TestMichelson.jl"))
 include(joinpath(@__DIR__, "E2E", "TestMachZehnder.jl"))
 include(joinpath(@__DIR__, "E2E", "TestFraunhofer.jl"))
 include(joinpath(@__DIR__, "E2E", "TestAnalyticReferences.jl"))
+include(joinpath(@__DIR__, "TestBeamletFieldInMedia.jl"))
 
 # Test rendering
 # MUST stay first: TestRenderErrors.jl needs to run before anything loads the BMO Makie ext.
 include(joinpath(@__DIR__, "Rendering", "TestRenderErrors.jl"))
 include(joinpath(@__DIR__, "Rendering", "TestRenderPolarization.jl"))
 include(joinpath(@__DIR__, "Rendering", "TestTessellation.jl"))
+include(joinpath(@__DIR__, "Rendering", "TestRenderMirrors.jl"))
 include(joinpath(@__DIR__, "Rendering", "TestRenderLook.jl"))
 include(joinpath(@__DIR__, "Rendering", "TestRenderLive.jl"))
 include(joinpath(@__DIR__, "Rendering", "TestRenderBoundingSphere.jl"))

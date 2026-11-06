@@ -3,7 +3,7 @@
 ## Prisms
 
 - `RightAnglePrism(leg_length, height, n)`: refractive right-angle prism with legs in x/y and height in z.
-  `n` may be a number for a constant refractive index. It is not aligned with the y-axis at spawn, so render it once to check its orientation.
+  It is not aligned with the y-axis at spawn, so render it once to check its orientation.
 - `Prism(vertices, height, n)`: right prism over any strictly convex polygon. `vertices` are `(x, y)` points in [m] in the local
   frame (either orientation, validated), extruded by `height` along local z, origin at the polygon coordinates' origin.
   Not aligned with the y-axis; orient it with the kinematic functions.

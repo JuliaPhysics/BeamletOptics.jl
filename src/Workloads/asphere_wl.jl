@@ -18,7 +18,7 @@
             EvenAsphericalSurface(R, d, k, A),
             SphericalSurface(Inf, d),
             ct,
-            _n -> n
+            ConstantRefractiveIndex(n)
         )
 
         system = System(lens)

@@ -166,7 +166,7 @@ const mm = 1e-3
 
         # Numerical result
         tl = BMO.ThinLensSDF(R1, R2, 0.025)
-        lens = Lens(tl, x -> nl)
+        lens = Lens(tl, ConstantRefractiveIndex(nl))
         system = System(lens)
         translate3d!(lens, [0, lens_y_location, 0])
         # Create and solve beam, calculate beam parameters
@@ -210,7 +210,7 @@ end
     λ = 1e-6
     n = 1.5
     # glass from y = 50.0 mm to about 50.5 mm
-    lens = ThinLens(50mm, 50mm, 10mm, n)
+    lens = ThinLens(50mm, 50mm, 10mm, ConstantRefractiveIndex(n))
     translate3d!(lens, [0, 50mm, 0])
     system = System([lens])
     Δφ(a, b) = rad2deg(angle(a / b))
@@ -237,7 +237,7 @@ end
     # a hit of the segment in the glass gives the field of the beam
     hit = BMO.GaussianBeamletHit(gb, 2)
     p = BMO.Point3(r, 50.25mm, 0.0)
-    @test BMO.beamlet_hit_field(hit, p) ≈ electric_field(gb, r, 50.25mm)
+    @test electric_field(hit, p) ≈ electric_field(gb, r, 50.25mm)
 end
 
 @testset "Gouy phase is collected along the beam" begin
@@ -247,7 +247,7 @@ end
     w0 = 1mm
     R = 50mm
     k = 2π / λ
-    lens(y) = (l = ThinLens(R, R, 10mm, n); translate3d!(l, [0, y, 0]); l)   # f = 50 mm
+    lens(y) = (l = ThinLens(R, R, 10mm, ConstantRefractiveIndex(n)); translate3d!(l, [0, y, 0]); l)   # f = 50 mm
     gb() = GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], λ, w0; support = [1.0, 0, 0])
     # ABCD law for the traced thick lenses: Gouy phase [deg] at the distance z along the beam,
     # -arg(A + B/q) with q = -i z_R at the waist. The segments alternate between air and glass.
@@ -270,7 +270,7 @@ end
     function axis_field(system, pd, beam)
         empty!(pd)
         solve_system!(system, beam)
-        _, _, E = electric_field(pd, RegularGrid(n = 1, x_min = 0, x_max = 0, z_min = 0, z_max = 0))
+        _, _, E = electric_field(pd, RegularGrid(num_points = 1, x_min = 0, x_max = 0, z_min = 0, z_max = 0))
         return E[1] * cis(-k * BMO.optical_path_length(beam))
     end
     gouy(args...) = rad2deg(angle(axis_field(args...)))
@@ -348,13 +348,36 @@ end
         empty!(pd_r)
         beam = gb()
         transmitted = axis_field(system, pd_t, beam)
-        @test BMO.hit_count(pd_t) == 1 && BMO.hit_count(pd_r) == 1
+        @test length(pd_t) == 1 && length(pd_r) == 1
         @test transmitted ≈ direct / sqrt(2) rtol = 1e-6
         # same distance behind the splitter: the reflected field differs by its sign only
-        _, _, E_r = electric_field(pd_r, RegularGrid(n = 1, x_min = 0, x_max = 0, z_min = 0, z_max = 0))
+        _, _, E_r = electric_field(pd_r, RegularGrid(num_points = 1, x_min = 0, x_max = 0, z_min = 0, z_max = 0))
         reflected = E_r[1] * cis(-k * BMO.optical_path_length(beam.children[2]))
         @test abs(reflected) ≈ abs(transmitted) rtol = 1e-6
         @test abs(sind(rad2deg(angle(reflected / transmitted)))) < 1e-6
+    end
+end
+
+@testset "GaussianSegment matches gauss_parameters" begin
+    lens(y) = (l = ThinLens(50mm, 50mm, 10mm, ConstantRefractiveIndex(1.5)); translate3d!(l, [0, y, 0]); l)
+    gauss = GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], 1e-6, 1mm; support = [1.0, 0, 0])
+    solve_system!(System([lens(50mm), lens(150mm)]), gauss)
+    chief_rays = BMO.rays(gauss.chief)
+    @test length(chief_rays) == 5
+    z_start = 0.0
+    for (i, ray) in enumerate(chief_rays)
+        z = z_start + (isfinite(length(ray)) ? length(ray) / 2 : 10mm)
+        p, index = BMO.point_on_beam(gauss, z)
+        @test index == i
+        l = z - z_start
+        w, R, ψ, w0 = BMO.gauss_parameters(gauss, z)
+        ws, Rs, ψs, w0s = BMO.gauss_parameters(BMO.GaussianSegment(gauss, i), l)
+        @test ws ≈ w
+        @test Rs ≈ R
+        @test w0s ≈ w0
+        # the Gouy offset is 0 only on the first segment of the root beam
+        i == 1 && @test ψs ≈ ψ
+        z_start += length(ray)
     end
 end
 

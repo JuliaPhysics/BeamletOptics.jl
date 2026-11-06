@@ -1,7 +1,7 @@
 """
     AbstractReflectiveOptic <: AbstractObject
 
-A generic type to represent an [`AbstractObject`] which reflects incoming rays.
+A generic type to represent an [`AbstractObject`](@ref) which reflects incoming rays.
 
 # Implementation reqs.
 
@@ -78,7 +78,7 @@ struct Mirror{T, S <: AbstractShape{T}} <: AbstractReflectiveOptic{T}
     shape::S
 end
 
-# order of inclusion matters
+# Order of inclusion matters
 include("MirrorUtils.jl")
 include("PlanoMirrors.jl")
 include("SphericalMirrors.jl")

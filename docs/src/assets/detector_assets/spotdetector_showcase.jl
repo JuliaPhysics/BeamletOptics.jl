@@ -7,14 +7,14 @@ const mm = 1e-3
 
 ##
 # define spherical lenses
-l1 = SphericalLens(69.21e-3, 433.84e-3, 9.33e-3, 70e-3, λ -> 1.671)
+l1 = SphericalLens(69.21e-3, 433.84e-3, 9.33e-3, 70e-3, ConstantRefractiveIndex(1.671))
 # front triplet: last surface only 40 mm clear aperture -> constructed from surfaces
 l234 = TripletLens(
     SphericalSurface(35.86e-3, 60e-3), SphericalSurface(85.87e-3, 60e-3),
     SphericalSurface(-646.31e-3, 60e-3), SphericalSurface(23.51e-3, 40e-3),
-    11.81e-3, 7.05e-3, 1.9e-3, λ -> 1.671, λ -> 1.4892, λ -> 1.7394)
+    11.81e-3, 7.05e-3, 1.9e-3, ConstantRefractiveIndex(1.671), ConstantRefractiveIndex(1.4892), ConstantRefractiveIndex(1.7394))
 l567 = SphericalTripletLens(Inf, 51.09e-3, -22.12e-3, -103.13e-3, 2.48e-3, 19.81e-3, 4.57e-3, 42e-3,
-                            λ -> 1.5232, λ -> 1.6578, λ -> 1.5894)
+                            ConstantRefractiveIndex(1.5232), ConstantRefractiveIndex(1.6578), ConstantRefractiveIndex(1.5894))
 
 # Calculate translation distances
 l_234 = thickness(l1) + 0.38e-3
@@ -54,7 +54,7 @@ b2_spots = spot_diagram(pd)
 empty!(pd)
 
 solve_system!(system, b3)
-x, z, I = intensity(pd, RegularGrid(n=300, crop_factor=1))
+x, z, I = intensity(pd, RegularGrid(num_points = 300, crop_factor=1))
 empty!(pd)
 
 ##

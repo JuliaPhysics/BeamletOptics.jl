@@ -23,17 +23,16 @@ Creates an empty system, to which objects are added via `push!`.
 """
 System() = System(ObjectOrGroup[])
 
-# `Leaves` of an empty vector is the vector itself, which is no object
 """
     objects(system::System)
 
 Exposes all objects stored within the system. By exposing the `Leaves` of the tree only, it is ensured that `AbstractObjectGroup`s are flattened into a regular vector.
-An empty system exposes no objects.
+An empty system exposes no objects, nor does an empty group, e.g. one whose objects were removed.
 """
-objects(system::System) = isempty(system.objects) ? () : Leaves(system.objects)
+objects(system::System) = _leaf_objects(system.objects)
 
-"""Returns `true` if `obj` is one of the `leaves`, compared by identity."""
-_is_leaf_of(obj, leaves) = any(leaf -> leaf === obj, leaves)
+"""Returns `true` if `object` is one of the `leaves`, compared by identity."""
+_is_leaf_of(object::ObjectOrGroup, leaves) = any(leaf -> leaf === object, leaves)
 
 """
     push!(system::System, objects::ObjectOrGroup...) -> system
@@ -45,14 +44,14 @@ directly or within a group, throws an `ArgumentError`; in this case nothing is a
 Beams and beam groups that were solved before do not know the new object: solve them again with
 `solve_system!(system, beam)`. The `system` must not be changed while it is being solved.
 """
-function Base.push!(system::System, objs::ObjectOrGroup...)
+function Base.push!(system::System, _objects::ObjectOrGroup...)
     leaves = AbstractObject[o for o in objects(system)]
-    for obj in objs, leaf in Leaves(obj)
+    for object in _objects, leaf in _leaf_objects(object)
         _is_leaf_of(leaf, leaves) && throw(ArgumentError(
             "the $(nameof(typeof(leaf))) is already an object of the system"))
         push!(leaves, leaf)
     end
-    append!(system.objects, objs)
+    append!(system.objects, _objects)
     return system
 end
 
@@ -84,12 +83,12 @@ removed on its own and throws an `ArgumentError`: remove the group instead.
 Beams and beam groups that were solved before still end on the removed object: solve them again
 with `solve_system!(system, beam)`. The `system` must not be changed while it is being solved.
 """
-function Base.delete!(system::System, obj::ObjectOrGroup)
-    i = findfirst(o -> o === obj, system.objects)
+function Base.delete!(system::System, object::ObjectOrGroup)
+    i = findfirst(o -> o === object, system.objects)
     if isnothing(i)
         for top in system.objects
-            any(o -> o === obj, PreOrderDFS(top)) && throw(ArgumentError(
-                "the $(nameof(typeof(obj))) is part of a $(nameof(typeof(top))) of the system, remove the group instead"))
+            any(o -> o === object, PreOrderDFS(top)) && throw(ArgumentError(
+                "the $(nameof(typeof(object))) is part of a $(nameof(typeof(top))) of the system, remove the group instead"))
         end
         return system
     end
@@ -103,6 +102,8 @@ end
 A static container storing the optical elements of, i.e. a camera lens or lab setup.
 Compared to `System` this way defining the system is less flexible, i.e. no elements
 can be added or removed after construction but it allows for more performant ray-tracing.
+The objects of its groups are stored when it is built: objects that are added to or removed from
+a group later, e.g. via `push!(group, object)`, are not seen.
 
 !!! warning
     This type uses long tuples for storing the elements. This container should not be used
@@ -118,7 +119,7 @@ end
 StaticSystem(object::ObjectOrGroup) = StaticSystem([object])
 # No bound on the element type: a vector of objects and groups has the element type `Any`
 function StaticSystem(objects::AbstractArray)
-    StaticSystem(tuple(collect(Leaves(objects))...))
+    StaticSystem(tuple(collect(_leaf_objects(objects))...))
 end
 
 objects(system::StaticSystem) = system.objects
@@ -160,11 +161,14 @@ end
 """
     tracing_step!(system::AbstractSystem, ray::AbstractRay{R}, hint::Hint)
 
-Tests if the `ray` intersects an `object` in the optical `system`. Returns the closest intersection.
+Tests if the `ray` intersects an `object` in the optical `system`. Stores the closest intersection, or
+`nothing` if there is none, in the `ray` via `intersection!` and returns `nothing`.
 
 # Hint
 
-An optional [`Hint`](@ref) can be provided to test against a specific object (and shape) in the `system` first.
+An optional [`Hint`](@ref) can be provided to test against a specific shape in the `system` first. The
+intersection of the hinted shape is assigned to the object of the hint, hence the solver calls `interact3d`
+for this object. For a [`MultiShape`](@ref) component the hint names the composite, not the part.
 
 !!! warning
     If a hint is provided and the object intersection is valid, the intersection will be returned immediately.
@@ -187,7 +191,7 @@ end
 """
     trace_system!(system::AbstractSystem, beam::Beam{T}; r_max = get_default_r_max()) where {T <: Real}
 
-Trace a [`Beam`](@ref) through an optical `system`. Maximum number of tracing steps can be capped by `r_max`.
+Trace a [`Beam`](@ref) through an optical `system`. The number of rays of the `beam` can be capped by `r_max`.
 
 # Tracing logic
 
@@ -197,9 +201,9 @@ further objects are hit, the tracing procedure is stopped.
 
 # Arguments
 
-- `system:`: The optical system through which the [`Beam`](@ref) is traced.
+- `system`: The optical system through which the [`Beam`](@ref) is traced.
 - `beam`: The [`Beam`](@ref) object to be traced.
-- `r_max`: Maximum number of tracing iterations.
+- `r_max`: Maximum number of rays of the `beam`, which ends the tracing.
 """
 function trace_system!(
         system::AbstractSystem,
@@ -235,27 +239,31 @@ function trace_system!(
 end
 
 """
-    trace_system!(system::System, gauss::GaussianBeamlet{T}; r_max = get_default_r_max()) where {T <: Real}
+    trace_system!(system::AbstractSystem, gauss::GaussianBeamlet{T}; r_max = get_default_r_max(), check_invariant = true) where {T <: Real}
 
-Trace a [`GaussianBeamlet`](@ref) through an optical `system`. Maximum number of tracing steps can be capped by `r_max`.
+Trace a [`GaussianBeamlet`](@ref) through an optical `system`. The number of rays of each component beam can be capped by `r_max`.
 
 # Tracing logic
 
 The chief, waist and divergence beams are traced step-by-step through the `system`.
 For each intersection after a [`tracing_step!`](@ref), the intersections are compared.
 If all rays hit the same target, the optical interaction is analyzed, else the tracing stops.
+Tracing also stops with a warning if the Lagrange invariant of a new segment leaves
+[`get_lagrange_tolerance`](@ref) of its start value.
 
 # Arguments
 
 - `system`: The optical system through which the [`GaussianBeamlet`](@ref) is traced.
 - `gauss`: The [`GaussianBeamlet`](@ref) object to be traced.
-- `r_max`: Maximum number of tracing iterations.
+- `r_max`: Maximum number of rays of each component beam, which ends the tracing.
+- `check_invariant`: enables or disables the check of the Lagrange invariant.
 """
 function trace_system!(
         system::AbstractSystem,
         gauss::GaussianBeamlet{T};
         # kwargs...
         r_max::Int = get_default_r_max(),
+        check_invariant::Bool = true,
         kwargs...
 ) where {T <: Real}
     # Test until bundle is stopped
@@ -297,6 +305,10 @@ function trace_system!(
         # Add rays to gauss beam
         push!(gauss, interaction)
         seg_counter += 1
+        # Verify that the paraxial assumptions still hold for the new segment
+        if check_invariant && !check_lagrange_invariants(gauss, seg_counter)
+            break
+        end
     end
     return nothing
 end
@@ -304,7 +316,8 @@ end
 """
     trace_system!(system, agb::AstigmaticGaussianBeamlet; r_max = get_default_r_max(), check_invariant = true, threshold = get_invariant_threshold())
 
-Trace an [`AstigmaticGaussianBeamlet`](@ref) through an optical `system`.
+Trace an [`AstigmaticGaussianBeamlet`](@ref) through an optical `system`. The number of rays of each
+component beam can be capped by `r_max`.
 All 9 component beams (chief + 8 parabasal) are traced in lockstep:
 the chief ray is traced first for each intersection, followed by the auxiliary rays.
 All rays must hit the same shape; otherwise tracing stops.
@@ -382,10 +395,11 @@ The objects of the `system` are not reset by default: a [`Detector`](@ref) keeps
 ## Keyword Arguments
 
 - `initialize = false`: if `true`, [`initialize!`](@ref)`(system)` is called before the `beam` is traced
-- `r_max = get_default_r_max()`: Maximum number of tracing iterations for each leaf.
+- `r_max = get_default_r_max()`: Maximum number of rays of each beam of the tree.
 - `depth_max = get_default_depth_max()`: Maximum number of branching levels explored from the root beam
 - `check_invariant = true`: enables or disables optical invariant checks where applicable
-- `threshold = get_invariant_threshold()`: threshold for paraxial invariant checks
+- `threshold = get_invariant_threshold()`: limit of the complex invariant of an [`AstigmaticGaussianBeamlet`](@ref).
+  The Lagrange invariants of both beamlets use [`get_lagrange_tolerance`](@ref) instead
 """
 function solve_system!(
         system::AbstractSystem,
@@ -398,30 +412,29 @@ function solve_system!(
         threshold::Real = get_invariant_threshold()
 ) where {B <: AbstractBeam}
     initialize && initialize!(system)
-    # The bounding spheres of the objects are computed once, unless the solve of a beam group did so
+    # Bounding spheres are computed once, unless a beam group solve did so
     with_bounding_spheres(system) do
-        _solve_beam!(system, beam; r_max, depth_max, check_invariant, threshold)
+        solve_beam!(system, beam; r_max, depth_max, check_invariant, threshold)
     end
     return nothing
 end
 
-function _solve_beam!(system::AbstractSystem, beam::B; r_max, depth_max, check_invariant,
+function solve_beam!(system::AbstractSystem, beam::B; r_max, depth_max, check_invariant,
         threshold) where {B <: AbstractBeam}
     queue = Tuple{B, Int}[(beam, 1)]
     while !isempty(queue)
-        # Process beams in FIFO order.
+        # Process beams in FIFO order
         current, depth = popfirst!(queue)
-        # Nothing of an earlier solve survives, also for a child that a component attached again.
+        # Discard earlier solve, also for a child attached again
         empty!(current)
         trace_system!(system, current; r_max, check_invariant, threshold)
-        # Check if the maximum branching depth has been reached.
+        # Enqueue children only below the maximum branching depth
         if depth <= depth_max
-            # Enqueue all child beams for subsequent processing.
-            for child in children(current) # 'children' returns an iterable of sub-beams.
+            for child in children(current)
                 push!(queue, (child, depth + 1))
             end
         else
-            # Maximum braching depth is reached. Remove childrens of the current beam because they will not be solved.
+            # Children beyond the maximum depth are not solved, drop them
             _drop_beams!(current)
         end
     end
@@ -453,22 +466,17 @@ function solve_system!(
         initialize::Bool = false, kwargs...)
     empty!(bg)
     initialize && initialize!(system)
-    # One table of bounding spheres for all beams. It belongs to a task, hence each task of the
-    # threads sets it for its beams.
+    # One bounding sphere table for all beams, set again in each task
     with_bounding_spheres(system) do
         table = current_bounding_spheres()::BoundingSphereTable
-        # Each chunk collects its detector hits and stores them at its end, see `with_hit_buffers`.
-        # With `:greedy`, a free task takes the next chunk. The beams of a group differ in cost
-        # (e.g. the inner rings of a source pass a lens, the outer ones miss it), and those of
-        # similar cost lie next to each other. 4 chunks per thread balance most of the load. Each
-        # further chunk costs a channel access and a flush, which shows if all beams cost the same.
+        # 4 chunks per thread balance the load
         chunks = Iterators.partition(beams(bg), max(1, cld(length(bg), 4 * Threads.nthreads())))
         _with_progress(progress, length(bg), "Tracing beams: ") do prog
             Threads.@threads :greedy for chunk in collect(chunks)
                 with_bounding_spheres(table) do
                     with_hit_buffers() do
-                        for _beam in chunk
-                            solve_system!(system, _beam; kwargs...)
+                        for beam in chunk
+                            solve_system!(system, beam; kwargs...)
                             _tick!(prog)
                         end
                     end

@@ -131,7 +131,7 @@ end
         @test length(edge_plots(rendered_plots(RoundPlanoMirror(25e-3, 5e-3); edges = true))) == 1
         @test isempty(edge_plots(rendered_plots(lens; edges = false)))
         # coating and prisms of a beamsplitter
-        @test length(edge_plots(rendered_plots(CubeBeamsplitter(20e-3, λ -> 1.5)))) == 1
+        @test length(edge_plots(rendered_plots(CubeBeamsplitter(20e-3, ConstantRefractiveIndex(1.5))))) == 1
         @test length(edge_plots(rendered_plots(ThinBeamsplitter(10e-3, 10e-3)))) == 1
 
         # MultiShape: only the parts with edges contribute, mechanics parts never by default
@@ -176,7 +176,7 @@ end
         # component classes
         for (obj, class) in (RoundPlanoMirror(25e-3, 5e-3) => :reflective,
                 Retroreflector(25e-3) => :reflective,
-                Prism(BMO.BoxSDF(10e-3, 10e-3, 10e-3), λ -> 1.5) => :refractive,
+                Prism(BMO.BoxSDF(10e-3, 10e-3, 10e-3), ConstantRefractiveIndex(1.5)) => :refractive,
                 ThinBeamsplitter(10e-3, 10e-3) => :coating,
                 RoundPolarizationFilter(25e-3) => :polarizer,
                 Detector(10e-3) => :detector,
@@ -187,7 +187,7 @@ end
         end
 
         # LinearPolarizer: substrates refractive, film with the polarizer material, edges switchable
-        lipo = RoundLinearPolarizer(25e-3, 2e-3, 2e-3, λ -> 1.5)
+        lipo = RoundLinearPolarizer(25e-3, 2e-3, 2e-3, ConstantRefractiveIndex(1.5))
         meshes = mesh_plots(rendered_plots(lipo))
         @test count(p -> p.color[] == Makie.to_color(mats[:polarizer].color), meshes) == 1
         @test count(p -> p.color[] == Makie.to_color(mats[:refractive].color), meshes) == 2
@@ -196,7 +196,7 @@ end
         @test n_lines - n_lines_noedges == 3 # one edge plot per part, the axis lines stay
 
         # MultiShape: materials per part, explicit kwargs for all parts
-        cbs = CubeBeamsplitter(20e-3, λ -> 1.5)
+        cbs = CubeBeamsplitter(20e-3, ConstantRefractiveIndex(1.5))
         prisms, coating = mesh_plots(rendered_plots(cbs))
         check_material(prisms, mats[:refractive])
         check_material(coating, mats[:coating])
@@ -209,7 +209,7 @@ end
     end
 
     @testset "feature edges" begin
-        box = Prism(BMO.BoxSDF(20e-3, 10e-3, 30e-3), λ -> 1.5)
+        box = Prism(BMO.BoxSDF(20e-3, 10e-3, 30e-3), ConstantRefractiveIndex(1.5))
         zrotate3d!(box, deg2rad(35))
         xrotate3d!(box, deg2rad(-20))
         plots = rendered_plots(box)
@@ -225,7 +225,7 @@ end
 
         # two circles, no edges along the smooth side wall
         s = BMO.CylinderSDF(5e-3, 2e-3)
-        cyl = Prism(s, λ -> 1.5)
+        cyl = Prism(s, ConstantRefractiveIndex(1.5))
 
         # mechanics: no edges by default, a mesh (e.g. loaded from a file) keeps its smooth shading
         mech = NonInteractableObject(BMO.CylinderSDF(5e-3, 2e-3))
@@ -267,20 +267,20 @@ end
         @test length(segments(only(edge_plots(rendered_plots(Detector(10e-3)))))) == 4
 
         # coincident flat faces (the bases of the caps of a thin lens) have no edges, only the rim
-        tl = ThinLens(34.9e-3, -34.9e-3, 25.4e-3, 1.5)
+        tl = ThinLens(34.9e-3, -34.9e-3, 25.4e-3, ConstantRefractiveIndex(1.5))
         segs = segments(only(edge_plots(rendered_plots(tl))))
         @test !isempty(segs)
         @test all(abs(norm(p[[1, 3]]) - 12.7e-3) < 1e-6 for seg in segs for p in seg)
 
         # edges = false
-        for obj in (box, cyl, CubeBeamsplitter(20e-3, λ -> 1.5), System([box, cyl]))
+        for obj in (box, cyl, CubeBeamsplitter(20e-3, ConstantRefractiveIndex(1.5)), System([box, cyl]))
             plots = rendered_plots(obj; edges = false)
             @test isempty(edge_plots(plots))
             @test all(p -> p isa Makie.Mesh, plots)
         end
 
         # MultiShape: one edge plot per object, after the meshes
-        plots = rendered_plots(CubeBeamsplitter(20e-3, λ -> 1.5))
+        plots = rendered_plots(CubeBeamsplitter(20e-3, ConstantRefractiveIndex(1.5)))
         @test length(edge_plots(plots)) == 1
         @test plots[end] isa Makie.Lines
 
@@ -305,7 +305,7 @@ end
     end
 
     @testset "cemented interfaces" begin
-        dl = SphericalDoubletLens(87.9e-3, -105.6e-3, -1000, 6e-3, 3e-3, 25.4e-3, 1.5, 1.6)
+        dl = SphericalDoubletLens(87.9e-3, -105.6e-3, -1000, 6e-3, 3e-3, 25.4e-3, ConstantRefractiveIndex(1.5), ConstantRefractiveIndex(1.6))
         zrotate3d!(dl, deg2rad(35))
         translate3d!(dl, [0.01, -0.02, 0.015])
         plots = rendered_plots(dl)
@@ -336,7 +336,7 @@ end
         @test isempty(edge_plots(rendered_plots(dl; edges = false)))
 
         # triplet: both interfaces in one mesh
-        tl = SphericalTripletLens(60e-3, 25e-3, -25e-3, -60e-3, 3e-3, 8e-3, 3e-3, 25.4e-3, 1.5, 1.6, 1.5)
+        tl = SphericalTripletLens(60e-3, 25e-3, -25e-3, -60e-3, 3e-3, 8e-3, 3e-3, 25.4e-3, ConstantRefractiveIndex(1.5), ConstantRefractiveIndex(1.6), ConstantRefractiveIndex(1.5))
         outer, interface = mesh_plots(rendered_plots(tl))
         s1, s2, s3 = BMO.shape(tl.front), BMO.shape(tl.middle), BMO.shape(tl.back)
         pts = points(interface)
@@ -348,7 +348,7 @@ end
         @test is_closed(points(outer), faces(outer), tol)
 
         # other composite objects have no interface mesh
-        @test length(mesh_plots(rendered_plots(CubeBeamsplitter(20e-3, λ -> 1.5)))) == 2
+        @test length(mesh_plots(rendered_plots(CubeBeamsplitter(20e-3, ConstantRefractiveIndex(1.5))))) == 2
         @test length(mesh_plots(rendered_plots(SphericalLens(34.9e-3, -34.9e-3, 6.8e-3, 25.4e-3)))) == 1
     end
 
@@ -386,6 +386,29 @@ end
         @test isnothing(studio_lighting!(ax3))
         @test only(Makie.get_lights(ax3.scene)) isa Makie.DirectionalLight
         @test_throws Ext.InvalidAxisError studio_lighting!(Axis(Figure()[1, 1]))
+    end
+
+    @testset "Camera helpers need an LScene" begin
+        mirror = RoundPlanoMirror(25e-3, 5e-3)
+        for ax in (Axis3(Figure()[1, 1]), Axis(Figure()[1, 1]))
+            @test_throws Ext.InvalidAxisError get_view(ax)
+            @test_throws Ext.InvalidAxisError set_view(ax, Matrix{Float32}(I, 4, 4))
+            @test_throws Ext.InvalidAxisError set_view(ax, [0, -1, 0], [0, 0, 0], [0, 0, 1])
+            @test_throws Ext.InvalidAxisError set_orthographic(ax)
+            @test_throws Ext.InvalidAxisError hide_axis(ax)
+            @test_throws Ext.InvalidAxisError hide_axis(ax, false)
+            @test_throws Ext.InvalidAxisError look_at!(ax, [0, 0, 0], [0, -1, 0])
+            @test_throws Ext.InvalidAxisError arrow!(ax, [0, 0, 0], [1, 0, 0]; scale = 2)
+            @test_throws Ext.InvalidAxisError render_lcs!(ax)
+            @test_throws Ext.InvalidAxisError render_lcs!(ax, [0, 0, 0], Matrix(1.0I, 3, 3))
+            @test_throws Ext.InvalidAxisError render_lcs!(ax, mirror; scale = 2)
+        end
+        # The LScene methods are unaffected
+        ls = LScene(Figure()[1, 1])
+        @test isnothing(set_orthographic(ls))
+        @test isnothing(render_lcs!(ls, mirror))
+        @test endswith(Ext.InvalidAxisError(Axis3, "LScene").msg, "must be LScene")
+        @test endswith(Ext.InvalidAxisError(Axis3).msg, "must be LScene or Axis3")
     end
 
     @testset "look_colors" begin

@@ -139,7 +139,7 @@ function _plot_astigmatic!(
         curve = _observe!(bp,
             () -> _field_curve(x; bp.settings[].flen, bp.settings[].render_every, λ_vis = pol_λ, scale = pol_scale,
                 focus_exponent = pol_focus_exponent, gain_max = pol_gain_max, ppl = pol_ppl))
-        _add!(bp, lines!(axis, curve; color = pol_color, linewidth = pol_linewidth))
+        push!(bp, lines!(axis, curve; color = pol_color, linewidth = pol_linewidth))
     end
     return bp
 end

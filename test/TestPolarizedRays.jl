@@ -39,6 +39,13 @@ const BMO = BeamletOptics
         @test_throws ErrorException PolarizedRay(zeros(3), [0,1,0], 1e-6, [0,1,1])
     end
 
+    @testset "Orthogonality tolerance is relative to |E0|" begin
+        thr = get_orthogonality_threshold()
+        E0(f) = 3 .* [1, f, 0]
+        @test PolarizedRay(zeros(3), [0, 1, 0], 1e-6, E0(0.5 * thr)) isa PolarizedRay
+        @test_throws ErrorException PolarizedRay(zeros(3), [0, 1, 0], 1e-6, E0(2 * thr))
+    end
+
     @testset "Mirror reflections" begin
         # Setup system as in https://opg.optica.org/ao/fulltext.cfm?uri=ao-50-18-2855&id=218813
         m1 = SquarePlanoMirror2D(1.0)
@@ -102,11 +109,11 @@ const BMO = BeamletOptics
         s3 = BMO.CuboidMesh(1.0, d, 1.0)
         s4 = BMO.CuboidMesh(1.0, d, 1.0)
         s5 = BMO.CuboidMesh(1.0, d, 1.0)
-        l1 = Lens(s1, x -> n)
-        l2 = Lens(s2, x -> n)
-        l3 = Lens(s3, x -> n)
-        l4 = Lens(s4, x -> n)
-        l5 = Lens(s5, x -> n)
+        l1 = Lens(s1, ConstantRefractiveIndex(n))
+        l2 = Lens(s2, ConstantRefractiveIndex(n))
+        l3 = Lens(s3, ConstantRefractiveIndex(n))
+        l4 = Lens(s4, ConstantRefractiveIndex(n))
+        l5 = Lens(s5, ConstantRefractiveIndex(n))
         translate3d!.([l1, l2, l3, l4, l5], Ref([-0.5, -d / 2, -0.5]))
         BMO.set_new_origin3d!.(BMO.shape.([l1, l2, l3, l4, l5]))
         translate3d!(l2, [0, 0.5, -1d / 2])
@@ -139,7 +146,7 @@ const BMO = BeamletOptics
         # Create Fresnel rhomb with n=1.5 and θ=53.3° for quarter-wave plate effect
         n = 1.5
         s1 = BMO.CuboidMesh(0.5, 1.25, 0.5, deg2rad(53.3))
-        l1 = Lens(s1, x -> n)
+        l1 = Lens(s1, ConstantRefractiveIndex(n))
         translate3d!(l1, [-0.25, 0, -0.25])
         BMO.set_new_origin3d!(s1)
         # Rotate prism to obtain 45° beam input polarization
@@ -189,7 +196,7 @@ const BMO = BeamletOptics
         end
 
         # index 101 is x = 0 (crossing point), index 51 is x = -Λ/2 (half a fringe away)
-        x_scan(pd) = electric_field(pd, RegularGrid(n = 201, x_min = -Λ, x_max = Λ, z_min = 0.0, z_max = 0.0))
+        x_scan(pd) = electric_field(pd, RegularGrid(num_points = 201, x_min = -Λ, x_max = Λ, z_min = 0.0, z_max = 0.0))
         visibility(I) = (maximum(I) - minimum(I)) / (maximum(I) + minimum(I))
 
         @testset "s-polarization: full-contrast fringes" begin
@@ -217,7 +224,7 @@ const BMO = BeamletOptics
 
         @testset "orthogonal polarizations do not interfere" begin
             pd = two_ray_detector(s_pol, p_minus)
-            xs, zs, I = intensity(pd, RegularGrid(n = 101, x_min = -Λ, x_max = Λ, z_min = -Λ, z_max = Λ))
+            xs, zs, I = intensity(pd, RegularGrid(num_points = 101, x_min = -Λ, x_max = Λ, z_min = -Λ, z_max = Λ))
 
             @test maximum(I) - minimum(I) < 1e-12 * maximum(I)
             # the flux of each ray through the detector is cos θ of its unit irradiance
@@ -227,7 +234,7 @@ const BMO = BeamletOptics
         @testset "tilted detector: flux falls with cos θ" begin
             # rays with and without polarization are weighted alike by the angle of incidence
             tilt = deg2rad(40)
-            probe(pd) = intensity(pd, RegularGrid(n = 1, x_min = 0.0, x_max = 0.0, z_min = 0.0, z_max = 0.0))[3][1, 1]
+            probe(pd) = intensity(pd, RegularGrid(num_points = 1, x_min = 0.0, x_max = 0.0, z_min = 0.0, z_max = 0.0))[3][1, 1]
 
             pd_pol = Detector(1.0)
             zrotate3d!(pd_pol, tilt)
@@ -284,7 +291,7 @@ const BMO = BeamletOptics
 
             W = 1.5λ / NA
             function normalized_psf(detector)
-                E = electric_field(detector, RegularGrid(n = 101, x_min = -W, x_max = W, z_min = -W, z_max = W))[3]
+                E = electric_field(detector, RegularGrid(num_points = 101, x_min = -W, x_max = W, z_min = -W, z_max = W))[3]
                 I = intensity.(E)
                 Ex2 = map(e -> abs2(e[1]), E)
                 Ey2 = map(e -> abs2(e[2]), E)
@@ -318,7 +325,7 @@ const BMO = BeamletOptics
         D = 15mm
         num_rays = 1000
 
-        lens = SphericalLens(R1, R2, l, d, x -> n)
+        lens = SphericalLens(R1, R2, l, d, ConstantRefractiveIndex(n))
 
         x_shift = y_shift = -2mm
         psfd = Detector(10e-3)
@@ -333,7 +340,7 @@ const BMO = BeamletOptics
         sys = System([lens, psfd])
         solve_system!(sys, pcs)
 
-        x, y, I_num = intensity(psfd, RegularGrid(n = 500, crop_factor = 5, center = MinMax()))
+        x, y, I_num = intensity(psfd, RegularGrid(num_points = 500, crop_factor = 5, center = MinMax()))
 
         # walk from the peak to the first local minimum through the centre column
         ix_ctr, jx_ctr = Tuple(argmax(I_num))
@@ -348,9 +355,9 @@ const BMO = BeamletOptics
         @test x[i_min] - x[ix_ctr] ≈ airy_radius rtol = 2e-2
 
         # vector field result feeds the scalar intensity/power pipeline
-        E_map = electric_field(psfd, RegularGrid(n = 200, crop_factor = 5, center = MinMax()))[3]
+        E_map = electric_field(psfd, RegularGrid(num_points = 200, crop_factor = 5, center = MinMax()))[3]
         @test eltype(E_map) <: BMO.Point3{<:Complex}
-        @test BMO.optical_power(psfd, RegularGrid(n = 100, crop_factor = 5, center = MinMax())) > 0
+        @test BMO.optical_power(psfd, RegularGrid(num_points = 100, crop_factor = 5, center = MinMax())) > 0
 
         # at this NA the PSF stays isotropic and the vector effects vanish
         row = I_num[ix_ctr, :]

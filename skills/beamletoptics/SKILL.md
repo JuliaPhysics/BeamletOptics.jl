@@ -24,8 +24,9 @@ When this Skill is active:
   - Read `src/` of the installed package (`julia -e 'using BeamletOptics; println(pkgdir(BeamletOptics))'`).
 - Everything is **SI**: meters, radians, watts, V/m. **Wavelengths are in meters** (`532e-9`).
 - The **optical axis is +y**, not z. Components spawn at the origin aligned with +y.
-- **Refractive indices are callables** `n(λ)` (λ in meters), never plain numbers:
-  `λ -> 1.5`, `DiscreteRefractiveIndex(...)` or `SellmeierEquation(...)`.
+- **Refractive indices are models** `n(λ)` (λ in meters): `SellmeierEquation(...)`,
+  `DiscreteRefractiveIndex(...)` or `ConstantRefractiveIndex(1.5)` (no dispersion). A plain number or a
+  function as `n` throws a `MethodError`.
 - **Detectors accumulate.** Solve with `solve_system!(system, beam; initialize = true)`, or call `initialize!(system)`
   (all detectors) or `empty!(detector)` (one) before every `solve_system!` that reuses the detectors; never reset
   between sources that should superpose. Field functions superpose all stored hits coherently; moving the detector empties it.
@@ -66,7 +67,7 @@ When this Skill is active:
 
 5) Evaluate
 - Rays: `rays(beam)`, `position`, `direction`, `length(beam)`, `beam.children` (splitters: transmitted first).
-- Detector: `spot_diagram`, `intensity`, `electric_field`, `optical_power` (`components/detectors.md`).
+- Detector: `spot_diagram`, `ray_hits`, `intensity`, `electric_field`, `optical_power` (`components/detectors.md`).
 - Gaussian: `gauss_parameters(beam, z)`, `waist_parameters`, `rayleigh_range`, `optical_power`.
 - Sanity-check numbers against a paraxial estimate (`BeamletOptics.lensmakers_eq`, Airy radius, Malus, …).
 

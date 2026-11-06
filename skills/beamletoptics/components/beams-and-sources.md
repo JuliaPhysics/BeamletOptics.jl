@@ -27,8 +27,10 @@ GaussianBeamlet(pos, dir, λ = 1e-6, w0 = 1e-3; M2 = 1, P0 = 1e-3, z0 = 0, suppo
 - `support` fixes the direction from the chief ray to the waist and divergence ray. It must be
   orthogonal to `dir` (any non-zero length), otherwise the constructor throws an `ArgumentError`.
 - Valid for on-axis, untilted, (nearly) aberration-free systems only.
-- Queries: `gauss_parameters(g, z)` → `(w, R, ψ, w0)`, `waist_parameters`, `rayleigh_range(g; M2)`,
-  `optical_power(g)`, `electric_field(g, r, z)`, `point_on_beam(g, t)`, `path_segments(g)` (segments of the chief ray and all child beamlets with accumulated path lengths).
+- `solve_system!` stops tracing with a "Lagrange invariant violation" warning where the beamlet
+  leaves its model, with the same limit as an `AstigmaticGaussianBeamlet` (see there).
+- Queries: `gauss_parameters(g, z)` → `(w, R, ψ, w0)` (`w0` is the waist radius for any `M2`), `waist_parameters`, `rayleigh_range(g; M2)`,
+  `optical_power(g)`, `electric_field(g, r, z)` (the physical field in V/m: smaller by `√n` in a medium of index `n` for the same power, as for `agb`), `point_on_beam(g, t)`, `path_segments(g)` (segments of the chief ray and all child beamlets with accumulated path lengths).
 
 ```julia
 AstigmaticGaussianBeamlet(pos, dir, λ, w0; M2, P0, E0, support, z0)
@@ -37,14 +39,28 @@ AstigmaticGaussianBeamlet(pos, dir, λ, w0_x, w0_y; M2_x, M2_y, P0, E0, support,
 
 - General astigmatic beamlet (9 rays, polarized chief ray). Use it for tilted, off-axis, cylindrical
   or polarization-dependent setups. `E0` defaults to a field along the `support` axis scaled to `P0`.
+- `z0` = waist offset along the axis, as for `GaussianBeamlet`: the beam starts at `pos`, its waist
+  lies at `pos + z0 * dir`. `z0_x` and `z0_y` place the two waists independently (default `z0`).
+  With the default `E0`, power, beam radius and field match a `GaussianBeamlet`, for any `M2`. An
+  explicit `E0` is the field at `pos`, not at the waist, and replaces `P0`.
+- `electric_field(agb, r, z)` is a scalar with the sign of the largest component of the field
+  vector, so it can differ in sign from a `GaussianBeamlet` (e.g. `support = -s`). The vector is
+  `BeamletOptics.polarized_field(agb, r, z)`.
 - `support` is the x axis of the beamlet (`w0_x`, `M2_x`, `z0_x`). As for `GaussianBeamlet` it must
   be orthogonal to `dir` (any non-zero length), otherwise the constructor throws an `ArgumentError`.
-- `solve_system!` checks the optical invariant and stops tracing if it is violated.
+- `solve_system!` checks the optical invariant and stops tracing if it is violated, with a "Lagrange
+  invariant violation" warning: a detector behind that point gets no hits. This is the limit of the
+  model. It ends where a strong focus takes the rays off the parabolic part of a surface, the earlier
+  the farther the waist lies from the surface (`w0 = 6.4 mm`, λ = 1064 nm: the first f that stops is
+  75 mm for `z0 = ±5`, 60 mm for `z0_y = 3`, 40 mm for `z0_y = 1`, none down to 40 mm for `z0 = 0`). Use
+  smaller beamlets or a `GaussianBeamletDecomposition`. The limit is `get_lagrange_tolerance()`, 50 %
+  of the start value for any `M2` and λ, set by `set_lagrange_tolerance!`, not by `threshold`;
+  `check_invariant = false` gives no valid field.
 - The field and the detector power follow the polarization of the chief ray: uncoated surfaces take
   their Fresnel loss (about 4 % of the power per surface at n = 1.5), polarizers and beamsplitters
   act, a mirror reverses the field. A `GaussianBeamlet` has no such losses.
 - Queries: `gauss_parameters(agb, z)` → `(w1, w2, R1, R2, ψ, w01, w02)`, `rayleigh_range(agb)` →
-  `(z_rx, z_ry)`, `intensity(agb, r, z)`, `electric_field`, `BeamletOptics.polarized_field`.
+  `(z_rx, z_ry)`, `intensity(agb, r, z)` (`n|E|²/(2Z₀)`), `electric_field`, `BeamletOptics.polarized_field`.
 
 ## Beam groups (sources)
 
@@ -62,11 +78,12 @@ to their untraced start state.
 | `UniformLineSource(pos, dir, width, λ = 1e-6; num_rays = 101, basis)` | 2D: parallel rays equidistant on a line of length `width` along `basis`, marginal rays included. Returns a `CollimatedSource`. |
 | `UniformFanSource(pos, dir, θ, λ = 1e-6; num_rays = 101, basis)` | 2D: diverging rays with equidistant angles in `[-θ, θ]` (rad, θ < π) in the plane of `dir` and `basis`, marginal rays included. Returns a `PointSource`. |
 | `CollimatedSource(beams, diameter, pos, dir)` / `PointSource(beams, NA, pos, dir)` | wrap your own beams (e.g. polarized ones) |
+| `CollimatedSource(pos, dir, diameter, sampling, λ = 1e-6; num_rays, basis)` / `PointSource(pos, dir, sampling, λ = 1e-6; num_rays, basis)` | generic form behind the six constructors above, e.g. `PointSource(pos, dir, BeamletOptics.ConeSunflower(θ), λ; num_rays = 500)`. `sampling` is a `BeamletOptics.AbstractSourceSampling`: `DiscRings(num_rings)`, `DiscSunflower()`, `DiscLine()`, `ConeRings(num_rings, θ)`, `ConeSunflower(θ)`, `ConeFan(θ)` or your own |
 | `CollimatedGaussianBeamletSource(pos, dir, D, λ, w0s; n_grid = 20, basis, randomize_axes, rng, P0)` | square grid of astigmatic beamlets, `w0s ≈ D/n_grid`; total power `P0` |
 | `SphericalGaussianBeamletSource(pos, dir, θ, λ; num_rings, num_rays, overlap = 1.2, basis, randomize_axes, rng, P0, E0)` | diverging beamlet fan; total power `P0`, `E0` sets only polarization and phase |
 | `EllipticalGaussianBeamletSource(pos, dir, θ_x, θ_y, λ; …)` | elliptical diverging beamlet fan; as above |
 | `GaussianBeamletDecomposition(pos, dir, λ, w0; n_grid, overlap, basis, randomize_axes, rng, P0, E0, threshold = 1e-4)` | one large Gaussian beam decomposed into beamlets; power `P0`, `E0` sets only polarization and phase, `n_grid > 4 overlap` |
-| `WavefrontBeamletDecomposition(x, y, amplitude, phase, dir, λ; threshold, overlap, basis, randomize_axes, rng, E0)` | arbitrary sampled wavefront; the grid is centered at the origin, move it with `translate3d!` |
+| `WavefrontBeamletDecomposition(x, y, amplitude, phase, pos, dir, λ; threshold, overlap, basis, randomize_axes, rng, E0)` | arbitrary sampled wavefront; the sample `x = y = 0` lies at `pos` |
 | `AstigmaticBeamGroup(beams, pos, dir_or_orientation)` | wrap your own astigmatic beamlets |
 
 The 2D sources are for layout sketches and for tracing one section (e.g. the meridional plane) of
@@ -78,9 +95,14 @@ equal-area or equal solid angle samples.
 The first beam of the first six sources above is the center ray, which starts at `pos` along `dir`:
 `first(BeamletOptics.beams(src))`.
 
-`set_num_rays!(src, n)` regenerates the rays of the first six sources above with `n` rays, same
+`num_rays!(src, n)` regenerates the rays of the first six sources above with `n` rays, same
 sampling, in the current pose (e.g. a coarse trace first, a fine one later); solve again afterwards.
 Wrapped beams can not be regenerated (`ArgumentError`).
+
+Invalid input throws an `ArgumentError`: a `num_rays` below the minimum of the sampling (e.g.
+`num_rays < 20 num_rings` for the ring sources and the cone beamlet sources), a half spread angle
+`θ ≥ π` (`θ_x` or `θ_y ≥ π/2` for `EllipticalGaussianBeamletSource`), and a `basis` that is zero
+or parallel to `dir`.
 
 Trace beamlet groups onto a `Detector` and read them out with `intensity`/`electric_field`, which sum
 the beamlets coherently.

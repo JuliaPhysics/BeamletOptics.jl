@@ -7,7 +7,8 @@ Detector(edge_length, stop = true)
 - An infinitely thin square screen at the origin in the x-z plane. Its normal points along −y, so beams
   travelling along +y hit it. Orient it like any other object, e.g. after `zrotate3d!(det, deg2rad(90))`
   it catches beams travelling along −x.
-- With `stop = false`, beams continue behind the detector.
+- With `stop = false`, rays and beamlets continue unchanged behind the detector, e.g. to sample a beam on an intermediate plane.
+  A beamlet that the detector clips only partly ends there, as at any object: make the detector larger than the beamlet.
 - Stores *hits* of exactly **one** type (Ray, PolarizedRay, GaussianBeamlet or AstigmaticGaussianBeamlet).
 - **Hits are values** of the beam state at the solve. Solving again, or moving a source, mirror or lens, never changes stored hits.
 - **Moving the detector empties it:** every kinematic call on it (also a move of a group containing it) clears its hits.
@@ -19,19 +20,20 @@ Detector(edge_length, stop = true)
 | Call | Returns |
 |------|---------|
 | `spot_diagram(det)` | `Vector{Point2}` of local `(x, z)` hit points (beamlets: projected 1/e² contour, kwargs `num_spots`, `crop_factor`) |
-| `electric_field(det, s = RegularGrid())` | `(xs, zs, E)`: complex field on the sampling `s`, by default an `n×n` grid (hits of `PolarizedRay`s and `AstigmaticGaussianBeamlet`s: a matrix of complex 3-vectors, use `sum(abs2, e)` per element) |
-| `intensity(det, s = RegularGrid())` | `(xs, zs, I)`: power per detector area in W/m², the Poynting flux through the detector; a single hit gives `n\|E\|² cos θ / (2Z₀)` |
-| `optical_power(det, s = RegularGrid())` | power in W, `Σ wᵢ Iᵢ` with the quadrature weights of the sampling, the beam power for any angle of incidence |
+| `ray_hits(det)` | `(pts, dirs)`: per hit the local `(x, z)` point and the unit direction in the detector frame `(x̂, n̂, ẑ)`, `n̂` the downstream normal, so a beam along +y onto an unrotated detector reads `(0, 1, 0)` (beamlets: chief ray) |
+| `electric_field(det, sampling = RegularGrid())` | `(xs, zs, E)`: complex field on the `sampling`, by default a `num_points×num_points` grid (hits of `PolarizedRay`s and `AstigmaticGaussianBeamlet`s: a matrix of complex 3-vectors, use `sum(abs2, e)` per element) |
+| `intensity(det, sampling = RegularGrid())` | `(xs, zs, I)`: power per detector area in W/m², the Poynting flux through the detector; a single hit gives `n\|E\|² cos θ / (2Z₀)` |
+| `optical_power(det, sampling = RegularGrid())` | power in W, `Σ wᵢ Iᵢ` with the quadrature weights of the sampling, the beam power for any angle of incidence |
 
-The sampling `s` decides where the readouts are evaluated, its window and the weights of `optical_power`:
+The `sampling` decides where the readouts are evaluated, its window and the weights of `optical_power`:
 
-- `RegularGrid(; kwargs...)`: `n×n` equidistant points in a window around the hits (keywords below), trapezoidal rule
+- `RegularGrid(; kwargs...)`: `num_points×num_points` equidistant points in a window around the hits (keywords below), trapezoidal rule
 - `RectilinearGrid(xs, zs)`: a grid of one's own (local `x`, `z` vectors in m, any spacing), the window is `xs × zs` as given, trapezoidal rule; use `optical_power(det, RectilinearGrid(xs, zs))` for the power on it
 - `electric_field(det, points)`, `intensity(det, points)`: the values only, at an array of local `(x, z)` points (e.g. `Point2`) in m, in the shape of `points`
 
 Keywords of `RegularGrid` (not of the readouts):
 
-- `n = 100`: grid points per axis
+- `num_points = 100`: grid points per axis
 - `crop_factor`: scales the automatic window around the hits; default `1` for rays (box around the hit points) and `3` for beamlets (three beam radii around each hit)
 - `center = Centroid()` or `MinMax()`: how the automatic window is centered
 - `x_min, x_max, z_min, z_max`: explicit window in local coordinates (m)
@@ -46,4 +48,16 @@ Local `(x, z)` form a left-handed frame with the normal, as seen by the incoming
 `intensity.(E)` turns a field matrix into `|E|²/(2Z₀)` per point (vacuum, not projected onto the detector); the irradiance on the detector, with `n` and `cos θ` of each hit, is `intensity(det)` or `intensity(det, RectilinearGrid(xs, zs))`.
 Ray-based PSFs are not normalized: compare shapes and positions, not absolute Strehl values.
 
-If nothing reaches the detector, readout throws "No hits available on detector."
+Angle over radius at a plane (collimation check, data for fitting a correcting asphere): place a large
+detector at the plane, trace a ray fan (`CollimatedSource`, `PointSource`) and read
+
+```julia
+using LinearAlgebra: norm
+pts, dirs = ray_hits(det)
+r = norm.(pts)                                    # m, from the detector center
+θ = [atan(hypot(d[1], d[3]), abs(d[2])) for d in dirs]  # rad, to the normal, either side; not acos, inaccurate near 0
+```
+
+If nothing reaches the detector (`length(det) == 0`), it reads as nothing: `optical_power` is `0`, `spot_diagram` is empty, and `electric_field` and `intensity` are zero on their grid (`RegularGrid` then spans the active surface).
+In a scan, power and field need no guard for a beam that misses, but a metric of the spots does: the mean or rms of no points is `NaN` (and `argmin` picks `NaN`), `maximum` throws. Check `isempty(pts)` or `length(det) == 0` first. `OpticsBase.PlaneField(det; ...)` still throws, since it takes `λ` and `n` from the hits.
+A hit on the back of the detector has `dirs[i][2] < 0`.

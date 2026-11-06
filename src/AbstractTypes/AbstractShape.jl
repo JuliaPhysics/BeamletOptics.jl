@@ -18,7 +18,7 @@ Subtypes of `AbstractShape` should implement the following:
 - [`position`](@ref) / `position!`: gets or sets the `pos`ition vector of the `AbstractShape`
 - [`orientation`](@ref) / `orientation!`: gets or sets the orientation matrix of the `AbstractShape`
 
-## Kinematic:
+## Kinematic
 
 `AbstractShape`s are [`BeamletOptics.Movable`](@ref) with an [`BeamletOptics.Oriented`](@ref) frame,
 see [`BeamletOptics.AbstractKinematicTrait`](@ref). The default primitives

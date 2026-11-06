@@ -1,7 +1,17 @@
 """
     AbstractMesh <: AbstractShape
 
-A generic type for an shape whose volume can be described by a mesh. Must have a field `mesh` of type `Mesh`. See also `Mesh{T}`.
+A generic type for a shape whose volume can be described by a mesh. See also `Mesh{T}`.
+
+# Implementation reqs.
+
+Subtypes of `AbstractMesh` should implement all reqs. of `AbstractShape` as well as the following:
+
+## Fields
+
+- `vertices`: (m x 3)-matrix that stores the points of all triangles
+- `faces`: (n x 3)-matrix of row indices into `vertices`, one row per triangle
+- `scale`: scalar value that represents the current scale of the mesh
 """
 abstract type AbstractMesh{T} <: AbstractShape{T} end
 
@@ -46,8 +56,8 @@ vertices and faces. The mesh is initialized at the global origin. Data type of M
 type of vertex data (i.e `Float32`).
 
 !!! tip
-    Mesh vertex data is scaled by factor 1e-3, assuming [m] scale. Ensure that the export program is adjusted accordingly
-    when scaling issues occur.
+    Mesh vertex data is scaled by the factor 1e-3, i.e. the STL file is assumed to be in mm and the mesh is in \\[m\\].
+    Ensure that the export program is adjusted accordingly when scaling issues occur.
 """
 function Mesh(mesh)
     # Determine mesh data type (i.e. Float32)
@@ -125,13 +135,16 @@ end
 """
     normal3d(mesh::AbstractMesh, fID::Int)
 
-Returns a vector with unit length that is perpendicular to the target `face`` according to
+Returns a vector with unit length that is perpendicular to the target `face` according to
 the right-hand rule. The vertices must be listed row-wise within the face matrix.
+
+The normal is `(v2 - v1) × (v3 - v1)` of the vertices `v1`, `v2`, `v3` of the face, so it points
+outwards of a closed mesh if the vertices of each face run counter-clockwise seen from outside.
 """
 function normal3d(mesh::AbstractMesh{T}, fID::Int) where{T}
     @views begin
         face = vertices(mesh)[faces(mesh)[fID, :], :]
-        # asserted, the vertices of a mesh type that is not known are not inferred
+        # Convert and assert vertex type
         v1 = Point3{T}(face[1, :])::Point3{T}
         n = cross(
             (Point3{T}(face[2, :])::Point3{T} - v1),
@@ -142,14 +155,15 @@ function normal3d(mesh::AbstractMesh{T}, fID::Int) where{T}
 end
 
 """
-    MoellerTrumboreAlgorithm(face::Matrix, ray::Ray)
+    MoellerTrumboreAlgorithm(face::Matrix, ray::AbstractRay; kϵ = 1e-9, lϵ = 1e-9)
 
 An implementation of the **Möller-Trumbore algorithm** for ray-triangle-intersection, which hits
 the `face` from both sides. This algorithm evaluates the possible intersection between a `ray` and a
 `face` that is defined by three vertices. If no intersection occurs, `Inf` is returned.
 
-- `kϵ`: dimensionless tolerance. A ray whose direction is closer than `kϵ` (in units of the cosine
-  of the angle to the face normal) to the plane of the face misses it, and the barycentric
+- `kϵ`: dimensionless tolerance. A ray misses the face if `sin α |cos θ| ≤ kϵ`, with the corner
+  angle `α` between the first two edges and the angle `θ` between the ray and the face normal, i.e.
+  if it runs (almost) parallel to the face or the face is degenerate. The barycentric
   coordinates of a hit may exceed the face by `kϵ`. Both are independent of the size of the face.
 - `lϵ`: the shortest distance in [m] from the start of the ray at which a hit counts, such that a
   ray that starts on the face does not hit it again.
@@ -157,7 +171,7 @@ the `face` from both sides. This algorithm evaluates the possible intersection b
 This algorithm is fast due to multiple breakout conditions.
 """
 function MoellerTrumboreAlgorithm(face, ray::AbstractRay{T}; kϵ = 1e-9, lϵ = 1e-9) where {T}
-    # in the number type of the ray and asserted, since the type of `face` may not be inferred
+    # Convert and assert vertex type
     V1 = Point3{T}(face[1, 1], face[1, 2], face[1, 3])::Point3{T}
     V2 = Point3{T}(face[2, 1], face[2, 2], face[2, 3])::Point3{T}
     V3 = Point3{T}(face[3, 1], face[3, 2], face[3, 3])::Point3{T}
@@ -166,12 +180,10 @@ function MoellerTrumboreAlgorithm(face, ray::AbstractRay{T}; kϵ = 1e-9, lϵ = 1
     E2 = V3 - V1
     Pv = cross(direction(ray), E2)
     Det = dot(E1, Pv)
-    # Check if the ray is parallel to the face. `Det` is the triple product of the direction and the
-    # edges, i.e. it scales with the area of the face, hence the test is relative to the edges.
-    # A degenerate face (`Det` = 0) is skipped as well.
+    # Skip parallel rays and degenerate faces, relative to edge lengths
     if Det^2 <= kϵ^2 * dot(E1, E1) * dot(E2, E2)
         # Adjust type of Inf
-        return T(Inf) # typemax(T) ?
+        return T(Inf)
     end
     # Compute normalized u and reject if less than 0 or greater than 1
     Tv = position(ray) - V1
@@ -186,7 +198,7 @@ function MoellerTrumboreAlgorithm(face, ray::AbstractRay{T}; kϵ = 1e-9, lϵ = 1
     if (v < 0 - kϵ) || (u + v > 1 + kϵ)
         return T(Inf)
     end
-    # Compute t (type def. for t to avoid Any)
+    # Compute t
     t::T = dot(E2, Qv) * invDet
     # Return intersection only if "in front of" ray origin
     if t < lϵ
@@ -301,23 +313,24 @@ Creates a 2D rectangular [`Mesh`](@ref) that is centered around the origin and a
 - `n`: slice discretization factor (higher equals better resolution)
 """
 function CircularFlatMesh(radius::T, n::Int=30) where T<:Real
-    # calculate vertices
+    # Calculate vertices
     xs = [cos(x)*radius for x in LinRange(0, 2pi * (n-1)/n, n)]
-    ys = zeros(n+1)
+    ys = zeros(T, n+1)
     zs = [sin(x)*radius for x in LinRange(0, 2pi * (n-1)/n, n)]
-    # add center vertex
+    # Add center vertex
     pushfirst!(xs, 0)
     pushfirst!(zs, 0)
-    vertices = Matrix{Float64}(undef, n+1, 3)
+    # Store vertices in number type of radius
+    vertices = Matrix{T}(undef, n+1, 3)
     vertices[:, 1] = xs
     vertices[:, 2] = ys
     vertices[:, 3] = zs
-    # sort faces
+    # Sort faces
     faces = Matrix{Int64}(undef, n, 3)
     for i = 2:n+1
         faces[i-1, :] = [1, i, i+1]
     end
-    # correct last entry
+    # Correct last entry
     faces[end] = 2
     return BeamletOptics.Mesh{T}(
         vertices,

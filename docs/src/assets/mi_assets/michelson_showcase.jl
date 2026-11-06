@@ -216,7 +216,7 @@ save("mi_pd.png", fig; px_per_unit=8, update = false)
 ## fringe plot
 x, y, I = intensity(
     pd,
-    RegularGrid(n=200, x_min=-pd_size/2, x_max=pd_size/2, z_min=-pd_size/2, z_max=pd_size/2),
+    RegularGrid(num_points = 200, x_min=-pd_size/2, x_max=pd_size/2, z_min=-pd_size/2, z_max=pd_size/2),
 )
 spots = spot_diagram(pd)
 
@@ -236,7 +236,7 @@ solve_system!(system, beam)
 
 x, y, I = intensity(
     pd,
-    RegularGrid(n=200, x_min=-pd_size/2, x_max=pd_size/2, z_min=-pd_size/2, z_max=pd_size/2),
+    RegularGrid(num_points = 200, x_min=-pd_size/2, x_max=pd_size/2, z_min=-pd_size/2, z_max=pd_size/2),
 )
 spots = spot_diagram(pd)
 

@@ -14,31 +14,37 @@ Optical elements serve as the building blocks for optical systems in the context
 <ComponentCatalog />
 ```
 
+## Passive objects
+
+Two objects have no optical effect of their own and are built from a shape, e.g. a [`Mesh`](@ref BeamletOptics.Mesh) loaded from a file:
+
+- [`IntersectableObject`](@ref) is hit by beams and blocks them like a hard target, e.g. a beam dump or a housing wall.
+- [`NonInteractableObject`](@ref) is never hit: beams pass through it as if it was not there. It is meant for visualization, e.g. kinematic mounts, and can be moved with the kinematic functions like any other component.
+
+```@docs; canonical=false
+IntersectableObject
+NonInteractableObject
+```
+
 ## Moving components
 
 Optical elements can be moved freely in 3D space and combined into groups that move as one, see [Moving optical elements](@ref) in the [Kinematics](@ref) section.
 
 ## Inspecting components
 
-[`properties`](@ref) lists what a component stores as `name => value` pairs, e.g. its type, pose, shape and optical parameters. Values are SI numbers; the unit is given in brackets at the end of the name, names without brackets are dimensionless. It also works for shapes, beams and sources. Tools such as the inspector of the [BeamletOpticsGUI](https://github.com/StackEnjoyer/BeamletOpticsGUI.jl) live view display this list.
+[`BeamletOptics.properties`](@ref) lists what a component stores as `name => value` pairs, e.g. its type, pose, shape and optical parameters. Values are SI numbers; the unit is given in brackets at the end of the name, names without brackets are dimensionless. It also works for shapes, beams and sources. Tools such as the inspector of the [BeamletOpticsGUI](https://github.com/StackEnjoyer/BeamletOpticsGUI.jl) live view display this list.
 
 ```julia
 lens = SphericalLens(50e-3, -50e-3, 5e-3, 25.4e-3)
-properties(lens)            # e.g. "Type" => "Lens", "Position [m]" => [0.0, 0.0, 0.0], ...
+BeamletOptics.properties(lens)            # e.g. "Type" => "Lens", "Position [m]" => [0.0, 0.0, 0.0], ...
 ```
 
-A new `AbstractObject` subtype gets the [`default_properties`](@ref) (type, pose and shape) without further work; a method of `properties` for the subtype adds its own parameters.
+A new `AbstractObject` subtype gets the [`BeamletOptics.default_properties`](@ref) (type, pose and shape) without further work; a method of `properties` for the subtype adds its own parameters.
 
 ```@docs; canonical=false
-properties
-default_properties
+BeamletOptics.properties
+BeamletOptics.default_properties
 ```
 
-## Listing available components
-
-When using this package in the REPL, a tree view of all implemented [`BeamletOptics.AbstractObject`](@ref)s can be generated via the [`BeamletOptics.list_subtypes`](@ref) helper function. Note that this function is not able to determine all available constructors.
-
-```@repl
-using BeamletOptics # hide
-BeamletOptics.list_subtypes(BeamletOptics.AbstractObject);
-```
+!!! tip "Own components"
+    The geometry of a component lives in its shape, its optical effect in its [`BeamletOptics.interact3d`](@ref) method. To add a component of your own, see [Implementing components](@ref) for the functions a solve calls on an object and how the component families react to a hit.

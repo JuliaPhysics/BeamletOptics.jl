@@ -10,6 +10,9 @@ import NodeJS_20_jll
 
 include(joinpath(@__DIR__, "DocUtils.jl"))
 
+# The roadmap board is generated from the GitHub milestones on every build (see `.gitignore`)
+DocUtils.fetch_milestones(joinpath(@__DIR__, "src", "components", "milestones.json"))
+
 # Literate-based tutorials: the source of truth is the `.jl` file in `docs/literate`.
 # `Literate.markdown` regenerates the corresponding page in `docs/src/tutorials` (see
 # `.gitignore`), and `Literate.script`/`Literate.notebook` produce the downloadable
@@ -104,7 +107,6 @@ makedocs(;
                 "Double slit"               => joinpath("examples", "double_slit.md"),
                 "Point spread functions"    => joinpath("examples", "psf.md"),
             ],
-            "AI assistants"                 => joinpath("tutorials", "ai_assistants.md"),
         ],
         "Basics" => Any[
             "Introduction"                  => joinpath("basics", "intro.md"),
@@ -126,6 +128,7 @@ makedocs(;
                 "Polarizing components"     => joinpath("basics", "components", "polarizers.md"),
             ],
             "Optical systems"               => joinpath("basics", "systems.md"),
+            "Automatic differentiation"     => joinpath("basics", "autodiff.md"),
             "Kinematics" => Any[
                 "Overview"                  => joinpath("basics", "kinematics", "kinematics.md"),
                 "Optical elements"          => joinpath("basics", "kinematics", "objects.md"),
@@ -140,6 +143,7 @@ makedocs(;
                 "Scene and camera"          => joinpath("basics", "visualization", "camera.md"),
                 "Live rendering"            => joinpath("basics", "visualization", "live_rendering.md"),
             ],
+            "AI assistants"                 => joinpath("basics", "ai_assistants.md"),
         ],
         "Developer Documentation" => Any[
             "Developer guide" => Any[
@@ -156,6 +160,10 @@ makedocs(;
                     "SDFs"                      => joinpath("api", "sdfs.md"),
                 ],
                 "Kinematics"                => joinpath("api", "kinematics_api.md"),
+                "Beams and sources"         => joinpath("api", "beams.md"),
+                "Components"                => joinpath("api", "components.md"),
+                "Detectors"                 => joinpath("api", "detectors.md"),
+                "Rendering"                 => joinpath("api", "rendering.md"),
             ],
             "Roadmap" => "roadmap.md",
         ],

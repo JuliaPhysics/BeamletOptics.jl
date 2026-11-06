@@ -37,7 +37,7 @@ dir = [0.0, 1.0, 0.0] # Propagation along Y
 # We explicitly define the basis to ensure Grid X = World X
 e1 = [1.0, 0.0, 0.0]
 e2 = [0.0, 0.0, 1.0]
-beams = WavefrontBeamletDecomposition(x, z, amplitude, phase, dir, λ;
+beams = WavefrontBeamletDecomposition(x, z, amplitude, phase, [0.0, 0.0, 0.0], dir, λ;
     threshold = 1e-3, overlap = overlap, basis = (e1, e2))
 
 @info "Number of beamlets generated: $(length(beams))"
@@ -58,7 +58,7 @@ solve_system!(system, beams)
 n_eval = 500
 # Evaluate over a 30mm window to see many fringes
 xs_eval, zs_eval, I = intensity(target_pd,
-    RegularGrid(n = n_eval, x_min = -15e-3, x_max = 15e-3, z_min = -15e-3, z_max = 15e-3))
+    RegularGrid(num_points = n_eval, x_min = -15e-3, x_max = 15e-3, z_min = -15e-3, z_max = 15e-3))
 
 ##
 # Visualization

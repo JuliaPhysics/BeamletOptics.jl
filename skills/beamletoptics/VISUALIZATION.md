@@ -60,7 +60,7 @@ usually dwarfs a millimeter-scale setup.
 - Use `aspect = :data` so optics are not distorted; or give explicit `aspect` and `limits`.
 - Remove decorations for figures: `hidedecorations!(ax); hidespines!(ax)`.
 
-`LScene` helpers:
+`LScene` helpers (any other Makie axis, e.g. `Axis3`, throws an `InvalidAxisError`):
 
 - `hide_axis(ls)`, `set_orthographic(ls)`
 - `get_view(ls)`: rotate the scene by hand, call it, paste the printed matrix into the script
@@ -68,7 +68,7 @@ usually dwarfs a millimeter-scale setup.
 - `look_at!(ls, target, offset; up = [0, 0, 1])`
 - `arrow!(ax, pos, dir; scale)`, `render_lcs!(ax, obj; scale, show_labels)` (draw local frames)
 
-Debugging (`LScene` or `Axis3`): `render_bounding_sphere!(ax, x; color = :magenta, main_color = :orange, linewidth = 1)` draws the bounding spheres that the solver tests before each shape, for a sphere value, shape, object or system `x` (one wireframe per shape with a sphere, plus one in `main_color` around the parts of each multi-part object or group; none for `NoBoundingSphere`); `render!(ax, x; show_bounding_sphere = true)` does the same along with the object or system, and with `live_render!` the spheres follow the objects.
+Debugging (`LScene` or `Axis3`): `render!(ax, BeamletOptics.bounding_sphere_of(shape); color = :magenta, linewidth = 1)` draws one bounding sphere that the solver tests before the shape; `render!(ax, x; show_bounding_sphere = true)` for an object, group or system `x` draws all spheres (one wireframe per shape with a sphere, plus one in orange around the parts of each multi-part object or group; none for `NoBoundingSphere`) along with `x`, and with `live_render!` the spheres follow the objects.
 
 ## Live rendering (GLMakie)
 
@@ -83,6 +83,8 @@ update_render!(hsys); update_render!(hbeam)   # remove_render!(h) deletes the pl
 
 push!(system, lens); live_render!(hsys, lens)       # object added at runtime
 delete!(system, lens); remove_render!(hsys, lens)   # and removed again (a group only as a whole)
+delete!(system, lens); push!(group, lens)           # a rendered object into a rendered group: no
+                                                    # render call needed, render_parent and picking follow
 
 BeamletOptics.render_settings(hbeam)                # (; flen, render_every, color, ...) of a beam handle
 BeamletOptics.render_settings!(hbeam; flen = 0.5)   # change the final ray length (or render_every, r_res, z_res), keeps the plots
@@ -99,7 +101,7 @@ not part of BeamletOptics. It is the package BeamletOpticsGUI
 ## Detector data plots
 
 ```julia
-x, z, I = intensity(det, RegularGrid(n = 301, crop_factor = 5))
+x, z, I = intensity(det, RegularGrid(num_points = 301, crop_factor = 5))
 fig = Figure()
 ax = Axis(fig[1, 1], aspect = 1, xlabel = "x [µm]", ylabel = "z [µm]")
 heatmap!(ax, x * 1e6, z * 1e6, I)

@@ -5,8 +5,9 @@ Stores data calculated by the [`intersect3d`](@ref) method.
 
 # Fields:
 
-- `object`: a [`Nullable`](@ref) reference to the [`AbstractObject`](@ref) that has been hit (optional but recommended)
-- `shape`: a [`Nullable`](@ref) reference to the [`AbstractShape`](@ref) of the `object` that has been hit (optional but recommended)
+- `object`: a [`Nullable`](@ref) reference to the [`AbstractObject`](@ref) that has been hit. The `intersect3d` methods of shapes leave it `nothing`, the solver sets it
+- `shape`: a [`Nullable`](@ref) reference to the [`AbstractShape`](@ref) of the `object` that has been hit. Provide it: composite objects
+  and the check whether the rays of a beamlet hit the same shape identify the hit part by this reference
 - `t`: length of the ray parametrization in [m]
 - `n`: normal vector at the point of intersection
 """
@@ -70,7 +71,7 @@ Subtypes of `AbstractRay` must implement the following:
 - `intersect3d`: calculates the [`Intersection`](@ref) between a ray and a shape
 - `rotate3d!(::Movable, ray, R::AbstractMatrix)`: only required for subtypes carrying direction-dependent data (e.g. field vectors); must rotate this data together with the ray direction and clear the intersection
 
-## Kinematic API:
+## Kinematic
 
 `AbstractRay`s are [`BeamletOptics.Movable`](@ref) with a [`BeamletOptics.Directed`](@ref) frame, see
 [`BeamletOptics.AbstractKinematicTrait`](@ref). Every verb clears the ray [`Intersection`](@ref), i.e. resets
@@ -81,7 +82,7 @@ the ray to its unsolved state. Rotations are applied about the ray start positio
 
 !!! info "Ray length"
     Base.`length`: this function is used to return the length of the `AbstractRay` (if no intersection exists, the ray length is `Inf`).
-    The `opl` keyword can be used to obtain the optical path length instead.
+    Use [`optical_path_length`](@ref) to obtain the optical path length instead.
 
 !!! warning "Ray direction"
     Many functions assume that the `dir`ection vector has unit length (i.e. ``|\\vec{d}| = 1``).
@@ -127,7 +128,10 @@ function intersection!(ray::AbstractRay, _intersection::Nullable{Intersection})
      return nothing
 end
 
-Base.empty!(ray::AbstractRay) = intersection!(ray, nothing)
+function Base.empty!(ray::AbstractRay)
+    intersection!(ray, nothing)
+    return ray
+end
 
 """
     hit_point(ray::AbstractRay)
@@ -175,7 +179,7 @@ end
     intersect3d(shape::AbstractShape, ::AbstractRay)
 
 Defines the intersection between an [`AbstractShape`](@ref) and an [`AbstractRay`](@ref), must return an [`Intersection`](@ref) or `nothing`.
-The default behavior for concrete `shape`s and rays is to indicate no intersection, that is `nothing`, which will inform the tracing algorithm to stop.
+The default behavior for concrete `shape`s and rays is to log a warning (`No intersect3d method defined for: ...`) and to indicate no intersection, that is `nothing`, which will inform the tracing algorithm to stop.
 Refer to the [`Intersection`](@ref) documentation for more information on the return type value.
 """
 function intersect3d(shape::AbstractShape, ::AbstractRay)
@@ -193,7 +197,7 @@ intersect3d(object::AbstractObject, ray::AbstractRay) = intersect3d(shape_trait_
 
 function intersect3d(::SingleShape, object::AbstractObject, ray::AbstractRay)
     s = shape(object)
-    # the sphere that the table of a running solve holds for the shape, none outside of a solve
+    # Test bounding sphere first
     intersection = intersect3d(bounding_sphere_of(current_bounding_spheres(), s), s, ray)
     # Ensure that the intersection knows about the object if intersected
     if !isnothing(intersection)
@@ -203,7 +207,7 @@ function intersect3d(::SingleShape, object::AbstractObject, ray::AbstractRay)
 end
 
 function intersect3d(::MultiShape, object::AbstractObject, ray::AbstractRay)
-    # No part is tested if the ray misses the sphere around all of them
+    # Test bounding sphere first
     intersection = intersect3d(bounding_sphere_of(current_bounding_spheres(), object), shape(object), ray)
     # Ensure that the intersection knows about the correct object if intersected
     if !isnothing(intersection)
@@ -229,12 +233,12 @@ end
     intersect3d(parts, ray::AbstractRay)
 
 Returns the closest [`Intersection`](@ref) of the `ray` with the `parts`, or `nothing` if it hits
-none of them. The `parts` are a tuple, a vector or the `Leaves` of shapes or objects, e.g. the shapes
-of a [`MultiShape`](@ref) object, the objects of a group or the objects of a system. Each part is
-tested via its own `intersect3d` method, hence parts that consist of parts, e.g. the groups of a
-system, are tested as a whole. No parts give `nothing`.
+none of them. The `parts` are a tuple, a vector, the `Leaves` of shapes or objects or the
+[`objects`](@ref) of a system, e.g. the shapes of a [`MultiShape`](@ref) object or the objects of
+a group. Each part is tested via its own `intersect3d` method, hence parts that consist of parts,
+e.g. the groups of a system, are tested as a whole. No parts give `nothing`.
 """
-function intersect3d(parts::Union{Tuple, AbstractVector, Leaves}, ray::AbstractRay{R}) where {R}
+function intersect3d(parts::Union{Tuple, AbstractVector, Leaves, LeafObjects}, ray::AbstractRay{R}) where {R}
     result::Nullable{Intersection{R}} = nothing
     for part in parts
         temp::Nullable{Intersection{R}} = intersect3d(part, ray)

@@ -66,7 +66,7 @@ end
 
 # Lens + mirror system
 function _lens_mirror_fixture()
-    lens = SphericalLens(50e-3, -50e-3, 10e-3, 25e-3, 1.5168)
+    lens = SphericalLens(50e-3, -50e-3, 10e-3, 25e-3, ConstantRefractiveIndex(1.5168))
     mir = RoundPlanoMirror(25.4e-3, 5e-3)
     translate3d!(mir, [0, 60e-3, 0])
     zrotate3d!(mir, deg2rad(45))
@@ -107,7 +107,7 @@ end
 # AGB through a thin lens, see test/Rendering/TestRenderPolarization.jl
 function _agb_lens_fixture()
     agb = AstigmaticGaussianBeamlet([0, 0, 0], [0, 1, 0], 1000e-9, 5e-3; support = [0, 0, 1])
-    l = ThinLens(50e-3, 50e-3, BMO.inch, 1.5)
+    l = ThinLens(50e-3, 50e-3, BMO.inch, ConstantRefractiveIndex(1.5))
     translate3d!(l, [0, 50e-3, 0])
     sys = System([l])
     solve_system!(sys, agb; check_invariant = false)
@@ -633,6 +633,13 @@ end
         @test_throws ArgumentError BMO.render_settings!(h; flen = 0.5, r_res = 10)
         @test BMO.render_settings(h) == (; flen = 0.3, render_every = 1, color = :blue)
         @test BMO.render_settings!(h) === h
+    end
+
+    @testset "Beams cannot be picked" begin
+        _, _, _, beam = _lens_mirror_fixture()
+        ax = LScene(Figure()[1, 1])
+        h = live_render!(ax, beam)
+        @test pick_object(h, only(BMO.render_plots(h))) === nothing
     end
 end
 

@@ -16,7 +16,7 @@ See also [`SphericalDoubletLens`](@ref) and the surface-based constructor
     This component type strongly assumes that both lenses are mounted fully flush with respect to each other. 
     Gaps between the components might lead to incorrect results.
 """
-struct DoubletLens{T, F<:AbstractShape{T}, B<:AbstractShape{T}, N1<:RefractiveIndex, N2<:RefractiveIndex} <: AbstractObject{T}
+struct DoubletLens{T, F<:AbstractShape{T}, B<:AbstractShape{T}, N1<:AbstractRefractiveIndex, N2<:AbstractRefractiveIndex} <: AbstractObject{T}
     front::Lens{T, F, N1}
     back::Lens{T, B, N2}
 end
@@ -47,8 +47,8 @@ both elements share the cemented surface `s2`.
 - `s3`: third surface
 - `l1`: first lens center thickness in m
 - `l2`: second lens center thickness in m
-- `n1`: first lens [`RefractiveIndex`](@ref)
-- `n2`: second lens [`RefractiveIndex`](@ref)
+- `n1`: first lens [`AbstractRefractiveIndex`](@ref)
+- `n2`: second lens [`AbstractRefractiveIndex`](@ref)
 
 # Additional information
 
@@ -72,8 +72,8 @@ function DoubletLens(
         s3::AbstractRotationallySymmetricSurface,
         l1::Real,
         l2::Real,
-        n1::RefractiveIndex,
-        n2::RefractiveIndex)
+        n1::AbstractRefractiveIndex,
+        n2::AbstractRefractiveIndex)
     # Generate "cemented" front and back lenses that share the surface s2
     front = Lens(s1, s2, l1, n1)
     back = Lens(s2, s3, l2, n2)
@@ -96,8 +96,8 @@ For radii sign definition, refer to the [`SphericalLens`](@ref) constructor.
 - `l1`: first lens thickness
 - `l2`: second lens thickness
 - `d`: lens diameter
-- `n1`: first lens [`RefractiveIndex`](@ref)
-- `n1`: second lens [`RefractiveIndex`](@ref)
+- `n1`: first lens [`AbstractRefractiveIndex`](@ref)
+- `n2`: second lens [`AbstractRefractiveIndex`](@ref)
 """
 function SphericalDoubletLens(r1, r2, r3, l1, l2, d, n1, n2)
     # Generate "cemented" front and back spherical lenses
@@ -117,5 +117,6 @@ function interact3d(system::AbstractSystem, dl::DoubletLens, beam::Beam{T, R}, r
         i = interact3d(system, dl.back, beam, ray)
         hint = Hint(dl, dl.front.shape)
     end
+    isnothing(i) && return nothing
     return BeamInteraction(hint, i.ray)
 end

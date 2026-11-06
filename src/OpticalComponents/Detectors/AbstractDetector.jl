@@ -47,7 +47,7 @@ function empty!(::D) where {D <: AbstractDetector}
     return nothing
 end
 
-initialize!(d::AbstractDetector) = (empty!(d); nothing)
+initialize!(detector::AbstractDetector) = (empty!(detector); nothing)
 
 """
     translate3d!(::Movable, detector::AbstractDetector, offset)
@@ -57,9 +57,9 @@ where it was during the solve, hence they are discarded when it moves. All kinem
 are derived from this one and [`rotate3d!`](@ref)`(::Movable, ::AbstractDetector, R)`, so each of
 them empties the detector, also when it moves as a member of an [`ObjectGroup`](@ref).
 """
-function translate3d!(::Movable, d::AbstractDetector, offset)
-    empty!(d)
-    translate3d!(shape_trait_of(d), d, offset)
+function translate3d!(::Movable, detector::AbstractDetector, offset)
+    empty!(detector)
+    translate3d!(shape_trait_of(detector), detector, offset)
     return nothing
 end
 
@@ -69,8 +69,8 @@ end
 Empties the `detector` (see `empty!`) and rotates it by `R` about its `position`, see
 [`translate3d!`](@ref)`(::Movable, ::AbstractDetector, offset)`.
 """
-function rotate3d!(::Movable, d::AbstractDetector, R::AbstractMatrix)
-    empty!(d)
-    rotate3d!(shape_trait_of(d), d, R)
+function rotate3d!(::Movable, detector::AbstractDetector, R::AbstractMatrix)
+    empty!(detector)
+    rotate3d!(shape_trait_of(detector), detector, R)
     return nothing
 end

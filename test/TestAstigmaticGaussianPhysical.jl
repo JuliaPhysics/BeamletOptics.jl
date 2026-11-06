@@ -140,7 +140,7 @@ dominant(E) = E[argmax(abs.(E))]
             isodd(n_mirrors) && zrotate3d!(pd, -π / 2)
             system = System([mirror.(mirror_pos[1:n_mirrors])..., pd])
             solve_system!(system, beam)
-            _, _, E = BMO.electric_field(pd, RegularGrid(n = 1, x_min = 0, x_max = 0, z_min = 0, z_max = 0))
+            _, _, E = BMO.electric_field(pd, RegularGrid(num_points = 1, x_min = 0, x_max = 0, z_min = 0, z_max = 0))
             return angle(dominant(E[1]) * cis(-k * BMO.optical_path_length(beam)))
         end
         for n_mirrors in 0:3
@@ -245,7 +245,7 @@ dominant(E) = E[argmax(abs.(E))]
             for E0 in E0s
                 solve_system!(system, AstigmaticGaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], 1e-6, 1e-3; E0))
             end
-            return optical_power(pd, RegularGrid(n = 150); progress = false)
+            return optical_power(pd, RegularGrid(num_points = 150); progress = false)
         end
         P1 = power([1.0, 0, 0])
         @test power([1.0, 0, 0], [1.0, 0, 0]) ≈ 4P1 rtol = 1e-9
@@ -260,7 +260,7 @@ dominant(E) = E[argmax(abs.(E))]
             pd = Detector(24e-3)
             translate3d!(pd, [0, 0.2, 0])
             solve_system!(System([pd]), source; progress = false)
-            return optical_power(pd, RegularGrid(n = 200); progress = false)
+            return optical_power(pd, RegularGrid(num_points = 200); progress = false)
         end
         @test source_power([1, 0, im] / sqrt(2)) ≈ source_power(ComplexF64[1, 0, 0]) rtol = 1e-3
     end
@@ -276,7 +276,7 @@ dominant(E) = E[argmax(abs.(E))]
             E0 = [0, 0, 1], support = [1, 0, 0])
         solve_system!(system, beam)
 
-        xs, zs, E = BMO.electric_field(pd, RegularGrid(n = 50))
+        xs, zs, E = BMO.electric_field(pd, RegularGrid(num_points = 50))
         @test size(E) == (50, 50)
         @test any(!iszero, E)
 
@@ -302,7 +302,7 @@ dominant(E) = E[argmax(abs.(E))]
             E0 = [0, 0, 1], support = [1, 0, 0])
         solve_system!(s1, b1)
         P1 = BMO.optical_power(pd1,
-            RegularGrid(n = 80, x_min = -pd_size / 2, x_max = pd_size / 2,
+            RegularGrid(num_points = 80, x_min = -pd_size / 2, x_max = pd_size / 2,
                 z_min = -pd_size / 2, z_max = pd_size / 2))
 
         pd2 = BMO.Detector(pd_size)
@@ -313,7 +313,7 @@ dominant(E) = E[argmax(abs.(E))]
             E0 = [0, 0, 1], support = [1, 0, 0])
         solve_system!(s2, b2)
         P2 = BMO.optical_power(pd2,
-            RegularGrid(n = 80, x_min = -pd_size / 2, x_max = pd_size / 2,
+            RegularGrid(num_points = 80, x_min = -pd_size / 2, x_max = pd_size / 2,
                 z_min = -pd_size / 2, z_max = pd_size / 2))
 
         # Power should be conserved (both detectors capture full beam)
@@ -339,7 +339,7 @@ dominant(E) = E[argmax(abs.(E))]
         BMO.zrotate3d!(pd_ref, deg2rad(180))
 
         pd_size = 10mm
-        grid = RegularGrid(n = 80, x_min = -pd_size / 2, x_max = pd_size / 2,
+        grid = RegularGrid(num_points = 80, x_min = -pd_size / 2, x_max = pd_size / 2,
             z_min = -pd_size / 2, z_max = pd_size / 2)
 
         # Measure reference power (no BS)
@@ -397,7 +397,7 @@ dominant(E) = E[argmax(abs.(E))]
             BMO.empty!(pd)
             solve_system!(system, beam)
             powers[i] = BMO.optical_power(pd,
-                RegularGrid(n = 60, x_min = -pd_size / 2, x_max = pd_size / 2,
+                RegularGrid(num_points = 60, x_min = -pd_size / 2, x_max = pd_size / 2,
                     z_min = -pd_size / 2, z_max = pd_size / 2))
         end
 
@@ -455,41 +455,30 @@ dominant(E) = E[argmax(abs.(E))]
         @test all(isapprox.(I_agb_norm, I_gb_norm; rtol = 1e-3))
     end
 
-    @testset "Invariant Violation Test" begin
+    @testset "A plate tilted by 80° keeps the invariants" begin
         λ = 532nm
         w0 = 0.1mm
 
-        # Create a highly non-paraxial setup:
-        # A flat plate tilted at an extreme angle (80 degrees)
+        # A flat plate tilted at an extreme angle (80 degrees) keeps the Lagrange invariants, so
+        # tracing goes on: `threshold` is the limit of the complex invariant only. A real
+        # violation is covered by "Limit of the beamlet model"
         surf1 = BMO.CircularFlatSurface(10.0mm)
         surf2 = BMO.CircularFlatSurface(10.0mm)
 
         # n=2.0 (high index)
-        lens = BMO.Lens(surf1, surf2, 1.0mm, λ -> 2.0)
+        lens = BMO.Lens(surf1, surf2, 1.0mm, ConstantRefractiveIndex(2.0))
 
         # Tilt the lens by 80 degrees
         BMO.zrotate3d!(lens, deg2rad(80))
         BMO.translate3d!(lens, [0, 1.0mm, 0])
 
-        # Set threshold very low to trigger violation (central diffs are very accurate)
-        strict_threshold = 1e-13
-
         system = BMO.System([lens])
 
-        # Create a beamlet pointing at the lens
-        beam = AstigmaticGaussianBeamlet(
-            [0.0, 0, 0], [0, 1, 0], λ, 0.05mm; support = [1, 0, 0])
-
-        # Reset beam for the actual test
         beam = AstigmaticGaussianBeamlet(
             [0.4mm, 0, 0], [0, 1, 0], λ, 0.05mm; support = [1, 0, 0])
 
-        @test_logs (:warn, r"Lagrange invariant violation") match_mode=:any BMO.solve_system!(
-            system, beam; threshold = strict_threshold)
-
-        # Verify that the beam stopped tracing once the invariant failed
-        # (solve_system calls trace_system! which has a break on invariant failure)
-        @test length(BMO.rays(beam.c)) < 10 # It should stop early
+        @test_nowarn BMO.solve_system!(system, beam; threshold = 1e-13)
+        @test length(BMO.rays(beam.c)) == 3
     end
 
     @testset "A child beamlet continues its parent" begin
@@ -498,7 +487,7 @@ dominant(E) = E[argmax(abs.(E))]
         w0 = 1mm
         P0 = 1e-3
         n = 1.5
-        lens() = (l = ThinLens(200mm, 200mm, 5mm, n); translate3d!(l, [0, 30mm, 0]); l)    # f = 200 mm
+        lens() = (l = ThinLens(200mm, 200mm, 5mm, ConstantRefractiveIndex(n)); translate3d!(l, [0, 30mm, 0]); l)    # f = 200 mm
         function splitter()
             bs = ThinBeamsplitter(25mm, reflectance = 0.5)
             translate3d!(bs, [0, 80mm, 0])
@@ -511,7 +500,7 @@ dominant(E) = E[argmax(abs.(E))]
         BMO.align3d!(pd_r, [-1.0, 0, 0])
         translate_to3d!(pd_r, [60mm, 80mm, 0])
         beam() = AstigmaticGaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], λ, w0; P0, support = [1.0, 0, 0])
-        axis_field(pd) = dominant(electric_field(pd, RegularGrid(n = 1, x_min = 0, x_max = 0, z_min = 0, z_max = 0))[3][1])
+        axis_field(pd) = dominant(electric_field(pd, RegularGrid(num_points = 1, x_min = 0, x_max = 0, z_min = 0, z_max = 0))[3][1])
         function solve(objects...)
             empty!(pd_t)
             empty!(pd_r)
@@ -522,7 +511,7 @@ dominant(E) = E[argmax(abs.(E))]
 
         # without the lens
         b = solve(splitter())
-        @test BMO.hit_count(pd_t) == 1 && BMO.hit_count(pd_r) == 1
+        @test length(pd_t) == 1 && length(pd_r) == 1
         @test optical_power(pd_t) ≈ P0 / 2 rtol = 1e-3
         @test optical_power(pd_r) ≈ P0 / 2 rtol = 1e-3
         # the reported Gouy phase of both children starts where that of the parent ends
@@ -541,7 +530,7 @@ dominant(E) = E[argmax(abs.(E))]
         solve(lens())
         E_direct = axis_field(pd_t)
         b = solve(lens(), splitter())
-        @test BMO.hit_count(pd_t) == 1 && BMO.hit_count(pd_r) == 1
+        @test length(pd_t) == 1 && length(pd_r) == 1
         @test optical_power(pd_t) ≈ T_lens * P0 / 2 rtol = 1e-3
         @test optical_power(pd_r) ≈ T_lens * P0 / 2 rtol = 1e-3
         @test BMO.optical_power(b.children[1]) ≈ T_lens * P0 / 2 rtol = 1e-3
@@ -568,6 +557,12 @@ dominant(E) = E[argmax(abs.(E))]
             end
             return maximum(longitudinal, BMO.children(b); init = m)
         end
+        # unit polarization of the field of a hit at its hit point, with the phase of its
+        # largest component removed
+        function hit_polarization(hit)
+            E = electric_field(hit, BMO.hit_point(hit))
+            return E / (norm(E) * cis(angle(E[argmax(abs.(E))])))
+        end
 
         @testset "Polarization filter" begin
             # transmission axis along x, turned about the beam
@@ -585,37 +580,38 @@ dominant(E) = E[argmax(abs.(E))]
             pd = detector([0, 100mm, 0], [0.0, 1, 0])
             solve_system!(System([pf, pd]), beam())
             @test optical_power(pd) < 1e-6 * P0
-            @test all(isfinite, BMO.beamlet_hit_polarization(only(BMO.hits(pd))))
-            # a segment without any light has no polarization direction
+            @test all(isfinite, hit_polarization(only(BMO.hits(pd))))
+            # a segment without any light has a zero field
             pd = detector([0, 100mm, 0], [0.0, 1, 0])
             solve_system!(System([pd]), AstigmaticGaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], λ, w0; E0 = [0.0, 0, 0]))
             @test optical_power(pd) == 0
-            @test iszero(BMO.beamlet_hit_polarization(only(BMO.hits(pd))))
+            hit = only(BMO.hits(pd))
+            @test iszero(electric_field(hit, BMO.hit_point(hit)))
         end
 
         # two uncoated surfaces at normal incidence
         T_normal = (4n / (n + 1)^2)^2
 
         @testset "Uncoated lens" begin
-            lens = ThinLens(200mm, 200mm, 5mm, n)
+            lens = ThinLens(200mm, 200mm, 5mm, ConstantRefractiveIndex(n))
             translate3d!(lens, [0, 30mm, 0])
             pd = detector([0, 140mm, 0], [0.0, 1, 0])
             b = beam()
             solve_system!(System([lens, pd]), b)
             @test optical_power(pd) ≈ T_normal * P0 rtol = 1e-3
             hit = only(BMO.hits(pd))
-            @test norm(BMO.beamlet_hit_polarization(hit)) ≈ 1
+            @test norm(hit_polarization(hit)) ≈ 1
             @test BMO.optical_power(b) ≈ P0 rtol = 1e-9
         end
 
         @testset "Cube beamsplitter" begin
             # coating at 135°: +y is reflected to -x
-            cbs = CubeBeamsplitter(25mm, n)
+            cbs = CubeBeamsplitter(25mm, ConstantRefractiveIndex(n))
             pd_t = detector([0, 100mm, 0], [0.0, 1, 0])
             pd_r = detector([-100mm, 0, 0], [-1.0, 0, 0])
             b = AstigmaticGaussianBeamlet([0.0, -100mm, 0], [0.0, 1, 0], λ, w0; P0, support = [1.0, 0, 0])
             solve_system!(System([cbs, pd_t, pd_r]), b)
-            @test BMO.hit_count(pd_t) == 1 && BMO.hit_count(pd_r) == 1
+            @test length(pd_t) == 1 && length(pd_r) == 1
             @test optical_power(pd_t) ≈ T_normal * P0 / 2 rtol = 1e-3
             @test optical_power(pd_r) ≈ T_normal * P0 / 2 rtol = 1e-3
             @test longitudinal(b) < 1e-12
@@ -630,14 +626,14 @@ dominant(E) = E[argmax(abs.(E))]
             r_p = (n * cos(θ_i) - cos(θ_t)) / (n * cos(θ_i) + cos(θ_t))
             # (polarization, power reflection of the back surface): s is normal to the plane of incidence
             for (e, R_back) in (([0.0, 0, 1], r_s^2), ([1.0, 0, 0], r_p^2))
-                pbs = RectangularPlateBeamsplitter(25mm, 25mm, 5mm, λ -> n)
+                pbs = RectangularPlateBeamsplitter(25mm, 25mm, 5mm, ConstantRefractiveIndex(n))
                 zrotate3d!(pbs, π / 4)
                 pd_t = detector([0, 100mm, 0], [0.0, 1, 0])
                 pd_r = detector([100mm, 0, 0], [1.0, 0, 0])
                 E = norm(BMO.polarization(beam()))
                 b = AstigmaticGaussianBeamlet([0.0, -100mm, 0], [0.0, 1, 0], λ, w0; E0 = E * e)
                 solve_system!(System([pbs, pd_t, pd_r]), b)
-                @test BMO.hit_count(pd_t) == 1 && BMO.hit_count(pd_r) == 1
+                @test length(pd_t) == 1 && length(pd_r) == 1
                 @test optical_power(pd_r) ≈ P0 / 2 rtol = 1e-3
                 @test optical_power(pd_t) ≈ (1 - R_back) * P0 / 2 rtol = 1e-3
                 @test longitudinal(b) < 1e-12
