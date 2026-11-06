@@ -126,7 +126,7 @@ explicitly. A rotation `axis` can have any non-zero length (it is normalized int
   their own getter
 
 Sources (rays, beams and beam groups) are additionally reset to their untraced start state by
-every one of the functions above: a moved but already-traced source would otherwise keep rays or
+every one of the functions above that moves them, i.e. all but the getter [`direction`](@ref): a moved but already-traced source would otherwise keep rays or
 child beams belonging to the old, now geometrically wrong, light path. Moving a beam that is
 not the root of its beam tree (e.g. one created by a beamsplitter interaction) throws an
 `ArgumentError`; move its root beam instead.
@@ -270,7 +270,8 @@ zrotate3d!(x, θ) = zrotate3d!(kinematic_trait_of(x), x, θ)
     align3d!(x, target)
 
 Rotates `x` about its `position` such that its [`direction`](@ref) is aligned with `target`.
-See [`BeamletOptics.Movable`](@ref).
+The rotation is the shortest one, so for [`BeamletOptics.Oriented`](@ref) values the twist about the
+new direction depends on the previous [`orientation`](@ref). See [`BeamletOptics.Movable`](@ref).
 """
 align3d!(x, target) = align3d!(kinematic_trait_of(x), x, target)
 

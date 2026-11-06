@@ -129,7 +129,7 @@
     "name": "ThinLens",
     "category": "Lenses",
     "image": "catalog_ThinLens.png",
-    "href": "/reference#BeamletOptics.ThinLens-Tuple{Real,%20Real,%20Real,%20Union{Function,%20DiscreteRefractiveIndex,%20SellmeierEquation}}",
+    "href": "/reference#BeamletOptics.ThinLens-Tuple{Real,%20Real,%20Real,%20BeamletOptics.AbstractRefractiveIndex}",
     "teaser": "Idealized thin spherical lens."
   },
   {
@@ -171,21 +171,21 @@
     "name": "RightAnglePrism",
     "category": "Prisms",
     "image": "catalog_RightAnglePrism.png",
-    "href": "/reference#BeamletOptics.RightAnglePrism-Tuple{Real,%20Real,%20Union{Function,%20DiscreteRefractiveIndex,%20SellmeierEquation}}",
+    "href": "/reference#BeamletOptics.RightAnglePrism-Tuple{Real,%20Real,%20BeamletOptics.AbstractRefractiveIndex}",
     "teaser": "Right-angle symmetric prism, e.g. for cube beamsplitters."
   },
   {
     "name": "EquilateralPrism",
     "category": "Prisms",
     "image": "catalog_EquilateralPrism.png",
-    "href": "/reference#BeamletOptics.EquilateralPrism-Tuple{Real,%20Real,%20Union{Function,%20DiscreteRefractiveIndex,%20SellmeierEquation}}",
+    "href": "/reference#BeamletOptics.EquilateralPrism-Tuple{Real,%20Real,%20BeamletOptics.AbstractRefractiveIndex}",
     "teaser": "Equilateral triangular prism for dispersion."
   },
   {
     "name": "DovePrism",
     "category": "Prisms",
     "image": "catalog_DovePrism.png",
-    "href": "/reference#BeamletOptics.DovePrism-Tuple{Real,%20Real,%20Real,%20Union{Function,%20DiscreteRefractiveIndex,%20SellmeierEquation}}",
+    "href": "/reference#BeamletOptics.DovePrism-Tuple{Real,%20Real,%20Real,%20BeamletOptics.AbstractRefractiveIndex}",
     "teaser": "Trapezoidal Dove prism with 45 degree end faces."
   },
   {
@@ -206,28 +206,28 @@
     "name": "RectangularPlateBeamsplitter",
     "category": "Beamsplitters",
     "image": "catalog_RectangularPlateBeamsplitter.png",
-    "href": "/reference#BeamletOptics.RectangularPlateBeamsplitter-Tuple{Real,%20Real,%20Real,%20Union{Function,%20DiscreteRefractiveIndex,%20SellmeierEquation}}",
+    "href": "/reference#BeamletOptics.RectangularPlateBeamsplitter-Tuple{Real,%20Real,%20Real,%20BeamletOptics.AbstractRefractiveIndex}",
     "teaser": "Rectangular plate beamsplitter with a finite substrate."
   },
   {
     "name": "RoundPlateBeamsplitter",
     "category": "Beamsplitters",
     "image": "catalog_RoundPlateBeamsplitter.png",
-    "href": "/reference#BeamletOptics.RoundPlateBeamsplitter-Tuple{Real,%20Real,%20Union{Function,%20DiscreteRefractiveIndex,%20SellmeierEquation}}",
+    "href": "/reference#BeamletOptics.RoundPlateBeamsplitter-Tuple{Real,%20Real,%20BeamletOptics.AbstractRefractiveIndex}",
     "teaser": "Round plate beamsplitter with a finite substrate."
   },
   {
     "name": "CubeBeamsplitter",
     "category": "Beamsplitters",
     "image": "catalog_CubeBeamsplitter.png",
-    "href": "/reference#BeamletOptics.CubeBeamsplitter-Tuple{Real,%20Union{Function,%20DiscreteRefractiveIndex,%20SellmeierEquation}}",
+    "href": "/reference#BeamletOptics.CubeBeamsplitter-Tuple{Real,%20BeamletOptics.AbstractRefractiveIndex}",
     "teaser": "Two cemented right-angle prisms forming a cube splitter."
   },
   {
     "name": "RectangularCompensatorPlate",
     "category": "Beamsplitters",
     "image": "catalog_RectangularCompensatorPlate.png",
-    "href": "/reference#BeamletOptics.RectangularCompensatorPlate-Union{Tuple{T},%20Tuple{H},%20Tuple{W},%20Tuple{W,%20H,%20T,%20Union{Function,%20DiscreteRefractiveIndex,%20SellmeierEquation}}}%20where%20{W<:Real,%20H<:Real,%20T<:Real}",
+    "href": "/reference#BeamletOptics.RectangularCompensatorPlate-Union{Tuple{T},%20Tuple{H},%20Tuple{W},%20Tuple{W,%20H,%20T,%20BeamletOptics.AbstractRefractiveIndex}}%20where%20{W<:Real,%20H<:Real,%20T<:Real}",
     "teaser": "Corrects the parallel beam offset of a plate beamsplitter."
   },
   {
@@ -262,7 +262,7 @@
     "name": "RoundLinearPolarizer",
     "category": "Polarizers",
     "image": "catalog_RoundLinearPolarizer.png",
-    "href": "/reference#BeamletOptics.RoundLinearPolarizer-Tuple{Real,%20Real,%20Real,%20Union{Function,%20DiscreteRefractiveIndex,%20SellmeierEquation}}",
+    "href": "/reference#BeamletOptics.RoundLinearPolarizer-Tuple{Real,%20Real,%20Real,%20BeamletOptics.AbstractRefractiveIndex}",
     "teaser": "Builds a round film polarizer with glass substrates."
   },
   {

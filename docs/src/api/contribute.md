@@ -16,6 +16,10 @@ file standalone, run `julia --project=test -e 'using Pkg; Pkg.instantiate()'` on
 (`test/Project.toml`); new test-only dependencies are added there, not to the root
 `Project.toml`.
 
+## Developing BMO with an assistant
+
+The agent skill of the [AI assistants](@ref "Using BMO with AI assistants") page describes how to *use* BMO. Instructions for changing the package itself (design philosophy, code conventions, tests) are in `AGENTS.md` at the root of the [repository](https://github.com/JuliaPhysics/BeamletOptics.jl). `CLAUDE.md` and `GEMINI.md` point to it.
+
 # Contributors
 
 The following is a list of people who have made significant contributions to the development of BMO:

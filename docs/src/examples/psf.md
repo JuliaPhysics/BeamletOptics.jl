@@ -35,7 +35,7 @@ n = 1.5
 
 # generate uniform source, lens and detector
 cs = UniformDiscSource([0, -10mm, 0], [0, 1, 0], 15e-3, λ)
-lens = SphericalLens(R1, R2, l, d, x -> n)
+lens = SphericalLens(R1, R2, l, d, ConstantRefractiveIndex(n))
 detector = Detector(10e-3)
 
 # shift detector into focus
@@ -68,7 +68,7 @@ A = [0*(1e3)^1, 2.7709219e-8*(1e3)^3, 6.418186e-13*(1e3)^5, -1.5724014e-17*(1e3)
 AL75150 = Lens(
     EvenAsphericalSurface(radius, d, k, A),
     l,
-    n -> 1.5006520430
+    ConstantRefractiveIndex(1.5006520430)
 )
 
 xrotate3d!(AL75150, deg2rad(-0.5))

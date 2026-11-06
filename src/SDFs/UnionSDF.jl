@@ -1,5 +1,5 @@
 """
-    UnionSDF{T, TT <: Tuple} <: AbstractSDF{T}
+    UnionSDF{T, TT <: Tuple} <: AbstractCompositeSDF{T}
 
 This SDF represents the merging of two or more SDFs. If the constituent SDFs do not overlap
 (they can and should touch) the resulting SDF should be still exact if the constituent SDFs

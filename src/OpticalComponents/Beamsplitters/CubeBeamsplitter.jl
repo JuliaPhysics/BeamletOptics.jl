@@ -40,15 +40,15 @@ coating is orientated at a 45° angle with respect to the y-axis.
 # Inputs
 
 - `leg_length`: the x-, y- and z-edge length in [m]
-- `n`: the [`RefractiveIndex`](@ref) of the front and back prism, or a number for a constant refractive index
+- `n`: the [`AbstractRefractiveIndex`](@ref) of the front and back prism
 
 # Keywords 
 
-- `reflectance`: defines the splitting ratio in [-], i.e. R = 0 ... 1.0
+- `reflectance`: defines the power reflectance R (dimensionless) of the coating, in the open interval (0, 1)
 """
 function CubeBeamsplitter(
         leg_length::Real,
-        n::RefractiveIndex;
+        n::AbstractRefractiveIndex;
         reflectance::Real=0.5
     )
     front = RightAnglePrism(leg_length, leg_length, n)
@@ -59,7 +59,6 @@ function CubeBeamsplitter(
     set_new_origin3d!(shape(bs))
     return CubeBeamsplitter(front, back, bs)
 end
-CubeBeamsplitter(leg_length::Real, n::Real; reflectance::Real=0.5) = CubeBeamsplitter(leg_length, λ -> n; reflectance)
 
 function interact3d(
     system::AbstractSystem,

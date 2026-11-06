@@ -207,7 +207,7 @@ Rz(θ) = BMO.rotate3d([0, 0, 1], θ)
         @test_throws ArgumentError translate3d!(Parts(Single(s), s), [0, 0, 1.0])
         @test isapprox(position(s), [0, 0, 0]; atol = 1e-12)
         # Doublet and its own front lens
-        dl = SphericalDoubletLens(40mm, -30mm, -120mm, 6mm, 2.5mm, 25mm, _ -> 1.62, _ -> 1.72)
+        dl = SphericalDoubletLens(40mm, -30mm, -120mm, 6mm, 2.5mm, 25mm, ConstantRefractiveIndex(1.62), ConstantRefractiveIndex(1.72))
         p_front, p_back = position(dl.front), position(dl.back)
         g = ObjectGroup([dl, dl.front])
         @test_throws ArgumentError translate3d!(g, [0, 0, 1.0])
@@ -222,9 +222,9 @@ Rz(θ) = BMO.rotate3d([0, 0, 1], θ)
     end
 
     @testset "Built-in MultiShape objects in a group" begin
-        dl = SphericalDoubletLens(40mm, -30mm, -120mm, 6mm, 2.5mm, 25mm, _ -> 1.62, _ -> 1.72)
-        cbs = CubeBeamsplitter(10mm, n -> 1.5)
-        pbs = RectangularPlateBeamsplitter(36mm, 25mm, 1mm, n -> 1.5)
+        dl = SphericalDoubletLens(40mm, -30mm, -120mm, 6mm, 2.5mm, 25mm, ConstantRefractiveIndex(1.62), ConstantRefractiveIndex(1.72))
+        cbs = CubeBeamsplitter(10mm, ConstantRefractiveIndex(1.5))
+        pbs = RectangularPlateBeamsplitter(36mm, 25mm, 1mm, ConstantRefractiveIndex(1.5))
         p = [position(x) for x in (dl.front, dl.back, cbs, pbs)]
         g = ObjectGroup([ObjectGroup([dl, cbs]), ObjectGroup([pbs, dl])])
         translate3d!(g, [0, 0, 1.0])

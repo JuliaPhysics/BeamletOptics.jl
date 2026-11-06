@@ -7,23 +7,23 @@ Main.DocUtils.conditional_include(joinpath(detector_showcase_dir, "photodetector
 
 # Detectors
 
-In practice, photodetectors allow the conversion of electromagnetic radiation into electric signals. BMO provides the [`Detector`](@ref) as an element to capture and evaluate optical data during and after running a simulation, respectively. The `Detector` is designed to accumulate e.g. field or ray data, enabling analysis of intensity distributions, interference patterns, and other beam properties. Currently, post-processing capabilities are limited to the functionality as described in the [Spot diagrams](@ref) and [Field distributions](@ref) sections.
+In practice, photodetectors allow the conversion of electromagnetic radiation into electric signals. BMO provides the [`Detector`](@ref) as an element to capture and evaluate optical data during and after running a simulation, respectively. The `Detector` is designed to accumulate e.g. field or ray data, enabling analysis of intensity distributions, interference patterns, and other beam properties. The post-processing is described in the sections [Reading out a detector](@ref), [Spot diagrams](@ref), [Ray directions](@ref) and [Field distributions](@ref), which also covers the coupling to other solvers via OpticsBase.
 
 In general, detector-like elements are supposed to fall under the [`BeamletOptics.AbstractDetector`](@ref) type, which defines a interface for detector implementations.
 
 !!! warning "Resetting detectors"
-    By default, the data stored in a `Detector` is not reset between calls of [`solve_system!`](@ref). This is intentional, since all beams of a beam group and several sources solved one after another are meant to superpose on the same detectors. To start from empty detectors, e.g. when a component is changed in a loop, solve with `initialize = true` or call [`initialize!`](@ref)`(system)`, which resets all detectors of a [`System`](@ref) including those in nested [`ObjectGroup`](@ref)s. A single detector is reset with [`empty!`](@ref). Hits are pushed under a lock, so beam groups can safely be solved multithreaded.
+    By default, the data stored in a `Detector` is not reset between calls of [`solve_system!`](@ref). This is intentional, since all beams of a beam group and several sources solved one after another are meant to superpose on the same detectors. To start from empty detectors, e.g. when a component is changed in a loop, solve with `initialize = true` or call [`initialize!`](@ref)`(system)`, which resets all detectors of a [`System`](@ref) including those in nested [`ObjectGroup`](@ref)s. A single detector is reset with [`empty!`](@ref). Hits are pushed under a lock, so beam groups can safely be solved multithreaded. In the solve of a beam group, the hits are first collected in buffers and stored in the detector at the end of each chunk of beams, see [Hit recording](@ref).
 
 ## Detector type
 
-A `Detector` can be easily spawned by initializing e.g. `pd = Detector(5mm)` which will create a 5x5 mm² detection screen.
+A `Detector` can be easily spawned by initializing e.g. `pd = Detector(5e-3)` which will create a 5x5 mm² detection screen (the edge length is given in meters).
 
 ```@docs; canonical=false
 Detector(::Real, ::Bool)
 Detector
 ```
 
-After solving a system containing a `Detector`, the methods listed below can be used in order to analyze the stored data. If no data is obtained during the tracing procedure, an error message will be stored.
+After solving a system containing a `Detector`, the methods listed below can be used in order to analyze the stored data. If no hits are stored, the readouts return zero or empty results.
 
 ## Reading out a detector
 
@@ -49,35 +49,7 @@ end
 spots = spot_diagram(pd)
 ```
 
-The following diagram shows how a solve records one hit type per beam model in a `Detector` and what empties it again; green boxes are the methods a new [`BeamletOptics.AbstractDetector`](@ref) implements.
-
-```mermaid
-flowchart TB
-    S(["<b>solve_system!</b><br/>beam or beam group"]) --> IA["<b>interact3d</b>(system, d, beam, ray or id)<br/>one method per beam model"]
-    IA -- Ray --> RH["<b>RayHit</b>"]
-    IA -- PolarizedRay --> PH["<b>PolarizedRayHit</b>"]
-    IA -- GaussianBeamlet --> GH["<b>GaussianBeamletHit</b>"]
-    IA -- AstigmaticGaussianBeamlet --> AH["<b>AstigmaticGaussianBeamletHit</b>"]
-    RH --> P["<b>push!</b>(d, hit)"]
-    PH --> P
-    GH --> P
-    AH --> P
-    P -- "solve of a beam group" --> B["<b>with_hit_buffers</b><br/>one buffer per chunk of beams and detector"]
-    P -- "otherwise, under d.lock" --> H["<b>hits</b>(d)<br/>nothing or a Vector of one hit type,<br/>counted by length(d)"]
-    B -- "append!(d, buffer)<br/>at the end of the chunk" --> H
-    I(["<b>initialize!</b>(system)<br/>or initialize = true"]) -- "initialize!(d)" --> E["<b>empty!</b>(d)"]
-    K(["<b>translate3d!</b> / <b>rotate3d!</b><br/>of d, also within an ObjectGroup"]) --> E
-    E -- "hits = nothing" --> H
-
-    classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
-    classDef green fill:#38982626,stroke:#389826,stroke-width:2px
-    classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
-    classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
-    class IA,E green
-    class RH,PH,GH,AH purple
-    class P,B,H blue
-    class S,I,K terminal
-```
+How a solve records the hits and what empties them again is shown in [Hit recording](@ref).
 
 ## Spot diagrams
 
@@ -126,47 +98,11 @@ x, z, I = intensity(pd, RegularGrid(num_points = 200, crop_factor = 5))
 P = optical_power(pd, RectilinearGrid(xs, zs))
 ```
 
-The following diagram shows how a readout turns a sampling into points and evaluates the stored hits there; green boxes are the methods a new sampling or hit type implements. A new hit type must also be added to the `hits` field of [`Detector`](@ref).
-
-```mermaid
-flowchart TB
-    R(["<b>electric_field</b> / <b>intensity</b> / <b>optical_power</b><br/>(pd, sampling = RegularGrid())"]) --> SP["<b>sample_points</b>(pd, sampling)"]
-    SP -- RegularGrid --> RG["<b>RegularGrid</b><br/>window around the hits via calc_local_lims,<br/>active surface without hits"]
-    SP -- RectilinearGrid --> RL["<b>RectilinearGrid</b><br/>points xs × zs,<br/>trapezoidal weights"]
-    SP -- "own AbstractDetectorSampling" --> OWN["own <b>sample_points</b> method"]
-    RG -- "own hit type, unless an<br/>AbstractRayHit or AbstractBeamletHit" --> LIM["own <b>calc_local_lims</b>(pd, hits, crop_factor) methods"]
-    RG -- "RectilinearGrid(xs, zs)" --> RL
-    RL --> DS["<b>DetectorSamples</b><br/>coordinates, points, weights"]
-    OWN --> DS
-    DS -- points --> PT["<b>electric_field</b>(pd, points)<br/><b>intensity</b>(pd, points)<br/>threaded over the points"]
-    PT -- "electric_field" --> SUM["<b>electric_field</b>(hits(pd), p)<br/>coherent sum over the hits"]
-    PT -- "intensity" --> IH["<b>intensity</b>(hits(pd), p, n̂)<br/>Poynting flux through the detector"]
-    IH -- "PolarizedRayHit,<br/>AstigmaticGaussianBeamletHit" --> IV["vector form<br/>½ Re[(E × H*) · n̂]"]
-    IH -- "RayHit,<br/>GaussianBeamletHit" --> IS["scalar form<br/>½ Re[E* F]"]
-    IH -- "own hit type" --> OWNI["own <b>intensity</b>(hits, p, n̂) method"]
-    PT -- "no hits: hits(pd) = nothing" --> ZERO["zero field and flux<br/>at every point"]
-    SUM --> EF["<b>electric_field</b>(hit, p)<br/>direction(hit), refractive_index(hit)"]
-    IV --> EF
-    IS --> EF
-    PT -- "values" --> RET(["electric_field, intensity:<br/>(coordinates..., values)"])
-    PT -- "intensity values I" --> OP(["optical_power:<br/>sum of weights .* I"])
-
-    classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
-    classDef green fill:#38982626,stroke:#389826,stroke-width:2px
-    classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
-    classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
-    class SP,RG,RL,DS purple
-    class PT,SUM,IH,IV,IS,ZERO blue
-    class OWN,LIM,OWNI,EF green
-    class R,RET,OP terminal
-```
+The steps of a readout and the methods a new sampling or hit type implements are shown in [Readout pipeline](@ref).
 
 ```@docs; canonical=false
 RegularGrid
 RectilinearGrid
-BeamletOptics.AbstractDetectorSampling
-BeamletOptics.sample_points
-BeamletOptics.DetectorSamples
 electric_field(::Detector, ::AbstractArray{<:AbstractVector})
 intensity(::Detector, ::AbstractArray{<:AbstractVector})
 ```
@@ -210,41 +146,7 @@ The field is built from the hits as follows:
 - [`AstigmaticGaussianBeamletHit`](@ref BeamletOptics.AstigmaticGaussianBeamletHit)s carry the polarization of their chief ray, so their field is `electric_field(hit, p)` already. A stigmatic [`GaussianBeamletHit`](@ref BeamletOptics.GaussianBeamletHit) carries no polarization in BMO (the model is scalar). By convention, matching OpticsBase's own rule for a scalar field (`PlaneField(E::AbstractMatrix, ...)` puts a scalar field entirely into `Eu`), its contribution is polarized along the plane's ``\mathbf{u}`` axis, made transverse to the hit direction ``\mathbf{d}_i`` (along ``\mathbf{v}`` if ``\mathbf{u}`` is parallel to it), so that ``\mathbf{E}_i \perp \mathbf{d}_i`` and ``\mathbf{H}_i = (n/Z_0)\, \mathbf{d}_i \times \mathbf{E}_i`` form a consistent plane wave. At normal incidence this is exactly ``\mathbf{u}``.
 - `R = Inf`: no reference sphere is removed, because BMO's beamlet field already carries the full spatial phase without needing one.
 
-The diagram shows how the constructors share one sampling of the hits and how the return path leaves the `PlaneField` again. Blue boxes are BMO's detector internals that the extension reuses, green boxes depend on the hit type, purple boxes are the rest of the extension.
-
-```mermaid
-flowchart TB
-    DET(["<b>PlaneField</b>(detector; size, spacing)"]) --> DH["<b>hits</b>(detector)<br/>ArgumentError if the detector has no hits"]
-    DET -- "default axes" --> DA["<b>default_plane_axes</b>(detector)<br/>u from <b>local_axes</b>, n = −<b>direction</b>"]
-    BEAM(["<b>PlaneField</b>(beamlet, id; size, spacing,<br/>origin, axes)"]) --> OH["one <b>GaussianBeamletHit</b> or<br/><b>AstigmaticGaussianBeamletHit</b><br/>(beamlet, id)"]
-    DH --> PH
-    DA -- "axes" --> PH
-    OH --> PH
-    PH["<b>PlaneField</b>(hits; size, spacing, origin, axes)<br/>beamlet hits only, otherwise ArgumentError"]
-    PH --> CW["<b>common_wavelength_index</b>(hits)<br/>all hits share λ and n"]
-    CW --> HFD["<b>hit_field_direction</b>(hit, u, v)<br/>per hit type"]
-    HFD -- AstigmaticGaussianBeamletHit --> HA["nothing: <b>electric_field</b>(hit, p)<br/>is a 3D vector"]
-    HFD -- GaussianBeamletHit --> HG["u made transverse to d<br/>(v if u ∥ d)"]
-    HA --> SM["<b>_sample</b>(hits, origin, u, v, points)<br/>threaded over points, shared with the readouts"]
-    HG --> SM
-    SM -- "per point p" --> HF["<b>hit_field</b>(hit, p, pol)<br/>per hit type"]
-    HF --> EH["E = Σᵢ Eᵢ projected on u, v<br/>H = Σᵢ (n/Z₀) dᵢ × Eᵢ projected on u, v"]
-    EH --> PF(["<b>OpticsBase.PlaneField</b>"])
-    PF -- "<b>forward</b>(f), n = 1" --> FF["<b>forward_field</b>(f)<br/>and <b>plane_frame</b>(f)"]
-    FF --> WD(["<b>WavefrontBeamletDecomposition</b>(f)"])
-    FF --> GD(["<b>GaussianModeDecomposition</b>(f)"])
-    WD -- "position f.origin" --> BG["AstigmaticBeamGroup"]
-    GD -- "starts at the centroid of the field" --> AB["AstigmaticGaussianBeamlet"]
-
-    classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
-    classDef green fill:#38982626,stroke:#389826,stroke-width:2px
-    classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
-    classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
-    class DH,SM blue
-    class OH,HFD,HA,HG,HF green
-    class DA,PH,CW,EH,FF purple
-    class DET,BEAM,PF,WD,GD,BG,AB terminal
-```
+The internal steps of these constructors are shown in [OpticsBase extension internals](@ref).
 
 ```@docs
 OpticsBase.PlaneField(::Detector)

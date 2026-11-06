@@ -8,10 +8,18 @@ Provides a shape function based on signed distance functions. See https://iquile
 
 Subtypes of `AbstractSDF` should implement all reqs. of `AbstractShape` as well as the following:
 
-# Functions
+## Fields
 
-- `sdf(::AbstractSDF, point)`: a function that returns the signed distance for a point in 3D space
+- `transposed_dir`: the transpose of `dir`, which `orientation!` keeps in sync and which `_world_to_sdf` reads
+
+## Functions
+
+- `sdf(::AbstractSDF, point)`: a function that returns the signed distance for a point in 3D space,
+  usually evaluated at `_world_to_sdf(sdf, point)`
 - `thickness(::AbstractSDF)` (optional): the material of the shape on its optical axis (local y) in \\[m\\]
+
+`_world_to_sdf(sdf, point)` is provided: it transforms a world point into the local frame of the `sdf`
+via `position` and `transposed_dir`, such that `sdf` only has to describe the shape at the origin.
 """
 abstract type AbstractSDF{T} <: AbstractShape{T} end
 

@@ -26,7 +26,7 @@ Returns `label => shape` pairs that cover the 20 concrete SDF types, both signs 
 a type has them, and the shapes of the public lens, prism and mirror constructors.
 """
 function instances()
-    n = λ -> 1.5
+    n = ConstantRefractiveIndex(1.5)
     asph = [0, 1e3]
     acyl = [0, 1.1926075e-5 * (1e3)^3, -2.9323497e-9 * (1e3)^5]
     # operands that are moved one by one, such that their frames differ from that of the composite
@@ -52,9 +52,9 @@ function instances()
             [(0.0, 0.0), (20e-3, 0.0), (25e-3, 10e-3), (8e-3, 18e-3), (-4e-3, 9e-3)], 7e-3),
         "PolygonPrismSDF, right triangle" => BMO.PolygonPrismSDF(
             [(0.0, 0.0), (20e-3, 0.0), (0.0, 20e-3)], 30e-3),
-        "EquilateralPrism" => BMO.shape(EquilateralPrism(20e-3, 10e-3, 1.5)),
-        "DovePrism" => BMO.shape(DovePrism(50e-3, 10e-3, 10e-3, 1.5)),
-        "RightAnglePrism" => BMO.shape(RightAnglePrism(25e-3, 20e-3, 1.5)),
+        "EquilateralPrism" => BMO.shape(EquilateralPrism(20e-3, 10e-3, ConstantRefractiveIndex(1.5))),
+        "DovePrism" => BMO.shape(DovePrism(50e-3, 10e-3, 10e-3, ConstantRefractiveIndex(1.5))),
+        "RightAnglePrism" => BMO.shape(RightAnglePrism(25e-3, 20e-3, ConstantRefractiveIndex(1.5))),
         # SphericalLensSDF.jl
         "PlanoSurfaceSDF" => BMO.PlanoSurfaceSDF(5e-3, 25e-3),
         "SphereSDF" => BMO.SphereSDF(8e-3),

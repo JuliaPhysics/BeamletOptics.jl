@@ -77,17 +77,17 @@ the substrate lies on the positive y-side of it, from y = 0 to `thickness`. See 
 - `width`: substrate width along the x-axis in [m]
 - `height`: substrate height along the z-axis in [m]
 - `thickness`: substrate thickness along the y-axis in [m]
-- `n`: the [`RefractiveIndex`](@ref) of the substrate
+- `n`: the [`AbstractRefractiveIndex`](@ref) of the substrate
 
 # Keywords
 
-- `reflectance`: defines the splitting ratio in [-], i.e. R = 0 ... 1.0
+- `reflectance`: defines the power reflectance R (dimensionless) of the coating, in the open interval (0, 1)
 """
 function RectangularPlateBeamsplitter(
         width::Real,
         height::Real,
         thickness::Real,
-        n::RefractiveIndex;
+        n::AbstractRefractiveIndex;
         reflectance::Real=0.5
     )
     # create substrate prism and move into pos
@@ -131,16 +131,16 @@ lies on the positive y-side of it, from y = 0 to `thickness`. See also [`Rectang
 
 - `diameter`: x-z-plane substrate diameter in [m]
 - `thickness`: substrate thickness along the y-axis in [m]
-- `n`: the [`RefractiveIndex`](@ref) of the substrate
+- `n`: the [`AbstractRefractiveIndex`](@ref) of the substrate
 
 # Keywords 
 
-- `reflectance`: defines the splitting ratio in [-], i.e. R = 0 ... 1.0
+- `reflectance`: defines the power reflectance R (dimensionless) of the coating, in the open interval (0, 1)
 """
 function RoundPlateBeamsplitter(
         diameter::Real,
         thickness::Real,
-        n::RefractiveIndex;
+        n::AbstractRefractiveIndex;
         reflectance::Real=0.5
     )
     # create substrate cylinder prism

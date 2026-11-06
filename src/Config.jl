@@ -12,8 +12,9 @@ const invariant_threshold = @load_preference("invariant_threshold", 1e-6)
 """
     get_invariant_threshold()
 
-Returns the global configuration threshold for the paraxial optical invariant check: the limit of
-the complex invariant of an astigmatic beamlet. The Lagrange invariants of both beamlets use
+Returns the global configuration threshold for the paraxial optical invariant check: the limit in
+\\[m\\] of the complex coupling invariant `h1 ⋅ u2 - h2 ⋅ u1` of an astigmatic beamlet, with the ray
+heights `h` in \\[m\\] and the dimensionless slopes `u`. Defaults to `1e-6`. The Lagrange invariants of both beamlets use
 [`get_lagrange_tolerance`](@ref).
 """
 get_invariant_threshold() = invariant_threshold
@@ -38,14 +39,18 @@ const sdf_miss_distance = @load_preference("sdf_miss_distance", 1e15)
 """
     get_sdf_surface_threshold()
 
-Returns the global configuration threshold for the Signed Distance Field (SDF) surface detection.
+Returns the global configuration threshold for the Signed Distance Field (SDF) surface detection:
+a ray whose start has an SDF value below this distance in \\[m\\] counts as starting on the surface.
+Defaults to `1e-9` (configurable via the `sdf_surface_threshold` preference).
 """
 get_sdf_surface_threshold() = sdf_surface_threshold
 
 """
     get_sdf_raymarch_eps()
 
-Returns the global configuration epsilon for the SDF ray marching algorithm.
+Returns the global configuration epsilon for the SDF ray marching algorithm, a distance in \\[m\\]:
+the SDF value below which the marched ray has reached the surface, and the minimum step.
+Defaults to `1e-10` (configurable via the `sdf_raymarch_eps` preference).
 """
 get_sdf_raymarch_eps() = sdf_raymarch_eps
 
@@ -81,21 +86,29 @@ const orthogonality_threshold = @load_preference("orthogonality_threshold", 1e-1
 """
     get_internal_reflection_threshold()
 
-Returns the global configuration threshold for total internal reflection detection.
+Returns the global configuration threshold for total internal reflection detection, dimensionless:
+a reflection counts as total if the reflectances `|rs|²` and `|rp|²` both deviate from 1 by at most
+this value. Defaults to `1e-6` (configurable via the `internal_reflection_threshold` preference).
 """
 get_internal_reflection_threshold() = internal_reflection_threshold
 
 """
     get_line_plane_intersection_threshold()
 
-Returns the global configuration threshold for line-plane intersection calculations.
+Returns the global configuration threshold for line-plane intersection calculations, dimensionless:
+a line whose direction has a dot product with the plane normal of at most this magnitude counts as
+parallel to the plane and does not intersect it. Defaults to `1e-6` (configurable via the
+`line_plane_intersection_threshold` preference).
 """
 get_line_plane_intersection_threshold() = line_plane_intersection_threshold
 
 """
     get_orthogonality_threshold()
 
-Returns the global configuration threshold for orthogonality checks (e.g., beam support axes).
+Returns the global configuration threshold for orthogonality checks (e.g., beam support axes),
+dimensionless: the largest magnitude of the dot product of two unit vectors that still counts as
+orthogonal. For the field `E0` of a [`PolarizedRay`](@ref BeamletOptics.PolarizedRay) it is scaled by `|E0|`. Defaults to `1e-10`
+(configurable via the `orthogonality_threshold` preference).
 """
 get_orthogonality_threshold() = orthogonality_threshold
 
@@ -107,14 +120,17 @@ const default_depth_max = @load_preference("default_depth_max", 100)
 """
     get_default_r_max()
 
-Returns the default maximum number of segments for ray tracing.
+Returns the default maximum number of rays (segments) per beam, the keyword `r_max` of
+[`solve_system!`](@ref BeamletOptics.solve_system!). Defaults to 100 (configurable via the `default_r_max` preference).
 """
 get_default_r_max() = default_r_max
 
 """
     get_default_depth_max()
 
-Returns the default maximum depth for recursive ray tracing (e.g., reflections/refractions).
+Returns the default maximum number of branching levels of the beam tree, the keyword `depth_max` of
+[`solve_system!`](@ref BeamletOptics.solve_system!): the children of a beam at level `depth_max + 1` (the root beam is at level 1),
+e.g. those attached by a beamsplitter, are dropped.
 Defaults to 100 (configurable via the `default_depth_max` preference).
 """
 get_default_depth_max() = default_depth_max
@@ -162,9 +178,12 @@ get_progress_threshold() = progress_threshold
 
 
 """
-    set_preference!(key::String, val; persistent=true)
+    set_preference!(key::String, val)
 
-Helper to set preferences. Default is persistent.
+Stores the preference `key` with the value `val` for this package via Preferences.jl (it is kept in a
+`LocalPreferences.toml`, i.e. across Julia sessions) and logs a message. The
+configuration constants are read when the package is loaded, hence Julia must be restarted for a new
+value to take effect.
 """
 function set_preference!(key::String, val)
     @set_preferences!(key => val)

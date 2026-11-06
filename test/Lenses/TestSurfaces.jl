@@ -31,7 +31,7 @@ const mm = 1e-3
         lens = Lens(
             SphericalSurface(r1, d),
             l,
-            n -> 1.458
+            ConstantRefractiveIndex(1.458)
         )
 
         # test lens thickness
@@ -50,7 +50,7 @@ const mm = 1e-3
             SphericalSurface(r1, d),
             SphericalSurface(r2, d),
             l,
-            n -> 1.517
+            ConstantRefractiveIndex(1.517)
         )
         shape = lens.shape
 
@@ -70,7 +70,7 @@ const mm = 1e-3
             SphericalSurface(r1, d),
             SphericalSurface(r2, d),
             l,
-            n -> 1.517
+            ConstantRefractiveIndex(1.517)
         )
         shape = lens.shape
 
@@ -89,7 +89,7 @@ const mm = 1e-3
             SphericalSurface(r1, d),
             SphericalSurface(r2, d),
             l,
-            n -> 1.517
+            ConstantRefractiveIndex(1.517)
         )
         shape = lens.shape
 
@@ -108,7 +108,7 @@ const mm = 1e-3
             SphericalSurface(r1, d),
             SphericalSurface(r2, d),
             l,
-            n -> 1.517
+            ConstantRefractiveIndex(1.517)
         )
         shape = lens.shape
 
@@ -127,7 +127,7 @@ const mm = 1e-3
             SphericalSurface(r1, d),
             SphericalSurface(r2, d),
             l,
-            n -> 1.517
+            ConstantRefractiveIndex(1.517)
         )
         shape = lens.shape
 
@@ -146,7 +146,7 @@ const mm = 1e-3
             SphericalSurface(r1, d),
             SphericalSurface(r2, d),
             l,
-            n -> 1.517
+            ConstantRefractiveIndex(1.517)
         )
         shape = lens.shape
 
@@ -166,7 +166,7 @@ const mm = 1e-3
             SphericalSurface(r1, d),
             SphericalSurface(r2, d),
             l,
-            n -> 1.517
+            ConstantRefractiveIndex(1.517)
         )
         shape = lens.shape
 
@@ -209,9 +209,9 @@ const mm = 1e-3
     @testset "Doublet and triplet construction from surfaces" begin
         d = 25.4mm
         hs = (0.0, 1e-6, 1mm, 5mm, -7mm, 10mm)
-        n1 = λ -> 1.5
-        n2 = λ -> 1.7
-        n3 = λ -> 1.6
+        n1 = ConstantRefractiveIndex(1.5)
+        n2 = ConstantRefractiveIndex(1.7)
+        n3 = ConstantRefractiveIndex(1.6)
         # Even aspheric coefficients for r², r⁴ and r⁶ in SI units
         A = [0, 2e-7 * (1e3)^3, 1e-11 * (1e3)^5]
 

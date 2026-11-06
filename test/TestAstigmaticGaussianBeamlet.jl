@@ -127,7 +127,7 @@ const BMO = BeamletOptics
 
     @testset "Lens interaction" begin
         s1 = BMO.CylinderSDF(BMO.inch / 2, BMO.inch)
-        l1 = BMO.Lens(s1, n -> 1.5)
+        l1 = BMO.Lens(s1, ConstantRefractiveIndex(1.5))
         BMO.translate3d!(l1, [0, 0.1, 0.0])
         BMO.zrotate3d!(l1, deg2rad(90))
 
@@ -188,8 +188,8 @@ const BMO = BeamletOptics
     @testset "Two-lens astigmatic system" begin
         s1 = BMO.CylinderSDF(BMO.inch / 2, BMO.inch)
         s2 = BMO.CylinderSDF(BMO.inch / 2, BMO.inch)
-        l1 = BMO.Lens(s1, n -> 1.5)
-        l2 = BMO.Lens(s2, n -> 1.5)
+        l1 = BMO.Lens(s1, ConstantRefractiveIndex(1.5))
+        l2 = BMO.Lens(s2, ConstantRefractiveIndex(1.5))
         BMO.translate3d!(l1, [0, 0.1, 0.0])
         BMO.translate3d!(l2, [0, 0.15, 0.0])
         BMO.zrotate3d!(l1, deg2rad(90))
@@ -209,7 +209,7 @@ const BMO = BeamletOptics
 
     @testset "Solving again" begin
         s1 = BMO.CylinderSDF(BMO.inch / 2, BMO.inch)
-        l1 = BMO.Lens(s1, n -> 1.5)
+        l1 = BMO.Lens(s1, ConstantRefractiveIndex(1.5))
         BMO.translate3d!(l1, [0, 0.1, 0.0])
         BMO.zrotate3d!(l1, deg2rad(90))
 
@@ -346,7 +346,7 @@ end
         return optical_power(pd)
     end
     function tilted_lens()
-        lens = SphericalLens(0.5, -0.5, 8e-3, BMO.inch, x -> 1.5)
+        lens = SphericalLens(0.5, -0.5, 8e-3, BMO.inch, ConstantRefractiveIndex(1.5))
         translate3d!(lens, [0, 0.1, 0])
         BMO.zrotate3d!(lens, deg2rad(8))
         BMO.xrotate3d!(lens, deg2rad(5))
@@ -377,7 +377,7 @@ end
         # A cylinder lens rotated against the axes of the beam twists it: for unequal M2,
         # H H† is complex, and det S exceeds |h1 × h2|² by 1.86 for M2 = (1, 20)
         function behind_cylinder_lens(M2_x, M2_y)
-            lens = Lens(CylindricalSurface(30e-3, 20e-3, 25e-3), 4e-3, _ -> 1.5)
+            lens = Lens(CylindricalSurface(30e-3, 20e-3, 25e-3), 4e-3, ConstantRefractiveIndex(1.5))
             BMO.yrotate3d!(lens, deg2rad(45))
             translate3d!(lens, [0, 50e-3, 0])
             pd = Detector(0.1)
@@ -401,7 +401,7 @@ end
     @testset "The limit does not depend on M2 and λ" begin
         # H deviates by 8.5 % in this focus, within the limit of 50 %
         function reaches_detector(; kw...)
-            lens = SphericalLens(50e-3, -50e-3, 8e-3, 30e-3, x -> 1.5)
+            lens = SphericalLens(50e-3, -50e-3, 8e-3, 30e-3, ConstantRefractiveIndex(1.5))
             translate3d!(lens, [0, 0.1, 0])
             pd = Detector(0.2)
             translate3d!(pd, [0, 0.15, 0])
@@ -424,7 +424,7 @@ end
     # waists the Lagrange invariant of one axis drops and changes its sign: Im Q has no
     # Gaussian decay left, the field would hold 1e6 times the power of the source.
     function detector_behind_lens(f; check_invariant = true)
-        lens = SphericalLens(f, -f, 8e-3, BMO.inch, x -> 1.5)
+        lens = SphericalLens(f, -f, 8e-3, BMO.inch, ConstantRefractiveIndex(1.5))
         translate3d!(lens, [0, 0.1, 0])
         pd = Detector(0.02)
         translate3d!(pd, [0, 0.1 + f, 0])
@@ -458,7 +458,7 @@ end
     λ, w0, n, d = 1e-6, 100e-6, 1.5, 0.05
     zR = π * w0^2 / λ
     beam = AstigmaticGaussianBeamlet([0.0, -d, 0], [0.0, 1, 0], λ, w0; support = [1.0, 0, 0])
-    solve_system!(System([SphericalLens(Inf, Inf, 20e-3, BMO.inch, λ -> n)]), beam)
+    solve_system!(System([SphericalLens(Inf, Inf, 20e-3, BMO.inch, ConstantRefractiveIndex(n))]), beam)
     for l in (0.0, 5e-3, 15e-3)                         # depth in the glass
         w = w0 * sqrt(1 + ((d + l / n) / zR)^2)
         field(r) = BMO.parabasal_field(beam, [r, 0.0, 0], d + l + 1e-9)

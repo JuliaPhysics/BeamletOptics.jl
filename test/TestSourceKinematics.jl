@@ -492,7 +492,7 @@ start_rays(b) = map(BMO.first_ray, BMO._component_beams(b))
     end
 
     @testset "Moving a child beam throws" begin
-        pbs = RectangularPlateBeamsplitter(36mm, 25mm, 1mm, n -> 1.5)
+        pbs = RectangularPlateBeamsplitter(36mm, 25mm, 1mm, ConstantRefractiveIndex(1.5))
         zrotate3d!(pbs, deg2rad(45))
         bs_system = System([pbs])
         beam = Beam([0, -50mm, 0], [0, 1, 0], 1e-6)
@@ -550,8 +550,8 @@ start_rays(b) = map(BMO.first_ray, BMO._component_beams(b))
             BMO.CylinderSDF(1mm, 2mm) + BMO.CylinderSDF(2mm, 1mm),   # composite SDF
             BMO.CubeMesh(1mm),                                       # mesh
             ref,                                                     # object (SingleShape)
-            CubeBeamsplitter(5mm, λ -> 1.5),                         # object (MultiShape)
-            ObjectGroup([RoundPlanoMirror(10mm, 2mm), CubeBeamsplitter(5mm, λ -> 1.5)]),
+            CubeBeamsplitter(5mm, ConstantRefractiveIndex(1.5)),                         # object (MultiShape)
+            ObjectGroup([RoundPlanoMirror(10mm, 2mm), CubeBeamsplitter(5mm, ConstantRefractiveIndex(1.5))]),
             Ray([1.0, 0, 0], [0, 1.0, 0]),
             PolarizedRay([1.0, 0, 0], [0, 1.0, 0], 1e-6, [0, 0, 1.0]),
             Beam([1.0, 0, 0], [0, 1.0, 0]),

@@ -17,17 +17,18 @@ flowchart TB
     S(["<b>solve_system!</b><br/>system + beam"]) --> I
     I["<b>1. Intersect</b><br/>closest hit of all objects,<br/>hinted object first"] -- hit --> X["<b>2. Interact</b><br/>compute<br/>AbstractInteraction"]
     X --> R["<b>3. Repeat</b><br/>attach next<br/>ray or beam segment"]
-    R -- "optional Hint" --> I
+    R -- "optional Hint" --> B(["back to<br/><b>1. Intersect</b>"])
     I -- "no hit or r_max" --> E([done])
+    X -- "returns nothing" --> E
 
     classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
     classDef green fill:#38982626,stroke:#389826,stroke-width:2px
     classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
     classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
-    class I blue
+    class I purple
     class X green
-    class R purple
-    class S,E terminal
+    class R blue
+    class S,E,B terminal
 ```
 
 This scheme is loosely referred to as the **Intersect-Interact-Repeat-Loop** and consists of the following steps:
@@ -55,52 +56,46 @@ Regardless of the underlying concrete implementation, each call of `intersect3d`
 BeamletOptics.Intersection
 ```
 
-Since an optical element can consist of multiple joint shapes, the return type must store which specific part of the object was hit.
+Since an optical element can consist of multiple joint shapes, the return type must store which specific part of the object was hit: the `shape` of the `Intersection` is that part, and the solver compares and looks up the hit part by this reference, e.g. to decide whether the rays of a beamlet hit the same shape. The `object` of the `Intersection` is set by the solver, the `intersect3d` method of a shape leaves it `nothing`.
 
-The following diagram shows how `trace_all` reaches the shapes of the objects and groups of a system, including the [Bounding sphere pretest](@ref) (green: implemented by a component author, purple: dispatch). Where surfaces touch, e.g. the faces of a cemented doublet, the ray hits several of them at the same point. The hits within `get_coincidence_tolerance()` of the closest one are kept as a chain, see [Coincident hits](@ref).
+The following diagram shows how `trace_all` reaches the shapes of the objects and groups of a [`System`](@ref), including the [Bounding sphere pretest](@ref), whose table is described below. A [`StaticSystem`](@ref) has no groups while tracing, since it flattens them when it is built. Where surfaces touch, e.g. the faces of a cemented doublet, the ray hits several of them at the same point. The hits within `get_coincidence_tolerance()` of the closest one are kept as a chain, see [Coincident hits](@ref).
 
 ```mermaid
 flowchart TB
-    TA(["<b>trace_all(system, ray)</b><br/><b>closest_hits</b> of the top-level<br/>objects and groups"])
-    BSO["<b>bounding_sphere_of(shape)</b><br/><i>optional</i>"]
-    TBL["<b>bounding_spheres(system)</b><br/>table, once per solve"]
-    P{"<b>intersect3d(parts, ray)</b><br/>each part, <b>merge_hits</b>:<br/>closest hit and those<br/>at the same point"}
+    TA(["<b>trace_all(system, ray)</b><br/><b>closest_hits</b> of the top-level<br/>objects (and groups of a System)"])
     BY{"<b>beyond</b>(sphere, ray, t)?<br/>sphere only behind<br/>the closest hit so far"}
-    G["<b>intersect3d(group, ray)</b><br/>x = objects(group)"]
+    P["<b>intersect3d(parts, ray)</b><br/>test each part, <b>merge_hits</b>:<br/>closest hit and those<br/>at the same point"]
+    G["<b>intersect3d(group, ray)</b><br/><i>System only</i><br/>x = objects(group)"]
     OJ["<b>intersect3d(object, ray)</b><br/><i>own method possible,<br/>e.g. PlateBeamsplitter</i>"]
-    T{"<b>shape_trait_of(object)</b>"}
-    SS["<b>SingleShape</b><br/>x = shape(object)"]
-    MS["<b>MultiShape</b><br/>x = shape(object), a tuple"]
-    PT{"<b>intersect3d(sphere, x, ray)</b><br/>sphere of x from the table,<br/>else NoBoundingSphere"}
+    T["<b>shape_trait_of(object)</b><br/>SingleShape: x = shape(object)<br/>MultiShape: x = a tuple of parts<br/>(shapes or objects)"]
+    PT["<b>intersect3d(sphere, x, ray)</b><br/>bounding sphere of x from the<br/>table of the solve, else none"]
     SH["<b>intersect3d(shape, ray)</b><br/>shape backend, see below"]
-    OBJ["<b>object!(intersection, object)</b><br/>by the SingleShape and MultiShape<br/>methods, not by a group"]
+    OBJ["<b>object!(intersection, object)</b><br/>by the SingleShape and<br/>MultiShape methods,<br/>not by a group"]
+    AGAIN(["back to<br/><b>intersect3d(parts, ray)</b><br/>with the parts of x"])
     MISS(["nothing"])
 
-    BSO --> TBL
-    TBL -. "current_bounding_spheres()" .-> PT
     TA -- "each top-level part" --> BY
     BY -- "yes: skipped" --> MISS
     BY -- no --> P
-    P -- "AbstractObjectGroup" --> G
-    P -- "AbstractObject" --> OJ
-    P -- "AbstractShape" --> SH
-    OJ --> T
-    T -- SingleShape --> SS --> PT
-    T -- MultiShape --> MS --> PT
+    P -- "isa AbstractObject" --> OJ
+    P -- "isa AbstractObjectGroup" --> G
+    P -- "isa AbstractShape" --> SH
+    OJ -- "default method" --> T
+    T --> PT
     G --> PT
-    PT -- "ray misses the sphere" --> MISS
     PT -- "x is a shape" --> SH
-    PT -- "x are parts" --> P
+    PT -- "x are parts" --> AGAIN
+    PT -- "ray misses<br/>the sphere" --> MISS
     SH --> OBJ
 
     classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
     classDef green fill:#38982626,stroke:#389826,stroke-width:2px
     classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
     classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
-    class TBL,G,SS,MS,OBJ blue
-    class BSO,OJ,SH green
+    class G,OBJ blue
+    class OJ,SH green
     class P,T,PT,BY purple
-    class TA,MISS terminal
+    class TA,AGAIN,MISS terminal
 ```
 
 The shape backend is selected by dispatch on the type of the shape, see [Geometry representation](@ref).
@@ -108,13 +103,13 @@ The shape backend is selected by dispatch on the type of the shape, see [Geometr
 ```mermaid
 flowchart TB
     SH{"<b>intersect3d(shape, ray)</b>"}
-    SDF["<b>AbstractSDF</b><br/>ray marching from outside<br/>or inside, up to the sphere exit<br/>if tested with its own sphere"]
-    MESH["<b>AbstractMesh</b><br/>MoellerTrumboreAlgorithm<br/>for each face, closest"]
+    SDF["<b>AbstractSDF</b><br/>Ray marching "]
+    MESH["<b>AbstractMesh</b><br/>Möller-Trumbore algorithm"]
     OWN["<b>own AbstractShape</b><br/>own intersect3d method"]
-    IX(["<b>Intersection(t, n, shape)</b><br/>or nothing"])
+    IX(["<b>return ::Intersection or ::Nothing</b>"])
 
-    SH -- AbstractSDF --> SDF
-    SH -- AbstractMesh --> MESH
+    SH -- isa AbstractSDF --> SDF
+    SH -- isa AbstractMesh --> MESH
     SH -- "other shape" --> OWN
     SDF --> IX
     MESH --> IX
@@ -149,11 +144,11 @@ Since the tracing is non-sequential, every ray is tested against every shape of 
 BeamletOptics.bounding_sphere_of(::BeamletOptics.AbstractShape)
 ```
 
-All [Signed Distance Functions (SDFs)](@ref) and [Meshes](@ref) have a bounding sphere. An object of several shapes and an object group have the sphere around the spheres of their parts, such that a ray that misses it is tested against none of them.
+All [Signed Distance Functions (SDFs)](@ref) and [Meshes](@ref) have a bounding sphere. An object of several shapes and an object group have the sphere around the spheres of their parts, such that a ray that misses it is tested against none of them. The table holds spheres of floating-point shapes only: for other number types, e.g. dual numbers under `ForwardDiff`, the pretest is skipped and the shapes are tested directly.
 
-The spheres are not stored in the shapes or objects. [`solve_system!`](@ref) computes them once per call, for the poses that the objects have at that time, via `bounding_sphere_of(x)` into a table, which the intersection code reads per ray via `bounding_sphere_of(table, x)`. Outside of a solve there is no table, i.e. a direct call of `intersect3d(object, ray)` tests the object without a sphere.
+The spheres are not stored in the shapes or objects. [`solve_system!`](@ref) computes them once per call, for the poses that the objects have at that time, via `bounding_sphere_of(x)` into a table, which the intersection code reads per ray via `bounding_sphere_of(table, x)`. The solve of a beam group computes the table once for all its beams, and the solves of its beams keep it instead of computing it again. Outside of a solve there is no table, i.e. a direct call of `intersect3d(object, ray)` tests the object without a sphere.
 
-The table lives in the task-local storage of the solving task, not in a `ScopedValue`, because the intersection code reads it for every object and ray and this read is several times cheaper. A task that is spawned within a solve does not see the table of its parent. It passes the table on by calling `with_bounding_spheres(g, table)`, as the solve of a beam group does. The system must not change while a solve runs, since the spheres are those of the poses at the start. The types in the sphere code are asserted, and the methods for the parts of an object are kept separate from those for a shape, because inference would otherwise widen their argument types and the shapes would be tested by code compiled for abstract types.
+The table lives in the task-local storage of the solving task, not in a `ScopedValue`, because the intersection code reads it for every object and ray and this read is several times cheaper. A task that is spawned within a solve does not see the table of its parent. It passes the table on by calling [`BeamletOptics.with_bounding_spheres`](@ref)`(f, table)`, as the solve of a beam group does. The system must not change while a solve runs, since the spheres are those of the poses at the start. The types in the sphere code are asserted, and the methods for the parts of an object are kept separate from those for a shape, because inference would otherwise widen their argument types and the shapes would be tested by code compiled for abstract types.
 
 ```@docs; canonical=false
 BeamletOptics.bounding_sphere_of(::BeamletOptics.BoundingSphereTable, ::Any)
@@ -180,7 +175,7 @@ BeamletOptics.AbstractInteraction
 
 An object whose `interact3d` method stores data in the object, e.g. a detector its hits, also implements [`initialize!`](@ref), which discards this data before a new solve.
 
-The `interact3d` return type limits the interface to only accepting one new `beam` segment per interaction at the moment. The developer needs to take into account that after e.g. a lens surface air-to-glass interaction, the solver "forgets" that the next logical step is to immediately test against the lens again, since the most likely step will be the refraction at the glass-to-air surface. In order to alleviate this issue, the `Hint` type can be used.
+The `interact3d` return type holds one new `beam` segment per interaction, which the solver appends to the current beam. Further beams, e.g. the reflected part at a beamsplitter, are attached to the beam as children by the component, and the solver queues them after the current beam, see [Tracing systems](@ref). The developer needs to take into account that after e.g. a lens surface air-to-glass interaction, the solver "forgets" that the next logical step is to immediately test against the lens again, since the most likely step will be the refraction at the glass-to-air surface. In order to alleviate this issue, the `Hint` type can be used.
 
 ### Re-emitting components
 
@@ -218,18 +213,18 @@ BeamletOptics.Hint
 
 The main reason for this is the intersection ambiguity encountered at interfaces between air-tight component interfaces, e.g. [Plate beamsplitters](@ref) or cemented [Doublet lenses](@ref). This is caused by the fact that for a ray with a starting point at this interface, technically both shapes are being "touched" at the same time. Additional program logic considering the ray direction of propagation can not always resolve this ambiguity. Therefore the task of providing additional information to the solver via the `Hint` interface is placed as a **burden on the developer**.
 
-The diagram below shows this for the [`CubeBeamsplitter`](@ref), whose `interact3d` method finds the hit part by identity, hands the beam to it and hints the coating; the `DoubletLens` hints the other lens in the same way (green: implemented by a component author, purple: dispatch).
+The diagram below shows this for the [`CubeBeamsplitter`](@ref), whose `interact3d` method finds the hit part by identity, hands the beam to it and hints the coating; the `DoubletLens` hints the other lens in the same way.
 
 ```mermaid
 flowchart TB
-    S(["<b>interact3d(system, cbs, beam, ray)</b><br/>object of the intersection: cbs,<br/>shape: the part that was hit"])
-    F{"shape(intersection(ray))<br/>=== shape of which part?"}
-    PR["<b>interact3d(system, cbs.front, beam, ray)</b><br/>the prism refracts<br/>(cbs.back alike)"]
-    H["<b>hint!(interaction,</b><br/><b>Hint(cbs, shape(cbs.coating)))</b>"]
-    CO["<b>interact3d(system, cbs.coating, beam, ray)</b><br/>children!: transmitted and reflected,<br/>refractive_index! of the cube"]
-    N(["return nothing<br/>the solver queues the children"])
+    S(["<b>interact3d(sys, cbs, ...)</b><br/>cbs isa ::MultiShape component<br/>"])
+    F{"<b>shape(intersection(ray))</b><br/>test which part has been hit"}
+    PR["<b>interact3d(sys, cbs.front, ...)</b><br/>Calculate refraction at substrate"]
+    H["<b>hint!</b><br>Update hint to guide solver"]
+    CO["<b>interact3d(sys, cbs.coating, ...)</b><br/>Calculate split beams and <br/> attach children to parent beam"]
+    N(["<b>return nothing</b><br/>the solver queues the children"])
     P["<b>push!(beam, interaction)</b>"]
-    TST{"<b>tracing_step!</b><br/>(system, ray, hint)"}
+    TST{"<b>tracing_step!</b><br/>(sys, ray, hint)"}
     HS["<b>trace_one</b><br/>intersect3d(object(hint), ray) first"]
     OB["<b>closest_hits</b><br/>of all other objects, those<br/>beyond the hint's hit skipped"]
     TA["<b>first_of_shape</b><br/>hinted shape first among<br/>the coincident hits"]
@@ -249,22 +244,24 @@ flowchart TB
     class S,N terminal
 ```
 
+The solver picks the `interact3d` method by the *object* of the hint, not by its shape. For a [`BeamletOptics.MultiShape`](@ref) component the hint therefore names the composite as `object` and the part that is hit next as `shape`, as `Hint(cbs, shape(cbs.coating))` does above; `Hint(object)` alone fails for such an object, since `shape(object)` is a tuple.
+
 !!! tip
-    Use of the `Hint` interface is primarily intended for multishape objects with joint surfaces.
+    The `Hint` interface is needed most for multishape objects with joint surfaces, but any component can use it: a single lens hints itself when a ray enters it or is totally internally reflected, since the next intersection lies on the same lens.
 
 ## Tracing logic
 
 ### Tracing systems
 
-In the initial state, is is assumed that the problem consists of `objects <: AbstractObject` (in a system) and a `beam <: AbstractBeam` with a defined starting position and direction. No additional information is provided, and the specific path of the beam is not known beforehand. Consequently, brute force tracing of the optical system is required, involving testing against each individual element to determine the trajectory of the beam.
+In the initial state, it is assumed that the problem consists of `objects <: AbstractObject` (in a system) and a `beam <: AbstractBeam` with a defined starting position and direction. No additional information is provided, and the specific path of the beam is not known beforehand. Consequently, brute force tracing of the optical system is required, involving testing against each individual element to determine the trajectory of the beam.
 
-A call of [`solve_system!`](@ref) traces the beam tree breadth-first: it traces one beam after another and queues the children that the components attach, up to `depth_max` branching levels (green: implemented by a component author, purple: dispatch).
+A call of [`solve_system!`](@ref) traces the beam tree breadth-first: it traces one beam after another and queues the children that the components attach, up to the keyword `depth_max` of [`solve_system!`](@ref) branching levels.
 
 ```mermaid
 flowchart TB
-    S(["<b>solve_system!</b><br/>system + beam"])
-    INI["<b>initialize!(system)</b><br/>initialize!(object) of each object,<br/>if initialize = true"]
-    BS["<b>with_bounding_spheres</b><br/>spheres of all objects,<br/>once per solve"]
+    S(["<b>solve_system!</b>"])
+    INI["<b>initialize!(system)</b><br/>initialize! each contained object"]
+    BS["<b>with_bounding_spheres</b><br/>precalculate spheres of all objects,<br/>unless a beam group did"]
     Q["<b>popfirst!(queue)</b><br/>next (beam, depth),<br/>the root at depth 1"]
     EM["<b>empty!(current)</b><br/>back to its first ray"]
     TS{"<b>trace_system!</b><br/>(system, current)"}
@@ -272,6 +269,7 @@ flowchart TB
     ENQ["<b>push!(queue, ...)</b><br/>children(current) at depth + 1,<br/>attached via children! or relaunch!"]
     DROP["<b>_drop_beams!(current)</b><br/>children are discarded"]
     QE{"queue empty?"}
+    BQ(["back to<br/><b>popfirst!(queue)</b>"])
     E([done])
 
     S -. "initialize = true" .-> INI
@@ -281,7 +279,7 @@ flowchart TB
     TS -- "method per beam type" --> D
     D -- yes --> ENQ --> QE
     D -- no --> DROP --> QE
-    QE -- no --> Q
+    QE -- no --> BQ
     QE -- yes --> E
 
     classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
@@ -291,7 +289,7 @@ flowchart TB
     class BS,Q,EM,ENQ,DROP blue
     class INI green
     class TS purple
-    class S,E terminal
+    class S,E,BQ terminal
 ```
 
 ```@docs; canonical=false
@@ -302,25 +300,26 @@ For a [`Beam`](@ref), `trace_system!` runs the loop below until the beam has `r_
 
 ```mermaid
 flowchart TB
-    S(["<b>trace_system!</b><br/>system + beam::Beam"])
-    RM{"length(rays(beam))<br/>#lt; r_max?"}
-    TST{"<b>tracing_step!</b><br/>(system, last ray, hint)"}
+    S(["<b>trace_system!</b><br/>with a ::Beam"])
+    RM{"<b>length(rays) #lt; r_max?</b><br>Safeguard resonant conditions"}
+    TST{"<b>tracing_step!</b>"}
     TO["<b>trace_one</b><br/>hinted object first,<br/>then all others"]
-    TA["<b>trace_all</b><br/>intersect3d of all top-level<br/>objects and groups"]
-    HIT{"intersection(ray)<br/>is nothing?"}
-    IA["<b>interact3d</b><br/>(system, object, beam, ray)"]
-    NI{"interaction<br/>is nothing?"}
-    P["<b>push!(beam, interaction)</b><br/>next ray, hint(interaction)"]
-    E([return])
+    TA["<b>trace_all</b><br/>intersect3d of all top-level<br/>objects (and groups of a System)"]
+    HIT{"No intersection determined?"}
+    IA["<b>interact3d</b><br/>Calculate optical interaction"]
+    NI{"<b>No interaction?</b><br/>E.g. beam blocked"}
+    P["<b>push!(beam, interaction)</b><br/>Add ray to beam, repeat"]
+    E([End loop])
+    BR(["back to<br/><b>length(rays) #lt; r_max?</b>"])
 
     S --> RM
     RM -- yes --> TST
-    TST -- "::Hint" --> TO
-    TST -- "::Nothing" --> TA
+    TST -- " with ::Hint" --> TO
+    TST -- "without ::Hint" --> TA
     TO --> HIT
     TA --> HIT
     HIT -- no --> IA --> NI
-    NI -- no --> P --> RM
+    NI -- no --> P --> BR
     RM -- no --> E
     HIT -- yes --> E
     NI -- yes --> E
@@ -332,7 +331,7 @@ flowchart TB
     class TO,TA,P blue
     class IA green
     class TST purple
-    class S,E terminal
+    class S,E,BR terminal
 ```
 
 This non-sequential mode is comparatively safe in determining the "true" beam path, but will scale suboptimally in time-complexity with the amount of optical elements.
@@ -342,9 +341,9 @@ This non-sequential mode is comparatively safe in determining the "true" beam pa
 
 ## CPU and GPU support
 
-Parallizing the execution of a [`solve_system!`](@ref) call on the CPU is straight-forward for systems that do not feature objects which can be mutated during runtime, e.g. detectors like the [`Detector`](@ref). For each beam or ray the solution is independent and the solver can run on multiple threads. Special consideration needs to be taken when implementing mutable elements as mentioned above, since multiple threads might be able to access the underlying memory, leading to race conditions. Specifically, this means ensuring e.g. atomic write and read access.
+Parallelizing the execution of a [`solve_system!`](@ref) call on the CPU is straight-forward, since the solution is independent for each beam or ray and the solver can run on multiple threads: the beams of a beam group are solved in parallel, see below. Objects that are mutated during a solve, e.g. detectors like the [`Detector`](@ref), need special consideration when implementing them, since multiple threads might be able to access the underlying memory, leading to race conditions. Specifically, this means ensuring e.g. atomic write and read access. The [`Detector`](@ref) takes a lock for its hits and, within a beam group solve, collects them in a buffer per chunk of beams.
 
-With respect to GPU acceleration, this is not the case. Currently, all available implementations of [`solve_system!`](@ref) are highly branching algorithms which can not be implemented in a parallized way easily. This will most likley require a specific new subtype of the [`BeamletOptics.AbstractSystem`](@ref) with determinable sequential properties. This is not a development goal as of the writing of this section.
+With respect to GPU acceleration, this is not the case. Currently, all available implementations of [`solve_system!`](@ref) are highly branching algorithms which can not be implemented in a parallelized way easily. This will most likely require a specific new subtype of the [`BeamletOptics.AbstractSystem`](@ref) with determinable sequential properties. This is not a development goal as of the writing of this section.
 
 The beams of a group are solved in chunks, and all beams of a group share one table of bounding spheres. It belongs to a task, so each task of the threads sets it for its beams. Each chunk collects its detector hits and stores them at its end. A free task takes the next chunk, because the beams of a group differ in cost (e.g. the inner rings of a source pass a lens, the outer ones miss it), and those of similar cost lie next to each other. Four chunks per thread balance most of the load. Each further chunk costs a channel access and a flush, which shows if all beams cost the same.
 

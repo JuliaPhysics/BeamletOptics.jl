@@ -8,7 +8,7 @@ ct = 5.9e-3 # center thickness
 cylindrical_lens = Lens(
     CylindricalSurface(r, d, h),
     ct,
-    n -> 1.517
+    ConstantRefractiveIndex(1.517)
 )
 
 fig_cylindrical = Figure(size=(600, 450))
@@ -34,7 +34,7 @@ acylindrical_lens = Lens(
         [0, 1.1926075e-5*(1e3)^3, -2.9323497e-9*(1e3)^5, -1.8718889e-11*(1e3)^7, -1.7009961e-14*(1e3)^9, 3.5481542e-17*(1e3)^11, 6.5241296e-20*(1e3)^13]
     ),
     7.5e-3,
-    n -> 1.777
+    ConstantRefractiveIndex(1.777)
 )
 
 fig_acylindrical = Figure(size=(600, 450))

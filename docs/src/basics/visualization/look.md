@@ -1,14 +1,18 @@
 # Look
 
 Rendered objects get a material per component class and visible cemented interfaces of doublet
-and triplet lenses. Two looks are available, which are selected via [`set_render_look`](@ref):
+and triplet lenses. Two looks are available, which are selected via `set_render_look`:
 
-- `:modern` (default): a restrained palette of clear, slightly tinted glass with highlights,
-  metallic mirrors and neutral mechanics; the coatings of beamsplitters and the films of
-  polarizers are saturated, such that the coated side of a plate is seen at a glance. Only the
-  glass (`:refractive`, `:coating` and `:interface`) gets faint silhouettes, i.e. its feature
-  edges at 50 % of the opacity of the `:cad` look, such that lenses stay readable in front of a
-  housing
+```@docs; canonical=false
+BeamletOptics.set_render_look(::Any)
+```
+
+The looks in detail:
+
+- `:modern` (default): clear, slightly tinted glass with highlights, metallic mirrors and neutral
+  mechanics; saturated coatings and polarizer films. Only the glass (`:refractive`, `:coating` and
+  `:interface`) gets faint silhouettes, i.e. its feature edges at 50 % of the opacity of the
+  `:cad` look
 - `:cad`: saturated materials with thin dark lines along the feature edges, like a CAD program
 
 ```julia
@@ -55,10 +59,11 @@ render!(ax, mount; material = :mechanics, edges = false)
 
 ## Lighting
 
-The lighting of the scene is set via [`studio_lighting!`](@ref): an ambient light plus a key
-light from the upper right front, a fill light from the left and a rim light from behind, all
-relative to the camera. Backends with a single directional light (e.g. CairoMakie) get the
-ambient and the key light only.
+The lighting of the scene is set via `studio_lighting!`:
+
+```@docs; canonical=false
+BeamletOptics.studio_lighting!(::Any)
+```
 
 ```julia
 fig = Figure()
@@ -67,5 +72,4 @@ studio_lighting!(ax)
 render!(ax, system)
 ```
 
-It works for an `LScene` and an `Axis3`. `studio_lighting!(ax; preset = :none)` keeps the
-default lights of Makie.
+It works for an `LScene` and an `Axis3`.

@@ -145,7 +145,7 @@ BMO.sdf(c::CountingSDF, point) = (c.count += 1; BMO.sdf(c.shape, point))
         i = BMO.intersect3d(ring, Ray([-10mm, 0, 0], [1.0, 0, 0]))
         @test i.t ≈ 20mm atol = 1e-9
         # a lens is a union of parts: the faces between the parts within the lens are no exit
-        lens = BMO.shape(SphericalLens(50mm, -50mm, 5mm, 25.4mm, λ -> 1.5))
+        lens = BMO.shape(SphericalLens(50mm, -50mm, 5mm, 25.4mm, ConstantRefractiveIndex(1.5)))
         front = BMO.intersect3d(lens, Ray([2mm, -50mm, 1mm], [0.0, 1, 0]))
         p = Point3(2mm, -50mm, 1mm) + front.t * Point3(0.0, 1, 0)
         d = normalize(Point3(0.1, 1, 0.05))

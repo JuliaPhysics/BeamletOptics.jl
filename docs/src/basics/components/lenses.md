@@ -50,7 +50,8 @@ A [`Lens`](@ref) can be then constructed with the following function call:
 
 
 ```@docs; canonical=false
-Lens(::BeamletOptics.AbstractRotationallySymmetricSurface, ::BeamletOptics.AbstractRotationallySymmetricSurface, ::Real, ::BeamletOptics.RefractiveIndex)
+Lens(::BeamletOptics.AbstractRotationallySymmetricSurface, ::BeamletOptics.AbstractRotationallySymmetricSurface, ::Real, ::BeamletOptics.AbstractRefractiveIndex)
+Lens(::BeamletOptics.AbstractRotationallySymmetricSurface, ::Real, ::BeamletOptics.AbstractRefractiveIndex)
 ```
 
 ### Lens constructor example
@@ -77,6 +78,8 @@ LB1811 = Lens(
 ```
 
 ![Lens constructor](lens_constructor.png)
+
+The refractive index `n` is a [`BeamletOptics.AbstractRefractiveIndex`](@ref). For a material without dispersion pass a [`ConstantRefractiveIndex`](@ref), e.g. `ConstantRefractiveIndex(1.5)`; use a [`DiscreteRefractiveIndex`](@ref) or a [`SellmeierEquation`](@ref) whenever the result depends on the wavelength.
 
 ### SDF-based spherical lenses
 
@@ -113,6 +116,12 @@ The spherical lenses are shown below. To recreate this figure, refer to the [Sph
 
 ![Spherical lens showcase](spherical_lens_showcase.png)
 
+A [`ThinLens`](@ref) is a bi-convex lens whose two spherical caps sit flush, without a cylindrical section between them. It is created directly or by [`SphericalLens`](@ref) with a thickness of `l = 0`. Note that its actual thickness is not zero.
+
+```@docs; canonical=false
+ThinLens
+```
+
 ## Aspherical lenses
 
 Aspherical lenses offer more advanced control over aberrations, enabling higher performance in specialized optical systems. The package offers surface support for rotationally symetrical [aspheric lenses](https://en.wikipedia.org/wiki/Aspheric_lens) that adhere to the DIN ISO 10110 convention with even terms.
@@ -145,7 +154,7 @@ L3 = Lens(
         1.5264e-5*(1e3)^15]     # coeffs
     ),
     0.7e-3,                     # center_thickness
-    n -> 1.580200               # refractive index
+    ConstantRefractiveIndex(1.580200) # refractive index
 )
 ```
 
@@ -159,7 +168,7 @@ L3 = Lens(
 Cylindrical lenses are non-rotationally symmetric lenses where a spherical or aspherical curvature is present only in one dimension, i.e. leading to a cylindrical shape.
 Thus, they focus or collimate light only in one dimension. This package currently supports convex/concave cylindrical and acylindrical lenses with an even aspheric deviation from the cylindrical shape.
 
-A plano-convex cylindrical lens can be constructed in the following way. Note that for this lens type a plano-surface can be constructed by passing a [`RectangularFlatSurface`](@ref) to the lens constructor:
+A plano-convex cylindrical lens can be constructed in the following way. The form with one surface, the thickness and the refractive index adds the flat back surface itself, a [`RectangularFlatSurface`](@ref) with the diameter of the front surface. Alternatively, pass a `RectangularFlatSurface` explicitly as the other surface of the two-surface constructor:
 
 ```julia
 r = 5.2e-3  # radius
@@ -169,7 +178,7 @@ ct = 5.9e-3 # center thickness
 lens = Lens(
     CylindricalSurface(r, d, h),
     ct,
-    n -> 1.517
+    ConstantRefractiveIndex(1.517)
 )
 ```
 
@@ -192,7 +201,7 @@ lens = Lens(
             [0, 1.1926075e-5*(1e3)^3, -2.9323497e-9*(1e3)^5, -1.8718889e-11*(1e3)^7, -1.7009961e-14*(1e3)^9, 3.5481542e-17*(1e3)^11, 6.5241296e-20*(1e3)^13]
         ),        
         7.5e-3,
-        n -> 1.777
+        ConstantRefractiveIndex(1.777)
     )
 ```
 
@@ -216,7 +225,7 @@ The following image shows the [AC254-150-AB](https://www.thorlabs.com/thorproduc
 Doublet lenses with aspherical surfaces, or with a different clear aperture per surface, are specified via the surface types introduced in the [Surface based lens construction](@ref) section.
 
 ```@docs; canonical=false
-DoubletLens(::BeamletOptics.AbstractRotationallySymmetricSurface, ::BeamletOptics.AbstractRotationallySymmetricSurface, ::BeamletOptics.AbstractRotationallySymmetricSurface, ::Real, ::Real, ::BeamletOptics.RefractiveIndex, ::BeamletOptics.RefractiveIndex)
+DoubletLens(::BeamletOptics.AbstractRotationallySymmetricSurface, ::BeamletOptics.AbstractRotationallySymmetricSurface, ::BeamletOptics.AbstractRotationallySymmetricSurface, ::Real, ::Real, ::BeamletOptics.AbstractRefractiveIndex, ::BeamletOptics.AbstractRefractiveIndex)
 ```
 
 ## Triplet lenses
@@ -226,5 +235,6 @@ common surfaces. As for the doublet, a triplet lens is constructed from surface 
 
 ```@docs; canonical=false
 TripletLens
+TripletLens(::BeamletOptics.AbstractRotationallySymmetricSurface, ::BeamletOptics.AbstractRotationallySymmetricSurface, ::BeamletOptics.AbstractRotationallySymmetricSurface, ::BeamletOptics.AbstractRotationallySymmetricSurface, ::Real, ::Real, ::Real, ::BeamletOptics.AbstractRefractiveIndex, ::BeamletOptics.AbstractRefractiveIndex, ::BeamletOptics.AbstractRefractiveIndex)
 SphericalTripletLens(::Any, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any, ::Any)
 ```

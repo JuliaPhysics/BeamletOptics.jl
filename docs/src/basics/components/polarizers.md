@@ -1,6 +1,6 @@
 # Polarizers
 
-Polarizers in the context of this package are optical elements that select or modify the R³ polarization vector of a [`PolarizedRay`](@ref), e.g. filters or λ/2 waveplates. This is mainly done by two approaches:
+Polarizers in the context of this package are optical elements that select or modify the R³ polarization vector of a [`PolarizedRay`](@ref), e.g. filters. This is mainly done by two approaches:
 
 1. 3D polarization ray-tracing calculus
 2. 3D modified Jones matrix calculus
@@ -40,6 +40,8 @@ in order to calculate ``\vec{E}_1 = P \cdot \vec{E}_0`` for normal incidence. Ad
 ## Polarisation filter
 
 A polarisation filter or linear polarizer is the simplest practical polarizer and is commonly used to select a desired polarization state. This package provides the [`PolarizationFilter`](@ref) as an idealized implementation for a zero-thickness filter.
+
+The keyword `cutoff_strength` (default `eps()`) is a threshold on the norm of the polarization vector behind the filter: if the norm is at most `cutoff_strength`, the ray is blocked and its beam ends at the filter. A ray that is not a [`PolarizedRay`](@ref), e.g. an unpolarized [`Ray`](@ref), passes the filter unchanged.
 
 ```@docs; canonical=false
 PolarizationFilter(::Real)

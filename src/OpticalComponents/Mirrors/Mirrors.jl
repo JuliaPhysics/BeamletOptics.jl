@@ -1,7 +1,7 @@
 """
     AbstractReflectiveOptic <: AbstractObject
 
-A generic type to represent an [`AbstractObject`] which reflects incoming rays.
+A generic type to represent an [`AbstractObject`](@ref) which reflects incoming rays.
 
 # Implementation reqs.
 

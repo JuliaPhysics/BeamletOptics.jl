@@ -24,18 +24,23 @@ This model acts as a quasi-coating, representing a very thin (zero-thickness) la
 - [`RoundThinBeamsplitter`](@ref)
 
 !!! info "Beamsplitter phase jump"
-    If you want to learn more about how beam splitting is modeled, especially in the context of interferometer simulations, refer to the [`ThinBeamsplitter`](@ref) type docs and the specific [`BeamletOptics.interact3d`](@ref) documentation.
+    If you want to learn more about how beam splitting is modeled, especially in the context of interferometer simulations, refer to the [`ThinBeamsplitter`](@ref) type docs and the `interact3d` methods below, which apply the phase jump.
+
+```@docs; canonical=false
+BeamletOptics.interact3d(::BeamletOptics.AbstractSystem, ::ThinBeamsplitter, ::GaussianBeamlet, ::Int)
+BeamletOptics.interact3d(::BeamletOptics.AbstractSystem, ::ThinBeamsplitter, ::AstigmaticGaussianBeamlet, ::Int)
+```
 
 ## Plate beamsplitters
 
-Plate beamsplitters provide a more sophisticated model by incorporating a substrate with finite thickness and [`BeamletOptics.RefractiveIndex`](@ref). The splitter coating is modeled via a [`ThinBeamsplitter`](@ref) placed flush onto a single face of the substrate. This allows for more realistic simulation of refractive effects such as e.g. beam path displacement and optical path differences caused by the substrate's geometry. Below two concrete implementations are showcased.
+Plate beamsplitters provide a more sophisticated model by incorporating a substrate with finite thickness and [`BeamletOptics.AbstractRefractiveIndex`](@ref). The splitter coating is modeled via a [`ThinBeamsplitter`](@ref) placed flush onto a single face of the substrate. This allows for more realistic simulation of refractive effects such as e.g. beam path displacement and optical path differences caused by the substrate's geometry. Below two concrete implementations are showcased.
 
 ### Rectangular plate beamsplitter
 
 The [`RectangularPlateBeamsplitter`](@ref) represents a planar, rectangular substrate with a partially reflective coating. 
 
 ```@docs; canonical=false
-RectangularPlateBeamsplitter(::Real, ::Real, ::Real, ::BeamletOptics.RefractiveIndex)
+RectangularPlateBeamsplitter(::Real, ::Real, ::Real, ::BeamletOptics.AbstractRefractiveIndex)
 ```
 
 A common application involves that this type of beamsplitter is paired with a compensator plate. Below an exemplary illustration of such a setup is shown, where the beamsplitter reflects part of the incoming beam perpendiculary. A [`RectangularCompensatorPlate`](@ref) ensures that the parallel path offset is corrected.
@@ -49,7 +54,7 @@ The depicted system consist of a rectangular beamsplitter (e.g. [BSW26R](https:/
 This variant uses a circular substrate. While components of this type often feature a wedge angle to avoid "ghost beams" in practice, e.g. the [BSW26](https://www.thorlabs.com/thorproduct.cfm?partnumber=BSW26), this is not modeled here.
 
 ```@docs; canonical=false
-RoundPlateBeamsplitter(::Real, ::Real, ::BeamletOptics.RefractiveIndex)
+RoundPlateBeamsplitter(::Real, ::Real, ::BeamletOptics.AbstractRefractiveIndex)
 ```
 
 ## Cube beamsplitter
@@ -57,7 +62,7 @@ RoundPlateBeamsplitter(::Real, ::Real, ::BeamletOptics.RefractiveIndex)
 The [`CubeBeamsplitter`](@ref) is composed of two [`RightAnglePrism`](@ref)s with a partially reflective interface at their internal joint. The splitting interface is represented by a [`ThinBeamsplitter`](@ref). As with other beamsplitters in this package, the cube beamsplitter uses scalar reflection and transmission coefficients.
 
 ```@docs; canonical=false
-CubeBeamsplitter(::Real, ::BeamletOptics.RefractiveIndex)
+CubeBeamsplitter(::Real, ::BeamletOptics.AbstractRefractiveIndex)
 ```
 
 A classic application of cube beamsplitters is in Mach–Zehnder interferometers, where two beamsplitters combine with additional mirrors to form two optical paths that later recombine. The figure below shows a rudimentary Mach–Zehnder arrangement using two cube beamsplitters and two [`RightAnglePrismMirror`](@ref)s:

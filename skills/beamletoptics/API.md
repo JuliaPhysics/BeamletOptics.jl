@@ -7,7 +7,7 @@ using BeamletOptics
 const mm = 1e-3
 
 # 1. build components (at the origin, aligned with +y)
-lens = SphericalLens(50mm, -50mm, 5mm, 25.4mm, λ -> 1.5)
+lens = SphericalLens(50mm, -50mm, 5mm, 25.4mm, ConstantRefractiveIndex(1.5))
 det  = Detector(20mm)
 
 # 2. place them (relative moves, radians)
@@ -36,7 +36,7 @@ Use `scripts/api_lookup.jl NAME` to print the docstring and signatures of any na
 | Rays & beams  | `Ray`, `PolarizedRay`, `Beam`, `GaussianBeamlet`, `AstigmaticGaussianBeamlet`, `rays`, `point_on_beam`, `path_segments`, `rayleigh_range`, `normal3d` |
 | Sources       | `CollimatedSource`, `UniformDiscSource`, `PointSource`, `UniformPointSource`, `UniformLineSource`, `UniformFanSource`, `num_rays!`, `CollimatedGaussianBeamletSource`, `SphericalGaussianBeamletSource`, `EllipticalGaussianBeamletSource`, `GaussianBeamletDecomposition`, `WavefrontBeamletDecomposition`, `GaussianModeDecomposition`, `AstigmaticBeamGroup` |
 | System        | `System`, `StaticSystem`, `solve_system!`, `initialize!`, `ObjectGroup` |
-| Materials     | `DiscreteRefractiveIndex`, `SellmeierEquation` |
+| Materials     | `DiscreteRefractiveIndex`, `SellmeierEquation`, `ConstantRefractiveIndex` |
 | Lenses        | `Lens`, `ThinLens`, `SphericalLens`, `DoubletLens`, `SphericalDoubletLens`, `TripletLens`, `SphericalTripletLens`, `thickness` |
 | Surfaces      | `SphericalSurface`, `CircularFlatSurface`, `RectangularFlatSurface`, `EvenAsphericalSurface`, `CylindricalSurface`, `AcylindricalSurface` |
 | Mirrors       | `Mirror`, `RoundPlanoMirror`, `SquarePlanoMirror`, `SquarePlanoMirror2D`, `RectangularPlanoMirror`, `RightAnglePrismMirror`, `SphericalMirror`, `ConicMirror`, `OffAxisConicMirror`, `ParabolicMirror`, `OffAxisParabolicMirror`, `EllipsoidalMirror`, `OffAxisEllipsoidalMirror`, `HyperbolicMirror`, `OffAxisHyperbolicMirror`, `Retroreflector` |
@@ -52,7 +52,8 @@ Use `scripts/api_lookup.jl NAME` to print the docstring and signatures of any na
 Useful non-exported helpers: `BeamletOptics.inch`, `lensmakers_eq(R1, R2, n)` (returns f),
 `divergence_angle(λ, w0, M2)`, `numerical_aperture(θ, n=1)` (also of a `PointSource` or a cone
 sampling, public), `optical_path_length(beam)`,
-`isparaxial(system, beam, θ=π/4)`, `fresnel_coefficients`, `beams(group)`, `objects(system)`,
+`isparaxial(system, beam, θ=π/4)`, `fresnel_coefficients`, `beams(group)`,
+`objects(system)` and `objects(group)` (public),
 `list_subtypes(T)`, constants `Z_vacuum`, `c_vacuum`.
 
 ## Properties of objects

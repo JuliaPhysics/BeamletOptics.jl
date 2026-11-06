@@ -44,7 +44,7 @@ features:
     linkText: Learn more
   - icon: "📊"
     title: Visualization + GUI
-    details: Move components in an interactive live view with BeamletOpticsGUI, render setups and beams in 2D and 3D with CairoMakie or GLMakie.
+    details: Move components in an interactive live view with BeamletOpticsGUI, render setups and beams in 3D with CairoMakie or GLMakie.
     link: /basics/visualization/overview
     linkText: Learn more
   - icon: "🧩"
@@ -82,8 +82,9 @@ using GLMakie, BeamletOptics
 const mm = 1e-3
 
 # Keplerian beam expander: f₁ = 15 mm, f₂ = 45 mm → 3× magnification
-lens1 = ThinLens(15mm, 15mm, 12mm, 1.5)      # biconvex, f = R for n = 1.5
-lens2 = ThinLens(45mm, 45mm, 25mm, 1.5)
+glass = ConstantRefractiveIndex(1.5)
+lens1 = ThinLens(15mm, 15mm, 12mm, glass)      # biconvex, f = R for n = 1.5
+lens2 = ThinLens(45mm, 45mm, 25mm, glass)
 translate3d!(lens1, [0, 20mm, 0])
 translate3d!(lens2, [0, 80mm, 0])              # spacing f₁ + f₂
 system = System([lens1, lens2])

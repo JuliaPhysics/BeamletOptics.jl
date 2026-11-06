@@ -24,8 +24,8 @@ The cemented interfaces of doublet and triplet lenses are rendered as thin amber
 
 - `show_bounding_sphere = false`: also draws the bounding sphere of the shape of the object as a
   magenta wireframe, for an object of several parts one sphere per part and the main sphere around
-  all parts in orange, which the solver tests first. A shape without a bounding sphere (e.g. a mesh)
-  gets none. With [`live_render!`](@ref) the spheres follow the object. To draw a single sphere in
+  all parts in orange, which the solver tests first. An object without a bounding sphere (e.g. a
+  `NonInteractableObject`) gets none. With [`live_render!`](@ref) the spheres follow the object. To draw a single sphere in
   another color or line width, call `render!(ax, sphere)` (see [`render!`](@ref) of an
   `AbstractBoundingSphere`) with a sphere of [`BeamletOptics.bounding_sphere_of`](@ref)
 

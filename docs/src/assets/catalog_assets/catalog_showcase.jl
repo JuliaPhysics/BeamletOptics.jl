@@ -11,8 +11,8 @@ const mm = 1e-3
 const inch = BMO.inch
 
 # refractive indices, the exact values do not matter for a catalog tile
-const n_crown = λ -> 1.5168
-const n_flint = λ -> 1.7
+const n_crown = ConstantRefractiveIndex(1.5168)
+const n_flint = ConstantRefractiveIndex(1.7)
 
 "Two cemented spherical lenses (AC254-100-like), assembled via the `DoubletLens` type directly."
 function manual_doublet()
@@ -60,7 +60,7 @@ const TILES = [
     # lenses
     "Lens" => object_tile(() -> Lens(SphericalSurface(25.8mm, inch), CircularFlatSurface(inch), 5.3mm, n_crown)),
     "SphericalLens" => object_tile(() -> SphericalLens(34.9mm, -34.9mm, 6.8mm, inch, n_crown)),
-    "ThinLens" => object_tile(() -> ThinLens(34.9mm, -34.9mm, inch, 1.5)),
+    "ThinLens" => object_tile(() -> ThinLens(34.9mm, -34.9mm, inch, ConstantRefractiveIndex(1.5))),
     "DoubletLens" => object_tile(manual_doublet),
     "SphericalDoubletLens" => object_tile(() -> SphericalDoubletLens(87.9mm, -105.6mm, -1000, 6mm, 3mm, inch, n_crown, n_flint)),
     "TripletLens" => object_tile(manual_triplet),

@@ -147,7 +147,7 @@ Base.delete!(h::_Combined, oh::BMO.AbstractObjectRenderHandle) = (filter!(c -> c
     end
 
     @testset "MultiShape (CubeBeamsplitter): rigid update + non-rigid fallback" begin
-        cbs = CubeBeamsplitter(0.02, λ -> 1.5)
+        cbs = CubeBeamsplitter(0.02, ConstantRefractiveIndex(1.5))
         h = live_render!(ax, cbs)
         n = length(h.plots)
         @test count(p -> p isa Makie.Mesh, h.plots) == 2 # merged front and back, coating
@@ -337,7 +337,7 @@ Base.delete!(h::_Combined, oh::BMO.AbstractObjectRenderHandle) = (filter!(c -> c
     end
 
     @testset "pick_object after a fallback rerender" begin
-        cbs = CubeBeamsplitter(0.02, λ -> 1.5)
+        cbs = CubeBeamsplitter(0.02, ConstantRefractiveIndex(1.5))
         h = live_render!(ax, System([cbs]))
         old_plots = copy(h.handles[1].plots)
         translate3d!(cbs.front, [0.0, 0.0, 0.01])

@@ -9,12 +9,17 @@ Subtypes of `AbstractSystem` must implement the following:
 
 ## Fields:
 
-- `objects`: a vector or tuple of [`AbstractObject`](@ref)s that make up the system
-- `n`: (optional) [`RefractiveIndex`](@ref) of the surrounding medium, default value is 1.0
+- `objects`: a vector or tuple of [`AbstractObject`](@ref)s and object groups ([`AbstractObjectGroup`](@ref)) that make up the system.
+  The solver does not read this field itself but calls the function `objects`, see below
 
 ## Functions:
 
-- `refractive_index`: returns the [`RefractiveIndex`](@ref) `n` of the system medium, see above
+- `objects(system)`: returns the objects of the system with object groups flattened into their objects. There is no fallback
+- `refractive_index(system, λ::Real)` (optional): returns the refractive index of the surrounding medium at the wavelength `λ`.
+  The default is `1.0`; a system does not store a refractive index
+
+The solver tests a ray against the top-level objects and groups of the system. For a custom system these are the result of `objects(system)`.
+The built-in [`System`](@ref) tests its groups as a whole, a [`StaticSystem`](@ref) flattens them when it is built.
 """
 abstract type AbstractSystem end
 
@@ -63,8 +68,12 @@ in the [`AbstractSystem`](@ref) will be hit next.
 
 # Fields
 
-- `object`: the object that might or will be intersected next
+- `object`: the object that might or will be intersected next. The solver calls `interact3d` for this object, hence for a part of a
+  [`MultiShape`](@ref) object it is the composite itself, not the part
 - `shape`: the underlying shape that will be intersected next, i.e. `shape(object)`, relevant for multi-shape objects
+
+`Hint(object)` uses `shape(object)`, which is a tuple for a [`MultiShape`](@ref) object and fails. Pass the hit part explicitly there,
+`Hint(object, part)`, with the composite as `object` and the shape that will be hit as `part`.
 """
 struct Hint
     object::AbstractObject
@@ -89,7 +98,7 @@ Subtypes of `AbstractInteraction` must implement the following:
 
 ## Fields
 
-- `hint`: a nullable [`Hint`](@ref) for the solver (optional but recommended)
+- `hint`: a nullable [`Hint`](@ref) for the solver. The field is required, since the solver reads it for every interaction, but it may be `nothing`
 
 ## Beam data
 

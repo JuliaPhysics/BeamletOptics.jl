@@ -577,7 +577,7 @@ end
     source() = BMO.AstigmaticGaussianBeamlet([0.0, ys, 0], [0.0, 1, 0], λ, w0; P0,
         support = [1.0, 0, 0])
     beam, det = source(), detector_at(0.1)
-    BMO.solve_system!(BMO.System([BMO.SphericalLens(Inf, Inf, t, BMO.inch, λ -> n_glass), det]),
+    BMO.solve_system!(BMO.System([BMO.SphericalLens(Inf, Inf, t, BMO.inch, ConstantRefractiveIndex(n_glass)), det]),
         beam)
     @test length(BMO.rays(beam.c)) == 3
     kw = (size = (64, 64), spacing = (w0 / 8, w0 / 8))

@@ -166,7 +166,7 @@ const mm = 1e-3
 
         # Numerical result
         tl = BMO.ThinLensSDF(R1, R2, 0.025)
-        lens = Lens(tl, x -> nl)
+        lens = Lens(tl, ConstantRefractiveIndex(nl))
         system = System(lens)
         translate3d!(lens, [0, lens_y_location, 0])
         # Create and solve beam, calculate beam parameters
@@ -210,7 +210,7 @@ end
     λ = 1e-6
     n = 1.5
     # glass from y = 50.0 mm to about 50.5 mm
-    lens = ThinLens(50mm, 50mm, 10mm, n)
+    lens = ThinLens(50mm, 50mm, 10mm, ConstantRefractiveIndex(n))
     translate3d!(lens, [0, 50mm, 0])
     system = System([lens])
     Δφ(a, b) = rad2deg(angle(a / b))
@@ -247,7 +247,7 @@ end
     w0 = 1mm
     R = 50mm
     k = 2π / λ
-    lens(y) = (l = ThinLens(R, R, 10mm, n); translate3d!(l, [0, y, 0]); l)   # f = 50 mm
+    lens(y) = (l = ThinLens(R, R, 10mm, ConstantRefractiveIndex(n)); translate3d!(l, [0, y, 0]); l)   # f = 50 mm
     gb() = GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], λ, w0; support = [1.0, 0, 0])
     # ABCD law for the traced thick lenses: Gouy phase [deg] at the distance z along the beam,
     # -arg(A + B/q) with q = -i z_R at the waist. The segments alternate between air and glass.
@@ -359,7 +359,7 @@ end
 end
 
 @testset "GaussianSegment matches gauss_parameters" begin
-    lens(y) = (l = ThinLens(50mm, 50mm, 10mm, 1.5); translate3d!(l, [0, y, 0]); l)
+    lens(y) = (l = ThinLens(50mm, 50mm, 10mm, ConstantRefractiveIndex(1.5)); translate3d!(l, [0, y, 0]); l)
     gauss = GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], 1e-6, 1mm; support = [1.0, 0, 0])
     solve_system!(System([lens(50mm), lens(150mm)]), gauss)
     chief_rays = BMO.rays(gauss.chief)

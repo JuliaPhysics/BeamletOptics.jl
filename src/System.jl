@@ -206,11 +206,14 @@ first_of_shape(::Nothing, target) = nothing
 """
     tracing_step!(system::AbstractSystem, ray::AbstractRay{R}, hint::Hint)
 
-Tests if the `ray` intersects an `object` in the optical `system`. Returns the closest intersection.
+Tests if the `ray` intersects an `object` in the optical `system`. Stores the closest intersection, or
+`nothing` if there is none, in the `ray` via `intersection!` and returns `nothing`.
 
 # Hint
 
-An optional [`Hint`](@ref) can be provided to test against a specific object (and shape) in the `system` first.
+An optional [`Hint`](@ref) can be provided to test against a specific shape in the `system` first. The
+intersection of the hinted shape is assigned to the object of the hint, hence the solver calls `interact3d`
+for this object. For a [`MultiShape`](@ref) component the hint names the composite, not the part.
 
 !!! warning
     If a hint is provided and the object intersection is valid, the intersection will be returned immediately.
@@ -233,7 +236,7 @@ end
 """
     trace_system!(system::AbstractSystem, beam::Beam{T}; r_max = get_default_r_max()) where {T <: Real}
 
-Trace a [`Beam`](@ref) through an optical `system`. Maximum number of tracing steps can be capped by `r_max`.
+Trace a [`Beam`](@ref) through an optical `system`. The number of rays of the `beam` can be capped by `r_max`.
 
 # Tracing logic
 
@@ -243,9 +246,9 @@ further objects are hit, the tracing procedure is stopped.
 
 # Arguments
 
-- `system:`: The optical system through which the [`Beam`](@ref) is traced.
+- `system`: The optical system through which the [`Beam`](@ref) is traced.
 - `beam`: The [`Beam`](@ref) object to be traced.
-- `r_max`: Maximum number of tracing iterations.
+- `r_max`: Maximum number of rays of the `beam`, which ends the tracing.
 """
 function trace_system!(
         system::AbstractSystem,
@@ -281,9 +284,9 @@ function trace_system!(
 end
 
 """
-    trace_system!(system::System, gauss::GaussianBeamlet{T}; r_max = get_default_r_max(), check_invariant = true) where {T <: Real}
+    trace_system!(system::AbstractSystem, gauss::GaussianBeamlet{T}; r_max = get_default_r_max(), check_invariant = true) where {T <: Real}
 
-Trace a [`GaussianBeamlet`](@ref) through an optical `system`. Maximum number of tracing steps can be capped by `r_max`.
+Trace a [`GaussianBeamlet`](@ref) through an optical `system`. The number of rays of each component beam can be capped by `r_max`.
 
 # Tracing logic
 
@@ -297,7 +300,7 @@ Tracing also stops with a warning if the Lagrange invariant of a new segment lea
 
 - `system`: The optical system through which the [`GaussianBeamlet`](@ref) is traced.
 - `gauss`: The [`GaussianBeamlet`](@ref) object to be traced.
-- `r_max`: Maximum number of tracing iterations.
+- `r_max`: Maximum number of rays of each component beam, which ends the tracing.
 - `check_invariant`: enables or disables the check of the Lagrange invariant.
 """
 function trace_system!(
@@ -358,7 +361,8 @@ end
 """
     trace_system!(system, agb::AstigmaticGaussianBeamlet; r_max = get_default_r_max(), check_invariant = true, threshold = get_invariant_threshold())
 
-Trace an [`AstigmaticGaussianBeamlet`](@ref) through an optical `system`.
+Trace an [`AstigmaticGaussianBeamlet`](@ref) through an optical `system`. The number of rays of each
+component beam can be capped by `r_max`.
 All 9 component beams (chief + 8 parabasal) are traced in lockstep:
 the chief ray is traced first for each intersection, followed by the auxiliary rays.
 All rays must hit the same shape; otherwise tracing stops.
@@ -436,7 +440,7 @@ The objects of the `system` are not reset by default: a [`Detector`](@ref) keeps
 ## Keyword Arguments
 
 - `initialize = false`: if `true`, [`initialize!`](@ref)`(system)` is called before the `beam` is traced
-- `r_max = get_default_r_max()`: Maximum number of tracing iterations for each leaf.
+- `r_max = get_default_r_max()`: Maximum number of rays of each beam of the tree.
 - `depth_max = get_default_depth_max()`: Maximum number of branching levels explored from the root beam
 - `check_invariant = true`: enables or disables optical invariant checks where applicable
 - `threshold = get_invariant_threshold()`: limit of the complex invariant of an [`AstigmaticGaussianBeamlet`](@ref).
