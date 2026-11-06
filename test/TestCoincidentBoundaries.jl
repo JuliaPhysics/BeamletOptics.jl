@@ -80,6 +80,9 @@ shape_sequence(beam::BMO.AbstractBeam) = [hit_shape(r) for r in rays(beam)]
 on_axis(::GaussianBeamlet) = 0.0
 on_axis(::AstigmaticGaussianBeamlet) = zeros(3)
 
+"""Power flux `n |E|²` of a polarized ray, relative to `|E0|² = 1` in air."""
+flux(ray::BMO.AbstractRay) = refractive_index(ray) * sum(abs2, polarization(ray))
+
 same_sequence(a, b) = length(a) == length(b) && all(x === y for (x, y) in zip(a, b))
 
 # fresh beam from `pos` along `dir`
@@ -221,6 +224,11 @@ function rotation_matrix(axis, θ)
     K = [0 -u[3] u[2]; u[3] 0 -u[1]; -u[2] u[1] 0]
     return I + sin(θ) * K + (1 - cos(θ)) * K^2
 end
+
+"""Fresnel power transmission at normal incidence from the index `n1` into `n2`."""
+normal_transmission(n1, n2) = 4n1 * n2 / (n1 + n2)^2
+"""Fresnel power transmission at normal incidence through the media `ns` in this order."""
+chain_transmission(ns) = prod(normal_transmission(a, b) for (a, b) in zip(ns[1:(end - 1)], ns[2:end]))
 
 #=
 Reference 2: the components under test
@@ -471,6 +479,24 @@ Tests
                 end
             end
         end
+
+        @testset "Touching plates, polarized: Fresnel loss of one glass-glass interface" begin
+            # normal incidence, |E|² = 1 in air: behind the plates the flux is the Fresnel chain of the media
+            # passed, one interface nA -> nB2 when touching (none for equal glass), two glass-air faces with a gap
+            for (gap, nB2) in ((0.0, nB), (0.0, nA), (1e-6, nB))
+                A = RectangularCompensatorPlate(40mm, 40mm, tA, ConstantRefractiveIndex(nA))
+                B = RectangularCompensatorPlate(40mm, 40mm, tB, ConstantRefractiveIndex(nB2))
+                translate3d!(B, [0, tA + gap, 0])
+                beam = Beam([0.0, -10mm, 0], [0.0, 1, 0], λ0, [1.0, 0, 0])
+                solve_system!(System([A, B]), beam)
+                if gap == 0
+                    # Cause: as for exact contact, the touching face pair is passed in air
+                    @test_broken flux(last(rays(beam))) ≈ chain_transmission([1.0, nA, nB2, 1.0]) atol = 1e-12
+                else
+                    @test flux(last(rays(beam))) ≈ chain_transmission([1.0, nA, 1.0, nB2, 1.0]) atol = 1e-12
+                end
+            end
+        end
     end
 
     @testset "3. Beamsplitters: paths, split and leaves" begin
@@ -566,8 +592,7 @@ Tests
                 @test direction(last(rays(tr))) ≈ [0, 1, 0] atol = TOL_DIR
                 @test direction(last(rays(rf))) ≈ [-1, 0, 0] atol = TOL_DIR
                 # Fresnel at normal incidence: T = 4n/(1+n)² per uncoated face, coating splits R : 1 - R
-                Tf = 4n / (1 + n)^2
-                flux(ray) = refractive_index(ray) * sum(abs2, polarization(ray))
+                Tf = normal_transmission(1, n)
                 @test flux(last(rays(tr))) ≈ Tf^2 * (1 - R) atol = 1e-12
                 @test flux(last(rays(rf))) ≈ Tf^2 * R atol = 1e-12
             end
@@ -1102,18 +1127,14 @@ Tests
         end
 
         @testset "PolarizedRay: Fresnel chain through the cemented doublet and triplet" begin
-            T(a, b) = 4a * b / (a + b)^2
             E0 = [0.6, 0, 0.8] # |E|² = 1, transverse to the direction +y
-            flux(ray) = refractive_index(ray) * sum(abs2, polarization(ray))
             for (obj, ns) in ((doublet(1.5, 1.72; y0 = 30mm), (1.5, 1.72)),
                 # same glass: no index step, T = 1 at the cemented surface
                 (doublet(1.6, 1.6; y0 = 30mm), (1.6, 1.6)),
                 (triplet(1.5, 1.74, 1.62; y0 = 30mm), (1.5, 1.74, 1.62)))
                 beam = Beam([0.0, -20mm, 0], [0.0, 1, 0], λ0, E0)
                 solve_system!(System([obj]), beam)
-                chain = [1.0; collect(ns); 1.0]
-                P_ref = prod(T(a, b) for (a, b) in zip(chain[1:(end - 1)], chain[2:end]))
-                @test flux(last(rays(beam))) ≈ P_ref atol = 1e-12
+                @test flux(last(rays(beam))) ≈ chain_transmission([1.0; collect(ns); 1.0]) atol = 1e-12
             end
         end
     end
