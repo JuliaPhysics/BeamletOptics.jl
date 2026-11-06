@@ -12,8 +12,12 @@ Test matrix for touching elements: cemented lenses (DoubletLens, TripletLens), p
 beamsplitters and bodies that merely touch in a System. At a shared boundary two or more surfaces
 coincide, and the solver has to decide which interaction happens (today: per-component `Hint`s).
 
+Convention (maintainers, #176): separate objects that touch are one interface, as if cemented. Light
+passes from the glass of one directly into the glass of the other, without air between them; only a
+real gap is air. The cases of touching bodies below expect this.
+
 Every expectation is derived without BMO: the vector form of Snell's law and the law of reflection
-in `follow`, an exact meridional trace through spherical surfaces (`trace_surfaces`), closed-form
+in `follow`, an exact trace through spherical surfaces (`sphere`, `lens_surfaces`), closed-form
 results (plate offset, Fresnel power transmission, ABCD law of Gaussian beams) and physical
 constructions (equal glass = no interface, reversibility of light paths, covariance under rigid
 motion). `@test_broken` marks a case that the current master gets wrong or cannot run; the comment
