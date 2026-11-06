@@ -19,7 +19,8 @@ export System, StaticSystem, solve_system!, initialize!
 export ObjectGroup
 
 # additional
-export DiscreteRefractiveIndex, SellmeierEquation, ConstantRefractiveIndex
+export DiscreteRefractiveIndex, SellmeierEquation, ConstantRefractiveIndex, AbsorbingRefractiveIndex,
+    extinction_coefficient
 public AbstractRefractiveIndex
 
 #=
@@ -50,6 +51,10 @@ export Detector, electric_field, intensity, spot_diagram, ray_hits, optical_powe
        waist_parameters, Centroid, MinMax, RegularGrid, RectilinearGrid
 
 # splitters
+# coatings
+export CoatingLayer, BeamsplitterCoating, MirrorCoating, AntireflectionCoating, SpectralCoating,
+    ThinFilmCoating, ThinFilmLayer, QuarterWaveLayer, FresnelGhosts
+
 export ThinBeamsplitter, RoundThinBeamsplitter, RectangularPlateBeamsplitter,
        RoundPlateBeamsplitter, CubeBeamsplitter, RectangularCompensatorPlate
 

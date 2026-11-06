@@ -305,12 +305,15 @@ struct DummyRefractiveIndex <: BMO.AbstractRefractiveIndex end
             examples = Dict(
                 ConstantRefractiveIndex => (ConstantRefractiveIndex(1.5), (1, 1f-6, 532e-9)),
                 DiscreteRefractiveIndex => (ref_index, (lambdas[1], T2(lambdas[2]))),
-                SellmeierEquation => (ref_sellm, (1, 1f-6, 532e-9)))
+                SellmeierEquation => (ref_sellm, (1, 1f-6, 532e-9)),
+                AbsorbingRefractiveIndex => (
+                    AbsorbingRefractiveIndex(ref_sellm, ConstantRefractiveIndex(0.1)), (1, 1f-6, 532e-9)))
             models = [getfield(BMO, s) for s in names(BMO; all = true) if isdefined(BMO, s)]
             filter!(x -> x isa Type && x <: BMO.AbstractRefractiveIndex && !isabstracttype(x), models)
             @test Set(models) == Set(keys(examples))
             for (model, λs) in values(examples), λ in λs
                 @test model(λ) isa Real
+                @test extinction_coefficient(model, λ) isa Real
             end
 
             @test_throws ErrorException DummyRefractiveIndex()(532e-9)

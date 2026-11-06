@@ -20,8 +20,8 @@ assigns the same model to a face; the models of this step do not change.
 | Model | Physics | Channels | `splitting_of` |
 |---|---|---|---|
 | `BeamsplitterCoating(R)` (exists) | lossless, fixed `R` | `r`, `t`, π when facing the normal | `AllChannels` |
-| `AntireflectionCoating()` | ideal AR: no reflection | transmitted with `|t| = 1` power-normalized, reflected dark | `Dominant` |
-| `MirrorCoating()` | ideal HR: `R = 1` | reflected with π when facing the normal, transmitted dark | `Dominant` |
+| `AntireflectionCoating()` = `BeamsplitterCoating(0, 1)` | ideal AR: no reflection | transmitted with `|t| = 1` power-normalized, reflected dark | `Dominant` |
+| `MirrorCoating()` = `BeamsplitterCoating(1, 0)` | ideal HR: `R = 1` | reflected with π when facing the normal, transmitted dark | `Dominant` |
 | `SpectralCoating(Rs, Rp)` | `Rs(λ, θ)`, `Rp(λ, θ)` given as functions or tables, lossless or with absorption `A` | s and p separately: `SPBasis(±√Rs, 0, 0, ∓√Rp)`, `SPBasis(√Ts, 0, 0, √Tp)` | `AllChannels` |
 | `ThinFilmCoating(layers)` | coherent layers by the characteristic matrix (Born & Wolf §1.6, Macleod ch. 2), complex `rs, rp, ts, tp` for both incidence sides | Fresnel-like `SPBasis` from the stack | `AllChannels` |
 | `FresnelGhosts()` | the bare boundary, both channels traced (decision 2 of #228) | the channels of the bare boundary, scalar `a` from the unpolarized power | `AllChannels` |

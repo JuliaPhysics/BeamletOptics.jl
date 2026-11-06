@@ -23,4 +23,7 @@ N_BK7(532e-9)                                         # still called with meters
 - Another dispersion formula is a new subtype with a functor:
   `struct Cauchy <: BeamletOptics.AbstractRefractiveIndex; A::Float64; B::Float64 end` and
   `(c::Cauchy)(λ) = c.A + c.B / (λ * 1e6)^2`. It must accept any `Real` λ and return a `Real`.
+- An absorbing material, e.g. the metal layer of a `ThinFilmCoating`, is
+  `AbsorbingRefractiveIndex(n, κ)` with the extinction coefficient κ (a number or an index type of κ(λ));
+  `extinction_coefficient(n, λ)` returns it, 0 for the other types.
 - Materials are used by lenses, prisms, plate/cube beamsplitters, compensator plates and linear polarizers.
