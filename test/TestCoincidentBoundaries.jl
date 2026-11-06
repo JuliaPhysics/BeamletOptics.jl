@@ -190,7 +190,7 @@ const DOUBLET = (r = (50mm, -40mm, -100mm), l = (4mm, 2mm), d = 20mm)
 const TRIPLET = (r = (40mm, -35mm, 60mm, -120mm), l = (3mm, 1.5mm, 2.5mm), d = 20mm)
 
 function doublet(n1, n2; y0 = 0.0, g = DOUBLET)
-    dl = SphericalDoubletLens(g.r..., g.l..., g.d, λ -> n1, λ -> n2)
+    dl = SphericalDoubletLens(g.r..., g.l..., g.d, ConstantRefractiveIndex(n1), ConstantRefractiveIndex(n2))
     translate3d!(dl, [0, y0, 0])
     return dl
 end
@@ -198,7 +198,7 @@ doublet_vertices(y0; g = DOUBLET) = [y0, y0 + g.l[1], y0 + sum(g.l)]
 doublet_surfaces(y0, n1, n2; g = DOUBLET) = (doublet_vertices(y0; g), collect(g.r), [n1, n2, 1.0])
 
 function triplet(n1, n2, n3; y0 = 0.0, g = TRIPLET)
-    tl = SphericalTripletLens(g.r..., g.l..., g.d, λ -> n1, λ -> n2, λ -> n3)
+    tl = SphericalTripletLens(g.r..., g.l..., g.d, ConstantRefractiveIndex(n1), ConstantRefractiveIndex(n2), ConstantRefractiveIndex(n3))
     translate3d!(tl, [0, y0, 0])
     return tl
 end
@@ -218,7 +218,7 @@ Tests
         @testset "Equal glass: a doublet is the equivalent singlet" begin
             n = 1.6
             dl = doublet(n, n; y0)
-            single = SphericalLens(DOUBLET.r[1], DOUBLET.r[3], sum(DOUBLET.l), DOUBLET.d, λ -> n)
+            single = SphericalLens(DOUBLET.r[1], DOUBLET.r[3], sum(DOUBLET.l), DOUBLET.d, ConstantRefractiveIndex(n))
             translate3d!(single, [0, y0, 0])
             for h in HEIGHTS
                 bd = solve([dl], beam_at([h, ystart, 0], [0, 1, 0]))
@@ -237,7 +237,7 @@ Tests
         @testset "Equal glass: a triplet is the equivalent singlet" begin
             n = 1.55
             tl = triplet(n, n, n; y0)
-            single = SphericalLens(TRIPLET.r[1], TRIPLET.r[4], sum(TRIPLET.l), TRIPLET.d, λ -> n)
+            single = SphericalLens(TRIPLET.r[1], TRIPLET.r[4], sum(TRIPLET.l), TRIPLET.d, ConstantRefractiveIndex(n))
             translate3d!(single, [0, y0, 0])
             for h in HEIGHTS
                 bt = solve([tl], beam_at([h, ystart, 0], [0, 1, 0]))
@@ -265,7 +265,7 @@ Tests
         @testset "Tilted plano doublet: Snell at the cemented surface by hand" begin
             n1, n2 = 1.5, 1.72
             l1, l2 = 4mm, 3mm
-            dl = SphericalDoubletLens(Inf, Inf, Inf, l1, l2, 60mm, λ -> n1, λ -> n2)
+            dl = SphericalDoubletLens(Inf, Inf, Inf, l1, l2, 60mm, ConstantRefractiveIndex(n1), ConstantRefractiveIndex(n2))
             α = deg2rad(25)
             zrotate3d!(dl, α)
             beam = solve([dl], beam_at([0, -10mm, 0], [0, 1, 0]))
@@ -333,8 +333,8 @@ Tests
         d = [sin(θ), cos(θ), 0]
         p = [0, -10mm, 0]
         function plates(gap)
-            A = RectangularCompensatorPlate(40mm, 40mm, tA, λ -> nA)
-            B = RectangularCompensatorPlate(40mm, 40mm, tB, λ -> nB)
+            A = RectangularCompensatorPlate(40mm, 40mm, tA, ConstantRefractiveIndex(nA))
+            B = RectangularCompensatorPlate(40mm, 40mm, tB, ConstantRefractiveIndex(nB))
             translate3d!(B, [0, tA + gap, 0])
             return A, B
         end
@@ -375,9 +375,9 @@ Tests
 
         @testset "Three touching plates" begin
             nC, tC = 1.55, 2mm
-            A = RectangularCompensatorPlate(40mm, 40mm, tA, λ -> nA)
-            B = RectangularCompensatorPlate(40mm, 40mm, tB, λ -> nB)
-            C = RectangularCompensatorPlate(40mm, 40mm, tC, λ -> nC)
+            A = RectangularCompensatorPlate(40mm, 40mm, tA, ConstantRefractiveIndex(nA))
+            B = RectangularCompensatorPlate(40mm, 40mm, tB, ConstantRefractiveIndex(nB))
+            C = RectangularCompensatorPlate(40mm, 40mm, tC, ConstantRefractiveIndex(nC))
             translate3d!(B, [0, tA, 0])
             translate3d!(C, [0, tA + tB, 0])
             beam = solve([A, B, C], beam_at(p, d))
@@ -394,7 +394,7 @@ Tests
         @testset "Plate beamsplitter, coating side first" begin
             t = 3mm
             α = deg2rad(40)
-            pbs = RectangularPlateBeamsplitter(36mm, 25mm, t, λ -> n; reflectance = R)
+            pbs = RectangularPlateBeamsplitter(36mm, 25mm, t, ConstantRefractiveIndex(n); reflectance = R)
             zrotate3d!(pbs, α)
             E0 = [1.0, 0, 0]
             beam = Beam([0.0, -20mm, 0], [0.0, 1, 0], λ0, E0)
@@ -431,7 +431,7 @@ Tests
         @testset "Cube beamsplitter, tilted" begin
             L = 20mm
             ρ = deg2rad(20)
-            cbs = CubeBeamsplitter(L, n; reflectance = R)
+            cbs = CubeBeamsplitter(L, ConstantRefractiveIndex(n); reflectance = R)
             zrotate3d!(cbs, ρ)
             Rz = [cos(ρ) -sin(ρ) 0; sin(ρ) cos(ρ) 0; 0 0 1]
             p0 = [2mm, -30mm, 0.0]
@@ -467,7 +467,7 @@ Tests
 
         @testset "Cube beamsplitter, normal incidence: power split" begin
             L = 20mm
-            cbs = CubeBeamsplitter(L, n; reflectance = R)
+            cbs = CubeBeamsplitter(L, ConstantRefractiveIndex(n); reflectance = R)
             E0 = [1.0, 0, 0]
             for x in (0.0, 3mm, -9.9mm, 9.9mm)
                 beam = Beam([x, -30mm, 0], [0.0, 1, 0], λ0, E0)
@@ -532,7 +532,7 @@ Tests
         @testset "Plate beamsplitter from the substrate side" begin
             t, n, R = 3mm, 1.5, 0.3
             α = deg2rad(40)
-            pbs = RectangularPlateBeamsplitter(36mm, 25mm, t, λ -> n; reflectance = R)
+            pbs = RectangularPlateBeamsplitter(36mm, 25mm, t, ConstantRefractiveIndex(n); reflectance = R)
             zrotate3d!(pbs, α)
             N = [sin(α), -cos(α), 0]
             p0 = [0.0, 20mm, 0.0]
@@ -564,7 +564,7 @@ Tests
 
         @testset "Cube beamsplitter from the other faces" begin
             L, n, R = 20mm, 1.5, 0.3
-            cbs = CubeBeamsplitter(L, n; reflectance = R)
+            cbs = CubeBeamsplitter(L, ConstantRefractiveIndex(n); reflectance = R)
             x = 3mm
             # from the top along -y: reflection to +x, transmission to -y
             beam = solve([cbs], beam_at([x, 30mm, 0], [0, -1, 0]))
@@ -583,7 +583,7 @@ Tests
 
         @testset "Reversibility of the cube beamsplitter" begin
             L, n = 20mm, 1.5
-            cbs = CubeBeamsplitter(L, n; reflectance = 0.4)
+            cbs = CubeBeamsplitter(L, ConstantRefractiveIndex(n); reflectance = 0.4)
             zrotate3d!(cbs, deg2rad(15))
             p0 = [1mm, -30mm, 0.0]
             fwd = solve([cbs], beam_at(p0, [0, 1, 0]))
@@ -655,14 +655,14 @@ Tests
 
         @testset "Touching prisms of different glass (cube without coating)" begin
             L = 20mm
-            cbs = CubeBeamsplitter(L, 1.5)
+            cbs = CubeBeamsplitter(L, ConstantRefractiveIndex(1.5))
             Nh = normalize([1, 1, 0])
             x = 3mm
             p0 = [x, -30mm, 0.0]
             d0 = [0.0, 1, 0]
             function prism_pair(na, nb)
-                front = Prism(BMO.shape(cbs.front), λ -> na)
-                back = Prism(BMO.shape(cbs.back), λ -> nb)
+                front = Prism(BMO.shape(cbs.front), ConstantRefractiveIndex(na))
+                back = Prism(BMO.shape(cbs.back), ConstantRefractiveIndex(nb))
                 return [front, back]
             end
             for (na, nb, name) in ((2.0, 1.35, "TIR at the hypotenuse"), (1.6, 1.4, "refraction into lower index"),
@@ -731,8 +731,8 @@ Tests
             builders = (
                 "doublet" => () -> doublet(n1, n2; y0 = 0.0),
                 "triplet" => () -> triplet(1.5, 1.74, n3; y0 = 0.0),
-                "plate" => () -> RectangularPlateBeamsplitter(36mm, 25mm, 3mm, λ -> 1.5; reflectance = 0.3),
-                "cube" => () -> CubeBeamsplitter(20mm, 1.5; reflectance = 0.3))
+                "plate" => () -> RectangularPlateBeamsplitter(36mm, 25mm, 3mm, ConstantRefractiveIndex(1.5); reflectance = 0.3),
+                "cube" => () -> CubeBeamsplitter(20mm, ConstantRefractiveIndex(1.5); reflectance = 0.3))
             starts = ("doublet" => [h, -20mm, 0.0], "triplet" => [h, -20mm, 0.0],
                 "plate" => [h, -20mm, 0.0], "cube" => [h, -30mm, 0.0])
             for ((name, build), (_, p0)) in zip(builders, starts)
@@ -756,7 +756,7 @@ Tests
         @testset "Plate beamsplitter: coating moved off the substrate" begin
             t, n, R = 3mm, 1.5, 0.3
             gap = 2mm
-            pbs = RectangularPlateBeamsplitter(36mm, 25mm, t, λ -> n; reflectance = R)
+            pbs = RectangularPlateBeamsplitter(36mm, 25mm, t, ConstantRefractiveIndex(n); reflectance = R)
             before = flatten(solve([pbs], beam_at([0, -20mm, 0], [0, 1, 0])))
             translate3d!(pbs.coating, [0, -gap, 0])
             beam = solve([pbs], beam_at([0, -20mm, 0], [0, 1, 0]))
@@ -774,7 +774,7 @@ Tests
 
         @testset "Cube beamsplitter: front prism moved off the coating" begin
             L, n = 20mm, 1.5
-            cbs = CubeBeamsplitter(L, n; reflectance = 0.3)
+            cbs = CubeBeamsplitter(L, ConstantRefractiveIndex(n); reflectance = 0.3)
             p0 = [3mm, -30mm, 0.0]
             before = flatten(solve([cbs], beam_at(p0, [0, 1, 0])))
             v = normalize([1.0, 1, 0])
@@ -799,7 +799,7 @@ Tests
     @testset "7. More than two coincident hits" begin
         @testset "Cube hypotenuse: front, back and coating coincide" begin
             L, n, R = 20mm, 1.5, 0.3
-            cbs = CubeBeamsplitter(L, n; reflectance = R)
+            cbs = CubeBeamsplitter(L, ConstantRefractiveIndex(n); reflectance = R)
             # from the center to the corners where the hypotenuse meets the faces
             for x in (0.0, 5mm, -5mm, 9.99mm, -9.99mm), dir in ([0.0, 1, 0], [0.0, -1, 0])
                 p0 = [x, -dir[2] * 30mm, 0.0]
@@ -818,8 +818,8 @@ Tests
         @testset "Thin beamsplitter between two touching plates" begin
             nA, nB = 1.7, 1.4
             tA, tB = 5mm, 3mm
-            A = RectangularCompensatorPlate(40mm, 40mm, tA, λ -> nA)
-            B = RectangularCompensatorPlate(40mm, 40mm, tB, λ -> nB)
+            A = RectangularCompensatorPlate(40mm, 40mm, tA, ConstantRefractiveIndex(nA))
+            B = RectangularCompensatorPlate(40mm, 40mm, tB, ConstantRefractiveIndex(nB))
             translate3d!(B, [0, tA, 0])
             bs = ThinBeamsplitter(40mm, 40mm; reflectance = 0.5)
             translate3d!(bs, [0, tA, 0])
@@ -861,8 +861,8 @@ Tests
         cases = (
             "doublet" => (doublet(1.5, 1.72; y0), [2mm, -20mm, 0.0]),
             "triplet" => (triplet(1.5, 1.74, 1.62; y0), [2mm, -20mm, 0.0]),
-            "plate" => (RectangularPlateBeamsplitter(36mm, 25mm, 3mm, λ -> 1.5; reflectance = 0.3), [0.0, -20mm, 0.0]),
-            "cube" => (CubeBeamsplitter(20mm, 1.5; reflectance = 0.3), [3mm, -30mm, 0.0]))
+            "plate" => (RectangularPlateBeamsplitter(36mm, 25mm, 3mm, ConstantRefractiveIndex(1.5); reflectance = 0.3), [0.0, -20mm, 0.0]),
+            "cube" => (CubeBeamsplitter(20mm, ConstantRefractiveIndex(1.5); reflectance = 0.3), [3mm, -30mm, 0.0]))
         for (name, (obj, p0)) in cases
             name == "plate" && zrotate3d!(obj, deg2rad(30))
             @testset "$name" begin
@@ -930,7 +930,7 @@ Tests
                 end
                 # and against the equivalent singlet for equal glass
                 dl_eq = doublet(1.6, 1.6; y0)
-                single = SphericalLens(DOUBLET.r[1], DOUBLET.r[3], sum(DOUBLET.l), DOUBLET.d, λ -> 1.6)
+                single = SphericalLens(DOUBLET.r[1], DOUBLET.r[3], sum(DOUBLET.l), DOUBLET.d, ConstantRefractiveIndex(1.6))
                 translate3d!(single, [0, y0, 0])
                 ga, gb = make(), make()
                 solve_system!(System([dl_eq]), ga)
@@ -957,7 +957,7 @@ Tests
             wsize(b, z) = first(BMO.gauss_parameters(b, z))
             @testset "$kind with the plate beamsplitter" begin
                 t, n, R = 3mm, 1.5, 0.3
-                pbs = RectangularPlateBeamsplitter(36mm, 25mm, t, λ -> n; reflectance = R)
+                pbs = RectangularPlateBeamsplitter(36mm, 25mm, t, ConstantRefractiveIndex(n); reflectance = R)
                 g = make([0.0, -50mm, 0])
                 solve_system!(System([pbs]), g)
                 @test length(leaves(g)) == 2
@@ -985,7 +985,7 @@ Tests
 
             @testset "$kind with the cube beamsplitter" begin
                 L, n, R = 20mm, 1.5, 0.3
-                cbs = CubeBeamsplitter(L, n; reflectance = R)
+                cbs = CubeBeamsplitter(L, ConstantRefractiveIndex(n); reflectance = R)
                 g = make([0.0, -40mm, 0])
                 solve_system!(System([cbs]), g)
                 @test length(leaves(g)) == 2
@@ -1097,7 +1097,7 @@ holds(shapes, s) = any(x -> x === s, shapes)
     end
 
     @testset "Cube beamsplitter: front, coating and back at the hypotenuse" begin
-        cbs = CubeBeamsplitter(20mm, 1.5)
+        cbs = CubeBeamsplitter(20mm, ConstantRefractiveIndex(1.5))
         system = System([cbs])
         hit = hits_at(system, [2mm, -8mm, 0], [0, 1, 0])
         shapes = hit_shapes(hit)
@@ -1107,8 +1107,8 @@ holds(shapes, s) = any(x -> x === s, shapes)
     end
 
     @testset "Separate touching objects, also within a group" begin
-        A = RectangularCompensatorPlate(40mm, 40mm, 5mm, λ -> 1.7)
-        B = RectangularCompensatorPlate(40mm, 40mm, 3mm, λ -> 1.4)
+        A = RectangularCompensatorPlate(40mm, 40mm, 5mm, ConstantRefractiveIndex(1.7))
+        B = RectangularCompensatorPlate(40mm, 40mm, 3mm, ConstantRefractiveIndex(1.4))
         translate3d!(B, [0, 5mm, 0])
         d = normalize([0.3, 1, 0.1])
         for system in (System([A, B]), System([B, A]), System(ObjectGroup([A, B])), StaticSystem([A, B]))
@@ -1132,8 +1132,8 @@ holds(shapes, s) = any(x -> x === s, shapes)
 
     @testset "Gaps: below the tolerance a contact, above two hits" begin
         for (gap, n_hits) in ((0.3e-9, 2), (5e-9, 1), (1e-6, 1))
-            A = RectangularCompensatorPlate(40mm, 40mm, 5mm, λ -> 1.7)
-            B = RectangularCompensatorPlate(40mm, 40mm, 3mm, λ -> 1.4)
+            A = RectangularCompensatorPlate(40mm, 40mm, 5mm, ConstantRefractiveIndex(1.7))
+            B = RectangularCompensatorPlate(40mm, 40mm, 3mm, ConstantRefractiveIndex(1.4))
             translate3d!(B, [0, 5mm + gap, 0])
             hit = hits_at(System([A, B]), [0, 2mm, 0], [0, 1, 0])
             @test length(hit_shapes(hit)) == n_hits
@@ -1146,15 +1146,15 @@ holds(shapes, s) = any(x -> x === s, shapes)
         # trace equals the closest hits of all objects without bounding spheres
         objs = Any[]
         for k in 1:12
-            o = isodd(k) ? SphericalLens(30mm, -30mm, 5mm, 15mm, λ -> 1.5) :
-                RectangularCompensatorPlate(10mm, 10mm, 2mm, λ -> 1.6)
+            o = isodd(k) ? SphericalLens(30mm, -30mm, 5mm, 15mm, ConstantRefractiveIndex(1.5)) :
+                RectangularCompensatorPlate(10mm, 10mm, 2mm, ConstantRefractiveIndex(1.6))
             φ = 2π * k / 12
             translate3d!(o, [60mm * cos(φ), 60mm * sin(φ), 10mm * sin(3φ)])
             push!(objs, o)
         end
         # a touching pair among them
-        A = RectangularCompensatorPlate(10mm, 10mm, 2mm, λ -> 1.6)
-        B = RectangularCompensatorPlate(10mm, 10mm, 2mm, λ -> 1.4)
+        A = RectangularCompensatorPlate(10mm, 10mm, 2mm, ConstantRefractiveIndex(1.6))
+        B = RectangularCompensatorPlate(10mm, 10mm, 2mm, ConstantRefractiveIndex(1.4))
         translate3d!(A, [0, 30mm, 0])
         translate3d!(B, [0, 32mm, 0])
         append!(objs, [A, B])
