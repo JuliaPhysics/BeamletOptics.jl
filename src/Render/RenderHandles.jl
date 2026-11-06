@@ -8,9 +8,9 @@ extension are internal.
     AbstractRenderHandle
 
 Supertype of all handles returned by [`live_render!`](@ref). A handle references the rendered
-object, system or beam and its plots, which can be re-synchronized via [`update_render!`](@ref)
-and deleted via [`remove_render!`](@ref). Concrete handles are implemented by the `Makie`
-extension.
+object, system or beam and its plots, which can be re-synchronized via [`update_render!`](@ref),
+drawn again via [`rerender!`](@ref) and deleted via [`remove_render!`](@ref). Concrete handles are
+implemented by the `Makie` extension.
 
 # Render handle protocol
 
@@ -35,6 +35,7 @@ Handle of one movable thing, returned by `live_render!(ax, obj)` for an `Abstrac
 object group and by `live_render!(draw, ax, x)` for anything with a pose. The plots are drawn once;
 [`update_render!`](@ref) applies the current pose of [`rendered`](@ref)`(h)` as their model
 matrix (and draws them again if the parts of a `MultiShape` object moved relative to each other).
+After a change of the shape, [`rerender!`](@ref) draws the object again, in place of the old plots.
 [`pick_object`](@ref) returns `rendered(h)` for the plots of [`pickable_plots`](@ref).
 """
 abstract type AbstractObjectRenderHandle <: AbstractRenderHandle end
@@ -54,7 +55,7 @@ its own. A subtype implements
 - `delete!(h, oh::AbstractObjectRenderHandle)`: removes `oh` from `h` and returns `h`; its plots
   stay, see [`remove_render!`](@ref)
 
-[`render_plots`](@ref), [`update_render!`](@ref), [`remove_render!`](@ref) and
+[`render_plots`](@ref), [`update_render!`](@ref), [`rerender!`](@ref), [`remove_render!`](@ref) and
 [`pick_object`](@ref) of a system handle are defined in terms of these.
 
 A handle that knows its axis, like the one returned by `live_render!(ax, sys)`, also implements
@@ -87,7 +88,8 @@ function rendered end
     render_plots(h::AbstractRenderHandle) -> AbstractVector
 
 The plots of the render handle `h`; of a system handle, the plots of all its object handles. The
-plots of an object handle may be replaced by [`update_render!`](@ref), hence do not keep them.
+plots of an object handle may be replaced by [`update_render!`](@ref) and [`rerender!`](@ref),
+hence do not keep them.
 """
 function render_plots end
 
