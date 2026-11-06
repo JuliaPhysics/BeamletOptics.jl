@@ -1,10 +1,9 @@
 module TestCoincidentBoundaries
 
+using AbstractTrees: children
 using BeamletOptics
 using LinearAlgebra
 using Test
-
-const BMO = BeamletOptics
 
 const mm = 1e-3
 
@@ -24,35 +23,58 @@ into `@test`.
 =#
 
 #=
+Adapter: the only place of this file that reads internals of BMO. The tests below use exported names
+and these functions only, such that a change of the internals by the media and transitions rebuild
+(#167: the medium as ray state, components without Hint, coatings on faces) updates this block and
+none of the expectations.
+=#
+
+const BMO = BeamletOptics
+
+# medium, field and path of a single ray or beam
+refractive_index(ray::BMO.AbstractRay) = BMO.refractive_index(ray)
+polarization(ray::BMO.AbstractRay) = BMO.polarization(ray)
+optical_path_length(beam::BMO.AbstractBeam) = BMO.optical_path_length(beam)
+
+# the beams that store the rays of a beam or beamlet, chief first
+components(beam::BMO.AbstractBeam) = BMO._component_beams(beam)
+
+"""Shape of the part of a component hit by `ray`, `nothing` for a ray without intersection."""
+hit_shape(ray::BMO.AbstractRay) = isnothing(BMO.intersection(ray)) ? nothing : BMO.shape(BMO.intersection(ray))
+
+# the parts of a composite component and their geometry
+front_part(dl::DoubletLens) = dl.front
+back_part(dl::DoubletLens) = dl.back
+front_part(cbs::CubeBeamsplitter) = cbs.front
+back_part(cbs::CubeBeamsplitter) = cbs.back
+plate_coating(pbs::RectangularPlateBeamsplitter) = BMO.coating(pbs)
+part_shape(part::BMO.AbstractObject) = BMO.shape(part)
+
+#=
 Helpers
 =#
 
 λ0 = 587.6e-9
 
 """Depth-first list of all beams (or beamlets) of a tree, the root first."""
-all_beams(b) = vcat([b], reduce(vcat, all_beams.(BMO.children(b)); init = typeof(b)[]))
-leaves(b) = filter(x -> isempty(BMO.children(x)), all_beams(b))
-
-# the beam that carries the geometric path
-chief_of(b::Beam) = b
-chief_of(g::GaussianBeamlet) = g.chief
-chief_of(a::AstigmaticGaussianBeamlet) = a.c
-# all component beams of a beamlet
-components(g::GaussianBeamlet) = (g.chief, g.waist, g.divergence)
-components(a::AstigmaticGaussianBeamlet) = BMO._component_beams(a)
+all_beams(b) = vcat([b], reduce(vcat, all_beams.(children(b)); init = typeof(b)[]))
+leaves(b) = filter(x -> isempty(children(x)), all_beams(b))
 
 """Position, direction and refractive index of every ray of every beam of the tree as one flat vector."""
 function flatten(b)
     out = Float64[]
-    for x in all_beams(b), r in rays(chief_of(x))
-        append!(out, position(r), direction(r), BMO.refractive_index(r))
+    # rays of a beamlet are those of its chief
+    for x in all_beams(b), r in rays(x)
+        append!(out, position(r), direction(r), refractive_index(r))
     end
     return out
 end
 
 """Hit shape of every ray of a beam, `nothing` for a ray without intersection."""
-shape_sequence(beam::Beam) = [isnothing(BMO.intersection(r)) ? nothing : BMO.shape(BMO.intersection(r))
-                              for r in rays(beam)]
+shape_sequence(beam::BMO.AbstractBeam) = [hit_shape(r) for r in rays(beam)]
+
+on_axis(::GaussianBeamlet) = 0.0
+on_axis(::AstigmaticGaussianBeamlet) = zeros(3)
 
 same_sequence(a, b) = length(a) == length(b) && all(x === y for (x, y) in zip(a, b))
 
@@ -173,7 +195,7 @@ function path_error(beam, ref)
         ray = r[k + 1]
         ep = max(ep, norm(position(ray) - h.pos))
         ed = max(ed, norm(direction(ray) - h.dir))
-        en = max(en, abs(BMO.refractive_index(ray) - h.n))
+        en = max(en, abs(refractive_index(ray) - h.n))
     end
     return (ep, ed, en)
 end
@@ -181,6 +203,13 @@ end
 const TOL_POS = 1e-8
 const TOL_DIR = 1e-7
 agrees(err; dir = TOL_DIR) = err[1] < TOL_POS && err[2] < dir && err[3] < 1e-12
+
+"""Counterclockwise rotation by `θ` about `axis` (Rodrigues' formula), for rigid motions of a setup."""
+function rotation_matrix(axis, θ)
+    u = normalize(collect(Float64, axis))
+    K = [0 -u[3] u[2]; u[3] 0 -u[1]; -u[2] u[1] 0]
+    return I + sin(θ) * K + (1 - cos(θ)) * K^2
+end
 
 #=
 Reference 2: the components under test
@@ -229,10 +258,10 @@ Tests
                 ps, ds = end_point(bs)
                 @test pd ≈ ps atol = TOL_POS
                 @test dd ≈ ds atol = TOL_DIR
-                @test BMO.optical_path_length(bd) ≈ BMO.optical_path_length(bs) atol = TOL_POS
+                @test optical_path_length(bd) ≈ optical_path_length(bs) atol = TOL_POS
                 # the cemented surface is no boundary: the doublet has one ray more, at the same index
                 @test length(rays(bd)) == length(rays(bs)) + 1
-                @test BMO.refractive_index.(rays(bd)) == [1.0, n, n, 1.0]
+                @test refractive_index.(rays(bd)) == [1.0, n, n, 1.0]
             end
         end
 
@@ -246,8 +275,8 @@ Tests
                 bs = solve([single], beam_at([h, ystart, 0], [0, 1, 0]))
                 @test end_point(bt)[1] ≈ end_point(bs)[1] atol = TOL_POS
                 @test end_point(bt)[2] ≈ end_point(bs)[2] atol = TOL_DIR
-                @test BMO.optical_path_length(bt) ≈ BMO.optical_path_length(bs) atol = TOL_POS
-                @test BMO.refractive_index.(rays(bt)) == [1.0, n, n, n, 1.0]
+                @test optical_path_length(bt) ≈ optical_path_length(bs) atol = TOL_POS
+                @test refractive_index.(rays(bt)) == [1.0, n, n, n, 1.0]
             end
         end
 
@@ -289,9 +318,9 @@ Tests
             @test direction(r[2]) ≈ cos(θ1) * u + sin(θ1) * v atol = TOL_DIR
             @test direction(r[3]) ≈ cos(θ2) * u + sin(θ2) * v atol = TOL_DIR
             @test direction(r[4]) ≈ [0, 1, 0] atol = TOL_DIR
-            @test BMO.refractive_index.(r) == [1.0, n1, n2, 1.0]
+            @test refractive_index.(r) == [1.0, n1, n2, 1.0]
             # optical path length: 10 mm of air, then n l / cos(θ) per layer
-            @test BMO.optical_path_length(beam) ≈ 10mm + n1 * l1 / cos(θ1) + n2 * l2 / cos(θ2) atol = TOL_POS
+            @test optical_path_length(beam) ≈ 10mm + n1 * l1 / cos(θ1) + n2 * l2 / cos(θ2) atol = TOL_POS
         end
 
         @testset "Curved doublet against the exact trace" begin
@@ -301,7 +330,7 @@ Tests
                 beam = solve([dl], beam_at([h, ystart, 0], [0, 1, 0]))
                 ref = follow(lens_surfaces(doublet_surfaces(y0, n1, n2)...), [h, ystart, 0], [0, 1, 0])
                 @test agrees(path_error(beam, ref))
-                @test BMO.optical_path_length(beam) ≈ ref.opl atol = TOL_POS
+                @test optical_path_length(beam) ≈ ref.opl atol = TOL_POS
             end
         end
 
@@ -312,7 +341,7 @@ Tests
                 beam = solve([tl], beam_at([h, ystart, 0], [0, 1, 0]))
                 ref = follow(lens_surfaces(triplet_surfaces(y0, n...)...), [h, ystart, 0], [0, 1, 0])
                 @test agrees(path_error(beam, ref))
-                @test BMO.optical_path_length(beam) ≈ ref.opl atol = TOL_POS
+                @test optical_path_length(beam) ≈ ref.opl atol = TOL_POS
             end
         end
 
@@ -341,7 +370,7 @@ Tests
             return A, B
         end
         function plate_surfaces(gap)
-            return [plane([0, 0, 0], [0, 1, 0], nA), plane([0, tA, 0], [0, 1, 0], 1.0 * (gap == 0 ? nB : 1.0)),
+            return [plane([0, 0, 0], [0, 1, 0], nA), plane([0, tA, 0], [0, 1, 0], 1.0),
                 plane([0, tA + gap, 0], [0, 1, 0], nB), plane([0, tA + gap + tB, 0], [0, 1, 0], 1.0)]
         end
 
@@ -357,7 +386,7 @@ Tests
             beam = solve([A, B], beam_at(p, d))
             ref = follow(plate_surfaces(1mm), p, d)
             @test agrees(path_error(beam, ref))
-            @test BMO.refractive_index.(rays(beam)) == [1.0, nA, 1.0, nB, 1.0]
+            @test refractive_index.(rays(beam)) == [1.0, nA, 1.0, nB, 1.0]
             # the exit is parallel to the entry (plane parallel layers)
             @test direction(last(rays(beam))) ≈ d atol = TOL_DIR
         end
@@ -372,7 +401,7 @@ Tests
             # Cause: the plates are separate objects without a Hint. A leaves into air (index of the system), and the
             # coincident front face of B (zero distance) is not found, so the ray runs through B as if in air.
             @test_broken agrees(err)
-            @test_broken BMO.refractive_index.(rays(beam)) == [1.0, nA, nB, 1.0]
+            @test_broken refractive_index.(rays(beam)) == [1.0, nA, nB, 1.0]
             @test_broken direction(rays(beam)[3]) ≈ ref.hits[2].dir atol = TOL_DIR
         end
 
@@ -388,6 +417,49 @@ Tests
                     plane([0, tA + tB, 0], [0, 1, 0], nC), plane([0, tA + tB + tC, 0], [0, 1, 0], 1.0)], p, d)
             # Cause: as above, every touching face pair is passed in air
             @test_broken agrees(path_error(beam, ref))
+        end
+
+        # first glass into second glass, the second plate `gap` farther
+        touching_surfaces(gap) = [plane([0, 0, 0], [0, 1, 0], nA), plane([0, tA, 0], [0, 1, 0], nB),
+            plane([0, tA + gap + tB, 0], [0, 1, 0], 1.0)]
+
+        @testset "Near contact: far below the coincidence tolerance touching, far above it air" begin
+            # a gap or an overlap of 10 pm is a contact, a gap of 1 µm is air (tolerance of #177: 1 nm)
+            for gap in (1e-11, -1e-11, 1e-6)
+                A, B = plates(gap)
+                beam = solve([A, B], beam_at(p, d))
+                if gap < 1e-9
+                    # Cause: as for exact contact, the touching face pair is passed in air
+                    @test_broken agrees(path_error(beam, follow(touching_surfaces(gap), p, d)))
+                else
+                    @test agrees(path_error(beam, follow(plate_surfaces(gap), p, d)))
+                end
+            end
+        end
+
+        @testset "Touching and separated plates, rotated and moved together" begin
+            # the rotation breaks the exact coincidence of the faces in floating point
+            Rm = rotation_matrix([0.3, 0.2, 1.0], deg2rad(37))
+            shift = [10mm, -5mm, 7mm]
+            # faces at the height y of the unmoved plates and the index behind them
+            moved_planes(faces) = [plane(Rm * [0, y, 0] + shift, Rm * [0, 1, 0], n) for (y, n) in faces]
+            for gap in (0.0, 1e-6)
+                A, B = plates(gap)
+                for plate in (A, B)
+                    rotate3d!(plate, Rm, zeros(3))
+                    translate3d!(plate, shift)
+                end
+                beam = solve([A, B], beam_at(Rm * p + shift, Rm * d))
+                faces = gap == 0 ? [(0.0, nA), (tA, nB), (tA + tB, 1.0)] :
+                        [(0.0, nA), (tA, 1.0), (tA + gap, nB), (tA + gap + tB, 1.0)]
+                ref = follow(moved_planes(faces), Rm * p + shift, Rm * d)
+                if gap == 0
+                    # Cause: as for exact contact, the touching face pair is passed in air
+                    @test_broken agrees(path_error(beam, ref))
+                else
+                    @test agrees(path_error(beam, ref))
+                end
+            end
         end
     end
 
@@ -406,7 +478,7 @@ Tests
             N = [sin(α), -cos(α), 0]
             @test length(all_beams(beam)) == 3
             @test length(leaves(beam)) == 2
-            tr, rf = BMO.children(beam)
+            tr, rf = children(beam)
             # reflected leaf: one ray, law of reflection
             d0 = [0.0, 1, 0]
             @test length(rays(rf)) == 1
@@ -419,15 +491,15 @@ Tests
             @test direction(rays(tr)[1]) ≈ ref.hits[1].dir atol = TOL_DIR
             @test position(rays(tr)[2]) ≈ ref.hits[2].pos atol = TOL_POS
             @test direction(rays(tr)[2]) ≈ d0 atol = TOL_DIR
-            @test BMO.refractive_index.(rays(tr)) == [n, 1.0]
+            @test refractive_index.(rays(tr)) == [n, 1.0]
             # textbook lateral displacement of a tilted plate: t sin(θ - θ') / cos(θ')
             θ = α
             θ′ = asin(sin(θ) / n)
             @test abs(position(rays(tr)[2])[1]) ≈ t * sin(θ - θ′) / cos(θ′) atol = TOL_POS
             # power: the reflection takes R, the transmission 1 - R. Power ~ n cos(θ) |E|²
             P0 = norm(E0)^2
-            @test sum(abs2, BMO.polarization(first(rays(rf)))) ≈ R * P0 atol = 1e-12
-            Pt = n * cos(θ′) * sum(abs2, BMO.polarization(rays(tr)[1]))
+            @test sum(abs2, polarization(first(rays(rf)))) ≈ R * P0 atol = 1e-12
+            Pt = n * cos(θ′) * sum(abs2, polarization(rays(tr)[1]))
             @test Pt ≈ (1 - R) * cos(θ) * P0 atol = 1e-12
         end
 
@@ -445,7 +517,7 @@ Tests
             Nbot, Ntop = Rz * [0, -1, 0], Rz * [0, 1, 0]
             Nleft = Rz * [-1, 0, 0]
             @test length(leaves(beam)) == 2
-            tr, rf = BMO.children(beam)
+            tr, rf = children(beam)
             entry = plane(L / 2 * Nbot, Nbot, n)
             # transmitted: entry face, coating (same glass, no change), exit face
             ref_t = follow([entry, plane(zeros(3), Nh, n), plane(L / 2 * Ntop, Ntop, 1.0)], p0, d0)
@@ -463,9 +535,9 @@ Tests
             @test direction(last(rays(rf))) ≈ ref_r.hits[3].dir atol = TOL_DIR
             @test length(rays(tr)) == 2
             @test length(rays(rf)) == 2
-            @test BMO.refractive_index.(rays(beam)) == [1.0, n]
-            @test BMO.refractive_index.(rays(tr)) == [n, 1.0]
-            @test BMO.refractive_index.(rays(rf)) == [n, 1.0]
+            @test refractive_index.(rays(beam)) == [1.0, n]
+            @test refractive_index.(rays(tr)) == [n, 1.0]
+            @test refractive_index.(rays(rf)) == [n, 1.0]
         end
 
         @testset "Cube beamsplitter, normal incidence: power split" begin
@@ -476,7 +548,7 @@ Tests
                 beam = Beam([x, -30mm, 0], [0.0, 1, 0], λ0, E0)
                 solve_system!(System([cbs]), beam)
                 @test length(leaves(beam)) == 2
-                tr, rf = BMO.children(beam)
+                tr, rf = children(beam)
                 # hypotenuse x + y = 0: coating hit at (x, -x)
                 @test position(first(rays(tr))) ≈ [x, -x, 0] atol = TOL_POS
                 @test position(last(rays(tr))) ≈ [x, L / 2, 0] atol = TOL_POS
@@ -485,7 +557,7 @@ Tests
                 @test direction(last(rays(rf))) ≈ [-1, 0, 0] atol = TOL_DIR
                 # Fresnel at normal incidence: T = 4n/(1+n)² per uncoated face, coating splits R : 1 - R
                 Tf = 4n / (1 + n)^2
-                flux(ray) = BMO.refractive_index(ray) * sum(abs2, BMO.polarization(ray))
+                flux(ray) = refractive_index(ray) * sum(abs2, polarization(ray))
                 @test flux(last(rays(tr))) ≈ Tf^2 * (1 - R) atol = 1e-12
                 @test flux(last(rays(rf))) ≈ Tf^2 * R atol = 1e-12
             end
@@ -501,8 +573,8 @@ Tests
                 beam = solve([dl], beam_at([h, 80mm, 0], [0, -1, 0]))
                 ref = follow_reversed(doublet_surfaces(y0, n1, n2)..., h, 80mm)
                 @test agrees(path_error(beam, ref))
-                @test BMO.optical_path_length(beam) ≈ ref.opl atol = TOL_POS
-                @test BMO.refractive_index.(rays(beam)) == [1.0, 1.72, 1.5, 1.0]
+                @test optical_path_length(beam) ≈ ref.opl atol = TOL_POS
+                @test refractive_index.(rays(beam)) == [1.0, 1.72, 1.5, 1.0]
             end
         end
 
@@ -526,9 +598,9 @@ Tests
                 @test db ≈ [0, -1, 0] atol = TOL_DIR
                 # same lateral height at the entry plane, the path is the same ray reversed
                 @test pb[1] ≈ 2mm atol = TOL_POS
-                @test BMO.refractive_index.(rays(back)) == reverse(BMO.refractive_index.(rays(fwd)))
+                @test refractive_index.(rays(back)) == reverse(refractive_index.(rays(fwd)))
                 air_in = norm(position(rays(fwd)[2]) - position(rays(fwd)[1]))
-                @test BMO.optical_path_length(back) - 40mm ≈ BMO.optical_path_length(fwd) - air_in atol = TOL_POS
+                @test optical_path_length(back) - 40mm ≈ optical_path_length(fwd) - air_in atol = TOL_POS
             end
         end
 
@@ -551,12 +623,12 @@ Tests
             @test position(rays(beam)[2]) ≈ ref_in.hits[1].pos atol = TOL_POS
             @test direction(rays(beam)[2]) ≈ ref_in.hits[1].dir atol = TOL_DIR
             @test length(leaves(beam)) == 2
-            tr, rf = BMO.children(beam)
+            tr, rf = children(beam)
             # transmitted: leaves into air, plane parallel, so along the incident direction
             @test length(rays(tr)) == 1
             @test position(first(rays(tr))) ≈ ref_t.hits[2].pos atol = TOL_POS
             @test direction(first(rays(tr))) ≈ ref_t.hits[2].dir atol = TOL_DIR
-            @test BMO.refractive_index(first(rays(tr))) == 1.0
+            @test refractive_index(first(rays(tr))) == 1.0
             # reflected: inside, then out of the back face
             @test length(rays(rf)) == 2
             @test position(rays(rf)[1]) ≈ ref_r.hits[2].pos atol = TOL_POS
@@ -571,14 +643,14 @@ Tests
             x = 3mm
             # from the top along -y: reflection to +x, transmission to -y
             beam = solve([cbs], beam_at([x, 30mm, 0], [0, -1, 0]))
-            tr, rf = BMO.children(beam)
+            tr, rf = children(beam)
             @test position(last(rays(tr))) ≈ [x, -L / 2, 0] atol = TOL_POS
             @test direction(last(rays(tr))) ≈ [0, -1, 0] atol = TOL_DIR
             @test position(last(rays(rf))) ≈ [L / 2, -x, 0] atol = TOL_POS
             @test direction(last(rays(rf))) ≈ [1, 0, 0] atol = TOL_DIR
             # from the +x side along -x: reflection to +y, transmission to -x
             beam = solve([cbs], beam_at([30mm, x, 0], [-1, 0, 0]))
-            tr, rf = BMO.children(beam)
+            tr, rf = children(beam)
             @test position(last(rays(tr))) ≈ [-L / 2, x, 0] atol = TOL_POS
             @test position(last(rays(rf))) ≈ [-x, L / 2, 0] atol = TOL_POS
             @test direction(last(rays(rf))) ≈ [0, 1, 0] atol = TOL_DIR
@@ -635,7 +707,7 @@ Tests
             @test direction(r[3]) ≈ ref.hits[2].dir atol = TOL_DIR
             # Cause: `interact3d(::DoubletLens)` hints the back lens, whose refraction code reports the back index n2
             # for the reflected ray, which is still in the front lens (n1) and must not enter the back lens.
-            @test_broken BMO.refractive_index(r[3]) == n1
+            @test_broken refractive_index(r[3]) == n1
             # the reflected ray hits the cemented surface a second time: the second event of the reference
             ref2 = follow([sphere(6mm, R2, n2), plane([0, 0, 0], [0, 1, 0], 1.0)], ref.hits[2].pos, ref.hits[2].dir; n0 = n1)
             @test ref2.hits[1].tir
@@ -665,8 +737,8 @@ Tests
             p0 = [x, -30mm, 0.0]
             d0 = [0.0, 1, 0]
             function prism_pair(na, nb)
-                front = Prism(BMO.shape(cbs.front), ConstantRefractiveIndex(na))
-                back = Prism(BMO.shape(cbs.back), ConstantRefractiveIndex(nb))
+                front = Prism(part_shape(front_part(cbs)), ConstantRefractiveIndex(na))
+                back = Prism(part_shape(back_part(cbs)), ConstantRefractiveIndex(nb))
                 return [front, back]
             end
             for (na, nb, name) in ((2.0, 1.35, "TIR at the hypotenuse"), (1.6, 1.4, "refraction into lower index"),
@@ -700,22 +772,22 @@ Tests
         @testset "Doublet parts moved apart and back" begin
             dl = doublet(n1, n2; y0)
             before = flatten(solve([dl], beam_at([h, -20mm, 0], [0, 1, 0])))
-            translate3d!(dl.back, [0, 3mm, 0])
-            translate3d!(dl.back, [0, -3mm, 0])
+            translate3d!(back_part(dl), [0, 3mm, 0])
+            translate3d!(back_part(dl), [0, -3mm, 0])
             @test flatten(solve([dl], beam_at([h, -20mm, 0], [0, 1, 0]))) ≈ before atol = TOL_POS
-            rotate3d!(dl.back, [0.0, 0, 1], deg2rad(2))
-            rotate3d!(dl.back, [0.0, 0, 1], -deg2rad(2))
+            rotate3d!(back_part(dl), [0.0, 0, 1], deg2rad(2))
+            rotate3d!(back_part(dl), [0.0, 0, 1], -deg2rad(2))
             @test flatten(solve([dl], beam_at([h, -20mm, 0], [0, 1, 0]))) ≈ before atol = TOL_POS
             # sideways and back
-            translate3d!(dl.front, [1mm, 0, 2mm])
-            translate3d!(dl.front, [-1mm, 0, -2mm])
+            translate3d!(front_part(dl), [1mm, 0, 2mm])
+            translate3d!(front_part(dl), [-1mm, 0, -2mm])
             @test flatten(solve([dl], beam_at([h, -20mm, 0], [0, 1, 0]))) ≈ before atol = TOL_POS
         end
 
         @testset "Doublet parts apart: the air gap is seen" begin
             gap = 3mm
             dl = doublet(n1, n2; y0)
-            translate3d!(dl.back, [0, gap, 0])
+            translate3d!(back_part(dl), [0, gap, 0])
             beam = solve([dl], beam_at([h, -20mm, 0], [0, 1, 0]))
             v, R, ns = doublet_surfaces(y0, n1, n2)
             # front surface in air, front rear surface into the gap (air), back front surface into n2, back surface
@@ -725,12 +797,12 @@ Tests
             # Cause: the Hint of the front lens points to the back lens, which is accepted as the closest hit
             # although the rear surface of the front lens comes first: the gap is skipped.
             @test_broken agrees(path_error(beam, ref))
-            @test_broken BMO.refractive_index.(rays(beam)) == [1.0, n1, 1.0, n2, 1.0]
+            @test_broken refractive_index.(rays(beam)) == [1.0, n1, 1.0, n2, 1.0]
         end
 
         @testset "Rigid motion of the whole component" begin
             # rotated and translated component with the beam moved along: all rays move rigidly
-            Rm = BMO.rotate3d([0.3, 0.2, 1.0], deg2rad(37))
+            Rm = rotation_matrix([0.3, 0.2, 1.0], deg2rad(37))
             shift = [10mm, -5mm, 7mm]
             n3 = 1.62
             builders = (
@@ -763,17 +835,17 @@ Tests
             gap = 2mm
             pbs = RectangularPlateBeamsplitter(36mm, 25mm, t, ConstantRefractiveIndex(n); reflectance = R)
             before = flatten(solve([pbs], beam_at([0, -20mm, 0], [0, 1, 0])))
-            translate3d!(pbs.coating, [0, -gap, 0])
+            translate3d!(plate_coating(pbs), [0, -gap, 0])
             beam = solve([pbs], beam_at([0, -20mm, 0], [0, 1, 0]))
-            tr, rf = BMO.children(beam)
+            tr, rf = children(beam)
             # the coating is in air, 2 mm in front of the substrate: the transmitted light travels in air, enters, leaves
             @test position(first(rays(rf))) ≈ [0, -gap, 0] atol = TOL_POS
             @test direction(first(rays(rf))) ≈ [0, -1, 0] atol = TOL_DIR
             # Cause: the coating interaction assumes the substrate behind it and sets its index for the transmitted ray
-            @test_broken BMO.refractive_index(first(rays(tr))) == 1.0
-            @test_broken BMO.refractive_index.(rays(tr)) == [1.0, n, 1.0]
+            @test_broken refractive_index(first(rays(tr))) == 1.0
+            @test_broken refractive_index.(rays(tr)) == [1.0, n, 1.0]
             # and back
-            translate3d!(pbs.coating, [0, gap, 0])
+            translate3d!(plate_coating(pbs), [0, gap, 0])
             @test flatten(solve([pbs], beam_at([0, -20mm, 0], [0, 1, 0]))) ≈ before atol = TOL_POS
         end
 
@@ -784,7 +856,7 @@ Tests
             before = flatten(solve([cbs], beam_at(p0, [0, 1, 0])))
             v = normalize([1.0, 1, 0])
             gap = 1mm
-            translate3d!(cbs.front, -gap * v)
+            translate3d!(front_part(cbs), -gap * v)
             beam = solve([cbs], beam_at(p0, [0, 1, 0]))
             # with an air gap the light at 45° inside the n = 1.5 prism is totally reflected at its hypotenuse
             # (n sin 45° = 1.06 > 1): reflected towards -x, leaves through the left leg, no splitting.
@@ -792,11 +864,11 @@ Tests
                     plane(-gap * v, v, n; mirror = true), plane([-L / 2 - gap * v[1], 0, 0], [-1, 0, 0], 1.0)],
                 p0, [0, 1, 0])
             # Cause: the Hint of the front prism points to the coating, which is accepted as the closest hit
-            @test_broken isempty(BMO.children(beam))
+            @test_broken isempty(children(beam))
             @test_broken position(last(rays(beam))) ≈ ref.hits[3].pos atol = TOL_POS
             @test_broken direction(last(rays(beam))) ≈ ref.hits[3].dir atol = TOL_DIR
             # and back
-            translate3d!(cbs.front, gap * v)
+            translate3d!(front_part(cbs), gap * v)
             @test flatten(solve([cbs], beam_at(p0, [0, 1, 0]))) ≈ before atol = TOL_POS
         end
     end
@@ -811,7 +883,7 @@ Tests
                 beam = solve([cbs], beam_at(p0, dir))
                 @test length(leaves(beam)) == 2
                 @test all(b -> length(rays(b)) ≤ 2, all_beams(beam))
-                tr, rf = BMO.children(beam)
+                tr, rf = children(beam)
                 y_hit = -x
                 @test position(first(rays(tr))) ≈ [x, y_hit, 0] atol = TOL_POS
                 @test position(first(rays(rf))) ≈ [x, y_hit, 0] atol = TOL_POS
@@ -882,7 +954,7 @@ Tests
                 e2 = Beam(p0, [0.0, 1, 0], λ0, [1.0, 0, 0])
                 solve_system!(System([obj]), e1)
                 solve_system!(StaticSystem([obj]), e2)
-                pol(b) = reduce(vcat, [collect(BMO.polarization(r)) for x in all_beams(b) for r in rays(x)])
+                pol(b) = reduce(vcat, [collect(polarization(r)) for x in all_beams(b) for r in rays(x)])
                 @test pol(e1) == pol(e2)
             end
         end
@@ -893,7 +965,7 @@ Tests
             solve_system!(System([dl]), g1)
             solve_system!(StaticSystem([dl]), g2)
             @test flatten(g1) == flatten(g2)
-            @test all(first(BMO.gauss_parameters(g1, z)) == first(BMO.gauss_parameters(g2, z)) for z in (50mm, 80mm))
+            @test all(first(gauss_parameters(g1, z)) == first(gauss_parameters(g2, z)) for z in (50mm, 80mm))
         end
     end
 
@@ -923,13 +995,13 @@ Tests
                 @test all(s -> same_sequence(s, first(seq)), seq)
                 @test length(first(seq)) == 4
                 # front lens, then the cemented surface and the rear surface of the back lens
-                @test same_sequence(first(seq), [BMO.shape(dl.front), BMO.shape(dl.back), BMO.shape(dl.back), nothing])
+                @test same_sequence(first(seq), [part_shape(front_part(dl)), part_shape(back_part(dl)), part_shape(back_part(dl)), nothing])
                 # the chief follows the plain ray
                 beam = solve([dl], beam_at([0, 0, 0], [0, 1, 0]; λ))
                 @test flatten(g) ≈ flatten(beam) atol = TOL_POS
                 # beam size behind the doublet against the ABCD law
                 for z in (20mm, 60mm)
-                    w = BMO.gauss_parameters(g, ybk + z)
+                    w = gauss_parameters(g, ybk + z)
                     w_ref = radius(prop(P(z) * Msys, q0))
                     @test all(x -> isapprox(x, w_ref; rtol = 1e-4), g isa GaussianBeamlet ? w[1:1] : w[1:2])
                 end
@@ -941,7 +1013,7 @@ Tests
                 solve_system!(System([dl_eq]), ga)
                 solve_system!(System([single]), gb)
                 for z in (20mm, 60mm)
-                    @test all(BMO.gauss_parameters(ga, ybk + z)[1:2] .≈ BMO.gauss_parameters(gb, ybk + z)[1:2])
+                    @test all(gauss_parameters(ga, ybk + z)[1:2] .≈ gauss_parameters(gb, ybk + z)[1:2])
                 end
             end
         end
@@ -959,7 +1031,9 @@ Tests
         for kind in ("GaussianBeamlet", "AstigmaticGaussianBeamlet")
             make(p) = kind == "GaussianBeamlet" ? GaussianBeamlet(p, [0.0, 1, 0], λ, w0) :
                       AstigmaticGaussianBeamlet(p, [0.0, 1, 0], λ, w0)
-            wsize(b, z) = first(BMO.gauss_parameters(b, z))
+            wsize(b, z) = first(gauss_parameters(b, z))
+            # physical field on the axis, |E| ∝ sqrt(P / n) / w for both beamlet models
+            peak_field(b, z) = abs(electric_field(b, on_axis(b), z))
             @testset "$kind with the plate beamsplitter" begin
                 t, n, R = 3mm, 1.5, 0.3
                 pbs = RectangularPlateBeamsplitter(36mm, 25mm, t, ConstantRefractiveIndex(n); reflectance = R)
@@ -970,7 +1044,7 @@ Tests
                     seq = [shape_sequence(c) for c in components(b)]
                     @test all(s -> same_sequence(s, first(seq)), seq)
                 end
-                tr, rf = BMO.children(g)
+                tr, rf = children(g)
                 ref_beam = solve([pbs], beam_at([0, -50mm, 0], [0, 1, 0]; λ))
                 @test flatten(g) ≈ flatten(ref_beam) atol = TOL_POS
                 # q parameter: free space for the reflected beam, the plate shortens the effective distance by t (1 - 1/n)
@@ -980,12 +1054,13 @@ Tests
                     @test wsize(rf, z) ≈ w_free rtol = 1e-4
                     @test wsize(tr, z) ≈ w_plate rtol = 1e-4
                 end
-                # field amplitudes behind the coating split as r : t
-                # The field behind the coating splits as t : r. The field of an astigmatic beamlet is a physical field
-                # (Poynting flux ~ n |E|²), such that it is smaller by sqrt(1 / n) in the glass of the plate. The field of a
-                # GaussianBeamlet is not rescaled by the medium.
-                f_medium = kind == "GaussianBeamlet" ? 1.0 : sqrt(1 / n)
-                @test norm(BMO.electric_field(tr)) / norm(BMO.electric_field(rf)) ≈ f_medium * sqrt((1 - R) / R) rtol = 1e-9
+                # the power splits as (1 - R) : R; inside the plate (z = 51.5 mm) the transmitted field is lower
+                # by 1 / √n, behind it (z = 80 mm) both branches are in air and the transmitted one has passed the
+                # uncoated back face: Fresnel transmission T for the astigmatic beamlet, none for the scalar model
+                T = kind == "GaussianBeamlet" ? 1.0 : 4n / (1 + n)^2
+                for (z, n_tr, T_tr) in ((50mm + t / 2, n, 1.0), (80mm, 1.0, T))
+                    @test peak_field(tr, z) / peak_field(rf, z) ≈ sqrt(T_tr * (1 - R) / (R * n_tr)) * wsize(rf, z) / wsize(tr, z) rtol = 1e-6
+                end
             end
 
             @testset "$kind with the cube beamsplitter" begin
@@ -998,7 +1073,7 @@ Tests
                     seq = [shape_sequence(c) for c in components(b)]
                     @test all(s -> same_sequence(s, first(seq)), seq)
                 end
-                tr, rf = BMO.children(g)
+                tr, rf = children(g)
                 ref_beam = solve([cbs], beam_at([0, -40mm, 0], [0, 1, 0]; λ))
                 @test flatten(g) ≈ flatten(ref_beam) atol = TOL_POS
                 # both branches travel L in glass in total
@@ -1007,16 +1082,20 @@ Tests
                     @test wsize(tr, z) ≈ w_ref rtol = 1e-4
                     @test wsize(rf, z) ≈ w_ref rtol = 1e-4
                 end
-                @test norm(BMO.electric_field(tr)) / norm(BMO.electric_field(rf)) ≈ sqrt((1 - R) / R) rtol = 1e-9
+                # the power splits as (1 - R) : R; both branches in glass (z = 45 mm) and in air (z = 80 mm),
+                # where each has passed one uncoated face at normal incidence, i.e. the same Fresnel transmission
+                for z in (45mm, 80mm)
+                    @test peak_field(tr, z) / peak_field(rf, z) ≈ sqrt((1 - R) / R) * wsize(rf, z) / wsize(tr, z) rtol = 1e-6
+                end
             end
         end
 
         @testset "PolarizedRay: Fresnel chain through the cemented doublet and triplet" begin
             T(a, b) = 4a * b / (a + b)^2
-            E0 = [0.6, 0.8, 0] # |E|² = 1; transverse for the direction +y is the x-z plane, use x and z
-            E0 = [0.6, 0, 0.8]
-            flux(ray) = BMO.refractive_index(ray) * sum(abs2, BMO.polarization(ray))
+            E0 = [0.6, 0, 0.8] # |E|² = 1, transverse to the direction +y
+            flux(ray) = refractive_index(ray) * sum(abs2, polarization(ray))
             for (obj, ns) in ((doublet(1.5, 1.72; y0 = 30mm), (1.5, 1.72)),
+                # same glass: no index step, T = 1 at the cemented surface
                 (doublet(1.6, 1.6; y0 = 30mm), (1.6, 1.6)),
                 (triplet(1.5, 1.74, 1.62; y0 = 30mm), (1.5, 1.74, 1.62)))
                 beam = Beam([0.0, -20mm, 0], [0.0, 1, 0], λ0, E0)
@@ -1024,7 +1103,6 @@ Tests
                 chain = [1.0; collect(ns); 1.0]
                 P_ref = prod(T(a, b) for (a, b) in zip(chain[1:(end - 1)], chain[2:end]))
                 @test flux(last(rays(beam))) ≈ P_ref atol = 1e-12
-                # no power change without an index step: same glass gives T = 1 at the cemented surface
             end
         end
     end
