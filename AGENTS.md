@@ -44,8 +44,11 @@ that interacts (`first_to_interact`) and derives the media on both sides (`trans
 [src/Transitions.jl](src/Transitions.jl). Bodies declare their medium via `medium(x)`; the physics
 at a boundary belongs to one surface model, `surface_model(t)`: the model that the thin layer at it
 carries (`surface_model(layer)`, e.g. a `BeamsplitterCoating`), else `Uncoated`; bodies and thin
-layers hand their rays to it with `interact3d(system, t, beam, at)`. Components never need a
-`Hint` for correctness; a `Hint` only speeds up the next intersection.
+layers hand their rays to it with `interact3d(system, t, beam, at)`. A model only transforms the
+channels of the bare boundary (`channels(model, t, ray, cs)`, [src/Channels.jl](src/Channels.jl));
+the solver builds the rays, children and child beamlets of every beam type from them, so a model has
+no code per beam type. Components never need a `Hint` for correctness; a `Hint` only speeds up the
+next intersection.
 
 **Be suspicious of** a component or algorithm that assumes a world-space orientation, an
 object order in a `System` or adjacency not derived from geometry at trace time; of paraxial or

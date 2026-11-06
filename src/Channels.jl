@@ -47,8 +47,23 @@ side(c::BoundaryChannel) = c.side
 direction(c::BoundaryChannel) = c.dir
 amplitude(c::BoundaryChannel) = c.a
 
-"""Returns a copy of the channel `c` with the field transfer `P` and the amplitude factor `a`."""
+"""
+    transfer(c::BoundaryChannel, P, a)
+    transfer(c::BoundaryChannel, ray, J::LocalJonesBasis, a)
+
+Returns a copy of the channel `c` with the field transfer `P` and the amplitude factor `a`. With a
+Jones matrix `J` in the s- and p-basis of the `ray` and the channel, e.g. `SPBasis(rs, 0, 0, rp)`, the
+field transfer is that of `J` in global coordinates, or `nothing` for a ray without a
+field. A surface model builds its channels with it.
+"""
 transfer(c::BoundaryChannel, P, a::Number) = BoundaryChannel(side(c), direction(c), P, a)
+transfer(c::BoundaryChannel, ray::AbstractRay, J::LocalJonesBasis, a::Number) =
+    transfer(c, jones_transfer(ray, direction(c), J), a)
+
+# The global field transfer of the Jones matrix `J` from the `ray` into the direction `dir`
+jones_transfer(::AbstractRay, dir, ::LocalJonesBasis) = nothing
+jones_transfer(ray::PolarizedRay, dir, J::LocalJonesBasis) =
+    _calculate_global_E0(direction(ray), dir, normal3d(intersection(ray)), J)
 
 """The refractive index on the `side` of the boundary of the transition `t`."""
 refractive_index(t::Transition, ::Reflected) = refractive_index_in(t)
@@ -62,9 +77,10 @@ side_hint(t::Transition, ::Transmitted) = hint_out(t)
     channels(t::Transition, ray)
 
 Returns the channels of the bare boundary of the transition `t` for the `ray`, as the tuple
-`(transmitted, reflected)` of [`BoundaryChannel`](@ref)s. The `ray` is refracted from the medium before into
-the medium behind the boundary via [`refraction3d`](@ref); beyond the critical angle it is totally
-reflected, and the transmitted channel carries no light. The field of a [`PolarizedRay`](@ref) is
+`(transmitted, reflected)` of [`BoundaryChannel`](@ref)s, the order of the `children` of a split beam.
+The `ray` is refracted from the medium before into the medium behind the boundary via
+[`refraction3d`](@ref); beyond the critical angle it is totally reflected, and the transmitted channel
+carries no light. The field of a [`PolarizedRay`](@ref) is
 transferred with the [`fresnel_coefficients`](@ref). Between equal indices the ray passes unchanged.
 """
 function channels(t::Transition, ray::Ray)
@@ -147,8 +163,7 @@ amplitude factor, or `nothing` if none carries light; for [`AllChannels`](@ref) 
 """
 function select_channels(::Dominant, cs::Tuple)
     c = reduce((a, b) -> abs2(amplitude(a)) ≥ abs2(amplitude(b)) ? a : b, cs)
-    iszero(amplitude(c)) && return nothing
-    return c
+    return islit(c) ? c : nothing
 end
 
 select_channels(::AllChannels, cs::Tuple) = cs
@@ -156,16 +171,33 @@ select_channels(::AllChannels, cs::Tuple) = cs
 """Returns `true` if the channel `c` carries light."""
 islit(c::BoundaryChannel) = !iszero(amplitude(c))
 
-# The child beams of the tuple `kids` whose channel carries light, `lit`, as a vector of type `B`
-function lit_children(::Type{B}, kids::Tuple, lit::Tuple) where {B}
-    v = Vector{B}(undef, count(lit))
+# The child beams of the tuple `kids` whose channel carries light, `lit`, and whose power is not below
+# the power cutoff, as a vector of type `B`
+function lit_children(::Type{B}, kids::Tuple, lit::Tuple, root::AbstractBeam) where {B}
+    traced = map((kid, l) -> l && !(power_fraction(kid, root) < get_power_cutoff()), kids, lit)
+    v = Vector{B}(undef, count(traced))
     k = 0
     for i in eachindex(kids)
-        lit[i] || continue
+        traced[i] || continue
         v[k += 1] = kids[i]
     end
     return v
 end
+
+"""
+    power_fraction(beam, root)
+
+The fraction of the power of the `root` beam that the child `beam` carries at its start. Beams of
+[`Ray`](@ref)s carry no power, their fraction is one.
+"""
+power_fraction(::Beam{T, <:Ray}, ::AbstractBeam) where {T} = one(T)
+power_fraction(beam::Beam{T, <:PolarizedRay}, root::Beam) where {T} =
+    ray_flux(first(rays(beam))) / ray_flux(first(rays(root)))
+power_fraction(beamlet::GaussianBeamlets, root::GaussianBeamlets) =
+    optical_power(beamlet) / optical_power(root)
+
+# Power flux of a polarized ray, up to a constant factor
+ray_flux(ray::PolarizedRay) = refractive_index(ray) * sum(abs2, polarization(ray))
 
 """
     realize(t::Transition, beam::Beam, ray, c)
@@ -176,16 +208,20 @@ channel.
 """
 realize(::Transition, ::Beam, ::AbstractRay, ::Nothing) = nothing
 
-function realize(t::Transition, ::Beam{T, R}, ray::R, c::BoundaryChannel) where {T <: Real, R <: AbstractRay{T}}
+function realize(t::Transition, ::Beam{T, R}, ray::R,
+        c::BoundaryChannel) where {T <: Real, R <: AbstractRay{T}}
     return BeamInteraction{T, R}(side_hint(t, side(c)), outgoing_ray(t, ray, c))
 end
 
-# Several channels: each that carries light starts a child beam, a single one continues the beam
-function realize(t::Transition, beam::Beam{T, R}, ray::R, cs::Tuple) where {T <: Real, R <: AbstractRay{T}}
-    lit = count(islit, cs)
-    lit == 0 && return nothing
-    lit == 1 && return realize(t, beam, ray, select_channels(Dominant(), cs))
-    children!(beam, lit_children(Beam{T, R}, map(c -> Beam(outgoing_ray(t, ray, c)), cs), map(islit, cs)))
+# Several channels: each that carries light starts a child beam, unless its power lies below the power
+# cutoff; a single one continues the beam
+function realize(t::Transition, beam::Beam{T, R}, ray::R,
+        cs::Tuple) where {T <: Real, R <: AbstractRay{T}}
+    num_lit = count(islit, cs)
+    num_lit == 0 && return nothing
+    num_lit == 1 && return realize(t, beam, ray, select_channels(Dominant(), cs))
+    kids = map(c -> Beam(outgoing_ray(t, ray, c)), cs)
+    children!(beam, lit_children(Beam{T, R}, kids, map(islit, cs), AbstractTrees.getroot(beam)))
     return nothing
 end
 
@@ -219,8 +255,7 @@ end
 
 function beamlet_interaction(system::AbstractSystem, ::AllChannels, model::AbstractSurfaceModel,
         beamlet::GaussianBeamlets, ray_id::Int)
-    # The new ray of each component ray in each channel at its own hit, and the amplitude factors;
-    # map unrolls the heterogeneous tuples, the new rays of one component share their type
+    # New rays and amplitude factors per component and channel
     hits = map(_component_beams(beamlet)) do b
         ray = rays(b)[ray_id]
         t = transition(system, ray)
@@ -233,7 +268,7 @@ function beamlet_interaction(system::AbstractSystem, ::AllChannels, model::Abstr
     num_lit == 0 && return nothing
     num_lit == 1 && return continued_beamlet(system, model, beamlet, ray_id, findfirst(lit))
     kids = ntuple(i -> child_beamlet(beamlet, map(h -> first(h)[i], hits), a[i]), Val(length(a)))
-    children!(beamlet, lit_children(typeof(beamlet), kids, lit))
+    children!(beamlet, lit_children(typeof(beamlet), kids, lit, AbstractTrees.getroot(beamlet)))
     return nothing
 end
 
@@ -251,8 +286,8 @@ end
 """
     child_beamlet(beamlet, starts, a)
 
-Returns the child of the `beamlet` whose component beams start with the rays `starts`, with the amplitude
-factor `a` of the channel of its chief ray. The waist of a [`GaussianBeamlet`](@ref) is its waist at
+Returns the child of the `beamlet` whose component beams start with the rays `starts`, with the
+amplitude factor `a` of the channel of its chief ray. The waist of a [`GaussianBeamlet`](@ref) is its waist at
 the boundary.
 """
 function child_beamlet(gauss::GaussianBeamlet, starts::Tuple, a::Number)

@@ -71,7 +71,7 @@ struct Transmitted <: AbstractSide end    # into medium_out(t)
 
 - `channels(t::Transition, ray)` returns the channels of the bare boundary as a tuple:
   Fresnel reflection and refraction, or only the reflection beyond the critical angle. This is
-  today's `cross_boundary` split into "which directions" and "which field".
+  today's `cross_boundary`, as the pair `(transmitted, reflected)` (the order of `children`), split into "which directions" and "which field".
 - `channels(model::AbstractSurfaceModel, t, ray, cs)` transforms the tuple `cs`. This is the one
   hook a model author implements. Default: `cs` unchanged (`Uncoated`).
 - `splitting_of(model)` is a trait (D3): `Dominant()` traces the strongest channel only,

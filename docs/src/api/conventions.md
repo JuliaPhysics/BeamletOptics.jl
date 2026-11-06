@@ -31,3 +31,16 @@ The normal of a face of a [`BeamletOptics.Mesh`](@ref) follows from the order of
 !!! info "Normal vector direction definition"
     Equations to calculate optical effects often rely on the normal vector at the ray intersection location to work correctly and point in a specific direction.
     It is important to ensure that this condition is fulfilled when spurious effects occur.
+
+## Reflection phase at a beamsplitter coating
+
+A lossless coating reflects with the amplitudes ``r`` from one side and ``r' = -r`` from the other
+(Stokes relations); only then do the two output ports of an interferometer sum to its input power. BMO
+applies the extra phase of ``\pi`` to a beam that faces the normal of the coating, i.e. that
+`isentering` it, and none from the other side. For a [`PolarizedRay`](@ref) and the chief ray of an
+[`AstigmaticGaussianBeamlet`](@ref), the s- and p-components are reflected with the Jones matrix
+`SPBasis(-r, 0, 0, r)` from the back and `SPBasis(r, 0, 0, -r)` when facing the normal; this matches the
+signs of the [`BeamletOptics.fresnel_coefficients`](@ref) of an external and an internal reflection at normal
+incidence. A [`GaussianBeamlet`](@ref) carries the scalar amplitude ``-r`` and ``r``, respectively. See
+[`BeamletOptics.BeamsplitterCoating`](@ref).
+

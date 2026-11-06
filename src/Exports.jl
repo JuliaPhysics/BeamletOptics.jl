@@ -67,7 +67,7 @@ export Retroreflector, get_invariant_threshold, set_invariant_threshold!,
     get_internal_reflection_threshold, get_line_plane_intersection_threshold,
     get_orthogonality_threshold, get_default_r_max, get_default_depth_max,
     get_default_wavelength, get_default_waist, get_default_power,
-    get_progress_threshold, set_progress_threshold!
+    get_progress_threshold, set_progress_threshold!, get_power_cutoff
 
 # render
 export wavelength_color, render!, get_view, set_view, hide_axis, set_orthographic, arrow!, render_lcs!, look_at!

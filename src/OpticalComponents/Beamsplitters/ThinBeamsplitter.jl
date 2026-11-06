@@ -63,7 +63,8 @@ Creates a zero-thickness, lossless, non-polarizing 2D rectangular [`ThinBeamspli
     are stored in the fields `reflectance` and `transmittance`, such that their squares sum to one.
 
 !!! warning "Reflection phase jump"
-    Note that the reflection phase jump θᵣ is implemented by the individual [`interact3d`](@ref)-methods. Refer to them for more information.
+    The reflection phase jump θᵣ = π applies to a beam that faces the normal of the splitter, see
+    [`channels`](@ref) of its [`BeamsplitterCoating`](@ref).
 """
 function ThinBeamsplitter(width::Real, height::Real; reflectance::Real = 0.5)
     if reflectance ≥ 1 || reflectance ≈ 0
@@ -114,9 +115,9 @@ coating transmits a fraction of the power, and the power of a beam is proportion
 
 # Reflection phase jump
 
-The reflection phase jump is θᵣ = π for a ray that faces the normal of the coating, i.e. `isentering`,
-and 0 from the other side, as required by the Stokes relations (r' = -r) for a lossless coating: only
-then do both outputs of an interferometer sum to its input. It applies to the field factor of beams
+The reflection phase jump is θᵣ = π for a ray that faces the normal of the coating, i.e.
+`isentering`, and 0 from the other side, as required by the Stokes relations (r' = -r) for a lossless
+coating: only then do both outputs of an interferometer sum to its input. It applies to the field factor of beams
 without polarization, e.g. a [`GaussianBeamlet`](@ref), and to the field of a [`PolarizedRay`](@ref),
 whose s- and p-components are reflected with `-r` and `r` from the other side, like an internal Fresnel
 reflection. The coating is assumed to have an unambiguous normal, i.e. a 2D mesh.
@@ -124,24 +125,14 @@ reflection. The coating is assumed to have an unambiguous normal, i.e. a 2D mesh
 function channels(coating::BeamsplitterCoating, t::Transition, ray::AbstractRay, cs)
     transmitted, reflected = cs
     # Total internal reflection: the ray does not reach the coating
-    iszero(amplitude(transmitted)) && return cs
+    islit(transmitted) || return cs
     r, τ = reflectance(coating), transmittance(coating)
     s = isentering(ray) ? -1 : 1
-    Pr = splitter_transfer(ray, direction(reflected), SPBasis(-s * r, 0, 0, s * r))
-    Pt = splitter_transfer(ray, t, direction(transmitted), τ)
-    return (transfer(transmitted, Pt, τ), transfer(reflected, Pr, s * r))
-end
-
-# Field transfer of a beamsplitter coating: none for a ray without a field
-splitter_transfer(::AbstractRay, args...) = nothing
-
-splitter_transfer(ray::PolarizedRay, dir, J::LocalJonesBasis) =
-    _calculate_global_E0(direction(ray), dir, normal3d(intersection(ray)), J)
-
-function splitter_transfer(ray::PolarizedRay, t::Transition, dir, τ)
-    d = direction(ray)
+    # The transmitted field scaled for the medium behind the boundary
     normal = normal3d(t)
-    cos_in, cos_out = abs(cos_angle3d(d, normal)), abs(cos_angle3d(dir, normal))
-    scale = sqrt(refractive_index_in(t) * cos_in / (refractive_index_out(t) * cos_out))
-    return splitter_transfer(ray, dir, SPBasis(scale * τ, 0, 0, scale * τ))
+    cos_in = abs(cos_angle3d(direction(ray), normal))
+    cos_out = abs(cos_angle3d(direction(transmitted), normal))
+    f = τ * sqrt(refractive_index_in(t) * cos_in / (refractive_index_out(t) * cos_out))
+    return (transfer(transmitted, ray, SPBasis(f, 0, 0, f), τ),
+        transfer(reflected, ray, SPBasis(-s * r, 0, 0, s * r), s * r))
 end

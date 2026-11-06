@@ -345,16 +345,16 @@ None required.
 
 ## Functions
 
-- `channels(model, t::Transition, ray, cs)`: the [`BoundaryChannel`](@ref)s of the boundary of the transition
-  `t` with the model, from the channels `cs` of the bare boundary, see [`channels`](@ref)
+- `channels(model, t::Transition, ray, cs)`: the [`BoundaryChannel`](@ref)s of the boundary of the
+  transition `t` with the model, from the channels `cs` of the bare boundary, see [`channels`](@ref)
 - `splitting_of(model)`: optional, which channels the solver traces, [`Dominant`](@ref) (default) or
   [`AllChannels`](@ref)
 - `interact3d(system, model, t::Transition, beam::Beam, ray)`: optional, the interaction of the `ray`
-  at the boundary of the transition `t`; by default the solver builds it from the channels
-- `interact3d(system, model, t::Transition, beamlet, ray_id)`: optional, the interaction of a
-  [`GaussianBeamlet`](@ref) or an [`AstigmaticGaussianBeamlet`](@ref) at the segment `ray_id`. By
-  default, each component ray interacts with the model at its own hit; a model that splits the beamlet,
-  e.g. a [`BeamsplitterCoating`](@ref), implements it.
+  at the boundary of the transition `t`; by default the solver builds it from the channels, see
+  [`realize`](@ref)
+
+The solver builds the new rays, child beams and child beamlets of every beam type from the channels,
+see [`beamlet_interaction`](@ref); a model needs no code per beam type.
 
 A thin layer object carries its model via [`surface_model`](@ref)`(object)`.
 """

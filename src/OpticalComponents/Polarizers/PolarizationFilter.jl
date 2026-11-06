@@ -91,12 +91,13 @@ end
 # angle the ray is totally reflected before it reaches the film
 function channels(film::JonesFilm, ::Transition, ray::PolarizedRay, cs)
     transmitted, reflected = cs
-    iszero(amplitude(transmitted)) && return cs
+    islit(transmitted) || return cs
     # Jones matrix projected into the plane transverse to the ray
     d = direction(ray)
     Q = I - d * transpose(d)
     J = Q * film.J * Q
-    norm(J * polarization(ray)) ≤ film.cutoff && return (transfer(transmitted, zero(transmitted.P), 0), reflected)
+    norm(J * polarization(ray)) ≤ film.cutoff &&
+        return (transfer(transmitted, zero(transmitted.P), 0), reflected)
     return (transfer(transmitted, transmitted.P * J, amplitude(transmitted)), reflected)
 end
 
