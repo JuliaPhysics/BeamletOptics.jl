@@ -62,31 +62,36 @@ The following diagram shows how `trace_all` reaches the shapes of the objects an
 
 ```mermaid
 flowchart TB
-    TA(["<b>trace_all(system, ray)</b><br/><b>closest_hits</b> of the top-level<br/>objects (and groups of a System)"])
-    BY{"<b>beyond</b>(sphere, ray, t)?<br/>sphere only behind<br/>the closest hit so far"}
-    P["<b>intersect3d(parts, ray)</b><br/>test each part, <b>merge_hits</b>:<br/>closest hit and those<br/>at the same point"]
-    G["<b>intersect3d(group, ray)</b><br/><i>System only</i><br/>x = objects(group)"]
+    TA(["<b>trace_all(system, ray)</b><br/>top-level objects<br/>(and groups of a System)"])
+    CH["<b>closest_hits(parts, ray, result, skip)</b><br/>each part in turn"]
+    SK{"part === skip?<br/>the hinted object,<br/>tested already"}
+    BY{"<b>isbeyond</b>(sphere, ray, t)?<br/>sphere missed or only<br/>behind the closest hit so far"}
+    G["<b>closest_hits(group, ...)</b><br/><i>System only</i><br/>parts = objects(group)"]
     OJ["<b>intersect3d(object, ray)</b><br/><i>own method possible,<br/>e.g. PlateBeamsplitter</i>"]
+    M["<b>merge_hits(result, hit)</b><br/>closest hit and those<br/>at the same point"]
     T["<b>shape_trait_of(object)</b><br/>SingleShape: x = shape(object)<br/>MultiShape: x = a tuple of parts<br/>(shapes or objects)"]
     PT["<b>intersect3d(sphere, x, ray)</b><br/>bounding sphere of x from the<br/>table of the solve, else none"]
+    P["<b>intersect3d(parts, ray)</b><br/>test each part, <b>merge_hits</b>"]
     SH["<b>intersect3d(shape, ray)</b><br/>shape backend, see below"]
-    OBJ["<b>object!(intersection, object)</b><br/>by the SingleShape and<br/>MultiShape methods,<br/>not by a group"]
-    AGAIN(["back to<br/><b>intersect3d(parts, ray)</b><br/>with the parts of x"])
-    MISS(["nothing"])
+    OBJ["<b>object!(intersection, object)</b><br/>by the SingleShape and<br/>MultiShape methods"]
+    MISS(["skipped / nothing"])
 
-    TA -- "each top-level part" --> BY
-    BY -- "yes: skipped" --> MISS
-    BY -- no --> P
-    P -- "isa AbstractObject" --> OJ
-    P -- "isa AbstractObjectGroup" --> G
-    P -- "isa AbstractShape" --> SH
+    TA --> CH --> SK
+    SK -- yes --> MISS
+    SK -- no --> BY
+    BY -- yes --> MISS
+    BY -- "no, isa AbstractObjectGroup" --> G
+    G -- "back to closest_hits<br/>with its objects" --> CH
+    BY -- "no, isa AbstractObject" --> OJ
     OJ -- "default method" --> T
     T --> PT
-    G --> PT
     PT -- "x is a shape" --> SH
-    PT -- "x are parts" --> AGAIN
+    PT -- "x are parts" --> P
     PT -- "ray misses<br/>the sphere" --> MISS
+    P -- "isa AbstractShape" --> SH
+    P -- "isa AbstractObject" --> OJ
     SH --> OBJ
+    OBJ -- "hit of the object" --> M
 
     classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
     classDef green fill:#38982626,stroke:#389826,stroke-width:2px
@@ -94,8 +99,8 @@ flowchart TB
     classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
     class G,OBJ blue
     class OJ,SH green
-    class P,T,PT,BY purple
-    class TA,AGAIN,MISS terminal
+    class CH,SK,BY,M,P,T,PT purple
+    class TA,MISS terminal
 ```
 
 The shape backend is selected by dispatch on the type of the shape, see [Geometry representation](@ref).

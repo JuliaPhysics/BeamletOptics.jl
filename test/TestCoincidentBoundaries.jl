@@ -1166,6 +1166,19 @@ function BMO.intersect3d(w::Wall, ray::BMO.AbstractRay)
     hit = BMO.intersect3d([0, w.y0, 0], [0, -1.0, 0], ray)
     return BMO.object!(hit, w)
 end
+# the plane reaches beyond the sphere of the mesh
+BMO.bounding_sphere_of(::Wall) = BMO.NoBoundingSphere()
+
+# a plate that counts the tests of the solver
+mutable struct CountingPlate{S <: BMO.AbstractShape{Float64}} <: BMO.AbstractObject{Float64}
+    shape::S
+    tests::Int
+end
+CountingPlate() = CountingPlate(BMO.PlanoSurfaceSDF(2mm, 10mm), 0)
+function BMO.intersect3d(p::CountingPlate, ray::BMO.AbstractRay)
+    p.tests += 1
+    return BMO.intersect3d(BMO.SingleShape(), p, ray)
+end
 hit_lengths(hit) = [length(h) for h in BMO.coincident_hits(hit)]
 holds(shapes, s) = any(x -> x === s, shapes)
 
@@ -1284,6 +1297,47 @@ holds(shapes, s) = any(x -> x === s, shapes)
                 @test length(pruned) == length(plain)
                 @test Set(objectid.(hit_shapes(pruned))) == Set(objectid.(hit_shapes(plain)))
             end
+        end
+        # the same objects in nested groups: the members of a group are skipped as well
+        grouped = System([ObjectGroup(objs[1:6]), ObjectGroup([ObjectGroup(objs[7:12]), A]), B])
+        for k in 0:359
+            φ = deg2rad(k + 0.5)
+            for p in ([0.0, 0, 0], [0.0, 31mm, 0])
+                ray = Ray(p, [cos(φ), sin(φ), 0.02], λ0)
+                pruned = BMO.with_bounding_spheres(() -> BMO.trace_all(grouped, ray), grouped)
+                plain = BMO.intersect3d(objs, ray)
+                @test isnothing(pruned) == isnothing(plain)
+                isnothing(plain) && continue
+                @test length(pruned) == length(plain)
+                @test Set(objectid.(hit_shapes(pruned))) == Set(objectid.(hit_shapes(plain)))
+            end
+        end
+    end
+
+    @testset "An own intersect3d beyond the shape: the hit does not depend on the order" begin
+        # the wall at y = 50 mm is hit at x = 20 mm, far outside of its 10 mm mesh; a plate lies behind it
+        plate = RectangularCompensatorPlate(10mm, 10mm, 2mm, ConstantRefractiveIndex(1.5))
+        translate3d!(plate, [20mm, 80mm, 0])
+        for objs in ([Wall(50mm), plate], [plate, Wall(50mm)])
+            for hint in (nothing, BMO.Hint(plate))
+                hit = hits_at(System(objs), [20mm, 0, 0], [0, 1, 0]; hint)
+                @test BMO.object(hit) isa Wall
+                @test length(hit) ≈ 50mm
+            end
+        end
+    end
+
+    @testset "A hinted object within a group is tested once" begin
+        a, b, c = CountingPlate(), CountingPlate(), CountingPlate()
+        translate3d!(b, [0, 20mm, 0])
+        translate3d!(c, [0, 40mm, 0])
+        for system in (System([a, b, c]), System([ObjectGroup([a, b]), c]),
+                System([ObjectGroup([ObjectGroup([a, b]), c])]))
+            foreach(p -> p.tests = 0, (a, b, c))
+            hit = hits_at(system, [0, -10mm, 0], [0, 1, 0]; hint = BMO.Hint(a))
+            @test BMO.object(hit) === a
+            # the plates beyond the hit of `a` are skipped
+            @test (a.tests, b.tests, c.tests) == (1, 0, 0)
         end
     end
 end
