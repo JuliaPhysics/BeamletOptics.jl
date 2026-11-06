@@ -97,21 +97,21 @@ Base.push!(::BeamletOptics.AbstractSystemRenderHandle, ::BeamletOptics.AbstractO
 Base.delete!(::BeamletOptics.AbstractSystemRenderHandle, ::BeamletOptics.AbstractObjectRenderHandle)
 ```
 
-[`update_render!`](@ref), [`remove_render!`](@ref) and [`pick_object`](@ref) work on any system
-handle through these accessors, so a handle type of your own only needs to implement them.
+[`update_render!`](@ref), [`rerender!`](@ref), [`remove_render!`](@ref) and [`pick_object`](@ref) work on any
+system handle through these accessors, so a handle type of your own only needs to implement them.
 
 The diagram shows which accessors and hooks the methods of a system handle call, and where they pass on to the object handles:
 
 ```mermaid
 flowchart TB
-    UR["<b>update_render!(h)</b><br/><b>render_plots(h)</b>"]
+    UR["<b>update_render!(h)</b><br/><b>rerender!(h)</b><br/><b>render_plots(h)</b>"]
     REM0["<b>remove_render!(h)</b>"]
     REM["<b>remove_render!(h, obj)</b>"]
     PCK["<b>pick_object(h, plot)</b>"]
     CH["<b>AbstractTrees.children(h)</b>"]
     PAR["<b>render_parent(h, obj)</b>"]
     DEL["<b>delete!(h, oh)</b><br/>after remove_render!(oh)"]
-    OHM["<b>each object handle oh</b><br/>rendered, update_render!,<br/>render_plots, remove_render!,<br/>pick_object"]
+    OHM["<b>each object handle oh</b><br/>rendered, update_render!,<br/>rerender!, render_plots,<br/>remove_render!, pick_object"]
     PP["<b>pickable_plots(x, plots)</b><br/><i>method per type of x</i>"]
 
     UR --> CH

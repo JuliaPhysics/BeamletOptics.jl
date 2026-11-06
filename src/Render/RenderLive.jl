@@ -88,8 +88,9 @@ the shape. Returns the `handle`.
 
 The handle stays the same object, in the same place among the children of its system handle. Its
 plots are replaced: [`render_plots`](@ref)`(handle)` returns the new plots, and attributes that were
-set on the old plots (e.g. visibility or a highlight) are not carried over. A system handle draws all
-its objects again, a beam handle draws its beam as [`update_render!`](@ref) does.
+set on the old plots (e.g. visibility or a highlight) are not carried over. If drawing the object
+throws, the handle keeps its old plots. A system handle draws all its objects again, a beam handle
+draws its beam as [`update_render!`](@ref) does.
 
 If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
 """

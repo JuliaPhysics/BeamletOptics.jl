@@ -63,10 +63,19 @@ function _subposes(x)
     return Point3{Float64}[_pose(p)[1] for p in parts], Matrix{Float64}[_pose(p)[2] for p in parts]
 end
 
-"""Returns the plots that are added to the `ax` by `f()`."""
+"""
+Returns the plots that are added to the `ax` by `f()`. If `f()` throws, the plots it added are
+deleted again and the exception is rethrown.
+"""
 function _capture_new_plots(f, ax::_RenderEnv)
     before = Set(objectid(p) for p in ax.scene.plots)
-    f()
+    try
+        f()
+    catch
+        # Leave no plots of a partial draw behind
+        foreach(p -> delete!(ax, p), [p for p in ax.scene.plots if objectid(p) ∉ before])
+        rethrow()
+    end
     return AbstractPlot[p for p in ax.scene.plots if objectid(p) ∉ before]
 end
 
@@ -163,14 +172,16 @@ end
 """
     rerender!(h::ObjectRenderHandle)
 
-Deletes the plots of `h` and draws the object again at its current pose, which becomes the reference
-pose of `h`.
+Draws the object again at its current pose, which becomes the reference pose of `h`, and then
+deletes the old plots of `h`. If drawing throws, `h` and the axis stay unchanged.
 """
 function rerender!(h::ObjectRenderHandle)
+    # Draw first, such that a failing draw keeps the old plots
+    plots = _capture_new_plots(h.draw, h.ax)
     for plot in h.plots
         delete!(h.ax, plot)
     end
-    h.plots = _capture_new_plots(h.draw, h.ax)
+    h.plots = plots
     h.P0, h.R0 = _pose(h.obj)
     h.P, h.R = h.P0, h.R0
     h.subP0, h.subR0 = _subposes(h.obj)

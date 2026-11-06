@@ -646,8 +646,37 @@ Base.delete!(h::_Combined, oh::BMO.AbstractObjectRenderHandle) = (filter!(c -> c
         oh = only(AbstractTrees.children(h2))
         _check_reference_points(BMO.render_plots(oh)[1], oh.P0, oh.R0, position(m2), BMO.orientation(m2))
         @test pick_object(c, BMO.render_plots(oh)[1]) === m2
+
+        # rerender! reaches the object handles through the protocol and keeps them
+        handles = copy(AbstractTrees.children(c))
+        old_plots = copy(BMO.render_plots(c))
+        @test rerender!(c) === c
+        @test all(AbstractTrees.children(c) .=== handles)
+        @test !any(p -> any(q -> q === p, old_plots), BMO.render_plots(c))
+        @test pick_object(c, BMO.render_plots(oh)[1]) === m2
+
         remove_render!(c)
         @test isempty(BMO.render_plots(c))
+    end
+
+    @testset "rerender! with a failing draw keeps the handle and the axis" begin
+        fail = Ref(false)
+        x = _Marker([0.0, 0.0, 0.0])
+        h = live_render!(ax, x) do
+            scatter!(ax, [Makie.Point3f(0, 0, 0)])
+            fail[] && error("draw failed")
+        end
+        plots = copy(BMO.render_plots(h))
+        n_plots = length(ax.scene.plots)
+        fail[] = true
+        @test_throws ErrorException rerender!(h)
+        @test BMO.render_plots(h) == plots
+        @test length(ax.scene.plots) == n_plots # the scatter of the failed draw is deleted
+        @test all(p -> any(q -> q === p, ax.scene.plots), plots)
+        fail[] = false
+        @test rerender!(h) === h
+        @test length(ax.scene.plots) == n_plots
+        remove_render!(h)
     end
 
     @testset "render! of a system, a component and a beam into an LScene" begin
