@@ -95,6 +95,8 @@ end
               optical_power(pd, g; progress = false)
         @test optical_power(BMO.sample_points(pd, cloud), I) ≈ optical_power(pd, cloud; progress = false)
         @test_throws DimensionMismatch optical_power(grid, I)
+        # a field is no intensity
+        @test_throws MethodError optical_power(grid, electric_field(pd, grid.points; progress = false))
         _, E = electric_field(pd, cloud; progress = false)
         @test E ≈ vec(electric_field(pd, g; progress = false)[3])
         # the values at local points alone, without a sampling

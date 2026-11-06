@@ -105,7 +105,7 @@ RegularGrid
 RectilinearGrid
 electric_field(::Detector, ::AbstractArray{<:AbstractVector})
 intensity(::Detector, ::AbstractArray{<:AbstractVector})
-optical_power(::BeamletOptics.DetectorSamples, ::AbstractArray)
+optical_power(::BeamletOptics.DetectorSamples, ::AbstractArray{<:Real})
 ```
 
 ### Gaussian beamlet interference

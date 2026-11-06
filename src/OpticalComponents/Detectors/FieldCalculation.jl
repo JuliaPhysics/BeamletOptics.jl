@@ -278,7 +278,7 @@ function optical_power(pd::Detector, sampling::AbstractDetectorSampling = Regula
 end
 
 """
-    optical_power(samples::DetectorSamples, I::AbstractArray)
+    optical_power(samples::DetectorSamples, I::AbstractArray{<:Real})
 
 The power in \\[W\\] of the irradiance `I` \\[W/m²\\] at the points of `samples`,
 `P ≈ Σᵢ wᵢ Iᵢ` with the weights of the sampling, see [`optical_power`](@ref)`(pd, sampling)`.
@@ -292,9 +292,10 @@ P = optical_power(samples, I)       # == optical_power(pd, RegularGrid(num_point
 x, z = samples.coordinates
 ```
 
-Throws a `DimensionMismatch` if `I` does not have the shape of the points.
+Throws a `DimensionMismatch` if `I` does not have the shape of the points. `I` is real: a field of
+[`electric_field`](@ref) has no method.
 """
-function optical_power(samples::DetectorSamples, I::AbstractArray)
+function optical_power(samples::DetectorSamples, I::AbstractArray{<:Real})
     size(I) == size(samples.points) || throw(DimensionMismatch(
         lazy"the intensity has the size $(size(I)), the points of the samples $(size(samples.points))"))
     # Lazy weighted sum
