@@ -104,8 +104,7 @@ end
         n::N
     end
 
-    BMO.refractive_index(ts::TestSubstrate, ::Real) = ts.n
-    set_index(ts::TestSubstrate, new) = (ts.n = new)
+    set_index(ts::TestSubstrate, new::Real) = (ts.n = ConstantRefractiveIndex(float(new)))
     get_index(ts::TestSubstrate) = ts.n
 
     "Shifts the phase of the beamlet by a specific amount in [rad]."
@@ -119,7 +118,7 @@ end
     # setup system for tests below
     splitter = CubeBeamsplitter(10mm, ConstantRefractiveIndex(1))
     substrate_length = 10mm
-    substrate = TestSubstrate(BMO.CylinderSDF(5mm, substrate_length / 2), 1.5)
+    substrate = TestSubstrate(BMO.CylinderSDF(5mm, substrate_length / 2), ConstantRefractiveIndex(1.5))
 
     pd_size = 10mm
     pd_res = 250
