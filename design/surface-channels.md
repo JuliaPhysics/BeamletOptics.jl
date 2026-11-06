@@ -57,7 +57,7 @@ flowchart TB
 
 ```julia
 """A channel of a boundary: an outgoing direction and the transfer of the field into it."""
-struct Channel{T, S <: AbstractSide}
+struct BoundaryChannel{T, S <: AbstractSide}
     side::S               # Reflected() or Transmitted(): medium, enclosure and hint follow from it
     dir::Point3{T}        # outgoing direction
     P::SMatrix{3, 3, Complex{T}, 9}   # global field transfer, E_out = P * E_in
@@ -131,7 +131,7 @@ channels at the end) may still declare their stage with a trait, so the user onl
 
 ## Decisions
 
-1. **Scalar beams carry their own factor.** A `Channel` holds a complex scalar `a` next to `P`.
+1. **Scalar beams carry their own factor.** A `BoundaryChannel` holds a complex scalar `a` next to `P`.
    Every model sets both: `BeamsplitterCoating` `a = r` or `t`, with π on the reflected channel
    when entering; `Uncoated` `a = 1` (scalar beamlets have no Fresnel loss today); Jones items leave
    `a` unchanged (scalar rays pass a polarizer unfiltered today). Deriving `a` from `P` was rejected:
@@ -142,12 +142,13 @@ channels at the end) may still declare their stage with a trait, so the user onl
 3. **The power cutoff is absolute:** relative to the power of the root beam, `|E|² / |E_root|²`,
    from `Config` (`get_power_cutoff()`), default 0, i.e. no cutoff and no change of results. Beams
    without an amplitude (`Ray`) are bounded by `depth_max` only.
-4. **Names as drafted:** `Channel`, `channels`, `Reflected`, `Transmitted`, `splitting_of`,
+4. **Names as drafted**, except `Channel`, which shadowed `Base.Channel` (renamed to
+   `BoundaryChannel`, N1): `BoundaryChannel`, `channels`, `Reflected`, `Transmitted`, `splitting_of`,
    `Dominant`, `AllChannels` (public for model authors); `realize` stays internal.
 
 ## Plan of the PR
 
-1. `Channel`, sides, `channels(t, ray)`; `realize` for `Beam` of `Ray` and `PolarizedRay`;
+1. `BoundaryChannel`, sides, `channels(t, ray)`; `realize` for `Beam` of `Ray` and `PolarizedRay`;
    `Uncoated` through the channels. All tests unchanged.
 2. `BeamsplitterCoating` and `JonesFilm` on channels; the helpers removed.
 3. `realize` for both beamlet types, full s/p splitting of the astigmatic beamlet.

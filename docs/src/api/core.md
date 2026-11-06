@@ -261,7 +261,7 @@ BeamletOptics.surface_model(::BeamletOptics.Transition)
 BeamletOptics.surface_model(::BeamletOptics.AbstractObject)
 BeamletOptics.AbstractSurfaceModel
 BeamletOptics.interact3d(::BeamletOptics.AbstractSystem, ::BeamletOptics.AbstractSurfaceModel, ::BeamletOptics.Transition, ::BeamletOptics.Beam, ::BeamletOptics.AbstractRay)
-BeamletOptics.Channel
+BeamletOptics.BoundaryChannel
 BeamletOptics.AbstractSide
 BeamletOptics.channels
 BeamletOptics.splitting_of

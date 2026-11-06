@@ -221,8 +221,9 @@ a label.
 field, long accessor (`pos` → `position`, `λ` → `wavelength`). Physics symbols for data (`λ`,
 `θ`, `E0`, `w0`), English words for functions. Arguments by role (`object::AbstractObject`,
 `ray`, `system`; concrete components by acronym, `cbs`), not `x`, `obj`, `sys`. Types
-`Abstract<Role>`, catalog `[Shape][Variant][Family]`, backend suffix (`BoxSDF`). Constants
-lowercase (`c_vacuum`), no SCREAMING_CASE; keyword families `num_*`, `*_max`, `show_*`.
+`Abstract<Role>`, catalog `[Shape][Variant][Family]`, backend suffix (`BoxSDF`). No name shadows
+an export of `Base` (`BoundaryChannel`, not `Channel`). Constants lowercase (`c_vacuum`), no
+SCREAMING_CASE; keyword families `num_*`, `*_max`, `show_*`.
 
 ### I · Internals
 

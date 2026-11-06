@@ -345,7 +345,7 @@ None required.
 
 ## Functions
 
-- `channels(model, t::Transition, ray, cs)`: the [`Channel`](@ref)s of the boundary of the transition
+- `channels(model, t::Transition, ray, cs)`: the [`BoundaryChannel`](@ref)s of the boundary of the transition
   `t` with the model, from the channels `cs` of the bare boundary, see [`channels`](@ref)
 - `splitting_of(model)`: optional, which channels the solver traces, [`Dominant`](@ref) (default) or
   [`AllChannels`](@ref)
