@@ -1189,7 +1189,7 @@ end
         @test BMO.refractive_index(BMO.IsotropicMedium(ConstantRefractiveIndex(1.5)), λ0) == 1.5
         nbk7 = SellmeierEquation(1.03961212, 0.231792344, 1.01046945, 0.00600069867, 0.0200179144, 103.560653)
         @test BMO.refractive_index(BMO.IsotropicMedium(nbk7), 1e-6) == nbk7(1e-6)
-        lens = SphericalLens(30mm, -30mm, 5mm, 15mm, λ -> 1.6)
+        lens = SphericalLens(30mm, -30mm, 5mm, 15mm, ConstantRefractiveIndex(1.6))
         @test BMO.medium(lens) isa BMO.IsotropicMedium
         @test BMO.refractive_index(BMO.medium(lens), λ0) == 1.6
         @test isnothing(BMO.medium(RoundPlanoMirror(25.4mm, 5mm)))
@@ -1200,7 +1200,7 @@ end
     end
 
     @testset "Single lens: air into glass, glass into the system medium" begin
-        lens = SphericalLens(30mm, -30mm, 5mm, 15mm, λ -> 1.6)
+        lens = SphericalLens(30mm, -30mm, 5mm, 15mm, ConstantRefractiveIndex(1.6))
         system = System([lens])
         t = transition_at(system, [1mm, -10mm, 0], [0, 1, 0])
         @test BMO.refractive_index_in(t) == 1.0 && BMO.refractive_index_out(t) == 1.6
@@ -1222,8 +1222,8 @@ end
     end
 
     @testset "Thin layer between two plates, and in air" begin
-        A = RectangularCompensatorPlate(40mm, 40mm, 5mm, λ -> 1.7)
-        B = RectangularCompensatorPlate(40mm, 40mm, 3mm, λ -> 1.4)
+        A = RectangularCompensatorPlate(40mm, 40mm, 5mm, ConstantRefractiveIndex(1.7))
+        B = RectangularCompensatorPlate(40mm, 40mm, 3mm, ConstantRefractiveIndex(1.4))
         translate3d!(B, [0, 5mm, 0])
         bs = ThinBeamsplitter(40mm, 40mm; reflectance = 0.5)
         translate3d!(bs, [0, 5mm, 0])
@@ -1257,7 +1257,7 @@ end
 @testset "Own interact3d methods take precedence" begin
     # the solver dispatches on the object that was hit; the transition and the surface models are
     # only the default methods of refracting bodies and thin layers
-    g = AbsorbingGlass(BMO.CuboidMesh(40mm, 5mm, 40mm), λ -> 1.5, 0)
+    g = AbsorbingGlass(BMO.CuboidMesh(40mm, 5mm, 40mm), ConstantRefractiveIndex(1.5), 0)
     beam = solve([g], beam_at([20mm, -20mm, 20mm], [0, 1, 0]))
     @test g.calls == 1
     @test length(rays(beam)) == 1
@@ -1272,7 +1272,7 @@ struct BareModel <: BMO.AbstractSurfaceModel end
 @testset "Fallbacks of the medium and surface model contracts" begin
     @test_throws ErrorException BMO.refractive_index(BareMedium(), λ0)
     # A surface model without interact3d warns and blocks the beam
-    plate = BMO.Lens(BMO.CuboidMesh(40mm, 5mm, 40mm), λ -> 1.5)
+    plate = BMO.Lens(BMO.CuboidMesh(40mm, 5mm, 40mm), ConstantRefractiveIndex(1.5))
     p, d = [20mm, -20mm, 20mm], [0.0, 1.0, 0.0]
     t = transition_at(System([plate]), p, d)
     ray = Ray(p, d, λ0)
@@ -1304,7 +1304,7 @@ BMO.medium(::GlassBlock) = BMO.IsotropicMedium(ConstantRefractiveIndex(1.5))
 @testset "A thin layer carries the surface model of the boundary" begin
     θ = deg2rad(25)
     p, d = [0, -10mm, 0], [sin(θ), cos(θ), 0]
-    plate() = RectangularCompensatorPlate(40mm, 40mm, 5mm, λ -> 1.5)
+    plate() = RectangularCompensatorPlate(40mm, 40mm, 5mm, ConstantRefractiveIndex(1.5))
     # A body that declares only its medium refracts as a refracting optic
     block = GlassBlock(BMO.shape(plate()))
     block_beam = solve([block], beam_at(p, d))
@@ -1340,8 +1340,8 @@ end
 
     @testset "Plate within a cuvette: back into the water, not into air" begin
         nw, ng = 1.33, 1.6
-        water = RectangularCompensatorPlate(60mm, 60mm, 20mm, λ -> nw)
-        glass = RectangularCompensatorPlate(20mm, 20mm, 4mm, λ -> ng)
+        water = RectangularCompensatorPlate(60mm, 60mm, 20mm, ConstantRefractiveIndex(nw))
+        glass = RectangularCompensatorPlate(20mm, 20mm, 4mm, ConstantRefractiveIndex(ng))
         translate3d!(glass, [0, 8mm, 0])
         beam = solve([water, glass], beam_at(p, d))
         ref = follow([plane([0, 0, 0], [0, 1, 0], nw), plane([0, 8mm, 0], [0, 1, 0], ng),
@@ -1359,7 +1359,7 @@ end
     @testset "Cemented doublet in water" begin
         nw, n1, n2 = 1.33, 1.5, 1.7
         dl = doublet(n1, n2; y0 = 10mm)
-        water = RectangularCompensatorPlate(60mm, 60mm, 30mm, λ -> nw)
+        water = RectangularCompensatorPlate(60mm, 60mm, 30mm, ConstantRefractiveIndex(nw))
         for h in (0.0, 2mm, -3.5mm)
             beam = solve([water, dl], beam_at([h, -10mm, 0], [0, 1, 0]))
             v, R, _ = doublet_surfaces(10mm, n1, n2)
@@ -1373,7 +1373,7 @@ end
 
     @testset "Detector that does not stop, on a glass face: the ray leaves the glass" begin
         ng = 1.6
-        A = RectangularCompensatorPlate(40mm, 40mm, 5mm, λ -> ng)
+        A = RectangularCompensatorPlate(40mm, 40mm, 5mm, ConstantRefractiveIndex(ng))
         det = Detector(30mm, false)
         translate3d!(det, [0, 5mm, 0])
         beam = solve([A, det], beam_at(p, d))
@@ -1386,7 +1386,7 @@ end
     @testset "New rays of components learn their enclosure from the solver" begin
         # a thin beamsplitter and a mirror within water create rays without an enclosure
         nw = 1.33
-        water = RectangularCompensatorPlate(60mm, 60mm, 40mm, λ -> nw)
+        water = RectangularCompensatorPlate(60mm, 60mm, 40mm, ConstantRefractiveIndex(nw))
         bs = ThinBeamsplitter(20mm, 20mm; reflectance = 0.5)
         zrotate3d!(bs, deg2rad(45))
         translate3d!(bs, [0, 20mm, 0])
