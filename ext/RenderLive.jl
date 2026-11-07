@@ -287,7 +287,7 @@ object, such that each object of a group can be moved on its own without renderi
 function live_render!(ax::_RenderEnv, sys::BMO.AbstractSystem; kwargs...)
     handles = AbstractObjectRenderHandle[]
     # Avoid use of objects(sys), which flattens the groups
-    roots = collect(BMO.ObjectOrGroup, BMO._top_level(sys))
+    roots = collect(BMO.ObjectOrGroup, AbstractTrees.children(sys))
     foreach(obj -> _live_render_leaves!(handles, ax, obj; kwargs...), roots)
     return SystemRenderHandle(ax, sys, handles, roots)
 end

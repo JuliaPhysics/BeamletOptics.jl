@@ -67,13 +67,13 @@ Since an optical element can consist of multiple joint shapes, the return type m
 
 The closest hit of a ray is found on two levels: the solver searches the system for the objects that the ray can reach, and each object it reaches computes its own hit.
 
-The search, shown below, goes through the top-level objects and groups of the system one at a time and keeps the closest hit found so far. Once there is a hit, every part whose bounding sphere the ray enters only beyond that hit (plus `get_coincidence_tolerance()`, so that touching surfaces are still found) is skipped, see [Bounding sphere pretest](@ref). A group is entered only if the ray reaches its sphere; its objects are then searched in the same way. `trace_all` starts without a hit. `trace_one` starts with the hit of the hinted object, so it can skip more parts from the start, see [Hints](@ref). A [`StaticSystem`](@ref) has no groups while tracing, since it flattens them when it is built.
+The search, shown below, goes through `children(system)`, the top-level objects and groups of the system, one at a time and keeps the closest hit found so far. Once there is a hit, every part whose bounding sphere the ray enters only beyond that hit (plus `get_coincidence_tolerance()`, so that touching surfaces are still found) is skipped, see [Bounding sphere pretest](@ref). A group is entered only if the ray reaches its sphere; its objects are then searched in the same way. `trace_all` starts without a hit. `trace_one` starts with the hit of the hinted object, so it can skip more parts from the start, see [Hints](@ref). A [`StaticSystem`](@ref) has no groups while tracing, since it flattens them when it is built.
 
 ```mermaid
 flowchart TB
     EA(["<b>trace_all</b><br/>best hit so far: none"])
     EO(["<b>trace_one</b><br/>best hit so far: hinted object"])
-    N{"another top-level<br/>object or group?"}
+    N{"another object or group<br/>of children(system)?"}
     H{"is it the<br/>hinted object?"}
     BH{"best hit<br/>so far?"}
     BY{"<b>isbeyond</b><br>does its sphere start<br/>behind the best hit?<br/><i></i>"}

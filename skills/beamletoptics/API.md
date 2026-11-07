@@ -53,8 +53,9 @@ Useful non-exported helpers: `BeamletOptics.inch`, `lensmakers_eq(R1, R2, n)` (r
 `divergence_angle(λ, w0, M2)`, `numerical_aperture(θ, n=1)` (also of a `PointSource` or a cone
 sampling, public), `optical_path_length(beam)`,
 `isparaxial(system, beam, θ=π/4)`, `fresnel_coefficients`, `beams(group)`,
-`objects(system)` and `objects(group)` (public),
-`list_subtypes(T)`, constants `Z_vacuum`, `c_vacuum`.
+`objects(system)` and `objects(group)` (public, groups flattened in a system),
+`AbstractTrees.children(system)` (the top-level objects and groups as added; a system is an
+AbstractTrees tree, e.g. for `print_tree`), `list_subtypes(T)`, constants `Z_vacuum`, `c_vacuum`.
 
 ## Properties of objects
 

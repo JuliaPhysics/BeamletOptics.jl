@@ -155,6 +155,8 @@ BMO.kinematic_trait_of(::StaticTestObject) = BMO.Static()
         @test BMO.objects(objects) isa Vector{BMO.ObjectOrGroup}
         @test BMO.objects(objects)[1] === center && BMO.objects(objects)[2] === circle
         @test collect(AbstractTrees.children(objects)) == [center, circle]
+        # printed into the given IO
+        @test sprint(show, MIME"text/plain"(), objects) == sprint(print_tree, objects)
         # only objects and groups are members, e.g. no shapes
         @test_throws TypeError ObjectGroup([center, BMO.CylinderSDF(1e-3, 2e-3)])
     end
