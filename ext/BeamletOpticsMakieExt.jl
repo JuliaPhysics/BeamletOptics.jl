@@ -3,7 +3,7 @@ module BeamletOpticsMakieExt
 using BeamletOptics
 import BeamletOptics: render!, RenderException, _RenderTypes, get_view, set_view, hide_axis,
                        set_orthographic, arrow!, render_lcs!, look_at!, live_render!, update_render!,
-                       remove_render!, pick_object, studio_lighting!, set_render_look,
+                       rerender!, remove_render!, pick_object, studio_lighting!, set_render_look,
                        rendered, render_plots, render_parent, render_settings, render_settings!,
                        pickable_plots, AbstractRenderHandle, AbstractObjectRenderHandle,
                        AbstractSystemRenderHandle, AbstractBeamRenderHandle

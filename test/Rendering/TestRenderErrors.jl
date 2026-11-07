@@ -28,6 +28,7 @@ const BMO = BeamletOptics
     @test_throws BMO.MissingBackendError BMO.look_at!(axis, [0,0,0], [1,0,0])
     @test_throws BMO.MissingBackendError live_render!(axis, cube)
     @test_throws BMO.MissingBackendError update_render!(nothing)
+    @test_throws BMO.MissingBackendError rerender!(nothing)
     @test_throws BMO.MissingBackendError BMO.render_settings!(nothing; flen = 1.0)
     @test_throws BMO.MissingBackendError remove_render!(nothing)
     @test_throws BMO.MissingBackendError pick_object(nothing, nothing)

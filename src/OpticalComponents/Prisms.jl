@@ -17,9 +17,14 @@ thickness(p::Prism) = thickness(shape(p))
 """
     RightAnglePrism(leg_length, height, n)
 
-Creates a right angle symmetric [`Prism`](@ref). The legs are the faces with the normals -x and -y
-and the hypotenuse passes through the local origin, see [`RightAnglePrismSDF`](@ref). The prism is
-*not aligned* with the y-axis.
+Creates a right angle symmetric [`Prism`](@ref), see [`RightAnglePrismSDF`](@ref). The legs are the
+faces with the normals -x and -y, the hypotenuse has the normal `(1, 1, 0) / √2`. The local origin
+is the center of the hypotenuse face, the right angle edge lies at `(-leg_length / 2, -leg_length / 2)`.
+
+As constructed, a beam along +y enters the leg with the normal -y, is totally internally reflected
+at the hypotenuse (for `n > √2`) and leaves along -x; after `yrotate3d!(prism, π)` it leaves along +x.
+`zrotate3d!(prism, 5π / 4)` turns the hypotenuse normal to -y, so that the hypotenuse faces a beam
+along +y and returns it antiparallel.
 
 # Arguments
 
@@ -58,7 +63,8 @@ end
 Creates an equilateral triangular [`Prism`](@ref), e.g. for dispersion. The local origin is the
 centroid of the triangle. The apex points along the local +y-axis and the base face has the
 normal -y. A beam travelling along +x or -x through the faces next to the apex at (approximately)
-minimum deviation is deflected towards the base.
+minimum deviation is deflected towards the base. For a beam along +y, `zrotate3d!(prism, π / 2 - θ)`
+with `θ = asin(n sin 30°) - 30°` sets minimum deviation, the beam is deflected towards +x.
 
 # Arguments
 
@@ -79,7 +85,8 @@ Creates a [`Prism`](@ref) with an isosceles trapezoid cross-section and 45° end
 Dove prism that inverts an image without deviating a beam along its axis. The long axis is the
 local y-axis, so that a beam travelling along +y enters the 45° end face. The base face with the
 normal -x is the one that totally internally reflects. The local origin is the center of the
-cross-section's bounding box.
+cross-section's bounding box. A beam along +y leaves the prism parallel to the y-axis, but in
+general laterally shifted.
 
 # Arguments
 

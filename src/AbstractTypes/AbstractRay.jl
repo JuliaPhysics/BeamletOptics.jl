@@ -141,7 +141,7 @@ function append_hits!(head::Intersection, other::Intersection, tol)
     hit = other
     while !isnothing(hit)
         next = hit.next
-        if abs(length(hit) - t0) ≤ tol && !holds_shape(head, shape(hit))
+        if abs(length(hit) - t0) ≤ tol && !is_in_chain(head, shape(hit))
             hit.next = nothing
             tail.next = hit
             tail = hit
@@ -168,8 +168,8 @@ function first_of(hit::Intersection, chosen::Intersection)
 end
 
 # Whether a hit of the chain `head` belongs to `target`, compared by identity
-holds_shape(head::Intersection, target) = any(hit -> shape(hit) === target, coincident_hits(head))
-holds_shape(::Intersection, ::Nothing) = false
+is_in_chain(head::Intersection, target::AbstractShape) = any(hit -> shape(hit) === target, coincident_hits(head))
+is_in_chain(::Intersection, ::Nothing) = false
 
 function Base.show(io::IO, ::MIME"text/plain", _intersection::Intersection)
     println(io, "Intersected object: $(typeof(object(_intersection)))")
