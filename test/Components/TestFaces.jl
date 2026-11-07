@@ -114,15 +114,58 @@ end
     @test !isapprox(R_A, R_B; rtol = 1e-3)
 end
 
-@testset "Two coated faces of a cemented boundary warn" begin
+# Two plates cemented at y = 5 mm, A below and B above
+function cemented_plates()
     A = RectangularCompensatorPlate(40mm, 40mm, 5mm, glass)
     B = RectangularCompensatorPlate(40mm, 40mm, 5mm, glass)
     translate3d!(B, [0, 5mm, 0])
+    return A, B
+end
+
+@testset "Two coated faces of a cemented boundary act together" begin
+    # A mirror on A and an anti-reflection coating on B: both lie in the boundary, the light is
+    # reflected from either side
+    A, B = cemented_plates()
     surface_model!(A, FlatFace([0, 1, 0]), MirrorCoating())
     surface_model!(B, FlatFace([0, -1, 0]), AntireflectionCoating())
+    for (p, d) in (([0, -10mm, 0], [0, 1, 0]), ([0, 20mm, 0], [0, -1, 0]))
+        beam = Beam(p, d, λ0)
+        solve_system!(System([A, B]), beam)
+        @test BMO.direction(last(rays(beam))) ≈ -d
+    end
+    # Two thin films act as one film of all their layers: a silver film split between both faces
+    silver = AbsorbingRefractiveIndex(ConstantRefractiveIndex(0.135), 3.985)
+    half, whole = ThinFilmLayer(silver, 10e-9), ThinFilmLayer(silver, 20e-9)
+    function reflected_power(models)
+        A, B = cemented_plates()
+        for (plate, normal, model) in zip((A, B), ([0, 1, 0], [0, -1, 0]), models)
+            isnothing(model) || surface_model!(plate, FlatFace(normal), model)
+        end
+        beam = polarized([0, -10mm, 0], [0, 1, 0])
+        solve_system!(System([A, B]), beam; depth_max = 2)
+        return flux(first(rays(children(beam)[2]))) / flux(last(rays(beam)))
+    end
+    @test reflected_power((ThinFilmCoating(half), ThinFilmCoating(half))) ≈
+          reflected_power((ThinFilmCoating(whole), nothing))
+    # A retarder on the entered body acts in the frame of that body: a half-wave film on B, turned
+    # with B, turns the light as the same film alone does
+    function turned_field(coat_A)
+        A, B = cemented_plates()
+        coat_A && surface_model!(A, FlatFace([0, 1, 0]), AntireflectionCoating())
+        surface_model!(B, FlatFace([0, -1, 0]), Retarder(π, [1, 0, 0]))
+        rotate3d!(B, [0, 1, 0], deg2rad(22.5))
+        beam = polarized([0, -10mm, 0], [0, 1, 0])
+        solve_system!(System([A, B]), beam)
+        return abs.(BMO.polarization(last(rays(beam))))
+    end
+    @test turned_field(true) ≈ turned_field(false)
+    @test turned_field(true)[3] > 0.1
+    # A pair that cannot be combined warns once, the coating of the body that the ray leaves acts
+    A, B = cemented_plates()
+    surface_model!(A, FlatFace([0, 1, 0]), MirrorCoating())
+    surface_model!(B, FlatFace([0, -1, 0]), ThinFilmCoating(half))
     beam = Beam([0, -10mm, 0], [0, 1, 0], λ0)
-    @test_logs (:warn, r"Both faces of a cemented boundary") solve_system!(System([A, B]), beam)
-    # The body that the ray leaves: A, whose mirror reflects
+    @test_logs (:warn, r"cannot be combined") solve_system!(System([A, B]), beam)
     @test BMO.direction(last(rays(beam))) ≈ [0, -1, 0]
 end
 

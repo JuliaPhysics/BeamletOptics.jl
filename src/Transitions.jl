@@ -427,9 +427,9 @@ function boundary_model(t::Transition)
     model = surface_model(t.layer)
     isnothing(model) || return model
     left, entered = face_model(t, t.exiting), face_model(t, t.entering)
-    isnothing(left) || isnothing(entered) ||
-        @warn "Both faces of a cemented boundary are coated, only the coating of the body that the ray leaves acts" maxlog = 1
-    return something(left, entered, Some(nothing))
+    isnothing(left) && return entered
+    isnothing(entered) && return left
+    return cemented_model(left, entered, t)
 end
 
 # The model of the coated face of a body at the boundary of `t`
