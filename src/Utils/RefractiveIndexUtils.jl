@@ -35,7 +35,8 @@ in \\[m\\]: the imaginary part of its complex index `n(λ) + iκ`, with the fiel
 of BMO. A field decays by `exp(-2πκz/λ)`. Zero for a transparent material (default).
 
 !!! info
-    The thin layers of a [`ThinFilmCoating`](@ref) absorb with κ; the volume of a body does not yet.
+    The thin layers of a [`ThinFilmCoating`](@ref) absorb with κ; the volume of a body does not
+    attenuate the light.
 """
 extinction_coefficient(n::AbstractRefractiveIndex, λ::Real) = zero(float(typeof(n(λ))))
 
