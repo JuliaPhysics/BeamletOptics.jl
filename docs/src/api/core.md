@@ -368,7 +368,34 @@ BeamletOptics.beamlet_interaction
 BeamletOptics.power_fraction
 ```
 
-Thin elements, e.g. coatings and polarizing films, describe their Jones matrices in reflection and transmission instead of channels; the channels and the stacking follow from them:
+Thin elements, e.g. coatings and polarizing films, describe their Jones matrices in reflection and transmission instead of channels; the channels and the stacking follow from them (green: implemented by an element author):
+
+```mermaid
+flowchart TB
+    C(["<b>channels</b>(element, t, ray, cs)"])
+    TIR{"transmitted channel<br/>of the bare boundary lit?"}
+    F["<b>IncidenceFrame</b>(t, ray)<br/>s- and p-bases of the incident<br/>and reflected direction, front side"]
+    S["<b>scattering</b>(element, frame)<br/>r, t, r′, t′ in the s- and p-bases"]
+    K["<b>SurfaceStack</b>: <b>cascade</b> of the elements<br/>in the order the ray meets them,<br/>reflections between them coherent"]
+    A["<b>channel_amplitude</b><br/>power fraction of the field<br/>or of unpolarized light"]
+    O(["(transmitted, reflected) channels:<br/>t scaled for the medium behind"])
+    B(["cs: totally reflected"])
+
+    C --> TIR
+    TIR -- no --> B
+    TIR -- yes --> F --> S
+    S -. "stack" .-> K -.-> A
+    S --> A --> O
+
+    classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
+    classDef green fill:#38982626,stroke:#389826,stroke-width:2px
+    classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
+    classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
+    class F,K,A blue
+    class S green
+    class TIR purple
+    class C,O,B terminal
+```
 
 ```@docs; canonical=false
 BeamletOptics.AbstractThinElement
