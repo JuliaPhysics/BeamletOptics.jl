@@ -272,6 +272,40 @@ BeamletOptics.AbstractSurfaceModel
 
 A face of a body is a question about a hit, not a piece of geometry: [`BeamletOptics.isonface`](@ref) answers whether a hit lies on it, in the local frame of the body. Faces defined by geometry, e.g. [`FrontFace`](@ref) or [`FlatFace`](@ref), decide from the point and the normal of the hit. A shape that knows its faces, e.g. a boundary representation, sets the native face of each hit in its `intersect3d` method via [`BeamletOptics.face!`](@ref); its faces are coated directly, and the geometric faces and masks work on it as well. The table of a body, [`BeamletOptics.face_models`](@ref), is only read when the body has coated faces.
 
+The diagram shows how the model of a boundary is found (green: implemented by a component or shape author, purple: dispatch).
+
+```mermaid
+flowchart TB
+    T(["<b>surface_model</b>(t)"])
+    L{"thin layer at the<br/>boundary with a model?"}
+    C{"<b>iscoated</b>(hit)<br/>faces of the body left,<br/>then entered, carry models?"}
+    F["<b>face_model</b>(part, hit, point)<br/>hit in the local frame of the part"]
+    O{"<b>isonface</b>(face, part, hit, point, normal)<br/>each entry of <b>face_models</b>(part),<br/>in the order coated"}
+    N["native face of the hit<br/><b>face</b>(hit), set by the shape"]
+    G["geometric face<br/>FrontFace, FlatFace, MaskedFace"]
+    S["<b>surface_model</b>(system)<br/>Uncoated by default"]
+    M(["the model of the boundary"])
+
+    T --> L
+    L -- yes --> M
+    L -- no --> C
+    C -- yes --> F --> O
+    O -.-> N
+    O -.-> G
+    O -- "first match" --> M
+    O -- "no match" --> S
+    C -- no --> S --> M
+
+    classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
+    classDef green fill:#38982626,stroke:#389826,stroke-width:2px
+    classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
+    classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
+    class F,S blue
+    class N,G green
+    class L,C,O purple
+    class T,M terminal
+```
+
 ```@docs; canonical=false
 BeamletOptics.AbstractFace
 BeamletOptics.isonface

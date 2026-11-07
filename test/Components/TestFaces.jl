@@ -114,6 +114,18 @@ end
     @test !isapprox(R_A, R_B; rtol = 1e-3)
 end
 
+@testset "Two coated faces of a cemented boundary warn" begin
+    A = RectangularCompensatorPlate(40mm, 40mm, 5mm, glass)
+    B = RectangularCompensatorPlate(40mm, 40mm, 5mm, glass)
+    translate3d!(B, [0, 5mm, 0])
+    surface_model!(A, FlatFace([0, 1, 0]), MirrorCoating())
+    surface_model!(B, FlatFace([0, -1, 0]), AntireflectionCoating())
+    beam = Beam([0, -10mm, 0], [0, 1, 0], λ0)
+    @test_logs (:warn, r"Both faces of a cemented boundary") solve_system!(System([A, B]), beam)
+    # The body that the ray leaves: A, whose mirror reflects
+    @test BMO.direction(last(rays(beam))) ≈ [0, -1, 0]
+end
+
 @testset "The surface model of a system" begin
     lens = lens_at([0, 50mm, 0])
     beam = polarized([0, 0, 0], [0, 1, 0])
