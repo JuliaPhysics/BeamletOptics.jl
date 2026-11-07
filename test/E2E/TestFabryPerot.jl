@@ -67,4 +67,58 @@ end
     @test sum(diff(peaks)) / (length(peaks) - 1) ≈ λ / (2α) rtol = 0.05
 end
 
+# The field of the k-th echo of a tilted plate (thickness t, index n, angle θ) on a screen at the
+# distance zdet from the waist w0, as a Gaussian beam: shifted by k s across the beam, delayed by
+# k 2nt cos θ′, at the reduced distance zdet - t + (2k + 1) t / n and weakened by R^k
+function echo_field(x, k; λ, n, t, θ, w0, zdet, x0, side)
+    θ′ = asin(sin(θ) / n)
+    s = 2t * cos(θ) * tan(θ′)
+    R = (((cos(θ) - n * cos(θ′)) / (cos(θ) + n * cos(θ′)))^2 +
+         ((n * cos(θ) - cos(θ′)) / (n * cos(θ) + cos(θ′)))^2) / 2
+    zR = π * w0^2 / λ
+    D = zdet - t + (2k + 1) * t / n
+    w, Rc, ψ = w0 * sqrt(1 + (D / zR)^2), D * (1 + (zR / D)^2), atan(D / zR)
+    xk = x0 + k * side * s
+    phase = 2π / λ * (k * 2n * t * cos(θ′) + (x - xk)^2 / (2Rc)) - ψ
+    return R^k * (w0 / w) * exp(-(x - xk)^2 / w^2) * cis(phase)
+end
+
+@testset "Ghost fringes of a tilted window" begin
+    # A beamlet through an uncoated window, 10 mm thick and tilted by 2°: its echoes interfere with
+    # the beam on the screen. Profile, offsets and phases agree with Gaussian beams of the echoes.
+    λ, n, t, θ, w0, zdet = 632.8e-9, 1.515, 10mm, deg2rad(2), 20μm, 150mm
+    θ′ = asin(sin(θ) / n)
+    xs = collect(range(-3mm, 3mm; length = 601))
+    # The setup as built and moved: placement does not matter
+    for (shift, φ) in (([0, 0, 0], 0.0), ([12mm, -30mm, 5mm], deg2rad(35)))
+        window = Lens(CircularFlatSurface(25mm), CircularFlatSurface(25mm), t, ConstantRefractiveIndex(n))
+        zrotate3d!(window, θ)
+        translate3d!(window, [0, 50mm, 0])
+        screen = Detector(8mm)
+        translate3d!(screen, [0, zdet, 0])
+        beam = GaussianBeamlet([0, 0, 0], [0, 1, 0], λ, w0)
+        for part in (window, screen, beam)
+            rotate3d!(part, [0, 0, 1], φ, [0, 0, 0])
+            translate3d!(part, shift)
+        end
+        solve_system!(System([window, screen]; surface_model = FresnelGhosts()), beam; depth_max = 6)
+        # Beam and two echoes reach the screen, the first one shifted by the plate
+        pts, _ = ray_hits(screen)
+        x = sort(first.(pts); by = abs)
+        @test length(x) == 3
+        @test abs(x[1]) ≈ t * (sin(θ) - cos(θ) * tan(θ′)) rtol = 1e-6
+        @test abs(x[2] - x[1]) ≈ 2t * cos(θ) * tan(θ′) rtol = 1e-6
+        @test abs(x[3] - x[1]) ≈ 4t * cos(θ) * tan(θ′) rtol = 1e-6
+        I = vec(last(intensity(screen, RectilinearGrid(xs, [0.0]))))
+        I_echoes = [abs2(sum(echo_field(xi, k; λ, n, t, θ, w0, zdet, x0 = x[1], side = sign(x[2] - x[1]))
+                    for k in 0:2)) for xi in xs]
+        I_echoes .*= dot(I_echoes, I) / dot(I_echoes, I_echoes)
+        # Up to the brightness, the fringes agree to 1e-3 of the peak, against a modulation of 7 %
+        @test maximum(abs.(I .- I_echoes)) < 1e-3 * maximum(I)
+        I_beam = [abs2(echo_field(xi, 0; λ, n, t, θ, w0, zdet, x0 = x[1], side = 1)) for xi in xs]
+        I_beam .*= dot(I_beam, I) / dot(I_beam, I_beam)
+        @test maximum(abs.(I .- I_beam)) > 0.05 * maximum(I)
+    end
+end
+
 end # module
