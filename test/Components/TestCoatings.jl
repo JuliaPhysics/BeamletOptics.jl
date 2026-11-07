@@ -101,6 +101,15 @@ end
     @test BMO.power_fraction(children(beam)[2], beam) ≈ ((ns - 1) / (ns + 1))^2
 end
 
+@testset "Beamsplitter coatings take the power reflectance" begin
+    bs = BeamsplitterCoating(0.7)
+    @test BMO.reflectance(bs)^2 ≈ 0.7
+    @test BMO.transmittance(bs)^2 ≈ 0.3
+    @test BMO.reflectance(BeamsplitterCoating()) ≈ √0.5
+    @test BMO.transmittance(MirrorCoating()) == 0
+    @test_throws ArgumentError BeamsplitterCoating(1.2)
+end
+
 @testset "Spectral coatings" begin
     table = BMO.LinearTable([500e-9, 600e-9, 700e-9], [0.0, 0.5, 1.0])
     @test table(550e-9) ≈ 0.25

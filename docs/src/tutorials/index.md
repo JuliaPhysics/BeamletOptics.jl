@@ -66,6 +66,21 @@ Browse the step-by-step tutorials and standalone examples below to see what you 
 <p class="bmo-teaser">Model the OpenRAMAN spectrometer with custom components.</p>
 <p class="bmo-tags">Custom components · Gratings · Point sources</p>
 </div>
+<div class="bmo-tile">
+```
+
+![Pancake lens](pancake_lens.png)
+
+```@raw html
+<p><Badge type="danger" text="Advanced" /></p>
+```
+
+[Pancake lens](@ref)
+
+```@raw html
+<p class="bmo-teaser">Fold the light of a VR eyepiece three times and find its ghost image.</p>
+<p class="bmo-tags">Coatings · Polarization · Beam trees</p>
+</div>
 </div>
 ```
 

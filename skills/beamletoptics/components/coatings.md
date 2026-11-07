@@ -42,12 +42,15 @@ solve_system!(System([lens, dichroic]), beam)
 
 | Model | Use |
 |-------|-----|
-| `BeamsplitterCoating(r, t)` | lossless split with field amplitudes `r`, `t` (`r² + t² = 1`), carried by `ThinBeamsplitter` |
+| `BeamsplitterCoating(R = 0.5)` | lossless split of the power reflectance `R` (`0.7` → 70:30), carried by `ThinBeamsplitter` |
 | `MirrorCoating()` | ideal mirror, `R = 1` |
 | `AntireflectionCoating()` | ideal AR, `R = 0`, no Fresnel loss |
 | `SpectralCoating(R)` / `SpectralCoating(Rs, Rp)` | power reflectance `R(λ, θ)` (λ in m, θ in rad), s and p separately; `SpectralCoating(λs, Rs)` interpolates a table linearly, constant beyond it |
 | `ThinFilmCoating(layers...)` | coherent thin-film stack, layers `ThinFilmLayer(n, d)` or `QuarterWaveLayer(n, λ0)` **from the substrate outward**; absorbing layers via `AbsorbingRefractiveIndex` |
 | `FresnelGhosts()` | the bare boundary with both Fresnel parts traced (ghost analysis) |
+| `Retarder(Γ, fast_axis; λ0)` | retarder film, retardance Γ in rad (`π/2` quarter wave, `π` half wave), fast axis in the **local** frame of the part; with `λ0` the retardance is `Γλ0/λ` (zero-order plate) |
+| `ReflectivePolarizer(transmission_axis)` | transmits the field along the axis (local frame), reflects the rest without loss |
+| `SurfaceStack(elements...)` | thin elements on top of each other, **listed from the substrate outward**; reflections between them add coherently. Elements: `BeamsplitterCoating`, `MirrorCoating`, `AntireflectionCoating`, `SpectralCoating`, `Retarder`, `ReflectivePolarizer`, `SurfaceStack` (not `ThinFilmCoating`) |
 
 - Splitting coatings (`BeamsplitterCoating`, `SpectralCoating`, `ThinFilmCoating`) trace the reflected and
   the transmitted light as `children` `[transmitted, reflected]` by default; `splitting = BMO.Dominant()`

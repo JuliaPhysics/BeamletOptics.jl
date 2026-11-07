@@ -195,20 +195,7 @@ is chosen for the s- and p-components.
 function _calculate_global_E0(in_dir::AbstractArray, out_dir::AbstractArray, normal::AbstractArray, J::LocalJonesBasis)
     # Static vectors keep the basis matrices static, e.g. for Point3 input
     in_dir, out_dir, normal = map(v -> SVector{3}(v[1], v[2], v[3]), (in_dir, out_dir, normal))
-    # Choose basis vectors
-    if !isparallel3d(in_dir, out_dir)
-        v = out_dir
-    else
-        v = normal
-    end
-    # test if in-dir and normal are parallel
-    if isparallel3d(in_dir, normal)
-        # Does this really always work for normal s-p-incidence?
-        v = normal3d(in_dir)
-    end
-    # Calculate support vector
-    s = cross(in_dir, v)
-    s = normalize(s)
+    s = s_vector(in_dir, out_dir, normal)
     # Calculate transforms
     p1 = cross(in_dir, s)
     O_in = vcat(s', p1', in_dir')
@@ -222,6 +209,20 @@ function _calculate_global_E0(in_dir::AbstractArray, out_dir::AbstractArray, nor
     # Calculate new E0
     P = O_out * static_data(J) * O_in
     return P
+end
+
+"""
+    s_vector(in_dir, out_dir, normal)
+
+The unit vector of the s-component of the field of a ray from `in_dir` into `out_dir` at a surface of
+the `normal`: perpendicular to the plane of incidence, or an arbitrary transverse vector at normal
+incidence. See [`_calculate_global_E0`](@ref).
+"""
+function s_vector(in_dir::AbstractVector, out_dir::AbstractVector, normal::AbstractVector)
+    v = isparallel3d(in_dir, out_dir) ? normal : out_dir
+    # Normal incidence: an arbitrary transverse vector
+    isparallel3d(in_dir, normal) && (v = normal3d(in_dir))
+    return normalize(cross(in_dir, v))
 end
 
 # unwrap the Local/GlobalJonesBasis types to allow static array optimization to happen

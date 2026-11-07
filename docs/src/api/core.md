@@ -326,6 +326,19 @@ BeamletOptics.beamlet_interaction
 BeamletOptics.power_fraction
 ```
 
+Thin elements, e.g. coatings and polarizing films, describe their Jones matrices in reflection and transmission instead of channels; the channels and the stacking follow from them:
+
+```@docs; canonical=false
+BeamletOptics.AbstractThinElement
+BeamletOptics.IncidenceFrame
+BeamletOptics.ThinScattering
+BeamletOptics.cascade
+BeamletOptics.mirror_jones
+BeamletOptics.jones_angle
+BeamletOptics.channel_amplitude
+BeamletOptics.lossless_scattering
+```
+
 The models of BMO:
 
 ```@docs; canonical=false

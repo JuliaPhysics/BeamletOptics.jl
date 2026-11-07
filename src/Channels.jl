@@ -168,8 +168,12 @@ end
 
 select_channels(::AllChannels, cs::Tuple) = cs
 
-"""Returns `true` if the channel `c` carries light."""
-islit(c::BoundaryChannel) = !iszero(amplitude(c))
+"""
+Returns `true` if the channel `c`, or a channel of the amplitude factor `a`, carries light: its power
+fraction exceeds the rounding error of its number type, e.g. not the field that a polarizer blocks.
+"""
+islit(c::BoundaryChannel) = islit(amplitude(c))
+islit(a::Complex{T}) where {T} = abs2(a) > eps(T)
 
 # The child beams of the tuple `kids` whose channel carries light, `lit`, and whose power is not below
 # the power cutoff, as a vector of type `B`
@@ -263,7 +267,7 @@ function beamlet_interaction(system::AbstractSystem, ::AllChannels, model::Abstr
         (map(c -> outgoing_ray(t, ray, c), cs), map(amplitude, cs))
     end
     a = last(first(hits))
-    lit = map(!iszero, a)
+    lit = map(islit, a)
     num_lit = count(lit)
     num_lit == 0 && return nothing
     num_lit == 1 && return continued_beamlet(system, model, beamlet, ray_id, findfirst(lit))
