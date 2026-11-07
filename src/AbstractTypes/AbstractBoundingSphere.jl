@@ -195,7 +195,16 @@ end
 For an object, the result follows from its shapes, see [`AbstractShapeTrait`](@ref): the sphere of
 the shape of a [`SingleShape`](@ref) object, and for a [`MultiShape`](@ref) object or an object
 group the [`MultiBoundingSphere`](@ref) that encloses the spheres of all its parts, or
-`NoBoundingSphere()` if one part has none.
+`NoBoundingSphere()` if one part has none. The solver skips an object whose sphere the ray misses or
+enters only beyond a hit found already, also if the object has an `intersect3d` method of its own.
+Hence the sphere of an object must enclose every hit of its `intersect3d`. A [`SingleShape`](@ref)
+object whose own `intersect3d` hits points outside of its shape, e.g. an unbounded plane, returns
+`NoBoundingSphere()`; the sphere of a [`MultiShape`](@ref) object is always the one around its parts,
+hence its own `intersect3d` must hit its parts only:
+
+```julia
+BeamletOptics.bounding_sphere_of(::MyPlane) = BeamletOptics.NoBoundingSphere()
+```
 """
 bounding_sphere_of(::AbstractShape) = NoBoundingSphere()
 
@@ -250,6 +259,14 @@ is computed.
 """
 bounding_sphere_of(table::BoundingSphereTable, x) = get(table, x, NoBoundingSphere())
 bounding_sphere_of(::Nothing, x) = NoBoundingSphere()
+
+# The table holds the sphere of a single-shape object under its shape, see `_register!`
+bounding_sphere_of(table::BoundingSphereTable, object::AbstractObject) =
+    bounding_sphere_of(table, shape_trait_of(object), object)
+bounding_sphere_of(table::BoundingSphereTable, ::SingleShape, object::AbstractObject) =
+    get(table, shape(object), NoBoundingSphere())
+bounding_sphere_of(table::BoundingSphereTable, ::MultiShape, object::AbstractObject) =
+    get(table, object, NoBoundingSphere())
 
 """
     bounding_spheres(system::AbstractSystem) -> BoundingSphereTable
@@ -323,14 +340,14 @@ Test of a ray against a bounding sphere
 =#
 
 """
-    _sphere_exit(sphere::AbstractBoundingSphere, ray, margin = 0)
+    sphere_chord(sphere::AbstractBoundingSphere, ray, margin = 0)
 
-Returns the path length in [m] at which the `ray` leaves the `sphere`, or `nothing` if the `ray`
-does not pass through it, i.e. if its line misses the sphere or the sphere lies behind its start.
-The radius is enlarged by the `margin` in [m] and by the rounding error of the test, such that a ray
-towards a point on the sphere still passes through it.
+Returns `(b, s)` such that the line of the `ray` passes through the `sphere` between the path lengths
+`b - s` and `b + s` in [m], or `nothing` if the line misses the sphere. The radius is enlarged by the
+`margin` in [m] and by the rounding error of the test, such that a ray towards a point on the sphere
+still passes through it.
 """
-function _sphere_exit(sphere::AbstractBoundingSphere, ray::AbstractRay, margin = 0)
+function sphere_chord(sphere::AbstractBoundingSphere, ray::AbstractRay, margin = 0)
     # Assert inferred types
     center, r = position(sphere)::Point3, radius(sphere)::Real
     dir = direction(ray)::Point3
@@ -342,9 +359,41 @@ function _sphere_exit(sphere::AbstractBoundingSphere, ray::AbstractRay, margin =
     tol = sqrt(eps(float(typeof(r))))
     ρ = r + margin + tol * (r + norm(center) + norm(oc))
     q > ρ^2 && return nothing
-    t_out = b + sqrt(ρ^2 - q)
+    return b, sqrt(ρ^2 - q)
+end
+
+"""
+    _sphere_exit(sphere::AbstractBoundingSphere, ray, margin = 0)
+
+Returns the path length in [m] at which the `ray` leaves the `sphere`, or `nothing` if the `ray`
+does not pass through it, i.e. if its line misses the sphere or the sphere lies behind its start.
+The radius is enlarged by the `margin` in [m] and by the rounding error of the test, such that a ray
+towards a point on the sphere still passes through it.
+"""
+function _sphere_exit(sphere::AbstractBoundingSphere, ray::AbstractRay, margin = 0)
+    chord = sphere_chord(sphere, ray, margin)
+    isnothing(chord) && return nothing
+    b, s = chord
+    t_out = b + s
     t_out < 0 && return nothing
     return t_out
+end
+
+"""
+    isbeyond(sphere::AbstractBoundingSphere, ray, t)
+
+Returns `true` if nothing within the `sphere` can be hit by the `ray` at a path length up to `t` in
+[m]: the `ray` misses the `sphere`, the sphere lies behind its start, or the `ray` enters it only
+beyond `t`. Without a sphere ([`NoBoundingSphere`](@ref)) the result is `false`. The solver skips
+such parts once it has found a hit at `t`, and those that the `ray` misses for `t = Inf`.
+"""
+isbeyond(::NoBoundingSphere, ::AbstractRay, t) = false
+
+function isbeyond(sphere::AbstractBoundingSphere, ray::AbstractRay, t)
+    chord = sphere_chord(sphere, ray)
+    isnothing(chord) && return true
+    b, s = chord
+    return b + s < 0 || b - s > t
 end
 
 """

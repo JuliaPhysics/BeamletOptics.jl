@@ -62,9 +62,10 @@ warn_no_interact3d(::MultiShape, object, ray) = @warn lazy"""
 A `Hint` can be passed as part of an [`AbstractInteraction`](@ref) and will inform the tracing algorithm about which [`AbstractObject`](@ref)
 in the [`AbstractSystem`](@ref) will be hit next.
 
-!!! info 
-    The `Hint` does not need to result in a guaranteed [`Intersection`](@ref). However, if the hinted shape is intersected, it will
-    be immediately assumed as the correct global intersection.
+!!! info
+    The `Hint` does not need to result in a guaranteed [`Intersection`](@ref), and it does not change which surface is hit: the
+    hinted object is tested first, the objects beyond its hit are skipped, and a closer hit of another object wins. Among the
+    surfaces hit at the same point, e.g. the touching faces of a cemented doublet, the hinted shape comes first.
 
 # Fields
 

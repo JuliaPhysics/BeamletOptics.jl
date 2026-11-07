@@ -15,7 +15,7 @@ The first two principles will be elaborated upon in more detail in the [Geometry
 ```mermaid
 flowchart TB
     S(["<b>solve_system!</b><br/>system + beam"]) --> I
-    I["<b>1. Intersect</b><br/>hinted shape first,<br/>else all objects"] -- hit --> X["<b>2. Interact</b><br/>compute<br/>AbstractInteraction"]
+    I["<b>1. Intersect</b><br/>closest hit of all objects,<br/>hinted object first"] -- hit --> X["<b>2. Interact</b><br/>compute<br/>AbstractInteraction"]
     X --> R["<b>3. Repeat</b><br/>attach next<br/>ray or beam segment"]
     R -- "optional Hint" --> B(["back to<br/><b>1. Intersect</b>"])
     I -- "no hit or r_max" --> E([done])
@@ -58,32 +58,40 @@ BeamletOptics.Intersection
 
 Since an optical element can consist of multiple joint shapes, the return type must store which specific part of the object was hit: the `shape` of the `Intersection` is that part, and the solver compares and looks up the hit part by this reference, e.g. to decide whether the rays of a beamlet hit the same shape. The `object` of the `Intersection` is set by the solver, the `intersect3d` method of a shape leaves it `nothing`.
 
-The following diagram shows how `trace_all` reaches the shapes of the objects and groups of a [`System`](@ref), including the [Bounding sphere pretest](@ref), whose table is described below. A [`StaticSystem`](@ref) has no groups while tracing, since it flattens them when it is built.
+The following diagram shows how `trace_all` reaches the shapes of the objects and groups of a [`System`](@ref), including the [Bounding sphere pretest](@ref), whose table is described below. A [`StaticSystem`](@ref) has no groups while tracing, since it flattens them when it is built. Where surfaces touch, e.g. the faces of a cemented doublet, the ray hits several of them at the same point. The hits within `get_coincidence_tolerance()` of the closest one are kept as a chain, see [Coincident hits](@ref).
 
 ```mermaid
 flowchart TB
-    TA(["<b>trace_all(system, ray)</b>"])
-    P["<b>intersect3d(parts, ray)</b><br/>test each part, closest hit wins"]
-    G["<b>intersect3d(group, ray)</b><br/><i>System only</i><br/>x = objects(group)"]
+    TA(["<b>trace_all(system, ray)</b><br/>top-level objects<br/>(and groups of a System)"])
+    CH["<b>closest_hits(parts, ray, result, skip)</b><br/>each part in turn"]
+    SK{"part === skip?<br/>the hinted object,<br/>tested already"}
+    BY{"<b>isbeyond</b>(sphere, ray, t)?<br/>sphere missed or only<br/>behind the closest hit so far"}
+    G["<b>closest_hits(group, ...)</b><br/><i>System only</i><br/>parts = objects(group)"]
     OJ["<b>intersect3d(object, ray)</b><br/><i>own method possible,<br/>e.g. PlateBeamsplitter</i>"]
+    M["<b>merge_hits(result, hit)</b><br/>closest hit and those<br/>at the same point"]
     T["<b>shape_trait_of(object)</b><br/>SingleShape: x = shape(object)<br/>MultiShape: x = a tuple of parts<br/>(shapes or objects)"]
     PT["<b>intersect3d(sphere, x, ray)</b><br/>bounding sphere of x from the<br/>table of the solve, else none"]
+    P["<b>intersect3d(parts, ray)</b><br/>test each part, <b>merge_hits</b>"]
     SH["<b>intersect3d(shape, ray)</b><br/>shape backend, see below"]
-    OBJ["<b>object!(intersection, object)</b><br/>by the SingleShape and<br/>MultiShape methods,<br/>not by a group"]
-    AGAIN(["back to<br/><b>intersect3d(parts, ray)</b><br/>with the parts of x"])
-    MISS(["nothing"])
+    OBJ["<b>object!(intersection, object)</b><br/>by the SingleShape and<br/>MultiShape methods"]
+    MISS(["skipped / nothing"])
 
-    TA --> P
-    P -- "isa AbstractObject" --> OJ
-    P -- "isa AbstractObjectGroup" --> G
-    P -- "isa AbstractShape" --> SH
+    TA --> CH --> SK
+    SK -- yes --> MISS
+    SK -- no --> BY
+    BY -- yes --> MISS
+    BY -- "no, isa AbstractObjectGroup" --> G
+    G -- "back to closest_hits<br/>with its objects" --> CH
+    BY -- "no, isa AbstractObject" --> OJ
     OJ -- "default method" --> T
     T --> PT
-    G --> PT
     PT -- "x is a shape" --> SH
-    PT -- "x are parts" --> AGAIN
+    PT -- "x are parts" --> P
     PT -- "ray misses<br/>the sphere" --> MISS
+    P -- "isa AbstractShape" --> SH
+    P -- "isa AbstractObject" --> OJ
     SH --> OBJ
+    OBJ -- "hit of the object" --> M
 
     classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
     classDef green fill:#38982626,stroke:#389826,stroke-width:2px
@@ -91,8 +99,8 @@ flowchart TB
     classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
     class G,OBJ blue
     class OJ,SH green
-    class P,T,PT purple
-    class TA,AGAIN,MISS terminal
+    class CH,SK,BY,M,P,T,PT purple
+    class TA,MISS terminal
 ```
 
 The shape backend is selected by dispatch on the type of the shape, see [Geometry representation](@ref).
@@ -121,6 +129,17 @@ flowchart TB
     class SH purple
     class IX terminal
 ```
+
+### Coincident hits
+
+Touching elements, e.g. the two lenses of a cemented doublet or a coating on its substrate, share a surface. A ray that reaches it hits the surfaces of both within the accuracy of the intersection algorithms. Instead of picking one of them, the solver keeps all hits within `get_coincidence_tolerance()` (1 nm by default) of the closest hit as a chain, linked by the `next` field of the [`BeamletOptics.Intersection`](@ref):
+
+```@docs; canonical=false
+BeamletOptics.coincident_hits
+BeamletOptics.merge_hits
+```
+
+Hence the hit of the ray does not depend on the order of the objects in the system or on a [`BeamletOptics.Hint`](@ref).
 
 ### Bounding sphere pretest
 
@@ -191,7 +210,7 @@ OpticsBase.PlaneField(::AbstractVector{<:Union{BeamletOptics.GaussianBeamletHit,
 
 ## Hints
 
-As mentioned in the previous section, the [`BeamletOptics.Hint`](@ref) interface allows developers to manipulate the non-sequential solver algorithm into testing against a specific component and shape during the next cycle of the [Intersect-Interact-Repeat-Loop](@ref). This interface has very high priority during intersection testing.
+As mentioned in the previous section, the [`BeamletOptics.Hint`](@ref) interface allows developers to manipulate the non-sequential solver algorithm into testing against a specific component and shape during the next cycle of the [Intersect-Interact-Repeat-Loop](@ref). The hinted object is tested first, and the objects whose bounding spheres lie beyond its hit are skipped. The hint does not change which surface is hit: a closer hit of another object wins, and among the [Coincident hits](@ref) at the closest point the hint only puts the hinted shape first.
 
 ```@docs; canonical=false
 BeamletOptics.Hint
@@ -211,16 +230,14 @@ flowchart TB
     N(["<b>return nothing</b><br/>the solver queues the children"])
     P["<b>push!(beam, interaction)</b>"]
     TST{"<b>tracing_step!</b><br/>(sys, ray, hint)"}
-    HS{"<b>trace_one</b><br/>hinted shape hit?"}
-    OB["No other object is tested"]
-    TA["<b>trace_all(sys, ray)</b>"]
+    HS["<b>trace_one</b><br/>intersect3d(object(hint), ray) first"]
+    OB["<b>closest_hits</b><br/>of all other objects, those<br/>beyond the hint's hit skipped"]
+    TA["<b>first_of_shape</b><br/>hinted shape first among<br/>the coincident hits"]
 
     S --> F
     F -- "cbs.front or cbs.back" --> PR --> H --> P --> TST
     F -- "cbs.coating" --> CO --> N
-    TST -- "::Hint" --> HS
-    HS -- yes --> OB
-    HS -- no --> TA
+    TST -- "::Hint" --> HS --> OB --> TA
 
     classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
     classDef green fill:#38982626,stroke:#389826,stroke-width:2px
@@ -291,7 +308,7 @@ flowchart TB
     S(["<b>trace_system!</b><br/>with a ::Beam"])
     RM{"<b>length(rays) #lt; r_max?</b><br>Safeguard resonant conditions"}
     TST{"<b>tracing_step!</b>"}
-    TO["<b>trace_one</b><br/>hinted shape first"]
+    TO["<b>trace_one</b><br/>hinted object first,<br/>then all others"]
     TA["<b>trace_all</b><br/>intersect3d of all top-level<br/>objects (and groups of a System)"]
     HIT{"No intersection determined?"}
     IA["<b>interact3d</b><br/>Calculate optical interaction"]
@@ -304,8 +321,7 @@ flowchart TB
     RM -- yes --> TST
     TST -- " with ::Hint" --> TO
     TST -- "without ::Hint" --> TA
-    TO -- "hinted shape missed" --> TA
-    TO -- hit --> HIT
+    TO --> HIT
     TA --> HIT
     HIT -- no --> IA --> NI
     NI -- no --> P --> BR
