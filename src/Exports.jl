@@ -54,7 +54,7 @@ export Detector, electric_field, intensity, spot_diagram, ray_hits, optical_powe
 # coatings
 export CoatingLayer, BeamsplitterCoating, MirrorCoating, AntireflectionCoating, SpectralCoating,
     ThinFilmCoating, ThinFilmLayer, QuarterWaveLayer, FresnelGhosts, Retarder, ReflectivePolarizer,
-    SurfaceStack
+    SurfaceStack, PolarizingCoating
 export surface_model, surface_model!, AllFaces, FrontFace, BackFace, EdgeFace, FlatFace, MaskedFace
 # own faces and masks, see AbstractFace
 public AbstractThinElement, IncidenceFrame, ThinScattering, scattering, mirror_jones, jones_angle,
@@ -64,6 +64,7 @@ export ThinBeamsplitter, RoundThinBeamsplitter, RectangularPlateBeamsplitter,
        RoundPlateBeamsplitter, CubeBeamsplitter, RectangularCompensatorPlate
 
 # polarizing components
+export QuarterWavePlate, HalfWavePlate, fast_axis, PolarizingCubeBeamsplitter
 export PolarizationFilter, RoundPolarizationFilter, LinearPolarizer, RoundLinearPolarizer,
        transmission_axis
 

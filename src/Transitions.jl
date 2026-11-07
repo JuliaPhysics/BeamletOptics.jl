@@ -386,22 +386,6 @@ interact3d(system::AbstractSystem, model::AbstractSurfaceModel, ::Transition,
     beamlet::GaussianBeamlets, ray_id::Int) =
     beamlet_interaction(system, splitting_of(model), model, beamlet, ray_id)
 
-"""
-    interact3d(system, ::SingleShape, object, beamlet, ray_id)
-
-The interaction of a [`GaussianBeamlet`](@ref) or an [`AstigmaticGaussianBeamlet`](@ref) with an
-`object` without a beamlet method of its own. A thin layer with a model (see [`surface_model`](@ref))
-hands the beamlet to its model, which may split it, e.g. a [`BeamsplitterCoating`](@ref). Any other
-object interacts with each component ray, e.g. a body refracts each at its own hit. A
-[`MultiShape`](@ref) object hands the beamlet to the part that the chief ray hits.
-"""
-function interact3d(system::AbstractSystem, ::SingleShape, object::AbstractObject,
-        beamlet::GaussianBeamlets, ray_id::Int)
-    isnothing(surface_model(object)) ||
-        return interact3d(system, transition(system, beamlet, ray_id), beamlet, ray_id)
-    return beamlet_interaction(b -> interact3d(system, object, b, rays(b)[ray_id]), beamlet)
-end
-
 # The interaction of a beamlet from the interaction `f(b)` of each component beam `b`, or `nothing`
 # if one of them ends; map unrolls the heterogeneous tuple of component beams. `F` forces
 # specialization on `f`, which is only passed on to `map`

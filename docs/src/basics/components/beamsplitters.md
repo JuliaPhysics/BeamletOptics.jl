@@ -72,3 +72,33 @@ The system is made up of two cube beamsplitters (e.g. [BS013](https://www.thorla
 
 !!! tip "Interferometer tutorial"
     Refer to the [Michelson interferometer](@ref) tutorial for a detailed showcase featuring beam splitters and other components.
+
+### Polarizing cube beamsplitter
+
+A [`PolarizingCubeBeamsplitter`](@ref) carries a [`PolarizingCoating`](@ref) at its hypotenuse: it
+reflects the s-component of the field and transmits the p-component. Placed as built, a beam along +y
+leaves with its x-component along +y and its z-component along -x. With a quarter-wave plate and a
+mirror behind it, it forms an optical isolator: the returning light leaves through the side port.
+
+```@example pbs
+using BeamletOptics
+const mm = 1e-3
+
+pbs = PolarizingCubeBeamsplitter(20mm, ConstantRefractiveIndex(1.5))
+translate3d!(pbs, [0, 50mm, 0])
+qwp = QuarterWavePlate(25mm)
+yrotate3d!(qwp, deg2rad(45))
+translate3d!(qwp, [0, 80mm, 0])
+mirror = SquarePlanoMirror2D(30mm)
+zrotate3d!(mirror, π)
+translate3d!(mirror, [0, 100mm, 0])
+
+beam = Beam(PolarizedRay([0, 0, 0], [0, 1, 0], 633e-9, [1, 0, 0]))
+solve_system!(System([pbs, qwp, mirror]), beam)
+BeamletOptics.direction(last(rays(last(collect(BeamletOptics.Leaves(beam))))))
+```
+
+```@docs; canonical=false
+PolarizingCubeBeamsplitter
+PolarizingCoating
+```

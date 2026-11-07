@@ -45,7 +45,7 @@ solve_system!(System([lens, dichroic]), beam)
 | `BeamsplitterCoating(R = 0.5)` | lossless split of the power reflectance `R` (`0.7` → 70:30), carried by `ThinBeamsplitter` |
 | `MirrorCoating()` | ideal mirror, `R = 1` |
 | `AntireflectionCoating()` | ideal AR, `R = 0`, no Fresnel loss |
-| `SpectralCoating(R)` / `SpectralCoating(Rs, Rp)` | power reflectance `R(λ, θ)` (λ in m, θ in rad), s and p separately; `SpectralCoating(λs, Rs)` interpolates a table linearly, constant beyond it |
+| `SpectralCoating(R)` / `SpectralCoating(Rs, Rp)` | power reflectance `R(λ, θ)` (λ in m, θ = **angle of incidence in air** in rad, from the invariant n·sinθ, the same from both sides), s and p separately; `SpectralCoating(λs, Rs)` interpolates a table linearly, constant beyond it |
 | `ThinFilmCoating(layers...)` | coherent thin-film stack, layers `ThinFilmLayer(n, d)` or `QuarterWaveLayer(n, λ0)` **from the substrate outward**; absorbing layers via `AbsorbingRefractiveIndex` |
 | `FresnelGhosts()` | the bare boundary with both Fresnel parts traced (ghost analysis) |
 | `Retarder(Γ, fast_axis; λ0)` | retarder film, retardance Γ in rad (`π/2` quarter wave, `π` half wave), fast axis in the **local** frame of the part; with `λ0` the retardance is `Γλ0/λ` (zero-order plate) |

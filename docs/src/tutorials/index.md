@@ -154,5 +154,27 @@ Browse the step-by-step tutorials and standalone examples below to see what you 
 <p class="bmo-teaser">Coherent diffraction with astigmatic beamlet decomposition.</p>
 <p class="bmo-tags">Astigmatic beamlets · Diffraction</p>
 </div>
+<div class="bmo-tile">
+```
+
+![Fabry-Pérot and Fizeau interferometers](../examples/fabry_perot.png)
+
+[Fabry-Pérot and Fizeau interferometers](@ref)
+
+```@raw html
+<p class="bmo-teaser">Airy resonances of an etalon and the fringes of a Fizeau wedge from a beam tree.</p>
+<p class="bmo-tags">Coatings · Astigmatic beamlets · Interference</p>
+</div>
+<div class="bmo-tile">
+```
+
+![Wedge light trap](../examples/wolit_trap.png)
+
+[Wedge light trap](@ref)
+
+```@raw html
+<p class="bmo-teaser">Trap a laser beam in a wedge with an angle-tuned edge filter.</p>
+<p class="bmo-tags">Coatings · Edge filters</p>
+</div>
 </div>
 ```
