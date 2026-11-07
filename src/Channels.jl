@@ -248,6 +248,12 @@ model at its own hit. For [`AllChannels`](@ref), the channels of the chief ray d
 that carries light starts a child beamlet, whose component rays leave their own hits on the same side;
 a single one continues the beamlet. The field factor of a child is that of the channel of the chief
 ray, its waist is the waist of the `beamlet` at the boundary.
+
+!!! warning "Near the critical angle"
+    The channels of the chief ray decide for the whole beamlet. A component ray in another regime,
+    e.g. totally reflected while the chief ray is transmitted, still starts its child in the channel
+    of the chief ray; as for clipping, a beamlet must be small against the range of angles in which
+    the boundary changes its behavior.
 """
 function beamlet_interaction(system::AbstractSystem, ::Dominant, model::AbstractSurfaceModel,
         beamlet::GaussianBeamlets, ray_id::Int)
