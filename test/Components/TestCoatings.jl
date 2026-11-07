@@ -110,6 +110,21 @@ end
     @test_throws ArgumentError BeamsplitterCoating(1.2)
 end
 
+@testset "A polarized ray splits by the power of its field" begin
+    # At the Brewster angle p-polarized light is not reflected: no empty ghost is traced
+    θB = atan(ns)
+    for model in (FresnelGhosts(), ThinFilmCoating())
+        plate = RectangularCompensatorPlate(40mm, 40mm, 5mm, ConstantRefractiveIndex(ns))
+        translate3d!(plate, [0, 30mm, 0])
+        surface_model!(plate, FlatFace([0, -1, 0]), model)
+        d = [sin(θB), cos(θB), 0]
+        beam = Beam(PolarizedRay([-30mm * tan(θB), 0, 0], d, λ0, [cos(θB), -sin(θB), 0]))
+        solve_system!(System([plate]), beam; depth_max = 1)
+        @test isempty(children(beam))
+        @test BMO.refractive_index(rays(beam)[2]) == ns
+    end
+end
+
 @testset "Spectral coatings" begin
     table = BMO.LinearTable([500e-9, 600e-9, 700e-9], [0.0, 0.5, 1.0])
     @test table(550e-9) ≈ 0.25

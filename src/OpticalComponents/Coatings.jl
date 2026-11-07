@@ -168,8 +168,9 @@ function channels(element::AbstractThinElement, t::Transition, ray::AbstractRay,
     cos_in = abs(cos_angle3d(direction(ray), normal))
     cos_out = abs(cos_angle3d(direction(transmitted), normal))
     f = sqrt(refractive_index_in(t) * cos_in / (refractive_index_out(t) * cos_out))
-    return (transfer(transmitted, ray, jones_basis(f * S.t), channel_amplitude(ray, frame, S.t, 1)),
-        transfer(reflected, ray, jones_basis(S.r), channel_amplitude(ray, frame, S.r, -1)))
+    a_t = channel_amplitude(ray, frame, S.t, jones_phase(S.t, 1))
+    a_r = channel_amplitude(ray, frame, S.r, jones_phase(S.r, -1))
+    return (transfer(transmitted, ray, jones_basis(f * S.t), a_t), transfer(reflected, ray, jones_basis(S.r), a_r))
 end
 
 # The 3×3 local Jones basis of the 2×2 matrix `J` in the s- and p-basis
@@ -177,21 +178,29 @@ jones_basis(J::SMatrix{2, 2}) =
     LocalJonesBasis(SMatrix{3, 3}(J[1, 1], J[2, 1], 0, J[1, 2], J[2, 2], 0, 0, 0, 1))
 
 """
-    channel_amplitude(ray, frame, J, σ)
+    channel_amplitude(ray, frame, J, phase)
 
-The amplitude factor of a channel with the Jones matrix `J` in the s- and p-basis of the `frame`: of
+The amplitude factor of a channel with the Jones matrix `J` in the s- and p-basis of the `frame`, of
+the unit phasor `phase`. Its magnitude is the square root of the power fraction of the channel: of
 unpolarized light for a ray without a field, of the field of a [`PolarizedRay`](@ref) otherwise, such
-that a channel that blocks the field carries no light. Its phase is that of the s- and p-amplitudes, in
-the sign convention `σ` of the s-component: -1 for a reflection, see [`mirror_jones`](@ref).
+that a channel that blocks the field carries no light. For a channel given by its power fractions
+`Fs` and `Fp`, `J = diag(√Fs, √Fp)`.
 """
-channel_amplitude(::AbstractRay, ::IncidenceFrame, J::SMatrix{2, 2}, σ) =
-    sqrt(sum(abs2, J) / 2) * phase_of(σ * J[1, 1] + J[2, 2])
+channel_amplitude(::AbstractRay, ::IncidenceFrame, J::AbstractMatrix, phase) =
+    sqrt(sum(abs2, J) / 2) * phase
 
-function channel_amplitude(ray::PolarizedRay, frame::IncidenceFrame, J::SMatrix{2, 2}, σ)
+function channel_amplitude(ray::PolarizedRay, frame::IncidenceFrame, J::AbstractMatrix, phase)
     E = polarization(ray)
     E_sp = SVector(dot(frame.s, E), dot(frame.p_d, E))
-    return norm(J * E_sp) / norm(E_sp) * phase_of(σ * J[1, 1] + J[2, 2])
+    return norm(J * E_sp) / norm(E_sp) * phase
 end
+
+# The phase of the s- and p-amplitudes of `J`, in the sign convention `σ` of the s-component: -1 for a
+# reflection, see mirror_jones
+jones_phase(J::AbstractMatrix, σ) = phase_of(σ * J[1, 1] + J[2, 2])
+
+# The matrix of the amplitudes of the power fractions `Fs` and `Fp`
+power_jones(Fs, Fp) = SMatrix{2, 2}(sqrt(Fs), 0, 0, sqrt(Fp))
 
 """
     BeamsplitterCoating(R = 0.5)
@@ -491,7 +500,8 @@ anti-reflection coating whose weak reflection is of no interest, see [`splitting
 
 !!! info
     Beams without polarization, e.g. a [`GaussianBeamlet`](@ref), carry the power fractions of
-    unpolarized light, with the phase of the sum of the s- and p-amplitudes.
+    unpolarized light, with the phase of the sum of the s- and p-amplitudes; a polarized ray splits by
+    the power fractions of its field.
 
 ```julia
 λ0 = 550e-9
@@ -516,8 +526,9 @@ function channels(coating::ThinFilmCoating, t::Transition, ray::AbstractRay, cs)
     cos0 = abs(cos_angle3d(direction(ray), normal3d(t)))
     (rs, rp, ts, tp), (Rs, Rp, Ts, Tp) = thin_film_coefficients(layers, refractive_index_in(t),
         refractive_index_out(t), cos0, wavelength(ray))
-    a_r = sqrt((Rs + Rp) / 2) * phase_of(rs + rp)
-    a_t = sqrt((Ts + Tp) / 2) * phase_of(ts + tp)
+    frame = IncidenceFrame(t, ray)
+    a_r = channel_amplitude(ray, frame, power_jones(Rs, Rp), phase_of(rs + rp))
+    a_t = channel_amplitude(ray, frame, power_jones(Ts, Tp), phase_of(ts + tp))
     return (transfer(transmitted, ray, SPBasis(ts, 0, 0, tp), a_t),
         transfer(reflected, ray, SPBasis(-rs, 0, 0, rp), a_r))
 end
@@ -592,6 +603,7 @@ function channels(::FresnelGhosts, t::Transition, ray::AbstractRay, cs)
     cos0 = abs(cos_angle3d(direction(ray), normal3d(t)))
     _, (Rs, Rp, Ts, Tp) = thin_film_coefficients((), refractive_index_in(t),
         refractive_index_out(t), cos0, wavelength(ray))
-    return (transfer(transmitted, transmitted.P, sqrt((Ts + Tp) / 2)),
-        transfer(reflected, reflected.P, sqrt((Rs + Rp) / 2)))
+    frame = IncidenceFrame(t, ray)
+    return (transfer(transmitted, transmitted.P, channel_amplitude(ray, frame, power_jones(Ts, Tp), 1)),
+        transfer(reflected, reflected.P, channel_amplitude(ray, frame, power_jones(Rs, Rp), 1)))
 end
