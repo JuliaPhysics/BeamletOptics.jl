@@ -48,6 +48,8 @@ When this Skill is active:
 - Paraxial laser beam on-axis (waist, Rayleigh range, interferometer power) → `GaussianBeamlet`
 - Tilted, off-axis, cylindrical, or polarization-sensitive Gaussian beam → `AstigmaticGaussianBeamlet`
 - Polarization with rays → `Beam(pos, dir, λ, E0)` (a `PolarizedRay` beam)
+- Coatings, cavities, interferometers with partial mirrors → splitting beam trees; bound them with
+  `depth_max` of `solve_system!` (see `components/coatings.md`)
 
 3) Build components at the origin, then place them
 - Construct each element (`components/*.md`), then orient with `xrotate3d!/yrotate3d!/zrotate3d!` and
@@ -76,9 +78,11 @@ When this Skill is active:
 
 ## Safety and non-goals
 
-- BeamletOptics does not model coatings, scattering or stray light from refractive surfaces (polarized
-  refraction traces only the refracted ray). Results are simulations, not certified optical designs;
-  point out model limits when they matter for the user's question.
+- Uncoated surfaces trace only the refracted ray (Fresnel ghosts only with `FresnelGhosts()`, per face or
+  as `System(...; surface_model = FresnelGhosts())`). Scattering and absorption in the volume of a body
+  are not modeled. Coatings are ideal models or thin-film designs (`components/coatings.md`). Results
+  are simulations, not certified optical designs; point out model limits when they matter for the
+  user's question.
 - Do not modify the BeamletOptics package source unless the user asks for it (then see the next
   section); write user scripts instead.
 

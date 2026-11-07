@@ -7,7 +7,8 @@
 - [ ] `DiscreteRefractiveIndex` contains the exact wavelength of every source (no interpolation).
 - [ ] Lens radius signs follow ISO 10110 (biconvex: `r1 > 0`, `r2 < 0`).
 - [ ] Geometry assumes +y as the optical axis; rotations are cumulative and relative.
-- [ ] Sources start **outside** of all elements and point at them.
+- [ ] Sources point at the elements; a source inside a mirror or detector is a mistake, inside a lens,
+      prism or plate it starts in its medium.
 - [ ] Detectors emptied before every re-solve in a loop (`initialize = true`, `initialize!(system)` or `empty!(detector)`), unless the hits of all solves are wanted together (e.g. the spots of a scan); `electric_field`, `intensity` and `optical_power` superpose all stored hits coherently; moving the detector empties it.
 - [ ] Beam model fits the question (see below).
 - [ ] Script was **run**, and the printed numbers were compared with a paraxial or analytic estimate.
@@ -38,6 +39,12 @@
 6. **`SphericalLens` with `l = 0`** builds a thin lens via `ThinLens`. If the center thickness is too small for the
    radii and diameter, the constructor throws ("cylinder section length ≤ 0"): increase `l` or reduce `d`.
 7. **`Mirror`s reflect on every face**, including the back and edges.
+8. **Splitting coatings grow beam trees.** Every `BeamsplitterCoating`, `SpectralCoating`, `ThinFilmCoating`
+   or `FresnelGhosts` boundary doubles the beams; cavities (etalons, two partial mirrors) never end by
+   themselves. Pass `depth_max` (e.g. 20–40) and read results from `Leaves(beam)` or a `Detector`.
+9. **Coating orientation:** layers of a `ThinFilmCoating` and `SurfaceStack` are listed **from the
+   substrate outward**; the axes of `Retarder`, `ReflectivePolarizer` and wave plates are in the **local**
+   frame of the part and turn with it.
 8. **Polarized refraction** traces only the refracted ray (no ghost reflections); no coatings are modeled.
    The refracted field carries the Fresnel transmission: a `PolarizedRay` or an `AstigmaticGaussianBeamlet`
    loses about 4 % of its power per uncoated surface (n = 1.5), a `GaussianBeamlet` nothing.
