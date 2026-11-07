@@ -36,11 +36,12 @@ Use `scripts/api_lookup.jl NAME` to print the docstring and signatures of any na
 | Rays & beams  | `Ray`, `PolarizedRay`, `Beam`, `GaussianBeamlet`, `AstigmaticGaussianBeamlet`, `rays`, `point_on_beam`, `path_segments`, `rayleigh_range`, `normal3d` |
 | Sources       | `CollimatedSource`, `UniformDiscSource`, `PointSource`, `UniformPointSource`, `UniformLineSource`, `UniformFanSource`, `num_rays!`, `CollimatedGaussianBeamletSource`, `SphericalGaussianBeamletSource`, `EllipticalGaussianBeamletSource`, `GaussianBeamletDecomposition`, `WavefrontBeamletDecomposition`, `GaussianModeDecomposition`, `AstigmaticBeamGroup` |
 | System        | `System`, `StaticSystem`, `solve_system!`, `initialize!`, `ObjectGroup` |
-| Materials     | `DiscreteRefractiveIndex`, `SellmeierEquation`, `ConstantRefractiveIndex` |
+| Materials     | `DiscreteRefractiveIndex`, `SellmeierEquation`, `ConstantRefractiveIndex`, `AbsorbingRefractiveIndex`, `extinction_coefficient` |
 | Lenses        | `Lens`, `ThinLens`, `SphericalLens`, `DoubletLens`, `SphericalDoubletLens`, `TripletLens`, `SphericalTripletLens`, `thickness` |
 | Surfaces      | `SphericalSurface`, `CircularFlatSurface`, `RectangularFlatSurface`, `EvenAsphericalSurface`, `CylindricalSurface`, `AcylindricalSurface` |
 | Mirrors       | `Mirror`, `RoundPlanoMirror`, `SquarePlanoMirror`, `SquarePlanoMirror2D`, `RectangularPlanoMirror`, `RightAnglePrismMirror`, `SphericalMirror`, `ConicMirror`, `OffAxisConicMirror`, `ParabolicMirror`, `OffAxisParabolicMirror`, `EllipsoidalMirror`, `OffAxisEllipsoidalMirror`, `HyperbolicMirror`, `OffAxisHyperbolicMirror`, `Retroreflector` |
 | Splitters     | `ThinBeamsplitter`, `RoundThinBeamsplitter`, `RectangularPlateBeamsplitter`, `RoundPlateBeamsplitter`, `CubeBeamsplitter`, `RectangularCompensatorPlate` |
+| Coatings      | `CoatingLayer`, `BeamsplitterCoating`, `MirrorCoating`, `AntireflectionCoating`, `SpectralCoating`, `ThinFilmCoating`, `ThinFilmLayer`, `QuarterWaveLayer`, `FresnelGhosts` |
 | Prisms        | `Prism`, `RightAnglePrism`, `EquilateralPrism`, `DovePrism` |
 | Polarizers    | `PolarizationFilter`, `RoundPolarizationFilter`, `LinearPolarizer`, `RoundLinearPolarizer`, `transmission_axis` |
 | Detectors     | `Detector`, `RegularGrid`, `RectilinearGrid`, `spot_diagram`, `ray_hits`, `intensity`, `electric_field`, `optical_power`, `gauss_parameters`, `waist_parameters`, `Centroid`, `MinMax` |
