@@ -249,6 +249,14 @@ A component creates its new rays without an enclosure. After each interaction, t
 BeamletOptics.enclose!
 ```
 
+The root beam of a solve starts in the bodies that contain its first ray: before tracing, the solver tests the bodies whose bounding spheres contain the start with [`BeamletOptics.isinside`](@ref) and sets the enclosure and the refractive index of the ray. Hence a source within a lens or a cuvette starts in its medium.
+
+```@docs; canonical=false
+BeamletOptics.start_enclosure
+BeamletOptics.enclose_start!
+BeamletOptics.isinside
+```
+
 The physics at the boundary belongs to the boundary, not to one of the bodies. A body, e.g. any [`BeamletOptics.AbstractRefractiveOptic`](@ref), and a thin layer, e.g. a [`ThinBeamsplitter`](@ref), hand the ray to the [`BeamletOptics.surface_model`](@ref) of the transition:
 
 ```@docs; canonical=false

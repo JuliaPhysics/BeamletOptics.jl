@@ -500,3 +500,63 @@ propagates.
 """
 cross_boundary(t::Transition, beam::Beam, ray::AbstractRay) =
     realize(t, beam, ray, select_channels(Dominant(), channels(t, ray)))
+
+"""
+    start_enclosure(system, point)
+
+Returns the [`Enclosure`](@ref) of a ray that starts at the `point`: the bodies of the `system` that
+contain it (see [`isinside`](@ref)), innermost first, or `nothing` outside of all bodies. Nested bodies
+are ordered by the size of their bounding spheres, the larger one outside. The bounding spheres of the
+solve skip the bodies far from the `point`.
+"""
+function start_enclosure(system::AbstractSystem, point::AbstractVector)
+    table = current_bounding_spheres()
+    bodies = AbstractObject[]
+    foreach(x -> collect_bodies!(bodies, table, x, point), _top_level(system))
+    isempty(bodies) && return nothing
+    sort!(bodies; by = body -> enclosing_radius(bounding_sphere_of(table, body)), rev = true)
+    return foldl(enter, bodies; init = nothing)
+end
+
+# The bodies within `x` that contain the `point`, pushed onto `bodies`
+collect_bodies!(bodies, table, object::AbstractObject, point) =
+    collect_bodies!(bodies, table, shape_trait_of(object), object, point)
+collect_bodies!(bodies, table, group::AbstractObjectGroup, point) =
+    foreach(o -> collect_bodies!(bodies, table, o, point), objects(group))
+# A plain shape of a composite, or anything else a custom system holds, is no body
+collect_bodies!(bodies, table, ::Any, point) = bodies
+
+function collect_bodies!(bodies, table, ::SingleShape, object::AbstractObject, point)
+    isnothing(medium(object)) && return bodies
+    isinside(bounding_sphere_of(table, object), point) || return bodies
+    isinside(shape(object), point) && push!(bodies, object)
+    return bodies
+end
+
+function collect_bodies!(bodies, table, ::MultiShape, object::AbstractObject, point)
+    isinside(bounding_sphere_of(table, object), point) || return bodies
+    foreach(part -> collect_bodies!(bodies, table, part, point), shape(object))
+    return bodies
+end
+
+enclosing_radius(sphere::AbstractBoundingSphere) = radius(sphere)
+enclosing_radius(::NoBoundingSphere) = Inf
+
+"""
+    enclose_start!(system, beam)
+
+Sets the [`Enclosure`](@ref) of the first ray of each component of the root `beam`, see
+[`start_enclosure`](@ref), and its refractive index: that of the innermost body that contains its
+start, else that of the system. A source that starts within a lens or a cuvette starts in its medium.
+"""
+function enclose_start!(system::AbstractSystem, beam::AbstractBeam)
+    foreach(_component_beams(beam)) do b
+        ray = first(rays(b))
+        λ = wavelength(ray)
+        enclosure = start_enclosure(system, position(ray))
+        enclosure!(ray, enclosure)
+        body = innermost(enclosure)
+        refractive_index!(ray, isnothing(body) ? refractive_index(system, λ) : medium_index(body, λ))
+    end
+    return nothing
+end

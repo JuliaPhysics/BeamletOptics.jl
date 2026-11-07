@@ -259,6 +259,30 @@ function intersect3d(mesh::AbstractMesh{M},
     end
 end
 
+"""
+    isinside(mesh::AbstractMesh, point)
+
+Returns `true` if the `point` lies within the closed `mesh`: a ray from the `point` crosses its faces an
+odd number of times. Three skew rays vote, such that a ray through an edge or a vertex of the mesh does
+not decide alone. The `mesh` must be closed, e.g. not a flat mesh.
+"""
+function isinside(mesh::AbstractMesh{M}, point::AbstractVector) where {M}
+    T = promote_type(M, eltype(point))
+    votes = count(mesh_probe_directions) do d
+        ray = Ray(Point3{T}(point...), Point3{T}(d...))
+        crossings = count(1:size(faces(mesh), 1)) do i
+            isfinite(MoellerTrumboreAlgorithm(@views(vertices(mesh)[faces(mesh)[i, :], :]), ray; lϵ = 0))
+        end
+        isodd(crossings)
+    end
+    return votes ≥ 2
+end
+
+# Skew directions of the parity test, far from the axes and diagonals of meshes
+const mesh_probe_directions = (
+    normalize([0.5773, 0.6011, 0.5530]), normalize([-0.4210, 0.7071, -0.5682]),
+    normalize([0.6631, -0.3519, -0.6607]))
+
 ## A collection of mesh constructors
 
 """

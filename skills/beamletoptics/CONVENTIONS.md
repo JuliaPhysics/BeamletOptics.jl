@@ -35,6 +35,8 @@ Defaults (`src/Config.jl`): `get_default_wavelength()` = 1e-6 m, `get_default_wa
   - `CubeBeamsplitter`: centered at the origin, coating at 45° to the y-axis
   - curved mirrors (`ParabolicMirror`, `ConicMirror`, …): vertex at the origin, opening towards −y
 - A typical source starts before the first element, e.g. `Beam([0, -0.05, 0], [0, 1, 0], λ)`.
+- A source that starts inside a body (lens, prism, plate, cuvette) starts in its medium: the solver sets the
+  refractive index of its first ray; outside of all bodies it is that of the system.
 - `orientation(obj)` returns a 3×3 matrix whose columns are the local x, y, z axes;
   `direction(obj) == orientation(obj)[:, 2]` is the local optical axis.
 - Surface normals of closed volumes point outward.

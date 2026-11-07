@@ -31,6 +31,14 @@ Base.position(sphere::AbstractBoundingSphere) = sphere.pos
 radius(sphere::AbstractBoundingSphere) = sphere.radius
 
 """
+    isinside(sphere::AbstractBoundingSphere, point)
+
+Returns `true` if the `point` lies within the `sphere`; always `true` without a sphere
+([`NoBoundingSphere`](@ref)), since nothing bounds the shape then.
+"""
+isinside(sphere::AbstractBoundingSphere, point::AbstractVector) = norm(point - position(sphere)) ≤ radius(sphere)
+
+"""
     NoBoundingSphere <: AbstractBoundingSphere
 
 States that a shape or object has no bounding sphere. It is then tested against every ray via
@@ -46,6 +54,7 @@ function no_sphere_error(what::AbstractString)
 end
 
 Base.position(::NoBoundingSphere) = no_sphere_error("center")
+isinside(::NoBoundingSphere, ::AbstractVector) = true
 radius(::NoBoundingSphere) = no_sphere_error("radius")
 
 """
