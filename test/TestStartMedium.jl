@@ -56,6 +56,23 @@ block(n; size = 40mm, thickness = 10mm) =
     @test BMO.refractive_index(first(rays(beam))) == 1
 end
 
+@testset "A ray that starts on a surface" begin
+    # On the front vertex of a lens: into the lens it starts in the glass, away from it in air
+    lens = SphericalLens(50mm, -50mm, 5mm, 25mm, ConstantRefractiveIndex(1.5))
+    for (d, n) in (([0, 1, 0], 1.5), ([0, -1, 0], 1.0))
+        beam = Beam([0, 0, 0], d, λ0)
+        solve_system!(System([lens]), beam)
+        @test BMO.refractive_index(first(rays(beam))) == n
+    end
+    # On the face of a mesh plate
+    plate = block(1.5)
+    for (d, n) in (([0, 1, 0], 1.5), ([0, -1, 0], 1.0))
+        beam = Beam([0, 0, 0], d, λ0)
+        solve_system!(System([plate]), beam)
+        @test BMO.refractive_index(first(rays(beam))) == n
+    end
+end
+
 @testset "A ray that starts in a lens within water" begin
     n_glass, n_water = 1.5, 1.33
     # Water from y = -40 mm to 0, the lens from y = -20 mm to -16 mm within it

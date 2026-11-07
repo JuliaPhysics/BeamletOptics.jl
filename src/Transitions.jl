@@ -502,15 +502,19 @@ cross_boundary(t::Transition, beam::Beam, ray::AbstractRay) =
     realize(t, beam, ray, select_channels(Dominant(), channels(t, ray)))
 
 """
-    start_enclosure(system, point)
+    start_enclosure(system, point, dir)
 
-Returns the [`Enclosure`](@ref) of a ray that starts at the `point`: the bodies of the `system` that
-contain it (see [`isinside`](@ref)), innermost first, or `nothing` outside of all bodies. Nested bodies
+Returns the [`Enclosure`](@ref) of a ray that starts at the `point` along `dir`: the bodies of the
+`system` that contain it (see [`isinside`](@ref)), innermost first, or `nothing` outside of all bodies.
+A ray that starts on the surface of a body is within it if it runs into it: the bodies are tested at
+the distance `get_coincidence_tolerance()` along `dir`. Nested bodies
 are ordered by the size of their bounding spheres, the larger one outside. The bounding spheres of the
 solve skip the bodies far from the `point`.
 """
-function start_enclosure(system::AbstractSystem, point::AbstractVector)
+function start_enclosure(system::AbstractSystem, point::AbstractVector, dir::AbstractVector)
     table = current_bounding_spheres()
+    # Just ahead of the start, which decides for a start on a surface
+    point = point + get_coincidence_tolerance() * dir
     bodies = AbstractObject[]
     foreach(x -> collect_bodies!(bodies, table, x, point), _top_level(system))
     isempty(bodies) && return nothing
@@ -553,7 +557,7 @@ function enclose_start!(system::AbstractSystem, beam::AbstractBeam)
     foreach(_component_beams(beam)) do b
         ray = first(rays(b))
         λ = wavelength(ray)
-        enclosure = start_enclosure(system, position(ray))
+        enclosure = start_enclosure(system, position(ray), direction(ray))
         enclosure!(ray, enclosure)
         body = innermost(enclosure)
         refractive_index!(ray, isnothing(body) ? refractive_index(system, λ) : medium_index(body, λ))

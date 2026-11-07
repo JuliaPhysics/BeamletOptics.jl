@@ -443,6 +443,7 @@ flowchart TB
     S(["<b>solve_system!</b>"])
     INI["<b>initialize!(system)</b><br/>initialize! each contained object"]
     BS["<b>with_bounding_spheres</b><br/>precalculate spheres of all objects,<br/>unless a beam group did"]
+    ST["<b>enclose_start!(system, beam)</b><br/>the root starts in the bodies<br/>around its first rays"]
     Q["<b>popfirst!(queue)</b><br/>next (beam, depth),<br/>the root at depth 1"]
     EM["<b>empty!(current)</b><br/>back to its first ray"]
     TS{"<b>trace_system!</b><br/>(system, current)"}
@@ -456,7 +457,7 @@ flowchart TB
     S -. "initialize = true" .-> INI
     S --> BS
     INI --> BS
-    BS --> Q --> EM --> TS
+    BS --> ST --> Q --> EM --> TS
     TS -- "method per beam type" --> D
     D -- yes --> ENQ --> QE
     D -- no --> DROP --> QE
@@ -467,7 +468,7 @@ flowchart TB
     classDef green fill:#38982626,stroke:#389826,stroke-width:2px
     classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
     classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
-    class BS,Q,EM,ENQ,DROP blue
+    class BS,ST,Q,EM,ENQ,DROP blue
     class INI green
     class TS purple
     class S,E,BQ terminal
