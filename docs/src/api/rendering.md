@@ -42,20 +42,24 @@ flowchart TB
 
 ## Updating a handle
 
-The diagram shows what `update_render!` does for each handle type:
+The diagram shows what `update_render!` and `rerender!` do for each handle type. `rerender!` skips
+the checks and always draws an object again, e.g. after a change of its shape:
 
 ```mermaid
 flowchart TB
     U(["<b>update_render!(h)</b>"])
+    RE(["<b>rerender!(h)</b>"])
     RG["<b>_is_rigid(h)</b><br/>parts unchanged and<br/>moved rigidly?"]
     OB["<b>refill the observables</b><br/>obs[] = geometry()"]
     PC["<b>pose of the object</b><br/>unchanged?"]
     MM["<b>translate!</b>, <b>rotate!</b><br/>model matrix of the plots"]
-    RR["<b>_rerender!(h)</b><br/>delete the plots, draw() again"]
+    RR["<b>draw again</b><br/>delete the plots, draw() at the<br/>current pose, which becomes P0, R0"]
     E(["<b>return h</b>"])
 
     U -- "ObjectRenderHandle, or<br/>update_render!(oh) for each oh in<br/>children(h) of a system handle" --> RG
     U -- "BeamRenderHandle" --> OB
+    RE -- "ObjectRenderHandle, or<br/>rerender!(oh) for each oh in<br/>children(h) of a system handle" --> RR
+    RE -- "BeamRenderHandle" --> OB
     RG -- yes --> PC
     RG -- no --> RR
     PC -- yes --> E
@@ -66,7 +70,7 @@ flowchart TB
     classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
     class MM,RR,OB blue
     class RG,PC purple
-    class U,E terminal
+    class U,RE,E terminal
 ```
 
 ## Render handle protocol
@@ -93,21 +97,21 @@ Base.push!(::BeamletOptics.AbstractSystemRenderHandle, ::BeamletOptics.AbstractO
 Base.delete!(::BeamletOptics.AbstractSystemRenderHandle, ::BeamletOptics.AbstractObjectRenderHandle)
 ```
 
-[`update_render!`](@ref), [`remove_render!`](@ref) and [`pick_object`](@ref) work on any system
-handle through these accessors, so a handle type of your own only needs to implement them.
+[`update_render!`](@ref), [`rerender!`](@ref), [`remove_render!`](@ref) and [`pick_object`](@ref) work on any
+system handle through these accessors, so a handle type of your own only needs to implement them.
 
 The diagram shows which accessors and hooks the methods of a system handle call, and where they pass on to the object handles:
 
 ```mermaid
 flowchart TB
-    UR["<b>update_render!(h)</b><br/><b>render_plots(h)</b>"]
+    UR["<b>update_render!(h)</b><br/><b>rerender!(h)</b><br/><b>render_plots(h)</b>"]
     REM0["<b>remove_render!(h)</b>"]
     REM["<b>remove_render!(h, obj)</b>"]
     PCK["<b>pick_object(h, plot)</b>"]
     CH["<b>AbstractTrees.children(h)</b>"]
     PAR["<b>render_parent(h, obj)</b>"]
     DEL["<b>delete!(h, oh)</b><br/>after remove_render!(oh)"]
-    OHM["<b>each object handle oh</b><br/>rendered, update_render!,<br/>render_plots, remove_render!,<br/>pick_object"]
+    OHM["<b>each object handle oh</b><br/>rendered, update_render!,<br/>rerender!, render_plots,<br/>remove_render!, pick_object"]
     PP["<b>pickable_plots(x, plots)</b><br/><i>method per type of x</i>"]
 
     UR --> CH

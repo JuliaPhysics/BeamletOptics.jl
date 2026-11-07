@@ -195,7 +195,16 @@ end
 For an object, the result follows from its shapes, see [`AbstractShapeTrait`](@ref): the sphere of
 the shape of a [`SingleShape`](@ref) object, and for a [`MultiShape`](@ref) object or an object
 group the [`MultiBoundingSphere`](@ref) that encloses the spheres of all its parts, or
-`NoBoundingSphere()` if one part has none.
+`NoBoundingSphere()` if one part has none. The solver skips an object whose sphere the ray misses or
+enters only beyond a hit found already, also if the object has an `intersect3d` method of its own.
+Hence the sphere of an object must enclose every hit of its `intersect3d`. A [`SingleShape`](@ref)
+object whose own `intersect3d` hits points outside of its shape, e.g. an unbounded plane, returns
+`NoBoundingSphere()`; the sphere of a [`MultiShape`](@ref) object is always the one around its parts,
+hence its own `intersect3d` must hit its parts only:
+
+```julia
+BeamletOptics.bounding_sphere_of(::MyPlane) = BeamletOptics.NoBoundingSphere()
+```
 """
 bounding_sphere_of(::AbstractShape) = NoBoundingSphere()
 
@@ -371,16 +380,16 @@ function _sphere_exit(sphere::AbstractBoundingSphere, ray::AbstractRay, margin =
 end
 
 """
-    beyond(sphere::AbstractBoundingSphere, ray, t)
+    isbeyond(sphere::AbstractBoundingSphere, ray, t)
 
 Returns `true` if nothing within the `sphere` can be hit by the `ray` at a path length up to `t` in
 [m]: the `ray` misses the `sphere`, the sphere lies behind its start, or the `ray` enters it only
 beyond `t`. Without a sphere ([`NoBoundingSphere`](@ref)) the result is `false`. The solver skips
-such parts once it has found a hit at `t`.
+such parts once it has found a hit at `t`, and those that the `ray` misses for `t = Inf`.
 """
-beyond(::NoBoundingSphere, ::AbstractRay, t) = false
+isbeyond(::NoBoundingSphere, ::AbstractRay, t) = false
 
-function beyond(sphere::AbstractBoundingSphere, ray::AbstractRay, t)
+function isbeyond(sphere::AbstractBoundingSphere, ray::AbstractRay, t)
     chord = sphere_chord(sphere, ray)
     isnothing(chord) && return true
     b, s = chord
