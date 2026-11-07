@@ -12,8 +12,8 @@ Two components are provided:
 
 - [`ReflectiveGrating`](@ref): a multi-shape reflective diffraction grating implementing
   the vector grating equation
-- [`LongpassDichroicMirror`](@ref): a dichroic mirror whose interaction branches on the
-  wavelength of the incoming ray
+- [`LongpassDichroicMirror`](@ref): a dichroic mirror, a glass plate whose front face carries a
+  longpass coating
 
 alongside a small set of `SellmeierEquation` glass models used by the OpenRAMAN optics.
 """
