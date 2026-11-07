@@ -64,20 +64,20 @@ perpendicular to the plane of incidence, `p_d = d × s` and `p_r = r × s`.
 - `d`, `r`: the incident and the reflected direction
 - `s`, `p_d`, `p_r`: the s- and p-vectors of both directions
 - `facing`: whether the ray comes from the front of the element, see [`isfacing`](@ref)
-- `t`: the [`Transition`](@ref) of the boundary; its carrier gives the local frame of the axes of an
-  element, see [`jones_angle`](@ref)
+- `carrier`: the hit of the surface that carries the element, whose part gives the local frame of the
+  axes of an element, see [`jones_angle`](@ref)
 - `λ`: the wavelength in \\[m\\]
 - `θ`: the angle of incidence in \\[rad\\], in the medium before the boundary
 - `θ_air`: the angle of incidence in air of the same Snell invariant `n sin θ`, `π/2` beyond it
 """
-struct IncidenceFrame{T, Tr <: Transition{T}}
+struct IncidenceFrame{T}
     d::SVector{3, T}
     r::SVector{3, T}
     s::SVector{3, T}
     p_d::SVector{3, T}
     p_r::SVector{3, T}
     facing::Bool
-    t::Tr
+    carrier::Intersection{T}
     λ::T
     θ::T
     θ_air::T
@@ -91,9 +91,14 @@ function IncidenceFrame(t::Transition, ray::AbstractRay{T}) where {T}
     s = s_vector(d, r, SVector{3, T}(normal3d(intersection(ray))...))
     θ = acos(min(abs(cos_angle3d(d, normal)), one(T)))
     θ_air = asin(min(refractive_index_in(t) * sin(θ), one(T)))
-    return IncidenceFrame{T, typeof(t)}(d, r, s, cross(d, s), cross(r, s), isfacing(t, ray), t,
-        T(wavelength(ray)), θ, θ_air)
+    return IncidenceFrame{T}(d, r, s, cross(d, s), cross(r, s), isfacing(t, ray),
+        carrier(t)::Intersection{T}, T(wavelength(ray)), θ, θ_air)
 end
+
+# The `frame` of an element on the surface of the hit `carrier`, from the side given by `facing`
+side_frame(frame::IncidenceFrame{T}, facing::Bool, carrier::Intersection{T}) where {T} =
+    IncidenceFrame{T}(frame.d, frame.r, frame.s, frame.p_d, frame.p_r, facing, carrier, frame.λ, frame.θ,
+        frame.θ_air)
 
 scattering(element::AbstractThinElement, ::IncidenceFrame) =
     error(lazy"scattering not defined for $(typeof(element))")
@@ -147,7 +152,7 @@ The angle of the `axis` of an element, in the local frame of its part, in the s-
 `frame` with the p-vector `p`: of its projection onto the plane transverse to the ray.
 """
 function jones_angle(frame::IncidenceFrame, axis::AbstractVector, p::AbstractVector)
-    a = orientation(part_of(carrier(frame.t))) * axis
+    a = orientation(part_of(frame.carrier)) * axis
     return atan(dot(a, p), dot(a, frame.s))
 end
 
@@ -606,4 +611,52 @@ function channels(::FresnelGhosts, t::Transition, ray::AbstractRay, cs)
     frame = IncidenceFrame(t, ray)
     return (transfer(transmitted, transmitted.P, channel_amplitude(ray, frame, power_jones(Ts, Tp), 1)),
         transfer(reflected, reflected.P, channel_amplitude(ray, frame, power_jones(Rs, Rp), 1)))
+end
+
+"""
+    CementedCoatings(left, left_hit, entered, entered_hit)
+
+The thin elements on the two touching faces of a cemented boundary, e.g. a beamsplitter coating on
+one prism of a cube and an anti-reflection coating on the other. The ray meets the coating of the body
+that it leaves first, from the substrate side, then the coating of the body that it enters, from its
+front; each element acts in the local frame of its own body, and the reflections between them add
+coherently, see [`cascade`](@ref). Built by the solver for such a boundary, see
+[`surface_model(::Transition)`](@ref).
+"""
+struct CementedCoatings{L <: AbstractThinElement, E <: AbstractThinElement, T} <: AbstractThinElement
+    left::L
+    left_hit::Intersection{T}
+    entered::E
+    entered_hit::Intersection{T}
+end
+
+splitting_of(c::CementedCoatings) = either_splitting(splitting_of(c.left), splitting_of(c.entered))
+
+# Split if one of two models splits
+either_splitting(::Dominant, ::Dominant) = Dominant()
+either_splitting(::AbstractSplitting, ::AbstractSplitting) = AllChannels()
+
+scattering(c::CementedCoatings, frame::IncidenceFrame) =
+    cascade(scattering(c.left, side_frame(frame, false, c.left_hit)),
+        scattering(c.entered, side_frame(frame, true, c.entered_hit)))
+
+"""
+    cemented_model(left, entered, t::Transition)
+
+The surface model of a boundary at which the face of the body that the ray leaves carries the model
+`left` and the face of the body that it enters the model `entered`: both thin elements as
+[`CementedCoatings`](@ref), two [`ThinFilmCoating`](@ref)s as one stack of all their layers. Other pairs
+cannot be combined: the model `left` acts, and a warning is issued once.
+"""
+cemented_model(left::AbstractThinElement, entered::AbstractThinElement, t::Transition) =
+    CementedCoatings(left, t.exiting, entered, t.entering)
+
+# The layers of the entered body are met from their outside, i.e. in reverse order
+cemented_model(left::ThinFilmCoating, entered::ThinFilmCoating, ::Transition) =
+    ThinFilmCoating((left.layers..., reverse(entered.layers)...),
+        either_splitting(left.splitting, entered.splitting))
+
+function cemented_model(left::AbstractSurfaceModel, ::AbstractSurfaceModel, ::Transition)
+    @warn "The coatings of two cemented faces cannot be combined, only the coating of the body that the ray leaves acts" maxlog = 1
+    return left
 end
