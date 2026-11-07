@@ -69,7 +69,8 @@ isonface(face::FlatFace, ::AbstractObject, ::Intersection, point, normal) =
 The part of the `face` that lies within the `mask`, a shape in the local frame of the body, e.g. a
 `BeamletOptics.CylinderSDF` along the optical axis for a circular area of a lens surface, a
 `BeamletOptics.RingSDF` for an annulus or a `BeamletOptics.BoxSDF` for a rectangle. The mask must
-implement [`isinside`](@ref).
+implement [`isinside`](@ref): a shape without a method contains no point, and the masked face never
+applies.
 
 ```julia
 center = MaskedFace(FrontFace(), BeamletOptics.CylinderSDF(5e-3, 1e-2))   # r < 5 mm
