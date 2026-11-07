@@ -47,6 +47,24 @@ delete!(system, lens)
 remove_render!(hsys, lens)   # deletes its plots and its handle
 ```
 
+## Changing the shape of an object
+
+`update_render!` moves the plots of an object but keeps its geometry. After the shape of a rendered
+object changed, e.g. the leg length of a prism of an own component type, draw it again with
+`rerender!`, called on the handle of the object or of the whole system:
+
+```@docs; canonical=false
+BeamletOptics.rerender!(::Any)
+```
+
+```julia
+hprism = live_render!(ax, prism)
+translate3d!(prism, [0, 0.01, 0])
+update_render!(hprism)   # moved: the plots follow the new pose
+# ... the shape of prism changes
+rerender!(hprism)        # new plots of the new shape, at the current pose
+```
+
 Beam handles report how they were drawn, and can change it at runtime, e.g. the drawn length of the
 final rays or the color (a single color or the color of the wavelength of each ray), without
 creating new plots:

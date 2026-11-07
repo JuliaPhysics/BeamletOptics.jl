@@ -74,7 +74,10 @@ end
     RightAnglePrismMirror(leg_length, height)
 
 Constructs a right-angle prism [`Mirror`](@ref) with perfect reflectivity (R = 1).
-The reflecting surface is modeled using a [`BeamletOptics.RightAnglePrismSDF`](@ref).
+The reflecting surface is modeled using a [`BeamletOptics.RightAnglePrismSDF`](@ref), which is
+rotated by 225° about z: the hypotenuse passes through the local origin with the normal -y and
+reflects a beam along +y back onto itself. The right angle edge lies on the +y-axis. Rotate the
+mirror by 45° about z or x to fold a beam by 90°.
 
 # Arguments
 
