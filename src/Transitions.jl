@@ -48,6 +48,13 @@ stores this with the part of the hit; a hit of an object with its own `intersect
 isbody(hit::Intersection) = isnothing(hit.part) ? !isnothing(medium(part_of(hit))) : hit.isbody
 
 """
+    iscoated(hit::Intersection)
+
+Returns `true` if faces of the part that was hit carry surface models, see [`surface_model!`](@ref).
+"""
+iscoated(hit::Intersection) = isnothing(hit.part) ? !isempty(face_models(part_of(hit))) : hit.iscoated
+
+"""
     interaction_rank(hit, ray)
 
 Returns the rank of the `hit` of the `ray` among the [`coincident_hits`](@ref): the hit of the lowest
@@ -119,6 +126,7 @@ struct Transition{T, S <: AbstractSystem}
     n_in::T
     n_out::T
     normal::Point3{T}
+    point::Point3{T}
     exiting::Nullable{Intersection{T}}
     entering::Nullable{Intersection{T}}
     layer::Nullable{Intersection{T}}
@@ -266,8 +274,8 @@ function transition(system::AbstractSystem, ray::AbstractRay{T}) where {T}
         n_in
     end
     normal = normal_against(normal3d(hit), ray)
-    return Transition{T, typeof(system)}(system, T(λ), n_in, n_out, normal, exiting, entering, layer,
-        e_in)
+    return Transition{T, typeof(system)}(system, T(λ), n_in, n_out, normal, Point3{T}(hit_point(ray)),
+        exiting, entering, layer, e_in)
 end
 
 """
@@ -419,12 +427,57 @@ struct Uncoated <: AbstractSurfaceModel end
 """
     surface_model(t::Transition)
 
-Returns the [`AbstractSurfaceModel`](@ref) that acts at the boundary of the transition `t`: the model
-of its thin layer, e.g. the [`BeamsplitterCoating`](@ref) of a [`ThinBeamsplitter`](@ref), else
-[`Uncoated`](@ref). A thin layer without a model, e.g. a [`Detector`](@ref) that does not stop the
-ray, leaves the boundary as it is. Coatings on the faces of bodies will enter here.
+Returns the [`AbstractSurfaceModel`](@ref) that acts at the boundary of the transition `t`, the first
+of
+1. the model of its thin layer, e.g. the [`BeamsplitterCoating`](@ref) of a [`ThinBeamsplitter`](@ref);
+   a thin layer without a model, e.g. a [`Detector`](@ref) that does not stop the ray, has none,
+2. the model of the coated face of the body that the ray leaves, then of the body that it enters, see
+   [`surface_model!`](@ref),
+3. the model of the system, see [`surface_model(::AbstractSystem)`](@ref), [`Uncoated`](@ref) by
+   default.
 """
-surface_model(t::Transition) = something(surface_model(t.layer), Uncoated())
+surface_model(t::Transition) = something(boundary_model(t), surface_model(t.system))
+
+# The model of the thin layer or of a coated face at the boundary of `t`, or `nothing`
+function boundary_model(t::Transition)
+    model = surface_model(t.layer)
+    isnothing(model) || return model
+    model = face_model(t, t.exiting)
+    isnothing(model) || return model
+    return face_model(t, t.entering)
+end
+
+# The model of the coated face of a body at the boundary of `t`
+face_model(::Transition, ::Nothing) = nothing
+face_model(t::Transition, hit::Intersection) =
+    iscoated(hit) ? face_model(part_of(hit), hit, t.point) : nothing
+
+"""
+    surface_model(system::AbstractSystem)
+
+Returns the surface model of every boundary of the `system` without a thin layer or a coated face:
+the keyword `surface_model` of [`System`](@ref) and [`StaticSystem`](@ref), e.g. [`FresnelGhosts`](@ref)
+to trace the ghost reflections of all uncoated surfaces, [`Uncoated`](@ref) by default.
+"""
+surface_model(::AbstractSystem) = Uncoated()
+surface_model(system::Union{System, StaticSystem}) = system.surface_model
+
+# The hit of the surface that carries the model of `t`, in the order of `surface_model(t)`
+function carrier(t::Transition)
+    isnothing(surface_model(t.layer)) || return t.layer
+    isnothing(face_model(t, t.exiting)) || return t.exiting
+    isnothing(face_model(t, t.entering)) || return t.entering
+    return something(t.layer, t.entering, t.exiting)
+end
+
+"""
+    isfacing(t::Transition, ray)
+
+Returns `true` if the `ray` comes from the side into which the surface that carries the model of the
+transition `t` faces: the normal of a thin layer, or the outside of a coated body. A coating lies on
+this side of its substrate.
+"""
+isfacing(t::Transition, ray::AbstractRay) = isentering(direction(ray), normal3d(carrier(t)))
 
 """
     surface_model(object::AbstractObject)
@@ -445,8 +498,13 @@ The interaction of the `beam` at the boundary of the transition `t`, at its ray 
 an `interact3d` method of their own interact here, an own method may call it, e.g. a [`Detector`](@ref)
 that does not stop the ray.
 """
-interact3d(system::AbstractSystem, t::Transition, beam::AbstractBeam, at::Union{AbstractRay, Int}) =
-    interact3d(system, surface_model(t), t, beam, at)
+function interact3d(system::AbstractSystem, t::Transition, beam::AbstractBeam,
+        at::Union{AbstractRay, Int})
+    model = boundary_model(t)
+    # The model of the system has the type that the system knows
+    isnothing(model) && return interact3d(system, surface_model(t.system), t, beam, at)
+    return interact3d(system, model, t, beam, at)
+end
 
 """
     cross_boundary(t::Transition, beam::Beam, ray)
