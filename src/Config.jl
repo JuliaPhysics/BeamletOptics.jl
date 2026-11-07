@@ -86,8 +86,12 @@ const coincidence_tolerance = @load_preference("coincidence_tolerance", 1e-9)
 
 Returns the path length in [m] within which the hits of a ray with several surfaces count as one
 point, e.g. the faces of two cemented lenses or a coating on a substrate. Gaps below this length are
-taken as contact. The default of 1 nm lies above the accuracy of the intersection algorithms and far
-below any gap that matters optically.
+taken as contact. The default of 1 nm lies far below any gap that matters optically.
+
+The tolerance must exceed the error of the hits in path length. A refined SDF hit lies much closer
+to the surface, but the exit of a ray that grazes an SDF surface from inside can lie up to
+`get_sdf_surface_threshold()` off the surface, i.e. this length divided by the cosine of the angle of
+incidence along the ray. Raising the surface threshold therefore calls for a larger tolerance.
 """
 get_coincidence_tolerance() = coincidence_tolerance
 

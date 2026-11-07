@@ -79,6 +79,29 @@ function update_render!(h::AbstractSystemRenderHandle)
 end
 
 """
+    rerender!(handle)
+
+Draws the object of the `handle` again from its current shape, at its current pose, e.g. after the
+leg length of a prism or the radius of a lens was changed. [`update_render!`](@ref) applies only the
+pose and keeps the plots, hence use it after moving components, and `rerender!` after a change of
+the shape. Returns the `handle`.
+
+The handle stays the same object, in the same place among the children of its system handle. Its
+plots are replaced: [`render_plots`](@ref)`(handle)` returns the new plots, and attributes that were
+set on the old plots (e.g. visibility or a highlight) are not carried over. If drawing the object
+throws, the handle keeps its old plots. A system handle draws all its objects again, a beam handle
+draws its beam as [`update_render!`](@ref) does.
+
+If no suitable backend is loaded, a [`MissingBackendError`](@ref) will be thrown.
+"""
+rerender!(::Any) = throw(MissingBackendError())
+
+function rerender!(h::AbstractSystemRenderHandle)
+    foreach(rerender!, children(h))
+    return h
+end
+
+"""
     remove_render!(handle)
 
 Deletes all plots of the `handle` from its axis.

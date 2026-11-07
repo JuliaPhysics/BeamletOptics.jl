@@ -232,8 +232,12 @@ dimensions::Point3 = (
     height,         # dim in z
 )
 
+The prism is the half of the box `|x|, |y| ≤ l / 2`, `|z| ≤ h / 2` with `x + y ≤ 0`. The local
+origin is the center of the hypotenuse face, the right angle edge lies at `(-l / 2, -l / 2)`.
+
 !!! info "Alignment"
-    Note that the prism is not aligned with the positive y-axis!
+    Note that the prism is not aligned with the positive y-axis! The legs have the normals -x and
+    -y, the hypotenuse has the normal `(1, 1, 0) / √2`.
 """
 mutable struct RightAnglePrismSDF{T} <: AbstractSDF{T}
     dir::SMatrix{3, 3, T, 9}

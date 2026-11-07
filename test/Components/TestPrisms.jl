@@ -149,6 +149,58 @@ const mm = 1e-3
             @test BMO.direction(r3)[2] < 0 # deflected towards the base
         end
     end
+
+    @testset "Origins and orientations from the docstrings" begin
+        n = ConstantRefractiveIndex(1.5)
+        L = 20mm
+        # Trace a beam along d from p0 + offset through the prism placed at p0
+        function trace(prism, p0, offset, d = [0, 1, 0])
+            translate3d!(prism, p0)
+            beam = Beam(p0 + offset, d, 1e-6)
+            solve_system!(System([prism]), beam)
+            return BMO.rays(beam)
+        end
+        p0 = [3mm, -7mm, 2mm]
+        # Right angle prism: origin at the hypotenuse center, right angle edge at (-L/2, -L/2)
+        rap = RightAnglePrism(L, 10mm, n)
+        @test BMO.sdf(BMO.shape(rap), [0, 0, 0]) ≈ 0 atol = 1e-15
+        @test BMO.sdf(BMO.shape(rap), [-L / 2, -L / 2, 0]) ≈ 0 atol = 1e-15
+        @test BMO.sdf(BMO.shape(rap), [-L / 4, -L / 4, 0]) < 0
+        @test BMO.sdf(BMO.shape(rap), [L / 4, L / 4, 0]) > 0
+        # As constructed: leg faces +y beam, TIR at the hypotenuse center, leaves along -x
+        rs = trace(rap, p0, [0, -30mm, 0])
+        @test length(rs) == 4
+        @test BMO.position(rs[3]) ≈ p0 atol = 1e-9
+        @test BMO.direction(rs[end]) ≈ [-1, 0, 0] atol = 1e-9
+        # Flipped about y: leaves along +x
+        rap = RightAnglePrism(L, 10mm, n)
+        yrotate3d!(rap, π)
+        @test BMO.direction(trace(rap, p0, [0, -30mm, 0])[end]) ≈ [1, 0, 0] atol = 1e-9
+        # Hypotenuse faces +y beam after 225° about z: enters at the origin plane, returned antiparallel
+        rap = RightAnglePrism(L, 10mm, n)
+        zrotate3d!(rap, 5π / 4)
+        rs = trace(rap, p0, [2mm, -30mm, 0])
+        @test BMO.position(rs[2]) ≈ p0 + [2mm, 0, 0] atol = 1e-9
+        @test BMO.position(rs[end]) ≈ p0 + [-2mm, 0, 0] atol = 1e-9
+        @test BMO.direction(rs[end]) ≈ [0, -1, 0] atol = 1e-9
+        # Right angle prism mirror: hypotenuse through the origin with normal -y
+        rpm = RightAnglePrismMirror(L, 10mm)
+        rs = trace(rpm, p0, [2mm, -30mm, 0])
+        @test BMO.position(rs[end]) ≈ p0 + [2mm, 0, 0] atol = 1e-9
+        @test BMO.direction(rs[end]) ≈ [0, -1, 0] atol = 1e-9
+        rpm = RightAnglePrismMirror(L, 10mm)
+        zrotate3d!(rpm, π / 4)
+        @test BMO.direction(trace(rpm, p0, [0, -30mm, 0])[end]) ≈ [1, 0, 0] atol = 1e-9
+        # Equilateral prism: minimum deviation for a +y beam, deflected towards +x
+        α = deg2rad(60)
+        θ = asin(1.5 * sin(α / 2)) - α / 2
+        eq = EquilateralPrism(40mm, 20mm, n)
+        zrotate3d!(eq, π / 2 - θ)
+        rs = trace(eq, p0, [0, -60mm, 0])
+        @test length(rs) == 3
+        @test acos(clamp(BMO.direction(rs[end])[2], -1, 1)) ≈ 2asin(1.5 * sin(α / 2)) - α atol = 1e-8
+        @test BMO.direction(rs[end])[1] > 0
+    end
 end
 
 end # module
