@@ -47,7 +47,9 @@ carries (`surface_model(layer)`, e.g. a `BeamsplitterCoating`), else `Uncoated`;
 layers hand their rays to it with `interact3d(system, t, beam, at)`. A model only transforms the
 channels of the bare boundary (`channels(model, t, ray, cs)`, [src/Channels.jl](src/Channels.jl));
 the solver builds the rays, children and child beamlets of every beam type from them, so a model has
-no code per beam type. Components never need a `Hint` for correctness; a `Hint` only speeds up the
+no code per beam type. A face of a body carries a model via `surface_model!(part, face, model)`
+([src/Faces.jl](src/Faces.jl)): a face answers `isonface` for a hit in the local frame of its part, or
+is the native face that a shape sets in its hits. Components never need a `Hint` for correctness; a `Hint` only speeds up the
 next intersection.
 
 **Be suspicious of** a component or algorithm that assumes a world-space orientation, an

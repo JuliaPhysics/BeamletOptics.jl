@@ -16,6 +16,8 @@ Subtypes of `AbstractSystem` must implement the following:
 
 - `objects(system)`: returns the objects of the system with object groups flattened into their objects. There is no fallback
 - `refractive_index(system, λ::Real)` (optional): returns the refractive index of the surrounding medium at the wavelength `λ`.
+- `surface_model(system)` (optional): returns the surface model of every boundary without a coating or
+  thin layer, [`Uncoated`](@ref) by default.
   The default is `1.0`; a system does not store a refractive index
 
 The solver tests a ray against the top-level objects and groups of the system. For a custom system these are the result of `objects(system)`.

@@ -8,13 +8,23 @@ A container storing the optical elements of, i.e. a camera lens or lab setup.
 - `objects`: vector containing the different objects (subtypes of [`AbstractObject`](@ref)) and object groups
   (subtypes of [`AbstractObjectGroup`](@ref)) that are part of the system.
   The constructor copies the vector it is given, such that `push!` and `delete!` of the system do not change it.
+- `surface_model`: the surface model of every boundary without a coating or thin layer, see
+  [`surface_model(::AbstractSystem)`](@ref); the keyword `surface_model` of the constructor, e.g.
+  [`FresnelGhosts`](@ref), [`Uncoated`](@ref) by default
 """
-struct System <: AbstractSystem
+struct System{M} <: AbstractSystem
     objects::Vector{ObjectOrGroup}
-    System(objects::AbstractVector) = new(collect(ObjectOrGroup, objects))
+    surface_model::M
+    function System(objects::AbstractVector; surface_model = Uncoated())
+        check_surface_model(surface_model)
+        return new{typeof(surface_model)}(collect(ObjectOrGroup, objects), surface_model)
+    end
 end
 
-System(object::ObjectOrGroup) = System([object])
+System(object::ObjectOrGroup; kwargs...) = System([object]; kwargs...)
+
+check_surface_model(model) = model isa AbstractSurfaceModel ||
+    throw(ArgumentError(lazy"surface_model must be an AbstractSurfaceModel, not $(typeof(model))"))
 
 """
     System()
@@ -112,14 +122,21 @@ a group later, e.g. via `push!(group, object)`, are not seen.
 # Fields
 
 - `objects`: vector containing the different objects that are part of the system (subtypes of [`AbstractObject`](@ref))
+- `surface_model`: the surface model of every boundary without a coating or thin layer, as for a
+  [`System`](@ref)
 """
-struct StaticSystem{T <: Tuple} <: AbstractSystem
+struct StaticSystem{T <: Tuple, M} <: AbstractSystem
     objects::T
+    surface_model::M
+    function StaticSystem(objects::T; surface_model = Uncoated()) where {T <: Tuple}
+        check_surface_model(surface_model)
+        return new{T, typeof(surface_model)}(objects, surface_model)
+    end
 end
-StaticSystem(object::ObjectOrGroup) = StaticSystem([object])
+StaticSystem(object::ObjectOrGroup; kwargs...) = StaticSystem([object]; kwargs...)
 # No bound on the element type: a vector of objects and groups has the element type `Any`
-function StaticSystem(objects::AbstractArray)
-    StaticSystem(tuple(collect(_leaf_objects(objects))...))
+function StaticSystem(objects::AbstractArray; kwargs...)
+    StaticSystem(tuple(collect(_leaf_objects(objects))...); kwargs...)
 end
 
 objects(system::StaticSystem) = system.objects

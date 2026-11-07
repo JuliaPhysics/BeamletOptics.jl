@@ -30,6 +30,8 @@ see [`BeamletOptics.AbstractKinematicTrait`](@ref). The default primitives
 - [`intersect3d`](@ref): returns the intersection between an `AbstractShape` and `AbstractRay`, or lack thereof. See also [`Intersection`](@ref)
 - [`bounding_sphere_of`](@ref) (optional): computes a sphere that encloses the shape. A solve then skips
   the shape for every ray that misses the sphere, without a call of `intersect3d`
+- [`isinside`](@ref) (optional): tests whether a point lies within the volume of the shape, e.g. for
+  the mask of a [`MaskedFace`](@ref)
 
 ## Rendering (with Makie):
 
@@ -38,6 +40,14 @@ Refer to the [`render!`](@ref) documentation.
 abstract type AbstractShape{T <: Real} end
 
 kinematic_trait_of(::AbstractShape) = Movable(Oriented())
+
+"""
+    isinside(shape::AbstractShape, point)
+
+Returns `true` if the `point` lies within the volume of the `shape` or on its surface. An
+[`AbstractSDF`](@ref) is inside where its signed distance is not positive.
+"""
+isinside(shape::AbstractShape, point) = error(lazy"isinside not defined for $(typeof(shape))")
 
 "Enforces that `shape` has to have the field `pos` or implement `position()`."
 Base.position(shape::AbstractShape) = shape.pos
