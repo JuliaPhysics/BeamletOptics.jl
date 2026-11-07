@@ -76,7 +76,8 @@ export Retroreflector, get_invariant_threshold, set_invariant_threshold!,
 
 # render
 export wavelength_color, render!, get_view, set_view, hide_axis, set_orthographic, arrow!, render_lcs!, look_at!
-export live_render!, update_render!, remove_render!, pick_object, studio_lighting!, set_render_look
+export live_render!, update_render!, rerender!, remove_render!, pick_object
+export studio_lighting!, set_render_look
 
 # render handle protocol and developer API for packages built on BeamletOptics: public, not exported
 public AbstractRenderHandle, AbstractObjectRenderHandle, AbstractSystemRenderHandle,

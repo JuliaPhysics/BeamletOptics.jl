@@ -83,6 +83,9 @@ function update_render!(h::BeamRenderHandle)
     return h
 end
 
+# A beam handle draws all rays anew on every update
+rerender!(h::BeamRenderHandle) = update_render!(h)
+
 function remove_render!(h::BeamRenderHandle)
     foreach(p -> delete!(h.axis, p), h.plots)
     empty!(h.plots)

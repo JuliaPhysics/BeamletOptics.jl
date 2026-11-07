@@ -36,10 +36,12 @@ kinematic API via `BeamletOptics.kinematic_trait_of(::Foo) = BeamletOptics.Stati
 
 - [`interact3d`](@ref): defines the optical interaction, the return type must be `Nothing` or an [`AbstractInteraction`](@ref)
 - [`initialize!`](@ref) (optional): resets the data that the object stores during a solve, e.g. the hits of a detector. By default nothing is reset.
-- `intersect3d(object, ray)` (optional): replaces the default intersection of the object, which tests its shapes via the shape trait. A method of its own bypasses the
-  bounding sphere test of the object, e.g. the [`RectangularPlateBeamsplitter`](@ref) does so
+- `intersect3d(object, ray)` (optional): replaces the default intersection of the object, which tests its shapes via the shape trait, e.g. the
+  [`RectangularPlateBeamsplitter`](@ref) does so. The solver still skips the object if the ray misses its bounding sphere or enters it only beyond a
+  hit found already, hence every hit of the method must lie within the sphere of the object: `bounding_sphere_of(object)` for a [`SingleShape`](@ref)
+  object, the sphere around the parts for a [`MultiShape`](@ref) object
 - `bounding_sphere_of(object)` (optional): the sphere around a [`SingleShape`](@ref) object, if it differs from the sphere of its shape. The default is the sphere of `shape(object)`,
-  see [`bounding_sphere_of`](@ref)
+  see [`bounding_sphere_of`](@ref). An object whose own `intersect3d` hits points outside of its shape returns `NoBoundingSphere()`
 """
 abstract type AbstractObject{T <: Real} end
 
