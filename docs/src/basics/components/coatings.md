@@ -134,6 +134,43 @@ AbsorbingRefractiveIndex
 extinction_coefficient
 ```
 
+## Retarders, reflective polarizers and stacks
+
+Polarizing films act on the field of [`PolarizedRay`](@ref)s and of the chief ray of
+[`AstigmaticGaussianBeamlet`](@ref)s. A [`Retarder`](@ref) delays the component along its slow axis, e.g.
+a quarter-wave film; a [`ReflectivePolarizer`](@ref) transmits the component along its axis and reflects
+the rest. Their axes are given in the local frame of the part that carries them, so they turn with it.
+
+Films laminated on top of each other form a [`SurfaceStack`](@ref), listed from the substrate outward. A
+ray meets them in the order of their side, light reflected by an outer film passes the inner ones
+again, and the reflections between the films add coherently. A stack is the core of a pancake lens:
+
+```@example coatings
+λ0 = 550e-9
+plate = RectangularCompensatorPlate(30e-3, 30e-3, 5e-3, ConstantRefractiveIndex(1.5))
+# A 50:50 mirror on the front face, a quarter-wave film under a reflective polarizer on the back face
+surface_model!(plate, FlatFace([0, -1, 0]), BeamsplitterCoating())
+surface_model!(plate, FlatFace([0, 1, 0]),
+    SurfaceStack(Retarder(π / 2, [1, 0, -1]), ReflectivePolarizer([1, 0, 0])))
+translate3d!(plate, [0, 50e-3, 0])
+
+# Circularly polarized light passes the plate after one round trip between the films
+beam = Beam(PolarizedRay([0, 0, 0], [0, 1, 0], λ0, [1, 0, im] / √2))
+solve_system!(System([plate]), beam; depth_max = 10)
+nothing # hide
+```
+
+A quarter of the light passes: half at the mirror on the way in, half at the mirror on the way back. The
+polarizer reflects the first pass, since the quarter-wave film turns the circular into linear light
+across its axis, and transmits the second pass, whose handedness the mirror has flipped. The
+[Pancake lens](@ref) tutorial traces the whole eyepiece.
+
+```@docs; canonical=false
+Retarder
+ReflectivePolarizer
+SurfaceStack
+```
+
 ## Ghost reflections
 
 An uncoated boundary refracts without tracing its weak Fresnel reflection. [`FresnelGhosts`](@ref)
