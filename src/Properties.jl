@@ -152,6 +152,9 @@ amplitude factors √R and √T, i.e. R as passed to the constructors of the bea
 _splitting_ratio(coating::ThinBeamsplitter) = Pair{String, Any}[
     "Reflectance" => reflectance(coating)^2, "Transmittance" => transmittance(coating)^2]
 
+# A coating layer of another model, e.g. of a polarizing cube, names its model
+_splitting_ratio(layer::CoatingLayer) = Pair{String, Any}["Coating" => nameof(typeof(surface_model(layer)))]
+
 properties(bs::ThinBeamsplitter) = [default_properties(bs); _flat_size(shape(bs)); _splitting_ratio(bs)]
 properties(bs::AbstractPlateBeamsplitter) = [default_properties(bs); _splitting_ratio(coating(bs));
     "Thickness [m]" => thickness(substrate(bs)); _index_properties(refractive_index(substrate(bs)))]

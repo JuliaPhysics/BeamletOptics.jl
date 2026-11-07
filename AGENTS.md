@@ -183,7 +183,7 @@ only if the method ignores it or passes it on unchecked.
 **D2 · Choose behavior by dispatch.** No `isa`, `typeof` comparisons, `hasmethod`,
 `haskey(kwargs, ...)` or Bool pseudo-traits to pick a code path. `isnothing` in plain control
 flow and `isa` in input validation that throws are fine. So is a fallback that asks the hooks a
-type declares (the `interact3d` fallback asks `isnothing(medium(x)) && isnothing(surface_model(x))`):
+type declares (the `interact3d` fallback asks `isboundary(x)`, i.e. `medium(x)` or `surface_model(x)`):
 the hook is the question, a trait would duplicate it (D3).
 
 **D3 · Traits `<question>_of(x)` for questions across the hierarchy.** Trait values are empty

@@ -53,7 +53,7 @@ side of [`isfacing`](@ref), see [`mirror_jones`](@ref) and
 abstract type AbstractThinElement <: AbstractSurfaceModel end
 
 """
-    IncidenceFrame{T}
+    IncidenceFrame{T, Tr}
 
 The geometry of a ray at a thin element, from which an element computes its Jones matrices. They are
 given in the s- and p-basis of the incident direction `d` and the reflected direction `r`; `s` is
@@ -64,20 +64,23 @@ perpendicular to the plane of incidence, `p_d = d × s` and `p_r = r × s`.
 - `d`, `r`: the incident and the reflected direction
 - `s`, `p_d`, `p_r`: the s- and p-vectors of both directions
 - `facing`: whether the ray comes from the front of the element, see [`isfacing`](@ref)
-- `R`: the orientation of the part that carries the element, whose local frame its axes refer to
+- `t`: the [`Transition`](@ref) of the boundary; its carrier gives the local frame of the axes of an
+  element, see [`jones_angle`](@ref)
 - `λ`: the wavelength in \\[m\\]
-- `θ`: the angle of incidence in \\[rad\\]
+- `θ`: the angle of incidence in \\[rad\\], in the medium before the boundary
+- `θ_air`: the angle of incidence in air of the same Snell invariant `n sin θ`, `π/2` beyond it
 """
-struct IncidenceFrame{T}
+struct IncidenceFrame{T, Tr <: Transition{T}}
     d::SVector{3, T}
     r::SVector{3, T}
     s::SVector{3, T}
     p_d::SVector{3, T}
     p_r::SVector{3, T}
     facing::Bool
-    R::SMatrix{3, 3, T, 9}
+    t::Tr
     λ::T
     θ::T
+    θ_air::T
 end
 
 function IncidenceFrame(t::Transition, ray::AbstractRay{T}) where {T}
@@ -87,9 +90,9 @@ function IncidenceFrame(t::Transition, ray::AbstractRay{T}) where {T}
     # The s-vector of the channels, see transfer
     s = s_vector(d, r, SVector{3, T}(normal3d(intersection(ray))...))
     θ = acos(min(abs(cos_angle3d(d, normal)), one(T)))
-    R = SMatrix{3, 3, T, 9}(orientation(part_of(carrier(t))))
-    return IncidenceFrame{T}(d, r, s, cross(d, s), cross(r, s), isfacing(t, ray), R,
-        T(wavelength(ray)), θ)
+    θ_air = asin(min(refractive_index_in(t) * sin(θ), one(T)))
+    return IncidenceFrame{T, typeof(t)}(d, r, s, cross(d, s), cross(r, s), isfacing(t, ray), t,
+        T(wavelength(ray)), θ, θ_air)
 end
 
 scattering(element::AbstractThinElement, ::IncidenceFrame) =
@@ -144,7 +147,7 @@ The angle of the `axis` of an element, in the local frame of its part, in the s-
 `frame` with the p-vector `p`: of its projection onto the plane transverse to the ray.
 """
 function jones_angle(frame::IncidenceFrame, axis::AbstractVector, p::AbstractVector)
-    a = frame.R * axis
+    a = orientation(part_of(carrier(frame.t))) * axis
     return atan(dot(a, p), dot(a, frame.s))
 end
 
@@ -265,8 +268,11 @@ AntireflectionCoating() = BeamsplitterCoating(0)
     SpectralCoating(λs, Rs; splitting = AllChannels())
 
 A lossless coating with the power reflectance `R(λ, θ)` of the wavelength `λ` in \\[m\\] and the
-angle of incidence `θ` in \\[rad\\], e.g. a dichroic mirror, an edge filter or a datasheet curve; it
-transmits `1 - R`. With two functions, `Rs` and `Rp` are the reflectances of the s- and
+angle of incidence in air `θ` in \\[rad\\], e.g. a dichroic mirror, an edge filter or a datasheet
+curve; it transmits `1 - R`. A thin film responds to the Snell invariant `n sin θ` of the ray only,
+the same on both of its sides, hence `θ` is the angle in air of this invariant, as datasheets give it:
+for a ray at the angle `θ₁` in a medium of the index `n₁`, `sin θ = n₁ sin θ₁`, and `θ = π/2` for a
+ray beyond the critical angle of air. With two functions, `Rs` and `Rp` are the reflectances of the s- and
 p-components, e.g. of a polarizing beamsplitter coating. A table of the reflectances `Rs` at the
 wavelengths `λs` is interpolated linearly and does not depend on the angle; beyond the table its
 first or last value holds.
@@ -293,8 +299,22 @@ SpectralCoating(λs::AbstractVector{<:Real}, Rs::AbstractVector{<:Real}; kwargs.
 splitting_of(coating::SpectralCoating) = coating.splitting
 
 function scattering(coating::SpectralCoating, frame::IncidenceFrame)
-    Rs, Rp = coating.Rs(frame.λ, frame.θ), coating.Rp(frame.λ, frame.θ)
+    Rs, Rp = coating.Rs(frame.λ, frame.θ_air), coating.Rp(frame.λ, frame.θ_air)
     return lossless_scattering(frame, sqrt(Rs), sqrt(Rp), sqrt(1 - Rs), sqrt(1 - Rp))
+end
+
+"""
+    PolarizingCoating(Rs = 1, Rp = 0)
+
+An ideal polarizing beamsplitter coating: a lossless [`SpectralCoating`](@ref) that reflects the
+s-component of the field with the power reflectance `Rs` and the p-component with `Rp`, at all
+wavelengths and angles. The s-component is perpendicular to the plane of incidence. Beams without
+polarization are split with the mean reflectance.
+"""
+function PolarizingCoating(Rs::Real = 1, Rp::Real = 0)
+    0 ≤ Rs ≤ 1 && 0 ≤ Rp ≤ 1 ||
+        throw(ArgumentError(lazy"the reflectances of a PolarizingCoating must lie in [0, 1], not $Rs, $Rp"))
+    return SpectralCoating((λ, θ) -> Rs, (λ, θ) -> Rp)
 end
 
 """
@@ -318,6 +338,15 @@ function Retarder(Γ::Real, fast_axis::AbstractVector{<:Real}; λ0::Nullable{Rea
     T = float(promote_type(typeof(Γ), eltype(fast_axis)))
     return Retarder(T(Γ), SVector{3, T}(normalize(fast_axis)), isnothing(λ0) ? nothing : T(λ0))
 end
+
+"""
+    fast_axis(layer::CoatingLayer)
+
+Returns the unit vector, in global coordinates, of the fast axis of the [`Retarder`](@ref) of the
+`layer`, e.g. of a [`QuarterWavePlate`](@ref). Its sign is arbitrary, since it is an axis.
+"""
+fast_axis(layer::CoatingLayer{T, S, <:Retarder}) where {T, S} =
+    normalize(orientation(layer) * surface_model(layer).fast_axis)
 
 """Returns the retardance of the `retarder` in \\[rad\\] at the wavelength `λ` in \\[m\\]."""
 retardance(retarder::Retarder{T, Nothing}, ::Real) where {T} = retarder.Γ
