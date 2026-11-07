@@ -47,7 +47,7 @@ Use `scripts/api_lookup.jl NAME` to print the docstring and signatures of any na
 | Dummies       | `NonInteractableObject`, `IntersectableObject` |
 | Config        | `get_default_wavelength`, `get_default_waist`, `get_default_power`, `get_default_r_max`, `get_default_depth_max`, `get_invariant_threshold`, `set_invariant_threshold!`, `get_lagrange_tolerance`, `set_lagrange_tolerance!`, `get_internal_reflection_threshold`, `get_line_plane_intersection_threshold`, `get_orthogonality_threshold`, `get_sdf_surface_threshold`, `get_sdf_raymarch_eps`, `get_sdf_miss_distance`, `get_progress_threshold`, `set_progress_threshold!` |
 | Render (Makie)| `wavelength_color`, `render!`, `get_view`, `set_view`, `hide_axis`, `set_orthographic`, `look_at!`, `arrow!`, `render_lcs!`, `set_render_look`, `studio_lighting!` |
-| Live (Makie)  | `live_render!`, `update_render!`, `remove_render!`, `pick_object` |
+| Live (Makie)  | `live_render!`, `update_render!`, `rerender!`, `remove_render!`, `pick_object` |
 
 Useful non-exported helpers: `BeamletOptics.inch`, `lensmakers_eq(R1, R2, n)` (returns f),
 `divergence_angle(λ, w0, M2)`, `numerical_aperture(θ, n=1)` (also of a `PointSource` or a cone
@@ -131,6 +131,8 @@ s          = RectilinearGrid(xs, zs)          # a grid of one's own: local x, z 
 x, z, E    = electric_field(det, s)
 x, z, I    = intensity(det, s)
 P          = optical_power(det, s)            # trapezoidal rule on xs × zs
+g          = BeamletOptics.sample_points(det, s)   # points, weights, coordinates of a sampling
+P          = optical_power(g, intensity(det, g.points))   # power of a field computed once
 ```
 
 The second argument of `electric_field`/`intensity`/`optical_power` is a sampling (default

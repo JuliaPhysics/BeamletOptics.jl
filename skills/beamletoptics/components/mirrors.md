@@ -11,7 +11,7 @@ including its back and edges. Curved mirrors can have a central hole via `hole_d
 | `SquarePlanoMirror(width, thickness)` | as above, square |
 | `RectangularPlanoMirror(width_x, height_z, thickness_y)` | as above, rectangular |
 | `SquarePlanoMirror2D(edge_length)` | zero-thickness square in the x-z plane |
-| `RightAnglePrismMirror(leg_length, height)` | right-angle prism with a reflecting hypotenuse; legs in x/y, height in z |
+| `RightAnglePrismMirror(leg_length, height)` | right-angle prism, height in z, pre-rotated by 225° about z: the hypotenuse passes through the origin with normal -y (back-reflects a +y beam), the right-angle edge lies on +y |
 
 To fold by 90°, rotate by 45° about the axis perpendicular to the fold plane:
 `zrotate3d!(m, deg2rad(45))` sends a +y beam to +x, and `xrotate3d!(m, deg2rad(-45))` sends it to +z.

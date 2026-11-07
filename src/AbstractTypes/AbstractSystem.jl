@@ -19,7 +19,8 @@ Subtypes of `AbstractSystem` must implement the following:
   The default is `1.0`; a system does not store a refractive index
 
 The solver tests a ray against the top-level objects and groups of the system. For a custom system these are the result of `objects(system)`.
-The built-in [`System`](@ref) tests its groups as a whole, a [`StaticSystem`](@ref) flattens them when it is built.
+The built-in [`System`](@ref) tests the bounding sphere of a group first and then its objects one by one, a [`StaticSystem`](@ref)
+flattens its groups when it is built.
 """
 abstract type AbstractSystem end
 
@@ -85,9 +86,10 @@ A `Hint` can be passed as part of an [`AbstractInteraction`](@ref) and will info
 in the [`AbstractSystem`](@ref) will probably be hit next.
 
 !!! info
-    The `Hint` only speeds up the tracing: the hinted object is tested first, and objects beyond its hit are skipped.
-    It does not change which object is hit, and touching elements (e.g. cemented lenses) need no `Hint`, since the
-    solver finds all surfaces at the hit point, see [`coincident_hits`](@ref) and [`transition`](@ref).
+    The `Hint` only speeds up the tracing: the hinted object is tested first, the objects beyond its hit are
+    skipped, and a closer hit of another object wins. It does not change which object is hit, and touching
+    elements (e.g. cemented lenses) need no `Hint`, since the solver finds all surfaces at the hit point, see
+    [`coincident_hits`](@ref) and [`transition`](@ref).
 
 # Fields
 

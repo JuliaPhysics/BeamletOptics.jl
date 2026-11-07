@@ -46,7 +46,7 @@ end
 
 println("Julia ", VERSION, ", threads: ", Threads.nthreads(), ", ", Sys.cpu_info()[1].model, ", N = ", N)
 println()
-println(rpad("component", 22), rpad("source", 28), rpad("System [µs]", 14), "StaticSystem [µs]")
+println(rpad("component", 26), rpad("source", 28), rpad("System [µs]", 14), "StaticSystem [µs]")
 # 50 lenses around the component, off the beam path: the cost of the other objects of a system
 function crowd()
     return [begin
@@ -64,5 +64,5 @@ for crowded in (false, true), (cname, (make, p)) in components, (sname, source) 
     cname = crowded ? cname * " + 50" : cname
     t_sys = min_time(System(objs), source(p), N)
     t_static = min_time(StaticSystem(objs), source(p), N)
-    println(rpad(cname, 22), rpad(sname, 28), rpad(round(1e6 * t_sys; digits = 1), 14), round(1e6 * t_static; digits = 1))
+    println(rpad(cname, 26), rpad(sname, 28), rpad(round(1e6 * t_sys; digits = 1), 14), round(1e6 * t_static; digits = 1))
 end

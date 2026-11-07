@@ -63,10 +63,19 @@ function _subposes(x)
     return Point3{Float64}[_pose(p)[1] for p in parts], Matrix{Float64}[_pose(p)[2] for p in parts]
 end
 
-"""Returns the plots that are added to the `ax` by `f()`."""
+"""
+Returns the plots that are added to the `ax` by `f()`. If `f()` throws, the plots it added are
+deleted again and the exception is rethrown.
+"""
 function _capture_new_plots(f, ax::_RenderEnv)
     before = Set(objectid(p) for p in ax.scene.plots)
-    f()
+    try
+        f()
+    catch
+        # Leave no plots of a partial draw behind
+        foreach(p -> delete!(ax, p), [p for p in ax.scene.plots if objectid(p) ∉ before])
+        rethrow()
+    end
     return AbstractPlot[p for p in ax.scene.plots if objectid(p) ∉ before]
 end
 
@@ -160,11 +169,19 @@ function _is_rigid(h::ObjectRenderHandle; atol = 1e-6, rtol = 1e-6)
     return true
 end
 
-function _rerender!(h::ObjectRenderHandle)
+"""
+    rerender!(h::ObjectRenderHandle)
+
+Draws the object again at its current pose, which becomes the reference pose of `h`, and then
+deletes the old plots of `h`. If drawing throws, `h` and the axis stay unchanged.
+"""
+function rerender!(h::ObjectRenderHandle)
+    # Draw first, such that a failing draw keeps the old plots
+    plots = _capture_new_plots(h.draw, h.ax)
     for plot in h.plots
         delete!(h.ax, plot)
     end
-    h.plots = _capture_new_plots(h.draw, h.ax)
+    h.plots = plots
     h.P0, h.R0 = _pose(h.obj)
     h.P, h.R = h.P0, h.R0
     h.subP0, h.subR0 = _subposes(h.obj)
@@ -180,7 +197,7 @@ an object group have not been moved rigidly, the object is rendered again.
 """
 function update_render!(h::ObjectRenderHandle)
     # The pose of a MultiShape object is the pose of its first part, hence check the other parts first
-    _is_rigid(h) || return _rerender!(h)
+    _is_rigid(h) || return rerender!(h)
     P, R = _pose(h.obj)
     (P == h.P && R == h.R) && return h
     # Makie model matrix: x ↦ Rd * x + t, since scale and origin are not used
