@@ -1340,6 +1340,36 @@ holds(shapes, s) = any(x -> x === s, shapes)
             @test (a.tests, b.tests, c.tests) == (1, 0, 0)
         end
     end
+
+    @testset "The closest hits are inferred, also through groups" begin
+        # the objects of a System are abstract: a lost return type makes every solve allocate more
+        dl = doublet(1.5, 1.7)
+        plate = RectangularCompensatorPlate(10mm, 10mm, 2mm, ConstantRefractiveIndex(1.6))
+        translate3d!(plate, [0, 30mm, 0])
+        ray = Ray([1mm, -10mm, 0], [0, 1.0, 0], λ0)
+        for system in (System([dl, plate]), System([ObjectGroup([dl]), plate]), StaticSystem([dl, plate]))
+            BMO.with_bounding_spheres(system) do
+                # a hit, inferred as Union{Nothing, Intersection{Float64}}
+                @test BMO.object(@inferred(Nothing, BMO.trace_all(system, ray))) === dl
+                @test BMO.object(@inferred(Nothing, BMO.trace_one(system, ray, BMO.Hint(plate)))) === dl
+            end
+        end
+        # the parts beside the ray cost no allocations, also with a hint
+        function allocs(num_parts)
+            others = map(1:num_parts) do k
+                p = RectangularCompensatorPlate(10mm, 10mm, 2mm, ConstantRefractiveIndex(1.6))
+                translate3d!(p, [100mm + 20mm * k, 0, 0])
+                p
+            end
+            system = System([dl, plate, others...])
+            return BMO.with_bounding_spheres(system) do
+                hint = BMO.Hint(plate)
+                BMO.trace_all(system, ray), BMO.trace_one(system, ray, hint)
+                @allocated(BMO.trace_all(system, ray)), @allocated(BMO.trace_one(system, ray, hint))
+            end
+        end
+        @test allocs(5) == allocs(50)
+    end
 end
 
 end # module

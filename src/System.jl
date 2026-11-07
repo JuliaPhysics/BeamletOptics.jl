@@ -129,8 +129,8 @@ function trace_system!(::AbstractSystem, beam::B; r_max = 0, kwargs...) where {B
     return nothing
 end
 
-# The objects and object groups at the top level of the system. A group tests its objects itself, see
-# `intersect3d(::MultiShape, group, ray)`, hence the tracing does not use the flattened `objects(system)`.
+# The objects and object groups at the top level of the system. The tracing enters a group only if the
+# ray reaches its bounding sphere, hence it does not use the flattened `objects(system)`.
 _top_level(system::AbstractSystem) = objects(system)
 _top_level(system::System) = system.objects
 
@@ -152,26 +152,34 @@ the closest hit found so far is not tested.
 
 Merges the hits of the `ray` with the `parts` (objects and groups) into the hits `result` (or
 `nothing`), see [`merge_hits`](@ref), and returns them. The object `skip` (or `nothing`) is not tested,
-since `result` holds its hits already. A part whose bounding sphere the `ray` misses or enters only
-beyond the closest hit found so far, see [`isbeyond`](@ref), is not tested either. The objects of a
-group are tested one by one, hence both rules apply to them as well.
+since `result` holds its hits already. Once a hit is found, a part whose bounding sphere the `ray`
+enters only beyond it, see [`isbeyond`](@ref), is not tested either. A group whose sphere the `ray`
+misses is skipped as a whole, else its objects are tested one by one, hence both rules apply to them
+as well. An object without a hit so far is tested by `intersect3d`, which tests its sphere itself.
 """
 function closest_hits(parts::Union{Tuple, AbstractVector, Leaves, LeafObjects}, ray::AbstractRay{R},
-        result::Nullable{Intersection{R}}, skip::Nullable{AbstractObject}) where {R}
+        result::Nullable{Intersection{R}}, @nospecialize(skip::Nullable{AbstractObject})) where {R}
     table = current_bounding_spheres()
     tol = get_coincidence_tolerance()
+    # Unspecialized skip, else boxed again for every part
     for part in parts
         part === skip && continue
         # Skip parts beyond the closest hit
-        t_max = isnothing(result) ? Inf : length(result) + tol
-        isbeyond(bounding_sphere_of(table, part), ray, t_max) && continue
-        result = closest_hits(part, ray, result, skip)
+        if !isnothing(result) && isbeyond(bounding_sphere_of(table, part), ray, length(result) + tol)
+            continue
+        end
+        # Assert the type, the parts of a System are abstract
+        result = closest_hits(part, ray, result, skip)::Nullable{Intersection{R}}
     end
     return result
 end
 
 function closest_hits(group::AbstractObjectGroup, ray::AbstractRay{R},
-        result::Nullable{Intersection{R}}, skip::Nullable{AbstractObject}) where {R}
+        result::Nullable{Intersection{R}}, @nospecialize(skip::Nullable{AbstractObject})) where {R}
+    # Skip a missed group, its sphere is tested above once a hit is found
+    if isnothing(result) && isbeyond(bounding_sphere_of(current_bounding_spheres(), group), ray, Inf)
+        return result
+    end
     return closest_hits(objects(group), ray, result, skip)
 end
 

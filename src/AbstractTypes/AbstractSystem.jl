@@ -19,7 +19,8 @@ Subtypes of `AbstractSystem` must implement the following:
   The default is `1.0`; a system does not store a refractive index
 
 The solver tests a ray against the top-level objects and groups of the system. For a custom system these are the result of `objects(system)`.
-The built-in [`System`](@ref) tests its groups as a whole, a [`StaticSystem`](@ref) flattens them when it is built.
+The built-in [`System`](@ref) tests the bounding sphere of a group first and then its objects one by one, a [`StaticSystem`](@ref)
+flattens its groups when it is built.
 """
 abstract type AbstractSystem end
 

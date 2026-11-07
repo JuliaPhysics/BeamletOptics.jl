@@ -65,8 +65,9 @@ flowchart TB
     TA(["<b>trace_all(system, ray)</b><br/>top-level objects<br/>(and groups of a System)"])
     CH["<b>closest_hits(parts, ray, result, skip)</b><br/>each part in turn"]
     SK{"part === skip?<br/>the hinted object,<br/>tested already"}
-    BY{"<b>isbeyond</b>(sphere, ray, t)?<br/>sphere missed or only<br/>behind the closest hit so far"}
-    G["<b>closest_hits(group, ...)</b><br/><i>System only</i><br/>parts = objects(group)"]
+    BY{"hit so far and<br/><b>isbeyond</b>(sphere, ray, t)?<br/>sphere only behind<br/>the closest hit"}
+    G{"<b>closest_hits(group, ...)</b><br/><i>System only</i><br/>no hit so far and<br/>sphere missed?"}
+    O["<b>closest_hits(object, ...)</b>"]
     OJ["<b>intersect3d(object, ray)</b><br/><i>own method possible,<br/>e.g. PlateBeamsplitter</i>"]
     M["<b>merge_hits(result, hit)</b><br/>closest hit and those<br/>at the same point"]
     T["<b>shape_trait_of(object)</b><br/>SingleShape: x = shape(object)<br/>MultiShape: x = a tuple of parts<br/>(shapes or objects)"]
@@ -80,9 +81,11 @@ flowchart TB
     SK -- yes --> MISS
     SK -- no --> BY
     BY -- yes --> MISS
-    BY -- "no, isa AbstractObjectGroup" --> G
-    G -- "back to closest_hits<br/>with its objects" --> CH
-    BY -- "no, isa AbstractObject" --> OJ
+    BY -- "no, a group" --> G
+    BY -- "no, an object" --> O
+    G -- yes --> MISS
+    G -- "no: back to closest_hits<br/>with objects(group)" --> CH
+    O --> OJ
     OJ -- "default method" --> T
     T --> PT
     PT -- "x is a shape" --> SH
@@ -99,7 +102,7 @@ flowchart TB
     classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
     class G,OBJ blue
     class OJ,SH green
-    class CH,SK,BY,M,P,T,PT purple
+    class CH,SK,BY,O,M,P,T,PT purple
     class TA,MISS terminal
 ```
 
