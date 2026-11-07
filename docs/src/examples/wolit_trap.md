@@ -46,7 +46,8 @@ degrees.
 
 ## The wedge
 
-Two glass plates form the wedge, 1 mm apart at the origin and tilted by ±0.6°. The lower plate carries an
+Two glass plates form the wedge, 1 mm apart at the origin and tilted by ±0.6° about it; their
+14 mm cover the part of the wedge that the beam uses. The lower plate carries an
 anti-reflection coating on its outer face and the filter on its inner face, the upper plate a mirror on
 its inner face. The faces of a plate are addressed by their outward normals in the local frame of the
 plate, see [Coatings](@ref).
@@ -55,16 +56,16 @@ plate, see [Coatings](@ref).
 α = deg2rad(1.2)   # wedge angle
 glass = ConstantRefractiveIndex(1.5)
 
-filter_plate = RectangularCompensatorPlate(40mm, 10mm, 1mm, glass)
+filter_plate = RectangularCompensatorPlate(14mm, 6mm, 1mm, glass)
 surface_model!(filter_plate, FlatFace([0, -1, 0]), AntireflectionCoating())
 surface_model!(filter_plate, FlatFace([0, 1, 0]), longpass)
-translate3d!(filter_plate, [0, -1mm, 0])
-zrotate3d!(filter_plate, α / 2)
+translate3d!(filter_plate, [-7mm, -1mm, 0])
+rotate3d!(filter_plate, [0, 0, 1], α / 2, [0, -1mm, 0])   # about its point at x = 0
 
-mirror_plate = RectangularCompensatorPlate(40mm, 10mm, 1mm, glass)
+mirror_plate = RectangularCompensatorPlate(14mm, 6mm, 1mm, glass)
 surface_model!(mirror_plate, FlatFace([0, -1, 0]), MirrorCoating())
-translate3d!(mirror_plate, [0, 1mm, 0])
-zrotate3d!(mirror_plate, -α / 2)
+translate3d!(mirror_plate, [-7mm, 1mm, 0])
+rotate3d!(mirror_plate, [0, 0, 1], -α / 2, [0, 1mm, 0])
 
 system = System([filter_plate, mirror_plate])
 nothing # hide
@@ -72,19 +73,32 @@ nothing # hide
 
 ## Trapping the beam
 
-The beam enters at 26.5°, just above the edge of the filter.
+The beam enters at 26.5°, just above the edge of the filter. [`render!`](@ref) draws each ray of the
+path in the color of its place along the path: the beam runs towards the apex of the wedge, turns
+there and returns, until the filter lets it out.
 
 ```@example wolit
 θ_in = deg2rad(26.5)
 beam = Beam([-12mm, -4mm, 0], [sin(θ_in), cos(θ_in), 0], λ)
 solve_system!(system, beam; r_max = 400)
 
-fig = Figure(size = (1000, 360))
+fig = Figure(size = (900, 400))
 ax = LScene(fig[1, 1]; show_axis = false)
-render!(ax, system)
-render!(ax, beam; color = :red, flen = 4mm)
-set_view(ax, [-8mm, 0.5mm, 14mm], [-8mm, 0.5mm, 0], [0, 1, 0]) # hide
+render!(ax, filter_plate; color = :orange, transparency = true, alpha = 0.35)
+render!(ax, mirror_plate; color = :silver, transparency = true, alpha = 0.5)
+path = rays(beam)
+colors = Makie.cgrad(:plasma)[range(0, 1; length = length(path))]
+for (ray, color) in zip(path, colors)
+    render!(ax, ray; color, flen = 3mm, linewidth = 2)
+end
+text!(ax, Point3f(-13.5mm, 2.4mm, 0); text = "mirror", fontsize = 18)
+text!(ax, Point3f(-6mm, -2.6mm, 0); text = "edge filter", fontsize = 18)
+text!(ax, Point3f(-1.5mm, 0.3mm, 0); text = "apex →", fontsize = 18)
+ax.scene.camera_controls.settings.center[] = false # hide
+set_view(ax, [-7.5mm, -1mm, 600mm], [-7.5mm, -1mm, 0], [0, 1, 0]) # hide
 set_orthographic(ax) # hide
+Colorbar(fig[1, 2]; colormap = :plasma, limits = (1, length(path)), label = "ray along the path",
+    height = Relative(0.6))
 fig
 ```
 
