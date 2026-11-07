@@ -274,9 +274,32 @@ detector that no beam hit gives `P = 0`, e.g. when a scan moves the beam off the
 function optical_power(pd::Detector, sampling::AbstractDetectorSampling = RegularGrid();
         progress::Bool = true)
     grid = sample_points(pd, sampling)
-    I = intensity(pd, grid.points; progress)
+    return optical_power(grid, intensity(pd, grid.points; progress))
+end
+
+"""
+    optical_power(samples::DetectorSamples, I::AbstractArray{<:Real})
+
+The power in \\[W\\] of the irradiance `I` \\[W/m²\\] at the points of `samples`,
+`P ≈ Σᵢ wᵢ Iᵢ` with the weights of the sampling, see [`optical_power`](@ref)`(pd, sampling)`.
+`I` has the shape of `samples.points`, e.g. the values of [`intensity`](@ref)`(pd, samples.points)`,
+so that a field that was computed once gives its power without being computed again:
+
+```julia
+samples = BeamletOptics.sample_points(pd, RegularGrid(num_points = 200))
+I = intensity(pd, samples.points)
+P = optical_power(samples, I)       # == optical_power(pd, RegularGrid(num_points = 200))
+x, z = samples.coordinates
+```
+
+Throws a `DimensionMismatch` if `I` does not have the shape of the points. `I` is real: a field of
+[`electric_field`](@ref) has no method.
+"""
+function optical_power(samples::DetectorSamples, I::AbstractArray{<:Real})
+    size(I) == size(samples.points) || throw(DimensionMismatch(
+        lazy"the intensity has the size $(size(I)), the points of the samples $(size(samples.points))"))
     # Lazy weighted sum
-    return sum(Broadcast.instantiate(Broadcast.broadcasted(*, grid.weights, I)))
+    return sum(Broadcast.instantiate(Broadcast.broadcasted(*, samples.weights, I)))
 end
 
 # Samples `f(hits, p)` at the global points `p` of the local detector coordinates `points`,

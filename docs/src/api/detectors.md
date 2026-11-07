@@ -52,6 +52,7 @@ flowchart TB
     RET(["electric_field, intensity:<br/>(coordinates..., values)<br/>optical_power:<br/>sum of weights .* I"])
     OWNI["own <b>intensity(hits, p, n)</b> method"]
     EF["<b>electric_field(hit, p)</b><br/>direction(hit), refractive_index(hit)"]
+    OPS(["<b>optical_power</b>(samples, I)<br/>an intensity computed once on the samples"])
 
     R --> SP
     SP -- "RegularGrid,<br/>RectilinearGrid" --> BMO
@@ -66,6 +67,8 @@ flowchart TB
     IH -- "own hit type" --> OWNI
     SUM --> EF
     IH --> EF
+    DS -. "samples" .-> OPS
+    OPS -- "sum of weights .* I" --> RET
 
     classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
     classDef green fill:#38982626,stroke:#389826,stroke-width:2px
@@ -74,7 +77,7 @@ flowchart TB
     class SP,BMO,DS purple
     class PT,SUM,IH blue
     class OWN,LIM,OWNI,EF green
-    class R,RET terminal
+    class R,RET,OPS terminal
 ```
 
 ```@docs; canonical=false
