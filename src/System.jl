@@ -191,11 +191,17 @@ function closest_hits(parts::Union{Tuple, AbstractVector, Leaves, LeafObjects}, 
     return result
 end
 
-function closest_hits(group::AbstractObjectGroup, ray::AbstractRay{R},
-        result::Nullable{Intersection{R}}, @nospecialize(skip::Nullable{AbstractObject})) where {R}
-    # Skip a missed group, its sphere is tested above once a hit is found
-    if isnothing(result) && isbeyond(bounding_sphere_of(current_bounding_spheres(), group), ray, Inf)
-        return result
+function closest_hits(
+        group::AbstractObjectGroup,
+        ray::AbstractRay{R},
+        result::Nullable{Intersection{R}},
+        @nospecialize(skip::Nullable{AbstractObject})
+    ) where {R}
+    # Without a hit, test the sphere here, else the loop over the parts has tested it
+    if isnothing(result)
+        sphere = bounding_sphere_of(current_bounding_spheres(), group)
+        # Skip a missed group
+        isbeyond(sphere, ray, Inf) && return nothing
     end
     return closest_hits(objects(group), ray, result, skip)
 end
@@ -218,8 +224,7 @@ Returns the closest [`Intersection`](@ref) of the `ray` with the objects of the 
 [`trace_all`](@ref), but tests the hinted object first. Its hit lets the solver skip all objects that
 lie beyond it, hence the `hint` speeds up the trace but does not change its result.
 """
-@inline function trace_one(
-        system::AbstractSystem, ray::AbstractRay{R}, hint::Hint) where {R}
+@inline function trace_one(system::AbstractSystem, ray::AbstractRay{R}, hint::Hint) where {R}
     seed::Nullable{Intersection{R}} = intersect3d(object(hint), ray)
     return closest_hits(_top_level(system), ray, seed, isnothing(seed) ? nothing : object(hint))
 end
