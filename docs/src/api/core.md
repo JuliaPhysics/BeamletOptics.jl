@@ -14,23 +14,32 @@ The first two principles will be elaborated upon in more detail in the [Geometry
 
 ```mermaid
 flowchart TB
-    S(["<b>solve_system!</b><br/>system + beam"]) --> I
-    I["<b>1. Intersect</b><br/>closest hit of all objects,<br/>hinted object first;<br/>all surfaces at that point"] -- "coincident hits" --> F["<b>first_to_interact</b><br/>thin layer, then entered body,<br/>then left body"]
-    F --> X["<b>2. Interact</b><br/>interact3d(system, object, beam, ray),<br/>dispatch on the object"]
-    X -- "body or thin layer" --> T["<b>transition(system, ray)</b><br/>media on both sides, thin layer"]
-    X -- "own method,<br/>e.g. mirror" --> R
-    T --> R["<b>3. Repeat</b><br/>attach next ray or children,<br/>assign their enclosure"]
-    R -- "optional Hint" --> B(["back to<br/><b>1. Intersect</b>"])
-    I -- "no hit or r_max" --> E([done])
-    X -- "returns nothing" --> E
+    S(["<b>solve_system!(system, beam)</b>"])
+    I["<b>1. Intersect</b><br/>find the closest surface<br/>that the ray hits, and all<br/>surfaces at that point"]
+    Q1{"hit?"}
+    F["<b>first_to_interact</b><br/>thin layer, then entered body,<br/>then left body"]
+    X["<b>2. Interact</b><br/>the hit object computes<br/>the next ray"]
+    T["<b>transition(system, ray)</b><br/>media on both sides,<br/>thin layer"]
+    Q2{"next ray?"}
+    R["<b>3. Repeat</b><br/>append the next ray or children,<br/>assign their enclosure,<br/>keep the hint of the interaction"]
+    B(["back to<br/><b>1. Intersect</b>"])
+    E(["done"])
+
+    S --> I --> Q1
+    Q1 -- yes --> F --> X
+    X -- "body or thin layer" --> T --> Q2
+    X -- "own method,<br/>e.g. mirror" --> Q2
+    Q1 -- "no, or r_max rays" --> E
+    Q2 -- yes --> R --> B
+    Q2 -- "no, e.g. blocked" --> E
 
     classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
     classDef green fill:#38982626,stroke:#389826,stroke-width:2px
     classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
     classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
-    class I,F purple
+    class I,Q1,F,Q2,R purple
     class X green
-    class T,R blue
+    class T blue
     class S,E,B terminal
 ```
 
@@ -61,52 +70,88 @@ BeamletOptics.Intersection
 
 Since an optical element can consist of multiple joint shapes, the return type must store which specific part of the object was hit: the `shape` of the `Intersection` is that part, and the solver compares and looks up the hit part by this reference, e.g. to decide whether the rays of a beamlet hit the same shape. The `object` of the `Intersection` is set by the solver, the `intersect3d` method of a shape leaves it `nothing`.
 
-The following diagram shows how `trace_all` reaches the shapes of the objects and groups of a [`System`](@ref), including the [Bounding sphere pretest](@ref), whose table is described below. A [`StaticSystem`](@ref) has no groups while tracing, since it flattens them when it is built. Where surfaces touch, e.g. the faces of a cemented doublet, the ray hits several of them at the same point. The hits within `get_coincidence_tolerance()` of the closest one are kept as a chain, see [Coincident hits](@ref).
+The closest hit of a ray is found on two levels: the solver searches the system for the objects that the ray can reach, and each object it reaches computes its own hit.
+
+The search, shown below, goes through the top-level objects and groups of the system one at a time and keeps the closest hit found so far. Once there is a hit, every part whose bounding sphere the ray enters only beyond that hit (plus `get_coincidence_tolerance()`, so that touching surfaces are still found) is skipped, see [Bounding sphere pretest](@ref). A group is entered only if the ray reaches its sphere; its objects are then searched in the same way. `trace_all` starts without a hit. `trace_one` starts with the hit of the hinted object, so it can skip more parts from the start, see [Hints](@ref). A [`StaticSystem`](@ref) has no groups while tracing, since it flattens them when it is built.
 
 ```mermaid
 flowchart TB
-    TA(["<b>trace_all(system, ray)</b><br/>top-level objects<br/>(and groups of a System)"])
-    CH["<b>closest_hits(parts, ray, result, skip)</b><br/>each part in turn"]
-    SK{"part === skip?<br/>the hinted object,<br/>tested already"}
-    BY{"hit so far and<br/><b>isbeyond</b>(sphere, ray, t)?<br/>sphere only behind<br/>the closest hit"}
-    G{"<b>closest_hits(group, ...)</b><br/><i>System only</i><br/>no hit so far and<br/>sphere missed?"}
-    O["<b>closest_hits(object, ...)</b>"]
-    OJ["<b>intersect3d(object, ray)</b><br/><i>own method possible,<br/>e.g. PlateBeamsplitter</i>"]
-    M["<b>merge_hits(result, hit)</b><br/>closest hit and those<br/>at the same point"]
-    T["<b>shape_trait_of(object)</b><br/>SingleShape: x = shape(object)<br/>MultiShape: x = a tuple of parts<br/>(shapes or objects)"]
-    PT["<b>intersect3d(sphere, x, ray)</b><br/>bounding sphere of x from the<br/>table of the solve, else none"]
-    P["<b>intersect3d(parts, ray)</b><br/>test each part, <b>merge_hits</b>"]
-    SH["<b>intersect3d(shape, ray)</b><br/>shape backend, see below"]
-    OBJ["<b>object!(intersection, object)</b><br/>by the SingleShape and<br/>MultiShape methods"]
-    MISS(["skipped / nothing"])
+    EA(["<b>trace_all</b><br/>best hit so far: none"])
+    EO(["<b>trace_one</b><br/>best hit so far: hinted object"])
+    N{"another top-level<br/>object or group?"}
+    H{"is it the<br/>hinted object?"}
+    BH{"best hit<br/>so far?"}
+    BY{"<b>isbeyond</b><br>does its sphere start<br/>behind the best hit?<br/><i></i>"}
+    K{"object<br/>or group?"}
+    GM{"does the ray miss<br/>the group's sphere?"}
+    O["<b>intersect3d(object, ray)</b><br/>the object computes its hit,<br/>see the next diagram"]
+    M["<b>merge_hits</b><br/>the closest hit becomes <br>the best hit"]
+    R(["best hit with its coincident<br/>hits, or nothing"])
+    B1(["tested already,<br/>next part"])
+    B2(["cannot be closer,<br/>next part"])
+    B3(["skip the whole group,<br/>next part"])
+    B4(["search its objects the<br/>same way, then next part"])
+    B5(["next part"])
 
-    TA --> CH --> SK
-    SK -- yes --> MISS
-    SK -- no --> BY
-    BY -- yes --> MISS
-    BY -- "no, a group" --> G
-    BY -- "no, an object" --> O
-    G -- yes --> MISS
-    G -- "no: back to closest_hits<br/>with objects(group)" --> CH
-    O --> OJ
-    OJ -- "default method" --> T
-    T --> PT
-    PT -- "x is a shape" --> SH
-    PT -- "x are parts" --> P
-    PT -- "ray misses<br/>the sphere" --> MISS
-    P -- "isa AbstractShape" --> SH
-    P -- "isa AbstractObject" --> OJ
-    SH --> OBJ
-    OBJ -- "hit of the object" --> M
+    EA --> N
+    EO --> N
+    N -- yes --> H
+    N -- no --> R
+    H -- yes --> B1
+    H -- no --> BH
+    BH -- yes --> BY
+    BH -- no --> K
+    BY -- yes --> B2
+    BY -- no --> K
+    K -- "object" --> O --> M --> B5
+    K -- "group (System only)" --> GM
+    GM -- yes --> B3
+    GM -- no --> B4
 
     classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
     classDef green fill:#38982626,stroke:#389826,stroke-width:2px
     classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
     classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
-    class G,OBJ blue
-    class OJ,SH green
-    class CH,SK,BY,O,M,P,T,PT purple
-    class TA,MISS terminal
+    class N,H,BH,K,M purple
+    class BY,GM blue
+    class O green
+    class EA,EO,R,B1,B2,B3,B4,B5 terminal
+```
+
+Where surfaces touch, e.g. the faces of a cemented doublet, the ray hits several of them at the same point. `merge_hits` keeps the hits within `get_coincidence_tolerance()` of the closest one as a chain, see [Coincident hits](@ref).
+
+Each object that the search reaches computes its hit with `intersect3d(object, ray)`, shown below. The default method tests the bounding sphere of the object first and then its shape or parts. A component can define its own method instead, as the plate beamsplitters do, e.g. the [`RectangularPlateBeamsplitter`](@ref). Once there is a hit, the search skips the object by this sphere, so the sphere must enclose every hit of such a method as well, see [Bounding sphere pretest](@ref).
+
+```mermaid
+flowchart TB
+    IO(["<b>intersect3d(object, ray)</b>"])
+    D{"does the object have<br/>its own intersect3d?"}
+    OWN["<b>own method</b><br/>e.g. plate beamsplitters,<br/>hits must lie in its sphere"]
+    SPH{"does the ray miss the<br/>object's bounding sphere?"}
+    T{"one shape or<br/>several parts?<br/><i>shape_trait_of</i>"}
+    SH["<b>intersect3d(shape, ray)</b><br/>SDF or mesh test,<br/>see below"]
+    P["<b>intersect3d(parts, ray)</b><br/>each part as above,<br/>merged by <b>merge_hits</b>"]
+    OBJ["<b>object!(hit, object)</b><br/>labels the hits<br/>with this object"]
+    NO(["nothing"])
+    HIT(["hit of the object with its<br/>coincident hits, or nothing"])
+
+    IO --> D
+    D -- yes --> OWN --> HIT
+    D -- no --> SPH
+    SPH -- yes --> NO
+    SPH -- no --> T
+    T -- "one shape" --> SH --> OBJ
+    T -- "several parts" --> P --> OBJ
+    OBJ --> HIT
+
+    classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
+    classDef green fill:#38982626,stroke:#389826,stroke-width:2px
+    classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
+    classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
+    class D,T,P,OBJ purple
+    class SPH,SH blue
+    class OWN green
+    class IO,NO,HIT terminal
 ```
 
 The shape backend is selected by dispatch on the type of the shape, see [Geometry representation](@ref).
@@ -419,23 +464,25 @@ A `Hint` never changes the result of the trace: the hinted object is not preferr
 
 ```mermaid
 flowchart TB
-    P["<b>push!(beam, interaction)</b><br/>next ray, hint(interaction)"]
-    TST{"<b>tracing_step!</b><br/>(system, ray, hint)"}
-    HS["<b>trace_one</b><br/>intersect3d(object(hint), ray) first"]
+    S(["<b>push!(beam, interaction)</b><br/>next ray, hint(interaction)"])
+    HQ{"did the interaction<br/>give a hint?<br/><i>tracing_step!</i>"}
+    HS["<b>trace_one(system, ray, hint)</b><br/>intersect3d(object(hint), ray) first"]
     OB["<b>closest_hits</b><br/>of all other objects, those<br/>beyond the hint's hit skipped"]
-    TA["<b>trace_all</b><br/>closest_hits of all objects"]
+    TA["<b>trace_all(system, ray)</b><br/>closest_hits of all objects"]
     FI["<b>first_to_interact</b><br/>the hit that interacts first"]
+    E(["on to <b>interact3d</b>"])
 
-    P --> TST
-    TST -- "::Hint" --> HS --> OB --> FI
-    TST -- "::Nothing" --> TA --> FI
+    S --> HQ
+    HQ -- yes --> HS --> OB --> FI
+    HQ -- no --> TA --> FI
+    FI --> E
 
     classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
     classDef green fill:#38982626,stroke:#389826,stroke-width:2px
     classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
     classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
-    class P,HS,OB,TA,FI blue
-    class TST purple
+    class HQ,HS,OB,TA,FI purple
+    class S,E terminal
 ```
 
 The solver picks the `interact3d` method by the *object* of the hint, not by its shape. For a [`BeamletOptics.MultiShape`](@ref) component the hint therefore names the composite as `object` and the part that is hit next as `shape`, e.g. `Hint(cbs, shape(cbs.coating))`; `Hint(object)` alone fails for such an object, since `shape(object)` is a tuple.
@@ -494,38 +541,36 @@ For a [`Beam`](@ref), `trace_system!` runs the loop below until the beam has `r_
 
 ```mermaid
 flowchart TB
-    S(["<b>trace_system!</b><br/>with a ::Beam"])
-    RM{"<b>length(rays) #lt; r_max?</b><br>Safeguard resonant conditions"}
-    TST{"<b>tracing_step!</b>"}
-    TO["<b>trace_one</b><br/>hinted object first,<br/>then all others"]
-    TA["<b>trace_all</b><br/>intersect3d of all top-level<br/>objects (and groups of a System)"]
-    HIT{"No intersection determined?<br/>else first_to_interact"}
-    IA["<b>interact3d</b><br/>Calculate optical interaction"]
-    NI{"<b>No interaction?</b><br/>E.g. beam blocked"}
+    S(["<b>trace_system!(system, beam)</b><br/>with a ::Beam"])
+    RM{"fewer than<br/>r_max rays?"}
+    HQ{"did the last interaction<br/>give a hint?<br/><i>tracing_step!</i>"}
+    TO["<b>trace_one(system, ray, hint)</b><br/>closest hit, hinted object first"]
+    TA["<b>trace_all(system, ray)</b><br/>closest hit, no object first"]
+    HIT{"did the ray<br/>hit anything?"}
+    FI["<b>first_to_interact</b><br/>of the hits at that point"]
+    IA["<b>interact3d(system, object, beam, ray)</b><br/>the hit object computes the next ray"]
+    NI{"did it return<br/>an interaction?"}
     EN["<b>enclose_new!</b><br/>enclosure of the new rays:<br/>next ray or children"]
-    P["<b>push!(beam, interaction)</b><br/>Add ray to beam, repeat"]
-    E([End loop])
-    BR(["back to<br/><b>length(rays) #lt; r_max?</b>"])
+    P["<b>push!(beam, interaction)</b><br/>append the next ray"]
+    E(["done"])
+    BR(["back to<br/><b>fewer than r_max rays?</b>"])
 
     S --> RM
-    RM -- yes --> TST
-    TST -- " with ::Hint" --> TO
-    TST -- "without ::Hint" --> TA
-    TO --> HIT
-    TA --> HIT
-    HIT -- no --> IA --> EN --> NI
-    NI -- no --> P --> BR
+    RM -- yes --> HQ
     RM -- no --> E
-    HIT -- yes --> E
-    NI -- yes --> E
+    HQ -- yes --> TO --> HIT
+    HQ -- no --> TA --> HIT
+    HIT -- yes --> FI --> IA --> NI
+    HIT -- no --> E
+    NI -- yes --> EN --> P --> BR
+    NI -- "no, e.g. blocked" --> E
 
     classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
     classDef green fill:#38982626,stroke:#389826,stroke-width:2px
     classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
     classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
-    class TO,TA,P,EN blue
+    class RM,HQ,TO,TA,HIT,FI,NI,EN,P purple
     class IA green
-    class TST purple
     class S,E,BR terminal
 ```
 
