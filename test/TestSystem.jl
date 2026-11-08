@@ -2,6 +2,7 @@ module TestSystem
 
 using BeamletOptics
 using Test
+using AbstractTrees: children, Leaves, print_tree
 # using LinearAlgebra
 # using GeometryBasics
 
@@ -57,6 +58,24 @@ end
         # also with the keywords that solve_system! passes on
         @test_logs (:warn, "Tracing for $(typeof(beam)) not implemented") BMO.trace_system!(
             system, beam; r_max = 10, check_invariant = true, threshold = 1e-6)
+    end
+
+    @testset "Tree of a system" begin
+        m1, m2, det = SquarePlanoMirror2D(0.01), SquarePlanoMirror2D(0.01), Detector(0.01)
+        group = ObjectGroup([m1, m2])
+        system = System([group, det])
+        # Top level as built, groups not flattened
+        @test all(children(system) .=== [group, det])
+        @test all(collect(Leaves(system)) .=== [m1, m2, det])
+        # Other systems default to their objects
+        static = StaticSystem([group, det])
+        @test children(static) === BMO.objects(static)
+        # One tree, printed into the given IO: root, group, two mirrors, detector
+        text = sprint(show, MIME"text/plain"(), system)
+        @test text == sprint(print_tree, system)
+        @test startswith(text, "System\n")
+        @test count(==('\n'), text) == 5
+        @test sprint(show, MIME"text/plain"(), System()) == "System\n"
     end
 
     # Setup circular multipass cell with flat mirrors

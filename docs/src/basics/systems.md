@@ -14,6 +14,12 @@ System
 StaticSystem
 ```
 
+A system is a tree in the sense of AbstractTrees: `children(system)` returns its objects and object groups as they were added, and the tree tools such as `Leaves` and `print_tree` reach into the groups. A [`System`](@ref) prints as this tree.
+
+```@docs; canonical=false
+BeamletOptics.children(::System)
+```
+
 ## Changing a system
 
 The objects of a [`System`](@ref) can be changed after its construction, e.g. to build up a setup
