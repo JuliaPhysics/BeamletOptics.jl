@@ -86,14 +86,15 @@ object!(::Nothing, ::AbstractObject) = nothing
 Sets the `part` of the `intersection` and of its [`coincident_hits`](@ref) that have none, i.e. the
 object of the hit shape, whether it is a body and whether its faces are coated. An object of several
 objects keeps the parts that they set. The type of `part` is known here, hence [`medium`](@ref) and
-[`face_models`](@ref) are cheap to call.
+[`face_models`](@ref) are cheap to call. The `part` is the object that [`object!`](@ref) has just
+set; it is read from the hit, so that an immutable object is stored once, not boxed again.
 """
 function part!(i::Intersection, part::AbstractObject)
     isbody = !isnothing(medium(part))
     iscoated = !isempty(face_models(part))
     for hit in coincident_hits(i)
         if isnothing(hit.part)
-            hit.part = part
+            hit.part = hit.object
             hit.isbody = isbody
             hit.iscoated = iscoated
         end
