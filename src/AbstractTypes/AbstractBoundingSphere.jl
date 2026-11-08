@@ -285,7 +285,7 @@ stored as `Float64`, with the radius enlarged by the rounding error of the shape
 """
 function bounding_spheres(system::AbstractSystem)
     table = BoundingSphereTable()
-    for object in _top_level(system)
+    for object in children(system)
         _register!(table, object)
     end
     return table
