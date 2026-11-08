@@ -178,6 +178,7 @@ end
                 Retroreflector(25e-3) => :reflective,
                 Prism(BMO.BoxSDF(10e-3, 10e-3, 10e-3), ConstantRefractiveIndex(1.5)) => :refractive,
                 ThinBeamsplitter(10e-3, 10e-3) => :coating,
+                CoatingLayer(BMO.RectangularFlatMesh(10e-3, 10e-3), MirrorCoating()) => :coating,
                 RoundPolarizationFilter(25e-3) => :polarizer,
                 Detector(10e-3) => :detector,
                 NonInteractableObject(BMO.CylinderSDF(5e-3, 2e-3)) => :mechanics,
