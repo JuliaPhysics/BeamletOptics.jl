@@ -64,6 +64,24 @@ a miss: a shape farther from the start of the ray than this is not hit. Defaults
 get_sdf_miss_distance() = sdf_miss_distance
 
 
+# --- Coincident boundaries ---
+const coincidence_tolerance = @load_preference("coincidence_tolerance", 1e-9)
+
+"""
+    get_coincidence_tolerance()
+
+Returns the path length in [m] within which the hits of a ray with several surfaces count as one
+point, e.g. the faces of two cemented lenses or a coating on a substrate. Gaps below this length are
+taken as contact. The default of 1 nm lies far below any gap that matters optically.
+
+The tolerance must exceed the error of the hits in path length. A refined SDF hit lies much closer
+to the surface, but the exit of a ray that grazes an SDF surface from inside can lie up to
+`get_sdf_surface_threshold()` off the surface, i.e. this length divided by the cosine of the angle of
+incidence along the ray. Raising the surface threshold therefore calls for a larger tolerance.
+"""
+get_coincidence_tolerance() = coincidence_tolerance
+
+
 # --- Numerical Thresholds ---
 const internal_reflection_threshold = @load_preference("internal_reflection_threshold", 1e-6)
 const line_plane_intersection_threshold = @load_preference("line_plane_intersection_threshold", 1e-6)

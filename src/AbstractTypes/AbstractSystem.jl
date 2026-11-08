@@ -15,13 +15,17 @@ Subtypes of `AbstractSystem` must implement the following:
 ## Functions:
 
 - `objects(system)`: returns the objects of the system with object groups flattened into their objects. There is no fallback
+- `AbstractTrees.children(system)` (optional): returns the top-level objects and groups of the system, which the solver tests.
+  The default is `objects(system)`
 - `refractive_index(system, λ::Real)` (optional): returns the refractive index of the surrounding medium at the wavelength `λ`.
   The default is `1.0`; a system does not store a refractive index
 
-The solver tests a ray against the top-level objects and groups of the system. For a custom system these are the result of `objects(system)`.
-The built-in [`System`](@ref) tests its groups as a whole, a [`StaticSystem`](@ref) flattens them when it is built.
+The solver tests a ray against `children(system)`. The built-in [`System`](@ref) returns its groups unflattened: the solver tests
+the bounding sphere of a group first and then its objects one by one. A [`StaticSystem`](@ref) flattens its groups when it is built.
 """
 abstract type AbstractSystem end
+
+AbstractTrees.children(system::AbstractSystem) = objects(system)
 
 refractive_index(::AbstractSystem, λ::Real) = 1.0
 
@@ -62,9 +66,10 @@ warn_no_interact3d(::MultiShape, object, ray) = @warn lazy"""
 A `Hint` can be passed as part of an [`AbstractInteraction`](@ref) and will inform the tracing algorithm about which [`AbstractObject`](@ref)
 in the [`AbstractSystem`](@ref) will be hit next.
 
-!!! info 
-    The `Hint` does not need to result in a guaranteed [`Intersection`](@ref). However, if the hinted shape is intersected, it will
-    be immediately assumed as the correct global intersection.
+!!! info
+    The `Hint` does not need to result in a guaranteed [`Intersection`](@ref), and it does not change which surface is hit: the
+    hinted object is tested first, the objects beyond its hit are skipped, and a closer hit of another object wins. Among the
+    surfaces hit at the same point, e.g. the touching faces of a cemented doublet, the hinted shape comes first.
 
 # Fields
 
