@@ -143,8 +143,8 @@ Render all objects contained in the `sys`tem. The `kwargs` are passed on to `ren
 object, e.g. `show_bounding_sphere = true` to draw the bounding spheres of all shapes.
 """
 function render!(ax::_RenderEnv, sys::BMO.AbstractSystem; kwargs...)
-    # Avoid use of objects(sys)
-    for _obj in sys.objects
+    # Groups unflattened, rendered as one
+    for _obj in AbstractTrees.children(sys)
         render!(ax, _obj; kwargs...)
     end
     return nothing
