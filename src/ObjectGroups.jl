@@ -131,4 +131,4 @@ throws a `BoundsError`. The pose of the `group` and the pose of the object stay 
 """
 Base.popat!(group::ObjectGroup, i::Integer) = popat!(group.objects, i)
 
-Base.show(::IO, ::MIME"text/plain", group::ObjectGroup) = print_tree(group)
+Base.show(io::IO, ::MIME"text/plain", group::ObjectGroup) = print_tree(io, group)
