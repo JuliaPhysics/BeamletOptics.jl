@@ -517,7 +517,7 @@ function start_enclosure(system::AbstractSystem, point::AbstractVector, dir::Abs
     # Just ahead of the start, which decides for a start on a surface
     point = point + get_coincidence_tolerance() * dir
     bodies = AbstractObject[]
-    foreach(x -> collect_bodies!(bodies, table, x, point), _top_level(system))
+    foreach(x -> collect_bodies!(bodies, table, x, point), children(system))
     isempty(bodies) && return nothing
     sort!(bodies; by = body -> enclosing_radius(bounding_sphere_of(table, body)), rev = true)
     return foldl(enter, bodies; init = nothing)
