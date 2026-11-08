@@ -264,15 +264,15 @@ Stores the interaction result for all 9 component beams of an
 - `dxp`, `dxm`, `dyp`, `dym`: divergence beam interactions
 """
 struct AstigmaticGaussianBeamletInteraction{R <: Real} <: AbstractInteraction
-    chief::BeamInteraction{R}
-    wxp::BeamInteraction{R}
-    wxm::BeamInteraction{R}
-    wyp::BeamInteraction{R}
-    wym::BeamInteraction{R}
-    dxp::BeamInteraction{R}
-    dxm::BeamInteraction{R}
-    dyp::BeamInteraction{R}
-    dym::BeamInteraction{R}
+    chief::BeamInteraction{R, PolarizedRay{R}}
+    wxp::BeamInteraction{R, Ray{R}}
+    wxm::BeamInteraction{R, Ray{R}}
+    wyp::BeamInteraction{R, Ray{R}}
+    wym::BeamInteraction{R, Ray{R}}
+    dxp::BeamInteraction{R, Ray{R}}
+    dxm::BeamInteraction{R, Ray{R}}
+    dyp::BeamInteraction{R, Ray{R}}
+    dym::BeamInteraction{R, Ray{R}}
 end
 
 hint(i::AstigmaticGaussianBeamletInteraction) = hint(i.chief)
