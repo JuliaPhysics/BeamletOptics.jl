@@ -129,10 +129,13 @@ function trace_system!(::AbstractSystem, beam::B; r_max = 0, kwargs...) where {B
     return nothing
 end
 
-# The objects and object groups at the top level of the system. The tracing enters a group only if the
-# ray reaches its bounding sphere, hence it does not use the flattened `objects(system)`.
-_top_level(system::AbstractSystem) = objects(system)
-_top_level(system::System) = system.objects
+"""
+    AbstractTrees.children(system::System)
+
+Returns the objects and object groups of the `system` as they were added, groups not flattened.
+See also `objects(system)`, which flattens the groups.
+"""
+AbstractTrees.children(system::System) = system.objects
 
 """
     trace_all(system::AbstractSystem, ray::AbstractRay)
@@ -143,7 +146,7 @@ faces, are its [`coincident_hits`](@ref). An object whose bounding sphere the `r
 the closest hit found so far is not tested.
 """
 @inline trace_all(system::AbstractSystem, ray::AbstractRay) =
-    closest_hits(_top_level(system), ray, nothing, nothing)
+    closest_hits(children(system), ray, nothing, nothing)
 
 """
     closest_hits(parts, ray, result, skip)
@@ -196,7 +199,7 @@ function closest_hits(object::AbstractObject, ray::AbstractRay{R},
 end
 
 function initialize!(system::AbstractSystem)
-    foreach(initialize!, _top_level(system))
+    foreach(initialize!, children(system))
     return nothing
 end
 
@@ -210,7 +213,7 @@ lie beyond it, hence the `hint` speeds up the trace but does not change the clos
 """
 @inline function trace_one(system::AbstractSystem, ray::AbstractRay{R}, hint::Hint) where {R}
     seed::Nullable{Intersection{R}} = intersect3d(object(hint), ray)
-    result = closest_hits(_top_level(system), ray, seed, isnothing(seed) ? nothing : object(hint))
+    result = closest_hits(children(system), ray, seed, isnothing(seed) ? nothing : object(hint))
     return first_of_shape(result, shape(hint))
 end
 
@@ -560,7 +563,6 @@ function AbstractTrees.printnode(io::IO, node::ObjectOrGroup; kw...)
     show(io, node)
 end
 
-Base.show(::IO, ::MIME"text/plain", system::System) =
-    for obj in system.objects
-        print_tree(obj)
-    end
+AbstractTrees.printnode(io::IO, system::AbstractSystem; kw...) = print(io, nameof(typeof(system)))
+
+Base.show(io::IO, ::MIME"text/plain", system::System) = print_tree(io, system)
