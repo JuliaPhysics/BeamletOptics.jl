@@ -519,33 +519,47 @@ solve skip the bodies far from the `point`.
 """
 function start_enclosure(system::AbstractSystem, point::AbstractVector, dir::AbstractVector)
     table = current_bounding_spheres()
-    # Just ahead of the start, which decides for a start on a surface
-    point = point + get_coincidence_tolerance() * dir
+    # Just ahead of the start, which decides for a start on a surface; in a `Ref`, since an isbits
+    # point would be boxed at each call per object, which dispatches on the type of the object
+    point = Ref(point + get_coincidence_tolerance() * dir)
     bodies = AbstractObject[]
-    foreach(x -> collect_bodies!(bodies, table, x, point), children(system))
+    for x in children(system)
+        collect_bodies!(bodies, table, x, point)
+    end
     isempty(bodies) && return nothing
     sort!(bodies; by = body -> enclosing_radius(bounding_sphere_of(table, body)), rev = true)
     return foldl(enter, bodies; init = nothing)
 end
 
 # The bodies within `x` that contain the `point`, pushed onto `bodies`
-collect_bodies!(bodies, table, object::AbstractObject, point) =
+collect_bodies!(bodies::Vector{AbstractObject}, table, object::AbstractObject, point::Ref) =
     collect_bodies!(bodies, table, shape_trait_of(object), object, point)
-collect_bodies!(bodies, table, group::AbstractObjectGroup, point) =
-    foreach(o -> collect_bodies!(bodies, table, o, point), objects(group))
-# A plain shape of a composite, or anything else a custom system holds, is no body
-collect_bodies!(bodies, table, ::Any, point) = bodies
 
-function collect_bodies!(bodies, table, ::SingleShape, object::AbstractObject, point)
-    isnothing(medium(object)) && return bodies
-    isinside(bounding_sphere_of(table, object), point) || return bodies
-    isinside(shape(object), point) && push!(bodies, object)
+function collect_bodies!(bodies::Vector{AbstractObject}, table, group::AbstractObjectGroup,
+        point::Ref)
+    for object in objects(group)
+        collect_bodies!(bodies, table, object, point)
+    end
     return bodies
 end
 
-function collect_bodies!(bodies, table, ::MultiShape, object::AbstractObject, point)
-    isinside(bounding_sphere_of(table, object), point) || return bodies
-    foreach(part -> collect_bodies!(bodies, table, part, point), shape(object))
+# A plain shape of a composite, or anything else a custom system holds, is no body
+collect_bodies!(bodies::Vector{AbstractObject}, table, ::Any, ::Ref) = bodies
+
+function collect_bodies!(bodies::Vector{AbstractObject}, table, ::SingleShape, object::AbstractObject,
+        point::Ref)
+    isnothing(medium(object)) && return bodies
+    isinside(bounding_sphere_of(table, object), point[]) || return bodies
+    isinside(shape(object), point[]) && push!(bodies, object)
+    return bodies
+end
+
+function collect_bodies!(bodies::Vector{AbstractObject}, table, ::MultiShape, object::AbstractObject,
+        point::Ref)
+    isinside(bounding_sphere_of(table, object), point[]) || return bodies
+    for part in shape(object)
+        collect_bodies!(bodies, table, part, point)
+    end
     return bodies
 end
 
