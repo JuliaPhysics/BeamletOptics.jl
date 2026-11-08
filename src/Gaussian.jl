@@ -79,9 +79,9 @@ Uses the hint of the `chief` beam.
 - `divergence`: [`Beam`](@ref) interaction
 """
 struct GaussianBeamletInteraction{R <: Real} <: AbstractInteraction
-    chief::BeamInteraction{R}
-    waist::BeamInteraction{R}
-    divergence::BeamInteraction{R}
+    chief::BeamInteraction{R, Ray{R}}
+    waist::BeamInteraction{R, Ray{R}}
+    divergence::BeamInteraction{R, Ray{R}}
 end
 
 hint(i::GaussianBeamletInteraction) = hint(i.chief)

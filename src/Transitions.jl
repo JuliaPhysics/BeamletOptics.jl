@@ -246,7 +246,7 @@ The [`Hint`](@ref) for a ray that is transmitted through the boundary: the body 
 """
 hint_out(t::Transition) = Hint(t.entering)
 
-Hint(hit::Intersection) = Hint(object(hit), shape(hit))
+Hint(hit::Intersection) = Hint(object(hit)::AbstractObject, shape(hit)::AbstractShape)
 Hint(::Nothing) = nothing
 
 """
@@ -265,7 +265,9 @@ function transition(system::AbstractSystem, ray::AbstractRay{T}) where {T}
     exiting, entering, layer = boundary_hits(hit, ray)
     # Bodies around the ray, including the body it leaves
     e_in = enter(enclosure(ray), part_of(exiting))
-    n_in = _index(innermost(e_in), λ, T(refractive_index(ray)))
+    # Index of the ray, unless it leaves a body outside of its enclosure
+    n_ray = T(refractive_index(ray))
+    n_in = e_in === enclosure(ray) ? n_ray : _index(innermost(e_in), λ, n_ray)
     n_out = if !isnothing(entering)
         _index(part_of(entering), λ, n_in)
     elseif !isnothing(exiting)
@@ -310,23 +312,26 @@ enclose_new!(system::AbstractSystem, ::Beam, ray::AbstractRay, interaction::Beam
 enclose_new!(system::AbstractSystem, beam::Beam, ray::AbstractRay, ::Nothing) =
     enclose!(system, ray, (first(rays(c)) for c in children(beam)))
 
-# The component beams of a beamlet differ in their ray type, hence they are handled by `map` over the
-# tuples, which is unrolled, not by a loop
-function enclose_new!(system::AbstractSystem, beam::GaussianBeamlets, ray_id::Int,
-        interaction::AbstractInteraction)
-    map(_component_beams(beam), component_interactions(interaction)) do b, bi
-        enclose!(system, rays(b)[ray_id], (bi.ray,))
+enclose_new!(system::AbstractSystem, beam::GaussianBeamlets, ray_id::Int,
+    interaction::AbstractInteraction) =
+    enclose_components!(system, ray_id, _component_beams(beam),
+        map(bi -> bi.ray, component_interactions(interaction)))
+
+function enclose_new!(system::AbstractSystem, beam::GaussianBeamlets, ray_id::Int, ::Nothing)
+    for c in children(beam)
+        enclose_components!(system, ray_id, _component_beams(beam),
+            map(cb -> first(rays(cb)), _component_beams(c)))
     end
     return nothing
 end
 
-function enclose_new!(system::AbstractSystem, beam::GaussianBeamlets, ray_id::Int, ::Nothing)
-    for c in children(beam)
-        map(_component_beams(beam), _component_beams(c)) do b, cb
-            enclose!(system, rays(b)[ray_id], (first(rays(cb)),))
-        end
-    end
-    return nothing
+# The component beams of a beamlet differ in their ray type, hence they are handled by recursion over
+# the tuples, which is unrolled, not by a loop; a closure over the system would be allocated
+enclose_components!(::AbstractSystem, ::Int, ::Tuple{}, ::Tuple{}) = nothing
+
+@inline function enclose_components!(system::AbstractSystem, ray_id::Int, beams::Tuple, new_rays::Tuple)
+    enclose!(system, rays(first(beams))[ray_id], (first(new_rays),))
+    return enclose_components!(system, ray_id, Base.tail(beams), Base.tail(new_rays))
 end
 
 component_interactions(interaction::GaussianBeamletInteraction) =
