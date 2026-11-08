@@ -42,6 +42,12 @@ BMO.pickable_plots(::_Marker, plots) = filter(p -> !(p isa Makie.Lines), plots)
 # An object without a shape, whose rendering throws
 struct _Unrenderable <: BMO.AbstractObject{Float64} end
 
+# A custom system with the required functions only, no `objects` field
+struct _CustomSystem <: BMO.AbstractSystem
+    parts::Vector{BMO.AbstractObject}
+end
+BMO.objects(system::_CustomSystem) = system.parts
+
 # An own system handle on the protocol, e.g. of a GUI that combines the handles of several systems
 struct _Combined <: BMO.AbstractSystemRenderHandle
     sys::System
@@ -694,6 +700,17 @@ Base.delete!(h::_Combined, oh::BMO.AbstractObjectRenderHandle) = (filter!(c -> c
         render!(ax2, lens)
         render!(ax2, beam; color = :red, flen = 0.05)
         @test length(ax2.scene.plots) > n + 2
+    end
+
+    @testset "Custom system without an objects field" begin
+        m = RoundPlanoMirror(0.025, 0.005)
+        sys = _CustomSystem([m])
+        n = length(ax.scene.plots)
+        render!(ax, sys)
+        @test length(ax.scene.plots) > n
+        h = live_render!(ax, sys)
+        @test length(AbstractTrees.children(h)) == 1
+        remove_render!(h)
     end
 
     @testset "show" begin
