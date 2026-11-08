@@ -7,5 +7,6 @@ _material_class(::BMO.AbstractObject) = :mechanics
 _material_class(::BMO.AbstractRefractiveOptic) = :refractive
 _material_class(::BMO.AbstractReflectiveOptic) = :reflective
 _material_class(::ThinBeamsplitter) = :coating
+_material_class(::CoatingLayer) = :coating
 _material_class(::BMO.AbstractJonesPolarizer) = :polarizer
 _material_class(::BMO.AbstractDetector) = :detector
