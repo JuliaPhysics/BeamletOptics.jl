@@ -1,2 +1,17 @@
-# Every pull request into master needs the approval of the repository owner
+# Every pull request into master needs the approval of a code owner of each changed file.
+# The last matching line wins.
 * @StackEnjoyer
+
+# SDFs
+/src/SDFs/ @TacHawkes
+/ext/RenderSDF.jl @TacHawkes
+/test/Geometry/SDFs/ @TacHawkes
+/docs/src/api/sdfs.md @TacHawkes
+/docs/src/assets/api_assets/sdf_showcase.jl @TacHawkes
+
+# Astigmatic Gaussian beamlets
+/src/AstigmaticGaussian.jl @TacHawkes
+/src/BeamGroups/Astigmatic* @TacHawkes
+/ext/RenderAstigmaticGaussian.jl @TacHawkes
+/test/TestAstigmaticGaussian* @TacHawkes
+/docs/src/basics/beams/astigmatic_beam.md @TacHawkes
