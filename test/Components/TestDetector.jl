@@ -57,7 +57,7 @@ end
 end
 
 @testset "Ray hits: points and directions in detector coordinates" begin
-    # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/191: rays from the origin onto a
+    # https://github.com/StackEnjoyer/BeamletOptics.jl/issues/191: rays from the origin onto a
     # detector at distance L, then the whole setup moved, which changes no local value
     L = 50mm
     dirs = [[sin(θ), cos(θ), 0.0] for θ in deg2rad.([-20, -5, 0, 10, 30])]
@@ -493,7 +493,7 @@ end
 end
 
 @testset "Default window holds the beam power" begin
-    # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/127
+    # https://github.com/StackEnjoyer/BeamletOptics.jl/issues/127
     P0 = 1e-3
     for beam in (GaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], 1e-6, 1mm; P0),
         AstigmaticGaussianBeamlet([0.0, 0, 0], [0.0, 1, 0], 1e-6, 1mm; P0))
@@ -509,7 +509,7 @@ end
 end
 
 @testset "Hits are values" begin
-    # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/42: a hit holds no reference to the
+    # https://github.com/StackEnjoyer/BeamletOptics.jl/issues/42: a hit holds no reference to the
     # beam that made it, hence a vector of hits is one block of memory
     for H in (BMO.RayHit, BMO.PolarizedRayHit, BMO.GaussianBeamletHit, BMO.AstigmaticGaussianBeamletHit)
         @test isbitstype(H{Float64})
@@ -517,7 +517,7 @@ end
 end
 
 @testset "A new solve does not change the stored hits" begin
-    # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/42
+    # https://github.com/StackEnjoyer/BeamletOptics.jl/issues/42
     @testset "Beam rotated between solves" begin
         pd = Detector(50mm)
         translate3d!(pd, [0, 100mm, 0])

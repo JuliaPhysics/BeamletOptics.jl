@@ -10,7 +10,7 @@ const BMO = BeamletOptics
 const mm = 1e-3
 
 @testset "Issue#11" begin
-    # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/11
+    # https://github.com/StackEnjoyer/BeamletOptics.jl/issues/11
     # A very narrow point source produced a scattered spot diagram behind a lens system that had
     # been moved and rotated before (suspected rounding errors of `_world_to_sdf`).
     @testset "Narrow point source through a double Gauss lens" begin
@@ -95,8 +95,8 @@ end
 end
 
 @testset "Issue#22 and Issue#23" begin
-    # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/22
-    # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/23
+    # https://github.com/StackEnjoyer/BeamletOptics.jl/issues/22
+    # https://github.com/StackEnjoyer/BeamletOptics.jl/issues/23
 
     mutable struct TestSubstrate{T, S <: BMO.AbstractShape{T}, N} <:
                    BMO.AbstractRefractiveOptic{T, N}
@@ -214,7 +214,7 @@ end
 end
 
 @testset "Issue#51" begin
-    # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/51
+    # https://github.com/StackEnjoyer/BeamletOptics.jl/issues/51
     mirror = BeamletOptics.SphericalMirror(0.1, 0.01, 0.2)
     system = StaticSystem([mirror])
     beam = Beam([0, -0.19, 0.07], [0.0, 1, 0])
@@ -248,7 +248,7 @@ end
 end
 
 @testset "Issue#80" begin
-    # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/80
+    # https://github.com/StackEnjoyer/BeamletOptics.jl/issues/80
     # Near-axis rays through hyperbolic plano-concave and plano-convex lenses.
     # A plano-conic lens with k = -n² images a collimated beam that enters through the plane
     # face exactly onto a point: every outgoing ray passes through the (real or virtual)
@@ -287,7 +287,7 @@ end
 end
 
 @testset "Issue#82" begin
-    # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/82
+    # https://github.com/StackEnjoyer/BeamletOptics.jl/issues/82
     rng = MersenneTwister(1)
     n = 1.458
     spurious = 0
@@ -348,7 +348,7 @@ end
 end
 
 @testset "Issue#87" begin
-    # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/87
+    # https://github.com/StackEnjoyer/BeamletOptics.jl/issues/87
     # Oblique unit vector (a ray direction from a pulse shaper), for which
     # dot(normalize(d), normalize(d)) - 1 = 4.4e-16 > eps()
     d = [-0.9999762904273509, 0.006881465035232346, -0.0002530259335731185]
@@ -406,7 +406,7 @@ end
 end
 
 @testset "Issue#209" begin
-    # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/209
+    # https://github.com/StackEnjoyer/BeamletOptics.jl/issues/209
     # At the waist of a beamlet on a tilted axis the height of the divergence ray is rounding
     # noise, and its slope was taken from the direction of that noise: w0 was up to 4000 times
     # too small exactly at the waist
@@ -439,7 +439,7 @@ end
 end
 
 @testset "Issue#210" begin
-    # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/210
+    # https://github.com/StackEnjoyer/BeamletOptics.jl/issues/210
     # The Lagrange invariant of a GaussianBeamlet was replaced by λ/π when it differed by more
     # than an absolute threshold, which gave w0 / M2 for large M2 or λ and never warned
     @testset "Waist radius for any M2 and λ" begin

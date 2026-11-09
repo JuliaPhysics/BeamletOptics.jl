@@ -83,7 +83,7 @@ makedocs(;
     authors="Hugo Uittenbosch <hugo.uittenbosch@dlr.de>, Oliver Kliebisch <oliver.kliebisch@dlr.de> and contributors",
     sitename="BeamletOptics.jl",
     format=DocumenterVitepress.MarkdownVitepress(;
-        repo="github.com/JuliaPhysics/BeamletOptics.jl",
+        repo="github.com/StackEnjoyer/BeamletOptics.jl",
         devbranch="master",
         devurl="dev",
     ),
@@ -184,7 +184,7 @@ if Sys.iswindows()
 end
 
 DocumenterVitepress.deploydocs(;
-    repo="github.com/JuliaPhysics/BeamletOptics.jl.git",
+    repo="github.com/StackEnjoyer/BeamletOptics.jl.git",
     target=joinpath(@__DIR__, "build"),
     devbranch="master",
     push_preview=false,

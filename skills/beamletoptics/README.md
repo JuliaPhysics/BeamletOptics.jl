@@ -2,7 +2,7 @@
 
 This folder is an [Agent Skill](https://docs.claude.com/en/docs/agents-and-tools/agent-skills/overview)
 that teaches coding agents how to write simulations with
-[BeamletOptics.jl](https://github.com/JuliaPhysics/BeamletOptics.jl).
+[BeamletOptics.jl](https://github.com/StackEnjoyer/BeamletOptics.jl).
 
 Install it in one of these ways:
 
