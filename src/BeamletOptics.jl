@@ -2,7 +2,7 @@
     BeamletOptics
 
 Non-sequential 3D ray and Gaussian beamlet tracing for optical setups ("BMO").
-Documentation: https://juliaphysics.github.io/BeamletOptics.jl/stable/
+Documentation: https://stackenjoyer.github.io/BeamletOptics.jl/stable/
 
 # AI coding assistants
 
