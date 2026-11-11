@@ -385,7 +385,7 @@ flowchart TB
     A["<b>AllChannels</b><br/>every channel that<br/>carries light"]
     R["<b>realize</b> / <b>beamlet_interaction</b><br/>one method per beam type"]
     BI(["BeamInteraction:<br/>one channel continues the beam"])
-    CH(["children!, nothing:<br/>a child beam per channel,<br/>above get_power_cutoff()"])
+    CH(["children!, nothing:<br/>a child beam per channel"])
     NO(["nothing:<br/>no channel carries light"])
 
     T --> B --> M --> S
@@ -548,7 +548,7 @@ The solver picks the `interact3d` method by the *object* of the hint, not by its
 
 In the initial state, it is assumed that the problem consists of `objects <: AbstractObject` (in a system) and a `beam <: AbstractBeam` with a defined starting position and direction. No additional information is provided, and the specific path of the beam is not known beforehand. Consequently, brute force tracing of the optical system is required, involving testing against each individual element to determine the trajectory of the beam.
 
-A call of [`solve_system!`](@ref) traces the beam tree breadth-first: it traces one beam after another and queues the children that the components attach, up to the keyword `depth_max` of [`solve_system!`](@ref) branching levels.
+A call of [`solve_system!`](@ref) traces the beam tree breadth-first: it traces one beam after another and queues the children that the components attach, up to the keyword `depth_max` of [`solve_system!`](@ref) branching levels. Children that carry less than the fraction `power_cutoff` of the power of the root beam are dropped before they are queued.
 
 ```mermaid
 flowchart TB
@@ -560,6 +560,7 @@ flowchart TB
     EM["<b>empty!(current)</b><br/>back to its first ray"]
     TS{"<b>trace_system!</b><br/>(system, current)"}
     D{"depth #lt;= depth_max?"}
+    PC["<b>drop_weak_children!</b><br/>children below power_cutoff<br/>are discarded"]
     ENQ["<b>push!(queue, ...)</b><br/>children(current) at depth + 1,<br/>attached via children! or relaunch!"]
     DROP["<b>_drop_beams!(current)</b><br/>children are discarded"]
     QE{"queue empty?"}
@@ -571,7 +572,7 @@ flowchart TB
     INI --> BS
     BS --> ST --> Q --> EM --> TS
     TS -- "method per beam type" --> D
-    D -- yes --> ENQ --> QE
+    D -- yes --> PC --> ENQ --> QE
     D -- no --> DROP --> QE
     QE -- no --> BQ
     QE -- yes --> E

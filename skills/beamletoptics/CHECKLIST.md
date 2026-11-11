@@ -50,7 +50,7 @@
    loses about 4 % of its power per uncoated surface (n = 1.5), a `GaussianBeamlet` nothing.
 9. **Doublets/triplets**: surfaces within 1 nm count as cemented, a larger gap is an air gap; only
    spherical menisci are supported; aspheres are experimental.
-10. **Resonators** (facing mirrors, cavities) need a bounded `r_max`/`depth_max`.
+10. **Resonators** (facing mirrors, cavities) need a bounded `r_max`/`depth_max`, or a `power_cutoff` for polarized rays and beamlets.
 11. **`ObjectGroup` rotates about its `center`**, which starts at the origin, not the centroid:
     use `set_pivot3d!`.
 12. **`reset_rotation3d!` throws for rays/beams**; use `align3d!` there.

@@ -454,11 +454,11 @@ function trace_system!(
 end
 
 """
-    solve_system!(system::AbstractSystem, beam::AbstractBeam; initialize=false, r_max=get_default_r_max(), depth_max=get_default_depth_max(), check_invariant=true, threshold=get_invariant_threshold())
+    solve_system!(system::AbstractSystem, beam::AbstractBeam; initialize=false, r_max=get_default_r_max(), depth_max=get_default_depth_max(), power_cutoff=get_power_cutoff(), check_invariant=true, threshold=get_invariant_threshold())
 
 Trace an `AbstractBeam` and all sub-beams it generates through an optical `system`. Every call solves the `beam` from its start: the `beam` is first reset to its untraced state with `empty!`, so nothing of an earlier solve is reused. A call after objects were moved, added or removed therefore gives the same result as solving a newly constructed beam.
 The condition to stop ray tracing is that the last `beam` intersection is `nothing` or the beam interaction is `nothing`. Then, the system is considered to be solved.
-A maximum number of rays per `beam` (`r_max`) can be specified in order to avoid infinite calculations under resonant conditions, i.e. two facing mirrors. Likewise, `depth_max` limits how many branching levels are explored when new sub-beams are generated (for example, by beamsplitters) so that the tree cannot grow without bound. Sub-beams beyond the depth limit are dropped from the tree.
+A maximum number of rays per `beam` (`r_max`) can be specified in order to avoid infinite calculations under resonant conditions, i.e. two facing mirrors. Likewise, `depth_max` limits how many branching levels are explored when new sub-beams are generated (for example, by beamsplitters) so that the tree cannot grow without bound. Sub-beams beyond the depth limit are dropped from the tree. `power_cutoff` bounds the tree by power instead, e.g. the passes between two partial mirrors: a sub-beam that carries less than this fraction of the power of the `beam` at its start is dropped as well.
 
 Between two calls only the `beam` itself and its first ray keep their identity. The child beams and all later rays are new objects after every call: read `children(beam)` again instead of keeping a child.
 The objects of the `system` are not reset by default: a [`Detector`](@ref) keeps the hits of earlier solves, such that several sources solved one after another superpose on it. With `initialize = true` the `system` is initialized first (see [`initialize!`](@ref)), i.e. all its detectors are emptied. Otherwise the hits of both solves add up.
@@ -473,6 +473,9 @@ The objects of the `system` are not reset by default: a [`Detector`](@ref) keeps
 - `initialize = false`: if `true`, [`initialize!`](@ref)`(system)` is called before the `beam` is traced
 - `r_max = get_default_r_max()`: Maximum number of rays of each beam of the tree.
 - `depth_max = get_default_depth_max()`: Maximum number of branching levels explored from the root beam
+- `power_cutoff = get_power_cutoff()`: fraction of the power of the root `beam` in [0, 1] below which a
+  sub-beam is not traced, at its start. Sub-beams of [`Ray`](@ref)s carry no power and
+  are bounded by `depth_max` only
 - `check_invariant = true`: enables or disables optical invariant checks where applicable
 - `threshold = get_invariant_threshold()`: limit of the complex invariant of an [`AstigmaticGaussianBeamlet`](@ref).
   The Lagrange invariants of both beamlets use [`get_lagrange_tolerance`](@ref) instead
@@ -484,19 +487,22 @@ function solve_system!(
         initialize::Bool = false,
         r_max::Int = get_default_r_max(),
         depth_max::Int = get_default_depth_max(),
+        power_cutoff::Real = get_power_cutoff(),
         check_invariant::Bool = true,
         threshold::Real = get_invariant_threshold()
 ) where {B <: AbstractBeam}
+    0 ≤ power_cutoff ≤ 1 ||
+        throw(ArgumentError(lazy"power_cutoff must lie in [0, 1], not $power_cutoff"))
     initialize && initialize!(system)
     # Bounding spheres are computed once, unless a beam group solve did so
     with_bounding_spheres(system) do
-        solve_beam!(system, beam; r_max, depth_max, check_invariant, threshold)
+        solve_beam!(system, beam; r_max, depth_max, power_cutoff, check_invariant, threshold)
     end
     return nothing
 end
 
-function solve_beam!(system::AbstractSystem, beam::B; r_max, depth_max, check_invariant,
-        threshold) where {B <: AbstractBeam}
+function solve_beam!(system::AbstractSystem, beam::B; r_max, depth_max, power_cutoff,
+        check_invariant, threshold) where {B <: AbstractBeam}
     # The root starts in the medium around its first ray
     enclose_start!(system, beam)
     queue = Tuple{B, Int}[(beam, 1)]
@@ -508,6 +514,8 @@ function solve_beam!(system::AbstractSystem, beam::B; r_max, depth_max, check_in
         trace_system!(system, current; r_max, check_invariant, threshold)
         # Enqueue children only below the maximum branching depth
         if depth <= depth_max
+            # Children below the power cutoff are not solved, drop them
+            drop_weak_children!(current, beam, power_cutoff)
             for child in children(current)
                 push!(queue, (child, depth + 1))
             end
@@ -517,6 +525,14 @@ function solve_beam!(system::AbstractSystem, beam::B; r_max, depth_max, check_in
         end
     end
     return nothing
+end
+
+# Drops the children of `current` that carry less than the fraction `power_cutoff` of the power of the
+# `root` beam, see `power_fraction`
+function drop_weak_children!(current::AbstractBeam, root::AbstractBeam, power_cutoff::Real)
+    iszero(power_cutoff) && return current
+    filter!(child -> !(power_fraction(child, root) < power_cutoff), children(current))
+    return current
 end
 
 """
