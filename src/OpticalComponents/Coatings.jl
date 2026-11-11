@@ -301,8 +301,8 @@ end
 
 The bare boundary, of which both the refracted and the reflected light are traced, e.g. to find the
 ghost images of a lens system. Beams without polarization carry the Fresnel power fractions of unpolarized
-light. Each boundary splits the beam, hence a power cutoff (see [`get_power_cutoff`](@ref)) or
-`depth_max` of [`solve_system!`](@ref) bounds the tree.
+light. Each boundary splits the beam, hence the keywords `power_cutoff` or `depth_max` of
+[`solve_system!`](@ref) bound the tree.
 """
 struct FresnelGhosts <: AbstractSurfaceModel end
 
