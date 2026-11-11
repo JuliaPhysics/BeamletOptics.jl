@@ -171,14 +171,12 @@ select_channels(::AllChannels, cs::Tuple) = cs
 """Returns `true` if the channel `c` carries light."""
 islit(c::BoundaryChannel) = !iszero(amplitude(c))
 
-# The child beams of the tuple `kids` whose channel carries light, `lit`, and whose power is not below
-# the power cutoff, as a vector of type `B`
-function lit_children(::Type{B}, kids::Tuple, lit::Tuple, root::AbstractBeam) where {B}
-    traced = map((kid, l) -> l && !(power_fraction(kid, root) < get_power_cutoff()), kids, lit)
-    v = Vector{B}(undef, count(traced))
+# The child beams of the tuple `kids` whose channel carries light, `lit`, as a vector of type `B`
+function lit_children(::Type{B}, kids::Tuple, lit::Tuple) where {B}
+    v = Vector{B}(undef, count(lit))
     k = 0
     for i in eachindex(kids)
-        traced[i] || continue
+        lit[i] || continue
         v[k += 1] = kids[i]
     end
     return v
@@ -187,8 +185,9 @@ end
 """
     power_fraction(beam, root)
 
-The fraction of the power of the `root` beam that the child `beam` carries at its start. Beams of
-[`Ray`](@ref)s carry no power, their fraction is one.
+The fraction of the power of the `root` beam that the child `beam` carries at its start, which the
+solver compares with the keyword `power_cutoff` of [`solve_system!`](@ref). Beams of [`Ray`](@ref)s
+carry no power, their fraction is one.
 """
 power_fraction(::Beam{T, <:Ray}, ::AbstractBeam) where {T} = one(T)
 power_fraction(beam::Beam{T, <:PolarizedRay}, root::Beam) where {T} =
@@ -213,15 +212,14 @@ function realize(t::Transition, ::Beam{T, R}, ray::R,
     return BeamInteraction{T, R}(side_hint(t, side(c)), outgoing_ray(t, ray, c))
 end
 
-# Several channels: each that carries light starts a child beam, unless its power lies below the power
-# cutoff; a single one continues the beam
+# Several channels: each that carries light starts a child beam, a single one continues the beam
 function realize(t::Transition, beam::Beam{T, R}, ray::R,
         cs::Tuple) where {T <: Real, R <: AbstractRay{T}}
     num_lit = count(islit, cs)
     num_lit == 0 && return nothing
     num_lit == 1 && return realize(t, beam, ray, select_channels(Dominant(), cs))
     kids = map(c -> Beam(outgoing_ray(t, ray, c)), cs)
-    children!(beam, lit_children(Beam{T, R}, kids, map(islit, cs), AbstractTrees.getroot(beam)))
+    children!(beam, lit_children(Beam{T, R}, kids, map(islit, cs)))
     return nothing
 end
 
@@ -274,7 +272,7 @@ function beamlet_interaction(system::AbstractSystem, ::AllChannels, model::Abstr
     num_lit == 0 && return nothing
     num_lit == 1 && return continued_beamlet(system, model, beamlet, ray_id, findfirst(lit))
     kids = ntuple(i -> child_beamlet(beamlet, map(h -> first(h)[i], hits), a[i]), Val(length(a)))
-    children!(beamlet, lit_children(typeof(beamlet), kids, lit, AbstractTrees.getroot(beamlet)))
+    children!(beamlet, lit_children(typeof(beamlet), kids, lit))
     return nothing
 end
 
