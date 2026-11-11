@@ -9,20 +9,19 @@ Subtypes of `AbstractBeamsplitter` should implement all supertype requirements.
 
 ## Interaction logic
 
-After intersection with the [`AbstractShape`](@ref) at which the beam splitting occurs, the `interact3d` function 
-should appended the transmitted and reflected sub-beams to the parent beam via the [`children!`](@ref) function.
-The `interact3d` function should then return `nothing` in order to stop the tracing of the parent beam.
+A splitting surface is a thin layer whose [`surface_model`](@ref) splits, e.g. a
+[`BeamsplitterCoating`](@ref) (see [`splitting_of`](@ref)): the solver appends the transmitted and the
+reflected beam to the parent beam via [`children!`](@ref) and stops the parent.
 
 !!! info "Appending convention"
-    As a convention, when splitting an incoming beam, the order of `children` appended to the parent beam should be
+    The `children` of a split beam are ordered
       1. transmitted beam
       2. reflected beam
 
 ## Functions
 
-- `interact3d`: see above. A splitting surface is a thin layer whose [`surface_model`](@ref) is a
-  [`BeamsplitterCoating`](@ref), e.g. a [`ThinBeamsplitter`](@ref); a composite holds one, e.g. a
-  [`CubeBeamsplitter`](@ref)
+- `surface_model`: the splitting model of a thin layer, e.g. of a [`ThinBeamsplitter`](@ref); a
+  composite holds such a layer, e.g. a [`CubeBeamsplitter`](@ref)
 """
 abstract type AbstractBeamsplitter{T} <: AbstractObject{T} end
 

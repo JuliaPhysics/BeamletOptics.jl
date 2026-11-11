@@ -64,6 +64,19 @@ a miss: a shape farther from the start of the ray than this is not hit. Defaults
 get_sdf_miss_distance() = sdf_miss_distance
 
 
+# --- Splitting ---
+const power_cutoff = @load_preference("power_cutoff", 0.0)
+
+"""
+    get_power_cutoff()
+
+Returns the default of the keyword `power_cutoff` of `solve_system!`: the fraction of the power of the
+root beam below which a child beam is not traced, e.g. the later passes between two partial mirrors.
+Defaults to `0`, every child is traced (configurable via the `power_cutoff` preference).
+"""
+get_power_cutoff() = power_cutoff
+
+
 # --- Coincident boundaries ---
 const coincidence_tolerance = @load_preference("coincidence_tolerance", 1e-9)
 

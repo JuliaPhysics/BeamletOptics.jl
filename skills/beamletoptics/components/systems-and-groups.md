@@ -25,7 +25,7 @@ popat!(system, i)                 # removes and returns the i-th top-level objec
   `System(v)` copies the vector `v`.
 
 ```julia
-solve_system!(system, beam_or_source; r_max = 100, depth_max = 100,
+solve_system!(system, beam_or_source; r_max = 100, depth_max = 100, power_cutoff = 0,
               check_invariant = true, threshold = get_invariant_threshold())
 ```
 

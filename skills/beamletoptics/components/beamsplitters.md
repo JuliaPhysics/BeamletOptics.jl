@@ -3,15 +3,17 @@
 The `reflectance` keyword is the reflected **power** fraction: `0.7` gives a 70:30 splitter, the default
 `0.5` a 50:50 splitter. Internally the field amplitudes are `r = √reflectance` and `t = √(1 − r²)`.
 
-The reflection phase depends on the beam type and on which side of the coating is hit. There is **no**
-universal π shift:
+The reflection phase depends on which side of the coating is hit, the same for every beam type that
+carries a field: a beam that faces the coating normal (`dot(dir, normal) < 0`) is reflected with an
+extra π, one from the other side without (Stokes relations, r' = −r). Only then do the two output
+ports of an interferometer sum to its input power.
 
 | Beam type | Reflected field |
 |-----------|-----------------|
 | `Ray` (`Beam` of rays) | no field is carried, so no phase |
-| `PolarizedRay` | Jones matrix `SPBasis(-r, 0, 0, r)`: the s and p components get opposite signs. The incidence side does not matter. |
-| `GaussianBeamlet` | scalar amplitude `r`, times `exp(iπ)` **only if** the incident direction faces the splitter normal (`dot(dir, normal) < 0`), otherwise no extra phase |
-| `AstigmaticGaussianBeamlet` | s/p Jones matrix as for `PolarizedRay`, **plus** the same conditional π as `GaussianBeamlet` on the chief polarization |
+| `PolarizedRay` | Jones matrix `SPBasis(-r, 0, 0, r)` from the back, `SPBasis(r, 0, 0, -r)` when facing the normal |
+| `GaussianBeamlet` | scalar amplitude `r` from the back, `-r` when facing the normal |
+| `AstigmaticGaussianBeamlet` | chief polarization as for `PolarizedRay` |
 
 Transmitted beams get the amplitude `t` and no phase shift. Behind the coating of a plate beamsplitter the
 field of a polarized beam is scaled for the glass (the coating transmits the power fraction `t²`), and it

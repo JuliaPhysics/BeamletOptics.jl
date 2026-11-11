@@ -45,7 +45,7 @@ Use `scripts/api_lookup.jl NAME` to print the docstring and signatures of any na
 | Polarizers    | `PolarizationFilter`, `RoundPolarizationFilter`, `LinearPolarizer`, `RoundLinearPolarizer`, `transmission_axis` |
 | Detectors     | `Detector`, `RegularGrid`, `RectilinearGrid`, `spot_diagram`, `ray_hits`, `intensity`, `electric_field`, `optical_power`, `gauss_parameters`, `waist_parameters`, `Centroid`, `MinMax` |
 | Dummies       | `NonInteractableObject`, `IntersectableObject` |
-| Config        | `get_default_wavelength`, `get_default_waist`, `get_default_power`, `get_default_r_max`, `get_default_depth_max`, `get_invariant_threshold`, `set_invariant_threshold!`, `get_lagrange_tolerance`, `set_lagrange_tolerance!`, `get_internal_reflection_threshold`, `get_line_plane_intersection_threshold`, `get_orthogonality_threshold`, `get_sdf_surface_threshold`, `get_sdf_raymarch_eps`, `get_sdf_miss_distance`, `get_progress_threshold`, `set_progress_threshold!` |
+| Config        | `get_default_wavelength`, `get_default_waist`, `get_default_power`, `get_default_r_max`, `get_default_depth_max`, `get_invariant_threshold`, `set_invariant_threshold!`, `get_lagrange_tolerance`, `set_lagrange_tolerance!`, `get_internal_reflection_threshold`, `get_line_plane_intersection_threshold`, `get_orthogonality_threshold`, `get_sdf_surface_threshold`, `get_sdf_raymarch_eps`, `get_sdf_miss_distance`, `get_progress_threshold`, `set_progress_threshold!`, `get_power_cutoff` |
 | Render (Makie)| `wavelength_color`, `render!`, `get_view`, `set_view`, `hide_axis`, `set_orthographic`, `look_at!`, `arrow!`, `render_lcs!`, `set_render_look`, `studio_lighting!` |
 | Live (Makie)  | `live_render!`, `update_render!`, `rerender!`, `remove_render!`, `pick_object` |
 
@@ -76,7 +76,7 @@ BeamletOptics.properties(x::MyFilter) =
 ## Solving
 
 ```julia
-solve_system!(system, beam; initialize = false, r_max = 100, depth_max = 100,
+solve_system!(system, beam; initialize = false, r_max = 100, depth_max = 100, power_cutoff = 0,
               check_invariant = true, threshold = get_invariant_threshold())
 solve_system!(system, beam_group; progress = true, initialize = false, kwargs...)   # multithreaded over member beams
 initialize!(system)   # empties all detectors of the system (nested groups included)
@@ -90,6 +90,8 @@ initialize!(system)   # empties all detectors of the system (nested groups inclu
 
 - `r_max`: max. rays per beam leaf (raise it for resonators, e.g. facing mirrors)
 - `depth_max`: max. splitting depth of the beam tree
+- `power_cutoff`: child beams below this fraction of the root's power are not traced, e.g. `1e-6` for
+  cavities and ghosts; beams of `Ray`s carry no power and are bounded by `depth_max` only
 - Every call solves the beam again from its start; the detectors are not emptied unless `initialize = true`. Child beams are new
   objects after every solve: read `beam.children` again after each solve instead of keeping a child.
 - Julia threads (`julia -t auto`) speed up solving of sources with many beams.
