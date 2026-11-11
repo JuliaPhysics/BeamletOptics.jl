@@ -206,7 +206,7 @@ const mm = 1e-3
 end
 
 @testset "Field phase in and in front of a medium" begin
-    # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/126
+    # https://github.com/StackEnjoyer/BeamletOptics.jl/issues/126
     λ = 1e-6
     n = 1.5
     # glass from y = 50.0 mm to about 50.5 mm
@@ -241,7 +241,7 @@ end
 end
 
 @testset "Gouy phase is collected along the beam" begin
-    # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/125
+    # https://github.com/StackEnjoyer/BeamletOptics.jl/issues/125
     λ = 1e-6
     n = 1.5
     w0 = 1mm
