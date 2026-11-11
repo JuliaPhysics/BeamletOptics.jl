@@ -399,3 +399,5 @@ function op_extrude_x(p::Point3{T}, sdf2d::Function, height::Real) where {T <: R
 
     return min(max(w[1], w[2]), zero(T)) + norm(max.(w, zero(T)))
 end
+
+isinside(s::AbstractSDF, point::AbstractVector) = sdf(s, point) ≤ 0

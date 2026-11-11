@@ -12,7 +12,9 @@ Stores data calculated by the [`intersect3d`](@ref) method.
 - `n`: normal vector at the point of intersection
 - `part`: the object that was hit, a part of `object` if this consists of objects, or `nothing`, see [`part_of`](@ref)
 - `isbody`: whether `part` is a body, i.e. has a [`medium`](@ref), see [`isbody`](@ref)
+- `iscoated`: whether faces of `part` carry surface models, see [`iscoated`](@ref)
 - `next`: the next hit of the ray at the same point, or `nothing`, see [`coincident_hits`](@ref)
+- `face`: the native [`AbstractFace`](@ref) of the hit, or `nothing`, see [`face`](@ref)
 
 # Coincident hits
 
@@ -29,12 +31,14 @@ mutable struct Intersection{T}
     n::Point3{T}
     part::Nullable{AbstractObject}
     isbody::Bool
+    iscoated::Bool
     next::Union{Nothing, Intersection{T}}
+    face::Nullable{AbstractFace}
 end
 
 function Intersection(object::Nullable{AbstractObject}, shape::Nullable{AbstractShape}, t::T,
         n::AbstractArray) where {T}
-    return Intersection{T}(object, shape, t, Point3{T}(n), nothing, false, nothing)
+    return Intersection{T}(object, shape, t, Point3{T}(n), nothing, false, false, nothing, nothing)
 end
 
 function Intersection(t::T, n::AbstractArray{T}) where {T}
@@ -47,6 +51,19 @@ end
 
 shape(i::Intersection) = i.shape
 object(i::Intersection) = i.object
+
+"""
+    face(hit::Intersection)
+    face!(hit::Intersection, face::AbstractFace) -> hit
+
+Gets or sets the native [`AbstractFace`](@ref) of the `hit`: the face of the shape that was hit, as the
+shape knows it, e.g. a face of a boundary representation. The `intersect3d` method of such a shape sets
+it; it is `nothing` for shapes that do not know their faces, e.g. signed distance functions and meshes.
+"""
+face(i::Intersection) = i.face
+
+"""Sets the native face of the `hit` and returns the `hit`, see [`face`](@ref)."""
+face!(hit::Intersection, new::AbstractFace) = (hit.face = new; hit)
 
 """
     object!(intersection, object) -> intersection
@@ -67,17 +84,19 @@ object!(::Nothing, ::AbstractObject) = nothing
     part!(intersection, part) -> intersection
 
 Sets the `part` of the `intersection` and of its [`coincident_hits`](@ref) that have none, i.e. the
-object of the hit shape, and whether it is a body. An object of several objects keeps the parts that
-they set. The type of `part` is known here, hence [`medium`](@ref) is cheap to call. The `part` is
-the object that [`object!`](@ref) has just set; it is read from the hit, so that an immutable object
-is stored once, not boxed again.
+object of the hit shape, whether it is a body and whether its faces are coated. An object of several
+objects keeps the parts that they set. The type of `part` is known here, hence [`medium`](@ref) and
+[`face_models`](@ref) are cheap to call. The `part` is the object that [`object!`](@ref) has just
+set; it is read from the hit, so that an immutable object is stored once, not boxed again.
 """
 function part!(i::Intersection, part::AbstractObject)
     isbody = !isnothing(medium(part))
+    iscoated = !isempty(face_models(part))
     for hit in coincident_hits(i)
         if isnothing(hit.part)
             hit.part = hit.object
             hit.isbody = isbody
+            hit.iscoated = iscoated
         end
     end
     return i

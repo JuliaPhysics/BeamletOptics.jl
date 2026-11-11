@@ -19,6 +19,8 @@ Subtypes of `AbstractSystem` must implement the following:
   The default is `objects(system)`
 - `refractive_index(system, λ::Real)` (optional): returns the refractive index of the surrounding medium at the wavelength `λ`.
   The default is `1.0`; a system does not store a refractive index
+- `surface_model(system)` (optional): returns the surface model of every boundary without a coating or
+  thin layer, [`Uncoated`](@ref) by default
 
 The solver tests a ray against `children(system)`. The built-in [`System`](@ref) returns its groups unflattened: the solver tests
 the bounding sphere of a group first and then its objects one by one. A [`StaticSystem`](@ref) flattens its groups when it is built.

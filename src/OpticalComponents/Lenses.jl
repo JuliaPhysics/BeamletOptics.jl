@@ -10,10 +10,12 @@ Subtypes of `AbstractRefractiveOptic` should implement all supertype reqs. as we
 ## Fields
 
 - `n`: the [`AbstractRefractiveIndex`](@ref) of the material, called as `n(λ)`
+- `coatings`: optional, the [`FaceModels`](@ref) of its faces, see [`surface_model!`](@ref)
 
 ## Getters/setters
 
 - `refractive_index`: gets the ref. index data of the optic
+- `face_models`: optional, the `coatings`; a subtype with this field implements it
 
 ## Functions
 
@@ -31,7 +33,7 @@ by specialized subtypes.
 
 !!! info "Uniform ref. index"
     It is assumed that the optic consists of a single transparent material with a homogeneous refractive index `n`.
-    It does not consider coated surfaces.
+    Its faces may carry coatings, see [`surface_model!`](@ref).
 
 !!! info "Polarization ray tracing"
     Fresnel coefficients at the point of refraction are calculated via the [`fresnel_coefficients`](@ref) function with the
@@ -51,13 +53,15 @@ medium(optic::AbstractRefractiveOptic) = IsotropicMedium(refractive_index(optic)
 """
     Lens{T, S <: AbstractShape{T}, N <: AbstractRefractiveIndex} <: AbstractRefractiveOptic{T, N}
 
-Represents an uncoated `Lens` with a homogeneous [`AbstractRefractiveIndex`](@ref) `n = n(λ)`.
+Represents a `Lens` with a homogeneous [`AbstractRefractiveIndex`](@ref) `n = n(λ)`, whose faces may
+carry coatings, see [`surface_model!`](@ref).
 Refer to the [`Lens`](@ref) and [`SphericalLens`](@ref) constructors for more information on how to generate lenses.
 
 # Fields
 
 - `shape`: geometry of the lens, refer to [`AbstractShape`](@ref) for more information
 - `n`: [`AbstractRefractiveIndex`](@ref) of the lens material
+- `coatings`: the [`FaceModels`](@ref) of its faces, empty when it is built
 
 # Additional information
 
@@ -69,13 +73,15 @@ Refer to the [`Lens`](@ref) and [`SphericalLens`](@ref) constructors for more in
 struct Lens{T, S <: AbstractShape{T}, N <: AbstractRefractiveIndex} <: AbstractRefractiveOptic{T, N}
     shape::S
     n::N
+    coatings::FaceModels
     function Lens(
             shape::S, n::N) where {T <: Real, S <: AbstractShape{T}, N <: AbstractRefractiveIndex}
-        return new{T, S, N}(shape, n)
+        return new{T, S, N}(shape, n, FaceModels())
     end
 end
 
 thickness(l::Lens) = thickness(shape(l))
+face_models(l::Lens) = l.coatings
 
 """
     _signed_edge_sag(surface, sd)

@@ -1,13 +1,14 @@
 """
     CoatingLayer(shape, model)
 
-A thin layer, e.g. a coating flush on the face of a substrate or a free-standing film, that carries the
+A free-standing thin layer, e.g. a dichroic film or a pellicle, that carries the
 [`AbstractSurfaceModel`](@ref) `model` at every boundary at which it lies, see [`surface_model`](@ref).
-The layers of a [`ThinFilmCoating`](@ref) are listed from the back of the `shape` to its front, the side
-into which its normal points: on a substrate, the normal points away from it.
+The front of the layer is the side into which the normal of its `shape` points: the layers of a
+[`ThinFilmCoating`](@ref) are listed from its back to its front. A coating on the face of a lens or a
+prism is set with [`surface_model!`](@ref) instead.
 
 ```julia
-coating = CoatingLayer(RectangularFlatMesh(25e-3, 25e-3), MirrorCoating())
+pellicle = CoatingLayer(BeamletOptics.RectangularFlatMesh(25e-3, 25e-3), BeamsplitterCoating(√0.08, √0.92))
 ```
 """
 struct CoatingLayer{T, S <: AbstractShape{T}, M <: AbstractSurfaceModel} <: AbstractObject{T}
@@ -65,8 +66,8 @@ Beams without polarization carry the amplitudes of unpolarized light.
 
 # Reflection phase jump
 
-The reflection phase jump is θᵣ = π for a ray that faces the normal of the coating, i.e.
-`isentering`, and 0 from the other side, as required by the Stokes relations (r' = -r) for a lossless
+The reflection phase jump is θᵣ = π for a ray that comes from the front of the coating (see
+[`isfacing`](@ref)), and 0 from the other side, as required by the Stokes relations (r' = -r) for a lossless
 coating: only then do both outputs of an interferometer sum to its input. The s- and p-components are
 reflected with `-r` and `r` from the other side, like an internal Fresnel reflection. The coating is
 assumed to have an unambiguous normal, i.e. a 2D mesh. See also
@@ -76,7 +77,7 @@ function lossless_channels(t::Transition, ray::AbstractRay, cs, (rs, rp), (τs, 
     transmitted, reflected = cs
     # Total internal reflection: the ray does not reach the coating
     islit(transmitted) || return cs
-    s = isentering(ray) ? -1 : 1
+    s = isfacing(t, ray) ? -1 : 1
     # Transmitted field scaled for the medium behind the boundary
     normal = normal3d(t)
     cos_in = abs(cos_angle3d(direction(ray), normal))
@@ -201,8 +202,8 @@ QuarterWaveLayer(n::AbstractRefractiveIndex, λ0::Real) = ThinFilmLayer(n, λ0 /
     ThinFilmCoating(layers::ThinFilmLayer...; splitting = AllChannels())
 
 A coherent stack of thin films, e.g. an anti-reflection, mirror, beamsplitter or filter coating of known
-design. The `layers` are listed from the back of the coated face to its front, i.e. from the
-substrate outward, see [`CoatingLayer`](@ref). The amplitudes of the reflected and transmitted s- and
+design. The `layers` are listed from the substrate outward: from the inside of a coated face of a body
+(see [`surface_model!`](@ref)), or from the back of a [`CoatingLayer`](@ref) to its front. The amplitudes of the reflected and transmitted s- and
 p-components follow from the characteristic matrix of the stack (Born & Wolf, Principles of Optics,
 §1.6; Macleod, Thin-Film Optical Filters, ch. 2), for both sides of incidence, any angle and absorbing
 layers; the media on both sides are those of the boundary. Their phases follow from the stack as well.
@@ -234,7 +235,7 @@ splitting_of(coating::ThinFilmCoating) = coating.splitting
 function channels(coating::ThinFilmCoating, t::Transition, ray::AbstractRay, cs)
     transmitted, reflected = cs
     # Layers in the order in which the ray meets them
-    layers = isentering(ray) ? reverse(coating.layers) : coating.layers
+    layers = isfacing(t, ray) ? reverse(coating.layers) : coating.layers
     cos0 = abs(cos_angle3d(direction(ray), normal3d(t)))
     (rs, rp, ts, tp), (Rs, Rp, Ts, Tp) = thin_film_coefficients(layers, refractive_index_in(t),
         refractive_index_out(t), cos0, wavelength(ray))

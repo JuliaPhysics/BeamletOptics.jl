@@ -246,7 +246,7 @@ An object whose `interact3d` method stores data in the object, e.g. a detector i
 
 At a boundary, the ray passes from one medium into another. The parts that the ray hits there play two roles: a part with a medium is a **body**, which the ray leaves or enters, e.g. a lens or a prism; a part without one is a **thin layer** between the media, e.g. a thin beamsplitter or a polarizing film. The [`BeamletOptics.transition`](@ref) at the hit of a ray holds both media and the layer. Hence a component needs no knowledge of the elements that touch it: the surface of a lens cemented to another lens refracts from one glass into the other, a beamsplitter coating on a substrate transmits into the substrate, and a film between two plates transmits from one plate into the other.
 
-The physics at a boundary has one place: the [`BeamletOptics.surface_model`](@ref) of the transition. It is the model that the thin layer at the boundary carries, else an uncoated surface. Bodies and thin layers both hand their rays to it, so a coating acts the same whether it stands free or lies on a substrate. The diagram shows this and how the solver assigns the enclosure of the new rays.
+The physics at a boundary has one place: the [`BeamletOptics.surface_model`](@ref) of the transition. It is the model that the thin layer at the boundary carries, else the coating of the face of the body that the ray leaves or enters, else the model of the system, an uncoated surface by default. Bodies and thin layers both hand their rays to it, so a coating acts the same whether it stands free or lies on a face. The diagram shows this and how the solver assigns the enclosure of the new rays.
 
 ```mermaid
 flowchart TB
@@ -258,7 +258,7 @@ flowchart TB
     W(["warning, nothing:<br/>the object blocks the beam"])
     TR["<b>transition</b>(system, ray)<br/><b>boundary_hits</b>: left body, entered body,<br/>thin layer; media from the enclosure"]
     BOUND["<b>interact3d</b>(system, t, beam, at)<br/>beamlet: to the model of a thin layer,<br/>else per component ray"]
-    SM["<b>surface_model</b>(t)<br/>model of the thin layer, else Uncoated:<br/>its channels, see Surface channels"]
+    SM["<b>surface_model</b>(t)<br/>thin layer, else coated face, else system<br/>(Uncoated): its channels, see Surface channels"]
     OWN["<b>own interact3d</b><br/>e.g. mirror, detector (a detector<br/>that does not stop: as a layer<br/>without a model)"]
     ENC["<b>enclose_new!</b><br/>enclosure of each new ray at the hit:<br/>back into the medium before the boundary<br/>or into the medium behind it"]
     E([next tracing step])
@@ -308,7 +308,57 @@ The physics at the boundary belongs to the boundary, not to one of the bodies. A
 BeamletOptics.interact3d(::BeamletOptics.AbstractSystem, ::BeamletOptics.Transition, ::BeamletOptics.AbstractBeam, ::Union{BeamletOptics.AbstractRay, Int})
 BeamletOptics.surface_model(::BeamletOptics.Transition)
 BeamletOptics.surface_model(::BeamletOptics.AbstractObject)
+BeamletOptics.surface_model(::BeamletOptics.AbstractSystem)
+BeamletOptics.isfacing
 BeamletOptics.AbstractSurfaceModel
+```
+
+#### Faces
+
+A face of a body is a question about a hit, not a piece of geometry: [`BeamletOptics.isonface`](@ref) answers whether a hit lies on it, in the local frame of the body. Faces defined by geometry, e.g. [`FrontFace`](@ref) or [`FlatFace`](@ref), decide from the point and the normal of the hit. A shape that knows its faces, e.g. a boundary representation, sets the native face of each hit in its `intersect3d` method via [`BeamletOptics.face!`](@ref); its faces are coated directly, and the geometric faces and masks work on it as well. The table of a body, [`BeamletOptics.face_models`](@ref), is only read when the body has coated faces.
+
+The diagram shows how the model of a boundary is found (green: implemented by a component or shape author, purple: dispatch).
+
+```mermaid
+flowchart TB
+    T(["<b>surface_model</b>(t)"])
+    L{"thin layer at the<br/>boundary with a model?"}
+    C{"<b>iscoated</b>(hit)<br/>faces of the body left,<br/>then entered, carry models?"}
+    F["<b>face_model</b>(part, hit, point)<br/>hit in the local frame of the part"]
+    O{"<b>isonface</b>(face, part, hit, point, normal)<br/>each entry of <b>face_models</b>(part),<br/>in the order coated"}
+    N["native face of the hit<br/><b>face</b>(hit), set by the shape"]
+    G["geometric face<br/>FrontFace, FlatFace, MaskedFace"]
+    S["<b>surface_model</b>(system)<br/>Uncoated by default"]
+    M(["the model of the boundary"])
+
+    T --> L
+    L -- yes --> M
+    L -- no --> C
+    C -- yes --> F --> O
+    O -.-> N
+    O -.-> G
+    O -- "first match" --> M
+    O -- "no match" --> S
+    C -- no --> S --> M
+
+    classDef blue fill:#4063D826,stroke:#4063D8,stroke-width:2px
+    classDef green fill:#38982626,stroke:#389826,stroke-width:2px
+    classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
+    classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
+    class F,S blue
+    class N,G green
+    class L,C,O purple
+    class T,M terminal
+```
+
+```@docs; canonical=false
+BeamletOptics.AbstractFace
+BeamletOptics.isonface
+BeamletOptics.face
+BeamletOptics.face_models
+BeamletOptics.FaceModels
+BeamletOptics.face_model
+BeamletOptics.isinside
 ```
 
 #### Surface channels

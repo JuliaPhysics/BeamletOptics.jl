@@ -1,19 +1,67 @@
 # Coatings
 
 A coating changes what happens at a boundary: how much light is reflected and transmitted, with which
-phase and polarization. In BMO a coating is a surface model, see [Surface channels](@ref). Until faces
-of components can carry coatings, a coating is a thin layer, a [`CoatingLayer`](@ref), that is placed
-flush on the face of a substrate or stands free. The solver finds the layer and the substrate at the
-same boundary by itself, see [Coincident hits](@ref).
+phase and polarization. In BMO a coating is a surface model, see [Surface channels](@ref), that a face
+of a lens or a prism carries.
+
+## Coating a face
+
+[`surface_model!`](@ref) coats a face of a body. The faces of a lens are its [`FrontFace`](@ref), its
+[`BackFace`](@ref) and its [`EdgeFace`](@ref); a flat face of a prism or a plate is a
+[`FlatFace`](@ref) of its outward normal in the local frame of the part, and [`AllFaces`](@ref) are all
+of them. The coating moves with its part and acts between the media on both sides of the face, also
+where the part is cemented to another one.
+
+```@example coatings
+using BeamletOptics
+
+λ0 = 550e-9
+lens = SphericalLens(50e-3, -50e-3, 5e-3, 25e-3, ConstantRefractiveIndex(1.52))
+ar = ThinFilmCoating(QuarterWaveLayer(ConstantRefractiveIndex(1.38), λ0); splitting = BeamletOptics.Dominant())
+surface_model!(lens, FrontFace(), ar)
+surface_model!(lens, BackFace(), ar)
+
+plate = RectangularCompensatorPlate(25e-3, 25e-3, 3e-3, ConstantRefractiveIndex(1.52))
+surface_model!(plate, FlatFace([0, -1, 0]), MirrorCoating())   # the face towards -y
+nothing # hide
+```
+
+A [`MaskedFace`](@ref) coats a part of a face, the part within a shape in the local frame of the body,
+e.g. a circle, an annulus or a rectangle. Where several coated faces apply to a hit, the face that was
+coated first acts.
+
+```@example coatings
+center = MaskedFace(FrontFace(), BeamletOptics.CylinderSDF(5e-3, 10e-3))   # r < 5 mm
+surface_model!(lens, center, MirrorCoating())
+surface_model(lens, center)
+nothing # hide
+```
+
+```@docs; canonical=false
+surface_model!
+surface_model(::BeamletOptics.AbstractObject, ::BeamletOptics.AbstractFace)
+FrontFace
+BackFace
+EdgeFace
+FlatFace
+AllFaces
+MaskedFace
+```
+
+!!! info "Orientation"
+    A coating lies on the outside of its body: the layers of a [`ThinFilmCoating`](@ref) are listed
+    from the substrate outward, and the reflection phase of the lossless coatings depends on the side,
+    see [Reflection phase at a beamsplitter coating](@ref).
+
+## Free-standing layers
+
+A film that is no face of a body, e.g. a pellicle or a dichroic film between two prisms, is a
+[`CoatingLayer`](@ref): a thin layer with its own shape. The solver finds a layer and the bodies that it
+touches at the same boundary by itself, see [Coincident hits](@ref).
 
 ```@docs; canonical=false
 CoatingLayer
 ```
-
-!!! info "Orientation"
-    The normal of the shape of a `CoatingLayer` points away from the substrate. The layers of a
-    [`ThinFilmCoating`](@ref) are listed from the substrate outward, and the reflection phase of the
-    lossless coatings depends on the side, see [Reflection phase at a beamsplitter coating](@ref).
 
 ## Ideal and spectral coatings
 

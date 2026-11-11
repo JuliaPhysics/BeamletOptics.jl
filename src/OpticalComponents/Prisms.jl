@@ -2,17 +2,19 @@
     Prism{T, S <: AbstractShape{T}, N <: AbstractRefractiveIndex} <: AbstractRefractiveOptic{T, N}
 
 Essentially represents the same functionality as [`Lens`](@ref).
-Refer to its documentation.
+Refer to its documentation. Its flat faces are addressed with [`FlatFace`](@ref).
 """
 struct Prism{T, S <: AbstractShape{T}, N <: AbstractRefractiveIndex} <: AbstractRefractiveOptic{T, N}
     shape::S
     n::N
+    coatings::FaceModels
     function Prism(shape::S, n::N) where {T<:Real, S<:AbstractShape{T}, N<:AbstractRefractiveIndex}
-        return new{T, S, N}(shape, n)
+        return new{T, S, N}(shape, n, FaceModels())
     end
 end
 
 thickness(p::Prism) = thickness(shape(p))
+face_models(p::Prism) = p.coatings
 
 """
     RightAnglePrism(leg_length, height, n)

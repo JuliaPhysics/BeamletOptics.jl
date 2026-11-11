@@ -1,26 +1,43 @@
 # Coatings
 
-A coating is a surface model that changes reflection and transmission at a boundary. Place it as a
-`CoatingLayer(shape, model)`: a thin layer flush on the face of a substrate (the solver combines layer and
-substrate at the same boundary) or free-standing. The **normal of the layer shape points away from the
-substrate**; `RectangularFlatMesh` has its normal along +y, so rotate it with `zrotate3d!(layer, π)` for the
-front face of an element that faces −y.
+A coating is a surface model that changes reflection and transmission at a boundary. Coat a **face of a
+body** (`Lens`, `Prism`, so also plates, cube halves and the lenses of a doublet) with
+`surface_model!(part, face, model)`; `surface_model(part, face)` reads it, `surface_model!(part, face,
+nothing)` removes it. The coating moves with the part and acts between the media on both sides, also at a
+cemented face.
+
+| Face | Meaning |
+|------|---------|
+| `FrontFace()`, `BackFace()`, `EdgeFace()` | lens faces: outward normal against, along, perpendicular to the lens axis (local +y) |
+| `FlatFace(normal)` | flat face of a prism or plate with this outward normal in the **local** frame of the part |
+| `AllFaces()` | every face |
+| `MaskedFace(face, mask)` | the part of `face` inside the shape `mask` (local frame), e.g. `BMO.CylinderSDF(r, h)` (along local y), `BMO.RingSDF`, `BMO.BoxSDF` |
+
+If several coated faces apply to a hit, the one coated first acts. A free-standing film (pellicle, film
+between two prisms) is a `CoatingLayer(shape, model)` with its own 2D shape; its front is the side its
+normal points to (`RectangularFlatMesh`: +y). `System(objects; surface_model = FresnelGhosts())` (also
+`StaticSystem`) sets the model of every uncoated boundary.
 
 ```julia
 using BeamletOptics
 const BMO = BeamletOptics
 
+λ0 = 550e-9
+lens = SphericalLens(50e-3, -50e-3, 5e-3, 25e-3, ConstantRefractiveIndex(1.52))
+ar = ThinFilmCoating(QuarterWaveLayer(ConstantRefractiveIndex(1.38), λ0); splitting = BMO.Dominant())
+surface_model!(lens, FrontFace(), ar)
+surface_model!(lens, BackFace(), ar)
+surface_model!(lens, MaskedFace(FrontFace(), BMO.CylinderSDF(3e-3, 10e-3)), MirrorCoating())  # coated first wins: AR
+translate3d!(lens, [0, 50e-3, 0])
+
 # A free-standing longpass dichroic at 45°: reflects below 800 nm, transmits above
 dichroic = CoatingLayer(BMO.RectangularFlatMesh(25e-3, 25e-3),
     SpectralCoating((λ, θ) -> λ < 800e-9 ? 0.98 : 0.02))
 zrotate3d!(dichroic, deg2rad(45))
-translate3d!(dichroic, [0, 50e-3, 0])
-
-# A single-layer AR coating; flush on a face, the layer must lie within 1 nm of it
-ar = ThinFilmCoating(QuarterWaveLayer(ConstantRefractiveIndex(1.38), 550e-9); splitting = BMO.Dominant())
+translate3d!(dichroic, [0, 100e-3, 0])
 
 beam = Beam([0, 0, 0], [0, 1, 0], 532e-9)
-solve_system!(System([dichroic]), beam)
+solve_system!(System([lens, dichroic]), beam)
 ```
 
 | Model | Use |
@@ -38,6 +55,7 @@ solve_system!(System([dichroic]), beam)
 - Every split doubles the beams: bound the tree with the keywords `power_cutoff` (fraction of the root
   power, e.g. `solve_system!(system, beam; power_cutoff = 1e-4)`) or `depth_max` of `solve_system!`.
   Beams of `Ray`s carry no power, only `depth_max` bounds them.
-- The lossless coatings reflect with an extra π when the beam faces the layer normal (Stokes relations);
+- The lossless coatings reflect with an extra π when the beam comes from the front of the coating, i.e.
+  from outside of the coated body or from the side the layer normal points to (Stokes relations);
   a `ThinFilmCoating` takes its phases from the design.
 - Beams without polarization (`GaussianBeamlet`) carry the power fractions of unpolarized light.
