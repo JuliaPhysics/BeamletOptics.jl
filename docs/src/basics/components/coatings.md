@@ -89,7 +89,7 @@ extinction_coefficient
 ## Ghost reflections
 
 An uncoated boundary refracts without tracing its weak Fresnel reflection. [`FresnelGhosts`](@ref)
-traces both, e.g. to find the ghost images of a lens system; [`get_power_cutoff`](@ref) and `depth_max`
+traces both, e.g. to find the ghost images of a lens system; the keywords `power_cutoff` and `depth_max`
 of [`solve_system!`](@ref) bound the growing beam tree.
 
 ```@docs; canonical=false
