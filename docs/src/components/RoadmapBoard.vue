@@ -4,7 +4,7 @@ import { computed } from 'vue'
 // response of the GitHub API for the milestones of the repository, or `[]` if it failed.
 import milestones from './milestones.json'
 
-const MILESTONES_URL = 'https://github.com/JuliaPhysics/BeamletOptics.jl/milestones'
+const MILESTONES_URL = 'https://github.com/StackEnjoyer/BeamletOptics.jl/milestones'
 
 // Status glyphs double as the accessible label so progress never depends on
 // colour alone (some readers are colour-blind, and dark/light themes shift

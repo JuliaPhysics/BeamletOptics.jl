@@ -53,7 +53,7 @@ side of [`isfacing`](@ref), see [`mirror_jones`](@ref) and
 abstract type AbstractThinElement <: AbstractSurfaceModel end
 
 """
-    IncidenceFrame{T, Tr}
+    IncidenceFrame{T}
 
 The geometry of a ray at a thin element, from which an element computes its Jones matrices. They are
 given in the s- and p-basis of the incident direction `d` and the reflected direction `r`; `s` is
