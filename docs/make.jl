@@ -17,8 +17,8 @@ DocUtils.fetch_milestones(joinpath(@__DIR__, "src", "components", "milestones.js
 # `Literate.markdown` regenerates the corresponding page in `docs/src/tutorials` (see
 # `.gitignore`), and `Literate.script`/`Literate.notebook` produce the downloadable
 # `.jl`/`.ipynb` files served via the `vitepress_assets` hook in `DocUtils.jl`.
-let
-    lit_src = joinpath(@__DIR__, "literate", "laser_alignment.jl")
+for name in ("laser_alignment.jl", "pancake_lens.jl")
+    lit_src = joinpath(@__DIR__, "literate", name)
     out_md  = joinpath(@__DIR__, "src", "tutorials")
     out_dl  = joinpath(@__DIR__, "src", "assets", "downloads")
     Literate.markdown(lit_src, out_md; documenter=true, credit=false)
@@ -98,6 +98,7 @@ makedocs(;
                 "Miniature microscope"      => joinpath("tutorials", "microscope.md"),
                 "Michelson interferometer"  => joinpath("tutorials", "michelson.md"),
                 "Raman spectroscopy"        => joinpath("tutorials", "openraman.md"),
+                "Pancake lens"              => joinpath("tutorials", "pancake_lens.md"),
             ],
             "Examples" => Any[
                 "Spherical lenses"          => joinpath("examples", "spherical_lenses.md"),

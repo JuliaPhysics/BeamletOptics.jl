@@ -8,7 +8,7 @@ The front of the layer is the side into which the normal of its `shape` points: 
 prism is set with [`surface_model!`](@ref) instead.
 
 ```julia
-pellicle = CoatingLayer(BeamletOptics.RectangularFlatMesh(25e-3, 25e-3), BeamsplitterCoating(√0.08, √0.92))
+pellicle = CoatingLayer(BeamletOptics.RectangularFlatMesh(25e-3, 25e-3), BeamsplitterCoating(0.08))
 ```
 """
 struct CoatingLayer{T, S <: AbstractShape{T}, M <: AbstractSurfaceModel} <: AbstractObject{T}
@@ -19,20 +19,214 @@ end
 surface_model(layer::CoatingLayer) = layer.model
 
 """
-    BeamsplitterCoating{T} <: AbstractSurfaceModel
+    AbstractThinElement <: AbstractSurfaceModel
 
-A lossless, non-polarizing coating that splits a ray into a transmitted and a reflected beam with the
-field factors `reflectance` and `transmittance` (R² + T² = 1). It acts between the media of the
-boundary, see [`Transition`](@ref): the transmitted beam is refracted into the medium behind it, e.g.
-the substrate that it is coated on, the reflected beam stays in the medium before it. Beyond the
-critical angle of these media, the ray is totally reflected and not split.
+An infinitesimally thin element of a boundary, e.g. a lossless coating, a retarder film or a reflective
+polarizer. It is described by its Jones matrices in reflection and transmission for light from both
+of its sides, see [`ThinScattering`](@ref), without the Fresnel reflection of the bare boundary; the
+transmitted field is scaled for the medium behind the boundary. Thin elements stack, see
+[`SurfaceStack`](@ref).
+
+# Implementation reqs.
+
+## Fields
+
+None required.
+
+## Getters/setters
+
+None required.
+
+## Functions
+
+- `scattering(element, frame::IncidenceFrame)`: the [`ThinScattering`](@ref) of the element for the
+  ray of the [`IncidenceFrame`](@ref) `frame`
+- `splitting_of(element)`: optional, see [`splitting_of`](@ref)
+
+# Reflection phase
+
+A lossless element reflects with the amplitudes ``r`` from its front and ``r' = -r`` from its back
+(Stokes relations): only then do both outputs of an interferometer sum to its input. The front is the
+side of [`isfacing`](@ref), see [`mirror_jones`](@ref) and
+[Reflection phase at a beamsplitter coating](@ref).
+"""
+abstract type AbstractThinElement <: AbstractSurfaceModel end
+
+"""
+    IncidenceFrame{T}
+
+The geometry of a ray at a thin element, from which an element computes its Jones matrices. They are
+given in the s- and p-basis of the incident direction `d` and the reflected direction `r`; `s` is
+perpendicular to the plane of incidence, `p_d = d × s` and `p_r = r × s`.
+
+# Fields
+
+- `d`, `r`: the incident and the reflected direction
+- `s`, `p_d`, `p_r`: the s- and p-vectors of both directions
+- `facing`: whether the ray comes from the front of the element, see [`isfacing`](@ref)
+- `R`: the orientation of the part that carries the element, whose local frame its axes refer to
+- `λ`: the wavelength in \\[m\\]
+- `θ`: the angle of incidence in \\[rad\\]
+"""
+struct IncidenceFrame{T}
+    d::SVector{3, T}
+    r::SVector{3, T}
+    s::SVector{3, T}
+    p_d::SVector{3, T}
+    p_r::SVector{3, T}
+    facing::Bool
+    R::SMatrix{3, 3, T, 9}
+    λ::T
+    θ::T
+end
+
+function IncidenceFrame(t::Transition, ray::AbstractRay{T}) where {T}
+    d = SVector{3, T}(direction(ray)...)
+    normal = normal3d(t)
+    r = SVector{3, T}(reflection3d(d, normal)...)
+    # The s-vector of the channels, see transfer
+    s = s_vector(d, r, SVector{3, T}(normal3d(intersection(ray))...))
+    θ = acos(min(abs(cos_angle3d(d, normal)), one(T)))
+    R = SMatrix{3, 3, T, 9}(orientation(part_of(carrier(t))))
+    return IncidenceFrame{T}(d, r, s, cross(d, s), cross(r, s), isfacing(t, ray), R,
+        T(wavelength(ray)), θ)
+end
+
+scattering(element::AbstractThinElement, ::IncidenceFrame) =
+    error(lazy"scattering not defined for $(typeof(element))")
+
+"""
+    ThinScattering{T}
+
+The Jones matrices of a thin element for a ray, in the bases of the [`IncidenceFrame`](@ref): `r` and
+`t` for light along the incident direction from the side of the ray, `r′` and `t′` for light along the
+reflected direction from the other side.
+"""
+struct ThinScattering{T}
+    r::SMatrix{2, 2, Complex{T}, 4}
+    t::SMatrix{2, 2, Complex{T}, 4}
+    r′::SMatrix{2, 2, Complex{T}, 4}
+    t′::SMatrix{2, 2, Complex{T}, 4}
+end
+
+ThinScattering(r::SMatrix{2, 2, Complex{T}}, t::SMatrix{2, 2}, r′::SMatrix{2, 2},
+    t′::SMatrix{2, 2}) where {T} = ThinScattering{T}(r, t, r′, t′)
+
+"""
+    cascade(near::ThinScattering, far::ThinScattering)
+
+The scattering of two thin elements on top of each other, of which the ray meets `near` first. The
+multiple reflections between them add coherently, without a phase between the elements (the Redheffer
+star product).
+"""
+function cascade(near::ThinScattering, far::ThinScattering)
+    # Round trips between the elements
+    A = inv(I - near.r′ * far.r)
+    B = inv(I - far.r * near.r′)
+    return ThinScattering(near.r + near.t′ * far.r * A * near.t, far.t * A * near.t,
+        far.r′ + far.t * near.r′ * B * far.t′, near.t′ * B * far.t′)
+end
+
+"""
+    mirror_jones(frame::IncidenceFrame)
+
+The Jones matrix of a lossless reflection with unit amplitude from the side of the ray of the `frame`:
+`[1 0; 0 -1]` from the front, `[-1 0; 0 1]` from the back, like the external and the internal
+reflection of the [`fresnel_coefficients`](@ref) at normal incidence.
+"""
+mirror_jones(frame::IncidenceFrame{T}) where {T} =
+    SMatrix{2, 2, Complex{T}, 4}(frame.facing ? (1, 0, 0, -1) : (-1, 0, 0, 1))
+
+"""
+    jones_angle(frame, axis, p)
+
+The angle of the `axis` of an element, in the local frame of its part, in the s- and p-basis of the
+`frame` with the p-vector `p`: of its projection onto the plane transverse to the ray.
+"""
+function jones_angle(frame::IncidenceFrame, axis::AbstractVector, p::AbstractVector)
+    a = frame.R * axis
+    return atan(dot(a, p), dot(a, frame.s))
+end
+
+# The 2×2 matrix of the rotation by `φ`
+rotation_jones(φ::T) where {T} = SMatrix{2, 2, T, 4}(cos(φ), sin(φ), -sin(φ), cos(φ))
+
+# The projector onto the axis at the angle `φ`
+projector_jones(φ) = (u = SVector(cos(φ), sin(φ)); u * transpose(u))
+
+function channels(element::AbstractThinElement, t::Transition, ray::AbstractRay, cs)
+    transmitted, reflected = cs
+    # Total internal reflection: the ray does not reach the element
+    islit(transmitted) || return cs
+    frame = IncidenceFrame(t, ray)
+    S = scattering(element, frame)
+    # Transmitted field scaled for the medium behind the boundary
+    normal = normal3d(t)
+    cos_in = abs(cos_angle3d(direction(ray), normal))
+    cos_out = abs(cos_angle3d(direction(transmitted), normal))
+    f = sqrt(refractive_index_in(t) * cos_in / (refractive_index_out(t) * cos_out))
+    a_t = channel_amplitude(ray, frame, S.t, jones_phase(S.t, 1))
+    a_r = channel_amplitude(ray, frame, S.r, jones_phase(S.r, -1))
+    return (transfer(transmitted, ray, jones_basis(f * S.t), a_t), transfer(reflected, ray, jones_basis(S.r), a_r))
+end
+
+# The 3×3 local Jones basis of the 2×2 matrix `J` in the s- and p-basis
+jones_basis(J::SMatrix{2, 2}) =
+    LocalJonesBasis(SMatrix{3, 3}(J[1, 1], J[2, 1], 0, J[1, 2], J[2, 2], 0, 0, 0, 1))
+
+"""
+    channel_amplitude(ray, frame, J, phase)
+
+The amplitude factor of a channel with the Jones matrix `J` in the s- and p-basis of the `frame`, of
+the unit phasor `phase`. Its magnitude is the square root of the power fraction of the channel: of
+unpolarized light for a ray without a field, of the field of a [`PolarizedRay`](@ref) otherwise, such
+that a channel that blocks the field carries no light. For a channel given by its power fractions
+`Fs` and `Fp`, `J = diag(√Fs, √Fp)`.
+"""
+channel_amplitude(::AbstractRay, ::IncidenceFrame, J::AbstractMatrix, phase) =
+    sqrt(sum(abs2, J) / 2) * phase
+
+function channel_amplitude(ray::PolarizedRay, frame::IncidenceFrame, J::AbstractMatrix, phase)
+    E = polarization(ray)
+    E_sp = SVector(dot(frame.s, E), dot(frame.p_d, E))
+    return norm(J * E_sp) / norm(E_sp) * phase
+end
+
+# The phase of the s- and p-amplitudes of `J`, in the sign convention `σ` of the s-component: -1 for a
+# reflection, see mirror_jones
+jones_phase(J::AbstractMatrix, σ) = phase_of(σ * J[1, 1] + J[2, 2])
+
+# The matrix of the amplitudes of the power fractions `Fs` and `Fp`
+power_jones(Fs, Fp) = SMatrix{2, 2}(sqrt(Fs), 0, 0, sqrt(Fp))
+
+"""
+    BeamsplitterCoating(R = 0.5)
+
+A lossless, non-polarizing coating of the power reflectance `R` that splits a ray into a reflected
+and a transmitted beam, e.g. `BeamsplitterCoating()` for 50:50 or `BeamsplitterCoating(0.7)` for
+70:30. It acts between the media of the boundary, see [`Transition`](@ref): the transmitted beam is
+refracted into the medium behind it, e.g. the substrate that it is coated on, the reflected beam
+stays in the medium before it. Beyond the critical angle of these media, the ray is totally
+reflected and not split. Its reflection phase follows the convention of
+[`AbstractThinElement`](@ref).
 
 A [`ThinBeamsplitter`](@ref) carries this coating, see [`surface_model`](@ref); see also
 [`MirrorCoating`](@ref) and [`AntireflectionCoating`](@ref).
+
+# Fields
+
+- `reflectance`, `transmittance`: the field amplitudes `√R` and `√(1 - R)`
 """
-struct BeamsplitterCoating{T <: Real} <: AbstractSurfaceModel
+struct BeamsplitterCoating{T <: Real} <: AbstractThinElement
     reflectance::T
     transmittance::T
+end
+
+function BeamsplitterCoating(R::Real = 0.5)
+    0 ≤ R ≤ 1 ||
+        throw(ArgumentError(lazy"the reflectance of a BeamsplitterCoating must lie in [0, 1], not $R"))
+    r = sqrt(float(R))
+    return BeamsplitterCoating(r, sqrt(1 - r^2))
 end
 
 reflectance(coating::BeamsplitterCoating) = coating.reflectance
@@ -40,53 +234,22 @@ transmittance(coating::BeamsplitterCoating) = coating.transmittance
 
 splitting_of(::BeamsplitterCoating) = AllChannels()
 
-"""
-    channels(coating::BeamsplitterCoating, t::Transition, ray, cs)
-
-The channels of the `coating`: the transmitted channel is refracted into the medium behind the
-boundary with the field factor `transmittance(coating)`, the reflected one stays in the medium before
-it with `reflectance(coating)`, see [`lossless_channels`](@ref).
-"""
-function channels(coating::BeamsplitterCoating, t::Transition, ray::AbstractRay, cs)
-    r, τ = reflectance(coating), transmittance(coating)
-    return lossless_channels(t, ray, cs, (r, r), (τ, τ))
-end
+scattering(coating::BeamsplitterCoating, frame::IncidenceFrame) =
+    lossless_scattering(frame, reflectance(coating), reflectance(coating), transmittance(coating),
+        transmittance(coating))
 
 """
-    lossless_channels(t::Transition, ray, cs, (rs, rp), (τs, τp))
+    lossless_scattering(frame, rs, rp, τs, τp)
 
-The channels of a coating that reflects the s- and p-components of the field with the real amplitudes
-`rs` and `rp` and transmits them with `τs` and `τp`, from the channels `cs` of the bare boundary
-of the transition `t`. Beyond the critical angle the ray is totally reflected before it reaches the coating,
-and `cs` is returned.
-
-The field of a transmitted [`PolarizedRay`](@ref) is scaled for the medium behind the boundary: the
-coating transmits a fraction of the power, and the power of a beam is proportional to `n cos(θ) |E|²`.
-Beams without polarization carry the amplitudes of unpolarized light.
-
-# Reflection phase jump
-
-The reflection phase jump is θᵣ = π for a ray that comes from the front of the coating (see
-[`isfacing`](@ref)), and 0 from the other side, as required by the Stokes relations (r' = -r) for a lossless
-coating: only then do both outputs of an interferometer sum to its input. The s- and p-components are
-reflected with `-r` and `r` from the other side, like an internal Fresnel reflection. The coating is
-assumed to have an unambiguous normal, i.e. a 2D mesh. See also
-[Reflection phase at a beamsplitter coating](@ref).
+The [`ThinScattering`](@ref) of a lossless element that reflects the s- and p-components with the real
+amplitudes `rs` and `rp` and transmits them with `τs` and `τp`, with the reflection phase of
+[`mirror_jones`](@ref).
 """
-function lossless_channels(t::Transition, ray::AbstractRay, cs, (rs, rp), (τs, τp))
-    transmitted, reflected = cs
-    # Total internal reflection: the ray does not reach the coating
-    islit(transmitted) || return cs
-    s = isfacing(t, ray) ? -1 : 1
-    # Transmitted field scaled for the medium behind the boundary
-    normal = normal3d(t)
-    cos_in = abs(cos_angle3d(direction(ray), normal))
-    cos_out = abs(cos_angle3d(direction(transmitted), normal))
-    f = sqrt(refractive_index_in(t) * cos_in / (refractive_index_out(t) * cos_out))
-    a_r = s * sqrt((rs^2 + rp^2) / 2)
-    a_t = sqrt((τs^2 + τp^2) / 2)
-    return (transfer(transmitted, ray, SPBasis(f * τs, 0, 0, f * τp), a_t),
-        transfer(reflected, ray, SPBasis(-s * rs, 0, 0, s * rp), a_r))
+function lossless_scattering(frame::IncidenceFrame{T}, rs, rp, τs, τp) where {T}
+    M = mirror_jones(frame)
+    ρ = SMatrix{2, 2, Complex{T}, 4}(rs, 0, 0, rp)
+    τ = SMatrix{2, 2, Complex{T}, 4}(τs, 0, 0, τp)
+    return ThinScattering(M * ρ, τ, -M * ρ, τ)
 end
 
 """
@@ -95,7 +258,7 @@ end
 An ideal, lossless mirror coating: it reflects all light, with the phase convention of a
 [`BeamsplitterCoating`](@ref).
 """
-MirrorCoating() = BeamsplitterCoating(1.0, 0.0)
+MirrorCoating() = BeamsplitterCoating(1)
 
 """
     AntireflectionCoating()
@@ -103,27 +266,28 @@ MirrorCoating() = BeamsplitterCoating(1.0, 0.0)
 An ideal anti-reflection coating: it transmits all light into the medium behind the boundary, without
 the Fresnel reflection of the bare boundary.
 """
-AntireflectionCoating() = BeamsplitterCoating(0.0, 1.0)
+AntireflectionCoating() = BeamsplitterCoating(0)
 
 """
     SpectralCoating(R; splitting = AllChannels())
     SpectralCoating(Rs, Rp; splitting = AllChannels())
     SpectralCoating(λs, Rs; splitting = AllChannels())
 
-A lossless coating with the power reflectance `R(λ, θ)` of the wavelength `λ` in \\[m\\] and the angle of
-incidence `θ` in \\[rad\\], e.g. a dichroic mirror, an edge filter or a datasheet curve; it transmits
-`1 - R`. With two functions, `Rs` and `Rp` are the reflectances of the s- and p-components, e.g. of a
-polarizing beamsplitter coating. A table of the reflectances `Rs` at the wavelengths `λs` is
-interpolated linearly and does not depend on the angle; beyond the table its first or last value holds.
+A lossless coating with the power reflectance `R(λ, θ)` of the wavelength `λ` in \\[m\\] and the
+angle of incidence `θ` in \\[rad\\], e.g. a dichroic mirror, an edge filter or a datasheet curve; it
+transmits `1 - R`. With two functions, `Rs` and `Rp` are the reflectances of the s- and
+p-components, e.g. of a polarizing beamsplitter coating. A table of the reflectances `Rs` at the
+wavelengths `λs` is interpolated linearly and does not depend on the angle; beyond the table its
+first or last value holds.
 
-The phase convention is that of a [`BeamsplitterCoating`](@ref), see [`lossless_channels`](@ref). With
-`splitting = Dominant()` only the stronger part of the light is traced, see [`splitting_of`](@ref).
+The phase convention is that of a [`BeamsplitterCoating`](@ref). With `splitting = Dominant()` only
+the stronger part of the light is traced, see [`splitting_of`](@ref).
 
 ```julia
 longpass = SpectralCoating((λ, θ) -> λ < 800e-9 ? 0.98 : 0.02)
 ```
 """
-struct SpectralCoating{F, G, S <: AbstractSplitting} <: AbstractSurfaceModel
+struct SpectralCoating{F, G, S <: AbstractSplitting} <: AbstractThinElement
     Rs::F
     Rp::G
     splitting::S
@@ -137,11 +301,103 @@ SpectralCoating(λs::AbstractVector{<:Real}, Rs::AbstractVector{<:Real}; kwargs.
 
 splitting_of(coating::SpectralCoating) = coating.splitting
 
-function channels(coating::SpectralCoating, t::Transition, ray::AbstractRay, cs)
-    λ = wavelength(ray)
-    θ = acos(min(abs(cos_angle3d(direction(ray), normal3d(t))), 1))
-    Rs, Rp = coating.Rs(λ, θ), coating.Rp(λ, θ)
-    return lossless_channels(t, ray, cs, (sqrt(Rs), sqrt(Rp)), (sqrt(1 - Rs), sqrt(1 - Rp)))
+function scattering(coating::SpectralCoating, frame::IncidenceFrame)
+    Rs, Rp = coating.Rs(frame.λ, frame.θ), coating.Rp(frame.λ, frame.θ)
+    return lossless_scattering(frame, sqrt(Rs), sqrt(Rp), sqrt(1 - Rs), sqrt(1 - Rp))
+end
+
+"""
+    Retarder(Γ, fast_axis; λ0 = nothing)
+
+An ideal retarder film, e.g. a quarter-wave (`Γ = π/2`) or half-wave (`Γ = π`) film: it transmits all
+light and delays the component along the slow axis by the retardance `Γ` in \\[rad\\] behind the
+component along the `fast_axis`, a vector in the local frame of the part that carries it, e.g.
+`[1, 0, 0]` on a lens face whose normal is the local y-axis. At oblique incidence, the axis is projected
+onto the plane transverse to the ray. With the design wavelength `λ0` in \\[m\\], the retardance is
+`Γ λ0 / λ`, that of a zero-order plate without dispersion of its birefringence; otherwise it is the
+same for all wavelengths.
+"""
+struct Retarder{T <: Real, L <: Nullable{Real}} <: AbstractThinElement
+    Γ::T
+    fast_axis::SVector{3, T}
+    λ0::L
+end
+
+function Retarder(Γ::Real, fast_axis::AbstractVector{<:Real}; λ0::Nullable{Real} = nothing)
+    T = float(promote_type(typeof(Γ), eltype(fast_axis)))
+    return Retarder(T(Γ), SVector{3, T}(normalize(fast_axis)), isnothing(λ0) ? nothing : T(λ0))
+end
+
+"""Returns the retardance of the `retarder` in \\[rad\\] at the wavelength `λ` in \\[m\\]."""
+retardance(retarder::Retarder{T, Nothing}, ::Real) where {T} = retarder.Γ
+retardance(retarder::Retarder{T, <:Real}, λ::Real) where {T} = retarder.Γ * retarder.λ0 / λ
+
+function scattering(retarder::Retarder, frame::IncidenceFrame{T}) where {T}
+    Γ = retardance(retarder, frame.λ)
+    J(φ) = rotation_jones(φ) * SMatrix{2, 2, Complex{T}, 4}(1, 0, 0, cis(Γ)) * rotation_jones(-φ)
+    O = zero(SMatrix{2, 2, Complex{T}, 4})
+    return ThinScattering(O, J(jones_angle(frame, retarder.fast_axis, frame.p_d)), O,
+        J(jones_angle(frame, retarder.fast_axis, frame.p_r)))
+end
+
+"""
+    ReflectivePolarizer(transmission_axis)
+
+An ideal reflective polarizer film, e.g. a wire grid or a birefringent multilayer film: it transmits
+the component of the field along the `transmission_axis`, a vector in the local frame of the part that
+carries it, and reflects the component perpendicular to it, without loss. At oblique incidence, the
+axis is projected onto the plane transverse to the ray. The reflection follows the phase convention of
+[`AbstractThinElement`](@ref).
+"""
+struct ReflectivePolarizer{T <: Real} <: AbstractThinElement
+    transmission_axis::SVector{3, T}
+end
+
+ReflectivePolarizer(axis::AbstractVector{<:Real}) =
+    ReflectivePolarizer(SVector{3, float(eltype(axis))}(normalize(axis)))
+
+splitting_of(::ReflectivePolarizer) = AllChannels()
+
+function scattering(polarizer::ReflectivePolarizer, frame::IncidenceFrame{T}) where {T}
+    M = mirror_jones(frame)
+    P_d = projector_jones(jones_angle(frame, polarizer.transmission_axis, frame.p_d))
+    P_r = projector_jones(jones_angle(frame, polarizer.transmission_axis, frame.p_r))
+    C = Complex{T}
+    return ThinScattering(M * (I - P_d), C.(P_d), -M * (I - P_r), C.(P_r))
+end
+
+"""
+    SurfaceStack(elements::AbstractThinElement...; splitting = AllChannels())
+
+Thin elements on top of each other at one boundary, e.g. a retarder film laminated under a reflective
+polarizer, listed from the substrate outward: from the inside of a coated face of a body (see
+[`surface_model!`](@ref)), or from the back of a [`CoatingLayer`](@ref) to its front. A ray meets them
+in this order from the substrate and in the reverse order from outside; light reflected by an outer
+element passes the inner ones again, and the multiple reflections between the elements add coherently,
+see [`cascade`](@ref). A stack is itself a thin element and may contain stacks.
+
+A [`ThinFilmCoating`](@ref) is no thin element: its layers form one coating, between the media of the
+boundary.
+
+```julia
+qwp = Retarder(π / 2, [1, 0, 1])
+fold = SurfaceStack(qwp, ReflectivePolarizer([1, 0, 0]))
+```
+"""
+struct SurfaceStack{E <: Tuple, S <: AbstractSplitting} <: AbstractThinElement
+    elements::E
+    splitting::S
+end
+
+SurfaceStack(elements::AbstractThinElement...; splitting::AbstractSplitting = AllChannels()) =
+    SurfaceStack(elements, splitting)
+
+splitting_of(stack::SurfaceStack) = stack.splitting
+
+function scattering(stack::SurfaceStack, frame::IncidenceFrame)
+    # Elements in the order in which the ray meets them
+    elements = frame.facing ? reverse(stack.elements) : stack.elements
+    return foldl(cascade, map(e -> scattering(e, frame), elements))
 end
 
 """
@@ -201,20 +457,22 @@ QuarterWaveLayer(n::AbstractRefractiveIndex, λ0::Real) = ThinFilmLayer(n, λ0 /
 """
     ThinFilmCoating(layers::ThinFilmLayer...; splitting = AllChannels())
 
-A coherent stack of thin films, e.g. an anti-reflection, mirror, beamsplitter or filter coating of known
-design. The `layers` are listed from the substrate outward: from the inside of a coated face of a body
-(see [`surface_model!`](@ref)), or from the back of a [`CoatingLayer`](@ref) to its front. The amplitudes of the reflected and transmitted s- and
-p-components follow from the characteristic matrix of the stack (Born & Wolf, Principles of Optics,
-§1.6; Macleod, Thin-Film Optical Filters, ch. 2), for both sides of incidence, any angle and absorbing
-layers; the media on both sides are those of the boundary. Their phases follow from the stack as well.
-Without layers, the coating is the bare boundary.
+A coherent stack of thin films, e.g. an anti-reflection, mirror, beamsplitter or filter coating of
+known design. The `layers` are listed from the substrate outward: from the inside of a coated face
+of a body (see [`surface_model!`](@ref)), or from the back of a [`CoatingLayer`](@ref) to its front.
+The amplitudes of the reflected and transmitted s- and p-components follow from the characteristic
+matrix of the stack (Born & Wolf, Principles of Optics, §1.6; Macleod, Thin-Film Optical Filters,
+ch. 2), for both sides of incidence, any angle and absorbing layers; the media on both sides are
+those of the boundary. Their phases follow from the stack as well. Without layers, the coating is
+the bare boundary.
 
 With `splitting = Dominant()` only the stronger part of the light is traced, e.g. for an
 anti-reflection coating whose weak reflection is of no interest, see [`splitting_of`](@ref).
 
 !!! info
     Beams without polarization, e.g. a [`GaussianBeamlet`](@ref), carry the power fractions of
-    unpolarized light, with the phase of the sum of the s- and p-amplitudes.
+    unpolarized light, with the phase of the sum of the s- and p-amplitudes; a polarized ray splits by
+    the power fractions of its field.
 
 ```julia
 λ0 = 550e-9
@@ -239,8 +497,9 @@ function channels(coating::ThinFilmCoating, t::Transition, ray::AbstractRay, cs)
     cos0 = abs(cos_angle3d(direction(ray), normal3d(t)))
     (rs, rp, ts, tp), (Rs, Rp, Ts, Tp) = thin_film_coefficients(layers, refractive_index_in(t),
         refractive_index_out(t), cos0, wavelength(ray))
-    a_r = sqrt((Rs + Rp) / 2) * phase_of(rs + rp)
-    a_t = sqrt((Ts + Tp) / 2) * phase_of(ts + tp)
+    frame = IncidenceFrame(t, ray)
+    a_r = channel_amplitude(ray, frame, power_jones(Rs, Rp), phase_of(rs + rp))
+    a_t = channel_amplitude(ray, frame, power_jones(Ts, Tp), phase_of(ts + tp))
     return (transfer(transmitted, ray, SPBasis(ts, 0, 0, tp), a_t),
         transfer(reflected, ray, SPBasis(-rs, 0, 0, rp), a_r))
 end
@@ -315,6 +574,7 @@ function channels(::FresnelGhosts, t::Transition, ray::AbstractRay, cs)
     cos0 = abs(cos_angle3d(direction(ray), normal3d(t)))
     _, (Rs, Rp, Ts, Tp) = thin_film_coefficients((), refractive_index_in(t),
         refractive_index_out(t), cos0, wavelength(ray))
-    return (transfer(transmitted, transmitted.P, sqrt((Ts + Tp) / 2)),
-        transfer(reflected, reflected.P, sqrt((Rs + Rp) / 2)))
+    frame = IncidenceFrame(t, ray)
+    return (transfer(transmitted, transmitted.P, channel_amplitude(ray, frame, power_jones(Ts, Tp), 1)),
+        transfer(reflected, reflected.P, channel_amplitude(ray, frame, power_jones(Rs, Rp), 1)))
 end

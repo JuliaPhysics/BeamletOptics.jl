@@ -1,4 +1,5 @@
 [deps]
+AbstractTrees = "1520ce14-60c1-5f80-bbc7-55ef81b5835c"
 BeamletOptics = "c387492b-ffec-4e51-9a46-bd230226031c"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
@@ -10,8 +11,8 @@ Literate = "98b081ad-f1c9-55d3-8b20-4c87d4299306"
 NodeJS_20_jll = "c7aee132-11e1-519c-8219-0a43005e73c2"
 OpticsBase = "0a174593-c395-4975-8599-97e6c4e949e6"
 
-[sources.BeamletOptics]
-path = ".."
+[sources]
+BeamletOptics = {path = ".."}
 
 [compat]
 BeamletOptics = "0.14, 0.13"
