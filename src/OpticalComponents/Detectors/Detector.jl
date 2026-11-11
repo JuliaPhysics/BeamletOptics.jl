@@ -87,6 +87,8 @@ Additionally, continued tracing can be configured via the `stop` flag where
 - `false` indicates continued tracing: rays and beamlets pass the detector unchanged
 - `true` stops the incoming beams as with any hard target
 
+It can be changed later via [`stop!`](@ref).
+
 !!! warning "Partly clipped beamlets"
     A beamlet whose rays hit the detector only partly ends there, as at any other object, also
     with `stop = false`. To sample a beamlet on an intermediate plane, make the detector larger
@@ -112,8 +114,18 @@ The number of hits stored in the detector `d`, `0` before the first solve and af
 """
 length(d::Detector) = isnothing(hits(d)) ? 0 : length(hits(d))
 
-"Allows continued tracing if set to false"
+"""
+    stop(d::Detector) -> Bool
+    stop!(d::Detector, stop::Bool)
+
+Returns or sets whether the detector `d` stops the beams that hit it, see [`Detector`](@ref): with
+`false`, rays and beamlets pass it. A change applies from the next solve on; the hits stored by
+earlier solves are kept.
+"""
 stop(d::Detector) = d.stop
+
+"""Sets whether the detector `d` stops the beams that hit it, see [`stop`](@ref)."""
+stop!(d::Detector, new::Bool) = (d.stop = new; nothing)
 
 """
     local_axes(pd::Detector) -> (x̂, ẑ)

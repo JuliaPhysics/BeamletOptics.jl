@@ -146,6 +146,31 @@ end
     @test BMO.polarization(rays(beam)[2]) == BMO.polarization(rays(beam)[1])
 end
 
+@testset "The stop of a detector can be switched after it is built" begin
+    d1 = Detector(20mm)
+    d2 = Detector(20mm)
+    translate_to3d!(d1, [0.0, 0.10, 0.0])
+    translate_to3d!(d2, [0.0, 0.20, 0.0])
+    system = System([d1, d2])
+    @test BMO.stop(d1)
+    beam = Beam(Ray([0.0, 0.0, 0.0], [0.0, 1.0, 0.0]))
+    solve_system!(system, beam)
+    @test (length(d1), length(d2)) == (1, 0)
+    # The beam passes d1 from the next solve on, its earlier hit is kept
+    @test isnothing(BMO.stop!(d1, false))
+    @test !BMO.stop(d1)
+    @test length(d1) == 1
+    beam = Beam(Ray([0.0, 0.0, 0.0], [0.0, 1.0, 0.0]))
+    solve_system!(system, beam)
+    @test (length(d1), length(d2)) == (2, 1)
+    @test length(rays(beam)) == 2
+    # And stops there again
+    BMO.stop!(d1, true)
+    beam = Beam(Ray([0.0, 0.0, 0.0], [0.0, 1.0, 0.0]))
+    solve_system!(system, beam)
+    @test (length(d1), length(d2)) == (3, 1)
+end
+
 @testset "Beamlets pass a detector with stop = false" begin
     # The field on a later detector is the same with and without the passed detector,
     # for a beamlet along +y and one along +x

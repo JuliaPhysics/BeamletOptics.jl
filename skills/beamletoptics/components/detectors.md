@@ -7,7 +7,7 @@ Detector(edge_length, stop = true)
 - An infinitely thin square screen at the origin in the x-z plane. Its normal points along −y, so beams
   travelling along +y hit it. Orient it like any other object, e.g. after `zrotate3d!(det, deg2rad(90))`
   it catches beams travelling along −x.
-- With `stop = false`, rays and beamlets continue unchanged behind the detector, e.g. to sample a beam on an intermediate plane.
+- With `stop = false`, rays and beamlets continue unchanged behind the detector, e.g. to sample a beam on an intermediate plane. `BeamletOptics.stop!(d, false)` switches an existing detector from the next solve on (stored hits stay), `BeamletOptics.stop(d)` reads it.
   A beamlet that the detector clips only partly ends there, as at any object: make the detector larger than the beamlet.
 - Stores *hits* of exactly **one** type (Ray, PolarizedRay, GaussianBeamlet or AstigmaticGaussianBeamlet).
 - **Hits are values** of the beam state at the solve. Solving again, or moving a source, mirror or lens, never changes stored hits.
