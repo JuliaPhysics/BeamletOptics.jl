@@ -5,7 +5,7 @@ struct CubeBeamsplitterShape{T} <: AbstractShape{T} end
     CubeBeamsplitter <: AbstractBeamsplitter
 
 A cuboid beamsplitter where the splitting interaction occurs between two [`RightAnglePrism`](@ref)s.
-For more information refer to the [`AbstractPlateBeamsplitter`](@ref) docs.
+For more information refer to the [`AbstractBeamsplitter`](@ref) docs.
 
 # Fields
 
