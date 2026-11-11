@@ -85,6 +85,8 @@ public properties, default_properties
 public relaunch!, GaussianBeamletHit, AstigmaticGaussianBeamletHit
 # own detector samplings, see AbstractDetectorSampling
 public AbstractDetectorSampling, sample_points, DetectorSamples
+# whether a detector stops the beams, e.g. a switch in a GUI
+public stop, stop!
 # optional part of the shape interface, see AbstractShape
 public bounding_sphere_of, AbstractBoundingSphere, NoBoundingSphere, SingleBoundingSphere, MultiBoundingSphere
 # own assembly types of separate parts, see AbstractObjectGroup

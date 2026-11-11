@@ -23,6 +23,13 @@ Detector(::Real, ::Bool)
 Detector
 ```
 
+Whether a detector stops the beams can be switched later, e.g. to let the beams pass a screen that has been placed for a first check of the setup:
+
+```@docs
+BeamletOptics.stop
+BeamletOptics.stop!
+```
+
 After solving a system containing a `Detector`, the methods listed below can be used in order to analyze the stored data. If no hits are stored, the readouts return zero or empty results.
 
 ## Reading out a detector
