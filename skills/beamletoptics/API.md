@@ -76,7 +76,7 @@ BeamletOptics.properties(x::MyFilter) =
 ## Solving
 
 ```julia
-solve_system!(system, beam; initialize = false, r_max = 100, depth_max = 100,
+solve_system!(system, beam; initialize = false, r_max = 100, depth_max = 100, power_cutoff = 0,
               check_invariant = true, threshold = get_invariant_threshold())
 solve_system!(system, beam_group; progress = true, initialize = false, kwargs...)   # multithreaded over member beams
 initialize!(system)   # empties all detectors of the system (nested groups included)
@@ -90,6 +90,8 @@ initialize!(system)   # empties all detectors of the system (nested groups inclu
 
 - `r_max`: max. rays per beam leaf (raise it for resonators, e.g. facing mirrors)
 - `depth_max`: max. splitting depth of the beam tree
+- `power_cutoff`: child beams below this fraction of the root's power are not traced, e.g. `1e-6` for
+  cavities and ghosts; beams of `Ray`s carry no power and are bounded by `depth_max` only
 - Every call solves the beam again from its start; the detectors are not emptied unless `initialize = true`. Child beams are new
   objects after every solve: read `beam.children` again after each solve instead of keeping a child.
 - Julia threads (`julia -t auto`) speed up solving of sources with many beams.

@@ -67,6 +67,32 @@ end
     end
 end
 
+@testset "The power cutoff bounds the beam tree of a cavity" begin
+    # Two partial mirrors at normal incidence, R = 0.9: each pass loses a factor of 0.9 or 0.1
+    mirrors = [ThinBeamsplitter(25mm; reflectance = 0.9) for _ in 1:2]
+    translate3d!(mirrors[1], [0, 50mm, 0])
+    translate3d!(mirrors[2], [0, 60mm, 0])
+    system = System(mirrors)
+    num_beams(beam) = count(_ -> true, PreOrderDFS(beam))
+    new_beam() = Beam(PolarizedRay([0, 0, 0], [0, 1, 0], λ0, [1.0 + 0im, 0, 0]))
+    for beam in (new_beam(), GaussianBeamlet([0, 0, 0], [0, 1, 0], λ0, 1mm))
+        solve_system!(system, beam; depth_max = 30)
+        all_beams = num_beams(beam)
+        solve_system!(system, beam; depth_max = 30, power_cutoff = 1e-3)
+        @test 1 < num_beams(beam) < all_beams
+        @test all(b -> BMO.power_fraction(b, beam) ≥ 1e-3, PreOrderDFS(beam))
+    end
+    # The tree of rays without a field is bounded by depth_max only
+    rays_only = Beam(Ray([0, 0, 0], [0, 1, 0], λ0))
+    solve_system!(system, rays_only; depth_max = 6)
+    n = num_beams(rays_only)
+    solve_system!(system, rays_only; depth_max = 6, power_cutoff = 0.5)
+    @test num_beams(rays_only) == n
+    for cutoff in (-0.1, 1.5)
+        @test_throws ArgumentError solve_system!(system, new_beam(); power_cutoff = cutoff)
+    end
+end
+
 # A dummy surface model that implements only its channels: a lossy half mirror that transmits and
 # reflects a quarter of the power each
 struct HalfMirror <: BMO.AbstractSurfaceModel end
