@@ -503,6 +503,8 @@ end
 
 function solve_beam!(system::AbstractSystem, beam::B; r_max, depth_max, power_cutoff,
         check_invariant, threshold) where {B <: AbstractBeam}
+    # The root starts in the medium around its first ray
+    enclose_start!(system, beam)
     queue = Tuple{B, Int}[(beam, 1)]
     while !isempty(queue)
         # Process beams in FIFO order

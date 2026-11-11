@@ -54,11 +54,16 @@ export Detector, electric_field, intensity, spot_diagram, ray_hits, optical_powe
 # coatings
 export CoatingLayer, BeamsplitterCoating, MirrorCoating, AntireflectionCoating, SpectralCoating,
     ThinFilmCoating, ThinFilmLayer, QuarterWaveLayer, FresnelGhosts, Retarder, ReflectivePolarizer,
-    SurfaceStack, PolarizingCoating
+    SurfaceStack, PolarizingCoating, Uncoated, Dominant, AllChannels
 export surface_model, surface_model!, AllFaces, FrontFace, BackFace, EdgeFace, FlatFace, MaskedFace
 # own faces and masks, see AbstractFace
 public AbstractThinElement, IncidenceFrame, ThinScattering, scattering, mirror_jones, jones_angle,
     AbstractFace, isonface, face_models, FaceModels, face, face!, isinside, BoxSDF, CylinderSDF, RingSDF
+# own bodies, thin layers and surface models, see AbstractMedium and AbstractSurfaceModel
+public AbstractMedium, IsotropicMedium, SystemMedium, medium, AbstractSurfaceModel, AbstractSplitting,
+    splitting_of, Transition, transition, medium_in, medium_out, refractive_index_in, refractive_index_out,
+    isfacing, cross_boundary, channels, BoundaryChannel, AbstractSide, Reflected, Transmitted, transfer,
+    amplitude
 
 export ThinBeamsplitter, RoundThinBeamsplitter, RectangularPlateBeamsplitter,
        RoundPlateBeamsplitter, CubeBeamsplitter, RectangularCompensatorPlate

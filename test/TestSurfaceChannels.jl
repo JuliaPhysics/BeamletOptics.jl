@@ -129,4 +129,14 @@ BMO.surface_model(::HalfMirrorFilm) = HalfMirror()
     @test sum(optical_power, children(agb)) ≈ optical_power(agb) / 2
 end
 
+@testset "The hooks of bodies, thin layers and surface models are public" begin
+    for name in (:AbstractMedium, :IsotropicMedium, :medium, :AbstractSurfaceModel, :splitting_of,
+            :Transition, :transition, :channels, :BoundaryChannel, :transfer, :amplitude)
+        @test Base.ispublic(BeamletOptics, name)
+    end
+    for name in (:Uncoated, :Dominant, :AllChannels)
+        @test Base.isexported(BeamletOptics, name)
+    end
+end
+
 end # module

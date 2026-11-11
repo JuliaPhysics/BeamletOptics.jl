@@ -2,25 +2,26 @@
     LongpassDichroicMirror{T, N} <: BeamletOptics.AbstractObject{T}
 
 A plane-parallel dichroic mirror that reflects everything below its `cuton` wavelength and
-transmits everything above it. Transmission is modelled as a regular refractive plate of
-refractive index `n`, i.e. the beam is refracted at both surfaces.
+transmits everything above it. It is a body of the substrate `n` whose front face carries a
+longpass coating; the transmitted light is refracted at both surfaces.
 
 # Fields
 
 - `shape`: a `PlanoSurfaceSDF` representing the substrate
 - `n`: the substrate [`BeamletOptics.AbstractRefractiveIndex`](@ref)
-- `cuton`: the cut-on wavelength in [m]
+- `coatings`: the coatings of its faces, see [`surface_model!`](@ref)
 """
 struct LongpassDichroicMirror{T, N <: BMO.AbstractRefractiveIndex} <: BMO.AbstractObject{T}
     shape::BMO.PlanoSurfaceSDF{T}
     n::N
-    cuton::T
+    coatings::BMO.FaceModels
 end
 
 BMO.refractive_index(lpm::LongpassDichroicMirror) = lpm.n
-BMO.refractive_index(lpm::LongpassDichroicMirror, λ::Real)::Float64 = lpm.n(λ)
 # the substrate is a body, whose medium the transitions at its surfaces take into account
 BMO.medium(lpm::LongpassDichroicMirror) = BMO.IsotropicMedium(lpm.n)
+# its faces carry coatings
+BMO.face_models(lpm::LongpassDichroicMirror) = lpm.coatings
 
 """
     LongpassDichroicMirror(diameter, thickness, n, cuton)
@@ -31,31 +32,11 @@ is normal to the local y-axis.
 function LongpassDichroicMirror(diameter::D, thickness::T, n::BMO.AbstractRefractiveIndex, cuton::Real) where {D, T}
     TT = promote_type(D, T)
     shape = BMO.PlanoSurfaceSDF(TT(thickness), TT(diameter))
-    return LongpassDichroicMirror(shape, n, TT(cuton))
+    lpm = LongpassDichroicMirror(shape, n, BMO.FaceModels())
+    longpass = SpectralCoating((λ, θ) -> λ < cuton ? 1.0 : 0.0; splitting = Dominant())
+    surface_model!(lpm, FrontFace(), longpass)
+    return lpm
 end
 
 BMO.render!(ax::LScene, lpm::LongpassDichroicMirror;
     color=:orange, transparency=true, alpha=0.5, kwargs...) = BMO.render!(ax, BMO.shape(lpm); color, transparency, alpha, kwargs...)
-
-function BMO.interact3d(
-    system::BMO.AbstractSystem,
-    ldm::LongpassDichroicMirror,
-    beam::BMO.Beam{T, R},
-    ray::R) where {T <: Real, R <: Ray{T}}
-    # test cut-on wavelength
-    if BMO.wavelength(ray) < ldm.cuton
-        # below cut-on: behave like a plane mirror
-        normal = BMO.normal3d(BMO.intersection(ray))
-        npos = BMO.position(ray) + BMO.length(ray) * BMO.direction(ray)
-        ndir = BMO.reflection3d(BMO.direction(ray), normal)
-        return BMO.BeamInteraction{T, R}(
-            nothing,
-            Ray{T}(npos, ndir, nothing, BMO.wavelength(ray), BMO.refractive_index(ray))
-        )
-    else
-        # above cut-on: behave like a refractive plate. The transition at the hit holds the media on
-        # both sides, the substrate and the medium of the system or of a touching body.
-        t = BMO.transition(system, ray)
-        return BMO.interact3d(system, t, beam, ray)
-    end
-end

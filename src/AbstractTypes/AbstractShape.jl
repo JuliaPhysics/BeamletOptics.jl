@@ -31,7 +31,8 @@ see [`BeamletOptics.AbstractKinematicTrait`](@ref). The default primitives
 - [`bounding_sphere_of`](@ref) (optional): computes a sphere that encloses the shape. A solve then skips
   the shape for every ray that misses the sphere, without a call of `intersect3d`
 - [`isinside`](@ref) (optional): tests whether a point lies within the volume of the shape, e.g. for
-  the mask of a [`MaskedFace`](@ref)
+  the mask of a [`MaskedFace`](@ref) and for the medium in which a source starts. A shape without a
+  method contains no point
 
 ## Rendering (with Makie):
 
@@ -45,9 +46,11 @@ kinematic_trait_of(::AbstractShape) = Movable(Oriented())
     isinside(shape::AbstractShape, point)
 
 Returns `true` if the `point` lies within the volume of the `shape` or on its surface. An
-[`AbstractSDF`](@ref) is inside where its signed distance is not positive.
+[`AbstractSDF`](@ref) is inside where its signed distance is not positive, a closed mesh where a ray from
+the `point` crosses it an odd number of times. A shape without a method contains no point, e.g. a flat
+mesh.
 """
-isinside(shape::AbstractShape, point) = error(lazy"isinside not defined for $(typeof(shape))")
+isinside(::AbstractShape, ::AbstractVector) = false
 
 "Enforces that `shape` has to have the field `pos` or implement `position()`."
 Base.position(shape::AbstractShape) = shape.pos

@@ -286,8 +286,11 @@ flowchart TB
 BeamletOptics.AbstractMedium
 BeamletOptics.IsotropicMedium
 BeamletOptics.medium
+BeamletOptics.SystemMedium
 BeamletOptics.transition
 BeamletOptics.Transition
+BeamletOptics.medium_in
+BeamletOptics.medium_out
 ```
 
 Every ray carries the bodies that enclose it, which the transitions update. Hence the medium behind a boundary is the body around the one that the ray leaves, e.g. the water of a cuvette around a lens:
@@ -300,6 +303,14 @@ A component creates its new rays without an enclosure. After each interaction, t
 
 ```@docs; canonical=false
 BeamletOptics.enclose!
+```
+
+The root beam of a solve starts in the bodies that contain its first ray: before tracing, the solver tests the bodies whose bounding spheres contain the start with [`BeamletOptics.isinside`](@ref) and sets the enclosure and the refractive index of the ray. Hence a source within a lens or a cuvette starts in its medium.
+
+```@docs; canonical=false
+BeamletOptics.start_enclosure
+BeamletOptics.enclose_start!
+BeamletOptics.isinside
 ```
 
 The physics at the boundary belongs to the boundary, not to one of the bodies. A body, e.g. any [`BeamletOptics.AbstractRefractiveOptic`](@ref), and a thin layer, e.g. a [`ThinBeamsplitter`](@ref), hand the ray to the [`BeamletOptics.surface_model`](@ref) of the transition:
@@ -400,6 +411,7 @@ flowchart TB
 ```@docs; canonical=false
 BeamletOptics.interact3d(::BeamletOptics.AbstractSystem, ::BeamletOptics.AbstractSurfaceModel, ::BeamletOptics.Transition, ::BeamletOptics.Beam, ::BeamletOptics.AbstractRay)
 BeamletOptics.BoundaryChannel
+BeamletOptics.amplitude
 BeamletOptics.AbstractSide
 BeamletOptics.Transmitted
 BeamletOptics.Reflected
@@ -547,6 +559,7 @@ flowchart TB
     S(["<b>solve_system!</b>"])
     INI["<b>initialize!(system)</b><br/>initialize! each contained object"]
     BS["<b>with_bounding_spheres</b><br/>precalculate spheres of all objects,<br/>unless a beam group did"]
+    ST["<b>enclose_start!(system, beam)</b><br/>the root starts in the bodies<br/>around its first rays"]
     Q["<b>popfirst!(queue)</b><br/>next (beam, depth),<br/>the root at depth 1"]
     EM["<b>empty!(current)</b><br/>back to its first ray"]
     TS{"<b>trace_system!</b><br/>(system, current)"}
@@ -561,7 +574,7 @@ flowchart TB
     S -. "initialize = true" .-> INI
     S --> BS
     INI --> BS
-    BS --> Q --> EM --> TS
+    BS --> ST --> Q --> EM --> TS
     TS -- "method per beam type" --> D
     D -- yes --> PC --> ENQ --> QE
     D -- no --> DROP --> QE
@@ -572,7 +585,7 @@ flowchart TB
     classDef green fill:#38982626,stroke:#389826,stroke-width:2px
     classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
     classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
-    class BS,Q,EM,ENQ,DROP blue
+    class BS,ST,Q,EM,ENQ,DROP blue
     class INI green
     class TS purple
     class S,E,BQ terminal

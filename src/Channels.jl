@@ -45,6 +45,7 @@ BoundaryChannel(side::AbstractSide, dir::AbstractVector{T}, P, a::Number) where 
 
 side(c::BoundaryChannel) = c.side
 direction(c::BoundaryChannel) = c.dir
+"""Returns the amplitude factor of the channel `c`, see [`BoundaryChannel`](@ref)."""
 amplitude(c::BoundaryChannel) = c.a
 
 """

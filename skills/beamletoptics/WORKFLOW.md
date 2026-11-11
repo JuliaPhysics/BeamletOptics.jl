@@ -92,8 +92,8 @@ and look at the image before trusting numbers. Axis-aligned top view: `Axis3(...
 ## Debugging checklist
 
 - Beam stops early: print `length(rays(beam))`, and for each `ray` its `position`/`direction`.
-  Common causes are the element being too small, the source starting inside an element, a wrong rotation
-  sign, a fully blocking polarizer, or `r_max` being reached.
+  Common causes are the element being too small, a source placed inside a mirror or detector, a wrong
+  rotation sign, a fully blocking polarizer, or `r_max` being reached.
 - Gaussian beamlet stops: all 3 (9) rays must hit the same surfaces; the beamlet may be clipped or the
   optical invariant check failed (`check_invariant = false` to diagnose, not to "fix").
 - `KeyError` from `DiscreteRefractiveIndex`: wavelength not in the table.

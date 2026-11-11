@@ -89,7 +89,7 @@ assembly is used:
   `shape(intersection(ray))`.
 - A `MultiShape` object of objects forwards rays and beamlets to the part that was hit, also the
   beamlet methods of the part (detectors, beamsplitters).
-- Media and boundaries (not exported, may still change): a body declares its medium with
+- Media and boundaries (`public`, not exported): a body declares its medium with
   `BeamletOptics.medium(x::MyBody) = BeamletOptics.IsotropicMedium(n)` (every `AbstractRefractiveOptic`
   has one), a thin layer its model with `BeamletOptics.surface_model(x::MyLayer)`; neither needs an
   own `interact3d`. In an own `interact3d`, `t = BeamletOptics.transition(system, ray)` holds the media on both

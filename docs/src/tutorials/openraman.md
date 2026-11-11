@@ -26,7 +26,8 @@ In this advanced tutorial the instrument is rebuilt in BMO.
 
 You will learn how to:
 
-1. Write your own optical component by implementing [`BeamletOptics.interact3d`](@ref)
+1. Write your own optical components: a coated body without code of its own, and a grating by
+   implementing [`BeamletOptics.interact3d`](@ref)
 2. Build a component out of several shapes using the [`BeamletOptics.MultiShape`](@ref) trait
 3. Give a component its own [`render!`](@ref) method
 4. Trace a [`GaussianBeamlet`](@ref) and geometrical [`PointSource`](@ref) ray bundles through the system
@@ -196,46 +197,40 @@ API (`translate3d!`, `zrotate3d!`, `position`, ...) then works for free:
 struct LongpassDichroicMirror{T, N <: BMO.AbstractRefractiveIndex} <: BMO.AbstractObject{T}
     shape::BMO.PlanoSurfaceSDF{T}
     n::N
-    cuton::T
+    coatings::BMO.FaceModels
 end
 ```
 
-The optical behaviour lives in [`BeamletOptics.interact3d`](@ref). It is handed the system,
-the object, the beam and the ray that just hit it, and returns either `nothing` (the trace
-stops) or a [`BeamletOptics.BeamInteraction`](@ref) holding the next ray segment:
-
-```julia
-function BMO.interact3d(system::BMO.AbstractSystem, ldm::LongpassDichroicMirror,
-                        beam::BMO.Beam{T, R}, ray::R) where {T <: Real, R <: Ray{T}}
-    if BMO.wavelength(ray) < ldm.cuton
-        # below cut-on: behave like a plane mirror
-        normal = BMO.normal3d(BMO.intersection(ray))
-        npos = BMO.position(ray) + BMO.length(ray) * BMO.direction(ray)
-        ndir = BMO.reflection3d(BMO.direction(ray), normal)
-        return BMO.BeamInteraction{T, R}(
-            nothing,
-            Ray{T}(npos, ndir, nothing, BMO.wavelength(ray), BMO.refractive_index(ray))
-        )
-    else
-        # above cut-on: behave like a refractive plate
-        ...
-    end
-end
-```
-
-The transmitting branch is the standard two-surface plate refraction. The component declares its
-substrate a body via [`BeamletOptics.medium`](@ref), and the [`BeamletOptics.transition`](@ref) at the
-hit then holds the media on both sides of the surface: the substrate and the medium of the system, or
-of a body that touches the surface. The surface model of the boundary, an uncoated surface, refracts the
-ray, or totally reflects it beyond the critical angle:
+A dichroic mirror is a glass plate whose front face carries an interference coating. Both
+parts already exist in BMO, so the component only declares them. Its substrate is a body via
+[`BeamletOptics.medium`](@ref): at every surface the [`BeamletOptics.transition`](@ref) holds the
+media on both sides, the substrate and the air, or a body that touches the surface. Its faces
+carry coatings via [`BeamletOptics.face_models`](@ref), which [`surface_model!`](@ref) fills:
 
 ```julia
 BMO.medium(lpm::LongpassDichroicMirror) = BMO.IsotropicMedium(lpm.n)
-
-# in interact3d, above cut-on
-t = BMO.transition(system, ray)
-return BMO.interact3d(system, t, beam, ray)
+BMO.face_models(lpm::LongpassDichroicMirror) = lpm.coatings
 ```
+
+The coating is a [`SpectralCoating`](@ref), whose reflectance is a function of the wavelength and
+the angle of incidence: it reflects all light below the cut-on wavelength and transmits all light
+above it. `splitting = Dominant()` traces only the stronger part, so the coating never splits
+the beam. The constructor puts it on the front face of the plate:
+
+```julia
+function LongpassDichroicMirror(diameter, thickness, n, cuton)
+    shape = BMO.PlanoSurfaceSDF(thickness, diameter)
+    lpm = LongpassDichroicMirror(shape, n, BMO.FaceModels())
+    longpass = SpectralCoating((λ, θ) -> λ < cuton ? 1.0 : 0.0; splitting = Dominant())
+    surface_model!(lpm, FrontFace(), longpass)
+    return lpm
+end
+```
+
+That is the whole component: it has no [`BeamletOptics.interact3d`](@ref) method of its own. A body
+or a coated face acts at the boundary by itself, and the uncoated back face refracts the
+transmitted light out of the plate. A component whose physics BMO does not know, such as the
+grating below, defines `interact3d` instead.
 
 The full component is in `OpenRaman/longpass.jl`, named after the Thorlabs
 [DMLP550](https://www.thorlabs.com/thorproduct.cfm?partnumber=DMLP550) it stands in for. We
