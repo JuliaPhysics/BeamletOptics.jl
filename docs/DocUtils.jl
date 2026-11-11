@@ -7,7 +7,7 @@ import Documenter, DocumenterVitepress
 
 const GLOBAL_USE_PLACEHOLDERS = true
 
-const MILESTONES_URL = "https://api.github.com/repos/JuliaPhysics/BeamletOptics.jl/milestones?state=all&per_page=100"
+const MILESTONES_URL = "https://api.github.com/repos/StackEnjoyer/BeamletOptics.jl/milestones?state=all&per_page=100"
 
 """
     fetch_milestones(path; url = MILESTONES_URL)
