@@ -55,9 +55,9 @@ solve_system!(System([lens, dichroic]), beam)
 - Splitting coatings (`BeamsplitterCoating`, `SpectralCoating`, `ThinFilmCoating`) trace the reflected and
   the transmitted light as `children` `[transmitted, reflected]` by default; `splitting = BMO.Dominant()`
   (keyword of `SpectralCoating` and `ThinFilmCoating`) traces only the stronger part, e.g. for AR coatings.
-- Every split doubles the beams: bound the tree with `depth_max` of `solve_system!` or the preference
-  `power_cutoff` (`get_power_cutoff()`, fraction of the root power; set via
-  `BeamletOptics.Config.set_preference!("power_cutoff", 1e-4)` and restart Julia).
+- Every split doubles the beams: bound the tree with the keywords `power_cutoff` (fraction of the root
+  power, e.g. `solve_system!(system, beam; power_cutoff = 1e-4)`) or `depth_max` of `solve_system!`.
+  Beams of `Ray`s carry no power, only `depth_max` bounds them.
 - The lossless coatings reflect with an extra π when the beam comes from the front of the coating, i.e.
   from outside of the coated body or from the side the layer normal points to (Stokes relations);
   a `ThinFilmCoating` takes its phases from the design.
