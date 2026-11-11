@@ -72,7 +72,7 @@ The numerical tolerances and defaults of the solver are global settings. Each ha
 | [`get_orthogonality_threshold`](@ref) | `1e-10` | magnitude of the dot product of unit vectors that still counts as orthogonal, e.g. for beam support axes, dimensionless |
 | [`get_default_r_max`](@ref) | `100` | rays per beam, the `r_max` of [`solve_system!`](@ref) |
 | [`get_default_depth_max`](@ref) | `100` | branching levels of the beam tree, the `depth_max` of [`solve_system!`](@ref) |
-| [`get_power_cutoff`](@ref) | `0` | fraction of the power of the root beam below which a split-off child beam is not traced |
+| [`get_power_cutoff`](@ref) | `0` | fraction of the power of the root beam below which a child beam is not traced, the `power_cutoff` of [`solve_system!`](@ref) |
 | [`get_default_wavelength`](@ref) | `1e-6` | wavelength in \[m\] |
 | [`get_default_waist`](@ref) | `1e-3` | beam waist radius in \[m\] |
 | [`get_default_power`](@ref) | `1e-3` | beam power in \[W\] |

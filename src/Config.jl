@@ -70,9 +70,8 @@ const power_cutoff = @load_preference("power_cutoff", 0.0)
 """
     get_power_cutoff()
 
-Returns the fraction of the power of the root beam below which a child beam that a surface model
-splits off is not traced, e.g. the later passes between two partial mirrors. Beams without a power,
-e.g. of `Ray`s, are bounded by `depth_max` of `solve_system!` only.
+Returns the default of the keyword `power_cutoff` of `solve_system!`: the fraction of the power of the
+root beam below which a child beam is not traced, e.g. the later passes between two partial mirrors.
 Defaults to `0`, every child is traced (configurable via the `power_cutoff` preference).
 """
 get_power_cutoff() = power_cutoff
