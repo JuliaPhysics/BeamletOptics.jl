@@ -32,7 +32,7 @@ const mm = 1e-3
 λ_cut, n_eff = 650e-9, 1.85   # edge at normal incidence, effective index of the filter
 edge(θ) = λ_cut * sqrt(1 - sin(θ)^2 / n_eff^2)
 
-longpass = SpectralCoating((λ, θ) -> λ > edge(θ) ? 0.0 : 1.0; splitting = BMO.Dominant())
+longpass = SpectralCoating((λ, θ) -> λ > edge(θ) ? 0.0 : 1.0; splitting = Dominant())
 nothing # hide
 ```
 

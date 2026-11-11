@@ -24,7 +24,7 @@ const BMO = BeamletOptics
 
 λ0 = 550e-9
 lens = SphericalLens(50e-3, -50e-3, 5e-3, 25e-3, ConstantRefractiveIndex(1.52))
-ar = ThinFilmCoating(QuarterWaveLayer(ConstantRefractiveIndex(1.38), λ0); splitting = BMO.Dominant())
+ar = ThinFilmCoating(QuarterWaveLayer(ConstantRefractiveIndex(1.38), λ0); splitting = Dominant())
 surface_model!(lens, FrontFace(), ar)
 surface_model!(lens, BackFace(), ar)
 surface_model!(lens, MaskedFace(FrontFace(), BMO.CylinderSDF(3e-3, 10e-3)), MirrorCoating())  # coated first wins: AR
@@ -53,7 +53,7 @@ solve_system!(System([lens, dichroic]), beam)
 | `SurfaceStack(elements...)` | thin elements on top of each other, **listed from the substrate outward**; reflections between them add coherently. Elements: `BeamsplitterCoating`, `MirrorCoating`, `AntireflectionCoating`, `SpectralCoating`, `Retarder`, `ReflectivePolarizer`, `SurfaceStack` (not `ThinFilmCoating`) |
 
 - Splitting coatings (`BeamsplitterCoating`, `SpectralCoating`, `ThinFilmCoating`) trace the reflected and
-  the transmitted light as `children` `[transmitted, reflected]` by default; `splitting = BMO.Dominant()`
+  the transmitted light as `children` `[transmitted, reflected]` by default; `splitting = Dominant()`
   (keyword of `SpectralCoating` and `ThinFilmCoating`) traces only the stronger part, e.g. for AR coatings.
 - Every split doubles the beams: bound the tree with the keywords `power_cutoff` (fraction of the root
   power, e.g. `solve_system!(system, beam; power_cutoff = 1e-4)`) or `depth_max` of `solve_system!`.

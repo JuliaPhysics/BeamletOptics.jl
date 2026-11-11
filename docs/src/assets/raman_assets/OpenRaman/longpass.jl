@@ -33,7 +33,7 @@ function LongpassDichroicMirror(diameter::D, thickness::T, n::BMO.AbstractRefrac
     TT = promote_type(D, T)
     shape = BMO.PlanoSurfaceSDF(TT(thickness), TT(diameter))
     lpm = LongpassDichroicMirror(shape, n, BMO.FaceModels())
-    longpass = SpectralCoating((λ, θ) -> λ < cuton ? 1.0 : 0.0; splitting = BMO.Dominant())
+    longpass = SpectralCoating((λ, θ) -> λ < cuton ? 1.0 : 0.0; splitting = Dominant())
     surface_model!(lpm, FrontFace(), longpass)
     return lpm
 end

@@ -17,7 +17,7 @@ using BeamletOptics
 
 λ0 = 550e-9
 lens = SphericalLens(50e-3, -50e-3, 5e-3, 25e-3, ConstantRefractiveIndex(1.52))
-ar = ThinFilmCoating(QuarterWaveLayer(ConstantRefractiveIndex(1.38), λ0); splitting = BeamletOptics.Dominant())
+ar = ThinFilmCoating(QuarterWaveLayer(ConstantRefractiveIndex(1.38), λ0); splitting = Dominant())
 surface_model!(lens, FrontFace(), ar)
 surface_model!(lens, BackFace(), ar)
 
@@ -102,7 +102,7 @@ transmitted light follows from the design as well.
 TiO2, MgF2 = ConstantRefractiveIndex(2.35), ConstantRefractiveIndex(1.38)
 
 # Single-layer anti-reflection coating: R ≈ 1.3 % on glass instead of 4.3 %
-ar = ThinFilmCoating(QuarterWaveLayer(MgF2, λ0); splitting = BeamletOptics.Dominant())
+ar = ThinFilmCoating(QuarterWaveLayer(MgF2, λ0); splitting = Dominant())
 
 # Quarter-wave mirror (HL)⁸H, from the substrate outward: R > 99.9 % at λ0
 hr = ThinFilmCoating(QuarterWaveLayer(TiO2, λ0),
@@ -112,7 +112,7 @@ nothing # hide
 
 By default a thin-film coating traces both the reflected and the transmitted light as child beams. For a
 coating whose weak part is of no interest, e.g. an anti-reflection coating, `splitting =
-BeamletOptics.Dominant()` traces the stronger part only.
+Dominant()` traces the stronger part only.
 
 ```@docs; canonical=false
 ThinFilmCoating

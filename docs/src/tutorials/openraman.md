@@ -221,7 +221,7 @@ the beam. The constructor puts it on the front face of the plate:
 function LongpassDichroicMirror(diameter, thickness, n, cuton)
     shape = BMO.PlanoSurfaceSDF(thickness, diameter)
     lpm = LongpassDichroicMirror(shape, n, BMO.FaceModels())
-    longpass = SpectralCoating((λ, θ) -> λ < cuton ? 1.0 : 0.0; splitting = BMO.Dominant())
+    longpass = SpectralCoating((λ, θ) -> λ < cuton ? 1.0 : 0.0; splitting = Dominant())
     surface_model!(lpm, FrontFace(), longpass)
     return lpm
 end

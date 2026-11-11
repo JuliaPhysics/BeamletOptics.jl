@@ -286,8 +286,11 @@ flowchart TB
 BeamletOptics.AbstractMedium
 BeamletOptics.IsotropicMedium
 BeamletOptics.medium
+BeamletOptics.SystemMedium
 BeamletOptics.transition
 BeamletOptics.Transition
+BeamletOptics.medium_in
+BeamletOptics.medium_out
 ```
 
 Every ray carries the bodies that enclose it, which the transitions update. Hence the medium behind a boundary is the body around the one that the ray leaves, e.g. the water of a cuvette around a lens:
@@ -408,6 +411,7 @@ flowchart TB
 ```@docs; canonical=false
 BeamletOptics.interact3d(::BeamletOptics.AbstractSystem, ::BeamletOptics.AbstractSurfaceModel, ::BeamletOptics.Transition, ::BeamletOptics.Beam, ::BeamletOptics.AbstractRay)
 BeamletOptics.BoundaryChannel
+BeamletOptics.amplitude
 BeamletOptics.AbstractSide
 BeamletOptics.Transmitted
 BeamletOptics.Reflected
