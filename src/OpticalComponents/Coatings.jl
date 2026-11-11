@@ -64,9 +64,11 @@ perpendicular to the plane of incidence, `p_d = d × s` and `p_r = r × s`.
 - `d`, `r`: the incident and the reflected direction
 - `s`, `p_d`, `p_r`: the s- and p-vectors of both directions
 - `facing`: whether the ray comes from the front of the element, see [`isfacing`](@ref)
-- `R`: the orientation of the part that carries the element, whose local frame its axes refer to
+- `carrier`: the hit of the surface that carries the element, whose part gives the local frame of the
+  axes of an element, see [`jones_angle`](@ref)
 - `λ`: the wavelength in \\[m\\]
-- `θ`: the angle of incidence in \\[rad\\]
+- `θ`: the angle of incidence in \\[rad\\], in the medium before the boundary
+- `θ_air`: the angle of incidence in air of the same Snell invariant `n sin θ`, `π/2` beyond it
 """
 struct IncidenceFrame{T}
     d::SVector{3, T}
@@ -75,9 +77,10 @@ struct IncidenceFrame{T}
     p_d::SVector{3, T}
     p_r::SVector{3, T}
     facing::Bool
-    R::SMatrix{3, 3, T, 9}
+    carrier::Intersection{T}
     λ::T
     θ::T
+    θ_air::T
 end
 
 function IncidenceFrame(t::Transition, ray::AbstractRay{T}) where {T}
@@ -87,10 +90,15 @@ function IncidenceFrame(t::Transition, ray::AbstractRay{T}) where {T}
     # The s-vector of the channels, see transfer
     s = s_vector(d, r, SVector{3, T}(normal3d(intersection(ray))...))
     θ = acos(min(abs(cos_angle3d(d, normal)), one(T)))
-    R = SMatrix{3, 3, T, 9}(orientation(part_of(carrier(t))))
-    return IncidenceFrame{T}(d, r, s, cross(d, s), cross(r, s), isfacing(t, ray), R,
-        T(wavelength(ray)), θ)
+    θ_air = asin(min(refractive_index_in(t) * sin(θ), one(T)))
+    return IncidenceFrame{T}(d, r, s, cross(d, s), cross(r, s), isfacing(t, ray),
+        carrier(t)::Intersection{T}, T(wavelength(ray)), θ, θ_air)
 end
+
+# The `frame` of an element on the surface of the hit `carrier`, from the side given by `facing`
+side_frame(frame::IncidenceFrame{T}, facing::Bool, carrier::Intersection{T}) where {T} =
+    IncidenceFrame{T}(frame.d, frame.r, frame.s, frame.p_d, frame.p_r, facing, carrier, frame.λ, frame.θ,
+        frame.θ_air)
 
 scattering(element::AbstractThinElement, ::IncidenceFrame) =
     error(lazy"scattering not defined for $(typeof(element))")
@@ -144,7 +152,7 @@ The angle of the `axis` of an element, in the local frame of its part, in the s-
 `frame` with the p-vector `p`: of its projection onto the plane transverse to the ray.
 """
 function jones_angle(frame::IncidenceFrame, axis::AbstractVector, p::AbstractVector)
-    a = frame.R * axis
+    a = orientation(part_of(frame.carrier)) * axis
     return atan(dot(a, p), dot(a, frame.s))
 end
 
@@ -274,8 +282,11 @@ AntireflectionCoating() = BeamsplitterCoating(0)
     SpectralCoating(λs, Rs; splitting = AllChannels())
 
 A lossless coating with the power reflectance `R(λ, θ)` of the wavelength `λ` in \\[m\\] and the
-angle of incidence `θ` in \\[rad\\], e.g. a dichroic mirror, an edge filter or a datasheet curve; it
-transmits `1 - R`. With two functions, `Rs` and `Rp` are the reflectances of the s- and
+angle of incidence in air `θ` in \\[rad\\], e.g. a dichroic mirror, an edge filter or a datasheet
+curve; it transmits `1 - R`. A thin film responds to the Snell invariant `n sin θ` of the ray only,
+the same on both of its sides, hence `θ` is the angle in air of this invariant, as datasheets give it:
+for a ray at the angle `θ₁` in a medium of the index `n₁`, `sin θ = n₁ sin θ₁`, and `θ = π/2` for a
+ray beyond the critical angle of air. With two functions, `Rs` and `Rp` are the reflectances of the s- and
 p-components, e.g. of a polarizing beamsplitter coating. A table of the reflectances `Rs` at the
 wavelengths `λs` is interpolated linearly and does not depend on the angle; beyond the table its
 first or last value holds.
@@ -302,8 +313,22 @@ SpectralCoating(λs::AbstractVector{<:Real}, Rs::AbstractVector{<:Real}; kwargs.
 splitting_of(coating::SpectralCoating) = coating.splitting
 
 function scattering(coating::SpectralCoating, frame::IncidenceFrame)
-    Rs, Rp = coating.Rs(frame.λ, frame.θ), coating.Rp(frame.λ, frame.θ)
+    Rs, Rp = coating.Rs(frame.λ, frame.θ_air), coating.Rp(frame.λ, frame.θ_air)
     return lossless_scattering(frame, sqrt(Rs), sqrt(Rp), sqrt(1 - Rs), sqrt(1 - Rp))
+end
+
+"""
+    PolarizingCoating(Rs = 1, Rp = 0)
+
+An ideal polarizing beamsplitter coating: a lossless [`SpectralCoating`](@ref) that reflects the
+s-component of the field with the power reflectance `Rs` and the p-component with `Rp`, at all
+wavelengths and angles. The s-component is perpendicular to the plane of incidence. Beams without
+polarization are split with the mean reflectance.
+"""
+function PolarizingCoating(Rs::Real = 1, Rp::Real = 0)
+    0 ≤ Rs ≤ 1 && 0 ≤ Rp ≤ 1 ||
+        throw(ArgumentError(lazy"the reflectances of a PolarizingCoating must lie in [0, 1], not $Rs, $Rp"))
+    return SpectralCoating((λ, θ) -> Rs, (λ, θ) -> Rp)
 end
 
 """
@@ -327,6 +352,15 @@ function Retarder(Γ::Real, fast_axis::AbstractVector{<:Real}; λ0::Nullable{Rea
     T = float(promote_type(typeof(Γ), eltype(fast_axis)))
     return Retarder(T(Γ), SVector{3, T}(normalize(fast_axis)), isnothing(λ0) ? nothing : T(λ0))
 end
+
+"""
+    fast_axis(layer::CoatingLayer)
+
+Returns the unit vector, in global coordinates, of the fast axis of the [`Retarder`](@ref) of the
+`layer`, e.g. of a [`QuarterWavePlate`](@ref). Its sign is arbitrary, since it is an axis.
+"""
+fast_axis(layer::CoatingLayer{T, S, <:Retarder}) where {T, S} =
+    normalize(orientation(layer) * surface_model(layer).fast_axis)
 
 """Returns the retardance of the `retarder` in \\[rad\\] at the wavelength `λ` in \\[m\\]."""
 retardance(retarder::Retarder{T, Nothing}, ::Real) where {T} = retarder.Γ
@@ -577,4 +611,52 @@ function channels(::FresnelGhosts, t::Transition, ray::AbstractRay, cs)
     frame = IncidenceFrame(t, ray)
     return (transfer(transmitted, transmitted.P, channel_amplitude(ray, frame, power_jones(Ts, Tp), 1)),
         transfer(reflected, reflected.P, channel_amplitude(ray, frame, power_jones(Rs, Rp), 1)))
+end
+
+"""
+    CementedCoatings(left, left_hit, entered, entered_hit)
+
+The thin elements on the two touching faces of a cemented boundary, e.g. a beamsplitter coating on
+one prism of a cube and an anti-reflection coating on the other. The ray meets the coating of the body
+that it leaves first, from the substrate side, then the coating of the body that it enters, from its
+front; each element acts in the local frame of its own body, and the reflections between them add
+coherently, see [`cascade`](@ref). Built by the solver for such a boundary, see
+[`surface_model(::Transition)`](@ref).
+"""
+struct CementedCoatings{L <: AbstractThinElement, E <: AbstractThinElement, T} <: AbstractThinElement
+    left::L
+    left_hit::Intersection{T}
+    entered::E
+    entered_hit::Intersection{T}
+end
+
+splitting_of(c::CementedCoatings) = either_splitting(splitting_of(c.left), splitting_of(c.entered))
+
+# Split if one of two models splits
+either_splitting(::Dominant, ::Dominant) = Dominant()
+either_splitting(::AbstractSplitting, ::AbstractSplitting) = AllChannels()
+
+scattering(c::CementedCoatings, frame::IncidenceFrame) =
+    cascade(scattering(c.left, side_frame(frame, false, c.left_hit)),
+        scattering(c.entered, side_frame(frame, true, c.entered_hit)))
+
+"""
+    cemented_model(left, entered, t::Transition)
+
+The surface model of a boundary at which the face of the body that the ray leaves carries the model
+`left` and the face of the body that it enters the model `entered`: both thin elements as
+[`CementedCoatings`](@ref), two [`ThinFilmCoating`](@ref)s as one stack of all their layers. Other pairs
+cannot be combined: the model `left` acts, and a warning is issued once.
+"""
+cemented_model(left::AbstractThinElement, entered::AbstractThinElement, t::Transition) =
+    CementedCoatings(left, t.exiting, entered, t.entering)
+
+# The layers of the entered body are met from their outside, i.e. in reverse order
+cemented_model(left::ThinFilmCoating, entered::ThinFilmCoating, ::Transition) =
+    ThinFilmCoating((left.layers..., reverse(entered.layers)...),
+        either_splitting(left.splitting, entered.splitting))
+
+function cemented_model(left::AbstractSurfaceModel, ::AbstractSurfaceModel, ::Transition)
+    @warn "The coatings of two cemented faces cannot be combined, only the coating of the body that the ray leaves acts" maxlog = 1
+    return left
 end

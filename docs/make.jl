@@ -107,6 +107,8 @@ makedocs(;
                 "Lens groups"               => joinpath("examples", "lens_groups.md"),
                 "Double slit"               => joinpath("examples", "double_slit.md"),
                 "Point spread functions"    => joinpath("examples", "psf.md"),
+                "Fabry-Pérot and Fizeau"    => joinpath("examples", "fabry_perot.md"),
+                "Wedge light trap"          => joinpath("examples", "wolit_trap.md"),
             ],
         ],
         "Basics" => Any[

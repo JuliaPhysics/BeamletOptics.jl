@@ -60,3 +60,32 @@ LinearPolarizer
 RoundLinearPolarizer
 transmission_axis(::LinearPolarizer)
 ```
+
+## Wave plates
+
+A [`QuarterWavePlate`](@ref) or [`HalfWavePlate`](@ref) is an infinitesimally thin retarder film, a
+[`CoatingLayer`](@ref) with a [`Retarder`](@ref). Its fast axis lies along x; as in the lab, the plate is
+turned in its mount about its normal to set the angle of the fast axis.
+
+```@example waveplates
+using BeamletOptics
+const mm = 1e-3
+
+hwp = HalfWavePlate(25.4mm)
+yrotate3d!(hwp, deg2rad(22.5))   # turns linear x by 45°
+translate3d!(hwp, [0, 20mm, 0])
+
+beam = Beam(PolarizedRay([0, 0, 0], [0, 1, 0], 633e-9, [1, 0, 0]))
+solve_system!(System([hwp]), beam)
+BeamletOptics.polarization(last(rays(beam)))
+```
+
+A zero-order plate is a quarter or half wave at its design wavelength `λ0` only. Films that act on a
+face of a component, e.g. a retarder under a reflective polarizer, are described on the
+[Coatings](@ref) page.
+
+```@docs; canonical=false
+QuarterWavePlate
+HalfWavePlate
+fast_axis
+```

@@ -307,3 +307,36 @@ end
 
 child_beamlet(::AstigmaticGaussianBeamlet, starts::Tuple, ::Number) =
     AstigmaticGaussianBeamlet(map(Beam, starts)...)
+
+"""
+    interact3d(system, ::SingleShape, object, beamlet, ray_id)
+
+The interaction of a [`GaussianBeamlet`](@ref) or an [`AstigmaticGaussianBeamlet`](@ref) with an
+`object` without a beamlet method of its own. At a boundary whose [`surface_model`](@ref) splits (see
+[`splitting_of`](@ref)), e.g. a [`BeamsplitterCoating`](@ref) of a thin layer or of a coated face, the
+model splits the whole beamlet. Otherwise the `object` interacts with each component ray, e.g. a body
+refracts each at its own hit, also by an own method for rays. A [`MultiShape`](@ref) object hands the
+beamlet to the part that the chief ray hits.
+"""
+function interact3d(system::AbstractSystem, ::SingleShape, object::AbstractObject,
+        beamlet::GaussianBeamlets, ray_id::Int)
+    isboundary(object) || return component_interaction(system, object, beamlet, ray_id)
+    t = transition(system, beamlet, ray_id)
+    return boundary_interaction(system, splitting_of(surface_model(t)), object, t, beamlet, ray_id)
+end
+
+# A boundary that splits: the model splits the whole beamlet
+boundary_interaction(system::AbstractSystem, ::AllChannels, ::AbstractObject, t::Transition,
+    beamlet::GaussianBeamlets, ray_id::Int) = interact3d(system, t, beamlet, ray_id)
+boundary_interaction(system::AbstractSystem, ::Dominant, object::AbstractObject, ::Transition,
+    beamlet::GaussianBeamlets, ray_id::Int) = component_interaction(system, object, beamlet, ray_id)
+
+# Each component ray of the beamlet interacts with the object at its own hit
+component_interaction(system::AbstractSystem, object::AbstractObject, beamlet::GaussianBeamlets,
+    ray_id::Int) = beamlet_interaction(b -> interact3d(system, object, b, rays(b)[ray_id]), beamlet)
+
+"""
+Returns `true` if the `object` acts at a boundary without an `interact3d` method of its own: a body,
+which declares its [`medium`](@ref), or a thin layer, which declares its [`surface_model`](@ref).
+"""
+isboundary(object::AbstractObject) = !isnothing(medium(object)) || !isnothing(surface_model(object))

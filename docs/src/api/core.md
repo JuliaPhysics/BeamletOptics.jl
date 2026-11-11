@@ -323,7 +323,7 @@ The diagram shows how the model of a boundary is found (green: implemented by a 
 flowchart TB
     T(["<b>surface_model</b>(t)"])
     L{"thin layer at the<br/>boundary with a model?"}
-    C{"<b>iscoated</b>(hit)<br/>faces of the body left,<br/>then entered, carry models?"}
+    C{"<b>iscoated</b>(hit)<br/>faces of the body left<br/>and entered carry models?"}
     F["<b>face_model</b>(part, hit, point)<br/>hit in the local frame of the part"]
     O{"<b>isonface</b>(face, part, hit, point, normal)<br/>each entry of <b>face_models</b>(part),<br/>in the order coated"}
     N["native face of the hit<br/><b>face</b>(hit), set by the shape"]
@@ -337,7 +337,9 @@ flowchart TB
     C -- yes --> F --> O
     O -.-> N
     O -.-> G
-    O -- "first match" --> M
+    O -- "first match" --> P{"both bodies<br/>coated?"}
+    P -- "one" --> M
+    P -- "both" --> CC["<b>cemented_model</b><br/>CementedCoatings or one<br/>ThinFilmCoating of all layers"] --> M
     O -- "no match" --> S
     C -- no --> S --> M
 
@@ -345,9 +347,9 @@ flowchart TB
     classDef green fill:#38982626,stroke:#389826,stroke-width:2px
     classDef purple fill:#9558B226,stroke:#9558B2,stroke-width:2px
     classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
-    class F,S blue
+    class F,S,CC blue
     class N,G green
-    class L,C,O purple
+    class L,C,O,P purple
     class T,M terminal
 ```
 
@@ -451,6 +453,8 @@ BeamletOptics.mirror_jones
 BeamletOptics.jones_angle
 BeamletOptics.channel_amplitude
 BeamletOptics.lossless_scattering
+BeamletOptics.CementedCoatings
+BeamletOptics.cemented_model
 ```
 
 The models of BMO:

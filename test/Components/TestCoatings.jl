@@ -143,6 +143,17 @@ end
         solve_system!(system, beam)
         @test abs.(BMO.direction(last(rays(beam)))) ≈ dir
     end
+    # The angle in air of a ray in glass: a filter that reflects above 30° in air reflects a ray at
+    # 25° in glass (sin = 0.634 in air) but passes one at 15° (sin = 0.388)
+    plate = RectangularCompensatorPlate(30mm, 30mm, 5mm, ConstantRefractiveIndex(1.5))
+    translate3d!(plate, [0, 50mm, 0])
+    surface_model!(plate, FlatFace([0, 1, 0]), SpectralCoating((λ, θ) -> θ > deg2rad(30) ? 1.0 : 0.0))
+    for (θ_glass, reflected) in ((deg2rad(25), true), (deg2rad(15), false))
+        θ_air = asin(1.5 * sin(θ_glass))
+        beam = Beam([0, 45mm, 0], [sin(θ_air), cos(θ_air), 0], λ0)
+        solve_system!(System([plate]), beam)
+        @test (BMO.direction(rays(beam)[3])[2] < 0) == reflected
+    end
     # A tabulated 50:50 point splits
     split = CoatingLayer(BMO.RectangularFlatMesh(25mm, 25mm),
         SpectralCoating([400e-9, 700e-9], [0.5, 0.5]))

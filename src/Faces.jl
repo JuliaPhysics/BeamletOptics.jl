@@ -109,10 +109,12 @@ the face, between the media on both sides; the layers of a coating lie on the ou
 Where several faces of the part apply to a hit, e.g. a [`MaskedFace`](@ref) and the face around it,
 the face that was coated first acts.
 
-!!! warning "Cemented faces"
-    Where two coated faces touch, e.g. the cemented faces of a doublet, only the coating of the body
-    that the ray leaves acts, and a warning is issued once. Coat one of the two faces, with a
-    [`SurfaceStack`](@ref) or a [`ThinFilmCoating`](@ref) of all layers.
+!!! info "Cemented faces"
+    Where two coated faces touch, e.g. the cemented faces of a doublet, both coatings act, each from
+    its own body outward, see [`CementedCoatings`](@ref): two thin elements are cascaded, two
+    [`ThinFilmCoating`](@ref)s form one stack. Other pairs, e.g. a thin-film design on one face and an
+    ideal mirror on the other, cannot be combined: the coating of the body that the ray leaves acts,
+    and a warning is issued once.
 
 ```julia
 lens = SphericalLens(50e-3, -50e-3, 5e-3, 25e-3, ConstantRefractiveIndex(1.5))

@@ -61,7 +61,7 @@ interact3d(system::AbstractSystem, object::AbstractObject, beam::AbstractBeam,
 # A body or a thin layer acts at the boundary, see `surface_model`; any other object blocks the beam
 function interact3d(system::AbstractSystem, ::SingleShape, object::AbstractObject, beam::AbstractBeam,
         ray::AbstractRay)
-    if isnothing(medium(object)) && isnothing(surface_model(object))
+    if !isboundary(object)
         warn_no_interact3d(shape_trait_of(object), object, ray)
         return nothing
     end

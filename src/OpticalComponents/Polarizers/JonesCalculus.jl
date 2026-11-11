@@ -28,3 +28,4 @@ abstract type AbstractJonesPolarizer{T} <: AbstractObject{T} end
 
 include("PolarizationFilter.jl")
 include("LinearPolarizer.jl")
+include("Waveplates.jl")
