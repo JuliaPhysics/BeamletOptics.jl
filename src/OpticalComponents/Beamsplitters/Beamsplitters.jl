@@ -20,9 +20,9 @@ The `interact3d` function should then return `nothing` in order to stop the trac
 
 ## Functions
 
-- `interact3d`: see above
-- `_beamsplitter_transmitted_beam`: optional helper function
-- `_beamsplitter_reflected_beam`: optical helper function
+- `interact3d`: see above. A splitting surface is a thin layer whose [`surface_model`](@ref) is a
+  [`BeamsplitterCoating`](@ref), e.g. a [`ThinBeamsplitter`](@ref); a composite holds one, e.g. a
+  [`CubeBeamsplitter`](@ref)
 """
 abstract type AbstractBeamsplitter{T} <: AbstractObject{T} end
 

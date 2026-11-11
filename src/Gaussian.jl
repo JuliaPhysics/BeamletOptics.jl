@@ -79,9 +79,9 @@ Uses the hint of the `chief` beam.
 - `divergence`: [`Beam`](@ref) interaction
 """
 struct GaussianBeamletInteraction{R <: Real} <: AbstractInteraction
-    chief::BeamInteraction{R}
-    waist::BeamInteraction{R}
-    divergence::BeamInteraction{R}
+    chief::BeamInteraction{R, Ray{R}}
+    waist::BeamInteraction{R, Ray{R}}
+    divergence::BeamInteraction{R, Ray{R}}
 end
 
 hint(i::GaussianBeamletInteraction) = hint(i.chief)
@@ -105,30 +105,6 @@ function parent!(child::GaussianBeamlet, parent::GaussianBeamlet)
     child.parent = parent
     child.chief.parent = parent.chief
     return nothing
-end
-
-"""
-    interact3d(system::AbstractSystem, object::AbstractObject, gauss::GaussianBeamlet{R}, ray_id::Int)
-
-Generic dispatch for the [`interact3d`](@ref) method of a [`GaussianBeamlet`](@ref) with an [`AbstractObject`](@ref).
-Unless a more concrete implementation exists, the interaction of the Gaussian is assumed to be the interaction of the
-chief, waist and divergence rays with an object.
-
-# Returns
-
-The `interact3d` method for the [`GaussianBeamlet`](@ref) must return a `GaussianBeamletInteraction`.
-"""
-function interact3d(system::AbstractSystem,
-        object::AbstractObject,
-        gauss::GaussianBeamlet{R},
-        ray_id::Int) where {R}
-    i_c = interact3d(system, object, gauss.chief, rays(gauss.chief)[ray_id])
-    i_w = interact3d(system, object, gauss.waist, rays(gauss.waist)[ray_id])
-    i_d = interact3d(system, object, gauss.divergence, rays(gauss.divergence)[ray_id])
-    if any(isnothing, (i_c, i_w, i_d))
-        return nothing
-    end
-    return GaussianBeamletInteraction{R}(i_c, i_w, i_d)
 end
 
 function Base.push!(gauss::GaussianBeamlet{T},

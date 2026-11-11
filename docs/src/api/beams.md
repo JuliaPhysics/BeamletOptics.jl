@@ -34,7 +34,7 @@ flowchart TB
 
 ## Tracing a beamlet
 
-Components define [`BeamletOptics.interact3d`](@ref) for a `Beam` and one of its rays; a beamlet hands this call on to each of its component beams, unless the component defines a method for the beamlet itself. The diagram shows the tracing loop of a `GaussianBeamlet` and where the methods of a component author are called; an `AstigmaticGaussianBeamlet` runs the same loop with its nine beams and also checks its complex invariant:
+Components define [`BeamletOptics.interact3d`](@ref) for a `Beam` and one of its rays; a beamlet hands this call on to each of its component beams, unless the component defines a method for the beamlet itself or is a thin layer, whose surface model handles the whole beamlet, see [Transitions](@ref). The diagram shows the tracing loop of a `GaussianBeamlet` and where the methods of a component author are called; an `AstigmaticGaussianBeamlet` runs the same loop with its nine beams and also checks its complex invariant:
 
 ```mermaid
 flowchart TB
@@ -43,7 +43,8 @@ flowchart TB
     C["<b>check hits</b><br/>every ray hit,<br/>all the same shape?"]
     E1(["stop"])
     I["<b>interact3d(system, object, gauss, id)</b><br/><i>dispatch on object</i>"]
-    OWN["<b>method for the beamlet</b><br/>e.g. ThinBeamsplitter: children!<br/>Detector: push! hit"]
+    OWN["<b>method for the beamlet</b><br/>e.g. Detector: push! hit"]
+    MOD["<b>surface model of a thin layer</b><br/>e.g. BeamsplitterCoating: children!"]
     GEN["<b>generic beamlet method</b><br/>one call per component beam"]
     CB["<b>interact3d(system, object, beam, ray)</b><br/><i>method for a Beam</i>"]
     E2(["stop:<br/>an interaction is nothing"])
@@ -59,12 +60,15 @@ flowchart TB
     C -- no --> E1
     C -- yes --> I
     I -- "method for<br/>the object" --> OWN
+    I -- "thin layer" --> MOD
     I -- otherwise --> GEN
     GEN --> CB
     CB -- nothing --> E2
     OWN -- nothing --> E2
     CB -- "3 BeamInteractions" --> GBI
     OWN -- interaction --> GBI
+    MOD -- nothing --> E2
+    MOD -- interaction --> GBI
     GBI --> P --> K
     K -- no --> E3
     K -- yes --> RM
@@ -77,7 +81,7 @@ flowchart TB
     classDef terminal fill:transparent,stroke:#CB3C33,stroke-width:1.5px,stroke-dasharray:4 3
     class T,C,P,K,RM blue
     class I,GEN,GBI purple
-    class OWN,CB green
+    class OWN,CB,MOD green
     class S,E1,E2,E3,E4,AGAIN terminal
 ```
 

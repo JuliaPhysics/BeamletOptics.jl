@@ -10,6 +10,8 @@ Stores data calculated by the [`intersect3d`](@ref) method.
   and the check whether the rays of a beamlet hit the same shape identify the hit part by this reference
 - `t`: length of the ray parametrization in [m]
 - `n`: normal vector at the point of intersection
+- `part`: the object that was hit, a part of `object` if this consists of objects, or `nothing`, see [`part_of`](@ref)
+- `isbody`: whether `part` is a body, i.e. has a [`medium`](@ref), see [`isbody`](@ref)
 - `next`: the next hit of the ray at the same point, or `nothing`, see [`coincident_hits`](@ref)
 
 # Coincident hits
@@ -25,12 +27,14 @@ mutable struct Intersection{T}
     shape::Nullable{AbstractShape}
     t::T
     n::Point3{T}
+    part::Nullable{AbstractObject}
+    isbody::Bool
     next::Union{Nothing, Intersection{T}}
 end
 
 function Intersection(object::Nullable{AbstractObject}, shape::Nullable{AbstractShape}, t::T,
         n::AbstractArray) where {T}
-    return Intersection{T}(object, shape, t, Point3{T}(n), nothing)
+    return Intersection{T}(object, shape, t, Point3{T}(n), nothing, false, nothing)
 end
 
 function Intersection(t::T, n::AbstractArray{T}) where {T}
@@ -58,6 +62,28 @@ function object!(i::Intersection, new::AbstractObject)
 end
 
 object!(::Nothing, ::AbstractObject) = nothing
+
+"""
+    part!(intersection, part) -> intersection
+
+Sets the `part` of the `intersection` and of its [`coincident_hits`](@ref) that have none, i.e. the
+object of the hit shape, and whether it is a body. An object of several objects keeps the parts that
+they set. The type of `part` is known here, hence [`medium`](@ref) is cheap to call. The `part` is
+the object that [`object!`](@ref) has just set; it is read from the hit, so that an immutable object
+is stored once, not boxed again.
+"""
+function part!(i::Intersection, part::AbstractObject)
+    isbody = !isnothing(medium(part))
+    for hit in coincident_hits(i)
+        if isnothing(hit.part)
+            hit.part = hit.object
+            hit.isbody = isbody
+        end
+    end
+    return i
+end
+
+part!(::Nothing, ::AbstractObject) = nothing
 
 Base.length(i::Intersection) = i.t
 
@@ -177,6 +203,8 @@ Subtypes of `AbstractRay` must implement the following:
 - `intersection`: a `Nullable` field that stores the current [`Intersection`] or `nothing`
 - `λ`: wavelength in [m]
 - `n`: refractive index along the ray path
+- `enclosure` (optional): the bodies that enclose the ray, see [`Enclosure`](@ref). Without it, the ray
+  is taken to be in the medium of its refractive index `n`
 
 ## Functions:
 
@@ -234,6 +262,17 @@ wavenumber(ray::AbstractRay) = 2π/wavelength(ray)
 
 refractive_index(ray::AbstractRay) = ray.n
 refractive_index!(ray::AbstractRay, n) = (ray.n = n)
+
+"""
+    enclosure(ray::AbstractRay)
+
+Returns the [`Enclosure`](@ref) of the `ray`, the bodies that enclose it, or `nothing` in the medium of
+the system. A ray type without the field `enclosure` is always taken to be outside of all bodies.
+"""
+enclosure(::AbstractRay) = nothing
+
+"""Sets the [`Enclosure`](@ref) of the `ray`. A ray type without the field `enclosure` ignores it."""
+enclosure!(::AbstractRay, new) = nothing
 
 intersection(ray::AbstractRay) = ray.intersection
 function intersection!(ray::AbstractRay, _intersection::Nullable{Intersection})
@@ -313,7 +352,7 @@ function intersect3d(::SingleShape, object::AbstractObject, ray::AbstractRay)
     # Test bounding sphere first
     intersection = intersect3d(bounding_sphere_of(current_bounding_spheres(), s), s, ray)
     # Ensure that the intersection knows about the object if intersected
-    return object!(intersection, object)
+    return part!(object!(intersection, object), object)
 end
 
 function intersect3d(::MultiShape, object::AbstractObject, ray::AbstractRay)

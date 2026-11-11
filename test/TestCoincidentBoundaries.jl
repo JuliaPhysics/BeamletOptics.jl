@@ -20,10 +20,8 @@ Every expectation is derived without BMO: the vector form of Snell's law and the
 in `follow`, an exact trace through spherical surfaces (`sphere`, `lens_surfaces`), closed-form
 results (plate offset, Fresnel power transmission, ABCD law of Gaussian beams) and physical
 constructions (equal glass = no interface, reversibility of light paths, covariance under rigid
-motion). `@test_broken` marks a case that the current master gets wrong or cannot run; the comment
-names the cause. The tests of this file are the regression base for a generic resolution of
-coincident hits: when one of them starts to pass, `@test_broken` reports it and must be turned
-into `@test`.
+motion). Touching elements need no `Hint`: the solver collects the surfaces at a hit point
+(`coincident_hits`) and derives the media on both sides from them (`transition`).
 =#
 
 #=
@@ -416,11 +414,10 @@ Tests
             ref = follow([plane([0, 0, 0], [0, 1, 0], nA), plane([0, tA, 0], [0, 1, 0], nB),
                     plane([0, tA + tB, 0], [0, 1, 0], 1.0)], p, d)
             err = path_error(beam, ref)
-            # Cause: the plates are separate objects without a Hint. A leaves into air (index of the system), and the
-            # coincident front face of B (zero distance) is not found, so the ray runs through B as if in air.
-            @test_broken agrees(err)
-            @test_broken refractive_index.(rays(beam)) == [1.0, nA, nB, 1.0]
-            @test_broken direction(rays(beam)[3]) ≈ ref.hits[2].dir atol = TOL_DIR
+            # the plates are separate objects: the rear face of A and the front face of B are one boundary
+            @test agrees(err)
+            @test refractive_index.(rays(beam)) == [1.0, nA, nB, 1.0]
+            @test direction(rays(beam)[3]) ≈ ref.hits[2].dir atol = TOL_DIR
         end
 
         @testset "Three touching plates" begin
@@ -433,8 +430,8 @@ Tests
             beam = solve([A, B, C], beam_at(p, d))
             ref = follow([plane([0, 0, 0], [0, 1, 0], nA), plane([0, tA, 0], [0, 1, 0], nB),
                     plane([0, tA + tB, 0], [0, 1, 0], nC), plane([0, tA + tB + tC, 0], [0, 1, 0], 1.0)], p, d)
-            # Cause: as above, every touching face pair is passed in air
-            @test_broken agrees(path_error(beam, ref))
+            # every touching face pair is one boundary
+            @test agrees(path_error(beam, ref))
         end
 
         # first glass into second glass, the second plate `gap` farther
@@ -447,8 +444,8 @@ Tests
                 A, B = plates(gap)
                 beam = solve([A, B], beam_at(p, d))
                 if gap < 1e-9
-                    # Cause: as for exact contact, the touching face pair is passed in air
-                    @test_broken agrees(path_error(beam, follow(touching_surfaces(gap), p, d)))
+                    # touching: the face pair is one glass-glass boundary
+                    @test agrees(path_error(beam, follow(touching_surfaces(gap), p, d)))
                 else
                     @test agrees(path_error(beam, follow(plate_surfaces(gap), p, d)))
                 end
@@ -472,8 +469,8 @@ Tests
                         [(0.0, nA), (tA, 1.0), (tA + gap, nB), (tA + gap + tB, 1.0)]
                 ref = follow(moved_planes(faces), Rm * p + shift, Rm * d)
                 if gap == 0
-                    # Cause: as for exact contact, the touching face pair is passed in air
-                    @test_broken agrees(path_error(beam, ref))
+                    # touching: the face pair is one glass-glass boundary
+                    @test agrees(path_error(beam, ref))
                 else
                     @test agrees(path_error(beam, ref))
                 end
@@ -490,8 +487,8 @@ Tests
                 beam = Beam([0.0, -10mm, 0], [0.0, 1, 0], λ0, [1.0, 0, 0])
                 solve_system!(System([A, B]), beam)
                 if gap == 0
-                    # Cause: as for exact contact, the touching face pair is passed in air
-                    @test_broken flux(last(rays(beam))) ≈ chain_transmission([1.0, nA, nB2, 1.0]) atol = 1e-12
+                    # touching: the face pair is one glass-glass boundary
+                    @test flux(last(rays(beam))) ≈ chain_transmission([1.0, nA, nB2, 1.0]) atol = 1e-12
                 else
                     @test flux(last(rays(beam))) ≈ chain_transmission([1.0, nA, 1.0, nB2, 1.0]) atol = 1e-12
                 end
@@ -740,9 +737,8 @@ Tests
             # the reflection: position and direction by the law of reflection
             @test position(r[3]) ≈ ref.hits[2].pos atol = TOL_POS
             @test direction(r[3]) ≈ ref.hits[2].dir atol = TOL_DIR
-            # Cause: `interact3d(::DoubletLens)` hints the back lens, whose refraction code reports the back index n2
-            # for the reflected ray, which is still in the front lens (n1) and must not enter the back lens.
-            @test_broken refractive_index(r[3]) == n1
+            # the reflected ray stays in the front lens (n1)
+            @test refractive_index(r[3]) == n1
             # the reflected ray hits the cemented surface a second time: the second event of the reference
             ref2 = follow([sphere(6mm, R2, n2), plane([0, 0, 0], [0, 1, 0], 1.0)], ref.hits[2].pos, ref.hits[2].dir; n0 = n1)
             @test ref2.hits[1].tir
@@ -793,8 +789,8 @@ Tests
                     @test agrees(err)
                 else
                     @test !tir
-                    # Cause: without a Hint the front prism refracts into air (system index) instead of into the touching back prism
-                    @test_broken agrees(err)
+                    # without a Hint the front prism refracts into the touching back prism
+                    @test agrees(err)
                 end
             end
         end
@@ -875,9 +871,9 @@ Tests
             # the coating is in air, 2 mm in front of the substrate: the transmitted light travels in air, enters, leaves
             @test position(first(rays(rf))) ≈ [0, -gap, 0] atol = TOL_POS
             @test direction(first(rays(rf))) ≈ [0, -1, 0] atol = TOL_DIR
-            # Cause: the coating interaction assumes the substrate behind it and sets its index for the transmitted ray
-            @test_broken refractive_index(first(rays(tr))) == 1.0
-            @test_broken refractive_index.(rays(tr)) == [1.0, n, 1.0]
+            # the transmitted ray stays in air between the coating and the substrate
+            @test refractive_index(first(rays(tr))) == 1.0
+            @test refractive_index.(rays(tr)) == [1.0, n, 1.0]
             # and back
             translate3d!(plate_coating(pbs), [0, gap, 0])
             @test flatten(solve([pbs], beam_at([0, -20mm, 0], [0, 1, 0]))) ≈ before atol = TOL_POS
@@ -938,17 +934,17 @@ Tests
             d = [sin(θ), cos(θ), 0]
             p = [0.0, -10mm, 0.0]
             beam = solve([A, bs, B], beam_at(p, d))
-            # Cause: with three coincident hits the splitter at zero distance is not found: the beam is not split.
-            @test_broken length(leaves(beam)) == 2
+            # three coincident hits: the splitter between the plates splits the beam
+            @test length(leaves(beam)) == 2
             # reference of the transmitted branch: A into B (Snell) and out of B, and of the reflected one: back out of A
             ref_t = follow([plane([0, 0, 0], [0, 1, 0], nA), plane([0, tA, 0], [0, 1, 0], nB),
                     plane([0, tA + tB, 0], [0, 1, 0], 1.0)], p, d)
             ref_r = follow([plane([0, 0, 0], [0, 1, 0], nA), plane([0, tA, 0], [0, 1, 0], nA; mirror = true),
                     plane([0, 0, 0], [0, 1, 0], 1.0)], p, d)
             # every ray in position, direction and index: the exit directions alone are the same with the splitter in air
-            @test_broken agrees(path_error(beam, (; hits = ref_t.hits[1:1])))
-            @test_broken any(b -> agrees(ray_error(rays(b), ref_t.hits[2:3])), leaves(beam))
-            @test_broken any(b -> agrees(ray_error(rays(b), ref_r.hits[2:3])), leaves(beam))
+            @test agrees(path_error(beam, (; hits = ref_t.hits[1:1])))
+            @test any(b -> agrees(ray_error(rays(b), ref_t.hits[2:3])), leaves(beam))
+            @test any(b -> agrees(ray_error(rays(b), ref_r.hits[2:3])), leaves(beam))
         end
 
         @testset "Triplet: two cemented surfaces in sequence" begin
@@ -1369,6 +1365,256 @@ holds(shapes, s) = any(x -> x === s, shapes)
             end
         end
         @test allocs(5) == allocs(50)
+    end
+end
+
+
+"""The transition of a ray from `p` along `d` at its first hit in the `system`."""
+function transition_at(system, p, d; λ = λ0)
+    ray = Ray(collect(Float64, p), collect(Float64, d), λ)
+    return BMO.with_bounding_spheres(system) do
+        BMO.intersection!(ray, BMO.first_to_interact(BMO.trace_all(system, ray), ray))
+        BMO.transition(system, ray)
+    end
+end
+
+@testset "Transitions" begin
+    @testset "Media" begin
+        @test BMO.refractive_index(BMO.IsotropicMedium(ConstantRefractiveIndex(1.5)), λ0) == 1.5
+        nbk7 = SellmeierEquation(1.03961212, 0.231792344, 1.01046945, 0.00600069867, 0.0200179144, 103.560653)
+        @test BMO.refractive_index(BMO.IsotropicMedium(nbk7), 1e-6) == nbk7(1e-6)
+        lens = SphericalLens(30mm, -30mm, 5mm, 15mm, ConstantRefractiveIndex(1.6))
+        @test BMO.medium(lens) isa BMO.IsotropicMedium
+        @test BMO.refractive_index(BMO.medium(lens), λ0) == 1.6
+        @test isnothing(BMO.medium(RoundPlanoMirror(25.4mm, 5mm)))
+        @test isnothing(BMO.medium(ThinBeamsplitter(10mm)))
+        system = System([lens])
+        @test BMO.medium(system) isa BMO.SystemMedium
+        @test BMO.refractive_index(BMO.medium(system), λ0) == 1.0
+    end
+
+    @testset "Single lens: air into glass, glass into the system medium" begin
+        lens = SphericalLens(30mm, -30mm, 5mm, 15mm, ConstantRefractiveIndex(1.6))
+        system = System([lens])
+        t = transition_at(system, [1mm, -10mm, 0], [0, 1, 0])
+        @test BMO.refractive_index_in(t) == 1.0 && BMO.refractive_index_out(t) == 1.6
+        @test isnothing(t.exiting) && BMO.shape(t.entering) === BMO.shape(lens) && isnothing(t.layer)
+        @test dot(BMO.normal3d(t), [0, 1, 0]) < 0
+        @test BMO.surface_model(t) === BMO.Uncoated()
+        t = transition_at(system, [1mm, 1mm, 0], [0, 1, 0])
+        @test BMO.refractive_index_in(t) == 1.6 && BMO.refractive_index_out(t) == 1.0
+        @test BMO.medium_out(t) isa BMO.SystemMedium
+        @test BMO.shape(t.exiting) === BMO.shape(lens) && isnothing(t.entering)
+    end
+
+    @testset "Cemented surface: from one glass into the other" begin
+        dl = doublet(1.5, 1.7)
+        t = transition_at(System([dl]), [1mm, 2mm, 0], [0, 1, 0])
+        @test BMO.refractive_index_in(t) == 1.5 && BMO.refractive_index_out(t) == 1.7
+        @test BMO.shape(t.exiting) === BMO.shape(dl.front) && BMO.shape(t.entering) === BMO.shape(dl.back)
+        @test BMO.hint_out(t).shape === BMO.shape(dl.back) && BMO.hint_in(t).shape === BMO.shape(dl.front)
+    end
+
+    @testset "Thin layer between two plates, and in air" begin
+        A = RectangularCompensatorPlate(40mm, 40mm, 5mm, ConstantRefractiveIndex(1.7))
+        B = RectangularCompensatorPlate(40mm, 40mm, 3mm, ConstantRefractiveIndex(1.4))
+        translate3d!(B, [0, 5mm, 0])
+        bs = ThinBeamsplitter(40mm, 40mm; reflectance = 0.5)
+        translate3d!(bs, [0, 5mm, 0])
+        t = transition_at(System([A, B, bs]), [0, 2mm, 0], [0, 1, 0])
+        @test BMO.shape(t.layer) === BMO.shape(bs)
+        @test BMO.refractive_index_in(t) == 1.7 && BMO.refractive_index_out(t) == 1.4
+        t = transition_at(System([bs]), [0, 2mm, 0], [0, 1, 0])
+        @test BMO.shape(t.layer) === BMO.shape(bs) && isnothing(t.exiting) && isnothing(t.entering)
+        @test BMO.refractive_index_in(t) == BMO.refractive_index_out(t) == 1.0
+    end
+
+    @testset "Several layers at one point: the closest acts, one warning" begin
+        f1, f2 = PolarizationFilter(20mm), PolarizationFilter(20mm)
+        system = System([f1, f2])
+        @test_logs (:warn, r"Several thin layers") transition_at(system, [0, -10mm, 0], [0, 1, 0])
+    end
+end
+
+
+# a refracting body with its own interact3d, which counts its calls and absorbs every ray
+mutable struct AbsorbingGlass{S <: BMO.AbstractShape{Float64}, N} <: BMO.AbstractRefractiveOptic{Float64, N}
+    shape::S
+    n::N
+    calls::Int
+end
+function BMO.interact3d(::BMO.AbstractSystem, g::AbsorbingGlass, ::Beam, ::BMO.AbstractRay)
+    g.calls += 1
+    return nothing
+end
+
+@testset "Own interact3d methods take precedence" begin
+    # the solver dispatches on the object that was hit; the transition and the surface models are
+    # only the default methods of refracting bodies and thin layers
+    g = AbsorbingGlass(BMO.CuboidMesh(40mm, 5mm, 40mm), ConstantRefractiveIndex(1.5), 0)
+    beam = solve([g], beam_at([20mm, -20mm, 20mm], [0, 1, 0]))
+    @test g.calls == 1
+    @test length(rays(beam)) == 1
+    # it is still a body for the transitions of others: a plate touching it refracts into it
+    @test BMO.medium(g) isa BMO.IsotropicMedium
+end
+
+# Dummy subtypes of the medium and surface model contracts, without their hooks
+struct BareMedium <: BMO.AbstractMedium end
+struct BareModel <: BMO.AbstractSurfaceModel end
+
+@testset "Fallbacks of the medium and surface model contracts" begin
+    @test_throws ErrorException BMO.refractive_index(BareMedium(), λ0)
+    # A surface model without interact3d warns and blocks the beam
+    plate = BMO.Lens(BMO.CuboidMesh(40mm, 5mm, 40mm), ConstantRefractiveIndex(1.5))
+    p, d = [20mm, -20mm, 20mm], [0.0, 1.0, 0.0]
+    t = transition_at(System([plate]), p, d)
+    ray = Ray(p, d, λ0)
+    @test isnothing(@test_logs (:warn, r"No interact3d method") BMO.interact3d(System([plate]),
+        BareModel(), t, Beam(ray), ray))
+end
+
+# A dummy thin layer that carries its own surface model, which counts its calls
+mutable struct CountingModel <: BMO.AbstractSurfaceModel
+    calls::Int
+end
+function BMO.interact3d(::BMO.AbstractSystem, model::CountingModel, t::BMO.Transition, beam::Beam,
+        ray::BMO.AbstractRay)
+    model.calls += 1
+    return BMO.cross_boundary(t, beam, ray)
+end
+struct CountingFilm{S <: BMO.AbstractShape{Float64}} <: BMO.AbstractObject{Float64}
+    shape::S
+    model::CountingModel
+end
+BMO.surface_model(film::CountingFilm) = film.model
+
+# A dummy body that declares only its medium
+struct GlassBlock{S <: BMO.AbstractShape{Float64}} <: BMO.AbstractObject{Float64}
+    shape::S
+end
+BMO.medium(::GlassBlock) = BMO.IsotropicMedium(ConstantRefractiveIndex(1.5))
+
+@testset "A thin layer carries the surface model of the boundary" begin
+    θ = deg2rad(25)
+    p, d = [0, -10mm, 0], [sin(θ), cos(θ), 0]
+    plate() = RectangularCompensatorPlate(40mm, 40mm, 5mm, ConstantRefractiveIndex(1.5))
+    # A body that declares only its medium refracts as a refracting optic
+    block = GlassBlock(BMO.shape(plate()))
+    block_beam = solve([block], beam_at(p, d))
+    plate_beam = solve([plate()], beam_at(p, d))
+    @test length(rays(block_beam)) == length(rays(plate_beam))
+    @test all(BMO.direction(a) ≈ BMO.direction(b) for (a, b) in zip(rays(block_beam), rays(plate_beam)))
+    film = CountingFilm(BMO.QuadraticFlatMesh(40mm), CountingModel(0))
+    # The model of the layer acts at the face of the plate, between air and glass
+    t = transition_at(System([plate(), film]), p, d)
+    @test BMO.surface_model(t) === film.model
+    film_beam = solve([plate(), film], beam_at(p, d))
+    bare_beam = solve([plate()], beam_at(p, d))
+    @test film.model.calls == 1
+    @test BMO.direction(rays(film_beam)[2]) ≈ BMO.direction(rays(bare_beam)[2])
+    @test length(rays(film_beam)) == length(rays(bare_beam))
+    # Each component ray of a beamlet interacts with the model at its own hit
+    film.model.calls = 0
+    gauss = GaussianBeamlet([0.0, -10mm, 0], [0.0, 1, 0], λ0, 0.3mm)
+    solve_system!(System([plate(), film]), gauss)
+    @test film.model.calls == 3
+    # Catalog layers: a thin beamsplitter carries its coating, a detector no model
+    bs = ThinBeamsplitter(40mm)
+    @test BMO.surface_model(transition_at(System([plate(), bs]), p, d)) isa BMO.BeamsplitterCoating
+    pd = Detector(40mm, false)
+    zrotate3d!(pd, π)
+    @test BMO.surface_model(transition_at(System([plate(), pd]), p, d)) === BMO.Uncoated()
+end
+
+@testset "Enclosure: bodies within bodies" begin
+    θ = deg2rad(25)
+    d = [sin(θ), cos(θ), 0]
+    p = [0, -10mm, 0]
+
+    @testset "Plate within a cuvette: back into the water, not into air" begin
+        nw, ng = 1.33, 1.6
+        water = RectangularCompensatorPlate(60mm, 60mm, 20mm, ConstantRefractiveIndex(nw))
+        glass = RectangularCompensatorPlate(20mm, 20mm, 4mm, ConstantRefractiveIndex(ng))
+        translate3d!(glass, [0, 8mm, 0])
+        beam = solve([water, glass], beam_at(p, d))
+        ref = follow([plane([0, 0, 0], [0, 1, 0], nw), plane([0, 8mm, 0], [0, 1, 0], ng),
+                plane([0, 12mm, 0], [0, 1, 0], nw), plane([0, 20mm, 0], [0, 1, 0], 1.0)], p, d)
+        @test agrees(path_error(beam, ref))
+        @test BMO.refractive_index.(rays(beam)) == [1.0, nw, ng, nw, 1.0]
+        r = rays(beam)
+        @test isnothing(BMO.enclosure(r[1])) && isnothing(BMO.enclosure(r[5]))
+        @test BMO.innermost(BMO.enclosure(r[3])) === glass
+        @test BMO.innermost(BMO.enclosure(r[4])) === water
+        # the medium behind the glass is the water
+        @test direction(r[4]) ≈ direction(r[2]) atol = TOL_DIR
+    end
+
+    @testset "Cemented doublet in water" begin
+        nw, n1, n2 = 1.33, 1.5, 1.7
+        dl = doublet(n1, n2; y0 = 10mm)
+        water = RectangularCompensatorPlate(60mm, 60mm, 30mm, ConstantRefractiveIndex(nw))
+        for h in (0.0, 2mm, -3.5mm)
+            beam = solve([water, dl], beam_at([h, -10mm, 0], [0, 1, 0]))
+            v, R, _ = doublet_surfaces(10mm, n1, n2)
+            surfaces = [plane([0, 0, 0], [0, 1, 0], nw); lens_surfaces(v, R, [n1, n2, nw]);
+                        plane([0, 30mm, 0], [0, 1, 0], 1.0)]
+            ref = follow(surfaces, [h, -10mm, 0], [0, 1, 0])
+            @test agrees(path_error(beam, ref))
+            @test BMO.refractive_index.(rays(beam)) == [1.0, nw, n1, n2, nw, 1.0]
+        end
+    end
+
+    @testset "Detector that does not stop, on a glass face: the ray leaves the glass" begin
+        ng = 1.6
+        A = RectangularCompensatorPlate(40mm, 40mm, 5mm, ConstantRefractiveIndex(ng))
+        det = Detector(30mm, false)
+        translate3d!(det, [0, 5mm, 0])
+        beam = solve([A, det], beam_at(p, d))
+        ref = follow([plane([0, 0, 0], [0, 1, 0], ng), plane([0, 5mm, 0], [0, 1, 0], 1.0)], p, d)
+        @test agrees(path_error(beam, ref))
+        @test BMO.refractive_index(last(rays(beam))) == 1.0
+        @test length(BMO.hits(det)) == 1
+    end
+
+    @testset "New rays of components learn their enclosure from the solver" begin
+        # a thin beamsplitter and a mirror within water create rays without an enclosure
+        nw = 1.33
+        water = RectangularCompensatorPlate(60mm, 60mm, 40mm, ConstantRefractiveIndex(nw))
+        bs = ThinBeamsplitter(20mm, 20mm; reflectance = 0.5)
+        zrotate3d!(bs, deg2rad(45))
+        translate3d!(bs, [0, 20mm, 0])
+        beam = solve([water, bs], beam_at([0, -10mm, 0], [0, 1, 0]))
+        tr, rf = BMO.children(beam)
+        @test BMO.innermost(BMO.enclosure(first(rays(tr)))) === water
+        @test BMO.innermost(BMO.enclosure(first(rays(rf)))) === water
+        # both leave the water into air, the reflected beam through a side face at normal incidence
+        @test BMO.refractive_index.(rays(tr)) == [nw, 1.0]
+        @test BMO.refractive_index.(rays(rf)) == [nw, 1.0]
+        @test abs(position(last(rays(rf)))[1]) ≈ 30mm atol = TOL_POS
+
+        mirror = RoundPlanoMirror(20mm, 2mm)
+        xrotate3d!(mirror, deg2rad(10))
+        translate3d!(mirror, [0, 25mm, 0])
+        beam = solve([water, mirror], beam_at([0, -10mm, 0], [0, 1, 0]))
+        r = rays(beam)
+        @test BMO.innermost(BMO.enclosure(r[3])) === water
+        @test BMO.refractive_index.(r) == [1.0, nw, nw, 1.0]
+    end
+
+    @testset "Rays of components without an enclosure" begin
+        # a ray that starts within glass without knowing it is taken to be in the medium of its index
+        dl = doublet(1.5, 1.7)
+        ray = Ray([1mm, 2mm, 0], [0, 1, 0], λ0)
+        BMO.refractive_index!(ray, 1.5)
+        t = BMO.with_bounding_spheres(System([dl])) do
+            BMO.intersection!(ray, BMO.first_to_interact(BMO.trace_all(System([dl]), ray), ray))
+            BMO.transition(System([dl]), ray)
+        end
+        @test BMO.refractive_index_in(t) == 1.5 && BMO.refractive_index_out(t) == 1.7
+        @test BMO.innermost(BMO.enclosure_in(t)) === dl.front
+        @test BMO.innermost(BMO.enclosure_out(t)) === dl.back
+        @test isnothing(BMO.enclosure_out(t).outer)
     end
 end
 

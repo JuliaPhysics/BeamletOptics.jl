@@ -208,55 +208,38 @@ end
 
 Returns the closest [`Intersection`](@ref) of the `ray` with the objects of the `system` like
 [`trace_all`](@ref), but tests the hinted object first. Its hit lets the solver skip all objects that
-lie beyond it, hence the `hint` speeds up the trace but does not change the closest hit. Among the
-[`coincident_hits`](@ref) at the closest point, the hit of the hinted shape comes first.
+lie beyond it, hence the `hint` speeds up the trace but does not change its result.
 """
 @inline function trace_one(system::AbstractSystem, ray::AbstractRay{R}, hint::Hint) where {R}
     seed::Nullable{Intersection{R}} = intersect3d(object(hint), ray)
-    result = closest_hits(children(system), ray, seed, isnothing(seed) ? nothing : object(hint))
-    return first_of_shape(result, shape(hint))
+    return closest_hits(children(system), ray, seed, isnothing(seed) ? nothing : object(hint))
 end
-
-"""
-    first_of_shape(hit, target::AbstractShape)
-
-Returns the chain of [`coincident_hits`](@ref) `hit` with the hit of the shape `target` first, if the chain
-holds one, else `hit` unchanged. No hit (`nothing`) stays `nothing`.
-"""
-function first_of_shape(hit::Intersection, target::AbstractShape)
-    for h in coincident_hits(hit)
-        shape(h) === target && return first_of(hit, h)
-    end
-    return hit
-end
-
-first_of_shape(::Nothing, ::AbstractShape) = nothing
 
 """
     tracing_step!(system::AbstractSystem, ray::AbstractRay{R}, hint::Hint)
 
 Tests if the `ray` intersects an `object` in the optical `system`. Stores the closest intersection, or
-`nothing` if there is none, in the `ray` via `intersection!` and returns `nothing`.
+`nothing` if there is none, in the `ray` via `intersection!` and returns `nothing`. Of the
+[`coincident_hits`](@ref) at the closest point, the hit that interacts with the `ray` comes first, see
+[`first_to_interact`](@ref).
 
 # Hint
 
 An optional [`Hint`](@ref) only speeds up the test, see [`trace_one`](@ref): the hinted object is tested
-first, and the objects beyond its hit are skipped. A closer hit of another object wins. Among the
-[`coincident_hits`](@ref) at the closest point, the hit of the hinted shape comes first, hence the solver
-calls `interact3d` for the object of the hint there. For a [`MultiShape`](@ref) component the hint names
-the composite, not the part.
+first, the objects beyond its hit are skipped, and a closer hit of another object wins. It does not change
+the result of the trace.
 """
 @inline function tracing_step!(
         system::AbstractSystem, ray::AbstractRay{R}, hint::Hint) where {R <: Real}
-    # Test against hinted object
-    intersection!(ray, trace_one(system, ray, hint))
+    # Test against hinted object first
+    intersection!(ray, first_to_interact(trace_one(system, ray, hint), ray))
     return nothing
 end
 
 @inline function tracing_step!(
         system::AbstractSystem, ray::AbstractRay{R}, ::Nothing) where {R <: Real}
     # Test against all objects in system
-    intersection!(ray, trace_all(system, ray))
+    intersection!(ray, first_to_interact(trace_all(system, ray), ray))
     return nothing
 end
 
@@ -301,6 +284,8 @@ function trace_system!(
         obj = object(ray_intersection)
         interaction = interact3d(
             system, obj, beam, ray)::Union{Nothing, BeamInteraction{T, R}}
+        # Enclosure of the new rays
+        enclose_new!(system, beam, ray, interaction)
         if isnothing(interaction)
             break
         end
@@ -371,6 +356,7 @@ function trace_system!(
             _object,
             gauss,
             seg_counter)
+        enclose_new!(system, gauss, seg_counter, interaction)
         if isnothing(interaction)
             break
         end
@@ -433,6 +419,7 @@ function trace_system!(
         end
         # Calculate interaction
         interaction = interact3d(system, _object, agb, seg_counter)
+        enclose_new!(system, agb, seg_counter, interaction)
         if isnothing(interaction)
             break
         end

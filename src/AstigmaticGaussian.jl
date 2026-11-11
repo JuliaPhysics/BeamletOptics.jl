@@ -212,6 +212,9 @@ function AstigmaticGaussianBeamlet(
     return AstigmaticGaussianBeamlet(Beam(c), wxp, wxm, wyp, wym, dxp, dxm, dyp, dym)
 end
 
+# The beamlet types, which interact at the segment `ray_id` of their component beams
+const GaussianBeamlets = Union{GaussianBeamlet, AstigmaticGaussianBeamlet}
+
 """Return a tuple of all 9 component beams of the [`AstigmaticGaussianBeamlet`](@ref)."""
 @inline _component_beams(agb::AstigmaticGaussianBeamlet) = (
     agb.c, agb.wxp, agb.wxm, agb.wyp, agb.wym, agb.dxp, agb.dxm, agb.dyp, agb.dym)
@@ -261,47 +264,20 @@ Stores the interaction result for all 9 component beams of an
 - `dxp`, `dxm`, `dyp`, `dym`: divergence beam interactions
 """
 struct AstigmaticGaussianBeamletInteraction{R <: Real} <: AbstractInteraction
-    chief::BeamInteraction{R}
-    wxp::BeamInteraction{R}
-    wxm::BeamInteraction{R}
-    wyp::BeamInteraction{R}
-    wym::BeamInteraction{R}
-    dxp::BeamInteraction{R}
-    dxm::BeamInteraction{R}
-    dyp::BeamInteraction{R}
-    dym::BeamInteraction{R}
+    chief::BeamInteraction{R, PolarizedRay{R}}
+    wxp::BeamInteraction{R, Ray{R}}
+    wxm::BeamInteraction{R, Ray{R}}
+    wyp::BeamInteraction{R, Ray{R}}
+    wym::BeamInteraction{R, Ray{R}}
+    dxp::BeamInteraction{R, Ray{R}}
+    dxm::BeamInteraction{R, Ray{R}}
+    dyp::BeamInteraction{R, Ray{R}}
+    dym::BeamInteraction{R, Ray{R}}
 end
 
 hint(i::AstigmaticGaussianBeamletInteraction) = hint(i.chief)
 function hint!(i::AstigmaticGaussianBeamletInteraction, new_hint::Nullable{Hint})
     hint!(i.chief, new_hint)
-end
-
-"""
-    interact3d(system, object, agb::AstigmaticGaussianBeamlet, ray_id)
-
-Generic dispatch: traces each component beam's ray through `object` independently.
-Returns `nothing` if any interaction fails; otherwise returns an
-[`AstigmaticGaussianBeamletInteraction`](@ref).
-"""
-function interact3d(system::AbstractSystem,
-        object::AbstractObject,
-        agb::AstigmaticGaussianBeamlet{R},
-        ray_id::Int) where {R}
-    i_c = interact3d(system, object, agb.c, rays(agb.c)[ray_id])
-    i_wxp = interact3d(system, object, agb.wxp, rays(agb.wxp)[ray_id])
-    i_wxm = interact3d(system, object, agb.wxm, rays(agb.wxm)[ray_id])
-    i_wyp = interact3d(system, object, agb.wyp, rays(agb.wyp)[ray_id])
-    i_wym = interact3d(system, object, agb.wym, rays(agb.wym)[ray_id])
-    i_dxp = interact3d(system, object, agb.dxp, rays(agb.dxp)[ray_id])
-    i_dxm = interact3d(system, object, agb.dxm, rays(agb.dxm)[ray_id])
-    i_dyp = interact3d(system, object, agb.dyp, rays(agb.dyp)[ray_id])
-    i_dym = interact3d(system, object, agb.dym, rays(agb.dym)[ray_id])
-    if any(isnothing, (i_c, i_wxp, i_wxm, i_wyp, i_wym, i_dxp, i_dxm, i_dyp, i_dym))
-        return nothing
-    end
-    return AstigmaticGaussianBeamletInteraction{R}(
-        i_c, i_wxp, i_wxm, i_wyp, i_wym, i_dxp, i_dxm, i_dyp, i_dym)
 end
 
 function Base.push!(agb::AstigmaticGaussianBeamlet{T},
