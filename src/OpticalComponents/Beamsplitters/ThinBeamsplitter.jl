@@ -47,14 +47,13 @@ Creates a zero-thickness, lossless, non-polarizing 2D rectangular [`ThinBeamspli
     The reflection phase jump θᵣ = π applies to a beam that faces the normal of the splitter, see
     [`channels`](@ref) of its [`BeamsplitterCoating`](@ref).
 """
-function ThinBeamsplitter(width::Real, height::Real; reflectance::Real = 0.5)
-    if reflectance ≥ 1 || reflectance ≈ 0
-        error("Splitting ratio ∈ (0, 1)!")
-    end
-    shape = RectangularFlatMesh(width, height)
-    Reflected = sqrt(reflectance)
-    Transmitted = sqrt(1 - Reflected^2)
-    return ThinBeamsplitter(shape, Reflected, Transmitted)
+ThinBeamsplitter(width::Real, height::Real; reflectance::Real = 0.5) =
+    thin_beamsplitter(RectangularFlatMesh(width, height), reflectance)
+
+# A splitter on the `shape` of the power reflectance `R` in the open interval (0, 1)
+function thin_beamsplitter(shape::AbstractShape, R::Real)
+    0 < R < 1 || throw(ArgumentError(lazy"the reflectance of a ThinBeamsplitter must lie in (0, 1), not $R"))
+    return ThinBeamsplitter(shape, sqrt(R), sqrt(1 - R))
 end
 
 """
@@ -63,15 +62,8 @@ end
 Creates a zero-thickness, 2D round [`ThinBeamsplitter`](@ref) with the specified `diameter` in [m].
 For more information, refer to the [`ThinBeamsplitter`](@ref) constructor.
 """
-function RoundThinBeamsplitter(diameter::Real; reflectance::Real = 0.5)
-    if reflectance ≥ 1 || reflectance ≈ 0
-        error("Splitting ratio ∈ (0, 1)!")
-    end
-    shape = CircularFlatMesh(diameter / 2)
-    R = sqrt(reflectance)
-    T = sqrt(1 - R^2)
-    return ThinBeamsplitter(shape, R, T)
-end
+RoundThinBeamsplitter(diameter::Real; reflectance::Real = 0.5) =
+    thin_beamsplitter(CircularFlatMesh(diameter / 2), reflectance)
 
 function ThinBeamsplitter(width::Real; reflectance::Real = 0.5)
     ThinBeamsplitter(width, width; reflectance)

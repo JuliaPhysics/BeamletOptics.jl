@@ -118,7 +118,8 @@ of every new ray that starts at the boundary, see [`enclose!`](@ref).
 # Layers
 
 At most one thin layer acts at a boundary. If several coincide, e.g. two films on top of each other,
-the closest one acts and a warning is issued once.
+the first one in the chain of [`coincident_hits`](@ref) acts, which the geometry does not define, and a
+warning is issued once. Films on top of each other belong into the model of one layer instead.
 """
 struct Transition{T, S <: AbstractSystem}
     system::S
@@ -219,7 +220,7 @@ function boundary_hits(hit::Intersection{T}, ray::AbstractRay) where {T}
             if isnothing(layer)
                 layer = h
             else
-                @warn "Several thin layers coincide at a boundary, only the closest one acts" maxlog = 1
+                @warn "Several thin layers coincide at a boundary, only one of them acts" maxlog = 1
             end
         elseif isentering(dir, normal3d(h))
             isnothing(entering) && (entering = h)

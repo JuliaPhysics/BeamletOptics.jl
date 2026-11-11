@@ -1,6 +1,6 @@
 # Contributing
 
-The code style of BMO, for human contributors and coding agents alike, is the section "Code style" of [AGENTS.md](https://github.com/JuliaPhysics/BeamletOptics.jl/blob/master/AGENTS.md) in the repository root. The [SciML Style Guide](https://github.com/SciML/SciMLStyle) is the formatting baseline. Refer to the [SciML Contributors Guide](https://github.com/SciML/ColPrac/blob/master/README.md) as well. Ideally, your contribution features:
+The code style of BMO, for human contributors and coding agents alike, is the section "Code style" of [AGENTS.md](https://github.com/StackEnjoyer/BeamletOptics.jl/blob/master/AGENTS.md) in the repository root. The [SciML Style Guide](https://github.com/SciML/SciMLStyle) is the formatting baseline. Refer to the [SciML Contributors Guide](https://github.com/SciML/ColPrac/blob/master/README.md) as well. Ideally, your contribution features:
 
  - tests for new or changed functionality
  - docstrings for relevant functions
@@ -18,7 +18,7 @@ file standalone, run `julia --project=test -e 'using Pkg; Pkg.instantiate()'` on
 
 ## Developing BMO with an assistant
 
-The agent skill of the [AI assistants](@ref "Using BMO with AI assistants") page describes how to *use* BMO. Instructions for changing the package itself (design philosophy, code conventions, tests) are in `AGENTS.md` at the root of the [repository](https://github.com/JuliaPhysics/BeamletOptics.jl). `CLAUDE.md` and `GEMINI.md` point to it.
+The agent skill of the [AI assistants](@ref "Using BMO with AI assistants") page describes how to *use* BMO. Instructions for changing the package itself (design philosophy, code conventions, tests) are in `AGENTS.md` at the root of the [repository](https://github.com/StackEnjoyer/BeamletOptics.jl). `CLAUDE.md` and `GEMINI.md` point to it.
 
 # Contributors
 

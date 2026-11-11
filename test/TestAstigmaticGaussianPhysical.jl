@@ -482,7 +482,7 @@ dominant(E) = E[argmax(abs.(E))]
     end
 
     @testset "A child beamlet continues its parent" begin
-        # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/124
+        # https://github.com/StackEnjoyer/BeamletOptics.jl/issues/124
         λ = 1000nm
         w0 = 1mm
         P0 = 1e-3
@@ -541,7 +541,7 @@ dominant(E) = E[argmax(abs.(E))]
     end
 
     @testset "Detector field follows the polarization" begin
-        # https://github.com/JuliaPhysics/BeamletOptics.jl/issues/123
+        # https://github.com/StackEnjoyer/BeamletOptics.jl/issues/123
         λ = 1000nm
         w0 = 1mm
         P0 = 1e-3

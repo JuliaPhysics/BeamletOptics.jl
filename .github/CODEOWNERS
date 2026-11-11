@@ -1,0 +1,17 @@
+# Every pull request into master needs the approval of a code owner of each changed file.
+# The last matching line wins; any one owner listed there is enough.
+* @StackEnjoyer
+
+# SDFs
+/src/SDFs/ @StackEnjoyer @TacHawkes
+/ext/RenderSDF.jl @StackEnjoyer @TacHawkes
+/test/Geometry/SDFs/ @StackEnjoyer @TacHawkes
+/docs/src/api/sdfs.md @StackEnjoyer @TacHawkes
+/docs/src/assets/api_assets/sdf_showcase.jl @StackEnjoyer @TacHawkes
+
+# Astigmatic Gaussian beamlets
+/src/AstigmaticGaussian.jl @StackEnjoyer @TacHawkes
+/src/BeamGroups/Astigmatic* @StackEnjoyer @TacHawkes
+/ext/RenderAstigmaticGaussian.jl @StackEnjoyer @TacHawkes
+/test/TestAstigmaticGaussian* @StackEnjoyer @TacHawkes
+/docs/src/basics/beams/astigmatic_beam.md @StackEnjoyer @TacHawkes

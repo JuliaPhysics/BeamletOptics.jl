@@ -19,7 +19,7 @@ hero:
       link: /basics/intro
     - theme: alt
       text: View on Github
-      link: https://github.com/JuliaPhysics/BeamletOptics.jl
+      link: https://github.com/StackEnjoyer/BeamletOptics.jl
 
 features:
   - icon: "🔦"

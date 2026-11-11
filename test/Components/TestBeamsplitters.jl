@@ -126,6 +126,20 @@ const mm = 1e-3
         end
     end
 
+    @testset "Reflectance of thin splitters" begin
+        for R in (0.3, 0.7)
+            for bs in (ThinBeamsplitter(25e-3; reflectance = R), RoundThinBeamsplitter(25e-3; reflectance = R))
+                @test BMO.reflectance(bs)^2 ≈ R
+                @test isvalid(bs)
+            end
+        end
+        for R in (0, 1, -0.1, 1.2)
+            @test_throws ArgumentError ThinBeamsplitter(25e-3; reflectance = R)
+            @test_throws ArgumentError RoundThinBeamsplitter(25e-3; reflectance = R)
+            @test_throws ArgumentError CubeBeamsplitter(25e-3, ConstantRefractiveIndex(N0); reflectance = R)
+        end
+    end
+
     @testset "Splitters and prisms with a constant refractive index" begin
         prism = RightAnglePrism(25e-3, 20e-3, ConstantRefractiveIndex(N0))
         @test prism isa Prism
