@@ -99,6 +99,7 @@ layer between them, see [`transition`](@ref).
 - `λ`: the wavelength of the ray
 - `n_in`, `n_out`: the refractive indices before and behind the boundary at `λ`
 - `normal`: the unit normal of the boundary at the hit, against the direction of the ray
+- `point`: the point of the hit
 - `exiting`: the hit of the body that the ray leaves, or `nothing`
 - `entering`: the hit of the body that the ray enters, or `nothing`
 - `layer`: the hit of the thin layer at the boundary (a surface that is no body, e.g. a thin
