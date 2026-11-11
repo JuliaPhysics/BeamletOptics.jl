@@ -113,6 +113,7 @@ wants the bug fixed or a feature added in BeamletOptics itself:
 - [Lenses & surfaces](./components/lenses.md)
 - [Mirrors](./components/mirrors.md)
 - [Beamsplitters & compensators](./components/beamsplitters.md)
+- [Coatings](./components/coatings.md)
 - [Polarizers](./components/polarizers.md)
 - [Detectors](./components/detectors.md)
 - [Prisms, retroreflectors & dummies](./components/prisms-and-dummies.md)

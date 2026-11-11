@@ -13,6 +13,9 @@ Subtypes of `AbstractRefractiveIndex` must implement the following:
 
 - `(n::AbstractRefractiveIndex)(λ)`: returns the refractive index as a `Real` for the wavelength
   `λ` in \\[m\\], for any `Real` type of `λ` within the domain of the model
+- `extinction_coefficient(n, λ)`: optional, the extinction coefficient κ of an absorbing material,
+  the imaginary part of its complex index `n(λ) + iκ`; 0 by default, see
+  [`AbsorbingRefractiveIndex`](@ref)
 
 # Additional information
 
@@ -23,6 +26,48 @@ Subtypes of `AbstractRefractiveIndex` must implement the following:
 abstract type AbstractRefractiveIndex end
 
 (n::AbstractRefractiveIndex)(λ) = error(lazy"refractive index n(λ) not defined for $(typeof(n))")
+
+"""
+    extinction_coefficient(n::AbstractRefractiveIndex, λ)
+
+Returns the extinction coefficient κ of the material of the refractive index `n` at the wavelength `λ`
+in \\[m\\]: the imaginary part of its complex index `n(λ) + iκ`, with the field `∝ exp(i(kz - ωt))`
+of BMO. A field decays by `exp(-2πκz/λ)`. Zero for a transparent material (default).
+
+!!! info
+    The thin layers of a [`ThinFilmCoating`](@ref) absorb with κ; the volume of a body does not
+    attenuate the light.
+"""
+extinction_coefficient(n::AbstractRefractiveIndex, λ::Real) = zero(float(typeof(n(λ))))
+
+"""
+    AbsorbingRefractiveIndex(n, κ)
+
+The refractive index of an absorbing material: the real index `n`, an
+[`AbstractRefractiveIndex`](@ref), and the extinction coefficient `κ`, a number or an
+`AbstractRefractiveIndex` that returns κ for a wavelength, e.g. a [`DiscreteRefractiveIndex`](@ref)
+of measured data. See [`extinction_coefficient`](@ref).
+
+```julia
+silver = AbsorbingRefractiveIndex(ConstantRefractiveIndex(0.135), 3.985)   # at 633 nm
+```
+"""
+struct AbsorbingRefractiveIndex{
+    N <: AbstractRefractiveIndex, K <: Union{Real, AbstractRefractiveIndex}} <: AbstractRefractiveIndex
+    n::N
+    κ::K
+end
+
+(ari::AbsorbingRefractiveIndex)(λ) = ari.n(λ)
+
+extinction_coefficient(ari::AbsorbingRefractiveIndex, λ::Real) = value_at(ari.κ, λ)
+
+# A constant or a function of the wavelength `λ`
+value_at(x::Real, ::Real) = x
+value_at(f::AbstractRefractiveIndex, λ::Real) = f(λ)
+
+"""Returns the complex refractive index `n(λ) + iκ` of the material of the refractive index `n`."""
+complex_index(n::AbstractRefractiveIndex, λ::Real) = complex(n(λ), extinction_coefficient(n, λ))
 
 """
     ConstantRefractiveIndex{T}

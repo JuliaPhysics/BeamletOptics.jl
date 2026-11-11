@@ -1,23 +1,4 @@
 """
-    BeamsplitterCoating{T} <: AbstractSurfaceModel
-
-A lossless, non-polarizing coating that splits a ray into a transmitted and a reflected beam with the
-field factors `reflectance` and `transmittance` (R² + T² = 1). It acts between the media of the
-boundary, see [`Transition`](@ref): the transmitted beam is refracted into the medium behind it, e.g.
-the substrate that it is coated on, the reflected beam stays in the medium before it. Beyond the
-critical angle of these media, the ray is totally reflected and not split.
-
-A [`ThinBeamsplitter`](@ref) carries this coating, see [`surface_model`](@ref).
-"""
-struct BeamsplitterCoating{T <: Real} <: AbstractSurfaceModel
-    reflectance::T
-    transmittance::T
-end
-
-reflectance(coating::BeamsplitterCoating) = coating.reflectance
-transmittance(coating::BeamsplitterCoating) = coating.transmittance
-
-"""
     ThinBeamsplitter <: AbstractBeamsplitter
 
 Represents a 2D beam-splitting device: a thin layer whose [`BeamsplitterCoating`](@ref) acts at the
@@ -66,14 +47,13 @@ Creates a zero-thickness, lossless, non-polarizing 2D rectangular [`ThinBeamspli
     The reflection phase jump θᵣ = π applies to a beam that faces the normal of the splitter, see
     [`channels`](@ref) of its [`BeamsplitterCoating`](@ref).
 """
-function ThinBeamsplitter(width::Real, height::Real; reflectance::Real = 0.5)
-    if reflectance ≥ 1 || reflectance ≈ 0
-        error("Splitting ratio ∈ (0, 1)!")
-    end
-    shape = RectangularFlatMesh(width, height)
-    Reflected = sqrt(reflectance)
-    Transmitted = sqrt(1 - Reflected^2)
-    return ThinBeamsplitter(shape, Reflected, Transmitted)
+ThinBeamsplitter(width::Real, height::Real; reflectance::Real = 0.5) =
+    thin_beamsplitter(RectangularFlatMesh(width, height), reflectance)
+
+# A splitter on the `shape` of the power reflectance `R` in the open interval (0, 1)
+function thin_beamsplitter(shape::AbstractShape, R::Real)
+    0 < R < 1 || throw(ArgumentError(lazy"the reflectance of a ThinBeamsplitter must lie in (0, 1), not $R"))
+    return ThinBeamsplitter(shape, sqrt(R), sqrt(1 - R))
 end
 
 """
@@ -82,57 +62,11 @@ end
 Creates a zero-thickness, 2D round [`ThinBeamsplitter`](@ref) with the specified `diameter` in [m].
 For more information, refer to the [`ThinBeamsplitter`](@ref) constructor.
 """
-function RoundThinBeamsplitter(diameter::Real; reflectance::Real = 0.5)
-    if reflectance ≥ 1 || reflectance ≈ 0
-        error("Splitting ratio ∈ (0, 1)!")
-    end
-    shape = CircularFlatMesh(diameter / 2)
-    R = sqrt(reflectance)
-    T = sqrt(1 - R^2)
-    return ThinBeamsplitter(shape, R, T)
-end
+RoundThinBeamsplitter(diameter::Real; reflectance::Real = 0.5) =
+    thin_beamsplitter(CircularFlatMesh(diameter / 2), reflectance)
 
 function ThinBeamsplitter(width::Real; reflectance::Real = 0.5)
     ThinBeamsplitter(width, width; reflectance)
 end
 
 Base.isvalid(bs::AbstractBeamsplitter) = reflectance(bs)^2 + transmittance(bs)^2 ≈ 1
-
-
-splitting_of(::BeamsplitterCoating) = AllChannels()
-
-"""
-    channels(coating::BeamsplitterCoating, t::Transition, ray, cs)
-
-The channels of the `coating`: the transmitted channel is refracted into the medium behind the
-boundary with the field factor `transmittance(coating)`, the reflected one stays in the medium before
-it with `reflectance(coating)`. Beyond the critical angle of the transition `t`, the ray is totally
-reflected and not split, the channels `cs` of the bare boundary are returned.
-
-The field of a transmitted [`PolarizedRay`](@ref) is scaled for the medium behind the boundary: the
-coating transmits a fraction of the power, and the power of a beam is proportional to
-`n cos(θ) |E|²`.
-
-# Reflection phase jump
-
-The reflection phase jump is θᵣ = π for a ray that faces the normal of the coating, i.e.
-`isentering`, and 0 from the other side, as required by the Stokes relations (r' = -r) for a lossless
-coating: only then do both outputs of an interferometer sum to its input. It applies to the field factor of beams
-without polarization, e.g. a [`GaussianBeamlet`](@ref), and to the field of a [`PolarizedRay`](@ref),
-whose s- and p-components are reflected with `-r` and `r` from the other side, like an internal Fresnel
-reflection. The coating is assumed to have an unambiguous normal, i.e. a 2D mesh.
-"""
-function channels(coating::BeamsplitterCoating, t::Transition, ray::AbstractRay, cs)
-    transmitted, reflected = cs
-    # Total internal reflection: the ray does not reach the coating
-    islit(transmitted) || return cs
-    r, τ = reflectance(coating), transmittance(coating)
-    s = isentering(ray) ? -1 : 1
-    # The transmitted field scaled for the medium behind the boundary
-    normal = normal3d(t)
-    cos_in = abs(cos_angle3d(direction(ray), normal))
-    cos_out = abs(cos_angle3d(direction(transmitted), normal))
-    f = τ * sqrt(refractive_index_in(t) * cos_in / (refractive_index_out(t) * cos_out))
-    return (transfer(transmitted, ray, SPBasis(f, 0, 0, f), τ),
-        transfer(reflected, ray, SPBasis(-s * r, 0, 0, s * r), s * r))
-end
